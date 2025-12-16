@@ -4,13 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"strconv"
 	"time"
 
+	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/enums"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/expressions"
 	"github.com/inngest/inngest/pkg/util"
+	"github.com/xhit/go-str2duration/v2"
 
 	"github.com/cespare/xxhash/v2"
 	"github.com/google/uuid"
@@ -21,19 +24,32 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-type jobIDValType struct{}
+type jobIDValType struct{ int }
 
-var jobCtxVal = jobIDValType{}
+var (
+	jobCtxVal   = jobIDValType{0}
+	shardCtxVal = jobIDValType{1}
+)
 
 // WithJobID returns a context that stores the given job ID inside.
 func WithJobID(ctx context.Context, jobID string) context.Context {
 	return context.WithValue(ctx, jobCtxVal, jobID)
 }
 
+// WithShardID returns a context that stores the shard ID for the current job.
+func WithShardID(ctx context.Context, shardID string) context.Context {
+	return context.WithValue(ctx, shardCtxVal, shardID)
+}
+
 // JobIDFromContext returns the job ID given the current context, or an
 // empty string if there's no job ID.
 func JobIDFromContext(ctx context.Context) string {
 	str, _ := ctx.Value(jobCtxVal).(string)
+	return str
+}
+
+func ShardIDFromContext(ctx context.Context) string {
+	str, _ := ctx.Value(shardCtxVal).(string)
 	return str
 }
 
@@ -94,6 +110,14 @@ type QueueItem struct {
 	// EnqueuedAt tracks the unix timestamp of enqueueing the queue item (to the backlog or directly to
 	// the partition). This is not the same as AtMS for items scheduled in the future or past.
 	EnqueuedAt int64 `json:"eat"`
+
+	// CapacityLease is the optional capacity lease for this queue item.
+	// This is set when the Constraint API feature flag is enabled and the item was refilled.
+	CapacityLease *CapacityLease `json:"cl,omitempty"`
+}
+
+type CapacityLease struct {
+	LeaseID ulid.ULID `json:"l,omitempty"`
 }
 
 func (q *QueueItem) SetID(ctx context.Context, str string) {
@@ -193,8 +217,10 @@ func (q QueueItem) SojournLatency(now time.Time) time.Duration {
 		return sojourn
 	}
 
-	refillDelay := time.Duration(q.RefilledAt-q.EnqueuedAt) * time.Millisecond
-	return refillDelay
+	// Track the entire time from enqueueing an item to refilling, including
+	// expected static (item in the future) and dynamic (time spent waiting due to concurrency limits) delays.
+	// note: System delays may be included in this.
+	return q.RefillDelay() + q.ExpectedDelay()
 }
 
 // Latency represents the processing delay excluding sojourn latency.
@@ -206,9 +232,47 @@ func (q QueueItem) Latency(now time.Time) time.Duration {
 	}
 
 	// Time between refill and lease/processing
+	return q.LeaseDelay(now)
+}
+
+// ExpectedDelay returns the expected delay for a queue item (usually 0, positive if scheduled into the future).
+// This is based on static information and thus does _not_ capture the time spent waiting due to concurrency constraints, etc.
+func (q QueueItem) ExpectedDelay() time.Duration {
+	if q.EnqueuedAt == 0 {
+		return 0
+	}
+
+	delayMS := q.AtMS - q.EnqueuedAt
+	delayMS = int64(math.Max(float64(delayMS), 0)) // ignore negative delays (item was planned earlier than enqueued)
+	itemDelay := time.Duration(delayMS) * time.Millisecond
+
+	return itemDelay
+}
+
+// RefillDelay returns the time it took from enqueueing to refilling (minus expected delays)
+func (q QueueItem) RefillDelay() time.Duration {
+	if q.RefilledAt == 0 || q.EnqueuedAt == 0 {
+		return 0
+	}
 	refilledAt := time.UnixMilli(q.RefilledAt)
-	processingDelay := now.Sub(refilledAt)
-	return processingDelay
+	enqueuedAt := time.UnixMilli(q.EnqueuedAt)
+
+	refillDelay := refilledAt.Sub(enqueuedAt)
+
+	// ignore expected delay (if item was scheduled in the future)
+	// note: this does not account for time spent waiting due to hitting concurrency limits, etc.
+	refillDelay = refillDelay - q.ExpectedDelay()
+
+	return refillDelay
+}
+
+// LeaseDelay returns the time between refilling and leasing
+func (q QueueItem) LeaseDelay(now time.Time) time.Duration {
+	if q.RefilledAt == 0 {
+		return 0
+	}
+
+	return now.Sub(time.UnixMilli(q.RefilledAt))
 }
 
 // Item represents an item stored within a queue.
@@ -267,6 +331,10 @@ type Item struct {
 	// this run has.  All next steps will use this as the factor when scheduling
 	// future edge jobs (on their first attempt).
 	PriorityFactor *int64 `json:"pf,omitempty"`
+
+	// ParallelMode controls discovery step scheduling after a parallel step
+	// ends
+	ParallelMode enums.ParallelMode `json:"pm,omitempty"`
 }
 
 func (i Item) GetMaxAttempts() int {
@@ -381,6 +449,7 @@ func (i *Item) UnmarshalJSON(b []byte) error {
 		Singleton             *Singleton                `json:"singleton"`
 		CustomConcurrencyKeys []state.CustomConcurrency `json:"cck,omitempty"`
 		PriorityFactor        *int64                    `json:"pf,omitempty"`
+		ParallelMode          enums.ParallelMode        `json:"pm,omitempty"`
 	}
 	temp := &kind{}
 	err := json.Unmarshal(b, temp)
@@ -401,6 +470,7 @@ func (i *Item) UnmarshalJSON(b []byte) error {
 	i.CustomConcurrencyKeys = temp.CustomConcurrencyKeys
 	i.PriorityFactor = temp.PriorityFactor
 	i.QueueName = temp.QueueName
+	i.ParallelMode = temp.ParallelMode
 
 	// Save this for custom unmarshalling of other jobs.  This is overwritten
 	// for known queue kinds.
@@ -444,6 +514,24 @@ func (i *Item) UnmarshalJSON(b []byte) error {
 			return nil
 		}
 		p := &PayloadJobPromote{}
+		if err := json.Unmarshal(temp.Payload, p); err != nil {
+			return err
+		}
+		i.Payload = *p
+	case KindFunctionPause:
+		if len(temp.Payload) == 0 {
+			return nil
+		}
+		p := &PayloadPauseFunction{}
+		if err := json.Unmarshal(temp.Payload, p); err != nil {
+			return err
+		}
+		i.Payload = *p
+	case KindFunctionUnpause:
+		if len(temp.Payload) == 0 {
+			return nil
+		}
+		p := &PayloadUnpauseFunction{}
 		if err := json.Unmarshal(temp.Payload, p); err != nil {
 			return err
 		}
@@ -492,6 +580,26 @@ type PayloadPauseTimeout struct {
 	Pause state.Pause `json:"pause"`
 }
 
+// PayloadPauseFunction represents the queue item payload for the internal system queue for
+// pausing functions reliably. The IDs are retrieved from the identifier.
+type PayloadPauseFunction struct {
+	// PausedAt represents the unix timestamp in milliseconds when the user requested to pause the function.
+	PausedAt int64 `json:"pat"`
+
+	// CancelRunningImmediately determines whether pending jobs should be cancelled immediately or after a set duration.
+	CancelRunningImmediately bool `json:"cri,omitempty"`
+}
+
+// PayloadUnpauseFunction represents the queue item payload for the internal system queue for
+// unpausing functions reliably. The IDs are retrieved from the identifier.
+type PayloadUnpauseFunction struct {
+	// PausedAt represents the unix timestamp in milliseconds when the user originally requested to pause the function.
+	// This is included in the unpause job to create a consistent identifier for pause periods and make unpausing idempotent.
+	PausedAt int64 `json:"pat"`
+	// UnpausedAt represents the unix timestamp in milliseconds when the user requested to unpause the function.
+	UnpausedAt int64 `json:"upat"`
+}
+
 func HashID(_ context.Context, id string) string {
 	ui := xxhash.Sum64String(id)
 	return strconv.FormatUint(ui, 36)
@@ -506,7 +614,7 @@ func GetThrottleConfig(ctx context.Context, fnID uuid.UUID, throttle *inngest.Th
 	throttleKey := HashID(ctx, unhashedThrottleKey)
 	var throttleExpr string
 	if throttle.Key != nil {
-		val, _, _ := expressions.Evaluate(ctx, *throttle.Key, map[string]any{
+		val, _ := expressions.Evaluate(ctx, *throttle.Key, map[string]any{
 			"event": evtMap,
 		})
 		unhashedThrottleKey = fmt.Sprintf("%v", val)
@@ -567,4 +675,74 @@ func GetCustomConcurrencyKeys(ctx context.Context, id sv2.ID, customConcurrency 
 	}
 
 	return keys
+}
+
+func ConvertToConstraintConfiguration(accountConcurrency int, fn inngest.Function) (constraintapi.ConstraintConfig, error) {
+	var rateLimit []constraintapi.RateLimitConfig
+	if fn.RateLimit != nil {
+		var rateLimitKey string
+		if fn.RateLimit.Key != nil {
+			rateLimitKey = *fn.RateLimit.Key
+		}
+
+		dur, err := str2duration.ParseDuration(fn.RateLimit.Period)
+		if err != nil {
+			return constraintapi.ConstraintConfig{}, fmt.Errorf("invalid rate limit period: %w", err)
+		}
+
+		rateLimit = append(rateLimit, constraintapi.RateLimitConfig{
+			Scope:             enums.RateLimitScopeFn,
+			Limit:             int(fn.RateLimit.Limit),
+			Period:            int(dur.Seconds()),
+			KeyExpressionHash: util.XXHash(rateLimitKey),
+		})
+	}
+
+	var customConcurrency []constraintapi.CustomConcurrencyLimit
+	if fn.Concurrency != nil {
+		for _, c := range fn.Concurrency.Limits {
+			if !c.IsCustomLimit() {
+				continue
+			}
+
+			customConcurrency = append(customConcurrency, constraintapi.CustomConcurrencyLimit{
+				Mode:              enums.ConcurrencyModeStep,
+				Scope:             c.Scope,
+				Limit:             c.Limit,
+				KeyExpressionHash: c.Hash,
+			})
+		}
+	}
+
+	var throttles []constraintapi.ThrottleConfig
+	if fn.Throttle != nil {
+		var throttleKey string
+		if fn.Throttle.Key != nil {
+			throttleKey = *fn.Throttle.Key
+		}
+
+		throttles = append(throttles, constraintapi.ThrottleConfig{
+			Limit:             int(fn.Throttle.Limit),
+			Burst:             int(fn.Throttle.Burst),
+			Period:            int(fn.Throttle.Period.Seconds()),
+			Scope:             enums.ThrottleScopeFn,
+			KeyExpressionHash: util.XXHash(throttleKey),
+		})
+	}
+
+	functionConcurrency := 0
+	if fn.Concurrency != nil {
+		functionConcurrency = fn.Concurrency.PartitionConcurrency()
+	}
+
+	return constraintapi.ConstraintConfig{
+		FunctionVersion: fn.FunctionVersion,
+		RateLimit:       rateLimit,
+		Concurrency: constraintapi.ConcurrencyConfig{
+			AccountConcurrency:    accountConcurrency,
+			FunctionConcurrency:   functionConcurrency,
+			CustomConcurrencyKeys: customConcurrency,
+		},
+		Throttle: throttles,
+	}, nil
 }

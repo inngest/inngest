@@ -12,11 +12,11 @@ export const eventsQuery = graphql(`
     $endTime: Time
     $celQuery: String = null
     $eventNames: [String!] = null
-    $includeInternalEvents: Boolean = true
+    $includeInternalEvents: Boolean = false
   ) {
     environment: workspace(id: $envID) {
       eventsV2(
-        first: 30
+        first: 50
         after: $cursor
         filter: {
           from: $startTime

@@ -60,6 +60,7 @@ export default function KeysListItem({ list }: KeysListItemProps) {
                   className="truncate text-sm"
                   format="relative"
                   value={new Date(key.createdAt)}
+                  copyable={false}
                 />
               </div>
             </NextLink>

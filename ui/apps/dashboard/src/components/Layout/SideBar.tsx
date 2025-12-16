@@ -16,6 +16,9 @@ import useOnboardingWidget from '../Onboarding/useOnboardingWidget';
 const OnboardingWidget = dynamic(() => import('../Navigation/OnboardingWidget'), {
   ssr: false,
 });
+const SeatOverageWidget = dynamic(() => import('../SeatOverage/SeatOverageWidget'), {
+  ssr: false,
+});
 
 export default function SideBar({
   collapsed: serverCollapsed,
@@ -48,7 +51,7 @@ export default function SideBar({
         window.removeEventListener('resize', autoCollapse);
       };
     }
-  }, []);
+  }, [serverCollapsed]);
 
   return (
     <nav
@@ -68,6 +71,7 @@ export default function SideBar({
         <Navigation collapsed={collapsed} activeEnv={activeEnv} />
 
         <div className="mx-4">
+          <SeatOverageWidget collapsed={collapsed} />
           {isWidgetOpen && <OnboardingWidget collapsed={collapsed} closeWidget={closeWidget} />}
           <Integrations collapsed={collapsed} />
           <Help collapsed={collapsed} showWidget={showWidget} />

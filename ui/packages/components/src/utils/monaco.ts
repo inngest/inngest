@@ -1,6 +1,4 @@
-'use-client';
-
-import { languages } from 'monaco-editor';
+import type { languages } from 'monaco-editor';
 import resolveConfig from 'tailwindcss/resolveConfig';
 
 import tailwindConfig from '../../tailwind.config';
@@ -12,10 +10,10 @@ const {
 
 const defaultColor = '#f6f6f6'; // carbon 50
 
-// Transform css variables into format that monaco can read
-export function resolveColor(colorValue: string, isDark: boolean): string {
-  return resolver(colorValue, isDark, defaultColor);
-}
+export const resolveColor = (colorValue: any, isDark: boolean): string =>
+  !colorValue || typeof colorValue !== 'string'
+    ? defaultColor
+    : resolver(colorValue, isDark, defaultColor);
 
 export const createRules = (isDark: boolean) => [
   {
@@ -83,10 +81,12 @@ export const createColors = (isDark: boolean) => ({
   'editorLineNumber.activeForeground': resolveColor(textColor.basis, isDark),
   'editorWidget.background': resolveColor(backgroundColor.codeEditor, isDark),
   'editorWidget.border': resolveColor(borderColor.subtle, isDark),
+  'editorSuggestWidget.background': resolveColor(backgroundColor.modalBase, isDark),
   'editorBracketHighlight.foreground1': resolveColor(textColor.codeDelimiterBracketJson, isDark),
   'editorBracketHighlight.foreground2': resolveColor(textColor.codeDelimiterBracketJson, isDark),
   'editorBracketHighlight.foreground3': resolveColor(textColor.codeDelimiterBracketJson, isDark),
   'editorBracketHighlight.foreground4': resolveColor(textColor.codeDelimiterBracketJson, isDark),
+  focusBorder: resolveColor(backgroundColor.codeEditor, isDark),
 });
 
 export const LINE_HEIGHT = 26;

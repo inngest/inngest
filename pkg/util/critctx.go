@@ -8,9 +8,7 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 )
 
-var (
-	ErrCritContextDeadlineExceeded = fmt.Errorf("function cancelled due to execution duration exceeded specified time frame")
-)
+var ErrCritContextDeadlineExceeded = fmt.Errorf("function cancelled due to execution duration exceeded specified time frame")
 
 type critctx struct {
 	boundary time.Duration
@@ -36,7 +34,7 @@ func Crit(ctx context.Context, name string, f func(ctx context.Context) error, o
 	return err
 }
 
-// Crit is a util to wrap a lambda with a non-cancellable context.  It allows an optional time boundary
+// CritT is a util to wrap a lambda with a non-cancellable context.  It allows an optional time boundary
 // for checking context deadlines;  if the parent ctx has a deadline shorter than the boundary we exit
 // immediately with an error.
 func CritT[T any](ctx context.Context, name string, f func(ctx context.Context) (T, error), opts ...CritOpt) (resp T, err error) {
@@ -79,27 +77,29 @@ func CritT[T any](ctx context.Context, name string, f func(ctx context.Context) 
 		)
 		defer cancel()
 
-		doneCh := make(chan T)
-		errCh := make(chan error)
+		doneCh := make(chan pair[T])
 
 		go func(ctx context.Context) {
 			res, err := f(ctx)
-			if err != nil {
-				errCh <- err
-			}
-			doneCh <- res
+			doneCh <- pair[T]{res: res, err: err}
 		}(ctx)
 
 		// wait for one of the results to come back
 		select {
-		case resp = <-doneCh:
-		case err = <-errCh:
+		case p := <-doneCh:
+			resp = p.res
+			err = p.err
 		case <-ctx.Done():
 			err = ErrCritContextDeadlineExceeded
 		}
 
-		return
+		return resp, err
 	}
 
 	return f(context.WithoutCancel(ctx))
+}
+
+type pair[T any] struct {
+	res T
+	err error
 }

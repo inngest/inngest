@@ -14,13 +14,19 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
+	"github.com/inngest/inngest/pkg/execution/executor"
 	statev1 "github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/history_reader"
 	"github.com/inngest/inngest/pkg/run"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
 	"go.opentelemetry.io/otel/attribute"
+)
+
+const (
+	pkgName = "coreapi.graph.resolvers"
 )
 
 func (r *functionRunResolver) PendingSteps(ctx context.Context, obj *models.FunctionRun) (*int, error) {
@@ -44,7 +50,7 @@ func (r *functionRunResolver) PendingSteps(ctx context.Context, obj *models.Func
 }
 
 func (r *functionRunResolver) Function(ctx context.Context, obj *models.FunctionRun) (*models.Function, error) {
-	fn, err := r.Data.GetFunctionByInternalUUID(ctx, uuid.UUID{}, uuid.MustParse(obj.FunctionID))
+	fn, err := r.Data.GetFunctionByInternalUUID(ctx, uuid.MustParse(obj.FunctionID))
 	if err != nil {
 		return nil, err
 	}
@@ -263,8 +269,9 @@ func (r *mutationResolver) Rerun(
 	ctx context.Context,
 	runID ulid.ULID,
 	fromStep *models.RerunFromStepInput,
+	debugSessionID *ulid.ULID,
+	debugRunID *ulid.ULID,
 ) (ulid.ULID, error) {
-	zero := ulid.ULID{}
 	accountID := consts.DevServerAccountID
 	workspaceID := consts.DevServerEnvID
 
@@ -275,26 +282,25 @@ func (r *mutationResolver) Rerun(
 		runID,
 	)
 	if err != nil {
-		return zero, err
+		return ulid.Zero, err
 	}
 
 	fnCQRS, err := r.Data.GetFunctionByInternalUUID(
 		ctx,
-		workspaceID,
 		fnrun.FunctionID,
 	)
 	if err != nil {
-		return zero, err
+		return ulid.Zero, err
 	}
 
 	fn, err := fnCQRS.InngestFunction()
 	if err != nil {
-		return zero, err
+		return ulid.Zero, err
 	}
 
 	evt, err := r.Data.GetEventByInternalID(ctx, fnrun.EventID)
 	if err != nil {
-		return zero, fmt.Errorf("failed to get run event: %w", err)
+		return ulid.Zero, fmt.Errorf("failed to get run event: %w", err)
 	}
 
 	ctx, span := run.NewSpan(ctx,
@@ -318,11 +324,18 @@ func (r *mutationResolver) Rerun(
 
 		if fromStep.Input != nil {
 			if len(*fromStep.Input) == 0 || (*fromStep.Input)[0] != '[' {
-				return zero, fmt.Errorf("input is not a valid JSON array")
+				return ulid.Zero, fmt.Errorf("input is not a valid JSON array")
 			}
 
 			fromStepReq.Input = json.RawMessage(*fromStep.Input)
 		}
+	}
+
+	//
+	// preserve the original run ID to support n+1 subsequent reruns from step
+	originalRunID := &fnrun.RunID
+	if fnrun.OriginalRunID != nil {
+		originalRunID = fnrun.OriginalRunID
 	}
 
 	identifier, err := r.Executor.Schedule(ctx, execution.ScheduleRequest{
@@ -334,13 +347,26 @@ func (r *mutationResolver) Rerun(
 			// will result in the creation of a new ID
 			event.NewOSSTrackedEventWithID(evt.Event(), evt.InternalID()),
 		},
-		OriginalRunID: &fnrun.RunID,
-		AccountID:     consts.DevServerAccountID,
-		FromStep:      fromStepReq,
-		WorkspaceID:   consts.DevServerEnvID,
+		OriginalRunID:  originalRunID,
+		AccountID:      consts.DevServerAccountID,
+		FromStep:       fromStepReq,
+		WorkspaceID:    consts.DevServerEnvID,
+		DebugSessionID: debugSessionID,
+		DebugRunID:     debugRunID,
+		// NOTE: Bypass rate limits for reruns, as the user explicitly expects this to trigger
+		PreventRateLimit: true,
 	})
+
+	metrics.IncrExecutorScheduleCount(ctx, metrics.CounterOpt{
+		PkgName: pkgName,
+		Tags: map[string]any{
+			"type":   "rerun",
+			"status": executor.ScheduleStatus(err),
+		},
+	})
+
 	if err != nil {
-		return zero, err
+		return ulid.Zero, err
 	}
 
 	return identifier.ID.RunID, nil

@@ -3,6 +3,7 @@ package runner
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"runtime/debug"
@@ -14,13 +15,15 @@ import (
 	"github.com/inngest/inngest/pkg/config"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
+	"github.com/inngest/inngest/pkg/event_trigger_patterns"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/batch"
+	"github.com/inngest/inngest/pkg/execution/cron"
 	"github.com/inngest/inngest/pkg/execution/executor"
 	"github.com/inngest/inngest/pkg/execution/pauses"
 	"github.com/inngest/inngest/pkg/execution/queue"
-	"github.com/inngest/inngest/pkg/execution/ratelimit"
 	"github.com/inngest/inngest/pkg/execution/state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/expressions"
@@ -28,16 +31,15 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/pubsub"
 	"github.com/inngest/inngest/pkg/service"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/oklog/ulid/v2"
-	"github.com/robfig/cron/v3"
-	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/propagation"
-	"go.opentelemetry.io/otel/trace"
 )
 
 const (
 	CancelTimeout = (24 * time.Hour) * 365
+	pkgName       = "execution.runner"
 )
 
 type Opt func(s *svc)
@@ -47,10 +49,11 @@ type Opt func(s *svc)
 type Runner interface {
 	service.Service
 
+	// This allows publishing of events to local CQRS for development.
+	event.Publisher
+
 	StateManager() state.Manager
 	InitializeCrons(ctx context.Context) error
-	Runs(ctx context.Context, accountId uuid.UUID, eventId ulid.ULID) ([]state.State, error)
-	Events(ctx context.Context, eventId string) ([]event.Event, error)
 }
 
 func WithCQRS(data cqrs.Manager) func(s *svc) {
@@ -77,12 +80,6 @@ func WithPauseManager(pm pauses.Manager) func(s *svc) {
 	}
 }
 
-func WithEventManager(e event.Manager) func(s *svc) {
-	return func(s *svc) {
-		s.em = &e
-	}
-}
-
 func WithStateManager(sm state.Manager) func(s *svc) {
 	return func(s *svc) {
 		s.state = sm
@@ -101,17 +98,9 @@ func WithBatchManager(b batch.BatchManager) func(s *svc) {
 	}
 }
 
-func WithRateLimiter(rl ratelimit.RateLimiter) func(s *svc) {
+func WithCronManager(c cron.CronManager) func(s *svc) {
 	return func(s *svc) {
-		s.rl = rl
-	}
-}
-
-// WithTracker is used in the dev server to track runs.
-func WithTracker(t *Tracker) func(s *svc) {
-	// XXX: Replace with sqlite
-	return func(s *svc) {
-		s.tracker = t
+		s.croner = c
 	}
 }
 
@@ -155,13 +144,8 @@ type svc struct {
 	queue queue.Queue
 	// batcher handles batch operations
 	batcher batch.BatchManager
-	// rl rate-limits functions.
-	rl ratelimit.RateLimiter
-	// cronmanager allows the creation of new scheduled functions.
-	cronmanager *cron.Cron
-	em          *event.Manager
-
-	tracker *Tracker
+	// croner handles cron operations
+	croner cron.CronManager
 
 	log logger.Logger
 }
@@ -197,17 +181,10 @@ func (s *svc) Pre(ctx context.Context) error {
 }
 
 func (s *svc) Run(ctx context.Context) error {
-	// Each runner service is responsible for initializing cron-based executions.
-	// As the runners are shared-nothing, there is contention when running multiple
-	// services;  each individual service will attempt to create a new cron execution
-	// simultaneously.  We currently rely on idempotency within the state store to
-	// ensure that only one run can execute.
+	// initialize crons from data store.
 	//
-	// In the future, we may want to add distributed locking and/or a limit on the
-	// number of concurrent services that can schedule crons.  We don't really want
-	// to rely on a single executor to 'claim' ownership:  we'd have to implement
-	// more complex logic to check for the last heartbeat and valid cron scheduled,
-	// then backtrack to re-execute in the case of node downtime.  This is simple.
+	// this is more relevant for persisted environment like lite, where there's an external data store
+	// persisting function configuration.
 	if err := s.InitializeCrons(ctx); err != nil {
 		return err
 	}
@@ -221,136 +198,94 @@ func (s *svc) Run(ctx context.Context) error {
 }
 
 func (s *svc) Stop(ctx context.Context) error {
-	if s.cronmanager != nil {
-		cronCtx := s.cronmanager.Stop()
-		select {
-		case <-cronCtx.Done():
-		case <-ctx.Done():
-			return fmt.Errorf("error waiting for scheduled executions to finish")
-		}
-	}
 	return nil
 }
 
-func (s *svc) InitializeCrons(ctx context.Context) error {
-	// If a previous cron manager exists, cancel it.
-	if s.cronmanager != nil {
-		s.cronmanager.Stop()
+// Publish fulfils the event.Publisher interface for local development.
+func (s *svc) Publish(ctx context.Context, evt event.TrackedEvent) error {
+	byt, err := json.Marshal(evt)
+	if err != nil {
+		return fmt.Errorf("error marshalling event: %w", err)
 	}
-
-	s.cronmanager = cron.New(
-		cron.WithParser(
-			cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow),
-		),
+	return s.publisher.Publish(
+		ctx,
+		s.config.EventStream.Service.TopicName(),
+		pubsub.Message{
+			Name:      event.EventReceivedName,
+			Data:      string(byt),
+			Timestamp: time.Now(),
+		},
 	)
+}
 
-	// Set the functions within the engine, then iterate through each function's
-	// triggers so that we can easily invoke them.  We also need to immediately
-	// set up cron timers to invoke functions on a schedule.
+// InitializeCrons initializes cron schedules for all scheduled functions in the system.
+// This method is called during service startup to ensure that all functions with
+// cron triggers are properly scheduled and ready to execute.
+//
+// The initialization process:
+// 1. Retrieves all functions that have scheduled triggers from the data store
+// 2. For each scheduled function, creates a CronItem with CronInit operation
+// 3. Enqueues the CronItem as a sync job to initialize the cron schedule
+//
+// The CronInit operation ensures that:
+// - If no schedule exists for the function, a new one is created
+// - If a schedule already exists, no changes are made (idempotent)
+//
+// This approach allows for safe restarts and prevents duplicate schedules while
+// ensuring all scheduled functions are properly initialized.
+func (s *svc) InitializeCrons(ctx context.Context) error {
+	l := s.log.With("action", "executor.InitializeCrons")
+
+	// Retrieve all functions that have scheduled triggers from the data store.
+	// This includes functions with cron expressions that need to be executed
+	// on a periodic basis.
 	fns, err := s.data.FunctionsScheduled(ctx)
 	if err != nil {
 		return err
 	}
 
+	// Process each function to initialize its cron schedule
 	for _, f := range fns {
 		fn := f
-		// Set up a cron schedule for the current function.
-		for _, t := range f.Triggers {
-			if t.CronTrigger == nil {
-				continue
-			}
-			cron := t.CronTrigger.Cron
-			_, err := s.cronmanager.AddFunc(cron, func() {
-				// Create a new context to avoid "context canceled" errors. This
-				// callback is run as a non-blocking goroutine in Cron.Start, so
-				// contexts from outside its scope will likely be cancelled
-				// before the function is run
-				ctx := context.Background()
 
-				ctx, span := itrace.UserTracer().Provider().
-					Tracer(consts.OtelScopeCron).
-					Start(ctx, "cron", trace.WithAttributes(
-						attribute.String(consts.OtelSysFunctionID, fn.ID.String()),
-						attribute.Int(consts.OtelSysFunctionVersion, fn.FunctionVersion),
-					))
-				defer span.End()
-
-				trackedEvent := event.NewOSSTrackedEvent(event.Event{
-					Data: map[string]any{
-						"cron": cron,
-					},
-					ID:        time.Now().UTC().Format(time.RFC3339),
-					Name:      event.FnCronName,
-					Timestamp: time.Now().UnixMilli(),
-				}, nil)
-
-				byt, err := json.Marshal(trackedEvent)
-				if err == nil {
-					err := s.publisher.Publish(
-						ctx,
-						s.config.EventStream.Service.TopicName(),
-						pubsub.Message{
-							Name:      event.EventReceivedName,
-							Data:      string(byt),
-							Timestamp: time.Now(),
-						},
-					)
-					if err != nil {
-						s.log.Error("error publishing cron event", "error", err)
-					}
-				} else {
-					s.log.Error("error marshaling cron event", "error", err)
-				}
-
-				err = s.initialize(ctx, fn, trackedEvent)
-				if err != nil {
-					s.log.Error("error initializing scheduled function", "error", err)
-				}
-			})
-			if err != nil {
-				return err
-			}
-		}
-	}
-
-	s.cronmanager.Start()
-	return nil
-}
-
-func (s *svc) Runs(ctx context.Context, accountId uuid.UUID, eventID ulid.ULID) ([]state.State, error) {
-	items, _ := s.tracker.Runs(ctx, eventID)
-	result := make([]state.State, len(items))
-	for n, i := range items {
-		state, err := s.state.Load(ctx, accountId, i)
+		cqrsFn, err := s.cqrs.GetFunctionByInternalUUID(ctx, fn.ID)
 		if err != nil {
-			return nil, err
+			return fmt.Errorf("error fetching appID during cron initialization for fn: %s, err: %w", fn.ID, err)
 		}
-		result[n] = state
+		appID := cqrsFn.AppID
+
+		cronExprs := f.ScheduleExpressions()
+		for _, cronExpr := range cronExprs {
+			// Launch each cron initialization in a separate goroutine to avoid
+			// blocking the startup process. This allows multiple functions to be
+			// initialized concurrently.
+			go func(ctx context.Context, fn inngest.Function) {
+				// Configure queue item parameters for the cron sync job
+				//
+				// This will trigger the cron manager's UpdateSchedule method with the
+				// CronInit operation to initialize the schedule if needed.
+				if err := s.croner.Sync(ctx, cron.CronItem{
+					ID:              ulid.MustNew(ulid.Now(), rand.Reader),
+					AccountID:       consts.DevServerAccountID,
+					WorkspaceID:     consts.DevServerEnvID,
+					FunctionID:      fn.ID,
+					AppID:           appID,
+					FunctionVersion: fn.FunctionVersion,
+					Expression:      cronExpr,
+					Op:              enums.CronInit, // Initialize operation
+				}); err != nil {
+					l.Error("error initializing cron sync job", "error", err)
+				}
+			}(ctx, fn)
+		}
 	}
-	return result, nil
+
+	// Start health check for crons.
+	return s.croner.EnqueueNextHealthCheck(ctx)
 }
 
 func (s *svc) StateManager() state.Manager {
 	return s.state
-}
-
-func (s *svc) Events(ctx context.Context, eventId string) ([]event.Event, error) {
-	if eventId != "" {
-		evt := s.em.EventById(eventId)
-		if evt != nil {
-			return []event.Event{evt.GetEvent()}, nil
-		}
-
-		return []event.Event{}, nil
-	}
-
-	trackedEvents := s.em.Events()
-	evts := make([]event.Event, len(trackedEvents))
-	for i, evt := range trackedEvents {
-		evts[i] = evt.GetEvent()
-	}
-
-	return evts, nil
 }
 
 func (s *svc) handleMessage(ctx context.Context, m pubsub.Message) error {
@@ -367,14 +302,7 @@ func (s *svc) handleMessage(ctx context.Context, m pubsub.Message) error {
 		}
 	}
 
-	var tracked event.TrackedEvent
-	var err error
-
-	if s.em == nil {
-		tracked, err = event.NewOSSTrackedEventFromString(m.Data)
-	} else {
-		tracked, err = s.em.NewEvent(m.Data)
-	}
+	tracked, err := event.NewOSSTrackedEventFromString(m.Data)
 	if err != nil {
 		return fmt.Errorf("error creating event: %w", err)
 	}
@@ -541,6 +469,8 @@ func (s *svc) functions(ctx context.Context, tracked event.TrackedEvent) error {
 	// Do this once instead of many times when evaluating expressions.
 	evtMap := evt.Map()
 
+	matchingPatterns := event_trigger_patterns.GenerateMatchingPatterns(evt.Name)
+
 	for _, fn := range fns {
 		// We want to initialize each function concurrently;  some of these
 		// may have expressions that take ~tens of milliseconds to run, and
@@ -565,11 +495,16 @@ func (s *svc) functions(ctx context.Context, tracked event.TrackedEvent) error {
 					continue
 				}
 
+				// Only process triggers that match the current event
+				if !t.EventTrigger.MatchesAnyPattern(matchingPatterns) {
+					continue
+				}
+
 				// Evaluate all expressions for matching triggers
 				if t.Expression != nil {
 					// Execute expressions here, ensuring that each function is only triggered
 					// under the correct conditions.
-					ok, _, evalerr := expressions.EvaluateBoolean(ctx, *t.Expression, map[string]interface{}{
+					ok, evalerr := expressions.EvaluateBoolean(ctx, *t.Expression, map[string]interface{}{
 						"event": evtMap,
 					})
 					if evalerr != nil {
@@ -650,7 +585,7 @@ func (s *svc) initialize(ctx context.Context, fn inngest.Function, evt event.Tra
 	var appID uuid.UUID
 	wsID := evt.GetWorkspaceID()
 	{
-		fn, err := s.cqrs.GetFunctionByInternalUUID(ctx, wsID, fn.ID)
+		fn, err := s.cqrs.GetFunctionByInternalUUID(ctx, fn.ID)
 		if err != nil {
 			return err
 		}
@@ -668,44 +603,23 @@ func (s *svc) initialize(ctx context.Context, fn inngest.Function, evt event.Tra
 			AccountID:       consts.DevServerAccountID,
 		}
 
-		if err := s.executor.AppendAndScheduleBatch(ctx, fn, bi, nil); err != nil {
-			return fmt.Errorf("could not append and schedule batch item: %w", err)
+		// When conditional batching is requested based on `EventBatch.If`, batching is enabled only for events that successfully evaluate to true.
+		// If the conditional expression evaluation fails or the expression evaluates to false, then the event is scheduled for immediate execution without waiting for a batch to fill up.
+		eligibleForBatching := true
+		if batchCondition := fn.EventBatch.If; batchCondition != nil {
+			ok, evalerr := expressions.EvaluateBoolean(ctx, *batchCondition, map[string]interface{}{
+				"event": evt.GetEvent().Map(),
+			})
+			if evalerr != nil || !ok {
+				eligibleForBatching = false
+			}
 		}
 
-		return nil
-	}
-
-	// Attempt to rate-limit the incoming function.
-	if s.rl != nil && fn.RateLimit != nil {
-		key, err := ratelimit.RateLimitKey(ctx, fn.ID, *fn.RateLimit, evt.GetEvent().Map())
-		switch err {
-		case nil:
-			limited, _, err := s.rl.RateLimit(ctx, key, *fn.RateLimit)
-			if err != nil {
-				return err
+		if eligibleForBatching {
+			if err := s.executor.AppendAndScheduleBatch(ctx, fn, bi, nil); err != nil {
+				return fmt.Errorf("could not append and schedule batch item: %w", err)
 			}
-			if limited {
-				if evt.GetEvent().IsInvokeEvent() {
-					// This function was invoked by another function, so we need to
-					// ensure that the invoker fails. If we don't do this, it'll
-					// hang forever
-					if err := s.executor.InvokeFailHandler(ctx, execution.InvokeFailHandlerOpts{
-						OriginalEvent: evt,
-						Err: map[string]any{
-							"name":    "Error",
-							"message": "invoked function is rate limited",
-						},
-					}); err != nil {
-						l.Error("error handling invoke rate limit", "error", err)
-					}
-				}
-				// Do nothing.
-				return nil
-			}
-		case ratelimit.ErrNotRateLimited:
-			// no-op: proceed with function run as usual
-		default:
-			return err
+			return nil
 		}
 	}
 
@@ -740,6 +654,7 @@ type InitOpts struct {
 // This is a separate, exported function so that it can be used from this service
 // and also from eg. the run command.
 func Initialize(ctx context.Context, opts InitOpts) (*sv2.Metadata, error) {
+	l := logger.StdlibLogger(ctx)
 	zero := uuid.UUID{}
 	tracked := opts.evt
 	wsID := tracked.GetWorkspaceID()
@@ -757,6 +672,14 @@ func Initialize(ctx context.Context, opts InitOpts) (*sv2.Metadata, error) {
 	// use the internal event ID
 	idempotencyKey := tracked.GetEvent().ID
 
+	var debugSessionID, debugRunID *ulid.ULID
+	if evt := tracked.GetEvent(); evt.IsInvokeEvent() {
+		if metadata, err := evt.InngestMetadata(); err == nil {
+			debugSessionID = metadata.DebugSessionID
+			debugRunID = metadata.DebugRunID
+		}
+	}
+
 	// If this is a debounced function, run this through a debouncer.
 	md, err := opts.exec.Schedule(ctx, execution.ScheduleRequest{
 		WorkspaceID:    wsID,
@@ -765,9 +688,36 @@ func Initialize(ctx context.Context, opts InitOpts) (*sv2.Metadata, error) {
 		Events:         []event.TrackedEvent{tracked},
 		IdempotencyKey: &idempotencyKey,
 		AccountID:      consts.DevServerAccountID,
+		DebugSessionID: debugSessionID,
+		DebugRunID:     debugRunID,
+	})
+
+	metrics.IncrExecutorScheduleCount(ctx, metrics.CounterOpt{
+		PkgName: pkgName,
+		Tags: map[string]any{
+			"type":   "event",
+			"status": executor.ScheduleStatus(err),
+		},
 	})
 
 	switch err {
+	case executor.ErrFunctionRateLimited:
+		if opts.evt.GetEvent().IsInvokeEvent() {
+			// This function was invoked by another function, so we need to
+			// ensure that the invoker fails. If we don't do this, it'll
+			// hang forever
+			if err := opts.exec.InvokeFailHandler(ctx, execution.InvokeFailHandlerOpts{
+				OriginalEvent: opts.evt,
+				Err: map[string]any{
+					"name":    "Error",
+					"message": "invoked function is rate limited",
+				},
+			}); err != nil {
+				l.Error("error handling invoke rate limit", "error", err)
+			}
+		}
+
+		return nil, nil
 	case executor.ErrFunctionDebounced,
 		executor.ErrFunctionSkipped,
 		executor.ErrFunctionSkippedIdempotency,
@@ -779,40 +729,4 @@ func Initialize(ctx context.Context, opts InitOpts) (*sv2.Metadata, error) {
 		logger.StdlibLogger(ctx).Error("error scheduling function", "error", err)
 	}
 	return md, err
-}
-
-// NewTracker returns a crappy in-memory tracker used for registering function runs.
-func NewTracker() (t *Tracker) {
-	return &Tracker{
-		l:      &sync.RWMutex{},
-		evtIDs: map[string][]ulid.ULID{},
-	}
-}
-
-type Tracker struct {
-	l      *sync.RWMutex
-	evtIDs map[string][]ulid.ULID
-}
-
-func (t *Tracker) Add(evtID string, id state.Identifier) {
-	if t.l == nil {
-		return
-	}
-
-	t.l.Lock()
-	defer t.l.Unlock()
-	if _, ok := t.evtIDs[evtID]; !ok {
-		t.evtIDs[evtID] = []ulid.ULID{id.RunID}
-		return
-	}
-	t.evtIDs[evtID] = append(t.evtIDs[evtID], id.RunID)
-}
-
-func (t *Tracker) Runs(ctx context.Context, eventId ulid.ULID) ([]ulid.ULID, error) {
-	if t.l == nil {
-		return nil, nil
-	}
-	t.l.RLock()
-	defer t.l.RUnlock()
-	return t.evtIDs[eventId.String()], nil
 }

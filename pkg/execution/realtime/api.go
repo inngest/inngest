@@ -78,7 +78,7 @@ func (a *api) setup() {
 }
 
 func (a *api) PostCreateJWT(w http.ResponseWriter, r *http.Request) {
-	w.Header().Add("content-type", "application/json")
+	w.Header().Set("content-type", "application/json")
 
 	// This only uses the given auth finder, which does not accept JWT claims.
 	auth, err := a.opts.AuthFinder(r.Context())
@@ -125,7 +125,7 @@ func (a *api) GetWebsocketUpgrade(w http.ResponseWriter, r *http.Request) {
 	// as necessary.
 	auth, err := realtimeAuth(ctx)
 	if err != nil {
-		w.Header().Add("content-type", "application/json")
+		w.Header().Set("content-type", "application/json")
 		_ = publicerr.WriteHTTP(w, publicerr.Wrapf(err, 401, "Not authenticated"))
 		return
 	}

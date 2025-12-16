@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import NextLink from 'next/link';
 import { ErrorCard } from '@inngest/components/Error/ErrorCard';
+import { usePathCreator } from '@inngest/components/SharedContext/usePathCreator';
 import { Skeleton } from '@inngest/components/Skeleton';
 import { Time } from '@inngest/components/Time';
 import { usePrettyJson } from '@inngest/components/hooks/usePrettyJson';
@@ -21,6 +22,7 @@ import {
   TimeElement,
 } from '../DetailsCard/NewElement';
 import { Link } from '../Link';
+import { useShared } from '../SharedContext/SharedContext';
 import { StatusDot } from '../Status/StatusDot';
 import { DragDivider } from '../icons/DragDivider';
 import { loadingSentinel, type Lazy } from '../utils/lazyLoad';
@@ -36,18 +38,20 @@ export function EventDetails({
   getEventDetails,
   getEventPayload,
   getEventRuns,
-  pathCreator,
   expandedRowActions,
   standalone,
+  pollInterval,
+  autoRefresh,
 }: {
   initialData?: Pick<Event, 'name' | 'runs'>;
   eventID: string;
-  pathCreator: React.ComponentProps<typeof EventsTable>['pathCreator'];
   getEventDetails: React.ComponentProps<typeof EventsTable>['getEventDetails'];
   getEventPayload: React.ComponentProps<typeof EventsTable>['getEventPayload'];
   getEventRuns?: ({ eventID }: { eventID: string }) => Promise<Pick<Event, 'runs' | 'name'>>;
   expandedRowActions: React.ComponentProps<typeof EventsTable>['expandedRowActions'];
   standalone: boolean;
+  pollInterval?: number;
+  autoRefresh?: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const leftColumnRef = useRef<HTMLDivElement>(null);
@@ -55,6 +59,8 @@ export function EventDetails({
   const [leftWidth, setLeftWidth] = useState(70);
   const [isDragging, setIsDragging] = useState(false);
   const { isRunning, send } = useDevServer();
+  const { pathCreator } = usePathCreator();
+  const { cloud } = useShared();
 
   const {
     isPending, // first load, no data
@@ -66,6 +72,7 @@ export function EventDetails({
     queryFn: useCallback(() => {
       return getEventDetails({ eventID: eventID });
     }, [getEventDetails, eventID]),
+    refetchInterval: autoRefresh ? pollInterval : false,
   });
 
   const {
@@ -78,6 +85,7 @@ export function EventDetails({
     queryFn: useCallback(() => {
       return getEventPayload({ eventID: eventID });
     }, [getEventPayload, eventID]),
+    refetchInterval: autoRefresh ? pollInterval : false,
   });
 
   const {
@@ -94,6 +102,7 @@ export function EventDetails({
       return getEventRuns({ eventID });
     }, [getEventRuns, eventID]),
     enabled: !!getEventRuns,
+    refetchInterval: autoRefresh ? pollInterval : false,
   });
 
   const handleMouseDown = useCallback(() => {
@@ -172,6 +181,7 @@ export function EventDetails({
                 {!standalone && (
                   <Link
                     size="medium"
+                    target="_blank"
                     href={pathCreator.eventPopout({ eventID: eventID })}
                     iconAfter={<RiExternalLinkLine className="h-4 w-4 shrink-0" />}
                   />
@@ -227,16 +237,20 @@ export function EventDetails({
                     content: prettyPayload,
                   }}
                   allowFullScreen={true}
-                  actions={[
-                    {
-                      label: 'Send to Dev Server',
-                      title: isRunning
-                        ? 'Send event payload to running Dev Server'
-                        : `Dev Server is not running at ${devServerURL}`,
-                      onClick: () => send(eventPayloadData?.payload || ''),
-                      disabled: !isRunning,
-                    },
-                  ]}
+                  actions={
+                    cloud
+                      ? [
+                          {
+                            label: 'Send to Dev Server',
+                            title: isRunning
+                              ? 'Send event payload to running Dev Server'
+                              : `Dev Server is not running at ${devServerURL}`,
+                            onClick: () => send(eventPayloadData?.payload || ''),
+                            disabled: !isRunning,
+                          },
+                        ]
+                      : []
+                  }
                 />
               </div>
             )}

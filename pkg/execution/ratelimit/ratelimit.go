@@ -3,15 +3,12 @@ package ratelimit
 import (
 	"context"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/expressions"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/util"
-	"github.com/throttled/throttled/v2"
-	"github.com/xhit/go-str2duration/v2"
 )
 
 var (
@@ -20,8 +17,36 @@ var (
 	ErrNotRateLimited                = fmt.Errorf("not rate limited")
 )
 
+type rateLimitOptions struct {
+	now time.Time
+
+	idempotencyKey string
+	idempotencyTTL time.Duration
+}
+
+type RateLimitOptionFn func(o *rateLimitOptions)
+
+func WithNow(now time.Time) RateLimitOptionFn {
+	return func(o *rateLimitOptions) {
+		o.now = now
+	}
+}
+
+func WithIdempotency(key string, ttl time.Duration) RateLimitOptionFn {
+	return func(o *rateLimitOptions) {
+		o.idempotencyKey = key
+		o.idempotencyTTL = ttl
+	}
+}
+
+type RateLimitResult struct {
+	Limited        bool
+	RetryAfter     time.Duration
+	IdempotencyHit bool
+}
+
 type RateLimiter interface {
-	RateLimit(ctx context.Context, key string, c inngest.RateLimit) (bool, time.Duration, error)
+	RateLimit(ctx context.Context, key string, c inngest.RateLimit, options ...RateLimitOptionFn) (*RateLimitResult, error)
 }
 
 // RateLimitKey returns the rate limiting key given a function ID, rate limit config,
@@ -34,7 +59,7 @@ func RateLimitKey(ctx context.Context, id uuid.UUID, c inngest.RateLimit, evt ma
 	if err != nil {
 		return "", ErrEvaluatingRateLimitExpression
 	}
-	res, _, err := eval.Evaluate(ctx, expressions.NewData(map[string]any{"event": evt}))
+	res, err := eval.Evaluate(ctx, expressions.NewData(map[string]any{"event": evt}))
 	if err != nil {
 		return "", ErrEvaluatingRateLimitExpression
 	}
@@ -50,34 +75,4 @@ func RateLimitKey(ctx context.Context, id uuid.UUID, c inngest.RateLimit, evt ma
 func hash(res any, id uuid.UUID) string {
 	sum := util.XXHash(res)
 	return fmt.Sprintf("%s-%s", id, sum)
-}
-
-// RateLimit checks the given key against the specified rate limit, returning true if limited.
-//
-// This allows bursts of up to 1/10th the given rate limit, by default.
-//
-// Tihs returns the duration until the next request will be permitted, or -1 if the rate limit
-// has not been exceeded.
-func rateLimit(ctx context.Context, store throttled.GCRAStoreCtx, key string, c inngest.RateLimit) (bool, time.Duration, error) {
-	dur, err := str2duration.ParseDuration(c.Period)
-	if err != nil {
-		return true, -1, err
-	}
-
-	quota := throttled.RateQuota{
-		MaxRate:  throttled.PerDuration(int(c.Limit), dur),
-		MaxBurst: int(c.Limit) / 10,
-	}
-
-	limiter, err := throttled.NewGCRARateLimiterCtx(store, quota)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	ok, res, err := limiter.RateLimitCtx(ctx, key, 1)
-	if err != nil {
-		return ok, -1, err
-	}
-
-	return ok, res.RetryAfter, err
 }

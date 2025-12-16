@@ -1,3 +1,4 @@
+import { Button } from '@inngest/components/Button';
 import { Chart } from '@inngest/components/Chart/Chart';
 import { Info } from '@inngest/components/Info/Info';
 import { Link } from '@inngest/components/Link/Link';
@@ -6,6 +7,7 @@ import { isDark } from '@inngest/components/utils/theme';
 import resolveConfig from 'tailwindcss/resolveConfig';
 
 import type { VolumeMetricsQuery } from '@/gql/graphql';
+import { pathCreator } from '@/utils/urls';
 import tailwindConfig from '../../../tailwind.config';
 import type { EntityLookup } from './Dashboard';
 import { getLineChartOptions, getXAxis, lineColors, seriesOptions } from './utils';
@@ -17,8 +19,7 @@ const {
 
 export const mapConcurrency = (
   { stepRunning: { metrics: runningMetrics } }: VolumeMetricsQuery['workspace'],
-  entities: EntityLookup,
-  concurrencyLimit?: number
+  entities: EntityLookup
 ) => {
   const dark = isDark();
 
@@ -27,51 +28,19 @@ export const mapConcurrency = (
       splitLine: {
         lineStyle: { color: resolveColor(borderColor.subtle, dark, '#E2E2E2') },
       },
-      max: ({ max }: { max: number }) =>
-        concurrencyLimit !== undefined && max > concurrencyLimit
-          ? max
-          : (concurrencyLimit ?? max) + (concurrencyLimit ?? max) * 0.1,
     },
     xAxis: getXAxis(runningMetrics),
     series: [
       ...runningMetrics
         .filter(({ id }) => id !== zeroID)
         .map((f, i) => ({
-          ...{ ...seriesOptions, stack: 'Total' },
+          ...seriesOptions,
           name: entities[f.id]?.name,
           data: f.data.map(({ value }) => value),
           itemStyle: {
             color: resolveColor(lineColors[i % lineColors.length]![0]!, dark, lineColors[0]?.[1]),
           },
-          areaStyle: { opacity: 1 },
         })),
-      {
-        ...seriesOptions,
-        markLine: {
-          symbol: 'none',
-          barMinHeight: '100%',
-          large: true,
-          animation: false,
-          lineStyle: {
-            type: 'solid' as any,
-            color: resolveColor(lineColors[3]![0]!, dark, lineColors[3]![1]),
-          },
-          data: [{ yAxis: concurrencyLimit, name: 'Concurrency Limit', symbol: 'none' }],
-          tooltip: {
-            show: false,
-          },
-          emphasis: {
-            label: {
-              show: true,
-              color: 'inherit',
-              position: 'insideStartTop' as const,
-              formatter: ({ value }: any) => {
-                return ` Plan Limit: ${value}\n\n`;
-              },
-            },
-          },
-        },
-      },
     ],
   };
 
@@ -83,27 +52,26 @@ export const mapConcurrency = (
   );
 };
 
-export const AccountConcurrency = ({
+export const Concurrency = ({
   workspace,
   entities,
-  concurrencyLimit,
+  isMarketplace = false,
 }: {
   workspace?: VolumeMetricsQuery['workspace'];
   entities: EntityLookup;
-  concurrencyLimit?: number;
+  isMarketplace: boolean;
 }) => {
-  const chartOptions = workspace && mapConcurrency(workspace, entities, concurrencyLimit);
+  const chartOptions = workspace && mapConcurrency(workspace, entities);
 
   return (
     <div className="bg-canvasBase border-subtle relative flex h-[384px] w-full flex-col overflow-x-hidden rounded-md border p-5">
       <div className="mb-2 flex flex-row items-center justify-between">
         <div className="text-subtle flex w-full flex-row items-center gap-x-2 text-lg">
-          Account Concurrency{' '}
+          Concurrency{' '}
           <Info
-            text="Total number of steps running compared to the account-level concurrency limits."
+            text="The number of concurrently running steps within this environment"
             action={
               <Link
-                arrowOnHover
                 className="text-sm"
                 href="https://www.inngest.com/docs/guides/concurrency#concurrency-use-cases"
               >
@@ -112,6 +80,14 @@ export const AccountConcurrency = ({
             }
           />
         </div>
+        {!isMarketplace && (
+          <Button
+            label="Increase Concurrency"
+            kind="secondary"
+            appearance="outlined"
+            href={pathCreator.billing({ ref: 'app-concurrency-chart', highlight: 'concurrency' })}
+          />
+        )}
       </div>
       <div className="flex h-full flex-row items-center">
         <Chart

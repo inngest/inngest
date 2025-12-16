@@ -1,10 +1,10 @@
-import { useState } from 'react';
-
 import { useShared } from './SharedContext';
 
 export type RerunFromStepPayload = {
   runID: string;
-  fromStep: { stepID: string; input: string };
+  fromStep: { stepID: string; input?: string };
+  debugSessionID?: string;
+  debugRunID?: string;
 };
 
 export type RerunFromStepResult = {

@@ -77,6 +77,8 @@ const (
 	// DefaultConcurrencyLimit is the default concurrency limit applied when not specified
 	DefaultConcurrencyLimit = 1_000
 
+	DefaultSystemConcurrencyLimit = 100_000
+
 	// FunctionIdempotencyPeriod determines how long a specific function remains idempotent
 	// when using idempotency keys.
 	FunctionIdempotencyPeriod = 24 * time.Hour
@@ -112,7 +114,7 @@ const (
 
 	DefaultQueueContinueLimit = uint(5)
 
-	PauseExpiredDeletionGracePeriod = time.Minute * 5
+	PauseExpiredDeletionGracePeriod = time.Minute * 20
 
 	DefaultQueueShardName = "default"
 
@@ -145,9 +147,19 @@ const (
 
 	ConnectWorkerRequestLeaseDuration = 20 * time.Second
 	ConnectWorkerRequestGracePeriod   = 5 * time.Second
+
+	// ConnectWorkerCapacityForNoConcurrencyLimit is used to indicate that a worker has no capacity limit.
+	// Due to integer overflows of using negative numbers, we use 0 to indicate no limit.``
+	ConnectWorkerCapacityForNoConcurrencyLimit = 0
+
+	KafkaMsgTooLargeError = "MESSAGE_TOO_LARGE"
+
+	ConstraintAPIScavengerTick = 500 * time.Millisecond
 )
 
 var (
+	ConnectWorkerRequestToWorkerMappingTTL  = 6 * ConnectWorkerRequestLeaseDuration  // 2 minutes so in case of gateway failure, we don't lose the mapping for too long
+	ConnectWorkerCapacityManagerTTL         = 45 * ConnectWorkerRequestLeaseDuration // 15 minutes
 	ConnectWorkerRequestExtendLeaseInterval = ConnectWorkerRequestLeaseDuration / 4
 	QueueShadowContinuationCooldownPeriod   = QueueContinuationCooldownPeriod
 	QueueShadowContinuationMaxPartitions    = QueueContinuationMaxPartitions

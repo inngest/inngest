@@ -408,6 +408,168 @@ func (c HgetallKey) Cache() Cacheable {
 	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
+type Hgetdel Incomplete
+
+func (b Builder) Hgetdel() (c Hgetdel) {
+	c = Hgetdel{cs: get(), ks: b.ks}
+	c.cs.s = append(c.cs.s, "HGETDEL")
+	return c
+}
+
+func (c Hgetdel) Key(key string) HgetdelKey {
+	if c.ks&NoSlot == NoSlot {
+		c.ks = NoSlot | slot(key)
+	} else {
+		c.ks = check(c.ks, slot(key))
+	}
+	c.cs.s = append(c.cs.s, key)
+	return (HgetdelKey)(c)
+}
+
+type HgetdelField Incomplete
+
+func (c HgetdelField) Field(field ...string) HgetdelField {
+	c.cs.s = append(c.cs.s, field...)
+	return c
+}
+
+func (c HgetdelField) Build() Completed {
+	c.cs.Build()
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
+}
+
+type HgetdelFields Incomplete
+
+func (c HgetdelFields) Numfields(numfields int64) HgetdelNumfields {
+	c.cs.s = append(c.cs.s, strconv.FormatInt(numfields, 10))
+	return (HgetdelNumfields)(c)
+}
+
+type HgetdelKey Incomplete
+
+func (c HgetdelKey) Fields() HgetdelFields {
+	c.cs.s = append(c.cs.s, "FIELDS")
+	return (HgetdelFields)(c)
+}
+
+type HgetdelNumfields Incomplete
+
+func (c HgetdelNumfields) Field(field ...string) HgetdelField {
+	c.cs.s = append(c.cs.s, field...)
+	return (HgetdelField)(c)
+}
+
+type Hgetex Incomplete
+
+func (b Builder) Hgetex() (c Hgetex) {
+	c = Hgetex{cs: get(), ks: b.ks}
+	c.cs.s = append(c.cs.s, "HGETEX")
+	return c
+}
+
+func (c Hgetex) Key(key string) HgetexKey {
+	if c.ks&NoSlot == NoSlot {
+		c.ks = NoSlot | slot(key)
+	} else {
+		c.ks = check(c.ks, slot(key))
+	}
+	c.cs.s = append(c.cs.s, key)
+	return (HgetexKey)(c)
+}
+
+type HgetexExpirationEx Incomplete
+
+func (c HgetexExpirationEx) Fields() HgetexFields {
+	c.cs.s = append(c.cs.s, "FIELDS")
+	return (HgetexFields)(c)
+}
+
+type HgetexExpirationExat Incomplete
+
+func (c HgetexExpirationExat) Fields() HgetexFields {
+	c.cs.s = append(c.cs.s, "FIELDS")
+	return (HgetexFields)(c)
+}
+
+type HgetexExpirationPersist Incomplete
+
+func (c HgetexExpirationPersist) Fields() HgetexFields {
+	c.cs.s = append(c.cs.s, "FIELDS")
+	return (HgetexFields)(c)
+}
+
+type HgetexExpirationPx Incomplete
+
+func (c HgetexExpirationPx) Fields() HgetexFields {
+	c.cs.s = append(c.cs.s, "FIELDS")
+	return (HgetexFields)(c)
+}
+
+type HgetexExpirationPxat Incomplete
+
+func (c HgetexExpirationPxat) Fields() HgetexFields {
+	c.cs.s = append(c.cs.s, "FIELDS")
+	return (HgetexFields)(c)
+}
+
+type HgetexField Incomplete
+
+func (c HgetexField) Field(field ...string) HgetexField {
+	c.cs.s = append(c.cs.s, field...)
+	return c
+}
+
+func (c HgetexField) Build() Completed {
+	c.cs.Build()
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
+}
+
+type HgetexFields Incomplete
+
+func (c HgetexFields) Numfields(numfields int64) HgetexNumfields {
+	c.cs.s = append(c.cs.s, strconv.FormatInt(numfields, 10))
+	return (HgetexNumfields)(c)
+}
+
+type HgetexKey Incomplete
+
+func (c HgetexKey) Ex(ex int64) HgetexExpirationEx {
+	c.cs.s = append(c.cs.s, "EX", strconv.FormatInt(ex, 10))
+	return (HgetexExpirationEx)(c)
+}
+
+func (c HgetexKey) Px(px int64) HgetexExpirationPx {
+	c.cs.s = append(c.cs.s, "PX", strconv.FormatInt(px, 10))
+	return (HgetexExpirationPx)(c)
+}
+
+func (c HgetexKey) Exat(exat int64) HgetexExpirationExat {
+	c.cs.s = append(c.cs.s, "EXAT", strconv.FormatInt(exat, 10))
+	return (HgetexExpirationExat)(c)
+}
+
+func (c HgetexKey) Pxat(pxat int64) HgetexExpirationPxat {
+	c.cs.s = append(c.cs.s, "PXAT", strconv.FormatInt(pxat, 10))
+	return (HgetexExpirationPxat)(c)
+}
+
+func (c HgetexKey) Persist() HgetexExpirationPersist {
+	c.cs.s = append(c.cs.s, "PERSIST")
+	return (HgetexExpirationPersist)(c)
+}
+
+func (c HgetexKey) Fields() HgetexFields {
+	c.cs.s = append(c.cs.s, "FIELDS")
+	return (HgetexFields)(c)
+}
+
+type HgetexNumfields Incomplete
+
+func (c HgetexNumfields) Field(field ...string) HgetexField {
+	c.cs.s = append(c.cs.s, field...)
+	return (HgetexField)(c)
+}
+
 type Hincrby Incomplete
 
 func (b Builder) Hincrby() (c Hincrby) {
@@ -1155,6 +1317,190 @@ type HsetKey Incomplete
 
 func (c HsetKey) FieldValue() HsetFieldValue {
 	return (HsetFieldValue)(c)
+}
+
+type Hsetex Incomplete
+
+func (b Builder) Hsetex() (c Hsetex) {
+	c = Hsetex{cs: get(), ks: b.ks}
+	c.cs.s = append(c.cs.s, "HSETEX")
+	return c
+}
+
+func (c Hsetex) Key(key string) HsetexKey {
+	if c.ks&NoSlot == NoSlot {
+		c.ks = NoSlot | slot(key)
+	} else {
+		c.ks = check(c.ks, slot(key))
+	}
+	c.cs.s = append(c.cs.s, key)
+	return (HsetexKey)(c)
+}
+
+type HsetexConditionFnx Incomplete
+
+func (c HsetexConditionFnx) Ex(ex int64) HsetexExpirationEx {
+	c.cs.s = append(c.cs.s, "EX", strconv.FormatInt(ex, 10))
+	return (HsetexExpirationEx)(c)
+}
+
+func (c HsetexConditionFnx) Px(px int64) HsetexExpirationPx {
+	c.cs.s = append(c.cs.s, "PX", strconv.FormatInt(px, 10))
+	return (HsetexExpirationPx)(c)
+}
+
+func (c HsetexConditionFnx) Exat(exat int64) HsetexExpirationExat {
+	c.cs.s = append(c.cs.s, "EXAT", strconv.FormatInt(exat, 10))
+	return (HsetexExpirationExat)(c)
+}
+
+func (c HsetexConditionFnx) Pxat(pxat int64) HsetexExpirationPxat {
+	c.cs.s = append(c.cs.s, "PXAT", strconv.FormatInt(pxat, 10))
+	return (HsetexExpirationPxat)(c)
+}
+
+func (c HsetexConditionFnx) Keepttl() HsetexExpirationKeepttl {
+	c.cs.s = append(c.cs.s, "KEEPTTL")
+	return (HsetexExpirationKeepttl)(c)
+}
+
+func (c HsetexConditionFnx) Fields() HsetexFields {
+	c.cs.s = append(c.cs.s, "FIELDS")
+	return (HsetexFields)(c)
+}
+
+type HsetexConditionFxx Incomplete
+
+func (c HsetexConditionFxx) Ex(ex int64) HsetexExpirationEx {
+	c.cs.s = append(c.cs.s, "EX", strconv.FormatInt(ex, 10))
+	return (HsetexExpirationEx)(c)
+}
+
+func (c HsetexConditionFxx) Px(px int64) HsetexExpirationPx {
+	c.cs.s = append(c.cs.s, "PX", strconv.FormatInt(px, 10))
+	return (HsetexExpirationPx)(c)
+}
+
+func (c HsetexConditionFxx) Exat(exat int64) HsetexExpirationExat {
+	c.cs.s = append(c.cs.s, "EXAT", strconv.FormatInt(exat, 10))
+	return (HsetexExpirationExat)(c)
+}
+
+func (c HsetexConditionFxx) Pxat(pxat int64) HsetexExpirationPxat {
+	c.cs.s = append(c.cs.s, "PXAT", strconv.FormatInt(pxat, 10))
+	return (HsetexExpirationPxat)(c)
+}
+
+func (c HsetexConditionFxx) Keepttl() HsetexExpirationKeepttl {
+	c.cs.s = append(c.cs.s, "KEEPTTL")
+	return (HsetexExpirationKeepttl)(c)
+}
+
+func (c HsetexConditionFxx) Fields() HsetexFields {
+	c.cs.s = append(c.cs.s, "FIELDS")
+	return (HsetexFields)(c)
+}
+
+type HsetexExpirationEx Incomplete
+
+func (c HsetexExpirationEx) Fields() HsetexFields {
+	c.cs.s = append(c.cs.s, "FIELDS")
+	return (HsetexFields)(c)
+}
+
+type HsetexExpirationExat Incomplete
+
+func (c HsetexExpirationExat) Fields() HsetexFields {
+	c.cs.s = append(c.cs.s, "FIELDS")
+	return (HsetexFields)(c)
+}
+
+type HsetexExpirationKeepttl Incomplete
+
+func (c HsetexExpirationKeepttl) Fields() HsetexFields {
+	c.cs.s = append(c.cs.s, "FIELDS")
+	return (HsetexFields)(c)
+}
+
+type HsetexExpirationPx Incomplete
+
+func (c HsetexExpirationPx) Fields() HsetexFields {
+	c.cs.s = append(c.cs.s, "FIELDS")
+	return (HsetexFields)(c)
+}
+
+type HsetexExpirationPxat Incomplete
+
+func (c HsetexExpirationPxat) Fields() HsetexFields {
+	c.cs.s = append(c.cs.s, "FIELDS")
+	return (HsetexFields)(c)
+}
+
+type HsetexFieldValue Incomplete
+
+func (c HsetexFieldValue) FieldValue(field string, value string) HsetexFieldValue {
+	c.cs.s = append(c.cs.s, field, value)
+	return c
+}
+
+func (c HsetexFieldValue) Build() Completed {
+	c.cs.Build()
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
+}
+
+type HsetexFields Incomplete
+
+func (c HsetexFields) Numfields(numfields int64) HsetexNumfields {
+	c.cs.s = append(c.cs.s, strconv.FormatInt(numfields, 10))
+	return (HsetexNumfields)(c)
+}
+
+type HsetexKey Incomplete
+
+func (c HsetexKey) Fnx() HsetexConditionFnx {
+	c.cs.s = append(c.cs.s, "FNX")
+	return (HsetexConditionFnx)(c)
+}
+
+func (c HsetexKey) Fxx() HsetexConditionFxx {
+	c.cs.s = append(c.cs.s, "FXX")
+	return (HsetexConditionFxx)(c)
+}
+
+func (c HsetexKey) Ex(ex int64) HsetexExpirationEx {
+	c.cs.s = append(c.cs.s, "EX", strconv.FormatInt(ex, 10))
+	return (HsetexExpirationEx)(c)
+}
+
+func (c HsetexKey) Px(px int64) HsetexExpirationPx {
+	c.cs.s = append(c.cs.s, "PX", strconv.FormatInt(px, 10))
+	return (HsetexExpirationPx)(c)
+}
+
+func (c HsetexKey) Exat(exat int64) HsetexExpirationExat {
+	c.cs.s = append(c.cs.s, "EXAT", strconv.FormatInt(exat, 10))
+	return (HsetexExpirationExat)(c)
+}
+
+func (c HsetexKey) Pxat(pxat int64) HsetexExpirationPxat {
+	c.cs.s = append(c.cs.s, "PXAT", strconv.FormatInt(pxat, 10))
+	return (HsetexExpirationPxat)(c)
+}
+
+func (c HsetexKey) Keepttl() HsetexExpirationKeepttl {
+	c.cs.s = append(c.cs.s, "KEEPTTL")
+	return (HsetexExpirationKeepttl)(c)
+}
+
+func (c HsetexKey) Fields() HsetexFields {
+	c.cs.s = append(c.cs.s, "FIELDS")
+	return (HsetexFields)(c)
+}
+
+type HsetexNumfields Incomplete
+
+func (c HsetexNumfields) FieldValue() HsetexFieldValue {
+	return (HsetexFieldValue)(c)
 }
 
 type Hsetnx Incomplete

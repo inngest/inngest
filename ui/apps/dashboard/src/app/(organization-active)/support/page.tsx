@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { type Route } from 'next';
 import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
+import { Banner } from '@inngest/components/Banner';
 import { Button } from '@inngest/components/Button';
 import { Link } from '@inngest/components/Link';
 import { Pill } from '@inngest/components/Pill/Pill';
@@ -43,8 +44,8 @@ export default function Page() {
   });
 
   const plan = data?.account.plan;
-  const isPaid = (plan?.amount || 0) > 0;
   const isEnterprise = plan ? isEnterprisePlan(plan) : false;
+  const isPaid = (plan?.amount || 0) > 0 || isEnterprise;
   const preselectedTicketType = searchParams.get('q') as TicketType;
 
   return (
@@ -61,6 +62,13 @@ export default function Page() {
             label={isSignedIn ? 'Back To Dashboard' : 'Sign In To Dashboard'}
           />
         </div>
+        {/* Thanksgiving banner for limited support availability, won't show after November 29 and will removed this after */}
+        {new Date() < new Date('2025-11-29') && (
+          <Banner severity="info" showIcon={false}>
+            In observance of Thanksgiving, our support team will have limited availability from
+            November 26–28. Thank you for your patience as response times may be delayed.
+          </Banner>
+        )}
         <header className="border-subtle flex items-center justify-between border-b py-6">
           <h1 className="text-2xl font-semibold">Inngest Support</h1>
           <div className="" title={`Status updated at ${status.updated_at}`}>

@@ -9,6 +9,7 @@ import (
 	"github.com/inngest/inngestgo/connect"
 	"github.com/inngest/inngestgo/internal/middleware"
 	"github.com/inngest/inngestgo/internal/sdkrequest"
+	"github.com/inngest/inngestgo/pkg/env"
 )
 
 const (
@@ -111,7 +112,7 @@ func Connect(ctx context.Context, opts ConnectOpts) (connect.WorkerConnection, e
 		MaxConcurrency:           concurrency,
 		APIBaseUrl:               defaultClient.h.GetAPIBaseURL(),
 		IsDev:                    defaultClient.h.isDev(),
-		DevServerUrl:             DevServerURL(),
+		DevServerUrl:             env.DevServerURL(),
 		InstanceID:               opts.InstanceID,
 		Platform:                 Ptr(platform()),
 		SDKVersion:               SDKVersion,
@@ -151,7 +152,7 @@ func (h *handler) InvokeFunction(ctx context.Context, slug string, stepId *strin
 	if !ok {
 		return nil, nil, fmt.Errorf("invalid client")
 	}
-	mw := middleware.NewMiddlewareManager().Add(cImpl.Middleware...)
+	mw := middleware.New().Add(cImpl.Middleware...)
 
 	// Invoke function, always complete regardless of
 	resp, ops, err := invoke(

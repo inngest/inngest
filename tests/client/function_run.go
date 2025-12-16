@@ -9,20 +9,22 @@ import (
 	"time"
 
 	"github.com/99designs/gqlgen/graphql"
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 type FunctionRunOpt struct {
-	Cursor    string
-	Items     int
-	Status    []string
-	TimeField models.RunsV2OrderByField
-	Order     []models.RunsV2OrderBy
-	Query     *string
-	Start     time.Time
-	End       time.Time
+	Cursor      string
+	Items       int
+	Status      []string
+	TimeField   models.RunsV2OrderByField
+	Order       []models.RunsV2OrderBy
+	Query       *string
+	Start       time.Time
+	End         time.Time
+	FunctionIDs []uuid.UUID
 }
 
 func (o FunctionRunOpt) OrderBy() string {
@@ -85,12 +87,13 @@ func (c *Client) FunctionRuns(ctx context.Context, opts FunctionRunOpt) ([]FnRun
 		$timeField: RunsV2OrderByField = QUEUED_AT,
 		$status: [FunctionRunStatus!],
 		$first: Int = 40,
-		$query: String
+		$query: String,
+		$ids: [UUID!]
 	) {
 		runs(
 			first: $first,
 			after: %s,
-			filter: { from: $startTime, until: $endTime, status: $status, timeField: $timeField, query: $query },
+			filter: { from: $startTime, until: $endTime, status: $status, timeField: $timeField, query: $query, functionIDs: $ids },
 			orderBy: %s
 		) {
 			edges {
@@ -125,6 +128,7 @@ func (c *Client) FunctionRuns(ctx context.Context, opts FunctionRunOpt) ([]FnRun
 			"status":    opts.Status,
 			"first":     items,
 			"query":     opts.Query,
+			"ids":       opts.FunctionIDs,
 		},
 	})
 	if len(resp.Errors) > 0 {
@@ -259,7 +263,7 @@ func (c *Client) WaitForRunTraces(ctx context.Context, t *testing.T, runID *stri
 		if !a.NotNil(run) {
 			return
 		}
-		if !a.Equal(opts.Status.String(), run.Status, "expected status did not match actual status") {
+		if opts.Status != "" && !a.Equal(opts.Status.String(), run.Status, "expected status did not match actual status") {
 			return
 		}
 

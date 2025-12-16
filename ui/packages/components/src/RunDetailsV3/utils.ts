@@ -1,7 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
-import type { Route } from 'next';
-import type { Result } from '@inngest/components/types/functionRun';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
+import type { FunctionRunStatus } from '../types/functionRun';
 import type { Trace } from './types';
 
 export const FINAL_SPAN_DISPLAY = 'Finalization';
@@ -28,6 +27,29 @@ export const maybeBooleanToString = (value: boolean | null): string | null => {
   }
   return value ? 'True' : 'False';
 };
+
+export function traceHasChildren(depth: number, trace: Trace) {
+  // Don't show single finalization step for successful runs
+  // unless they have children (e.g. failed attempts)
+  //
+  if (
+    depth === 0 &&
+    trace.childrenSpans?.length === 1 &&
+    // TODO: maybe update name here to allow "Finalization" as well as that seems to be present in traces now
+    trace.childrenSpans[0]?.name === FINAL_SPAN_NAME &&
+    (trace.childrenSpans[0]?.childrenSpans?.length ?? 0) == 0
+  ) {
+    return false;
+  }
+
+  if (depth == 1 && trace.childrenSpans?.length === 1) {
+    if (!trace.childrenSpans[0]?.isUserland) {
+      return false;
+    }
+  }
+
+  return (trace.childrenSpans?.length ?? 0) > 0;
+}
 
 export function createSpanWidths({ ended, max, min, queued, started }: SpanTimes): SpanWidths {
   let beforeWidth = queued - min;
@@ -94,7 +116,7 @@ const stepSelectionEmitter = {
   },
 };
 
-export const useStepSelection = (runID?: string) => {
+export const useStepSelection = ({ runID }: { runID?: string }) => {
   const [selectedStep, setSelectedStep] = useState<StepInfoType | undefined>(undefined);
 
   useEffect(() => {
@@ -134,4 +156,54 @@ export const formatDuration = (ms: number): string => {
 
 export const getSpanName = (name: string) => {
   return name === FINAL_SPAN_NAME ? FINAL_SPAN_DISPLAY : name;
+};
+
+export type DynamicRunData = {
+  runID: string;
+  status: string;
+  endedAt?: string;
+};
+
+type RunDataListener = {
+  callback: (data: DynamicRunData | undefined) => void;
+  runID?: string;
+};
+
+const dynamicRunDataEmitter = {
+  listeners: new Set<RunDataListener>(),
+
+  subscribe(callback: (step: DynamicRunData | undefined) => void, runID?: string) {
+    const listener = { callback, runID };
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  },
+
+  emit(data: DynamicRunData | undefined) {
+    this.listeners.forEach((listener) => {
+      if (!listener.runID || !data || listener.runID === data.runID) {
+        listener.callback(data);
+      }
+    });
+  },
+};
+
+//
+// This is a way for the detail trace data (which we poll) to emit updates to statuses and
+// run end times so we can immediately reflect those changes in the run list.
+// This exists because we can't currently, easily poll the run list to get realtime updates there.
+export const useDynamicRunData = ({ runID }: { runID?: string }) => {
+  const [dynamicRunData, setDynamicRunData] = useState<DynamicRunData | undefined>(undefined);
+
+  useEffect(() => {
+    const cleanup = dynamicRunDataEmitter.subscribe(setDynamicRunData, runID);
+    return () => {
+      cleanup();
+    };
+  }, [runID]);
+
+  const updateDynamicRunData = useCallback((data: DynamicRunData | undefined) => {
+    dynamicRunDataEmitter.emit(data);
+  }, []);
+
+  return { dynamicRunData, updateDynamicRunData };
 };

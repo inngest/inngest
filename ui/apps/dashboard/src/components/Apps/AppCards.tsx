@@ -9,11 +9,13 @@ import WorkerCounter from '@inngest/components/Workers/ConnectedWorkersDescripti
 import { methodTypes } from '@inngest/components/types/app';
 
 import { ArchiveModal } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/apps/[externalID]/ArchiveModal';
+import ResyncModal from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/apps/[externalID]/ResyncModal';
 import { ValidateModal } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/apps/[externalID]/ValidateButton/ValidateModal';
 import { type FlattenedApp } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/apps/useApps';
 import { ActionsMenu } from '@/components/Apps/ActionsMenu';
 import getAppCardContent from '@/components/Apps/AppCardContent';
 import { pathCreator } from '@/utils/urls';
+import { isSyncStatusHiddenOnAppCard } from '../SyncStatusPill';
 import { useWorkersCount } from '../Workers/useWorker';
 
 export default function AppCards({ apps, envSlug }: { apps: FlattenedApp[]; envSlug: string }) {
@@ -21,9 +23,9 @@ export default function AppCards({ apps, envSlug }: { apps: FlattenedApp[]; envS
   const router = useRouter();
 
   const [selectedApp, setSelectedApp] = useState<FlattenedApp | null>(null);
-  const [modalType, setModalType] = useState<'archive' | 'validate' | null>(null);
+  const [modalType, setModalType] = useState<'archive' | 'validate' | 'resync' | null>(null);
 
-  const handleShowModal = (app: FlattenedApp, type: 'archive' | 'validate') => {
+  const handleShowModal = (app: FlattenedApp, type: 'archive' | 'validate' | 'resync') => {
     setSelectedApp(app);
     setModalType(type);
   };
@@ -58,7 +60,7 @@ export default function AppCards({ apps, envSlug }: { apps: FlattenedApp[]; envS
                 url={pathCreator.app({ envSlug, externalAppID: app.externalID })}
                 app={app}
                 pill={
-                  status ? (
+                  status && !isSyncStatusHiddenOnAppCard(app.status) ? (
                     <Pill appearance="outlined" kind={appKind}>
                       {status}
                     </Pill>
@@ -80,6 +82,7 @@ export default function AppCards({ apps, envSlug }: { apps: FlattenedApp[]; envS
                       disableArchive={!app.url}
                       showValidate={() => handleShowModal(app, 'validate')}
                       disableValidate={app.isParentArchived || app.method === methodTypes.Connect}
+                      showResync={() => handleShowModal(app, 'resync')}
                     />
                   </div>
                 }
@@ -105,6 +108,16 @@ export default function AppCards({ apps, envSlug }: { apps: FlattenedApp[]; envS
           isArchived={selectedApp.isArchived}
           isOpen={true}
           onClose={handleCloseModal}
+        />
+      )}
+      {selectedApp?.url && modalType === 'resync' && (
+        <ResyncModal
+          appExternalID={selectedApp.externalID}
+          appMethod={selectedApp.method}
+          isOpen={true}
+          onClose={handleCloseModal}
+          url={selectedApp.url}
+          platform={selectedApp.platform || null}
         />
       )}
     </>

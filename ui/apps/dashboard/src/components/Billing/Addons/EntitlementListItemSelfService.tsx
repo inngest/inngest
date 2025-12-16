@@ -8,9 +8,11 @@ import { RiAlertFill } from '@remixicon/react';
 import { toast } from 'sonner';
 import { useMutation } from 'urql';
 
+import AdvancedObservabilityComponent from '@/components/Billing/Addons/AdvancedObservabilityModal';
 import EntitlementListItemSelfServiceNumeric from '@/components/Billing/Addons/EntitlementListItemSelfServiceNumeric';
 import { addonQtyCostString } from '@/components/Billing/Addons/pricing_help';
 import { graphql } from '@/gql';
+import SlackChannelComponent from './SlackChannelModal';
 
 const UpdateAccountAddonQuantityDocument = graphql(`
   mutation UpdateAccountAddonQuantity($addonName: String!, $quantity: Int!) {
@@ -26,6 +28,7 @@ export default function EntitlementListItemSelfService({
   tooltip,
   entitlement,
   addon,
+  addonPurchased,
   onChange,
 }: {
   title: string;
@@ -42,6 +45,7 @@ export default function EntitlementListItemSelfService({
     quantityPer: number;
     price: number;
   };
+  addonPurchased?: boolean;
   onChange?: () => void;
 }) {
   const router = useRouter();
@@ -50,11 +54,17 @@ export default function EntitlementListItemSelfService({
   const [openConfirmationModal, setOpenConfirmationModal] = useState(false);
   const [addonCost, setAddonCost] = useState(0);
   const [addonQty, setAddonQty] = useState(0);
+  const [isRemoving, setIsRemoving] = useState(false);
   const [, updateAccountAddonQuantity] = useMutation(UpdateAccountAddonQuantityDocument);
   const [err, setErr] = useState<String | null>(null);
 
   const switchInput = typeof entitlement.currentValue === 'boolean';
   const numericInput = typeof entitlement.currentValue === 'number';
+
+  const isAdvancedObservability =
+    title === 'Log retention' || title === 'Metrics granularity' || title === 'Metrics freshness';
+
+  const isDedicatedSlackChannel = title === 'Dedicated Slack Channel';
 
   const addonCostStr = addonQtyCostString(addonQty, addon);
 
@@ -68,11 +78,6 @@ export default function EntitlementListItemSelfService({
         addonQty * addon.quantityPer
       } ${title.toLowerCase()} will be ${addonCostStr}.`
     : `Your new charge for ${title.toLowerCase()} will be ${addonCostStr}.`;
-
-  if (switchInput) {
-    // TODO: boolean/switch support: https://linear.app/inngest/issue/INN-4303/addon-ui-component-supports-switchboolean-inputs
-    throw new Error('Switch input is not yet supported');
-  }
 
   const handleSubmit = async () => {
     setOpenConfirmationModal(false);
@@ -89,9 +94,40 @@ export default function EntitlementListItemSelfService({
         onChange();
       }
       router.refresh();
-      toast.success(`Addon updated successfully`);
+      toast.success(`Addon ${isRemoving ? 'removed' : 'updated'} successfully`);
     }
+    setIsRemoving(false);
   };
+
+  if (switchInput) {
+    if (isAdvancedObservability) {
+      return (
+        <AdvancedObservabilityComponent
+          title={title}
+          description={description}
+          tooltip={tooltip}
+          entitlement={entitlement}
+          addon={addon}
+          addonPurchased={addonPurchased}
+          onChange={onChange}
+        />
+      );
+    } else if (isDedicatedSlackChannel) {
+      return (
+        <SlackChannelComponent
+          title={title}
+          description={description}
+          tooltip={tooltip}
+          entitlement={entitlement}
+          addon={addon}
+          addonPurchased={addonPurchased}
+          onChange={onChange}
+        />
+      );
+    } else {
+      throw new Error('Boolean addons not supported yet');
+    }
+  }
 
   return (
     <>

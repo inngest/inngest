@@ -4,8 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/inngest/inngest/pkg/expressions"
 	"time"
+
+	"github.com/inngest/inngest/pkg/expressions"
 
 	"github.com/inngest/inngest/pkg/syscode"
 )
@@ -49,6 +50,10 @@ type EventBatchConfig struct {
 	// Timeout is the maximum number of time the batch will
 	// wait before being consumed.
 	Timeout string `json:"timeout"`
+
+	// If is an optional boolean expression which must evaluate to true for the event to be eligible for batching.
+	// For events where this expression evaluates to false, the event will be scheduled for execution immediately in a non-batched mode
+	If *string `json:"if,omitempty"`
 }
 
 func (c EventBatchConfig) IsEnabled() bool {
@@ -85,6 +90,16 @@ func (c EventBatchConfig) IsValid(ctx context.Context) error {
 			return syscode.Error{
 				Code:    syscode.CodeBatchKeyExpressionInvalid,
 				Message: fmt.Sprintf("batch key expression is invalid: %s", exprErr),
+			}
+		}
+	}
+
+	if c.If != nil {
+		// Ensure the expression is valid if present.
+		if exprErr := expressions.Validate(ctx, nil, *c.If); exprErr != nil {
+			return syscode.Error{
+				Code:    syscode.CodeBatchIfExpressionInvalid,
+				Message: fmt.Sprintf("conditional batch expression is invalid %s", exprErr),
 			}
 		}
 	}

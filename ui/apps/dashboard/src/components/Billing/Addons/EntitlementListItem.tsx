@@ -2,6 +2,8 @@
 
 import { Button } from '@inngest/components/Button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip/Tooltip';
+import { useSearchParam } from '@inngest/components/hooks/useSearchParam';
+import { cn } from '@inngest/components/utils/classNames';
 import { RiInformationLine } from '@remixicon/react';
 
 import EntitlementListItemSelfService from '@/components/Billing/Addons/EntitlementListItemSelfService';
@@ -34,9 +36,13 @@ export default function EntitlementListItem({
     maxValue: number;
     quantityPer: number; // The number of units (e.g. concurrency or users) included in one purchase of this addon
     price: number | null; // Price for one purchase of this addon, in US Cents.
+    purchased?: boolean;
   }; // No addon, or no price, implies self-service is not available.
   onChange?: () => void;
 }) {
+  const [highlight] = useSearchParam('highlight');
+
+  const highlighted = highlight === title.toLowerCase().replace(/ /g, '-');
   const tooltip = tooltipContent ? (
     <Tooltip>
       <TooltipTrigger>
@@ -72,6 +78,7 @@ export default function EntitlementListItem({
           quantityPer: addon.quantityPer,
           addonName: addon.name,
         }}
+        addonPurchased={addon.purchased}
         onChange={onChange}
       />
     );
@@ -125,5 +132,14 @@ export default function EntitlementListItem({
     );
   }
 
-  return <div className="mb-5">{content}</div>;
+  return (
+    <div
+      className={cn(
+        'mb-5 transition-colors duration-300',
+        highlighted && 'bg-primary-subtle/10 border-primary-subtle/20 rounded-md border p-3'
+      )}
+    >
+      {content}
+    </div>
+  );
 }

@@ -9,6 +9,9 @@ on:
     paths-ignore:
       - "ui/**"
 
+permissions:
+  contents: read
+
 jobs:
   golangci:
     name: Lint
@@ -18,34 +21,64 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: true
+
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.24'
+          go-version-file: ./go.mod
+
       - name: Lint
+        uses: golangci/golangci-lint-action@v8
+        with:
+          version: v2.2.1
+          args: --verbose
+
+  gen:
+    name: 'git state after "make gen protobuf"'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: nicknovitski/nix-develop@v1.2.1
+      - name: 'Check for dirty Git state after running "make gen protobuf"'
         run: |
-          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v2.1.2
-          ./bin/golangci-lint run --verbose
+          make gen protobuf
+          git diff
+          git diff --name-only --exit-code
 
   test-linux-race:
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]
-        experimentalKeyQueues: [ false, true ]
+        experimentalKeyQueues: [false, true]
+        enableConstraintAPI: [false, true]
     runs-on: ${{ matrix.os }}
-    name: "Test / OS: ${{ matrix.os }}, key-queues: ${{ matrix.experimentalKeyQueues }}"
+    name: "Test / OS: ${{ matrix.os }}, key-queues: ${{ matrix.experimentalKeyQueues }}, constraint-api: ${{ matrix.enableConstraintAPI }}"
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: true
 
       - name: Set up Go
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v5
         with:
-          go-version: '1.24'
+          go-version-file: ./go.mod
 
       - name: Test
         run: |
-          go test -v $(find . -iname "*_test.go" | xargs -I {} dirname {} | uniq | grep -v "./tests") -race -count=1
+          go test -v $(find . -iname "*_test.go" | xargs -I {} dirname {} | uniq | grep -v "./tests") -race -count=1 -coverprofile=coverage.txt
         env:
           TEST_MODE: true
           EXPERIMENTAL_KEY_QUEUES_ENABLE: "${{ matrix.experimentalKeyQueues }}"
+          ENABLE_CONSTRAINT_API: "${{ matrix.enableConstraintAPI }}"
+
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          flags: unit,kq-${{ matrix.experimentalKeyQueues }}

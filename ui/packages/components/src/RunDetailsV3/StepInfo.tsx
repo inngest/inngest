@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Button } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button/Button';
+import { Button as NewButton } from '@inngest/components/Button/NewButton';
 import { RiArrowRightSLine } from '@remixicon/react';
 
 import { AITrace } from '../AI/AITrace';
@@ -11,12 +12,15 @@ import {
   TextElement,
   TimeElement,
 } from '../DetailsCard/NewElement';
+import { RerunModal as NewRerunModal } from '../Rerun/NewRerunModal';
 import { RerunModal } from '../Rerun/RerunModal';
+import { useShared } from '../SharedContext/SharedContext';
+import { useGetTraceResult } from '../SharedContext/useGetTraceResult';
 import { usePathCreator } from '../SharedContext/usePathCreator';
 import { Time } from '../Time';
-import { usePrettyErrorBody, usePrettyJson } from '../hooks/usePrettyJson';
-import type { Result } from '../types/functionRun';
+import { usePrettyErrorBody, usePrettyJson, usePrettyShortError } from '../hooks/usePrettyJson';
 import { formatMilliseconds, toMaybeDate } from '../utils/date';
+import { ErrorInfo } from './ErrorInfo';
 import { IO } from './IO';
 import { Tabs } from './Tabs';
 import { UserlandAttrs } from './UserlandAttrs';
@@ -123,65 +127,39 @@ const getStepKindInfo = (props: StepKindInfoProps): JSX.Element | null =>
 
 export const StepInfo = ({
   selectedStep,
-  getResult,
-  pollInterval,
+  pollInterval: initialPollInterval,
+  tracesPreviewEnabled,
+  debug = false,
+  newStack = false,
 }: {
   selectedStep: StepInfoType;
-  getResult: (outputID: string) => Promise<Result>;
   pollInterval?: number;
+  tracesPreviewEnabled?: boolean;
+  debug?: boolean;
+  newStack?: boolean;
 }) => {
+  const { cloud } = useShared();
   const [expanded, setExpanded] = useState(true);
   const [rerunModalOpen, setRerunModalOpen] = useState(false);
   const { runID, trace } = selectedStep;
-  const [result, setResult] = useState<Result>();
+  const [pollInterval, setPollInterval] = useState(initialPollInterval);
+  const { loading, data: result } = useGetTraceResult({
+    traceID: trace.outputID,
+    refetchInterval: pollInterval ? pollInterval : undefined,
+    preview: tracesPreviewEnabled,
+  });
 
   useEffect(() => {
-    let intervalId: ReturnType<typeof setInterval> | undefined;
-
-    const refreshResult = () => {
-      if (trace.outputID) {
-        getResult(trace.outputID).then(setResult);
-      } else {
-        setResult(undefined);
-      }
-    };
-
-    //
-    // fetch once on load
-    refreshResult();
-
-    //
-    // while the run is polling, continue polling for output
-    if (pollInterval) {
-      intervalId = setInterval(() => {
-        refreshResult();
-      }, pollInterval);
-    }
-
-    return () => {
-      if (intervalId) {
-        clearInterval(intervalId);
-      }
-    };
-  }, [getResult, trace.outputID, pollInterval, setResult]);
+    result && setPollInterval(undefined);
+  }, [result]);
 
   const delayText = formatMilliseconds(
     (toMaybeDate(trace.startedAt) ?? new Date()).getTime() - new Date(trace.queuedAt).getTime()
   );
 
-  const duration = trace.childrenSpans?.length
-    ? trace.childrenSpans
-        .filter((child) => child.startedAt)
-        .reduce(
-          (total, child) =>
-            total +
-            ((toMaybeDate(child.endedAt) ?? new Date()).getTime() -
-              new Date(child.startedAt!).getTime()),
-          0
-        )
-    : trace.startedAt
-    ? (toMaybeDate(trace.endedAt) ?? new Date()).getTime() - new Date(trace.startedAt).getTime()
-    : 0;
+  const startedAt = toMaybeDate(trace.startedAt);
+  const endedAt = toMaybeDate(trace.endedAt);
+  const duration = startedAt ? (endedAt ?? new Date()).getTime() - startedAt.getTime() : 0;
 
   const durationText = duration > 0 ? formatMilliseconds(duration) : '-';
 
@@ -193,9 +171,10 @@ export const StepInfo = ({
   const prettyInput = usePrettyJson(result?.input ?? '') || (result?.input ?? '');
   const prettyOutput = usePrettyJson(result?.data ?? '') || (result?.data ?? '');
   const prettyErrorBody = usePrettyErrorBody(result?.error);
+  const prettyShortError = usePrettyShortError(result?.error);
 
   return (
-    <div className="sticky top-14 flex flex-col justify-start gap-2 overflow-hidden">
+    <div className="flex h-full flex-col justify-start gap-2">
       <div className="flex min-h-11 w-full flex-row items-center justify-between border-none px-4">
         <div
           className="text-basis flex cursor-pointer items-center justify-start gap-2"
@@ -209,24 +188,45 @@ export const StepInfo = ({
 
           <span className="text-basis text-sm font-normal">{trace.name}</span>
         </div>
-        {runID && trace.stepID && prettyInput && (
-          <>
-            <Button
-              kind="primary"
-              appearance="outlined"
-              size="medium"
-              label="Rerun from step"
-              onClick={() => setRerunModalOpen(true)}
-            />
-            <RerunModal
-              open={rerunModalOpen}
-              setOpen={setRerunModalOpen}
-              runID={runID}
-              stepID={trace.stepID}
-              input={prettyInput}
-            />
-          </>
-        )}
+        {!debug &&
+          runID &&
+          trace.stepID &&
+          (!cloud || prettyInput) &&
+          (newStack ? (
+            <>
+              <NewButton
+                kind="primary"
+                appearance="outlined"
+                size="medium"
+                label="Rerun from step"
+                onClick={() => setRerunModalOpen(true)}
+              />
+              <NewRerunModal
+                open={rerunModalOpen}
+                setOpen={setRerunModalOpen}
+                runID={runID}
+                stepID={trace.stepID}
+                input={prettyInput || result?.input || ''}
+              />
+            </>
+          ) : (
+            <>
+              <Button
+                kind="primary"
+                appearance="outlined"
+                size="medium"
+                label="Rerun from step"
+                onClick={() => setRerunModalOpen(true)}
+              />
+              <RerunModal
+                open={rerunModalOpen}
+                setOpen={setRerunModalOpen}
+                runID={runID}
+                stepID={trace.stepID}
+                input={prettyInput || result?.input || ''}
+              />
+            </>
+          ))}
       </div>
 
       {expanded && (
@@ -272,46 +272,50 @@ export const StepInfo = ({
       {trace.isUserland && trace.userlandSpan ? (
         <UserlandAttrs userlandSpan={trace.userlandSpan} />
       ) : (
-        <Tabs
-          defaultActive={result?.error ? 'error' : prettyInput ? 'input' : 'output'}
-          tabs={[
-            ...(prettyInput
-              ? [
-                  {
-                    label: 'Input',
-                    id: 'input',
-                    node: <IO title="Step Input" raw={prettyInput} />,
-                  },
-                ]
-              : []),
-            ...(prettyOutput
-              ? [
-                  {
-                    label: 'Output',
-                    id: 'output',
-                    node: <IO title="Step Output" raw={prettyOutput} />,
-                  },
-                ]
-              : []),
-            ...(result?.error
-              ? [
-                  {
-                    label: 'Error',
-                    id: 'error',
-                    node: (
-                      <IO
-                        title={`${result.error.name || 'Error'} ${
-                          result.error.message ? `: ${result.error.message}` : ''
-                        }`}
-                        raw={prettyErrorBody ?? ''}
-                        error={true}
-                      />
-                    ),
-                  },
-                ]
-              : []),
-          ]}
-        />
+        <>
+          {result?.error && <ErrorInfo error={prettyShortError} />}
+          <div className="flex-1">
+            <Tabs
+              defaultActive={result?.error ? 'error' : 'output'}
+              tabs={[
+                ...(prettyInput
+                  ? [
+                      {
+                        label: 'Input',
+                        id: 'input',
+                        node: <IO title="Step Input" raw={prettyInput} loading={loading} />,
+                      },
+                    ]
+                  : []),
+                ...(prettyOutput
+                  ? [
+                      {
+                        label: 'Output',
+                        id: 'output',
+                        node: <IO title="Step Output" raw={prettyOutput} loading={loading} />,
+                      },
+                    ]
+                  : []),
+                ...(result?.error
+                  ? [
+                      {
+                        label: 'Error details',
+                        id: 'error',
+                        node: (
+                          <IO
+                            title={prettyShortError}
+                            raw={prettyErrorBody ?? ''}
+                            error={true}
+                            loading={loading}
+                          />
+                        ),
+                      },
+                    ]
+                  : []),
+              ]}
+            />
+          </div>
+        </>
       )}
     </div>
   );

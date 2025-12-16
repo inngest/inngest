@@ -9,6 +9,11 @@ scalar Uint
 scalar ULID
 scalar UUID
 scalar Bytes
+scalar Unknown
+scalar Int64
+scalar SpanMetadataKind
+scalar SpanMetadataScope
+scalar SpanMetadataValues
 
 "The pagination information in a connection."
 type PageInfo {
@@ -93,6 +98,52 @@ enum EventStatus {
 
   # The event triggered no functions.
   NO_FUNCTIONS
+}
+
+type EventsConnection {
+  edges: [EventsEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type EventsEdge {
+  node: EventV2!
+  cursor: String!
+}
+
+type EventV2 {
+  envID: UUID!
+
+  # Internal ID.
+  id: ULID!
+
+  # The "id" field.
+  idempotencyKey: String
+
+  name: String!
+
+  # The "ts" field, or receivedAt if "ts" was not set.
+  occurredAt: Time!
+
+  # The raw event data. Basically what the event producer sent.
+  raw: String!
+
+  # When the event was received by Inngest.
+  receivedAt: Time!
+
+  # NOTE: Should this use Relay-style pagination?
+  runs: [FunctionRunV2!]!
+
+  source: EventSource
+
+  # The "version" field.
+  version: String
+}
+
+type EventSource {
+  id: ID!
+  name: String
+  sourceKind: String!
 }
 
 enum FunctionStatus {
@@ -449,7 +500,7 @@ type FunctionRunV2 {
 type RunsV2Connection {
   edges: [FunctionRunV2Edge!]!
   pageInfo: PageInfo!
-  totalCount: Int!
+  totalCount(preview: Boolean): Int!
 }
 
 type FunctionRunV2Edge {
@@ -539,12 +590,23 @@ type RunTraceSpan {
   stepOp: StepOp # the operation this span represents; nil means it can't be attributed to a step yet
   stepID: String # the ID of the step this span is associated with
   stepInfo: StepInfo # info about the step - use fragments to access appropriately
+  stepType: String!
   # Nice-to-haves for navigating the trace
   isRoot: Boolean! # whether this span is the root span of the trace (shortcut for presence of rootspan)
   parentSpanID: String
   parentSpan: RunTraceSpan # the parent span of this span
   isUserland: Boolean! # whether this span is a userland span
   userlandSpan: UserlandSpan
+  debugRunID: ULID
+  debugSessionID: ULID
+  debugPaused: Boolean!
+  metadata: [SpanMetadata!]!
+}
+
+type SpanMetadata {
+  scope: SpanMetadataScope!
+  kind: SpanMetadataKind!
+  values: SpanMetadataValues!
 }
 
 type UserlandSpan {
@@ -567,7 +629,7 @@ type StepError {
   message: String!
   name: String
   stack: String
-  cause: Bytes
+  cause: Unknown
 }
 
 type RunTraceTrigger {
@@ -578,6 +640,32 @@ type RunTraceTrigger {
   isBatch: Boolean! # indicates if this trigger is a batch trigger
   batchID: ULID # the batchID of this list of events if available
   cron: String # The cron expression if available
+}
+
+# debug types
+
+type DebugRun {
+  debugTraces: [RunTraceSpan!]
+}
+
+type DebugSessionRun {
+  status: RunTraceSpanStatus!
+  queuedAt: Time!
+  startedAt: Time
+  endedAt: Time
+  debugRunID: ULID
+  tags: [String!]
+  versions: [String!]
+}
+
+type DebugSession {
+  debugRuns: [DebugSessionRun!]
+}
+
+type RunStep {
+  stepID: String!
+  name: String!
+  stepOp: StepOp
 }
 
 # connect
@@ -620,6 +708,7 @@ type ConnectV1WorkerConnection {
   gatewayId: ULID!
   instanceId: String!
   workerIp: String!
+  maxWorkerConcurrency: Int64!
 
   appName: String
   appID: UUID
@@ -664,6 +753,7 @@ type ConnectV1WorkerConnectionEdge {
 enum AppMethod {
   SERVE
   CONNECT
+  API
 }
 
 input AppsFilterV1 {

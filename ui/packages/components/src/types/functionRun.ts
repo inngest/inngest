@@ -9,6 +9,7 @@ export const functionRunStatuses = [
   'CANCELLED',
   'SKIPPED',
   'WAITING',
+  'UNKNOWN',
 ] as const;
 const FunctionRunEndedStatuses = ['CANCELLED', 'COMPLETED', 'FAILED'] as const;
 export type FunctionRunStatus = (typeof functionRunStatuses)[number];
@@ -53,14 +54,3 @@ export function isFunctionTimeField(s: string): s is FunctionRunTimeField {
 
   return false;
 }
-
-export type Result = {
-  input: string | null;
-  data: string | null;
-  error: {
-    message: string;
-    name: string | null;
-    stack: string | null;
-    cause: string | null;
-  } | null;
-};

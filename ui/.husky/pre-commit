@@ -1,5 +1,22 @@
 #!/usr/bin/env sh
 . "$(dirname -- "$0")/_/husky.sh"
 
+# 
+# detect any global precommit hooks and run those before running ours
+GLOBAL_HOOKS_PATH=$(git config --global core.hooksPath 2>/dev/null || echo "")
+
+if [ -n "$GLOBAL_HOOKS_PATH" ]; then
+  GLOBAL_PRECOMMIT="$GLOBAL_HOOKS_PATH/pre-commit"
+  if [ -x "$GLOBAL_PRECOMMIT" ]; then
+    echo "Running user global pre-commit hook at $GLOBAL_PRECOMMIT..."
+    "$GLOBAL_PRECOMMIT"
+    STATUS=$?
+    if [ $STATUS -ne 0 ]; then
+      echo "❌ Global pre-commit hook failed. Aborting commit."
+      exit $STATUS
+    fi
+  fi
+fi
+
 cd ui/
 npx lint-staged

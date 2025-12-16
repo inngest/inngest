@@ -129,6 +129,16 @@ func (s SerializableRequest) Bytes() (io.Reader, error) {
 	return &buf, nil
 }
 
+// JSON returns the marshaled serialized request as bytes without escaping special characters
+func (s SerializableRequest) JSON() ([]byte, error) {
+	reader, err := s.Bytes()
+	if err != nil {
+		return nil, err
+	}
+
+	return io.ReadAll(reader)
+}
+
 // HTTPRequest converts the serializable request into a *http.Request ready to be sent
 func (s SerializableRequest) HTTPRequest() (*http.Request, error) {
 	var body io.Reader
@@ -144,6 +154,7 @@ func (s SerializableRequest) HTTPRequest() (*http.Request, error) {
 	req.Header = s.Header
 	// Always close the request after reading the body, ensuring the connection is not recycled.
 	req.Close = true
+	req.Header.Add("user-agent", "Inngest")
 	return req, nil
 }
 

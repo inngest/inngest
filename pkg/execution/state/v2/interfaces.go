@@ -35,11 +35,11 @@ type RunService interface {
 	StateLoader
 
 	// Create creates new state in the store for the given run ID.
-	Create(ctx context.Context, s CreateState) (state.State, error)
+	Create(ctx context.Context, s CreateState) (State, error)
 	// Delete deletes state, metadata, and - when pauses are included - associated pauses
 	// for the run from the store.  Nothing referencing the run should exist in the state
 	// store after.
-	Delete(ctx context.Context, id ID) (bool, error)
+	Delete(ctx context.Context, id ID) error
 	// Exists checks whether a run exists given an ID
 	Exists(ctx context.Context, id ID) (bool, error)
 	// Update updates configuration on the state, eg. setting the execution
@@ -59,6 +59,12 @@ type StateLoader interface {
 	LoadEvents(ctx context.Context, id ID) ([]json.RawMessage, error)
 	// LoadState returns all steps for a run.
 	LoadSteps(ctx context.Context, id ID) (map[string]json.RawMessage, error)
+	// LoadStepInputs returns only the step inputs for a run.
+	LoadStepInputs(ctx context.Context, id ID) (map[string]json.RawMessage, error)
+	// LoadStepsWithIDs returns a list of steps with the given IDs for a run.
+	LoadStepsWithIDs(ctx context.Context, id ID, stepIDs []string) (map[string]json.RawMessage, error)
+	// LoadStack returns the stack for a given run
+	LoadStack(ctx context.Context, id ID) ([]string, error)
 
 	// LoadState returns all state for a run, including steps, events, and metadata.
 	LoadState(ctx context.Context, id ID) (State, error)
@@ -66,3 +72,19 @@ type StateLoader interface {
 	// StreamState returns all state without loading in-memory
 	// StreamState(ctx context.Context, id ID) (io.Reader, error)
 }
+
+//
+// Re-exports for compat.
+//
+
+type (
+	GeneratorOpcode = state.GeneratorOpcode
+	UserError       = state.UserError
+	DriverResponse  = state.DriverResponse
+)
+
+var (
+	ErrRunNotFound        = state.ErrRunNotFound
+	ErrIdempotentResponse = state.ErrIdempotentResponse
+	ErrDuplicateResponse  = state.ErrDuplicateResponse
+)

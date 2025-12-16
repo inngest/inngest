@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { notFound } from 'next/navigation';
+import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
 import {
   DropdownMenu,
@@ -15,6 +16,7 @@ import { useEnvironment } from '@/components/Environments/environment-context';
 import { Secret } from '@/components/Secret';
 import type { SecretKind } from '@/components/Secret/Secret';
 import { graphql } from '@/gql';
+import { EnvironmentType } from '@/utils/environments';
 import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
 import { Provider } from './Context';
 import DeleteKeyModal from './DeleteKeyModal';
@@ -96,69 +98,76 @@ export default function Keys({ params: { ingestKeys, keyID } }: KeyDetailsProps)
   }
 
   return (
-    <div className="divide-subtle m-6 divide-y">
-      <Provider initialState={key}>
-        <div className="pb-8">
-          <div className="mb-8 flex items-center gap-2">
-            <h2 className="text-lg font-semibold">{key.name}</h2>
-            {/* TO DO: move this to the Header as ActionsMenu */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  kind="secondary"
-                  appearance="outlined"
-                  size="medium"
-                  icon={<RiMore2Line />}
-                />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                <DropdownMenuItem onSelect={() => setIsEditKeyNameModalVisible(true)}>
-                  <RiPencilLine className="h-4 w-4" />
-                  Edit name
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onSelect={() => setIsDeleteKeyModalVisible(true)}
-                  className="text-error"
-                >
-                  <RiDeleteBinLine className="h-4 w-4" />
-                  Delete
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <DeleteKeyModal
-              keyID={keyID}
-              isOpen={isDeleteKeyModalVisible}
-              onClose={() => setIsDeleteKeyModalVisible(false)}
-              description={
-                isIntegration
-                  ? 'Warning: This key was created via integration. Please confirm that you are no longer using it before deleting.'
-                  : ''
-              }
-            />
-            <EditKeyNameModal
-              keyID={keyID}
-              keyName={key.name}
-              isOpen={isEditKeyNameModalVisible}
-              onClose={() => setIsEditKeyNameModalVisible(false)}
-            />
-            {key.source === SOURCE_INTEGRATION && (
-              <span className="text-subtle ml-8 text-sm">Created via integration</span>
-            )}
+    <div>
+      {ingestKeys === 'keys' && environment.type === EnvironmentType.BranchParent && (
+        <Alert className="flex items-center rounded-none text-sm" severity="info">
+          Event keys are shared for all branch environments
+        </Alert>
+      )}
+      <div className="divide-subtle m-6 divide-y">
+        <Provider initialState={key}>
+          <div className="pb-8">
+            <div className="mb-8 flex items-center gap-2">
+              <h2 className="text-lg font-semibold">{key.name}</h2>
+              {/* TO DO: move this to the Header as ActionsMenu */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    kind="secondary"
+                    appearance="outlined"
+                    size="medium"
+                    icon={<RiMore2Line />}
+                  />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  <DropdownMenuItem onSelect={() => setIsEditKeyNameModalVisible(true)}>
+                    <RiPencilLine className="h-4 w-4" />
+                    Edit name
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onSelect={() => setIsDeleteKeyModalVisible(true)}
+                    className="text-error"
+                  >
+                    <RiDeleteBinLine className="h-4 w-4" />
+                    Delete
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <DeleteKeyModal
+                keyID={keyID}
+                isOpen={isDeleteKeyModalVisible}
+                onClose={() => setIsDeleteKeyModalVisible(false)}
+                description={
+                  isIntegration
+                    ? 'Warning: This key was created via integration. Please confirm that you are no longer using it before deleting.'
+                    : ''
+                }
+              />
+              <EditKeyNameModal
+                keyID={keyID}
+                keyName={key.name}
+                isOpen={isEditKeyNameModalVisible}
+                onClose={() => setIsEditKeyNameModalVisible(false)}
+              />
+              {key.source === SOURCE_INTEGRATION && (
+                <span className="text-subtle ml-8 text-sm">Created via integration</span>
+              )}
+            </div>
+            <div className="w-3/5">
+              <Secret kind={secretKind} secret={value} />
+            </div>
           </div>
-          <div className="w-3/5">
-            <Secret kind={secretKind} secret={value} />
-          </div>
-        </div>
-        <TransformEvent keyID={keyID} metadata={key.metadata} keyName={key.name} />
-        <FilterEvents
-          keyID={keyID}
-          filter={{
-            ...key.filter,
-            type: filterType,
-          }}
-          keyName={key.name}
-        />
-      </Provider>
+          <TransformEvent keyID={keyID} metadata={key.metadata} keyName={key.name} />
+          <FilterEvents
+            keyID={keyID}
+            filter={{
+              ...key.filter,
+              type: filterType,
+            }}
+            keyName={key.name}
+          />
+        </Provider>
+      </div>
     </div>
   );
 }

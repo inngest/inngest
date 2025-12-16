@@ -6,6 +6,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net"
+	"net/http"
+	"net/url"
+	"time"
+
 	"github.com/coder/websocket"
 	"github.com/inngest/inngest/pkg/backoff"
 	connecterrors "github.com/inngest/inngest/pkg/connect/errors"
@@ -15,10 +21,6 @@ import (
 	"github.com/inngest/inngest/pkg/syscode"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/oklog/ulid/v2"
-	"io"
-	"net/http"
-	"net/url"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/headers"
@@ -35,6 +37,7 @@ type StateManager interface {
 	WorkerGroupManager
 	GatewayManager
 	RequestStateManager
+	WorkerCapacityManager
 }
 
 type ConnectionManager interface {
@@ -57,21 +60,30 @@ type GatewayManager interface {
 	UpsertGateway(ctx context.Context, gateway *Gateway) error
 	DeleteGateway(ctx context.Context, gatewayId ulid.ULID) error
 	GetGateway(ctx context.Context, gatewayId ulid.ULID) (*Gateway, error)
+	GetAllGateways(ctx context.Context) ([]*Gateway, error)
+	GetAllGatewayIDs(ctx context.Context) ([]string, error)
 }
 
 type RequestStateManager interface {
 	// LeaseRequest attempts to lease the given requestID for <duration>. If the request is already leased, this will fail with ErrRequestLeased.
-	LeaseRequest(ctx context.Context, envID uuid.UUID, requestID string, duration time.Duration) (leaseID *ulid.ULID, err error)
+	LeaseRequest(ctx context.Context, envID uuid.UUID, requestID string, duration time.Duration, executorIP net.IP) (leaseID *ulid.ULID, err error)
 
 	// ExtendRequestLease attempts to extend a lease for the given request. This will fail if the lease expired (ErrRequestLeaseExpired) or
 	// the current lease does not match the passed leaseID (ErrRequestLeased).
-	ExtendRequestLease(ctx context.Context, envID uuid.UUID, requestID string, leaseID ulid.ULID, duration time.Duration) (newLeaseID *ulid.ULID, err error)
+	// It also refreshes the worker instance's lease by updating the worker instance's last heartbeat.
+	ExtendRequestLease(ctx context.Context, envID uuid.UUID, instanceID string, requestID string, leaseID ulid.ULID, duration time.Duration, isWorkerCapacityUnlimited bool) (newLeaseID *ulid.ULID, err error)
 
 	// IsRequestLeased checks whether the given request is currently leased and the lease has not expired.
 	IsRequestLeased(ctx context.Context, envID uuid.UUID, requestID string) (bool, error)
 
 	// DeleteLease allows the executor to clean up the lease once the request is done processing.
 	DeleteLease(ctx context.Context, envID uuid.UUID, requestID string) error
+
+	// GetExecutorIP retrieves the IP of the executor that owns the request's lease.
+	GetExecutorIP(ctx context.Context, envID uuid.UUID, requestID string) (net.IP, error)
+
+	// GetAssignedWorkerID retrieves the instance ID of the worker that is assigned to the request.
+	GetAssignedWorkerID(ctx context.Context, envID uuid.UUID, requestID string) (string, error)
 
 	// SaveResponse is an idempotent, atomic write for reliably buffering a response for the executor to pick up
 	// in case Redis PubSub fails to notify the executor.
@@ -82,6 +94,37 @@ type RequestStateManager interface {
 
 	// DeleteResponse is an idempotent delete operation for the temporary response buffer.
 	DeleteResponse(ctx context.Context, envID uuid.UUID, requestID string) error
+}
+
+// WorkerCapacityManager tracks concurrency limits per worker instance.
+// This allows enforcement of maxConcurrentLeases settings per worker regardless
+// of how many apps or functions the worker serves.
+type WorkerCapacityManager interface {
+	// SetWorkerTotalCapacity registers a worker instance with its maximum concurrency limit.
+	// If maxConcurrentLeases is 0 or negative, no limit is enforced for this worker.
+	SetWorkerTotalCapacity(ctx context.Context, envID uuid.UUID, instanceID string, maxConcurrentLeases int64) error
+
+	// GetWorkerTotalCapacity returns the current capacity limit for a worker instance.
+	// Returns 0 if no limit is set.
+	GetWorkerTotalCapacity(ctx context.Context, envID uuid.UUID, instanceID string) (int64, error)
+
+	// GetWorkerCapacities returns the available capacity for a worker instance.
+	// Returns 0 if no limit is set (unlimited).
+	GetWorkerCapacities(ctx context.Context, envID uuid.UUID, instanceID string) (*WorkerCapacity, error)
+
+	// AssignRequestToWorker increments the active lease count for a worker instance.
+	// Returns an error if the worker is at capacity.
+	AssignRequestToWorker(ctx context.Context, envID uuid.UUID, instanceID string, requestID string) error
+
+	// DeleteRequestFromWorker decrements the active lease count for a worker instance.
+	DeleteRequestFromWorker(ctx context.Context, envID uuid.UUID, instanceID string, requestID string) error
+
+	// WorkerCapacityOnHeartbeat refreshes the TTL on the worker capacity key.
+	// Called on heartbeat to keep the capacity limit alive while worker is active.
+	WorkerCapacityOnHeartbeat(ctx context.Context, envID uuid.UUID, instanceID string) error
+
+	// GetAllActiveWorkerRequests returns all active requests for a worker instance.
+	GetAllActiveWorkerRequests(ctx context.Context, envID uuid.UUID, instanceID string, isWorkerCapacityUnlimited bool) ([]string, error)
 }
 
 type AuthContext struct {
@@ -156,6 +199,8 @@ type Gateway struct {
 	LastHeartbeatAtMS int64         `json:"last_heartbeat"`
 
 	Hostname string `json:"hostname"`
+
+	IPAddress net.IP `json:"ip"`
 }
 
 // Connection have all the metadata associated with a worker connection
@@ -185,7 +230,7 @@ func (c *Connection) AppNames() []string {
 // an out-of-band Sync request is sent to the API. This is expected to handle idempotency, so subsequent calls return the same App ID and Sync ID
 // given the same idempotency key.
 // - To enable rollback functionality, the API should trigger a new sync if, and only if, the requested idempotency key does not match the current deploy.
-func (g *WorkerGroup) Sync(ctx context.Context, groupManager WorkerGroupManager, apiBaseUrl string, initialReq *connpb.WorkerConnectRequestData) error {
+func (g *WorkerGroup) Sync(ctx context.Context, groupManager WorkerGroupManager, apiBaseUrl string, initialReq *connpb.WorkerConnectRequestData, isDev bool) error {
 	// The group is expected to exist in the state, as UpsertConnection also creates the group if it doesn't exist
 	existingGroup, err := groupManager.GetWorkerGroupByHash(ctx, g.EnvID, g.Hash)
 	if err != nil {
@@ -222,9 +267,18 @@ func (g *WorkerGroup) Sync(ctx context.Context, groupManager WorkerGroupManager,
 		appVersion = *g.AppVersion
 	}
 
+	appURL := connURL.String()
+
+	// When running on the dev server, make sure to append the app name to create a deterministic UUID
+	// This is necessary for multi-app connections, where each app sends an individual sync request and should
+	// always use the same App ID to avoid creating duplicate apps when changing the function configuration.
+	if isDev {
+		appURL += fmt.Sprintf("?app_name=%s", url.QueryEscape(g.AppName))
+	}
+
 	config := sdk.RegisterRequest{
 		V:          "1",
-		URL:        connURL.String(),
+		URL:        appURL,
 		DeployType: sdk.DeployTypeConnect,
 		SDK:        sdkVersion,
 		AppName:    g.AppName,
@@ -292,7 +346,11 @@ func (g *WorkerGroup) Sync(ctx context.Context, groupManager WorkerGroupManager,
 			req.Header.Set("X-Inngest-Env", initialReq.GetEnvironment())
 		}
 
-		resp, err := http.DefaultClient.Do(req)
+		client := &http.Client{
+			Timeout: time.Minute,
+		}
+
+		resp, err := client.Do(req)
 		if err != nil {
 			return fmt.Errorf("error making sync request: %w", err)
 		}
@@ -352,4 +410,22 @@ func (g *WorkerGroup) Sync(ctx context.Context, groupManager WorkerGroupManager,
 	}
 
 	return nil
+}
+
+type WorkerCapacity struct {
+	Total     int64
+	Available int64
+}
+
+func (w *WorkerCapacity) IsUnlimited() bool {
+	return w.Total <= 0
+}
+
+func (w *WorkerCapacity) IsAvailable() bool {
+	// // allow negative values to indicate unlimited capacity as well though it shouldn't happen
+	return w.Available != 0 || w.IsUnlimited()
+}
+
+func (w *WorkerCapacity) IsAtCapacity() bool {
+	return !w.IsAvailable() // Total > 0 means there is a limit set
 }

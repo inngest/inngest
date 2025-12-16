@@ -1,5 +1,5 @@
 module.exports = {
-  extends: ['next/core-web-vitals', 'prettier', 'plugin:storybook/recommended'],
+  extends: ['next/core-web-vitals', 'prettier'],
   parserOptions: {
     project: true,
     tsconfigRootDir: __dirname,

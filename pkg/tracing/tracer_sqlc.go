@@ -2,182 +2,271 @@ package tracing
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
-	"fmt"
+	"time"
 
 	sqlc "github.com/inngest/inngest/pkg/cqrs/base_cqrs/sqlc/sqlite"
-	"github.com/inngest/inngest/pkg/execution/queue"
-	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
-	"github.com/inngest/inngest/pkg/inngest/version"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/tracing/meta"
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/propagation"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	"go.opentelemetry.io/otel/trace"
 )
 
-var defaultPropagator = propagation.NewCompositeTextMapPropagator(
-	propagation.TraceContext{},
-	propagation.Baggage{},
+const (
+	cleanAttrs = false
 )
 
-// sqlcTracerProvider implements TracerProvider.
-type sqlcTracerProvider struct {
+func NewSqlcTracerProvider(q sqlc.Querier) TracerProvider {
+	// With sqlc, write every 50.
+	return NewOtelTracerProvider(&dbExporter{q: q}, 50*time.Millisecond)
+}
+
+type dbExporter struct {
 	q sqlc.Querier
 }
 
-func NewSqlcTracerProvider(q sqlc.Querier) TracerProvider {
-	return &sqlcTracerProvider{
-		q: q,
-	}
-}
+func (e *dbExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlySpan) error {
+	for _, span := range spans {
+		traceID := span.SpanContext().TraceID().String()
+		spanID := span.SpanContext().SpanID().String()
+		parentID := span.Parent().SpanID().String()
+		isExtensionSpan := span.Name() == meta.SpanNameDynamicExtension
+		var envID string
+		var accountID string
+		var appID string
+		var dynamicSpanID string
+		var functionID string
+		var output any
+		var input any
+		var runID string
+		var debugSessionID string
+		var debugRunID string
+		var status string
+		var eventIdsByt []byte
 
-func (tp *sqlcTracerProvider) getTracer(md *statev2.Metadata, qi *queue.Item) trace.Tracer {
-	exp := &DBExporter{q: tp.q}
-	base := sdktrace.NewSimpleSpanProcessor(exp)
+		attrs := make(map[string]any)
+		for _, attr := range span.Attributes() {
+			// If output, extract and store separately
+			// This is always cleaned
+			if string(attr.Key) == meta.Attrs.StepOutput.Key() {
+				output = attr.Value.AsInterface()
+				continue
+			}
 
-	otelTP := sdktrace.NewTracerProvider(
-		sdktrace.WithSpanProcessor(newExecutionProcessor(md, qi, base)),
-		// sdktrace.WithIDGenerator(), // Deterministic span IDs for idempotency pls
-	)
+			// If input, extract and store separately
+			// This is always cleaned
+			if string(attr.Key) == meta.Attrs.EventsInput.Key() || string(attr.Key) == meta.Attrs.StepInput.Key() {
+				input = attr.Value.AsInterface()
+				continue
+			}
 
-	tracer := otelTP.Tracer("inngest", trace.WithInstrumentationVersion(version.Print()))
+			if string(attr.Key) == meta.Attrs.EventIDs.Key() {
+				var err error
+				// We store event IDs as a JSON array of strings
+				if eventIdsByt, err = json.Marshal(attr.Value.AsStringSlice()); err != nil {
+					logger.StdlibLogger(ctx).Error("failed to marshal event IDs",
+						"span_id", spanID,
+						"trace_id", traceID,
+						"parent_id", parentID,
+						"name", span.Name(),
+						"start_time", span.StartTime(),
+						"end_time", span.EndTime(),
+						"app_id", appID,
+						"function_id", functionID,
+					)
+				}
+				if cleanAttrs {
+					continue
+				}
+			}
 
-	return tracer
-}
+			if string(attr.Key) == meta.Attrs.AccountID.Key() {
+				accountID = attr.Value.AsString()
+				if cleanAttrs {
+					continue
+				}
+			}
 
-func (d *DroppableSpan) Drop() {
-	d.span.SetAttributes(attribute.Bool(meta.AttributeDropSpan, true))
-	// Send span but we don't care if it makes it or not, as we're dropping
-	// anyway
-	d.span.End()
-}
+			if string(attr.Key) == meta.Attrs.EnvID.Key() {
+				envID = attr.Value.AsString()
+				if cleanAttrs {
+					continue
+				}
+			}
 
-// TODO Sync send span; might wait for flush channel
-func (d *DroppableSpan) Send() error {
-	d.span.End()
-	return nil
-}
+			// Capture but omit the run ID attribute from the span attributes
+			if string(attr.Key) == meta.Attrs.RunID.Key() {
+				runID = attr.Value.AsString()
+				if cleanAttrs {
+					continue
+				}
+			}
 
-func (tp *sqlcTracerProvider) CreateSpan(
-	name string,
-	opts *CreateSpanOptions,
-) (*meta.SpanReference, error) {
-	ds, err := tp.CreateDroppableSpan(name, opts)
-	if err != nil {
-		return nil, fmt.Errorf("failed to CreateSpan: %w", err)
-	}
+			if string(attr.Key) == meta.Attrs.AppID.Key() {
+				appID = attr.Value.AsString()
+				if cleanAttrs {
+					continue
+				}
+			}
 
-	err = ds.Send()
-	if err != nil {
-		return nil, fmt.Errorf("failed to send span during creation: %w", err)
-	}
+			if string(attr.Key) == meta.Attrs.FunctionID.Key() {
+				functionID = attr.Value.AsString()
+				if cleanAttrs {
+					continue
+				}
+			}
 
-	return ds.Ref, nil
-}
+			// If we've been given a trace ID, it should overwrite whatever
+			// we've found in the span's own context; the caller knows best
+			if string(attr.Key) == meta.Attrs.DynamicTraceID.Key() {
+				traceID = attr.Value.AsString()
+				if cleanAttrs {
+					continue
+				}
+			}
 
-// CreateDroppableSpan creates a span that can be dropped and relies on us
-// calling `.End()`.
-func (tp *sqlcTracerProvider) CreateDroppableSpan(
-	name string,
-	opts *CreateSpanOptions,
-) (*DroppableSpan, error) {
-	ctx := context.Background()
-	if opts.Parent != nil {
-		carrier := propagation.MapCarrier{
-			"traceparent": opts.Parent.TraceParent,
-			"tracestate":  opts.Parent.TraceState,
+			// Capture but omit the dynamic span ID attribute from the span attributes
+			if string(attr.Key) == meta.Attrs.DynamicSpanID.Key() {
+				dynamicSpanID = attr.Value.AsString()
+				if cleanAttrs {
+					continue
+				}
+			}
+
+			// Omit drop span attribute if we're an extension span
+			if isExtensionSpan && string(attr.Key) == meta.Attrs.DropSpan.Key() {
+				if cleanAttrs {
+					continue
+				}
+			}
+
+			if string(attr.Key) == meta.Attrs.DebugSessionID.Key() {
+				debugSessionID = attr.Value.AsString()
+				if cleanAttrs {
+					continue
+				}
+			}
+
+			if string(attr.Key) == meta.Attrs.DebugRunID.Key() {
+				debugRunID = attr.Value.AsString()
+				if cleanAttrs {
+					continue
+				}
+			}
+
+			if string(attr.Key) == meta.Attrs.DynamicStatus.Key() {
+				status = attr.Value.AsString()
+				if cleanAttrs {
+					continue
+				}
+			}
+
+			if string(attr.Key) == meta.Attrs.UserlandSpanID.Key() {
+				if cleanAttrs {
+					continue
+				}
+			}
+
+			attrs[string(attr.Key)] = attr.Value.AsInterface()
 		}
-		ctx = defaultPropagator.Extract(context.Background(), carrier)
-	}
 
-	spanOptions := append(opts.SpanOptions, trace.WithSpanKind(trace.SpanKindServer))
-	if opts.FollowsFrom != nil {
-		spanOptions = append(
-			spanOptions,
-			trace.WithLinks(trace.Link{
-				SpanContext: spanContextFromMetadata(opts.FollowsFrom),
-				Attributes: []attribute.KeyValue{
-					attribute.String(meta.LinkAttributeType, meta.LinkAttributeTypeFollowsFrom),
-				},
-			}),
-		)
-	}
+		// If we don't have a run ID, we can't store this span
+		if runID == "" {
+			logger.StdlibLogger(ctx).Error("span missing run ID",
+				"span_id", spanID,
+				"trace_id", traceID,
+				"parent_id", parentID,
+				"name", span.Name(),
+				"start_time", span.StartTime(),
+				"end_time", span.EndTime(),
+				"app_id", appID,
+				"function_id", functionID,
+			)
+			continue
+		}
 
-	tracer := tp.getTracer(opts.Metadata, opts.QueueItem)
-	ctx, span := tracer.Start(ctx, name, spanOptions...)
-
-	carrier := propagation.MapCarrier{}
-	defaultPropagator.Inject(ctx, carrier)
-
-	spanRef := &meta.SpanReference{
-		TraceParent: carrier["traceparent"],
-		TraceState:  carrier["tracestate"],
-	}
-
-	// Only spans with parents can be dynamic? Hm.
-	spanRef.DynamicSpanID = span.SpanContext().SpanID().String()
-	if opts.Parent != nil {
-		spanRef.DynamicSpanTraceParent = opts.Parent.TraceParent
-		spanRef.DynamicSpanTraceState = opts.Parent.TraceState
-	}
-
-	span.SetAttributes(
-		attribute.String(meta.AttributeDynamicSpanID, spanRef.DynamicSpanID),
-	)
-
-	if len(opts.Carriers) > 0 {
-		byt, err := json.Marshal(spanRef)
+		attrsByt, err := json.Marshal(attrs)
 		if err != nil {
-			return nil, fmt.Errorf("failed to marshal span metadata when injecting to carriers: %w", err)
+			logger.StdlibLogger(ctx).Error("failed to marshal span attributes",
+				"span_id", spanID,
+				"trace_id", traceID,
+				"parent_id", parentID,
+				"name", span.Name(),
+				"start_time", span.StartTime(),
+				"end_time", span.EndTime(),
+				"app_id", appID,
+				"function_id", functionID,
+				"error", err,
+			)
+			continue
 		}
 
-		for _, carrier := range opts.Carriers {
-			carrier[meta.PropagationKey] = string(byt)
+		linksByt, err := json.Marshal(span.Links())
+		if err != nil {
+			logger.StdlibLogger(ctx).Error("failed to marshal span links",
+				"span_id", spanID,
+				"trace_id", traceID,
+				"parent_id", parentID,
+				"name", span.Name(),
+				"start_time", span.StartTime(),
+				"end_time", span.EndTime(),
+				"app_id", appID,
+				"function_id", functionID,
+				"error", err,
+			)
+			continue
+		}
+
+		err = e.q.InsertSpan(ctx, sqlc.InsertSpanParams{
+			SpanID:       spanID,
+			TraceID:      traceID,
+			ParentSpanID: sql.NullString{String: parentID, Valid: parentID != ""},
+			Name:         span.Name(),
+			StartTime:    span.StartTime(),
+			EndTime:      span.EndTime(),
+			RunID:        runID,
+			AppID:        appID,
+			FunctionID:   functionID,
+			Attributes:   string(attrsByt),
+			Links:        string(linksByt),
+			DynamicSpanID: sql.NullString{
+				String: dynamicSpanID,
+				Valid:  dynamicSpanID != "",
+			},
+			AccountID: accountID,
+			EnvID:     envID,
+			Output:    output,
+			Input:     input,
+			DebugSessionID: sql.NullString{
+				String: debugSessionID,
+				Valid:  debugSessionID != "",
+			},
+			DebugRunID: sql.NullString{
+				String: debugRunID,
+				Valid:  debugRunID != "",
+			},
+			Status: sql.NullString{
+				String: status,
+				Valid:  status != "",
+			},
+			EventIds: string(eventIdsByt),
+		})
+		if err != nil {
+			logger.StdlibLogger(ctx).Error("failed to insert span into database",
+				"span_id", spanID,
+				"trace_id", traceID,
+				"parent_id", parentID,
+				"name", span.Name(),
+				"start_time", span.StartTime(),
+				"end_time", span.EndTime(),
+				"app_id", appID,
+				"function_id", functionID,
+				"error", err,
+			)
+			continue
 		}
 	}
-
-	return &DroppableSpan{
-		span: span,
-		Ref:  spanRef,
-	}, nil
-}
-
-// Returns nothing, as the span is only extended and no further context is given
-func (tp *sqlcTracerProvider) UpdateSpan(
-	opts *UpdateSpanOptions,
-) error {
-	if opts.TargetSpan == nil {
-		return fmt.Errorf("no target span")
-	}
-
-	if opts.TargetSpan.DynamicSpanID == "" {
-		// Oof. Not good.
-		return fmt.Errorf("target span is not dynamic; has no DynamicSpanID")
-	}
-
-	carrier := propagation.MapCarrier{
-		"traceparent": opts.TargetSpan.DynamicSpanTraceParent,
-		"tracestate":  opts.TargetSpan.DynamicSpanTraceState,
-	}
-	ctx := defaultPropagator.Extract(context.Background(), carrier)
-
-	attrs := []attribute.KeyValue{
-		attribute.String(meta.AttributeDynamicSpanID, opts.TargetSpan.DynamicSpanID),
-		attribute.String(meta.AttributeDynamicStatus, opts.Status.String()),
-	}
-
-	if opts.Status.IsEnded() {
-		attrs = append(attrs, attribute.Int64(meta.AttributeEndedAt, opts.EndTime.UnixMilli()))
-	}
-
-	// Be careful to make sure that whatever attrs we specify here are
-	// overwritten by whatever is given in options; the caller knows best.
-	spanOpts := append([]trace.SpanStartOption{trace.WithAttributes(attrs...)}, opts.SpanOptions...)
-
-	tracer := tp.getTracer(opts.Metadata, opts.QueueItem)
-	_, span := tracer.Start(ctx, meta.SpanNameDynamicExtension, spanOpts...)
-
-	span.End()
 	return nil
 }
+
+func (e *dbExporter) Shutdown(context.Context) error { return nil }

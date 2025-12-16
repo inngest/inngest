@@ -53,7 +53,7 @@ export default function NewUser() {
           completion, you will be entered into a drawing for an Amazon gift card.
         </div>
         <div className="border-subtle border-t px-3 py-2">
-          <Link href="https://t.maze.co/282304348" arrowOnHover={true} target="_blank">
+          <Link href="https://t.maze.co/282304348" target="_blank">
             Take survey
           </Link>
         </div>

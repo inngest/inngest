@@ -31,19 +31,18 @@ export default function TimeFieldFilter({
       }}
       label="Time Field"
       isLabelVisible={false}
-      className="min-w-[6.8rem]"
+      className="bg-modalBase min-w-[90px]"
+      size="small"
     >
-      <Select.Button>
-        <span className="pr-2 text-sm lowercase first-letter:capitalize">
-          {selectedValue?.name}
-        </span>
+      <Select.Button size="small">
+        <span className="lowercase first-letter:capitalize">{selectedValue?.name}</span>
       </Select.Button>
       <Select.Options>
         {options.map((option) => {
           return (
             <Select.Option key={option.id} option={option}>
               <span className="inline-flex items-center gap-2 lowercase">
-                <label className="text-sm first-letter:capitalize">{option.name}</label>
+                <label className="first-letter:capitalize">{option.name}</label>
               </span>
             </Select.Option>
           );

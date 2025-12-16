@@ -1,14 +1,17 @@
 export function useTracking() {
-  const trackEvent = async (eventName: string, eventData: Record<string, any> = {}) => {
+  const trackEvent = async (
+    eventName: string,
+    eventData: Record<string, any> = {},
+  ) => {
     try {
-      const response = await fetch(createDevServerURL('/telemetry'), {
+      const response = await fetch(createDevServerURL('/v0/telemetry'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           eventName,
-          data: eventData,
+          ...eventData,
         }),
       });
 
@@ -16,7 +19,9 @@ export function useTracking() {
         console.error('Failed to send telemetry event');
       }
     } catch (err) {
-      console.error(err instanceof Error ? err : new Error('An error occurred'));
+      console.error(
+        err instanceof Error ? err : new Error('An error occurred'),
+      );
     }
   };
 
@@ -24,7 +29,7 @@ export function useTracking() {
 }
 
 function createDevServerURL(path: string) {
-  const host = process.env.NEXT_PUBLIC_API_BASE_URL;
+  const host = import.meta.env.VITE_PUBLIC_API_BASE_URL;
   if (!host) {
     return path;
   }

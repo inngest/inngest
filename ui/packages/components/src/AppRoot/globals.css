@@ -38,21 +38,24 @@
 .cl-rootBox [class*='__danger'] *,
 .cl-rootBox [class*='__danger'] svg * {
   color: rgb(var(--color-foreground-error));
-  fill: rgb(var(--color-foreground-error)); /* Explicitly set `fill` for SVG */
+  fill: rgb(var(--color-foreground-error));
+  /* Explicitly set `fill` for SVG */
 }
 
 .cl-rootBox [class*='__warning'],
 .cl-rootBox [class*='__warning'] *,
 .cl-rootBox [class*='__warning'] svg * {
   color: rgb(var(--color-foreground-warning));
-  fill: rgb(var(--color-foreground-warning)); /* Explicitly set `fill` for SVG */
+  fill: rgb(var(--color-foreground-warning));
+  /* Explicitly set `fill` for SVG */
 }
 
 .cl-rootBox [class*='__success'],
 .cl-rootBox [class*='__success'] *,
 .cl-rootBox [class*='__success'] svg * {
   color: rgb(var(--color-foreground-success));
-  fill: rgb(var(--color-foreground-success)); /* Explicitly set `fill` for SVG */
+  fill: rgb(var(--color-foreground-success));
+  /* Explicitly set `fill` for SVG */
 }
 
 .cl-selectButton * {
@@ -64,6 +67,7 @@ input[type='number']::-webkit-outer-spin-button {
   -webkit-appearance: none;
   margin: 0;
 }
+
 input[type='number'] {
   -moz-appearance: textfield;
   appearance: none;
@@ -168,6 +172,13 @@ input[type='number'] {
     --color-purplehaze-800: 77 31 196;
     --color-purplehaze-900: 67 34 175;
 
+    /*Citrus colors*/
+    --color-citrus-100: 255 223 203;
+    --color-citrus-300: 255 174 127;
+    --color-citrus-500: 255 115 0;
+    --color-citrus-700: 186 89 5;
+    --color-citrus-900: 113 59 4;
+
     /* Token Colors */
     --color-background-canvas-base: var(--color-carbon-0);
     --color-background-canvas-subtle: var(--color-carbon-50);
@@ -207,6 +218,7 @@ input[type='number'] {
     --color-border-error: var(--color-ruby-600);
     --color-border-warning: var(--color-honey-600);
     --color-border-info: var(--color-breeze-700);
+    --color-border-active: var(--color-breeze-500);
 
     --color-primary-3xSubtle: var(--color-matcha-100);
     --color-primary-2xSubtle: var(--color-matcha-200);
@@ -274,6 +286,12 @@ input[type='number'] {
     --color-quaternary-cool-xIntense: var(--color-purplehaze-700);
     --color-quaternary-cool-3xIntense: var(--color-purplehaze-900);
 
+    --color-quaternary-warmer-3xSubtle: var(--color-citrus-100);
+    --color-quaternary-warmer-xSubtle: var(--color-citrus-300);
+    --color-quaternary-warmer-moderate: var(--color-citrus-500);
+    --color-quaternary-warmer-xIntense: var(--color-citrus-700);
+    --color-quaternary-warmer-3xIntense: var(--color-citrus-900);
+
     --color-accent-3xSubtle: var(--color-honey-100);
     --color-accent-2xSubtle: var(--color-honey-200);
     --color-accent-xSubtle: var(--color-honey-300);
@@ -324,6 +342,7 @@ input[type='number'] {
     --color-border-error: var(--color-ruby-300);
     --color-border-warning: var(--color-honey-300);
     --color-border-info: var(--color-breeze-300);
+    --color-border-active: var(--color-breeze-500);
 
     --color-primary-3xSubtle: var(--color-matcha-900);
     --color-primary-2xSubtle: var(--color-matcha-800);
@@ -391,6 +410,12 @@ input[type='number'] {
     --color-quaternary-cool-xIntense: var(--color-purplehaze-300);
     --color-quaternary-cool-3xIntense: var(--color-purplehaze-100);
 
+    --color-quarternary-warmer-3xSubtle: var(--color-citrus-900);
+    --color-quarternary-warmer-xSubtle: var(--color-citrus-700);
+    --color-quarternary-warmer-moderate: var(--color-citrus-500);
+    --color-quarternary-warmer-xIntense: var(--color-citrus-300);
+    --color-quarternary-warmer-3xIntense: var(--color-citrus-100);
+
     --color-accent-3xSubtle: var(--color-honey-900);
     --color-accent-2xSubtle: var(--color-honey-800);
     --color-accent-xSubtle: var(--color-honey-700);
@@ -408,29 +433,36 @@ input[type='number'] {
 #maze-media-host {
   pointer-events: auto;
 }
+
 /* Toasts */
 [data-sonner-toast] {
   /* We can remove important when we upgrade Sonner */
   --toast-accent-color: var(--color-background-canvas-muted);
   border-color: rgb(var(--toast-accent-color)) !important;
 }
+
 .dark [data-sonner-toast] {
   --tw-drop-shadow: drop-shadow(0 10px 20px rgb(172 172 172 / 0.1))
     drop-shadow(0 4px 10px rgb(172 172 172 / 0.4));
 }
+
 [data-sonner-toast] [data-icon] svg {
   transform: scale(0.8);
   color: rgb(var(--toast-accent-color));
 }
+
 [data-sonner-toast][data-type='success'] {
   --toast-accent-color: var(--color-primary-moderate);
 }
+
 [data-sonner-toast][data-type='error'] {
   --toast-accent-color: var(--color-tertiary-moderate);
 }
+
 [data-sonner-toast][data-type='warning'] {
   --toast-accent-color: var(--color-accent-moderate);
 }
+
 [data-sonner-toast][data-type='info'] {
   --toast-accent-color: var(--color-secondary-moderate);
 }

@@ -25,20 +25,20 @@ type LoaderParams struct {
 func Middleware(params LoaderParams) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			loaders := newLoaders(params)
-			ctx := toCtx(r.Context(), loaders)
+			loaders := NewLoaders(params)
+			ctx := ToCtx(r.Context(), loaders)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
 }
 
 // FromCtx returns the DataLoader from the context.
-func FromCtx(ctx context.Context) *loaders {
-	return ctx.Value(loadersKey).(*loaders)
+func FromCtx(ctx context.Context) *Loaders {
+	return ctx.Value(loadersKey).(*Loaders)
 }
 
 // toCtx sets the DataLoader on the context.
-func toCtx(ctx context.Context, loaders *loaders) context.Context {
+func ToCtx(ctx context.Context, loaders *Loaders) context.Context {
 	return context.WithValue(ctx, loadersKey, loaders)
 }
 
@@ -119,19 +119,26 @@ func LoadManyWithString[T interface{}](
 	return LoadMany[T](ctx, loader, dataloader.NewKeysFromStrings(keys))
 }
 
-type loaders struct {
+type Loaders struct {
 	RunTraceLoader       *dataloader.Loader
 	LegacyRunTraceLoader *dataloader.Loader
 	RunSpanLoader        *dataloader.Loader
+	EventLoader          *dataloader.Loader
+	DebugRunLoader       *dataloader.Loader
+	DebugSessionLoader   *dataloader.Loader
 }
 
-func newLoaders(params LoaderParams) *loaders {
-	loaders := &loaders{}
+func NewLoaders(params LoaderParams) *Loaders {
+	loaders := &Loaders{}
 	tr := &traceReader{loaders: loaders, reader: params.DB}
+	er := &eventReader{loaders: loaders, reader: params.DB}
 
 	loaders.RunTraceLoader = dataloader.NewBatchedLoader(tr.GetRunTrace)
 	loaders.LegacyRunTraceLoader = dataloader.NewBatchedLoader(tr.GetLegacyRunTrace)
 	loaders.RunSpanLoader = dataloader.NewBatchedLoader(tr.GetLegacySpanRun)
+	loaders.EventLoader = dataloader.NewBatchedLoader(er.GetEvents)
+	loaders.DebugRunLoader = dataloader.NewBatchedLoader(tr.GetDebugRunTrace)
+	loaders.DebugSessionLoader = dataloader.NewBatchedLoader(tr.GetDebugSessionTrace)
 
 	return loaders
 }

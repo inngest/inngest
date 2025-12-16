@@ -1,4 +1,5 @@
 import { HorizontalPillList, Pill } from '@inngest/components/Pill';
+import { type PathCreator } from '@inngest/components/SharedContext/usePathCreator';
 import { TextCell, TimeCell } from '@inngest/components/Table';
 import { type Event } from '@inngest/components/types/event';
 import { cn } from '@inngest/components/utils/classNames';
@@ -24,7 +25,7 @@ export function useColumns({
   pathCreator,
   singleEventTypePage,
 }: {
-  pathCreator: React.ComponentProps<typeof EventsTable>['pathCreator'];
+  pathCreator: PathCreator;
   singleEventTypePage: React.ComponentProps<typeof EventsTable>['singleEventTypePage'];
 }) {
   const columns = [
@@ -73,7 +74,7 @@ export function useColumns({
                 key={run_.id}
               >
                 <span className="flex items-center gap-1">
-                  <StatusDot status={run_.status} className="h-2 w-2 shrink-0" />
+                  <StatusDot status={run_.status} size="small" />
                   <p
                     className={cn(
                       'truncate',

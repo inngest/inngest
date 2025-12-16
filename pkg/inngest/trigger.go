@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/cespare/xxhash/v2"
@@ -27,9 +28,11 @@ func (m MultipleTriggers) Triggers() []Trigger {
 func (m MultipleTriggers) Validate(ctx context.Context) error {
 	var err error
 
-	if len(m) < 1 {
-		err = multierror.Append(err, fmt.Errorf("At least one trigger is required"))
-	} else if len(m) > consts.MaxTriggers {
+	if len(m) == 0 {
+		return nil
+	}
+
+	if len(m) > consts.MaxTriggers {
 		err = multierror.Append(err, fmt.Errorf("This function exceeds the max number of triggers: %d", consts.MaxTriggers))
 	}
 
@@ -131,6 +134,11 @@ func (e EventTrigger) TitleName() string {
 	}
 
 	return strings.Join(words, joiner)
+}
+
+// MatchesAnyPattern checks if this event trigger matches any of the provided patterns.
+func (e EventTrigger) MatchesAnyPattern(patterns []string) bool {
+	return slices.Contains(patterns, e.Event)
 }
 
 func (e EventTrigger) Validate(ctx context.Context) error {

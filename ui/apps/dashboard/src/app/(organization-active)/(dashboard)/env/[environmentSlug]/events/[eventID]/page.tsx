@@ -1,13 +1,11 @@
 'use client';
 
-import { useMemo } from 'react';
 import { EventDetails } from '@inngest/components/Events/EventDetails';
+import { useReplayModal } from '@inngest/components/Events/useReplayModal';
 
 import { ExpandedRowActions } from '@/components/Events/ExpandedRowActions';
 import { SendEventModal } from '@/components/Events/SendEventModal';
 import { useEventDetails, useEventPayload, useEventRuns } from '@/components/Events/useEvents';
-import { useReplayModal } from '@/components/Events/useReplayModal';
-import { createInternalPathCreator } from '@/components/Events/utils';
 
 type Props = {
   params: {
@@ -22,8 +20,6 @@ export default function Page({ params }: Props) {
 
   const { isModalVisible, selectedEvent, openModal, closeModal } = useReplayModal();
 
-  const internalPathCreator = useMemo(() => createInternalPathCreator(envSlug), [envSlug]);
-
   const getEventDetails = useEventDetails();
   const getEventPayload = useEventPayload();
   const getEventRuns = useEventRuns();
@@ -31,7 +27,6 @@ export default function Page({ params }: Props) {
   return (
     <>
       <EventDetails
-        pathCreator={internalPathCreator}
         eventID={eventID}
         standalone
         getEventDetails={getEventDetails}

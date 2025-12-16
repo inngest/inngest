@@ -130,6 +130,15 @@ func WorkerQueueCapacityCounter(ctx context.Context, incr int64, opts CounterOpt
 	})
 }
 
+func IncrExecutorScheduleCount(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "executor_scheduled_total",
+		Description: "Total number of executor schedule calls",
+		Tags:        opts.Tags,
+	})
+}
+
 func IncrBatchScheduledCounter(ctx context.Context, opts CounterOpt) {
 	RecordCounterMetric(ctx, 1, CounterOpt{
 		PkgName:     opts.PkgName,
@@ -184,6 +193,15 @@ func IncrSpanBatchProcessorEnqueuedCounter(ctx context.Context, opts CounterOpt)
 	})
 }
 
+func IncrSpanBatchProcessorDroppedCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "span_batch_processor_dropped_total",
+		Description: "Total number of spans dropped for batch processing",
+		Tags:        opts.Tags,
+	})
+}
+
 func IncrSpanBatchProcessorAttemptCounter(ctx context.Context, incr int64, opts CounterOpt) {
 	RecordCounterMetric(ctx, incr, CounterOpt{
 		PkgName:     opts.PkgName,
@@ -211,6 +229,24 @@ func IncrSpanBatchProcessorDeadLetterPublishStatusCounter(ctx context.Context, o
 	})
 }
 
+func IncrLogExportDataLoss(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "log_export_data_loss_total",
+		Description: "Total number of data loss detected in logs",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrLogRecordExportedCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "log_records_exported_total",
+		Description: "Total number of log records exported",
+		Tags:        opts.Tags,
+	})
+}
+
 func IncrAggregatePausesEvaluatedCounter(ctx context.Context, value int64, opts CounterOpt) {
 	RecordCounterMetric(ctx, value, CounterOpt{
 		PkgName:     opts.PkgName,
@@ -229,7 +265,7 @@ func IncrAggregatePausesFoundCounter(ctx context.Context, value int64, opts Coun
 	})
 }
 
-func IncrConnectGatewayReceivedRouterPubSubMessageCounter(ctx context.Context, value int64, opts CounterOpt) {
+func IncrConnectGatewayReceivedRouterGRPCMessageCounter(ctx context.Context, value int64, opts CounterOpt) {
 	RecordCounterMetric(ctx, value, CounterOpt{
 		PkgName:     opts.PkgName,
 		MetricName:  "connect_gateway.router.received_pubsub_messages",
@@ -238,7 +274,52 @@ func IncrConnectGatewayReceivedRouterPubSubMessageCounter(ctx context.Context, v
 	})
 }
 
-func IncrConnectRouterPubSubMessageSentCounter(ctx context.Context, value int64, opts CounterOpt) {
+func IncrConnectGatewayGRPCClientCreateCounter(ctx context.Context, value int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, value, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "connect_gateway.grpc.client_created",
+		Description: "The total number of GRPC clients created",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrConnectGatewayGRPCClientGCCounter(ctx context.Context, value int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, value, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "connect_gateway.grpc.client_garbage_collected",
+		Description: "The total number of GRPC client garbage collected",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrConnectGatewayGRPCForwardCounter(ctx context.Context, value int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, value, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "connect_gateway.grpc.forward_total",
+		Description: "Total number of messages forwarded via gRPC to connect gateways",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrConnectGatewayGRPCReplyCounter(ctx context.Context, value int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, value, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "connect_gateway.grpc.reply_total",
+		Description: "Total number of replies coming from connect gateways to executors",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrConnectGatewayGRPCClientFailureCounter(ctx context.Context, value int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, value, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "connect_gateway.grpc.client_failure_total",
+		Description: "Total number of gRPC client creation failures for connect gateways",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrConnectRouterGRPCMessageSentCounter(ctx context.Context, value int64, opts CounterOpt) {
 	RecordCounterMetric(ctx, value, CounterOpt{
 		PkgName:     opts.PkgName,
 		MetricName:  "connect_gateway.router.sent_pubsub_messages",
@@ -270,6 +351,15 @@ func IncrConnectRouterNoHealthyConnectionCounter(ctx context.Context, value int6
 		PkgName:     opts.PkgName,
 		MetricName:  "connect_router.no_healthy_connections",
 		Description: "Total number of attempts to forward a message without finding healthy connections",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrConnectRouterAllWorkersAtCapacityCounter(ctx context.Context, value int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, value, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "connect_router.all_workers_at_capacity",
+		Description: "Total number of attempts to forward a message without finding any worker capacity",
 		Tags:        opts.Tags,
 	})
 }
@@ -497,6 +587,195 @@ func IncrQueueActiveCheckInvalidItemsRemovedCounter(ctx context.Context, val int
 		PkgName:     opts.PkgName,
 		MetricName:  "queue_active_check_invalid_items_removed_total",
 		Description: "The total number of invalid items removed during an active check",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrQueueActiveCheckAccountScannedCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "queue_active_check_account_scanned_total",
+		Description: "The total number of times an account was scanned during an active check",
+		Tags:        opts.Tags,
+	})
+}
+
+func ActiveBacklogNormalizeCount(ctx context.Context, incr int64, opts CounterOpt) {
+	RecordUpDownCounterMetric(ctx, incr, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "active_backlog_normalize_count",
+		Description: "The number of active backlog normalizations",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrAPICacheHit(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "http_api_cache_hit",
+		Description: "The number of times a HTTP API request is served from cache",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrAPICacheMiss(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "http_api_cache_miss",
+		Description: "The number of times a HTTP API request is not served from cache",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrQueueThrottleKeyExpressionMismatchCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "queue_throttle_key_expr_mismatch",
+		Description: "The total number of times a throttle key expression mismatch was detected",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrPausesFlushedToBlocks(ctx context.Context, value int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, value, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "pauses_flushed_to_blocks_total",
+		Description: "Total number of pauses flushed to blocks",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrPausesBlocksCreated(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "pauses_blocks_created_total",
+		Description: "Total number of pause blocks created",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrPausesDeletedAfterBlockFlush(ctx context.Context, value int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, value, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "pauses_deleted_after_flush_total",
+		Description: "Total number of pauses deleted after flushing them to blocks",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrPausesBlockFlushExpectedFail(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "pauses_blocks_flush_expected_fail_total",
+		Description: "Total number of pauses block flush failures",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrQueueDatabaseContextTimeoutCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "queue_database_context_timeout_total",
+		Description: "Total number of database context timeouts in queue operations",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrRateLimitUsage(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "rate_limit_usage",
+		Description: "Total number of calls to the rate limiter",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrPausesLegacyDeletionCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "pauses_legacy_deletion_total",
+		Description: "Total number of legacy pause deletions without timestamps",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrMetadataSpansTotal(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "metadata_spans_total",
+		Description: "Total number of metadata spans",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrConstraintAPIScavengerTotalAccountsCounter(ctx context.Context, count int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, count, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "constraintapi_scavenger_total_accounts_total",
+		Description: "Total number of accounts found by Constraint API scavenger",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrConstraintAPIScavengerExpiredAccountsCounter(ctx context.Context, count int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, count, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "constraintapi_scavenger_expired_accounts_total",
+		Description: "Total number of accounts with expired leases found by Constraint API scavenger",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrConstraintAPIScavengerScannedAccountsCounter(ctx context.Context, count int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, count, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "constraintapi_scavenger_accounts_peeked_total",
+		Description: "Total number of accounts peeked by Constraint API scavenger",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrConstraintAPIScavengerTotalExpiredLeasesCounter(ctx context.Context, count int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, count, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "constraintapi_scavenger_expired_leases_total",
+		Description: "Total number of expired leases found by Constraint API scavenger",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrConstraintAPIScavengerReclaimedLeasesCounter(ctx context.Context, count int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, count, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "constraintapi_scavenger_reclaimed_total",
+		Description: "Total number of expired leases reclaimed by Constraint API scavenger",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrQueueScavengerRequeuedItemsCounter(ctx context.Context, count int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, count, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "queue_scavenger_requeued_total",
+		Description: "Total number of requeud items reclaimed by queue scavenger",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrQueueThrottleStatus(ctx context.Context, count int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, count, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "queue_fn_throttle_status",
+		Description: "Total number of throttled items",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrAsyncCancellationCheckCounter(ctx context.Context, count int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, count, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "async_cancellation_check",
+		Description: "Total number of async cancellation checks",
 		Tags:        opts.Tags,
 	})
 }

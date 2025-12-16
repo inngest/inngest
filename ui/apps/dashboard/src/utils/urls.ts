@@ -46,8 +46,24 @@ export const pathCreator = {
   appSyncs({ envSlug, externalAppID }: { envSlug: string; externalAppID: string }): Route {
     return `/env/${envSlug}/apps/${encodeURIComponent(externalAppID)}/syncs` as Route;
   },
-  billing({ ref, tab }: { ref?: string; tab?: string } = {}): Route {
-    return `/billing${tab ? `/${tab}` : ''}${ref ? `?ref=${ref}` : ''}` as Route;
+  billing({ ref, tab, highlight }: { ref?: string; tab?: string; highlight?: string } = {}): Route {
+    let path = '/billing';
+    if (tab) {
+      path += `/${tab}`;
+    }
+
+    const query = new URLSearchParams();
+    if (highlight) {
+      query.set('highlight', highlight);
+    }
+    if (ref) {
+      query.set('ref', ref);
+    }
+    if (query.toString()) {
+      path += `?${query.toString()}`;
+    }
+
+    return path as Route;
   },
   createApp({ envSlug }: { envSlug: string }): Route {
     return `/env/${envSlug}/apps/sync-new` as Route;
@@ -73,6 +89,22 @@ export const pathCreator = {
   function({ envSlug, functionSlug }: { envSlug: string; functionSlug: string }): Route {
     return `/env/${envSlug}/functions/${encodeURIComponent(functionSlug)}` as Route;
   },
+  functionReplays({ envSlug, functionSlug }: { envSlug: string; functionSlug: string }): Route {
+    return `/env/${envSlug}/functions/${encodeURIComponent(functionSlug)}/replays` as Route;
+  },
+  functionReplay({
+    envSlug,
+    functionSlug,
+    replayID,
+  }: {
+    envSlug: string;
+    functionSlug: string;
+    replayID: string;
+  }): Route {
+    return `/env/${envSlug}/functions/${encodeURIComponent(
+      functionSlug
+    )}/replays/${replayID}` as Route;
+  },
   functionCancellations({
     envSlug,
     functionSlug,
@@ -81,6 +113,9 @@ export const pathCreator = {
     functionSlug: string;
   }): Route {
     return `/env/${envSlug}/functions/${encodeURIComponent(functionSlug)}/cancellations` as Route;
+  },
+  insights({ envSlug, ref }: { envSlug: string; ref?: string }): Route {
+    return `/env/${envSlug}/insights${ref ? `?ref=${ref}` : ''}` as Route;
   },
   integrations(): Route {
     return `/settings/integrations` as Route;

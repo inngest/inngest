@@ -223,13 +223,18 @@ func (c *client) exportContext(parent context.Context) (context.Context, context
 	)
 
 	if c.exportTimeout > 0 {
-		ctx, cancel = context.WithTimeout(parent, c.exportTimeout)
+		ctx, cancel = context.WithTimeoutCause(parent, c.exportTimeout, errors.New("exporter export timeout"))
 	} else {
 		ctx, cancel = context.WithCancel(parent)
 	}
 
 	if c.metadata.Len() > 0 {
-		ctx = metadata.NewOutgoingContext(ctx, c.metadata)
+		md := c.metadata
+		if outMD, ok := metadata.FromOutgoingContext(ctx); ok {
+			md = metadata.Join(md, outMD)
+		}
+
+		ctx = metadata.NewOutgoingContext(ctx, md)
 	}
 
 	// Unify the client stopCtx with the parent.
@@ -289,7 +294,7 @@ func (c *client) MarshalLog() interface{} {
 		Type     string
 		Endpoint string
 	}{
-		Type:     "otlphttpgrpc",
+		Type:     "otlptracegrpc",
 		Endpoint: c.endpoint,
 	}
 }

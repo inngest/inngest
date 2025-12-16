@@ -30,12 +30,8 @@ const (
 	attrCountLimit = 128
 )
 
-var (
-	// type assertion
-	gen tracesdk.IDGenerator = newSpanIDGenerator()
-
-	nilULID = ulid.ULID{}
-)
+// type assertion
+var gen tracesdk.IDGenerator = newSpanIDGenerator()
 
 type SpanOpt func(s *spanOpt)
 
@@ -619,7 +615,7 @@ func (s *Span) SetEvents(ctx context.Context, evts []json.RawMessage, mapping ma
 		}
 
 		ts := time.Now()
-		if id != nilULID {
+		if !id.IsZero() {
 			ts = ulid.Time(id.Time())
 		}
 

@@ -1,7 +1,6 @@
 package redis_state
 
 import (
-	"bytes"
 	"context"
 	"embed"
 	"encoding/json"
@@ -189,6 +188,9 @@ func New(ctx context.Context, opts ...Opt) (state.Manager, error) {
 		u: m.unsafeUnshardedClientDoNotUse,
 	}
 
+	// Default to deleting pauses from buffer only
+	m.pauseDeleter = m.unshardedMgr
+
 	return m, nil
 }
 
@@ -206,12 +208,18 @@ func WithUnshardedClient(u *UnshardedClient) Opt {
 	}
 }
 
+func (m *mgr) SetPauseDeleter(pm state.PauseDeleter) {
+	m.pauseDeleter = pm
+}
+
 type mgr struct {
 	// unsafe: Operate on sharded manager instead.
 	unsafeShardedClientDoNotUse *ShardedClient
 
 	// unsafe: Operate on unsharded manager instead.
 	unsafeUnshardedClientDoNotUse *UnshardedClient
+
+	pauseDeleter state.PauseDeleter
 
 	shardedMgr
 	unshardedMgr
@@ -346,11 +354,16 @@ func (m shardedMgr) New(ctx context.Context, input state.Input) (state.State, er
 			),
 			nil
 	case 1: // already exists
-		st, err := m.Load(ctx, input.Identifier.AccountID, input.Identifier.RunID)
-		if err != nil {
-			return nil, err
-		}
-		return st, state.ErrIdentifierExists
+		// XXX: Returns a shell of a state with mutated identifier to the existing runID
+		// It does not load the existing run state anymore.
+		return state.NewStateInstance(
+			input.Identifier,
+			metadata.Metadata(),
+			make([]map[string]any, 0),
+			make([]state.MemoizedStep, 0),
+			make([]string, 0),
+		), state.ErrIdentifierExists
+
 	default:
 		return nil, fmt.Errorf("unknown status %d when attempting to create function state", status)
 	}
@@ -430,22 +443,6 @@ func (m shardedMgr) UpdateMetadata(ctx context.Context, accountID uuid.UUID, run
 		return fmt.Errorf("unknown response updating metadata: %w", err)
 	}
 	return nil
-}
-
-func (m shardedMgr) IsComplete(ctx context.Context, accountId uuid.UUID, runID ulid.ULID) (bool, error) {
-	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "IsComplete"), redis_telemetry.ScopeFnRunState)
-
-	fnRunState := m.s.FunctionRunState()
-
-	r, isSharded := fnRunState.Client(ctx, accountId, runID)
-
-	val, err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
-		return client.B().Hget().Key(fnRunState.kg.RunMetadata(ctx, isSharded, runID)).Field("status").Build()
-	}).AsBytes()
-	if err != nil {
-		return false, err
-	}
-	return !bytes.Equal(val, []byte("0")), nil
 }
 
 func (m shardedMgr) Exists(ctx context.Context, accountId uuid.UUID, runID ulid.ULID) (bool, error) {
@@ -544,24 +541,17 @@ func (m shardedMgr) LoadEvents(ctx context.Context, accountId uuid.UUID, fnID uu
 	byt, err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
 		return client.B().Get().Key(fnRunState.kg.Events(ctx, isSharded, fnID, runID)).Build()
 	}).AsBytes()
-	if err == nil {
-		if err := json.Unmarshal(byt, &events); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal batch; %w", err)
-		}
-		return events, nil
-	}
-
-	// Pre-batch days for backcompat.
-	byt, err = r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
-		return client.B().Get().Key(fnRunState.kg.Event(ctx, isSharded, fnID, runID)).Build()
-	}).AsBytes()
 	if err != nil {
 		if err == rueidis.Nil {
 			return nil, state.ErrEventNotFound
 		}
 		return nil, fmt.Errorf("failed to get event; %w", err)
 	}
-	return []json.RawMessage{byt}, nil
+
+	if err := json.Unmarshal(byt, &events); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal batch; %w", err)
+	}
+	return events, nil
 }
 
 func (m shardedMgr) LoadSteps(ctx context.Context, accountId uuid.UUID, fnID uuid.UUID, runID ulid.ULID) (map[string]json.RawMessage, error) {
@@ -612,6 +602,60 @@ func (m shardedMgr) LoadSteps(ctx context.Context, accountId uuid.UUID, fnID uui
 	return steps, nil
 }
 
+func (m shardedMgr) LoadStepInputs(ctx context.Context, accountId uuid.UUID, fnID uuid.UUID, runID ulid.ULID) (map[string]json.RawMessage, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "LoadStepInputs"), redis_telemetry.ScopeFnRunState)
+
+	fnRunState := m.s.FunctionRunState()
+
+	var (
+		steps = map[string]json.RawMessage{}
+		v1id  = state.Identifier{
+			RunID:      runID,
+			WorkflowID: fnID,
+			AccountID:  accountId,
+		}
+	)
+
+	r, isSharded := fnRunState.Client(ctx, accountId, runID)
+
+	// Load action inputs only
+	inputMap, err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
+		return client.B().Hgetall().Key(fnRunState.kg.ActionInputs(ctx, isSharded, v1id)).Build()
+	}).AsStrMap()
+	if err != nil {
+		return nil, fmt.Errorf("failed loading action inputs; %w", err)
+	}
+	for stepID, marshalled := range inputMap {
+		steps[stepID] = json.RawMessage(marshalled)
+	}
+
+	return steps, nil
+}
+
+func (m shardedMgr) LoadStepsWithIDs(ctx context.Context, accountId uuid.UUID, fnID uuid.UUID, runID ulid.ULID, stepIDs []string) (map[string]json.RawMessage, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "LoadStepsWithIDs"), redis_telemetry.ScopeFnRunState)
+
+	fnRunState := m.s.FunctionRunState()
+
+	steps := map[string]json.RawMessage{}
+
+	r, isSharded := fnRunState.Client(ctx, accountId, runID)
+
+	for _, stepID := range stepIDs {
+		result, err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
+			return client.B().Hget().Key(fnRunState.kg.Actions(ctx, isSharded, fnID, runID)).Field(stepID).Build()
+		}).ToString()
+		if err != nil && err != rueidis.Nil {
+			return nil, fmt.Errorf("failed loading action for step %s; %w", stepID, err)
+		}
+		if err != rueidis.Nil {
+			steps[stepID] = json.RawMessage(result)
+		}
+	}
+
+	return steps, nil
+}
+
 func (m shardedMgr) Load(ctx context.Context, accountId uuid.UUID, runID ulid.ULID) (state.State, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Load"), redis_telemetry.ScopeFnRunState)
 
@@ -629,36 +673,18 @@ func (m shardedMgr) Load(ctx context.Context, accountId uuid.UUID, runID ulid.UL
 
 	// Load events.
 	events := []map[string]any{}
-	switch metadata.Version {
-	case 0: // pre-batch days
-		byt, err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
-			return client.B().Get().Key(fnRunState.kg.Event(ctx, isSharded, id.WorkflowID, runID)).Build()
-		}).AsBytes()
-		if err != nil {
-			if err == rueidis.Nil {
-				return nil, state.ErrEventNotFound
-			}
-			return nil, fmt.Errorf("failed to get event; %w", err)
+
+	byt, err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
+		return client.B().Get().Key(fnRunState.kg.Events(ctx, isSharded, id.WorkflowID, runID)).Build()
+	}).AsBytes()
+	if err != nil {
+		if rueidis.IsRedisNil(err) {
+			return nil, state.ErrEventNotFound
 		}
-		event := map[string]any{}
-		if err := json.Unmarshal(byt, &event); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal event; %w", err)
-		}
-		events = []map[string]any{event}
-	default: // current default is 1
-		// Load the batch of events
-		byt, err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
-			return client.B().Get().Key(fnRunState.kg.Events(ctx, isSharded, id.WorkflowID, runID)).Build()
-		}).AsBytes()
-		if err != nil {
-			if rueidis.IsRedisNil(err) {
-				return nil, state.ErrEventNotFound
-			}
-			return nil, fmt.Errorf("failed to get batch; %w", err)
-		}
-		if err := json.Unmarshal(byt, &events); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal batch; %w", err)
-		}
+		return nil, fmt.Errorf("failed to get batch; %w", err)
+	}
+	if err := json.Unmarshal(byt, &events); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal batch; %w", err)
 	}
 
 	actions := []state.MemoizedStep{}
@@ -727,29 +753,6 @@ func (m shardedMgr) stack(ctx context.Context, accountId uuid.UUID, runID ulid.U
 		return nil, fmt.Errorf("error fetching stack: %w", err)
 	}
 	return stack, nil
-}
-
-func (m shardedMgr) StackIndex(ctx context.Context, accountId uuid.UUID, runID ulid.ULID, stepID string) (int, error) {
-	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "StackIndex"), redis_telemetry.ScopeFnRunState)
-
-	fnRunState := m.s.FunctionRunState()
-
-	r, isSharded := fnRunState.Client(ctx, accountId, runID)
-	stack, err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
-		return client.B().Lrange().Key(fnRunState.kg.Stack(ctx, isSharded, runID)).Start(0).Stop(-1).Build()
-	}).AsStrSlice()
-	if err != nil {
-		return 0, err
-	}
-	if len(stack) == 0 {
-		return 0, nil
-	}
-	for n, i := range stack {
-		if i == stepID {
-			return n + 1, nil
-		}
-	}
-	return 0, fmt.Errorf("step not found in stack: %s", stepID)
 }
 
 func (m shardedMgr) SaveResponse(ctx context.Context, i state.Identifier, stepID, marshalledOuptut string) (bool, error) {
@@ -831,22 +834,32 @@ func (m shardedMgr) SavePending(ctx context.Context, i state.Identifier, pending
 func (m unshardedMgr) PauseCreatedAt(ctx context.Context, workspaceID uuid.UUID, event string, pauseID uuid.UUID) (time.Time, error) {
 	pc := m.u.Pauses()
 	idx := pc.kg.PauseIndex(ctx, "add", workspaceID, event)
-	ts, err := pc.Client().Do(ctx, pc.Client().B().Zmscore().Key(idx).Member(pauseID.String()).Build()).AsInt64()
-	if rueidis.IsRedisNil(err) {
-		return time.Time{}, fmt.Errorf("pause timestamp not found")
+	result, err := pc.Client().Do(ctx, pc.Client().B().Zmscore().Key(idx).Member(pauseID.String()).Build()).ToArray()
+	if err != nil {
+		if rueidis.IsRedisNil(err) {
+			return time.Time{}, state.ErrPauseNotFound
+		}
+		return time.Time{}, err
 	}
+
+	if len(result) == 0 {
+		return time.Time{}, state.ErrPauseNotFound
+	}
+
+	// ZMSCORE returns nil for non-existent members
+	if result[0].IsNil() {
+		return time.Time{}, state.ErrPauseNotFound
+	}
+
+	ts, err := result[0].AsInt64()
 	if err != nil {
 		return time.Time{}, err
 	}
+
 	return time.Unix(ts, 0), nil
 }
 
 func (m unshardedMgr) SavePause(ctx context.Context, p state.Pause) (int64, error) {
-	packed, err := json.Marshal(p)
-	if err != nil {
-		return 0, err
-	}
-
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "SavePause"), redis_telemetry.ScopePauses)
 
 	// `evt` is used to search for pauses based on event names. We only want to
@@ -869,7 +882,19 @@ func (m unshardedMgr) SavePause(ctx context.Context, p state.Pause) (int64, erro
 	}
 
 	extendedExpiry := time.Until(p.Expires.Time().Add(10 * time.Minute)).Seconds()
-	nowUnixSeconds := time.Now().Unix()
+
+	createdAt := p.CreatedAt
+	if createdAt.IsZero() {
+		createdAt = time.Now()
+	}
+
+	nowUnixSeconds := createdAt.Unix()
+	p.CreatedAt = createdAt
+
+	packed, err := json.Marshal(p)
+	if err != nil {
+		return 0, err
+	}
 
 	pause := m.u.Pauses()
 
@@ -971,25 +996,21 @@ func (m unshardedMgr) LeasePause(ctx context.Context, id uuid.UUID) error {
 // lifecycle.  Now, state stores must account for deletion directly.  Note that if the
 // state store is queue-aware, it must delete queue items for the run also.  This may
 // not always be the case.
-//
-// Returns a boolean indicating whether it performed deletion. If the run had
-// parallel steps then it may be false, since parallel steps cause the function
-// end to be reached multiple times in a single run
-func (m mgr) Delete(ctx context.Context, i state.Identifier) (bool, error) {
-	performedDeletion, err := m.shardedMgr.delete(ctx, ctx, i)
+func (m mgr) Delete(ctx context.Context, i state.Identifier) error {
+	err := m.shardedMgr.delete(ctx, ctx, i)
 	if err != nil {
-		return false, err
+		return err
 	}
 
-	err = m.deletePausesForRun(ctx, ctx, i)
+	err = m.unshardedMgr.deletePausesForRun(ctx, ctx, m.pauseDeleter, i)
 	if err != nil {
-		return false, err
+		return err
 	}
 
-	return performedDeletion, nil
+	return nil
 }
 
-func (m shardedMgr) delete(ctx context.Context, callCtx context.Context, i state.Identifier) (bool, error) {
+func (m shardedMgr) delete(ctx context.Context, callCtx context.Context, i state.Identifier) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "delete"), redis_telemetry.ScopeFnRunState)
 
 	fnRunState := m.s.FunctionRunState()
@@ -1016,67 +1037,66 @@ func (m shardedMgr) delete(ctx context.Context, callCtx context.Context, i state
 		fnRunState.kg.RunMetadata(ctx, isSharded, i.RunID),
 		fnRunState.kg.Actions(ctx, isSharded, i.WorkflowID, i.RunID),
 		fnRunState.kg.Stack(ctx, isSharded, i.RunID),
-
-		// XXX: remove these in a state store refactor.
-		fnRunState.kg.Event(ctx, isSharded, i.WorkflowID, i.RunID),
-		fnRunState.kg.History(ctx, isSharded, i.RunID),
-		fnRunState.kg.Errors(ctx, isSharded, i),
 	}
 
-	performedDeletion := false
-	for _, k := range keys {
-		result := r.Do(callCtx, func(client rueidis.Client) rueidis.Completed {
-			return client.B().Del().Key(k).Build()
-		})
+	result := r.Do(callCtx, func(client rueidis.Client) rueidis.Completed {
+		return client.B().Del().Key(keys...).Build()
+	})
 
-		// We should check a single key rather than all keys, to avoid races.
-		// We'll somewhat arbitrarily pick RunMetadata
-		if k == fnRunState.kg.RunMetadata(ctx, isSharded, i.RunID) {
-			if count, _ := result.ToInt64(); count > 0 {
-				performedDeletion = true
-			}
-		}
-
-		if err := result.Error(); err != nil {
-			return false, err
-		}
+	if err := result.Error(); err != nil {
+		return err
 	}
 
-	return performedDeletion, nil
+	return nil
 }
 
-func (m unshardedMgr) deletePausesForRun(ctx context.Context, callCtx context.Context, i state.Identifier) error {
+func (m unshardedMgr) deletePausesForRun(ctx context.Context, callCtx context.Context, pauseDeleter state.PauseDeleter, i state.Identifier) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "deletePausesForRun"), redis_telemetry.ScopePauses)
 
 	pause := m.u.Pauses()
 
-	// Fetch all pauses for the run
-	if pauseIDs, err := pause.Client().Do(callCtx, pause.Client().B().Smembers().Key(pause.kg.RunPauses(ctx, i.RunID)).Build()).AsStrSlice(); err == nil {
-		for _, id := range pauseIDs {
-			pauseID, _ := uuid.Parse(id)
-			_ = m.DeletePauseByID(ctx, pauseID)
+	pauseIDs, err := pause.Client().Do(callCtx, pause.Client().B().Smembers().Key(pause.kg.RunPauses(ctx, i.RunID)).Build()).AsStrSlice()
+	if err != nil {
+		return err
+	}
+
+	for _, id := range pauseIDs {
+		pauseID, err := uuid.Parse(id)
+		if err != nil {
+			// This should never happen
+			logger.StdlibLogger(ctx).Error("invalid pause ID in run pause set", "error", err, "pauseID", id, "runID", i.RunID)
+			continue
+		}
+		// This call will either go to the pause manager to handle deleting from blocks
+		// or use the current implementation in this file by default.
+		if err := pauseDeleter.DeletePauseByID(ctx, pauseID, i.WorkspaceID); err != nil {
+			return err
 		}
 	}
 
 	return pause.Client().Do(callCtx, pause.Client().B().Del().Key(pause.kg.RunPauses(ctx, i.RunID)).Build()).Error()
 }
 
-func (m unshardedMgr) DeletePauseByID(ctx context.Context, pauseID uuid.UUID) error {
+func (m unshardedMgr) DeletePauseByID(ctx context.Context, pauseID uuid.UUID, workspaceID uuid.UUID) error {
 	// Attempt to fetch this pause.
 	pause, err := m.PauseByID(ctx, pauseID)
-	if err == nil && pause != nil {
-		return m.DeletePause(ctx, *pause)
+	if err != nil {
+		if errors.Is(err, state.ErrPauseNotFound) {
+			// pause doesn't exist, nothing to delete
+			return nil
+		}
+		// bubble the error up we can safely retry the whole process
+		return err
 	}
-
-	// This won't delete event keys, invoke correlations, or signals nicely,
-	// but still gets the pause yeeted. Critically, this means a dangling
-	// signal in the DB.
-	return m.DeletePause(ctx, state.Pause{
-		ID: pauseID,
-	})
+	return m.DeletePause(ctx, *pause)
 }
 
-func (m unshardedMgr) DeletePause(ctx context.Context, p state.Pause) error {
+func (m unshardedMgr) DeletePause(ctx context.Context, p state.Pause, options ...state.DeletePauseOpt) error {
+	opts := state.DeletePauseOpts{}
+	for _, fn := range options {
+		fn(&opts)
+	}
+
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "DeletePause"), redis_telemetry.ScopePauses)
 
 	pause := m.u.Pauses()
@@ -1118,6 +1138,15 @@ func (m unshardedMgr) DeletePause(ctx context.Context, p state.Pause) error {
 		pause.kg.PauseIndex(ctx, "exp", p.WorkspaceID, evt),
 		runPausesKey,
 		pause.kg.GlobalPauseIndex(ctx),
+		pause.kg.PauseBlockIndex(ctx, p.ID),
+	}
+
+	// Marshal WriteBlockIndex to JSON if it has content, otherwise pass empty string
+	blockIndexJSON := ""
+	if opts.WriteBlockIndex.BlockID != "" {
+		if blockIndexBytes, err := json.Marshal(opts.WriteBlockIndex); err == nil {
+			blockIndexJSON = string(blockIndexBytes)
+		}
 	}
 
 	status, err := scripts["deletePause"].Exec(
@@ -1128,6 +1157,7 @@ func (m unshardedMgr) DeletePause(ctx context.Context, p state.Pause) error {
 			p.ID.String(),
 			invokeCorrId,
 			signalCorrId,
+			blockIndexJSON,
 		},
 	).AsInt64()
 	if err != nil {
@@ -1137,6 +1167,8 @@ func (m unshardedMgr) DeletePause(ctx context.Context, p state.Pause) error {
 	switch status {
 	case 0:
 		return nil
+	case 1:
+		return state.ErrPauseNotInBuffer
 	default:
 		return fmt.Errorf("unknown response deleting pause: %d", status)
 	}
@@ -1294,48 +1326,6 @@ func (m unshardedMgr) PauseBySignalID(ctx context.Context, wsID uuid.UUID, signa
 	return p, nil
 }
 
-func (m unshardedMgr) PausesByID(ctx context.Context, ids ...uuid.UUID) ([]*state.Pause, error) {
-	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "PausesByID"), redis_telemetry.ScopePauses)
-
-	pause := m.u.Pauses()
-	if len(ids) == 0 {
-		return nil, nil
-	}
-
-	keys := make([]string, len(ids))
-	for n, id := range ids {
-		keys[n] = pause.kg.Pause(ctx, id)
-	}
-
-	cmd := pause.Client().B().Mget().Key(keys...).Build()
-	strings, err := pause.Client().Do(ctx, cmd).AsStrSlice()
-	if err == rueidis.Nil {
-		return nil, state.ErrPauseNotFound
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	var merr error
-
-	pauses := []*state.Pause{}
-	for _, item := range strings {
-		if len(item) == 0 {
-			continue
-		}
-
-		pause := &state.Pause{}
-		err = json.Unmarshal([]byte(item), pause)
-		if err != nil {
-			merr = errors.Join(merr, err)
-			continue
-		}
-		pauses = append(pauses, pause)
-	}
-
-	return pauses, merr
-}
-
 func (m unshardedMgr) PauseLen(ctx context.Context, workspaceID uuid.UUID, event string) (int64, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "PuaseLen"), redis_telemetry.ScopePauses)
 	pauses := m.u.Pauses()
@@ -1407,7 +1397,47 @@ func (m unshardedMgr) PausesByEventSince(ctx context.Context, workspaceID uuid.U
 		kf:    pauses.kg,
 		start: start,
 	}
-	err = iter.init(ctx, ids, 100)
+	err = iter.init(ctx, ids, []float64{}, 100)
+	return iter, err
+}
+
+// PausesByEventSinceWithCreatedAt is for getting ordered pauses and ensuring that they are returned
+// with their createdAt time even when the queue item doesn't have it.
+func (m unshardedMgr) PausesByEventSinceWithCreatedAt(ctx context.Context, workspaceID uuid.UUID, event string, since time.Time, limit int64) (state.PauseIterator, error) {
+	start := time.Now()
+
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "PausesByEventSinceWithCreatedAt"), redis_telemetry.ScopePauses)
+
+	pauses := m.u.Pauses()
+
+	cmd := pauses.Client().B().
+		Zrange().
+		Key(pauses.kg.PauseIndex(ctx, "add", workspaceID, event)).
+		Min(strconv.Itoa(int(since.Unix()))).
+		Max("+inf").
+		Byscore().
+		Limit(0, limit).
+		Withscores().
+		Build()
+
+	results, err := pauses.Client().Do(ctx, cmd).AsZScores()
+	if err != nil {
+		return nil, err
+	}
+
+	ids := make([]string, len(results))
+	scores := make([]float64, len(results))
+	for i, result := range results {
+		ids[i] = result.Member
+		scores[i] = result.Score
+	}
+
+	iter := &keyIter{
+		r:     pauses.Client(),
+		kf:    pauses.kg,
+		start: start,
+	}
+	err = iter.init(ctx, ids, scores, 100)
 	return iter, err
 }
 
@@ -1429,10 +1459,18 @@ func (m unshardedMgr) LoadEvaluablesSince(ctx context.Context, workspaceID uuid.
 		}
 
 		if pause.Expires.Time().Before(time.Now()) {
-			shouldDelete := pause.Expires.Time().Add(consts.PauseExpiredDeletionGracePeriod).Before(time.Now())
-			if shouldDelete {
+			// runTS is the time that the run started.
+			runTS := time.UnixMilli(int64(pause.Identifier.RunID.Time()))
+
+			// isMaxAge returns whether the pause is greater than the max age allowed
+			isMaxAge := time.Now().Add(-1 * consts.CancelTimeout).After(runTS)
+
+			afterGrace := pause.Expires.Time().Add(consts.PauseExpiredDeletionGracePeriod).Before(time.Now())
+
+			if isMaxAge || afterGrace {
 				expired = append(expired, pause)
 			}
+
 			continue
 		}
 
@@ -1443,6 +1481,7 @@ func (m unshardedMgr) LoadEvaluablesSince(ctx context.Context, workspaceID uuid.
 
 	// GC pauses on fetch.
 	for _, pause := range expired {
+		logger.StdlibLogger(ctx).Debug("deleting expired pause in iterator", "pause", pause)
 		_ = m.DeletePause(ctx, *pause)
 	}
 
@@ -1494,6 +1533,9 @@ func (i *bufIter) Next(ctx context.Context) bool {
 			metrics.HistogramAggregatePausesLoadDuration(ctx, dur, metrics.HistogramOpt{
 				PkgName: pkgName,
 				// TODO: tag workspace ID eventually??
+				Tags: map[string]any{
+					"iterator": "buffer",
+				},
 			})
 		}
 		return false
@@ -1570,13 +1612,13 @@ func (i *scanIter) Index() int64 {
 }
 
 func (i *scanIter) fetch(ctx context.Context) error {
-	// Reset the index.
-	i.i = -1
-
 	if i.cursor == 0 {
 		// We're done, no need to fetch.
 		return errScanDone
 	}
+
+	// Reset the index.
+	i.i = -1
 
 	// Scan 100 times up until there are values
 	for scans := 0; scans < 100; scans++ {
@@ -1597,6 +1639,12 @@ func (i *scanIter) fetch(ctx context.Context) error {
 		if len(i.vals.Elements) > 0 {
 			return nil
 		}
+
+		// Prevent starting a new iteration, otherwise we risk an infinite loop if the data isn't changing
+		// and we get an empty scan with a 0 cursor which is actually possible in Redis.
+		if i.cursor == 0 {
+			return errScanDone
+		}
 	}
 
 	return fmt.Errorf("Scanned max times without finding pause values")
@@ -1616,6 +1664,9 @@ func (i *scanIter) Next(ctx context.Context) bool {
 				metrics.HistogramAggregatePausesLoadDuration(ctx, dur, metrics.HistogramOpt{
 					PkgName: pkgName,
 					// TODO: tag workspace ID eventually??
+					Tags: map[string]any{
+						"iterator": "scan",
+					},
 				})
 			}
 			return false
@@ -1771,7 +1822,15 @@ type keyIter struct {
 	// keys stores pause IDs to fetch in batches
 	keys []string
 	// vals stores pauses as strings from MGET
-	vals  []string
+	vals []string
+
+	// scores stores pause creation times or index scores
+	// they are conditionally used so the iterator works
+	// just fine if it's empty
+	scores []float64
+
+	hasScores bool
+
 	idx   int64
 	err   error
 	start time.Time
@@ -1781,9 +1840,11 @@ func (i *keyIter) Error() error {
 	return i.err
 }
 
-func (i *keyIter) init(ctx context.Context, keys []string, chunk int64) error {
+func (i *keyIter) init(ctx context.Context, keys []string, scores []float64, chunk int64) error {
 	i.keys = keys
 	i.chunk = chunk
+	i.scores = scores
+	i.hasScores = len(scores) == len(keys)
 	err := i.fetch(ctx)
 	if err == errScanDone {
 		return nil
@@ -1807,6 +1868,9 @@ func (i *keyIter) fetch(ctx context.Context) error {
 		metrics.HistogramAggregatePausesLoadDuration(ctx, dur, metrics.HistogramOpt{
 			PkgName: pkgName,
 			// TODO: tag workspace ID eventually??
+			Tags: map[string]any{
+				"iterator": "key",
+			},
 		})
 		return errScanDone
 	}
@@ -1847,12 +1911,17 @@ func (i *keyIter) Next(ctx context.Context) bool {
 }
 
 func (i *keyIter) Val(ctx context.Context) *state.Pause {
+	var score float64
 	if len(i.vals) == 0 {
 		return nil
 	}
 
 	val := i.vals[0]
 	i.vals = i.vals[1:]
+	if i.hasScores {
+		score = i.scores[0]
+		i.scores = i.scores[1:]
+	}
 	if val == "" {
 		return nil
 	}
@@ -1862,6 +1931,13 @@ func (i *keyIter) Val(ctx context.Context) *state.Pause {
 	if err != nil {
 		return nil
 	}
+
+	// Hack for older pauses that don't have a createdAt
+	// persisted in the pause item.
+	if i.hasScores && pause.CreatedAt.IsZero() {
+		pause.CreatedAt = time.Unix(int64(score), 0)
+	}
+
 	return pause
 }
 

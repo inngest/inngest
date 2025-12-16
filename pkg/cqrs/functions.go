@@ -10,12 +10,14 @@ import (
 )
 
 type Function struct {
-	ID        uuid.UUID       `json:"internal_id"`
-	AppID     uuid.UUID       `json:"app_id"`
-	Slug      string          `json:"id"`
-	Name      string          `json:"name"`
-	Config    json.RawMessage `json:"config"`
-	CreatedAt time.Time       `json:"created_at"`
+	ID         uuid.UUID       `json:"internal_id"`
+	EnvID      uuid.UUID       `json:"env_id"`
+	AppID      uuid.UUID       `json:"app_id"`
+	Slug       string          `json:"id"`
+	Name       string          `json:"name"`
+	Config     json.RawMessage `json:"config"`
+	CreatedAt  time.Time       `json:"created_at"`
+	ArchivedAt time.Time       `json:"archived_at"`
 }
 
 func (f Function) InngestFunction() (*inngest.Function, error) {
@@ -27,18 +29,25 @@ func (f Function) InngestFunction() (*inngest.Function, error) {
 	return &fn, nil
 }
 
+func (f Function) IsArchived() bool {
+	if f.ArchivedAt.After(time.Time{}) && time.Now().After(f.ArchivedAt) {
+		return true
+	}
+	return false
+}
+
 // FunctionReader finds functions for use across the API and dev server.
 type FunctionReader interface {
 	// GetFunctionsByAppInternalID returns functions given the string ID of an app as defined
 	// by users in our SDKs.
 	GetFunctionsByAppExternalID(ctx context.Context, workspaceID uuid.UUID, app string) ([]*Function, error)
 	// GetFunctionsByAppInternalID returns functions given an internal app UUID.
-	GetFunctionsByAppInternalID(ctx context.Context, workspaceID uuid.UUID, appID uuid.UUID) ([]*Function, error)
+	GetFunctionsByAppInternalID(ctx context.Context, appID uuid.UUID) ([]*Function, error)
 	// GetFunctionByExternalID returns a function given a workspace ID and the SDK's client ID / function ID,
 	// defined as a string.
 	GetFunctionByExternalID(ctx context.Context, wsID uuid.UUID, appID string, functionID string) (*Function, error)
-	// GetFunctionByInternalUUID returns a function given a worksapce ID and the internal ID.
-	GetFunctionByInternalUUID(ctx context.Context, wsID uuid.UUID, fnID uuid.UUID) (*Function, error)
+	// GetFunctionByInternalUUID returns a function given the internal ID.
+	GetFunctionByInternalUUID(ctx context.Context, fnID uuid.UUID) (*Function, error)
 }
 
 // DevFunctionManager is a development-only function manager
@@ -53,14 +62,20 @@ type DevFunctionManager interface {
 	DevFunctionWriter
 }
 
+// FunctionCreator creates functions in the backing store.
+type FunctionCreator interface {
+	InsertFunction(ctx context.Context, params InsertFunctionParams) (*Function, error)
+	UpdateFunctionConfig(ctx context.Context, arg UpdateFunctionConfigParams) (*Function, error)
+}
+
 // DevFunctionReader is a development-only function reader.
 type DevFunctionReader interface {
 	GetFunctions(ctx context.Context) ([]*Function, error)
 }
 
 type DevFunctionWriter interface {
-	InsertFunction(ctx context.Context, params InsertFunctionParams) (*Function, error)
-	UpdateFunctionConfig(ctx context.Context, arg UpdateFunctionConfigParams) (*Function, error)
+	FunctionCreator
+
 	// DeleteFunctionsByAppID deletes all functions for a specific app.
 	DeleteFunctionsByAppID(ctx context.Context, appID uuid.UUID) error
 	// DeleteFunctionsByIDs deletes all functions with the given IDs
@@ -69,6 +84,8 @@ type DevFunctionWriter interface {
 
 type InsertFunctionParams struct {
 	ID        uuid.UUID
+	AccountID uuid.UUID
+	EnvID     uuid.UUID
 	AppID     uuid.UUID
 	Name      string
 	Slug      string
@@ -77,6 +94,9 @@ type InsertFunctionParams struct {
 }
 
 type UpdateFunctionConfigParams struct {
-	Config string
-	ID     uuid.UUID
+	Config    string
+	ID        uuid.UUID
+	AccountID uuid.UUID
+	EnvID     uuid.UUID
+	AppID     uuid.UUID
 }

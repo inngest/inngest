@@ -47,6 +47,23 @@ type Index struct {
 	EventName   string    `json:"eventName"`
 }
 
+// BlockInfo contains information about a single block.
+type BlockInfo struct {
+	ID             string    `json:"id"`
+	Length         int       `json:"length"`
+	FirstTimestamp time.Time `json:"firstTimestamp"`
+	LastTimestamp  time.Time `json:"lastTimestamp"`
+	DeleteCount    int64     `json:"deleteCount"`
+}
+
+// IndexStats contains statistics about a pause index.
+type IndexStats struct {
+	WorkspaceID  uuid.UUID    `json:"workspaceID"`
+	EventName    string       `json:"eventName"`
+	BufferLength int64        `json:"bufferLength"`
+	Blocks       []*BlockInfo `json:"blocks"`
+}
+
 // PauseIndex returns an index for a given pause.
 func PauseIndex(p state.Pause) Index {
 	idx := Index{WorkspaceID: p.WorkspaceID}
@@ -105,13 +122,32 @@ type Manager interface {
 
 	// Delete deletes a pause from either the block index or the buffer, depending on
 	// where the pause is stored.
-	Delete(ctx context.Context, index Index, pause state.Pause) error
+	Delete(ctx context.Context, index Index, pause state.Pause, opts ...state.DeletePauseOpt) error
+
+	// FlushIndexBlock flushes a new pauses block for the specified index.
+	FlushIndexBlock(ctx context.Context, index Index) error
+
+	// IndexStats returns statistics about an index including block information.
+	// Used for debugging pause storage and block compaction status.
+	IndexStats(ctx context.Context, index Index) (*IndexStats, error)
+
+	// GetBlockPauseIDs returns all pause IDs from a specific block.
+	// Used for debugging block contents. Returns IDs, total count, and error.
+	GetBlockPauseIDs(ctx context.Context, index Index, blockID ulid.ULID) ([]string, int64, error)
+
+	// GetBlockDeletedIDs returns all deleted pause IDs for a specific block.
+	// Used for debugging block deletion tracking. Returns IDs, total count, and error.
+	GetBlockDeletedIDs(ctx context.Context, index Index, blockID ulid.ULID) ([]string, int64, error)
+
+	// DeletePauseByID deletes a pause by its ID, handling both buffer and block storage
+	DeletePauseByID(ctx context.Context, pauseID uuid.UUID, workspaceID uuid.UUID) error
 }
 
 // Bufferer represents a datastore which accepts all writes for pauses.
 // The buffer writes them to a datastore before being periodically flushed
 // to blocks on disk.
 type Bufferer interface {
+	state.PauseDeleter
 	// Write writes one or more pauses to the backing store.  Note that the index
 	// for each pause must be the same.
 	//
@@ -133,9 +169,13 @@ type Bufferer interface {
 	// Note that this does not return blocks, as this only reads from the BufferIndexer.
 	PausesSince(ctx context.Context, index Index, since time.Time) (state.PauseIterator, error)
 
+	// PausesSinceWithCreatedAt loads up to limit pauses for a given index since a given time,
+	// ordered by creation time, with createdAt populated from Redis sorted set scores. The since time is inclusive.
+	PausesSinceWithCreatedAt(ctx context.Context, index Index, since time.Time, limit int64) (state.PauseIterator, error)
+
 	// Delete deletes a pause from the buffer, or returns ErrNotInBuffer if the pause is not in
 	// the buffer.
-	Delete(ctx context.Context, index Index, pause state.Pause) error
+	Delete(ctx context.Context, index Index, pause state.Pause, opts ...state.DeletePauseOpt) error
 
 	// PauseTimestamp returns the created at timestamp for a pause.
 	PauseTimestamp(ctx context.Context, index Index, pause state.Pause) (time.Time, error)
@@ -179,8 +219,11 @@ type BlockFlusher interface {
 	// BlockSize returns the number of pauses saved in each block.
 	BlockSize() int
 
-	// Delete deletes a pause from from block storage.
-	Delete(ctx context.Context, index Index, pause state.Pause) error
+	// Delete deletes a pause from block storage.
+	Delete(ctx context.Context, index Index, pause state.Pause, opts ...state.DeletePauseOpt) error
+
+	// DeleteByID deletes a pause from a block by its ID.
+	DeleteByID(ctx context.Context, pauseID uuid.UUID, workspaceID uuid.UUID) error
 }
 
 // BlockReader reads blocks for a given index.
@@ -199,6 +242,22 @@ type BlockReader interface {
 	// LastBlockMetadata returns metadata on the last block written for the given index.
 	// This allows us to check the last timestamp flushed overall.
 	LastBlockMetadata(ctx context.Context, index Index) (*blockMetadata, error)
+
+	// GetBlockMetadata returns metadata for all blocks in the given index.
+	// Used for debugging block information.
+	GetBlockMetadata(ctx context.Context, index Index) (map[string]*blockMetadata, error)
+
+	// GetBlockDeleteCount returns the number of deleted pauses for a specific block.
+	// Used for debugging block compaction status.
+	GetBlockDeleteCount(ctx context.Context, index Index, blockID ulid.ULID) (int64, error)
+
+	// GetBlockPauseIDs returns all pause IDs from a specific block.
+	// Used for debugging block contents. Returns total count and all IDs.
+	GetBlockPauseIDs(ctx context.Context, index Index, blockID ulid.ULID) ([]string, int64, error)
+
+	// GetBlockDeletedIDs returns all deleted pause IDs for a specific block.
+	// Used for debugging block deletion tracking. Returns total count and all IDs.
+	GetBlockDeletedIDs(ctx context.Context, index Index, blockID ulid.ULID) ([]string, int64, error)
 
 	// IndexExists returns whether we've written any blocks for the given index.
 	IndexExists(ctx context.Context, i Index) (bool, error)

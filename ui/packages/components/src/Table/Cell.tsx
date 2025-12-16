@@ -4,12 +4,14 @@ import {
   type PillAppearance,
   type PillContentProps,
 } from '@inngest/components/Pill';
-import { StatusDot } from '@inngest/components/Status/StatusDot';
+import { StatusDot, type StatusDotProps } from '@inngest/components/Status/StatusDot';
 import { getStatusTextClass } from '@inngest/components/Status/statusClasses';
 import { Time } from '@inngest/components/Time';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
 import { cn } from '@inngest/components/utils/classNames';
 import { RiSparkling2Fill } from '@remixicon/react';
+
+import { useDynamicRunData } from '../RunDetailsV3/utils';
 
 const cellStyles = 'text-basis text-sm';
 
@@ -47,21 +49,74 @@ export function PillCell({
   );
 }
 
-export function TimeCell({ date, format }: { date: Date | string; format?: 'relative' }) {
+export function TimeCell({
+  date,
+  format,
+  copyable = true,
+}: {
+  date: Date | string;
+  format?: 'relative';
+  copyable?: boolean;
+}) {
   return (
     <span className={cn(cellStyles, 'text-muted font-medium')}>
-      <Time value={date} format={format} copyable={false} />
+      <Time value={date} format={format} copyable={copyable} />
     </span>
   );
 }
 
-export function StatusCell({ status }: React.PropsWithChildren<{ status: string }>) {
+export function StatusCell({
+  status,
+  label,
+  size,
+}: React.PropsWithChildren<{ status: string; label?: string; size?: StatusDotProps['size'] }>) {
   const colorClass = getStatusTextClass(status);
 
   return (
     <div className={cn(cellStyles, 'flex items-center gap-2.5 font-medium')}>
-      <StatusDot status={status} />
-      <p className={cn(colorClass, 'lowercase first-letter:capitalize')}>{status}</p>
+      <StatusDot status={status} size={size} />
+      <p className={cn('text-nowrap lowercase first-letter:capitalize', colorClass)}>
+        {label || status}
+      </p>
+    </div>
+  );
+}
+
+export function RunStatusCell({
+  runID,
+  status,
+  size,
+}: React.PropsWithChildren<{
+  runID: string;
+  status: string;
+  size?: StatusDotProps['size'];
+}>) {
+  const { dynamicRunData } = useDynamicRunData({ runID });
+  const colorClass = getStatusTextClass(dynamicRunData?.status || status);
+
+  return (
+    <div className={cn(cellStyles, 'flex items-center gap-2.5 font-medium')}>
+      <StatusDot status={dynamicRunData?.status || status} size={size} />
+      <p className={cn('text-nowrap lowercase first-letter:capitalize', colorClass)}>
+        {dynamicRunData?.status || status}
+      </p>
+    </div>
+  );
+}
+
+export function EndedAtCell({
+  runID,
+  endedAt,
+}: React.PropsWithChildren<{
+  runID: string;
+  endedAt?: string | null;
+}>) {
+  const { dynamicRunData } = useDynamicRunData({ runID });
+  const time = dynamicRunData?.endedAt || endedAt;
+
+  return (
+    <div className="flex items-center">
+      {time ? <TimeCell date={new Date(time)} /> : <TextCell>-</TextCell>}
     </div>
   );
 }

@@ -124,8 +124,7 @@ func (o GetHistoryOutputOpts) Validate() error {
 	if o.AccountID == uuid.Nil {
 		return errors.New("account ID must be provided")
 	}
-	zeroULID := ulid.ULID{}
-	if o.RunID == zeroULID {
+	if o.RunID.IsZero() {
 		return errors.New("run ID must be provided")
 	}
 	if o.WorkspaceID == uuid.Nil {

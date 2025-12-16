@@ -5,7 +5,7 @@ import { formatMilliseconds } from '@inngest/components/utils/date';
 import { RiSparkling2Fill } from '@remixicon/react';
 import { createColumnHelper } from '@tanstack/react-table';
 
-import { AICell } from '../Table/Cell';
+import { AICell, EndedAtCell, RunStatusCell } from '../Table/Cell';
 import type { Run, ViewScope } from './types';
 
 const columnHelper = createColumnHelper<Run>();
@@ -32,13 +32,13 @@ function ensureColumnID(id: ColumnID): ColumnID {
 }
 
 const columns = [
-  columnHelper.accessor<'status', FunctionRunStatus>('status', {
-    cell: (info) => {
-      const status = info.getValue();
+  columnHelper.display({
+    cell: (props) => {
+      const { id, status } = props.row.original;
 
       return (
         <div className="flex items-center">
-          <StatusCell status={status} />
+          <RunStatusCell status={status} runID={id} />
         </div>
       );
     },
@@ -86,8 +86,6 @@ const columns = [
         );
       }
 
-      // Unreachable
-      console.error(`Unknown trigger for run ${data.id}`);
       return null;
     },
     header: 'Trigger',
@@ -152,13 +150,9 @@ const columns = [
   }),
   columnHelper.accessor('endedAt', {
     cell: (info) => {
-      const time = info.getValue();
+      const endedAt = info.getValue();
 
-      return (
-        <div className="flex items-center">
-          {time ? <TimeCell date={new Date(time)} /> : <TextCell>-</TextCell>}
-        </div>
-      );
+      return <EndedAtCell runID={info.row.original.id} endedAt={endedAt} />;
     },
     header: 'Ended at',
     enableSorting: false,

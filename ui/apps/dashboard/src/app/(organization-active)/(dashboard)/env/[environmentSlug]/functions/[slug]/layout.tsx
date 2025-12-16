@@ -53,7 +53,7 @@ export default function FunctionLayout({
   const { isArchived = false, isPaused } = fn ?? {};
 
   const doesFunctionAcceptPayload =
-    fn?.current?.triggers.some((trigger) => {
+    fn?.triggers.some((trigger) => {
       return trigger.type == FunctionTriggerTypes.Event;
     }) ?? false;
 
@@ -144,11 +144,11 @@ export default function FunctionLayout({
             exactRouteMatch: true,
           },
           { children: 'Runs', href: `/env/${environmentSlug}/functions/${slug}/runs` },
-          { children: 'Replay history', href: `/env/${environmentSlug}/functions/${slug}/replay` },
+          { children: 'Replays', href: `/env/${environmentSlug}/functions/${slug}/replays` },
           ...(isBulkCancellationEnabled.isReady && isBulkCancellationEnabled.value
             ? [
                 {
-                  children: 'Cancellation history',
+                  children: 'Cancellations',
                   href: `/env/${environmentSlug}/functions/${slug}/cancellations`,
                 },
               ]

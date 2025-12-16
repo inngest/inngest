@@ -43,8 +43,9 @@ func Fetch[OutputT any](
 	id string,
 	in FetchOpts,
 ) (out FetchResponse[OutputT], err error) {
-	mgr := preflight(ctx)
-	op := mgr.NewOp(enums.OpcodeGateway, id, nil)
+	targetID := getTargetStepID(ctx)
+	mgr := preflight(ctx, enums.OpcodeGateway)
+	op := mgr.NewOp(enums.OpcodeGateway, id)
 	hashedID := op.MustHash()
 
 	if val, ok := mgr.Step(ctx, op); ok {
@@ -57,7 +58,7 @@ func Fetch[OutputT any](
 				err := errors.StepError{}
 				if err := json.Unmarshal(unwrapped.Error, &err); err != nil {
 					mgr.SetErr(fmt.Errorf("error unmarshalling error for step '%s': %w", id, err))
-					panic(ControlHijack{})
+					panic(sdkrequest.ControlHijack{})
 				}
 
 				// See if we have any data for multiple returns in the error type.
@@ -77,11 +78,19 @@ func Fetch[OutputT any](
 		return out, err
 	}
 
-	mgr.AppendOp(sdkrequest.GeneratorOpcode{
-		ID:   hashedID,
-		Op:   enums.OpcodeGateway,
-		Name: id,
-		Opts: in,
-	})
-	panic(ControlHijack{})
+	if targetID != nil && *targetID != hashedID {
+		// Don't report this step since targeting is happening and it isn't
+		// targeted
+		panic(sdkrequest.ControlHijack{})
+	}
+
+	plannedOp := sdkrequest.GeneratorOpcode{
+		ID:       hashedID,
+		Op:       enums.OpcodeGateway,
+		Name:     id,
+		Opts:     in,
+		Userland: op.Userland(),
+	}
+	mgr.AppendOp(ctx, plannedOp)
+	panic(sdkrequest.ControlHijack{})
 }

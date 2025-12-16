@@ -1,12 +1,15 @@
 package base_cqrs
 
 import (
+	"cmp"
 	"context"
 	"crypto/rand"
 	"database/sql"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"maps"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -17,6 +20,7 @@ import (
 	_ "github.com/doug-martin/goqu/v9/dialect/postgres"
 	_ "github.com/doug-martin/goqu/v9/dialect/sqlite3"
 	sqexp "github.com/doug-martin/goqu/v9/exp"
+	"github.com/elliotchance/orderedmap/v3"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
@@ -28,9 +32,9 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/run"
 	"github.com/inngest/inngest/pkg/tracing/meta"
+	"github.com/inngest/inngest/pkg/tracing/metadata"
 	"github.com/inngest/inngest/pkg/util"
 	connpb "github.com/inngest/inngest/proto/gen/connect/v1"
-	"github.com/jinzhu/copier"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -41,13 +45,12 @@ const (
 var (
 	// end represents a ulid ending with 'Z', eg. a far out cursor.
 	endULID = ulid.ULID([16]byte{'Z'})
-	nilULID = ulid.ULID{}
 	nilUUID = uuid.UUID{}
 )
 
-func NewQueries(db *sql.DB, driver string) (q sqlc.Querier) {
+func NewQueries(db *sql.DB, driver string, o sqlc_postgres.NewNormalizedOpts) (q sqlc.Querier) {
 	if driver == "postgres" {
-		q = sqlc_postgres.NewNormalized(db)
+		q = sqlc_postgres.NewNormalized(db, o)
 	} else {
 		q = sqlc.New(db)
 	}
@@ -55,11 +58,14 @@ func NewQueries(db *sql.DB, driver string) (q sqlc.Querier) {
 	return q
 }
 
-func NewCQRS(db *sql.DB, driver string) cqrs.Manager {
+func NewCQRS(db *sql.DB, driver string, o sqlc_postgres.NewNormalizedOpts) cqrs.Manager {
+	// Force goqu to use prepared statements for consistency with sqlc
+	sq.SetDefaultPrepared(true)
 	return wrapper{
 		driver: driver,
-		q:      NewQueries(db, driver),
+		q:      NewQueries(db, driver, o),
 		db:     db,
+		opts:   o,
 	}
 }
 
@@ -68,6 +74,7 @@ type wrapper struct {
 	q      sqlc.Querier
 	db     *sql.DB
 	tx     *sql.Tx
+	opts   sqlc_postgres.NewNormalizedOpts
 }
 
 func (w wrapper) isPostgres() bool {
@@ -82,6 +89,16 @@ func (w wrapper) dialect() string {
 	return "sqlite3"
 }
 
+type normalizedSpan interface {
+	GetTraceID() string
+	GetRunID() string
+	GetDynamicSpanID() sql.NullString
+	GetParentSpanID() sql.NullString
+	GetStartTime() interface{}
+	GetEndTime() interface{}
+	GetSpanFragments() any
+}
+
 func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.OtelSpan, error) {
 	spans, err := w.q.GetSpansByRunID(ctx, runID.String())
 	if err != nil {
@@ -89,152 +106,404 @@ func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.Ot
 		return nil, err
 	}
 
-	spanMap := make(map[string]*cqrs.OtelSpan)
-	// A map of dynamic span IDs to the specific span ID that contains an
-	// output
-	outputDynamicRefs := make(map[string]string)
-	var root *cqrs.OtelSpan
+	return mapRootSpansFromRows(ctx, spans)
+}
 
+func (w wrapper) GetSpansByDebugRunID(ctx context.Context, debugRunID ulid.ULID) ([]*cqrs.OtelSpan, error) {
+	spans, err := w.q.GetSpansByDebugRunID(ctx, sql.NullString{String: debugRunID.String(), Valid: true})
+	if err != nil {
+		logger.StdlibLogger(ctx).Error("error getting spans by debug run ID", "error", err)
+		return nil, err
+	}
+
+	if len(spans) == 0 {
+		return nil, nil
+	}
+
+	return buildDebugRunSpan(ctx, spans)
+}
+
+func (w wrapper) GetSpansByDebugSessionID(ctx context.Context, debugSessionID ulid.ULID) ([][]*cqrs.OtelSpan, error) {
+	spans, err := w.q.GetSpansByDebugSessionID(ctx, sql.NullString{String: debugSessionID.String(), Valid: true})
+	if err != nil {
+		logger.StdlibLogger(ctx).Error("error getting spans by debug session ID", "error", err)
+		return nil, err
+	}
+
+	if len(spans) == 0 {
+		return nil, nil
+	}
+
+	spansByDebugSession := make(map[string][]*sqlc.GetSpansByDebugSessionIDRow)
 	for _, span := range spans {
-		st := strings.Split(span.StartTime.(string), " m=")[0]
-		startTime, err := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", st)
+		if span.DebugRunID.Valid {
+			spansByDebugSession[span.DebugRunID.String] = append(spansByDebugSession[span.DebugRunID.String], span)
+		}
+	}
+
+	var allDebugRuns [][]*cqrs.OtelSpan
+
+	for _, runSpans := range spansByDebugSession {
+		debugRunSpans, err := buildDebugRunSpan(ctx, runSpans)
+		if err != nil {
+			return nil, err
+		}
+		allDebugRuns = append(allDebugRuns, debugRunSpans)
+	}
+
+	return allDebugRuns, nil
+}
+
+var _ normalizedSpan = (*sqlc.GetRunSpanByRunIDRow)(nil)
+
+func (w wrapper) GetRunSpanByRunID(ctx context.Context, runID ulid.ULID, accountID, workspaceID uuid.UUID) (*cqrs.OtelSpan, error) {
+	// Ignore the workspace ID for now.
+	span, err := w.q.GetRunSpanByRunID(ctx, sqlc.GetRunSpanByRunIDParams{
+		RunID:     runID.String(),
+		AccountID: accountID.String(),
+	})
+	if err != nil {
+		logger.StdlibLogger(ctx).Error("error getting span by run ID", "error", err)
+		return nil, err
+	}
+
+	return mapSpanFromRow(ctx, span, nil)
+}
+
+func (w wrapper) GetStepSpanByStepID(ctx context.Context, runID ulid.ULID, stepID string, accountID, workspaceID uuid.UUID) (*cqrs.OtelSpan, error) {
+	// Ignore the workspace ID for now.
+	span, err := w.q.GetStepSpanByStepID(ctx, sqlc.GetStepSpanByStepIDParams{
+		RunID:     runID.String(),
+		StepID:    stepID,
+		AccountID: accountID.String(),
+	})
+	if err != nil {
+		logger.StdlibLogger(ctx).Error("error getting step span by step ID", "error", err)
+		return nil, err
+	}
+
+	return mapSpanFromRow(ctx, span, nil)
+}
+
+func (w wrapper) GetExecutionSpanByStepIDAndAttempt(ctx context.Context, runID ulid.ULID, stepID string, attempt int, accountID, workspaceID uuid.UUID) (*cqrs.OtelSpan, error) {
+	// Ignore the workspace ID for now.
+	span, err := w.q.GetExecutionSpanByStepIDAndAttempt(ctx, sqlc.GetExecutionSpanByStepIDAndAttemptParams{
+		RunID:       runID.String(),
+		StepID:      stepID,
+		StepAttempt: int64(attempt),
+		AccountID:   accountID.String(),
+	})
+	if err != nil {
+		logger.StdlibLogger(ctx).Error("error getting step execution span by step ID and attempt", "error", err)
+		return nil, err
+	}
+
+	return mapSpanFromRow(ctx, span, nil)
+}
+
+func (w wrapper) GetLatestExecutionSpanByStepID(ctx context.Context, runID ulid.ULID, stepID string, accountID, workspaceID uuid.UUID) (*cqrs.OtelSpan, error) {
+	// Ignore the workspace ID for now.
+	span, err := w.q.GetLatestExecutionSpanByStepID(ctx, sqlc.GetLatestExecutionSpanByStepIDParams{
+		RunID:     runID.String(),
+		StepID:    stepID,
+		AccountID: accountID.String(),
+	})
+	if err != nil {
+		logger.StdlibLogger(ctx).Error("error getting step execution span by step ID and attempt", "error", err)
+		return nil, err
+	}
+
+	return mapSpanFromRow(ctx, span, nil)
+}
+
+func (w wrapper) GetSpanBySpanID(ctx context.Context, runID ulid.ULID, spanID string, accountID, workspaceID uuid.UUID) (*cqrs.OtelSpan, error) {
+	// Ignore the workspace ID for now.
+	span, err := w.q.GetSpanBySpanID(ctx, sqlc.GetSpanBySpanIDParams{
+		RunID:     runID.String(),
+		SpanID:    spanID,
+		AccountID: accountID.String(),
+	})
+	if err != nil {
+		logger.StdlibLogger(ctx).Error("error getting step span by step ID", "error", err)
+		return nil, err
+	}
+
+	return mapSpanFromRow(ctx, span, nil)
+}
+
+type IODynamicRef struct {
+	OutputRef string
+	InputRef  string
+}
+
+type spanRollupInfo struct {
+	metadataByParent map[string][]*cqrs.SpanMetadata
+	dynamicRefs      map[string]*IODynamicRef
+}
+
+func mapSpanFromRow[T normalizedSpan](ctx context.Context, span T, info *spanRollupInfo) (*cqrs.OtelSpan, error) {
+	// Use interface methods to get the fields directly
+	traceID := span.GetTraceID()
+	runIDStr := span.GetRunID()
+	dynamicSpanID := span.GetDynamicSpanID()
+	parentSpanID := span.GetParentSpanID()
+	startTime := span.GetStartTime()
+	endTime := span.GetEndTime()
+	spanFragments := span.GetSpanFragments()
+
+	var parsedStartTime time.Time
+	switch v := startTime.(type) {
+	case time.Time:
+		parsedStartTime = v
+	case string:
+		st := strings.Split(v, " m=")[0]
+		parsed, err := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", st)
 		if err != nil {
 			logger.StdlibLogger(ctx).Error("error parsing start time", "error", err)
 			return nil, err
 		}
+		parsedStartTime = parsed
+	default:
+		return nil, fmt.Errorf("unexpected start time type: %T", startTime)
+	}
 
-		et := strings.Split(span.EndTime.(string), " m=")[0]
-		endTime, err := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", et)
+	var parsedEndTime time.Time
+	switch v := endTime.(type) {
+	case time.Time:
+		parsedEndTime = v
+	case string:
+		et := strings.Split(v, " m=")[0]
+		parsed, err := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", et)
 		if err != nil {
 			logger.StdlibLogger(ctx).Error("error parsing end time", "error", err)
 			return nil, err
 		}
-
-		var parentSpanID *string
-		if span.ParentSpanID.Valid {
-			parentSpanID = &span.ParentSpanID.String
-		}
-
-		newSpan := &cqrs.OtelSpan{
-			RawOtelSpan: cqrs.RawOtelSpan{
-				SpanID:       span.DynamicSpanID.String,
-				TraceID:      span.TraceID,
-				ParentSpanID: parentSpanID,
-				StartTime:    startTime,
-				EndTime:      endTime,
-				Name:         "",
-				Attributes:   make(map[string]any),
-			},
-			Status:          enums.StepStatusRunning,
-			RunID:           runID,
-			MarkedAsDropped: false,
-		}
-
-		var outputSpanID *string
-		var fragments []map[string]interface{}
-		_ = json.Unmarshal([]byte(span.SpanFragments.(string)), &fragments)
-
-		// TODO same for links
-		for _, fragment := range fragments {
-			if name, ok := fragment["name"].(string); ok {
-				if strings.HasPrefix(name, "executor.") {
-					newSpan.Name = name
-				}
-			}
-
-			if attrs, ok := fragment["attributes"].(string); ok {
-				fragmentAttr := map[string]any{}
-				if err := json.Unmarshal([]byte(attrs), &fragmentAttr); err != nil {
-					logger.StdlibLogger(ctx).Error("error unmarshalling span attributes", "error", err)
-					return nil, err
-				}
-
-				for k, v := range fragmentAttr {
-					// TODO We should remove this and only keep non-Inngest
-					// attributes here instead. Especially if we use them
-					// below. For now, they're used sometimes.
-					newSpan.Attributes[k] = v
-
-					switch k {
-					case meta.AttributeDynamicStatus:
-						{
-							if status, ok := v.(string); ok {
-								if statusStr, err := enums.StepStatusString(status); err == nil {
-									newSpan.Status = statusStr
-								}
-							}
-						}
-					case meta.AttributeAppID:
-						{
-							newSpan.AppID = uuid.MustParse(v.(string))
-						}
-					case meta.AttributeFunctionID:
-						{
-							newSpan.FunctionID = uuid.MustParse(v.(string))
-						}
-					case meta.AttributeRunID:
-						{
-							newSpan.RunID = ulid.MustParse(v.(string))
-						}
-					case meta.AttributeStartedAt:
-						{
-							newSpan.StartTime = time.UnixMilli(int64(v.(float64)))
-						}
-					case meta.AttributeEndedAt:
-						{
-							newSpan.EndTime = time.UnixMilli(int64(v.(float64)))
-						}
-					case meta.AttributeDropSpan:
-						{
-							newSpan.MarkedAsDropped = true
-						}
-					default:
-						newSpan.Attributes[k] = v
-					}
-				}
-			}
-
-			if outputRef, ok := fragment["output_span_id"].(string); ok {
-				outputSpanID = &outputRef
-				outputDynamicRefs[span.DynamicSpanID.String] = outputRef
-			}
-		}
-
-		// If this span has finished, set a preliminary output ID.
-		if outputSpanID != nil && *outputSpanID != "" {
-			newSpan.OutputID, err = encodeSpanOutputID(*outputSpanID)
-			if err != nil {
-				logger.StdlibLogger(ctx).Error("error encoding span identifier", "error", err)
-				return nil, err
-			}
-		}
-
-		spanMap[span.DynamicSpanID.String] = newSpan
+		parsedEndTime = parsed
+	default:
+		return nil, fmt.Errorf("unexpected end time type: %T", endTime)
 	}
 
-	for _, span := range spanMap {
-		// If we have an output reference for this span, set the appropriate
-		// target span ID here
-		if ref, ok := span.Attributes[meta.AttributeStepOutputRef]; ok {
-			if refStr, ok := ref.(string); ok && refStr != "" {
-				if targetSpanID, ok := outputDynamicRefs[refStr]; ok {
-					// We've found the span ID that we need to target for
-					// this span. So let's use it!
-					span.OutputID, err = encodeSpanOutputID(targetSpanID)
-					if err != nil {
-						logger.StdlibLogger(ctx).Error("error encoding span output ID", "error", err)
-						return nil, err
-					}
-				}
+	var parentSpanIDPtr *string
+	if parentSpanID.Valid {
+		parentSpanIDPtr = &parentSpanID.String
+	}
+
+	runID, err := ulid.Parse(runIDStr)
+	if err != nil {
+		logger.StdlibLogger(ctx).Error("error parsing run ID from span", "error", err)
+		return nil, err
+	}
+
+	newSpan := &cqrs.OtelSpan{
+		RawOtelSpan: cqrs.RawOtelSpan{
+			SpanID:       dynamicSpanID.String,
+			TraceID:      traceID,
+			ParentSpanID: parentSpanIDPtr,
+			StartTime:    parsedStartTime,
+			// NOTE:
+			// The end time is only valid if this span denotes a step end, or the run end.
+			// EG. if this is an "Executor.run" span, this would never have an end time.
+			// However, this is the actual span commit time.  We must handle this when we
+			// parse the spans.
+			EndTime:    parsedEndTime,
+			Name:       "",
+			Attributes: make(map[string]any),
+		},
+		Status:          enums.StepStatusRunning,
+		RunID:           runID,
+		MarkedAsDropped: false,
+	}
+
+	var (
+		outputSpanID *string
+		inputSpanID  *string
+		fragments    []map[string]any
+
+		isMetadata bool
+	)
+
+	var spanFragmentsBytes []byte
+	switch v := spanFragments.(type) {
+	case string:
+		spanFragmentsBytes = []byte(v)
+	case json.RawMessage:
+		spanFragmentsBytes = []byte(v)
+	case []byte:
+		spanFragmentsBytes = v
+	default:
+		return nil, fmt.Errorf("unexpected span fragments type: %T", spanFragments)
+	}
+
+	_ = json.Unmarshal(spanFragmentsBytes, &fragments)
+
+fragmentLoop:
+	for _, fragment := range fragments {
+		if name, ok := fragment["name"].(string); ok {
+			switch {
+			case strings.HasPrefix(name, "executor."):
+				newSpan.Name = name
+			case name == meta.SpanNameMetadata:
+				newSpan.Name = name
+				isMetadata = true
+				break fragmentLoop
 			}
 		}
 
-		if span.ParentSpanID == nil || *span.ParentSpanID == "" || *span.ParentSpanID == "0000000000000000" {
-			root = spanMap[span.SpanID]
+		if attrs, ok := fragment["attributes"].(string); ok {
+			fragmentAttr := map[string]any{}
+			if err := json.Unmarshal([]byte(attrs), &fragmentAttr); err != nil {
+				logger.StdlibLogger(ctx).Error("error unmarshalling span attributes", "error", err)
+				return nil, err
+			}
+
+			maps.Copy(newSpan.RawOtelSpan.Attributes, fragmentAttr)
+
+			if outputRef, ok := fragment["output_span_id"].(string); ok && info != nil {
+				outputSpanID = &outputRef
+				if io, ok := info.dynamicRefs[dynamicSpanID.String]; ok && io != nil {
+					io.OutputRef = outputRef
+				} else {
+					info.dynamicRefs[dynamicSpanID.String] = &IODynamicRef{OutputRef: outputRef}
+				}
+			}
+
+			if inputRef, ok := fragment["input_span_id"].(string); ok && info != nil {
+				inputSpanID = &inputRef
+				if io, ok := info.dynamicRefs[dynamicSpanID.String]; ok && io != nil {
+					io.InputRef = inputRef
+				} else {
+					info.dynamicRefs[dynamicSpanID.String] = &IODynamicRef{InputRef: inputRef}
+				}
+			}
+		}
+	}
+
+	if info != nil && isMetadata && parentSpanIDPtr != nil {
+		metadata, err := rollupSpanMetadataFromFragments(ctx, fragments, parsedEndTime)
+		if err != nil {
+			logger.StdlibLogger(ctx).Error("error rolling up metadata span", "error", err)
+		} else {
+			info.metadataByParent[*parentSpanIDPtr] = append(info.metadataByParent[*parentSpanIDPtr], metadata)
+		}
+	}
+
+	newSpan.Attributes, err = meta.ExtractTypedValues(ctx, newSpan.RawOtelSpan.Attributes)
+	if err != nil {
+		return nil, fmt.Errorf("error extracting typed values from span attributes: %w", err)
+	}
+
+	if newSpan.Attributes.DynamicStatus != nil {
+		newSpan.Status = *newSpan.Attributes.DynamicStatus
+	}
+
+	if newSpan.Attributes.AppID != nil {
+		newSpan.AppID = *newSpan.Attributes.AppID
+	}
+
+	if newSpan.Attributes.FunctionID != nil {
+		newSpan.FunctionID = *newSpan.Attributes.FunctionID
+	}
+
+	if newSpan.Attributes.RunID != nil {
+		newSpan.RunID = *newSpan.Attributes.RunID
+	}
+
+	if newSpan.Attributes.DebugRunID != nil {
+		newSpan.DebugRunID = *newSpan.Attributes.DebugRunID
+	}
+
+	if newSpan.Attributes.DebugSessionID != nil {
+		newSpan.DebugSessionID = *newSpan.Attributes.DebugSessionID
+	}
+
+	if newSpan.Attributes.StartedAt != nil {
+		newSpan.StartTime = *newSpan.Attributes.StartedAt
+	}
+
+	if newSpan.Attributes.EndedAt != nil {
+		newSpan.EndTime = *newSpan.Attributes.EndedAt
+	}
+
+	if newSpan.Attributes.DropSpan != nil && *newSpan.Attributes.DropSpan {
+		newSpan.MarkedAsDropped = true
+	}
+
+	// If this span has finished, set a preliminary output ID.
+	if (outputSpanID != nil && *outputSpanID != "") || (inputSpanID != nil && *inputSpanID != "") {
+		newSpan.OutputID, err = encodeSpanOutputID(outputSpanID, inputSpanID)
+		if err != nil {
+			logger.StdlibLogger(ctx).Error("error encoding span identifier", "error", err)
+			return nil, err
+		}
+	}
+
+	return newSpan, nil
+}
+
+// Uses generics to accept slices of any type that implements normalizedSpan interface
+func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cqrs.OtelSpan, error) {
+	// ordered map is required by subsequent gql mapping
+	spanMap := orderedmap.NewOrderedMap[string, *cqrs.OtelSpan]()
+
+	metadataByParent := make(map[string][]*cqrs.SpanMetadata)
+
+	// A map of dynamic span IDs to the specific span ID that contains I/O
+	dynamicRefs := make(map[string]*IODynamicRef)
+
+	var root *cqrs.OtelSpan
+	var runID ulid.ULID
+	var err error
+
+	for _, span := range spans {
+		info := spanRollupInfo{
+			dynamicRefs:      dynamicRefs,
+			metadataByParent: metadataByParent,
+		}
+		newSpan, err := mapSpanFromRow(ctx, span, &info)
+		if err != nil {
+			return nil, err
+		}
+
+		if newSpan.Name == meta.SpanNameMetadata {
 			continue
 		}
 
-		if parent, ok := spanMap[*span.ParentSpanID]; ok {
+		spanMap.Set(newSpan.SpanID, newSpan)
+	}
+
+	// Build a reverse lookup map for output references
+	outputDynamicRefs := make(map[string]*string)
+	for spanID, ioRef := range dynamicRefs {
+		if ioRef != nil && ioRef.OutputRef != "" {
+			outputDynamicRefs[ioRef.OutputRef] = &spanID
+		}
+	}
+
+	for _, span := range spanMap.AllFromFront() {
+		// If we have an output reference for this span, set the appropriate
+		// target span ID here
+		if spanRefStr := span.Attributes.StepOutputRef; spanRefStr != nil && *spanRefStr != "" {
+			if targetSpanID, ok := outputDynamicRefs[*spanRefStr]; ok {
+				// We've found the span ID that we need to target for
+				// this span. So let's use it!
+				span.OutputID, err = encodeSpanOutputID(targetSpanID, nil)
+				if err != nil {
+					logger.StdlibLogger(ctx).Error("error encoding span output ID", "error", err)
+					return nil, err
+				}
+			}
+		}
+
+		if metadata, ok := metadataByParent[span.SpanID]; ok {
+			span.Metadata = metadata
+		}
+
+		if (span.Attributes.IsUserland == nil || !*span.Attributes.IsUserland) && (span.ParentSpanID == nil || *span.ParentSpanID == "" || *span.ParentSpanID == "0000000000000000") {
+			root, _ = spanMap.Get(span.SpanID)
+			continue
+		}
+
+		if parent, ok := spanMap.Get(*span.ParentSpanID); ok {
 			// This is wrong. Either do it properly in DB or infer it
 			// correctly here. e.g. if child failed but more attempts coming,
 			// still running
@@ -242,7 +511,8 @@ func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.Ot
 				parent.Status = span.Status
 			}
 
-			parent.Children = append(parent.Children, spanMap[span.SpanID])
+			item, _ := spanMap.Get(span.SpanID)
+			parent.Children = append(parent.Children, item)
 		} else {
 			logger.StdlibLogger(ctx).Warn(
 				"lost lineage detected",
@@ -252,17 +522,102 @@ func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.Ot
 		}
 	}
 
+	if root == nil {
+		return nil, fmt.Errorf("no root span found for run %s", runID.String())
+	}
+
 	sorter(root)
 
 	return root, nil
 }
 
-func encodeSpanOutputID(spanID string) (*string, error) {
+func rollupSpanMetadataFromFragments(ctx context.Context, fragments []map[string]any, updatedAt time.Time) (*cqrs.SpanMetadata, error) {
+	ret := &cqrs.SpanMetadata{
+		Values:    metadata.Values{},
+		UpdatedAt: updatedAt,
+	}
+
+	for _, fragment := range fragments {
+		attrs, ok := fragment["attributes"].(string)
+		if !ok {
+			logger.StdlibLogger(ctx).Error("error unmarshalling metadata span kind, no attributes")
+			continue
+		}
+
+		var fragmentAttr struct {
+			Scope  *metadata.Scope  `json:"_inngest.metadata.scope"`
+			Kind   *metadata.Kind   `json:"_inngest.metadata.kind"`
+			Op     *metadata.Opcode `json:"_inngest.metadata.op"`
+			Values *string          `json:"_inngest.metadata.values"`
+		}
+		if err := json.Unmarshal([]byte(attrs), &fragmentAttr); err != nil {
+			logger.StdlibLogger(ctx).Error("error unmarshalling metadata span attributes", "error", err)
+			return nil, err
+		}
+
+		switch {
+		case fragmentAttr.Scope == nil:
+			logger.StdlibLogger(ctx).Error("error unmarshalling metadata span kind")
+			continue // TODO: err
+		case fragmentAttr.Kind == nil:
+			logger.StdlibLogger(ctx).Error("error unmarshalling metadata span kind")
+			continue // TODO: err
+		case fragmentAttr.Op == nil:
+			logger.StdlibLogger(ctx).Error("error unmarshalling metadata span op")
+			continue
+		case fragmentAttr.Values == nil:
+			logger.StdlibLogger(ctx).Error("error unmarshalling metadata span metadata")
+			continue
+		}
+
+		if ret.Kind == "" && *fragmentAttr.Kind != "" {
+			ret.Kind = *fragmentAttr.Kind
+		} else if ret.Kind != *fragmentAttr.Kind {
+			logger.StdlibLogger(ctx).Warn(
+				"mismatch in metadata kind during rollup, skipping",
+				"kinds", []metadata.Kind{ret.Kind, *fragmentAttr.Kind},
+			)
+			continue
+		}
+
+		if ret.Scope == enums.MetadataScopeUnknown && *fragmentAttr.Scope != enums.MetadataScopeUnknown {
+			ret.Scope = *fragmentAttr.Scope
+		} else if ret.Scope != *fragmentAttr.Scope {
+			logger.StdlibLogger(ctx).Warn(
+				"mismatch in metadata scope during rollup, skipping",
+				"scopes", []metadata.Scope{ret.Scope, *fragmentAttr.Scope},
+			)
+			continue
+		}
+
+		var fragmentMetadata metadata.Values
+		err := json.Unmarshal([]byte(*fragmentAttr.Values), &fragmentMetadata)
+		if err != nil {
+			logger.StdlibLogger(ctx).Error("error unmarshalling span metadata", "error", err)
+			return nil, err
+		}
+
+		err = ret.Values.Combine(fragmentMetadata, *fragmentAttr.Op)
+		if err != nil {
+			logger.StdlibLogger(ctx).Error("error rolling up metadata span metadata", "error", err)
+			return nil, err
+		}
+	}
+
+	return ret, nil
+}
+
+func encodeSpanOutputID(outputSpanID *string, inputSpanID *string) (*string, error) {
 	p := true
+	osid := ""
+	if outputSpanID != nil {
+		osid = *outputSpanID
+	}
 
 	id := &cqrs.SpanIdentifier{
-		SpanID:  spanID,
-		Preview: &p,
+		SpanID:      osid,
+		InputSpanID: inputSpanID,
+		Preview:     &p,
 	}
 
 	encoded, err := id.Encode()
@@ -273,9 +628,50 @@ func encodeSpanOutputID(spanID string) (*string, error) {
 	return &encoded, nil
 }
 
+// group by run id, sort by started at, let the frontend handle overlay.
+func buildDebugRunSpan[T normalizedSpan](ctx context.Context, spans []T) ([]*cqrs.OtelSpan, error) {
+	if len(spans) == 0 {
+		return nil, nil
+	}
+
+	spansByRunID := make(map[string][]T)
+	for _, span := range spans {
+		runID := span.GetRunID()
+		spansByRunID[runID] = append(spansByRunID[runID], span)
+	}
+
+	runSpans := make([]*cqrs.OtelSpan, 0, len(spansByRunID))
+	for _, runSpansGroup := range spansByRunID {
+		runSpan, err := mapRootSpansFromRows(ctx, runSpansGroup)
+		if err != nil {
+			return nil, err
+		}
+		if runSpan != nil {
+			runSpans = append(runSpans, runSpan)
+		}
+	}
+
+	if len(runSpans) == 0 {
+		return nil, nil
+	}
+
+	return runSpans, nil
+}
+
 func sorter(span *cqrs.OtelSpan) {
 	sort.Slice(span.Children, func(i, j int) bool {
-		return span.Children[i].StartTime.Before(span.Children[j].StartTime)
+		if !span.Children[i].StartTime.Equal(span.Children[j].StartTime) {
+			return span.Children[i].StartTime.Before(span.Children[j].StartTime)
+		}
+
+		// sort based on SpanID if two spans have equal timestamps
+		return span.Children[i].SpanID < span.Children[j].SpanID
+	})
+
+	slices.SortFunc(span.Metadata, func(a, b *cqrs.SpanMetadata) int {
+		return cmp.Or(
+			cmp.Compare(a.Scope, b.Scope),
+			cmp.Compare(a.Kind, b.Kind))
 	})
 
 	for _, child := range span.Children {
@@ -286,7 +682,7 @@ func sorter(span *cqrs.OtelSpan) {
 // LoadFunction implements the state.FunctionLoader interface.
 func (w wrapper) LoadFunction(ctx context.Context, envID, fnID uuid.UUID) (*state.ExecutorFunction, error) {
 	// XXX: This doesn't store versions, as the dev server is currently ignorant to version.s
-	fn, err := w.GetFunctionByInternalUUID(ctx, envID, fnID)
+	fn, err := w.GetFunctionByInternalUUID(ctx, fnID)
 	if err != nil {
 		return nil, err
 	}
@@ -313,14 +709,16 @@ func (w wrapper) WithTx(ctx context.Context) (cqrs.TxManager, error) {
 
 	var q sqlc.Querier
 	if w.isPostgres() {
-		q = sqlc_postgres.NewNormalized(tx)
+		q = sqlc_postgres.NewNormalized(tx, w.opts)
 	} else {
 		q = sqlc.New(tx)
 	}
 
 	return &wrapper{
-		q:  q,
-		tx: tx,
+		driver: w.driver,
+		q:      q,
+		tx:     tx,
+		opts:   w.opts,
 	}, nil
 }
 
@@ -448,60 +846,67 @@ func (w wrapper) InsertQueueSnapshotChunk(ctx context.Context, params cqrs.Inser
 
 // GetApps returns apps that have not been deleted.
 func (w wrapper) GetApps(ctx context.Context, envID uuid.UUID, filter *cqrs.FilterAppParam) ([]*cqrs.App, error) {
-	f := func(ctx context.Context) ([]*sqlc.App, error) {
-		return w.q.GetApps(ctx)
-	}
-
-	apps, err := copyInto(ctx, f, []*cqrs.App{})
+	data, err := w.q.GetApps(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("could not get apps: %w", err)
 	}
+	if filter == nil {
+		return SQLiteToCQRSList(data, sqliteApp), nil
+	}
 
-	filtered := make([]*cqrs.App, 0, len(apps))
-	for _, app := range apps {
-		if filter != nil && filter.Method != nil && filter.Method.String() != app.Method {
+	filtered := []*cqrs.App{}
+	for _, app := range data {
+		if filter.Method != nil && filter.Method.String() != app.Method {
 			continue
 		}
-		filtered = append(filtered, app)
+		filtered = append(filtered, SQLiteToCQRS(app, sqliteApp))
 	}
 
 	return filtered, nil
 }
 
 func (w wrapper) GetAppByChecksum(ctx context.Context, envID uuid.UUID, checksum string) (*cqrs.App, error) {
-	f := func(ctx context.Context) (*sqlc.App, error) {
-		return w.q.GetAppByChecksum(ctx, checksum)
+	app, err := w.q.GetAppByChecksum(ctx, checksum)
+	if err != nil {
+		return nil, err
 	}
-	return copyInto(ctx, f, &cqrs.App{})
+	return SQLiteToCQRS(app, sqliteApp), nil
 }
 
 func (w wrapper) GetAppByID(ctx context.Context, id uuid.UUID) (*cqrs.App, error) {
-	f := func(ctx context.Context) (*sqlc.App, error) {
-		return w.q.GetAppByID(ctx, id)
+	app, err := w.q.GetAppByID(ctx, id)
+	if err != nil {
+		return nil, err
 	}
-	return copyInto(ctx, f, &cqrs.App{})
+	return SQLiteToCQRS(app, sqliteApp), nil
 }
 
 func (w wrapper) GetAppByURL(ctx context.Context, envID uuid.UUID, url string) (*cqrs.App, error) {
 	// Normalize the URL before inserting into the DB.
 	url = util.NormalizeAppURL(url, forceHTTPS)
 
-	f := func(ctx context.Context) (*sqlc.App, error) {
-		return w.q.GetAppByURL(ctx, url)
+	app, err := w.q.GetAppByURL(ctx, url)
+	if err != nil {
+		return nil, err
 	}
-	return copyInto(ctx, f, &cqrs.App{})
+	return SQLiteToCQRS(app, sqliteApp), nil
 }
 
 func (w wrapper) GetAppByName(ctx context.Context, envID uuid.UUID, name string) (*cqrs.App, error) {
-	f := func(ctx context.Context) (*sqlc.App, error) {
-		return w.q.GetAppByName(ctx, name)
+	app, err := w.q.GetAppByName(ctx, name)
+	if err != nil {
+		return nil, err
 	}
-	return copyInto(ctx, f, &cqrs.App{})
+	return SQLiteToCQRS(app, sqliteApp), nil
 }
 
 // GetAllApps returns all apps.
 func (w wrapper) GetAllApps(ctx context.Context, envID uuid.UUID) ([]*cqrs.App, error) {
-	return copyInto(ctx, w.q.GetAllApps, []*cqrs.App{})
+	apps, err := w.q.GetAllApps(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return SQLiteToCQRSList(apps, sqliteApp), nil
 }
 
 // InsertApp creates a new app.
@@ -513,70 +918,52 @@ func (w wrapper) UpsertApp(ctx context.Context, arg cqrs.UpsertAppParams) (*cqrs
 		arg.Method = enums.AppMethodServe.String()
 	}
 
-	return copyWriter(
-		ctx,
-		w.q.UpsertApp,
-		arg,
-		sqlc.UpsertAppParams{},
-		&cqrs.App{},
-	)
+	app, err := w.q.UpsertApp(ctx, sqlc.UpsertAppParams{
+		ID:          arg.ID,
+		Name:        arg.Name,
+		SdkLanguage: arg.SdkLanguage,
+		SdkVersion:  arg.SdkVersion,
+		Framework:   arg.Framework,
+		Metadata:    arg.Metadata,
+		Status:      arg.Status,
+		Error:       arg.Error,
+		Checksum:    arg.Checksum,
+		Url:         arg.Url,
+		Method:      arg.Method,
+		AppVersion:  sql.NullString{String: arg.AppVersion, Valid: arg.AppVersion != ""},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return SQLiteToCQRS(app, sqliteApp), nil
 }
 
 func (w wrapper) UpdateAppError(ctx context.Context, arg cqrs.UpdateAppErrorParams) (*cqrs.App, error) {
-	// https://duckdb.org/docs/sql/indexes.html
-	//
-	// NOTE: You cannot update in DuckDB without deleting first right now.  Instead,
-	// we run a series of transactions to get, delete, then re-insert the app.  This
-	// will be fixed in a near version of DuckDB.
-	app, err := w.q.GetApp(ctx, arg.ID)
+	// Use the direct SQL UPDATE query instead of load-then-upsert
+	app, err := w.q.UpdateAppError(ctx, sqlc.UpdateAppErrorParams{
+		ID:    arg.ID,
+		Error: arg.Error,
+	})
 	if err != nil {
 		return nil, err
 	}
-	if err := w.q.DeleteApp(ctx, arg.ID); err != nil {
-		return nil, err
-	}
-
-	app.Error = arg.Error
-	params := sqlc.UpsertAppParams{}
-	_ = copier.CopyWithOption(&params, app, copier.Option{DeepCopy: true})
-
-	// Recreate the app.
-	app, err = w.q.UpsertApp(ctx, params)
-	if err != nil {
-		return nil, err
-	}
-	out := &cqrs.App{}
-	err = copier.CopyWithOption(out, app, copier.Option{DeepCopy: true})
-	return out, err
+	return SQLiteToCQRS(app, sqliteApp), nil
 }
 
 func (w wrapper) UpdateAppURL(ctx context.Context, arg cqrs.UpdateAppURLParams) (*cqrs.App, error) {
-	// Normalize the URL before inserting into the DB.
+	// Normalize the URL before updating in the DB.
 	arg.Url = util.NormalizeAppURL(arg.Url, forceHTTPS)
 
-	// https://duckdb.org/docs/sql/indexes.html
-	//
-	// NOTE: You cannot update in DuckDB without deleting first right now.  Instead,
-	// we run a series of transactions to get, delete, then re-insert the app.  This
-	// will be fixed in a near version of DuckDB.
-	app, err := w.q.GetApp(ctx, arg.ID)
+	// Use the direct SQL UPDATE query instead of delete-and-reinsert
+	app, err := w.q.UpdateAppURL(ctx, sqlc.UpdateAppURLParams{
+		ID:  arg.ID,
+		Url: arg.Url,
+	})
 	if err != nil {
 		return nil, err
 	}
-	if err := w.q.DeleteApp(ctx, arg.ID); err != nil {
-		return nil, err
-	}
-	app.Url = arg.Url
-	params := sqlc.UpsertAppParams{}
-	_ = copier.CopyWithOption(&params, app, copier.Option{DeepCopy: true})
-	// Recreate the app.
-	app, err = w.q.UpsertApp(ctx, params)
-	if err != nil {
-		return nil, err
-	}
-	out := &cqrs.App{}
-	err = copier.CopyWithOption(out, app, copier.Option{DeepCopy: true})
-	return out, err
+	return SQLiteToCQRS(app, sqliteApp), nil
 }
 
 // DeleteApp deletes an app
@@ -589,54 +976,74 @@ func (w wrapper) DeleteApp(ctx context.Context, id uuid.UUID) error {
 //
 
 func (w wrapper) GetAppFunctions(ctx context.Context, appID uuid.UUID) ([]*cqrs.Function, error) {
-	f := func(ctx context.Context) ([]*sqlc.Function, error) {
-		return w.q.GetAppFunctions(ctx, appID)
+	fns, err := w.q.GetAppFunctions(ctx, appID)
+	if err != nil {
+		return nil, err
 	}
-	return copyInto(ctx, f, []*cqrs.Function{})
+
+	return SQLiteToCQRSList(fns, sqliteFunction), nil
 }
 
 func (w wrapper) GetFunctionByExternalID(ctx context.Context, wsID uuid.UUID, appID, fnSlug string) (*cqrs.Function, error) {
-	f := func(ctx context.Context) (*sqlc.Function, error) {
-		return w.q.GetFunctionBySlug(ctx, fnSlug)
+	fn, err := w.q.GetFunctionBySlug(ctx, fnSlug)
+	if err != nil {
+		return nil, err
 	}
-	return copyInto(ctx, f, &cqrs.Function{})
+
+	return SQLiteToCQRS(fn, sqliteFunction), nil
 }
 
-func (w wrapper) GetFunctionByInternalUUID(ctx context.Context, wsID, fnID uuid.UUID) (*cqrs.Function, error) {
-	f := func(ctx context.Context) (*sqlc.Function, error) {
-		return w.q.GetFunctionByID(ctx, fnID)
+func (w wrapper) GetFunctionByInternalUUID(ctx context.Context, fnID uuid.UUID) (*cqrs.Function, error) {
+	fn, err := w.q.GetFunctionByID(ctx, fnID)
+	if err != nil {
+		return nil, err
 	}
-	return copyInto(ctx, f, &cqrs.Function{})
+
+	return SQLiteToCQRS(fn, sqliteFunction), nil
 }
 
 func (w wrapper) GetFunctions(ctx context.Context) ([]*cqrs.Function, error) {
-	return copyInto(ctx, w.q.GetFunctions, []*cqrs.Function{})
+	fns, err := w.q.GetFunctions(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return SQLiteToCQRSList(fns, sqliteFunction), nil
 }
 
-func (w wrapper) GetFunctionsByAppInternalID(ctx context.Context, workspaceID, appID uuid.UUID) ([]*cqrs.Function, error) {
-	f := func(ctx context.Context) ([]*sqlc.Function, error) {
-		// Ingore the workspace ID for now.
-		return w.q.GetAppFunctions(ctx, appID)
+func (w wrapper) GetFunctionsByAppInternalID(ctx context.Context, appID uuid.UUID) ([]*cqrs.Function, error) {
+	fns, err := w.q.GetAppFunctions(ctx, appID)
+	if err != nil {
+		return nil, err
 	}
-	return copyInto(ctx, f, []*cqrs.Function{})
+
+	return SQLiteToCQRSList(fns, sqliteFunction), nil
 }
 
 func (w wrapper) GetFunctionsByAppExternalID(ctx context.Context, workspaceID uuid.UUID, appID string) ([]*cqrs.Function, error) {
-	f := func(ctx context.Context) ([]*sqlc.Function, error) {
-		// Ingore the workspace ID for now.
-		return w.q.GetAppFunctionsBySlug(ctx, appID)
+	// Ingore the workspace ID for now.
+	fns, err := w.q.GetAppFunctionsBySlug(ctx, appID)
+	if err != nil {
+		return nil, err
 	}
-	return copyInto(ctx, f, []*cqrs.Function{})
+
+	return SQLiteToCQRSList(fns, sqliteFunction), nil
 }
 
 func (w wrapper) InsertFunction(ctx context.Context, params cqrs.InsertFunctionParams) (*cqrs.Function, error) {
-	return copyWriter(
-		ctx,
-		w.q.InsertFunction,
-		params,
-		sqlc.InsertFunctionParams{},
-		&cqrs.Function{},
-	)
+	fn, err := w.q.InsertFunction(ctx, sqlc.InsertFunctionParams{
+		ID:        params.ID,
+		AppID:     params.AppID,
+		Name:      params.Name,
+		Slug:      params.Slug,
+		Config:    params.Config,
+		CreatedAt: params.CreatedAt,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return SQLiteToCQRS(fn, sqliteFunction), nil
 }
 
 func (w wrapper) DeleteFunctionsByAppID(ctx context.Context, appID uuid.UUID) error {
@@ -648,13 +1055,15 @@ func (w wrapper) DeleteFunctionsByIDs(ctx context.Context, ids []uuid.UUID) erro
 }
 
 func (w wrapper) UpdateFunctionConfig(ctx context.Context, arg cqrs.UpdateFunctionConfigParams) (*cqrs.Function, error) {
-	return copyWriter(
-		ctx,
-		w.q.UpdateFunctionConfig,
-		arg,
-		sqlc.UpdateFunctionConfigParams{},
-		&cqrs.Function{},
-	)
+	fn, err := w.q.UpdateFunctionConfig(ctx, sqlc.UpdateFunctionConfigParams{
+		ID:     arg.ID,
+		Config: arg.Config,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return SQLiteToCQRS(fn, sqliteFunction), nil
 }
 
 //
@@ -712,8 +1121,8 @@ func (w wrapper) GetEventByInternalID(ctx context.Context, internalID ulid.ULID)
 	if err != nil {
 		return nil, err
 	}
-	evt := convertEvent(obj)
-	return &evt, nil
+
+	return SQLiteToCQRS(obj, sqliteEvent), nil
 }
 
 func (w wrapper) GetEventBatchesByEventID(ctx context.Context, eventID ulid.ULID) ([]*cqrs.EventBatch, error) {
@@ -722,22 +1131,16 @@ func (w wrapper) GetEventBatchesByEventID(ctx context.Context, eventID ulid.ULID
 		return nil, err
 	}
 
-	var out = make([]*cqrs.EventBatch, len(batches))
-	for n, i := range batches {
-		eb := convertEventBatch(i)
-		out[n] = &eb
-	}
-
-	return out, nil
+	return SQLiteToCQRSList(batches, sqliteEventBatch), nil
 }
+
 func (w wrapper) GetEventBatchByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.EventBatch, error) {
 	obj, err := w.q.GetEventBatchByRunID(ctx, runID)
 	if err != nil {
 		return nil, err
 	}
 
-	eb := convertEventBatch(obj)
-	return &eb, nil
+	return SQLiteToCQRS(obj, sqliteEventBatch), nil
 }
 
 func (w wrapper) GetEventsByInternalIDs(ctx context.Context, ids []ulid.ULID) ([]*cqrs.Event, error) {
@@ -746,13 +1149,7 @@ func (w wrapper) GetEventsByInternalIDs(ctx context.Context, ids []ulid.ULID) ([
 		return nil, err
 	}
 
-	evts := make([]*cqrs.Event, len(objs))
-	for i, o := range objs {
-		evt := convertEvent(o)
-		evts[i] = &evt
-	}
-
-	return evts, nil
+	return SQLiteToCQRSList(objs, sqliteEvent), nil
 }
 
 func (w wrapper) GetEventsByExpressions(ctx context.Context, cel []string) ([]*cqrs.Event, error) {
@@ -844,39 +1241,122 @@ func (w wrapper) GetEvents(ctx context.Context, accountID uuid.UUID, workspaceID
 		opts.Cursor = &endULID
 	}
 
-	var (
-		evts []*sqlc.Event
-		err  error
-	)
+	builder := newEventsQueryBuilder(ctx, *opts)
+	filter := builder.filter
+	order := builder.order
 
-	if opts.Name == nil {
-		params := sqlc.WorkspaceEventsParams{
-			Cursor: *opts.Cursor,
-			Before: opts.Newest,
-			After:  opts.Oldest,
-			Limit:  int64(opts.Limit),
-		}
-		evts, err = w.q.WorkspaceEvents(ctx, params)
-	} else {
-		params := sqlc.WorkspaceNamedEventsParams{
-			Name:   *opts.Name,
-			Cursor: *opts.Cursor,
-			Before: opts.Newest,
-			After:  opts.Oldest,
-			Limit:  int64(opts.Limit),
-		}
-		evts, err = w.q.WorkspaceNamedEvents(ctx, params)
-	}
-
+	sql, args, err := sq.Dialect(w.dialect()).
+		From("events").
+		Select(
+			"internal_id",
+			"account_id",
+			"workspace_id",
+			"source",
+			"source_id",
+			"received_at",
+			"event_id",
+			"event_name",
+			"event_data",
+			"event_user",
+			"event_v",
+			"event_ts",
+		).
+		Where(filter...).
+		Order(order...).
+		Limit(uint(opts.Limit)).
+		ToSQL()
 	if err != nil {
 		return nil, err
 	}
-	out := make([]*cqrs.Event, len(evts))
-	for n, evt := range evts {
-		val := convertEvent(evt)
-		out[n] = &val
+
+	rows, err := w.db.QueryContext(ctx, sql, args...)
+	if err != nil {
+		return nil, err
 	}
+	defer rows.Close()
+
+	out := make([]*cqrs.Event, 0, opts.Limit)
+	for rows.Next() {
+		data := sqlc.Event{}
+		if err := rows.Scan(
+			&data.InternalID,
+			&data.AccountID,
+			&data.WorkspaceID,
+			&data.Source,
+			&data.SourceID,
+			&data.ReceivedAt,
+			&data.EventID,
+			&data.EventName,
+			&data.EventData,
+			&data.EventUser,
+			&data.EventV,
+			&data.EventTs,
+		); err != nil {
+			return nil, err
+		}
+		out = append(out, SQLiteToCQRS(&data, sqliteEvent))
+	}
+
 	return out, nil
+}
+
+func (w wrapper) GetEventsCount(ctx context.Context, accountID uuid.UUID, workspaceID uuid.UUID, opts cqrs.WorkspaceEventsOpts) (int64, error) {
+	if err := opts.Validate(); err != nil {
+		return 0, err
+	}
+
+	// We don't want to consider cursor pagination for total count, so overwrite input param
+	opts.Cursor = &endULID
+
+	builder := newEventsQueryBuilder(ctx, opts)
+	filter := builder.filter
+	// ignore builder.order for count queries, it will error on Postgres
+
+	sql, args, err := sq.Dialect(w.dialect()).
+		From("events").
+		Select(sq.COUNT("*").As("count")).
+		Where(filter...).
+		ToSQL()
+	if err != nil {
+		return 0, err
+	}
+
+	var count int64
+	err = w.db.QueryRowContext(ctx, sql, args...).Scan(&count)
+	if err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
+type eventsQueryBuilder struct {
+	filter []sq.Expression
+	order  []sqexp.OrderedExpression
+}
+
+func newEventsQueryBuilder(ctx context.Context, opt cqrs.WorkspaceEventsOpts) *eventsQueryBuilder {
+	filter := []sq.Expression{}
+
+	filter = append(filter, sq.C("received_at").Lte(opt.Newest))
+	filter = append(filter, sq.C("received_at").Gte(opt.Oldest))
+	if opt.Cursor != nil {
+		filter = append(filter, sq.C("internal_id").Lt(*opt.Cursor))
+	}
+
+	if len(opt.Names) > 0 {
+		filter = append(filter, sq.C("event_name").In(opt.Names))
+	}
+	if !opt.IncludeInternalEvents {
+		filter = append(filter, sq.C("event_name").NotLike("inngest/%"))
+	}
+
+	order := []sqexp.OrderedExpression{}
+	order = append(order, sq.C("internal_id").Desc())
+
+	return &eventsQueryBuilder{
+		filter: filter,
+		order:  order,
+	}
 }
 
 func (w wrapper) GetEventsIDbound(
@@ -885,13 +1365,12 @@ func (w wrapper) GetEventsIDbound(
 	limit int,
 	includeInternal bool,
 ) ([]*cqrs.Event, error) {
-
 	if ids.Before == nil {
 		ids.Before = &endULID
 	}
 
 	if ids.After == nil {
-		ids.After = &nilULID
+		ids.After = &ulid.Zero
 	}
 
 	evts, err := w.q.GetEventsIDbound(ctx, sqlc.GetEventsIDboundParams{
@@ -904,47 +1383,7 @@ func (w wrapper) GetEventsIDbound(
 		return []*cqrs.Event{}, err
 	}
 
-	var res = make([]*cqrs.Event, len(evts))
-	for n, i := range evts {
-		e := convertEvent(i)
-		res[n] = &e
-	}
-	return res, nil
-}
-
-func convertEvent(obj *sqlc.Event) cqrs.Event {
-	evt := &cqrs.Event{
-		ID:           obj.InternalID,
-		ReceivedAt:   obj.ReceivedAt,
-		EventID:      obj.EventID,
-		EventName:    obj.EventName,
-		EventVersion: obj.EventV.String,
-		EventTS:      obj.EventTs.UnixMilli(),
-		EventData:    map[string]any{},
-		EventUser:    map[string]any{},
-	}
-	_ = json.Unmarshal([]byte(obj.EventData), &evt.EventData)
-	_ = json.Unmarshal([]byte(obj.EventUser), &evt.EventUser)
-	return *evt
-}
-
-func convertEventBatch(obj *sqlc.EventBatch) cqrs.EventBatch {
-	var evtIDs []ulid.ULID
-	if ids, err := obj.EventIDs(); err == nil {
-		evtIDs = ids
-	}
-
-	eb := cqrs.NewEventBatch(
-		cqrs.WithEventBatchID(obj.ID),
-		cqrs.WithEventBatchAccountID(obj.AccountID),
-		cqrs.WithEventBatchWorkspaceID(obj.WorkspaceID),
-		cqrs.WithEventBatchAppID(obj.AppID),
-		cqrs.WithEventBatchRunID(obj.RunID),
-		cqrs.WithEventBatchEventIDs(evtIDs),
-		cqrs.WithEventBatchExecutedTime(obj.ExecutedAt),
-	)
-
-	return *eb
+	return SQLiteToCQRSList(evts, sqliteEvent), nil
 }
 
 //
@@ -952,12 +1391,23 @@ func convertEventBatch(obj *sqlc.EventBatch) cqrs.EventBatch {
 //
 
 func (w wrapper) InsertFunctionRun(ctx context.Context, e cqrs.FunctionRun) error {
-	run := sqlc.InsertFunctionRunParams{}
-	if err := copier.CopyWithOption(&run, e, copier.Option{DeepCopy: true}); err != nil {
-		return err
+	run := sqlc.InsertFunctionRunParams{
+		RunID:           e.RunID,
+		RunStartedAt:    e.RunStartedAt,
+		FunctionID:      e.FunctionID,
+		FunctionVersion: e.FunctionVersion,
+		TriggerType:     "event",
+		EventID:         e.EventID,
+		WorkspaceID:     e.WorkspaceID,
 	}
 
-	// Need to manually set the cron field since `copier` won't do it.
+	// Handle nullable fields
+	if e.BatchID != nil {
+		run.BatchID = *e.BatchID
+	}
+	if e.OriginalRunID != nil {
+		run.OriginalRunID = *e.OriginalRunID
+	}
 	if e.Cron != nil {
 		run.Cron = sql.NullString{
 			Valid:  true,
@@ -1029,9 +1479,11 @@ func (w wrapper) GetFunctionRunFinishesByRunIDs(
 	workspaceID uuid.UUID,
 	runIDs []ulid.ULID,
 ) ([]*cqrs.FunctionRunFinish, error) {
-	return copyInto(ctx, func(ctx context.Context) ([]*sqlc.FunctionFinish, error) {
-		return w.q.GetFunctionRunFinishesByRunIDs(ctx, runIDs)
-	}, []*cqrs.FunctionRunFinish{})
+	finish, err := w.q.GetFunctionRunFinishesByRunIDs(ctx, runIDs)
+	if err != nil {
+		return nil, err
+	}
+	return SQLiteToCQRSList(finish, sqliteFunctionFinish), nil
 }
 
 //
@@ -1061,10 +1513,10 @@ func toCQRSRun(run sqlc.FunctionRun, finish sqlc.FunctionFinish) *cqrs.FunctionR
 		EventID:         run.EventID,
 		WorkspaceID:     run.WorkspaceID,
 	}
-	if run.BatchID != nilULID {
+	if !run.BatchID.IsZero() {
 		copied.BatchID = &run.BatchID
 	}
-	if run.OriginalRunID != nilULID {
+	if !run.OriginalRunID.IsZero() {
 		copied.OriginalRunID = &run.OriginalRunID
 	}
 	if run.Cron.Valid {
@@ -1256,8 +1708,59 @@ func (w wrapper) FindOrBuildTraceRun(ctx context.Context, opts cqrs.FindOrCreate
 	return &new, nil
 }
 
-func (w wrapper) GetTraceRun(ctx context.Context, id cqrs.TraceRunIdentifier) (*cqrs.TraceRun, error) {
+func (w wrapper) GetTraceRunsByTriggerID(ctx context.Context, triggerID ulid.ULID) ([]*cqrs.TraceRun, error) {
+	// convert sqlc.TraceRun{} to cqrs.TraceRun{}
+	sqlcTraceRuns, err := w.q.GetTraceRunsByTriggerId(ctx, triggerID.String())
+	if err != nil {
+		return nil, err
+	}
+	cqrsTraceRuns := make([]*cqrs.TraceRun, len(sqlcTraceRuns))
+	// dedupe this conversion
+	for i, run := range sqlcTraceRuns {
+		start := time.UnixMilli(run.StartedAt)
+		end := time.UnixMilli(run.EndedAt)
+		triggerIDS := strings.Split(string(run.TriggerIds), ",")
 
+		var (
+			isBatch bool
+			batchID *ulid.ULID
+			cron    *string
+		)
+
+		if !run.BatchID.IsZero() {
+			isBatch = true
+			batchID = &run.BatchID
+		}
+
+		if run.CronSchedule.Valid {
+			cron = &run.CronSchedule.String
+		}
+
+		cqrsTraceRuns[i] = &cqrs.TraceRun{
+			AccountID:    run.AccountID,
+			WorkspaceID:  run.WorkspaceID,
+			AppID:        run.AppID,
+			FunctionID:   run.FunctionID,
+			TraceID:      string(run.TraceID),
+			RunID:        run.RunID.String(),
+			QueuedAt:     time.UnixMilli(run.QueuedAt),
+			StartedAt:    start,
+			EndedAt:      end,
+			Duration:     end.Sub(start),
+			SourceID:     run.SourceID,
+			TriggerIDs:   triggerIDS,
+			Output:       run.Output,
+			Status:       enums.RunCodeToStatus(run.Status),
+			BatchID:      batchID,
+			IsBatch:      isBatch,
+			CronSchedule: cron,
+			HasAI:        run.HasAi,
+		}
+	}
+	return cqrsTraceRuns, nil
+}
+
+func (w wrapper) GetTraceRun(ctx context.Context, id cqrs.TraceRunIdentifier) (*cqrs.TraceRun, error) {
 	run, err := w.q.GetTraceRun(ctx, id.RunID)
 	if err != nil {
 		return nil, err
@@ -1273,7 +1776,7 @@ func (w wrapper) GetTraceRun(ctx context.Context, id cqrs.TraceRunIdentifier) (*
 		cron    *string
 	)
 
-	if run.BatchID != nilULID {
+	if !run.BatchID.IsZero() {
 		isBatch = true
 		batchID = &run.BatchID
 	}
@@ -1307,29 +1810,54 @@ func (w wrapper) GetTraceRun(ctx context.Context, id cqrs.TraceRunIdentifier) (*
 }
 
 func (w wrapper) GetSpanOutput(ctx context.Context, opts cqrs.SpanIdentifier) (*cqrs.SpanOutput, error) {
-	if opts.SpanID == "" {
-		return nil, fmt.Errorf("spanID is required to retrieve output")
+	ids := []string{}
+	if opts.SpanID != "" {
+		ids = append(ids, opts.SpanID)
+	}
+	if opts.InputSpanID != nil && *opts.InputSpanID != "" {
+		ids = append(ids, *opts.InputSpanID)
 	}
 
-	s, err := w.q.GetSpanOutput(ctx, opts.SpanID)
+	if len(ids) == 0 {
+		return nil, fmt.Errorf("span ID or input span ID is required to retrieve output")
+	}
+
+	rows, err := w.q.GetSpanOutput(ctx, ids)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving span output: %w", err)
 	}
 
 	so := &cqrs.SpanOutput{}
-	var m map[string]any
 
-	so.Data = []byte(fmt.Append(nil, s))
-	if err := json.Unmarshal(so.Data, &m); err == nil && m != nil {
-		if errData, ok := m["error"]; ok {
-			so.IsError = true
-			so.Data, _ = json.Marshal(errData)
-		} else if successData, ok := m["data"]; ok {
-			so.Data, _ = json.Marshal(successData)
-		} else {
-			sanitizedSpanID := strings.ReplaceAll(opts.SpanID, "\n", "")
-			sanitizedSpanID = strings.ReplaceAll(sanitizedSpanID, "\r", "")
-			logger.StdlibLogger(ctx).Error("span output is not keyed, assuming success", "spanID", sanitizedSpanID)
+	for _, row := range rows {
+		if row.Input != nil {
+			so.Input = []byte(fmt.Append(nil, row.Input))
+		}
+
+		if row.Output != nil {
+			var m map[string]any
+
+			so.Data = []byte(fmt.Append(nil, row.Output))
+			if err := json.Unmarshal(so.Data, &m); err == nil && m != nil {
+				// NOTE: By default, we wrap errors and data.  However, unforutnately
+				// step.waitForEvent is _not_ wrapped, so we check to see if there's
+				// both "data" and "name";  if so, we return the data wholesale.
+				if isWaitForEventOutput(m) {
+					return so, nil
+				}
+
+				if errData, ok := m["error"]; ok {
+					so.IsError = true
+					so.Data, _ = json.Marshal(errData)
+				} else if successData, ok := m["data"]; ok {
+					so.Data, _ = json.Marshal(successData)
+				} else {
+					sanitizedSpanID := strings.ReplaceAll(opts.SpanID, "\n", "")
+					sanitizedSpanID = strings.ReplaceAll(sanitizedSpanID, "\r", "")
+
+					logger.StdlibLogger(ctx).Error("span output is not keyed, assuming success", "spanID", sanitizedSpanID)
+				}
+			}
 		}
 	}
 
@@ -1576,7 +2104,15 @@ func newRunsQueryBuilder(ctx context.Context, opt cqrs.GetTraceRunOpt) *runsQuer
 func (w wrapper) GetTraceRunsCount(ctx context.Context, opt cqrs.GetTraceRunOpt) (int, error) {
 	// explicitly set it to zero so it would not attempt to paginate
 	opt.Items = 0
-	res, err := w.GetTraceRuns(ctx, opt)
+	var (
+		res []*cqrs.TraceRun
+		err error
+	)
+	if opt.Preview {
+		res, err = w.GetSpanRuns(ctx, opt)
+	} else {
+		res, err = w.GetTraceRuns(ctx, opt)
+	}
 	if err != nil {
 		return 0, err
 	}
@@ -1585,6 +2121,10 @@ func (w wrapper) GetTraceRunsCount(ctx context.Context, opt cqrs.GetTraceRunOpt)
 }
 
 func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*cqrs.TraceRun, error) {
+	if opt.Preview {
+		return w.GetSpanRuns(ctx, opt)
+	}
+
 	l := logger.StdlibLogger(ctx)
 
 	// use evtIDs as post query filter
@@ -1728,7 +2268,7 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 			cron = &data.CronSchedule.String
 		}
 		var batchID *ulid.ULID
-		isBatch := data.BatchID != nilULID
+		isBatch := !data.BatchID.IsZero()
 		if isBatch {
 			batchID = &data.BatchID
 		}
@@ -1844,11 +2384,12 @@ func (w wrapper) InsertWorkerConnection(ctx context.Context, conn *cqrs.WorkerCo
 		AppID:       conn.AppID,
 		AppName:     conn.AppName,
 
-		ID:         conn.Id,
-		GatewayID:  conn.GatewayId,
-		InstanceID: conn.InstanceId,
-		Status:     int64(conn.Status),
-		WorkerIp:   conn.WorkerIP,
+		ID:                   conn.Id,
+		GatewayID:            conn.GatewayId,
+		InstanceID:           conn.InstanceId,
+		Status:               int64(conn.Status),
+		WorkerIp:             conn.WorkerIP,
+		MaxWorkerConcurrency: conn.MaxWorkerConcurrency,
 
 		ConnectedAt:     conn.ConnectedAt.UnixMilli(),
 		LastHeartbeatAt: lastHeartbeatAt,
@@ -1915,11 +2456,12 @@ func (w wrapper) GetWorkerConnection(ctx context.Context, id cqrs.WorkerConnecti
 		WorkspaceID: conn.WorkspaceID,
 		AppID:       conn.AppID,
 
-		Id:         conn.ID,
-		GatewayId:  conn.GatewayID,
-		InstanceId: conn.InstanceID,
-		Status:     connpb.ConnectionStatus(conn.Status),
-		WorkerIP:   conn.WorkerIp,
+		Id:                   conn.ID,
+		GatewayId:            conn.GatewayID,
+		InstanceId:           conn.InstanceID,
+		Status:               connpb.ConnectionStatus(conn.Status),
+		WorkerIP:             conn.WorkerIp,
+		MaxWorkerConcurrency: conn.MaxWorkerConcurrency,
 
 		LastHeartbeatAt: lastHeartbeatAt,
 		ConnectedAt:     connectedAt,
@@ -2108,6 +2650,7 @@ func (w wrapper) GetWorkerConnections(ctx context.Context, opt cqrs.GetWorkerCon
 			"instance_id",
 			"status",
 			"worker_ip",
+			"max_worker_concurrency",
 
 			"connected_at",
 			"last_heartbeat_at",
@@ -2156,6 +2699,7 @@ func (w wrapper) GetWorkerConnections(ctx context.Context, opt cqrs.GetWorkerCon
 			&data.InstanceID,
 			&data.Status,
 			&data.WorkerIp,
+			&data.MaxWorkerConcurrency,
 
 			&data.ConnectedAt,
 			&data.LastHeartbeatAt,
@@ -2235,11 +2779,12 @@ func (w wrapper) GetWorkerConnections(ctx context.Context, opt cqrs.GetWorkerCon
 			AppID:       data.AppID,
 			AppName:     data.AppName,
 
-			Id:         data.ID,
-			GatewayId:  data.GatewayID,
-			InstanceId: data.InstanceID,
-			Status:     connpb.ConnectionStatus(data.Status),
-			WorkerIP:   data.WorkerIp,
+			Id:                   data.ID,
+			GatewayId:            data.GatewayID,
+			InstanceId:           data.InstanceID,
+			Status:               connpb.ConnectionStatus(data.Status),
+			WorkerIP:             data.WorkerIp,
+			MaxWorkerConcurrency: data.MaxWorkerConcurrency,
 
 			LastHeartbeatAt: lastHeartbeatAt,
 			ConnectedAt:     connectedAt,
@@ -2273,46 +2818,448 @@ func (w wrapper) GetWorkerConnections(ctx context.Context, opt cqrs.GetWorkerCon
 	return res, nil
 }
 
-// copyWriter allows running duck-db specific functions as CQRS functions, copying CQRS types to DDB types
-// automatically.
-func copyWriter[
-	PARAMS_IN any,
-	INTERNAL_PARAMS any,
-	IN any,
-	OUT any,
-](
-	ctx context.Context,
-	f func(context.Context, INTERNAL_PARAMS) (IN, error),
-	pin PARAMS_IN,
-	pout INTERNAL_PARAMS,
-	out OUT,
-) (OUT, error) {
-	err := copier.Copy(&pout, &pin)
+// GetSpanRuns retrieves a list of span-based runs using the same filtering
+// logic as GetTraceRuns but working against the spans table with executor.run +
+// EXTEND span grouping
+func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*cqrs.TraceRun, error) {
+	l := logger.StdlibLogger(ctx)
+
+	// use evtIDs as post query filter
+	// evtIDs := []string{}
+	// expHandler, err := run.NewExpressionHandler(ctx,
+	// 	run.WithExpressionHandlerBlob(opt.Filter.CEL, "\n"),
+	// )
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// if expHandler.HasEventFilters() {
+	// 	evts, err := w.GetEventsByExpressions(ctx, expHandler.EventExprList)
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
+	// 	for _, e := range evts {
+	// 		evtIDs = append(evtIDs, e.ID.String())
+	// 	}
+	// }
+
+	builder := newSpanRunsQueryBuilder(ctx, opt)
+	filter := builder.filter
+	order := builder.order
+	resCursorLayout := builder.cursorLayout
+
+	// Query spans table directly, similar to how GetTraceRuns queries
+	// trace_runs
+	sql, args, err := sq.Dialect(w.dialect()).
+		From("spans").
+		Select(
+			"run_id",
+			"account_id",
+			"app_id",
+			"function_id",
+			"trace_id",
+			"dynamic_span_id",
+			"start_time",
+			"end_time",
+			"status",
+			"span_id",
+			"name",
+			"attributes",
+			"links",
+			"output",
+			"event_ids",
+			"input",
+		).
+		Where(sq.C("dynamic_span_id").In(
+			sq.Dialect(w.dialect()).Select("dynamic_span_id").Distinct().From("spans").Where(sq.C("name").Eq(meta.SpanNameRun)),
+		)).
+		Where(filter...).
+		Order(order...).
+		ToSQL()
 	if err != nil {
-		return out, err
+		return nil, err
 	}
 
-	in, err := f(ctx, pout)
+	rows, err := w.db.QueryContext(ctx, sql, args...)
 	if err != nil {
-		return out, err
+		return nil, err
 	}
 
-	err = copier.CopyWithOption(&out, in, copier.Option{DeepCopy: true})
-	return out, err
+	// Define span row structure for scanning
+	type spanRow struct {
+		RunID         string
+		AccountID     string
+		AppID         string
+		FunctionID    string
+		TraceID       string
+		DynamicSpanID string
+		StartTime     time.Time
+		EndTime       *time.Time
+		Status        *string
+		SpanID        string
+		Name          string
+		Attributes    *string
+		Links         *string
+		Output        *string
+		EventIDs      *string
+		Input         *string
+	}
+
+	// Group spans by run_id and dynamic_span_id
+	runSpanMap := make(map[string]map[string][]*spanRow)
+	for rows.Next() {
+		var span spanRow
+		err := rows.Scan(
+			&span.RunID,
+			&span.AccountID,
+			&span.AppID,
+			&span.FunctionID,
+			&span.TraceID,
+			&span.DynamicSpanID,
+			&span.StartTime,
+			&span.EndTime,
+			&span.Status,
+			&span.SpanID,
+			&span.Name,
+			&span.Attributes,
+			&span.Links,
+			&span.Output,
+			&span.EventIDs,
+			&span.Input,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		// TODO Event ID filtering based on CEL filtering
+
+		if runSpanMap[span.RunID] == nil {
+			runSpanMap[span.RunID] = make(map[string][]*spanRow)
+		}
+		runSpanMap[span.RunID][span.DynamicSpanID] = append(runSpanMap[span.RunID][span.DynamicSpanID], &span)
+	}
+
+	// Convert grouped spans to TraceRuns
+	type runGroup struct {
+		runID         string
+		dynamicSpanID string
+		spans         []*spanRow
+		startTime     time.Time
+	}
+
+	// Collect all run groups first
+	var runGroups []runGroup
+	for runID, spanGroups := range runSpanMap {
+		for dynamicSpanID, spans := range spanGroups {
+			if len(spans) == 0 {
+				continue
+			}
+			// Find earliest start time for sorting
+			startTime := spans[0].StartTime
+			for _, span := range spans {
+				if span.StartTime.Before(startTime) {
+					startTime = span.StartTime
+				}
+			}
+
+			// order the spans by start time too so that we process each
+			// update step-by-step as they happened
+			sort.Slice(spans, func(i, j int) bool {
+				return spans[i].StartTime.Before(spans[j].StartTime)
+			})
+
+			runGroups = append(runGroups, runGroup{
+				runID:         runID,
+				dynamicSpanID: dynamicSpanID,
+				spans:         spans,
+				startTime:     startTime,
+			})
+		}
+	}
+
+	// Sort by start_time DESC (newest first), then by run_id for stable ordering
+	sort.Slice(runGroups, func(i, j int) bool {
+		if runGroups[i].startTime.Equal(runGroups[j].startTime) {
+			return runGroups[i].runID < runGroups[j].runID
+		}
+		return runGroups[i].startTime.After(runGroups[j].startTime)
+	})
+
+	res := []*cqrs.TraceRun{}
+	var count uint
+
+	for _, group := range runGroups {
+		spans := group.spans
+
+		// Use first span for metadata (they should all have the same metadata)
+		firstSpan := spans[0]
+
+		// Parse UUIDs
+		accountUUID, err := uuid.Parse(firstSpan.AccountID)
+		if err != nil {
+			l.Debug("invalid account ID", "account_id", firstSpan.AccountID, "error", err)
+			continue
+		}
+		appUUID, err := uuid.Parse(firstSpan.AppID)
+		if err != nil {
+			l.Debug("invalid app ID", "app_id", firstSpan.AppID, "error", err)
+			continue
+		}
+		functionUUID, err := uuid.Parse(firstSpan.FunctionID)
+		if err != nil {
+			l.Debug("invalid function ID", "function_id", firstSpan.FunctionID, "error", err)
+			continue
+		}
+
+		// Find min start_time and max end_time across all spans in this group
+		startTime := spans[0].StartTime
+		var endTime *time.Time
+		status := enums.RunStatusRunning
+		var triggerIDs []string
+
+		for _, span := range spans {
+			if span.StartTime.Before(startTime) {
+				startTime = span.StartTime
+			}
+			if span.EndTime != nil && (endTime == nil || span.EndTime.After(*endTime)) {
+				endTime = span.EndTime
+			}
+			// Get the latest non-empty status
+			if span.Status != nil && *span.Status != "" {
+				// Convert StepStatus string to RunStatus enum
+				if stepStatus, err := enums.StepStatusString(*span.Status); err == nil {
+					status = enums.StepStatusToRunStatus(stepStatus)
+				}
+			}
+
+			if span.EventIDs != nil && *span.EventIDs != "" {
+				// Event IDs are a stringified JSON array of strings. Unpack
+				// them here.
+				var eids []string
+				if err := json.Unmarshal([]byte(*span.EventIDs), &eids); err == nil {
+					triggerIDs = append(triggerIDs, eids...)
+				} else {
+					l.Debug("invalid event IDs in span", "run_id", span.RunID, "dynamic_span_id", span.DynamicSpanID, "error", err)
+				}
+			}
+		}
+
+		// Calculate duration
+		var duration time.Duration
+		if endTime != nil {
+			duration = endTime.Sub(startTime)
+		}
+
+		// Build cursor for pagination
+		var cursor string
+		if resCursorLayout != nil {
+			c := &cqrs.TracePageCursor{
+				ID:      group.runID,
+				Cursors: map[string]cqrs.TraceCursor{},
+			}
+			for field := range resCursorLayout.Cursors {
+				switch field {
+				case "start_time":
+					c.Cursors[field] = cqrs.TraceCursor{Field: field, Value: startTime.UnixMilli()}
+				case "end_time":
+					if endTime != nil {
+						c.Cursors[field] = cqrs.TraceCursor{Field: field, Value: endTime.UnixMilli()}
+					}
+				}
+			}
+			if encoded, err := c.Encode(); err == nil {
+				cursor = encoded
+			}
+		}
+
+		traceRun := &cqrs.TraceRun{
+			AccountID:   accountUUID,
+			WorkspaceID: accountUUID, // Using account ID as workspace ID for now
+			AppID:       appUUID,
+			FunctionID:  functionUUID,
+			TraceID:     firstSpan.TraceID,
+			RunID:       group.runID,
+			QueuedAt:    startTime,
+			StartedAt:   startTime,
+			Duration:    duration,
+			Status:      status,
+			Cursor:      cursor,
+			TriggerIDs:  triggerIDs,
+		}
+
+		if endTime != nil {
+			traceRun.EndedAt = *endTime
+		}
+
+		res = append(res, traceRun)
+		count++
+
+		// enough items, don't need to proceed anymore
+		if opt.Items > 0 && count >= opt.Items {
+			break
+		}
+	}
+
+	return res, nil
 }
 
-func copyInto[
-	IN any,
-	OUT any,
-](
-	ctx context.Context,
-	f func(context.Context) (IN, error),
-	out OUT,
-) (OUT, error) {
-	in, err := f(ctx)
-	if err != nil {
-		return out, err
+// newSpanRunsQueryBuilder creates a query builder for span-based runs Similar
+// to newRunsQueryBuilder but adapted for spans table structure
+func newSpanRunsQueryBuilder(ctx context.Context, opt cqrs.GetTraceRunOpt) *runsQueryBuilder {
+	l := logger.StdlibLogger(ctx)
+
+	// filters
+	filter := []sq.Expression{}
+	//
+	// debug runs are a special kind of run that should not be included in the main runs list
+	filter = append(filter, sq.C("debug_run_id").IsNull())
+	if len(opt.Filter.AppID) > 0 {
+		filter = append(filter, sq.C("app_id").In(opt.Filter.AppID))
 	}
-	err = copier.CopyWithOption(&out, in, copier.Option{DeepCopy: true})
-	return out, err
+	if len(opt.Filter.FunctionID) > 0 {
+		filter = append(filter, sq.C("function_id").In(opt.Filter.FunctionID))
+	}
+	if len(opt.Filter.Status) > 0 {
+		statusStrings := make([]string, 0, len(opt.Filter.Status))
+		for _, s := range opt.Filter.Status {
+			statusStrings = append(statusStrings, s.String())
+		}
+		filter = append(filter, sq.C("status").In(statusStrings))
+	}
+
+	// Map time fields - spans use start_time/end_time instead of
+	// queued_at/started_at/ended_at
+	var tsfield string
+	switch opt.Filter.TimeField {
+	case enums.TraceRunTimeQueuedAt, enums.TraceRunTimeStartedAt:
+		tsfield = "start_time"
+	case enums.TraceRunTimeEndedAt:
+		tsfield = "end_time"
+	default:
+		tsfield = "start_time"
+	}
+
+	// Convert time to Unix milliseconds to match spans storage format
+	filter = append(filter, sq.C(tsfield).Gte(opt.Filter.From))
+	filter = append(filter, sq.C(tsfield).Lt(opt.Filter.Until))
+
+	// cursor
+	resCursorLayout := &cqrs.TracePageCursor{
+		Cursors: map[string]cqrs.TraceCursor{},
+	}
+
+	// decode request cursor if there's one
+	var reqCursor *cqrs.TracePageCursor
+	if len(opt.Cursor) > 0 {
+		reqCursor = &cqrs.TracePageCursor{Cursors: map[string]cqrs.TraceCursor{}}
+		if err := reqCursor.Decode(opt.Cursor); err != nil {
+			l.Debug("cursor decode failed", "error", err)
+			reqCursor = nil
+		}
+	}
+
+	// orders
+	order := []sqexp.OrderedExpression{}
+	for _, o := range opt.Order {
+		// Map enum field names to column names
+		var field string
+		switch o.Field {
+		case enums.TraceRunTimeQueuedAt, enums.TraceRunTimeStartedAt:
+			field = "start_time"
+		case enums.TraceRunTimeEndedAt:
+			field = "end_time"
+		default:
+			field = "start_time"
+		}
+
+		resCursorLayout.Add(field)
+
+		switch o.Direction {
+		case enums.TraceRunOrderAsc:
+			order = append(order, sq.C(field).Asc())
+		case enums.TraceRunOrderDesc:
+			order = append(order, sq.C(field).Desc())
+		}
+	}
+
+	// Always add run_id as final sort field for stable pagination
+	order = append(order, sq.C("run_id").Asc())
+	resCursorLayout.Add("run_id")
+
+	// cursor-based pagination filter
+	if reqCursor != nil {
+		cursorFilters := []sq.Expression{}
+		for i, o := range opt.Order {
+			// Map field names same as above
+			var field string
+			switch o.Field {
+			case enums.TraceRunTimeQueuedAt, enums.TraceRunTimeStartedAt:
+				field = "start_time"
+			case enums.TraceRunTimeEndedAt:
+				field = "end_time"
+			default:
+				field = "start_time"
+			}
+
+			if cursor := reqCursor.Find(field); cursor != nil {
+				// Build cursor condition for this field
+				var baseCondition sq.Expression
+				if o.Direction == enums.TraceRunOrderAsc {
+					baseCondition = sq.C(field).Gt(cursor.Value)
+				} else {
+					baseCondition = sq.C(field).Lt(cursor.Value)
+				}
+
+				// Build compound condition for tie-breaking
+				equalityConditions := []sq.Expression{sq.C(field).Eq(cursor.Value)}
+
+				// Add conditions for all subsequent fields in sort order
+				for j := i + 1; j < len(opt.Order); j++ {
+					var nextField string
+					switch opt.Order[j].Field {
+					case enums.TraceRunTimeQueuedAt, enums.TraceRunTimeStartedAt:
+						nextField = "start_time"
+					case enums.TraceRunTimeEndedAt:
+						nextField = "end_time"
+					default:
+						nextField = "start_time"
+					}
+
+					if nextCursor := reqCursor.Find(nextField); nextCursor != nil {
+						if opt.Order[j].Direction == enums.TraceRunOrderAsc {
+							equalityConditions = append(equalityConditions, sq.C(nextField).Gt(nextCursor.Value))
+						} else {
+							equalityConditions = append(equalityConditions, sq.C(nextField).Lt(nextCursor.Value))
+						}
+					}
+				}
+
+				// Add run_id tie-breaker
+				if runIDCursor := reqCursor.Find("run_id"); runIDCursor != nil {
+					equalityConditions = append(equalityConditions, sq.C("run_id").Gt(runIDCursor.Value))
+				}
+
+				// Combine: (field > cursor_value) OR (field = cursor_value AND next_conditions)
+				tieBreakingCondition := sq.And(equalityConditions...)
+				cursorFilters = append(cursorFilters, sq.Or(baseCondition, tieBreakingCondition))
+			}
+		}
+
+		if len(cursorFilters) > 0 {
+			filter = append(filter, sq.Or(cursorFilters...))
+		}
+	}
+
+	return &runsQueryBuilder{
+		filter:       filter,
+		order:        order,
+		cursor:       reqCursor,
+		cursorLayout: resCursorLayout,
+	}
+}
+
+func isWaitForEventOutput(o map[string]any) bool {
+	_, name := o["name"]
+	_, data := o["data"]
+	_, ts := o["ts"]
+	return name && data && ts
 }

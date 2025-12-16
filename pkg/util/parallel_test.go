@@ -74,14 +74,13 @@ func TestParallelDecode(t *testing.T) {
 		`{"who": "it be"}`,
 	}
 
-	vals, err := ParallelDecode(items, func(val any) (map[string]any, bool, error) {
+	vals, err := ParallelDecode(items, func(val any, _ int) (map[string]any, bool, error) {
 		str, _ := val.(string)
 		item := map[string]any{}
 		if err := json.Unmarshal(unsafe.Slice(unsafe.StringData(str), len(str)), &item); err != nil {
 			return nil, false, fmt.Errorf("error reading partition item: %w", err)
 		}
 		return item, false, nil
-
 	})
 	require.NoError(t, err)
 	require.EqualValues(t, vals[0], map[string]any{"hi": "ok"})
@@ -101,7 +100,7 @@ func TestParallelDecodeWithNils(t *testing.T) {
 	type itemTyp struct {
 		Val int `json:"val"`
 	}
-	vals, err := ParallelDecode(items, func(val any) (*itemTyp, bool, error) {
+	vals, err := ParallelDecode(items, func(val any, _ int) (*itemTyp, bool, error) {
 		str, _ := val.(string)
 		item := itemTyp{}
 		if err := json.Unmarshal(unsafe.Slice(unsafe.StringData(str), len(str)), &item); err != nil {
@@ -112,7 +111,6 @@ func TestParallelDecodeWithNils(t *testing.T) {
 			return nil, true, nil
 		}
 		return &item, false, nil
-
 	})
 	require.NoError(t, err)
 	require.Len(t, vals, 3)
@@ -120,5 +118,4 @@ func TestParallelDecodeWithNils(t *testing.T) {
 	require.EqualValues(t, 1, vals[1].Val)
 	require.EqualValues(t, 1, vals[2].Val)
 	require.Equal(t, 2, int(nilCtr))
-
 }

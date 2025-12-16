@@ -18,9 +18,13 @@ export const Switch = forwardRef<
   );
 });
 
-export const SwitchWrapper = ({ children }: { children: React.ReactNode }) => (
-  <div className="flex items-center gap-2">{children}</div>
-);
+export const SwitchWrapper = ({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) => <div className={cn('flex items-center gap-2', className)}>{children}</div>;
 
 interface SwitchLabelProps extends HTMLAttributes<HTMLLabelElement> {
   htmlFor: string;

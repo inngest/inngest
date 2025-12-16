@@ -183,6 +183,7 @@ func (t *Test) ExpectRequest(name string, queryStepID string, timeout time.Durat
 			require.EqualValues(t.test, t.requestEvent, er.Event, "Request event is incorrect")
 			er.Event.Timestamp = ts
 			er.Event.ID = evtID
+			er.Ctx.MaxAttempts = 0
 
 			for _, m := range modifiers {
 				m(&t.requestCtx)
@@ -192,6 +193,9 @@ func (t *Test) ExpectRequest(name string, queryStepID string, timeout time.Durat
 			t.requestCtx.RunID = er.Ctx.RunID
 			t.requestCtx.FunctionID = uuid.UUID{}
 			er.Ctx.FunctionID = uuid.UUID{}
+			// Unset the queue ref, too
+			t.requestCtx.QueueItemRef = ""
+			er.Ctx.QueueItemRef = ""
 
 			// For each error, remove the stack from our tests.
 			for _, v := range er.Steps {

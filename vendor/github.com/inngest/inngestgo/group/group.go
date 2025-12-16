@@ -3,7 +3,8 @@ package group
 import (
 	"context"
 
-	"github.com/inngest/inngestgo/step"
+	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngestgo/internal/sdkrequest"
 )
 
 type Result struct {
@@ -29,18 +30,34 @@ func Parallel(
 	ctx context.Context,
 	fns ...func(ctx context.Context) (any, error),
 ) Results {
-	ctx = context.WithValue(ctx, step.ParallelKey, true)
+	return ParallelWithOpts(ctx, ParallelOpts{}, fns...)
+}
+
+type ParallelOpts struct {
+	// ParallelMode controls "discovery request" scheduling after a parallel
+	// step ends. Defaults to ParallelModeWait.
+	ParallelMode enums.ParallelMode
+}
+
+func ParallelWithOpts(
+	ctx context.Context,
+	opts ParallelOpts,
+	fns ...func(ctx context.Context) (any, error),
+) Results {
+	ctx = context.WithValue(ctx, sdkrequest.ParallelKey, true)
+	ctx = context.WithValue(ctx, sdkrequest.ParallelModeKey, opts.ParallelMode)
 
 	results := Results{}
 	isPlanned := false
 	ch := make(chan struct{}, 1)
 	var unexpectedPanic any
+
 	for _, fn := range fns {
 		fn := fn
 		go func(fn func(ctx context.Context) (any, error)) {
 			defer func() {
 				if r := recover(); r != nil {
-					if _, ok := r.(step.ControlHijack); ok {
+					if _, ok := r.(sdkrequest.ControlHijack); ok {
 						isPlanned = true
 					} else {
 						unexpectedPanic = r
@@ -61,8 +78,7 @@ func Parallel(
 	}
 
 	if isPlanned {
-		panic(step.ControlHijack{})
+		panic(sdkrequest.ControlHijack{})
 	}
-
 	return results
 }

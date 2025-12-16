@@ -13,9 +13,10 @@ import (
 )
 
 const (
-	defaultBatchMaxSize = 10_000
-	defaultConcurrency  = 100
-	defaultBatchTimeout = 200 * time.Millisecond
+	defaultBatchMaxSize             = 10_000
+	defaultSharedInputBufferMaxSize = 50_000
+	defaultConcurrency              = 100
+	defaultBatchTimeout             = 200 * time.Millisecond
 )
 
 type BatchSpanProcessorOpt func(b *batchSpanProcessor)
@@ -24,6 +25,14 @@ func WithBatchProcessorBufferSize(size int) BatchSpanProcessorOpt {
 	return func(b *batchSpanProcessor) {
 		if size > 0 {
 			b.maxSize = size
+		}
+	}
+}
+
+func WithBatchProcessorSharedInputBufferSize(size int) BatchSpanProcessorOpt {
+	return func(b *batchSpanProcessor) {
+		if size > 0 {
+			b.maxSharedInputBufferSize = size
 		}
 	}
 }
@@ -44,33 +53,42 @@ func WithBatchProcessorConcurrency(c int) BatchSpanProcessorOpt {
 	}
 }
 
+func WithBatchProcessorDropBlockingSpans() BatchSpanProcessorOpt {
+	return func(b *batchSpanProcessor) {
+		b.dropBlockingSpans = true
+	}
+}
+
 type batchSpanProcessor struct {
-	mt          sync.RWMutex
-	exporter    trace.SpanExporter
-	maxSize     int
-	concurrency int
-	timeout     time.Duration
-	buffer      map[string][]trace.ReadOnlySpan
-	pointer     uuid.UUID
-	in          chan *trace.ReadOnlySpan
-	out         chan string
+	mt                       sync.RWMutex
+	exporter                 trace.SpanExporter
+	maxSize                  int
+	maxSharedInputBufferSize int
+	concurrency              int
+	timeout                  time.Duration
+	buffer                   map[string][]trace.ReadOnlySpan
+	pointer                  uuid.UUID
+	in                       chan *trace.ReadOnlySpan
+	out                      chan string
+	dropBlockingSpans        bool
 }
 
 func NewBatchSpanProcessor(ctx context.Context, exporter trace.SpanExporter, opts ...BatchSpanProcessorOpt) trace.SpanProcessor {
 	p := &batchSpanProcessor{
-		mt:          sync.RWMutex{},
-		exporter:    exporter,
-		maxSize:     defaultBatchMaxSize,
-		timeout:     defaultBatchTimeout,
-		concurrency: defaultConcurrency,
-		buffer:      map[string][]trace.ReadOnlySpan{},
-		pointer:     uuid.New(),
+		mt:                       sync.RWMutex{},
+		exporter:                 exporter,
+		maxSize:                  defaultBatchMaxSize,
+		maxSharedInputBufferSize: defaultSharedInputBufferMaxSize,
+		timeout:                  defaultBatchTimeout,
+		concurrency:              defaultConcurrency,
+		buffer:                   map[string][]trace.ReadOnlySpan{},
+		pointer:                  uuid.New(),
 	}
 
 	for _, apply := range opts {
 		apply(p)
 	}
-	p.in = make(chan *trace.ReadOnlySpan, p.maxSize)
+	p.in = make(chan *trace.ReadOnlySpan, p.maxSharedInputBufferSize)
 	p.out = make(chan string, p.maxSize)
 
 	// start process loop
@@ -87,8 +105,18 @@ func (b *batchSpanProcessor) OnStart(ctx context.Context, s trace.ReadWriteSpan)
 
 func (b *batchSpanProcessor) OnEnd(s trace.ReadOnlySpan) {
 	// pass span into the channel
-	b.in <- &s
-	metrics.IncrSpanBatchProcessorEnqueuedCounter(context.TODO(), metrics.CounterOpt{PkgName: pkgName})
+	if !b.dropBlockingSpans {
+		b.in <- &s
+		metrics.IncrSpanBatchProcessorEnqueuedCounter(context.TODO(), metrics.CounterOpt{PkgName: pkgName})
+		return
+	}
+
+	select {
+	case b.in <- &s:
+		metrics.IncrSpanBatchProcessorEnqueuedCounter(context.TODO(), metrics.CounterOpt{PkgName: pkgName})
+	default:
+		metrics.IncrSpanBatchProcessorDroppedCounter(context.TODO(), metrics.CounterOpt{PkgName: pkgName})
+	}
 }
 
 func (b *batchSpanProcessor) Shutdown(ctx context.Context) error {
@@ -209,7 +237,16 @@ func (b *batchSpanProcessor) send(ctx context.Context, id string) error {
 func (b *batchSpanProcessor) flush(ctx context.Context) error {
 	var errs error
 
+	b.mt.Lock()
+	ids := make([]string, len(b.buffer))
+	var i int
 	for id := range b.buffer {
+		ids[i] = id
+		i++
+	}
+	b.mt.Unlock()
+
+	for _, id := range ids {
 		if err := b.send(ctx, id); err != nil {
 			errs = multierror.Append(err, errs)
 		}

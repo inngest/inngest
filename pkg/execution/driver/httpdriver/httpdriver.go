@@ -17,6 +17,7 @@ import (
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/exechttp"
+	"github.com/inngest/inngest/pkg/execution/executor/queueref"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
@@ -49,8 +50,8 @@ type executor struct {
 	requireLocalSigningKey bool
 }
 
-// RuntimeType fulfiils the inngest.Runtime interface.
-func (e executor) RuntimeType() string {
+// Name fulfiils the inngest.Runtime interface.
+func (e executor) Name() string {
 	return "http"
 }
 
@@ -66,7 +67,9 @@ func (e executor) Execute(ctx context.Context, sl sv2.StateLoader, s sv2.Metadat
 		return nil, err
 	}
 
-	input, err := driver.MarshalV1(ctx, sl, s, step, idx, "", attempt)
+	jID := queueref.StringFromCtx(ctx)
+
+	input, err := driver.MarshalV1(ctx, sl, s, step, idx, "", attempt, item.GetMaxAttempts(), jID)
 	if err != nil {
 		return nil, err
 	}
@@ -90,6 +93,9 @@ func (e executor) Execute(ctx context.Context, sl sv2.StateLoader, s sv2.Metadat
 	}
 
 	dr, _, err := ExecuteDriverRequest(ctx, e.Client, Request{
+		AccountID:  s.ID.Tenant.AccountID,
+		WorkflowID: s.ID.FunctionID,
+		RunID:      s.ID.RunID,
 		SigningKey: e.localSigningKey,
 		URL:        *uri,
 		Input:      input,
@@ -314,9 +320,11 @@ func do(ctx context.Context, c exechttp.RequestExecutor, r Request) (*Response, 
 		req.Header.Add(AccountIDHeader, r.AccountID.String())
 	}
 
-	if len(r.SigningKey) > 0 {
+	if len(r.SigningKey) > 0 && len(r.Signature) == 0 {
+		// Attempt to sign
 		req.Header.Add("X-Inngest-Signature", Sign(ctx, r.SigningKey, r.Input))
 	}
+
 	if len(r.Signature) > 0 {
 		// Use this if provided, and override any sig added.
 		req.Header.Add("X-Inngest-Signature", r.Signature)
@@ -325,6 +333,9 @@ func do(ctx context.Context, c exechttp.RequestExecutor, r Request) (*Response, 
 	for k, v := range r.Headers {
 		req.Header.Add(k, v)
 	}
+
+	// Always add the run ID
+	req.Header.Add("X-Run-ID", r.RunID.String())
 
 	// Perform the request.
 	resp, err := c.DoRequest(ctx, req)
@@ -395,6 +406,11 @@ func do(ctx context.Context, c exechttp.RequestExecutor, r Request) (*Response, 
 	if resp.StatusCode == 201 && sysErr == nil {
 		stream, err := ParseStream(resp.Body)
 		if err != nil {
+			l.Error(
+				"error parsing SDK response stream",
+				"error", err,
+				"body", string(resp.Body),
+			)
 			return nil, resp.StatResult, fmt.Errorf("error parsing stream: %w", err)
 		} else {
 			// These are all contained within a single wrapper.

@@ -1,8 +1,6 @@
-import { createRef } from 'react';
+import { Table } from '@inngest/components/Table';
 import type { Meta, StoryObj } from '@storybook/react';
-import { createColumnHelper, getCoreRowModel } from '@tanstack/react-table';
-
-import { Table } from './Table';
+import { createColumnHelper } from '@tanstack/react-table';
 
 type Table = {
   firstName: string;
@@ -35,7 +33,6 @@ const meta = {
   parameters: {
     layout: 'centered',
   },
-  tags: ['autodocs'],
 } satisfies Meta<typeof Table>;
 
 export default meta;
@@ -44,15 +41,10 @@ type Story = StoryObj<typeof Table>;
 
 export const Default: Story = {
   render: () => {
-    const tableContainerRef = createRef<HTMLDivElement>();
     return (
       <Table
-        options={{
-          data: data,
-          columns: defaultColumns,
-          getCoreRowModel: getCoreRowModel(),
-        }}
-        tableContainerRef={tableContainerRef}
+        data={data}
+        columns={defaultColumns}
         blankState={<p className="text-basis">No names</p>}
       />
     );
@@ -61,15 +53,10 @@ export const Default: Story = {
 
 export const Empty: Story = {
   render: () => {
-    const tableContainerRef = createRef<HTMLDivElement>();
     return (
       <Table
-        options={{
-          data: [],
-          columns: defaultColumns,
-          getCoreRowModel: getCoreRowModel(),
-        }}
-        tableContainerRef={tableContainerRef}
+        data={[]}
+        columns={defaultColumns}
         blankState={<p className="text-basis">No names</p>}
       />
     );

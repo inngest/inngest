@@ -59,18 +59,14 @@ export const SdkThroughput = ({ workspace }: { workspace?: VolumeMetricsQuery['w
   const metrics = workspace && mapSdkThroughput(workspace);
 
   return (
-    <div className="bg-canvasBase border-subtle relative flex h-[384px] w-full flex-col overflow-x-hidden rounded-md border p-5 md:w-[75%]">
+    <div className="bg-canvasBase border-subtle relative flex h-[384px] w-full flex-col overflow-x-hidden rounded-md border p-5">
       <div className="mb-2 flex w-full flex-row items-center justify-between p-0">
         <div className="text-subtle flex w-full flex-row items-center gap-x-2 text-lg">
           SDK request throughput{' '}
           <Info
             text="Total number of requests to Inngest SDKs from functions in your apps."
             action={
-              <Link
-                arrowOnHover
-                className="text-sm"
-                href="https://www.inngest.com/docs/sdk/overview"
-              >
+              <Link className="text-sm" href="https://www.inngest.com/docs/sdk/overview">
                 Learn more about SDK throughput.
               </Link>
             }

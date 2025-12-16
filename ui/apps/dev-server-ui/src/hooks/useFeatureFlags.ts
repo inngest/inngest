@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 
 interface FeatureFlags {
   FEATURE_CEL_SEARCH?: boolean;
+  FEATURE_EVENTS?: boolean;
 }
 
 export function useFeatureFlags() {
@@ -35,8 +36,8 @@ export function useFeatureFlags() {
  * Creates a Dev Server URL from a path. If Dev Server host is unknown, it
  * returns the path.
  */
-function createDevServerURL(path: string) {
-  const host = process.env.NEXT_PUBLIC_API_BASE_URL;
+export function createDevServerURL(path: string) {
+  const host = import.meta.env.VITE_PUBLIC_API_BASE_URL;
   if (!host) {
     return path;
   }

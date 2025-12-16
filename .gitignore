@@ -22,3 +22,16 @@ Thumbs.db
 !/tmp/nats/.gitkeep
 
 __debug_bin*
+.claude/
+
+# Generated OpenAPI documentation
+docs/openapi/v2/
+docs/openapi/v3/
+
+/bin/
+
+# Go workspace file
+go.work
+go.work.sum
+
+pkg/execution/state/redis_state/testdata

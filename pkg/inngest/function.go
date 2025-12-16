@@ -20,6 +20,7 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/expressions"
 	"github.com/inngest/inngest/pkg/syscode"
+	"github.com/inngest/inngest/pkg/util"
 	"github.com/xhit/go-str2duration/v2"
 )
 
@@ -97,6 +98,29 @@ type Function struct {
 	// Actions represents the actions to take for this function.  If empty, this assumes
 	// that we have a single action specified in the current directory using
 	Steps []Step `json:"steps,omitempty"`
+
+	// Driver represents driver parameters for executing the Inngest function.  Typically,
+	// this is an HTTP driver with a URL.
+	//
+	// Sometimes, we may include additional information for eg. sync-based functions.
+	Driver FunctionDriver `json:"driver,omitzero"`
+}
+
+func (f Function) MaxAttempts() int {
+	if len(f.Steps) == 0 {
+		return consts.DefaultRetryCount
+	}
+	// TODO: Improve this please...
+	return f.Steps[0].RetryCount() + 1
+}
+
+func (f Function) HasCronExpression(cron string) bool {
+	for _, f := range f.Triggers {
+		if f.CronTrigger != nil && f.CronTrigger.Cron == cron {
+			return true
+		}
+	}
+	return false
 }
 
 type RateLimit struct {
@@ -139,7 +163,7 @@ func (r RateLimit) IsValid(ctx context.Context) error {
 // DeterministicUUID returns a deterministic V3 UUID based off of the SHA1
 // hash of the function's name.
 func (f *Function) DeterministicUUID() uuid.UUID {
-	return DeterministicSha1UUID(f.Name + f.Steps[0].URI)
+	return DeterministicSha1UUID(f.Name + f.URI().String())
 }
 
 // Throttle represents concurrency over time.
@@ -286,6 +310,7 @@ func (f Function) GetSlug() string {
 	return strings.ToLower(slug.Make(f.Name))
 }
 
+// IsScheduled indicates if the function is a cron function or not
 func (f Function) IsScheduled() bool {
 	for _, t := range f.Triggers {
 		if t.CronTrigger != nil {
@@ -293,6 +318,17 @@ func (f Function) IsScheduled() bool {
 		}
 	}
 	return false
+}
+
+// ScheduleExpression returns all the cron expression strings for the function
+func (f Function) ScheduleExpressions() []string {
+	var cronExpressions []string
+	for _, t := range f.Triggers {
+		if t.CronTrigger != nil {
+			cronExpressions = append(cronExpressions, t.CronTrigger.Cron)
+		}
+	}
+	return cronExpressions
 }
 
 func (f Function) IsBatchEnabled() bool {
@@ -307,9 +343,6 @@ func (f Function) Validate(ctx context.Context) error {
 	var err error
 	if f.Name == "" {
 		err = multierror.Append(err, fmt.Errorf("A function name is required"))
-	}
-	if len(f.Triggers) == 0 {
-		err = multierror.Append(err, fmt.Errorf("At least one trigger is required"))
 	}
 
 	if f.Concurrency != nil {
@@ -367,8 +400,12 @@ func (f Function) Validate(ctx context.Context) error {
 		}
 	}
 
-	if len(f.Steps) != 1 {
-		err = multierror.Append(err, fmt.Errorf("Functions must contain one step"))
+	if f.Driver.URI == "" {
+		// Backwards compatible functions:  we used to store driver information in "steps", allowing DAGs
+		// in functions.  We no longer need this.
+		if len(f.Steps) != 1 {
+			err = multierror.Append(err, fmt.Errorf("Functions must contain one step"))
+		}
 	}
 
 	// Validate priority expression
@@ -446,7 +483,7 @@ func (f Function) RunPriorityFactor(ctx context.Context, event map[string]any) (
 		return 0, fmt.Errorf("Priority.Run expression is invalid: %s", err)
 	}
 
-	val, _, err := expr.Evaluate(ctx, expressions.NewData(map[string]any{"event": event}))
+	val, err := expr.Evaluate(ctx, expressions.NewData(map[string]any{"event": event}))
 	if err != nil {
 		return 0, fmt.Errorf("Priority.Run expression errored: %s", err)
 	}
@@ -475,11 +512,18 @@ func (f Function) RunPriorityFactor(ctx context.Context, event map[string]any) (
 
 // URI returns the function's URI.  It is expected that the function has already been
 // validated.
-func (f Function) URI() (*url.URL, error) {
-	if len(f.Steps) >= 1 {
-		return url.Parse(f.Steps[0].URI)
+func (f Function) URI() *url.URL {
+	if f.Driver.URI == "" {
+		// Backcompat - use the step URI if the function driver doesnt exist.
+		if url, _ := url.Parse(f.Steps[0].URI); url != nil {
+			return url
+		}
 	}
-	return nil, fmt.Errorf("No steps configured")
+
+	if url, _ := url.Parse(f.Driver.URI); url != nil {
+		return url
+	}
+	return &url.URL{}
 }
 
 // DeterminsiticAppUUID returns a deterministic V3 UUID based off of the SHA1
@@ -491,7 +535,7 @@ func DeterministicAppUUID(url string) uuid.UUID {
 // DeterministicSha1UUID returns a deterministic V3 UUID based off of the SHA1
 // hash of the input string.
 func DeterministicSha1UUID(str string) uuid.UUID {
-	return uuid.NewSHA1(uuid.NameSpaceOID, []byte(str))
+	return util.DeterministicUUID([]byte(str))
 }
 
 func RandomID() (string, error) {

@@ -15,19 +15,21 @@ import {
 } from '../DetailsCard/NewElement';
 import { ErrorCard } from '../Error/ErrorCard';
 import { InvokeModal } from '../InvokeButton';
+import type { TraceResult } from '../SharedContext/useGetTraceResult';
 import { useInvokeRun } from '../SharedContext/useInvokeRun';
 import { usePrettyErrorBody, usePrettyJson } from '../hooks/usePrettyJson';
 import { IconCloudArrowDown } from '../icons/CloudArrowDown';
-import type { Result } from '../types/functionRun';
 import { devServerURL, useDevServer } from '../utils/useDevServer';
+import { ErrorInfo } from './ErrorInfo';
 import { IO } from './IO';
 import { Tabs } from './Tabs';
 
 type TopInfoProps = {
   slug?: string;
   getTrigger: (runID: string) => Promise<Trigger>;
-  result?: Result;
+  result?: TraceResult;
   runID: string;
+  resultLoading?: boolean;
 };
 
 export type Trigger = {
@@ -78,7 +80,7 @@ export const actionConfigs = (
   };
 };
 
-export const TopInfo = ({ slug, getTrigger, runID, result }: TopInfoProps) => {
+export const TopInfo = ({ slug, getTrigger, runID, result, resultLoading }: TopInfoProps) => {
   const [expanded, setExpanded] = useState(true);
   const { isRunning, send } = useDevServer();
   const { invoke, loading: invokeLoading, error: invokeError } = useInvokeRun();
@@ -129,7 +131,7 @@ export const TopInfo = ({ slug, getTrigger, runID, result }: TopInfoProps) => {
   }
 
   return (
-    <div className="sticky top-14 flex flex-col justify-start gap-2 overflow-hidden">
+    <div className="flex h-full flex-col justify-start gap-2 overflow-hidden">
       <div className="flex h-11 w-full flex-row items-center justify-between border-none px-4 pt-2">
         <div
           className="text-basis flex cursor-pointer items-center justify-start gap-2"
@@ -239,8 +241,8 @@ export const TopInfo = ({ slug, getTrigger, runID, result }: TopInfoProps) => {
           )}
         </div>
       )}
-
-      <div className="">
+      {result?.error && <ErrorInfo error={result.error.message || 'Unknown error'} />}
+      <div className="flex-1">
         <Tabs
           defaultActive={result?.error ? 'error' : prettyPayload ? 'input' : 'output'}
           tabs={[
@@ -250,7 +252,12 @@ export const TopInfo = ({ slug, getTrigger, runID, result }: TopInfoProps) => {
                     label: 'Input',
                     id: 'input',
                     node: (
-                      <IO title="Function Payload" raw={prettyPayload} actions={codeBlockActions} />
+                      <IO
+                        title="Function Payload"
+                        raw={prettyPayload}
+                        actions={codeBlockActions}
+                        loading={isPending || resultLoading}
+                      />
                     ),
                   },
                 ]
@@ -260,22 +267,23 @@ export const TopInfo = ({ slug, getTrigger, runID, result }: TopInfoProps) => {
                   {
                     label: 'Output',
                     id: 'output',
-                    node: <IO title="Output" raw={prettyOutput} />,
+                    node: (
+                      <IO title="Output" raw={prettyOutput} loading={isPending || resultLoading} />
+                    ),
                   },
                 ]
               : []),
             ...(result?.error
               ? [
                   {
-                    label: 'Error',
+                    label: 'Error details',
                     id: 'error',
                     node: (
                       <IO
-                        title={`${result.error.name || 'Error'} ${
-                          result.error.message ? `: ${result.error.message}` : ''
-                        }`}
+                        title={result.error.message || 'Unknown error'}
                         raw={prettyErrorBody ?? ''}
                         error={true}
+                        loading={isPending || resultLoading}
                       />
                     ),
                   },

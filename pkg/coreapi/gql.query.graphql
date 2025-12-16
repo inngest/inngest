@@ -1,6 +1,6 @@
 type Query {
   apps(filter: AppsFilterV1): [App!]!
-	app(id: UUID!): App
+  app(id: UUID!): App
 
   stream(query: StreamQuery!): [StreamItem!]!
 
@@ -9,6 +9,14 @@ type Query {
 
   # Get all events sent
   events(query: EventsQuery!): [Event!]
+
+  eventV2(id: ULID!): EventV2!
+
+  eventsV2(
+    first: Int! = 40
+    after: String
+    filter: EventsFilter!
+  ): EventsConnection!
 
   functionBySlug(query: FunctionQuery!): Function
 
@@ -23,19 +31,24 @@ type Query {
     after: String
     orderBy: [RunsV2OrderBy!]!
     filter: RunsFilterV2!
+    preview: Boolean
   ): RunsV2Connection!
   # runsMetrics(filter: RunsFilterV2!): MetricsResponse!
   run(runID: String!): FunctionRunV2
   runTraceSpanOutputByID(outputID: String!): RunTraceSpanOutput!
   runTrigger(runID: String!): RunTraceTrigger!
+  runTrace(runID: String!): RunTraceSpan!
+
+  debugRun(query: DebugRunQuery!): DebugRun
+  debugSession(query: DebugSessionQuery!): DebugSession
 
   workerConnections(
-      first: Int! = 100
-      after: String
-      orderBy: [ConnectV1WorkerConnectionsOrderBy!]!
-      filter: ConnectV1WorkerConnectionsFilter!
-    ): ConnectV1WorkerConnectionsConnection!
-	workerConnection(connectionId: ULID!): ConnectV1WorkerConnection
+    first: Int! = 100
+    after: String
+    orderBy: [ConnectV1WorkerConnectionsOrderBy!]!
+    filter: ConnectV1WorkerConnectionsFilter!
+  ): ConnectV1WorkerConnectionsConnection!
+  workerConnection(connectionId: ULID!): ConnectV1WorkerConnection
 }
 
 input ActionVersionQuery {
@@ -59,6 +72,20 @@ input FunctionQuery {
   functionSlug: String!
 }
 
+input DebugRunQuery {
+  workspaceId: ID! = "local"
+  functionSlug: String!
+  debugRunID: String
+  runID: String
+}
+
+input DebugSessionQuery {
+  workspaceId: ID! = "local"
+  functionSlug: String!
+  debugSessionID: String
+  runID: String
+}
+
 input FunctionRunQuery {
   workspaceId: ID! = "local"
   functionRunId: ID!
@@ -78,4 +105,15 @@ input StreamQuery {
   before: ID
   limit: Int! = 20
   includeInternalEvents: Boolean
+}
+
+input EventsFilter {
+  eventNames: [String!]
+  from: Time!
+  includeInternalEvents: Boolean! = false
+
+  # CEL query string.
+  query: String
+
+  until: Time
 }

@@ -15,7 +15,7 @@ export const PopoverContent = forwardRef<
   return (
     <PopoverPrimitive.Portal container={container}>
       <PopoverPrimitive.Content
-        sideOffset={5}
+        sideOffset={4}
         ref={forwardedRef}
         className={cn(
           'bg-canvasBase border-muted z-[100] max-h-[var(--radix-popover-content-available-height)] overflow-y-auto overflow-x-hidden rounded border',

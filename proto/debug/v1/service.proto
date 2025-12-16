@@ -1,0 +1,30 @@
+syntax = "proto3";
+package debug.v1;
+
+import "debug/v1/queue.proto";
+import "debug/v1/pause.proto";
+import "debug/v1/constraintapi.proto";
+import "constraintapi/v1/service.proto";
+
+option go_package = "github.com/inngest/inngest/proto/gen/debug/v1;debug";
+
+service Debug {
+  // GetPartition retrieves the partition data from the database
+  rpc GetPartition(PartitionRequest) returns (PartitionResponse) {}
+  // GetPartition retrieves additional status of the partition from the queue
+  // directly
+  rpc GetPartitionStatus(PartitionRequest) returns (PartitionStatusResponse) {}
+  // GetQueueItem retrieves the queue item object from the queue
+  rpc GetQueueItem(QueueItemRequest) returns (QueueItemResponse) {}
+  // GetPause retrieves a single pause item.
+  rpc GetPause(PauseRequest) returns (PauseResponse) {}
+  // GetIndex retrieves block information for a pause index.
+  rpc GetIndex(IndexRequest) returns (IndexResponse) {}
+  // BlockPeek retrieves pause IDs from a specific block.
+  rpc BlockPeek(BlockPeekRequest) returns (BlockPeekResponse) {}
+  // BlockDeleted retrieves deleted pause IDs from a specific block.
+  rpc BlockDeleted(BlockDeletedRequest) returns (BlockDeletedResponse) {}
+  // CheckConstraints invokes Check() on the configured capacity manager
+  rpc CheckConstraints(constraintapi.v1.CapacityCheckRequest) returns (CheckConstraintsResponse);
+}
+

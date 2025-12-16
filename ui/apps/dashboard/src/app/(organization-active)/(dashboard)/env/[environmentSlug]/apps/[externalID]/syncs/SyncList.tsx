@@ -2,7 +2,7 @@
 
 import { Skeleton } from '@inngest/components/Skeleton';
 import { Time } from '@inngest/components/Time';
-import { FunctionsIcon } from '@inngest/components/icons/sections/Functions';
+// import { FunctionsIcon } from '@inngest/components/icons/sections/Functions';
 import { cn } from '@inngest/components/utils/classNames';
 
 import { SyncStatusPill } from '@/components/SyncStatusPill';
@@ -71,7 +71,7 @@ export function SyncList({
                     <SyncStatusPill status={sync.status} />
                   </div>
                   <div className="flex-1 py-4 pl-2 align-middle sm:pl-0">
-                    <Time className="text-wrap" value={sync.lastSyncedAt} />
+                    <Time className="text-wrap" value={sync.lastSyncedAt} copyable={false} />
                   </div>
                 </div>
                 <div
@@ -80,12 +80,12 @@ export function SyncList({
                     sync.syncedFunctions.length === 1 ? 'function' : 'functions'
                   }`}
                 >
-                  {sync.syncedFunctions.length > 0 && (
+                  {/* {sync.syncedFunctions.length > 0 && (
                     <>
                       <FunctionsIcon className="text-muted h-4 w-4" />
                       {sync.syncedFunctions.length}
                     </>
-                  )}
+                  )} */}
                 </div>
               </li>
             );

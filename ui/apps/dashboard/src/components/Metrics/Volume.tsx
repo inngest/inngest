@@ -6,11 +6,13 @@ import { graphql } from '@/gql';
 import { MetricsScope } from '@/gql/graphql';
 import { useSkippableGraphQLQuery } from '@/utils/useGraphQLQuery';
 import { useEnvironment } from '../Environments/environment-context';
+import { useBooleanFlag } from '../FeatureFlags/hooks';
+import { AccountConcurrency } from './AccountConcurrency';
 import { AUTO_REFRESH_INTERVAL } from './ActionMenu';
 import { Backlog } from './Backlog';
-import { AccountConcurrency } from './Concurrency';
+import { Concurrency } from './Concurrency';
+import { ConnectWorkerPercentage, ConnectWorkerTotalCapacity } from './ConnectWorkerMetrics';
 import { type EntityLookup } from './Dashboard';
-import { Feedback } from './Feedback';
 import { RunsThrougput } from './RunsThroughput';
 import { SdkThroughput } from './SdkThroughput';
 import { StepsThroughput } from './StepsThroughput';
@@ -24,6 +26,7 @@ export type MetricsFilters = {
   entities: EntityLookup;
   scope: MetricsScope;
   concurrencyLimit?: number;
+  isMarketplace: boolean;
 };
 
 const GetVolumeMetrics = graphql(`
@@ -35,6 +38,16 @@ const GetVolumeMetrics = graphql(`
     $until: Time
     $scope: MetricsScope!
   ) {
+    accountConcurrency: metrics(opts: { name: "steps_running", from: $from, to: $until }) {
+      data {
+        bucket
+        value
+      }
+      from
+      to
+      granularity
+    }
+
     workspace(id: $workspaceId) {
       runsThroughput: scopedMetrics(
         filter: {
@@ -195,10 +208,38 @@ const GetVolumeMetrics = graphql(`
           name: "concurrency_limit_reached_total"
           scope: $scope
           from: $from
-          functionIDs: $functionIDs
-          appIDs: $appIDs
           until: $until
         }
+      ) {
+        metrics {
+          id
+          tagName
+          tagValue
+          data {
+            value
+            bucket
+          }
+        }
+      }
+    }
+    workspace(id: $workspaceId) {
+      workerPercentageUsed: connectWorkerMetrics(
+        filter: { name: "worker_percentage_used", from: $from, until: $until }
+      ) {
+        metrics {
+          id
+          tagName
+          tagValue
+          data {
+            value
+            bucket
+          }
+        }
+      }
+    }
+    workspace(id: $workspaceId) {
+      workerTotalCapacity: connectWorkerMetrics(
+        filter: { name: "worker_total_capacity", from: $from, until: $until }
       ) {
         metrics {
           id
@@ -223,10 +264,15 @@ export const MetricsVolume = ({
   entities,
   scope,
   concurrencyLimit,
+  isMarketplace = false,
 }: MetricsFilters) => {
   const [volumeOpen, setVolumeOpen] = useState(true);
 
   const env = useEnvironment();
+
+  const { value: connectMetricsEnabled, isReady: connectMetricsReady } = useBooleanFlag(
+    'connect-worker-concurrency-metrics'
+  );
 
   const variables = {
     workspaceId: env.id,
@@ -264,19 +310,32 @@ export const MetricsVolume = ({
           <div className="relative grid w-full auto-cols-max grid-cols-1 gap-2 overflow-hidden md:grid-cols-2">
             <RunsThrougput workspace={data?.workspace} entities={entities} />
             <StepsThroughput workspace={data?.workspace} entities={entities} />
-            <div className="col-span-2 flex flex-row flex-wrap gap-2 overflow-hidden md:flex-nowrap">
-              <SdkThroughput workspace={data?.workspace} />
-              <Backlog workspace={data?.workspace} entities={entities} />
-            </div>
-            <div className="col-span-2 flex flex-row flex-wrap gap-2 overflow-hidden md:flex-nowrap">
-              <AccountConcurrency
-                workspace={data?.workspace}
-                entities={entities}
-                concurrencyLimit={concurrencyLimit}
-              />
-              <Feedback />
-            </div>
-            <div className="col-span-2 flex flex-row flex-wrap gap-2 overflow-hidden md:flex-nowrap"></div>
+            <SdkThroughput workspace={data?.workspace} />
+            <Backlog workspace={data?.workspace} entities={entities} />
+
+            <Concurrency
+              workspace={data?.workspace}
+              entities={entities}
+              isMarketplace={isMarketplace}
+            />
+            <AccountConcurrency
+              data={data?.accountConcurrency}
+              limit={concurrencyLimit}
+              isMarketplace={isMarketplace}
+            />
+            {/* Only show Connect worker metrics if there's data */}
+            {connectMetricsEnabled &&
+              connectMetricsReady &&
+              data &&
+              data.workspace.workerPercentageUsed.metrics.length > 0 && (
+                <ConnectWorkerPercentage workspace={data.workspace} entities={entities} />
+              )}
+            {connectMetricsEnabled &&
+              connectMetricsReady &&
+              data &&
+              data.workspace.workerTotalCapacity.metrics.length > 0 && (
+                <ConnectWorkerTotalCapacity workspace={data.workspace} entities={entities} />
+              )}
           </div>
         </>
       )}

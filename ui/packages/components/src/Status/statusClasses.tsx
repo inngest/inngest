@@ -1,14 +1,22 @@
+import { isAppStatus, type AppStatus } from '../types/app';
 import {
   isFunctionRunStatus,
   isReplayRunStatus,
   type FunctionRunStatus,
   type ReplayRunStatus,
 } from '../types/functionRun';
+import { isReplayStatus, type ReplayStatus } from '../types/replay';
 import { isWorkerStatus, type GroupedWorkerStatus } from '../types/workers';
 import { cn } from '../utils/classNames';
 
 const backgroundClasses: {
-  [key in FunctionRunStatus | ReplayRunStatus | GroupedWorkerStatus | 'UNKNOWN']: string;
+  [key in
+    | FunctionRunStatus
+    | ReplayRunStatus
+    | GroupedWorkerStatus
+    | AppStatus
+    | ReplayStatus
+    | 'UNKNOWN']: string;
 } = {
   CANCELLED: 'bg-status-cancelled',
   COMPLETED: 'bg-status-completed',
@@ -22,19 +30,33 @@ const backgroundClasses: {
   SKIPPED: 'bg-status-paused',
   INACTIVE: 'bg-accent-subtle dark:bg-accent-intense',
   ACTIVE: 'bg-status-completed',
+  ARCHIVED: 'bg-status-cancelled',
   DISCONNECTED: 'bg-status-cancelled',
+  CREATED: 'bg-status-runningSubtle',
+  ENDED: 'bg-status-completed',
 };
 
 export function getStatusBackgroundClass(status: string): string {
-  if (!isFunctionRunStatus(status) && !isReplayRunStatus(status) && !isWorkerStatus(status)) {
-    console.error(`unexpected status: ${status}`);
+  if (
+    !isFunctionRunStatus(status) &&
+    !isReplayRunStatus(status) &&
+    !isWorkerStatus(status) &&
+    !isAppStatus(status) &&
+    !isReplayStatus(status)
+  ) {
     return backgroundClasses['UNKNOWN'];
   }
   return backgroundClasses[status];
 }
 
 const borderClasses: {
-  [key in FunctionRunStatus | ReplayRunStatus | GroupedWorkerStatus | 'UNKNOWN']: string;
+  [key in
+    | FunctionRunStatus
+    | ReplayRunStatus
+    | GroupedWorkerStatus
+    | AppStatus
+    | ReplayStatus
+    | 'UNKNOWN']: string;
 } = {
   CANCELLED: 'border-status-cancelled',
   COMPLETED: 'border-status-completed',
@@ -48,19 +70,33 @@ const borderClasses: {
   SKIPPED: 'border-accent-paused',
   INACTIVE: 'border-accent-subtle dark:border-accent-intense',
   ACTIVE: 'border-status-completed',
+  ARCHIVED: 'border-status-cancelled',
   DISCONNECTED: 'border-status-cancelled',
+  CREATED: 'border-status-running',
+  ENDED: 'border-status-completed',
 };
 
 export function getStatusBorderClass(status: string): string {
-  if (!isFunctionRunStatus(status) && !isReplayRunStatus(status) && !isWorkerStatus(status)) {
-    console.error(`unexpected status: ${status}`);
+  if (
+    !isFunctionRunStatus(status) &&
+    !isReplayRunStatus(status) &&
+    !isWorkerStatus(status) &&
+    !isAppStatus(status) &&
+    !isReplayStatus(status)
+  ) {
     return cn('border', borderClasses['UNKNOWN']);
   }
   return cn('border', borderClasses[status]);
 }
 
 const textClasses: {
-  [key in FunctionRunStatus | ReplayRunStatus | GroupedWorkerStatus | 'UNKNOWN']: string;
+  [key in
+    | FunctionRunStatus
+    | ReplayRunStatus
+    | GroupedWorkerStatus
+    | AppStatus
+    | ReplayStatus
+    | 'UNKNOWN']: string;
 } = {
   CANCELLED: 'text-status-cancelledText',
   COMPLETED: 'text-status-completedText',
@@ -74,12 +110,20 @@ const textClasses: {
   SKIPPED: 'text-status-pausedText',
   INACTIVE: 'text-accent-subtle dark:text-accent-intense',
   ACTIVE: 'text-status-completedText',
+  ARCHIVED: 'text-status-cancelledText',
   DISCONNECTED: 'text-status-cancelledText',
+  CREATED: 'text-status-runningText',
+  ENDED: 'text-status-completedText',
 };
 
 export function getStatusTextClass(status: string): string {
-  if (!isFunctionRunStatus(status) && !isReplayRunStatus(status) && !isWorkerStatus(status)) {
-    console.error(`unexpected status: ${status}`);
+  if (
+    !isFunctionRunStatus(status) &&
+    !isReplayRunStatus(status) &&
+    !isWorkerStatus(status) &&
+    !isAppStatus(status) &&
+    !isReplayStatus(status)
+  ) {
     return textClasses['UNKNOWN'];
   }
   return textClasses[status];

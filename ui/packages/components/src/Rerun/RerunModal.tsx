@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { RiCloseLine } from '@remixicon/react';
 
@@ -11,8 +11,11 @@ export type RerunModalType = {
   open: boolean;
   setOpen: (open: boolean) => void;
   runID: string;
+  debugRunID?: string;
+  debugSessionID?: string;
   stepID: string;
   input: string;
+  redirect?: boolean;
 };
 
 export type RerunResult = {
@@ -34,7 +37,16 @@ const patchInput = (newInput: string) => {
   }
 };
 
-export const RerunModal = ({ open, setOpen, runID, stepID, input }: RerunModalType) => {
+export const RerunModal = ({
+  open,
+  setOpen,
+  runID,
+  stepID,
+  input,
+  debugRunID,
+  debugSessionID,
+  redirect = true,
+}: RerunModalType) => {
   const { rerun } = useRerunFromStep();
   const [newInput, setNewInput] = useState(input);
   const [loading, setLoading] = useState(false);
@@ -46,6 +58,10 @@ export const RerunModal = ({ open, setOpen, runID, stepID, input }: RerunModalTy
     setError(null);
     setOpen(false);
   };
+
+  useEffect(() => {
+    setNewInput(input);
+  }, [input]);
 
   return (
     <Modal className="flex max-w-[1200px] flex-col p-6" isOpen={open} onClose={close}>
@@ -98,14 +114,20 @@ export const RerunModal = ({ open, setOpen, runID, stepID, input }: RerunModalTy
             setLoading(true);
             const result = await rerun({
               runID,
-              fromStep: { stepID, input: patchInput(newInput) },
+              debugRunID,
+              debugSessionID,
+              fromStep: { stepID, ...(newInput ? { input: patchInput(newInput) } : {}) },
             });
 
+            setLoading(false);
+
             if (result.error) {
-              console.error('rerun from step error', error);
+              console.error('rerun from step error', result.error);
+              setError(result.error);
+              return;
             }
 
-            if (result.redirect) {
+            if (redirect && result.redirect) {
               router.push(result.redirect);
             }
 

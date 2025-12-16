@@ -2,7 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import NextLink from 'next/link';
-import { SignOutButton } from '@clerk/nextjs';
+import { useClerk } from '@clerk/nextjs';
 import { Listbox } from '@headlessui/react';
 import {
   RiArrowLeftRightLine,
@@ -11,6 +11,7 @@ import {
   RiGroupLine,
   RiLogoutCircleLine,
   RiUserLine,
+  RiUserSharedLine,
 } from '@remixicon/react';
 
 import { pathCreator } from '@/utils/urls';
@@ -40,6 +41,17 @@ export const ProfileMenu = ({ children, isMarketplace }: Props) => {
 
           <hr className="border-subtle" />
 
+          <NextLink href="/settings/user" scroll={false}>
+            <Listbox.Option
+              className="text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
+              value="userProfile"
+            >
+              <div className="hover:bg-canvasSubtle flex flex-row items-center justify-start">
+                <RiUserLine className="text-muted mr-2 h-4 w-4" />
+                <div>Your Profile</div>
+              </div>
+            </Listbox.Option>
+          </NextLink>
           <NextLink href="/settings/organization" scroll={false}>
             <Listbox.Option
               className="text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
@@ -63,19 +75,18 @@ export const ProfileMenu = ({ children, isMarketplace }: Props) => {
             </Listbox.Option>
           </NextLink>
 
-          {!isMarketplace && (
-            <NextLink href={pathCreator.billing()} scroll={false}>
-              <Listbox.Option
-                className="text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
-                value="billing"
-              >
-                <div className="hover:bg-canvasSubtle flex flex-row items-center justify-start">
-                  <RiBillLine className="text-muted mr-2 h-4 w-4" />
-                  <div>Billing</div>
-                </div>
-              </Listbox.Option>
-            </NextLink>
-          )}
+          <NextLink href={pathCreator.billing()} scroll={false}>
+            <Listbox.Option
+              className="text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
+              value="billing"
+            >
+              <div className="hover:bg-canvasSubtle flex flex-row items-center justify-start">
+                <RiBillLine className="text-muted mr-2 h-4 w-4" />
+                <div>Billing</div>
+              </div>
+            </Listbox.Option>
+          </NextLink>
+
           <a href="/organization-list">
             <Listbox.Option
               className="text-muted hover:bg-canvasSubtle m-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
@@ -90,17 +101,18 @@ export const ProfileMenu = ({ children, isMarketplace }: Props) => {
 
           <hr className="border-subtle" />
 
-          <NextLink href="/settings/user" scroll={false}>
+          <NextLink href="/sign-in/choose" scroll={false}>
             <Listbox.Option
-              className="text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
-              value="userProfile"
+              className="text-muted hover:bg-canvasSubtle m-2 mx-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
+              value="switchAccount"
             >
               <div className="hover:bg-canvasSubtle flex flex-row items-center justify-start">
-                <RiUserLine className="text-muted mr-2 h-4 w-4" />
-                <div>Your Profile</div>
+                <RiUserSharedLine className="text-muted mr-2 h-4 w-4" />
+                <div>Switch Account</div>
               </div>
             </Listbox.Option>
           </NextLink>
+          <hr className="border-subtle" />
           <Listbox.Option
             className="text-muted hover:bg-canvasSubtle m-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
             value="signOut"
@@ -114,16 +126,26 @@ export const ProfileMenu = ({ children, isMarketplace }: Props) => {
 };
 
 function SignOut({ isMarketplace }: { isMarketplace: boolean }) {
+  const { signOut, session } = useClerk();
+
   const content = (
     <div className="hover:bg-canvasSubtle flex flex-row items-center justify-start">
       <RiLogoutCircleLine className="text-muted mr-2 h-4 w-4" />
-      <div>Sign Out</div>
+      <div>Sign Out </div>
     </div>
   );
 
   if (!isMarketplace) {
     // Sign out via Clerk.
-    return <SignOutButton>{content}</SignOutButton>;
+    return (
+      <button
+        onClick={async () => {
+          await signOut({ sessionId: session?.id, redirectUrl: '/sign-in/choose' });
+        }}
+      >
+        {content}
+      </button>
+    );
   }
 
   // Sign out via our backend.

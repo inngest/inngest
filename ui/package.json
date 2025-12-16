@@ -1,6 +1,8 @@
 {
   "name": "inngest-ui",
   "scripts": {
+    "dev:new-dashboard": "pnpm run --filter @inngest/new-dashboard dev",
+    "dev:dev-server-ui": "pnpm run --filter @inngest/dev-server-ui dev",
     "format": "prettier . --write",
     "preinstall": "npx only-allow pnpm",
     "prepare": "cd .. && husky install ./ui/.husky"
@@ -9,19 +11,20 @@
     "@ianvs/prettier-plugin-sort-imports": "^3.7.2",
     "husky": "^8.0.2",
     "lint-staged": "^15.5.0",
+    "postcss-nesting": "^13.0.2",
     "prettier": "^2.8.7",
     "prettier-plugin-tailwindcss": "^0.2.7",
     "turbo": "^2.0.1"
   },
   "engines": {
     "node": "20.x",
-    "pnpm": "8.15.8"
+    "pnpm": "10.x"
   },
   "workspaces": [
     "packages/*",
     "apps/*"
   ],
-  "packageManager": "pnpm@8.15.8",
+  "packageManager": "pnpm@10.18.2",
   "private": true,
   "pnpm": {
     "overrides": {
@@ -67,7 +70,27 @@
       "vite@>=5.0.0 <5.4.16": ">=5.4.16",
       "vite@>=6.2.0 <6.2.6": ">=6.2.6",
       "image-size@>=1.1.0 <1.2.1": ">=1.2.1",
-      "vite@>=6.2.0 <=6.2.6": ">=6.2.7"
-    }
+      "vite@>=6.2.0 <=6.2.6": ">=6.2.7",
+      "brace-expansion@>=1.0.0 <=1.1.11": ">=1.1.12",
+      "brace-expansion@>=2.0.0 <=2.0.1": ">=2.0.2",
+      "pbkdf2@<=3.1.2": ">=3.1.3",
+      "pbkdf2@>=3.0.10 <=3.1.2": ">=3.1.3",
+      "form-data@>=3.0.0 <3.0.4": ">=3.0.4",
+      "tmp@<=0.2.3": ">=0.2.4",
+      "sha.js@<=2.4.11": ">=2.4.12",
+      "cipher-base@<=1.0.4": ">=1.0.5",
+      "minimatch@<5.0.0": ">=5.0.0",
+      "nodemon": ">=3.0.0",
+      "nodemon>minimatch": "3.1.2",
+      "nodemon>brace-expansion": "1.1.11"
+    },
+    "onlyBuiltDependencies": [
+      "@sentry/cli",
+      "esbuild"
+    ],
+    "ignoredBuiltDependencies": [
+      "@clerk/shared",
+      "core-js-pure"
+    ]
   }
 }

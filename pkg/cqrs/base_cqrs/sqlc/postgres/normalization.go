@@ -300,40 +300,150 @@ func (wc *WorkerConnection) ToSQLite() (*sqlc.WorkerConnection, error) {
 	}
 
 	return &sqlc.WorkerConnection{
-		AccountID:        wc.AccountID,
-		WorkspaceID:      wc.WorkspaceID,
-		AppID:            wc.AppID,
-		ID:               wc.ID,
-		GatewayID:        wc.GatewayID,
-		InstanceID:       wc.InstanceID,
-		Status:           int64(wc.Status),
-		WorkerIp:         wc.WorkerIp,
-		ConnectedAt:      wc.ConnectedAt,
-		LastHeartbeatAt:  lastHeartbeatAt,
-		DisconnectedAt:   disconnectedAt,
-		RecordedAt:       wc.RecordedAt,
-		InsertedAt:       wc.InsertedAt,
-		DisconnectReason: wc.DisconnectReason,
-		GroupHash:        wc.GroupHash,
-		SdkLang:          wc.SdkLang,
-		SdkVersion:       wc.SdkVersion,
-		SdkPlatform:      wc.SdkPlatform,
-		SyncID:           wc.SyncID,
-		AppVersion:       wc.AppVersion,
-		FunctionCount:    int64(wc.FunctionCount),
-		CpuCores:         int64(wc.CpuCores),
-		MemBytes:         wc.MemBytes,
-		Os:               wc.Os,
+		AccountID:            wc.AccountID,
+		WorkspaceID:          wc.WorkspaceID,
+		AppID:                wc.AppID,
+		ID:                   wc.ID,
+		GatewayID:            wc.GatewayID,
+		InstanceID:           wc.InstanceID,
+		Status:               int64(wc.Status),
+		WorkerIp:             wc.WorkerIp,
+		MaxWorkerConcurrency: wc.MaxWorkerConcurrency,
+		ConnectedAt:          wc.ConnectedAt,
+		LastHeartbeatAt:      lastHeartbeatAt,
+		DisconnectedAt:       disconnectedAt,
+		RecordedAt:           wc.RecordedAt,
+		InsertedAt:           wc.InsertedAt,
+		DisconnectReason:     wc.DisconnectReason,
+		GroupHash:            wc.GroupHash,
+		SdkLang:              wc.SdkLang,
+		SdkVersion:           wc.SdkVersion,
+		SdkPlatform:          wc.SdkPlatform,
+		SyncID:               wc.SyncID,
+		AppVersion:           wc.AppVersion,
+		FunctionCount:        int64(wc.FunctionCount),
+		CpuCores:             int64(wc.CpuCores),
+		MemBytes:             wc.MemBytes,
+		Os:                   wc.Os,
 	}, nil
 }
 
 func (r *GetSpansByRunIDRow) ToSQLite() (*sqlc.GetSpansByRunIDRow, error) {
 	return &sqlc.GetSpansByRunIDRow{
+		RunID:         r.RunID,
+		TraceID:       r.TraceID,
 		DynamicSpanID: r.DynamicSpanID,
 		ParentSpanID:  r.ParentSpanID,
 		StartTime:     r.StartTime,
 		EndTime:       r.EndTime,
 		SpanFragments: r.SpanFragments,
+	}, nil
+}
+
+func (r *GetSpansByDebugRunIDRow) ToSQLite() (*sqlc.GetSpansByDebugRunIDRow, error) {
+	return &sqlc.GetSpansByDebugRunIDRow{
+		TraceID:        r.TraceID,
+		RunID:          r.RunID,
+		DebugSessionID: r.DebugSessionID,
+		DynamicSpanID:  r.DynamicSpanID,
+		StartTime:      r.StartTime,
+		EndTime:        r.EndTime,
+		ParentSpanID:   r.ParentSpanID,
+		SpanFragments:  r.SpanFragments,
+	}, nil
+}
+
+func (r *GetSpansByDebugSessionIDRow) ToSQLite() (*sqlc.GetSpansByDebugSessionIDRow, error) {
+	return &sqlc.GetSpansByDebugSessionIDRow{
+		TraceID:       r.TraceID,
+		RunID:         r.RunID,
+		DebugRunID:    r.DebugRunID,
+		DynamicSpanID: r.DynamicSpanID,
+		StartTime:     r.StartTime,
+		EndTime:       r.EndTime,
+		ParentSpanID:  r.ParentSpanID,
+		SpanFragments: r.SpanFragments,
+	}, nil
+}
+
+func (r *GetRunSpanByRunIDRow) ToSQLite() (*sqlc.GetRunSpanByRunIDRow, error) {
+	return &sqlc.GetRunSpanByRunIDRow{
+		RunID:         r.RunID,
+		TraceID:       r.TraceID,
+		DynamicSpanID: r.DynamicSpanID,
+		ParentSpanID:  r.ParentSpanID,
+		StartTime:     r.StartTime,
+		EndTime:       r.EndTime,
+		SpanFragments: r.SpanFragments,
+	}, nil
+}
+
+func (r *GetStepSpanByStepIDRow) ToSQLite() (*sqlc.GetStepSpanByStepIDRow, error) {
+	return &sqlc.GetStepSpanByStepIDRow{
+		RunID:         r.RunID,
+		TraceID:       r.TraceID,
+		DynamicSpanID: r.DynamicSpanID,
+		ParentSpanID:  r.ParentSpanID,
+		StartTime:     r.StartTime,
+		EndTime:       r.EndTime,
+		SpanFragments: r.SpanFragments,
+	}, nil
+}
+
+func (r *GetExecutionSpanByStepIDAndAttemptRow) ToSQLite() (*sqlc.GetExecutionSpanByStepIDAndAttemptRow, error) {
+	return &sqlc.GetExecutionSpanByStepIDAndAttemptRow{
+		RunID:         r.RunID,
+		TraceID:       r.TraceID,
+		DynamicSpanID: r.DynamicSpanID,
+		ParentSpanID:  r.ParentSpanID,
+		StartTime:     r.StartTime,
+		EndTime:       r.EndTime,
+		SpanFragments: r.SpanFragments,
+	}, nil
+}
+
+func (r *GetLatestExecutionSpanByStepIDRow) ToSQLite() (*sqlc.GetLatestExecutionSpanByStepIDRow, error) {
+	return &sqlc.GetLatestExecutionSpanByStepIDRow{
+		RunID:         r.RunID,
+		TraceID:       r.TraceID,
+		DynamicSpanID: r.DynamicSpanID,
+		ParentSpanID:  r.ParentSpanID,
+		StartTime:     r.StartTime,
+		EndTime:       r.EndTime,
+		SpanFragments: r.SpanFragments,
+	}, nil
+}
+
+func (r *GetSpanBySpanIDRow) ToSQLite() (*sqlc.GetSpanBySpanIDRow, error) {
+	return &sqlc.GetSpanBySpanIDRow{
+		RunID:         r.RunID,
+		TraceID:       r.TraceID,
+		DynamicSpanID: r.DynamicSpanID,
+		ParentSpanID:  r.ParentSpanID,
+		StartTime:     r.StartTime,
+		EndTime:       r.EndTime,
+		SpanFragments: r.SpanFragments,
+	}, nil
+}
+
+func (r *GetSpanOutputRow) ToSQLite() (*sqlc.GetSpanOutputRow, error) {
+	var input, output interface{}
+
+	if r.Input.Valid {
+		if err := json.Unmarshal(r.Input.RawMessage, &input); err != nil {
+			return nil, err
+		}
+	}
+
+	if r.Output.Valid {
+		if err := json.Unmarshal(r.Output.RawMessage, &output); err != nil {
+			return nil, err
+		}
+	}
+
+	return &sqlc.GetSpanOutputRow{
+		Input:  input,
+		Output: output,
 	}, nil
 }
 

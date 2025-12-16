@@ -15,8 +15,8 @@ type Queue interface {
 
 	JobQueueReader
 	Migrator
-
-	SetFunctionPaused(ctx context.Context, accountId uuid.UUID, fnID uuid.UUID, paused bool) error
+	Unpauser
+	AttemptResetter
 }
 
 type RunInfo struct {
@@ -29,6 +29,7 @@ type RunInfo struct {
 	// on the same function by limiting the number of continues possible within a given chain.
 	ContinueCount       uint
 	RefilledFromBacklog string
+	CapacityLease       *CapacityLease
 }
 
 // RunFunc represents a function called to process each item in the queue.  This may be
@@ -52,15 +53,16 @@ type EnqueueOpts struct {
 	PassthroughJobId       bool
 	ForceQueueShardName    string
 	NormalizeFromBacklogID string
+	// IdempotencyPerioud allows customizing the idempotency period for this queue
+	// item.  For example, after a debounce queue has been consumed we want to remove
+	// the idempotency key immediately;  the same debounce key should become available
+	// for another debounced function run.
+	IdempotencyPeriod *time.Duration `json:"ip,omitempty"`
 }
 
 type Producer interface {
 	// Enqueue allows an item to be enqueued ton run at the given time.
 	Enqueue(context.Context, Item, time.Time, EnqueueOpts) error
-}
-
-type Enqueuer interface {
-	EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (QueueItem, error)
 }
 
 type Consumer interface {
@@ -81,10 +83,19 @@ type QueueMigrationHandler func(ctx context.Context, qi *QueueItem) error
 type Migrator interface {
 	// SetFunctionMigrate updates the function metadata to signal it's being migrated to
 	// another queue shard
-	SetFunctionMigrate(ctx context.Context, sourceShard string, fnID uuid.UUID, migrate bool) error
+	SetFunctionMigrate(ctx context.Context, sourceShard string, fnID uuid.UUID, migrateLockUntil *time.Time) error
 	// Migration does a peek operation like the normal peek, but ignores leases and other conditions a normal peek cares about.
 	// The sore goal is to grab things and migrate them to somewhere else
 	Migrate(ctx context.Context, shard string, fnID uuid.UUID, limit int64, concurrency int, handler QueueMigrationHandler) (int64, error)
+}
+
+type Unpauser interface {
+	UnpauseFunction(ctx context.Context, shard string, acctID, fnID uuid.UUID) error
+}
+
+// AttemptResetter resets queue item attempts after a successful checkpoint.
+type AttemptResetter interface {
+	ResetAttemptsByJobID(ctx context.Context, shard string, jobID string) error
 }
 
 type QueueDirectAccess interface {
@@ -193,7 +204,8 @@ type alwaysRetry struct {
 func (a alwaysRetry) AlwaysRetryable() {}
 
 func IsAlwaysRetryable(err error) bool {
-	return errors.Is(err, alwaysRetry{})
+	var ar alwaysRetry
+	return errors.As(err, &ar)
 }
 
 type JobResponse struct {

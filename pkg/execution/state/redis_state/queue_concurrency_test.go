@@ -39,23 +39,30 @@ func TestQueuePartitionConcurrency(t *testing.T) {
 	workflowIDs := []uuid.UUID{limit_1, limit_10}
 
 	// Limit function concurrency by workflow ID.
-	pkf := func(ctx context.Context, p QueuePartition) PartitionConcurrencyLimits {
-		switch *p.FunctionID {
+	pkf := func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
+		switch p.FunctionID {
 		case limit_1:
-			return PartitionConcurrencyLimits{
-				AccountLimit:   NoConcurrencyLimit,
-				FunctionLimit:  1,
-				CustomKeyLimit: 1,
+			return PartitionConstraintConfig{
+				Concurrency: PartitionConcurrency{
+					AccountConcurrency:  NoConcurrencyLimit,
+					FunctionConcurrency: 1,
+				},
 			}
 		case limit_10:
-			return PartitionConcurrencyLimits{
-				AccountLimit:   NoConcurrencyLimit,
-				FunctionLimit:  10,
-				CustomKeyLimit: 10,
+			return PartitionConstraintConfig{
+				Concurrency: PartitionConcurrency{
+					AccountConcurrency:  NoConcurrencyLimit,
+					FunctionConcurrency: 10,
+				},
 			}
 		default:
 			// No concurrency, which means use the default concurrency limits.
-			return PartitionConcurrencyLimits{NoConcurrencyLimit, NoConcurrencyLimit, NoConcurrencyLimit}
+			return PartitionConstraintConfig{
+				Concurrency: PartitionConcurrency{
+					AccountConcurrency:  NoConcurrencyLimit,
+					FunctionConcurrency: NoConcurrencyLimit,
+				},
+			}
 		}
 	}
 
@@ -65,7 +72,7 @@ func TestQueuePartitionConcurrency(t *testing.T) {
 	q := NewQueue(
 		QueueShard{RedisClient: NewQueueClient(rc, QueueDefaultKey), Kind: string(enums.QueueShardKindRedis), Name: consts.DefaultQueueShardName},
 		WithNumWorkers(100),
-		WithConcurrencyLimitGetter(pkf),
+		WithPartitionConstraintConfigGetter(pkf),
 		WithQueueLifecycles(ll),
 	)
 

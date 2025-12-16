@@ -3,8 +3,9 @@ package cqrs
 import (
 	"context"
 	"database/sql"
-	"github.com/inngest/inngest/pkg/enums"
 	"time"
+
+	"github.com/inngest/inngest/pkg/enums"
 
 	"github.com/google/uuid"
 )
@@ -46,9 +47,15 @@ type AppReader interface {
 	GetAppByID(ctx context.Context, id uuid.UUID) (*App, error)
 }
 
-type AppWriter interface {
-	// UpsertApp creates or updates an app.
+type AppCreator interface {
+	// UpsertApp creates or updates an app. The conflict key is the ID, which
+	// must always exist.
 	UpsertApp(ctx context.Context, arg UpsertAppParams) (*App, error)
+}
+
+type AppWriter interface {
+	AppCreator
+
 	// UpdateAppError sets an app error.  A nil string
 	// clears the app error.
 	UpdateAppError(ctx context.Context, arg UpdateAppErrorParams) (*App, error)

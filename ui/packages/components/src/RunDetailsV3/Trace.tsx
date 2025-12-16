@@ -2,9 +2,10 @@ import { useRef, useState } from 'react';
 import { RiArrowRightSLine } from '@remixicon/react';
 
 import { InlineSpans } from './InlineSpans';
+import { StepType } from './StepType';
 import { TimelineHeader } from './TimelineHeader';
 import { type Trace } from './types';
-import { FINAL_SPAN_NAME, getSpanName, useStepSelection } from './utils';
+import { getSpanName, traceHasChildren, useStepSelection } from './utils';
 
 type Props = {
   depth: number;
@@ -18,20 +19,12 @@ const INDENT_WIDTH = 40;
 
 export function Trace({ depth, maxTime, minTime, trace, runID }: Props) {
   const [expanded, setExpanded] = useState(true);
-  const { selectStep, selectedStep } = useStepSelection(runID);
+  const { selectStep, selectedStep } = useStepSelection({ runID });
   const expanderRef = useRef<HTMLDivElement>(null);
 
-  //
-  // Don't show single finalization step for successful runs
-  // unless they have children (e.g. failed attempts)
-  const hasChildren =
-    depth === 0 &&
-    trace.childrenSpans?.length === 1 &&
-    trace.childrenSpans[0]?.name === FINAL_SPAN_NAME &&
-    (trace.childrenSpans[0]?.childrenSpans?.length ?? 0) == 0
-      ? false
-      : (trace.childrenSpans?.length ?? 0) > 0;
+  const hasChildren = traceHasChildren(depth, trace);
 
+  const spanName = getSpanName(trace.name);
   return (
     <div className="relative flex w-full flex-col">
       <TimelineHeader trace={trace} minTime={minTime} maxTime={maxTime} />
@@ -44,7 +37,9 @@ export function Trace({ depth, maxTime, minTime, trace, runID }: Props) {
               ? 'bg-secondary-3xSubtle'
               : 'hover:bg-canvasSubtle hover:bg-opacity-60'
           } `}
-          onClick={() => selectStep({ trace, runID })}
+          onClick={() => {
+            selectStep({ trace, runID });
+          }}
         >
           <div
             className="flex w-[30%] flex-row items-center justify-start gap-1 overflow-hidden"
@@ -82,13 +77,13 @@ export function Trace({ depth, maxTime, minTime, trace, runID }: Props) {
                 />
               </div>
             )}
-
+            <StepType stepType={trace.stepType} />
             <div
               className={`text-basis overflow-hidden text-ellipsis whitespace-nowrap text-sm font-normal leading-tight ${
                 !hasChildren && 'pl-1.5'
               }`}
             >
-              {getSpanName(trace.name)}
+              {spanName}
             </div>
           </div>
 

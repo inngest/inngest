@@ -3,20 +3,16 @@ package executor
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"time"
 
 	"github.com/inngest/inngest/pkg/consts"
-	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
-	"github.com/inngest/inngest/pkg/expressions"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
-	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -52,7 +48,6 @@ type runValidator struct {
 func (r *runValidator) validate(ctx context.Context) error {
 	chain := []func(ctx context.Context) error{
 		r.checkStepLimit,
-		r.checkCancellation,
 		r.checkStartTimeout,
 		r.checkFinishTimeout,
 	}
@@ -98,15 +93,20 @@ func (r *runValidator) checkStepLimit(ctx context.Context) error {
 		resp.Err = &gracefulErr
 		resp.SetFinal()
 
-		metrics.IncrRunFinalizedCounter(ctx, metrics.CounterOpt{
-			PkgName: pkgName,
-			Tags: map[string]any{
-				"reason": "validation-step-limit-reached",
+		// This is the function result.
+		if err := r.e.Finalize(ctx, execution.FinalizeOpts{
+			Metadata: r.md,
+			Response: execution.FinalizeResponse{
+				Type:           execution.FinalizeResponseDriver,
+				DriverResponse: resp, // contains the error.
 			},
-		})
-
-		if err := r.e.finalize(ctx, r.md, r.evts, r.f.GetSlug(), r.e.assignedQueueShard, resp, nil); err != nil {
-			l.Error("error running finish handler", "error", err)
+			Optional: execution.FinalizeOptional{
+				FnSlug:      r.f.GetSlug(),
+				InputEvents: r.evts,
+				Reason:      "validation-step-limit-reached",
+			},
+		}); err != nil {
+			l.ReportError(err, "error running finish handler")
 		}
 
 		// Can be reached multiple times for parallel discovery steps
@@ -117,55 +117,6 @@ func (r *runValidator) checkStepLimit(ctx context.Context) error {
 		// Stop the function from running, but don't return an error as we don't
 		// want the step to retry.
 		r.stopWithoutRetry = true
-	}
-	return nil
-}
-
-func (r *runValidator) checkCancellation(ctx context.Context) error {
-	if r.e.cancellationChecker != nil {
-		evt := event.Event{}
-		if err := json.Unmarshal(r.evts[0], &evt); err != nil {
-			return fmt.Errorf("error decoding input event in cancellation checker: %w", err)
-		}
-
-		cancel, err := r.e.cancellationChecker.IsCancelled(
-			ctx,
-			r.md.ID.Tenant.EnvID,
-			r.md.ID.FunctionID,
-			r.md.ID.RunID,
-			evt.Map(),
-		)
-		if err != nil {
-			if errors.Is(err, &expressions.CompileError{}) {
-				logger.StdlibLogger(ctx).Warn(
-					"invalid cancellation expression",
-					"error", err.Error(),
-					"run_id", r.md.ID.RunID,
-					"function_id", r.md.ID.FunctionID,
-					"workspace_id", r.md.ID.Tenant.EnvID,
-				)
-			} else {
-				logger.StdlibLogger(ctx).Error(
-					"error checking cancellation",
-					"error", err.Error(),
-					"run_id", r.md.ID.RunID,
-					"function_id", r.md.ID.FunctionID,
-					"workspace_id", r.md.ID.Tenant.EnvID,
-				)
-			}
-		}
-		if cancel != nil {
-			err = r.e.Cancel(ctx, r.md.ID, execution.CancelRequest{
-				CancellationID: &cancel.ID,
-			})
-			if err != nil {
-				return err
-			}
-
-			// Stop the function from running, but don't return an error as we don't
-			// want the step to retry.
-			r.stopWithoutRetry = true
-		}
 	}
 	return nil
 }
@@ -184,7 +135,6 @@ func (r *runValidator) checkStartTimeout(ctx context.Context) error {
 		}
 	}
 	return nil
-
 }
 
 func (r *runValidator) checkFinishTimeout(ctx context.Context) error {
@@ -209,5 +159,4 @@ func (r *runValidator) checkFinishTimeout(ctx context.Context) error {
 		r.stopWithoutRetry = true
 	}
 	return nil
-
 }

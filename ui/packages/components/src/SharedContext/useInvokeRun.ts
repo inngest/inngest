@@ -1,12 +1,14 @@
 import { useState } from 'react';
 
-import { useShared, type SharedDefinitions } from './SharedContext';
+import { useShared } from './SharedContext';
 
 export interface InvokeRunPayload {
   envID?: string;
   functionSlug: string;
   data: Record<string, unknown>;
   user: Record<string, unknown> | null;
+  debugSessionID?: string;
+  debugRunID?: string;
 }
 export type InvokeRunResult = {
   error?: unknown;

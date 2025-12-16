@@ -1,6 +1,7 @@
 package base_cqrs
 
 import (
+	"crypto/rand"
 	"database/sql"
 	"embed"
 	"fmt"
@@ -19,6 +20,7 @@ import (
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/inngest/inngest/pkg/consts"
 	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/oklog/ulid/v2"
 	_ "modernc.org/sqlite"
 )
 
@@ -28,8 +30,16 @@ var (
 )
 
 type BaseCQRSOptions struct {
-	InMemory bool
+	// Persist indicates that the sqlite db should persist data to disk.
+	// This can be used for the Dev server, testing, and single-node services.
+	Persist bool
+	// ForTest indicates that the database handler is created for testing purposes.
+	// By default database handlers are all singletons, but when this flag is enabled, they will create temporary handlers.
+	//
+	// Only supports with in-memory with sqlite for the moment.
+	ForTest bool
 
+	// PostgresURI declares the postgres connection to connect to a postgres database
 	PostgresURI string
 
 	// The path at which the SQLite database should be stored.
@@ -41,17 +51,16 @@ func New(opts BaseCQRSOptions) (*sql.DB, error) {
 
 	if opts.PostgresURI != "" {
 		if !strings.HasPrefix(opts.PostgresURI, "postgres://") && !strings.HasPrefix(opts.PostgresURI, "postgresql://") {
-			return nil, fmt.Errorf("unsupported database URL: %s", opts.PostgresURI)
+			if u, parseErr := url.Parse(opts.PostgresURI); parseErr == nil {
+				return nil, fmt.Errorf("unsupported database URL: %s", u.Redacted())
+			}
+			return nil, fmt.Errorf("unsupported database URL format")
 		}
 
 		o.Do(func() {
 			db, err = sql.Open("pgx", opts.PostgresURI)
 		})
-	} else if opts.InMemory {
-		o.Do(func() {
-			db, err = sql.Open("sqlite", "file:inngest?mode=memory&cache=shared")
-		})
-	} else {
+	} else if opts.Persist {
 		o.Do(func() {
 			// make the dir if it doesn't exist
 			dir := consts.DefaultInngestConfigDir
@@ -78,6 +87,18 @@ func New(opts BaseCQRSOptions) (*sql.DB, error) {
 
 			db, err = sql.Open("sqlite", fmt.Sprintf("file:%s?cache=shared", file))
 		})
+	} else {
+		// In-memory
+		if opts.ForTest {
+			// initializes a temporary database every time for test purposes
+			dbName := fmt.Sprintf("sqlite_%s", strings.ToLower(ulid.MustNew(ulid.Now(), rand.Reader).String()))
+			db, err = sql.Open("sqlite", fmt.Sprintf("file:%s?mode=memory&cache=shared", dbName))
+		} else {
+			// initialize the db once
+			o.Do(func() {
+				db, err = sql.Open("sqlite", "file:inngest?mode=memory&cache=shared")
+			})
+		}
 	}
 
 	if err != nil {
@@ -120,7 +141,7 @@ func up(db *sql.DB, opts BaseCQRSOptions) error {
 		dbName = "postgres"
 		parsedURL, err := url.Parse(opts.PostgresURI)
 		if err != nil {
-			return fmt.Errorf("error parsing postgres URI to retrieve DB name: %w", err)
+			return fmt.Errorf("error parsing postgres URI to retrieve DB name: invalid format")
 		}
 
 		if parsedURL.Path != "" && parsedURL.Path != "/" {
@@ -150,7 +171,7 @@ func up(db *sql.DB, opts BaseCQRSOptions) error {
 		}
 
 		dbName = "file:inngest?mode=memory&cache=shared"
-		if !opts.InMemory {
+		if opts.Persist {
 			dbName = fmt.Sprintf("file:%s?cache=shared", fmt.Sprintf("%s/%s", consts.DefaultInngestConfigDir, consts.SQLiteDbFileName))
 		}
 	}

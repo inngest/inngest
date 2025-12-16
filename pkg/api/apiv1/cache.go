@@ -3,6 +3,7 @@ package apiv1
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -11,30 +12,32 @@ import (
 	"github.com/eko/gocache/lib/v4/cache"
 	"github.com/eko/gocache/lib/v4/store"
 	rcache "github.com/eko/gocache/store/rueidis/v4"
+	"github.com/go-chi/chi/v5"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/pquerna/cachecontrol/cacheobject"
 	"github.com/redis/rueidis"
 )
 
-func NewRedisCacheMiddleware(r rueidis.Client) CachingMiddleware {
+func NewRedisCacheMiddleware(r rueidis.Client) CachingMiddleware[string] {
 	store := rcache.NewRueidis(r)
-	cache := cache.New[[]byte](store)
+	cache := cache.New[string](store)
 	return NewCacheMiddleware(cache)
 }
 
-func NewCacheMiddleware(cache *cache.Cache[[]byte]) CachingMiddleware {
-	return cacheMiddleware{cache: cache}
+func NewCacheMiddleware[T ~string | ~[]byte](cache *cache.Cache[T]) CachingMiddleware[T] {
+	return cacheMiddleware[T]{cache: cache}
 }
 
-type CachingMiddleware interface {
+type CachingMiddleware[T ~string | ~[]byte] interface {
 	Middleware(next http.Handler) http.Handler
 }
 
-type cacheMiddleware struct {
-	cache *cache.Cache[[]byte]
+type cacheMiddleware[T ~string | ~[]byte] struct {
+	cache *cache.Cache[T]
 }
 
-func (c cacheMiddleware) Middleware(next http.Handler) http.Handler {
+func (c cacheMiddleware[T]) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
@@ -45,12 +48,36 @@ func (c cacheMiddleware) Middleware(next http.Handler) http.Handler {
 			return
 		}
 
+		route := chi.RouteContext(ctx).RoutePattern()
+
 		// Check the cache.
+		// XXX: We need to support both types because freecache does not support storing strings
+		// and gocache's `Get` is buggy with []byte.
+		// https://github.com/eko/gocache/issues/197#issuecomment-1679348756
 		resp, err := c.cache.Get(ctx, *key)
-		if err == nil && len(resp) > 0 {
-			// TODO: Metrics on cache hit.
-			_, _ = w.Write(resp)
-			return
+		if err == nil {
+			var data []byte
+			switch v := any(resp).(type) {
+			case string:
+				if len(v) > 0 {
+					data = []byte(v)
+				}
+			case []byte:
+				if len(v) > 0 {
+					data = v
+				}
+			}
+
+			if len(data) > 0 {
+				metrics.IncrAPICacheHit(ctx, metrics.CounterOpt{
+					PkgName: pkgName,
+					Tags:    map[string]any{"route": route},
+				})
+				_, _ = w.Write(data)
+				return
+			}
+		} else if !errors.Is(err, store.NotFound{}) {
+			logger.StdlibLogger(ctx).Error("error retrieving cache", "error", err, "key", key)
 		}
 
 		// Record the response from the handler itself.
@@ -88,10 +115,20 @@ func (c cacheMiddleware) Middleware(next http.Handler) http.Handler {
 			return
 		}
 
-		if err := c.cache.Set(ctx, *key, body, store.WithExpiration(time.Duration(maxAge)*time.Second)); err != nil {
+		var cacheValue T
+		switch any(cacheValue).(type) {
+		case string:
+			cacheValue = any(rec.Body.String()).(T)
+		case []byte:
+			cacheValue = any(body).(T)
+		}
+		if err := c.cache.Set(ctx, *key, cacheValue, store.WithExpiration(time.Duration(maxAge)*time.Second)); err != nil {
 			logger.StdlibLogger(ctx).Warn("error caching api response", "error", err)
 		}
-		// TODO: Metrics on cache miss.
+		metrics.IncrAPICacheMiss(ctx, metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags:    map[string]any{"route": route},
+		})
 	})
 }
 

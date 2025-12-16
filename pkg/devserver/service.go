@@ -23,6 +23,7 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
+	"github.com/inngest/inngest/pkg/execution/cron"
 	"github.com/inngest/inngest/pkg/execution/history"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/runner"
@@ -83,11 +84,11 @@ type devserver struct {
 
 	// Runner stores the Runner
 	Runner      runner.Runner
-	Tracker     *runner.Tracker
 	State       state.Manager
 	Queue       queue.Queue
 	Executor    execution.Executor
 	publisher   pubsub.Publisher
+	CronSyncer  cron.CronSyncer
 	redisClient rueidis.Client
 
 	Apiservice service.Service
@@ -120,12 +121,21 @@ func (d *devserver) Name() string {
 		return "persistence"
 	}
 
+	if d.Opts.Config.ServerKind == "cloud" {
+		return "inngest"
+	}
+
 	return "devserver"
 }
 
 func (d *devserver) PrettyName() string {
-	if d.Name() != "devserver" {
+	// Single node service should return empty string
+	if d.IsSingleNodeService() {
 		return ""
+	}
+
+	if d.Opts.Config.ServerKind == "cloud" {
+		return "Server"
 	}
 
 	return "Dev Server"
@@ -177,7 +187,11 @@ func (d *devserver) Run(ctx context.Context) error {
 			fmt.Println("")
 			fmt.Println("")
 			fmt.Print(cli.BoldStyle.Render(fmt.Sprintf("\tInngest%s online ", prettyName)))
-			fmt.Printf("%s\n\n", cli.TextStyle.Render(fmt.Sprintf("at %s, visible at the following URLs:", addr)))
+			if d.Opts.NoUI {
+				fmt.Printf("%s\n\n", cli.TextStyle.Render(fmt.Sprintf("at %s, web UI and GraphQL API endpoint disabled:", addr)))
+			} else {
+				fmt.Printf("%s\n\n", cli.TextStyle.Render(fmt.Sprintf("at %s, visible at the following URLs:", addr)))
+			}
 			for n, ip := range localIPs() {
 				style := cli.BoldStyle
 				if n > 0 {
@@ -312,7 +326,7 @@ func (d *devserver) pollSDKs(ctx context.Context) {
 		urls := map[string]struct{}{}
 		if apps, err := d.Data.GetApps(ctx, consts.DevServerEnvID, nil); err == nil {
 			for _, app := range apps {
-				if app.Method == enums.AppMethodConnect.String() {
+				if app.Method == enums.AppMethodConnect.String() || app.Method == enums.AppMethodAPI.String() {
 					continue
 				}
 
@@ -726,8 +740,7 @@ func upsertErroredApp(
 		}
 	}
 
-	appID := inngest.DeterministicAppUUID(appURL)
-	_, err = tx.GetAppByID(ctx, appID)
+	app, err := tx.GetAppByURL(ctx, consts.DevServerEnvID, appURL)
 	if err == sql.ErrNoRows {
 		// App doesn't exist so create it.
 		_, err = tx.UpsertApp(ctx, cqrs.UpsertAppParams{
@@ -735,7 +748,7 @@ func upsertErroredApp(
 				String: pingError.Error(),
 				Valid:  true,
 			},
-			ID:  appID,
+			ID:  inngest.DeterministicAppUUID(appURL),
 			Url: appURL,
 		})
 		if err != nil {
@@ -759,7 +772,7 @@ func upsertErroredApp(
 		return
 	}
 	_, err = tx.UpdateAppError(ctx, cqrs.UpdateAppErrorParams{
-		ID: appID,
+		ID: app.ID,
 		Error: sql.NullString{
 			String: pingError.Error(),
 			Valid:  true,

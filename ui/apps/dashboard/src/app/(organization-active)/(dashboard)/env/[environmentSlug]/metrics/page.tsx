@@ -25,7 +25,7 @@ export default async function MetricsPage({ params: { environmentSlug: envSlug }
         }
       />
       <div id="chart-tooltip" className="z-[1000]" />
-      <div className="bg-canvasSubtle mx-auto flex h-full w-full flex-col">
+      <div className="bg-canvasBase mx-auto flex h-full w-full flex-col">
         <Dashboard envSlug={envSlug} />
       </div>
     </>

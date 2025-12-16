@@ -34,15 +34,15 @@ import (
 type Options struct {
 	Data cqrs.Manager
 
-	Config        config.Config
-	Logger        logger.Logger
-	Runner        runner.Runner
-	Tracker       *runner.Tracker
-	State         state.Manager
-	Queue         queue.JobQueueReader
-	EventHandler  api.EventHandler
-	Executor      execution.Executor
-	HistoryReader history_reader.Reader
+	AuthMiddleware func(http.Handler) http.Handler
+	Config         config.Config
+	Logger         logger.Logger
+	Runner         runner.Runner
+	State          state.Manager
+	Queue          queue.JobQueueReader
+	EventHandler   api.EventHandler
+	Executor       execution.Executor
+	HistoryReader  history_reader.Reader
 
 	// LocalSigningKey is the key used to sign events for self-hosted services.
 	LocalSigningKey string
@@ -53,7 +53,15 @@ type Options struct {
 	// ingesting events will not work.
 	RequireKeys bool
 
+	// DisableGraphQL controls whether GraphQL endpoints are enabled
+	DisableGraphQL *bool
+
 	ConnectOpts connectv0.Opts
+}
+
+func (o Options) isGraphQLEnabled() bool {
+	// Default to true if not explicitly set to false
+	return o.DisableGraphQL == nil || !*o.DisableGraphQL
 }
 
 func NewCoreApi(o Options) (*CoreAPI, error) {
@@ -64,13 +72,12 @@ func NewCoreApi(o Options) (*CoreAPI, error) {
 	}
 
 	a := &CoreAPI{
-		data:    o.Data,
-		config:  o.Config,
-		log:     logger,
-		Router:  chi.NewMux(),
-		runner:  o.Runner,
-		tracker: o.Tracker,
-		state:   o.State,
+		data:   o.Data,
+		config: o.Config,
+		log:    logger,
+		Router: chi.NewMux(),
+		runner: o.Runner,
+		state:  o.State,
 	}
 
 	cors := cors.New(cors.Options{
@@ -87,43 +94,50 @@ func NewCoreApi(o Options) (*CoreAPI, error) {
 		}),
 	)
 
-	srv := handler.NewDefaultServer(generated.NewExecutableSchema(generated.Config{Resolvers: &resolvers.Resolver{
-		Data:            o.Data,
-		HistoryReader:   o.HistoryReader,
-		Runner:          o.Runner,
-		Queue:           o.Queue,
-		EventHandler:    o.EventHandler,
-		Executor:        o.Executor,
-		ServerKind:      o.Config.GetServerKind(),
-		LocalSigningKey: o.LocalSigningKey,
-		RequireKeys:     o.RequireKeys,
-	}}))
+	if o.isGraphQLEnabled() {
+		a.resolver = &resolvers.Resolver{
+			Data:            o.Data,
+			HistoryReader:   o.HistoryReader,
+			Runner:          o.Runner,
+			Queue:           o.Queue,
+			EventHandler:    o.EventHandler,
+			Executor:        o.Executor,
+			ServerKind:      o.Config.GetServerKind(),
+			LocalSigningKey: o.LocalSigningKey,
+			RequireKeys:     o.RequireKeys,
+		}
+		srv := handler.NewDefaultServer(generated.NewExecutableSchema(generated.Config{Resolvers: a.resolver}))
 
-	// TODO - Add option for enabling GraphQL Playground
-	a.Handle("/", playground.Handler("GraphQL playground", "/v0/gql"))
-	a.Handle("/gql", srv)
+		// TODO - Add option for enabling GraphQL Playground
+		a.Handle("/", playground.Handler("GraphQL playground", "/v0/gql"))
+		a.Handle("/gql", srv)
+	}
 
 	// V0 APIs
-	a.Delete("/runs/{runID}", a.CancelRun)
+	a.With(o.AuthMiddleware).Delete("/runs/{runID}", a.CancelRun)
 	// NOTE: These are present in the 2.x and 3.x SDKs to enable large payload sizes.
-	a.Get("/runs/{runID}/batch", a.GetEventBatch)
-	a.Get("/runs/{runID}/actions", a.GetActions)
-	a.Post("/telemetry", a.TrackEvent)
+	a.With(o.AuthMiddleware).Get("/runs/{runID}/batch", a.GetEventBatch)
+	a.With(o.AuthMiddleware).Get("/runs/{runID}/actions", a.GetActions)
+	a.With(o.AuthMiddleware).Post("/telemetry", a.TrackEvent)
 
-	a.Mount("/connect", connectv0.New(a, o.ConnectOpts))
+	a.With(o.AuthMiddleware).Mount("/connect", connectv0.New(a, o.ConnectOpts))
 
 	return a, nil
 }
 
 type CoreAPI struct {
 	chi.Router
-	data    cqrs.Manager
-	config  config.Config
-	log     logger.Logger
-	server  *http.Server
-	state   state.Manager
-	runner  runner.Runner
-	tracker *runner.Tracker
+	data     cqrs.Manager
+	config   config.Config
+	log      logger.Logger
+	server   *http.Server
+	state    state.Manager
+	runner   runner.Runner
+	resolver *resolvers.Resolver
+}
+
+func (a *CoreAPI) Resolver() *resolvers.Resolver {
+	return a.resolver
 }
 
 func (a *CoreAPI) Start(ctx context.Context) error {

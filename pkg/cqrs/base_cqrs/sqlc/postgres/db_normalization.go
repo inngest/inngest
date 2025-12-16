@@ -4,14 +4,28 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"math"
+	"time"
 
 	"github.com/google/uuid"
 	sqlc_sqlite "github.com/inngest/inngest/pkg/cqrs/base_cqrs/sqlc/sqlite"
 	"github.com/oklog/ulid/v2"
 )
 
-func NewNormalized(db DBTX) sqlc_sqlite.Querier {
+type NewNormalizedOpts struct {
+	MaxIdleConns    int
+	MaxOpenConns    int
+	ConnMaxIdle     int
+	ConnMaxLifetime int
+}
+
+func NewNormalized(db DBTX, o NewNormalizedOpts) sqlc_sqlite.Querier {
+	if sqlDB, ok := db.(*sql.DB); ok {
+		sqlDB.SetMaxIdleConns(o.MaxIdleConns)
+		sqlDB.SetMaxOpenConns(o.MaxOpenConns)
+		sqlDB.SetConnMaxIdleTime(time.Duration(o.ConnMaxIdle) * time.Minute)
+		sqlDB.SetConnMaxLifetime(time.Duration(o.ConnMaxLifetime) * time.Minute)
+	}
+
 	return &NormalizedQueries{db: New(db)}
 }
 
@@ -34,31 +48,32 @@ func (q NormalizedQueries) GetWorkerConnection(ctx context.Context, arg sqlc_sql
 
 func (q NormalizedQueries) InsertWorkerConnection(ctx context.Context, arg sqlc_sqlite.InsertWorkerConnectionParams) error {
 	err := q.db.InsertWorkerConnection(ctx, InsertWorkerConnectionParams{
-		AccountID:        arg.AccountID,
-		WorkspaceID:      arg.WorkspaceID,
-		AppName:          arg.AppName,
-		AppID:            arg.AppID,
-		ID:               arg.ID,
-		GatewayID:        arg.GatewayID,
-		InstanceID:       arg.InstanceID,
-		Status:           int16(arg.Status),
-		WorkerIp:         arg.WorkerIp,
-		ConnectedAt:      arg.ConnectedAt,
-		LastHeartbeatAt:  arg.LastHeartbeatAt,
-		DisconnectedAt:   arg.DisconnectedAt,
-		RecordedAt:       arg.RecordedAt,
-		InsertedAt:       arg.InsertedAt,
-		DisconnectReason: arg.DisconnectReason,
-		GroupHash:        arg.GroupHash,
-		SdkLang:          arg.SdkLang,
-		SdkVersion:       arg.SdkVersion,
-		SdkPlatform:      arg.SdkPlatform,
-		SyncID:           arg.SyncID,
-		AppVersion:       arg.AppVersion,
-		FunctionCount:    int32(arg.FunctionCount),
-		CpuCores:         int32(arg.CpuCores),
-		MemBytes:         arg.MemBytes,
-		Os:               arg.Os,
+		AccountID:            arg.AccountID,
+		WorkspaceID:          arg.WorkspaceID,
+		AppName:              arg.AppName,
+		AppID:                arg.AppID,
+		ID:                   arg.ID,
+		GatewayID:            arg.GatewayID,
+		InstanceID:           arg.InstanceID,
+		Status:               int16(arg.Status),
+		WorkerIp:             arg.WorkerIp,
+		MaxWorkerConcurrency: arg.MaxWorkerConcurrency,
+		ConnectedAt:          arg.ConnectedAt,
+		LastHeartbeatAt:      arg.LastHeartbeatAt,
+		DisconnectedAt:       arg.DisconnectedAt,
+		RecordedAt:           arg.RecordedAt,
+		InsertedAt:           arg.InsertedAt,
+		DisconnectReason:     arg.DisconnectReason,
+		GroupHash:            arg.GroupHash,
+		SdkLang:              arg.SdkLang,
+		SdkVersion:           arg.SdkVersion,
+		SdkPlatform:          arg.SdkPlatform,
+		SyncID:               arg.SyncID,
+		AppVersion:           arg.AppVersion,
+		FunctionCount:        int32(arg.FunctionCount),
+		CpuCores:             int32(arg.CpuCores),
+		MemBytes:             arg.MemBytes,
+		Os:                   arg.Os,
 	})
 	if err != nil {
 		return err
@@ -433,59 +448,6 @@ func (q NormalizedQueries) GetEventsByInternalIDs(ctx context.Context, ids []uli
 	return sqliteEvents, nil
 }
 
-func (q NormalizedQueries) WorkspaceEvents(ctx context.Context, params sqlc_sqlite.WorkspaceEventsParams) ([]*sqlc_sqlite.Event, error) {
-	// Keep CodeQL happy
-	if params.Limit > math.MaxInt32 || params.Limit < math.MinInt32 {
-		return nil, fmt.Errorf("limit must be a valid int32")
-	}
-
-	pgParams := WorkspaceEventsParams{
-		InternalID:   params.Cursor,
-		ReceivedAt:   params.Before,
-		ReceivedAt_2: params.After,
-		Limit:        int32(params.Limit),
-	}
-
-	events, err := q.db.WorkspaceEvents(ctx, pgParams)
-	if err != nil {
-		return nil, err
-	}
-
-	sqliteEvents := make([]*sqlc_sqlite.Event, len(events))
-	for i, event := range events {
-		sqliteEvents[i], _ = event.ToSQLite()
-	}
-
-	return sqliteEvents, nil
-}
-
-func (q NormalizedQueries) WorkspaceNamedEvents(ctx context.Context, params sqlc_sqlite.WorkspaceNamedEventsParams) ([]*sqlc_sqlite.Event, error) {
-	// Keep CodeQL happy
-	if params.Limit > math.MaxInt32 || params.Limit < math.MinInt32 {
-		return nil, fmt.Errorf("limit must be a valid int32")
-	}
-
-	pgParams := WorkspaceNamedEventsParams{
-		InternalID:   params.Cursor,
-		ReceivedAt:   params.Before,
-		ReceivedAt_2: params.After,
-		EventName:    params.Name,
-		Limit:        int32(params.Limit),
-	}
-
-	events, err := q.db.WorkspaceNamedEvents(ctx, pgParams)
-	if err != nil {
-		return nil, err
-	}
-
-	sqliteEvents := make([]*sqlc_sqlite.Event, len(events))
-	for i, event := range events {
-		sqliteEvents[i], _ = event.ToSQLite()
-	}
-
-	return sqliteEvents, nil
-}
-
 func (q NormalizedQueries) GetEventsIDbound(ctx context.Context, params sqlc_sqlite.GetEventsIDboundParams) ([]*sqlc_sqlite.Event, error) {
 	pgParams := GetEventsIDboundParams{
 		InternalID:   params.After,
@@ -729,6 +691,20 @@ func (q NormalizedQueries) GetTraceSpanOutput(ctx context.Context, arg sqlc_sqli
 	return sqliteTraces, nil
 }
 
+func (q NormalizedQueries) GetTraceRunsByTriggerId(ctx context.Context, eventID string) ([]*sqlc_sqlite.TraceRun, error) {
+	traces, err := q.db.GetTraceRunsByTriggerId(ctx, eventID)
+	if err != nil {
+		return nil, err
+	}
+
+	sqliteTraces := make([]*sqlc_sqlite.TraceRun, len(traces))
+	for i, trace := range traces {
+		sqliteTraces[i], _ = trace.ToSQLite()
+	}
+
+	return sqliteTraces, nil
+}
+
 func (q NormalizedQueries) InsertFunctionFinish(ctx context.Context, arg sqlc_sqlite.InsertFunctionFinishParams) error {
 	var completedStepCount int32
 	if arg.CompletedStepCount.Valid {
@@ -787,28 +763,115 @@ func (q NormalizedQueries) GetSpansByRunID(ctx context.Context, runID string) ([
 	return sqliteRows, nil
 }
 
-func (q NormalizedQueries) GetSpanOutput(ctx context.Context, spanID string) (any, error) {
-	// TODO
-	return nil, nil
+func (q NormalizedQueries) GetSpansByDebugRunID(ctx context.Context, debugRunID sql.NullString) ([]*sqlc_sqlite.GetSpansByDebugRunIDRow, error) {
+	rows, err := q.db.GetSpansByDebugRunID(ctx, debugRunID.String)
+	if err != nil {
+		return nil, err
+	}
+
+	sqliteRows := make([]*sqlc_sqlite.GetSpansByDebugRunIDRow, len(rows))
+	for i, row := range rows {
+		sqliteRows[i], _ = row.ToSQLite()
+	}
+
+	return sqliteRows, nil
+}
+
+func (q NormalizedQueries) GetSpansByDebugSessionID(ctx context.Context, debugSessionID sql.NullString) ([]*sqlc_sqlite.GetSpansByDebugSessionIDRow, error) {
+	rows, err := q.db.GetSpansByDebugSessionID(ctx, debugSessionID.String)
+	if err != nil {
+		return nil, err
+	}
+
+	sqliteRows := make([]*sqlc_sqlite.GetSpansByDebugSessionIDRow, len(rows))
+	for i, row := range rows {
+		sqliteRows[i], _ = row.ToSQLite()
+	}
+
+	return sqliteRows, nil
+}
+
+func (q NormalizedQueries) GetRunSpanByRunID(ctx context.Context, args sqlc_sqlite.GetRunSpanByRunIDParams) (*sqlc_sqlite.GetRunSpanByRunIDRow, error) {
+	row, err := q.db.GetRunSpanByRunID(ctx, GetRunSpanByRunIDParams(args))
+	if err != nil {
+		return nil, err
+	}
+
+	return row.ToSQLite()
+}
+
+func (q NormalizedQueries) GetStepSpanByStepID(ctx context.Context, args sqlc_sqlite.GetStepSpanByStepIDParams) (*sqlc_sqlite.GetStepSpanByStepIDRow, error) {
+	row, err := q.db.GetStepSpanByStepID(ctx, GetStepSpanByStepIDParams(args))
+	if err != nil {
+		return nil, err
+	}
+
+	return row.ToSQLite()
+}
+
+func (q NormalizedQueries) GetExecutionSpanByStepIDAndAttempt(ctx context.Context, args sqlc_sqlite.GetExecutionSpanByStepIDAndAttemptParams) (*sqlc_sqlite.GetExecutionSpanByStepIDAndAttemptRow, error) {
+	row, err := q.db.GetExecutionSpanByStepIDAndAttempt(ctx, GetExecutionSpanByStepIDAndAttemptParams(args))
+	if err != nil {
+		return nil, err
+	}
+
+	return row.ToSQLite()
+}
+
+func (q NormalizedQueries) GetLatestExecutionSpanByStepID(ctx context.Context, args sqlc_sqlite.GetLatestExecutionSpanByStepIDParams) (*sqlc_sqlite.GetLatestExecutionSpanByStepIDRow, error) {
+	row, err := q.db.GetLatestExecutionSpanByStepID(ctx, GetLatestExecutionSpanByStepIDParams(args))
+	if err != nil {
+		return nil, err
+	}
+
+	return row.ToSQLite()
+}
+
+func (q NormalizedQueries) GetSpanBySpanID(ctx context.Context, args sqlc_sqlite.GetSpanBySpanIDParams) (*sqlc_sqlite.GetSpanBySpanIDRow, error) {
+	row, err := q.db.GetSpanBySpanID(ctx, GetSpanBySpanIDParams(args))
+	if err != nil {
+		return nil, err
+	}
+
+	return row.ToSQLite()
+}
+
+func (q NormalizedQueries) GetSpanOutput(ctx context.Context, spanIds []string) ([]*sqlc_sqlite.GetSpanOutputRow, error) {
+	rows, err := q.db.GetSpanOutput(ctx, spanIds)
+	if err != nil {
+		return nil, err
+	}
+
+	sqliteRows := make([]*sqlc_sqlite.GetSpanOutputRow, len(rows))
+	for i, row := range rows {
+		sqliteRows[i], _ = row.ToSQLite()
+	}
+
+	return sqliteRows, nil
 }
 
 func (q NormalizedQueries) InsertSpan(ctx context.Context, arg sqlc_sqlite.InsertSpanParams) error {
 	pgArg := InsertSpanParams{
-		AccountID:     arg.AccountID,
-		AppID:         arg.AppID,
-		Attributes:    toNullRawMessage(arg.Attributes),
-		DynamicSpanID: arg.DynamicSpanID,
-		EndTime:       arg.EndTime,
-		EnvID:         arg.EnvID,
-		FunctionID:    arg.FunctionID,
-		Links:         toNullRawMessage(arg.Links),
-		Name:          arg.Name,
-		Output:        toNullRawMessage(arg.Output),
-		ParentSpanID:  arg.ParentSpanID,
-		RunID:         arg.RunID,
-		SpanID:        arg.SpanID,
-		StartTime:     arg.StartTime,
-		TraceID:       arg.TraceID,
+		AccountID:      arg.AccountID,
+		AppID:          arg.AppID,
+		Attributes:     toNullRawMessage(arg.Attributes),
+		DynamicSpanID:  arg.DynamicSpanID,
+		EndTime:        arg.EndTime,
+		EnvID:          arg.EnvID,
+		FunctionID:     arg.FunctionID,
+		Links:          toNullRawMessage(arg.Links),
+		Name:           arg.Name,
+		Output:         toNullRawMessage(arg.Output),
+		ParentSpanID:   arg.ParentSpanID,
+		RunID:          arg.RunID,
+		SpanID:         arg.SpanID,
+		StartTime:      arg.StartTime,
+		TraceID:        arg.TraceID,
+		Input:          toNullRawMessage(arg.Input),
+		DebugRunID:     arg.DebugRunID,
+		DebugSessionID: arg.DebugSessionID,
+		Status:         arg.Status,
+		EventIds:       toNullRawMessage(arg.EventIds),
 	}
 
 	return q.db.InsertSpan(ctx, pgArg)

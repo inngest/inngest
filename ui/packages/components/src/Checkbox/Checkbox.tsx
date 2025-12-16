@@ -12,7 +12,7 @@ export function Checkbox({
   return (
     <CheckboxPrimitive.Root
       className={cn(
-        'data-[state=checked]:border-primary-moderate data-[state=checked]:bg-primary-moderate hover:border-contrast border-muted bg-canvasSubtle disabled:border-muted disabled:bg-subtle flex h-5 w-5 items-center justify-center rounded border outline-none transition-all',
+        'data-[state=checked]:border-primary-moderate data-[state=checked]:bg-primary-moderate hover:border-contrast border-muted bg-canvasSubtle disabled:border-muted disabled:bg-subtle flex h-5 w-5 items-center justify-center rounded-sm border outline-none transition-all',
         className
       )}
       {...props}
@@ -38,7 +38,7 @@ export function LabeledCheckbox({
     <div className="items-top flex gap-2">
       <CheckboxPrimitive.Root
         className={cn(
-          'data-[state=checked]:border-primary-moderate data-[state=checked]:bg-primary-moderate hover:border-contrast border-muted bg-canvasSubtle disabled:border-muted disabled:bg-subtle flex h-5 w-5 items-center justify-center rounded border outline-none transition-all',
+          'data-[state=checked]:border-primary-moderate data-[state=checked]:bg-primary-moderate hover:border-contrast border-muted bg-canvasSubtle disabled:border-muted disabled:bg-subtle flex h-5 w-5 items-center justify-center rounded-sm border outline-none transition-all',
           className
         )}
         id={id}

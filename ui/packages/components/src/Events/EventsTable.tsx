@@ -1,14 +1,14 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState, type UIEventHandler } from 'react';
-import type { Route } from 'next';
 import dynamic from 'next/dynamic';
 import { Button } from '@inngest/components/Button';
 import { ErrorCard } from '@inngest/components/Error/ErrorCard';
 import TableBlankState from '@inngest/components/EventTypes/TableBlankState';
 import { TimeFilter } from '@inngest/components/Filter/TimeFilter';
+import { InfiniteScrollTrigger } from '@inngest/components/InfiniteScrollTrigger/InfiniteScrollTrigger';
 import { Pill } from '@inngest/components/Pill';
-import NewTable from '@inngest/components/Table/NewTable';
+import { Table } from '@inngest/components/Table';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip/Tooltip';
 import {
   DEFAULT_TIME,
@@ -23,6 +23,8 @@ import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 
 import type { RangeChangeProps } from '../DatePicker/RangePicker';
 import EntityFilter from '../Filter/EntityFilter';
+import { useShared } from '../SharedContext/SharedContext';
+import { usePathCreator } from '../SharedContext/usePathCreator';
 import {
   useBatchedSearchParams,
   useBooleanSearchParam,
@@ -30,6 +32,7 @@ import {
   useStringArraySearchParam,
 } from '../hooks/useSearchParam';
 import type { Features } from '../types/features';
+import { parseCelSearchError } from '../utils/searchErrorParser';
 import { EventDetails } from './EventDetails';
 import TotalCount from './TotalCount';
 import { useColumns } from './columns';
@@ -45,11 +48,12 @@ export function EventsTable({
   getEventTypes,
   eventNames,
   singleEventTypePage,
-  pathCreator,
   emptyActions,
   expandedRowActions,
   features,
   standalone = false,
+  pollInterval,
+  autoRefresh,
 }: {
   emptyActions: React.ReactNode;
   expandedRowActions: ({
@@ -59,11 +63,6 @@ export function EventsTable({
     eventName?: string;
     payload?: string;
   }) => React.ReactNode;
-  pathCreator: {
-    eventType: (params: { eventName: string }) => Route;
-    runPopout: (params: { runID: string }) => Route;
-    eventPopout: (params: { eventID: string }) => Route;
-  };
   getEvents: ({
     cursor,
     eventNames,
@@ -83,12 +82,16 @@ export function EventsTable({
   }) => Promise<{ events: Event[]; pageInfo: PageInfo; totalCount: number }>;
   getEventDetails: ({ eventID }: { eventID: string }) => Promise<Event>;
   getEventPayload: ({ eventID }: { eventID: string }) => Promise<Pick<Event, 'payload'>>;
-  getEventTypes: () => Promise<Required<Pick<EventType, 'name' | 'id'>>[]>;
+  getEventTypes?: () => Promise<Required<Pick<EventType, 'name' | 'id'>>[]>;
   eventNames?: string[];
   singleEventTypePage?: boolean;
   features: Pick<Features, 'history'>;
   standalone?: boolean;
+  pollInterval?: number;
+  autoRefresh?: boolean;
 }) {
+  const { pathCreator } = usePathCreator();
+  const { cloud } = useShared();
   const columns = useColumns({ pathCreator, singleEventTypePage });
   const [showSearch, setShowSearch] = useState(false);
   const [lastDays] = useSearchParam('last');
@@ -127,6 +130,7 @@ export function EventsTable({
     data: eventsData,
     isFetching,
     refetch,
+    isRefetching,
     isFetchingNextPage,
   } = useInfiniteQuery({
     queryKey: [
@@ -137,7 +141,7 @@ export function EventsTable({
         startTime: calculatedStartTime.toISOString(),
         endTime: endTime ?? null,
         celQuery: search,
-        includeInternalEvents: includeInternalEvents ?? true,
+        includeInternalEvents: singleEventTypePage || (includeInternalEvents ?? false),
       },
     ],
     queryFn: ({ pageParam }: { pageParam: string | null }) =>
@@ -148,7 +152,7 @@ export function EventsTable({
         startTime: calculatedStartTime.toISOString(),
         endTime: endTime ?? null,
         celQuery: search,
-        includeInternalEvents,
+        includeInternalEvents: singleEventTypePage || (includeInternalEvents ?? false),
       }),
     getNextPageParam: (lastPage) => {
       if (!lastPage || !lastPage.pageInfo.hasNextPage) {
@@ -157,12 +161,15 @@ export function EventsTable({
       return lastPage.pageInfo.endCursor;
     },
     initialPageParam: null,
+    refetchInterval: autoRefresh ? pollInterval : false,
     select: (data) => ({
       ...data,
       events: data.pages.flatMap((page) => page.events),
       totalCount: data.pages[data.pages.length - 1]?.totalCount ?? 0,
     }),
   });
+
+  const searchError = parseCelSearchError(error);
   /* TODO: Find out what to do with the event types filter, since it will affect performance */
 
   // const { data: eventTypesData } = useQuery({
@@ -220,58 +227,60 @@ export function EventsTable({
 
   const hasEventsData = eventsData?.events && eventsData?.events.length > 0;
 
-  const onScroll: UIEventHandler<HTMLDivElement> = useCallback(
-    (event) => {
-      if (hasEventsData && hasNextPage) {
-        const { scrollHeight, scrollTop, clientHeight } = event.target as HTMLDivElement;
-
-        // Check if scrolled to the bottom
-        const reachedBottom = scrollHeight - scrollTop - clientHeight < 200;
-        if (reachedBottom && !isFetching && !isFetchingNextPage) {
-          fetchNextPage();
-        }
-      }
-    },
-    [fetchNextPage, hasNextPage, isFetchingNextPage, hasEventsData, isFetching]
-  );
-
-  if (error) {
+  if (error && !searchError) {
     return <ErrorCard error={error} reset={() => refetch()} />;
   }
 
   return (
-    <div className="bg-canvasBase text-basis no-scrollbar flex-1 overflow-hidden focus-visible:outline-none">
+    <div className="bg-canvasBase text-basis no-scrollbar flex flex-1 flex-col overflow-hidden focus-visible:outline-none">
       <div className="bg-canvasBase sticky top-0 z-10">
-        <div className="m-3 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
+        <div className="mx-3 flex h-11 items-center justify-between gap-1.5">
+          <div className="flex items-center gap-1.5">
             {/* <EntityFilter
               type="event"
               onFilterChange={onEventFilterChange}
               selectedEntities={filteredEvent ?? []}
               entities={eventTypesData ?? []}
             /> */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  disabled
-                  icon={<RiSearchLine />}
-                  size="large"
-                  iconSide="left"
-                  appearance="outlined"
-                  label={showSearch ? 'Hide search' : 'Show search'}
-                  onClick={() => setShowSearch((prev) => !prev)}
-                  className={cn(
-                    search
-                      ? 'after:bg-secondary-moderate after:mb-3 after:ml-0.5 after:h-2 after:w-2 after:rounded'
-                      : ''
-                  )}
-                />
-              </TooltipTrigger>
-              <TooltipContent>Coming soon</TooltipContent>
-            </Tooltip>
-            <TotalCount totalCount={eventsData?.totalCount} />
-          </div>
-          <div className="flex">
+            {/* TODO: Remove disabled prop when search is implemented in Dev Server */}
+            {cloud ? (
+              <Button
+                icon={<RiSearchLine />}
+                size="small"
+                kind="secondary"
+                iconSide="left"
+                appearance="outlined"
+                label={showSearch ? 'Hide search' : 'Show search'}
+                onClick={() => setShowSearch((prev) => !prev)}
+                className={cn(
+                  search
+                    ? 'after:bg-secondary-moderate after:mb-3 after:ml-0.5 after:h-2 after:w-2 after:rounded'
+                    : '',
+                  'h-[26px] w-[103px] rounded'
+                )}
+              />
+            ) : (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    disabled
+                    icon={<RiSearchLine />}
+                    size="small"
+                    kind="secondary"
+                    iconSide="left"
+                    appearance="outlined"
+                    label={showSearch ? 'Hide search' : 'Show search'}
+                    onClick={() => setShowSearch((prev) => !prev)}
+                    className={cn(
+                      search
+                        ? 'after:bg-secondary-moderate after:mb-3 after:ml-0.5 after:h-2 after:w-2 after:rounded'
+                        : ''
+                    )}
+                  />
+                </TooltipTrigger>
+                <TooltipContent>Coming soon</TooltipContent>
+              </Tooltip>
+            )}
             <TimeFilter
               daysAgoMax={features.history}
               onDaysChange={onDaysChange}
@@ -294,6 +303,9 @@ export function EventsTable({
               }
             />
           </div>
+          <div className="flex">
+            <TotalCount totalCount={eventsData?.totalCount} />
+          </div>
         </div>
         {showSearch && (
           <>
@@ -308,7 +320,7 @@ export function EventsTable({
                 icon={<RiArrowRightUpLine />}
                 iconSide="right"
                 size="small"
-                // TODO: Create "Inspecting an event" doc in Monitor
+                target="_blank"
                 href="https://www.inngest.com/docs/platform/monitor/inspecting-events?ref=events-table"
               />
             </div>
@@ -317,30 +329,33 @@ export function EventsTable({
                 onSearch={onSearchChange}
                 placeholder="event.data.userId == “1234” or event.data.billingPlan == 'Enterprise'"
                 value={search}
+                preset="events"
+                searchError={searchError}
               />
             </div>
           </>
         )}
       </div>
 
-      <div className="h-[calc(100%-58px)] overflow-y-auto" onScroll={onScroll} ref={containerRef}>
-        <NewTable
+      <div className="flex-1 overflow-y-auto" ref={containerRef}>
+        <Table
           columns={columns}
           data={eventsData?.events || []}
-          isLoading={isPending || (isFetching && !isFetchingNextPage)}
+          isLoading={isPending || (isFetching && !isFetchingNextPage && !isRefetching)}
           blankState={<TableBlankState actions={emptyActions} />}
           renderSubComponent={({ row }) => {
             const { id, name, runs } = row.original;
             const initialData: Pick<Event, 'name' | 'runs'> = { name, runs };
             return (
               <EventDetails
-                pathCreator={pathCreator}
                 initialData={initialData}
                 getEventDetails={getEventDetails}
                 getEventPayload={getEventPayload}
                 expandedRowActions={expandedRowActions}
                 standalone={standalone}
                 eventID={id}
+                pollInterval={pollInterval}
+                autoRefresh={autoRefresh}
               />
             );
           }}
@@ -356,6 +371,12 @@ export function EventsTable({
               });
             }
           }}
+        />
+        <InfiniteScrollTrigger
+          onIntersect={fetchNextPage}
+          hasMore={hasNextPage ?? false}
+          isLoading={isFetching || isFetchingNextPage}
+          root={containerRef.current}
         />
         {!hasNextPage && hasEventsData && isScrollable && !isFetchingNextPage && !isFetching && (
           <div className="flex flex-col items-center pb-4 pt-8">

@@ -1,4 +1,5 @@
 import 'server-only';
+import { getBooleanFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
 import { graphql } from '@/gql';
 import {
   type EntitlementUsageQuery,
@@ -31,8 +32,165 @@ export const entitlementUsageDocument = graphql(`
           purchaseCount
           quantityPer
         }
+        advancedObservability {
+          available
+          name
+          price
+          purchased
+          entitlements {
+            history {
+              limit
+            }
+            metricsExportFreshness {
+              limit
+            }
+            metricsExportGranularity {
+              limit
+            }
+          }
+        }
+        slackChannel {
+          available
+          baseValue
+          maxValue
+          name
+          price
+          purchaseCount
+          quantityPer
+        }
+        connectWorkers {
+          available
+          baseValue
+          maxValue
+          name
+          price
+          purchaseCount
+          quantityPer
+        }
       }
       entitlements {
+        # Disable entitlements here as it queries the usage table as well - see monorepo for now
+        #executions {
+        # DISABLE USAGE FOR NOW - SEE EXE-1011
+        #usage
+        #  limit
+        #  overageAllowed
+        #}
+        runCount {
+          #usage
+          limit
+          overageAllowed
+        }
+        stepCount {
+          #usage
+          limit
+          overageAllowed
+        }
+        concurrency {
+          #usage
+          limit
+        }
+        eventSize {
+          limit
+        }
+        history {
+          limit
+        }
+        userCount {
+          usage
+          limit
+        }
+        hipaa {
+          enabled
+        }
+        metricsExport {
+          enabled
+        }
+        metricsExportFreshness {
+          limit
+        }
+        metricsExportGranularity {
+          limit
+        }
+        slackChannel {
+          enabled
+        }
+        connectWorkerConnections {
+          limit
+        }
+      }
+      plan {
+        name
+      }
+    }
+  }
+`);
+
+export const entitlementUsageWithMetricsDocument = graphql(`
+  query EntitlementUsageWithMetrics {
+    account {
+      id
+      addons {
+        concurrency {
+          available
+          baseValue
+          maxValue
+          name
+          price
+          purchaseCount
+          quantityPer
+        }
+        userCount {
+          available
+          baseValue
+          maxValue
+          name
+          price
+          purchaseCount
+          quantityPer
+        }
+        advancedObservability {
+          available
+          name
+          price
+          purchased
+          entitlements {
+            history {
+              limit
+            }
+            metricsExportFreshness {
+              limit
+            }
+            metricsExportGranularity {
+              limit
+            }
+          }
+        }
+        slackChannel {
+          available
+          baseValue
+          maxValue
+          name
+          price
+          purchaseCount
+          quantityPer
+        }
+        connectWorkers {
+          available
+          baseValue
+          maxValue
+          name
+          price
+          purchaseCount
+          quantityPer
+        }
+      }
+      entitlements {
+        executions {
+          usage
+          limit
+          overageAllowed
+        }
         runCount {
           usage
           limit
@@ -69,6 +227,12 @@ export const entitlementUsageDocument = graphql(`
         metricsExportGranularity {
           limit
         }
+        slackChannel {
+          enabled
+        }
+        connectWorkerConnections {
+          limit
+        }
       }
       plan {
         name
@@ -79,7 +243,19 @@ export const entitlementUsageDocument = graphql(`
 
 export const entitlementUsage = async () => {
   try {
-    const res = await graphqlAPI.request<EntitlementUsageQuery>(entitlementUsageDocument);
+    // Check feature flag to determine which query to use
+    const usageMetricsCacheEnabled = await getBooleanFlag('usage-metrics-db-cache', {
+      defaultValue: false,
+    });
+
+    let res;
+    if (usageMetricsCacheEnabled) {
+      // Use the query with cached usage metrics
+      res = await graphqlAPI.request<EntitlementUsageQuery>(entitlementUsageWithMetricsDocument);
+    } else {
+      // Use the existing query without usage fields
+      res = await graphqlAPI.request<EntitlementUsageQuery>(entitlementUsageDocument);
+    }
 
     // TODO: Replace this with a proper programmatic check. Relying on the plan
     // name is fragile.
@@ -139,10 +315,23 @@ export const currentPlanDocument = graphql(`
             purchaseCount
             quantityPer
           }
+          slackChannel {
+            available
+            price
+            purchaseCount
+            quantityPer
+          }
+          connectWorkers {
+            available
+            price
+            purchaseCount
+            quantityPer
+          }
         }
       }
       subscription {
         nextInvoiceDate
+        nextInvoiceAmount
       }
     }
   }

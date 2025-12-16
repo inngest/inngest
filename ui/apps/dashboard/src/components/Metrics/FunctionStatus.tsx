@@ -153,14 +153,13 @@ export const FunctionStatus = ({ totals }: { totals?: FunctionTotals }) => {
   const metrics = totals && mapMetrics(totals);
 
   return (
-    <div className="bg-canvasBase border-subtle relative flex h-[384px] w-[448px] shrink-0 flex-col rounded-md border p-5">
+    <div className="bg-canvasBase border-subtle relative flex h-[384px] w-full shrink-0 flex-col rounded-md border p-5 md:w-[448px]">
       <div className="text-subtle mb-2 flex flex-row items-center gap-x-2 text-lg">
         Functions Status{' '}
         <Info
           text="Interact with the chart to see the status and total number of your function runs over a period of time."
           action={
             <Link
-              arrowOnHover
               className="text-sm"
               href="https://www.inngest.com/docs/platform/monitor/observability-metrics#function-status"
               target="_new"

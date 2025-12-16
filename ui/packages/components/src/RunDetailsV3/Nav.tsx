@@ -1,4 +1,7 @@
+'use client';
+
 import NextLink from 'next/link';
+import { useRouter } from 'next/navigation';
 import { RiArrowDownSLine, RiExternalLinkLine, RiShareForward2Line } from '@remixicon/react';
 
 import { Button } from '../Button';
@@ -10,6 +13,7 @@ import {
   DropdownMenuTrigger,
 } from '../DropdownMenu';
 import { Link } from '../Link';
+import { useShared } from '../SharedContext/SharedContext';
 import { useBooleanFlag } from '../SharedContext/useBooleanFlag';
 import { usePathCreator } from '../SharedContext/usePathCreator';
 
@@ -19,7 +23,7 @@ type NavProps = {
   runID: string;
 };
 
-export const Standalone = ({ standalone, runID }: NavProps) => {
+export const Standalone = ({ runID }: NavProps) => {
   const { pathCreator } = usePathCreator();
 
   return (
@@ -48,33 +52,52 @@ export const Standalone = ({ standalone, runID }: NavProps) => {
 };
 
 export const Nav = ({ standalone, functionSlug, runID }: NavProps) => {
+  const router = useRouter();
   const { booleanFlag } = useBooleanFlag();
   const { pathCreator } = usePathCreator();
+  const { cloud } = useShared();
 
   const { value: debuggerEnabled, isReady: debuggerFlagReady } = booleanFlag(
     'step-over-debugger',
     false
   );
 
-  return debuggerFlagReady && debuggerEnabled ? (
-    <SplitButton
-      left={
-        <Button
-          size="medium"
-          kind="primary"
-          appearance="outlined"
-          label="Open in Debugger"
-          className="rounder-r-none border-r-0"
-          href={pathCreator.debugger({ functionSlug, runID })}
+  const debuggerRedirect = async (e: React.MouseEvent) => {
+    e?.preventDefault && e.preventDefault();
+    const debuggerPath = pathCreator.debugger({
+      functionSlug,
+      runID,
+      debugSessionID: runID,
+    });
+
+    router.push(debuggerPath);
+    return;
+  };
+
+  return (
+    <>
+      {!cloud && debuggerFlagReady && debuggerEnabled ? (
+        <SplitButton
+          left={
+            <Button
+              size="medium"
+              kind="primary"
+              appearance="outlined"
+              label="Open in Debugger"
+              className="rounder-r-none border-r-0"
+              onClick={debuggerRedirect}
+            />
+          }
+          right={<Standalone standalone={standalone} functionSlug={functionSlug} runID={runID} />}
         />
-      }
-      right={<Standalone standalone={standalone} functionSlug={functionSlug} runID={runID} />}
-    />
-  ) : !standalone ? (
-    <Link
-      size="medium"
-      href={pathCreator.runPopout({ runID })}
-      iconAfter={<RiExternalLinkLine className="h-4 w-4 shrink-0" />}
-    />
-  ) : null;
+      ) : !standalone ? (
+        <Link
+          size="medium"
+          href={pathCreator.runPopout({ runID })}
+          target="_blank"
+          iconAfter={<RiExternalLinkLine className="h-4 w-4 shrink-0" />}
+        />
+      ) : null}
+    </>
+  );
 };

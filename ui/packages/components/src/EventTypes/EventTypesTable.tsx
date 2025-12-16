@@ -7,7 +7,8 @@ import { Button } from '@inngest/components/Button/Button';
 import { ErrorCard } from '@inngest/components/Error/ErrorCard';
 import TableBlankState from '@inngest/components/EventTypes/TableBlankState';
 import { Search } from '@inngest/components/Forms/Search';
-import NewTable from '@inngest/components/Table/NewTable';
+import { InfiniteScrollTrigger } from '@inngest/components/InfiniteScrollTrigger/InfiniteScrollTrigger';
+import { Table } from '@inngest/components/Table';
 import useDebounce from '@inngest/components/hooks/useDebounce';
 import {
   EventTypesOrderByDirection,
@@ -16,7 +17,7 @@ import {
   type EventTypesOrderBy,
   type PageInfo,
 } from '@inngest/components/types/eventType';
-import { keepPreviousData, useInfiniteQuery } from '@tanstack/react-query';
+import { useInfiniteQuery } from '@tanstack/react-query';
 import { type Row, type SortingState } from '@tanstack/react-table';
 
 import { useSearchParam } from '../hooks/useSearchParam';
@@ -119,7 +120,7 @@ export function EventTypesTable({
     queryKey: ['event-types', { orderBy, archived, nameSearch }],
     queryFn: ({ pageParam }: { pageParam: string | null }) =>
       getEventTypes({ orderBy, cursor: pageParam, archived, nameSearch }),
-    placeholderData: keepPreviousData,
+    refetchOnWindowFocus: false,
     getNextPageParam: (lastPage) => {
       if (!lastPage || !lastPage.pageInfo.hasNextPage) {
         return undefined;
@@ -149,21 +150,6 @@ export function EventTypesTable({
     }
   }, [mergedData]);
 
-  const onScroll: UIEventHandler<HTMLDivElement> = useCallback(
-    (event) => {
-      if (hasEventTypesData && hasNextPage) {
-        const { scrollHeight, scrollTop, clientHeight } = event.target as HTMLDivElement;
-
-        // Check if scrolled to the bottom
-        const reachedBottom = scrollHeight - scrollTop - clientHeight < 200;
-        if (reachedBottom && !isFetching && !isFetchingNextPage) {
-          fetchNextPage();
-        }
-      }
-    },
-    [fetchNextPage, hasNextPage, isFetchingNextPage, hasEventTypesData, isFetching]
-  );
-
   useEffect(() => {
     const sortEntry = sorting[0];
     if (!sortEntry) return;
@@ -187,26 +173,22 @@ export function EventTypesTable({
   }
 
   return (
-    <div className="bg-canvasBase text-basis no-scrollbar flex-1 overflow-hidden focus-visible:outline-none">
-      <div className="bg-canvasBase sticky top-0 z-10 m-3 flex items-center gap-2">
-        <EventTypesStatusFilter
-          archived={archived}
-          pathCreator={'/'}
-          onStatusChange={onStatusFilterChange}
-        />
+    <div className="bg-canvasBase text-basis no-scrollbar flex flex-1 flex-col overflow-hidden focus-visible:outline-none">
+      <div className="bg-canvasBase sticky top-0 z-10 mx-3 flex h-11 items-center gap-1.5">
         <Search
           name="search"
-          placeholder="Search by event type"
+          placeholder="Search by event name"
           value={searchInput}
-          className="h-[30px] w-56 py-3"
+          className="w-[182px]"
           onUpdate={(value) => {
             setSearchInput(value);
             debouncedSearch();
           }}
         />
+        <EventTypesStatusFilter archived={archived} onStatusChange={onStatusFilterChange} />
       </div>
-      <div className="h-[calc(100%-58px)] overflow-y-auto" onScroll={onScroll} ref={containerRef}>
-        <NewTable
+      <div className="flex-1 overflow-y-auto" ref={containerRef}>
+        <Table
           columns={columns}
           data={mergedData || []}
           isLoading={isPending || (isFetching && !isFetchingNextPage)}
@@ -227,6 +209,12 @@ export function EventTypesTable({
           }
           onRowClick={(row) => router.push(pathCreator.eventType({ eventName: row.original.name }))}
           getRowHref={(row) => pathCreator.eventType({ eventName: row.original.name })}
+        />
+        <InfiniteScrollTrigger
+          onIntersect={fetchNextPage}
+          hasMore={hasNextPage ?? false}
+          isLoading={isFetching || isFetchingNextPage}
+          root={containerRef.current}
         />
         {!hasNextPage &&
           hasEventTypesData &&

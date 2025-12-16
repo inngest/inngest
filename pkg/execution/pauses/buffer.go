@@ -47,8 +47,8 @@ func (r redisAdapter) PausesSince(ctx context.Context, index Index, since time.T
 
 // Delete deletes a pause from the buffer, or returns ErrNotInBuffer if the pause is not in
 // the buffer.
-func (r redisAdapter) Delete(ctx context.Context, index Index, pause state.Pause) error {
-	return r.rsm.DeletePause(ctx, pause)
+func (r redisAdapter) Delete(ctx context.Context, index Index, pause state.Pause, opts ...state.DeletePauseOpt) error {
+	return r.rsm.DeletePause(ctx, pause, opts...)
 }
 
 // PauseByID loads pauses by ID.
@@ -87,4 +87,14 @@ func (r redisAdapter) IndexExists(ctx context.Context, i Index) (bool, error) {
 
 func (r redisAdapter) BufferLen(ctx context.Context, i Index) (int64, error) {
 	return r.rsm.PauseLen(ctx, i.WorkspaceID, i.EventName)
+}
+
+// PausesSinceWithCreatedAt loads up to limit pauses for a given index since a given time,
+// ordered by creation time, with createdAt populated from Redis sorted set scores.
+func (r redisAdapter) PausesSinceWithCreatedAt(ctx context.Context, index Index, since time.Time, limit int64) (state.PauseIterator, error) {
+	return r.rsm.PausesByEventSinceWithCreatedAt(ctx, index.WorkspaceID, index.EventName, since, limit)
+}
+
+func (r redisAdapter) DeletePauseByID(ctx context.Context, pauseID uuid.UUID, workspaceID uuid.UUID) error {
+	return r.rsm.DeletePauseByID(ctx, pauseID, workspaceID)
 }

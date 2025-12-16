@@ -11,6 +11,10 @@ export const usePathCreator = () => {
     return {
       app: (params: { externalAppID: string }) =>
         internalPathCreator.app({ envSlug: env.slug, externalAppID: params.externalAppID }),
+      eventPopout: ({ eventID }: { eventID: string }) =>
+        internalPathCreator.eventPopout({ envSlug: env.slug, eventID }),
+      eventType: ({ eventName }: { eventName: string }) =>
+        internalPathCreator.eventType({ envSlug: env.slug, eventName }),
       function: (params: { functionSlug: string }) =>
         internalPathCreator.function({ envSlug: env.slug, functionSlug: params.functionSlug }),
       runPopout: (params: { runID: string }) =>

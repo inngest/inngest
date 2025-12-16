@@ -20,6 +20,6 @@ func UnmarshalULID(v interface{}) (ulid.ULID, error) {
 	case string:
 		return ulid.Parse(v)
 	default:
-		return ulid.ULID{}, errors.Errorf("%T is not a ULID", v)
+		return ulid.Zero, errors.Errorf("%T is not a ULID", v)
 	}
 }

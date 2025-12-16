@@ -1,62 +1,81 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import { ErrorCard } from '../Error/ErrorCard';
 import type { Run as InitialRunData } from '../RunsPage/types';
+import { useBooleanFlag } from '../SharedContext/useBooleanFlag';
+import { useGetRun } from '../SharedContext/useGetRun';
+import { useGetTraceResult } from '../SharedContext/useGetTraceResult';
 import { StatusCell } from '../Table/Cell';
 import { TriggerDetails } from '../TriggerDetails';
 import { DragDivider } from '../icons/DragDivider';
-import type { Result } from '../types/functionRun';
 import { nullishToLazy } from '../utils/lazyLoad';
+import { RunInfo as NewRunInfo } from './NewRunInfo';
 import { RunInfo } from './RunInfo';
 import { StepInfo } from './StepInfo';
 import { Tabs } from './Tabs';
 import { Timeline } from './Timeline';
 import { TopInfo } from './TopInfo';
-import type { Trace } from './Trace';
 import { Waiting } from './Waiting';
-import { useStepSelection } from './utils';
+import { useDynamicRunData, useStepSelection } from './utils';
+
+//
+// userland traces can land after the run is completed
+const RESIDUAL_POLL_INTERVAL = 6000;
 
 type Props = {
   standalone: boolean;
-  getResult: (outputID: string, preview?: boolean) => Promise<Result>;
-  getRun: (runID: string, preview?: boolean) => Promise<Run>;
   initialRunData?: InitialRunData;
   getTrigger: React.ComponentProps<typeof TriggerDetails>['getTrigger'];
   pollInterval?: number;
   runID: string;
-  tracesPreviewEnabled?: boolean;
-};
-
-type Run = {
-  app: {
-    externalID: string;
-    name: string;
-  };
-  fn: {
-    id: string;
-    name: string;
-    slug: string;
-  };
-  id: string;
-  trace: React.ComponentProps<typeof Trace>['trace'];
-  hasAI: boolean;
+  newStack?: boolean;
 };
 
 const MIN_HEIGHT = 586;
+const NO_SPANS_OR_TRACE_ERROR = /no function run span found|trace run not found/gi;
 
-export const RunDetailsV3 = (props: Props) => {
+//
+// Do not show the error if queued and can't find the trace or spans (backend timing issue)
+// TODO: do this properly in the backend resolver
+const isWaiting = (status?: string, runError?: Error | null, traceResultError?: Error | null) => {
+  if (status && status !== 'QUEUED') {
+    return false;
+  }
+
+  return (
+    !!runError?.toString().match(NO_SPANS_OR_TRACE_ERROR) ||
+    !!traceResultError?.toString().match(NO_SPANS_OR_TRACE_ERROR)
+  );
+};
+
+export const RunDetailsV3 = ({
+  getTrigger,
+  runID,
+  standalone,
+  pollInterval: initialPollInterval,
+  initialRunData,
+  newStack = false,
+}: Props) => {
+  const { booleanFlag } = useBooleanFlag();
+  const { value: pollingDisabled, isReady: pollingFlagReady } = booleanFlag(
+    'polling-disabled',
+    false
+  );
+  const { value: tracesPreviewEnabled } = booleanFlag('traces-preview', true, true);
+  const { updateDynamicRunData } = useDynamicRunData({ runID });
+
   const containerRef = useRef<HTMLDivElement>(null);
   const leftColumnRef = useRef<HTMLDivElement>(null);
   const runInfoRef = useRef<HTMLDivElement>(null);
-  const { getResult, getRun, getTrigger, runID, standalone } = props;
-  const [pollInterval, setPollInterval] = useState(props.pollInterval);
+  const [pollInterval, setPollInterval] = useState(initialPollInterval);
+
   const [leftWidth, setLeftWidth] = useState(55);
-  const [height, setHeight] = useState(0);
+  const [height, setHeight] = useState(MIN_HEIGHT);
   const [isDragging, setIsDragging] = useState(false);
-  const { selectedStep } = useStepSelection(runID);
+  const [windowHeight, setWindowHeight] = useState(0);
+  const { selectedStep } = useStepSelection({ runID });
 
   const handleMouseDown = useCallback(() => {
     setIsDragging(true);
@@ -85,11 +104,35 @@ export const RunDetailsV3 = (props: Props) => {
   );
 
   useEffect(() => {
-    //
-    // left column height is dynamic and should determine right column height
-    const h = leftColumnRef.current?.clientHeight ?? 0;
-    setHeight(h > MIN_HEIGHT ? h : MIN_HEIGHT);
-  }, [leftColumnRef.current?.clientHeight]);
+    setWindowHeight(window.innerHeight);
+
+    const handleResize = () => {
+      setWindowHeight(window.innerHeight);
+    };
+
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!leftColumnRef.current) {
+      return;
+    }
+
+    const resizeObserver = new ResizeObserver(() => {
+      const h = leftColumnRef.current?.clientHeight ?? 0;
+      setHeight(h > MIN_HEIGHT ? h : MIN_HEIGHT);
+    });
+
+    resizeObserver.observe(leftColumnRef.current);
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, []);
 
   useEffect(() => {
     if (isDragging) {
@@ -104,54 +147,71 @@ export const RunDetailsV3 = (props: Props) => {
     };
   }, [isDragging, handleMouseMove, handleMouseUp]);
 
-  const runRes = useQuery({
-    queryKey: ['run', runID, { preview: props.tracesPreviewEnabled }],
-    queryFn: useCallback(() => {
-      console.log('lollllyep', { 'props.tracesPreviewEnabled': props.tracesPreviewEnabled });
-
-      return getRun(runID, props.tracesPreviewEnabled);
-    }, [getRun, runID, props.tracesPreviewEnabled]),
-    retry: 3,
+  const {
+    data: runData,
+    error: runError,
+    refetch: refetchRun,
+  } = useGetRun({
+    runID,
+    preview: tracesPreviewEnabled,
+    //
+    // TODO: enable this for cloud once we're sure we can handle the load
     refetchInterval: pollInterval,
   });
 
-  const outputID = runRes?.data?.trace.outputID;
-  const resultRes = useQuery({
+  const outputID = runData?.trace?.outputID;
+  const {
+    data: resultData,
+    error: resultError,
+    refetch: refetchResult,
+  } = useGetTraceResult({
+    traceID: outputID,
+    preview: tracesPreviewEnabled,
+    refetchInterval: pollInterval,
     enabled: Boolean(outputID),
-    refetchInterval: pollInterval,
-    queryKey: ['run-result', runID, { preview: props.tracesPreviewEnabled }],
-    queryFn: useCallback(() => {
-      if (!outputID) {
-        // Unreachable
-        throw new Error('missing outputID');
-      }
-
-      return getResult(outputID, props.tracesPreviewEnabled);
-    }, [getResult, outputID, props.tracesPreviewEnabled]),
   });
 
-  const run = runRes.data;
-  if (run?.trace.endedAt && pollInterval) {
+  useEffect(() => {
+    if (pollingFlagReady && pollingDisabled) {
+      setPollInterval(undefined);
+    }
+  }, [pollingFlagReady, pollingDisabled]);
+
+  if (runData?.trace.endedAt && pollInterval) {
     //
     // Stop polling for ended runs, but still give it
     // a few seconds for any lingering userland traces.
     setTimeout(() => {
       setPollInterval(undefined);
-    }, 6000);
+    }, RESIDUAL_POLL_INTERVAL);
   }
 
-  // Do not show the error if queued and the error is no spans
-  const noSpansFoundError = !!runRes.error?.toString().match(/no function run span found/gi);
-  const waiting = props.initialRunData?.status === 'QUEUED' && noSpansFoundError;
-  const showError = waiting ? false : runRes.error || resultRes.error;
+  useEffect(() => {
+    if (!runData?.status || runData?.status === initialRunData?.status) {
+      return;
+    }
+
+    updateDynamicRunData({
+      runID,
+      status: runData.status,
+      endedAt: runData.trace.endedAt ?? undefined,
+    });
+  }, [runData?.trace.endedAt, runData?.status]);
+
+  const waiting = isWaiting(initialRunData?.status || runData?.status, runError, resultError);
+  const showError = waiting ? false : runError || resultError;
+
+  //
+  // works around a variety of layout and scroll issues with our two column layout
+  const dynamicHeight = standalone ? '85vh' : height < windowHeight * 0.85 ? height : '85vh';
 
   return (
     <>
-      {standalone && run && (
+      {standalone && runData && (
         <div className="border-muted flex flex-row items-start justify-between border-b px-4 pb-4">
           <div className="flex flex-col gap-1">
-            <StatusCell status={run.trace.status} />
-            <p className="text-basis text-2xl font-medium">{run.fn.name}</p>
+            <StatusCell status={runData.status} />
+            <p className="text-basis text-2xl font-medium">{runData.fn.name}</p>
             <p className="text-subtle font-mono">{runID}</p>
           </div>
         </div>
@@ -159,18 +219,29 @@ export const RunDetailsV3 = (props: Props) => {
       <div ref={containerRef} className="flex flex-row">
         <div ref={leftColumnRef} className="flex flex-col gap-2" style={{ width: `${leftWidth}%` }}>
           <div ref={runInfoRef} className="px-4">
-            <RunInfo
-              className="mb-4"
-              initialRunData={props.initialRunData}
-              run={nullishToLazy(run)}
-              runID={runID}
-              standalone={standalone}
-              result={resultRes.data}
-            />
+            {newStack ? (
+              <NewRunInfo
+                className="mb-4"
+                initialRunData={initialRunData}
+                run={nullishToLazy(runData)}
+                runID={runID}
+                standalone={standalone}
+                result={resultData}
+              />
+            ) : (
+              <RunInfo
+                className="mb-4"
+                initialRunData={initialRunData}
+                run={nullishToLazy(runData)}
+                runID={runID}
+                standalone={standalone}
+                result={resultData}
+              />
+            )}
             {showError && (
               <ErrorCard
-                error={runRes.error || resultRes.error}
-                reset={runRes.error ? () => runRes.refetch() : () => resultRes.refetch()}
+                error={runError || resultError}
+                reset={runError ? () => refetchRun() : () => refetchResult()}
               />
             )}
           </div>
@@ -181,8 +252,8 @@ export const RunDetailsV3 = (props: Props) => {
                 id: 'trace',
                 node: waiting ? (
                   <Waiting />
-                ) : run ? (
-                  <Timeline runID={runID} trace={run?.trace} />
+                ) : runData ? (
+                  <Timeline runID={runID} trace={runData?.trace} />
                 ) : null,
               },
             ]}
@@ -204,21 +275,26 @@ export const RunDetailsV3 = (props: Props) => {
         </div>
 
         <div
-          className="border-muted flex flex-col justify-start"
-          style={{ width: `${100 - leftWidth}%`, height: standalone ? '85vh' : height }}
+          className="border-muted sticky top-0 flex flex-col justify-start overflow-y-auto"
+          style={{
+            width: `${100 - leftWidth}%`,
+            height: dynamicHeight,
+            alignSelf: 'flex-start',
+          }}
         >
           {selectedStep && !selectedStep.trace.isRoot ? (
             <StepInfo
               selectedStep={selectedStep}
-              getResult={getResult}
               pollInterval={pollInterval}
+              tracesPreviewEnabled={tracesPreviewEnabled}
+              newStack={newStack}
             />
           ) : (
             <TopInfo
-              slug={run?.fn.slug}
+              slug={runData?.fn.slug}
               getTrigger={getTrigger}
               runID={runID}
-              result={resultRes.data}
+              result={resultData}
             />
           )}
         </div>

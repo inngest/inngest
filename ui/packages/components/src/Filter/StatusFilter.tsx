@@ -78,8 +78,10 @@ export default function StatusFilter<T extends string>({
       }}
       label="Status"
       isLabelVisible
+      size="small"
+      className="bg-modalBase"
     >
-      <Select.Button isLabelVisible ref={comboboxRef}>
+      <Select.Button isLabelVisible ref={comboboxRef} size="small">
         <div className="w-7 text-left">
           {temporarySelectedStatuses.length > 0 && !areAllStatusesSelected && (
             <span>{statusDots}</span>
@@ -93,8 +95,8 @@ export default function StatusFilter<T extends string>({
           return (
             <Select.CheckboxOption key={option.id} option={option}>
               <span className="flex items-center gap-1 lowercase">
-                <StatusDot status={option.id} className="h-2 w-2" />
-                <label className="text-sm first-letter:capitalize">{option.name}</label>
+                <StatusDot status={option.id} size="small" />
+                <label className="first-letter:capitalize">{option.name}</label>
               </span>
             </Select.CheckboxOption>
           );

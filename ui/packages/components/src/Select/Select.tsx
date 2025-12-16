@@ -42,23 +42,31 @@ export function Select({
   onChange,
   multiple,
   className,
+  size = 'medium',
 }: Props) {
   return (
     <Listbox value={value} onChange={onChange} multiple={multiple}>
-      <span
-        className={cn(
-          isLabelVisible && 'divide-muted bg-canvasSubtle text-basis divide-x',
-          'border-muted flex items-center rounded-md border text-sm',
-          className
-        )}
-      >
-        <Listbox.Label
-          className={cn(!isLabelVisible && 'sr-only', 'rounded-l-[5px] px-2 capitalize')}
+      {({ open }) => (
+        <span
+          className={cn(
+            isLabelVisible && 'divide-muted text-muted divide-x',
+            'disabled:bg-disabled disabled:text-disabled border-muted flex items-center rounded border',
+            size === 'small' ? 'text-[13px]' : 'text-sm',
+            className
+          )}
         >
-          {label}
-        </Listbox.Label>
-        <span className="relative w-full">{children}</span>
-      </span>
+          <Listbox.Label
+            className={cn(
+              !isLabelVisible && 'sr-only',
+              'rounded-l px-2 capitalize',
+              size === 'small' ? 'text-xs' : 'text-sm'
+            )}
+          >
+            {label}
+          </Listbox.Label>
+          <span className="relative w-full">{children}</span>
+        </span>
+      )}
     </Listbox>
   );
 }
@@ -77,15 +85,16 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       <Component
         ref={ref}
         className={cn(
-          !isLabelVisible && 'rounded-l-[5px]',
-          size === 'small' ? 'h-[30px]' : 'h-[38px]',
-          'bg-surfaceBase text-basis flex w-full items-center justify-between rounded-r-[5px] px-2',
+          !isLabelVisible && 'rounded-l',
+          // Real height is 26px and 34px, but we add the 2px border
+          size === 'small' ? 'h-[24px] text-xs' : 'h-[32px] py-1.5 text-sm',
+          'disabled:bg-disabled disabled:text-disabled text-basis placeholder:text-disabled flex w-full items-center justify-between gap-1 rounded-r px-1.5',
           className
         )}
       >
         {children}
         <RiArrowDownSLine
-          className="ui-open:-rotate-180 text-muted h-4 w-4 transition-transform duration-500"
+          className="ui-open:-rotate-180 text-subtle h-4 w-4 transition-transform duration-200"
           aria-hidden="true"
         />
       </Component>
@@ -101,7 +110,7 @@ function Options({
 }: React.PropsWithChildren<{ as: React.ElementType; className?: string }>) {
   return (
     <Component className={cn('absolute z-10 mt-1 min-w-max', className)}>
-      <div className="border-muted bg-surfaceBase shadow-primary z-10 overflow-hidden rounded-md border py-1">
+      <div className="border-subtle bg-surfaceBase shadow-primary z-10 overflow-hidden rounded border py-1">
         {children}
       </div>
     </Component>
@@ -115,14 +124,12 @@ function Option({
 }: React.PropsWithChildren<{ option: Option; as: React.ElementType }>) {
   return (
     <Component
-      className=" ui-selected:text-success ui-selected:font-medium ui-active:bg-canvasSubtle/50 text-basis flex select-none items-center justify-between focus:outline-none"
+      className="ui-selected:text-secondary-intense ui-selected:font-medium ui-active:bg-canvasSubtle/50 text-basis flex select-none items-center justify-between px-4 py-1.5 focus:outline-none"
       key={option.id}
       value={option}
       disabled={option.disabled}
     >
-      <div className="ui-selected:border-success my-2 w-full border-l-2 border-transparent pl-5 pr-4">
-        {children}
-      </div>
+      {children}
     </Component>
   );
 }
@@ -134,7 +141,7 @@ function CheckboxOption({
 }: React.PropsWithChildren<{ option: Option; as: React.ElementType }>) {
   return (
     <Component
-      className=" ui-active:bg-canvasSubtle/50 text-basis flex select-none items-center justify-between py-1.5 pl-2 pr-4 focus:outline-none"
+      className=" ui-active:bg-canvasSubtle/50 text-basis flex select-none items-center justify-between px-4 py-1.5 focus:outline-none"
       key={option.id}
       value={option}
     >
@@ -169,7 +176,7 @@ function Footer({
   return (
     <div
       className={cn(
-        'border-muted mt-1 flex items-center border-t px-2 pb-1 pt-2',
+        'border-subtle mt-1 flex items-center border-t px-2 pb-1 pt-2',
         onReset ? 'justify-between' : 'justify-end'
       )}
     >
@@ -177,6 +184,7 @@ function Footer({
         <InngestButton
           label="Reset"
           appearance="ghost"
+          kind="secondary"
           size="small"
           onClick={onReset}
           disabled={disabledReset}
@@ -211,17 +219,23 @@ export function SelectWithSearch({
   onChange,
   multiple,
   className,
+  size,
 }: Props) {
-  const content = (
+  const renderContent = (open: boolean) => (
     <span
       className={cn(
-        isLabelVisible && 'divide-muted bg-canvasSubtle text-basis divide-x',
-        'border-muted flex items-center rounded-md border text-sm',
+        isLabelVisible && 'divide-muted text-muted divide-x',
+        'disabled:bg-disabled disabled:text-disabled border-muted flex items-center rounded border',
+        size === 'small' ? 'text-[13px]' : 'text-sm',
         className
       )}
     >
       <Combobox.Label
-        className={cn(!isLabelVisible && 'sr-only', 'rounded-l-[5px] px-2 capitalize')}
+        className={cn(
+          !isLabelVisible && 'sr-only',
+          'rounded-l px-2 capitalize',
+          size === 'small' ? 'text-xs' : 'text-sm'
+        )}
       >
         {label}
       </Combobox.Label>
@@ -235,23 +249,23 @@ export function SelectWithSearch({
   if (multiple) {
     return (
       <Combobox value={value} onChange={onChange} multiple={multiple}>
-        {content}
+        {({ open }) => renderContent(open)}
       </Combobox>
     );
   }
 
   return (
     <Combobox value={value} onChange={onChange} multiple={multiple}>
-      {content}
+      {({ open }) => renderContent(open)}
     </Combobox>
   );
 }
 
 function Search<T>({ ...props }: ComboboxInputProps<'input', T>) {
   return (
-    <div className="mx-2 my-2">
+    <div className="mx-3 my-2">
       <Combobox.Input
-        className="border-subtle focus-visible:border-subtle text-basis bg-surfaceBase placeholder:text-disabled focus-visible:outline-primary-moderate w-full rounded-md border px-4 py-2 text-sm outline-2 focus-visible:outline focus-visible:outline-offset-0"
+        className="border-subtle focus-visible:border-active text-basis bg-surfaceBase placeholder:text-disabled w-full rounded border px-2 py-1 text-sm outline-none focus-visible:outline-none focus-visible:ring-0"
         {...props}
       />
     </div>

@@ -28,6 +28,7 @@ var (
 	// that doesn't exist within the backing state store.
 	ErrPauseNotFound       = fmt.Errorf("pause not found")
 	ErrInvokePauseNotFound = fmt.Errorf("invoke pause not found")
+	ErrPauseNotInBuffer    = fmt.Errorf("pause not in buffer")
 	ErrRunNotFound         = fmt.Errorf("run not found in state store")
 	// ErrPauseLeased is returned when attempting to lease a pause that is
 	// already leased by another event.
@@ -49,6 +50,8 @@ var (
 	ErrEventNotFound      = fmt.Errorf("event not found in state store")
 	ErrFunctionPaused     = fmt.Errorf("function is paused")
 	ErrStateOverflowed    = fmt.Errorf("state is too large")
+	// Error Connect Retry Errors
+	ErrConnectWorkerCapacity = fmt.Errorf("connect workers at capacity")
 )
 
 const (
@@ -176,8 +179,11 @@ func (c CustomConcurrency) ParseKey() (scope enums.ConcurrencyScope, id uuid.UUI
 	}
 }
 
-// IdempotencyKey returns the unique key used to represent this single
-// workflow run, across all steps.
+// IdempotencyKey returns the unique key used to represent this single workflow
+// run, across all steps.
+//
+// NOT to be used for step/queue idempotency keys; this is exclusively used for
+// run-level idempotency. For that purpose, use `Metadata.IdempotencyKey()`.
 func (i Identifier) IdempotencyKey() string {
 	key := i.Key
 	if i.Key == "" {
@@ -316,6 +322,11 @@ type State interface {
 	IsCron() bool
 }
 
+// PauseDeleter manages pause deletion
+type PauseDeleter interface {
+	DeletePauseByID(context.Context, uuid.UUID, uuid.UUID) error
+}
+
 // Manager represents a state manager which can both load and mutate state.
 type Manager interface {
 	StateLoader
@@ -324,6 +335,8 @@ type Manager interface {
 	// PauseManager embeds buffering pause services.  Note that this is
 	// superseded by pauses.Manager.
 	PauseManager
+
+	SetPauseDeleter(PauseDeleter)
 }
 
 // FunctionNotifier is an optional interface that state stores can fulfil,
@@ -357,14 +370,6 @@ type StateLoader interface {
 
 	// Load returns run state for the given identifier.
 	Load(ctx context.Context, accountId uuid.UUID, runID ulid.ULID) (State, error)
-
-	// IsComplete returns whether the given identifier is complete, ie. the
-	// pending count in the identifier's metadata is zero.
-	IsComplete(ctx context.Context, accountId uuid.UUID, runID ulid.ULID) (complete bool, err error)
-
-	// StackIndex returns the index for the given step ID within the function stack of
-	// a given run.
-	StackIndex(ctx context.Context, accountId uuid.UUID, runID ulid.ULID, stepID string) (int, error)
 }
 
 // FunctionLoader loads function definitions based off of an identifier.
@@ -394,7 +399,7 @@ type Mutater interface {
 	UpdateMetadata(ctx context.Context, accountId uuid.UUID, runID ulid.ULID, md MetadataUpdate) error
 
 	// Delete removes state from the state store.
-	Delete(ctx context.Context, i Identifier) (bool, error)
+	Delete(ctx context.Context, i Identifier) error
 
 	// Cancel sets a function run metadata status to RunStatusCancelled, which prevents
 	// future execution of steps.

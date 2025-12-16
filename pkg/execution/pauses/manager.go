@@ -3,25 +3,46 @@ package pauses
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/inngest/expr"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/oklog/ulid/v2"
 )
 
 var BlockFlushQueueName = "block-flush"
 
 var defaultFlushDelay = 10 * time.Second
 
-type ManagerOpt func(m Manager)
+type ManagerOpt func(m *manager)
+
+type FeatureCallback func(ctx context.Context, workspaceID uuid.UUID) bool
 
 func WithFlushDelay(delay time.Duration) ManagerOpt {
-	return func(m Manager) {
-		if mgr, ok := m.(*manager); ok {
-			mgr.flushDelay = delay
-		}
+	return func(mgr *manager) {
+		mgr.flushDelay = delay
+	}
+}
+
+func WithBlockFlushEnabled(cb FeatureCallback) ManagerOpt {
+	return func(mgr *manager) {
+		mgr.blockFlushEnabled = cb
+	}
+}
+
+func WithBlockStoreEnabled(cb FeatureCallback) ManagerOpt {
+	return func(mgr *manager) {
+		mgr.blockStoreEnabled = cb
+	}
+}
+
+func WithFlusher(flusher BlockFlushEnqueuer) ManagerOpt {
+	return func(mgr *manager) {
+		mgr.flusher = flusher
 	}
 }
 
@@ -30,12 +51,14 @@ func WithFlushDelay(delay time.Duration) ManagerOpt {
 //
 // Blocks are flushed from the buffer in background jobs enqueued to the given queue.
 // This prevents eg. executors and new-runs from retaining blocks in-memory.
-func NewManager(buf Bufferer, bs BlockStore, flusher BlockFlushEnqueuer, opts ...ManagerOpt) Manager {
+func NewManager(buf Bufferer, bs BlockStore, opts ...ManagerOpt) Manager {
 	mgr := &manager{
-		buf:        buf,
-		bs:         bs,
-		flusher:    flusher,
-		flushDelay: defaultFlushDelay,
+		buf:               buf,
+		bs:                bs,
+		flusher:           nil,
+		flushDelay:        defaultFlushDelay,
+		blockFlushEnabled: func(ctx context.Context, acctID uuid.UUID) bool { return false },
+		blockStoreEnabled: func(ctx context.Context, acctID uuid.UUID) bool { return false },
 	}
 
 	for _, o := range opts {
@@ -50,7 +73,6 @@ func NewRedisOnlyManager(rsm state.PauseManager) Manager {
 	return NewManager(
 		StateBufferer(rsm),
 		nil,
-		nil,
 	)
 }
 
@@ -59,6 +81,13 @@ type manager struct {
 	bs         BlockStore
 	flusher    BlockFlushEnqueuer
 	flushDelay time.Duration
+
+	// blockFlushEnabled enables flushing pauses to blocks, uploading them to the block
+	// store and updating the metadata.
+	blockFlushEnabled FeatureCallback
+	// blockStoreEnabled enables reading from the block store for a specific workspace,
+	// and also marking pauses as deleted (metadata update, not actual deletion of blocks)
+	blockStoreEnabled FeatureCallback
 }
 
 // PauseTimestamp returns the created at timestamp for a pause.
@@ -87,7 +116,7 @@ func (m manager) Aggregated(ctx context.Context, idx Index, minLen int64) (bool,
 	if n > minLen {
 		return true, nil
 	}
-	if m.bs == nil {
+	if m.bs == nil || !m.blockStoreEnabled(ctx, idx.WorkspaceID) {
 		return false, nil
 	}
 	// If we've written a blob, aggregate, assuming there are always many pauses for this index.
@@ -96,7 +125,7 @@ func (m manager) Aggregated(ctx context.Context, idx Index, minLen int64) (bool,
 
 func (m manager) IndexExists(ctx context.Context, i Index) (bool, error) {
 	ok, err := m.buf.IndexExists(ctx, i)
-	if err != nil || ok || m.bs == nil {
+	if err != nil || ok || m.bs == nil || !m.blockStoreEnabled(ctx, i.WorkspaceID) {
 		// It exists in the buffer, so no need to check blobstore.
 		return ok, err
 	}
@@ -177,15 +206,15 @@ func (m manager) Write(ctx context.Context, index Index, pauses ...*state.Pause)
 		return n, err
 	}
 
-	if m.bs == nil || SkipFlushing(index, pauses) {
+	if m.bs == nil || SkipFlushing(index, pauses) || !m.blockFlushEnabled(ctx, index.WorkspaceID) {
 		// Don't bother flushing, as this needs to be kept in the buffer.
 		return n, nil
 	}
 
 	// If this is larger than the max buffer len, schedule a new block write.  We only
 	// enqueue this job once per index ID, using queue singletons to handle these.
-	if n >= m.bs.BlockSize() {
-		if err := m.flusher.Enqueue(ctx, index); err != nil {
+	if n >= m.bs.BlockSize() && m.flusher != nil {
+		if err := m.flusher.Enqueue(ctx, index); err != nil && !errors.Is(err, redis_state.ErrQueueItemExists) {
 			logger.StdlibLogger(ctx).Error("error attempting to flush block", "error", err)
 		}
 	}
@@ -218,7 +247,7 @@ func (m manager) PauseByID(ctx context.Context, index Index, pauseID uuid.UUID) 
 		return pause, err
 	}
 
-	if m.bs != nil {
+	if m.bs != nil && m.blockStoreEnabled(ctx, index.WorkspaceID) {
 		// We couldn't load from the buffer, so fall back.
 		return m.bs.PauseByID(ctx, index, pauseID)
 	}
@@ -238,7 +267,7 @@ func (m manager) PausesSince(ctx context.Context, index Index, since time.Time) 
 		return nil, err
 	}
 
-	if m.bs == nil {
+	if m.bs == nil || !m.blockStoreEnabled(ctx, index.WorkspaceID) {
 		return bufIter, nil
 	}
 
@@ -254,6 +283,12 @@ func (m manager) PausesSince(ctx context.Context, index Index, since time.Time) 
 		m.bs,
 		blocks,
 	), nil
+}
+
+// PausesSinceWithCreatedAt loads up to limit pauses for a given index since a given time,
+// ordered by creation time, with createdAt populated from Redis sorted set scores.
+func (m manager) PausesSinceWithCreatedAt(ctx context.Context, index Index, since time.Time, limit int64) (state.PauseIterator, error) {
+	return m.buf.PausesSinceWithCreatedAt(ctx, index, since, limit)
 }
 
 // LoadEvaluablesSince calls PausesSince and implements the aggregate expression interface implementation
@@ -282,7 +317,7 @@ func (m manager) LoadEvaluablesSince(ctx context.Context, workspaceID uuid.UUID,
 }
 
 // Delete deletes a pause from from block storage or the buffer.
-func (m manager) Delete(ctx context.Context, index Index, pause state.Pause) error {
+func (m manager) Delete(ctx context.Context, index Index, pause state.Pause, opts ...state.DeletePauseOpt) error {
 	// Potential future optimization:  cache the last written block for an index
 	// in-memory so we can fast lookup here:
 	//
@@ -290,18 +325,51 @@ func (m manager) Delete(ctx context.Context, index Index, pause state.Pause) err
 	//
 	// This lets us skip deleting from the buffer, as this is a longer and more complex
 	// transaction than a single lookup.
-	err := m.buf.Delete(ctx, index, pause)
+
+	blockFlushEnabled := m.blockFlushEnabled(ctx, pause.WorkspaceID)
+	if blockFlushEnabled && pause.CreatedAt.IsZero() {
+		// Try to get the pause's creation timestamp before deleting it from the buffer
+		ts, err := m.buf.PauseTimestamp(ctx, index, pause)
+		if err != nil && !errors.Is(err, state.ErrPauseNotFound) {
+			return fmt.Errorf("unable to get creation timestamp while deleting pause: %w", err)
+		}
+		pause.CreatedAt = ts
+		if pause.CreatedAt.IsZero() {
+			// Creation timestamp unavailable — cannot determine which blocks contain this pause.
+			// We'll just warn and eventually mark it as deleted on all blocks present.
+			logger.StdlibLogger(ctx).Warn("pause deletion missing creation timestamp; marking as deleted on all blocks")
+		}
+	}
+
+	err := m.buf.Delete(ctx, index, pause, opts...)
 	if err != nil && !errors.Is(err, ErrNotInBuffer) {
 		return err
 	}
 
-	if m.bs == nil {
+	// We check the block flushing feature flag because block store delete will only
+	// just mark pauses as deleted in Redis. Without compaction it won't really do
+	// anything.
+	if m.bs == nil || !blockFlushEnabled {
 		return nil
 	}
 
 	// Always also delegate to the flusher, just in case a block was written whilst
 	// we issued the delete request.
-	return m.bs.Delete(ctx, index, pause)
+	return m.bs.Delete(ctx, index, pause, opts...)
+}
+
+// DeletePauseByID deletes a pause by ID from block storage and the buffer.
+func (m manager) DeletePauseByID(ctx context.Context, pauseID uuid.UUID, workspaceID uuid.UUID) error {
+	// We check the block flushing feature flag because block store delete will only
+	// just mark pauses as deleted in Redis. It's done before the buffer delete because
+	// we need the pause block index to be there to mark the block deletion
+	if m.bs != nil && m.blockFlushEnabled(ctx, workspaceID) {
+		if err := m.bs.DeleteByID(ctx, pauseID, workspaceID); err != nil {
+			return err
+		}
+	}
+
+	return m.buf.DeletePauseByID(ctx, pauseID, workspaceID)
 }
 
 func (m manager) FlushIndexBlock(ctx context.Context, index Index) error {
@@ -316,4 +384,80 @@ func (m manager) FlushIndexBlock(ctx context.Context, index Index) error {
 	// flushDelay is the amount of clock skew we mitigate.
 	time.Sleep(m.flushDelay)
 	return m.bs.FlushIndexBlock(ctx, index)
+}
+
+func (m manager) IndexStats(ctx context.Context, index Index) (*IndexStats, error) {
+	stats := &IndexStats{
+		WorkspaceID: index.WorkspaceID,
+		EventName:   index.EventName,
+	}
+
+	// Get buffer length
+	bufLen, err := m.buf.BufferLen(ctx, index)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get buffer length: %w", err)
+	}
+	stats.BufferLength = bufLen
+
+	// Get block information if blockstore is available
+	if m.bs != nil {
+		blockIDs, err := m.bs.BlocksSince(ctx, index, time.Time{}) // Get all blocks
+		if err != nil {
+			return nil, fmt.Errorf("failed to get blocks: %w", err)
+		}
+
+		for _, blockID := range blockIDs {
+			blockInfo, err := m.getBlockInfo(ctx, index, blockID)
+			if err != nil {
+				logger.StdlibLogger(ctx).Warn("failed to get block info", "block_id", blockID, "error", err)
+				continue
+			}
+			stats.Blocks = append(stats.Blocks, blockInfo)
+		}
+	}
+
+	return stats, nil
+}
+
+func (m manager) getBlockInfo(ctx context.Context, index Index, blockID ulid.ULID) (*BlockInfo, error) {
+	// Get metadata for the block
+	metadataMap, err := m.bs.GetBlockMetadata(ctx, index)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read block metadata: %w", err)
+	}
+
+	blockIDStr := blockID.String()
+	metadata, exists := metadataMap[blockIDStr]
+	if !exists {
+		return nil, fmt.Errorf("metadata not found for block %s", blockIDStr)
+	}
+
+	// Get delete count for the block
+	deleteCount, err := m.bs.GetBlockDeleteCount(ctx, index, blockID)
+	if err != nil {
+		logger.StdlibLogger(ctx).Warn("failed to get delete count", "block_id", blockIDStr, "error", err)
+		deleteCount = 0 // Default to 0 if we can't get the count
+	}
+
+	return &BlockInfo{
+		ID:             blockIDStr,
+		Length:         metadata.Len,
+		FirstTimestamp: metadata.FirstTimestamp(),
+		LastTimestamp:  metadata.LastTimestamp(),
+		DeleteCount:    deleteCount,
+	}, nil
+}
+
+func (m manager) GetBlockPauseIDs(ctx context.Context, index Index, blockID ulid.ULID) ([]string, int64, error) {
+	if m.bs == nil {
+		return nil, 0, fmt.Errorf("block store not available")
+	}
+	return m.bs.GetBlockPauseIDs(ctx, index, blockID)
+}
+
+func (m manager) GetBlockDeletedIDs(ctx context.Context, index Index, blockID ulid.ULID) ([]string, int64, error) {
+	if m.bs == nil {
+		return nil, 0, fmt.Errorf("block store not available")
+	}
+	return m.bs.GetBlockDeletedIDs(ctx, index, blockID)
 }

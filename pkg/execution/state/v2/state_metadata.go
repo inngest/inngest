@@ -17,11 +17,13 @@ import (
 )
 
 const (
-	cronScheduleKey = "__cron"
-	fnslugKey       = "__fnslug"
-	traceLinkKey    = "__tracelink"
-	debounceKey     = "__debounce"
-	evtmapKey       = "__evtmap"
+	cronScheduleKey   = "__cron"
+	fnslugKey         = "__fnslug"
+	traceLinkKey      = "__tracelink"
+	debounceKey       = "__debounce"
+	evtmapKey         = "__evtmap"
+	debugSessionIDKey = "__debug_session_id"
+	debugRunIDKey     = "__debug_run_id"
 )
 
 type ID struct {
@@ -53,6 +55,7 @@ func V1FromMetadata(md Metadata) statev1.Identifier {
 		WorkflowVersion:       md.Config.FunctionVersion,
 		WorkspaceID:           md.ID.Tenant.EnvID,
 		AccountID:             md.ID.Tenant.AccountID,
+		AppID:                 md.ID.Tenant.AppID,
 		EventID:               md.Config.EventID(),
 		EventIDs:              md.Config.EventIDs,
 		BatchID:               md.Config.BatchID,
@@ -101,6 +104,11 @@ func (m Metadata) ShouldCoalesceParallelism(resp *statev1.DriverResponse) bool {
 	return reqVersion >= 2
 }
 
+// IdempotencyKey returns a unique key for this run, intended to used as part of
+// an idempotency key when enqueuing steps.
+//
+// NOT to be used for run-level idempotency keys; this is exclusively used for
+// step-level idepotency. For that purpose, use `Identifier.IdempotencyKey()`.
 func (m Metadata) IdempotencyKey() string {
 	key := m.Config.Idempotency
 	if key == "" {
@@ -185,7 +193,7 @@ func (c *Config) EventID() ulid.ULID {
 	if len(c.EventIDs) > 0 {
 		return c.EventIDs[0]
 	}
-	return ulid.ULID{}
+	return ulid.Zero
 }
 
 func (c *Config) GetSpanID() (*trace.SpanID, error) {
@@ -341,7 +349,6 @@ func (c *Config) FunctionTrace() *itrace.TraceCarrier {
 			}
 
 		}
-
 	}
 	return nil
 }
@@ -354,7 +361,11 @@ func (c *Config) NewSetFunctionTrace(carrier *meta.SpanReference) {
 	c.Context[meta.PropagationKey] = *carrier
 }
 
-func (c *Config) NewFunctionTrace() *meta.SpanReference {
+// RootSpanFromConfig is deprecated.  Use tracing.RunSpanRefFromMetadata.
+func (c *Config) RootSpanFromConfig() *meta.SpanReference {
+	if c == nil || c.mu == nil {
+		return nil
+	}
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
@@ -409,6 +420,62 @@ func (c *Config) EventIDMapping() map[string]ulid.ULID {
 			var m map[string]ulid.ULID
 			if err := json.Unmarshal([]byte(s), &m); err == nil {
 				return m
+			}
+		}
+	}
+
+	return nil
+}
+
+func (c *Config) SetDebugSessionID(debugSessionID ulid.ULID) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.initContext()
+	c.Context[debugSessionIDKey] = debugSessionID.String()
+}
+
+// DebugSessionID retrieves the stored debug session ID if available
+func (c *Config) DebugSessionID() *ulid.ULID {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	if c.Context == nil {
+		return nil
+	}
+
+	if v, ok := c.Context[debugSessionIDKey]; ok {
+		if s, ok := v.(string); ok {
+			if id, err := ulid.Parse(s); err == nil {
+				return &id
+			}
+		}
+	}
+
+	return nil
+}
+
+func (c *Config) SetDebugRunID(debugRunID ulid.ULID) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.initContext()
+	c.Context[debugRunIDKey] = debugRunID.String()
+}
+
+// DebugRunID retrieves the stored debug run ID if available
+func (c *Config) DebugRunID() *ulid.ULID {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	if c.Context == nil {
+		return nil
+	}
+
+	if v, ok := c.Context[debugRunIDKey]; ok {
+		if s, ok := v.(string); ok {
+			if id, err := ulid.Parse(s); err == nil {
+				return &id
 			}
 		}
 	}

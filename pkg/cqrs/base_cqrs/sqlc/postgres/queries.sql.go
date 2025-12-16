@@ -542,6 +542,71 @@ func (q *Queries) GetEventsIDbound(ctx context.Context, arg GetEventsIDboundPara
 	return items, nil
 }
 
+const getExecutionSpanByStepIDAndAttempt = `-- name: GetExecutionSpanByStepIDAndAttempt :one
+SELECT
+  run_id,
+  trace_id,
+  dynamic_span_id,
+  MIN(start_time) as start_time,
+  MAX(end_time) AS end_time,
+  parent_span_id,
+  json_agg(json_build_object(
+    'name', name,
+    'attributes', attributes,
+    'links', links,
+    'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
+    'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
+  )) AS span_fragments
+FROM spans
+WHERE run_id = CAST($1 AS CHAR(26)) AND account_id = $2
+GROUP BY dynamic_span_id, run_id, trace_id, parent_span_id
+HAVING
+  SUM(((attributes#>>'{}')::json->>'_inngest.step.id' = $3::text)::int) > 0
+  AND
+  SUM(((((attributes#>>'{}')::json->>'_inngest.step.attempt')::bigint) = $4::bigint)::int) > 0
+  AND
+  SUM((name IN ('executor.step', 'executor.execution'))::int) > 0
+ORDER BY start_time ASC
+LIMIT 1
+`
+
+type GetExecutionSpanByStepIDAndAttemptParams struct {
+	RunID       string
+	AccountID   string
+	StepID      string
+	StepAttempt int64
+}
+
+type GetExecutionSpanByStepIDAndAttemptRow struct {
+	RunID         string
+	TraceID       string
+	DynamicSpanID sql.NullString
+	StartTime     interface{}
+	EndTime       interface{}
+	ParentSpanID  sql.NullString
+	SpanFragments json.RawMessage
+}
+
+func (q *Queries) GetExecutionSpanByStepIDAndAttempt(ctx context.Context, arg GetExecutionSpanByStepIDAndAttemptParams) (*GetExecutionSpanByStepIDAndAttemptRow, error) {
+	row := q.db.QueryRowContext(ctx, getExecutionSpanByStepIDAndAttempt,
+		arg.RunID,
+		arg.AccountID,
+		arg.StepID,
+		arg.StepAttempt,
+	)
+	var i GetExecutionSpanByStepIDAndAttemptRow
+	err := row.Scan(
+		&i.RunID,
+		&i.TraceID,
+		&i.DynamicSpanID,
+		&i.StartTime,
+		&i.EndTime,
+		&i.ParentSpanID,
+		&i.SpanFragments,
+	)
+	return &i, err
+}
+
 const getFunctionByID = `-- name: GetFunctionByID :one
 SELECT id, app_id, name, slug, config, created_at, archived_at FROM functions WHERE id = $1
 `
@@ -945,6 +1010,63 @@ func (q *Queries) GetHistoryItem(ctx context.Context, id ulid.ULID) (*History, e
 	return &i, err
 }
 
+const getLatestExecutionSpanByStepID = `-- name: GetLatestExecutionSpanByStepID :one
+SELECT
+  run_id,
+  trace_id,
+  dynamic_span_id,
+  MIN(start_time) as start_time,
+  MAX(end_time) AS end_time,
+  parent_span_id,
+  json_agg(json_build_object(
+    'name', name,
+    'attributes', attributes,
+    'links', links,
+    'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
+    'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
+  )) AS span_fragments
+FROM spans b
+WHERE b.run_id = CAST($1 AS CHAR(26)) AND b.account_id = $2
+GROUP BY dynamic_span_id, run_id, trace_id, parent_span_id
+HAVING
+  SUM(((attributes#>>'{}')::json->>'_inngest.step.id' = $3::text)::int) > 0
+  AND
+  SUM((name IN ('executor.step', 'executor.execution'))::int) > 0
+ORDER BY start_time DESC
+LIMIT 1
+`
+
+type GetLatestExecutionSpanByStepIDParams struct {
+	RunID     string
+	AccountID string
+	StepID    string
+}
+
+type GetLatestExecutionSpanByStepIDRow struct {
+	RunID         string
+	TraceID       string
+	DynamicSpanID sql.NullString
+	StartTime     interface{}
+	EndTime       interface{}
+	ParentSpanID  sql.NullString
+	SpanFragments json.RawMessage
+}
+
+func (q *Queries) GetLatestExecutionSpanByStepID(ctx context.Context, arg GetLatestExecutionSpanByStepIDParams) (*GetLatestExecutionSpanByStepIDRow, error) {
+	row := q.db.QueryRowContext(ctx, getLatestExecutionSpanByStepID, arg.RunID, arg.AccountID, arg.StepID)
+	var i GetLatestExecutionSpanByStepIDRow
+	err := row.Scan(
+		&i.RunID,
+		&i.TraceID,
+		&i.DynamicSpanID,
+		&i.StartTime,
+		&i.EndTime,
+		&i.ParentSpanID,
+		&i.SpanFragments,
+	)
+	return &i, err
+}
+
 const getLatestQueueSnapshotChunks = `-- name: GetLatestQueueSnapshotChunks :many
 SELECT chunk_id, data
 FROM queue_snapshot_chunks
@@ -1020,24 +1142,284 @@ func (q *Queries) GetQueueSnapshotChunks(ctx context.Context, snapshotID string)
 	return items, nil
 }
 
-const getSpanOutput = `-- name: GetSpanOutput :one
+const getRunSpanByRunID = `-- name: GetRunSpanByRunID :one
 SELECT
-  -- input, TODO
-  output
+  run_id,
+  trace_id,
+  dynamic_span_id,
+  MIN(start_time) as start_time,
+  MAX(end_time) AS end_time,
+  parent_span_id,
+  json_agg(json_build_object(
+    'name', name,
+    'attributes', attributes,
+    'links', links,
+    'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
+    'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
+  )) AS span_fragments
 FROM spans
-WHERE span_id = $1
+WHERE run_id = CAST($1 AS CHAR(26)) AND account_id = $2 AND (parent_span_id IS NULL OR parent_span_id = '0000000000000000')
+GROUP BY dynamic_span_id, run_id, trace_id, parent_span_id
+HAVING SUM((name = 'executor.run')::int) > 0
+ORDER BY start_time ASC
 LIMIT 1
 `
 
-func (q *Queries) GetSpanOutput(ctx context.Context, spanID string) (pqtype.NullRawMessage, error) {
-	row := q.db.QueryRowContext(ctx, getSpanOutput, spanID)
-	var output pqtype.NullRawMessage
-	err := row.Scan(&output)
-	return output, err
+type GetRunSpanByRunIDParams struct {
+	RunID     string
+	AccountID string
+}
+
+type GetRunSpanByRunIDRow struct {
+	RunID         string
+	TraceID       string
+	DynamicSpanID sql.NullString
+	StartTime     interface{}
+	EndTime       interface{}
+	ParentSpanID  sql.NullString
+	SpanFragments json.RawMessage
+}
+
+func (q *Queries) GetRunSpanByRunID(ctx context.Context, arg GetRunSpanByRunIDParams) (*GetRunSpanByRunIDRow, error) {
+	row := q.db.QueryRowContext(ctx, getRunSpanByRunID, arg.RunID, arg.AccountID)
+	var i GetRunSpanByRunIDRow
+	err := row.Scan(
+		&i.RunID,
+		&i.TraceID,
+		&i.DynamicSpanID,
+		&i.StartTime,
+		&i.EndTime,
+		&i.ParentSpanID,
+		&i.SpanFragments,
+	)
+	return &i, err
+}
+
+const getSpanBySpanID = `-- name: GetSpanBySpanID :one
+SELECT
+  run_id,
+  trace_id,
+  dynamic_span_id,
+  MIN(start_time) as start_time,
+  MAX(end_time) AS end_time,
+  parent_span_id,
+  json_agg(json_build_object(
+    'name', name,
+    'attributes', attributes,
+    'links', links,
+    'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
+    'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
+  )) AS span_fragments
+FROM spans
+WHERE run_id = CAST($1 AS CHAR(26)) AND span_id = $2 AND account_id = $3
+GROUP BY dynamic_span_id, run_id, trace_id, parent_span_id
+ORDER BY start_time ASC
+LIMIT 1
+`
+
+type GetSpanBySpanIDParams struct {
+	RunID     string
+	SpanID    string
+	AccountID string
+}
+
+type GetSpanBySpanIDRow struct {
+	RunID         string
+	TraceID       string
+	DynamicSpanID sql.NullString
+	StartTime     interface{}
+	EndTime       interface{}
+	ParentSpanID  sql.NullString
+	SpanFragments json.RawMessage
+}
+
+func (q *Queries) GetSpanBySpanID(ctx context.Context, arg GetSpanBySpanIDParams) (*GetSpanBySpanIDRow, error) {
+	row := q.db.QueryRowContext(ctx, getSpanBySpanID, arg.RunID, arg.SpanID, arg.AccountID)
+	var i GetSpanBySpanIDRow
+	err := row.Scan(
+		&i.RunID,
+		&i.TraceID,
+		&i.DynamicSpanID,
+		&i.StartTime,
+		&i.EndTime,
+		&i.ParentSpanID,
+		&i.SpanFragments,
+	)
+	return &i, err
+}
+
+const getSpanOutput = `-- name: GetSpanOutput :many
+SELECT
+  input,
+  output
+FROM spans
+WHERE span_id IN (SELECT UNNEST($1::TEXT[]))
+LIMIT 2
+`
+
+type GetSpanOutputRow struct {
+	Input  pqtype.NullRawMessage
+	Output pqtype.NullRawMessage
+}
+
+func (q *Queries) GetSpanOutput(ctx context.Context, ids []string) ([]*GetSpanOutputRow, error) {
+	rows, err := q.db.QueryContext(ctx, getSpanOutput, pq.Array(ids))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*GetSpanOutputRow
+	for rows.Next() {
+		var i GetSpanOutputRow
+		if err := rows.Scan(&i.Input, &i.Output); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getSpansByDebugRunID = `-- name: GetSpansByDebugRunID :many
+SELECT
+  trace_id,
+  run_id,
+  debug_session_id,
+  dynamic_span_id,
+  MIN(start_time) as start_time,
+  MAX(end_time) AS end_time,
+  parent_span_id,
+  json_agg(json_build_object(
+    'span_id', span_id,
+    'name', name,
+    'attributes', attributes,
+    'links', links,
+    'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
+    'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
+  )) AS span_fragments
+FROM spans
+WHERE debug_run_id = CAST($1 AS CHAR(26))
+GROUP BY trace_id, run_id, debug_session_id, parent_span_id
+ORDER BY start_time
+`
+
+type GetSpansByDebugRunIDRow struct {
+	TraceID        string
+	RunID          string
+	DebugSessionID sql.NullString
+	DynamicSpanID  sql.NullString
+	StartTime      interface{}
+	EndTime        interface{}
+	ParentSpanID   sql.NullString
+	SpanFragments  json.RawMessage
+}
+
+func (q *Queries) GetSpansByDebugRunID(ctx context.Context, dollar_1 string) ([]*GetSpansByDebugRunIDRow, error) {
+	rows, err := q.db.QueryContext(ctx, getSpansByDebugRunID, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*GetSpansByDebugRunIDRow
+	for rows.Next() {
+		var i GetSpansByDebugRunIDRow
+		if err := rows.Scan(
+			&i.TraceID,
+			&i.RunID,
+			&i.DebugSessionID,
+			&i.DynamicSpanID,
+			&i.StartTime,
+			&i.EndTime,
+			&i.ParentSpanID,
+			&i.SpanFragments,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getSpansByDebugSessionID = `-- name: GetSpansByDebugSessionID :many
+SELECT
+  trace_id,
+  run_id,
+  debug_run_id,
+  dynamic_span_id,
+  MIN(start_time) as start_time,
+  MAX(end_time) AS end_time,
+  parent_span_id,
+  json_agg(json_build_object(
+    'span_id', span_id,
+    'name', name,
+    'attributes', attributes,
+    'links', links,
+    'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
+    'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
+  )) AS span_fragments
+FROM spans
+WHERE debug_session_id = CAST($1 AS CHAR(26))
+GROUP BY trace_id, run_id, debug_run_id, dynamic_span_id, parent_span_id
+ORDER BY start_time
+`
+
+type GetSpansByDebugSessionIDRow struct {
+	TraceID       string
+	RunID         string
+	DebugRunID    sql.NullString
+	DynamicSpanID sql.NullString
+	StartTime     interface{}
+	EndTime       interface{}
+	ParentSpanID  sql.NullString
+	SpanFragments json.RawMessage
+}
+
+func (q *Queries) GetSpansByDebugSessionID(ctx context.Context, dollar_1 string) ([]*GetSpansByDebugSessionIDRow, error) {
+	rows, err := q.db.QueryContext(ctx, getSpansByDebugSessionID, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*GetSpansByDebugSessionIDRow
+	for rows.Next() {
+		var i GetSpansByDebugSessionIDRow
+		if err := rows.Scan(
+			&i.TraceID,
+			&i.RunID,
+			&i.DebugRunID,
+			&i.DynamicSpanID,
+			&i.StartTime,
+			&i.EndTime,
+			&i.ParentSpanID,
+			&i.SpanFragments,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const getSpansByRunID = `-- name: GetSpansByRunID :many
 SELECT
+  run_id,
   trace_id,
   dynamic_span_id,
   MIN(start_time) as start_time,
@@ -1048,15 +1430,17 @@ SELECT
     'name', name,
     'attributes', attributes,
     'links', links,
-    'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END
+    'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
+    'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
   )) AS span_fragments
 FROM spans
 WHERE run_id = CAST($1 AS CHAR(26))
-GROUP BY dynamic_span_id
+GROUP BY run_id, trace_id, dynamic_span_id, parent_span_id
 ORDER BY start_time
 `
 
 type GetSpansByRunIDRow struct {
+	RunID         string
 	TraceID       string
 	DynamicSpanID sql.NullString
 	StartTime     interface{}
@@ -1075,6 +1459,7 @@ func (q *Queries) GetSpansByRunID(ctx context.Context, dollar_1 string) ([]*GetS
 	for rows.Next() {
 		var i GetSpansByRunIDRow
 		if err := rows.Scan(
+			&i.RunID,
 			&i.TraceID,
 			&i.DynamicSpanID,
 			&i.StartTime,
@@ -1093,6 +1478,94 @@ func (q *Queries) GetSpansByRunID(ctx context.Context, dollar_1 string) ([]*GetS
 		return nil, err
 	}
 	return items, nil
+}
+
+const getStepSpanByStepID = `-- name: GetStepSpanByStepID :one
+SELECT
+  run_id,
+  trace_id,
+  dynamic_span_id,
+  MIN(start_time) as start_time,
+  MAX(end_time) AS end_time,
+  parent_span_id,
+  json_agg(json_build_object(
+    'name', name,
+    'attributes', attributes,
+    'links', links,
+    'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
+    'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
+  )) AS span_fragments
+FROM spans
+WHERE span_id IN (
+  SELECT
+    parent_span_id
+  FROM spans execSpans
+  WHERE execSpans.run_id = CAST($1 AS CHAR(26)) AND execSpans.account_id = $2
+  GROUP BY dynamic_span_id, parent_span_id
+  HAVING
+    SUM(((attributes#>>'{}')::json->>'_inngest.step.id' = $3::text)::int) > 0
+    AND
+    SUM((name = 'executor.execution')::int) > 0
+  ORDER BY MIN(start_time)
+  LIMIT 1
+)
+GROUP BY dynamic_span_id, run_id, trace_id, parent_span_id
+HAVING SUM((name = 'executor.step.discovery')::int) > 0
+UNION ALL
+SELECT
+  run_id,
+  trace_id,
+  dynamic_span_id,
+  MIN(start_time) as start_time,
+  MAX(end_time) AS end_time,
+  parent_span_id,
+  json_agg(json_build_object(
+    'name', name,
+    'attributes', attributes,
+    'links', links,
+    'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
+    'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
+  )) AS span_fragments
+FROM spans
+WHERE run_id = CAST($1 AS CHAR(26)) AND account_id = $2
+GROUP BY dynamic_span_id, run_id, trace_id, parent_span_id
+HAVING
+  SUM(((attributes#>>'{}')::json->>'_inngest.step.id' = $3::text)::int) > 0
+  AND
+  SUM((name = 'executor.step')::int) > 0
+ORDER BY start_time ASC
+LIMIT 1
+`
+
+type GetStepSpanByStepIDParams struct {
+	RunID     string
+	AccountID string
+	StepID    string
+}
+
+type GetStepSpanByStepIDRow struct {
+	RunID         string
+	TraceID       string
+	DynamicSpanID sql.NullString
+	StartTime     interface{}
+	EndTime       interface{}
+	ParentSpanID  sql.NullString
+	SpanFragments json.RawMessage
+}
+
+func (q *Queries) GetStepSpanByStepID(ctx context.Context, arg GetStepSpanByStepIDParams) (*GetStepSpanByStepIDRow, error) {
+	row := q.db.QueryRowContext(ctx, getStepSpanByStepID, arg.RunID, arg.AccountID, arg.StepID)
+	var i GetStepSpanByStepIDRow
+	err := row.Scan(
+		&i.RunID,
+		&i.TraceID,
+		&i.DynamicSpanID,
+		&i.StartTime,
+		&i.EndTime,
+		&i.ParentSpanID,
+		&i.SpanFragments,
+	)
+	return &i, err
 }
 
 const getTraceRun = `-- name: GetTraceRun :one
@@ -1122,6 +1595,51 @@ func (q *Queries) GetTraceRun(ctx context.Context, runID string) (*TraceRun, err
 		&i.HasAi,
 	)
 	return &i, err
+}
+
+const getTraceRunsByTriggerId = `-- name: GetTraceRunsByTriggerId :many
+SELECT run_id, account_id, workspace_id, app_id, function_id, trace_id, queued_at, started_at, ended_at, status, source_id, trigger_ids, output, is_debounce, batch_id, cron_schedule, has_ai FROM trace_runs WHERE POSITION($1 IN trigger_ids::text) > 0
+`
+
+func (q *Queries) GetTraceRunsByTriggerId(ctx context.Context, eventID interface{}) ([]*TraceRun, error) {
+	rows, err := q.db.QueryContext(ctx, getTraceRunsByTriggerId, eventID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*TraceRun
+	for rows.Next() {
+		var i TraceRun
+		if err := rows.Scan(
+			&i.RunID,
+			&i.AccountID,
+			&i.WorkspaceID,
+			&i.AppID,
+			&i.FunctionID,
+			&i.TraceID,
+			&i.QueuedAt,
+			&i.StartedAt,
+			&i.EndedAt,
+			&i.Status,
+			&i.SourceID,
+			&i.TriggerIds,
+			&i.Output,
+			&i.IsDebounce,
+			&i.BatchID,
+			&i.CronSchedule,
+			&i.HasAi,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const getTraceSpanOutput = `-- name: GetTraceSpanOutput :many
@@ -1229,7 +1747,7 @@ func (q *Queries) GetTraceSpans(ctx context.Context, arg GetTraceSpansParams) ([
 }
 
 const getWorkerConnection = `-- name: GetWorkerConnection :one
-SELECT account_id, workspace_id, app_name, app_id, id, gateway_id, instance_id, status, worker_ip, connected_at, last_heartbeat_at, disconnected_at, recorded_at, inserted_at, disconnect_reason, group_hash, sdk_lang, sdk_version, sdk_platform, sync_id, app_version, function_count, cpu_cores, mem_bytes, os FROM worker_connections WHERE account_id = $1 AND workspace_id = $2 AND id = $3
+SELECT account_id, workspace_id, app_name, app_id, id, gateway_id, instance_id, status, worker_ip, max_worker_concurrency, connected_at, last_heartbeat_at, disconnected_at, recorded_at, inserted_at, disconnect_reason, group_hash, sdk_lang, sdk_version, sdk_platform, sync_id, app_version, function_count, cpu_cores, mem_bytes, os FROM worker_connections WHERE account_id = $1 AND workspace_id = $2 AND id = $3
 `
 
 type GetWorkerConnectionParams struct {
@@ -1251,6 +1769,7 @@ func (q *Queries) GetWorkerConnection(ctx context.Context, arg GetWorkerConnecti
 		&i.InstanceID,
 		&i.Status,
 		&i.WorkerIp,
+		&i.MaxWorkerConcurrency,
 		&i.ConnectedAt,
 		&i.LastHeartbeatAt,
 		&i.DisconnectedAt,
@@ -1550,26 +2069,36 @@ INSERT INTO spans (
   dynamic_span_id,
   attributes,
   links,
-  output
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+  output,
+  input,
+  debug_run_id,
+  debug_session_id,
+  status,
+  event_ids
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
 `
 
 type InsertSpanParams struct {
-	SpanID        string
-	TraceID       string
-	ParentSpanID  sql.NullString
-	Name          string
-	StartTime     time.Time
-	EndTime       time.Time
-	RunID         string
-	AccountID     string
-	AppID         string
-	FunctionID    string
-	EnvID         string
-	DynamicSpanID sql.NullString
-	Attributes    pqtype.NullRawMessage
-	Links         pqtype.NullRawMessage
-	Output        pqtype.NullRawMessage
+	SpanID         string
+	TraceID        string
+	ParentSpanID   sql.NullString
+	Name           string
+	StartTime      time.Time
+	EndTime        time.Time
+	RunID          string
+	AccountID      string
+	AppID          string
+	FunctionID     string
+	EnvID          string
+	DynamicSpanID  sql.NullString
+	Attributes     pqtype.NullRawMessage
+	Links          pqtype.NullRawMessage
+	Output         pqtype.NullRawMessage
+	Input          pqtype.NullRawMessage
+	DebugRunID     sql.NullString
+	DebugSessionID sql.NullString
+	Status         sql.NullString
+	EventIds       pqtype.NullRawMessage
 }
 
 // New
@@ -1590,6 +2119,11 @@ func (q *Queries) InsertSpan(ctx context.Context, arg InsertSpanParams) error {
 		arg.Attributes,
 		arg.Links,
 		arg.Output,
+		arg.Input,
+		arg.DebugRunID,
+		arg.DebugSessionID,
+		arg.Status,
+		arg.EventIds,
 	)
 	return err
 }
@@ -1724,7 +2258,7 @@ func (q *Queries) InsertTraceRun(ctx context.Context, arg InsertTraceRunParams) 
 const insertWorkerConnection = `-- name: InsertWorkerConnection :exec
 
 INSERT INTO worker_connections (
-    account_id, workspace_id, app_name, app_id, id, gateway_id, instance_id, status, worker_ip, connected_at, last_heartbeat_at, disconnected_at,
+    account_id, workspace_id, app_name, app_id, id, gateway_id, instance_id, status, worker_ip, max_worker_concurrency, connected_at, last_heartbeat_at, disconnected_at,
     recorded_at, inserted_at, disconnect_reason, group_hash, sdk_lang, sdk_version, sdk_platform, sync_id, app_version, function_count, cpu_cores, mem_bytes, os
 )
 VALUES (
@@ -1752,7 +2286,8 @@ VALUES (
         $22,
         $23,
         $24,
-        $25
+        $25,
+        $26
         )
     ON CONFLICT(id, app_name)
 DO UPDATE SET
@@ -1766,6 +2301,7 @@ DO UPDATE SET
            instance_id = excluded.instance_id,
            status = excluded.status,
            worker_ip = excluded.worker_ip,
+           max_worker_concurrency = excluded.max_worker_concurrency,
 
            connected_at = excluded.connected_at,
            last_heartbeat_at = excluded.last_heartbeat_at,
@@ -1789,31 +2325,32 @@ DO UPDATE SET
 `
 
 type InsertWorkerConnectionParams struct {
-	AccountID        uuid.UUID
-	WorkspaceID      uuid.UUID
-	AppName          string
-	AppID            *uuid.UUID
-	ID               ulid.ULID
-	GatewayID        ulid.ULID
-	InstanceID       string
-	Status           int16
-	WorkerIp         string
-	ConnectedAt      int64
-	LastHeartbeatAt  sql.NullInt64
-	DisconnectedAt   sql.NullInt64
-	RecordedAt       int64
-	InsertedAt       int64
-	DisconnectReason sql.NullString
-	GroupHash        []byte
-	SdkLang          string
-	SdkVersion       string
-	SdkPlatform      string
-	SyncID           *uuid.UUID
-	AppVersion       sql.NullString
-	FunctionCount    int32
-	CpuCores         int32
-	MemBytes         int64
-	Os               string
+	AccountID            uuid.UUID
+	WorkspaceID          uuid.UUID
+	AppName              string
+	AppID                *uuid.UUID
+	ID                   ulid.ULID
+	GatewayID            ulid.ULID
+	InstanceID           string
+	Status               int16
+	WorkerIp             string
+	MaxWorkerConcurrency int64
+	ConnectedAt          int64
+	LastHeartbeatAt      sql.NullInt64
+	DisconnectedAt       sql.NullInt64
+	RecordedAt           int64
+	InsertedAt           int64
+	DisconnectReason     sql.NullString
+	GroupHash            []byte
+	SdkLang              string
+	SdkVersion           string
+	SdkPlatform          string
+	SyncID               *uuid.UUID
+	AppVersion           sql.NullString
+	FunctionCount        int32
+	CpuCores             int32
+	MemBytes             int64
+	Os                   string
 }
 
 // Worker Connections
@@ -1828,6 +2365,7 @@ func (q *Queries) InsertWorkerConnection(ctx context.Context, arg InsertWorkerCo
 		arg.InstanceID,
 		arg.Status,
 		arg.WorkerIp,
+		arg.MaxWorkerConcurrency,
 		arg.ConnectedAt,
 		arg.LastHeartbeatAt,
 		arg.DisconnectedAt,
@@ -1948,7 +2486,8 @@ ON CONFLICT(id) DO UPDATE SET
     checksum = excluded.checksum,
     archived_at = NULL,
     "method" = excluded.method,
-    app_version = excluded.app_version
+    app_version = excluded.app_version,
+    url = excluded.url
 RETURNING id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, created_at, archived_at, url, method, app_version
 `
 
@@ -2000,110 +2539,4 @@ func (q *Queries) UpsertApp(ctx context.Context, arg UpsertAppParams) (*App, err
 		&i.AppVersion,
 	)
 	return &i, err
-}
-
-const workspaceEvents = `-- name: WorkspaceEvents :many
-SELECT internal_id, account_id, workspace_id, source, source_id, received_at, event_id, event_name, event_data, event_user, event_v, event_ts FROM events WHERE internal_id < $1 AND received_at <= $2 AND received_at >= $3 ORDER BY internal_id DESC LIMIT $4
-`
-
-type WorkspaceEventsParams struct {
-	InternalID   ulid.ULID
-	ReceivedAt   time.Time
-	ReceivedAt_2 time.Time
-	Limit        int32
-}
-
-func (q *Queries) WorkspaceEvents(ctx context.Context, arg WorkspaceEventsParams) ([]*Event, error) {
-	rows, err := q.db.QueryContext(ctx, workspaceEvents,
-		arg.InternalID,
-		arg.ReceivedAt,
-		arg.ReceivedAt_2,
-		arg.Limit,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []*Event
-	for rows.Next() {
-		var i Event
-		if err := rows.Scan(
-			&i.InternalID,
-			&i.AccountID,
-			&i.WorkspaceID,
-			&i.Source,
-			&i.SourceID,
-			&i.ReceivedAt,
-			&i.EventID,
-			&i.EventName,
-			&i.EventData,
-			&i.EventUser,
-			&i.EventV,
-			&i.EventTs,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, &i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const workspaceNamedEvents = `-- name: WorkspaceNamedEvents :many
-SELECT internal_id, account_id, workspace_id, source, source_id, received_at, event_id, event_name, event_data, event_user, event_v, event_ts FROM events WHERE internal_id < $1 AND received_at <= $2 AND received_at >= $3 AND event_name = $4 ORDER BY internal_id DESC LIMIT $5
-`
-
-type WorkspaceNamedEventsParams struct {
-	InternalID   ulid.ULID
-	ReceivedAt   time.Time
-	ReceivedAt_2 time.Time
-	EventName    string
-	Limit        int32
-}
-
-func (q *Queries) WorkspaceNamedEvents(ctx context.Context, arg WorkspaceNamedEventsParams) ([]*Event, error) {
-	rows, err := q.db.QueryContext(ctx, workspaceNamedEvents,
-		arg.InternalID,
-		arg.ReceivedAt,
-		arg.ReceivedAt_2,
-		arg.EventName,
-		arg.Limit,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []*Event
-	for rows.Next() {
-		var i Event
-		if err := rows.Scan(
-			&i.InternalID,
-			&i.AccountID,
-			&i.WorkspaceID,
-			&i.Source,
-			&i.SourceID,
-			&i.ReceivedAt,
-			&i.EventID,
-			&i.EventName,
-			&i.EventData,
-			&i.EventUser,
-			&i.EventV,
-			&i.EventTs,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, &i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
 }

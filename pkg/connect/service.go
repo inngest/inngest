@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	mathRand "math/rand"
+	"net"
 	"net/http"
 	"os"
 	"sync"
@@ -14,14 +15,17 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	connectConfig "github.com/inngest/inngest/pkg/config/connect"
 	"github.com/inngest/inngest/pkg/connect/auth"
-	"github.com/inngest/inngest/pkg/connect/pubsub"
+	"github.com/inngest/inngest/pkg/connect/grpc"
 	"github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
+	pb "github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/oklog/ulid/v2"
 	"golang.org/x/sync/errgroup"
+	grpcLib "google.golang.org/grpc"
 )
 
 const (
@@ -59,10 +63,16 @@ type ConnectEntitlementRetriever interface {
 }
 
 type connectGatewaySvc struct {
+	pb.ConnectGatewayServer
+
 	gatewayPublicPort int
+	grpcConfig        connectConfig.ConnectGRPCConfig
 
 	gatewayRoutes  chi.Router
 	maintenanceApi chi.Router
+
+	grpcServer    *grpcLib.Server
+	wsConnections sync.Map
 
 	// gatewayId is a unique identifier, generated each time the service is started.
 	// This should be used to uniquely identify the gateway instance when sending messages and routing requests.
@@ -75,7 +85,6 @@ type connectGatewaySvc struct {
 
 	auther       auth.Handler
 	stateManager state.StateManager
-	receiver     pubsub.RequestReceiver
 	apiBaseUrl   string
 
 	consecutiveWorkerHeartbeatMissesBeforeConnectionClose int
@@ -83,17 +92,20 @@ type connectGatewaySvc struct {
 	workerRequestExtendLeaseInterval                      time.Duration
 	workerRequestLeaseDuration                            time.Duration
 
-	hostname string
+	hostname  string
+	ipAddress net.IP
 
 	// groupName specifies the name of the deployment group in case this gateway is one of many replicas.
 	groupName string
 
 	lifecycles []ConnectGatewayLifecycleListener
 
-	isDraining      bool
+	isDraining      atomic.Bool
 	connectionCount connectionCounter
 	drainListener   *drainListener
 	stateUpdateLock sync.Mutex
+
+	grpcClientManager *grpc.GRPCClientManager[pb.ConnectExecutorClient]
 }
 
 func (c *connectGatewaySvc) MaintenanceAPI() http.Handler {
@@ -101,7 +113,7 @@ func (c *connectGatewaySvc) MaintenanceAPI() http.Handler {
 }
 
 func (c *connectGatewaySvc) IsDraining() bool {
-	return c.isDraining
+	return c.isDraining.Load()
 }
 
 func (c *connectGatewaySvc) IsDrained() bool {
@@ -131,12 +143,6 @@ func WithConnectionStateManager(m state.StateManager) gatewayOpt {
 	}
 }
 
-func WithRequestReceiver(r pubsub.RequestReceiver) gatewayOpt {
-	return func(c *connectGatewaySvc) {
-		c.receiver = r
-	}
-}
-
 func WithLifeCycles(lifecycles []ConnectGatewayLifecycleListener) gatewayOpt {
 	return func(svc *connectGatewaySvc) {
 		svc.lifecycles = lifecycles
@@ -151,13 +157,19 @@ func WithDev() gatewayOpt {
 
 func WithStartAsDraining(isDraining bool) gatewayOpt {
 	return func(svc *connectGatewaySvc) {
-		svc.isDraining = isDraining
+		svc.isDraining.Store(isDraining)
 	}
 }
 
 func WithGatewayPublicPort(port int) gatewayOpt {
 	return func(svc *connectGatewaySvc) {
 		svc.gatewayPublicPort = port
+	}
+}
+
+func WithGRPCConfig(config connectConfig.ConnectGRPCConfig) gatewayOpt {
+	return func(svc *connectGatewaySvc) {
+		svc.grpcConfig = config
 	}
 }
 
@@ -203,11 +215,18 @@ func NewConnectGatewayService(opts ...gatewayOpt) *connectGatewaySvc {
 		lifecycles:        []ConnectGatewayLifecycleListener{},
 		drainListener:     newDrainListener(),
 		gatewayPublicPort: 8080,
+		grpcConfig: connectConfig.NewGRPCConfig(
+			context.Background(),
+			grpc.DefaultConnectGRPCIP, grpc.DefaultConnectGatewayGRPCPort,
+			grpc.DefaultConnectGRPCIP, grpc.DefaultConnectExecutorGRPCPort,
+		),
 
 		workerHeartbeatInterval:                               consts.ConnectWorkerHeartbeatInterval,
 		workerRequestExtendLeaseInterval:                      consts.ConnectWorkerRequestExtendLeaseInterval,
 		workerRequestLeaseDuration:                            consts.ConnectWorkerRequestLeaseDuration,
 		consecutiveWorkerHeartbeatMissesBeforeConnectionClose: 5,
+
+		grpcServer: grpcLib.NewServer(),
 	}
 
 	for _, opt := range opts {
@@ -215,7 +234,7 @@ func NewConnectGatewayService(opts ...gatewayOpt) *connectGatewaySvc {
 	}
 
 	readinessHandler := func(writer http.ResponseWriter, request *http.Request) {
-		if gateway.isDraining {
+		if gateway.isDraining.Load() {
 			writer.WriteHeader(http.StatusServiceUnavailable)
 			return
 		}
@@ -268,9 +287,16 @@ func (c *connectGatewaySvc) Pre(ctx context.Context) error {
 	}
 	c.hostname = hostname
 
+	c.ipAddress = c.grpcConfig.Gateway.IP
+
 	if err := c.updateGatewayState(state.GatewayStatusStarting); err != nil {
 		return fmt.Errorf("could not set initial gateway state: %w", err)
 	}
+
+	c.grpcClientManager = grpc.NewGRPCClientManager(pb.NewConnectExecutorClient, grpc.WithLogger[pb.ConnectExecutorClient](c.logger))
+
+	// Register gRPC server
+	pb.RegisterConnectGatewayServer(c.grpcServer, c)
 
 	return nil
 }
@@ -284,7 +310,7 @@ func (c *connectGatewaySvc) heartbeat(ctx context.Context) {
 			return
 		case <-heartbeatTicker.C:
 			status := state.GatewayStatusActive
-			if c.isDraining {
+			if c.isDraining.Load() {
 				status = state.GatewayStatusDraining
 			}
 
@@ -324,7 +350,7 @@ func (c *connectGatewaySvc) instrument(ctx context.Context) {
 			Tags:    additionalTags,
 		})
 
-		if c.isDraining {
+		if c.isDraining.Load() {
 			metrics.GaugeConnectDrainingGateway(ctx, 1, metrics.GaugeOpt{
 				PkgName: pkgName,
 				Tags:    additionalTags,
@@ -415,23 +441,17 @@ func (c *connectGatewaySvc) Run(ctx context.Context) error {
 	})
 
 	eg.Go(func() error {
-		// TODO Mark gateway as active a couple seconds into the future (how do we make sure PubSub is connected and ready to receive?)
-		// Start listening for messages, this will block until the context is cancelled
-		err := c.receiver.Wait(ctx)
+		addr := fmt.Sprintf(":%d", c.grpcConfig.Gateway.Port)
+
+		l, err := net.Listen("tcp", addr)
 		if err != nil {
-			if ctx.Err() != nil {
-				return nil
-			}
-			// TODO Should we retry? Exit here? This will interrupt existing connections!
-			return fmt.Errorf("could not listen for pubsub messages: %w", err)
+			return fmt.Errorf("could not listen for: %w", err)
 		}
-
-		c.logger.Debug("receiver wait finished")
-
-		return nil
+		logger.StdlibLogger(ctx).Info("starting connect gateway grpc server", "addr", addr)
+		return c.grpcServer.Serve(l)
 	})
 
-	if !c.isDraining {
+	if !c.isDraining.Load() {
 		err := c.updateGatewayState(state.GatewayStatusActive)
 		if err != nil {
 			return fmt.Errorf("could not update gateway state: %w", err)
@@ -459,6 +479,7 @@ func (c *connectGatewaySvc) updateGatewayState(status state.GatewayStatus) error
 		Status:            status,
 		LastHeartbeatAtMS: time.Now().UnixMilli(),
 		Hostname:          c.hostname,
+		IPAddress:         c.ipAddress,
 	})
 	if err != nil {
 		c.logger.Error("failed to update gateway status in state", "status", status, "error", err)
@@ -516,7 +537,7 @@ func (c *connectGatewaySvc) DrainGateway() error {
 	if err != nil {
 		return fmt.Errorf("could not update gateway state: %w", err)
 	}
-	c.isDraining = true
+	c.isDraining.Store(true)
 	c.drainListener.Notify()
 	return nil
 }
@@ -526,6 +547,20 @@ func (c *connectGatewaySvc) ActivateGateway() error {
 	if err != nil {
 		return fmt.Errorf("could not update gateway state: %w", err)
 	}
-	c.isDraining = false
+	c.isDraining.Store(false)
 	return nil
+}
+
+// getOrCreateGRPCClient gets the executor IP and returns a gRPC client for that executor,
+// creating one if it doesn't exist.
+func (c *connectGatewaySvc) getOrCreateGRPCClient(ctx context.Context, envID uuid.UUID, requestId string) (pb.ConnectExecutorClient, error) {
+	ip, err := c.stateManager.GetExecutorIP(ctx, envID, requestId)
+	if err != nil {
+		return nil, err
+	}
+	executorIP := ip.String()
+
+	grpcURL := net.JoinHostPort(executorIP, fmt.Sprintf("%d", c.grpcConfig.Executor.Port))
+
+	return c.grpcClientManager.GetOrCreateClient(ctx, executorIP, grpcURL)
 }

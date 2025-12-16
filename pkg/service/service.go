@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"sync"
 	"syscall"
 	"time"
 
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/sourcegraph/conc"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -19,19 +19,16 @@ var (
 
 	ErrPreTimeout = fmt.Errorf("service.Pre did not end within the given timeout")
 	ErrRunTimeout = fmt.Errorf("service.Run did not end within the given timeout")
-
-	wgctxVal = wgctx{}
 )
 
-type wgctx struct{}
+var wg conc.WaitGroup
 
-// GetWaitgroup returns a waitgroup from the top-level service context
-func GetWaitgroup(ctx context.Context) *sync.WaitGroup {
-	wg, _ := ctx.Value(wgctxVal).(*sync.WaitGroup)
-	if wg == nil {
-		wg = &sync.WaitGroup{}
-	}
-	return wg
+func Go(f func()) {
+	wg.Go(f)
+}
+
+func Wait() {
+	wg.Wait()
 }
 
 // Service represents a basic interface for a long-running service.  By invoking
@@ -133,11 +130,6 @@ func Start(ctx context.Context, s Service) (err error) {
 	ctx, cleanup := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
 	defer cleanup()
 
-	// Create a new parent waitgroup which can be used to prevent stopping
-	// until the WG reaches 0.  This can be used for ephemeral goroutines.
-	wg := &sync.WaitGroup{}
-	ctx = context.WithValue(ctx, wgctxVal, wg)
-
 	defer func() {
 		if r := recover(); r != nil {
 			l.Error("service panicked", "recover", r)
@@ -234,14 +226,22 @@ func stop(ctx context.Context, s Service) error {
 	l := logger.StdlibLogger(ctx).With("service", s.Name())
 	stopCh := make(chan error)
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				l.Error("panic waiting for service to stop", "error", r)
+			}
+		}()
+
 		l.Info("service cleaning up")
 		// Create a new context that's not cancelled.
 		if err := s.Stop(context.Background()); err != nil && err != context.Canceled {
 			stopCh <- err
 			return
 		}
-		// Wait for everything in the run waitgroup
-		GetWaitgroup(ctx).Wait()
+		// Wait for everything in the global waitgroup.
+		if recovered := wg.WaitAndRecover(); recovered != nil {
+			l.Error("global goroutine panic waiting for service to stop", "error", recovered.Value, "stack", recovered.Stack)
+		}
 		stopCh <- nil
 	}()
 

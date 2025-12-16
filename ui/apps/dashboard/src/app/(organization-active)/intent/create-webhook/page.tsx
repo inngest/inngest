@@ -64,7 +64,7 @@ export default function Page() {
   }, [redirectURI]);
 
   const displayName = capitalCase(
-    name ?? domain !== null ? getNameFromDomain(domain) : 'Webhook integration'
+    name ?? (domain !== null ? getNameFromDomain(domain) : 'Webhook integration')
   );
 
   const slugifyOptions = { preserveCharacters: ['.'] };

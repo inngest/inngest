@@ -11,7 +11,7 @@ const query = graphql(`
     environment: workspace(id: $envID) {
       eventTypesV2(
         after: $cursor
-        first: 30
+        first: 40
         filter: { archived: $archived, nameSearch: $nameSearch }
       ) {
         edges {
@@ -74,6 +74,7 @@ export function useEventTypes() {
       const eventTypesData = result.data.environment.eventTypesV2;
       const events = eventTypesData.edges.map(({ node }) => ({
         name: node.name,
+        latestSchema: '',
         functions: node.functions.edges.map((f) => f.node),
         archived,
       }));
@@ -237,6 +238,7 @@ export function useAllEventTypes() {
     const events = eventsData.edges.map(({ node }) => ({
       id: node.name,
       name: node.name,
+      latestSchema: '',
     }));
 
     return events;

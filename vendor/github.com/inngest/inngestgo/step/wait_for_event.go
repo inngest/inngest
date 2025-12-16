@@ -39,7 +39,8 @@ type WaitForEventOpts struct {
 //		Timeout: 24 * time.Hour,
 //	})
 func WaitForEvent[T any](ctx context.Context, stepID string, opts WaitForEventOpts) (T, error) {
-	mgr := preflight(ctx)
+	targetID := getTargetStepID(ctx)
+	mgr := preflight(ctx, enums.OpcodeWaitForEvent)
 	args := map[string]any{
 		"timeout": str2duration.String(opts.Timeout),
 		"event":   opts.Event,
@@ -50,8 +51,9 @@ func WaitForEvent[T any](ctx context.Context, stepID string, opts WaitForEventOp
 	if opts.Name == "" {
 		opts.Name = stepID
 	}
+	op := mgr.NewOp(enums.OpcodeWaitForEvent, stepID)
+	hashedID := op.MustHash()
 
-	op := mgr.NewOp(enums.OpcodeWaitForEvent, stepID, args)
 	if val, ok := mgr.Step(ctx, op); ok {
 		var output T
 		if val == nil || bytes.Equal(val, []byte{0x6e, 0x75, 0x6c, 0x6c}) {
@@ -59,16 +61,25 @@ func WaitForEvent[T any](ctx context.Context, stepID string, opts WaitForEventOp
 		}
 		if err := json.Unmarshal(val, &output); err != nil {
 			mgr.SetErr(fmt.Errorf("error unmarshalling wait for event value in '%s': %w", opts.Event, err))
-			panic(ControlHijack{})
+			panic(sdkrequest.ControlHijack{})
 		}
 		return output, nil
 	}
 
-	mgr.AppendOp(sdkrequest.GeneratorOpcode{
-		ID:   op.MustHash(),
-		Op:   op.Op,
-		Name: opts.Name,
-		Opts: op.Opts,
-	})
-	panic(ControlHijack{})
+	if targetID != nil && *targetID != hashedID {
+		// Don't report this step since targeting is happening and it isn't
+		// targeted
+		panic(sdkrequest.ControlHijack{})
+	}
+
+	plannedOp := sdkrequest.GeneratorOpcode{
+		ID:       hashedID,
+		Op:       op.Op,
+		Name:     opts.Name,
+		Opts:     args,
+		Userland: op.Userland(),
+	}
+	mgr.AppendOp(ctx, plannedOp)
+	// This cannot resolve.  It must always hand control back to the handler.
+	panic(sdkrequest.ControlHijack{})
 }

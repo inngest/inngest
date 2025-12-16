@@ -25,16 +25,17 @@ export function TableFilter({ options, columnVisibility, setColumnVisibility }: 
       }}
       label="Table columns"
       isLabelVisible={false}
+      size="small"
     >
-      <Select.Button isLabelVisible={false}>
-        <div className="w-24 text-left">Table columns</div>
+      <Select.Button isLabelVisible={false} size="small">
+        <div className="text-left">Table columns</div>
       </Select.Button>
-      <Select.Options>
+      <Select.Options className="right-0">
         {options.map((option) => {
           return (
             <Select.CheckboxOption key={option.id} option={option}>
               <span className="flex items-center gap-1 lowercase">
-                <label className="text-sm first-letter:capitalize">{option.name}</label>
+                <label className="first-letter:capitalize">{option.name}</label>
               </span>
             </Select.CheckboxOption>
           );

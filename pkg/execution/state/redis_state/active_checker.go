@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
@@ -19,25 +20,86 @@ import (
 )
 
 const (
-	PartitionActiveCheckPeekMax          = 10
-	BacklogActiveCheckPeekMax            = 10
-	PartitionActiveCheckBacklogPeekMax   = 20
-	PartitionActiveCheckCooldownDuration = 5 * time.Minute
-	BacklogActiveCheckCooldownDuration   = 5 * time.Minute
+	// ActiveCheckBacklogConcurrency determines how many accounts are peeked and processed in parallel
+	ActiveCheckAccountConcurrency = 30
+
+	// ActiveCheckBacklogConcurrency determines how many backlogs are peeked and processed in parallel
+	ActiveCheckBacklogConcurrency = 30
+
+	// ActiveCheckScanBatchSize determines how many queue items are scanned in each loop.
+	// More queue items will slow down the active checker but yield faster iteration over the set. Tune carefully.
+	ActiveCheckScanBatchSize = 25
+
+	BacklogActiveCheckCooldownDuration = 1 * time.Minute
+	AccountActiveCheckCooldownDuration = 1 * time.Minute
 )
 
 func (q *queue) ActiveCheck(ctx context.Context) (int, error) {
-	// Peek shadow partitions for active checks
-	backlogs, err := q.BacklogActiveCheckPeek(ctx, BacklogActiveCheckPeekMax)
-	if err != nil {
-		return 0, fmt.Errorf("could not peek backlogs for active checker: %w", err)
-	}
-
 	l := q.log.With("scope", "active-check")
 
 	shard := q.primaryQueueShard
 	client := shard.RedisClient.Client()
 	kg := shard.RedisClient.KeyGenerator()
+
+	// Check account entrypoint
+	if mathRand.Intn(100) <= q.activeCheckAccountProbability {
+		accountIDs, err := q.AccountActiveCheckPeek(ctx, q.activeCheckAccountConcurrency)
+		if err != nil {
+			return 0, fmt.Errorf("could not peek accounts for active checker: %w", err)
+		}
+
+		eg := errgroup.Group{}
+		for _, accountID := range accountIDs {
+			accountID := accountID
+			eg.Go(func() error {
+				checkID, err := ulid.New(ulid.Timestamp(q.clock.Now()), rand.Reader)
+				if err != nil {
+					return fmt.Errorf("could not create checkID: %w", err)
+				}
+
+				l := l.With("account_id", accountID.String(), "check_id", checkID)
+
+				l.Debug("attempting to active check account")
+
+				readOnly := true
+				if q.readOnlySpotChecks != nil && !q.readOnlySpotChecks(ctx, accountID) {
+					readOnly = false
+				}
+
+				err = q.accountActiveCheck(logger.WithStdlib(ctx, l.With("check-scope", "account-check")), accountID, client, kg, readOnly)
+				if err != nil {
+					return fmt.Errorf("could not check account active items: %w", err)
+				}
+
+				err = q.activeCheckRemove(
+					ctx,
+					shard,
+					kg.AccountActiveCheckSet(),
+					kg.AccountActiveCheckCooldown(accountID.String()),
+					accountID.String(),
+					AccountActiveCheckCooldownDuration,
+				)
+				if err != nil {
+					l.Error("could not remove backlog from active check set", "err", err)
+				}
+
+				return nil
+			})
+		}
+
+		err = eg.Wait()
+		if err != nil {
+			return 0, fmt.Errorf("could not active check accounts: %w", err)
+		}
+
+		// We also always want to check backlogs, do not return yet
+	}
+
+	// Peek backlogs for active checks
+	backlogs, err := q.BacklogActiveCheckPeek(ctx, q.activeCheckBacklogConcurrency)
+	if err != nil {
+		return 0, fmt.Errorf("could not peek backlogs for active checker: %w", err)
+	}
 
 	var checked int64
 
@@ -56,27 +118,18 @@ func (q *queue) ActiveCheck(ctx context.Context) (int, error) {
 
 			l.Debug("attempting to active check backlog")
 
-			cleanup, err := q.backlogActiveCheck(logger.WithStdlib(ctx, l), backlog, client, kg)
+			cleanup, err := q.backlogActiveCheck(logger.WithStdlib(ctx, l), backlog, shard, kg)
 			if cleanup {
-				status, cerr := scripts["queue/activeCheckRemoveBacklog"].Exec(
+				cerr := q.activeCheckRemove(
 					ctx,
-					client,
-					[]string{
-						kg.BacklogActiveCheckSet(),
-						kg.BacklogActiveCheckCooldown(backlog.BacklogID),
-					},
-					[]string{
-						backlog.BacklogID,
-						strconv.Itoa(int(q.clock.Now().UnixMilli())),
-						strconv.Itoa(int(BacklogActiveCheckCooldownDuration.Seconds())),
-					},
-				).ToInt64()
+					shard,
+					kg.BacklogActiveCheckSet(),
+					kg.BacklogActiveCheckCooldown(backlog.BacklogID),
+					backlog.BacklogID,
+					BacklogActiveCheckCooldownDuration,
+				)
 				if cerr != nil {
-					l.Error("could not mark backlog active check cooldown", "err", cerr)
-				}
-
-				if status != 0 {
-					l.Error("invalid status received from active check removal", "status", status)
+					l.Error("could not remove backlog from active check set", "err", cerr)
 				}
 			}
 
@@ -98,8 +151,25 @@ func (q *queue) ActiveCheck(ctx context.Context) (int, error) {
 	return int(atomic.LoadInt64(&checked)), nil
 }
 
-func (q *queue) backlogActiveCheck(ctx context.Context, b *QueueBacklog, client rueidis.Client, kg QueueKeyGenerator) (bool, error) {
+func (q *queue) backlogActiveCheck(ctx context.Context, b *QueueBacklog, shard QueueShard, kg QueueKeyGenerator) (bool, error) {
+	accountID := uuid.Nil
+
+	start := q.clock.Now()
+	defer func() {
+		dur := q.clock.Now().Sub(start)
+
+		metrics.HistogramQueueActiveCheckDuration(ctx, dur, metrics.HistogramOpt{
+			PkgName: pkgName,
+			Tags: map[string]any{
+				"queue_shard": q.primaryQueueShard.Name,
+				"type":        "backlog",
+				"account_id":  accountID,
+			},
+		})
+	}()
+
 	l := logger.StdlibLogger(ctx)
+	client := shard.RedisClient.Client()
 
 	var sp QueueShadowPartition
 
@@ -126,7 +196,6 @@ func (q *queue) backlogActiveCheck(ctx context.Context, b *QueueBacklog, client 
 		}
 	}
 
-	accountID := uuid.Nil
 	if sp.AccountID != nil {
 		accountID = *sp.AccountID
 	}
@@ -147,7 +216,7 @@ func (q *queue) backlogActiveCheck(ctx context.Context, b *QueueBacklog, client 
 	// Check account
 	_, accountSpotCheckProbability := q.activeSpotCheckProbability(ctx, accountID)
 	if accountID != uuid.Nil && mathRand.Intn(100) <= accountSpotCheckProbability {
-		err := q.accountActiveCheck(logger.WithStdlib(ctx, l.With("check-scope", "account-check")), &sp, accountID, client, kg, readOnly)
+		err := q.accountActiveCheck(logger.WithStdlib(ctx, l.With("check-scope", "account-check")), accountID, client, kg, readOnly)
 		if err != nil {
 			return false, fmt.Errorf("could not check account active items: %w", err)
 		}
@@ -174,23 +243,35 @@ func (q *queue) backlogActiveCheck(ctx context.Context, b *QueueBacklog, client 
 
 func (q *queue) accountActiveCheck(
 	ctx context.Context,
-	sp *QueueShadowPartition,
 	accountID uuid.UUID,
 	client rueidis.Client,
 	kg QueueKeyGenerator,
 	readOnly bool,
 ) error {
+	start := q.clock.Now()
+	defer func() {
+		dur := q.clock.Now().Sub(start)
+
+		metrics.HistogramQueueActiveCheckDuration(ctx, dur, metrics.HistogramOpt{
+			PkgName: pkgName,
+			Tags: map[string]any{
+				"queue_shard": q.primaryQueueShard.Name,
+				"type":        "account",
+				"account_id":  accountID.String(),
+			},
+		})
+	}()
+
 	l := logger.StdlibLogger(ctx)
 
 	// Compare the account active key
-	keyActive := sp.accountActiveKey(kg)
+	keyActive := kg.ActiveSet("account", accountID.String())
 
 	// To the account in progress key
-	keyInProgress := sp.accountInProgressKey(kg)
+	keyInProgress := kg.Concurrency("account", accountID.String())
 
-	l.Debug("checking account for invalid or missing active keys", "account_id", sp.AccountID, "key", keyActive, "in_progress", keyInProgress)
+	l.Debug("checking account for invalid or missing active keys", "account_id", accountID, "key", keyActive, "in_progress", keyInProgress)
 
-	var batchSize int64 = 20
 	var cursor int64
 
 	for {
@@ -201,7 +282,7 @@ func (q *queue) accountActiveCheck(
 
 		l := l.With("chunk_id", chunkID)
 
-		res, err := q.activeCheckScanAccount(ctx, q.primaryQueueShard, sp, cursor, batchSize)
+		res, err := q.activeCheckScan(ctx, q.primaryQueueShard, keyActive, keyInProgress, cursor, q.activeCheckScanBatchSize)
 		if err != nil {
 			return fmt.Errorf("could not scan account: %w", err)
 		}
@@ -214,9 +295,10 @@ func (q *queue) accountActiveCheck(
 			metrics.IncrQueueActiveCheckInvalidItemsFoundCounter(ctx, int64(len(res.MissingItems)), metrics.CounterOpt{
 				PkgName: pkgName,
 				Tags: map[string]any{
-					"account_id": accountID.String(),
-					"check":      "account",
-					"reason":     "missing-item",
+					"queue_shard": q.primaryQueueShard.Name,
+					"account_id":  accountID.String(),
+					"check":       "account",
+					"reason":      "missing-item",
 				},
 			})
 			invalidItems = append(invalidItems, res.MissingItems...)
@@ -227,9 +309,10 @@ func (q *queue) accountActiveCheck(
 				metrics.IncrQueueActiveCheckInvalidItemsFoundCounter(ctx, 1, metrics.CounterOpt{
 					PkgName: pkgName,
 					Tags: map[string]any{
-						"account_id": accountID.String(),
-						"check":      "account",
-						"reason":     "missing-in-targets",
+						"queue_shard": q.primaryQueueShard.Name,
+						"account_id":  accountID.String(),
+						"check":       "account",
+						"reason":      "missing-in-targets",
 					},
 				})
 				invalidItems = append(invalidItems, item.ID)
@@ -241,7 +324,6 @@ func (q *queue) accountActiveCheck(
 				"removing invalid items from account active key",
 				"mode", "account",
 				"job_id", invalidItems,
-				"partition_id", sp.PartitionID,
 				"active", keyActive,
 				"in_progress", keyInProgress,
 				"readonly", readOnly,
@@ -251,8 +333,9 @@ func (q *queue) accountActiveCheck(
 				metrics.IncrQueueActiveCheckInvalidItemsRemovedCounter(ctx, int64(len(invalidItems)), metrics.CounterOpt{
 					PkgName: pkgName,
 					Tags: map[string]any{
-						"account_id": accountID.String(),
-						"check":      "account",
+						"queue_shard": q.primaryQueueShard.Name,
+						"account_id":  accountID.String(),
+						"check":       "account",
 					},
 				})
 
@@ -273,6 +356,14 @@ func (q *queue) accountActiveCheck(
 		<-time.After(100 * time.Millisecond)
 	}
 
+	metrics.IncrQueueActiveCheckAccountScannedCounter(ctx, metrics.CounterOpt{
+		PkgName: pkgName,
+		Tags: map[string]any{
+			"queue_shard": q.primaryQueueShard.Name,
+			"account_id":  accountID.String(),
+		},
+	})
+
 	return nil
 }
 
@@ -290,7 +381,6 @@ func (q *queue) partitionActiveCheck(
 	keyInProgress := sp.inProgressKey(kg)
 	keyReady := sp.readyQueueKey(kg)
 
-	var batchSize int64 = 20
 	var cursor int64
 
 	for {
@@ -307,7 +397,7 @@ func (q *queue) partitionActiveCheck(
 			"ready", keyActive,
 		)
 
-		res, err := q.activeCheckScanStatic(ctx, q.primaryQueueShard, keyActive, keyReady, keyInProgress, cursor, batchSize)
+		res, err := q.activeCheckScan(ctx, q.primaryQueueShard, keyActive, keyInProgress, cursor, q.activeCheckScanBatchSize)
 		if err != nil {
 			return fmt.Errorf("could not scan partition: %w", err)
 		}
@@ -320,9 +410,10 @@ func (q *queue) partitionActiveCheck(
 			metrics.IncrQueueActiveCheckInvalidItemsFoundCounter(ctx, int64(len(res.MissingItems)), metrics.CounterOpt{
 				PkgName: pkgName,
 				Tags: map[string]any{
-					"account_id": accountID.String(),
-					"check":      "partition",
-					"reason":     "missing-item",
+					"queue_shard": q.primaryQueueShard.Name,
+					"account_id":  accountID.String(),
+					"check":       "partition",
+					"reason":      "missing-item",
 				},
 			})
 			invalidItems = append(invalidItems, res.MissingItems...)
@@ -333,9 +424,10 @@ func (q *queue) partitionActiveCheck(
 				metrics.IncrQueueActiveCheckInvalidItemsFoundCounter(ctx, 1, metrics.CounterOpt{
 					PkgName: pkgName,
 					Tags: map[string]any{
-						"account_id": accountID.String(),
-						"check":      "partition",
-						"reason":     "missing-in-targets",
+						"queue_shard": q.primaryQueueShard.Name,
+						"account_id":  accountID.String(),
+						"check":       "partition",
+						"reason":      "missing-in-targets",
 					},
 				})
 				invalidItems = append(invalidItems, item.ID)
@@ -358,8 +450,9 @@ func (q *queue) partitionActiveCheck(
 				metrics.IncrQueueActiveCheckInvalidItemsRemovedCounter(ctx, int64(len(invalidItems)), metrics.CounterOpt{
 					PkgName: pkgName,
 					Tags: map[string]any{
-						"account_id": accountID.String(),
-						"check":      "partition",
+						"queue_shard": q.primaryQueueShard.Name,
+						"account_id":  accountID.String(),
+						"check":       "partition",
 					},
 				})
 
@@ -389,10 +482,6 @@ func (q *queue) customConcurrencyActiveCheck(ctx context.Context, sp *QueueShado
 	keyActive := bcc.activeKey(kg)
 	keyInProgress := bcc.concurrencyKey(kg)
 
-	// Can use the partition ready queue as it includes _all_ concurrency keys' items
-	keyReady := sp.readyQueueKey(kg)
-
-	var batchSize int64 = 20
 	var cursor int64
 
 	for {
@@ -406,10 +495,9 @@ func (q *queue) customConcurrencyActiveCheck(ctx context.Context, sp *QueueShado
 			"cursor", cursor,
 			"active", keyActive,
 			"in_progress", keyInProgress,
-			"ready", keyActive,
 		)
 
-		res, err := q.activeCheckScanStatic(ctx, q.primaryQueueShard, keyActive, keyReady, keyInProgress, cursor, batchSize)
+		res, err := q.activeCheckScan(ctx, q.primaryQueueShard, keyActive, keyInProgress, cursor, q.activeCheckScanBatchSize)
 		if err != nil {
 			return fmt.Errorf("could not scan custom concurrency key: %w", err)
 		}
@@ -422,9 +510,10 @@ func (q *queue) customConcurrencyActiveCheck(ctx context.Context, sp *QueueShado
 			metrics.IncrQueueActiveCheckInvalidItemsFoundCounter(ctx, int64(len(res.MissingItems)), metrics.CounterOpt{
 				PkgName: pkgName,
 				Tags: map[string]any{
-					"account_id": accountID.String(),
-					"check":      "custom-concurrency",
-					"reason":     "missing-item",
+					"queue_shard": q.primaryQueueShard.Name,
+					"account_id":  accountID.String(),
+					"check":       "custom-concurrency",
+					"reason":      "missing-item",
 				},
 			})
 			invalidItems = append(invalidItems, res.MissingItems...)
@@ -435,9 +524,10 @@ func (q *queue) customConcurrencyActiveCheck(ctx context.Context, sp *QueueShado
 				metrics.IncrQueueActiveCheckInvalidItemsFoundCounter(ctx, 1, metrics.CounterOpt{
 					PkgName: pkgName,
 					Tags: map[string]any{
-						"account_id": accountID.String(),
-						"check":      "custom-concurrency",
-						"reason":     "missing-in-targets",
+						"queue_shard": q.primaryQueueShard.Name,
+						"account_id":  accountID.String(),
+						"check":       "custom-concurrency",
+						"reason":      "missing-in-targets",
 					},
 				})
 				invalidItems = append(invalidItems, item.ID)
@@ -452,7 +542,6 @@ func (q *queue) customConcurrencyActiveCheck(ctx context.Context, sp *QueueShado
 				"bcc", bcc,
 				"partition_id", sp.PartitionID,
 				"active", keyActive,
-				"ready", keyReady,
 				"in_progress", keyInProgress,
 				"readonly", readOnly,
 			)
@@ -461,8 +550,9 @@ func (q *queue) customConcurrencyActiveCheck(ctx context.Context, sp *QueueShado
 				metrics.IncrQueueActiveCheckInvalidItemsRemovedCounter(ctx, int64(len(invalidItems)), metrics.CounterOpt{
 					PkgName: pkgName,
 					Tags: map[string]any{
-						"account_id": accountID.String(),
-						"check":      "custom-concurrency",
+						"queue_shard": q.primaryQueueShard.Name,
+						"account_id":  accountID.String(),
+						"check":       "custom-concurrency",
 					},
 				})
 
@@ -495,8 +585,8 @@ func (q *queue) BacklogActiveCheckPeek(ctx context.Context, peekSize int64) ([]*
 
 	peeker := peeker[QueueBacklog]{
 		q:                      q,
-		max:                    PartitionActiveCheckPeekMax,
-		opName:                 "peekPartitionActiveCheck",
+		max:                    q.activeCheckBacklogConcurrency,
+		opName:                 "peekBacklogActiveCheck",
 		isMillisecondPrecision: true,
 		handleMissingItems:     CleanupMissingPointers(ctx, key, client, q.log),
 		maker: func() *QueueBacklog {
@@ -505,15 +595,42 @@ func (q *queue) BacklogActiveCheckPeek(ctx context.Context, peekSize int64) ([]*
 		keyMetadataHash: kg.BacklogMeta(),
 	}
 
-	// Pick random partitions within bounds
+	// Pick random backlogs within bounds
 	isSequential := false
 
 	res, err := peeker.peek(ctx, key, isSequential, q.clock.Now(), peekSize)
 	if err != nil {
-		return nil, fmt.Errorf("could not peek active check partitions: %w", err)
+		return nil, fmt.Errorf("could not peek active check backlogs: %w", err)
 	}
 
 	return res.Items, nil
+}
+
+func (q *queue) AccountActiveCheckPeek(ctx context.Context, peekSize int64) ([]uuid.UUID, error) {
+	shard := q.primaryQueueShard
+	client := shard.RedisClient.Client()
+	kg := shard.RedisClient.KeyGenerator()
+
+	key := kg.AccountActiveCheckSet()
+
+	peeker := peeker[QueueBacklog]{
+		q:                      q,
+		max:                    q.activeCheckAccountConcurrency,
+		opName:                 "peekAccountActiveCheck",
+		isMillisecondPrecision: true,
+		handleMissingItems:     CleanupMissingPointers(ctx, key, client, q.log),
+		keyMetadataHash:        kg.BacklogMeta(),
+	}
+
+	// Pick random account IDs within bounds
+	isSequential := false
+
+	accountIDs, err := peeker.peekUUIDPointer(ctx, key, isSequential, q.clock.Now(), peekSize)
+	if err != nil {
+		return nil, fmt.Errorf("could not peek active check accounts: %w", err)
+	}
+
+	return accountIDs, nil
 }
 
 func (q *queue) AddBacklogToActiveCheck(ctx context.Context, shard QueueShard, accountID uuid.UUID, backlogID string) error {
@@ -547,19 +664,19 @@ type activeCheckScanResult struct {
 	StaleItems   []osqueue.QueueItem
 }
 
-func (q *queue) activeCheckScanAccount(ctx context.Context, shard QueueShard, sp *QueueShadowPartition, cursor, count int64) (*activeCheckScanResult, error) {
+func (q *queue) activeCheckScan(ctx context.Context, shard QueueShard, keyActive, keyInProgress string, cursor, count int64) (*activeCheckScanResult, error) {
 	kg := shard.RedisClient.KeyGenerator()
 	client := shard.RedisClient.Client()
 
 	res, err := duration(
 		ctx,
 		q.primaryQueueShard.Name,
-		"active_check_scan_account",
+		"active_check_scan",
 		q.clock.Now(),
 		func(ctx context.Context) (any, error) {
-			res, err := scripts["queue/activeCheckScanAccount"].Exec(ctx, client, []string{
-				sp.accountActiveKey(kg),
-				sp.accountInProgressKey(kg),
+			res, err := scripts["queue/activeCheckScan"].Exec(ctx, client, []string{
+				keyActive,
+				keyInProgress,
 				kg.QueueItem(),
 			},
 				[]string{
@@ -571,7 +688,7 @@ func (q *queue) activeCheckScanAccount(ctx context.Context, shard QueueShard, sp
 			return res, err
 		})
 	if err != nil {
-		return nil, fmt.Errorf("could not scan account for active check: %w", err)
+		return nil, fmt.Errorf("could not scan for active check: %w", err)
 	}
 
 	return parseScanResult(res)
@@ -644,32 +761,33 @@ func parseScanResult(res any) (*activeCheckScanResult, error) {
 	}, nil
 }
 
-func (q *queue) activeCheckScanStatic(ctx context.Context, shard QueueShard, keyActiveSet, keyTarget1, keyTarget2 string, cursor, count int64) (*activeCheckScanResult, error) {
-	kg := shard.RedisClient.KeyGenerator()
-	client := shard.RedisClient.Client()
-
-	res, err := duration(
-		ctx,
-		q.primaryQueueShard.Name,
-		"active_check_scan_static",
-		q.clock.Now(),
-		func(ctx context.Context) (any, error) {
-			res, err := scripts["queue/activeCheckScanStatic"].Exec(ctx, client, []string{
-				keyActiveSet,
-				keyTarget1,
-				keyTarget2,
-				kg.QueueItem(),
-			},
-				[]string{
-					strconv.Itoa(int(cursor)),
-					strconv.Itoa(int(count)),
-					strconv.Itoa(int(q.clock.Now().UnixMilli())),
-				}).ToAny()
-			return res, err
-		})
-	if err != nil {
-		return nil, fmt.Errorf("could not scan static targets for active check: %w", err)
+func (q *queue) activeCheckRemove(ctx context.Context, shard QueueShard, keyActiveCheckSet, keyActiveCheckCooldown, pointer string, cooldown time.Duration) error {
+	if shard.Kind != string(enums.QueueShardKindRedis) {
+		return fmt.Errorf("unexpected queue shard kind %v", shard.Kind)
 	}
 
-	return parseScanResult(res)
+	client := shard.RedisClient.Client()
+
+	status, err := scripts["queue/activeCheckRemove"].Exec(
+		ctx,
+		client,
+		[]string{
+			keyActiveCheckSet,
+			keyActiveCheckCooldown,
+		},
+		[]string{
+			pointer,
+			strconv.Itoa(int(q.clock.Now().UnixMilli())),
+			strconv.Itoa(int(cooldown.Seconds())),
+		},
+	).ToInt64()
+	if err != nil {
+		return fmt.Errorf("could not mark active check cooldown: %w", err)
+	}
+
+	if status != 0 {
+		return fmt.Errorf("invalid status received from active check removal: %v", status)
+	}
+
+	return nil
 }

@@ -6,7 +6,7 @@ import { RiErrorWarningLine } from '@remixicon/react';
 import { AppGitCard } from '@/components/AppGitCard/AppGitCard';
 import { AppInfoCard } from '@/components/AppInfoCard';
 import { useEnvironment } from '@/components/Environments/environment-context';
-import { FunctionList } from './FunctionList';
+// import { FunctionList } from './FunctionList';
 import { useSync } from './useSync';
 
 type Props = {
@@ -65,10 +65,10 @@ export function Sync({ externalAppID, syncID }: Props) {
         <AppInfoCard app={app} className="mb-4" sync={sync} linkToSyncs />
         <AppGitCard className="mb-4" sync={sync} />
 
-        <FunctionList
+        {/* <FunctionList
           removedFunctions={sync.removedFunctions}
           syncedFunctions={sync.syncedFunctions}
-        />
+        /> */}
       </div>
     </div>
   );

@@ -42,11 +42,9 @@ const RELATIVES = {
   '1m': 'Last 1 minute',
   '10m': 'Last 10 minutes',
   '30m': 'Last 30 minutes',
-  '45m': 'Last 45 minutes',
   '1h': 'Last 1 hour',
   '12h': 'Last 12 hours',
   '1d': 'Last 1 day',
-  '2d': 'Last 2 days',
   '3d': 'Last 3 days',
   '7d': 'Last 7 days',
   '30d': 'Last 30 days',
@@ -185,17 +183,19 @@ export const RangePicker = ({
   return (
     <Popover open={open} onOpenChange={setOpen} modal={true}>
       <PopoverTrigger asChild>
-        <TriggerComponent {...props}>
-          {displayValue ? (
-            displayValue
-          ) : (
-            <span className="text-disabled">{placeholder ? placeholder : 'Select dates'}</span>
-          )}
-        </TriggerComponent>
+        <div>
+          <TriggerComponent {...props}>
+            {displayValue ? (
+              displayValue
+            ) : (
+              <span className="text-disabled">{placeholder ? placeholder : 'Select dates'}</span>
+            )}
+          </TriggerComponent>
+        </div>
       </PopoverTrigger>
-      <PopoverContent align="start">
+      <PopoverContent align="start" className="border-subtle shadow-primary">
         <div className="bg-canvasBase flex flex-row">
-          <div className={`${showAbsolute && 'min-h-[584px]'} border-muted w-[250px] border-r`}>
+          <div className={`${showAbsolute && 'min-h-[584px]'} border-subtle w-[250px] border-r`}>
             <div className="px-3 py-2">
               <Input
                 ref={durationRef}

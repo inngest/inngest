@@ -121,21 +121,26 @@ type QueueSnapshotChunk struct {
 }
 
 type Span struct {
-	SpanID        string
-	TraceID       string
-	ParentSpanID  sql.NullString
-	Name          string
-	StartTime     time.Time
-	EndTime       time.Time
-	Attributes    interface{}
-	Links         interface{}
-	DynamicSpanID sql.NullString
-	AccountID     string
-	AppID         string
-	FunctionID    string
-	RunID         string
-	EnvID         string
-	Output        interface{}
+	SpanID         string
+	TraceID        string
+	ParentSpanID   sql.NullString
+	Name           string
+	StartTime      time.Time
+	EndTime        time.Time
+	Attributes     interface{}
+	Links          interface{}
+	DynamicSpanID  sql.NullString
+	AccountID      string
+	AppID          string
+	FunctionID     string
+	RunID          string
+	EnvID          string
+	Output         interface{}
+	Input          interface{}
+	DebugRunID     sql.NullString
+	DebugSessionID sql.NullString
+	Status         sql.NullString
+	EventIds       interface{}
 }
 
 type Trace struct {
@@ -181,29 +186,30 @@ type TraceRun struct {
 }
 
 type WorkerConnection struct {
-	AccountID        uuid.UUID
-	WorkspaceID      uuid.UUID
-	AppName          string
-	AppID            *uuid.UUID
-	ID               ulid.ULID
-	GatewayID        ulid.ULID
-	InstanceID       string
-	Status           int64
-	WorkerIp         string
-	ConnectedAt      int64
-	LastHeartbeatAt  sql.NullInt64
-	DisconnectedAt   sql.NullInt64
-	RecordedAt       int64
-	InsertedAt       int64
-	DisconnectReason sql.NullString
-	GroupHash        []byte
-	SdkLang          string
-	SdkVersion       string
-	SdkPlatform      string
-	SyncID           *uuid.UUID
-	AppVersion       sql.NullString
-	FunctionCount    int64
-	CpuCores         int64
-	MemBytes         int64
-	Os               string
+	AccountID            uuid.UUID
+	WorkspaceID          uuid.UUID
+	AppName              string
+	AppID                *uuid.UUID
+	ID                   ulid.ULID
+	GatewayID            ulid.ULID
+	InstanceID           string
+	Status               int64
+	WorkerIp             string
+	MaxWorkerConcurrency int64
+	ConnectedAt          int64
+	LastHeartbeatAt      sql.NullInt64
+	DisconnectedAt       sql.NullInt64
+	RecordedAt           int64
+	InsertedAt           int64
+	DisconnectReason     sql.NullString
+	GroupHash            []byte
+	SdkLang              string
+	SdkVersion           string
+	SdkPlatform          string
+	SyncID               *uuid.UUID
+	AppVersion           sql.NullString
+	FunctionCount        int64
+	CpuCores             int64
+	MemBytes             int64
+	Os                   string
 }

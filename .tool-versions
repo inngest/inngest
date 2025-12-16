@@ -4,5 +4,5 @@
 # See: https://asdf-vm.com/manage/configuration.html
 #
 
-nodejs 20.18.2
-pnpm 8.15.8
+nodejs 22.16.0
+pnpm 10.18.2

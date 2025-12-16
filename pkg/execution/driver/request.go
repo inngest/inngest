@@ -41,8 +41,15 @@ type SDKRequestContext struct {
 	// Attempt is the zero-index attempt number.
 	Attempt int `json:"attempt"`
 
+	// MaxAttempts is the maximum number of attempts allowed for this function.
+	MaxAttempts int `json:"max_attempts"`
+
 	// Stack represents the function stack at the time of the step invocation.
 	Stack *FunctionStack `json:"stack"`
+
+	// QueueItemID is the ID of the queue item and shard, used when checkpointing
+	// async functions so that the API knows which queue item to reset.
+	QueueItemRef string `json:"qi_id"`
 
 	// DisableImmediateExecution is used to tell the SDK whether it should
 	// disallow immediate execution of steps as they are found.

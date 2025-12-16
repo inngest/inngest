@@ -28,15 +28,14 @@ func (r *eventResolver) FunctionRuns(ctx context.Context, obj *models.Event) ([]
 }
 
 func (r *eventResolver) PendingRuns(ctx context.Context, obj *models.Event) (*int, error) {
-	state, err := r.Runner.Runs(ctx, consts.DevServerAccountID, obj.ID)
+	runs, err := r.Data.GetEventRuns(ctx, obj.ID, consts.DevServerAccountID, consts.DevServerEnvID)
 	if err != nil {
 		return nil, err
 	}
 
 	var pending int
-
-	for _, s := range state {
-		if s.Metadata().Status == enums.RunStatusRunning {
+	for _, r := range runs {
+		if r.Status == enums.RunStatusRunning {
 			pending++
 		}
 	}
@@ -45,14 +44,14 @@ func (r *eventResolver) PendingRuns(ctx context.Context, obj *models.Event) (*in
 }
 
 func (r *eventResolver) Status(ctx context.Context, obj *models.Event) (*models.EventStatus, error) {
-	state, err := r.Runner.Runs(ctx, consts.DevServerAccountID, obj.ID)
+	runs, err := r.Data.GetEventRuns(ctx, obj.ID, consts.DevServerAccountID, consts.DevServerEnvID)
 	if err != nil {
 		return nil, err
 	}
 
 	status := models.EventStatusNoFunctions
 
-	if len(state) == 0 {
+	if len(runs) == 0 {
 		return &status, nil
 	}
 
@@ -60,21 +59,20 @@ func (r *eventResolver) Status(ctx context.Context, obj *models.Event) (*models.
 	var failedRuns int
 	var isRunning bool
 
-	for _, s := range state {
-		m := s.Metadata()
-		if m.Status == enums.RunStatusFailed {
+	for _, s := range runs {
+		if s.Status == enums.RunStatusFailed {
 			failedRuns++
 			continue
 		}
 
-		if m.Status == enums.RunStatusRunning {
+		if s.Status == enums.RunStatusRunning {
 			isRunning = true
 			continue
 		}
 	}
 
 	if failedRuns > 0 {
-		if failedRuns == len(state) {
+		if failedRuns == len(runs) {
 			status = models.EventStatusFailed
 		} else {
 			status = models.EventStatusPartiallyFailed
@@ -87,20 +85,13 @@ func (r *eventResolver) Status(ctx context.Context, obj *models.Event) (*models.
 }
 
 func (r *eventResolver) Raw(ctx context.Context, obj *models.Event) (*string, error) {
-	eventID := obj.ID.String()
-	evts, err := r.Runner.Events(ctx, eventID)
+	evt, err := r.Data.GetEventByInternalID(ctx, obj.ID)
 	if err != nil {
 		return nil, err
 	}
 
-	if len(evts) == 0 {
-		return nil, nil
-	}
-
-	evt := evts[0]
-
 	// Marshall the entire event to JSON and return that string.
-	byt, err := json.Marshal(evt)
+	byt, err := json.Marshal(evt.Event())
 	if err != nil {
 		return nil, err
 	}
@@ -111,12 +102,13 @@ func (r *eventResolver) Raw(ctx context.Context, obj *models.Event) (*string, er
 }
 
 func (r *eventResolver) TotalRuns(ctx context.Context, obj *models.Event) (*int, error) {
-	metadata, err := r.Runner.Runs(ctx, consts.DevServerAccountID, obj.ID)
+	// XXX: This is implemented during a broad refactor;  we should totally implement a query
+	// that returns JUST the count for this, so that we don't read and discard data.   I apologize.
+	runs, err := r.Data.GetEventRuns(ctx, obj.ID, consts.DevServerAccountID, consts.DevServerEnvID)
 	if err != nil {
 		return nil, err
 	}
 
-	total := len(metadata)
-
+	total := len(runs)
 	return &total, nil
 }

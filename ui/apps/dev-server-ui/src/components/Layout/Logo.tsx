@@ -1,12 +1,10 @@
-'use client';
-
-import NextLink from 'next/link';
 import { Button } from '@inngest/components/Button';
 import { InngestLogo } from '@inngest/components/icons/logos/InngestLogo';
 import { InngestLogoSmall } from '@inngest/components/icons/logos/InngestLogoSmall';
 import { RiContractLeftLine, RiContractRightLine } from '@remixicon/react';
 
 import { useInfoQuery } from '@/store/devApi';
+import { Link } from '@tanstack/react-router';
 
 type LogoProps = {
   collapsed: boolean;
@@ -39,8 +37,8 @@ const NavToggle = ({ collapsed, setCollapsed }: LogoProps) => {
 };
 
 export default function Logo({ collapsed, setCollapsed }: LogoProps) {
-  const { data: info, isLoading } = useInfoQuery();
-  const isDevServer = isLoading ? false : !info?.isSingleNodeService;
+  const { data: info, isLoading, error } = useInfoQuery();
+  const isDevServer = error ? false : !info?.isSingleNodeService;
 
   return (
     <div
@@ -48,21 +46,23 @@ export default function Logo({ collapsed, setCollapsed }: LogoProps) {
         collapsed ? 'justify-center' : 'mx-4 justify-start'
       }`}
     >
-      <div className={`flex flex-row items-center justify-start ${collapsed ? '' : 'mr-1.5'} `}>
+      <div
+        className={`flex flex-row items-center justify-start ${
+          collapsed ? '' : 'mr-1.5'
+        } `}
+      >
         {collapsed ? (
           <div className="cursor-pointer group-hover:hidden">
             <InngestLogoSmall className="text-basis" />
           </div>
         ) : (
           <div className="flex flex-row items-center justify-start">
-            <NextLink href="/">
+            <Link to="/">
               <InngestLogo className="text-basis mr-1.5" width={96} />
-            </NextLink>
-            {isDevServer ? (
-              <span className="text-primary-intense text-[11px] font-medium leading-none">
-                DEV SERVER
-              </span>
-            ) : null}
+            </Link>
+            <span className="text-primary-intense text-[11px] font-medium leading-none">
+              {isDevServer ? 'DEV SERVER' : 'SERVER'}
+            </span>
           </div>
         )}
       </div>

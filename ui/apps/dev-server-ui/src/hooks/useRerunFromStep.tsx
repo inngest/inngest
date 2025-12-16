@@ -11,9 +11,9 @@ export const useRerunFromStep = () => {
   const [rerunFromStep] = useRerunFromStepMutation();
 
   return useCallback(
-    async ({ runID, fromStep }: RerunFromStepPayload): Promise<RerunFromStepResult> => {
+    async (payload: RerunFromStepPayload): Promise<RerunFromStepResult> => {
       try {
-        const res = await rerunFromStep({ runID, fromStep });
+        const res = await rerunFromStep(payload);
         if ('error' in res) {
           throw res.error;
         }

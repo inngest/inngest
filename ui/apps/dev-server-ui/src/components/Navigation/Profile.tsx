@@ -1,10 +1,11 @@
-'use client';
-
 import { RiCodeSSlashLine } from '@remixicon/react';
 
+import { useInfoQuery } from '@/store/devApi';
 import { ProfileMenu } from './ProfileMenu';
 
 const Profile = ({ collapsed }: { collapsed: boolean }) => {
+  const { data: info, isLoading, error } = useInfoQuery();
+  const isDevServer = error ? false : !info?.isSingleNodeService;
   return (
     <ProfileMenu>
       <div
@@ -21,8 +22,12 @@ const Profile = ({ collapsed }: { collapsed: boolean }) => {
 
           {!collapsed && (
             <div className="ml-2 flex flex-col items-start justify-start overflow-hidden">
-              <div className="text-subtle leading-1 max-w-full text-sm">Settings</div>
-              <div className="text-muted max-w-full text-xs leading-4">Dev Server</div>
+              <div className="text-subtle leading-1 max-w-full text-sm">
+                Settings
+              </div>
+              <div className="text-muted max-w-full text-xs leading-4">
+                {isDevServer ? 'Dev Server' : 'Server'}
+              </div>
             </div>
           )}
         </div>

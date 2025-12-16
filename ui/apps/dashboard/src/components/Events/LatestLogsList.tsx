@@ -102,8 +102,12 @@ export default function LatestLogsList({ environmentSlug, eventName }: LatestLog
                       }
                     >
                       <td className="flex items-center gap-6 p-4">
-                        <TimeCell format="relative" date={new Date(e.receivedAt)} />
-                        <TimeCell date={new Date(e.receivedAt)} />
+                        <TimeCell
+                          format="relative"
+                          date={new Date(e.receivedAt)}
+                          copyable={false}
+                        />
+                        <TimeCell date={new Date(e.receivedAt)} copyable={true} />
                       </td>
                       <td>
                         <IDCell>{e.id}</IDCell>

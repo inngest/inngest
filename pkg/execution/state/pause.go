@@ -44,10 +44,10 @@ type PauseMutater interface {
 	ConsumePause(ctx context.Context, p Pause, opts ConsumePauseOpts) (ConsumePauseResult, func() error, error)
 
 	// DeletePause permanently deletes a pause.
-	DeletePause(ctx context.Context, p Pause) error
+	DeletePause(ctx context.Context, p Pause, opts ...DeletePauseOpt) error
 
-	// DeletePauseByID removes a puse by its ID.
-	DeletePauseByID(ctx context.Context, pauseID uuid.UUID) error
+	// DeletePauseByID removes a pause by its ID.
+	DeletePauseByID(ctx context.Context, pauseID uuid.UUID, workspaceID uuid.UUID) error
 }
 
 // PauseGetter allows a runner to return all existing pauses by event or by outgoing ID.  This
@@ -62,6 +62,10 @@ type PauseGetter interface {
 
 	PausesByEventSince(ctx context.Context, workspaceID uuid.UUID, event string, since time.Time) (PauseIterator, error)
 
+	// PausesByEventSinceWithCreatedAt returns all pauses for a given event within a workspace since a given time,
+	// with createdAt timestamps populated from Redis sorted set scores.
+	PausesByEventSinceWithCreatedAt(ctx context.Context, workspaceID uuid.UUID, event string, since time.Time, limit int64) (PauseIterator, error)
+
 	// EventHasPauses returns whether the event has pauses stored.
 	EventHasPauses(ctx context.Context, workspaceID uuid.UUID, eventName string) (bool, error)
 
@@ -70,12 +74,6 @@ type PauseGetter interface {
 	//
 	// This should not return consumed pauses.
 	PauseByID(ctx context.Context, pauseID uuid.UUID) (*Pause, error)
-
-	// PauseByID returns a given pause by pause ID.  This must return expired pauses
-	// that have not yet been consumed in order to properly handle timeouts.
-	//
-	// This should not return consumed pauses.
-	PausesByID(ctx context.Context, pauseID ...uuid.UUID) ([]*Pause, error)
 
 	// PauseByInvokeCorrelationID returns a given pause by the correlation ID.
 	// This must return expired invoke pauses that have not yet been consumed in order to properly handle timeouts.
@@ -103,6 +101,30 @@ type ConsumePauseResult struct {
 
 	// HasPendingSteps indicates whether the run still has pending steps.
 	HasPendingSteps bool
+}
+
+// BlockIndex contains the block ID and event name for pause block indexing
+type BlockIndex struct {
+	BlockID   string `json:"b"`
+	EventName string `json:"e"`
+}
+
+// DeletePauseOpts are the options to be passed in for deleting a pause
+type DeletePauseOpts struct {
+	// WriteBlockIndex is the block information to create a block index so the pause can still be
+	// retrieved by its ID after deletion. Empty struct means no block index.
+	WriteBlockIndex BlockIndex
+}
+
+type DeletePauseOpt func(*DeletePauseOpts)
+
+func WithWriteBlockIndex(blockID string, eventName string) DeletePauseOpt {
+	return func(opts *DeletePauseOpts) {
+		opts.WriteBlockIndex = BlockIndex{
+			BlockID:   blockID,
+			EventName: eventName,
+		}
+	}
 }
 
 // PauseIterator allows the runner to iterate over all pauses returned by a PauseGetter.  This
@@ -239,6 +261,17 @@ type Pause struct {
 	TriggeringEventID *string `json:"tID,omitempty"`
 	// Metadata is additional metadata that should be stored with the pause
 	Metadata map[string]any
+
+	// ParallelMode controls discovery step scheduling after a parallel step
+	// ends
+	ParallelMode enums.ParallelMode `json:"pm,omitempty"`
+
+	// CreatedAt is the timestamp when the pause was saved. This field may
+	// be empty for older pauses created before this field was added. It's used to
+	// determine which time-based storage blocks contain this pause, as block
+	// timeframes are based on this timestamp (previously only available as the
+	// sort score in pause indexes).
+	CreatedAt time.Time `json:"ca"`
 }
 
 func (p Pause) GetOpcode() enums.Opcode {
@@ -323,7 +356,7 @@ func (p Pause) GetResumeData(evt event.Event) ResumeData {
 	isInvokeFunctionOpcode := p.Opcode != nil && *p.Opcode == enums.OpcodeInvokeFunction.String()
 	if isInvokeFunctionOpcode && evt.IsFinishedEvent() {
 		if retRunID, ok := evt.Data["run_id"].(string); ok {
-			if ulidRunID, _ := ulid.Parse(retRunID); ulidRunID != (ulid.ULID{}) {
+			if ulidRunID, _ := ulid.Parse(retRunID); !ulidRunID.IsZero() {
 				ret.RunID = &ulidRunID
 			}
 		}

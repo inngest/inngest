@@ -42,10 +42,11 @@ func TestPauseCancelFunction(t *testing.T) {
 
 	triggerEvtName := uuid.New().String()
 
+	testPauseCancelFnName := "function-test-pause-cancel"
 	_, err := inngestgo.CreateFunction(
 		inngestClient,
 		inngestgo.FunctionOpts{
-			ID: "function-test-pause-cancel",
+			ID: testPauseCancelFnName,
 		},
 		inngestgo.EventTrigger(triggerEvtName, nil),
 		func(ctx context.Context, input inngestgo.Input[testCancelEvt]) (any, error) {
@@ -97,7 +98,7 @@ func TestPauseCancelFunction(t *testing.T) {
 			return false
 		}
 		for _, function := range functions {
-			if function.App.ExternalID != appName {
+			if function.App.ExternalID != appName || function.Name != testPauseCancelFnName {
 				continue
 			}
 
@@ -196,12 +197,13 @@ func TestPauseCancelFunction(t *testing.T) {
 		pauseFn(consts.DevServerAccountID, uuid.MustParse(fnId))
 		cancelFnRun(consts.DevServerAccountID, uuid.MustParse(fnId), ulid.MustParse(runID))
 
-		<-time.After(5 * time.Second)
+		require.EventuallyWithT(t, func(t *assert.CollectT) {
+			r := require.New(t)
+			r.Equal(int32(1), atomic.LoadInt32(&runCounter))
+			r.Equal(int32(1), atomic.LoadInt32(&runCancelled))
+			r.Equal(0, getQueueSize(consts.DevServerAccountID, uuid.MustParse(fnId)), fmt.Sprintf("fnID: %s", fnId))
+		}, 10*time.Second, 10*time.Millisecond)
 
-		require.Equal(t, int32(1), atomic.LoadInt32(&runCounter))
-		require.Equal(t, int32(1), atomic.LoadInt32(&runCancelled))
-
-		require.Equal(t, 0, getQueueSize(consts.DevServerAccountID, uuid.MustParse(fnId)))
 	})
 
 	t.Run("trace run should have appropriate data", func(t *testing.T) {

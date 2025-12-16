@@ -1,3 +1,4 @@
+import headlessui from '@headlessui/tailwindcss';
 import type { Config } from 'tailwindcss';
 import defaultTheme from 'tailwindcss/defaultTheme';
 
@@ -51,6 +52,11 @@ export default {
           coolModerate: 'rgb(var(--color-quaternary-cool-moderate) / <alpha-value>)',
           coolxIntense: 'rgb(var(--color-quaternary-cool-xIntense) / <alpha-value>)',
           cool3xIntense: 'rgb(var(--color-quaternary-cool-3xIntense) / <alpha-value>)',
+          warmer3xSubtle: 'rgb(var(--color-quaternary-warmer-3xSubtle) / <alpha-value>)',
+          warmerxSubtle: 'rgb(var(--color-quaternary-warmer-xSubtle) / <alpha-value>)',
+          warmerModerate: 'rgb(var(--color-quaternary-warmer-moderate) / <alpha-value>)',
+          warmerxIntense: 'rgb(var(--color-quaternary-warmer-xIntense) / <alpha-value>)',
+          warmer3xIntense: 'rgb(var(--color-quaternary-warmer-3xIntense) / <alpha-value>)',
         },
         accent: {
           '3xSubtle': 'rgb(var(--color-accent-3xSubtle) / <alpha-value>)',
@@ -90,6 +96,7 @@ export default {
         error: 'rgb(var(--color-border-error) / <alpha-value>)',
         warning: 'rgb(var(--color-border-warning) / <alpha-value>)',
         info: 'rgb(var(--color-border-info) / <alpha-value>)',
+        active: 'rgb(var(--color-border-active) / <alpha-value>)',
       },
       outlineColor: {
         error: 'rgb(var(--color-border-error) / <alpha-value>)',
@@ -199,7 +206,8 @@ export default {
         subtle: 'rgb(var(--color-border-subtle) / <alpha-value>)',
       },
       boxShadow: {
-        primary: '0 4px 4px 0 rgba(0,0,0,0.25)',
+        primary:
+          '-4px 8px 12px -5px rgba(46, 46, 46, 0.08), 4px 8px 12px -5px rgba(46, 46, 46, 0.08), -2px 24px 12px -20px rgba(46, 46, 46, 0.02);',
         floating: '0 0 0 0.5px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(255, 255, 255, 0.15)',
       },
       outlineOffset: {
@@ -209,6 +217,14 @@ export default {
         shimmer: {
           '100%': {
             transform: 'translateX(100%)',
+          },
+        },
+        'shimmer-text': {
+          '0%': {
+            backgroundPosition: '100% 0',
+          },
+          '100%': {
+            backgroundPosition: '0 0',
           },
         },
         'slide-down-and-fade': {
@@ -237,12 +253,15 @@ export default {
         'slide-up-and-fade': 'slide-up-and-fade 400ms cubic-bezier(0.16, 1, 0.3, 1)',
         'slide-right-and-fade': 'slide-right-and-fade 400ms cubic-bezier(0.16, 1, 0.3, 1)',
         underline: 'underline 2s linear infinite',
+        'shimmer-text': 'shimmer-text 1.25s linear infinite',
       },
       spacing: {
         'cmdk-margin': 'calc((100vh - (84.5px + 330px)) / 2)',
       },
     },
   },
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  plugins: [require('@headlessui/tailwindcss')],
+  //
+  // TODO: Temp cast to avoid lots of changes to dashboard before we migrate to tanstack
+  // Remove this when we migrate to tanstack
+  plugins: [headlessui as any],
 } satisfies Config;

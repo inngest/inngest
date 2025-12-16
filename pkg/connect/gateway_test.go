@@ -18,7 +18,6 @@ import (
 	"github.com/coder/websocket"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/connect/auth"
-	"github.com/inngest/inngest/pkg/connect/pubsub"
 	"github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/connect/types"
 	"github.com/inngest/inngest/pkg/connect/wsproto"
@@ -37,6 +36,8 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
+
+var testExecutorIP = net.ParseIP("127.0.0.1")
 
 func TestConnectionEstablished(t *testing.T) {
 	res := createTestingGateway(t)
@@ -67,44 +68,6 @@ func TestConnectionEstablished(t *testing.T) {
 	require.Equal(t, connect.ConnectionStatus_READY, conn.Status)
 }
 
-func TestExecutorMessageForwarding(t *testing.T) {
-	params := testingParameters{
-		consecutiveMissesBeforeClose: 10,
-		heartbeatInterval:            1 * time.Second,
-	}
-	res := createTestingGateway(t, params)
-
-	handshake(t, res)
-
-	expectedPayload := &connect.GatewayExecutorRequestData{
-		RequestId:      "test-req",
-		AccountId:      res.accountID.String(),
-		EnvId:          res.envID.String(),
-		AppId:          res.appID.String(),
-		AppName:        res.appName,
-		FunctionId:     res.fnID.String(),
-		FunctionSlug:   res.fnSlug,
-		StepId:         ptr.String("step"),
-		RequestPayload: []byte("hello world"),
-		RunId:          res.runID.String(),
-		LeaseId:        "lease-test",
-	}
-
-	// Publish message to "PubSub"
-	_ = res.testConn.RouteExecutorRequest(context.Background(), res.svc.gatewayId, res.connID, expectedPayload)
-
-	// Expect message to be received by gateway and forwarded over WebSocket
-	msg := awaitNextMessage(t, res.ws, 2*time.Second)
-	require.Equal(t, connect.GatewayMessageType_GATEWAY_EXECUTOR_REQUEST, msg.Kind)
-
-	payload := &connect.GatewayExecutorRequestData{}
-	err := proto.Unmarshal(msg.Payload, payload)
-	require.NoError(t, err)
-
-	// Expect messages to match
-	require.True(t, proto.Equal(expectedPayload, payload))
-}
-
 func TestLeaseRenewal(t *testing.T) {
 	params := testingParameters{
 		consecutiveMissesBeforeClose: 10,
@@ -116,7 +79,7 @@ func TestLeaseRenewal(t *testing.T) {
 
 	requestID := "test-req"
 
-	leaseID, err := res.svc.stateManager.LeaseRequest(context.Background(), res.envID, requestID, time.Second*5)
+	leaseID, err := res.svc.stateManager.LeaseRequest(context.Background(), res.envID, requestID, time.Second*5, testExecutorIP)
 	require.NoError(t, err)
 
 	expectedPayload := &connect.GatewayExecutorRequestData{
@@ -133,8 +96,13 @@ func TestLeaseRenewal(t *testing.T) {
 		LeaseId:        leaseID.String(),
 	}
 
-	// Publish message to "PubSub"
-	_ = res.testConn.RouteExecutorRequest(context.Background(), res.svc.gatewayId, res.connID, expectedPayload)
+	// Simulate gRPC delivery by directly sending to the connection
+	messageChan, ok := res.svc.wsConnections.Load(res.connID.String())
+	require.True(t, ok, "connection should be registered for gRPC delivery")
+
+	go func() {
+		messageChan.(chan *connect.GatewayExecutorRequestData) <- expectedPayload
+	}()
 
 	// Expect message to be received by gateway and forwarded over WebSocket
 	msg := awaitNextMessage(t, res.ws, 2*time.Second)
@@ -189,7 +157,7 @@ func TestLeaseRenewalWithInvalidLeaseShouldNotClose(t *testing.T) {
 
 	requestID := "test-req"
 
-	leaseID, err := res.svc.stateManager.LeaseRequest(context.Background(), res.envID, requestID, time.Second*5)
+	leaseID, err := res.svc.stateManager.LeaseRequest(context.Background(), res.envID, requestID, time.Second*5, testExecutorIP)
 	require.NoError(t, err)
 
 	expectedPayload := &connect.GatewayExecutorRequestData{
@@ -206,8 +174,13 @@ func TestLeaseRenewalWithInvalidLeaseShouldNotClose(t *testing.T) {
 		LeaseId:        leaseID.String(),
 	}
 
-	// Publish message to "PubSub"
-	_ = res.testConn.RouteExecutorRequest(context.Background(), res.svc.gatewayId, res.connID, expectedPayload)
+	// Simulate gRPC delivery by directly sending to the connection
+	messageChan, ok := res.svc.wsConnections.Load(res.connID.String())
+	require.True(t, ok, "connection should be registered for gRPC delivery")
+
+	go func() {
+		messageChan.(chan *connect.GatewayExecutorRequestData) <- expectedPayload
+	}()
 
 	// Expect message to be received by gateway and forwarded over WebSocket
 	msg := awaitNextMessage(t, res.ws, 2*time.Second)
@@ -276,6 +249,161 @@ func TestLeaseRenewalWithInvalidLeaseShouldNotClose(t *testing.T) {
 	require.Nil(t, nackPayload.NewLeaseId)
 
 	exchangeHeartbeat(t, res.ws, 2*time.Second)
+}
+
+func TestLeaseRenewalWithDeletedLeaseShouldNotClose(t *testing.T) {
+	params := testingParameters{
+		consecutiveMissesBeforeClose: 10,
+		heartbeatInterval:            1 * time.Second,
+	}
+	res := createTestingGateway(t, params)
+
+	handshake(t, res)
+
+	requestID := "test-req"
+
+	leaseID, err := res.svc.stateManager.LeaseRequest(context.Background(), res.envID, requestID, time.Second*5, testExecutorIP)
+	require.NoError(t, err)
+
+	expectedPayload := &connect.GatewayExecutorRequestData{
+		RequestId:      requestID,
+		AccountId:      res.accountID.String(),
+		EnvId:          res.envID.String(),
+		AppId:          res.appID.String(),
+		AppName:        res.appName,
+		FunctionId:     res.fnID.String(),
+		FunctionSlug:   res.fnSlug,
+		StepId:         ptr.String("step"),
+		RequestPayload: []byte("hello world"),
+		RunId:          res.runID.String(),
+		LeaseId:        leaseID.String(),
+	}
+
+	// Simulate gRPC delivery by directly sending to the connection
+	messageChan, ok := res.svc.wsConnections.Load(res.connID.String())
+	require.True(t, ok, "connection should be registered for gRPC delivery")
+
+	go func() {
+		messageChan.(chan *connect.GatewayExecutorRequestData) <- expectedPayload
+	}()
+
+	// Expect message to be received by gateway and forwarded over WebSocket
+	msg := awaitNextMessage(t, res.ws, 2*time.Second)
+	require.Equal(t, connect.GatewayMessageType_GATEWAY_EXECUTOR_REQUEST, msg.Kind)
+
+	payload := &connect.GatewayExecutorRequestData{}
+	err = proto.Unmarshal(msg.Payload, payload)
+	require.NoError(t, err)
+
+	// Expect messages to match
+	require.True(t, proto.Equal(expectedPayload, payload))
+
+	sendWorkerExtendLeaseMessage(t, res, &connect.WorkerRequestExtendLeaseData{
+		RequestId:      payload.RequestId,
+		AccountId:      payload.AccountId,
+		EnvId:          payload.EnvId,
+		AppId:          payload.AppId,
+		FunctionSlug:   payload.FunctionSlug,
+		StepId:         payload.StepId,
+		SystemTraceCtx: payload.SystemTraceCtx,
+		UserTraceCtx:   payload.UserTraceCtx,
+		RunId:          payload.RunId,
+		LeaseId:        payload.LeaseId,
+	})
+
+	// Expect lease extension ack
+	msg = awaitNextMessage(t, res.ws, 2*time.Second)
+	require.Equal(t, connect.GatewayMessageType_WORKER_REQUEST_EXTEND_LEASE_ACK, msg.Kind)
+
+	ackPayload := connect.WorkerRequestExtendLeaseAckData{}
+	err = proto.Unmarshal(msg.Payload, &ackPayload)
+	require.NoError(t, err)
+
+	require.Equal(t, payload.RequestId, ackPayload.RequestId)
+	require.Equal(t, payload.AccountId, ackPayload.AccountId)
+	require.NotNil(t, ackPayload.NewLeaseId)
+
+	parsed, err := ulid.Parse(*ackPayload.NewLeaseId)
+	require.NoError(t, err)
+
+	require.WithinDuration(t, time.Now().Add(consts.ConnectWorkerRequestLeaseDuration), ulid.Time(parsed.Time()), 500*time.Millisecond)
+
+	// Delete the leasing which can only if redis key TTL hits (MaxFunctionTimeout) or the lease was deleted by the executor
+	// after receiving a response
+	err = res.svc.stateManager.DeleteLease(context.Background(), res.envID, requestID)
+	require.NoError(t, err)
+
+	// Try to extend the deleted lease
+	sendWorkerExtendLeaseMessage(t, res, &connect.WorkerRequestExtendLeaseData{
+		RequestId:      payload.RequestId,
+		AccountId:      payload.AccountId,
+		EnvId:          payload.EnvId,
+		AppId:          payload.AppId,
+		FunctionSlug:   payload.FunctionSlug,
+		StepId:         payload.StepId,
+		SystemTraceCtx: payload.SystemTraceCtx,
+		UserTraceCtx:   payload.UserTraceCtx,
+		RunId:          payload.RunId,
+		LeaseId:        *ackPayload.NewLeaseId,
+	})
+
+	// Expect lease extension nack (no new lease)
+	msg = awaitNextMessage(t, res.ws, 2*time.Second)
+	require.Equal(t, connect.GatewayMessageType_WORKER_REQUEST_EXTEND_LEASE_ACK, msg.Kind)
+
+	nackPayload := connect.WorkerRequestExtendLeaseAckData{}
+	err = proto.Unmarshal(msg.Payload, &nackPayload)
+	require.NoError(t, err)
+
+	require.Equal(t, payload.RequestId, nackPayload.RequestId)
+	require.Equal(t, payload.AccountId, nackPayload.AccountId)
+	require.Nil(t, nackPayload.NewLeaseId)
+
+	// Verify connection should not close - exchange heartbeat to confirm
+	exchangeHeartbeat(t, res.ws, 2*time.Second)
+}
+
+func TestExecutorMessageForwardingGRPC(t *testing.T) {
+	params := testingParameters{
+		consecutiveMissesBeforeClose: 10,
+		heartbeatInterval:            1 * time.Second,
+		shouldUseGRPC:                true,
+	}
+	res := createTestingGateway(t, params)
+
+	handshake(t, res)
+
+	expectedPayload := &connect.GatewayExecutorRequestData{
+		RequestId:      "test-req",
+		AccountId:      res.accountID.String(),
+		EnvId:          res.envID.String(),
+		AppId:          res.appID.String(),
+		AppName:        res.appName,
+		FunctionId:     res.fnID.String(),
+		FunctionSlug:   res.fnSlug,
+		StepId:         ptr.String("step"),
+		RequestPayload: []byte("hello world"),
+		RunId:          res.runID.String(),
+		LeaseId:        "lease-test",
+	}
+
+	// Simulate gRPC delivery by directly sending to the connection
+	messageChan, ok := res.svc.wsConnections.Load(res.connID.String())
+	require.True(t, ok, "connection should be registered for gRPC delivery")
+
+	go func() {
+		messageChan.(chan *connect.GatewayExecutorRequestData) <- expectedPayload
+	}()
+
+	// Expect message to be received by gateway and forwarded over WS
+	msg := awaitNextMessage(t, res.ws, 2*time.Second)
+	require.Equal(t, connect.GatewayMessageType_GATEWAY_EXECUTOR_REQUEST, msg.Kind)
+
+	payload := &connect.GatewayExecutorRequestData{}
+	err := proto.Unmarshal(msg.Payload, payload)
+	require.NoError(t, err)
+
+	require.True(t, proto.Equal(expectedPayload, payload))
 }
 
 func TestCloseConnectionOnConsecutiveHeartbeatFail(t *testing.T) {
@@ -674,7 +802,6 @@ type testingResources struct {
 	redis        *miniredis.Miniredis
 	rc           rueidis.Client
 	stateManager state.StateManager
-	testConn     *testingConnector
 
 	ws         *websocket.Conn
 	lifecycles *testRecorderLifecycles
@@ -707,6 +834,7 @@ type testingParameters struct {
 	consecutiveMissesBeforeClose int
 	shouldFailSync               bool
 	disallowConnection           bool
+	shouldUseGRPC                bool
 
 	noConnect bool
 }
@@ -741,11 +869,6 @@ func createTestingGateway(t *testing.T, params ...testingParameters) testingReso
 	})
 
 	connManager := state.NewRedisConnectionStateManager(rc)
-
-	testConn := &testingConnector{}
-
-	conn, err := pubsub.NewConnector(ctx, withTestingConnector(testConn))
-	require.NoError(t, err)
 
 	var fakeApiBaseUrl string
 	{
@@ -828,7 +951,6 @@ func createTestingGateway(t *testing.T, params ...testingParameters) testingReso
 		}),
 		WithConnectionStateManager(connManager),
 		WithGroupName("gw-1"),
-		WithRequestReceiver(conn),
 		WithLifeCycles([]ConnectGatewayLifecycleListener{lifecycles}),
 		WithApiBaseUrl(fakeApiBaseUrl),
 		WithGatewayPublicPort(gwPort),
@@ -850,6 +972,7 @@ func createTestingGateway(t *testing.T, params ...testingParameters) testingReso
 		if params[0].consecutiveMissesBeforeClose > 0 {
 			opts = append(opts, WithConsecutiveWorkerHeartbeatMissesBeforeConnectionClose(params[0].consecutiveMissesBeforeClose))
 		}
+
 	}
 
 	svc := NewConnectGatewayService(
@@ -979,7 +1102,6 @@ func createTestingGateway(t *testing.T, params ...testingParameters) testingReso
 		redis:        r,
 		rc:           rc,
 		stateManager: connManager,
-		testConn:     testConn,
 		ws:           ws,
 		lifecycles:   lifecycles,
 		envID:        envID,
@@ -1110,108 +1232,390 @@ func freePort() int {
 	return l.Addr().(*net.TCPAddr).Port
 }
 
-func withTestingConnector(t *testingConnector) pubsub.ConnectorOpt {
-	return func(ctx context.Context) (pubsub.Connector, error) {
-		return t, nil
-	}
-}
+// TestHandleSdkReply tests the handleSdkReply function which currently has 0% coverage
+func TestHandleSdkReply(t *testing.T) {
+	res := createTestingGateway(t)
+	handshake(t, res)
 
-// testingConnector is a blank implementation of the Connector interface
-type testingConnector struct {
-	subsLock            gosync.Mutex
-	executorRequestSubs map[string][]chan *connect.GatewayExecutorRequestData
-	ackSubs             map[string][]chan pubsub.AckSource
-}
+	requestID := "test-req"
+	runID := ulid.MustNew(ulid.Now(), rand.Reader)
 
-func (t *testingConnector) Proxy(ctx, traceCtx context.Context, opts pubsub.ProxyOpts) (*connect.SDKResponse, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-
-func (t *testingConnector) RouteExecutorRequest(ctx context.Context, gatewayId ulid.ULID, connId ulid.ULID, data *connect.GatewayExecutorRequestData) error {
-	t.subsLock.Lock()
-	defer t.subsLock.Unlock()
-
-	subKey := fmt.Sprintf("%s-%s", gatewayId.String(), connId.String())
-
-	sub, ok := t.executorRequestSubs[subKey]
-	if !ok {
-		return nil
+	sdkResponse := &connect.SDKResponse{
+		RequestId:      requestID,
+		AccountId:      res.accountID.String(),
+		EnvId:          res.envID.String(),
+		AppId:          res.appID.String(),
+		Status:         connect.SDKResponseStatus_DONE,
+		Body:           []byte("test response"),
+		NoRetry:        false,
+		RetryAfter:     nil,
+		SdkVersion:     "test-version",
+		RequestVersion: 1,
+		SystemTraceCtx: nil,
+		UserTraceCtx:   nil,
+		RunId:          runID.String(),
 	}
 
-	for _, ch := range sub {
-		ch <- data
-	}
-	return nil
+	responseBytes, err := proto.Marshal(sdkResponse)
+	require.NoError(t, err)
+
+	// Send WORKER_REPLY message through the websocket (simulating SDK sending response)
+	err = wsproto.Write(context.Background(), res.ws, &connect.ConnectMessage{
+		Kind:    connect.GatewayMessageType_WORKER_REPLY,
+		Payload: responseBytes,
+	})
+	require.NoError(t, err)
+
+	// Should receive a reply ack message
+	ackMsg := awaitNextMessage(t, res.ws, 2*time.Second)
+	require.Equal(t, connect.GatewayMessageType_WORKER_REPLY_ACK, ackMsg.Kind)
+
+	ackData := &connect.WorkerReplyAckData{}
+	err = proto.Unmarshal(ackMsg.Payload, ackData)
+	require.NoError(t, err)
+	require.Equal(t, requestID, ackData.RequestId)
+
+	// Verify the response was saved
+	savedResponse, err := res.stateManager.GetResponse(context.Background(), res.envID, requestID)
+	require.NoError(t, err)
+	require.NotNil(t, savedResponse)
+	require.Equal(t, requestID, savedResponse.RequestId)
+	require.Equal(t, connect.SDKResponseStatus_DONE, savedResponse.Status)
 }
 
-func (t *testingConnector) ReceiveRoutedRequest(ctx context.Context, gatewayId ulid.ULID, connId ulid.ULID, onMessage func(rawBytes []byte, data *connect.GatewayExecutorRequestData), onSubscribed chan struct{}) error {
-	logger.StdlibLogger(ctx).Error("using no-op connector receive routed request", "gateway_id", gatewayId, "conn_id", connId)
+// TestHandleIncomingWebSocketMessageInvalidPayloads tests error handling for invalid message payloads
+func TestHandleIncomingWebSocketMessageInvalidPayloads(t *testing.T) {
+	res := createTestingGateway(t)
+	handshake(t, res)
 
-	t.subsLock.Lock()
-	if t.executorRequestSubs == nil {
-		t.executorRequestSubs = make(map[string][]chan *connect.GatewayExecutorRequestData)
+	ch := &connectionHandler{
+		svc: res.svc,
+		conn: &state.Connection{
+			EnvID: res.envID,
+			Data: &connect.WorkerConnectRequestData{
+				InstanceId: "test-instance",
+			},
+		},
+		ws:  res.ws,
+		log: res.svc.logger,
 	}
-	subKey := fmt.Sprintf("%s-%s", gatewayId.String(), connId.String())
 
-	sub := make(chan *connect.GatewayExecutorRequestData)
-	t.executorRequestSubs[subKey] = append(t.executorRequestSubs[subKey], sub)
-
-	t.subsLock.Unlock()
-
-	onSubscribed <- struct{}{} // Notify that subscription is ready
-	for {
-		select {
-		case <-ctx.Done():
-			t.subsLock.Lock()
-			defer t.subsLock.Unlock()
-
-			// Remove the subscription
-			if subs, ok := t.executorRequestSubs[subKey]; ok {
-				for i, s := range subs {
-					if s == sub {
-						t.executorRequestSubs[subKey] = append(subs[:i], subs[i+1:]...)
-						break
-					}
-				}
-				if len(t.executorRequestSubs[subKey]) == 0 {
-					delete(t.executorRequestSubs, subKey)
-				}
-			}
-
-			return nil
-		case msg := <-sub:
-			marshaled, err := proto.Marshal(msg)
-			if err != nil {
-				return err
-			}
-			onMessage(marshaled, msg)
-		}
+	// Test WORKER_REQUEST_ACK with invalid payload
+	msg := &connect.ConnectMessage{
+		Kind:    connect.GatewayMessageType_WORKER_REQUEST_ACK,
+		Payload: []byte("invalid protobuf"),
 	}
+
+	serr := ch.handleIncomingWebSocketMessage(context.Background(), msg)
+	require.NotNil(t, serr)
+	require.Equal(t, syscode.CodeConnectWorkerRequestAckInvalidPayload, serr.SysCode)
+
+	// Test WORKER_REQUEST_EXTEND_LEASE with invalid payload
+	msg = &connect.ConnectMessage{
+		Kind:    connect.GatewayMessageType_WORKER_REQUEST_EXTEND_LEASE,
+		Payload: []byte("invalid protobuf"),
+	}
+
+	serr = ch.handleIncomingWebSocketMessage(context.Background(), msg)
+	require.NotNil(t, serr)
+	require.Equal(t, syscode.CodeConnectWorkerRequestExtendLeaseInvalidPayload, serr.SysCode)
+
+	// Test WORKER_REQUEST_EXTEND_LEASE with invalid lease ID
+	extendLeaseData := &connect.WorkerRequestExtendLeaseData{
+		RequestId:    "test-req",
+		AccountId:    res.accountID.String(),
+		EnvId:        res.envID.String(),
+		AppId:        res.appID.String(),
+		FunctionSlug: "test-fn",
+		LeaseId:      "invalid-ulid",
+	}
+	extendLeaseBytes, err := proto.Marshal(extendLeaseData)
+	require.NoError(t, err)
+
+	msg = &connect.ConnectMessage{
+		Kind:    connect.GatewayMessageType_WORKER_REQUEST_EXTEND_LEASE,
+		Payload: extendLeaseBytes,
+	}
+
+	serr = ch.handleIncomingWebSocketMessage(context.Background(), msg)
+	require.NotNil(t, serr)
+	require.Equal(t, syscode.CodeConnectWorkerRequestExtendLeaseInvalidPayload, serr.SysCode)
 }
 
-func (t *testingConnector) AckMessage(ctx context.Context, requestId string, source pubsub.AckSource) error {
-	ackKey := fmt.Sprintf("ack:%s", requestId)
+// TestHandleIncomingWebSocketMessageDraining tests message handling when gateway is draining
+func TestHandleIncomingWebSocketMessageDraining(t *testing.T) {
+	res := createTestingGateway(t)
+	handshake(t, res)
 
-	t.subsLock.Lock()
-	defer t.subsLock.Unlock()
+	// Start draining
+	err := res.svc.DrainGateway()
+	require.NoError(t, err)
 
-	subs, ok := t.ackSubs[ackKey]
-	if !ok {
-		return nil
+	ch := &connectionHandler{
+		svc: res.svc,
+		conn: &state.Connection{
+			EnvID: res.envID,
+			Data: &connect.WorkerConnectRequestData{
+				InstanceId: "test-instance",
+			},
+		},
+		ws:  res.ws,
+		log: res.svc.logger,
 	}
 
-	for _, ch := range subs {
-		ch <- source
+	// Test WORKER_READY while draining
+	msg := &connect.ConnectMessage{
+		Kind: connect.GatewayMessageType_WORKER_READY,
 	}
 
-	return nil
+	serr := ch.handleIncomingWebSocketMessage(context.Background(), msg)
+	require.NotNil(t, serr)
+	require.Equal(t, ErrDraining.SysCode, serr.SysCode)
+
+	// Test WORKER_HEARTBEAT while draining
+	msg = &connect.ConnectMessage{
+		Kind: connect.GatewayMessageType_WORKER_HEARTBEAT,
+	}
+
+	serr = ch.handleIncomingWebSocketMessage(context.Background(), msg)
+	require.NotNil(t, serr)
+	require.Equal(t, ErrDraining.SysCode, serr.SysCode)
+
+	// Test WORKER_PAUSE while draining
+	msg = &connect.ConnectMessage{
+		Kind: connect.GatewayMessageType_WORKER_PAUSE,
+	}
+
+	serr = ch.handleIncomingWebSocketMessage(context.Background(), msg)
+	require.NotNil(t, serr)
+	require.Equal(t, ErrDraining.SysCode, serr.SysCode)
 }
 
-func (t *testingConnector) NotifyExecutor(ctx context.Context, resp *connect.SDKResponse) error {
-	return fmt.Errorf("not implemented")
+// TestHandleIncomingWebSocketMessageMissingInstanceId tests error handling for missing instance ID
+func TestHandleIncomingWebSocketMessageMissingInstanceId(t *testing.T) {
+	res := createTestingGateway(t)
+	handshake(t, res)
+
+	ch := &connectionHandler{
+		svc: res.svc,
+		conn: &state.Connection{
+			EnvID: res.envID,
+			Data: &connect.WorkerConnectRequestData{
+				InstanceId: "", // Empty instance ID
+			},
+		},
+		ws:  res.ws,
+		log: res.svc.logger,
+	}
+
+	// Test WORKER_READY with missing instance ID
+	msg := &connect.ConnectMessage{
+		Kind: connect.GatewayMessageType_WORKER_READY,
+	}
+
+	serr := ch.handleIncomingWebSocketMessage(context.Background(), msg)
+	require.NotNil(t, serr)
+	t.Logf("serr: %+v", serr)
+	require.Equal(t, syscode.CodeConnectInternal, serr.SysCode)
+	require.Contains(t, serr.Msg, "missing instanceId")
+
+	// Test WORKER_HEARTBEAT with missing instance ID
+	msg = &connect.ConnectMessage{
+		Kind: connect.GatewayMessageType_WORKER_HEARTBEAT,
+	}
+
+	serr = ch.handleIncomingWebSocketMessage(context.Background(), msg)
+	require.NotNil(t, serr)
+	require.Equal(t, syscode.CodeConnectInternal, serr.SysCode)
+	require.Contains(t, serr.Msg, "missing instanceId")
 }
 
-func (t *testingConnector) Wait(ctx context.Context) error {
-	<-ctx.Done()
-	return nil
+// TestEstablishConnectionInvalidConnectMessage tests invalid connect messages
+func TestEstablishConnectionInvalidConnectMessage(t *testing.T) {
+	res := createTestingGateway(t, testingParameters{
+		noConnect: true,
+	})
+
+	ws, _, err := websocket.Dial(context.Background(), res.websocketUrl, &websocket.DialOptions{
+		Subprotocols: []string{types.GatewaySubProtocol},
+	})
+	require.NoError(t, err)
+	defer func() { _ = ws.CloseNow() }()
+
+	// Wait for hello message
+	msg := awaitNextMessage(t, ws, 2*time.Second)
+	require.Equal(t, connect.GatewayMessageType_GATEWAY_HELLO, msg.Kind)
+
+	// Send wrong message type
+	err = wsproto.Write(context.Background(), ws, &connect.ConnectMessage{
+		Kind: connect.GatewayMessageType_WORKER_HEARTBEAT, // Wrong message type
+	})
+	require.NoError(t, err)
+
+	status, reason := awaitClosure(t, ws, 2*time.Second)
+	require.Equal(t, websocket.StatusPolicyViolation, status)
+	require.Equal(t, syscode.CodeConnectWorkerHelloInvalidMsg, reason)
+}
+
+// TestEstablishConnectionInvalidPayload tests invalid protobuf payload
+func TestEstablishConnectionInvalidPayload(t *testing.T) {
+	res := createTestingGateway(t, testingParameters{
+		noConnect: true,
+	})
+
+	ws, _, err := websocket.Dial(context.Background(), res.websocketUrl, &websocket.DialOptions{
+		Subprotocols: []string{types.GatewaySubProtocol},
+	})
+	require.NoError(t, err)
+	defer func() { _ = ws.CloseNow() }()
+
+	// Wait for hello message
+	msg := awaitNextMessage(t, ws, 2*time.Second)
+	require.Equal(t, connect.GatewayMessageType_GATEWAY_HELLO, msg.Kind)
+
+	// Send invalid protobuf payload
+	err = wsproto.Write(context.Background(), ws, &connect.ConnectMessage{
+		Kind:    connect.GatewayMessageType_WORKER_CONNECT,
+		Payload: []byte("invalid protobuf"),
+	})
+	require.NoError(t, err)
+
+	status, reason := awaitClosure(t, ws, 2*time.Second)
+	require.Equal(t, websocket.StatusPolicyViolation, status)
+	require.Equal(t, syscode.CodeConnectWorkerHelloInvalidPayload, reason)
+}
+
+// TestEstablishConnectionInvalidConnectionId tests invalid connection ID
+func TestEstablishConnectionInvalidConnectionId(t *testing.T) {
+	res := createTestingGateway(t, testingParameters{
+		noConnect: true,
+	})
+
+	ws, _, err := websocket.Dial(context.Background(), res.websocketUrl, &websocket.DialOptions{
+		Subprotocols: []string{types.GatewaySubProtocol},
+	})
+	require.NoError(t, err)
+	defer func() { _ = ws.CloseNow() }()
+
+	// Wait for hello message
+	msg := awaitNextMessage(t, ws, 2*time.Second)
+	require.Equal(t, connect.GatewayMessageType_GATEWAY_HELLO, msg.Kind)
+
+	// Send connect message with invalid connection ID
+	reqData := &connect.WorkerConnectRequestData{
+		ConnectionId: "invalid-ulid", // Invalid ULID
+		InstanceId:   "test-worker",
+		AuthData: &connect.AuthData{
+			SessionToken: "test-session-token",
+			SyncToken:    "test-sync-token",
+		},
+		Apps: []*connect.AppConfiguration{},
+	}
+
+	connectMsg, err := proto.Marshal(reqData)
+	require.NoError(t, err)
+
+	err = wsproto.Write(context.Background(), ws, &connect.ConnectMessage{
+		Kind:    connect.GatewayMessageType_WORKER_CONNECT,
+		Payload: connectMsg,
+	})
+	require.NoError(t, err)
+
+	status, reason := awaitClosure(t, ws, 2*time.Second)
+	require.Equal(t, websocket.StatusPolicyViolation, status)
+	require.Equal(t, syscode.CodeConnectWorkerHelloInvalidPayload, reason)
+}
+
+// TestEstablishConnectionMissingInstanceId tests missing instance ID
+func TestEstablishConnectionMissingInstanceId(t *testing.T) {
+	res := createTestingGateway(t, testingParameters{
+		noConnect: true,
+	})
+
+	ws, _, err := websocket.Dial(context.Background(), res.websocketUrl, &websocket.DialOptions{
+		Subprotocols: []string{types.GatewaySubProtocol},
+	})
+	require.NoError(t, err)
+	defer func() { _ = ws.CloseNow() }()
+
+	// Wait for hello message
+	msg := awaitNextMessage(t, ws, 2*time.Second)
+	require.Equal(t, connect.GatewayMessageType_GATEWAY_HELLO, msg.Kind)
+
+	connID := ulid.MustNew(ulid.Now(), rand.Reader)
+
+	// Send connect message with missing instance ID
+	reqData := &connect.WorkerConnectRequestData{
+		ConnectionId: connID.String(),
+		InstanceId:   "", // Missing instance ID
+		AuthData: &connect.AuthData{
+			SessionToken: "test-session-token",
+			SyncToken:    "test-sync-token",
+		},
+		Apps: []*connect.AppConfiguration{},
+	}
+
+	connectMsg, err := proto.Marshal(reqData)
+	require.NoError(t, err)
+
+	err = wsproto.Write(context.Background(), ws, &connect.ConnectMessage{
+		Kind:    connect.GatewayMessageType_WORKER_CONNECT,
+		Payload: connectMsg,
+	})
+	require.NoError(t, err)
+
+	status, reason := awaitClosure(t, ws, 2*time.Second)
+	require.Equal(t, websocket.StatusPolicyViolation, status)
+	require.Equal(t, syscode.CodeConnectWorkerHelloInvalidPayload, reason)
+}
+
+// TestCloseWithConnectError tests the closeWithConnectError function
+func TestCloseWithConnectError(t *testing.T) {
+	res := createTestingGateway(t, testingParameters{
+		noConnect: true,
+	})
+
+	ws, _, err := websocket.Dial(context.Background(), res.websocketUrl, &websocket.DialOptions{
+		Subprotocols: []string{types.GatewaySubProtocol},
+	})
+	require.NoError(t, err)
+
+	// Test closeWithConnectError by triggering it through auth failure
+	msg := awaitNextMessage(t, ws, 2*time.Second)
+	require.Equal(t, connect.GatewayMessageType_GATEWAY_HELLO, msg.Kind)
+
+	// Create a disallowed connection to trigger closeWithConnectError
+	res2 := createTestingGateway(t, testingParameters{
+		disallowConnection: true,
+		noConnect:          true,
+	})
+
+	ws2, _, err := websocket.Dial(context.Background(), res2.websocketUrl, &websocket.DialOptions{
+		Subprotocols: []string{types.GatewaySubProtocol},
+	})
+	require.NoError(t, err)
+	defer func() { _ = ws2.CloseNow() }()
+
+	msg = awaitNextMessage(t, ws2, 2*time.Second)
+	require.Equal(t, connect.GatewayMessageType_GATEWAY_HELLO, msg.Kind)
+
+	// Send connect message that will fail auth
+	sendWorkerConnectMessage(t, testingResources{
+		ws:        ws2,
+		reqData:   res2.reqData,
+		connID:    res2.connID,
+		envID:     res2.envID,
+		accountID: res2.accountID,
+		appID:     res2.appID,
+		syncID:    res2.syncID,
+		fnID:      res2.fnID,
+		appName:   res2.appName,
+		fnName:    res2.fnName,
+		fnSlug:    res2.fnSlug,
+		runID:     res2.runID,
+	})
+
+	status, reason := awaitClosure(t, ws2, 2*time.Second)
+	require.Equal(t, websocket.StatusPolicyViolation, status)
+	require.Equal(t, syscode.CodeConnectAuthFailed, reason)
 }

@@ -3,7 +3,7 @@ package registration
 import (
 	"context"
 
-	"github.com/inngest/inngest/pkg/connect/pubsub"
+	"github.com/inngest/inngest/pkg/connect/grpc"
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/exechttp"
 	"github.com/inngest/inngest/pkg/execution/queue"
@@ -62,14 +62,14 @@ type NewDriverOpts struct {
 	LocalSigningKey        *string
 	RequireLocalSigningKey bool
 
-	ConnectForwarder  pubsub.RequestForwarder
+	ConnectForwarder  grpc.RequestForwarder
 	ConditionalTracer trace.ConditionalTracer
 	HTTPClient        exechttp.RequestExecutor
 }
 
 // DriverConfig is an interface used to determine driver config structs.
 type DriverConfig interface {
-	NewDriver(opts ...NewDriverOpts) (driver.Driver, error)
+	NewDriver(opts ...NewDriverOpts) (driver.DriverV1, error)
 
 	// DriverName returns the name of the specific driver.
 	DriverName() string

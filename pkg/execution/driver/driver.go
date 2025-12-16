@@ -12,10 +12,69 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/inngest/inngest/pkg/util/errs"
 )
 
-type Driver interface {
-	inngest.Runtime
+// DriverV2 represents a driver that makes requests to SDKs to re-enter and execute
+// steps.  This is the reimplementation of our driver to simplify and improve code
+// paths, and allow re-entry of sync functions.
+type DriverV2 interface {
+	// Do executes a request to an SDK for the given run in V2RequestOpts.
+	//
+	// The type T represents a driver-specific configuration struct.
+	//
+	// This responds with a *state.DriverResponse (which itself should be refactored),
+	// alongside any user and internal errors.
+	Do(ctx context.Context, sl sv2.StateLoader, opts V2RequestOpts) (*state.DriverResponse, errs.UserError, errs.InternalError)
+
+	// Name returns the driver name.
+	Name() string
+}
+
+// V2RequestOpts represent common data needed to execute the request, alongside
+// driver-specific configuration in DriverConfig.
+type V2RequestOpts struct {
+	// Metadata is the run's metadata.
+	Metadata sv2.Metadata
+
+	// Fn represents the function being called.  This allows the driver to unmarshal
+	// driver specific details when executing the function.
+	Fn inngest.Function
+
+	// SigningKey is the key used to sign all requests.  If not present, this request
+	// will be sent unsigned (this is only intended to be used in the dev server).
+	SigningKey []byte
+
+	// Attempt is the attempt count for this request.
+	Attempt int
+
+	// Index is the index for this particular request.  This is required for
+	// specific SDK implementations.
+	Index int
+
+	// QueueRef is the executor.QueueRef encoded as a string, used when checkpointing
+	// async functions so that the API knows which queue item to reset.
+	QueueRef string
+
+	// StepID is an optional step ID that we're specifically executing.
+	//
+	// This happens in the case of StepPlanned ops, which request an explicit step ID
+	// to be executed via this request.
+	StepID *string
+
+	// URL is the URL to hit.  This is always provided by the caller instead of being derived
+	// from the function, as individual runs in a function may hit a unique URL.
+	URL string
+}
+
+// DriverV1 represents an old deprecated driver type for
+// creating SDK requests.
+//
+// This is the OG driver created from the prototypical start of Inngest,
+// and is slowly being deprecated with the new DriverV2 interface.
+type DriverV1 interface {
+	// Name returns the driver name.
+	Name() string
 
 	// Execute executes the given action for the given step.
 	Execute(
@@ -39,6 +98,8 @@ func MarshalV1(
 	stackIndex int,
 	env string,
 	attempt int,
+	maxAttempts int,
+	queueItemRef string,
 ) ([]byte, error) {
 	rawEvts, err := sl.LoadEvents(ctx, md.ID)
 	if err != nil {
@@ -64,16 +125,18 @@ func MarshalV1(
 		Events:  evts,
 		Actions: map[string]any{},
 		Context: &SDKRequestContext{
-			UseAPI:     true,
-			FunctionID: md.ID.FunctionID,
-			Env:        env,
-			StepID:     step.ID,
-			RunID:      md.ID.RunID,
+			UseAPI:       true,
+			FunctionID:   md.ID.FunctionID,
+			Env:          env,
+			StepID:       step.ID,
+			RunID:        md.ID.RunID,
+			QueueItemRef: queueItemRef,
 			Stack: &FunctionStack{
 				Stack:   md.Stack,
 				Current: stackIndex,
 			},
 			Attempt:                   attempt,
+			MaxAttempts:               maxAttempts,
 			DisableImmediateExecution: md.Config.ForceStepPlan,
 		},
 		Version: md.Config.RequestVersion,

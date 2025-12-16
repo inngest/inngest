@@ -1,10 +1,10 @@
 'use client';
 
-import { useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@inngest/components/Button/Button';
+import { EventsActionMenu } from '@inngest/components/Events/EventsActionMenu';
 import { EventsTable } from '@inngest/components/Events/EventsTable';
-import { InternalEventsToggle } from '@inngest/components/Events/InternalEventsToggle';
+import { useReplayModal } from '@inngest/components/Events/useReplayModal';
 import { Header } from '@inngest/components/Header/Header';
 import { RefreshButton } from '@inngest/components/Refresh/RefreshButton';
 import { RiExternalLinkLine, RiRefreshLine } from '@remixicon/react';
@@ -15,8 +15,6 @@ import { ExpandedRowActions } from '@/components/Events/ExpandedRowActions';
 import SendEventButton from '@/components/Events/SendEventButton';
 import { SendEventModal } from '@/components/Events/SendEventModal';
 import { useEventDetails, useEventPayload, useEvents } from '@/components/Events/useEvents';
-import { useReplayModal } from '@/components/Events/useReplayModal';
-import { createInternalPathCreator } from '@/components/Events/utils';
 import { useAccountFeatures } from '@/utils/useAccountFeatures';
 
 export default function EventsPage({
@@ -31,7 +29,6 @@ export default function EventsPage({
   singleEventTypePage?: boolean;
 }) {
   const router = useRouter();
-  const internalPathCreator = useMemo(() => createInternalPathCreator(envSlug), [envSlug]);
   const { isModalVisible, selectedEvent, openModal, closeModal } = useReplayModal();
 
   const getEvents = useEvents();
@@ -50,13 +47,12 @@ export default function EventsPage({
             <div className="flex items-center gap-1.5">
               <RefreshButton />
               <SendEventButton />
-              <InternalEventsToggle />
+              <EventsActionMenu />
             </div>
           }
         />
       )}
       <EventsTable
-        pathCreator={internalPathCreator}
         getEvents={getEvents}
         getEventDetails={getEventDetails}
         getEventPayload={getEventPayload}

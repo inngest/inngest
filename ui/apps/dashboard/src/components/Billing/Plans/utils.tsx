@@ -6,6 +6,7 @@ import type {
   EntitlementInt,
   EntitlementRunCount,
 } from '@/gql/graphql';
+import { pathCreator } from '@/utils/urls';
 
 export type Plan = Omit<BillingPlan, 'entitlements' | 'features' | 'availableAddons' | 'addons'> & {
   entitlements: {
@@ -46,7 +47,10 @@ export function processPlan(plan: Plan) {
   };
 }
 
-function getFeatureDescriptions(planName: string, entitlements: Plan['entitlements']): string[] {
+function getFeatureDescriptions(
+  planName: string,
+  entitlements: Plan['entitlements']
+): (string | React.ReactNode)[] {
   const numberFormatter = new Intl.NumberFormat('en-US', {
     notation: 'compact',
     compactDisplay: 'short',
@@ -82,7 +86,15 @@ function getFeatureDescriptions(planName: string, entitlements: Plan['entitlemen
         'Starts at 1,000,000+ executions',
         '100+ concurrent steps',
         '1,000+ realtime connections',
-        '15+ users',
+        <>
+          10 users included
+          <a
+            className="hover:underline"
+            href={pathCreator.billing({ ref: 'app-billing-plans-pro-addons', highlight: 'users' })}
+          >
+            (add-ons available)
+          </a>
+        </>,
         'Granular metrics',
         'Higher usage limits',
       ];
@@ -101,7 +113,7 @@ function getFeatureDescriptions(planName: string, entitlements: Plan['entitlemen
     case PlanNames.Hobby:
       return [
         '100k executions, hard limited',
-        '25 concurrent steps',
+        '5 concurrent steps',
         '3 realtime connections',
         '3 users',
         'Basic alerting',
@@ -136,4 +148,13 @@ export function isEnterprisePlan(plan: Plan | (Partial<BillingPlan> & { name: st
 
 export function isTrialPlan(plan: Plan | (Partial<BillingPlan> & { name: string })): boolean {
   return Boolean(plan.name.match(/Trial/i));
+}
+
+export function isHobbyFreePlan(plan: Plan | (Partial<BillingPlan> & { name: string })): boolean {
+  if (!plan.slug) return false;
+  return plan.slug.startsWith('hobby-free-');
+}
+
+export function isHobbyPlan(plan: Plan | (Partial<BillingPlan> & { name: string })): boolean {
+  return isHobbyFreePlan(plan);
 }

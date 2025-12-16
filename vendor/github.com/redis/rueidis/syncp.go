@@ -221,8 +221,8 @@ func (r *conncount) ResetLen(n int) {
 type connretry struct {
 	m          map[conn]*retry
 	n          int
+	RetryDelay time.Duration // NOTE: This is not thread-safe.
 	Redirects  uint32        // NOTE: This is not thread-safe.
-	RetryDelay time.Duration // NOTE: It is not thread-safe.
 }
 
 func (r *connretry) Capacity() int {
@@ -238,8 +238,8 @@ func (r *connretry) ResetLen(n int) {
 type connretrycache struct {
 	m          map[conn]*retrycache
 	n          int
+	RetryDelay time.Duration // NOTE: This is not thread-safe.
 	Redirects  uint32        // NOTE: This is not thread-safe.
-	RetryDelay time.Duration // NOTE: It is not thread-safe.
 }
 
 func (r *connretrycache) Capacity() int {

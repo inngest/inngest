@@ -56,34 +56,28 @@ type SeverityOption = {
 };
 export const severityOptions: SeverityOption[] = [
   {
-    label: 'Technical guidance',
+    label: 'P3 - Technical guidance',
     description: 'A bug or general question',
-    value: '4' as const,
-  },
-  {
-    label: 'Low impact',
-    description: 'Service fully usable',
-    paidOnly: true,
     value: '3' as const,
   },
   {
-    label: 'Medium impact',
+    label: 'P2 - Medium impact',
     description: 'Production system impaired',
     paidOnly: true,
     value: '2' as const,
   },
   {
-    label: 'High impact',
+    label: 'P1 - High impact',
     description: 'Production system down',
     paidOnly: true,
     value: '1' as const,
   },
   {
-    label: 'Major impact',
+    label: 'P0 - Major impact',
     description: 'Business critical systems down',
     enterpriseOnly: true,
     value: '0' as const,
   },
 ];
 export type BugSeverity = (typeof severityOptions)[number]['value'];
-export const DEFAULT_BUG_SEVERITY_LEVEL = '4';
+export const DEFAULT_BUG_SEVERITY_LEVEL = '3';

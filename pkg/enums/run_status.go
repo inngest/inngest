@@ -106,3 +106,24 @@ func RunCodeToStatus(val int64) RunStatus {
 	}
 	return RunStatusUnknown
 }
+
+func StepStatusToRunStatus(stepStatus StepStatus) RunStatus {
+	switch stepStatus {
+	case StepStatusCompleted:
+		return RunStatusCompleted
+	case StepStatusFailed, StepStatusErrored:
+		return RunStatusFailed
+	case StepStatusRunning:
+		return RunStatusRunning
+	case StepStatusCancelled:
+		return RunStatusCancelled
+	case StepStatusTimedOut:
+		return RunStatusCancelled // Map timeout to cancelled
+	case StepStatusScheduled, StepStatusQueued:
+		return RunStatusScheduled // Functions in queue due to concurrency limits
+	case StepStatusWaiting, StepStatusSleeping, StepStatusInvoking:
+		return RunStatusRunning // These are all "in progress" states
+	default:
+		return RunStatusUnknown // default to unknown
+	}
+}

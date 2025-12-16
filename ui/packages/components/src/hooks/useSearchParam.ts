@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import type { Route } from 'next';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 
@@ -118,18 +118,21 @@ export function useStringArraySearchParam(
     router.replace((pathname + '?' + params.toString()) as Route);
   }, [name, pathname, router, searchParams]);
 
-  let value = undefined;
   const rawValue = searchParams.get(name);
-  if (typeof rawValue === 'string') {
-    const parsed: unknown = JSON.parse(rawValue);
+  const value = useMemo(() => {
+    let value = undefined;
+    if (typeof rawValue === 'string') {
+      const parsed: unknown = JSON.parse(rawValue);
 
-    if (isStringArray(parsed)) {
-      value = parsed;
-    } else {
-      // This means the query param value is the wrong type
-      console.error(`invalid type for search param ${name}`);
+      if (isStringArray(parsed)) {
+        value = parsed;
+      } else {
+        // This means the query param value is the wrong type
+        console.error(`invalid type for search param ${name}`);
+      }
     }
-  }
+    return value;
+  }, [rawValue]);
 
   return [value, upsert, remove];
 }

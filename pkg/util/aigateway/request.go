@@ -78,7 +78,7 @@ func (r Request) SerializableRequest() (exechttp.SerializableRequest, error) {
 	}
 
 	// Always sending JSON.
-	req.Header.Add("content-type", "application/json")
+	req.Header.Set("content-type", "application/json")
 
 	// Add auth, depending on the format.
 	switch r.Format {

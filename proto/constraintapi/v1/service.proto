@@ -1,0 +1,229 @@
+syntax = "proto3";
+package constraintapi.v1;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/duration.proto";
+
+option go_package = "github.com/inngest/inngest/proto/gen/constraintapi/v1;constraintapi";
+
+// Enums with CONSTRAINT_API_ prefix for global uniqueness
+enum ConstraintApiRateLimitScope {
+  CONSTRAINT_API_RATE_LIMIT_SCOPE_UNSPECIFIED = 0;
+  CONSTRAINT_API_RATE_LIMIT_SCOPE_FUNCTION = 1;
+  CONSTRAINT_API_RATE_LIMIT_SCOPE_ENV = 2;
+  CONSTRAINT_API_RATE_LIMIT_SCOPE_ACCOUNT = 3;
+}
+
+enum ConstraintApiConcurrencyScope {
+  CONSTRAINT_API_CONCURRENCY_SCOPE_UNSPECIFIED = 0;
+  CONSTRAINT_API_CONCURRENCY_SCOPE_FUNCTION = 1;
+  CONSTRAINT_API_CONCURRENCY_SCOPE_ENV = 2;
+  CONSTRAINT_API_CONCURRENCY_SCOPE_ACCOUNT = 3;
+}
+
+enum ConstraintApiThrottleScope {
+  CONSTRAINT_API_THROTTLE_SCOPE_UNSPECIFIED = 0;
+  CONSTRAINT_API_THROTTLE_SCOPE_FUNCTION = 1;
+  CONSTRAINT_API_THROTTLE_SCOPE_ENV = 2;
+  CONSTRAINT_API_THROTTLE_SCOPE_ACCOUNT = 3;
+}
+
+enum ConstraintApiConcurrencyMode {
+  CONSTRAINT_API_CONCURRENCY_MODE_UNSPECIFIED = 0;
+  CONSTRAINT_API_CONCURRENCY_MODE_STEP = 1;
+  CONSTRAINT_API_CONCURRENCY_MODE_RUN = 2;
+}
+
+enum ConstraintApiConstraintKind {
+  CONSTRAINT_API_CONSTRAINT_KIND_UNSPECIFIED = 0;
+  CONSTRAINT_API_CONSTRAINT_KIND_RATE_LIMIT = 1;
+  CONSTRAINT_API_CONSTRAINT_KIND_CONCURRENCY = 2;
+  CONSTRAINT_API_CONSTRAINT_KIND_THROTTLE = 3;
+}
+
+enum ConstraintApiRunProcessingMode {
+  CONSTRAINT_API_RUN_PROCESSING_MODE_UNSPECIFIED = 0;
+  CONSTRAINT_API_RUN_PROCESSING_MODE_BACKGROUND = 1;
+  CONSTRAINT_API_RUN_PROCESSING_MODE_DURABLE_ENDPOINT = 2;
+}
+
+enum ConstraintApiCallerLocation {
+  CONSTRAINT_API_CALLER_LOCATION_UNSPECIFIED = 0;
+  CONSTRAINT_API_CALLER_LOCATION_SCHEDULE = 1;
+  CONSTRAINT_API_CALLER_LOCATION_BACKLOG_REFILL = 2;
+  CONSTRAINT_API_CALLER_LOCATION_ITEM_LEASE = 3;
+  CONSTRAINT_API_CALLER_LOCATION_CHECKPOINT = 4;
+}
+
+enum ConstraintApiLeaseService {
+  CONSTRAINT_API_LEASE_SERVICE_UNSPECIFIED = 0;
+  CONSTRAINT_API_LEASE_SERVICE_NEW_RUNS = 1;
+  CONSTRAINT_API_LEASE_SERVICE_EXECUTOR = 2;
+  CONSTRAINT_API_LEASE_SERVICE_API = 3;
+}
+
+// Message definitions
+message RateLimitConfig {
+  ConstraintApiRateLimitScope scope = 1;
+  int32 limit = 2;
+  int32 period = 3;
+  string key_expression_hash = 4;
+}
+
+message CustomConcurrencyLimit {
+  ConstraintApiConcurrencyMode mode = 1;
+  ConstraintApiConcurrencyScope scope = 2;
+  int32 limit = 3;
+  string key_expression_hash = 4;
+}
+
+message ConcurrencyConfig {
+  int32 account_concurrency = 1;
+  int32 function_concurrency = 2;
+  int32 account_run_concurrency = 3;
+  int32 function_run_concurrency = 4;
+  repeated CustomConcurrencyLimit custom_concurrency_keys = 5;
+}
+
+message ThrottleConfig {
+  ConstraintApiThrottleScope scope = 1;
+  string key_expression_hash = 2;
+  int32 limit = 3;
+  int32 burst = 4;
+  int32 period = 5;
+}
+
+message ConstraintConfig {
+  int32 function_version = 1;
+  repeated RateLimitConfig rate_limit = 2;
+  ConcurrencyConfig concurrency = 3;
+  repeated ThrottleConfig throttle = 4;
+}
+
+// Individual constraint types
+message RateLimitConstraint {
+  ConstraintApiRateLimitScope scope = 1;
+  string key_expression_hash = 2;
+  string evaluated_key_hash = 3;
+}
+
+message ConcurrencyConstraint {
+  ConstraintApiConcurrencyMode mode = 1;
+  ConstraintApiConcurrencyScope scope = 2;
+  string key_expression_hash = 3;
+  string evaluated_key_hash = 4;
+  string in_progress_item_key = 5; 
+}
+
+message ThrottleConstraint {
+  ConstraintApiThrottleScope scope = 1;
+  string key_expression_hash = 2;
+  string evaluated_key_hash = 3;
+}
+
+// Constraint item that matches Go's ConstraintItem struct
+message ConstraintItem {
+  ConstraintApiConstraintKind kind = 1;
+  optional ConcurrencyConstraint concurrency = 2;
+  optional ThrottleConstraint throttle = 3;
+  optional RateLimitConstraint rate_limit = 4;
+}
+
+// Constraint usage information
+message ConstraintUsage {
+  ConstraintItem constraint = 1;
+  int32 used = 2;
+  int32 limit = 3;
+}
+
+// Capacity lease information
+message CapacityLease {
+  string lease_id = 1;  // ULID string
+  string idempotency_key = 2;
+}
+
+// Migration identifier for constraint API migration hints
+message MigrationIdentifier {
+  bool is_rate_limit = 1;
+  string queue_shard = 2;
+}
+
+message LeaseSource {
+  ConstraintApiLeaseService service = 1;
+  ConstraintApiCallerLocation location = 2;
+  ConstraintApiRunProcessingMode run_processing_mode = 3;
+}
+
+// Request/Response messages
+message CapacityCheckRequest {
+  string account_id = 1;
+  string env_id = 2;
+  string function_id = 3;
+  ConstraintConfig configuration = 4;
+  repeated ConstraintItem constraints = 5;
+  MigrationIdentifier migration = 6;
+}
+
+message CapacityCheckResponse {
+  int32 available_capacity = 1;
+  repeated ConstraintItem limiting_constraints = 2;
+  repeated ConstraintUsage usage = 3;
+  int32 fairness_reduction = 4;
+  google.protobuf.Timestamp retry_after = 5;
+}
+
+message CapacityAcquireRequest {
+  string idempotency_key = 1;
+  string account_id = 2;
+  string env_id = 3;
+  string function_id = 4;
+  ConstraintConfig configuration = 5;
+  repeated ConstraintItem constraints = 6;
+  int32 amount = 7;
+  repeated string lease_idempotency_keys = 8;
+  map<string, string> lease_run_ids = 9;
+  google.protobuf.Timestamp current_time = 10;
+  google.protobuf.Duration duration = 11;
+  google.protobuf.Duration maximum_lifetime = 12;
+  google.protobuf.Duration blocking_threshold = 13;
+  LeaseSource source = 14;
+  MigrationIdentifier migration = 15;
+}
+
+message CapacityAcquireResponse {
+  repeated CapacityLease leases = 1;
+  repeated ConstraintItem limiting_constraints = 2;
+  int32 fairness_reduction = 3;
+  google.protobuf.Timestamp retry_after = 4;
+}
+
+message CapacityExtendLeaseRequest {
+  string idempotency_key = 1;
+  string account_id = 2;
+  string lease_id = 3;
+  google.protobuf.Duration duration = 4;
+  MigrationIdentifier migration = 5;
+}
+
+message CapacityExtendLeaseResponse {
+  optional string lease_id = 1;
+}
+
+message CapacityReleaseRequest {
+  string idempotency_key = 1;
+  string account_id = 2;
+  string lease_id = 3;
+  MigrationIdentifier migration = 4;
+}
+
+message CapacityReleaseResponse {
+}
+
+
+service ConstraintAPI {
+  rpc Check(CapacityCheckRequest) returns (CapacityCheckResponse);
+  rpc Acquire(CapacityAcquireRequest) returns (CapacityAcquireResponse);
+  rpc ExtendLease(CapacityExtendLeaseRequest) returns (CapacityExtendLeaseResponse);
+  rpc Release(CapacityReleaseRequest) returns (CapacityReleaseResponse);
+}
+

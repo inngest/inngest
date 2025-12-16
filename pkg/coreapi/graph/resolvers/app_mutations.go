@@ -15,6 +15,7 @@ import (
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/run"
+	"github.com/oklog/ulid/v2"
 	"go.opentelemetry.io/otel/attribute"
 )
 
@@ -25,9 +26,18 @@ func (r *mutationResolver) CreateApp(ctx context.Context, input models.CreateApp
 		input.URL = "http://" + input.URL
 	}
 
+	// This ID will not match the app ID after the sync process succeeds. That's
+	// because the eventual app ID will use the app name, rather than the URL.
+	// But we still need to create a placeholder app with a deterministic ID in
+	// the meantime.
+	//
+	// Ideally the app ID would be the same before and after the SDK ping, but
+	// we don't know the app name until after the SDK ping
+	appID := inngest.DeterministicAppUUID(input.URL)
+
 	// Create a new app which holds the error message.
 	params := cqrs.UpsertAppParams{
-		ID:  inngest.DeterministicAppUUID(input.URL),
+		ID:  appID,
 		Url: input.URL,
 		Error: sql.NullString{
 			Valid:  true,
@@ -94,13 +104,17 @@ func (r *mutationResolver) InvokeFunction(
 	data map[string]any,
 	functionSlug string,
 	user map[string]any,
+	debugSessionID *ulid.ULID,
+	debugRunID *ulid.ULID,
 ) (*bool, error) {
 	evt := event.NewInvocationEvent(event.NewInvocationEventOpts{
 		Event: event.Event{
 			Data: data,
 			User: user,
 		},
-		FnID: functionSlug,
+		FnID:           functionSlug,
+		DebugSessionID: debugSessionID,
+		DebugRunID:     debugRunID,
 	})
 
 	ctx, span := run.NewSpan(ctx,

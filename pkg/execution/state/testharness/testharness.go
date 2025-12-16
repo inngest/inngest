@@ -100,7 +100,6 @@ func CheckState(t *testing.T, gen Generator) {
 		"PausesByEvent/ConcurrentCursors":  checkPausesByEvent_concurrent,
 		"PausesByEvent/Consumed":           checkPausesByEvent_consumed,
 		"PauseByID":                        checkPauseByID,
-		"PausesByID":                       checkPausesByID,
 		"Idempotency":                      checkIdempotency,
 		"SetStatus":                        checkSetStatus,
 		"Cancel":                           checkCancel,
@@ -591,6 +590,8 @@ func checkDeletePause(t *testing.T, m state.Manager) {
 
 	p := iter.Val(ctx)
 	p.Expires = state.Time(p.Expires.Time().UTC())
+	// SavePause embeds the CreatedAt time, so assign it to expected pause for comparison
+	pause.CreatedAt = p.CreatedAt
 	require.EqualValues(t, pause, *p)
 
 	t.Run("Deleting a pause works", func(t *testing.T) {
@@ -993,7 +994,10 @@ func checkPausesByEvent_single(t *testing.T, m state.Manager) {
 	require.NoError(t, err)
 	require.NotNil(t, iter)
 	require.True(t, iter.Next(ctx))
-	require.EqualValues(t, &pause, iter.Val(ctx))
+	val := iter.Val(ctx)
+	// SavePause embeds the CreatedAt time, so assign it to expected pause for comparison
+	pause.CreatedAt = val.CreatedAt
+	require.EqualValues(t, &pause, val)
 	require.False(t, iter.Next(ctx))
 }
 
@@ -1343,6 +1347,8 @@ func checkPausesByEvent_consumed(t *testing.T, m state.Manager) {
 		for iter.Next(ctx) {
 			n++
 			val := iter.Val(ctx)
+			// SavePause embeds the CreatedAt time, so assign it to expected pause for comparison
+			p2.CreatedAt = val.CreatedAt
 			require.EqualValues(t, p2, *val)
 		}
 
@@ -1371,6 +1377,8 @@ func checkPauseByID(t *testing.T, m state.Manager) {
 
 	found, err := m.PauseByID(ctx, pause.ID)
 	require.Nil(t, err)
+	// SavePause embeds the CreatedAt time, so assign it to expected pause for comparison
+	pause.CreatedAt = found.CreatedAt
 	require.EqualValues(t, pause, *found)
 
 	<-time.After(time.Second * 3)
@@ -1397,64 +1405,6 @@ func checkPauseByID(t *testing.T, m state.Manager) {
 	require.Nil(t, found, "PauseByID should not return random IDs")
 	require.NotNil(t, err)
 	require.Error(t, state.ErrPauseNotFound, err)
-}
-
-func checkPausesByID(t *testing.T, m state.Manager) {
-	ctx := context.Background()
-	s := setup(t, m)
-
-	// Save a pause.
-	a := state.Pause{
-		ID: pauseID(t),
-		Identifier: state.PauseIdentifier{
-			RunID:      s.Identifier().RunID,
-			FunctionID: s.Identifier().WorkflowID,
-			AccountID:  s.Identifier().AccountID,
-		},
-		Outgoing: inngest.TriggerName,
-		Incoming: w.Steps[0].ID,
-		Expires:  state.Time(time.Now().Add(time.Second * 2).Truncate(time.Millisecond).UTC()),
-	}
-	b := state.Pause{
-		ID: pauseID(t),
-		Identifier: state.PauseIdentifier{
-			RunID:      s.Identifier().RunID,
-			FunctionID: s.Identifier().WorkflowID,
-			AccountID:  s.Identifier().AccountID,
-		},
-		Outgoing: inngest.TriggerName,
-		Incoming: w.Steps[0].ID,
-		Expires:  state.Time(time.Now().Add(time.Second * 2).Truncate(time.Millisecond).UTC()),
-	}
-	_, err := m.SavePause(ctx, a)
-	require.NoError(t, err)
-	_, err = m.SavePause(ctx, b)
-	require.NoError(t, err)
-
-	found, err := m.PausesByID(ctx, a.ID)
-	require.Nil(t, err)
-	require.EqualValues(t, 1, len(found))
-	require.EqualValues(t, a, *found[0])
-
-	<-time.After(time.Second * 3)
-
-	// Finds two
-	found, err = m.PausesByID(ctx, a.ID, b.ID)
-	require.Nil(t, err)
-	require.EqualValues(t, 2, len(found))
-
-	_, cleanup, err := m.ConsumePause(ctx, a, state.ConsumePauseOpts{
-		IdempotencyKey: uuid.NewString(),
-		Data:           nil,
-	})
-	// Consume.
-	require.Nil(t, err, "Consuming an expired pause should work")
-	require.NoError(t, cleanup())
-
-	found, err = m.PausesByID(ctx, a.ID)
-	require.Empty(t, found, "PausesByID should not return consumed pauses")
-	require.Error(t, state.ErrPauseNotFound, err)
-	require.Equal(t, 0, len(found))
 }
 
 func checkIdempotency(t *testing.T, m state.Manager) {

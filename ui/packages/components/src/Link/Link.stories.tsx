@@ -19,7 +19,6 @@ const meta = {
       control: false,
     },
   },
-  tags: ['autodocs'],
 } satisfies Meta<typeof Link>;
 
 export default meta;
@@ -29,7 +28,6 @@ type Story = StoryObj<typeof Link>;
 export const ArrowOnHover: Story = {
   args: {
     children: <p>This is a link to inside the app</p>,
-    arrowOnHover: true,
     href: '/app',
   },
   parameters: {

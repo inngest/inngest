@@ -13,9 +13,9 @@ import {
   TimeElement,
 } from '../DetailsCard/NewElement';
 import type { Run as InitialRunData } from '../RunsPage/types';
+import type { TraceResult } from '../SharedContext/useGetTraceResult';
 import { usePathCreator } from '../SharedContext/usePathCreator';
 import { AICell } from '../Table/Cell';
-import type { Result } from '../types/functionRun';
 import { toMaybeDate } from '../utils/date';
 import { isLazyDone, type Lazy } from '../utils/lazyLoad';
 import { Actions } from './Actions';
@@ -28,7 +28,7 @@ type Props = {
   initialRunData?: InitialRunData;
   run: Lazy<Run>;
   runID: string;
-  result?: Result;
+  result?: TraceResult;
 };
 
 type Run = {
@@ -49,6 +49,7 @@ type Run = {
     startedAt: string | null;
     status: string;
     stepID?: string | null;
+    debugSessionID?: string | null;
   };
   hasAI: boolean;
 };
@@ -80,7 +81,7 @@ export const RunInfo = ({ initialRunData, run, runID, standalone, result }: Prop
           </div>
 
           {isLazyDone(run) && (
-            <Nav standalone={standalone} functionSlug={run.fn.name} runID={runID} />
+            <Nav standalone={standalone} functionSlug={run.fn.slug} runID={runID} />
           )}
         </div>
 

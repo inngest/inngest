@@ -710,11 +710,11 @@ func (l traceLifecycle) OnStepGatewayRequestFinished(
 	case enums.OpcodeAIGateway:
 		req, _ := op.AIGatewayOpts()
 		// Parse the request
-		if parsed, err := aigateway.ParseInput(ctx, req); err == nil {
+		if parsed, err := aigateway.ParseInput(req); err == nil {
 			span.SetAIRequestMetadata(parsed)
 		}
 		// And parse the response.
-		if parsed, err := aigateway.ParseOutput(ctx, req.Format, op.Data); err == nil {
+		if parsed, err := aigateway.ParseOutput(req.Format, op.Data); err == nil {
 			span.SetAIResponseMetadata(parsed)
 		}
 	}
@@ -837,18 +837,17 @@ func (l traceLifecycle) OnStepFinished(
 			switch op.Op {
 			case enums.OpcodeAIGateway:
 				req, _ := op.AIGatewayOpts()
-				if parsed, err := aigateway.ParseInput(ctx, req); err == nil {
+				if parsed, err := aigateway.ParseInput(req); err == nil {
 					span.SetAIRequestMetadata(parsed)
 				}
 			case enums.OpcodeStep, enums.OpcodeStepRun:
 				// Handle input and attempt to best-effort parse.
-				input, _ := op.Input()
-				if parsed, err := aigateway.ParseUnknownInput(ctx, json.RawMessage(input)); err == nil {
-					span.SetAIRequestMetadata(parsed)
-
-					// Now that we know the step run was a wrapped AI call, we can also parse the output
-					// to see if we can store the response metadata correctly.
-				}
+				// input, _ := op.Input()
+				// if parsed, err := aigateway.ParseUnknownInput(ctx, json.RawMessage(input)); err == nil {
+				// 	span.SetAIRequestMetadata(parsed)
+				// 	// Now that we know the step run was a wrapped AI call, we can also parse the output
+				// 	// to see if we can store the response metadata correctly.
+				// }
 			}
 
 		} else if resp.Retryable() { // these are function retries

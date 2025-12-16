@@ -1,6 +1,5 @@
 import { Client, useQuery, type UseQueryResponse } from 'urql';
 
-import type { TimeRange } from '@/types/TimeRangeFilter';
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { graphql } from '@/gql';
 import type { GetFunctionQuery } from '@/gql/graphql';
@@ -68,17 +67,16 @@ const GetFunctionsDocument = graphql(`
         data {
           app {
             name
+            externalID
           }
           id
           slug
           name
           isPaused
           isArchived
-          current {
-            triggers {
-              type
-              value
-            }
+          triggers {
+            type
+            value
           }
         }
       }
@@ -122,7 +120,7 @@ export function useFunctionsPage({
         return {
           ...fn,
           failureRate: undefined,
-          triggers: fn.current?.triggers || [],
+          triggers: fn.triggers,
           usage: undefined,
         };
       }),
@@ -146,17 +144,10 @@ const GetFunctionDocument = graphql(`
         isPaused
         isArchived
         app {
+          externalID
           name
-        }
-        current {
-          triggers {
-            type
-            value
-            condition
-          }
-          deploy {
-            id
-            createdAt
+          latestSync {
+            lastSyncedAt
           }
         }
         triggers {
@@ -351,12 +342,14 @@ type UsageItem = {
 
 type UseFunctionUsageParams = {
   functionSlug: string;
-  timeRange: TimeRange;
+  startTime: string;
+  endTime: string;
 };
 
 export const useFunctionUsage = ({
   functionSlug,
-  timeRange,
+  startTime,
+  endTime,
 }: UseFunctionUsageParams): UseQueryResponse<UsageItem[]> => {
   const environment = useEnvironment();
   const [{ data: functionData }] = useFunction({ functionSlug });
@@ -367,8 +360,8 @@ export const useFunctionUsage = ({
     variables: {
       environmentID: environment.id,
       id: functionId!,
-      startTime: timeRange.start.toISOString(),
-      endTime: timeRange.end.toISOString(),
+      startTime,
+      endTime,
     },
     pause: !functionId,
   });

@@ -1,16 +1,16 @@
 .PHONY: dev
-dev:
+dev: docs
 	goreleaser build --single-target --snapshot --clean
 
 # specifically for tests
 .PHONY: run
 run:
-	TEST_MODE=true LOG_LEVEL=trace go run ./cmd/main.go dev --tick=50 --no-poll --no-discovery -v $(PARAMS)
+	TEST_MODE=true LOG_LEVEL=info DEBUG=1 go run ./cmd dev --tick=50 --no-poll --verbose $(PARAMS)
 
 # Start with debug mode in Delve
 .PHONY: debug
 debug:
-	TEST_MODE=true LOG_LEVEL=trace dlv debug ./cmd/main.go --headless --listen=127.0.0.1:40000 --continue --accept-multiclient --log -- dev --tick=50 --no-poll --no-discovery -v $(PARAMS)
+	TEST_MODE=true LOG_LEVEL=trace DEBUG=1 dlv debug ./cmd --headless --listen=127.0.0.1:40000 --continue --accept-multiclient --log -- dev --tick=50 --no-poll --no-discovery --verbose $(PARAMS)
 
 xgo:
 	xgo -pkg cmd -ldflags="-s -w" -out build/inngest -targets "linux/arm64,linux/amd64,darwin/arm64,darwin/amd64" .
@@ -41,11 +41,16 @@ e2e-golang:
 .PHONY: gen
 gen:
 	go generate ./...
-	make gql queries
+	make gql queries constraintapi-snapshots
 
 .PHONY: protobuf
 protobuf:
 	buf generate
+	buf generate --path proto/api/v2 --template proto/api/v2/buf.gen.yaml
+	buf generate --path proto/connect/v1 --template proto/connect/v1/buf.gen.yaml
+	buf generate --path proto/debug/v1 --template proto/debug/v1/buf.gen.yaml
+	buf generate --path proto/state/v2 --template proto/state/v2/buf.gen.yaml
+	buf generate --path proto/constraintapi/v1 --template proto/constraintapi/v1/buf.gen.yaml
 
 # $GOBIN must be set and be in your path for this to work
 .PHONY: queries
@@ -62,16 +67,39 @@ build-ui:
 	cd ui/apps/dev-server-ui && pnpm install --frozen-lockfile
 	cd ui/apps/dev-server-ui && pnpm build
 	cp -r ./ui/apps/dev-server-ui/dist/* ./pkg/devserver/static/
-	cp -r ./ui/apps/dev-server-ui/.next/routes-manifest.json ./pkg/devserver/static/
+
+# Generate OpenAPI documentation from protobuf files
+.PHONY: docs
+docs:
+	@echo "Validating examples JSON structure..."
+	@cd tools/convert-openapi && go test -run TestExamplesJSONStructure -v
+	@echo "Generating protobuf files..."
+	@# Generate OpenAPI v2 directly using protoc due to buf configuration issues
+	@mkdir -p docs/openapi/v2
+	cd proto && protoc --proto_path=. --proto_path=third_party \
+		--openapiv2_out=../docs/openapi/v2 \
+		--openapiv2_opt=allow_delete_body=true \
+		--openapiv2_opt=json_names_for_fields=false \
+		api/v2/service.proto
+	@echo "Converting OpenAPI v2 to v3..."
+	go run ./tools/convert-openapi docs/openapi/v2 docs/openapi/v3
 
 .PHONY: build
-build:
+build: docs
 	goreleaser build
 
 .PHONY: gql
 gql:
 	go run github.com/99designs/gqlgen --verbose --config ./pkg/coreapi/gqlgen.yml
 
+.PHONY: constraintapi-snapshots
+constraintapi-snapshots:
+	@echo "Regenerating constraint API Lua script snapshots..."
+	rm -rf pkg/constraintapi/testdata/snapshots
+	cd pkg/constraintapi && go test -run TestLuaScriptSnapshots .
+
 .PHONY: clean
 clean:
-	rm __debug_bin*
+	rm -f __debug_bin*
+	rm -rf docs/openapi/v2/*
+	rm -rf docs/openapi/v3/*

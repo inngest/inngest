@@ -12,8 +12,11 @@ export type Trace = {
   status: string;
   stepInfo: StepInfoInvoke | StepInfoSleep | StepInfoWait | StepInfoRun | StepInfoSignal | null;
   stepOp?: string | null;
+  stepType?: string | null;
   userlandSpan: UserlandSpanType | null;
   isUserland: boolean;
+  debugRunID?: string | null;
+  debugSessionID?: string | null;
 };
 
 export type UserlandSpanType = {

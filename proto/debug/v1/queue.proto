@@ -1,0 +1,64 @@
+syntax = "proto3";
+package debug.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/inngest/inngest/proto/gen/debug/v1;debug";
+
+//
+// Partition
+//
+message PartitionRequest { string id = 1; }
+
+message PartitionResponse {
+  string id = 1;
+  string slug = 2;
+  PartitionTenant tenant = 3;
+  bytes config = 4;
+  QueueShard queue_shard = 5;
+  repeated CronSchedule crons = 6;
+}
+
+message PartitionStatusResponse {
+  string id = 1;
+
+  bool paused = 2;
+  bool migrate = 3;
+
+  int64 account_active = 4;
+  int64 account_in_progress = 5;
+  int64 ready = 6;
+  int64 in_progress = 7;
+  int64 active = 8;
+  int64 future = 9;
+  int64 backlogs = 10;
+}
+
+message PartitionTenant {
+  string account_id = 1;
+  string env_id = 2;
+  string app_id = 3;
+}
+
+message QueueShard {
+  string name = 1;
+  string kind = 2;
+}
+
+message CronSchedule {
+  google.protobuf.Timestamp next = 1;
+  string job_id = 2;
+  string expr = 3;
+  bool scheduled = 4;
+}
+
+//
+// Item
+//
+message QueueItemRequest {
+  string item_id = 1;
+  string run_id = 2;
+  string queue_shard = 3;
+}
+
+message QueueItemResponse { bytes data = 1; }

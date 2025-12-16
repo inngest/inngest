@@ -2284,6 +2284,11 @@ func (c GeosearchCircleBoxHeight) Mi() GeosearchCircleBoxUnitMi {
 
 type GeosearchCircleBoxUnitFt Incomplete
 
+func (c GeosearchCircleBoxUnitFt) NumVertices(numVertices int64) GeosearchCirclePolygonNumVertices {
+	c.cs.s = append(c.cs.s, "BYPOLYGON", strconv.FormatInt(numVertices, 10))
+	return (GeosearchCirclePolygonNumVertices)(c)
+}
+
 func (c GeosearchCircleBoxUnitFt) Asc() GeosearchOrderAsc {
 	c.cs.s = append(c.cs.s, "ASC")
 	return (GeosearchOrderAsc)(c)
@@ -2325,6 +2330,11 @@ func (c GeosearchCircleBoxUnitFt) Cache() Cacheable {
 }
 
 type GeosearchCircleBoxUnitKm Incomplete
+
+func (c GeosearchCircleBoxUnitKm) NumVertices(numVertices int64) GeosearchCirclePolygonNumVertices {
+	c.cs.s = append(c.cs.s, "BYPOLYGON", strconv.FormatInt(numVertices, 10))
+	return (GeosearchCirclePolygonNumVertices)(c)
+}
 
 func (c GeosearchCircleBoxUnitKm) Asc() GeosearchOrderAsc {
 	c.cs.s = append(c.cs.s, "ASC")
@@ -2368,6 +2378,11 @@ func (c GeosearchCircleBoxUnitKm) Cache() Cacheable {
 
 type GeosearchCircleBoxUnitM Incomplete
 
+func (c GeosearchCircleBoxUnitM) NumVertices(numVertices int64) GeosearchCirclePolygonNumVertices {
+	c.cs.s = append(c.cs.s, "BYPOLYGON", strconv.FormatInt(numVertices, 10))
+	return (GeosearchCirclePolygonNumVertices)(c)
+}
+
 func (c GeosearchCircleBoxUnitM) Asc() GeosearchOrderAsc {
 	c.cs.s = append(c.cs.s, "ASC")
 	return (GeosearchOrderAsc)(c)
@@ -2409,6 +2424,11 @@ func (c GeosearchCircleBoxUnitM) Cache() Cacheable {
 }
 
 type GeosearchCircleBoxUnitMi Incomplete
+
+func (c GeosearchCircleBoxUnitMi) NumVertices(numVertices int64) GeosearchCirclePolygonNumVertices {
+	c.cs.s = append(c.cs.s, "BYPOLYGON", strconv.FormatInt(numVertices, 10))
+	return (GeosearchCirclePolygonNumVertices)(c)
+}
 
 func (c GeosearchCircleBoxUnitMi) Asc() GeosearchOrderAsc {
 	c.cs.s = append(c.cs.s, "ASC")
@@ -2479,6 +2499,11 @@ func (c GeosearchCircleCircleUnitFt) Bybox(width float64) GeosearchCircleBoxBybo
 	return (GeosearchCircleBoxBybox)(c)
 }
 
+func (c GeosearchCircleCircleUnitFt) NumVertices(numVertices int64) GeosearchCirclePolygonNumVertices {
+	c.cs.s = append(c.cs.s, "BYPOLYGON", strconv.FormatInt(numVertices, 10))
+	return (GeosearchCirclePolygonNumVertices)(c)
+}
+
 func (c GeosearchCircleCircleUnitFt) Asc() GeosearchOrderAsc {
 	c.cs.s = append(c.cs.s, "ASC")
 	return (GeosearchOrderAsc)(c)
@@ -2524,6 +2549,11 @@ type GeosearchCircleCircleUnitKm Incomplete
 func (c GeosearchCircleCircleUnitKm) Bybox(width float64) GeosearchCircleBoxBybox {
 	c.cs.s = append(c.cs.s, "BYBOX", strconv.FormatFloat(width, 'f', -1, 64))
 	return (GeosearchCircleBoxBybox)(c)
+}
+
+func (c GeosearchCircleCircleUnitKm) NumVertices(numVertices int64) GeosearchCirclePolygonNumVertices {
+	c.cs.s = append(c.cs.s, "BYPOLYGON", strconv.FormatInt(numVertices, 10))
+	return (GeosearchCirclePolygonNumVertices)(c)
 }
 
 func (c GeosearchCircleCircleUnitKm) Asc() GeosearchOrderAsc {
@@ -2573,6 +2603,11 @@ func (c GeosearchCircleCircleUnitM) Bybox(width float64) GeosearchCircleBoxBybox
 	return (GeosearchCircleBoxBybox)(c)
 }
 
+func (c GeosearchCircleCircleUnitM) NumVertices(numVertices int64) GeosearchCirclePolygonNumVertices {
+	c.cs.s = append(c.cs.s, "BYPOLYGON", strconv.FormatInt(numVertices, 10))
+	return (GeosearchCirclePolygonNumVertices)(c)
+}
+
 func (c GeosearchCircleCircleUnitM) Asc() GeosearchOrderAsc {
 	c.cs.s = append(c.cs.s, "ASC")
 	return (GeosearchOrderAsc)(c)
@@ -2620,6 +2655,11 @@ func (c GeosearchCircleCircleUnitMi) Bybox(width float64) GeosearchCircleBoxBybo
 	return (GeosearchCircleBoxBybox)(c)
 }
 
+func (c GeosearchCircleCircleUnitMi) NumVertices(numVertices int64) GeosearchCirclePolygonNumVertices {
+	c.cs.s = append(c.cs.s, "BYPOLYGON", strconv.FormatInt(numVertices, 10))
+	return (GeosearchCirclePolygonNumVertices)(c)
+}
+
 func (c GeosearchCircleCircleUnitMi) Asc() GeosearchOrderAsc {
 	c.cs.s = append(c.cs.s, "ASC")
 	return (GeosearchOrderAsc)(c)
@@ -2658,6 +2698,67 @@ func (c GeosearchCircleCircleUnitMi) Build() Completed {
 func (c GeosearchCircleCircleUnitMi) Cache() Cacheable {
 	c.cs.Build()
 	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
+}
+
+type GeosearchCirclePolygonNumVertices Incomplete
+
+func (c GeosearchCirclePolygonNumVertices) Longitude(longitude float64) GeosearchCirclePolygonVerticesLongitude {
+	c.cs.s = append(c.cs.s, strconv.FormatFloat(longitude, 'f', -1, 64))
+	return (GeosearchCirclePolygonVerticesLongitude)(c)
+}
+
+type GeosearchCirclePolygonVerticesLatitude Incomplete
+
+func (c GeosearchCirclePolygonVerticesLatitude) Longitude(longitude float64) GeosearchCirclePolygonVerticesLongitude {
+	c.cs.s = append(c.cs.s, strconv.FormatFloat(longitude, 'f', -1, 64))
+	return (GeosearchCirclePolygonVerticesLongitude)(c)
+}
+
+func (c GeosearchCirclePolygonVerticesLatitude) Asc() GeosearchOrderAsc {
+	c.cs.s = append(c.cs.s, "ASC")
+	return (GeosearchOrderAsc)(c)
+}
+
+func (c GeosearchCirclePolygonVerticesLatitude) Desc() GeosearchOrderDesc {
+	c.cs.s = append(c.cs.s, "DESC")
+	return (GeosearchOrderDesc)(c)
+}
+
+func (c GeosearchCirclePolygonVerticesLatitude) Count(count int64) GeosearchCountCount {
+	c.cs.s = append(c.cs.s, "COUNT", strconv.FormatInt(count, 10))
+	return (GeosearchCountCount)(c)
+}
+
+func (c GeosearchCirclePolygonVerticesLatitude) Withcoord() GeosearchWithcoord {
+	c.cs.s = append(c.cs.s, "WITHCOORD")
+	return (GeosearchWithcoord)(c)
+}
+
+func (c GeosearchCirclePolygonVerticesLatitude) Withdist() GeosearchWithdist {
+	c.cs.s = append(c.cs.s, "WITHDIST")
+	return (GeosearchWithdist)(c)
+}
+
+func (c GeosearchCirclePolygonVerticesLatitude) Withhash() GeosearchWithhash {
+	c.cs.s = append(c.cs.s, "WITHHASH")
+	return (GeosearchWithhash)(c)
+}
+
+func (c GeosearchCirclePolygonVerticesLatitude) Build() Completed {
+	c.cs.Build()
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
+}
+
+func (c GeosearchCirclePolygonVerticesLatitude) Cache() Cacheable {
+	c.cs.Build()
+	return Cacheable{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
+}
+
+type GeosearchCirclePolygonVerticesLongitude Incomplete
+
+func (c GeosearchCirclePolygonVerticesLongitude) Latitude(latitude float64) GeosearchCirclePolygonVerticesLatitude {
+	c.cs.s = append(c.cs.s, strconv.FormatFloat(latitude, 'f', -1, 64))
+	return (GeosearchCirclePolygonVerticesLatitude)(c)
 }
 
 type GeosearchCountAny Incomplete
@@ -2731,6 +2832,11 @@ func (c GeosearchFrommemberFromlonlat) Bybox(width float64) GeosearchCircleBoxBy
 	return (GeosearchCircleBoxBybox)(c)
 }
 
+func (c GeosearchFrommemberFromlonlat) NumVertices(numVertices int64) GeosearchCirclePolygonNumVertices {
+	c.cs.s = append(c.cs.s, "BYPOLYGON", strconv.FormatInt(numVertices, 10))
+	return (GeosearchCirclePolygonNumVertices)(c)
+}
+
 type GeosearchFrommemberFrommember Incomplete
 
 func (c GeosearchFrommemberFrommember) Fromlonlat(longitude float64, latitude float64) GeosearchFrommemberFromlonlat {
@@ -2746,6 +2852,11 @@ func (c GeosearchFrommemberFrommember) Byradius(radius float64) GeosearchCircleC
 func (c GeosearchFrommemberFrommember) Bybox(width float64) GeosearchCircleBoxBybox {
 	c.cs.s = append(c.cs.s, "BYBOX", strconv.FormatFloat(width, 'f', -1, 64))
 	return (GeosearchCircleBoxBybox)(c)
+}
+
+func (c GeosearchFrommemberFrommember) NumVertices(numVertices int64) GeosearchCirclePolygonNumVertices {
+	c.cs.s = append(c.cs.s, "BYPOLYGON", strconv.FormatInt(numVertices, 10))
+	return (GeosearchCirclePolygonNumVertices)(c)
 }
 
 type GeosearchKey Incomplete
@@ -2924,6 +3035,11 @@ func (c GeosearchstoreCircleBoxHeight) Mi() GeosearchstoreCircleBoxUnitMi {
 
 type GeosearchstoreCircleBoxUnitFt Incomplete
 
+func (c GeosearchstoreCircleBoxUnitFt) NumVertices(numVertices int64) GeosearchstoreCirclePolygonNumVertices {
+	c.cs.s = append(c.cs.s, "BYPOLYGON", strconv.FormatInt(numVertices, 10))
+	return (GeosearchstoreCirclePolygonNumVertices)(c)
+}
+
 func (c GeosearchstoreCircleBoxUnitFt) Asc() GeosearchstoreOrderAsc {
 	c.cs.s = append(c.cs.s, "ASC")
 	return (GeosearchstoreOrderAsc)(c)
@@ -2950,6 +3066,11 @@ func (c GeosearchstoreCircleBoxUnitFt) Build() Completed {
 }
 
 type GeosearchstoreCircleBoxUnitKm Incomplete
+
+func (c GeosearchstoreCircleBoxUnitKm) NumVertices(numVertices int64) GeosearchstoreCirclePolygonNumVertices {
+	c.cs.s = append(c.cs.s, "BYPOLYGON", strconv.FormatInt(numVertices, 10))
+	return (GeosearchstoreCirclePolygonNumVertices)(c)
+}
 
 func (c GeosearchstoreCircleBoxUnitKm) Asc() GeosearchstoreOrderAsc {
 	c.cs.s = append(c.cs.s, "ASC")
@@ -2978,6 +3099,11 @@ func (c GeosearchstoreCircleBoxUnitKm) Build() Completed {
 
 type GeosearchstoreCircleBoxUnitM Incomplete
 
+func (c GeosearchstoreCircleBoxUnitM) NumVertices(numVertices int64) GeosearchstoreCirclePolygonNumVertices {
+	c.cs.s = append(c.cs.s, "BYPOLYGON", strconv.FormatInt(numVertices, 10))
+	return (GeosearchstoreCirclePolygonNumVertices)(c)
+}
+
 func (c GeosearchstoreCircleBoxUnitM) Asc() GeosearchstoreOrderAsc {
 	c.cs.s = append(c.cs.s, "ASC")
 	return (GeosearchstoreOrderAsc)(c)
@@ -3004,6 +3130,11 @@ func (c GeosearchstoreCircleBoxUnitM) Build() Completed {
 }
 
 type GeosearchstoreCircleBoxUnitMi Incomplete
+
+func (c GeosearchstoreCircleBoxUnitMi) NumVertices(numVertices int64) GeosearchstoreCirclePolygonNumVertices {
+	c.cs.s = append(c.cs.s, "BYPOLYGON", strconv.FormatInt(numVertices, 10))
+	return (GeosearchstoreCirclePolygonNumVertices)(c)
+}
 
 func (c GeosearchstoreCircleBoxUnitMi) Asc() GeosearchstoreOrderAsc {
 	c.cs.s = append(c.cs.s, "ASC")
@@ -3059,6 +3190,11 @@ func (c GeosearchstoreCircleCircleUnitFt) Bybox(width float64) GeosearchstoreCir
 	return (GeosearchstoreCircleBoxBybox)(c)
 }
 
+func (c GeosearchstoreCircleCircleUnitFt) NumVertices(numVertices int64) GeosearchstoreCirclePolygonNumVertices {
+	c.cs.s = append(c.cs.s, "BYPOLYGON", strconv.FormatInt(numVertices, 10))
+	return (GeosearchstoreCirclePolygonNumVertices)(c)
+}
+
 func (c GeosearchstoreCircleCircleUnitFt) Asc() GeosearchstoreOrderAsc {
 	c.cs.s = append(c.cs.s, "ASC")
 	return (GeosearchstoreOrderAsc)(c)
@@ -3089,6 +3225,11 @@ type GeosearchstoreCircleCircleUnitKm Incomplete
 func (c GeosearchstoreCircleCircleUnitKm) Bybox(width float64) GeosearchstoreCircleBoxBybox {
 	c.cs.s = append(c.cs.s, "BYBOX", strconv.FormatFloat(width, 'f', -1, 64))
 	return (GeosearchstoreCircleBoxBybox)(c)
+}
+
+func (c GeosearchstoreCircleCircleUnitKm) NumVertices(numVertices int64) GeosearchstoreCirclePolygonNumVertices {
+	c.cs.s = append(c.cs.s, "BYPOLYGON", strconv.FormatInt(numVertices, 10))
+	return (GeosearchstoreCirclePolygonNumVertices)(c)
 }
 
 func (c GeosearchstoreCircleCircleUnitKm) Asc() GeosearchstoreOrderAsc {
@@ -3123,6 +3264,11 @@ func (c GeosearchstoreCircleCircleUnitM) Bybox(width float64) GeosearchstoreCirc
 	return (GeosearchstoreCircleBoxBybox)(c)
 }
 
+func (c GeosearchstoreCircleCircleUnitM) NumVertices(numVertices int64) GeosearchstoreCirclePolygonNumVertices {
+	c.cs.s = append(c.cs.s, "BYPOLYGON", strconv.FormatInt(numVertices, 10))
+	return (GeosearchstoreCirclePolygonNumVertices)(c)
+}
+
 func (c GeosearchstoreCircleCircleUnitM) Asc() GeosearchstoreOrderAsc {
 	c.cs.s = append(c.cs.s, "ASC")
 	return (GeosearchstoreOrderAsc)(c)
@@ -3155,6 +3301,11 @@ func (c GeosearchstoreCircleCircleUnitMi) Bybox(width float64) GeosearchstoreCir
 	return (GeosearchstoreCircleBoxBybox)(c)
 }
 
+func (c GeosearchstoreCircleCircleUnitMi) NumVertices(numVertices int64) GeosearchstoreCirclePolygonNumVertices {
+	c.cs.s = append(c.cs.s, "BYPOLYGON", strconv.FormatInt(numVertices, 10))
+	return (GeosearchstoreCirclePolygonNumVertices)(c)
+}
+
 func (c GeosearchstoreCircleCircleUnitMi) Asc() GeosearchstoreOrderAsc {
 	c.cs.s = append(c.cs.s, "ASC")
 	return (GeosearchstoreOrderAsc)(c)
@@ -3178,6 +3329,52 @@ func (c GeosearchstoreCircleCircleUnitMi) Storedist() GeosearchstoreStoredist {
 func (c GeosearchstoreCircleCircleUnitMi) Build() Completed {
 	c.cs.Build()
 	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
+}
+
+type GeosearchstoreCirclePolygonNumVertices Incomplete
+
+func (c GeosearchstoreCirclePolygonNumVertices) Longitude(longitude float64) GeosearchstoreCirclePolygonVerticesLongitude {
+	c.cs.s = append(c.cs.s, strconv.FormatFloat(longitude, 'f', -1, 64))
+	return (GeosearchstoreCirclePolygonVerticesLongitude)(c)
+}
+
+type GeosearchstoreCirclePolygonVerticesLatitude Incomplete
+
+func (c GeosearchstoreCirclePolygonVerticesLatitude) Longitude(longitude float64) GeosearchstoreCirclePolygonVerticesLongitude {
+	c.cs.s = append(c.cs.s, strconv.FormatFloat(longitude, 'f', -1, 64))
+	return (GeosearchstoreCirclePolygonVerticesLongitude)(c)
+}
+
+func (c GeosearchstoreCirclePolygonVerticesLatitude) Asc() GeosearchstoreOrderAsc {
+	c.cs.s = append(c.cs.s, "ASC")
+	return (GeosearchstoreOrderAsc)(c)
+}
+
+func (c GeosearchstoreCirclePolygonVerticesLatitude) Desc() GeosearchstoreOrderDesc {
+	c.cs.s = append(c.cs.s, "DESC")
+	return (GeosearchstoreOrderDesc)(c)
+}
+
+func (c GeosearchstoreCirclePolygonVerticesLatitude) Count(count int64) GeosearchstoreCountCount {
+	c.cs.s = append(c.cs.s, "COUNT", strconv.FormatInt(count, 10))
+	return (GeosearchstoreCountCount)(c)
+}
+
+func (c GeosearchstoreCirclePolygonVerticesLatitude) Storedist() GeosearchstoreStoredist {
+	c.cs.s = append(c.cs.s, "STOREDIST")
+	return (GeosearchstoreStoredist)(c)
+}
+
+func (c GeosearchstoreCirclePolygonVerticesLatitude) Build() Completed {
+	c.cs.Build()
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
+}
+
+type GeosearchstoreCirclePolygonVerticesLongitude Incomplete
+
+func (c GeosearchstoreCirclePolygonVerticesLongitude) Latitude(latitude float64) GeosearchstoreCirclePolygonVerticesLatitude {
+	c.cs.s = append(c.cs.s, strconv.FormatFloat(latitude, 'f', -1, 64))
+	return (GeosearchstoreCirclePolygonVerticesLatitude)(c)
 }
 
 type GeosearchstoreCountAny Incomplete
@@ -3233,6 +3430,11 @@ func (c GeosearchstoreFrommemberFromlonlat) Bybox(width float64) GeosearchstoreC
 	return (GeosearchstoreCircleBoxBybox)(c)
 }
 
+func (c GeosearchstoreFrommemberFromlonlat) NumVertices(numVertices int64) GeosearchstoreCirclePolygonNumVertices {
+	c.cs.s = append(c.cs.s, "BYPOLYGON", strconv.FormatInt(numVertices, 10))
+	return (GeosearchstoreCirclePolygonNumVertices)(c)
+}
+
 type GeosearchstoreFrommemberFrommember Incomplete
 
 func (c GeosearchstoreFrommemberFrommember) Fromlonlat(longitude float64, latitude float64) GeosearchstoreFrommemberFromlonlat {
@@ -3248,6 +3450,11 @@ func (c GeosearchstoreFrommemberFrommember) Byradius(radius float64) Geosearchst
 func (c GeosearchstoreFrommemberFrommember) Bybox(width float64) GeosearchstoreCircleBoxBybox {
 	c.cs.s = append(c.cs.s, "BYBOX", strconv.FormatFloat(width, 'f', -1, 64))
 	return (GeosearchstoreCircleBoxBybox)(c)
+}
+
+func (c GeosearchstoreFrommemberFrommember) NumVertices(numVertices int64) GeosearchstoreCirclePolygonNumVertices {
+	c.cs.s = append(c.cs.s, "BYPOLYGON", strconv.FormatInt(numVertices, 10))
+	return (GeosearchstoreCirclePolygonNumVertices)(c)
 }
 
 type GeosearchstoreOrderAsc Incomplete

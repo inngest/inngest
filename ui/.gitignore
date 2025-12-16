@@ -13,3 +13,14 @@ node_modules/
 
 # Builds
 .turbo/
+
+# tanstack
+.nitro
+.tanstack
+.output
+.vinxi
+node_modules
+.DS_Store
+dist
+dist-ssr
+*.local

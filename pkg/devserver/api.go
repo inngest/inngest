@@ -2,6 +2,7 @@ package devserver
 
 import (
 	"context"
+	"crypto/rand"
 	"database/sql"
 	_ "embed"
 	"encoding/json"
@@ -14,14 +15,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/inngest/inngest/pkg/cqrs/sync"
-	"github.com/inngest/inngest/pkg/enums"
-
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/api/tel"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
+	"github.com/inngest/inngest/pkg/cqrs/sync"
+	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/execution/cron"
 	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/inngest/version"
@@ -40,19 +41,26 @@ type devapi struct {
 	// TODO: Refactor this so that it's a part of the devserver, instead
 	// of holding a reference which is a weird pattern (tonyhb)
 	devserver *devserver
+	disableUI bool
 }
 
-func NewDevAPI(d *devserver) chi.Router {
+type DevAPIOptions struct {
+	disableUI      bool
+	AuthMiddleware func(http.Handler) http.Handler
+}
+
+func NewDevAPI(d *devserver, o DevAPIOptions) chi.Router {
 	// Return a chi router, which lets us attach routes to a handler.
 	api := &devapi{
 		Router:    chi.NewMux(),
 		devserver: d,
+		disableUI: o.disableUI,
 	}
-	api.addRoutes()
+	api.addRoutes(o.AuthMiddleware)
 	return api
 }
 
-func (a *devapi) addRoutes() {
+func (a *devapi) addRoutes(AuthMiddleware func(http.Handler) http.Handler) {
 	a.Use(func(next http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
 			l := a.devserver.log.With("caller", a.devserver.Name())
@@ -63,46 +71,55 @@ func (a *devapi) addRoutes() {
 	})
 	a.Use(headers.StaticHeadersMiddleware(a.devserver.Opts.Config.GetServerKind()))
 
-	a.Get("/dev", a.Info)
-	a.Post("/dev/traces", a.OTLPTrace)
-	a.Post("/fn/register", a.Register)
-	// This allows tests to remove apps by URL
-	a.Delete("/fn/remove", a.RemoveApp)
+	a.Post("/dev/traces", a.OTLPTrace) // Intentionally outside the AuthMiddleware
 
-	// This allows tests to update step limits per function
-	a.Post("/fn/step-limit", a.SetStepLimit)
-	a.Delete("/fn/step-limit", a.RemoveStepLimit)
-	a.Post("/fn/state-size-limit", a.SetStateSizeLimit)
-	a.Delete("/fn/state-size-limit", a.RemoveStateSizeLimit)
+	a.Group(func(r chi.Router) {
+		r.Use(AuthMiddleware)
 
-	// Go embeds files relative to the current source, which embeds
-	// all under ./static.  We remove the ./static
-	// directory by using fs.Sub: https://pkg.go.dev/io/fs#Sub.
-	staticFS, _ := fs.Sub(static, "static")
-	a.Get("/images/*", http.FileServer(http.FS(staticFS)).ServeHTTP)
+		r.Get("/dev", a.Info)
 
-	a.Get("/assets/*", http.FileServer(http.FS(staticFS)).ServeHTTP)
-	a.Get("/_next/*", http.FileServer(http.FS(staticFS)).ServeHTTP)
-	a.Get("/{file}.txt", http.FileServer(http.FS(staticFS)).ServeHTTP)
-	a.Get("/{file}.svg", http.FileServer(http.FS(staticFS)).ServeHTTP)
-	a.Get("/{file}.jpg", http.FileServer(http.FS(staticFS)).ServeHTTP)
-	a.Get("/{file}.png", http.FileServer(http.FS(staticFS)).ServeHTTP)
-	// Everything else loads the UI.
-	a.NotFound(a.UI)
+		r.Post("/fn/register", a.Register)
+		// This allows tests to remove apps by URL
+		r.Delete("/fn/remove", a.RemoveApp)
+
+		// This allows tests to update step limits per function
+		r.Post("/fn/step-limit", a.SetStepLimit)
+		r.Delete("/fn/step-limit", a.RemoveStepLimit)
+		r.Post("/fn/state-size-limit", a.SetStateSizeLimit)
+		r.Delete("/fn/state-size-limit", a.RemoveStateSizeLimit)
+	})
+
+	// Only register static file serving if UI is enabled
+	if !a.disableUI {
+		//
+		// Create filesystem rooted at static/client for Tanstack assets
+		staticFS, _ := fs.Sub(static, "static/client")
+		a.Get("/images/*", http.FileServer(http.FS(staticFS)).ServeHTTP)
+		a.Get("/assets/*", http.FileServer(http.FS(staticFS)).ServeHTTP)
+		a.Get("/{file}.txt", http.FileServer(http.FS(staticFS)).ServeHTTP)
+		a.Get("/{file}.svg", http.FileServer(http.FS(staticFS)).ServeHTTP)
+		a.Get("/{file}.jpg", http.FileServer(http.FS(staticFS)).ServeHTTP)
+		a.Get("/{file}.png", http.FileServer(http.FS(staticFS)).ServeHTTP)
+		//
+		// Everything else loads the UI (SPA fallback)
+		a.NotFound(a.UI)
+	}
+
 }
 
 func (a devapi) UI(w http.ResponseWriter, r *http.Request) {
-	// If there's a file that exists within `static` for this particular route,
-	// return it as a static asset.
+	//
+	// If there's a file that exists within static/client for this route, serve it as a static asset
 	path := r.URL.Path
-	if f, err := static.Open("static" + path); err == nil {
+	if f, err := static.Open("static/client" + path); err == nil {
 		if stat, err := f.Stat(); err == nil && !stat.IsDir() {
 			_, _ = io.Copy(w, f)
 			return
 		}
 	}
 
-	// If there's a trailing slash, redirect to non-trailing slashes.
+	//
+	// If there's a trailing slash, redirect to non-trailing slashes
 	if strings.HasSuffix(r.URL.Path, "/") && r.URL.Path != "/" {
 		r.URL.Path = strings.TrimSuffix(r.URL.Path, "/")
 		http.Redirect(w, r, r.URL.String(), http.StatusSeeOther)
@@ -113,12 +130,18 @@ func (a devapi) UI(w http.ResponseWriter, r *http.Request) {
 	tel.SendEvent(r.Context(), "cli/dev_ui.loaded", m)
 	tel.SendMetadata(r.Context(), m)
 
-	byt := parsedRoutes.serve(r.Context(), r.URL.Path)
+	byt := serve(r.Context(), r.URL.Path)
 	_, _ = w.Write(byt)
 }
 
 // Info returns information about the dev server and its registered functions.
 func (a devapi) Info(w http.ResponseWriter, r *http.Request) {
+	// Return 404 in self-hosted mode
+	if a.devserver.Opts.Config.ServerKind == "cloud" {
+		http.NotFound(w, r)
+		return
+	}
+
 	a.devserver.handlerLock.Lock()
 	defer a.devserver.handlerLock.Unlock()
 
@@ -134,6 +157,23 @@ func (a devapi) Info(w http.ResponseWriter, r *http.Request) {
 	for _, flag := range featureFlags {
 		enabled, _ := strconv.ParseBool(os.Getenv(flag))
 		features[flag] = enabled
+	}
+
+	//
+	// inngest feature flags are a map of arbitrary key value
+	// pairs such that we can use the same feature flag names as cloud
+	if ffEnv := os.Getenv("INNGEST_FEATURE_FLAGS"); ffEnv != "" {
+		pairs := strings.Split(ffEnv, ",")
+		for _, pair := range pairs {
+			kv := strings.SplitN(strings.TrimSpace(pair), "=", 2)
+			if len(kv) == 2 {
+				key := strings.TrimSpace(kv[0])
+				valStr := strings.TrimSpace(kv[1])
+				if value, err := strconv.ParseBool(valStr); err == nil {
+					features[key] = value
+				}
+			}
+		}
 	}
 
 	ir := InfoResponse{
@@ -182,13 +222,6 @@ func (a devapi) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Re-initialize our cron manager.
-	if err := a.devserver.Runner.InitializeCrons(ctx); err != nil {
-		l.Warn("error initializing crons", "error", err)
-		a.err(ctx, w, 400, err)
-		return
-	}
-
 	resp, err := json.Marshal(reply)
 	if err != nil {
 		_ = publicerr.WriteHTTP(w, err)
@@ -233,15 +266,25 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 		}
 	}
 
-	// Attempt to get the existing app by URL, and delete it if possible.
-	// We're going to recreate it below.
-	//
-	// We need to do this as we always create an app when entering the URL
-	// via the UI.  This is a dev-server specific quirk.
-	appID := inngest.DeterministicAppUUID(r.URL)
-	if r.IsConnect() {
-		appID = uuid.New()
+	app, err := a.devserver.Data.GetAppByURL(ctx, consts.DevServerEnvID, r.URL)
+	if err == nil && app.Name == "" {
+		// Since there's an app with the same URL but no name, we can assume it
+		// was a failed sync. We should delete it since we're in the process of
+		// syncing a replacement app.
+		//
+		// This situation happens when a user enters an unreachable URL in the
+		// UI. It'll still create an app, but in a placeholder state
+
+		err = a.devserver.Data.DeleteApp(ctx, app.ID)
+		if err != nil {
+			l.Error("error deleting app", "error", err)
+		}
 	}
+
+	// setup a list of crons to be upserted into the queue for scheduling
+	var crons []cron.CronItem
+
+	appID := inngest.DeterministicAppUUID(r.AppName)
 
 	tx, err := a.devserver.Data.WithTx(ctx)
 	if err != nil {
@@ -282,10 +325,17 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 		if err != nil {
 			l.Error("error registering functions", "error", err)
 		}
+
+		// handle cron sync to system queue
+		for _, ci := range crons {
+			if err := a.devserver.CronSyncer.Sync(ctx, ci); err != nil {
+				l.Error("error on triggering cron-sync", "functionID", ci.FunctionID, "cronExpr", ci.Expression, "functionVersion", ci.FunctionVersion, "error", err)
+			}
+		}
 	}()
 
 	// Get a list of all functions
-	existing, _ := tx.GetFunctionsByAppInternalID(ctx, consts.DevServerEnvID, appID)
+	existing, _ := tx.GetFunctionsByAppInternalID(ctx, appID)
 	// And get a list of functions that we've upserted.  We'll delete all existing functions not in
 	// this set.
 	seen := map[uuid.UUID]struct{}{}
@@ -305,12 +355,28 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 		// Mark as seen.
 		seen[fn.ID] = struct{}{}
 
+		fnExists := false
+		var currentFn *inngest.Function
+		if cqrsFn, err := tx.GetFunctionByInternalUUID(ctx, fn.ID); err == nil {
+			currentFn, err = cqrsFn.InngestFunction()
+			if err != nil {
+				return nil, publicerr.Wrap(err, 500, "Error unmarshalling function config")
+			}
+			if currentFn == nil {
+				return nil, publicerr.Wrap(fmt.Errorf("function config empty"), 500, "Error unmarshalling function config")
+			}
+			fnExists = true
+		}
+
+		if fnExists {
+			fn.FunctionVersion = currentFn.FunctionVersion + 1
+		}
 		config, err := json.Marshal(fn)
 		if err != nil {
 			return nil, publicerr.Wrap(err, 500, "Error marshalling function")
 		}
 
-		if _, err := tx.GetFunctionByInternalUUID(ctx, consts.DevServerEnvID, fn.ID); err == nil {
+		if fnExists {
 			// Update the function config.
 			_, err = tx.UpdateFunctionConfig(ctx, cqrs.UpdateFunctionConfigParams{
 				ID:     fn.ID,
@@ -319,6 +385,20 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 			if err != nil {
 				return nil, publicerr.Wrap(err, 500, "Error updating function config")
 			}
+			cronExprs := fn.ScheduleExpressions()
+			for _, cronExpr := range cronExprs {
+				crons = append(crons, cron.CronItem{
+					ID:              ulid.MustNew(ulid.Now(), rand.Reader),
+					AccountID:       consts.DevServerAccountID,
+					WorkspaceID:     consts.DevServerEnvID,
+					AppID:           appID,
+					FunctionID:      fn.ID,
+					FunctionVersion: fn.FunctionVersion,
+					Expression:      cronExpr,
+					Op:              enums.CronOpUpdate,
+				})
+			}
+
 			continue
 		}
 
@@ -331,8 +411,23 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 			CreatedAt: time.Now(),
 		})
 		if err != nil {
-			err = fmt.Errorf("Function %s is invalid: %w", fn.Slug, err)
+			err = fmt.Errorf("function %s is invalid: %w", fn.Slug, err)
 			return nil, publicerr.Wrap(err, 500, "Error saving function")
+		}
+
+		cronExprs := fn.ScheduleExpressions()
+		for _, cronExpr := range cronExprs {
+			crons = append(crons, cron.CronItem{
+				ID:              ulid.MustNew(ulid.Now(), rand.Reader),
+				AccountID:       consts.DevServerAccountID,
+				WorkspaceID:     consts.DevServerEnvID,
+				AppID:           appID,
+				FunctionID:      fn.ID,
+				FunctionVersion: fn.FunctionVersion,
+				Expression:      cronExpr,
+				Op:              enums.CronOpNew,
+			})
+
 		}
 	}
 
@@ -353,7 +448,6 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 	if len(deletes) == 0 {
 		return reply, nil
 	}
-
 	if err = tx.DeleteFunctionsByIDs(ctx, deletes); err != nil {
 		return nil, publicerr.Wrap(err, 500, "Error deleting removed function")
 	}

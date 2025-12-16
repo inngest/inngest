@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/cqrs"
+	sqlc_postgres "github.com/inngest/inngest/pkg/cqrs/base_cqrs/sqlc/postgres"
 	sqlc "github.com/inngest/inngest/pkg/cqrs/base_cqrs/sqlc/sqlite"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/history"
@@ -18,9 +19,9 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
-func NewHistoryReader(db *sql.DB, driver string) history_reader.Reader {
+func NewHistoryReader(db *sql.DB, driver string, o sqlc_postgres.NewNormalizedOpts) history_reader.Reader {
 	return &reader{
-		q: NewQueries(db, driver),
+		q: NewQueries(db, driver, o),
 	}
 }
 
@@ -265,11 +266,11 @@ func sqlToRun(item *sqlc.FunctionRun, finish *sqlc.FunctionFinish) (*history_rea
 		endedAt = &finish.CreatedAt.Time
 	}
 
-	if item.BatchID != nilULID {
+	if !item.BatchID.IsZero() {
 		batchID = &item.BatchID
 	}
 
-	if item.OriginalRunID != nilULID {
+	if !item.OriginalRunID.IsZero() {
 		originalRunID = &item.OriginalRunID
 	}
 

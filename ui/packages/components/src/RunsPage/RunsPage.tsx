@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useRef, useState, type UIEventHandler } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { Button } from '@inngest/components/Button';
 import TimeFieldFilter from '@inngest/components/Filter/TimeFieldFilter';
@@ -49,14 +49,11 @@ type Props = {
   data: Run[];
   defaultVisibleColumns?: ColumnID[];
   features: Pick<Features, 'history' | 'tracesPreview'>;
-  getRun: React.ComponentProps<typeof RunDetailsV3>['getRun'];
-  getTraceResult: React.ComponentProps<typeof RunDetailsV3>['getResult'];
   getTrigger: React.ComponentProps<typeof RunDetailsV3>['getTrigger'];
   hasMore: boolean;
   isLoadingInitial: boolean;
   isLoadingMore: boolean;
   onRefresh?: () => void;
-  onScroll: UIEventHandler<HTMLDivElement>;
   onScrollToTop: () => void;
   pollInterval?: number;
   apps?: Option[];
@@ -65,12 +62,12 @@ type Props = {
   scope: ViewScope;
   totalCount: number | undefined;
   searchError?: Error;
+  error?: Error | null;
+  infiniteScrollTrigger?: (containerRef: HTMLDivElement | null) => React.ReactNode;
 };
 
 export function RunsPage({
   defaultVisibleColumns,
-  getRun,
-  getTraceResult,
   getTrigger,
   data,
   features,
@@ -78,7 +75,6 @@ export function RunsPage({
   isLoadingInitial,
   isLoadingMore,
   onRefresh,
-  onScroll,
   onScrollToTop,
   apps,
   functions,
@@ -87,6 +83,8 @@ export function RunsPage({
   scope,
   totalCount,
   searchError,
+  error,
+  infiniteScrollTrigger,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const columns = useScopedColumns(scope);
@@ -234,19 +232,16 @@ export function RunsPage({
       return (
         <div className={`border-subtle `}>
           <RunDetailsV3
-            getResult={getTraceResult}
-            getRun={getRun}
             initialRunData={rowData}
             getTrigger={getTrigger}
             pollInterval={pollInterval}
             runID={rowData.id}
             standalone={false}
-            tracesPreviewEnabled={features.tracesPreview}
           />
         </div>
       );
     },
-    [getRun, getTraceResult, getTrigger, pollInterval, features.tracesPreview]
+    [getTrigger, pollInterval, features.tracesPreview]
   );
 
   const options = useMemo(() => {
@@ -270,10 +265,25 @@ export function RunsPage({
     pollInterval && pollInterval < 1000 ? isLoadingInitial : isLoadingMore || isLoadingInitial;
 
   return (
-    <main className="bg-canvasBase text-basis no-scrollbar flex-1 overflow-hidden focus-visible:outline-none">
+    <main className="bg-canvasBase text-basis no-scrollbar flex flex-1 flex-col overflow-hidden focus-visible:outline-none">
       <div className="bg-canvasBase sticky top-0 z-10 flex flex-col">
-        <div className="flex h-[58px] items-center justify-between gap-2 px-3">
-          <div className="flex items-center gap-2">
+        <div className="flex h-11 items-center justify-between gap-1.5 px-3">
+          <div className="flex items-center gap-1.5">
+            <Button
+              icon={<RiSearchLine />}
+              size="small"
+              kind="secondary"
+              iconSide="left"
+              appearance="outlined"
+              label={showSearch ? 'Hide search' : 'Show search'}
+              onClick={() => setShowSearch((prev) => !prev)}
+              className={cn(
+                search
+                  ? 'after:bg-secondary-moderate after:mb-3 after:ml-0.5 after:h-2 after:w-2 after:rounded'
+                  : '',
+                'h-[26px] w-[103px] rounded'
+              )}
+            />
             <SelectGroup>
               <TimeFieldFilter
                 selectedTimeField={timeField}
@@ -323,23 +333,9 @@ export function RunsPage({
                 entities={functions}
               />
             )}
-
-            <Button
-              icon={<RiSearchLine />}
-              size="large"
-              iconSide="left"
-              appearance="outlined"
-              label={showSearch ? 'Hide search' : 'Show search'}
-              onClick={() => setShowSearch((prev) => !prev)}
-              className={cn(
-                search
-                  ? 'after:bg-secondary-moderate after:mb-3 after:ml-0.5 after:h-2 after:w-2 after:rounded'
-                  : ''
-              )}
-            />
-            <TotalCount totalCount={totalCount} />
           </div>
           <div className="flex items-center gap-2">
+            <TotalCount totalCount={totalCount} />
             <TableFilter
               columnVisibility={columnVisibility}
               setColumnVisibility={setColumnVisibility}
@@ -361,6 +357,7 @@ export function RunsPage({
                 icon={<RiArrowRightUpLine />}
                 iconSide="right"
                 size="small"
+                target="_blank"
                 href="https://www.inngest.com/docs/platform/monitor/inspecting-function-runs#searching-function-runs?ref=app-runs-search"
               />
             </div>
@@ -369,24 +366,24 @@ export function RunsPage({
               placeholder="event.data.userId == “1234” or output.count > 10"
               value={search}
               searchError={searchError}
+              preset="runs"
             />
           </>
         )}
       </div>
 
-      <div
-        className="h-[calc(100%-58px)] overflow-y-auto pb-2"
-        onScroll={onScroll}
-        ref={containerRef}
-      >
+      <div className="flex-1 overflow-y-auto pb-2" ref={containerRef}>
         <RunsTable
           data={data}
           isLoading={isLoadingInitial}
+          error={error}
+          onRefresh={onRefresh}
           renderSubComponent={renderSubComponent}
           getRowCanExpand={() => true}
           visibleColumns={columnVisibility}
           scope={scope}
         />
+        {infiniteScrollTrigger?.(containerRef.current)}
         {!hasMore && data.length > 1 && (
           <div className="flex flex-col items-center pt-8">
             <p className="text-muted">No additional runs found.</p>
@@ -398,7 +395,7 @@ export function RunsPage({
             />
           </div>
         )}
-        {onRefresh && (
+        {onRefresh && !error && (
           <div className="flex flex-col items-center pt-2">
             <Button
               kind="secondary"
@@ -430,7 +427,11 @@ function TotalCount({
 
   const formatted = new Intl.NumberFormat().format(totalCount);
   if (totalCount === 1) {
-    return <span className={className}>{formatted} run</span>;
+    return (
+      <span className={cn('text-muted text-xs font-semibold', className)}>{formatted} run</span>
+    );
   }
-  return <span className={className}>{formatted} runs</span>;
+  return (
+    <span className={cn('text-muted text-xs font-semibold', className)}>{formatted} runs</span>
+  );
 }

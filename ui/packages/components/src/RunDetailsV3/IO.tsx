@@ -1,23 +1,27 @@
-import { CodeBlock, type CodeBlockAction } from '../CodeBlock';
+import { type CodeBlockAction } from '../CodeBlock';
+import { NewCodeBlock } from '../NewCodeBlock/NewCodeBlock';
 
 export type IOProps = {
   title: string;
   actions?: CodeBlockAction[];
   raw?: string;
   error?: boolean;
+  loading?: boolean;
+  parsed?: boolean;
 };
 
-export const IO = ({ title, actions, raw, error }: IOProps) => {
+export const IO = ({ title, actions, raw, error, loading, parsed = false }: IOProps) => {
   return (
-    <div className="text-muted h-full overflow-y-scroll" onWheel={(e) => e.stopPropagation()}>
-      <CodeBlock
+    <div className="text-muted bg-codeEditor h-full">
+      <NewCodeBlock
         actions={actions}
         header={{ title, ...(error && { status: 'error' }) }}
         tab={{
           content: raw ?? 'Unknown',
         }}
-        alwaysFullHeight={true}
         allowFullScreen={true}
+        parsed={parsed}
+        loading={loading}
       />
     </div>
   );

@@ -2,6 +2,7 @@
 /ui @anafilipadealmeida @amh4r @djfarrelly @jacobheric
 
 # Execution
-/pkg/execution @tonyhb @darwin67 @BrunoScheufler
-/pkg/telemetry @tonyhb @darwin67 @BrunoScheufler
-/pkg/run @tonyhb @darwin67 @BrunoScheufler
+/pkg/execution @tonyhb @darwin67 @BrunoScheufler @KiKoS0 @jpwilliams
+/pkg/execution/state @tonyhb @darwin67 @BrunoScheufler @KiKoS0
+/pkg/telemetry @darwin67 @BrunoScheufler
+/pkg/run @darwin67 @jpwilliams

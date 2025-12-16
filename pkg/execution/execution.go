@@ -3,10 +3,14 @@ package execution
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"time"
 
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/execution/apiresult"
 	"github.com/inngest/inngest/pkg/execution/batch"
+	"github.com/inngest/inngest/pkg/execution/exechttp"
+	"github.com/inngest/inngest/pkg/tracing/meta"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/event"
@@ -102,8 +106,16 @@ type Executor interface {
 	// HandleInvokeFinish handles the invoke pauses from an incoming event. This delegates to Cancel and
 	// Resume where necessary
 	HandleInvokeFinish(ctx context.Context, event event.TrackedEvent) error
+
+	// HandleGenerator handles an individual opcode from an executor response.
+	// NOTE: This is used for both async (executor controlled) and sync (externally controlled request)
+	// functions.  This specific codepath always converts from sync -> async.
+	HandleGenerator(ctx context.Context, i RunContext, gen state.GeneratorOpcode) error
+
 	// Cancel cancels an in-progress function run, preventing any enqueued or future steps from running.
 	Cancel(ctx context.Context, id sv2.ID, r CancelRequest) error
+
+	Finalize(ctx context.Context, opts FinalizeOpts) error
 
 	// AddLifecycleListener adds a lifecycle listener to run on hooks.  This must
 	// always add to a list of listeners vs replace listeners.
@@ -121,6 +133,48 @@ type Executor interface {
 	AppendAndScheduleBatch(ctx context.Context, fn inngest.Function, bi batch.BatchItem, opts *BatchExecOpts) error
 
 	RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Function, payload batch.ScheduleBatchPayload, opts *BatchExecOpts) error
+
+	// NOTE: Temporary for manually resuming pauses, you likely shouldn't use this
+	GetEvent(ctx context.Context, id ulid.ULID, accountID uuid.UUID, workspaceID uuid.UUID) (any, error)
+}
+
+// RunContext provides the context needed for HandleGenerator execution without
+// exposing internal executor state. This allows external packages to implement
+// HandleGenerator calls.
+type RunContext interface {
+	// Metadata access
+	Metadata() *sv2.Metadata
+	Events() []json.RawMessage
+	HTTPClient() exechttp.RequestExecutor
+
+	// The span that represents this individual execution
+	ExecutionSpan() *meta.SpanReference
+	// The span that represents this execution's parent.
+	ParentSpan() *meta.SpanReference
+
+	// Group correlation - for pause operations and history tracking
+	GroupID() string
+
+	// Retry logic - encapsulates the common retry pattern
+	AttemptCount() int
+	MaxAttempts() *int
+	ShouldRetry() bool
+	IncrementAttempt()
+
+	// Queue item creation - provides the "template" data for new items
+	PriorityFactor() *int64
+	ConcurrencyKeys() []state.CustomConcurrency
+	ParallelMode() enums.ParallelMode
+
+	// Lifecycle support - provides queue.Item for lifecycle events
+	// TODO: This could be further abstracted in the future
+	LifecycleItem() queue.Item
+
+	// Response tracking methods
+	SetStatusCode(code int)
+	UpdateOpcodeError(op *state.GeneratorOpcode, err state.UserError)
+	UpdateOpcodeOutput(op *state.GeneratorOpcode, output json.RawMessage)
+	SetError(err error)
 }
 
 type ResumeSignalResult struct {
@@ -156,9 +210,6 @@ type InvokeFailHandler func(context.Context, InvokeFailHandlerOpts, []event.Even
 // item.
 type HandleSendingEvent func(context.Context, event.Event, queue.Item) error
 
-// PreDeleteStateSizeReporter reports the state size before deleting state
-type PreDeleteStateSizeReporter func(context.Context, sv2.Metadata)
-
 // ScheduleRequest represents all data necessary to schedule a new function.
 type ScheduleRequest struct {
 	Function inngest.Function
@@ -170,7 +221,19 @@ type ScheduleRequest struct {
 	WorkspaceID uuid.UUID
 	// AppID is the app that this request belongs to.
 	AppID uuid.UUID
-
+	// RunID allows specifying a run ID for the scheduled run.  This is entirely
+	// optional, and allows clients to choose a run ID when scheduling.  We need this
+	// for run IDs with API-based checkpointing.
+	//
+	// Note that this should never be provided by the user, as that could welcome
+	// conflicts.
+	RunID *ulid.ULID
+	// URL is the URL that is being hit for REST-based sync functions.
+	//
+	// This is required because some URLs may contain IDs (/v1/users/:id).
+	// These URLs are *run specific* vs function specific;  we must always include
+	// the URL for these in metadata.
+	URL string
 	// OriginalRunID is the ID of the ID of the original run, if this a replay.
 	OriginalRunID *ulid.ULID
 	// ReplayID is the ID of the ID of the replay, if this a replay.
@@ -190,12 +253,26 @@ type ScheduleRequest struct {
 	// execution.  This is used after the debounce has finished to force execution
 	// of the function, instead of debouncing again.
 	PreventDebounce bool
+	// PreventRateLimit allows ignoring rate limit checks in case the check was
+	// previously handled and scheduling was allowed.
+	PreventRateLimit bool
 	// FunctionPausedAt indicates whether the function is paused.
 	FunctionPausedAt *time.Time
+	// RunMode represents how this function runs.  Async functions are, by nature,
+	// purely background orchestration driven by queues, and so on.  Sync functions
+	// are ephemeral functions that start their live via eg. API requests.
+	//
+	// The default is always RunModeAsync which is safer:  asyncs are always backed
+	// by the queue.
+	RunMode enums.RunMode
 	// DrainedAt indicates the time that the function started draining.  Draining is
 	// similar to paused in that new functions skip, but current functions continue
 	// to execute.
 	DrainedAt *time.Time
+	// DebugSessionID is the ID of the debugger session that this function is being scheduled from.
+	DebugSessionID *ulid.ULID
+	// DebugRunID is the ID of the debugger run that this function is being scheduled from.
+	DebugRunID *ulid.ULID
 }
 
 func (r ScheduleRequest) SkipReason() enums.SkipReason {
@@ -321,4 +398,92 @@ func (h HandlePauseResult) Processed() int32 {
 // and successfully impacted runs (either by cancellation or continuing).
 func (h HandlePauseResult) Handled() int32 {
 	return h[1]
+}
+
+type FinalizeOpts struct {
+	// Metadata is the run metadata.
+	Metadata sv2.Metadata
+	// Response is the final run output, either an opcode, API result, or
+	// driver response.
+	Response FinalizeResponse
+	// Optional represents optional fields that improve performance of the
+	// finalize call, requiring less data calls to fetch associated information
+	// when finalizing.  Where possible, if already loaded in memory these fields
+	// should be supplied.
+	Optional FinalizeOptional
+}
+
+type FinalizeResponseType int
+
+const (
+	FinalizeResponseRunComplete FinalizeResponseType = iota
+	FinalizeResponseAPI
+	FinalizeResponseDriver
+)
+
+// FinalizeResponse is a union containing one of:
+// 1. an enums.OpcodeRunComplete (for async fns),
+// 2. or a apiresult.APIResponse (for sync fns)
+// 3. A DriverResponse for SDKs not using opcode responses.
+type FinalizeResponse struct {
+	// Type indicates the field to use.
+	Type FinalizeResponseType
+	// OpcodeResponse exists with an enums.OpcodeRunComplete enum.
+	RunComplete state.GeneratorOpcode
+	// DriverResponse is the old response for <= V4 TS SDKs which don't respond
+	// with FunctionRunResponse opcodes.
+	DriverResponse state.DriverResponse
+	// APIResponse exists for HTTP-based sync functions.
+	APIResponse apiresult.APIResult
+}
+
+// FinalizeOptional represents optional fields that improve performance of the
+// finalize call, requiring less data calls to fetch associated information
+// when finalizing.  Where possible, if already loaded in memory these fields
+// should be supplied.
+type FinalizeOptional struct {
+	// FnSlug is the slug of the function, used in the finish event.
+	//
+	// If not present, this will be loaded via the function loader.
+	FnSlug string
+	// InputEvents are the events that triggered the function run.
+	InputEvents []json.RawMessage
+	// TODO: Document
+	OutputSpanRef *meta.SpanReference
+	// Reason is the tag used in finalization counters to track in metrics.
+	Reason string
+	// Cancel indicates if we've cancelled the function.  This has no output
+	// and defaults to false.
+	Cancel bool
+}
+
+func (f FinalizeOpts) Status() enums.StepStatus {
+	if f.Optional.Cancel {
+		return enums.StepStatusCancelled
+	}
+
+	switch f.Response.Type {
+	case FinalizeResponseRunComplete:
+		return enums.StepStatusCompleted
+	case FinalizeResponseAPI:
+		// XXX: all statuses are currently completed except for 5XX
+		if f.Response.APIResponse.StatusCode >= 500 {
+			return enums.StepStatusFailed
+		}
+		return enums.StepStatusCompleted
+	case FinalizeResponseDriver:
+
+		dr := f.Response.DriverResponse
+
+		if dr.Error() != "" {
+			return enums.StepStatusFailed
+		}
+
+		if dr.Err != nil && strings.Contains(*dr.Err, state.ErrFunctionCancelled.Error()) {
+			return enums.StepStatusCancelled
+		}
+
+	}
+
+	return enums.StepStatusCompleted
 }

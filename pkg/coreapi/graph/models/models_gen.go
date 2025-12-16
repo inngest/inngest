@@ -10,7 +10,9 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/cqrs"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/history_reader"
+	"github.com/inngest/inngest/pkg/tracing/metadata"
 	ulid "github.com/oklog/ulid/v2"
 )
 
@@ -50,29 +52,30 @@ type ConcurrencyLimitConfiguration struct {
 }
 
 type ConnectV1WorkerConnection struct {
-	ID               ulid.ULID                 `json:"id"`
-	GatewayID        ulid.ULID                 `json:"gatewayId"`
-	InstanceID       string                    `json:"instanceId"`
-	WorkerIP         string                    `json:"workerIp"`
-	AppName          *string                   `json:"appName,omitempty"`
-	AppID            *uuid.UUID                `json:"appID,omitempty"`
-	App              *cqrs.App                 `json:"app,omitempty"`
-	ConnectedAt      time.Time                 `json:"connectedAt"`
-	LastHeartbeatAt  *time.Time                `json:"lastHeartbeatAt,omitempty"`
-	DisconnectedAt   *time.Time                `json:"disconnectedAt,omitempty"`
-	DisconnectReason *string                   `json:"disconnectReason,omitempty"`
-	Status           ConnectV1ConnectionStatus `json:"status"`
-	GroupHash        string                    `json:"groupHash"`
-	SdkLang          string                    `json:"sdkLang"`
-	SdkVersion       string                    `json:"sdkVersion"`
-	SdkPlatform      string                    `json:"sdkPlatform"`
-	SyncID           *uuid.UUID                `json:"syncId,omitempty"`
-	BuildID          *string                   `json:"buildId,omitempty"`
-	AppVersion       *string                   `json:"appVersion,omitempty"`
-	FunctionCount    int                       `json:"functionCount"`
-	CPUCores         int                       `json:"cpuCores"`
-	MemBytes         int                       `json:"memBytes"`
-	Os               string                    `json:"os"`
+	ID                   ulid.ULID                 `json:"id"`
+	GatewayID            ulid.ULID                 `json:"gatewayId"`
+	InstanceID           string                    `json:"instanceId"`
+	WorkerIP             string                    `json:"workerIp"`
+	MaxWorkerConcurrency int64                     `json:"maxWorkerConcurrency"`
+	AppName              *string                   `json:"appName,omitempty"`
+	AppID                *uuid.UUID                `json:"appID,omitempty"`
+	App                  *cqrs.App                 `json:"app,omitempty"`
+	ConnectedAt          time.Time                 `json:"connectedAt"`
+	LastHeartbeatAt      *time.Time                `json:"lastHeartbeatAt,omitempty"`
+	DisconnectedAt       *time.Time                `json:"disconnectedAt,omitempty"`
+	DisconnectReason     *string                   `json:"disconnectReason,omitempty"`
+	Status               ConnectV1ConnectionStatus `json:"status"`
+	GroupHash            string                    `json:"groupHash"`
+	SdkLang              string                    `json:"sdkLang"`
+	SdkVersion           string                    `json:"sdkVersion"`
+	SdkPlatform          string                    `json:"sdkPlatform"`
+	SyncID               *uuid.UUID                `json:"syncId,omitempty"`
+	BuildID              *string                   `json:"buildId,omitempty"`
+	AppVersion           *string                   `json:"appVersion,omitempty"`
+	FunctionCount        int                       `json:"functionCount"`
+	CPUCores             int                       `json:"cpuCores"`
+	MemBytes             int                       `json:"memBytes"`
+	Os                   string                    `json:"os"`
 }
 
 type ConnectV1WorkerConnectionEdge struct {
@@ -97,9 +100,52 @@ type CreateAppInput struct {
 	URL string `json:"url"`
 }
 
+type CreateDebugSessionInput struct {
+	WorkspaceID  string  `json:"workspaceId"`
+	FunctionSlug string  `json:"functionSlug"`
+	RunID        *string `json:"runID,omitempty"`
+}
+
+type CreateDebugSessionResponse struct {
+	DebugSessionID ulid.ULID `json:"debugSessionID"`
+	DebugRunID     ulid.ULID `json:"debugRunID"`
+}
+
 type DebounceConfiguration struct {
 	Period string  `json:"period"`
 	Key    *string `json:"key,omitempty"`
+}
+
+type DebugRun struct {
+	DebugTraces []*RunTraceSpan `json:"debugTraces,omitempty"`
+}
+
+type DebugRunQuery struct {
+	WorkspaceID  string  `json:"workspaceId"`
+	FunctionSlug string  `json:"functionSlug"`
+	DebugRunID   *string `json:"debugRunID,omitempty"`
+	RunID        *string `json:"runID,omitempty"`
+}
+
+type DebugSession struct {
+	DebugRuns []*DebugSessionRun `json:"debugRuns,omitempty"`
+}
+
+type DebugSessionQuery struct {
+	WorkspaceID    string  `json:"workspaceId"`
+	FunctionSlug   string  `json:"functionSlug"`
+	DebugSessionID *string `json:"debugSessionID,omitempty"`
+	RunID          *string `json:"runID,omitempty"`
+}
+
+type DebugSessionRun struct {
+	Status     RunTraceSpanStatus `json:"status"`
+	QueuedAt   time.Time          `json:"queuedAt"`
+	StartedAt  *time.Time         `json:"startedAt,omitempty"`
+	EndedAt    *time.Time         `json:"endedAt,omitempty"`
+	DebugRunID *ulid.ULID         `json:"debugRunID,omitempty"`
+	Tags       []string           `json:"tags,omitempty"`
+	Versions   []string           `json:"versions,omitempty"`
 }
 
 type Event struct {
@@ -122,12 +168,50 @@ type EventQuery struct {
 	EventID     string `json:"eventId"`
 }
 
+type EventSource struct {
+	ID         string  `json:"id"`
+	Name       *string `json:"name,omitempty"`
+	SourceKind string  `json:"sourceKind"`
+}
+
+type EventV2 struct {
+	EnvID          uuid.UUID        `json:"envID"`
+	ID             ulid.ULID        `json:"id"`
+	IdempotencyKey *string          `json:"idempotencyKey,omitempty"`
+	Name           string           `json:"name"`
+	OccurredAt     time.Time        `json:"occurredAt"`
+	Raw            string           `json:"raw"`
+	ReceivedAt     time.Time        `json:"receivedAt"`
+	Runs           []*FunctionRunV2 `json:"runs"`
+	Source         *EventSource     `json:"source,omitempty"`
+	Version        *string          `json:"version,omitempty"`
+}
+
 type EventsBatchConfiguration struct {
 	// The maximum number of events a batch can have.
 	MaxSize int `json:"maxSize"`
 	// How long to wait before running the function with the batch.
 	Timeout string  `json:"timeout"`
 	Key     *string `json:"key,omitempty"`
+}
+
+type EventsConnection struct {
+	Edges      []*EventsEdge `json:"edges"`
+	PageInfo   *PageInfo     `json:"pageInfo"`
+	TotalCount int           `json:"totalCount"`
+}
+
+type EventsEdge struct {
+	Node   *EventV2 `json:"node"`
+	Cursor string   `json:"cursor"`
+}
+
+type EventsFilter struct {
+	EventNames            []string   `json:"eventNames,omitempty"`
+	From                  time.Time  `json:"from"`
+	IncludeInternalEvents bool       `json:"includeInternalEvents"`
+	Query                 *string    `json:"query,omitempty"`
+	Until                 *time.Time `json:"until,omitempty"`
 }
 
 type EventsQuery struct {
@@ -278,37 +362,17 @@ type RetryConfiguration struct {
 	IsDefault *bool `json:"isDefault,omitempty"`
 }
 
+type RunStep struct {
+	StepID string  `json:"stepID"`
+	Name   string  `json:"name"`
+	StepOp *StepOp `json:"stepOp,omitempty"`
+}
+
 type RunStepInfo struct {
 	Type *string `json:"type,omitempty"`
 }
 
 func (RunStepInfo) IsStepInfo() {}
-
-type RunTraceSpan struct {
-	AppID         uuid.UUID          `json:"appID"`
-	FunctionID    uuid.UUID          `json:"functionID"`
-	RunID         ulid.ULID          `json:"runID"`
-	Run           *FunctionRun       `json:"run"`
-	SpanID        string             `json:"spanID"`
-	TraceID       string             `json:"traceID"`
-	Name          string             `json:"name"`
-	Status        RunTraceSpanStatus `json:"status"`
-	Attempts      *int               `json:"attempts,omitempty"`
-	Duration      *int               `json:"duration,omitempty"`
-	OutputID      *string            `json:"outputID,omitempty"`
-	QueuedAt      time.Time          `json:"queuedAt"`
-	StartedAt     *time.Time         `json:"startedAt,omitempty"`
-	EndedAt       *time.Time         `json:"endedAt,omitempty"`
-	ChildrenSpans []*RunTraceSpan    `json:"childrenSpans"`
-	StepOp        *StepOp            `json:"stepOp,omitempty"`
-	StepID        *string            `json:"stepID,omitempty"`
-	StepInfo      StepInfo           `json:"stepInfo,omitempty"`
-	IsRoot        bool               `json:"isRoot"`
-	ParentSpanID  *string            `json:"parentSpanID,omitempty"`
-	ParentSpan    *RunTraceSpan      `json:"parentSpan,omitempty"`
-	IsUserland    bool               `json:"isUserland"`
-	UserlandSpan  *UserlandSpan      `json:"userlandSpan,omitempty"`
-}
 
 type RunTraceSpanOutput struct {
 	Input *string    `json:"input,omitempty"`
@@ -352,11 +416,17 @@ type SleepStepInfo struct {
 
 func (SleepStepInfo) IsStepInfo() {}
 
+type SpanMetadata struct {
+	Scope  enums.MetadataScope `json:"scope"`
+	Kind   metadata.Kind       `json:"kind"`
+	Values metadata.Values     `json:"values"`
+}
+
 type StepError struct {
-	Message string  `json:"message"`
-	Name    *string `json:"name,omitempty"`
-	Stack   *string `json:"stack,omitempty"`
-	Cause   *string `json:"cause,omitempty"`
+	Message string      `json:"message"`
+	Name    *string     `json:"name,omitempty"`
+	Stack   *string     `json:"stack,omitempty"`
+	Cause   interface{} `json:"cause,omitempty"`
 }
 
 type StepEvent struct {
@@ -443,16 +513,18 @@ type AppMethod string
 const (
 	AppMethodServe   AppMethod = "SERVE"
 	AppMethodConnect AppMethod = "CONNECT"
+	AppMethodAPI     AppMethod = "API"
 )
 
 var AllAppMethod = []AppMethod{
 	AppMethodServe,
 	AppMethodConnect,
+	AppMethodAPI,
 }
 
 func (e AppMethod) IsValid() bool {
 	switch e {
-	case AppMethodServe, AppMethodConnect:
+	case AppMethodServe, AppMethodConnect, AppMethodAPI:
 		return true
 	}
 	return false

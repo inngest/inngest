@@ -10,10 +10,21 @@ type Mutation {
     data: Map
     functionSlug: String!
     user: Map
+    debugSessionID: ULID
+    debugRunID: ULID
   ): Boolean
 
   cancelRun(runID: ULID!): FunctionRun!
-  rerun(runID: ULID!, fromStep: RerunFromStepInput): ULID!
+  rerun(
+    runID: ULID!
+    fromStep: RerunFromStepInput
+    debugSessionID: ULID
+    debugRunID: ULID
+  ): ULID!
+
+  createDebugSession(
+    input: CreateDebugSessionInput!
+  ): CreateDebugSessionResponse!
 }
 
 input CreateAppInput {
@@ -28,4 +39,15 @@ input UpdateAppInput {
 input RerunFromStepInput {
   stepID: String!
   input: Bytes
+}
+
+input CreateDebugSessionInput {
+  workspaceId: ID! = "local"
+  functionSlug: String!
+  runID: String
+}
+
+type CreateDebugSessionResponse {
+  debugSessionID: ULID!
+  debugRunID: ULID!
 }

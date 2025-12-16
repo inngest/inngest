@@ -3,8 +3,10 @@ package redis_state
 import (
 	"context"
 	"fmt"
+	"math"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/cespare/xxhash/v2"
@@ -14,6 +16,7 @@ import (
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/util"
+	"github.com/jonboulle/clockwork"
 	"github.com/redis/rueidis"
 	"github.com/stretchr/testify/require"
 )
@@ -29,24 +32,13 @@ func TestQueueItemBacklogs(t *testing.T) {
 
 	q := NewQueue(
 		QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName},
-		WithConcurrencyLimitGetter(func(ctx context.Context, p QueuePartition) PartitionConcurrencyLimits {
-			return PartitionConcurrencyLimits{
-				AccountLimit:   100,
-				FunctionLimit:  25,
-				CustomKeyLimit: 0, // this is just used for PartitionLease on key queues v1
-			}
-		}),
-		WithCustomConcurrencyKeyLimitRefresher(func(ctx context.Context, i osqueue.QueueItem) []state.CustomConcurrency {
-			// Pretend current keys are latest version
-			return i.Data.GetConcurrencyKeys()
-		}),
-		WithSystemConcurrencyLimitGetter(func(ctx context.Context, p QueuePartition) SystemPartitionConcurrencyLimits {
-			return SystemPartitionConcurrencyLimits{
-				// this is used by the old system as "account concurrency" for system queues -- bounding the entirety of system queue concurrency
-				GlobalLimit: 0,
-
-				// this is used to enforce concurrency limits on individual system queues
-				PartitionLimit: 250,
+		WithPartitionConstraintConfigGetter(func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
+			return PartitionConstraintConfig{
+				Concurrency: PartitionConcurrency{
+					SystemConcurrency:   250,
+					AccountConcurrency:  100,
+					FunctionConcurrency: 25,
+				},
 			}
 		}),
 	)
@@ -156,7 +148,6 @@ func TestQueueItemBacklogs(t *testing.T) {
 		kg := queueKeyGenerator{queueDefaultKey: QueueDefaultKey}
 		require.Equal(t, kg.Concurrency("", ""), backlog.customKeyInProgress(kg, 1))
 		require.Equal(t, kg.Concurrency("", ""), backlog.customKeyInProgress(kg, 2))
-
 	})
 
 	t.Run("throttle", func(t *testing.T) {
@@ -670,26 +661,23 @@ func TestQueueItemShadowPartition(t *testing.T) {
 	require.NoError(t, err)
 	defer rc.Close()
 
+	hashedThrottleKeyExpr := util.XXHash("event.data.customerID")
+
 	q := NewQueue(
 		QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName},
-		WithConcurrencyLimitGetter(func(ctx context.Context, p QueuePartition) PartitionConcurrencyLimits {
-			return PartitionConcurrencyLimits{
-				AccountLimit:   100,
-				FunctionLimit:  25,
-				CustomKeyLimit: 0, // this is just used for PartitionLease on key queues v1
-			}
-		}),
-		WithCustomConcurrencyKeyLimitRefresher(func(ctx context.Context, i osqueue.QueueItem) []state.CustomConcurrency {
-			// Pretend current keys are latest version
-			return i.Data.GetConcurrencyKeys()
-		}),
-		WithSystemConcurrencyLimitGetter(func(ctx context.Context, p QueuePartition) SystemPartitionConcurrencyLimits {
-			return SystemPartitionConcurrencyLimits{
-				// this is used by the old system as "account concurrency" for system queues -- bounding the entirety of system queue concurrency
-				GlobalLimit: 0,
-
-				// this is used to enforce concurrency limits on individual system queues
-				PartitionLimit: 250,
+		WithPartitionConstraintConfigGetter(func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
+			return PartitionConstraintConfig{
+				Concurrency: PartitionConcurrency{
+					SystemConcurrency:   250,
+					AccountConcurrency:  100,
+					FunctionConcurrency: 25,
+				},
+				Throttle: &PartitionThrottle{
+					ThrottleKeyExpressionHash: hashedThrottleKeyExpr,
+					Limit:                     70,
+					Burst:                     20,
+					Period:                    600,
+				},
 			}
 		}),
 	)
@@ -704,15 +692,6 @@ func TestQueueItemShadowPartition(t *testing.T) {
 			EnvID:           &wsID,
 			AccountID:       &accID,
 			SystemQueueName: nil,
-			Concurrency: ShadowPartitionConcurrency{
-				SystemConcurrency:     0,
-				AccountConcurrency:    100,
-				FunctionConcurrency:   25,
-				CustomConcurrencyKeys: nil,
-			},
-			Throttle:     nil,
-			PauseRefill:  false,
-			PauseEnqueue: false,
 		}
 
 		shadowPart := q.ItemShadowPartition(ctx, osqueue.QueueItem{
@@ -750,15 +729,6 @@ func TestQueueItemShadowPartition(t *testing.T) {
 			EnvID:           nil,
 			AccountID:       nil,
 			SystemQueueName: &sysQueueName,
-			Concurrency: ShadowPartitionConcurrency{
-				SystemConcurrency:     250,
-				AccountConcurrency:    0,
-				FunctionConcurrency:   0,
-				CustomConcurrencyKeys: nil,
-			},
-			Throttle:     nil,
-			PauseRefill:  false,
-			PauseEnqueue: false,
 		}
 
 		shadowPart := q.ItemShadowPartition(ctx, osqueue.QueueItem{
@@ -783,7 +753,6 @@ func TestQueueItemShadowPartition(t *testing.T) {
 	})
 
 	t.Run("throttle", func(t *testing.T) {
-		hashedThrottleKeyExpr := util.XXHash("event.data.customerID")
 		rawThrottleKey := "customer1"
 		hashedThrottleKey := osqueue.HashID(ctx, rawThrottleKey)
 
@@ -793,20 +762,6 @@ func TestQueueItemShadowPartition(t *testing.T) {
 			EnvID:           &wsID,
 			AccountID:       &accID,
 			SystemQueueName: nil,
-			Concurrency: ShadowPartitionConcurrency{
-				SystemConcurrency:     0,
-				AccountConcurrency:    100,
-				FunctionConcurrency:   25,
-				CustomConcurrencyKeys: nil,
-			},
-			Throttle: &ShadowPartitionThrottle{
-				ThrottleKeyExpressionHash: hashedThrottleKeyExpr,
-				Limit:                     70,
-				Burst:                     20,
-				Period:                    600,
-			},
-			PauseRefill:  false,
-			PauseEnqueue: false,
 		}
 
 		shadowPart := q.ItemShadowPartition(ctx, osqueue.QueueItem{
@@ -852,21 +807,6 @@ func TestQueueItemShadowPartition(t *testing.T) {
 			EnvID:           &wsID,
 			AccountID:       &accID,
 			SystemQueueName: nil,
-			Concurrency: ShadowPartitionConcurrency{
-				SystemConcurrency:   0,
-				AccountConcurrency:  100,
-				FunctionConcurrency: 25,
-				CustomConcurrencyKeys: []CustomConcurrencyLimit{
-					{
-						Scope:               enums.ConcurrencyScopeFn,
-						HashedKeyExpression: hashedConcurrencyKeyExpr,
-						Limit:               23,
-					},
-				},
-			},
-			Throttle:     nil,
-			PauseRefill:  false,
-			PauseEnqueue: false,
 		}
 
 		shadowPart := q.ItemShadowPartition(ctx, osqueue.QueueItem{
@@ -919,26 +859,6 @@ func TestQueueItemShadowPartition(t *testing.T) {
 			EnvID:           &wsID,
 			AccountID:       &accID,
 			SystemQueueName: nil,
-			Concurrency: ShadowPartitionConcurrency{
-				SystemConcurrency:   0,
-				AccountConcurrency:  100,
-				FunctionConcurrency: 25,
-				CustomConcurrencyKeys: []CustomConcurrencyLimit{
-					{
-						Scope:               enums.ConcurrencyScopeFn,
-						HashedKeyExpression: hashedConcurrencyKeyExpr,
-						Limit:               23,
-					},
-				},
-			},
-			Throttle: &ShadowPartitionThrottle{
-				ThrottleKeyExpressionHash: hashedThrottleKeyExpr,
-				Limit:                     70,
-				Burst:                     20,
-				Period:                    600,
-			},
-			PauseRefill:  false,
-			PauseEnqueue: false,
 		}
 
 		shadowPart := q.ItemShadowPartition(ctx, osqueue.QueueItem{
@@ -992,7 +912,7 @@ func TestBacklogIsOutdated(t *testing.T) {
 	t.Run("same config should not be marked as outdated", func(t *testing.T) {
 		keyHash := util.XXHash("event.data.customerID")
 
-		concurrency := ShadowPartitionConcurrency{
+		concurrency := PartitionConcurrency{
 			CustomConcurrencyKeys: []CustomConcurrencyLimit{
 				{
 					Scope:               enums.ConcurrencyScopeFn,
@@ -1020,14 +940,14 @@ func TestBacklogIsOutdated(t *testing.T) {
 			Throttle: nil,
 		}
 
-		require.Equal(t, enums.QueueNormalizeReasonUnchanged, backlog.isOutdated(&constraints))
+		require.Equal(t, enums.QueueNormalizeReasonUnchanged, backlog.isOutdated(constraints))
 	})
 
 	t.Run("adding concurrency keys should not mark default partition as outdated", func(t *testing.T) {
 		keyHash := util.XXHash("event.data.customerID")
 
-		constraints := &PartitionConstraintConfig{
-			Concurrency: ShadowPartitionConcurrency{
+		constraints := PartitionConstraintConfig{
+			Concurrency: PartitionConcurrency{
 				CustomConcurrencyKeys: []CustomConcurrencyLimit{
 					{
 						Scope:               enums.ConcurrencyScopeFn,
@@ -1046,8 +966,8 @@ func TestBacklogIsOutdated(t *testing.T) {
 		keyHashOld := util.XXHash("event.data.customerID")
 		keyHashNew := util.XXHash("event.data.orgID")
 
-		constraints := &PartitionConstraintConfig{
-			Concurrency: ShadowPartitionConcurrency{
+		constraints := PartitionConstraintConfig{
+			Concurrency: PartitionConcurrency{
 				CustomConcurrencyKeys: []CustomConcurrencyLimit{
 					{
 						Scope:               enums.ConcurrencyScopeFn,
@@ -1075,8 +995,8 @@ func TestBacklogIsOutdated(t *testing.T) {
 	t.Run("removing concurrency key should mark as outdated", func(t *testing.T) {
 		keyHashOld := util.XXHash("event.data.customerID")
 
-		constraints := &PartitionConstraintConfig{
-			Concurrency: ShadowPartitionConcurrency{
+		constraints := PartitionConstraintConfig{
+			Concurrency: PartitionConcurrency{
 				CustomConcurrencyKeys: nil,
 			},
 		}
@@ -1099,8 +1019,8 @@ func TestBacklogIsOutdated(t *testing.T) {
 		keyHashOld := util.XXHash("event.data.customerID")
 		keyHashNew := util.XXHash("event.data.orgID")
 
-		constraints := &PartitionConstraintConfig{
-			Throttle: &ShadowPartitionThrottle{
+		constraints := PartitionConstraintConfig{
+			Throttle: &PartitionThrottle{
 				ThrottleKeyExpressionHash: keyHashNew,
 			},
 		}
@@ -1116,8 +1036,8 @@ func TestBacklogIsOutdated(t *testing.T) {
 	t.Run("same throttle key should not mark as outdated", func(t *testing.T) {
 		keyHash := util.XXHash("event.data.orgID")
 
-		constraints := &PartitionConstraintConfig{
-			Throttle: &ShadowPartitionThrottle{
+		constraints := PartitionConstraintConfig{
+			Throttle: &PartitionThrottle{
 				ThrottleKeyExpressionHash: keyHash,
 			},
 		}
@@ -1133,7 +1053,7 @@ func TestBacklogIsOutdated(t *testing.T) {
 	t.Run("removing throttle key should mark as outdated", func(t *testing.T) {
 		keyHashOld := util.XXHash("event.data.customerID")
 
-		constraints := &PartitionConstraintConfig{
+		constraints := PartitionConstraintConfig{
 			Throttle: nil,
 		}
 		backlog := &QueueBacklog{
@@ -1144,4 +1064,357 @@ func TestBacklogIsOutdated(t *testing.T) {
 
 		require.Equal(t, enums.QueueNormalizeReasonThrottleRemoved, backlog.isOutdated(constraints))
 	})
+}
+
+func TestShuffleBacklogs(t *testing.T) {
+	iterations := 1000
+
+	matches := 0
+
+	for i := 0; i < iterations; i++ {
+		b1Start := &QueueBacklog{
+			BacklogID: "b-1:start",
+			Start:     true,
+		}
+
+		b1 := &QueueBacklog{
+			BacklogID: "b-1",
+		}
+
+		b2Start := &QueueBacklog{
+			BacklogID: "b-2:start",
+			Start:     true,
+		}
+
+		b2 := &QueueBacklog{
+			BacklogID: "b-2",
+		}
+
+		b3Start := &QueueBacklog{
+			BacklogID: "b-3:start",
+			Start:     true,
+		}
+
+		b3 := &QueueBacklog{
+			BacklogID: "b-3",
+		}
+
+		shuffled := shuffleBacklogs([]*QueueBacklog{
+			b1,
+			b1Start,
+			b2,
+			b2Start,
+			b3,
+			b3Start,
+		})
+
+		findIndex := func(b *QueueBacklog) int {
+			for i, backlog := range shuffled {
+				if backlog.BacklogID == b.BacklogID {
+					return i
+				}
+			}
+
+			return -1
+		}
+
+		if findIndex(b1) > findIndex(b1Start) {
+			continue
+		}
+		if findIndex(b2) > findIndex(b2Start) {
+			continue
+		}
+		if findIndex(b3) > findIndex(b3Start) {
+			continue
+		}
+
+		matches++
+	}
+
+	require.Greater(t, matches, int(math.Ceil(float64(iterations)/2)))
+}
+
+func TestBacklogsByPartition(t *testing.T) {
+	r, rc := initRedis(t)
+	defer rc.Close()
+
+	ctx := context.Background()
+	clock := clockwork.NewFakeClock()
+	defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+
+	acctId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
+
+	testcases := []struct {
+		name          string
+		num           int
+		interval      time.Duration
+		from          time.Time
+		until         time.Time
+		expectedItems int
+		batchSize     int64
+	}{
+		{
+			name:          "simple",
+			num:           10,
+			expectedItems: 10,
+			until:         clock.Now().Add(time.Minute),
+		},
+		{
+			name:          "with interval",
+			num:           100,
+			until:         clock.Now().Add(time.Minute),
+			interval:      -1 * time.Second,
+			expectedItems: 100,
+		},
+		{
+			name:          "with out of range interval",
+			num:           10,
+			from:          clock.Now(),
+			until:         clock.Now().Add(7 * time.Second).Truncate(time.Second),
+			interval:      time.Second,
+			expectedItems: 7,
+		},
+		{
+			name:          "with batch size",
+			num:           500,
+			until:         clock.Now().Add(10 * time.Second).Truncate(time.Second),
+			interval:      10 * time.Millisecond,
+			expectedItems: 500,
+			batchSize:     150,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			r.FlushAll()
+
+			q := NewQueue(
+				defaultShard,
+				WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+					return true
+				}),
+				WithClock(clock),
+			)
+
+			for i := range tc.num {
+				at := clock.Now()
+				if !tc.from.IsZero() {
+					at = tc.from
+				}
+				at = at.Add(time.Duration(i) * tc.interval)
+
+				id := fmt.Sprintf("test%d", i)
+				item := osqueue.QueueItem{
+					ID:          id,
+					FunctionID:  fnID,
+					WorkspaceID: wsID,
+					Data: osqueue.Item{
+						WorkspaceID: wsID,
+						Kind:        osqueue.KindEdge,
+						Identifier: state.Identifier{
+							AccountID:       acctId,
+							WorkspaceID:     wsID,
+							WorkflowID:      fnID,
+							WorkflowVersion: 1,
+						},
+						CustomConcurrencyKeys: []state.CustomConcurrency{
+							{
+								Key:   id,
+								Hash:  hashConcurrencyKey(id),
+								Limit: 10,
+							},
+						},
+					},
+				}
+
+				_, err := q.EnqueueItem(ctx, defaultShard, item, at, osqueue.EnqueueOpts{})
+				require.NoError(t, err)
+			}
+
+			items, err := q.BacklogsByPartition(ctx, defaultShard, fnID.String(), tc.from, tc.until,
+				WithQueueItemIterBatchSize(tc.batchSize),
+			)
+			require.NoError(t, err)
+
+			var count int
+			for range items {
+				count++
+			}
+
+			require.Equal(t, tc.expectedItems, count)
+		})
+	}
+}
+
+func TestBacklogSize(t *testing.T) {
+	_, rc := initRedis(t)
+	defer rc.Close()
+
+	defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+
+	q := NewQueue(
+		defaultShard,
+		WithPartitionConstraintConfigGetter(func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
+			return PartitionConstraintConfig{
+				Concurrency: PartitionConcurrency{
+					AccountConcurrency:  100,
+					FunctionConcurrency: 25,
+				},
+			}
+		}),
+		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+			return true
+		}),
+	)
+	ctx := context.Background()
+
+	fnID, wsID, accID := uuid.New(), uuid.New(), uuid.New()
+
+	count := 10
+	var backlogID string
+
+	for i := range count {
+		item := osqueue.QueueItem{
+			ID:          fmt.Sprintf("test%d", i),
+			FunctionID:  fnID,
+			WorkspaceID: wsID,
+			Data: osqueue.Item{
+				WorkspaceID: wsID,
+				Kind:        osqueue.KindEdge,
+				Identifier: state.Identifier{
+					WorkflowID:  fnID,
+					AccountID:   accID,
+					WorkspaceID: wsID,
+				},
+				Throttle:              nil,
+				CustomConcurrencyKeys: nil,
+				QueueName:             nil,
+			},
+			QueueName: nil,
+		}
+
+		if backlogID == "" {
+			backlog := q.ItemBacklog(ctx, item)
+			backlogID = backlog.BacklogID
+		}
+
+		_, err := q.EnqueueItem(ctx, defaultShard, item, time.Now(), osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+	}
+	require.NotEmpty(t, backlogID)
+
+	size, err := q.BacklogSize(ctx, defaultShard, backlogID)
+	require.NoError(t, err)
+
+	require.EqualValues(t, count, size)
+}
+
+func TestPartitionBacklogSize(t *testing.T) {
+	r1, rc1 := initRedis(t)
+	defer rc1.Close()
+
+	r2, rc2 := initRedis(t)
+	defer rc2.Close()
+
+	ctx := context.Background()
+	clock := clockwork.NewFakeClock()
+
+	shard1 := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc1, QueueDefaultKey), Name: "one"}
+	shard2 := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc2, QueueDefaultKey), Name: "two"}
+	queueShards := map[string]QueueShard{
+		"one": shard1,
+		"two": shard2,
+	}
+
+	acctId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
+
+	testcases := []struct {
+		name   string
+		num    int
+		rotate bool
+	}{
+		{
+			name: "enqueue on one shard",
+			num:  100,
+		},
+		{
+			name:   "enqueue on both shards",
+			num:    200,
+			rotate: true,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			r1.FlushAll()
+			r2.FlushAll()
+
+			q1 := NewQueue(
+				shard1,
+				WithQueueShardClients(queueShards),
+				WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+					return true
+				}),
+				WithClock(clock),
+			)
+			q2 := NewQueue(
+				shard2,
+				WithQueueShardClients(queueShards),
+				WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+					return true
+				}),
+				WithClock(clock),
+			)
+
+			for i := range tc.num {
+				id := fmt.Sprintf("test%d", i)
+				item := osqueue.QueueItem{
+					ID:          id,
+					FunctionID:  fnID,
+					WorkspaceID: wsID,
+					Data: osqueue.Item{
+						WorkspaceID: wsID,
+						Kind:        osqueue.KindEdge,
+						Identifier: state.Identifier{
+							AccountID:       acctId,
+							WorkspaceID:     wsID,
+							WorkflowID:      fnID,
+							WorkflowVersion: 1,
+						},
+						CustomConcurrencyKeys: []state.CustomConcurrency{
+							{
+								Key:   id,
+								Hash:  hashConcurrencyKey(id),
+								Limit: 10,
+							},
+						},
+					},
+				}
+
+				if tc.rotate {
+					// enqueue to both queues, simulate queue migrations
+					switch i % 2 {
+					case 0:
+						_, err := q1.EnqueueItem(ctx, shard1, item, clock.Now(), osqueue.EnqueueOpts{})
+						require.NoError(t, err)
+					case 1:
+						_, err := q2.EnqueueItem(ctx, shard2, item, clock.Now(), osqueue.EnqueueOpts{})
+						require.NoError(t, err)
+					}
+				} else {
+					_, err := q1.EnqueueItem(ctx, shard1, item, clock.Now(), osqueue.EnqueueOpts{})
+					require.NoError(t, err)
+				}
+			}
+
+			// NOTE: should return the same result regardless of which shard initiated the instrumentation
+			size1, err := q1.PartitionBacklogSize(ctx, fnID.String())
+			require.NoError(t, err)
+			require.EqualValues(t, tc.num, size1)
+
+			size2, err := q2.PartitionBacklogSize(ctx, fnID.String())
+			require.NoError(t, err)
+			require.EqualValues(t, tc.num, size2)
+		})
+	}
 }

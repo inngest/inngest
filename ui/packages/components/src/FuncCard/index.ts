@@ -1,1 +1,0 @@
-export { FuncCard } from './FuncCard';

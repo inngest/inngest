@@ -165,6 +165,7 @@ CREATE TABLE worker_connections (
     instance_id VARCHAR NOT NULL,
     status INT NOT NULL,
     worker_ip VARCHAR NOT NULL,
+    max_worker_concurrency INT NOT NULL,
 
     connected_at INT NOT NULL,
     last_heartbeat_at INT,
@@ -208,6 +209,11 @@ CREATE TABLE spans (
   run_id TEXT NOT NULL,
   env_id TEXT NOT NULL,
   output JSON,
+  input JSON,
+  debug_run_id TEXT,
+  debug_session_id TEXT,
+  status TEXT,
+  event_ids JSON,
 
   PRIMARY KEY (trace_id, span_id)
 );

@@ -1,156 +1,238 @@
+import { Fragment, useMemo } from 'react';
+import { Skeleton } from '@inngest/components/Skeleton';
 import { cn } from '@inngest/components/utils/classNames';
-import { RiArrowDownSLine } from '@remixicon/react';
-import { flexRender, useReactTable, type Row, type TableOptions } from '@tanstack/react-table';
-import { useVirtual } from 'react-virtual';
+import { RiSortAsc, RiSortDesc } from '@remixicon/react';
+import {
+  flexRender,
+  getCoreRowModel,
+  useReactTable,
+  type ColumnDef,
+  type OnChangeFn,
+  type Row,
+  type SortingState,
+} from '@tanstack/react-table';
 
-const cellStyles = 'pl-4 pr-2 py-3 whitespace-nowrap';
+interface WithId {
+  id: string;
+}
 
-type TableProps<T> = {
-  options: TableOptions<T>;
-  blankState: React.ReactNode;
-  customRowProps?: (row: Row<T>) => void;
-  tableContainerRef: React.RefObject<HTMLDivElement>;
-  isVirtualized?: boolean;
+type ExpandableTableProps<T> = {
+  renderSubComponent: (props: { row: Row<T> }) => React.ReactElement;
+  expandedIDs: string[];
 };
 
+type BaseTableProps<T> = {
+  data: T[] | undefined;
+  sorting?: SortingState;
+  setSorting?: OnChangeFn<SortingState>;
+  isLoading?: boolean;
+  columns: ColumnDef<T, any>[];
+  onRowClick?: (row: Row<T>) => void;
+  getRowHref?: (row: Row<T>) => string;
+  blankState?: React.ReactNode;
+  cellClassName?: string;
+  noHeader?: boolean;
+};
+
+type TableProps<T> = BaseTableProps<T> &
+  (T extends WithId
+    ? Partial<ExpandableTableProps<T>>
+    : { renderSubComponent?: never; expandedIDs?: never });
+
 export function Table<T>({
-  options,
+  data = [],
+  isLoading,
+  sorting,
+  setSorting,
+  renderSubComponent,
+  onRowClick,
+  getRowHref,
   blankState,
-  customRowProps,
-  tableContainerRef,
-  isVirtualized = true,
+  columns,
+  expandedIDs = [],
+  cellClassName,
+  noHeader = false,
 }: TableProps<T>) {
-  const table = useReactTable(options);
-  const { rows } = table.getRowModel();
+  // Render empty lines for skeletons when data is loading
+  const tableData = useMemo(() => {
+    if (isLoading) {
+      return Array(columns.length)
+        .fill(null)
+        .map((_, index) => {
+          return {
+            ...loadingRow,
 
-  const rowVirtualizer = useVirtual({
-    parentRef: tableContainerRef,
-    size: rows?.length,
-    overscan: 10,
+            // Need an ID to avoid "missing key" errors when rendering rows
+            id: index,
+          };
+        }) as unknown as T[]; // Casting is bad but we need to do this for the loading skeleton
+    }
+
+    return data;
+  }, [isLoading, data]);
+
+  const tableColumns = useMemo(
+    () =>
+      isLoading
+        ? columns.map((column) => ({
+            ...column,
+            cell: () => <Skeleton className="my-2 block h-3" />,
+          }))
+        : columns,
+    [isLoading]
+  );
+
+  const table = useReactTable({
+    data: tableData,
+    columns: tableColumns,
+    getCoreRowModel: getCoreRowModel(),
+    manualSorting: true,
+    onSortingChange: setSorting,
+    state: {
+      sorting,
+    },
   });
-  const { virtualItems: virtualRows, totalSize } = rowVirtualizer;
-  const paddingTop = virtualRows.length > 0 ? virtualRows?.[0]?.start || 0 : 0;
-  const paddingBottom =
-    virtualRows.length > 0 ? totalSize - (virtualRows?.[virtualRows.length - 1]?.end || 0) : 0;
 
-  // Calculates total colSpan of the table, to assign the colSpan of the blank state.
-  // Might need to be changed if we implement the column visibity feature.
-  let colSpanTotalSum = table.getHeaderGroups().reduce((sum, headerGroup) => {
-    return (
-      sum +
-      headerGroup.headers.reduce((subSum, header) => {
-        return subSum + header.colSpan;
-      }, 0)
-    );
-  }, 0);
+  const tableStyles = 'w-full';
+  const tableHeadStyles = 'bg-tableHeader sticky top-0 z-[2]';
+  const tableColumnStyles = 'px-4';
+  const expandedRowSideBorder =
+    'before:bg-surfaceMuted relative before:absolute before:bottom-0 before:left-0 before:top-0 before:w-0.5';
+
+  const isEmpty = data.length < 1 && !isLoading;
+
+  // Type guard to check if a row has an id property
+  const hasId = <T,>(obj: T): obj is T & WithId => {
+    return typeof (obj as any).id === 'string';
+  };
 
   return (
-    <table className="bg-canvasBase border-subtle w-full border-b text-sm">
-      <thead className="sticky top-0 z-[3] text-left">
-        {table.getHeaderGroups().map((headerGroup) => (
-          <tr key={headerGroup.id}>
-            {headerGroup.headers.map((header) => (
-              <th
-                className={cn(
-                  cellStyles,
-                  'bg-tableHeader text-muted text-xs font-medium',
-                  header.column.getIsPinned() && 'sticky left-0 z-[4]',
-                  header.column.getCanSort() && 'cursor-pointer'
-                )}
-                onClick={header.column.getToggleSortingHandler()}
-                key={header.id}
-                style={{
-                  width: header.getSize() === Number.MAX_SAFE_INTEGER ? 'auto' : header.getSize(),
-                }}
-              >
-                <div className="flex items-center gap-2">
-                  {header.isPlaceholder
-                    ? null
-                    : flexRender(header.column.columnDef.header, header.getContext())}
-                  {header.column.getIsSorted() && options.data.length > 1 && (
-                    <RiArrowDownSLine
+    <div className="">
+      <table className={cn(tableStyles)}>
+        {!noHeader && (
+          <thead className={tableHeadStyles}>
+            {table.getHeaderGroups().map((headerGroup) => (
+              <tr key={headerGroup.id} className="h-9">
+                {headerGroup.headers.map((header) => {
+                  const isIconOnlyColumn = header.column.columnDef.header === undefined;
+                  return (
+                    <th
+                      key={header.id}
                       className={cn(
-                        'h-3 w-3 transition-all duration-500',
-                        header.column.getIsSorted() === 'asc' && '-rotate-180'
+                        isIconOnlyColumn ? '' : tableColumnStyles,
+                        'text-muted text-nowrap text-left text-xs font-medium'
                       )}
-                    />
-                  )}
-                </div>
-              </th>
-            ))}
-          </tr>
-        ))}
-      </thead>
-      <tbody className="divide-light text-basis divide-y">
-        {options.data.length < 1 && (
-          <tr>
-            <td className={cn(cellStyles, 'text-center')} colSpan={colSpanTotalSum}>
-              {blankState}
-            </td>
-          </tr>
-        )}
-        {isVirtualized && paddingTop > 0 && (
-          <tr>
-            <td style={{ height: `${paddingTop}px` }} />
-          </tr>
-        )}
-        {isVirtualized &&
-          virtualRows &&
-          virtualRows.map((virtualRow) => {
-            const row = table.getRowModel().rows[virtualRow.index];
-            if (!row) return;
-            return (
-              <tr
-                key={row.id}
-                {...(customRowProps ? customRowProps(row) : {})}
-                className="bg-canvasBase hover:bg-canvasSubtle"
-              >
-                {row.getVisibleCells().map((cell) => (
-                  <td
-                    className={cn(cellStyles, cell.column.getIsPinned() && 'sticky left-0 z-[2]')}
-                    key={cell.id}
-                    style={{
-                      width:
-                        cell.column.getSize() === Number.MAX_SAFE_INTEGER
-                          ? 'auto'
-                          : cell.column.getSize(),
-                    }}
-                  >
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </td>
-                ))}
+                    >
+                      {header.isPlaceholder ? null : (
+                        <div
+                          className={cn(
+                            header.column.getCanSort()
+                              ? 'flex cursor-pointer select-none items-center gap-1'
+                              : header.column.getIsSorted()
+                              ? 'flex items-center gap-1'
+                              : ''
+                          )}
+                          onClick={header.column.getToggleSortingHandler()}
+                        >
+                          {flexRender(header.column.columnDef.header, header.getContext())}
+                          {{
+                            asc: <RiSortAsc className="text-light h-4 w-4" />,
+                            desc: <RiSortDesc className="text-light h-4 w-4" />,
+                          }[header.column.getIsSorted() as string] ?? null}
+                        </div>
+                      )}
+                    </th>
+                  );
+                })}
               </tr>
-            );
-          })}
-        {isVirtualized && paddingBottom > 0 && (
-          <tr>
-            <td style={{ height: `${paddingBottom}px` }} />
-          </tr>
+            ))}
+          </thead>
         )}
-        {!isVirtualized &&
-          table.getRowModel().rows.map((row) => (
-            <tr
-              key={row.id}
-              {...(customRowProps ? customRowProps(row) : {})}
-              className="bg-canvaseBase hover:bg-canvasSubtle"
-            >
-              {row.getVisibleCells().map((cell) => (
-                <td
-                  className={cn(cellStyles, cell.column.getIsPinned() && 'sticky left-0 z-[2]')}
-                  key={cell.id}
-                  style={{
-                    width:
-                      cell.column.getSize() === Number.MAX_SAFE_INTEGER
-                        ? 'auto'
-                        : cell.column.getSize(),
+        <tbody>
+          {isEmpty && (
+            <tr>
+              <td
+                className="text-muted h-[42px] text-center text-sm font-normal"
+                colSpan={table.getVisibleFlatColumns().length}
+              >
+                {blankState}
+              </td>
+            </tr>
+          )}
+          {!isEmpty &&
+            table.getRowModel().rows.map((row) => (
+              <Fragment key={row.id}>
+                <tr
+                  role={getRowHref ? 'link' : undefined}
+                  tabIndex={onRowClick ? 0 : undefined}
+                  aria-label={getRowHref ? 'View details' : undefined}
+                  className={cn(
+                    hasId(row.original) && expandedIDs.includes(row.original.id)
+                      ? 'h-[42px]'
+                      : 'border-light box-border h-[42px] border-b',
+                    onRowClick ? 'hover:bg-canvasSubtle cursor-pointer' : ''
+                  )}
+                  onClick={(e) => {
+                    const modalsContainer = document.getElementById('modals');
+                    const hasModals = modalsContainer && modalsContainer.children.length > 0;
+                    if (hasModals) return;
+
+                    const url = getRowHref?.(row);
+                    if (url && (e.metaKey || e.ctrlKey || e.button === 1)) {
+                      // Simulate native link behavior
+                      window.open(url, '_blank');
+                      return;
+                    }
+                    onRowClick?.(row);
                   }}
                 >
-                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                </td>
-              ))}
-            </tr>
-          ))}
-      </tbody>
-    </table>
+                  {row.getVisibleCells().map((cell, i) => {
+                    const isIconOnlyColumn = cell.column.columnDef.header === undefined;
+                    return (
+                      <td
+                        key={cell.id}
+                        className={cn(
+                          i === 0 && hasId(row.original) && expandedIDs.includes(row.original.id)
+                            ? expandedRowSideBorder
+                            : '',
+                          isIconOnlyColumn ? '' : tableColumnStyles,
+                          cellClassName ?? ''
+                        )}
+                      >
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </td>
+                    );
+                  })}
+                </tr>
+                {hasId(row.original) &&
+                  expandedIDs.includes(row.original.id) &&
+                  renderSubComponent &&
+                  !isLoading && (
+                    <>
+                      <tr>
+                        <td
+                          colSpan={row.getVisibleCells().length}
+                          className={expandedRowSideBorder}
+                        >
+                          {renderSubComponent({ row })}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td
+                          colSpan={row.getVisibleCells().length}
+                          className="border-light border-b pb-6"
+                        ></td>
+                      </tr>
+                    </>
+                  )}
+              </Fragment>
+            ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
+
+const loadingRow = {
+  isLoadingRow: true,
+} as const;

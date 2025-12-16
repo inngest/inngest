@@ -13,11 +13,13 @@ import (
 
 	"github.com/VividCortex/ewma"
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/service"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 	"github.com/oklog/ulid/v2"
@@ -104,9 +106,24 @@ func (q *queue) Enqueue(ctx context.Context, item osqueue.Item, at time.Time, op
 		WallTimeMS:  at.UnixMilli(),
 	}
 
+	l := q.log.With(
+		"item", qi,
+		"account_id", item.Identifier.AccountID,
+		"env_id", item.WorkspaceID,
+		"app_id", item.Identifier.AppID,
+		"fn_id", item.Identifier.WorkflowID,
+		"queue_shard", q.primaryQueueShard.Name,
+	)
+
 	if item.QueueName == nil && qi.FunctionID == uuid.Nil {
-		q.log.Error("attempted to enqueue QueueItem without function ID or queueName override", "item", qi)
-		return fmt.Errorf("queue name or function ID must be set")
+		err := fmt.Errorf("queue name or function ID must be set")
+		l.ReportError(err, "attempted to enqueue QueueItem without function ID or queueName override")
+		return err
+	}
+
+	// Pass optional idempotency period to queue item
+	if opts.IdempotencyPeriod != nil {
+		qi.IdempotencyPeriod = opts.IdempotencyPeriod
 	}
 
 	// Use the queue item's score, ensuring we process older function runs first
@@ -180,7 +197,7 @@ func (q *queue) Enqueue(ctx context.Context, item osqueue.Item, at time.Time, op
 		}, promoteAt, osqueue.EnqueueOpts{})
 		if err != nil && err != ErrQueueItemExists {
 			// This is best effort, and shouldn't fail the OG enqueue.
-			logger.StdlibLogger(ctx).Error("error scheduling promotion job", "error", err)
+			l.ReportError(err, "error scheduling promotion job")
 		}
 		return nil
 	default:
@@ -257,6 +274,10 @@ func (q *queue) Run(ctx context.Context, f osqueue.RunFunc) error {
 }
 
 func (q *queue) executionScan(ctx context.Context, f osqueue.RunFunc) error {
+	l := q.log.With(
+		"queue_shard", q.primaryQueueShard.Name,
+	)
+
 	for i := int32(0); i < q.numWorkers; i++ {
 		go q.worker(ctx, f)
 	}
@@ -266,8 +287,7 @@ func (q *queue) executionScan(ctx context.Context, f osqueue.RunFunc) error {
 	}
 
 	tick := q.clock.NewTicker(q.pollTick)
-
-	q.log.Debug("starting queue worker", "poll", q.pollTick.String())
+	l.Debug("starting queue worker", "poll", q.pollTick.String())
 
 	backoff := time.Millisecond * 250
 
@@ -282,7 +302,7 @@ LOOP:
 		case err = <-q.quit:
 			// An inner function received an error which was deemed irrecoverable, so
 			// we're quitting the queue.
-			q.log.Error("quitting runner internally", "error", err)
+			q.log.ReportError(err, "quitting runner internally")
 			tick.Stop()
 			break LOOP
 
@@ -293,6 +313,7 @@ LOOP:
 				// have capacity to run at least MinWorkersFree concurrent
 				// QueueItems.  This reduces latency of enqueued items when
 				// there are lots of enqueued and available jobs.
+				l.Warn("all workers busy, early exiting scan", "worker_capacity", q.capacity())
 				continue
 			}
 
@@ -308,7 +329,7 @@ LOOP:
 
 				// On scan errors, halt the worker entirely.
 				if !errors.Is(err, context.Canceled) {
-					q.log.Error("error scanning partition pointers", "error", err)
+					q.log.ReportError(err, "error scanning partition pointers")
 				}
 				break LOOP
 			}
@@ -456,7 +477,7 @@ func (q *queue) runActiveChecker(ctx context.Context) {
 	q.activeCheckerLeaseLock.Unlock()
 
 	tick := q.clock.NewTicker(ConfigLeaseDuration / 3)
-	checkTick := q.clock.NewTicker(30 * time.Second)
+	checkTick := q.clock.NewTicker(q.activeCheckTick)
 
 	for {
 		select {
@@ -523,7 +544,7 @@ func (q *queue) runInstrumentation(ctx context.Context) {
 	setLease(leaseID)
 
 	tick := q.clock.NewTicker(ConfigLeaseMax / 3)
-	instr := q.clock.NewTicker(20 * time.Second)
+	instr := q.clock.NewTicker(q.instrumentInterval)
 
 	for {
 		select {
@@ -570,7 +591,7 @@ func (q *queue) worker(ctx context.Context, f osqueue.RunFunc) {
 			// XXX: When jobs can have their own cancellation signals, move this into
 			// process itself.
 			processCtx, cancel := context.WithCancel(context.Background())
-			err := q.process(processCtx, i.P, i.PCtr, i.I, f)
+			err := q.process(processCtx, i, f)
 			q.sem.Release(1)
 			metrics.WorkerQueueCapacityCounter(ctx, -1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name}})
 			cancel()
@@ -601,13 +622,11 @@ func (q *queue) scanPartition(ctx context.Context, partitionKey string, peekLimi
 		atomic.AddInt64(reportPeekedPartitions, int64(len(partitions)))
 	}
 
-	if len(partitions) > 0 {
-		q.log.Trace("processing partitions",
-			"partition_key", partitionKey,
-			"peek_until", peekUntil.Format(time.StampMilli),
-			"partition", len(partitions),
-		)
-	}
+	q.log.Trace("processing partitions",
+		"partition_key", partitionKey,
+		"peek_until", peekUntil.Format(time.StampMilli),
+		"partition", len(partitions),
+	)
 
 	eg := errgroup.Group{}
 
@@ -665,6 +684,10 @@ func (q *queue) scan(ctx context.Context) error {
 		processAccount = true
 	}
 
+	if len(q.runMode.ExclusiveAccounts) > 0 {
+		processAccount = true
+	}
+
 	if processAccount {
 		metrics.IncrQueueScanCounter(ctx,
 			metrics.CounterOpt{
@@ -676,14 +699,21 @@ func (q *queue) scan(ctx context.Context) error {
 			},
 		)
 
-		peekedAccounts, err := duration(ctx, q.primaryQueueShard.Name, "account_peek", q.clock.Now(), func(ctx context.Context) ([]uuid.UUID, error) {
-			return q.accountPeek(ctx, q.isSequential(), peekUntil, AccountPeekMax)
-		})
-		if err != nil {
-			return fmt.Errorf("could not peek accounts: %w", err)
+		var peekedAccounts []uuid.UUID
+		if len(q.runMode.ExclusiveAccounts) > 0 {
+			peekedAccounts = q.runMode.ExclusiveAccounts
+		} else {
+			peeked, err := duration(ctx, q.primaryQueueShard.Name, "account_peek", q.clock.Now(), func(ctx context.Context) ([]uuid.UUID, error) {
+				return q.accountPeek(ctx, q.isSequential(), peekUntil, AccountPeekMax)
+			})
+			if err != nil {
+				return fmt.Errorf("could not peek accounts: %w", err)
+			}
+			peekedAccounts = peeked
 		}
 
 		if len(peekedAccounts) == 0 {
+			q.log.Trace("account_peek yielded no accounts")
 			return nil
 		}
 
@@ -821,6 +851,15 @@ func (q *queue) scanContinuations(ctx context.Context) error {
 // randomOffset allows us to peek jobs out-of-order, and occurs when we hit concurrency key issues
 // such that we can attempt to work on other jobs not blocked by heading concurrency key issues.
 func (q *queue) processPartition(ctx context.Context, p *QueuePartition, continuationCount uint, randomOffset bool) error {
+	// When Constraint API is enabled, disable capacity checks on PartitionLease.
+	// This is necessary as capacity was already granted to individual items, and
+	// constraints like concurrency were consumed.
+	var disableLeaseChecks bool
+	if p.AccountID != uuid.Nil && q.capacityManager != nil && q.useConstraintAPI != nil {
+		enableConstraintAPI, _ := q.useConstraintAPI(ctx, p.AccountID)
+		disableLeaseChecks = enableConstraintAPI
+	}
+
 	// Attempt to lease items.  This checks partition-level concurrency limits
 	//
 	// For optimization, because this is the only thread that can be leasing
@@ -834,7 +873,7 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, continu
 	// processing the partition by N seconds, meaning the latency is increased by
 	// up to this period for scheduled items behind the concurrency limits.
 	_, err := duration(ctx, q.primaryQueueShard.Name, "partition_lease", q.clock.Now(), func(ctx context.Context) (int, error) {
-		l, capacity, err := q.PartitionLease(ctx, p, PartitionLeaseDuration)
+		l, capacity, err := q.PartitionLease(ctx, p, PartitionLeaseDuration, PartitionLeaseOptionDisableLeaseChecks(disableLeaseChecks))
 		p.LeaseID = l
 		return capacity, err
 	})
@@ -1060,11 +1099,17 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, continu
 
 func (q *queue) process(
 	ctx context.Context,
-	p QueuePartition,
-	continuationCtr uint, // the number of times the partition has been continued
-	qi osqueue.QueueItem,
+	i processItem,
 	f osqueue.RunFunc,
 ) error {
+	qi := i.I
+	p := i.P
+	continuationCtr := i.PCtr
+
+	capacityLeaseID := newCapacityLease(i.capacityLease)
+
+	disableConstraintUpdates := i.disableConstraintUpdates
+
 	var err error
 	leaseID := qi.LeaseID
 
@@ -1075,6 +1120,9 @@ func (q *queue) process(
 	// Continually the lease while this job is being processed.
 	extendLeaseTick := q.clock.NewTicker(QueueLeaseDuration / 2)
 	defer extendLeaseTick.Stop()
+
+	extendCapacityLeaseTick := q.clock.NewTicker(q.capacityLeaseExtendInterval)
+	defer extendCapacityLeaseTick.Stop()
 
 	errCh := make(chan error)
 	doneCh := make(chan struct{})
@@ -1099,7 +1147,14 @@ func (q *queue) process(
 				}
 
 				// Once a job has started, use a BG context to always renew.
-				leaseID, err = q.ExtendLease(context.Background(), qi, *leaseID, QueueLeaseDuration)
+				leaseID, err = q.ExtendLease(
+					context.Background(),
+					qi,
+					*leaseID,
+					QueueLeaseDuration,
+					// When holding a capacity lease, do not update constraint state
+					ExtendLeaseOptionDisableConstraintUpdates(disableConstraintUpdates),
+				)
 				if err != nil {
 					// log error if unexpected; the queue item may be removed by a Dequeue() operation
 					// invoked by finalize() (Cancellations, Parallelism)
@@ -1111,6 +1166,72 @@ func (q *queue) process(
 					errCh <- fmt.Errorf("error extending lease while processing: %w", err)
 					return
 				}
+			case <-extendCapacityLeaseTick.Chan():
+				if ctx.Err() != nil {
+					// Don't extend lease when the ctx is done.
+					return
+				}
+
+				// If no initial capacity lease was provided for this queue item, no-op
+				// This specifically happens when
+				// - the item is enqueued to a system queue
+				// - the Constraint API is disabled or the current account is not enrolled
+				// - the Constraint API provided a lease which expired at the time of leasing the queue item
+				if i.capacityLease == nil {
+					q.log.Trace("item has no capacity lease, skipping lease extension")
+					continue
+				}
+
+				currentCapacityLease := capacityLeaseID.get()
+				if currentCapacityLease == nil {
+					q.log.Error("cannot extend capacity lease since capacity lease ID is nil", "qi", qi, "partition", p)
+					// Don't extend lease since one doesn't exist
+					errCh <- fmt.Errorf("cannot extend lease since lease ID is nil")
+					return
+				}
+
+				// This idempotency key will change with every refreshed lease, which makes sense.
+				operationIdempotencyKey := currentCapacityLease.String()
+
+				res, err := q.capacityManager.ExtendLease(context.Background(), &constraintapi.CapacityExtendLeaseRequest{
+					AccountID:      p.AccountID,
+					IdempotencyKey: operationIdempotencyKey,
+					LeaseID:        *currentCapacityLease,
+					Migration: constraintapi.MigrationIdentifier{
+						IsRateLimit: false,
+						QueueShard:  q.primaryQueueShard.Name,
+					},
+					Duration: QueueLeaseDuration,
+				})
+				if err != nil {
+					// log error if unexpected; the queue item may be removed by a Dequeue() operation
+					// invoked by finalize() (Cancellations, Parallelism)
+					if !errors.Is(ErrQueueItemNotFound, err) {
+						q.log.ReportError(
+							err,
+							"error extending capacity lease",
+							logger.WithErrorReportLog(true),
+							logger.WithErrorReportTags(map[string]string{
+								"partitionID": p.ID,
+								"accountID":   p.AccountID.String(),
+								"item":        qi.ID,
+								"leaseID":     currentCapacityLease.String(),
+							}),
+						)
+					}
+
+					// always stop processing the queue item if lease cannot be extended
+					errCh <- fmt.Errorf("error extending lease while processing: %w", err)
+					return
+				}
+
+				if res.LeaseID == nil {
+					// Lease could not be extended
+					errCh <- fmt.Errorf("failed to extend capacity lease, no new lease ID received")
+					return
+				}
+
+				capacityLeaseID.set(res.LeaseID)
 			}
 		}
 	}()
@@ -1122,6 +1243,10 @@ func (q *queue) process(
 	// Add the job ID to the queue context.  This allows any logic that handles the run function
 	// to inspect job IDs, eg. for tracing or logging, without having to thread this down as
 	// arguments.
+	//
+	// NOTE: It is important that we keep this here for every job;  the exeuctor uses this to pass
+	// along the job ID as metadata to the SDK.  We also need to pass in shard information.
+	jobCtx = osqueue.WithShardID(jobCtx, q.primaryQueueShard.Name)
 	jobCtx = osqueue.WithJobID(jobCtx, qi.ID)
 	// Same with the group ID, if it exists.
 	if qi.Data.GroupID != "" {
@@ -1211,6 +1336,7 @@ func (q *queue) process(
 			QueueShardName:      q.primaryQueueShard.Name,
 			ContinueCount:       continuationCtr,
 			RefilledFromBacklog: qi.RefilledFrom,
+			CapacityLease:       i.capacityLease,
 		}
 
 		// Call the run func.
@@ -1240,6 +1366,36 @@ func (q *queue) process(
 		close(doneCh)
 	}()
 
+	// When capacity is leased, release it after requeueing/dequeueing the item.
+	// This is optional and best-effort to free up concurrency capacity as quickly as possible
+	// for the next worker to lease a queue item.
+	if capacityLeaseID.has() {
+		defer service.Go(func() {
+			currentLeaseID := capacityLeaseID.get()
+			if capacityLeaseID == nil {
+				return
+			}
+
+			res, err := q.capacityManager.Release(context.Background(), &constraintapi.CapacityReleaseRequest{
+				AccountID:      p.AccountID,
+				IdempotencyKey: qi.ID,
+				LeaseID:        *currentLeaseID,
+				Migration: constraintapi.MigrationIdentifier{
+					IsRateLimit: false,
+					QueueShard:  q.primaryQueueShard.Name,
+				},
+			})
+			if err != nil {
+				q.log.ReportError(err, "failed to release capacity", logger.WithErrorReportTags(map[string]string{
+					"account_id": p.AccountID.String(),
+					"lease_id":   currentLeaseID.String(),
+				}))
+			}
+
+			q.log.Trace("released capacity", "res", res)
+		})
+	}
+
 	select {
 	case err := <-errCh:
 		// Job errored or extending lease errored.  Cancel the job ASAP.
@@ -1259,7 +1415,7 @@ func (q *queue) process(
 			}
 
 			qi.AtMS = at.UnixMilli()
-			if err := q.Requeue(context.WithoutCancel(ctx), q.primaryQueueShard, qi, at); err != nil {
+			if err := q.Requeue(context.WithoutCancel(ctx), q.primaryQueueShard, qi, at, RequeueOptionDisableConstraintUpdates(disableConstraintUpdates)); err != nil {
 				if err == ErrQueueItemNotFound {
 					// Safe. The executor may have dequeued.
 					return nil
@@ -1277,7 +1433,7 @@ func (q *queue) process(
 
 		// Dequeue this entirely, as this permanently failed.
 		// XXX: Increase permanently failed counter here.
-		if err := q.Dequeue(context.WithoutCancel(ctx), q.primaryQueueShard, qi); err != nil {
+		if err := q.Dequeue(context.WithoutCancel(ctx), q.primaryQueueShard, qi, DequeueOptionDisableConstraintUpdates(disableConstraintUpdates)); err != nil {
 			if err == ErrQueueItemNotFound {
 				// Safe. The executor may have dequeued.
 				return nil
@@ -1292,7 +1448,7 @@ func (q *queue) process(
 		}
 
 	case <-doneCh:
-		if err := q.Dequeue(context.WithoutCancel(ctx), q.primaryQueueShard, qi); err != nil {
+		if err := q.Dequeue(context.WithoutCancel(ctx), q.primaryQueueShard, qi, DequeueOptionDisableConstraintUpdates(disableConstraintUpdates)); err != nil {
 			if err == ErrQueueItemNotFound {
 				// Safe. The executor may have dequeued.
 				return nil
@@ -1494,9 +1650,14 @@ func durationWithTags[T any](ctx context.Context, queueShardName string, op stri
 	}
 
 	res, err := f(ctx)
+
+	d := time.Since(start)
+	if d > time.Second {
+		logger.StdlibLogger(ctx).Warn("queue operation took >1s", "op", op, "duration", d)
+	}
 	metrics.HistogramQueueOperationDuration(
 		ctx,
-		time.Since(start).Milliseconds(),
+		d.Milliseconds(),
 		metrics.HistogramOpt{
 			PkgName: pkgName,
 			Tags:    finalTags,
@@ -1666,24 +1827,80 @@ func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error 
 
 	metrics.WorkerQueueCapacityCounter(ctx, 1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": p.queue.primaryQueueShard.Name}})
 
-	// Attempt to lease this item before passing this to a worker.  We have to do this
-	// synchronously as we need to lease prior to requeueing the partition pointer. If
-	// we don't do this here, the workers may not lease the items before calling Peek
-	// to re-enqeueu the pointer, which then increases contention - as we requeue a
-	// pointer too early.
-	//
-	// This is safe:  only one process runs scan(), and we guard the total number of
-	// available workers with the above semaphore.
-	leaseID, err := duration(ctx, p.queue.primaryQueueShard.Name, "lease", p.queue.clock.Now(), func(ctx context.Context) (*ulid.ULID, error) {
-		return p.queue.Lease(ctx, *item, QueueLeaseDuration, p.staticTime, p.denies)
-	})
-	// NOTE: If this loop ends in an error, we must _always_ release an item from the
-	// semaphore to free capacity.  This will happen automatically when the worker
-	// finishes processing a queue item on success.
+	backlog := p.queue.ItemBacklog(ctx, *item)
+	partition := p.queue.ItemShadowPartition(ctx, *item)
+	constraints := p.queue.partitionConstraintConfigGetter(ctx, partition.Identifier())
+
+	leaseOptions := []leaseOptionFn{
+		LeaseBacklog(backlog),
+		LeaseShadowPartition(partition),
+		LeaseConstraints(constraints),
+	}
+
+	constraintRes, err := p.queue.itemLeaseConstraintCheck(
+		ctx,
+		&partition,
+		&backlog,
+		constraints,
+		item,
+		p.staticTime,
+		p.queue.primaryQueueShard.RedisClient.KeyGenerator(),
+	)
 	if err != nil {
-		// Continue on and handle the error below.
 		p.queue.sem.Release(1)
 		metrics.WorkerQueueCapacityCounter(ctx, -1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": p.queue.primaryQueueShard.Name}})
+
+		return fmt.Errorf("could not check constraints to lease item: %w", err)
+	}
+
+	if constraintRes.skipConstraintChecks {
+		leaseOptions = append(leaseOptions, LeaseOptionDisableConstraintChecks(true))
+	}
+
+	var leaseID *ulid.ULID
+	switch constraintRes.limitingConstraint {
+	// If no constraints were hit (or we didn't invoke the Constraint API)
+	case enums.QueueConstraintNotLimited:
+
+		// Attempt to lease this item before passing this to a worker.  We have to do this
+		// synchronously as we need to lease prior to requeueing the partition pointer. If
+		// we don't do this here, the workers may not lease the items before calling Peek
+		// to re-enqeueu the pointer, which then increases contention - as we requeue a
+		// pointer too early.
+		//
+		// This is safe:  only one process runs scan(), and we guard the total number of
+		// available workers with the above semaphore.
+		leaseID, err = duration(ctx, p.queue.primaryQueueShard.Name, "lease", p.queue.clock.Now(), func(ctx context.Context) (*ulid.ULID, error) {
+			return p.queue.Lease(
+				ctx,
+				*item,
+				QueueLeaseDuration,
+				p.staticTime,
+				p.denies,
+				leaseOptions...,
+			)
+		})
+		// NOTE: If this loop ends in an error, we must _always_ release an item from the
+		// semaphore to free capacity.  This will happen automatically when the worker
+		// finishes processing a queue item on success.
+		if err != nil {
+			// Continue on and handle the error below.
+			p.queue.sem.Release(1)
+			metrics.WorkerQueueCapacityCounter(ctx, -1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": p.queue.primaryQueueShard.Name}})
+		}
+	// Simulate errors returned by Lease
+	case enums.QueueConstraintThrottle:
+		err = ErrQueueItemThrottled
+	case enums.QueueConstraintAccountConcurrency:
+		err = newKeyError(ErrAccountConcurrencyLimit, partition.AccountID.String())
+	case enums.QueueConstraintFunctionConcurrency:
+		err = newKeyError(ErrPartitionConcurrencyLimit, partition.FunctionID.String())
+	case enums.QueueConstraintCustomConcurrencyKey1:
+		err = newKeyError(ErrConcurrencyLimitCustomKey, backlog.customConcurrencyKeyID(1))
+	case enums.QueueConstraintCustomConcurrencyKey2:
+		err = newKeyError(ErrConcurrencyLimitCustomKey, backlog.customConcurrencyKeyID(2))
+	default:
+		// Limited but the constraint is unknown?
 	}
 
 	// Check the sojourn delay for this item in the queue. Tracking system latency vs
@@ -1722,7 +1939,24 @@ func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error 
 		cause = key.cause
 	}
 
-	l = l.With("cause", cause)
+	l = l.With(
+		"cause", cause,
+		"item_id", item.ID,
+		"account_id", item.Data.Identifier.AccountID.String(),
+		"env_id", item.WorkspaceID.String(),
+		"app_id", item.Data.Identifier.AppID.String(),
+		"fn_id", item.FunctionID.String(),
+		"queue_shard", p.queue.primaryQueueShard.Name,
+	)
+
+	// used for error reporting
+	errTags := map[string]string{}
+	if cause != nil {
+		errTags["cause"] = cause.Error()
+	}
+	if leaseID != nil {
+		errTags["lease"] = leaseID.String()
+	}
 
 	switch cause {
 	case ErrQueueItemThrottled:
@@ -1740,8 +1974,10 @@ func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error 
 
 		if p.queue.itemEnableKeyQueues(ctx, *item) {
 			err := p.queue.Requeue(ctx, p.queue.primaryQueueShard, *item, time.UnixMilli(item.AtMS))
-			if err != nil {
-				l.Error("could not requeue item to backlog after hitting throttle limit", "error", err)
+			if err != nil && !errors.Is(err, ErrQueueItemNotFound) {
+				l.ReportError(err, "could not requeue item to backlog after hitting throttle limit",
+					logger.WithErrorReportTags(errTags),
+				)
 				return fmt.Errorf("could not requeue to backlog: %w", err)
 			}
 
@@ -1797,8 +2033,10 @@ func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error 
 
 		if p.queue.itemEnableKeyQueues(ctx, *item) {
 			err := p.queue.Requeue(ctx, p.queue.primaryQueueShard, *item, time.UnixMilli(item.AtMS))
-			if err != nil {
-				l.Error("could not requeue item to backlog after hitting concurrency limit", "error", err)
+			if err != nil && !errors.Is(err, ErrQueueItemNotFound) {
+				l.ReportError(err, "could not requeue item to backlog after hitting concurrency limit",
+					logger.WithErrorReportTags(errTags),
+				)
 				return fmt.Errorf("could not requeue to backlog: %w", err)
 			}
 
@@ -1838,8 +2076,10 @@ func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error 
 
 		if p.queue.itemEnableKeyQueues(ctx, *item) {
 			err := p.queue.Requeue(ctx, p.queue.primaryQueueShard, *item, time.UnixMilli(item.AtMS))
-			if err != nil {
-				l.Error("could not requeue item to backlog after hitting custom concurrency limit", "error", err)
+			if err != nil && !errors.Is(err, ErrQueueItemNotFound) {
+				l.ReportError(err, "could not requeue item to backlog after hitting custom concurrency limit",
+					logger.WithErrorReportTags(errTags),
+				)
 				return fmt.Errorf("could not requeue to backlog: %w", err)
 			}
 
@@ -1892,7 +2132,18 @@ func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error 
 		PkgName: pkgName,
 		Tags:    map[string]any{"status": "success", "queue_shard": p.queue.primaryQueueShard.Name},
 	})
-	p.queue.workers <- processItem{P: *p.partition, I: *item, PCtr: p.partitionContinueCtr}
+	p.queue.workers <- processItem{
+		P:    *p.partition,
+		I:    *item,
+		PCtr: p.partitionContinueCtr,
+
+		capacityLease: constraintRes.capacityLease,
+		// Disable constraint updates in case we skipped constraint checks.
+		// This should always be linked, as we want consistent behavior while
+		// processing a queue item.
+		disableConstraintUpdates: constraintRes.skipConstraintChecks,
+	}
+
 	return nil
 }
 
