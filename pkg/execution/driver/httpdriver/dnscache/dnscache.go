@@ -174,6 +174,10 @@ func (r *resolver) dialParallel(ctx context.Context, network, port string, prima
 	if len(fallbacks) == 0 {
 		return r.dialSerial(ctx, network, port, primaries)
 	}
+	if len(primaries) == 0 {
+		// also handle ipv6 only, if someone is brave enough to do so!
+		return r.dialSerial(ctx, network, port, fallbacks)
+	}
 
 	// create a chan that tells us if we've already finished the dialer.  this ensures that
 	// we don't forever poll on a chan that won't be sent/received.
