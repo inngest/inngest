@@ -445,35 +445,34 @@ func TestLuaRateLimit_RetryAfterValidation(t *testing.T) {
 		limiter := New(ctx, rc, "{rl}:")
 
 		config := inngest.RateLimit{
-			Limit:  0, // Zero limit should always rate limit
+			Limit:  0, // Zero limit should be converted to 1
 			Period: "1h",
 		}
 
 		key := "zero-capacity-test"
 
-		// First request should be rate limited
+		// First request should not be rate limited
 		r.SetTime(clock.Now())
 		res, err := limiter.RateLimit(ctx, key, config, WithNow(clock.Now()))
 		require.NoError(t, err)
-		require.True(t, res.Limited)
-		require.Greater(t, res.RetryAfter, time.Duration(0))
+		require.False(t, res.Limited)
+		require.Equal(t, time.Duration(0), res.RetryAfter)
 
-		t.Logf("Zero limit retryAfter: %v", res.RetryAfter)
-
-		// With zero limit, retryAfter should be the full period
-		require.Greater(t, res.RetryAfter, 59*time.Minute)
-		require.Less(t, res.RetryAfter, 61*time.Minute)
-
-		// Subsequent requests should also be rate limited
+		// Subsequent requests should be rate limited
 		r.SetTime(clock.Now())
 		res2, err := limiter.RateLimit(ctx, key, config, WithNow(clock.Now()))
 		require.NoError(t, err)
 		require.True(t, res2.Limited)
 		require.Greater(t, res2.RetryAfter, time.Duration(0))
 
-		// RetryAfter should remain close to original (zero capacity = no progress)
-		timeDiff := abs(res.RetryAfter - res2.RetryAfter)
-		require.Less(t, timeDiff, 100*time.Millisecond, "RetryAfter should be consistent for zero limit")
+		// RetryAfter should not remain close to original (zero capacity = no progress)
+		require.WithinDuration(
+			t,
+			time.Unix(0, int64(res2.RetryAfter)),
+			time.Unix(0, int64(res.RetryAfter)).Add(time.Hour),
+			100*time.Millisecond,
+			"RetryAfter should be consistent for zero limit",
+		)
 	})
 
 	t.Run("retryAfter precision validation", func(t *testing.T) {
@@ -701,7 +700,7 @@ func TestLuaRateLimit_Idempotency(t *testing.T) {
 
 		key := "expiry-test"
 		idempotencyKey := "request-789"
-		idempotencyTTL := 5 * time.Second // Short TTL for testing
+		idempotencyTTL := 2 * time.Second // Short TTL for testing
 
 		// First request with idempotency should be allowed and consume the 1 available capacity
 		r.SetTime(clock.Now())
@@ -723,11 +722,19 @@ func TestLuaRateLimit_Idempotency(t *testing.T) {
 		require.Equal(t, time.Duration(0), res2.RetryAfter)
 		t.Logf("Duplicate within TTL: limited=%v, retry=%v", res2.Limited, res2.RetryAfter)
 
+		require.True(t, r.Exists("{rl}:"+idempotencyKey), r.Dump())
+		require.True(t, r.Exists("{rl}:"+key), r.Dump())
+
+		require.Equal(t, 6*time.Second, r.TTL("{rl}:"+key))
+
 		// Advance time to expire the idempotency key
 		expiryWait := idempotencyTTL + 1*time.Second
 		clock.Advance(expiryWait)
 		r.FastForward(expiryWait)
 		t.Logf("Advanced time by %v to expire idempotency key", expiryWait)
+
+		require.False(t, r.Exists("{rl}:"+idempotencyKey))
+		require.True(t, r.Exists("{rl}:"+key), r.Dump())
 
 		// Request with same idempotency key should now be rate limited (capacity already exhausted by first request)
 		r.SetTime(clock.Now())

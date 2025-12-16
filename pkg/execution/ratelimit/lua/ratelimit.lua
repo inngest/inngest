@@ -33,6 +33,8 @@ local idempotencyTTL = tonumber(ARGV[5])
 ---@param burst integer
 ---@param quantity integer
 local function rateLimit(key, now_ns, period_ns, limit, burst, quantity)
+	limit = math.max(limit, 1)
+
 	---@type { limit: integer, ei: number, retry_at: number, dvt: number, tat: number, inc: number, ntat: number, aat: number, diff: number, retry_after: integer?, u: number, next: number?, remaining: integer?, reset_after: integer?, limited: boolean? }
 	local result = {}
 
@@ -40,7 +42,7 @@ local function rateLimit(key, now_ns, period_ns, limit, burst, quantity)
 	result["limit"] = burst + 1
 
 	-- emission defines the window size
-	local emission = period_ns / math.max(limit, 1)
+	local emission = period_ns / limit
 	result["ei"] = emission
 
 	-- retry_at is always computed under the assumption that all

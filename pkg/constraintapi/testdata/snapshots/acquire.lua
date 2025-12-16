@@ -62,9 +62,10 @@ local function toInteger(value)
 	return math.floor(value + 0.5) 
 end
 local function rateLimit(key, now_ns, period_ns, limit, burst, quantity)
+	limit = math.max(limit, 1)
 	local result = {}
 	result["limit"] = burst + 1
-	local emission = period_ns / math.max(limit, 1)
+	local emission = period_ns / limit
 	result["ei"] = emission
 	result["retry_at"] = now_ns + emission
 	local dvt = emission * (burst + 1)
