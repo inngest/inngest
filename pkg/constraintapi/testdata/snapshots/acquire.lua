@@ -87,41 +87,39 @@ local function rateLimit(key, now_ns, period_ns, limit, burst, quantity)
 		new_tat = now_ns + increment
 	end
 	result["ntat"] = new_tat
+	local ttl = tat - now_ns
+	result["reset_after"] = ttl
+	local used_tokens = math.min(math.ceil(ttl / emission), limit)
+	result["u"] = used_tokens
 	local allow_at = new_tat - dvt
 	result["aat"] = allow_at
 	local diff = now_ns - allow_at
 	result["diff"] = diff
-	local ttl = 0
 	if diff < 0 then
 		if increment <= dvt then
 			result["retry_after"] = -diff
 			result["retry_at"] = now_ns - diff
-			ttl = tat - now_ns
-			result["ttl"] = ttl
 		end
 		if origQuantity > 0 then
 			local next = dvt - ttl
 			result["next"] = next
 			result["remaining"] = 0
-			result["reset_after"] = ttl
 			result["limited"] = true
 			return result
 		end
 	end
-	ttl = tat - now_ns
 	if origQuantity > 0 then
 		ttl = new_tat - now_ns
 		local expiry = string.format("%d", math.max(ttl / 1000000000, 1))
 		call("SET", key, new_tat, "EX", expiry)
 	end
-	result["ttl"] = ttl
+	result["reset_after"] = ttl
 	local next = dvt - ttl
+	result["next"] = next
 	if next > -emission then
 		local remaining = math.floor(next / emission)
 		result["remaining"] = remaining
 	end
-	result["reset_after"] = ttl
-	result["next"] = next
 	return result
 end
 local function throttle(key, now_ms, period_ms, limit, burst, quantity)
@@ -150,41 +148,39 @@ local function throttle(key, now_ms, period_ms, limit, burst, quantity)
 		new_tat = now_ms + increment
 	end
 	result["ntat"] = new_tat
+	local ttl = tat - now_ms
+	result["reset_after"] = ttl
+	local used_tokens = math.min(math.ceil(ttl / emission), limit)
+	result["u"] = used_tokens
 	local allow_at = new_tat - dvt
 	result["aat"] = allow_at
 	local diff = now_ms - allow_at
 	result["diff"] = diff
-	local ttl = 0
 	if diff < 0 then
 		if increment <= dvt then
 			result["retry_after"] = -diff
 			result["retry_at"] = now_ms - diff
-			ttl = tat - now_ms
-			result["ttl"] = ttl
 		end
 		if origQuantity > 0 then
 			local next = dvt - ttl
 			result["next"] = next
 			result["remaining"] = 0
-			result["reset_after"] = ttl
 			result["limited"] = true
 			return result
 		end
 	end
-	ttl = tat - now_ms
 	if origQuantity > 0 then
 		ttl = new_tat - now_ms
 		local expiry = string.format("%d", math.max(ttl / 1000, 1))
 		call("SET", key, new_tat, "EX", expiry)
 	end
-	result["ttl"] = ttl
+	result["reset_after"] = ttl
 	local next = dvt - ttl
+	result["next"] = next
 	if next > -emission then
 		local remaining = math.floor(next / emission)
 		result["remaining"] = remaining
 	end
-	result["reset_after"] = ttl
-	result["next"] = next
 	return result
 end
 local requested = requestDetails.r

@@ -102,7 +102,7 @@ end
 ---@param burst integer
 ---@param quantity integer
 local function rateLimit(key, now_ns, period_ns, limit, burst, quantity)
-	---@type { limit: integer, ei: number, retry_at: number, dvt: number, tat: number, inc: number, ntat: number, aat: number, diff: number, retry_after: integer?, ttl: number?, next: number?, remaining: integer?, reset_after: integer?, limited: boolean? }
+	---@type { limit: integer, ei: number, retry_at: number, dvt: number, tat: number, inc: number, ntat: number, aat: number, diff: number, retry_after: integer?, u: number, next: number?, remaining: integer?, reset_after: integer?, limited: boolean? }
 	local result = {}
 
 	-- limit defines the maximum number of requests that can be admitted at once (irrespective of current usage)
@@ -147,6 +147,14 @@ local function rateLimit(key, now_ns, period_ns, limit, burst, quantity)
 	end
 	result["ntat"] = new_tat
 
+	-- ttl represents the current time until the full "limit" is allowed again
+	local ttl = tat - now_ns
+	result["reset_after"] = ttl
+
+	-- currently used tokens must be calculated without burst
+	local used_tokens = math.min(math.ceil(ttl / emission), limit)
+	result["u"] = used_tokens
+
 	-- requests should be allowed from the new_tat on, burst
 	-- decreases the time to allowing a new request even if the original period received the maximum number of requests
 	local allow_at = new_tat - dvt
@@ -156,16 +164,11 @@ local function rateLimit(key, now_ns, period_ns, limit, burst, quantity)
 	local diff = now_ns - allow_at
 	result["diff"] = diff
 
-	local ttl = 0
-
 	if diff < 0 then
 		if increment <= dvt then
 			-- retry_after outlines when the next request would be accepted
 			result["retry_after"] = -diff
 			result["retry_at"] = now_ns - diff
-			-- ttl represents the current time until the full "limit" is allowed again
-			ttl = tat - now_ns
-			result["ttl"] = ttl
 		end
 
 		if origQuantity > 0 then
@@ -173,29 +176,27 @@ local function rateLimit(key, now_ns, period_ns, limit, burst, quantity)
 			local next = dvt - ttl
 			result["next"] = next
 			result["remaining"] = 0
-			result["reset_after"] = ttl
 			result["limited"] = true
 
 			return result
 		end
 	end
 
-	ttl = tat - now_ns
 	if origQuantity > 0 then
 		-- update state to new_tat
 		ttl = new_tat - now_ns
 		local expiry = string.format("%d", math.max(ttl / 1000000000, 1))
 		call("SET", key, new_tat, "EX", expiry)
 	end
-	result["ttl"] = ttl
+	result["reset_after"] = ttl
 
 	local next = dvt - ttl
+	result["next"] = next
+
 	if next > -emission then
 		local remaining = math.floor(next / emission)
 		result["remaining"] = remaining
 	end
-	result["reset_after"] = ttl
-	result["next"] = next
 
 	return result
 end
@@ -207,7 +208,7 @@ end
 ---@param burst integer
 ---@param quantity integer
 local function throttle(key, now_ms, period_ms, limit, burst, quantity)
-	---@type { limit: integer, ei: number, retry_at: number, dvt: number, tat: number, inc: number, ntat: number, aat: number, diff: number, retry_after: integer?, ttl: number?, next: number?, remaining: integer?, reset_after: integer?, limited: boolean? }
+	---@type { limit: integer, ei: number, retry_at: number, dvt: number, tat: number, inc: number, ntat: number, aat: number, diff: number, retry_after: integer?, u: number, next: number?, remaining: integer?, reset_after: integer?, limited: boolean? }
 	local result = {}
 
 	-- limit defines the maximum number of requests that can be admitted at once (irrespective of current usage)
@@ -252,6 +253,14 @@ local function throttle(key, now_ms, period_ms, limit, burst, quantity)
 	end
 	result["ntat"] = new_tat
 
+	-- ttl represents the current time until the full "limit" is allowed again
+	local ttl = tat - now_ms
+	result["reset_after"] = ttl
+
+	-- currently used tokens must be calculated without burst
+	local used_tokens = math.min(math.ceil(ttl / emission), limit)
+	result["u"] = used_tokens
+
 	-- requests should be allowed from the new_tat on, burst
 	-- decreases the time to allowing a new request even if the original period received the maximum number of requests
 	local allow_at = new_tat - dvt
@@ -261,16 +270,11 @@ local function throttle(key, now_ms, period_ms, limit, burst, quantity)
 	local diff = now_ms - allow_at
 	result["diff"] = diff
 
-	local ttl = 0
-
 	if diff < 0 then
 		if increment <= dvt then
 			-- retry_after outlines when the next request would be accepted
 			result["retry_after"] = -diff
 			result["retry_at"] = now_ms - diff
-			-- ttl represents the current time until the full "limit" is allowed again
-			ttl = tat - now_ms
-			result["ttl"] = ttl
 		end
 
 		if origQuantity > 0 then
@@ -278,29 +282,27 @@ local function throttle(key, now_ms, period_ms, limit, burst, quantity)
 			local next = dvt - ttl
 			result["next"] = next
 			result["remaining"] = 0
-			result["reset_after"] = ttl
 			result["limited"] = true
 
 			return result
 		end
 	end
 
-	ttl = tat - now_ms
 	if origQuantity > 0 then
 		-- update state to new_tat
 		ttl = new_tat - now_ms
 		local expiry = string.format("%d", math.max(ttl / 1000, 1))
 		call("SET", key, new_tat, "EX", expiry)
 	end
-	result["ttl"] = ttl
+	result["reset_after"] = ttl
 
 	local next = dvt - ttl
+	result["next"] = next
+
 	if next > -emission then
 		local remaining = math.floor(next / emission)
 		result["remaining"] = remaining
 	end
-	result["reset_after"] = ttl
-	result["next"] = next
 
 	return result
 end
