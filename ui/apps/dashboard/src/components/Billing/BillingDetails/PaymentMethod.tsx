@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from '@tanstack/react-router';
+import { useNavigate, useRouter } from '@tanstack/react-router';
 import { Button } from '@inngest/components/Button/NewButton';
 import { capitalCase } from 'change-case';
 
@@ -20,13 +20,13 @@ export default function PaymentMethod({
   } | null;
 }) {
   const [isEditing, setIsEditing] = useState(false);
-  const navigate = useNavigate();
+  const router = useRouter();
 
   const onSuccess = () => {
     setIsEditing(false);
     //
     // Refresh the current route to reload data
-    navigate({ to: '.', replace: true });
+    router.invalidate();
   };
 
   return (

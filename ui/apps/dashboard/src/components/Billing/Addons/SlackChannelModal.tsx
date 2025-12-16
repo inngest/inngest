@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 import { useMutation } from 'urql';
 
 import { graphql } from '@/gql';
-import { useNavigate } from '@tanstack/react-router';
+import { useNavigate, useRouter } from '@tanstack/react-router';
 
 const UpdateAccountAddonQuantityDocument = graphql(`
   mutation UpdateAccountAddonQuantity($addonName: String!, $quantity: Int!) {
@@ -40,7 +40,7 @@ export default function SlackChannelComponent({
   addonPurchased?: boolean;
   onChange?: () => void;
 }) {
-  const navigate = useNavigate();
+  const router = useRouter();
   const [, updateAccountAddonQuantity] = useMutation(
     UpdateAccountAddonQuantityDocument,
   );
@@ -96,7 +96,7 @@ export default function SlackChannelComponent({
       if (onChange) {
         onChange();
       }
-      navigate({ to: '.', replace: true });
+      router.invalidate();
       toast.success(`Addon ${isRemoving ? 'removed' : 'updated'} successfully`);
     }
     setOpenModal(false);

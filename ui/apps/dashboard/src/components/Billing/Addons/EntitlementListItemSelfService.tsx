@@ -11,7 +11,7 @@ import EntitlementListItemSelfServiceNumeric from '@/components/Billing/Addons/E
 import { addonQtyCostString } from '@/components/Billing/Addons/pricing_help';
 import { graphql } from '@/gql';
 import SlackChannelComponent from './SlackChannelModal';
-import { useNavigate } from '@tanstack/react-router';
+import { useNavigate, useRouter } from '@tanstack/react-router';
 
 const UpdateAccountAddonQuantityDocument = graphql(`
   mutation UpdateAccountAddonQuantity($addonName: String!, $quantity: Int!) {
@@ -47,7 +47,7 @@ export default function EntitlementListItemSelfService({
   addonPurchased?: boolean;
   onChange?: () => void;
 }) {
-  const navigate = useNavigate();
+  const router = useRouter();
 
   const [openSelfService, setOpenSelfService] = useState(false);
   const [openConfirmationModal, setOpenConfirmationModal] = useState(false);
@@ -97,7 +97,7 @@ export default function EntitlementListItemSelfService({
       if (onChange) {
         onChange();
       }
-      navigate({ to: '.', replace: true });
+      router.invalidate();
       toast.success(`Addon ${isRemoving ? 'removed' : 'updated'} successfully`);
     }
     setIsRemoving(false);

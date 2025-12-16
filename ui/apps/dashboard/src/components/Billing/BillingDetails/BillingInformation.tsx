@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from '@tanstack/react-router';
+import { useNavigate, useRouter } from '@tanstack/react-router';
 import { Button } from '@inngest/components/Button/NewButton';
 import { Input } from '@inngest/components/Forms/Input';
 import { toast } from 'sonner';
@@ -31,7 +31,7 @@ export default function BillingInformation({
   const [, updateBillingInformation] = useMutation(
     updateBillingInformationDocument,
   );
-  const navigate = useNavigate();
+  const router = useRouter();
 
   function onEditButtonClick() {
     setIsEditing(true);
@@ -59,7 +59,7 @@ export default function BillingInformation({
           toast.success(`Billing information was successfully updated`);
           //
           // Refresh the current route to reload data
-          navigate({ to: '.', replace: true });
+          router.invalidate();
         }
       },
     );

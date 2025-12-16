@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from '@tanstack/react-router';
+import { useNavigate, useRouter } from '@tanstack/react-router';
 import { Button } from '@inngest/components/Button/NewButton';
 import { toast } from 'sonner';
 
@@ -31,7 +31,7 @@ export default function UpgradeButton({
   onPlanChange: () => void;
   label?: string;
 }) {
-  const navigate = useNavigate();
+  const router = useRouter();
   const [checkoutData, setCheckoutData] = useState<{
     action: 'upgrade' | 'downgrade' | 'cancel';
     items: CheckoutItem[];
@@ -101,7 +101,7 @@ export default function UpgradeButton({
     onPlanChange();
     //
     // Refresh the current route to reload data
-    navigate({ to: '.', replace: true });
+    router.invalidate();
     toast.success(`Plan changed successfully`);
   };
 
