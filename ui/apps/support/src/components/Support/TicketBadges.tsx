@@ -1,5 +1,6 @@
 import { getLabelForStatus } from "@/data/plain";
-import { getStatusColor, getPriorityColor } from "@/utils/ticket";
+import { getPriorityColor } from "@/utils/ticket";
+import { Pill } from "@inngest/components/Pill";
 
 type StatusBadgeProps = {
   status: string;
@@ -14,18 +15,22 @@ type PriorityBadgeProps = {
 
 /**
  * Badge component for displaying ticket status
+ * Uses Pill component with "primary" for open status and "info" for closed status
  */
 export function StatusBadge({ status, size = "md" }: StatusBadgeProps) {
-  const sizeClasses = size === "sm" ? "px-2 py-1 text-xs" : "px-3 py-1 text-sm";
+  const statusStr = status ? String(status).toLowerCase() : "";
+  const label = getLabelForStatus(status);
+
+  // Map status to Pill kind: "primary" for open, "info" for closed
+  let pillKind: "primary" | "info" = "primary";
+  if (statusStr === "done") {
+    pillKind = "info";
+  }
 
   return (
-    <span
-      className={`rounded-full font-medium ${sizeClasses} ${getStatusColor(
-        status,
-      )}`}
-    >
-      {getLabelForStatus(status)}
-    </span>
+    <Pill kind={pillKind} appearance="solid">
+      {label}
+    </Pill>
   );
 }
 

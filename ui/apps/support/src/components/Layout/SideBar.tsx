@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import { Link, useLocation } from "@tanstack/react-router";
+import { RiTicketLine, RiHomeLine } from "@remixicon/react";
 
 import Logo from "../Navigation/Logo";
 import { Profile } from "../Navigation/Profile";
@@ -12,6 +14,8 @@ export default function SideBar({
   profile?: ProfileDisplayType;
 }) {
   const navRef = useRef<HTMLDivElement>(null);
+  const location = useLocation();
+  const pathname = location.pathname;
 
   const [collapsed, setCollapsed] = useState<boolean>(serverCollapsed ?? false);
 
@@ -34,6 +38,21 @@ export default function SideBar({
     }
   }, [serverCollapsed]);
 
+  const navItems = [
+    {
+      icon: RiHomeLine,
+      label: "Tickets",
+      path: "/",
+      exact: true,
+    },
+    {
+      icon: RiTicketLine,
+      label: "Support",
+      path: "/support",
+      exact: false,
+    },
+  ];
+
   return (
     <nav
       className={`bg-canvasBase border-subtle group
@@ -44,7 +63,31 @@ export default function SideBar({
     >
       <Logo collapsed={collapsed} setCollapsed={setCollapsed} />
       <div className="flex grow flex-col justify-between">
-        <div className="mx-4 h-full"></div>
+        <div className="mx-2 mt-4 space-y-1">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = item.exact
+              ? pathname === item.path
+              : pathname.startsWith(item.path);
+            return (
+              <Link
+                key={item.path}
+                to={item.path}
+                className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                  collapsed ? "justify-center" : ""
+                } ${
+                  isActive
+                    ? "bg-secondary-4xSubtle text-info"
+                    : "text-subtle hover:bg-canvasSubtle hover:text-basis"
+                }`}
+                title={collapsed ? item.label : undefined}
+              >
+                <Icon className="h-5 w-5 shrink-0" />
+                {!collapsed && <span>{item.label}</span>}
+              </Link>
+            );
+          })}
+        </div>
         {profile && <Profile collapsed={collapsed} profile={profile} />}
       </div>
     </nav>
