@@ -101,7 +101,7 @@
             lua-language-server
 
             # Tools
-            sqlite
+            sqlite-interactive
             sqlc
             buf
             protobuf
