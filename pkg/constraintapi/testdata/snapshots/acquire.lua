@@ -61,89 +61,68 @@ end
 local function toInteger(value)
 	return math.floor(value + 0.5) 
 end
-local function clampTat(tat, now_ns, period_ns, delay_variation_tolerance)
-	local max_reasonable_tat = now_ns + period_ns + delay_variation_tolerance
-	local min_reasonable_tat = now_ns - period_ns 
-	if tat > max_reasonable_tat then
-		return toInteger(max_reasonable_tat)
-	elseif tat < min_reasonable_tat then
-		return toInteger(now_ns) 
-	else
-		return toInteger(tat)
-	end
-end
-local function retrieveAndNormalizeTat(key, now_ns, period_ns, delay_variation_tolerance)
+local function rateLimit(key, now_ns, period_ns, limit, burst, quantity)
+	local result = {}
+	result["limit"] = burst + 1
+	local emission = period_ns / math.max(limit, 1)
+	result["ei"] = emission
+	result["retry_at"] = now_ns + emission
+	local dvt = emission * (burst + 1)
+	result["dvt"] = dvt
 	local tat = call("GET", key)
 	if not tat then
-		return now_ns
+		tat = now_ns
+	else
+		tat = tonumber(tat)
 	end
-	local raw_tat = tonumber(tat)
-	if not raw_tat then
-		return now_ns 
+	result["tat"] = tat
+	local origQuantity = quantity
+	if quantity == 0 then
+		quantity = 1
 	end
-	local clamped_tat = clampTat(raw_tat, now_ns, period_ns, delay_variation_tolerance)
-	if raw_tat ~= clamped_tat then
-		call("SET", key, clamped_tat, "KEEPTTL")
-	end
-	return clamped_tat
-end
-local function rateLimitCapacity(key, now_ns, period_ns, limit, burst)
-	if limit == 0 then
-		return { 0, now_ns + period_ns, 0 }
-	end
-	local emission_interval = period_ns / limit
-	local total_capacity = burst + 1
-	local delay_variation_tolerance = emission_interval * total_capacity
-	local tat = retrieveAndNormalizeTat(key, now_ns, period_ns, delay_variation_tolerance)
-	local used_tokens = 0
-	if tat > now_ns then
-		local consumed_time = tat - now_ns
-		used_tokens = math.min(math.ceil(consumed_time / emission_interval), limit)
-	end
-	local increment = 1 * emission_interval
-	local new_tat
+	local increment = quantity * emission
+	result["inc"] = increment
+	local new_tat = tat + increment
 	if now_ns > tat then
 		new_tat = now_ns + increment
-	else
-		new_tat = tat + increment
 	end
-	local allow_at = new_tat - delay_variation_tolerance
+	result["ntat"] = new_tat
+	local allow_at = new_tat - dvt
+	result["aat"] = allow_at
 	local diff = now_ns - allow_at
+	result["diff"] = diff
+	local ttl = 0
 	if diff < 0 then
-		return { 0, allow_at, used_tokens }
-	else
-		local current_ttl = math.max(tat - now_ns, 0)
-		local next = delay_variation_tolerance - current_ttl
-		local remaining = 0
-		if next > -emission_interval then
-			remaining = math.floor(next / emission_interval)
+		if increment <= dvt then
+			result["retry_after"] = -diff
+			result["retry_at"] = now_ns - diff
+			ttl = tat - now_ns
+			result["ttl"] = ttl
 		end
-		local new_tat_after_consumption = math.max(tat, now_ns) + remaining * emission_interval
-		local next_available_at_ns = new_tat_after_consumption - delay_variation_tolerance + emission_interval
-		return { remaining, toInteger(next_available_at_ns), used_tokens }
+		if origQuantity > 0 then
+			local next = dvt - ttl
+			result["next"] = next
+			result["remaining"] = 0
+			result["reset_after"] = ttl
+			result["limited"] = true
+			return result
+		end
 	end
-end
-local function rateLimitUpdate(key, now_ns, period_ns, limit, capacity, burst)
-	if limit == 0 then
-		return
+	ttl = tat - now_ns
+	if origQuantity > 0 then
+		ttl = new_tat - now_ns
+		local expiry = string.format("%d", math.max(ttl / 1000000000, 1))
+		call("SET", key, new_tat, "EX", expiry)
 	end
-	local emission_interval = period_ns / limit
-	local total_capacity = (burst or 0) + 1
-	local delay_variation_tolerance = emission_interval * total_capacity
-	local tat = retrieveAndNormalizeTat(key, now_ns, period_ns, delay_variation_tolerance)
-	local increment = math.max(capacity, 1) * emission_interval
-	local new_tat
-	if now_ns > tat then
-		new_tat = now_ns + increment
-	else
-		new_tat = tat + increment
+	result["ttl"] = ttl
+	local next = dvt - ttl
+	if next > -emission then
+		local remaining = math.floor(next / emission)
+		result["remaining"] = remaining
 	end
-	if capacity > 0 then
-		local clamped_tat = clampTat(new_tat, now_ns, period_ns, delay_variation_tolerance)
-		local ttl_ns = clamped_tat - now_ns
-		local ttl_seconds = math.ceil(ttl_ns / 1000000000) 
-		call("SET", key, clamped_tat, "EX", ttl_seconds)
-	end
+	result["reset_after"] = ttl
+	result["next"] = next
+	return result
 end
 local function throttle(key, now_ms, period_ms, limit, burst, quantity)
 	local result = {}
@@ -153,7 +132,7 @@ local function throttle(key, now_ms, period_ms, limit, burst, quantity)
 	result["retry_at"] = now_ms + emission
 	local dvt = emission * (burst + 1)
 	result["dvt"] = dvt
-	local tat = redis.call("GET", key)
+	local tat = call("GET", key)
 	if not tat then
 		tat = now_ms
 	else
@@ -196,7 +175,7 @@ local function throttle(key, now_ms, period_ms, limit, burst, quantity)
 	if origQuantity > 0 then
 		ttl = new_tat - now_ms
 		local expiry = string.format("%d", math.max(ttl / 1000, 1))
-		redis.call("SET", key, new_tat, "EX", expiry)
+		call("SET", key, new_tat, "EX", expiry)
 	end
 	result["ttl"] = ttl
 	local next = dvt - ttl
@@ -244,10 +223,9 @@ for index, value in ipairs(constraints) do
 		constraintCapacity = availableCapacity
 		debug("skipping gcra" .. index)
 	elseif value.k == 1 then
-		local burst = math.floor(value.r.l / 10) 
-		local rlRes = rateLimitCapacity(value.r.k, nowNS, value.r.p, value.r.l, burst)
-		constraintCapacity = rlRes[1]
-		constraintRetryAfter = toInteger(rlRes[2] / 1000000) 
+		local rlRes = rateLimit(value.r.k, nowNS, value.r.p, value.r.l, value.r.b, 0)
+		constraintCapacity = rlRes["remaining"]
+		constraintRetryAfter = toInteger(rlRes["retry_at"] / 1000000) 
 	elseif value.k == 2 then
 		debug("evaluating concurrency")
 		local inProgressItems = getConcurrencyCount(value.c.iik)
@@ -310,7 +288,7 @@ for i = 1, granted, 1 do
 		if skipGCRA then
 		elseif value.k == 1 then
 			debug("updating rate limit", value.r.h)
-			rateLimitUpdate(value.r.k, nowNS, value.r.p, value.r.l, 1, value.r.b)
+			rateLimit(value.r.k, nowNS, value.r.p, value.r.l, value.r.b, 1)
 		elseif value.k == 2 then
 			call("ZADD", value.c.ilk, tostring(leaseExpiryMS), initialLeaseID)
 		elseif value.k == 3 then

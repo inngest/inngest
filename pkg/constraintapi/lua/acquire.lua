@@ -95,163 +95,109 @@ local function toInteger(value)
 	return math.floor(value + 0.5) -- Round to nearest integer
 end
 
---- clampTat ensures tat value is within reasonable bounds to prevent corruption issues
----@param tat number
----@param now_ns integer
----@param period_ns integer
----@param delay_variation_tolerance number
----@return integer
-local function clampTat(tat, now_ns, period_ns, delay_variation_tolerance)
-	local max_reasonable_tat = now_ns + period_ns + delay_variation_tolerance
-	local min_reasonable_tat = now_ns - period_ns -- Allow some past values for clock skew
-
-	if tat > max_reasonable_tat then
-		return toInteger(max_reasonable_tat)
-	elseif tat < min_reasonable_tat then
-		return toInteger(now_ns) -- Reset to current time if too far in past
-	else
-		return toInteger(tat)
-	end
-end
-
---- retrieveAndNormalizeTat gets the TAT value from Redis and normalizes it if needed
 ---@param key string
 ---@param now_ns integer
 ---@param period_ns integer
----@param delay_variation_tolerance number
----@return integer
-local function retrieveAndNormalizeTat(key, now_ns, period_ns, delay_variation_tolerance)
+---@param limit integer
+---@param burst integer
+---@param quantity integer
+local function rateLimit(key, now_ns, period_ns, limit, burst, quantity)
+	---@type { limit: integer, ei: number, retry_at: number, dvt: number, tat: number, inc: number, ntat: number, aat: number, diff: number, retry_after: integer?, ttl: number?, next: number?, remaining: integer?, reset_after: integer?, limited: boolean? }
+	local result = {}
+
+	-- limit defines the maximum number of requests that can be admitted at once (irrespective of current usage)
+	result["limit"] = burst + 1
+
+	-- emission defines the window size
+	local emission = period_ns / math.max(limit, 1)
+	result["ei"] = emission
+
+	-- retry_at is always computed under the assumption that all
+	-- remaining capacity is consumed
+	result["retry_at"] = now_ns + emission
+
+	-- dvt determines how many requests can be admitted
+	local dvt = emission * (burst + 1)
+	result["dvt"] = dvt
+
+	-- use existing tat or start at now_ms
 	local tat = call("GET", key)
 	if not tat then
-		return now_ns
+		tat = now_ns
+	else
+		tat = tonumber(tat)
 	end
 
-	local raw_tat = tonumber(tat)
-	if not raw_tat then
-		return now_ns -- Reset if tonumber failed
+	result["tat"] = tat
+	-- When called with quantity 0, we simulate a call with quantity=1 to
+	-- calculate retry after, remaining, etc. values
+	local origQuantity = quantity
+	if quantity == 0 then
+		quantity = 1
 	end
 
-	local clamped_tat = clampTat(raw_tat, now_ns, period_ns, delay_variation_tolerance)
-	-- If value was clamped, commit the normalization immediately
-	if raw_tat ~= clamped_tat then
-		call("SET", key, clamped_tat, "KEEPTTL")
-	end
+	-- increment based on quantity
+	local increment = quantity * emission
+	result["inc"] = increment
 
-	return clamped_tat
-end
-
---- rateLimitCapacity is the first half of a nanosecond-precision GCRA implementation. This method calculates the number of requests that can be admitted in the current period.
----@param key string
----@param now_ns integer
----@param period_ns integer
----@param limit integer
----@param burst integer
----@return integer[] returns a 3-tuple of remaining capacity, retry at, and current usage
-local function rateLimitCapacity(key, now_ns, period_ns, limit, burst)
-	-- Handle zero limit case - immediately rate limit
-	if limit == 0 then
-		return { 0, now_ns + period_ns, 0 }
-	end
-
-	-- Match throttled library calculations exactly
-	-- emissionInterval = quota.MaxRate.period / limit
-	local emission_interval = period_ns / limit
-
-	-- delayVariationTolerance = emission_interval * (maxBurst + 1)
-	-- In throttled: immediate capacity = MaxBurst + 1
-	local total_capacity = burst + 1
-	local delay_variation_tolerance = emission_interval * total_capacity
-
-	-- retrieve and normalize theoretical arrival time
-	local tat = retrieveAndNormalizeTat(key, now_ns, period_ns, delay_variation_tolerance)
-
-	-- Calculate current usage (consumed tokens) independently of burst capacity
-	local used_tokens = 0
-	if tat > now_ns then
-		local consumed_time = tat - now_ns
-		used_tokens = math.min(math.ceil(consumed_time / emission_interval), limit)
-	end
-
-	-- Calculate what the next TAT would be if we processed this request (quantity = 1)
-	local increment = 1 * emission_interval
-	local new_tat
+	-- if existing tat is in the past, increment from now_ms
+	local new_tat = tat + increment
 	if now_ns > tat then
 		new_tat = now_ns + increment
-	else
-		new_tat = tat + increment
 	end
+	result["ntat"] = new_tat
 
-	-- Block the request if the next permitted time is in the future
-	-- allowAt = newTat.Add(-delayVariationTolerance)
-	local allow_at = new_tat - delay_variation_tolerance
+	-- requests should be allowed from the new_tat on, burst
+	-- decreases the time to allowing a new request even if the original period received the maximum number of requests
+	local allow_at = new_tat - dvt
+	result["aat"] = allow_at
+
+	-- allow_at must be in the past to allow the request (diff >= 0)
 	local diff = now_ns - allow_at
+	result["diff"] = diff
+
+	local ttl = 0
 
 	if diff < 0 then
-		-- We are rate limited - calculate retry time
-		-- RetryAfter = -diff (when diff is negative)
-		return { 0, allow_at, used_tokens }
-	else
-		-- Not rate limited - calculate remaining capacity
-		-- Use current TAT instead of new_tat since we haven't consumed the token yet
-		-- next = delayVariationTolerance - ttl, where ttl = currentTat.Sub(now)
-		local current_ttl = math.max(tat - now_ns, 0)
-		local next = delay_variation_tolerance - current_ttl
-		local remaining = 0
-		if next > -emission_interval then
-			remaining = math.floor(next / emission_interval)
+		if increment <= dvt then
+			-- retry_after outlines when the next request would be accepted
+			result["retry_after"] = -diff
+			result["retry_at"] = now_ns - diff
+			-- ttl represents the current time until the full "limit" is allowed again
+			ttl = tat - now_ns
+			result["ttl"] = ttl
 		end
 
-		-- Calculate when the next unit will be available after consuming all remaining capacity
-		local new_tat_after_consumption = math.max(tat, now_ns) + remaining * emission_interval
-		local next_available_at_ns = new_tat_after_consumption - delay_variation_tolerance + emission_interval
+		if origQuantity > 0 then
+			-- if we did want to update, we got limited
+			local next = dvt - ttl
+			result["next"] = next
+			result["remaining"] = 0
+			result["reset_after"] = ttl
+			result["limited"] = true
 
-		return { remaining, toInteger(next_available_at_ns), used_tokens }
-	end
-end
-
---- rateLimitUpdate is the second half of a nanosecond-precision GCRA implementation, used for updating rate limit state.
----@param key string
----@param now_ns integer
----@param period_ns integer
----@param limit integer
----@param capacity integer the number of requests to admit at once
----@param burst integer
-local function rateLimitUpdate(key, now_ns, period_ns, limit, capacity, burst)
-	-- Handle zero limit case - no update needed since we always rate limit
-	if limit == 0 then
-		return
+			return result
+		end
 	end
 
-	-- calculate emission interval (tau) - time between each token
-	-- This matches throttled library: quota.MaxRate.period
-	local emission_interval = period_ns / limit
-
-	-- Calculate delay_variation_tolerance for bounds checking
-	local total_capacity = (burst or 0) + 1
-	local delay_variation_tolerance = emission_interval * total_capacity
-
-	-- retrieve and normalize theoretical arrival time
-	local tat = retrieveAndNormalizeTat(key, now_ns, period_ns, delay_variation_tolerance)
-
-	-- calculate next theoretical arrival time
-	-- This matches throttled library logic: tat.Add(increment) where increment = quantity * emissionInterval
-	local increment = math.max(capacity, 1) * emission_interval
-	local new_tat
-	if now_ns > tat then
-		new_tat = now_ns + increment
-	else
-		new_tat = tat + increment
+	ttl = tat - now_ns
+	if origQuantity > 0 then
+		-- update state to new_tat
+		ttl = new_tat - now_ns
+		local expiry = string.format("%d", math.max(ttl / 1000000000, 1))
+		call("SET", key, new_tat, "EX", expiry)
 	end
+	result["ttl"] = ttl
 
-	if capacity > 0 then
-		-- Clamp new_tat to reasonable bounds and ensure integer storage
-		local clamped_tat = clampTat(new_tat, now_ns, period_ns, delay_variation_tolerance)
-
-		-- Calculate TTL like throttled library: ttl = newTat.Sub(now)
-		local ttl_ns = clamped_tat - now_ns
-		local ttl_seconds = math.ceil(ttl_ns / 1000000000) -- Convert nanoseconds to seconds
-		call("SET", key, clamped_tat, "EX", ttl_seconds)
+	local next = dvt - ttl
+	if next > -emission then
+		local remaining = math.floor(next / emission)
+		result["remaining"] = remaining
 	end
+	result["reset_after"] = ttl
+	result["next"] = next
+
+	return result
 end
 
 ---@param key string
@@ -280,7 +226,7 @@ local function throttle(key, now_ms, period_ms, limit, burst, quantity)
 	result["dvt"] = dvt
 
 	-- use existing tat or start at now_ms
-	local tat = redis.call("GET", key)
+	local tat = call("GET", key)
 	if not tat then
 		tat = now_ms
 	else
@@ -344,7 +290,7 @@ local function throttle(key, now_ms, period_ms, limit, burst, quantity)
 		-- update state to new_tat
 		ttl = new_tat - now_ms
 		local expiry = string.format("%d", math.max(ttl / 1000, 1))
-		redis.call("SET", key, new_tat, "EX", expiry)
+		call("SET", key, new_tat, "EX", expiry)
 	end
 	result["ttl"] = ttl
 
@@ -428,10 +374,9 @@ for index, value in ipairs(constraints) do
 		debug("skipping gcra" .. index)
 	elseif value.k == 1 then
 		-- rate limit
-		local burst = math.floor(value.r.l / 10) -- align with burst in ratelimit
-		local rlRes = rateLimitCapacity(value.r.k, nowNS, value.r.p, value.r.l, burst)
-		constraintCapacity = rlRes[1]
-		constraintRetryAfter = toInteger(rlRes[2] / 1000000) -- convert from ns to ms
+		local rlRes = rateLimit(value.r.k, nowNS, value.r.p, value.r.l, value.r.b, 0)
+		constraintCapacity = rlRes["remaining"]
+		constraintRetryAfter = toInteger(rlRes["retry_at"] / 1000000) -- convert from ns to ms
 	elseif value.k == 2 then
 		-- concurrency
 		debug("evaluating concurrency")
@@ -516,7 +461,7 @@ for i = 1, granted, 1 do
 		elseif value.k == 1 then
 			debug("updating rate limit", value.r.h)
 			-- rate limit
-			rateLimitUpdate(value.r.k, nowNS, value.r.p, value.r.l, 1, value.r.b)
+			rateLimit(value.r.k, nowNS, value.r.p, value.r.l, value.r.b, 1)
 		elseif value.k == 2 then
 			-- concurrency
 			call("ZADD", value.c.ilk, tostring(leaseExpiryMS), initialLeaseID)
