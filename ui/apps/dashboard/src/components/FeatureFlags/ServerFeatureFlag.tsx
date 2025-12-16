@@ -1,5 +1,5 @@
 import type { PropsWithChildren } from 'react';
-import { auth, clerkClient, currentUser } from '@clerk/nextjs/server';
+import { auth } from '@clerk/nextjs/server';
 import * as Sentry from '@sentry/nextjs';
 
 import { getLaunchDarklyClient } from '@/launchDarkly';
@@ -23,35 +23,23 @@ export async function getBooleanFlag(
   flag: string,
   { defaultValue = false }: { defaultValue?: boolean } = {}
 ): Promise<boolean> {
-  const user = await currentUser();
-  const clerk = clerkClient();
-  const { orgId } = auth();
-
-  let organization: Awaited<ReturnType<typeof clerk.organizations.getOrganization>> | undefined;
-
-  if (orgId) {
-    organization = await clerk.organizations.getOrganization({ organizationId: orgId });
-  }
+  const { sessionClaims } = auth();
 
   try {
     const client = await getLaunchDarklyClient();
 
-    const accountID =
-      organization?.publicMetadata?.accountID &&
-      typeof organization.publicMetadata.accountID === 'string'
-        ? organization.publicMetadata.accountID
-        : 'Unknown';
+    const accountID = sessionClaims?.orgPublickMetadata?.accountId ?? 'Unknown';
 
     const context = {
       account: {
         key: accountID,
-        name: organization?.name ?? 'Unknown',
+        name: sessionClaims?.orgName ?? 'Unknown',
       },
       kind: 'multi',
       user: {
         anonymous: false,
-        key: user?.externalId ?? 'Unknown',
-        name: `${user?.firstName ?? ''} ${user?.lastName ?? ''}`.trim() || 'Unknown',
+        key: sessionClaims?.externalId ?? 'Unknown',
+        name: sessionClaims?.fullName || 'Unknown',
       },
     } as const;
 
