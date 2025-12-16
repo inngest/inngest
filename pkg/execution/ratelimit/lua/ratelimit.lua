@@ -116,10 +116,14 @@ local function rateLimit(key, now_ns, period_ns, limit, burst, quantity)
 	if origQuantity > 0 then
 		-- update state to new_tat
 		ttl = new_tat - now_ns
+		result["reset_after"] = ttl
+
+		used_tokens = math.min(math.ceil(ttl / emission), limit)
+		result["u"] = used_tokens
+
 		local expiry = string.format("%d", math.max(ttl / 1000000000, 1))
 		redis.call("SET", key, new_tat, "EX", expiry)
 	end
-	result["reset_after"] = ttl
 
 	local next = dvt - ttl
 	result["next"] = next
