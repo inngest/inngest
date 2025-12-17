@@ -49,7 +49,7 @@ func TestSystemQueueConfigs(t *testing.T) {
 	q := redis_state.NewQueue(
 		defaultShard,
 		redis_state.WithClock(clock),
-		redis_state.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+		redis_state.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 			return false
 		}),
 		redis_state.WithKindToQueueMapping(mapping),

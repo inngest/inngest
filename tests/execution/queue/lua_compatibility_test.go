@@ -284,7 +284,7 @@ func TestLuaCompatibility(t *testing.T) {
 
 				// Initialize queue
 				q := redis_state.NewQueue(shard,
-					redis_state.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+					redis_state.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 						return true
 					}),
 					redis_state.WithPartitionConstraintConfigGetter(func(ctx context.Context, p redis_state.PartitionIdentifier) redis_state.PartitionConstraintConfig {

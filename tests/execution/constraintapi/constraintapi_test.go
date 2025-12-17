@@ -1313,7 +1313,7 @@ func TestQueueConstraintAPICompatibility(t *testing.T) {
 			redis_state.WithPartitionConstraintConfigGetter(func(ctx context.Context, p redis_state.PartitionIdentifier) redis_state.PartitionConstraintConfig {
 				return partitionConstraints
 			}),
-			redis_state.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+			redis_state.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 				return true
 			}),
 		)
