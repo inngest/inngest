@@ -54,6 +54,10 @@ func (r *runInstance) Metadata() *sv2.Metadata {
 	return &r.md
 }
 
+func (r *runInstance) DriverResponse() *state.DriverResponse {
+	return r.resp
+}
+
 func (r *runInstance) Events() []json.RawMessage {
 	return r.events
 }
