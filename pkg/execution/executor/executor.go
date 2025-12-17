@@ -3325,16 +3325,34 @@ func (e *executor) handleGeneratorFunctionFinished(ctx context.Context, runCtx e
 	// In this case, we've reported that the function has finished.  It's an async
 	// function.  In this case, we always want to update the span ourselves to mark
 	// the function as finished, and add the output here.
-	return e.Finalize(ctx, execution.FinalizeOpts{
-		Metadata: *runCtx.Metadata(),
+	md := runCtx.Metadata()
+	evts := runCtx.Events()
+	resp := runCtx.DriverResponse()
+
+	err := e.Finalize(ctx, execution.FinalizeOpts{
+		Metadata: *md,
 		Response: execution.FinalizeResponse{
 			Type:        execution.FinalizeResponseRunComplete,
 			RunComplete: gen,
 		},
 		Optional: execution.FinalizeOptional{
-			InputEvents: runCtx.Events(),
+			InputEvents: evts,
 		},
 	})
+
+	if resp != nil {
+		for _, e := range e.lifecycles {
+			go e.OnFunctionFinished(
+				context.WithoutCancel(ctx),
+				*md,
+				runCtx.LifecycleItem(),
+				evts,
+				*resp,
+			)
+		}
+	}
+
+	return err
 }
 
 func (e *executor) handleGeneratorSyncFunctionFinished(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
@@ -3349,16 +3367,35 @@ func (e *executor) handleGeneratorSyncFunctionFinished(ctx context.Context, runC
 		logger.StdlibLogger(ctx).Error("error unmarshalling api result from sync RunComplete op", "error", err)
 		return err
 	}
-	return e.Finalize(ctx, execution.FinalizeOpts{
-		Metadata: *runCtx.Metadata(),
+
+	md := runCtx.Metadata()
+	evts := runCtx.Events()
+	resp := runCtx.DriverResponse()
+
+	err := e.Finalize(ctx, execution.FinalizeOpts{
+		Metadata: *md,
 		Response: execution.FinalizeResponse{
 			Type:        execution.FinalizeResponseAPI,
 			APIResponse: result.Data,
 		},
 		Optional: execution.FinalizeOptional{
-			InputEvents: runCtx.Events(),
+			InputEvents: evts,
 		},
 	})
+
+	if resp != nil {
+		for _, e := range e.lifecycles {
+			go e.OnFunctionFinished(
+				context.WithoutCancel(ctx),
+				*md,
+				runCtx.LifecycleItem(),
+				evts,
+				*resp,
+			)
+		}
+	}
+
+	return err
 }
 
 func (e *executor) handleGeneratorStepPlanned(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
