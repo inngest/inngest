@@ -294,16 +294,13 @@ func (r *DriverResponse) UpdateOpcodeError(op *GeneratorOpcode, err UserError) {
 // return false if it's a step result.
 func (r *DriverResponse) IsFunctionResult() bool {
 	for _, op := range r.Generator {
-		if op.Op != enums.OpcodeNone {
-			return false
-		}
-
-		// Always a result...
 		if op.Op == enums.OpcodeRunComplete || op.Op == enums.OpcodeSyncRunComplete {
+			// Always a result...
 			return true
 		}
 	}
-	return true
+
+	return len(r.Generator) == 0
 }
 
 func (r *DriverResponse) IsOpResponse() bool {
