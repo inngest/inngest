@@ -1,17 +1,11 @@
-import {
-  createFileRoute,
-  useLocation,
-  useNavigate,
-} from '@tanstack/react-router';
-import { SignIn } from '@clerk/tanstack-react-start';
-import SplitView from '@/components/SignIn/SplitView';
-import { Alert } from '@inngest/components/Alert/NewAlert';
+import LoadingIcon from '@/components/Icons/LoadingIcon';
 import SignInRedirectErrors, {
   hasErrorMessage,
 } from '@/components/SignIn/Errors';
-import LoadingIcon from '@/components/Icons/LoadingIcon';
-import { useAuth } from '@clerk/tanstack-react-start';
-import { useEffect } from 'react';
+import SplitView from '@/components/SignIn/SplitView';
+import { SignIn } from '@clerk/tanstack-react-start';
+import { Alert } from '@inngest/components/Alert/NewAlert';
+import { createFileRoute, useLocation } from '@tanstack/react-router';
 
 type SignInSearchParams = {
   redirect_url?: string;
@@ -35,30 +29,14 @@ export const Route = createFileRoute('/(auth)/sign-in/$')({
 });
 
 function RouteComponent() {
-  const { error, redirect_url } = Route.useSearch();
-  const navigate = useNavigate();
+  const { error } = Route.useSearch();
   const location = useLocation();
-  const { isLoaded, isSignedIn } = useAuth();
-  const redirectTo = redirect_url ?? import.meta.env.VITE_HOME_PATH;
   const isRedirect = !location.pathname.startsWith('/sign-in');
-
-  useEffect(() => {
-    if (!isLoaded || !isSignedIn || !isRedirect) {
-      return;
-    }
-
-    //
-    // Clerk redirects are not reliable. Do it ourselves.
-    navigate({
-      to: redirectTo,
-      replace: true,
-    });
-  }, [isLoaded, isSignedIn, navigate, redirectTo]);
 
   return (
     <SplitView>
       <div className="mx-auto my-auto text-center">
-        {isLoaded && isSignedIn && isRedirect ? (
+        {isRedirect ? (
           <div className="flex items-center justify-center">
             <LoadingIcon />
           </div>
