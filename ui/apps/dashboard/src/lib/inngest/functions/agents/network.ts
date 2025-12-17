@@ -1,6 +1,6 @@
 import {
   createNetwork,
-  openai,
+  anthropic,
   type Network,
   type State,
 } from '@inngest/agent-kit';
@@ -28,7 +28,12 @@ export function createInsightsNetwork(
     description:
       'Selects relevant events, proposes a SQL query, and summarizes the result.',
     agents: [eventMatcherAgent, queryWriterAgent, summarizerAgent],
-    defaultModel: openai({ model: 'claude-haiku-4-5' }),
+    defaultModel: anthropic({
+      model: 'claude-haiku-4-5',
+      defaultParameters: {
+        max_tokens: 4096,
+      },
+    }),
     maxIter: 6,
     defaultState: initialState,
     router: sequenceRouter,
