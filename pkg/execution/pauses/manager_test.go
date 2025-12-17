@@ -349,3 +349,7 @@ func (m *mockBlockStore) GetBlockPauseIDs(ctx context.Context, index Index, bloc
 func (m *mockBlockStore) GetBlockDeletedIDs(ctx context.Context, index Index, blockID ulid.ULID) ([]string, int64, error) {
 	return nil, 0, nil
 }
+
+func (m *mockBlockStore) CleanBlock(ctx context.Context, index Index, blockID ulid.ULID) error {
+	return nil
+}

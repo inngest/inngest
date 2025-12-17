@@ -461,3 +461,10 @@ func (m manager) GetBlockDeletedIDs(ctx context.Context, index Index, blockID ul
 	}
 	return m.bs.GetBlockDeletedIDs(ctx, index, blockID)
 }
+
+func (m manager) CleanBlock(ctx context.Context, index Index, blockID ulid.ULID) error {
+	if m.bs == nil {
+		return fmt.Errorf("block store not available")
+	}
+	return m.bs.CleanBlock(ctx, index, blockID)
+}

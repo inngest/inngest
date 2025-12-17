@@ -1949,3 +1949,157 @@ func TestBlockstoreDeleteByID(t *testing.T) {
 	remainingKeys := append([]string(nil), allKeys...)
 	require.Equal(t, 0, len(remainingKeys), "Expected no keys remaining after run deletion, but found: %v", remainingKeys)
 }
+
+func TestCleanBlock(t *testing.T) {
+	r := miniredis.RunT(t)
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	bucket := memblob.OpenBucket(nil)
+	defer bucket.Close()
+
+	unshardedClient := redis_state.NewUnshardedClient(rc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
+	sm, err := redis_state.New(
+		context.Background(),
+		redis_state.WithUnshardedClient(unshardedClient),
+	)
+	require.NoError(t, err)
+
+	ctx := context.Background()
+	now := time.Now()
+	workspaceID := uuid.New()
+	eventName := "test.clean"
+
+	index := Index{
+		WorkspaceID: workspaceID,
+		EventName:   eventName,
+	}
+
+	runID := ulid.MustNew(ulid.Now(), nil)
+	expires := state.Time(now.Add(time.Hour))
+
+	pause1 := state.Pause{
+		ID:          uuid.New(),
+		WorkspaceID: workspaceID,
+		CreatedAt:   now,
+		Identifier: state.PauseIdentifier{
+			RunID:      runID,
+			AccountID:  workspaceID,
+			FunctionID: uuid.New(),
+		},
+		Outgoing: "start",
+		Incoming: "end",
+		StepName: "pause-1",
+		Expires:  expires,
+		Event:    &eventName,
+	}
+	pause2 := state.Pause{
+		ID:          uuid.New(),
+		WorkspaceID: workspaceID,
+		CreatedAt:   now.Add(time.Second),
+		Identifier: state.PauseIdentifier{
+			RunID:      runID,
+			AccountID:  workspaceID,
+			FunctionID: uuid.New(),
+		},
+		Outgoing: "start",
+		Incoming: "end",
+		StepName: "pause-2",
+		Expires:  expires,
+		Event:    &eventName,
+	}
+	pause3 := state.Pause{
+		ID:          uuid.New(),
+		WorkspaceID: workspaceID,
+		CreatedAt:   now.Add(2 * time.Second),
+		Identifier: state.PauseIdentifier{
+			RunID:      runID,
+			AccountID:  workspaceID,
+			FunctionID: uuid.New(),
+		},
+		Outgoing: "start",
+		Incoming: "end",
+		StepName: "pause-3",
+		Expires:  expires,
+		Event:    &eventName,
+	}
+
+	_, err = sm.SavePause(ctx, pause1)
+	require.NoError(t, err)
+	_, err = sm.SavePause(ctx, pause2)
+	require.NoError(t, err)
+	_, err = sm.SavePause(ctx, pause3)
+	require.NoError(t, err)
+
+	leaser := redisBlockLeaser{
+		rc:       rc,
+		prefix:   "test",
+		duration: 5 * time.Second,
+	}
+
+	pauseClient := redis_state.NewPauseClient(rc, redis_state.StateDefaultKey)
+	bufferer := StateBufferer(sm)
+
+	store, err := NewBlockstore(BlockstoreOpts{
+		PauseClient:            pauseClient,
+		Bucket:                 bucket,
+		Bufferer:               bufferer,
+		Leaser:                 leaser,
+		BlockSize:              3,
+		CompactionGarbageRatio: 0.5,
+		CompactionSample:       1.0,
+		CompactionLeaser:       leaser,
+		DeleteAfterFlush:       func(ctx context.Context, workspaceID uuid.UUID) bool { return true },
+		EnableBlockCompaction:  func(ctx context.Context, workspaceID uuid.UUID) bool { return true },
+	})
+	require.NoError(t, err)
+
+	err = store.FlushIndexBlock(ctx, index)
+	require.NoError(t, err)
+
+	// Wait for pauses to be deleted from buffer after flush
+	require.EventuallyWithT(t, func(t *assert.CollectT) {
+		keys, err := rc.Do(ctx, rc.B().Keys().Pattern("*:pause-block:*").Build()).AsStrSlice()
+		assert.NoError(t, err)
+		assert.Equal(t, 3, len(keys), "Expected 3 pause-block keys after flush, but found: %v", keys)
+	}, 5*time.Second, 100*time.Millisecond)
+
+	blocks, err := store.BlocksSince(ctx, index, time.Time{})
+	require.NoError(t, err)
+	require.Len(t, blocks, 1)
+
+	blockID := blocks[0]
+
+	// Verify block exists and has all pauses
+	block, err := store.ReadBlock(ctx, index, blockID)
+	require.NoError(t, err)
+	require.Len(t, block.Pauses, 3)
+
+	err = store.CleanBlock(ctx, index, blockID)
+	require.NoError(t, err)
+
+	// Expire TTLs
+	r.FastForward(20 * time.Minute)
+
+	// Verify complete cleanup: no blocks, no pause-block keys, and empty buffer
+	require.EventuallyWithT(t, func(t *assert.CollectT) {
+		// No blocks should exist
+		blocks, err := store.BlocksSince(ctx, index, time.Time{})
+		assert.NoError(t, err)
+		assert.Len(t, blocks, 0, "block should be removed after cleaning")
+
+		// No pause-block keys should exist
+		keys, err := rc.Do(ctx, rc.B().Keys().Pattern("*:pause-block:*").Build()).AsStrSlice()
+		assert.NoError(t, err)
+		assert.Equal(t, 0, len(keys), "Expected no pause-block keys after cleanup, but found: %v", keys)
+
+		// Buffer should be empty
+		bufLen, err := bufferer.BufferLen(ctx, index)
+		assert.NoError(t, err)
+		assert.Equal(t, int64(0), bufLen, "buffer should be empty after cleanup")
+	}, 5*time.Second, 100*time.Millisecond)
+}

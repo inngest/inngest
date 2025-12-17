@@ -1222,3 +1222,29 @@ func (b *blockstore) deleteBlock(ctx context.Context, index Index, blockID ulid.
 
 	return nil
 }
+
+// CleanBlock reads a block, deletes all pauses in it, and then triggers compaction.
+func (b *blockstore) CleanBlock(ctx context.Context, index Index, blockID ulid.ULID) error {
+	l := logger.StdlibLogger(ctx).With("workspace_id", index.WorkspaceID, "event_name", index.EventName, "block_id", blockID)
+
+	block, err := b.ReadBlock(ctx, index, blockID)
+	if err != nil {
+		return fmt.Errorf("error reading block for cleanup: %w", err)
+	}
+
+	pauseCount := len(block.Pauses)
+	for _, pause := range block.Pauses {
+		if err := b.Delete(ctx, index, *pause); err != nil {
+			l.Error("error deleting pause during cleanup", "pause_id", pause.ID, "error", err)
+		}
+	}
+
+	l.Debug("deleted pauses during cleanup", "count", pauseCount)
+
+	if err := b.Compact(ctx, index); err != nil {
+		return fmt.Errorf("error compacting after cleanup: %w", err)
+	}
+
+	l.Debug("cleanup successful", "pauses_deleted", pauseCount)
+	return nil
+}

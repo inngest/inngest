@@ -259,53 +259,27 @@ end
 ---@param period_ms integer
 ---@param limit integer
 ---@param burst integer
----@return integer[]
-local function throttleCapacity(key, now_ms, period_ms, limit, burst)
-	-- TODO: Reuse shared script
+---@param quantity integer
+local function throttle(key, now_ms, period_ms, limit, burst, quantity)
+	---@type { limit: integer, ei: number, retry_at: number, dvt: number, tat: number, inc: number, ntat: number, aat: number, diff: number, retry_after: integer?, ttl: number?, next: number?, remaining: integer?, reset_after: integer?, limited: boolean? }
+	local result = {}
 
-	-- calculate emission interval (tau) - time between each token
+	-- limit defines the maximum number of requests that can be admitted at once (irrespective of current usage)
+	result["limit"] = burst + 1
+
+	-- emission defines the window size
 	local emission = period_ms / math.max(limit, 1)
+	result["ei"] = emission
 
-	-- calculate total capacity in time units
-	local total_capacity_time = emission * (limit + burst)
+	-- retry_at is always computed under the assumption that all
+	-- remaining capacity is consumed
+	result["retry_at"] = now_ms + emission
 
-	-- retrieve theoretical arrival time
-	local tat = call("GET", key)
-	if not tat then
-		tat = now_ms
-	else
-		tat = tonumber(tat)
-	end
+	-- dvt determines how many requests can be admitted
+	local dvt = emission * (burst + 1)
+	result["dvt"] = dvt
 
-	-- remaining capacity in time units
-	local time_capacity_remain = now_ms + total_capacity_time - tat
-
-	-- Convert the remaining time budget back into a number of tokens.
-	local capacity = math.floor(time_capacity_remain / emission)
-
-	-- The capacity cannot exceed the defined limit + burst.
-	local final_capacity = math.min(capacity, limit + burst)
-
-	-- Calculate when the next unit will be available after consuming all remaining capacity.
-	-- The current TAT represents when the bucket becomes "full" if no requests are made.
-	-- If we consume final_capacity tokens now, we need to advance TAT by final_capacity * emission.
-	-- The next token after consumption will be available when: new_tat + emission - total_capacity_time
-	local new_tat_after_consumption = math.max(tat, now_ms) + final_capacity * emission
-	local next_available_at_ms = math.ceil(new_tat_after_consumption - total_capacity_time + emission)
-
-	return { final_capacity, next_available_at_ms }
-end
-
----@param key string
----@param now_ms integer
----@param period_ms integer
----@param limit integer
----@param capacity integer
-local function throttleUpdate(key, now_ms, period_ms, limit, capacity)
-	-- calculate emission interval (tau) - time between each token
-	local emission = period_ms / math.max(limit, 1)
-
-	-- retrieve theoretical arrival time
+	-- use existing tat or start at now_ms
 	local tat = redis.call("GET", key)
 	if not tat then
 		tat = now_ms
@@ -313,21 +287,76 @@ local function throttleUpdate(key, now_ms, period_ms, limit, capacity)
 		tat = tonumber(tat)
 	end
 
-	-- calculate next theoretical arrival time
-	local new_tat
-	if now_ms > tat then
-		new_tat = now_ms + (math.max(capacity, 1) * emission)
-	else
-		new_tat = tat + (math.max(capacity, 1) * emission)
+	result["tat"] = tat
+	-- When called with quantity 0, we simulate a call with quantity=1 to
+	-- calculate retry after, remaining, etc. values
+	local origQuantity = quantity
+	if quantity == 0 then
+		quantity = 1
 	end
 
-	if capacity > 0 then
-		local expiry = string.format("%d", period_ms / 1000)
-		if expiry == "0" then
-			expiry = "1"
-		end
-		call("SET", key, new_tat, "EX", expiry)
+	-- increment based on quantity
+	local increment = quantity * emission
+	result["inc"] = increment
+
+	-- if existing tat is in the past, increment from now_ms
+	local new_tat = tat + increment
+	if now_ms > tat then
+		new_tat = now_ms + increment
 	end
+	result["ntat"] = new_tat
+
+	-- requests should be allowed from the new_tat on, burst
+	-- decreases the time to allowing a new request even if the original period received the maximum number of requests
+	local allow_at = new_tat - dvt
+	result["aat"] = allow_at
+
+	-- allow_at must be in the past to allow the request (diff >= 0)
+	local diff = now_ms - allow_at
+	result["diff"] = diff
+
+	local ttl = 0
+
+	if diff < 0 then
+		if increment <= dvt then
+			-- retry_after outlines when the next request would be accepted
+			result["retry_after"] = -diff
+			result["retry_at"] = now_ms - diff
+			-- ttl represents the current time until the full "limit" is allowed again
+			ttl = tat - now_ms
+			result["ttl"] = ttl
+		end
+
+		if origQuantity > 0 then
+			-- if we did want to update, we got limited
+			local next = dvt - ttl
+			result["next"] = next
+			result["remaining"] = 0
+			result["reset_after"] = ttl
+			result["limited"] = true
+
+			return result
+		end
+	end
+
+	ttl = tat - now_ms
+	if origQuantity > 0 then
+		-- update state to new_tat
+		ttl = new_tat - now_ms
+		local expiry = string.format("%d", math.max(ttl / 1000, 1))
+		redis.call("SET", key, new_tat, "EX", expiry)
+	end
+	result["ttl"] = ttl
+
+	local next = dvt - ttl
+	if next > -emission then
+		local remaining = math.floor(next / emission)
+		result["remaining"] = remaining
+	end
+	result["reset_after"] = ttl
+	result["next"] = next
+
+	return result
 end
 
 ---@type integer
@@ -413,9 +442,11 @@ for index, value in ipairs(constraints) do
 	elseif value.k == 3 then
 		-- throttle
 		debug("evaluating throttle")
-		local throttleRes = throttleCapacity(value.t.k, nowMS, value.t.p, value.t.l, value.t.b)
-		constraintCapacity = throttleRes[1]
-		constraintRetryAfter = toInteger(throttleRes[2]) -- already in ms
+		-- allow consuming all capacity in one request (for generating multiple leases)
+		local maxBurst = (value.t.l or 0) + (value.t.b or 0) - 1
+		local throttleRes = throttle(value.t.k, nowMS, value.t.p, value.t.l, maxBurst, 0)
+		constraintCapacity = throttleRes["remaining"]
+		constraintRetryAfter = toInteger(throttleRes["retry_at"]) -- already in ms
 	end
 
 	-- If index ends up limiting capacity, reduce available capacity and remember current constraint
@@ -490,8 +521,10 @@ for i = 1, granted, 1 do
 			-- concurrency
 			call("ZADD", value.c.ilk, tostring(leaseExpiryMS), initialLeaseID)
 		elseif value.k == 3 then
-			-- throttle
-			throttleUpdate(value.t.k, nowMS, value.t.p, value.t.l, 1)
+			-- update throttle: consume 1 unit
+			-- allow consuming all capacity in one request (for generating multiple leases)
+			local maxBurst = (value.t.l or 0) + (value.t.b or 0) - 1
+			throttle(value.t.k, nowMS, value.t.p, value.t.l, maxBurst, 1)
 		end
 	end
 
