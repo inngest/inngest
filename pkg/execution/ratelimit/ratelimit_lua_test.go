@@ -954,12 +954,3 @@ func TestLuaRateLimit_EdgeCases(t *testing.T) {
 		require.False(t, res.Limited)
 	})
 }
-
-// Helper functions
-
-func abs(d time.Duration) time.Duration {
-	if d < 0 {
-		return -d
-	}
-	return d
-}
