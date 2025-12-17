@@ -3327,6 +3327,7 @@ func (e *executor) handleGeneratorFunctionFinished(ctx context.Context, runCtx e
 	// the function as finished, and add the output here.
 	md := runCtx.Metadata()
 	evts := runCtx.Events()
+	resp := runCtx.DriverResponse()
 
 	err := e.Finalize(ctx, execution.FinalizeOpts{
 		Metadata: *md,
@@ -3339,14 +3340,16 @@ func (e *executor) handleGeneratorFunctionFinished(ctx context.Context, runCtx e
 		},
 	})
 
-	for _, e := range e.lifecycles {
-		go e.OnFunctionFinished(
-			context.WithoutCancel(ctx),
-			*md,
-			runCtx.LifecycleItem(),
-			evts,
-			*runCtx.DriverResponse(),
-		)
+	if resp != nil {
+		for _, e := range e.lifecycles {
+			go e.OnFunctionFinished(
+				context.WithoutCancel(ctx),
+				*md,
+				runCtx.LifecycleItem(),
+				evts,
+				*resp,
+			)
+		}
 	}
 
 	return err
@@ -3367,6 +3370,7 @@ func (e *executor) handleGeneratorSyncFunctionFinished(ctx context.Context, runC
 
 	md := runCtx.Metadata()
 	evts := runCtx.Events()
+	resp := runCtx.DriverResponse()
 
 	err := e.Finalize(ctx, execution.FinalizeOpts{
 		Metadata: *md,
@@ -3379,14 +3383,16 @@ func (e *executor) handleGeneratorSyncFunctionFinished(ctx context.Context, runC
 		},
 	})
 
-	for _, e := range e.lifecycles {
-		go e.OnFunctionFinished(
-			context.WithoutCancel(ctx),
-			*md,
-			runCtx.LifecycleItem(),
-			evts,
-			*runCtx.DriverResponse(),
-		)
+	if resp != nil {
+		for _, e := range e.lifecycles {
+			go e.OnFunctionFinished(
+				context.WithoutCancel(ctx),
+				*md,
+				runCtx.LifecycleItem(),
+				evts,
+				*resp,
+			)
+		}
 	}
 
 	return err
