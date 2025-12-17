@@ -22,6 +22,7 @@ import globalsCss from '@inngest/components/AppRoot/globals.css?url';
 import { TooltipProvider } from '@inngest/components/Tooltip';
 import { QueryClient } from '@tanstack/react-query';
 import { ThemeProvider } from 'next-themes';
+import NotFound from '@/components/Error/NotFound';
 
 export const Route = createRootRouteWithContext<{
   queryClient: QueryClient;

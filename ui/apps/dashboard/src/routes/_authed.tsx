@@ -1,13 +1,23 @@
 import { fetchClerkAuth, jwtAuth } from '@/lib/auth';
-import { createFileRoute, notFound, Outlet } from '@tanstack/react-router';
+import {
+  createFileRoute,
+  notFound,
+  Outlet,
+  useMatch,
+} from '@tanstack/react-router';
 
 import Layout from '@/components/Layout/Layout';
 import { navCollapsed } from '@/lib/nav';
 import { getEnvironment } from '@/queries/server/getEnvironment';
 import { getProfileDisplay } from '@/queries/server/profile';
+import { SentryWrappedCatchBoundary } from '@/components/Error/DefaultCatchBoundary';
+import NotFound from '@/components/Error/NotFound';
 
 export const Route = createFileRoute('/_authed')({
   component: Authed,
+  notFoundComponent: () => {
+    return <NotFound />;
+  },
   beforeLoad: async ({ location }) => {
     const isJWTAuth = await jwtAuth();
 
@@ -28,6 +38,7 @@ export const Route = createFileRoute('/_authed')({
       token,
     };
   },
+  errorComponent: AuthedErrorComponent,
 
   loader: async ({ params }: { params: { envSlug?: string } }) => {
     const env = params.envSlug
@@ -58,6 +69,23 @@ function Authed() {
   return (
     <Layout collapsed={navCollapsed} activeEnv={env} profile={profile}>
       <Outlet />
+    </Layout>
+  );
+}
+
+//
+// Thin layout wrapper because errors here mean most of the nav stuff can't be loaded
+function AuthedErrorComponent(
+  props: Parameters<typeof SentryWrappedCatchBoundary>[0],
+) {
+  const navCollapsed = useMatch({
+    from: '__root__',
+    select: (state) => state.loaderData?.navCollapsed ?? false,
+  });
+
+  return (
+    <Layout collapsed={navCollapsed}>
+      <SentryWrappedCatchBoundary {...props} />
     </Layout>
   );
 }
