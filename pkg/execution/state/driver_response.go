@@ -306,6 +306,10 @@ func (r *DriverResponse) IsFunctionResult() bool {
 	return true
 }
 
+func (r *DriverResponse) IsOpResponse() bool {
+	return len(r.Generator) > 0
+}
+
 // IsDiscoveryResponse returns true if the response is the SDK reporting or
 // requesting steps to be done, or if it is reporting that it itself has done
 // work.

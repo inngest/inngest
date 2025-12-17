@@ -1595,8 +1595,8 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 		go e.OnStepFinished(context.WithoutCancel(ctx), i.md, i.item, i.edge, i.resp, nil)
 	}
 
-	if i.resp.Err == nil && !i.resp.IsFunctionResult() {
-		// Handle generator responses then return.
+	if i.resp.Err == nil && i.resp.IsOpResponse() {
+		// Handle generator op responses then return.
 		if serr := e.HandleGeneratorResponse(ctx, i, i.resp); serr != nil {
 			// If this is an error compiling async expressions, fail the function.
 			shouldFailEarly := errors.Is(serr, &expressions.CompileError{}) || errors.Is(serr, state.ErrStateOverflowed) || errors.Is(serr, state.ErrFunctionOverflowed) || errors.Is(serr, state.ErrSignalConflict)
