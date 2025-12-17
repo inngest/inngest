@@ -329,7 +329,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		redis_state.WithRefreshItemThrottle(NormalizeThrottle(smv2, dbcqrs)),
 		redis_state.WithPartitionConstraintConfigGetter(PartitionConstraintConfigGetter(dbcqrs)),
 
-		redis_state.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+		redis_state.WithAllowKeyQueues(func(ctx context.Context, acctID, functionID uuid.UUID) bool {
 			return enableKeyQueues
 		}),
 		redis_state.WithBacklogRefillLimit(10),
