@@ -1,7 +1,7 @@
 import LoadingIcon from '@/components/Icons/LoadingIcon';
 import SplitView from '@/components/SignIn/SplitView';
 import { OrganizationList, useAuth } from '@clerk/tanstack-react-start';
-import { createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, useLocation } from '@tanstack/react-router';
 
 type OrganizationListSearchParams = {
   redirect_url?: string;
@@ -24,6 +24,7 @@ export const Route = createFileRoute('/(auth)/organization-list/$')({
 
 function RouteComponent() {
   const { redirect_url } = Route.useSearch();
+  const location = useLocation();
   const { isLoaded, orgId } = useAuth();
   const isRedirect = !location.pathname.startsWith('/organization-list');
   const redirectURL =
