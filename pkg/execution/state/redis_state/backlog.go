@@ -167,11 +167,11 @@ func (sp QueueShadowPartition) keyQueuesEnabled(ctx context.Context, q *queue) b
 		return false
 	}
 
-	if sp.AccountID == nil || q.allowKeyQueues == nil {
+	if sp.AccountID == nil || sp.FunctionID == nil || q.allowKeyQueues == nil {
 		return false
 	}
 
-	return q.allowKeyQueues(ctx, *sp.AccountID)
+	return q.allowKeyQueues(ctx, *sp.AccountID, *sp.FunctionID)
 }
 
 func (q *PartitionConstraintConfig) CustomConcurrencyLimit(n int) int {

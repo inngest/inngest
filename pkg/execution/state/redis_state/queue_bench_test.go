@@ -36,7 +36,7 @@ func BenchmarkKeyQueues(b *testing.B) {
 
 	q := NewQueue(
 		defaultShard,
-		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 			return true
 		}),
 		WithKindToQueueMapping(map[string]string{

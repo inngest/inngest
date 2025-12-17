@@ -31,7 +31,7 @@ func TestBacklogNormalizationLease(t *testing.T) {
 	q := NewQueue(
 		defaultShard,
 		WithClock(clock),
-		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 			return enqueueToBacklog
 		}),
 	)
@@ -77,7 +77,7 @@ func TestExtendBacklogNormalizationLease(t *testing.T) {
 	q := NewQueue(
 		defaultShard,
 		WithClock(clock),
-		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 			return enqueueToBacklog
 		}),
 	)
@@ -132,7 +132,7 @@ func TestQueueBacklogPrepareNormalize(t *testing.T) {
 
 	q := NewQueue(
 		defaultShard,
-		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 			return true
 		}),
 		WithClock(clock),
@@ -242,7 +242,7 @@ func TestQueueBacklogNormalization(t *testing.T) {
 
 	q := NewQueue(
 		defaultShard,
-		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 			return true
 		}),
 		WithClock(clock),
@@ -355,7 +355,7 @@ func TestBacklogNormalizeItem(t *testing.T) {
 
 	q := NewQueue(
 		defaultShard,
-		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 			return true
 		}),
 		WithNormalizeRefreshItemCustomConcurrencyKeys(func(ctx context.Context, item *osqueue.QueueItem, existingKeys []state.CustomConcurrency, shadowPartition *QueueShadowPartition) ([]state.CustomConcurrency, error) {
@@ -464,7 +464,7 @@ func TestQueueBacklogNormalizationWithRewrite(t *testing.T) {
 
 	q := NewQueue(
 		defaultShard,
-		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 			return true
 		}),
 		WithNormalizeRefreshItemCustomConcurrencyKeys(func(ctx context.Context, item *osqueue.QueueItem, existingKeys []state.CustomConcurrency, shadowPartition *QueueShadowPartition) ([]state.CustomConcurrency, error) {
@@ -575,7 +575,7 @@ func TestBacklogNormalizationScanner(t *testing.T) {
 
 	q := NewQueue(
 		defaultShard,
-		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 			return true
 		}),
 		WithClock(clock),
@@ -698,7 +698,7 @@ func TestBacklogNormalizeItemWithSingleton(t *testing.T) {
 
 	q := NewQueue(
 		defaultShard,
-		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 			return true
 		}),
 		WithNormalizeRefreshItemCustomConcurrencyKeys(func(ctx context.Context, item *osqueue.QueueItem, existingKeys []state.CustomConcurrency, shadowPartition *QueueShadowPartition) ([]state.CustomConcurrency, error) {

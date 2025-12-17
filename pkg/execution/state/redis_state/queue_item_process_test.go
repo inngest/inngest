@@ -133,7 +133,7 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 		q := NewQueue(
 			shard,
 			WithClock(clock),
-			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 				return true
 			}),
 		)
@@ -165,7 +165,7 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 		q := NewQueue(
 			shard,
 			WithClock(clock),
-			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 				return true
 			}),
 			WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool, fallback bool) {
@@ -206,7 +206,7 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 		q := NewQueue(
 			shard,
 			WithClock(clock),
-			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 				return true
 			}),
 			WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool, fallback bool) {
@@ -379,7 +379,7 @@ func TestQueueProcessorPreLeaseWithConstraintAPI(t *testing.T) {
 		q := NewQueue(
 			shard,
 			WithClock(clock),
-			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 				return false
 			}),
 			WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool, fallback bool) {
@@ -420,7 +420,7 @@ func TestQueueProcessorPreLeaseWithConstraintAPI(t *testing.T) {
 		q := NewQueue(
 			shard,
 			WithClock(clock),
-			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 				return false
 			}),
 			WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool, fallback bool) {
@@ -470,7 +470,7 @@ func TestQueueProcessorPreLeaseWithConstraintAPI(t *testing.T) {
 		q := NewQueue(
 			shard,
 			WithClock(clock),
-			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 				return false
 			}),
 			WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool, fallback bool) {

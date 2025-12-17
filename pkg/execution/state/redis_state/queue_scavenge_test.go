@@ -39,7 +39,7 @@ func TestQueueScavenge(t *testing.T) {
 		q := NewQueue(
 			shard,
 			WithClock(clock),
-			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 				return true
 			}),
 		)
@@ -116,7 +116,7 @@ func TestQueueScavenge(t *testing.T) {
 		q := NewQueue(
 			shard,
 			WithClock(clock),
-			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 				return true
 			}),
 		)
@@ -169,7 +169,7 @@ func TestQueueScavenge(t *testing.T) {
 		q := NewQueue(
 			shard,
 			WithClock(clock),
-			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 				return true
 			}),
 		)
@@ -228,7 +228,7 @@ func TestQueueScavenge(t *testing.T) {
 		q := NewQueue(
 			shard,
 			WithClock(clock),
-			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 				return true
 			}),
 		)
@@ -310,7 +310,7 @@ func TestQueueScavenge(t *testing.T) {
 			q := NewQueue(
 				shard,
 				WithClock(clock),
-				WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+				WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 					return true
 				}),
 			)
@@ -386,7 +386,7 @@ func TestQueueScavenge(t *testing.T) {
 				q := NewQueue(
 					shard,
 					WithClock(clock),
-					WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+					WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 						return true
 					}),
 				)
@@ -448,7 +448,7 @@ func TestQueueScavenge(t *testing.T) {
 				q := NewQueue(
 					shard,
 					WithClock(clock),
-					WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+					WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 						return true
 					}),
 				)
@@ -511,7 +511,7 @@ func TestQueueScavenge(t *testing.T) {
 				q := NewQueue(
 					shard,
 					WithClock(clock),
-					WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+					WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 						return true
 					}),
 				)
@@ -578,7 +578,7 @@ func TestQueueScavenge(t *testing.T) {
 				q := NewQueue(
 					shard,
 					WithClock(clock),
-					WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+					WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 						return true
 					}),
 				)
@@ -645,7 +645,7 @@ func TestQueueScavenge(t *testing.T) {
 				q := NewQueue(
 					shard,
 					WithClock(clock),
-					WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+					WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 						return true
 					}),
 				)
@@ -720,7 +720,7 @@ func TestQueueScavenge(t *testing.T) {
 				q := NewQueue(
 					shard,
 					WithClock(clock),
-					WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+					WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 						return true
 					}),
 				)
@@ -798,7 +798,7 @@ func TestQueueScavenge(t *testing.T) {
 				q := NewQueue(
 					shard,
 					WithClock(clock),
-					WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+					WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 						return true
 					}),
 				)
@@ -879,7 +879,7 @@ func TestQueueScavenge(t *testing.T) {
 				q := NewQueue(
 					shard,
 					WithClock(clock),
-					WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+					WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 						return true
 					}),
 				)
@@ -954,7 +954,7 @@ func TestQueueScavenge(t *testing.T) {
 				q := NewQueue(
 					shard,
 					WithClock(clock),
-					WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+					WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 						return true
 					}),
 				)
@@ -1032,7 +1032,7 @@ func TestQueueScavenge(t *testing.T) {
 				q := NewQueue(
 					shard,
 					WithClock(clock),
-					WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+					WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 						return true
 					}),
 				)
@@ -1113,7 +1113,7 @@ func TestQueueScavenge(t *testing.T) {
 		q := NewQueue(
 			shard,
 			WithClock(clock),
-			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 				return true
 			}),
 		)

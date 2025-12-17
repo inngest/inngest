@@ -27,7 +27,7 @@ func (q *queue) UnpauseFunction(ctx context.Context, shardName string, acctID, f
 	}
 
 	// Also unpause shadow partition if key queues enabled
-	if q.allowKeyQueues(ctx, acctID) {
+	if q.allowKeyQueues(ctx, acctID, fnID) {
 		shadowPart := &QueueShadowPartition{
 			PartitionID: fnID.String(),
 			FunctionID:  &fnID,

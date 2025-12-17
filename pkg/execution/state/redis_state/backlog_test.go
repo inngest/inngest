@@ -1190,7 +1190,7 @@ func TestBacklogsByPartition(t *testing.T) {
 
 			q := NewQueue(
 				defaultShard,
-				WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+				WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 					return true
 				}),
 				WithClock(clock),
@@ -1262,7 +1262,7 @@ func TestBacklogSize(t *testing.T) {
 				},
 			}
 		}),
-		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 			return true
 		}),
 	)
@@ -1352,7 +1352,7 @@ func TestPartitionBacklogSize(t *testing.T) {
 			q1 := NewQueue(
 				shard1,
 				WithQueueShardClients(queueShards),
-				WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+				WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 					return true
 				}),
 				WithClock(clock),
@@ -1360,7 +1360,7 @@ func TestPartitionBacklogSize(t *testing.T) {
 			q2 := NewQueue(
 				shard2,
 				WithQueueShardClients(queueShards),
-				WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+				WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 					return true
 				}),
 				WithClock(clock),

@@ -39,7 +39,7 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 		enqueueToBacklog := false
 		q := NewQueue(
 			defaultShard,
-			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 				return enqueueToBacklog
 			}),
 		)
@@ -153,7 +153,7 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 		enqueueToBacklog := false
 		q := NewQueue(
 			defaultShard,
-			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 				return enqueueToBacklog
 			}),
 		)
@@ -300,7 +300,7 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 		enqueueToBacklog := false
 		q := NewQueue(
 			defaultShard,
-			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 				return enqueueToBacklog
 			}),
 		)
@@ -469,7 +469,7 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 		enqueueToBacklog := false
 		q := NewQueue(
 			defaultShard,
-			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 				return enqueueToBacklog
 			}),
 		)
@@ -987,7 +987,7 @@ func TestQueueDequeueWithDisabledConstraintUpdates(t *testing.T) {
 	q := NewQueue(
 		shard,
 		WithClock(clock),
-		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 			return true
 		}),
 	)

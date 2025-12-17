@@ -1169,7 +1169,7 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 		q := NewQueue(
 			defaultShard,
 			WithClock(clock),
-			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 				return enqueueToBacklog
 			}),
 		)
@@ -1263,7 +1263,7 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 		q := NewQueue(
 			defaultShard,
 			WithClock(clock),
-			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 				return enqueueToBacklog
 			}),
 			WithPartitionConstraintConfigGetter(func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
@@ -1403,7 +1403,7 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 		q := NewQueue(
 			defaultShard,
 			WithClock(clock),
-			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 				return enqueueToBacklog
 			}),
 			WithPartitionConstraintConfigGetter(func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
@@ -1568,7 +1568,7 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 		q := NewQueue(
 			defaultShard,
 			WithClock(clock),
-			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 				return enqueueToBacklog
 			}),
 		)
@@ -1679,7 +1679,7 @@ func TestQueueLeaseConstraintIdempotency(t *testing.T) {
 		q := NewQueue(
 			shard,
 			WithClock(clock),
-			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 				return false
 			}),
 			WithPartitionConstraintConfigGetter(func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
@@ -1772,7 +1772,7 @@ func TestQueueLeaseConstraintIdempotency(t *testing.T) {
 		q := NewQueue(
 			shard,
 			WithClock(clock),
-			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 				return false
 			}),
 			WithPartitionConstraintConfigGetter(func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
