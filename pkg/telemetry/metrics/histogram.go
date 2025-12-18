@@ -439,3 +439,14 @@ func HistogramCancellationCheckDuration(ctx context.Context, dur time.Duration, 
 		Boundaries:  cancellationReadDurationBoundaries,
 	})
 }
+
+func HistogramScheduleDuration(ctx context.Context, dur int64, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, dur, HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "schedule_duration",
+		Description: "Distribution of schedule duration with constraint API tracking",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  DefaultBoundaries,
+	})
+}

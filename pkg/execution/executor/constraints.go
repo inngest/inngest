@@ -48,6 +48,9 @@ func WithConstraints[T any](
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
+	start := time.Now()
+	constraintAPIFallback := true
+
 	// If capacity manager / feature flag are not passed, execute Schedule code
 	// with existing constraint checks
 	if capacityManager == nil || useConstraintAPI == nil {
@@ -59,6 +62,17 @@ func WithConstraints[T any](
 
 	// Read feature flag
 	enable, fallback := useConstraintAPI(ctx, req.AccountID, req.WorkspaceID, req.Function.ID)
+
+	defer func() {
+		metrics.HistogramScheduleDuration(ctx, time.Since(start).Milliseconds(), metrics.HistogramOpt{
+			PkgName: pkgName,
+			Tags: map[string]any{
+				"constraint_api":          enable,
+				"constraint_api_fallback": constraintAPIFallback,
+			},
+		})
+	}()
+
 	if !enable {
 		// If feature flag is disabled, execute Schedule code with existing constraint checks
 		metrics.IncrScheduleConstraintsCheckFallbackCounter(ctx, enums.ScheduleConstraintCheckFallbackReasonFeatureFlagDisabled.String(), metrics.CounterOpt{
@@ -237,6 +251,7 @@ func WithConstraints[T any](
 
 	// Run user code with lease guarantee
 	// NOTE: The passed context will be canceled if the lease expires.
+	constraintAPIFallback = false
 	return fn(userCtx, false)
 }
 
