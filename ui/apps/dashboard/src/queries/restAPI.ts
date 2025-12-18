@@ -11,13 +11,28 @@ const restAPI = ky.create({
         const { getToken, userId } = await auth();
         const sessionToken = await getToken();
 
-        console.log('rest api user id and session token', userId, sessionToken);
-
+        //
         // TODO: Does this need to be changed for Vercel Marketplace? Vercel
         // Marketplace users don't auth with Clerk.
-        if (!sessionToken) return;
+        if (!sessionToken) {
+          console.log('No session token, skipping auth header');
+          return;
+        }
 
-        request.headers.set('Authorization', `Bearer ${sessionToken}`);
+        const headers = new Headers(request.headers);
+        headers.set('Authorization', `Bearer ${sessionToken}`);
+
+        const newRequest = new Request(request, { headers });
+
+        //
+        // Debug: Log the request being sent with headers
+        console.log('Sending request:', {
+          url: newRequest.url,
+          method: newRequest.method,
+          headers: Object.fromEntries(newRequest.headers.entries()),
+        });
+
+        return newRequest;
       },
     ],
   },
