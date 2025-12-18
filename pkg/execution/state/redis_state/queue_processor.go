@@ -855,8 +855,8 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, continu
 	// This is necessary as capacity was already granted to individual items, and
 	// constraints like concurrency were consumed.
 	var disableLeaseChecks bool
-	if p.AccountID != uuid.Nil && q.capacityManager != nil && q.useConstraintAPI != nil {
-		enableConstraintAPI, _ := q.useConstraintAPI(ctx, p.AccountID)
+	if p.AccountID != uuid.Nil && p.EnvID != nil && p.FunctionID != nil && q.capacityManager != nil && q.useConstraintAPI != nil {
+		enableConstraintAPI, _ := q.useConstraintAPI(ctx, p.AccountID, *p.EnvID, *p.FunctionID)
 		disableLeaseChecks = enableConstraintAPI
 	}
 
