@@ -33,6 +33,7 @@ import { Route as AuthedEnvEnvSlugRouteRouteImport } from './routes/_authed/env/
 import { Route as AuthedSettingsIntegrationsIndexRouteImport } from './routes/_authed/settings/integrations/index';
 import { Route as AuthedIntentSetupAwsMarketplaceIndexRouteImport } from './routes/_authed/intent/setup-aws-marketplace/index';
 import { Route as AuthedIntentCreateWebhookIndexRouteImport } from './routes/_authed/intent/create-webhook/index';
+import { Route as AuthedIntegrationsVercelIndexRouteImport } from './routes/_authed/integrations/vercel/index';
 import { Route as AuthedBillingUsageIndexRouteImport } from './routes/_authed/billing/usage/index';
 import { Route as AuthedBillingPlansIndexRouteImport } from './routes/_authed/billing/plans/index';
 import { Route as AuthedBillingPaymentsIndexRouteImport } from './routes/_authed/billing/payments/index';
@@ -51,6 +52,7 @@ import { Route as AuthedIntegrationsVercelCallbackIndexRouteImport } from './rou
 import { Route as AuthedEnvEnvSlugUnattachedSyncsIndexRouteImport } from './routes/_authed/env/$envSlug/unattached-syncs/index';
 import { Route as AuthedEnvEnvSlugRunsIndexRouteImport } from './routes/_authed/env/$envSlug/runs/index';
 import { Route as AuthedEnvEnvSlugMetricsIndexRouteImport } from './routes/_authed/env/$envSlug/metrics/index';
+import { Route as AuthedEnvEnvSlugManageIndexRouteImport } from './routes/_authed/env/$envSlug/manage/index';
 import { Route as AuthedEnvEnvSlugInsightsIndexRouteImport } from './routes/_authed/env/$envSlug/insights/index';
 import { Route as AuthedEnvEnvSlugFunctionsIndexRouteImport } from './routes/_authed/env/$envSlug/functions/index';
 import { Route as AuthedEnvEnvSlugEventsIndexRouteImport } from './routes/_authed/env/$envSlug/events/index';
@@ -218,6 +220,12 @@ const AuthedIntentCreateWebhookIndexRoute =
     path: '/create-webhook/',
     getParentRoute: () => AuthedIntentRouteRoute,
   } as any);
+const AuthedIntegrationsVercelIndexRoute =
+  AuthedIntegrationsVercelIndexRouteImport.update({
+    id: '/integrations/vercel/',
+    path: '/integrations/vercel/',
+    getParentRoute: () => AuthedRoute,
+  } as any);
 const AuthedBillingUsageIndexRoute = AuthedBillingUsageIndexRouteImport.update({
   id: '/usage/',
   path: '/usage/',
@@ -322,6 +330,12 @@ const AuthedEnvEnvSlugMetricsIndexRoute =
     id: '/metrics/',
     path: '/metrics/',
     getParentRoute: () => AuthedEnvEnvSlugRouteRoute,
+  } as any);
+const AuthedEnvEnvSlugManageIndexRoute =
+  AuthedEnvEnvSlugManageIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AuthedEnvEnvSlugManageRouteRoute,
   } as any);
 const AuthedEnvEnvSlugInsightsIndexRoute =
   AuthedEnvEnvSlugInsightsIndexRouteImport.update({
@@ -600,6 +614,7 @@ export interface FileRoutesByFullPath {
   '/billing/payments': typeof AuthedBillingPaymentsIndexRoute;
   '/billing/plans': typeof AuthedBillingPlansIndexRoute;
   '/billing/usage': typeof AuthedBillingUsageIndexRoute;
+  '/integrations/vercel': typeof AuthedIntegrationsVercelIndexRoute;
   '/intent/create-webhook': typeof AuthedIntentCreateWebhookIndexRoute;
   '/intent/setup-aws-marketplace': typeof AuthedIntentSetupAwsMarketplaceIndexRoute;
   '/settings/integrations': typeof AuthedSettingsIntegrationsIndexRoute;
@@ -617,6 +632,7 @@ export interface FileRoutesByFullPath {
   '/env/$envSlug/events': typeof AuthedEnvEnvSlugEventsIndexRoute;
   '/env/$envSlug/functions': typeof AuthedEnvEnvSlugFunctionsIndexRoute;
   '/env/$envSlug/insights': typeof AuthedEnvEnvSlugInsightsIndexRoute;
+  '/env/$envSlug/manage/': typeof AuthedEnvEnvSlugManageIndexRoute;
   '/env/$envSlug/metrics': typeof AuthedEnvEnvSlugMetricsIndexRoute;
   '/env/$envSlug/runs': typeof AuthedEnvEnvSlugRunsIndexRoute;
   '/env/$envSlug/unattached-syncs/': typeof AuthedEnvEnvSlugUnattachedSyncsIndexRoute;
@@ -674,13 +690,13 @@ export interface FileRoutesByTo {
   '/create-environment': typeof AuthedCreateEnvironmentIndexRoute;
   '/env': typeof AuthedEnvIndexRoute;
   '/support/impersonation': typeof SupportImpersonationIndexRoute;
-  '/env/$envSlug/manage': typeof AuthedEnvEnvSlugManageRouteRouteWithChildren;
   '/env/$envSlug/onboarding': typeof AuthedEnvEnvSlugOnboardingRouteRouteWithChildren;
   '/settings/organization/$': typeof AuthedSettingsOrganizationSplatRoute;
   '/settings/user/$': typeof AuthedSettingsUserSplatRoute;
   '/billing/payments': typeof AuthedBillingPaymentsIndexRoute;
   '/billing/plans': typeof AuthedBillingPlansIndexRoute;
   '/billing/usage': typeof AuthedBillingUsageIndexRoute;
+  '/integrations/vercel': typeof AuthedIntegrationsVercelIndexRoute;
   '/intent/create-webhook': typeof AuthedIntentCreateWebhookIndexRoute;
   '/intent/setup-aws-marketplace': typeof AuthedIntentSetupAwsMarketplaceIndexRoute;
   '/settings/integrations': typeof AuthedSettingsIntegrationsIndexRoute;
@@ -690,6 +706,7 @@ export interface FileRoutesByTo {
   '/env/$envSlug/events': typeof AuthedEnvEnvSlugEventsIndexRoute;
   '/env/$envSlug/functions': typeof AuthedEnvEnvSlugFunctionsIndexRoute;
   '/env/$envSlug/insights': typeof AuthedEnvEnvSlugInsightsIndexRoute;
+  '/env/$envSlug/manage': typeof AuthedEnvEnvSlugManageIndexRoute;
   '/env/$envSlug/metrics': typeof AuthedEnvEnvSlugMetricsIndexRoute;
   '/env/$envSlug/runs': typeof AuthedEnvEnvSlugRunsIndexRoute;
   '/env/$envSlug/unattached-syncs': typeof AuthedEnvEnvSlugUnattachedSyncsIndexRoute;
@@ -759,6 +776,7 @@ export interface FileRoutesById {
   '/_authed/billing/payments/': typeof AuthedBillingPaymentsIndexRoute;
   '/_authed/billing/plans/': typeof AuthedBillingPlansIndexRoute;
   '/_authed/billing/usage/': typeof AuthedBillingUsageIndexRoute;
+  '/_authed/integrations/vercel/': typeof AuthedIntegrationsVercelIndexRoute;
   '/_authed/intent/create-webhook/': typeof AuthedIntentCreateWebhookIndexRoute;
   '/_authed/intent/setup-aws-marketplace/': typeof AuthedIntentSetupAwsMarketplaceIndexRoute;
   '/_authed/settings/integrations/': typeof AuthedSettingsIntegrationsIndexRoute;
@@ -776,6 +794,7 @@ export interface FileRoutesById {
   '/_authed/env/$envSlug/events/': typeof AuthedEnvEnvSlugEventsIndexRoute;
   '/_authed/env/$envSlug/functions/': typeof AuthedEnvEnvSlugFunctionsIndexRoute;
   '/_authed/env/$envSlug/insights/': typeof AuthedEnvEnvSlugInsightsIndexRoute;
+  '/_authed/env/$envSlug/manage/': typeof AuthedEnvEnvSlugManageIndexRoute;
   '/_authed/env/$envSlug/metrics/': typeof AuthedEnvEnvSlugMetricsIndexRoute;
   '/_authed/env/$envSlug/runs/': typeof AuthedEnvEnvSlugRunsIndexRoute;
   '/_authed/env/$envSlug/unattached-syncs/': typeof AuthedEnvEnvSlugUnattachedSyncsIndexRoute;
@@ -845,6 +864,7 @@ export interface FileRouteTypes {
     | '/billing/payments'
     | '/billing/plans'
     | '/billing/usage'
+    | '/integrations/vercel'
     | '/intent/create-webhook'
     | '/intent/setup-aws-marketplace'
     | '/settings/integrations'
@@ -862,6 +882,7 @@ export interface FileRouteTypes {
     | '/env/$envSlug/events'
     | '/env/$envSlug/functions'
     | '/env/$envSlug/insights'
+    | '/env/$envSlug/manage/'
     | '/env/$envSlug/metrics'
     | '/env/$envSlug/runs'
     | '/env/$envSlug/unattached-syncs/'
@@ -919,13 +940,13 @@ export interface FileRouteTypes {
     | '/create-environment'
     | '/env'
     | '/support/impersonation'
-    | '/env/$envSlug/manage'
     | '/env/$envSlug/onboarding'
     | '/settings/organization/$'
     | '/settings/user/$'
     | '/billing/payments'
     | '/billing/plans'
     | '/billing/usage'
+    | '/integrations/vercel'
     | '/intent/create-webhook'
     | '/intent/setup-aws-marketplace'
     | '/settings/integrations'
@@ -935,6 +956,7 @@ export interface FileRouteTypes {
     | '/env/$envSlug/events'
     | '/env/$envSlug/functions'
     | '/env/$envSlug/insights'
+    | '/env/$envSlug/manage'
     | '/env/$envSlug/metrics'
     | '/env/$envSlug/runs'
     | '/env/$envSlug/unattached-syncs'
@@ -1003,6 +1025,7 @@ export interface FileRouteTypes {
     | '/_authed/billing/payments/'
     | '/_authed/billing/plans/'
     | '/_authed/billing/usage/'
+    | '/_authed/integrations/vercel/'
     | '/_authed/intent/create-webhook/'
     | '/_authed/intent/setup-aws-marketplace/'
     | '/_authed/settings/integrations/'
@@ -1020,6 +1043,7 @@ export interface FileRouteTypes {
     | '/_authed/env/$envSlug/events/'
     | '/_authed/env/$envSlug/functions/'
     | '/_authed/env/$envSlug/insights/'
+    | '/_authed/env/$envSlug/manage/'
     | '/_authed/env/$envSlug/metrics/'
     | '/_authed/env/$envSlug/runs/'
     | '/_authed/env/$envSlug/unattached-syncs/'
@@ -1245,6 +1269,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedIntentCreateWebhookIndexRouteImport;
       parentRoute: typeof AuthedIntentRouteRoute;
     };
+    '/_authed/integrations/vercel/': {
+      id: '/_authed/integrations/vercel/';
+      path: '/integrations/vercel';
+      fullPath: '/integrations/vercel';
+      preLoaderRoute: typeof AuthedIntegrationsVercelIndexRouteImport;
+      parentRoute: typeof AuthedRoute;
+    };
     '/_authed/billing/usage/': {
       id: '/_authed/billing/usage/';
       path: '/usage';
@@ -1370,6 +1401,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/env/$envSlug/metrics';
       preLoaderRoute: typeof AuthedEnvEnvSlugMetricsIndexRouteImport;
       parentRoute: typeof AuthedEnvEnvSlugRouteRoute;
+    };
+    '/_authed/env/$envSlug/manage/': {
+      id: '/_authed/env/$envSlug/manage/';
+      path: '/';
+      fullPath: '/env/$envSlug/manage/';
+      preLoaderRoute: typeof AuthedEnvEnvSlugManageIndexRouteImport;
+      parentRoute: typeof AuthedEnvEnvSlugManageRouteRoute;
     };
     '/_authed/env/$envSlug/insights/': {
       id: '/_authed/env/$envSlug/insights/';
@@ -1852,6 +1890,7 @@ const AuthedEnvEnvSlugManageIngestKeysRouteRouteWithChildren =
 
 interface AuthedEnvEnvSlugManageRouteRouteChildren {
   AuthedEnvEnvSlugManageIngestKeysRouteRoute: typeof AuthedEnvEnvSlugManageIngestKeysRouteRouteWithChildren;
+  AuthedEnvEnvSlugManageIndexRoute: typeof AuthedEnvEnvSlugManageIndexRoute;
   AuthedEnvEnvSlugManageSigningKeyIndexRoute: typeof AuthedEnvEnvSlugManageSigningKeyIndexRoute;
 }
 
@@ -1859,6 +1898,7 @@ const AuthedEnvEnvSlugManageRouteRouteChildren: AuthedEnvEnvSlugManageRouteRoute
   {
     AuthedEnvEnvSlugManageIngestKeysRouteRoute:
       AuthedEnvEnvSlugManageIngestKeysRouteRouteWithChildren,
+    AuthedEnvEnvSlugManageIndexRoute: AuthedEnvEnvSlugManageIndexRoute,
     AuthedEnvEnvSlugManageSigningKeyIndexRoute:
       AuthedEnvEnvSlugManageSigningKeyIndexRoute,
   };
@@ -2015,6 +2055,7 @@ interface AuthedRouteChildren {
   AuthedEnvEnvSlugRouteRoute: typeof AuthedEnvEnvSlugRouteRouteWithChildren;
   AuthedCreateEnvironmentIndexRoute: typeof AuthedCreateEnvironmentIndexRoute;
   AuthedEnvIndexRoute: typeof AuthedEnvIndexRoute;
+  AuthedIntegrationsVercelIndexRoute: typeof AuthedIntegrationsVercelIndexRoute;
   AuthedIntegrationsVercelCallbackIndexRoute: typeof AuthedIntegrationsVercelCallbackIndexRoute;
   AuthedIntegrationsVercelCallbackSuccessIndexRoute: typeof AuthedIntegrationsVercelCallbackSuccessIndexRoute;
 }
@@ -2026,6 +2067,7 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedEnvEnvSlugRouteRoute: AuthedEnvEnvSlugRouteRouteWithChildren,
   AuthedCreateEnvironmentIndexRoute: AuthedCreateEnvironmentIndexRoute,
   AuthedEnvIndexRoute: AuthedEnvIndexRoute,
+  AuthedIntegrationsVercelIndexRoute: AuthedIntegrationsVercelIndexRoute,
   AuthedIntegrationsVercelCallbackIndexRoute:
     AuthedIntegrationsVercelCallbackIndexRoute,
   AuthedIntegrationsVercelCallbackSuccessIndexRoute:
