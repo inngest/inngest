@@ -35,7 +35,7 @@ const getBreadCrumbs = (pathname: string): BreadCrumbType[] =>
 const userTabs = [
   {
     children: 'General',
-    href: '/settings/user',
+    href: '/settings/user/profile',
     exactRouteMatch: true,
   },
   {
