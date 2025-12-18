@@ -30,7 +30,6 @@ import { Route as authSignUpSplatRouteImport } from './routes/(auth)/sign-up.$';
 import { Route as authSignInSplatRouteImport } from './routes/(auth)/sign-in.$';
 import { Route as authOrganizationListSplatRouteImport } from './routes/(auth)/organization-list.$';
 import { Route as AuthedEnvEnvSlugRouteRouteImport } from './routes/_authed/env/$envSlug/route';
-import { Route as AuthedSettingsUserIndexRouteImport } from './routes/_authed/settings/user/index';
 import { Route as AuthedSettingsIntegrationsIndexRouteImport } from './routes/_authed/settings/integrations/index';
 import { Route as AuthedIntentSetupAwsMarketplaceIndexRouteImport } from './routes/_authed/intent/setup-aws-marketplace/index';
 import { Route as AuthedIntentCreateWebhookIndexRouteImport } from './routes/_authed/intent/create-webhook/index';
@@ -38,6 +37,7 @@ import { Route as AuthedIntegrationsVercelIndexRouteImport } from './routes/_aut
 import { Route as AuthedBillingUsageIndexRouteImport } from './routes/_authed/billing/usage/index';
 import { Route as AuthedBillingPlansIndexRouteImport } from './routes/_authed/billing/plans/index';
 import { Route as AuthedBillingPaymentsIndexRouteImport } from './routes/_authed/billing/payments/index';
+import { Route as AuthedSettingsUserSplatRouteImport } from './routes/_authed/settings/user/$';
 import { Route as AuthedSettingsOrganizationSplatRouteImport } from './routes/_authed/settings/organization/$';
 import { Route as AuthedEnvEnvSlugUnattachedSyncsRouteRouteImport } from './routes/_authed/env/$envSlug/unattached-syncs/route';
 import { Route as AuthedEnvEnvSlugOnboardingRouteRouteImport } from './routes/_authed/env/$envSlug/onboarding/route';
@@ -202,11 +202,6 @@ const AuthedEnvEnvSlugRouteRoute = AuthedEnvEnvSlugRouteRouteImport.update({
   path: '/env/$envSlug',
   getParentRoute: () => AuthedRoute,
 } as any);
-const AuthedSettingsUserIndexRoute = AuthedSettingsUserIndexRouteImport.update({
-  id: '/user/',
-  path: '/user/',
-  getParentRoute: () => AuthedSettingsRouteRoute,
-} as any);
 const AuthedSettingsIntegrationsIndexRoute =
   AuthedSettingsIntegrationsIndexRouteImport.update({
     id: '/integrations/',
@@ -247,6 +242,11 @@ const AuthedBillingPaymentsIndexRoute =
     path: '/payments/',
     getParentRoute: () => AuthedBillingRouteRoute,
   } as any);
+const AuthedSettingsUserSplatRoute = AuthedSettingsUserSplatRouteImport.update({
+  id: '/user/$',
+  path: '/user/$',
+  getParentRoute: () => AuthedSettingsRouteRoute,
+} as any);
 const AuthedSettingsOrganizationSplatRoute =
   AuthedSettingsOrganizationSplatRouteImport.update({
     id: '/organization/$',
@@ -610,6 +610,7 @@ export interface FileRoutesByFullPath {
   '/env/$envSlug/onboarding': typeof AuthedEnvEnvSlugOnboardingRouteRouteWithChildren;
   '/env/$envSlug/unattached-syncs': typeof AuthedEnvEnvSlugUnattachedSyncsRouteRouteWithChildren;
   '/settings/organization/$': typeof AuthedSettingsOrganizationSplatRoute;
+  '/settings/user/$': typeof AuthedSettingsUserSplatRoute;
   '/billing/payments': typeof AuthedBillingPaymentsIndexRoute;
   '/billing/plans': typeof AuthedBillingPlansIndexRoute;
   '/billing/usage': typeof AuthedBillingUsageIndexRoute;
@@ -617,7 +618,6 @@ export interface FileRoutesByFullPath {
   '/intent/create-webhook': typeof AuthedIntentCreateWebhookIndexRoute;
   '/intent/setup-aws-marketplace': typeof AuthedIntentSetupAwsMarketplaceIndexRoute;
   '/settings/integrations': typeof AuthedSettingsIntegrationsIndexRoute;
-  '/settings/user': typeof AuthedSettingsUserIndexRoute;
   '/env/$envSlug/apps/$externalID': typeof AuthedEnvEnvSlugAppsExternalIDRouteRouteWithChildren;
   '/env/$envSlug/apps/sync-new': typeof AuthedEnvEnvSlugAppsSyncNewRouteRouteWithChildren;
   '/env/$envSlug/event-types/$eventTypeName': typeof AuthedEnvEnvSlugEventTypesEventTypeNameRouteRouteWithChildren;
@@ -692,6 +692,7 @@ export interface FileRoutesByTo {
   '/support/impersonation': typeof SupportImpersonationIndexRoute;
   '/env/$envSlug/onboarding': typeof AuthedEnvEnvSlugOnboardingRouteRouteWithChildren;
   '/settings/organization/$': typeof AuthedSettingsOrganizationSplatRoute;
+  '/settings/user/$': typeof AuthedSettingsUserSplatRoute;
   '/billing/payments': typeof AuthedBillingPaymentsIndexRoute;
   '/billing/plans': typeof AuthedBillingPlansIndexRoute;
   '/billing/usage': typeof AuthedBillingUsageIndexRoute;
@@ -699,7 +700,6 @@ export interface FileRoutesByTo {
   '/intent/create-webhook': typeof AuthedIntentCreateWebhookIndexRoute;
   '/intent/setup-aws-marketplace': typeof AuthedIntentSetupAwsMarketplaceIndexRoute;
   '/settings/integrations': typeof AuthedSettingsIntegrationsIndexRoute;
-  '/settings/user': typeof AuthedSettingsUserIndexRoute;
   '/env/$envSlug/apps': typeof AuthedEnvEnvSlugAppsIndexRoute;
   '/env/$envSlug/debugger': typeof AuthedEnvEnvSlugDebuggerIndexRoute;
   '/env/$envSlug/event-types': typeof AuthedEnvEnvSlugEventTypesIndexRoute;
@@ -772,6 +772,7 @@ export interface FileRoutesById {
   '/_authed/env/$envSlug/onboarding': typeof AuthedEnvEnvSlugOnboardingRouteRouteWithChildren;
   '/_authed/env/$envSlug/unattached-syncs': typeof AuthedEnvEnvSlugUnattachedSyncsRouteRouteWithChildren;
   '/_authed/settings/organization/$': typeof AuthedSettingsOrganizationSplatRoute;
+  '/_authed/settings/user/$': typeof AuthedSettingsUserSplatRoute;
   '/_authed/billing/payments/': typeof AuthedBillingPaymentsIndexRoute;
   '/_authed/billing/plans/': typeof AuthedBillingPlansIndexRoute;
   '/_authed/billing/usage/': typeof AuthedBillingUsageIndexRoute;
@@ -779,7 +780,6 @@ export interface FileRoutesById {
   '/_authed/intent/create-webhook/': typeof AuthedIntentCreateWebhookIndexRoute;
   '/_authed/intent/setup-aws-marketplace/': typeof AuthedIntentSetupAwsMarketplaceIndexRoute;
   '/_authed/settings/integrations/': typeof AuthedSettingsIntegrationsIndexRoute;
-  '/_authed/settings/user/': typeof AuthedSettingsUserIndexRoute;
   '/_authed/env/$envSlug/apps/$externalID': typeof AuthedEnvEnvSlugAppsExternalIDRouteRouteWithChildren;
   '/_authed/env/$envSlug/apps/sync-new': typeof AuthedEnvEnvSlugAppsSyncNewRouteRouteWithChildren;
   '/_authed/env/$envSlug/event-types/$eventTypeName': typeof AuthedEnvEnvSlugEventTypesEventTypeNameRouteRouteWithChildren;
@@ -860,6 +860,7 @@ export interface FileRouteTypes {
     | '/env/$envSlug/onboarding'
     | '/env/$envSlug/unattached-syncs'
     | '/settings/organization/$'
+    | '/settings/user/$'
     | '/billing/payments'
     | '/billing/plans'
     | '/billing/usage'
@@ -867,7 +868,6 @@ export interface FileRouteTypes {
     | '/intent/create-webhook'
     | '/intent/setup-aws-marketplace'
     | '/settings/integrations'
-    | '/settings/user'
     | '/env/$envSlug/apps/$externalID'
     | '/env/$envSlug/apps/sync-new'
     | '/env/$envSlug/event-types/$eventTypeName'
@@ -942,6 +942,7 @@ export interface FileRouteTypes {
     | '/support/impersonation'
     | '/env/$envSlug/onboarding'
     | '/settings/organization/$'
+    | '/settings/user/$'
     | '/billing/payments'
     | '/billing/plans'
     | '/billing/usage'
@@ -949,7 +950,6 @@ export interface FileRouteTypes {
     | '/intent/create-webhook'
     | '/intent/setup-aws-marketplace'
     | '/settings/integrations'
-    | '/settings/user'
     | '/env/$envSlug/apps'
     | '/env/$envSlug/debugger'
     | '/env/$envSlug/event-types'
@@ -1021,6 +1021,7 @@ export interface FileRouteTypes {
     | '/_authed/env/$envSlug/onboarding'
     | '/_authed/env/$envSlug/unattached-syncs'
     | '/_authed/settings/organization/$'
+    | '/_authed/settings/user/$'
     | '/_authed/billing/payments/'
     | '/_authed/billing/plans/'
     | '/_authed/billing/usage/'
@@ -1028,7 +1029,6 @@ export interface FileRouteTypes {
     | '/_authed/intent/create-webhook/'
     | '/_authed/intent/setup-aws-marketplace/'
     | '/_authed/settings/integrations/'
-    | '/_authed/settings/user/'
     | '/_authed/env/$envSlug/apps/$externalID'
     | '/_authed/env/$envSlug/apps/sync-new'
     | '/_authed/env/$envSlug/event-types/$eventTypeName'
@@ -1248,13 +1248,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedEnvEnvSlugRouteRouteImport;
       parentRoute: typeof AuthedRoute;
     };
-    '/_authed/settings/user/': {
-      id: '/_authed/settings/user/';
-      path: '/user';
-      fullPath: '/settings/user';
-      preLoaderRoute: typeof AuthedSettingsUserIndexRouteImport;
-      parentRoute: typeof AuthedSettingsRouteRoute;
-    };
     '/_authed/settings/integrations/': {
       id: '/_authed/settings/integrations/';
       path: '/integrations';
@@ -1303,6 +1296,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/billing/payments';
       preLoaderRoute: typeof AuthedBillingPaymentsIndexRouteImport;
       parentRoute: typeof AuthedBillingRouteRoute;
+    };
+    '/_authed/settings/user/$': {
+      id: '/_authed/settings/user/$';
+      path: '/user/$';
+      fullPath: '/settings/user/$';
+      preLoaderRoute: typeof AuthedSettingsUserSplatRouteImport;
+      parentRoute: typeof AuthedSettingsRouteRoute;
     };
     '/_authed/settings/organization/$': {
       id: '/_authed/settings/organization/$';
@@ -1762,8 +1762,8 @@ const AuthedSettingsIntegrationsSupabaseStepRouteRouteWithChildren =
 
 interface AuthedSettingsRouteRouteChildren {
   AuthedSettingsOrganizationSplatRoute: typeof AuthedSettingsOrganizationSplatRoute;
+  AuthedSettingsUserSplatRoute: typeof AuthedSettingsUserSplatRoute;
   AuthedSettingsIntegrationsIndexRoute: typeof AuthedSettingsIntegrationsIndexRoute;
-  AuthedSettingsUserIndexRoute: typeof AuthedSettingsUserIndexRoute;
   AuthedSettingsIntegrationsNeonStepRouteRoute: typeof AuthedSettingsIntegrationsNeonStepRouteRouteWithChildren;
   AuthedSettingsIntegrationsSupabaseStepRouteRoute: typeof AuthedSettingsIntegrationsSupabaseStepRouteRouteWithChildren;
   AuthedSettingsIntegrationsDatadogIndexRoute: typeof AuthedSettingsIntegrationsDatadogIndexRoute;
@@ -1782,8 +1782,8 @@ interface AuthedSettingsRouteRouteChildren {
 
 const AuthedSettingsRouteRouteChildren: AuthedSettingsRouteRouteChildren = {
   AuthedSettingsOrganizationSplatRoute: AuthedSettingsOrganizationSplatRoute,
+  AuthedSettingsUserSplatRoute: AuthedSettingsUserSplatRoute,
   AuthedSettingsIntegrationsIndexRoute: AuthedSettingsIntegrationsIndexRoute,
-  AuthedSettingsUserIndexRoute: AuthedSettingsUserIndexRoute,
   AuthedSettingsIntegrationsNeonStepRouteRoute:
     AuthedSettingsIntegrationsNeonStepRouteRouteWithChildren,
   AuthedSettingsIntegrationsSupabaseStepRouteRoute:

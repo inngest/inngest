@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 
-import { Link, useLocation, useNavigate } from '@tanstack/react-router';
 import { Listbox } from '@headlessui/react';
 import { OptionalTooltip } from '@inngest/components/Tooltip/OptionalTooltip';
 import {
@@ -16,6 +15,7 @@ import {
   RiExpandUpDownLine,
   RiLoopLeftLine,
 } from '@remixicon/react';
+import { useLocation, useNavigate } from '@tanstack/react-router';
 
 import { useEnvironments } from '@/queries';
 import {
@@ -129,7 +129,8 @@ export default function EnvironmentSelectMenu({
   collapsed,
 }: EnvironmentSelectMenuProps) {
   const navigate = useNavigate();
-  const [selected, setSelected] = useState<Environment | null>(null);
+  type ListboxValue = Environment | null | 'view_all' | 'sync_branch';
+  const [selected, setSelected] = useState<ListboxValue>(null);
   const nextPathname = useSwitchablePathname();
   const [{ data: envs = [], error }] = useEnvironments();
 
@@ -168,9 +169,16 @@ export default function EnvironmentSelectMenu({
   ).slice(0, 5);
   const testEnvironments = getTestEnvironments(envs, includeArchived);
 
-  const onSelect = (env: Environment) => {
+  const selectedEnv = typeof selected === 'string' ? null : selected;
+
+  const onSelect = (value: ListboxValue) => {
+    if (value === null || value === 'view_all' || value === 'sync_branch') {
+      navigate({ to: '/env' });
+      return;
+    }
+
     navigate({
-      to: `/env/${env.slug}${nextPathname}`,
+      to: `/env/${value.slug}${nextPathname}`,
     });
   };
 
@@ -178,7 +186,7 @@ export default function EnvironmentSelectMenu({
     <Listbox value={selected} onChange={onSelect}>
       {({ open }) => (
         <div className="bg-canvasBase relative flex">
-          <OptionalTooltip tooltip={collapsed && tooltip(selected)}>
+          <OptionalTooltip tooltip={collapsed && tooltip(selectedEnv)}>
             <Listbox.Button
               className={`border-muted bg-canvasBase text-primary-intense hover:bg-canvasSubtle px-2 ${
                 collapsed ? `w-8` : !activeEnv ? 'w-[196px]' : 'w-[158px]'
@@ -191,7 +199,7 @@ export default function EnvironmentSelectMenu({
                   collapsed ? 'justify-center' : 'justify-between'
                 }`}
               >
-                <SelectedDisplay selected={selected} collapsed={collapsed} />
+                <SelectedDisplay selected={selectedEnv} collapsed={collapsed} />
                 {!collapsed && (
                   <RiExpandUpDownLine
                     className="text-muted h-4 w-4"
@@ -225,24 +233,26 @@ export default function EnvironmentSelectMenu({
                   />
                 ))
               ) : (
-                <div
+                <Listbox.Option
+                  key="sync-branch"
+                  value="sync_branch"
                   className="bg-canvasBase hover:bg-canvasSubtle text-subtle flex h-10 cursor-pointer items-center gap-3 px-3 text-[13px] font-normal"
-                  onClick={() => navigate({ to: '/env' })}
                 >
                   <RiLoopLeftLine className="h-3 w-3" />
                   Sync a branch
-                </div>
+                </Listbox.Option>
               )}
             </div>
 
             <div>
-              <div
+              <Listbox.Option
+                key="view-all"
+                value="view_all"
                 className="hover:bg-canvasSubtle text-subtle flex h-10 cursor-pointer items-center gap-3 whitespace-nowrap px-3 text-[13px] font-normal"
-                onClick={() => navigate({ to: '/env' })}
               >
                 <RiCloudFill className="h-3 w-3" />
                 View All Environments
-              </div>
+              </Listbox.Option>
             </div>
           </Listbox.Options>
         </div>

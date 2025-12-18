@@ -43,7 +43,9 @@ export const ProfileMenu = ({ children, isMarketplace }: Props) => {
           <Listbox.Option
             className="text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
             value="userProfile"
-            onClick={() => navigate({ to: '/settings/user' })}
+            onClick={() =>
+              navigate({ to: '/settings/user/profile' as FileRouteTypes['to'] })
+            }
           >
             <div className="hover:bg-canvasSubtle flex flex-row items-center justify-start">
               <RiUserLine className="text-muted mr-2 h-4 w-4" />

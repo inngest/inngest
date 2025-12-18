@@ -53,12 +53,12 @@ export const Route = createRootRouteWithContext<{
       },
       {
         rel: 'icon',
-        url: '/favicon-june-2025-light.svg',
+        href: import.meta.env.VITE_FAVICON ?? '/favicon-june-2025-light.svg',
         media: '(prefers-color-scheme: light)',
       },
       {
         rel: 'icon',
-        url: '/favicon-june-2025-dark.svg',
+        href: import.meta.env.VITE_FAVICON ?? '/favicon-june-2025-dark.svg',
         media: '(prefers-color-scheme: dark)',
       },
     ],
