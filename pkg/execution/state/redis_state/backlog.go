@@ -716,10 +716,6 @@ func (q *queue) BacklogRefill(
 		accountID = *sp.AccountID
 	}
 
-	if sp.SystemQueueName == nil && (latestConstraints.Concurrency.AccountConcurrency == 0 || latestConstraints.Concurrency.FunctionConcurrency == 0) {
-		return nil, fmt.Errorf("expected account and function concurency for non system queues")
-	}
-
 	nowMS := q.clock.Now().UnixMilli()
 
 	var (
