@@ -12,7 +12,7 @@ export const Route = createFileRoute(
 
 function KeysComponent() {
   const currentContent = useManagePageTerminology();
-  const { env } = OrgActiveRoute.useLoaderData();
+  const { env } = OrgActiveRoute?.useLoaderData() ?? {};
 
   const shouldShowAlert =
     currentContent?.param === 'keys' &&

@@ -225,22 +225,24 @@ export default function EnvironmentSelectMenu({
                   />
                 ))
               ) : (
-                <Link to="/env">
-                  <div className="bg-canvasBase hover:bg-canvasSubtle text-subtle flex h-10 cursor-pointer items-center gap-3 px-3 text-[13px] font-normal">
-                    <RiLoopLeftLine className="h-3 w-3" />
-                    Sync a branch
-                  </div>
-                </Link>
+                <div
+                  className="bg-canvasBase hover:bg-canvasSubtle text-subtle flex h-10 cursor-pointer items-center gap-3 px-3 text-[13px] font-normal"
+                  onClick={() => navigate({ to: '/env' })}
+                >
+                  <RiLoopLeftLine className="h-3 w-3" />
+                  Sync a branch
+                </div>
               )}
             </div>
 
             <div>
-              <Link to="/env">
-                <div className="hover:bg-canvasSubtle text-subtle flex h-10 cursor-pointer items-center gap-3 whitespace-nowrap px-3 text-[13px] font-normal">
-                  <RiCloudFill className="h-3 w-3" />
-                  View All Environments
-                </div>
-              </Link>
+              <div
+                className="hover:bg-canvasSubtle text-subtle flex h-10 cursor-pointer items-center gap-3 whitespace-nowrap px-3 text-[13px] font-normal"
+                onClick={() => navigate({ to: '/env' })}
+              >
+                <RiCloudFill className="h-3 w-3" />
+                View All Environments
+              </div>
             </div>
           </Listbox.Options>
         </div>

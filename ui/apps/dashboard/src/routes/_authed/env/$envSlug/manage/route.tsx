@@ -9,7 +9,7 @@ export const Route = createFileRoute('/_authed/env/$envSlug/manage')({
 });
 
 function ManageLayoutComponent() {
-  const { env } = OrgActiveRoute.useLoaderData();
+  const { env } = OrgActiveRoute?.useLoaderData() ?? {};
 
   if (env?.hasParent) {
     return <ChildEmptyState />;
