@@ -168,7 +168,7 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 				return true
 			}),
-			WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool, fallback bool) {
+			WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
 				return true, true
 			}),
 			WithCapacityManager(cm),
@@ -209,7 +209,7 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 				return true
 			}),
-			WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool, fallback bool) {
+			WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
 				return true, true
 			}),
 			WithCapacityManager(cm),
@@ -382,7 +382,7 @@ func TestQueueProcessorPreLeaseWithConstraintAPI(t *testing.T) {
 			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 				return false
 			}),
-			WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool, fallback bool) {
+			WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
 				return false, false
 			}),
 			WithCapacityManager(cm),
@@ -423,7 +423,7 @@ func TestQueueProcessorPreLeaseWithConstraintAPI(t *testing.T) {
 			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 				return false
 			}),
-			WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool, fallback bool) {
+			WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
 				return true, true
 			}),
 			WithCapacityManager(cm),
@@ -473,7 +473,7 @@ func TestQueueProcessorPreLeaseWithConstraintAPI(t *testing.T) {
 			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 				return false
 			}),
-			WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool, fallback bool) {
+			WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
 				return true, true
 			}),
 			WithCapacityManager(cm),
