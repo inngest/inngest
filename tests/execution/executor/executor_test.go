@@ -249,7 +249,7 @@ func TestScheduleRaceCondition(t *testing.T) {
 
 				evtID := ulid.MustNew(ulid.Timestamp(at), rand.Reader)
 
-				evt := event.NewOSSTrackedEvent(event.Event{
+				evt := event.NewBaseTrackedEvent(event.Event{
 					Name: "cron-resumed",
 					ID:   evtID.String(),
 				}, event.SeededIDFromString("", 0))
@@ -423,7 +423,7 @@ func TestScheduleRaceConditionWithExistingIdempotencyKey(t *testing.T) {
 
 				evtID := ulid.MustNew(ulid.Timestamp(at), rand.Reader)
 
-				evt := event.NewOSSTrackedEvent(event.Event{
+				evt := event.NewBaseTrackedEvent(event.Event{
 					Name: "cron-resumed",
 					ID:   evtID.String(),
 				}, event.SeededIDFromString("", 0))
@@ -594,7 +594,7 @@ func TestFinalize(t *testing.T) {
 		WorkspaceID: wsID,
 		AppID:       appID,
 		Events: []event.TrackedEvent{
-			event.NewOSSTrackedEventWithID(event.Event{
+			event.NewBaseTrackedEventWithID(event.Event{
 				Name: "test/event",
 			}, evtID1),
 		},
@@ -633,7 +633,7 @@ func TestFinalize(t *testing.T) {
 		WorkspaceID: wsID,
 		AppID:       appID,
 		Events: []event.TrackedEvent{
-			event.NewOSSTrackedEventWithID(event.Event{
+			event.NewBaseTrackedEventWithID(event.Event{
 				Name: "test/event",
 			}, evtID2),
 		},
@@ -895,7 +895,7 @@ func TestInvokeRetrySucceedsIfPauseAlreadyCreated(t *testing.T) {
 		WorkspaceID: wsID,
 		AppID:       appID,
 		Events: []event.TrackedEvent{
-			event.NewOSSTrackedEventWithID(event.Event{
+			event.NewBaseTrackedEventWithID(event.Event{
 				Name: "test/event",
 			}, evtID),
 		},
@@ -1067,7 +1067,7 @@ func TestExecutorReturnsResponseWhenNonRetriableError(t *testing.T) {
 		WorkspaceID: wsID,
 		AppID:       appID,
 		Events: []event.TrackedEvent{
-			event.NewOSSTrackedEventWithID(event.Event{
+			event.NewBaseTrackedEventWithID(event.Event{
 				Name: "test/event",
 			}, evtID),
 		},
@@ -1243,7 +1243,7 @@ func TestExecutorScheduleRateLimit(t *testing.T) {
 	now := time.Now()
 	evtID := ulid.MustNew(ulid.Timestamp(now), rand.Reader)
 
-	evt := event.NewOSSTrackedEventWithID(event.Event{
+	evt := event.NewBaseTrackedEventWithID(event.Event{
 		Name: "test/event",
 		Data: map[string]any{
 			"userID": "inngest",
@@ -1286,7 +1286,7 @@ func TestExecutorScheduleRateLimit(t *testing.T) {
 	now = time.Now()
 	evtID = ulid.MustNew(ulid.Timestamp(now), rand.Reader)
 
-	evt2 := event.NewOSSTrackedEventWithID(event.Event{
+	evt2 := event.NewBaseTrackedEventWithID(event.Event{
 		Name: "test/event",
 		Data: map[string]any{
 			"userID": "inngest",

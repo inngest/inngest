@@ -200,7 +200,7 @@ func (s *svc) getFinishHandler(ctx context.Context) (func(context.Context, sv2.I
 		for _, e := range events {
 			evt := e
 			eg.Go(func() error {
-				trackedEvent := event.NewOSSTrackedEvent(evt, nil)
+				trackedEvent := event.NewBaseTrackedEvent(evt, nil)
 				byt, err := json.Marshal(trackedEvent)
 				if err != nil {
 					return fmt.Errorf("error marshalling event: %w", err)
@@ -1048,7 +1048,7 @@ func (s *svc) handleCron(ctx context.Context, item queue.Item) error {
 
 	idempotencyKey := ci.ID.Timestamp().UTC().Format(time.RFC3339)
 
-	evt := event.NewOSSTrackedEvent(event.Event{
+	evt := event.NewBaseTrackedEvent(event.Event{
 		ID:   idempotencyKey,
 		Name: consts.FnCronName,
 		Data: map[string]any{

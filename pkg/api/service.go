@@ -135,7 +135,7 @@ func (a *apiServer) handleEvent(
 
 	l.Debug("handling event", "event", e.Name)
 
-	trackedEvent := event.NewOSSTrackedEvent(
+	trackedEvent := event.NewBaseTrackedEvent(
 		*e,
 		seed,
 	)
