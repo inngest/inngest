@@ -780,6 +780,20 @@ func IncrAsyncCancellationCheckCounter(ctx context.Context, count int64, opts Co
 	})
 }
 
+func IncrQueueItemConstraintCheckFallbackCounter(ctx context.Context, reason string, opts CounterOpt) {
+	if opts.Tags == nil {
+		opts.Tags = map[string]any{}
+	}
+	opts.Tags["reason"] = reason
+
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "check_constraints_in_lease_reason_total",
+		Description: "Total number of constraint checks performed during item lease with reason",
+		Tags:        opts.Tags,
+	})
+}
+
 func IncrBacklogRefillConstraintCheckFallbackCounter(ctx context.Context, reason string, opts CounterOpt) {
 	if opts.Tags == nil {
 		opts.Tags = map[string]any{}

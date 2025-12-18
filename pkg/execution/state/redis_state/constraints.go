@@ -242,17 +242,25 @@ func (q *queue) itemLeaseConstraintCheck(
 	if shadowPart.AccountID == nil ||
 		shadowPart.EnvID == nil ||
 		shadowPart.FunctionID == nil {
+		metrics.IncrQueueItemConstraintCheckFallbackCounter(ctx, enums.QueueItemConstraintFallbackReasonIdNil.String(), metrics.CounterOpt{
+			PkgName: pkgName,
+		})
 		return itemLeaseConstraintCheckResult{}, nil
 	}
 
 	if q.capacityManager == nil ||
 		q.useConstraintAPI == nil {
-
+		metrics.IncrQueueItemConstraintCheckFallbackCounter(ctx, enums.QueueItemConstraintFallbackReasonConstraintAPIUninitialized.String(), metrics.CounterOpt{
+			PkgName: pkgName,
+		})
 		return itemLeaseConstraintCheckResult{}, nil
 	}
 
 	useAPI, fallback := q.useConstraintAPI(ctx, *shadowPart.AccountID, *shadowPart.EnvID, *shadowPart.FunctionID)
 	if !useAPI {
+		metrics.IncrQueueItemConstraintCheckFallbackCounter(ctx, enums.QueueItemConstraintFallbackReasonFeatureFlagDisabled.String(), metrics.CounterOpt{
+			PkgName: pkgName,
+		})
 		return itemLeaseConstraintCheckResult{}, nil
 	}
 
@@ -305,6 +313,9 @@ func (q *queue) itemLeaseConstraintCheck(
 		}
 
 		// Fallback to Lease (with idempotency)
+		metrics.IncrQueueItemConstraintCheckFallbackCounter(ctx, enums.QueueItemConstraintFallbackReasonConstraintAPIError.String(), metrics.CounterOpt{
+			PkgName: pkgName,
+		})
 		return itemLeaseConstraintCheckResult{}, nil
 	}
 
