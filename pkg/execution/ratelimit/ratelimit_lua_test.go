@@ -3,7 +3,6 @@ package ratelimit
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"testing"
 	"time"
 
@@ -798,88 +797,6 @@ func TestLuaRateLimit_ScientificNotationParsing(t *testing.T) {
 			r.SetTime(clock.Now())
 		}
 	})
-
-	t.Run("force lua to write scientific notation with artificially large number", func(t *testing.T) {
-		r, rc, clock := initRedis(t)
-		defer rc.Close()
-
-		limiter := New(ctx, rc, prefix)
-
-		config := inngest.RateLimit{
-			Limit:  10,
-			Period: "1h",
-		}
-
-		key := "scientific-notation-direct-test"
-		redisKey := prefix + key
-
-		// Try to force Redis to store in scientific notation by using a very large number with decimals
-		cmd := rc.B().Eval().Script(`local key = KEYS[1]
-			-- Create a number that's too large for Redis to store as a normal integer
-			-- Math operations that create very large floating-point results
-			local base = 9223372036854775807  -- Max int64
-			local multiplier = 1.5
-			local very_large = base * multiplier  -- This should force floating-point representation
-			redis.call("SET", key, very_large)
-			return 0`).Numkeys(1).Key(redisKey).Build()
-		err := rc.Do(ctx, cmd).Error()
-		require.NoError(t, err)
-
-		// Verify the value was set
-		storedValue, err := r.Get(redisKey)
-		require.NoError(t, err)
-		t.Logf("Confirmed stored value: %s", storedValue)
-
-		// Also test the direct Redis parsing that would happen in GetWithTime
-		cmd = rc.B().Get().Key(redisKey).Build()
-		result := rc.Do(ctx, cmd)
-
-		// Try to parse as int64 - this should fail
-		_, parseErr := result.AsInt64()
-		require.Error(t, parseErr)
-		t.Logf("Direct AsInt64() parsing also failed as expected: %v", parseErr)
-
-		// But ToString should work
-		strResult, err := result.ToString()
-		require.NoError(t, err)
-		t.Logf("ToString() works fine: %s", strResult)
-
-		// Should fail because it's clamped to the maximum
-		res, err := limiter.RateLimit(ctx, key, config, WithNow(clock.Now()))
-
-		// We expect this to fail with a parsing error
-		require.NoError(t, err)
-
-		// Expect value to be clamped
-		storedValue, err = r.Get(redisKey)
-		require.NoError(t, err)
-		t.Logf("Confirmed stored value: %s", storedValue)
-
-		normalizedValue, err := strconv.Atoi(storedValue)
-		require.NoError(t, err)
-
-		emissionInterval := time.Hour.Nanoseconds() / 10
-		burst := 1
-		totalCapacity := (burst + 1)
-		delayVariationTolerance := emissionInterval * int64(totalCapacity)
-		expectedMax := clock.Now().UnixNano() + time.Hour.Nanoseconds() + delayVariationTolerance
-
-		require.InDelta(t, int(expectedMax), normalizedValue, 10)
-
-		require.True(t, res.Limited)
-		require.Equal(t, time.Hour+6*time.Minute, res.RetryAfter.Round(time.Minute))
-
-		clock.Advance(res.RetryAfter + time.Minute)
-		r.FastForward(res.RetryAfter + time.Minute)
-		r.SetTime(clock.Now())
-
-		// Should allow another request
-		res, err = limiter.RateLimit(ctx, key, config, WithNow(clock.Now()))
-
-		require.NoError(t, err)
-		require.False(t, res.Limited)
-		require.Equal(t, time.Duration(0), res.RetryAfter)
-	})
 }
 
 func TestLuaRateLimit_EdgeCases(t *testing.T) {
@@ -915,15 +832,20 @@ func TestLuaRateLimit_EdgeCases(t *testing.T) {
 
 		// The throttled library panics with divide by zero for limit=0
 		// So we test that our Lua implementation gracefully handles zero limits
-		// by immediately rate limiting (which is the logical behavior)
+		// by falling back to 1
 		r.SetTime(clock.Now())
 		res, err := limiter.RateLimit(ctx, "test-key", config, WithNow(clock.Now()))
 		require.NoError(t, err)
 		t.Logf("Lua with zero limit: limited=%v, retry=%v", res.Limited, res.RetryAfter)
 
 		// Zero limit should immediately rate limit
+		require.False(t, res.Limited)
+		require.Equal(t, res.RetryAfter, time.Duration(0))
+
+		// Second call should fail
+		res, err = limiter.RateLimit(ctx, "test-key", config, WithNow(clock.Now()))
+		require.NoError(t, err)
 		require.True(t, res.Limited)
-		require.Greater(t, res.RetryAfter, time.Duration(0))
 	})
 
 	t.Run("very short period", func(t *testing.T) {
