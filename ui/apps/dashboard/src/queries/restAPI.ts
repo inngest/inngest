@@ -8,8 +8,10 @@ const restAPI = ky.create({
   hooks: {
     beforeRequest: [
       async (request) => {
-        const { getToken } = await auth();
+        const { getToken, userId } = await auth();
         const sessionToken = await getToken();
+
+        console.log('rest api user id and session token', userId, sessionToken);
 
         // TODO: Does this need to be changed for Vercel Marketplace? Vercel
         // Marketplace users don't auth with Clerk.
