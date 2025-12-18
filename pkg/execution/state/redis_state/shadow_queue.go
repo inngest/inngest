@@ -302,11 +302,12 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 	if latestConstraints.Throttle != nil && len(latestConstraints.Concurrency.CustomConcurrencyKeys) == 0 {
 		// Create non-start function backlog
 		fnBacklog := shadowPart.DefaultBacklog(latestConstraints, false)
+		if fnBacklog != nil {
+			l.Trace("refilling from fn backlog for fairness", "backlog_id", fnBacklog.BacklogID)
 
-		l.Trace("refilling from fn backlog for fairness", "backlog_id", fnBacklog.BacklogID)
-
-		// Start with non-start function backlog
-		backlogs = append([]*QueueBacklog{fnBacklog}, backlogs...)
+			// Start with non-start function backlog
+			backlogs = append([]*QueueBacklog{fnBacklog}, backlogs...)
+		}
 	}
 
 	for _, backlog := range backlogs {
