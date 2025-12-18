@@ -366,7 +366,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		}
 
 		queueOpts = append(queueOpts, redis_state.WithCapacityManager(cm))
-		queueOpts = append(queueOpts, redis_state.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool, fallback bool) {
+		queueOpts = append(queueOpts, redis_state.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
 			return true, true
 		}))
 
@@ -533,7 +533,7 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	if capacityManager != nil {
 		executorOpts = append(executorOpts, executor.WithCapacityManager(capacityManager))
-		executorOpts = append(executorOpts, executor.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool, fallback bool) {
+		executorOpts = append(executorOpts, executor.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
 			return true, true
 		}))
 	}
