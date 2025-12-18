@@ -2,7 +2,7 @@ import {
   type Indicator,
   type InngestStatus as Status,
 } from '@inngest/components/SharedContext/useInngestStatus';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 
 export type { Status };
 

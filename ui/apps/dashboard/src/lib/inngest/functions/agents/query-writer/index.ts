@@ -33,7 +33,8 @@ export const generateSqlTool = createTool({
   description:
     'Provide the final SQL SELECT statement for ClickHouse based on the selected events and schemas.',
   parameters: GenerateSqlParams as unknown as AnyZodType, // (ted): need to update to latest version of zod + agent-kit
-  handler: ({ sql, title, reasoning }: z.infer<typeof GenerateSqlParams>) => {
+  handler: (args: unknown) => {
+    const { sql, title, reasoning } = args as z.infer<typeof GenerateSqlParams>;
     return {
       sql,
       title,

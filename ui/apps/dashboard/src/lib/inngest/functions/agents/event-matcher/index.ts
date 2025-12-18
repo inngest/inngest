@@ -29,8 +29,8 @@ export const selectEventsTool = createTool({
   description:
     "Select 1-6 event names from the provided list that are most relevant to the user's query.",
   parameters: SelectEventsParams as unknown as AnyZodType, // (ted): need to align zod version; version 3.25 does not support same types as 3.22
-  handler: (args: z.infer<typeof SelectEventsParams>, { network }) => {
-    const { events } = args;
+  handler: (args: unknown, { network }) => {
+    const { events } = args as z.infer<typeof SelectEventsParams>;
     if (!Array.isArray(events) || events.length === 0) {
       return {
         selected: [],

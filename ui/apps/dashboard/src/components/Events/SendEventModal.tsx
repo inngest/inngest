@@ -7,7 +7,7 @@ import ky from 'ky';
 import { toast } from 'sonner';
 
 import { useQuery } from 'urql';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
 import CodeEditor from '@/components/Textarea/CodeEditor';
