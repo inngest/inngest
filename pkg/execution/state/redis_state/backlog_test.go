@@ -1432,7 +1432,7 @@ func TestShadowPartitionFunctionBacklog(t *testing.T) {
 			Concurrency: PartitionConcurrency{},
 		}
 
-		b := sp.FunctionBacklog(constraints, false)
+		b := sp.DefaultBacklog(constraints, false)
 
 		require.Equal(t, &QueueBacklog{
 			BacklogID:         fmt.Sprintf("system:%s", sysQueueName),
@@ -1447,7 +1447,7 @@ func TestShadowPartitionFunctionBacklog(t *testing.T) {
 			Concurrency: PartitionConcurrency{},
 		}
 
-		b := sp.FunctionBacklog(constraints, false)
+		b := sp.DefaultBacklog(constraints, false)
 		require.Nil(t, b)
 	})
 
@@ -1467,7 +1467,7 @@ func TestShadowPartitionFunctionBacklog(t *testing.T) {
 			Concurrency:     PartitionConcurrency{},
 		}
 
-		b := sp.FunctionBacklog(constraints, false)
+		b := sp.DefaultBacklog(constraints, false)
 
 		require.Equal(t, &QueueBacklog{
 			BacklogID:                              fmt.Sprintf("fn:%s", fnID),
@@ -1497,7 +1497,7 @@ func TestShadowPartitionFunctionBacklog(t *testing.T) {
 			Concurrency:     PartitionConcurrency{},
 		}
 
-		b := sp.FunctionBacklog(constraints, true)
+		b := sp.DefaultBacklog(constraints, true)
 
 		require.Equal(t, &QueueBacklog{
 			BacklogID:                              fmt.Sprintf("fn:%s:start", fnID),
@@ -1533,7 +1533,7 @@ func TestShadowPartitionFunctionBacklog(t *testing.T) {
 			},
 		}
 
-		b := sp.FunctionBacklog(constraints, true)
+		b := sp.DefaultBacklog(constraints, true)
 
 		require.Nil(t, b)
 	})
@@ -1560,7 +1560,7 @@ func TestShadowPartitionFunctionBacklog(t *testing.T) {
 			},
 		}
 
-		b := sp.FunctionBacklog(constraints, false)
+		b := sp.DefaultBacklog(constraints, false)
 
 		require.Equal(t, &QueueBacklog{
 			BacklogID:                              fmt.Sprintf("fn:%s", fnID),

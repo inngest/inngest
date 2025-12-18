@@ -301,7 +301,7 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 	// runs can finish before new runs are started.
 	if latestConstraints.Throttle != nil && len(latestConstraints.Concurrency.CustomConcurrencyKeys) == 0 {
 		// Create non-start function backlog
-		fnBacklog := shadowPart.FunctionBacklog(latestConstraints, false)
+		fnBacklog := shadowPart.DefaultBacklog(latestConstraints, false)
 
 		l.Trace("refilling from fn backlog for fairness", "backlog_id", fnBacklog.BacklogID)
 

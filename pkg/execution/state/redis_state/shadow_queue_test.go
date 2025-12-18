@@ -2701,10 +2701,10 @@ func TestPreventThrottleBacklogUnfairness(t *testing.T) {
 		// This should be the "default" function backlog
 		b2 := q.ItemBacklog(ctx, item2)
 
-		require.Nil(t, shadowPart.FunctionBacklog(constraints, true))
+		require.Nil(t, shadowPart.DefaultBacklog(constraints, true))
 
 		// Function backlog should return b2
-		require.Equal(t, b2, *shadowPart.FunctionBacklog(constraints, false))
+		require.Equal(t, b2, *shadowPart.DefaultBacklog(constraints, false))
 
 		// Shadow partition set should include both backlog IDs
 		require.True(t, r.Exists(kg.ShadowPartitionSet(shadowPart.PartitionID)))
@@ -2858,10 +2858,10 @@ func TestPreventThrottleBacklogUnfairness(t *testing.T) {
 		// This should be the "default" function backlog
 		b2 := q.ItemBacklog(ctx, item2)
 
-		require.Nil(t, shadowPart.FunctionBacklog(constraints, true))
+		require.Nil(t, shadowPart.DefaultBacklog(constraints, true))
 
 		// Function backlog should return b2
-		require.Equal(t, b2, *shadowPart.FunctionBacklog(constraints, false))
+		require.Equal(t, b2, *shadowPart.DefaultBacklog(constraints, false))
 
 		// Shadow partition set should include both backlog IDs
 		require.True(t, r.Exists(kg.ShadowPartitionSet(shadowPart.PartitionID)))

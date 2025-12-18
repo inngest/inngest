@@ -249,7 +249,12 @@ func (sp QueueShadowPartition) activeRunKey(kg QueueKeyGenerator) string {
 	return kg.ActiveRunsSet("p", sp.PartitionID)
 }
 
-func (sp QueueShadowPartition) FunctionBacklog(constraints PartitionConstraintConfig, start bool) *QueueBacklog {
+// DefaultBacklog returns the default "start" or "continue" backlog for a shadow partition.
+//
+// This is the backlog items are added to when no keys are configured (or when throttle is configured but we're dealing with non-start items).
+//
+// This function may return nil if throttle or concurrency keys are configured in the constraints.
+func (sp QueueShadowPartition) DefaultBacklog(constraints PartitionConstraintConfig, start bool) *QueueBacklog {
 	if sp.SystemQueueName != nil {
 		return &QueueBacklog{
 			ShadowPartitionID: *sp.SystemQueueName,
