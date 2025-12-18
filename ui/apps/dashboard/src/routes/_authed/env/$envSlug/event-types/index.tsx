@@ -62,6 +62,7 @@ export default function EventTypesComponent() {
       />
       <ClientOnly>
         <EventTypesTable
+          key={envSlug}
           pathCreator={internalPathCreator}
           getEventTypes={getEventTypes}
           getEventTypeVolume={getEventTypeVolume}

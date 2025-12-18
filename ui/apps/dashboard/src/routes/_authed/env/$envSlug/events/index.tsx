@@ -13,7 +13,7 @@ function EventsComponent() {
   return (
     <>
       <ClientOnly>
-        <EventsPage environmentSlug={envSlug} showHeader />
+        <EventsPage key={envSlug} environmentSlug={envSlug} showHeader />
       </ClientOnly>
       <EventsFeedback />
     </>

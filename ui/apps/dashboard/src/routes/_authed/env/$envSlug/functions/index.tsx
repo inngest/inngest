@@ -52,6 +52,7 @@ function FunctionPage() {
       />
       <ClientOnly>
         <FunctionsTable
+          key={envSlug}
           pathCreator={internalPathCreator}
           getFunctions={getFunctions}
           getFunctionVolume={getFunctionVolume}

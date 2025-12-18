@@ -1,11 +1,6 @@
 import { useEffect, useState } from 'react';
 
-import {
-  Link,
-  useLocation,
-  useNavigate,
-  useRouter,
-} from '@tanstack/react-router';
+import { Link, useLocation, useNavigate } from '@tanstack/react-router';
 import { Listbox } from '@headlessui/react';
 import { OptionalTooltip } from '@inngest/components/Tooltip/OptionalTooltip';
 import {
@@ -134,8 +129,6 @@ export default function EnvironmentSelectMenu({
   collapsed,
 }: EnvironmentSelectMenuProps) {
   const navigate = useNavigate();
-  const router = useRouter();
-  const location = useLocation();
   const [selected, setSelected] = useState<Environment | null>(null);
   const nextPathname = useSwitchablePathname();
   const [{ data: envs = [], error }] = useEnvironments();
@@ -143,14 +136,9 @@ export default function EnvironmentSelectMenu({
   //
   // Sync selected state with activeEnv from route
   useEffect(() => {
+    console.log('activeEnv changed:', activeEnv);
     setSelected(activeEnv || null);
   }, [activeEnv]);
-
-  //
-  // Invalidate router on pathname changes to ensure loaders re-run
-  useEffect(() => {
-    router.invalidate();
-  }, [location.pathname, router]);
 
   if (error) {
     console.error('error fetching envs', error);
