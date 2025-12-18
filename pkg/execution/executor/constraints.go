@@ -53,7 +53,7 @@ func WithConstraints[T any](
 	}
 
 	// Read feature flag
-	enable, fallback := useConstraintAPI(ctx, req.AccountID)
+	enable, fallback := useConstraintAPI(ctx, req.AccountID, req.WorkspaceID, req.Function.ID)
 	if !enable {
 		// If feature flag is disabled, execute Schedule code with existing constraint checks
 

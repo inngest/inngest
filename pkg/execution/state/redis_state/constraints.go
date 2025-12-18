@@ -102,7 +102,7 @@ func (q *queue) backlogRefillConstraintCheck(
 		}, nil
 	}
 
-	useAPI, fallback := q.useConstraintAPI(ctx, *shadowPart.AccountID)
+	useAPI, fallback := q.useConstraintAPI(ctx, *shadowPart.AccountID, *shadowPart.EnvID, *shadowPart.FunctionID)
 	if !useAPI {
 		return &backlogRefillConstraintCheckResult{
 			itemsToRefill: itemIDs,
@@ -238,7 +238,7 @@ func (q *queue) itemLeaseConstraintCheck(
 		return itemLeaseConstraintCheckResult{}, nil
 	}
 
-	useAPI, fallback := q.useConstraintAPI(ctx, *shadowPart.AccountID)
+	useAPI, fallback := q.useConstraintAPI(ctx, *shadowPart.AccountID, *shadowPart.EnvID, *shadowPart.FunctionID)
 	if !useAPI {
 		return itemLeaseConstraintCheckResult{}, nil
 	}

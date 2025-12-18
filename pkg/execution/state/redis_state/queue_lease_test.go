@@ -1693,7 +1693,7 @@ func TestQueueLeaseConstraintIdempotency(t *testing.T) {
 				}
 			}),
 
-			WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool, fallback bool) {
+			WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
 				return true, true
 			}),
 			WithCapacityManager(rolloutManager),
@@ -1786,7 +1786,7 @@ func TestQueueLeaseConstraintIdempotency(t *testing.T) {
 				}
 			}),
 
-			WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool, fallback bool) {
+			WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
 				return true, true
 			}),
 			WithCapacityManager(rolloutManager),
