@@ -28,7 +28,11 @@ export const dynamic = 'force-dynamic';
 
 export default async function Page() {
   const { addons, entitlements } = await getEntitlementUsage();
-  const { plan: currentPlan, subscription: currentSubscription } = await getCurrentPlan();
+  const {
+    plan: currentPlan,
+    subscription: currentSubscription,
+    marketplace,
+  } = await getCurrentPlan();
   const billing = await getBillingDetails();
 
   if (!currentPlan) {
@@ -122,11 +126,16 @@ export default async function Page() {
     ? formatDayString(new Date(currentSubscription.nextInvoiceDate))
     : undefined;
 
-  const nextInvoiceAmount = currentSubscription?.nextInvoiceAmount
-    ? `$${(currentSubscription.nextInvoiceAmount / 100).toFixed(2)}`
-    : currentPlan.amount
-    ? `$${(currentPlan.amount / 100).toFixed(2)}`
-    : 'Free';
+  const nextInvoiceAmount =
+    marketplace === 'AWS'
+      ? currentPlan.amount
+        ? `$${(currentPlan.amount / 100).toFixed(2)}`
+        : 'Free'
+      : currentSubscription?.nextInvoiceAmount
+      ? `$${(currentSubscription.nextInvoiceAmount / 100).toFixed(2)}`
+      : currentPlan.amount
+      ? `$${(currentPlan.amount / 100).toFixed(2)}`
+      : 'Free';
   const overageAllowed =
     (entitlements.runCount.overageAllowed || entitlements.stepCount.overageAllowed) &&
     !isHobbyFreePlan(currentPlan);
