@@ -2,6 +2,7 @@ package executor
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -13,6 +14,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/ratelimit"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/service"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
 )
@@ -49,6 +51,9 @@ func WithConstraints[T any](
 	// If capacity manager / feature flag are not passed, execute Schedule code
 	// with existing constraint checks
 	if capacityManager == nil || useConstraintAPI == nil {
+		metrics.IncrScheduleConstraintsCheckFallbackCounter(ctx, enums.ScheduleConstraintCheckFallbackReasonConstraintAPIUninitialized.String(), metrics.CounterOpt{
+			PkgName: pkgName,
+		})
 		return fn(ctx, true)
 	}
 
@@ -56,19 +61,27 @@ func WithConstraints[T any](
 	enable, fallback := useConstraintAPI(ctx, req.AccountID, req.WorkspaceID, req.Function.ID)
 	if !enable {
 		// If feature flag is disabled, execute Schedule code with existing constraint checks
-
+		metrics.IncrScheduleConstraintsCheckFallbackCounter(ctx, enums.ScheduleConstraintCheckFallbackReasonFeatureFlagDisabled.String(), metrics.CounterOpt{
+			PkgName: pkgName,
+		})
 		return fn(ctx, true)
 	}
 
 	constraints, err := getScheduleConstraints(ctx, req)
 	if err != nil {
 		l.Error("failed to get schedule constraints", "err", err)
+		metrics.IncrScheduleConstraintsCheckFallbackCounter(ctx, enums.ScheduleConstraintCheckFallbackReasonGetConstraintsError.String(), metrics.CounterOpt{
+			PkgName: pkgName,
+		})
 		return fn(ctx, true)
 	}
 
 	// If no rate limits are configured, simply run the function
 	if len(constraints) == 0 {
 		// TODO: Should we skip constraint checks in this case?
+		metrics.IncrScheduleConstraintsCheckFallbackCounter(ctx, enums.ScheduleConstraintCheckFallbackReasonNoRateLimitConfigured.String(), metrics.CounterOpt{
+			PkgName: pkgName,
+		})
 		return fn(ctx, true)
 	}
 
@@ -85,11 +98,17 @@ func WithConstraints[T any](
 	)
 	if err != nil {
 		l.Error("failed to check constraints", "err", err)
+		metrics.IncrScheduleConstraintsCheckFallbackCounter(ctx, enums.ScheduleConstraintCheckFallbackReasonConstraintAPIError.String(), metrics.CounterOpt{
+			PkgName: pkgName,
+		})
 		return fn(ctx, true)
 	}
 
 	// If the Constraint API didn't successfully return, call the user function and indicate checks should run
 	if checkResult.mustCheck {
+		metrics.IncrScheduleConstraintsCheckFallbackCounter(ctx, enums.ScheduleConstraintCheckFallbackReasonConstraintAPIError.String(), metrics.CounterOpt{
+			PkgName: pkgName,
+		})
 		return fn(ctx, true)
 	}
 
@@ -108,9 +127,11 @@ func WithConstraints[T any](
 	// If no lease was provided, we are not allowed to process
 	if checkResult.leaseID == nil {
 		// TODO: When does this happen?
-		l.Warn("acquire request did not return lease ID")
-
+		l.ReportError(errors.New("acquire request was allowed but did not return lease ID"), "acquire request was allowed but did not return lease ID")
 		// Pretend the API request failed
+		metrics.IncrScheduleConstraintsCheckFallbackCounter(ctx, enums.ScheduleConstraintCheckFallbackReasonMissingLease.String(), metrics.CounterOpt{
+			PkgName: pkgName,
+		})
 		return fn(ctx, true)
 	}
 
