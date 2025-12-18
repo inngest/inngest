@@ -16,9 +16,9 @@ import { cn } from '@inngest/components/utils/classNames';
 import { durationToString, parseDuration } from '@inngest/components/utils/date';
 import { RiArrowRightUpLine, RiRefreshLine, RiSearchLine } from '@remixicon/react';
 import { type VisibilityState } from '@tanstack/react-table';
-import { useLocalStorage } from 'react-use';
+import useLocalStorage from 'react-use/lib/useLocalStorage';
 
-import CodeSearch from '../CodeSearch/CodeSearch';
+import CodeSearch from '../CodeSearch/NewCodeSearch';
 import type { RangeChangeProps } from '../DatePicker/RangePicker';
 import EntityFilter from '../Filter/EntityFilter';
 import { RunDetailsV3 } from '../RunDetailsV3/RunDetailsV3';

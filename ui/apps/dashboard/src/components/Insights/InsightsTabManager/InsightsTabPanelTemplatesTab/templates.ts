@@ -20,7 +20,8 @@ ORDER BY
 }
 
 const EVENT_TYPE_VOLUME_PER_HOUR_QUERY = makeEventVolumePerHourQuery();
-const SPECIFIC_EVENT_PER_HOUR_QUERY = makeEventVolumePerHourQuery('{{ event_name }}');
+const SPECIFIC_EVENT_PER_HOUR_QUERY =
+  makeEventVolumePerHourQuery('{{ event_name }}');
 
 const COUNT_ALIAS_MAP: Record<'failed' | 'cancelled' | 'finished', string> = {
   failed: 'failed_count',
@@ -62,7 +63,8 @@ export const TEMPLATES: QueryTemplate[] = [
     id: 'recent-events',
     name: 'Recent events',
     query: 'SELECT * FROM events',
-    explanation: 'View recents events subject to row and plan history limit restrictions.',
+    explanation:
+      'View recents events subject to row and plan history limit restrictions.',
     templateKind: 'time',
   },
   {

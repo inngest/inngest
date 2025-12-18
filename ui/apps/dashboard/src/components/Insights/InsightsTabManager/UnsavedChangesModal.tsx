@@ -1,7 +1,5 @@
-'use client';
-
-import { Alert } from '@inngest/components/Alert/Alert';
-import { Button } from '@inngest/components/Button';
+import { Alert } from '@inngest/components/Alert/NewAlert';
+import { Button } from '@inngest/components/Button/NewButton';
 import { Modal } from '@inngest/components/Modal/Modal';
 
 import type { Tab } from '@/components/Insights/types';
@@ -34,7 +32,9 @@ export function UnsavedChangesModal({
             Unsaved changes: <strong>{unsavedTabs[0]?.name}</strong>
           </p>
         ) : (
-          <p className="text-subtle text-sm">You have {unsavedTabs.length} unsaved tabs</p>
+          <p className="text-subtle text-sm">
+            You have {unsavedTabs.length} unsaved tabs
+          </p>
         )}
         <Alert className="mt-4 text-sm" severity="warning">
           Changes in these tabs will be lost if you discard them without saving.
@@ -42,8 +42,18 @@ export function UnsavedChangesModal({
       </Modal.Body>
       <Modal.Footer>
         <div className="flex justify-end gap-2">
-          <Button appearance="outlined" kind="secondary" label="Cancel" onClick={onCancel} />
-          <Button appearance="outlined" kind="danger" label={discardLabel} onClick={onDiscardAll} />
+          <Button
+            appearance="outlined"
+            kind="secondary"
+            label="Cancel"
+            onClick={onCancel}
+          />
+          <Button
+            appearance="outlined"
+            kind="danger"
+            label={discardLabel}
+            onClick={onDiscardAll}
+          />
           <Button kind="primary" label={saveLabel} onClick={onSaveAll} />
         </div>
       </Modal.Footer>

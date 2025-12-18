@@ -10,14 +10,19 @@ import { useOnboardingStepCompletedTracking } from './useOnboardingTracking';
 
 const getHighestStep = (steps: OnboardingStep[]): OnboardingStep | null => {
   return steps.length > 0
-    ? steps.reduce((prev, current) => (current.stepNumber > prev.stepNumber ? current : prev))
+    ? steps.reduce((prev, current) =>
+        current.stepNumber > prev.stepNumber ? current : prev,
+      )
     : null;
 };
 
 export default function useOnboardingStep() {
   // Temporary approach, we will store this value in the backend in the future
-  const [lastCompletedStep, setLastCompletedStep] = useState<OnboardingStep | null>(null);
-  const [completedSteps, setCompletedSteps] = useState<OnboardingStep[] | []>([]);
+  const [lastCompletedStep, setLastCompletedStep] =
+    useState<OnboardingStep | null>(null);
+  const [completedSteps, setCompletedSteps] = useState<OnboardingStep[] | []>(
+    [],
+  );
 
   const tracking = useOnboardingStepCompletedTracking();
 
@@ -56,11 +61,17 @@ export default function useOnboardingStep() {
       setLastCompletedStep(highestStep);
     };
 
-    window.addEventListener('onboardingStepUpdate', handleCustomEvent as EventListener);
+    window.addEventListener(
+      'onboardingStepUpdate',
+      handleCustomEvent as EventListener,
+    );
 
     return () => {
       window.removeEventListener('storage', handleStorageChange);
-      window.removeEventListener('onboardingStepUpdate', handleCustomEvent as EventListener);
+      window.removeEventListener(
+        'onboardingStepUpdate',
+        handleCustomEvent as EventListener,
+      );
     };
   }, []);
 
@@ -69,12 +80,19 @@ export default function useOnboardingStep() {
       // If no step has been completed, return the first step
       return steps.find((step) => step.stepNumber === 1) || null;
     }
-    return steps.find((step) => step.stepNumber === lastCompletedStep.stepNumber + 1) || null;
+    return (
+      steps.find(
+        (step) => step.stepNumber === lastCompletedStep.stepNumber + 1,
+      ) || null
+    );
   }, [lastCompletedStep]);
 
   const totalStepsCompleted: TotalStepsCompleted = completedSteps.length;
 
-  const updateCompletedSteps = (stepName: OnboardingSteps, metadata?: Record<string, any>) => {
+  const updateCompletedSteps = (
+    stepName: OnboardingSteps,
+    metadata?: Record<string, any>,
+  ) => {
     if (typeof window !== 'undefined') {
       const step = steps.find((s) => s.name === stepName);
 
@@ -89,7 +107,7 @@ export default function useOnboardingStep() {
         const stepsToAdd = steps.filter(
           (s) =>
             s.stepNumber < step.stepNumber &&
-            !completedSteps.some((cs) => cs.stepNumber === s.stepNumber)
+            !completedSteps.some((cs) => cs.stepNumber === s.stepNumber),
         );
 
         const newCompletedSteps = [...completedSteps, ...stepsToAdd, step];
@@ -99,11 +117,16 @@ export default function useOnboardingStep() {
         setLastCompletedStep(step);
 
         // Update localStorage
-        localStorage.setItem('onboardingCompletedSteps', JSON.stringify(newCompletedSteps));
+        localStorage.setItem(
+          'onboardingCompletedSteps',
+          JSON.stringify(newCompletedSteps),
+        );
 
         // Dispatch event for other components
         window.dispatchEvent(
-          new CustomEvent('onboardingStepUpdate', { detail: newCompletedSteps })
+          new CustomEvent('onboardingStepUpdate', {
+            detail: newCompletedSteps,
+          }),
         );
 
         // Tracking for the previous steps marked with automatic completion
@@ -118,5 +141,11 @@ export default function useOnboardingStep() {
     }
   };
 
-  return { lastCompletedStep, completedSteps, updateCompletedSteps, nextStep, totalStepsCompleted };
+  return {
+    lastCompletedStep,
+    completedSteps,
+    updateCompletedSteps,
+    nextStep,
+    totalStepsCompleted,
+  };
 }

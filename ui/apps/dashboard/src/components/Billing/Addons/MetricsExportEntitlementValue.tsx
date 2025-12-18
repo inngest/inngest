@@ -22,14 +22,18 @@ export default function MetricsExportEntitlementValue({
         <>
           <span className="border-subtle border-l border-r" />
           <span className="text-muted">Granularity</span>
-          <span className="font-medium">{entitlementSecondsToStr(granularitySeconds)}</span>
+          <span className="font-medium">
+            {entitlementSecondsToStr(granularitySeconds)}
+          </span>
         </>
       )}
       {freshnessSeconds && (
         <>
           <span className="border-subtle border-l border-r" />
           <span className="text-muted">Delay</span>
-          <span className="font-medium">{entitlementSecondsToStr(freshnessSeconds)}</span>
+          <span className="font-medium">
+            {entitlementSecondsToStr(freshnessSeconds)}
+          </span>
         </>
       )}
     </div>

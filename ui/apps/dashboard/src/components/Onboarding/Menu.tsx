@@ -1,14 +1,22 @@
-'use client';
-
-import StepsMenu from '@inngest/components/Steps/StepsMenu';
-import { RiDiscordLine, RiExternalLinkLine, RiMailLine } from '@remixicon/react';
+import StepsMenu from '@inngest/components/Steps/NewStepsMenu';
+import {
+  RiDiscordLine,
+  RiExternalLinkLine,
+  RiMailLine,
+} from '@remixicon/react';
 
 import { WEBSITE_CONTACT_URL, pathCreator } from '@/utils/urls';
-import { isValidStep, steps } from '../Onboarding/types';
+import { isValidStep, steps } from './types';
 import { onboardingMenuStepContent } from './content';
 import useOnboardingStep from './useOnboardingStep';
 
-export default function Menu({ envSlug, stepName }: { envSlug: string; stepName: string }) {
+export default function Menu({
+  envSlug,
+  stepName,
+}: {
+  envSlug: string;
+  stepName: string;
+}) {
   const { completedSteps } = useOnboardingStep();
 
   return (
@@ -20,12 +28,17 @@ export default function Menu({ envSlug, stepName }: { envSlug: string; stepName:
           return 'error';
         }
 
-        const isCompleted = completedSteps.some((step) => step.stepNumber === stepNumber);
+        const isCompleted = completedSteps.some(
+          (step) => step.stepNumber === stepNumber,
+        );
 
         const isActive = stepName === name;
 
         const stepContent = onboardingMenuStepContent.step[name];
-        const url = pathCreator.onboardingSteps({ envSlug: envSlug, step: name });
+        const url = pathCreator.onboardingSteps({
+          envSlug: envSlug,
+          step: name,
+        });
 
         return (
           <StepsMenu.MenuItem

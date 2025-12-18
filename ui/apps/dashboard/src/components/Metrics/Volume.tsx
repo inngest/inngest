@@ -11,7 +11,10 @@ import { AccountConcurrency } from './AccountConcurrency';
 import { AUTO_REFRESH_INTERVAL } from './ActionMenu';
 import { Backlog } from './Backlog';
 import { Concurrency } from './Concurrency';
-import { ConnectWorkerPercentage, ConnectWorkerTotalCapacity } from './ConnectWorkerMetrics';
+import {
+  ConnectWorkerPercentage,
+  ConnectWorkerTotalCapacity,
+} from './ConnectWorkerMetrics';
 import { type EntityLookup } from './Dashboard';
 import { RunsThrougput } from './RunsThroughput';
 import { SdkThroughput } from './SdkThroughput';
@@ -270,9 +273,8 @@ export const MetricsVolume = ({
 
   const env = useEnvironment();
 
-  const { value: connectMetricsEnabled, isReady: connectMetricsReady } = useBooleanFlag(
-    'connect-worker-concurrency-metrics'
-  );
+  const { value: connectMetricsEnabled, isReady: connectMetricsReady } =
+    useBooleanFlag('connect-worker-concurrency-metrics');
 
   const variables = {
     workspaceId: env.id,
@@ -305,7 +307,9 @@ export const MetricsVolume = ({
       </div>
       {volumeOpen && (
         <>
-          {error && <Error message="There was an error fetching volume metrics data." />}
+          {error && (
+            <Error message="There was an error fetching volume metrics data." />
+          )}
 
           <div className="relative grid w-full auto-cols-max grid-cols-1 gap-2 overflow-hidden md:grid-cols-2">
             <RunsThrougput workspace={data?.workspace} entities={entities} />
@@ -328,13 +332,19 @@ export const MetricsVolume = ({
               connectMetricsReady &&
               data &&
               data.workspace.workerPercentageUsed.metrics.length > 0 && (
-                <ConnectWorkerPercentage workspace={data.workspace} entities={entities} />
+                <ConnectWorkerPercentage
+                  workspace={data.workspace}
+                  entities={entities}
+                />
               )}
             {connectMetricsEnabled &&
               connectMetricsReady &&
               data &&
               data.workspace.workerTotalCapacity.metrics.length > 0 && (
-                <ConnectWorkerTotalCapacity workspace={data.workspace} entities={entities} />
+                <ConnectWorkerTotalCapacity
+                  workspace={data.workspace}
+                  entities={entities}
+                />
               )}
           </div>
         </>

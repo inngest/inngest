@@ -1,13 +1,17 @@
-'use client';
-
-import { Button } from '@inngest/components/Button/Button';
+import { Button } from '@inngest/components/Button/NewButton';
 
 import { useInsightsStateMachineContext } from '../InsightsStateMachineContext/InsightsStateMachineContext';
 import { KeyboardShortcut } from '../KeyboardShortcut';
 import { useDocumentShortcuts } from './actions/handleShortcuts';
 import { getCanRunQuery } from './utils';
 
-function QueryButtonLabel({ disabled, isRunning }: { disabled: boolean; isRunning: boolean }) {
+function QueryButtonLabel({
+  disabled,
+  isRunning,
+}: {
+  disabled: boolean;
+  isRunning: boolean;
+}) {
   if (isRunning) return null;
 
   return (

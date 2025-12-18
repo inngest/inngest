@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Error } from '@inngest/components/Error/Error';
+import { Error } from '@inngest/components/Error/NewError';
 import { RiArrowDownSFill, RiArrowRightSFill } from '@remixicon/react';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
@@ -172,7 +172,9 @@ export const MetricsOverview = ({
       </div>
       {overviewOpen && (
         <>
-          {error && <Error message="There was an error fetching overview metrics data." />}
+          {error && (
+            <Error message="There was an error fetching overview metrics data." />
+          )}
           <div className="relative flex w-full flex-row flex-wrap items-center justify-start gap-2 overflow-hidden md:flex-nowrap">
             <FunctionStatus totals={data?.workspace.totals} />
             <FailedFunctions

@@ -1,5 +1,3 @@
-'use client';
-
 import { memo } from 'react';
 import { Table } from '@inngest/components/Table';
 import type { ColumnDef } from '@tanstack/react-table';
@@ -18,7 +16,13 @@ type InsightsTableProps = {
 };
 
 function InsightsTable({ cellClassName, columns, data }: InsightsTableProps) {
-  return <Table<InsightsEntry> cellClassName={cellClassName} columns={columns} data={data} />;
+  return (
+    <Table<InsightsEntry>
+      cellClassName={cellClassName}
+      columns={columns}
+      data={data}
+    />
+  );
 }
 
 const MemoizedInsightsTable = memo(InsightsTable);
@@ -31,7 +35,10 @@ export function ResultsTable() {
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <div className="flex-1 overflow-auto overscroll-none" id="insights-table-container">
+      <div
+        className="flex-1 overflow-auto overscroll-none"
+        id="insights-table-container"
+      >
         <MemoizedInsightsTable
           cellClassName="[&:not(:first-child)]:border-l [&:not(:first-child)]:border-light box-border align-top px-4 py-2.5 group focus-within:ring-2 focus-within:ring-blue-500 focus-within:ring-inset outline-none"
           columns={columns}

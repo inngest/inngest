@@ -1,4 +1,8 @@
-import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@inngest/components/Tooltip';
 import { cn } from '@inngest/components/utils/classNames';
 import { RiEyeLine, RiEyeOffLine } from '@remixicon/react';
 

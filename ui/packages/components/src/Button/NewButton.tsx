@@ -44,16 +44,12 @@ type LinkWrapperProps = {
 
 export const LinkWrapper = forwardRef<HTMLAnchorElement, LinkWrapperProps>(
   ({ children, href, to, target, prefetch = false, scroll = true, ...props }, ref) =>
-    href || to ? (
-      <Link
-        href={href}
-        to={to}
-        target={target}
-        preload={prefetch}
-        resetScroll={scroll}
-        ref={ref}
-        {...props}
-      >
+    href ? (
+      <a href={href} target={target} {...props}>
+        {children}
+      </a>
+    ) : to ? (
+      <Link to={to} target={target} preload={prefetch} resetScroll={scroll} ref={ref} {...props}>
         {children}
       </Link>
     ) : (

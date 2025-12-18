@@ -1,8 +1,6 @@
-'use client';
-
 import { useMemo } from 'react';
-import { ContextualBanner } from '@inngest/components/Banner';
-import { Button } from '@inngest/components/Button';
+import { ContextualBanner } from '@inngest/components/Banner/NewBanner';
+import { Button } from '@inngest/components/Button/NewButton';
 import { useBooleanLocalStorage } from '@inngest/components/hooks/useBooleanLocalStorage';
 
 // import { type EntitlementUsageQuery } from '@/gql/graphql';
@@ -13,7 +11,8 @@ export function BillingBannerView({}: // entitlementUsage,
 {
   // entitlementUsage: EntitlementUsageQuery['account']['entitlements'];
 }) {
-  const { bannerMessage, bannerSeverity, items } = parseEntitlementUsage(/*entitlementUsage*/);
+  const { bannerMessage, bannerSeverity, items } =
+    parseEntitlementUsage(/*entitlementUsage*/);
 
   const isVisible = useBooleanLocalStorage('BillingBanner:visible', true);
 
@@ -51,7 +50,10 @@ export function BillingBannerView({}: // entitlementUsage,
       cta={
         <Button
           appearance="outlined"
-          href={pathCreator.billing({ tab: 'plans', ref: 'app-billing-banner' })}
+          href={pathCreator.billing({
+            tab: 'plans',
+            ref: 'app-billing-banner',
+          })}
           kind="secondary"
           label="Upgrade plan"
         />

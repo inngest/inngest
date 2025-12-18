@@ -1,6 +1,4 @@
 import { useEffect, useRef } from 'react';
-import type { AppRouterInstance } from 'next/dist/shared/lib/app-router-context.shared-runtime';
-import type { ReadonlyURLSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 
 import type { TabManagerActions } from '@/components/Insights/InsightsTabManager/InsightsTabManager';
@@ -9,15 +7,18 @@ import { useStoredQueries } from '@/components/Insights/QueryHelperPanel/StoredQ
 interface UseDeepLinkHandlerParams {
   actions: TabManagerActions;
   activeSavedQueryId: string | undefined;
-  router: AppRouterInstance;
-  searchParams: ReadonlyURLSearchParams;
+  navigate: (opts: {
+    search: (prev: Record<string, unknown>) => Record<string, unknown>;
+    replace?: boolean;
+  }) => void;
+  search: Record<string, unknown>;
 }
 
 export function useDeepLinkHandler({
   actions,
   activeSavedQueryId,
-  router,
-  searchParams,
+  navigate,
+  search,
 }: UseDeepLinkHandlerParams) {
   const { queries, isSavedQueriesFetching } = useStoredQueries();
   const hasProcessedInitialQueryId = useRef(false);
@@ -26,7 +27,8 @@ export function useDeepLinkHandler({
   useEffect(() => {
     if (hasProcessedInitialQueryId.current) return;
 
-    const queryIdFromUrl = searchParams.get('query_id');
+    const queryIdFromUrl =
+      typeof search.query_id === 'string' ? search.query_id : undefined;
     if (!queryIdFromUrl) {
       hasProcessedInitialQueryId.current = true;
       return;
@@ -46,31 +48,36 @@ export function useDeepLinkHandler({
       actions.createTabFromQuery(savedQuery);
     } else {
       // Show error toast if query not found
-      toast.error('Unable to load query; please ensure that you have access to it');
+      toast.error(
+        'Unable to load query; please ensure that you have access to it',
+      );
     }
-  }, [searchParams, queries.data, isSavedQueriesFetching, actions]);
+  }, [search, queries.data, isSavedQueriesFetching, actions]);
 
   // Update URL when active tab changes
   useEffect(() => {
     // Don't sync URL until we've processed the initial query_id
     if (!hasProcessedInitialQueryId.current) return;
 
-    const currentQueryId = searchParams.get('query_id');
+    const currentQueryId =
+      typeof search.query_id === 'string' ? search.query_id : undefined;
     const newQueryId = activeSavedQueryId;
 
     // Don't update if URL already has the correct query_id
     if (currentQueryId === newQueryId) return;
 
-    const params = new URLSearchParams(searchParams.toString());
-
-    if (newQueryId) {
-      params.set('query_id', newQueryId);
-    } else {
-      params.delete('query_id');
-    }
-
     // Update URL without triggering navigation
-    const newUrl = params.toString() ? `?${params.toString()}` : window.location.pathname;
-    router.replace(newUrl, { scroll: false });
-  }, [activeSavedQueryId, searchParams, router]);
+    navigate({
+      search: (prev: Record<string, unknown>) => {
+        const next = { ...prev };
+        if (newQueryId) {
+          next.query_id = newQueryId;
+        } else {
+          delete next.query_id;
+        }
+        return next;
+      },
+      replace: true,
+    });
+  }, [activeSavedQueryId, search, navigate]);
 }

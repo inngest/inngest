@@ -1,13 +1,27 @@
-import { cookies } from 'next/headers';
-import { notFound } from 'next/navigation';
-import { auth } from '@clerk/nextjs/server';
-import { GraphQLClient, type RequestMiddleware, type ResponseMiddleware } from 'graphql-request';
+import {
+  GraphQLClient,
+  type RequestMiddleware,
+  type ResponseMiddleware,
+} from 'graphql-request';
+import { notFound } from '@tanstack/react-router';
 
-import 'server-only';
+const decodeJWT = (token: string) => {
+  try {
+    const payload = token.split('.')[1];
+    return JSON.parse(atob(payload));
+  } catch {
+    return null;
+  }
+};
 
 const requestMiddleware: RequestMiddleware = async (request) => {
-  const { getToken } = auth();
-  const sessionToken = await getToken();
+  //
+  // Lazy import server-only modules to prevent them from being bundled for the client
+  const { auth } = await import('@clerk/tanstack-react-start/server');
+  const { getCookies } = await import('@tanstack/react-start/server');
+
+  const { getToken } = await auth();
+  let sessionToken = await getToken();
 
   let headers = request.headers;
   if (sessionToken) {
@@ -16,16 +30,16 @@ const requestMiddleware: RequestMiddleware = async (request) => {
       Authorization: `Bearer ${sessionToken}`,
     };
   } else {
+    //
     // Need to forward the `Cookie` header for non-Clerk users.
-
-    const allCookies = cookies()
-      .getAll()
-      .map((c) => `${c.name}=${c.value}`)
+    const allCookies = getCookies();
+    const cookieString = Object.entries(allCookies)
+      .map(([name, value]) => `${name}=${value}`)
       .join('; ');
 
     headers = {
       ...headers,
-      Cookie: allCookies,
+      Cookie: cookieString,
     };
   }
 
@@ -36,10 +50,8 @@ const requestMiddleware: RequestMiddleware = async (request) => {
 };
 
 /**
- * Throws the `NEXT_NOT_FOUND` error when a requested resource wasn't found, which can be
+ * Throws the not found error when a requested resource wasn't found, which can be
  * handled gracefully by an enclosing `not-found` file.
- *
- * @see {@link https://beta.nextjs.org/docs/api-reference/notfound#notfound}
  */
 const throwNotFoundError: ResponseMiddleware = (response) => {
   if (response instanceof Error && response.message.includes('not found')) {
@@ -47,10 +59,12 @@ const throwNotFoundError: ResponseMiddleware = (response) => {
   }
 };
 
-const graphqlAPI = new GraphQLClient(`${process.env.NEXT_PUBLIC_API_URL}/gql`, {
-  requestMiddleware,
-  responseMiddleware: throwNotFoundError,
-  fetch, // use global fetch for Vercel Edge runtime
-});
+export const graphqlAPI = new GraphQLClient(
+  `${import.meta.env.VITE_API_URL}/gql`,
+  {
+    requestMiddleware,
+    responseMiddleware: throwNotFoundError,
+  },
+);
 
 export default graphqlAPI;

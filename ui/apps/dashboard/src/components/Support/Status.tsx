@@ -1,5 +1,4 @@
 import {
-  impactSchema,
   type Indicator,
   type InngestStatus as Status,
 } from '@inngest/components/SharedContext/useInngestStatus';
@@ -18,13 +17,17 @@ const statusEventSchema = z.object({
       id: z.string(),
       name: z.string(),
       group_name: z.string().optional(),
-    })
+    }),
   ),
 });
 
 const incidentSchema = statusEventSchema.extend({
   status: z.enum(['identified', 'investigating', 'monitoring']),
-  current_worst_impact: impactSchema,
+  current_worst_impact: z.enum([
+    'partial_outage',
+    'degraded_performance',
+    'full_outage',
+  ]),
 });
 
 const maintenanceInProgressEventSchema = statusEventSchema.extend({
@@ -65,7 +68,9 @@ export const indicatorColor: { [K in Indicator]: string } = {
 
 export const STATUS_PAGE_URL = 'https://status.inngest.com';
 
-const mapStatus = (res: z.infer<typeof statusPageSummaryResponseSchema>): Status => {
+const mapStatus = (
+  res: z.infer<typeof statusPageSummaryResponseSchema>,
+): Status => {
   // Grab first incident and maintenance item
   const incident = res.ongoing_incidents[0];
   const maintenance = res.in_progress_maintenances[0];
@@ -82,7 +87,9 @@ const mapStatus = (res: z.infer<typeof statusPageSummaryResponseSchema>): Status
 
 const fetchStatus = async () => {
   return statusPageSummaryResponseSchema.parse(
-    await fetch('https://status.inngest.com/api/v1/summary').then((r) => r.json())
+    await fetch('https://status.inngest.com/api/v1/summary').then((r) =>
+      r.json(),
+    ),
   );
 };
 

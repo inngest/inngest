@@ -1,6 +1,9 @@
-'use client';
-
-import { RiAlertLine, RiCheckLine, RiErrorWarningLine, RiTimeLine } from '@remixicon/react';
+import {
+  RiAlertLine,
+  RiCheckLine,
+  RiErrorWarningLine,
+  RiTimeLine,
+} from '@remixicon/react';
 
 import type { QueryTemplate } from '@/components/Insights/types';
 import { useTabManagerActions } from '../TabManagerContext';
@@ -69,7 +72,9 @@ export function InsightsTabPanelTemplatesTabCard({
       <div
         className={`${config.backgroundColor} flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md`}
       >
-        <IconComponent className={`${config.textColor} h-5 w-5 flex-shrink-0`} />
+        <IconComponent
+          className={`${config.textColor} h-5 w-5 flex-shrink-0`}
+        />
       </div>
       <div className={CONTENT_LAYOUT_CLASSES}>
         <h3 className={TITLE_CLASSES}>{template.name}</h3>

@@ -1,16 +1,14 @@
-'use client';
+import { Header } from '@inngest/components/Header/NewHeader';
 
-import { usePathname } from 'next/navigation';
-import { Header } from '@inngest/components/Header/Header';
-
-import CreateKeyButton from '../../app/(organization-active)/(dashboard)/env/[environmentSlug]/manage/[ingestKeys]/CreateKeyButton';
+import CreateKeyButton from '@/components/Manage/CreateKeyButton';
 import { EventKeyInfo } from './EventKeyInfo';
 import { SigningKeyInfo } from './SigningKeyInfo';
 import { WebhookInfo } from './WebhookInfo';
+import { useLocation } from '@tanstack/react-router';
 
 export const ManageHeader = () => {
-  const pathname = usePathname();
-
+  const location = useLocation();
+  const pathname = location.pathname;
   return (
     <Header
       breadcrumb={[

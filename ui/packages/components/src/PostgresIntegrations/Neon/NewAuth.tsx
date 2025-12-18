@@ -107,7 +107,7 @@ export default function NeonAuth({
       </form>
       <Button
         label="Next"
-        href={`/settings/integrations/${integration}/${nextStep}`}
+        to={`/settings/integrations/${integration}/${nextStep}`}
         disabled={!isVerified}
       />
     </>

@@ -121,7 +121,7 @@ function convertToJSON(data: InsightsFetchResult): string {
   return JSON.stringify(
     jsonData,
     (_key, value) => (value instanceof Date ? value.toISOString() : value),
-    2
+    2,
   );
 }
 
@@ -169,7 +169,7 @@ export type DownloadFormat = 'csv' | 'json';
  */
 export function useDownloadInsightsResults(
   data: InsightsFetchResult | undefined,
-  queryName?: string
+  queryName?: string,
 ) {
   const downloadAsCSV = useCallback(() => {
     if (!data) return;
@@ -197,7 +197,7 @@ export function useDownloadInsightsResults(
         downloadAsJSON();
       }
     },
-    [downloadAsCSV, downloadAsJSON]
+    [downloadAsCSV, downloadAsJSON],
   );
 
   return {

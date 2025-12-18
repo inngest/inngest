@@ -54,7 +54,10 @@ export default function useGetUsageChartData({
   const options = {
     previous: {
       month: currentMonthIndex === 0 ? 12 : currentMonthIndex,
-      year: currentMonthIndex === 0 ? new Date().getUTCFullYear() - 1 : new Date().getUTCFullYear(),
+      year:
+        currentMonthIndex === 0
+          ? new Date().getUTCFullYear() - 1
+          : new Date().getUTCFullYear(),
     },
     current: {
       month: currentMonthIndex + 1,
