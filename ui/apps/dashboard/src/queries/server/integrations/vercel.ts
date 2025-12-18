@@ -154,6 +154,8 @@ export const createVercelIntegration = createServerFn({ method: 'POST' })
     url.searchParams.set('workspaceID', environment.id);
     url.searchParams.set('code', data.vercelAuthorizationCode);
 
+    console.log('rest api call url', url);
+
     const response = await restAPI(url).json<{
       projects: { id: string; name: string }[];
     }>();
