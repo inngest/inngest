@@ -1389,8 +1389,9 @@ func (q *queue) process(
 			})
 			if err != nil {
 				q.log.ReportError(err, "failed to release capacity", logger.WithErrorReportTags(map[string]string{
-					"account_id": p.AccountID.String(),
-					"lease_id":   currentLeaseID.String(),
+					"account_id":  p.AccountID.String(),
+					"lease_id":    currentLeaseID.String(),
+					"function_id": p.FunctionID.String(),
 				}))
 			}
 

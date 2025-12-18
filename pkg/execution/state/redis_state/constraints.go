@@ -143,6 +143,8 @@ func (q *queue) backlogRefillConstraintCheck(
 		},
 	})
 	if err != nil {
+		logger.StdlibLogger(ctx).Error("acquiring capacity lease failed", "err", err, "method", "backlogRefillConstraintCheck", "functionID", *shadowPart.FunctionID)
+
 		if !fallback {
 			return nil, fmt.Errorf("could not enforce constraints and acquire lease: %w", err)
 		}
@@ -306,7 +308,7 @@ func (q *queue) itemLeaseConstraintCheck(
 		},
 	})
 	if err != nil {
-		l.Error("could not acquire capacity lease", "err", err)
+		l.Error("acquiring capacity lease failed", "err", err, "method", "itemLeaseConstraintCheck", "constraints", constraints, "item", item)
 
 		if !fallback {
 			return itemLeaseConstraintCheckResult{}, fmt.Errorf("could not enforce constraints and acquire lease: %w", err)

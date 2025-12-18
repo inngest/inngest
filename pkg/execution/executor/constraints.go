@@ -197,7 +197,7 @@ func WithConstraints[T any](
 				Source:   source,
 			})
 			if err != nil {
-				l.Error("could not extend schedule capacity lease", "err", err)
+				l.Error("could not extend schedule capacity lease", "err", err, "leaseID", lID, "req", req)
 				continue
 			}
 
@@ -241,8 +241,9 @@ func WithConstraints[T any](
 				})
 				if internalErr != nil {
 					l.ReportError(internalErr, "failed to release capacity after schedule", logger.WithErrorReportTags(map[string]string{
-						"account_id": req.AccountID.String(),
-						"lease_id":   lID.String(),
+						"account_id":  req.AccountID.String(),
+						"lease_id":    lID.String(),
+						"function_id": req.Function.ID.String(),
 					}))
 				}
 			})
@@ -353,7 +354,7 @@ func CheckConstraints(
 		},
 	})
 	if internalErr != nil {
-		l.Error("acquiring capacity lease failed", "err", internalErr)
+		l.Error("acquiring capacity lease failed", "err", internalErr, "method", "CheckConstraints", "req", req)
 
 		if fallback {
 			return checkResult{
