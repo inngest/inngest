@@ -249,6 +249,44 @@ func (sp QueueShadowPartition) activeRunKey(kg QueueKeyGenerator) string {
 	return kg.ActiveRunsSet("p", sp.PartitionID)
 }
 
+func (sp QueueShadowPartition) FunctionBacklog(constraints PartitionConstraintConfig, start bool) *QueueBacklog {
+	if sp.SystemQueueName != nil {
+		return &QueueBacklog{
+			ShadowPartitionID: *sp.SystemQueueName,
+			BacklogID:         fmt.Sprintf("system:%s", *sp.SystemQueueName),
+		}
+	}
+
+	// Function ID should be set for non-system queues
+	if sp.FunctionID == nil {
+		return nil
+	}
+
+	// NOTE: In case custom concurrency keys are configured, we should not use the default
+	// function backlog. Instead, all backlogs should include the dynamic key.
+	if len(constraints.Concurrency.CustomConcurrencyKeys) > 0 {
+		return nil
+	}
+
+	// NOTE: In case a start backlog is requested and throttle is used, we should not use
+	// the default function backlog. Instead, all backlogs should include the dynamic key.
+	if start && constraints.Throttle != nil {
+		return nil
+	}
+
+	b := &QueueBacklog{
+		BacklogID:               fmt.Sprintf("fn:%s", *sp.FunctionID),
+		ShadowPartitionID:       sp.FunctionID.String(),
+		EarliestFunctionVersion: constraints.FunctionVersion,
+		Start:                   start,
+	}
+	if start {
+		b.BacklogID += ":start"
+	}
+
+	return b
+}
+
 // BacklogConcurrencyKey represents a custom concurrency key, which can be scoped to the function, environment, or account.
 //
 // Note: BacklogConcurrencyKey is only used for custom concurrency keys with a defined `key`.
@@ -465,7 +503,7 @@ func (b QueueBacklog) isDefault() bool {
 func (b QueueBacklog) isOutdated(constraints PartitionConstraintConfig) enums.QueueNormalizeReason {
 	// If the backlog represents newer items than the constraints we're working on,
 	// do not attempt to mark the backlog as outdated. Constraints MUST be >= backlog function version at all times.
-	if b.EarliestFunctionVersion > 0 && constraints.FunctionVersion > 0 && b.EarliestFunctionVersion > constraints.FunctionVersion {
+	if b.EarliestFunctionVersion > 0 && constraints.FunctionVersion > 0 && b.EarliestFunctionVersion >= constraints.FunctionVersion {
 		return enums.QueueNormalizeReasonUnchanged
 	}
 
@@ -676,6 +714,10 @@ func (q *queue) BacklogRefill(
 	accountID := uuid.Nil
 	if sp.AccountID != nil {
 		accountID = *sp.AccountID
+	}
+
+	if sp.SystemQueueName == nil && (latestConstraints.Concurrency.AccountConcurrency == 0 || latestConstraints.Concurrency.FunctionConcurrency == 0) {
+		return nil, fmt.Errorf("expected account and function concurency for non system queues")
 	}
 
 	nowMS := q.clock.Now().UnixMilli()
@@ -1245,6 +1287,10 @@ func (q *queue) BacklogSize(ctx context.Context, queueShard QueueShard, backlogI
 	return count, err
 }
 
+// shuffleBacklog returns shuffled backlogs while applying higher weights to non-start backlogs.
+//
+// NOTE: Applying a higher weight on non-start backlogs is important to ensure queue items to finalize existing functions have a higher likelihood
+// of being refilled to the ready queue.
 func shuffleBacklogs(b []*QueueBacklog) []*QueueBacklog {
 	weights := make([]float64, len(b))
 	for i, backlog := range b {

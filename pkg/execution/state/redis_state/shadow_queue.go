@@ -288,11 +288,40 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 		refilledItems  int  // Number of refilled items
 	)
 
-	for _, backlog := range shuffleBacklogs(backlogs) {
+	// Always shuffle backlogs while prioritizing non-start backlogs.
+	// This is necessary to ensure we refill items to finish existing runs before
+	// refilling run starts.
+	backlogs = shuffleBacklogs(backlogs)
+
+	// If throttle is configured without custom concurrency keys, we have a mismatch:
+	// - Each start queue item is added to a dedicated backlog per key
+	// - Non-start queue items are added to the default backlog
+	//
+	// In this case, we always want to refill the default backlog first to ensure existing
+	// runs can finish before new runs are started.
+	if latestConstraints.Throttle != nil && len(latestConstraints.Concurrency.CustomConcurrencyKeys) == 0 {
+		// Create non-start function backlog
+		fnBacklog := shadowPart.FunctionBacklog(latestConstraints, false)
+
+		l.Trace("refilling from fn backlog for fairness", "backlog_id", fnBacklog.BacklogID)
+
+		// Start with non-start function backlog
+		backlogs = append([]*QueueBacklog{fnBacklog}, backlogs...)
+	}
+
+	seen := map[string]struct{}{}
+	for _, backlog := range backlogs {
 		// If cancelled, return early
 		if errors.Is(ctx.Err(), context.Canceled) {
 			return nil
 		}
+
+		// Prevent duplicate processing in the same iteration
+		// This may happen when we force-insert the function backlog in the case of throttle fairness
+		if _, alreadySeen := seen[backlog.BacklogID]; alreadySeen {
+			continue
+		}
+		seen[backlog.BacklogID] = struct{}{}
 
 		res, fullyProcessed, err := q.processShadowPartitionBacklog(logger.WithStdlib(ctx, l), shadowPart, backlog, refillUntil, latestConstraints)
 		if err != nil {
