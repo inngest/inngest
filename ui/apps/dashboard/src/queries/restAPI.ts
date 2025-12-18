@@ -1,4 +1,3 @@
-import { auth } from '@clerk/tanstack-react-start/server';
 import ky from 'ky';
 
 export { HTTPError } from 'ky';
@@ -8,7 +7,11 @@ const restAPI = ky.create({
   hooks: {
     beforeRequest: [
       async (request) => {
-        const { getToken, userId } = await auth();
+        //
+        // Lazy import server-only modules to prevent them from being bundled for the client
+        const { auth } = await import('@clerk/tanstack-react-start/server');
+
+        const { getToken } = await auth();
         const sessionToken = await getToken();
 
         //
@@ -19,6 +22,8 @@ const restAPI = ky.create({
           return;
         }
 
+        //
+        // Create new headers object with Authorization header (matching graphqlAPI pattern)
         const headers = new Headers(request.headers);
         headers.set('Authorization', `Bearer ${sessionToken}`);
 
@@ -29,7 +34,8 @@ const restAPI = ky.create({
         console.log('Sending request:', {
           url: newRequest.url,
           method: newRequest.method,
-          headers: Object.fromEntries(newRequest.headers.entries()),
+          hasAuthHeader: headers.has('authorization'),
+          tokenPrefix: sessionToken.substring(0, 50) + '...',
         });
 
         return newRequest;
