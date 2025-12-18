@@ -13,6 +13,17 @@ import Menu from '@/components/Onboarding/Menu';
 
 export const Route = createFileRoute('/_authed/env/$envSlug/onboarding/$step')({
   component: OnboardingStepLayout,
+  loader: ({ params }) => {
+    //
+    // Onboarding is only available for production environment
+    if (params.envSlug !== 'production') {
+      redirect({
+        to: '/env/$envSlug/apps',
+        params: { envSlug: params.envSlug },
+        throw: true,
+      });
+    }
+  },
 });
 
 function OnboardingStepLayout() {
