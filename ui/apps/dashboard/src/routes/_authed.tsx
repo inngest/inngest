@@ -38,7 +38,6 @@ export const Route = createFileRoute('/_authed')({
       token,
     };
   },
-  errorComponent: AuthedErrorComponent,
 
   loader: async ({ params }: { params: { envSlug?: string } }) => {
     const env = params.envSlug
