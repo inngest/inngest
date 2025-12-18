@@ -6,6 +6,7 @@ import (
 	"io"
 	"log/slog"
 	"maps"
+	"math/rand"
 	"os"
 	"runtime/debug"
 	"strings"
@@ -71,6 +72,10 @@ type Logger interface {
 	Emergency(msg string, args ...any)
 	EmergencyContext(ctx context.Context, msg string, args ...any)
 	SLog() *slog.Logger
+
+	// DebugSample samples a % of time to produce a debug log, between 0-100.
+	// Non-sampled logs are logged as a trace.
+	DebugSample(percent int, msg string, args ...any)
 
 	// ReportError is a wrapper over Error, and will also submit a report to the error report tool
 	ReportError(err error, msg string, opts ...ReportErrorOpt)
@@ -260,6 +265,14 @@ type logger struct {
 
 	// attrs represent the additional attributes used for this logger
 	attrs []any
+}
+
+func (l *logger) DebugSample(percent int, msg string, args ...any) {
+	if rand.Intn(100) < percent {
+		l.Debug(msg, args...)
+		return
+	}
+	l.Trace(msg, args...)
 }
 
 func (l *logger) Level() slog.Level {
