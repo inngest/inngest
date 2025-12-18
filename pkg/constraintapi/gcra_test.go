@@ -103,7 +103,7 @@ func TestThrottleGCRA(t *testing.T) {
 	t.Run("should return gcra result struct", func(t *testing.T) {
 		t.Parallel()
 
-		clock := clockwork.NewFakeClock()
+		clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Minute))
 
 		_, rc := initRedis(t)
 		defer rc.Close()
@@ -127,7 +127,7 @@ func TestThrottleGCRA(t *testing.T) {
 
 		require.Equal(t, (6 * time.Second).Milliseconds(), res.EmissionInterval)
 		require.Equal(t, res.TAT, clock.Now().UnixMilli())
-		require.Equal(t, res.NewTAT, clock.Now().Add(6*time.Second).UnixMilli())
+		require.WithinDuration(t, clock.Now().Add(6*time.Second), time.UnixMilli(res.NewTAT), time.Second)
 		require.Equal(t, (6 * time.Second).Milliseconds(), res.DVT)
 		require.Equal(t, (6 * time.Second).Milliseconds(), res.Increment)
 		require.Equal(t, clock.Now().UnixMilli(), res.AllowAt)
@@ -143,7 +143,7 @@ func TestThrottleGCRA(t *testing.T) {
 	t.Run("consume 1 should work", func(t *testing.T) {
 		t.Parallel()
 
-		clock := clockwork.NewFakeClock()
+		clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Minute))
 
 		_, rc := initRedis(t)
 		defer rc.Close()
@@ -167,7 +167,7 @@ func TestThrottleGCRA(t *testing.T) {
 		require.False(t, res.Limited)
 		require.Equal(t, (6 * time.Second).Milliseconds(), res.EmissionInterval)
 		require.Equal(t, res.TAT, clock.Now().UnixMilli())
-		require.Equal(t, res.NewTAT, clock.Now().Add(6*time.Second).UnixMilli())
+		require.WithinDuration(t, clock.Now().Add(6*time.Second), time.UnixMilli(res.NewTAT), time.Second)
 		require.Equal(t, (6 * time.Second).Milliseconds(), res.DVT)
 		require.Equal(t, (6 * time.Second).Milliseconds(), res.Increment)
 		require.Equal(t, clock.Now().UnixMilli(), res.AllowAt)
@@ -183,7 +183,7 @@ func TestThrottleGCRA(t *testing.T) {
 	t.Run("consume 1 with burst 1 should work", func(t *testing.T) {
 		t.Parallel()
 
-		clock := clockwork.NewFakeClock()
+		clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Minute))
 
 		_, rc := initRedis(t)
 		defer rc.Close()
@@ -207,7 +207,7 @@ func TestThrottleGCRA(t *testing.T) {
 		require.False(t, res.Limited)
 		require.Equal(t, (6 * time.Second).Milliseconds(), res.EmissionInterval)
 		require.Equal(t, res.TAT, clock.Now().UnixMilli())
-		require.Equal(t, res.NewTAT, clock.Now().Add(2*6*time.Second).UnixMilli())
+		require.WithinDuration(t, clock.Now().Add(2*6*time.Second), time.UnixMilli(res.NewTAT), time.Second)
 		require.Equal(t, (12 * time.Second).Milliseconds(), res.DVT)
 		require.Equal(t, (2 * 6 * time.Second).Milliseconds(), res.Increment)
 		require.Equal(t, clock.Now().Add(2*6*time.Second).Add(-12*time.Second).UnixMilli(), res.AllowAt)
@@ -224,7 +224,7 @@ func TestThrottleGCRA(t *testing.T) {
 	t.Run("being limited should work", func(t *testing.T) {
 		t.Parallel()
 
-		clock := clockwork.NewFakeClock()
+		clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Minute))
 
 		_, rc := initRedis(t)
 		defer rc.Close()
@@ -246,7 +246,7 @@ func TestThrottleGCRA(t *testing.T) {
 		})
 
 		require.Equal(t, res.TAT, clock.Now().UnixMilli())
-		require.Equal(t, res.NewTAT, clock.Now().Add(1*6*time.Second).UnixMilli())
+		require.WithinDuration(t, clock.Now().Add(1*6*time.Second), time.UnixMilli(res.NewTAT), time.Second)
 
 		require.False(t, res.Limited)
 		require.Equal(t, 1, res.Limit)
@@ -265,7 +265,7 @@ func TestThrottleGCRA(t *testing.T) {
 
 		require.Equal(t, (6 * time.Second).Milliseconds(), res.EmissionInterval)
 		require.Equal(t, res.TAT, clock.Now().Add(6*time.Second).UnixMilli())
-		require.Equal(t, res.NewTAT, clock.Now().Add(2*6*time.Second).UnixMilli())
+		require.WithinDuration(t, clock.Now().Add(2*6*time.Second), time.UnixMilli(res.NewTAT), time.Second)
 		require.Equal(t, (6 * time.Second).Milliseconds(), res.DVT)
 		require.Equal(t, (1 * 6 * time.Second).Milliseconds(), res.Increment)
 		require.Equal(t, clock.Now().Add(2*6*time.Second).Add(-6*time.Second).UnixMilli(), res.AllowAt)
@@ -283,7 +283,7 @@ func TestThrottleGCRA(t *testing.T) {
 	t.Run("1 request every 24h should work", func(t *testing.T) {
 		t.Parallel()
 
-		clock := clockwork.NewFakeClock()
+		clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Minute))
 
 		r, rc := initRedis(t)
 		defer rc.Close()
@@ -306,7 +306,7 @@ func TestThrottleGCRA(t *testing.T) {
 
 		require.False(t, res.Limited)
 		require.Equal(t, res.TAT, clock.Now().UnixMilli())
-		require.Equal(t, res.NewTAT, clock.Now().Add(24*time.Hour).UnixMilli())
+		require.WithinDuration(t, clock.Now().Add(24*time.Hour), time.UnixMilli(res.NewTAT), time.Second)
 
 		require.Equal(t, 1, res.Limit)
 		require.Equal(t, 0, res.Remaining)
@@ -324,7 +324,7 @@ func TestThrottleGCRA(t *testing.T) {
 
 		require.Equal(t, (24 * time.Hour).Milliseconds(), res.EmissionInterval)
 		require.Equal(t, res.TAT, clock.Now().Add(24*time.Hour).UnixMilli())
-		require.Equal(t, res.NewTAT, clock.Now().Add(2*24*time.Hour).UnixMilli())
+		require.WithinDuration(t, clock.Now().Add(2*24*time.Hour), time.UnixMilli(res.NewTAT), time.Second)
 		require.Equal(t, (24 * time.Hour * 1).Milliseconds(), res.DVT)
 		require.Equal(t, (1 * 24 * time.Hour).Milliseconds(), res.Increment)
 		require.Equal(t, clock.Now().Add(24*time.Hour).Add(1*24*time.Hour).Add(-24*time.Hour).UnixMilli(), res.AllowAt)
@@ -354,7 +354,7 @@ func TestThrottleGCRA(t *testing.T) {
 
 		require.Equal(t, (24 * time.Hour).Milliseconds(), res.EmissionInterval)
 		require.Equal(t, res.TAT, clock.Now().Add(20*time.Hour).UnixMilli())
-		require.Equal(t, res.NewTAT, clock.Now().Add(20*time.Hour+24*time.Hour).UnixMilli())
+		require.WithinDuration(t, clock.Now().Add(20*time.Hour+24*time.Hour), time.UnixMilli(res.NewTAT), time.Second)
 		require.Equal(t, (24 * time.Hour * 1).Milliseconds(), res.DVT)
 		require.Equal(t, (1 * 24 * time.Hour).Milliseconds(), res.Increment)
 		require.Equal(t, clock.Now().Add(20*time.Hour).Add(1*24*time.Hour).Add(-24*time.Hour).UnixMilli(), res.AllowAt)
@@ -371,7 +371,7 @@ func TestThrottleGCRA(t *testing.T) {
 	t.Run("3000 requests every minute should work", func(t *testing.T) {
 		t.Parallel()
 
-		clock := clockwork.NewFakeClock()
+		clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Minute))
 
 		_, rc := initRedis(t)
 		defer rc.Close()
@@ -393,7 +393,7 @@ func TestThrottleGCRA(t *testing.T) {
 		})
 
 		require.Equal(t, res.TAT, clock.Now().UnixMilli())
-		require.Equal(t, res.NewTAT, clock.Now().Add(20*time.Millisecond).UnixMilli())
+		require.WithinDuration(t, clock.Now().Add(20*time.Millisecond), time.UnixMilli(res.NewTAT), time.Second)
 		require.Equal(t, (20 * time.Millisecond).Milliseconds(), res.EmissionInterval)
 		require.Equal(t, (20 * time.Millisecond).Milliseconds(), res.DVT)
 		require.Equal(t, (20 * time.Millisecond).Milliseconds(), res.Increment)
@@ -415,7 +415,7 @@ func TestThrottleGCRA(t *testing.T) {
 	t.Run("3000 requests every minute with burst should work", func(t *testing.T) {
 		t.Parallel()
 
-		clock := clockwork.NewFakeClock()
+		clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Minute))
 
 		r, rc := initRedis(t)
 		defer rc.Close()
@@ -438,7 +438,7 @@ func TestThrottleGCRA(t *testing.T) {
 		require.False(t, res.Limited)
 
 		require.Equal(t, res.TAT, clock.Now().UnixMilli())
-		require.Equal(t, res.NewTAT, clock.Now().Add(2*20*time.Millisecond).UnixMilli())
+		require.WithinDuration(t, clock.Now().Add(2*20*time.Millisecond), time.UnixMilli(res.NewTAT), time.Second)
 		require.Equal(t, (20 * time.Millisecond).Milliseconds(), res.EmissionInterval)
 		require.Equal(t, (2 * 20 * time.Millisecond).Milliseconds(), res.DVT)
 		require.Equal(t, (2 * 20 * time.Millisecond).Milliseconds(), res.Increment)
@@ -515,7 +515,7 @@ func TestThrottleGCRA(t *testing.T) {
 	t.Run("capacity calculation should work", func(t *testing.T) {
 		t.Parallel()
 
-		clock := clockwork.NewFakeClock()
+		clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Minute))
 
 		_, rc := initRedis(t)
 		defer rc.Close()
@@ -611,7 +611,7 @@ func TestThrottleGCRA(t *testing.T) {
 	t.Run("simulate gcraCapacity for key queues", func(t *testing.T) {
 		t.Parallel()
 
-		clock := clockwork.NewFakeClock()
+		clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Minute))
 
 		_, rc := initRedis(t)
 		defer rc.Close()
@@ -643,7 +643,7 @@ func TestThrottleGCRA(t *testing.T) {
 	t.Run("simulate using up capacity and getting retryAt", func(t *testing.T) {
 		t.Parallel()
 
-		clock := clockwork.NewFakeClock()
+		clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Minute))
 
 		_, rc := initRedis(t)
 		defer rc.Close()
@@ -692,7 +692,7 @@ func TestThrottleGCRA(t *testing.T) {
 	t.Run("retryAt should be properly calculated", func(t *testing.T) {
 		t.Parallel()
 
-		clock := clockwork.NewFakeClock()
+		clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Minute))
 
 		r, rc := initRedis(t)
 		defer rc.Close()
@@ -727,7 +727,7 @@ func TestThrottleGCRA(t *testing.T) {
 
 		require.Equal(t, (6 * time.Second).Milliseconds(), res.EmissionInterval)
 		require.Equal(t, res.TAT, clock.Now().UnixMilli())
-		require.Equal(t, res.NewTAT, clock.Now().Add(2*6*time.Second).UnixMilli())
+		require.WithinDuration(t, clock.Now().Add(2*6*time.Second), time.UnixMilli(res.NewTAT), time.Second)
 		require.Equal(t, (12 * time.Second).Milliseconds(), res.DVT)
 		require.Equal(t, (2 * 6 * time.Second).Milliseconds(), res.Increment)
 		require.Equal(t, clock.Now().Add(2*6*time.Second).Add(-12*time.Second).UnixMilli(), res.AllowAt)
@@ -871,7 +871,7 @@ func TestRateLimitGCRA(t *testing.T) {
 	t.Run("should return gcra result struct", func(t *testing.T) {
 		t.Parallel()
 
-		clock := clockwork.NewFakeClock()
+		clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Minute))
 
 		_, rc := initRedis(t)
 		defer rc.Close()
@@ -895,7 +895,7 @@ func TestRateLimitGCRA(t *testing.T) {
 
 		require.Equal(t, (6 * time.Second).Nanoseconds(), res.EmissionInterval)
 		require.WithinDuration(t, clock.Now(), time.Unix(0, res.TAT), time.Second)
-		require.Equal(t, res.NewTAT, clock.Now().Add(6*time.Second).UnixNano())
+		require.WithinDuration(t, clock.Now().Add(6*time.Second), time.Unix(0, res.NewTAT), time.Second)
 		require.Equal(t, (6 * time.Second).Nanoseconds(), res.DVT)
 		require.Equal(t, (6 * time.Second).Nanoseconds(), res.Increment)
 		require.Equal(t, clock.Now().UnixNano(), res.AllowAt)
@@ -911,7 +911,7 @@ func TestRateLimitGCRA(t *testing.T) {
 	t.Run("consume 1 should work", func(t *testing.T) {
 		t.Parallel()
 
-		clock := clockwork.NewFakeClock()
+		clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Minute))
 
 		_, rc := initRedis(t)
 		defer rc.Close()
@@ -935,7 +935,7 @@ func TestRateLimitGCRA(t *testing.T) {
 		require.False(t, res.Limited)
 		require.Equal(t, (6 * time.Second).Nanoseconds(), res.EmissionInterval)
 		require.WithinDuration(t, clock.Now(), time.Unix(0, res.TAT), time.Second)
-		require.Equal(t, res.NewTAT, clock.Now().Add(6*time.Second).UnixNano())
+		require.WithinDuration(t, clock.Now().Add(6*time.Second), time.Unix(0, res.NewTAT), time.Second)
 		require.Equal(t, (6 * time.Second).Nanoseconds(), res.DVT)
 		require.Equal(t, (6 * time.Second).Nanoseconds(), res.Increment)
 		require.Equal(t, clock.Now().UnixNano(), res.AllowAt)
@@ -951,7 +951,7 @@ func TestRateLimitGCRA(t *testing.T) {
 	t.Run("consume 1 with burst 1 should work", func(t *testing.T) {
 		t.Parallel()
 
-		clock := clockwork.NewFakeClock()
+		clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Minute))
 
 		_, rc := initRedis(t)
 		defer rc.Close()
@@ -975,7 +975,7 @@ func TestRateLimitGCRA(t *testing.T) {
 		require.False(t, res.Limited)
 		require.Equal(t, (6 * time.Second).Nanoseconds(), res.EmissionInterval)
 		require.WithinDuration(t, clock.Now(), time.Unix(0, res.TAT), time.Second)
-		require.Equal(t, res.NewTAT, clock.Now().Add(2*6*time.Second).UnixNano())
+		require.WithinDuration(t, clock.Now().Add(2*6*time.Second), time.Unix(0, res.NewTAT), time.Second)
 		require.Equal(t, (12 * time.Second).Nanoseconds(), res.DVT)
 		require.Equal(t, (2 * 6 * time.Second).Nanoseconds(), res.Increment)
 		require.Equal(t, clock.Now().Add(2*6*time.Second).Add(-12*time.Second).UnixNano(), res.AllowAt)
@@ -992,7 +992,7 @@ func TestRateLimitGCRA(t *testing.T) {
 	t.Run("being limited should work", func(t *testing.T) {
 		t.Parallel()
 
-		clock := clockwork.NewFakeClock()
+		clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Minute))
 
 		_, rc := initRedis(t)
 		defer rc.Close()
@@ -1014,7 +1014,7 @@ func TestRateLimitGCRA(t *testing.T) {
 		})
 
 		require.WithinDuration(t, clock.Now(), time.Unix(0, res.TAT), time.Second)
-		require.Equal(t, res.NewTAT, clock.Now().Add(1*6*time.Second).UnixNano())
+		require.WithinDuration(t, clock.Now().Add(1*6*time.Second), time.Unix(0, res.NewTAT), time.Second)
 
 		require.False(t, res.Limited)
 		require.Equal(t, 1, res.Limit)
@@ -1033,7 +1033,7 @@ func TestRateLimitGCRA(t *testing.T) {
 
 		require.Equal(t, (6 * time.Second).Nanoseconds(), res.EmissionInterval)
 		require.Equal(t, res.TAT, clock.Now().Add(6*time.Second).UnixNano())
-		require.Equal(t, res.NewTAT, clock.Now().Add(2*6*time.Second).UnixNano())
+		require.WithinDuration(t, clock.Now().Add(2*6*time.Second), time.Unix(0, res.NewTAT), time.Second)
 		require.Equal(t, (6 * time.Second).Nanoseconds(), res.DVT)
 		require.Equal(t, (1 * 6 * time.Second).Nanoseconds(), res.Increment)
 		require.Equal(t, clock.Now().Add(2*6*time.Second).Add(-6*time.Second).UnixNano(), res.AllowAt)
@@ -1051,7 +1051,7 @@ func TestRateLimitGCRA(t *testing.T) {
 	t.Run("1 request every 24h should work", func(t *testing.T) {
 		t.Parallel()
 
-		clock := clockwork.NewFakeClock()
+		clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Minute))
 
 		r, rc := initRedis(t)
 		defer rc.Close()
@@ -1074,7 +1074,7 @@ func TestRateLimitGCRA(t *testing.T) {
 
 		require.False(t, res.Limited)
 		require.WithinDuration(t, clock.Now(), time.Unix(0, res.TAT), time.Second)
-		require.Equal(t, res.NewTAT, clock.Now().Add(24*time.Hour).UnixNano())
+		require.WithinDuration(t, clock.Now().Add(24*time.Hour), time.Unix(0, res.NewTAT), time.Second)
 
 		require.Equal(t, 1, res.Limit)
 		require.Equal(t, 0, res.Remaining)
@@ -1092,7 +1092,7 @@ func TestRateLimitGCRA(t *testing.T) {
 
 		require.Equal(t, (24 * time.Hour).Nanoseconds(), res.EmissionInterval)
 		require.Equal(t, res.TAT, clock.Now().Add(24*time.Hour).UnixNano())
-		require.Equal(t, res.NewTAT, clock.Now().Add(2*24*time.Hour).UnixNano())
+		require.WithinDuration(t, clock.Now().Add(2*24*time.Hour), time.Unix(0, res.NewTAT), time.Second)
 		require.Equal(t, (24 * time.Hour * 1).Nanoseconds(), res.DVT)
 		require.Equal(t, (1 * 24 * time.Hour).Nanoseconds(), res.Increment)
 		require.Equal(t, clock.Now().Add(24*time.Hour).Add(1*24*time.Hour).Add(-24*time.Hour).UnixNano(), res.AllowAt)
@@ -1122,7 +1122,7 @@ func TestRateLimitGCRA(t *testing.T) {
 
 		require.Equal(t, (24 * time.Hour).Nanoseconds(), res.EmissionInterval)
 		require.Equal(t, res.TAT, clock.Now().Add(20*time.Hour).UnixNano())
-		require.Equal(t, res.NewTAT, clock.Now().Add(20*time.Hour+24*time.Hour).UnixNano())
+		require.WithinDuration(t, clock.Now().Add(20*time.Hour+24*time.Hour), time.Unix(0, res.NewTAT), time.Second)
 		require.Equal(t, (24 * time.Hour * 1).Nanoseconds(), res.DVT)
 		require.Equal(t, (1 * 24 * time.Hour).Nanoseconds(), res.Increment)
 		require.Equal(t, clock.Now().Add(20*time.Hour).Add(1*24*time.Hour).Add(-24*time.Hour).UnixNano(), res.AllowAt)
@@ -1139,7 +1139,7 @@ func TestRateLimitGCRA(t *testing.T) {
 	t.Run("3000 requests every minute should work", func(t *testing.T) {
 		t.Parallel()
 
-		clock := clockwork.NewFakeClock()
+		clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Minute))
 
 		_, rc := initRedis(t)
 		defer rc.Close()
@@ -1161,7 +1161,7 @@ func TestRateLimitGCRA(t *testing.T) {
 		})
 
 		require.WithinDuration(t, clock.Now(), time.Unix(0, res.TAT), time.Second)
-		require.Equal(t, res.NewTAT, clock.Now().Add(20*time.Millisecond).UnixNano())
+		require.WithinDuration(t, clock.Now().Add(20*time.Millisecond), time.Unix(0, res.NewTAT), time.Second)
 		require.Equal(t, (20 * time.Millisecond).Nanoseconds(), res.EmissionInterval)
 		require.Equal(t, (20 * time.Millisecond).Nanoseconds(), res.DVT)
 		require.Equal(t, (20 * time.Millisecond).Nanoseconds(), res.Increment)
@@ -1183,7 +1183,7 @@ func TestRateLimitGCRA(t *testing.T) {
 	t.Run("3000 requests every minute with burst should work", func(t *testing.T) {
 		t.Parallel()
 
-		clock := clockwork.NewFakeClock()
+		clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Minute))
 
 		r, rc := initRedis(t)
 		defer rc.Close()
@@ -1206,7 +1206,7 @@ func TestRateLimitGCRA(t *testing.T) {
 		require.False(t, res.Limited)
 
 		require.WithinDuration(t, clock.Now(), time.Unix(0, res.TAT), time.Second)
-		require.Equal(t, res.NewTAT, clock.Now().Add(2*20*time.Millisecond).UnixNano())
+		require.WithinDuration(t, clock.Now().Add(2*20*time.Millisecond), time.Unix(0, res.NewTAT), time.Second)
 		require.Equal(t, (20 * time.Millisecond).Nanoseconds(), res.EmissionInterval)
 		require.Equal(t, (2 * 20 * time.Millisecond).Nanoseconds(), res.DVT)
 		require.Equal(t, (2 * 20 * time.Millisecond).Nanoseconds(), res.Increment)
@@ -1283,7 +1283,7 @@ func TestRateLimitGCRA(t *testing.T) {
 	t.Run("capacity calculation should work", func(t *testing.T) {
 		t.Parallel()
 
-		clock := clockwork.NewFakeClock()
+		clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Minute))
 
 		_, rc := initRedis(t)
 		defer rc.Close()
@@ -1379,7 +1379,7 @@ func TestRateLimitGCRA(t *testing.T) {
 	t.Run("simulate gcraCapacity for key queues", func(t *testing.T) {
 		t.Parallel()
 
-		clock := clockwork.NewFakeClock()
+		clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Minute))
 
 		_, rc := initRedis(t)
 		defer rc.Close()
@@ -1411,7 +1411,7 @@ func TestRateLimitGCRA(t *testing.T) {
 	t.Run("simulate using up capacity and getting retryAt", func(t *testing.T) {
 		t.Parallel()
 
-		clock := clockwork.NewFakeClock()
+		clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Minute))
 
 		_, rc := initRedis(t)
 		defer rc.Close()
@@ -1460,7 +1460,7 @@ func TestRateLimitGCRA(t *testing.T) {
 	t.Run("retryAt should be properly calculated", func(t *testing.T) {
 		t.Parallel()
 
-		clock := clockwork.NewFakeClock()
+		clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Minute))
 
 		r, rc := initRedis(t)
 		defer rc.Close()
@@ -1495,7 +1495,7 @@ func TestRateLimitGCRA(t *testing.T) {
 
 		require.Equal(t, (6 * time.Second).Nanoseconds(), res.EmissionInterval)
 		require.Equal(t, res.TAT, clock.Now().UnixNano())
-		require.Equal(t, res.NewTAT, clock.Now().Add(2*6*time.Second).UnixNano())
+		require.WithinDuration(t, clock.Now().Add(2*6*time.Second), time.Unix(0, res.NewTAT), time.Second)
 		require.Equal(t, (12 * time.Second).Nanoseconds(), res.DVT)
 		require.Equal(t, (2 * 6 * time.Second).Nanoseconds(), res.Increment)
 		require.Equal(t, clock.Now().Add(2*6*time.Second).Add(-12*time.Second).UnixNano(), res.AllowAt)
