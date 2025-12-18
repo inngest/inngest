@@ -317,7 +317,7 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 		multiplier := backlogRefillMultiplier(backlogs, backlog, latestConstraints)
 		for i := range multiplier {
 			l := l.With(
-				"multiplier", i,
+				"multiplier", multiplier,
 				"multiplier_index", i,
 			)
 
