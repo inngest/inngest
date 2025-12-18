@@ -6,13 +6,13 @@ import { pathCreator } from '@/utils/urls';
 export const Route = createFileRoute('/_authed/env/$envSlug/onboarding')({
   component: OnboardingLayout,
   loader: ({ params }) => {
-    if (!('step' in params)) {
-      redirect({
-        to: '/env/$envSlug/onboarding/$step',
-        params: { envSlug: params.envSlug, step: 'create-app' },
-        throw: true,
-      });
-    }
+    //
+    // Always redirect to production environment for onboarding
+    redirect({
+      to: '/env/$envSlug/onboarding/$step',
+      params: { envSlug: 'production', step: 'create-app' },
+      throw: true,
+    });
   },
 });
 
