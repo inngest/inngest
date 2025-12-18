@@ -313,7 +313,7 @@ LOOP:
 				// have capacity to run at least MinWorkersFree concurrent
 				// QueueItems.  This reduces latency of enqueued items when
 				// there are lots of enqueued and available jobs.
-				l.Warn("all workers busy, early exiting scan", "worker_capacity", q.capacity())
+				l.Trace("all workers busy, early exiting scan", "worker_capacity", q.capacity())
 				continue
 			}
 
