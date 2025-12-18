@@ -117,6 +117,17 @@ func WithConstraints[T any](
 	leaseID := checkResult.leaseID
 	leaseIDLock := sync.Mutex{}
 
+	source := constraintapi.LeaseSource{
+		Service:           constraintapi.ServiceExecutor,
+		RunProcessingMode: constraintapi.RunProcessingModeBackground,
+		Location:          constraintapi.CallerLocationSchedule,
+	}
+	if req.RunMode == enums.RunModeSync {
+		source.Service = constraintapi.ServiceAPI
+		source.RunProcessingMode = constraintapi.RunProcessingModeDurableEndpoint
+		source.Location = constraintapi.CallerLocationCheckpoint
+	}
+
 	go func() {
 		for {
 			select {
@@ -148,6 +159,7 @@ func WithConstraints[T any](
 					IsRateLimit: true,
 				},
 				Duration: ScheduleLeaseDuration,
+				Source:   source,
 			})
 			if err != nil {
 				l.Error("could not extend schedule capacity lease", "err", err)
@@ -190,6 +202,7 @@ func WithConstraints[T any](
 					Migration: constraintapi.MigrationIdentifier{
 						IsRateLimit: true,
 					},
+					Source: source,
 				})
 				if internalErr != nil {
 					l.ReportError(internalErr, "failed to release capacity after schedule", logger.WithErrorReportTags(map[string]string{

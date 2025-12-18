@@ -1202,6 +1202,7 @@ func (q *queue) process(
 						QueueShard:  q.primaryQueueShard.Name,
 					},
 					Duration: QueueLeaseDuration,
+					Source:   constraintapi.LeaseSource{Location: constraintapi.CallerLocationItemLease},
 				})
 				if err != nil {
 					// log error if unexpected; the queue item may be removed by a Dequeue() operation
@@ -1384,6 +1385,7 @@ func (q *queue) process(
 					IsRateLimit: false,
 					QueueShard:  q.primaryQueueShard.Name,
 				},
+				Source: constraintapi.LeaseSource{Location: constraintapi.CallerLocationItemLease},
 			})
 			if err != nil {
 				q.log.ReportError(err, "failed to release capacity", logger.WithErrorReportTags(map[string]string{
