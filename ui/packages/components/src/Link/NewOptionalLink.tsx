@@ -14,5 +14,5 @@ export const OptionalLink = ({
       {children}
     </Link>
   ) : (
-    <>{children}</>
+    <span {...props}>{children}</span>
   );
