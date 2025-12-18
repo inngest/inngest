@@ -1292,6 +1292,9 @@ func (q *queue) BacklogSize(ctx context.Context, queueShard QueueShard, backlogI
 //
 // NOTE: Applying a higher weight on non-start backlogs is important to ensure queue items to finalize existing functions have a higher likelihood
 // of being refilled to the ready queue.
+//
+// WARN: This only applies to peeked backlogs. Since we apply a random offset while peeking, we may
+// omit the default backlog. This is why we add the default backlog in processShadowPartition
 func shuffleBacklogs(b []*QueueBacklog) []*QueueBacklog {
 	weights := make([]float64, len(b))
 	for i, backlog := range b {
@@ -1313,4 +1316,25 @@ func shuffleBacklogs(b []*QueueBacklog) []*QueueBacklog {
 	}
 
 	return result
+}
+
+// backlogRefillMultiplier calculates the backlog specific multiplier to apply when refilling items.
+//
+// This is required to ensure fairness among backlogs and to guarantee that existing runs finish before new runs are started.
+func backlogRefillMultiplier(backlogs []*QueueBacklog, backlog *QueueBacklog, constraints PartitionConstraintConfig) int {
+	switch {
+	case backlog.isDefault() && constraints.Throttle != nil && len(constraints.Concurrency.CustomConcurrencyKeys) == 0:
+		// We are attempting to refill items from the default backlog while throttle is configured. This means
+		// - we are refilling items to continue or finish existing runs
+		// - we want to apply a higher priority
+		// - the first backlog is the default function backlog including items to continue existing runs
+		// - all following backlogs include start items and represent individual tenants
+
+		// Multiply based on the number of backlogs.
+		// Example: If we end up with 100 backlogs, 1 out of 100 is for continuing runs while 99 are starts.
+		// Returning len(backlogs) means we apply a multiplier of 100 to the first backlog.
+		return len(backlogs)
+	default:
+		return 1
+	}
 }
