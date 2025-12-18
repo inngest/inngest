@@ -15,7 +15,6 @@ import NotFound from '@/components/Error/NotFound';
 
 export const Route = createFileRoute('/_authed')({
   component: Authed,
-  staleTime: 0,
   notFoundComponent: () => {
     return <NotFound />;
   },

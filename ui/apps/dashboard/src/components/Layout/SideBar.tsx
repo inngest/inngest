@@ -8,7 +8,8 @@ import { Profile } from '../Navigation/Profile';
 import { Integrations } from '../Navigation/Integrations';
 import { Help } from '../Navigation/Help';
 import useOnboardingWidget from '../Onboarding/useOnboardingWidget';
-// import useOnboardingWidget from "../Onboarding/useOnboardingWidget";
+import SeatOverageWidget from '../SeatOverage/SeatOverageWidget';
+import OnboardingWidget from '../Navigation/OnboardingWidget';
 
 // Disable SSR in Onboarding Widget, to prevent hydration errors. It requires windows info
 // const OnboardingWidget = dynamic(() => import('../Navigation/OnboardingWidget'), {
@@ -30,7 +31,7 @@ export default function SideBar({
   const navRef = useRef<HTMLDivElement>(null);
 
   const [collapsed, setCollapsed] = useState<boolean>(serverCollapsed ?? false);
-  const { showWidget } = useOnboardingWidget();
+  const { isWidgetOpen, showWidget, closeWidget } = useOnboardingWidget();
 
   const autoCollapse = () =>
     typeof window !== 'undefined' &&
@@ -69,10 +70,10 @@ export default function SideBar({
         <Navigation collapsed={collapsed} activeEnv={activeEnv} />
 
         <div className="mx-4">
-          {/* <SeatOverageWidget collapsed={collapsed} />
+          <SeatOverageWidget collapsed={collapsed} />
           {isWidgetOpen && (
             <OnboardingWidget collapsed={collapsed} closeWidget={closeWidget} />
-          )} */}
+          )}
           <Integrations collapsed={collapsed} />
           <Help collapsed={collapsed} showWidget={showWidget} />
         </div>
