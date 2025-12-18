@@ -136,7 +136,6 @@ export default function EnvironmentSelectMenu({
   //
   // Sync selected state with activeEnv from route
   useEffect(() => {
-    console.log('activeEnv changed:', activeEnv);
     setSelected(activeEnv || null);
   }, [activeEnv]);
 

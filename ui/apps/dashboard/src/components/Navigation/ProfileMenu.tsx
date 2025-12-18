@@ -11,7 +11,7 @@ import {
 import ModeSwitch from '@inngest/components/ThemeMode/ModeSwitch';
 
 import { pathCreator } from '@/utils/urls';
-import { Link } from '@tanstack/react-router';
+import { useNavigate } from '@tanstack/react-router';
 import { SignOutButton } from '../Auth/SignOutButton';
 import type { FileRouteTypes } from '@/routeTree.gen';
 
@@ -20,6 +20,8 @@ type Props = React.PropsWithChildren<{
 }>;
 
 export const ProfileMenu = ({ children, isMarketplace }: Props) => {
+  const navigate = useNavigate();
+
   return (
     <Listbox>
       <Listbox.Button className="w-full cursor-pointer ring-0">
@@ -38,86 +40,82 @@ export const ProfileMenu = ({ children, isMarketplace }: Props) => {
 
           <hr className="border-subtle" />
 
-          <Link to="/settings/user" resetScroll={false}>
-            <Listbox.Option
-              className="text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
-              value="userProfile"
-            >
-              <div className="hover:bg-canvasSubtle flex flex-row items-center justify-start">
-                <RiUserLine className="text-muted mr-2 h-4 w-4" />
-                <div>Your Profile</div>
-              </div>
-            </Listbox.Option>
-          </Link>
-          <Link
-            to={'/settings/organization' as FileRouteTypes['to']}
-            resetScroll={false}
+          <Listbox.Option
+            className="text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
+            value="userProfile"
+            onClick={() => navigate({ to: '/settings/user' })}
           >
-            <Listbox.Option
-              className="text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
-              value="org"
-            >
-              <div className="hover:bg-canvasSubtle flex flex-row items-center justify-start">
-                <RiEqualizerLine className="text-muted mr-2 h-4 w-4 " />
-                <div>Your Organization</div>
-              </div>
-            </Listbox.Option>
-          </Link>
-
-          <Link
-            to={
-              '/settings/organization/organization-members' as FileRouteTypes['to']
+            <div className="hover:bg-canvasSubtle flex flex-row items-center justify-start">
+              <RiUserLine className="text-muted mr-2 h-4 w-4" />
+              <div>Your Profile</div>
+            </div>
+          </Listbox.Option>
+          <Listbox.Option
+            className="text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
+            value="org"
+            onClick={() =>
+              navigate({ to: '/settings/organization' as FileRouteTypes['to'] })
             }
-            resetScroll={false}
           >
-            <Listbox.Option
-              className="text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
-              value="members"
-            >
-              <div className="hover:bg-canvasSubtle flex flex-row items-center justify-start">
-                <RiGroupLine className="text-muted mr-2 h-4 w-4" />
-                <div>Members</div>
-              </div>
-            </Listbox.Option>
-          </Link>
+            <div className="hover:bg-canvasSubtle flex flex-row items-center justify-start">
+              <RiEqualizerLine className="text-muted mr-2 h-4 w-4 " />
+              <div>Your Organization</div>
+            </div>
+          </Listbox.Option>
 
-          <Link to={pathCreator.billing()}>
-            <Listbox.Option
-              className="text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
-              value="billing"
-            >
-              <div className="hover:bg-canvasSubtle flex flex-row items-center justify-start">
-                <RiBillLine className="text-muted mr-2 h-4 w-4" />
-                <div>Billing</div>
-              </div>
-            </Listbox.Option>
-          </Link>
+          <Listbox.Option
+            className="text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
+            value="members"
+            onClick={() =>
+              navigate({
+                to: '/settings/organization/organization-members' as FileRouteTypes['to'],
+              })
+            }
+          >
+            <div className="hover:bg-canvasSubtle flex flex-row items-center justify-start">
+              <RiGroupLine className="text-muted mr-2 h-4 w-4" />
+              <div>Members</div>
+            </div>
+          </Listbox.Option>
 
-          <Link to={'/organization-list' as FileRouteTypes['to']}>
-            <Listbox.Option
-              className="text-muted hover:bg-canvasSubtle m-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
-              value="switchOrg"
-            >
-              <div className="hover:bg-canvasSubtle flex flex-row items-center justify-start">
-                <RiArrowLeftRightLine className="text-muted mr-2 h-4 w-4" />
-                <div>Switch Organization</div>
-              </div>
-            </Listbox.Option>
-          </Link>
+          <Listbox.Option
+            className="text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
+            value="billing"
+            onClick={() => navigate({ to: pathCreator.billing() })}
+          >
+            <div className="hover:bg-canvasSubtle flex flex-row items-center justify-start">
+              <RiBillLine className="text-muted mr-2 h-4 w-4" />
+              <div>Billing</div>
+            </div>
+          </Listbox.Option>
+
+          <Listbox.Option
+            className="text-muted hover:bg-canvasSubtle m-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
+            value="switchOrg"
+            onClick={() =>
+              navigate({ to: '/organization-list' as FileRouteTypes['to'] })
+            }
+          >
+            <div className="hover:bg-canvasSubtle flex flex-row items-center justify-start">
+              <RiArrowLeftRightLine className="text-muted mr-2 h-4 w-4" />
+              <div>Switch Organization</div>
+            </div>
+          </Listbox.Option>
 
           <hr className="border-subtle" />
 
-          <Link to={'/sign-in/choose' as FileRouteTypes['to']}>
-            <Listbox.Option
-              className="text-muted hover:bg-canvasSubtle m-2 mx-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
-              value="switchAccount"
-            >
-              <div className="hover:bg-canvasSubtle flex flex-row items-center justify-start">
-                <RiUserSharedLine className="text-muted mr-2 h-4 w-4" />
-                <div>Switch Account</div>
-              </div>
-            </Listbox.Option>
-          </Link>
+          <Listbox.Option
+            className="text-muted hover:bg-canvasSubtle m-2 mx-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
+            value="switchAccount"
+            onClick={() =>
+              navigate({ to: '/sign-in/choose' as FileRouteTypes['to'] })
+            }
+          >
+            <div className="hover:bg-canvasSubtle flex flex-row items-center justify-start">
+              <RiUserSharedLine className="text-muted mr-2 h-4 w-4" />
+              <div>Switch Account</div>
+            </div>
+          </Listbox.Option>
           <hr className="border-subtle" />
           <Listbox.Option
             className="text-muted hover:bg-canvasSubtle m-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
