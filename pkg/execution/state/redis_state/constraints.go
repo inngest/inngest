@@ -11,6 +11,7 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -91,12 +92,18 @@ func (q *queue) backlogRefillConstraintCheck(
 	}
 
 	if q.capacityManager == nil || q.useConstraintAPI == nil {
+		metrics.IncrBacklogRefillConstraintCheckFallbackCounter(ctx, enums.BacklogRefillConstraintCheckFallbackReasonConstraintAPIUninitialized.String(), metrics.CounterOpt{
+			PkgName: pkgName,
+		})
 		return &backlogRefillConstraintCheckResult{
 			itemsToRefill: itemIDs,
 		}, nil
 	}
 
 	if shadowPart.AccountID == nil || shadowPart.EnvID == nil || shadowPart.FunctionID == nil {
+		metrics.IncrBacklogRefillConstraintCheckFallbackCounter(ctx, enums.BacklogRefillConstraintCheckFallbackReasonIDNil.String(), metrics.CounterOpt{
+			PkgName: pkgName,
+		})
 		return &backlogRefillConstraintCheckResult{
 			itemsToRefill: itemIDs,
 		}, nil
@@ -104,6 +111,9 @@ func (q *queue) backlogRefillConstraintCheck(
 
 	useAPI, fallback := q.useConstraintAPI(ctx, *shadowPart.AccountID, *shadowPart.EnvID, *shadowPart.FunctionID)
 	if !useAPI {
+		metrics.IncrBacklogRefillConstraintCheckFallbackCounter(ctx, enums.BacklogRefillConstraintCheckFallbackReasonFeatureFlagDisabled.String(), metrics.CounterOpt{
+			PkgName: pkgName,
+		})
 		return &backlogRefillConstraintCheckResult{
 			itemsToRefill: itemIDs,
 		}, nil
@@ -138,6 +148,9 @@ func (q *queue) backlogRefillConstraintCheck(
 		}
 
 		// Attempt to fall back to BacklogRefill -- ignore GCRA with constraint check idempotency
+		metrics.IncrBacklogRefillConstraintCheckFallbackCounter(ctx, enums.BacklogRefillConstraintCheckFallbackReasonConstraintAPIError.String(), metrics.CounterOpt{
+			PkgName: pkgName,
+		})
 		return &backlogRefillConstraintCheckResult{
 			itemsToRefill: itemIDs,
 		}, nil

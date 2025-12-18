@@ -779,3 +779,17 @@ func IncrAsyncCancellationCheckCounter(ctx context.Context, count int64, opts Co
 		Tags:        opts.Tags,
 	})
 }
+
+func IncrBacklogRefillConstraintCheckFallbackCounter(ctx context.Context, reason string, opts CounterOpt) {
+	if opts.Tags == nil {
+		opts.Tags = map[string]any{}
+	}
+	opts.Tags["reason"] = reason
+
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "backlog_refill_constraint_check_fallback_total",
+		Description: "Total number of backlog refill constraint check fallbacks with reason",
+		Tags:        opts.Tags,
+	})
+}
