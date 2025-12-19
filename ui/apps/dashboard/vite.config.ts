@@ -42,35 +42,7 @@ export default defineConfig({
   },
   plugins: [
     tanstackStart(),
-    nitroV2Plugin({
-      hooks: {
-        compiled(nitro) {
-          //
-          // Hack alert: we're inlining the server side senty init here
-          // so we don't have to eject from the nitro preset on vercel to do it the
-          // sentry way: https://docs.sentry.io/platforms/javascript/guides/tanstackstart-react/
-          // when we move to proper nitro we can use a plugin
-          const entryPath = path.join(
-            nitro.options.output.serverDir,
-            'index.mjs',
-          );
-
-          if (fs.existsSync(entryPath)) {
-            const content = fs.readFileSync(entryPath, 'utf-8');
-            const sentryInit = `import * as Sentry from "@sentry/tanstackstart-react";
-              Sentry.init({
-                dsn: process.env.VITE_SENTRY_DSN,
-                tracesSampleRate: 0.2,
-              });
-            `;
-
-            if (!content.includes('Sentry.init')) {
-              fs.writeFileSync(entryPath, sentryInit + content);
-            }
-          }
-        },
-      },
-    }),
+    nitroV2Plugin(),
     tsConfigPaths({
       projects: ['./tsconfig.json'],
     }),
