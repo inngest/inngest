@@ -42,7 +42,7 @@ export const Route = createFileRoute('/_authed/integrations/vercel/callback/')({
   },
 });
 
-async function VercelCallbackComponent() {
+function VercelCallbackComponent() {
   const searchParams = Route.useSearch();
   const vercelIntegration = Route.useLoaderData();
   if (!searchParams.code) {
