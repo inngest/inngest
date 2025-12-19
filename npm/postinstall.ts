@@ -58,7 +58,7 @@ async function getBinaryUrl(source: "cdn" | "github"): Promise<URL> {
 
   if (source === "cdn") {
     const url = new URL(
-      `https://cli.inngest.com/artifact/v${version}/inngest_${version}_${platform.platform}_${arch}${platform.extension}`
+      `http://localhost:8080/inngest_v${version}_${platform.platform}_${arch}${platform.extension}`
     );
     debug("targetUrl:", url.href);
     return url;
