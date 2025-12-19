@@ -508,7 +508,7 @@ func (b QueueBacklog) isDefault() bool {
 func (b QueueBacklog) isOutdated(constraints PartitionConstraintConfig) enums.QueueNormalizeReason {
 	// If the backlog represents newer items than the constraints we're working on,
 	// do not attempt to mark the backlog as outdated. Constraints MUST be >= backlog function version at all times.
-	if b.EarliestFunctionVersion > 0 && constraints.FunctionVersion > 0 && b.EarliestFunctionVersion >= constraints.FunctionVersion {
+	if b.EarliestFunctionVersion > 0 && constraints.FunctionVersion > 0 && b.EarliestFunctionVersion > constraints.FunctionVersion {
 		return enums.QueueNormalizeReasonUnchanged
 	}
 
