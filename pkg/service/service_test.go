@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -21,7 +20,6 @@ type mockserver struct {
 	stop func(ctx context.Context) error
 
 	startTimeout time.Duration
-	runTimeout   time.Duration
 }
 
 func (m mockserver) Name() string {
@@ -50,13 +48,6 @@ func (m mockserver) StartTimeout() time.Duration {
 	return defaultTimeout
 }
 
-func (m mockserver) RunTimeout() time.Duration {
-	if m.runTimeout != 0 {
-		return m.runTimeout
-	}
-	return defaultTimeout
-}
-
 func TestStart(t *testing.T) {
 	m := mockserver{
 		pre:  func(ctx context.Context) error { return nil },
@@ -76,58 +67,7 @@ func TestSignals(t *testing.T) {
 	}
 
 	for name, sig := range signals {
-
-		t.Run(fmt.Sprintf("%s: It waits the full run timeout to end", name), func(t *testing.T) {
-			timeout := 5 * time.Second
-			m := mockserver{
-				pre: func(ctx context.Context) error { return nil },
-				run: func(ctx context.Context) error {
-					start := time.Now()
-					i := 0
-					// Run for longer than the timeout, ensuring that the service ends with ErrRunTimeout.
-					for time.Now().Before(start.Add(timeout * 2)) {
-						if i > 2 {
-							require.NotNil(t, ctx.Err(), "expected ctx to be cancelled with signal")
-						}
-						i++
-						<-time.After(time.Second)
-					}
-					return nil
-				},
-				runTimeout: timeout,
-				stop:       func(ctx context.Context) error { return nil },
-			}
-
-			// Track when the fn is done.
-			wg := sync.WaitGroup{}
-			wg.Add(1)
-
-			go func() {
-				// Block until the service finishes.
-				err := Start(context.Background(), m)
-				// The server above does not finish before the timeout.
-				require.Equal(t, true, errors.Is(err, ErrRunTimeout))
-				wg.Done()
-			}()
-
-			<-time.After(50 * time.Millisecond)
-
-			start := time.Now()
-
-			// XXX: We use gopsutil for support on linux and windows.
-			p, err := process.NewProcess(int32(syscall.Getpid()))
-			require.NoError(t, err)
-			err = p.SendSignal(sig)
-			require.NoError(t, err)
-
-			wg.Wait()
-
-			// The timeout should end after runTimeout.
-			require.WithinDuration(t, time.Now(), start.Add(m.runTimeout), 50*time.Millisecond)
-		})
-
 		t.Run(fmt.Sprintf("%s: Run context is cancelled and we end the fn", name), func(t *testing.T) {
-			timeout := 5 * time.Second
 			m := mockserver{
 				pre: func(ctx context.Context) error { return nil },
 				run: func(ctx context.Context) error {
@@ -139,8 +79,7 @@ func TestSignals(t *testing.T) {
 					}
 					return nil
 				},
-				runTimeout: timeout,
-				stop:       func(ctx context.Context) error { return nil },
+				stop: func(ctx context.Context) error { return nil },
 			}
 
 			// Track when the fn is done.
@@ -226,7 +165,7 @@ func TestSingleSvcError(t *testing.T) {
 				<-time.After(500 * time.Millisecond)
 				return fmt.Errorf("boo")
 			}
-			//The others should run.
+			// The others should run.
 			select {
 			case <-time.After(time.Minute):
 			case <-ctx.Done():
