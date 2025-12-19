@@ -2,6 +2,7 @@ syntax = "proto3";
 package api.v2;
 
 import "google/protobuf/timestamp.proto";
+import "google/protobuf/struct.proto";
 import "third_party/google/api/annotations.proto";
 import "api/v2/options.proto";
 import "third_party/protoc-gen-openapiv2/options/annotations.proto";
@@ -912,6 +913,144 @@ service V2 {
       }
     };
   }
+
+  rpc InvokeFunction(InvokeFunctionRequest) returns (InvokeFunctionResponse) {
+    option (google.api.http) = {
+      post: "/functions/{function_id}/invoke",
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Invoke function"
+      description: "Invokes a function, executing the function either asynchronously or synchronously based on the mode parameter in the request body"
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+      responses: {
+        key: "200"
+        value: {
+          description: "Function invoked synchronously and has finished executing"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2InvokeFunctionResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "201"
+        value: {
+          description: "Function invoked asynchronously"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2InvokeFunctionResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "202"
+        value: {
+          description: "Function invoked synchronously but has not yet finished executing"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2InvokeFunctionResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "400"
+        value: {
+          description: "Bad Request - invalid input data"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "401"
+        value: {
+          description: "Unauthorized - authentication required"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "403"
+        value: {
+          description: "Forbidden - insufficient permissions"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "404"
+        value: {
+          description: "Not Found - function not found"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "409"
+        value: {
+          description: "Conflict - this function has already been invoked using the given idempotency key.  Note that this returns the previously invoked run's data."
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2InvokeFunctionResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "422"
+        value: {
+          description: "Unprocessable Entity - function was rate limited, debounced, skipped, or otherwise could not be invoked"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "429"
+        value: {
+          description: "Too Many Requests - API rate limit exceeded.  The request was entirely rejected, and no function was invoked."
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "500"
+        value: {
+          description: "Internal Server Error"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+    };
+  }
 }
 
 message HealthRequest {
@@ -1201,4 +1340,88 @@ message PatchEnvRequest {
 message PatchEnvsResponse {
   Env data = 1;
   ResponseMetadata metadata = 2;
+}
+
+message InvokeFunctionRequest {
+  string function_id = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "The ID of the function to invoke"
+      example: "\"my-app-hello-world\""
+    }
+  ];
+  google.protobuf.Struct data = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "JSON object containing the input data for the function"
+      example: "{\"message\": \"Hello, World!\"}"
+    }
+  ];
+  optional string idempotency_key = 3 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Optional idempotency key to ensure the function is only invoked once within 24h using the same key"
+      example: "\"user-action-123\""
+    }
+  ];
+  // optional string mode = 4 [
+  //   (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+  //     description: "Execution mode: 'sync' for synchronous execution, 'async' for asynchronous execution"
+  //     default: "async"
+  //     enum: ["sync", "async"]
+  //   }
+  // ];
+}
+
+
+enum RunStatus {
+  RUN_STATUS_QUEUED = 0;
+  RUN_STATUS_RUNNING = 1;
+  RUN_STATUS_COMPLETED = 2;
+  RUN_STATUS_FAILED = 3;
+  RUN_STATUS_CANCELLED = 4;
+  RUN_STATUS_SKIPPED = 5;
+}
+
+message InvokeFunctionResponse {
+  InvokeFunctionData data = 1;
+  ResponseMetadata metadata = 2;
+}
+
+message InvokeFunctionData {
+  string run_id = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Unique identifier for this function execution"
+      example: "\"01hp1zx8m3ng9vp6qn0xk7j4cy\""
+    }
+  ];
+  RunStatus status = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Current status of the function execution"
+      example: "\"RUN_STATUS_RUNNING\""
+    }
+  ];
+  google.protobuf.Timestamp queued_at = 3 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Timestamp when the function execution was enqueued"
+    }
+  ];
+  optional google.protobuf.Timestamp started_at = 4 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Timestamp when the function execution started (if started)"
+    }
+  ];
+  optional google.protobuf.Timestamp completed_at = 5 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Timestamp when the function execution completed (if finished)"
+    }
+  ];
+  optional string result = 6 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "JSON string containing the function result (only available for completed synchronous invocations)"
+      example: "\"{\\\"success\\\": true, \\\"data\\\": \\\"Hello, World!\\\"}\""
+    }
+  ];
+  optional string error = 7 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Error message if the function execution failed"
+    }
+  ];
 }

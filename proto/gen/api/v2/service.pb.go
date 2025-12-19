@@ -11,6 +11,7 @@ import (
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	structpb "google.golang.org/protobuf/types/known/structpb"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
@@ -117,6 +118,64 @@ func (x FilterType) Number() protoreflect.EnumNumber {
 // Deprecated: Use FilterType.Descriptor instead.
 func (FilterType) EnumDescriptor() ([]byte, []int) {
 	return file_api_v2_service_proto_rawDescGZIP(), []int{1}
+}
+
+type RunStatus int32
+
+const (
+	RunStatus_RUN_STATUS_QUEUED    RunStatus = 0
+	RunStatus_RUN_STATUS_RUNNING   RunStatus = 1
+	RunStatus_RUN_STATUS_COMPLETED RunStatus = 2
+	RunStatus_RUN_STATUS_FAILED    RunStatus = 3
+	RunStatus_RUN_STATUS_CANCELLED RunStatus = 4
+	RunStatus_RUN_STATUS_SKIPPED   RunStatus = 5
+)
+
+// Enum value maps for RunStatus.
+var (
+	RunStatus_name = map[int32]string{
+		0: "RUN_STATUS_QUEUED",
+		1: "RUN_STATUS_RUNNING",
+		2: "RUN_STATUS_COMPLETED",
+		3: "RUN_STATUS_FAILED",
+		4: "RUN_STATUS_CANCELLED",
+		5: "RUN_STATUS_SKIPPED",
+	}
+	RunStatus_value = map[string]int32{
+		"RUN_STATUS_QUEUED":    0,
+		"RUN_STATUS_RUNNING":   1,
+		"RUN_STATUS_COMPLETED": 2,
+		"RUN_STATUS_FAILED":    3,
+		"RUN_STATUS_CANCELLED": 4,
+		"RUN_STATUS_SKIPPED":   5,
+	}
+)
+
+func (x RunStatus) Enum() *RunStatus {
+	p := new(RunStatus)
+	*p = x
+	return p
+}
+
+func (x RunStatus) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (RunStatus) Descriptor() protoreflect.EnumDescriptor {
+	return file_api_v2_service_proto_enumTypes[2].Descriptor()
+}
+
+func (RunStatus) Type() protoreflect.EnumType {
+	return &file_api_v2_service_proto_enumTypes[2]
+}
+
+func (x RunStatus) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use RunStatus.Descriptor instead.
+func (RunStatus) EnumDescriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{2}
 }
 
 type HealthRequest struct {
@@ -2087,11 +2146,223 @@ func (x *PatchEnvsResponse) GetMetadata() *ResponseMetadata {
 	return nil
 }
 
+type InvokeFunctionRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	FunctionId     string                 `protobuf:"bytes,1,opt,name=function_id,json=functionId,proto3" json:"function_id,omitempty"`
+	Data           *structpb.Struct       `protobuf:"bytes,2,opt,name=data,proto3" json:"data,omitempty"`
+	Mode           *string                `protobuf:"bytes,3,opt,name=mode,proto3,oneof" json:"mode,omitempty"`
+	IdempotencyKey *string                `protobuf:"bytes,4,opt,name=idempotency_key,json=idempotencyKey,proto3,oneof" json:"idempotency_key,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *InvokeFunctionRequest) Reset() {
+	*x = InvokeFunctionRequest{}
+	mi := &file_api_v2_service_proto_msgTypes[34]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *InvokeFunctionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*InvokeFunctionRequest) ProtoMessage() {}
+
+func (x *InvokeFunctionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[34]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use InvokeFunctionRequest.ProtoReflect.Descriptor instead.
+func (*InvokeFunctionRequest) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{34}
+}
+
+func (x *InvokeFunctionRequest) GetFunctionId() string {
+	if x != nil {
+		return x.FunctionId
+	}
+	return ""
+}
+
+func (x *InvokeFunctionRequest) GetData() *structpb.Struct {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+func (x *InvokeFunctionRequest) GetMode() string {
+	if x != nil && x.Mode != nil {
+		return *x.Mode
+	}
+	return ""
+}
+
+func (x *InvokeFunctionRequest) GetIdempotencyKey() string {
+	if x != nil && x.IdempotencyKey != nil {
+		return *x.IdempotencyKey
+	}
+	return ""
+}
+
+type InvokeFunctionResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Data          *InvokeFunctionData    `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
+	Metadata      *ResponseMetadata      `protobuf:"bytes,2,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *InvokeFunctionResponse) Reset() {
+	*x = InvokeFunctionResponse{}
+	mi := &file_api_v2_service_proto_msgTypes[35]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *InvokeFunctionResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*InvokeFunctionResponse) ProtoMessage() {}
+
+func (x *InvokeFunctionResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[35]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use InvokeFunctionResponse.ProtoReflect.Descriptor instead.
+func (*InvokeFunctionResponse) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{35}
+}
+
+func (x *InvokeFunctionResponse) GetData() *InvokeFunctionData {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+func (x *InvokeFunctionResponse) GetMetadata() *ResponseMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+type InvokeFunctionData struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RunId         string                 `protobuf:"bytes,1,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
+	Status        RunStatus              `protobuf:"varint,2,opt,name=status,proto3,enum=api.v2.RunStatus" json:"status,omitempty"`
+	QueuedAt      *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=queued_at,json=queuedAt,proto3" json:"queued_at,omitempty"`
+	StartedAt     *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=started_at,json=startedAt,proto3,oneof" json:"started_at,omitempty"`
+	CompletedAt   *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=completed_at,json=completedAt,proto3,oneof" json:"completed_at,omitempty"`
+	Result        *string                `protobuf:"bytes,6,opt,name=result,proto3,oneof" json:"result,omitempty"`
+	Error         *string                `protobuf:"bytes,7,opt,name=error,proto3,oneof" json:"error,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *InvokeFunctionData) Reset() {
+	*x = InvokeFunctionData{}
+	mi := &file_api_v2_service_proto_msgTypes[36]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *InvokeFunctionData) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*InvokeFunctionData) ProtoMessage() {}
+
+func (x *InvokeFunctionData) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[36]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use InvokeFunctionData.ProtoReflect.Descriptor instead.
+func (*InvokeFunctionData) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{36}
+}
+
+func (x *InvokeFunctionData) GetRunId() string {
+	if x != nil {
+		return x.RunId
+	}
+	return ""
+}
+
+func (x *InvokeFunctionData) GetStatus() RunStatus {
+	if x != nil {
+		return x.Status
+	}
+	return RunStatus_RUN_STATUS_QUEUED
+}
+
+func (x *InvokeFunctionData) GetQueuedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.QueuedAt
+	}
+	return nil
+}
+
+func (x *InvokeFunctionData) GetStartedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.StartedAt
+	}
+	return nil
+}
+
+func (x *InvokeFunctionData) GetCompletedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CompletedAt
+	}
+	return nil
+}
+
+func (x *InvokeFunctionData) GetResult() string {
+	if x != nil && x.Result != nil {
+		return *x.Result
+	}
+	return ""
+}
+
+func (x *InvokeFunctionData) GetError() string {
+	if x != nil && x.Error != nil {
+		return *x.Error
+	}
+	return ""
+}
+
 var File_api_v2_service_proto protoreflect.FileDescriptor
 
 const file_api_v2_service_proto_rawDesc = "" +
 	"\n" +
-	"\x14api/v2/service.proto\x12\x06api.v2\x1a\x1fgoogle/protobuf/timestamp.proto\x1a(third_party/google/api/annotations.proto\x1a\x14api/v2/options.proto\x1a:third_party/protoc-gen-openapiv2/options/annotations.proto\"\x0f\n" +
+	"\x14api/v2/service.proto\x12\x06api.v2\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a(third_party/google/api/annotations.proto\x1a\x14api/v2/options.proto\x1a:third_party/protoc-gen-openapiv2/options/annotations.proto\"\x0f\n" +
 	"\rHealthRequest\"\x15\n" +
 	"\x13FetchAccountRequest\"n\n" +
 	"\x0eHealthResponse\x12&\n" +
@@ -2243,7 +2514,31 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\v_isArchived\"j\n" +
 	"\x11PatchEnvsResponse\x12\x1f\n" +
 	"\x04data\x18\x01 \x01(\v2\v.api.v2.EnvR\x04data\x124\n" +
-	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata*/\n" +
+	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"\xd1\x04\n" +
+	"\x15InvokeFunctionRequest\x12\\\n" +
+	"\vfunction_id\x18\x01 \x01(\tB;\x92A82 The ID of the function to invokeJ\x14\"my-app-hello-world\"R\n" +
+	"functionId\x12\x86\x01\n" +
+	"\x04data\x18\x02 \x01(\v2\x17.google.protobuf.StructBY\x92AV26JSON object containing the input data for the functionJ\x1c{\"message\": \"Hello, World!\"}R\x04data\x12\x88\x01\n" +
+	"\x04mode\x18\x03 \x01(\tBo\x92Al2TExecution mode: 'sync' for synchronous execution, 'async' for asynchronous execution:\x05async\xf2\x02\x04sync\xf2\x02\x05asyncH\x00R\x04mode\x88\x01\x01\x12\xa8\x01\n" +
+	"\x0fidempotency_key\x18\x04 \x01(\tBz\x92Aw2bOptional idempotency key to ensure the function is only invoked once within 24h using the same keyJ\x11\"user-action-123\"H\x01R\x0eidempotencyKey\x88\x01\x01B\a\n" +
+	"\x05_modeB\x12\n" +
+	"\x10_idempotency_key\"~\n" +
+	"\x16InvokeFunctionResponse\x12.\n" +
+	"\x04data\x18\x01 \x01(\v2\x1a.api.v2.InvokeFunctionDataR\x04data\x124\n" +
+	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"\xaa\a\n" +
+	"\x12InvokeFunctionData\x12g\n" +
+	"\x06run_id\x18\x01 \x01(\tBP\x92AM2-Unique identifier for this function executionJ\x1c\"01hp1zx8m3ng9vp6qn0xk7j4cy\"R\x05runId\x12n\n" +
+	"\x06status\x18\x02 \x01(\x0e2\x11.api.v2.RunStatusBC\x92A@2(Current status of the function executionJ\x14\"RUN_STATUS_RUNNING\"R\x06status\x12p\n" +
+	"\tqueued_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampB7\x92A422Timestamp when the function execution was enqueuedR\bqueuedAt\x12\x7f\n" +
+	"\n" +
+	"started_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampB?\x92A<2:Timestamp when the function execution started (if started)H\x00R\tstartedAt\x88\x01\x01\x12\x86\x01\n" +
+	"\fcompleted_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampBB\x92A?2=Timestamp when the function execution completed (if finished)H\x01R\vcompletedAt\x88\x01\x01\x12\xb9\x01\n" +
+	"\x06result\x18\x06 \x01(\tB\x9b\x01\x92A\x97\x012aJSON string containing the function result (only available for completed synchronous invocations)J2\"{\\\"success\\\": true, \\\"data\\\": \\\"Hello, World!\\\"}\"H\x02R\x06result\x88\x01\x01\x12N\n" +
+	"\x05error\x18\a \x01(\tB3\x92A02.Error message if the function execution failedH\x03R\x05error\x88\x01\x01B\r\n" +
+	"\v_started_atB\x0f\n" +
+	"\r_completed_atB\t\n" +
+	"\a_resultB\b\n" +
+	"\x06_error*/\n" +
 	"\aEnvType\x12\x0e\n" +
 	"\n" +
 	"PRODUCTION\x10\x00\x12\b\n" +
@@ -2253,7 +2548,14 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\n" +
 	"FilterType\x12\t\n" +
 	"\x05ALLOW\x10\x00\x12\b\n" +
-	"\x04DENY\x10\x012\xd8;\n" +
+	"\x04DENY\x10\x01*\x9d\x01\n" +
+	"\tRunStatus\x12\x15\n" +
+	"\x11RUN_STATUS_QUEUED\x10\x00\x12\x16\n" +
+	"\x12RUN_STATUS_RUNNING\x10\x01\x12\x18\n" +
+	"\x14RUN_STATUS_COMPLETED\x10\x02\x12\x15\n" +
+	"\x11RUN_STATUS_FAILED\x10\x03\x12\x18\n" +
+	"\x14RUN_STATUS_CANCELLED\x10\x04\x12\x16\n" +
+	"\x12RUN_STATUS_SKIPPED\x10\x052\xfbF\n" +
 	"\x02V2\x12\xb2\x02\n" +
 	"\x06Health\x12\x15.api.v2.HealthRequest\x1a\x16.api.v2.HealthResponse\"\xf8\x01\x92A\xe5\x01\x12\fHealth check\x1a,Returns the health status of the API serviceJR\n" +
 	"\x03401\x12K\n" +
@@ -2490,7 +2792,46 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x0e\n" +
 	"\n" +
 	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x0f:\x01*2\n" +
-	"/envs/{id}B\xc8\x02\x92A\x91\x02\x12\x9b\x01\n" +
+	"/envs/{id}\x12\xa0\v\n" +
+	"\x0eInvokeFunction\x12\x1d.api.v2.InvokeFunctionRequest\x1a\x1e.api.v2.InvokeFunctionResponse\"\xce\n" +
+	"\x92A\xa0\n" +
+	"\x12\x0fInvoke function\x1a\x81\x01Invokes a function, executing the function either asynchronously or synchronously based on the mode parameter in the request bodyJn\n" +
+	"\x03200\x12g\n" +
+	"9Function invoked synchronously and has finished executing\x12*\n" +
+	"(\x1a&#/definitions/v2InvokeFunctionResponseJT\n" +
+	"\x03201\x12M\n" +
+	"\x1fFunction invoked asynchronously\x12*\n" +
+	"(\x1a&#/definitions/v2InvokeFunctionResponseJv\n" +
+	"\x03202\x12o\n" +
+	"AFunction invoked synchronously but has not yet finished executing\x12*\n" +
+	"(\x1a&#/definitions/v2InvokeFunctionResponseJL\n" +
+	"\x03400\x12E\n" +
+	" Bad Request - invalid input data\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJR\n" +
+	"\x03401\x12K\n" +
+	"&Unauthorized - authentication required\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJP\n" +
+	"\x03403\x12I\n" +
+	"$Forbidden - insufficient permissions\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJJ\n" +
+	"\x03404\x12C\n" +
+	"\x1eNot Found - function not found\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJ\xc4\x01\n" +
+	"\x03409\x12\xbc\x01\n" +
+	"\x8d\x01Conflict - this function has already been invoked using the given idempotency key.  Note that this returns the previously invoked run's data.\x12*\n" +
+	"(\x1a&#/definitions/v2InvokeFunctionResponseJ\x85\x01\n" +
+	"\x03422\x12~\n" +
+	"YUnprocessable Entity - function was debounced, skipped, or otherwise could not be invoked\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJg\n" +
+	"\x03429\x12`\n" +
+	";Too Many Requests - function invocation rate limit exceeded\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJA\n" +
+	"\x03500\x12:\n" +
+	"\x15Internal Server Error\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseb\x10\n" +
+	"\x0e\n" +
+	"\n" +
+	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02$:\x01*\"\x1f/functions/{function_id}/invokeB\xc8\x02\x92A\x91\x02\x12\x9b\x01\n" +
 	"\x13Inngest REST API v2\x12}The v2 API delivers a significantly improved developer experience with consistent design patterns and enhanced functionality.2\x052.0.0\x1a\x0fapi.inngest.com\"\x03/v2*\x01\x02ZX\n" +
 	"V\n" +
 	"\n" +
@@ -2508,120 +2849,134 @@ func file_api_v2_service_proto_rawDescGZIP() []byte {
 	return file_api_v2_service_proto_rawDescData
 }
 
-var file_api_v2_service_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_api_v2_service_proto_msgTypes = make([]protoimpl.MessageInfo, 34)
+var file_api_v2_service_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
+var file_api_v2_service_proto_msgTypes = make([]protoimpl.MessageInfo, 37)
 var file_api_v2_service_proto_goTypes = []any{
 	(EnvType)(0),                            // 0: api.v2.EnvType
 	(FilterType)(0),                         // 1: api.v2.FilterType
-	(*HealthRequest)(nil),                   // 2: api.v2.HealthRequest
-	(*FetchAccountRequest)(nil),             // 3: api.v2.FetchAccountRequest
-	(*HealthResponse)(nil),                  // 4: api.v2.HealthResponse
-	(*HealthData)(nil),                      // 5: api.v2.HealthData
-	(*Error)(nil),                           // 6: api.v2.Error
-	(*ErrorResponse)(nil),                   // 7: api.v2.ErrorResponse
-	(*ResponseMetadata)(nil),                // 8: api.v2.ResponseMetadata
-	(*CreateAccountRequest)(nil),            // 9: api.v2.CreateAccountRequest
-	(*CreateAccountResponse)(nil),           // 10: api.v2.CreateAccountResponse
-	(*CreateEnvRequest)(nil),                // 11: api.v2.CreateEnvRequest
-	(*CreateEnvResponse)(nil),               // 12: api.v2.CreateEnvResponse
-	(*Env)(nil),                             // 13: api.v2.Env
-	(*CreateAccountData)(nil),               // 14: api.v2.CreateAccountData
-	(*FetchAccountsRequest)(nil),            // 15: api.v2.FetchAccountsRequest
-	(*FetchAccountsResponse)(nil),           // 16: api.v2.FetchAccountsResponse
-	(*FetchAccountResponse)(nil),            // 17: api.v2.FetchAccountResponse
-	(*Account)(nil),                         // 18: api.v2.Account
-	(*Page)(nil),                            // 19: api.v2.Page
-	(*FetchAccountEventKeysRequest)(nil),    // 20: api.v2.FetchAccountEventKeysRequest
-	(*FetchAccountEventKeysResponse)(nil),   // 21: api.v2.FetchAccountEventKeysResponse
-	(*EventKey)(nil),                        // 22: api.v2.EventKey
-	(*FetchAccountEnvsRequest)(nil),         // 23: api.v2.FetchAccountEnvsRequest
-	(*FetchAccountEnvsResponse)(nil),        // 24: api.v2.FetchAccountEnvsResponse
-	(*FetchAccountSigningKeysRequest)(nil),  // 25: api.v2.FetchAccountSigningKeysRequest
-	(*FetchAccountSigningKeysResponse)(nil), // 26: api.v2.FetchAccountSigningKeysResponse
-	(*SigningKey)(nil),                      // 27: api.v2.SigningKey
-	(*CreateWebhookRequest)(nil),            // 28: api.v2.CreateWebhookRequest
-	(*CreateWebhookResponse)(nil),           // 29: api.v2.CreateWebhookResponse
-	(*EventFilter)(nil),                     // 30: api.v2.EventFilter
-	(*ListWebhooksRequest)(nil),             // 31: api.v2.ListWebhooksRequest
-	(*ListWebhooksResponse)(nil),            // 32: api.v2.ListWebhooksResponse
-	(*Webhook)(nil),                         // 33: api.v2.Webhook
-	(*PatchEnvRequest)(nil),                 // 34: api.v2.PatchEnvRequest
-	(*PatchEnvsResponse)(nil),               // 35: api.v2.PatchEnvsResponse
-	(*timestamppb.Timestamp)(nil),           // 36: google.protobuf.Timestamp
+	(RunStatus)(0),                          // 2: api.v2.RunStatus
+	(*HealthRequest)(nil),                   // 3: api.v2.HealthRequest
+	(*FetchAccountRequest)(nil),             // 4: api.v2.FetchAccountRequest
+	(*HealthResponse)(nil),                  // 5: api.v2.HealthResponse
+	(*HealthData)(nil),                      // 6: api.v2.HealthData
+	(*Error)(nil),                           // 7: api.v2.Error
+	(*ErrorResponse)(nil),                   // 8: api.v2.ErrorResponse
+	(*ResponseMetadata)(nil),                // 9: api.v2.ResponseMetadata
+	(*CreateAccountRequest)(nil),            // 10: api.v2.CreateAccountRequest
+	(*CreateAccountResponse)(nil),           // 11: api.v2.CreateAccountResponse
+	(*CreateEnvRequest)(nil),                // 12: api.v2.CreateEnvRequest
+	(*CreateEnvResponse)(nil),               // 13: api.v2.CreateEnvResponse
+	(*Env)(nil),                             // 14: api.v2.Env
+	(*CreateAccountData)(nil),               // 15: api.v2.CreateAccountData
+	(*FetchAccountsRequest)(nil),            // 16: api.v2.FetchAccountsRequest
+	(*FetchAccountsResponse)(nil),           // 17: api.v2.FetchAccountsResponse
+	(*FetchAccountResponse)(nil),            // 18: api.v2.FetchAccountResponse
+	(*Account)(nil),                         // 19: api.v2.Account
+	(*Page)(nil),                            // 20: api.v2.Page
+	(*FetchAccountEventKeysRequest)(nil),    // 21: api.v2.FetchAccountEventKeysRequest
+	(*FetchAccountEventKeysResponse)(nil),   // 22: api.v2.FetchAccountEventKeysResponse
+	(*EventKey)(nil),                        // 23: api.v2.EventKey
+	(*FetchAccountEnvsRequest)(nil),         // 24: api.v2.FetchAccountEnvsRequest
+	(*FetchAccountEnvsResponse)(nil),        // 25: api.v2.FetchAccountEnvsResponse
+	(*FetchAccountSigningKeysRequest)(nil),  // 26: api.v2.FetchAccountSigningKeysRequest
+	(*FetchAccountSigningKeysResponse)(nil), // 27: api.v2.FetchAccountSigningKeysResponse
+	(*SigningKey)(nil),                      // 28: api.v2.SigningKey
+	(*CreateWebhookRequest)(nil),            // 29: api.v2.CreateWebhookRequest
+	(*CreateWebhookResponse)(nil),           // 30: api.v2.CreateWebhookResponse
+	(*EventFilter)(nil),                     // 31: api.v2.EventFilter
+	(*ListWebhooksRequest)(nil),             // 32: api.v2.ListWebhooksRequest
+	(*ListWebhooksResponse)(nil),            // 33: api.v2.ListWebhooksResponse
+	(*Webhook)(nil),                         // 34: api.v2.Webhook
+	(*PatchEnvRequest)(nil),                 // 35: api.v2.PatchEnvRequest
+	(*PatchEnvsResponse)(nil),               // 36: api.v2.PatchEnvsResponse
+	(*InvokeFunctionRequest)(nil),           // 37: api.v2.InvokeFunctionRequest
+	(*InvokeFunctionResponse)(nil),          // 38: api.v2.InvokeFunctionResponse
+	(*InvokeFunctionData)(nil),              // 39: api.v2.InvokeFunctionData
+	(*timestamppb.Timestamp)(nil),           // 40: google.protobuf.Timestamp
+	(*structpb.Struct)(nil),                 // 41: google.protobuf.Struct
 }
 var file_api_v2_service_proto_depIdxs = []int32{
-	5,  // 0: api.v2.HealthResponse.data:type_name -> api.v2.HealthData
-	8,  // 1: api.v2.HealthResponse.metadata:type_name -> api.v2.ResponseMetadata
-	6,  // 2: api.v2.ErrorResponse.errors:type_name -> api.v2.Error
-	36, // 3: api.v2.ResponseMetadata.fetched_at:type_name -> google.protobuf.Timestamp
-	36, // 4: api.v2.ResponseMetadata.cached_until:type_name -> google.protobuf.Timestamp
-	14, // 5: api.v2.CreateAccountResponse.data:type_name -> api.v2.CreateAccountData
-	8,  // 6: api.v2.CreateAccountResponse.metadata:type_name -> api.v2.ResponseMetadata
-	13, // 7: api.v2.CreateEnvResponse.data:type_name -> api.v2.Env
-	8,  // 8: api.v2.CreateEnvResponse.metadata:type_name -> api.v2.ResponseMetadata
+	6,  // 0: api.v2.HealthResponse.data:type_name -> api.v2.HealthData
+	9,  // 1: api.v2.HealthResponse.metadata:type_name -> api.v2.ResponseMetadata
+	7,  // 2: api.v2.ErrorResponse.errors:type_name -> api.v2.Error
+	40, // 3: api.v2.ResponseMetadata.fetched_at:type_name -> google.protobuf.Timestamp
+	40, // 4: api.v2.ResponseMetadata.cached_until:type_name -> google.protobuf.Timestamp
+	15, // 5: api.v2.CreateAccountResponse.data:type_name -> api.v2.CreateAccountData
+	9,  // 6: api.v2.CreateAccountResponse.metadata:type_name -> api.v2.ResponseMetadata
+	14, // 7: api.v2.CreateEnvResponse.data:type_name -> api.v2.Env
+	9,  // 8: api.v2.CreateEnvResponse.metadata:type_name -> api.v2.ResponseMetadata
 	0,  // 9: api.v2.Env.type:type_name -> api.v2.EnvType
-	36, // 10: api.v2.Env.createdAt:type_name -> google.protobuf.Timestamp
-	36, // 11: api.v2.CreateAccountData.createdAt:type_name -> google.protobuf.Timestamp
-	36, // 12: api.v2.CreateAccountData.updatedAt:type_name -> google.protobuf.Timestamp
-	18, // 13: api.v2.FetchAccountsResponse.data:type_name -> api.v2.Account
-	8,  // 14: api.v2.FetchAccountsResponse.metadata:type_name -> api.v2.ResponseMetadata
-	19, // 15: api.v2.FetchAccountsResponse.page:type_name -> api.v2.Page
-	18, // 16: api.v2.FetchAccountResponse.data:type_name -> api.v2.Account
-	8,  // 17: api.v2.FetchAccountResponse.metadata:type_name -> api.v2.ResponseMetadata
-	36, // 18: api.v2.Account.createdAt:type_name -> google.protobuf.Timestamp
-	36, // 19: api.v2.Account.updatedAt:type_name -> google.protobuf.Timestamp
-	22, // 20: api.v2.FetchAccountEventKeysResponse.data:type_name -> api.v2.EventKey
-	8,  // 21: api.v2.FetchAccountEventKeysResponse.metadata:type_name -> api.v2.ResponseMetadata
-	19, // 22: api.v2.FetchAccountEventKeysResponse.page:type_name -> api.v2.Page
-	36, // 23: api.v2.EventKey.createdAt:type_name -> google.protobuf.Timestamp
-	13, // 24: api.v2.FetchAccountEnvsResponse.data:type_name -> api.v2.Env
-	8,  // 25: api.v2.FetchAccountEnvsResponse.metadata:type_name -> api.v2.ResponseMetadata
-	19, // 26: api.v2.FetchAccountEnvsResponse.page:type_name -> api.v2.Page
-	27, // 27: api.v2.FetchAccountSigningKeysResponse.data:type_name -> api.v2.SigningKey
-	8,  // 28: api.v2.FetchAccountSigningKeysResponse.metadata:type_name -> api.v2.ResponseMetadata
-	19, // 29: api.v2.FetchAccountSigningKeysResponse.page:type_name -> api.v2.Page
-	36, // 30: api.v2.SigningKey.createdAt:type_name -> google.protobuf.Timestamp
-	30, // 31: api.v2.CreateWebhookRequest.event_filter:type_name -> api.v2.EventFilter
-	33, // 32: api.v2.CreateWebhookResponse.data:type_name -> api.v2.Webhook
-	8,  // 33: api.v2.CreateWebhookResponse.metadata:type_name -> api.v2.ResponseMetadata
+	40, // 10: api.v2.Env.createdAt:type_name -> google.protobuf.Timestamp
+	40, // 11: api.v2.CreateAccountData.createdAt:type_name -> google.protobuf.Timestamp
+	40, // 12: api.v2.CreateAccountData.updatedAt:type_name -> google.protobuf.Timestamp
+	19, // 13: api.v2.FetchAccountsResponse.data:type_name -> api.v2.Account
+	9,  // 14: api.v2.FetchAccountsResponse.metadata:type_name -> api.v2.ResponseMetadata
+	20, // 15: api.v2.FetchAccountsResponse.page:type_name -> api.v2.Page
+	19, // 16: api.v2.FetchAccountResponse.data:type_name -> api.v2.Account
+	9,  // 17: api.v2.FetchAccountResponse.metadata:type_name -> api.v2.ResponseMetadata
+	40, // 18: api.v2.Account.createdAt:type_name -> google.protobuf.Timestamp
+	40, // 19: api.v2.Account.updatedAt:type_name -> google.protobuf.Timestamp
+	23, // 20: api.v2.FetchAccountEventKeysResponse.data:type_name -> api.v2.EventKey
+	9,  // 21: api.v2.FetchAccountEventKeysResponse.metadata:type_name -> api.v2.ResponseMetadata
+	20, // 22: api.v2.FetchAccountEventKeysResponse.page:type_name -> api.v2.Page
+	40, // 23: api.v2.EventKey.createdAt:type_name -> google.protobuf.Timestamp
+	14, // 24: api.v2.FetchAccountEnvsResponse.data:type_name -> api.v2.Env
+	9,  // 25: api.v2.FetchAccountEnvsResponse.metadata:type_name -> api.v2.ResponseMetadata
+	20, // 26: api.v2.FetchAccountEnvsResponse.page:type_name -> api.v2.Page
+	28, // 27: api.v2.FetchAccountSigningKeysResponse.data:type_name -> api.v2.SigningKey
+	9,  // 28: api.v2.FetchAccountSigningKeysResponse.metadata:type_name -> api.v2.ResponseMetadata
+	20, // 29: api.v2.FetchAccountSigningKeysResponse.page:type_name -> api.v2.Page
+	40, // 30: api.v2.SigningKey.createdAt:type_name -> google.protobuf.Timestamp
+	31, // 31: api.v2.CreateWebhookRequest.event_filter:type_name -> api.v2.EventFilter
+	34, // 32: api.v2.CreateWebhookResponse.data:type_name -> api.v2.Webhook
+	9,  // 33: api.v2.CreateWebhookResponse.metadata:type_name -> api.v2.ResponseMetadata
 	1,  // 34: api.v2.EventFilter.filter:type_name -> api.v2.FilterType
-	33, // 35: api.v2.ListWebhooksResponse.data:type_name -> api.v2.Webhook
-	8,  // 36: api.v2.ListWebhooksResponse.metadata:type_name -> api.v2.ResponseMetadata
-	19, // 37: api.v2.ListWebhooksResponse.page:type_name -> api.v2.Page
-	30, // 38: api.v2.Webhook.event_filter:type_name -> api.v2.EventFilter
-	36, // 39: api.v2.Webhook.createdAt:type_name -> google.protobuf.Timestamp
-	36, // 40: api.v2.Webhook.updatedAt:type_name -> google.protobuf.Timestamp
-	13, // 41: api.v2.PatchEnvsResponse.data:type_name -> api.v2.Env
-	8,  // 42: api.v2.PatchEnvsResponse.metadata:type_name -> api.v2.ResponseMetadata
-	2,  // 43: api.v2.V2.Health:input_type -> api.v2.HealthRequest
-	2,  // 44: api.v2.V2._SchemaOnly:input_type -> api.v2.HealthRequest
-	9,  // 45: api.v2.V2.CreatePartnerAccount:input_type -> api.v2.CreateAccountRequest
-	11, // 46: api.v2.V2.CreateEnv:input_type -> api.v2.CreateEnvRequest
-	15, // 47: api.v2.V2.FetchPartnerAccounts:input_type -> api.v2.FetchAccountsRequest
-	3,  // 48: api.v2.V2.FetchAccount:input_type -> api.v2.FetchAccountRequest
-	23, // 49: api.v2.V2.FetchAccountEnvs:input_type -> api.v2.FetchAccountEnvsRequest
-	20, // 50: api.v2.V2.FetchAccountEventKeys:input_type -> api.v2.FetchAccountEventKeysRequest
-	25, // 51: api.v2.V2.FetchAccountSigningKeys:input_type -> api.v2.FetchAccountSigningKeysRequest
-	28, // 52: api.v2.V2.CreateWebhook:input_type -> api.v2.CreateWebhookRequest
-	31, // 53: api.v2.V2.ListWebhooks:input_type -> api.v2.ListWebhooksRequest
-	34, // 54: api.v2.V2.PatchEnv:input_type -> api.v2.PatchEnvRequest
-	4,  // 55: api.v2.V2.Health:output_type -> api.v2.HealthResponse
-	7,  // 56: api.v2.V2._SchemaOnly:output_type -> api.v2.ErrorResponse
-	10, // 57: api.v2.V2.CreatePartnerAccount:output_type -> api.v2.CreateAccountResponse
-	12, // 58: api.v2.V2.CreateEnv:output_type -> api.v2.CreateEnvResponse
-	16, // 59: api.v2.V2.FetchPartnerAccounts:output_type -> api.v2.FetchAccountsResponse
-	17, // 60: api.v2.V2.FetchAccount:output_type -> api.v2.FetchAccountResponse
-	24, // 61: api.v2.V2.FetchAccountEnvs:output_type -> api.v2.FetchAccountEnvsResponse
-	21, // 62: api.v2.V2.FetchAccountEventKeys:output_type -> api.v2.FetchAccountEventKeysResponse
-	26, // 63: api.v2.V2.FetchAccountSigningKeys:output_type -> api.v2.FetchAccountSigningKeysResponse
-	29, // 64: api.v2.V2.CreateWebhook:output_type -> api.v2.CreateWebhookResponse
-	32, // 65: api.v2.V2.ListWebhooks:output_type -> api.v2.ListWebhooksResponse
-	35, // 66: api.v2.V2.PatchEnv:output_type -> api.v2.PatchEnvsResponse
-	55, // [55:67] is the sub-list for method output_type
-	43, // [43:55] is the sub-list for method input_type
-	43, // [43:43] is the sub-list for extension type_name
-	43, // [43:43] is the sub-list for extension extendee
-	0,  // [0:43] is the sub-list for field type_name
+	34, // 35: api.v2.ListWebhooksResponse.data:type_name -> api.v2.Webhook
+	9,  // 36: api.v2.ListWebhooksResponse.metadata:type_name -> api.v2.ResponseMetadata
+	20, // 37: api.v2.ListWebhooksResponse.page:type_name -> api.v2.Page
+	31, // 38: api.v2.Webhook.event_filter:type_name -> api.v2.EventFilter
+	40, // 39: api.v2.Webhook.createdAt:type_name -> google.protobuf.Timestamp
+	40, // 40: api.v2.Webhook.updatedAt:type_name -> google.protobuf.Timestamp
+	14, // 41: api.v2.PatchEnvsResponse.data:type_name -> api.v2.Env
+	9,  // 42: api.v2.PatchEnvsResponse.metadata:type_name -> api.v2.ResponseMetadata
+	41, // 43: api.v2.InvokeFunctionRequest.data:type_name -> google.protobuf.Struct
+	39, // 44: api.v2.InvokeFunctionResponse.data:type_name -> api.v2.InvokeFunctionData
+	9,  // 45: api.v2.InvokeFunctionResponse.metadata:type_name -> api.v2.ResponseMetadata
+	2,  // 46: api.v2.InvokeFunctionData.status:type_name -> api.v2.RunStatus
+	40, // 47: api.v2.InvokeFunctionData.queued_at:type_name -> google.protobuf.Timestamp
+	40, // 48: api.v2.InvokeFunctionData.started_at:type_name -> google.protobuf.Timestamp
+	40, // 49: api.v2.InvokeFunctionData.completed_at:type_name -> google.protobuf.Timestamp
+	3,  // 50: api.v2.V2.Health:input_type -> api.v2.HealthRequest
+	3,  // 51: api.v2.V2._SchemaOnly:input_type -> api.v2.HealthRequest
+	10, // 52: api.v2.V2.CreatePartnerAccount:input_type -> api.v2.CreateAccountRequest
+	12, // 53: api.v2.V2.CreateEnv:input_type -> api.v2.CreateEnvRequest
+	16, // 54: api.v2.V2.FetchPartnerAccounts:input_type -> api.v2.FetchAccountsRequest
+	4,  // 55: api.v2.V2.FetchAccount:input_type -> api.v2.FetchAccountRequest
+	24, // 56: api.v2.V2.FetchAccountEnvs:input_type -> api.v2.FetchAccountEnvsRequest
+	21, // 57: api.v2.V2.FetchAccountEventKeys:input_type -> api.v2.FetchAccountEventKeysRequest
+	26, // 58: api.v2.V2.FetchAccountSigningKeys:input_type -> api.v2.FetchAccountSigningKeysRequest
+	29, // 59: api.v2.V2.CreateWebhook:input_type -> api.v2.CreateWebhookRequest
+	32, // 60: api.v2.V2.ListWebhooks:input_type -> api.v2.ListWebhooksRequest
+	35, // 61: api.v2.V2.PatchEnv:input_type -> api.v2.PatchEnvRequest
+	37, // 62: api.v2.V2.InvokeFunction:input_type -> api.v2.InvokeFunctionRequest
+	5,  // 63: api.v2.V2.Health:output_type -> api.v2.HealthResponse
+	8,  // 64: api.v2.V2._SchemaOnly:output_type -> api.v2.ErrorResponse
+	11, // 65: api.v2.V2.CreatePartnerAccount:output_type -> api.v2.CreateAccountResponse
+	13, // 66: api.v2.V2.CreateEnv:output_type -> api.v2.CreateEnvResponse
+	17, // 67: api.v2.V2.FetchPartnerAccounts:output_type -> api.v2.FetchAccountsResponse
+	18, // 68: api.v2.V2.FetchAccount:output_type -> api.v2.FetchAccountResponse
+	25, // 69: api.v2.V2.FetchAccountEnvs:output_type -> api.v2.FetchAccountEnvsResponse
+	22, // 70: api.v2.V2.FetchAccountEventKeys:output_type -> api.v2.FetchAccountEventKeysResponse
+	27, // 71: api.v2.V2.FetchAccountSigningKeys:output_type -> api.v2.FetchAccountSigningKeysResponse
+	30, // 72: api.v2.V2.CreateWebhook:output_type -> api.v2.CreateWebhookResponse
+	33, // 73: api.v2.V2.ListWebhooks:output_type -> api.v2.ListWebhooksResponse
+	36, // 74: api.v2.V2.PatchEnv:output_type -> api.v2.PatchEnvsResponse
+	38, // 75: api.v2.V2.InvokeFunction:output_type -> api.v2.InvokeFunctionResponse
+	63, // [63:76] is the sub-list for method output_type
+	50, // [50:63] is the sub-list for method input_type
+	50, // [50:50] is the sub-list for extension type_name
+	50, // [50:50] is the sub-list for extension extendee
+	0,  // [0:50] is the sub-list for field type_name
 }
 
 func init() { file_api_v2_service_proto_init() }
@@ -2641,13 +2996,15 @@ func file_api_v2_service_proto_init() {
 	file_api_v2_service_proto_msgTypes[29].OneofWrappers = []any{}
 	file_api_v2_service_proto_msgTypes[31].OneofWrappers = []any{}
 	file_api_v2_service_proto_msgTypes[32].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[34].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[36].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_api_v2_service_proto_rawDesc), len(file_api_v2_service_proto_rawDesc)),
-			NumEnums:      2,
-			NumMessages:   34,
+			NumEnums:      3,
+			NumMessages:   37,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

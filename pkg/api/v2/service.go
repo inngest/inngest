@@ -16,9 +16,12 @@ import (
 // Service implements the V2 API service for gRPC with grpc-gateway
 type Service struct {
 	apiv2.UnimplementedV2Server
-	signingKeys SigningKeysProvider
-	eventKeys   EventKeysProvider
-	base        *apiv2base.Base
+	signingKeys    SigningKeysProvider
+	eventKeys      EventKeysProvider
+	functions      FunctionProvider
+	executor       FunctionScheduler
+	eventPublisher EventPublisher
+	base           *apiv2base.Base
 }
 
 // ServiceOptions contains configuration for the V2 service

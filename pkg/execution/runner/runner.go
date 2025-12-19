@@ -399,6 +399,10 @@ func FindInvokedFunction(ctx context.Context, tracked event.TrackedEvent, fl cqr
 	}
 
 	for _, fn := range fns {
+		// allow ID lookups.
+		if fn.ID.String() == fnID {
+			return &fn, nil
+		}
 		if fn.GetSlug() == fnID {
 			return &fn, nil
 		}

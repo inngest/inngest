@@ -34,6 +34,15 @@ type responseMetadata struct {
 	CachedUntil *string `json:"cachedUntil"`
 }
 
+type errorResponse struct {
+	Errors []errorItem `json:"errors"`
+}
+
+type errorItem struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+}
+
 func TestHTTPGateway_Health(t *testing.T) {
 	ctx := context.Background()
 	opts := HTTPHandlerOptions{}
@@ -394,6 +403,150 @@ func TestHTTPGateway_ConcurrentRequests(t *testing.T) {
 				require.Fail(t, "timeout waiting for concurrent requests")
 			}
 		}
+	})
+}
+
+func TestHTTPGateway_InvokeFunction(t *testing.T) {
+	ctx := context.Background()
+	opts := HTTPHandlerOptions{}
+	handler, err := newTestHTTPHandler(ctx, ServiceOptions{}, opts)
+	require.NoError(t, err)
+
+	t.Run("POST /api/v2/functions/{id}/invoke with mode=async in request body", func(t *testing.T) {
+		body := `{"data": {"message": "Hello, World!"}, "mode": "async", "idempotencyKey": "test-123"}`
+		req := httptest.NewRequest(http.MethodPost, "/api/v2/functions/my-app-hello-world/invoke", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+
+		handler.ServeHTTP(rec, req)
+
+		require.Equal(t, http.StatusNotImplemented, rec.Code)
+		require.Contains(t, rec.Header().Get("Content-Type"), "application/json")
+
+		var response errorResponse
+		err := json.Unmarshal(rec.Body.Bytes(), &response)
+		require.NoError(t, err)
+		require.Len(t, response.Errors, 1)
+		require.Contains(t, response.Errors[0].Message, "not implemented")
+		// Assert that the mode parameter was correctly parsed from the request body
+		require.Contains(t, response.Errors[0].Message, "mode: async")
+	})
+
+	t.Run("POST /api/v2/functions/{id}/invoke with mode=sync in request body", func(t *testing.T) {
+		body := `{"data": {"message": "Hello, World!"}, "mode": "sync", "idempotencyKey": "test-456"}`
+		req := httptest.NewRequest(http.MethodPost, "/api/v2/functions/my-app-hello-world/invoke", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+
+		handler.ServeHTTP(rec, req)
+
+		require.Equal(t, http.StatusNotImplemented, rec.Code)
+		require.Contains(t, rec.Header().Get("Content-Type"), "application/json")
+
+		var response errorResponse
+		err := json.Unmarshal(rec.Body.Bytes(), &response)
+		require.NoError(t, err)
+		require.Len(t, response.Errors, 1)
+		require.Contains(t, response.Errors[0].Message, "not implemented")
+		// Assert that the mode parameter was correctly parsed from the request body
+		require.Contains(t, response.Errors[0].Message, "mode: sync")
+	})
+
+	t.Run("POST /api/v2/functions/{id}/invoke without mode defaults to async", func(t *testing.T) {
+		body := `{"data": {"message": "Hello, World!"}}`
+		req := httptest.NewRequest(http.MethodPost, "/api/v2/functions/my-app-hello-world/invoke", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+
+		handler.ServeHTTP(rec, req)
+
+		require.Equal(t, http.StatusNotImplemented, rec.Code)
+		require.Contains(t, rec.Header().Get("Content-Type"), "application/json")
+
+		var response errorResponse
+		err := json.Unmarshal(rec.Body.Bytes(), &response)
+		require.NoError(t, err)
+		require.Len(t, response.Errors, 1)
+		require.Contains(t, response.Errors[0].Message, "not implemented")
+		// Assert that when no mode is provided, it defaults to async
+		require.Contains(t, response.Errors[0].Message, "mode: async")
+	})
+
+	t.Run("POST /api/v2/functions/{id}/invoke with invalid mode parameter", func(t *testing.T) {
+		body := `{"data": {"message": "Hello, World!"}, "mode": "invalid"}`
+		req := httptest.NewRequest(http.MethodPost, "/api/v2/functions/my-app-hello-world/invoke", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+
+		handler.ServeHTTP(rec, req)
+
+		require.Equal(t, http.StatusBadRequest, rec.Code)
+		require.Contains(t, rec.Header().Get("Content-Type"), "application/json")
+
+		var response errorResponse
+		err := json.Unmarshal(rec.Body.Bytes(), &response)
+		require.NoError(t, err)
+		require.Len(t, response.Errors, 1)
+		require.Contains(t, response.Errors[0].Message, "Mode must be either 'sync' or 'async'")
+	})
+
+	t.Run("POST /api/v2/functions/{id}/invoke with missing function ID", func(t *testing.T) {
+		body := `{"data": {"message": "Hello, World!"}, "mode": "sync"}`
+		req := httptest.NewRequest(http.MethodPost, "/api/v2/functions//invoke", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+
+		handler.ServeHTTP(rec, req)
+
+		// This should return a 400 because the function ID validation happens before URL routing
+		require.Equal(t, http.StatusBadRequest, rec.Code)
+	})
+
+	t.Run("POST /api/v2/functions/{id}/invoke with missing data", func(t *testing.T) {
+		body := `{"mode": "sync", "idempotencyKey": "test-789"}`
+		req := httptest.NewRequest(http.MethodPost, "/api/v2/functions/my-app-hello-world/invoke", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+
+		handler.ServeHTTP(rec, req)
+
+		require.Equal(t, http.StatusBadRequest, rec.Code)
+		require.Contains(t, rec.Header().Get("Content-Type"), "application/json")
+
+		var response errorResponse
+		err := json.Unmarshal(rec.Body.Bytes(), &response)
+		require.NoError(t, err)
+		require.Len(t, response.Errors, 1)
+		require.Contains(t, response.Errors[0].Message, "Input data is required")
+	})
+
+	t.Run("POST /api/v2/functions/{id}/invoke with complex nested data object", func(t *testing.T) {
+		body := `{"data": {"user": {"id": 123, "name": "John"}, "items": [{"id": 1, "name": "Item1"}]}, "mode": "sync", "idempotencyKey": "test-complex"}`
+		req := httptest.NewRequest(http.MethodPost, "/api/v2/functions/my-app-hello-world/invoke", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+
+		handler.ServeHTTP(rec, req)
+
+		require.Equal(t, http.StatusNotImplemented, rec.Code)
+		require.Contains(t, rec.Header().Get("Content-Type"), "application/json")
+
+		var response errorResponse
+		err := json.Unmarshal(rec.Body.Bytes(), &response)
+		require.NoError(t, err)
+		require.Len(t, response.Errors, 1)
+		require.Contains(t, response.Errors[0].Message, "not implemented")
+		require.Contains(t, response.Errors[0].Message, "mode: sync")
+	})
+
+	t.Run("GET /api/v2/functions/{id}/invoke returns not implemented", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/api/v2/functions/my-app-hello-world/invoke", nil)
+		rec := httptest.NewRecorder()
+
+		handler.ServeHTTP(rec, req)
+
+		// grpc-gateway returns 501 for unsupported HTTP methods on valid endpoints
+		require.Equal(t, http.StatusNotImplemented, rec.Code)
 	})
 }
 

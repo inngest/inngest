@@ -225,11 +225,9 @@ type ScheduleRequest struct {
 	// RunID allows specifying a run ID for the scheduled run.  This is entirely
 	// optional, and allows clients to choose a run ID when scheduling.  We need this
 	// for run IDs with API-based checkpointing.
-	//
-	// Note that this should never be provided by the user, as that could welcome
-	// conflicts.
 	RunID *ulid.ULID
-	// URL is the URL that is being hit for REST-based sync functions.
+	// URL is the URL that is being hit for durable endpoints, and without this
+	// we cannot reenter and resume these durable endpoint runs.
 	//
 	// This is required because some URLs may contain IDs (/v1/users/:id).
 	// These URLs are *run specific* vs function specific;  we must always include
@@ -274,6 +272,22 @@ type ScheduleRequest struct {
 	DebugSessionID *ulid.ULID
 	// DebugRunID is the ID of the debugger run that this function is being scheduled from.
 	DebugRunID *ulid.ULID
+}
+
+func NewScheduleRequest(f inngest.DeployedFunction) ScheduleRequest {
+	req := ScheduleRequest{
+		Function:    f.Function,
+		AccountID:   f.AccountID,
+		WorkspaceID: f.EnvironmentID,
+		AppID:       f.AppID,
+	}
+	if !f.PausedAt.IsZero() {
+		req.FunctionPausedAt = &f.PausedAt
+	}
+	if !f.DrainedAt.IsZero() {
+		req.DrainedAt = &f.DrainedAt
+	}
+	return req
 }
 
 func (r ScheduleRequest) SkipReason() enums.SkipReason {

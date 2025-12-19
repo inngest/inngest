@@ -115,8 +115,7 @@ func (s *Service) FetchAccountEventKeys(ctx context.Context, req *apiv2.FetchAcc
 		}
 	}
 
-	// For now, return all keys without pagination
-	// In a real implementation, you'd handle cursor-based pagination here
+	// XXX: In the future we can/should add pagination.
 
 	return &apiv2.FetchAccountEventKeysResponse{
 		Data: filteredKeys,

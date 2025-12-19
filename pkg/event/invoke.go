@@ -52,17 +52,22 @@ func NewInvocationEvent(opts NewInvocationEventOpts) Event {
 // function. Note that this metadata is not present on all functions. For
 // accessing an event's correlation ID, prefer using `Event.CorrelationID()`.
 type InngestMetadata struct {
-	SourceAppID         string               `json:"source_app_id"`
-	SourceFnID          string               `json:"source_fn_id"`
-	SourceFnVersion     int                  `json:"source_fn_v"`
-	InvokeFnID          string               `json:"fn_id"`
-	InvokeCorrelationId string               `json:"correlation_id,omitempty"`
-	InvokeTraceCarrier  *itrace.TraceCarrier `json:"tc,omitempty"`
-	InvokeExpiresAt     int64                `json:"expire"`
-	InvokeGroupID       string               `json:"gid"`
-	InvokeDisplayName   string               `json:"name"`
-	DebugSessionID      *ulid.ULID           `json:"debug_session_id,omitempty"`
-	DebugRunID          *ulid.ULID           `json:"debug_run_id,omitempty"`
+	// InvokeType represents the invoke type, eg. "step", "api", and so on.
+	// This allows us to differentiate function invocations and handle things
+	// specifically.
+	InvokeType           string               `json:"type,omitempty"`
+	InvokeIdempotencyKey string               `json:"invoke_idempotency,omitempty"`
+	SourceAppID          string               `json:"source_app_id"`
+	SourceFnID           string               `json:"source_fn_id"`
+	SourceFnVersion      int                  `json:"source_fn_v"`
+	InvokeFnID           string               `json:"fn_id"`
+	InvokeCorrelationId  string               `json:"correlation_id,omitempty"`
+	InvokeTraceCarrier   *itrace.TraceCarrier `json:"tc,omitempty"`
+	InvokeExpiresAt      int64                `json:"expire"`
+	InvokeGroupID        string               `json:"gid"`
+	InvokeDisplayName    string               `json:"name"`
+	DebugSessionID       *ulid.ULID           `json:"debug_session_id,omitempty"`
+	DebugRunID           *ulid.ULID           `json:"debug_run_id,omitempty"`
 }
 
 func (m *InngestMetadata) Decode(data any) error {
