@@ -480,6 +480,7 @@ func TestConstraintEnforcement(t *testing.T) {
 				require.WithinDuration(t, deps.clock.Now().Add(6*time.Second), tat, time.Second)
 			},
 			afterPreAcquireCheck: func(t *testing.T, deps *deps, resp *constraintapi.CapacityCheckResponse) { // Usage should already be visible in check
+				t.Log(resp.Debug())
 				require.Len(t, resp.Usage, 1)
 				require.Equal(t, constraintapi.ConstraintKindRateLimit, resp.Usage[0].Constraint.Kind)
 				require.Equal(t, 1, resp.Usage[0].Used)

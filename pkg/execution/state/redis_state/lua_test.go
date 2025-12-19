@@ -36,6 +36,8 @@ func TestNewGCRAScript(t *testing.T) {
 		// key, Limit would always be 10.
 		Limit int `json:"limit"`
 
+		Usage int64 `json:"u"`
+
 		// Remaining is the maximum number of requests that could be
 		// permitted instantaneously for this key given the current
 		// state. For example, if a rate limiter allows 10 requests per
@@ -68,8 +70,6 @@ func TestNewGCRAScript(t *testing.T) {
 		AllowAt   int64 `json:"aat"`
 
 		Diff int64 `json:"diff"`
-
-		TTL int64 `json:"ttl"`
 
 		Next int64 `json:"next"`
 	}
@@ -664,6 +664,7 @@ func TestNewGCRAScript(t *testing.T) {
 		})
 		require.False(t, res.Limited)
 		require.Equal(t, 5, res.Limit)
+		require.Equal(t, int64(0), res.Usage)
 		require.Equal(t, 5, res.Remaining)
 
 		// Consume all
@@ -678,9 +679,9 @@ func TestNewGCRAScript(t *testing.T) {
 		require.False(t, res.Limited)
 		require.Equal(t, 5, res.Limit)
 		require.Equal(t, 0, res.Remaining)
+		require.Equal(t, int64(5), res.Usage)
 
 		require.Equal(t, int64(0), res.RetryAfterMS)
-		require.Equal(t, time.Hour.Milliseconds(), res.TTL)
 		require.Equal(t, time.Hour.Milliseconds(), res.ResetAfterMS)
 	})
 
