@@ -199,25 +199,6 @@ func run(ctx context.Context, stop func(), s Service) error {
 
 		// Ensure that we prevent the paretn context from capturing signals again.
 		stop()
-		// And set up a new context to quit if we receive the same signal again.
-		repeat, cleanup := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
-		defer cleanup()
-
-		timeout := runTimeout(s)
-		l.Info("signal received, service stopping",
-			"signal", ctx.Err(),
-			"seconds", timeout.Seconds(),
-		)
-
-		select {
-		case <-repeat.Done():
-			return fmt.Errorf("repeated signal received")
-		case <-time.After(timeout):
-			return ErrRunTimeout
-		case err := <-runErr:
-			return err
-		}
-
 	}
 	return nil
 }
