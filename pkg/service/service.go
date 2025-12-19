@@ -18,7 +18,6 @@ var (
 	defaultTimeout = 30 * time.Second
 
 	ErrPreTimeout = fmt.Errorf("service.Pre did not end within the given timeout")
-	ErrRunTimeout = fmt.Errorf("service.Run did not end within the given timeout")
 )
 
 var wg conc.WaitGroup
@@ -61,21 +60,6 @@ type StartTimeouter interface {
 func startTimeout(s Service) time.Duration {
 	if t, ok := s.(StartTimeouter); ok {
 		return t.StartTimeout()
-	}
-	return defaultTimeout
-}
-
-// RunTimeouter lets a Service define how long the Run method can block for prior
-// to starting cleanup.
-type RunTimeouter interface {
-	Service
-	RunTimeout() time.Duration
-}
-
-// runTimeout returns the timeout duration used when an interrupt is received.
-func runTimeout(s Service) time.Duration {
-	if t, ok := s.(RunTimeouter); ok {
-		return t.RunTimeout()
 	}
 	return defaultTimeout
 }
