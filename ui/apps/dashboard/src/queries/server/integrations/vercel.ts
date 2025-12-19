@@ -1,18 +1,17 @@
 import { getVercelApps, syncNewApp } from '@/components/Onboarding/data';
+import { graphql } from '@/gql';
 import {
   CreateVercelAppDocument,
-  UpdateVercelAppDocument,
   RemoveVercelAppDocument,
+  UpdateVercelAppDocument,
   type App,
   type Deploy,
   type VercelApp as GraphQLVercelApp,
   type VercelIntegration as GraphQLVercelIntegration,
 } from '@/gql/graphql';
-import { createServerFn } from '@tanstack/react-start';
 import { getProductionEnvironment } from '@/queries/server/getEnvironment';
-import restAPI, { HTTPError } from '../../restAPI';
+import { createServerFn } from '@tanstack/react-start';
 import graphqlAPI from '../../graphqlAPI';
-import { graphql } from '@/gql';
 
 import { ClientError } from 'graphql-request';
 
