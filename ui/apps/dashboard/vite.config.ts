@@ -6,7 +6,6 @@ import tsConfigPaths from 'vite-tsconfig-paths';
 import viteReact from '@vitejs/plugin-react';
 import path from 'path';
 import svgrPlugin from 'vite-plugin-svgr';
-import fs from 'fs';
 
 export default defineConfig({
   resolve: {
