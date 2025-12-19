@@ -95,8 +95,8 @@ homebrew_casks:
       name: homebrew-tap
       branch: main
 
-    binaries:
-      - inngest
+    # set to auto to skip prerelease
+    skip_upload: false
 
     homepage: "https://www.inngest.com/"
     description: "Inngest CLI and development server"
