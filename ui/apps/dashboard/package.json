@@ -20,7 +20,7 @@
     "build": "tsc --noEmit && if test \"$VERCEL_ENV\" = \"production\"; then pnpm graphql-codegen && vite build; else vite build; fi",
     "graphql-codegen": "graphql-codegen -r dotenv/config",
     "start": "node .output/server/index.mjs",
-    "start:local": "node -r dotenv/config .output/server/index.mjs dotenv_config_path=.env.local",
+    "start:local": "PORT=5173 node -r dotenv/config .output/server/index.mjs dotenv_config_path=.env.local",
     "format": "prettier --write src",
     "lint": "eslint src --report-unused-disable-directives --max-warnings 0",
     "type-check": "tsc --noEmit",

@@ -10,7 +10,7 @@ import {
 } from '@/gql/graphql';
 import { createServerFn } from '@tanstack/react-start';
 import { getProductionEnvironment } from '@/queries/server/getEnvironment';
-import restAPI from '../../restAPI';
+import restAPI, { HTTPError } from '../../restAPI';
 import graphqlAPI from '../../graphqlAPI';
 import { graphql } from '@/gql';
 
@@ -147,28 +147,43 @@ export const createVercelIntegration = createServerFn({ method: 'POST' })
   .handler(async ({ data }): Promise<VercelIntegration> => {
     const environment = await getProductionEnvironment();
 
-    const url = new URL(
-      '/v1/integrations/vercel/projects',
-      import.meta.env.VITE_API_URL,
-    );
-    url.searchParams.set('workspaceID', environment.id);
-    url.searchParams.set('code', data.vercelAuthorizationCode);
+    try {
+      const response = await restAPI
+        .get('integrations/vercel/projects', {
+          searchParams: {
+            workspaceID: environment.id,
+            code: data.vercelAuthorizationCode,
+          },
+        })
+        .json<{
+          projects: { id: string; name: string }[];
+        }>();
 
-    console.log('rest api call url', url);
+      const projects = await enrichVercelProjectsHelper(response.projects);
 
-    const response = await restAPI(url).json<{
-      projects: { id: string; name: string }[];
-    }>();
+      return {
+        id: 'dummy-placeholder-id',
+        name: 'Vercel',
+        slug: 'vercel',
+        projects,
+        enabled: true,
+      };
+    } catch (error: unknown) {
+      if (error instanceof HTTPError) {
+        const errorBody = await error.response
+          .clone()
+          .text()
+          .catch(() => '');
 
-    const projects = await enrichVercelProjectsHelper(response.projects);
-
-    return {
-      id: 'dummy-placeholder-id',
-      name: 'Vercel',
-      slug: 'vercel',
-      projects,
-      enabled: true,
-    };
+        console.error('API Error Response:', {
+          status: error.response.status,
+          statusText: error.response.statusText,
+          body: errorBody,
+          url: error.response.url,
+        });
+      }
+      throw error;
+    }
   });
 
 //
@@ -341,7 +356,19 @@ export const getVercelIntegration = createServerFn({
     return res.account.vercelIntegration ?? null;
   } catch (err) {
     if (err instanceof ClientError) {
-      throw new Error(err.response.errors?.[0]?.message ?? 'Unknown error');
+      const errorMessage = err.response.errors?.[0]?.message ?? 'Unknown error';
+
+      //
+      // If the Vercel access token is forbidden/expired, treat it as if there's no integration
+      // this will redirect the user to the connect page
+      if (errorMessage.toLowerCase().includes('forbidden')) {
+        console.warn(
+          'Vercel access token is forbidden, treating as no integration',
+        );
+        return null;
+      }
+
+      throw new Error(errorMessage);
     }
     if (err instanceof Error) {
       throw err;

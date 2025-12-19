@@ -27,18 +27,7 @@ const restAPI = ky.create({
         const headers = new Headers(request.headers);
         headers.set('Authorization', `Bearer ${sessionToken}`);
 
-        const newRequest = new Request(request, { headers });
-
-        //
-        // Debug: Log the request being sent with headers
-        console.log('Sending request:', {
-          url: newRequest.url,
-          method: newRequest.method,
-          hasAuthHeader: headers.has('authorization'),
-          tokenPrefix: sessionToken.substring(0, 50) + '...',
-        });
-
-        return newRequest;
+        return new Request(request, { headers });
       },
     ],
   },
