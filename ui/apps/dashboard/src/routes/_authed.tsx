@@ -3,6 +3,7 @@ import {
   createFileRoute,
   notFound,
   Outlet,
+  redirect,
   useMatch,
 } from '@tanstack/react-router';
 
@@ -12,6 +13,7 @@ import { getEnvironment } from '@/queries/server/getEnvironment';
 import { getProfileDisplay } from '@/queries/server/profile';
 import { SentryWrappedCatchBoundary } from '@/components/Error/DefaultCatchBoundary';
 import NotFound from '@/components/Error/NotFound';
+import { auth, clerkClient } from '@clerk/tanstack-react-start/server';
 
 export const Route = createFileRoute('/_authed')({
   component: Authed,
@@ -32,6 +34,56 @@ export const Route = createFileRoute('/_authed')({
         redirectUrl: location.href,
       },
     });
+
+    //
+    // Check setup status similar to Next.js middleware
+    const { orgId } = await auth();
+    const user = await clerkClient().users.getUser(userId);
+    const isUserSetup = !!user.externalId;
+    const hasActiveOrganization = !!orgId;
+
+    //
+    // User is not set up yet - redirect to user setup
+    if (!isUserSetup) {
+      throw redirect({
+        to: '/user-setup',
+      });
+    }
+
+    //
+    // User is set up but has no active organization - redirect to organization list
+    if (
+      isUserSetup &&
+      !hasActiveOrganization &&
+      !location.pathname.startsWith('/organization-list')
+    ) {
+      throw redirect({
+        to: '/organization-list/$',
+        params: { _splat: '' },
+        search: {
+          redirect_url: location.pathname,
+        },
+      });
+    }
+
+    //
+    // User has active org - check if org is set up
+    if (isUserSetup && hasActiveOrganization) {
+      const org = await clerkClient().organizations.getOrganization({
+        organizationId: orgId,
+      });
+      const isOrganizationSetup = !!(
+        org.publicMetadata as { accountID?: string }
+      ).accountID;
+
+      //
+      // Organization not set up yet - redirect to organization setup
+      if (!isOrganizationSetup) {
+        throw redirect({
+          to: '/organization-setup',
+        });
+      }
+    }
 
     return {
       userId,
