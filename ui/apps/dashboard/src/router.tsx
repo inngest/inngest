@@ -42,11 +42,12 @@ export const getRouter = () => {
       ],
       replaysSessionSampleRate: 0.2,
       replaysOnErrorSampleRate: 1.0,
-    });
-
-    Sentry.replayIntegration({
-      maskAllText: false,
-      blockAllMedia: false,
+      integrations: [
+        Sentry.replayIntegration({
+          maskAllText: false,
+          blockAllMedia: false,
+        }),
+      ],
     });
   }
 
