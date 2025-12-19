@@ -56,6 +56,8 @@ async function getBinaryUrl(source: "cdn" | "github"): Promise<URL> {
   let version = packageJson.version.trim();
   debug("package.json version:", version);
 
+  // test
+
   if (source === "cdn") {
     const url = new URL(
       `https://cli.inngest.com/artifact/v${version}/inngest_${version}_${platform.platform}_${arch}${platform.extension}`
