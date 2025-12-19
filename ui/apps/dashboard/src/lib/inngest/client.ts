@@ -13,4 +13,7 @@ export const inngest = new Inngest({
   middleware: [realtimeMiddleware()],
   eventKey: process.env.INNGEST_AI_EVENT_KEY,
   schemas: new EventSchemas().fromRecord<Events>(),
+  checkpointing: {
+    maxRuntime: 120_000,
+  },
 });

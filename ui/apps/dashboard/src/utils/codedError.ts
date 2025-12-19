@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from 'zod/v3';
 
 // This is a TypeScript implementation of the syscode package in Inngest OSS
 

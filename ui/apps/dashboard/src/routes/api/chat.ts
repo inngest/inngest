@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { auth } from '@clerk/tanstack-react-start/server';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import { inngest } from '@/lib/inngest/client';
 
 //
