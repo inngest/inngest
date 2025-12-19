@@ -98,9 +98,10 @@ local function rateLimit(key, now_ns, period_ns, limit, burst, quantity)
 	return result
 end
 local function throttle(key, now_ms, period_ms, limit, burst, quantity)
+	limit = math.max(limit, 1)
 	local result = {}
 	result["limit"] = burst + 1
-	local emission = period_ms / math.max(limit, 1)
+	local emission = period_ms / limit
 	result["ei"] = emission
 	result["retry_at"] = now_ms + emission
 	local dvt = emission * (burst + 1)

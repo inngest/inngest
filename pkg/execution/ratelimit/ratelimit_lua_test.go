@@ -838,7 +838,7 @@ func TestLuaRateLimit_EdgeCases(t *testing.T) {
 		require.NoError(t, err)
 		t.Logf("Lua with zero limit: limited=%v, retry=%v", res.Limited, res.RetryAfter)
 
-		// Zero limit should immediately rate limit
+		// Should allow the first request
 		require.False(t, res.Limited)
 		require.Equal(t, res.RetryAfter, time.Duration(0))
 
