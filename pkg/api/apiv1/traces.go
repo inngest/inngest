@@ -149,14 +149,16 @@ func (a router) convertOTLPAndSend(ctx context.Context, auth apiv1auth.V1Auth, r
 					defer wg.Done()
 					defer func() {
 						if r := recover(); r != nil {
-							l.Error("failed to commit span with", "panic", r)
+							l.Error("panic committing span", "panic", r)
 							errs.Add(1)
 						}
 					}()
 
 					err := a.commitSpan(ctx, l, auth, res, ss.Scope, s)
 					if err != nil {
-						l.Error("failed to commit span with", "error", err)
+						if !strings.Contains(err.Error(), "failed to get traceref") {
+							l.Error("failed to commit span", "error", err)
+						}
 						errs.Add(1)
 						return
 					}

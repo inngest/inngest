@@ -79,7 +79,8 @@ var (
 	ErrFunctionSkipped            = fmt.Errorf("function skipped")
 	ErrFunctionSkippedIdempotency = fmt.Errorf("function skipped due to idempotency")
 
-	ErrFunctionEnded = fmt.Errorf("function already ended")
+	ErrFunctionEnded   = fmt.Errorf("function already ended")
+	ErrNoCorrelationID = fmt.Errorf("no correlation ID found in event when trying to resume invoke parent")
 
 	// ErrHandledStepError is returned when an OpcodeStepError is caught and the
 	// step should be safely retried.
@@ -2367,28 +2368,30 @@ func (e *executor) handlePause(
 }
 
 func (e *executor) HandleInvokeFinish(ctx context.Context, evt event.TrackedEvent) error {
-	evtID := evt.GetInternalID()
-	l := e.log.With("event_id", evtID.String())
-
 	correlationID := evt.GetEvent().CorrelationID()
 	if correlationID == "" {
-		return fmt.Errorf("no correlation ID found in event when trying to handle finish")
+		return ErrNoCorrelationID
 	}
 
+	var (
+		evtID = evt.GetInternalID()
+		wsID  = evt.GetWorkspaceID()
+		l     = e.log.With("event_id", evtID.String())
+
+		eventName string
+	)
+
 	// find the pause with correlationID
-	wsID := evt.GetWorkspaceID()
 	pause, err := e.pm.PauseByInvokeCorrelationID(ctx, wsID, correlationID)
 	if err != nil {
 		return err
 	}
-
-	var eventName string
 	if pause.Event != nil {
 		eventName = *pause.Event
 	}
 
 	if pause.Expires.Time().Before(e.now()) {
-		l.Debug("encountered expired pause")
+		l.Debug("expired pause resuming invoke")
 
 		shouldDelete := pause.Expires.Time().Add(consts.PauseExpiredDeletionGracePeriod).Before(e.now())
 		if shouldDelete {
@@ -2396,34 +2399,19 @@ func (e *executor) HandleInvokeFinish(ctx context.Context, evt event.TrackedEven
 			l.Debug("deleting expired pause")
 			_ = e.pm.Delete(context.Background(), pauses.Index{WorkspaceID: pause.WorkspaceID, EventName: eventName}, *pause)
 		}
-
 		return nil
 	}
 
-	if pause.Cancel {
-		// This is a cancellation signal.  Check if the function
-		// has ended, and if so remove the pause.
-		//
-		// NOTE: Bookkeeping must be added to individual function runs and handled on
-		// completion instead of here.  This is a hot path and should only exist whilst
-		// bookkeeping is not implemented.
-		if exists, err := e.smv2.Exists(ctx, sv2.IDFromPause(*pause)); !exists && err == nil {
-			// This function has ended.  Delete the pause and continue
-			_ = e.pm.Delete(context.Background(), pauses.Index{WorkspaceID: pause.WorkspaceID, EventName: eventName}, *pause)
-			return nil
-		}
-	}
+	l.DebugSample(10, "resuming pause from invoke", "pause.DataKey", pause.DataKey)
 
 	resumeData := pause.GetResumeData(evt.GetEvent())
-	l.Debug("resuming pause from invoke", "pause.DataKey", pause.DataKey)
-
 	return e.Resume(ctx, *pause, execution.ResumeRequest{
 		With:           resumeData.With,
 		EventID:        &evtID,
 		EventName:      evt.GetEvent().Name,
 		RunID:          resumeData.RunID,
 		StepName:       resumeData.StepName,
-		IdempotencyKey: evtID.String(),
+		IdempotencyKey: correlationID,
 	})
 }
 

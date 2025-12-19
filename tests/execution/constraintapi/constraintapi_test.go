@@ -364,7 +364,7 @@ func TestConstraintEnforcement(t *testing.T) {
 					AppID:          appID,
 					IdempotencyKey: &idempotencyKey,
 					Events: []event.TrackedEvent{
-						event.NewOSSTrackedEventWithID(event.Event{
+						event.NewBaseTrackedEventWithID(event.Event{
 							Name: "test/event",
 							Data: map[string]any{
 								"customerID": "user1",
@@ -456,7 +456,7 @@ func TestConstraintEnforcement(t *testing.T) {
 					AppID:          appID,
 					IdempotencyKey: &idempotencyKey,
 					Events: []event.TrackedEvent{
-						event.NewOSSTrackedEventWithID(event.Event{
+						event.NewBaseTrackedEventWithID(event.Event{
 							Name: "test/event",
 							Data: map[string]any{
 								"customerID": "user1",
@@ -1648,7 +1648,7 @@ func TestScheduleConstraintAPICompatibility(t *testing.T) {
 				},
 			},
 			Events: []event.TrackedEvent{
-				event.NewOSSTrackedEventWithID(event.Event{
+				event.NewBaseTrackedEventWithID(event.Event{
 					Name: "test/event",
 					Data: map[string]any{
 						"customerID": val,
@@ -1855,7 +1855,7 @@ func TestScheduleConstraintAPICompatibility(t *testing.T) {
 				},
 			},
 			Events: []event.TrackedEvent{
-				event.NewOSSTrackedEventWithID(event.Event{
+				event.NewBaseTrackedEventWithID(event.Event{
 					Name: "test/event",
 					Data: map[string]any{
 						"customerID": val,

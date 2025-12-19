@@ -382,7 +382,7 @@ func (d *devserver) HandleEvent(ctx context.Context, e *event.Event, seed *event
 
 	l.Debug("handling event", "event", e.Name)
 
-	trackedEvent := event.NewOSSTrackedEvent(*e, seed)
+	trackedEvent := event.NewBaseTrackedEvent(*e, seed)
 
 	byt, err := json.Marshal(trackedEvent)
 	if err != nil {
@@ -454,7 +454,7 @@ func (d *devserver) exportRedisSnapshot(ctx context.Context) (err error) {
 	keys, err := rc.Do(ctx, cmd).AsStrSlice()
 	if err != nil {
 		err = fmt.Errorf("error getting keys: %w", err)
-		return
+		return err
 	}
 
 	for _, key := range keys {
@@ -463,7 +463,7 @@ func (d *devserver) exportRedisSnapshot(ctx context.Context) (err error) {
 		typ, err = rc.Do(ctx, typeCmd).ToString()
 		if err != nil {
 			err = fmt.Errorf("error getting type for key %s: %w", key, err)
-			return
+			return err
 		}
 
 		switch typ {
@@ -473,7 +473,7 @@ func (d *devserver) exportRedisSnapshot(ctx context.Context) (err error) {
 			val, err = rc.Do(ctx, getCmd).ToString()
 			if err != nil {
 				err = fmt.Errorf("error getting value for string key %s: %w", key, err)
-				return
+				return err
 			}
 			snapshot[key] = cqrs.SnapshotValue{
 				Type:  typ,
@@ -485,7 +485,7 @@ func (d *devserver) exportRedisSnapshot(ctx context.Context) (err error) {
 			vals, err = rc.Do(ctx, lrangeCmd).AsStrSlice()
 			if err != nil {
 				err = fmt.Errorf("error getting values for list key %s: %w", key, err)
-				return
+				return err
 			}
 			snapshot[key] = cqrs.SnapshotValue{
 				Type:  typ,
@@ -497,7 +497,7 @@ func (d *devserver) exportRedisSnapshot(ctx context.Context) (err error) {
 			vals, err = rc.Do(ctx, smembersCmd).AsStrSlice()
 			if err != nil {
 				err = fmt.Errorf("error getting values for set key %s: %w", key, err)
-				return
+				return err
 			}
 			snapshot[key] = cqrs.SnapshotValue{
 				Type:  typ,
@@ -509,7 +509,7 @@ func (d *devserver) exportRedisSnapshot(ctx context.Context) (err error) {
 			vals, err = rc.Do(ctx, zrangeCmd).AsStrSlice()
 			if err != nil {
 				err = fmt.Errorf("error getting values for zset key %s: %w", key, err)
-				return
+				return err
 			}
 			snapshot[key] = cqrs.SnapshotValue{
 				Type:  typ,
@@ -521,7 +521,7 @@ func (d *devserver) exportRedisSnapshot(ctx context.Context) (err error) {
 			rawVals, err = rc.Do(ctx, hgetallCmd).AsMap()
 			if err != nil {
 				err = fmt.Errorf("error getting values for hash key %s: %w", key, err)
-				return
+				return err
 			}
 			vals := make(map[string]string, len(rawVals))
 			for k, v := range rawVals {
@@ -538,7 +538,7 @@ func (d *devserver) exportRedisSnapshot(ctx context.Context) (err error) {
 			// the client is read-only before we try to dump.
 		default:
 			err = fmt.Errorf("unsupported type: %s", typ)
-			return
+			return err
 		}
 	}
 
@@ -547,10 +547,10 @@ func (d *devserver) exportRedisSnapshot(ctx context.Context) (err error) {
 	})
 	if err != nil {
 		err = fmt.Errorf("error inserting queue snapshot: %w", err)
-		return
+		return err
 	}
 
-	return
+	return err
 }
 
 func (d *devserver) importRedisSnapshot(ctx context.Context) (imported bool, err error) {
@@ -574,10 +574,10 @@ func (d *devserver) importRedisSnapshot(ctx context.Context) (imported bool, err
 	}()
 	if err != nil {
 		err = fmt.Errorf("error getting latest queue snapshot: %w", err)
-		return
+		return imported, err
 	}
 	if snapshot == nil {
-		return
+		return imported, err
 	}
 
 	rc, done := d.redisClient.Dedicate()
@@ -591,7 +591,7 @@ func (d *devserver) importRedisSnapshot(ctx context.Context) (imported bool, err
 			err = rc.Do(ctx, setCmd).Error()
 			if err != nil {
 				err = fmt.Errorf("error setting string key %s: %w", key, err)
-				return
+				return imported, err
 			}
 
 		case "list":
@@ -605,7 +605,7 @@ func (d *devserver) importRedisSnapshot(ctx context.Context) (imported bool, err
 			err = rc.Do(ctx, rpushCmd).Error()
 			if err != nil {
 				err = fmt.Errorf("error pushing to list key %s: %w", key, err)
-				return
+				return imported, err
 			}
 
 		case "set":
@@ -622,7 +622,7 @@ func (d *devserver) importRedisSnapshot(ctx context.Context) (imported bool, err
 			err = rc.Do(ctx, saddCmd).Error()
 			if err != nil {
 				err = fmt.Errorf("error adding to set key %s: %w", key, err)
-				return
+				return imported, err
 			}
 
 		case "zset":
@@ -636,7 +636,7 @@ func (d *devserver) importRedisSnapshot(ctx context.Context) (imported bool, err
 			err = rc.Do(ctx, zaddCmd.Build()).Error()
 			if err != nil {
 				err = fmt.Errorf("error adding to zset key %s: %w", key, err)
-				return
+				return imported, err
 			}
 
 		case "hash":
@@ -649,18 +649,18 @@ func (d *devserver) importRedisSnapshot(ctx context.Context) (imported bool, err
 			err = rc.Do(ctx, hmsetCmd.Build()).Error()
 			if err != nil {
 				err = fmt.Errorf("error setting hash key %s: %w", key, err)
-				return
+				return imported, err
 			}
 
 		default:
 			err = fmt.Errorf("unsupported key type: %s", data.Type)
-			return
+			return imported, err
 		}
 	}
 
 	imported = true
 
-	return
+	return imported, err
 }
 
 func (d *devserver) AuthenticateRequest(_ context.Context, _, _ string) (*auth.Response, error) {
