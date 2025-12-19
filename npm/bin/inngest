@@ -1,0 +1,16 @@
+#!/usr/bin/env node
+
+console.error('Error: Inngest CLI binary not found.');
+console.error('');
+console.error('This happened because install scripts were skipped.');
+console.error('To fix this, use the method most appropriate for your setup');
+console.error('');
+console.error('one-off npx run:');
+console.error('  NPM_CONFIG_CACHE=$(mktemp -d) npx --ignore-scripts=false inngest-cli@latest');
+console.error('');
+console.error('or delete your npx cache at ~/.npm/_npx and run:');
+console.error('  npx --ignore-scripts=false inngest-cli@latest');
+console.error('');
+console.error('if you are using npm install:');
+console.error('  npm rebuild --ignore-scripts=false inngest-cli');
+process.exit(1);
