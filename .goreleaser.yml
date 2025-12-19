@@ -101,10 +101,6 @@ homebrew_casks:
     homepage: "https://www.inngest.com/"
     description: "Inngest CLI and development server"
 
-    # Test the installation
-    test: |
-      system "#{bin}/inngest version"
-
 release:
   # Repo in which the release will be created.
   # Default is extracted from the origin remote URL or empty if its private hosted.
