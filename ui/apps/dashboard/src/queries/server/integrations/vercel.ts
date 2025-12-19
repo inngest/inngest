@@ -13,6 +13,7 @@ import { getProductionEnvironment } from '@/queries/server/getEnvironment';
 import restAPI, { HTTPError } from '../../restAPI';
 import graphqlAPI from '../../graphqlAPI';
 import { graphql } from '@/gql';
+import ky from 'ky';
 
 import { ClientError } from 'graphql-request';
 
@@ -147,12 +148,35 @@ export const createVercelIntegration = createServerFn({ method: 'POST' })
   .handler(async ({ data }): Promise<VercelIntegration> => {
     const environment = await getProductionEnvironment();
 
+    console.log('REST API workspaceID', environment.id);
+
+    //
+    // Get the auth token directly here instead of relying on ky hook
+    const { auth } = await import('@clerk/tanstack-react-start/server');
+    const { getToken } = await auth();
+    const sessionToken = await getToken();
+
+    console.log('Token obtained in handler:', {
+      hasToken: !!sessionToken,
+      tokenPreview: sessionToken?.substring(0, 20) + '...',
+    });
+
+    if (!sessionToken) {
+      throw new Error('No session token available');
+    }
+
     try {
-      const response = await restAPI
+      //
+      // Use ky directly without the restAPI hook to avoid auth context issues
+      const response = await ky
         .get('integrations/vercel/projects', {
+          prefixUrl: `${import.meta.env.VITE_API_URL}/v1`,
           searchParams: {
             workspaceID: environment.id,
             code: data.vercelAuthorizationCode,
+          },
+          headers: {
+            Authorization: `Bearer ${sessionToken}`,
           },
         })
         .json<{
