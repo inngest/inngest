@@ -19,7 +19,7 @@ export const fetchClerkAuth = createServerFn({ method: 'GET' })
     }
 
     //
-    // Check setup status similar to Next.js middleware
+    // Check setup status
     const user = await clerkClient().users.getUser(userId);
     const isUserSetup = !!user.externalId;
     const hasActiveOrganization = !!orgId;
