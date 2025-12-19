@@ -18,23 +18,11 @@ const restAPI = ky.create({
         // TODO: Does this need to be changed for Vercel Marketplace? Vercel
         // Marketplace users don't auth with Clerk.
         if (!sessionToken) {
-          console.log('No session token, skipping auth header');
           return;
         }
 
-        //
-        // Create new headers object with Authorization header (matching graphqlAPI pattern)
         const headers = new Headers(request.headers);
         headers.set('Authorization', `Bearer ${sessionToken}`);
-
-        //
-        // Log all headers for debugging in staging
-        const headersObj = Object.fromEntries(headers.entries());
-        console.log('REST API request headers:', {
-          url: request.url,
-          method: request.method,
-          headers: headersObj,
-        });
 
         return new Request(request, { headers });
       },

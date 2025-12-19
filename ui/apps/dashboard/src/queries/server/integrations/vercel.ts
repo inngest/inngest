@@ -147,10 +147,6 @@ export const createVercelIntegration = createServerFn({ method: 'POST' })
   .handler(async ({ data }): Promise<VercelIntegration> => {
     const environment = await getProductionEnvironment();
 
-    console.log('REST API workspaceID', environment.id);
-
-    //
-    // Get the auth token directly here instead of relying on ky hook
     const { auth } = await import('@clerk/tanstack-react-start/server');
     const { getToken } = await auth();
     const sessionToken = await getToken();
@@ -159,87 +155,46 @@ export const createVercelIntegration = createServerFn({ method: 'POST' })
       throw new Error('No session token available');
     }
 
-    //
-    // Decode token to see what we're actually sending
-    const decodeJWT = (token: string) => {
-      try {
-        const payload = token.split('.')[1];
-        return JSON.parse(Buffer.from(payload, 'base64').toString());
-      } catch {
-        return null;
-      }
-    };
+    const url = `${
+      import.meta.env.VITE_API_URL
+    }/v1/integrations/vercel/projects?workspaceID=${environment.id}&code=${
+      data.vercelAuthorizationCode
+    }`;
 
-    const decodedToken = decodeJWT(sessionToken);
-    console.log('Token obtained in handler:', {
-      hasToken: !!sessionToken,
-      iat: decodedToken?.iat,
-      exp: decodedToken?.exp,
-      jti: decodedToken?.jti,
-      sid: decodedToken?.sid,
-      azp: decodedToken?.azp,
+    const fetchResponse = await fetch(url, {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json',
+        Authorization: `Bearer ${sessionToken}`,
+      },
     });
 
-    try {
-      const url = `${
-        import.meta.env.VITE_API_URL
-      }/v1/integrations/vercel/projects?workspaceID=${environment.id}&code=${
-        data.vercelAuthorizationCode
-      }`;
-
-      console.log('Making REST API call with native fetch:', {
-        url,
-        authorizationHeaderLast20: sessionToken.substring(
-          sessionToken.length - 20,
-        ),
-      });
-
-      //
-      // Use native fetch to eliminate any ky weirdness
-      const fetchResponse = await fetch(url, {
-        method: 'GET',
-        headers: {
-          Accept: 'application/json',
-          Authorization: `Bearer ${sessionToken}`,
-        },
-      });
-
-      console.log('Fetch response:', {
+    if (!fetchResponse.ok) {
+      const errorBody = await fetchResponse.text().catch(() => '');
+      console.error('API Error Response:', {
         status: fetchResponse.status,
         statusText: fetchResponse.statusText,
-        ok: fetchResponse.ok,
+        body: errorBody,
+        url: fetchResponse.url,
       });
-
-      if (!fetchResponse.ok) {
-        const errorBody = await fetchResponse.text().catch(() => '');
-        console.error('API Error Response:', {
-          status: fetchResponse.status,
-          statusText: fetchResponse.statusText,
-          body: errorBody,
-          url: fetchResponse.url,
-        });
-        throw new Error(
-          `API request failed: ${fetchResponse.status} ${fetchResponse.statusText}`,
-        );
-      }
-
-      const response = (await fetchResponse.json()) as {
-        projects: { id: string; name: string }[];
-      };
-
-      const projects = await enrichVercelProjectsHelper(response.projects);
-
-      return {
-        id: 'dummy-placeholder-id',
-        name: 'Vercel',
-        slug: 'vercel',
-        projects,
-        enabled: true,
-      };
-    } catch (error: unknown) {
-      console.error('Error in createVercelIntegration:', error);
-      throw error;
+      throw new Error(
+        `API request failed: ${fetchResponse.status} ${fetchResponse.statusText}`,
+      );
     }
+
+    const response = (await fetchResponse.json()) as {
+      projects: { id: string; name: string }[];
+    };
+
+    const projects = await enrichVercelProjectsHelper(response.projects);
+
+    return {
+      id: 'dummy-placeholder-id',
+      name: 'Vercel',
+      slug: 'vercel',
+      projects,
+      enabled: true,
+    };
   });
 
 //
