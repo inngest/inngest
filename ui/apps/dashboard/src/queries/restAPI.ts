@@ -27,6 +27,15 @@ const restAPI = ky.create({
         const headers = new Headers(request.headers);
         headers.set('Authorization', `Bearer ${sessionToken}`);
 
+        //
+        // Log all headers for debugging in staging
+        const headersObj = Object.fromEntries(headers.entries());
+        console.log('REST API request headers:', {
+          url: request.url,
+          method: request.method,
+          headers: headersObj,
+        });
+
         return new Request(request, { headers });
       },
     ],
