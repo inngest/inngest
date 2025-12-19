@@ -239,6 +239,9 @@ type CapacityExtendLeaseRequest struct {
 	Duration time.Duration
 
 	Migration MigrationIdentifier
+
+	// Source includes information on the calling service and processing mode for instrumentation purposes.
+	Source LeaseSource
 }
 
 type CapacityExtendLeaseResponse struct {
@@ -258,6 +261,9 @@ type CapacityReleaseRequest struct {
 	LeaseID ulid.ULID
 
 	Migration MigrationIdentifier
+
+	// Source includes information on the calling service and processing mode for instrumentation purposes.
+	Source LeaseSource
 }
 
 type CapacityReleaseResponse struct {

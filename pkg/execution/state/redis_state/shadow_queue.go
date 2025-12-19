@@ -620,7 +620,8 @@ func (q *queue) processShadowPartitionBacklog(
 		opts := metrics.CounterOpt{
 			PkgName: pkgName,
 			Tags: map[string]any{
-				"queue_shard": q.primaryQueueShard.Name,
+				"queue_shard":    q.primaryQueueShard.Name,
+				"constraint_api": constraintCheckRes.skipConstraintChecks,
 				// "partition_id": shadowPart.PartitionID,
 			},
 		}
