@@ -13,6 +13,7 @@ import { Route as AuthedRouteImport } from './routes/_authed';
 import { Route as IndexRouteImport } from './routes/index';
 import { Route as SupportIndexRouteImport } from './routes/support/index';
 import { Route as ApiSupportTicketsRouteImport } from './routes/api/support-tickets';
+import { Route as ApiSentryRouteImport } from './routes/api/sentry';
 import { Route as ApiInngestRouteImport } from './routes/api/inngest';
 import { Route as ApiChatRouteImport } from './routes/api/chat';
 import { Route as authUserSetupRouteImport } from './routes/(auth)/user-setup';
@@ -112,6 +113,11 @@ const SupportIndexRoute = SupportIndexRouteImport.update({
 const ApiSupportTicketsRoute = ApiSupportTicketsRouteImport.update({
   id: '/api/support-tickets',
   path: '/api/support-tickets',
+  getParentRoute: () => rootRouteImport,
+} as any);
+const ApiSentryRoute = ApiSentryRouteImport.update({
+  id: '/api/sentry',
+  path: '/api/sentry',
   getParentRoute: () => rootRouteImport,
 } as any);
 const ApiInngestRoute = ApiInngestRouteImport.update({
@@ -594,6 +600,7 @@ export interface FileRoutesByFullPath {
   '/user-setup': typeof authUserSetupRoute;
   '/api/chat': typeof ApiChatRoute;
   '/api/inngest': typeof ApiInngestRoute;
+  '/api/sentry': typeof ApiSentryRoute;
   '/api/support-tickets': typeof ApiSupportTicketsRoute;
   '/support': typeof SupportIndexRoute;
   '/env/$envSlug': typeof AuthedEnvEnvSlugRouteRouteWithChildren;
@@ -679,6 +686,7 @@ export interface FileRoutesByTo {
   '/user-setup': typeof authUserSetupRoute;
   '/api/chat': typeof ApiChatRoute;
   '/api/inngest': typeof ApiInngestRoute;
+  '/api/sentry': typeof ApiSentryRoute;
   '/api/support-tickets': typeof ApiSupportTicketsRoute;
   '/support': typeof SupportIndexRoute;
   '/env/$envSlug': typeof AuthedEnvEnvSlugRouteRouteWithChildren;
@@ -756,6 +764,7 @@ export interface FileRoutesById {
   '/(auth)/user-setup': typeof authUserSetupRoute;
   '/api/chat': typeof ApiChatRoute;
   '/api/inngest': typeof ApiInngestRoute;
+  '/api/sentry': typeof ApiSentryRoute;
   '/api/support-tickets': typeof ApiSupportTicketsRoute;
   '/support/': typeof SupportIndexRoute;
   '/_authed/env/$envSlug': typeof AuthedEnvEnvSlugRouteRouteWithChildren;
@@ -844,6 +853,7 @@ export interface FileRouteTypes {
     | '/user-setup'
     | '/api/chat'
     | '/api/inngest'
+    | '/api/sentry'
     | '/api/support-tickets'
     | '/support'
     | '/env/$envSlug'
@@ -929,6 +939,7 @@ export interface FileRouteTypes {
     | '/user-setup'
     | '/api/chat'
     | '/api/inngest'
+    | '/api/sentry'
     | '/api/support-tickets'
     | '/support'
     | '/env/$envSlug'
@@ -1005,6 +1016,7 @@ export interface FileRouteTypes {
     | '/(auth)/user-setup'
     | '/api/chat'
     | '/api/inngest'
+    | '/api/sentry'
     | '/api/support-tickets'
     | '/support/'
     | '/_authed/env/$envSlug'
@@ -1090,6 +1102,7 @@ export interface RootRouteChildren {
   authUserSetupRoute: typeof authUserSetupRoute;
   ApiChatRoute: typeof ApiChatRoute;
   ApiInngestRoute: typeof ApiInngestRoute;
+  ApiSentryRoute: typeof ApiSentryRoute;
   ApiSupportTicketsRoute: typeof ApiSupportTicketsRoute;
   SupportIndexRoute: typeof SupportIndexRoute;
   authOrganizationListSplatRoute: typeof authOrganizationListSplatRoute;
@@ -1127,6 +1140,13 @@ declare module '@tanstack/react-router' {
       path: '/api/support-tickets';
       fullPath: '/api/support-tickets';
       preLoaderRoute: typeof ApiSupportTicketsRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    '/api/sentry': {
+      id: '/api/sentry';
+      path: '/api/sentry';
+      fullPath: '/api/sentry';
+      preLoaderRoute: typeof ApiSentryRouteImport;
       parentRoute: typeof rootRouteImport;
     };
     '/api/inngest': {
@@ -2085,6 +2105,7 @@ const rootRouteChildren: RootRouteChildren = {
   authUserSetupRoute: authUserSetupRoute,
   ApiChatRoute: ApiChatRoute,
   ApiInngestRoute: ApiInngestRoute,
+  ApiSentryRoute: ApiSentryRoute,
   ApiSupportTicketsRoute: ApiSupportTicketsRoute,
   SupportIndexRoute: SupportIndexRoute,
   authOrganizationListSplatRoute: authOrganizationListSplatRoute,

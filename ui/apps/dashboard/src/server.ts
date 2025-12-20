@@ -12,7 +12,6 @@ if (dsn) {
   console.log('server side sentry environment', environment);
 
   Sentry.init({
-    debug: true,
     dsn,
     environment,
     release,

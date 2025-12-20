@@ -45,6 +45,7 @@ export const getRouter = () => {
         dsn,
         environment,
         release,
+        tunnel: '/api/sentry',
         tracesSampleRate: 0.2,
         tracePropagationTargets: [
           /^\//, // All URLs on current origin.
