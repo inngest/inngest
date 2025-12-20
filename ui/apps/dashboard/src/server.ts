@@ -13,7 +13,7 @@ if (dsn) {
 
   Sentry.init({
     dsn,
-    environment,
+    environment: environment ? `vercel-${environment}` : 'development',
     release,
     tracesSampleRate: 0.2,
   });

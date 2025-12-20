@@ -43,7 +43,7 @@ export const getRouter = () => {
 
       Sentry.init({
         dsn,
-        environment,
+        environment: environment ? `vercel-${environment}` : 'development',
         release,
         tunnel: '/api/sentry',
         tracesSampleRate: 0.2,
