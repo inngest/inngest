@@ -96,8 +96,9 @@ homebrew_casks:
       branch: main
       token: "{{ .Env.TAP_GITHUB_TOKEN }}"
 
-    # set to auto to skip prerelease
-    skip_upload: false
+    # auto only uploads stable releases to homebrew-tap
+    # set to false temporarily if testing prereleases too
+    skip_upload: auto
 
     homepage: "https://www.inngest.com/"
     description: "Inngest CLI and development server"
