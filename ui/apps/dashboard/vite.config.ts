@@ -8,6 +8,12 @@ import path from 'path';
 import svgrPlugin from 'vite-plugin-svgr';
 
 export default defineConfig({
+  define: {
+    'import.meta.env.VITE_VERCEL_GIT_COMMIT_SHA': JSON.stringify(
+      process.env.VERCEL_GIT_COMMIT_SHA,
+    ),
+    'import.meta.env.VITE_VERCEL_ENV': JSON.stringify(process.env.VERCEL_ENV),
+  },
   resolve: {
     alias: {
       '@inngest/components': path.resolve(
