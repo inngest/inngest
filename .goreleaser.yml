@@ -94,6 +94,7 @@ homebrew_casks:
       owner: inngest
       name: homebrew-tap
       branch: main
+      token: "{{ .Env.TAP_GITHUB_TOKEN }}"
 
     # set to auto to skip prerelease
     skip_upload: false
