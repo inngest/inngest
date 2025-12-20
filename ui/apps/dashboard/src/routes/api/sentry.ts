@@ -40,13 +40,32 @@ export const Route = createFileRoute('/api/sentry')({
 
           const sentryUrl = `https://${sentryConfig.host}/api/${sentryConfig.projectId}/envelope/`;
 
+          //
+          // Forward relevant headers from the original request
+          const forwardHeaders: Record<string, string> = {
+            'Content-Type': 'application/x-sentry-envelope',
+          };
+
+          const headersToForward = [
+            'x-sentry-auth',
+            'content-encoding',
+            'user-agent',
+          ];
+
+          for (const headerName of headersToForward) {
+            const value = request.headers.get(headerName);
+            if (value) {
+              forwardHeaders[headerName] = value;
+            }
+          }
+
           const sentryResponse = await fetch(sentryUrl, {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/x-sentry-envelope',
-            },
+            headers: forwardHeaders,
             body: envelope,
           });
+
+          console.log('Sentry response status:', sentryResponse.status);
 
           return new Response(null, {
             status: sentryResponse.status,
