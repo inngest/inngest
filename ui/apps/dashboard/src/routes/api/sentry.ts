@@ -40,8 +40,6 @@ export const Route = createFileRoute('/api/sentry')({
 
           const sentryUrl = `https://${sentryConfig.host}/api/${sentryConfig.projectId}/envelope/`;
 
-          //
-          // Forward relevant headers from the original request
           const forwardHeaders: Record<string, string> = {
             'Content-Type': 'application/x-sentry-envelope',
           };
@@ -64,8 +62,6 @@ export const Route = createFileRoute('/api/sentry')({
             headers: forwardHeaders,
             body: envelope,
           });
-
-          console.log('Sentry response status:', sentryResponse.status);
 
           return new Response(null, {
             status: sentryResponse.status,

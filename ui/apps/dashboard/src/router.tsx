@@ -32,14 +32,10 @@ export const getRouter = () => {
 
   if (!router.isServer && !Sentry.getClient()) {
     const dsn = import.meta.env.VITE_SENTRY_DSN;
-    console.log('client side sentry dsn', dsn);
 
     if (dsn) {
       const release = import.meta.env.VITE_VERCEL_GIT_COMMIT_SHA;
       const environment = import.meta.env.VITE_VERCEL_ENV;
-
-      console.log('client side sentry release', release);
-      console.log('client side sentry environment', environment);
 
       Sentry.init({
         dsn,
