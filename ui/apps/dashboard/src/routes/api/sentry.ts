@@ -53,7 +53,7 @@ const forwardToSentry = async (request: Request) => {
       );
     }
   } catch (error) {
-    console.error('Error processing Sentry request:', error);
+    console.warn('Error processing Sentry request:', error);
   }
 };
 
@@ -61,9 +61,7 @@ export const Route = createFileRoute('/api/sentry')({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        //
-        // it's just analytics, don't block and log if anything goes wrong
-        void forwardToSentry(request.clone());
+        await forwardToSentry(request.clone());
         return new Response(null, { status: 200 });
       },
     },
