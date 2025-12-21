@@ -57,24 +57,6 @@ export const getRouter = () => {
             maskAllText: false,
             blockAllMedia: false,
             networkCaptureBodies: false,
-            beforeAddRecordingEvent: (event) => {
-              //
-              // Filter out network events to prevent AbortError and response body reading errors
-              // that occur with TanStack Router's navigation and request cancellation
-              if (event.data && 'tag' in event.data) {
-                const tag = event.data.tag;
-                if (
-                  tag === 'performanceSpan' &&
-                  event.data.payload &&
-                  'op' in event.data.payload &&
-                  (event.data.payload.op === 'resource.fetch' ||
-                    event.data.payload.op === 'resource.xhr')
-                ) {
-                  return null;
-                }
-              }
-              return event;
-            },
           }),
         ],
       });

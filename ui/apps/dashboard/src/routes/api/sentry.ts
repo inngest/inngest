@@ -41,7 +41,7 @@ const forwardToSentry = async (request: Request) => {
     });
 
     if (sentryResponse.status === 429) {
-      console.warn('Sentry rate limit exceeded', sentryResponse);
+      console.warn('Sentry rate limit exceeded');
       return;
     }
 
