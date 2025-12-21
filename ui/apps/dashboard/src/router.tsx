@@ -34,23 +34,14 @@ export const getRouter = () => {
     const dsn = import.meta.env.VITE_SENTRY_DSN;
 
     if (dsn) {
-      const isDev = import.meta.env.DEV;
-
-      const release =
-        import.meta.env.VITE_SENTRY_RELEASE ||
-        import.meta.env.VITE_VERCEL_GIT_COMMIT_SHA ||
-        (isDev ? `dev-${Date.now()}` : undefined);
-
-      const environment =
-        import.meta.env.VITE_ENVIRONMENT ||
-        import.meta.env.VITE_VERCEL_ENV ||
-        import.meta.env.MODE;
+      const release = import.meta.env.VITE_VERCEL_GIT_COMMIT_SHA;
+      const environment = import.meta.env.VITE_VERCEL_ENV;
 
       Sentry.init({
-        debug: isDev,
         dsn,
-        environment,
+        environment: environment ? `vercel-${environment}` : 'development',
         release,
+        tunnel: '/api/sentry',
         tracesSampleRate: 0.2,
         tracePropagationTargets: [
           /^\//, // All URLs on current origin.
@@ -61,9 +52,11 @@ export const getRouter = () => {
         replaysSessionSampleRate: 0.2,
         replaysOnErrorSampleRate: 1.0,
         integrations: [
+          Sentry.tanstackRouterBrowserTracingIntegration(router),
           Sentry.replayIntegration({
             maskAllText: false,
             blockAllMedia: false,
+            networkCaptureBodies: false,
           }),
         ],
       });
