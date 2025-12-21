@@ -44,6 +44,7 @@ const forwardToSentry = async (request: Request) => {
         body: await sentryResponse.json().catch(() => null),
       });
     }
+    console.log('debug sentryResponse', sentryResponse);
   } catch (error) {
     console.warn('Error processing Sentry request:', error);
   }
