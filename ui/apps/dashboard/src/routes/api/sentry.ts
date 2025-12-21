@@ -13,31 +13,23 @@ const sentryConfig = sentryDsn ? parseDsn(sentryDsn) : null;
 
 const forwardToSentry = async (request: Request) => {
   try {
-    const envelope = await request.text();
-
-    if (!sentryConfig) {
-      console.error('VITE_SENTRY_DSN not configured');
-      return;
-    }
-
-    const pieces = envelope.split('\n');
-    const header = JSON.parse(pieces[0]);
-    const incomingDsn = parseDsn(header.dsn || '');
-
-    if (incomingDsn.projectId !== sentryConfig.projectId) {
-      console.error(
-        'Invalid Sentry project ID:',
-        incomingDsn.projectId,
-        'expected:',
-        sentryConfig.projectId,
-      );
+    if (!sentryConfig?.host || !sentryConfig?.projectId) {
+      console.error('VITE_SENTRY_DSN not properly configured');
       return;
     }
 
     const sentryUrl = `https://${sentryConfig.host}/api/${sentryConfig.projectId}/envelope/`;
+
+    const forwardHeaders = Object.fromEntries(
+      ['content-type', 'content-encoding']
+        .map((h) => [h, request.headers.get(h)])
+        .filter(([, v]) => v),
+    );
+
     const sentryResponse = await fetch(sentryUrl, {
       method: 'POST',
-      body: envelope,
+      headers: forwardHeaders,
+      body: await request.arrayBuffer(),
     });
 
     if (sentryResponse.status === 429) {
@@ -46,11 +38,11 @@ const forwardToSentry = async (request: Request) => {
     }
 
     if (!sentryResponse.ok) {
-      console.warn(
-        'Error sending event to Sentry',
-        sentryResponse.statusText,
-        sentryResponse,
-      );
+      console.warn('Error sending event to Sentry', {
+        status: sentryResponse.status,
+        statusText: sentryResponse.statusText,
+        body: await sentryResponse.json().catch(() => null),
+      });
     }
   } catch (error) {
     console.warn('Error processing Sentry request:', error);
