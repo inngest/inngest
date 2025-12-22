@@ -1133,6 +1133,9 @@ export type InvokeStepInfo = {
 };
 
 export enum Marketplace {
+  Aws = 'AWS',
+  DigitalOcean = 'DIGITAL_OCEAN',
+  Partner = 'PARTNER',
   Vercel = 'VERCEL'
 }
 

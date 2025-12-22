@@ -8,6 +8,7 @@ import { cn } from '@inngest/components/utils/classNames';
 import { RiInformationLine } from '@remixicon/react';
 
 export type Data = {
+  isVisible: boolean;
   title: string;
   description: string;
   current: number;

@@ -72,6 +72,7 @@ export const Route = createFileRoute('/_authed/billing/')({
           : null;
 
       runs = {
+        isVisible: !!runLimit,
         title: 'Runs',
         description: `${
           entitlements.runCount.overageAllowed
@@ -84,28 +85,22 @@ export const Route = createFileRoute('/_authed/billing/')({
         tooltipContent: 'A single durable function execution.',
       };
 
-      const isExecutionBasedPlan =
-        currentPlan.slug === 'pro-2025-08-08' ||
-        currentPlan.slug === 'pro-2025-06-04';
-
       steps = {
-        title: isExecutionBasedPlan ? 'Executions' : 'Steps',
+        isVisible: !!stepLimit,
+        title: 'Steps',
         description: `${
-          entitlements.runCount.overageAllowed && !legacyNoRunsPlan
+          entitlements.stepCount.overageAllowed && !legacyNoRunsPlan
             ? 'Additional usage incurred at additional charge. Additional runs include 5 steps per run.'
-            : entitlements.runCount.overageAllowed
-            ? 'Additional usage incurred at additional charge.'
-            : ''
+            : 'Additional usage incurred at additional charge.'
         }`,
         current: stepUsage,
         limit: stepLimit,
         overageAllowed: entitlements.stepCount.overageAllowed,
-        tooltipContent: isExecutionBasedPlan
-          ? 'Combined total of runs and steps executed.'
-          : 'An individual step in durable functions.',
+        tooltipContent: 'An individual step in durable functions.',
       };
 
       executions = {
+        isVisible: !!executionLimit,
         title: 'Executions',
         description: isCurrentHobbyPlan
           ? 'The maximum number of executions per month'
@@ -244,13 +239,13 @@ function BillingComponent() {
           <div className="border-subtle mb-6 border" />
           {usageMetricsCacheEnabled && (
             <>
-              {runs && !legacyNoRunsPlan && !isCurrentHobbyPlan && (
+              {runs?.isVisible && !legacyNoRunsPlan && !isCurrentHobbyPlan && (
                 <LimitBar data={runs} className="my-4" />
               )}
-              {steps && !isCurrentHobbyPlan && (
+              {steps?.isVisible && !isCurrentHobbyPlan && (
                 <LimitBar data={steps} className="mb-6" />
               )}
-              {executions && isCurrentHobbyPlan && (
+              {executions?.isVisible && (
                 <LimitBar data={executions} className="mb-6" />
               )}
             </>
