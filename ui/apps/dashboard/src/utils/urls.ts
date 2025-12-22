@@ -89,6 +89,26 @@ export const pathCreator = {
 
     return path as FileRouteTypes['to'];
   },
+  billingUsage({
+    dimension,
+    previous,
+  }: {
+    dimension?: string;
+    previous?: boolean;
+  } = {}): FileRouteTypes['to'] {
+    let path = '/billing/usage';
+    const query = new URLSearchParams();
+    if (dimension) {
+      query.set('dimension', dimension);
+    }
+    if (previous) {
+      query.set('previous', previous.toString());
+    }
+    if (query.toString()) {
+      path += `?${query.toString()}`;
+    }
+    return path as FileRouteTypes['to'];
+  },
   createApp({ envSlug }: { envSlug: string }): FileRouteTypes['to'] {
     return `/env/${envSlug}/apps/sync-new` as FileRouteTypes['to'];
   },

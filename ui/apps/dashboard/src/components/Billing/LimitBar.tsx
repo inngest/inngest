@@ -1,3 +1,4 @@
+import { Link } from '@inngest/components/Link/NewLink';
 import ProgressBar from '@inngest/components/ProgressBar/ProgressBar';
 import {
   Tooltip,
@@ -8,6 +9,7 @@ import { cn } from '@inngest/components/utils/classNames';
 import { RiInformationLine } from '@remixicon/react';
 
 export type Data = {
+  isVisible: boolean;
   title: string;
   description: string;
   current: number;
@@ -19,9 +21,11 @@ export type Data = {
 export function LimitBar({
   data,
   className,
+  usageURL,
 }: {
   data: Data;
   className?: string;
+  usageURL?: string;
 }) {
   const { title, description, current, limit, overageAllowed, tooltipContent } =
     data;
@@ -47,19 +51,31 @@ export function LimitBar({
         limit={limit}
         overageAllowed={overageAllowed}
       />
-      <div className="mt-1 text-left">
-        <span
-          className={cn(
-            'text-medium text-basis text-sm font-medium',
-            !isUnlimited && current > limit && overageAllowed && 'text-warning',
-            !isUnlimited && current > limit && !overageAllowed && 'text-error',
-          )}
-        >
-          {current.toLocaleString()}
-        </span>
-        <span className="text-muted text-sm">
-          /{isUnlimited ? 'unlimited' : limit.toLocaleString()}
-        </span>
+      <div className="mt-1 flex items-center justify-between">
+        <div className="text-left">
+          <span
+            className={cn(
+              'text-medium text-basis text-sm font-medium',
+              !isUnlimited &&
+                current > limit &&
+                !overageAllowed &&
+                'text-error',
+            )}
+          >
+            {current.toLocaleString()}
+          </span>
+          <span className="text-muted text-sm">
+            /{isUnlimited ? 'unlimited' : limit.toLocaleString()}
+          </span>
+        </div>
+        {usageURL && (
+          <Link
+            to={usageURL}
+            className="mr-1 text-xs text-btnPrimary hover:decoration-primary-intense"
+          >
+            View detailed usage
+          </Link>
+        )}
       </div>
     </div>
   );

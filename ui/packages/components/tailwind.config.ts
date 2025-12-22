@@ -99,6 +99,7 @@ export default {
         active: 'rgb(var(--color-border-active) / <alpha-value>)',
       },
       outlineColor: {
+        subtle: 'rgb(var(--color-border-subtle) / <alpha-value>)',
         error: 'rgb(var(--color-border-error) / <alpha-value>)',
       },
       divideColor: {
