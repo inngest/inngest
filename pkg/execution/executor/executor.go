@@ -1045,26 +1045,36 @@ func (e *executor) schedule(
 		}
 	}
 
-	st, err := e.smv2.Create(ctx, newState)
-	switch {
-	case err == nil: // no-op
-	case errors.Is(err, state.ErrIdentifierExists): // no-op
-	case errors.Is(err, state.ErrIdentifierTomestone):
-		return nil, ErrFunctionSkippedIdempotency
-	default:
-		return nil, fmt.Errorf("error creating run state: %w", err)
-	}
+	stv1ID := sv2.V1FromMetadata(metadata)
 
-	stv1ID := sv2.V1FromMetadata(st.Metadata)
+	// Check if the function should be skipped (paused, draining)
+	skipReason := req.SkipReason()
 
-	// NOTE: if the runID mismatches, it means there's already a state available
-	// and we need to override the one we already have to make sure we're using
-	// the correct metedata values
-	if metadata.ID.RunID != stv1ID.RunID {
-		id := sv2.IDFromV1(stv1ID)
-		metadata, err = e.smv2.LoadMetadata(ctx, id)
-		if err != nil {
-			return nil, err
+	// Create run state if not skipped
+	if skipReason == enums.SkipReasonNone {
+
+		st, err := e.smv2.Create(ctx, newState)
+		switch {
+		case err == nil: // no-op
+		case errors.Is(err, state.ErrIdentifierExists): // no-op
+		case errors.Is(err, state.ErrIdentifierTomestone):
+			return nil, ErrFunctionSkippedIdempotency
+		default:
+			return nil, fmt.Errorf("error creating run state: %w", err)
+		}
+
+		// Override existing identifier in case we changed the run ID due to idempotency
+		stv1ID = sv2.V1FromMetadata(st.Metadata)
+
+		// NOTE: if the runID mismatches, it means there's already a state available
+		// and we need to override the one we already have to make sure we're using
+		// the correct metedata values
+		if metadata.ID.RunID != stv1ID.RunID {
+			id := sv2.IDFromV1(stv1ID)
+			metadata, err = e.smv2.LoadMetadata(ctx, id)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 
@@ -1089,7 +1099,7 @@ func (e *executor) schedule(
 	}
 
 	status := enums.StepStatusQueued
-	if req.SkipReason() != enums.SkipReasonNone {
+	if skipReason != enums.SkipReasonNone {
 		status = enums.StepStatusSkipped
 	}
 
@@ -1112,9 +1122,9 @@ func (e *executor) schedule(
 	}
 
 	// If this is paused, immediately end just before creating state.
-	if skipped := req.SkipReason(); skipped != enums.SkipReasonNone {
+	if skipReason != enums.SkipReasonNone {
 		sendSpans()
-		return e.handleFunctionSkipped(ctx, req, metadata, evts, skipped)
+		return e.handleFunctionSkipped(ctx, req, metadata, evts, skipReason)
 	}
 
 	if req.BatchID == nil {
