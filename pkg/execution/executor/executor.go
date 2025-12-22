@@ -427,6 +427,20 @@ func WithAllowStepMetadata(md AllowStepMetadata) ExecutorOpt {
 	}
 }
 
+func WithFunctionBacklogSizeLimit(fbsl BacklogSizeLimitFn) ExecutorOpt {
+	return func(e execution.Executor) error {
+		e.(*executor).functionBacklogSizeLimit = fbsl
+		return nil
+	}
+}
+
+type BacklogSizeLimit struct {
+	Limit   int
+	Enforce bool
+}
+
+type BacklogSizeLimitFn func(ctx context.Context, accountID, envID, fnID uuid.UUID) BacklogSizeLimit
+
 // executor represents a built-in executor for running workflows.
 type executor struct {
 	log logger.Logger
@@ -473,6 +487,8 @@ type executor struct {
 
 	// stateSizeLimit finds state size limits for a given run
 	stateSizeLimit func(sv2.ID) int
+
+	functionBacklogSizeLimit BacklogSizeLimitFn
 
 	assignedQueueShard redis_state.QueueShard
 	shardFinder        redis_state.ShardSelector
@@ -668,6 +684,68 @@ func (e *executor) createEagerCancellationForTimeout(ctx context.Context, since 
 	l.Trace("Enqueued system job for eager cancellation of timed out job")
 
 	return nil
+}
+
+func (e *executor) skipped(ctx context.Context, req execution.ScheduleRequest) enums.SkipReason {
+	l := logger.StdlibLogger(ctx)
+
+	// Check if function is paused, draining
+	skipReason := req.SkipReason()
+	if skipReason != enums.SkipReasonNone {
+		return skipReason
+	}
+
+	// Check if backlog size limit was hit
+	res, err := e.checkBacklogSizeLimit(ctx, req)
+	if err != nil {
+		l.ReportError(err, "error checking backlog size limit")
+		return enums.SkipReasonNone
+	}
+
+	return res
+}
+
+func (e *executor) checkBacklogSizeLimit(ctx context.Context, req execution.ScheduleRequest) (enums.SkipReason, error) {
+	if e.functionBacklogSizeLimit == nil {
+		return enums.SkipReasonNone, nil
+	}
+
+	backlogSizeLimit := e.functionBacklogSizeLimit(ctx, req.AccountID, req.WorkspaceID, req.Function.ID)
+	if backlogSizeLimit.Limit <= 0 {
+		return enums.SkipReasonNone, nil
+	}
+
+	scheduledSteps, err := e.queue.StatusCount(ctx, req.Function.ID, "start")
+	if err != nil {
+		return enums.SkipReasonNone, fmt.Errorf("could not get scheduled step count: %w", err)
+	}
+
+	if int(scheduledSteps) < backlogSizeLimit.Limit {
+		return enums.SkipReasonNone, nil
+	}
+
+	// The backlog size exceeds the limit
+
+	id := sv2.ID{
+		FunctionID: req.Function.ID,
+		Tenant: sv2.Tenant{
+			AccountID: req.AccountID,
+			EnvID:     req.WorkspaceID,
+			AppID:     req.AppID,
+		},
+	}
+
+	for _, ll := range e.lifecycles {
+		service.Go(func() {
+			ll.OnFunctionBacklogSizeLimitReached(ctx, id)
+		})
+	}
+
+	if !backlogSizeLimit.Enforce {
+		return enums.SkipReasonNone, nil
+	}
+
+	return enums.SkipReasonFunctionBacklogSizeLimitHit, nil
 }
 
 func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) (*sv2.Metadata, error) {
@@ -1048,11 +1126,10 @@ func (e *executor) schedule(
 	stv1ID := sv2.V1FromMetadata(metadata)
 
 	// Check if the function should be skipped (paused, draining)
-	skipReason := req.SkipReason()
+	skipReason := e.skipped(ctx, req)
 
 	// Create run state if not skipped
 	if skipReason == enums.SkipReasonNone {
-
 		st, err := e.smv2.Create(ctx, newState)
 		switch {
 		case err == nil: // no-op
