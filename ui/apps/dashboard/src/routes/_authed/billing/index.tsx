@@ -236,17 +236,31 @@ function BillingComponent() {
               })}
             />
           </div>
-          <div className="border-subtle mb-6 border" />
+          <div className="border-subtle my-4 border" />
           {usageMetricsCacheEnabled && (
             <>
+              {executions?.isVisible && (
+                <LimitBar
+                  data={executions}
+                  className="mb-6"
+                  usageURL={pathCreator.billingUsage({
+                    dimension: 'execution',
+                  })}
+                />
+              )}
               {runs?.isVisible && !legacyNoRunsPlan && !isCurrentHobbyPlan && (
-                <LimitBar data={runs} className="my-4" />
+                <LimitBar
+                  data={runs}
+                  className="my-4"
+                  usageURL={pathCreator.billingUsage({ dimension: 'run' })}
+                />
               )}
               {steps?.isVisible && !isCurrentHobbyPlan && (
-                <LimitBar data={steps} className="mb-6" />
-              )}
-              {executions?.isVisible && (
-                <LimitBar data={executions} className="mb-6" />
+                <LimitBar
+                  data={steps}
+                  className="mb-6"
+                  usageURL={pathCreator.billingUsage({ dimension: 'step' })}
+                />
               )}
             </>
           )}
