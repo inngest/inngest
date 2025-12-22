@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -27,6 +28,7 @@ import (
 	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/service"
 	"github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/inngest/inngest/pkg/tracing"
 	"github.com/inngest/inngest/pkg/util"
@@ -1305,4 +1307,213 @@ func TestExecutorScheduleRateLimit(t *testing.T) {
 	})
 	require.Error(t, err)
 	require.ErrorIs(t, err, executor.ErrFunctionRateLimited)
+}
+
+type fakeLimitLifecycle struct {
+	execution.NoopLifecyceListener
+
+	skippedCount      int64
+	limitReachedCount int64
+}
+
+func (fll *fakeLimitLifecycle) OnFunctionSkipped(
+	context.Context,
+	statev2.Metadata,
+	execution.SkipState,
+) {
+	atomic.AddInt64(&fll.skippedCount, 1)
+}
+
+// OnFunctionBacklogSizeLimitReached is called when a function backlog size limit is hit
+func (fll *fakeLimitLifecycle) OnFunctionBacklogSizeLimitReached(context.Context, execution.ScheduleRequest) {
+	atomic.AddInt64(&fll.limitReachedCount, 1)
+}
+
+func TestExecutorScheduleBacklogSizeLimit(t *testing.T) {
+	ctx := context.Background()
+
+	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{Persist: false})
+	require.NoError(t, err)
+
+	dbDriver := "sqlite"
+	dbcqrs := base_cqrs.NewCQRS(db, dbDriver, sqlc_postgres.NewNormalizedOpts{})
+	loader := dbcqrs.(state.FunctionLoader)
+
+	fnID, wsID, appID, aID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+
+	fn := inngest.Function{
+		ID:              fnID,
+		FunctionVersion: 1,
+		Name:            "test-fn",
+		Slug:            "test-fn",
+		Steps: []inngest.Step{
+			{
+				ID:   "step",
+				Name: "step",
+				URI:  "/step",
+			},
+		},
+	}
+
+	config, err := json.Marshal(fn)
+	require.NoError(t, err)
+
+	_, err = dbcqrs.UpsertApp(ctx, cqrs.UpsertAppParams{
+		ID:   appID,
+		Name: "test-app",
+	})
+	require.NoError(t, err)
+
+	_, err = dbcqrs.InsertFunction(ctx, cqrs.InsertFunctionParams{
+		ID:     fnID,
+		AppID:  appID,
+		Name:   fn.Name,
+		Slug:   fn.Slug,
+		Config: string(config),
+	})
+	require.NoError(t, err)
+
+	_, shardedRc, err := createInmemoryRedis(t)
+	require.NoError(t, err)
+	defer shardedRc.Close()
+
+	_, unshardedRc, err := createInmemoryRedis(t)
+	require.NoError(t, err)
+	defer unshardedRc.Close()
+
+	unshardedClient := redis_state.NewUnshardedClient(unshardedRc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
+	shardedClient := redis_state.NewShardedClient(redis_state.ShardedClientOpts{
+		UnshardedClient:        unshardedClient,
+		FunctionRunStateClient: shardedRc,
+		StateDefaultKey:        redis_state.StateDefaultKey,
+		FnRunIsSharded:         redis_state.AlwaysShardOnRun,
+		BatchClient:            shardedRc,
+		QueueDefaultKey:        redis_state.QueueDefaultKey,
+	})
+
+	queueShard := redis_state.QueueShard{Name: consts.DefaultQueueShardName, RedisClient: unshardedClient.Queue(), Kind: string(enums.QueueShardKindRedis)}
+
+	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (redis_state.QueueShard, error) {
+		return queueShard, nil
+	}
+
+	queueShards := map[string]redis_state.QueueShard{
+		consts.DefaultQueueShardName: queueShard,
+	}
+
+	var sm state.Manager
+	sm, err = redis_state.New(
+		ctx,
+		redis_state.WithShardedClient(shardedClient),
+		redis_state.WithUnshardedClient(unshardedClient),
+	)
+	require.NoError(t, err)
+	smv2 := redis_state.MustRunServiceV2(sm)
+
+	queueOpts := []redis_state.QueueOpt{
+		redis_state.WithIdempotencyTTL(time.Hour),
+		redis_state.WithShardSelector(shardSelector),
+		redis_state.WithQueueShardClients(queueShards),
+	}
+
+	rq := redis_state.NewQueue(queueShard, queueOpts...)
+
+	fll := &fakeLimitLifecycle{}
+
+	exec, err := executor.NewExecutor(
+		executor.WithStateManager(smv2),
+		executor.WithPauseManager(pauses.NewRedisOnlyManager(sm)),
+		executor.WithQueue(rq),
+		executor.WithLogger(logger.StdlibLogger(ctx)),
+		executor.WithFunctionLoader(loader),
+		executor.WithAssignedQueueShard(queueShard),
+		executor.WithShardSelector(shardSelector),
+		executor.WithTracerProvider(tracing.NewOtelTracerProvider(nil, time.Millisecond)),
+
+		executor.WithLifecycleListeners(fll),
+		executor.WithFunctionBacklogSizeLimit(func(ctx context.Context, accountID, envID, fnID uuid.UUID) executor.BacklogSizeLimit {
+			return executor.BacklogSizeLimit{
+				Limit:   1,
+				Enforce: true,
+			}
+		}),
+	)
+	require.NoError(t, err)
+
+	//
+	// First event: Success
+	//
+
+	now := time.Now()
+	evtID := ulid.MustNew(ulid.Timestamp(now), rand.Reader)
+
+	evt := event.NewBaseTrackedEventWithID(event.Event{
+		Name: "test/event",
+		Data: map[string]any{
+			"userID": "inngest",
+		},
+	}, evtID)
+
+	run, err := exec.Schedule(ctx, execution.ScheduleRequest{
+		Function:    fn,
+		At:          &now,
+		AccountID:   aID,
+		WorkspaceID: wsID,
+		AppID:       appID,
+		Events: []event.TrackedEvent{
+			evt,
+		},
+	})
+	require.NoError(t, err)
+
+	// Job should have been scheduled
+	jobsAfterSchedule, err := rq.RunJobs(
+		ctx,
+		queueShard.Name,
+		run.ID.Tenant.EnvID,
+		run.ID.FunctionID,
+		run.ID.RunID,
+		1000,
+		0,
+	)
+	require.NoError(t, err)
+	require.NotEmpty(t, jobsAfterSchedule)
+
+	stateBefore, err := smv2.LoadState(ctx, run.ID)
+	require.NoError(t, err)
+	require.NotNil(t, stateBefore)
+
+	require.Equal(t, 0, int(fll.limitReachedCount))
+	require.Equal(t, 0, int(fll.skippedCount))
+
+	//
+	// Second event: Backlog size limit exceeded
+	//
+
+	now = time.Now()
+	evtID = ulid.MustNew(ulid.Timestamp(now), rand.Reader)
+
+	evt2 := event.NewBaseTrackedEventWithID(event.Event{
+		Name: "test/event",
+		Data: map[string]any{
+			"userID": "inngest",
+		},
+	}, evtID)
+
+	_, err = exec.Schedule(ctx, execution.ScheduleRequest{
+		Function:    fn,
+		At:          &now,
+		AccountID:   aID,
+		WorkspaceID: wsID,
+		AppID:       appID,
+		Events: []event.TrackedEvent{
+			evt2,
+		},
+	})
+	require.ErrorIs(t, err, executor.ErrFunctionSkipped)
+
+	service.Wait()
+
+	require.Equal(t, 1, int(atomic.LoadInt64(&fll.limitReachedCount)))
+	require.Equal(t, 1, int(atomic.LoadInt64(&fll.skippedCount)))
 }

@@ -726,8 +726,13 @@ func (e *executor) checkBacklogSizeLimit(ctx context.Context, req execution.Sche
 
 	// The backlog size exceeds the limit
 
+	for _, ll := range e.lifecycles {
+		service.Go(func() {
+			ll.OnFunctionBacklogSizeLimitReached(ctx, req)
+		})
+	}
+
 	if !backlogSizeLimit.Enforce {
-		// TODO: Emit warning
 		return enums.SkipReasonNone, nil
 	}
 
