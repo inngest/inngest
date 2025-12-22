@@ -746,7 +746,7 @@ func (b *blockstore) Compact(ctx context.Context, index Index) error {
 	if b.buf == nil || b.bucket == nil || b.blocksize == 0 {
 		return fmt.Errorf("error bucket is not setup")
 	}
-	_ = util.Lease(
+	return util.Lease(
 		ctx,
 		"compact index blocks",
 		// NOTE: Lease, Renew, and Revoke are closures because they need
@@ -768,7 +768,6 @@ func (b *blockstore) Compact(ctx context.Context, index Index) error {
 		},
 		b.compactionLeaseRenewInterval,
 	)
-	return nil
 }
 
 func (b *blockstore) compact(ctx context.Context, index Index) error {
