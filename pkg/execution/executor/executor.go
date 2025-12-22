@@ -1047,12 +1047,12 @@ func (e *executor) schedule(
 
 	stv1ID := sv2.V1FromMetadata(metadata)
 
-	// Check if the function should be skipReason
+	// Check if the function should be skipped (paused, draining)
 	skipReason := req.SkipReason()
 
+	// Create run state if not skipped
 	if skipReason == enums.SkipReasonNone {
 
-		// Create run state if not skipped
 		st, err := e.smv2.Create(ctx, newState)
 		switch {
 		case err == nil: // no-op
