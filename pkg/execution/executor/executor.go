@@ -728,7 +728,14 @@ func (e *executor) checkBacklogSizeLimit(ctx context.Context, req execution.Sche
 
 	for _, ll := range e.lifecycles {
 		service.Go(func() {
-			ll.OnFunctionBacklogSizeLimitReached(ctx, req)
+			ll.OnFunctionBacklogSizeLimitReached(ctx, sv2.ID{
+				FunctionID: req.Function.ID,
+				Tenant: sv2.Tenant{
+					AccountID: req.AccountID,
+					EnvID:     req.WorkspaceID,
+					AppID:     req.AppID,
+				},
+			})
 		})
 	}
 

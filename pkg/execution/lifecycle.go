@@ -51,7 +51,7 @@ type LifecycleListener interface {
 	// OnFunctionBacklogSizeLimitReached is called when a function backlog size limit is hit
 	OnFunctionBacklogSizeLimitReached(
 		context.Context,
-		ScheduleRequest,
+		statev2.ID,
 	)
 
 	// OnFunctionStarted is called when the function starts.  This may be
@@ -233,7 +233,7 @@ func (NoopLifecyceListener) OnFunctionSkipped(
 }
 
 // OnFunctionBacklogSizeLimitReached is called when a function backlog size limit is hit
-func (NoopLifecyceListener) OnFunctionBacklogSizeLimitReached(context.Context, ScheduleRequest) {
+func (NoopLifecyceListener) OnFunctionBacklogSizeLimitReached(context.Context, statev2.ID) {
 }
 
 // OnFunctionStarted is called when the function starts.  This may be

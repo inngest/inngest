@@ -164,7 +164,7 @@ func (l lifecycle) OnFunctionSkipped(
 }
 
 // OnFunctionBacklogSizeLimitReached implements execution.LifecycleListener.
-func (l lifecycle) OnFunctionBacklogSizeLimitReached(context.Context, execution.ScheduleRequest) {
+func (l lifecycle) OnFunctionBacklogSizeLimitReached(context.Context, sv2.ID) {
 }
 
 // OnFunctionFinished is called when a function finishes.  This will

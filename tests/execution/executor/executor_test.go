@@ -1325,7 +1325,7 @@ func (fll *fakeLimitLifecycle) OnFunctionSkipped(
 }
 
 // OnFunctionBacklogSizeLimitReached is called when a function backlog size limit is hit
-func (fll *fakeLimitLifecycle) OnFunctionBacklogSizeLimitReached(context.Context, execution.ScheduleRequest) {
+func (fll *fakeLimitLifecycle) OnFunctionBacklogSizeLimitReached(context.Context, statev2.ID) {
 	atomic.AddInt64(&fll.limitReachedCount, 1)
 }
 
