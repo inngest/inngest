@@ -60,3 +60,13 @@ var (
 	// jobs in a queue, via custom concurrency keys which are evaluated to a specific string.
 	ErrConcurrencyLimitCustomKey = fmt.Errorf("at concurrency limit")
 )
+
+var (
+	ErrShadowPartitionAlreadyLeased               = fmt.Errorf("shadow partition already leased")
+	ErrShadowPartitionLeaseNotFound               = fmt.Errorf("shadow partition lease not found")
+	ErrShadowPartitionNotFound                    = fmt.Errorf("shadow partition not found")
+	ErrShadowPartitionPaused                      = fmt.Errorf("shadow partition refill is disabled")
+	ErrShadowPartitionBacklogPeekMaxExceedsLimits = fmt.Errorf("shadow partition backlog peek exceeded the maximum limit of %d", ShadowPartitionPeekMaxBacklogs)
+	ErrShadowPartitionPeekMaxExceedsLimits        = fmt.Errorf("shadow partition peek exceeded the maximum limit of %d", ShadowPartitionPeekMax)
+	ErrShadowPartitionAccountPeekMaxExceedsLimits = fmt.Errorf("account peek with shadow partitions exceeded the maximum limit of %d", ShadowPartitionAccountPeekMax)
+)
