@@ -13,6 +13,52 @@ type DequeueOptions struct {
 	DisableConstraintUpdates bool
 }
 
+type LeaseOptions struct {
+	disableConstraintChecks bool
+
+	backlog     QueueBacklog
+	sp          QueueShadowPartition
+	constraints PartitionConstraintConfig
+}
+
+func LeaseOptionDisableConstraintChecks(disableChecks bool) LeaseOptionFn {
+	return func(o *LeaseOptions) {
+		o.disableConstraintChecks = disableChecks
+	}
+}
+
+func LeaseBacklog(b QueueBacklog) LeaseOptionFn {
+	return func(o *LeaseOptions) {
+		o.backlog = b
+	}
+}
+
+func LeaseShadowPartition(sp QueueShadowPartition) LeaseOptionFn {
+	return func(o *LeaseOptions) {
+		o.sp = sp
+	}
+}
+
+func LeaseConstraints(constraints PartitionConstraintConfig) LeaseOptionFn {
+	return func(o *LeaseOptions) {
+		o.constraints = constraints
+	}
+}
+
+type LeaseOptionFn func(o *LeaseOptions)
+
+type extendLeaseOptions struct {
+	disableConstraintUpdates bool
+}
+
+func ExtendLeaseOptionDisableConstraintUpdates(disableUpdates bool) ExtendLeaseOptionFn {
+	return func(o *extendLeaseOptions) {
+		o.disableConstraintUpdates = disableUpdates
+	}
+}
+
+type ExtendLeaseOptionFn func(o *extendLeaseOptions)
+
 type QueueProcessor interface {
 	EnqueueItem(ctx context.Context, shard QueueShard, i QueueItem, at time.Time, opts EnqueueOpts) (QueueItem, error)
 	Peek(ctx context.Context, partition *QueuePartition, until time.Time, limit int64) ([]*QueueItem, error)
