@@ -117,7 +117,7 @@ func NewQueueProcessor(
 		activeCheckAccountConcurrency: ActiveCheckAccountConcurrency,
 		activeCheckBacklogConcurrency: ActiveCheckBacklogConcurrency,
 		activeCheckScanBatchSize:      ActiveCheckScanBatchSize,
-		capacityLeaseExtendInterval:   QueueLeaseDuration / 2,
+		CapacityLeaseExtendInterval:   QueueLeaseDuration / 2,
 	}
 
 	// default to using primary queue client for shard selection
