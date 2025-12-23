@@ -206,6 +206,46 @@ type queueProcessor struct {
 	scavengerLeaseLock *sync.RWMutex
 }
 
+// OutstandingJobCount implements Queue.
+func (q *queueProcessor) OutstandingJobCount(ctx context.Context, envID uuid.UUID, fnID uuid.UUID, runID ulid.ULID) (int, error) {
+	panic("unimplemented")
+}
+
+// ResetAttemptsByJobID implements Queue.
+func (q *queueProcessor) ResetAttemptsByJobID(ctx context.Context, shard string, jobID string) error {
+	panic("unimplemented")
+}
+
+// Run implements Queue.
+func (q *queueProcessor) Run(context.Context, RunFunc) error {
+	panic("unimplemented")
+}
+
+// RunJobs implements Queue.
+func (q *queueProcessor) RunJobs(ctx context.Context, queueShardName string, workspaceID uuid.UUID, workflowID uuid.UUID, runID ulid.ULID, limit int64, offset int64) ([]JobResponse, error) {
+	panic("unimplemented")
+}
+
+// RunningCount implements Queue.
+func (q *queueProcessor) RunningCount(ctx context.Context, workflowID uuid.UUID) (int64, error) {
+	panic("unimplemented")
+}
+
+// SetFunctionMigrate implements Queue.
+func (q *queueProcessor) SetFunctionMigrate(ctx context.Context, sourceShard string, fnID uuid.UUID, migrateLockUntil *time.Time) error {
+	panic("unimplemented")
+}
+
+// StatusCount implements Queue.
+func (q *queueProcessor) StatusCount(ctx context.Context, workflowID uuid.UUID, status string) (int64, error) {
+	panic("unimplemented")
+}
+
+// UnpauseFunction implements Queue.
+func (q *queueProcessor) UnpauseFunction(ctx context.Context, shard string, acctID uuid.UUID, fnID uuid.UUID) error {
+	panic("unimplemented")
+}
+
 // trackingSemaphore returns a semaphore that tracks closely - but not atomically -
 // the total number of items in the semaphore.  This is best effort, and is loosely
 // accurate to reduce further contention.
