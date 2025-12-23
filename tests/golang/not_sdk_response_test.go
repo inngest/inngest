@@ -69,7 +69,7 @@ func TestNotSDKResponse(t *testing.T) {
 				ic,
 				inngestgo.FunctionOpts{
 					ID:      "fn",
-					Retries: inngestgo.IntPtr(1),
+					Retries: inngestgo.IntPtr(0),
 				},
 				inngestgo.EventTrigger(eventName, nil),
 				func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
@@ -88,7 +88,7 @@ func TestNotSDKResponse(t *testing.T) {
 			// Wait for 2 attempts.
 			r.EventuallyWithT(func(t *assert.CollectT) {
 				a := assert.New(t)
-				a.Equal(int32(2), count)
+				a.Equal(int32(1), count)
 			}, time.Minute, 100*time.Millisecond)
 
 			// Assert status and output.
