@@ -518,17 +518,17 @@ func (q *queue) Peek(ctx context.Context, partition *osqueue.QueuePartition, unt
 		// 1k at a time regardless.
 		limit = osqueue.AbsoluteQueuePeekMax
 	}
-	if limit > q.peekMax {
-		limit = q.peekMax
+	if limit > q.PeekMax {
+		limit = q.PeekMax
 	}
 	if limit <= 0 {
-		limit = q.peekMin
+		limit = q.PeekMin
 	}
 	if isPeekNext {
 		limit = 1
 	}
 
-	partitionKey := partition.zsetKey(q.primaryQueueShard.RedisClient.kg)
+	partitionKey := partitionZsetKey(q.RedisClient.kg)
 	return q.peek(
 		ctx,
 		q.primaryQueueShard,
@@ -583,7 +583,9 @@ type peekOpts struct {
 	Limit        int64
 }
 
-func (q *queue) peek(ctx context.Context, shard RedisQueueShard, opts peekOpts) ([]*osqueue.QueueItem, error) {
+func (q *queue) peek(ctx context.Context, opts peekOpts) ([]*osqueue.QueueItem, error) {
+	l := logger.StdlibLogger(ctx)
+
 	from := "-inf"
 	if opts.From != nil && !opts.From.IsZero() {
 		from = strconv.Itoa(int(opts.From.UnixMilli()))
@@ -601,7 +603,7 @@ func (q *queue) peek(ctx context.Context, shard RedisQueueShard, opts peekOpts) 
 
 	keys := []string{
 		opts.PartitionKey,
-		shard.RedisClient.kg.QueueItem(),
+		q.RedisClient.kg.QueueItem(),
 	}
 	args, err := StrSlice([]any{
 		from,
@@ -615,7 +617,7 @@ func (q *queue) peek(ctx context.Context, shard RedisQueueShard, opts peekOpts) 
 
 	peekRet, err := scripts["queue/peek"].Exec(
 		redis_telemetry.WithScriptName(ctx, "peek"),
-		shard.RedisClient.unshardedRc,
+		q.RedisClient.unshardedRc,
 		keys,
 		args,
 	).ToAny()
@@ -664,7 +666,7 @@ func (q *queue) peek(ctx context.Context, shard RedisQueueShard, opts peekOpts) 
 	}
 
 	if len(missingQueueItems) > 0 {
-		q.log.Warn("encountered missing queue items in partition queue",
+		l.Warn("encountered missing queue items in partition queue",
 			"key", opts.PartitionKey,
 			"items", missingQueueItems,
 		)
@@ -673,7 +675,7 @@ func (q *queue) peek(ctx context.Context, shard RedisQueueShard, opts peekOpts) 
 		for _, missingItemId := range missingQueueItems {
 			id := missingItemId
 			eg.Go(func() error {
-				return q.removeQueueItem(ctx, shard, opts.PartitionKey, id)
+				return q.RemoveQueueItem(ctx, opts.PartitionKey, id)
 			})
 		}
 
@@ -684,7 +686,7 @@ func (q *queue) peek(ctx context.Context, shard RedisQueueShard, opts peekOpts) 
 
 	return util.ParallelDecode(items, func(val any, _ int) (*osqueue.QueueItem, bool, error) {
 		if val == nil {
-			q.log.Error("nil item value in peek response", "partition", opts.PartitionKey)
+			l.Error("nil item value in peek response", "partition", opts.PartitionKey)
 			return nil, true, nil
 		}
 
@@ -702,13 +704,13 @@ func (q *queue) peek(ctx context.Context, shard RedisQueueShard, opts peekOpts) 
 			return nil, false, fmt.Errorf("error unmarshalling peeked queue item: %w", err)
 		}
 
-		now := q.clock.Now()
+		now := q.Clock.Now()
 		if qi.IsLeased(now) {
 			metrics.IncrQueuePeekLeaseContentionCounter(ctx, metrics.CounterOpt{
 				PkgName: pkgName,
 				Tags: map[string]any{
 					// "partition_id": opts.PartitionID,
-					"queue_shard": shard.Name,
+					"queue_shard": q.Name(),
 				},
 			})
 
@@ -722,22 +724,15 @@ func (q *queue) peek(ctx context.Context, shard RedisQueueShard, opts peekOpts) 
 	})
 }
 
-func (q *queue) ResetAttemptsByJobID(ctx context.Context, shardName string, jobID string) error {
-	queueShard, ok := q.queueShardClients[shardName]
-	if !ok {
-		return fmt.Errorf("queue shard not found %q", shardName)
-	}
+func (q *queue) ResetAttemptsByJobID(ctx context.Context, jobID string) error {
+	l := logger.StdlibLogger(ctx)
 
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "ResetAttemptsByJobID"), redis_telemetry.ScopeQueue)
-
-	if queueShard.Kind != string(enums.QueueShardKindRedis) {
-		return fmt.Errorf("unsupported queue shard kind for RequeueByJobID: %s", queueShard.Kind)
-	}
 
 	// NOTE: We expect that the job ID is the hashed, stored ID in the queue already.
 
 	keys := []string{
-		queueShard.RedisClient.kg.QueueItem(),
+		q.RedisClient.kg.QueueItem(),
 	}
 
 	args, err := StrSlice([]any{jobID})
@@ -746,12 +741,12 @@ func (q *queue) ResetAttemptsByJobID(ctx context.Context, shardName string, jobI
 	}
 	status, err := scripts["queue/resetAttempts"].Exec(
 		redis_telemetry.WithScriptName(ctx, "requeueByID"),
-		queueShard.RedisClient.unshardedRc,
+		q.RedisClient.unshardedRc,
 		keys,
 		args,
 	).AsInt64()
 	if err != nil {
-		q.log.Error("error requeueing queue item by JobID",
+		l.Error("error requeueing queue item by JobID",
 			"error", err,
 			"job_id", jobID,
 		)
@@ -761,7 +756,7 @@ func (q *queue) ResetAttemptsByJobID(ctx context.Context, shardName string, jobI
 	case 0:
 		return nil
 	case -1:
-		return ErrQueueItemNotFound
+		return osqueue.ErrQueueItemNotFound
 	default:
 		return fmt.Errorf("unknown requeue by id response: %d", status)
 	}
@@ -773,23 +768,21 @@ func (q *queue) ResetAttemptsByJobID(ctx context.Context, shardName string, jobI
 // progress, or doesn't exist) this returns an error.
 //
 // Note: This only works with items that directly go into ready queues (system queues).
-func (q *queue) RequeueByJobID(ctx context.Context, queueShard RedisQueueShard, jobID string, at time.Time) error {
-	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "RequeueByJobID"), redis_telemetry.ScopeQueue)
+func (q *queue) RequeueByJobID(ctx context.Context, jobID string, at time.Time) error {
+	l := logger.StdlibLogger(ctx)
 
-	if queueShard.Kind != string(enums.QueueShardKindRedis) {
-		return fmt.Errorf("unsupported queue shard kind for RequeueByJobID: %s", queueShard.Kind)
-	}
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "RequeueByJobID"), redis_telemetry.ScopeQueue)
 
 	jobID = osqueue.HashID(ctx, jobID)
 
 	// Find the queue item so that we can fetch the shard info.
 	i := osqueue.QueueItem{}
-	if err := queueShard.RedisClient.unshardedRc.Do(ctx, queueShard.RedisClient.unshardedRc.B().Hget().Key(queueShard.RedisClient.kg.QueueItem()).Field(jobID).Build()).DecodeJSON(&i); err != nil {
+	if err := q.RedisClient.unshardedRc.Do(ctx, q.RedisClient.unshardedRc.B().Hget().Key(q.RedisClient.kg.QueueItem()).Field(jobID).Build()).DecodeJSON(&i); err != nil {
 		return err
 	}
 
 	// Don't requeue before now.
-	now := q.clock.Now()
+	now := q.Clock.Now()
 	if at.Before(now) {
 		at = now
 	}
@@ -798,16 +791,16 @@ func (q *queue) RequeueByJobID(ctx context.Context, queueShard RedisQueueShard, 
 	// the queue item instead of just the partition passed via args.
 	//
 	// This is because a single queue item may be present in more than one queue.
-	fnPartition := q.ItemPartition(ctx, queueShard, i)
+	fnPartition := osqueue.ItemPartition(ctx, i)
 
 	keys := []string{
-		queueShard.RedisClient.kg.QueueItem(),
-		queueShard.RedisClient.kg.PartitionItem(), // Partition item, map
-		queueShard.RedisClient.kg.GlobalPartitionIndex(),
-		queueShard.RedisClient.kg.GlobalAccountIndex(),
-		queueShard.RedisClient.kg.AccountPartitionIndex(i.Data.Identifier.AccountID),
+		q.RedisClient.kg.QueueItem(),
+		q.RedisClient.kg.PartitionItem(), // Partition item, map
+		q.RedisClient.kg.GlobalPartitionIndex(),
+		q.RedisClient.kg.GlobalAccountIndex(),
+		q.RedisClient.kg.AccountPartitionIndex(i.Data.Identifier.AccountID),
 
-		fnPartition.zsetKey(queueShard.RedisClient.kg),
+		partitionZsetKey(fnPartition, q.RedisClient.kg),
 	}
 
 	args, err := StrSlice([]any{
@@ -823,12 +816,12 @@ func (q *queue) RequeueByJobID(ctx context.Context, queueShard RedisQueueShard, 
 	}
 	status, err := scripts["queue/requeueByID"].Exec(
 		redis_telemetry.WithScriptName(ctx, "requeueByID"),
-		queueShard.RedisClient.unshardedRc,
+		q.RedisClient.unshardedRc,
 		keys,
 		args,
 	).AsInt64()
 	if err != nil {
-		q.log.Error("error requeueing queue item by JobID",
+		l.Error("error requeueing queue item by JobID",
 			"error", err,
 			"item", i,
 			"fnPartition", fnPartition,
@@ -839,9 +832,9 @@ func (q *queue) RequeueByJobID(ctx context.Context, queueShard RedisQueueShard, 
 	case 0:
 		return nil
 	case -1:
-		return ErrQueueItemNotFound
+		return osqueue.ErrQueueItemNotFound
 	case -2:
-		return ErrQueueItemAlreadyLeased
+		return osqueue.ErrQueueItemAlreadyLeased
 	default:
 		return fmt.Errorf("unknown requeue by id response: %d", status)
 	}

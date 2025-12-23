@@ -45,8 +45,8 @@ func NewQueueProcessor(
 		partitionPausedGetter: func(ctx context.Context, fnID uuid.UUID) PartitionPausedInfo {
 			return PartitionPausedInfo{}
 		},
-		peekMin:                     DefaultQueuePeekMin,
-		peekMax:                     DefaultQueuePeekMax,
+		PeekMin:                     DefaultQueuePeekMin,
+		PeekMax:                     DefaultQueuePeekMax,
 		shadowPeekMin:               ShadowPartitionPeekMinBacklogs,
 		shadowPeekMax:               ShadowPartitionPeekMaxBacklogs,
 		backlogRefillLimit:          BacklogRefillHardLimit,
