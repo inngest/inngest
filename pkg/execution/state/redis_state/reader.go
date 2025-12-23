@@ -106,7 +106,7 @@ func (q *queue) StatusCount(ctx context.Context, workflowID uuid.UUID, status st
 
 	iterate := func(client *QueueClient) (int64, error) {
 		key := client.kg.Status(status, workflowID)
-		cmd := client.unshardedRc.B().Zcount().Key(key).Min("-inf").Max("+inf").Build()
+		cmd := client.unshardedRc.B().Zcard().Key(key).Build()
 		count, err := client.unshardedRc.Do(ctx, cmd).AsInt64()
 		if err != nil {
 			return 0, fmt.Errorf("error inspecting function queue status: %w", err)
@@ -564,7 +564,7 @@ func (q *queue) QueueIterator(ctx context.Context, opts QueueIteratorOpts) (part
 					queueKey = q.primaryQueueShard.RedisClient.kg.PartitionQueueSet(enums.PartitionTypeDefault, pkey, "")
 				}
 
-				cntCmd := r.B().Zcount().Key(queueKey).Min("-inf").Max("+inf").Build()
+				cntCmd := r.B().Zcard().Key(queueKey).Build()
 				itemCount, err := q.primaryQueueShard.RedisClient.unshardedRc.Do(ctx, cntCmd).AsInt64()
 				if err != nil {
 					log.Warn("error checking partition count", "pkey", pkey, "context", "instrumentation")
