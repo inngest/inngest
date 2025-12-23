@@ -12,10 +12,10 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 )
 
-type ItemHandler func(ctx context.Context, shard redis_state.QueueShard, qi *queue.QueueItem) error
+type ItemHandler func(ctx context.Context, shard redis_state.RedisQueueShard, qi *queue.QueueItem) error
 
 type DeleteManager interface {
-	DeleteQueueItem(ctx context.Context, shard redis_state.QueueShard, qi *queue.QueueItem) error
+	DeleteQueueItem(ctx context.Context, shard redis_state.RedisQueueShard, qi *queue.QueueItem) error
 }
 
 type deleteManager struct {
@@ -28,7 +28,7 @@ type deleteManager struct {
 }
 
 // DeleteQueueItem implements DeleteManager.
-func (d *deleteManager) DeleteQueueItem(ctx context.Context, shard redis_state.QueueShard, item *queue.QueueItem) error {
+func (d *deleteManager) DeleteQueueItem(ctx context.Context, shard redis_state.RedisQueueShard, item *queue.QueueItem) error {
 	switch item.Data.Kind {
 	// For pause timeouts, delete the associated pause. The pause might otherwise sit in the system for up to a year.
 	case queue.KindPause:

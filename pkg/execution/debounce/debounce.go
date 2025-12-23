@@ -153,7 +153,7 @@ type Debouncer interface {
 	StartExecution(ctx context.Context, d DebounceItem, fn inngest.Function, debounceID ulid.ULID) error
 }
 
-func NewRedisDebouncer(primaryDebounceClient *redis_state.DebounceClient, primaryQueueShard redis_state.QueueShard, primaryQueueManager redis_state.QueueManager) Debouncer {
+func NewRedisDebouncer(primaryDebounceClient *redis_state.DebounceClient, primaryQueueShard redis_state.RedisQueueShard, primaryQueueManager redis_state.QueueManager) Debouncer {
 	return debouncer{
 		c:                     clockwork.NewRealClock(),
 		primaryDebounceClient: primaryDebounceClient,
@@ -169,12 +169,12 @@ type DebouncerOpts struct {
 	// Destination/Target: New system queue + colocated debounce state shard
 	PrimaryDebounceClient *redis_state.DebounceClient
 	PrimaryQueue          redis_state.QueueManager
-	PrimaryQueueShard     redis_state.QueueShard
+	PrimaryQueueShard     redis_state.RedisQueueShard
 
 	// Source/Old: Default queue cluster
 	SecondaryDebounceClient *redis_state.DebounceClient
 	SecondaryQueue          redis_state.QueueManager
-	SecondaryQueueShard     redis_state.QueueShard
+	SecondaryQueueShard     redis_state.RedisQueueShard
 
 	ShouldMigrate func(ctx context.Context, accountID uuid.UUID) bool
 
@@ -212,12 +212,12 @@ type debouncer struct {
 	// New: system queue
 	primaryDebounceClient *redis_state.DebounceClient
 	primaryQueueManager   redis_state.QueueManager
-	primaryQueueShard     redis_state.QueueShard
+	primaryQueueShard     redis_state.RedisQueueShard
 
 	// Old: default queue
 	secondaryDebounceClient *redis_state.DebounceClient
 	secondaryQueueManager   redis_state.QueueManager
-	secondaryQueueShard     redis_state.QueueShard
+	secondaryQueueShard     redis_state.RedisQueueShard
 
 	// shouldMigrate determines if old debounces should be migrated to new cluster on the fly
 	shouldMigrate func(ctx context.Context, accountID uuid.UUID) bool
@@ -249,7 +249,7 @@ func (d debouncer) client(shouldMigrate bool) *redis_state.DebounceClient {
 	return d.secondaryDebounceClient
 }
 
-func (d debouncer) queueShard(shouldMigrate bool) redis_state.QueueShard {
+func (d debouncer) queueShard(shouldMigrate bool) redis_state.RedisQueueShard {
 	if d.usePrimary(shouldMigrate) {
 		return d.primaryQueueShard
 	}

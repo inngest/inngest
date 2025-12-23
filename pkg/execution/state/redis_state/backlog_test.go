@@ -31,7 +31,7 @@ func TestQueueItemBacklogs(t *testing.T) {
 	defer rc.Close()
 
 	q := NewQueue(
-		QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName},
+		RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName},
 		WithPartitionConstraintConfigGetter(func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
 			return PartitionConstraintConfig{
 				Concurrency: PartitionConcurrency{
@@ -664,7 +664,7 @@ func TestQueueItemShadowPartition(t *testing.T) {
 	hashedThrottleKeyExpr := util.XXHash("event.data.customerID")
 
 	q := NewQueue(
-		QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName},
+		RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName},
 		WithPartitionConstraintConfigGetter(func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
 			return PartitionConstraintConfig{
 				Concurrency: PartitionConcurrency{
@@ -1140,7 +1140,7 @@ func TestBacklogsByPartition(t *testing.T) {
 
 	ctx := context.Background()
 	clock := clockwork.NewFakeClock()
-	defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+	defaultShard := RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 
 	acctId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
 
@@ -1250,7 +1250,7 @@ func TestBacklogSize(t *testing.T) {
 	_, rc := initRedis(t)
 	defer rc.Close()
 
-	defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+	defaultShard := RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 
 	q := NewQueue(
 		defaultShard,
@@ -1319,9 +1319,9 @@ func TestPartitionBacklogSize(t *testing.T) {
 	ctx := context.Background()
 	clock := clockwork.NewFakeClock()
 
-	shard1 := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc1, QueueDefaultKey), Name: "one"}
-	shard2 := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc2, QueueDefaultKey), Name: "two"}
-	queueShards := map[string]QueueShard{
+	shard1 := RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc1, QueueDefaultKey), Name: "one"}
+	shard2 := RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc2, QueueDefaultKey), Name: "two"}
+	queueShards := map[string]RedisQueueShard{
 		"one": shard1,
 		"two": shard2,
 	}

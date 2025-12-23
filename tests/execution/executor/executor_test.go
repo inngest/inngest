@@ -105,17 +105,17 @@ func (fq *fakeQueue) RemoveQueueItem(ctx context.Context, shard string, partitio
 	return qm.RemoveQueueItem(ctx, shard, partitionKey, itemID)
 }
 
-func (fq *fakeQueue) Requeue(ctx context.Context, queueShard redis_state.QueueShard, i queue.QueueItem, at time.Time) error {
+func (fq *fakeQueue) Requeue(ctx context.Context, queueShard redis_state.RedisQueueShard, i queue.QueueItem, at time.Time) error {
 	qm := fq.Queue.(redis_state.QueueManager)
 	return qm.Requeue(ctx, queueShard, i, at)
 }
 
-func (fq *fakeQueue) RequeueByJobID(ctx context.Context, queueShard redis_state.QueueShard, jobID string, at time.Time) error {
+func (fq *fakeQueue) RequeueByJobID(ctx context.Context, queueShard redis_state.RedisQueueShard, jobID string, at time.Time) error {
 	qm := fq.Queue.(redis_state.QueueManager)
 	return qm.RequeueByJobID(ctx, queueShard, jobID, at)
 }
 
-func (fq *fakeQueue) Dequeue(ctx context.Context, queueShard redis_state.QueueShard, i queue.QueueItem) error {
+func (fq *fakeQueue) Dequeue(ctx context.Context, queueShard redis_state.RedisQueueShard, i queue.QueueItem) error {
 	qm := fq.Queue.(redis_state.QueueManager)
 
 	err := qm.Dequeue(ctx, queueShard, i)
@@ -171,13 +171,13 @@ func TestScheduleRaceCondition(t *testing.T) {
 		QueueDefaultKey:        redis_state.QueueDefaultKey,
 	})
 
-	queueShard := redis_state.QueueShard{Name: consts.DefaultQueueShardName, RedisClient: unshardedClient.Queue(), Kind: string(enums.QueueShardKindRedis)}
+	queueShard := redis_state.RedisQueueShard{Name: consts.DefaultQueueShardName, RedisClient: unshardedClient.Queue(), Kind: string(enums.QueueShardKindRedis)}
 
-	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (redis_state.QueueShard, error) {
+	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (redis_state.RedisQueueShard, error) {
 		return queueShard, nil
 	}
 
-	queueShards := map[string]redis_state.QueueShard{
+	queueShards := map[string]redis_state.RedisQueueShard{
 		consts.DefaultQueueShardName: queueShard,
 	}
 
@@ -339,13 +339,13 @@ func TestScheduleRaceConditionWithExistingIdempotencyKey(t *testing.T) {
 		QueueDefaultKey:        redis_state.QueueDefaultKey,
 	})
 
-	queueShard := redis_state.QueueShard{Name: consts.DefaultQueueShardName, RedisClient: unshardedClient.Queue(), Kind: string(enums.QueueShardKindRedis)}
+	queueShard := redis_state.RedisQueueShard{Name: consts.DefaultQueueShardName, RedisClient: unshardedClient.Queue(), Kind: string(enums.QueueShardKindRedis)}
 
-	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (redis_state.QueueShard, error) {
+	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (redis_state.RedisQueueShard, error) {
 		return queueShard, nil
 	}
 
-	queueShards := map[string]redis_state.QueueShard{
+	queueShards := map[string]redis_state.RedisQueueShard{
 		consts.DefaultQueueShardName: queueShard,
 	}
 
@@ -540,13 +540,13 @@ func TestFinalize(t *testing.T) {
 		QueueDefaultKey:        redis_state.QueueDefaultKey,
 	})
 
-	queueShard := redis_state.QueueShard{Name: consts.DefaultQueueShardName, RedisClient: unshardedClient.Queue(), Kind: string(enums.QueueShardKindRedis)}
+	queueShard := redis_state.RedisQueueShard{Name: consts.DefaultQueueShardName, RedisClient: unshardedClient.Queue(), Kind: string(enums.QueueShardKindRedis)}
 
-	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (redis_state.QueueShard, error) {
+	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (redis_state.RedisQueueShard, error) {
 		return queueShard, nil
 	}
 
-	queueShards := map[string]redis_state.QueueShard{
+	queueShards := map[string]redis_state.RedisQueueShard{
 		consts.DefaultQueueShardName: queueShard,
 	}
 
@@ -820,13 +820,13 @@ func TestInvokeRetrySucceedsIfPauseAlreadyCreated(t *testing.T) {
 		QueueDefaultKey:        redis_state.QueueDefaultKey,
 	})
 
-	queueShard := redis_state.QueueShard{Name: consts.DefaultQueueShardName, RedisClient: unshardedClient.Queue(), Kind: string(enums.QueueShardKindRedis)}
+	queueShard := redis_state.RedisQueueShard{Name: consts.DefaultQueueShardName, RedisClient: unshardedClient.Queue(), Kind: string(enums.QueueShardKindRedis)}
 
-	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (redis_state.QueueShard, error) {
+	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (redis_state.RedisQueueShard, error) {
 		return queueShard, nil
 	}
 
-	queueShards := map[string]redis_state.QueueShard{
+	queueShards := map[string]redis_state.RedisQueueShard{
 		consts.DefaultQueueShardName: queueShard,
 	}
 
@@ -1006,13 +1006,13 @@ func TestExecutorReturnsResponseWhenNonRetriableError(t *testing.T) {
 		QueueDefaultKey:        redis_state.QueueDefaultKey,
 	})
 
-	queueShard := redis_state.QueueShard{Name: consts.DefaultQueueShardName, RedisClient: unshardedClient.Queue(), Kind: string(enums.QueueShardKindRedis)}
+	queueShard := redis_state.RedisQueueShard{Name: consts.DefaultQueueShardName, RedisClient: unshardedClient.Queue(), Kind: string(enums.QueueShardKindRedis)}
 
-	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (redis_state.QueueShard, error) {
+	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (redis_state.RedisQueueShard, error) {
 		return queueShard, nil
 	}
 
-	queueShards := map[string]redis_state.QueueShard{
+	queueShards := map[string]redis_state.RedisQueueShard{
 		consts.DefaultQueueShardName: queueShard,
 	}
 
@@ -1196,13 +1196,13 @@ func TestExecutorScheduleRateLimit(t *testing.T) {
 		QueueDefaultKey:        redis_state.QueueDefaultKey,
 	})
 
-	queueShard := redis_state.QueueShard{Name: consts.DefaultQueueShardName, RedisClient: unshardedClient.Queue(), Kind: string(enums.QueueShardKindRedis)}
+	queueShard := redis_state.RedisQueueShard{Name: consts.DefaultQueueShardName, RedisClient: unshardedClient.Queue(), Kind: string(enums.QueueShardKindRedis)}
 
-	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (redis_state.QueueShard, error) {
+	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (redis_state.RedisQueueShard, error) {
 		return queueShard, nil
 	}
 
-	queueShards := map[string]redis_state.QueueShard{
+	queueShards := map[string]redis_state.RedisQueueShard{
 		consts.DefaultQueueShardName: queueShard,
 	}
 
@@ -1391,13 +1391,13 @@ func TestExecutorScheduleBacklogSizeLimit(t *testing.T) {
 		QueueDefaultKey:        redis_state.QueueDefaultKey,
 	})
 
-	queueShard := redis_state.QueueShard{Name: consts.DefaultQueueShardName, RedisClient: unshardedClient.Queue(), Kind: string(enums.QueueShardKindRedis)}
+	queueShard := redis_state.RedisQueueShard{Name: consts.DefaultQueueShardName, RedisClient: unshardedClient.Queue(), Kind: string(enums.QueueShardKindRedis)}
 
-	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (redis_state.QueueShard, error) {
+	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (redis_state.RedisQueueShard, error) {
 		return queueShard, nil
 	}
 
-	queueShards := map[string]redis_state.QueueShard{
+	queueShards := map[string]redis_state.RedisQueueShard{
 		consts.DefaultQueueShardName: queueShard,
 	}
 

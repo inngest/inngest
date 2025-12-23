@@ -1,7 +1,11 @@
 package queue
 
 import (
+	"context"
+	"encoding/json"
+
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -45,4 +49,71 @@ type QueuePartition struct {
 	// that it was requeued due to concurrency issues and should not be brought forward
 	// when a new step is enqueued, if now < ForcedAtMS.
 	ForceAtMS int64 `json:"forceAtMS"`
+}
+
+func (qp QueuePartition) IsSystem() bool {
+	return qp.QueueName != nil && *qp.QueueName != ""
+}
+
+// ItemPartitions returns the partition for a given item.
+func ItemPartition(ctx context.Context, shard QueueShard, i QueueItem) QueuePartition {
+	l := logger.StdlibLogger(ctx)
+
+	queueName := i.QueueName
+
+	// sanity check: both QueueNames should be set, but sometimes aren't
+	if queueName == nil && i.QueueName != nil {
+		queueName = i.QueueName
+		l.Warn("encountered queue item with inconsistent custom queue name, should have both i.QueueName and i.Data.QueueName set",
+			"item", i,
+		)
+	}
+
+	// sanity check: queueName values must match
+	if i.Data.QueueName != nil && i.QueueName != nil && *i.Data.QueueName != *i.QueueName {
+		l.Warn("encountered queue item with inconsistent custom queue names, should have matching values for i.QueueName and i.Data.QueueName",
+			"item", i,
+		)
+	}
+
+	// The only case when we manually set a queueName is for system partitions
+	if queueName != nil {
+		systemPartition := QueuePartition{
+			// NOTE: Never remove this. The ID is required to enqueue items to the
+			// partition, as it is used for conditional checks in Lua
+			ID:        *queueName,
+			QueueName: queueName,
+		}
+		return systemPartition
+	}
+
+	if i.FunctionID == uuid.Nil {
+		l.Error("unexpected missing functionID in ItemPartitions()", "item", i)
+	}
+
+	fnPartition := QueuePartition{
+		ID:         i.FunctionID.String(),
+		FunctionID: &i.FunctionID,
+		AccountID:  i.Data.Identifier.AccountID,
+	}
+
+	return fnPartition
+}
+
+func (qp QueuePartition) Queue() string {
+	// This is redundant but acts as a safeguard, so that
+	// we always return the ID (queueName) for system partitions
+	if qp.IsSystem() {
+		return *qp.QueueName
+	}
+
+	if qp.ID == "" && qp.FunctionID != nil {
+		return qp.FunctionID.String()
+	}
+
+	return qp.ID
+}
+
+func (qp QueuePartition) MarshalBinary() ([]byte, error) {
+	return json.Marshal(qp)
 }

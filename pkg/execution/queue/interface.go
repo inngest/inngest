@@ -85,6 +85,8 @@ func PartitionLeaseOptionDisableLeaseChecks(disableLeaseChecks bool) PartitionLe
 }
 
 type QueueProcessor interface {
+	Options() QueueOptions
+
 	EnqueueItem(ctx context.Context, shard QueueShard, i QueueItem, at time.Time, opts EnqueueOpts) (QueueItem, error)
 	Peek(ctx context.Context, partition *QueuePartition, until time.Time, limit int64) ([]*QueueItem, error)
 	Lease(ctx context.Context, item QueueItem, leaseDuration time.Duration, now time.Time, denies *LeaseDenies, options ...LeaseOptionFn) (*ulid.ULID, error)

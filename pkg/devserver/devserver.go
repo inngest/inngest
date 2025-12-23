@@ -269,13 +269,13 @@ func start(ctx context.Context, opts StartOpts) error {
 		QueueDefaultKey:        redis_state.QueueDefaultKey,
 	})
 
-	queueShard := redis_state.QueueShard{Name: consts.DefaultQueueShardName, RedisClient: unshardedClient.Queue(), Kind: string(enums.QueueShardKindRedis)}
+	queueShard := redis_state.RedisQueueShard{Name: consts.DefaultQueueShardName, RedisClient: unshardedClient.Queue(), Kind: string(enums.QueueShardKindRedis)}
 
-	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (redis_state.QueueShard, error) {
+	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (redis_state.RedisQueueShard, error) {
 		return queueShard, nil
 	}
 
-	queueShards := map[string]redis_state.QueueShard{
+	queueShards := map[string]redis_state.RedisQueueShard{
 		consts.DefaultQueueShardName: queueShard,
 	}
 

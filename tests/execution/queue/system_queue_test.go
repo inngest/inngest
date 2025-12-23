@@ -40,7 +40,7 @@ func TestSystemQueueConfigs(t *testing.T) {
 
 	batchClient := redis_state.NewBatchClient(rc, redis_state.QueueDefaultKey)
 
-	defaultShard := redis_state.QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: redis_state.NewQueueClient(rc, redis_state.QueueDefaultKey), Name: consts.DefaultQueueShardName}
+	defaultShard := redis_state.RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: redis_state.NewQueueClient(rc, redis_state.QueueDefaultKey), Name: consts.DefaultQueueShardName}
 	kg := defaultShard.RedisClient.KeyGenerator()
 
 	clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Second))
@@ -53,7 +53,7 @@ func TestSystemQueueConfigs(t *testing.T) {
 			return false
 		}),
 		redis_state.WithKindToQueueMapping(mapping),
-		redis_state.WithShardSelector(func(ctx context.Context, accountId uuid.UUID, queueName *string) (redis_state.QueueShard, error) {
+		redis_state.WithShardSelector(func(ctx context.Context, accountId uuid.UUID, queueName *string) (redis_state.RedisQueueShard, error) {
 			return defaultShard, nil
 		}),
 	)

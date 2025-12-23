@@ -17,7 +17,7 @@ import (
 type QueueOpOpt func(o *queueOpOpt)
 
 type queueOpOpt struct {
-	shard *QueueShard
+	shard *RedisQueueShard
 }
 
 // newQueueOpOpt returns the default option settings for queue operations
@@ -34,7 +34,7 @@ func newQueueOpOptWithOpts(opts ...QueueOpOpt) queueOpOpt {
 	return opt
 }
 
-func WithQueueOpShard(shard QueueShard) QueueOpOpt {
+func WithQueueOpShard(shard RedisQueueShard) QueueOpOpt {
 	return func(o *queueOpOpt) {
 		o.shard = &shard
 	}
@@ -77,7 +77,7 @@ func DequeueOptionDisableConstraintUpdates(disableUpdates bool) dequeueOptionFn 
 type dequeueOptionFn func(o *dequeueOptions)
 
 // Dequeue removes an item from the queue entirely.
-func (q *queue) Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.QueueItem, options ...dequeueOptionFn) error {
+func (q *queue) Dequeue(ctx context.Context, queueShard RedisQueueShard, i osqueue.QueueItem, options ...dequeueOptionFn) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Dequeue"), redis_telemetry.ScopeQueue)
 
 	o := &dequeueOptions{}
@@ -206,7 +206,7 @@ func (q *queue) Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 }
 
 // Requeue requeues an item in the future.
-func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.QueueItem, at time.Time, options ...requeueOptionFn) error {
+func (q *queue) Requeue(ctx context.Context, queueShard RedisQueueShard, i osqueue.QueueItem, at time.Time, options ...requeueOptionFn) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Requeue"), redis_telemetry.ScopeQueue)
 
 	o := &requeueOptions{}

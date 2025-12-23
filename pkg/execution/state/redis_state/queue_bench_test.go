@@ -32,7 +32,7 @@ func BenchmarkKeyQueues(b *testing.B) {
 
 	clock := clockwork.NewFakeClock()
 
-	defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+	defaultShard := RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 
 	q := NewQueue(
 		defaultShard,
@@ -62,7 +62,7 @@ func BenchmarkKeyQueues(b *testing.B) {
 			ShadowContinuationSkipProbability: consts.QueueContinuationSkipProbability,
 			NormalizePartition:                true,
 		}),
-		WithShardSelector(func(ctx context.Context, accountId uuid.UUID, queueName *string) (QueueShard, error) {
+		WithShardSelector(func(ctx context.Context, accountId uuid.UUID, queueName *string) (RedisQueueShard, error) {
 			return defaultShard, nil
 		}),
 	)

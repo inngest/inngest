@@ -212,7 +212,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 	require.NoError(t, err)
 	defer rc.Close()
 
-	q := NewQueue(QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName})
+	q := NewQueue(RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName})
 	ctx := context.Background()
 
 	start := time.Now().Truncate(time.Second)
@@ -639,7 +639,7 @@ func TestQueueEnqueueItemIdempotency(t *testing.T) {
 	defer rc.Close()
 
 	// Set idempotency to a second
-	q := NewQueue(QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}, WithIdempotencyTTL(dur))
+	q := NewQueue(RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}, WithIdempotencyTTL(dur))
 	ctx := context.Background()
 
 	start := time.Now().Truncate(time.Second)
@@ -708,7 +708,7 @@ func BenchmarkPeekTiming(b *testing.B) {
 
 	// Enqueue 500 items into one queue.
 
-	q := NewQueue(QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName})
+	q := NewQueue(RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName})
 	ctx := context.Background()
 
 	enqueue := func(id uuid.UUID, n int) {
@@ -746,7 +746,7 @@ func TestQueueSystemPartitions(t *testing.T) {
 	customTestLimit := 1
 
 	q := NewQueue(
-		QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName},
+		RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName},
 		WithAllowQueueNames(customQueueName),
 		WithPartitionConstraintConfigGetter(func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
 			return PartitionConstraintConfig{
@@ -997,7 +997,7 @@ func TestQueuePeek(t *testing.T) {
 	require.NoError(t, err)
 	defer rc.Close()
 
-	q := NewQueue(QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName})
+	q := NewQueue(RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName})
 	ctx := context.Background()
 
 	// The default blank UUID
@@ -1148,7 +1148,7 @@ func TestQueuePartitionPeek(t *testing.T) {
 	defer rc.Close()
 
 	q := NewQueue(
-		QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey)},
+		RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey)},
 		WithPartitionPriorityFinder(func(ctx context.Context, p QueuePartition) uint {
 			if p.FunctionID == nil {
 				return PriorityMin
@@ -1247,7 +1247,7 @@ func TestQueuePartitionPeek(t *testing.T) {
 		defer rc.Close()
 
 		q := NewQueue(
-			QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey)},
+			RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey)},
 			WithPartitionPriorityFinder(func(ctx context.Context, p QueuePartition) uint {
 				if p.FunctionID == nil {
 					return PriorityMin
@@ -1293,7 +1293,7 @@ func TestQueuePartitionPeek(t *testing.T) {
 
 		paused := make(map[uuid.UUID]bool)
 		q := NewQueue(
-			QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey)},
+			RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey)},
 			WithPartitionPriorityFinder(func(_ context.Context, _ QueuePartition) uint {
 				return PriorityDefault
 			}),
@@ -1346,7 +1346,7 @@ func TestQueuePartitionPeek(t *testing.T) {
 		defer rc.Close()
 
 		q := NewQueue(
-			QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey)},
+			RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey)},
 			WithPartitionPriorityFinder(func(_ context.Context, _ QueuePartition) uint {
 				return PriorityDefault
 			}),
@@ -1388,7 +1388,7 @@ func TestQueuePartitionRequeue(t *testing.T) {
 	defer rc.Close()
 
 	var enableKeyQueues bool
-	shard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey)}
+	shard := RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey)}
 	q := NewQueue(
 		shard,
 		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
@@ -1689,7 +1689,7 @@ func TestQueueFunctionPause(t *testing.T) {
 
 	var paused bool
 
-	shard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey)}
+	shard := RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey)}
 	kg := shard.RedisClient.KeyGenerator()
 	q := NewQueue(
 		shard,
@@ -1736,7 +1736,7 @@ func TestQueueSetFunctionMigrate(t *testing.T) {
 	defer rc.Close()
 
 	t.Run("with default shard", func(t *testing.T) {
-		shard := QueueShard{Name: "default", Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey)}
+		shard := RedisQueueShard{Name: "default", Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey)}
 		kg := shard.RedisClient.kg
 		q := NewQueue(
 			shard,
@@ -1770,7 +1770,7 @@ func TestQueueSetFunctionMigrate(t *testing.T) {
 	})
 
 	t.Run("with key queues", func(t *testing.T) {
-		shard := QueueShard{Name: "default", Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey)}
+		shard := RedisQueueShard{Name: "default", Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey)}
 		q := NewQueue(
 			shard,
 			WithPartitionPriorityFinder(func(ctx context.Context, part QueuePartition) uint {
@@ -1830,12 +1830,12 @@ func TestQueueSetFunctionMigrate(t *testing.T) {
 		require.NoError(t, err)
 		defer rc2.Close()
 
-		yoloShard := QueueShard{Name: "yolo", Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc2, QueueDefaultKey)}
-		defaultShard := QueueShard{Name: "default", Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey)}
+		yoloShard := RedisQueueShard{Name: "yolo", Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc2, QueueDefaultKey)}
+		defaultShard := RedisQueueShard{Name: "default", Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey)}
 
 		q := NewQueue(
 			defaultShard,
-			WithQueueShardClients(map[string]QueueShard{
+			WithQueueShardClients(map[string]RedisQueueShard{
 				"yolo":                       yoloShard,
 				consts.DefaultQueueShardName: defaultShard,
 			}),
@@ -1926,7 +1926,7 @@ func TestQueueRequeueByJobID(t *testing.T) {
 	require.NoError(t, err)
 	defer rc.Close()
 
-	q := NewQueue(QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey)})
+	q := NewQueue(RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey)})
 	q.ppf = func(ctx context.Context, p QueuePartition) uint {
 		return PriorityMin
 	}
@@ -2151,7 +2151,7 @@ func TestQueueLeaseSequential(t *testing.T) {
 	require.NoError(t, err)
 	defer rc.Close()
 
-	qc := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey)}
+	qc := RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey)}
 	q := queue{
 		primaryQueueShard: qc,
 		ppf: func(ctx context.Context, p QueuePartition) uint {
@@ -2219,7 +2219,7 @@ func TestQueueRateLimit(t *testing.T) {
 	ctx := context.Background()
 	clock := clockwork.NewFakeClock()
 	q := NewQueue(
-		QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey)}, WithClock(clock),
+		RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey)}, WithClock(clock),
 	)
 
 	idA, idB := uuid.New(), uuid.New()
@@ -2458,10 +2458,10 @@ func TestMigrate(t *testing.T) {
 			shard1Name := "default"
 			shard2Name := "yolo"
 
-			shard1 := QueueShard{Name: shard1Name, Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc1, QueueDefaultKey)}
-			shard2 := QueueShard{Name: shard2Name, Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc2, QueueDefaultKey)}
+			shard1 := RedisQueueShard{Name: shard1Name, Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc1, QueueDefaultKey)}
+			shard2 := RedisQueueShard{Name: shard2Name, Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc2, QueueDefaultKey)}
 
-			shards := map[string]QueueShard{shard1Name: shard1, shard2Name: shard2}
+			shards := map[string]RedisQueueShard{shard1Name: shard1, shard2Name: shard2}
 
 			q1 := NewQueue(
 				shard1,
@@ -2487,7 +2487,7 @@ func TestMigrate(t *testing.T) {
 				}),
 			)
 
-			expectItemCountForPartition := func(ctx context.Context, q *queue, shard QueueShard, partitionID uuid.UUID, expected int) {
+			expectItemCountForPartition := func(ctx context.Context, q *queue, shard RedisQueueShard, partitionID uuid.UUID, expected int) {
 				var count int
 
 				from := time.Time{}
@@ -2818,7 +2818,7 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 		require.NoError(t, err)
 		defer rc.Close()
 
-		defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+		defaultShard := RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 		kg := defaultShard.RedisClient.kg
 
 		clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Second))
@@ -2991,7 +2991,7 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 		require.NoError(t, err)
 		defer rc.Close()
 
-		defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+		defaultShard := RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 		kg := defaultShard.RedisClient.kg
 
 		clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Second))
@@ -3113,7 +3113,7 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 		require.NoError(t, err)
 		defer rc.Close()
 
-		defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+		defaultShard := RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 		kg := defaultShard.RedisClient.kg
 
 		clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Second))
@@ -3253,7 +3253,7 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 		require.NoError(t, err)
 		defer rc.Close()
 
-		defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+		defaultShard := RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 		kg := defaultShard.RedisClient.kg
 
 		clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Second))
@@ -3331,7 +3331,7 @@ func TestQueueEnqueueItemSingleton(t *testing.T) {
 	require.NoError(t, err)
 	defer rc.Close()
 
-	defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+	defaultShard := RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 	q := NewQueue(defaultShard)
 
 	kg := defaultShard.RedisClient.KeyGenerator()
@@ -3489,7 +3489,7 @@ func TestQueueActiveCounters(t *testing.T) {
 	require.NoError(t, err)
 	defer rc.Close()
 
-	defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+	defaultShard := RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 	kg := defaultShard.RedisClient.kg
 
 	enqueueToBacklog := false
@@ -4050,7 +4050,7 @@ func TestInvalidScoreOnRefill(t *testing.T) {
 	require.NoError(t, err)
 	defer rc.Close()
 
-	defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+	defaultShard := RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 
 	constraints := PartitionConstraintConfig{
 		Concurrency: PartitionConcurrency{

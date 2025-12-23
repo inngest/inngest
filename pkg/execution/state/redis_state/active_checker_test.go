@@ -27,7 +27,7 @@ func TestShadowPartitionActiveCheck(t *testing.T) {
 
 	ctx = logger.WithStdlib(ctx, l)
 
-	defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+	defaultShard := RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 	clock := clockwork.NewFakeClock()
 
 	enqueueToBacklog := false

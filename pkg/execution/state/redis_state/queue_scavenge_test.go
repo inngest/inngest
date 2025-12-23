@@ -30,7 +30,7 @@ func TestQueueScavenge(t *testing.T) {
 
 	clock := clockwork.NewFakeClock()
 
-	shard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+	shard := RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 	kg := shard.RedisClient.KeyGenerator()
 
 	t.Run("in-progress items must be added to scavenger index", func(t *testing.T) {

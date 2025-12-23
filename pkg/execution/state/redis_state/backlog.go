@@ -776,7 +776,7 @@ func (q *queue) backlogPeek(ctx context.Context, b *QueueBacklog, from time.Time
 }
 
 // NOTE: this function only work with key queues
-func (q *queue) BacklogsByPartition(ctx context.Context, queueShard QueueShard, partitionID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueBacklog], error) {
+func (q *queue) BacklogsByPartition(ctx context.Context, queueShard RedisQueueShard, partitionID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueBacklog], error) {
 	opt := queueIterOpt{
 		batchSize:                 1000,
 		interval:                  50 * time.Millisecond,
@@ -926,7 +926,7 @@ func (q *queue) PartitionBacklogSize(ctx context.Context, partitionID string) (i
 	return count, nil
 }
 
-func (q *queue) BacklogSize(ctx context.Context, queueShard QueueShard, backlogID string) (int64, error) {
+func (q *queue) BacklogSize(ctx context.Context, queueShard RedisQueueShard, backlogID string) (int64, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "backlogSize"), redis_telemetry.ScopeQueue)
 
 	rc := queueShard.RedisClient.Client()

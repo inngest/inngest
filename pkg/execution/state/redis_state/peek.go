@@ -21,12 +21,12 @@ type PeekOpt func(p *peekOption)
 type peekOption struct {
 	// Shard specifies which shard to use for the peek operation instead of the shard that the executor points to.
 	// The use of this should be rare, and should be limited to system queue operations as much as possible.
-	Shard *QueueShard
+	Shard *RedisQueueShard
 
 	ignoreCleanup bool
 }
 
-func WithPeekOptQueueShard(qs *QueueShard) PeekOpt {
+func WithPeekOptQueueShard(qs *RedisQueueShard) PeekOpt {
 	return func(p *peekOption) {
 		p.Shard = qs
 	}

@@ -37,7 +37,7 @@ func TestDeleteManager(t *testing.T) {
 	unshardedClient := redis_state.NewUnshardedClient(redisClient, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
 
 	// Set up queue shard
-	defaultQueueShard := redis_state.QueueShard{
+	defaultQueueShard := redis_state.RedisQueueShard{
 		Name:        consts.DefaultQueueShardName,
 		RedisClient: unshardedClient.Queue(),
 		Kind:        string(enums.QueueShardKindRedis),
@@ -47,11 +47,11 @@ func TestDeleteManager(t *testing.T) {
 	queueManager := redis_state.NewQueue(
 		defaultQueueShard,
 		redis_state.WithQueueShardClients(
-			map[string]redis_state.QueueShard{
+			map[string]redis_state.RedisQueueShard{
 				defaultQueueShard.Name: defaultQueueShard,
 			},
 		),
-		redis_state.WithShardSelector(func(ctx context.Context, accountId uuid.UUID, queueName *string) (redis_state.QueueShard, error) {
+		redis_state.WithShardSelector(func(ctx context.Context, accountId uuid.UUID, queueName *string) (redis_state.RedisQueueShard, error) {
 			return defaultQueueShard, nil
 		}),
 		redis_state.WithKindToQueueMapping(map[string]string{
@@ -388,7 +388,7 @@ func TestDeleteManager(t *testing.T) {
 			WithPauseManager(pauseManager),
 			WithBatchManager(batchManager),
 			WithDebouncer(debouncer),
-			WithUnknownHandler(func(ctx context.Context, shard redis_state.QueueShard, item *queue.QueueItem) error {
+			WithUnknownHandler(func(ctx context.Context, shard redis_state.RedisQueueShard, item *queue.QueueItem) error {
 				handlerCallCount++
 				return nil
 			}),

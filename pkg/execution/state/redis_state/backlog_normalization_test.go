@@ -24,7 +24,7 @@ func TestBacklogNormalizationLease(t *testing.T) {
 	_, rc := initRedis(t)
 	defer rc.Close()
 
-	defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+	defaultShard := RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 	clock := clockwork.NewFakeClock()
 
 	enqueueToBacklog := false
@@ -70,7 +70,7 @@ func TestExtendBacklogNormalizationLease(t *testing.T) {
 	r, rc := initRedis(t)
 	defer rc.Close()
 
-	defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+	defaultShard := RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 	clock := clockwork.NewFakeClock()
 
 	enqueueToBacklog := false
@@ -127,7 +127,7 @@ func TestQueueBacklogPrepareNormalize(t *testing.T) {
 
 	clock := clockwork.NewFakeClock()
 
-	defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+	defaultShard := RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 	kg := defaultShard.RedisClient.kg
 
 	q := NewQueue(
@@ -237,7 +237,7 @@ func TestQueueBacklogNormalization(t *testing.T) {
 
 	clock := clockwork.NewFakeClock()
 
-	defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+	defaultShard := RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 	kg := defaultShard.RedisClient.kg
 
 	q := NewQueue(
@@ -314,7 +314,7 @@ func TestBacklogNormalizeItem(t *testing.T) {
 	defer r.Close()
 
 	clock := clockwork.NewFakeClock()
-	defaultShard := QueueShard{
+	defaultShard := RedisQueueShard{
 		Kind:        string(enums.QueueShardKindRedis),
 		RedisClient: NewQueueClient(rc, QueueDefaultKey),
 		Name:        consts.DefaultQueueShardName,
@@ -430,7 +430,7 @@ func TestQueueBacklogNormalizationWithRewrite(t *testing.T) {
 
 	clock := clockwork.NewFakeClock()
 
-	defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+	defaultShard := RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 	kg := defaultShard.RedisClient.kg
 
 	accountId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
@@ -570,7 +570,7 @@ func TestBacklogNormalizationScanner(t *testing.T) {
 
 	clock := clockwork.NewFakeClock()
 
-	defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+	defaultShard := RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 	kg := defaultShard.RedisClient.kg
 
 	q := NewQueue(
@@ -657,7 +657,7 @@ func TestBacklogNormalizeItemWithSingleton(t *testing.T) {
 	defer r.Close()
 
 	clock := clockwork.NewFakeClock()
-	defaultShard := QueueShard{
+	defaultShard := RedisQueueShard{
 		Kind:        string(enums.QueueShardKindRedis),
 		RedisClient: NewQueueClient(rc, QueueDefaultKey),
 		Name:        consts.DefaultQueueShardName,
