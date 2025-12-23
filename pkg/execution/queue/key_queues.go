@@ -1,6 +1,7 @@
 package queue
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -243,7 +244,7 @@ func (b QueueBacklog) IsOutdated(constraints PartitionConstraintConfig) enums.Qu
 	return enums.QueueNormalizeReasonUnchanged
 }
 
-func (b QueueBacklog) customConcurrencyKeyID(n int) string {
+func (b QueueBacklog) CustomConcurrencyKeyID(n int) string {
 	if n < 0 || n > len(b.ConcurrencyKeys) {
 		return ""
 	}
@@ -327,4 +328,17 @@ func backlogRefillMultiplier(backlogs []*QueueBacklog, backlog *QueueBacklog, co
 	default:
 		return 1
 	}
+}
+
+func (o QueueOptions) ItemEnableKeyQueues(ctx context.Context, item QueueItem) bool {
+	isSystem := item.QueueName != nil || item.Data.QueueName != nil
+	if isSystem {
+		return false
+	}
+
+	if item.Data.Identifier.AccountID != uuid.Nil && o.AllowKeyQueues != nil {
+		return o.AllowKeyQueues(ctx, item.Data.Identifier.AccountID, item.FunctionID)
+	}
+
+	return false
 }

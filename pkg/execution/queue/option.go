@@ -371,8 +371,8 @@ type QueueOptions struct {
 
 	lifecycles QueueLifecycleListeners
 
-	allowKeyQueues                  AllowKeyQueues
-	partitionConstraintConfigGetter PartitionConstraintConfigGetter
+	AllowKeyQueues                  AllowKeyQueues
+	PartitionConstraintConfigGetter PartitionConstraintConfigGetter
 
 	activeCheckTick               time.Duration
 	activeCheckAccountConcurrency int64
@@ -464,7 +464,7 @@ type QueueOptions struct {
 	useConstraintAPI            constraintapi.UseConstraintAPIFn
 	capacityLeaseExtendInterval time.Duration
 
-	enableThrottleInstrumentation EnableThrottleInstrumentationFn
+	EnableThrottleInstrumentation EnableThrottleInstrumentationFn
 }
 
 // ShardSelector returns a shard reference for the given queue item.
@@ -489,7 +489,7 @@ type PartitionConstraintConfigGetter func(ctx context.Context, p PartitionIdenti
 // WithPartitionConstraintConfigGetter assigns a function that returns queue constraints for a given partition.
 func WithPartitionConstraintConfigGetter(f PartitionConstraintConfigGetter) QueueOpt {
 	return func(q *QueueOptions) {
-		q.partitionConstraintConfigGetter = f
+		q.PartitionConstraintConfigGetter = f
 	}
 }
 
@@ -498,7 +498,7 @@ type AllowKeyQueues func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) 
 
 func WithAllowKeyQueues(kq AllowKeyQueues) QueueOpt {
 	return func(q *QueueOptions) {
-		q.allowKeyQueues = kq
+		q.AllowKeyQueues = kq
 	}
 }
 
@@ -598,7 +598,7 @@ type EnableThrottleInstrumentationFn func(ctx context.Context, accountID, fnID u
 
 func WithEnableThrottleInstrumentation(fn EnableThrottleInstrumentationFn) QueueOpt {
 	return func(q *QueueOptions) {
-		q.enableThrottleInstrumentation = fn
+		q.EnableThrottleInstrumentation = fn
 	}
 }
 
