@@ -840,19 +840,6 @@ func (q *queue) RequeueByJobID(ctx context.Context, jobID string, at time.Time) 
 	}
 }
 
-func (q *queue) itemEnableKeyQueues(ctx context.Context, item osqueue.QueueItem) bool {
-	isSystem := item.QueueName != nil || item.Data.QueueName != nil
-	if isSystem {
-		return false
-	}
-
-	if item.Data.Identifier.AccountID != uuid.Nil && q.allowKeyQueues != nil {
-		return q.allowKeyQueues(ctx, item.Data.Identifier.AccountID, item.FunctionID)
-	}
-
-	return false
-}
-
 // Lease temporarily dequeues an item from the queue by obtaining a lease, preventing
 // other workers from working on this queue item at the same time.
 //
@@ -864,71 +851,67 @@ func (q *queue) Lease(
 	leaseDuration time.Duration,
 	now time.Time,
 	denies *osqueue.LeaseDenies,
-	options ...leaseOptionFn,
+	options ...osqueue.LeaseOptionFn,
 ) (*ulid.ULID, error) {
-	o := &leaseOptions{}
+	o := &osqueue.LeaseOptions{}
 	for _, opt := range options {
 		opt(o)
 	}
 
-	if o.backlog.BacklogID == "" {
-		o.backlog = q.ItemBacklog(ctx, item)
+	if o.Backlog.BacklogID == "" {
+		o.Backlog = osqueue.ItemBacklog(ctx, item)
 	}
 
-	if o.sp.PartitionID == "" {
-		o.sp = q.ItemShadowPartition(ctx, item)
+	if o.ShadowPartition.PartitionID == "" {
+		o.ShadowPartition = osqueue.ItemShadowPartition(ctx, item)
 	}
 
-	if o.constraints.FunctionVersion == 0 {
-		o.constraints = q.partitionConstraintConfigGetter(ctx, o.sp.Identifier())
+	if o.Constraints.FunctionVersion == 0 {
+		o.Constraints = q.PartitionConstraintConfigGetter(ctx, o.ShadowPartition.Identifier())
 	}
 
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Lease"), redis_telemetry.ScopeQueue)
 
-	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
-		return nil, fmt.Errorf("unsupported queue shard kind for Lease: %s", q.primaryQueueShard.Kind)
-	}
+	kg := q.RedisClient.kg
 
-	kg := q.primaryQueueShard.RedisClient.kg
-
-	enableKeyQueues := q.itemEnableKeyQueues(ctx, item)
+	enableKeyQueues := q.ItemEnableKeyQueues(ctx, item)
 
 	refilledFromBacklog := enableKeyQueues && item.RefilledFrom != ""
 
 	// Disable constraint checks and updates under certain circumstances
 	// - For system queues
 	// - When a valid capacity lease is held
-	checkConstraints := !o.disableConstraintChecks
+	checkConstraints := !o.DisableConstraintChecks
 
 	if checkConstraints {
-		if item.Data.Throttle != nil && denies != nil && denies.denyThrottle(item.Data.Throttle.Key) {
-			return nil, ErrQueueItemThrottled
+		if item.Data.Throttle != nil && denies != nil && denies.DenyThrottle(item.Data.Throttle.Key) {
+			return nil, osqueue.ErrQueueItemThrottled
 		}
 
 		// Check to see if this key has already been denied in the lease iteration.
 		// If partition concurrency limits were encountered previously, fail early.
-		if denies != nil && denies.denyConcurrency(item.FunctionID.String()) {
+		if denies != nil && denies.DenyConcurrency(item.FunctionID.String()) {
 			// Note that we do not need to wrap the key as the key is already present.
-			return nil, ErrPartitionConcurrencyLimit
+			return nil, osqueue.ErrPartitionConcurrencyLimit
 		}
 
 		// Same for account concurrency limits
-		if denies != nil && denies.denyConcurrency(item.Data.Identifier.AccountID.String()) {
-			return nil, ErrAccountConcurrencyLimit
+		if denies != nil && denies.DenyConcurrency(item.Data.Identifier.AccountID.String()) {
+			return nil, osqueue.ErrAccountConcurrencyLimit
 		}
 	}
 
 	if checkConstraints {
 		// Check to see if this key has already been denied in the lease iteration.
 		// If so, fail early.
-		if denies != nil && len(o.backlog.ConcurrencyKeys) > 0 && denies.denyConcurrency(o.backlog.customConcurrencyKeyID(1)) {
-			return nil, ErrConcurrencyLimitCustomKey
+		if denies != nil && len(o.Backlog.ConcurrencyKeys) > 0 && denies.DenyConcurrency(o.Backlog.CustomConcurrencyKeyID(1)) {
+			return nil, osqueue.ErrConcurrencyLimitCustomKey
 		}
 
 		// Check to see if this key has already been denied in the lease iteration.
 		// If so, fail early.
-		if denies != nil && len(o.backlog.ConcurrencyKeys) > 1 && denies.denyConcurrency(o.backlog.customConcurrencyKeyID(2)) {
-			return nil, ErrConcurrencyLimitCustomKey
+		if denies != nil && len(o.Backlog.ConcurrencyKeys) > 1 && denies.DenyConcurrency(o.Backlog.CustomConcurrencyKeyID(2)) {
+			return nil, osqueue.ErrConcurrencyLimitCustomKey
 		}
 	}
 
@@ -947,16 +930,16 @@ func (q *queue) Lease(
 		checkConstraintsVal = "1"
 	}
 
-	checkThrottle := checkConstraints && o.constraints.Throttle != nil && item.Data.Throttle != nil
+	checkThrottle := checkConstraints && o.Constraints.Throttle != nil && item.Data.Throttle != nil
 
 	enableThrottleInstrumentation := checkThrottle &&
-		o.sp.AccountID != nil &&
-		o.sp.FunctionID != nil &&
-		q.enableThrottleInstrumentation != nil &&
-		q.enableThrottleInstrumentation(ctx, *o.sp.AccountID, *o.sp.FunctionID)
+		o.ShadowPartition.AccountID != nil &&
+		o.ShadowPartition.FunctionID != nil &&
+		q.EnableThrottleInstrumentation != nil &&
+		q.EnableThrottleInstrumentation(ctx, *o.ShadowPartition.AccountID, *o.ShadowPartition.FunctionID)
 
 	// Check if throttle is outdated
-	if outdatedThrottleReason := o.constraints.HasOutdatedThrottle(item); outdatedThrottleReason != enums.OutdatedThrottleReasonNone {
+	if outdatedThrottleReason := o.Constraints.HasOutdatedThrottle(item); outdatedThrottleReason != enums.OutdatedThrottleReasonNone {
 		// TODO: Re-evaluate throttle with event data
 		metrics.IncrQueueThrottleKeyExpressionMismatchCounter(ctx, metrics.CounterOpt{
 			PkgName: pkgName,
