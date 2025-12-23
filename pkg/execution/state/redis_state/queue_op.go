@@ -205,18 +205,6 @@ func (q *queue) Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 	}
 }
 
-type requeueOptions struct {
-	disableConstraintUpdates bool
-}
-
-func RequeueOptionDisableConstraintUpdates(disableUpdates bool) requeueOptionFn {
-	return func(o *requeueOptions) {
-		o.disableConstraintUpdates = disableUpdates
-	}
-}
-
-type requeueOptionFn func(o *requeueOptions)
-
 // Requeue requeues an item in the future.
 func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.QueueItem, at time.Time, options ...requeueOptionFn) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Requeue"), redis_telemetry.ScopeQueue)
