@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 )
 
@@ -19,6 +20,8 @@ const (
 // TODO: Lift this function and the queue interface to a higher level, so that it's disconnected from the
 // concrete Redis implementation.
 func (q *queueProcessor) Enqueue(ctx context.Context, item Item, at time.Time, opts EnqueueOpts) error {
+	l := logger.StdlibLogger(ctx)
+
 	// propagate
 	if item.Metadata == nil {
 		item.Metadata = map[string]any{}
@@ -31,7 +34,7 @@ func (q *queueProcessor) Enqueue(ctx context.Context, item Item, at time.Time, o
 
 	if item.QueueName == nil {
 		// Check if we have a kind mapping.
-		if name, ok := q.options.queueKindMapping[item.Kind]; ok {
+		if name, ok := q.queueKindMapping[item.Kind]; ok {
 			item.QueueName = &name
 		}
 	}
@@ -46,13 +49,13 @@ func (q *queueProcessor) Enqueue(ctx context.Context, item Item, at time.Time, o
 		WallTimeMS:  at.UnixMilli(),
 	}
 
-	l := q.options.log.With(
+	l = l.With(
 		"item", qi,
 		"account_id", item.Identifier.AccountID,
 		"env_id", item.WorkspaceID,
 		"app_id", item.Identifier.AppID,
 		"fn_id", item.Identifier.WorkflowID,
-		"queue_shard", q.options.PrimaryQueueShard.Name,
+		"queue_shard", q.PrimaryQueueShard.Name,
 	)
 
 	if item.QueueName == nil && qi.FunctionID == uuid.Nil {
@@ -68,7 +71,7 @@ func (q *queueProcessor) Enqueue(ctx context.Context, item Item, at time.Time, o
 
 	// Use the queue item's score, ensuring we process older function runs first
 	// (eg. before at)
-	next := time.UnixMilli(qi.Score(q.options.Clock.Now()))
+	next := time.UnixMilli(qi.Score(q.Clock.Now()))
 
 	if factor := qi.Data.GetPriorityFactor(); factor != 0 {
 		// Ensure we mutate the AtMS time by the given priority factor.
@@ -91,7 +94,7 @@ func (q *queueProcessor) Enqueue(ctx context.Context, item Item, at time.Time, o
 
 	switch shard.Kind() {
 	case enums.QueueShardKindRedis:
-		_, err := shard.Processor().EnqueueItem(ctx, shard, qi, next, opts)
+		_, err := shard.Processor().EnqueueItem(ctx, qi, next, opts)
 		if err != nil {
 			return err
 		}
@@ -102,7 +105,7 @@ func (q *queueProcessor) Enqueue(ctx context.Context, item Item, at time.Time, o
 		//
 		// Without this, step.sleep or retries for a very old workflow may still lag behind steps from
 		// later workflows when scheduled in the future.  This can, worst case, cause never-ending runs.
-		if !q.options.enableJobPromotion || !qi.RequiresPromotionJob(q.options.Clock.Now()) {
+		if !q.enableJobPromotion || !qi.RequiresPromotionJob(q.Clock.Now()) {
 			// scheule a rebalance job automatically.
 			return nil
 		}

@@ -56,7 +56,7 @@ func (qp QueuePartition) IsSystem() bool {
 }
 
 // ItemPartitions returns the partition for a given item.
-func ItemPartition(ctx context.Context, shard QueueShard, i QueueItem) QueuePartition {
+func ItemPartition(ctx context.Context, i QueueItem) QueuePartition {
 	l := logger.StdlibLogger(ctx)
 
 	queueName := i.QueueName

@@ -92,8 +92,8 @@ func WithPeekSizeRange(min int64, max int64) QueueOpt {
 		if max > AbsoluteQueuePeekMax {
 			max = AbsoluteQueuePeekMax
 		}
-		q.peekMin = min
-		q.peekMax = max
+		q.PeekMin = min
+		q.PeekMax = max
 	}
 }
 
@@ -404,8 +404,8 @@ type QueueOptions struct {
 	// numBacklogNormalizationWorkers stores the maximum number of workers available to concurrenctly scan normalization partitions
 	numBacklogNormalizationWorkers int32
 	// peek min & max sets the range for partitions to peek for items
-	peekMin int64
-	peekMax int64
+	PeekMin int64
+	PeekMax int64
 	// usePeekEWMA specifies whether we should use EWMA for peeking.
 	usePeekEWMA bool
 	// peekCurrMultiplier is a multiplier used for calculating the dynamic peek size
