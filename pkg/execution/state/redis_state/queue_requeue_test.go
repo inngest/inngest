@@ -31,7 +31,7 @@ func TestQueueRequeue(t *testing.T) {
 	require.NoError(t, err)
 	defer rc.Close()
 
-	q := NewQueue(QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName})
+	q := NewQueue(RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName})
 	ctx := context.Background()
 
 	t.Run("Re-enqueuing a leased item should succeed", func(t *testing.T) {
@@ -238,7 +238,7 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 		require.NoError(t, err)
 		defer rc.Close()
 
-		defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+		defaultShard := RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 		kg := defaultShard.RedisClient.kg
 
 		clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Second))
@@ -384,7 +384,7 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 		require.NoError(t, err)
 		defer rc.Close()
 
-		defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+		defaultShard := RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 		kg := defaultShard.RedisClient.kg
 
 		clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Second))
@@ -552,7 +552,7 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 		require.NoError(t, err)
 		defer rc.Close()
 
-		defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+		defaultShard := RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 		kg := defaultShard.RedisClient.kg
 
 		clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Second))
@@ -752,7 +752,7 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 		require.NoError(t, err)
 		defer rc.Close()
 
-		defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+		defaultShard := RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 		kg := defaultShard.RedisClient.kg
 
 		clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Second))
@@ -873,7 +873,7 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 		require.NoError(t, err)
 		defer rc.Close()
 
-		defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+		defaultShard := RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 		kg := defaultShard.RedisClient.kg
 
 		clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Second))
@@ -1007,7 +1007,7 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 		require.NoError(t, err)
 		defer rc.Close()
 
-		defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+		defaultShard := RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 		kg := defaultShard.RedisClient.kg
 
 		clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Second))
@@ -1132,7 +1132,7 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 		require.NoError(t, err)
 		defer rc.Close()
 
-		defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+		defaultShard := RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 		kg := defaultShard.RedisClient.kg
 
 		clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Second))
@@ -1232,7 +1232,7 @@ func TestQueueRequeueWithDisabledConstraintUpdates(t *testing.T) {
 
 	clock := clockwork.NewFakeClock()
 
-	shard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+	shard := RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 	kg := shard.RedisClient.KeyGenerator()
 
 	q := NewQueue(

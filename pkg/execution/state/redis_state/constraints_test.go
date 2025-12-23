@@ -34,7 +34,7 @@ func TestItemLeaseConstraintCheck(t *testing.T) {
 
 	clock := clockwork.NewFakeClock()
 
-	shard := QueueShard{
+	shard := RedisQueueShard{
 		Kind:        string(enums.QueueShardKindRedis),
 		RedisClient: NewQueueClient(rc, "q:v1"),
 		Name:        consts.DefaultQueueShardName,
@@ -486,7 +486,7 @@ func TestBacklogRefillConstraintCheck(t *testing.T) {
 
 	clock := clockwork.NewFakeClock()
 
-	shard := QueueShard{
+	shard := RedisQueueShard{
 		Kind:        string(enums.QueueShardKindRedis),
 		RedisClient: NewQueueClient(rc, "q:v1"),
 		Name:        consts.DefaultQueueShardName,

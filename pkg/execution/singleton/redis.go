@@ -20,18 +20,18 @@ redis.call('del', KEYS[1])
 return v
 `
 
-func New(ctx context.Context, queueShards map[string]redis_state.QueueShard, shardSelector redis_state.ShardSelector) Singleton {
+func New(ctx context.Context, queueShards map[string]redis_state.RedisQueueShard, shardSelector redis_state.ShardSelector) Singleton {
 	return &redisStore{
-		queueShards: queueShards,
-		shardSelector:     shardSelector,
-		getAndDelScript:   rueidis.NewLuaScript(getAndDeleteLua),
+		queueShards:     queueShards,
+		shardSelector:   shardSelector,
+		getAndDelScript: rueidis.NewLuaScript(getAndDeleteLua),
 	}
 }
 
 type redisStore struct {
-	queueShards map[string]redis_state.QueueShard
-	shardSelector     redis_state.ShardSelector
-	getAndDelScript   *rueidis.Lua
+	queueShards     map[string]redis_state.RedisQueueShard
+	shardSelector   redis_state.ShardSelector
+	getAndDelScript *rueidis.Lua
 }
 
 func (r *redisStore) HandleSingleton(ctx context.Context, key string, s inngest.Singleton, accountID uuid.UUID) (*ulid.ULID, error) {
@@ -64,7 +64,7 @@ func (r *redisStore) GetCurrentRunID(ctx context.Context, key string, accountID 
 	return parseRunIDFromRedisValue(val, err)
 }
 
-func (r *redisStore) shardByAccount(ctx context.Context, accountID uuid.UUID) (redis_state.QueueShard, error) {
+func (r *redisStore) shardByAccount(ctx context.Context, accountID uuid.UUID) (redis_state.RedisQueueShard, error) {
 	return r.shardSelector(ctx, accountID, nil)
 }
 

@@ -17,21 +17,16 @@ import (
 
 	"github.com/VividCortex/ewma"
 	"github.com/google/uuid"
-	"github.com/inngest/inngest/pkg/backoff"
 	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
-	"github.com/inngest/inngest/pkg/execution/state"
-	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 	"github.com/inngest/inngest/pkg/util"
-	"github.com/jonboulle/clockwork"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 	"golang.org/x/sync/errgroup"
-	"golang.org/x/sync/semaphore"
 	"gonum.org/v1/gonum/stat/sampleuv"
 )
 
@@ -73,24 +68,24 @@ type QueueManager interface {
 	osqueue.QueueDirectAccess
 
 	DequeueByJobID(ctx context.Context, jobID string, opts ...QueueOpOpt) error
-	Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.QueueItem, opts ...dequeueOptionFn) error
-	Requeue(ctx context.Context, queueShard QueueShard, i osqueue.QueueItem, at time.Time, opts ...requeueOptionFn) error
-	RequeueByJobID(ctx context.Context, queueShard QueueShard, jobID string, at time.Time) error
+	Dequeue(ctx context.Context, queueShard RedisQueueShard, i osqueue.QueueItem, opts ...dequeueOptionFn) error
+	Requeue(ctx context.Context, queueShard RedisQueueShard, i osqueue.QueueItem, at time.Time, opts ...requeueOptionFn) error
+	RequeueByJobID(ctx context.Context, queueShard RedisQueueShard, jobID string, at time.Time) error
 
 	// ResetAttemptsByJobID sets retries to zero given a single job ID.  This is important for
 	// checkpointing;  a single job becomes shared amongst many  steps.
 	ResetAttemptsByJobID(ctx context.Context, shard string, jobID string) error
 
 	// ItemsByPartition returns a queue item iterator for a function within a specific time range
-	ItemsByPartition(ctx context.Context, queueShard QueueShard, partitionID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*osqueue.QueueItem], error)
+	ItemsByPartition(ctx context.Context, queueShard RedisQueueShard, partitionID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*osqueue.QueueItem], error)
 	// ItemsByBacklog returns a queue item iterator for a backlog within a specific time range
-	ItemsByBacklog(ctx context.Context, queueShard QueueShard, backlogID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*osqueue.QueueItem], error)
+	ItemsByBacklog(ctx context.Context, queueShard RedisQueueShard, backlogID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*osqueue.QueueItem], error)
 	// BacklogsByPartition returns an iterator for the partition's backlogs
-	BacklogsByPartition(ctx context.Context, queueShard QueueShard, partitionID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueBacklog], error)
+	BacklogsByPartition(ctx context.Context, queueShard RedisQueueShard, partitionID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueBacklog], error)
 	// BacklogSize retrieves the number of items in the specified backlog
-	BacklogSize(ctx context.Context, queueShard QueueShard, backlogID string) (int64, error)
+	BacklogSize(ctx context.Context, queueShard RedisQueueShard, backlogID string) (int64, error)
 	// PartitionByID retrieves the partition by the partition ID
-	PartitionByID(ctx context.Context, queueShard QueueShard, partitionID string) (*PartitionInspectionResult, error)
+	PartitionByID(ctx context.Context, queueShard RedisQueueShard, partitionID string) (*PartitionInspectionResult, error)
 	// ItemByID retrieves the queue item by the jobID
 	ItemByID(ctx context.Context, jobID string, opts ...QueueOpOpt) (*osqueue.QueueItem, error)
 	// ItemExists checks if an item with jobID exists in the queue
@@ -109,553 +104,59 @@ type QueueManager interface {
 	TotalSystemQueueDepth(ctx context.Context) (int64, error)
 
 	// Shard returns the shard with the provided name if available
-	Shard(ctx context.Context, shardName string) (QueueShard, bool)
+	Shard(ctx context.Context, shardName string) (RedisQueueShard, bool)
 }
 
-type QueueProcessor interface {
-	EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.QueueItem, at time.Time, opts osqueue.EnqueueOpts) (osqueue.QueueItem, error)
-	Peek(ctx context.Context, partition *QueuePartition, until time.Time, limit int64) ([]*osqueue.QueueItem, error)
-	Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration time.Duration, now time.Time, denies *leaseDenies, options ...leaseOptionFn) (*ulid.ULID, error)
-	ExtendLease(ctx context.Context, i osqueue.QueueItem, leaseID ulid.ULID, duration time.Duration, opts ...extendLeaseOptionFn) (*ulid.ULID, error)
-	Requeue(ctx context.Context, queueShard QueueShard, i osqueue.QueueItem, at time.Time, opts ...requeueOptionFn) error
-	RequeueByJobID(ctx context.Context, queueShard QueueShard, jobID string, at time.Time) error
-	Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.QueueItem, opts ...dequeueOptionFn) error
-
-	PartitionPeek(ctx context.Context, sequential bool, until time.Time, limit int64) ([]*QueuePartition, error)
-	PartitionLease(ctx context.Context, p *QueuePartition, duration time.Duration, opts ...partitionLeaseOpt) (*ulid.ULID, int, error)
-	PartitionRequeue(ctx context.Context, shard QueueShard, p *QueuePartition, at time.Time, forceAt bool) error
-}
-
-type QueueShard struct {
-	Name string
-	Kind string
-
+type RedisQueueShard struct {
+	name        string
 	RedisClient *QueueClient
+
+	q *queue
 }
 
-func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
-	ctx := context.Background()
+func (q RedisQueueShard) Name() string {
+	return q.name
+}
 
+func (q RedisQueueShard) Kind() enums.QueueShardKind {
+	return enums.QueueShardKindRedis
+}
+
+func (q RedisQueueShard) Processor() osqueue.QueueProcessor {
+	return q.q
+}
+
+func NewRedisQueue(options osqueue.QueueOptions, name string, queueClient *QueueClient) osqueue.QueueShard {
 	q := &queue{
-		primaryQueueShard: primaryQueueShard,
-		queueShardClients: map[string]QueueShard{primaryQueueShard.Name: primaryQueueShard},
-		ppf: func(_ context.Context, _ QueuePartition) uint {
-			return PriorityDefault
-		},
-		apf: func(_ context.Context, _ uuid.UUID) uint {
-			return PriorityDefault
-		},
-		partitionPausedGetter: func(ctx context.Context, fnID uuid.UUID) PartitionPausedInfo {
-			return PartitionPausedInfo{}
-		},
-		peekMin:                     DefaultQueuePeekMin,
-		peekMax:                     DefaultQueuePeekMax,
-		shadowPeekMin:               ShadowPartitionPeekMinBacklogs,
-		shadowPeekMax:               ShadowPartitionPeekMaxBacklogs,
-		backlogRefillLimit:          BacklogRefillHardLimit,
-		backlogNormalizeConcurrency: defaultBacklogNormalizeConcurrency,
-		runMode: QueueRunMode{
-			Sequential:                        true,
-			Scavenger:                         true,
-			Partition:                         true,
-			Account:                           true,
-			AccountWeight:                     85,
-			ShadowPartition:                   true,
-			AccountShadowPartition:            true,
-			AccountShadowPartitionWeight:      85,
-			NormalizePartition:                true,
-			ShadowContinuationSkipProbability: consts.QueueContinuationSkipProbability,
-		},
-		numWorkers:                     defaultNumWorkers,
-		numShadowWorkers:               defaultNumShadowWorkers,
-		numBacklogNormalizationWorkers: defaultBacklogNormalizationWorkers,
-		wg:                             &sync.WaitGroup{},
-		seqLeaseLock:                   &sync.RWMutex{},
-		scavengerLeaseLock:             &sync.RWMutex{},
-		activeCheckerLeaseLock:         &sync.RWMutex{},
-		instrumentationLeaseLock:       &sync.RWMutex{},
-		pollTick:                       defaultPollTick,
-		shadowPollTick:                 defaultShadowPollTick,
-		backlogNormalizePollTick:       defaultBacklogNormalizePollTick,
-		activeCheckTick:                defaultActiveCheckTick,
-		idempotencyTTL:                 defaultIdempotencyTTL,
-		queueKindMapping:               make(map[string]string),
-		peekSizeForFunctions:           make(map[string]int64),
-		log:                            logger.StdlibLogger(ctx),
-		instrumentInterval:             DefaultInstrumentInterval,
-		partitionConstraintConfigGetter: func(ctx context.Context, pi PartitionIdentifier) PartitionConstraintConfig {
-			def := defaultConcurrency
-
-			return PartitionConstraintConfig{
-				Concurrency: PartitionConcurrency{
-					AccountConcurrency:  def,
-					FunctionConcurrency: def,
-				},
-			}
-		},
-		allowKeyQueues: func(ctx context.Context, acctID, fnID uuid.UUID) bool {
-			return false
-		},
-		shadowPartitionProcessCount: func(ctx context.Context, acctID uuid.UUID) int {
-			return 5
-		},
-		tenantInstrumentor: func(ctx context.Context, partitionID string) error {
-			return nil
-		},
-		itemIndexer:             QueueItemIndexerFunc,
-		backoffFunc:             backoff.DefaultBackoff,
-		clock:                   clockwork.NewRealClock(),
-		continuesLock:           &sync.Mutex{},
-		continues:               map[string]continuation{},
-		continueCooldown:        map[string]time.Time{},
-		continuationLimit:       consts.DefaultQueueContinueLimit,
-		shadowContinuesLock:     &sync.Mutex{},
-		shadowContinuationLimit: consts.DefaultQueueContinueLimit,
-		shadowContinues:         map[string]shadowContinuation{},
-		shadowContinueCooldown:  map[string]time.Time{},
-		normalizeRefreshItemCustomConcurrencyKeys: func(ctx context.Context, item *osqueue.QueueItem, existingKeys []state.CustomConcurrency, shadowPartition *QueueShadowPartition) ([]state.CustomConcurrency, error) {
-			return existingKeys, nil
-		},
-		refreshItemThrottle: func(ctx context.Context, item *osqueue.QueueItem) (*osqueue.Throttle, error) {
-			return nil, nil
-		},
-		readOnlySpotChecks: func(ctx context.Context, acctID uuid.UUID) bool {
-			return true
-		},
-		activeSpotCheckProbability: func(ctx context.Context, acctID uuid.UUID) (backlogRefillCheckProbability int, accountSpotCheckProbability int) {
-			return 100, 100
-		},
-		activeCheckAccountProbability: 10,
-		activeCheckAccountConcurrency: ActiveCheckAccountConcurrency,
-		activeCheckBacklogConcurrency: ActiveCheckBacklogConcurrency,
-		activeCheckScanBatchSize:      ActiveCheckScanBatchSize,
-		capacityLeaseExtendInterval:   QueueLeaseDuration / 2,
+		itemIndexer: QueueItemIndexerFunc,
+		options:     options,
 	}
 
-	// default to using primary queue client for shard selection
-	q.shardSelector = func(_ context.Context, _ uuid.UUID, _ *string) (QueueShard, error) {
-		return q.primaryQueueShard, nil
+	return RedisQueueShard{
+		name:        name,
+		RedisClient: queueClient,
+		q:           q,
 	}
-
-	for _, opt := range opts {
-		opt(q)
-	}
-
-	q.sem = &trackingSemaphore{Weighted: semaphore.NewWeighted(int64(q.numWorkers))}
-	q.workers = make(chan processItem, q.numWorkers)
-
-	// We only need one signal to exit the executionScan loop but after it exits, it
-	// waits for all workers to finish. And if any other worker would try to send to
-	// this channel we deadlock.
-	q.quit = make(chan error, q.numWorkers)
-
-	return q
 }
 
 type queue struct {
-	// name is the identifiable name for this worker, for logging.
-	name string
-
-	// primaryQueueShard stores the queue shard to use.
-	primaryQueueShard QueueShard
-
-	// queueShardClients contains all non-default queue shard clients.
-	queueShardClients map[string]QueueShard
-	shardSelector     ShardSelector
-
-	ppf                   PartitionPriorityFinder
-	apf                   AccountPriorityFinder
-	partitionPausedGetter PartitionPausedGetter
-
-	lifecycles QueueLifecycleListeners
-
-	allowKeyQueues                  AllowKeyQueues
-	partitionConstraintConfigGetter PartitionConstraintConfigGetter
-
-	activeCheckTick               time.Duration
-	activeCheckAccountConcurrency int64
-	activeCheckBacklogConcurrency int64
-	activeCheckScanBatchSize      int64
-
-	activeCheckAccountProbability int
-	activeSpotCheckProbability    ActiveSpotChecksProbability
-	readOnlySpotChecks            ReadOnlySpotChecks
-	// activeCheckerLeaseID stores the lease ID if this queue is the ActiveChecker processor.
-	// all runners attempt to claim this lease automatically.
-	activeCheckerLeaseID *ulid.ULID
-	// activeCheckerLeaseLock ensures that there are no data races writing to
-	// or reading from activeCheckerLeaseID in parallel.
-	activeCheckerLeaseLock *sync.RWMutex
-
-	shadowPartitionProcessCount QueueShadowPartitionProcessCount
-
-	tenantInstrumentor TenantInstrumentor
-
-	// idempotencyTTL is the default or static idempotency duration apply to jobs,
-	// if idempotencyTTLFunc is not defined.
-	idempotencyTTL time.Duration
-	// idempotencyTTLFunc returns an time.Duration representing how long job IDs
-	// remain idempotent.
-	idempotencyTTLFunc func(context.Context, osqueue.QueueItem) time.Duration
-	// pollTick is the interval between each scan for jobs.
-	pollTick                 time.Duration
-	shadowPollTick           time.Duration
-	backlogNormalizePollTick time.Duration
-	// quit is a channel that any method can send on to trigger termination
-	// of the Run loop.  This typically accepts an error, but a nil error
-	// will still quit the runner.
-	quit chan error
-	// wg stores a waitgroup for all in-progress jobs
-	wg *sync.WaitGroup
-	// numWorkers stores the number of workers available to concurrently process jobs.
-	numWorkers int32
-	// numShadowWorkers stores the number of workers available to concurrently scan partitions
-	numShadowWorkers int32
-	// numBacklogNormalizationWorkers stores the maximum number of workers available to concurrenctly scan normalization partitions
-	numBacklogNormalizationWorkers int32
-	// peek min & max sets the range for partitions to peek for items
-	peekMin int64
-	peekMax int64
-	// usePeekEWMA specifies whether we should use EWMA for peeking.
-	usePeekEWMA bool
-	// peekCurrMultiplier is a multiplier used for calculating the dynamic peek size
-	// based on the EWMA values
-	peekCurrMultiplier int64
-	// peekEWMALen is the size of the list to hold the most recent values
-	peekEWMALen int
-	// workers is a buffered channel which allows scanners to send queue items
-	// to workers to be processed
-	workers chan processItem
-	// sem stores a semaphore controlling the number of jobs currently
-	// being processed.  This lets us check whether there's capacity in the queue
-	// prior to leasing items.
-	sem *trackingSemaphore
-	// queueKindMapping stores a map of job kind => queue names
-	queueKindMapping        map[string]string
-	disableFifoForFunctions map[string]struct{}
-	disableFifoForAccounts  map[string]struct{}
-	peekSizeForFunctions    map[string]int64
-	log                     logger.Logger
+	options osqueue.QueueOptions
 
 	// itemIndexer returns indexes for a given queue item.
 	itemIndexer QueueItemIndexer
-
-	// denyQueues provides a denylist ensuring that the queue will never claim
-	// this partition, meaning that no jobs from this queue will run on this worker.
-	denyQueues        []string
-	denyQueueMap      map[string]*struct{}
-	denyQueuePrefixes map[string]*struct{}
-
-	// allowQueues provides an allowlist, ensuring that the queue only peeks the specified
-	// partitions.  jobs from other partitions will never be scanned or processed.
-	allowQueues   []string
-	allowQueueMap map[string]*struct{}
-	// allowQueuePrefixes are memoized prefixes that can be allowed.
-	allowQueuePrefixes map[string]*struct{}
-
-	// seqLeaseID stores the lease ID if this queue is the sequential processor.
-	// all runners attempt to claim this lease automatically.
-	seqLeaseID *ulid.ULID
-	// seqLeaseLock ensures that there are no data races writing to
-	// or reading from seqLeaseID in parallel.
-	seqLeaseLock *sync.RWMutex
-
-	// instrumentationLeaseID stores the lease ID if executor is running queue
-	// instrumentations
-	instrumentationLeaseID *ulid.ULID
-	// instrumentationLeaseLock ensures that there are no data races writing to or
-	// reading from instrumentationLeaseID
-	instrumentationLeaseLock *sync.RWMutex
-	// instrumentInterval represents the frequency and instrumentation will attempt to run
-	instrumentInterval time.Duration
-
-	// scavengerLeaseID stores the lease ID if this queue is the scavenger processor.
-	// all runners attempt to claim this lease automatically.
-	scavengerLeaseID *ulid.ULID
-	// scavengerLeaseLock ensures that there are no data races writing to
-	// or reading from scavengerLeaseID in parallel.
-	scavengerLeaseLock *sync.RWMutex
-
-	// backoffFunc is the backoff function to use when retrying operations.
-	backoffFunc backoff.BackoffFunc
-
-	clock clockwork.Clock
-
-	// runMode defines the processing scopes or capabilities of the queue instances
-	runMode QueueRunMode
-
-	// continues stores a map of all partition IDs to continues for a partition.
-	// this lets us optimize running consecutive steps for a function, as a continuation, to a specific limit.
-	continues        map[string]continuation
-	continueCooldown map[string]time.Time
-
-	// continuesLock protects the continues map.
-	continuesLock     *sync.Mutex
-	continuationLimit uint
-
-	shadowContinues             map[string]shadowContinuation
-	shadowContinueCooldown      map[string]time.Time
-	shadowContinuesLock         *sync.Mutex
-	shadowContinuationLimit     uint
-	shadowPeekMin               int64
-	shadowPeekMax               int64
-	backlogRefillLimit          int64
-	backlogNormalizeConcurrency int64
-
-	normalizeRefreshItemCustomConcurrencyKeys NormalizeRefreshItemCustomConcurrencyKeysFn
-	refreshItemThrottle                       RefreshItemThrottleFn
-
-	enableJobPromotion bool
-
-	capacityManager             constraintapi.RolloutManager
-	useConstraintAPI            constraintapi.UseConstraintAPIFn
-	capacityLeaseExtendInterval time.Duration
-
-	enableThrottleInstrumentation EnableThrottleInstrumentationFn
-}
-
-type QueueRunMode struct {
-	// Sequential determines whether Run() instance acquires sequential lease and processes items sequentially if lease is granted
-	Sequential bool
-
-	// Scavenger determines whether scavenger lease is acquired and scavenger is processed if lease is granted
-	Scavenger bool
-
-	// Partition determines whether partitions are processed
-	Partition bool
-
-	// Account determines whether accounts are processed
-	Account bool
-
-	// AccountWeight is the weight of processing accounts over partitions between 0 - 100 where 100 means only process accounts
-	AccountWeight int
-
-	// Continuations enables continuations
-	Continuations bool
-
-	// Shadow enables shadow partition processing
-	ShadowPartition bool
-
-	// AccountShadowPartition enables scanning of accounts for fair shadow partition processing
-	AccountShadowPartition bool
-
-	// AccountShadowPartitionWeight is the weight of processing accounts over global shadow partitions between 0 - 100 where 100 means only process accounts
-	AccountShadowPartitionWeight int
-
-	// ShadowContinuations enables shadow continuations
-	ShadowContinuations bool
-
-	// ShadowContinuationSkipProbability represents the probability to skip continuations (defaults to 0.2)
-	ShadowContinuationSkipProbability float64
-
-	// NormalizePartition enables the processing of partitions for normalization
-	NormalizePartition bool
-
-	// ActiveChecker enables background checking of active sets.
-	ActiveChecker bool
-
-	// ExclusiveAccounts defines a list of account IDs to peek exclusively.
-	// This can be used to configure executors processing only a static subset of accounts.
-	ExclusiveAccounts []uuid.UUID
-}
-
-// continuation represents a partition continuation, forcung the queue to continue working
-// on a partition once a job from a partition has been processed.
-type continuation struct {
-	partition *QueuePartition
-	// count is stored and incremented each time the partition is enqueued.
-	count uint
-}
-
-// shadowContinuation is the equivalent of continuation for shadow partitions
-type shadowContinuation struct {
-	shadowPart *QueueShadowPartition
-	count      uint
-}
-
-// processItem references the queue partition and queue item to be processed by a worker.
-// both items need to be passed to a worker as both items are needed to generate concurrency
-// keys to extend leases and dequeue.
-type processItem struct {
-	P QueuePartition
-	I osqueue.QueueItem
-
-	// PCtr represents the number of times the partition has been continued.
-	PCtr uint
-
-	capacityLease *osqueue.CapacityLease
-
-	// disableConstraintUpdates determines whether ExtendLease, Requeue,
-	// and Dequeue should update constraint state.
-	//
-	// Disable constraint updates in case
-	// - we are processing an item for a system queue
-	// - we are holding an active capacity lease
-	//
-	// For system queues, we skip constraint checks + updates entirely,
-	// for regular functions we manage constraint checks + updates in the Constraint API,
-	// if enabled for the current account.
-	//
-	// If the Constraint API is disabled or the lease expired, we will manage constraint state internally.
-	//
-	// NOTE: This value is set in itemLeaseConstraintCheck.
-	disableConstraintUpdates bool
-}
-
-type capacityLease struct {
-	currentCapacityLeaseID *ulid.ULID
-	capacityLeaseLock      sync.Mutex
-}
-
-func newCapacityLease(initialLease *osqueue.CapacityLease) *capacityLease {
-	cl := &capacityLease{
-		capacityLeaseLock: sync.Mutex{},
-	}
-	if initialLease != nil {
-		cl.currentCapacityLeaseID = &initialLease.LeaseID
-	}
-
-	return cl
-}
-
-func (p *capacityLease) set(leaseID *ulid.ULID) {
-	p.capacityLeaseLock.Lock()
-	defer p.capacityLeaseLock.Unlock()
-	p.currentCapacityLeaseID = leaseID
-}
-
-func (p *capacityLease) get() *ulid.ULID {
-	p.capacityLeaseLock.Lock()
-	defer p.capacityLeaseLock.Unlock()
-	return p.currentCapacityLeaseID
-}
-
-func (p *capacityLease) has() bool {
-	p.capacityLeaseLock.Lock()
-	defer p.capacityLeaseLock.Unlock()
-	return p.currentCapacityLeaseID != nil
-}
-
-// FnMetadata is stored within the queue for retrieving
-type FnMetadata struct {
-	// NOTE: This is not encoded via JSON as we should always have the function
-	// ID prior to doing a lookup, or should be able to retrieve the function ID
-	// via the key.
-	FnID uuid.UUID `json:"fnID"`
-
-	// Paused represents whether the fn is paused.  This allows us to prevent leases
-	// to a given partition if the partition belongs to a fn.
-	Paused bool `json:"off"`
-
-	// Migrate indicates if this queue is to be migrated or not
-	Migrate bool `json:"migrate"`
-}
-
-type PartitionIdentifier struct {
-	SystemQueueName *string
-	FunctionID      uuid.UUID
-	AccountID       uuid.UUID
-	EnvID           uuid.UUID
-}
-
-// QueuePartition represents an individual queue for a workflow.  It stores the
-// time of the earliest job within the workflow.
-type QueuePartition struct {
-	// ID represents the key used within the global Partition hash and global pointer set
-	// which represents this QueuePartition.  This is the function ID for enums.PartitionTypeDefault,
-	// or the entire key returned from the key generator for other types.
-	ID string `json:"id,omitempty"`
-	// PartitionType is the int-value of the enums.PartitionType for this
-	// partition.  By default, partitions are function-scoped without any
-	// custom keys.
-	PartitionType int `json:"pt,omitempty"`
-	// QueueName is used for manually overriding queue items to be enqueued for
-	// system jobs like pause events and timeouts, batch timeouts, and replays.
-	//
-	// NOTE: This field is required for backwards compatibility, as old system partitions
-	// simply set the queue name.
-	//
-	// This should almost always be nil.
-	QueueName *string `json:"queue,omitempty"`
-	// ConcurrencyScope is the int-value representation of the enums.ConcurrencyScope,
-	// if this is a concurrency-scoped partition.
-	ConcurrencyScope int `json:"cs,omitempty"`
-	// FunctionID represents the function ID that this partition manages.
-	// NOTE:  If this partition represents many fns (eg. acct or env), this may be nil
-	FunctionID *uuid.UUID `json:"wid,omitempty"`
-	// EnvID represents the environment ID for the partition, either from the
-	// function ID or the environment scope itself.
-	EnvID *uuid.UUID `json:"wsID,omitempty"`
-	// AccountID represents the account ID for the partition
-	AccountID uuid.UUID `json:"aID,omitempty"`
-	// LeaseID represents a lease on this partition.  If the LeaseID is not nil,
-	// this partition can be claimed by a shared-nothing worker to work on the
-	// queue items within this partition.
-	//
-	// A lease is shortly held (eg seconds).  It should last long enough for
-	// workers to claim QueueItems only.
-	LeaseID *ulid.ULID `json:"leaseID,omitempty"`
-	// Last represents the time that this partition was last leased, as a millisecond
-	// unix epoch.  In essence, we need this to track how frequently we're leasing and
-	// attempting to run items in the partition's queue.
-	// Without this, we cannot track sojourn latency.
-	Last int64 `json:"last"`
-	// ForcedAtMS records the time that the partition is forced to, in milliseconds, if
-	// the partition has been forced into the future via concurrency issues. This means
-	// that it was requeued due to concurrency issues and should not be brought forward
-	// when a new step is enqueued, if now < ForcedAtMS.
-	ForceAtMS int64 `json:"forceAtMS"`
-
-	//
-	// Concurrency
-	//
-
-	// EvaluatedConcurrencyKey represents the evaluated and hashed custom key for the queue partition, if this is
-	// for a custom key.
-	EvaluatedConcurrencyKey string `json:"ck,omitempty"`
-	// UnevaluatedConcurrencyHash is the hashed but unevaluated custom key for the queue partition, if this is
-	// for a custom key.
-	//
-	// This must be set so that we can fetch the latest concurrency limits dynamically when
-	// leasing a partition, if desired, via the ConcurrencyLimitGetter.
-	UnevaluatedConcurrencyHash string `json:"ch,omitempty"`
-}
-
-func (qp QueuePartition) Identifier() PartitionIdentifier {
-	fnID := uuid.Nil
-	if qp.FunctionID != nil {
-		fnID = *qp.FunctionID
-	}
-
-	envID := uuid.Nil
-	if qp.EnvID != nil {
-		envID = *qp.EnvID
-	}
-
-	return PartitionIdentifier{
-		SystemQueueName: qp.QueueName,
-
-		AccountID:  qp.AccountID,
-		FunctionID: fnID,
-		EnvID:      envID,
-	}
-}
-
-func (qp QueuePartition) IsSystem() bool {
-	return qp.QueueName != nil && *qp.QueueName != ""
 }
 
 // zsetKey represents the key used to store the zset for this partition's items.
 // For default partitions, this is different to the ID (for backwards compatibility, it's just
 // the fn ID without prefixes)
-func (qp QueuePartition) zsetKey(kg QueueKeyGenerator) string {
+func partitionZsetKey(qp osqueue.QueuePartition, kg QueueKeyGenerator) string {
 	// For system partitions, return zset using custom queueName
 	if qp.IsSystem() {
 		return kg.PartitionQueueSet(enums.PartitionTypeDefault, qp.Queue(), "")
 	}
 
 	// Backwards compatibility with old fn queues
-	if qp.PartitionType == int(enums.PartitionTypeDefault) && qp.FunctionID != nil {
+	if qp.FunctionID != nil {
 		// return the top-level function queue.
 		return kg.PartitionQueueSet(enums.PartitionTypeDefault, qp.FunctionID.String(), "")
 	}
@@ -672,21 +173,13 @@ func (qp QueuePartition) zsetKey(kg QueueKeyGenerator) string {
 // concurrencyKey returns the single concurrency key for the given partition, depending
 // on the partition type.  This is used to check the partition's in-progress items whilst
 // requeueing partitions.
-func (qp QueuePartition) concurrencyKey(kg QueueKeyGenerator) string {
-	switch enums.PartitionType(qp.PartitionType) {
-	case enums.PartitionTypeDefault:
-		return qp.fnConcurrencyKey(kg)
-	case enums.PartitionTypeConcurrencyKey:
-		// Hierarchically, custom keys take precedence.
-		return qp.customConcurrencyKey(kg)
-	default:
-		panic(fmt.Sprintf("unexpected partition type encountered in concurrencyKey %q", qp.PartitionType))
-	}
+func partitionConcurrencyKey(qp osqueue.QueuePartition, kg QueueKeyGenerator) string {
+	return fnConcurrencyKey(qp, kg)
 }
 
 // fnConcurrencyKey returns the concurrency key for a function scope limit, on the
 // entire function (not custom keys)
-func (qp QueuePartition) fnConcurrencyKey(kg QueueKeyGenerator) string {
+func fnConcurrencyKey(qp osqueue.QueuePartition, kg QueueKeyGenerator) string {
 	// Enable system partitions to use the queueName override instead of the fnId
 	if qp.IsSystem() {
 		return kg.Concurrency("p", qp.Queue())
@@ -700,7 +193,7 @@ func (qp QueuePartition) fnConcurrencyKey(kg QueueKeyGenerator) string {
 
 // acctConcurrencyKey returns the concurrency key for the account limit, on the
 // entire account (not custom keys)
-func (qp QueuePartition) acctConcurrencyKey(kg QueueKeyGenerator) string {
+func acctConcurrencyKey(qp osqueue.QueuePartition, kg QueueKeyGenerator) string {
 	// Enable system partitions to use the queueName override instead of the accountId
 	if qp.IsSystem() {
 		return kg.Concurrency("account", qp.Queue())
@@ -711,7 +204,7 @@ func (qp QueuePartition) acctConcurrencyKey(kg QueueKeyGenerator) string {
 	return kg.Concurrency("account", qp.AccountID.String())
 }
 
-func (qp QueuePartition) acctInProgressLeasesKey(kg QueueKeyGenerator, cm constraintapi.RolloutKeyGenerator) string {
+func partitionAccountInProgressLeasesKey(qp osqueue.QueuePartition, kg QueueKeyGenerator, cm constraintapi.RolloutKeyGenerator) string {
 	if cm == nil {
 		return kg.Concurrency("", "")
 	}
@@ -724,7 +217,7 @@ func (qp QueuePartition) acctInProgressLeasesKey(kg QueueKeyGenerator, cm constr
 	return cm.KeyInProgressLeasesAccount(qp.AccountID)
 }
 
-func (sp QueueShadowPartition) acctInProgressLeasesKey(kg QueueKeyGenerator, cm constraintapi.RolloutKeyGenerator) string {
+func shadowPartitionAccountInProgressLeasesKey(sp osqueue.QueueShadowPartition, kg QueueKeyGenerator, cm constraintapi.RolloutKeyGenerator) string {
 	if cm == nil {
 		return kg.Concurrency("", "")
 	}
@@ -737,7 +230,7 @@ func (sp QueueShadowPartition) acctInProgressLeasesKey(kg QueueKeyGenerator, cm 
 	return cm.KeyInProgressLeasesAccount(*sp.AccountID)
 }
 
-func (qp QueuePartition) fnInProgressLeasesKey(kg QueueKeyGenerator, cm constraintapi.RolloutKeyGenerator) string {
+func partitionFunctionInProgressLeasesKey(qp osqueue.QueuePartition, kg QueueKeyGenerator, cm constraintapi.RolloutKeyGenerator) string {
 	if cm == nil {
 		return kg.Concurrency("", "")
 	}
@@ -751,7 +244,7 @@ func (qp QueuePartition) fnInProgressLeasesKey(kg QueueKeyGenerator, cm constrai
 	return cm.KeyInProgressLeasesFunction(qp.AccountID, *qp.FunctionID)
 }
 
-func (sp QueueShadowPartition) fnInProgressLeasesKey(kg QueueKeyGenerator, cm constraintapi.RolloutKeyGenerator) string {
+func shadowPartitionFunctionInProgressLeasesKey(sp osqueue.QueueShadowPartition, kg QueueKeyGenerator, cm constraintapi.RolloutKeyGenerator) string {
 	if cm == nil {
 		return kg.Concurrency("", "")
 	}
@@ -765,146 +258,19 @@ func (sp QueueShadowPartition) fnInProgressLeasesKey(kg QueueKeyGenerator, cm co
 	return cm.KeyInProgressLeasesFunction(*sp.AccountID, *sp.FunctionID)
 }
 
-// customConcurrencyKey returns the concurrency key if this partition represents
-// a custom concurrnecy limit.
-func (qp QueuePartition) customConcurrencyKey(kg QueueKeyGenerator) string {
-	// This should never happen, but we attempt to handle it gracefully
-	if qp.IsSystem() {
-		// this is consistent with the concrete WithCustomConcurrencyKeyGenerator in cloud previously
-		return kg.Concurrency("custom", qp.Queue())
-	}
-
-	if qp.EvaluatedConcurrencyKey == "" {
-		return kg.Concurrency("custom", "-")
-	}
-	return kg.Concurrency("custom", qp.EvaluatedConcurrencyKey)
-}
-
-func (qp QueuePartition) Queue() string {
-	// This is redundant but acts as a safeguard, so that
-	// we always return the ID (queueName) for system partitions
-	if qp.IsSystem() {
-		return *qp.QueueName
-	}
-
-	if qp.ID == "" && qp.FunctionID != nil {
-		return qp.FunctionID.String()
-	}
-
-	return qp.ID
-}
-
-func (qp QueuePartition) MarshalBinary() ([]byte, error) {
-	return json.Marshal(qp)
-}
-
-// ItemPartitions returns the partition for a given item.
-func (q *queue) ItemPartition(ctx context.Context, shard QueueShard, i osqueue.QueueItem) QueuePartition {
-	queueName := i.QueueName
-
-	// sanity check: both QueueNames should be set, but sometimes aren't
-	if queueName == nil && i.QueueName != nil {
-		queueName = i.QueueName
-		q.log.Warn("encountered queue item with inconsistent custom queue name, should have both i.QueueName and i.Data.QueueName set",
-			"item", i,
-		)
-	}
-
-	// sanity check: queueName values must match
-	if i.Data.QueueName != nil && i.QueueName != nil && *i.Data.QueueName != *i.QueueName {
-		q.log.Warn("encountered queue item with inconsistent custom queue names, should have matching values for i.QueueName and i.Data.QueueName",
-			"item", i,
-		)
-	}
-
-	// The only case when we manually set a queueName is for system partitions
-	if queueName != nil {
-		systemPartition := QueuePartition{
-			// NOTE: Never remove this. The ID is required to enqueue items to the
-			// partition, as it is used for conditional checks in Lua
-			ID:        *queueName,
-			QueueName: queueName,
-		}
-		return systemPartition
-	}
-
-	if i.FunctionID == uuid.Nil {
-		q.log.Error("unexpected missing functionID in ItemPartitions()", "item", i)
-	}
-
-	fnPartition := QueuePartition{
-		ID:            i.FunctionID.String(),
-		PartitionType: int(enums.PartitionTypeDefault), // Function partition
-		FunctionID:    &i.FunctionID,
-		AccountID:     i.Data.Identifier.AccountID,
-	}
-
-	return fnPartition
-}
-
-// ItemPartitions returns up 3 item partitions for a given queue item, as well as the account concurrency limit.
-// Note: Currently, we only ever return 2 partitions (2x custom concurrency keys or function + custom concurrency key)
-// Note: For backwards compatibility, we may return a third partition for the function itself, in case two custom concurrency keys are used.
-// This will change with the implementation of throttling key queues.
-func (q *queue) ItemPartitions(ctx context.Context, shard QueueShard, i osqueue.QueueItem) (fnPartition, customConcurrencyKey1, customConcurrencyKey2 QueuePartition) {
-	fnPartition = q.ItemPartition(ctx, shard, i)
-
-	ckeys := i.Data.GetConcurrencyKeys()
-	if len(ckeys) == 0 {
-		return fnPartition, customConcurrencyKey1, customConcurrencyKey2
-	}
-
-	// Up to 2 concurrency keys.
-	for j, key := range ckeys {
-		scope, id, checksum, _ := key.ParseKey()
-
-		// TODO: Is this supposed to stay? Then the comment below should change
-		// (if not, do we validate against this case from happening in cloud?)
-		if checksum == "" && key.Key != "" {
-			// For testing, use the key here.
-			checksum = key.Key
-		}
-
-		partition := QueuePartition{
-			ID:               shard.RedisClient.kg.PartitionQueueSet(enums.PartitionTypeConcurrencyKey, id.String(), checksum),
-			PartitionType:    int(enums.PartitionTypeConcurrencyKey),
-			FunctionID:       &i.FunctionID,
-			AccountID:        i.Data.Identifier.AccountID,
-			ConcurrencyScope: int(scope),
-
-			EvaluatedConcurrencyKey:    key.Key,
-			UnevaluatedConcurrencyHash: key.Hash,
-		}
-
-		switch scope {
-		case enums.ConcurrencyScopeFn:
-			partition.FunctionID = &i.FunctionID
-		case enums.ConcurrencyScopeEnv:
-			partition.EnvID = &i.WorkspaceID
-		case enums.ConcurrencyScopeAccount:
-			// AccountID comes from the concurrency key in this case
-			partition.AccountID = id
-		}
-
-		switch j {
-		case 0:
-			customConcurrencyKey1 = partition
-		case 1:
-			customConcurrencyKey2 = partition
-		}
-	}
-
-	return fnPartition, customConcurrencyKey1, customConcurrencyKey2
-}
-
-func (q *queue) EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.QueueItem, at time.Time, opts osqueue.EnqueueOpts) (osqueue.QueueItem, error) {
+func (q *queue) EnqueueItem(ctx context.Context, shard osqueue.QueueShard, i osqueue.QueueItem, at time.Time, opts osqueue.EnqueueOpts) (osqueue.QueueItem, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "EnqueueItem"), redis_telemetry.ScopeQueue)
 
-	if shard.Kind != string(enums.QueueShardKindRedis) {
+	if shard.Kind() != enums.QueueShardKindRedis {
 		return osqueue.QueueItem{}, fmt.Errorf("unsupported queue shard kind for EnqueueItem: %s", shard.Kind)
 	}
 
-	kg := shard.RedisClient.kg
+	redisShard, ok := shard.(RedisQueueShard)
+	if !ok {
+		return osqueue.QueueItem{}, fmt.Errorf("expected RedisQueueShard: %s", shard.Kind)
+	}
+
+	kg := redisShard.RedisClient.kg
 
 	if len(i.ID) == 0 {
 		i.SetID(ctx, ulid.MustNew(ulid.Now(), rnd).String())
@@ -914,7 +280,7 @@ func (q *queue) EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.Que
 		}
 	}
 
-	now := q.clock.Now()
+	now := q.options.clock.Now()
 
 	// XXX: If the length of ID >= max, error.
 	if i.WallTimeMS == 0 {
@@ -1065,7 +431,7 @@ func (q *queue) EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.Que
 // dropPartitionPointerIfEmpty atomically drops a pointer queue member if the associated
 // ZSET is empty. This is used to ensure that we don't have pointers to empty ZSETs, in case
 // the cleanup process fails.
-func (q *queue) dropPartitionPointerIfEmpty(ctx context.Context, shard QueueShard, keyIndex, keyPartition, indexMember string) error {
+func (q *queue) dropPartitionPointerIfEmpty(ctx context.Context, shard RedisQueueShard, keyIndex, keyPartition, indexMember string) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "SetFunctionPaused"), redis_telemetry.ScopeQueue)
 
 	if shard.Kind != string(enums.QueueShardKindRedis) {
@@ -1212,7 +578,7 @@ func (q *queue) RemoveQueueItem(ctx context.Context, shardName string, partition
 
 // removeQueueItem attempts to remove a specific item in the target queue shard
 // and also remove it from the queue item hash as well
-func (q *queue) removeQueueItem(ctx context.Context, shard QueueShard, partitionKey string, itemID string) error {
+func (q *queue) removeQueueItem(ctx context.Context, shard RedisQueueShard, partitionKey string, itemID string) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "removeQueueItem"), redis_telemetry.ScopeQueue)
 
 	keys := []string{
@@ -1357,7 +723,7 @@ type peekOpts struct {
 	Limit        int64
 }
 
-func (q *queue) peek(ctx context.Context, shard QueueShard, opts peekOpts) ([]*osqueue.QueueItem, error) {
+func (q *queue) peek(ctx context.Context, shard RedisQueueShard, opts peekOpts) ([]*osqueue.QueueItem, error) {
 	from := "-inf"
 	if opts.From != nil && !opts.From.IsZero() {
 		from = strconv.Itoa(int(opts.From.UnixMilli()))
@@ -1547,7 +913,7 @@ func (q *queue) ResetAttemptsByJobID(ctx context.Context, shardName string, jobI
 // progress, or doesn't exist) this returns an error.
 //
 // Note: This only works with items that directly go into ready queues (system queues).
-func (q *queue) RequeueByJobID(ctx context.Context, queueShard QueueShard, jobID string, at time.Time) error {
+func (q *queue) RequeueByJobID(ctx context.Context, queueShard RedisQueueShard, jobID string, at time.Time) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "RequeueByJobID"), redis_telemetry.ScopeQueue)
 
 	if queueShard.Kind != string(enums.QueueShardKindRedis) {
@@ -2706,7 +2072,7 @@ func checkList(check string, exact, prefixes map[string]*struct{}) bool {
 // forceAt is used to enforce the given queue time.  This is used when partitions are at a
 // concurrency limit;  we don't want to scan the partition next time, so we force the partition
 // to be at a specific time instead of taking the earliest available queue item time
-func (q *queue) PartitionRequeue(ctx context.Context, shard QueueShard, p *QueuePartition, at time.Time, forceAt bool) error {
+func (q *queue) PartitionRequeue(ctx context.Context, shard RedisQueueShard, p *QueuePartition, at time.Time, forceAt bool) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "PartitionRequeue"), redis_telemetry.ScopeQueue)
 
 	if shard.Kind != string(enums.QueueShardKindRedis) {
@@ -2842,7 +2208,7 @@ func (q *queue) InProgress(ctx context.Context, prefix string, concurrencyKey st
 
 func (q *queue) Instrument(ctx context.Context) error {
 	_, _, err := q.QueueIterator(ctx, QueueIteratorOpts{
-		OnPartitionProcessed: func(ctx context.Context, partitionKey, queueKey string, itemCount int64, queueShard QueueShard) {
+		OnPartitionProcessed: func(ctx context.Context, partitionKey, queueKey string, itemCount int64, queueShard RedisQueueShard) {
 			// Handle individual partition instrumentation
 			// NOTE: tmp workaround for cardinality issues
 			// ideally we want to instrument everything, but until there's a better way to do this, we primarily care only
@@ -2859,7 +2225,7 @@ func (q *queue) Instrument(ctx context.Context) error {
 				})
 			}
 		},
-		OnIterationComplete: func(ctx context.Context, totalPartitions, totalQueueItems int64, queueShard QueueShard) {
+		OnIterationComplete: func(ctx context.Context, totalPartitions, totalQueueItems int64, queueShard RedisQueueShard) {
 			// Handle the final metrics reporting
 			metrics.GaugeGlobalPartitionSize(ctx, totalPartitions, metrics.GaugeOpt{
 				PkgName: pkgName,

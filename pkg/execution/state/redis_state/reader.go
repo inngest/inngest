@@ -219,7 +219,7 @@ func (q *queue) RunningCount(ctx context.Context, workflowID uuid.UUID) (int64, 
 	return count, nil
 }
 
-func (q *queue) ItemsByPartition(ctx context.Context, shard QueueShard, partitionID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*osqueue.QueueItem], error) {
+func (q *queue) ItemsByPartition(ctx context.Context, shard RedisQueueShard, partitionID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*osqueue.QueueItem], error) {
 	opt := queueIterOpt{
 		batchSize:                 1000,
 		interval:                  500 * time.Millisecond,
@@ -430,7 +430,7 @@ func (q *queue) ItemsByPartition(ctx context.Context, shard QueueShard, partitio
 	}, nil
 }
 
-func (q *queue) ItemsByBacklog(ctx context.Context, shard QueueShard, backlogID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*osqueue.QueueItem], error) {
+func (q *queue) ItemsByBacklog(ctx context.Context, shard RedisQueueShard, backlogID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*osqueue.QueueItem], error) {
 	opt := queueIterOpt{
 		batchSize: 1000,
 		interval:  500 * time.Millisecond,
@@ -519,9 +519,9 @@ func (q *queue) ItemsByBacklog(ctx context.Context, shard QueueShard, backlogID 
 
 type QueueIteratorOpts struct {
 	// OnPartitionProcessed is called for each partition during instrumentation
-	OnPartitionProcessed func(ctx context.Context, partitionKey string, queueKey string, itemCount int64, queueShard QueueShard)
+	OnPartitionProcessed func(ctx context.Context, partitionKey string, queueKey string, itemCount int64, queueShard RedisQueueShard)
 	// OnIterationComplete is called after all partitions are processed with the final totals
-	OnIterationComplete func(ctx context.Context, totalPartitions int64, totalQueueItems int64, queueShard QueueShard)
+	OnIterationComplete func(ctx context.Context, totalPartitions int64, totalQueueItems int64, queueShard RedisQueueShard)
 }
 
 func (q *queue) QueueIterator(ctx context.Context, opts QueueIteratorOpts) (partitionCount int64, queueItemCount int64, err error) {
@@ -652,7 +652,7 @@ func (q *queue) ItemExists(ctx context.Context, jobID string, opts ...QueueOpOpt
 	return exists, nil
 }
 
-func (q *queue) Shard(ctx context.Context, shardName string) (QueueShard, bool) {
+func (q *queue) Shard(ctx context.Context, shardName string) (RedisQueueShard, bool) {
 	shard, ok := q.queueShardClients[shardName]
 	return shard, ok
 }

@@ -39,11 +39,11 @@ func TestQueueRunSequential(t *testing.T) {
 	defer q2cancel()
 
 	q1 := NewQueue(
-		QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName},
+		RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName},
 		WithNumWorkers(10),
 	)
 	q2 := NewQueue(
-		QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName},
+		RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName},
 		WithNumWorkers(10),
 	)
 
@@ -106,7 +106,7 @@ func TestQueueRunBasic(t *testing.T) {
 	defer rc.Close()
 
 	q := NewQueue(
-		QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName},
+		RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName},
 		// We can't add more than 8128 goroutines when detecting race conditions.
 		WithNumWorkers(10),
 		// Test custom queue names
@@ -202,7 +202,7 @@ func TestQueueRunRetry(t *testing.T) {
 	defer rc.Close()
 
 	q := NewQueue(
-		QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName},
+		RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName},
 		// We can't add more than 8128 goroutines when detecting race conditions.
 		WithNumWorkers(10),
 	)
@@ -278,7 +278,7 @@ func TestQueueRunExtended(t *testing.T) {
 	defer rc.Close()
 
 	q := NewQueue(
-		QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName},
+		RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName},
 		// We can't add more than 8128 goroutines when detecting race conditions,
 		// so lower the number of workers.
 		WithNumWorkers(200),
@@ -304,7 +304,7 @@ func TestQueueRunExtended(t *testing.T) {
 				// randomly, between 1 and 10 seconds in.
 				ctx, cancel := context.WithCancel(context.Background())
 				q := NewQueue(
-					QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName},
+					RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName},
 					// We can't add more than 8128 goroutines when detecting race conditions,
 					// so lower the number of workers.
 					WithNumWorkers(200),
@@ -452,7 +452,7 @@ func TestRunPriorityFactor(t *testing.T) {
 	defer rc.Close()
 
 	q := NewQueue(
-		QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName},
+		RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName},
 		// We can't add more than 8128 goroutines when detecting race conditions.
 		WithNumWorkers(10),
 	)
@@ -535,7 +535,7 @@ func TestQueueAllowList(t *testing.T) {
 	otherQueueName := "other"
 
 	q := NewQueue(
-		QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName},
+		RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName},
 		// We can't add more than 8128 goroutines when detecting race conditions.
 		WithNumWorkers(10),
 		WithAllowQueueNames(allowedQueueName),
@@ -649,7 +649,7 @@ func TestQueueDenyList(t *testing.T) {
 	otherQueueName := "other"
 
 	q := NewQueue(
-		QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName},
+		RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName},
 		// We can't add more than 8128 goroutines when detecting race conditions.
 		WithNumWorkers(10),
 		WithDenyQueueNames(deniedQueueName),
@@ -761,7 +761,7 @@ func TestQueueRunAccount(t *testing.T) {
 	defer rc.Close()
 
 	q := NewQueue(
-		QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName},
+		RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName},
 		// We can't add more than 8128 goroutines when detecting race conditions.
 		WithNumWorkers(10),
 		// Test custom queue names

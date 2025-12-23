@@ -58,7 +58,7 @@ func (q *queue) shadowWorker(ctx context.Context, qspc chan shadowPartitionChanM
 	}
 }
 
-func (q *queue) isMigrationLocked(ctx context.Context, shard QueueShard, fnID uuid.UUID) (*time.Time, error) {
+func (q *queue) isMigrationLocked(ctx context.Context, shard RedisQueueShard, fnID uuid.UUID) (*time.Time, error) {
 	client := shard.RedisClient.Client()
 	kg := shard.RedisClient.KeyGenerator()
 	cmd := client.B().Get().Key(kg.QueueMigrationLock(fnID)).Build()

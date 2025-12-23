@@ -57,7 +57,7 @@ func TestQueueRefillBacklog(t *testing.T) {
 
 	clock := clockwork.NewFakeClock()
 
-	defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+	defaultShard := RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 	kg := defaultShard.RedisClient.kg
 
 	q := NewQueue(
@@ -258,7 +258,7 @@ func TestQueueRefillBacklog(t *testing.T) {
 
 		ctx := context.Background()
 
-		defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+		defaultShard := RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 
 		clock := clockwork.NewFakeClock()
 
@@ -375,7 +375,7 @@ func TestQueueRefillBacklog(t *testing.T) {
 
 		ctx := context.Background()
 
-		defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+		defaultShard := RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 
 		clock := clockwork.NewFakeClock()
 
@@ -524,7 +524,7 @@ func TestQueueRefillBacklog(t *testing.T) {
 
 		ctx := context.Background()
 
-		defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+		defaultShard := RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 
 		clock := clockwork.NewFakeClock()
 
@@ -675,7 +675,7 @@ func TestQueueShadowPartitionLease(t *testing.T) {
 
 	ctx := context.Background()
 
-	defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+	defaultShard := RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 	kg := defaultShard.RedisClient.kg
 
 	clock := clockwork.NewFakeClock()
@@ -903,7 +903,7 @@ func TestQueueShadowScanner(t *testing.T) {
 
 	ctx := context.Background()
 
-	defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+	defaultShard := RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 
 	clock := clockwork.NewFakeClock()
 
@@ -967,7 +967,7 @@ func TestQueueShadowScannerContinuations(t *testing.T) {
 
 	ctx := context.Background()
 
-	defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+	defaultShard := RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 	kg := defaultShard.RedisClient.kg
 
 	clock := clockwork.NewFakeClock()
@@ -1684,7 +1684,7 @@ func TestRefillConstraints(t *testing.T) {
 
 			ctx := context.Background()
 
-			defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+			defaultShard := RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 			kg := defaultShard.RedisClient.kg
 
 			clock := clockwork.NewFakeClock()
@@ -1977,7 +1977,7 @@ func TestShadowPartitionPointerTimings(t *testing.T) {
 
 		ctx := context.Background()
 
-		defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+		defaultShard := RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 
 		clock := clockwork.NewFakeClock()
 
@@ -2118,7 +2118,7 @@ func TestShadowPartitionPointerTimings(t *testing.T) {
 
 		ctx := context.Background()
 
-		defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+		defaultShard := RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 
 		clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Second))
 
@@ -2217,7 +2217,7 @@ func TestConstraintLifecycleReporting(t *testing.T) {
 
 	ctx := context.Background()
 
-	defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+	defaultShard := RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 
 	clock := clockwork.NewFakeClock()
 
@@ -2364,7 +2364,7 @@ func TestBacklogRefillWithDisabledConstraintChecks(t *testing.T) {
 
 	clock := clockwork.NewFakeClock()
 
-	shard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+	shard := RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 
 	constraints := PartitionConstraintConfig{
 		FunctionVersion: 1,
@@ -2506,7 +2506,7 @@ func TestBacklogRefillSetCapacityLease(t *testing.T) {
 
 	clock := clockwork.NewFakeClock()
 
-	shard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+	shard := RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 
 	constraints := PartitionConstraintConfig{
 		FunctionVersion: 1,
@@ -2622,7 +2622,7 @@ func TestPreventThrottleBacklogUnfairness(t *testing.T) {
 
 		clock := clockwork.NewFakeClock()
 
-		shard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+		shard := RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 		kg := shard.RedisClient.KeyGenerator()
 
 		constraints := PartitionConstraintConfig{
@@ -2751,7 +2751,7 @@ func TestPreventThrottleBacklogUnfairness(t *testing.T) {
 
 		clock := clockwork.NewFakeClock()
 
-		shard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+		shard := RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 		kg := shard.RedisClient.KeyGenerator()
 
 		constraints := PartitionConstraintConfig{

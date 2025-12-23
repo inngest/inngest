@@ -77,7 +77,7 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 
 	clock := clockwork.NewFakeClock()
 
-	shard := QueueShard{
+	shard := RedisQueueShard{
 		Name:        consts.DefaultQueueShardName,
 		Kind:        string(enums.QueueShardKindRedis),
 		RedisClient: NewQueueClient(rc, QueueDefaultKey),
@@ -323,7 +323,7 @@ func TestQueueProcessorPreLeaseWithConstraintAPI(t *testing.T) {
 
 	clock := clockwork.NewFakeClock()
 
-	shard := QueueShard{
+	shard := RedisQueueShard{
 		Kind:        string(enums.QueueShardKindRedis),
 		RedisClient: NewQueueClient(rc, "q:v1"),
 		Name:        consts.DefaultQueueShardName,
@@ -580,7 +580,7 @@ func TestPartitionProcessRequeueAfterLimitedWithConstraintAPI(t *testing.T) {
 
 	clock := clockwork.NewFakeClock()
 
-	shard := QueueShard{
+	shard := RedisQueueShard{
 		Name:        consts.DefaultQueueShardName,
 		Kind:        string(enums.QueueShardKindRedis),
 		RedisClient: NewQueueClient(rc, "q:v1"),

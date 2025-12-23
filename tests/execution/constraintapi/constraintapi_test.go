@@ -43,7 +43,7 @@ func TestConstraintEnforcement(t *testing.T) {
 		rc    rueidis.Client
 
 		q     redis_state.QueueProcessor
-		shard redis_state.QueueShard
+		shard redis_state.RedisQueueShard
 
 		exec execution.Executor
 
@@ -530,17 +530,17 @@ func TestConstraintEnforcement(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, cm)
 
-			defaultShard := redis_state.QueueShard{
+			defaultShard := redis_state.RedisQueueShard{
 				Kind:        string(enums.QueueShardKindRedis),
 				Name:        "test",
 				RedisClient: redis_state.NewQueueClient(rc, "q:v1"),
 			}
 			q := redis_state.NewQueue(defaultShard,
 				redis_state.WithClock(clock),
-				redis_state.WithQueueShardClients(map[string]redis_state.QueueShard{
+				redis_state.WithQueueShardClients(map[string]redis_state.RedisQueueShard{
 					"test": defaultShard,
 				}),
-				redis_state.WithShardSelector(func(ctx context.Context, accountId uuid.UUID, queueName *string) (redis_state.QueueShard, error) {
+				redis_state.WithShardSelector(func(ctx context.Context, accountId uuid.UUID, queueName *string) (redis_state.RedisQueueShard, error) {
 					return defaultShard, nil
 				}),
 				redis_state.WithCapacityManager(cm),
@@ -762,17 +762,17 @@ func TestQueueConstraintAPICompatibility(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, cm)
 
-		defaultShard := redis_state.QueueShard{
+		defaultShard := redis_state.RedisQueueShard{
 			Kind:        string(enums.QueueShardKindRedis),
 			Name:        "test",
 			RedisClient: redis_state.NewQueueClient(rc, "q:v1"),
 		}
 		q := redis_state.NewQueue(defaultShard,
 			redis_state.WithClock(clock),
-			redis_state.WithQueueShardClients(map[string]redis_state.QueueShard{
+			redis_state.WithQueueShardClients(map[string]redis_state.RedisQueueShard{
 				"test": defaultShard,
 			}),
-			redis_state.WithShardSelector(func(ctx context.Context, accountId uuid.UUID, queueName *string) (redis_state.QueueShard, error) {
+			redis_state.WithShardSelector(func(ctx context.Context, accountId uuid.UUID, queueName *string) (redis_state.RedisQueueShard, error) {
 				return defaultShard, nil
 			}),
 			redis_state.WithCapacityManager(cm),
@@ -902,17 +902,17 @@ func TestQueueConstraintAPICompatibility(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, cm)
 
-		defaultShard := redis_state.QueueShard{
+		defaultShard := redis_state.RedisQueueShard{
 			Kind:        string(enums.QueueShardKindRedis),
 			Name:        "test",
 			RedisClient: redis_state.NewQueueClient(rc, "q:v1"),
 		}
 		q := redis_state.NewQueue(defaultShard,
 			redis_state.WithClock(clock),
-			redis_state.WithQueueShardClients(map[string]redis_state.QueueShard{
+			redis_state.WithQueueShardClients(map[string]redis_state.RedisQueueShard{
 				"test": defaultShard,
 			}),
-			redis_state.WithShardSelector(func(ctx context.Context, accountId uuid.UUID, queueName *string) (redis_state.QueueShard, error) {
+			redis_state.WithShardSelector(func(ctx context.Context, accountId uuid.UUID, queueName *string) (redis_state.RedisQueueShard, error) {
 				return defaultShard, nil
 			}),
 			redis_state.WithCapacityManager(cm),
@@ -1077,17 +1077,17 @@ func TestQueueConstraintAPICompatibility(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, cm)
 
-		defaultShard := redis_state.QueueShard{
+		defaultShard := redis_state.RedisQueueShard{
 			Kind:        string(enums.QueueShardKindRedis),
 			Name:        "test",
 			RedisClient: redis_state.NewQueueClient(rc, "q:v1"),
 		}
 		q := redis_state.NewQueue(defaultShard,
 			redis_state.WithClock(clock),
-			redis_state.WithQueueShardClients(map[string]redis_state.QueueShard{
+			redis_state.WithQueueShardClients(map[string]redis_state.RedisQueueShard{
 				"test": defaultShard,
 			}),
-			redis_state.WithShardSelector(func(ctx context.Context, accountId uuid.UUID, queueName *string) (redis_state.QueueShard, error) {
+			redis_state.WithShardSelector(func(ctx context.Context, accountId uuid.UUID, queueName *string) (redis_state.RedisQueueShard, error) {
 				return defaultShard, nil
 			}),
 			redis_state.WithCapacityManager(cm),
@@ -1294,17 +1294,17 @@ func TestQueueConstraintAPICompatibility(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, cm)
 
-		shard := redis_state.QueueShard{
+		shard := redis_state.RedisQueueShard{
 			Kind:        string(enums.QueueShardKindRedis),
 			Name:        "test",
 			RedisClient: redis_state.NewQueueClient(rc, "q:v1"),
 		}
 		q := redis_state.NewQueue(shard,
 			redis_state.WithClock(clock),
-			redis_state.WithQueueShardClients(map[string]redis_state.QueueShard{
+			redis_state.WithQueueShardClients(map[string]redis_state.RedisQueueShard{
 				"test": shard,
 			}),
-			redis_state.WithShardSelector(func(ctx context.Context, accountId uuid.UUID, queueName *string) (redis_state.QueueShard, error) {
+			redis_state.WithShardSelector(func(ctx context.Context, accountId uuid.UUID, queueName *string) (redis_state.RedisQueueShard, error) {
 				return shard, nil
 			}),
 			redis_state.WithCapacityManager(cm),
@@ -1499,17 +1499,17 @@ func TestScheduleConstraintAPICompatibility(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, cm)
 
-		defaultShard := redis_state.QueueShard{
+		defaultShard := redis_state.RedisQueueShard{
 			Kind:        string(enums.QueueShardKindRedis),
 			Name:        "test",
 			RedisClient: redis_state.NewQueueClient(rc, "q:v1"),
 		}
 		q := redis_state.NewQueue(defaultShard,
 			redis_state.WithClock(clock),
-			redis_state.WithQueueShardClients(map[string]redis_state.QueueShard{
+			redis_state.WithQueueShardClients(map[string]redis_state.RedisQueueShard{
 				"test": defaultShard,
 			}),
-			redis_state.WithShardSelector(func(ctx context.Context, accountId uuid.UUID, queueName *string) (redis_state.QueueShard, error) {
+			redis_state.WithShardSelector(func(ctx context.Context, accountId uuid.UUID, queueName *string) (redis_state.RedisQueueShard, error) {
 				return defaultShard, nil
 			}),
 			redis_state.WithCapacityManager(cm),
@@ -1695,17 +1695,17 @@ func TestScheduleConstraintAPICompatibility(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, cm)
 
-		defaultShard := redis_state.QueueShard{
+		defaultShard := redis_state.RedisQueueShard{
 			Kind:        string(enums.QueueShardKindRedis),
 			Name:        "test",
 			RedisClient: redis_state.NewQueueClient(rc, "q:v1"),
 		}
 		q := redis_state.NewQueue(defaultShard,
 			redis_state.WithClock(clock),
-			redis_state.WithQueueShardClients(map[string]redis_state.QueueShard{
+			redis_state.WithQueueShardClients(map[string]redis_state.RedisQueueShard{
 				"test": defaultShard,
 			}),
-			redis_state.WithShardSelector(func(ctx context.Context, accountId uuid.UUID, queueName *string) (redis_state.QueueShard, error) {
+			redis_state.WithShardSelector(func(ctx context.Context, accountId uuid.UUID, queueName *string) (redis_state.RedisQueueShard, error) {
 				return defaultShard, nil
 			}),
 			redis_state.WithCapacityManager(cm),
