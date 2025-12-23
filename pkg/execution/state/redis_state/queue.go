@@ -327,8 +327,8 @@ func (q *queue) EnqueueItem(ctx context.Context, shard osqueue.QueueShard, i osq
 	var backlog osqueue.QueueBacklog
 	var shadowPartition osqueue.QueueShadowPartition
 	if enqueueToBacklogs {
-		backlog = q.ItemBacklog(ctx, i)
-		shadowPartition = q.ItemShadowPartition(ctx, i)
+		backlog = osqueue.ItemBacklog(ctx, i)
+		shadowPartition = osqueue.ItemShadowPartition(ctx, i)
 	}
 
 	keys := []string{
@@ -340,7 +340,7 @@ func (q *queue) EnqueueItem(ctx context.Context, shard osqueue.QueueShard, i osq
 		kg.Idempotency(i.ID),
 
 		// Add all 3 partition sets
-		defaultPartition.zsetKey(kg),
+		partitionZsetKey(defaultPartition, kg),
 
 		// Key queues v2
 		kg.BacklogSet(backlog.BacklogID),
