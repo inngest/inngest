@@ -2561,18 +2561,6 @@ func (q *queue) peekGlobalNormalizeAccounts(ctx context.Context, until time.Time
 	return p.peekUUIDPointer(ctx, rc.kg.GlobalAccountNormalizeSet(), true, until, limit)
 }
 
-type partitionLeaseOptions struct {
-	disableLeaseChecks bool
-}
-
-type partitionLeaseOpt func(o *partitionLeaseOptions)
-
-func PartitionLeaseOptionDisableLeaseChecks(disableLeaseChecks bool) partitionLeaseOpt {
-	return func(o *partitionLeaseOptions) {
-		o.disableLeaseChecks = disableLeaseChecks
-	}
-}
-
 // PartitionLease leases a partition for a given workflow ID.  It returns the new lease ID.
 //
 // NOTE: This does not check the queue/partition name against allow or denylists;  it assumes
