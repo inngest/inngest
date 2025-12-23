@@ -292,7 +292,7 @@ func WithRunMode(m QueueRunMode) QueueOpt {
 // WithClock allows replacing the queue's default (real) clock by a mock, for testing.
 func WithClock(c clockwork.Clock) QueueOpt {
 	return func(q *QueueOptions) {
-		q.clock = c
+		q.Clock = c
 	}
 }
 
@@ -358,8 +358,8 @@ type QueueRunMode struct {
 }
 
 type QueueOptions struct {
-	// primaryQueueShard stores the queue shard to use.
-	primaryQueueShard QueueShard
+	// PrimaryQueueShard stores the queue shard to use.
+	PrimaryQueueShard QueueShard
 
 	// queueShardClients contains all non-default queue shard clients.
 	queueShardClients map[string]QueueShard
@@ -439,7 +439,7 @@ type QueueOptions struct {
 	// backoffFunc is the backoff function to use when retrying operations.
 	backoffFunc backoff.BackoffFunc
 
-	clock clockwork.Clock
+	Clock clockwork.Clock
 
 	// runMode defines the processing scopes or capabilities of the queue instances
 	runMode QueueRunMode

@@ -23,7 +23,7 @@ func (q *queueProcessor) Migrate(ctx context.Context, sourceShardName string, fn
 
 	from := time.Time{}
 	// setting it to 5 years ahead should be enough to cover all queue items in the partition
-	until := q.options.clock.Now().Add(24 * time.Hour * 365 * 5)
+	until := q.options.Clock.Now().Add(24 * time.Hour * 365 * 5)
 	items, err := shard.Processor().ItemsByPartition(ctx, shard, fnID.String(), from, until,
 		WithQueueItemIterBatchSize(limit),
 	)
