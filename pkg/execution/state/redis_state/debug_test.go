@@ -21,7 +21,7 @@ func TestPartitionByID(t *testing.T) {
 
 	ctx := context.Background()
 	clock := clockwork.NewFakeClock()
-	defaultShard := QueueShard{
+	defaultShard := RedisQueueShard{
 		Kind:        string(enums.QueueShardKindRedis),
 		RedisClient: NewQueueClient(rc, QueueDefaultKey),
 		Name:        consts.DefaultQueueShardName,
