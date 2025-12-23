@@ -96,3 +96,29 @@ type QueueProcessor interface {
 	PartitionLease(ctx context.Context, p *QueuePartition, duration time.Duration, opts ...PartitionLeaseOpt) (*ulid.ULID, int, error)
 	PartitionRequeue(ctx context.Context, shard QueueShard, p *QueuePartition, at time.Time, forceAt bool) error
 }
+
+type BacklogRefillOptions struct {
+	ConstraintCheckIdempotencyKey string
+	DisableConstraintChecks       bool
+	CapacityLeases                []CapacityLease
+}
+
+type BacklogRefillOptionFn func(o *BacklogRefillOptions)
+
+func WithBacklogRefillConstraintCheckIdempotencyKey(idempotencyKey string) BacklogRefillOptionFn {
+	return func(o *BacklogRefillOptions) {
+		o.ConstraintCheckIdempotencyKey = idempotencyKey
+	}
+}
+
+func WithBacklogRefillDisableConstraintChecks(disableConstraintChecks bool) BacklogRefillOptionFn {
+	return func(o *BacklogRefillOptions) {
+		o.DisableConstraintChecks = disableConstraintChecks
+	}
+}
+
+func WithBacklogRefillItemCapacityLeases(itemCapacityLeases []CapacityLease) BacklogRefillOptionFn {
+	return func(o *BacklogRefillOptions) {
+		o.CapacityLeases = itemCapacityLeases
+	}
+}
