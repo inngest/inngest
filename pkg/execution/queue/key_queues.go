@@ -7,6 +7,18 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/oklog/ulid/v2"
+	"gonum.org/v1/gonum/stat/sampleuv"
+)
+
+// NOTE: there's no logic behind this number, it's just a random pick for now
+var ThrottleBackoffMultiplierThreshold = 15 * time.Second
+
+var (
+	ErrBacklogNotFound = fmt.Errorf("backlog not found")
+
+	ErrBacklogPeekMaxExceedsLimits = fmt.Errorf("backlog peek exceeded the maximum limit")
+
+	ErrBacklogGarbageCollected = fmt.Errorf("backlog was garbage-collected")
 )
 
 type QueueShadowPartition struct {
@@ -264,4 +276,55 @@ type BacklogRefillResult struct {
 	Refill            int
 	RefilledItems     []string
 	RetryAt           time.Time
+}
+
+// ShuffleBacklog returns shuffled backlogs while applying higher weights to non-start backlogs.
+//
+// NOTE: Applying a higher weight on non-start backlogs is important to ensure queue items to finalize existing functions have a higher likelihood
+// of being refilled to the ready queue.
+//
+// WARN: This only applies to peeked backlogs. Since we apply a random offset while peeking, we may
+// omit the default backlog. This is why we add the default backlog in processShadowPartition
+func ShuffleBacklogs(b []*QueueBacklog) []*QueueBacklog {
+	weights := make([]float64, len(b))
+	for i, backlog := range b {
+		if backlog.Start {
+			weights[i] = 1.0
+		} else {
+			weights[i] = 10.0
+		}
+	}
+
+	w := sampleuv.NewWeighted(weights, rnd)
+	result := make([]*QueueBacklog, len(b))
+	for n := range result {
+		idx, ok := w.Take()
+		if !ok {
+			return b
+		}
+		result[n] = b[idx]
+	}
+
+	return result
+}
+
+// backlogRefillMultiplier calculates the backlog specific multiplier to apply when refilling items.
+//
+// This is required to ensure fairness among backlogs and to guarantee that existing runs finish before new runs are started.
+func backlogRefillMultiplier(backlogs []*QueueBacklog, backlog *QueueBacklog, constraints PartitionConstraintConfig) int {
+	switch {
+	case backlog.IsDefault() && constraints.Throttle != nil && len(constraints.Concurrency.CustomConcurrencyKeys) == 0:
+		// We are attempting to refill items from the default backlog while throttle is configured. This means
+		// - we are refilling items to continue or finish existing runs
+		// - we want to apply a higher priority
+		// - the first backlog is the default function backlog including items to continue existing runs
+		// - all following backlogs include start items and represent individual tenants
+
+		// Multiply based on the number of backlogs.
+		// Example: If we end up with 100 backlogs, 1 out of 100 is for continuing runs while 99 are starts.
+		// Returning len(backlogs) means we apply a multiplier of 100 to the first backlog.
+		return len(backlogs)
+	default:
+		return 1
+	}
 }

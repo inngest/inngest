@@ -30,3 +30,33 @@ func (k KeyError) Error() string {
 func (k KeyError) Unwrap() error {
 	return k.cause
 }
+
+var (
+	ErrQueueItemExists               = fmt.Errorf("queue item already exists")
+	ErrQueueItemNotFound             = fmt.Errorf("queue item not found")
+	ErrQueueItemAlreadyLeased        = fmt.Errorf("queue item already leased")
+	ErrQueueItemLeaseMismatch        = fmt.Errorf("item lease does not match")
+	ErrQueueItemNotLeased            = fmt.Errorf("queue item is not leased")
+	ErrQueuePeekMaxExceedsLimits     = fmt.Errorf("peek exceeded the maximum limit of %d", AbsoluteQueuePeekMax)
+	ErrQueueItemSingletonExists      = fmt.Errorf("singleton item already exists")
+	ErrPriorityTooLow                = fmt.Errorf("priority is too low")
+	ErrPriorityTooHigh               = fmt.Errorf("priority is too high")
+	ErrPartitionNotFound             = fmt.Errorf("partition not found")
+	ErrPartitionAlreadyLeased        = fmt.Errorf("partition already leased")
+	ErrPartitionPeekMaxExceedsLimits = fmt.Errorf("peek exceeded the maximum limit of %d", PartitionPeekMax)
+	ErrAccountPeekMaxExceedsLimits   = fmt.Errorf("account peek exceeded the maximum limit of %d", AccountPeekMax)
+	ErrPartitionGarbageCollected     = fmt.Errorf("partition garbage collected")
+	ErrPartitionPaused               = fmt.Errorf("partition is paused")
+	ErrConfigAlreadyLeased           = fmt.Errorf("config scanner already leased")
+	ErrConfigLeaseExceedsLimits      = fmt.Errorf("config lease duration exceeds the maximum of %d seconds", int(ConfigLeaseMax.Seconds()))
+
+	ErrPartitionConcurrencyLimit = fmt.Errorf("at partition concurrency limit")
+	ErrAccountConcurrencyLimit   = fmt.Errorf("at account concurrency limit")
+
+	// ErrSystemConcurrencyLimit represents a concurrency limit for system partitions
+	ErrSystemConcurrencyLimit = fmt.Errorf("at system concurrency limit")
+
+	// ErrConcurrencyLimitCustomKey represents a concurrency limit being hit for *some*, but *not all*
+	// jobs in a queue, via custom concurrency keys which are evaluated to a specific string.
+	ErrConcurrencyLimitCustomKey = fmt.Errorf("at concurrency limit")
+)
