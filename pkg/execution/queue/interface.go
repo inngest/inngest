@@ -5,6 +5,7 @@ import (
 	"iter"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -100,6 +101,8 @@ type QueueProcessor interface {
 	PartitionRequeue(ctx context.Context, shard QueueShard, p *QueuePartition, at time.Time, forceAt bool) error
 
 	ItemsByPartition(ctx context.Context, shard QueueShard, partitionID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueItem], error)
+
+	SetFunctionMigrate(ctx context.Context, shard QueueShard, fnID uuid.UUID, migrateLockUntil *time.Time)
 }
 
 type BacklogRefillOptions struct {
