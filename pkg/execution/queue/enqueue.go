@@ -52,7 +52,7 @@ func (q *queueProcessor) Enqueue(ctx context.Context, item Item, at time.Time, o
 		"env_id", item.WorkspaceID,
 		"app_id", item.Identifier.AppID,
 		"fn_id", item.Identifier.WorkflowID,
-		"queue_shard", q.options.primaryQueueShard.Name,
+		"queue_shard", q.options.PrimaryQueueShard.Name,
 	)
 
 	if item.QueueName == nil && qi.FunctionID == uuid.Nil {
@@ -68,7 +68,7 @@ func (q *queueProcessor) Enqueue(ctx context.Context, item Item, at time.Time, o
 
 	// Use the queue item's score, ensuring we process older function runs first
 	// (eg. before at)
-	next := time.UnixMilli(qi.Score(q.options.clock.Now()))
+	next := time.UnixMilli(qi.Score(q.options.Clock.Now()))
 
 	if factor := qi.Data.GetPriorityFactor(); factor != 0 {
 		// Ensure we mutate the AtMS time by the given priority factor.
@@ -102,7 +102,7 @@ func (q *queueProcessor) Enqueue(ctx context.Context, item Item, at time.Time, o
 		//
 		// Without this, step.sleep or retries for a very old workflow may still lag behind steps from
 		// later workflows when scheduled in the future.  This can, worst case, cause never-ending runs.
-		if !q.options.enableJobPromotion || !qi.RequiresPromotionJob(q.options.clock.Now()) {
+		if !q.options.enableJobPromotion || !qi.RequiresPromotionJob(q.options.Clock.Now()) {
 			// scheule a rebalance job automatically.
 			return nil
 		}
