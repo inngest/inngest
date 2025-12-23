@@ -1,5 +1,23 @@
 #!/usr/bin/env node
 
+const { existsSync } = require('fs');
+const { join } = require('path');
+const { execFileSync } = require('child_process');
+
+// On Windows, the downloaded release does not overwrite this file
+// so check if inngest.exe exists and run it
+if (process.platform === 'win32') {
+  const exePath = join(__dirname, 'inngest.exe');
+  if (existsSync(exePath)) {
+    try {
+      execFileSync(exePath, process.argv.slice(2), { stdio: 'inherit' });
+      process.exit(0);
+    } catch (err) {
+      process.exit(err.status || 1);
+    }
+  }
+}
+
 console.error('Error: Inngest CLI binary not found.');
 console.error('');
 console.error('This happened because install scripts were skipped.');
