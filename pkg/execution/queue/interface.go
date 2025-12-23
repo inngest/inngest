@@ -2,6 +2,7 @@ package queue
 
 import (
 	"context"
+	"iter"
 	"time"
 
 	"github.com/oklog/ulid/v2"
@@ -95,6 +96,8 @@ type QueueProcessor interface {
 	PartitionPeek(ctx context.Context, sequential bool, until time.Time, limit int64) ([]*QueuePartition, error)
 	PartitionLease(ctx context.Context, p *QueuePartition, duration time.Duration, opts ...PartitionLeaseOpt) (*ulid.ULID, int, error)
 	PartitionRequeue(ctx context.Context, shard QueueShard, p *QueuePartition, at time.Time, forceAt bool) error
+
+	ItemsByPartition(ctx context.Context, shard QueueShard, partitionID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueItem], error)
 }
 
 type BacklogRefillOptions struct {
