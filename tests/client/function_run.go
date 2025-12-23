@@ -233,7 +233,7 @@ func (c *Client) WaitForRunStatus(
 	}
 
 	require.NotEmpty(t, runID, "Expected non-nil run id: %s", runID)
-	require.Failf(t, "didn't get expected status: %s, got %s", expectedStatus, run.Status)
+	require.Failf(t, "status didn't match", "didn't get expected status: %s, got %s", expectedStatus, run.Status)
 	return run
 }
 
