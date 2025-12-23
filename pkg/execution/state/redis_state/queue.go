@@ -2464,18 +2464,6 @@ func (q *queue) Lease(
 	}
 }
 
-type extendLeaseOptions struct {
-	disableConstraintUpdates bool
-}
-
-func ExtendLeaseOptionDisableConstraintUpdates(disableUpdates bool) extendLeaseOptionFn {
-	return func(o *extendLeaseOptions) {
-		o.disableConstraintUpdates = disableUpdates
-	}
-}
-
-type extendLeaseOptionFn func(o *extendLeaseOptions)
-
 // ExtendLease extens the lease for a given queue item, given the queue item is currently
 // leased with the given ID.  This returns a new lease ID if the lease is successfully ended.
 //
