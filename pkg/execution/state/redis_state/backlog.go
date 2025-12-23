@@ -25,26 +25,26 @@ func shadowPartitionReadyQueueKey(sp osqueue.QueueShadowPartition, kg QueueKeyGe
 }
 
 // inProgressKey returns the key storing the in progress set for the shadow partition
-func (sp QueueShadowPartition) inProgressKey(kg QueueKeyGenerator) string {
+func shadowPartitionInProgressKey(sp osqueue.QueueShadowPartition, kg QueueKeyGenerator) string {
 	return kg.Concurrency("p", sp.PartitionID)
 }
 
 // activeKey returns the key storing the active set for the shadow partition
-func (sp QueueShadowPartition) activeKey(kg QueueKeyGenerator) string {
+func shadowPartitionActiveKey(sp osqueue.QueueShadowPartition, kg QueueKeyGenerator) string {
 	return kg.ActiveSet("p", sp.PartitionID)
 }
 
-func (q PartitionConstraintConfig) CustomConcurrencyKey(kg QueueKeyGenerator, b *QueueBacklog, n int) (string, int) {
+func constraintConfigCustomConcurrencyKey(kg QueueKeyGenerator, c osqueue.PartitionConstraintConfig, b *osqueue.QueueBacklog, n int) (string, int) {
 	if n < 0 || n > len(b.ConcurrencyKeys) {
 		return kg.Concurrency("", ""), 0
 	}
 
 	backlogKey := b.ConcurrencyKeys[n-1]
 
-	for _, key := range q.Concurrency.CustomConcurrencyKeys {
+	for _, key := range c.Concurrency.CustomConcurrencyKeys {
 		if key.Scope == backlogKey.Scope && key.HashedKeyExpression == backlogKey.HashedKeyExpression {
 			// Return concrete key with latest limit from shadow partition
-			return backlogKey.concurrencyKey(kg), key.Limit
+			return backlogConcurrencyKey(backlogKey, kg), key.Limit
 		}
 	}
 
@@ -52,7 +52,7 @@ func (q PartitionConstraintConfig) CustomConcurrencyKey(kg QueueKeyGenerator, b 
 }
 
 // accountInProgressKey returns the key storing the in progress set for the shadow partition's account
-func (sp QueueShadowPartition) accountInProgressKey(kg QueueKeyGenerator) string {
+func shadowPartitionAccountInProgressKey(sp osqueue.QueueShadowPartition, kg QueueKeyGenerator) string {
 	// Do not track account concurrency for system queues
 	if sp.SystemQueueName != nil {
 		return kg.Concurrency("", "")
@@ -67,7 +67,7 @@ func (sp QueueShadowPartition) accountInProgressKey(kg QueueKeyGenerator) string
 }
 
 // accountActiveKey returns the key storing the active set for the shadow partition's account
-func (sp QueueShadowPartition) accountActiveKey(kg QueueKeyGenerator) string {
+func shadowPartitionAccountActiveKey(sp osqueue.QueueShadowPartition, kg QueueKeyGenerator) string {
 	// Do not track account concurrency for system queues
 	if sp.SystemQueueName != nil {
 		return kg.ActiveSet("", "")
@@ -81,7 +81,7 @@ func (sp QueueShadowPartition) accountActiveKey(kg QueueKeyGenerator) string {
 	return kg.ActiveSet("account", sp.AccountID.String())
 }
 
-func (sp QueueShadowPartition) accountActiveRunKey(kg QueueKeyGenerator) string {
+func shadowPartitionAccountActiveRunKey(sp osqueue.QueueShadowPartition, kg QueueKeyGenerator) string {
 	// Do not track account run concurrency for system queues
 	if sp.SystemQueueName != nil {
 		return kg.ActiveRunsSet("", "")
@@ -95,49 +95,49 @@ func (sp QueueShadowPartition) accountActiveRunKey(kg QueueKeyGenerator) string 
 	return kg.ActiveRunsSet("account", sp.AccountID.String())
 }
 
-func (sp QueueShadowPartition) activeRunKey(kg QueueKeyGenerator) string {
+func shadowPartitionActiveRunKey(sp osqueue.QueueShadowPartition, kg QueueKeyGenerator) string {
 	return kg.ActiveRunsSet("p", sp.PartitionID)
 }
 
 // customKeyInProgress returns the key to the "in progress" ZSET
-func (b QueueBacklog) customKeyInProgress(kg QueueKeyGenerator, n int) string {
+func backlogCustomKeyInProgress(b osqueue.QueueBacklog, kg QueueKeyGenerator, n int) string {
 	if n < 0 || n > len(b.ConcurrencyKeys) {
 		return kg.Concurrency("", "")
 	}
 
 	key := b.ConcurrencyKeys[n-1]
-	return key.concurrencyKey(kg)
+	return backlogConcurrencyKey(key, kg)
 }
 
-func (b BacklogConcurrencyKey) concurrencyKey(kg QueueKeyGenerator) string {
+func backlogConcurrencyKey(bck osqueue.BacklogConcurrencyKey, kg QueueKeyGenerator) string {
 	// Concurrency accounting keys are made up of three parts:
 	// - The scope (account, environment, function) to apply the concurrency limit on
 	// - The entity (account ID, envID, or function ID) based on the scope
 	// - The dynamic key value (hashed evaluated expression)
-	return kg.Concurrency("custom", b.CanonicalKeyID)
+	return kg.Concurrency("custom", bck.CanonicalKeyID)
 }
 
 // customKeyActive returns the key to the active set for the given custom concurrency key
-func (b QueueBacklog) customKeyActive(kg QueueKeyGenerator, n int) string {
+func backlogCustomKeyActive(b osqueue.QueueBacklog, kg QueueKeyGenerator, n int) string {
 	if n < 0 || n > len(b.ConcurrencyKeys) {
 		return kg.ActiveSet("", "")
 	}
 
 	key := b.ConcurrencyKeys[n-1]
-	return key.activeKey(kg)
+	return backlogConcurrencyKeyActiveKey(key, kg)
 }
 
 // customKeyActiveRuns returns the key to the active runs counter for the given custom concurrency key
-func (b QueueBacklog) customKeyActiveRuns(kg QueueKeyGenerator, n int) string {
+func backlogCustomKeyActiveRuns(b osqueue.QueueBacklog, kg QueueKeyGenerator, n int) string {
 	if n < 0 || n > len(b.ConcurrencyKeys) {
 		return kg.ActiveRunsSet("", "")
 	}
 
 	key := b.ConcurrencyKeys[n-1]
-	return key.activeRunsKey(kg)
+	return backlogConcurrencyKeyActiveRunsKey(key, kg)
 }
 
-func (b QueueBacklog) inProgressLeasesCustomKey(cm constraintapi.RolloutKeyGenerator, kg QueueKeyGenerator, accountID *uuid.UUID, n int) string {
+func backlogInProgressLeasesCustomKey(b osqueue.QueueBacklog, cm constraintapi.RolloutKeyGenerator, kg QueueKeyGenerator, accountID *uuid.UUID, n int) string {
 	if cm == nil {
 		return kg.Concurrency("", "")
 	}
@@ -151,27 +151,27 @@ func (b QueueBacklog) inProgressLeasesCustomKey(cm constraintapi.RolloutKeyGener
 	}
 
 	key := b.ConcurrencyKeys[n-1]
-	return key.inProgressLeasesKey(cm, *accountID)
+	return backlogConcurrencyKeyInProgressLeasesKey(key, cm, *accountID)
 }
 
-func (b BacklogConcurrencyKey) activeKey(kg QueueKeyGenerator) string {
+func backlogConcurrencyKeyActiveKey(bck osqueue.BacklogConcurrencyKey, kg QueueKeyGenerator) string {
 	// Concurrency accounting keys are made up of three parts:
 	// - The scope (account, environment, function) to apply the concurrency limit on
 	// - The entity (account ID, envID, or function ID) based on the scope
 	// - The dynamic key value (hashed evaluated expression)
-	return kg.ActiveSet("custom", b.CanonicalKeyID)
+	return kg.ActiveSet("custom", bck.CanonicalKeyID)
 }
 
-func (b BacklogConcurrencyKey) activeRunsKey(kg QueueKeyGenerator) string {
-	return kg.ActiveRunsSet("custom", b.CanonicalKeyID)
+func backlogConcurrencyKeyActiveRunsKey(bck osqueue.BacklogConcurrencyKey, kg QueueKeyGenerator) string {
+	return kg.ActiveRunsSet("custom", bck.CanonicalKeyID)
 }
 
-func (b BacklogConcurrencyKey) inProgressLeasesKey(cm constraintapi.RolloutKeyGenerator, accountID uuid.UUID) string {
-	return cm.KeyInProgressLeasesCustom(accountID, b.Scope, b.EntityID, b.HashedKeyExpression, b.HashedValue)
+func backlogConcurrencyKeyInProgressLeasesKey(bck osqueue.BacklogConcurrencyKey, cm constraintapi.RolloutKeyGenerator, accountID uuid.UUID) string {
+	return cm.KeyInProgressLeasesCustom(accountID, bck.Scope, bck.EntityID, bck.HashedKeyExpression, bck.HashedValue)
 }
 
 // activeKey returns backlog compound active key
-func (b QueueBacklog) activeKey(kg QueueKeyGenerator) string {
+func backlogActiveKey(b osqueue.QueueBacklog, kg QueueKeyGenerator) string {
 	return kg.ActiveSet("compound", b.BacklogID)
 }
 

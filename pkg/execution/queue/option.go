@@ -460,9 +460,9 @@ type QueueOptions struct {
 
 	enableJobPromotion bool
 
-	capacityManager             constraintapi.RolloutManager
-	useConstraintAPI            constraintapi.UseConstraintAPIFn
-	capacityLeaseExtendInterval time.Duration
+	CapacityManager             constraintapi.RolloutManager
+	UseConstraintAPI            constraintapi.UseConstraintAPIFn
+	CapacityLeaseExtendInterval time.Duration
 
 	EnableThrottleInstrumentation EnableThrottleInstrumentationFn
 }
@@ -578,19 +578,19 @@ func WithEnableJobPromotion(enable bool) QueueOpt {
 
 func WithCapacityManager(capacityManager constraintapi.RolloutManager) QueueOpt {
 	return func(q *QueueOptions) {
-		q.capacityManager = capacityManager
+		q.CapacityManager = capacityManager
 	}
 }
 
 func WithUseConstraintAPI(uca constraintapi.UseConstraintAPIFn) QueueOpt {
 	return func(q *QueueOptions) {
-		q.useConstraintAPI = uca
+		q.UseConstraintAPI = uca
 	}
 }
 
 func WithCapacityLeaseExtendInterval(interval time.Duration) QueueOpt {
 	return func(q *QueueOptions) {
-		q.capacityLeaseExtendInterval = interval
+		q.CapacityLeaseExtendInterval = interval
 	}
 }
 
