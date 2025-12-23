@@ -953,7 +953,7 @@ func (q *queue) Lease(
 		kg.QueueItem(),
 		kg.ConcurrencyIndex(),
 
-		o.sp.readyQueueKey(kg),
+		shadowPartitionReadyQueueKey(o.ShadowPartition, kg),
 
 		// In progress (concurrency) ZSETs
 		o.sp.accountInProgressKey(kg),
