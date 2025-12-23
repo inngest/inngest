@@ -29,10 +29,10 @@ type PartitionPausedGetter func(ctx context.Context, fnID uuid.UUID) PartitionPa
 
 type QueueOpt func(q *QueueOptions)
 
-type QueueProcessorOpt func(q *QueueProcessor)
+type QueueProcessorOpt func(q *queueProcessor)
 
 func WithName(name string) QueueProcessorOpt {
-	return func(q *QueueProcessor) {
+	return func(q *queueProcessor) {
 		q.name = name
 	}
 }
@@ -392,7 +392,7 @@ type QueueOptions struct {
 	idempotencyTTL time.Duration
 	// idempotencyTTLFunc returns an time.Duration representing how long job IDs
 	// remain idempotent.
-	idempotencyTTLFunc func(context.Context, osqueue.QueueItem) time.Duration
+	idempotencyTTLFunc func(context.Context, QueueItem) time.Duration
 	// pollTick is the interval between each scan for jobs.
 	pollTick                 time.Duration
 	shadowPollTick           time.Duration
@@ -471,14 +471,14 @@ type QueueOptions struct {
 // This allows applying a policy to enqueue items to different queue shards.
 type ShardSelector func(ctx context.Context, accountId uuid.UUID, queueName *string) (QueueShard, error)
 
-func WithShardSelector(s ShardSelector) func(q *queue) {
-	return func(q *queue) {
+func WithShardSelector(s ShardSelector) QueueOpt {
+	return func(q *QueueOptions) {
 		q.shardSelector = s
 	}
 }
 
-func WithPeekEWMA(on bool) func(q *queue) {
-	return func(q *queue) {
+func WithPeekEWMA(on bool) QueueOpt {
+	return func(q *QueueOptions) {
 		q.usePeekEWMA = on
 	}
 }
@@ -487,8 +487,8 @@ func WithPeekEWMA(on bool) func(q *queue) {
 type PartitionConstraintConfigGetter func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig
 
 // WithPartitionConstraintConfigGetter assigns a function that returns queue constraints for a given partition.
-func WithPartitionConstraintConfigGetter(f PartitionConstraintConfigGetter) func(q *queue) {
-	return func(q *queue) {
+func WithPartitionConstraintConfigGetter(f PartitionConstraintConfigGetter) QueueOpt {
+	return func(q *QueueOptions) {
 		q.partitionConstraintConfigGetter = f
 	}
 }
@@ -497,7 +497,7 @@ func WithPartitionConstraintConfigGetter(f PartitionConstraintConfigGetter) func
 type AllowKeyQueues func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool
 
 func WithAllowKeyQueues(kq AllowKeyQueues) QueueOpt {
-	return func(q *queue) {
+	return func(q *QueueOptions) {
 		q.allowKeyQueues = kq
 	}
 }
@@ -509,24 +509,24 @@ func WithAllowKeyQueues(kq AllowKeyQueues) QueueOpt {
 type QueueShadowPartitionProcessCount func(ctx context.Context, acctID uuid.UUID) int
 
 func WithQueueShadowPartitionProcessCount(spc QueueShadowPartitionProcessCount) QueueOpt {
-	return func(q *queue) {
+	return func(q *QueueOptions) {
 		q.shadowPartitionProcessCount = spc
 	}
 }
 
 type (
-	NormalizeRefreshItemCustomConcurrencyKeysFn func(ctx context.Context, item *osqueue.QueueItem, existingKeys []state.CustomConcurrency, shadowPartition *QueueShadowPartition) ([]state.CustomConcurrency, error)
-	RefreshItemThrottleFn                       func(ctx context.Context, item *osqueue.QueueItem) (*osqueue.Throttle, error)
+	NormalizeRefreshItemCustomConcurrencyKeysFn func(ctx context.Context, item *QueueItem, existingKeys []state.CustomConcurrency, shadowPartition *QueueShadowPartition) ([]state.CustomConcurrency, error)
+	RefreshItemThrottleFn                       func(ctx context.Context, item *QueueItem) (*Throttle, error)
 )
 
 func WithNormalizeRefreshItemCustomConcurrencyKeys(fn NormalizeRefreshItemCustomConcurrencyKeysFn) QueueOpt {
-	return func(q *queue) {
+	return func(q *QueueOptions) {
 		q.normalizeRefreshItemCustomConcurrencyKeys = fn
 	}
 }
 
 func WithRefreshItemThrottle(fn RefreshItemThrottleFn) QueueOpt {
-	return func(q *queue) {
+	return func(q *QueueOptions) {
 		q.refreshItemThrottle = fn
 	}
 }
@@ -537,13 +537,13 @@ type (
 )
 
 func WithActiveSpotCheckProbability(fn ActiveSpotChecksProbability) QueueOpt {
-	return func(q *queue) {
+	return func(q *QueueOptions) {
 		q.activeSpotCheckProbability = fn
 	}
 }
 
 func WithReadOnlySpotChecks(fn ReadOnlySpotChecks) QueueOpt {
-	return func(q *queue) {
+	return func(q *QueueOptions) {
 		q.readOnlySpotChecks = fn
 	}
 }
@@ -551,13 +551,13 @@ func WithReadOnlySpotChecks(fn ReadOnlySpotChecks) QueueOpt {
 type TenantInstrumentor func(ctx context.Context, partitionID string) error
 
 func WithTenantInstrumentor(fn TenantInstrumentor) QueueOpt {
-	return func(q *queue) {
+	return func(q *QueueOptions) {
 		q.tenantInstrumentor = fn
 	}
 }
 
 func WithInstrumentInterval(t time.Duration) QueueOpt {
-	return func(q *queue) {
+	return func(q *QueueOptions) {
 		if t > 0 {
 			q.instrumentInterval = t
 		}
@@ -565,31 +565,31 @@ func WithInstrumentInterval(t time.Duration) QueueOpt {
 }
 
 func WithQueueShardClients(queueShards map[string]QueueShard) QueueOpt {
-	return func(q *queue) {
+	return func(q *QueueOptions) {
 		q.queueShardClients = queueShards
 	}
 }
 
 func WithEnableJobPromotion(enable bool) QueueOpt {
-	return func(q *queue) {
+	return func(q *QueueOptions) {
 		q.enableJobPromotion = enable
 	}
 }
 
 func WithCapacityManager(capacityManager constraintapi.RolloutManager) QueueOpt {
-	return func(q *queue) {
+	return func(q *QueueOptions) {
 		q.capacityManager = capacityManager
 	}
 }
 
 func WithUseConstraintAPI(uca constraintapi.UseConstraintAPIFn) QueueOpt {
-	return func(q *queue) {
+	return func(q *QueueOptions) {
 		q.useConstraintAPI = uca
 	}
 }
 
 func WithCapacityLeaseExtendInterval(interval time.Duration) QueueOpt {
-	return func(q *queue) {
+	return func(q *QueueOptions) {
 		q.capacityLeaseExtendInterval = interval
 	}
 }
@@ -597,7 +597,7 @@ func WithCapacityLeaseExtendInterval(interval time.Duration) QueueOpt {
 type EnableThrottleInstrumentationFn func(ctx context.Context, accountID, fnID uuid.UUID) bool
 
 func WithEnableThrottleInstrumentation(fn EnableThrottleInstrumentationFn) QueueOpt {
-	return func(q *queue) {
+	return func(q *QueueOptions) {
 		q.enableThrottleInstrumentation = fn
 	}
 }
