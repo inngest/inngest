@@ -210,11 +210,17 @@ func (c *Client) WaitForRunStatus(
 		timeout = o.Timeout
 	}
 
-	require.NotEmpty(t, runID)
-
 	start := time.Now()
 	var run Run
 	for {
+
+		// It looks as though this original code may mutate the run ID
+		// passed in as a pointer while this loop runs?  This feels like
+		// a strange pattern and a bit of a code smell
+		if runID == nil || *runID == "" {
+			continue
+		}
+
 		run = c.Run(ctx, *runID)
 		if run.Status == expectedStatus {
 			return run
@@ -226,6 +232,7 @@ func (c *Client) WaitForRunStatus(
 		time.Sleep(100 * time.Millisecond)
 	}
 
+	require.NotEmpty(t, runID, "Expected non-nil run id: %s", runID)
 	require.Failf(t, "didn't get expected status: %s, got %s", expectedStatus, run.Status)
 	return run
 }
