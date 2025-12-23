@@ -88,21 +88,22 @@ func PartitionLeaseOptionDisableLeaseChecks(disableLeaseChecks bool) PartitionLe
 type QueueProcessor interface {
 	Options() QueueOptions
 
-	EnqueueItem(ctx context.Context, shard QueueShard, i QueueItem, at time.Time, opts EnqueueOpts) (QueueItem, error)
+	EnqueueItem(ctx context.Context, i QueueItem, at time.Time, opts EnqueueOpts) (QueueItem, error)
 	Peek(ctx context.Context, partition *QueuePartition, until time.Time, limit int64) ([]*QueueItem, error)
 	Lease(ctx context.Context, item QueueItem, leaseDuration time.Duration, now time.Time, denies *LeaseDenies, options ...LeaseOptionFn) (*ulid.ULID, error)
 	ExtendLease(ctx context.Context, i QueueItem, leaseID ulid.ULID, duration time.Duration, opts ...ExtendLeaseOptionFn) (*ulid.ULID, error)
-	Requeue(ctx context.Context, queueShard QueueShard, i QueueItem, at time.Time, opts ...RequeueOptionFn) error
-	RequeueByJobID(ctx context.Context, queueShard QueueShard, jobID string, at time.Time) error
-	Dequeue(ctx context.Context, queueShard QueueShard, i QueueItem, opts ...DequeueOptionFn) error
+	Requeue(ctx context.Context, i QueueItem, at time.Time, opts ...RequeueOptionFn) error
+	RequeueByJobID(ctx context.Context, jobID string, at time.Time) error
+	Dequeue(ctx context.Context, i QueueItem, opts ...DequeueOptionFn) error
 
 	PartitionPeek(ctx context.Context, sequential bool, until time.Time, limit int64) ([]*QueuePartition, error)
 	PartitionLease(ctx context.Context, p *QueuePartition, duration time.Duration, opts ...PartitionLeaseOpt) (*ulid.ULID, int, error)
-	PartitionRequeue(ctx context.Context, shard QueueShard, p *QueuePartition, at time.Time, forceAt bool) error
+	PartitionRequeue(ctx context.Context, p *QueuePartition, at time.Time, forceAt bool) error
 
-	ItemsByPartition(ctx context.Context, shard QueueShard, partitionID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueItem], error)
+	ItemsByPartition(ctx context.Context, partitionID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueItem], error)
 
-	SetFunctionMigrate(ctx context.Context, shard QueueShard, fnID uuid.UUID, migrateLockUntil *time.Time)
+	SetFunctionMigrate(ctx context.Context, fnID uuid.UUID, migrateLockUntil *time.Time)
+	ResetAttemptsByJobID(ctx context.Context, jobID string) error
 }
 
 type BacklogRefillOptions struct {
