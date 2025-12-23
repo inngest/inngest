@@ -195,13 +195,11 @@ type WaitForRunStatusOpts struct {
 
 func (c *Client) WaitForRunStatus(
 	ctx context.Context,
-	t *testing.T,
+	t require.TestingT,
 	expectedStatus string,
 	runID *string,
 	opts ...WaitForRunStatusOpts,
 ) Run {
-	t.Helper()
-
 	var o WaitForRunStatusOpts
 	if len(opts) > 0 {
 		o = opts[0]
@@ -212,29 +210,23 @@ func (c *Client) WaitForRunStatus(
 		timeout = o.Timeout
 	}
 
+	require.NotEmpty(t, runID)
+
 	start := time.Now()
 	var run Run
 	for {
-		if runID != nil && *runID != "" {
-			run = c.Run(ctx, *runID)
-			if run.Status == expectedStatus {
-				break
-			}
+		run = c.Run(ctx, *runID)
+		if run.Status == expectedStatus {
+			return run
 		}
 
 		if time.Since(start) > timeout {
-			var msg string
-			if runID == nil || *runID == "" {
-				msg = "Run ID is empty"
-			} else {
-				msg = fmt.Sprintf("Expected status %s, got %s", expectedStatus, run.Status)
-			}
-			t.Fatal(msg)
+			break
 		}
-
 		time.Sleep(100 * time.Millisecond)
 	}
 
+	require.Failf(t, "didn't get expected status: %s, got %s", expectedStatus, run.Status)
 	return run
 }
 

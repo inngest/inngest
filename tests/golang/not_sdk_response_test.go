@@ -92,10 +92,13 @@ func TestNotSDKResponse(t *testing.T) {
 			}, time.Minute, 100*time.Millisecond)
 
 			// Assert status and output.
-			runs, err := c.RunsByEventID(ctx, eventID)
-			r.NoError(err)
-			r.Len(runs, 1)
-			run := c.WaitForRunStatus(ctx, t, "FAILED", &runs[0].ID)
+			var run client.Run
+			r.EventuallyWithT(func(t *assert.CollectT) {
+				runs, err := c.RunsByEventID(ctx, eventID)
+				require.NoError(t, err)
+				require.Len(t, runs, 1)
+				run = c.WaitForRunStatus(ctx, t, "FAILED", &runs[0].ID)
+			}, 20*time.Second, time.Second)
 
 			if statusCode == http.StatusOK {
 				// Function output includes the HTML response.
