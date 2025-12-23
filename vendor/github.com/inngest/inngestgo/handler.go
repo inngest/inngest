@@ -537,8 +537,14 @@ func (h *handler) inBandSync(
 			Status: 400,
 		}
 	}
-	if h.URL != nil {
-		appURL = h.URL
+
+	appURL, err = overrideURL(appURL, h.handlerOpts)
+	if err != nil {
+		h.Logger.Error("error parsing app URL", "error", err)
+		return publicerr.Error{
+			Err:    fmt.Errorf("error parsing app URL: %w", err),
+			Status: 400,
+		}
 	}
 
 	fns, err := createFunctionConfigs(h.appName, h.funcs, *appURL, false)
@@ -597,9 +603,6 @@ func (h *handler) outOfBandSync(w http.ResponseWriter, r *http.Request) error {
 	h.l.Lock()
 	defer h.l.Unlock()
 
-	scheme := httputil.GetScheme(r)
-	host := r.Host
-
 	// Get the sync ID from the URL and then remove it, since we don't want the
 	// sync ID to show in the function URLs (that would affect the checksum and
 	// is ugly in the UI)
@@ -608,7 +611,20 @@ func (h *handler) outOfBandSync(w http.ResponseWriter, r *http.Request) error {
 	qp.Del("deployId")
 	r.URL.RawQuery = qp.Encode()
 
-	pathAndParams := r.URL.String()
+	appURL, err := url.Parse(fmt.Sprintf(
+		"%s://%s%s?%s",
+		httputil.GetScheme(r),
+		r.Host,
+		r.URL.Path,
+		r.URL.RawQuery,
+	))
+	if err != nil {
+		return fmt.Errorf("error parsing request URL: %w", err)
+	}
+	appURL, err = overrideURL(appURL, h.handlerOpts)
+	if err != nil {
+		return fmt.Errorf("error overriding request URL: %w", err)
+	}
 
 	appVersion := ""
 	if h.AppVersion != nil {
@@ -616,7 +632,7 @@ func (h *handler) outOfBandSync(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	config := types.RegisterRequest{
-		URL:        fmt.Sprintf("%s://%s%s", scheme, host, pathAndParams),
+		URL:        appURL.String(),
 		V:          "1",
 		DeployType: types.DeployTypePing,
 		SDK:        HeaderValueSDK,
@@ -629,7 +645,7 @@ func (h *handler) outOfBandSync(w http.ResponseWriter, r *http.Request) error {
 		AppVersion:   appVersion,
 	}
 
-	fns, err := createFunctionConfigs(h.appName, h.funcs, *h.url(r), false)
+	fns, err := createFunctionConfigs(h.appName, h.funcs, *appURL, false)
 	if err != nil {
 		return fmt.Errorf("error creating function configs: %w", err)
 	}
@@ -694,17 +710,6 @@ func (h *handler) outOfBandSync(w http.ResponseWriter, r *http.Request) error {
 	w.Header().Add(HeaderKeySyncKind, SyncKindOutOfBand)
 
 	return nil
-}
-
-func (h *handler) url(r *http.Request) *url.URL {
-	if h.URL != nil {
-		return h.URL
-	}
-
-	// Get the current URL.
-	scheme := httputil.GetScheme(r)
-	u, _ := url.Parse(fmt.Sprintf("%s://%s%s", scheme, r.Host, r.RequestURI))
-	return u
 }
 
 func createFunctionConfigs(
@@ -833,6 +838,7 @@ func (h *handler) invoke(w http.ResponseWriter, r *http.Request) error {
 		mw,
 		fn,
 		h.GetSigningKey(),
+		h.GetSigningKeyFallback(),
 		request,
 		stepID,
 	)
@@ -1008,14 +1014,6 @@ func (h *handler) createSecureInspection() (*secureInspection, error) {
 		env = &val
 	}
 
-	var serveOrigin, servePath *string
-	if h.URL != nil {
-		serveOriginStr := h.URL.Scheme + "://" + h.URL.Host
-		serveOrigin = &serveOriginStr
-
-		servePath = &h.URL.Path
-	}
-
 	authenticationSucceeded = true
 	insecureInspection, err := h.createInsecureInspection(&authenticationSucceeded)
 	if err != nil {
@@ -1034,8 +1032,8 @@ func (h *handler) createSecureInspection() (*secureInspection, error) {
 		SDKVersion:             SDKVersion,
 		SigningKeyFallbackHash: signingKeyFallbackHash,
 		SigningKeyHash:         signingKeyHash,
-		ServeOrigin:            serveOrigin,
-		ServePath:              servePath,
+		ServeOrigin:            serveOriginOverride(h.handlerOpts),
+		ServePath:              servePathOverride(h.handlerOpts),
 	}, nil
 }
 
@@ -1176,6 +1174,7 @@ func invoke(
 	mw *middleware.MiddlewareManager,
 	sf ServableFunction,
 	signingKey string,
+	signingKeyFallback string,
 	input *sdkrequest.Request,
 	stepID *string,
 ) (any, []sdkrequest.GeneratorOpcode, error) {
@@ -1200,12 +1199,14 @@ func invoke(
 
 	// This must be a pointer so that it can be mutated from within function tools.
 	mgr := sdkrequest.NewManager(sdkrequest.Opts{
-		Fn:         sf,
-		Middleware: mw,
-		Cancel:     cancel,
-		Request:    input,
-		SigningKey: signingKey,
-		Mode:       sdkrequest.StepModeYield,
+		Fn:                 sf,
+		Middleware:         mw,
+		Cancel:             cancel,
+		Request:            input,
+		SigningKey:         signingKey,
+		SigningKeyFallback: signingKeyFallback,
+		Mode:               sdkrequest.StepModeYield,
+		APIBaseURL:         env.APIServerURL(client.Options().APIBaseURL),
 	})
 	fCtx = sdkrequest.SetManager(fCtx, mgr)
 

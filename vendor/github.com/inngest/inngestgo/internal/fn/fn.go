@@ -49,10 +49,10 @@ type FunctionOpts struct {
 	// Name represents a human-readable function name.
 	Name string
 
-	// CheckpointConfig configues checkpointing for the current function.  Checkpointing
+	// Checkpoint configues checkpointing for the current function.  Checkpointing
 	// allows each step.Run result to be stored via an API call, lowering latency between
 	// steps.
-	CheckpointConfig *checkpoint.Config
+	Checkpoint *checkpoint.Config
 
 	// Priority allows you to specify priority options for the function.
 	Priority *Priority
