@@ -13,35 +13,47 @@ type DequeueOptions struct {
 	DisableConstraintUpdates bool
 }
 
-type LeaseOptions struct {
-	disableConstraintChecks bool
+type RequeueOptions struct {
+	DisableConstraintUpdates bool
+}
 
-	backlog     QueueBacklog
-	sp          QueueShadowPartition
-	constraints PartitionConstraintConfig
+func RequeueOptionDisableConstraintUpdates(disableUpdates bool) RequeueOptionFn {
+	return func(o *RequeueOptions) {
+		o.DisableConstraintUpdates = disableUpdates
+	}
+}
+
+type RequeueOptionFn func(o *RequeueOptions)
+
+type LeaseOptions struct {
+	DisableConstraintChecks bool
+
+	Backlog         QueueBacklog
+	ShadowPartition QueueShadowPartition
+	Constraints     PartitionConstraintConfig
 }
 
 func LeaseOptionDisableConstraintChecks(disableChecks bool) LeaseOptionFn {
 	return func(o *LeaseOptions) {
-		o.disableConstraintChecks = disableChecks
+		o.DisableConstraintChecks = disableChecks
 	}
 }
 
 func LeaseBacklog(b QueueBacklog) LeaseOptionFn {
 	return func(o *LeaseOptions) {
-		o.backlog = b
+		o.Backlog = b
 	}
 }
 
 func LeaseShadowPartition(sp QueueShadowPartition) LeaseOptionFn {
 	return func(o *LeaseOptions) {
-		o.sp = sp
+		o.ShadowPartition = sp
 	}
 }
 
 func LeaseConstraints(constraints PartitionConstraintConfig) LeaseOptionFn {
 	return func(o *LeaseOptions) {
-		o.constraints = constraints
+		o.Constraints = constraints
 	}
 }
 
@@ -59,16 +71,28 @@ func ExtendLeaseOptionDisableConstraintUpdates(disableUpdates bool) ExtendLeaseO
 
 type ExtendLeaseOptionFn func(o *extendLeaseOptions)
 
+type PartitionLeaseOptions struct {
+	DisableLeaseChecks bool
+}
+
+type PartitionLeaseOpt func(o *PartitionLeaseOptions)
+
+func PartitionLeaseOptionDisableLeaseChecks(disableLeaseChecks bool) PartitionLeaseOpt {
+	return func(o *PartitionLeaseOptions) {
+		o.DisableLeaseChecks = disableLeaseChecks
+	}
+}
+
 type QueueProcessor interface {
 	EnqueueItem(ctx context.Context, shard QueueShard, i QueueItem, at time.Time, opts EnqueueOpts) (QueueItem, error)
 	Peek(ctx context.Context, partition *QueuePartition, until time.Time, limit int64) ([]*QueueItem, error)
 	Lease(ctx context.Context, item QueueItem, leaseDuration time.Duration, now time.Time, denies *LeaseDenies, options ...LeaseOptionFn) (*ulid.ULID, error)
 	ExtendLease(ctx context.Context, i QueueItem, leaseID ulid.ULID, duration time.Duration, opts ...ExtendLeaseOptionFn) (*ulid.ULID, error)
-	Requeue(ctx context.Context, queueShard QueueShard, i QueueItem, at time.Time, opts ...requeueOptionFn) error
+	Requeue(ctx context.Context, queueShard QueueShard, i QueueItem, at time.Time, opts ...RequeueOptionFn) error
 	RequeueByJobID(ctx context.Context, queueShard QueueShard, jobID string, at time.Time) error
 	Dequeue(ctx context.Context, queueShard QueueShard, i QueueItem, opts ...DequeueOptionFn) error
 
 	PartitionPeek(ctx context.Context, sequential bool, until time.Time, limit int64) ([]*QueuePartition, error)
-	PartitionLease(ctx context.Context, p *QueuePartition, duration time.Duration, opts ...partitionLeaseOpt) (*ulid.ULID, int, error)
+	PartitionLease(ctx context.Context, p *QueuePartition, duration time.Duration, opts ...PartitionLeaseOpt) (*ulid.ULID, int, error)
 	PartitionRequeue(ctx context.Context, shard QueueShard, p *QueuePartition, at time.Time, forceAt bool) error
 }
