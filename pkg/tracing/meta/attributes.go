@@ -116,6 +116,8 @@ var Attrs = struct {
 	ResponseStatusCode attr[*int]
 	ResponseOutputSize attr[*int]
 
+	IsCheckpoint attr[*bool]
+
 	// Userland attributes
 	IsUserland                 attr[*bool]
 	UserlandSpanID             attr[*string]
@@ -196,6 +198,7 @@ var Attrs = struct {
 	StepWaitForEventMatchedID:          ULIDAttr("step.wait_for_event.matched_id"),
 	StepWaitForEventName:               StringAttr("step.wait_for_event.name"),
 	UserlandSpanID:                     StringAttr("userland.span.id"),
+	IsCheckpoint:                       BoolAttr("checkpoint"),
 	IsUserland:                         BoolAttr("userland"),
 	UserlandKind:                       StringAttr("userland.kind"),
 	UserlandServiceName:                StringAttr("userland.service.name"),
