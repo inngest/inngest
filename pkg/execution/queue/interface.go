@@ -61,17 +61,17 @@ func LeaseConstraints(constraints PartitionConstraintConfig) LeaseOptionFn {
 
 type LeaseOptionFn func(o *LeaseOptions)
 
-type extendLeaseOptions struct {
-	disableConstraintUpdates bool
+type ExtendLeaseOptions struct {
+	DisableConstraintUpdates bool
 }
 
 func ExtendLeaseOptionDisableConstraintUpdates(disableUpdates bool) ExtendLeaseOptionFn {
-	return func(o *extendLeaseOptions) {
-		o.disableConstraintUpdates = disableUpdates
+	return func(o *ExtendLeaseOptions) {
+		o.DisableConstraintUpdates = disableUpdates
 	}
 }
 
-type ExtendLeaseOptionFn func(o *extendLeaseOptions)
+type ExtendLeaseOptionFn func(o *ExtendLeaseOptions)
 
 type PartitionLeaseOptions struct {
 	DisableLeaseChecks bool
