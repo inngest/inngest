@@ -24,7 +24,7 @@ type PartitionInspectionResult struct {
 	Backlogs          int  `json:"backlogs"`
 }
 
-func (q *queue) PartitionByID(ctx context.Context, shard QueueShard, partitionID string) (*PartitionInspectionResult, error) {
+func (q *queue) PartitionByID(ctx context.Context, shard RedisQueueShard, partitionID string) (*PartitionInspectionResult, error) {
 	var (
 		result PartitionInspectionResult
 		qp     QueuePartition

@@ -70,7 +70,7 @@ func TestQueuePartitionConcurrency(t *testing.T) {
 	ll := newTestLifecycleListener()
 
 	q := NewQueue(
-		QueueShard{RedisClient: NewQueueClient(rc, QueueDefaultKey), Kind: string(enums.QueueShardKindRedis), Name: consts.DefaultQueueShardName},
+		RedisQueueShard{RedisClient: NewQueueClient(rc, QueueDefaultKey), Kind: string(enums.QueueShardKindRedis), Name: consts.DefaultQueueShardName},
 		WithNumWorkers(100),
 		WithPartitionConstraintConfigGetter(pkf),
 		WithQueueLifecycles(ll),

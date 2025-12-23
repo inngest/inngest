@@ -351,7 +351,7 @@ func WithDriverV2(drivers ...driver.DriverV2) ExecutorOpt {
 	}
 }
 
-func WithAssignedQueueShard(shard redis_state.QueueShard) ExecutorOpt {
+func WithAssignedQueueShard(shard redis_state.RedisQueueShard) ExecutorOpt {
 	return func(e execution.Executor) error {
 		e.(*executor).assignedQueueShard = shard
 		return nil
@@ -490,7 +490,7 @@ type executor struct {
 
 	functionBacklogSizeLimit BacklogSizeLimitFn
 
-	assignedQueueShard redis_state.QueueShard
+	assignedQueueShard redis_state.RedisQueueShard
 	shardFinder        redis_state.ShardSelector
 
 	traceReader    cqrs.TraceReader

@@ -5,6 +5,11 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
+	mathRand "math/rand"
+	"strconv"
+	"sync/atomic"
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
@@ -13,10 +18,6 @@ import (
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 	"golang.org/x/sync/errgroup"
-	mathRand "math/rand"
-	"strconv"
-	"sync/atomic"
-	"time"
 )
 
 const (
@@ -151,7 +152,7 @@ func (q *queue) ActiveCheck(ctx context.Context) (int, error) {
 	return int(atomic.LoadInt64(&checked)), nil
 }
 
-func (q *queue) backlogActiveCheck(ctx context.Context, b *QueueBacklog, shard QueueShard, kg QueueKeyGenerator) (bool, error) {
+func (q *queue) backlogActiveCheck(ctx context.Context, b *QueueBacklog, shard RedisQueueShard, kg QueueKeyGenerator) (bool, error) {
 	accountID := uuid.Nil
 
 	start := q.clock.Now()
@@ -633,7 +634,7 @@ func (q *queue) AccountActiveCheckPeek(ctx context.Context, peekSize int64) ([]u
 	return accountIDs, nil
 }
 
-func (q *queue) AddBacklogToActiveCheck(ctx context.Context, shard QueueShard, accountID uuid.UUID, backlogID string) error {
+func (q *queue) AddBacklogToActiveCheck(ctx context.Context, shard RedisQueueShard, accountID uuid.UUID, backlogID string) error {
 	kg := shard.RedisClient.KeyGenerator()
 	client := shard.RedisClient.Client()
 
@@ -664,7 +665,7 @@ type activeCheckScanResult struct {
 	StaleItems   []osqueue.QueueItem
 }
 
-func (q *queue) activeCheckScan(ctx context.Context, shard QueueShard, keyActive, keyInProgress string, cursor, count int64) (*activeCheckScanResult, error) {
+func (q *queue) activeCheckScan(ctx context.Context, shard RedisQueueShard, keyActive, keyInProgress string, cursor, count int64) (*activeCheckScanResult, error) {
 	kg := shard.RedisClient.KeyGenerator()
 	client := shard.RedisClient.Client()
 
@@ -761,7 +762,7 @@ func parseScanResult(res any) (*activeCheckScanResult, error) {
 	}, nil
 }
 
-func (q *queue) activeCheckRemove(ctx context.Context, shard QueueShard, keyActiveCheckSet, keyActiveCheckCooldown, pointer string, cooldown time.Duration) error {
+func (q *queue) activeCheckRemove(ctx context.Context, shard RedisQueueShard, keyActiveCheckSet, keyActiveCheckCooldown, pointer string, cooldown time.Duration) error {
 	if shard.Kind != string(enums.QueueShardKindRedis) {
 		return fmt.Errorf("unexpected queue shard kind %v", shard.Kind)
 	}

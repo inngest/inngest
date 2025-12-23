@@ -391,7 +391,7 @@ func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp 
 
 func (q *queue) normalizeItem(
 	ctx context.Context,
-	shard QueueShard,
+	shard RedisQueueShard,
 	sp *QueueShadowPartition,
 	latestConstraints PartitionConstraintConfig,
 	sourceBacklog *QueueBacklog,

@@ -33,7 +33,7 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 		require.NoError(t, err)
 		defer rc.Close()
 
-		defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+		defaultShard := RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 		kg := defaultShard.RedisClient.kg
 
 		enqueueToBacklog := false
@@ -147,7 +147,7 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 		require.NoError(t, err)
 		defer rc.Close()
 
-		defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+		defaultShard := RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 		kg := defaultShard.RedisClient.kg
 
 		enqueueToBacklog := false
@@ -294,7 +294,7 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 		require.NoError(t, err)
 		defer rc.Close()
 
-		defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+		defaultShard := RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 		kg := defaultShard.RedisClient.kg
 
 		enqueueToBacklog := false
@@ -463,7 +463,7 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 		require.NoError(t, err)
 		defer rc.Close()
 
-		defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+		defaultShard := RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 		kg := defaultShard.RedisClient.kg
 
 		enqueueToBacklog := false
@@ -574,7 +574,7 @@ func TestQueueDequeue(t *testing.T) {
 	require.NoError(t, err)
 	defer rc.Close()
 
-	queueClient := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+	queueClient := RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 	q := NewQueue(queueClient)
 	ctx := context.Background()
 
@@ -981,7 +981,7 @@ func TestQueueDequeueWithDisabledConstraintUpdates(t *testing.T) {
 
 	clock := clockwork.NewFakeClock()
 
-	shard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+	shard := RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 	kg := shard.RedisClient.KeyGenerator()
 
 	q := NewQueue(
