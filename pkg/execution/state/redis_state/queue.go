@@ -2161,40 +2161,6 @@ func (q *queue) itemEnableKeyQueues(ctx context.Context, item osqueue.QueueItem)
 	return false
 }
 
-type leaseOptions struct {
-	disableConstraintChecks bool
-
-	backlog     QueueBacklog
-	sp          QueueShadowPartition
-	constraints PartitionConstraintConfig
-}
-
-func LeaseOptionDisableConstraintChecks(disableChecks bool) leaseOptionFn {
-	return func(o *leaseOptions) {
-		o.disableConstraintChecks = disableChecks
-	}
-}
-
-func LeaseBacklog(b QueueBacklog) leaseOptionFn {
-	return func(o *leaseOptions) {
-		o.backlog = b
-	}
-}
-
-func LeaseShadowPartition(sp QueueShadowPartition) leaseOptionFn {
-	return func(o *leaseOptions) {
-		o.sp = sp
-	}
-}
-
-func LeaseConstraints(constraints PartitionConstraintConfig) leaseOptionFn {
-	return func(o *leaseOptions) {
-		o.constraints = constraints
-	}
-}
-
-type leaseOptionFn func(o *leaseOptions)
-
 // Lease temporarily dequeues an item from the queue by obtaining a lease, preventing
 // other workers from working on this queue item at the same time.
 //
@@ -2205,7 +2171,7 @@ func (q *queue) Lease(
 	item osqueue.QueueItem,
 	leaseDuration time.Duration,
 	now time.Time,
-	denies *leaseDenies,
+	denies *osqueue.LeaseDenies,
 	options ...leaseOptionFn,
 ) (*ulid.ULID, error) {
 	o := &leaseOptions{}
@@ -3693,52 +3659,4 @@ func newLeaseDenyList() *leaseDenies {
 		concurrency: map[string]struct{}{},
 		throttle:    map[string]struct{}{},
 	}
-}
-
-// leaseDenies stores a mapping of keys that must not be leased.
-//
-// When iterating over a list of peeked queue items, each queue item may have the same
-// or different concurrency keys.  As soon as one of these concurrency keys reaches its
-// limit, any next queue items with the same keys must _never_ be considered for leasing.
-//
-// This has two benefits:  we prevent wasted work, and we prevent out of order work.
-type leaseDenies struct {
-	lock *sync.RWMutex
-
-	concurrency map[string]struct{}
-	throttle    map[string]struct{}
-}
-
-func (l *leaseDenies) addThrottled(err error) {
-	var key keyError
-	if !errors.As(err, &key) {
-		return
-	}
-	l.lock.Lock()
-	l.throttle[key.key] = struct{}{}
-	l.lock.Unlock()
-}
-
-func (l *leaseDenies) addConcurrency(err error) {
-	var key keyError
-	if !errors.As(err, &key) {
-		return
-	}
-	l.lock.Lock()
-	l.concurrency[key.key] = struct{}{}
-	l.lock.Unlock()
-}
-
-func (l *leaseDenies) denyConcurrency(key string) bool {
-	l.lock.RLock()
-	_, ok := l.concurrency[key]
-	l.lock.RUnlock()
-	return ok
-}
-
-func (l *leaseDenies) denyThrottle(key string) bool {
-	l.lock.RLock()
-	_, ok := l.throttle[key]
-	l.lock.RUnlock()
-	return ok
 }
