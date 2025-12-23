@@ -15,7 +15,7 @@ type QueueShard interface {
 }
 
 func (q *queueProcessor) selectShard(ctx context.Context, shardName string, qi QueueItem) (QueueShard, error) {
-	shard := q.options.primaryQueueShard
+	shard := q.options.PrimaryQueueShard
 	switch {
 	// If the caller wants us to enqueue the job to a specific queue shard, use that.
 	case shardName != "":

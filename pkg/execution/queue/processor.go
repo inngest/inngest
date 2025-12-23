@@ -33,7 +33,7 @@ func NewQueueProcessor(
 	options ...QueueOpt,
 ) (Queue, error) {
 	o := &QueueOptions{
-		primaryQueueShard: primaryQueueShard,
+		PrimaryQueueShard: primaryQueueShard,
 		queueShardClients: map[string]QueueShard{primaryQueueShard.Name(): primaryQueueShard},
 		ppf: func(_ context.Context, _ QueuePartition) uint {
 			return PriorityDefault
@@ -94,7 +94,7 @@ func NewQueueProcessor(
 			return nil
 		},
 		backoffFunc:             backoff.DefaultBackoff,
-		clock:                   clockwork.NewRealClock(),
+		Clock:                   clockwork.NewRealClock(),
 		continuationLimit:       consts.DefaultQueueContinueLimit,
 		shadowContinuesLock:     &sync.Mutex{},
 		shadowContinuationLimit: consts.DefaultQueueContinueLimit,
@@ -121,7 +121,7 @@ func NewQueueProcessor(
 
 	// default to using primary queue client for shard selection
 	o.shardSelector = func(_ context.Context, _ uuid.UUID, _ *string) (QueueShard, error) {
-		return o.primaryQueueShard, nil
+		return o.PrimaryQueueShard, nil
 	}
 
 	for _, qopt := range options {
