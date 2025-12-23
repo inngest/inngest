@@ -21,31 +21,6 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-const (
-	AbsoluteShadowPartitionPeekMax int64 = 10 * ShadowPartitionPeekMaxBacklogs
-
-	ShadowPartitionAccountPeekMax  = int64(30)
-	ShadowPartitionPeekMax         = int64(300) // same as PartitionPeekMax for now
-	ShadowPartitionPeekMinBacklogs = int64(10)
-	ShadowPartitionPeekMaxBacklogs = int64(100)
-
-	ShadowPartitionRequeueExtendedDuration = 3 * time.Second
-
-	ShadowPartitionLookahead = 2 * PartitionLookahead
-
-	BacklogForceRequeueMaxBackoff = 5 * time.Minute
-)
-
-var (
-	ErrShadowPartitionAlreadyLeased               = fmt.Errorf("shadow partition already leased")
-	ErrShadowPartitionLeaseNotFound               = fmt.Errorf("shadow partition lease not found")
-	ErrShadowPartitionNotFound                    = fmt.Errorf("shadow partition not found")
-	ErrShadowPartitionPaused                      = fmt.Errorf("shadow partition refill is disabled")
-	ErrShadowPartitionBacklogPeekMaxExceedsLimits = fmt.Errorf("shadow partition backlog peek exceeded the maximum limit of %d", ShadowPartitionPeekMaxBacklogs)
-	ErrShadowPartitionPeekMaxExceedsLimits        = fmt.Errorf("shadow partition peek exceeded the maximum limit of %d", ShadowPartitionPeekMax)
-	ErrShadowPartitionAccountPeekMaxExceedsLimits = fmt.Errorf("account peek with shadow partitions exceeded the maximum limit of %d", ShadowPartitionAccountPeekMax)
-)
-
 var (
 	durOpGobalShadowPartitionAccountPeek = "global_shadow_partition_account_peek"
 	durOpShadowPartitionRequeue          = "shadow_partition_requeue"

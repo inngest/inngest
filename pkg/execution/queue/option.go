@@ -29,8 +29,10 @@ type PartitionPausedGetter func(ctx context.Context, fnID uuid.UUID) PartitionPa
 
 type QueueOpt func(q *QueueOptions)
 
-func WithName(name string) func(q *QueueOptions) {
-	return func(q *QueueOptions) {
+type QueueProcessorOpt func(q *QueueProcessor)
+
+func WithName(name string) QueueProcessorOpt {
+	return func(q *QueueProcessor) {
 		q.name = name
 	}
 }
@@ -48,45 +50,45 @@ func WithPartitionPriorityFinder(ppf PartitionPriorityFinder) QueueOpt {
 }
 
 func WithPartitionPausedGetter(partitionPausedGetter PartitionPausedGetter) QueueOpt {
-	return func(q *queue) {
+	return func(q *QueueOptions) {
 		q.partitionPausedGetter = partitionPausedGetter
 	}
 }
 
 func WithAccountPriorityFinder(apf AccountPriorityFinder) QueueOpt {
-	return func(q *queue) {
+	return func(q *QueueOptions) {
 		q.apf = apf
 	}
 }
 
 func WithIdempotencyTTL(t time.Duration) QueueOpt {
-	return func(q *queue) {
+	return func(q *QueueOptions) {
 		q.idempotencyTTL = t
 	}
 }
 
 // WithIdempotencyTTLFunc returns custom idempotecy durations given a QueueItem.
 // This allows customization of the idempotency TTL based off of specific jobs.
-func WithIdempotencyTTLFunc(f func(context.Context, osqueue.QueueItem) time.Duration) QueueOpt {
-	return func(q *queue) {
+func WithIdempotencyTTLFunc(f func(context.Context, QueueItem) time.Duration) QueueOpt {
+	return func(q *QueueOptions) {
 		q.idempotencyTTLFunc = f
 	}
 }
 
 func WithNumWorkers(n int32) QueueOpt {
-	return func(q *queue) {
+	return func(q *QueueOptions) {
 		q.numWorkers = n
 	}
 }
 
 func WithShadowNumWorkers(n int32) QueueOpt {
-	return func(q *queue) {
+	return func(q *QueueOptions) {
 		q.numShadowWorkers = n
 	}
 }
 
 func WithPeekSizeRange(min int64, max int64) QueueOpt {
-	return func(q *queue) {
+	return func(q *QueueOptions) {
 		if max > AbsoluteQueuePeekMax {
 			max = AbsoluteQueuePeekMax
 		}
@@ -96,7 +98,7 @@ func WithPeekSizeRange(min int64, max int64) QueueOpt {
 }
 
 func WithShadowPeekSizeRange(min int64, max int64) QueueOpt {
-	return func(q *queue) {
+	return func(q *QueueOptions) {
 		if max > AbsoluteShadowPartitionPeekMax {
 			max = AbsoluteShadowPartitionPeekMax
 		}
@@ -106,25 +108,25 @@ func WithShadowPeekSizeRange(min int64, max int64) QueueOpt {
 }
 
 func WithBacklogRefillLimit(limit int64) QueueOpt {
-	return func(q *queue) {
+	return func(q *QueueOptions) {
 		q.backlogRefillLimit = limit
 	}
 }
 
 func WithBacklogNormalizationConcurrency(limit int64) QueueOpt {
-	return func(q *queue) {
+	return func(q *QueueOptions) {
 		q.backlogNormalizeConcurrency = limit
 	}
 }
 
 func WithPeekConcurrencyMultiplier(m int64) QueueOpt {
-	return func(q *queue) {
+	return func(q *QueueOptions) {
 		q.peekCurrMultiplier = m
 	}
 }
 
 func WithPeekEWMALength(l int) QueueOpt {
-	return func(q *queue) {
+	return func(q *QueueOptions) {
 		q.peekEWMALen = l
 	}
 }
@@ -132,7 +134,7 @@ func WithPeekEWMALength(l int) QueueOpt {
 // WithPollTick specifies the interval at which the queue will poll the backing store
 // for available partitions.
 func WithPollTick(t time.Duration) QueueOpt {
-	return func(q *queue) {
+	return func(q *QueueOptions) {
 		q.pollTick = t
 	}
 }
@@ -140,7 +142,7 @@ func WithPollTick(t time.Duration) QueueOpt {
 // WithShadowPollTick specifies the interval at which the queue will poll the backing store
 // for available shadow partitions.
 func WithShadowPollTick(t time.Duration) QueueOpt {
-	return func(q *queue) {
+	return func(q *QueueOptions) {
 		q.shadowPollTick = t
 	}
 }
@@ -148,7 +150,7 @@ func WithShadowPollTick(t time.Duration) QueueOpt {
 // WithBacklogNormalizePollTick specifies the interval at which the queue will poll the backing store
 // for available backlogs to normalize.
 func WithBacklogNormalizePollTick(t time.Duration) QueueOpt {
-	return func(q *queue) {
+	return func(q *QueueOptions) {
 		q.backlogNormalizePollTick = t
 	}
 }
@@ -156,21 +158,21 @@ func WithBacklogNormalizePollTick(t time.Duration) QueueOpt {
 // WithActiveCheckPollTick specifies the interval at which the queue will poll the backing store
 // for available backlogs to normalize.
 func WithActiveCheckPollTick(t time.Duration) QueueOpt {
-	return func(q *queue) {
+	return func(q *QueueOptions) {
 		q.activeCheckTick = t
 	}
 }
 
 // WithActiveCheckAccountProbability specifies the probability of processing accounts vs. backlogs during an active check run.
 func WithActiveCheckAccountProbability(p int) QueueOpt {
-	return func(q *queue) {
+	return func(q *QueueOptions) {
 		q.activeCheckAccountProbability = p
 	}
 }
 
 // WithActiveCheckAccountConcurrency specifies the number of accounts to be peeked and processed by the active checker in parallel
 func WithActiveCheckAccountConcurrency(p int) QueueOpt {
-	return func(q *queue) {
+	return func(q *QueueOptions) {
 		if p > 0 {
 			q.activeCheckAccountConcurrency = int64(p)
 		}
@@ -179,7 +181,7 @@ func WithActiveCheckAccountConcurrency(p int) QueueOpt {
 
 // WithActiveCheckBacklogConcurrency specifies the number of backlogs to be peeked and processed by the active checker in parallel
 func WithActiveCheckBacklogConcurrency(p int) QueueOpt {
-	return func(q *queue) {
+	return func(q *QueueOptions) {
 		if p > 0 {
 			q.activeCheckBacklogConcurrency = int64(p)
 		}
@@ -188,16 +190,10 @@ func WithActiveCheckBacklogConcurrency(p int) QueueOpt {
 
 // WithActiveCheckScanBatchSize specifies the batch size for iterating over active sets
 func WithActiveCheckScanBatchSize(p int) QueueOpt {
-	return func(q *queue) {
+	return func(q *QueueOptions) {
 		if p > 0 {
 			q.activeCheckScanBatchSize = int64(p)
 		}
-	}
-}
-
-func WithQueueItemIndexer(i QueueItemIndexer) QueueOpt {
-	return func(q *queue) {
-		q.itemIndexer = i
 	}
 }
 
@@ -208,7 +204,7 @@ func WithQueueItemIndexer(i QueueItemIndexer) QueueOpt {
 // NOTE: If this is set and this worker claims the sequential lease, there is no guarantee
 // on latency or fairness in the denied queue partitions.
 func WithDenyQueueNames(queues ...string) QueueOpt {
-	return func(q *queue) {
+	return func(q *QueueOptions) {
 		q.denyQueues = queues
 		q.denyQueueMap = make(map[string]*struct{})
 		q.denyQueuePrefixes = make(map[string]*struct{})
@@ -227,7 +223,7 @@ func WithDenyQueueNames(queues ...string) QueueOpt {
 // within the given list of names.  This means that the worker will never work on jobs in
 // other queues.
 func WithAllowQueueNames(queues ...string) QueueOpt {
-	return func(q *queue) {
+	return func(q *QueueOptions) {
 		q.allowQueues = queues
 		q.allowQueueMap = make(map[string]*struct{})
 		q.allowQueuePrefixes = make(map[string]*struct{})
@@ -252,50 +248,50 @@ func WithAllowQueueNames(queues ...string) QueueOpt {
 func WithKindToQueueMapping(mapping map[string]string) QueueOpt {
 	// XXX: Refactor osqueue.Item and this package to resolve these interfaces
 	// and clean up this function.
-	return func(q *queue) {
+	return func(q *QueueOptions) {
 		q.queueKindMapping = mapping
 	}
 }
 
 func WithDisableFifoForFunctions(mapping map[string]struct{}) QueueOpt {
-	return func(q *queue) {
+	return func(q *QueueOptions) {
 		q.disableFifoForFunctions = mapping
 	}
 }
 
 func WithPeekSizeForFunction(mapping map[string]int64) QueueOpt {
-	return func(q *queue) {
+	return func(q *QueueOptions) {
 		q.peekSizeForFunctions = mapping
 	}
 }
 
 func WithDisableFifoForAccounts(mapping map[string]struct{}) QueueOpt {
-	return func(q *queue) {
+	return func(q *QueueOptions) {
 		q.disableFifoForAccounts = mapping
 	}
 }
 
 func WithLogger(l logger.Logger) QueueOpt {
-	return func(q *queue) {
+	return func(q *QueueOptions) {
 		q.log = l
 	}
 }
 
-func WithBackoffFunc(f backoff.BackoffFunc) func(q *queue) {
-	return func(q *queue) {
+func WithBackoffFunc(f backoff.BackoffFunc) QueueOpt {
+	return func(q *QueueOptions) {
 		q.backoffFunc = f
 	}
 }
 
-func WithRunMode(m QueueRunMode) func(q *queue) {
-	return func(q *queue) {
+func WithRunMode(m QueueRunMode) QueueOpt {
+	return func(q *QueueOptions) {
 		q.runMode = m
 	}
 }
 
 // WithClock allows replacing the queue's default (real) clock by a mock, for testing.
-func WithClock(c clockwork.Clock) func(q *queue) {
-	return func(q *queue) {
+func WithClock(c clockwork.Clock) QueueOpt {
+	return func(q *QueueOptions) {
 		q.clock = c
 	}
 }
@@ -303,7 +299,7 @@ func WithClock(c clockwork.Clock) func(q *queue) {
 // WithQueueContinuationLimit sets the continuation limit in the queue, eg. how many
 // sequential steps cause hints in the queue to continue executing the same partition.
 func WithQueueContinuationLimit(limit uint) QueueOpt {
-	return func(q *queue) {
+	return func(q *QueueOptions) {
 		q.continuationLimit = limit
 	}
 }
@@ -311,65 +307,54 @@ func WithQueueContinuationLimit(limit uint) QueueOpt {
 // WithQueueShadowContinuationLimit sets the shadow continuation limit in the queue, eg. how many
 // sequential steps cause hints in the queue to continue executing the same shadow partition.
 func WithQueueShadowContinuationLimit(limit uint) QueueOpt {
-	return func(q *queue) {
+	return func(q *QueueOptions) {
 		q.shadowContinuationLimit = limit
 	}
 }
 
-type QueueProcessor struct {
-	// name is the identifiable name for this worker, for logging.
-	name string
+type QueueRunMode struct {
+	// Sequential determines whether Run() instance acquires sequential lease and processes items sequentially if lease is granted
+	Sequential bool
 
-	// quit is a channel that any method can send on to trigger termination
-	// of the Run loop.  This typically accepts an error, but a nil error
-	// will still quit the runner.
-	quit chan error
-	// wg stores a waitgroup for all in-progress jobs
-	wg *sync.WaitGroup
+	// Scavenger determines whether scavenger lease is acquired and scavenger is processed if lease is granted
+	Scavenger bool
 
-	// activeCheckerLeaseID stores the lease ID if this queue is the ActiveChecker processor.
-	// all runners attempt to claim this lease automatically.
-	activeCheckerLeaseID *ulid.ULID
-	// activeCheckerLeaseLock ensures that there are no data races writing to
-	// or reading from activeCheckerLeaseID in parallel.
-	activeCheckerLeaseLock *sync.RWMutex
+	// Partition determines whether partitions are processed
+	Partition bool
 
-	// workers is a buffered channel which allows scanners to send queue items
-	// to workers to be processed
-	workers chan processItem
-	// sem stores a semaphore controlling the number of jobs currently
-	// being processed.  This lets us check whether there's capacity in the queue
-	// prior to leasing items.
-	sem *trackingSemaphore
+	// Account determines whether accounts are processed
+	Account bool
 
-	// seqLeaseID stores the lease ID if this queue is the sequential processor.
-	// all runners attempt to claim this lease automatically.
-	seqLeaseID *ulid.ULID
-	// seqLeaseLock ensures that there are no data races writing to
-	// or reading from seqLeaseID in parallel.
-	seqLeaseLock *sync.RWMutex
+	// AccountWeight is the weight of processing accounts over partitions between 0 - 100 where 100 means only process accounts
+	AccountWeight int
 
-	// instrumentationLeaseID stores the lease ID if executor is running queue
-	// instrumentations
-	instrumentationLeaseID *ulid.ULID
-	// instrumentationLeaseLock ensures that there are no data races writing to or
-	// reading from instrumentationLeaseID
-	instrumentationLeaseLock *sync.RWMutex
+	// Continuations enables continuations
+	Continuations bool
 
-	// continues stores a map of all partition IDs to continues for a partition.
-	// this lets us optimize running consecutive steps for a function, as a continuation, to a specific limit.
-	continues        map[string]continuation
-	continueCooldown map[string]time.Time
+	// Shadow enables shadow partition processing
+	ShadowPartition bool
 
-	// continuesLock protects the continues map.
-	continuesLock *sync.Mutex
+	// AccountShadowPartition enables scanning of accounts for fair shadow partition processing
+	AccountShadowPartition bool
 
-	// scavengerLeaseID stores the lease ID if this queue is the scavenger processor.
-	// all runners attempt to claim this lease automatically.
-	scavengerLeaseID *ulid.ULID
-	// scavengerLeaseLock ensures that there are no data races writing to
-	// or reading from scavengerLeaseID in parallel.
-	scavengerLeaseLock *sync.RWMutex
+	// AccountShadowPartitionWeight is the weight of processing accounts over global shadow partitions between 0 - 100 where 100 means only process accounts
+	AccountShadowPartitionWeight int
+
+	// ShadowContinuations enables shadow continuations
+	ShadowContinuations bool
+
+	// ShadowContinuationSkipProbability represents the probability to skip continuations (defaults to 0.2)
+	ShadowContinuationSkipProbability float64
+
+	// NormalizePartition enables the processing of partitions for normalization
+	NormalizePartition bool
+
+	// ActiveChecker enables background checking of active sets.
+	ActiveChecker bool
+
+	// ExclusiveAccounts defines a list of account IDs to peek exclusively.
+	// This can be used to configure executors processing only a static subset of accounts.
+	ExclusiveAccounts []uuid.UUID
 }
 
 type QueueOptions struct {
@@ -434,9 +419,6 @@ type QueueOptions struct {
 	disableFifoForAccounts  map[string]struct{}
 	peekSizeForFunctions    map[string]int64
 	log                     logger.Logger
-
-	// itemIndexer returns indexes for a given queue item.
-	itemIndexer QueueItemIndexer
 
 	// denyQueues provides a denylist ensuring that the queue will never claim
 	// this partition, meaning that no jobs from this queue will run on this worker.
@@ -618,4 +600,103 @@ func WithEnableThrottleInstrumentation(fn EnableThrottleInstrumentationFn) Queue
 	return func(q *queue) {
 		q.enableThrottleInstrumentation = fn
 	}
+}
+
+// continuation represents a partition continuation, forcung the queue to continue working
+// on a partition once a job from a partition has been processed.
+type continuation struct {
+	partition *QueuePartition
+	// count is stored and incremented each time the partition is enqueued.
+	count uint
+}
+
+// shadowContinuation is the equivalent of continuation for shadow partitions
+type shadowContinuation struct {
+	shadowPart *QueueShadowPartition
+	count      uint
+}
+
+// processItem references the queue partition and queue item to be processed by a worker.
+// both items need to be passed to a worker as both items are needed to generate concurrency
+// keys to extend leases and dequeue.
+type processItem struct {
+	P QueuePartition
+	I QueueItem
+
+	// PCtr represents the number of times the partition has been continued.
+	PCtr uint
+
+	capacityLease *CapacityLease
+
+	// disableConstraintUpdates determines whether ExtendLease, Requeue,
+	// and Dequeue should update constraint state.
+	//
+	// Disable constraint updates in case
+	// - we are processing an item for a system queue
+	// - we are holding an active capacity lease
+	//
+	// For system queues, we skip constraint checks + updates entirely,
+	// for regular functions we manage constraint checks + updates in the Constraint API,
+	// if enabled for the current account.
+	//
+	// If the Constraint API is disabled or the lease expired, we will manage constraint state internally.
+	//
+	// NOTE: This value is set in itemLeaseConstraintCheck.
+	disableConstraintUpdates bool
+}
+
+type capacityLease struct {
+	currentCapacityLeaseID *ulid.ULID
+	capacityLeaseLock      sync.Mutex
+}
+
+func newCapacityLease(initialLease *CapacityLease) *capacityLease {
+	cl := &capacityLease{
+		capacityLeaseLock: sync.Mutex{},
+	}
+	if initialLease != nil {
+		cl.currentCapacityLeaseID = &initialLease.LeaseID
+	}
+
+	return cl
+}
+
+func (p *capacityLease) set(leaseID *ulid.ULID) {
+	p.capacityLeaseLock.Lock()
+	defer p.capacityLeaseLock.Unlock()
+	p.currentCapacityLeaseID = leaseID
+}
+
+func (p *capacityLease) get() *ulid.ULID {
+	p.capacityLeaseLock.Lock()
+	defer p.capacityLeaseLock.Unlock()
+	return p.currentCapacityLeaseID
+}
+
+func (p *capacityLease) has() bool {
+	p.capacityLeaseLock.Lock()
+	defer p.capacityLeaseLock.Unlock()
+	return p.currentCapacityLeaseID != nil
+}
+
+// FnMetadata is stored within the queue for retrieving
+type FnMetadata struct {
+	// NOTE: This is not encoded via JSON as we should always have the function
+	// ID prior to doing a lookup, or should be able to retrieve the function ID
+	// via the key.
+	FnID uuid.UUID `json:"fnID"`
+
+	// Paused represents whether the fn is paused.  This allows us to prevent leases
+	// to a given partition if the partition belongs to a fn.
+	Paused bool `json:"off"`
+
+	// Migrate indicates if this queue is to be migrated or not
+	Migrate bool `json:"migrate"`
+}
+
+type PartitionIdentifier struct {
+	SystemQueueName *string
+	FunctionID      uuid.UUID
+	AccountID       uuid.UUID
+	EnvID           uuid.UUID
 }
