@@ -3,7 +3,6 @@ package queue
 import (
 	"context"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/VividCortex/ewma"
@@ -12,9 +11,9 @@ import (
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/util"
 	"github.com/jonboulle/clockwork"
 	"github.com/oklog/ulid/v2"
-	"golang.org/x/sync/semaphore"
 )
 
 var (
@@ -143,6 +142,10 @@ func NewQueueProcessor(
 		continuesLock:    &sync.Mutex{},
 		continues:        map[string]continuation{},
 		continueCooldown: map[string]time.Time{},
+
+		sem:     util.NewTrackingSemaphore(int(o.numWorkers)),
+		workers: make(chan processItem, o.numWorkers),
+		quit:    make(chan error, o.numWorkers),
 	}
 
 	return qp, nil
@@ -174,7 +177,7 @@ type queueProcessor struct {
 	// sem stores a semaphore controlling the number of jobs currently
 	// being processed.  This lets us check whether there's capacity in the queue
 	// prior to leasing items.
-	sem *trackingSemaphore
+	sem util.TrackingSemaphore
 
 	// seqLeaseID stores the lease ID if this queue is the sequential processor.
 	// all runners attempt to claim this lease automatically.
@@ -244,35 +247,4 @@ func (q *queueProcessor) StatusCount(ctx context.Context, workflowID uuid.UUID, 
 // UnpauseFunction implements Queue.
 func (q *queueProcessor) UnpauseFunction(ctx context.Context, shard string, acctID uuid.UUID, fnID uuid.UUID) error {
 	panic("unimplemented")
-}
-
-// trackingSemaphore returns a semaphore that tracks closely - but not atomically -
-// the total number of items in the semaphore.  This is best effort, and is loosely
-// accurate to reduce further contention.
-//
-// This is only used as an indicator as to whether to scan.
-type trackingSemaphore struct {
-	*semaphore.Weighted
-	counter int64
-}
-
-func (t *trackingSemaphore) TryAcquire(n int64) bool {
-	if !t.Weighted.TryAcquire(n) {
-		return false
-	}
-	atomic.AddInt64(&t.counter, n)
-	return true
-}
-
-func (t *trackingSemaphore) Acquire(ctx context.Context, n int64) error {
-	if err := t.Weighted.Acquire(ctx, n); err != nil {
-		return err
-	}
-	atomic.AddInt64(&t.counter, n)
-	return nil
-}
-
-func (t *trackingSemaphore) Release(n int64) {
-	t.Weighted.Release(n)
-	atomic.AddInt64(&t.counter, -n)
 }
