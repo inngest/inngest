@@ -75,7 +75,7 @@ func NewQueueProcessor(
 		peekSizeForFunctions:           make(map[string]int64),
 		log:                            logger.StdlibLogger(ctx),
 		instrumentInterval:             DefaultInstrumentInterval,
-		partitionConstraintConfigGetter: func(ctx context.Context, pi PartitionIdentifier) PartitionConstraintConfig {
+		PartitionConstraintConfigGetter: func(ctx context.Context, pi PartitionIdentifier) PartitionConstraintConfig {
 			def := defaultConcurrency
 
 			return PartitionConstraintConfig{
@@ -85,7 +85,7 @@ func NewQueueProcessor(
 				},
 			}
 		},
-		allowKeyQueues: func(ctx context.Context, acctID, fnID uuid.UUID) bool {
+		AllowKeyQueues: func(ctx context.Context, acctID, fnID uuid.UUID) bool {
 			return false
 		},
 		shadowPartitionProcessCount: func(ctx context.Context, acctID uuid.UUID) int {
