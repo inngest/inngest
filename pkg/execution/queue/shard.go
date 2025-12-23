@@ -19,7 +19,7 @@ func (q *queueProcessor) selectShard(ctx context.Context, shardName string, qi Q
 	switch {
 	// If the caller wants us to enqueue the job to a specific queue shard, use that.
 	case shardName != "":
-		foundShard, ok := q.options.queueShardClients[shardName]
+		foundShard, ok := q.options.QueueShardClients[shardName]
 		if !ok {
 			return shard, fmt.Errorf("tried to force invalid queue shard %q", shardName)
 		}

@@ -361,8 +361,8 @@ type QueueOptions struct {
 	// PrimaryQueueShard stores the queue shard to use.
 	PrimaryQueueShard QueueShard
 
-	// queueShardClients contains all non-default queue shard clients.
-	queueShardClients map[string]QueueShard
+	// QueueShardClients contains all non-default queue shard clients.
+	QueueShardClients map[string]QueueShard
 	shardSelector     ShardSelector
 
 	ppf                   PartitionPriorityFinder
@@ -566,7 +566,7 @@ func WithInstrumentInterval(t time.Duration) QueueOpt {
 
 func WithQueueShardClients(queueShards map[string]QueueShard) QueueOpt {
 	return func(q *QueueOptions) {
-		q.queueShardClients = queueShards
+		q.QueueShardClients = queueShards
 	}
 }
 

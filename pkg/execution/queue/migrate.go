@@ -16,7 +16,7 @@ import (
 func (q *queueProcessor) Migrate(ctx context.Context, sourceShardName string, fnID uuid.UUID, limit int64, concurrency int, handler QueueMigrationHandler) (int64, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "MigrationPeek"), redis_telemetry.ScopeQueue)
 
-	shard, ok := q.options.queueShardClients[sourceShardName]
+	shard, ok := q.options.QueueShardClients[sourceShardName]
 	if !ok {
 		return -1, fmt.Errorf("no queue shard available for '%s'", sourceShardName)
 	}

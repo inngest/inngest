@@ -11,7 +11,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 	"unsafe"
 
@@ -75,45 +74,36 @@ type QueueManager interface {
 
 	// Total queue depth of all partitions including backlog and ready state items
 	TotalSystemQueueDepth(ctx context.Context) (int64, error)
-
-	// Shard returns the shard with the provided name if available
-	Shard(ctx context.Context, shardName string) (RedisQueueShard, bool)
 }
 
-type RedisQueueShard struct {
-	name        string
-	RedisClient *QueueClient
-
-	q *queue
-}
-
-func (q RedisQueueShard) Name() string {
+func (q *queue) Name() string {
 	return q.name
 }
 
-func (q RedisQueueShard) Kind() enums.QueueShardKind {
+func (q *queue) Kind() enums.QueueShardKind {
 	return enums.QueueShardKindRedis
 }
 
-func (q RedisQueueShard) Processor() osqueue.QueueProcessor {
-	return q.q
+func (q *queue) Processor() osqueue.QueueProcessor {
+	return q
 }
 
 func NewRedisQueue(options osqueue.QueueOptions, name string, queueClient *QueueClient) osqueue.QueueShard {
 	q := &queue{
+		name:         name,
 		itemIndexer:  QueueItemIndexerFunc,
 		QueueOptions: options,
 	}
 
-	return RedisQueueShard{
-		name:        name,
-		RedisClient: queueClient,
-		q:           q,
-	}
+	return q
 }
 
 type queue struct {
 	osqueue.QueueOptions
+
+	name string
+
+	RedisClient *QueueClient
 
 	// itemIndexer returns indexes for a given queue item.
 	itemIndexer QueueItemIndexer
@@ -236,16 +226,7 @@ func (q *queue) EnqueueItem(ctx context.Context, shard osqueue.QueueShard, i osq
 
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "EnqueueItem"), redis_telemetry.ScopeQueue)
 
-	if shard.Kind() != enums.QueueShardKindRedis {
-		return osqueue.QueueItem{}, fmt.Errorf("unsupported queue shard kind for EnqueueItem: %s", shard.Kind)
-	}
-
-	redisShard, ok := shard.(RedisQueueShard)
-	if !ok {
-		return osqueue.QueueItem{}, fmt.Errorf("expected RedisQueueShard: %s", shard.Kind)
-	}
-
-	kg := redisShard.RedisClient.kg
+	kg := q.RedisClient.kg
 
 	if len(i.ID) == 0 {
 		i.SetID(ctx, ulid.MustNew(ulid.Now(), rnd).String())
@@ -334,7 +315,7 @@ func (q *queue) EnqueueItem(ctx context.Context, shard osqueue.QueueShard, i osq
 		kg.SingletonKey(i.Data.Singleton),
 	}
 	// Append indexes
-	for _, idx := range q.itemIndexer(ctx, i, redisShard.RedisClient.kg) {
+	for _, idx := range q.itemIndexer(ctx, i, q.RedisClient.kg) {
 		if idx != "" {
 			keys = append(keys, idx)
 		}
@@ -378,7 +359,7 @@ func (q *queue) EnqueueItem(ctx context.Context, shard osqueue.QueueShard, i osq
 
 	status, err := scripts["queue/enqueue"].Exec(
 		redis_telemetry.WithScriptName(ctx, "enqueue"),
-		redisShard.RedisClient.Client(),
+		q.RedisClient.Client(),
 		keys,
 		args,
 	).AsInt64()
@@ -406,12 +387,8 @@ func (q *queue) EnqueueItem(ctx context.Context, shard osqueue.QueueShard, i osq
 // dropPartitionPointerIfEmpty atomically drops a pointer queue member if the associated
 // ZSET is empty. This is used to ensure that we don't have pointers to empty ZSETs, in case
 // the cleanup process fails.
-func (q *queue) dropPartitionPointerIfEmpty(ctx context.Context, shard RedisQueueShard, keyIndex, keyPartition, indexMember string) error {
+func (q *queue) dropPartitionPointerIfEmpty(ctx context.Context, keyIndex, keyPartition, indexMember string) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "SetFunctionPaused"), redis_telemetry.ScopeQueue)
-
-	if shard.Kind != string(enums.QueueShardKindRedis) {
-		return nil
-	}
 
 	keys := []string{keyIndex, keyPartition}
 	args, err := StrSlice([]any{
@@ -423,7 +400,7 @@ func (q *queue) dropPartitionPointerIfEmpty(ctx context.Context, shard RedisQueu
 
 	status, err := scripts["queue/dropPartitionPointerIfEmpty"].Exec(
 		redis_telemetry.WithScriptName(ctx, "dropPartitionPointerIfEmpty"),
-		shard.RedisClient.unshardedRc,
+		q.RedisClient.unshardedRc,
 		keys,
 		args,
 	).AsInt64()
@@ -438,20 +415,10 @@ func (q *queue) dropPartitionPointerIfEmpty(ctx context.Context, shard RedisQueu
 	}
 }
 
-func (q *queue) SetFunctionMigrate(ctx context.Context, sourceShard string, fnID uuid.UUID, migrateLockUntil *time.Time) error {
+func (q *queue) SetFunctionMigrate(ctx context.Context, shard osqueue.QueueShard, fnID uuid.UUID, migrateLockUntil *time.Time) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "SetFunctionMigrate"), redis_telemetry.ScopeQueue)
-
-	if q.queueShardClients == nil {
-		return fmt.Errorf("no queue shard clients are available")
-	}
-
-	shard, ok := q.queueShardClients[sourceShard]
-	if !ok {
-		return fmt.Errorf("no queue shard available for '%s'", sourceShard)
-	}
-
-	client := shard.RedisClient.Client()
-	kg := shard.RedisClient.KeyGenerator()
+	client := q.RedisClient.Client()
+	kg := q.RedisClient.KeyGenerator()
 
 	key := kg.QueueMigrationLock(fnID)
 	if migrateLockUntil == nil {
@@ -476,95 +443,22 @@ func (q *queue) SetFunctionMigrate(ctx context.Context, sourceShard string, fnID
 	return nil
 }
 
-func (q *queue) Migrate(ctx context.Context, sourceShardName string, fnID uuid.UUID, limit int64, concurrency int, handler osqueue.QueueMigrationHandler) (int64, error) {
-	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "MigrationPeek"), redis_telemetry.ScopeQueue)
-
-	shard, ok := q.queueShardClients[sourceShardName]
-	if !ok {
-		return -1, fmt.Errorf("no queue shard available for '%s'", sourceShardName)
-	}
-
-	from := time.Time{}
-	// setting it to 5 years ahead should be enough to cover all queue items in the partition
-	until := q.clock.Now().Add(24 * time.Hour * 365 * 5)
-	items, err := q.ItemsByPartition(ctx, shard, fnID.String(), from, until,
-		WithQueueItemIterBatchSize(limit),
-	)
-	if err != nil {
-		// the partition doesn't exist, meaning there are no workloads
-		if errors.Is(err, rueidis.Nil) {
-			return 0, nil
-		}
-
-		return -1, fmt.Errorf("error preparing partition iteration: %w", err)
-	}
-
-	// Should process in order because we don't want out of order execution when moved over
-	var processed int64
-
-	process := func(qi *osqueue.QueueItem) error {
-		if err := handler(ctx, qi); err != nil {
-			return err
-		}
-
-		if err := q.Dequeue(ctx, shard, *qi); err != nil {
-			q.log.ReportError(err, "error dequeueing queue item after migration")
-		}
-
-		atomic.AddInt64(&processed, 1)
-		return nil
-	}
-
-	if concurrency > 0 {
-		eg := errgroup.Group{}
-		eg.SetLimit(concurrency)
-
-		for qi := range items {
-			i := qi
-			eg.Go(func() error {
-				return process(i)
-			})
-		}
-
-		err := eg.Wait()
-		if err != nil {
-			return atomic.LoadInt64(&processed), err
-		}
-
-		return atomic.LoadInt64(&processed), nil
-	}
-
-	for qi := range items {
-		if err := process(qi); err != nil {
-			return processed, err
-		}
-	}
-
-	return atomic.LoadInt64(&processed), nil
-}
-
-func (q *queue) RemoveQueueItem(ctx context.Context, shardName string, partitionKey string, itemID string) error {
-	queueShard, ok := q.queueShardClients[shardName]
-	if !ok {
-		return fmt.Errorf("queue shard not found %q", shardName)
-	}
-	return q.removeQueueItem(ctx, queueShard, partitionKey, itemID)
-}
-
 // removeQueueItem attempts to remove a specific item in the target queue shard
 // and also remove it from the queue item hash as well
-func (q *queue) removeQueueItem(ctx context.Context, shard RedisQueueShard, partitionKey string, itemID string) error {
+func (q *queue) RemoveQueueItem(ctx context.Context, partitionKey string, itemID string) error {
+	l := logger.StdlibLogger(ctx)
+
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "removeQueueItem"), redis_telemetry.ScopeQueue)
 
 	keys := []string{
 		partitionKey,
-		shard.RedisClient.kg.QueueItem(),
+		q.RedisClient.kg.QueueItem(),
 	}
 	args := []string{itemID}
 
 	code, err := scripts["queue/removeItem"].Exec(
 		ctx,
-		shard.RedisClient.Client(),
+		q.RedisClient.Client(),
 		keys,
 		args,
 	).AsInt64()
@@ -574,7 +468,7 @@ func (q *queue) removeQueueItem(ctx context.Context, shard RedisQueueShard, part
 
 	switch code {
 	case 0:
-		q.log.Debug("removed queue item", "item_id", itemID)
+		l.Debug("removed queue item", "item_id", itemID)
 
 		return nil
 	default:
@@ -582,19 +476,14 @@ func (q *queue) removeQueueItem(ctx context.Context, shard RedisQueueShard, part
 	}
 }
 
-func (q *queue) LoadQueueItem(ctx context.Context, shardName string, itemID string) (*osqueue.QueueItem, error) {
-	queueShard, ok := q.queueShardClients[shardName]
-	if !ok {
-		return nil, fmt.Errorf("queue shard not found %q", shardName)
-	}
-
-	kg := queueShard.RedisClient.KeyGenerator()
-	client := queueShard.RedisClient.Client()
+func (q *queue) LoadQueueItem(ctx context.Context, itemID string) (*osqueue.QueueItem, error) {
+	kg := q.RedisClient.KeyGenerator()
+	client := q.RedisClient.Client()
 
 	queueItemStr, err := client.Do(ctx, client.B().Hget().Key(kg.QueueItem()).Field(itemID).Build()).ToString()
 	if err != nil {
 		if rueidis.IsRedisNil(err) {
-			return nil, ErrQueueItemNotFound
+			return nil, osqueue.ErrQueueItemNotFound
 		}
 
 		return nil, fmt.Errorf("could not load queue item: %w", err)
@@ -614,12 +503,8 @@ func (q *queue) LoadQueueItem(ctx context.Context, shardName string, itemID stri
 //
 // If limit is -1, this will return the first unleased item - representing the next available item in the
 // queue.
-func (q *queue) Peek(ctx context.Context, partition *QueuePartition, until time.Time, limit int64) ([]*osqueue.QueueItem, error) {
+func (q *queue) Peek(ctx context.Context, partition *osqueue.QueuePartition, until time.Time, limit int64) ([]*osqueue.QueueItem, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Peek"), redis_telemetry.ScopeQueue)
-
-	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
-		return nil, fmt.Errorf("unsupported queue shard kind for Peek: %s", q.primaryQueueShard.Kind)
-	}
 
 	if partition == nil {
 		return nil, fmt.Errorf("expected partition to be set")
@@ -628,10 +513,10 @@ func (q *queue) Peek(ctx context.Context, partition *QueuePartition, until time.
 	// Check whether limit is -1, peeking next available time
 	isPeekNext := limit == -1
 
-	if limit > AbsoluteQueuePeekMax {
+	if limit > osqueue.AbsoluteQueuePeekMax {
 		// Lua's max unpack() length is 8000; don't allow users to peek more than
 		// 1k at a time regardless.
-		limit = AbsoluteQueuePeekMax
+		limit = osqueue.AbsoluteQueuePeekMax
 	}
 	if limit > q.peekMax {
 		limit = q.peekMax

@@ -2,6 +2,7 @@ package queue
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -34,7 +35,7 @@ func NewQueueProcessor(
 ) (Queue, error) {
 	o := &QueueOptions{
 		PrimaryQueueShard: primaryQueueShard,
-		queueShardClients: map[string]QueueShard{primaryQueueShard.Name(): primaryQueueShard},
+		QueueShardClients: map[string]QueueShard{primaryQueueShard.Name(): primaryQueueShard},
 		ppf: func(_ context.Context, _ QueuePartition) uint {
 			return PriorityDefault
 		},
@@ -131,7 +132,7 @@ func NewQueueProcessor(
 	qp := &queueProcessor{
 		name: name,
 
-		options: o,
+		QueueOptions: o,
 
 		wg:                       &sync.WaitGroup{},
 		seqLeaseLock:             &sync.RWMutex{},
@@ -152,7 +153,7 @@ func NewQueueProcessor(
 }
 
 type queueProcessor struct {
-	options *QueueOptions
+	*QueueOptions
 
 	// name is the identifiable name for this worker, for logging.
 	name string
@@ -236,7 +237,12 @@ func (q *queueProcessor) RunningCount(ctx context.Context, workflowID uuid.UUID)
 
 // SetFunctionMigrate implements Queue.
 func (q *queueProcessor) SetFunctionMigrate(ctx context.Context, sourceShard string, fnID uuid.UUID, migrateLockUntil *time.Time) error {
-	panic("unimplemented")
+	shard, ok := q.QueueShardClients[sourceShard]
+	if !ok {
+		return fmt.Errorf("could not find shard %q", sourceShard)
+	}
+
+	return shard.Processor().SetFunctionMigrate(ctx, sourceShard, fnID uuid.UUID, migrateLockUntil *time.Time)
 }
 
 // StatusCount implements Queue.
