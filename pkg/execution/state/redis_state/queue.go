@@ -21,6 +21,7 @@ import (
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 	"github.com/inngest/inngest/pkg/util"
@@ -128,8 +129,8 @@ func (q RedisQueueShard) Processor() osqueue.QueueProcessor {
 
 func NewRedisQueue(options osqueue.QueueOptions, name string, queueClient *QueueClient) osqueue.QueueShard {
 	q := &queue{
-		itemIndexer: QueueItemIndexerFunc,
-		options:     options,
+		itemIndexer:  QueueItemIndexerFunc,
+		QueueOptions: options,
 	}
 
 	return RedisQueueShard{
@@ -140,7 +141,7 @@ func NewRedisQueue(options osqueue.QueueOptions, name string, queueClient *Queue
 }
 
 type queue struct {
-	options osqueue.QueueOptions
+	osqueue.QueueOptions
 
 	// itemIndexer returns indexes for a given queue item.
 	itemIndexer QueueItemIndexer
@@ -259,6 +260,8 @@ func shadowPartitionFunctionInProgressLeasesKey(sp osqueue.QueueShadowPartition,
 }
 
 func (q *queue) EnqueueItem(ctx context.Context, shard osqueue.QueueShard, i osqueue.QueueItem, at time.Time, opts osqueue.EnqueueOpts) (osqueue.QueueItem, error) {
+	l := logger.StdlibLogger(ctx)
+
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "EnqueueItem"), redis_telemetry.ScopeQueue)
 
 	if shard.Kind() != enums.QueueShardKindRedis {
@@ -280,7 +283,7 @@ func (q *queue) EnqueueItem(ctx context.Context, shard osqueue.QueueShard, i osq
 		}
 	}
 
-	now := q.options.clock.Now()
+	now := q.Clock.Now()
 
 	// XXX: If the length of ID >= max, error.
 	if i.WallTimeMS == 0 {
@@ -306,23 +309,23 @@ func (q *queue) EnqueueItem(ctx context.Context, shard osqueue.QueueShard, i osq
 		// We don't want to enqueue partitions (pointers to fns) before now.
 		// Doing so allows users to stay at the front of the queue for
 		// leases.
-		partitionTime = q.clock.Now()
+		partitionTime = q.Clock.Now()
 	}
 
 	i.EnqueuedAt = now.UnixMilli()
 
-	defaultPartition := q.ItemPartition(ctx, shard, i)
+	defaultPartition := osqueue.ItemPartition(ctx, shard, i)
 
 	isSystemPartition := defaultPartition.IsSystem()
 
 	if defaultPartition.AccountID == uuid.Nil && !isSystemPartition {
-		q.log.Warn("attempting to enqueue item to non-system partition without account ID", "item", i)
+		l.Warn("attempting to enqueue item to non-system partition without account ID", "item", i)
 	}
 
 	enqueueToBacklogs := q.itemEnableKeyQueues(ctx, i)
 
-	var backlog QueueBacklog
-	var shadowPartition QueueShadowPartition
+	var backlog osqueue.QueueBacklog
+	var shadowPartition osqueue.QueueShadowPartition
 	if enqueueToBacklogs {
 		backlog = q.ItemBacklog(ctx, i)
 		shadowPartition = q.ItemShadowPartition(ctx, i)
