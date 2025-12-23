@@ -151,6 +151,7 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 				}),
 				meta.SpanNameStep,
 				&tracing.CreateSpanOptions{
+					Debug:      &tracing.SpanDebugData{Location: "checkpoint.SyncStep"},
 					Parent:     tracing.RunSpanRefFromMetadata(input.Metadata),
 					StartTime:  op.Timing.Start(),
 					EndTime:    op.Timing.End(),
@@ -185,6 +186,7 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 				}),
 				meta.SpanNameStep,
 				&tracing.CreateSpanOptions{
+					Debug:      &tracing.SpanDebugData{Location: "checkpoint.SyncErr"},
 					Parent:     tracing.RunSpanRefFromMetadata(input.Metadata),
 					StartTime:  op.Timing.Start(),
 					EndTime:    op.Timing.End(),
@@ -334,6 +336,7 @@ func (c checkpointer) checkpointAsyncSteps(ctx context.Context, input AsyncCheck
 				}),
 				meta.SpanNameStep,
 				&tracing.CreateSpanOptions{
+					Debug:      &tracing.SpanDebugData{Location: "checkpoint.AsyncStep"},
 					Seed:       []byte(op.ID + op.Timing.String()),
 					Parent:     tracing.RunSpanRefFromMetadata(&md),
 					StartTime:  op.Timing.Start(),
