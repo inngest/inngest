@@ -33,35 +33,7 @@ import (
 
 const (
 	pkgName = "redis_state.state.execution.inngest"
-
-	// dbReadTimeout is the maximum time to wait for database/config getter operations
-	// like checking paused status or fetching partition constraints.
-	dbReadTimeout = 30 * time.Second
-
-	defaultNumWorkers                  = 100
-	defaultNumShadowWorkers            = 100
-	defaultBacklogNormalizationWorkers = 10
-	defaultBacklogNormalizeConcurrency = int64(20)
-
-	defaultPollTick                 = 10 * time.Millisecond
-	defaultShadowPollTick           = 100 * time.Millisecond
-	defaultBacklogNormalizePollTick = 250 * time.Millisecond
-	defaultActiveCheckTick          = 10 * time.Second
-
-	defaultIdempotencyTTL = 12 * time.Hour
-	defaultConcurrency    = 1000 // TODO: add function to override.
-
-	DefaultInstrumentInterval = 10 * time.Second
-
-	NoConcurrencyLimit = -1
 )
-
-var rnd *util.FrandRNG
-
-func init() {
-	// For weighted shuffles generate a new rand.
-	rnd = util.NewFrandRNG()
-}
 
 type QueueManager interface {
 	osqueue.JobQueueReader
@@ -362,7 +334,7 @@ func (q *queue) EnqueueItem(ctx context.Context, shard osqueue.QueueShard, i osq
 		kg.SingletonKey(i.Data.Singleton),
 	}
 	// Append indexes
-	for _, idx := range q.itemIndexer(ctx, i, shard.RedisClient.kg) {
+	for _, idx := range q.itemIndexer(ctx, i, redisShard.RedisClient.kg) {
 		if idx != "" {
 			keys = append(keys, idx)
 		}
@@ -395,7 +367,7 @@ func (q *queue) EnqueueItem(ctx context.Context, shard osqueue.QueueShard, i osq
 		return i, err
 	}
 
-	q.log.Trace("enqueue item",
+	l.Trace("enqueue item",
 		"id", i.ID,
 		"kind", i.Data.Kind,
 		"time", at.Format(time.StampMilli),
@@ -406,7 +378,7 @@ func (q *queue) EnqueueItem(ctx context.Context, shard osqueue.QueueShard, i osq
 
 	status, err := scripts["queue/enqueue"].Exec(
 		redis_telemetry.WithScriptName(ctx, "enqueue"),
-		shard.RedisClient.Client(),
+		redisShard.RedisClient.Client(),
 		keys,
 		args,
 	).AsInt64()
@@ -416,16 +388,16 @@ func (q *queue) EnqueueItem(ctx context.Context, shard osqueue.QueueShard, i osq
 	switch status {
 	case 0:
 		// Hint to executor that we should refill if the item has no delay
-		refillSoon := i.ExpectedDelay() < ShadowPartitionLookahead
+		refillSoon := i.ExpectedDelay() < osqueue.ShadowPartitionLookahead
 		if enqueueToBacklogs && refillSoon {
 			q.addShadowContinue(ctx, &shadowPartition, 0)
 		}
 
 		return i, nil
 	case 1:
-		return i, ErrQueueItemExists
+		return i, osqueue.ErrQueueItemExists
 	case 2:
-		return i, ErrQueueItemSingletonExists
+		return i, osqueue.ErrQueueItemSingletonExists
 	default:
 		return i, fmt.Errorf("unknown response enqueueing item: %v (%T)", status, status)
 	}
