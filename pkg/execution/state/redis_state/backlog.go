@@ -20,7 +20,7 @@ import (
 )
 
 // readyQueueKey returns the ZSET key to the ready queue
-func (sp QueueShadowPartition) readyQueueKey(kg QueueKeyGenerator) string {
+func shadowPartitionReadyQueueKey(sp osqueue.QueueShadowPartition, kg QueueKeyGenerator) string {
 	return kg.PartitionQueueSet(enums.PartitionTypeDefault, sp.PartitionID, "")
 }
 
@@ -32,18 +32,6 @@ func (sp QueueShadowPartition) inProgressKey(kg QueueKeyGenerator) string {
 // activeKey returns the key storing the active set for the shadow partition
 func (sp QueueShadowPartition) activeKey(kg QueueKeyGenerator) string {
 	return kg.ActiveSet("p", sp.PartitionID)
-}
-
-func (sp QueueShadowPartition) keyQueuesEnabled(ctx context.Context, q *queue) bool {
-	if sp.SystemQueueName != nil {
-		return false
-	}
-
-	if sp.AccountID == nil || sp.FunctionID == nil || q.allowKeyQueues == nil {
-		return false
-	}
-
-	return q.allowKeyQueues(ctx, *sp.AccountID, *sp.FunctionID)
 }
 
 func (q PartitionConstraintConfig) CustomConcurrencyKey(kg QueueKeyGenerator, b *QueueBacklog, n int) (string, int) {

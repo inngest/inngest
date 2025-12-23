@@ -44,6 +44,18 @@ type QueueShadowPartition struct {
 	SystemQueueName *string    `json:"queueName,omitempty"`
 }
 
+func (sp QueueShadowPartition) KeyQueuesEnabled(ctx context.Context, q *QueueOptions) bool {
+	if sp.SystemQueueName != nil {
+		return false
+	}
+
+	if sp.AccountID == nil || sp.FunctionID == nil || q.AllowKeyQueues == nil {
+		return false
+	}
+
+	return q.AllowKeyQueues(ctx, *sp.AccountID, *sp.FunctionID)
+}
+
 func (sp QueueShadowPartition) Identifier() PartitionIdentifier {
 	fnID := uuid.Nil
 	if sp.FunctionID != nil {
