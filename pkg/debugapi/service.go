@@ -61,6 +61,8 @@ type debugAPI struct {
 	log       logger.Logger
 	findShard queue.ShardSelector
 
+	shards map[string]queue.QueueShard
+
 	db     cqrs.Manager
 	queue  queue.QueueManager
 	state  state.Manager
