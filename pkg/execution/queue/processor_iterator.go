@@ -153,14 +153,13 @@ func (p *processor) process(ctx context.Context, item *QueueItem) error {
 		LeaseConstraints(constraints),
 	}
 
-	constraintRes, err := p.queue.itemLeaseConstraintCheck(
+	constraintRes, err := p.queue.PrimaryQueueShard.ItemLeaseConstraintCheck(
 		ctx,
 		&partition,
 		&backlog,
 		constraints,
 		item,
 		p.staticTime,
-		p.queue.PrimaryQueueShard.RedisClient.KeyGenerator(),
 	)
 	if err != nil {
 		p.queue.sem.Release(1)
@@ -170,13 +169,13 @@ func (p *processor) process(ctx context.Context, item *QueueItem) error {
 	}
 
 	constraint_check_source := "lease"
-	if constraintRes.skipConstraintChecks {
+	if constraintRes.SkipConstraintChecks {
 		constraint_check_source = "constraint-api"
 		leaseOptions = append(leaseOptions, LeaseOptionDisableConstraintChecks(true))
 	}
 
 	var leaseID *ulid.ULID
-	switch constraintRes.limitingConstraint {
+	switch constraintRes.LimitingConstraint {
 	// If no constraints were hit (or we didn't invoke the Constraint API)
 	case enums.QueueConstraintNotLimited:
 
@@ -189,7 +188,7 @@ func (p *processor) process(ctx context.Context, item *QueueItem) error {
 		// This is safe:  only one process runs scan(), and we guard the total number of
 		// available workers with the above semaphore.
 		leaseID, err = Duration(ctx, p.queue.PrimaryQueueShard.Name(), "lease", p.queue.Clock.Now(), func(ctx context.Context) (*ulid.ULID, error) {
-			return p.queue.PrimaryQueueShard.Processor().Lease(
+			return p.queue.PrimaryQueueShard.Lease(
 				ctx,
 				*item,
 				QueueLeaseDuration,
@@ -218,7 +217,7 @@ func (p *processor) process(ctx context.Context, item *QueueItem) error {
 	case enums.QueueConstraintCustomConcurrencyKey2:
 		err = NewKeyError(ErrConcurrencyLimitCustomKey, backlog.CustomConcurrencyKeyID(2))
 	default:
-		l.ReportError(errors.New("unhandled queue constraint type"), fmt.Sprintf("constraint type: %s", constraintRes.limitingConstraint))
+		l.ReportError(errors.New("unhandled queue constraint type"), fmt.Sprintf("constraint type: %s", constraintRes.LimitingConstraint))
 		// Limited but the constraint is unknown?
 	}
 
@@ -292,7 +291,7 @@ func (p *processor) process(ctx context.Context, item *QueueItem) error {
 		})
 
 		if p.queue.ItemEnableKeyQueues(ctx, *item) {
-			err := p.queue.PrimaryQueueShard.Processor().Requeue(ctx, *item, time.UnixMilli(item.AtMS))
+			err := p.queue.PrimaryQueueShard.Requeue(ctx, *item, time.UnixMilli(item.AtMS))
 			if err != nil && !errors.Is(err, ErrQueueItemNotFound) {
 				l.ReportError(err, "could not requeue item to backlog after hitting throttle limit",
 					logger.WithErrorReportTags(errTags),
@@ -351,7 +350,7 @@ func (p *processor) process(ctx context.Context, item *QueueItem) error {
 		})
 
 		if p.queue.ItemEnableKeyQueues(ctx, *item) {
-			err := p.queue.PrimaryQueueShard.Processor().Requeue(ctx, *item, time.UnixMilli(item.AtMS))
+			err := p.queue.PrimaryQueueShard.Requeue(ctx, *item, time.UnixMilli(item.AtMS))
 			if err != nil && !errors.Is(err, ErrQueueItemNotFound) {
 				l.ReportError(err, "could not requeue item to backlog after hitting concurrency limit",
 					logger.WithErrorReportTags(errTags),
@@ -395,7 +394,7 @@ func (p *processor) process(ctx context.Context, item *QueueItem) error {
 		})
 
 		if p.queue.ItemEnableKeyQueues(ctx, *item) {
-			err := p.queue.PrimaryQueueShard.Processor().Requeue(ctx, *item, time.UnixMilli(item.AtMS))
+			err := p.queue.PrimaryQueueShard.Requeue(ctx, *item, time.UnixMilli(item.AtMS))
 			if err != nil && !errors.Is(err, ErrQueueItemNotFound) {
 				l.ReportError(err, "could not requeue item to backlog after hitting custom concurrency limit",
 					logger.WithErrorReportTags(errTags),
@@ -457,11 +456,11 @@ func (p *processor) process(ctx context.Context, item *QueueItem) error {
 		I:    *item,
 		PCtr: p.partitionContinueCtr,
 
-		capacityLease: constraintRes.capacityLease,
+		capacityLease: constraintRes.CapacityLease,
 		// Disable constraint updates in case we skipped constraint checks.
 		// This should always be linked, as we want consistent behavior while
 		// processing a queue item.
-		disableConstraintUpdates: constraintRes.skipConstraintChecks,
+		disableConstraintUpdates: constraintRes.SkipConstraintChecks,
 	}
 
 	return nil

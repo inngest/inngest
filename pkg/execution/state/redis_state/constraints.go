@@ -15,7 +15,7 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
-func (q *queue) backlogRefillConstraintCheck(
+func (q *queue) BacklogRefillConstraintCheck(
 	ctx context.Context,
 	shadowPart *osqueue.QueueShadowPartition,
 	backlog *osqueue.QueueBacklog,
@@ -142,16 +142,17 @@ func (q *queue) backlogRefillConstraintCheck(
 //
 // In the case of using the Constraint API, the item may also receive a capacity lease to be
 // extended for the duration of processing.
-func (q *queue) itemLeaseConstraintCheck(
+func (q *queue) ItemLeaseConstraintCheck(
 	ctx context.Context,
 	shadowPart *osqueue.QueueShadowPartition,
 	backlog *osqueue.QueueBacklog,
 	constraints osqueue.PartitionConstraintConfig,
 	item *osqueue.QueueItem,
 	now time.Time,
-	kg QueueKeyGenerator,
 ) (osqueue.ItemLeaseConstraintCheckResult, error) {
 	l := logger.StdlibLogger(ctx)
+
+	kg := q.RedisClient.kg
 
 	// Disable lease checks for system queues
 	// NOTE: This also disables constraint updates during processing, for consistency.
