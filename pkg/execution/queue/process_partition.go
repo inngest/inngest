@@ -139,10 +139,10 @@ func (q *queueProcessor) processPartition(ctx context.Context, p *QueuePartition
 		go metrics.HistogramQueuePeekEWMA(ctx, peek, metrics.HistogramOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name()}})
 
 		if randomOffset {
-			return q.PeekRandom(peekCtx, p, fetch, peek)
+			return q.primaryQueueShard.PeekRandom(peekCtx, p, fetch, peek)
 		}
 
-		return q.Peek(peekCtx, p, fetch, peek)
+		return q.primaryQueueShard.Peek(peekCtx, p, fetch, peek)
 	})
 	if err != nil {
 		return err

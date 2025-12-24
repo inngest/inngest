@@ -8,6 +8,7 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/logger"
@@ -112,10 +113,8 @@ func (q *queueProcessor) iterateNormalizationPartition(ctx context.Context, unti
 	// Scan and process account shadow partitions in parallel
 	eg := errgroup.Group{}
 	for _, account := range peekedAccounts {
-		partitionKey := q.primaryQueueShard.RedisClient.kg.AccountNormalizeSet(account)
-
 		eg.Go(func() error {
-			return q.iterateNormalizationShadowPartition(ctx, partitionKey, accountShadowPartitionPeekMax, until, bc)
+			return q.iterateNormalizationShadowPartition(ctx, &account, accountShadowPartitionPeekMax, until, bc)
 		})
 	}
 
@@ -127,10 +126,10 @@ func (q *queueProcessor) iterateNormalizationPartition(ctx context.Context, unti
 	return nil
 }
 
-func (q *queueProcessor) iterateNormalizationShadowPartition(ctx context.Context, shadowPartitionIndexKey string, peekLimit int64, until time.Time, bc chan normalizeWorkerChanMsg) error {
+func (q *queueProcessor) iterateNormalizationShadowPartition(ctx context.Context, accountID *uuid.UUID, peekLimit int64, until time.Time, bc chan normalizeWorkerChanMsg) error {
 	// Find partitions in account or globally with backlogs to normalize
 	sequential := false
-	shadowPartitions, err := q.primaryQueueShard.PeekShadowPartitions(ctx, shadowPartitionIndexKey, sequential, peekLimit, until)
+	shadowPartitions, err := q.primaryQueueShard.PeekShadowPartitions(ctx, accountID, sequential, peekLimit, until)
 	if err != nil {
 		return fmt.Errorf("could not peek shadow partitions to normalize: %w", err)
 	}
@@ -227,7 +226,6 @@ func (q *queueProcessor) normalizeBacklog(ctx context.Context, backlog *QueueBac
 
 	l.Debug("starting backlog normalization")
 
-	shard := q.primaryQueueShard
 	var total int64
 	for {
 		// If context is canceled, stop normalizing
