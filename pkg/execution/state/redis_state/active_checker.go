@@ -19,21 +19,6 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-const (
-	// ActiveCheckBacklogConcurrency determines how many accounts are peeked and processed in parallel
-	ActiveCheckAccountConcurrency = 30
-
-	// ActiveCheckBacklogConcurrency determines how many backlogs are peeked and processed in parallel
-	ActiveCheckBacklogConcurrency = 30
-
-	// ActiveCheckScanBatchSize determines how many queue items are scanned in each loop.
-	// More queue items will slow down the active checker but yield faster iteration over the set. Tune carefully.
-	ActiveCheckScanBatchSize = 25
-
-	BacklogActiveCheckCooldownDuration = 1 * time.Minute
-	AccountActiveCheckCooldownDuration = 1 * time.Minute
-)
-
 func (q *queue) ActiveCheck(ctx context.Context) (int, error) {
 	l := logger.StdlibLogger(ctx).With("scope", "active-check")
 
@@ -75,7 +60,7 @@ func (q *queue) ActiveCheck(ctx context.Context) (int, error) {
 					kg.AccountActiveCheckSet(),
 					kg.AccountActiveCheckCooldown(accountID.String()),
 					accountID.String(),
-					AccountActiveCheckCooldownDuration,
+					osqueue.AccountActiveCheckCooldownDuration,
 				)
 				if err != nil {
 					l.Error("could not remove backlog from active check set", "err", err)
@@ -123,7 +108,7 @@ func (q *queue) ActiveCheck(ctx context.Context) (int, error) {
 					kg.BacklogActiveCheckSet(),
 					kg.BacklogActiveCheckCooldown(backlog.BacklogID),
 					backlog.BacklogID,
-					BacklogActiveCheckCooldownDuration,
+					osqueue.BacklogActiveCheckCooldownDuration,
 				)
 				if cerr != nil {
 					l.Error("could not remove backlog from active check set", "err", cerr)
