@@ -15,6 +15,12 @@ type DequeueOptions struct {
 	DisableConstraintUpdates bool
 }
 
+func DequeueOptionDisableConstraintUpdates(disableUpdates bool) DequeueOptionFn {
+	return func(o *DequeueOptions) {
+		o.DisableConstraintUpdates = disableUpdates
+	}
+}
+
 type RequeueOptions struct {
 	DisableConstraintUpdates bool
 }
