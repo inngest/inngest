@@ -142,6 +142,7 @@ type QueueProcessor interface {
 
 	Scavenge(ctx context.Context, limit int) (int, error)
 	ActiveCheck(ctx context.Context) (int, error)
+	Instrument(ctx context.Context) error
 
 	ItemsByPartition(ctx context.Context, partitionID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueItem], error)
 
