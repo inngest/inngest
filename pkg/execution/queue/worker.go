@@ -2,6 +2,7 @@ package queue
 
 import (
 	"context"
+	"errors"
 
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 )
@@ -31,6 +32,43 @@ func (q *queueProcessor) worker(ctx context.Context, f RunFunc) {
 			// the item into the queue.  Here, the worker can continue as
 			// usual to process the next item.
 			q.log.Error("error processing queue item", "error", err, "item", i)
+		}
+	}
+}
+
+type shadowPartitionChanMsg struct {
+	sp                *QueueShadowPartition
+	continuationCount uint
+}
+
+// shadowWorker runs a blocking process that listens to item being pushed into the
+// shadow queue partition channel. This allows us to process an individual shadow partition.
+func (q *queueProcessor) shadowWorker(ctx context.Context, qspc chan shadowPartitionChanMsg) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+
+		case msg := <-qspc:
+			_, err := DurationWithTags(
+				ctx,
+				q.primaryQueueShard.Name(),
+				"shadow_partition_process_duration",
+				q.Clock.Now(),
+				func(ctx context.Context) (any, error) {
+					err := q.processShadowPartition(ctx, msg.sp, msg.continuationCount)
+					if errors.Is(err, context.Canceled) {
+						return nil, nil
+					}
+					return nil, err
+				},
+				map[string]any{
+					// 	"partition_id": msg.sp.PartitionID,
+				},
+			)
+			if err != nil {
+				q.log.Error("could not scan shadow partition", "error", err, "shadow_part", msg.sp, "continuation_count", msg.continuationCount)
+			}
 		}
 	}
 }

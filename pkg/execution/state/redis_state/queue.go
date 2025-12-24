@@ -1164,13 +1164,13 @@ func (q *queue) ExtendLease(ctx context.Context, i osqueue.QueueItem, leaseID ul
 	}
 }
 
-func (q *queue) peekGlobalNormalizeAccounts(ctx context.Context, until time.Time, limit int64) ([]uuid.UUID, error) {
+func (q *queue) PeekGlobalNormalizeAccounts(ctx context.Context, until time.Time, limit int64) ([]uuid.UUID, error) {
 	rc := q.RedisClient
 
 	p := peeker[osqueue.QueueBacklog]{
 		q:                      q,
 		opName:                 "peekGlobalNormalizeAccounts",
-		max:                    NormalizeAccountPeekMax,
+		max:                    osqueue.NormalizeAccountPeekMax,
 		isMillisecondPrecision: true,
 	}
 
