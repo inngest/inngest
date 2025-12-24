@@ -9,7 +9,7 @@ import (
 
 func (q *queueProcessor) runScavenger(ctx context.Context) {
 	// Attempt to claim the lease immediately.
-	leaseID, err := q.PrimaryQueueShard.Processor().ConfigLease(ctx, "scavenger", ConfigLeaseDuration, q.scavengerLease())
+	leaseID, err := q.PrimaryQueueShard.ConfigLease(ctx, "scavenger", ConfigLeaseDuration, q.scavengerLease())
 	if err != ErrConfigAlreadyLeased && err != nil {
 		q.quit <- err
 		return
@@ -31,7 +31,7 @@ func (q *queueProcessor) runScavenger(ctx context.Context) {
 		case <-scavenge.Chan():
 			// Scavenge the items
 			if q.isScavenger() {
-				count, err := q.PrimaryQueueShard.Processor().Scavenge(ctx, ScavengePeekSize)
+				count, err := q.PrimaryQueueShard.Scavenge(ctx, ScavengePeekSize)
 				if err != nil {
 					q.log.Error("error scavenging", "error", err)
 				}
@@ -41,7 +41,7 @@ func (q *queueProcessor) runScavenger(ctx context.Context) {
 			}
 		case <-tick.Chan():
 			// Attempt to re-lease the lock.
-			leaseID, err := q.PrimaryQueueShard.Processor().ConfigLease(ctx, "scavenger", ConfigLeaseDuration, q.scavengerLease())
+			leaseID, err := q.PrimaryQueueShard.ConfigLease(ctx, "scavenger", ConfigLeaseDuration, q.scavengerLease())
 			if err == ErrConfigAlreadyLeased {
 				// This is expected; every time there is > 1 runner listening to the
 				// queue there will be contention.
