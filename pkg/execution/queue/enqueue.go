@@ -94,7 +94,7 @@ func (q *queueProcessor) Enqueue(ctx context.Context, item Item, at time.Time, o
 
 	switch shard.Kind() {
 	case enums.QueueShardKindRedis:
-		_, err := shard.Processor().EnqueueItem(ctx, qi, next, opts)
+		_, err := shard.EnqueueItem(ctx, qi, next, opts)
 		if err != nil {
 			return err
 		}
