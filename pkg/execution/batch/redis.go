@@ -54,7 +54,7 @@ func WithLogger(l logger.Logger) RedisBatchManagerOpt {
 	}
 }
 
-func NewRedisBatchManager(b *redis_state.BatchClient, q redis_state.QueueManager, opts ...RedisBatchManagerOpt) BatchManager {
+func NewRedisBatchManager(b *redis_state.BatchClient, q queue.QueueManager, opts ...RedisBatchManagerOpt) BatchManager {
 	manager := redisBatchManager{
 		b:                                  b,
 		q:                                  q,
@@ -73,7 +73,7 @@ func NewRedisBatchManager(b *redis_state.BatchClient, q redis_state.QueueManager
 
 type redisBatchManager struct {
 	b *redis_state.BatchClient
-	q redis_state.QueueManager
+	q queue.QueueManager
 
 	// sizeLimit is the size limit that a batch can have
 	sizeLimit int
@@ -277,7 +277,7 @@ func (b redisBatchManager) ScheduleExecution(ctx context.Context, opts ScheduleB
 		Payload:     opts.ScheduleBatchPayload,
 		QueueName:   &queueName,
 	}, opts.At, queue.EnqueueOpts{})
-	if err == redis_state.ErrQueueItemExists {
+	if err == queue.ErrQueueItemExists {
 		b.log.Debug("queue item already exists for scheduled batch", "job_id", jobID)
 		return nil
 	}
