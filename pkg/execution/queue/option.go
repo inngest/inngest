@@ -127,7 +127,7 @@ func WithPeekConcurrencyMultiplier(m int64) QueueOpt {
 
 func WithPeekEWMALength(l int) QueueOpt {
 	return func(q *QueueOptions) {
-		q.peekEWMALen = l
+		q.PeekEWMALen = l
 	}
 }
 
@@ -411,8 +411,8 @@ type QueueOptions struct {
 	// peekCurrMultiplier is a multiplier used for calculating the dynamic peek size
 	// based on the EWMA values
 	peekCurrMultiplier int64
-	// peekEWMALen is the size of the list to hold the most recent values
-	peekEWMALen int
+	// PeekEWMALen is the size of the list to hold the most recent values
+	PeekEWMALen int
 	// queueKindMapping stores a map of job kind => queue names
 	queueKindMapping        map[string]string
 	disableFifoForFunctions map[string]struct{}
