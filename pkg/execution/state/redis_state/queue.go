@@ -227,7 +227,7 @@ func (q *queue) EnqueueItem(ctx context.Context, i osqueue.QueueItem, at time.Ti
 		l.Warn("attempting to enqueue item to non-system partition without account ID", "item", i)
 	}
 
-	enqueueToBacklogs := q.ItemEnableKeyQueues(ctx, i)
+	enqueueToBacklogs := q.QueueOptions.ItemEnableKeyQueues(ctx, i)
 
 	var backlog osqueue.QueueBacklog
 	var shadowPartition osqueue.QueueShadowPartition
@@ -320,12 +320,6 @@ func (q *queue) EnqueueItem(ctx context.Context, i osqueue.QueueItem, at time.Ti
 	}
 	switch status {
 	case 0:
-		// Hint to executor that we should refill if the item has no delay
-		refillSoon := i.ExpectedDelay() < osqueue.ShadowPartitionLookahead
-		if enqueueToBacklogs && refillSoon {
-			q.addShadowContinue(ctx, &shadowPartition, 0)
-		}
-
 		return i, nil
 	case 1:
 		return i, osqueue.ErrQueueItemExists
