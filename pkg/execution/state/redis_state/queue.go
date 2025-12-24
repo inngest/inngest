@@ -53,6 +53,7 @@ func NewRedisQueue(options osqueue.QueueOptions, name string, queueClient *Queue
 		name:         name,
 		itemIndexer:  QueueItemIndexerFunc,
 		QueueOptions: options,
+		RedisClient:  queueClient,
 	}
 
 	return q
