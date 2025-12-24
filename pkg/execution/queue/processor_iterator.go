@@ -107,11 +107,11 @@ func (p *processor) iterate(ctx context.Context) error {
 		err = eg.Wait()
 	}
 
-	if errors.Is(err, errProcessStopIterator) {
+	if errors.Is(err, ErrProcessStopIterator) {
 		// This is safe;  it's stopping safely but isn't an error.
 		return nil
 	}
-	if errors.Is(err, errProcessNoCapacity) {
+	if errors.Is(err, ErrProcessNoCapacity) {
 		// This is safe;  it's stopping safely but isn't an error.
 		return nil
 	}
@@ -138,7 +138,7 @@ func (p *processor) process(ctx context.Context, item *QueueItem) error {
 	if !p.queue.sem.TryAcquire(1) {
 		metrics.IncrQueuePartitionProcessNoCapacityCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": p.queue.primaryQueueShard.Name()}})
 		// Break the entire loop to prevent out of order work.
-		return errProcessNoCapacity
+		return ErrProcessNoCapacity
 	}
 
 	metrics.WorkerQueueCapacityCounter(ctx, 1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": p.queue.primaryQueueShard.Name()}})
@@ -368,7 +368,7 @@ func (p *processor) process(ctx context.Context, item *QueueItem) error {
 			})
 		}
 
-		return fmt.Errorf("concurrency hit: %w", errProcessStopIterator)
+		return fmt.Errorf("concurrency hit: %w", ErrProcessStopIterator)
 	case ErrConcurrencyLimitCustomKey:
 		p.ctrConcurrency++
 

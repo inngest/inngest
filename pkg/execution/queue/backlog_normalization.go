@@ -153,7 +153,7 @@ func (q *queueProcessor) iterateNormalizationShadowPartition(ctx context.Context
 				return nil, err
 			})
 			if err != nil {
-				if errors.Is(err, errBacklogAlreadyLeasedForNormalization) {
+				if errors.Is(err, ErrBacklogAlreadyLeasedForNormalization) {
 					continue
 				}
 
@@ -213,7 +213,7 @@ func (q *queueProcessor) normalizeBacklog(ctx context.Context, backlog *QueueBac
 				if err := q.extendBacklogNormalizationLease(ctx, q.Clock.Now(), backlog); err != nil {
 					switch err {
 					// can't extend since it's already expired
-					case errBacklogNormalizationLeaseExpired:
+					case ErrBacklogNormalizationLeaseExpired:
 						l.Debug("normalization lease expired")
 						cancelNormalization()
 						return
