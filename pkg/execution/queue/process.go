@@ -361,14 +361,14 @@ func (q *queueProcessor) process(
 			return err
 		}
 
-		if _, ok := err.(osqueue.QuitError); ok {
+		if _, ok := err.(QuitError); ok {
 			q.log.Warn("received queue quit error", "error", err)
 			q.quit <- err
 			return err
 		}
 
 	case <-doneCh:
-		if err := q.Dequeue(context.WithoutCancel(ctx), q.primaryQueueShard, qi, DequeueOptionDisableConstraintUpdates(disableConstraintUpdates)); err != nil {
+		if err := q.PrimaryQueueShard.Processor().Dequeue(context.WithoutCancel(ctx), qi, DequeueOptionDisableConstraintUpdates(disableConstraintUpdates)); err != nil {
 			if err == ErrQueueItemNotFound {
 				// Safe. The executor may have dequeued.
 				return nil
