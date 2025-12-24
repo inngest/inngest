@@ -11,7 +11,7 @@ import (
 func (q *queueProcessor) runInstrumentation(ctx context.Context) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Instrument"), redis_telemetry.ScopeQueue)
 
-	leaseID, err := q.PrimaryQueueShard.ConfigLease(ctx, "instrument", ConfigLeaseMax, q.instrumentationLease())
+	leaseID, err := q.primaryQueueShard.ConfigLease(ctx, "instrument", ConfigLeaseMax, q.instrumentationLease())
 	if err != ErrConfigAlreadyLeased && err != nil {
 		q.quit <- err
 		return
@@ -23,7 +23,7 @@ func (q *queueProcessor) runInstrumentation(ctx context.Context) {
 		q.instrumentationLeaseID = lease
 
 		if lease != nil && q.instrumentationLeaseID == nil {
-			metrics.IncrInstrumentationLeaseClaimsCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.PrimaryQueueShard.Name()}})
+			metrics.IncrInstrumentationLeaseClaimsCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name()}})
 		}
 	}
 
@@ -40,14 +40,14 @@ func (q *queueProcessor) runInstrumentation(ctx context.Context) {
 			return
 		case <-instr.Chan():
 			if q.isInstrumentator() {
-				if err := q.PrimaryQueueShard.Instrument(ctx); err != nil {
+				if err := q.primaryQueueShard.Instrument(ctx); err != nil {
 					q.log.Error("error running instrumentation", "error", err)
 				}
 			}
 		case <-tick.Chan():
-			metrics.GaugeWorkerQueueCapacity(ctx, int64(q.numWorkers), metrics.GaugeOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.PrimaryQueueShard.Name()}})
+			metrics.GaugeWorkerQueueCapacity(ctx, int64(q.numWorkers), metrics.GaugeOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name()}})
 
-			leaseID, err := q.PrimaryQueueShard.ConfigLease(ctx, "instrument", ConfigLeaseMax, q.instrumentationLease())
+			leaseID, err := q.primaryQueueShard.ConfigLease(ctx, "instrument", ConfigLeaseMax, q.instrumentationLease())
 			if err == ErrConfigAlreadyLeased {
 				setLease(nil)
 				continue
