@@ -71,7 +71,7 @@ func NewQueueProcessor(
 		pollTick:                       defaultPollTick,
 		shadowPollTick:                 defaultShadowPollTick,
 		backlogNormalizePollTick:       defaultBacklogNormalizePollTick,
-		activeCheckTick:                defaultActiveCheckTick,
+		ActiveCheckTick:                defaultActiveCheckTick,
 		IdempotencyTTL:                 defaultIdempotencyTTL,
 		queueKindMapping:               make(map[string]string),
 		peekSizeForFunctions:           make(map[string]int64),
@@ -109,16 +109,16 @@ func NewQueueProcessor(
 		RefreshItemThrottle: func(ctx context.Context, item *QueueItem) (*Throttle, error) {
 			return nil, nil
 		},
-		readOnlySpotChecks: func(ctx context.Context, acctID uuid.UUID) bool {
+		ReadOnlySpotChecks: func(ctx context.Context, acctID uuid.UUID) bool {
 			return true
 		},
-		activeSpotCheckProbability: func(ctx context.Context, acctID uuid.UUID) (backlogRefillCheckProbability int, accountSpotCheckProbability int) {
+		ActiveSpotCheckProbability: func(ctx context.Context, acctID uuid.UUID) (backlogRefillCheckProbability int, accountSpotCheckProbability int) {
 			return 100, 100
 		},
-		activeCheckAccountProbability: 10,
-		activeCheckAccountConcurrency: ActiveCheckAccountConcurrency,
-		activeCheckBacklogConcurrency: ActiveCheckBacklogConcurrency,
-		activeCheckScanBatchSize:      ActiveCheckScanBatchSize,
+		ActiveCheckAccountProbability: 10,
+		ActiveCheckAccountConcurrency: ActiveCheckAccountConcurrency,
+		ActiveCheckBacklogConcurrency: ActiveCheckBacklogConcurrency,
+		ActiveCheckScanBatchSize:      ActiveCheckScanBatchSize,
 		CapacityLeaseExtendInterval:   QueueLeaseDuration / 2,
 	}
 
