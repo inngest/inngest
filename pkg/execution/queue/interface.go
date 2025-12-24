@@ -140,6 +140,8 @@ type QueueProcessor interface {
 	PartitionLease(ctx context.Context, p *QueuePartition, duration time.Duration, opts ...PartitionLeaseOpt) (*ulid.ULID, int, error)
 	PartitionRequeue(ctx context.Context, p *QueuePartition, at time.Time, forceAt bool) error
 
+	Scavenge(ctx context.Context, limit int) (int, error)
+
 	ItemsByPartition(ctx context.Context, partitionID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueItem], error)
 
 	SetFunctionMigrate(ctx context.Context, fnID uuid.UUID, migrateLockUntil *time.Time) error
