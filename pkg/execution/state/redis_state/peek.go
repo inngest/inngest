@@ -9,6 +9,7 @@ import (
 	"unsafe"
 
 	"github.com/google/uuid"
+	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 	"github.com/inngest/inngest/pkg/util"
@@ -50,18 +51,8 @@ type peeker[T any] struct {
 
 var ErrPeekerPeekExceedsMaxLimits = fmt.Errorf("provided limit exceeds max configured limit")
 
-type peekResult[T any] struct {
-	Items        []*T
-	TotalCount   int
-	RemovedCount int
-
-	// Cursor represents the score of the last item in the peek result.
-	// This can be used for pagination within iterators
-	Cursor int64
-}
-
 // peek peeks up to <limit> items from the given ZSET up to until, in order if sequential is true, otherwise randomly.
-func (p *peeker[T]) peek(ctx context.Context, keyOrderedPointerSet string, sequential bool, until time.Time, limit int64, opts ...PeekOpt) (*peekResult[T], error) {
+func (p *peeker[T]) peek(ctx context.Context, keyOrderedPointerSet string, sequential bool, until time.Time, limit int64, opts ...PeekOpt) (*osqueue.PeekResult[T], error) {
 	l := logger.StdlibLogger(ctx)
 
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, p.opName), redis_telemetry.ScopeQueue)
@@ -224,7 +215,7 @@ func (p *peeker[T]) peek(ctx context.Context, keyOrderedPointerSet string, seque
 		}
 	}
 
-	return &peekResult[T]{
+	return &osqueue.PeekResult[T]{
 		Items:        items,
 		TotalCount:   int(totalCount),
 		RemovedCount: len(missingItems),
