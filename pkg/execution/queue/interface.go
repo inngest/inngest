@@ -225,6 +225,8 @@ type QueueProcessor interface {
 	) (*BacklogRefillResult, error)
 	BacklogRequeue(ctx context.Context, backlog *QueueBacklog, sp *QueueShadowPartition, requeueAt time.Time) error
 
+	PeekShadowPartitions(ctx context.Context, accountID *uuid.UUID, sequential bool, peekLimit int64, until time.Time) ([]*QueueShadowPartition, error)
+
 	IsMigrationLocked(ctx context.Context, fnID uuid.UUID) (*time.Time, error)
 }
 

@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 	"github.com/oklog/ulid/v2"
@@ -38,18 +39,21 @@ func (q *queue) IsMigrationLocked(ctx context.Context, fnID uuid.UUID) (*time.Ti
 }
 
 // peekShadowPartitions returns pending shadow partitions within the global shadow partition pointer _or_ account shadow partition pointer ZSET.
-func (q *queue) peekShadowPartitions(ctx context.Context, partitionIndexKey string, sequential bool, peekLimit int64, until time.Time) ([]*QueueShadowPartition, error) {
-	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
-		return nil, fmt.Errorf("unsupported queue shard kind for peekShadowPartitions: %s", q.primaryQueueShard.Kind)
+func (q *queue) PeekShadowPartitions(ctx context.Context, accountID *uuid.UUID, sequential bool, peekLimit int64, until time.Time) ([]*osqueue.QueueShadowPartition, error) {
+	l := logger.StdlibLogger(ctx)
+
+	key := q.RedisClient.kg.GlobalShadowPartitionSet()
+	if accountID != nil {
+		key = q.RedisClient.kg.AccountShadowPartitions(*accountID)
 	}
 
-	p := peeker[QueueShadowPartition]{
+	p := peeker[osqueue.QueueShadowPartition]{
 		q:               q,
 		opName:          "peekShadowPartitions",
-		keyMetadataHash: q.primaryQueueShard.RedisClient.kg.ShadowPartitionMeta(),
-		max:             ShadowPartitionPeekMax,
-		maker: func() *QueueShadowPartition {
-			return &QueueShadowPartition{}
+		keyMetadataHash: q.RedisClient.kg.ShadowPartitionMeta(),
+		max:             osqueue.ShadowPartitionPeekMax,
+		maker: func() *osqueue.QueueShadowPartition {
+			return &osqueue.QueueShadowPartition{}
 		},
 		handleMissingItems: func(pointers []string) error {
 			return nil
@@ -57,17 +61,17 @@ func (q *queue) peekShadowPartitions(ctx context.Context, partitionIndexKey stri
 		isMillisecondPrecision: true,
 	}
 
-	res, err := p.peek(ctx, partitionIndexKey, sequential, until, peekLimit)
+	res, err := p.peek(ctx, key, sequential, until, peekLimit)
 	if err != nil {
 		if errors.Is(err, ErrPeekerPeekExceedsMaxLimits) {
-			return nil, ErrShadowPartitionPeekMaxExceedsLimits
+			return nil, osqueue.ErrShadowPartitionPeekMaxExceedsLimits
 		}
 		return nil, fmt.Errorf("could not peek shadow partitions: %w", err)
 	}
 
 	if res.TotalCount > 0 {
 		for _, p := range res.Items {
-			q.log.Trace("peeked shadow partition", "partition_id", p.PartitionID, "until", until.Format(time.StampMilli))
+			l.Trace("peeked shadow partition", "partition_id", p.PartitionID, "until", until.Format(time.StampMilli))
 		}
 	}
 
@@ -75,7 +79,7 @@ func (q *queue) peekShadowPartitions(ctx context.Context, partitionIndexKey stri
 }
 
 func (q *queue) ShadowPartitionPeek(ctx context.Context, sp *QueueShadowPartition, sequential bool, until time.Time, limit int64, opts ...PeekOpt) ([]*QueueBacklog, int, error) {
-	opt := peekOption{}
+	opt := osqueue.PeekOption{}
 	for _, apply := range opts {
 		apply(&opt)
 	}
