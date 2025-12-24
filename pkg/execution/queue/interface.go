@@ -199,6 +199,11 @@ type QueueProcessor interface {
 
 	RemoveQueueItem(ctx context.Context, partitionID string, itemID string) error
 	LoadQueueItem(ctx context.Context, itemID string) (*QueueItem, error)
+
+	LeaseBacklogForNormalization(ctx context.Context, bl *QueueBacklog) error
+	ExtendBacklogNormalizationLease(ctx context.Context, now time.Time, bl *QueueBacklog) error
+	ShadowPartitionPeekNormalizeBacklogs(ctx context.Context, sp *QueueShadowPartition, limit int64) ([]*QueueBacklog, error)
+	BacklogNormalizePeek(ctx context.Context, b *QueueBacklog, limit int64) (*PeekResult[QueueItem], error)
 }
 
 type BacklogRefillOptions struct {

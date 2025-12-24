@@ -6,25 +6,23 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 )
 
-func (q *queue) leaseBacklogForNormalization(ctx context.Context, bl *QueueBacklog) error {
-	leaseExpiry := q.clock.Now().Add(BacklogNormalizeLeaseDuration)
+func (q *queue) LeaseBacklogForNormalization(ctx context.Context, bl *osqueue.QueueBacklog) error {
+	leaseExpiry := q.Clock.Now().Add(osqueue.BacklogNormalizeLeaseDuration)
 	leaseID, err := ulid.New(ulid.Timestamp(leaseExpiry), rand.Reader)
 	if err != nil {
 		return fmt.Errorf("could not generate leaseID: %w", err)
 	}
 
-	shard := q.primaryQueueShard
-
-	rc := shard.RedisClient.Client()
+	rc := q.RedisClient.Client()
 	cmd := rc.B().
 		Set().
-		Key(shard.RedisClient.kg.BacklogNormalizationLease(bl.BacklogID)).
+		Key(q.RedisClient.kg.BacklogNormalizationLease(bl.BacklogID)).
 		Value(leaseID.String()).
 		Nx().
 		Get().
@@ -40,22 +38,20 @@ func (q *queue) leaseBacklogForNormalization(ctx context.Context, bl *QueueBackl
 		return err
 	}
 
-	return errBacklogAlreadyLeasedForNormalization
+	return osqueue.ErrBacklogAlreadyLeasedForNormalization
 }
 
-func (q *queue) extendBacklogNormalizationLease(ctx context.Context, now time.Time, bl *QueueBacklog) error {
-	leaseExpiry := now.Add(BacklogNormalizeLeaseDuration)
+func (q *queue) ExtendBacklogNormalizationLease(ctx context.Context, now time.Time, bl *osqueue.QueueBacklog) error {
+	leaseExpiry := now.Add(osqueue.BacklogNormalizeLeaseDuration)
 	newLeaseID, err := ulid.New(ulid.Timestamp(leaseExpiry), rand.Reader)
 	if err != nil {
 		return fmt.Errorf("could not generate newLeaseID: %w", err)
 	}
 
-	shard := q.primaryQueueShard
-
-	rc := shard.RedisClient.Client()
+	rc := q.RedisClient.Client()
 	cmd := rc.B().
 		Set().
-		Key(shard.RedisClient.kg.BacklogNormalizationLease(bl.BacklogID)).
+		Key(q.RedisClient.kg.BacklogNormalizationLease(bl.BacklogID)).
 		Value(newLeaseID.String()).
 		Xx().
 		Get().
@@ -64,7 +60,7 @@ func (q *queue) extendBacklogNormalizationLease(ctx context.Context, now time.Ti
 
 	_, err = rc.Do(ctx, cmd).ToAny()
 	if err == rueidis.Nil {
-		return errBacklogNormalizationLeaseExpired
+		return osqueue.ErrBacklogNormalizationLeaseExpired
 	}
 	if err != nil {
 		return err
@@ -74,30 +70,24 @@ func (q *queue) extendBacklogNormalizationLease(ctx context.Context, now time.Ti
 	return nil
 }
 
-func (q *queue) ShadowPartitionPeekNormalizeBacklogs(ctx context.Context, sp *QueueShadowPartition, limit int64) ([]*QueueBacklog, error) {
-	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
-		return nil, fmt.Errorf("unsupported queue shard kind for ShadowPartitionPeekNormalizeBacklogs: %s", q.primaryQueueShard.Kind)
-	}
+func (q *queue) ShadowPartitionPeekNormalizeBacklogs(ctx context.Context, sp *osqueue.QueueShadowPartition, limit int64) ([]*osqueue.QueueBacklog, error) {
+	partitionNormalizeSet := q.RedisClient.kg.PartitionNormalizeSet(sp.PartitionID)
 
-	rc := q.primaryQueueShard.RedisClient
-
-	partitionNormalizeSet := rc.kg.PartitionNormalizeSet(sp.PartitionID)
-
-	p := peeker[QueueBacklog]{
+	p := peeker[osqueue.QueueBacklog]{
 		q:               q,
 		opName:          "ShadowPartitionPeekNormalizeBacklogs",
-		keyMetadataHash: q.primaryQueueShard.RedisClient.kg.BacklogMeta(),
-		max:             NormalizePartitionPeekMax,
-		maker: func() *QueueBacklog {
-			return &QueueBacklog{}
+		keyMetadataHash: q.RedisClient.kg.BacklogMeta(),
+		max:             osqueue.NormalizePartitionPeekMax,
+		maker: func() *osqueue.QueueBacklog {
+			return &osqueue.QueueBacklog{}
 		},
-		handleMissingItems: CleanupMissingPointers(ctx, partitionNormalizeSet, rc.Client(), q.log.With("sp", sp)),
+		handleMissingItems: CleanupMissingPointers(ctx, partitionNormalizeSet, q.RedisClient.Client(), logger.StdlibLogger(ctx).With("sp", sp)),
 		// faster option: load items regardless of zscore
 		ignoreUntil:            true,
 		isMillisecondPrecision: true,
 	}
 
-	res, err := p.peek(ctx, partitionNormalizeSet, false, q.clock.Now(), limit)
+	res, err := p.peek(ctx, partitionNormalizeSet, false, q.Clock.Now(), limit)
 	if err != nil {
 		return nil, fmt.Errorf("could not peek backlogs for normalization: %w", err)
 	}
@@ -105,31 +95,25 @@ func (q *queue) ShadowPartitionPeekNormalizeBacklogs(ctx context.Context, sp *Qu
 	return res.Items, nil
 }
 
-func (q *queue) BacklogNormalizePeek(ctx context.Context, b *QueueBacklog, limit int64) (*peekResult[osqueue.QueueItem], error) {
-	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
-		return nil, fmt.Errorf("unsupported queue shard kind for BacklogNormalizePeek: %s", q.primaryQueueShard.Kind)
-	}
-
-	rc := q.primaryQueueShard.RedisClient
-
-	backlogSet := rc.kg.BacklogSet(b.BacklogID)
+func (q *queue) BacklogNormalizePeek(ctx context.Context, b *osqueue.QueueBacklog, limit int64) (*osqueue.PeekResult[osqueue.QueueItem], error) {
+	backlogSet := q.RedisClient.kg.BacklogSet(b.BacklogID)
 
 	p := peeker[osqueue.QueueItem]{
 		q:               q,
 		opName:          "BacklogNormalizePeek",
-		keyMetadataHash: q.primaryQueueShard.RedisClient.kg.QueueItem(),
-		max:             NormalizeBacklogPeekMax,
+		keyMetadataHash: q.RedisClient.kg.QueueItem(),
+		max:             osqueue.NormalizeBacklogPeekMax,
 		maker: func() *osqueue.QueueItem {
 			return &osqueue.QueueItem{}
 		},
-		handleMissingItems: CleanupMissingPointers(ctx, backlogSet, rc.Client(), q.log.With("backlog", b)),
+		handleMissingItems: CleanupMissingPointers(ctx, backlogSet, q.RedisClient.Client(), logger.StdlibLogger(ctx).With("backlog", b)),
 		// faster option: load items regardless of zscore
 		ignoreUntil:            true,
 		isMillisecondPrecision: true,
 	}
 
 	// this is essentially +inf as no queue items should ever be scheduled >2y out
-	normalizeLookahead := q.clock.Now().Add(time.Hour * 24 * 365 * 2)
+	normalizeLookahead := q.Clock.Now().Add(time.Hour * 24 * 365 * 2)
 
 	res, err := p.peek(ctx, backlogSet, false, normalizeLookahead, limit)
 	if err != nil {
