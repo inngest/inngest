@@ -2,10 +2,13 @@ package queue
 
 import (
 	"context"
+	"errors"
+	"math/rand"
 	"time"
 
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
+	"golang.org/x/sync/errgroup"
 )
 
 // addContinue adds a continuation for the given partition.  This hints that the queue should
@@ -77,4 +80,52 @@ func (q *queueProcessor) removeContinue(ctx context.Context, p *QueuePartition, 
 			consts.QueueContinuationCooldownPeriod,
 		)
 	}
+}
+
+func (q *queueProcessor) scanContinuations(ctx context.Context) error {
+	if !q.runMode.Continuations {
+		// continuations are not enabled.
+		return nil
+	}
+
+	// Have some chance of skipping continuations in this iteration.
+	if rand.Float64() <= consts.QueueContinuationSkipProbability {
+		return nil
+	}
+
+	eg := errgroup.Group{}
+	// If we have continued partitions, process those immediately.
+	q.continuesLock.Lock()
+	for _, c := range q.continues {
+		cont := c
+		eg.Go(func() error {
+			p := cont.partition
+			if q.capacity() == 0 {
+				// no longer any available workers for partition, so we can skip
+				// work
+				metrics.IncrQueueScanNoCapacityCounter(ctx, metrics.CounterOpt{PkgName: pkgName})
+				return nil
+			}
+
+			q.log.Trace("continue partition processing", "partition_id", p.ID, "count", c.count)
+
+			if err := q.processPartition(ctx, p, cont.count, false); err != nil {
+				if err == ErrPartitionNotFound || err == ErrPartitionGarbageCollected {
+					q.removeContinue(ctx, p, false)
+					return nil
+				}
+				if errors.Unwrap(err) != context.Canceled {
+					q.log.Error("error processing partition", "error", err)
+				}
+				return err
+			}
+
+			metrics.IncrQueuePartitionProcessedCounter(ctx, metrics.CounterOpt{
+				PkgName: pkgName,
+			})
+			return nil
+		})
+	}
+	q.continuesLock.Unlock()
+	return eg.Wait()
 }
