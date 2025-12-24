@@ -204,6 +204,11 @@ type QueueProcessor interface {
 	ExtendBacklogNormalizationLease(ctx context.Context, now time.Time, bl *QueueBacklog) error
 	ShadowPartitionPeekNormalizeBacklogs(ctx context.Context, sp *QueueShadowPartition, limit int64) ([]*QueueBacklog, error)
 	BacklogNormalizePeek(ctx context.Context, b *QueueBacklog, limit int64) (*PeekResult[QueueItem], error)
+	PeekGlobalNormalizeAccounts(ctx context.Context, until time.Time, limit int64) ([]uuid.UUID, error)
+
+	PeekGlobalShadowPartitionAccounts(ctx context.Context, sequential bool, until time.Time, limit int64) ([]uuid.UUID, error)
+
+	IsMigrationLocked(ctx context.Context, fnID uuid.UUID) (*time.Time, error)
 }
 
 type BacklogRefillOptions struct {

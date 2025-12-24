@@ -129,3 +129,120 @@ func (q *queueProcessor) scanContinuations(ctx context.Context) error {
 	q.continuesLock.Unlock()
 	return eg.Wait()
 }
+
+// addShadowContinue is the equivalent of addContinue for shadow partitions
+func (q *queueProcessor) addShadowContinue(ctx context.Context, p *QueueShadowPartition, ctr uint) {
+	if !q.runMode.ShadowContinuations {
+		// shadow continuations are not enabled.
+		return
+	}
+
+	if ctr >= q.shadowContinuationLimit {
+		q.removeShadowContinue(ctx, p, true)
+		return
+	}
+
+	q.shadowContinuesLock.Lock()
+	defer q.shadowContinuesLock.Unlock()
+
+	// If this is the first shadow continuation, check if we're on a cooldown, or if we're
+	// beyond capacity.
+	if ctr == 1 {
+		if len(q.shadowContinues) > consts.QueueShadowContinuationMaxPartitions {
+			metrics.IncrQueueShadowContinuationOpCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name, "op": "max_capacity"}})
+			return
+		}
+		if t, ok := q.shadowContinueCooldown[p.PartitionID]; ok && t.After(time.Now()) {
+			metrics.IncrQueueShadowContinuationOpCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name, "op": "cooldown"}})
+			return
+		}
+
+		// Remove the shadow continuation cooldown.
+		delete(q.shadowContinueCooldown, p.PartitionID)
+	}
+
+	c, ok := q.shadowContinues[p.PartitionID]
+	if !ok || c.count < ctr {
+		// Update the continue count if it doesn't exist, or the current counter
+		// is higher.  This ensures that we always have the highest continuation
+		// count stored for queue processing.
+		q.shadowContinues[p.PartitionID] = shadowContinuation{shadowPart: p, count: ctr}
+		metrics.IncrQueueShadowContinuationOpCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name, "op": "added"}})
+	}
+}
+
+func (q *queueProcessor) removeShadowContinue(ctx context.Context, p *QueueShadowPartition, cooldown bool) {
+	if !q.runMode.ShadowContinuations {
+		// shadow continuations are not enabled.
+		return
+	}
+
+	// This is over the limit for continuing the shadow partition, so force it to be
+	// removed in every case.
+	q.shadowContinuesLock.Lock()
+	defer q.shadowContinuesLock.Unlock()
+
+	metrics.IncrQueueShadowContinuationOpCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name, "op": "removed"}})
+
+	delete(q.shadowContinues, p.PartitionID)
+
+	if cooldown {
+		// Add a cooldown, preventing this partition from being added as a continuation
+		// for a given period of time.
+		//
+		// Note that this isn't shared across replicas;  cooldowns
+		// only exist in the current replica.
+		q.shadowContinueCooldown[p.PartitionID] = time.Now().Add(
+			consts.QueueShadowContinuationCooldownPeriod,
+		)
+	}
+}
+
+func (q *queueProcessor) scanShadowContinuations(ctx context.Context) error {
+	if !q.runMode.ShadowContinuations {
+		return nil
+	}
+
+	if rand.Float64() <= q.runMode.ShadowContinuationSkipProbability {
+		return nil
+	}
+
+	eg := errgroup.Group{}
+	q.shadowContinuesLock.Lock()
+	for _, c := range q.shadowContinues {
+		cont := c
+		eg.Go(func() error {
+			sp := cont.shadowPart
+
+			_, err := DurationWithTags(
+				ctx,
+				q.primaryQueueShard.Name(),
+				"shadow_partition_process_duration",
+				q.Clock.Now(),
+				func(ctx context.Context) (any, error) {
+					err := q.processShadowPartition(ctx, sp, cont.count)
+					if errors.Is(err, context.Canceled) {
+						return nil, nil
+					}
+					return nil, err
+				},
+				map[string]any{
+					// "partition_id": sp.PartitionID,
+				},
+			)
+			if err != nil {
+				if err == ErrShadowPartitionLeaseNotFound {
+					return nil
+				}
+				if !errors.Is(err, context.Canceled) {
+					q.log.Error("error processing shadow partition", "error", err, "continuation", true, "continuation_count", cont.count)
+				}
+				return err
+			}
+
+			return nil
+		})
+	}
+	q.shadowContinuesLock.Unlock()
+	return eg.Wait()
+}
