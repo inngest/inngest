@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/backoff"
 	"github.com/inngest/inngest/pkg/constraintapi"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/jonboulle/clockwork"
@@ -358,13 +359,6 @@ type QueueRunMode struct {
 }
 
 type QueueOptions struct {
-	// PrimaryQueueShard stores the queue shard to use.
-	PrimaryQueueShard QueueShard
-
-	// QueueShardClients contains all non-default queue shard clients.
-	QueueShardClients map[string]QueueShard
-	shardSelector     ShardSelector
-
 	PartitionPriorityFinder PartitionPriorityFinder
 	AccountPriorityFinder   AccountPriorityFinder
 	PartitionPausedGetter   PartitionPausedGetter
@@ -471,12 +465,6 @@ type QueueOptions struct {
 // This allows applying a policy to enqueue items to different queue shards.
 type ShardSelector func(ctx context.Context, accountId uuid.UUID, queueName *string) (QueueShard, error)
 
-func WithShardSelector(s ShardSelector) QueueOpt {
-	return func(q *QueueOptions) {
-		q.shardSelector = s
-	}
-}
-
 func WithPeekEWMA(on bool) QueueOpt {
 	return func(q *QueueOptions) {
 		q.usePeekEWMA = on
@@ -561,12 +549,6 @@ func WithInstrumentInterval(t time.Duration) QueueOpt {
 		if t > 0 {
 			q.instrumentInterval = t
 		}
-	}
-}
-
-func WithQueueShardClients(queueShards map[string]QueueShard) QueueOpt {
-	return func(q *QueueOptions) {
-		q.QueueShardClients = queueShards
 	}
 }
 
@@ -699,4 +681,99 @@ type PartitionIdentifier struct {
 	FunctionID      uuid.UUID
 	AccountID       uuid.UUID
 	EnvID           uuid.UUID
+}
+
+func NewQueueOptions(
+	ctx context.Context,
+	options ...QueueOpt,
+) *QueueOptions {
+	o := &QueueOptions{
+		PartitionPriorityFinder: func(_ context.Context, _ QueuePartition) uint {
+			return PriorityDefault
+		},
+		AccountPriorityFinder: func(_ context.Context, _ uuid.UUID) uint {
+			return PriorityDefault
+		},
+		PartitionPausedGetter: func(ctx context.Context, fnID uuid.UUID) PartitionPausedInfo {
+			return PartitionPausedInfo{}
+		},
+		PeekMin:                     DefaultQueuePeekMin,
+		PeekMax:                     DefaultQueuePeekMax,
+		shadowPeekMin:               ShadowPartitionPeekMinBacklogs,
+		shadowPeekMax:               ShadowPartitionPeekMaxBacklogs,
+		backlogRefillLimit:          BacklogRefillHardLimit,
+		backlogNormalizeConcurrency: defaultBacklogNormalizeConcurrency,
+		runMode: QueueRunMode{
+			Sequential:                        true,
+			Scavenger:                         true,
+			Partition:                         true,
+			Account:                           true,
+			AccountWeight:                     85,
+			ShadowPartition:                   true,
+			AccountShadowPartition:            true,
+			AccountShadowPartitionWeight:      85,
+			NormalizePartition:                true,
+			ShadowContinuationSkipProbability: consts.QueueContinuationSkipProbability,
+		},
+		numWorkers:                     defaultNumWorkers,
+		numShadowWorkers:               defaultNumShadowWorkers,
+		numBacklogNormalizationWorkers: defaultBacklogNormalizationWorkers,
+		pollTick:                       defaultPollTick,
+		shadowPollTick:                 defaultShadowPollTick,
+		backlogNormalizePollTick:       defaultBacklogNormalizePollTick,
+		ActiveCheckTick:                defaultActiveCheckTick,
+		IdempotencyTTL:                 defaultIdempotencyTTL,
+		queueKindMapping:               make(map[string]string),
+		peekSizeForFunctions:           make(map[string]int64),
+		log:                            logger.StdlibLogger(ctx),
+		instrumentInterval:             DefaultInstrumentInterval,
+		PartitionConstraintConfigGetter: func(ctx context.Context, pi PartitionIdentifier) PartitionConstraintConfig {
+			def := defaultConcurrency
+
+			return PartitionConstraintConfig{
+				Concurrency: PartitionConcurrency{
+					AccountConcurrency:  def,
+					FunctionConcurrency: def,
+				},
+			}
+		},
+		AllowKeyQueues: func(ctx context.Context, acctID, fnID uuid.UUID) bool {
+			return false
+		},
+		shadowPartitionProcessCount: func(ctx context.Context, acctID uuid.UUID) int {
+			return 5
+		},
+		TenantInstrumentor: func(ctx context.Context, partitionID string) error {
+			return nil
+		},
+		backoffFunc:             backoff.DefaultBackoff,
+		Clock:                   clockwork.NewRealClock(),
+		continuationLimit:       consts.DefaultQueueContinueLimit,
+		shadowContinuesLock:     &sync.Mutex{},
+		shadowContinuationLimit: consts.DefaultQueueContinueLimit,
+		shadowContinues:         map[string]shadowContinuation{},
+		shadowContinueCooldown:  map[string]time.Time{},
+		NormalizeRefreshItemCustomConcurrencyKeys: func(ctx context.Context, item *QueueItem, existingKeys []state.CustomConcurrency, shadowPartition *QueueShadowPartition) ([]state.CustomConcurrency, error) {
+			return existingKeys, nil
+		},
+		RefreshItemThrottle: func(ctx context.Context, item *QueueItem) (*Throttle, error) {
+			return nil, nil
+		},
+		ReadOnlySpotChecks: func(ctx context.Context, acctID uuid.UUID) bool {
+			return true
+		},
+		ActiveSpotCheckProbability: func(ctx context.Context, acctID uuid.UUID) (backlogRefillCheckProbability int, accountSpotCheckProbability int) {
+			return 100, 100
+		},
+		ActiveCheckAccountProbability: 10,
+		ActiveCheckAccountConcurrency: ActiveCheckAccountConcurrency,
+		ActiveCheckBacklogConcurrency: ActiveCheckBacklogConcurrency,
+		ActiveCheckScanBatchSize:      ActiveCheckScanBatchSize,
+		CapacityLeaseExtendInterval:   QueueLeaseDuration / 2,
+	}
+
+	for _, qopt := range options {
+		qopt(o)
+	}
+	return o
 }
