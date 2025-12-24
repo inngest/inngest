@@ -49,9 +49,9 @@ func NewQueueProcessor(
 		continues:        map[string]continuation{},
 		continueCooldown: map[string]time.Time{},
 
-		sem:     util.NewTrackingSemaphore(int(o.NumWorkers)),
-		workers: make(chan processItem, o.NumWorkers),
-		quit:    make(chan error, o.NumWorkers),
+		sem:     util.NewTrackingSemaphore(int(o.numWorkers)),
+		workers: make(chan processItem, o.numWorkers),
+		quit:    make(chan error, o.numWorkers),
 
 		primaryQueueShard: primaryQueueShard,
 		queueShardClients: queueShardClients,
@@ -281,5 +281,5 @@ func (q *queueProcessor) UnpauseFunction(ctx context.Context, shard string, acct
 }
 
 func (q *queueProcessor) capacity() int64 {
-	return int64(q.NumWorkers) - q.sem.Count()
+	return int64(q.numWorkers) - q.sem.Count()
 }
