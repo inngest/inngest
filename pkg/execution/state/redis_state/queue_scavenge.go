@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/hashicorp/go-multierror"
-	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 	"github.com/redis/rueidis"
@@ -41,20 +41,16 @@ func (q *queue) randomScavengeOffset(seed int64, count int64, limit int) int64 {
 //
 // We scan all partition concurrency queues - queues of leases - to find leases that have expired.
 func (q *queue) Scavenge(ctx context.Context, limit int) (int, error) {
-	shard := q.primaryQueueShard
+	l := logger.StdlibLogger(ctx)
 
-	if shard.Kind != string(enums.QueueShardKindRedis) {
-		return 0, fmt.Errorf("unsupported queue shard kind for Scavenge: %s", shard.Kind)
-	}
-
-	client := shard.RedisClient.unshardedRc
-	kg := shard.RedisClient.KeyGenerator()
+	client := q.RedisClient.unshardedRc
+	kg := q.RedisClient.KeyGenerator()
 
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Scavenge"), redis_telemetry.ScopeQueue)
 
 	// Find all items that have an expired lease - eg. where the min time for a lease is between
 	// (0-now] in unix milliseconds.
-	now := fmt.Sprintf("%d", q.clock.Now().UnixMilli())
+	now := fmt.Sprintf("%d", q.Clock.Now().UnixMilli())
 
 	count, err := client.Do(ctx, client.B().Zcount().Key(kg.ConcurrencyIndex()).Min("-inf").Max(now).Build()).AsInt64()
 	if err != nil {
@@ -66,7 +62,7 @@ func (q *queue) Scavenge(ctx context.Context, limit int) (int, error) {
 		Min("-inf").
 		Max(now).
 		Byscore().
-		Limit(q.randomScavengeOffset(q.clock.Now().UnixMilli(), count, limit), int64(limit)).
+		Limit(q.randomScavengeOffset(q.Clock.Now().UnixMilli(), count, limit), int64(limit)).
 		Build()
 
 	// NOTE: Received keys can be legacy (workflow IDs or system/internal queue names) or new (full Redis keys)
@@ -98,9 +94,9 @@ func (q *queue) Scavenge(ctx context.Context, limit int) (int, error) {
 		}
 
 		scavengePartition := func(queueKey string, kind string) (int, int, error) {
-			start := q.clock.Now()
+			start := q.Clock.Now()
 			defer func() {
-				dur := q.clock.Now().Sub(start)
+				dur := q.Clock.Now().Sub(start)
 				metrics.HistogramQueueScavengerPartitionScavengeDuration(ctx, time.Duration(dur.Milliseconds()), metrics.HistogramOpt{
 					PkgName: pkgName,
 					Tags: map[string]any{
@@ -135,7 +131,7 @@ func (q *queue) Scavenge(ctx context.Context, limit int) (int, error) {
 			for i, item := range jobs {
 				itemID := itemIDs[i]
 				if item == "" {
-					q.log.Error("missing queue item in concurrency queue",
+					l.Error("missing queue item in concurrency queue",
 						"index_partition", partition,
 						"concurrency_queue_key", queueKey,
 						"item_id", itemID,
@@ -154,7 +150,7 @@ func (q *queue) Scavenge(ctx context.Context, limit int) (int, error) {
 					resultErr = multierror.Append(resultErr, fmt.Errorf("error unmarshalling job '%s': %w", item, err))
 					continue
 				}
-				if err := q.Requeue(ctx, q.primaryQueueShard, qi, q.clock.Now()); err != nil {
+				if err := q.Requeue(ctx, qi, q.Clock.Now()); err != nil {
 					resultErr = multierror.Append(resultErr, fmt.Errorf("error requeueing job '%s': %w", item, err))
 					continue
 				}
@@ -181,7 +177,6 @@ func (q *queue) Scavenge(ctx context.Context, limit int) (int, error) {
 			// Atomically attempt to drop empty pointer if we've processed all items
 			err := q.dropPartitionPointerIfEmpty(
 				ctx,
-				shard,
 				kg.ConcurrencyIndex(),
 				queueKey,
 				partition,
