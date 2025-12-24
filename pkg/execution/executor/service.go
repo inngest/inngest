@@ -733,17 +733,12 @@ func (s *svc) handleEagerCancelBacklog(ctx context.Context, c cqrs.Cancellation)
 		from = *c.StartedAfter
 	}
 
-	qm, ok := s.queue.(queue.QueueManager)
-	if !ok {
-		return fmt.Errorf("expected queue manager for cancellation")
-	}
-
 	shard, err := s.findShard(ctx, c.AccountID, c.QueueName)
 	if err != nil {
 		return fmt.Errorf("error selecting shard for cancellation: %w", err)
 	}
 
-	items, err := qm.ItemsByBacklog(ctx, shard, c.TargetID, from, c.StartedBefore)
+	items, err := shard.ItemsByBacklog(ctx, c.TargetID, from, c.StartedBefore)
 	if err != nil {
 		return fmt.Errorf("error retrieving backlog iterator: %w", err)
 	}
@@ -789,7 +784,7 @@ func (s *svc) handleEagerCancelBacklog(ctx context.Context, c cqrs.Cancellation)
 		}
 
 		// dequeue the item
-		if err := qm.Dequeue(ctx, shard, *qi); err != nil {
+		if err := shard.Dequeue(ctx, *qi); err != nil {
 			return err
 		}
 	}
@@ -1152,12 +1147,6 @@ func (s *svc) handleJobPromote(ctx context.Context, item queue.Item) error {
 
 	l = l.With("job_id", data.PromoteJobID, "scheduled_at", time.UnixMilli(data.ScheduledAt))
 
-	qm, ok := s.queue.(queue.QueueManager)
-	if !ok {
-		l.Warn("queue does not conform to queue manager")
-		return nil
-	}
-
 	// Retrieve current queue shard for sleep item. The account might have been migrated
 	// to a different shard since the original sleep item was enqueued, so we must fetch the shard now.
 	shard, err := s.shardSelector(ctx, item.Identifier.AccountID, nil)
@@ -1183,7 +1172,7 @@ func (s *svc) handleJobPromote(ctx context.Context, item queue.Item) error {
 	// Grab the score, which already handles promotion by fudigng the time to
 	// be that of the actual run ID, prioritizing older runs.
 	nextTime := time.UnixMilli(qi.Score(time.Now()))
-	err = qm.Requeue(ctx, shard, *qi, nextTime)
+	err = shard.Requeue(ctx, *qi, nextTime)
 	if err != nil && !errors.Is(err, queue.ErrQueueItemNotFound) {
 		return fmt.Errorf("could not requeue job with promoted time: %w", err)
 	}
