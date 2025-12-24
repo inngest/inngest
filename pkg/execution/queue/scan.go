@@ -20,7 +20,7 @@ func (q *queueProcessor) executionScan(ctx context.Context, f RunFunc) error {
 		"queue_shard", q.primaryQueueShard.Name(),
 	)
 
-	for i := int32(0); i < q.numWorkers; i++ {
+	for i := int32(0); i < q.NumWorkers; i++ {
 		go q.worker(ctx, f)
 	}
 

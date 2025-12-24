@@ -75,3 +75,8 @@ var (
 	errProcessNoCapacity   = fmt.Errorf("no capacity")
 	errProcessStopIterator = fmt.Errorf("stop iterator")
 )
+
+var (
+	errBacklogNormalizationLeaseExpired     = fmt.Errorf("backlog normalization lease expired")
+	errBacklogAlreadyLeasedForNormalization = fmt.Errorf("backlog already leased for normalization")
+)

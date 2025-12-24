@@ -45,7 +45,7 @@ func (q *queueProcessor) runInstrumentation(ctx context.Context) {
 				}
 			}
 		case <-tick.Chan():
-			metrics.GaugeWorkerQueueCapacity(ctx, int64(q.numWorkers), metrics.GaugeOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name()}})
+			metrics.GaugeWorkerQueueCapacity(ctx, int64(q.NumWorkers), metrics.GaugeOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name()}})
 
 			leaseID, err := q.primaryQueueShard.ConfigLease(ctx, "instrument", ConfigLeaseMax, q.instrumentationLease())
 			if err == ErrConfigAlreadyLeased {
