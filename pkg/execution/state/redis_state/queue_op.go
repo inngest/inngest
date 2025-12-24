@@ -14,39 +14,8 @@ import (
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 )
 
-type QueueOpOpt func(o *queueOpOpt)
-
-type queueOpOpt struct {
-	shard osqueue.QueueShard
-}
-
-// newQueueOpOpt returns the default option settings for queue operations
-func newQueueOpOpt() queueOpOpt {
-	return queueOpOpt{}
-}
-
-func newQueueOpOptWithOpts(opts ...QueueOpOpt) queueOpOpt {
-	opt := newQueueOpOpt()
-	for _, apply := range opts {
-		apply(&opt)
-	}
-
-	return opt
-}
-
-func WithQueueOpShard(shard osqueue.QueueShard) QueueOpOpt {
-	return func(o *queueOpOpt) {
-		o.shard = shard
-	}
-}
-
-func (q *queue) DequeueByJobID(ctx context.Context, jobID string, opts ...QueueOpOpt) error {
-	opt := newQueueOpOpt()
-	for _, apply := range opts {
-		apply(&opt)
-	}
-
-	item, err := q.ItemByID(ctx, jobID, opts...)
+func (q *queue) DequeueByJobID(ctx context.Context, jobID string) error {
+	item, err := q.ItemByID(ctx, jobID)
 	switch err {
 	case nil:
 		// no-op
@@ -59,25 +28,13 @@ func (q *queue) DequeueByJobID(ctx context.Context, jobID string, opts ...QueueO
 	return q.Dequeue(ctx, *item)
 }
 
-type dequeueOptions struct {
-	disableConstraintUpdates bool
-}
-
-func DequeueOptionDisableConstraintUpdates(disableUpdates bool) dequeueOptionFn {
-	return func(o *dequeueOptions) {
-		o.disableConstraintUpdates = disableUpdates
-	}
-}
-
-type dequeueOptionFn func(o *dequeueOptions)
-
 // Dequeue removes an item from the queue entirely.
-func (q *queue) Dequeue(ctx context.Context, i osqueue.QueueItem, options ...dequeueOptionFn) error {
+func (q *queue) Dequeue(ctx context.Context, i osqueue.QueueItem, options ...osqueue.DequeueOptionFn) error {
 	l := logger.StdlibLogger(ctx)
 
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Dequeue"), redis_telemetry.ScopeQueue)
 
-	o := &dequeueOptions{}
+	o := &osqueue.DequeueOptions{}
 	for _, opt := range options {
 		opt(o)
 	}
@@ -156,7 +113,7 @@ func (q *queue) Dequeue(ctx context.Context, i osqueue.QueueItem, options ...deq
 	// - processing system queue items
 	// - holding a valid capacity lease
 	updateConstraintStateVal := "1"
-	if o.disableConstraintUpdates {
+	if o.DisableConstraintUpdates {
 		updateConstraintStateVal = "0"
 	}
 

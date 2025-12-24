@@ -138,10 +138,10 @@ func (q *queue) RunningCount(ctx context.Context, workflowID uuid.UUID) (int64, 
 	return count, nil
 }
 
-func (q *queue) ItemsByPartition(ctx context.Context, partitionID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*osqueue.QueueItem], error) {
+func (q *queue) ItemsByPartition(ctx context.Context, partitionID string, from time.Time, until time.Time, opts ...osqueue.QueueIterOpt) (iter.Seq[*osqueue.QueueItem], error) {
 	l := logger.StdlibLogger(ctx)
 
-	opt := queueIterOpt{
+	opt := osqueue.QueueIterOptions{
 		batchSize:                 1000,
 		interval:                  500 * time.Millisecond,
 		iterateBacklogs:           true,
@@ -539,7 +539,7 @@ func (q *queue) ItemByID(ctx context.Context, jobID string, opts ...QueueOpOpt) 
 	return &item, nil
 }
 
-func (q *queue) ItemExists(ctx context.Context, jobID string, opts ...QueueOpOpt) (bool, error) {
+func (q *queue) ItemExists(ctx context.Context, jobID string) (bool, error) {
 	rc := q.RedisClient.Client()
 	kg := q.RedisClient.kg
 
@@ -555,7 +555,7 @@ func (q *queue) ItemExists(ctx context.Context, jobID string, opts ...QueueOpOpt
 	return exists, nil
 }
 
-func (q *queue) ItemsByRunID(ctx context.Context, runID ulid.ULID, opts ...QueueOpOpt) ([]*osqueue.QueueItem, error) {
+func (q *queue) ItemsByRunID(ctx context.Context, runID ulid.ULID) ([]*osqueue.QueueItem, error) {
 	rc := q.RedisClient.Client()
 	kg := q.RedisClient.KeyGenerator()
 

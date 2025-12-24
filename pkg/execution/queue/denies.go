@@ -52,3 +52,11 @@ func (l *LeaseDenies) DenyThrottle(key string) bool {
 	l.lock.RUnlock()
 	return ok
 }
+
+func NewLeaseDenyList() *LeaseDenies {
+	return &LeaseDenies{
+		lock:        &sync.RWMutex{},
+		concurrency: map[string]struct{}{},
+		throttle:    map[string]struct{}{},
+	}
+}

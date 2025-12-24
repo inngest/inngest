@@ -7,32 +7,19 @@ import (
 
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/redis/rueidis"
+
+	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 )
 
-type PartitionInspectionResult struct {
-	QueuePartition       *QueuePartition
-	QueueShadowPartition *QueueShadowPartition
-
-	Paused            bool `json:"paused"`
-	Migrate           bool `json:"migrate"`
-	AccountActive     int  `json:"acct_active"`
-	AccountInProgress int  `json:"acct_in_progress"`
-	Ready             int  `json:"ready"`
-	InProgress        int  `json:"in_progress"`
-	Active            int  `json:"active"`
-	Future            int  `json:"future"`
-	Backlogs          int  `json:"backlogs"`
-}
-
-func (q *queue) PartitionByID(ctx context.Context, shard RedisQueueShard, partitionID string) (*PartitionInspectionResult, error) {
+func (q *queue) PartitionByID(ctx context.Context, partitionID string) (*osqueue.PartitionInspectionResult, error) {
 	var (
-		result PartitionInspectionResult
-		qp     QueuePartition
-		sqp    QueueShadowPartition
+		result osqueue.PartitionInspectionResult
+		qp     osqueue.QueuePartition
+		sqp    osqueue.QueueShadowPartition
 	)
 
-	rc := shard.RedisClient.Client()
-	kg := shard.RedisClient.kg
+	rc := q.RedisClient.Client()
+	kg := q.RedisClient.kg
 
 	// load queue partition
 	{
@@ -40,7 +27,7 @@ func (q *queue) PartitionByID(ctx context.Context, shard RedisQueueShard, partit
 		byt, err := rc.Do(ctx, cmd).AsBytes()
 		if err != nil {
 			if rueidis.IsRedisNil(err) {
-				return nil, ErrPartitionNotFound
+				return nil, osqueue.ErrPartitionNotFound
 			}
 
 			return nil, fmt.Errorf("error retrieving queue partition: %w", err)
@@ -83,7 +70,7 @@ func (q *queue) PartitionByID(ctx context.Context, shard RedisQueueShard, partit
 			kg.ShadowPartitionSet(sqp.PartitionID),
 		}
 		args, err := StrSlice([]any{
-			q.clock.Now().UnixMilli(),
+			q.Clock.Now().UnixMilli(),
 		})
 		if err != nil {
 			return nil, fmt.Errorf("error preparing args for redis: %w", err)
@@ -106,10 +93,10 @@ func (q *queue) PartitionByID(ctx context.Context, shard RedisQueueShard, partit
 
 	// Fetch paused + migrating state
 	if qp.FunctionID != nil {
-		paused := q.partitionPausedGetter(ctx, *qp.FunctionID)
+		paused := q.PartitionPausedGetter(ctx, *qp.FunctionID)
 		result.Paused = paused.Paused
 
-		locked, err := q.isMigrationLocked(ctx, shard, *qp.FunctionID)
+		locked, err := q.isMigrationLocked(ctx, *qp.FunctionID)
 		if err != nil {
 			return nil, fmt.Errorf("could not get locked state: %w", err)
 		}

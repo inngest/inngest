@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"iter"
 	"math"
 	"strconv"
 	"strings"
@@ -17,7 +16,6 @@ import (
 	"github.com/VividCortex/ewma"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/constraintapi"
-	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/logger"
@@ -33,48 +31,6 @@ import (
 const (
 	pkgName = "redis_state.state.execution.inngest"
 )
-
-type QueueManager interface {
-	osqueue.JobQueueReader
-	osqueue.Queue
-	osqueue.QueueDirectAccess
-
-	DequeueByJobID(ctx context.Context, jobID string, opts ...QueueOpOpt) error
-	Dequeue(ctx context.Context, queueShard RedisQueueShard, i osqueue.QueueItem, opts ...dequeueOptionFn) error
-	Requeue(ctx context.Context, queueShard RedisQueueShard, i osqueue.QueueItem, at time.Time, opts ...requeueOptionFn) error
-	RequeueByJobID(ctx context.Context, queueShard RedisQueueShard, jobID string, at time.Time) error
-
-	// ResetAttemptsByJobID sets retries to zero given a single job ID.  This is important for
-	// checkpointing;  a single job becomes shared amongst many  steps.
-	ResetAttemptsByJobID(ctx context.Context, shard string, jobID string) error
-
-	// ItemsByPartition returns a queue item iterator for a function within a specific time range
-	ItemsByPartition(ctx context.Context, queueShard RedisQueueShard, partitionID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*osqueue.QueueItem], error)
-	// ItemsByBacklog returns a queue item iterator for a backlog within a specific time range
-	ItemsByBacklog(ctx context.Context, queueShard RedisQueueShard, backlogID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*osqueue.QueueItem], error)
-	// BacklogsByPartition returns an iterator for the partition's backlogs
-	BacklogsByPartition(ctx context.Context, queueShard RedisQueueShard, partitionID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueBacklog], error)
-	// BacklogSize retrieves the number of items in the specified backlog
-	BacklogSize(ctx context.Context, queueShard RedisQueueShard, backlogID string) (int64, error)
-	// PartitionByID retrieves the partition by the partition ID
-	PartitionByID(ctx context.Context, queueShard RedisQueueShard, partitionID string) (*PartitionInspectionResult, error)
-	// ItemByID retrieves the queue item by the jobID
-	ItemByID(ctx context.Context, jobID string, opts ...QueueOpOpt) (*osqueue.QueueItem, error)
-	// ItemExists checks if an item with jobID exists in the queue
-	ItemExists(ctx context.Context, jobID string, opts ...QueueOpOpt) (bool, error)
-	// ItemsByRunID retrieves all queue items via runID
-	//
-	// NOTE
-	// The queue technically shouldn't know about runIDs, so we should make this more generic with certain type of indices in the future
-	ItemsByRunID(ctx context.Context, runID ulid.ULID, opts ...QueueOpOpt) ([]*osqueue.QueueItem, error)
-
-	// PartitionBacklogSize returns the point in time backlog size of the partition.
-	// This will sum the size of all backlogs in that partition
-	PartitionBacklogSize(ctx context.Context, partitionID string) (int64, error)
-
-	// Total queue depth of all partitions including backlog and ready state items
-	TotalSystemQueueDepth(ctx context.Context) (int64, error)
-}
 
 func (q *queue) Name() string {
 	return q.name
@@ -221,7 +177,7 @@ func shadowPartitionFunctionInProgressLeasesKey(sp osqueue.QueueShadowPartition,
 	return cm.KeyInProgressLeasesFunction(*sp.AccountID, *sp.FunctionID)
 }
 
-func (q *queue) EnqueueItem(ctx context.Context, shard osqueue.QueueShard, i osqueue.QueueItem, at time.Time, opts osqueue.EnqueueOpts) (osqueue.QueueItem, error) {
+func (q *queue) EnqueueItem(ctx context.Context, i osqueue.QueueItem, at time.Time, opts osqueue.EnqueueOpts) (osqueue.QueueItem, error) {
 	l := logger.StdlibLogger(ctx)
 
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "EnqueueItem"), redis_telemetry.ScopeQueue)
@@ -267,7 +223,7 @@ func (q *queue) EnqueueItem(ctx context.Context, shard osqueue.QueueShard, i osq
 
 	i.EnqueuedAt = now.UnixMilli()
 
-	defaultPartition := osqueue.ItemPartition(ctx, shard, i)
+	defaultPartition := osqueue.ItemPartition(ctx, i)
 
 	isSystemPartition := defaultPartition.IsSystem()
 
@@ -275,7 +231,7 @@ func (q *queue) EnqueueItem(ctx context.Context, shard osqueue.QueueShard, i osq
 		l.Warn("attempting to enqueue item to non-system partition without account ID", "item", i)
 	}
 
-	enqueueToBacklogs := q.itemEnableKeyQueues(ctx, i)
+	enqueueToBacklogs := q.ItemEnableKeyQueues(ctx, i)
 
 	var backlog osqueue.QueueBacklog
 	var shadowPartition osqueue.QueueShadowPartition
@@ -415,7 +371,7 @@ func (q *queue) dropPartitionPointerIfEmpty(ctx context.Context, keyIndex, keyPa
 	}
 }
 
-func (q *queue) SetFunctionMigrate(ctx context.Context, shard osqueue.QueueShard, fnID uuid.UUID, migrateLockUntil *time.Time) error {
+func (q *queue) SetFunctionMigrate(ctx context.Context, fnID uuid.UUID, migrateLockUntil *time.Time) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "SetFunctionMigrate"), redis_telemetry.ScopeQueue)
 	client := q.RedisClient.Client()
 	kg := q.RedisClient.KeyGenerator()
@@ -528,10 +484,9 @@ func (q *queue) Peek(ctx context.Context, partition *osqueue.QueuePartition, unt
 		limit = 1
 	}
 
-	partitionKey := partitionZsetKey(q.RedisClient.kg)
+	partitionKey := partitionZsetKey(*partition, q.RedisClient.kg)
 	return q.peek(
 		ctx,
-		q.primaryQueueShard,
 		peekOpts{
 			Limit:        limit,
 			Until:        until,
@@ -541,29 +496,25 @@ func (q *queue) Peek(ctx context.Context, partition *osqueue.QueuePartition, unt
 	)
 }
 
-func (q *queue) PeekRandom(ctx context.Context, partition *QueuePartition, until time.Time, limit int64) ([]*osqueue.QueueItem, error) {
+func (q *queue) PeekRandom(ctx context.Context, partition *osqueue.QueuePartition, until time.Time, limit int64) ([]*osqueue.QueueItem, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Peek"), redis_telemetry.ScopeQueue)
-	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
-		return nil, fmt.Errorf("unsupported queue shard kind for Peek: %s", q.primaryQueueShard.Kind)
-	}
 	if partition == nil {
 		return nil, fmt.Errorf("expected partition to be set")
 	}
-	if limit > AbsoluteQueuePeekMax {
+	if limit > osqueue.AbsoluteQueuePeekMax {
 		// Lua's max unpack() length is 8000; don't allow users to peek more than
 		// 1k at a time regardless.
-		limit = AbsoluteQueuePeekMax
+		limit = osqueue.AbsoluteQueuePeekMax
 	}
-	if limit > q.peekMax {
-		limit = q.peekMax
+	if limit > q.PeekMax {
+		limit = q.PeekMax
 	}
 	if limit <= 0 {
-		limit = q.peekMin
+		limit = q.PeekMin
 	}
-	partitionKey := partition.zsetKey(q.primaryQueueShard.RedisClient.kg)
+	partitionKey := partitionZsetKey(*partition, q.RedisClient.kg)
 	return q.peek(
 		ctx,
-		q.primaryQueueShard,
 		peekOpts{
 			Limit:        limit,
 			Until:        until,
@@ -2068,17 +2019,13 @@ func isKeyConcurrencyPointerItem(partition string) bool {
 //
 // If the sequential key is leased, this allows a worker to peek partitions sequentially.
 func (q *queue) ConfigLease(ctx context.Context, key string, duration time.Duration, existingLeaseID ...*ulid.ULID) (*ulid.ULID, error) {
-	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
-		return nil, fmt.Errorf("unsupported queue shard kind for ConfigLease: %s", q.primaryQueueShard.Kind)
-	}
-
-	if duration > ConfigLeaseMax {
-		return nil, ErrConfigLeaseExceedsLimits
+	if duration > osqueue.ConfigLeaseMax {
+		return nil, osqueue.ErrConfigLeaseExceedsLimits
 	}
 
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "ConfigLease"), redis_telemetry.ScopeQueue)
 
-	now := q.clock.Now()
+	now := q.Clock.Now()
 	newLeaseID, err := ulid.New(ulid.Timestamp(now.Add(duration)), rnd)
 	if err != nil {
 		return nil, err
@@ -2100,7 +2047,7 @@ func (q *queue) ConfigLease(ctx context.Context, key string, duration time.Durat
 
 	status, err := scripts["queue/configLease"].Exec(
 		redis_telemetry.WithScriptName(ctx, "configLease"),
-		q.primaryQueueShard.RedisClient.unshardedRc,
+		q.RedisClient.unshardedRc,
 		[]string{key},
 		args,
 	).AsInt64()
@@ -2111,7 +2058,7 @@ func (q *queue) ConfigLease(ctx context.Context, key string, duration time.Durat
 	case 0:
 		return &newLeaseID, nil
 	case 1:
-		return nil, ErrConfigAlreadyLeased
+		return nil, osqueue.ErrConfigAlreadyLeased
 	default:
 		return nil, fmt.Errorf("unknown response claiming config lease: %d", status)
 	}
@@ -2122,13 +2069,9 @@ func (q *queue) ConfigLease(ctx context.Context, key string, duration time.Durat
 func (q *queue) peekEWMA(ctx context.Context, fnID uuid.UUID) (int64, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "peekEWMA"), redis_telemetry.ScopeQueue)
 
-	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
-		return 0, fmt.Errorf("unsupported queue shard kind for peekEWMA: %s", q.primaryQueueShard.Kind)
-	}
-
 	// retrieves the list from redis
-	cmd := q.primaryQueueShard.RedisClient.Client().B().Lrange().Key(q.primaryQueueShard.RedisClient.KeyGenerator().ConcurrencyFnEWMA(fnID)).Start(0).Stop(-1).Build()
-	strlist, err := q.primaryQueueShard.RedisClient.Client().Do(ctx, cmd).AsStrSlice()
+	cmd := q.RedisClient.Client().B().Lrange().Key(q.RedisClient.KeyGenerator().ConcurrencyFnEWMA(fnID)).Start(0).Stop(-1).Build()
+	strlist, err := q.RedisClient.Client().Do(ctx, cmd).AsStrSlice()
 	if err != nil {
 		return 0, fmt.Errorf("error reading function concurrency EWMA values: %w", err)
 	}
@@ -2166,24 +2109,20 @@ func (q *queue) peekEWMA(ctx context.Context, fnID uuid.UUID) (int64, error) {
 
 // setPeekEWMA add the new value to the existing list.
 // if the length of the list exceeds the predetermined size, pop out the first item
-func (q *queue) setPeekEWMA(ctx context.Context, fnID *uuid.UUID, val int64) error {
+func (q *queue) SetPeekEWMA(ctx context.Context, fnID *uuid.UUID, val int64) error {
 	if fnID == nil {
 		return nil
 	}
 
-	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
-		return fmt.Errorf("unsupported queue shard kind for setPeekEWMA: %s", q.primaryQueueShard.Kind)
-	}
-
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "setPeekEWMA"), redis_telemetry.ScopeQueue)
 
-	listSize := q.peekEWMALen
+	listSize := q.PeekEWMALen
 	if listSize == 0 {
-		listSize = QueuePeekEWMALen
+		listSize = osqueue.QueuePeekEWMALen
 	}
 
 	keys := []string{
-		q.primaryQueueShard.RedisClient.kg.ConcurrencyFnEWMA(*fnID),
+		q.RedisClient.kg.ConcurrencyFnEWMA(*fnID),
 	}
 	args, err := StrSlice([]any{
 		val,
@@ -2195,7 +2134,7 @@ func (q *queue) setPeekEWMA(ctx context.Context, fnID *uuid.UUID, val int64) err
 
 	_, err = scripts["queue/setPeekEWMA"].Exec(
 		redis_telemetry.WithScriptName(ctx, "setPeekEWMA"),
-		q.primaryQueueShard.RedisClient.Client(),
+		q.RedisClient.Client(),
 		keys,
 		args,
 	).AsInt64()
@@ -2204,83 +2143,4 @@ func (q *queue) setPeekEWMA(ctx context.Context, fnID *uuid.UUID, val int64) err
 	}
 
 	return nil
-}
-
-// addContinue adds a continuation for the given partition.  This hints that the queue should
-// peek and process this partition on the next loop, allowing us to hint that a partition
-// should be processed when a step finishes (to decrease inter-step latency on non-connect
-// workloads).
-func (q *queue) addContinue(ctx context.Context, p *QueuePartition, ctr uint) {
-	if !q.runMode.Continuations {
-		// continuations are not enabled.
-		return
-	}
-
-	if ctr >= q.continuationLimit {
-		q.removeContinue(ctx, p, true)
-		return
-	}
-
-	q.continuesLock.Lock()
-	defer q.continuesLock.Unlock()
-
-	// If this is the first continuation, check if we're on a cooldown, or if we're
-	// beyond capacity.
-	if ctr == 1 {
-		if len(q.continues) > consts.QueueContinuationMaxPartitions {
-			metrics.IncrQueueContinuationMaxCapcityCounter(ctx, metrics.CounterOpt{PkgName: pkgName})
-			return
-		}
-		if t, ok := q.continueCooldown[p.Queue()]; ok && t.After(time.Now()) {
-			metrics.IncrQueueContinuationCooldownCounter(ctx, metrics.CounterOpt{PkgName: pkgName})
-			return
-		}
-
-		// Remove the continuation cooldown.
-		delete(q.continueCooldown, p.Queue())
-	}
-
-	c, ok := q.continues[p.Queue()]
-	if !ok || c.count < ctr {
-		// Update the continue count if it doesn't exist, or the current counter
-		// is higher.  This ensures that we always have the highest continuation
-		// count stored for queue processing.
-		q.continues[p.Queue()] = continuation{partition: p, count: ctr}
-		metrics.IncrQueueContinuationAddedCounter(ctx, metrics.CounterOpt{PkgName: pkgName})
-	}
-}
-
-func (q *queue) removeContinue(ctx context.Context, p *QueuePartition, cooldown bool) {
-	if !q.runMode.Continuations {
-		// continuations are not enabled.
-		return
-	}
-
-	// This is over the limit for conntinuing the partition, so force it to be
-	// removed in every case.
-	q.continuesLock.Lock()
-	defer q.continuesLock.Unlock()
-
-	metrics.IncrQueueContinuationRemovedCounter(ctx, metrics.CounterOpt{PkgName: pkgName})
-
-	delete(q.continues, p.Queue())
-
-	if cooldown {
-		// Add a cooldown, preventing this partition from being added as a continuation
-		// for a given period of time.
-		//
-		// Note that this isn't shared across replicas;  cooldowns
-		// only exist in the current replica.
-		q.continueCooldown[p.Queue()] = time.Now().Add(
-			consts.QueueContinuationCooldownPeriod,
-		)
-	}
-}
-
-func newLeaseDenyList() *leaseDenies {
-	return &leaseDenies{
-		lock:        &sync.RWMutex{},
-		concurrency: map[string]struct{}{},
-		throttle:    map[string]struct{}{},
-	}
 }

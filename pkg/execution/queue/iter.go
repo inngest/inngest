@@ -2,37 +2,37 @@ package queue
 
 import "time"
 
-type QueueIterOpt func(o *queueIterOpt)
+type QueueIterOpt func(o *QueueIterOptions)
 
-type queueIterOpt struct {
-	batchSize                 int64
-	interval                  time.Duration
-	iterateBacklogs           bool
-	enableMillisecondIncrease bool
+type QueueIterOptions struct {
+	BatchSize                 int64
+	Interval                  time.Duration
+	IterateBacklogs           bool
+	EnableMillisecondIncrease bool
 }
 
 func WithQueueItemIterBatchSize(size int64) QueueIterOpt {
-	return func(o *queueIterOpt) {
+	return func(o *QueueIterOptions) {
 		if size > 0 {
-			o.batchSize = size
+			o.BatchSize = size
 		}
 	}
 }
 
 func WithQueueItemIterInterval(itv time.Duration) QueueIterOpt {
-	return func(o *queueIterOpt) {
-		o.interval = itv
+	return func(o *QueueIterOptions) {
+		o.Interval = itv
 	}
 }
 
 func WithQueueItemIterEnableBacklog(iterateBacklogs bool) QueueIterOpt {
-	return func(o *queueIterOpt) {
-		o.iterateBacklogs = iterateBacklogs
+	return func(o *QueueIterOptions) {
+		o.IterateBacklogs = iterateBacklogs
 	}
 }
 
 func WithQueueItemIterDisableMillisecondIncrease() QueueIterOpt {
-	return func(o *queueIterOpt) {
-		o.enableMillisecondIncrease = false
+	return func(o *QueueIterOptions) {
+		o.EnableMillisecondIncrease = false
 	}
 }
