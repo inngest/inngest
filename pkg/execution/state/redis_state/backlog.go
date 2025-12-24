@@ -177,32 +177,28 @@ func backlogActiveKey(b osqueue.QueueBacklog, kg QueueKeyGenerator) string {
 
 func (q *queue) BacklogRefill(
 	ctx context.Context,
-	b *QueueBacklog,
-	sp *QueueShadowPartition,
+	b *osqueue.QueueBacklog,
+	sp *osqueue.QueueShadowPartition,
 	refillUntil time.Time,
 	refillItems []string,
-	latestConstraints PartitionConstraintConfig,
-	options ...backlogRefillOptionFn,
-) (*BacklogRefillResult, error) {
+	latestConstraints osqueue.PartitionConstraintConfig,
+	options ...osqueue.BacklogRefillOptionFn,
+) (*osqueue.BacklogRefillResult, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "BacklogRefill"), redis_telemetry.ScopeQueue)
 
-	o := &backlogRefillOptions{}
+	o := &osqueue.BacklogRefillOptions{}
 	for _, opt := range options {
 		opt(o)
 	}
 
-	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
-		return nil, fmt.Errorf("unsupported queue shard kind for BacklogRefill: %s", q.primaryQueueShard.Kind)
-	}
-
-	kg := q.primaryQueueShard.RedisClient.kg
+	kg := q.RedisClient.kg
 
 	accountID := uuid.Nil
 	if sp.AccountID != nil {
 		accountID = *sp.AccountID
 	}
 
-	nowMS := q.clock.Now().UnixMilli()
+	nowMS := q.Clock.Now().UnixMilli()
 
 	var (
 		keyThrottleState                             string
@@ -226,7 +222,7 @@ func (q *queue) BacklogRefill(
 		kg.GlobalAccountShadowPartitions(),
 		kg.AccountShadowPartitions(accountID),
 
-		sp.readyQueueKey(kg),
+		shadowPartitionReadyQueueKey(*sp, kg),
 		kg.GlobalPartitionIndex(),
 		kg.GlobalAccountIndex(),
 		kg.AccountPartitionIndex(accountID),
@@ -234,18 +230,18 @@ func (q *queue) BacklogRefill(
 		kg.QueueItem(),
 
 		// Constraint-related accounting keys
-		sp.accountActiveKey(kg),  // account active
-		sp.activeKey(kg),         // partition active
-		b.customKeyActive(kg, 1), // custom key 1
-		b.customKeyActive(kg, 2), // custom key 2
-		b.activeKey(kg),          // compound key (active for this backlog)
+		shadowPartitionAccountActiveKey(*sp, kg), // account active
+		shadowPartitionActiveKey(*sp, kg),        // partition active
+		backlogCustomKeyActive(*b, kg, 1),        // custom key 1
+		backlogCustomKeyActive(*b, kg, 2),        // custom key 2
+		backlogActiveKey(*b, kg),                 // compound key (active for this backlog)
 
 		// Active run sets
 		// kg.RunActiveSet(i.Data.Identifier.RunID), -> dynamically constructed in script for each item
-		sp.accountActiveRunKey(kg),   // Set for active runs in account
-		sp.activeRunKey(kg),          // Set for active runs in partition
-		b.customKeyActiveRuns(kg, 1), // Set for active runs with custom concurrency key 1
-		b.customKeyActiveRuns(kg, 2), // Set for active runs with custom concurrency key 2
+		shadowPartitionAccountActiveRunKey(*sp, kg), // Set for active runs in account
+		shadowPartitionActiveRunKey(*sp, kg),        // Set for active runs in partition
+		backlogCustomKeyActiveRuns(*b, kg, 1),       // Set for active runs with custom concurrency key 1
+		backlogCustomKeyActiveRuns(*b, kg, 2),       // Set for active runs with custom concurrency key 2
 
 		kg.BacklogActiveCheckSet(),
 		kg.BacklogActiveCheckCooldown(b.BacklogID),
@@ -253,14 +249,14 @@ func (q *queue) BacklogRefill(
 		kg.PartitionNormalizeSet(sp.PartitionID),
 
 		// Constraint API rollout
-		q.keyConstraintCheckIdempotency(sp.AccountID, o.constraintCheckIdempotencyKey),
+		q.keyConstraintCheckIdempotency(sp.AccountID, o.ConstraintCheckIdempotencyKey),
 	}
 
 	// Don't check constraints if
 	// - key queues have been disabled for this function (refill as quickly as possible)
 	// - capacity leases were successfully acquired
-	checkConstraints := sp.keyQueuesEnabled(ctx, q)
-	if o.disableConstraintChecks {
+	checkConstraints := sp.KeyQueuesEnabled(ctx, &q.QueueOptions)
+	if o.DisableConstraintChecks {
 		checkConstraints = false
 	}
 
@@ -270,11 +266,11 @@ func (q *queue) BacklogRefill(
 	}
 
 	// Enable conditional spot checking (probability in queue settings + feature flag)
-	refillProbability, _ := q.activeSpotCheckProbability(ctx, accountID)
+	refillProbability, _ := q.ActiveSpotCheckProbability(ctx, accountID)
 	shouldSpotCheckActiveSet := checkConstraints && rand.Intn(100) <= refillProbability
 
 	// Ensure capacityLeaseIDs is never nil to avoid JSON marshaling to "null"
-	capacityLeaseIDs := o.capacityLeases
+	capacityLeaseIDs := o.CapacityLeases
 	if capacityLeaseIDs == nil {
 		capacityLeaseIDs = []osqueue.CapacityLease{}
 	}
@@ -309,7 +305,7 @@ func (q *queue) BacklogRefill(
 
 	res, err := scripts["queue/backlogRefill"].Exec(
 		redis_telemetry.WithScriptName(ctx, "backlogRefill"),
-		q.primaryQueueShard.RedisClient.unshardedRc,
+		q.RedisClient.unshardedRc,
 		keys,
 		args,
 	).ToAny()
@@ -375,7 +371,7 @@ func (q *queue) BacklogRefill(
 		retryAt = time.UnixMilli(retryAtMillis)
 	}
 
-	refillResult := &BacklogRefillResult{
+	refillResult := &osqueue.BacklogRefillResult{
 		Refilled:          int(refillCount),
 		TotalBacklogCount: int(backlogCountTotal),
 		BacklogCountUntil: int(backlogCountUntil),
@@ -408,14 +404,12 @@ func (q *queue) BacklogRefill(
 	}
 }
 
-func (q *queue) BacklogRequeue(ctx context.Context, backlog *QueueBacklog, sp *QueueShadowPartition, requeueAt time.Time) error {
+func (q *queue) BacklogRequeue(ctx context.Context, backlog *osqueue.QueueBacklog, sp *osqueue.QueueShadowPartition, requeueAt time.Time) error {
+	l := logger.StdlibLogger(ctx)
+
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "BacklogRequeue"), redis_telemetry.ScopeQueue)
 
-	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
-		return fmt.Errorf("unsupported queue shard kind for BacklogRequeue: %s", q.primaryQueueShard.Kind)
-	}
-
-	kg := q.primaryQueueShard.RedisClient.kg
+	kg := q.RedisClient.kg
 
 	accountID := uuid.Nil
 	if sp.AccountID != nil {
@@ -447,7 +441,7 @@ func (q *queue) BacklogRequeue(ctx context.Context, backlog *QueueBacklog, sp *Q
 
 	status, err := scripts["queue/backlogRequeue"].Exec(
 		redis_telemetry.WithScriptName(ctx, "backlogRequeue"),
-		q.primaryQueueShard.RedisClient.unshardedRc,
+		q.RedisClient.unshardedRc,
 		keys,
 		args,
 	).AsInt64()
@@ -455,7 +449,7 @@ func (q *queue) BacklogRequeue(ctx context.Context, backlog *QueueBacklog, sp *Q
 		return fmt.Errorf("could not requeue backlog: %w", err)
 	}
 
-	q.log.Trace("requeued backlog",
+	l.Trace("requeued backlog",
 		"id", backlog.BacklogID,
 		"partition", sp.PartitionID,
 		"time", requeueAt.Format(time.StampMilli),
@@ -468,21 +462,16 @@ func (q *queue) BacklogRequeue(ctx context.Context, backlog *QueueBacklog, sp *Q
 	case 0, 1:
 		return nil
 	case -1:
-		return ErrBacklogNotFound
+		return osqueue.ErrBacklogNotFound
 	default:
 		return fmt.Errorf("unknown response requeueing backlog: %v (%T)", status, status)
 	}
 }
 
-func (q *queue) BacklogPrepareNormalize(ctx context.Context, b *QueueBacklog, sp *QueueShadowPartition) error {
+func (q *queue) BacklogPrepareNormalize(ctx context.Context, b *osqueue.QueueBacklog, sp *osqueue.QueueShadowPartition) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "BacklogPrepareNormalize"), redis_telemetry.ScopeQueue)
 
-	shard := q.primaryQueueShard
-
-	if shard.Kind != string(enums.QueueShardKindRedis) {
-		return fmt.Errorf("unsupported queue shard kind for BacklogPrepareNormalize: %s", shard.Kind)
-	}
-	kg := shard.RedisClient.kg
+	kg := q.RedisClient.kg
 
 	accountID := uuid.Nil
 	if sp.AccountID != nil {
@@ -508,7 +497,7 @@ func (q *queue) BacklogPrepareNormalize(ctx context.Context, b *QueueBacklog, sp
 		sp.PartitionID,
 		accountID,
 		// order normalize by timestamp
-		q.clock.Now().UnixMilli(),
+		q.Clock.Now().UnixMilli(),
 	})
 	if err != nil {
 		return fmt.Errorf("could not serialize args: %w", err)
@@ -516,7 +505,7 @@ func (q *queue) BacklogPrepareNormalize(ctx context.Context, b *QueueBacklog, sp
 
 	status, err := scripts["queue/backlogPrepareNormalize"].Exec(
 		redis_telemetry.WithScriptName(ctx, "backlogPrepareNormalize"),
-		shard.RedisClient.unshardedRc,
+		q.RedisClient.unshardedRc,
 		keys,
 		args,
 	).ToInt64()
@@ -528,21 +517,22 @@ func (q *queue) BacklogPrepareNormalize(ctx context.Context, b *QueueBacklog, sp
 	case 1:
 		return nil
 	case -1:
-		return ErrBacklogGarbageCollected
+		return osqueue.ErrBacklogGarbageCollected
 	default:
 		return fmt.Errorf("unknown status preparing backlog normalization: %v (%T)", status, status)
 	}
 }
 
 // BacklogPeek is the public interface to peek items from a backlog
-func (q *queue) BacklogPeek(ctx context.Context, b *QueueBacklog, from time.Time, until time.Time, limit int64, opts ...PeekOpt) ([]*osqueue.QueueItem, int, error) {
+func (q *queue) BacklogPeek(ctx context.Context, b *osqueue.QueueBacklog, from time.Time, until time.Time, limit int64, opts ...PeekOpt) ([]*osqueue.QueueItem, int, error) {
 	return q.backlogPeek(ctx, b, from, until, limit, opts...)
 }
 
 // backlogPeek peeks item from the given backlog.
 //
 // Pointers to missing items will be removed from the backlog.
-func (q *queue) backlogPeek(ctx context.Context, b *QueueBacklog, from time.Time, until time.Time, limit int64, opts ...PeekOpt) ([]*osqueue.QueueItem, int, error) {
+func (q *queue) backlogPeek(ctx context.Context, b *osqueue.QueueBacklog, from time.Time, until time.Time, limit int64, opts ...PeekOpt) ([]*osqueue.QueueItem, int, error) {
+	l := logger.StdlibLogger(ctx)
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "backlogPeek"), redis_telemetry.ScopeQueue)
 
 	opt := peekOption{}
@@ -550,19 +540,15 @@ func (q *queue) backlogPeek(ctx context.Context, b *QueueBacklog, from time.Time
 		apply(&opt)
 	}
 
-	if !q.isPermittedQueueKind() {
-		return nil, 0, fmt.Errorf("unsupported queue shared kind for backlogPeek: %s", q.primaryQueueShard.Kind)
-	}
-
 	if b == nil {
 		return nil, 0, fmt.Errorf("expected backlog to be provided")
 	}
 
-	if limit > AbsoluteQueuePeekMax || limit > q.peekMax {
-		limit = q.peekMax
+	if limit > osqueue.AbsoluteQueuePeekMax || limit > q.PeekMax {
+		limit = q.PeekMax
 	}
 	if limit <= 0 {
-		limit = q.peekMin
+		limit = q.PeekMin
 	}
 
 	var fromTime *time.Time
@@ -570,7 +556,7 @@ func (q *queue) backlogPeek(ctx context.Context, b *QueueBacklog, from time.Time
 		fromTime = &from
 	}
 
-	l := q.log.With(
+	l = l.With(
 		"method", "backlogPeek",
 		"backlog", b,
 		"from", from,
@@ -578,18 +564,14 @@ func (q *queue) backlogPeek(ctx context.Context, b *QueueBacklog, from time.Time
 		"limit", limit,
 	)
 
-	rc := q.primaryQueueShard.RedisClient
-	if opt.Shard != nil {
-		rc = opt.Shard.RedisClient
-	}
-
+	rc := q.RedisClient
 	backlogSet := rc.kg.BacklogSet(b.BacklogID)
 
 	p := peeker[osqueue.QueueItem]{
 		q:               q,
 		opName:          "backlogPeek",
 		keyMetadataHash: rc.kg.QueueItem(),
-		max:             q.peekMax,
+		max:             q.PeekMax,
 		maker: func() *osqueue.QueueItem {
 			return &osqueue.QueueItem{}
 		},
@@ -601,7 +583,7 @@ func (q *queue) backlogPeek(ctx context.Context, b *QueueBacklog, from time.Time
 	res, err := p.peek(ctx, backlogSet, true, until, limit, opts...)
 	if err != nil {
 		if errors.Is(err, ErrPeekerPeekExceedsMaxLimits) {
-			return nil, 0, ErrBacklogPeekMaxExceedsLimits
+			return nil, 0, osqueue.ErrBacklogPeekMaxExceedsLimits
 		}
 		return nil, 0, fmt.Errorf("error peeking backlog queue items, %w", err)
 	}
@@ -610,52 +592,51 @@ func (q *queue) backlogPeek(ctx context.Context, b *QueueBacklog, from time.Time
 }
 
 // NOTE: this function only work with key queues
-func (q *queue) BacklogsByPartition(ctx context.Context, queueShard RedisQueueShard, partitionID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueBacklog], error) {
-	opt := queueIterOpt{
-		batchSize:                 1000,
-		interval:                  50 * time.Millisecond,
-		enableMillisecondIncrease: true,
+func (q *queue) BacklogsByPartition(ctx context.Context, partitionID string, from time.Time, until time.Time, opts ...osqueue.QueueIterOpt) (iter.Seq[*osqueue.QueueBacklog], error) {
+	l := logger.StdlibLogger(ctx)
+	opt := osqueue.QueueIterOptions{
+		BatchSize:                 1000,
+		Interval:                  50 * time.Millisecond,
+		EnableMillisecondIncrease: true,
 	}
 	for _, apply := range opts {
 		apply(&opt)
 	}
 
-	l := q.log.With(
+	l = l.With(
 		"method", "BacklogsByPartition",
 		"partitionID", partitionID,
 		"from", from,
 		"until", until,
 	)
 
-	kg := queueShard.RedisClient.kg
+	kg := q.RedisClient.kg
 
-	return func(yield func(*QueueBacklog) bool) {
+	return func(yield func(*osqueue.QueueBacklog) bool) {
 		hashKey := kg.BacklogMeta()
 		ptFrom := from
 
 		for {
 			var iterated int
 
-			peeker := peeker[QueueBacklog]{
+			peeker := peeker[osqueue.QueueBacklog]{
 				q:                      q,
-				max:                    opt.batchSize,
+				max:                    opt.BatchSize,
 				opName:                 "backlogsByPartition",
 				isMillisecondPrecision: true,
 				handleMissingItems: func(pointers []string) error {
 					// don't interfere, clean up will happen in normal processing anyways
 					return nil
 				},
-				maker: func() *QueueBacklog {
-					return &QueueBacklog{}
+				maker: func() *osqueue.QueueBacklog {
+					return &osqueue.QueueBacklog{}
 				},
 				keyMetadataHash: hashKey,
 				fromTime:        &ptFrom,
 			}
 
 			isSequential := true
-			res, err := peeker.peek(ctx, kg.ShadowPartitionSet(partitionID), isSequential, until, opt.batchSize,
-				WithPeekOptQueueShard(&queueShard),
-			)
+			res, err := peeker.peek(ctx, kg.ShadowPartitionSet(partitionID), isSequential, until, opt.BatchSize)
 			if err != nil {
 				l.Error("error peeking backlogs for partition", "partition_id", partitionID, "err", err)
 				return
@@ -682,7 +663,7 @@ func (q *queue) BacklogsByPartition(ctx context.Context, queueShard RedisQueueSh
 				break
 			}
 
-			if opt.enableMillisecondIncrease {
+			if opt.EnableMillisecondIncrease {
 				// shift the starting point 1ms so it doesn't try to grab the same stuff again
 				// NOTE: this could result skipping items if the previous batch of items are all on
 				// the same millisecond
@@ -690,7 +671,7 @@ func (q *queue) BacklogsByPartition(ctx context.Context, queueShard RedisQueueSh
 			}
 
 			// wait a little before processing the next batch
-			<-time.After(opt.interval)
+			<-time.After(opt.Interval)
 		}
 	}, nil
 }
@@ -698,73 +679,52 @@ func (q *queue) BacklogsByPartition(ctx context.Context, queueShard RedisQueueSh
 func (q *queue) PartitionBacklogSize(ctx context.Context, partitionID string) (int64, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "partitionBacklogSize"), redis_telemetry.ScopeQueue)
 
-	if q.queueShardClients == nil {
-		return 0, nil
-	}
-
-	l := q.log.With(
+	l := logger.StdlibLogger(ctx).With(
 		"method", "PartitionBacklogSize",
 		"partition_id", partitionID,
 	)
 
-	var (
-		wg    sync.WaitGroup
-		count int64
-	)
-	until := q.clock.Now().Add(24 * time.Hour * 365) // 1y ahead
+	var count int64
+	until := q.Clock.Now().Add(24 * time.Hour * 365) // 1y ahead
 
-	for _, shard := range q.queueShardClients {
-		shard := shard
+	log := l.With("shard", q.name)
 
-		wg.Add(1)
+	backlogs, err := q.BacklogsByPartition(ctx, partitionID, time.Time{}, until)
+	if err != nil {
+		return 0, fmt.Errorf("could not prepare backlog iterator: %w", err)
+	}
+
+	bwg := sync.WaitGroup{}
+	for bl := range backlogs {
+		bwg.Add(1)
+		backlogID := bl.BacklogID
+
 		go func() {
-			defer wg.Done()
+			defer bwg.Done()
 
-			log := l.With("shard", shard.Name)
-
-			backlogs, err := q.BacklogsByPartition(ctx, shard, partitionID, time.Time{}, until)
+			size, err := q.BacklogSize(ctx, backlogID)
 			if err != nil {
-				log.ReportError(err, "error preparing backlog iterator")
+				log.ReportError(err, "error retrieving backlog size",
+					logger.WithErrorReportTags(map[string]string{
+						"backlog":   bl.BacklogID,
+						"partition": bl.ShadowPartitionID,
+					}),
+				)
 				return
 			}
-
-			bwg := sync.WaitGroup{}
-			for bl := range backlogs {
-				bwg.Add(1)
-				backlogID := bl.BacklogID
-
-				go func() {
-					defer bwg.Done()
-
-					size, err := q.BacklogSize(ctx, shard, backlogID)
-					if errors.Is(err, context.Canceled) {
-						return
-					}
-					if err != nil {
-						log.ReportError(err, "error retrieving backlog size",
-							logger.WithErrorReportTags(map[string]string{
-								"backlog":   bl.BacklogID,
-								"partition": bl.ShadowPartitionID,
-							}),
-						)
-						return
-					}
-					atomic.AddInt64(&count, size)
-				}()
-			}
-			bwg.Wait()
+			atomic.AddInt64(&count, size)
 		}()
 	}
-	wg.Wait()
+	bwg.Wait()
 
 	return count, nil
 }
 
-func (q *queue) BacklogSize(ctx context.Context, queueShard RedisQueueShard, backlogID string) (int64, error) {
+func (q *queue) BacklogSize(ctx context.Context, backlogID string) (int64, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "backlogSize"), redis_telemetry.ScopeQueue)
 
-	rc := queueShard.RedisClient.Client()
-	cmd := rc.B().Zcard().Key(queueShard.RedisClient.kg.BacklogSet(backlogID)).Build()
+	rc := q.RedisClient.Client()
+	cmd := rc.B().Zcard().Key(q.RedisClient.kg.BacklogSet(backlogID)).Build()
 	count, err := rc.Do(ctx, cmd).AsInt64()
 	if rueidis.IsRedisNil(err) {
 		return 0, nil
