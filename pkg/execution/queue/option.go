@@ -159,14 +159,14 @@ func WithBacklogNormalizePollTick(t time.Duration) QueueOpt {
 // for available backlogs to normalize.
 func WithActiveCheckPollTick(t time.Duration) QueueOpt {
 	return func(q *QueueOptions) {
-		q.activeCheckTick = t
+		q.ActiveCheckTick = t
 	}
 }
 
 // WithActiveCheckAccountProbability specifies the probability of processing accounts vs. backlogs during an active check run.
 func WithActiveCheckAccountProbability(p int) QueueOpt {
 	return func(q *QueueOptions) {
-		q.activeCheckAccountProbability = p
+		q.ActiveCheckAccountProbability = p
 	}
 }
 
@@ -174,7 +174,7 @@ func WithActiveCheckAccountProbability(p int) QueueOpt {
 func WithActiveCheckAccountConcurrency(p int) QueueOpt {
 	return func(q *QueueOptions) {
 		if p > 0 {
-			q.activeCheckAccountConcurrency = int64(p)
+			q.ActiveCheckAccountConcurrency = int64(p)
 		}
 	}
 }
@@ -183,7 +183,7 @@ func WithActiveCheckAccountConcurrency(p int) QueueOpt {
 func WithActiveCheckBacklogConcurrency(p int) QueueOpt {
 	return func(q *QueueOptions) {
 		if p > 0 {
-			q.activeCheckBacklogConcurrency = int64(p)
+			q.ActiveCheckBacklogConcurrency = int64(p)
 		}
 	}
 }
@@ -192,7 +192,7 @@ func WithActiveCheckBacklogConcurrency(p int) QueueOpt {
 func WithActiveCheckScanBatchSize(p int) QueueOpt {
 	return func(q *QueueOptions) {
 		if p > 0 {
-			q.activeCheckScanBatchSize = int64(p)
+			q.ActiveCheckScanBatchSize = int64(p)
 		}
 	}
 }
@@ -374,14 +374,14 @@ type QueueOptions struct {
 	AllowKeyQueues                  AllowKeyQueues
 	PartitionConstraintConfigGetter PartitionConstraintConfigGetter
 
-	activeCheckTick               time.Duration
-	activeCheckAccountConcurrency int64
-	activeCheckBacklogConcurrency int64
-	activeCheckScanBatchSize      int64
+	ActiveCheckTick               time.Duration
+	ActiveCheckAccountConcurrency int64
+	ActiveCheckBacklogConcurrency int64
+	ActiveCheckScanBatchSize      int64
 
-	activeCheckAccountProbability int
-	activeSpotCheckProbability    ActiveSpotChecksProbability
-	readOnlySpotChecks            ReadOnlySpotChecks
+	ActiveCheckAccountProbability int
+	ActiveSpotCheckProbability    ActiveSpotChecksProbability
+	ReadOnlySpotChecks            ReadOnlySpotChecks
 
 	shadowPartitionProcessCount QueueShadowPartitionProcessCount
 
@@ -538,13 +538,13 @@ type (
 
 func WithActiveSpotCheckProbability(fn ActiveSpotChecksProbability) QueueOpt {
 	return func(q *QueueOptions) {
-		q.activeSpotCheckProbability = fn
+		q.ActiveSpotCheckProbability = fn
 	}
 }
 
 func WithReadOnlySpotChecks(fn ReadOnlySpotChecks) QueueOpt {
 	return func(q *QueueOptions) {
-		q.readOnlySpotChecks = fn
+		q.ReadOnlySpotChecks = fn
 	}
 }
 
