@@ -128,7 +128,7 @@ func (q *queueProcessor) scan(ctx context.Context) error {
 			peekedAccounts = q.runMode.ExclusiveAccounts
 		} else {
 			peeked, err := Duration(ctx, q.PrimaryQueueShard.Name(), "account_peek", q.Clock.Now(), func(ctx context.Context) ([]uuid.UUID, error) {
-				return q.PrimaryQueueShard.Processor().AccountPeek(ctx, q.isSequential(), peekUntil, AccountPeekMax)
+				return q.PrimaryQueueShard.AccountPeek(ctx, q.isSequential(), peekUntil, AccountPeekMax)
 			})
 			if err != nil {
 				return fmt.Errorf("could not peek accounts: %w", err)
@@ -210,7 +210,7 @@ func (q *queueProcessor) scan(ctx context.Context) error {
 }
 
 func (q *queueProcessor) ScanAccountPartitions(ctx context.Context, accountID uuid.UUID, peekLimit int64, peekUntil time.Time, metricShardName string, reportPeekedPartitions *int64) error {
-	partitions, err := q.PrimaryQueueShard.Processor().PeekAccountPartitions(ctx, accountID, peekLimit, peekUntil, q.isSequential())
+	partitions, err := q.PrimaryQueueShard.PeekAccountPartitions(ctx, accountID, peekLimit, peekUntil, q.isSequential())
 	if err != nil {
 		return fmt.Errorf("could not peek account partitions: %w", err)
 	}
@@ -219,7 +219,7 @@ func (q *queueProcessor) ScanAccountPartitions(ctx context.Context, accountID uu
 }
 
 func (q *queueProcessor) ScanGlobalPartitions(ctx context.Context, peekLimit int64, peekUntil time.Time, metricShardName string, reportPeekedPartitions *int64) error {
-	partitions, err := q.PrimaryQueueShard.Processor().PeekGlobalPartitions(ctx, peekLimit, peekUntil, q.isSequential())
+	partitions, err := q.PrimaryQueueShard.PeekGlobalPartitions(ctx, peekLimit, peekUntil, q.isSequential())
 	if err != nil {
 		return fmt.Errorf("could not peek global partitions: %w", err)
 	}
