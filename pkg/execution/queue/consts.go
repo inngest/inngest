@@ -140,3 +140,8 @@ const (
 const (
 	minWorkersFree = 5
 )
+
+const (
+	ScavengePeekSize                 = 100
+	ScavengeConcurrencyQueuePeekSize = 100
+)

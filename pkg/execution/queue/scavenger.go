@@ -9,7 +9,7 @@ import (
 
 func (q *queueProcessor) runScavenger(ctx context.Context) {
 	// Attempt to claim the lease immediately.
-	leaseID, err := q.ConfigLease(ctx, q.primaryQueueShard.RedisClient.kg.Scavenger(), ConfigLeaseDuration, q.scavengerLease())
+	leaseID, err := q.PrimaryQueueShard.Processor().ConfigLease(ctx, "scavenger", ConfigLeaseDuration, q.scavengerLease())
 	if err != ErrConfigAlreadyLeased && err != nil {
 		q.quit <- err
 		return
@@ -19,8 +19,8 @@ func (q *queueProcessor) runScavenger(ctx context.Context) {
 	q.scavengerLeaseID = leaseID // no-op if not leased
 	q.scavengerLeaseLock.Unlock()
 
-	tick := q.clock.NewTicker(ConfigLeaseDuration / 3)
-	scavenge := q.clock.NewTicker(30 * time.Second)
+	tick := q.Clock.NewTicker(ConfigLeaseDuration / 3)
+	scavenge := q.Clock.NewTicker(30 * time.Second)
 
 	for {
 		select {
@@ -31,7 +31,7 @@ func (q *queueProcessor) runScavenger(ctx context.Context) {
 		case <-scavenge.Chan():
 			// Scavenge the items
 			if q.isScavenger() {
-				count, err := q.Scavenge(ctx, ScavengePeekSize)
+				count, err := q.PrimaryQueueShard.Processor().Scavenge(ctx, ScavengePeekSize)
 				if err != nil {
 					q.log.Error("error scavenging", "error", err)
 				}
@@ -41,7 +41,7 @@ func (q *queueProcessor) runScavenger(ctx context.Context) {
 			}
 		case <-tick.Chan():
 			// Attempt to re-lease the lock.
-			leaseID, err := q.ConfigLease(ctx, q.primaryQueueShard.RedisClient.kg.Scavenger(), ConfigLeaseDuration, q.scavengerLease())
+			leaseID, err := q.PrimaryQueueShard.Processor().ConfigLease(ctx, "scavenger", ConfigLeaseDuration, q.scavengerLease())
 			if err == ErrConfigAlreadyLeased {
 				// This is expected; every time there is > 1 runner listening to the
 				// queue there will be contention.
@@ -62,7 +62,7 @@ func (q *queueProcessor) runScavenger(ctx context.Context) {
 			if q.scavengerLeaseID == nil {
 				// Only track this if we're creating a new lease, not if we're renewing
 				// a lease.
-				metrics.IncrQueueSequentialLeaseClaimsCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name}})
+				metrics.IncrQueueSequentialLeaseClaimsCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.PrimaryQueueShard.Name}})
 			}
 			q.scavengerLeaseID = leaseID
 			q.scavengerLeaseLock.Unlock()
