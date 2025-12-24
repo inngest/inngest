@@ -3,6 +3,7 @@ package queue
 import (
 	"context"
 	"fmt"
+	"iter"
 	"sync"
 	"time"
 
@@ -30,7 +31,7 @@ func NewQueueProcessor(
 	queueShardClients map[string]QueueShard,
 	shardSelector ShardSelector,
 	options ...QueueOpt,
-) (Queue, error) {
+) (QueueManager, error) {
 	o := NewQueueOptions(ctx, options...)
 
 	qp := &queueProcessor{
@@ -120,6 +121,86 @@ type queueProcessor struct {
 	// scavengerLeaseLock ensures that there are no data races writing to
 	// or reading from scavengerLeaseID in parallel.
 	scavengerLeaseLock *sync.RWMutex
+}
+
+// BacklogSize implements QueueManager.
+func (q *queueProcessor) BacklogSize(ctx context.Context, queueShard QueueShard, backlogID string) (int64, error) {
+	panic("unimplemented")
+}
+
+// BacklogsByPartition implements QueueManager.
+func (q *queueProcessor) BacklogsByPartition(ctx context.Context, queueShard QueueShard, partitionID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueBacklog], error) {
+	panic("unimplemented")
+}
+
+// Dequeue implements QueueManager.
+func (q *queueProcessor) Dequeue(ctx context.Context, queueShard QueueShard, i QueueItem, opts ...DequeueOptionFn) error {
+	panic("unimplemented")
+}
+
+// DequeueByJobID implements QueueManager.
+func (q *queueProcessor) DequeueByJobID(ctx context.Context, jobID string) error {
+	panic("unimplemented")
+}
+
+// ItemByID implements QueueManager.
+func (q *queueProcessor) ItemByID(ctx context.Context, jobID string) (*QueueItem, error) {
+	panic("unimplemented")
+}
+
+// ItemExists implements QueueManager.
+func (q *queueProcessor) ItemExists(ctx context.Context, jobID string) (bool, error) {
+	panic("unimplemented")
+}
+
+// ItemsByBacklog implements QueueManager.
+func (q *queueProcessor) ItemsByBacklog(ctx context.Context, queueShard QueueShard, backlogID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueItem], error) {
+	panic("unimplemented")
+}
+
+// ItemsByPartition implements QueueManager.
+func (q *queueProcessor) ItemsByPartition(ctx context.Context, queueShard QueueShard, partitionID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueItem], error) {
+	panic("unimplemented")
+}
+
+// ItemsByRunID implements QueueManager.
+func (q *queueProcessor) ItemsByRunID(ctx context.Context, runID ulid.ULID) ([]*QueueItem, error) {
+	panic("unimplemented")
+}
+
+// LoadQueueItem implements QueueManager.
+func (q *queueProcessor) LoadQueueItem(ctx context.Context, shard string, itemID string) (*QueueItem, error) {
+	panic("unimplemented")
+}
+
+// PartitionBacklogSize implements QueueManager.
+func (q *queueProcessor) PartitionBacklogSize(ctx context.Context, partitionID string) (int64, error) {
+	panic("unimplemented")
+}
+
+// PartitionByID implements QueueManager.
+func (q *queueProcessor) PartitionByID(ctx context.Context, queueShard QueueShard, partitionID string) (*PartitionInspectionResult, error) {
+	panic("unimplemented")
+}
+
+// RemoveQueueItem implements QueueManager.
+func (q *queueProcessor) RemoveQueueItem(ctx context.Context, shard string, partitionKey string, itemID string) error {
+	panic("unimplemented")
+}
+
+// Requeue implements QueueManager.
+func (q *queueProcessor) Requeue(ctx context.Context, queueShard QueueShard, i QueueItem, at time.Time, opts ...RequeueOptionFn) error {
+	panic("unimplemented")
+}
+
+// RequeueByJobID implements QueueManager.
+func (q *queueProcessor) RequeueByJobID(ctx context.Context, queueShard QueueShard, jobID string, at time.Time) error {
+	panic("unimplemented")
+}
+
+// TotalSystemQueueDepth implements QueueManager.
+func (q *queueProcessor) TotalSystemQueueDepth(ctx context.Context) (int64, error) {
+	panic("unimplemented")
 }
 
 // OutstandingJobCount implements Queue.

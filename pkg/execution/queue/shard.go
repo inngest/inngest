@@ -18,11 +18,11 @@ type QueueShard interface {
 func (q *queueProcessor) selectShard(ctx context.Context, shardName string, qi QueueItem) (QueueShard, error) {
 	l := logger.StdlibLogger(ctx)
 
-	shard := q.PrimaryQueueShard
+	shard := q.primaryQueueShard
 	switch {
 	// If the caller wants us to enqueue the job to a specific queue shard, use that.
 	case shardName != "":
-		foundShard, ok := q.QueueShardClients[shardName]
+		foundShard, ok := q.queueShardClients[shardName]
 		if !ok {
 			return shard, fmt.Errorf("tried to force invalid queue shard %q", shardName)
 		}
