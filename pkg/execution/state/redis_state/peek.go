@@ -16,19 +16,6 @@ import (
 	"github.com/redis/rueidis"
 )
 
-type PeekOpt func(p *peekOption)
-
-type peekOption struct {
-	ignoreCleanup bool
-}
-
-// WithPeekOptIgnoreCleanup will prevent missing items from being deleted.
-func WithPeekOptIgnoreCleanup() PeekOpt {
-	return func(p *peekOption) {
-		p.ignoreCleanup = true
-	}
-}
-
 type peeker[T any] struct {
 	q      *queue
 	max    int64
@@ -52,12 +39,12 @@ type peeker[T any] struct {
 var ErrPeekerPeekExceedsMaxLimits = fmt.Errorf("provided limit exceeds max configured limit")
 
 // peek peeks up to <limit> items from the given ZSET up to until, in order if sequential is true, otherwise randomly.
-func (p *peeker[T]) peek(ctx context.Context, keyOrderedPointerSet string, sequential bool, until time.Time, limit int64, opts ...PeekOpt) (*osqueue.PeekResult[T], error) {
+func (p *peeker[T]) peek(ctx context.Context, keyOrderedPointerSet string, sequential bool, until time.Time, limit int64, opts ...osqueue.PeekOpt) (*osqueue.PeekResult[T], error) {
 	l := logger.StdlibLogger(ctx)
 
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, p.opName), redis_telemetry.ScopeQueue)
 
-	opt := peekOption{}
+	opt := osqueue.PeekOption{}
 	for _, apply := range opts {
 		apply(&opt)
 	}
@@ -209,7 +196,7 @@ func (p *peeker[T]) peek(ctx context.Context, keyOrderedPointerSet string, seque
 		return nil, fmt.Errorf("error decoding items: %w", err)
 	}
 
-	if !opt.ignoreCleanup && p.handleMissingItems != nil && len(missingItems) > 0 {
+	if !opt.IgnoreCleanup && p.handleMissingItems != nil && len(missingItems) > 0 {
 		if err := p.handleMissingItems(missingItems); err != nil {
 			return nil, fmt.Errorf("could not handle missing items: %w", err)
 		}

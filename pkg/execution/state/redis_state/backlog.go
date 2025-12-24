@@ -523,19 +523,14 @@ func (q *queue) BacklogPrepareNormalize(ctx context.Context, b *osqueue.QueueBac
 	}
 }
 
-// BacklogPeek is the public interface to peek items from a backlog
-func (q *queue) BacklogPeek(ctx context.Context, b *osqueue.QueueBacklog, from time.Time, until time.Time, limit int64, opts ...PeekOpt) ([]*osqueue.QueueItem, int, error) {
-	return q.backlogPeek(ctx, b, from, until, limit, opts...)
-}
-
-// backlogPeek peeks item from the given backlog.
+// BacklogPeek peeks item from the given backlog.
 //
 // Pointers to missing items will be removed from the backlog.
-func (q *queue) backlogPeek(ctx context.Context, b *osqueue.QueueBacklog, from time.Time, until time.Time, limit int64, opts ...PeekOpt) ([]*osqueue.QueueItem, int, error) {
+func (q *queue) BacklogPeek(ctx context.Context, b *osqueue.QueueBacklog, from time.Time, until time.Time, limit int64, opts ...osqueue.PeekOpt) ([]*osqueue.QueueItem, int, error) {
 	l := logger.StdlibLogger(ctx)
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "backlogPeek"), redis_telemetry.ScopeQueue)
 
-	opt := peekOption{}
+	opt := osqueue.PeekOption{}
 	for _, apply := range opts {
 		apply(&opt)
 	}

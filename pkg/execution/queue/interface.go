@@ -208,6 +208,23 @@ type QueueProcessor interface {
 
 	PeekGlobalShadowPartitionAccounts(ctx context.Context, sequential bool, until time.Time, limit int64) ([]uuid.UUID, error)
 
+	ShadowPartitionRequeue(ctx context.Context, sp *QueueShadowPartition, requeueAt *time.Time) error
+	ShadowPartitionLease(ctx context.Context, sp *QueueShadowPartition, duration time.Duration) (*ulid.ULID, error)
+	ShadowPartitionExtendLease(ctx context.Context, sp *QueueShadowPartition, leaseID ulid.ULID, duration time.Duration) (*ulid.ULID, error)
+	ShadowPartitionPeek(ctx context.Context, sp *QueueShadowPartition, sequential bool, until time.Time, limit int64, opts ...PeekOpt) ([]*QueueBacklog, int, error)
+	BacklogPrepareNormalize(ctx context.Context, b *QueueBacklog, sp *QueueShadowPartition) error
+	BacklogPeek(ctx context.Context, b *QueueBacklog, from time.Time, until time.Time, limit int64, opts ...PeekOpt) ([]*QueueItem, int, error)
+	BacklogRefill(
+		ctx context.Context,
+		b *QueueBacklog,
+		sp *QueueShadowPartition,
+		refillUntil time.Time,
+		refillItems []string,
+		latestConstraints PartitionConstraintConfig,
+		options ...BacklogRefillOptionFn,
+	) (*BacklogRefillResult, error)
+	BacklogRequeue(ctx context.Context, backlog *QueueBacklog, sp *QueueShadowPartition, requeueAt time.Time) error
+
 	IsMigrationLocked(ctx context.Context, fnID uuid.UUID) (*time.Time, error)
 }
 
