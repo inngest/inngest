@@ -117,3 +117,23 @@ func (qp QueuePartition) Queue() string {
 func (qp QueuePartition) MarshalBinary() ([]byte, error) {
 	return json.Marshal(qp)
 }
+
+func (qp QueuePartition) Identifier() PartitionIdentifier {
+	fnID := uuid.Nil
+	if qp.FunctionID != nil {
+		fnID = *qp.FunctionID
+	}
+
+	envID := uuid.Nil
+	if qp.EnvID != nil {
+		envID = *qp.EnvID
+	}
+
+	return PartitionIdentifier{
+		SystemQueueName: qp.QueueName,
+
+		AccountID:  qp.AccountID,
+		FunctionID: fnID,
+		EnvID:      envID,
+	}
+}

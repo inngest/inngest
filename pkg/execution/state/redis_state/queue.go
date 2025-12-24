@@ -1241,6 +1241,8 @@ func (q *queue) PartitionLease(
 	duration time.Duration,
 	options ...osqueue.PartitionLeaseOpt,
 ) (*ulid.ULID, int, error) {
+	l := logger.StdlibLogger(ctx)
+
 	o := &osqueue.PartitionLeaseOptions{}
 	for _, opt := range options {
 		opt(o)
@@ -1251,8 +1253,8 @@ func (q *queue) PartitionLease(
 	kg := q.RedisClient.kg
 
 	// Fetch partition constraints with a timeout
-	dbCtx, dbCtxCancel := context.WithTimeout(ctx, dbReadTimeout)
-	constraints := q.partitionConstraintConfigGetter(dbCtx, p.Identifier())
+	dbCtx, dbCtxCancel := context.WithTimeout(ctx, osqueue.DatabaseReadTimeout)
+	constraints := q.PartitionConstraintConfigGetter(dbCtx, p.Identifier())
 
 	if dbCtx.Err() == context.DeadlineExceeded {
 		metrics.IncrQueueDatabaseContextTimeoutCounter(ctx, metrics.CounterOpt{
@@ -1277,7 +1279,7 @@ func (q *queue) PartitionLease(
 	// XXX: Check for function throttling prior to leasing;  if it's throttled we can requeue
 	// the pointer and back off.  A question here is enqueuing new items onto the partition
 	// will reset the pointer update, leading to thrash.
-	now := q.clock.Now()
+	now := q.Clock.Now()
 	leaseExpires := now.Add(duration).UTC().Truncate(time.Millisecond)
 	leaseID, err := ulid.New(ulid.Timestamp(leaseExpires), rnd)
 	if err != nil {
@@ -1285,8 +1287,8 @@ func (q *queue) PartitionLease(
 	}
 
 	disableLeaseChecks := p.IsSystem()
-	if o.disableLeaseChecks {
-		disableLeaseChecks = o.disableLeaseChecks
+	if o.DisableLeaseChecks {
+		disableLeaseChecks = o.DisableLeaseChecks
 	}
 
 	disableLeaseChecksVal := "0"
@@ -1305,11 +1307,11 @@ func (q *queue) PartitionLease(
 
 		// These concurrency keys are for fast checking of partition
 		// concurrency limits prior to leasing, as an optimization.
-		p.acctConcurrencyKey(kg),
-		p.fnConcurrencyKey(kg),
+		acctConcurrencyKey(*p, kg),
+		fnConcurrencyKey(*p, kg),
 
-		p.acctInProgressLeasesKey(kg, q.capacityManager),
-		p.fnInProgressLeasesKey(kg, q.capacityManager),
+		partitionAccountInProgressLeasesKey(*p, kg, q.CapacityManager),
+		partitionFunctionInProgressLeasesKey(*p, kg, q.CapacityManager),
 	}
 
 	args, err := StrSlice([]any{
@@ -1319,7 +1321,7 @@ func (q *queue) PartitionLease(
 		leaseExpires.Unix(),
 		accountLimit,
 		functionLimit,
-		now.Add(PartitionConcurrencyLimitRequeueExtension).Unix(),
+		now.Add(osqueue.PartitionConcurrencyLimitRequeueExtension).Unix(),
 		p.AccountID.String(),
 		disableLeaseChecksVal,
 	})
@@ -1329,7 +1331,7 @@ func (q *queue) PartitionLease(
 
 	result, err := scripts["queue/partitionLease"].Exec(
 		redis_telemetry.WithScriptName(ctx, "partitionLease"),
-		shard.RedisClient.unshardedRc,
+		q.RedisClient.unshardedRc,
 		keys,
 		args,
 	).AsIntSlice()
@@ -1340,7 +1342,7 @@ func (q *queue) PartitionLease(
 		return nil, 0, fmt.Errorf("unknown partition lease result: %v", result)
 	}
 
-	q.log.Trace("leased partition",
+	l.Trace("leased partition",
 		"partition", p.Queue(),
 		"lease_id", leaseID.String(),
 		"status", result[0],
@@ -1349,13 +1351,13 @@ func (q *queue) PartitionLease(
 
 	switch result[0] {
 	case -1:
-		return nil, 0, ErrAccountConcurrencyLimit
+		return nil, 0, osqueue.ErrAccountConcurrencyLimit
 	case -2:
-		return nil, 0, ErrPartitionConcurrencyLimit
+		return nil, 0, osqueue.ErrPartitionConcurrencyLimit
 	case -3:
-		return nil, 0, ErrPartitionNotFound
+		return nil, 0, osqueue.ErrPartitionNotFound
 	case -4:
-		return nil, 0, ErrPartitionAlreadyLeased
+		return nil, 0, osqueue.ErrPartitionAlreadyLeased
 	default:
 		limit := functionLimit
 		if len(result) == 2 {
@@ -1379,19 +1381,15 @@ func (q *queue) PartitionLease(
 // available lease times. Otherwise, this shuffles all partitions and picks partitions
 // randomly, with higher priority partitions more likely to be selected.  This reduces
 // lease contention amongst multiple shared-nothing workers.
-func (q *queue) PartitionPeek(ctx context.Context, sequential bool, until time.Time, limit int64) ([]*QueuePartition, error) {
-	return q.partitionPeek(ctx, q.primaryQueueShard.RedisClient.kg.GlobalPartitionIndex(), sequential, until, limit, nil)
+func (q *queue) PartitionPeek(ctx context.Context, sequential bool, until time.Time, limit int64) ([]*osqueue.QueuePartition, error) {
+	return q.partitionPeek(ctx, q.RedisClient.kg.GlobalPartitionIndex(), sequential, until, limit, nil)
 }
 
 func (q *queue) partitionSize(ctx context.Context, partitionKey string, until time.Time) (int64, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "partitionSize"), redis_telemetry.ScopeQueue)
 
-	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
-		return 0, fmt.Errorf("unsupported queue shard kind for partitionSize: %s", q.primaryQueueShard.Kind)
-	}
-
-	cmd := q.primaryQueueShard.RedisClient.Client().B().Zcount().Key(partitionKey).Min("-inf").Max(strconv.Itoa(int(until.Unix()))).Build()
-	return q.primaryQueueShard.RedisClient.Client().Do(ctx, cmd).AsInt64()
+	cmd := q.RedisClient.Client().B().Zcount().Key(partitionKey).Min("-inf").Max(strconv.Itoa(int(until.Unix()))).Build()
+	return q.RedisClient.Client().Do(ctx, cmd).AsInt64()
 }
 
 // TotalSystemQueueDepth calculates and returns the aggregate queue depth across all                           │ │
@@ -1416,18 +1414,16 @@ func (q *queue) TotalSystemQueueDepth(ctx context.Context) (int64, error) {
 func (q *queue) cleanupNilPartitionInAccount(ctx context.Context, accountId uuid.UUID, partitionKey string) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "cleanupNilPartitionInAccount"), redis_telemetry.ScopeQueue)
 
-	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
-		return fmt.Errorf("unsupported queue shard kind for cleanupNilPartitionInAccount: %s", q.primaryQueueShard.Kind)
-	}
+	l := logger.StdlibLogger(ctx)
 
 	// Log because this should only happen as long as we run old code
-	q.log.Warn("removing account partitions pointer to missing partition",
+	l.Warn("removing account partitions pointer to missing partition",
 		"partition", partitionKey,
 		"account_id", accountId.String(),
 	)
 
-	cmd := q.primaryQueueShard.RedisClient.Client().B().Zrem().Key(q.primaryQueueShard.RedisClient.kg.AccountPartitionIndex(accountId)).Member(partitionKey).Build()
-	if err := q.primaryQueueShard.RedisClient.Client().Do(ctx, cmd).Error(); err != nil {
+	cmd := q.RedisClient.Client().B().Zrem().Key(q.RedisClient.kg.AccountPartitionIndex(accountId)).Member(partitionKey).Build()
+	if err := q.RedisClient.Client().Do(ctx, cmd).Error(); err != nil {
 		return fmt.Errorf("failed to remove nil partition from account partitions pointer queue: %w", err)
 	}
 
@@ -1446,21 +1442,19 @@ func (q *queue) cleanupNilPartitionInAccount(ctx context.Context, accountId uuid
 func (q *queue) cleanupEmptyAccount(ctx context.Context, accountId uuid.UUID) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "cleanupEmptyAccount"), redis_telemetry.ScopeQueue)
 
-	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
-		return fmt.Errorf("unsupported queue shard kind for cleanupEmptyAccount: %s", q.primaryQueueShard.Kind)
-	}
+	l := logger.StdlibLogger(ctx)
 
 	if accountId == uuid.Nil {
-		q.log.Warn("attempted to clean up empty account pointer with nil account ID")
+		l.Warn("attempted to clean up empty account pointer with nil account ID")
 		return nil
 	}
 
 	status, err := scripts["queue/cleanupEmptyAccount"].Exec(
 		redis_telemetry.WithScriptName(ctx, "cleanupEmptyAccount"),
-		q.primaryQueueShard.RedisClient.Client(),
+		q.RedisClient.Client(),
 		[]string{
-			q.primaryQueueShard.RedisClient.kg.GlobalAccountIndex(),
-			q.primaryQueueShard.RedisClient.kg.AccountPartitionIndex(accountId),
+			q.RedisClient.kg.GlobalAccountIndex(),
+			q.RedisClient.kg.AccountPartitionIndex(accountId),
 		},
 		[]string{
 			accountId.String(),
@@ -1472,29 +1466,26 @@ func (q *queue) cleanupEmptyAccount(ctx context.Context, accountId uuid.UUID) er
 
 	if status == 1 {
 		// Log because this should only happen as long as we run old code
-		q.log.Warn("removed empty account pointer", "account_id", accountId.String())
+		l.Warn("removed empty account pointer", "account_id", accountId.String())
 	}
 
 	return nil
 }
 
 // partitionPeek returns pending queue partitions within the global partition pointer _or_ account partition pointer ZSET.
-func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequential bool, until time.Time, limit int64, accountId *uuid.UUID) ([]*QueuePartition, error) {
+func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequential bool, until time.Time, limit int64, accountId *uuid.UUID) ([]*osqueue.QueuePartition, error) {
+	l := logger.StdlibLogger(ctx)
+
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "partitionPeek"), redis_telemetry.ScopeQueue)
 
-	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
-		return nil, fmt.Errorf("unsupported queue shard kind for partitionPeek: %s", q.primaryQueueShard.Kind)
-	}
+	client := q.RedisClient.Client()
+	kg := q.RedisClient.kg
 
-	shard := q.primaryQueueShard
-	client := shard.RedisClient.Client()
-	kg := shard.RedisClient.kg
-
-	if limit > PartitionPeekMax {
-		return nil, ErrPartitionPeekMaxExceedsLimits
+	if limit > osqueue.PartitionPeekMax {
+		return nil, osqueue.ErrPartitionPeekMaxExceedsLimits
 	}
 	if limit <= 0 {
-		limit = PartitionPeekMax
+		limit = osqueue.PartitionPeekMax
 	}
 
 	// TODO(tony): If this is an allowlist, only peek the given partitions.  Use ZMSCORE
@@ -1572,14 +1563,14 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 	}
 
 	weights := []float64{}
-	items := make([]*QueuePartition, len(encoded))
+	items := make([]*osqueue.QueuePartition, len(encoded))
 	fnIDs := make([]uuid.UUID, 0, len(encoded))
 	fnIDsMu := sync.Mutex{}
 
 	// Use parallel decoding as per Peek
-	partitions, err := util.ParallelDecode(encoded, func(val any, _ int) (*QueuePartition, bool, error) {
+	partitions, err := util.ParallelDecode(encoded, func(val any, _ int) (*osqueue.QueuePartition, bool, error) {
 		if val == nil {
-			q.log.Error("encountered nil partition item in pointer queue",
+			l.Error("encountered nil partition item in pointer queue",
 				"encoded", encoded,
 				"missing", missingPartitions,
 				"key", partitionKey,
@@ -1592,7 +1583,7 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 			return nil, false, fmt.Errorf("unknown type in partition peek: %T", val)
 		}
 
-		item := &QueuePartition{}
+		item := &osqueue.QueuePartition{}
 
 		if err := json.Unmarshal(unsafe.Slice(unsafe.StringData(str), len(str)), item); err != nil {
 			return nil, false, fmt.Errorf("error reading partition item: %w", err)
@@ -1686,8 +1677,8 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 			// Check paused status from database with a timeout
 			// PartitionPausedGetter does not return errors and simply returns a zero value of
 			// info.Paused = false when it encounters an error.
-			dbCtx, dbCtxCancel := context.WithTimeout(ctx, dbReadTimeout)
-			info := q.partitionPausedGetter(dbCtx, *item.FunctionID)
+			dbCtx, dbCtxCancel := context.WithTimeout(ctx, osqueue.DatabaseReadTimeout)
+			info := q.PartitionPausedGetter(dbCtx, *item.FunctionID)
 
 			if dbCtx.Err() == context.DeadlineExceeded {
 				metrics.IncrQueueDatabaseContextTimeoutCounter(ctx, metrics.CounterOpt{
@@ -1706,11 +1697,11 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 				// in case the function was unpaused in the last 60s.
 				if !info.Stale {
 					// Function is pulled up when it is unpaused, so we can push it back for a long time (see SetFunctionPaused)
-					err := q.PartitionRequeue(ctx, shard, item, q.clock.Now().Truncate(time.Second).Add(PartitionPausedRequeueExtension), true)
-					if err != nil && !errors.Is(err, ErrPartitionGarbageCollected) {
-						q.log.Error("failed to push back paused partition", "error", err, "partition", item)
+					err := q.PartitionRequeue(ctx, item, q.Clock.Now().Truncate(time.Second).Add(osqueue.PartitionPausedRequeueExtension), true)
+					if err != nil && !errors.Is(err, osqueue.ErrPartitionGarbageCollected) {
+						l.Error("failed to push back paused partition", "error", err, "partition", item)
 					} else {
-						q.log.Trace("pushed back paused partition", "partition", item.Queue())
+						l.Trace("pushed back paused partition", "partition", item.Queue())
 					}
 				}
 
@@ -1719,11 +1710,11 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 			}
 
 			if lockedUntil, ok := migrateLocks[*item.FunctionID]; ok {
-				err := q.PartitionRequeue(ctx, shard, item, lockedUntil, true)
-				if err != nil && !errors.Is(err, ErrPartitionGarbageCollected) {
-					q.log.Error("failed to push back migrating partition", "error", err, "partition", item)
+				err := q.PartitionRequeue(ctx, item, lockedUntil, true)
+				if err != nil && !errors.Is(err, osqueue.ErrPartitionGarbageCollected) {
+					l.Error("failed to push back migrating partition", "error", err, "partition", item)
 				} else {
-					q.log.Trace("pushed back migrating partition", "partition", item.Queue())
+					l.Trace("pushed back migrating partition", "partition", item.Queue())
 				}
 				// skip this since the executor is not responsible for migrating queues
 				ignored++
@@ -1742,7 +1733,7 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 		}
 
 		// If we have an allowlist, only accept this partition if its in the allowlist.
-		if len(q.allowQueues) > 0 && !checkList(item.Queue(), q.allowQueueMap, q.allowQueuePrefixes) {
+		if len(q.AllowQueues) > 0 && !checkList(item.Queue(), q.AllowQueueMap, q.AllowQueuePrefixes) {
 			// This is not in the allowlist specified, so do not allow this partition to be used.
 			ignored++
 			continue
@@ -1752,14 +1743,14 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 		// we allocate the len(encoded) amount, we also want to track the number of
 		// ignored queues to use the correct index when setting our items;  this ensures
 		// that we don't access items with an index and get nil pointers.
-		if len(q.denyQueues) > 0 && checkList(item.Queue(), q.denyQueueMap, q.denyQueuePrefixes) {
+		if len(q.DenyQueues) > 0 && checkList(item.Queue(), q.DenyQueueMap, q.DenyQueuePrefixes) {
 			// This is in the denylist explicitly set, so continue
 			ignored++
 			continue
 		}
 
 		items[n-ignored] = item
-		partPriority := q.ppf(ctx, *item)
+		partPriority := q.PartitionPriorityFinder(ctx, *item)
 		weights = append(weights, float64(10-partPriority))
 	}
 
@@ -1769,7 +1760,7 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 	// Some scanners run sequentially, ensuring we always work on the functions with
 	// the oldest run at times in order, no matter the priority.
 	if sequential {
-		n := int(math.Min(float64(len(items)), float64(PartitionSelectionMax)))
+		n := int(math.Min(float64(len(items)), float64(osqueue.PartitionSelectionMax)))
 		return items[0:n], nil
 	}
 
@@ -1778,7 +1769,7 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 	// randomized order favouring higher-priority queue items.  This reduces the chances
 	// of contention when leasing.
 	w := sampleuv.NewWeighted(weights, rnd)
-	result := make([]*QueuePartition, len(items))
+	result := make([]*osqueue.QueuePartition, len(items))
 	for n := range result {
 		idx, ok := w.Take()
 		if !ok {
@@ -1793,15 +1784,11 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 func (q *queue) accountPeek(ctx context.Context, sequential bool, until time.Time, limit int64) ([]uuid.UUID, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "accountPeek"), redis_telemetry.ScopeQueue)
 
-	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
-		return nil, fmt.Errorf("unsupported queue shard kind for accountPeek: %s", q.primaryQueueShard.Kind)
-	}
-
-	if limit > AccountPeekMax {
-		return nil, ErrAccountPeekMaxExceedsLimits
+	if limit > osqueue.AccountPeekMax {
+		return nil, osqueue.ErrAccountPeekMaxExceedsLimits
 	}
 	if limit <= 0 {
-		limit = AccountPeekMax
+		limit = osqueue.AccountPeekMax
 	}
 
 	ms := until.UnixMilli()
@@ -1822,9 +1809,9 @@ func (q *queue) accountPeek(ctx context.Context, sequential bool, until time.Tim
 
 	peekRet, err := scripts["queue/accountPeek"].Exec(
 		redis_telemetry.WithScriptName(ctx, "accountPeek"),
-		q.primaryQueueShard.RedisClient.unshardedRc,
+		q.RedisClient.unshardedRc,
 		[]string{
-			q.primaryQueueShard.RedisClient.kg.GlobalAccountIndex(),
+			q.RedisClient.kg.GlobalAccountIndex(),
 		},
 		args,
 	).AsStrSlice()
@@ -1845,14 +1832,14 @@ func (q *queue) accountPeek(ctx context.Context, sequential bool, until time.Tim
 
 	weights := make([]float64, len(items))
 	for i := range items {
-		accountPriority := q.apf(ctx, items[i])
+		accountPriority := q.AccountPriorityFinder(ctx, items[i])
 		weights[i] = float64(10 - accountPriority)
 	}
 
 	// Some scanners run sequentially, ensuring we always work on the accounts with
 	// the oldest run at times in order, no matter the priority.
 	if sequential {
-		n := int(math.Min(float64(len(items)), float64(PartitionSelectionMax)))
+		n := int(math.Min(float64(len(items)), float64(osqueue.PartitionSelectionMax)))
 		return items[0:n], nil
 	}
 
@@ -1896,14 +1883,12 @@ func checkList(check string, exact, prefixes map[string]*struct{}) bool {
 // forceAt is used to enforce the given queue time.  This is used when partitions are at a
 // concurrency limit;  we don't want to scan the partition next time, so we force the partition
 // to be at a specific time instead of taking the earliest available queue item time
-func (q *queue) PartitionRequeue(ctx context.Context, shard RedisQueueShard, p *QueuePartition, at time.Time, forceAt bool) error {
+func (q *queue) PartitionRequeue(ctx context.Context, p *osqueue.QueuePartition, at time.Time, forceAt bool) error {
+	l := logger.StdlibLogger(ctx)
+
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "PartitionRequeue"), redis_telemetry.ScopeQueue)
 
-	if shard.Kind != string(enums.QueueShardKindRedis) {
-		return fmt.Errorf("unsupported queue shard kind for PartitionRequeue: %s", shard.Kind)
-	}
-
-	kg := shard.RedisClient.kg
+	kg := q.RedisClient.kg
 
 	functionId := uuid.Nil
 	if p.FunctionID != nil {
@@ -1925,8 +1910,8 @@ func (q *queue) PartitionRequeue(ctx context.Context, shard RedisQueueShard, p *
 		kg.PartitionMeta(p.Queue()),
 		kg.FnMetadata(functionId),
 
-		p.zsetKey(kg), // Partition ZSET itself
-		p.concurrencyKey(kg),
+		partitionZsetKey(*p, kg), // Partition ZSET itself
+		partitionConcurrencyKey(*p, kg),
 		kg.QueueItem(),
 
 		// Backlogs in shadow partition
@@ -1947,7 +1932,7 @@ func (q *queue) PartitionRequeue(ctx context.Context, shard RedisQueueShard, p *
 	}
 	status, err := scripts["queue/partitionRequeue"].Exec(
 		redis_telemetry.WithScriptName(ctx, "partitionRequeue"),
-		shard.RedisClient.Client(),
+		q.RedisClient.Client(),
 		keys,
 		args,
 	).AsInt64()
@@ -1960,7 +1945,7 @@ func (q *queue) PartitionRequeue(ctx context.Context, shard RedisQueueShard, p *
 		leaseID = p.LeaseID.String()
 	}
 
-	q.log.Trace("requeued partition",
+	l.Trace("requeued partition",
 		"partition", p.Queue(),
 		"status", status,
 		"lease_id", leaseID,
@@ -1971,9 +1956,9 @@ func (q *queue) PartitionRequeue(ctx context.Context, shard RedisQueueShard, p *
 	case 0:
 		return nil
 	case 1:
-		return ErrPartitionNotFound
+		return osqueue.ErrPartitionNotFound
 	case 2, 3:
-		return ErrPartitionGarbageCollected
+		return osqueue.ErrPartitionGarbageCollected
 	default:
 		return fmt.Errorf("unknown response requeueing item: %d", status)
 	}
@@ -1983,11 +1968,11 @@ func (q *queue) PartitionRequeue(ctx context.Context, shard RedisQueueShard, p *
 func (q *queue) PartitionReprioritize(ctx context.Context, queueName string, priority uint) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "PartitionReprioritize"), redis_telemetry.ScopeQueue)
 
-	if priority > PriorityMin {
-		return ErrPriorityTooLow
+	if priority > osqueue.PriorityMin {
+		return osqueue.ErrPriorityTooLow
 	}
-	if priority < PriorityMax {
-		return ErrPriorityTooHigh
+	if priority < osqueue.PriorityMax {
+		return osqueue.ErrPriorityTooHigh
 	}
 
 	args, err := StrSlice([]any{
@@ -1998,10 +1983,10 @@ func (q *queue) PartitionReprioritize(ctx context.Context, queueName string, pri
 		return err
 	}
 
-	keys := []string{q.primaryQueueShard.RedisClient.kg.PartitionItem()}
+	keys := []string{q.RedisClient.kg.PartitionItem()}
 	status, err := scripts["queue/partitionReprioritize"].Exec(
 		redis_telemetry.WithScriptName(ctx, "partitionReprioritize"),
-		q.primaryQueueShard.RedisClient.unshardedRc,
+		q.RedisClient.unshardedRc,
 		keys,
 		args,
 	).AsInt64()
@@ -2012,7 +1997,7 @@ func (q *queue) PartitionReprioritize(ctx context.Context, queueName string, pri
 	case 0:
 		return nil
 	case 1:
-		return ErrPartitionNotFound
+		return osqueue.ErrPartitionNotFound
 	default:
 		return fmt.Errorf("unknown response reprioritizing partition: %d", status)
 	}
@@ -2021,18 +2006,18 @@ func (q *queue) PartitionReprioritize(ctx context.Context, queueName string, pri
 func (q *queue) InProgress(ctx context.Context, prefix string, concurrencyKey string) (int64, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "InProgress"), redis_telemetry.ScopeQueue)
 
-	s := q.clock.Now().UnixMilli()
-	cmd := q.primaryQueueShard.RedisClient.unshardedRc.B().Zcount().
-		Key(q.primaryQueueShard.RedisClient.kg.Concurrency(prefix, concurrencyKey)).
+	s := q.Clock.Now().UnixMilli()
+	cmd := q.RedisClient.unshardedRc.B().Zcount().
+		Key(q.RedisClient.kg.Concurrency(prefix, concurrencyKey)).
 		Min(fmt.Sprintf("%d", s)).
 		Max("+inf").
 		Build()
-	return q.primaryQueueShard.RedisClient.unshardedRc.Do(ctx, cmd).AsInt64()
+	return q.RedisClient.unshardedRc.Do(ctx, cmd).AsInt64()
 }
 
 func (q *queue) Instrument(ctx context.Context) error {
 	_, _, err := q.QueueIterator(ctx, QueueIteratorOpts{
-		OnPartitionProcessed: func(ctx context.Context, partitionKey, queueKey string, itemCount int64, queueShard RedisQueueShard) {
+		OnPartitionProcessed: func(ctx context.Context, partitionKey, queueKey string, itemCount int64) {
 			// Handle individual partition instrumentation
 			// NOTE: tmp workaround for cardinality issues
 			// ideally we want to instrument everything, but until there's a better way to do this, we primarily care only
@@ -2044,17 +2029,17 @@ func (q *queue) Instrument(ctx context.Context) error {
 						// NOTE: potentially high cardinality but this gives better clarify of stuff
 						// this is potentially useless for key queues
 						"partition":   partitionKey,
-						"queue_shard": queueShard.Name,
+						"queue_shard": q.Name,
 					},
 				})
 			}
 		},
-		OnIterationComplete: func(ctx context.Context, totalPartitions, totalQueueItems int64, queueShard RedisQueueShard) {
+		OnIterationComplete: func(ctx context.Context, totalPartitions, totalQueueItems int64) {
 			// Handle the final metrics reporting
 			metrics.GaugeGlobalPartitionSize(ctx, totalPartitions, metrics.GaugeOpt{
 				PkgName: pkgName,
 				Tags: map[string]any{
-					"queue_shard": queueShard.Name,
+					"queue_shard": q.Name,
 				},
 			})
 		},

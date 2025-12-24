@@ -130,3 +130,9 @@ const (
 
 	NoConcurrencyLimit = -1
 )
+
+const (
+	// dbReadTimeout is the maximum time to wait for database/config getter operations
+	// like checking paused status or fetching partition constraints.
+	DatabaseReadTimeout = 30 * time.Second
+)

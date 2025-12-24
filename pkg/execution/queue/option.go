@@ -45,25 +45,25 @@ func WithQueueLifecycles(l ...QueueLifecycleListener) QueueOpt {
 
 func WithPartitionPriorityFinder(ppf PartitionPriorityFinder) QueueOpt {
 	return func(q *QueueOptions) {
-		q.ppf = ppf
+		q.PartitionPriorityFinder = ppf
 	}
 }
 
 func WithPartitionPausedGetter(partitionPausedGetter PartitionPausedGetter) QueueOpt {
 	return func(q *QueueOptions) {
-		q.partitionPausedGetter = partitionPausedGetter
+		q.PartitionPausedGetter = partitionPausedGetter
 	}
 }
 
 func WithAccountPriorityFinder(apf AccountPriorityFinder) QueueOpt {
 	return func(q *QueueOptions) {
-		q.apf = apf
+		q.AccountPriorityFinder = apf
 	}
 }
 
 func WithIdempotencyTTL(t time.Duration) QueueOpt {
 	return func(q *QueueOptions) {
-		q.idempotencyTTL = t
+		q.IdempotencyTTL = t
 	}
 }
 
@@ -71,7 +71,7 @@ func WithIdempotencyTTL(t time.Duration) QueueOpt {
 // This allows customization of the idempotency TTL based off of specific jobs.
 func WithIdempotencyTTLFunc(f func(context.Context, QueueItem) time.Duration) QueueOpt {
 	return func(q *QueueOptions) {
-		q.idempotencyTTLFunc = f
+		q.IdempotencyTTLFunc = f
 	}
 }
 
@@ -205,15 +205,15 @@ func WithActiveCheckScanBatchSize(p int) QueueOpt {
 // on latency or fairness in the denied queue partitions.
 func WithDenyQueueNames(queues ...string) QueueOpt {
 	return func(q *QueueOptions) {
-		q.denyQueues = queues
-		q.denyQueueMap = make(map[string]*struct{})
-		q.denyQueuePrefixes = make(map[string]*struct{})
+		q.DenyQueues = queues
+		q.DenyQueueMap = make(map[string]*struct{})
+		q.DenyQueuePrefixes = make(map[string]*struct{})
 		for _, i := range queues {
-			q.denyQueueMap[i] = &struct{}{}
+			q.DenyQueueMap[i] = &struct{}{}
 			// If WithDenyQueueNames includes "user:*", trim the asterisc and use
 			// this as a prefix match.
 			if strings.HasSuffix(i, "*") {
-				q.denyQueuePrefixes[strings.TrimSuffix(i, "*")] = &struct{}{}
+				q.DenyQueuePrefixes[strings.TrimSuffix(i, "*")] = &struct{}{}
 			}
 		}
 	}
@@ -224,15 +224,15 @@ func WithDenyQueueNames(queues ...string) QueueOpt {
 // other queues.
 func WithAllowQueueNames(queues ...string) QueueOpt {
 	return func(q *QueueOptions) {
-		q.allowQueues = queues
-		q.allowQueueMap = make(map[string]*struct{})
-		q.allowQueuePrefixes = make(map[string]*struct{})
+		q.AllowQueues = queues
+		q.AllowQueueMap = make(map[string]*struct{})
+		q.AllowQueuePrefixes = make(map[string]*struct{})
 		for _, i := range queues {
-			q.allowQueueMap[i] = &struct{}{}
+			q.AllowQueueMap[i] = &struct{}{}
 			// If WithAllowQueueNames includes "user:*", trim the asterisc and use
 			// this as a prefix match.
 			if strings.HasSuffix(i, "*") {
-				q.allowQueuePrefixes[strings.TrimSuffix(i, "*")] = &struct{}{}
+				q.AllowQueuePrefixes[strings.TrimSuffix(i, "*")] = &struct{}{}
 			}
 		}
 	}
@@ -365,9 +365,9 @@ type QueueOptions struct {
 	QueueShardClients map[string]QueueShard
 	shardSelector     ShardSelector
 
-	ppf                   PartitionPriorityFinder
-	apf                   AccountPriorityFinder
-	partitionPausedGetter PartitionPausedGetter
+	PartitionPriorityFinder PartitionPriorityFinder
+	AccountPriorityFinder   AccountPriorityFinder
+	PartitionPausedGetter   PartitionPausedGetter
 
 	lifecycles QueueLifecycleListeners
 
@@ -385,14 +385,14 @@ type QueueOptions struct {
 
 	shadowPartitionProcessCount QueueShadowPartitionProcessCount
 
-	tenantInstrumentor TenantInstrumentor
+	TenantInstrumentor TenantInstrumentor
 
-	// idempotencyTTL is the default or static idempotency duration apply to jobs,
+	// IdempotencyTTL is the default or static idempotency duration apply to jobs,
 	// if idempotencyTTLFunc is not defined.
-	idempotencyTTL time.Duration
-	// idempotencyTTLFunc returns an time.Duration representing how long job IDs
+	IdempotencyTTL time.Duration
+	// IdempotencyTTLFunc returns an time.Duration representing how long job IDs
 	// remain idempotent.
-	idempotencyTTLFunc func(context.Context, QueueItem) time.Duration
+	IdempotencyTTLFunc func(context.Context, QueueItem) time.Duration
 	// pollTick is the interval between each scan for jobs.
 	pollTick                 time.Duration
 	shadowPollTick           time.Duration
@@ -420,18 +420,18 @@ type QueueOptions struct {
 	peekSizeForFunctions    map[string]int64
 	log                     logger.Logger
 
-	// denyQueues provides a denylist ensuring that the queue will never claim
+	// DenyQueues provides a denylist ensuring that the queue will never claim
 	// this partition, meaning that no jobs from this queue will run on this worker.
-	denyQueues        []string
-	denyQueueMap      map[string]*struct{}
-	denyQueuePrefixes map[string]*struct{}
+	DenyQueues        []string
+	DenyQueueMap      map[string]*struct{}
+	DenyQueuePrefixes map[string]*struct{}
 
-	// allowQueues provides an allowlist, ensuring that the queue only peeks the specified
+	// AllowQueues provides an allowlist, ensuring that the queue only peeks the specified
 	// partitions.  jobs from other partitions will never be scanned or processed.
-	allowQueues   []string
-	allowQueueMap map[string]*struct{}
-	// allowQueuePrefixes are memoized prefixes that can be allowed.
-	allowQueuePrefixes map[string]*struct{}
+	AllowQueues   []string
+	AllowQueueMap map[string]*struct{}
+	// AllowQueuePrefixes are memoized prefixes that can be allowed.
+	AllowQueuePrefixes map[string]*struct{}
 
 	// instrumentInterval represents the frequency and instrumentation will attempt to run
 	instrumentInterval time.Duration
@@ -455,8 +455,8 @@ type QueueOptions struct {
 	backlogRefillLimit          int64
 	backlogNormalizeConcurrency int64
 
-	normalizeRefreshItemCustomConcurrencyKeys NormalizeRefreshItemCustomConcurrencyKeysFn
-	refreshItemThrottle                       RefreshItemThrottleFn
+	NormalizeRefreshItemCustomConcurrencyKeys NormalizeRefreshItemCustomConcurrencyKeysFn
+	RefreshItemThrottle                       RefreshItemThrottleFn
 
 	enableJobPromotion bool
 
@@ -521,13 +521,13 @@ type (
 
 func WithNormalizeRefreshItemCustomConcurrencyKeys(fn NormalizeRefreshItemCustomConcurrencyKeysFn) QueueOpt {
 	return func(q *QueueOptions) {
-		q.normalizeRefreshItemCustomConcurrencyKeys = fn
+		q.NormalizeRefreshItemCustomConcurrencyKeys = fn
 	}
 }
 
 func WithRefreshItemThrottle(fn RefreshItemThrottleFn) QueueOpt {
 	return func(q *QueueOptions) {
-		q.refreshItemThrottle = fn
+		q.RefreshItemThrottle = fn
 	}
 }
 
@@ -552,7 +552,7 @@ type TenantInstrumentor func(ctx context.Context, partitionID string) error
 
 func WithTenantInstrumentor(fn TenantInstrumentor) QueueOpt {
 	return func(q *QueueOptions) {
-		q.tenantInstrumentor = fn
+		q.TenantInstrumentor = fn
 	}
 }
 
