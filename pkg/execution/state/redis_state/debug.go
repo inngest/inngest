@@ -96,7 +96,7 @@ func (q *queue) PartitionByID(ctx context.Context, partitionID string) (*osqueue
 		paused := q.PartitionPausedGetter(ctx, *qp.FunctionID)
 		result.Paused = paused.Paused
 
-		locked, err := q.isMigrationLocked(ctx, *qp.FunctionID)
+		locked, err := q.IsMigrationLocked(ctx, *qp.FunctionID)
 		if err != nil {
 			return nil, fmt.Errorf("could not get locked state: %w", err)
 		}
