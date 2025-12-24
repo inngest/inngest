@@ -26,7 +26,7 @@ func (q *queueProcessor) runActiveChecker(ctx context.Context) {
 		case <-checkTick.Chan():
 			// Active check backlogs
 			if q.isActiveChecker() {
-				count, err := q.ActiveCheck(ctx)
+				count, err := q.PrimaryQueueShard.Processor().ActiveCheck(ctx)
 				if err != nil {
 					q.log.Error("error checking active jobs", "error", err)
 				}
@@ -36,7 +36,7 @@ func (q *queueProcessor) runActiveChecker(ctx context.Context) {
 			}
 		case <-tick.Chan():
 			// Attempt to re-lease the lock.
-			leaseID, err := q.ConfigLease(ctx, q.primaryQueueShard.RedisClient.kg.ActiveChecker(), ConfigLeaseDuration, q.activeCheckerLease())
+			leaseID, err := q.PrimaryQueueShard.Processor().ConfigLease(ctx, "active-checker", ConfigLeaseDuration, q.activeCheckerLease())
 			if err == ErrConfigAlreadyLeased {
 				// This is expected; every time there is > 1 runner listening to the
 				// queue there will be contention.
