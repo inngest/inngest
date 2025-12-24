@@ -230,6 +230,8 @@ type QueueProcessor interface {
 	PeekShadowPartitions(ctx context.Context, accountID *uuid.UUID, sequential bool, peekLimit int64, until time.Time) ([]*QueueShadowPartition, error)
 
 	IsMigrationLocked(ctx context.Context, fnID uuid.UUID) (*time.Time, error)
+
+	RunJobs(ctx context.Context, workspaceID, workflowID uuid.UUID, runID ulid.ULID, limit, offset int64) ([]JobResponse, error)
 }
 
 type BacklogRefillOptions struct {
