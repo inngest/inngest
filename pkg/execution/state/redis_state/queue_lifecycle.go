@@ -4,6 +4,8 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+
+	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 )
 
 // QueueLifecycleListener represents a lifecycle listener for queue-related specifics.
@@ -24,8 +26,8 @@ type QueueLifecycleListener interface {
 		workspaceID *uuid.UUID,
 	)
 
-	OnBacklogRefillConstraintHit(ctx context.Context, p *QueueShadowPartition, b *QueueBacklog, res *BacklogRefillResult)
-	OnBacklogRefilled(ctx context.Context, p *QueueShadowPartition, b *QueueBacklog, res *BacklogRefillResult)
+	OnBacklogRefillConstraintHit(ctx context.Context, p *osqueue.QueueShadowPartition, b *osqueue.QueueBacklog, res *osqueue.BacklogRefillResult)
+	OnBacklogRefilled(ctx context.Context, p *osqueue.QueueShadowPartition, b *osqueue.QueueBacklog, res *osqueue.BacklogRefillResult)
 }
 
 type QueueLifecycleListeners []QueueLifecycleListener
@@ -60,13 +62,13 @@ func (l QueueLifecycleListeners) OnCustomKeyConcurrencyLimitReached(ctx context.
 	})
 }
 
-func (l QueueLifecycleListeners) OnBacklogRefillConstraintHit(ctx context.Context, p *QueueShadowPartition, b *QueueBacklog, res *BacklogRefillResult) {
+func (l QueueLifecycleListeners) OnBacklogRefillConstraintHit(ctx context.Context, p *osqueue.QueueShadowPartition, b *osqueue.QueueBacklog, res *osqueue.BacklogRefillResult) {
 	l.GoEach(func(listener QueueLifecycleListener) {
 		listener.OnBacklogRefillConstraintHit(ctx, p, b, res)
 	})
 }
 
-func (l QueueLifecycleListeners) OnBacklogRefilled(ctx context.Context, p *QueueShadowPartition, b *QueueBacklog, res *BacklogRefillResult) {
+func (l QueueLifecycleListeners) OnBacklogRefilled(ctx context.Context, p *osqueue.QueueShadowPartition, b *osqueue.QueueBacklog, res *osqueue.BacklogRefillResult) {
 	l.GoEach(func(listener QueueLifecycleListener) {
 		listener.OnBacklogRefilled(ctx, p, b, res)
 	})
