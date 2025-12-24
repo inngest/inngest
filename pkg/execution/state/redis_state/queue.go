@@ -1732,7 +1732,7 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 	return result, nil
 }
 
-func (q *queue) accountPeek(ctx context.Context, sequential bool, until time.Time, limit int64) ([]uuid.UUID, error) {
+func (q *queue) AccountPeek(ctx context.Context, sequential bool, until time.Time, limit int64) ([]uuid.UUID, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "accountPeek"), redis_telemetry.ScopeQueue)
 
 	if limit > osqueue.AccountPeekMax {
