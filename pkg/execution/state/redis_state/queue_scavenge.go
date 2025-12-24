@@ -16,11 +16,6 @@ import (
 	"github.com/redis/rueidis"
 )
 
-const (
-	ScavengePeekSize                 = 100
-	ScavengeConcurrencyQueuePeekSize = 100
-)
-
 func (q *queue) randomScavengeOffset(seed int64, count int64, limit int) int64 {
 	// only apply random offset if there are more total items to scavenge than the limit
 	if count > int64(limit) {
