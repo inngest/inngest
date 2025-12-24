@@ -157,6 +157,21 @@ type QueueProcessor interface {
 
 	SetPeekEWMA(ctx context.Context, fnID *uuid.UUID, val int64) error
 	ConfigLease(ctx context.Context, key string, duration time.Duration, existingLeaseID ...*ulid.ULID) (*ulid.ULID, error)
+
+	PeekAccountPartitions(
+		ctx context.Context,
+		accountID uuid.UUID,
+		peekLimit int64,
+		peekUntil time.Time,
+		sequential bool,
+	) ([]*QueuePartition, error)
+
+	PeekGlobalPartitions(
+		ctx context.Context,
+		peekLimit int64,
+		peekUntil time.Time,
+		sequential bool,
+	) ([]*QueuePartition, error)
 }
 
 type BacklogRefillOptions struct {
