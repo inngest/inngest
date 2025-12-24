@@ -16,7 +16,6 @@ import (
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
-	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
@@ -110,7 +109,7 @@ func (l lifecycle) OnFunctionStarted(
 		)
 	}
 
-	latency, _ := redis_state.GetItemSystemLatency(ctx)
+	latency, _ := queue.GetItemSystemLatency(ctx)
 	latencyMS := latency.Milliseconds()
 
 	h := History{
@@ -330,7 +329,7 @@ func (l lifecycle) OnStepStarted(
 		)
 	}
 
-	latency, _ := redis_state.GetItemSystemLatency(ctx)
+	latency, _ := queue.GetItemSystemLatency(ctx)
 	latencyMS := latency.Milliseconds()
 
 	h := History{
