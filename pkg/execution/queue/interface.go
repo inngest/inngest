@@ -152,6 +152,7 @@ type QueueProcessor interface {
 	Instrument(ctx context.Context) error
 
 	ItemsByPartition(ctx context.Context, partitionID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueItem], error)
+	ItemsByBacklog(ctx context.Context, backlogID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueItem], error)
 
 	SetFunctionMigrate(ctx context.Context, fnID uuid.UUID, migrateLockUntil *time.Time) error
 	ResetAttemptsByJobID(ctx context.Context, jobID string) error
