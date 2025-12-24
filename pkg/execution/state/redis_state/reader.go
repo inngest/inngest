@@ -142,10 +142,10 @@ func (q *queue) ItemsByPartition(ctx context.Context, partitionID string, from t
 	l := logger.StdlibLogger(ctx)
 
 	opt := osqueue.QueueIterOptions{
-		batchSize:                 1000,
-		interval:                  500 * time.Millisecond,
-		iterateBacklogs:           true,
-		enableMillisecondIncrease: true,
+		BatchSize:                 1000,
+		Interval:                  500 * time.Millisecond,
+		IterateBacklogs:           true,
+		EnableMillisecondIncrease: true,
 	}
 	for _, apply := range opts {
 		apply(&opt)
@@ -186,7 +186,7 @@ func (q *queue) ItemsByPartition(ctx context.Context, partitionID string, from t
 			items, err := q.peek(ctx, peekOpts{
 				From:         &ptFrom,
 				Until:        until,
-				Limit:        opt.batchSize,
+				Limit:        opt.BatchSize,
 				PartitionID:  partitionID,
 				PartitionKey: partitionZsetKey(pt, q.RedisClient.kg),
 			})
@@ -227,7 +227,7 @@ func (q *queue) ItemsByPartition(ctx context.Context, partitionID string, from t
 				break
 			}
 
-			if opt.enableMillisecondIncrease {
+			if opt.EnableMillisecondIncrease {
 				// shift the starting point 1ms so it doesn't try to grab the same stuff again
 				// NOTE: this could result skipping items if the previous batch of items are all on
 				// the same millisecond
@@ -235,10 +235,10 @@ func (q *queue) ItemsByPartition(ctx context.Context, partitionID string, from t
 			}
 
 			// wait a little before proceeding
-			<-time.After(opt.interval)
+			<-time.After(opt.Interval)
 		}
 
-		if !opt.iterateBacklogs {
+		if !opt.IterateBacklogs {
 			return
 		}
 
@@ -285,7 +285,7 @@ func (q *queue) ItemsByPartition(ctx context.Context, partitionID string, from t
 				}
 
 				var last time.Time
-				items, _, err := q.backlogPeek(ctx, backlog, backlogFrom, until, opt.batchSize)
+				items, _, err := q.BacklogPeek(ctx, backlog, backlogFrom, until, opt.BatchSize)
 				if err != nil {
 					l.ReportError(err, "error retrieving queue items from backlog",
 						logger.WithErrorReportTags(errTags),
@@ -334,7 +334,7 @@ func (q *queue) ItemsByPartition(ctx context.Context, partitionID string, from t
 				}
 			}
 
-			if opt.enableMillisecondIncrease {
+			if opt.EnableMillisecondIncrease {
 				// shift the starting point 1ms so it doesn't try to grab the same stuff again
 				// NOTE: this could result skipping items if the previous batch of items are all on
 				// the same millisecond
@@ -342,17 +342,17 @@ func (q *queue) ItemsByPartition(ctx context.Context, partitionID string, from t
 			}
 
 			// wait a little before proceeding
-			<-time.After(opt.interval)
+			<-time.After(opt.Interval)
 		}
 	}, nil
 }
 
-func (q *queue) ItemsByBacklog(ctx context.Context, backlogID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*osqueue.QueueItem], error) {
+func (q *queue) ItemsByBacklog(ctx context.Context, backlogID string, from time.Time, until time.Time, opts ...osqueue.QueueIterOpt) (iter.Seq[*osqueue.QueueItem], error) {
 	l := logger.StdlibLogger(ctx)
 
-	opt := queueIterOpt{
-		batchSize: 1000,
-		interval:  500 * time.Millisecond,
+	opt := osqueue.QueueIterOptions{
+		BatchSize: 1000,
+		Interval:  500 * time.Millisecond,
 	}
 	for _, apply := range opts {
 		apply(&opt)
@@ -385,7 +385,7 @@ func (q *queue) ItemsByBacklog(ctx context.Context, backlogID string, from time.
 			var iterated int
 
 			// peek items for backlog
-			items, _, err := q.backlogPeek(ctx, &backlog, backlogFrom, until, opt.batchSize)
+			items, _, err := q.BacklogPeek(ctx, &backlog, backlogFrom, until, opt.BatchSize)
 			if err != nil {
 				l.ReportError(err, "error retrieving queue items from backlog",
 					logger.WithErrorReportTags(map[string]string{
@@ -429,7 +429,7 @@ func (q *queue) ItemsByBacklog(ctx context.Context, backlogID string, from time.
 			// the same millisecond
 			backlogFrom = backlogFrom.Add(time.Millisecond)
 
-			<-time.After(opt.interval)
+			<-time.After(opt.Interval)
 		}
 	}, nil
 }
@@ -519,7 +519,7 @@ func (q *queue) QueueIterator(ctx context.Context, opts QueueIteratorOpts) (part
 	return atomic.LoadInt64(&totalPartitions), atomic.LoadInt64(&totalQueueItems), nil
 }
 
-func (q *queue) ItemByID(ctx context.Context, jobID string, opts ...QueueOpOpt) (*osqueue.QueueItem, error) {
+func (q *queue) ItemByID(ctx context.Context, jobID string) (*osqueue.QueueItem, error) {
 	rc := q.RedisClient.Client()
 	kg := q.RedisClient.kg
 
