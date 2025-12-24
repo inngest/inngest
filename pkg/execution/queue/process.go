@@ -64,7 +64,7 @@ func (q *queueProcessor) process(
 				}
 
 				// Once a job has started, use a BG context to always renew.
-				leaseID, err = q.PrimaryQueueShard.Processor().ExtendLease(
+				leaseID, err = q.PrimaryQueueShard.ExtendLease(
 					context.Background(),
 					qi,
 					*leaseID,
@@ -335,7 +335,7 @@ func (q *queueProcessor) process(
 			}
 
 			qi.AtMS = at.UnixMilli()
-			if err := q.PrimaryQueueShard.Processor().Requeue(context.WithoutCancel(ctx), qi, at, RequeueOptionDisableConstraintUpdates(disableConstraintUpdates)); err != nil {
+			if err := q.PrimaryQueueShard.Requeue(context.WithoutCancel(ctx), qi, at, RequeueOptionDisableConstraintUpdates(disableConstraintUpdates)); err != nil {
 				if err == ErrQueueItemNotFound {
 					// Safe. The executor may have dequeued.
 					return nil
@@ -353,7 +353,7 @@ func (q *queueProcessor) process(
 
 		// Dequeue this entirely, as this permanently failed.
 		// XXX: Increase permanently failed counter here.
-		if err := q.PrimaryQueueShard.Processor().Dequeue(context.WithoutCancel(ctx), qi, DequeueOptionDisableConstraintUpdates(disableConstraintUpdates)); err != nil {
+		if err := q.PrimaryQueueShard.Dequeue(context.WithoutCancel(ctx), qi, DequeueOptionDisableConstraintUpdates(disableConstraintUpdates)); err != nil {
 			if err == ErrQueueItemNotFound {
 				// Safe. The executor may have dequeued.
 				return nil
@@ -368,7 +368,7 @@ func (q *queueProcessor) process(
 		}
 
 	case <-doneCh:
-		if err := q.PrimaryQueueShard.Processor().Dequeue(context.WithoutCancel(ctx), qi, DequeueOptionDisableConstraintUpdates(disableConstraintUpdates)); err != nil {
+		if err := q.PrimaryQueueShard.Dequeue(context.WithoutCancel(ctx), qi, DequeueOptionDisableConstraintUpdates(disableConstraintUpdates)); err != nil {
 			if err == ErrQueueItemNotFound {
 				// Safe. The executor may have dequeued.
 				return nil

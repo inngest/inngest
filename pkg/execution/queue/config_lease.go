@@ -11,15 +11,13 @@ import (
 // attempting to claim a lease on sequential processing.  Only one worker is allowed to
 // work on partitions sequentially;  this reduces contention.
 func (q *queueProcessor) claimSequentialLease(ctx context.Context) {
-	proc := q.PrimaryQueueShard.Processor()
-
 	// Workers with an allowlist can never claim sequential queues.
 	if len(q.AllowQueues) > 0 {
 		return
 	}
 
 	// Attempt to claim the lease immediately.
-	leaseID, err := proc.ConfigLease(ctx, "sequential", ConfigLeaseDuration, q.sequentialLease())
+	leaseID, err := q.PrimaryQueueShard.ConfigLease(ctx, "sequential", ConfigLeaseDuration, q.sequentialLease())
 	if err != ErrConfigAlreadyLeased && err != nil {
 		q.quit <- err
 		return
@@ -36,7 +34,7 @@ func (q *queueProcessor) claimSequentialLease(ctx context.Context) {
 			tick.Stop()
 			return
 		case <-tick.Chan():
-			leaseID, err := proc.ConfigLease(ctx, "sequential", ConfigLeaseDuration, q.sequentialLease())
+			leaseID, err := q.PrimaryQueueShard.ConfigLease(ctx, "sequential", ConfigLeaseDuration, q.sequentialLease())
 			if err == ErrConfigAlreadyLeased {
 				// This is expected; every time there is > 1 runner listening to the
 				// queue there will be contention.
