@@ -624,7 +624,7 @@ func (q *queueProcessor) scanShadowPartitions(ctx context.Context, until time.Ti
 		return fmt.Errorf("error scanning shadow continuations: %w", err)
 	}
 
-	shouldScanAccount := q.runMode.AccountShadowPartition && mrand.Intn(100) <= q.runMode.AccountShadowPartitionWeight
+	shouldScanAccount := q.runMode.AccountShadowPartition && rand.Intn(100) <= q.runMode.AccountShadowPartitionWeight
 	if len(q.runMode.ExclusiveAccounts) > 0 {
 		shouldScanAccount = true
 	}
@@ -636,7 +636,7 @@ func (q *queueProcessor) scanShadowPartitions(ctx context.Context, until time.Ti
 		if len(q.runMode.ExclusiveAccounts) > 0 {
 			peekedAccounts = q.runMode.ExclusiveAccounts
 		} else {
-			peeked, err := Duration(ctx, q.primaryQueueShard.Name, durOpGobalShadowPartitionAccountPeek, q.clock.Now(), func(ctx context.Context) ([]uuid.UUID, error) {
+			peeked, err := Duration(ctx, q.primaryQueueShard.Name(), durOpGobalShadowPartitionAccountPeek, q.Clock.Now(), func(ctx context.Context) ([]uuid.UUID, error) {
 				return q.primaryQueueShard.PeekGlobalShadowPartitionAccounts(ctx, sequential, until, ShadowPartitionAccountPeekMax)
 			})
 			if err != nil {
@@ -663,9 +663,8 @@ func (q *queueProcessor) scanShadowPartitions(ctx context.Context, until time.Ti
 			wg.Add(1)
 			go func(account uuid.UUID) {
 				defer wg.Done()
-				partitionKey := q.primaryQueueShard.RedisClient.kg.AccountShadowPartitions(account)
 
-				parts, err := q.peekShadowPartitions(ctx, partitionKey, sequential, accountPartitionPeekMax, until)
+				parts, err := q.primaryQueueShard.PeekShadowPartitions(ctx, &account, sequential, accountPartitionPeekMax, until)
 				if err != nil && !errors.Is(err, context.Canceled) {
 					q.log.ReportError(err, "error peeking account partition",
 						logger.WithErrorReportTags(map[string]string{
@@ -689,9 +688,8 @@ func (q *queueProcessor) scanShadowPartitions(ctx context.Context, until time.Ti
 		return nil
 	}
 
-	kg := q.primaryQueueShard.RedisClient.kg
 	sequential := false
-	parts, err := q.peekShadowPartitions(ctx, kg.GlobalShadowPartitionSet(), sequential, ShadowPartitionPeekMax, until)
+	parts, err := q.primaryQueueShard.PeekShadowPartitions(ctx, nil, sequential, ShadowPartitionPeekMax, until)
 	if err != nil {
 		return fmt.Errorf("could not peek global shadow partitions: %w", err)
 	}
