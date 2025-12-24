@@ -4,14 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math"
 	"math/rand"
-	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/logger"
@@ -135,238 +132,47 @@ func (q *queue) runActiveChecker(ctx context.Context) {
 	}
 }
 
-func (q *queue) scanPartition(ctx context.Context, partitionKey string, peekLimit int64, peekUntil time.Time, metricShardName string, accountId *uuid.UUID, reportPeekedPartitions *int64) error {
+func (q *queue) PeekAccountPartitions(
+	ctx context.Context,
+	accountID uuid.UUID,
+	peekLimit int64,
+	peekUntil time.Time,
+	sequential bool,
+) ([]*osqueue.QueuePartition, error) {
+	partitionKey := q.RedisClient.kg.AccountPartitionIndex(accountID)
+
 	// Peek 1s into the future to pull jobs off ahead of time, minimizing 0 latency
-	partitions, err := durationWithTags(ctx, q.primaryQueueShard.Name, "partition_peek", q.clock.Now(), func(ctx context.Context) ([]*QueuePartition, error) {
-		return q.partitionPeek(ctx, partitionKey, q.isSequential(), peekUntil, peekLimit, accountId)
+	partitions, err := osqueue.DurationWithTags(ctx, q.PrimaryQueueShard.Name(), "partition_peek", q.Clock.Now(), func(ctx context.Context) ([]*osqueue.QueuePartition, error) {
+		return q.partitionPeek(ctx, partitionKey, sequential, peekUntil, peekLimit, &accountID)
 	}, map[string]any{
-		"is_global_partition_peek": fmt.Sprintf("%t", accountId == nil),
+		"is_global_partition_peek": false,
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	if reportPeekedPartitions != nil {
-		atomic.AddInt64(reportPeekedPartitions, int64(len(partitions)))
-	}
-
-	q.log.Trace("processing partitions",
-		"partition_key", partitionKey,
-		"peek_until", peekUntil.Format(time.StampMilli),
-		"partition", len(partitions),
-	)
-
-	eg := errgroup.Group{}
-
-	for _, ptr := range partitions {
-		p := *ptr
-		eg.Go(func() error {
-			if q.capacity() == 0 {
-				// no longer any available workers for partition, so we can skip
-				// work
-				metrics.IncrQueueScanNoCapacityCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"shard": metricShardName, "queue_shard": q.primaryQueueShard.Name}})
-				return nil
-			}
-			if err := q.processPartition(ctx, &p, 0, false); err != nil {
-				if err == ErrPartitionNotFound || err == ErrPartitionGarbageCollected {
-					// Another worker grabbed the partition, or the partition was deleted
-					// during the scan by an another worker.
-					// TODO: Increase internal metrics
-					return nil
-				}
-				if !errors.Is(err, context.Canceled) {
-					q.log.Error("error processing partition", "error", err)
-				}
-				return err
-			}
-
-			metrics.IncrQueuePartitionProcessedCounter(ctx, metrics.CounterOpt{
-				PkgName: pkgName,
-				Tags:    map[string]any{"shard": metricShardName, "queue_shard": q.primaryQueueShard.Name},
-			})
-			return nil
-		})
-	}
-
-	return eg.Wait()
+	return partitions, nil
 }
 
-func (q *queue) scan(ctx context.Context) error {
-	if q.capacity() == 0 {
-		return nil
-	}
+func (q *queue) PeekGlobalPartitions(
+	ctx context.Context,
+	peekLimit int64,
+	peekUntil time.Time,
+	sequential bool,
+) ([]*osqueue.QueuePartition, error) {
+	partitionKey := q.RedisClient.kg.GlobalPartitionIndex()
 
-	// If there are continuations, process those immediately.
-	if err := q.scanContinuations(ctx); err != nil {
-		return fmt.Errorf("error scanning continuations: %w", err)
-	}
-
-	// Store the shard that we processed, allowing us to eventually pass this
-	// down to the job for stat tracking.
-	metricShardName := "<global>" // default global name for metrics in this function
-
-	peekUntil := q.clock.Now().Add(PartitionLookahead)
-
-	processAccount := false
-	if q.runMode.Account && (!q.runMode.Partition || rand.Intn(100) <= q.runMode.AccountWeight) {
-		processAccount = true
-	}
-
-	if len(q.runMode.ExclusiveAccounts) > 0 {
-		processAccount = true
-	}
-
-	if processAccount {
-		metrics.IncrQueueScanCounter(ctx,
-			metrics.CounterOpt{
-				PkgName: pkgName,
-				Tags: map[string]any{
-					"kind":        "accounts",
-					"queue_shard": q.primaryQueueShard.Name,
-				},
-			},
-		)
-
-		var peekedAccounts []uuid.UUID
-		if len(q.runMode.ExclusiveAccounts) > 0 {
-			peekedAccounts = q.runMode.ExclusiveAccounts
-		} else {
-			peeked, err := duration(ctx, q.primaryQueueShard.Name, "account_peek", q.clock.Now(), func(ctx context.Context) ([]uuid.UUID, error) {
-				return q.accountPeek(ctx, q.isSequential(), peekUntil, AccountPeekMax)
-			})
-			if err != nil {
-				return fmt.Errorf("could not peek accounts: %w", err)
-			}
-			peekedAccounts = peeked
-		}
-
-		if len(peekedAccounts) == 0 {
-			q.log.Trace("account_peek yielded no accounts")
-			return nil
-		}
-
-		// Reduce number of peeked partitions as we're processing multiple accounts in parallel
-		// Note: This is not optimal as some accounts may have fewer partitions than others and
-		// we're leaving capacity on the table. We'll need to find a better way to determine the
-		// optimal peek size in this case.
-		accountPartitionPeekMax := int64(math.Round(float64(PartitionPeekMax / int64(len(peekedAccounts)))))
-
-		var actualScannedPartitions int64
-
-		// Scan and process account partitions in parallel
-		wg := sync.WaitGroup{}
-		for _, account := range peekedAccounts {
-			account := account
-
-			wg.Add(1)
-			go func(account uuid.UUID) {
-				defer wg.Done()
-				partitionKey := q.primaryQueueShard.RedisClient.kg.AccountPartitionIndex(account)
-
-				if err := q.scanPartition(ctx, partitionKey, accountPartitionPeekMax, peekUntil, metricShardName, &account, &actualScannedPartitions); err != nil {
-					q.log.Error("error processing account partitions", "error", err)
-				}
-			}(account)
-		}
-
-		wg.Wait()
-
-		metrics.IncrQueuePartitionScannedCounter(ctx,
-			actualScannedPartitions,
-			metrics.CounterOpt{
-				PkgName: pkgName,
-				Tags: map[string]any{
-					"kind":        "accounts",
-					"queue_shard": q.primaryQueueShard.Name,
-				},
-			},
-		)
-
-		return nil
-	}
-
-	metrics.IncrQueueScanCounter(ctx,
-		metrics.CounterOpt{
-			PkgName: pkgName,
-			Tags: map[string]any{
-				"kind":        "partitions",
-				"queue_shard": q.primaryQueueShard.Name,
-			},
-		},
-	)
-
-	// By default, use the global partition
-	partitionKey := q.primaryQueueShard.RedisClient.kg.GlobalPartitionIndex()
-
-	var actualScannedPartitions int64
-	err := q.scanPartition(ctx, partitionKey, PartitionPeekMax, peekUntil, metricShardName, nil, &actualScannedPartitions)
+	// Peek 1s into the future to pull jobs off ahead of time, minimizing 0 latency
+	partitions, err := osqueue.DurationWithTags(ctx, q.PrimaryQueueShard.Name(), "partition_peek", q.Clock.Now(), func(ctx context.Context) ([]*osqueue.QueuePartition, error) {
+		return q.partitionPeek(ctx, partitionKey, sequential, peekUntil, peekLimit, nil)
+	}, map[string]any{
+		"is_global_partition_peek": true,
+	})
 	if err != nil {
-		return fmt.Errorf("error scanning partition: %w", err)
+		return nil, err
 	}
 
-	metrics.IncrQueuePartitionScannedCounter(ctx,
-		actualScannedPartitions,
-		metrics.CounterOpt{
-			PkgName: pkgName,
-			Tags: map[string]any{
-				"kind":        "partitions",
-				"queue_shard": q.primaryQueueShard.Name,
-			},
-		},
-	)
-
-	return nil
-}
-
-func (q *queue) scanContinuations(ctx context.Context) error {
-	if !q.runMode.Continuations {
-		// continuations are not enabled.
-		return nil
-	}
-
-	// Have some chance of skipping continuations in this iteration.
-	if rand.Float64() <= consts.QueueContinuationSkipProbability {
-		return nil
-	}
-
-	eg := errgroup.Group{}
-	// If we have continued partitions, process those immediately.
-	q.continuesLock.Lock()
-	for _, c := range q.continues {
-		cont := c
-		eg.Go(func() error {
-			p := cont.partition
-			if q.capacity() == 0 {
-				// no longer any available workers for partition, so we can skip
-				// work
-				metrics.IncrQueueScanNoCapacityCounter(ctx, metrics.CounterOpt{PkgName: pkgName})
-				return nil
-			}
-			if p.PartitionType != int(enums.PartitionTypeDefault) {
-				return nil
-			}
-
-			q.log.Trace("continue partition processing", "partition_id", p.ID, "count", c.count)
-
-			if err := q.processPartition(ctx, p, cont.count, false); err != nil {
-				if err == ErrPartitionNotFound || err == ErrPartitionGarbageCollected {
-					q.removeContinue(ctx, p, false)
-					return nil
-				}
-				if errors.Unwrap(err) != context.Canceled {
-					q.log.Error("error processing partition", "error", err)
-				}
-				return err
-			}
-
-			metrics.IncrQueuePartitionProcessedCounter(ctx, metrics.CounterOpt{
-				PkgName: pkgName,
-			})
-			return nil
-		})
-	}
-	q.continuesLock.Unlock()
-	return eg.Wait()
+	return partitions, nil
 }
 
 // processPartition processes a given partition, peeking jobs from the partition to run.
@@ -713,50 +519,6 @@ func (q *queue) ewmaPeekSize(ctx context.Context, p *QueuePartition) int64 {
 	}
 
 	return size
-}
-
-func (q *queue) isSequential() bool {
-	l := q.sequentialLease()
-	if l == nil {
-		return false
-	}
-	return ulid.Time(l.Time()).After(q.clock.Now())
-}
-
-// duration is a helper function to record durations of queue operations.
-func duration[T any](ctx context.Context, queueShardName string, op string, start time.Time, f func(ctx context.Context) (T, error)) (T, error) {
-	return durationWithTags(ctx, queueShardName, op, start, f, nil)
-}
-
-// durationWithTags is a helper function to record durations of queue operations.
-func durationWithTags[T any](ctx context.Context, queueShardName string, op string, start time.Time, f func(ctx context.Context) (T, error), tags map[string]any) (T, error) {
-	if start.IsZero() {
-		start = time.Now()
-	}
-
-	finalTags := map[string]any{
-		"operation":   op,
-		"queue_shard": queueShardName,
-	}
-	for k, v := range tags {
-		finalTags[k] = v
-	}
-
-	res, err := f(ctx)
-
-	d := time.Since(start)
-	if d > time.Second {
-		logger.StdlibLogger(ctx).Warn("queue operation took >1s", "op", op, "duration", d)
-	}
-	metrics.HistogramQueueOperationDuration(
-		ctx,
-		d.Milliseconds(),
-		metrics.HistogramOpt{
-			PkgName: pkgName,
-			Tags:    finalTags,
-		},
-	)
-	return res, err
 }
 
 // trackingSemaphore returns a semaphore that tracks closely - but not atomically -
