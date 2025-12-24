@@ -136,3 +136,41 @@ type ItemLeaseConstraintCheckResult struct {
 
 	RetryAfter time.Time
 }
+
+func ConstraintConfigFromConstraints(
+	constraints PartitionConstraintConfig,
+) constraintapi.ConstraintConfig {
+	config := constraintapi.ConstraintConfig{
+		FunctionVersion: constraints.FunctionVersion,
+		Concurrency: constraintapi.ConcurrencyConfig{
+			AccountConcurrency:     constraints.Concurrency.AccountConcurrency,
+			FunctionConcurrency:    constraints.Concurrency.FunctionConcurrency,
+			AccountRunConcurrency:  constraints.Concurrency.AccountRunConcurrency,
+			FunctionRunConcurrency: constraints.Concurrency.FunctionRunConcurrency,
+		},
+	}
+
+	if len(constraints.Concurrency.CustomConcurrencyKeys) > 0 {
+		config.Concurrency.CustomConcurrencyKeys = make([]constraintapi.CustomConcurrencyLimit, len(constraints.Concurrency.CustomConcurrencyKeys))
+
+		for i, ccl := range constraints.Concurrency.CustomConcurrencyKeys {
+			config.Concurrency.CustomConcurrencyKeys[i] = constraintapi.CustomConcurrencyLimit{
+				Mode:              ccl.Mode,
+				Scope:             ccl.Scope,
+				Limit:             ccl.Limit,
+				KeyExpressionHash: ccl.HashedKeyExpression,
+			}
+		}
+	}
+
+	if constraints.Throttle != nil {
+		config.Throttle = append(config.Throttle, constraintapi.ThrottleConfig{
+			Limit:             constraints.Throttle.Limit,
+			Burst:             constraints.Throttle.Burst,
+			Period:            constraints.Throttle.Period,
+			KeyExpressionHash: constraints.Throttle.ThrottleKeyExpressionHash,
+		})
+	}
+
+	return config
+}
