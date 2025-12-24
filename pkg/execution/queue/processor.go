@@ -36,13 +36,13 @@ func NewQueueProcessor(
 	o := &QueueOptions{
 		PrimaryQueueShard: primaryQueueShard,
 		QueueShardClients: map[string]QueueShard{primaryQueueShard.Name(): primaryQueueShard},
-		ppf: func(_ context.Context, _ QueuePartition) uint {
+		PartitionPriorityFinder: func(_ context.Context, _ QueuePartition) uint {
 			return PriorityDefault
 		},
-		apf: func(_ context.Context, _ uuid.UUID) uint {
+		AccountPriorityFinder: func(_ context.Context, _ uuid.UUID) uint {
 			return PriorityDefault
 		},
-		partitionPausedGetter: func(ctx context.Context, fnID uuid.UUID) PartitionPausedInfo {
+		PartitionPausedGetter: func(ctx context.Context, fnID uuid.UUID) PartitionPausedInfo {
 			return PartitionPausedInfo{}
 		},
 		PeekMin:                     DefaultQueuePeekMin,
@@ -70,7 +70,7 @@ func NewQueueProcessor(
 		shadowPollTick:                 defaultShadowPollTick,
 		backlogNormalizePollTick:       defaultBacklogNormalizePollTick,
 		activeCheckTick:                defaultActiveCheckTick,
-		idempotencyTTL:                 defaultIdempotencyTTL,
+		IdempotencyTTL:                 defaultIdempotencyTTL,
 		queueKindMapping:               make(map[string]string),
 		peekSizeForFunctions:           make(map[string]int64),
 		log:                            logger.StdlibLogger(ctx),
@@ -91,7 +91,7 @@ func NewQueueProcessor(
 		shadowPartitionProcessCount: func(ctx context.Context, acctID uuid.UUID) int {
 			return 5
 		},
-		tenantInstrumentor: func(ctx context.Context, partitionID string) error {
+		TenantInstrumentor: func(ctx context.Context, partitionID string) error {
 			return nil
 		},
 		backoffFunc:             backoff.DefaultBackoff,
@@ -101,10 +101,10 @@ func NewQueueProcessor(
 		shadowContinuationLimit: consts.DefaultQueueContinueLimit,
 		shadowContinues:         map[string]shadowContinuation{},
 		shadowContinueCooldown:  map[string]time.Time{},
-		normalizeRefreshItemCustomConcurrencyKeys: func(ctx context.Context, item *QueueItem, existingKeys []state.CustomConcurrency, shadowPartition *QueueShadowPartition) ([]state.CustomConcurrency, error) {
+		NormalizeRefreshItemCustomConcurrencyKeys: func(ctx context.Context, item *QueueItem, existingKeys []state.CustomConcurrency, shadowPartition *QueueShadowPartition) ([]state.CustomConcurrency, error) {
 			return existingKeys, nil
 		},
-		refreshItemThrottle: func(ctx context.Context, item *QueueItem) (*Throttle, error) {
+		RefreshItemThrottle: func(ctx context.Context, item *QueueItem) (*Throttle, error) {
 			return nil, nil
 		},
 		readOnlySpotChecks: func(ctx context.Context, acctID uuid.UUID) bool {
