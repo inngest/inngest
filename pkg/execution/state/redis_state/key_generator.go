@@ -201,6 +201,9 @@ type QueueKeyGenerator interface {
 
 	// Sequential returns the key which allows a worker to claim sequential processing
 	// of the partitions.
+	ConfigLeaseKey(scope string) string
+	// Sequential returns the key which allows a worker to claim sequential processing
+	// of the partitions.
 	Sequential() string
 	// Scavenger returns the key which allows a worker to claim scavenger processing
 	// of the partitions for lost jobs
@@ -314,6 +317,10 @@ func (u queueKeyGenerator) Scavenger() string {
 
 func (u queueKeyGenerator) Instrumentation() string {
 	return fmt.Sprintf("{%s}:queue:instrument", u.queueDefaultKey)
+}
+
+func (u queueKeyGenerator) ConfigLeaseKey(scope string) string {
+	return fmt.Sprintf("{%s}:queue:%s", u.queueDefaultKey, scope)
 }
 
 func (u queueKeyGenerator) ActiveChecker() string {
