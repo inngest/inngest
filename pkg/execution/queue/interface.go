@@ -155,7 +155,10 @@ type QueueProcessor interface {
 	SetFunctionMigrate(ctx context.Context, fnID uuid.UUID, migrateLockUntil *time.Time) error
 	ResetAttemptsByJobID(ctx context.Context, jobID string) error
 
+	PeekEWMA(ctx context.Context, fnID uuid.UUID) (int64, error)
 	SetPeekEWMA(ctx context.Context, fnID *uuid.UUID, val int64) error
+	PartitionSize(ctx context.Context, partitionID string, until time.Time) (int64, error)
+
 	ConfigLease(ctx context.Context, key string, duration time.Duration, existingLeaseID ...*ulid.ULID) (*ulid.ULID, error)
 
 	AccountPeek(ctx context.Context, sequential bool, until time.Time, limit int64) ([]uuid.UUID, error)

@@ -48,7 +48,7 @@ func (q *queueProcessor) ewmaPeekSize(ctx context.Context, p *QueuePartition) in
 	}
 
 	// retrieve the EWMA value
-	ewma, err := q.peekEWMA(ctx, *p.FunctionID)
+	ewma, err := q.PrimaryQueueShard.Processor().PeekEWMA(ctx, *p.FunctionID)
 	if err != nil {
 		// return the minimum if there's an error
 		return q.PeekMin
@@ -80,7 +80,7 @@ func (q *queueProcessor) ewmaPeekSize(ctx context.Context, p *QueuePartition) in
 	}
 
 	dur := time.Hour * 24
-	qsize, _ := q.partitionSize(ctx, p.zsetKey(q.primaryQueueShard.RedisClient.kg), q.Clock.Now().Add(dur))
+	qsize, _ := q.PrimaryQueueShard.Processor().PartitionSize(ctx, p.ID, q.Clock.Now().Add(dur))
 	if qsize > size {
 		size = qsize
 	}

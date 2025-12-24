@@ -1336,6 +1336,10 @@ func (q *queue) PartitionPeek(ctx context.Context, sequential bool, until time.T
 	return q.partitionPeek(ctx, q.RedisClient.kg.GlobalPartitionIndex(), sequential, until, limit, nil)
 }
 
+func (q *queue) PartitionSize(ctx context.Context, partitionID string, until time.Time) (int64, error) {
+	return q.partitionSize(ctx, q.RedisClient.kg.PartitionQueueSet(enums.PartitionTypeDefault, partitionID, ""), until)
+}
+
 func (q *queue) partitionSize(ctx context.Context, partitionKey string, until time.Time) (int64, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "partitionSize"), redis_telemetry.ScopeQueue)
 
