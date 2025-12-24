@@ -146,6 +146,7 @@ type QueueProcessor interface {
 	ResetAttemptsByJobID(ctx context.Context, jobID string) error
 
 	SetPeekEWMA(ctx context.Context, fnID *uuid.UUID, val int64) error
+	ConfigLease(ctx context.Context, key string, duration time.Duration, existingLeaseID ...*ulid.ULID) (*ulid.ULID, error)
 }
 
 type BacklogRefillOptions struct {
