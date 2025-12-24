@@ -397,13 +397,13 @@ func (q *queue) SetFunctionMigrate(ctx context.Context, fnID uuid.UUID, migrateL
 
 // removeQueueItem attempts to remove a specific item in the target queue shard
 // and also remove it from the queue item hash as well
-func (q *queue) RemoveQueueItem(ctx context.Context, partitionKey string, itemID string) error {
+func (q *queue) RemoveQueueItem(ctx context.Context, partitionID string, itemID string) error {
 	l := logger.StdlibLogger(ctx)
 
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "removeQueueItem"), redis_telemetry.ScopeQueue)
 
 	keys := []string{
-		partitionKey,
+		q.RedisClient.kg.PartitionQueueSet(enums.PartitionTypeDefault, partitionID, ""),
 		q.RedisClient.kg.QueueItem(),
 	}
 	args := []string{itemID}
@@ -622,7 +622,7 @@ func (q *queue) peek(ctx context.Context, opts peekOpts) ([]*osqueue.QueueItem, 
 		for _, missingItemId := range missingQueueItems {
 			id := missingItemId
 			eg.Go(func() error {
-				return q.RemoveQueueItem(ctx, opts.PartitionKey, id)
+				return q.RemoveQueueItem(ctx, opts.PartitionID, id)
 			})
 		}
 
