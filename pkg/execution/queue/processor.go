@@ -15,6 +15,7 @@ import (
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/jonboulle/clockwork"
 	"github.com/oklog/ulid/v2"
+	"golang.org/x/sync/errgroup"
 )
 
 var (
@@ -220,9 +221,41 @@ func (q *queueProcessor) ResetAttemptsByJobID(ctx context.Context, shard string,
 	panic("unimplemented")
 }
 
-// Run implements Queue.
-func (q *queueProcessor) Run(context.Context, RunFunc) error {
-	panic("unimplemented")
+func (q *queueProcessor) Run(ctx context.Context, f RunFunc) error {
+	if q.runMode.Sequential {
+		go q.claimSequentialLease(ctx)
+	}
+
+	if q.runMode.Scavenger {
+		go q.runScavenger(ctx)
+	}
+
+	if q.runMode.ActiveChecker {
+		go q.runActiveChecker(ctx)
+	}
+
+	go q.runInstrumentation(ctx)
+
+	// start execution and shadow scan concurrently
+	eg, ctx := errgroup.WithContext(ctx)
+
+	eg.Go(func() error {
+		return q.executionScan(ctx, f)
+	})
+
+	if q.runMode.ShadowPartition {
+		eg.Go(func() error {
+			return q.shadowScan(ctx)
+		})
+	}
+
+	if q.runMode.NormalizePartition {
+		eg.Go(func() error {
+			return q.backlogNormalizationScan(ctx)
+		})
+	}
+
+	return eg.Wait()
 }
 
 // RunJobs implements Queue.
@@ -242,7 +275,7 @@ func (q *queueProcessor) SetFunctionMigrate(ctx context.Context, sourceShard str
 		return fmt.Errorf("could not find shard %q", sourceShard)
 	}
 
-	return shard.Processor().SetFunctionMigrate(ctx, sourceShard, fnID uuid.UUID, migrateLockUntil *time.Time)
+	return shard.Processor().SetFunctionMigrate(ctx, fnID, migrateLockUntil)
 }
 
 // StatusCount implements Queue.

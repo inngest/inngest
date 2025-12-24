@@ -136,3 +136,7 @@ const (
 	// like checking paused status or fetching partition constraints.
 	DatabaseReadTimeout = 30 * time.Second
 )
+
+const (
+	minWorkersFree = 5
+)
