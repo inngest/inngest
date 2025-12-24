@@ -26,7 +26,7 @@ func (q *queueProcessor) Migrate(ctx context.Context, sourceShardName string, fn
 	from := time.Time{}
 	// setting it to 5 years ahead should be enough to cover all queue items in the partition
 	until := q.Clock.Now().Add(24 * time.Hour * 365 * 5)
-	items, err := shard.Processor().ItemsByPartition(ctx, fnID.String(), from, until,
+	items, err := shard.ItemsByPartition(ctx, fnID.String(), from, until,
 		WithQueueItemIterBatchSize(limit),
 	)
 	if err != nil {
@@ -46,7 +46,7 @@ func (q *queueProcessor) Migrate(ctx context.Context, sourceShardName string, fn
 			return err
 		}
 
-		if err := shard.Processor().Dequeue(ctx, *qi); err != nil {
+		if err := shard.Dequeue(ctx, *qi); err != nil {
 			l.ReportError(err, "error dequeueing queue item after migration")
 		}
 
