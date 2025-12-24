@@ -40,6 +40,14 @@ func (q *queue) Kind() enums.QueueShardKind {
 	return enums.QueueShardKindRedis
 }
 
+type RedisQueueShard interface {
+	Client() *QueueClient
+}
+
+func (q *queue) Client() *QueueClient {
+	return q.RedisClient
+}
+
 func NewRedisQueue(options osqueue.QueueOptions, name string, queueClient *QueueClient) osqueue.QueueShard {
 	q := &queue{
 		name:         name,
