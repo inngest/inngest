@@ -1166,7 +1166,7 @@ func (s *svc) handleJobPromote(ctx context.Context, item queue.Item) error {
 	}
 
 	// The sleep item should usually exist
-	qi, err := qm.LoadQueueItem(ctx, shard.Name(), data.PromoteJobID)
+	qi, err := shard.LoadQueueItem(ctx, data.PromoteJobID)
 	if err != nil {
 		if errors.Is(err, queue.ErrQueueItemNotFound) {
 			return nil
