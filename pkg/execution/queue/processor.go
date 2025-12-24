@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/VividCortex/ewma"
@@ -276,7 +275,7 @@ func (q *queueProcessor) SetFunctionMigrate(ctx context.Context, sourceShard str
 		return fmt.Errorf("could not find shard %q", sourceShard)
 	}
 
-	return shard.Processor().SetFunctionMigrate(ctx, fnID, migrateLockUntil)
+	return shard.SetFunctionMigrate(ctx, fnID, migrateLockUntil)
 }
 
 // StatusCount implements Queue.
@@ -290,5 +289,5 @@ func (q *queueProcessor) UnpauseFunction(ctx context.Context, shard string, acct
 }
 
 func (q *queueProcessor) capacity() int64 {
-	return int64(q.numWorkers) - atomic.LoadInt64(&q.sem.counter)
+	return int64(q.numWorkers) - q.sem.Count()
 }
