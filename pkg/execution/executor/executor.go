@@ -35,7 +35,6 @@ import (
 	"github.com/inngest/inngest/pkg/execution/realtime"
 	"github.com/inngest/inngest/pkg/execution/singleton"
 	"github.com/inngest/inngest/pkg/execution/state"
-	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/expressions"
 	"github.com/inngest/inngest/pkg/expressions/expragg"
@@ -105,7 +104,7 @@ func ScheduleStatus(err error) string {
 		return "debounced"
 	case errors.Is(err, ErrFunctionSkipped):
 		return "skipped"
-	case errors.Is(err, redis_state.ErrQueueItemExists), errors.Is(err, ErrFunctionSkippedIdempotency), errors.Is(err, state.ErrIdentifierExists):
+	case errors.Is(err, queue.ErrQueueItemExists), errors.Is(err, ErrFunctionSkippedIdempotency), errors.Is(err, state.ErrIdentifierExists):
 		return "idempotency"
 	case err != nil:
 		return "error"
@@ -351,14 +350,14 @@ func WithDriverV2(drivers ...driver.DriverV2) ExecutorOpt {
 	}
 }
 
-func WithAssignedQueueShard(shard redis_state.RedisQueueShard) ExecutorOpt {
+func WithAssignedQueueShard(shard queue.QueueShard) ExecutorOpt {
 	return func(e execution.Executor) error {
 		e.(*executor).assignedQueueShard = shard
 		return nil
 	}
 }
 
-func WithShardSelector(selector redis_state.ShardSelector) ExecutorOpt {
+func WithShardSelector(selector queue.ShardSelector) ExecutorOpt {
 	return func(e execution.Executor) error {
 		e.(*executor).shardFinder = selector
 		return nil
@@ -490,8 +489,8 @@ type executor struct {
 
 	functionBacklogSizeLimit BacklogSizeLimitFn
 
-	assignedQueueShard redis_state.RedisQueueShard
-	shardFinder        redis_state.ShardSelector
+	assignedQueueShard queue.QueueShard
+	shardFinder        queue.ShardSelector
 
 	traceReader    cqrs.TraceReader
 	tracerProvider tracing.TracerProvider
@@ -677,7 +676,7 @@ func (e *executor) createEagerCancellationForTimeout(ctx context.Context, since 
 		QueueName:   &queueName,
 	}, enqueueAt, queue.EnqueueOpts{})
 
-	if err != nil && err != redis_state.ErrQueueItemExists {
+	if err != nil && err != queue.ErrQueueItemExists {
 		l.Trace("Error enqueueing system job", "error", err.Error())
 		return err
 	}
@@ -1308,13 +1307,13 @@ func (e *executor) schedule(
 	switch err {
 	case nil:
 		// no-op
-	case redis_state.ErrQueueItemExists:
+	case queue.ErrQueueItemExists:
 		// If the item already exists in the queue, we can safely ignore this
 		// entire schedule request; it's basically a retry and we should not
 		// persist this for the user.
 		return nil, state.ErrIdentifierExists
 
-	case redis_state.ErrQueueItemSingletonExists:
+	case queue.ErrQueueItemSingletonExists:
 		err := e.smv2.Delete(ctx, sv2.IDFromV1(stv1ID))
 		if err != nil {
 			l.ReportError(err, "error deleting function state")
@@ -1464,7 +1463,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	//
 	// record function start time using the same method as step started,
 	// ensures ui timeline alignment
-	start, ok := redis_state.GetItemStart(ctx)
+	start, ok := queue.GetItemStart(ctx)
 	if !ok {
 		start = e.now()
 	}
@@ -2667,7 +2666,7 @@ func (e *executor) ResumePauseTimeout(ctx context.Context, pause state.Pause, r 
 
 		err = e.queue.Enqueue(ctx, nextItem, e.now(), queue.EnqueueOpts{})
 		if err != nil {
-			if errors.Is(err, redis_state.ErrQueueItemExists) {
+			if errors.Is(err, queue.ErrQueueItemExists) {
 				nextStepSpan.Drop()
 			} else {
 				_ = nextStepSpan.Send()
@@ -2835,7 +2834,7 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 
 			err = e.queue.Enqueue(ctx, nextItem, e.now(), queue.EnqueueOpts{})
 			if err != nil {
-				if err == redis_state.ErrQueueItemExists {
+				if err == queue.ErrQueueItemExists {
 					nextStepSpan.Drop()
 				} else {
 					_ = nextStepSpan.Send()
@@ -2868,7 +2867,7 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 		}
 
 		// And dequeue the timeout job to remove unneeded work from the queue, etc.
-		if q, ok := e.queue.(redis_state.QueueManager); ok {
+		if q, ok := e.queue.(queue.QueueManager); ok {
 			// timeout jobs are enqueued to the workflow partition (see handleGeneratorWaitForEvent)
 			// this is _not_ a system partition and lives on the account shard, which we need to retrieve
 			shard, err := e.shardFinder(ctx, md.ID.Tenant.AccountID, nil)
@@ -2886,7 +2885,7 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 				},
 			})
 			if err != nil {
-				if errors.Is(err, redis_state.ErrQueueItemNotFound) {
+				if errors.Is(err, queue.ErrQueueItemNotFound) {
 					logger.StdlibLogger(ctx).Warn("missing pause timeout item", "shard", shard.Name, "pause", pause)
 				} else {
 					logger.StdlibLogger(ctx).Error("error dequeueing consumed pause job when resuming", "error", err)
@@ -3139,7 +3138,7 @@ func (e *executor) maybeEnqueueDiscoveryStep(ctx context.Context, runCtx executi
 		if err != nil {
 			span.Drop()
 
-			if err == redis_state.ErrQueueItemExists {
+			if err == queue.ErrQueueItemExists {
 				return nil
 			}
 
@@ -3391,7 +3390,7 @@ func (e *executor) handleStepFailed(ctx context.Context, runCtx execution.RunCon
 		}
 
 		err = e.queue.Enqueue(ctx, nextItem, now, queue.EnqueueOpts{})
-		if err == redis_state.ErrQueueItemExists {
+		if err == queue.ErrQueueItemExists {
 			span.Drop()
 			return nil
 		}
@@ -3547,7 +3546,7 @@ func (e *executor) handleGeneratorStepPlanned(ctx context.Context, runCtx execut
 	}
 
 	err = e.queue.Enqueue(ctx, nextItem, now, queue.EnqueueOpts{})
-	if err == redis_state.ErrQueueItemExists {
+	if err == queue.ErrQueueItemExists {
 		span.Drop()
 		return nil
 	}
@@ -3652,7 +3651,7 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, runCtx execution.Ru
 	err = e.queue.Enqueue(ctx, nextItem, until, queue.EnqueueOpts{
 		PassthroughJobId: true,
 	})
-	if err == redis_state.ErrQueueItemExists {
+	if err == queue.ErrQueueItemExists {
 		span.Drop()
 		return nil
 	}
@@ -3823,7 +3822,7 @@ func (e *executor) handleGeneratorGateway(ctx context.Context, runCtx execution.
 				span.Drop()
 			}
 
-			if err == redis_state.ErrQueueItemExists {
+			if err == queue.ErrQueueItemExists {
 				return nil
 			}
 
@@ -4064,7 +4063,7 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 				span.Drop()
 			}
 
-			if err == redis_state.ErrQueueItemExists {
+			if err == queue.ErrQueueItemExists {
 				return nil
 			}
 
@@ -4230,7 +4229,7 @@ func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, runCtx exec
 	}
 
 	err = e.queue.Enqueue(ctx, nextItem, expires, queue.EnqueueOpts{})
-	if err == redis_state.ErrQueueItemExists {
+	if err == queue.ErrQueueItemExists {
 		if span != nil {
 			span.Drop()
 		}
@@ -4397,7 +4396,7 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, runCtx exe
 	}
 
 	err = e.queue.Enqueue(ctx, nextItem, expires, queue.EnqueueOpts{})
-	if err == redis_state.ErrQueueItemExists {
+	if err == queue.ErrQueueItemExists {
 		if span != nil {
 			span.Drop()
 		}
@@ -4609,7 +4608,7 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, runCtx execu
 
 	// TODO Is this fine to leave? No attempts.
 	err = e.queue.Enqueue(ctx, nextItem, expires, queue.EnqueueOpts{})
-	if err == redis_state.ErrQueueItemExists {
+	if err == queue.ErrQueueItemExists {
 		span.Drop()
 		return nil
 	}
@@ -4764,7 +4763,7 @@ func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Func
 
 	// Ensure to delete batch when Schedule worked, we already processed it, or the function was paused
 	shouldDeleteBatch := err == nil ||
-		err == redis_state.ErrQueueItemExists ||
+		err == queue.ErrQueueItemExists ||
 		errors.Is(err, ErrFunctionSkipped) ||
 		errors.Is(err, ErrFunctionSkippedIdempotency) ||
 		errors.Is(err, state.ErrIdentifierExists)
@@ -4777,7 +4776,7 @@ func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Func
 
 	// Don't bother if it's already there
 	// If function is paused, we do not schedule runs
-	if err == redis_state.ErrQueueItemExists ||
+	if err == queue.ErrQueueItemExists ||
 		errors.Is(err, ErrFunctionSkipped) ||
 		errors.Is(err, ErrFunctionSkippedIdempotency) {
 		span.SetAttributes(attribute.Bool(consts.OtelSysStepDelete, true))
