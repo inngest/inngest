@@ -81,7 +81,7 @@ func (q *queue) BacklogRefillConstraintCheck(
 		},
 		Migration: constraintapi.MigrationIdentifier{
 			IsRateLimit: false,
-			QueueShard:  q.PrimaryQueueShard.Name(),
+			QueueShard:  q.name,
 		},
 	})
 	if err != nil {
@@ -225,7 +225,7 @@ func (q *queue) ItemLeaseConstraintCheck(
 		},
 		Migration: constraintapi.MigrationIdentifier{
 			IsRateLimit: false,
-			QueueShard:  q.PrimaryQueueShard.Name(),
+			QueueShard:  q.name,
 		},
 	})
 	if err != nil {
@@ -371,6 +371,6 @@ func (q *queue) keyConstraintCheckIdempotency(accountID *uuid.UUID, itemID strin
 
 	return q.CapacityManager.KeyConstraintCheckIdempotency(constraintapi.MigrationIdentifier{
 		IsRateLimit: false,
-		QueueShard:  q.PrimaryQueueShard.Name(),
+		QueueShard:  q.name,
 	}, *accountID, itemID)
 }
