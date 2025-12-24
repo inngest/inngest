@@ -64,7 +64,7 @@ func (q *queueProcessor) process(
 				}
 
 				// Once a job has started, use a BG context to always renew.
-				leaseID, err = q.PrimaryQueueShard.ExtendLease(
+				leaseID, err = q.primaryQueueShard.ExtendLease(
 					context.Background(),
 					qi,
 					*leaseID,
@@ -116,7 +116,7 @@ func (q *queueProcessor) process(
 					LeaseID:        *currentCapacityLease,
 					Migration: constraintapi.MigrationIdentifier{
 						IsRateLimit: false,
-						QueueShard:  q.PrimaryQueueShard.Name(),
+						QueueShard:  q.primaryQueueShard.Name(),
 					},
 					Duration: QueueLeaseDuration,
 					Source:   constraintapi.LeaseSource{Location: constraintapi.CallerLocationItemLease},
@@ -164,7 +164,7 @@ func (q *queueProcessor) process(
 	//
 	// NOTE: It is important that we keep this here for every job;  the exeuctor uses this to pass
 	// along the job ID as metadata to the SDK.  We also need to pass in shard information.
-	jobCtx = WithShardID(jobCtx, q.PrimaryQueueShard.Name())
+	jobCtx = WithShardID(jobCtx, q.primaryQueueShard.Name())
 	jobCtx = WithJobID(jobCtx, qi.ID)
 	// Same with the group ID, if it exists.
 	if qi.Data.GroupID != "" {
@@ -231,27 +231,27 @@ func (q *queueProcessor) process(
 			latencyAvg.Add(float64(latency))
 			metrics.GaugeQueueItemLatencyEWMA(ctx, int64(latencyAvg.Value()/1e6), metrics.GaugeOpt{
 				PkgName: pkgName,
-				Tags:    map[string]any{"kind": qi.Data.Kind, "queue_shard": q.PrimaryQueueShard.Name()},
+				Tags:    map[string]any{"kind": qi.Data.Kind, "queue_shard": q.primaryQueueShard.Name()},
 			})
 			latencySem.Unlock()
 
 			// Set the metrics historgram and gauge, which reports the ewma value.
 			metrics.HistogramQueueItemLatency(ctx, latency.Milliseconds(), metrics.HistogramOpt{
 				PkgName: pkgName,
-				Tags:    map[string]any{"kind": qi.Data.Kind, "queue_shard": q.PrimaryQueueShard.Name()},
+				Tags:    map[string]any{"kind": qi.Data.Kind, "queue_shard": q.primaryQueueShard.Name()},
 			})
 		}()
 
 		metrics.IncrQueueItemStatusCounter(ctx, metrics.CounterOpt{
 			PkgName: pkgName,
-			Tags:    map[string]any{"status": "started", "queue_shard": q.PrimaryQueueShard.Name()},
+			Tags:    map[string]any{"status": "started", "queue_shard": q.primaryQueueShard.Name()},
 		})
 
 		runInfo := RunInfo{
 			Latency:             latency,
 			SojournDelay:        sojourn,
 			Priority:            q.PartitionPriorityFinder(ctx, p),
-			QueueShardName:      q.PrimaryQueueShard.Name(),
+			QueueShardName:      q.primaryQueueShard.Name(),
 			ContinueCount:       continuationCtr,
 			RefilledFromBacklog: qi.RefilledFrom,
 			CapacityLease:       i.capacityLease,
@@ -263,14 +263,14 @@ func (q *queueProcessor) process(
 		if err != nil {
 			metrics.IncrQueueItemStatusCounter(ctx, metrics.CounterOpt{
 				PkgName: pkgName,
-				Tags:    map[string]any{"status": "errored", "queue_shard": q.PrimaryQueueShard.Name()},
+				Tags:    map[string]any{"status": "errored", "queue_shard": q.primaryQueueShard.Name()},
 			})
 			errCh <- err
 			return
 		}
 		metrics.IncrQueueItemStatusCounter(ctx, metrics.CounterOpt{
 			PkgName: pkgName,
-			Tags:    map[string]any{"status": "completed", "queue_shard": q.PrimaryQueueShard.Name()},
+			Tags:    map[string]any{"status": "completed", "queue_shard": q.primaryQueueShard.Name()},
 		})
 
 		if res.ScheduledImmediateJob {
@@ -300,7 +300,7 @@ func (q *queueProcessor) process(
 				LeaseID:        *currentLeaseID,
 				Migration: constraintapi.MigrationIdentifier{
 					IsRateLimit: false,
-					QueueShard:  q.PrimaryQueueShard.Name(),
+					QueueShard:  q.primaryQueueShard.Name(),
 				},
 				Source: constraintapi.LeaseSource{Location: constraintapi.CallerLocationItemLease},
 			})
@@ -335,7 +335,7 @@ func (q *queueProcessor) process(
 			}
 
 			qi.AtMS = at.UnixMilli()
-			if err := q.PrimaryQueueShard.Requeue(context.WithoutCancel(ctx), qi, at, RequeueOptionDisableConstraintUpdates(disableConstraintUpdates)); err != nil {
+			if err := q.primaryQueueShard.Requeue(context.WithoutCancel(ctx), qi, at, RequeueOptionDisableConstraintUpdates(disableConstraintUpdates)); err != nil {
 				if err == ErrQueueItemNotFound {
 					// Safe. The executor may have dequeued.
 					return nil
@@ -353,7 +353,7 @@ func (q *queueProcessor) process(
 
 		// Dequeue this entirely, as this permanently failed.
 		// XXX: Increase permanently failed counter here.
-		if err := q.PrimaryQueueShard.Dequeue(context.WithoutCancel(ctx), qi, DequeueOptionDisableConstraintUpdates(disableConstraintUpdates)); err != nil {
+		if err := q.primaryQueueShard.Dequeue(context.WithoutCancel(ctx), qi, DequeueOptionDisableConstraintUpdates(disableConstraintUpdates)); err != nil {
 			if err == ErrQueueItemNotFound {
 				// Safe. The executor may have dequeued.
 				return nil
@@ -368,7 +368,7 @@ func (q *queueProcessor) process(
 		}
 
 	case <-doneCh:
-		if err := q.PrimaryQueueShard.Dequeue(context.WithoutCancel(ctx), qi, DequeueOptionDisableConstraintUpdates(disableConstraintUpdates)); err != nil {
+		if err := q.primaryQueueShard.Dequeue(context.WithoutCancel(ctx), qi, DequeueOptionDisableConstraintUpdates(disableConstraintUpdates)); err != nil {
 			if err == ErrQueueItemNotFound {
 				// Safe. The executor may have dequeued.
 				return nil

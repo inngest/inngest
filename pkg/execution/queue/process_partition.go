@@ -41,8 +41,8 @@ func (q *queueProcessor) processPartition(ctx context.Context, p *QueuePartition
 	// items are dynamic generators).  This means that we have to delay
 	// processing the partition by N seconds, meaning the latency is increased by
 	// up to this period for scheduled items behind the concurrency limits.
-	_, err := Duration(ctx, q.PrimaryQueueShard.Name(), "partition_lease", q.Clock.Now(), func(ctx context.Context) (int, error) {
-		l, capacity, err := q.PrimaryQueueShard.PartitionLease(ctx, p, PartitionLeaseDuration, PartitionLeaseOptionDisableLeaseChecks(disableLeaseChecks))
+	_, err := Duration(ctx, q.primaryQueueShard.Name(), "partition_lease", q.Clock.Now(), func(ctx context.Context) (int, error) {
+		l, capacity, err := q.primaryQueueShard.PartitionLease(ctx, p, PartitionLeaseDuration, PartitionLeaseOptionDisableLeaseChecks(disableLeaseChecks))
 		p.LeaseID = l
 		return capacity, err
 	})
@@ -53,10 +53,10 @@ func (q *queueProcessor) processPartition(ctx context.Context, p *QueuePartition
 		metrics.IncrQueuePartitionConcurrencyLimitCounter(ctx,
 			metrics.CounterOpt{
 				PkgName: pkgName,
-				Tags:    map[string]any{"kind": "function", "queue_shard": q.PrimaryQueueShard.Name()},
+				Tags:    map[string]any{"kind": "function", "queue_shard": q.primaryQueueShard.Name()},
 			},
 		)
-		return q.PrimaryQueueShard.PartitionRequeue(ctx, p, q.Clock.Now().Truncate(time.Second).Add(PartitionConcurrencyLimitRequeueExtension), true)
+		return q.primaryQueueShard.PartitionRequeue(ctx, p, q.Clock.Now().Truncate(time.Second).Add(PartitionConcurrencyLimitRequeueExtension), true)
 	}
 	if errors.Is(err, ErrAccountConcurrencyLimit) {
 		// For backwards compatibility, we report on the function level as well
@@ -71,13 +71,13 @@ func (q *queueProcessor) processPartition(ctx context.Context, p *QueuePartition
 		metrics.IncrQueuePartitionConcurrencyLimitCounter(ctx,
 			metrics.CounterOpt{
 				PkgName: pkgName,
-				Tags:    map[string]any{"kind": "account", "queue_shard": q.PrimaryQueueShard.Name()},
+				Tags:    map[string]any{"kind": "account", "queue_shard": q.primaryQueueShard.Name()},
 			},
 		)
-		return q.PrimaryQueueShard.PartitionRequeue(ctx, p, q.Clock.Now().Truncate(time.Second).Add(PartitionConcurrencyLimitRequeueExtension), true)
+		return q.primaryQueueShard.PartitionRequeue(ctx, p, q.Clock.Now().Truncate(time.Second).Add(PartitionConcurrencyLimitRequeueExtension), true)
 	}
 	if errors.Is(err, ErrPartitionAlreadyLeased) {
-		metrics.IncrQueuePartitionLeaseContentionCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.PrimaryQueueShard.Name()}})
+		metrics.IncrQueuePartitionLeaseContentionCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name()}})
 		// If this is a continuation, remove it from the continuation counter.
 		// This prevents us from keeping partitions as continuations forever until
 		// we hit the max limit.
@@ -94,7 +94,7 @@ func (q *queueProcessor) processPartition(ctx context.Context, p *QueuePartition
 		// we hit the max limit.
 		q.removeContinue(ctx, p, false)
 
-		metrics.IncrPartitionGoneCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.PrimaryQueueShard.Name()}})
+		metrics.IncrPartitionGoneCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name()}})
 		return nil
 	}
 	if errors.Is(err, ErrPartitionPaused) {
@@ -112,7 +112,7 @@ func (q *queueProcessor) processPartition(ctx context.Context, p *QueuePartition
 		metrics.HistogramProcessPartitionDuration(ctx, q.Clock.Since(begin).Milliseconds(), metrics.HistogramOpt{
 			PkgName: pkgName,
 			Tags: map[string]any{
-				"queue_shard":     q.PrimaryQueueShard.Name(),
+				"queue_shard":     q.primaryQueueShard.Name(),
 				"is_continuation": continuationCount > 0,
 			},
 		})
@@ -132,11 +132,11 @@ func (q *queueProcessor) processPartition(ctx context.Context, p *QueuePartition
 	// to the worker, how long Redis takes to lease the item, etc.
 	fetch := q.Clock.Now().Truncate(time.Second).Add(PartitionLookahead)
 
-	queue, err := Duration(peekCtx, q.PrimaryQueueShard.Name(), "peek", q.Clock.Now(), func(ctx context.Context) ([]*QueueItem, error) {
+	queue, err := Duration(peekCtx, q.primaryQueueShard.Name(), "peek", q.Clock.Now(), func(ctx context.Context) ([]*QueueItem, error) {
 		peek := q.peekSize(ctx, p)
 		// NOTE: would love to instrument this value to see it over time per function but
 		// it's likely too high of a cardinality
-		go metrics.HistogramQueuePeekEWMA(ctx, peek, metrics.HistogramOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.PrimaryQueueShard.Name()}})
+		go metrics.HistogramQueuePeekEWMA(ctx, peek, metrics.HistogramOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name()}})
 
 		if randomOffset {
 			return q.PeekRandom(peekCtx, p, fetch, peek)
@@ -151,7 +151,7 @@ func (q *queueProcessor) processPartition(ctx context.Context, p *QueuePartition
 	metrics.HistogramQueuePeekSize(ctx, int64(len(queue)), metrics.HistogramOpt{
 		PkgName: pkgName,
 		Tags: map[string]any{
-			"queue_shard":     q.PrimaryQueueShard.Name(),
+			"queue_shard":     q.primaryQueueShard.Name(),
 			"is_continuation": continuationCount > 0,
 		},
 	})
@@ -160,7 +160,7 @@ func (q *queueProcessor) processPartition(ctx context.Context, p *QueuePartition
 	metrics.IncrQueuePartitionLeasedCounter(ctx, metrics.CounterOpt{
 		PkgName: pkgName,
 		Tags: map[string]any{
-			"queue_shard":     q.PrimaryQueueShard.Name(),
+			"queue_shard":     q.primaryQueueShard.Name(),
 			"is_continuation": continuationCount > 0,
 		},
 	})
@@ -191,7 +191,7 @@ func (q *queueProcessor) processPartition(ctx context.Context, p *QueuePartition
 	}
 
 	if q.usePeekEWMA {
-		if err := q.PrimaryQueueShard.SetPeekEWMA(ctx, p.FunctionID, int64(iter.ctrConcurrency+iter.ctrRateLimit)); err != nil {
+		if err := q.primaryQueueShard.SetPeekEWMA(ctx, p.FunctionID, int64(iter.ctrConcurrency+iter.ctrRateLimit)); err != nil {
 			q.log.Warn("error recording concurrency limit for EWMA", "error", err)
 		}
 	}
@@ -201,7 +201,7 @@ func (q *queueProcessor) processPartition(ctx context.Context, p *QueuePartition
 		// as random offset is currently false (so we don't loop forever)
 
 		// Note: we must requeue the partition to remove the lease.
-		err := q.PrimaryQueueShard.PartitionRequeue(ctx, p, q.Clock.Now().Truncate(time.Second).Add(PartitionConcurrencyLimitRequeueExtension), true)
+		err := q.primaryQueueShard.PartitionRequeue(ctx, p, q.Clock.Now().Truncate(time.Second).Add(PartitionConcurrencyLimitRequeueExtension), true)
 		if err != nil {
 			q.log.Warn("error requeuieng partition for random peek", "error", err)
 		}
@@ -223,8 +223,8 @@ func (q *queueProcessor) processPartition(ctx context.Context, p *QueuePartition
 		}
 
 		// Requeue this partition as we hit concurrency limits.
-		metrics.IncrQueuePartitionConcurrencyLimitCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.PrimaryQueueShard.Name()}})
-		err = q.PrimaryQueueShard.PartitionRequeue(ctx, p, q.Clock.Now().Truncate(time.Second).Add(requeue), true)
+		metrics.IncrQueuePartitionConcurrencyLimitCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name()}})
+		err = q.primaryQueueShard.PartitionRequeue(ctx, p, q.Clock.Now().Truncate(time.Second).Add(requeue), true)
 		if errors.Is(err, ErrPartitionGarbageCollected) {
 			q.removeContinue(ctx, p, false)
 		}
@@ -237,8 +237,8 @@ func (q *queueProcessor) processPartition(ctx context.Context, p *QueuePartition
 	// Requeue the partition, which reads the next unleased job or sets a time of
 	// 30 seconds.  This is why we have to lease items above, else this may return an item that is
 	// about to be leased and processed by the worker.
-	_, err = Duration(ctx, q.PrimaryQueueShard.Name(), "partition_requeue", q.Clock.Now(), func(ctx context.Context) (any, error) {
-		err = q.PrimaryQueueShard.PartitionRequeue(ctx, p, q.Clock.Now().Add(PartitionRequeueExtension), false)
+	_, err = Duration(ctx, q.primaryQueueShard.Name(), "partition_requeue", q.Clock.Now(), func(ctx context.Context) (any, error) {
+		err = q.primaryQueueShard.PartitionRequeue(ctx, p, q.Clock.Now().Add(PartitionRequeueExtension), false)
 		return nil, err
 	})
 	if err == ErrPartitionGarbageCollected {
