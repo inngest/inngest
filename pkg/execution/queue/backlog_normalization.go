@@ -94,7 +94,7 @@ func (q *queueProcessor) backlogNormalizationScan(ctx context.Context) error {
 // iterateNormalizationPartition scans and iterate through the global normalization partition to process backlogs needing to be normalized
 func (q *queueProcessor) iterateNormalizationPartition(ctx context.Context, until time.Time, bc chan normalizeWorkerChanMsg) error {
 	// introduce weight probability to blend account/global scanning
-	peekedAccounts, err := q.peekGlobalNormalizeAccounts(ctx, until, NormalizeAccountPeekMax)
+	peekedAccounts, err := q.primaryQueueShard.PeekGlobalNormalizeAccounts(ctx, until, NormalizeAccountPeekMax)
 	if err != nil {
 		return fmt.Errorf("could not peek global normalize accounts: %w", err)
 	}
@@ -130,7 +130,7 @@ func (q *queueProcessor) iterateNormalizationPartition(ctx context.Context, unti
 func (q *queueProcessor) iterateNormalizationShadowPartition(ctx context.Context, shadowPartitionIndexKey string, peekLimit int64, until time.Time, bc chan normalizeWorkerChanMsg) error {
 	// Find partitions in account or globally with backlogs to normalize
 	sequential := false
-	shadowPartitions, err := q.peekShadowPartitions(ctx, shadowPartitionIndexKey, sequential, peekLimit, until)
+	shadowPartitions, err := q.primaryQueueShard.PeekShadowPartitions(ctx, shadowPartitionIndexKey, sequential, peekLimit, until)
 	if err != nil {
 		return fmt.Errorf("could not peek shadow partitions to normalize: %w", err)
 	}
@@ -138,7 +138,7 @@ func (q *queueProcessor) iterateNormalizationShadowPartition(ctx context.Context
 	// For each partition, attempt to normalize backlogs
 	for _, partition := range shadowPartitions {
 		backlogs, err := Duration(ctx, q.primaryQueueShard.Name(), "normalize_peek", until, func(ctx context.Context) ([]*QueueBacklog, error) {
-			return q.ShadowPartitionPeekNormalizeBacklogs(ctx, partition, NormalizePartitionPeekMax)
+			return q.primaryQueueShard.ShadowPartitionPeekNormalizeBacklogs(ctx, partition, NormalizePartitionPeekMax)
 		})
 		if err != nil {
 			return err
@@ -148,8 +148,8 @@ func (q *queueProcessor) iterateNormalizationShadowPartition(ctx context.Context
 
 		for _, bl := range backlogs {
 			// lease the backlog
-			_, err := Duration(ctx, q.primaryQueueShard.Name, "normalize_lease", q.Clock.Now(), func(ctx context.Context) (any, error) {
-				err := q.leaseBacklogForNormalization(ctx, bl)
+			_, err := Duration(ctx, q.primaryQueueShard.Name(), "normalize_lease", q.Clock.Now(), func(ctx context.Context) (any, error) {
+				err := q.primaryQueueShard.LeaseBacklogForNormalization(ctx, bl)
 				return nil, err
 			})
 			if err != nil {
@@ -210,7 +210,7 @@ func (q *queueProcessor) normalizeBacklog(ctx context.Context, backlog *QueueBac
 			case <-extendLeaseCtx.Done():
 				return
 			case <-time.Tick(BacklogNormalizeLeaseDuration / 2):
-				if err := q.extendBacklogNormalizationLease(ctx, q.Clock.Now(), backlog); err != nil {
+				if err := q.primaryQueueShard.ExtendBacklogNormalizationLease(ctx, q.Clock.Now(), backlog); err != nil {
 					switch err {
 					// can't extend since it's already expired
 					case ErrBacklogNormalizationLeaseExpired:
@@ -235,7 +235,7 @@ func (q *queueProcessor) normalizeBacklog(ctx context.Context, backlog *QueueBac
 			return nil
 		}
 
-		res, err := q.BacklogNormalizePeek(ctx, backlog, NormalizeBacklogPeekMax)
+		res, err := q.primaryQueueShard.BacklogNormalizePeek(ctx, backlog, NormalizeBacklogPeekMax)
 		if err != nil {
 			if errors.Is(err, context.Canceled) {
 				return nil
@@ -254,7 +254,7 @@ func (q *queueProcessor) normalizeBacklog(ctx context.Context, backlog *QueueBac
 		for _, item := range res.Items {
 			item := item // capture range variable
 			wg.Go(func() {
-				_, err := q.normalizeItem(logger.WithStdlib(ctx, l), shard, sp, latestConstraints, backlog, *item)
+				_, err := q.normalizeItem(logger.WithStdlib(ctx, l), sp, latestConstraints, backlog, *item)
 				if err != nil && !errors.Is(err, context.Canceled) {
 					l.ReportError(err, "could not normalize item",
 						logger.WithErrorReportTags(map[string]string{
