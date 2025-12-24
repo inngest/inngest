@@ -158,6 +158,8 @@ type QueueProcessor interface {
 	SetPeekEWMA(ctx context.Context, fnID *uuid.UUID, val int64) error
 	ConfigLease(ctx context.Context, key string, duration time.Duration, existingLeaseID ...*ulid.ULID) (*ulid.ULID, error)
 
+	AccountPeek(ctx context.Context, sequential bool, until time.Time, limit int64) ([]uuid.UUID, error)
+
 	PeekAccountPartitions(
 		ctx context.Context,
 		accountID uuid.UUID,
