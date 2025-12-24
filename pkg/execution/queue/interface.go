@@ -116,21 +116,21 @@ type QueueManager interface {
 	// PartitionByID retrieves the partition by the partition ID
 	PartitionByID(ctx context.Context, queueShard QueueShard, partitionID string) (*PartitionInspectionResult, error)
 	// ItemByID retrieves the queue item by the jobID
-	ItemByID(ctx context.Context, jobID string) (*QueueItem, error)
+	ItemByID(ctx context.Context, queueShard QueueShard, jobID string) (*QueueItem, error)
 	// ItemExists checks if an item with jobID exists in the queue
-	ItemExists(ctx context.Context, jobID string) (bool, error)
+	ItemExists(ctx context.Context, queueShard QueueShard, jobID string) (bool, error)
 	// ItemsByRunID retrieves all queue items via runID
 	//
 	// NOTE
 	// The queue technically shouldn't know about runIDs, so we should make this more generic with certain type of indices in the future
-	ItemsByRunID(ctx context.Context, runID ulid.ULID) ([]*QueueItem, error)
+	ItemsByRunID(ctx context.Context, queueShard QueueShard, runID ulid.ULID) ([]*QueueItem, error)
 
 	// PartitionBacklogSize returns the point in time backlog size of the partition.
 	// This will sum the size of all backlogs in that partition
-	PartitionBacklogSize(ctx context.Context, partitionID string) (int64, error)
+	PartitionBacklogSize(ctx context.Context, queueShard QueueShard, partitionID string) (int64, error)
 
 	// Total queue depth of all partitions including backlog and ready state items
-	TotalSystemQueueDepth(ctx context.Context) (int64, error)
+	TotalSystemQueueDepth(ctx context.Context, queueShard QueueShard) (int64, error)
 }
 
 type QueueProcessor interface {
