@@ -665,7 +665,7 @@ func (q *queue) activeCheckScan(ctx context.Context, keyActive, keyInProgress st
 	kg := q.RedisClient.KeyGenerator()
 	client := q.RedisClient.Client()
 
-	res, err := duration(
+	res, err := osqueue.Duration(
 		ctx,
 		q.Name(),
 		"active_check_scan",
