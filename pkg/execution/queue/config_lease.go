@@ -110,3 +110,27 @@ func (q *queueProcessor) activeCheckerLease() *ulid.ULID {
 	copied := *q.activeCheckerLeaseID
 	return &copied
 }
+
+func (q *queueProcessor) isScavenger() bool {
+	l := q.scavengerLease()
+	if l == nil {
+		return false
+	}
+	return ulid.Time(l.Time()).After(q.Clock.Now())
+}
+
+func (q *queueProcessor) isActiveChecker() bool {
+	l := q.activeCheckerLease()
+	if l == nil {
+		return false
+	}
+	return ulid.Time(l.Time()).After(q.Clock.Now())
+}
+
+func (q *queueProcessor) isInstrumentator() bool {
+	l := q.instrumentationLease()
+	if l == nil {
+		return false
+	}
+	return ulid.Time(l.Time()).After(q.Clock.Now())
+}
