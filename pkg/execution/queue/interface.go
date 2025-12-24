@@ -196,6 +196,9 @@ type QueueProcessor interface {
 		item *QueueItem,
 		now time.Time,
 	) (ItemLeaseConstraintCheckResult, error)
+
+	RemoveQueueItem(ctx context.Context, partitionID string, itemID string) error
+	LoadQueueItem(ctx context.Context, itemID string) (*QueueItem, error)
 }
 
 type BacklogRefillOptions struct {
