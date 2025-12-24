@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
+	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
@@ -58,9 +59,9 @@ func (q *queue) shadowWorker(ctx context.Context, qspc chan shadowPartitionChanM
 	}
 }
 
-func (q *queue) isMigrationLocked(ctx context.Context, shard RedisQueueShard, fnID uuid.UUID) (*time.Time, error) {
-	client := shard.RedisClient.Client()
-	kg := shard.RedisClient.KeyGenerator()
+func (q *queue) isMigrationLocked(ctx context.Context, fnID uuid.UUID) (*time.Time, error) {
+	client := q.RedisClient.Client()
+	kg := q.RedisClient.KeyGenerator()
 	cmd := client.B().Get().Key(kg.QueueMigrationLock(fnID)).Build()
 	exists, err := client.Do(ctx, cmd).ToString()
 	if err != nil {
@@ -79,7 +80,7 @@ func (q *queue) isMigrationLocked(ctx context.Context, shard RedisQueueShard, fn
 	return &lockUntil, nil
 }
 
-func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueShadowPartition, continuationCount uint) error {
+func (q *queue) processShadowPartition(ctx context.Context, shadowPart *osqueue.QueueShadowPartition, continuationCount uint) error {
 	l := logger.StdlibLogger(ctx).With(
 		"partition_id", shadowPart.PartitionID,
 		"account_id", shadowPart.AccountID,
