@@ -11,7 +11,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/VividCortex/ewma"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/consts"
@@ -26,91 +25,6 @@ import (
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
 )
-
-const (
-	minWorkersFree = 5
-)
-
-var (
-	latencyAvg ewma.MovingAverage
-	latencySem *sync.Mutex
-
-	startedAtKey = startedAtCtxKey{}
-	sojournKey   = sojournCtxKey{}
-	latencyKey   = latencyCtxKey{}
-
-	errProcessNoCapacity   = fmt.Errorf("no capacity")
-	errProcessStopIterator = fmt.Errorf("stop iterator")
-)
-
-func init() {
-	latencyAvg = ewma.NewMovingAverage()
-	latencySem = &sync.Mutex{}
-}
-
-// startedAtCtxKey is a context key which records when the queue item starts,
-// available via context.
-type startedAtCtxKey struct{}
-
-// latencyCtxKey is a context key which records when the queue item starts,
-// available via context.
-type latencyCtxKey struct{}
-
-// sojournCtxKey is a context key which records when the queue item starts,
-// available via context.
-type sojournCtxKey struct{}
-
-func GetItemStart(ctx context.Context) (time.Time, bool) {
-	t, ok := ctx.Value(startedAtKey).(time.Time)
-	return t, ok
-}
-
-func GetItemSystemLatency(ctx context.Context) (time.Duration, bool) {
-	t, ok := ctx.Value(latencyKey).(time.Duration)
-	return t, ok
-}
-
-func GetItemConcurrencyLatency(ctx context.Context) (time.Duration, bool) {
-	t, ok := ctx.Value(sojournKey).(time.Duration)
-	return t, ok
-}
-
-func (q *queue) Run(ctx context.Context, f osqueue.RunFunc) error {
-	if q.runMode.Sequential {
-		go q.claimSequentialLease(ctx)
-	}
-
-	if q.runMode.Scavenger {
-		go q.runScavenger(ctx)
-	}
-
-	if q.runMode.ActiveChecker {
-		go q.runActiveChecker(ctx)
-	}
-
-	go q.runInstrumentation(ctx)
-
-	// start execution and shadow scan concurrently
-	eg, ctx := errgroup.WithContext(ctx)
-
-	eg.Go(func() error {
-		return q.executionScan(ctx, f)
-	})
-
-	if q.runMode.ShadowPartition {
-		eg.Go(func() error {
-			return q.shadowScan(ctx)
-		})
-	}
-
-	if q.runMode.NormalizePartition {
-		eg.Go(func() error {
-			return q.backlogNormalizationScan(ctx)
-		})
-	}
-
-	return eg.Wait()
-}
 
 func (q *queue) executionScan(ctx context.Context, f osqueue.RunFunc) error {
 	l := q.log.With(
@@ -1302,56 +1216,6 @@ func (q *queue) process(
 	}
 
 	return nil
-}
-
-// sequentialLease is a helper method for concurrently reading the sequential
-// lease ID.
-func (q *queue) sequentialLease() *ulid.ULID {
-	q.seqLeaseLock.RLock()
-	defer q.seqLeaseLock.RUnlock()
-	if q.seqLeaseID == nil {
-		return nil
-	}
-	copied := *q.seqLeaseID
-	return &copied
-}
-
-// instrumentationLease is a helper method for concurrently reading the
-// instrumentation lease ID.
-func (q *queue) instrumentationLease() *ulid.ULID {
-	q.instrumentationLeaseLock.RLock()
-	defer q.instrumentationLeaseLock.RUnlock()
-	if q.instrumentationLeaseID == nil {
-		return nil
-	}
-	copied := *q.instrumentationLeaseID
-	return &copied
-}
-
-// scavengerLease is a helper method for concurrently reading the sequential
-// lease ID.
-func (q *queue) scavengerLease() *ulid.ULID {
-	q.scavengerLeaseLock.RLock()
-	defer q.scavengerLeaseLock.RUnlock()
-	if q.scavengerLeaseID == nil {
-		return nil
-	}
-	copied := *q.scavengerLeaseID
-	return &copied
-}
-
-func (q *queue) activeCheckerLease() *ulid.ULID {
-	q.activeCheckerLeaseLock.RLock()
-	defer q.activeCheckerLeaseLock.RUnlock()
-	if q.activeCheckerLeaseID == nil {
-		return nil
-	}
-	copied := *q.activeCheckerLeaseID
-	return &copied
-}
-
-func (q *queue) capacity() int64 {
-	return int64(q.numWorkers) - atomic.LoadInt64(&q.sem.counter)
 }
 
 // peekSize returns the number of items to peek for the queue based on a couple of factors
