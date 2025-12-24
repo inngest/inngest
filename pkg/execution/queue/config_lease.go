@@ -134,3 +134,11 @@ func (q *queueProcessor) isInstrumentator() bool {
 	}
 	return ulid.Time(l.Time()).After(q.Clock.Now())
 }
+
+func (q *queueProcessor) isSequential() bool {
+	l := q.sequentialLease()
+	if l == nil {
+		return false
+	}
+	return ulid.Time(l.Time()).After(q.Clock.Now())
+}
