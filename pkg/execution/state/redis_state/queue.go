@@ -40,10 +40,6 @@ func (q *queue) Kind() enums.QueueShardKind {
 	return enums.QueueShardKindRedis
 }
 
-func (q *queue) Processor() osqueue.QueueProcessor {
-	return q
-}
-
 func NewRedisQueue(options osqueue.QueueOptions, name string, queueClient *QueueClient) osqueue.QueueShard {
 	q := &queue{
 		name:         name,
@@ -2052,7 +2048,9 @@ func (q *queue) ConfigLease(ctx context.Context, key string, duration time.Durat
 	status, err := scripts["queue/configLease"].Exec(
 		redis_telemetry.WithScriptName(ctx, "configLease"),
 		q.RedisClient.unshardedRc,
-		[]string{key},
+		[]string{
+			q.RedisClient.kg.ConfigLeaseKey(key),
+		},
 		args,
 	).AsInt64()
 	if err != nil {

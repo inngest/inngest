@@ -9,10 +9,10 @@ import (
 )
 
 type QueueShard interface {
+	QueueProcessor
+
 	Name() string
 	Kind() enums.QueueShardKind
-
-	Processor() QueueProcessor
 }
 
 func (q *queueProcessor) selectShard(ctx context.Context, shardName string, qi QueueItem) (QueueShard, error) {
