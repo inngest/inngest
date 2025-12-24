@@ -84,6 +84,7 @@ func WithHealthCheckLeadTimeSeconds(leadTime int) RedisCronManagerOpt {
 }
 
 func NewRedisCronManager(
+	shard queue.QueueShard,
 	q queue.QueueManager,
 	log logger.Logger,
 	opts ...RedisCronManagerOpt,
@@ -101,16 +102,18 @@ func NewRedisCronManager(
 	opt.validate()
 
 	manager := &redisCronManager{
-		q:   q,
-		log: log,
-		opt: opt,
+		shard: shard,
+		q:     q,
+		log:   log,
+		opt:   opt,
 	}
 
 	return manager
 }
 
 type redisCronManager struct {
-	q queue.QueueManager
+	shard queue.QueueShard
+	q     queue.QueueManager
 
 	log logger.Logger
 	opt redisCronManagerOpt
@@ -261,7 +264,7 @@ func (c *redisCronManager) HealthCheck(ctx context.Context, functionID uuid.UUID
 	jobID := queue.HashID(ctx, c.CronProcessJobID(next, expr, functionID, fnVersion))
 
 	// check if the jobID exists in the system queue.
-	exists, err := c.q.ItemExists(ctx, jobID)
+	exists, err := c.q.ItemExists(ctx, c.shard, jobID)
 	if err != nil {
 		return CronHealthCheckStatus{}, fmt.Errorf("failed to check if item exits for health check: %w", err)
 	}
