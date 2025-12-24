@@ -177,6 +177,25 @@ type QueueProcessor interface {
 		peekUntil time.Time,
 		sequential bool,
 	) ([]*QueuePartition, error)
+
+	BacklogRefillConstraintCheck(
+		ctx context.Context,
+		shadowPart *QueueShadowPartition,
+		backlog *QueueBacklog,
+		constraints PartitionConstraintConfig,
+		items []*QueueItem,
+		operationIdempotencyKey string,
+		now time.Time,
+	) (*BacklogRefillConstraintCheckResult, error)
+
+	ItemLeaseConstraintCheck(
+		ctx context.Context,
+		shadowPart *QueueShadowPartition,
+		backlog *QueueBacklog,
+		constraints PartitionConstraintConfig,
+		item *QueueItem,
+		now time.Time,
+	) (ItemLeaseConstraintCheckResult, error)
 }
 
 type BacklogRefillOptions struct {
