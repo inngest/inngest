@@ -128,7 +128,7 @@ func (q *queueProcessor) scan(ctx context.Context) error {
 			peekedAccounts = q.runMode.ExclusiveAccounts
 		} else {
 			peeked, err := Duration(ctx, q.PrimaryQueueShard.Name(), "account_peek", q.Clock.Now(), func(ctx context.Context) ([]uuid.UUID, error) {
-				return q.accountPeek(ctx, q.isSequential(), peekUntil, AccountPeekMax)
+				return q.PrimaryQueueShard.Processor().AccountPeek(ctx, q.isSequential(), peekUntil, AccountPeekMax)
 			})
 			if err != nil {
 				return fmt.Errorf("could not peek accounts: %w", err)
