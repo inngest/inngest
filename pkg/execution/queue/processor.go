@@ -8,12 +8,7 @@ import (
 
 	"github.com/VividCortex/ewma"
 	"github.com/google/uuid"
-	"github.com/inngest/inngest/pkg/backoff"
-	"github.com/inngest/inngest/pkg/consts"
-	"github.com/inngest/inngest/pkg/execution/state"
-	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/util"
-	"github.com/jonboulle/clockwork"
 	"github.com/oklog/ulid/v2"
 	"golang.org/x/sync/errgroup"
 )
@@ -32,103 +27,11 @@ func NewQueueProcessor(
 	ctx context.Context,
 	name string,
 	primaryQueueShard QueueShard,
+	queueShardClients map[string]QueueShard,
+	shardSelector ShardSelector,
 	options ...QueueOpt,
 ) (Queue, error) {
-	o := &QueueOptions{
-		PrimaryQueueShard: primaryQueueShard,
-		QueueShardClients: map[string]QueueShard{primaryQueueShard.Name(): primaryQueueShard},
-		PartitionPriorityFinder: func(_ context.Context, _ QueuePartition) uint {
-			return PriorityDefault
-		},
-		AccountPriorityFinder: func(_ context.Context, _ uuid.UUID) uint {
-			return PriorityDefault
-		},
-		PartitionPausedGetter: func(ctx context.Context, fnID uuid.UUID) PartitionPausedInfo {
-			return PartitionPausedInfo{}
-		},
-		PeekMin:                     DefaultQueuePeekMin,
-		PeekMax:                     DefaultQueuePeekMax,
-		shadowPeekMin:               ShadowPartitionPeekMinBacklogs,
-		shadowPeekMax:               ShadowPartitionPeekMaxBacklogs,
-		backlogRefillLimit:          BacklogRefillHardLimit,
-		backlogNormalizeConcurrency: defaultBacklogNormalizeConcurrency,
-		runMode: QueueRunMode{
-			Sequential:                        true,
-			Scavenger:                         true,
-			Partition:                         true,
-			Account:                           true,
-			AccountWeight:                     85,
-			ShadowPartition:                   true,
-			AccountShadowPartition:            true,
-			AccountShadowPartitionWeight:      85,
-			NormalizePartition:                true,
-			ShadowContinuationSkipProbability: consts.QueueContinuationSkipProbability,
-		},
-		numWorkers:                     defaultNumWorkers,
-		numShadowWorkers:               defaultNumShadowWorkers,
-		numBacklogNormalizationWorkers: defaultBacklogNormalizationWorkers,
-		pollTick:                       defaultPollTick,
-		shadowPollTick:                 defaultShadowPollTick,
-		backlogNormalizePollTick:       defaultBacklogNormalizePollTick,
-		ActiveCheckTick:                defaultActiveCheckTick,
-		IdempotencyTTL:                 defaultIdempotencyTTL,
-		queueKindMapping:               make(map[string]string),
-		peekSizeForFunctions:           make(map[string]int64),
-		log:                            logger.StdlibLogger(ctx),
-		instrumentInterval:             DefaultInstrumentInterval,
-		PartitionConstraintConfigGetter: func(ctx context.Context, pi PartitionIdentifier) PartitionConstraintConfig {
-			def := defaultConcurrency
-
-			return PartitionConstraintConfig{
-				Concurrency: PartitionConcurrency{
-					AccountConcurrency:  def,
-					FunctionConcurrency: def,
-				},
-			}
-		},
-		AllowKeyQueues: func(ctx context.Context, acctID, fnID uuid.UUID) bool {
-			return false
-		},
-		shadowPartitionProcessCount: func(ctx context.Context, acctID uuid.UUID) int {
-			return 5
-		},
-		TenantInstrumentor: func(ctx context.Context, partitionID string) error {
-			return nil
-		},
-		backoffFunc:             backoff.DefaultBackoff,
-		Clock:                   clockwork.NewRealClock(),
-		continuationLimit:       consts.DefaultQueueContinueLimit,
-		shadowContinuesLock:     &sync.Mutex{},
-		shadowContinuationLimit: consts.DefaultQueueContinueLimit,
-		shadowContinues:         map[string]shadowContinuation{},
-		shadowContinueCooldown:  map[string]time.Time{},
-		NormalizeRefreshItemCustomConcurrencyKeys: func(ctx context.Context, item *QueueItem, existingKeys []state.CustomConcurrency, shadowPartition *QueueShadowPartition) ([]state.CustomConcurrency, error) {
-			return existingKeys, nil
-		},
-		RefreshItemThrottle: func(ctx context.Context, item *QueueItem) (*Throttle, error) {
-			return nil, nil
-		},
-		ReadOnlySpotChecks: func(ctx context.Context, acctID uuid.UUID) bool {
-			return true
-		},
-		ActiveSpotCheckProbability: func(ctx context.Context, acctID uuid.UUID) (backlogRefillCheckProbability int, accountSpotCheckProbability int) {
-			return 100, 100
-		},
-		ActiveCheckAccountProbability: 10,
-		ActiveCheckAccountConcurrency: ActiveCheckAccountConcurrency,
-		ActiveCheckBacklogConcurrency: ActiveCheckBacklogConcurrency,
-		ActiveCheckScanBatchSize:      ActiveCheckScanBatchSize,
-		CapacityLeaseExtendInterval:   QueueLeaseDuration / 2,
-	}
-
-	// default to using primary queue client for shard selection
-	o.shardSelector = func(_ context.Context, _ uuid.UUID, _ *string) (QueueShard, error) {
-		return o.PrimaryQueueShard, nil
-	}
-
-	for _, qopt := range options {
-		qopt(o)
-	}
+	o := NewQueueOptions(ctx, options...)
 
 	qp := &queueProcessor{
 		name: name,
@@ -148,6 +51,10 @@ func NewQueueProcessor(
 		sem:     util.NewTrackingSemaphore(int(o.numWorkers)),
 		workers: make(chan processItem, o.numWorkers),
 		quit:    make(chan error, o.numWorkers),
+
+		primaryQueueShard: primaryQueueShard,
+		queueShardClients: queueShardClients,
+		shardSelector:     shardSelector,
 	}
 
 	return qp, nil
@@ -158,6 +65,10 @@ type queueProcessor struct {
 
 	// name is the identifiable name for this worker, for logging.
 	name string
+
+	primaryQueueShard QueueShard
+	queueShardClients map[string]QueueShard
+	shardSelector     ShardSelector
 
 	// quit is a channel that any method can send on to trigger termination
 	// of the Run loop.  This typically accepts an error, but a nil error
@@ -270,7 +181,7 @@ func (q *queueProcessor) RunningCount(ctx context.Context, workflowID uuid.UUID)
 
 // SetFunctionMigrate implements Queue.
 func (q *queueProcessor) SetFunctionMigrate(ctx context.Context, sourceShard string, fnID uuid.UUID, migrateLockUntil *time.Time) error {
-	shard, ok := q.QueueShardClients[sourceShard]
+	shard, ok := q.queueShardClients[sourceShard]
 	if !ok {
 		return fmt.Errorf("could not find shard %q", sourceShard)
 	}
