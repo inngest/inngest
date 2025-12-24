@@ -144,12 +144,12 @@ func (q *queueProcessor) DequeueByJobID(ctx context.Context, jobID string) error
 }
 
 // ItemByID implements QueueManager.
-func (q *queueProcessor) ItemByID(ctx context.Context, jobID string) (*QueueItem, error) {
+func (q *queueProcessor) ItemByID(ctx context.Context, shard QueueShard, jobID string) (*QueueItem, error) {
 	panic("unimplemented")
 }
 
 // ItemExists implements QueueManager.
-func (q *queueProcessor) ItemExists(ctx context.Context, jobID string) (bool, error) {
+func (q *queueProcessor) ItemExists(ctx context.Context, shard QueueShard, jobID string) (bool, error) {
 	panic("unimplemented")
 }
 
@@ -164,7 +164,7 @@ func (q *queueProcessor) ItemsByPartition(ctx context.Context, queueShard QueueS
 }
 
 // ItemsByRunID implements QueueManager.
-func (q *queueProcessor) ItemsByRunID(ctx context.Context, runID ulid.ULID) ([]*QueueItem, error) {
+func (q *queueProcessor) ItemsByRunID(ctx context.Context, shard QueueShard, runID ulid.ULID) ([]*QueueItem, error) {
 	panic("unimplemented")
 }
 
@@ -174,7 +174,7 @@ func (q *queueProcessor) LoadQueueItem(ctx context.Context, shard string, itemID
 }
 
 // PartitionBacklogSize implements QueueManager.
-func (q *queueProcessor) PartitionBacklogSize(ctx context.Context, partitionID string) (int64, error) {
+func (q *queueProcessor) PartitionBacklogSize(ctx context.Context, shard QueueShard, partitionID string) (int64, error) {
 	panic("unimplemented")
 }
 
@@ -199,7 +199,7 @@ func (q *queueProcessor) RequeueByJobID(ctx context.Context, queueShard QueueSha
 }
 
 // TotalSystemQueueDepth implements QueueManager.
-func (q *queueProcessor) TotalSystemQueueDepth(ctx context.Context) (int64, error) {
+func (q *queueProcessor) TotalSystemQueueDepth(ctx context.Context, shard QueueShard) (int64, error) {
 	panic("unimplemented")
 }
 
