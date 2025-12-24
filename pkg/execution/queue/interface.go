@@ -85,9 +85,49 @@ func PartitionLeaseOptionDisableLeaseChecks(disableLeaseChecks bool) PartitionLe
 	}
 }
 
-type QueueProcessor interface {
-	Options() QueueOptions
+type QueueManager interface {
+	JobQueueReader
+	Queue
+	QueueDirectAccess
 
+	DequeueByJobID(ctx context.Context, jobID string) error
+	Dequeue(ctx context.Context, queueShard QueueShard, i QueueItem, opts ...DequeueOptionFn) error
+	Requeue(ctx context.Context, queueShard QueueShard, i QueueItem, at time.Time, opts ...RequeueOptionFn) error
+	RequeueByJobID(ctx context.Context, queueShard QueueShard, jobID string, at time.Time) error
+
+	// ResetAttemptsByJobID sets retries to zero given a single job ID.  This is important for
+	// checkpointing;  a single job becomes shared amongst many  steps.
+	ResetAttemptsByJobID(ctx context.Context, shard string, jobID string) error
+
+	// ItemsByPartition returns a queue item iterator for a function within a specific time range
+	ItemsByPartition(ctx context.Context, queueShard QueueShard, partitionID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueItem], error)
+	// ItemsByBacklog returns a queue item iterator for a backlog within a specific time range
+	ItemsByBacklog(ctx context.Context, queueShard QueueShard, backlogID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueItem], error)
+	// BacklogsByPartition returns an iterator for the partition's backlogs
+	BacklogsByPartition(ctx context.Context, queueShard QueueShard, partitionID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueBacklog], error)
+	// BacklogSize retrieves the number of items in the specified backlog
+	BacklogSize(ctx context.Context, queueShard QueueShard, backlogID string) (int64, error)
+	// PartitionByID retrieves the partition by the partition ID
+	PartitionByID(ctx context.Context, queueShard QueueShard, partitionID string) (*PartitionInspectionResult, error)
+	// ItemByID retrieves the queue item by the jobID
+	ItemByID(ctx context.Context, jobID string) (*QueueItem, error)
+	// ItemExists checks if an item with jobID exists in the queue
+	ItemExists(ctx context.Context, jobID string) (bool, error)
+	// ItemsByRunID retrieves all queue items via runID
+	//
+	// NOTE
+	// The queue technically shouldn't know about runIDs, so we should make this more generic with certain type of indices in the future
+	ItemsByRunID(ctx context.Context, runID ulid.ULID) ([]*QueueItem, error)
+
+	// PartitionBacklogSize returns the point in time backlog size of the partition.
+	// This will sum the size of all backlogs in that partition
+	PartitionBacklogSize(ctx context.Context, partitionID string) (int64, error)
+
+	// Total queue depth of all partitions including backlog and ready state items
+	TotalSystemQueueDepth(ctx context.Context) (int64, error)
+}
+
+type QueueProcessor interface {
 	EnqueueItem(ctx context.Context, i QueueItem, at time.Time, opts EnqueueOpts) (QueueItem, error)
 	Peek(ctx context.Context, partition *QueuePartition, until time.Time, limit int64) ([]*QueueItem, error)
 	Lease(ctx context.Context, item QueueItem, leaseDuration time.Duration, now time.Time, denies *LeaseDenies, options ...LeaseOptionFn) (*ulid.ULID, error)
@@ -102,8 +142,10 @@ type QueueProcessor interface {
 
 	ItemsByPartition(ctx context.Context, partitionID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueItem], error)
 
-	SetFunctionMigrate(ctx context.Context, fnID uuid.UUID, migrateLockUntil *time.Time)
+	SetFunctionMigrate(ctx context.Context, fnID uuid.UUID, migrateLockUntil *time.Time) error
 	ResetAttemptsByJobID(ctx context.Context, jobID string) error
+
+	SetPeekEWMA(ctx context.Context, fnID *uuid.UUID, val int64) error
 }
 
 type BacklogRefillOptions struct {
