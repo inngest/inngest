@@ -21,7 +21,7 @@ func (q *queueProcessor) worker(ctx context.Context, f RunFunc) {
 			processCtx, cancel := context.WithCancel(context.Background())
 			err := q.process(processCtx, i, f)
 			q.sem.Release(1)
-			metrics.WorkerQueueCapacityCounter(ctx, -1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name}})
+			metrics.WorkerQueueCapacityCounter(ctx, -1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.PrimaryQueueShard.Name()}})
 			cancel()
 			if err == nil {
 				continue
