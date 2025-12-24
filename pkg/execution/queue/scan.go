@@ -17,7 +17,7 @@ import (
 
 func (q *queueProcessor) executionScan(ctx context.Context, f RunFunc) error {
 	l := q.log.With(
-		"queue_shard", q.PrimaryQueueShard.Name(),
+		"queue_shard", q.primaryQueueShard.Name(),
 	)
 
 	for i := int32(0); i < q.numWorkers; i++ {
@@ -118,7 +118,7 @@ func (q *queueProcessor) scan(ctx context.Context) error {
 				PkgName: pkgName,
 				Tags: map[string]any{
 					"kind":        "accounts",
-					"queue_shard": q.PrimaryQueueShard.Name(),
+					"queue_shard": q.primaryQueueShard.Name(),
 				},
 			},
 		)
@@ -127,8 +127,8 @@ func (q *queueProcessor) scan(ctx context.Context) error {
 		if len(q.runMode.ExclusiveAccounts) > 0 {
 			peekedAccounts = q.runMode.ExclusiveAccounts
 		} else {
-			peeked, err := Duration(ctx, q.PrimaryQueueShard.Name(), "account_peek", q.Clock.Now(), func(ctx context.Context) ([]uuid.UUID, error) {
-				return q.PrimaryQueueShard.AccountPeek(ctx, q.isSequential(), peekUntil, AccountPeekMax)
+			peeked, err := Duration(ctx, q.primaryQueueShard.Name(), "account_peek", q.Clock.Now(), func(ctx context.Context) ([]uuid.UUID, error) {
+				return q.primaryQueueShard.AccountPeek(ctx, q.isSequential(), peekUntil, AccountPeekMax)
 			})
 			if err != nil {
 				return fmt.Errorf("could not peek accounts: %w", err)
@@ -171,7 +171,7 @@ func (q *queueProcessor) scan(ctx context.Context) error {
 				PkgName: pkgName,
 				Tags: map[string]any{
 					"kind":        "accounts",
-					"queue_shard": q.PrimaryQueueShard.Name(),
+					"queue_shard": q.primaryQueueShard.Name(),
 				},
 			},
 		)
@@ -184,7 +184,7 @@ func (q *queueProcessor) scan(ctx context.Context) error {
 			PkgName: pkgName,
 			Tags: map[string]any{
 				"kind":        "partitions",
-				"queue_shard": q.PrimaryQueueShard.Name(),
+				"queue_shard": q.primaryQueueShard.Name(),
 			},
 		},
 	)
@@ -201,7 +201,7 @@ func (q *queueProcessor) scan(ctx context.Context) error {
 			PkgName: pkgName,
 			Tags: map[string]any{
 				"kind":        "partitions",
-				"queue_shard": q.PrimaryQueueShard.Name(),
+				"queue_shard": q.primaryQueueShard.Name(),
 			},
 		},
 	)
@@ -210,7 +210,7 @@ func (q *queueProcessor) scan(ctx context.Context) error {
 }
 
 func (q *queueProcessor) ScanAccountPartitions(ctx context.Context, accountID uuid.UUID, peekLimit int64, peekUntil time.Time, metricShardName string, reportPeekedPartitions *int64) error {
-	partitions, err := q.PrimaryQueueShard.PeekAccountPartitions(ctx, accountID, peekLimit, peekUntil, q.isSequential())
+	partitions, err := q.primaryQueueShard.PeekAccountPartitions(ctx, accountID, peekLimit, peekUntil, q.isSequential())
 	if err != nil {
 		return fmt.Errorf("could not peek account partitions: %w", err)
 	}
@@ -219,7 +219,7 @@ func (q *queueProcessor) ScanAccountPartitions(ctx context.Context, accountID uu
 }
 
 func (q *queueProcessor) ScanGlobalPartitions(ctx context.Context, peekLimit int64, peekUntil time.Time, metricShardName string, reportPeekedPartitions *int64) error {
-	partitions, err := q.PrimaryQueueShard.PeekGlobalPartitions(ctx, peekLimit, peekUntil, q.isSequential())
+	partitions, err := q.primaryQueueShard.PeekGlobalPartitions(ctx, peekLimit, peekUntil, q.isSequential())
 	if err != nil {
 		return fmt.Errorf("could not peek global partitions: %w", err)
 	}
@@ -251,7 +251,7 @@ func (q *queueProcessor) processScannedPartitions(
 			if q.capacity() == 0 {
 				// no longer any available workers for partition, so we can skip
 				// work
-				metrics.IncrQueueScanNoCapacityCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"shard": metricShardName, "queue_shard": q.PrimaryQueueShard.Name()}})
+				metrics.IncrQueueScanNoCapacityCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"shard": metricShardName, "queue_shard": q.primaryQueueShard.Name()}})
 				return nil
 			}
 			if err := q.processPartition(ctx, &p, 0, false); err != nil {
@@ -269,7 +269,7 @@ func (q *queueProcessor) processScannedPartitions(
 
 			metrics.IncrQueuePartitionProcessedCounter(ctx, metrics.CounterOpt{
 				PkgName: pkgName,
-				Tags:    map[string]any{"shard": metricShardName, "queue_shard": q.PrimaryQueueShard.Name()},
+				Tags:    map[string]any{"shard": metricShardName, "queue_shard": q.primaryQueueShard.Name()},
 			})
 			return nil
 		})
