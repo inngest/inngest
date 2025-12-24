@@ -232,6 +232,9 @@ type QueueProcessor interface {
 	IsMigrationLocked(ctx context.Context, fnID uuid.UUID) (*time.Time, error)
 
 	RunJobs(ctx context.Context, workspaceID, workflowID uuid.UUID, runID ulid.ULID, limit, offset int64) ([]JobResponse, error)
+
+	// Total queue depth of all partitions including backlog and ready state items
+	TotalSystemQueueDepth(ctx context.Context) (int64, error)
 }
 
 type BacklogRefillOptions struct {

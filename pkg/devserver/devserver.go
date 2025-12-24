@@ -389,9 +389,11 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	batcher := batch.NewRedisBatchManager(shardedClient.Batch(), rq, batch.WithLogger(l))
 	debouncer := debounce.NewRedisDebouncer(unshardedClient.Debounce(), queueShard, rq)
-	croner := cron.NewRedisCronManager(rq, l)
+	croner := cron.NewRedisCronManager(queueShard, rq, l)
 
-	sn := singleton.New(ctx, queueShards, shardSelector)
+	sn := singleton.New(ctx, map[string]*redis_state.QueueClient{
+		consts.DefaultQueueShardName: unshardedClient.Queue(),
+	}, shardSelector)
 
 	conditionalTracer := itrace.NewConditionalTracer(itrace.ConnectTracer(), itrace.AlwaysTrace)
 
@@ -672,7 +674,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	// This provides system queue depth metrics via /metrics endpoint.
 	metricsAPI, err := metrics.NewMetricsAPI(metrics.Opts{
 		AuthMiddleware: authn.SigningKeyMiddleware(opts.SigningKey),
-		QueueManager:   rq,
+		QueueShard:     queueShard,
 	})
 	if err != nil {
 		return err
