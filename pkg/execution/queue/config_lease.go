@@ -4,19 +4,22 @@ import (
 	"context"
 
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
+	"github.com/oklog/ulid/v2"
 )
 
 // claimSequentialLease is a process which continually runs while listening to the queue,
 // attempting to claim a lease on sequential processing.  Only one worker is allowed to
 // work on partitions sequentially;  this reduces contention.
 func (q *queueProcessor) claimSequentialLease(ctx context.Context) {
+	proc := q.PrimaryQueueShard.Processor()
+
 	// Workers with an allowlist can never claim sequential queues.
 	if len(q.AllowQueues) > 0 {
 		return
 	}
 
 	// Attempt to claim the lease immediately.
-	leaseID, err := q.PrimaryQueueShard.Processor().ConfigLease(ctx, "seq", ConfigLeaseDuration, q.sequentialLease())
+	leaseID, err := proc.ConfigLease(ctx, "sequential", ConfigLeaseDuration, q.sequentialLease())
 	if err != ErrConfigAlreadyLeased && err != nil {
 		q.quit <- err
 		return
@@ -26,14 +29,14 @@ func (q *queueProcessor) claimSequentialLease(ctx context.Context) {
 	q.seqLeaseID = leaseID
 	q.seqLeaseLock.Unlock()
 
-	tick := q.clock.NewTicker(ConfigLeaseDuration / 3)
+	tick := q.Clock.NewTicker(ConfigLeaseDuration / 3)
 	for {
 		select {
 		case <-ctx.Done():
 			tick.Stop()
 			return
 		case <-tick.Chan():
-			leaseID, err := q.ConfigLease(ctx, q.primaryQueueShard.RedisClient.kg.Sequential(), ConfigLeaseDuration, q.sequentialLease())
+			leaseID, err := proc.ConfigLease(ctx, "sequential", ConfigLeaseDuration, q.sequentialLease())
 			if err == ErrConfigAlreadyLeased {
 				// This is expected; every time there is > 1 runner listening to the
 				// queue there will be contention.
@@ -60,4 +63,50 @@ func (q *queueProcessor) claimSequentialLease(ctx context.Context) {
 			q.seqLeaseLock.Unlock()
 		}
 	}
+}
+
+// sequentialLease is a helper method for concurrently reading the sequential
+// lease ID.
+func (q *queueProcessor) sequentialLease() *ulid.ULID {
+	q.seqLeaseLock.RLock()
+	defer q.seqLeaseLock.RUnlock()
+	if q.seqLeaseID == nil {
+		return nil
+	}
+	copied := *q.seqLeaseID
+	return &copied
+}
+
+// instrumentationLease is a helper method for concurrently reading the
+// instrumentation lease ID.
+func (q *queueProcessor) instrumentationLease() *ulid.ULID {
+	q.instrumentationLeaseLock.RLock()
+	defer q.instrumentationLeaseLock.RUnlock()
+	if q.instrumentationLeaseID == nil {
+		return nil
+	}
+	copied := *q.instrumentationLeaseID
+	return &copied
+}
+
+// scavengerLease is a helper method for concurrently reading the sequential
+// lease ID.
+func (q *queueProcessor) scavengerLease() *ulid.ULID {
+	q.scavengerLeaseLock.RLock()
+	defer q.scavengerLeaseLock.RUnlock()
+	if q.scavengerLeaseID == nil {
+		return nil
+	}
+	copied := *q.scavengerLeaseID
+	return &copied
+}
+
+func (q *queueProcessor) activeCheckerLease() *ulid.ULID {
+	q.activeCheckerLeaseLock.RLock()
+	defer q.activeCheckerLeaseLock.RUnlock()
+	if q.activeCheckerLeaseID == nil {
+		return nil
+	}
+	copied := *q.activeCheckerLeaseID
+	return &copied
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/VividCortex/ewma"
@@ -286,4 +287,8 @@ func (q *queueProcessor) StatusCount(ctx context.Context, workflowID uuid.UUID, 
 // UnpauseFunction implements Queue.
 func (q *queueProcessor) UnpauseFunction(ctx context.Context, shard string, acctID uuid.UUID, fnID uuid.UUID) error {
 	panic("unimplemented")
+}
+
+func (q *queueProcessor) capacity() int64 {
+	return int64(q.numWorkers) - atomic.LoadInt64(&q.sem.counter)
 }
