@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	mrand "math/rand"
 	"strings"
 	"time"
 
@@ -15,20 +14,6 @@ import (
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 	"github.com/redis/rueidis"
 )
-
-func (q *queue) randomScavengeOffset(seed int64, count int64, limit int) int64 {
-	// only apply random offset if there are more total items to scavenge than the limit
-	if count > int64(limit) {
-		r := mrand.New(mrand.NewSource(seed))
-
-		// the result of count-limit must be greater than 0 as we have already checked count > limit
-		// we increase the argument by 1 to make the highest possible index accessible
-		// example: for count = 9, limit = 3, we want to access indices 0 through 6, not 0 through 5
-		return r.Int63n(count - int64(limit) + 1)
-	}
-
-	return 0
-}
 
 // Scavenge attempts to find jobs that may have been lost due to killed workers.  Workers are shared
 // nothing, and each item in a queue has a lease.  If a worker dies, it will not finish the job and
@@ -57,7 +42,7 @@ func (q *queue) Scavenge(ctx context.Context, limit int) (int, error) {
 		Min("-inf").
 		Max(now).
 		Byscore().
-		Limit(q.randomScavengeOffset(q.Clock.Now().UnixMilli(), count, limit), int64(limit)).
+		Limit(osqueue.RandomScavengeOffset(q.Clock.Now().UnixMilli(), count, limit), int64(limit)).
 		Build()
 
 	// NOTE: Received keys can be legacy (workflow IDs or system/internal queue names) or new (full Redis keys)
@@ -105,7 +90,7 @@ func (q *queue) Scavenge(ctx context.Context, limit int) (int, error) {
 				Min("-inf").
 				Max(now).
 				Byscore().
-				Limit(0, ScavengeConcurrencyQueuePeekSize).
+				Limit(0, osqueue.ScavengeConcurrencyQueuePeekSize).
 				Build()
 			itemIDs, err := client.Do(ctx, cmd).AsStrSlice()
 			if err != nil && err != rueidis.Nil {
@@ -168,7 +153,7 @@ func (q *queue) Scavenge(ctx context.Context, limit int) (int, error) {
 			},
 		})
 
-		if peekedFromIndex < ScavengeConcurrencyQueuePeekSize {
+		if peekedFromIndex < osqueue.ScavengeConcurrencyQueuePeekSize {
 			// Atomically attempt to drop empty pointer if we've processed all items
 			err := q.dropPartitionPointerIfEmpty(
 				ctx,
