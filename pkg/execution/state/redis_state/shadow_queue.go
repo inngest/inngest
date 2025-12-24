@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
-	"math"
 	"time"
 
 	"github.com/google/uuid"
@@ -36,52 +35,6 @@ func (q *queue) IsMigrationLocked(ctx context.Context, fnID uuid.UUID) (*time.Ti
 
 	lockUntil := parsed.Timestamp()
 	return &lockUntil, nil
-}
-
-// shadowScan iterates through the shadow partitions and attempt to add queue items
-// to the function partition for processing
-func (q *queue) shadowScan(ctx context.Context) error {
-	l := q.log.With("method", "shadowScan")
-	qspc := make(chan shadowPartitionChanMsg)
-
-	for i := int32(0); i < q.numShadowWorkers; i++ {
-		go q.shadowWorker(ctx, qspc)
-	}
-
-	tick := q.clock.NewTicker(q.shadowPollTick)
-	l.Debug("starting shadow scanner", "poll", q.shadowPollTick.String())
-
-	backoff := 200 * time.Millisecond
-
-	for {
-		select {
-		case <-ctx.Done():
-			tick.Stop()
-			return nil
-
-		case <-tick.Chan():
-			// Scan a little further into the future
-			now := q.Clock.Now()
-			scanUntil := now.Truncate(time.Second).Add(ShadowPartitionLookahead)
-			if err := q.scanShadowPartitions(ctx, scanUntil, qspc); err != nil {
-				if errors.Is(err, context.DeadlineExceeded) {
-					l.Warn("deadline exceeded scanning shadow partitions")
-					<-time.After(backoff)
-
-					// Backoff doubles up to 5 seconds
-					backoff = time.Duration(math.Min(float64(backoff*2), float64(5*time.Second)))
-					continue
-				}
-
-				if !errors.Is(err, context.Canceled) {
-					l.ReportError(err, "error scanning shadow partitions")
-				}
-				return fmt.Errorf("error scanning shadow partitions: %w", err)
-			}
-
-			backoff = 200 * time.Millisecond
-		}
-	}
 }
 
 // peekShadowPartitions returns pending shadow partitions within the global shadow partition pointer _or_ account shadow partition pointer ZSET.
