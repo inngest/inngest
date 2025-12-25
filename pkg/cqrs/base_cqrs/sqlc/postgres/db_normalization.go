@@ -498,7 +498,11 @@ func (q NormalizedQueries) GetFunctionRunsFromEvents(ctx context.Context, eventI
 
 	sqliteRows := make([]*sqlc_sqlite.GetFunctionRunsFromEventsRow, len(rows))
 	for i, row := range rows {
-		sqliteRows[i], _ = row.ToSQLite()
+		sqliteRow, err := row.ToSQLite()
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert function run row: %w", err)
+		}
+		sqliteRows[i] = sqliteRow
 	}
 
 	return sqliteRows, nil
