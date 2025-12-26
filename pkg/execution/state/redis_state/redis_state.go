@@ -389,8 +389,13 @@ func (m shardedMgr) idempotencyCheck(ctx context.Context, rc RetriableClient, ke
 		return nil, err
 	}
 
-	if prev == consts.FunctionIdempotencyTombstone {
-		return nil, state.ErrIdentifierTomestone
+	// When a run finishes, we prefix the run ID with the tombstone marker.
+	// This is needed for scheduling idempotency:  if scheduling retries the new state op
+	// and elsewhere we've updated with the tombstone prefix, scheduling can stop.
+	// Realisitcally, the chances of this are low, as the entire run has to finish while
+	// the scheduling op retries.
+	if len(prev) > 0 && prev[0] == consts.FunctionIdempotencyTombstone {
+		return nil, state.ErrIdentifierTombstone
 	}
 
 	// if there are existing values, the state might have already been created
@@ -1026,9 +1031,10 @@ func (m shardedMgr) delete(ctx context.Context, callCtx context.Context, i state
 	}
 
 	_ = r.Do(callCtx, func(client rueidis.Client) rueidis.Completed {
-		// update the idempotency key to the tombstone value to indicate this run is done
-		// do scheduling knows to not need to continue attempting to do so
-		return client.B().Set().Key(key).Value(consts.FunctionIdempotencyTombstone).Xx().Keepttl().Build()
+		// update the idempotency key to the tombstone prefix to indicate this run is done
+		// so scheduling retries can detect and stop.
+		val := fmt.Sprintf("%s%s", string(consts.FunctionIdempotencyTombstone), i.RunID)
+		return client.B().Set().Key(key).Value(val).Xx().Keepttl().Build()
 	}).Error()
 
 	// Clear all other data for a job.
