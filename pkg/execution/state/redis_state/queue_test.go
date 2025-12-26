@@ -212,7 +212,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 	require.NoError(t, err)
 	defer rc.Close()
 
-	q := NewQueue(RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName})
+	q, shard := newQueue(t, rc)
 	ctx := context.Background()
 
 	start := time.Now().Truncate(time.Second)
@@ -222,7 +222,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 	t.Run("It enqueues an item", func(t *testing.T) {
 		id := uuid.New()
 
-		item, err := q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{
+		item, err := shard.EnqueueItem(ctx, osqueue.QueueItem{
 			FunctionID: id,
 			Data: osqueue.Item{
 				Identifier: state.Identifier{
@@ -241,7 +241,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 		// Ensure the partition is inserted.
 		qp := getDefaultPartition(t, r, item.FunctionID)
 		require.Equal(t, accountId.String(), qp.AccountID.String())
-		require.Equal(t, QueuePartition{
+		require.Equal(t, osqueue.QueuePartition{
 			ID:         item.FunctionID.String(),
 			FunctionID: &item.FunctionID,
 			AccountID:  accountId,
@@ -262,10 +262,10 @@ func TestQueueEnqueueItem(t *testing.T) {
 		requireAccountScoreEquals(t, r, accountId, start)
 
 		// New key queue data structures should not exist with the flag being toggled off
-		backlog := q.ItemBacklog(ctx, item)
+		backlog := osqueue.ItemBacklog(ctx, item)
 		require.NotEmpty(t, backlog.BacklogID)
 
-		shadowPartition := q.ItemShadowPartition(ctx, item)
+		shadowPartition := osqueue.ItemShadowPartition(ctx, item)
 		require.NotEmpty(t, shadowPartition.PartitionID)
 
 		require.False(t, r.Exists(kg.BacklogMeta()))
@@ -278,7 +278,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 	t.Run("It sets the right item score", func(t *testing.T) {
 		start := time.Now()
 
-		item, err := q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{}, start, osqueue.EnqueueOpts{})
+		item, err := shard.EnqueueItem(ctx, osqueue.QueueItem{}, start, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
 		requireItemScoreEquals(t, r, item, start)
@@ -290,7 +290,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 
 		at := time.Now().Add(time.Hour).Truncate(time.Second)
 
-		item, err := q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{
+		item, err := shard.EnqueueItem(ctx, osqueue.QueueItem{
 			Data: osqueue.Item{
 				Identifier: state.Identifier{
 					AccountID: accountId,
@@ -302,26 +302,26 @@ func TestQueueEnqueueItem(t *testing.T) {
 		// Ensure the partition is inserted, and the earliest time is still
 		// the start time.
 		qp := getDefaultPartition(t, r, item.FunctionID)
-		require.Equal(t, QueuePartition{
+		require.Equal(t, osqueue.QueuePartition{
 			ID:         item.FunctionID.String(),
 			FunctionID: &item.FunctionID,
 			AccountID:  accountId,
 		}, qp)
 
 		// Ensure that the zscore did not change.
-		keys, err := r.ZMembers(q.primaryQueueShard.RedisClient.kg.GlobalPartitionIndex())
+		keys, err := r.ZMembers(shard.Client().kg.GlobalPartitionIndex())
 		require.NoError(t, err)
 		require.Equal(t, 1, len(keys))
 
-		score, err := r.ZScore(q.primaryQueueShard.RedisClient.kg.GlobalPartitionIndex(), keys[0])
+		score, err := r.ZScore(shard.Client().kg.GlobalPartitionIndex(), keys[0])
 		require.NoError(t, err)
 		require.EqualValues(t, at.Unix(), score)
 
-		score, err = r.ZScore(q.primaryQueueShard.RedisClient.kg.AccountPartitionIndex(accountId), keys[0])
+		score, err = r.ZScore(shard.Client().kg.AccountPartitionIndex(accountId), keys[0])
 		require.NoError(t, err)
 		require.EqualValues(t, at.Unix(), score)
 
-		score, err = r.ZScore(q.primaryQueueShard.RedisClient.kg.GlobalAccountIndex(), accountId.String())
+		score, err = r.ZScore(shard.Client().kg.GlobalAccountIndex(), accountId.String())
 		require.NoError(t, err)
 		require.EqualValues(t, at.Unix(), score)
 	})
@@ -331,7 +331,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 		at := now.Add(-10 * time.Minute).Truncate(time.Second)
 
 		// Note: This will reuse the existing partition (zero UUID) from the step above
-		item, err := q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{
+		item, err := shard.EnqueueItem(ctx, osqueue.QueueItem{
 			Data: osqueue.Item{
 				Identifier: state.Identifier{
 					AccountID: accountId,
@@ -343,27 +343,27 @@ func TestQueueEnqueueItem(t *testing.T) {
 		// Ensure the partition is inserted, and the earliest time is updated
 		// inside the partition item.
 		qp := getDefaultPartition(t, r, item.FunctionID)
-		require.Equal(t, QueuePartition{
+		require.Equal(t, osqueue.QueuePartition{
 			ID:         item.FunctionID.String(),
 			FunctionID: &item.FunctionID,
 			AccountID:  accountId,
 		}, qp, "queue partition does not match")
 
 		// Assert that the zscore was changed to this earliest timestamp.
-		keys, err := r.ZMembers(q.primaryQueueShard.RedisClient.kg.GlobalPartitionIndex())
+		keys, err := r.ZMembers(shard.Client().kg.GlobalPartitionIndex())
 		require.NoError(t, err)
 		require.Equal(t, 1, len(keys))
 
-		score, err := r.ZScore(q.primaryQueueShard.RedisClient.kg.GlobalPartitionIndex(), keys[0])
+		score, err := r.ZScore(shard.Client().kg.GlobalPartitionIndex(), keys[0])
 		require.NoError(t, err)
 		require.EqualValues(t, now.Unix(), score)
 
-		score, err = r.ZScore(q.primaryQueueShard.RedisClient.kg.AccountPartitionIndex(accountId), keys[0])
+		score, err = r.ZScore(shard.Client().kg.AccountPartitionIndex(accountId), keys[0])
 		require.NoError(t, err)
 		require.NotZero(t, score)
 		require.EqualValues(t, now.Unix(), score, r.Dump())
 
-		score, err = r.ZScore(q.primaryQueueShard.RedisClient.kg.GlobalAccountIndex(), accountId.String())
+		score, err = r.ZScore(shard.Client().kg.GlobalAccountIndex(), accountId.String())
 		require.NoError(t, err)
 		require.EqualValues(t, now.Unix(), score)
 	})
@@ -373,7 +373,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 
 		accountId := uuid.New()
 
-		item, err := q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{
+		item, err := shard.EnqueueItem(ctx, osqueue.QueueItem{
 			FunctionID: uuid.New(),
 			Data: osqueue.Item{
 				Identifier: state.Identifier{
@@ -384,19 +384,19 @@ func TestQueueEnqueueItem(t *testing.T) {
 		require.NoError(t, err)
 
 		// Assert that we have two zscores in partition:sorted.
-		keys, err := r.ZMembers(q.primaryQueueShard.RedisClient.kg.GlobalPartitionIndex())
+		keys, err := r.ZMembers(shard.Client().kg.GlobalPartitionIndex())
 		require.NoError(t, err)
 		require.Equal(t, 2, len(keys))
 
 		// Assert that we have one zscore in accounts:$accountId:partition:sorted.
-		keys, err = r.ZMembers(q.primaryQueueShard.RedisClient.kg.AccountPartitionIndex(accountId))
+		keys, err = r.ZMembers(shard.Client().kg.AccountPartitionIndex(accountId))
 		require.NoError(t, err)
 		require.Equal(t, 1, len(keys))
 
 		// Ensure the partition is inserted, and the earliest time is updated
 		// inside the partition item.
 		qp := getDefaultPartition(t, r, item.FunctionID)
-		require.Equal(t, QueuePartition{
+		require.Equal(t, osqueue.QueuePartition{
 			ID:         item.FunctionID.String(),
 			FunctionID: &item.FunctionID,
 			AccountID:  accountId,
@@ -406,7 +406,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 	t.Run("Stores default indexes", func(t *testing.T) {
 		at := time.Now().Truncate(time.Second)
 		rid := ulid.MustNew(ulid.Now(), rand.Reader)
-		_, err := q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{
+		_, err := shard.EnqueueItem(ctx, osqueue.QueueItem{
 			FunctionID: uuid.New(),
 			Data: osqueue.Item{
 				Kind: osqueue.KindEdge,
@@ -443,7 +443,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 				},
 			}
 
-			_, partitionCustomConcurrencyKey1, _ := q.ItemPartitions(ctx, q.primaryQueueShard, qi)
+			_, partitionCustomConcurrencyKey1, _ := osqueue.ItemPartitions(ctx, qi)
 
 			// Enqueue always enqueues to the default partitions - enqueueing to key queues has been disabled for now
 			customkeyQueuePartition := QueuePartition{
