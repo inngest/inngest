@@ -6,6 +6,9 @@ type Events = {
   'insights-agent/chat.requested': {
     data: ChatRequestEvent;
   };
+  'app/csp-violation.reported': {
+    data: {};
+  };
 };
 
 export const inngest = new Inngest({
