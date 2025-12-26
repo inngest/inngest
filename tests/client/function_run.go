@@ -195,13 +195,11 @@ type WaitForRunStatusOpts struct {
 
 func (c *Client) WaitForRunStatus(
 	ctx context.Context,
-	t *testing.T,
+	t require.TestingT,
 	expectedStatus string,
 	runID *string,
 	opts ...WaitForRunStatusOpts,
 ) Run {
-	t.Helper()
-
 	var o WaitForRunStatusOpts
 	if len(opts) > 0 {
 		o = opts[0]
@@ -215,26 +213,27 @@ func (c *Client) WaitForRunStatus(
 	start := time.Now()
 	var run Run
 	for {
-		if runID != nil && *runID != "" {
-			run = c.Run(ctx, *runID)
-			if run.Status == expectedStatus {
-				break
-			}
+
+		// It looks as though this original code may mutate the run ID
+		// passed in as a pointer while this loop runs?  This feels like
+		// a strange pattern and a bit of a code smell
+		if runID == nil || *runID == "" {
+			continue
+		}
+
+		run = c.Run(ctx, *runID)
+		if run.Status == expectedStatus {
+			return run
 		}
 
 		if time.Since(start) > timeout {
-			var msg string
-			if runID == nil || *runID == "" {
-				msg = "Run ID is empty"
-			} else {
-				msg = fmt.Sprintf("Expected status %s, got %s", expectedStatus, run.Status)
-			}
-			t.Fatal(msg)
+			break
 		}
-
 		time.Sleep(100 * time.Millisecond)
 	}
 
+	require.NotEmpty(t, runID, "Expected non-nil run id: %s", runID)
+	require.Failf(t, "status didn't match", "didn't get expected status: %s, got %s", expectedStatus, run.Status)
 	return run
 }
 
