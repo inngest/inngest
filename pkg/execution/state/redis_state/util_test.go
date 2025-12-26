@@ -22,11 +22,11 @@ func initRedis(t *testing.T) (*miniredis.Miniredis, rueidis.Client) {
 	return r, rc
 }
 
-func shardFromClient(name string, rc rueidis.Client, opts ...osqueue.QueueOpt) osqueue.QueueShard {
+func shardFromClient(name string, rc rueidis.Client, opts ...osqueue.QueueOpt) RedisQueueShard {
 	ctx := context.Background()
 	options := osqueue.NewQueueOptions(ctx, opts...)
 	queueClient := NewQueueClient(rc, QueueDefaultKey)
-	shard := NewRedisQueue(*options, consts.DefaultQueueShardName, queueClient)
+	shard := NewRedisQueue(*options, consts.DefaultQueueShardName, queueClient).(RedisQueueShard)
 
 	return shard
 }
@@ -46,7 +46,7 @@ func alwaysSelectShard(shard osqueue.QueueShard) osqueue.ShardSelector {
 	}
 }
 
-func initQueue(t *testing.T, rc rueidis.Client, opts ...osqueue.QueueOpt) (osqueue.Queue, osqueue.QueueShard) {
+func newQueue(t *testing.T, rc rueidis.Client, opts ...osqueue.QueueOpt) (osqueue.Queue, RedisQueueShard) {
 	ctx := context.Background()
 
 	shard := shardFromClient(consts.DefaultQueueShardName, rc, opts...)
