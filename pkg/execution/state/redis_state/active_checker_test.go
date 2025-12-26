@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
@@ -27,23 +26,22 @@ func TestShadowPartitionActiveCheck(t *testing.T) {
 
 	ctx = logger.WithStdlib(ctx, l)
 
-	defaultShard := RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 	clock := clockwork.NewFakeClock()
 
 	enqueueToBacklog := false
-	q := NewQueue(
-		defaultShard,
-		WithClock(clock),
-		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+	q, shard := newQueue(
+		t, rc,
+		osqueue.WithClock(clock),
+		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 			return enqueueToBacklog
 		}),
-		WithReadOnlySpotChecks(func(ctx context.Context, acctID uuid.UUID) bool {
+		osqueue.WithReadOnlySpotChecks(func(ctx context.Context, acctID uuid.UUID) bool {
 			return false
 		}),
-		WithActiveSpotCheckProbability(func(ctx context.Context, acctID uuid.UUID) (int, int) {
+		osqueue.WithActiveSpotCheckProbability(func(ctx context.Context, acctID uuid.UUID) (int, int) {
 			return 100, 100
 		}),
-		WithRunMode(QueueRunMode{
+		osqueue.WithRunMode(osqueue.QueueRunMode{
 			ActiveChecker: true,
 		}),
 	)
@@ -71,13 +69,13 @@ func TestShadowPartitionActiveCheck(t *testing.T) {
 		QueueName: nil,
 	}
 
-	qi, err := q.EnqueueItem(ctx, defaultShard, item, clock.Now(), osqueue.EnqueueOpts{})
+	qi, err := shard.EnqueueItem(ctx, item, clock.Now(), osqueue.EnqueueOpts{})
 	require.NoError(t, err)
 
-	sp := q.ItemShadowPartition(ctx, qi)
-	backlog := q.ItemBacklog(ctx, qi)
+	sp := osqueue.ItemShadowPartition(ctx, qi)
+	backlog := osqueue.ItemBacklog(ctx, qi)
 
-	kg := defaultShard.RedisClient.KeyGenerator()
+	kg := shard.Client().kg
 
 	setup := func(t *testing.T) {
 		cluster.FlushAll()
@@ -89,15 +87,30 @@ func TestShadowPartitionActiveCheck(t *testing.T) {
 		marshaled, err = json.Marshal(sp)
 		require.NoError(t, err)
 		cluster.HSet(kg.ShadowPartitionMeta(), sp.PartitionID, string(marshaled))
-
-		q.activeCheckAccountProbability = 0
 	}
 
 	t.Run("should work on missing account set", func(t *testing.T) {
 		setup(t)
 
-		q.activeCheckAccountProbability = 100
-		_, err := q.ActiveCheck(ctx)
+		_, shard := newQueue(
+			t, rc,
+			osqueue.WithClock(clock),
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+				return enqueueToBacklog
+			}),
+			osqueue.WithReadOnlySpotChecks(func(ctx context.Context, acctID uuid.UUID) bool {
+				return false
+			}),
+			osqueue.WithActiveSpotCheckProbability(func(ctx context.Context, acctID uuid.UUID) (int, int) {
+				return 100, 100
+			}),
+			osqueue.WithRunMode(osqueue.QueueRunMode{
+				ActiveChecker: true,
+			}),
+			osqueue.WithActiveCheckAccountProbability(100),
+		)
+
+		_, err := shard.ActiveCheck(ctx)
 		require.NoError(t, err)
 	})
 
@@ -105,7 +118,7 @@ func TestShadowPartitionActiveCheck(t *testing.T) {
 		setup(t)
 
 		testAccountID := uuid.New()
-		_, err := cluster.ZAdd(kg.AccountActiveCheckSet(), float64(q.clock.Now().UnixMilli()), testAccountID.String())
+		_, err := cluster.ZAdd(kg.AccountActiveCheckSet(), float64(clock.Now().UnixMilli()), testAccountID.String())
 		require.NoError(t, err)
 
 		keyActive := kg.ActiveSet("account", testAccountID.String())
@@ -114,8 +127,25 @@ func TestShadowPartitionActiveCheck(t *testing.T) {
 
 		require.True(t, cluster.Exists(keyActive))
 
-		q.activeCheckAccountProbability = 100
-		_, err = q.ActiveCheck(ctx)
+		_, shard := newQueue(
+			t, rc,
+			osqueue.WithClock(clock),
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+				return enqueueToBacklog
+			}),
+			osqueue.WithReadOnlySpotChecks(func(ctx context.Context, acctID uuid.UUID) bool {
+				return false
+			}),
+			osqueue.WithActiveSpotCheckProbability(func(ctx context.Context, acctID uuid.UUID) (int, int) {
+				return 100, 100
+			}),
+			osqueue.WithRunMode(osqueue.QueueRunMode{
+				ActiveChecker: true,
+			}),
+			osqueue.WithActiveCheckAccountProbability(100),
+		)
+
+		_, err = shard.ActiveCheck(ctx)
 		require.NoError(t, err)
 
 		require.False(t, cluster.Exists(keyActive))
@@ -132,7 +162,7 @@ func TestShadowPartitionActiveCheck(t *testing.T) {
 	t.Run("adding to active check should work", func(t *testing.T) {
 		setup(t)
 
-		err := q.AddBacklogToActiveCheck(ctx, defaultShard, accountID, backlog.BacklogID)
+		err := shard.AddBacklogToActiveCheck(ctx, accountID, backlog.BacklogID)
 		require.NoError(t, err)
 
 		require.True(t, cluster.Exists(kg.BacklogActiveCheckSet()))
@@ -144,7 +174,7 @@ func TestShadowPartitionActiveCheck(t *testing.T) {
 
 		// goes to ready queue
 		enqueueToBacklog = false
-		qi, err := q.EnqueueItem(ctx, defaultShard, item, clock.Now(), osqueue.EnqueueOpts{})
+		qi, err := shard.EnqueueItem(ctx, item, clock.Now(), osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
 		_, err = cluster.SAdd(sp.accountActiveKey(kg), qi.ID)
@@ -162,10 +192,10 @@ func TestShadowPartitionActiveCheck(t *testing.T) {
 
 		// goes to ready queue
 		enqueueToBacklog = false
-		qi, err := q.EnqueueItem(ctx, defaultShard, item, clock.Now(), osqueue.EnqueueOpts{})
+		qi, err := shard.EnqueueItem(ctx, item, clock.Now(), osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
-		leaseID, err := q.Lease(ctx, qi, 20*time.Second, q.clock.Now(), nil)
+		leaseID, err := shard.Lease(ctx, qi, 20*time.Second, clock.Now(), nil)
 		require.NoError(t, err)
 		require.NotNil(t, leaseID)
 
@@ -190,7 +220,7 @@ func TestShadowPartitionActiveCheck(t *testing.T) {
 		setup(t)
 
 		enqueueToBacklog = true
-		qi, err := q.EnqueueItem(ctx, defaultShard, item, clock.Now(), osqueue.EnqueueOpts{})
+		qi, err := shard.EnqueueItem(ctx, item, clock.Now(), osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
 		_, err = cluster.SAdd(sp.accountActiveKey(kg), qi.ID)
