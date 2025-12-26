@@ -6,7 +6,6 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/expfmt"
 )
@@ -89,7 +88,7 @@ type QueueManager interface {
 // Opts holds the configuration options for the metrics API
 type Opts struct {
 	AuthMiddleware func(http.Handler) http.Handler
-	QueueShard     queue.QueueShard
+	QueueManager   QueueManager
 }
 
 // MetricsAPI provides Prometheus-compatible metrics endpoints
@@ -103,7 +102,7 @@ type MetricsAPI struct {
 // NewMetricsAPI creates a new metrics API instance with Prometheus integration
 func NewMetricsAPI(opts Opts) (*MetricsAPI, error) {
 	// Validate required options
-	if opts.QueueShard == nil {
+	if opts.QueueManager == nil {
 		return nil, fmt.Errorf("QueueManager is required")
 	}
 
@@ -141,7 +140,7 @@ func (api *MetricsAPI) setupRoutes() {
 // handleMetrics serves Prometheus-formatted metrics
 func (api *MetricsAPI) handleMetrics(w http.ResponseWriter, r *http.Request) {
 	// Update queue depth metric
-	depth, err := api.opts.QueueShard.TotalSystemQueueDepth(r.Context())
+	depth, err := api.opts.QueueManager.TotalSystemQueueDepth(r.Context())
 	if err != nil {
 		http.Error(w, "Failed to get queue depth", http.StatusInternalServerError)
 		return
