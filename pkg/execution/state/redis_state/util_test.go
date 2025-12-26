@@ -1,9 +1,13 @@
 package redis_state
 
 import (
+	"context"
 	"testing"
 
 	"github.com/alicebob/miniredis/v2"
+	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/consts"
+	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/redis/rueidis"
 	"github.com/stretchr/testify/require"
 )
@@ -16,4 +20,45 @@ func initRedis(t *testing.T) (*miniredis.Miniredis, rueidis.Client) {
 	})
 	require.NoError(t, err)
 	return r, rc
+}
+
+func shardFromClient(name string, rc rueidis.Client, opts ...osqueue.QueueOpt) osqueue.QueueShard {
+	ctx := context.Background()
+	options := osqueue.NewQueueOptions(ctx, opts...)
+	queueClient := NewQueueClient(rc, QueueDefaultKey)
+	shard := NewRedisQueue(*options, consts.DefaultQueueShardName, queueClient)
+
+	return shard
+}
+
+func mapFromShards(shards ...osqueue.QueueShard) map[string]osqueue.QueueShard {
+	shardMap := make(map[string]osqueue.QueueShard)
+	for _, qs := range shards {
+		shardMap[qs.Name()] = qs
+	}
+
+	return shardMap
+}
+
+func alwaysSelectShard(shard osqueue.QueueShard) osqueue.ShardSelector {
+	return func(ctx context.Context, accountId uuid.UUID, queueName *string) (osqueue.QueueShard, error) {
+		return shard, nil
+	}
+}
+
+func initQueue(t *testing.T, rc rueidis.Client, opts ...osqueue.QueueOpt) (osqueue.Queue, osqueue.QueueShard) {
+	ctx := context.Background()
+
+	shard := shardFromClient(consts.DefaultQueueShardName, rc, opts...)
+
+	queue, err := osqueue.NewQueueProcessor(
+		ctx,
+		"test-queue",
+		shard,
+		mapFromShards(shard),
+		alwaysSelectShard(shard),
+		opts...)
+	require.NoError(t, err)
+
+	return queue, shard
 }
