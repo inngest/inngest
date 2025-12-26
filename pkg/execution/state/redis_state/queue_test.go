@@ -443,31 +443,16 @@ func TestQueueEnqueueItem(t *testing.T) {
 				},
 			}
 
-			_, partitionCustomConcurrencyKey1, _ := osqueue.ItemPartitions(ctx, qi)
-
-			// Enqueue always enqueues to the default partitions - enqueueing to key queues has been disabled for now
-			customkeyQueuePartition := QueuePartition{
-				ID:                         q.primaryQueueShard.RedisClient.kg.PartitionQueueSet(enums.PartitionTypeConcurrencyKey, fnID.String(), hash),
-				PartitionType:              int(enums.PartitionTypeConcurrencyKey),
-				ConcurrencyScope:           int(enums.ConcurrencyScopeFn),
-				FunctionID:                 &fnID,
-				AccountID:                  accountId,
-				EvaluatedConcurrencyKey:    ck.Key,
-				UnevaluatedConcurrencyHash: ck.Hash,
-			}
-
-			assert.Equal(t, customkeyQueuePartition, partitionCustomConcurrencyKey1)
-
-			i, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi, now.Add(10*time.Second), osqueue.EnqueueOpts{})
+			i, err := shard.EnqueueItem(ctx, qi, now.Add(10*time.Second), osqueue.EnqueueOpts{})
 			require.NoError(t, err)
 
 			// There should be 2 partitions - custom key, and the function
 			// level limit.
-			items, _ := r.HKeys(q.primaryQueueShard.RedisClient.kg.PartitionItem())
+			items, _ := r.HKeys(shard.Client().kg.PartitionItem())
 			require.Equal(t, 1, len(items))
 
 			// Concurrency key queue should not exist
-			require.False(t, r.Exists(q.primaryQueueShard.RedisClient.kg.PartitionQueueSet(enums.PartitionTypeConcurrencyKey, fnID.String(), hash)))
+			require.False(t, r.Exists(shard.Client().kg.PartitionQueueSet(enums.PartitionTypeConcurrencyKey, fnID.String(), hash)))
 
 			accountIds := getGlobalAccounts(t, rc)
 			require.Equal(t, 1, len(accountIds))
@@ -481,13 +466,13 @@ func TestQueueEnqueueItem(t *testing.T) {
 
 			// We enqueue to the function-specific queue for backwards-compatibility reasons
 			defaultPartition := getDefaultPartition(t, r, fnID)
-			assert.Equal(t, QueuePartition{
+			assert.Equal(t, osqueue.QueuePartition{
 				ID:         fnID.String(),
 				FunctionID: &fnID,
 				AccountID:  accountId,
 			}, defaultPartition)
 
-			mem, err := r.ZMembers(defaultPartition.zsetKey(q.primaryQueueShard.RedisClient.kg))
+			mem, err := r.ZMembers(defaultPartition.zsetKey(shard.Client().kg))
 			require.NoError(t, err)
 			require.Equal(t, 1, len(mem))
 			require.Contains(t, mem, i.ID)
@@ -513,43 +498,21 @@ func TestQueueEnqueueItem(t *testing.T) {
 				},
 			}
 
-			partitionFn, partitionCustomConcurrencyKey1, partitionCustomConcurrencyKey2 := q.ItemPartitions(ctx, q.primaryQueueShard, qi)
+			partitionFn := osqueue.ItemPartition(ctx, qi)
 
 			// We enqueue to the function-specific queue for backwards-compatibility reasons
-			expectedDefaultPartition := QueuePartition{
+			expectedDefaultPartition := osqueue.QueuePartition{
 				ID:         fnID.String(),
 				FunctionID: &fnID,
 				AccountID:  accountId,
 			}
 			assert.Equal(t, expectedDefaultPartition, partitionFn)
 
-			keyQueueA := QueuePartition{
-				ID:                         q.primaryQueueShard.RedisClient.kg.PartitionQueueSet(enums.PartitionTypeConcurrencyKey, fnID.String(), hashA),
-				PartitionType:              int(enums.PartitionTypeConcurrencyKey),
-				ConcurrencyScope:           int(enums.ConcurrencyScopeFn),
-				FunctionID:                 &fnID,
-				AccountID:                  accountId,
-				EvaluatedConcurrencyKey:    ckA.Key,
-				UnevaluatedConcurrencyHash: ckA.Hash,
-			}
-			assert.Equal(t, keyQueueA, partitionCustomConcurrencyKey1)
-
-			keyQueueB := QueuePartition{
-				ID:                         q.primaryQueueShard.RedisClient.kg.PartitionQueueSet(enums.PartitionTypeConcurrencyKey, fnID.String(), hashB),
-				PartitionType:              int(enums.PartitionTypeConcurrencyKey),
-				ConcurrencyScope:           int(enums.ConcurrencyScopeFn),
-				FunctionID:                 &fnID,
-				AccountID:                  accountId,
-				EvaluatedConcurrencyKey:    ckB.Key,
-				UnevaluatedConcurrencyHash: ckB.Hash,
-			}
-			assert.Equal(t, keyQueueB, partitionCustomConcurrencyKey2)
-
-			i, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi, now.Add(10*time.Second), osqueue.EnqueueOpts{})
+			i, err := shard.EnqueueItem(ctx, qi, now.Add(10*time.Second), osqueue.EnqueueOpts{})
 			require.NoError(t, err)
 
 			// just the default partition
-			items, _ := r.HKeys(q.primaryQueueShard.RedisClient.kg.PartitionItem())
+			items, _ := r.HKeys(shard.Client().kg.PartitionItem())
 			require.Equal(t, 1, len(items))
 			require.Contains(t, items, expectedDefaultPartition.ID)
 
@@ -568,17 +531,17 @@ func TestQueueEnqueueItem(t *testing.T) {
 			require.Equal(t, 1, len(apIds))
 			require.Contains(t, apIds, expectedDefaultPartition.ID)
 
-			assert.True(t, r.Exists(expectedDefaultPartition.zsetKey(q.primaryQueueShard.RedisClient.kg)), "expected default partition to exist")
+			assert.True(t, r.Exists(partitionZsetKey(expectedDefaultPartition, shard.Client().kg)), "expected default partition to exist")
 			defaultPartition := getDefaultPartition(t, r, fnID)
 			assert.Equal(t, expectedDefaultPartition, defaultPartition)
 
-			mem, err := r.ZMembers(defaultPartition.zsetKey(q.primaryQueueShard.RedisClient.kg))
+			mem, err := r.ZMembers(defaultPartition.zsetKey(shard.Client().kg))
 			require.NoError(t, err)
 			require.Equal(t, 1, len(mem))
 			require.Contains(t, mem, i.ID)
 
 			t.Run("Peeking partitions returns the three partitions", func(t *testing.T) {
-				parts, err := q.PartitionPeek(ctx, true, time.Now().Add(time.Hour), 10)
+				parts, err := shard.PartitionPeek(ctx, true, time.Now().Add(time.Hour), 10)
 				require.NoError(t, err)
 				require.Equal(t, 1, len(parts))
 				require.Equal(t, expectedDefaultPartition, *parts[0], "Got: %v", spew.Sdump(parts), r.Dump())
@@ -594,8 +557,8 @@ func TestQueueEnqueueItem(t *testing.T) {
 
 		oldPartitionSnapshot := "{\"at\":1723814830,\"p\":6,\"wsID\":\"e8c0aacd-fcb4-4d5a-b78a-7f0528841543\",\"wid\":\"baac957a-3aa5-4e42-8c1d-f86dee5d58da\",\"last\":1723814800026,\"forceAtMS\":0,\"off\":false}"
 
-		r.HSet(q.primaryQueueShard.RedisClient.kg.PartitionItem(), id.String(), oldPartitionSnapshot)
-		assert.Equal(t, QueuePartition{
+		r.HSet(shard.Client().kg.PartitionItem(), id.String(), oldPartitionSnapshot)
+		assert.Equal(t, osqueue.QueuePartition{
 			FunctionID: &id,
 			EnvID:      &envId,
 			// No accountId is present,
@@ -604,7 +567,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 			Last:      1723814800026,
 		}, getPartition(t, r, enums.PartitionTypeDefault, id))
 
-		item, err := q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{
+		item, err := shard.EnqueueItem(ctx, osqueue.QueueItem{
 			FunctionID: id,
 			Data: osqueue.Item{
 				Identifier: state.Identifier{
@@ -616,7 +579,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 		require.NotEqual(t, item.ID, ulid.Zero)
 		require.Equal(t, time.UnixMilli(item.WallTimeMS).Truncate(time.Second), start)
 
-		assert.Equal(t, QueuePartition{
+		assert.Equal(t, osqueue.QueuePartition{
 			FunctionID: &id,
 			EnvID:      &envId,
 			// No accountId is present,
@@ -639,7 +602,7 @@ func TestQueueEnqueueItemIdempotency(t *testing.T) {
 	defer rc.Close()
 
 	// Set idempotency to a second
-	q := NewQueue(RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}, WithIdempotencyTTL(dur))
+	q, _ := newQueue(t, rc, osqueue.WithIdempotencyTTL(dur))
 	ctx := context.Background()
 
 	start := time.Now().Truncate(time.Second)
