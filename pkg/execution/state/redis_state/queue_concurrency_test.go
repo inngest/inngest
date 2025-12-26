@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/inngest/inngest/pkg/consts"
-	"github.com/inngest/inngest/pkg/enums"
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/google/uuid"
@@ -39,28 +38,28 @@ func TestQueuePartitionConcurrency(t *testing.T) {
 	workflowIDs := []uuid.UUID{limit_1, limit_10}
 
 	// Limit function concurrency by workflow ID.
-	pkf := func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
+	pkf := func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
 		switch p.FunctionID {
 		case limit_1:
-			return PartitionConstraintConfig{
-				Concurrency: PartitionConcurrency{
-					AccountConcurrency:  NoConcurrencyLimit,
+			return osqueue.PartitionConstraintConfig{
+				Concurrency: osqueue.PartitionConcurrency{
+					AccountConcurrency:  osqueue.NoConcurrencyLimit,
 					FunctionConcurrency: 1,
 				},
 			}
 		case limit_10:
-			return PartitionConstraintConfig{
-				Concurrency: PartitionConcurrency{
-					AccountConcurrency:  NoConcurrencyLimit,
+			return osqueue.PartitionConstraintConfig{
+				Concurrency: osqueue.PartitionConcurrency{
+					AccountConcurrency:  osqueue.NoConcurrencyLimit,
 					FunctionConcurrency: 10,
 				},
 			}
 		default:
 			// No concurrency, which means use the default concurrency limits.
-			return PartitionConstraintConfig{
-				Concurrency: PartitionConcurrency{
-					AccountConcurrency:  NoConcurrencyLimit,
-					FunctionConcurrency: NoConcurrencyLimit,
+			return osqueue.PartitionConstraintConfig{
+				Concurrency: osqueue.PartitionConcurrency{
+					AccountConcurrency:  osqueue.NoConcurrencyLimit,
+					FunctionConcurrency: osqueue.NoConcurrencyLimit,
 				},
 			}
 		}
@@ -69,12 +68,29 @@ func TestQueuePartitionConcurrency(t *testing.T) {
 	// Create a new lifecycle listener.  This should be invoked each time we hit limits.
 	ll := newTestLifecycleListener()
 
-	q := NewQueue(
-		RedisQueueShard{RedisClient: NewQueueClient(rc, QueueDefaultKey), Kind: string(enums.QueueShardKindRedis), Name: consts.DefaultQueueShardName},
-		WithNumWorkers(100),
-		WithPartitionConstraintConfigGetter(pkf),
-		WithQueueLifecycles(ll),
+	opts := []osqueue.QueueOpt{
+		osqueue.WithNumWorkers(100),
+		osqueue.WithPartitionConstraintConfigGetter(pkf),
+		osqueue.WithQueueLifecycles(ll),
+	}
+
+	shard1 := NewRedisQueue(*osqueue.NewQueueOptions(ctx, opts...), consts.DefaultQueueShardName, NewQueueClient(rc, QueueDefaultKey))
+
+	shards := map[string]osqueue.QueueShard{
+		consts.DefaultQueueShardName: shard1,
+	}
+
+	q, err := osqueue.NewQueueProcessor(
+		ctx,
+		"test-queue",
+		shard1,
+		shards,
+		func(ctx context.Context, accountId uuid.UUID, queueName *string) (osqueue.QueueShard, error) {
+			return shard1, nil
+		},
+		opts...,
 	)
+	require.NoError(t, err)
 
 	var (
 		counter_1   int32
@@ -194,10 +210,10 @@ func (t testLifecycleListener) OnCustomKeyConcurrencyLimitReached(_ context.Cont
 	t.ckConcurrency[key] = i + 1
 }
 
-func (t testLifecycleListener) OnBacklogRefillConstraintHit(ctx context.Context, p *QueueShadowPartition, b *QueueBacklog, res *BacklogRefillResult) {
+func (t testLifecycleListener) OnBacklogRefillConstraintHit(ctx context.Context, p *osqueue.QueueShadowPartition, b *osqueue.QueueBacklog, res *osqueue.BacklogRefillResult) {
 	// no-op
 }
 
-func (t testLifecycleListener) OnBacklogRefilled(ctx context.Context, p *QueueShadowPartition, b *QueueBacklog, res *BacklogRefillResult) {
+func (t testLifecycleListener) OnBacklogRefilled(ctx context.Context, p *osqueue.QueueShadowPartition, b *osqueue.QueueBacklog, res *osqueue.BacklogRefillResult) {
 	// no-op
 }
