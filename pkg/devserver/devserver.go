@@ -674,7 +674,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	// This provides system queue depth metrics via /metrics endpoint.
 	metricsAPI, err := metrics.NewMetricsAPI(metrics.Opts{
 		AuthMiddleware: authn.SigningKeyMiddleware(opts.SigningKey),
-		QueueShard:     queueShard,
+		QueueManager:   queueShard,
 	})
 	if err != nil {
 		return err
