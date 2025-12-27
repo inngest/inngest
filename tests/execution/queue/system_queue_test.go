@@ -14,7 +14,6 @@ import (
 	"github.com/inngest/inngest/pkg/execution/batch"
 	"github.com/inngest/inngest/pkg/execution/debounce"
 	"github.com/inngest/inngest/pkg/execution/queue"
-	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/jonboulle/clockwork"
@@ -25,10 +24,10 @@ import (
 
 func TestSystemQueueConfigs(t *testing.T) {
 	mapping := map[string]string{
-		osqueue.KindScheduleBatch: osqueue.KindScheduleBatch,
-		"pause-event":             "pause-event",
-		osqueue.KindDebounce:      osqueue.KindDebounce,
-		osqueue.KindQueueMigrate:  osqueue.KindQueueMigrate,
+		queue.KindScheduleBatch: queue.KindScheduleBatch,
+		"pause-event":           "pause-event",
+		queue.KindDebounce:      queue.KindDebounce,
+		queue.KindQueueMigrate:  queue.KindQueueMigrate,
 	}
 
 	r := miniredis.RunT(t)
@@ -60,10 +59,10 @@ func TestSystemQueueConfigs(t *testing.T) {
 		context.Background(),
 		"test-queue",
 		shard,
-		map[string]osqueue.QueueShard{
+		map[string]queue.QueueShard{
 			shard.Name(): shard,
 		},
-		func(ctx context.Context, accountId uuid.UUID, queueName *string) (osqueue.QueueShard, error) {
+		func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
 			return shard, nil
 		},
 		opts...,
@@ -94,7 +93,7 @@ func TestSystemQueueConfigs(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		require.True(t, r.Exists(kg.PartitionQueueSet(enums.PartitionTypeDefault, osqueue.KindScheduleBatch, "")))
+		require.True(t, r.Exists(kg.PartitionQueueSet(enums.PartitionTypeDefault, queue.KindScheduleBatch, "")))
 		require.True(t, r.Exists(kg.AccountPartitionIndex(accountId)))
 		require.True(t, r.Exists(kg.GlobalAccountIndex()))
 		require.True(t, hasMember(t, r, kg.GlobalAccountIndex(), accountId.String()))
@@ -125,10 +124,10 @@ func TestSystemQueueConfigs(t *testing.T) {
 		}, debounceID)
 		require.NoError(t, err)
 
-		err = q.Enqueue(ctx, qi, now, osqueue.EnqueueOpts{})
+		err = q.Enqueue(ctx, qi, now, queue.EnqueueOpts{})
 		require.NoError(t, err)
 
-		require.True(t, r.Exists(kg.PartitionQueueSet(enums.PartitionTypeDefault, osqueue.KindDebounce, "")))
+		require.True(t, r.Exists(kg.PartitionQueueSet(enums.PartitionTypeDefault, queue.KindDebounce, "")))
 		require.True(t, r.Exists(kg.AccountPartitionIndex(accountId)))
 		require.True(t, r.Exists(kg.GlobalAccountIndex()))
 		require.True(t, hasMember(t, r, kg.GlobalAccountIndex(), accountId.String()))
@@ -137,16 +136,16 @@ func TestSystemQueueConfigs(t *testing.T) {
 	t.Run("pause timeouts should belong to fn queue", func(t *testing.T) {
 		r.FlushAll()
 
-		err := q.Enqueue(ctx, osqueue.Item{
+		err := q.Enqueue(ctx, queue.Item{
 			WorkspaceID: wsID,
-			Kind:        osqueue.KindPause,
+			Kind:        queue.KindPause,
 			Identifier: state.Identifier{
 				WorkflowID:  fnID,
 				AccountID:   accountId,
 				WorkspaceID: wsID,
 			},
 			Payload: nil,
-		}, now, osqueue.EnqueueOpts{})
+		}, now, queue.EnqueueOpts{})
 		require.NoError(t, err)
 
 		require.True(t, r.Exists(kg.PartitionQueueSet(enums.PartitionTypeDefault, fnID.String(), "")), r.Dump())
@@ -159,11 +158,11 @@ func TestSystemQueueConfigs(t *testing.T) {
 		r.FlushAll()
 
 		queueName := fmt.Sprintf("pause:%s", wsID.String())
-		err := q.Enqueue(ctx, osqueue.Item{
+		err := q.Enqueue(ctx, queue.Item{
 			QueueName: &queueName, WorkspaceID: wsID,
 			Kind:    "pause-event",
 			Payload: nil,
-		}, now, osqueue.EnqueueOpts{})
+		}, now, queue.EnqueueOpts{})
 		require.NoError(t, err)
 
 		require.True(t, r.Exists(kg.PartitionQueueSet(enums.PartitionTypeDefault, queueName, "")))

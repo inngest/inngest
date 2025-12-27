@@ -34,23 +34,6 @@ func shadowPartitionActiveKey(sp osqueue.QueueShadowPartition, kg QueueKeyGenera
 	return kg.ActiveSet("p", sp.PartitionID)
 }
 
-func constraintConfigCustomConcurrencyKey(kg QueueKeyGenerator, c osqueue.PartitionConstraintConfig, b *osqueue.QueueBacklog, n int) (string, int) {
-	if n < 0 || n > len(b.ConcurrencyKeys) {
-		return kg.Concurrency("", ""), 0
-	}
-
-	backlogKey := b.ConcurrencyKeys[n-1]
-
-	for _, key := range c.Concurrency.CustomConcurrencyKeys {
-		if key.Scope == backlogKey.Scope && key.HashedKeyExpression == backlogKey.HashedKeyExpression {
-			// Return concrete key with latest limit from shadow partition
-			return backlogConcurrencyKey(backlogKey, kg), key.Limit
-		}
-	}
-
-	return kg.Concurrency("", ""), 0
-}
-
 // accountInProgressKey returns the key storing the in progress set for the shadow partition's account
 func shadowPartitionAccountInProgressKey(sp osqueue.QueueShadowPartition, kg QueueKeyGenerator) string {
 	// Do not track account concurrency for system queues
