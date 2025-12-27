@@ -618,7 +618,7 @@ func (q *queueProcessor) processShadowPartitionBacklog(
 	return res, fullyProcessedBacklog, nil
 }
 
-func (q *queueProcessor) scanShadowPartitions(ctx context.Context, until time.Time, qspc chan shadowPartitionChanMsg) error {
+func (q *queueProcessor) ScanShadowPartitions(ctx context.Context, until time.Time, qspc chan ShadowPartitionChanMsg) error {
 	// check whether continuations are enabled and apply chance of skipping continuations in this iteration
 	if err := q.scanShadowContinuations(ctx); err != nil {
 		return fmt.Errorf("error scanning shadow continuations: %w", err)
@@ -675,9 +675,9 @@ func (q *queueProcessor) scanShadowPartitions(ctx context.Context, until time.Ti
 				}
 
 				for _, part := range parts {
-					qspc <- shadowPartitionChanMsg{
-						sp:                part,
-						continuationCount: 0,
+					qspc <- ShadowPartitionChanMsg{
+						ShadowPartition:   part,
+						ContinuationCount: 0,
 					}
 				}
 			}(account)
@@ -695,9 +695,9 @@ func (q *queueProcessor) scanShadowPartitions(ctx context.Context, until time.Ti
 	}
 
 	for _, part := range parts {
-		qspc <- shadowPartitionChanMsg{
-			sp:                part,
-			continuationCount: 0,
+		qspc <- ShadowPartitionChanMsg{
+			ShadowPartition:   part,
+			ContinuationCount: 0,
 		}
 	}
 

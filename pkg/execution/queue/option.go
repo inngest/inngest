@@ -440,10 +440,8 @@ type QueueOptions struct {
 
 	continuationLimit uint
 
-	shadowContinues             map[string]shadowContinuation
-	shadowContinueCooldown      map[string]time.Time
-	shadowContinuesLock         *sync.Mutex
-	shadowContinuationLimit     uint
+	shadowContinuationLimit uint
+
 	shadowPeekMin               int64
 	shadowPeekMax               int64
 	backlogRefillLimit          int64
@@ -728,7 +726,7 @@ func NewQueueOptions(
 		log:                            logger.StdlibLogger(ctx),
 		instrumentInterval:             DefaultInstrumentInterval,
 		PartitionConstraintConfigGetter: func(ctx context.Context, pi PartitionIdentifier) PartitionConstraintConfig {
-			def := defaultConcurrency
+			def := DefaultConcurrency
 
 			return PartitionConstraintConfig{
 				Concurrency: PartitionConcurrency{
@@ -746,13 +744,9 @@ func NewQueueOptions(
 		TenantInstrumentor: func(ctx context.Context, partitionID string) error {
 			return nil
 		},
-		backoffFunc:             backoff.DefaultBackoff,
-		Clock:                   clockwork.NewRealClock(),
-		continuationLimit:       consts.DefaultQueueContinueLimit,
-		shadowContinuesLock:     &sync.Mutex{},
-		shadowContinuationLimit: consts.DefaultQueueContinueLimit,
-		shadowContinues:         map[string]shadowContinuation{},
-		shadowContinueCooldown:  map[string]time.Time{},
+		backoffFunc:       backoff.DefaultBackoff,
+		Clock:             clockwork.NewRealClock(),
+		continuationLimit: consts.DefaultQueueContinueLimit,
 		NormalizeRefreshItemCustomConcurrencyKeys: func(ctx context.Context, item *QueueItem, existingKeys []state.CustomConcurrency, shadowPartition *QueueShadowPartition) ([]state.CustomConcurrency, error) {
 			return existingKeys, nil
 		},
