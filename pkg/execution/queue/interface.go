@@ -149,6 +149,8 @@ type QueueManager interface {
 		f RunFunc,
 	) error
 	ProcessPartition(ctx context.Context, p *QueuePartition, continuationCount uint, randomOffset bool) error
+
+	ScanShadowPartitions(ctx context.Context, until time.Time, qspc chan ShadowPartitionChanMsg) error
 }
 
 type QueueProcessor interface {
@@ -158,6 +160,10 @@ type QueueProcessor interface {
 	Options() *QueueOptions
 	Workers() chan ProcessItem
 	SequentialLease() *ulid.ULID
+
+	ShadowPartitionWorkers() chan ShadowPartitionChanMsg
+
+	ShadowContinues
 }
 
 type ShardOperations interface {
