@@ -128,7 +128,7 @@ type QueueManager interface {
 
 	// PartitionBacklogSize returns the point in time backlog size of the partition.
 	// This will sum the size of all backlogs in that partition
-	PartitionBacklogSize(ctx context.Context, queueShard QueueShard, partitionID string) (int64, error)
+	PartitionBacklogSize(ctx context.Context, partitionID string) (int64, error)
 
 	// Total queue depth of all partitions including backlog and ready state items
 	TotalSystemQueueDepth(ctx context.Context, queueShard QueueShard) (int64, error)

@@ -26,7 +26,7 @@ func shardFromClient(name string, rc rueidis.Client, opts ...osqueue.QueueOpt) R
 	ctx := context.Background()
 	options := osqueue.NewQueueOptions(ctx, opts...)
 	queueClient := NewQueueClient(rc, QueueDefaultKey)
-	shard := NewRedisQueue(*options, consts.DefaultQueueShardName, queueClient)
+	shard := NewRedisQueue(*options, name, queueClient)
 
 	return shard
 }
