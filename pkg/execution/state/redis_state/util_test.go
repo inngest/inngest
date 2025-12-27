@@ -46,7 +46,7 @@ func alwaysSelectShard(shard osqueue.QueueShard) osqueue.ShardSelector {
 	}
 }
 
-func newQueue(t testing.TB, rc rueidis.Client, opts ...osqueue.QueueOpt) (osqueue.Queue, RedisQueueShard) {
+func newQueue(t testing.TB, rc rueidis.Client, opts ...osqueue.QueueOpt) (osqueue.QueueManager, RedisQueueShard) {
 	ctx := context.Background()
 
 	shard := shardFromClient(consts.DefaultQueueShardName, rc, opts...)
