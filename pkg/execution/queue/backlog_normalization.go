@@ -34,7 +34,7 @@ func (q *queueProcessor) backlogNormalizationWorker(ctx context.Context, nc chan
 
 		case msg := <-nc:
 			_, err := DurationWithTags(ctx, q.name, "normalize_backlog", q.Clock.Now(), func(ctx context.Context) (any, error) {
-				err := q.normalizeBacklog(ctx, msg.b, msg.sp, msg.constraints)
+				err := q.NormalizeBacklog(ctx, msg.b, msg.sp, msg.constraints)
 				return nil, err
 			}, map[string]any{
 				"async_processing": true,
@@ -179,10 +179,10 @@ func (q *queueProcessor) iterateNormalizationShadowPartition(ctx context.Context
 	return nil
 }
 
-// normalizeBacklog must be called with exclusive access to the shadow partition
+// NormalizeBacklog must be called with exclusive access to the shadow partition
 // NOTE: ideally this is one transaction in a lua script but enqueue_to_backlog is way too much work to
 // utilize
-func (q *queueProcessor) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp *QueueShadowPartition, latestConstraints PartitionConstraintConfig) error {
+func (q *queueProcessor) NormalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp *QueueShadowPartition, latestConstraints PartitionConstraintConfig) error {
 	ctx, cancelNormalization := context.WithCancel(ctx)
 	defer cancelNormalization()
 
@@ -252,7 +252,7 @@ func (q *queueProcessor) normalizeBacklog(ctx context.Context, backlog *QueueBac
 		for _, item := range res.Items {
 			item := item // capture range variable
 			wg.Go(func() {
-				_, err := q.normalizeItem(logger.WithStdlib(ctx, l), sp, latestConstraints, backlog, *item)
+				_, err := q.NormalizeItem(logger.WithStdlib(ctx, l), sp, latestConstraints, backlog, *item)
 				if err != nil && !errors.Is(err, context.Canceled) {
 					l.ReportError(err, "could not normalize item",
 						logger.WithErrorReportTags(map[string]string{
@@ -302,7 +302,7 @@ func (q *queueProcessor) normalizeBacklog(ctx context.Context, backlog *QueueBac
 	return nil
 }
 
-func (q *queueProcessor) normalizeItem(
+func (q *queueProcessor) NormalizeItem(
 	ctx context.Context,
 	sp *QueueShadowPartition,
 	latestConstraints PartitionConstraintConfig,

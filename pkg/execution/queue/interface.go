@@ -131,6 +131,15 @@ type QueueManager interface {
 
 	// Total queue depth of all partitions including backlog and ready state items
 	TotalSystemQueueDepth(ctx context.Context, queueShard QueueShard) (int64, error)
+
+	NormalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp *QueueShadowPartition, latestConstraints PartitionConstraintConfig) error
+	NormalizeItem(
+		ctx context.Context,
+		sp *QueueShadowPartition,
+		latestConstraints PartitionConstraintConfig,
+		sourceBacklog *QueueBacklog,
+		item QueueItem,
+	) (QueueItem, error)
 }
 
 type QueueProcessor interface {
