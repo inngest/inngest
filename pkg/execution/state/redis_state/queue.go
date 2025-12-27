@@ -43,6 +43,8 @@ func (q *queue) Kind() enums.QueueShardKind {
 type RedisQueueShard interface {
 	osqueue.QueueShard
 	Client() *QueueClient
+
+	InProgress(ctx context.Context, prefix string, concurrencyKey string) (int64, error)
 }
 
 func (q *queue) Client() *QueueClient {
