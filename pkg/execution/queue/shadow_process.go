@@ -28,8 +28,8 @@ func (q *queueProcessor) ProcessShadowPartition(ctx context.Context, shadowPart 
 	)
 	shard := q.primaryQueueShard
 
-	metrics.ActiveShadowScannerCount(ctx, 1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": shard.Name}})
-	defer metrics.ActiveShadowScannerCount(ctx, -1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": shard.Name}})
+	metrics.ActiveShadowScannerCount(ctx, 1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": shard.Name()}})
+	defer metrics.ActiveShadowScannerCount(ctx, -1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": shard.Name()}})
 
 	// Check if shadow partition cannot be processed (paused/refill disabled, etc.)
 	if shadowPart.FunctionID != nil {
@@ -97,7 +97,7 @@ func (q *queueProcessor) ProcessShadowPartition(ctx context.Context, shadowPart 
 			metrics.IncrQueueShadowPartitionLeaseContentionCounter(ctx, metrics.CounterOpt{
 				PkgName: pkgName,
 				Tags: map[string]any{
-					"queue_shard": shard.Name,
+					"queue_shard": shard.Name(),
 					// "partition_id": shadowPart.PartitionID,
 					"action": "lease",
 				},
@@ -108,7 +108,7 @@ func (q *queueProcessor) ProcessShadowPartition(ctx context.Context, shadowPart 
 			metrics.IncrQueueShadowPartitionGoneCounter(ctx, metrics.CounterOpt{
 				PkgName: pkgName,
 				Tags: map[string]any{
-					"queue_shard": shard.Name,
+					"queue_shard": shard.Name(),
 					// "partition_id": shadowPart.PartitionID,
 				},
 			})
@@ -150,7 +150,7 @@ func (q *queueProcessor) ProcessShadowPartition(ctx context.Context, shadowPart 
 						metrics.IncrQueueShadowPartitionLeaseContentionCounter(ctx, metrics.CounterOpt{
 							PkgName: pkgName,
 							Tags: map[string]any{
-								"queue_shard": shard.Name,
+								"queue_shard": shard.Name(),
 								// "partition_id": shadowPart.PartitionID,
 								"action": "extend_lease",
 							},
@@ -298,7 +298,7 @@ func (q *queueProcessor) ProcessShadowPartition(ctx context.Context, shadowPart 
 	metrics.IncrQueueShadowPartitionProcessedCounter(ctx, metrics.CounterOpt{
 		PkgName: pkgName,
 		Tags: map[string]any{
-			"queue_shard": shard.Name,
+			"queue_shard": shard.Name(),
 		},
 	})
 
@@ -391,7 +391,7 @@ func (q *queueProcessor) ProcessShadowPartitionBacklog(
 		metrics.IncrQueueOutdatedBacklogCounter(ctx, metrics.CounterOpt{
 			PkgName: pkgName,
 			Tags: map[string]any{
-				"queue_shard": q.primaryQueueShard.Name,
+				"queue_shard": q.primaryQueueShard.Name(),
 				// "partition_id": shadowPart.PartitionID,
 				"reason": reason.String(),
 			},
@@ -536,7 +536,7 @@ func (q *queueProcessor) ProcessShadowPartitionBacklog(
 		opts := metrics.CounterOpt{
 			PkgName: pkgName,
 			Tags: map[string]any{
-				"queue_shard":    q.primaryQueueShard.Name,
+				"queue_shard":    q.primaryQueueShard.Name(),
 				"constraint_api": constraintCheckRes.SkipConstraintChecks,
 				// "partition_id": shadowPart.PartitionID,
 			},
@@ -555,7 +555,7 @@ func (q *queueProcessor) ProcessShadowPartitionBacklog(
 			metrics.IncrQueueBacklogRefillConstraintCounter(ctx, metrics.CounterOpt{
 				PkgName: pkgName,
 				Tags: map[string]any{
-					"queue_shard": q.primaryQueueShard.Name,
+					"queue_shard": q.primaryQueueShard.Name(),
 					// "partition_id": shadowPart.PartitionID,
 					"constraint": res.Constraint.String(),
 				},

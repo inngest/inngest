@@ -335,7 +335,7 @@ func (q *queue) Requeue(ctx context.Context, i osqueue.QueueItem, at time.Time, 
 			metrics.IncrBacklogRequeuedCounter(ctx, metrics.CounterOpt{
 				PkgName: pkgName,
 				Tags: map[string]any{
-					"queue_shard": q.Name,
+					"queue_shard": q.Name(),
 					// "partition_id": i.FunctionID.String(),
 				},
 			})

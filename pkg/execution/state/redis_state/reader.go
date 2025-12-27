@@ -134,8 +134,6 @@ func (q *queue) RunningCount(ctx context.Context, workflowID uuid.UUID) (int64, 
 	}
 	atomic.AddInt64(&count, cnt)
 	return count, nil
-
-	return count, nil
 }
 
 func (q *queue) ItemsByPartition(ctx context.Context, partitionID string, from time.Time, until time.Time, opts ...osqueue.QueueIterOpt) (iter.Seq[*osqueue.QueueItem], error) {
@@ -156,7 +154,7 @@ func (q *queue) ItemsByPartition(ctx context.Context, partitionID string, from t
 		"partition_id", partitionID,
 		"from", from,
 		"until", until,
-		"queue_shard", q.Name,
+		"queue_shard", q.Name(),
 	)
 
 	// retrieve partition by ID

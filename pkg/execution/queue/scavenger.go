@@ -63,7 +63,7 @@ func (q *queueProcessor) runScavenger(ctx context.Context) {
 			if q.scavengerLeaseID == nil {
 				// Only track this if we're creating a new lease, not if we're renewing
 				// a lease.
-				metrics.IncrQueueSequentialLeaseClaimsCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name}})
+				metrics.IncrQueueSequentialLeaseClaimsCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name()}})
 			}
 			q.scavengerLeaseID = leaseID
 			q.scavengerLeaseLock.Unlock()
