@@ -590,10 +590,10 @@ type continuation struct {
 	count uint
 }
 
-// shadowContinuation is the equivalent of continuation for shadow partitions
-type shadowContinuation struct {
-	shadowPart *QueueShadowPartition
-	count      uint
+// ShadowContinuation is the equivalent of continuation for shadow partitions
+type ShadowContinuation struct {
+	ShadowPart *QueueShadowPartition
+	Count      uint
 }
 
 // ProcessItem references the queue partition and queue item to be processed by a worker.

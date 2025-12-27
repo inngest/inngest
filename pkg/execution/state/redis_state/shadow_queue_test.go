@@ -12,7 +12,6 @@ import (
 	"github.com/alicebob/miniredis/v2"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/constraintapi"
-	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
@@ -57,7 +56,7 @@ func TestQueueRefillBacklog(t *testing.T) {
 
 	clock := clockwork.NewFakeClock()
 
-	q, shard := newQueue(
+	_, shard := newQueue(
 		t, rc,
 		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 			return true
@@ -259,7 +258,7 @@ func TestQueueRefillBacklog(t *testing.T) {
 		clock := clockwork.NewFakeClock()
 
 		enqueueToBacklog := true
-		q, shard := newQueue(
+		_, shard := newQueue(
 			t, rc,
 			osqueue.WithClock(clock),
 			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
@@ -374,7 +373,7 @@ func TestQueueRefillBacklog(t *testing.T) {
 		clock := clockwork.NewFakeClock()
 
 		enqueueToBacklog := true
-		q, shard := newQueue(
+		_, shard := newQueue(
 			t, rc,
 			osqueue.WithClock(clock),
 			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
@@ -521,7 +520,7 @@ func TestQueueRefillBacklog(t *testing.T) {
 		clock := clockwork.NewFakeClock()
 
 		enqueueToBacklog := true
-		q, shard := newQueue(
+		_, shard := newQueue(
 			t, rc,
 			osqueue.WithClock(clock),
 			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
@@ -670,7 +669,7 @@ func TestQueueShadowPartitionLease(t *testing.T) {
 	clock := clockwork.NewFakeClock()
 
 	enqueueToBacklog := false
-	q, shard := newQueue(
+	_, shard := newQueue(
 		t, rc,
 		osqueue.WithClock(clock),
 		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
@@ -903,7 +902,6 @@ func TestQueueShadowScanner(t *testing.T) {
 			return enqueueToBacklog
 		}),
 	)
-	kg := shard.Client().kg
 
 	fnID, accountID, envID := uuid.New(), uuid.New(), uuid.New()
 
@@ -1028,39 +1026,39 @@ func TestQueueShadowScannerContinuations(t *testing.T) {
 	require.NotEqual(t, sp1, sp2)
 
 	t.Run("should retrieve using continuation", func(t *testing.T) {
-		q.addShadowContinue(ctx, &sp1, 1)
+		q.AddShadowContinue(ctx, &sp1, 1)
 
-		q.shadowContinuesLock.Lock()
-		cont, ok := q.shadowContinues[sp1.PartitionID]
+		cont, ok := q.GetShadowContinuations()[sp1.PartitionID]
 		require.True(t, ok)
-		require.Equal(t, uint(1), cont.count)
-		require.Equal(t, sp1, *cont.shadowPart)
-		q.shadowContinuesLock.Unlock()
+		require.Equal(t, uint(1), cont.Count)
+		require.Equal(t, sp1, *cont.ShadowPart)
 
 		fmt.Println("scanning")
 
-		err = q.scanShadowPartitions(ctx, at, qspc)
+		err = q.ScanShadowPartitions(ctx, at, qspc)
 		require.NoError(t, err)
 
 		fmt.Println("waiting for message")
 
 		// check that it's scanned and gone
-		q.shadowContinuesLock.Lock()
-		defer q.shadowContinuesLock.Unlock()
 
-		_, ok = q.shadowContinues[sp1.PartitionID]
+		_, ok = q.GetShadowContinuations()[sp1.PartitionID]
 		require.False(t, ok)
 	})
 
 	t.Run("should increase continuations when more items are available", func(t *testing.T) {
 		r.FlushAll()
 
-		q.shadowContinuesLock.Lock()
-		clear(q.shadowContinues)
-		clear(q.shadowContinueCooldown)
-		q.shadowContinuesLock.Unlock()
+		q.ClearShadowContinuations()
 
-		q.backlogRefillLimit = 1
+		q, _ := newQueue(
+			t, rc,
+			osqueue.WithClock(clock),
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+				return enqueueToBacklog
+			}),
+			osqueue.WithBacklogRefillLimit(1),
+		)
 
 		addItem("test1", state.Identifier{
 			AccountID:   accountID1,
@@ -1080,40 +1078,40 @@ func TestQueueShadowScannerContinuations(t *testing.T) {
 			WorkflowID:  fnID2,
 		}, at)
 
-		q.addShadowContinue(ctx, &sp1, 1)
+		q.AddShadowContinue(ctx, &sp1, 1)
 
 		// Process and refill once
-		err := q.processShadowPartition(ctx, &sp1, 1)
+		err := q.ProcessShadowPartition(ctx, &sp1, 1)
 		require.NoError(t, err)
 
 		// Expect continuation to be set
-		q.shadowContinuesLock.Lock()
-		cont, ok := q.shadowContinues[sp1.PartitionID]
+		cont, ok := q.GetShadowContinuations()[sp1.PartitionID]
 		require.True(t, ok)
-		require.Equal(t, uint(2), cont.count)
-		require.Equal(t, sp1, *cont.shadowPart)
-		q.shadowContinuesLock.Unlock()
+		require.Equal(t, uint(2), cont.Count)
+		require.Equal(t, sp1, *cont.ShadowPart)
 
 		// Process and refill again, final item in backlog
-		err = q.processShadowPartition(ctx, &sp1, 1)
+		err = q.ProcessShadowPartition(ctx, &sp1, 1)
 		require.NoError(t, err)
 
 		// Expect continuation to be cleared out
-		q.shadowContinuesLock.Lock()
-		_, ok = q.shadowContinues[sp1.PartitionID]
+		_, ok = q.GetShadowContinuations()[sp1.PartitionID]
 		require.False(t, ok)
-		q.shadowContinuesLock.Unlock()
 	})
 
 	t.Run("should remove continuation on missing shadow partition", func(t *testing.T) {
 		r.FlushAll()
 
-		q.shadowContinuesLock.Lock()
-		clear(q.shadowContinues)
-		clear(q.shadowContinueCooldown)
-		q.shadowContinuesLock.Unlock()
-
-		q.backlogRefillLimit = 1
+		q.ClearShadowContinuations()
+		q, shard := newQueue(
+			t, rc,
+			osqueue.WithClock(clock),
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+				return enqueueToBacklog
+			}),
+			osqueue.WithBacklogRefillLimit(1),
+		)
+		kg := shard.Client().kg
 
 		addItem("test1", state.Identifier{
 			AccountID:   accountID1,
@@ -1134,40 +1132,39 @@ func TestQueueShadowScannerContinuations(t *testing.T) {
 		}, at)
 
 		// Process and refill once
-		err := q.processShadowPartition(ctx, &sp1, 1)
+		err := q.ProcessShadowPartition(ctx, &sp1, 1)
 		require.NoError(t, err)
 
 		// Expect continuation to be set
-		q.shadowContinuesLock.Lock()
-		cont, ok := q.shadowContinues[sp1.PartitionID]
+		cont, ok := q.GetShadowContinuations()[sp1.PartitionID]
 		require.True(t, ok)
-		require.Equal(t, uint(2), cont.count)
-		require.Equal(t, sp1, *cont.shadowPart)
-		q.shadowContinuesLock.Unlock()
+		require.Equal(t, uint(2), cont.Count)
+		require.Equal(t, sp1, *cont.ShadowPart)
 
 		// Drop shadow partition
 		r.HDel(kg.ShadowPartitionMeta(), sp1.PartitionID)
 
 		// Process and refill again, final item in backlog
-		err = q.processShadowPartition(ctx, &sp1, 1)
+		err = q.ProcessShadowPartition(ctx, &sp1, 1)
 		require.NoError(t, err)
 
 		// Expect continuation to be cleared out
-		q.shadowContinuesLock.Lock()
-		_, ok = q.shadowContinues[sp1.PartitionID]
+		_, ok = q.GetShadowContinuations()[sp1.PartitionID]
 		require.False(t, ok)
-		q.shadowContinuesLock.Unlock()
 	})
 
 	t.Run("should remove continuation on leased shadow partition", func(t *testing.T) {
 		r.FlushAll()
 
-		q.shadowContinuesLock.Lock()
-		clear(q.shadowContinues)
-		clear(q.shadowContinueCooldown)
-		q.shadowContinuesLock.Unlock()
-
-		q.backlogRefillLimit = 1
+		q.ClearShadowContinuations()
+		q, shard := newQueue(
+			t, rc,
+			osqueue.WithClock(clock),
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+				return enqueueToBacklog
+			}),
+			osqueue.WithBacklogRefillLimit(1),
+		)
 
 		addItem("test1", state.Identifier{
 			AccountID:   accountID1,
@@ -1188,32 +1185,28 @@ func TestQueueShadowScannerContinuations(t *testing.T) {
 		}, at)
 
 		// Process and refill once
-		err := q.processShadowPartition(ctx, &sp1, 1)
+		err := q.ProcessShadowPartition(ctx, &sp1, 1)
 		require.NoError(t, err)
 
 		// Expect continuation to be set
-		q.shadowContinuesLock.Lock()
-		cont, ok := q.shadowContinues[sp1.PartitionID]
+		cont, ok := q.GetShadowContinuations()[sp1.PartitionID]
 		require.True(t, ok)
-		require.Equal(t, uint(2), cont.count)
-		require.Equal(t, sp1, *cont.shadowPart)
-		q.shadowContinuesLock.Unlock()
+		require.Equal(t, uint(2), cont.Count)
+		require.Equal(t, sp1, *cont.ShadowPart)
 
 		// Simulate another process leasing the shadow partition
 		spCopy := sp1
-		leaseID, err := q.ShadowPartitionLease(ctx, &spCopy, 3*time.Minute)
+		leaseID, err := shard.ShadowPartitionLease(ctx, &spCopy, 3*time.Minute)
 		require.NoError(t, err)
 		require.NotNil(t, leaseID)
 
 		// Process and refill again, final item in backlog
-		err = q.processShadowPartition(ctx, &sp1, 1)
+		err = q.ProcessShadowPartition(ctx, &sp1, 1)
 		require.NoError(t, err)
 
 		// Expect continuation to be cleared out
-		q.shadowContinuesLock.Lock()
-		_, ok = q.shadowContinues[sp1.PartitionID]
+		_, ok = q.GetShadowContinuations()[sp1.PartitionID]
 		require.False(t, ok)
-		q.shadowContinuesLock.Unlock()
 	})
 }
 
@@ -1234,7 +1227,7 @@ func TestRefillConstraints(t *testing.T) {
 	}
 
 	type expected struct {
-		result            BacklogRefillResult
+		result            osqueue.BacklogRefillResult
 		itemsInBacklog    int
 		itemsInReadyQueue int
 		retryAt           time.Duration
@@ -1282,7 +1275,7 @@ func TestRefillConstraints(t *testing.T) {
 				functionConcurrencyLimit: 10,
 			},
 			expected: expected{
-				result: BacklogRefillResult{
+				result: osqueue.BacklogRefillResult{
 					Constraint:        enums.QueueConstraintNotLimited,
 					TotalBacklogCount: 1,
 					BacklogCountUntil: 1,
@@ -1307,7 +1300,7 @@ func TestRefillConstraints(t *testing.T) {
 				functionConcurrencyLimit: 10,
 			},
 			expected: expected{
-				result: BacklogRefillResult{
+				result: osqueue.BacklogRefillResult{
 					Constraint:        enums.QueueConstraintFunctionConcurrency,
 					TotalBacklogCount: 40,
 					BacklogCountUntil: 40,
@@ -1331,7 +1324,7 @@ func TestRefillConstraints(t *testing.T) {
 				functionConcurrencyLimit: 10,
 			},
 			expected: expected{
-				result: BacklogRefillResult{
+				result: osqueue.BacklogRefillResult{
 					Constraint:        enums.QueueConstraintFunctionConcurrency,
 					TotalBacklogCount: 40,
 					BacklogCountUntil: 40,
@@ -1355,7 +1348,7 @@ func TestRefillConstraints(t *testing.T) {
 				functionConcurrencyLimit: 10,
 			},
 			expected: expected{
-				result: BacklogRefillResult{
+				result: osqueue.BacklogRefillResult{
 					Constraint:        enums.QueueConstraintNotLimited,
 					TotalBacklogCount: 40,
 					BacklogCountUntil: 40,
@@ -1380,7 +1373,7 @@ func TestRefillConstraints(t *testing.T) {
 				functionConcurrencyLimit: 10,
 			},
 			expected: expected{
-				result: BacklogRefillResult{
+				result: osqueue.BacklogRefillResult{
 					Constraint:        enums.QueueConstraintAccountConcurrency,
 					TotalBacklogCount: 40,
 					BacklogCountUntil: 40,
@@ -1404,7 +1397,7 @@ func TestRefillConstraints(t *testing.T) {
 				functionConcurrencyLimit: 10,
 			},
 			expected: expected{
-				result: BacklogRefillResult{
+				result: osqueue.BacklogRefillResult{
 					Constraint:        enums.QueueConstraintNotLimited,
 					TotalBacklogCount: 40,
 					BacklogCountUntil: 40,
@@ -1432,7 +1425,7 @@ func TestRefillConstraints(t *testing.T) {
 				customConcurrencyKey1Active: 2,
 			},
 			expected: expected{
-				result: BacklogRefillResult{
+				result: osqueue.BacklogRefillResult{
 					Constraint:        enums.QueueConstraintNotLimited,
 					TotalBacklogCount: 40,
 					BacklogCountUntil: 40,
@@ -1459,7 +1452,7 @@ func TestRefillConstraints(t *testing.T) {
 				customConcurrencyKey1:    &ck1,
 			},
 			expected: expected{
-				result: BacklogRefillResult{
+				result: osqueue.BacklogRefillResult{
 					Constraint:        enums.QueueConstraintCustomConcurrencyKey1,
 					TotalBacklogCount: 40,
 					BacklogCountUntil: 40,
@@ -1489,7 +1482,7 @@ func TestRefillConstraints(t *testing.T) {
 				customConcurrencyKey2:    &ck2,
 			},
 			expected: expected{
-				result: BacklogRefillResult{
+				result: osqueue.BacklogRefillResult{
 					Constraint:        enums.QueueConstraintNotLimited,
 					TotalBacklogCount: 40,
 					BacklogCountUntil: 40,
@@ -1518,7 +1511,7 @@ func TestRefillConstraints(t *testing.T) {
 				customConcurrencyKey2:    &ck2,
 			},
 			expected: expected{
-				result: BacklogRefillResult{
+				result: osqueue.BacklogRefillResult{
 					Constraint:        enums.QueueConstraintCustomConcurrencyKey2,
 					TotalBacklogCount: 40,
 					BacklogCountUntil: 40,
@@ -1544,7 +1537,7 @@ func TestRefillConstraints(t *testing.T) {
 				functionActive: 15, // 15 out of 20
 			},
 			expected: expected{
-				result: BacklogRefillResult{
+				result: osqueue.BacklogRefillResult{
 					Constraint:        enums.QueueConstraintNotLimited,
 					TotalBacklogCount: 40,
 					BacklogCountUntil: 40,
@@ -1570,7 +1563,7 @@ func TestRefillConstraints(t *testing.T) {
 				functionActive: 20, // 20 out of 20
 			},
 			expected: expected{
-				result: BacklogRefillResult{
+				result: osqueue.BacklogRefillResult{
 					Constraint:        enums.QueueConstraintFunctionConcurrency,
 					TotalBacklogCount: 40,
 					BacklogCountUntil: 40,
@@ -1594,7 +1587,7 @@ func TestRefillConstraints(t *testing.T) {
 				accountActive:  25, // 25 out of 100
 			},
 			expected: expected{
-				result: BacklogRefillResult{
+				result: osqueue.BacklogRefillResult{
 					Constraint:        enums.QueueConstraintNotLimited,
 					TotalBacklogCount: 40, // would move 40
 					BacklogCountUntil: 40,
@@ -1620,7 +1613,7 @@ func TestRefillConstraints(t *testing.T) {
 			expected: expected{
 				itemsInBacklog:    0,
 				itemsInReadyQueue: 10,
-				result: BacklogRefillResult{
+				result: osqueue.BacklogRefillResult{
 					Constraint:        enums.QueueConstraintNotLimited,
 					TotalBacklogCount: 10,
 					BacklogCountUntil: 10,
@@ -1645,7 +1638,7 @@ func TestRefillConstraints(t *testing.T) {
 			expected: expected{
 				itemsInBacklog:    10,
 				itemsInReadyQueue: 0,
-				result: BacklogRefillResult{
+				result: osqueue.BacklogRefillResult{
 					Constraint:        enums.QueueConstraintThrottle,
 					TotalBacklogCount: 10,
 					BacklogCountUntil: 10,
@@ -1670,21 +1663,18 @@ func TestRefillConstraints(t *testing.T) {
 
 			ctx := context.Background()
 
-			defaultShard := RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
-			kg := defaultShard.RedisClient.kg
-
 			clock := clockwork.NewFakeClock()
 
 			testLifecycles := newTestLifecycleListener()
 
 			enqueueToBacklog := true
-			q := NewQueue(
-				defaultShard,
-				WithClock(clock),
-				WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+			q, shard := newQueue(
+				t, rc,
+				osqueue.WithClock(clock),
+				osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 					return enqueueToBacklog
 				}),
-				WithRunMode(QueueRunMode{
+				osqueue.WithRunMode(osqueue.QueueRunMode{
 					Sequential:                        true,
 					Scavenger:                         true,
 					Partition:                         true,
@@ -1697,18 +1687,19 @@ func TestRefillConstraints(t *testing.T) {
 					ShadowContinuationSkipProbability: 0,
 					NormalizePartition:                true,
 				}),
-				WithBacklogRefillLimit(int64(testCase.knobs.maxRefill)),
-				WithPartitionConstraintConfigGetter(func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
-					return PartitionConstraintConfig{
-						Concurrency: PartitionConcurrency{
+				osqueue.WithBacklogRefillLimit(int64(testCase.knobs.maxRefill)),
+				osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
+					return osqueue.PartitionConstraintConfig{
+						Concurrency: osqueue.PartitionConcurrency{
 							AccountConcurrency:  testCase.knobs.accountConcurrencyLimit,
 							FunctionConcurrency: testCase.knobs.functionConcurrencyLimit,
 							SystemConcurrency:   678,
 						},
 					}
 				}),
-				WithQueueLifecycles(testLifecycles),
+				osqueue.WithQueueLifecycles(testLifecycles),
 			)
+			kg := shard.Client().kg
 
 			addItem := func(id string, identifier state.Identifier, at time.Time) osqueue.QueueItem {
 				kind := osqueue.KindEdge
@@ -1740,7 +1731,7 @@ func TestRefillConstraints(t *testing.T) {
 					QueueName: nil,
 				}
 
-				qi, err := q.EnqueueItem(ctx, defaultShard, item, at, osqueue.EnqueueOpts{})
+				qi, err := shard.EnqueueItem(ctx, item, at, osqueue.EnqueueOpts{})
 				require.NoError(t, err)
 
 				return qi
@@ -1764,8 +1755,8 @@ func TestRefillConstraints(t *testing.T) {
 				}
 			}
 
-			backlog := q.ItemBacklog(ctx, qi1)
-			shadowPart := q.ItemShadowPartition(ctx, qi1)
+			backlog := osqueue.ItemBacklog(ctx, qi1)
+			shadowPart := osqueue.ItemShadowPartition(ctx, qi1)
 
 			if testCase.knobs.danglingItemsInBacklog > 0 {
 				for i := 1; i <= testCase.knobs.danglingItemsInBacklog; i++ {
@@ -1867,8 +1858,8 @@ func TestRefillConstraints(t *testing.T) {
 
 			logKeyValues()
 
-			constraints := PartitionConstraintConfig{
-				Concurrency: PartitionConcurrency{
+			constraints := osqueue.PartitionConstraintConfig{
+				Concurrency: osqueue.PartitionConcurrency{
 					AccountConcurrency:  testCase.knobs.accountConcurrencyLimit,
 					FunctionConcurrency: testCase.knobs.functionConcurrencyLimit,
 				},
@@ -1877,7 +1868,7 @@ func TestRefillConstraints(t *testing.T) {
 			if testCase.knobs.customConcurrencyKey1 != nil {
 				scope, _, _, _ := testCase.knobs.customConcurrencyKey1.ParseKey()
 				constraints.Concurrency.CustomConcurrencyKeys = append(constraints.Concurrency.CustomConcurrencyKeys,
-					CustomConcurrencyLimit{
+					osqueue.CustomConcurrencyLimit{
 						Mode:                enums.ConcurrencyModeStep,
 						Scope:               scope,
 						HashedKeyExpression: testCase.knobs.customConcurrencyKey1.Hash,
@@ -1888,7 +1879,7 @@ func TestRefillConstraints(t *testing.T) {
 			if testCase.knobs.customConcurrencyKey2 != nil {
 				scope, _, _, _ := testCase.knobs.customConcurrencyKey2.ParseKey()
 				constraints.Concurrency.CustomConcurrencyKeys = append(constraints.Concurrency.CustomConcurrencyKeys,
-					CustomConcurrencyLimit{
+					osqueue.CustomConcurrencyLimit{
 						Mode:                enums.ConcurrencyModeStep,
 						Scope:               scope,
 						HashedKeyExpression: testCase.knobs.customConcurrencyKey2.Hash,
@@ -1897,7 +1888,7 @@ func TestRefillConstraints(t *testing.T) {
 			}
 
 			if testCase.knobs.throttle != nil {
-				constraints.Throttle = &PartitionThrottle{
+				constraints.Throttle = &osqueue.PartitionThrottle{
 					ThrottleKeyExpressionHash: testCase.knobs.throttle.KeyExpressionHash,
 					Limit:                     testCase.knobs.throttle.Limit,
 					Burst:                     testCase.knobs.throttle.Burst,
@@ -1905,7 +1896,7 @@ func TestRefillConstraints(t *testing.T) {
 				}
 			}
 
-			res, _, err := q.processShadowPartitionBacklog(ctx, &shadowPart, &backlog, refillUntil, constraints)
+			res, _, err := q.ProcessShadowPartitionBacklog(ctx, &shadowPart, &backlog, refillUntil, constraints)
 			require.NoError(t, err)
 
 			logKeyValues()
@@ -1963,22 +1954,18 @@ func TestShadowPartitionPointerTimings(t *testing.T) {
 
 		ctx := context.Background()
 
-		defaultShard := RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
-
 		clock := clockwork.NewFakeClock()
 
 		accountID, wsID, fnID := uuid.New(), uuid.New(), uuid.New()
 
-		kg := defaultShard.RedisClient.kg
-
 		enqueueToBacklog := true
-		q := NewQueue(
-			defaultShard,
-			WithClock(clock),
-			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+		_, shard := newQueue(
+			t, rc,
+			osqueue.WithClock(clock),
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 				return enqueueToBacklog
 			}),
-			WithRunMode(QueueRunMode{
+			osqueue.WithRunMode(osqueue.QueueRunMode{
 				Sequential:                        true,
 				Scavenger:                         true,
 				Partition:                         true,
@@ -1991,10 +1978,10 @@ func TestShadowPartitionPointerTimings(t *testing.T) {
 				ShadowContinuationSkipProbability: 0,
 				NormalizePartition:                true,
 			}),
-			WithBacklogRefillLimit(500),
-			WithPartitionConstraintConfigGetter(func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
-				return PartitionConstraintConfig{
-					Concurrency: PartitionConcurrency{
+			osqueue.WithBacklogRefillLimit(500),
+			osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
+				return osqueue.PartitionConstraintConfig{
+					Concurrency: osqueue.PartitionConcurrency{
 						AccountConcurrency:  123,
 						FunctionConcurrency: 45,
 						SystemConcurrency:   678,
@@ -2002,6 +1989,7 @@ func TestShadowPartitionPointerTimings(t *testing.T) {
 				}
 			}),
 		)
+		kg := shard.Client().kg
 
 		addItem := func(id string, identifier state.Identifier, at time.Time) osqueue.QueueItem {
 			item := osqueue.QueueItem{
@@ -2019,7 +2007,7 @@ func TestShadowPartitionPointerTimings(t *testing.T) {
 				QueueName: nil,
 			}
 
-			qi, err := q.EnqueueItem(ctx, defaultShard, item, at, osqueue.EnqueueOpts{})
+			qi, err := shard.EnqueueItem(ctx, item, at, osqueue.EnqueueOpts{})
 			require.NoError(t, err)
 
 			return qi
@@ -2037,8 +2025,8 @@ func TestShadowPartitionPointerTimings(t *testing.T) {
 			}, now.Add(time.Duration(i)*time.Second))
 		}
 
-		backlog := q.ItemBacklog(ctx, items[0])
-		shadowPart := q.ItemShadowPartition(ctx, items[0])
+		backlog := osqueue.ItemBacklog(ctx, items[0])
+		shadowPart := osqueue.ItemShadowPartition(ctx, items[0])
 
 		// Pointer should be earliest item
 		require.Equal(t, now.Add(time.Second).UnixMilli(), int64(score(t, r, kg.BacklogSet(backlog.BacklogID), items[0].ID)))
@@ -2047,8 +2035,8 @@ func TestShadowPartitionPointerTimings(t *testing.T) {
 		require.Equal(t, now.Add(time.Second).UnixMilli(), int64(score(t, r, kg.AccountShadowPartitions(accountID), shadowPart.PartitionID)))
 		require.Equal(t, now.Add(time.Second).UnixMilli(), int64(score(t, r, kg.GlobalAccountShadowPartitions(), accountID.String())))
 
-		until := now.Add(PartitionLookahead)
-		peeked, totalUntil, err := q.ShadowPartitionPeek(ctx, &shadowPart, false, until, 100)
+		until := now.Add(osqueue.PartitionLookahead)
+		peeked, totalUntil, err := shard.ShadowPartitionPeek(ctx, &shadowPart, false, until, 100)
 		require.NoError(t, err)
 
 		require.Equal(t, 1, totalUntil)
@@ -2060,11 +2048,11 @@ func TestShadowPartitionPointerTimings(t *testing.T) {
 			refillUntil := itemAt
 
 			// Get items to refill from backlog
-			itemIDs, err := getItemIDsFromBacklog(ctx, q, &backlog, refillUntil, 1000)
+			itemIDs, err := getItemIDsFromBacklog(ctx, shard, &backlog, refillUntil, 1000)
 			require.NoError(t, err)
 
-			res, err := q.BacklogRefill(ctx, &backlog, &shadowPart, refillUntil, itemIDs, PartitionConstraintConfig{
-				Concurrency: PartitionConcurrency{
+			res, err := shard.BacklogRefill(ctx, &backlog, &shadowPart, refillUntil, itemIDs, osqueue.PartitionConstraintConfig{
+				Concurrency: osqueue.PartitionConcurrency{
 					AccountConcurrency:  123,
 					FunctionConcurrency: 45,
 				},
@@ -2104,22 +2092,18 @@ func TestShadowPartitionPointerTimings(t *testing.T) {
 
 		ctx := context.Background()
 
-		defaultShard := RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
-
 		clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Second))
 
 		accountID, wsID, fnID := uuid.New(), uuid.New(), uuid.New()
 
-		kg := defaultShard.RedisClient.kg
-
 		enqueueToBacklog := true
-		q := NewQueue(
-			defaultShard,
-			WithClock(clock),
-			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+		_, shard := newQueue(
+			t, rc,
+			osqueue.WithClock(clock),
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 				return enqueueToBacklog
 			}),
-			WithRunMode(QueueRunMode{
+			osqueue.WithRunMode(osqueue.QueueRunMode{
 				Sequential:                        true,
 				Scavenger:                         true,
 				Partition:                         true,
@@ -2132,10 +2116,10 @@ func TestShadowPartitionPointerTimings(t *testing.T) {
 				ShadowContinuationSkipProbability: 0,
 				NormalizePartition:                true,
 			}),
-			WithBacklogRefillLimit(500),
-			WithPartitionConstraintConfigGetter(func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
-				return PartitionConstraintConfig{
-					Concurrency: PartitionConcurrency{
+			osqueue.WithBacklogRefillLimit(500),
+			osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
+				return osqueue.PartitionConstraintConfig{
+					Concurrency: osqueue.PartitionConcurrency{
 						AccountConcurrency:  123,
 						FunctionConcurrency: 45,
 						SystemConcurrency:   678,
@@ -2143,6 +2127,7 @@ func TestShadowPartitionPointerTimings(t *testing.T) {
 				}
 			}),
 		)
+		kg := shard.Client().kg
 
 		now := clock.Now()
 
@@ -2163,11 +2148,11 @@ func TestShadowPartitionPointerTimings(t *testing.T) {
 		}
 
 		sleepUntil := now.Add(2 * time.Second)
-		qi, err := q.EnqueueItem(ctx, defaultShard, item, sleepUntil, osqueue.EnqueueOpts{})
+		qi, err := shard.EnqueueItem(ctx, item, sleepUntil, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
-		backlog := q.ItemBacklog(ctx, qi)
-		shadowPart := q.ItemShadowPartition(ctx, qi)
+		backlog := osqueue.ItemBacklog(ctx, qi)
+		shadowPart := osqueue.ItemShadowPartition(ctx, qi)
 
 		require.Equal(t, sleepUntil.UnixMilli(), int64(score(t, r, kg.BacklogSet(backlog.BacklogID), qi.ID)))
 		require.Equal(t, sleepUntil.UnixMilli(), int64(score(t, r, kg.ShadowPartitionSet(shadowPart.PartitionID), backlog.BacklogID)))
@@ -2176,14 +2161,14 @@ func TestShadowPartitionPointerTimings(t *testing.T) {
 		require.Equal(t, sleepUntil.UnixMilli(), int64(score(t, r, kg.GlobalAccountShadowPartitions(), accountID.String())))
 
 		until := now.Add(time.Second)
-		peeked, totalUntil, err := q.ShadowPartitionPeek(ctx, &shadowPart, false, until, 100)
+		peeked, totalUntil, err := shard.ShadowPartitionPeek(ctx, &shadowPart, false, until, 100)
 		require.NoError(t, err)
 
 		require.Equal(t, 0, totalUntil)
 		require.Len(t, peeked, 0)
 
 		until = now.Add(2 * time.Second)
-		peeked, totalUntil, err = q.ShadowPartitionPeek(ctx, &shadowPart, false, until, 100)
+		peeked, totalUntil, err = shard.ShadowPartitionPeek(ctx, &shadowPart, false, until, 100)
 		require.NoError(t, err)
 
 		require.Equal(t, 1, totalUntil)
@@ -2203,20 +2188,18 @@ func TestConstraintLifecycleReporting(t *testing.T) {
 
 	ctx := context.Background()
 
-	defaultShard := RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
-
 	clock := clockwork.NewFakeClock()
 
 	testLifecycles := newTestLifecycleListener()
 
 	enqueueToBacklog := true
-	q := NewQueue(
-		defaultShard,
-		WithClock(clock),
-		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+	q, shard := newQueue(
+		t, rc,
+		osqueue.WithClock(clock),
+		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 			return enqueueToBacklog
 		}),
-		WithRunMode(QueueRunMode{
+		osqueue.WithRunMode(osqueue.QueueRunMode{
 			Sequential:                        true,
 			Scavenger:                         true,
 			Partition:                         true,
@@ -2229,17 +2212,17 @@ func TestConstraintLifecycleReporting(t *testing.T) {
 			ShadowContinuationSkipProbability: 0,
 			NormalizePartition:                true,
 		}),
-		WithBacklogRefillLimit(100),
-		WithPartitionConstraintConfigGetter(func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
-			return PartitionConstraintConfig{
-				Concurrency: PartitionConcurrency{
+		osqueue.WithBacklogRefillLimit(100),
+		osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
+			return osqueue.PartitionConstraintConfig{
+				Concurrency: osqueue.PartitionConcurrency{
 					AccountConcurrency:  123,
 					FunctionConcurrency: 45,
 					SystemConcurrency:   678,
 				},
 			}
 		}),
-		WithQueueLifecycles(testLifecycles),
+		osqueue.WithQueueLifecycles(testLifecycles),
 	)
 
 	fnID1, accountID1, envID1 := uuid.New(), uuid.New(), uuid.New()
@@ -2261,15 +2244,15 @@ func TestConstraintLifecycleReporting(t *testing.T) {
 			QueueName: nil,
 		}
 
-		qi, err := q.EnqueueItem(ctx, defaultShard, item, at, osqueue.EnqueueOpts{})
+		qi, err := shard.EnqueueItem(ctx, item, at, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
 		return qi
 	}
 	at := clock.Now()
 
-	constraints := PartitionConstraintConfig{
-		Concurrency: PartitionConcurrency{
+	constraints := osqueue.PartitionConstraintConfig{
+		Concurrency: osqueue.PartitionConcurrency{
 			AccountConcurrency:  1,
 			FunctionConcurrency: 1,
 		},
@@ -2281,13 +2264,13 @@ func TestConstraintLifecycleReporting(t *testing.T) {
 		WorkflowID:  fnID1,
 	}, at)
 
-	sp1 := q.ItemShadowPartition(ctx, itemA1)
-	b1 := q.ItemBacklog(ctx, itemA1)
+	sp1 := osqueue.ItemShadowPartition(ctx, itemA1)
+	b1 := osqueue.ItemBacklog(ctx, itemA1)
 
 	require.Equal(t, 1, constraints.Concurrency.FunctionConcurrency)
 	require.Equal(t, 1, constraints.Concurrency.AccountConcurrency)
 
-	res, _, err := q.processShadowPartitionBacklog(ctx, &sp1, &b1, at.Add(time.Minute), constraints)
+	res, _, err := q.ProcessShadowPartitionBacklog(ctx, &sp1, &b1, at.Add(time.Minute), constraints)
 	require.NoError(t, err)
 	require.NotNil(t, res)
 	require.Equal(t, enums.QueueConstraintNotLimited, res.Constraint)
@@ -2304,7 +2287,7 @@ func TestConstraintLifecycleReporting(t *testing.T) {
 		WorkflowID:  fnID1,
 	}, at)
 
-	res, _, err = q.processShadowPartitionBacklog(ctx, &sp1, &b1, at.Add(time.Minute), constraints)
+	res, _, err = q.ProcessShadowPartitionBacklog(ctx, &sp1, &b1, at.Add(time.Minute), constraints)
 	require.NoError(t, err)
 	require.NotNil(t, res)
 	require.Equal(t, enums.QueueConstraintFunctionConcurrency, res.Constraint)
@@ -2322,11 +2305,11 @@ func TestConstraintLifecycleReporting(t *testing.T) {
 		WorkspaceID: envID1,
 	}, at)
 
-	b2 := q.ItemBacklog(ctx, itemB1)
+	b2 := osqueue.ItemBacklog(ctx, itemB1)
 
-	sp2 := q.ItemShadowPartition(ctx, itemB1)
+	sp2 := osqueue.ItemShadowPartition(ctx, itemB1)
 
-	res, _, err = q.processShadowPartitionBacklog(ctx, &sp2, &b2, at.Add(time.Minute), constraints)
+	res, _, err = q.ProcessShadowPartitionBacklog(ctx, &sp2, &b2, at.Add(time.Minute), constraints)
 	require.NoError(t, err)
 	require.NotNil(t, res)
 	require.Equal(t, enums.QueueConstraintAccountConcurrency, res.Constraint)
@@ -2350,17 +2333,15 @@ func TestBacklogRefillWithDisabledConstraintChecks(t *testing.T) {
 
 	clock := clockwork.NewFakeClock()
 
-	shard := RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
-
-	constraints := PartitionConstraintConfig{
+	constraints := osqueue.PartitionConstraintConfig{
 		FunctionVersion: 1,
-		Throttle: &PartitionThrottle{
+		Throttle: &osqueue.PartitionThrottle{
 			ThrottleKeyExpressionHash: "throttle-key-hash",
 			Limit:                     1,
 			Burst:                     0,
 			Period:                    5,
 		},
-		Concurrency: PartitionConcurrency{
+		Concurrency: osqueue.PartitionConcurrency{
 			AccountConcurrency:  10,
 			FunctionConcurrency: 5,
 		},
@@ -2369,17 +2350,17 @@ func TestBacklogRefillWithDisabledConstraintChecks(t *testing.T) {
 	var cm constraintapi.CapacityManager = &testRolloutManager{}
 	rolloutManager := constraintapi.NewRolloutManager(cm, QueueDefaultKey, "rl")
 
-	q := NewQueue(
-		shard,
-		WithClock(clock),
-		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+	_, shard := newQueue(
+		t, rc,
+		osqueue.WithClock(clock),
+		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 			return true
 		}),
-		WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
+		osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
 			return true, true
 		}),
-		WithCapacityManager(rolloutManager),
-		WithPartitionConstraintConfigGetter(func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
+		osqueue.WithCapacityManager(rolloutManager),
+		osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
 			return constraints
 		}),
 	)
@@ -2409,20 +2390,20 @@ func TestBacklogRefillWithDisabledConstraintChecks(t *testing.T) {
 
 	start := time.Now().Truncate(time.Second)
 
-	item1, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi, start, osqueue.EnqueueOpts{})
+	item1, err := shard.EnqueueItem(ctx, qi, start, osqueue.EnqueueOpts{})
 	require.NoError(t, err)
-	item2, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi, start, osqueue.EnqueueOpts{})
+	item2, err := shard.EnqueueItem(ctx, qi, start, osqueue.EnqueueOpts{})
 	require.NoError(t, err)
-	item3, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi, start, osqueue.EnqueueOpts{})
+	item3, err := shard.EnqueueItem(ctx, qi, start, osqueue.EnqueueOpts{})
 	require.NoError(t, err)
 
-	backlog := q.ItemBacklog(ctx, item1)
+	backlog := osqueue.ItemBacklog(ctx, item1)
 	require.NotNil(t, backlog.Throttle)
 
-	shadowPart := q.ItemShadowPartition(ctx, item1)
+	shadowPart := osqueue.ItemShadowPartition(ctx, item1)
 
 	// Refill once, should work
-	res, err := q.BacklogRefill(ctx, &backlog, &shadowPart, clock.Now().Add(time.Minute), []string{item1.ID}, constraints)
+	res, err := shard.BacklogRefill(ctx, &backlog, &shadowPart, clock.Now().Add(time.Minute), []string{item1.ID}, constraints)
 	require.NoError(t, err)
 	require.Equal(t, 1, res.Refill) // refill gets adjusted to constraint
 	require.Equal(t, 1, res.Capacity)
@@ -2430,7 +2411,7 @@ func TestBacklogRefillWithDisabledConstraintChecks(t *testing.T) {
 	require.Equal(t, enums.QueueConstraintNotLimited, res.Constraint)
 
 	// Refill again, should fail due throttle
-	res, err = q.BacklogRefill(ctx, &backlog, &shadowPart, clock.Now().Add(time.Minute), []string{item2.ID}, constraints)
+	res, err = shard.BacklogRefill(ctx, &backlog, &shadowPart, clock.Now().Add(time.Minute), []string{item2.ID}, constraints)
 	require.NoError(t, err)
 	require.Equal(t, 0, res.Refill) // refill gets adjusted to constraint
 
@@ -2441,22 +2422,22 @@ func TestBacklogRefillWithDisabledConstraintChecks(t *testing.T) {
 	// Set idempotency key
 	idempotencyKey := "random string for backlog operation"
 	keyConstraintCheckIdempotency := rolloutManager.KeyConstraintCheckIdempotency(constraintapi.MigrationIdentifier{
-		QueueShard: shard.Name,
+		QueueShard: shard.Name(),
 	}, accountID, idempotencyKey)
 
 	err = r.Set(keyConstraintCheckIdempotency, strconv.Itoa(int(clock.Now().UnixMilli())))
 	require.NoError(t, err)
 
 	// Refill with idempotency should work
-	res, err = q.BacklogRefill(
+	res, err = shard.BacklogRefill(
 		ctx,
 		&backlog,
 		&shadowPart,
 		clock.Now().Add(time.Minute),
 		[]string{item2.ID},
 		constraints,
-		WithBacklogRefillDisableConstraintChecks(false),
-		WithBacklogRefillConstraintCheckIdempotencyKey(idempotencyKey),
+		osqueue.WithBacklogRefillDisableConstraintChecks(false),
+		osqueue.WithBacklogRefillConstraintCheckIdempotencyKey(idempotencyKey),
 	)
 	require.NoError(t, err)
 	require.Equal(t, 1, res.Refill)
@@ -2465,14 +2446,14 @@ func TestBacklogRefillWithDisabledConstraintChecks(t *testing.T) {
 	require.Equal(t, []string{item2.ID}, res.RefilledItems)
 
 	// Refill with ignoring checks should work
-	res, err = q.BacklogRefill(
+	res, err = shard.BacklogRefill(
 		ctx,
 		&backlog,
 		&shadowPart,
 		clock.Now().Add(time.Minute),
 		[]string{item3.ID},
 		constraints,
-		WithBacklogRefillDisableConstraintChecks(true),
+		osqueue.WithBacklogRefillDisableConstraintChecks(true),
 	)
 	require.NoError(t, err)
 	require.Equal(t, 1, res.Refill)
@@ -2492,23 +2473,21 @@ func TestBacklogRefillSetCapacityLease(t *testing.T) {
 
 	clock := clockwork.NewFakeClock()
 
-	shard := RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
-
-	constraints := PartitionConstraintConfig{
+	constraints := osqueue.PartitionConstraintConfig{
 		FunctionVersion: 1,
-		Concurrency: PartitionConcurrency{
+		Concurrency: osqueue.PartitionConcurrency{
 			AccountConcurrency:  10,
 			FunctionConcurrency: 5,
 		},
 	}
 
-	q := NewQueue(
-		shard,
-		WithClock(clock),
-		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+	q, shard := newQueue(
+		t, rc,
+		osqueue.WithClock(clock),
+		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 			return true
 		}),
-		WithPartitionConstraintConfigGetter(func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
+		osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
 			return constraints
 		}),
 	)
@@ -2531,18 +2510,18 @@ func TestBacklogRefillSetCapacityLease(t *testing.T) {
 
 	start := clock.Now()
 
-	item1, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi, start, osqueue.EnqueueOpts{})
+	item1, err := shard.EnqueueItem(ctx, qi, start, osqueue.EnqueueOpts{})
 	require.NoError(t, err)
 
-	item2, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi, start, osqueue.EnqueueOpts{})
+	item2, err := shard.EnqueueItem(ctx, qi, start, osqueue.EnqueueOpts{})
 	require.NoError(t, err)
 
-	item3, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi, start, osqueue.EnqueueOpts{})
+	item3, err := shard.EnqueueItem(ctx, qi, start, osqueue.EnqueueOpts{})
 	require.NoError(t, err)
 
-	backlog := q.ItemBacklog(ctx, item1)
+	backlog := osqueue.ItemBacklog(ctx, item1)
 
-	shadowPart := q.ItemShadowPartition(ctx, item1)
+	shadowPart := osqueue.ItemShadowPartition(ctx, item1)
 
 	capacityLeaseID := ulid.MustNew(ulid.Timestamp(clock.Now()), rand.Reader)
 	capacityLeaseID2 := ulid.MustNew(ulid.Timestamp(clock.Now()), rand.Reader)
@@ -2558,14 +2537,14 @@ func TestBacklogRefillSetCapacityLease(t *testing.T) {
 	}}
 
 	// Refill once, should work
-	res, err := q.BacklogRefill(
+	res, err := shard.BacklogRefill(
 		ctx,
 		&backlog,
 		&shadowPart,
 		clock.Now().Add(time.Minute),
 		refillItemIDs,
 		constraints,
-		WithBacklogRefillItemCapacityLeases(capacityLeaseIDs),
+		osqueue.WithBacklogRefillItemCapacityLeases(capacityLeaseIDs),
 	)
 	require.NoError(t, err)
 	require.Equal(t, 3, res.Refill) // refill gets adjusted to constraint
@@ -2573,19 +2552,19 @@ func TestBacklogRefillSetCapacityLease(t *testing.T) {
 	require.Equal(t, 3, res.Refilled)
 	require.Equal(t, enums.QueueConstraintNotLimited, res.Constraint)
 
-	loaded, err := q.ItemByID(ctx, item1.ID, WithQueueOpShard(shard))
+	loaded, err := q.ItemByID(ctx, shard, item1.ID)
 	require.NoError(t, err)
 	require.Equal(t, loaded.ID, item1.ID)
 	require.NotNil(t, loaded.CapacityLease)
 	require.Equal(t, capacityLeaseID, loaded.CapacityLease.LeaseID)
 
-	loaded, err = q.ItemByID(ctx, item2.ID, WithQueueOpShard(shard))
+	loaded, err = q.ItemByID(ctx, shard, item2.ID)
 	require.NoError(t, err)
 	require.Equal(t, loaded.ID, item2.ID)
 	require.NotNil(t, loaded.CapacityLease)
 	require.Equal(t, capacityLeaseID2, loaded.CapacityLease.LeaseID)
 
-	loaded, err = q.ItemByID(ctx, item3.ID, WithQueueOpShard(shard))
+	loaded, err = q.ItemByID(ctx, shard, item3.ID)
 	require.NoError(t, err)
 	require.Equal(t, loaded.ID, item3.ID)
 	require.NotNil(t, loaded.CapacityLease)
@@ -2608,33 +2587,31 @@ func TestPreventThrottleBacklogUnfairness(t *testing.T) {
 
 		clock := clockwork.NewFakeClock()
 
-		shard := RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
-		kg := shard.RedisClient.KeyGenerator()
-
-		constraints := PartitionConstraintConfig{
+		constraints := osqueue.PartitionConstraintConfig{
 			FunctionVersion: 1,
-			Throttle: &PartitionThrottle{
+			Throttle: &osqueue.PartitionThrottle{
 				ThrottleKeyExpressionHash: "expr-hash",
 				Limit:                     1,
 				Period:                    60,
 			},
-			Concurrency: PartitionConcurrency{
+			Concurrency: osqueue.PartitionConcurrency{
 				AccountConcurrency:  10,
 				FunctionConcurrency: 5,
 			},
 		}
 
-		q := NewQueue(
-			shard,
-			WithClock(clock),
-			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+		q, shard := newQueue(
+			t, rc,
+			osqueue.WithClock(clock),
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 				return true
 			}),
-			WithPartitionConstraintConfigGetter(func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
+			osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
 				return constraints
 			}),
-			WithLogger(l),
+			osqueue.WithLogger(l),
 		)
+		kg := shard.Client().kg
 
 		accountID := uuid.New()
 		fnID := uuid.New()
@@ -2660,7 +2637,7 @@ func TestPreventThrottleBacklogUnfairness(t *testing.T) {
 
 		start := clock.Now()
 
-		item1, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi, start, osqueue.EnqueueOpts{})
+		item1, err := shard.EnqueueItem(ctx, qi, start, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
 		qi2 := osqueue.QueueItem{
@@ -2676,16 +2653,16 @@ func TestPreventThrottleBacklogUnfairness(t *testing.T) {
 			},
 		}
 
-		item2, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi2, start, osqueue.EnqueueOpts{})
+		item2, err := shard.EnqueueItem(ctx, qi2, start, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
-		shadowPart := q.ItemShadowPartition(ctx, item1)
+		shadowPart := osqueue.ItemShadowPartition(ctx, item1)
 
 		// This should be the throttle key backlog
-		b := q.ItemBacklog(ctx, item1)
+		b := osqueue.ItemBacklog(ctx, item1)
 
 		// This should be the "default" function backlog
-		b2 := q.ItemBacklog(ctx, item2)
+		b2 := osqueue.ItemBacklog(ctx, item2)
 
 		require.Nil(t, shadowPart.DefaultBacklog(constraints, true))
 
@@ -2711,7 +2688,7 @@ func TestPreventThrottleBacklogUnfairness(t *testing.T) {
 
 		require.False(t, r.Exists(kg.PartitionQueueSet(enums.PartitionTypeDefault, fnID.String(), "")))
 
-		err = q.processShadowPartition(ctx, &shadowPart, 0)
+		err = q.ProcessShadowPartition(ctx, &shadowPart, 0)
 		require.NoError(t, err, "expected to refill from both backlogs", r.Dump())
 
 		require.True(t, r.Exists(kg.PartitionQueueSet(enums.PartitionTypeDefault, fnID.String(), "")))
@@ -2737,33 +2714,31 @@ func TestPreventThrottleBacklogUnfairness(t *testing.T) {
 
 		clock := clockwork.NewFakeClock()
 
-		shard := RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
-		kg := shard.RedisClient.KeyGenerator()
-
-		constraints := PartitionConstraintConfig{
+		constraints := osqueue.PartitionConstraintConfig{
 			FunctionVersion: 1,
-			Throttle: &PartitionThrottle{
+			Throttle: &osqueue.PartitionThrottle{
 				ThrottleKeyExpressionHash: "expr-hash",
 				Limit:                     1,
 				Period:                    60,
 			},
-			Concurrency: PartitionConcurrency{
+			Concurrency: osqueue.PartitionConcurrency{
 				AccountConcurrency:  10,
 				FunctionConcurrency: 1, // ensure we can only refill a single item
 			},
 		}
 
-		q := NewQueue(
-			shard,
-			WithClock(clock),
-			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+		q, shard := newQueue(
+			t, rc,
+			osqueue.WithClock(clock),
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 				return true
 			}),
-			WithPartitionConstraintConfigGetter(func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
+			osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
 				return constraints
 			}),
-			WithLogger(l),
+			osqueue.WithLogger(l),
 		)
+		kg := shard.Client().kg
 
 		accountID := uuid.New()
 		fnID := uuid.New()
@@ -2789,7 +2764,7 @@ func TestPreventThrottleBacklogUnfairness(t *testing.T) {
 			},
 		}
 
-		item1, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi, start, osqueue.EnqueueOpts{})
+		item1, err := shard.EnqueueItem(ctx, qi, start, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
 		amount := 1000
@@ -2813,7 +2788,7 @@ func TestPreventThrottleBacklogUnfairness(t *testing.T) {
 				},
 			}
 
-			_, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi, start, osqueue.EnqueueOpts{})
+			_, err := shard.EnqueueItem(ctx, qi, start, osqueue.EnqueueOpts{})
 			require.NoError(t, err)
 		}
 
@@ -2833,16 +2808,16 @@ func TestPreventThrottleBacklogUnfairness(t *testing.T) {
 		// Insert default backlog LATER than other items, but still early enough to get peeked for refilling (+2s)
 		// This is to make the test case more extreme: We should always expect the default backlog to be processed,
 		// ensuring we continue processing items to wrap up existing runs
-		item2, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi2, start.Add(time.Second), osqueue.EnqueueOpts{})
+		item2, err := shard.EnqueueItem(ctx, qi2, start.Add(time.Second), osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
-		shadowPart := q.ItemShadowPartition(ctx, item1)
+		shadowPart := osqueue.ItemShadowPartition(ctx, item1)
 
 		// This should be the throttle key backlog
-		b := q.ItemBacklog(ctx, item1)
+		b := osqueue.ItemBacklog(ctx, item1)
 
 		// This should be the "default" function backlog
-		b2 := q.ItemBacklog(ctx, item2)
+		b2 := osqueue.ItemBacklog(ctx, item2)
 
 		require.Nil(t, shadowPart.DefaultBacklog(constraints, true))
 
@@ -2868,7 +2843,7 @@ func TestPreventThrottleBacklogUnfairness(t *testing.T) {
 
 		require.False(t, r.Exists(kg.PartitionQueueSet(enums.PartitionTypeDefault, fnID.String(), "")))
 
-		err = q.processShadowPartition(ctx, &shadowPart, 0)
+		err = q.ProcessShadowPartition(ctx, &shadowPart, 0)
 		require.NoError(t, err, "expected to refill from both backlogs", r.Dump())
 
 		require.True(t, r.Exists(kg.PartitionQueueSet(enums.PartitionTypeDefault, fnID.String(), "")))

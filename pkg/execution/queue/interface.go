@@ -151,6 +151,15 @@ type QueueManager interface {
 	ProcessPartition(ctx context.Context, p *QueuePartition, continuationCount uint, randomOffset bool) error
 
 	ScanShadowPartitions(ctx context.Context, until time.Time, qspc chan ShadowPartitionChanMsg) error
+	ProcessShadowPartition(ctx context.Context, shadowPart *QueueShadowPartition, continuationCount uint) error
+
+	ProcessShadowPartitionBacklog(
+		ctx context.Context,
+		shadowPart *QueueShadowPartition,
+		backlog *QueueBacklog,
+		refillUntil time.Time,
+		constraints PartitionConstraintConfig,
+	) (*BacklogRefillResult, bool, error)
 }
 
 type QueueProcessor interface {
@@ -162,8 +171,9 @@ type QueueProcessor interface {
 	SequentialLease() *ulid.ULID
 
 	ShadowPartitionWorkers() chan ShadowPartitionChanMsg
-
-	ShadowContinues
+	AddShadowContinue(ctx context.Context, p *QueueShadowPartition, ctr uint)
+	GetShadowContinuations() map[string]ShadowContinuation
+	ClearShadowContinuations()
 }
 
 type ShardOperations interface {
