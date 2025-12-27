@@ -10,6 +10,7 @@ import (
 
 	"github.com/VividCortex/ewma"
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/jonboulle/clockwork"
 	"github.com/oklog/ulid/v2"
@@ -241,8 +242,23 @@ func (q *queueProcessor) LoadQueueItem(ctx context.Context, shardName string, it
 }
 
 // PartitionBacklogSize implements QueueManager.
-func (q *queueProcessor) PartitionBacklogSize(ctx context.Context, shard QueueShard, partitionID string) (int64, error) {
-	return shard.PartitionBacklogSize(ctx, partitionID)
+func (q *queueProcessor) PartitionBacklogSize(ctx context.Context, partitionID string) (int64, error) {
+	var totalCount int64
+
+	err := q.AllShards(ctx, func(ctx context.Context, shard QueueShard) error {
+		backlogSize, err := shard.PartitionBacklogSize(ctx, partitionID)
+		if err != nil {
+			return fmt.Errorf("could not load partition backlog size: %w", err)
+		}
+		l := logger.StdlibLogger(ctx)
+		l.Trace("retrieved backlog size", "size", backlogSize)
+		atomic.AddInt64(&totalCount, int64(backlogSize))
+		return nil
+	})
+	if err != nil {
+		return 0, fmt.Errorf("could not load partition backlog size: %w", err)
+	}
+	return totalCount, nil
 }
 
 // PartitionByID implements QueueManager.
@@ -278,12 +294,14 @@ func (q *queueProcessor) TotalSystemQueueDepth(ctx context.Context, shard QueueS
 func (q *queueProcessor) AllShards(ctx context.Context, fn func(context.Context, QueueShard) error) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
+	l := logger.StdlibLogger(ctx)
 
 	eg, ctx := errgroup.WithContext(ctx)
 
 	for shardName, qs := range q.queueShardClients {
 		eg.Go(func() error {
-			err := fn(ctx, qs)
+			l := l.With("shard_name", shardName)
+			err := fn(logger.WithStdlib(ctx, l), qs)
 			if err != nil {
 				return fmt.Errorf("map operation on shard %q failed: %w", shardName, err)
 			}
