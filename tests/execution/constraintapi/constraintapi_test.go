@@ -42,8 +42,7 @@ func TestConstraintEnforcement(t *testing.T) {
 		r     *miniredis.Miniredis
 		rc    rueidis.Client
 
-		q     redis_state.QueueProcessor
-		shard redis_state.RedisQueueShard
+		shard queue.ShardOperations
 
 		exec execution.Executor
 
@@ -57,7 +56,7 @@ func TestConstraintEnforcement(t *testing.T) {
 		amount           int
 		config           constraintapi.ConstraintConfig
 		constraints      []constraintapi.ConstraintItem
-		queueConstraints redis_state.PartitionConstraintConfig
+		queueConstraints queue.PartitionConstraintConfig
 		mi               constraintapi.MigrationIdentifier
 
 		beforeAcquire func(t *testing.T, deps *deps)
@@ -102,12 +101,11 @@ func TestConstraintEnforcement(t *testing.T) {
 			},
 			beforeAcquire: func(t *testing.T, deps *deps) {
 				clock := deps.clock
-				q := deps.q
+				q := deps.shard
 				// Simulate existing concurrency usage (in progress item Leased by queue)
 				for i := range 5 { // 5/10
 					qi, err := q.EnqueueItem(
 						context.Background(),
-						deps.shard,
 						queue.QueueItem{
 							ID:          fmt.Sprintf("item%d", i),
 							FunctionID:  fnID,
@@ -161,13 +159,12 @@ func TestConstraintEnforcement(t *testing.T) {
 			},
 			beforeAcquire: func(t *testing.T, deps *deps) {
 				clock := deps.clock
-				q := deps.q
+				q := deps.shard
 
 				// Simulate existing concurrency usage (in progress item Leased by queue)
 				for i := range 5 { // 5/10
 					qi, err := q.EnqueueItem(
 						context.Background(),
-						deps.shard,
 						queue.QueueItem{
 							ID:          fmt.Sprintf("item%d", i),
 							FunctionID:  fnID,
@@ -227,9 +224,9 @@ func TestConstraintEnforcement(t *testing.T) {
 					},
 				},
 			},
-			queueConstraints: redis_state.PartitionConstraintConfig{
+			queueConstraints: queue.PartitionConstraintConfig{
 				FunctionVersion: 1,
-				Throttle: &redis_state.PartitionThrottle{
+				Throttle: &queue.PartitionThrottle{
 					ThrottleKeyExpressionHash: "expr-hash",
 					Period:                    60,
 					Limit:                     1,
@@ -241,7 +238,7 @@ func TestConstraintEnforcement(t *testing.T) {
 			},
 			beforeAcquire: func(t *testing.T, deps *deps) {
 				clock := deps.clock
-				q := deps.q
+				q := deps.shard
 				r := deps.r
 
 				for i := range 1 {
@@ -252,7 +249,6 @@ func TestConstraintEnforcement(t *testing.T) {
 					// Simulate existing throttle usage
 					qi, err := q.EnqueueItem(
 						context.Background(),
-						deps.shard,
 						queue.QueueItem{
 							ID:          fmt.Sprintf("item%d", i),
 							FunctionID:  fnID,
@@ -309,7 +305,7 @@ func TestConstraintEnforcement(t *testing.T) {
 					},
 				},
 			},
-			queueConstraints: redis_state.PartitionConstraintConfig{
+			queueConstraints: queue.PartitionConstraintConfig{
 				FunctionVersion: 1,
 			},
 			constraints: []constraintapi.ConstraintItem{
@@ -401,7 +397,7 @@ func TestConstraintEnforcement(t *testing.T) {
 					},
 				},
 			},
-			queueConstraints: redis_state.PartitionConstraintConfig{
+			queueConstraints: queue.PartitionConstraintConfig{
 				FunctionVersion: 1,
 			},
 			constraints: []constraintapi.ConstraintItem{
@@ -530,27 +526,32 @@ func TestConstraintEnforcement(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, cm)
 
-			defaultShard := redis_state.RedisQueueShard{
-				Kind:        string(enums.QueueShardKindRedis),
-				Name:        "test",
-				RedisClient: redis_state.NewQueueClient(rc, "q:v1"),
-			}
-			q := redis_state.NewQueue(defaultShard,
-				redis_state.WithClock(clock),
-				redis_state.WithQueueShardClients(map[string]redis_state.RedisQueueShard{
-					"test": defaultShard,
-				}),
-				redis_state.WithShardSelector(func(ctx context.Context, accountId uuid.UUID, queueName *string) (redis_state.RedisQueueShard, error) {
-					return defaultShard, nil
-				}),
-				redis_state.WithCapacityManager(cm),
-				redis_state.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (bool, bool) {
+			queueOpts := []queue.QueueOpt{
+				queue.WithClock(clock),
+				queue.WithCapacityManager(cm),
+				queue.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (bool, bool) {
 					return true, true
 				}),
-				redis_state.WithPartitionConstraintConfigGetter(func(ctx context.Context, p redis_state.PartitionIdentifier) redis_state.PartitionConstraintConfig {
+				queue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p queue.PartitionIdentifier) queue.PartitionConstraintConfig {
 					return test.queueConstraints
 				}),
+			}
+			queueOptions := queue.NewQueueOptions(ctx, queueOpts...)
+			shard := redis_state.NewRedisQueue(*queueOptions, "test", redis_state.NewQueueClient(rc, "q:v1"))
+
+			q, err := queue.NewQueueProcessor(
+				ctx,
+				"test-queue",
+				shard,
+				map[string]queue.QueueShard{
+					shard.Name(): shard,
+				},
+				func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
+					return shard, nil
+				},
+				queueOpts...,
 			)
+			require.NoError(t, err)
 
 			rl := ratelimit.New(ctx, rc, "{rl}:")
 
@@ -571,7 +572,7 @@ func TestConstraintEnforcement(t *testing.T) {
 			require.NoError(t, err)
 			exec, err := executor.NewExecutor(
 				executor.WithRateLimiter(rl),
-				executor.WithAssignedQueueShard(defaultShard),
+				executor.WithAssignedQueueShard(shard),
 				executor.WithQueue(q),
 				executor.WithStateManager(redis_state.MustRunServiceV2(sm)),
 				executor.WithPauseManager(pauses.NewRedisOnlyManager(sm)),
@@ -595,8 +596,7 @@ func TestConstraintEnforcement(t *testing.T) {
 				clock:       clock,
 				r:           r,
 				rc:          rc,
-				q:           q,
-				shard:       defaultShard,
+				shard:       shard,
 				exec:        exec,
 			}
 
@@ -742,8 +742,8 @@ func TestQueueConstraintAPICompatibility(t *testing.T) {
 				},
 			},
 		}
-		partitionConstraints := redis_state.PartitionConstraintConfig{
-			Concurrency: redis_state.PartitionConcurrency{
+		partitionConstraints := queue.PartitionConstraintConfig{
+			Concurrency: queue.PartitionConcurrency{
 				AccountConcurrency: 10,
 			},
 		}
@@ -762,27 +762,18 @@ func TestQueueConstraintAPICompatibility(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, cm)
 
-		defaultShard := redis_state.RedisQueueShard{
-			Kind:        string(enums.QueueShardKindRedis),
-			Name:        "test",
-			RedisClient: redis_state.NewQueueClient(rc, "q:v1"),
-		}
-		q := redis_state.NewQueue(defaultShard,
-			redis_state.WithClock(clock),
-			redis_state.WithQueueShardClients(map[string]redis_state.RedisQueueShard{
-				"test": defaultShard,
-			}),
-			redis_state.WithShardSelector(func(ctx context.Context, accountId uuid.UUID, queueName *string) (redis_state.RedisQueueShard, error) {
-				return defaultShard, nil
-			}),
-			redis_state.WithCapacityManager(cm),
-			redis_state.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (bool, bool) {
+		queueOpts := []queue.QueueOpt{
+			queue.WithClock(clock),
+			queue.WithCapacityManager(cm),
+			queue.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (bool, bool) {
 				return true, true
 			}),
-			redis_state.WithPartitionConstraintConfigGetter(func(ctx context.Context, p redis_state.PartitionIdentifier) redis_state.PartitionConstraintConfig {
+			queue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p queue.PartitionIdentifier) queue.PartitionConstraintConfig {
 				return partitionConstraints
 			}),
-		)
+		}
+		queueOptions := queue.NewQueueOptions(ctx, queueOpts...)
+		shard := redis_state.NewRedisQueue(*queueOptions, "test", redis_state.NewQueueClient(rc, "q:v1"))
 
 		amount := 10
 
@@ -820,9 +811,8 @@ func TestQueueConstraintAPICompatibility(t *testing.T) {
 		// Leasing should fail
 		for i := range 1 {
 			// Simulate existing throttle usage
-			qi, err := q.EnqueueItem(
+			qi, err := shard.EnqueueItem(
 				context.Background(),
-				defaultShard,
 				queue.QueueItem{
 					ID:          fmt.Sprintf("item%d", i),
 					FunctionID:  fnID,
@@ -843,7 +833,7 @@ func TestQueueConstraintAPICompatibility(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, qi)
 
-			leaseID, err := q.Lease(context.Background(), qi, 5*time.Second, clock.Now(), nil)
+			leaseID, err := shard.Lease(context.Background(), qi, 5*time.Second, clock.Now(), nil)
 			require.Error(t, err)
 			require.Nil(t, leaseID)
 			require.ErrorContains(t, err, "at account concurrency limit")
@@ -882,8 +872,8 @@ func TestQueueConstraintAPICompatibility(t *testing.T) {
 				},
 			},
 		}
-		partitionConstraints := redis_state.PartitionConstraintConfig{
-			Concurrency: redis_state.PartitionConcurrency{
+		partitionConstraints := queue.PartitionConstraintConfig{
+			Concurrency: queue.PartitionConcurrency{
 				AccountConcurrency: 10,
 			},
 		}
@@ -902,27 +892,18 @@ func TestQueueConstraintAPICompatibility(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, cm)
 
-		defaultShard := redis_state.RedisQueueShard{
-			Kind:        string(enums.QueueShardKindRedis),
-			Name:        "test",
-			RedisClient: redis_state.NewQueueClient(rc, "q:v1"),
-		}
-		q := redis_state.NewQueue(defaultShard,
-			redis_state.WithClock(clock),
-			redis_state.WithQueueShardClients(map[string]redis_state.RedisQueueShard{
-				"test": defaultShard,
-			}),
-			redis_state.WithShardSelector(func(ctx context.Context, accountId uuid.UUID, queueName *string) (redis_state.RedisQueueShard, error) {
-				return defaultShard, nil
-			}),
-			redis_state.WithCapacityManager(cm),
-			redis_state.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (bool, bool) {
+		queueOpts := []queue.QueueOpt{
+			queue.WithClock(clock),
+			queue.WithCapacityManager(cm),
+			queue.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (bool, bool) {
 				return true, true
 			}),
-			redis_state.WithPartitionConstraintConfigGetter(func(ctx context.Context, p redis_state.PartitionIdentifier) redis_state.PartitionConstraintConfig {
+			queue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p queue.PartitionIdentifier) queue.PartitionConstraintConfig {
 				return partitionConstraints
 			}),
-		)
+		}
+		queueOptions := queue.NewQueueOptions(ctx, queueOpts...)
+		shard := redis_state.NewRedisQueue(*queueOptions, "test", redis_state.NewQueueClient(rc, "q:v1"))
 
 		amount := 10
 
@@ -957,9 +938,8 @@ func TestQueueConstraintAPICompatibility(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, acquireResp.Leases, 10)
 
-		qi, err := q.EnqueueItem(
+		qi, err := shard.EnqueueItem(
 			context.Background(),
-			defaultShard,
 			queue.QueueItem{
 				ID:          "item0",
 				FunctionID:  fnID,
@@ -980,19 +960,19 @@ func TestQueueConstraintAPICompatibility(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, qi)
 
-		p := q.ItemPartition(ctx, defaultShard, qi)
+		p := queue.ItemPartition(ctx, qi)
 
 		// Reject when enforcing checks -> This verifies PartitionLease also considers in progress leases.
 		// This is relevant during a rollout or when enabling the feature flag for an account, as propagation
 		// may take a while. During this time, executors must respect the leases generated by other executors using the Constraint API already.
-		leaseID, capacity, err := q.PartitionLease(ctx, &p, 5*time.Second)
+		leaseID, capacity, err := shard.PartitionLease(ctx, &p, 5*time.Second)
 		require.Error(t, err)
 		require.ErrorContains(t, err, "at account concurrency limit")
 		require.Nil(t, leaseID)
 		require.Zero(t, capacity)
 
 		// Allow when skipping checks
-		leaseID, _, err = q.PartitionLease(ctx, &p, 5*time.Second, redis_state.PartitionLeaseOptionDisableLeaseChecks(true))
+		leaseID, _, err = shard.PartitionLease(ctx, &p, 5*time.Second, queue.PartitionLeaseOptionDisableLeaseChecks(true))
 		require.NoError(t, err)
 		require.NotNil(t, leaseID)
 	})
@@ -1052,11 +1032,11 @@ func TestQueueConstraintAPICompatibility(t *testing.T) {
 			Period:            60,
 		}
 
-		partitionConstraints := redis_state.PartitionConstraintConfig{
-			Concurrency: redis_state.PartitionConcurrency{
+		partitionConstraints := queue.PartitionConstraintConfig{
+			Concurrency: queue.PartitionConcurrency{
 				AccountConcurrency: 10,
 			},
-			Throttle: &redis_state.PartitionThrottle{
+			Throttle: &queue.PartitionThrottle{
 				ThrottleKeyExpressionHash: "expr-hash",
 				Limit:                     5,
 				Period:                    60,
@@ -1077,31 +1057,21 @@ func TestQueueConstraintAPICompatibility(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, cm)
 
-		defaultShard := redis_state.RedisQueueShard{
-			Kind:        string(enums.QueueShardKindRedis),
-			Name:        "test",
-			RedisClient: redis_state.NewQueueClient(rc, "q:v1"),
-		}
-		q := redis_state.NewQueue(defaultShard,
-			redis_state.WithClock(clock),
-			redis_state.WithQueueShardClients(map[string]redis_state.RedisQueueShard{
-				"test": defaultShard,
-			}),
-			redis_state.WithShardSelector(func(ctx context.Context, accountId uuid.UUID, queueName *string) (redis_state.RedisQueueShard, error) {
-				return defaultShard, nil
-			}),
-			redis_state.WithCapacityManager(cm),
-			redis_state.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (bool, bool) {
+		queueOpts := []queue.QueueOpt{
+			queue.WithClock(clock),
+			queue.WithCapacityManager(cm),
+			queue.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (bool, bool) {
 				return true, true
 			}),
-			redis_state.WithPartitionConstraintConfigGetter(func(ctx context.Context, p redis_state.PartitionIdentifier) redis_state.PartitionConstraintConfig {
+			queue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p queue.PartitionIdentifier) queue.PartitionConstraintConfig {
 				return partitionConstraints
 			}),
-		)
+		}
+		queueOptions := queue.NewQueueOptions(ctx, queueOpts...)
+		shard := redis_state.NewRedisQueue(*queueOptions, "test", redis_state.NewQueueClient(rc, "q:v1"))
 
-		qi, err := q.EnqueueItem(
+		qi, err := shard.EnqueueItem(
 			context.Background(),
-			defaultShard,
 			queue.QueueItem{
 				ID:          "item0",
 				FunctionID:  fnID,
@@ -1123,9 +1093,8 @@ func TestQueueConstraintAPICompatibility(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, qi)
 
-		qi2, err := q.EnqueueItem(
+		qi2, err := shard.EnqueueItem(
 			context.Background(),
-			defaultShard,
 			queue.QueueItem{
 				ID:          "other-item",
 				FunctionID:  fnID,
@@ -1192,12 +1161,12 @@ func TestQueueConstraintAPICompatibility(t *testing.T) {
 
 		// Expect constraint check idempotency to be set
 		keyConstraintCheckIdempotency := cm.KeyConstraintCheckIdempotency(constraintapi.MigrationIdentifier{
-			QueueShard: defaultShard.Name,
+			QueueShard: shard.Name(),
 		}, accountID, util.XXHash("item0"))
 		require.True(t, r.Exists(keyConstraintCheckIdempotency))
 
 		// Should work because we handle constraint check idempotency
-		leaseID, err := q.Lease(ctx, qi, 5*time.Second, clock.Now(), nil)
+		leaseID, err := shard.Lease(ctx, qi, 5*time.Second, clock.Now(), nil)
 		require.NoError(t, err)
 		require.NotNil(t, leaseID)
 
@@ -1213,7 +1182,7 @@ func TestQueueConstraintAPICompatibility(t *testing.T) {
 		// NOTE: This is allowed for the time being as the legacy gcra() implementation uses period_ms for `variance`
 		// As soon as we migrate gcra() to use `emission` instead of `period_ms`, we will be limited as expected.
 		// For more details, see https://github.com/inngest/inngest/pull/3356
-		leaseID, err = q.Lease(ctx, qi2, 5*time.Second, clock.Now(), nil)
+		leaseID, err = shard.Lease(ctx, qi2, 5*time.Second, clock.Now(), nil)
 		// TODO: Once gcra() is fixed and this test fails, remove the following assertions and use the commented out assertions instead
 		require.NoError(t, err)
 		require.NotNil(t, leaseID)
@@ -1268,12 +1237,12 @@ func TestQueueConstraintAPICompatibility(t *testing.T) {
 				},
 			},
 		}
-		partitionConstraints := redis_state.PartitionConstraintConfig{
+		partitionConstraints := queue.PartitionConstraintConfig{
 			FunctionVersion: 1,
-			Concurrency: redis_state.PartitionConcurrency{
+			Concurrency: queue.PartitionConcurrency{
 				AccountConcurrency: 10,
 			},
-			Throttle: &redis_state.PartitionThrottle{
+			Throttle: &queue.PartitionThrottle{
 				ThrottleKeyExpressionHash: "expr-hash",
 				Limit:                     5,
 				Period:                    60,
@@ -1294,30 +1263,21 @@ func TestQueueConstraintAPICompatibility(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, cm)
 
-		shard := redis_state.RedisQueueShard{
-			Kind:        string(enums.QueueShardKindRedis),
-			Name:        "test",
-			RedisClient: redis_state.NewQueueClient(rc, "q:v1"),
-		}
-		q := redis_state.NewQueue(shard,
-			redis_state.WithClock(clock),
-			redis_state.WithQueueShardClients(map[string]redis_state.RedisQueueShard{
-				"test": shard,
-			}),
-			redis_state.WithShardSelector(func(ctx context.Context, accountId uuid.UUID, queueName *string) (redis_state.RedisQueueShard, error) {
-				return shard, nil
-			}),
-			redis_state.WithCapacityManager(cm),
-			redis_state.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (bool, bool) {
+		queueOpts := []queue.QueueOpt{
+			queue.WithClock(clock),
+			queue.WithCapacityManager(cm),
+			queue.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (bool, bool) {
 				return true, true
 			}),
-			redis_state.WithPartitionConstraintConfigGetter(func(ctx context.Context, p redis_state.PartitionIdentifier) redis_state.PartitionConstraintConfig {
+			queue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p queue.PartitionIdentifier) queue.PartitionConstraintConfig {
 				return partitionConstraints
 			}),
-			redis_state.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+			queue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 				return true
 			}),
-		)
+		}
+		queueOptions := queue.NewQueueOptions(ctx, queueOpts...)
+		shard := redis_state.NewRedisQueue(*queueOptions, "test", redis_state.NewQueueClient(rc, "q:v1"))
 
 		amount := 4
 
@@ -1329,7 +1289,7 @@ func TestQueueConstraintAPICompatibility(t *testing.T) {
 		// Claim concurrency capacity
 		acquireResp, err := cm.Acquire(ctx, &constraintapi.CapacityAcquireRequest{
 			Migration: constraintapi.MigrationIdentifier{
-				QueueShard: shard.Name,
+				QueueShard: shard.Name(),
 			},
 			AccountID:            accountID,
 			IdempotencyKey:       "acquire",
@@ -1352,9 +1312,8 @@ func TestQueueConstraintAPICompatibility(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, acquireResp.Leases, amount)
 
-		qi, err := q.EnqueueItem(
+		qi, err := shard.EnqueueItem(
 			context.Background(),
-			shard,
 			queue.QueueItem{
 				ID:          "item0",
 				FunctionID:  fnID,
@@ -1381,9 +1340,8 @@ func TestQueueConstraintAPICompatibility(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, qi)
 
-		qi2, err := q.EnqueueItem(
+		qi2, err := shard.EnqueueItem(
 			context.Background(),
-			shard,
 			queue.QueueItem{
 				ID:          "other-item",
 				FunctionID:  fnID,
@@ -1423,38 +1381,38 @@ func TestQueueConstraintAPICompatibility(t *testing.T) {
 
 		// Expect constraint check idempotency to be set
 		keyConstraintCheckIdempotency := cm.KeyConstraintCheckIdempotency(constraintapi.MigrationIdentifier{
-			QueueShard: shard.Name,
+			QueueShard: shard.Name(),
 		}, accountID, "item0")
 		require.True(t, r.Exists(keyConstraintCheckIdempotency))
 
-		b := q.ItemBacklog(ctx, qi)
+		b := queue.ItemBacklog(ctx, qi)
 		require.NotNil(t, b.Throttle)
 
-		sp := q.ItemShadowPartition(ctx, qi)
+		sp := queue.ItemShadowPartition(ctx, qi)
 
 		// Item should be refilled
-		res, err := q.BacklogRefill(ctx, &b, &sp, clock.Now().Add(5*time.Second), []string{qi.ID}, partitionConstraints)
+		res, err := shard.BacklogRefill(ctx, &b, &sp, clock.Now().Add(5*time.Second), []string{qi.ID}, partitionConstraints)
 		require.NoError(t, err)
 		require.Equal(t, 1, res.Refill)
 		require.Equal(t, 1, res.Refilled)
 		require.Equal(t, qi.ID, res.RefilledItems[0])
 
 		// Other item should fail
-		res, err = q.BacklogRefill(ctx, &b, &sp, clock.Now().Add(5*time.Second), []string{qi2.ID}, partitionConstraints)
+		res, err = shard.BacklogRefill(ctx, &b, &sp, clock.Now().Add(5*time.Second), []string{qi2.ID}, partitionConstraints)
 		require.NoError(t, err)
 		require.Equal(t, enums.QueueConstraintThrottle, res.Constraint)
 		require.Equal(t, 0, res.Refill)
 		require.Equal(t, 0, res.Refilled)
 
 		// Should succeed when skipping constraint checks
-		res, err = q.BacklogRefill(
+		res, err = shard.BacklogRefill(
 			ctx,
 			&b,
 			&sp,
 			clock.Now().Add(5*time.Second),
 			[]string{qi2.ID},
 			partitionConstraints,
-			redis_state.WithBacklogRefillDisableConstraintChecks(true),
+			queue.WithBacklogRefillDisableConstraintChecks(true),
 		)
 		require.NoError(t, err)
 		require.Equal(t, enums.QueueConstraintNotLimited, res.Constraint)
@@ -1469,7 +1427,7 @@ func TestScheduleConstraintAPICompatibility(t *testing.T) {
 		// enforce gcra during acquire which sets constraint check idempotency key
 		// run rate limit with same constraint check idempotency key and verify it's ignored
 
-		queueConstraints := redis_state.PartitionConstraintConfig{
+		queueConstraints := queue.PartitionConstraintConfig{
 			FunctionVersion: 1,
 		}
 
@@ -1499,27 +1457,32 @@ func TestScheduleConstraintAPICompatibility(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, cm)
 
-		defaultShard := redis_state.RedisQueueShard{
-			Kind:        string(enums.QueueShardKindRedis),
-			Name:        "test",
-			RedisClient: redis_state.NewQueueClient(rc, "q:v1"),
-		}
-		q := redis_state.NewQueue(defaultShard,
-			redis_state.WithClock(clock),
-			redis_state.WithQueueShardClients(map[string]redis_state.RedisQueueShard{
-				"test": defaultShard,
-			}),
-			redis_state.WithShardSelector(func(ctx context.Context, accountId uuid.UUID, queueName *string) (redis_state.RedisQueueShard, error) {
-				return defaultShard, nil
-			}),
-			redis_state.WithCapacityManager(cm),
-			redis_state.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (bool, bool) {
+		queueOpts := []queue.QueueOpt{
+			queue.WithClock(clock),
+			queue.WithCapacityManager(cm),
+			queue.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (bool, bool) {
 				return true, true
 			}),
-			redis_state.WithPartitionConstraintConfigGetter(func(ctx context.Context, p redis_state.PartitionIdentifier) redis_state.PartitionConstraintConfig {
+			queue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p queue.PartitionIdentifier) queue.PartitionConstraintConfig {
 				return queueConstraints
 			}),
+		}
+		queueOptions := queue.NewQueueOptions(ctx, queueOpts...)
+		shard := redis_state.NewRedisQueue(*queueOptions, "test", redis_state.NewQueueClient(rc, "q:v1"))
+
+		q, err := queue.NewQueueProcessor(
+			ctx,
+			"test-queue",
+			shard,
+			map[string]queue.QueueShard{
+				shard.Name(): shard,
+			},
+			func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
+				return shard, nil
+			},
+			queueOpts...,
 		)
+		require.NoError(t, err)
 
 		rl := ratelimit.New(ctx, rc, "{rl}:")
 
@@ -1540,7 +1503,7 @@ func TestScheduleConstraintAPICompatibility(t *testing.T) {
 		require.NoError(t, err)
 		exec, err := executor.NewExecutor(
 			executor.WithRateLimiter(rl),
-			executor.WithAssignedQueueShard(defaultShard),
+			executor.WithAssignedQueueShard(shard),
 			executor.WithQueue(q),
 			executor.WithStateManager(redis_state.MustRunServiceV2(sm)),
 			executor.WithPauseManager(pauses.NewRedisOnlyManager(sm)),
@@ -1665,7 +1628,7 @@ func TestScheduleConstraintAPICompatibility(t *testing.T) {
 		// run rate limit on different idempotency key and check it still uses the same state
 		// this verifies we correctly and consistently enforce rate limits while we are rolling out or rolling back the Constraint API and it's partially used
 
-		queueConstraints := redis_state.PartitionConstraintConfig{
+		queueConstraints := queue.PartitionConstraintConfig{
 			FunctionVersion: 1,
 		}
 
@@ -1695,27 +1658,32 @@ func TestScheduleConstraintAPICompatibility(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, cm)
 
-		defaultShard := redis_state.RedisQueueShard{
-			Kind:        string(enums.QueueShardKindRedis),
-			Name:        "test",
-			RedisClient: redis_state.NewQueueClient(rc, "q:v1"),
-		}
-		q := redis_state.NewQueue(defaultShard,
-			redis_state.WithClock(clock),
-			redis_state.WithQueueShardClients(map[string]redis_state.RedisQueueShard{
-				"test": defaultShard,
-			}),
-			redis_state.WithShardSelector(func(ctx context.Context, accountId uuid.UUID, queueName *string) (redis_state.RedisQueueShard, error) {
-				return defaultShard, nil
-			}),
-			redis_state.WithCapacityManager(cm),
-			redis_state.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (bool, bool) {
+		queueOpts := []queue.QueueOpt{
+			queue.WithClock(clock),
+			queue.WithCapacityManager(cm),
+			queue.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (bool, bool) {
 				return true, true
 			}),
-			redis_state.WithPartitionConstraintConfigGetter(func(ctx context.Context, p redis_state.PartitionIdentifier) redis_state.PartitionConstraintConfig {
+			queue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p queue.PartitionIdentifier) queue.PartitionConstraintConfig {
 				return queueConstraints
 			}),
+		}
+		queueOptions := queue.NewQueueOptions(ctx, queueOpts...)
+		shard := redis_state.NewRedisQueue(*queueOptions, "test", redis_state.NewQueueClient(rc, "q:v1"))
+
+		q, err := queue.NewQueueProcessor(
+			ctx,
+			"test-queue",
+			shard,
+			map[string]queue.QueueShard{
+				shard.Name(): shard,
+			},
+			func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
+				return shard, nil
+			},
+			queueOpts...,
 		)
+		require.NoError(t, err)
 
 		rl := ratelimit.New(ctx, rc, "{rl}:")
 
@@ -1736,7 +1704,7 @@ func TestScheduleConstraintAPICompatibility(t *testing.T) {
 		require.NoError(t, err)
 		exec, err := executor.NewExecutor(
 			executor.WithRateLimiter(rl),
-			executor.WithAssignedQueueShard(defaultShard),
+			executor.WithAssignedQueueShard(shard),
 			executor.WithQueue(q),
 			executor.WithStateManager(redis_state.MustRunServiceV2(sm)),
 			executor.WithPauseManager(pauses.NewRedisOnlyManager(sm)),

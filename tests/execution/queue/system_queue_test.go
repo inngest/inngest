@@ -13,6 +13,7 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/batch"
 	"github.com/inngest/inngest/pkg/execution/debounce"
+	"github.com/inngest/inngest/pkg/execution/queue"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
@@ -40,23 +41,34 @@ func TestSystemQueueConfigs(t *testing.T) {
 
 	batchClient := redis_state.NewBatchClient(rc, redis_state.QueueDefaultKey)
 
-	defaultShard := redis_state.RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: redis_state.NewQueueClient(rc, redis_state.QueueDefaultKey), Name: consts.DefaultQueueShardName}
-	kg := defaultShard.RedisClient.KeyGenerator()
-
 	clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Second))
-	now := clock.Now()
-
-	q := redis_state.NewQueue(
-		defaultShard,
-		redis_state.WithClock(clock),
-		redis_state.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+	opts := []queue.QueueOpt{
+		queue.WithClock(clock),
+		queue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 			return false
 		}),
-		redis_state.WithKindToQueueMapping(mapping),
-		redis_state.WithShardSelector(func(ctx context.Context, accountId uuid.UUID, queueName *string) (redis_state.RedisQueueShard, error) {
-			return defaultShard, nil
-		}),
+		queue.WithKindToQueueMapping(mapping),
+	}
+
+	shard := redis_state.NewRedisQueue(*queue.NewQueueOptions(context.Background(), opts...), consts.DefaultQueueShardName, redis_state.NewQueueClient(rc, redis_state.QueueDefaultKey))
+
+	kg := shard.Client().KeyGenerator()
+
+	now := clock.Now()
+
+	q, err := queue.NewQueueProcessor(
+		context.Background(),
+		"test-queue",
+		shard,
+		map[string]osqueue.QueueShard{
+			shard.Name(): shard,
+		},
+		func(ctx context.Context, accountId uuid.UUID, queueName *string) (osqueue.QueueShard, error) {
+			return shard, nil
+		},
+		opts...,
 	)
+	require.NoError(t, err)
 	ctx := context.Background()
 
 	accountId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
@@ -94,7 +106,7 @@ func TestSystemQueueConfigs(t *testing.T) {
 		debouncer, err := debounce.NewRedisDebouncerWithMigration(debounce.DebouncerOpts{
 			PrimaryDebounceClient: redis_state.NewDebounceClient(rc, redis_state.QueueDefaultKey),
 			PrimaryQueue:          q,
-			PrimaryQueueShard:     defaultShard,
+			PrimaryQueueShard:     shard,
 			ShouldMigrate: func(ctx context.Context, accountID uuid.UUID) bool {
 				return false
 			},
