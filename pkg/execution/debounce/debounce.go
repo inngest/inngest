@@ -527,9 +527,19 @@ func (d debouncer) debounce(ctx context.Context, di DebounceItem, fn inngest.Fun
 		"evt_id", di.EventID.String(),
 		"ttl", ttl,
 		"timeout", fn.Debounce.Timeout,
-		"primary_shard_name", d.primaryQueueShard.Name,
-		"secondary_shard_name", d.secondaryQueueShard.Name,
 	)
+
+	if d.primaryQueueShard != nil {
+		l = l.With(
+			"primary_shard_name", d.primaryQueueShard.Name(),
+		)
+	}
+
+	if d.secondaryQueueShard != nil {
+		l = l.With(
+			"secondary_shard_name", d.secondaryQueueShard.Name(),
+		)
+	}
 
 	//
 	// Enable debounce migration
