@@ -96,9 +96,7 @@ func PartitionLeaseOptionDisableLeaseChecks(disableLeaseChecks bool) PartitionLe
 type QueueManager interface {
 	JobQueueReader
 	Queue
-	QueueDirectAccess
 
-	DequeueByJobID(ctx context.Context, jobID string) error
 	Dequeue(ctx context.Context, queueShard QueueShard, i QueueItem, opts ...DequeueOptionFn) error
 	Requeue(ctx context.Context, queueShard QueueShard, i QueueItem, at time.Time, opts ...RequeueOptionFn) error
 	RequeueByJobID(ctx context.Context, queueShard QueueShard, jobID string, at time.Time) error
@@ -119,6 +117,7 @@ type QueueManager interface {
 	PartitionByID(ctx context.Context, queueShard QueueShard, partitionID string) (*PartitionInspectionResult, error)
 	// ItemByID retrieves the queue item by the jobID
 	ItemByID(ctx context.Context, queueShard QueueShard, jobID string) (*QueueItem, error)
+
 	// ItemExists checks if an item with jobID exists in the queue
 	ItemExists(ctx context.Context, queueShard QueueShard, jobID string) (bool, error)
 	// ItemsByRunID retrieves all queue items via runID
@@ -269,15 +268,30 @@ type ShardOperations interface {
 		options ...BacklogRefillOptionFn,
 	) (*BacklogRefillResult, error)
 	BacklogRequeue(ctx context.Context, backlog *QueueBacklog, sp *QueueShadowPartition, requeueAt time.Time) error
+	BacklogsByPartition(ctx context.Context, partitionID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueBacklog], error)
+	BacklogSize(ctx context.Context, backlogID string) (int64, error)
 
 	PeekShadowPartitions(ctx context.Context, accountID *uuid.UUID, sequential bool, peekLimit int64, until time.Time) ([]*QueueShadowPartition, error)
 
 	IsMigrationLocked(ctx context.Context, fnID uuid.UUID) (*time.Time, error)
 
-	RunJobs(ctx context.Context, workspaceID, workflowID uuid.UUID, runID ulid.ULID, limit, offset int64) ([]JobResponse, error)
-
 	// Total queue depth of all partitions including backlog and ready state items
 	TotalSystemQueueDepth(ctx context.Context) (int64, error)
+
+	DequeueByJobID(ctx context.Context, jobID string) error
+
+	ItemByID(ctx context.Context, jobID string) (*QueueItem, error)
+	ItemExists(ctx context.Context, jobID string) (bool, error)
+	ItemsByRunID(ctx context.Context, runID ulid.ULID) ([]*QueueItem, error)
+	PartitionBacklogSize(ctx context.Context, partitionID string) (int64, error)
+	PartitionByID(ctx context.Context, partitionID string) (*PartitionInspectionResult, error)
+
+	UnpauseFunction(ctx context.Context, acctID, fnID uuid.UUID) error
+
+	OutstandingJobCount(ctx context.Context, workspaceID, workflowID uuid.UUID, runID ulid.ULID) (int, error)
+	RunningCount(ctx context.Context, workflowID uuid.UUID) (int64, error)
+	StatusCount(ctx context.Context, workflowID uuid.UUID, status string) (int64, error)
+	RunJobs(ctx context.Context, workspaceID, workflowID uuid.UUID, runID ulid.ULID, limit, offset int64) ([]JobResponse, error)
 }
 
 type BacklogRefillOptions struct {

@@ -80,3 +80,5 @@ var (
 	ErrBacklogNormalizationLeaseExpired     = fmt.Errorf("backlog normalization lease expired")
 	ErrBacklogAlreadyLeasedForNormalization = fmt.Errorf("backlog already leased for normalization")
 )
+
+var ErrQueueShardNotFound = fmt.Errorf("could not find queue shard for the specified name")
