@@ -77,13 +77,6 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 
 	clock := clockwork.NewFakeClock()
 
-	shard := RedisQueueShard{
-		Name:        consts.DefaultQueueShardName,
-		Kind:        string(enums.QueueShardKindRedis),
-		RedisClient: NewQueueClient(rc, QueueDefaultKey),
-	}
-	kg := shard.RedisClient.kg
-
 	ctx := context.Background()
 	l := logger.StdlibLogger(ctx, logger.WithLoggerLevel(logger.LevelTrace))
 	ctx = logger.WithStdlib(ctx, l)
@@ -131,18 +124,19 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 	t.Run("without constraint api", func(t *testing.T) {
 		reset()
 
-		q := NewQueue(
-			shard,
-			WithClock(clock),
-			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+		q, shard := newQueue(
+			t, rc,
+			osqueue.WithClock(clock),
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 				return true
 			}),
 		)
+		kg := shard.Client().kg
 
-		qi, err := q.EnqueueItem(ctx, q.primaryQueueShard, item, start, osqueue.EnqueueOpts{})
+		qi, err := shard.EnqueueItem(ctx, item, start, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
-		p := q.ItemPartition(ctx, shard, qi)
+		p := osqueue.ItemPartition(ctx, qi)
 
 		var counter int64
 
