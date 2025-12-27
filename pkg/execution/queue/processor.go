@@ -69,7 +69,7 @@ func NewQueueProcessor(
 		qspc: make(chan ShadowPartitionChanMsg),
 
 		shadowContinuesLock:    &sync.Mutex{},
-		shadowContinues:        map[string]shadowContinuation{},
+		shadowContinues:        map[string]ShadowContinuation{},
 		shadowContinueCooldown: map[string]time.Time{},
 	}
 
@@ -140,10 +140,25 @@ type queueProcessor struct {
 	// or reading from scavengerLeaseID in parallel.
 	scavengerLeaseLock *sync.RWMutex
 
-	shadowContinues         map[string]shadowContinuation
+	shadowContinues         map[string]ShadowContinuation
 	shadowContinueCooldown  map[string]time.Time
 	shadowContinuesLock     *sync.Mutex
 	shadowContinuationLimit uint
+}
+
+func (q *queueProcessor) GetShadowContinuations() map[string]ShadowContinuation {
+	q.shadowContinuesLock.Lock()
+	defer q.shadowContinuesLock.Unlock()
+
+	return q.shadowContinues
+}
+
+func (q *queueProcessor) ClearShadowContinuations() {
+	q.shadowContinuesLock.Lock()
+	defer q.shadowContinuesLock.Unlock()
+
+	clear(q.shadowContinues)
+	clear(q.shadowContinueCooldown)
 }
 
 func (q *queueProcessor) Clock() clockwork.Clock {

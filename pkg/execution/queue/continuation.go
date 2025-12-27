@@ -130,8 +130,8 @@ func (q *queueProcessor) scanContinuations(ctx context.Context) error {
 	return eg.Wait()
 }
 
-// addShadowContinue is the equivalent of addContinue for shadow partitions
-func (q *queueProcessor) addShadowContinue(ctx context.Context, p *QueueShadowPartition, ctr uint) {
+// AddShadowContinue is the equivalent of addContinue for shadow partitions
+func (q *queueProcessor) AddShadowContinue(ctx context.Context, p *QueueShadowPartition, ctr uint) {
 	if !q.runMode.ShadowContinuations {
 		// shadow continuations are not enabled.
 		return
@@ -162,11 +162,11 @@ func (q *queueProcessor) addShadowContinue(ctx context.Context, p *QueueShadowPa
 	}
 
 	c, ok := q.shadowContinues[p.PartitionID]
-	if !ok || c.count < ctr {
+	if !ok || c.Count < ctr {
 		// Update the continue count if it doesn't exist, or the current counter
 		// is higher.  This ensures that we always have the highest continuation
 		// count stored for queue processing.
-		q.shadowContinues[p.PartitionID] = shadowContinuation{shadowPart: p, count: ctr}
+		q.shadowContinues[p.PartitionID] = ShadowContinuation{ShadowPart: p, Count: ctr}
 		metrics.IncrQueueShadowContinuationOpCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name, "op": "added"}})
 	}
 }
@@ -212,7 +212,7 @@ func (q *queueProcessor) scanShadowContinuations(ctx context.Context) error {
 	for _, c := range q.shadowContinues {
 		cont := c
 		eg.Go(func() error {
-			sp := cont.shadowPart
+			sp := cont.ShadowPart
 
 			_, err := DurationWithTags(
 				ctx,
@@ -220,7 +220,7 @@ func (q *queueProcessor) scanShadowContinuations(ctx context.Context) error {
 				"shadow_partition_process_duration",
 				q.Clock().Now(),
 				func(ctx context.Context) (any, error) {
-					err := q.processShadowPartition(ctx, sp, cont.count)
+					err := q.processShadowPartition(ctx, sp, cont.Count)
 					if errors.Is(err, context.Canceled) {
 						return nil, nil
 					}
@@ -235,7 +235,7 @@ func (q *queueProcessor) scanShadowContinuations(ctx context.Context) error {
 					return nil
 				}
 				if !errors.Is(err, context.Canceled) {
-					q.log.Error("error processing shadow partition", "error", err, "continuation", true, "continuation_count", cont.count)
+					q.log.Error("error processing shadow partition", "error", err, "continuation", true, "continuation_count", cont.Count)
 				}
 				return err
 			}
