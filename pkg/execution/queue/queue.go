@@ -98,11 +98,6 @@ type AttemptResetter interface {
 	ResetAttemptsByJobID(ctx context.Context, shard string, jobID string) error
 }
 
-type QueueDirectAccess interface {
-	RemoveQueueItem(ctx context.Context, shard string, partitionKey string, itemID string) error
-	LoadQueueItem(ctx context.Context, shard string, itemID string) (*QueueItem, error)
-}
-
 // QuitError is an error that, when returned, quits the queue.  This always retries
 // an error.
 type QuitError interface {
