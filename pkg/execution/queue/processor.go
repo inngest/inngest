@@ -137,7 +137,7 @@ func (q *queueProcessor) Semaphore() util.TrackingSemaphore {
 }
 
 func (q *queueProcessor) Options() *QueueOptions {
-	return q.Options()
+	return q.QueueOptions
 }
 
 func (q *queueProcessor) Workers() chan ProcessItem {
