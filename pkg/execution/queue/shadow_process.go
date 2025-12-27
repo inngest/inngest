@@ -40,7 +40,7 @@ func (q *queueProcessor) processShadowPartition(ctx context.Context, shadowPart 
 
 		if lockedUntil != nil {
 			q.removeShadowContinue(ctx, shadowPart, false)
-			_, err := DurationWithTags(ctx, q.primaryQueueShard.Name(), durOpShadowPartitionRequeue, q.Clock.Now(), func(ctx context.Context) (any, error) {
+			_, err := DurationWithTags(ctx, q.primaryQueueShard.Name(), durOpShadowPartitionRequeue, q.Clock().Now(), func(ctx context.Context) (any, error) {
 				err := q.primaryQueueShard.ShadowPartitionRequeue(ctx, shadowPart, lockedUntil)
 				return nil, err
 			}, map[string]any{"reason": "migrating"})
@@ -71,8 +71,8 @@ func (q *queueProcessor) processShadowPartition(ctx context.Context, shadowPart 
 			q.removeShadowContinue(ctx, shadowPart, false)
 
 			if !info.Stale {
-				forceRequeueAt := q.Clock.Now().Add(ShadowPartitionRefillPausedRequeueExtension)
-				_, err := DurationWithTags(ctx, shard.Name(), durOpShadowPartitionRequeue, q.Clock.Now(), func(ctx context.Context) (any, error) {
+				forceRequeueAt := q.Clock().Now().Add(ShadowPartitionRefillPausedRequeueExtension)
+				_, err := DurationWithTags(ctx, shard.Name(), durOpShadowPartitionRequeue, q.Clock().Now(), func(ctx context.Context) (any, error) {
 					err := q.primaryQueueShard.ShadowPartitionRequeue(ctx, shadowPart, &forceRequeueAt)
 					return nil, err
 				}, map[string]any{"reason": "paused"})
@@ -87,7 +87,7 @@ func (q *queueProcessor) processShadowPartition(ctx context.Context, shadowPart 
 	}
 
 	// acquire lease for shadow partition
-	leaseID, err := Duration(ctx, shard.Name(), "shadow_partition_lease", q.Clock.Now(), func(ctx context.Context) (*ulid.ULID, error) {
+	leaseID, err := Duration(ctx, shard.Name(), "shadow_partition_lease", q.Clock().Now(), func(ctx context.Context) (*ulid.ULID, error) {
 		leaseID, err := q.primaryQueueShard.ShadowPartitionLease(ctx, shadowPart, ShadowPartitionLeaseDuration)
 		return leaseID, err
 	})
@@ -177,11 +177,11 @@ func (q *queueProcessor) processShadowPartition(ctx context.Context, shadowPart 
 	limit := ShadowPartitionPeekMaxBacklogs
 
 	// Scan a little further into the future
-	refillUntil := q.Clock.Now().Truncate(time.Millisecond).Add(ShadowPartitionLookahead)
+	refillUntil := q.Clock().Now().Truncate(time.Millisecond).Add(ShadowPartitionLookahead)
 	if !keyQueuesEnabled {
 		// If key queues are disabled, peek and refill all
 		// items in the entire backlog, not just the next 2 seconds.
-		refillUntil = q.Clock.Now().Add(time.Hour * 24 * 365)
+		refillUntil = q.Clock().Now().Add(time.Hour * 24 * 365)
 	}
 
 	// Pick a random backlog offset every time
@@ -276,9 +276,9 @@ func (q *queueProcessor) processShadowPartition(ctx context.Context, shadowPart 
 				// No more backlogs right now, we can continue the scan loop until new items are added
 				q.removeShadowContinue(ctx, shadowPart, false)
 
-				forceRequeueShadowPartitionAt := q.Clock.Now().Add(PartitionConcurrencyLimitRequeueExtension)
+				forceRequeueShadowPartitionAt := q.Clock().Now().Add(PartitionConcurrencyLimitRequeueExtension)
 
-				_, err = DurationWithTags(ctx, shard.Name(), durOpShadowPartitionRequeue, q.Clock.Now(), func(ctx context.Context) (any, error) {
+				_, err = DurationWithTags(ctx, shard.Name(), durOpShadowPartitionRequeue, q.Clock().Now(), func(ctx context.Context) (any, error) {
 					err := q.primaryQueueShard.ShadowPartitionRequeue(ctx, shadowPart, &forceRequeueShadowPartitionAt)
 					return nil, err
 				}, map[string]any{"reason": "concurrency_limited", "cause": res.Constraint.String()})
@@ -309,7 +309,7 @@ func (q *queueProcessor) processShadowPartition(ctx context.Context, shadowPart 
 		// No more backlogs right now, we can continue the scan loop until new items are added
 		q.removeShadowContinue(ctx, shadowPart, false)
 
-		_, err = DurationWithTags(ctx, shard.Name(), durOpShadowPartitionRequeue, q.Clock.Now(), func(ctx context.Context) (any, error) {
+		_, err = DurationWithTags(ctx, shard.Name(), durOpShadowPartitionRequeue, q.Clock().Now(), func(ctx context.Context) (any, error) {
 			err := q.primaryQueueShard.ShadowPartitionRequeue(ctx, shadowPart, nil)
 			return nil, err
 		}, map[string]any{"reason": "empty"})
@@ -349,7 +349,7 @@ func (q *queueProcessor) processShadowPartition(ctx context.Context, shadowPart 
 		}
 	}
 
-	_, err = DurationWithTags(ctx, shard.Name(), durOpShadowPartitionRequeue, q.Clock.Now(), func(ctx context.Context) (any, error) {
+	_, err = DurationWithTags(ctx, shard.Name(), durOpShadowPartitionRequeue, q.Clock().Now(), func(ctx context.Context) (any, error) {
 		err := q.primaryQueueShard.ShadowPartitionRequeue(ctx, shadowPart, nil)
 		return nil, err
 	}, map[string]any{"reason": "handled"})
@@ -398,7 +398,7 @@ func (q *queueProcessor) processShadowPartitionBacklog(
 		})
 
 		// ensure exclusive access to backlog
-		if _, err := Duration(ctx, q.primaryQueueShard.Name(), "normalize_lease", q.Clock.Now(), func(ctx context.Context) (any, error) {
+		if _, err := Duration(ctx, q.primaryQueueShard.Name(), "normalize_lease", q.Clock().Now(), func(ctx context.Context) (any, error) {
 			err := q.primaryQueueShard.LeaseBacklogForNormalization(ctx, backlog)
 			return nil, err
 		}); err != nil {
@@ -458,7 +458,7 @@ func (q *queueProcessor) processShadowPartitionBacklog(
 
 	// NOTE: This idempotency key is simply used for retrying Acquire
 	// We do not use the same key for multiple processShadowPartitionBacklog attempts
-	now := q.Clock.Now()
+	now := q.Clock().Now()
 	operationIdempotencyKey := fmt.Sprintf("%s-%d", backlog.BacklogID, now.UnixMilli())
 
 	constraintCheckRes, err := q.primaryQueueShard.BacklogRefillConstraintCheck(ctx, shadowPart, backlog, constraints, items, operationIdempotencyKey, now)
@@ -480,7 +480,7 @@ func (q *queueProcessor) processShadowPartitionBacklog(
 			ctx,
 			q.primaryQueueShard.Name(),
 			"backlog_process_duration",
-			q.Clock.Now(),
+			q.Clock().Now(),
 			func(ctx context.Context) (*BacklogRefillResult, error) {
 				return q.primaryQueueShard.BacklogRefill(
 					ctx,
@@ -599,13 +599,13 @@ func (q *queueProcessor) processShadowPartitionBacklog(
 	switch res.Constraint {
 	// If backlog is concurrency limited by custom key, requeue just this backlog in the future
 	case enums.QueueConstraintCustomConcurrencyKey1, enums.QueueConstraintCustomConcurrencyKey2:
-		forceRequeueBacklogAt = backlog.requeueBackOff(q.Clock.Now(), res.Constraint)
+		forceRequeueBacklogAt = backlog.requeueBackOff(q.Clock().Now(), res.Constraint)
 	}
 
 	if !forceRequeueBacklogAt.IsZero() {
 		// Cap maximum backoff to ensure constraint updates (changing throttle period, etc.) are reflected reasonably quickly
-		if forceRequeueBacklogAt.Sub(q.Clock.Now()) > BacklogForceRequeueMaxBackoff {
-			forceRequeueBacklogAt = q.Clock.Now().Add(BacklogForceRequeueMaxBackoff)
+		if forceRequeueBacklogAt.Sub(q.Clock().Now()) > BacklogForceRequeueMaxBackoff {
+			forceRequeueBacklogAt = q.Clock().Now().Add(BacklogForceRequeueMaxBackoff)
 		}
 
 		if err := q.primaryQueueShard.BacklogRequeue(ctx, backlog, shadowPart, forceRequeueBacklogAt); err != nil && !errors.Is(err, ErrBacklogNotFound) {
@@ -636,7 +636,7 @@ func (q *queueProcessor) scanShadowPartitions(ctx context.Context, until time.Ti
 		if len(q.runMode.ExclusiveAccounts) > 0 {
 			peekedAccounts = q.runMode.ExclusiveAccounts
 		} else {
-			peeked, err := Duration(ctx, q.primaryQueueShard.Name(), durOpGobalShadowPartitionAccountPeek, q.Clock.Now(), func(ctx context.Context) ([]uuid.UUID, error) {
+			peeked, err := Duration(ctx, q.primaryQueueShard.Name(), durOpGobalShadowPartitionAccountPeek, q.Clock().Now(), func(ctx context.Context) ([]uuid.UUID, error) {
 				return q.primaryQueueShard.PeekGlobalShadowPartitionAccounts(ctx, sequential, until, ShadowPartitionAccountPeekMax)
 			})
 			if err != nil {

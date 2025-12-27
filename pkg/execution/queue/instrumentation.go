@@ -29,8 +29,8 @@ func (q *queueProcessor) runInstrumentation(ctx context.Context) {
 
 	setLease(leaseID)
 
-	tick := q.Clock.NewTicker(ConfigLeaseMax / 3)
-	instr := q.Clock.NewTicker(q.instrumentInterval)
+	tick := q.Clock().NewTicker(ConfigLeaseMax / 3)
+	instr := q.Clock().NewTicker(q.instrumentInterval)
 
 	for {
 		select {
