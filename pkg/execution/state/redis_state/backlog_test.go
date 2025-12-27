@@ -14,6 +14,7 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/jonboulle/clockwork"
 	"github.com/redis/rueidis"
@@ -1283,10 +1284,20 @@ func TestPartitionBacklogSize(t *testing.T) {
 	defer rc2.Close()
 
 	ctx := context.Background()
+	l := logger.StdlibLogger(ctx, logger.WithLoggerLevel(logger.LevelTrace))
+	ctx = logger.WithStdlib(ctx, l)
+
 	clock := clockwork.NewFakeClock()
 
-	shard1 := shardFromClient("one", rc1)
-	shard2 := shardFromClient("two", rc2)
+	opts := []osqueue.QueueOpt{
+		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+			return true
+		}),
+		osqueue.WithClock(clock),
+	}
+
+	shard1 := shardFromClient("one", rc1, opts...)
+	shard2 := shardFromClient("two", rc2, opts...)
 	queueShards := mapFromShards(shard1, shard2)
 
 	acctId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
@@ -1320,10 +1331,7 @@ func TestPartitionBacklogSize(t *testing.T) {
 				func(ctx context.Context, accountId uuid.UUID, queueName *string) (osqueue.QueueShard, error) {
 					return shard1, nil
 				},
-				osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
-					return true
-				}),
-				osqueue.WithClock(clock),
+				opts...,
 			)
 			require.NoError(t, err)
 			q2, err := osqueue.NewQueueProcessor(
@@ -1334,10 +1342,7 @@ func TestPartitionBacklogSize(t *testing.T) {
 				func(ctx context.Context, accountId uuid.UUID, queueName *string) (osqueue.QueueShard, error) {
 					return shard2, nil
 				},
-				osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
-					return true
-				}),
-				osqueue.WithClock(clock),
+				opts...,
 			)
 			require.NoError(t, err)
 
@@ -1383,13 +1388,13 @@ func TestPartitionBacklogSize(t *testing.T) {
 			}
 
 			// NOTE: should return the same result regardless of which shard initiated the instrumentation
-			size1, err := q1.PartitionBacklogSize(ctx, shard1, fnID.String())
+			size1, err := q1.PartitionBacklogSize(ctx, fnID.String())
 			require.NoError(t, err)
-			require.EqualValues(t, tc.num, size1)
+			require.EqualValues(t, int64(tc.num), size1)
 
-			size2, err := q2.PartitionBacklogSize(ctx, shard2, fnID.String())
+			size2, err := q2.PartitionBacklogSize(ctx, fnID.String())
 			require.NoError(t, err)
-			require.EqualValues(t, tc.num, size2)
+			require.EqualValues(t, int64(tc.num), size2)
 		})
 	}
 }
