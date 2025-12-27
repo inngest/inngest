@@ -296,7 +296,7 @@ func (d debouncer) DeleteDebounceItem(ctx context.Context, debounceID ulid.ULID,
 			PkgName: pkgName,
 			Tags: map[string]any{
 				"op":          "deleted",
-				"queue_shard": queueShard.Name,
+				"queue_shard": queueShard.Name(),
 				"success":     success,
 			},
 		})
@@ -455,7 +455,7 @@ func (d debouncer) StartExecution(ctx context.Context, di DebounceItem, fn innge
 			PkgName: pkgName,
 			Tags: map[string]any{
 				"op":          "start",
-				"queue_shard": queueShard.Name,
+				"queue_shard": queueShard.Name(),
 				"status":      status,
 			},
 		})
@@ -595,7 +595,7 @@ func (d debouncer) debounce(ctx context.Context, di DebounceItem, fn inngest.Fun
 				PkgName: pkgName,
 				Tags: map[string]any{
 					"op":          "migration_prepared",
-					"queue_shard": d.secondaryQueueShard.Name,
+					"queue_shard": d.secondaryQueueShard.Name(),
 				},
 			})
 		}
@@ -748,7 +748,7 @@ func (d debouncer) newDebounce(ctx context.Context, di DebounceItem, fn inngest.
 			PkgName: pkgName,
 			Tags: map[string]any{
 				"op":          "created",
-				"queue_shard": queueShard.Name,
+				"queue_shard": queueShard.Name(),
 			},
 		})
 
@@ -934,7 +934,7 @@ func (d debouncer) updateDebounce(ctx context.Context, di DebounceItem, fn innge
 			PkgName: pkgName,
 			Tags: map[string]any{
 				"op":          "updated",
-				"queue_shard": queueShard.Name,
+				"queue_shard": queueShard.Name(),
 			},
 		})
 

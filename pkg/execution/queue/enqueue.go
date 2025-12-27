@@ -88,7 +88,7 @@ func (q *queueProcessor) Enqueue(ctx context.Context, item Item, at time.Time, o
 		Tags: map[string]any{
 			"status":      "enqueued",
 			"kind":        item.Kind,
-			"queue_shard": shard.Name,
+			"queue_shard": shard.Name(),
 		},
 	})
 
