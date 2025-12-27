@@ -60,7 +60,7 @@ func (q *queueProcessor) shadowWorker(ctx context.Context, qspc chan ShadowParti
 				"shadow_partition_process_duration",
 				q.Clock().Now(),
 				func(ctx context.Context) (any, error) {
-					err := q.processShadowPartition(ctx, msg.ShadowPartition, msg.ContinuationCount)
+					err := q.ProcessShadowPartition(ctx, msg.ShadowPartition, msg.ContinuationCount)
 					if errors.Is(err, context.Canceled) {
 						return nil, nil
 					}

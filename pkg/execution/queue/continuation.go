@@ -220,7 +220,7 @@ func (q *queueProcessor) scanShadowContinuations(ctx context.Context) error {
 				"shadow_partition_process_duration",
 				q.Clock().Now(),
 				func(ctx context.Context) (any, error) {
-					err := q.processShadowPartition(ctx, sp, cont.Count)
+					err := q.ProcessShadowPartition(ctx, sp, cont.Count)
 					if errors.Is(err, context.Canceled) {
 						return nil, nil
 					}
