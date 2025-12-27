@@ -254,7 +254,7 @@ func (q *queueProcessor) processScannedPartitions(
 				metrics.IncrQueueScanNoCapacityCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"shard": metricShardName, "queue_shard": q.primaryQueueShard.Name()}})
 				return nil
 			}
-			if err := q.processPartition(ctx, &p, 0, false); err != nil {
+			if err := q.ProcessPartition(ctx, &p, 0, false); err != nil {
 				if err == ErrPartitionNotFound || err == ErrPartitionGarbageCollected {
 					// Another worker grabbed the partition, or the partition was deleted
 					// during the scan by an another worker.
