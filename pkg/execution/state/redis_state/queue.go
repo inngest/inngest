@@ -45,6 +45,8 @@ type RedisQueueShard interface {
 	Client() *QueueClient
 
 	InProgress(ctx context.Context, prefix string, concurrencyKey string) (int64, error)
+
+	QueueIterator(ctx context.Context, opts QueueIteratorOpts) (partitionCount int64, queueItemCount int64, err error)
 }
 
 func (q *queue) Client() *QueueClient {
