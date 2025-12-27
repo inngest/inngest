@@ -1325,6 +1325,7 @@ func TestPartitionBacklogSize(t *testing.T) {
 				}),
 				osqueue.WithClock(clock),
 			)
+			require.NoError(t, err)
 			q2, err := osqueue.NewQueueProcessor(
 				ctx,
 				"q2",
@@ -1338,6 +1339,7 @@ func TestPartitionBacklogSize(t *testing.T) {
 				}),
 				osqueue.WithClock(clock),
 			)
+			require.NoError(t, err)
 
 			for i := range tc.num {
 				id := fmt.Sprintf("test%d", i)

@@ -59,6 +59,7 @@ func TestDeleteManager(t *testing.T) {
 		},
 		opts...,
 	)
+	require.NoError(t, err)
 
 	ctx := context.Background()
 
