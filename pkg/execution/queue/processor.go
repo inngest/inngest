@@ -25,6 +25,14 @@ func init() {
 	latencySem = &sync.Mutex{}
 }
 
+func LatencySem() *sync.Mutex {
+	return latencySem
+}
+
+func LatencyAverage() float64 {
+	return latencyAvg.Value()
+}
+
 func NewQueueProcessor(
 	ctx context.Context,
 	name string,

@@ -157,6 +157,7 @@ type QueueProcessor interface {
 	Semaphore() util.TrackingSemaphore
 	Options() *QueueOptions
 	Workers() chan ProcessItem
+	SequentialLease() *ulid.ULID
 }
 
 type ShardOperations interface {
