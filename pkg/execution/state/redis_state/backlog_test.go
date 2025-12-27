@@ -1284,7 +1284,7 @@ func TestPartitionBacklogSize(t *testing.T) {
 	defer rc2.Close()
 
 	ctx := context.Background()
-	l := logger.StdlibLogger(ctx, logger.WithLoggerLevel(logger.LevelTrace))
+	l := logger.StdlibLogger(ctx, logger.WithLoggerLevel(logger.LevelInfo))
 	ctx = logger.WithStdlib(ctx, l)
 
 	clock := clockwork.NewFakeClock()
