@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/util"
+	"github.com/jonboulle/clockwork"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -149,6 +151,14 @@ type QueueManager interface {
 }
 
 type QueueProcessor interface {
+	Shard() QueueShard
+	Clock() clockwork.Clock
+	Semaphore() util.TrackingSemaphore
+	Options() *QueueOptions
+	Workers() chan ProcessItem
+}
+
+type ShardOperations interface {
 	EnqueueItem(ctx context.Context, i QueueItem, at time.Time, opts EnqueueOpts) (QueueItem, error)
 	Peek(ctx context.Context, partition *QueuePartition, until time.Time, limit int64) ([]*QueueItem, error)
 	PeekRandom(ctx context.Context, partition *QueuePartition, until time.Time, limit int64) ([]*QueueItem, error)

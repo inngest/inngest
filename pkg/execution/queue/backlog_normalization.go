@@ -33,7 +33,7 @@ func (q *queueProcessor) backlogNormalizationWorker(ctx context.Context, nc chan
 			return
 
 		case msg := <-nc:
-			_, err := DurationWithTags(ctx, q.name, "normalize_backlog", q.Clock.Now(), func(ctx context.Context) (any, error) {
+			_, err := DurationWithTags(ctx, q.name, "normalize_backlog", q.Clock().Now(), func(ctx context.Context) (any, error) {
 				err := q.NormalizeBacklog(ctx, msg.b, msg.sp, msg.constraints)
 				return nil, err
 			}, map[string]any{
@@ -56,7 +56,7 @@ func (q *queueProcessor) backlogNormalizationScan(ctx context.Context) error {
 		go q.backlogNormalizationWorker(ctx, bc)
 	}
 
-	tick := q.Clock.NewTicker(q.backlogNormalizePollTick)
+	tick := q.Clock().NewTicker(q.backlogNormalizePollTick)
 	l.Debug("starting normalization scanner", "poll", q.backlogNormalizePollTick.String())
 
 	backoff := 200 * time.Millisecond
@@ -68,7 +68,7 @@ func (q *queueProcessor) backlogNormalizationScan(ctx context.Context) error {
 			return nil
 
 		case <-tick.Chan():
-			until := q.Clock.Now()
+			until := q.Clock().Now()
 
 			if err := q.iterateNormalizationPartition(ctx, until, bc); err != nil {
 				if errors.Is(err, context.DeadlineExceeded) {
@@ -147,7 +147,7 @@ func (q *queueProcessor) iterateNormalizationShadowPartition(ctx context.Context
 
 		for _, bl := range backlogs {
 			// lease the backlog
-			_, err := Duration(ctx, q.primaryQueueShard.Name(), "normalize_lease", q.Clock.Now(), func(ctx context.Context) (any, error) {
+			_, err := Duration(ctx, q.primaryQueueShard.Name(), "normalize_lease", q.Clock().Now(), func(ctx context.Context) (any, error) {
 				err := q.primaryQueueShard.LeaseBacklogForNormalization(ctx, bl)
 				return nil, err
 			})
@@ -209,7 +209,7 @@ func (q *queueProcessor) NormalizeBacklog(ctx context.Context, backlog *QueueBac
 			case <-extendLeaseCtx.Done():
 				return
 			case <-time.Tick(BacklogNormalizeLeaseDuration / 2):
-				if err := q.primaryQueueShard.ExtendBacklogNormalizationLease(ctx, q.Clock.Now(), backlog); err != nil {
+				if err := q.primaryQueueShard.ExtendBacklogNormalizationLease(ctx, q.Clock().Now(), backlog); err != nil {
 					switch err {
 					// can't extend since it's already expired
 					case ErrBacklogNormalizationLeaseExpired:

@@ -80,7 +80,7 @@ func (q *queueProcessor) ewmaPeekSize(ctx context.Context, p *QueuePartition) in
 	}
 
 	dur := time.Hour * 24
-	qsize, _ := q.primaryQueueShard.PartitionSize(ctx, p.ID, q.Clock.Now().Add(dur))
+	qsize, _ := q.primaryQueueShard.PartitionSize(ctx, p.ID, q.Clock().Now().Add(dur))
 	if qsize > size {
 		size = qsize
 	}

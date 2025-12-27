@@ -35,10 +35,10 @@ func (q *queueProcessor) ProcessItem(
 	defer q.wg.Done()
 
 	// Continually the lease while this job is being processed.
-	extendLeaseTick := q.Clock.NewTicker(QueueLeaseDuration / 2)
+	extendLeaseTick := q.Clock().NewTicker(QueueLeaseDuration / 2)
 	defer extendLeaseTick.Stop()
 
-	extendCapacityLeaseTick := q.Clock.NewTicker(q.CapacityLeaseExtendInterval)
+	extendCapacityLeaseTick := q.Clock().NewTicker(q.CapacityLeaseExtendInterval)
 	defer extendCapacityLeaseTick.Stop()
 
 	errCh := make(chan error)
@@ -171,9 +171,9 @@ func (q *queueProcessor) ProcessItem(
 		jobCtx = state.WithGroupID(jobCtx, qi.Data.GroupID)
 	}
 
-	startedAt := q.Clock.Now()
+	startedAt := q.Clock().Now()
 	go func() {
-		longRunningJobStatusTick := q.Clock.NewTicker(5 * time.Minute)
+		longRunningJobStatusTick := q.Clock().NewTicker(5 * time.Minute)
 		defer longRunningJobStatusTick.Stop()
 
 		for {
@@ -183,7 +183,7 @@ func (q *queueProcessor) ProcessItem(
 			case <-longRunningJobStatusTick.Chan():
 			}
 
-			q.log.Debug("long running queue job tick", "item", qi, "dur", q.Clock.Now().Sub(startedAt).String())
+			q.log.Debug("long running queue job tick", "item", qi, "dur", q.Clock().Now().Sub(startedAt).String())
 		}
 	}()
 
@@ -199,16 +199,16 @@ func (q *queueProcessor) ProcessItem(
 
 		// This job may be up to 1999 ms in the future, as explained in processPartition.
 		// Just... wait until the job is available.
-		delay := time.UnixMilli(qi.AtMS).Sub(q.Clock.Now())
+		delay := time.UnixMilli(qi.AtMS).Sub(q.Clock().Now())
 
 		if delay > 0 {
-			<-q.Clock.After(delay)
+			<-q.Clock().After(delay)
 			q.log.Trace("delaying job in memory",
 				"at", qi.AtMS,
 				"ms", delay.Milliseconds(),
 			)
 		}
-		n := q.Clock.Now()
+		n := q.Clock().Now()
 
 		// Track the sojourn (concurrency) latency.
 		sojourn := qi.SojournLatency(n)
