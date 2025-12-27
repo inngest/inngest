@@ -28,7 +28,7 @@ func (q *queueProcessor) executionScan(ctx context.Context, f RunFunc) error {
 		return fmt.Errorf("need to specify either partition, account, or both in queue run mode")
 	}
 
-	tick := q.Clock.NewTicker(q.pollTick)
+	tick := q.Clock().NewTicker(q.pollTick)
 	l.Debug("starting queue worker", "poll", q.pollTick.String())
 
 	backoff := time.Millisecond * 250
@@ -101,7 +101,7 @@ func (q *queueProcessor) scan(ctx context.Context) error {
 	// down to the job for stat tracking.
 	metricShardName := "<global>" // default global name for metrics in this function
 
-	peekUntil := q.Clock.Now().Add(PartitionLookahead)
+	peekUntil := q.Clock().Now().Add(PartitionLookahead)
 
 	processAccount := false
 	if q.runMode.Account && (!q.runMode.Partition || rand.Intn(100) <= q.runMode.AccountWeight) {
@@ -127,7 +127,7 @@ func (q *queueProcessor) scan(ctx context.Context) error {
 		if len(q.runMode.ExclusiveAccounts) > 0 {
 			peekedAccounts = q.runMode.ExclusiveAccounts
 		} else {
-			peeked, err := Duration(ctx, q.primaryQueueShard.Name(), "account_peek", q.Clock.Now(), func(ctx context.Context) ([]uuid.UUID, error) {
+			peeked, err := Duration(ctx, q.primaryQueueShard.Name(), "account_peek", q.Clock().Now(), func(ctx context.Context) ([]uuid.UUID, error) {
 				return q.primaryQueueShard.AccountPeek(ctx, q.isSequential(), peekUntil, AccountPeekMax)
 			})
 			if err != nil {
@@ -288,7 +288,7 @@ func (q *queueProcessor) shadowScan(ctx context.Context) error {
 		go q.shadowWorker(ctx, qspc)
 	}
 
-	tick := q.Clock.NewTicker(q.shadowPollTick)
+	tick := q.Clock().NewTicker(q.shadowPollTick)
 	l.Debug("starting shadow scanner", "poll", q.shadowPollTick.String())
 
 	backoff := 200 * time.Millisecond
@@ -301,7 +301,7 @@ func (q *queueProcessor) shadowScan(ctx context.Context) error {
 
 		case <-tick.Chan():
 			// Scan a little further into the future
-			now := q.Clock.Now()
+			now := q.Clock().Now()
 			scanUntil := now.Truncate(time.Second).Add(ShadowPartitionLookahead)
 			if err := q.scanShadowPartitions(ctx, scanUntil, qspc); err != nil {
 				if errors.Is(err, context.DeadlineExceeded) {

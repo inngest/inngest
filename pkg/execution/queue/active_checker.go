@@ -14,8 +14,8 @@ func (q *queueProcessor) runActiveChecker(ctx context.Context) {
 	q.activeCheckerLeaseID = leaseID // no-op if not leased
 	q.activeCheckerLeaseLock.Unlock()
 
-	tick := q.Clock.NewTicker(ConfigLeaseDuration / 3)
-	checkTick := q.Clock.NewTicker(q.ActiveCheckTick)
+	tick := q.Clock().NewTicker(ConfigLeaseDuration / 3)
+	checkTick := q.Clock().NewTicker(q.ActiveCheckTick)
 
 	for {
 		select {

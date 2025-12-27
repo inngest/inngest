@@ -27,7 +27,7 @@ func (q *queueProcessor) claimSequentialLease(ctx context.Context) {
 	q.seqLeaseID = leaseID
 	q.seqLeaseLock.Unlock()
 
-	tick := q.Clock.NewTicker(ConfigLeaseDuration / 3)
+	tick := q.Clock().NewTicker(ConfigLeaseDuration / 3)
 	for {
 		select {
 		case <-ctx.Done():
@@ -114,7 +114,7 @@ func (q *queueProcessor) isScavenger() bool {
 	if l == nil {
 		return false
 	}
-	return ulid.Time(l.Time()).After(q.Clock.Now())
+	return ulid.Time(l.Time()).After(q.Clock().Now())
 }
 
 func (q *queueProcessor) isActiveChecker() bool {
@@ -122,7 +122,7 @@ func (q *queueProcessor) isActiveChecker() bool {
 	if l == nil {
 		return false
 	}
-	return ulid.Time(l.Time()).After(q.Clock.Now())
+	return ulid.Time(l.Time()).After(q.Clock().Now())
 }
 
 func (q *queueProcessor) isInstrumentator() bool {
@@ -130,7 +130,7 @@ func (q *queueProcessor) isInstrumentator() bool {
 	if l == nil {
 		return false
 	}
-	return ulid.Time(l.Time()).After(q.Clock.Now())
+	return ulid.Time(l.Time()).After(q.Clock().Now())
 }
 
 func (q *queueProcessor) isSequential() bool {
@@ -138,5 +138,5 @@ func (q *queueProcessor) isSequential() bool {
 	if l == nil {
 		return false
 	}
-	return ulid.Time(l.Time()).After(q.Clock.Now())
+	return ulid.Time(l.Time()).After(q.Clock().Now())
 }

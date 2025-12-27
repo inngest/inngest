@@ -10,6 +10,7 @@ import (
 	"github.com/VividCortex/ewma"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/util"
+	"github.com/jonboulle/clockwork"
 	"github.com/oklog/ulid/v2"
 	"golang.org/x/sync/errgroup"
 )
@@ -121,6 +122,26 @@ type queueProcessor struct {
 	// scavengerLeaseLock ensures that there are no data races writing to
 	// or reading from scavengerLeaseID in parallel.
 	scavengerLeaseLock *sync.RWMutex
+}
+
+func (q *queueProcessor) Clock() clockwork.Clock {
+	return q.QueueOptions.Clock
+}
+
+func (q *queueProcessor) Shard() QueueShard {
+	return q.primaryQueueShard
+}
+
+func (q *queueProcessor) Semaphore() util.TrackingSemaphore {
+	return q.sem
+}
+
+func (q *queueProcessor) Options() *QueueOptions {
+	return q.Options()
+}
+
+func (q *queueProcessor) Workers() chan ProcessItem {
+	return q.workers
 }
 
 // BacklogSize implements QueueManager.

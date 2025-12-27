@@ -20,8 +20,8 @@ func (q *queueProcessor) runScavenger(ctx context.Context) {
 	q.scavengerLeaseID = leaseID // no-op if not leased
 	q.scavengerLeaseLock.Unlock()
 
-	tick := q.Clock.NewTicker(ConfigLeaseDuration / 3)
-	scavenge := q.Clock.NewTicker(30 * time.Second)
+	tick := q.Clock().NewTicker(ConfigLeaseDuration / 3)
+	scavenge := q.Clock().NewTicker(30 * time.Second)
 
 	for {
 		select {

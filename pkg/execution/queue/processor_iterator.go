@@ -22,7 +22,7 @@ type ProcessorIterator struct {
 	PartitionContinueCtr uint
 
 	// Queue is the Queue that owns this processor.
-	Queue *queueProcessor
+	Queue QueueProcessor
 
 	// Denies records a denylist as keys hit concurrency and throttling limits.
 	// this lets us prevent lease attempts for consecutive keys, as soon as the first
@@ -56,7 +56,7 @@ type ProcessorIterator struct {
 	IsCustomKeyLimitOnly bool
 }
 
-func (p *ProcessorIterator) iterate(ctx context.Context) error {
+func (p *ProcessorIterator) Iterate(ctx context.Context) error {
 	var err error
 
 	// set flag to true to begin with
@@ -73,7 +73,7 @@ func (p *ProcessorIterator) iterate(ctx context.Context) error {
 		if p.Parallel {
 			item := *i
 			eg.Go(func() error {
-				err := p.process(ctx, &item)
+				err := p.Process(ctx, &item)
 				if err != nil {
 					// NOTE: ignore if the queue item is not found
 					if errors.Is(err, ErrQueueItemNotFound) {
@@ -86,7 +86,7 @@ func (p *ProcessorIterator) iterate(ctx context.Context) error {
 		}
 
 		// non-parallel (sequential fifo) processing.
-		if err = p.process(ctx, i); err != nil {
+		if err = p.Process(ctx, i); err != nil {
 			// NOTE: ignore if the queue item is not found
 			if errors.Is(err, ErrQueueItemNotFound) {
 				continue
@@ -120,32 +120,32 @@ func (p *ProcessorIterator) iterate(ctx context.Context) error {
 	return err
 }
 
-func (p *ProcessorIterator) process(ctx context.Context, item *QueueItem) error {
-	l := p.Queue.log.With("partition", p.Partition, "item", item)
+func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error {
+	l := logger.StdlibLogger(ctx).With("partition", p.Partition, "item", item)
 
 	// TODO: Create an in-memory mapping of rate limit keys that have been hit,
 	//       and don't bother to process if the queue item has a limited key.  This
 	//       lessens work done in the queue, as we can `continue` immediately.
-	if item.IsLeased(p.Queue.Clock.Now()) {
+	if item.IsLeased(p.Queue.Clock().Now()) {
 		metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{
 			PkgName: pkgName,
-			Tags:    map[string]any{"status": "lease_contention", "queue_shard": p.Queue.primaryQueueShard.Name(), "constraint_source": "lease"},
+			Tags:    map[string]any{"status": "lease_contention", "queue_shard": p.Queue.Shard().Name(), "constraint_source": "lease"},
 		})
 		return nil
 	}
 
 	// Check if there's capacity from our local workers atomically prior to leasing our items.
-	if !p.Queue.sem.TryAcquire(1) {
-		metrics.IncrQueuePartitionProcessNoCapacityCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": p.Queue.primaryQueueShard.Name()}})
+	if !p.Queue.Semaphore().TryAcquire(1) {
+		metrics.IncrQueuePartitionProcessNoCapacityCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": p.Queue.Shard().Name()}})
 		// Break the entire loop to prevent out of order work.
 		return ErrProcessNoCapacity
 	}
 
-	metrics.WorkerQueueCapacityCounter(ctx, 1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": p.Queue.primaryQueueShard.Name()}})
+	metrics.WorkerQueueCapacityCounter(ctx, 1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": p.Queue.Shard().Name()}})
 
 	backlog := ItemBacklog(ctx, *item)
 	partition := ItemShadowPartition(ctx, *item)
-	constraints := p.Queue.PartitionConstraintConfigGetter(ctx, partition.Identifier())
+	constraints := p.Queue.Options().PartitionConstraintConfigGetter(ctx, partition.Identifier())
 
 	leaseOptions := []LeaseOptionFn{
 		LeaseBacklog(backlog),
@@ -153,7 +153,7 @@ func (p *ProcessorIterator) process(ctx context.Context, item *QueueItem) error 
 		LeaseConstraints(constraints),
 	}
 
-	constraintRes, err := p.Queue.primaryQueueShard.ItemLeaseConstraintCheck(
+	constraintRes, err := p.Queue.Shard().ItemLeaseConstraintCheck(
 		ctx,
 		&partition,
 		&backlog,
@@ -162,8 +162,8 @@ func (p *ProcessorIterator) process(ctx context.Context, item *QueueItem) error 
 		p.StaticTime,
 	)
 	if err != nil {
-		p.Queue.sem.Release(1)
-		metrics.WorkerQueueCapacityCounter(ctx, -1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": p.Queue.primaryQueueShard.Name()}})
+		p.Queue.Semaphore().Release(1)
+		metrics.WorkerQueueCapacityCounter(ctx, -1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": p.Queue.Shard().Name()}})
 
 		return fmt.Errorf("could not check constraints to lease item: %w", err)
 	}
@@ -187,8 +187,8 @@ func (p *ProcessorIterator) process(ctx context.Context, item *QueueItem) error 
 		//
 		// This is safe:  only one process runs scan(), and we guard the total number of
 		// available workers with the above semaphore.
-		leaseID, err = Duration(ctx, p.Queue.primaryQueueShard.Name(), "lease", p.Queue.Clock.Now(), func(ctx context.Context) (*ulid.ULID, error) {
-			return p.Queue.primaryQueueShard.Lease(
+		leaseID, err = Duration(ctx, p.Queue.Shard().Name(), "lease", p.Queue.Clock().Now(), func(ctx context.Context) (*ulid.ULID, error) {
+			return p.Queue.Shard().Lease(
 				ctx,
 				*item,
 				QueueLeaseDuration,
@@ -202,8 +202,8 @@ func (p *ProcessorIterator) process(ctx context.Context, item *QueueItem) error 
 		// finishes processing a queue item on success.
 		if err != nil {
 			// Continue on and handle the error below.
-			p.Queue.sem.Release(1)
-			metrics.WorkerQueueCapacityCounter(ctx, -1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": p.Queue.primaryQueueShard.Name()}})
+			p.Queue.Semaphore().Release(1)
+			metrics.WorkerQueueCapacityCounter(ctx, -1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": p.Queue.Shard().Name()}})
 		}
 	// Simulate errors returned by Lease
 	case enums.QueueConstraintThrottle:
@@ -264,7 +264,7 @@ func (p *ProcessorIterator) process(ctx context.Context, item *QueueItem) error 
 		"env_id", item.WorkspaceID.String(),
 		"app_id", item.Data.Identifier.AppID.String(),
 		"fn_id", item.FunctionID.String(),
-		"queue_shard", p.Queue.primaryQueueShard.Name(),
+		"queue_shard", p.Queue.Shard().Name(),
 	)
 
 	// used for error reporting
@@ -287,11 +287,11 @@ func (p *ProcessorIterator) process(ctx context.Context, item *QueueItem) error 
 		p.CtrRateLimit++
 		metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{
 			PkgName: pkgName,
-			Tags:    map[string]any{"status": "throttled", "queue_shard": p.Queue.primaryQueueShard.Name(), "constraint_source": constraint_check_source},
+			Tags:    map[string]any{"status": "throttled", "queue_shard": p.Queue.Shard().Name(), "constraint_source": constraint_check_source},
 		})
 
-		if p.Queue.ItemEnableKeyQueues(ctx, *item) {
-			err := p.Queue.primaryQueueShard.Requeue(ctx, *item, time.UnixMilli(item.AtMS))
+		if p.Queue.Options().ItemEnableKeyQueues(ctx, *item) {
+			err := p.Queue.Shard().Requeue(ctx, *item, time.UnixMilli(item.AtMS))
 			if err != nil && !errors.Is(err, ErrQueueItemNotFound) {
 				l.ReportError(err, "could not requeue item to backlog after hitting throttle limit",
 					logger.WithErrorReportTags(errTags),
@@ -302,7 +302,7 @@ func (p *ProcessorIterator) process(ctx context.Context, item *QueueItem) error 
 			metrics.IncrRequeueExistingToBacklogCounter(ctx, metrics.CounterOpt{
 				PkgName: pkgName,
 				Tags: map[string]any{
-					"queue_shard": p.Queue.primaryQueueShard.Name(),
+					"queue_shard": p.Queue.Shard().Name(),
 					// "partition_id": item.FunctionID.String(),
 					"status": "throttled",
 				},
@@ -328,16 +328,16 @@ func (p *ProcessorIterator) process(ctx context.Context, item *QueueItem) error 
 		case ErrPartitionConcurrencyLimit:
 			status = "partition_concurrency_limit"
 			if p.Partition.FunctionID != nil {
-				p.Queue.lifecycles.OnFnConcurrencyLimitReached(context.WithoutCancel(ctx), *p.Partition.FunctionID)
+				p.Queue.Options().lifecycles.OnFnConcurrencyLimitReached(context.WithoutCancel(ctx), *p.Partition.FunctionID)
 			}
 		case ErrAccountConcurrencyLimit:
 			status = "account_concurrency_limit"
 			// For backwards compatibility, we report on the function level as well
 			if p.Partition.FunctionID != nil {
-				p.Queue.lifecycles.OnFnConcurrencyLimitReached(context.WithoutCancel(ctx), *p.Partition.FunctionID)
+				p.Queue.Options().lifecycles.OnFnConcurrencyLimitReached(context.WithoutCancel(ctx), *p.Partition.FunctionID)
 			}
 
-			p.Queue.lifecycles.OnAccountConcurrencyLimitReached(
+			p.Queue.Options().lifecycles.OnAccountConcurrencyLimitReached(
 				context.WithoutCancel(ctx),
 				p.Partition.AccountID,
 				p.Partition.EnvID,
@@ -346,11 +346,11 @@ func (p *ProcessorIterator) process(ctx context.Context, item *QueueItem) error 
 
 		metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{
 			PkgName: pkgName,
-			Tags:    map[string]any{"status": status, "queue_shard": p.Queue.primaryQueueShard.Name(), "constraint_source": constraint_check_source},
+			Tags:    map[string]any{"status": status, "queue_shard": p.Queue.Shard().Name(), "constraint_source": constraint_check_source},
 		})
 
-		if p.Queue.ItemEnableKeyQueues(ctx, *item) {
-			err := p.Queue.primaryQueueShard.Requeue(ctx, *item, time.UnixMilli(item.AtMS))
+		if p.Queue.Options().ItemEnableKeyQueues(ctx, *item) {
+			err := p.Queue.Shard().Requeue(ctx, *item, time.UnixMilli(item.AtMS))
 			if err != nil && !errors.Is(err, ErrQueueItemNotFound) {
 				l.ReportError(err, "could not requeue item to backlog after hitting concurrency limit",
 					logger.WithErrorReportTags(errTags),
@@ -361,7 +361,7 @@ func (p *ProcessorIterator) process(ctx context.Context, item *QueueItem) error 
 			metrics.IncrRequeueExistingToBacklogCounter(ctx, metrics.CounterOpt{
 				PkgName: pkgName,
 				Tags: map[string]any{
-					"queue_shard": p.Queue.primaryQueueShard.Name(),
+					"queue_shard": p.Queue.Shard().Name(),
 					// "partition_id": item.FunctionID.String(),
 					"status": status,
 				},
@@ -382,7 +382,7 @@ func (p *ProcessorIterator) process(ctx context.Context, item *QueueItem) error 
 
 		// For backwards compatibility, we report on the function level as well
 		if p.Partition.FunctionID != nil {
-			p.Queue.lifecycles.OnFnConcurrencyLimitReached(context.WithoutCancel(ctx), *p.Partition.FunctionID)
+			p.Queue.Options().lifecycles.OnFnConcurrencyLimitReached(context.WithoutCancel(ctx), *p.Partition.FunctionID)
 		}
 
 		// TODO: Report on key that was hit (this must have been empty previously)
@@ -390,11 +390,11 @@ func (p *ProcessorIterator) process(ctx context.Context, item *QueueItem) error 
 
 		metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{
 			PkgName: pkgName,
-			Tags:    map[string]any{"status": "custom_key_concurrency_limit", "queue_shard": p.Queue.primaryQueueShard.Name(), "constraint_source": constraint_check_source},
+			Tags:    map[string]any{"status": "custom_key_concurrency_limit", "queue_shard": p.Queue.Shard().Name(), "constraint_source": constraint_check_source},
 		})
 
-		if p.Queue.ItemEnableKeyQueues(ctx, *item) {
-			err := p.Queue.primaryQueueShard.Requeue(ctx, *item, time.UnixMilli(item.AtMS))
+		if p.Queue.Options().ItemEnableKeyQueues(ctx, *item) {
+			err := p.Queue.Shard().Requeue(ctx, *item, time.UnixMilli(item.AtMS))
 			if err != nil && !errors.Is(err, ErrQueueItemNotFound) {
 				l.ReportError(err, "could not requeue item to backlog after hitting custom concurrency limit",
 					logger.WithErrorReportTags(errTags),
@@ -405,7 +405,7 @@ func (p *ProcessorIterator) process(ctx context.Context, item *QueueItem) error 
 			metrics.IncrRequeueExistingToBacklogCounter(ctx, metrics.CounterOpt{
 				PkgName: pkgName,
 				Tags: map[string]any{
-					"queue_shard": p.Queue.primaryQueueShard.Name(),
+					"queue_shard": p.Queue.Shard().Name(),
 					// "partition_id": item.FunctionID.String(),
 					"status": "custom_key_concurrency_limit",
 				},
@@ -417,7 +417,7 @@ func (p *ProcessorIterator) process(ctx context.Context, item *QueueItem) error 
 		p.CtrSuccess++ // count as a success for stats purposes.
 		metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{
 			PkgName: pkgName,
-			Tags:    map[string]any{"status": "success", "queue_shard": p.Queue.primaryQueueShard.Name(), "constraint_source": constraint_check_source},
+			Tags:    map[string]any{"status": "success", "queue_shard": p.Queue.Shard().Name(), "constraint_source": constraint_check_source},
 		})
 		return nil
 	case ErrQueueItemAlreadyLeased:
@@ -425,7 +425,7 @@ func (p *ProcessorIterator) process(ctx context.Context, item *QueueItem) error 
 		p.CtrSuccess++ // count as a success for stats purposes.
 		metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{
 			PkgName: pkgName,
-			Tags:    map[string]any{"status": "success", "queue_shard": p.Queue.primaryQueueShard.Name(), "constraint_source": constraint_check_source},
+			Tags:    map[string]any{"status": "success", "queue_shard": p.Queue.Shard().Name(), "constraint_source": constraint_check_source},
 		})
 		return nil
 	}
@@ -435,7 +435,7 @@ func (p *ProcessorIterator) process(ctx context.Context, item *QueueItem) error 
 		p.Err = fmt.Errorf("error leasing in process: %w", err)
 		metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{
 			PkgName: pkgName,
-			Tags:    map[string]any{"status": "error", "queue_shard": p.Queue.primaryQueueShard.Name(), "constraint_source": constraint_check_source},
+			Tags:    map[string]any{"status": "error", "queue_shard": p.Queue.Shard().Name(), "constraint_source": constraint_check_source},
 		})
 		return p.Err
 	}
@@ -449,9 +449,9 @@ func (p *ProcessorIterator) process(ctx context.Context, item *QueueItem) error 
 	p.CtrSuccess++
 	metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{
 		PkgName: pkgName,
-		Tags:    map[string]any{"status": "success", "queue_shard": p.Queue.primaryQueueShard.Name(), "constraint_source": constraint_check_source},
+		Tags:    map[string]any{"status": "success", "queue_shard": p.Queue.Shard().Name(), "constraint_source": constraint_check_source},
 	})
-	p.Queue.workers <- ProcessItem{
+	p.Queue.Workers() <- ProcessItem{
 		P:    *p.Partition,
 		I:    *item,
 		PCtr: p.PartitionContinueCtr,
@@ -466,7 +466,7 @@ func (p *ProcessorIterator) process(ctx context.Context, item *QueueItem) error 
 	return nil
 }
 
-func (p *ProcessorIterator) isRequeuable() bool {
+func (p *ProcessorIterator) IsRequeuable() bool {
 	// if we have concurrency OR we hit rate limiting/throttling.
 	return p.CtrConcurrency > 0 || (p.CtrRateLimit > 0 && p.CtrConcurrency == 0 && p.CtrSuccess == 0)
 }
