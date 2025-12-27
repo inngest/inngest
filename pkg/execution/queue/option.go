@@ -598,19 +598,19 @@ type shadowContinuation struct {
 	count      uint
 }
 
-// processItem references the queue partition and queue item to be processed by a worker.
+// ProcessItem references the queue partition and queue item to be processed by a worker.
 // both items need to be passed to a worker as both items are needed to generate concurrency
 // keys to extend leases and dequeue.
-type processItem struct {
+type ProcessItem struct {
 	P QueuePartition
 	I QueueItem
 
 	// PCtr represents the number of times the partition has been continued.
 	PCtr uint
 
-	capacityLease *CapacityLease
+	CapacityLease *CapacityLease
 
-	// disableConstraintUpdates determines whether ExtendLease, Requeue,
+	// DisableConstraintUpdates determines whether ExtendLease, Requeue,
 	// and Dequeue should update constraint state.
 	//
 	// Disable constraint updates in case
@@ -624,7 +624,7 @@ type processItem struct {
 	// If the Constraint API is disabled or the lease expired, we will manage constraint state internally.
 	//
 	// NOTE: This value is set in itemLeaseConstraintCheck.
-	disableConstraintUpdates bool
+	DisableConstraintUpdates bool
 }
 
 type capacityLease struct {

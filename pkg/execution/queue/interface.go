@@ -140,6 +140,12 @@ type QueueManager interface {
 		sourceBacklog *QueueBacklog,
 		item QueueItem,
 	) (QueueItem, error)
+
+	ProcessItem(
+		ctx context.Context,
+		i ProcessItem,
+		f RunFunc,
+	) error
 }
 
 type QueueProcessor interface {

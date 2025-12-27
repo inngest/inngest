@@ -14,18 +14,18 @@ import (
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 )
 
-func (q *queueProcessor) process(
+func (q *queueProcessor) ProcessItem(
 	ctx context.Context,
-	i processItem,
+	i ProcessItem,
 	f RunFunc,
 ) error {
 	qi := i.I
 	p := i.P
 	continuationCtr := i.PCtr
 
-	capacityLeaseID := newCapacityLease(i.capacityLease)
+	capacityLeaseID := newCapacityLease(i.CapacityLease)
 
-	disableConstraintUpdates := i.disableConstraintUpdates
+	disableConstraintUpdates := i.DisableConstraintUpdates
 
 	var err error
 	leaseID := qi.LeaseID
@@ -94,7 +94,7 @@ func (q *queueProcessor) process(
 				// - the item is enqueued to a system queue
 				// - the Constraint API is disabled or the current account is not enrolled
 				// - the Constraint API provided a lease which expired at the time of leasing the queue item
-				if i.capacityLease == nil {
+				if i.CapacityLease == nil {
 					q.log.Trace("item has no capacity lease, skipping lease extension")
 					continue
 				}
@@ -254,7 +254,7 @@ func (q *queueProcessor) process(
 			QueueShardName:      q.primaryQueueShard.Name(),
 			ContinueCount:       continuationCtr,
 			RefilledFromBacklog: qi.RefilledFrom,
-			CapacityLease:       i.capacityLease,
+			CapacityLease:       i.CapacityLease,
 		}
 
 		// Call the run func.
