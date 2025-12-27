@@ -993,7 +993,7 @@ func (q *queue) Lease(
 	metrics.HistogramQueueOperationDelay(ctx, itemDelay, metrics.HistogramOpt{
 		PkgName: pkgName,
 		Tags: map[string]any{
-			"queue_shard": q.Name,
+			"queue_shard": q.Name(),
 			"op":          "item",
 		},
 	},
@@ -1005,7 +1005,7 @@ func (q *queue) Lease(
 	metrics.HistogramQueueOperationDelay(ctx, refillDelay, metrics.HistogramOpt{
 		PkgName: pkgName,
 		Tags: map[string]any{
-			"queue_shard": q.Name,
+			"queue_shard": q.Name(),
 			"op":          "refill",
 		},
 	},
@@ -1017,7 +1017,7 @@ func (q *queue) Lease(
 	metrics.HistogramQueueOperationDelay(ctx, leaseDelay, metrics.HistogramOpt{
 		PkgName: pkgName,
 		Tags: map[string]any{
-			"queue_shard": q.Name,
+			"queue_shard": q.Name(),
 			"op":          "lease",
 		},
 	},
@@ -1988,7 +1988,7 @@ func (q *queue) Instrument(ctx context.Context) error {
 						// NOTE: potentially high cardinality but this gives better clarify of stuff
 						// this is potentially useless for key queues
 						"partition":   partitionKey,
-						"queue_shard": q.Name,
+						"queue_shard": q.Name(),
 					},
 				})
 			}
@@ -1998,7 +1998,7 @@ func (q *queue) Instrument(ctx context.Context) error {
 			metrics.GaugeGlobalPartitionSize(ctx, totalPartitions, metrics.GaugeOpt{
 				PkgName: pkgName,
 				Tags: map[string]any{
-					"queue_shard": q.Name,
+					"queue_shard": q.Name(),
 				},
 			})
 		},

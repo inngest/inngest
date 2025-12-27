@@ -149,11 +149,11 @@ func (q *queueProcessor) AddShadowContinue(ctx context.Context, p *QueueShadowPa
 	// beyond capacity.
 	if ctr == 1 {
 		if len(q.shadowContinues) > consts.QueueShadowContinuationMaxPartitions {
-			metrics.IncrQueueShadowContinuationOpCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name, "op": "max_capacity"}})
+			metrics.IncrQueueShadowContinuationOpCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name(), "op": "max_capacity"}})
 			return
 		}
 		if t, ok := q.shadowContinueCooldown[p.PartitionID]; ok && t.After(time.Now()) {
-			metrics.IncrQueueShadowContinuationOpCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name, "op": "cooldown"}})
+			metrics.IncrQueueShadowContinuationOpCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name(), "op": "cooldown"}})
 			return
 		}
 
@@ -167,7 +167,7 @@ func (q *queueProcessor) AddShadowContinue(ctx context.Context, p *QueueShadowPa
 		// is higher.  This ensures that we always have the highest continuation
 		// count stored for queue processing.
 		q.shadowContinues[p.PartitionID] = ShadowContinuation{ShadowPart: p, Count: ctr}
-		metrics.IncrQueueShadowContinuationOpCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name, "op": "added"}})
+		metrics.IncrQueueShadowContinuationOpCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name(), "op": "added"}})
 	}
 }
 
@@ -182,7 +182,7 @@ func (q *queueProcessor) removeShadowContinue(ctx context.Context, p *QueueShado
 	q.shadowContinuesLock.Lock()
 	defer q.shadowContinuesLock.Unlock()
 
-	metrics.IncrQueueShadowContinuationOpCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name, "op": "removed"}})
+	metrics.IncrQueueShadowContinuationOpCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name(), "op": "removed"}})
 
 	delete(q.shadowContinues, p.PartitionID)
 
