@@ -326,7 +326,7 @@ func (q *queueProcessor) processShadowPartition(ctx context.Context, shadowPart 
 		q.removeShadowContinue(ctx, shadowPart, false)
 	} else {
 		// Not constrained so we can add a continuation
-		q.addShadowContinue(ctx, shadowPart, continuationCount+1)
+		q.AddShadowContinue(ctx, shadowPart, continuationCount+1)
 
 		// Hint to the executor
 		if refilledItems > 0 {
