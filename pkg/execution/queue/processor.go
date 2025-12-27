@@ -65,6 +65,12 @@ func NewQueueProcessor(
 		primaryQueueShard: primaryQueueShard,
 		queueShardClients: queueShardClients,
 		shardSelector:     shardSelector,
+
+		qspc: make(chan ShadowPartitionChanMsg),
+
+		shadowContinuesLock:    &sync.Mutex{},
+		shadowContinues:        map[string]shadowContinuation{},
+		shadowContinueCooldown: map[string]time.Time{},
 	}
 
 	return qp, nil
@@ -97,6 +103,9 @@ type queueProcessor struct {
 	// workers is a buffered channel which allows scanners to send queue items
 	// to workers to be processed
 	workers chan ProcessItem
+
+	qspc chan ShadowPartitionChanMsg
+
 	// sem stores a semaphore controlling the number of jobs currently
 	// being processed.  This lets us check whether there's capacity in the queue
 	// prior to leasing items.
@@ -130,6 +139,11 @@ type queueProcessor struct {
 	// scavengerLeaseLock ensures that there are no data races writing to
 	// or reading from scavengerLeaseID in parallel.
 	scavengerLeaseLock *sync.RWMutex
+
+	shadowContinues         map[string]shadowContinuation
+	shadowContinueCooldown  map[string]time.Time
+	shadowContinuesLock     *sync.Mutex
+	shadowContinuationLimit uint
 }
 
 func (q *queueProcessor) Clock() clockwork.Clock {

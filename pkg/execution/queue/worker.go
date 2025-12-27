@@ -36,14 +36,18 @@ func (q *queueProcessor) worker(ctx context.Context, f RunFunc) {
 	}
 }
 
-type shadowPartitionChanMsg struct {
-	sp                *QueueShadowPartition
-	continuationCount uint
+type ShadowPartitionChanMsg struct {
+	ShadowPartition   *QueueShadowPartition
+	ContinuationCount uint
+}
+
+func (q *queueProcessor) ShadowPartitionWorkers() chan ShadowPartitionChanMsg {
+	return q.qspc
 }
 
 // shadowWorker runs a blocking process that listens to item being pushed into the
 // shadow queue partition channel. This allows us to process an individual shadow partition.
-func (q *queueProcessor) shadowWorker(ctx context.Context, qspc chan shadowPartitionChanMsg) {
+func (q *queueProcessor) shadowWorker(ctx context.Context, qspc chan ShadowPartitionChanMsg) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -56,7 +60,7 @@ func (q *queueProcessor) shadowWorker(ctx context.Context, qspc chan shadowParti
 				"shadow_partition_process_duration",
 				q.Clock().Now(),
 				func(ctx context.Context) (any, error) {
-					err := q.processShadowPartition(ctx, msg.sp, msg.continuationCount)
+					err := q.processShadowPartition(ctx, msg.ShadowPartition, msg.ContinuationCount)
 					if errors.Is(err, context.Canceled) {
 						return nil, nil
 					}
@@ -67,7 +71,7 @@ func (q *queueProcessor) shadowWorker(ctx context.Context, qspc chan shadowParti
 				},
 			)
 			if err != nil {
-				q.log.Error("could not scan shadow partition", "error", err, "shadow_part", msg.sp, "continuation_count", msg.continuationCount)
+				q.log.Error("could not scan shadow partition", "error", err, "shadow_part", msg.ShadowPartition, "continuation_count", msg.ContinuationCount)
 			}
 		}
 	}

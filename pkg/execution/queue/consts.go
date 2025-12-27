@@ -124,7 +124,7 @@ const (
 	defaultActiveCheckTick          = 10 * time.Second
 
 	defaultIdempotencyTTL = 12 * time.Hour
-	defaultConcurrency    = 1000 // TODO: add function to override.
+	DefaultConcurrency    = 1000 // TODO: add function to override.
 
 	DefaultInstrumentInterval = 10 * time.Second
 

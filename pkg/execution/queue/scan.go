@@ -282,10 +282,9 @@ func (q *queueProcessor) processScannedPartitions(
 // to the function partition for processing
 func (q *queueProcessor) shadowScan(ctx context.Context) error {
 	l := q.log.With("method", "shadowScan")
-	qspc := make(chan shadowPartitionChanMsg)
 
 	for i := int32(0); i < q.numShadowWorkers; i++ {
-		go q.shadowWorker(ctx, qspc)
+		go q.shadowWorker(ctx, q.qspc)
 	}
 
 	tick := q.Clock().NewTicker(q.shadowPollTick)
@@ -303,7 +302,7 @@ func (q *queueProcessor) shadowScan(ctx context.Context) error {
 			// Scan a little further into the future
 			now := q.Clock().Now()
 			scanUntil := now.Truncate(time.Second).Add(ShadowPartitionLookahead)
-			if err := q.scanShadowPartitions(ctx, scanUntil, qspc); err != nil {
+			if err := q.ScanShadowPartitions(ctx, scanUntil, q.qspc); err != nil {
 				if errors.Is(err, context.DeadlineExceeded) {
 					l.Warn("deadline exceeded scanning shadow partitions")
 					<-time.After(backoff)
