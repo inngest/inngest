@@ -390,9 +390,9 @@ func TestQueueProcessorPreLeaseWithConstraintAPI(t *testing.T) {
 			Items:                []*osqueue.QueueItem{&qi},
 			PartitionContinueCtr: 0,
 			Queue:                q,
-			denies:               newLeaseDenyList(),
-			staticTime:           q.clock.Now(),
-			parallel:             false,
+			Denies:               osqueue.NewLeaseDenyList(),
+			StaticTime:           clock.Now(),
+			Parallel:             false,
 		}
 
 		err = iter.process(ctx, &qi)

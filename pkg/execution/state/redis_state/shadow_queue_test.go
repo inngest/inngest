@@ -26,7 +26,7 @@ import (
 )
 
 // getItemIDsFromBacklog is a helper function to peek items from a backlog and extract their IDs
-func getItemIDsFromBacklog(ctx context.Context, q osqueue.QueueProcessor, backlog *osqueue.QueueBacklog, refillUntil time.Time, limit int64) ([]string, error) {
+func getItemIDsFromBacklog(ctx context.Context, q osqueue.ShardOperations, backlog *osqueue.QueueBacklog, refillUntil time.Time, limit int64) ([]string, error) {
 	items, _, err := q.BacklogPeek(
 		ctx,
 		backlog,

@@ -9,7 +9,7 @@ import (
 )
 
 type QueueShard interface {
-	QueueProcessor
+	ShardOperations
 
 	Name() string
 	Kind() enums.QueueShardKind
