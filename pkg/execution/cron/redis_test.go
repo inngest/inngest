@@ -665,7 +665,7 @@ func TestRedisCronManager(t *testing.T) {
 	shard := redis_state.NewRedisQueue(
 		*queue.NewQueueOptions(ctx, opts...),
 		consts.DefaultQueueShardName,
-		redis_state.NewQueueClient(rc, consts.DefaultQueueShardName),
+		redis_state.NewQueueClient(rc, redis_state.QueueDefaultKey),
 	)
 
 	q, err := queue.NewQueueProcessor(
@@ -1375,6 +1375,9 @@ func TestRedisCronManager(t *testing.T) {
 
 	t.Run("EnqueueHealthCheck", func(t *testing.T) {
 		t.Run("not idempotent", func(t *testing.T) {
+			l := logger.StdlibLogger(ctx, logger.WithLoggerLevel(logger.LevelTrace))
+			ctx := logger.WithStdlib(ctx, l)
+
 			r.FlushAll()
 			cronItem := createCronItem(enums.CronHealthCheck)
 
@@ -1385,6 +1388,8 @@ func TestRedisCronManager(t *testing.T) {
 			// Get count of queue items in the partition
 			cmd := rc.B().Zcard().Key("{queue}:queue:sorted:cron-health-check").Build()
 			queueItemCount1, _ := rc.Do(ctx, cmd).AsInt64()
+
+			require.Equal(t, 1, int(queueItemCount1))
 
 			// Call enqueue should succeed: second time - should enqueue another item
 			err = cm.EnqueueHealthCheck(ctx, cronItem)
