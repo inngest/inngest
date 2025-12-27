@@ -35,26 +35,33 @@ func TestDebounce(t *testing.T) {
 	unshardedClient := redis_state.NewUnshardedClient(unshardedRc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
 	debounceClient := unshardedClient.Debounce()
 
-	defaultQueueShard := redis_state.RedisQueueShard{Name: consts.DefaultQueueShardName, RedisClient: unshardedClient.Queue(), Kind: string(enums.QueueShardKindRedis)}
-
-	q := redis_state.NewQueue(
-		defaultQueueShard,
-		redis_state.WithQueueShardClients(
-			map[string]redis_state.RedisQueueShard{
-				defaultQueueShard.Name: defaultQueueShard,
-			},
-		),
-		redis_state.WithShardSelector(func(ctx context.Context, accountId uuid.UUID, queueName *string) (redis_state.RedisQueueShard, error) {
-			return defaultQueueShard, nil
-		}),
-		redis_state.WithKindToQueueMapping(map[string]string{
+	opts := []queue.QueueOpt{
+		queue.WithKindToQueueMapping(map[string]string{
 			queue.KindDebounce: queue.KindDebounce,
 		}),
+	}
+
+	shard := redis_state.NewRedisQueue(*queue.NewQueueOptions(context.Background(), opts...), consts.DefaultQueueShardName, unshardedClient.Queue())
+
+	q, err := queue.NewQueueProcessor(
+		context.Background(),
+		"debounce-test",
+
+		shard,
+		map[string]queue.QueueShard{
+			consts.DefaultQueueShardName: shard,
+		},
+		func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
+			return shard, nil
+		},
+		opts...,
 	)
+	require.NoError(t, err)
+	kg := shard.Client().KeyGenerator()
 
 	fakeClock := clockwork.NewFakeClock()
 
-	redisDebouncer := NewRedisDebouncer(debounceClient, defaultQueueShard, q).(debouncer)
+	redisDebouncer := NewRedisDebouncer(debounceClient, shard, q).(debouncer)
 	redisDebouncer.c = fakeClock
 
 	ctx := context.Background()
@@ -112,12 +119,12 @@ func TestDebounce(t *testing.T) {
 
 		// Queue state should match
 		{
-			queueItemIds, err := unshardedCluster.HKeys(defaultQueueShard.RedisClient.KeyGenerator().QueueItem())
+			queueItemIds, err := unshardedCluster.HKeys(kg.QueueItem())
 			require.NoError(t, err)
 			require.Len(t, queueItemIds, 1)
 
 			var qi queue.QueueItem
-			err = json.Unmarshal([]byte(unshardedCluster.HGet(defaultQueueShard.RedisClient.KeyGenerator().QueueItem(), queueItemIds[0])), &qi)
+			err = json.Unmarshal([]byte(unshardedCluster.HGet(kg.QueueItem(), queueItemIds[0])), &qi)
 			require.NoError(t, err)
 
 			require.Equal(t, queue.KindDebounce, qi.Data.Kind)
@@ -133,7 +140,7 @@ func TestDebounce(t *testing.T) {
 
 			require.Equal(t, expectedPayload, payload)
 
-			itemScore, err := unshardedCluster.ZScore(defaultQueueShard.RedisClient.KeyGenerator().PartitionQueueSet(enums.PartitionTypeDefault, queue.KindDebounce, ""), qi.ID)
+			itemScore, err := unshardedCluster.ZScore(kg.PartitionQueueSet(enums.PartitionTypeDefault, queue.KindDebounce, ""), qi.ID)
 			require.NoError(t, err)
 			expectedQueueScore := eventTime.
 				Add(10 * time.Second).       // Debounce period
@@ -192,12 +199,12 @@ func TestDebounce(t *testing.T) {
 
 		// Queue state should match
 		{
-			queueItemIds, err := unshardedCluster.HKeys(defaultQueueShard.RedisClient.KeyGenerator().QueueItem())
+			queueItemIds, err := unshardedCluster.HKeys(kg.QueueItem())
 			require.NoError(t, err)
 			require.Len(t, queueItemIds, 1)
 
 			var qi queue.QueueItem
-			err = json.Unmarshal([]byte(unshardedCluster.HGet(defaultQueueShard.RedisClient.KeyGenerator().QueueItem(), queueItemIds[0])), &qi)
+			err = json.Unmarshal([]byte(unshardedCluster.HGet(kg.QueueItem(), queueItemIds[0])), &qi)
 			require.NoError(t, err)
 
 			require.Equal(t, queue.KindDebounce, qi.Data.Kind)
@@ -213,7 +220,7 @@ func TestDebounce(t *testing.T) {
 
 			require.Equal(t, expectedPayload, payload)
 
-			itemScore, err := unshardedCluster.ZScore(defaultQueueShard.RedisClient.KeyGenerator().PartitionQueueSet(enums.PartitionTypeDefault, queue.KindDebounce, ""), qi.ID)
+			itemScore, err := unshardedCluster.ZScore(kg.PartitionQueueSet(enums.PartitionTypeDefault, queue.KindDebounce, ""), qi.ID)
 			require.NoError(t, err)
 
 			initialScore := evt0Time.
@@ -284,7 +291,16 @@ func TestJITDebounceMigration(t *testing.T) {
 	unshardedClient := redis_state.NewUnshardedClient(unshardedRc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
 	unshardedDebounceClient := unshardedClient.Debounce()
 
-	defaultQueueShard := redis_state.RedisQueueShard{Name: consts.DefaultQueueShardName, RedisClient: unshardedClient.Queue(), Kind: string(enums.QueueShardKindRedis)}
+	fakeClock := clockwork.NewFakeClock()
+
+	opts := []queue.QueueOpt{
+		queue.WithKindToQueueMapping(map[string]string{
+			queue.KindDebounce: queue.KindDebounce,
+		}),
+		queue.WithClock(fakeClock),
+	}
+
+	defaultQueueShard := redis_state.NewRedisQueue(*queue.NewQueueOptions(context.Background(), opts...), consts.DefaultQueueShardName, unshardedClient.Queue())
 
 	// Create new single-shard (but multi-replica) Valkey cluster for system queues + colocated debounce state
 	newSystemCluster := miniredis.RunT(t)
@@ -294,49 +310,47 @@ func TestJITDebounceMigration(t *testing.T) {
 	})
 	newSystemClusterClient := redis_state.NewUnshardedClient(newSystemClusterRc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
 	require.NoError(t, err)
-	newSystemShard := redis_state.RedisQueueShard{Name: "new-system", RedisClient: newSystemClusterClient.Queue(), Kind: string(enums.QueueShardKindRedis)}
+	newSystemShard := redis_state.NewRedisQueue(*queue.NewQueueOptions(context.Background(), opts...), "new-system", newSystemClusterClient.Queue())
 	newSystemDebounceClient := newSystemClusterClient.Debounce()
 
 	// TODO What happens if both old and new services are running? Does this break debounces?
 	//  Do we need to keep the old behavior and flip using a feature flag (LaunchDarkly)
 	//  once all services running `Schedule` (new-runs, executor) are rolled out?
-	oldQueue := redis_state.NewQueue(
+	oldQueue, err := queue.NewQueueProcessor(
+		context.Background(),
+		"old-queue",
 		defaultQueueShard,
-		redis_state.WithQueueShardClients(
-			map[string]redis_state.RedisQueueShard{
-				defaultQueueShard.Name: defaultQueueShard,
-			},
-		),
-		redis_state.WithShardSelector(func(ctx context.Context, accountId uuid.UUID, queueName *string) (redis_state.RedisQueueShard, error) {
+		map[string]queue.QueueShard{
+			consts.DefaultQueueShardName: defaultQueueShard,
+		},
+		func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
 			return defaultQueueShard, nil
-		}),
-		redis_state.WithKindToQueueMapping(map[string]string{
-			queue.KindDebounce: queue.KindDebounce,
-		}),
+		},
+		opts...,
 	)
+	require.NoError(t, err)
 
-	newQueue := redis_state.NewQueue(
-		newSystemShard, // Primary
-		redis_state.WithQueueShardClients(
-			map[string]redis_state.RedisQueueShard{
-				defaultQueueShard.Name: defaultQueueShard,
-				newSystemShard.Name:    newSystemShard,
-			},
-		),
-		redis_state.WithShardSelector(func(ctx context.Context, accountId uuid.UUID, queueName *string) (redis_state.RedisQueueShard, error) {
+	newQueue, err := queue.NewQueueProcessor(
+		context.Background(),
+		"new-queue",
+		newSystemShard,
+		map[string]queue.QueueShard{
+			consts.DefaultQueueShardName: defaultQueueShard,
+			newSystemShard.Name():        newSystemShard,
+		},
+		func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
 			// Enqueue new system queue items to new system queue shard
 			if queueName != nil {
 				return newSystemShard, nil
 			}
 
 			return defaultQueueShard, nil
-		}),
-		redis_state.WithKindToQueueMapping(map[string]string{
-			queue.KindDebounce: queue.KindDebounce,
-		}),
+		},
+		opts...,
 	)
+	require.NoError(t, err)
 
-	fakeClock := clockwork.NewFakeClock()
+	kg := defaultQueueShard.Client().KeyGenerator()
 
 	oldRedisDebouncer := NewRedisDebouncer(unshardedDebounceClient, defaultQueueShard, oldQueue).(debouncer)
 	oldRedisDebouncer.c = fakeClock
@@ -413,12 +427,12 @@ func TestJITDebounceMigration(t *testing.T) {
 
 		// Queue state should match
 		{
-			queueItemIds, err := unshardedCluster.HKeys(defaultQueueShard.RedisClient.KeyGenerator().QueueItem())
+			queueItemIds, err := unshardedCluster.HKeys(kg.QueueItem())
 			require.NoError(t, err)
 			require.Len(t, queueItemIds, 1)
 
 			var qi queue.QueueItem
-			err = json.Unmarshal([]byte(unshardedCluster.HGet(defaultQueueShard.RedisClient.KeyGenerator().QueueItem(), queueItemIds[0])), &qi)
+			err = json.Unmarshal([]byte(unshardedCluster.HGet(kg.QueueItem(), queueItemIds[0])), &qi)
 			require.NoError(t, err)
 
 			require.Equal(t, queue.KindDebounce, qi.Data.Kind)
@@ -434,7 +448,7 @@ func TestJITDebounceMigration(t *testing.T) {
 
 			require.Equal(t, expectedPayload, payload)
 
-			itemScore, err := unshardedCluster.ZScore(defaultQueueShard.RedisClient.KeyGenerator().PartitionQueueSet(enums.PartitionTypeDefault, queue.KindDebounce, ""), qi.ID)
+			itemScore, err := unshardedCluster.ZScore(kg.PartitionQueueSet(enums.PartitionTypeDefault, queue.KindDebounce, ""), qi.ID)
 			require.NoError(t, err)
 			expectedQueueScore := eventTime.
 				Add(10 * time.Second).       // Debounce period
@@ -493,12 +507,12 @@ func TestJITDebounceMigration(t *testing.T) {
 
 		// Queue state should match
 		{
-			queueItemIds, err := newSystemCluster.HKeys(newSystemShard.RedisClient.KeyGenerator().QueueItem())
+			queueItemIds, err := newSystemCluster.HKeys(kg.QueueItem())
 			require.NoError(t, err)
 			require.Len(t, queueItemIds, 1)
 
 			var qi queue.QueueItem
-			err = json.Unmarshal([]byte(newSystemCluster.HGet(newSystemShard.RedisClient.KeyGenerator().QueueItem(), queueItemIds[0])), &qi)
+			err = json.Unmarshal([]byte(newSystemCluster.HGet(kg.QueueItem(), queueItemIds[0])), &qi)
 			require.NoError(t, err)
 
 			require.Equal(t, queue.KindDebounce, qi.Data.Kind)
@@ -514,7 +528,7 @@ func TestJITDebounceMigration(t *testing.T) {
 
 			require.Equal(t, expectedPayload, payload)
 
-			itemScore, err := newSystemCluster.ZScore(newSystemShard.RedisClient.KeyGenerator().PartitionQueueSet(enums.PartitionTypeDefault, queue.KindDebounce, ""), qi.ID)
+			itemScore, err := newSystemCluster.ZScore(kg.PartitionQueueSet(enums.PartitionTypeDefault, queue.KindDebounce, ""), qi.ID)
 			require.NoError(t, err)
 
 			initialScore := evt0Time.
@@ -557,7 +571,16 @@ func TestDebounceMigrationWithoutTimeout(t *testing.T) {
 	unshardedClient := redis_state.NewUnshardedClient(unshardedRc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
 	unshardedDebounceClient := unshardedClient.Debounce()
 
-	defaultQueueShard := redis_state.RedisQueueShard{Name: consts.DefaultQueueShardName, RedisClient: unshardedClient.Queue(), Kind: string(enums.QueueShardKindRedis)}
+	fakeClock := clockwork.NewFakeClock()
+
+	opts := []queue.QueueOpt{
+		queue.WithKindToQueueMapping(map[string]string{
+			queue.KindDebounce: queue.KindDebounce,
+		}),
+		queue.WithClock(fakeClock),
+	}
+
+	defaultQueueShard := redis_state.NewRedisQueue(*queue.NewQueueOptions(context.Background(), opts...), consts.DefaultQueueShardName, unshardedClient.Queue())
 
 	// Create new single-shard (but multi-replica) Valkey cluster for system queues + colocated debounce state
 	newSystemCluster := miniredis.RunT(t)
@@ -567,50 +590,47 @@ func TestDebounceMigrationWithoutTimeout(t *testing.T) {
 	})
 	newSystemClusterClient := redis_state.NewUnshardedClient(newSystemClusterRc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
 	require.NoError(t, err)
-	newSystemShard := redis_state.RedisQueueShard{Name: "new-system", RedisClient: newSystemClusterClient.Queue(), Kind: string(enums.QueueShardKindRedis)}
+	newSystemShard := redis_state.NewRedisQueue(*queue.NewQueueOptions(context.Background(), opts...), "new-system", newSystemClusterClient.Queue())
 	newSystemDebounceClient := newSystemClusterClient.Debounce()
 
 	// TODO What happens if both old and new services are running? Does this break debounces?
 	//  Do we need to keep the old behavior and flip using a feature flag (LaunchDarkly)
 	//  once all services running `Schedule` (new-runs, executor) are rolled out?
-	oldQueue := redis_state.NewQueue(
+	oldQueue, err := queue.NewQueueProcessor(
+		context.Background(),
+		"old-queue",
 		defaultQueueShard,
-		redis_state.WithQueueShardClients(
-			map[string]redis_state.RedisQueueShard{
-				defaultQueueShard.Name: defaultQueueShard,
-			},
-		),
-		redis_state.WithShardSelector(func(ctx context.Context, accountId uuid.UUID, queueName *string) (redis_state.RedisQueueShard, error) {
+		map[string]queue.QueueShard{
+			consts.DefaultQueueShardName: defaultQueueShard,
+		},
+		func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
 			return defaultQueueShard, nil
-		}),
-		redis_state.WithKindToQueueMapping(map[string]string{
-			queue.KindDebounce: queue.KindDebounce,
-		}),
+		},
+		opts...,
 	)
+	require.NoError(t, err)
 
-	newQueue := redis_state.NewQueue(
-		newSystemShard, // Primary
-		redis_state.WithQueueShardClients(
-			map[string]redis_state.RedisQueueShard{
-				defaultQueueShard.Name: defaultQueueShard,
-				newSystemShard.Name:    newSystemShard,
-			},
-		),
-		redis_state.WithShardSelector(func(ctx context.Context, accountId uuid.UUID, queueName *string) (redis_state.RedisQueueShard, error) {
+	newQueue, err := queue.NewQueueProcessor(
+		context.Background(),
+		"new-queue",
+		newSystemShard,
+		map[string]queue.QueueShard{
+			consts.DefaultQueueShardName: defaultQueueShard,
+			newSystemShard.Name():        newSystemShard,
+		},
+		func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
 			// Enqueue new system queue items to new system queue shard
 			if queueName != nil {
 				return newSystemShard, nil
 			}
 
 			return defaultQueueShard, nil
-		}),
-		redis_state.WithKindToQueueMapping(map[string]string{
-			queue.KindDebounce: queue.KindDebounce,
-		}),
+		},
+		opts...,
 	)
+	require.NoError(t, err)
 
-	fakeClock := clockwork.NewFakeClock()
-
+	kg := defaultQueueShard.Client().KeyGenerator()
 	oldRedisDebouncer := NewRedisDebouncer(unshardedDebounceClient, defaultQueueShard, oldQueue).(debouncer)
 	oldRedisDebouncer.c = fakeClock
 
@@ -682,12 +702,12 @@ func TestDebounceMigrationWithoutTimeout(t *testing.T) {
 
 		// Queue state should match
 		{
-			queueItemIds, err := unshardedCluster.HKeys(defaultQueueShard.RedisClient.KeyGenerator().QueueItem())
+			queueItemIds, err := unshardedCluster.HKeys(kg.QueueItem())
 			require.NoError(t, err)
 			require.Len(t, queueItemIds, 1)
 
 			var qi queue.QueueItem
-			err = json.Unmarshal([]byte(unshardedCluster.HGet(defaultQueueShard.RedisClient.KeyGenerator().QueueItem(), queueItemIds[0])), &qi)
+			err = json.Unmarshal([]byte(unshardedCluster.HGet(kg.QueueItem(), queueItemIds[0])), &qi)
 			require.NoError(t, err)
 
 			require.Equal(t, queue.KindDebounce, qi.Data.Kind)
@@ -703,7 +723,7 @@ func TestDebounceMigrationWithoutTimeout(t *testing.T) {
 
 			require.Equal(t, expectedPayload, payload)
 
-			itemScore, err := unshardedCluster.ZScore(defaultQueueShard.RedisClient.KeyGenerator().PartitionQueueSet(enums.PartitionTypeDefault, queue.KindDebounce, ""), qi.ID)
+			itemScore, err := unshardedCluster.ZScore(kg.PartitionQueueSet(enums.PartitionTypeDefault, queue.KindDebounce, ""), qi.ID)
 			require.NoError(t, err)
 			expectedQueueScore := eventTime.
 				Add(10 * time.Second).       // Debounce period
@@ -760,12 +780,12 @@ func TestDebounceMigrationWithoutTimeout(t *testing.T) {
 
 		// Queue state should match
 		{
-			queueItemIds, err := newSystemCluster.HKeys(newSystemShard.RedisClient.KeyGenerator().QueueItem())
+			queueItemIds, err := newSystemCluster.HKeys(kg.QueueItem())
 			require.NoError(t, err)
 			require.Len(t, queueItemIds, 1)
 
 			var qi queue.QueueItem
-			err = json.Unmarshal([]byte(newSystemCluster.HGet(newSystemShard.RedisClient.KeyGenerator().QueueItem(), queueItemIds[0])), &qi)
+			err = json.Unmarshal([]byte(newSystemCluster.HGet(kg.QueueItem(), queueItemIds[0])), &qi)
 			require.NoError(t, err)
 
 			require.Equal(t, queue.KindDebounce, qi.Data.Kind)
@@ -781,7 +801,7 @@ func TestDebounceMigrationWithoutTimeout(t *testing.T) {
 
 			require.Equal(t, expectedPayload, payload)
 
-			itemScore, err := newSystemCluster.ZScore(newSystemShard.RedisClient.KeyGenerator().PartitionQueueSet(enums.PartitionTypeDefault, queue.KindDebounce, ""), qi.ID)
+			itemScore, err := newSystemCluster.ZScore(kg.PartitionQueueSet(enums.PartitionTypeDefault, queue.KindDebounce, ""), qi.ID)
 			require.NoError(t, err)
 
 			initialScore := evt0Time.
@@ -814,7 +834,16 @@ func TestDebounceTimeoutIsPreserved(t *testing.T) {
 	unshardedClient := redis_state.NewUnshardedClient(unshardedRc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
 	unshardedDebounceClient := unshardedClient.Debounce()
 
-	defaultQueueShard := redis_state.RedisQueueShard{Name: consts.DefaultQueueShardName, RedisClient: unshardedClient.Queue(), Kind: string(enums.QueueShardKindRedis)}
+	fakeClock := clockwork.NewFakeClock()
+
+	opts := []queue.QueueOpt{
+		queue.WithKindToQueueMapping(map[string]string{
+			queue.KindDebounce: queue.KindDebounce,
+		}),
+		queue.WithClock(fakeClock),
+	}
+
+	defaultQueueShard := redis_state.NewRedisQueue(*queue.NewQueueOptions(context.Background(), opts...), consts.DefaultQueueShardName, unshardedClient.Queue())
 
 	// Create new single-shard (but multi-replica) Valkey cluster for system queues + colocated debounce state
 	newSystemCluster := miniredis.RunT(t)
@@ -824,46 +853,47 @@ func TestDebounceTimeoutIsPreserved(t *testing.T) {
 	})
 	newSystemClusterClient := redis_state.NewUnshardedClient(newSystemClusterRc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
 	require.NoError(t, err)
-	newSystemShard := redis_state.RedisQueueShard{Name: "new-system", RedisClient: newSystemClusterClient.Queue(), Kind: string(enums.QueueShardKindRedis)}
+	newSystemShard := redis_state.NewRedisQueue(*queue.NewQueueOptions(context.Background(), opts...), "new-system", newSystemClusterClient.Queue())
 	newSystemDebounceClient := newSystemClusterClient.Debounce()
 
-	oldQueue := redis_state.NewQueue(
+	// TODO What happens if both old and new services are running? Does this break debounces?
+	//  Do we need to keep the old behavior and flip using a feature flag (LaunchDarkly)
+	//  once all services running `Schedule` (new-runs, executor) are rolled out?
+	oldQueue, err := queue.NewQueueProcessor(
+		context.Background(),
+		"old-queue",
 		defaultQueueShard,
-		redis_state.WithQueueShardClients(
-			map[string]redis_state.RedisQueueShard{
-				defaultQueueShard.Name: defaultQueueShard,
-			},
-		),
-		redis_state.WithShardSelector(func(ctx context.Context, accountId uuid.UUID, queueName *string) (redis_state.RedisQueueShard, error) {
+		map[string]queue.QueueShard{
+			consts.DefaultQueueShardName: defaultQueueShard,
+		},
+		func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
 			return defaultQueueShard, nil
-		}),
-		redis_state.WithKindToQueueMapping(map[string]string{
-			queue.KindDebounce: queue.KindDebounce,
-		}),
+		},
+		opts...,
 	)
+	require.NoError(t, err)
 
-	newQueue := redis_state.NewQueue(
-		newSystemShard, // Primary
-		redis_state.WithQueueShardClients(
-			map[string]redis_state.RedisQueueShard{
-				defaultQueueShard.Name: defaultQueueShard,
-				newSystemShard.Name:    newSystemShard,
-			},
-		),
-		redis_state.WithShardSelector(func(ctx context.Context, accountId uuid.UUID, queueName *string) (redis_state.RedisQueueShard, error) {
+	newQueue, err := queue.NewQueueProcessor(
+		context.Background(),
+		"new-queue",
+		newSystemShard,
+		map[string]queue.QueueShard{
+			consts.DefaultQueueShardName: defaultQueueShard,
+			newSystemShard.Name():        newSystemShard,
+		},
+		func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
 			// Enqueue new system queue items to new system queue shard
 			if queueName != nil {
 				return newSystemShard, nil
 			}
 
 			return defaultQueueShard, nil
-		}),
-		redis_state.WithKindToQueueMapping(map[string]string{
-			queue.KindDebounce: queue.KindDebounce,
-		}),
+		},
+		opts...,
 	)
+	require.NoError(t, err)
 
-	fakeClock := clockwork.NewFakeClock()
+	kg := defaultQueueShard.Client().KeyGenerator()
 
 	oldRedisDebouncer := NewRedisDebouncer(unshardedDebounceClient, defaultQueueShard, oldQueue).(debouncer)
 	oldRedisDebouncer.c = fakeClock
@@ -983,12 +1013,12 @@ func TestDebounceTimeoutIsPreserved(t *testing.T) {
 
 		// Queue state should match
 		{
-			queueItemIds, err := newSystemCluster.HKeys(newSystemShard.RedisClient.KeyGenerator().QueueItem())
+			queueItemIds, err := newSystemCluster.HKeys(kg.QueueItem())
 			require.NoError(t, err)
 			require.Len(t, queueItemIds, 1)
 
 			var qi queue.QueueItem
-			err = json.Unmarshal([]byte(newSystemCluster.HGet(newSystemShard.RedisClient.KeyGenerator().QueueItem(), queueItemIds[0])), &qi)
+			err = json.Unmarshal([]byte(newSystemCluster.HGet(kg.QueueItem(), queueItemIds[0])), &qi)
 			require.NoError(t, err)
 
 			require.Equal(t, queue.KindDebounce, qi.Data.Kind)
@@ -1004,7 +1034,7 @@ func TestDebounceTimeoutIsPreserved(t *testing.T) {
 
 			require.Equal(t, expectedPayload, payload)
 
-			itemScore, err := newSystemCluster.ZScore(newSystemShard.RedisClient.KeyGenerator().PartitionQueueSet(enums.PartitionTypeDefault, queue.KindDebounce, ""), qi.ID)
+			itemScore, err := newSystemCluster.ZScore(kg.PartitionQueueSet(enums.PartitionTypeDefault, queue.KindDebounce, ""), qi.ID)
 			require.NoError(t, err)
 
 			expectedRequeueScore := eventTime.
@@ -1032,7 +1062,16 @@ func TestDebounceExplicitMigration(t *testing.T) {
 	unshardedClient := redis_state.NewUnshardedClient(unshardedRc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
 	unshardedDebounceClient := unshardedClient.Debounce()
 
-	defaultQueueShard := redis_state.RedisQueueShard{Name: consts.DefaultQueueShardName, RedisClient: unshardedClient.Queue(), Kind: string(enums.QueueShardKindRedis)}
+	fakeClock := clockwork.NewFakeClock()
+
+	opts := []queue.QueueOpt{
+		queue.WithKindToQueueMapping(map[string]string{
+			queue.KindDebounce: queue.KindDebounce,
+		}),
+		queue.WithClock(fakeClock),
+	}
+
+	defaultQueueShard := redis_state.NewRedisQueue(*queue.NewQueueOptions(context.Background(), opts...), consts.DefaultQueueShardName, unshardedClient.Queue())
 
 	// Create new single-shard (but multi-replica) Valkey cluster for system queues + colocated debounce state
 	newSystemCluster := miniredis.RunT(t)
@@ -1042,46 +1081,47 @@ func TestDebounceExplicitMigration(t *testing.T) {
 	})
 	newSystemClusterClient := redis_state.NewUnshardedClient(newSystemClusterRc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
 	require.NoError(t, err)
-	newSystemShard := redis_state.RedisQueueShard{Name: "new-system", RedisClient: newSystemClusterClient.Queue(), Kind: string(enums.QueueShardKindRedis)}
+	newSystemShard := redis_state.NewRedisQueue(*queue.NewQueueOptions(context.Background(), opts...), "new-system", newSystemClusterClient.Queue())
 	newSystemDebounceClient := newSystemClusterClient.Debounce()
 
-	oldQueue := redis_state.NewQueue(
+	// TODO What happens if both old and new services are running? Does this break debounces?
+	//  Do we need to keep the old behavior and flip using a feature flag (LaunchDarkly)
+	//  once all services running `Schedule` (new-runs, executor) are rolled out?
+	oldQueue, err := queue.NewQueueProcessor(
+		context.Background(),
+		"old-queue",
 		defaultQueueShard,
-		redis_state.WithQueueShardClients(
-			map[string]redis_state.RedisQueueShard{
-				defaultQueueShard.Name: defaultQueueShard,
-			},
-		),
-		redis_state.WithShardSelector(func(ctx context.Context, accountId uuid.UUID, queueName *string) (redis_state.RedisQueueShard, error) {
+		map[string]queue.QueueShard{
+			consts.DefaultQueueShardName: defaultQueueShard,
+		},
+		func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
 			return defaultQueueShard, nil
-		}),
-		redis_state.WithKindToQueueMapping(map[string]string{
-			queue.KindDebounce: queue.KindDebounce,
-		}),
+		},
+		opts...,
 	)
+	require.NoError(t, err)
 
-	newQueue := redis_state.NewQueue(
-		newSystemShard, // Primary
-		redis_state.WithQueueShardClients(
-			map[string]redis_state.RedisQueueShard{
-				defaultQueueShard.Name: defaultQueueShard,
-				newSystemShard.Name:    newSystemShard,
-			},
-		),
-		redis_state.WithShardSelector(func(ctx context.Context, accountId uuid.UUID, queueName *string) (redis_state.RedisQueueShard, error) {
+	newQueue, err := queue.NewQueueProcessor(
+		context.Background(),
+		"new-queue",
+		newSystemShard,
+		map[string]queue.QueueShard{
+			consts.DefaultQueueShardName: defaultQueueShard,
+			newSystemShard.Name():        newSystemShard,
+		},
+		func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
 			// Enqueue new system queue items to new system queue shard
 			if queueName != nil {
 				return newSystemShard, nil
 			}
 
 			return defaultQueueShard, nil
-		}),
-		redis_state.WithKindToQueueMapping(map[string]string{
-			queue.KindDebounce: queue.KindDebounce,
-		}),
+		},
+		opts...,
 	)
+	require.NoError(t, err)
 
-	fakeClock := clockwork.NewFakeClock()
+	kg := defaultQueueShard.Client().KeyGenerator()
 
 	oldRedisDebouncer := NewRedisDebouncer(unshardedDebounceClient, defaultQueueShard, oldQueue).(debouncer)
 	oldRedisDebouncer.c = fakeClock
@@ -1172,12 +1212,12 @@ func TestDebounceExplicitMigration(t *testing.T) {
 
 		// Queue state should match
 		{
-			queueItemIds, err := newSystemCluster.HKeys(newSystemShard.RedisClient.KeyGenerator().QueueItem())
+			queueItemIds, err := newSystemCluster.HKeys(kg.QueueItem())
 			require.NoError(t, err)
 			require.Len(t, queueItemIds, 1)
 
 			var qi queue.QueueItem
-			err = json.Unmarshal([]byte(newSystemCluster.HGet(newSystemShard.RedisClient.KeyGenerator().QueueItem(), queueItemIds[0])), &qi)
+			err = json.Unmarshal([]byte(newSystemCluster.HGet(kg.QueueItem(), queueItemIds[0])), &qi)
 			require.NoError(t, err)
 
 			require.Equal(t, queue.KindDebounce, qi.Data.Kind)
@@ -1193,7 +1233,7 @@ func TestDebounceExplicitMigration(t *testing.T) {
 
 			require.Equal(t, expectedPayload, payload)
 
-			itemScore, err := newSystemCluster.ZScore(newSystemShard.RedisClient.KeyGenerator().PartitionQueueSet(enums.PartitionTypeDefault, queue.KindDebounce, ""), qi.ID)
+			itemScore, err := newSystemCluster.ZScore(kg.PartitionQueueSet(enums.PartitionTypeDefault, queue.KindDebounce, ""), qi.ID)
 			require.NoError(t, err)
 
 			expectedRequeueScore := eventTime.
@@ -1220,7 +1260,16 @@ func TestDebouncePrimaryChooser(t *testing.T) {
 	unshardedClient := redis_state.NewUnshardedClient(unshardedRc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
 	unshardedDebounceClient := unshardedClient.Debounce()
 
-	defaultQueueShard := redis_state.RedisQueueShard{Name: consts.DefaultQueueShardName, RedisClient: unshardedClient.Queue(), Kind: string(enums.QueueShardKindRedis)}
+	fakeClock := clockwork.NewFakeClock()
+
+	opts := []queue.QueueOpt{
+		queue.WithKindToQueueMapping(map[string]string{
+			queue.KindDebounce: queue.KindDebounce,
+		}),
+		queue.WithClock(fakeClock),
+	}
+
+	defaultQueueShard := redis_state.NewRedisQueue(*queue.NewQueueOptions(context.Background(), opts...), consts.DefaultQueueShardName, unshardedClient.Queue())
 
 	// Create new single-shard (but multi-replica) Valkey cluster for system queues + colocated debounce state
 	newSystemCluster := miniredis.RunT(t)
@@ -1230,46 +1279,45 @@ func TestDebouncePrimaryChooser(t *testing.T) {
 	})
 	newSystemClusterClient := redis_state.NewUnshardedClient(newSystemClusterRc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
 	require.NoError(t, err)
-	newSystemShard := redis_state.RedisQueueShard{Name: "new-system", RedisClient: newSystemClusterClient.Queue(), Kind: string(enums.QueueShardKindRedis)}
+	newSystemShard := redis_state.NewRedisQueue(*queue.NewQueueOptions(context.Background(), opts...), "new-system", newSystemClusterClient.Queue())
 	newSystemDebounceClient := newSystemClusterClient.Debounce()
 
-	oldQueue := redis_state.NewQueue(
+	// TODO What happens if both old and new services are running? Does this break debounces?
+	//  Do we need to keep the old behavior and flip using a feature flag (LaunchDarkly)
+	//  once all services running `Schedule` (new-runs, executor) are rolled out?
+	oldQueue, err := queue.NewQueueProcessor(
+		context.Background(),
+		"old-queue",
 		defaultQueueShard,
-		redis_state.WithQueueShardClients(
-			map[string]redis_state.RedisQueueShard{
-				defaultQueueShard.Name: defaultQueueShard,
-			},
-		),
-		redis_state.WithShardSelector(func(ctx context.Context, accountId uuid.UUID, queueName *string) (redis_state.RedisQueueShard, error) {
+		map[string]queue.QueueShard{
+			consts.DefaultQueueShardName: defaultQueueShard,
+		},
+		func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
 			return defaultQueueShard, nil
-		}),
-		redis_state.WithKindToQueueMapping(map[string]string{
-			queue.KindDebounce: queue.KindDebounce,
-		}),
+		},
+		opts...,
 	)
+	require.NoError(t, err)
 
-	newQueue := redis_state.NewQueue(
-		newSystemShard, // Primary
-		redis_state.WithQueueShardClients(
-			map[string]redis_state.RedisQueueShard{
-				defaultQueueShard.Name: defaultQueueShard,
-				newSystemShard.Name:    newSystemShard,
-			},
-		),
-		redis_state.WithShardSelector(func(ctx context.Context, accountId uuid.UUID, queueName *string) (redis_state.RedisQueueShard, error) {
+	newQueue, err := queue.NewQueueProcessor(
+		context.Background(),
+		"new-queue",
+		newSystemShard,
+		map[string]queue.QueueShard{
+			consts.DefaultQueueShardName: defaultQueueShard,
+			newSystemShard.Name():        newSystemShard,
+		},
+		func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
 			// Enqueue new system queue items to new system queue shard
 			if queueName != nil {
 				return newSystemShard, nil
 			}
 
 			return defaultQueueShard, nil
-		}),
-		redis_state.WithKindToQueueMapping(map[string]string{
-			queue.KindDebounce: queue.KindDebounce,
-		}),
+		},
+		opts...,
 	)
-
-	fakeClock := clockwork.NewFakeClock()
+	require.NoError(t, err)
 
 	oldRedisDebouncer := NewRedisDebouncer(unshardedDebounceClient, defaultQueueShard, oldQueue).(debouncer)
 	oldRedisDebouncer.c = fakeClock
@@ -1385,7 +1433,16 @@ func TestDebounceExecutionDuringMigrationWorks(t *testing.T) {
 	unshardedClient := redis_state.NewUnshardedClient(unshardedRc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
 	unshardedDebounceClient := unshardedClient.Debounce()
 
-	defaultQueueShard := redis_state.RedisQueueShard{Name: consts.DefaultQueueShardName, RedisClient: unshardedClient.Queue(), Kind: string(enums.QueueShardKindRedis)}
+	fakeClock := clockwork.NewFakeClock()
+
+	opts := []queue.QueueOpt{
+		queue.WithKindToQueueMapping(map[string]string{
+			queue.KindDebounce: queue.KindDebounce,
+		}),
+		queue.WithClock(fakeClock),
+	}
+
+	defaultQueueShard := redis_state.NewRedisQueue(*queue.NewQueueOptions(context.Background(), opts...), consts.DefaultQueueShardName, unshardedClient.Queue())
 
 	// Create new single-shard (but multi-replica) Valkey cluster for system queues + colocated debounce state
 	newSystemCluster := miniredis.RunT(t)
@@ -1395,49 +1452,47 @@ func TestDebounceExecutionDuringMigrationWorks(t *testing.T) {
 	})
 	newSystemClusterClient := redis_state.NewUnshardedClient(newSystemClusterRc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
 	require.NoError(t, err)
-	newSystemShard := redis_state.RedisQueueShard{Name: "new-system", RedisClient: newSystemClusterClient.Queue(), Kind: string(enums.QueueShardKindRedis)}
+	newSystemShard := redis_state.NewRedisQueue(*queue.NewQueueOptions(context.Background(), opts...), "new-system", newSystemClusterClient.Queue())
 	newSystemDebounceClient := newSystemClusterClient.Debounce()
 
 	// TODO What happens if both old and new services are running? Does this break debounces?
 	//  Do we need to keep the old behavior and flip using a feature flag (LaunchDarkly)
 	//  once all services running `Schedule` (new-runs, executor) are rolled out?
-	oldQueue := redis_state.NewQueue(
+	oldQueue, err := queue.NewQueueProcessor(
+		context.Background(),
+		"old-queue",
 		defaultQueueShard,
-		redis_state.WithQueueShardClients(
-			map[string]redis_state.RedisQueueShard{
-				defaultQueueShard.Name: defaultQueueShard,
-			},
-		),
-		redis_state.WithShardSelector(func(ctx context.Context, accountId uuid.UUID, queueName *string) (redis_state.RedisQueueShard, error) {
+		map[string]queue.QueueShard{
+			consts.DefaultQueueShardName: defaultQueueShard,
+		},
+		func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
 			return defaultQueueShard, nil
-		}),
-		redis_state.WithKindToQueueMapping(map[string]string{
-			queue.KindDebounce: queue.KindDebounce,
-		}),
+		},
+		opts...,
 	)
+	require.NoError(t, err)
 
-	newQueue := redis_state.NewQueue(
-		newSystemShard, // Primary
-		redis_state.WithQueueShardClients(
-			map[string]redis_state.RedisQueueShard{
-				defaultQueueShard.Name: defaultQueueShard,
-				newSystemShard.Name:    newSystemShard,
-			},
-		),
-		redis_state.WithShardSelector(func(ctx context.Context, accountId uuid.UUID, queueName *string) (redis_state.RedisQueueShard, error) {
+	newQueue, err := queue.NewQueueProcessor(
+		context.Background(),
+		"new-queue",
+		newSystemShard,
+		map[string]queue.QueueShard{
+			consts.DefaultQueueShardName: defaultQueueShard,
+			newSystemShard.Name():        newSystemShard,
+		},
+		func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
 			// Enqueue new system queue items to new system queue shard
 			if queueName != nil {
 				return newSystemShard, nil
 			}
 
 			return defaultQueueShard, nil
-		}),
-		redis_state.WithKindToQueueMapping(map[string]string{
-			queue.KindDebounce: queue.KindDebounce,
-		}),
+		},
+		opts...,
 	)
+	require.NoError(t, err)
 
-	fakeClock := clockwork.NewFakeClock()
+	kg := defaultQueueShard.Client().KeyGenerator()
 
 	oldRedisDebouncer := NewRedisDebouncer(unshardedDebounceClient, defaultQueueShard, oldQueue).(debouncer)
 	oldRedisDebouncer.c = fakeClock
@@ -1514,12 +1569,12 @@ func TestDebounceExecutionDuringMigrationWorks(t *testing.T) {
 
 		// Queue state should match
 		{
-			queueItemIds, err := unshardedCluster.HKeys(defaultQueueShard.RedisClient.KeyGenerator().QueueItem())
+			queueItemIds, err := unshardedCluster.HKeys(kg.QueueItem())
 			require.NoError(t, err)
 			require.Len(t, queueItemIds, 1)
 
 			var qi queue.QueueItem
-			err = json.Unmarshal([]byte(unshardedCluster.HGet(defaultQueueShard.RedisClient.KeyGenerator().QueueItem(), queueItemIds[0])), &qi)
+			err = json.Unmarshal([]byte(unshardedCluster.HGet(kg.QueueItem(), queueItemIds[0])), &qi)
 			require.NoError(t, err)
 
 			require.Equal(t, queue.KindDebounce, qi.Data.Kind)
@@ -1535,7 +1590,7 @@ func TestDebounceExecutionDuringMigrationWorks(t *testing.T) {
 
 			require.Equal(t, expectedPayload, payload)
 
-			itemScore, err := unshardedCluster.ZScore(defaultQueueShard.RedisClient.KeyGenerator().PartitionQueueSet(enums.PartitionTypeDefault, queue.KindDebounce, ""), qi.ID)
+			itemScore, err := unshardedCluster.ZScore(kg.PartitionQueueSet(enums.PartitionTypeDefault, queue.KindDebounce, ""), qi.ID)
 			require.NoError(t, err)
 			expectedQueueScore := eventTime.
 				Add(10 * time.Second).       // Debounce period
@@ -1598,7 +1653,16 @@ func TestDebounceExecutionShouldNotRaceMigration(t *testing.T) {
 	unshardedClient := redis_state.NewUnshardedClient(unshardedRc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
 	unshardedDebounceClient := unshardedClient.Debounce()
 
-	defaultQueueShard := redis_state.RedisQueueShard{Name: consts.DefaultQueueShardName, RedisClient: unshardedClient.Queue(), Kind: string(enums.QueueShardKindRedis)}
+	fakeClock := clockwork.NewFakeClock()
+
+	opts := []queue.QueueOpt{
+		queue.WithKindToQueueMapping(map[string]string{
+			queue.KindDebounce: queue.KindDebounce,
+		}),
+		queue.WithClock(fakeClock),
+	}
+
+	defaultQueueShard := redis_state.NewRedisQueue(*queue.NewQueueOptions(context.Background(), opts...), consts.DefaultQueueShardName, unshardedClient.Queue())
 
 	// Create new single-shard (but multi-replica) Valkey cluster for system queues + colocated debounce state
 	newSystemCluster := miniredis.RunT(t)
@@ -1608,49 +1672,47 @@ func TestDebounceExecutionShouldNotRaceMigration(t *testing.T) {
 	})
 	newSystemClusterClient := redis_state.NewUnshardedClient(newSystemClusterRc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
 	require.NoError(t, err)
-	newSystemShard := redis_state.RedisQueueShard{Name: "new-system", RedisClient: newSystemClusterClient.Queue(), Kind: string(enums.QueueShardKindRedis)}
+	newSystemShard := redis_state.NewRedisQueue(*queue.NewQueueOptions(context.Background(), opts...), "new-system", newSystemClusterClient.Queue())
 	newSystemDebounceClient := newSystemClusterClient.Debounce()
 
 	// TODO What happens if both old and new services are running? Does this break debounces?
 	//  Do we need to keep the old behavior and flip using a feature flag (LaunchDarkly)
 	//  once all services running `Schedule` (new-runs, executor) are rolled out?
-	oldQueue := redis_state.NewQueue(
+	oldQueue, err := queue.NewQueueProcessor(
+		context.Background(),
+		"old-queue",
 		defaultQueueShard,
-		redis_state.WithQueueShardClients(
-			map[string]redis_state.RedisQueueShard{
-				defaultQueueShard.Name: defaultQueueShard,
-			},
-		),
-		redis_state.WithShardSelector(func(ctx context.Context, accountId uuid.UUID, queueName *string) (redis_state.RedisQueueShard, error) {
+		map[string]queue.QueueShard{
+			consts.DefaultQueueShardName: defaultQueueShard,
+		},
+		func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
 			return defaultQueueShard, nil
-		}),
-		redis_state.WithKindToQueueMapping(map[string]string{
-			queue.KindDebounce: queue.KindDebounce,
-		}),
+		},
+		opts...,
 	)
+	require.NoError(t, err)
 
-	newQueue := redis_state.NewQueue(
-		newSystemShard, // Primary
-		redis_state.WithQueueShardClients(
-			map[string]redis_state.RedisQueueShard{
-				defaultQueueShard.Name: defaultQueueShard,
-				newSystemShard.Name:    newSystemShard,
-			},
-		),
-		redis_state.WithShardSelector(func(ctx context.Context, accountId uuid.UUID, queueName *string) (redis_state.RedisQueueShard, error) {
+	newQueue, err := queue.NewQueueProcessor(
+		context.Background(),
+		"new-queue",
+		newSystemShard,
+		map[string]queue.QueueShard{
+			consts.DefaultQueueShardName: defaultQueueShard,
+			newSystemShard.Name():        newSystemShard,
+		},
+		func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
 			// Enqueue new system queue items to new system queue shard
 			if queueName != nil {
 				return newSystemShard, nil
 			}
 
 			return defaultQueueShard, nil
-		}),
-		redis_state.WithKindToQueueMapping(map[string]string{
-			queue.KindDebounce: queue.KindDebounce,
-		}),
+		},
+		opts...,
 	)
+	require.NoError(t, err)
 
-	fakeClock := clockwork.NewFakeClock()
+	kg := defaultQueueShard.Client().KeyGenerator()
 
 	oldRedisDebouncer := NewRedisDebouncer(unshardedDebounceClient, defaultQueueShard, oldQueue).(debouncer)
 	oldRedisDebouncer.c = fakeClock
@@ -1727,12 +1789,12 @@ func TestDebounceExecutionShouldNotRaceMigration(t *testing.T) {
 
 		// Queue state should match
 		{
-			queueItemIds, err := unshardedCluster.HKeys(defaultQueueShard.RedisClient.KeyGenerator().QueueItem())
+			queueItemIds, err := unshardedCluster.HKeys(kg.QueueItem())
 			require.NoError(t, err)
 			require.Len(t, queueItemIds, 1)
 
 			var qi queue.QueueItem
-			err = json.Unmarshal([]byte(unshardedCluster.HGet(defaultQueueShard.RedisClient.KeyGenerator().QueueItem(), queueItemIds[0])), &qi)
+			err = json.Unmarshal([]byte(unshardedCluster.HGet(kg.QueueItem(), queueItemIds[0])), &qi)
 			require.NoError(t, err)
 
 			require.Equal(t, queue.KindDebounce, qi.Data.Kind)
@@ -1748,7 +1810,7 @@ func TestDebounceExecutionShouldNotRaceMigration(t *testing.T) {
 
 			require.Equal(t, expectedPayload, payload)
 
-			itemScore, err := unshardedCluster.ZScore(defaultQueueShard.RedisClient.KeyGenerator().PartitionQueueSet(enums.PartitionTypeDefault, queue.KindDebounce, ""), qi.ID)
+			itemScore, err := unshardedCluster.ZScore(kg.PartitionQueueSet(enums.PartitionTypeDefault, queue.KindDebounce, ""), qi.ID)
 			require.NoError(t, err)
 			expectedQueueScore := eventTime.
 				Add(10 * time.Second).       // Debounce period
