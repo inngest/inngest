@@ -173,14 +173,14 @@ func (q *queueProcessor) processPartition(ctx context.Context, p *QueuePartition
 
 	parallel := parallelFn || parallelAccount || isSystemFn
 
-	iter := processor{
-		partition:            p,
-		items:                queue,
-		partitionContinueCtr: continuationCount,
-		queue:                q,
-		denies:               NewLeaseDenyList(),
-		staticTime:           q.Clock.Now(),
-		parallel:             parallel,
+	iter := ProcessorIterator{
+		Partition:            p,
+		Items:                queue,
+		PartitionContinueCtr: continuationCount,
+		Queue:                q,
+		Denies:               NewLeaseDenyList(),
+		StaticTime:           q.Clock.Now(),
+		Parallel:             parallel,
 	}
 
 	if processErr := iter.iterate(ctx); processErr != nil {
@@ -191,12 +191,12 @@ func (q *queueProcessor) processPartition(ctx context.Context, p *QueuePartition
 	}
 
 	if q.usePeekEWMA {
-		if err := q.primaryQueueShard.SetPeekEWMA(ctx, p.FunctionID, int64(iter.ctrConcurrency+iter.ctrRateLimit)); err != nil {
+		if err := q.primaryQueueShard.SetPeekEWMA(ctx, p.FunctionID, int64(iter.CtrConcurrency+iter.CtrRateLimit)); err != nil {
 			q.log.Warn("error recording concurrency limit for EWMA", "error", err)
 		}
 	}
 
-	if iter.isRequeuable() && iter.isCustomKeyLimitOnly && !randomOffset && parallel {
+	if iter.isRequeuable() && iter.IsCustomKeyLimitOnly && !randomOffset && parallel {
 		// We hit custom concurrency key issues.  Re-process this partition at a random offset, as long
 		// as random offset is currently false (so we don't loop forever)
 
@@ -213,7 +213,7 @@ func (q *queueProcessor) processPartition(ctx context.Context, p *QueuePartition
 	// with a force:  ensure that we won't re-scan it until 2 seconds in the future.
 	if iter.isRequeuable() {
 		requeue := PartitionConcurrencyLimitRequeueExtension
-		if iter.ctrConcurrency == 0 {
+		if iter.CtrConcurrency == 0 {
 			// This has been throttled only.  Don't requeue so far ahead, otherwise we'll be waiting longer
 			// than the minimum throttle.
 			//

@@ -31,7 +31,7 @@ func NewQueueProcessor(
 	queueShardClients map[string]QueueShard,
 	shardSelector ShardSelector,
 	options ...QueueOpt,
-) (QueueManager, error) {
+) (*queueProcessor, error) {
 	o := NewQueueOptions(ctx, options...)
 
 	qp := &queueProcessor{
@@ -50,7 +50,7 @@ func NewQueueProcessor(
 		continueCooldown: map[string]time.Time{},
 
 		sem:     util.NewTrackingSemaphore(int(o.numWorkers)),
-		workers: make(chan processItem, o.numWorkers),
+		workers: make(chan ProcessItem, o.numWorkers),
 		quit:    make(chan error, o.numWorkers),
 
 		primaryQueueShard: primaryQueueShard,
@@ -87,7 +87,7 @@ type queueProcessor struct {
 
 	// workers is a buffered channel which allows scanners to send queue items
 	// to workers to be processed
-	workers chan processItem
+	workers chan ProcessItem
 	// sem stores a semaphore controlling the number of jobs currently
 	// being processed.  This lets us check whether there's capacity in the queue
 	// prior to leasing items.
