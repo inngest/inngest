@@ -17,7 +17,7 @@ func (q *queueProcessor) claimSequentialLease(ctx context.Context) {
 	}
 
 	// Attempt to claim the lease immediately.
-	leaseID, err := q.primaryQueueShard.ConfigLease(ctx, "sequential", ConfigLeaseDuration, q.sequentialLease())
+	leaseID, err := q.primaryQueueShard.ConfigLease(ctx, "sequential", ConfigLeaseDuration, q.SequentialLease())
 	if err != ErrConfigAlreadyLeased && err != nil {
 		q.quit <- err
 		return
@@ -34,7 +34,7 @@ func (q *queueProcessor) claimSequentialLease(ctx context.Context) {
 			tick.Stop()
 			return
 		case <-tick.Chan():
-			leaseID, err := q.primaryQueueShard.ConfigLease(ctx, "sequential", ConfigLeaseDuration, q.sequentialLease())
+			leaseID, err := q.primaryQueueShard.ConfigLease(ctx, "sequential", ConfigLeaseDuration, q.SequentialLease())
 			if err == ErrConfigAlreadyLeased {
 				// This is expected; every time there is > 1 runner listening to the
 				// queue there will be contention.
@@ -63,9 +63,9 @@ func (q *queueProcessor) claimSequentialLease(ctx context.Context) {
 	}
 }
 
-// sequentialLease is a helper method for concurrently reading the sequential
+// SequentialLease is a helper method for concurrently reading the sequential
 // lease ID.
-func (q *queueProcessor) sequentialLease() *ulid.ULID {
+func (q *queueProcessor) SequentialLease() *ulid.ULID {
 	q.seqLeaseLock.RLock()
 	defer q.seqLeaseLock.RUnlock()
 	if q.seqLeaseID == nil {
@@ -134,7 +134,7 @@ func (q *queueProcessor) isInstrumentator() bool {
 }
 
 func (q *queueProcessor) isSequential() bool {
-	l := q.sequentialLease()
+	l := q.SequentialLease()
 	if l == nil {
 		return false
 	}
