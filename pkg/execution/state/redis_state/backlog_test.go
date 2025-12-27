@@ -11,7 +11,6 @@ import (
 	"github.com/alicebob/miniredis/v2"
 	"github.com/cespare/xxhash/v2"
 	"github.com/google/uuid"
-	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
@@ -651,24 +650,6 @@ func TestQueueItemShadowPartition(t *testing.T) {
 
 	hashedThrottleKeyExpr := util.XXHash("event.data.customerID")
 
-	q, _ := newQueue(
-		t, rc,
-		osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
-			return osqueue.PartitionConstraintConfig{
-				Concurrency: osqueue.PartitionConcurrency{
-					SystemConcurrency:   250,
-					AccountConcurrency:  100,
-					FunctionConcurrency: 25,
-				},
-				Throttle: &osqueue.PartitionThrottle{
-					ThrottleKeyExpressionHash: hashedThrottleKeyExpr,
-					Limit:                     70,
-					Burst:                     20,
-					Period:                    600,
-				},
-			}
-		}),
-	)
 	ctx := context.Background()
 
 	fnID, wsID, accID := uuid.New(), uuid.New(), uuid.New()
@@ -983,13 +964,13 @@ func TestBacklogIsOutdated(t *testing.T) {
 	t.Run("removing concurrency key should mark as outdated", func(t *testing.T) {
 		keyHashOld := util.XXHash("event.data.customerID")
 
-		constraints := PartitionConstraintConfig{
-			Concurrency: PartitionConcurrency{
+		constraints := osqueue.PartitionConstraintConfig{
+			Concurrency: osqueue.PartitionConcurrency{
 				CustomConcurrencyKeys: nil,
 			},
 		}
-		backlog := &QueueBacklog{
-			ConcurrencyKeys: []BacklogConcurrencyKey{
+		backlog := &osqueue.QueueBacklog{
+			ConcurrencyKeys: []osqueue.BacklogConcurrencyKey{
 				{
 					Scope:               enums.ConcurrencyScopeFn,
 					EntityID:            uuid.UUID{},
@@ -1000,57 +981,57 @@ func TestBacklogIsOutdated(t *testing.T) {
 			},
 		}
 
-		require.Equal(t, enums.QueueNormalizeReasonCustomConcurrencyKeyCountMismatch, backlog.isOutdated(constraints))
+		require.Equal(t, enums.QueueNormalizeReasonCustomConcurrencyKeyCountMismatch, backlog.IsOutdated(constraints))
 	})
 
 	t.Run("changing throttle key should mark as outdated", func(t *testing.T) {
 		keyHashOld := util.XXHash("event.data.customerID")
 		keyHashNew := util.XXHash("event.data.orgID")
 
-		constraints := PartitionConstraintConfig{
-			Throttle: &PartitionThrottle{
+		constraints := osqueue.PartitionConstraintConfig{
+			Throttle: &osqueue.PartitionThrottle{
 				ThrottleKeyExpressionHash: keyHashNew,
 			},
 		}
-		backlog := &QueueBacklog{
-			Throttle: &BacklogThrottle{
+		backlog := &osqueue.QueueBacklog{
+			Throttle: &osqueue.BacklogThrottle{
 				ThrottleKeyExpressionHash: keyHashOld,
 			},
 		}
 
-		require.Equal(t, enums.QueueNormalizeReasonThrottleKeyChanged, backlog.isOutdated(constraints))
+		require.Equal(t, enums.QueueNormalizeReasonThrottleKeyChanged, backlog.IsOutdated(constraints))
 	})
 
 	t.Run("same throttle key should not mark as outdated", func(t *testing.T) {
 		keyHash := util.XXHash("event.data.orgID")
 
-		constraints := PartitionConstraintConfig{
-			Throttle: &PartitionThrottle{
+		constraints := osqueue.PartitionConstraintConfig{
+			Throttle: &osqueue.PartitionThrottle{
 				ThrottleKeyExpressionHash: keyHash,
 			},
 		}
-		backlog := &QueueBacklog{
-			Throttle: &BacklogThrottle{
+		backlog := &osqueue.QueueBacklog{
+			Throttle: &osqueue.BacklogThrottle{
 				ThrottleKeyExpressionHash: keyHash,
 			},
 		}
 
-		require.Equal(t, enums.QueueNormalizeReasonUnchanged, backlog.isOutdated(constraints))
+		require.Equal(t, enums.QueueNormalizeReasonUnchanged, backlog.IsOutdated(constraints))
 	})
 
 	t.Run("removing throttle key should mark as outdated", func(t *testing.T) {
 		keyHashOld := util.XXHash("event.data.customerID")
 
-		constraints := PartitionConstraintConfig{
+		constraints := osqueue.PartitionConstraintConfig{
 			Throttle: nil,
 		}
-		backlog := &QueueBacklog{
-			Throttle: &BacklogThrottle{
+		backlog := &osqueue.QueueBacklog{
+			Throttle: &osqueue.BacklogThrottle{
 				ThrottleKeyExpressionHash: keyHashOld,
 			},
 		}
 
-		require.Equal(t, enums.QueueNormalizeReasonThrottleRemoved, backlog.isOutdated(constraints))
+		require.Equal(t, enums.QueueNormalizeReasonThrottleRemoved, backlog.IsOutdated(constraints))
 	})
 }
 
@@ -1060,34 +1041,34 @@ func TestShuffleBacklogs(t *testing.T) {
 	matches := 0
 
 	for i := 0; i < iterations; i++ {
-		b1Start := &QueueBacklog{
+		b1Start := &osqueue.QueueBacklog{
 			BacklogID: "b-1:start",
 			Start:     true,
 		}
 
-		b1 := &QueueBacklog{
+		b1 := &osqueue.QueueBacklog{
 			BacklogID: "b-1",
 		}
 
-		b2Start := &QueueBacklog{
+		b2Start := &osqueue.QueueBacklog{
 			BacklogID: "b-2:start",
 			Start:     true,
 		}
 
-		b2 := &QueueBacklog{
+		b2 := &osqueue.QueueBacklog{
 			BacklogID: "b-2",
 		}
 
-		b3Start := &QueueBacklog{
+		b3Start := &osqueue.QueueBacklog{
 			BacklogID: "b-3:start",
 			Start:     true,
 		}
 
-		b3 := &QueueBacklog{
+		b3 := &osqueue.QueueBacklog{
 			BacklogID: "b-3",
 		}
 
-		shuffled := shuffleBacklogs([]*QueueBacklog{
+		shuffled := osqueue.ShuffleBacklogs([]*osqueue.QueueBacklog{
 			b1,
 			b1Start,
 			b2,
@@ -1096,7 +1077,7 @@ func TestShuffleBacklogs(t *testing.T) {
 			b3Start,
 		})
 
-		findIndex := func(b *QueueBacklog) int {
+		findIndex := func(b *osqueue.QueueBacklog) int {
 			for i, backlog := range shuffled {
 				if backlog.BacklogID == b.BacklogID {
 					return i
@@ -1128,7 +1109,6 @@ func TestBacklogsByPartition(t *testing.T) {
 
 	ctx := context.Background()
 	clock := clockwork.NewFakeClock()
-	defaultShard := RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 
 	acctId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
 
@@ -1176,12 +1156,12 @@ func TestBacklogsByPartition(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			r.FlushAll()
 
-			q := NewQueue(
-				defaultShard,
-				WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+			q, shard := newQueue(
+				t, rc,
+				osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 					return true
 				}),
-				WithClock(clock),
+				osqueue.WithClock(clock),
 			)
 
 			for i := range tc.num {
@@ -1215,12 +1195,12 @@ func TestBacklogsByPartition(t *testing.T) {
 					},
 				}
 
-				_, err := q.EnqueueItem(ctx, defaultShard, item, at, osqueue.EnqueueOpts{})
+				_, err := shard.EnqueueItem(ctx, item, at, osqueue.EnqueueOpts{})
 				require.NoError(t, err)
 			}
 
-			items, err := q.BacklogsByPartition(ctx, defaultShard, fnID.String(), tc.from, tc.until,
-				WithQueueItemIterBatchSize(tc.batchSize),
+			items, err := q.BacklogsByPartition(ctx, shard, fnID.String(), tc.from, tc.until,
+				osqueue.WithQueueItemIterBatchSize(tc.batchSize),
 			)
 			require.NoError(t, err)
 
@@ -1238,19 +1218,17 @@ func TestBacklogSize(t *testing.T) {
 	_, rc := initRedis(t)
 	defer rc.Close()
 
-	defaultShard := RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
-
-	q := NewQueue(
-		defaultShard,
-		WithPartitionConstraintConfigGetter(func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
-			return PartitionConstraintConfig{
-				Concurrency: PartitionConcurrency{
+	q, shard := newQueue(
+		t, rc,
+		osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
+			return osqueue.PartitionConstraintConfig{
+				Concurrency: osqueue.PartitionConcurrency{
 					AccountConcurrency:  100,
 					FunctionConcurrency: 25,
 				},
 			}
 		}),
-		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 			return true
 		}),
 	)
@@ -1282,16 +1260,16 @@ func TestBacklogSize(t *testing.T) {
 		}
 
 		if backlogID == "" {
-			backlog := q.ItemBacklog(ctx, item)
+			backlog := osqueue.ItemBacklog(ctx, item)
 			backlogID = backlog.BacklogID
 		}
 
-		_, err := q.EnqueueItem(ctx, defaultShard, item, time.Now(), osqueue.EnqueueOpts{})
+		_, err := shard.EnqueueItem(ctx, item, time.Now(), osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 	}
 	require.NotEmpty(t, backlogID)
 
-	size, err := q.BacklogSize(ctx, defaultShard, backlogID)
+	size, err := q.BacklogSize(ctx, shard, backlogID)
 	require.NoError(t, err)
 
 	require.EqualValues(t, count, size)
@@ -1307,12 +1285,9 @@ func TestPartitionBacklogSize(t *testing.T) {
 	ctx := context.Background()
 	clock := clockwork.NewFakeClock()
 
-	shard1 := RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc1, QueueDefaultKey), Name: "one"}
-	shard2 := RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc2, QueueDefaultKey), Name: "two"}
-	queueShards := map[string]RedisQueueShard{
-		"one": shard1,
-		"two": shard2,
-	}
+	shard1 := shardFromClient("one", rc1)
+	shard2 := shardFromClient("two", rc2)
+	queueShards := mapFromShards(shard1, shard2)
 
 	acctId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
 
@@ -1337,21 +1312,31 @@ func TestPartitionBacklogSize(t *testing.T) {
 			r1.FlushAll()
 			r2.FlushAll()
 
-			q1 := NewQueue(
+			q1, err := osqueue.NewQueueProcessor(
+				ctx,
+				"q1",
 				shard1,
-				WithQueueShardClients(queueShards),
-				WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+				queueShards,
+				func(ctx context.Context, accountId uuid.UUID, queueName *string) (osqueue.QueueShard, error) {
+					return shard1, nil
+				},
+				osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 					return true
 				}),
-				WithClock(clock),
+				osqueue.WithClock(clock),
 			)
-			q2 := NewQueue(
+			q2, err := osqueue.NewQueueProcessor(
+				ctx,
+				"q2",
 				shard2,
-				WithQueueShardClients(queueShards),
-				WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+				queueShards,
+				func(ctx context.Context, accountId uuid.UUID, queueName *string) (osqueue.QueueShard, error) {
+					return shard2, nil
+				},
+				osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 					return true
 				}),
-				WithClock(clock),
+				osqueue.WithClock(clock),
 			)
 
 			for i := range tc.num {
@@ -1383,24 +1368,24 @@ func TestPartitionBacklogSize(t *testing.T) {
 					// enqueue to both queues, simulate queue migrations
 					switch i % 2 {
 					case 0:
-						_, err := q1.EnqueueItem(ctx, shard1, item, clock.Now(), osqueue.EnqueueOpts{})
+						_, err := shard1.EnqueueItem(ctx, item, clock.Now(), osqueue.EnqueueOpts{})
 						require.NoError(t, err)
 					case 1:
-						_, err := q2.EnqueueItem(ctx, shard2, item, clock.Now(), osqueue.EnqueueOpts{})
+						_, err := shard2.EnqueueItem(ctx, item, clock.Now(), osqueue.EnqueueOpts{})
 						require.NoError(t, err)
 					}
 				} else {
-					_, err := q1.EnqueueItem(ctx, shard1, item, clock.Now(), osqueue.EnqueueOpts{})
+					_, err := shard1.EnqueueItem(ctx, item, clock.Now(), osqueue.EnqueueOpts{})
 					require.NoError(t, err)
 				}
 			}
 
 			// NOTE: should return the same result regardless of which shard initiated the instrumentation
-			size1, err := q1.PartitionBacklogSize(ctx, fnID.String())
+			size1, err := q1.PartitionBacklogSize(ctx, shard1, fnID.String())
 			require.NoError(t, err)
 			require.EqualValues(t, tc.num, size1)
 
-			size2, err := q2.PartitionBacklogSize(ctx, fnID.String())
+			size2, err := q2.PartitionBacklogSize(ctx, shard2, fnID.String())
 			require.NoError(t, err)
 			require.EqualValues(t, tc.num, size2)
 		})
@@ -1412,27 +1397,27 @@ func TestShadowPartitionFunctionBacklog(t *testing.T) {
 	sysQueueName := "test-system-queue"
 
 	t.Run("system queue backlog should work", func(t *testing.T) {
-		sp := QueueShadowPartition{
+		sp := osqueue.QueueShadowPartition{
 			SystemQueueName: &sysQueueName,
 		}
 
-		constraints := PartitionConstraintConfig{
-			Concurrency: PartitionConcurrency{},
+		constraints := osqueue.PartitionConstraintConfig{
+			Concurrency: osqueue.PartitionConcurrency{},
 		}
 
 		b := sp.DefaultBacklog(constraints, false)
 
-		require.Equal(t, &QueueBacklog{
+		require.Equal(t, &osqueue.QueueBacklog{
 			BacklogID:         fmt.Sprintf("system:%s", sysQueueName),
 			ShadowPartitionID: sysQueueName,
 		}, b)
 	})
 
 	t.Run("empty queue backlog should not work", func(t *testing.T) {
-		sp := QueueShadowPartition{}
+		sp := osqueue.QueueShadowPartition{}
 
-		constraints := PartitionConstraintConfig{
-			Concurrency: PartitionConcurrency{},
+		constraints := osqueue.PartitionConstraintConfig{
+			Concurrency: osqueue.PartitionConcurrency{},
 		}
 
 		b := sp.DefaultBacklog(constraints, false)
@@ -1440,7 +1425,7 @@ func TestShadowPartitionFunctionBacklog(t *testing.T) {
 	})
 
 	t.Run("non-start backlog should work", func(t *testing.T) {
-		sp := QueueShadowPartition{
+		sp := osqueue.QueueShadowPartition{
 			FunctionVersion: 1,
 			FunctionID:      &fnID,
 			SystemQueueName: nil,
@@ -1450,14 +1435,14 @@ func TestShadowPartitionFunctionBacklog(t *testing.T) {
 			AccountID:       &accountID,
 		}
 
-		constraints := PartitionConstraintConfig{
+		constraints := osqueue.PartitionConstraintConfig{
 			FunctionVersion: 2,
-			Concurrency:     PartitionConcurrency{},
+			Concurrency:     osqueue.PartitionConcurrency{},
 		}
 
 		b := sp.DefaultBacklog(constraints, false)
 
-		require.Equal(t, &QueueBacklog{
+		require.Equal(t, &osqueue.QueueBacklog{
 			BacklogID:                              fmt.Sprintf("fn:%s", fnID),
 			ShadowPartitionID:                      fnID.String(),
 			EarliestFunctionVersion:                2,
@@ -1470,7 +1455,7 @@ func TestShadowPartitionFunctionBacklog(t *testing.T) {
 	})
 
 	t.Run("start backlog should work", func(t *testing.T) {
-		sp := QueueShadowPartition{
+		sp := osqueue.QueueShadowPartition{
 			FunctionVersion: 1,
 			FunctionID:      &fnID,
 			SystemQueueName: nil,
@@ -1480,14 +1465,14 @@ func TestShadowPartitionFunctionBacklog(t *testing.T) {
 			AccountID:       &accountID,
 		}
 
-		constraints := PartitionConstraintConfig{
+		constraints := osqueue.PartitionConstraintConfig{
 			FunctionVersion: 2,
-			Concurrency:     PartitionConcurrency{},
+			Concurrency:     osqueue.PartitionConcurrency{},
 		}
 
 		b := sp.DefaultBacklog(constraints, true)
 
-		require.Equal(t, &QueueBacklog{
+		require.Equal(t, &osqueue.QueueBacklog{
 			BacklogID:                              fmt.Sprintf("fn:%s:start", fnID),
 			ShadowPartitionID:                      fnID.String(),
 			EarliestFunctionVersion:                2,
@@ -1500,7 +1485,7 @@ func TestShadowPartitionFunctionBacklog(t *testing.T) {
 	})
 
 	t.Run("throttle backlog should not work", func(t *testing.T) {
-		sp := QueueShadowPartition{
+		sp := osqueue.QueueShadowPartition{
 			FunctionVersion: 1,
 			FunctionID:      &fnID,
 			SystemQueueName: nil,
@@ -1510,10 +1495,10 @@ func TestShadowPartitionFunctionBacklog(t *testing.T) {
 			AccountID:       &accountID,
 		}
 
-		constraints := PartitionConstraintConfig{
+		constraints := osqueue.PartitionConstraintConfig{
 			FunctionVersion: 2,
-			Concurrency:     PartitionConcurrency{},
-			Throttle: &PartitionThrottle{
+			Concurrency:     osqueue.PartitionConcurrency{},
+			Throttle: &osqueue.PartitionThrottle{
 				ThrottleKeyExpressionHash: "expr-hash",
 				Limit:                     1,
 				Burst:                     1,
@@ -1527,7 +1512,7 @@ func TestShadowPartitionFunctionBacklog(t *testing.T) {
 	})
 
 	t.Run("non start throttle backlog should work", func(t *testing.T) {
-		sp := QueueShadowPartition{
+		sp := osqueue.QueueShadowPartition{
 			FunctionVersion: 1,
 			FunctionID:      &fnID,
 			SystemQueueName: nil,
@@ -1537,10 +1522,10 @@ func TestShadowPartitionFunctionBacklog(t *testing.T) {
 			AccountID:       &accountID,
 		}
 
-		constraints := PartitionConstraintConfig{
+		constraints := osqueue.PartitionConstraintConfig{
 			FunctionVersion: 2,
-			Concurrency:     PartitionConcurrency{},
-			Throttle: &PartitionThrottle{
+			Concurrency:     osqueue.PartitionConcurrency{},
+			Throttle: &osqueue.PartitionThrottle{
 				ThrottleKeyExpressionHash: "expr-hash",
 				Limit:                     1,
 				Burst:                     1,
@@ -1550,7 +1535,7 @@ func TestShadowPartitionFunctionBacklog(t *testing.T) {
 
 		b := sp.DefaultBacklog(constraints, false)
 
-		require.Equal(t, &QueueBacklog{
+		require.Equal(t, &osqueue.QueueBacklog{
 			BacklogID:                              fmt.Sprintf("fn:%s", fnID),
 			ShadowPartitionID:                      fnID.String(),
 			EarliestFunctionVersion:                2,
