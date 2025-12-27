@@ -21,7 +21,7 @@ var (
 	durOpShadowPartitionRequeue          = "shadow_partition_requeue"
 )
 
-func (q *queueProcessor) processShadowPartition(ctx context.Context, shadowPart *QueueShadowPartition, continuationCount uint) error {
+func (q *queueProcessor) ProcessShadowPartition(ctx context.Context, shadowPart *QueueShadowPartition, continuationCount uint) error {
 	l := logger.StdlibLogger(ctx).With(
 		"partition_id", shadowPart.PartitionID,
 		"account_id", shadowPart.AccountID,
@@ -243,7 +243,7 @@ func (q *queueProcessor) processShadowPartition(ctx context.Context, shadowPart 
 				return nil
 			}
 
-			res, fullyProcessed, err := q.processShadowPartitionBacklog(logger.WithStdlib(ctx, l), shadowPart, backlog, refillUntil, latestConstraints)
+			res, fullyProcessed, err := q.ProcessShadowPartitionBacklog(logger.WithStdlib(ctx, l), shadowPart, backlog, refillUntil, latestConstraints)
 			if err != nil {
 				return fmt.Errorf("could not process backlog: %w", err)
 			}
@@ -361,7 +361,7 @@ func (q *queueProcessor) processShadowPartition(ctx context.Context, shadowPart 
 	}
 }
 
-func (q *queueProcessor) processShadowPartitionBacklog(
+func (q *queueProcessor) ProcessShadowPartitionBacklog(
 	ctx context.Context,
 	shadowPart *QueueShadowPartition,
 	backlog *QueueBacklog,

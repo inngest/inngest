@@ -9,7 +9,6 @@ import (
 	"github.com/alicebob/miniredis/v2"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
-	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution/batch"
 	"github.com/inngest/inngest/pkg/execution/debounce"
@@ -36,30 +35,29 @@ func TestDeleteManager(t *testing.T) {
 	// Create unsharded client and managers
 	unshardedClient := redis_state.NewUnshardedClient(redisClient, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
 
-	// Set up queue shard
-	defaultQueueShard := redis_state.RedisQueueShard{
-		Name:        consts.DefaultQueueShardName,
-		RedisClient: unshardedClient.Queue(),
-		Kind:        string(enums.QueueShardKindRedis),
-	}
-
-	// Create queue manager
-	queueManager := redis_state.NewQueue(
-		defaultQueueShard,
-		redis_state.WithQueueShardClients(
-			map[string]redis_state.RedisQueueShard{
-				defaultQueueShard.Name: defaultQueueShard,
-			},
-		),
-		redis_state.WithShardSelector(func(ctx context.Context, accountId uuid.UUID, queueName *string) (redis_state.RedisQueueShard, error) {
-			return defaultQueueShard, nil
-		}),
-		redis_state.WithKindToQueueMapping(map[string]string{
+	opts := []queue.QueueOpt{
+		queue.WithKindToQueueMapping(map[string]string{
 			queue.KindEdge:          queue.KindEdge,
 			queue.KindPause:         queue.KindPause,
 			queue.KindScheduleBatch: queue.KindScheduleBatch,
 			queue.KindDebounce:      queue.KindDebounce,
 		}),
+	}
+
+	// Set up queue shard
+	shard := redis_state.NewRedisQueue(*queue.NewQueueOptions(context.Background(), opts...), consts.DefaultQueueShardName, unshardedClient.Queue())
+	// Create queue manager
+	queueManager, err := queue.NewQueueProcessor(
+		context.Background(),
+		"delete-test",
+		shard,
+		map[string]queue.QueueShard{
+			shard.Name(): shard,
+		},
+		func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
+			return shard, nil
+		},
+		opts...,
 	)
 
 	ctx := context.Background()
@@ -83,11 +81,10 @@ func TestDeleteManager(t *testing.T) {
 
 	// Create debounce manager
 	debounceClient := unshardedClient.Debounce()
-	debouncer := debounce.NewRedisDebouncer(debounceClient, defaultQueueShard, queueManager)
+	debouncer := debounce.NewRedisDebouncer(debounceClient, shard, queueManager)
 
 	// Create DeleteManager with all dependencies
 	deleteManager, err := NewDeleteManager(
-		WithQueueManager(queueManager),
 		WithPauseManager(pauseManager),
 		WithBatchManager(batchManager),
 		WithDebouncer(debouncer),
@@ -124,7 +121,7 @@ func TestDeleteManager(t *testing.T) {
 		require.NoError(t, err)
 
 		// Delete the queue item (this is what we're actually testing)
-		err = deleteManager.DeleteQueueItem(ctx, defaultQueueShard, queueItem)
+		err = deleteManager.DeleteQueueItem(ctx, shard, queueItem)
 		require.NoError(t, err, "DeleteQueueItem should succeed for KindEdge")
 	})
 
@@ -192,7 +189,7 @@ func TestDeleteManager(t *testing.T) {
 		require.NoError(t, err)
 
 		// Delete the queue item (should also delete the pause)
-		err = deleteManager.DeleteQueueItem(ctx, defaultQueueShard, queueItem)
+		err = deleteManager.DeleteQueueItem(ctx, shard, queueItem)
 		require.NoError(t, err, "DeleteQueueItem should succeed for KindPause")
 
 		// Verify pause was also deleted
@@ -286,7 +283,7 @@ func TestDeleteManager(t *testing.T) {
 		require.NoError(t, err)
 
 		// Delete the queue item (should also delete the batch)
-		err = deleteManager.DeleteQueueItem(ctx, defaultQueueShard, queueItem)
+		err = deleteManager.DeleteQueueItem(ctx, shard, queueItem)
 		require.NoError(t, err, "DeleteQueueItem should succeed for KindScheduleBatch")
 
 		// Verify batch was also deleted by trying to retrieve items
@@ -369,7 +366,7 @@ func TestDeleteManager(t *testing.T) {
 		require.NoError(t, err)
 
 		// Delete the queue item (should also delete the debounce)
-		err = deleteManager.DeleteQueueItem(ctx, defaultQueueShard, queueItem)
+		err = deleteManager.DeleteQueueItem(ctx, shard, queueItem)
 		require.Error(t, err)
 		require.ErrorIs(t, err, debounce.ErrDebounceNotFound)
 
@@ -384,11 +381,10 @@ func TestDeleteManager(t *testing.T) {
 
 		// Create a DeleteManager with a custom handler for unknown kinds
 		deleteManagerWithHandler, err := NewDeleteManager(
-			WithQueueManager(queueManager),
 			WithPauseManager(pauseManager),
 			WithBatchManager(batchManager),
 			WithDebouncer(debouncer),
-			WithUnknownHandler(func(ctx context.Context, shard redis_state.RedisQueueShard, item *queue.QueueItem) error {
+			WithUnknownHandler(func(ctx context.Context, shard queue.QueueShard, item *queue.QueueItem) error {
 				handlerCallCount++
 				return nil
 			}),
@@ -421,7 +417,7 @@ func TestDeleteManager(t *testing.T) {
 		require.NoError(t, err)
 
 		// Delete the queue item (should call our custom handler)
-		err = deleteManagerWithHandler.DeleteQueueItem(ctx, defaultQueueShard, queueItem)
+		err = deleteManagerWithHandler.DeleteQueueItem(ctx, shard, queueItem)
 		require.NoError(t, err, "DeleteQueueItem should succeed for unknown kind")
 
 		// Validate that the handler was called at least once
@@ -432,7 +428,6 @@ func TestDeleteManager(t *testing.T) {
 		t.Run("NilPauseManager", func(t *testing.T) {
 			// DeleteManager without pause manager should skip pause deletion
 			deleteManagerNoPause, err := NewDeleteManager(
-				WithQueueManager(queueManager),
 				WithBatchManager(batchManager),
 				WithDebouncer(debouncer),
 			)
@@ -465,7 +460,7 @@ func TestDeleteManager(t *testing.T) {
 			err = queueManager.Enqueue(ctx, queueItem.Data, time.Now(), queue.EnqueueOpts{})
 			require.NoError(t, err)
 
-			err = deleteManagerNoPause.DeleteQueueItem(ctx, defaultQueueShard, queueItem)
+			err = deleteManagerNoPause.DeleteQueueItem(ctx, shard, queueItem)
 			require.NoError(t, err, "Should succeed even with nil pause manager")
 		})
 
@@ -495,7 +490,7 @@ func TestDeleteManager(t *testing.T) {
 			err := queueManager.Enqueue(ctx, queueItem.Data, time.Now(), queue.EnqueueOpts{})
 			require.NoError(t, err)
 
-			err = deleteManager.DeleteQueueItem(ctx, defaultQueueShard, queueItem)
+			err = deleteManager.DeleteQueueItem(ctx, shard, queueItem)
 			require.NoError(t, err, "Should succeed even with invalid payload type")
 		})
 
@@ -533,7 +528,7 @@ func TestDeleteManager(t *testing.T) {
 			err := queueManager.Enqueue(ctx, queueItem.Data, time.Now(), queue.EnqueueOpts{})
 			require.NoError(t, err)
 
-			err = deleteManager.DeleteQueueItem(ctx, defaultQueueShard, queueItem)
+			err = deleteManager.DeleteQueueItem(ctx, shard, queueItem)
 			require.NoError(t, err, "Should succeed even when pause is not found")
 		})
 	})
@@ -542,7 +537,6 @@ func TestDeleteManager(t *testing.T) {
 		t.Run("NilDebouncer", func(t *testing.T) {
 			// DeleteManager without debouncer should skip debounce deletion
 			deleteManagerNoDebounce, err := NewDeleteManager(
-				WithQueueManager(queueManager),
 				WithPauseManager(pauseManager),
 				WithBatchManager(batchManager),
 			)
@@ -578,7 +572,7 @@ func TestDeleteManager(t *testing.T) {
 			err = queueManager.Enqueue(ctx, queueItem.Data, time.Now(), queue.EnqueueOpts{})
 			require.NoError(t, err)
 
-			err = deleteManagerNoDebounce.DeleteQueueItem(ctx, defaultQueueShard, queueItem)
+			err = deleteManagerNoDebounce.DeleteQueueItem(ctx, shard, queueItem)
 			require.NoError(t, err, "Should succeed even with nil debouncer")
 		})
 
@@ -608,7 +602,7 @@ func TestDeleteManager(t *testing.T) {
 			err := queueManager.Enqueue(ctx, queueItem.Data, time.Now(), queue.EnqueueOpts{})
 			require.NoError(t, err)
 
-			err = deleteManager.DeleteQueueItem(ctx, defaultQueueShard, queueItem)
+			err = deleteManager.DeleteQueueItem(ctx, shard, queueItem)
 			require.NoError(t, err, "Should succeed even with invalid payload type")
 		})
 	})
@@ -617,7 +611,6 @@ func TestDeleteManager(t *testing.T) {
 		t.Run("NilBatchManager", func(t *testing.T) {
 			// DeleteManager without batch manager should skip batch deletion
 			deleteManagerNoBatch, err := NewDeleteManager(
-				WithQueueManager(queueManager),
 				WithPauseManager(pauseManager),
 				WithDebouncer(debouncer),
 			)
@@ -653,7 +646,7 @@ func TestDeleteManager(t *testing.T) {
 			err = queueManager.Enqueue(ctx, queueItem.Data, time.Now(), queue.EnqueueOpts{})
 			require.NoError(t, err)
 
-			err = deleteManagerNoBatch.DeleteQueueItem(ctx, defaultQueueShard, queueItem)
+			err = deleteManagerNoBatch.DeleteQueueItem(ctx, shard, queueItem)
 			require.NoError(t, err, "Should succeed even with nil batch manager")
 		})
 
@@ -683,7 +676,7 @@ func TestDeleteManager(t *testing.T) {
 			err := queueManager.Enqueue(ctx, queueItem.Data, time.Now(), queue.EnqueueOpts{})
 			require.NoError(t, err)
 
-			err = deleteManager.DeleteQueueItem(ctx, defaultQueueShard, queueItem)
+			err = deleteManager.DeleteQueueItem(ctx, shard, queueItem)
 			require.NoError(t, err, "Should succeed even with invalid payload type")
 		})
 	})
