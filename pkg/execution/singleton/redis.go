@@ -2,8 +2,10 @@ package singleton
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/pkg/inngest"
@@ -20,18 +22,18 @@ redis.call('del', KEYS[1])
 return v
 `
 
-func New(ctx context.Context, queueShards map[string]redis_state.QueueShard, shardSelector redis_state.ShardSelector) Singleton {
+func New(ctx context.Context, queueShards map[string]*redis_state.QueueClient, shardSelector queue.ShardSelector) Singleton {
 	return &redisStore{
-		queueShards: queueShards,
-		shardSelector:     shardSelector,
-		getAndDelScript:   rueidis.NewLuaScript(getAndDeleteLua),
+		queueShards:     queueShards,
+		shardSelector:   shardSelector,
+		getAndDelScript: rueidis.NewLuaScript(getAndDeleteLua),
 	}
 }
 
 type redisStore struct {
-	queueShards map[string]redis_state.QueueShard
-	shardSelector     redis_state.ShardSelector
-	getAndDelScript   *rueidis.Lua
+	queueShards     map[string]*redis_state.QueueClient
+	shardSelector   queue.ShardSelector
+	getAndDelScript *rueidis.Lua
 }
 
 func (r *redisStore) HandleSingleton(ctx context.Context, key string, s inngest.Singleton, accountID uuid.UUID) (*ulid.ULID, error) {
@@ -39,12 +41,11 @@ func (r *redisStore) HandleSingleton(ctx context.Context, key string, s inngest.
 }
 
 func (r *redisStore) ReleaseSingleton(ctx context.Context, key string, accountID uuid.UUID) (*ulid.ULID, error) {
-	shard, err := r.shardByAccount(ctx, accountID)
+	client, err := r.shardByAccount(ctx, accountID)
 	if err != nil {
 		return nil, err
 	}
 
-	client := shard.RedisClient
 	redisKey := r.generateSingletonKey(client, key)
 
 	val, err := r.getAndDelScript.Exec(ctx, client.Client(), []string{redisKey}, nil).ToString()
@@ -52,20 +53,32 @@ func (r *redisStore) ReleaseSingleton(ctx context.Context, key string, accountID
 }
 
 func (r *redisStore) GetCurrentRunID(ctx context.Context, key string, accountID uuid.UUID) (*ulid.ULID, error) {
-	shard, err := r.shardByAccount(ctx, accountID)
+	client, err := r.shardByAccount(ctx, accountID)
 	if err != nil {
 		return nil, err
 	}
 
-	client := shard.RedisClient
 	redisKey := r.generateSingletonKey(client, key)
 
 	val, err := client.Client().Do(ctx, client.Client().B().Get().Key(redisKey).Build()).ToString()
 	return parseRunIDFromRedisValue(val, err)
 }
 
-func (r *redisStore) shardByAccount(ctx context.Context, accountID uuid.UUID) (redis_state.QueueShard, error) {
-	return r.shardSelector(ctx, accountID, nil)
+func (r *redisStore) shardByAccount(ctx context.Context, accountID uuid.UUID) (*redis_state.QueueClient, error) {
+	selected, err := r.shardSelector(ctx, accountID, nil)
+	if err != nil {
+		return nil, err
+	}
+	if selected.Kind() != enums.QueueShardKindRedis {
+		return nil, fmt.Errorf("must use redis shard for singletons")
+	}
+
+	shard, ok := r.queueShards[selected.Name()]
+	if !ok || shard == nil {
+		return nil, fmt.Errorf("could not find shard %q", selected.Name())
+	}
+
+	return shard, nil
 }
 
 func (r *redisStore) generateSingletonKey(client *redis_state.QueueClient, key string) string {

@@ -11,7 +11,6 @@ import (
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
-	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/redis/rueidis"
 )
@@ -94,7 +93,7 @@ func (r redisReadWriter) CreateCancellation(ctx context.Context, c cqrs.Cancella
 		Payload:     c,
 		QueueName:   &queueName,
 	}, time.Now(), queue.EnqueueOpts{})
-	if err == redis_state.ErrQueueItemExists {
+	if err == queue.ErrQueueItemExists {
 		return nil
 	}
 	return err

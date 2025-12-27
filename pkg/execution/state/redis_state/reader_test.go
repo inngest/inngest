@@ -25,7 +25,7 @@ func TestItemsByPartitionOnEmptyPartition(t *testing.T) {
 
 	ctx := context.Background()
 	clock := clockwork.NewFakeClock()
-	defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+	defaultShard := RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 
 	t.Run("test empty partition", func(t *testing.T) {
 		r.FlushAll()
@@ -52,7 +52,7 @@ func TestItemsByPartition(t *testing.T) {
 
 	ctx := context.Background()
 	clock := clockwork.NewFakeClock()
-	defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+	defaultShard := RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 	// kg := defaultShard.RedisClient.kg
 
 	acctId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
@@ -198,7 +198,7 @@ func TestItemsByPartitionWithSystemQueue(t *testing.T) {
 
 	ctx := context.Background()
 	clock := clockwork.NewFakeClock()
-	defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+	defaultShard := RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 	// kg := defaultShard.RedisClient.kg
 
 	acctID, wsID := uuid.New(), uuid.New()
@@ -258,7 +258,7 @@ func TestItemsByBacklog(t *testing.T) {
 
 	ctx := context.Background()
 	clock := clockwork.NewFakeClock()
-	defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+	defaultShard := RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 	kg := defaultShard.RedisClient.kg
 
 	acctId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
@@ -371,7 +371,7 @@ func TestQueueIterator(t *testing.T) {
 
 	ctx := context.Background()
 	clock := clockwork.NewFakeClock()
-	defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+	defaultShard := RedisQueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 
 	q := NewQueue(
 		defaultShard,
@@ -449,7 +449,7 @@ func TestItemByID(t *testing.T) {
 
 	ctx := context.Background()
 	clock := clockwork.NewFakeClock()
-	defaultShard := QueueShard{
+	defaultShard := RedisQueueShard{
 		Kind:        string(enums.QueueShardKindRedis),
 		RedisClient: NewQueueClient(rc, QueueDefaultKey),
 		Name:        consts.DefaultQueueShardName,
@@ -464,7 +464,7 @@ func TestItemByID(t *testing.T) {
 		WithClock(clock),
 	)
 
-	enqueue := func(ctx context.Context, shard QueueShard) (osqueue.QueueItem, error) {
+	enqueue := func(ctx context.Context, shard RedisQueueShard) (osqueue.QueueItem, error) {
 		item := osqueue.QueueItem{
 			ID:          ulid.MustNew(ulid.Now(), rand.Reader).String(),
 			FunctionID:  fnID,
@@ -509,7 +509,7 @@ func TestItemExists(t *testing.T) {
 
 	ctx := context.Background()
 	clock := clockwork.NewFakeClock()
-	defaultShard := QueueShard{
+	defaultShard := RedisQueueShard{
 		Kind:        string(enums.QueueShardKindRedis),
 		RedisClient: NewQueueClient(rc, QueueDefaultKey),
 		Name:        consts.DefaultQueueShardName,
@@ -524,7 +524,7 @@ func TestItemExists(t *testing.T) {
 		WithClock(clock),
 	)
 
-	enqueue := func(ctx context.Context, shard QueueShard, jobID string) (osqueue.QueueItem, error) {
+	enqueue := func(ctx context.Context, shard RedisQueueShard, jobID string) (osqueue.QueueItem, error) {
 		item := osqueue.QueueItem{
 			ID:          jobID,
 			FunctionID:  fnID,
@@ -595,12 +595,12 @@ func TestShard(t *testing.T) {
 	ctx := context.Background()
 	clock := clockwork.NewFakeClock()
 
-	shard1 := QueueShard{
+	shard1 := RedisQueueShard{
 		Kind:        string(enums.QueueShardKindRedis),
 		RedisClient: NewQueueClient(rc, QueueDefaultKey),
 		Name:        consts.DefaultQueueShardName,
 	}
-	shard2 := QueueShard{
+	shard2 := RedisQueueShard{
 		Kind:        string(enums.QueueShardKindRedis),
 		RedisClient: NewQueueClient(rc, QueueDefaultKey),
 		Name:        "yolo",
@@ -609,7 +609,7 @@ func TestShard(t *testing.T) {
 	q := NewQueue(
 		shard1,
 		WithClock(clock),
-		WithQueueShardClients(map[string]QueueShard{
+		WithQueueShardClients(map[string]RedisQueueShard{
 			consts.DefaultQueueShardName: shard1,
 			"yolo":                       shard2,
 		}),

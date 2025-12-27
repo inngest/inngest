@@ -74,7 +74,7 @@ func TestLuaCompatibility(t *testing.T) {
 		t.Run(tc.Name, func(t *testing.T) {
 			ctx := context.Background()
 
-			setup := func(t *testing.T) redis_state.QueueShard {
+			setup := func(t *testing.T) redis_state.RedisQueueShard {
 				// Start the appropriate server based on test case
 				var client rueidis.Client
 
@@ -114,7 +114,7 @@ func TestLuaCompatibility(t *testing.T) {
 					t.Fatalf("unknown server type: %s", tc.ServerType)
 				}
 
-				shard := redis_state.QueueShard{
+				shard := redis_state.RedisQueueShard{
 					Kind:        string(enums.QueueShardKindRedis),
 					RedisClient: redis_state.NewQueueClient(client, redis_state.QueueDefaultKey),
 					Name:        consts.DefaultQueueShardName,
