@@ -109,7 +109,7 @@ func (q *queueProcessor) scanContinuations(ctx context.Context) error {
 
 			q.log.Trace("continue partition processing", "partition_id", p.ID, "count", c.count)
 
-			if err := q.processPartition(ctx, p, cont.count, false); err != nil {
+			if err := q.ProcessPartition(ctx, p, cont.count, false); err != nil {
 				if err == ErrPartitionNotFound || err == ErrPartitionGarbageCollected {
 					q.removeContinue(ctx, p, false)
 					return nil

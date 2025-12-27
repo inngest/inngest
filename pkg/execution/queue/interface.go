@@ -148,6 +148,7 @@ type QueueManager interface {
 		i ProcessItem,
 		f RunFunc,
 	) error
+	ProcessPartition(ctx context.Context, p *QueuePartition, continuationCount uint, randomOffset bool) error
 }
 
 type QueueProcessor interface {

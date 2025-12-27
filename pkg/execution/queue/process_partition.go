@@ -10,7 +10,7 @@ import (
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 )
 
-// processPartition processes a given partition, peeking jobs from the partition to run.
+// ProcessPartition processes a given partition, peeking jobs from the partition to run.
 //
 // It accepts a uint continuationCount which represents the number of times that the partition
 // has been continued;  this occurs when a job enqueues another job to the same partition and
@@ -19,7 +19,7 @@ import (
 //
 // randomOffset allows us to peek jobs out-of-order, and occurs when we hit concurrency key issues
 // such that we can attempt to work on other jobs not blocked by heading concurrency key issues.
-func (q *queueProcessor) processPartition(ctx context.Context, p *QueuePartition, continuationCount uint, randomOffset bool) error {
+func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition, continuationCount uint, randomOffset bool) error {
 	// When Constraint API is enabled, disable capacity checks on PartitionLease.
 	// This is necessary as capacity was already granted to individual items, and
 	// constraints like concurrency were consumed.
@@ -206,7 +206,7 @@ func (q *queueProcessor) processPartition(ctx context.Context, p *QueuePartition
 			q.log.Warn("error requeuieng partition for random peek", "error", err)
 		}
 
-		return q.processPartition(ctx, p, continuationCount, true)
+		return q.ProcessPartition(ctx, p, continuationCount, true)
 	}
 
 	// If we've hit concurrency issues OR we've only hit rate limit issues, re-enqueue the partition
