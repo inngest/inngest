@@ -2454,6 +2454,7 @@ func TestMigrate(t *testing.T) {
 				}),
 				osqueue.WithIdempotencyTTL(idempotencyTTL),
 			)
+			require.NoError(t, err)
 
 			expectItemCountForPartition := func(ctx context.Context, shard RedisQueueShard, partitionID uuid.UUID, expected int) {
 				var count int

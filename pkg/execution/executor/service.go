@@ -1177,5 +1177,7 @@ func (s *svc) handleJobPromote(ctx context.Context, item queue.Item) error {
 		return fmt.Errorf("could not requeue job with promoted time: %w", err)
 	}
 
+	l.Trace("promoted queue item")
+
 	return nil
 }

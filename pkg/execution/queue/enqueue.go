@@ -144,6 +144,6 @@ func (q *queueProcessor) Enqueue(ctx context.Context, item Item, at time.Time, o
 		}
 		return nil
 	default:
-		return fmt.Errorf("unknown shard kind: %s", shard.Kind)
+		return fmt.Errorf("unknown shard kind: %s", string(shard.Kind()))
 	}
 }
