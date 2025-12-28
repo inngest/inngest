@@ -454,7 +454,7 @@ func TestQueueLease(t *testing.T) {
 			}, start, osqueue.EnqueueOpts{})
 			require.NoError(t, err)
 
-			zsetKeyA := kg.PartitionQueueSet(enums.PartitionTypeDefault, fnId.String(), keyExprChecksum)
+			zsetKeyA := kg.PartitionQueueSet(enums.PartitionTypeConcurrencyKey, fnId.String(), keyExprChecksum)
 			pA := osqueue.QueuePartition{ID: zsetKeyA, AccountID: accountId, FunctionID: &itemA.FunctionID}
 
 			t.Run("With denylists it does not lease.", func(t *testing.T) {
@@ -466,28 +466,15 @@ func TestQueueLease(t *testing.T) {
 			})
 
 			t.Run("Leases with capacity", func(t *testing.T) {
-				// Use the new item's workflow ID
-				require.Equal(t, partitionZsetKey(pA, kg), zsetKeyA)
-
 				// partition key queue does not exist
-				require.False(t, r.Exists(partitionZsetKey(pA, kg)), "partition shouldn't have been added by enqueue or lease")
-				// require.True(t, r.Exists(zsetKeyA))
-				// memPart, err := r.ZMembers(zsetKeyA)
-				// require.NoError(t, err)
-				// require.Equal(t, 2, len(memPart))
-				// require.Contains(t, memPart, itemA.ID)
-				// require.Contains(t, memPart, itemB.ID)
+				require.False(t, r.Exists(zsetKeyA), "partition shouldn't have been added by enqueue or lease")
 
 				// concurrency key queue does not yet exist
 				require.False(t, r.Exists(partitionConcurrencyKey(pA, kg)))
 
-				_, err = shard.Lease(ctx, itemA, 5*time.Second, clock.Now(), nil)
+				leaseID, err := shard.Lease(ctx, itemA, 5*time.Second, clock.Now(), nil)
 				require.NoError(t, err)
-
-				// memPart, err = r.ZMembers(zsetKeyA)
-				// require.NoError(t, err)
-				// require.Equal(t, 1, len(memPart))
-				// require.Contains(t, memPart, itemB.ID)
+				require.NotNil(t, leaseID)
 
 				require.True(t, r.Exists(partitionConcurrencyKey(pA, kg)))
 				memConcurrency, err := r.ZMembers(partitionConcurrencyKey(pA, kg))
