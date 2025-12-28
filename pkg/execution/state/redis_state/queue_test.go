@@ -710,6 +710,7 @@ func TestQueueSystemPartitions(t *testing.T) {
 	_, shard := newQueue(
 		t,
 		rc,
+		osqueue.WithClock(clock),
 		osqueue.WithAllowQueueNames(customQueueName),
 		osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
 			return osqueue.PartitionConstraintConfig{
@@ -720,11 +721,10 @@ func TestQueueSystemPartitions(t *testing.T) {
 				},
 			}
 		}),
-		osqueue.WithClock(clock),
 	)
 	ctx := context.Background()
 
-	start := time.Now().Truncate(time.Second)
+	start := clock.Now().Truncate(time.Second)
 
 	id := uuid.New()
 
@@ -805,11 +805,11 @@ func TestQueueSystemPartitions(t *testing.T) {
 		found := getQueueItem(t, r, item.ID)
 		require.Equal(t, item, found)
 
-		leaseId, err := shard.Lease(ctx, item, time.Second, time.Now(), nil)
+		leaseId, err := shard.Lease(ctx, item, time.Second, clock.Now(), nil)
 		require.NoError(t, err)
 		require.NotNil(t, leaseId)
 
-		leaseId, err = shard.Lease(ctx, item2, time.Second, time.Now(), nil)
+		leaseId, err = shard.Lease(ctx, item2, time.Second, clock.Now(), nil)
 		require.Error(t, err)
 		require.ErrorIs(t, err, osqueue.ErrSystemConcurrencyLimit)
 		require.Nil(t, leaseId)
@@ -817,7 +817,9 @@ func TestQueueSystemPartitions(t *testing.T) {
 
 	t.Run("scavenges partition items with expired leases", func(t *testing.T) {
 		// wait til leases are expired
-		<-time.After(2 * time.Second)
+		clock.Advance(2 * time.Second)
+		r.FastForward(2 * time.Second)
+		r.SetTime(clock.Now())
 
 		requeued, err := shard.Scavenge(ctx, osqueue.ScavengePeekSize)
 		require.NoError(t, err)
@@ -827,7 +829,7 @@ func TestQueueSystemPartitions(t *testing.T) {
 	t.Run("backcompat: scavenges previous partition items with expired leases", func(t *testing.T) {
 		r.FlushAll()
 
-		start := time.Now().Truncate(time.Second)
+		start := clock.Now().Truncate(time.Second)
 
 		item, err := shard.EnqueueItem(ctx, qi, start, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
@@ -836,7 +838,7 @@ func TestQueueSystemPartitions(t *testing.T) {
 
 		qp := getSystemPartition(t, r, customQueueName)
 
-		leaseStart := time.Now()
+		leaseStart := clock.Now()
 		leaseExpires := clock.Now().Add(time.Second)
 
 		itemCountMatches := func(num int) {
@@ -873,8 +875,11 @@ func TestQueueSystemPartitions(t *testing.T) {
 		concurrencyItemCountMatches(1)
 
 		// wait til leases are expired
-		<-time.After(2 * time.Second)
-		require.True(t, time.Now().After(leaseExpires))
+		clock.Advance(2 * time.Second)
+		r.FastForward(2 * time.Second)
+		r.SetTime(clock.Now())
+
+		require.True(t, clock.Now().After(leaseExpires))
 
 		incompatibleConcurrencyIndexItem := shard.Client().kg.Concurrency("p", customQueueName)
 		compatibleConcurrencyIndexItem := customQueueName
@@ -907,7 +912,7 @@ func TestQueueSystemPartitions(t *testing.T) {
 	t.Run("It enqueues an item to account queues when account id is present", func(t *testing.T) {
 		r.FlushAll()
 
-		start := time.Now().Truncate(time.Second)
+		start := clock.Now().Truncate(time.Second)
 
 		// This test case handles account-scoped system partitions
 
@@ -1126,7 +1131,7 @@ func TestQueuePartitionPeek(t *testing.T) {
 	)
 	ctx := context.Background()
 
-	enqueue := func(q osqueue.QueueShard, now time.Time) {
+	enqueue := func(shard osqueue.QueueShard, now time.Time) {
 		atA, atB, atC := now, now.Add(2*time.Second), now.Add(4*time.Second)
 
 		_, err := shard.EnqueueItem(ctx, newQueueItem(idA), atA, osqueue.EnqueueOpts{})
@@ -2417,12 +2422,18 @@ func TestMigrate(t *testing.T) {
 			require.NoError(t, err)
 			defer rc2.Close()
 
-			shard1 := shardFromClient("default", rc1)
-			shard2 := shardFromClient("yolo", rc2)
+			idempotencyTTL := 5 * time.Second
+			opts := []osqueue.QueueOpt{
+				osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+					return tc.keyQueue
+				}),
+				osqueue.WithIdempotencyTTL(idempotencyTTL),
+			}
+
+			shard1 := shardFromClient("default", rc1, opts...)
+			shard2 := shardFromClient("yolo", rc2, opts...)
 
 			shards := mapFromShards(shard1, shard2)
-
-			idempotencyTTL := 5 * time.Second
 
 			q1, err := osqueue.NewQueueProcessor(
 				context.Background(),
@@ -2432,13 +2443,11 @@ func TestMigrate(t *testing.T) {
 				func(ctx context.Context, accountId uuid.UUID, queueName *string) (osqueue.QueueShard, error) {
 					return shard1, nil
 				},
-				osqueue.WithClock(clock),
-				osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
-					return tc.keyQueue
-				}),
-				osqueue.WithIdempotencyTTL(idempotencyTTL),
+				opts...,
 			)
 			require.NoError(t, err)
+
+			require.Equal(t, idempotencyTTL, q1.QueueOptions.IdempotencyTTL)
 
 			q2, err := osqueue.NewQueueProcessor(
 				context.Background(),
@@ -2448,11 +2457,7 @@ func TestMigrate(t *testing.T) {
 				func(ctx context.Context, accountId uuid.UUID, queueName *string) (osqueue.QueueShard, error) {
 					return shard2, nil
 				},
-				osqueue.WithClock(clock),
-				osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
-					return tc.keyQueue
-				}),
-				osqueue.WithIdempotencyTTL(idempotencyTTL),
+				opts...,
 			)
 			require.NoError(t, err)
 
@@ -2480,6 +2485,9 @@ func TestMigrate(t *testing.T) {
 				require.NoError(t, err)
 			}
 
+			items, err := r1.HKeys(shard1.Client().kg.QueueItem())
+			require.NoError(t, err)
+
 			// Don't really need it since there are no executors to process the enqueued items
 			lockUntil := clock.Now().Add(10 * time.Minute)
 			err = q1.SetFunctionMigrate(ctx, shard1.Name(), fnID, &lockUntil)
@@ -2504,11 +2512,14 @@ func TestMigrate(t *testing.T) {
 			clock.Advance(idempotencyTTL + 5*time.Second)
 			r1.FastForward(idempotencyTTL + 5*time.Second)
 
+			remainingTTL := r1.TTL(shard1.Client().kg.Idempotency(items[0]))
+			require.Equal(t, time.Duration(0), remainingTTL, remainingTTL.String())
+
 			// Now, move everything back to queue 1
 			returned, err := q2.Migrate(ctx, shard2.Name(), fnID, 10, 0, func(ctx context.Context, qi *osqueue.QueueItem) error {
 				return q1.Enqueue(ctx, qi.Data, time.UnixMilli(qi.AtMS), osqueue.EnqueueOpts{PassthroughJobId: true})
 			})
-			require.NoError(t, err)
+			require.NoError(t, err, "r1", r1.Dump())
 			require.Equal(t, int64(5), returned)
 
 			// shard1 should have the queue items again
