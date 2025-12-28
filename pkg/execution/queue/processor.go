@@ -142,10 +142,9 @@ type queueProcessor struct {
 	// or reading from scavengerLeaseID in parallel.
 	scavengerLeaseLock *sync.RWMutex
 
-	shadowContinues         map[string]ShadowContinuation
-	shadowContinueCooldown  map[string]time.Time
-	shadowContinuesLock     *sync.Mutex
-	shadowContinuationLimit uint
+	shadowContinues        map[string]ShadowContinuation
+	shadowContinueCooldown map[string]time.Time
+	shadowContinuesLock    *sync.Mutex
 }
 
 func (q *queueProcessor) GetShadowContinuations() map[string]ShadowContinuation {
