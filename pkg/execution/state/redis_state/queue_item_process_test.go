@@ -90,7 +90,7 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 		constraintapi.WithQueueShards(map[string]rueidis.Client{
 			consts.DefaultQueueShardName: rc,
 		}),
-		constraintapi.WithQueueStateKeyPrefix("q:v1"),
+		constraintapi.WithQueueStateKeyPrefix("queue"),
 		constraintapi.WithRateLimitClient(rc),
 		constraintapi.WithRateLimitKeyPrefix("rl"),
 	)
@@ -330,7 +330,7 @@ func TestQueueProcessorPreLeaseWithConstraintAPI(t *testing.T) {
 		constraintapi.WithQueueShards(map[string]rueidis.Client{
 			consts.DefaultQueueShardName: rc,
 		}),
-		constraintapi.WithQueueStateKeyPrefix("q:v1"),
+		constraintapi.WithQueueStateKeyPrefix("queue"),
 		constraintapi.WithRateLimitClient(rc),
 		constraintapi.WithRateLimitKeyPrefix("rl"),
 	)
@@ -581,7 +581,7 @@ func TestPartitionProcessRequeueAfterLimitedWithConstraintAPI(t *testing.T) {
 		constraintapi.WithQueueShards(map[string]rueidis.Client{
 			consts.DefaultQueueShardName: rc,
 		}),
-		constraintapi.WithQueueStateKeyPrefix("q:v1"),
+		constraintapi.WithQueueStateKeyPrefix("queue"),
 		constraintapi.WithRateLimitClient(rc),
 		constraintapi.WithRateLimitKeyPrefix("rl"),
 	)
