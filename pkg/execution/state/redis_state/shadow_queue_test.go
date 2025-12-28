@@ -976,6 +976,7 @@ func TestQueueShadowScannerContinuations(t *testing.T) {
 			ShadowContinuationSkipProbability: 0,
 			NormalizePartition:                true,
 		}),
+		osqueue.WithQueueShadowContinuationLimit(10),
 	)
 
 	fnID1, accountID1, envID1 := uuid.New(), uuid.New(), uuid.New()
