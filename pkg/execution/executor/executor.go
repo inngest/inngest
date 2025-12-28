@@ -1334,11 +1334,14 @@ func (e *executor) schedule(
 
 func (e *executor) handleFunctionSkipped(ctx context.Context, req execution.ScheduleRequest, metadata sv2.Metadata, evts []json.RawMessage, reason enums.SkipReason) (*sv2.Metadata, error) {
 	for _, e := range e.lifecycles {
-		go e.OnFunctionSkipped(context.WithoutCancel(ctx), metadata, execution.SkipState{
-			CronSchedule: req.Events[0].GetEvent().CronSchedule(),
-			Reason:       reason,
-			Events:       evts,
-		})
+		service.Go(
+			func() {
+				e.OnFunctionSkipped(context.WithoutCancel(ctx), metadata, execution.SkipState{
+					CronSchedule: req.Events[0].GetEvent().CronSchedule(),
+					Reason:       reason,
+					Events:       evts,
+				})
+			})
 	}
 	return nil, ErrFunctionSkipped
 }
