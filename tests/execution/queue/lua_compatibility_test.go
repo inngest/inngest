@@ -288,8 +288,6 @@ func TestLuaCompatibility(t *testing.T) {
 			})
 
 			t.Run("backlog refill with throttle", func(t *testing.T) {
-				shard := setup(t)
-
 				// Test data setup
 				accountID := uuid.New()
 				functionID := uuid.New()
@@ -318,6 +316,8 @@ func TestLuaCompatibility(t *testing.T) {
 						return true
 					}),
 				}
+
+				shard := setup(t, opts...)
 
 				q, err := queue.NewQueueProcessor(
 					context.Background(),
@@ -368,7 +368,7 @@ func TestLuaCompatibility(t *testing.T) {
 				res, err := shard.BacklogRefill(ctx, &backlog, &sp, refillUntil, refillItems, constraints)
 				require.NoError(t, err)
 				require.NotNil(t, res)
-				require.Equal(t, 1, res.Refill)
+				require.Equal(t, 1, res.Refill, *res)
 				require.Equal(t, 1, res.Refilled)
 
 				// Add second item with capacity lease
