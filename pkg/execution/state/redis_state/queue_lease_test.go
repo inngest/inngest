@@ -42,7 +42,7 @@ func TestQueueLease(t *testing.T) {
 
 	ctx := context.Background()
 
-	start := time.Now().Truncate(time.Second)
+	start := clock.Now().Truncate(time.Second)
 
 	t.Run("It leases an item", func(t *testing.T) {
 		fnID, accountID := uuid.New(), uuid.New()
@@ -75,9 +75,9 @@ func TestQueueLease(t *testing.T) {
 			require.Equal(t, 1, len(mem))
 		})
 
-		now := time.Now()
+		now := clock.Now()
 		leaseExpiry := now.Add(time.Second)
-		id, err := shard.Lease(ctx, item, time.Second, time.Now(), nil)
+		id, err := shard.Lease(ctx, item, time.Second, clock.Now(), nil)
 		require.NoError(t, err)
 
 		item = getQueueItem(t, r, item.ID)
@@ -127,15 +127,20 @@ func TestQueueLease(t *testing.T) {
 
 		t.Run("Leasing again should fail", func(t *testing.T) {
 			for i := 0; i < 50; i++ {
-				id, err := shard.Lease(ctx, item, time.Second, time.Now(), nil)
+				id, err := shard.Lease(ctx, item, time.Second, clock.Now(), nil)
 				require.Equal(t, osqueue.ErrQueueItemAlreadyLeased, err)
 				require.Nil(t, id)
-				<-time.After(5 * time.Millisecond)
+
+				clock.Advance(5 * time.Millisecond)
+				r.FastForward(5 * time.Millisecond)
+				r.SetTime(clock.Now())
 			}
 		})
 
 		t.Run("Leasing an expired lease should succeed", func(t *testing.T) {
-			<-time.After(1005 * time.Millisecond)
+			clock.Advance(1005 * time.Millisecond)
+			r.FastForward(1005 * time.Millisecond)
+			r.SetTime(clock.Now())
 
 			// Now expired
 			t.Run("After expiry, no items should be in progress", func(t *testing.T) {
@@ -144,9 +149,8 @@ func TestQueueLease(t *testing.T) {
 				require.EqualValues(t, 0, count)
 			})
 
-			now := time.Now()
-			id, err := shard.Lease(ctx, item, 5*time.Second, time.Now(), nil)
-			require.NoError(t, err)
+			now := clock.Now()
+			id, err := shard.Lease(ctx, item, 5*time.Second, clock.Now(), nil)
 			require.NoError(t, err)
 
 			item = getQueueItem(t, r, item.ID)
@@ -162,14 +166,14 @@ func TestQueueLease(t *testing.T) {
 		})
 
 		t.Run("It should remove the item from the function queue, as this is now in the partition's in-progress concurrency queue", func(t *testing.T) {
-			start := time.Now()
+			start := clock.Now()
 			item, err := shard.EnqueueItem(ctx, osqueue.QueueItem{}, start, osqueue.EnqueueOpts{})
 			require.NoError(t, err)
 			require.Nil(t, item.LeaseID)
 
 			requireItemScoreEquals(t, r, item, start)
 
-			_, err = shard.Lease(ctx, item, time.Minute, time.Now(), nil)
+			_, err = shard.Lease(ctx, item, time.Minute, clock.Now(), nil)
 			require.NoError(t, err)
 
 			_, err = r.ZScore(kg.FnQueueSet(item.FunctionID.String()), item.ID)
@@ -179,7 +183,7 @@ func TestQueueLease(t *testing.T) {
 		t.Run("it should not update the partition score to the next item", func(t *testing.T) {
 			r.FlushAll()
 
-			timeNow := time.Now().Truncate(time.Second)
+			timeNow := clock.Now().Truncate(time.Second)
 			timeNowPlusFiveSeconds := timeNow.Add(time.Second * 5).Truncate(time.Second)
 
 			acctId := uuid.New()
@@ -250,19 +254,19 @@ func TestQueueLease(t *testing.T) {
 		t.Run("With denylists it does not lease.", func(t *testing.T) {
 			list := osqueue.NewLeaseDenyList()
 			list.AddConcurrency(osqueue.NewKeyError(osqueue.ErrPartitionConcurrencyLimit, p.Queue()))
-			id, err := shard.Lease(ctx, itemA, 5*time.Second, time.Now(), list)
+			id, err := shard.Lease(ctx, itemA, 5*time.Second, clock.Now(), list)
 			require.NotNil(t, err, "Expcted error leasing denylists")
 			require.Nil(t, id, "Expected nil ID with denylists")
 			require.ErrorIs(t, err, osqueue.ErrPartitionConcurrencyLimit)
 		})
 
 		t.Run("Leases with capacity", func(t *testing.T) {
-			_, err = shard.Lease(ctx, itemA, 5*time.Second, time.Now(), nil)
+			_, err = shard.Lease(ctx, itemA, 5*time.Second, clock.Now(), nil)
 			require.NoError(t, err)
 		})
 
 		t.Run("Errors without capacity", func(t *testing.T) {
-			id, err := shard.Lease(ctx, itemB, 5*time.Second, time.Now(), nil)
+			id, err := shard.Lease(ctx, itemB, 5*time.Second, clock.Now(), nil)
 			require.Nil(t, id, "Leased item when concurrency limits are reached.\n%s", r.Dump())
 			require.Error(t, err)
 		})
@@ -294,12 +298,12 @@ func TestQueueLease(t *testing.T) {
 		require.NoError(t, err)
 
 		t.Run("Leases with capacity", func(t *testing.T) {
-			_, err = shard.Lease(ctx, itemA, 5*time.Second, time.Now(), nil)
+			_, err = shard.Lease(ctx, itemA, 5*time.Second, clock.Now(), nil)
 			require.NoError(t, err)
 		})
 
 		t.Run("Errors without capacity", func(t *testing.T) {
-			id, err := shard.Lease(ctx, itemB, 5*time.Second, time.Now(), nil)
+			id, err := shard.Lease(ctx, itemB, 5*time.Second, clock.Now(), nil)
 			require.Nil(t, id)
 			require.Error(t, err)
 			require.ErrorIs(t, err, osqueue.ErrAccountConcurrencyLimit)
@@ -357,13 +361,13 @@ func TestQueueLease(t *testing.T) {
 			t.Run("With denylists it does not lease.", func(t *testing.T) {
 				list := osqueue.NewLeaseDenyList()
 				list.AddConcurrency(osqueue.NewKeyError(osqueue.ErrConcurrencyLimitCustomKey, ck.Key))
-				_, err = shard.Lease(ctx, itemA, 5*time.Second, time.Now(), list)
+				_, err = shard.Lease(ctx, itemA, 5*time.Second, clock.Now(), list)
 				require.NotNil(t, err)
 				require.ErrorIs(t, err, osqueue.ErrConcurrencyLimitCustomKey)
 			})
 
 			t.Run("Leases with capacity", func(t *testing.T) {
-				now := time.Now()
+				now := clock.Now()
 				_, err = shard.Lease(ctx, itemA, 5*time.Second, now, nil)
 				require.NoError(t, err)
 
@@ -380,7 +384,7 @@ func TestQueueLease(t *testing.T) {
 			})
 
 			t.Run("Errors without capacity", func(t *testing.T) {
-				id, err := shard.Lease(ctx, itemB, 5*time.Second, time.Now(), nil)
+				id, err := shard.Lease(ctx, itemB, 5*time.Second, clock.Now(), nil)
 				require.Nil(t, id)
 				require.Error(t, err)
 			})
@@ -450,13 +454,13 @@ func TestQueueLease(t *testing.T) {
 			}, start, osqueue.EnqueueOpts{})
 			require.NoError(t, err)
 
-			zsetKeyA := kg.PartitionQueueSet(enums.PartitionTypeConcurrencyKey, fnId.String(), keyExprChecksum)
+			zsetKeyA := kg.PartitionQueueSet(enums.PartitionTypeDefault, fnId.String(), keyExprChecksum)
 			pA := osqueue.QueuePartition{ID: zsetKeyA, AccountID: accountId, FunctionID: &itemA.FunctionID}
 
 			t.Run("With denylists it does not lease.", func(t *testing.T) {
 				list := osqueue.NewLeaseDenyList()
 				list.AddConcurrency(osqueue.NewKeyError(osqueue.ErrConcurrencyLimitCustomKey, ck.Key))
-				_, err = shard.Lease(ctx, itemA, 5*time.Second, time.Now(), list)
+				_, err = shard.Lease(ctx, itemA, 5*time.Second, clock.Now(), list)
 				require.NotNil(t, err)
 				require.ErrorIs(t, err, osqueue.ErrConcurrencyLimitCustomKey)
 			})
@@ -477,7 +481,7 @@ func TestQueueLease(t *testing.T) {
 				// concurrency key queue does not yet exist
 				require.False(t, r.Exists(partitionConcurrencyKey(pA, kg)))
 
-				_, err = shard.Lease(ctx, itemA, 5*time.Second, time.Now(), nil)
+				_, err = shard.Lease(ctx, itemA, 5*time.Second, clock.Now(), nil)
 				require.NoError(t, err)
 
 				// memPart, err = r.ZMembers(zsetKeyA)
@@ -493,7 +497,7 @@ func TestQueueLease(t *testing.T) {
 			})
 
 			t.Run("Errors without capacity", func(t *testing.T) {
-				id, err := shard.Lease(ctx, itemB, 5*time.Second, time.Now(), nil)
+				id, err := shard.Lease(ctx, itemB, 5*time.Second, clock.Now(), nil)
 				require.Nil(t, id)
 				require.Error(t, err)
 				require.ErrorIs(t, err, osqueue.ErrConcurrencyLimitCustomKey)
@@ -564,19 +568,19 @@ func TestQueueLease(t *testing.T) {
 			require.False(t, r.Exists(zsetKeyB))
 
 			// Lease item A1 - should work
-			_, err = shard.Lease(ctx, itemA1, 5*time.Second, time.Now(), nil)
+			_, err = shard.Lease(ctx, itemA1, 5*time.Second, clock.Now(), nil)
 			require.NoError(t, err)
 
 			// Lease item B1 - should work
-			_, err = shard.Lease(ctx, itemB1, 5*time.Second, time.Now(), nil)
+			_, err = shard.Lease(ctx, itemB1, 5*time.Second, clock.Now(), nil)
 			require.NoError(t, err)
 
 			// Lease item A2 - should fail due to custom concurrency limit
-			_, err = shard.Lease(ctx, itemA2, 5*time.Second, time.Now(), nil)
+			_, err = shard.Lease(ctx, itemA2, 5*time.Second, clock.Now(), nil)
 			require.ErrorIs(t, err, osqueue.ErrConcurrencyLimitCustomKey)
 
 			// Lease item B1 - should fail due to custom concurrency limit
-			_, err = shard.Lease(ctx, itemB2, 5*time.Second, time.Now(), nil)
+			_, err = shard.Lease(ctx, itemB2, 5*time.Second, clock.Now(), nil)
 			require.ErrorIs(t, err, osqueue.ErrConcurrencyLimitCustomKey)
 		})
 	})
@@ -596,7 +600,7 @@ func TestQueueLease(t *testing.T) {
 			// NOTE: We need two items to ensure that this updates.  Leasing an
 			// item removes it from the fn queue.
 			t.Run("With a single item in the queue hwen leasing, nothing updates", func(t *testing.T) {
-				at := time.Now().Truncate(time.Second).Add(time.Second)
+				at := clock.Now().Truncate(time.Second).Add(time.Second)
 				accountId := uuid.New()
 				item, err := shard.EnqueueItem(ctx, osqueue.QueueItem{
 					Data: osqueue.Item{Identifier: state.Identifier{AccountID: accountId}},
@@ -614,7 +618,7 @@ func TestQueueLease(t *testing.T) {
 
 				// Nothing should update here, as there's nothing left in the fn queue
 				// so nothing happens.
-				_, err = shard.Lease(ctx, item, 10*time.Second, time.Now(), nil)
+				_, err = shard.Lease(ctx, item, 10*time.Second, clock.Now(), nil)
 				require.NoError(t, err)
 
 				nextScore, err := r.ZScore(kg.GlobalPartitionIndex(), p.Queue())
@@ -631,7 +635,7 @@ func TestQueueLease(t *testing.T) {
 			r.FlushAll()
 
 			t.Run("It moves items from each concurrency queue", func(t *testing.T) {
-				at := time.Now().Truncate(time.Second).Add(time.Second)
+				at := clock.Now().Truncate(time.Second).Add(time.Second)
 				itemA, err := shard.EnqueueItem(ctx, osqueue.QueueItem{
 					Data: osqueue.Item{
 						CustomConcurrencyKeys: []state.CustomConcurrency{
@@ -724,7 +728,7 @@ func TestQueueLease(t *testing.T) {
 		t.Run("With more than one item in the fn queue, it uses the next val for the global partition index", func(t *testing.T) {
 			r.FlushAll()
 
-			atA := time.Now().Truncate(time.Second).Add(time.Second)
+			atA := clock.Now().Truncate(time.Second).Add(time.Second)
 			atB := atA.Add(time.Minute)
 
 			itemA, err := shard.EnqueueItem(ctx, osqueue.QueueItem{}, atA, osqueue.EnqueueOpts{})
@@ -739,7 +743,7 @@ func TestQueueLease(t *testing.T) {
 			require.EqualValues(t, atA.Unix(), score)
 
 			// Leasing the item should update the score.
-			_, err = shard.Lease(ctx, itemA, 10*time.Second, time.Now(), nil)
+			_, err = shard.Lease(ctx, itemA, 10*time.Second, clock.Now(), nil)
 			require.NoError(t, err)
 
 			nextScore, err := r.ZScore(kg.GlobalPartitionIndex(), p.Queue())
@@ -761,8 +765,8 @@ func TestQueueLease(t *testing.T) {
 
 		p := osqueue.QueuePartition{} // Empty partition
 
-		now := time.Now()
-		id, err := shard.Lease(ctx, item, time.Second, time.Now(), nil)
+		now := clock.Now()
+		id, err := shard.Lease(ctx, item, time.Second, clock.Now(), nil)
 		require.NoError(t, err)
 
 		item = getQueueItem(t, r, item.ID)
@@ -794,8 +798,8 @@ func TestQueueLease(t *testing.T) {
 
 		p := getSystemPartition(t, r, systemQueueName)
 
-		now := time.Now()
-		id, err := shard.Lease(ctx, item, time.Second, time.Now(), nil)
+		now := clock.Now()
+		id, err := shard.Lease(ctx, item, time.Second, clock.Now(), nil)
 		require.NoError(t, err)
 
 		require.False(t, r.Exists("{queue}:queue:sorted:system-queue"))
@@ -849,8 +853,8 @@ func TestQueueLease(t *testing.T) {
 
 		p := getSystemPartition(t, r, systemQueueName)
 
-		now := time.Now()
-		id, err := shard.Lease(ctx, item, time.Second, time.Now(), nil)
+		now := clock.Now()
+		id, err := shard.Lease(ctx, item, time.Second, clock.Now(), nil)
 		require.NoError(t, err)
 
 		require.False(t, r.Exists("{queue}:queue:sorted:schedule-batch"))
@@ -929,8 +933,8 @@ func TestQueueLease(t *testing.T) {
 
 		require.True(t, r.Exists(partitionZsetKey(defaultPart, kg)))
 
-		now := time.Now()
-		id, err := shard.Lease(ctx, item, time.Second, time.Now(), nil)
+		now := clock.Now()
+		id, err := shard.Lease(ctx, item, time.Second, clock.Now(), nil)
 		require.NoError(t, err)
 
 		item = getQueueItem(t, r, item.ID)
@@ -1684,7 +1688,7 @@ func TestQueueLeaseConstraintIdempotency(t *testing.T) {
 			},
 		}
 
-		start := time.Now().Truncate(time.Second)
+		start := clock.Now().Truncate(time.Second)
 
 		t.Run("constraint state should be set when not skipping", func(t *testing.T) {
 			r.FlushAll()
@@ -1775,7 +1779,7 @@ func TestQueueLeaseConstraintIdempotency(t *testing.T) {
 			},
 		}
 
-		start := time.Now().Truncate(time.Second)
+		start := clock.Now().Truncate(time.Second)
 
 		item, err := shard.EnqueueItem(ctx, qi, start, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
