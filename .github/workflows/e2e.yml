@@ -146,6 +146,14 @@ jobs:
           # pass in all the directories in coverage to be merged
           go tool covdata percent -i=$GOCOVERDIR | tee coverage.txt
 
+      - name: Upload devserver logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: devserver-logs-golang-kq-${{ matrix.experimentalKeyQueues }}-split-${{ matrix.index }}
+          path: /tmp/dev-output.txt
+          retention-days: 7
+
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
         with:
