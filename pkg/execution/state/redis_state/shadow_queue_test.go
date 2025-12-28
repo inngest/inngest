@@ -952,17 +952,13 @@ func TestQueueShadowScannerContinuations(t *testing.T) {
 	require.NoError(t, err)
 	defer rc.Close()
 
-	ctx := context.Background()
-
 	clock := clockwork.NewFakeClock()
-
-	enqueueToBacklog := true
-	q, shard := newQueue(
-		t, rc,
+	queueOpts := []osqueue.QueueOpt{
 		osqueue.WithClock(clock),
 		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
-			return enqueueToBacklog
+			return true
 		}),
+		osqueue.WithBacklogRefillLimit(1),
 		osqueue.WithRunMode(osqueue.QueueRunMode{
 			Sequential:                        true,
 			Scavenger:                         true,
@@ -977,12 +973,19 @@ func TestQueueShadowScannerContinuations(t *testing.T) {
 			NormalizePartition:                true,
 		}),
 		osqueue.WithQueueShadowContinuationLimit(10),
+	}
+
+	ctx := context.Background()
+
+	q, shard := newQueue(
+		t, rc,
+		queueOpts...,
 	)
 
 	fnID1, accountID1, envID1 := uuid.New(), uuid.New(), uuid.New()
 	fnID2, accountID2, envID2 := uuid.New(), uuid.New(), uuid.New()
 
-	addItem := func(id string, identifier state.Identifier, at time.Time) osqueue.QueueItem {
+	addItem := func(shard osqueue.QueueShard, id string, identifier state.Identifier, at time.Time) osqueue.QueueItem {
 		item := osqueue.QueueItem{
 			ID:          id,
 			FunctionID:  identifier.WorkflowID,
@@ -1005,13 +1008,13 @@ func TestQueueShadowScannerContinuations(t *testing.T) {
 	}
 	at := clock.Now()
 
-	item1 := addItem("test1", state.Identifier{
+	item1 := addItem(shard, "test1", state.Identifier{
 		AccountID:   accountID1,
 		WorkspaceID: envID1,
 		WorkflowID:  fnID1,
 	}, at)
 
-	item2 := addItem("test2", state.Identifier{
+	item2 := addItem(shard, "test2", state.Identifier{
 		AccountID:   accountID2,
 		WorkspaceID: envID2,
 		WorkflowID:  fnID2,
@@ -1050,35 +1053,31 @@ func TestQueueShadowScannerContinuations(t *testing.T) {
 	t.Run("should increase continuations when more items are available", func(t *testing.T) {
 		r.FlushAll()
 
-		q.ClearShadowContinuations()
-
-		q, _ := newQueue(
+		q, shard := newQueue(
 			t, rc,
-			osqueue.WithClock(clock),
-			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
-				return enqueueToBacklog
-			}),
-			osqueue.WithBacklogRefillLimit(1),
+			queueOpts...,
 		)
 
-		addItem("test1", state.Identifier{
+		addItem(shard, "test1", state.Identifier{
 			AccountID:   accountID1,
 			WorkspaceID: envID1,
 			WorkflowID:  fnID1,
 		}, at)
 
-		addItem("test2", state.Identifier{
+		addItem(shard, "test2", state.Identifier{
 			AccountID:   accountID1,
 			WorkspaceID: envID1,
 			WorkflowID:  fnID1,
 		}, at)
 
-		addItem("test3", state.Identifier{
+		addItem(shard, "test3", state.Identifier{
 			AccountID:   accountID2,
 			WorkspaceID: envID2,
 			WorkflowID:  fnID2,
 		}, at)
 
+		l := logger.StdlibLogger(ctx, logger.WithLoggerLevel(logger.LevelTrace))
+		ctx := logger.WithStdlib(ctx, l)
 		q.AddShadowContinue(ctx, &sp1, 1)
 
 		// Process and refill once
@@ -1103,30 +1102,25 @@ func TestQueueShadowScannerContinuations(t *testing.T) {
 	t.Run("should remove continuation on missing shadow partition", func(t *testing.T) {
 		r.FlushAll()
 
-		q.ClearShadowContinuations()
 		q, shard := newQueue(
 			t, rc,
-			osqueue.WithClock(clock),
-			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
-				return enqueueToBacklog
-			}),
-			osqueue.WithBacklogRefillLimit(1),
+			queueOpts...,
 		)
 		kg := shard.Client().kg
 
-		addItem("test1", state.Identifier{
+		addItem(shard, "test1", state.Identifier{
 			AccountID:   accountID1,
 			WorkspaceID: envID1,
 			WorkflowID:  fnID1,
 		}, at)
 
-		addItem("test2", state.Identifier{
+		addItem(shard, "test2", state.Identifier{
 			AccountID:   accountID1,
 			WorkspaceID: envID1,
 			WorkflowID:  fnID1,
 		}, at)
 
-		addItem("test3", state.Identifier{
+		addItem(shard, "test3", state.Identifier{
 			AccountID:   accountID2,
 			WorkspaceID: envID2,
 			WorkflowID:  fnID2,
@@ -1138,7 +1132,7 @@ func TestQueueShadowScannerContinuations(t *testing.T) {
 
 		// Expect continuation to be set
 		cont, ok := q.GetShadowContinuations()[sp1.PartitionID]
-		require.True(t, ok)
+		require.True(t, ok, cont)
 		require.Equal(t, uint(2), cont.Count)
 		require.Equal(t, sp1, *cont.ShadowPart)
 
@@ -1160,26 +1154,22 @@ func TestQueueShadowScannerContinuations(t *testing.T) {
 		q.ClearShadowContinuations()
 		q, shard := newQueue(
 			t, rc,
-			osqueue.WithClock(clock),
-			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
-				return enqueueToBacklog
-			}),
-			osqueue.WithBacklogRefillLimit(1),
+			queueOpts...,
 		)
 
-		addItem("test1", state.Identifier{
+		addItem(shard, "test1", state.Identifier{
 			AccountID:   accountID1,
 			WorkspaceID: envID1,
 			WorkflowID:  fnID1,
 		}, at)
 
-		addItem("test2", state.Identifier{
+		addItem(shard, "test2", state.Identifier{
 			AccountID:   accountID1,
 			WorkspaceID: envID1,
 			WorkflowID:  fnID1,
 		}, at)
 
-		addItem("test3", state.Identifier{
+		addItem(shard, "test3", state.Identifier{
 			AccountID:   accountID2,
 			WorkspaceID: envID2,
 			WorkflowID:  fnID2,
