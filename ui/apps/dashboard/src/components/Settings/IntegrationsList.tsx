@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Button } from '@inngest/components/Button/NewButton';
+import { Button } from '@inngest/components/Button';
 import { Card } from '@inngest/components/Card/Card';
 import { IconDatadog } from '@inngest/components/icons/platforms/Datadog';
 import { IconNeon } from '@inngest/components/icons/platforms/Neon';

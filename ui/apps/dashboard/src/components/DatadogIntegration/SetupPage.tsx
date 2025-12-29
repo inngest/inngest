@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Alert } from '@inngest/components/Alert/NewAlert';
-import { Button } from '@inngest/components/Button/NewButton';
+import { Alert } from '@inngest/components/Alert';
+import { Button } from '@inngest/components/Button';
 import { AlertModal } from '@inngest/components/Modal';
 import { StatusDot } from '@inngest/components/Status/StatusDot';
 import { Time } from '@inngest/components/Time';

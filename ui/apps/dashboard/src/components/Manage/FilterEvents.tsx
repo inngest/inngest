@@ -1,4 +1,4 @@
-import { Button } from '@inngest/components/Button/NewButton';
+import { Button } from '@inngest/components/Button';
 import ToggleGroup from '@inngest/components/ToggleGroup/ToggleGroup';
 import { useContext, useState } from 'react';
 import { toast } from 'sonner';

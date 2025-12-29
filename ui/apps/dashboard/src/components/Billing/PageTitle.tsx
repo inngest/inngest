@@ -1,5 +1,5 @@
 import { useLocation } from '@tanstack/react-router';
-import { Link } from '@inngest/components/Link/NewLink';
+import { Link } from '@inngest/components/Link';
 
 import { WEBSITE_PRICING_URL, pathCreator } from '@/utils/urls';
 

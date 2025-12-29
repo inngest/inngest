@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Button } from '@inngest/components/Button';
 import { InlineCode } from '@inngest/components/Code';
 import { Link } from '@inngest/components/Link';
-import { IntegrationSteps } from '@inngest/components/PostgresIntegrations/types';
+import { IntegrationSteps } from '@inngest/components/PostgresIntegrations/newTypes';
 import { parseConnectionString } from '@inngest/components/PostgresIntegrations/utils';
 
 export default function NeonFormat({
@@ -21,7 +21,7 @@ export default function NeonFormat({
     engine: string;
     name: string;
     replicaConn?: string;
-  }) => Promise<{ success: boolean; error: string }>;
+  }) => Promise<{ success: boolean; error: string | null }>;
 }) {
   const [isVerifying, setIsVerifying] = useState(false);
   const [error, setError] = useState<string>();
@@ -97,7 +97,7 @@ export default function NeonFormat({
       {isVerified ? (
         <Button
           label="Next"
-          href={`/settings/integrations/${integration}/${IntegrationSteps.ConnectDb}`}
+          to={`/settings/integrations/${integration}/${IntegrationSteps.ConnectDb}`}
         />
       ) : (
         <Button

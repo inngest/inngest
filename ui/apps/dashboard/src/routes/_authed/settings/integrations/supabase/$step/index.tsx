@@ -1,5 +1,5 @@
-import Auth from '@inngest/components/PostgresIntegrations/Neon/NewAuth';
-import Connect from '@inngest/components/PostgresIntegrations/Neon/NewConnect';
+import Auth from '@inngest/components/PostgresIntegrations/Neon/Auth';
+import Connect from '@inngest/components/PostgresIntegrations/Neon/Connect';
 import {
   IntegrationSteps,
   STEPS_ORDER,

@@ -1,5 +1,3 @@
-'use client';
-
 import { Button } from '@inngest/components/Button';
 import {
   DropdownMenu,
@@ -9,7 +7,6 @@ import {
 } from '@inngest/components/DropdownMenu/DropdownMenu';
 import { RiSettingsLine } from '@remixicon/react';
 
-import { FeatureToggle } from '../FeatureToggle/FeatureToggle';
 import { Switch } from '../Switch';
 
 export type RunsActionMenuProps = {
@@ -54,18 +51,6 @@ export const RunsActionMenu = ({
                 e.stopPropagation();
                 setAutoRefresh();
               }}
-            />
-          </DropdownMenuItem>
-          <DropdownMenuItem className="hover:bg-canvasBase">
-            <div className="flex flex-col">
-              <div className="text-basis text-sm">Traces Preview</div>
-              <div className="text-basis text-xs">Use a new Developer Preview mode of traces</div>
-            </div>
-            <div className="flex-1" />
-            <FeatureToggle
-              defaultEnabled={false}
-              featureFlagName="traces-preview"
-              toggle={setPreview}
             />
           </DropdownMenuItem>
         </DropdownMenuContent>

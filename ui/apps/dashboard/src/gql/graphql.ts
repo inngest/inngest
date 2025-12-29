@@ -618,6 +618,11 @@ export type EntitlementInt = {
   limit: Scalars['Int']['output'];
 };
 
+export type EntitlementNullableInt = {
+  __typename?: 'EntitlementNullableInt';
+  limit: Maybe<Scalars['Int']['output']>;
+};
+
 export type EntitlementRunCount = {
   __typename?: 'EntitlementRunCount';
   limit: Maybe<Scalars['Int']['output']>;
@@ -671,6 +676,7 @@ export type Entitlements = {
   eventSize: EntitlementInt;
   events: EntitlementEvents;
   executions: EntitlementExecutions;
+  functionBacklogSize: EntitlementNullableInt;
   hipaa: EntitlementBool;
   history: EntitlementInt;
   metricsExport: EntitlementBool;

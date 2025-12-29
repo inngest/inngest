@@ -5,7 +5,7 @@ import { RotateSigningKeyButton } from '@/components/SigningKey/RotateSigningKey
 import { SigningKey } from '@/components/SigningKey/SigningKey';
 import { useSigningKeys } from '@/components/SigningKey/useSigningKeys';
 import { EnvironmentType } from '@/gql/graphql';
-import { Alert } from '@inngest/components/Alert/NewAlert';
+import { Alert } from '@inngest/components/Alert';
 import { Card } from '@inngest/components/Card';
 import { InlineCode } from '@inngest/components/Code';
 import LoadingIcon from '@/components/Icons/LoadingIcon';

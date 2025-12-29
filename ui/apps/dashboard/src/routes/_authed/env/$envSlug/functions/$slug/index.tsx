@@ -10,8 +10,8 @@ import LoadingIcon from '@/components/Icons/LoadingIcon';
 import { useFunction, useFunctionUsage } from '@/queries';
 import { pathCreator } from '@/utils/urls';
 import { useAccountFeatures } from '@/utils/useAccountFeatures';
-import { Alert } from '@inngest/components/Alert/NewAlert';
-import { Button } from '@inngest/components/Button/NewButton';
+import { Alert } from '@inngest/components/Alert';
+import { Button } from '@inngest/components/Button';
 import type { RangeChangeProps } from '@inngest/components/DatePicker/RangePicker';
 import { TimeFilter } from '@inngest/components/Filter/TimeFilter';
 import { useCalculatedStartTime } from '@inngest/components/hooks/useCalculatedStartTime';
@@ -20,7 +20,7 @@ import * as Sentry from '@sentry/tanstackstart-react';
 import {
   useBatchedSearchParams,
   useSearchParam,
-} from '@inngest/components/hooks/useNewSearchParams';
+} from '@inngest/components/hooks/useSearchParams';
 import { cn } from '@inngest/components/utils/classNames';
 import {
   durationToString,

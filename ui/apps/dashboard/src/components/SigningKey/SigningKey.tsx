@@ -1,5 +1,5 @@
 import { Card } from '@inngest/components/Card';
-import { Pill } from '@inngest/components/Pill/NewPill';
+import { Pill } from '@inngest/components/Pill';
 import { Time } from '@inngest/components/Time';
 import { RiStarFill } from '@remixicon/react';
 

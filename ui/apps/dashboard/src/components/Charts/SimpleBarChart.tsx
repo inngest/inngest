@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Pill } from '@inngest/components/Pill/NewPill';
+import { Pill } from '@inngest/components/Pill';
 import { cn } from '@inngest/components/utils/classNames';
 import { minuteTime } from '@inngest/components/utils/date';
 import {

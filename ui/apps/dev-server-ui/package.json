@@ -16,7 +16,7 @@
     "dev": "pnpm i && concurrently --prefix-colors \"green.inverse,magenta.inverse,blue.inverse\" pnpm:dev:*",
     "dev:vite": "vite dev",
     "dev:codegen": "nodemon -w ../pkg/coreapi -e graphql -x 'pnpm codegen'",
-    "build": "vite build --mode=production && tsc --noEmit",
+    "build": "tsc --noEmit && vite build --mode=production",
     "preview": "vite preview",
     "start": "vite start",
     "format": "prettier --write src",

@@ -1,4 +1,4 @@
-import { Button } from '@inngest/components/Button/NewButton';
+import { Button } from '@inngest/components/Button';
 import { Error } from '@inngest/components/Error/Error';
 import type { ErrorComponentProps } from '@tanstack/react-router';
 import { rootRouteId, useMatch, useRouter } from '@tanstack/react-router';

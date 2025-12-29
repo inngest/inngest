@@ -11,7 +11,7 @@ import ApprovalDialog from '@/components/Intent/ApprovalDialog';
 import { createTransform } from '@/components/Manage/transformHelpers';
 import { graphql } from '@/gql';
 import { useDefaultEnvironment } from '@/queries/environments';
-import { useSearchParam } from '@inngest/components/hooks/useNewSearchParams';
+import { useSearchParam } from '@inngest/components/hooks/useSearchParams';
 
 export const Route = createFileRoute('/_authed/intent/create-webhook/')({
   component: CreateWebhookComponent,

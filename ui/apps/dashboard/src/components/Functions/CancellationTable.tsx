@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState, type UIEventHandler } from 'react';
 import { useNavigate } from '@tanstack/react-router';
-import { Button } from '@inngest/components/Button/NewButton';
+import { Button } from '@inngest/components/Button';
 import {
   IDCell,
   Table,

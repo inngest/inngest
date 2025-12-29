@@ -1,4 +1,4 @@
-import { type MenuStepContent } from '../Steps/NewStepsMenu';
+import { type MenuStepContent } from '../Steps/StepsMenu';
 
 export enum IntegrationSteps {
   Authorize = 'authorize',

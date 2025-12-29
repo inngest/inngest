@@ -1,7 +1,7 @@
 import { AccordionList } from '@inngest/components/AccordionCard/AccordionList';
 import { InlineCode } from '@inngest/components/Code';
 import { CodeLine } from '@inngest/components/CodeLine';
-import { Link } from '@inngest/components/Link/NewLink';
+import { Link } from '@inngest/components/Link';
 import { RiAddLine, RiFunctionLine, RiPlayFill } from '@remixicon/react';
 
 import { useTracking } from '@/hooks/useTracking';

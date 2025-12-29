@@ -1,8 +1,8 @@
 'use client';
 
-import { Button } from '@inngest/components/Button/NewButton';
+import { Button } from '@inngest/components/Button';
 import { FunctionConfiguration } from '@inngest/components/FunctionConfiguration';
-import { Header } from '@inngest/components/Header/NewHeader';
+import { Header } from '@inngest/components/Header/Header';
 import { InvokeButton } from '@inngest/components/InvokeButton';
 import { RiCloseLine } from '@remixicon/react';
 import { toast } from 'sonner';

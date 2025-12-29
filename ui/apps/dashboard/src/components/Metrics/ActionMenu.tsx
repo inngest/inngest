@@ -1,4 +1,4 @@
-import { Button } from '@inngest/components/Button/NewButton';
+import { Button } from '@inngest/components/Button';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -6,7 +6,7 @@ import {
   DropdownMenuTrigger,
 } from '@inngest/components/DropdownMenu/DropdownMenu';
 import { Switch } from '@inngest/components/Switch';
-import { useSearchParam } from '@inngest/components/hooks/useNewSearchParams';
+import { useSearchParam } from '@inngest/components/hooks/useSearchParams';
 import { RiSettingsLine } from '@remixicon/react';
 
 export const AUTO_REFRESH_INTERVAL = 5;

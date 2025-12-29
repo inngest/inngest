@@ -1,7 +1,4 @@
-'use client';
-
 import { useCallback, useEffect, useRef, useState } from 'react';
-import NextLink from 'next/link';
 import { ErrorCard } from '@inngest/components/Error/ErrorCard';
 import { usePathCreator } from '@inngest/components/SharedContext/usePathCreator';
 import { Skeleton } from '@inngest/components/Skeleton';
@@ -12,6 +9,7 @@ import { cn } from '@inngest/components/utils/classNames';
 import { devServerURL, useDevServer } from '@inngest/components/utils/useDevServer';
 import { RiArrowRightSLine, RiExternalLinkLine } from '@remixicon/react';
 import { useQuery } from '@tanstack/react-query';
+import { Link as TanstackLink } from '@tanstack/react-router';
 
 import { CodeBlock } from '../CodeBlock';
 import {
@@ -20,7 +18,7 @@ import {
   PillElement,
   TextElement,
   TimeElement,
-} from '../DetailsCard/NewElement';
+} from '../DetailsCard/Element';
 import { Link } from '../Link';
 import { useShared } from '../SharedContext/SharedContext';
 import { StatusDot } from '../Status/StatusDot';
@@ -284,8 +282,8 @@ export function EventDetails({
               <ul className="divide-light divide-y [&>*:not(:first-child)]:pt-[6px] [&>*:not(:last-child)]:pb-[6px]">
                 {eventRuns.map((run) => (
                   <li key={run.fnSlug}>
-                    <NextLink
-                      href={pathCreator.runPopout({ runID: run.id })}
+                    <TanstackLink
+                      to={pathCreator.runPopout({ runID: run.id })}
                       className="hover:bg-canvasSubtle flex items-center justify-between rounded p-1.5"
                     >
                       <div className="flex flex-col gap-0.5">
@@ -307,7 +305,7 @@ export function EventDetails({
                         </div>
                       </div>
                       <RiArrowRightSLine className="text-muted h-5 shrink-0" />
-                    </NextLink>
+                    </TanstackLink>
                   </li>
                 ))}
               </ul>

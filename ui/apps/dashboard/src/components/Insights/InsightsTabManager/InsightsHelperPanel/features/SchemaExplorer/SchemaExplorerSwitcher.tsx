@@ -1,6 +1,6 @@
 import { Fragment, type ReactElement } from 'react';
-import { Alert } from '@inngest/components/Alert/NewAlert';
-import { Button } from '@inngest/components/Button/NewButton';
+import { Alert } from '@inngest/components/Alert';
+import { Button } from '@inngest/components/Button';
 import { Skeleton } from '@inngest/components/Skeleton';
 
 import type { SchemaEntry } from './SchemasContext/types';

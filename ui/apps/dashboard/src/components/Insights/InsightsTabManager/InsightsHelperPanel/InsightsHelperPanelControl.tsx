@@ -1,5 +1,5 @@
 import { type ReactElement } from 'react';
-import { Link } from '@inngest/components/Link/NewLink';
+import { Link } from '@inngest/components/Link';
 import { cn } from '@inngest/components/utils/classNames';
 
 export interface HelperItem {

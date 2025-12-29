@@ -1,4 +1,4 @@
-import { Alert } from '@inngest/components/Alert/NewAlert';
+import { Alert } from '@inngest/components/Alert';
 
 import { SdkMode, SecretCheck, type AppCheckResult } from '@/gql/graphql';
 import { isAppInfoMissingData } from './utils';

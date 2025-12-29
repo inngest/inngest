@@ -1,5 +1,5 @@
 import { deleteConn } from '@/queries/server/integrations/db';
-import IntegrationsPage from '@inngest/components/PostgresIntegrations/NewIntegrationPage';
+import IntegrationsPage from '@inngest/components/PostgresIntegrations/IntegrationPage';
 import { neonIntegrationPageContent } from '@inngest/components/PostgresIntegrations/Neon/newNeonContent';
 import type { Publication } from '@inngest/components/PostgresIntegrations/newTypes';
 

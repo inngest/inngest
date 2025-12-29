@@ -1,4 +1,4 @@
-import { Banner } from '@inngest/components/Banner/NewBanner';
+import { Banner } from '@inngest/components/Banner';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { graphql } from '@/gql';

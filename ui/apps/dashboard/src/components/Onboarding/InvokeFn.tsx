@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 
-import { Alert } from '@inngest/components/Alert/NewAlert';
-import { Button } from '@inngest/components/Button/NewButton';
-import { CodeBlock } from '@inngest/components/CodeBlock/NewCodeBlock';
+import { Alert } from '@inngest/components/Alert';
+import { Button } from '@inngest/components/Button';
+import { CodeBlock } from '@inngest/components/CodeBlock';
 import { parseCode } from '@inngest/components/InvokeButton/utils';
-import { Link } from '@inngest/components/Link/NewLink';
-import { Select, type Option } from '@inngest/components/Select/NewSelect';
+import { Link } from '@inngest/components/Link';
+import { Select, type Option } from '@inngest/components/Select/Select';
 import { RiCheckboxCircleFill } from '@remixicon/react';
 import { toast } from 'sonner';
 
@@ -140,7 +140,9 @@ export default function InvokeFn() {
         </p>
 
         <Select
-          onChange={(option) => setSelectedFunction(option as FunctionOption)}
+          onChange={(option: Option) =>
+            setSelectedFunction(option as FunctionOption)
+          }
           isLabelVisible={false}
           label={selectDisplay}
           multiple={false}

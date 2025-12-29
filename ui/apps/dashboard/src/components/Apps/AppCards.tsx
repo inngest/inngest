@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
 
 import { AppCard } from '@inngest/components/Apps/AppCard';
-import { Button } from '@inngest/components/Button/NewButton';
-import { Pill } from '@inngest/components/Pill/NewPill';
+import { Button } from '@inngest/components/Button';
+import { Pill } from '@inngest/components/Pill';
 import WorkerCounter from '@inngest/components/Workers/ConnectedWorkersDescription';
 import { methodTypes } from '@inngest/components/types/app';
 

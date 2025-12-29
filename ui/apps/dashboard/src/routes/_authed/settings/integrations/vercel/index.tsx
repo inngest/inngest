@@ -1,6 +1,6 @@
 import { createFileRoute, redirect } from '@tanstack/react-router';
-import { Button } from '@inngest/components/Button/NewButton';
-import { Link } from '@inngest/components/Link/NewLink';
+import { Button } from '@inngest/components/Button';
+import { Link } from '@inngest/components/Link';
 import { IconVercel } from '@inngest/components/icons/platforms/Vercel';
 import { RiExternalLinkLine } from '@remixicon/react';
 

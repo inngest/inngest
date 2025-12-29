@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button } from '@inngest/components/Button/NewButton';
+import { Button } from '@inngest/components/Button';
 import { RiDeleteBin2Line } from '@remixicon/react';
 
 import { DeleteSigningKeyModal } from './DeleteSigningKeyModal';

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
+import { Button as NewButton } from '@inngest/components/Button';
 import { Button } from '@inngest/components/Button/Button';
-import { Button as NewButton } from '@inngest/components/Button/NewButton';
 import { RiArrowRightSLine } from '@remixicon/react';
 
 import { AITrace } from '../AI/AITrace';
@@ -11,9 +11,8 @@ import {
   LinkElement,
   TextElement,
   TimeElement,
-} from '../DetailsCard/NewElement';
-import { RerunModal as NewRerunModal } from '../Rerun/NewRerunModal';
-import { RerunModal } from '../Rerun/RerunModal';
+} from '../DetailsCard/Element';
+import { RerunModal as NewRerunModal, RerunModal } from '../Rerun/RerunModal';
 import { useShared } from '../SharedContext/SharedContext';
 import { useGetTraceResult } from '../SharedContext/useGetTraceResult';
 import { usePathCreator } from '../SharedContext/usePathCreator';

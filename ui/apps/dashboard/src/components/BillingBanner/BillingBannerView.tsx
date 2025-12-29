@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
-import { ContextualBanner } from '@inngest/components/Banner/NewBanner';
-import { Button } from '@inngest/components/Button/NewButton';
+import { ContextualBanner } from '@inngest/components/Banner';
+import { Button } from '@inngest/components/Button';
 import { useBooleanLocalStorage } from '@inngest/components/hooks/useBooleanLocalStorage';
 
 // import { type EntitlementUsageQuery } from '@/gql/graphql';

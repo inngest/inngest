@@ -1,4 +1,4 @@
-import { Header } from '@inngest/components/Header/NewHeader';
+import { Header } from '@inngest/components/Header/Header';
 import { createFileRoute, Outlet } from '@tanstack/react-router';
 
 import PageTitle from '@/components/Billing/PageTitle';

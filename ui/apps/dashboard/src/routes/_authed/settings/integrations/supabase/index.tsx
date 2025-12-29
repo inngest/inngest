@@ -1,5 +1,5 @@
 import { createFileRoute, redirect } from '@tanstack/react-router';
-import IntegrationsPage from '@inngest/components/PostgresIntegrations/NewIntegrationPage';
+import IntegrationsPage from '@inngest/components/PostgresIntegrations/IntegrationPage';
 import { integrationPageContent } from '@inngest/components/PostgresIntegrations/Supabase/newSupabaseContent';
 
 import {

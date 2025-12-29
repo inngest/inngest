@@ -1,12 +1,12 @@
 import { forwardRef, useCallback, useImperativeHandle, useMemo } from 'react';
 import { InfiniteScrollTrigger } from '@inngest/components/InfiniteScrollTrigger/InfiniteScrollTrigger';
-import { RunsPage } from '@inngest/components/RunsPage/NewRunsPage';
+import { RunsPage } from '@inngest/components/RunsPage/RunsPage';
 import { useBooleanFlag } from '@inngest/components/SharedContext/useBooleanFlag';
 import { useCalculatedStartTime } from '@inngest/components/hooks/useCalculatedStartTime';
 import {
   useSearchParam,
   useStringArraySearchParam,
-} from '@inngest/components/hooks/useNewSearchParams';
+} from '@inngest/components/hooks/useSearchParams';
 import { CombinedError, useQuery } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';

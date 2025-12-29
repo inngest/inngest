@@ -1,4 +1,4 @@
-import { Link } from '@inngest/components/Link/NewLink';
+import { Link } from '@inngest/components/Link';
 import ProgressBar from '@inngest/components/ProgressBar/ProgressBar';
 import {
   Tooltip,

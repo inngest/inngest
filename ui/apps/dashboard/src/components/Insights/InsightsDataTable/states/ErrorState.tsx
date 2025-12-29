@@ -1,5 +1,5 @@
 import { Banner } from '@inngest/components/Banner/Banner';
-import { Button } from '@inngest/components/Button/NewButton';
+import { Button } from '@inngest/components/Button';
 
 import { useInsightsStateMachineContext } from '../../InsightsStateMachineContext/InsightsStateMachineContext';
 
