@@ -29,18 +29,6 @@ export const Route = createRootRoute({
         title: 'Inngest Server',
       },
     ],
-    icons: {
-      icon: [
-        {
-          url: '/favicon-june-2025.svg',
-          media: '(prefers-color-scheme: light)',
-        },
-        {
-          url: '/favicon-june-2025.svg',
-          media: '(prefers-color-scheme: dark)',
-        },
-      ],
-    },
     links: [
       {
         rel: 'stylesheet',
@@ -49,6 +37,16 @@ export const Route = createRootRoute({
       {
         rel: 'stylesheet',
         href: fontsCss,
+      },
+      {
+        rel: 'icon',
+        href: '/favicon-june-2025.svg',
+        media: '(prefers-color-scheme: light)',
+      },
+      {
+        rel: 'icon',
+        href: '/favicon-june-2025.svg',
+        media: '(prefers-color-scheme: dark)',
       },
     ],
   }),
