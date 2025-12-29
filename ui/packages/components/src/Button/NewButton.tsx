@@ -1,7 +1,7 @@
 import React, { forwardRef, type ButtonHTMLAttributes, type ReactNode } from 'react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
 import { IconSpinner } from '@inngest/components/icons/Spinner';
-import { Link, type LinkComponentProps, type ToPathOption } from '@tanstack/react-router';
+import { Link, type LinkComponentProps } from '@tanstack/react-router';
 
 import { cn } from '../utils/classNames';
 import {
@@ -45,15 +45,11 @@ type LinkWrapperProps = {
 export const LinkWrapper = forwardRef<HTMLAnchorElement, LinkWrapperProps>(
   ({ children, href, to, target, prefetch = false, scroll = true, ...props }, ref) =>
     href ? (
-      <Link
-        href={href}
-        to={to}
-        target={target}
-        preload={prefetch}
-        resetScroll={scroll}
-        ref={ref}
-        {...props}
-      >
+      <a href={href} target={target} {...props}>
+        {children}
+      </a>
+    ) : to ? (
+      <Link to={to} target={target} preload={prefetch} resetScroll={scroll} ref={ref} {...props}>
         {children}
       </Link>
     ) : (
@@ -89,6 +85,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       iconSide,
       loading = false,
       href,
+      to,
       type = 'button',
       keys,
       className,
@@ -155,7 +152,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
 
     return (
       <TooltipWrapper tooltip={tooltip}>
-        <LinkWrapper href={href} target={target} prefetch={prefetch} scroll={scroll}>
+        <LinkWrapper href={href} to={to} target={target} prefetch={prefetch} scroll={scroll}>
           {buttonElement}
         </LinkWrapper>
       </TooltipWrapper>

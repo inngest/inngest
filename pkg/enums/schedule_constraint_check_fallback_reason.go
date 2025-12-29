@@ -1,0 +1,14 @@
+//go:generate go run github.com/dmarkham/enumer -trimprefix=ScheduleConstraintCheckFallbackReason -type=ScheduleConstraintCheckFallbackReason -transform=snake -json -text
+
+package enums
+
+type ScheduleConstraintCheckFallbackReason int
+
+const (
+	ScheduleConstraintCheckFallbackReasonConstraintAPIUninitialized ScheduleConstraintCheckFallbackReason = iota
+	ScheduleConstraintCheckFallbackReasonFeatureFlagDisabled
+	ScheduleConstraintCheckFallbackReasonGetConstraintsError
+	ScheduleConstraintCheckFallbackReasonNoRateLimitConfigured
+	ScheduleConstraintCheckFallbackReasonConstraintAPIError
+	ScheduleConstraintCheckFallbackReasonMissingLease
+)

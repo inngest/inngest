@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/logger"
@@ -163,14 +164,14 @@ func (sp QueueShadowPartition) activeKey(kg QueueKeyGenerator) string {
 
 func (sp QueueShadowPartition) keyQueuesEnabled(ctx context.Context, q *queue) bool {
 	if sp.SystemQueueName != nil {
-		return q.enqueueSystemQueuesToBacklog
-	}
-
-	if sp.AccountID == nil || q.allowKeyQueues == nil {
 		return false
 	}
 
-	return q.allowKeyQueues(ctx, *sp.AccountID)
+	if sp.AccountID == nil || sp.FunctionID == nil || q.allowKeyQueues == nil {
+		return false
+	}
+
+	return q.allowKeyQueues(ctx, *sp.AccountID, *sp.FunctionID)
 }
 
 func (q *PartitionConstraintConfig) CustomConcurrencyLimit(n int) int {
@@ -246,6 +247,49 @@ func (sp QueueShadowPartition) accountActiveRunKey(kg QueueKeyGenerator) string 
 
 func (sp QueueShadowPartition) activeRunKey(kg QueueKeyGenerator) string {
 	return kg.ActiveRunsSet("p", sp.PartitionID)
+}
+
+// DefaultBacklog returns the default "start" or "continue" backlog for a shadow partition.
+//
+// This is the backlog items are added to when no keys are configured (or when throttle is configured but we're dealing with non-start items).
+//
+// This function may return nil if throttle or concurrency keys are configured in the constraints.
+func (sp QueueShadowPartition) DefaultBacklog(constraints PartitionConstraintConfig, start bool) *QueueBacklog {
+	if sp.SystemQueueName != nil {
+		return &QueueBacklog{
+			ShadowPartitionID: *sp.SystemQueueName,
+			BacklogID:         fmt.Sprintf("system:%s", *sp.SystemQueueName),
+		}
+	}
+
+	// Function ID should be set for non-system queues
+	if sp.FunctionID == nil {
+		return nil
+	}
+
+	// NOTE: In case custom concurrency keys are configured, we should not use the default
+	// function backlog. Instead, all backlogs should include the dynamic key.
+	if len(constraints.Concurrency.CustomConcurrencyKeys) > 0 {
+		return nil
+	}
+
+	// NOTE: In case a start backlog is requested and throttle is used, we should not use
+	// the default function backlog. Instead, all backlogs should include the dynamic key.
+	if start && constraints.Throttle != nil {
+		return nil
+	}
+
+	b := &QueueBacklog{
+		BacklogID:               fmt.Sprintf("fn:%s", *sp.FunctionID),
+		ShadowPartitionID:       sp.FunctionID.String(),
+		EarliestFunctionVersion: constraints.FunctionVersion,
+		Start:                   start,
+	}
+	if start {
+		b.BacklogID += ":start"
+	}
+
+	return b
 }
 
 // BacklogConcurrencyKey represents a custom concurrency key, which can be scoped to the function, environment, or account.
@@ -551,6 +595,23 @@ func (b QueueBacklog) customKeyActiveRuns(kg QueueKeyGenerator, n int) string {
 	return key.activeRunsKey(kg)
 }
 
+func (b QueueBacklog) inProgressLeasesCustomKey(cm constraintapi.RolloutKeyGenerator, kg QueueKeyGenerator, accountID *uuid.UUID, n int) string {
+	if cm == nil {
+		return kg.Concurrency("", "")
+	}
+
+	if accountID == nil {
+		return kg.Concurrency("", "")
+	}
+
+	if n < 0 || n > len(b.ConcurrencyKeys) {
+		return kg.Concurrency("", "")
+	}
+
+	key := b.ConcurrencyKeys[n-1]
+	return key.inProgressLeasesKey(cm, *accountID)
+}
+
 func (b BacklogConcurrencyKey) activeKey(kg QueueKeyGenerator) string {
 	// Concurrency accounting keys are made up of three parts:
 	// - The scope (account, environment, function) to apply the concurrency limit on
@@ -561,6 +622,10 @@ func (b BacklogConcurrencyKey) activeKey(kg QueueKeyGenerator) string {
 
 func (b BacklogConcurrencyKey) activeRunsKey(kg QueueKeyGenerator) string {
 	return kg.ActiveRunsSet("custom", b.CanonicalKeyID)
+}
+
+func (b BacklogConcurrencyKey) inProgressLeasesKey(cm constraintapi.RolloutKeyGenerator, accountID uuid.UUID) string {
+	return cm.KeyInProgressLeasesCustom(accountID, b.Scope, b.EntityID, b.HashedKeyExpression, b.HashedValue)
 }
 
 // activeKey returns backlog compound active key
@@ -604,14 +669,28 @@ type BacklogRefillResult struct {
 }
 
 type backlogRefillOptions struct {
-	fallbackIdempotencyKey string
+	constraintCheckIdempotencyKey string
+	disableConstraintChecks       bool
+	capacityLeases                []osqueue.CapacityLease
 }
 
 type backlogRefillOptionFn func(o *backlogRefillOptions)
 
-func WithBacklogRefillFallbackIdempotencyKey(idempotencyKey string) backlogRefillOptionFn {
+func WithBacklogRefillConstraintCheckIdempotencyKey(idempotencyKey string) backlogRefillOptionFn {
 	return func(o *backlogRefillOptions) {
-		o.fallbackIdempotencyKey = idempotencyKey
+		o.constraintCheckIdempotencyKey = idempotencyKey
+	}
+}
+
+func WithBacklogRefillDisableConstraintChecks(disableConstraintChecks bool) backlogRefillOptionFn {
+	return func(o *backlogRefillOptions) {
+		o.disableConstraintChecks = disableConstraintChecks
+	}
+}
+
+func WithBacklogRefillItemCapacityLeases(itemCapacityLeases []osqueue.CapacityLease) backlogRefillOptionFn {
+	return func(o *backlogRefillOptions) {
+		o.capacityLeases = itemCapacityLeases
 	}
 }
 
@@ -645,11 +724,12 @@ func (q *queue) BacklogRefill(
 	nowMS := q.clock.Now().UnixMilli()
 
 	var (
-		throttleKey                                  string
+		keyThrottleState                             string
 		throttleLimit, throttleBurst, throttlePeriod int
 	)
 	if latestConstraints.Throttle != nil && b.Throttle != nil {
-		throttleKey = b.Throttle.ThrottleKey
+		// NOTE: The Throttle state key must be generated to match the Redis key used in the Lease and Constraint API implementation
+		keyThrottleState = kg.ThrottleKey(&osqueue.Throttle{Key: b.Throttle.ThrottleKey})
 		throttleLimit = latestConstraints.Throttle.Limit
 		throttleBurst = latestConstraints.Throttle.Burst
 		throttlePeriod = latestConstraints.Throttle.Period
@@ -690,19 +770,33 @@ func (q *queue) BacklogRefill(
 		kg.BacklogActiveCheckCooldown(b.BacklogID),
 
 		kg.PartitionNormalizeSet(sp.PartitionID),
+
+		// Constraint API rollout
+		q.keyConstraintCheckIdempotency(sp.AccountID, o.constraintCheckIdempotencyKey),
 	}
 
-	enableKeyQueues := sp.keyQueuesEnabled(ctx, q)
+	// Don't check constraints if
+	// - key queues have been disabled for this function (refill as quickly as possible)
+	// - capacity leases were successfully acquired
+	checkConstraints := sp.keyQueuesEnabled(ctx, q)
+	if o.disableConstraintChecks {
+		checkConstraints = false
+	}
 
-	enableKeyQueuesVal := "0"
-	// Don't check constraints if key queues have been disabled for this function (refill as quickly as possible)
-	if enableKeyQueues {
-		enableKeyQueuesVal = "1"
+	checkConstraintsVal := "1"
+	if !checkConstraints {
+		checkConstraintsVal = "0"
 	}
 
 	// Enable conditional spot checking (probability in queue settings + feature flag)
 	refillProbability, _ := q.activeSpotCheckProbability(ctx, accountID)
-	shouldSpotCheckActiveSet := enableKeyQueues && rand.Intn(100) <= refillProbability
+	shouldSpotCheckActiveSet := checkConstraints && rand.Intn(100) <= refillProbability
+
+	// Ensure capacityLeaseIDs is never nil to avoid JSON marshaling to "null"
+	capacityLeaseIDs := o.capacityLeases
+	if capacityLeaseIDs == nil {
+		capacityLeaseIDs = []osqueue.CapacityLease{}
+	}
 
 	args, err := StrSlice([]any{
 		b.BacklogID,
@@ -717,17 +811,16 @@ func (q *queue) BacklogRefill(
 		latestConstraints.CustomConcurrencyLimit(1),
 		latestConstraints.CustomConcurrencyLimit(2),
 
-		throttleKey,
+		keyThrottleState,
 		throttleLimit,
 		throttleBurst,
 		throttlePeriod,
 
 		kg.QueuePrefix(),
-		enableKeyQueuesVal,
+		checkConstraintsVal,
 		shouldSpotCheckActiveSet,
 
-		// constraint API rollout
-		o.fallbackIdempotencyKey,
+		capacityLeaseIDs,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("could not serialize args: %w", err)
@@ -745,7 +838,7 @@ func (q *queue) BacklogRefill(
 
 	returnTuple, ok := res.([]any)
 	if !ok || len(returnTuple) != 8 {
-		return nil, fmt.Errorf("expected return tuple to include 7 items")
+		return nil, fmt.Errorf("expected return tuple to include 8 items")
 	}
 
 	status, ok := returnTuple[0].(int64)
@@ -1195,6 +1288,13 @@ func (q *queue) BacklogSize(ctx context.Context, queueShard QueueShard, backlogI
 	return count, err
 }
 
+// shuffleBacklog returns shuffled backlogs while applying higher weights to non-start backlogs.
+//
+// NOTE: Applying a higher weight on non-start backlogs is important to ensure queue items to finalize existing functions have a higher likelihood
+// of being refilled to the ready queue.
+//
+// WARN: This only applies to peeked backlogs. Since we apply a random offset while peeking, we may
+// omit the default backlog. This is why we add the default backlog in processShadowPartition
 func shuffleBacklogs(b []*QueueBacklog) []*QueueBacklog {
 	weights := make([]float64, len(b))
 	for i, backlog := range b {
@@ -1216,4 +1316,25 @@ func shuffleBacklogs(b []*QueueBacklog) []*QueueBacklog {
 	}
 
 	return result
+}
+
+// backlogRefillMultiplier calculates the backlog specific multiplier to apply when refilling items.
+//
+// This is required to ensure fairness among backlogs and to guarantee that existing runs finish before new runs are started.
+func backlogRefillMultiplier(backlogs []*QueueBacklog, backlog *QueueBacklog, constraints PartitionConstraintConfig) int {
+	switch {
+	case backlog.isDefault() && constraints.Throttle != nil && len(constraints.Concurrency.CustomConcurrencyKeys) == 0:
+		// We are attempting to refill items from the default backlog while throttle is configured. This means
+		// - we are refilling items to continue or finish existing runs
+		// - we want to apply a higher priority
+		// - the first backlog is the default function backlog including items to continue existing runs
+		// - all following backlogs include start items and represent individual tenants
+
+		// Multiply based on the number of backlogs.
+		// Example: If we end up with 100 backlogs, 1 out of 100 is for continuing runs while 99 are starts.
+		// Returning len(backlogs) means we apply a multiplier of 100 to the first backlog.
+		return len(backlogs)
+	default:
+		return 1
+	}
 }

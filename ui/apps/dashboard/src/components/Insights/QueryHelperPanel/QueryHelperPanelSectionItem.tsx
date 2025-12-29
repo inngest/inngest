@@ -1,15 +1,14 @@
-'use client';
-
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { Alert } from '@inngest/components/Alert/Alert';
-import { Button } from '@inngest/components/Button/Button';
 import { AlertModal } from '@inngest/components/Modal/AlertModal';
-import { OptionalTooltip } from '@inngest/components/Tooltip/OptionalTooltip';
-import { cn } from '@inngest/components/utils/classNames';
-import { RiCloseLargeLine, RiCodeBlock, RiHistoryLine, RiSaveLine } from '@remixicon/react';
+import { RiCodeBlock, RiHistoryLine, RiSaveLine } from '@remixicon/react';
 
 import type { QuerySnapshot } from '@/components/Insights/types';
 import type { InsightsQueryStatement } from '@/gql/graphql';
+
+import { isQuerySnapshot } from '../queries';
+import { QueryHelperPanelSectionItemRow } from './QueryHelperPanelSectionItemRow';
+import { QueryActionsMenu } from '../QueryActionsMenu';
 
 interface QueryHelperPanelSectionItemProps {
   activeSavedQueryId?: string;
@@ -26,66 +25,47 @@ export function QueryHelperPanelSectionItem({
   query,
   sectionType,
 }: QueryHelperPanelSectionItemProps) {
-  const textRef = useRef<HTMLSpanElement>(null);
-  const [isTruncated, setIsTruncated] = useState(false);
-  const [isHovered, setIsHovered] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const displayText = query.name;
   const Icon =
-    sectionType === 'history' ? RiHistoryLine : sectionType === 'saved' ? RiSaveLine : RiCodeBlock;
+    sectionType === 'history'
+      ? RiHistoryLine
+      : sectionType === 'saved'
+      ? RiSaveLine
+      : RiCodeBlock;
 
   const isActiveTab =
-    (sectionType === 'saved' || sectionType === 'shared') && activeSavedQueryId === query.id;
-
-  useEffect(() => {
-    const el = textRef.current;
-    if (el === null) return;
-
-    setIsTruncated(el.scrollWidth > el.clientWidth);
-  }, [displayText]);
+    (sectionType === 'saved' || sectionType === 'shared') &&
+    activeSavedQueryId === query.id;
 
   return (
     <>
-      <OptionalTooltip side="right" tooltip={isTruncated ? displayText : ''}>
-        <div
-          className={cn(
-            'text-subtle flex w-full cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-left text-sm transition-colors',
-            isActiveTab ? 'bg-canvasSubtle' : 'hover:bg-canvasSubtle'
-          )}
-          onClick={() => {
-            onQuerySelect(query);
-          }}
-          onMouseEnter={() => setIsHovered(true)}
-          onMouseLeave={() => setIsHovered(false)}
-        >
-          <Icon className="h-4 w-4 flex-shrink-0" />
-          <span
-            ref={textRef}
-            className="flex-1 overflow-hidden truncate text-ellipsis whitespace-nowrap"
-          >
-            {displayText}
-          </span>
-          <div className="flex h-4 w-4 flex-shrink-0 items-center justify-center">
-            <Button
-              appearance="ghost"
-              className={cn(
-                'text-subtle h-4 w-4 p-0 transition-all',
-                isHovered ? 'opacity-100' : 'opacity-0'
-              )}
-              icon={<RiCloseLargeLine className="h-3 w-3" />}
-              onClick={(e: React.MouseEvent) => {
-                e.stopPropagation();
-
-                if (sectionType === 'saved' || sectionType === 'shared') setShowDeleteModal(true);
-                else onQueryDelete(query.id);
-              }}
-              size="small"
-              tooltip="Delete query"
-            />
-          </div>
-        </div>
-      </OptionalTooltip>
+      <QueryActionsMenu
+        onOpenChange={setMenuOpen}
+        onSelectDelete={() => {
+          if (isQuerySnapshot(query)) onQueryDelete(query.id);
+          else setShowDeleteModal(true);
+        }}
+        open={menuOpen}
+        query={query}
+        trigger={
+          <QueryHelperPanelSectionItemRow
+            icon={<Icon className="h-4 w-4 flex-shrink-0" />}
+            isActive={isActiveTab}
+            onClick={(e) => {
+              e.preventDefault();
+              onQuerySelect(query);
+            }}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              setMenuOpen(true);
+            }}
+            text={displayText}
+          />
+        }
+      />
 
       <AlertModal
         cancelButtonLabel="Cancel"
@@ -101,7 +81,8 @@ export function QueryHelperPanelSectionItem({
       >
         <div className="p-6">
           <p className="text-subtle text-sm">
-            Are you sure you want to delete <strong>{query.name}</strong> permanently?
+            Are you sure you want to delete <strong>{query.name}</strong>{' '}
+            permanently?
           </p>
           <Alert className="mt-4 text-sm" severity="warning">
             This action is permanent and cannot be undone.

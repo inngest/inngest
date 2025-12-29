@@ -4,10 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"sync"
 	"testing"
 
+	"github.com/inngest/inngest/pkg/config"
 	"github.com/inngest/inngest/pkg/cqrs/base_cqrs"
 	sqlc_postgres "github.com/inngest/inngest/pkg/cqrs/base_cqrs/sqlc/postgres"
+	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/sdk"
@@ -65,7 +70,7 @@ func TestRegister_FunctionVersionIncrement(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify the function was created with version 0
-		fnVersions := getFunctionIDandVersion(t, ds, req.URL)
+		fnVersions := getFunctionIDandVersion(t, ds, req.AppName)
 		require.Len(t, fnVersions, 1)
 		for _, fnVersion := range fnVersions {
 			require.Equal(t, 0, fnVersion)
@@ -84,7 +89,7 @@ func TestRegister_FunctionVersionIncrement(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify the function was created with version 0
-		fnVersions1 := getFunctionIDandVersion(t, ds, req.URL)
+		fnVersions1 := getFunctionIDandVersion(t, ds, req.AppName)
 		require.Len(t, fnVersions1, 1)
 		for _, fnVersion := range fnVersions1 {
 			require.Equal(t, 0, fnVersion)
@@ -95,7 +100,7 @@ func TestRegister_FunctionVersionIncrement(t *testing.T) {
 		require.NoError(t, err)
 
 		// Get the updated version
-		fnVersions2 := getFunctionIDandVersion(t, ds, req.URL)
+		fnVersions2 := getFunctionIDandVersion(t, ds, req.AppName)
 		require.Len(t, fnVersions2, 1)
 
 		// fn versions don't change
@@ -124,7 +129,7 @@ func TestRegister_FunctionVersionIncrement(t *testing.T) {
 			require.NoError(t, err, "registration %d failed", i)
 
 			// Verify the version is incremented
-			fnVersions := getFunctionIDandVersion(t, ds, req.URL)
+			fnVersions := getFunctionIDandVersion(t, ds, req.AppName)
 			require.Len(t, fnVersions, 1)
 			for _, fnVersion := range fnVersions {
 				require.Equal(t, expectedVersion, fnVersion, "function version should be %d after %d registration(s)", expectedVersion, i+1)
@@ -142,7 +147,7 @@ func TestRegister_FunctionVersionIncrement(t *testing.T) {
 		_, err := api.register(ctx, req)
 		require.NoError(t, err)
 
-		fnVersions := getFunctionIDandVersion(t, ds, req.URL)
+		fnVersions := getFunctionIDandVersion(t, ds, req.AppName)
 		require.Len(t, fnVersions, 1)
 		for _, fnVersion := range fnVersions {
 			require.Equal(t, 0, fnVersion)
@@ -155,7 +160,7 @@ func TestRegister_FunctionVersionIncrement(t *testing.T) {
 		_, err = api.register(ctx, req)
 		require.NoError(t, err)
 
-		fnVersions = getFunctionIDandVersion(t, ds, req.URL)
+		fnVersions = getFunctionIDandVersion(t, ds, req.AppName)
 		require.Len(t, fnVersions, 2)
 		require.Contains(t, fnVersions, sdkFunction1.Name)
 		require.Equal(t, fnVersions[sdkFunction1.Name], 1)
@@ -168,7 +173,7 @@ func TestRegister_FunctionVersionIncrement(t *testing.T) {
 		require.NoError(t, err)
 
 		// Function1 should bumped up to version 2, function2 should be removed.
-		fnVersions = getFunctionIDandVersion(t, ds, req.URL)
+		fnVersions = getFunctionIDandVersion(t, ds, req.AppName)
 		require.Len(t, fnVersions, 1)
 		require.Contains(t, fnVersions, sdkFunction1.Name)
 		require.Equal(t, fnVersions[sdkFunction1.Name], 2)
@@ -188,7 +193,7 @@ func TestRegister_FunctionVersionIncrement(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify the functions were created with version 0
-		fnVersions := getFunctionIDandVersion(t, ds, req.URL)
+		fnVersions := getFunctionIDandVersion(t, ds, req.AppName)
 		require.Len(t, fnVersions, 2)
 		for _, fnVersion := range fnVersions {
 			require.Equal(t, 0, fnVersion)
@@ -205,7 +210,7 @@ func TestRegister_FunctionVersionIncrement(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify both functions had versions incremented even though function2 had no change in config.
-		fnVersions = getFunctionIDandVersion(t, ds, req.URL)
+		fnVersions = getFunctionIDandVersion(t, ds, req.AppName)
 		require.Len(t, fnVersions, 2)
 		for _, fnVersion := range fnVersions {
 			require.Equal(t, 1, fnVersion)
@@ -225,7 +230,7 @@ func TestRegister_FunctionVersionIncrement(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify the functions were created with version 0
-		fnVersions := getFunctionIDandVersion(t, ds, req.URL)
+		fnVersions := getFunctionIDandVersion(t, ds, req.AppName)
 		require.Len(t, fnVersions, 2)
 		for _, fnVersion := range fnVersions {
 			require.Equal(t, fnVersion, 0)
@@ -241,7 +246,7 @@ func TestRegister_FunctionVersionIncrement(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify function1 is gone and function2 is now on version=1
-		fnVersions = getFunctionIDandVersion(t, ds, req.URL)
+		fnVersions = getFunctionIDandVersion(t, ds, req.AppName)
 		require.Len(t, fnVersions, 1)
 		require.Contains(t, fnVersions, sdkFunction2.Name)
 		require.Equal(t, fnVersions[sdkFunction2.Name], 1)
@@ -253,7 +258,7 @@ func newTestDevServer(t *testing.T) *devserver {
 	t.Helper()
 
 	// Create in-memory database
-	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{InMemory: true, ForTest: true})
+	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{Persist: false, ForTest: true})
 	require.NoError(t, err)
 
 	// Initialize CQRS manager
@@ -261,19 +266,21 @@ func newTestDevServer(t *testing.T) *devserver {
 	data := base_cqrs.NewCQRS(db, dbDriver, sqlc_postgres.NewNormalizedOpts{})
 
 	ds := &devserver{
-		Data: data,
-		log:  logger.StdlibLogger(t.Context()),
+		Data:        data,
+		log:         logger.StdlibLogger(t.Context()),
+		handlerLock: &sync.Mutex{},
+		handlers:    []SDKHandler{},
 	}
 
 	return ds
 }
 
-func getFunctionIDandVersion(t *testing.T, ds *devserver, URL string) map[string]int {
+func getFunctionIDandVersion(t *testing.T, ds *devserver, appName string) map[string]int {
 	t.Helper()
 
 	functionVersions := make(map[string]int)
 
-	appID := inngest.DeterministicAppUUID(URL)
+	appID := inngest.DeterministicAppUUID(appName)
 	funcs, err := ds.Data.GetFunctionsByAppInternalID(t.Context(), appID)
 	require.NoError(t, err)
 
@@ -284,4 +291,57 @@ func getFunctionIDandVersion(t *testing.T, ds *devserver, URL string) map[string
 		functionVersions[fn.Name] = fn.FunctionVersion
 	}
 	return functionVersions
+}
+
+func TestDevEndpoint_ReturnsInfoInDevMode(t *testing.T) {
+	// Create devserver with dev mode (default)
+	ds := newTestDevServer(t)
+	ds.Opts = StartOpts{
+		Config: config.Config{
+			ServerKind: headers.ServerKindDev,
+		},
+	}
+
+	// Create API router with no-op auth middleware for testing
+	noAuthMiddleware := func(next http.Handler) http.Handler { return next }
+	api := NewDevAPI(ds, DevAPIOptions{AuthMiddleware: noAuthMiddleware})
+
+	// Create test request
+	req := httptest.NewRequest("GET", "/dev", nil)
+	w := httptest.NewRecorder()
+
+	// Call through the router
+	api.ServeHTTP(w, req)
+
+	// Should return 200 with info
+	require.Equal(t, http.StatusOK, w.Code)
+
+	// Verify response is valid JSON
+	var info InfoResponse
+	err := json.Unmarshal(w.Body.Bytes(), &info)
+	require.NoError(t, err)
+}
+
+func TestDevEndpoint_Returns404InCloudMode(t *testing.T) {
+	// Create devserver with cloud mode (self-hosted)
+	ds := newTestDevServer(t)
+	ds.Opts = StartOpts{
+		Config: config.Config{
+			ServerKind: headers.ServerKindCloud,
+		},
+	}
+
+	// Create API router with no-op auth middleware for testing
+	noAuthMiddleware := func(next http.Handler) http.Handler { return next }
+	api := NewDevAPI(ds, DevAPIOptions{AuthMiddleware: noAuthMiddleware})
+
+	// Create test request
+	req := httptest.NewRequest("GET", "/dev", nil)
+	w := httptest.NewRecorder()
+
+	// Call through the router
+	api.ServeHTTP(w, req)
+
+	// Should return 404
+	require.Equal(t, http.StatusNotFound, w.Code)
 }

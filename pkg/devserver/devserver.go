@@ -31,6 +31,7 @@ import (
 	"github.com/inngest/inngest/pkg/connect/lifecycles"
 	connectv0 "github.com/inngest/inngest/pkg/connect/rest/v0"
 	connstate "github.com/inngest/inngest/pkg/connect/state"
+	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/coreapi"
 	"github.com/inngest/inngest/pkg/cqrs"
@@ -71,8 +72,10 @@ import (
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/inngest/inngest/pkg/testapi"
 	"github.com/inngest/inngest/pkg/tracing"
+	"github.com/inngest/inngest/pkg/tracing/metadata/extractors"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/inngest/inngest/pkg/util/awsgateway"
+	"github.com/jonboulle/clockwork"
 	"github.com/redis/rueidis"
 	"go.opentelemetry.io/otel/propagation"
 	"golang.org/x/sync/errgroup"
@@ -131,9 +134,9 @@ type StartOpts struct {
 
 	NoUI bool
 
-	// InMemory controls whether to only use in-memory databases (as opposed to
-	// filesystem)
-	InMemory bool
+	// Persist controls whether to persist data in between restarts.  If false,
+	// the dev server will use in-memory databases.
+	Persist bool `json:"persist"`
 
 	// RedisURI allows connecting to external Redis instead of in-memory Redis
 	RedisURI string `json:"redis_uri"`
@@ -174,8 +177,10 @@ func start(ctx context.Context, opts StartOpts) error {
 	l := logger.StdlibLogger(ctx)
 	ctx = logger.WithStdlib(ctx, l)
 
+	services := []service.Service{}
+
 	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{
-		InMemory:    opts.InMemory,
+		Persist:     opts.Persist,
 		PostgresURI: opts.PostgresURI,
 		Directory:   opts.SQLiteDir,
 	})
@@ -295,6 +300,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		Continuations: true,
 	}
 	enableKeyQueues := os.Getenv("EXPERIMENTAL_KEY_QUEUES_ENABLE") == "true"
+	enableStepMetadata := os.Getenv("EXPERIMENTAL_STEP_METADATA") == "true"
 
 	if enableKeyQueues {
 		runMode.ShadowPartition = true
@@ -323,12 +329,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		redis_state.WithRefreshItemThrottle(NormalizeThrottle(smv2, dbcqrs)),
 		redis_state.WithPartitionConstraintConfigGetter(PartitionConstraintConfigGetter(dbcqrs)),
 
-		redis_state.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
-			return enableKeyQueues
-		}),
-		redis_state.WithEnqueueSystemPartitionsToBacklog(false),
-		redis_state.WithDisableLeaseChecksForSystemQueues(enableKeyQueues),
-		redis_state.WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
+		redis_state.WithAllowKeyQueues(func(ctx context.Context, acctID, functionID uuid.UUID) bool {
 			return enableKeyQueues
 		}),
 		redis_state.WithBacklogRefillLimit(10),
@@ -342,6 +343,40 @@ func start(ctx context.Context, opts StartOpts) error {
 			return redis_state.PartitionPausedInfo{}
 		}),
 	}
+
+	const rateLimitPrefix = "ratelimit"
+	var capacityManager constraintapi.RolloutManager
+	enableConstraintAPI := os.Getenv("ENABLE_CONSTRAINT_API") == "true"
+	if enableConstraintAPI {
+		shards := make(map[string]rueidis.Client)
+		for k, qs := range queueShards {
+			shards[k] = qs.RedisClient.Client()
+		}
+
+		cm, err := constraintapi.NewRedisCapacityManager(
+			constraintapi.WithClock(clockwork.NewRealClock()),
+			constraintapi.WithNumScavengerShards(1),
+			constraintapi.WithQueueShards(shards),
+			constraintapi.WithRateLimitClient(unshardedRc),
+			constraintapi.WithQueueStateKeyPrefix(redis_state.QueueDefaultKey),
+			constraintapi.WithRateLimitKeyPrefix(rateLimitPrefix),
+		)
+		if err != nil {
+			return fmt.Errorf("could not create contraint API: %w", err)
+		}
+
+		queueOpts = append(queueOpts, redis_state.WithCapacityManager(cm))
+		queueOpts = append(queueOpts, redis_state.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
+			return true, true
+		}))
+
+		services = append(services, constraintapi.NewLeaseScavengerService(cm, consts.ConstraintAPIScavengerTick))
+
+		capacityManager = cm
+
+		l.Warn("EXPERIMENTAL: Enabling Constraint API")
+	}
+
 	if opts.RetryInterval > 0 {
 		queueOpts = append(queueOpts, redis_state.WithBackoffFunc(
 			backoff.GetLinearBackoffFunc(time.Duration(opts.RetryInterval)*time.Second),
@@ -349,7 +384,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	}
 	rq := redis_state.NewQueue(queueShard, queueOpts...)
 
-	rl := ratelimit.New(ctx, unshardedRc, "{ratelimit}:")
+	rl := ratelimit.New(ctx, unshardedRc, fmt.Sprintf("{%s}:", rateLimitPrefix))
 
 	batcher := batch.NewRedisBatchManager(shardedClient.Batch(), rq, batch.WithLogger(l))
 	debouncer := debounce.NewRedisDebouncer(unshardedClient.Debounce(), queueShard, rq)
@@ -429,7 +464,7 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	pauseMgr := pauses.NewRedisOnlyManager(sm)
 
-	exec, err := executor.NewExecutor(
+	executorOpts := []executor.ExecutorOpt{
 		executor.WithHTTPClient(httpClient),
 		executor.WithStateManager(smv2),
 		executor.WithPauseManager(pauseMgr),
@@ -490,7 +525,20 @@ func start(ctx context.Context, opts StartOpts) error {
 			PublishURL: fmt.Sprintf("http://%s:%d/v1/realtime/publish", url, opts.Config.CoreAPI.Port),
 		}),
 		executor.WithTracerProvider(tp),
-	)
+
+		executor.WithAllowStepMetadata(func(ctx context.Context, acctID uuid.UUID) bool {
+			return enableStepMetadata
+		}),
+	}
+
+	if capacityManager != nil {
+		executorOpts = append(executorOpts, executor.WithCapacityManager(capacityManager))
+		executorOpts = append(executorOpts, executor.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
+			return true, true
+		}))
+	}
+
+	exec, err := executor.NewExecutor(executorOpts...)
 	if err != nil {
 		return err
 	}
@@ -578,7 +626,6 @@ func start(ctx context.Context, opts StartOpts) error {
 			AuthMiddleware:     authn.SigningKeyMiddleware(opts.SigningKey),
 			CachingMiddleware:  caching,
 			FunctionReader:     ds.Data,
-			FunctionRunReader:  ds.Data,
 			JobQueueReader:     ds.Queue.(queue.JobQueueReader),
 			Executor:           ds.Executor,
 			Queue:              rq,
@@ -596,6 +643,13 @@ func start(ctx context.Context, opts StartOpts) error {
 			CheckpointOpts: apiv1.CheckpointAPIOpts{
 				RunOutputReader: devutil.NewLocalOutputReader(core.Resolver(), ds.Data, ds.Data),
 				RunJWTSecret:    consts.DevServerRunJWTSecret,
+			},
+
+			MetadataOpts: apiv1.MetadataOpts{
+				Flag: func(ctx context.Context, accountID uuid.UUID) bool {
+					return enableStepMetadata
+				},
+				SpanExtractor: extractors.DefaultSpanExtractors,
 			},
 		})
 	})
@@ -686,18 +740,19 @@ func start(ctx context.Context, opts StartOpts) error {
 		Logger:         l,
 	})
 
-	services := []service.Service{ds, runner, executorSvc, ds.Apiservice, connGateway}
+	services = append(services, ds, runner, executorSvc, ds.Apiservice, connGateway)
 
 	if os.Getenv("DEBUG") != "" {
 		services = append(services, debugapi.NewDebugAPI(debugapi.Opts{
-			Log:           l,
-			DB:            ds.Data,
-			Queue:         rq,
-			State:         ds.State,
-			Cron:          croner,
-			ShardSelector: shardSelector,
-			Port:          ds.Opts.DebugAPIPort,
-			PauseManager:  pauseMgr,
+			Log:             l,
+			DB:              ds.Data,
+			Queue:           rq,
+			State:           ds.State,
+			Cron:            croner,
+			ShardSelector:   shardSelector,
+			Port:            ds.Opts.DebugAPIPort,
+			PauseManager:    pauseMgr,
+			CapacityManager: capacityManager,
 		}))
 	}
 
@@ -729,7 +784,7 @@ func createInmemoryRedis(ctx context.Context, tick time.Duration) (rueidis.Clien
 
 func getSendingEventHandler(ctx context.Context, pb pubsub.Publisher, topic string) execution.HandleSendingEvent {
 	return func(ctx context.Context, evt event.Event, item queue.Item) error {
-		trackedEvent := event.NewOSSTrackedEvent(evt, nil)
+		trackedEvent := event.NewBaseTrackedEvent(evt, nil)
 		byt, err := json.Marshal(trackedEvent)
 		if err != nil {
 			return fmt.Errorf("error marshalling invocation event: %w", err)
@@ -765,7 +820,7 @@ func getInvokeFailHandler(ctx context.Context, pb pubsub.Publisher, topic string
 		for _, e := range evts {
 			evt := e
 			eg.Go(func() error {
-				trackedEvent := event.NewOSSTrackedEvent(evt, nil)
+				trackedEvent := event.NewBaseTrackedEvent(evt, nil)
 				byt, err := json.Marshal(trackedEvent)
 				if err != nil {
 					return fmt.Errorf("error marshalling function finished event: %w", err)
@@ -891,8 +946,13 @@ func PartitionConstraintConfigGetter(dbcqrs cqrs.Manager) redis_state.PartitionC
 			fnLimit = accountLimit
 		}
 
+		fnVersion := fn.FunctionVersion
+		if fnVersion <= 0 {
+			fnVersion = 1
+		}
+
 		constraints := redis_state.PartitionConstraintConfig{
-			FunctionVersion: fn.FunctionVersion,
+			FunctionVersion: fnVersion,
 
 			Concurrency: redis_state.PartitionConcurrency{
 				SystemConcurrency:     consts.DefaultConcurrencyLimit,

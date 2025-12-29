@@ -105,6 +105,10 @@ func (q *queue) isMigrationLocked(ctx context.Context, shard QueueShard, fnID uu
 }
 
 func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueShadowPartition, continuationCount uint) error {
+	l := logger.StdlibLogger(ctx).With(
+		"partition_id", shadowPart.PartitionID,
+		"account_id", shadowPart.AccountID,
+	)
 	shard := q.primaryQueueShard
 
 	metrics.ActiveShadowScannerCount(ctx, 1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": shard.Name}})
@@ -284,55 +288,93 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 		refilledItems  int  // Number of refilled items
 	)
 
-	for _, backlog := range shuffleBacklogs(backlogs) {
-		// If cancelled, return early
-		if errors.Is(ctx.Err(), context.Canceled) {
-			return nil
+	// Always shuffle backlogs while prioritizing non-start backlogs.
+	// This is necessary to ensure we refill items to finish existing runs before
+	// refilling run starts.
+	backlogs = shuffleBacklogs(backlogs)
+
+	// If throttle is configured without custom concurrency keys, we have a mismatch:
+	// - Each start queue item is added to a dedicated backlog per key
+	// - Non-start queue items are added to the default backlog
+	//
+	// In this case, we always want to refill the default backlog first to ensure existing
+	// runs can finish before new runs are started.
+	if latestConstraints.Throttle != nil && len(latestConstraints.Concurrency.CustomConcurrencyKeys) == 0 {
+		// Create non-start function backlog
+		fnBacklog := shadowPart.DefaultBacklog(latestConstraints, false)
+		if fnBacklog != nil {
+			l.Trace("refilling from fn backlog for fairness", "backlog_id", fnBacklog.BacklogID)
+
+			// Start with non-start function backlog
+			backlogs = append([]*QueueBacklog{fnBacklog}, backlogs...)
 		}
+	}
 
-		res, fullyProcessed, err := q.processShadowPartitionBacklog(ctx, shadowPart, backlog, refillUntil, latestConstraints)
-		if err != nil {
-			return fmt.Errorf("could not process backlog: %w", err)
-		}
+	for _, backlog := range backlogs {
+		// Apply a refill multiplier: Some backlogs should receive more refill capacity.
+		// While the global refill limit controls how many items should be refilled per backlog, the multiplier
+		// applies a backlog and constraint-specific policy to determine if the backlog should be prioritized.
+		multiplier := backlogRefillMultiplier(backlogs, backlog, latestConstraints)
+		for i := range multiplier {
+			l := l.With(
+				"multiplier", multiplier,
+				"multiplier_index", i,
+			)
 
-		if res != nil {
-			refilledItems += res.Refilled
-		}
-
-		// If we fully refilled, track and continue
-		if fullyProcessed {
-			fullyProcessedBacklogs++
-			continue
-		}
-
-		// If we did not refill, continue on to next backlog
-		if res == nil {
-			continue
-		}
-
-		// If we hit a constraint affecting the entire shadow partition, stop processing other backlogs
-		// and requeue the partition early, as we cannot refill items from other backlogs right now.
-		switch res.Constraint {
-		case enums.QueueConstraintNotLimited:
-			continue
-		case enums.QueueConstraintAccountConcurrency, enums.QueueConstraintFunctionConcurrency:
-			// No more backlogs right now, we can continue the scan loop until new items are added
-			q.removeShadowContinue(ctx, shadowPart, false)
-
-			forceRequeueShadowPartitionAt := q.clock.Now().Add(PartitionConcurrencyLimitRequeueExtension)
-
-			_, err = durationWithTags(ctx, shard.Name, durOpShadowPartitionRequeue, q.clock.Now(), func(ctx context.Context) (any, error) {
-				err := q.ShadowPartitionRequeue(ctx, shadowPart, &forceRequeueShadowPartitionAt)
-				return nil, err
-			}, map[string]any{"reason": "concurrency_limited", "cause": res.Constraint.String()})
-			switch err {
-			case nil, ErrShadowPartitionNotFound: // no-op
+			// If cancelled, return early
+			if errors.Is(ctx.Err(), context.Canceled) {
 				return nil
-			default:
-				return fmt.Errorf("could not requeue shadow partition: %w", err)
 			}
-		default:
-			wasConstrained = true
+
+			res, fullyProcessed, err := q.processShadowPartitionBacklog(logger.WithStdlib(ctx, l), shadowPart, backlog, refillUntil, latestConstraints)
+			if err != nil {
+				return fmt.Errorf("could not process backlog: %w", err)
+			}
+
+			if res != nil {
+				refilledItems += res.Refilled
+			}
+
+			// If we fully refilled, track and continue
+			if fullyProcessed {
+				fullyProcessedBacklogs++
+				break // continue with next backlog
+			}
+
+			// If we did not refill, continue on to next backlog
+			if res == nil {
+				break // continue with next backlog
+			}
+
+			// If we hit a constraint affecting the entire shadow partition, stop processing other backlogs
+			// and requeue the partition early, as we cannot refill items from other backlogs right now.
+			switch res.Constraint {
+			case enums.QueueConstraintNotLimited:
+				// continue with next backlog
+			case enums.QueueConstraintAccountConcurrency, enums.QueueConstraintFunctionConcurrency:
+				l.Trace("limited by concurrency, requeueing shadow partition in the future",
+					"scope", res.Constraint,
+				)
+
+				// No more backlogs right now, we can continue the scan loop until new items are added
+				q.removeShadowContinue(ctx, shadowPart, false)
+
+				forceRequeueShadowPartitionAt := q.clock.Now().Add(PartitionConcurrencyLimitRequeueExtension)
+
+				_, err = durationWithTags(ctx, shard.Name, durOpShadowPartitionRequeue, q.clock.Now(), func(ctx context.Context) (any, error) {
+					err := q.ShadowPartitionRequeue(ctx, shadowPart, &forceRequeueShadowPartitionAt)
+					return nil, err
+				}, map[string]any{"reason": "concurrency_limited", "cause": res.Constraint.String()})
+				switch err {
+				case nil, ErrShadowPartitionNotFound: // no-op
+					return nil
+				default:
+					return fmt.Errorf("could not requeue shadow partition: %w", err)
+				}
+			default:
+				// backlog was constrained, continue with others until the shadow partition is constrained
+				wasConstrained = true
+			}
 		}
 	}
 
@@ -345,6 +387,8 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 
 	hasMoreBacklogs := totalCount > fullyProcessedBacklogs
 	if !hasMoreBacklogs {
+		l.Trace("no more backlogs in shadow partition")
+
 		// No more backlogs right now, we can continue the scan loop until new items are added
 		q.removeShadowContinue(ctx, shadowPart, false)
 
@@ -367,7 +411,9 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 		// Not constrained so we can add a continuation
 		q.addShadowContinue(ctx, shadowPart, continuationCount+1)
 
+		// Hint to the executor
 		if refilledItems > 0 {
+			l.Trace("hinting to executor after refilling items")
 
 			var accountID uuid.UUID
 			if shadowPart.AccountID != nil {
@@ -406,9 +452,13 @@ func (q *queue) processShadowPartitionBacklog(
 	refillUntil time.Time,
 	constraints PartitionConstraintConfig,
 ) (*BacklogRefillResult, bool, error) {
-	enableKeyQueues := shadowPart.SystemQueueName != nil && q.enqueueSystemQueuesToBacklog
-	if shadowPart.AccountID != nil {
-		enableKeyQueues = q.allowKeyQueues(ctx, *shadowPart.AccountID)
+	l := logger.StdlibLogger(ctx).With(
+		"backlog_id", backlog.BacklogID,
+	)
+
+	var enableKeyQueues bool
+	if shadowPart.AccountID != nil && shadowPart.FunctionID != nil {
+		enableKeyQueues = q.allowKeyQueues(ctx, *shadowPart.AccountID, *shadowPart.FunctionID)
 	}
 
 	// May need to normalize - this will not happen for default backlogs
@@ -490,39 +540,53 @@ func (q *queue) processShadowPartitionBacklog(
 		return nil, false, nil
 	}
 
-	constraintCheckRes, err := q.backlogRefillConstraintCheck(ctx, shadowPart, backlog, constraints, items)
+	// NOTE: This idempotency key is simply used for retrying Acquire
+	// We do not use the same key for multiple processShadowPartitionBacklog attempts
+	now := q.clock.Now()
+	operationIdempotencyKey := fmt.Sprintf("%s-%d", backlog.BacklogID, now.UnixMilli())
+
+	constraintCheckRes, err := q.backlogRefillConstraintCheck(ctx, shadowPart, backlog, constraints, items, q.primaryQueueShard.RedisClient.KeyGenerator(), operationIdempotencyKey, now)
 	if err != nil {
 		return nil, false, fmt.Errorf("could not check constraints for backlogRefill: %w", err)
 	}
 
-	// If no items can be refilled, exit early
-	if len(constraintCheckRes.itemsToRefill) == 0 {
-		return &BacklogRefillResult{
-			Constraint:        constraintCheckRes.limitingConstraint,
-			Refilled:          0,
-			Refill:            len(items),
-			BacklogCountUntil: total,
-			TotalBacklogCount: 0, // Not fetched
-			Capacity:          0,
-			RefilledItems:     nil,
-			RetryAt:           constraintCheckRes.retryAfter,
-		}, false, nil
+	// In case the Constraint API determines no work can happen right now, we will report the limit
+	// and respect the retryAfter value
+	res := &BacklogRefillResult{
+		Constraint:        constraintCheckRes.limitingConstraint,
+		RetryAt:           constraintCheckRes.retryAfter,
+		BacklogCountUntil: total,
 	}
 
-	res, err := durationWithTags(
-		ctx,
-		q.primaryQueueShard.Name,
-		"backlog_process_duration",
-		q.clock.Now(),
-		func(ctx context.Context) (*BacklogRefillResult, error) {
-			return q.BacklogRefill(ctx, backlog, shadowPart, refillUntil, constraintCheckRes.itemsToRefill, constraints)
-		},
-		map[string]any{
-			//	"partition_id": shadowPart.PartitionID,
-		},
-	)
-	if err != nil {
-		return nil, false, fmt.Errorf("could not refill backlog: %w", err)
+	// If no items can be refilled, exit early
+	if len(constraintCheckRes.itemsToRefill) > 0 {
+		res, err = durationWithTags(
+			ctx,
+			q.primaryQueueShard.Name,
+			"backlog_process_duration",
+			q.clock.Now(),
+			func(ctx context.Context) (*BacklogRefillResult, error) {
+				return q.BacklogRefill(
+					ctx,
+					backlog,
+					shadowPart,
+					refillUntil,
+					constraintCheckRes.itemsToRefill,
+					constraints,
+					WithBacklogRefillConstraintCheckIdempotencyKey(operationIdempotencyKey),
+					WithBacklogRefillDisableConstraintChecks(constraintCheckRes.skipConstraintChecks),
+					WithBacklogRefillItemCapacityLeases(constraintCheckRes.itemCapacityLeases),
+				)
+			},
+			map[string]any{
+				//	"partition_id": shadowPart.PartitionID,
+			},
+		)
+		if err != nil {
+			return nil, false, fmt.Errorf("could not refill backlog: %w", err)
+		}
+	} else {
+		l.Trace("no items to refill after capacity check", "limiting", res.Constraint)
 	}
 
 	// Report limiting constraint
@@ -556,7 +620,8 @@ func (q *queue) processShadowPartitionBacklog(
 		opts := metrics.CounterOpt{
 			PkgName: pkgName,
 			Tags: map[string]any{
-				"queue_shard": q.primaryQueueShard.Name,
+				"queue_shard":    q.primaryQueueShard.Name,
+				"constraint_api": constraintCheckRes.skipConstraintChecks,
 				// "partition_id": shadowPart.PartitionID,
 			},
 		}

@@ -23,6 +23,7 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/syscode"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
+	"github.com/inngest/inngest/pkg/util"
 	connectpb "github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/oklog/ulid/v2"
 	"golang.org/x/sync/errgroup"
@@ -231,7 +232,16 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			return
 		}
 
-		ch.log = ch.log.With("account_id", conn.AccountID, "env_id", conn.EnvID, "conn_id", conn.ConnectionId)
+		instanceId := ""
+		if conn.Data != nil {
+			instanceId = conn.Data.InstanceId
+		}
+		ch.log = ch.log.With(
+			"account_id", conn.AccountID,
+			"env_id", conn.EnvID,
+			"conn_id", conn.ConnectionId,
+			"instance_id", util.SanitizeLogField(instanceId),
+			"worker_ip", util.SanitizeLogField(conn.WorkerIP))
 
 		workerDrainedCtx, notifyWorkerDrained := context.WithCancel(context.Background())
 		defer notifyWorkerDrained()
@@ -1163,7 +1173,12 @@ func (c *connectionHandler) establishConnection(ctx context.Context) (*state.Con
 		}
 	}
 
-	log := c.log.With("account_id", authResp.AccountID, "env_id", authResp.EnvID)
+	log := c.log.With(
+		"account_id", authResp.AccountID,
+		"env_id", authResp.EnvID,
+		"conn_id", connectionId.String(),
+		"instance_id", util.SanitizeLogField(initialMessageData.InstanceId),
+		"worker_ip", util.SanitizeLogField(c.remoteAddr))
 
 	workerGroups := make(map[string]*state.WorkerGroup)
 	{

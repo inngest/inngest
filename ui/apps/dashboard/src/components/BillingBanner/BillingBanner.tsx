@@ -1,4 +1,4 @@
-import { entitlementUsage } from '@/components/Billing/data';
+import { entitlementUsage } from '@/queries/server/billing';
 import { BillingBannerView } from './BillingBannerView';
 
 export async function BillingBanner() {
@@ -14,5 +14,5 @@ export async function BillingBanner() {
     return null;
   }
 
-  return <BillingBannerView entitlementUsage={data.entitlements} />;
+  return <BillingBannerView /*  entitlementUsage={data.entitlements} */ />;
 }

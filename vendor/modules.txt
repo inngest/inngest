@@ -732,8 +732,6 @@ github.com/hashicorp/errwrap
 # github.com/hashicorp/go-multierror v1.1.1
 ## explicit; go 1.13
 github.com/hashicorp/go-multierror
-# github.com/hashicorp/golang-lru v1.0.2
-## explicit; go 1.12
 # github.com/hashicorp/golang-lru/v2 v2.0.1
 ## explicit; go 1.18
 github.com/hashicorp/golang-lru/v2
@@ -756,8 +754,8 @@ github.com/inngest/expr
 # github.com/inngest/go-httpstat v0.0.0-20250328150054-dfda91359d48
 ## explicit; go 1.23.2
 github.com/inngest/go-httpstat
-# github.com/inngest/inngestgo v0.14.2-0.20251103042514-df5395833dc9
-## explicit; go 1.24
+# github.com/inngest/inngestgo v0.15.0
+## explicit; go 1.24.0
 github.com/inngest/inngestgo
 github.com/inngest/inngestgo/connect
 github.com/inngest/inngestgo/errors
@@ -1070,13 +1068,13 @@ github.com/prometheus/procfs/internal/util
 github.com/protocolbuffers/txtpbfmt/ast
 github.com/protocolbuffers/txtpbfmt/parser
 github.com/protocolbuffers/txtpbfmt/unquote
-# github.com/redis/rueidis v1.0.51
-## explicit; go 1.21
+# github.com/redis/rueidis v1.0.68
+## explicit; go 1.23.0
 github.com/redis/rueidis
 github.com/redis/rueidis/internal/cmds
 github.com/redis/rueidis/internal/util
-# github.com/redis/rueidis/rueidiscompat v1.0.51
-## explicit; go 1.21
+# github.com/redis/rueidis/rueidiscompat v1.0.68
+## explicit; go 1.23.0
 github.com/redis/rueidis/rueidiscompat
 # github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec
 ## explicit; go 1.12
@@ -1170,10 +1168,6 @@ github.com/testcontainers/testcontainers-go/internal/core
 github.com/testcontainers/testcontainers-go/internal/core/network
 github.com/testcontainers/testcontainers-go/log
 github.com/testcontainers/testcontainers-go/wait
-# github.com/throttled/throttled/v2 v2.11.0
-## explicit; go 1.13
-github.com/throttled/throttled/v2
-github.com/throttled/throttled/v2/store/storetest
 # github.com/tidwall/btree v1.7.0
 ## explicit; go 1.19
 github.com/tidwall/btree
@@ -1418,8 +1412,8 @@ gocloud.dev/pubsub/mempubsub
 # gocloud.dev/pubsub/natspubsub v0.25.0
 ## explicit; go 1.12
 gocloud.dev/pubsub/natspubsub
-# golang.org/x/crypto v0.39.0
-## explicit; go 1.23.0
+# golang.org/x/crypto v0.45.0
+## explicit; go 1.24.0
 golang.org/x/crypto/blake2b
 golang.org/x/crypto/blowfish
 golang.org/x/crypto/chacha20
@@ -1442,13 +1436,13 @@ golang.org/x/crypto/ssh/internal/bcrypt_pbkdf
 golang.org/x/exp/constraints
 golang.org/x/exp/rand
 golang.org/x/exp/slices
-# golang.org/x/mod v0.25.0
-## explicit; go 1.23.0
+# golang.org/x/mod v0.29.0
+## explicit; go 1.24.0
 golang.org/x/mod/internal/lazyregexp
 golang.org/x/mod/module
 golang.org/x/mod/semver
-# golang.org/x/net v0.41.0
-## explicit; go 1.23.0
+# golang.org/x/net v0.47.0
+## explicit; go 1.24.0
 golang.org/x/net/http/httpguts
 golang.org/x/net/http2
 golang.org/x/net/http2/hpack
@@ -1468,19 +1462,19 @@ golang.org/x/oauth2/google/internal/stsexchange
 golang.org/x/oauth2/internal
 golang.org/x/oauth2/jws
 golang.org/x/oauth2/jwt
-# golang.org/x/sync v0.15.0
-## explicit; go 1.23.0
+# golang.org/x/sync v0.18.0
+## explicit; go 1.24.0
 golang.org/x/sync/errgroup
 golang.org/x/sync/semaphore
-# golang.org/x/sys v0.36.0
+# golang.org/x/sys v0.38.0
 ## explicit; go 1.24.0
 golang.org/x/sys/cpu
 golang.org/x/sys/execabs
 golang.org/x/sys/unix
 golang.org/x/sys/windows
 golang.org/x/sys/windows/registry
-# golang.org/x/text v0.26.0
-## explicit; go 1.23.0
+# golang.org/x/text v0.31.0
+## explicit; go 1.24.0
 golang.org/x/text/cases
 golang.org/x/text/encoding
 golang.org/x/text/encoding/internal
@@ -1502,9 +1496,11 @@ golang.org/x/text/width
 # golang.org/x/time v0.6.0
 ## explicit; go 1.18
 golang.org/x/time/rate
-# golang.org/x/tools v0.34.0
-## explicit; go 1.23.0
+# golang.org/x/tools v0.38.0
+## explicit; go 1.24.0
 golang.org/x/tools/go/ast/astutil
+golang.org/x/tools/go/ast/edge
+golang.org/x/tools/go/ast/inspector
 golang.org/x/tools/go/gcexportdata
 golang.org/x/tools/go/packages
 golang.org/x/tools/go/types/objectpath

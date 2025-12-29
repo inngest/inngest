@@ -13,6 +13,7 @@ import (
 	"github.com/alicebob/miniredis/v2"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/util"
 	"github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/jonboulle/clockwork"
 	"github.com/oklog/ulid/v2"
@@ -1253,7 +1254,7 @@ func TestGetWorkerCapacities(t *testing.T) {
 	t.Run("returns unlimited capacity when no limit set", func(t *testing.T) {
 		caps, err := mgr.GetWorkerCapacities(ctx, envID, instanceID)
 		require.NoError(t, err)
-		require.Equal(t, int64(consts.ConnectWorkerNoConcurrencyLimitForRequests), caps.Available)
+		require.Equal(t, int64(consts.ConnectWorkerCapacityForNoConcurrencyLimit), caps.Available)
 		require.Equal(t, int64(0), caps.Total)
 		require.False(t, caps.IsAtCapacity())
 		require.True(t, caps.IsAvailable())
@@ -1553,7 +1554,7 @@ func TestDeleteRequestFromWorker(t *testing.T) {
 		caps, err := mgr.GetWorkerCapacities(ctx, envID, instanceID)
 		require.NoError(t, err)
 		require.Equal(t, int64(0), caps.Total)
-		require.Equal(t, int64(consts.ConnectWorkerNoConcurrencyLimitForRequests), caps.Available)
+		require.Equal(t, int64(consts.ConnectWorkerCapacityForNoConcurrencyLimit), caps.Available)
 
 		// TTL should be expired
 		setKey := mgr.workerRequestsKey(envID, instanceID)
@@ -1881,7 +1882,7 @@ func TestWorkerCapacityEndToEnd(t *testing.T) {
 		// Should return unlimited
 		caps, err := mgr.GetWorkerCapacities(ctx, envID, instanceID)
 		require.NoError(t, err)
-		require.Equal(t, int64(consts.ConnectWorkerNoConcurrencyLimitForRequests), caps.Available)
+		require.Equal(t, int64(consts.ConnectWorkerCapacityForNoConcurrencyLimit), caps.Available)
 		require.Equal(t, int64(0), caps.Total)
 		require.False(t, caps.IsAtCapacity())
 		require.True(t, caps.IsAvailable())
@@ -2300,7 +2301,7 @@ func TestWorkerCapacityManager_FastForwardEdgeCases(t *testing.T) {
 		caps, err := mgr.GetWorkerCapacities(ctx, envID, instanceID)
 		require.NoError(t, err)
 		require.Equal(t, int64(0), caps.Total) // No capacity limit due to expired key
-		require.Equal(t, int64(consts.ConnectWorkerNoConcurrencyLimitForRequests), caps.Available)
+		require.Equal(t, int64(consts.ConnectWorkerCapacityForNoConcurrencyLimit), caps.Available)
 
 		// But new assignments should still work (no limit)
 		err = mgr.AssignRequestToWorker(ctx, envID, instanceID, "req-3")
@@ -2317,7 +2318,7 @@ func TestWorkerCapacityManager_FastForwardEdgeCases(t *testing.T) {
 		require.NoError(t, err)
 
 		// Manually set short TTL on the worker requests set to simulate edge case
-		workerRequestsKey := fmt.Sprintf("{%s}:worker-requests-set:%s", envID.String(), instanceID)
+		workerRequestsKey := fmt.Sprintf("{%s}:worker-requests-set:%s", envID.String(), util.XXHash(instanceID))
 		r.SetTTL(workerRequestsKey, time.Second)
 
 		// FastForward past the set TTL but not the individual request lease duration

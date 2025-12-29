@@ -188,6 +188,9 @@ func New(ctx context.Context, opts ...Opt) (state.Manager, error) {
 		u: m.unsafeUnshardedClientDoNotUse,
 	}
 
+	// Default to deleting pauses from buffer only
+	m.pauseDeleter = m.unshardedMgr
+
 	return m, nil
 }
 
@@ -205,12 +208,18 @@ func WithUnshardedClient(u *UnshardedClient) Opt {
 	}
 }
 
+func (m *mgr) SetPauseDeleter(pm state.PauseDeleter) {
+	m.pauseDeleter = pm
+}
+
 type mgr struct {
 	// unsafe: Operate on sharded manager instead.
 	unsafeShardedClientDoNotUse *ShardedClient
 
 	// unsafe: Operate on unsharded manager instead.
 	unsafeUnshardedClientDoNotUse *UnshardedClient
+
+	pauseDeleter state.PauseDeleter
 
 	shardedMgr
 	unshardedMgr
@@ -993,7 +1002,7 @@ func (m mgr) Delete(ctx context.Context, i state.Identifier) error {
 		return err
 	}
 
-	err = m.deletePausesForRun(ctx, ctx, i)
+	err = m.unshardedMgr.deletePausesForRun(ctx, ctx, m.pauseDeleter, i)
 	if err != nil {
 		return err
 	}
@@ -1041,27 +1050,34 @@ func (m shardedMgr) delete(ctx context.Context, callCtx context.Context, i state
 	return nil
 }
 
-func (m unshardedMgr) deletePausesForRun(ctx context.Context, callCtx context.Context, i state.Identifier) error {
+func (m unshardedMgr) deletePausesForRun(ctx context.Context, callCtx context.Context, pauseDeleter state.PauseDeleter, i state.Identifier) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "deletePausesForRun"), redis_telemetry.ScopePauses)
 
 	pause := m.u.Pauses()
 
-	// Fetch all pauses for the run
-	if pauseIDs, err := pause.Client().Do(callCtx, pause.Client().B().Smembers().Key(pause.kg.RunPauses(ctx, i.RunID)).Build()).AsStrSlice(); err == nil {
-		for _, id := range pauseIDs {
-			pauseID, _ := uuid.Parse(id)
-			err = m.DeletePauseByID(ctx, pauseID)
-			if err != nil {
-				// bubble the error up we can safely retry the whole process
-				return err
-			}
+	pauseIDs, err := pause.Client().Do(callCtx, pause.Client().B().Smembers().Key(pause.kg.RunPauses(ctx, i.RunID)).Build()).AsStrSlice()
+	if err != nil {
+		return err
+	}
+
+	for _, id := range pauseIDs {
+		pauseID, err := uuid.Parse(id)
+		if err != nil {
+			// This should never happen
+			logger.StdlibLogger(ctx).Error("invalid pause ID in run pause set", "error", err, "pauseID", id, "runID", i.RunID)
+			continue
+		}
+		// This call will either go to the pause manager to handle deleting from blocks
+		// or use the current implementation in this file by default.
+		if err := pauseDeleter.DeletePauseByID(ctx, pauseID, i.WorkspaceID); err != nil {
+			return err
 		}
 	}
 
 	return pause.Client().Do(callCtx, pause.Client().B().Del().Key(pause.kg.RunPauses(ctx, i.RunID)).Build()).Error()
 }
 
-func (m unshardedMgr) DeletePauseByID(ctx context.Context, pauseID uuid.UUID) error {
+func (m unshardedMgr) DeletePauseByID(ctx context.Context, pauseID uuid.UUID, workspaceID uuid.UUID) error {
 	// Attempt to fetch this pause.
 	pause, err := m.PauseByID(ctx, pauseID)
 	if err != nil {
@@ -1075,7 +1091,12 @@ func (m unshardedMgr) DeletePauseByID(ctx context.Context, pauseID uuid.UUID) er
 	return m.DeletePause(ctx, *pause)
 }
 
-func (m unshardedMgr) DeletePause(ctx context.Context, p state.Pause) error {
+func (m unshardedMgr) DeletePause(ctx context.Context, p state.Pause, options ...state.DeletePauseOpt) error {
+	opts := state.DeletePauseOpts{}
+	for _, fn := range options {
+		fn(&opts)
+	}
+
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "DeletePause"), redis_telemetry.ScopePauses)
 
 	pause := m.u.Pauses()
@@ -1117,6 +1138,15 @@ func (m unshardedMgr) DeletePause(ctx context.Context, p state.Pause) error {
 		pause.kg.PauseIndex(ctx, "exp", p.WorkspaceID, evt),
 		runPausesKey,
 		pause.kg.GlobalPauseIndex(ctx),
+		pause.kg.PauseBlockIndex(ctx, p.ID),
+	}
+
+	// Marshal WriteBlockIndex to JSON if it has content, otherwise pass empty string
+	blockIndexJSON := ""
+	if opts.WriteBlockIndex.BlockID != "" {
+		if blockIndexBytes, err := json.Marshal(opts.WriteBlockIndex); err == nil {
+			blockIndexJSON = string(blockIndexBytes)
+		}
 	}
 
 	status, err := scripts["deletePause"].Exec(
@@ -1127,6 +1157,7 @@ func (m unshardedMgr) DeletePause(ctx context.Context, p state.Pause) error {
 			p.ID.String(),
 			invokeCorrId,
 			signalCorrId,
+			blockIndexJSON,
 		},
 	).AsInt64()
 	if err != nil {
@@ -1136,6 +1167,8 @@ func (m unshardedMgr) DeletePause(ctx context.Context, p state.Pause) error {
 	switch status {
 	case 0:
 		return nil
+	case 1:
+		return state.ErrPauseNotInBuffer
 	default:
 		return fmt.Errorf("unknown response deleting pause: %d", status)
 	}
@@ -1291,48 +1324,6 @@ func (m unshardedMgr) PauseBySignalID(ctx context.Context, wsID uuid.UUID, signa
 	}
 
 	return p, nil
-}
-
-func (m unshardedMgr) PausesByID(ctx context.Context, ids ...uuid.UUID) ([]*state.Pause, error) {
-	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "PausesByID"), redis_telemetry.ScopePauses)
-
-	pause := m.u.Pauses()
-	if len(ids) == 0 {
-		return nil, nil
-	}
-
-	keys := make([]string, len(ids))
-	for n, id := range ids {
-		keys[n] = pause.kg.Pause(ctx, id)
-	}
-
-	cmd := pause.Client().B().Mget().Key(keys...).Build()
-	strings, err := pause.Client().Do(ctx, cmd).AsStrSlice()
-	if err == rueidis.Nil {
-		return nil, state.ErrPauseNotFound
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	var merr error
-
-	pauses := []*state.Pause{}
-	for _, item := range strings {
-		if len(item) == 0 {
-			continue
-		}
-
-		pause := &state.Pause{}
-		err = json.Unmarshal([]byte(item), pause)
-		if err != nil {
-			merr = errors.Join(merr, err)
-			continue
-		}
-		pauses = append(pauses, pause)
-	}
-
-	return pauses, merr
 }
 
 func (m unshardedMgr) PauseLen(ctx context.Context, workspaceID uuid.UUID, event string) (int64, error) {
@@ -1621,13 +1612,13 @@ func (i *scanIter) Index() int64 {
 }
 
 func (i *scanIter) fetch(ctx context.Context) error {
-	// Reset the index.
-	i.i = -1
-
 	if i.cursor == 0 {
 		// We're done, no need to fetch.
 		return errScanDone
 	}
+
+	// Reset the index.
+	i.i = -1
 
 	// Scan 100 times up until there are values
 	for scans := 0; scans < 100; scans++ {

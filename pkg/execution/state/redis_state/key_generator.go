@@ -220,6 +220,9 @@ type QueueKeyGenerator interface {
 	// have in-progress work.  This allows us to scan and scavenge jobs in concurrency queues where
 	// leases have expired (in the case of failed workers)
 	ConcurrencyIndex() string
+	// PartitionScavengerIndex returns a key to a set holding in-progress jobs
+	// This allows us to scan and scavenge jobs where leases have expired (in the case of failed workers)
+	PartitionScavengerIndex(partitionID string) string
 	// ThrottleKey returns the throttle key for a given queue item.
 	ThrottleKey(t *osqueue.Throttle) string
 	// RunIndex returns the index for storing job IDs associated with run IDs.
@@ -331,6 +334,10 @@ func (u queueKeyGenerator) Concurrency(prefix, key string) string {
 
 func (u queueKeyGenerator) ConcurrencyIndex() string {
 	return fmt.Sprintf("{%s}:concurrency:sorted", u.queueDefaultKey)
+}
+
+func (u queueKeyGenerator) PartitionScavengerIndex(partitionID string) string {
+	return fmt.Sprintf("{%s}:scavenger:%s:sorted", u.queueDefaultKey, partitionID)
 }
 
 func (u queueKeyGenerator) RunIndex(runID ulid.ULID) string {
@@ -634,6 +641,10 @@ type PauseKeyGenerator interface {
 	// which is used when caching pauses in-memory to only load the subset of pauses
 	// added after the cache was last updated.
 	PauseIndex(ctx context.Context, kind string, wsID uuid.UUID, event string) string
+
+	// PauseBlockIndex is a key that's used to keep the block ID of the flushed pause
+	// so we can still get pauses by ID from blocks.
+	PauseBlockIndex(ctx context.Context, pauseID uuid.UUID) string
 }
 
 type pauseKeyGenerator struct {
@@ -665,6 +676,10 @@ func (u pauseKeyGenerator) PauseIndex(ctx context.Context, kind string, wsID uui
 		return fmt.Sprintf("{%s}:pause-idx:%s:%s:-", u.stateDefaultKey, kind, wsID)
 	}
 	return fmt.Sprintf("{%s}:pause-idx:%s:%s:%s", u.stateDefaultKey, kind, wsID, event)
+}
+
+func (u pauseKeyGenerator) PauseBlockIndex(ctx context.Context, pauseID uuid.UUID) string {
+	return fmt.Sprintf("{%s}:pause-block:%s", u.stateDefaultKey, pauseID.String())
 }
 
 type queueItemKeyGenerator struct {

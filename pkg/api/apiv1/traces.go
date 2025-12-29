@@ -13,12 +13,15 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/api/apiv1/apiv1auth"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/tracing"
 	"github.com/inngest/inngest/pkg/tracing/meta"
+	"github.com/inngest/inngest/pkg/tracing/metadata"
+	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/sdk/resource"
@@ -146,14 +149,16 @@ func (a router) convertOTLPAndSend(ctx context.Context, auth apiv1auth.V1Auth, r
 					defer wg.Done()
 					defer func() {
 						if r := recover(); r != nil {
-							l.Error("failed to commit span with", "panic", r)
+							l.Error("panic committing span", "panic", r)
 							errs.Add(1)
 						}
 					}()
 
-					err := a.commitSpan(ctx, auth, res, ss.Scope, s)
+					err := a.commitSpan(ctx, l, auth, res, ss.Scope, s)
 					if err != nil {
-						l.Error("failed to commit span with", "error", err)
+						if !strings.Contains(err.Error(), "failed to get traceref") {
+							l.Error("failed to commit span", "error", err)
+						}
 						errs.Add(1)
 						return
 					}
@@ -167,7 +172,7 @@ func (a router) convertOTLPAndSend(ctx context.Context, auth apiv1auth.V1Auth, r
 	return errs.Load()
 }
 
-func (a router) commitSpan(ctx context.Context, auth apiv1auth.V1Auth, res *resource.Resource, scope *commonv1.InstrumentationScope, s *tracev1.Span) error {
+func (a router) commitSpan(ctx context.Context, l logger.Logger, auth apiv1auth.V1Auth, res *resource.Resource, scope *commonv1.InstrumentationScope, s *tracev1.Span) error {
 	// To be valid, each span must have an "inngest.traceref" attribute
 	tr, err := getInngestTraceRef(s)
 	if err != nil {
@@ -191,15 +196,31 @@ func (a router) commitSpan(ctx context.Context, auth apiv1auth.V1Auth, res *reso
 	// Legacy, but try to pull the run ID out from the attributes using the
 	// legacy key.
 	var runID ulid.ULID
+	var functionID uuid.UUID
 	for _, kv := range attrs {
-		if kv.Key == consts.OtelAttrSDKRunID {
+		switch kv.Key {
+		case consts.OtelAttrSDKRunID:
 			runID, err = ulid.Parse(kv.Value.AsString())
 			if err != nil {
 				return fmt.Errorf("failed to parse run ID from attributes: %w", err)
 			}
-
-			break
+		case consts.OtelSysFunctionID:
+			functionID, err = uuid.Parse(kv.Value.AsString())
+			if err != nil {
+				return fmt.Errorf("failed to parse function ID from attributes: %w", err)
+			}
 		}
+	}
+
+	// NOTE: We can't use the external ID/slug because that is not included in the extended trace spans so
+	// instead we fetch the function anyways and then validate that the workspace IDs match.
+	fn, err := a.opts.FunctionReader.GetFunctionByInternalUUID(ctx, functionID)
+	if err != nil {
+		return fmt.Errorf("function not found: %w", err)
+	} else if fn.EnvID != uuid.Nil && fn.EnvID != auth.WorkspaceID() {
+		return fmt.Errorf("mismatched workspace ID")
+	} else if fn.IsArchived() {
+		return fmt.Errorf("function is archived: %s", functionID)
 	}
 
 	spanID := trace.SpanID(s.SpanId).String()
@@ -207,19 +228,13 @@ func (a router) commitSpan(ctx context.Context, auth apiv1auth.V1Auth, res *reso
 	resourceServiceName := resourceServiceName(res)
 	isUserland := true
 
-	run, err := a.opts.FunctionRunReader.GetFunctionRun(ctx, auth.AccountID(), auth.WorkspaceID(), runID)
-	if err != nil {
-		return fmt.Errorf("function run not found: %w", err)
-	}
-	functionID := run.FunctionID
-
-	fn, err := a.opts.FunctionReader.GetFunctionByInternalUUID(ctx, functionID)
-	if err != nil {
-		return fmt.Errorf("function not found: %w", err)
-	}
-	if fn.IsArchived() {
-		return fmt.Errorf("function is archived: %s", functionID)
-	}
+	tenantAttrs := meta.NewAttrSet(
+		meta.Attr(meta.Attrs.RunID, &runID),
+		meta.Attr(meta.Attrs.AppID, &fn.AppID),
+		meta.Attr(meta.Attrs.FunctionID, &functionID),
+		meta.Attr(meta.Attrs.AccountID, util.ToPtr(auth.AccountID())),
+		meta.Attr(meta.Attrs.EnvID, util.ToPtr(auth.WorkspaceID())),
+	)
 
 	ourAttrs := meta.NewAttrSet(
 		meta.Attr(meta.Attrs.IsUserland, &isUserland),
@@ -227,14 +242,11 @@ func (a router) commitSpan(ctx context.Context, auth apiv1auth.V1Auth, res *reso
 		meta.Attr(meta.Attrs.DynamicSpanID, &spanID),
 		meta.Attr(meta.Attrs.UserlandName, &s.Name),
 		meta.Attr(meta.Attrs.DynamicStatus, &status),
-		meta.Attr(meta.Attrs.RunID, &runID),
 		meta.Attr(meta.Attrs.UserlandKind, &spanKind),
 		meta.Attr(meta.Attrs.UserlandServiceName, &resourceServiceName),
 		meta.Attr(meta.Attrs.UserlandScopeName, &scope.Name),
 		meta.Attr(meta.Attrs.UserlandScopeVersion, &scope.Version),
-		meta.Attr(meta.Attrs.AppID, &fn.AppID),
-		meta.Attr(meta.Attrs.FunctionID, &functionID),
-	)
+	).Merge(tenantAttrs)
 
 	// Add some additional attributes on top
 	attrs = append(attrs, ourAttrs.Serialize()...)
@@ -252,15 +264,49 @@ func (a router) commitSpan(ctx context.Context, auth apiv1auth.V1Auth, res *reso
 		}
 	}
 
-	_, err = a.opts.TracerProvider.CreateSpan(context.Background(), meta.SpanNameUserland, &tracing.CreateSpanOptions{
+	span, err := a.opts.TracerProvider.CreateSpan(ctx, meta.SpanNameUserland, &tracing.CreateSpanOptions{
 		Debug:              &tracing.SpanDebugData{Location: "apiv1.traces.commitSpan"},
 		StartTime:          time.Unix(0, int64(s.StartTimeUnixNano)),
 		EndTime:            time.Unix(0, int64(s.EndTimeUnixNano)),
 		Parent:             parent,
 		RawOtelSpanOptions: []trace.SpanStartOption{trace.WithAttributes(attrs...)},
+		SpanID:             trace.SpanID(s.SpanId),
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create span: %w", err)
+	}
+
+	addTenantIDs := func(cfg *tracing.MetadataSpanConfig) {
+		cfg.Attrs = cfg.Attrs.Merge(tenantAttrs)
+	}
+
+	if a.opts.MetadataOpts.Flag.Enabled(ctx, auth.AccountID()) && a.opts.MetadataOpts.SpanExtractor != nil {
+		l := l.With("step_metadata", true)
+		md, err := a.opts.MetadataOpts.SpanExtractor.ExtractSpanMetadata(ctx, s)
+		if err != nil {
+			warnings := metadata.ExtractWarnings(err)
+			if len(warnings) > 0 {
+				md = append(md, warnings)
+			}
+		}
+
+		for _, m := range md {
+			_, err := tracing.CreateMetadataSpan(
+				ctx,
+				a.opts.TracerProvider,
+				span,
+				"router.commitSpanMetadata",
+				pkgName,
+				nil,
+				m,
+				enums.MetadataScopeExtendedTrace,
+				addTenantIDs,
+			)
+			if err != nil {
+				l.Error("failed to create metadata span", "err", err)
+				continue
+			}
+		}
 	}
 
 	return nil

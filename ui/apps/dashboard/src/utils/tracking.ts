@@ -1,4 +1,4 @@
-import { useOrganization, useUser } from '@clerk/nextjs';
+import { useOrganization, useUser } from '@clerk/tanstack-react-start';
 
 type TrackingUser = {
   external_id: string | null;

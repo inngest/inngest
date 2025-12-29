@@ -234,7 +234,9 @@ func TestFunctionResponseTooLargeFailure(t *testing.T) {
 	ctx := context.Background()
 
 	c := client.New(t)
-	inngestClient, server, registerFuncs := NewSDKHandler(t, "fail-large-response_output")
+	inngestClient, server, registerFuncs := NewSDKHandler(t,
+		randomSuffix("fail-large-response_output"),
+	)
 	defer server.Close()
 
 	var runID string
@@ -311,7 +313,9 @@ func TestFunctionResponseTooLargeFailureWithRetry(t *testing.T) {
 	ctx := context.Background()
 
 	c := client.New(t)
-	inngestClient, server, registerFuncs := NewSDKHandler(t, "fail-large-response_output")
+	inngestClient, server, registerFuncs := NewSDKHandler(t,
+		randomSuffix("fail-large-response_output"),
+	)
 	defer server.Close()
 
 	var runID string

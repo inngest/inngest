@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"errors"
 	"net/http"
-	"time"
 
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
@@ -16,6 +15,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/service"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/tracing"
 	"github.com/inngest/inngest/pkg/tracing/meta"
@@ -31,7 +31,7 @@ func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) er
 	l := logger.StdlibLogger(ctx)
 
 	err := e.tracerProvider.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
-		EndTime:    time.Now(),
+		EndTime:    e.now(),
 		Debug:      &tracing.SpanDebugData{Location: "executor.finalize"},
 		Metadata:   &opts.Metadata,
 		TargetSpan: tracing.RunSpanRefFromMetadata(&opts.Metadata),
@@ -78,6 +78,9 @@ func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) er
 	})
 
 	e.finalizeRemoveJobs(ctx, opts)
+
+	// finalizeEvents creates function finished events, and also attempts to fast-resume
+	// any parent function that invoked this run.
 	return e.finalizeEvents(ctx, opts)
 }
 
@@ -152,8 +155,10 @@ func (e *executor) finalizeEvents(ctx context.Context, opts execution.FinalizeOp
 	}
 
 	var (
-		fnSlug = opts.Optional.FnSlug
-		evts   = opts.Optional.InputEvents
+		// Track whether this run was an invoke.
+		isInvoke bool
+		fnSlug   = opts.Optional.FnSlug
+		evts     = opts.Optional.InputEvents
 	)
 
 	// Find the function slug.
@@ -176,7 +181,7 @@ func (e *executor) finalizeEvents(ctx context.Context, opts execution.FinalizeOp
 	}
 
 	// Prepare events that we must send
-	now := time.Now()
+	now := e.now()
 	base := &functionFinishedData{
 		FunctionID: fnSlug,
 		RunID:      opts.Metadata.ID.RunID,
@@ -199,6 +204,8 @@ func (e *executor) finalizeEvents(ctx context.Context, opts execution.FinalizeOp
 			// all events with a correlation ID.
 			continue
 		}
+
+		isInvoke = true
 
 		// Copy the base data to set the event.
 		copied := *base
@@ -234,6 +241,29 @@ func (e *executor) finalizeEvents(ctx context.Context, opts execution.FinalizeOp
 				Name:      event.FnFailedName,
 				Timestamp: now.UnixMilli(),
 				Data:      data,
+			})
+		}
+	}
+
+	// For each event, if this has a correlation ID attempt to resume
+	// the invoke parent within a goroutine.
+	//
+	// Note that sending the event will trigger the event handler pub/sub
+	// listener which _also_ attempts to do this;  however, this introduces
+	// some small delay due to message stream latency.
+	if isInvoke {
+		for _, evt := range freshEvents {
+			tracked := event.BaseTrackedEvent{
+				ID:          ulid.MustParse(evt.ID),
+				Event:       evt,
+				AccountID:   opts.Metadata.ID.Tenant.AccountID,
+				WorkspaceID: opts.Metadata.ID.Tenant.EnvID,
+			}
+			service.Go(func() {
+				err := e.HandleInvokeFinish(context.WithoutCancel(ctx), tracked)
+				if err != nil && !errors.Is(err, ErrNoCorrelationID) {
+					logger.From(ctx).Error("error fast resuming invoke", "error", err)
+				}
 			})
 		}
 	}

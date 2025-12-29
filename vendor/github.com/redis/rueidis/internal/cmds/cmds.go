@@ -6,11 +6,12 @@ const (
 	optInTag = uint16(1 << 15)
 	blockTag = uint16(1 << 14)
 	readonly = uint16(1 << 13)
-	noRetTag = uint16(1<<12) | readonly // make noRetTag can also be retried
-	mtGetTag = uint16(1<<11) | readonly // make mtGetTag can also be retried
-	scrRoTag = uint16(1<<10) | readonly // make scrRoTag can also be retried
+	noRetTag = uint16(1<<12) | readonly | pipeTag // make noRetTag can also be retried and auto pipelining
+	mtGetTag = uint16(1<<11) | readonly           // make mtGetTag can also be retried
+	scrRoTag = uint16(1<<10) | readonly           // make scrRoTag can also be retried
+	unsubTag = uint16(1<<9) | noRetTag
+	pipeTag  = uint16(1 << 8) // make blocking mode request can use auto pipelining
 	// InitSlot indicates that the command be sent to any redis node in cluster
-	// When SendToReplicas is set, InitSlot command will be sent to primary node
 	InitSlot = uint16(1 << 14)
 	// NoSlot indicates that the command has no key slot specified
 	NoSlot = uint16(1 << 15)
@@ -20,6 +21,11 @@ var (
 	// OptInCmd is predefined CLIENT CACHING YES
 	OptInCmd = Completed{
 		cs: newCommandSlice([]string{"CLIENT", "CACHING", "YES"}),
+		cf: optInTag,
+	}
+	// OptInNopCmd is a predefined alternative for CLIENT CACHING YES in BCAST/OPTOUT mode.
+	OptInNopCmd = Completed{
+		cs: newCommandSlice([]string{"ECHO", ""}),
 		cf: optInTag,
 	}
 	// MultiCmd is predefined MULTI
@@ -33,22 +39,23 @@ var (
 	// RoleCmd is predefined ROLE
 	RoleCmd = Completed{
 		cs: newCommandSlice([]string{"ROLE"}),
+		cf: pipeTag,
 	}
 
 	// UnsubscribeCmd is predefined UNSUBSCRIBE
 	UnsubscribeCmd = Completed{
 		cs: newCommandSlice([]string{"UNSUBSCRIBE"}),
-		cf: noRetTag,
+		cf: unsubTag,
 	}
 	// PUnsubscribeCmd is predefined PUNSUBSCRIBE
 	PUnsubscribeCmd = Completed{
 		cs: newCommandSlice([]string{"PUNSUBSCRIBE"}),
-		cf: noRetTag,
+		cf: unsubTag,
 	}
 	// SUnsubscribeCmd is predefined SUNSUBSCRIBE
 	SUnsubscribeCmd = Completed{
 		cs: newCommandSlice([]string{"SUNSUBSCRIBE"}),
-		cf: noRetTag,
+		cf: unsubTag,
 	}
 	// PingCmd is predefined PING
 	PingCmd = Completed{
@@ -57,10 +64,12 @@ var (
 	// SlotCmd is predefined CLUSTER SLOTS
 	SlotCmd = Completed{
 		cs: newCommandSlice([]string{"CLUSTER", "SLOTS"}),
+		cf: pipeTag,
 	}
 	// ShardsCmd is predefined CLUSTER SHARDS
 	ShardsCmd = Completed{
 		cs: newCommandSlice([]string{"CLUSTER", "SHARDS"}),
+		cf: pipeTag,
 	}
 	// AskingCmd is predefined CLUSTER ASKING
 	AskingCmd = Completed{
@@ -74,7 +83,7 @@ var (
 	// SentinelUnSubscribe is predefined UNSUBSCRIBE ASKING
 	SentinelUnSubscribe = Completed{
 		cs: newCommandSlice([]string{"UNSUBSCRIBE", "+sentinel", "+slave", "-sdown", "+sdown", "+switch-master", "+reboot"}),
-		cf: noRetTag,
+		cf: unsubTag,
 	}
 
 	// DiscardCmd is predefined DISCARD
@@ -88,7 +97,7 @@ func ToBlock(c *Completed) {
 	c.cf |= blockTag
 }
 
-// Incomplete represents an incomplete Redis command. It should then be completed by calling the Build().
+// Incomplete represents an incomplete Redis command. It should then be completed by calling Build().
 type Incomplete struct {
 	cs *CommandSlice
 	cf int16 // use int16 instead of uint16 to make a difference with Completed
@@ -105,6 +114,12 @@ type Completed struct {
 // Pin prevents a Completed to be recycled
 func (c Completed) Pin() Completed {
 	c.cs.r = 1
+	return c
+}
+
+// ToPipe returns a new command with pipeTag
+func (c Completed) ToPipe() Completed {
+	c.cf |= pipeTag
 	return c
 }
 
@@ -128,6 +143,11 @@ func (c *Completed) NoReply() bool {
 	return c.cf&noRetTag == noRetTag
 }
 
+// IsUnsub checks if it is one of the UNSUBSCRIBE, PUNSUBSCRIBE, or SUNSUBSCRIBE commands.
+func (c *Completed) IsUnsub() bool {
+	return c.cf&unsubTag == unsubTag
+}
+
 // IsReadOnly checks if it is readonly command and can be retried when network error.
 func (c *Completed) IsReadOnly() bool {
 	return c.cf&readonly == readonly
@@ -136,6 +156,11 @@ func (c *Completed) IsReadOnly() bool {
 // IsWrite checks if it is not readonly command.
 func (c *Completed) IsWrite() bool {
 	return !c.IsReadOnly()
+}
+
+// IsPipe checks if it is set pipeTag which prefers auto pipelining
+func (c *Completed) IsPipe() bool {
+	return c.cf&pipeTag == pipeTag
 }
 
 // Commands returns the commands as []string.
@@ -159,6 +184,8 @@ func (c Completed) SetSlot(key string) Completed {
 	}
 	return c
 }
+
+var Slot = slot
 
 // Cacheable represents a completed Redis command which supports server-assisted client side caching,
 // and it should be created by the Cache() of command builder.

@@ -3,6 +3,10 @@ package redis_state
 import (
 	"context"
 	"encoding/json"
+	"log/slog"
+	"testing"
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
@@ -11,9 +15,6 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/jonboulle/clockwork"
 	"github.com/stretchr/testify/require"
-	"log/slog"
-	"testing"
-	"time"
 )
 
 func TestShadowPartitionActiveCheck(t *testing.T) {
@@ -33,11 +34,8 @@ func TestShadowPartitionActiveCheck(t *testing.T) {
 	q := NewQueue(
 		defaultShard,
 		WithClock(clock),
-		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 			return enqueueToBacklog
-		}),
-		WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-			return true
 		}),
 		WithReadOnlySpotChecks(func(ctx context.Context, acctID uuid.UUID) bool {
 			return false

@@ -13,6 +13,7 @@ import (
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/expressions"
 	"github.com/inngest/inngest/pkg/util"
+	"github.com/xhit/go-str2duration/v2"
 
 	"github.com/cespare/xxhash/v2"
 	"github.com/google/uuid"
@@ -110,9 +111,13 @@ type QueueItem struct {
 	// the partition). This is not the same as AtMS for items scheduled in the future or past.
 	EnqueuedAt int64 `json:"eat"`
 
-	// CapacityLeaseID is the optional capacity lease for this queue item.
+	// CapacityLease is the optional capacity lease for this queue item.
 	// This is set when the Constraint API feature flag is enabled and the item was refilled.
-	CapacityLeaseID *ulid.ULID `json:"clid,omitempty"`
+	CapacityLease *CapacityLease `json:"cl,omitempty"`
+}
+
+type CapacityLease struct {
+	LeaseID ulid.ULID `json:"l,omitempty"`
 }
 
 func (q *QueueItem) SetID(ctx context.Context, str string) {
@@ -672,7 +677,7 @@ func GetCustomConcurrencyKeys(ctx context.Context, id sv2.ID, customConcurrency 
 	return keys
 }
 
-func ConvertToConstraintConfiguration(accountConcurrency int, fn inngest.Function) constraintapi.ConstraintConfig {
+func ConvertToConstraintConfiguration(accountConcurrency int, fn inngest.Function) (constraintapi.ConstraintConfig, error) {
 	var rateLimit []constraintapi.RateLimitConfig
 	if fn.RateLimit != nil {
 		var rateLimitKey string
@@ -680,9 +685,15 @@ func ConvertToConstraintConfiguration(accountConcurrency int, fn inngest.Functio
 			rateLimitKey = *fn.RateLimit.Key
 		}
 
+		dur, err := str2duration.ParseDuration(fn.RateLimit.Period)
+		if err != nil {
+			return constraintapi.ConstraintConfig{}, fmt.Errorf("invalid rate limit period: %w", err)
+		}
+
 		rateLimit = append(rateLimit, constraintapi.RateLimitConfig{
 			Scope:             enums.RateLimitScopeFn,
 			Limit:             int(fn.RateLimit.Limit),
+			Period:            int(dur.Seconds()),
 			KeyExpressionHash: util.XXHash(rateLimitKey),
 		})
 	}
@@ -711,11 +722,11 @@ func ConvertToConstraintConfiguration(accountConcurrency int, fn inngest.Functio
 		}
 
 		throttles = append(throttles, constraintapi.ThrottleConfig{
-			Limit:                     int(fn.Throttle.Limit),
-			Burst:                     int(fn.Throttle.Burst),
-			Period:                    int(fn.Throttle.Period.Seconds()),
-			Scope:                     enums.ThrottleScopeFn,
-			ThrottleKeyExpressionHash: util.XXHash(throttleKey),
+			Limit:             int(fn.Throttle.Limit),
+			Burst:             int(fn.Throttle.Burst),
+			Period:            int(fn.Throttle.Period.Seconds()),
+			Scope:             enums.ThrottleScopeFn,
+			KeyExpressionHash: util.XXHash(throttleKey),
 		})
 	}
 
@@ -733,5 +744,5 @@ func ConvertToConstraintConfiguration(accountConcurrency int, fn inngest.Functio
 			CustomConcurrencyKeys: customConcurrency,
 		},
 		Throttle: throttles,
-	}
+	}, nil
 }

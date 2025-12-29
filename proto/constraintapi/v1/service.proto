@@ -44,15 +44,15 @@ enum ConstraintApiConstraintKind {
 enum ConstraintApiRunProcessingMode {
   CONSTRAINT_API_RUN_PROCESSING_MODE_UNSPECIFIED = 0;
   CONSTRAINT_API_RUN_PROCESSING_MODE_BACKGROUND = 1;
-  CONSTRAINT_API_RUN_PROCESSING_MODE_SYNC = 2;
+  CONSTRAINT_API_RUN_PROCESSING_MODE_DURABLE_ENDPOINT = 2;
 }
 
-enum ConstraintApiLeaseLocation {
-  CONSTRAINT_API_LEASE_LOCATION_UNSPECIFIED = 0;
-  CONSTRAINT_API_LEASE_LOCATION_SCHEDULE_RUN = 1;
-  CONSTRAINT_API_LEASE_LOCATION_PARTITION_LEASE = 2;
-  CONSTRAINT_API_LEASE_LOCATION_ITEM_LEASE = 3;
-  CONSTRAINT_API_LEASE_LOCATION_CHECKPOINT = 4;
+enum ConstraintApiCallerLocation {
+  CONSTRAINT_API_CALLER_LOCATION_UNSPECIFIED = 0;
+  CONSTRAINT_API_CALLER_LOCATION_SCHEDULE = 1;
+  CONSTRAINT_API_CALLER_LOCATION_BACKLOG_REFILL = 2;
+  CONSTRAINT_API_CALLER_LOCATION_ITEM_LEASE = 3;
+  CONSTRAINT_API_CALLER_LOCATION_CHECKPOINT = 4;
 }
 
 enum ConstraintApiLeaseService {
@@ -62,17 +62,11 @@ enum ConstraintApiLeaseService {
   CONSTRAINT_API_LEASE_SERVICE_API = 3;
 }
 
-enum ConstraintApiLeaseResourceKind {
-  CONSTRAINT_API_LEASE_RESOURCE_KIND_UNSPECIFIED = 0;
-  CONSTRAINT_API_LEASE_RESOURCE_KIND_EVENT = 1;
-  CONSTRAINT_API_LEASE_RESOURCE_KIND_QUEUE_ITEM = 2;
-}
-
 // Message definitions
 message RateLimitConfig {
   ConstraintApiRateLimitScope scope = 1;
   int32 limit = 2;
-  string period = 3;
+  int32 period = 3;
   string key_expression_hash = 4;
 }
 
@@ -93,7 +87,7 @@ message ConcurrencyConfig {
 
 message ThrottleConfig {
   ConstraintApiThrottleScope scope = 1;
-  string throttle_key_expression_hash = 2;
+  string key_expression_hash = 2;
   int32 limit = 3;
   int32 burst = 4;
   int32 period = 5;
@@ -118,6 +112,7 @@ message ConcurrencyConstraint {
   ConstraintApiConcurrencyScope scope = 2;
   string key_expression_hash = 3;
   string evaluated_key_hash = 4;
+  string in_progress_item_key = 5; 
 }
 
 message ThrottleConstraint {
@@ -147,10 +142,15 @@ message CapacityLease {
   string idempotency_key = 2;
 }
 
+// Migration identifier for constraint API migration hints
+message MigrationIdentifier {
+  bool is_rate_limit = 1;
+  string queue_shard = 2;
+}
 
 message LeaseSource {
   ConstraintApiLeaseService service = 1;
-  ConstraintApiLeaseLocation location = 2;
+  ConstraintApiCallerLocation location = 2;
   ConstraintApiRunProcessingMode run_processing_mode = 3;
 }
 
@@ -161,12 +161,15 @@ message CapacityCheckRequest {
   string function_id = 3;
   ConstraintConfig configuration = 4;
   repeated ConstraintItem constraints = 5;
+  MigrationIdentifier migration = 6;
 }
 
 message CapacityCheckResponse {
   int32 available_capacity = 1;
   repeated ConstraintItem limiting_constraints = 2;
   repeated ConstraintUsage usage = 3;
+  int32 fairness_reduction = 4;
+  google.protobuf.Timestamp retry_after = 5;
 }
 
 message CapacityAcquireRequest {
@@ -178,18 +181,20 @@ message CapacityAcquireRequest {
   repeated ConstraintItem constraints = 6;
   int32 amount = 7;
   repeated string lease_idempotency_keys = 8;
-  ConstraintApiLeaseResourceKind resource_kind = 9;
+  map<string, string> lease_run_ids = 9;
   google.protobuf.Timestamp current_time = 10;
   google.protobuf.Duration duration = 11;
   google.protobuf.Duration maximum_lifetime = 12;
   google.protobuf.Duration blocking_threshold = 13;
   LeaseSource source = 14;
+  MigrationIdentifier migration = 15;
 }
 
 message CapacityAcquireResponse {
   repeated CapacityLease leases = 1;
   repeated ConstraintItem limiting_constraints = 2;
-  google.protobuf.Timestamp retry_after = 3;
+  int32 fairness_reduction = 3;
+  google.protobuf.Timestamp retry_after = 4;
 }
 
 message CapacityExtendLeaseRequest {
@@ -197,6 +202,7 @@ message CapacityExtendLeaseRequest {
   string account_id = 2;
   string lease_id = 3;
   google.protobuf.Duration duration = 4;
+  MigrationIdentifier migration = 5;
 }
 
 message CapacityExtendLeaseResponse {
@@ -207,6 +213,7 @@ message CapacityReleaseRequest {
   string idempotency_key = 1;
   string account_id = 2;
   string lease_id = 3;
+  MigrationIdentifier migration = 4;
 }
 
 message CapacityReleaseResponse {

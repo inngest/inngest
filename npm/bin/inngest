@@ -1,0 +1,34 @@
+#!/usr/bin/env node
+
+const { existsSync } = require('fs');
+const { join } = require('path');
+const { execFileSync } = require('child_process');
+
+// On Windows, the downloaded release does not overwrite this file
+// so check if inngest.exe exists and run it
+if (process.platform === 'win32') {
+  const exePath = join(__dirname, 'inngest.exe');
+  if (existsSync(exePath)) {
+    try {
+      execFileSync(exePath, process.argv.slice(2), { stdio: 'inherit' });
+      process.exit(0);
+    } catch (err) {
+      process.exit(err.status || 1);
+    }
+  }
+}
+
+console.error('Error: Inngest CLI binary not found.');
+console.error('');
+console.error('This happened because install scripts were skipped.');
+console.error('To fix this, use the method most appropriate for your setup');
+console.error('');
+console.error('one-off npx run:');
+console.error('  NPM_CONFIG_CACHE=$(mktemp -d) npx --ignore-scripts=false inngest-cli@latest');
+console.error('');
+console.error('or delete your npx cache at ~/.npm/_npx and run:');
+console.error('  npx --ignore-scripts=false inngest-cli@latest');
+console.error('');
+console.error('if you are using npm install:');
+console.error('  npm rebuild --ignore-scripts=false inngest-cli');
+process.exit(1);

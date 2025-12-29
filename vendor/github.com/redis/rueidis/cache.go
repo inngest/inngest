@@ -20,7 +20,7 @@ type CacheStoreOption struct {
 // More detailed interface requirement can be found in cache_test.go
 type CacheStore interface {
 	// Flight is called when DoCache and DoMultiCache, with the requested client side ttl and the current time.
-	// It should look up the store in single-flight manner and return one of the following three combinations:
+	// It should look up the store in a single-flight manner and return one of the following three combinations:
 	// Case 1: (empty RedisMessage, nil CacheEntry)     <- when cache missed, and rueidis will send the request to redis.
 	// Case 2: (empty RedisMessage, non-nil CacheEntry) <- when cache missed, and rueidis will use CacheEntry.Wait to wait for response.
 	// Case 3: (non-empty RedisMessage, nil CacheEntry) <- when cache hit
@@ -33,15 +33,15 @@ type CacheStore interface {
 	// It should not only deliver the error to all CacheEntry.Wait but also remove the CacheEntry from the store.
 	Cancel(key, cmd string, err error)
 	// Delete is called when receiving invalidation notifications from redis.
-	// If the keys is nil then it should delete all non-pending cached entries under all keys.
-	// If the keys is not nil then it should delete all non-pending cached entries under those keys.
+	// If the keys are nil, then it should delete all non-pending cached entries under all keys.
+	// If the keys are not nil, then it should delete all non-pending cached entries under those keys.
 	Delete(keys []RedisMessage)
-	// Close is called when connection between redis is broken.
+	// Close is called when the connection between redis is broken.
 	// It should flush all cached entries and deliver the error to all pending CacheEntry.Wait.
 	Close(err error)
 }
 
-// CacheEntry should be used to wait for single-flight response when cache missed.
+// CacheEntry should be used to wait for a single-flight response when cache missed.
 type CacheEntry interface {
 	Wait(ctx context.Context) (RedisMessage, error)
 }
@@ -137,7 +137,7 @@ func (a *adapter) Delete(keys []RedisMessage) {
 		}
 	} else {
 		for _, k := range keys {
-			a.del(k.string)
+			a.del(k.string())
 		}
 	}
 	a.mu.Unlock()

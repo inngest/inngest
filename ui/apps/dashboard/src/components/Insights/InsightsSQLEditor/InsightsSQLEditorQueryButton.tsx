@@ -1,28 +1,26 @@
-'use client';
-
-import { useEffect } from 'react';
-import { Button } from '@inngest/components/Button/Button';
-import { cn } from '@inngest/components/utils/classNames';
-import { RiCommandLine, RiCornerDownLeftFill } from '@remixicon/react';
+import { Button } from '@inngest/components/Button/NewButton';
 
 import { useInsightsStateMachineContext } from '../InsightsStateMachineContext/InsightsStateMachineContext';
+import { KeyboardShortcut } from '../KeyboardShortcut';
+import { useDocumentShortcuts } from './actions/handleShortcuts';
 import { getCanRunQuery } from './utils';
 
-function QueryButtonLabel({ disabled, isRunning }: { disabled: boolean; isRunning: boolean }) {
+function QueryButtonLabel({
+  disabled,
+  isRunning,
+}: {
+  disabled: boolean;
+  isRunning: boolean;
+}) {
   if (isRunning) return null;
 
   return (
     <div className="flex items-center gap-2">
       <span>Run query</span>
-      <div
-        className={cn(
-          'flex shrink-0 gap-0.5 rounded-[4px] px-1 py-0.5',
-          disabled ? 'bg-muted' : 'bg-primary-moderate'
-        )}
-      >
-        <RiCommandLine className="h-4 w-4" />
-        <RiCornerDownLeftFill className="h-4 w-4" />
-      </div>
+      <KeyboardShortcut
+        backgroundColor={disabled ? 'bg-muted' : 'bg-primary-moderate'}
+        keys={['cmd', 'ctrl', 'enter']}
+      />
     </div>
   );
 }
@@ -32,21 +30,14 @@ export function InsightsSQLEditorQueryButton() {
   const isRunning = status === 'loading';
   const canRunQuery = getCanRunQuery(query, isRunning);
 
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Enter' && (event.metaKey || event.ctrlKey) && canRunQuery) {
-        event.preventDefault();
-        event.stopPropagation();
-        runQuery();
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [canRunQuery, runQuery]);
+  useDocumentShortcuts([
+    {
+      combo: { code: 'Enter', metaOrCtrl: true },
+      handler: () => {
+        if (canRunQuery) runQuery();
+      },
+    },
+  ]);
 
   return (
     <Button

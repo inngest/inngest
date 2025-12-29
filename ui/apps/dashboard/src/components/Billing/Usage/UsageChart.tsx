@@ -1,6 +1,4 @@
-'use client';
-
-import { Alert } from '@inngest/components/Alert';
+import { Alert } from '@inngest/components/Alert/NewAlert';
 import { Chart } from '@inngest/components/Chart/Chart';
 
 import { createChartOptions } from './transformData';
@@ -13,7 +11,11 @@ type Props = {
   type: UsageDimension;
 };
 
-export default function BillableUsageChart({ includedCountLimit, selectedPeriod, type }: Props) {
+export default function BillableUsageChart({
+  includedCountLimit,
+  selectedPeriod,
+  type,
+}: Props) {
   const { data, fetching } = useGetUsageChartData({
     selectedPeriod: selectedPeriod,
     type: type,

@@ -66,6 +66,12 @@ func CreateFunction[T any](
 		return nil, err
 	}
 
+	if fc.Checkpoint == nil {
+		if v, ok := c.(*apiClient); ok {
+			fc.Checkpoint = v.Checkpoint
+		}
+	}
+
 	sf := servableFunc{
 		appID:   c.AppID(),
 		fc:      fc,

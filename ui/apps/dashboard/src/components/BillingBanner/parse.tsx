@@ -1,18 +1,19 @@
 import type { Severity } from '@inngest/components/Banner';
 
-import type { EntitlementUsageQuery } from '@/gql/graphql';
-import { BillingBannerTooltip } from './BillingBannerTooltip';
+// import type { EntitlementUsageQuery } from '@/gql/graphql';
+// import { BillingBannerTooltip } from './BillingBannerTooltip';
 
-export function parseEntitlementUsage(data: EntitlementUsageQuery['account']['entitlements']): {
+export function parseEntitlementUsage(/*data: EntitlementUsageQuery['account']['entitlements']*/): {
   bannerMessage: React.ReactNode;
   bannerSeverity: Severity;
   items: [string, React.ReactNode][];
 } {
-  const { runCount, stepCount } = data;
+  // const { runCount, stepCount } = data;
   const issues = new Issues();
 
   // Users who can buy additional runs should not warnings about nearing the run
   // limit.
+  /* SEE EXE-1011
   if (runCount.limit && !runCount.overageAllowed) {
     if (runCount.usage >= runCount.limit) {
       issues.add(
@@ -69,7 +70,7 @@ export function parseEntitlementUsage(data: EntitlementUsageQuery['account']['en
         IssueSeverity.hardLimitNear
       );
     }
-  }
+  }*/
 
   // Concurrency warnings temporarily disabled
   // if (concurrency.usage >= 12) {
@@ -116,21 +117,24 @@ class Issues {
     if (this.maxIssueSeverity === IssueSeverity.hardLimitNear) {
       return (
         <>
-          <span className="font-semibold">High usage.</span> You are nearing the usage included in
-          your plan. Please upgrade to avoid service disruption.
+          <span className="font-semibold">High usage.</span> You are nearing the
+          usage included in your plan. Please upgrade to avoid service
+          disruption.
         </>
       );
     } else if (this.maxIssueSeverity === IssueSeverity.hardLimitReached) {
       return (
         <>
-          <span className="font-semibold">Limit exceeded.</span> You have exceeded the usage
-          included in your plan. Please upgrade to avoid service disruption.
+          <span className="font-semibold">Limit exceeded.</span> You have
+          exceeded the usage included in your plan. Please upgrade to avoid
+          service disruption.
         </>
       );
     } else {
       return (
         <>
-          <span className="font-semibold">Limit reached.</span> Performance may be impacted.
+          <span className="font-semibold">Limit reached.</span> Performance may
+          be impacted.
         </>
       );
     }

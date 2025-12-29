@@ -1,7 +1,5 @@
-'use client';
-
 import { useCallback, useEffect, useState } from 'react';
-import { Alert } from '@inngest/components/Alert';
+import { Alert } from '@inngest/components/Alert/NewAlert';
 import { AlertModal } from '@inngest/components/Modal/AlertModal';
 import { toast } from 'sonner';
 import { useMutation } from 'urql';
@@ -95,20 +93,22 @@ export function EnvironmentArchiveModal(props: Props) {
       <div className="p-6 pb-0">
         {isArchived && (
           <p className="pb-4 text-sm">
-            Any active functions within this environment will become triggerable.
+            Any active functions within this environment will become
+            triggerable.
           </p>
         )}
 
         {!isArchived && (
           <p className="pb-4 text-sm">
-            Functions within this environment will no longer be triggerable. Nothing will be deleted
-            and you can unarchive at any time.
+            Functions within this environment will no longer be triggerable.
+            Nothing will be deleted and you can unarchive at any time.
           </p>
         )}
 
         {!isArchived && isBranchEnv && (
           <p className="pb-4 text-sm">
-            Since this is a branch environment, any future app syncs will unarchive the environment.
+            Since this is a branch environment, any future app syncs will
+            unarchive the environment.
           </p>
         )}
         {error && <Alert severity="error">{error}</Alert>}

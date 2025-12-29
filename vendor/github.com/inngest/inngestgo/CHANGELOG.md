@@ -1,5 +1,29 @@
 # inngestgo
 
+## 0.15.0
+
+### Minor Changes
+
+- a8c3db8: Add checkpointing
+
+## 0.14.4
+
+### Patch Changes
+
+- 2bc16f0: Protect connectHandler.state behind RWMutex
+
+## 0.14.3
+
+### Patch Changes
+
+- a2747b8: - [SYS-370] Adding Worker Concurrency - Go SDK
+
+## 0.14.2
+
+### Patch Changes
+
+- e9c5f74: Fix serve URL overrides
+
 ## 0.14.1
 
 ### Patch Changes

@@ -10,7 +10,9 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/cqrs"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/history_reader"
+	"github.com/inngest/inngest/pkg/tracing/metadata"
 	ulid "github.com/oklog/ulid/v2"
 )
 
@@ -50,29 +52,30 @@ type ConcurrencyLimitConfiguration struct {
 }
 
 type ConnectV1WorkerConnection struct {
-	ID               ulid.ULID                 `json:"id"`
-	GatewayID        ulid.ULID                 `json:"gatewayId"`
-	InstanceID       string                    `json:"instanceId"`
-	WorkerIP         string                    `json:"workerIp"`
-	AppName          *string                   `json:"appName,omitempty"`
-	AppID            *uuid.UUID                `json:"appID,omitempty"`
-	App              *cqrs.App                 `json:"app,omitempty"`
-	ConnectedAt      time.Time                 `json:"connectedAt"`
-	LastHeartbeatAt  *time.Time                `json:"lastHeartbeatAt,omitempty"`
-	DisconnectedAt   *time.Time                `json:"disconnectedAt,omitempty"`
-	DisconnectReason *string                   `json:"disconnectReason,omitempty"`
-	Status           ConnectV1ConnectionStatus `json:"status"`
-	GroupHash        string                    `json:"groupHash"`
-	SdkLang          string                    `json:"sdkLang"`
-	SdkVersion       string                    `json:"sdkVersion"`
-	SdkPlatform      string                    `json:"sdkPlatform"`
-	SyncID           *uuid.UUID                `json:"syncId,omitempty"`
-	BuildID          *string                   `json:"buildId,omitempty"`
-	AppVersion       *string                   `json:"appVersion,omitempty"`
-	FunctionCount    int                       `json:"functionCount"`
-	CPUCores         int                       `json:"cpuCores"`
-	MemBytes         int                       `json:"memBytes"`
-	Os               string                    `json:"os"`
+	ID                   ulid.ULID                 `json:"id"`
+	GatewayID            ulid.ULID                 `json:"gatewayId"`
+	InstanceID           string                    `json:"instanceId"`
+	WorkerIP             string                    `json:"workerIp"`
+	MaxWorkerConcurrency int64                     `json:"maxWorkerConcurrency"`
+	AppName              *string                   `json:"appName,omitempty"`
+	AppID                *uuid.UUID                `json:"appID,omitempty"`
+	App                  *cqrs.App                 `json:"app,omitempty"`
+	ConnectedAt          time.Time                 `json:"connectedAt"`
+	LastHeartbeatAt      *time.Time                `json:"lastHeartbeatAt,omitempty"`
+	DisconnectedAt       *time.Time                `json:"disconnectedAt,omitempty"`
+	DisconnectReason     *string                   `json:"disconnectReason,omitempty"`
+	Status               ConnectV1ConnectionStatus `json:"status"`
+	GroupHash            string                    `json:"groupHash"`
+	SdkLang              string                    `json:"sdkLang"`
+	SdkVersion           string                    `json:"sdkVersion"`
+	SdkPlatform          string                    `json:"sdkPlatform"`
+	SyncID               *uuid.UUID                `json:"syncId,omitempty"`
+	BuildID              *string                   `json:"buildId,omitempty"`
+	AppVersion           *string                   `json:"appVersion,omitempty"`
+	FunctionCount        int                       `json:"functionCount"`
+	CPUCores             int                       `json:"cpuCores"`
+	MemBytes             int                       `json:"memBytes"`
+	Os                   string                    `json:"os"`
 }
 
 type ConnectV1WorkerConnectionEdge struct {
@@ -412,6 +415,12 @@ type SleepStepInfo struct {
 }
 
 func (SleepStepInfo) IsStepInfo() {}
+
+type SpanMetadata struct {
+	Scope  enums.MetadataScope `json:"scope"`
+	Kind   metadata.Kind       `json:"kind"`
+	Values metadata.Values     `json:"values"`
+}
 
 type StepError struct {
 	Message string      `json:"message"`

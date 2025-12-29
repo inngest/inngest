@@ -1,4 +1,4 @@
-import { MenuItem } from '@inngest/components/Menu/MenuItem';
+import { MenuItem } from '@inngest/components/Menu/NewMenuItem';
 import { EventLogsIcon } from '@inngest/components/icons/sections/EventLogs';
 import { InsightsIcon } from '@inngest/components/icons/sections/Insights';
 import { MetricsIcon } from '@inngest/components/icons/sections/Metrics';
@@ -19,28 +19,30 @@ export default function Monitor({
       {collapsed ? (
         <hr className="border-subtle mx-auto mb-1 w-6" />
       ) : (
-        <div className="text-muted leading-4.5 mb-1 text-xs font-medium">Monitor</div>
+        <div className="text-muted leading-4.5 mb-1 text-xs font-medium">
+          Monitor
+        </div>
       )}
       <MenuItem
-        href={getNavRoute(activeEnv, 'metrics')}
+        to={getNavRoute(activeEnv, 'metrics')}
         collapsed={collapsed}
         text="Metrics"
         icon={<MetricsIcon className="h-[18px] w-[18px]" />}
       />
       <MenuItem
-        href={getNavRoute(activeEnv, 'runs')}
+        to={getNavRoute(activeEnv, 'runs')}
         collapsed={collapsed}
         text="Runs"
         icon={<RunsIcon className="h-[18px] w-[18px]" />}
       />
       <MenuItem
-        href={getNavRoute(activeEnv, 'events')}
+        to={getNavRoute(activeEnv, 'events')}
         collapsed={collapsed}
         text="Events"
         icon={<EventLogsIcon className="h-[18px] w-[18px]" />}
       />
       <MenuItem
-        href={getNavRoute(activeEnv, 'insights')}
+        to={getNavRoute(activeEnv, 'insights')}
         beta
         collapsed={collapsed}
         text="Insights"

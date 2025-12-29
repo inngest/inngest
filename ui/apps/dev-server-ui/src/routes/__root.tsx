@@ -2,6 +2,7 @@
 import * as React from 'react';
 import { TanStackRouterDevtools } from '@tanstack/react-router-devtools';
 import { ThemeProvider } from 'next-themes';
+import { Toaster } from 'sonner';
 
 import {
   HeadContent,
@@ -25,7 +26,7 @@ export const Route = createRootRoute({
         content: 'width=device-width, initial-scale=1',
       },
       {
-        title: 'Inngest Development Server',
+        title: 'Inngest Server',
       },
     ],
     icons: {
@@ -60,6 +61,17 @@ function RootComponent() {
       <StoreProvider>
         <ThemeProvider attribute="class" defaultTheme="system">
           <Outlet />
+          <Toaster
+            toastOptions={{
+              className: 'drop-shadow-lg',
+              style: {
+                background: `rgb(var(--color-background-canvas-base))`,
+                borderRadius: 0,
+                borderWidth: '0px 0px 2px',
+                color: `rgb(var(--color-foreground-base))`,
+              },
+            }}
+          />
         </ThemeProvider>
       </StoreProvider>
     </RootDocument>

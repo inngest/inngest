@@ -57,7 +57,13 @@ type CreateSpanOptions struct {
 	StartTime          time.Time
 	EndTime            time.Time
 
-	Seed []byte
+	Seed   []byte
+	SpanID trace.SpanID
+
+	// DynamicSeed is optional and used for CreateOrUpdate operations
+	// This differs from Seed in that seed creates a deterministic trace and span ID while
+	// dynamic seed only creates a deterministic dynamic span ID while leaving the concrete span ID random.
+	DynamicSeed []byte
 }
 
 type UpdateSpanOptions struct {
@@ -118,7 +124,7 @@ func (tp *otelTracerProvider) CreateSpan(
 ) (*meta.SpanReference, error) {
 	ds, err := tp.CreateDroppableSpan(ctx, name, opts)
 	if err != nil {
-		return nil, fmt.Errorf("failed to C{reateSpan: %w", err)
+		return nil, fmt.Errorf("failed to CreateSpan: %w", err)
 	}
 
 	err = ds.Send()
@@ -204,6 +210,11 @@ func (tp *otelTracerProvider) CreateDroppableSpan(
 	// YAY.  We love determinism.  This is important for eg. root spans.
 	if len(opts.Seed) > 0 {
 		ctx = setDeteterministicIDs(ctx, DeterministicSpanConfig(opts.Seed))
+	} else if opts.SpanID.IsValid() && opts.Parent != nil {
+		ctx = setDeteterministicIDs(ctx, DeterministicIDs{
+			TraceID: trace.SpanContextFromContext(ctx).TraceID(),
+			SpanID:  opts.SpanID,
+		})
 	}
 
 	tracer := tp.getTracer(opts.Metadata)
@@ -220,6 +231,9 @@ func (tp *otelTracerProvider) CreateDroppableSpan(
 	}
 
 	spanRef.DynamicSpanID = span.SpanContext().SpanID().String()
+	if opts.DynamicSeed != nil {
+		spanRef.DynamicSpanID = DeterministicSpanID(opts.DynamicSeed).String()
+	}
 
 	if opts.Parent != nil {
 		// If the span has a parent, set some attributes so we can extend it later
@@ -340,6 +354,13 @@ func (tp *otelTracerProvider) UpdateSpan(
 	return nil
 }
 
+func DeterministicSpanID(seed []byte) trace.SpanID {
+	sum := sha256.Sum256(seed)
+	r := frand.NewCustom(sum[:], 8, 10)
+	return trace.SpanID(r.Bytes(8))
+}
+
+// DeterministicSpanConfig creates a new span config based off of a deterministic seed.
 func DeterministicSpanConfig(seed []byte) DeterministicIDs {
 	sum := sha256.Sum256(seed)
 	// XXX: can we not allocate here?

@@ -214,6 +214,7 @@ func TestConvertToConstraintConfiguration(t *testing.T) {
 						Scope:             enums.RateLimitScopeFn,
 						Limit:             10,
 						KeyExpressionHash: util.XXHash(""),
+						Period:            60,
 					},
 				},
 				Concurrency: constraintapi.ConcurrencyConfig{
@@ -241,6 +242,7 @@ func TestConvertToConstraintConfiguration(t *testing.T) {
 					{
 						Scope:             enums.RateLimitScopeFn,
 						Limit:             10,
+						Period:            60,
 						KeyExpressionHash: util.XXHash("event.user.id"),
 					},
 				},
@@ -348,11 +350,11 @@ func TestConvertToConstraintConfiguration(t *testing.T) {
 				},
 				Throttle: []constraintapi.ThrottleConfig{
 					{
-						Limit:                     20,
-						Burst:                     5,
-						Period:                    60,
-						Scope:                     enums.ThrottleScopeFn,
-						ThrottleKeyExpressionHash: util.XXHash(""),
+						Limit:             20,
+						Burst:             5,
+						Period:            60,
+						Scope:             enums.ThrottleScopeFn,
+						KeyExpressionHash: util.XXHash(""),
 					},
 				},
 			},
@@ -379,11 +381,11 @@ func TestConvertToConstraintConfiguration(t *testing.T) {
 				},
 				Throttle: []constraintapi.ThrottleConfig{
 					{
-						Limit:                     15,
-						Burst:                     3,
-						Period:                    30,
-						Scope:                     enums.ThrottleScopeFn,
-						ThrottleKeyExpressionHash: util.XXHash("event.tenant.id"),
+						Limit:             15,
+						Burst:             3,
+						Period:            30,
+						Scope:             enums.ThrottleScopeFn,
+						KeyExpressionHash: util.XXHash("event.tenant.id"),
 					},
 				},
 			},
@@ -426,6 +428,7 @@ func TestConvertToConstraintConfiguration(t *testing.T) {
 						Scope:             enums.RateLimitScopeFn,
 						Limit:             25,
 						KeyExpressionHash: util.XXHash("event.api_key"),
+						Period:            120,
 					},
 				},
 				Concurrency: constraintapi.ConcurrencyConfig{
@@ -442,11 +445,11 @@ func TestConvertToConstraintConfiguration(t *testing.T) {
 				},
 				Throttle: []constraintapi.ThrottleConfig{
 					{
-						Limit:                     50,
-						Burst:                     10,
-						Period:                    90,
-						Scope:                     enums.ThrottleScopeFn,
-						ThrottleKeyExpressionHash: util.XXHash("event.organization.slug"),
+						Limit:             50,
+						Burst:             10,
+						Period:            90,
+						Scope:             enums.ThrottleScopeFn,
+						KeyExpressionHash: util.XXHash("event.organization.slug"),
 					},
 				},
 			},
@@ -480,7 +483,8 @@ func TestConvertToConstraintConfiguration(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := ConvertToConstraintConfiguration(tt.accountConcurrency, tt.fn)
+			result, err := ConvertToConstraintConfiguration(tt.accountConcurrency, tt.fn)
+			require.NoError(t, err)
 			assert.Equal(t, tt.expected, result)
 		})
 	}

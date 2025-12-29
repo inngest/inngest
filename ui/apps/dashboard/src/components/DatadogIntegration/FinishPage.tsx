@@ -1,7 +1,4 @@
-'use client';
-
 import { useEffect } from 'react';
-import { useSearchParams } from 'next/navigation';
 import { useMutation } from 'urql';
 
 import ConnectingView from '@/components/DatadogIntegration/ConnectingView';
@@ -27,14 +24,29 @@ const FinishDatadogIntegrationDocument = graphql(`
   }
 `);
 
-export default function FinishPage({}) {
-  const [{ data, error }, finishDdInt] = useMutation(FinishDatadogIntegrationDocument);
-  const searchParams = useSearchParams();
-  const ddSite = searchParams.get('site');
-  const ddDomain = searchParams.get('domain');
-  const authCode = searchParams.get('code');
-  const orgID = searchParams.get('dd_oid');
-  const orgName = searchParams.get('dd_org_name');
+type FinishPageProps = {
+  site: string | undefined;
+  domain: string | undefined;
+  code: string | undefined;
+  dd_oid: string | undefined;
+  dd_org_name: string | undefined;
+};
+
+export default function FinishPage({
+  site,
+  domain,
+  code,
+  dd_oid,
+  dd_org_name,
+}: FinishPageProps) {
+  const [{ data, error }, finishDdInt] = useMutation(
+    FinishDatadogIntegrationDocument,
+  );
+  const ddSite = site;
+  const ddDomain = domain;
+  const authCode = code;
+  const orgID = dd_oid;
+  const orgName = dd_org_name;
   const oauthStateReady = ddSite && ddDomain && authCode && orgID && orgName;
 
   useEffect(() => {
@@ -49,7 +61,15 @@ export default function FinishPage({}) {
       ddSite: ddSite,
       ddDomain: ddDomain,
     });
-  }, [finishDdInt, orgID, orgName, authCode, ddSite, ddDomain, oauthStateReady]);
+  }, [
+    finishDdInt,
+    orgID,
+    orgName,
+    authCode,
+    ddSite,
+    ddDomain,
+    oauthStateReady,
+  ]);
 
   useEffect(() => {
     if (data) {

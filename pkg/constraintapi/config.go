@@ -23,8 +23,8 @@ type RateLimitConfig struct {
 	// Limit is how often the function can be called within the specified period
 	Limit int
 
-	// Period represents the time period for throttling the function
-	Period string
+	// Period represents the time period for throttling the function in seconds
+	Period int
 
 	KeyExpressionHash string
 }
@@ -44,8 +44,8 @@ type CustomConcurrencyLimit struct {
 type ThrottleConfig struct {
 	Scope enums.ThrottleScope
 
-	// ThrottleKeyExpressionHash is the hashed throttle key expression, if set.
-	ThrottleKeyExpressionHash string `json:"tkh,omitempty"`
+	// KeyExpressionHash is the hashed throttle key expression, if set.
+	KeyExpressionHash string `json:"tkh,omitempty"`
 
 	// Limit is the actual rate limit
 	Limit int `json:"l"`

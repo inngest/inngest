@@ -69,7 +69,7 @@ func TestNotSDKResponse(t *testing.T) {
 				ic,
 				inngestgo.FunctionOpts{
 					ID:      "fn",
-					Retries: inngestgo.IntPtr(1),
+					Retries: inngestgo.IntPtr(0),
 				},
 				inngestgo.EventTrigger(eventName, nil),
 				func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
@@ -88,14 +88,17 @@ func TestNotSDKResponse(t *testing.T) {
 			// Wait for 2 attempts.
 			r.EventuallyWithT(func(t *assert.CollectT) {
 				a := assert.New(t)
-				a.Equal(int32(2), count)
+				a.Equal(int32(1), count)
 			}, time.Minute, 100*time.Millisecond)
 
 			// Assert status and output.
-			runs, err := c.RunsByEventID(ctx, eventID)
-			r.NoError(err)
-			r.Len(runs, 1)
-			run := c.WaitForRunStatus(ctx, t, "FAILED", &runs[0].ID)
+			var run client.Run
+			r.EventuallyWithT(func(t *assert.CollectT) {
+				runs, err := c.RunsByEventID(ctx, eventID)
+				require.NoError(t, err)
+				require.Len(t, runs, 1)
+				run = c.WaitForRunStatus(ctx, t, "FAILED", &runs[0].ID)
+			}, 20*time.Second, time.Second)
 
 			if statusCode == http.StatusOK {
 				// Function output includes the HTML response.

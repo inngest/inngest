@@ -19,6 +19,7 @@ import (
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/service"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 	"github.com/oklog/ulid/v2"
@@ -312,7 +313,7 @@ LOOP:
 				// have capacity to run at least MinWorkersFree concurrent
 				// QueueItems.  This reduces latency of enqueued items when
 				// there are lots of enqueued and available jobs.
-				l.Warn("all workers busy, early exiting scan", "worker_capacity", q.capacity())
+				l.Trace("all workers busy, early exiting scan", "worker_capacity", q.capacity())
 				continue
 			}
 
@@ -853,7 +854,11 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, continu
 	// When Constraint API is enabled, disable capacity checks on PartitionLease.
 	// This is necessary as capacity was already granted to individual items, and
 	// constraints like concurrency were consumed.
-	disableLeaseChecks := p.AccountID != uuid.Nil && q.capacityManager != nil && q.useConstraintAPI != nil
+	var disableLeaseChecks bool
+	if p.AccountID != uuid.Nil && p.EnvID != nil && p.FunctionID != nil && q.capacityManager != nil && q.useConstraintAPI != nil {
+		enableConstraintAPI, _ := q.useConstraintAPI(ctx, p.AccountID, *p.EnvID, *p.FunctionID)
+		disableLeaseChecks = enableConstraintAPI
+	}
 
 	// Attempt to lease items.  This checks partition-level concurrency limits
 	//
@@ -1100,7 +1105,10 @@ func (q *queue) process(
 	qi := i.I
 	p := i.P
 	continuationCtr := i.PCtr
-	capacityLeaseID := i.capacityLeaseID
+
+	capacityLeaseID := newCapacityLease(i.capacityLease)
+
+	disableConstraintUpdates := i.disableConstraintUpdates
 
 	var err error
 	leaseID := qi.LeaseID
@@ -1113,7 +1121,7 @@ func (q *queue) process(
 	extendLeaseTick := q.clock.NewTicker(QueueLeaseDuration / 2)
 	defer extendLeaseTick.Stop()
 
-	extendCapacityLeaseTick := q.clock.NewTicker(QueueLeaseDuration / 2)
+	extendCapacityLeaseTick := q.clock.NewTicker(q.capacityLeaseExtendInterval)
 	defer extendCapacityLeaseTick.Stop()
 
 	errCh := make(chan error)
@@ -1139,7 +1147,14 @@ func (q *queue) process(
 				}
 
 				// Once a job has started, use a BG context to always renew.
-				leaseID, err = q.ExtendLease(context.Background(), qi, *leaseID, QueueLeaseDuration)
+				leaseID, err = q.ExtendLease(
+					context.Background(),
+					qi,
+					*leaseID,
+					QueueLeaseDuration,
+					// When holding a capacity lease, do not update constraint state
+					ExtendLeaseOptionDisableConstraintUpdates(disableConstraintUpdates),
+				)
 				if err != nil {
 					// log error if unexpected; the queue item may be removed by a Dequeue() operation
 					// invoked by finalize() (Cancellations, Parallelism)
@@ -1157,12 +1172,18 @@ func (q *queue) process(
 					return
 				}
 
-				// If no capacity lease is used, no-op
-				if i.capacityLeaseID == nil {
+				// If no initial capacity lease was provided for this queue item, no-op
+				// This specifically happens when
+				// - the item is enqueued to a system queue
+				// - the Constraint API is disabled or the current account is not enrolled
+				// - the Constraint API provided a lease which expired at the time of leasing the queue item
+				if i.capacityLease == nil {
+					q.log.Trace("item has no capacity lease, skipping lease extension")
 					continue
 				}
 
-				if capacityLeaseID == nil {
+				currentCapacityLease := capacityLeaseID.get()
+				if currentCapacityLease == nil {
 					q.log.Error("cannot extend capacity lease since capacity lease ID is nil", "qi", qi, "partition", p)
 					// Don't extend lease since one doesn't exist
 					errCh <- fmt.Errorf("cannot extend lease since lease ID is nil")
@@ -1170,12 +1191,18 @@ func (q *queue) process(
 				}
 
 				// This idempotency key will change with every refreshed lease, which makes sense.
-				idempotencyKey := capacityLeaseID.String()
+				operationIdempotencyKey := currentCapacityLease.String()
 
 				res, err := q.capacityManager.ExtendLease(context.Background(), &constraintapi.CapacityExtendLeaseRequest{
 					AccountID:      p.AccountID,
-					IdempotencyKey: idempotencyKey,
-					LeaseID:        *capacityLeaseID,
+					IdempotencyKey: operationIdempotencyKey,
+					LeaseID:        *currentCapacityLease,
+					Migration: constraintapi.MigrationIdentifier{
+						IsRateLimit: false,
+						QueueShard:  q.primaryQueueShard.Name,
+					},
+					Duration: QueueLeaseDuration,
+					Source:   constraintapi.LeaseSource{Location: constraintapi.CallerLocationItemLease},
 				})
 				if err != nil {
 					// log error if unexpected; the queue item may be removed by a Dequeue() operation
@@ -1189,7 +1216,7 @@ func (q *queue) process(
 								"partitionID": p.ID,
 								"accountID":   p.AccountID.String(),
 								"item":        qi.ID,
-								"leaseID":     capacityLeaseID.String(),
+								"leaseID":     currentCapacityLease.String(),
 							}),
 						)
 					}
@@ -1205,7 +1232,7 @@ func (q *queue) process(
 					return
 				}
 
-				capacityLeaseID = res.LeaseID
+				capacityLeaseID.set(res.LeaseID)
 			}
 		}
 	}()
@@ -1310,6 +1337,7 @@ func (q *queue) process(
 			QueueShardName:      q.primaryQueueShard.Name,
 			ContinueCount:       continuationCtr,
 			RefilledFromBacklog: qi.RefilledFrom,
+			CapacityLease:       i.capacityLease,
 		}
 
 		// Call the run func.
@@ -1340,21 +1368,35 @@ func (q *queue) process(
 	}()
 
 	// When capacity is leased, release it after requeueing/dequeueing the item.
-	// This MUST happen to free up concurrency capacity in a timely manner for
-	// the next worker to lease a queue item.
-	if capacityLeaseID != nil {
-		defer func() {
-			res, err := q.capacityManager.Release(ctx, &constraintapi.CapacityReleaseRequest{
+	// This is optional and best-effort to free up concurrency capacity as quickly as possible
+	// for the next worker to lease a queue item.
+	if capacityLeaseID.has() {
+		defer service.Go(func() {
+			currentLeaseID := capacityLeaseID.get()
+			if capacityLeaseID == nil {
+				return
+			}
+
+			res, err := q.capacityManager.Release(context.Background(), &constraintapi.CapacityReleaseRequest{
 				AccountID:      p.AccountID,
 				IdempotencyKey: qi.ID,
-				LeaseID:        *capacityLeaseID,
+				LeaseID:        *currentLeaseID,
+				Migration: constraintapi.MigrationIdentifier{
+					IsRateLimit: false,
+					QueueShard:  q.primaryQueueShard.Name,
+				},
+				Source: constraintapi.LeaseSource{Location: constraintapi.CallerLocationItemLease},
 			})
 			if err != nil {
-				q.log.ReportError(err, "failed to release capacity")
+				q.log.ReportError(err, "failed to release capacity", logger.WithErrorReportTags(map[string]string{
+					"account_id":  p.AccountID.String(),
+					"lease_id":    currentLeaseID.String(),
+					"function_id": p.FunctionID.String(),
+				}))
 			}
 
 			q.log.Trace("released capacity", "res", res)
-		}()
+		})
 	}
 
 	select {
@@ -1376,7 +1418,7 @@ func (q *queue) process(
 			}
 
 			qi.AtMS = at.UnixMilli()
-			if err := q.Requeue(context.WithoutCancel(ctx), q.primaryQueueShard, qi, at); err != nil {
+			if err := q.Requeue(context.WithoutCancel(ctx), q.primaryQueueShard, qi, at, RequeueOptionDisableConstraintUpdates(disableConstraintUpdates)); err != nil {
 				if err == ErrQueueItemNotFound {
 					// Safe. The executor may have dequeued.
 					return nil
@@ -1394,7 +1436,7 @@ func (q *queue) process(
 
 		// Dequeue this entirely, as this permanently failed.
 		// XXX: Increase permanently failed counter here.
-		if err := q.Dequeue(context.WithoutCancel(ctx), q.primaryQueueShard, qi); err != nil {
+		if err := q.Dequeue(context.WithoutCancel(ctx), q.primaryQueueShard, qi, DequeueOptionDisableConstraintUpdates(disableConstraintUpdates)); err != nil {
 			if err == ErrQueueItemNotFound {
 				// Safe. The executor may have dequeued.
 				return nil
@@ -1409,7 +1451,7 @@ func (q *queue) process(
 		}
 
 	case <-doneCh:
-		if err := q.Dequeue(context.WithoutCancel(ctx), q.primaryQueueShard, qi); err != nil {
+		if err := q.Dequeue(context.WithoutCancel(ctx), q.primaryQueueShard, qi, DequeueOptionDisableConstraintUpdates(disableConstraintUpdates)); err != nil {
 			if err == ErrQueueItemNotFound {
 				// Safe. The executor may have dequeued.
 				return nil
@@ -1774,7 +1816,7 @@ func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error 
 	if item.IsLeased(p.queue.clock.Now()) {
 		metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{
 			PkgName: pkgName,
-			Tags:    map[string]any{"status": "lease_contention", "queue_shard": p.queue.primaryQueueShard.Name},
+			Tags:    map[string]any{"status": "lease_contention", "queue_shard": p.queue.primaryQueueShard.Name, "constraint_source": "lease"},
 		})
 		return nil
 	}
@@ -1798,7 +1840,15 @@ func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error 
 		LeaseConstraints(constraints),
 	}
 
-	constraintRes, err := p.queue.itemLeaseConstraintCheck(ctx, *p.partition, &backlog, constraints, item, p.staticTime)
+	constraintRes, err := p.queue.itemLeaseConstraintCheck(
+		ctx,
+		&partition,
+		&backlog,
+		constraints,
+		item,
+		p.staticTime,
+		p.queue.primaryQueueShard.RedisClient.KeyGenerator(),
+	)
 	if err != nil {
 		p.queue.sem.Release(1)
 		metrics.WorkerQueueCapacityCounter(ctx, -1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": p.queue.primaryQueueShard.Name}})
@@ -1806,11 +1856,9 @@ func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error 
 		return fmt.Errorf("could not check constraints to lease item: %w", err)
 	}
 
-	if constraintRes.fallbackIdempotencyKey != "" {
-		leaseOptions = append(leaseOptions, LeaseOptionFallbackIdempotencyKey(constraintRes.fallbackIdempotencyKey))
-	}
-
+	constraint_check_source := "lease"
 	if constraintRes.skipConstraintChecks {
+		constraint_check_source = "constraint-api"
 		leaseOptions = append(leaseOptions, LeaseOptionDisableConstraintChecks(true))
 	}
 
@@ -1857,6 +1905,7 @@ func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error 
 	case enums.QueueConstraintCustomConcurrencyKey2:
 		err = newKeyError(ErrConcurrencyLimitCustomKey, backlog.customConcurrencyKeyID(2))
 	default:
+		l.ReportError(errors.New("unhandled queue constraint type"), fmt.Sprintf("constraint type: %s", constraintRes.limitingConstraint))
 		// Limited but the constraint is unknown?
 	}
 
@@ -1926,7 +1975,7 @@ func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error 
 		p.ctrRateLimit++
 		metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{
 			PkgName: pkgName,
-			Tags:    map[string]any{"status": "throttled", "queue_shard": p.queue.primaryQueueShard.Name},
+			Tags:    map[string]any{"status": "throttled", "queue_shard": p.queue.primaryQueueShard.Name, "constraint_source": constraint_check_source},
 		})
 
 		if p.queue.itemEnableKeyQueues(ctx, *item) {
@@ -1985,7 +2034,7 @@ func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error 
 
 		metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{
 			PkgName: pkgName,
-			Tags:    map[string]any{"status": status, "queue_shard": p.queue.primaryQueueShard.Name},
+			Tags:    map[string]any{"status": status, "queue_shard": p.queue.primaryQueueShard.Name, "constraint_source": constraint_check_source},
 		})
 
 		if p.queue.itemEnableKeyQueues(ctx, *item) {
@@ -2028,7 +2077,7 @@ func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error 
 
 		metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{
 			PkgName: pkgName,
-			Tags:    map[string]any{"status": "custom_key_concurrency_limit", "queue_shard": p.queue.primaryQueueShard.Name},
+			Tags:    map[string]any{"status": "custom_key_concurrency_limit", "queue_shard": p.queue.primaryQueueShard.Name, "constraint_source": constraint_check_source},
 		})
 
 		if p.queue.itemEnableKeyQueues(ctx, *item) {
@@ -2055,7 +2104,7 @@ func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error 
 		p.ctrSuccess++ // count as a success for stats purposes.
 		metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{
 			PkgName: pkgName,
-			Tags:    map[string]any{"status": "success", "queue_shard": p.queue.primaryQueueShard.Name},
+			Tags:    map[string]any{"status": "success", "queue_shard": p.queue.primaryQueueShard.Name, "constraint_source": constraint_check_source},
 		})
 		return nil
 	case ErrQueueItemAlreadyLeased:
@@ -2063,7 +2112,7 @@ func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error 
 		p.ctrSuccess++ // count as a success for stats purposes.
 		metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{
 			PkgName: pkgName,
-			Tags:    map[string]any{"status": "success", "queue_shard": p.queue.primaryQueueShard.Name},
+			Tags:    map[string]any{"status": "success", "queue_shard": p.queue.primaryQueueShard.Name, "constraint_source": constraint_check_source},
 		})
 		return nil
 	}
@@ -2073,7 +2122,7 @@ func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error 
 		p.err = fmt.Errorf("error leasing in process: %w", err)
 		metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{
 			PkgName: pkgName,
-			Tags:    map[string]any{"status": "error", "queue_shard": p.queue.primaryQueueShard.Name},
+			Tags:    map[string]any{"status": "error", "queue_shard": p.queue.primaryQueueShard.Name, "constraint_source": constraint_check_source},
 		})
 		return p.err
 	}
@@ -2087,14 +2136,18 @@ func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error 
 	p.ctrSuccess++
 	metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{
 		PkgName: pkgName,
-		Tags:    map[string]any{"status": "success", "queue_shard": p.queue.primaryQueueShard.Name},
+		Tags:    map[string]any{"status": "success", "queue_shard": p.queue.primaryQueueShard.Name, "constraint_source": constraint_check_source},
 	})
 	p.queue.workers <- processItem{
 		P:    *p.partition,
 		I:    *item,
 		PCtr: p.partitionContinueCtr,
 
-		capacityLeaseID: constraintRes.leaseID,
+		capacityLease: constraintRes.capacityLease,
+		// Disable constraint updates in case we skipped constraint checks.
+		// This should always be linked, as we want consistent behavior while
+		// processing a queue item.
+		disableConstraintUpdates: constraintRes.skipConstraintChecks,
 	}
 
 	return nil

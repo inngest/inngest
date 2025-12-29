@@ -1,4 +1,4 @@
-import { MenuItem } from '@inngest/components/Menu/MenuItem';
+import { MenuItem } from '@inngest/components/Menu/NewMenuItem';
 import { AppsIcon } from '@inngest/components/icons/sections/Apps';
 import { EventsIcon } from '@inngest/components/icons/sections/Events';
 import { FunctionsIcon } from '@inngest/components/icons/sections/Functions';
@@ -19,28 +19,30 @@ export default function Manage({
       {collapsed ? (
         <hr className="border-subtle mx-auto mb-1 w-6" />
       ) : (
-        <div className="text-muted leading-4.5 mb-1 text-xs font-medium">Manage</div>
+        <div className="text-muted leading-4.5 mb-1 text-xs font-medium">
+          Manage
+        </div>
       )}
       <MenuItem
-        href={getNavRoute(activeEnv, 'apps')}
+        to={getNavRoute(activeEnv, 'apps')}
         collapsed={collapsed}
         text="Apps"
         icon={<AppsIcon className="h-[18px] w-[18px]" />}
       />
       <MenuItem
-        href={getNavRoute(activeEnv, 'functions')}
+        to={getNavRoute(activeEnv, 'functions')}
         collapsed={collapsed}
         text="Functions"
         icon={<FunctionsIcon className="h-[18px] w-[18px]" />}
       />
       <MenuItem
-        href={getNavRoute(activeEnv, 'event-types')}
+        to={getNavRoute(activeEnv, 'event-types')}
         collapsed={collapsed}
         text="Event Types"
         icon={<EventsIcon className="h-[18px] w-[18px]" />}
       />
       <MenuItem
-        href={getNavRoute(activeEnv, 'manage/webhooks')}
+        to={getNavRoute(activeEnv, 'manage/webhooks')}
         collapsed={collapsed}
         text="Webhooks"
         icon={<WebhooksIcon className="h-[18px] w-[18px]" />}

@@ -151,6 +151,7 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 				}),
 				meta.SpanNameStep,
 				&tracing.CreateSpanOptions{
+					Debug:      &tracing.SpanDebugData{Location: "checkpoint.SyncStep"},
 					Parent:     tracing.RunSpanRefFromMetadata(input.Metadata),
 					StartTime:  op.Timing.Start(),
 					EndTime:    op.Timing.End(),
@@ -185,6 +186,7 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 				}),
 				meta.SpanNameStep,
 				&tracing.CreateSpanOptions{
+					Debug:      &tracing.SpanDebugData{Location: "checkpoint.SyncErr"},
 					Parent:     tracing.RunSpanRefFromMetadata(input.Metadata),
 					StartTime:  op.Timing.Start(),
 					EndTime:    op.Timing.End(),
@@ -272,6 +274,15 @@ func (c checkpointer) CheckpointAsyncSteps(ctx context.Context, input AsyncCheck
 		"env_id", input.EnvID,
 	)
 
+	t := time.Now()
+	err := c.checkpointAsyncSteps(ctx, input, l)
+	if d := time.Since(t); d > time.Second {
+		l.Warn("slow async checkpoint", "duration_ms", d.Milliseconds())
+	}
+	return err
+}
+
+func (c checkpointer) checkpointAsyncSteps(ctx context.Context, input AsyncCheckpoint, l logger.Logger) error {
 	md, err := c.State.LoadMetadata(ctx, input.ID())
 	if errors.Is(err, state.ErrRunNotFound) || errors.Is(err, state.ErrMetadataNotFound) {
 		// Handle run not found with 404
@@ -325,6 +336,8 @@ func (c checkpointer) CheckpointAsyncSteps(ctx context.Context, input AsyncCheck
 				}),
 				meta.SpanNameStep,
 				&tracing.CreateSpanOptions{
+					Debug:      &tracing.SpanDebugData{Location: "checkpoint.AsyncStep"},
+					Seed:       []byte(op.ID + op.Timing.String()),
 					Parent:     tracing.RunSpanRefFromMetadata(&md),
 					StartTime:  op.Timing.Start(),
 					EndTime:    op.Timing.End(),

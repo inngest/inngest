@@ -1,8 +1,6 @@
-'use client';
-
 import { Fragment, type ReactElement } from 'react';
-import { Alert } from '@inngest/components/Alert/Alert';
-import { Button } from '@inngest/components/Button/Button';
+import { Alert } from '@inngest/components/Alert/NewAlert';
+import { Button } from '@inngest/components/Button/NewButton';
 import { Skeleton } from '@inngest/components/Skeleton';
 
 import type { SchemaEntry } from './SchemasContext/types';
@@ -33,7 +31,9 @@ export function SchemaExplorerSwitcher({
 
   return (
     <Fragment>
-      <div className="flex flex-col gap-1">{entries.map((entry) => renderEntry(entry))}</div>
+      <div className="flex flex-col gap-1">
+        {entries.map((entry) => renderEntry(entry))}
+      </div>
       {showShimmers && <LoadingShimmers />}
       {showError && (
         <Alert className="mt-2 text-xs" severity="error">

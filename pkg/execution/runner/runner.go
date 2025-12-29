@@ -302,7 +302,7 @@ func (s *svc) handleMessage(ctx context.Context, m pubsub.Message) error {
 		}
 	}
 
-	tracked, err := event.NewOSSTrackedEventFromString(m.Data)
+	tracked, err := event.NewBaseTrackedEventFromString(m.Data)
 	if err != nil {
 		return fmt.Errorf("error creating event: %w", err)
 	}

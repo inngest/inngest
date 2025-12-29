@@ -323,6 +323,7 @@ func (b *bookkeeper) update(ctx context.Context, l EvaluableLoader) error {
 		"workspace_id", b.wsID,
 		"event", b.event,
 		"delta_ms", at.Sub(b.updatedAt).Milliseconds(),
+		"duration_ms", time.Since(at).Milliseconds(),
 		"count", count,
 		"error", err,
 	)

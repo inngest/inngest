@@ -44,10 +44,10 @@ type PauseMutater interface {
 	ConsumePause(ctx context.Context, p Pause, opts ConsumePauseOpts) (ConsumePauseResult, func() error, error)
 
 	// DeletePause permanently deletes a pause.
-	DeletePause(ctx context.Context, p Pause) error
+	DeletePause(ctx context.Context, p Pause, opts ...DeletePauseOpt) error
 
-	// DeletePauseByID removes a puse by its ID.
-	DeletePauseByID(ctx context.Context, pauseID uuid.UUID) error
+	// DeletePauseByID removes a pause by its ID.
+	DeletePauseByID(ctx context.Context, pauseID uuid.UUID, workspaceID uuid.UUID) error
 }
 
 // PauseGetter allows a runner to return all existing pauses by event or by outgoing ID.  This
@@ -75,12 +75,6 @@ type PauseGetter interface {
 	// This should not return consumed pauses.
 	PauseByID(ctx context.Context, pauseID uuid.UUID) (*Pause, error)
 
-	// PauseByID returns a given pause by pause ID.  This must return expired pauses
-	// that have not yet been consumed in order to properly handle timeouts.
-	//
-	// This should not return consumed pauses.
-	PausesByID(ctx context.Context, pauseID ...uuid.UUID) ([]*Pause, error)
-
 	// PauseByInvokeCorrelationID returns a given pause by the correlation ID.
 	// This must return expired invoke pauses that have not yet been consumed in order to properly handle timeouts.
 	//
@@ -107,6 +101,30 @@ type ConsumePauseResult struct {
 
 	// HasPendingSteps indicates whether the run still has pending steps.
 	HasPendingSteps bool
+}
+
+// BlockIndex contains the block ID and event name for pause block indexing
+type BlockIndex struct {
+	BlockID   string `json:"b"`
+	EventName string `json:"e"`
+}
+
+// DeletePauseOpts are the options to be passed in for deleting a pause
+type DeletePauseOpts struct {
+	// WriteBlockIndex is the block information to create a block index so the pause can still be
+	// retrieved by its ID after deletion. Empty struct means no block index.
+	WriteBlockIndex BlockIndex
+}
+
+type DeletePauseOpt func(*DeletePauseOpts)
+
+func WithWriteBlockIndex(blockID string, eventName string) DeletePauseOpt {
+	return func(opts *DeletePauseOpts) {
+		opts.WriteBlockIndex = BlockIndex{
+			BlockID:   blockID,
+			EventName: eventName,
+		}
+	}
 }
 
 // PauseIterator allows the runner to iterate over all pauses returned by a PauseGetter.  This

@@ -18,31 +18,31 @@ var BlockFlushQueueName = "block-flush"
 
 var defaultFlushDelay = 10 * time.Second
 
-type ManagerOpt func(m Manager)
+type ManagerOpt func(m *manager)
 
 type FeatureCallback func(ctx context.Context, workspaceID uuid.UUID) bool
 
 func WithFlushDelay(delay time.Duration) ManagerOpt {
-	return func(m Manager) {
-		if mgr, ok := m.(*manager); ok {
-			mgr.flushDelay = delay
-		}
+	return func(mgr *manager) {
+		mgr.flushDelay = delay
 	}
 }
 
 func WithBlockFlushEnabled(cb FeatureCallback) ManagerOpt {
-	return func(m Manager) {
-		if mgr, ok := m.(*manager); ok {
-			mgr.blockFlushEnabled = cb
-		}
+	return func(mgr *manager) {
+		mgr.blockFlushEnabled = cb
 	}
 }
 
 func WithBlockStoreEnabled(cb FeatureCallback) ManagerOpt {
-	return func(m Manager) {
-		if mgr, ok := m.(*manager); ok {
-			mgr.blockStoreEnabled = cb
-		}
+	return func(mgr *manager) {
+		mgr.blockStoreEnabled = cb
+	}
+}
+
+func WithFlusher(flusher BlockFlushEnqueuer) ManagerOpt {
+	return func(mgr *manager) {
+		mgr.flusher = flusher
 	}
 }
 
@@ -51,11 +51,11 @@ func WithBlockStoreEnabled(cb FeatureCallback) ManagerOpt {
 //
 // Blocks are flushed from the buffer in background jobs enqueued to the given queue.
 // This prevents eg. executors and new-runs from retaining blocks in-memory.
-func NewManager(buf Bufferer, bs BlockStore, flusher BlockFlushEnqueuer, opts ...ManagerOpt) Manager {
+func NewManager(buf Bufferer, bs BlockStore, opts ...ManagerOpt) Manager {
 	mgr := &manager{
 		buf:               buf,
 		bs:                bs,
-		flusher:           flusher,
+		flusher:           nil,
 		flushDelay:        defaultFlushDelay,
 		blockFlushEnabled: func(ctx context.Context, acctID uuid.UUID) bool { return false },
 		blockStoreEnabled: func(ctx context.Context, acctID uuid.UUID) bool { return false },
@@ -72,7 +72,6 @@ func NewManager(buf Bufferer, bs BlockStore, flusher BlockFlushEnqueuer, opts ..
 func NewRedisOnlyManager(rsm state.PauseManager) Manager {
 	return NewManager(
 		StateBufferer(rsm),
-		nil,
 		nil,
 	)
 }
@@ -214,7 +213,7 @@ func (m manager) Write(ctx context.Context, index Index, pauses ...*state.Pause)
 
 	// If this is larger than the max buffer len, schedule a new block write.  We only
 	// enqueue this job once per index ID, using queue singletons to handle these.
-	if n >= m.bs.BlockSize() {
+	if n >= m.bs.BlockSize() && m.flusher != nil {
 		if err := m.flusher.Enqueue(ctx, index); err != nil && !errors.Is(err, redis_state.ErrQueueItemExists) {
 			logger.StdlibLogger(ctx).Error("error attempting to flush block", "error", err)
 		}
@@ -318,7 +317,7 @@ func (m manager) LoadEvaluablesSince(ctx context.Context, workspaceID uuid.UUID,
 }
 
 // Delete deletes a pause from from block storage or the buffer.
-func (m manager) Delete(ctx context.Context, index Index, pause state.Pause) error {
+func (m manager) Delete(ctx context.Context, index Index, pause state.Pause, opts ...state.DeletePauseOpt) error {
 	// Potential future optimization:  cache the last written block for an index
 	// in-memory so we can fast lookup here:
 	//
@@ -342,7 +341,7 @@ func (m manager) Delete(ctx context.Context, index Index, pause state.Pause) err
 		}
 	}
 
-	err := m.buf.Delete(ctx, index, pause)
+	err := m.buf.Delete(ctx, index, pause, opts...)
 	if err != nil && !errors.Is(err, ErrNotInBuffer) {
 		return err
 	}
@@ -356,7 +355,21 @@ func (m manager) Delete(ctx context.Context, index Index, pause state.Pause) err
 
 	// Always also delegate to the flusher, just in case a block was written whilst
 	// we issued the delete request.
-	return m.bs.Delete(ctx, index, pause)
+	return m.bs.Delete(ctx, index, pause, opts...)
+}
+
+// DeletePauseByID deletes a pause by ID from block storage and the buffer.
+func (m manager) DeletePauseByID(ctx context.Context, pauseID uuid.UUID, workspaceID uuid.UUID) error {
+	// We check the block flushing feature flag because block store delete will only
+	// just mark pauses as deleted in Redis. It's done before the buffer delete because
+	// we need the pause block index to be there to mark the block deletion
+	if m.bs != nil && m.blockFlushEnabled(ctx, workspaceID) {
+		if err := m.bs.DeleteByID(ctx, pauseID, workspaceID); err != nil {
+			return err
+		}
+	}
+
+	return m.buf.DeletePauseByID(ctx, pauseID, workspaceID)
 }
 
 func (m manager) FlushIndexBlock(ctx context.Context, index Index) error {
@@ -447,4 +460,11 @@ func (m manager) GetBlockDeletedIDs(ctx context.Context, index Index, blockID ul
 		return nil, 0, fmt.Errorf("block store not available")
 	}
 	return m.bs.GetBlockDeletedIDs(ctx, index, blockID)
+}
+
+func (m manager) CleanBlock(ctx context.Context, index Index, blockID ulid.ULID) error {
+	if m.bs == nil {
+		return fmt.Errorf("block store not available")
+	}
+	return m.bs.CleanBlock(ctx, index, blockID)
 }

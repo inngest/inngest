@@ -1,6 +1,6 @@
-'use client';
-
-import React, {
+import type { AgentStatus, ToolOutputOf } from '@inngest/use-agent';
+import { useQuery } from '@tanstack/react-query';
+import {
   createContext,
   useCallback,
   useContext,
@@ -9,10 +9,8 @@ import React, {
   useState,
   type ReactNode,
 } from 'react';
-import type { AgentStatus, ToolOutputOf } from '@inngest/use-agent';
-import { useQuery } from '@tanstack/react-query';
 
-import { useAllEventTypes } from '@/components/EventTypes/useEventTypes';
+import { useFetchAllEventTypes } from '@/components/EventTypes/useFetchAllEventTypes';
 import {
   useInsightsAgent,
   type ClientState,
@@ -61,32 +59,41 @@ const InsightsChatContext = createContext<ContextValue | undefined>(undefined);
 
 export function InsightsChatProvider({ children }: { children: ReactNode }) {
   // Per-thread UI flags in React state for rerenders
-  const [threadFlags, setThreadFlags] = useState<Record<string, ThreadFlags>>({});
+  const [threadFlags, setThreadFlags] = useState<Record<string, ThreadFlags>>(
+    {},
+  );
   // Latest generated SQL per thread
   const latestSqlByThreadRef = useRef<Map<string, string>>(new Map());
   const [latestSqlVersion, setLatestSqlVersion] = useState(0);
 
   // Per-thread client state map used by the state() function
   const threadClientStateRef = useRef<Map<string, ClientState>>(new Map());
-  const setThreadClientState = useCallback((threadId: string, state: ClientState) => {
-    threadClientStateRef.current.set(threadId, state);
-  }, []);
+  const setThreadClientState = useCallback(
+    (threadId: string, state: ClientState) => {
+      threadClientStateRef.current.set(threadId, state);
+    },
+    [],
+  );
 
   // Track which thread is currently sending so state() can reference the correct entry
   const activeSendThreadIdRef = useRef<string | null>(null);
 
   const getFlags = useCallback(
     (threadId: string): ThreadFlags => threadFlags[threadId] ?? defaultFlags,
-    [threadFlags]
+    [threadFlags],
   );
 
-  const getLatestGeneratedSql = useCallback((threadId: string): string | undefined => {
-    return latestSqlByThreadRef.current.get(threadId);
-  }, []);
+  const getLatestGeneratedSql = useCallback(
+    (threadId: string): string | undefined => {
+      return latestSqlByThreadRef.current.get(threadId);
+    },
+    [],
+  );
 
   const onEvent = useCallback((evt: InsightsAgentEvent) => {
     try {
-      const tid = typeof evt.data.threadId === 'string' ? evt.data.threadId : undefined;
+      const tid =
+        typeof evt.data.threadId === 'string' ? evt.data.threadId : undefined;
       if (!tid) return;
 
       setThreadFlags((prev) => {
@@ -146,7 +153,10 @@ export function InsightsChatProvider({ children }: { children: ReactNode }) {
             }
 
             // Capture generated SQL from tool-output (typed via manifest)
-            if (partType === 'tool-output' && evt.data.toolName === 'generate_sql') {
+            if (
+              partType === 'tool-output' &&
+              evt.data.toolName === 'generate_sql'
+            ) {
               const output = evt.data.finalContent as
                 | ToolOutputOf<InsightsAgentConfig, 'generate_sql'>
                 | undefined;
@@ -180,16 +190,16 @@ export function InsightsChatProvider({ children }: { children: ReactNode }) {
     } catch {}
   }, []);
 
-  // Fetch event types and schemas once; keep it simple (no caching beyond query instance)
-  // TODO: seAllEventTypes has an implicit limit of 40, need to update this to fetch more than 40 events
-  const fetchAllEventTypes = useAllEventTypes();
+  // Fetch event types and schemas with pagination (up to 5 pages = 200 events)
+  const fetchAllEventTypes = useFetchAllEventTypes();
   const { data: eventsData } = useQuery({
     queryKey: ['insights', 'all-event-types'],
     queryFn: async () => {
-      const events = await fetchAllEventTypes();
-      const names: string[] = events.map((e) => e.name);
+      const allEvents = await fetchAllEventTypes();
+
+      const names: string[] = allEvents.map((e) => e.name);
       const schemaMap: Record<string, string> = {};
-      for (const e of events) {
+      for (const e of allEvents) {
         const raw = (e.latestSchema || '').trim();
         if (!raw) continue;
         schemaMap[e.name] = raw;
@@ -236,7 +246,7 @@ export function InsightsChatProvider({ children }: { children: ReactNode }) {
         activeSendThreadIdRef.current = null;
       }
     },
-    [baseSendMessageToThread]
+    [baseSendMessageToThread],
   );
 
   const value: ContextValue = useMemo(
@@ -267,14 +277,21 @@ export function InsightsChatProvider({ children }: { children: ReactNode }) {
       setThreadClientState,
       eventsData?.names,
       eventsData?.schemaMap,
-    ]
+    ],
   );
 
-  return <InsightsChatContext.Provider value={value}>{children}</InsightsChatContext.Provider>;
+  return (
+    <InsightsChatContext.Provider value={value}>
+      {children}
+    </InsightsChatContext.Provider>
+  );
 }
 
 export function useInsightsChatProvider(): ContextValue {
   const ctx = useContext(InsightsChatContext);
-  if (!ctx) throw new Error('useInsightsChatProvider must be used within InsightsChatProvider');
+  if (!ctx)
+    throw new Error(
+      'useInsightsChatProvider must be used within InsightsChatProvider',
+    );
   return ctx;
 }

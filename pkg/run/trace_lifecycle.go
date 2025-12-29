@@ -334,7 +334,7 @@ func (l traceLifecycle) OnFunctionFinished(
 	}
 
 	switch resp.StatusCode {
-	case 200:
+	case 200, 206:
 		span.SetStatus(codes.Ok, "success")
 		span.SetAttributes(attribute.Int64(consts.OtelSysFunctionStatusCode, enums.RunStatusCompleted.ToCode()))
 	default: // everything else are errors
@@ -842,13 +842,12 @@ func (l traceLifecycle) OnStepFinished(
 				}
 			case enums.OpcodeStep, enums.OpcodeStepRun:
 				// Handle input and attempt to best-effort parse.
-				input, _ := op.Input()
-				if parsed, err := aigateway.ParseUnknownInput(ctx, json.RawMessage(input)); err == nil {
-					span.SetAIRequestMetadata(parsed)
-
-					// Now that we know the step run was a wrapped AI call, we can also parse the output
-					// to see if we can store the response metadata correctly.
-				}
+				// input, _ := op.Input()
+				// if parsed, err := aigateway.ParseUnknownInput(ctx, json.RawMessage(input)); err == nil {
+				// 	span.SetAIRequestMetadata(parsed)
+				// 	// Now that we know the step run was a wrapped AI call, we can also parse the output
+				// 	// to see if we can store the response metadata correctly.
+				// }
 			}
 
 		} else if resp.Retryable() { // these are function retries

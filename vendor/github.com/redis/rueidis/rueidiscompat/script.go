@@ -88,7 +88,7 @@ func (s *Script) EvalShaRO(ctx context.Context, c Scripter, keys []string, args 
 	return c.EvalShaRO(ctx, s.hash, keys, args...)
 }
 
-// Run optimistically uses EVALSHA to run the script. If script does not exist
+// Run optimistically uses EVALSHA to run the script. If the script does not exist,
 // it is retried using EVAL.
 func (s *Script) Run(ctx context.Context, c Scripter, keys []string, args ...interface{}) *Cmd {
 	r := s.EvalSha(ctx, c, keys, args...)
@@ -102,7 +102,7 @@ func (s *Script) Run(ctx context.Context, c Scripter, keys []string, args ...int
 	return r
 }
 
-// RunRO optimistically uses EVALSHA_RO to run the script. If script does not exist
+// RunRO optimistically uses EVALSHA_RO to run the script. If the script does not exist,
 // it is retried using EVAL_RO.
 func (s *Script) RunRO(ctx context.Context, c Scripter, keys []string, args ...interface{}) *Cmd {
 	r := s.EvalShaRO(ctx, c, keys, args...)

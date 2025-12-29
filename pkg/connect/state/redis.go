@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/util"
 	"github.com/jonboulle/clockwork"
 	"github.com/oklog/ulid/v2"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -188,7 +189,13 @@ func (r *redisConnectionStateManager) GetConnectionsByAppID(ctx context.Context,
 	conns := []*connpb.ConnMetadata{}
 	for _, meta := range res {
 		var conn connpb.ConnMetadata
+		// ignore zombie Connection IDs (where metadata doesn't exist)
+		if len(meta) == 0 {
+			r.logger.Info("ignoring zombie connection metadata", "env_id", envId, "app_id", appID, "connections", res)
+			continue
+		}
 		if err := json.Unmarshal([]byte(meta), &conn); err != nil {
+			r.logger.Error("error deserializing connection metadata from json", "env_id", envId, "app_id", appID, "error", err, "conn_metadata", meta, "conn_ids", connIds, "connections", res)
 			return nil, err
 		}
 		conns = append(conns, &conn)
@@ -917,8 +924,8 @@ func (r *redisConnectionStateManager) GetWorkerCapacities(ctx context.Context, e
 	isWorkerCapacityUnlimited := totalCapacity == 0
 	if isWorkerCapacityUnlimited {
 		return &WorkerCapacity{
-			Total:     totalCapacity,
-			Available: consts.ConnectWorkerNoConcurrencyLimitForRequests,
+			Total:     consts.ConnectWorkerCapacityForNoConcurrencyLimit,
+			Available: consts.ConnectWorkerCapacityForNoConcurrencyLimit,
 		}, nil
 	}
 
@@ -1098,12 +1105,12 @@ func (r *redisConnectionStateManager) GetAllActiveWorkerRequests(ctx context.Con
 
 // workerCapacityKey returns the Redis key for storing a worker's capacity limit
 func (r *redisConnectionStateManager) workerCapacityKey(envID uuid.UUID, instanceID string) string {
-	return fmt.Sprintf("{%s}:worker-capacity:%s", envID.String(), instanceID)
+	return fmt.Sprintf("{%s}:worker-capacity:%s", envID.String(), util.XXHash(instanceID))
 }
 
 // workerRequestsKey returns the Redis key for storing a worker's active leases as a sorted set
 func (r *redisConnectionStateManager) workerRequestsKey(envID uuid.UUID, instanceID string) string {
-	return fmt.Sprintf("{%s}:worker-requests-set:%s", envID.String(), instanceID)
+	return fmt.Sprintf("{%s}:worker-requests-set:%s", envID.String(), util.XXHash(instanceID))
 }
 
 // requestWorkerKey returns the Redis key for storing the mapping from request ID to worker instance ID

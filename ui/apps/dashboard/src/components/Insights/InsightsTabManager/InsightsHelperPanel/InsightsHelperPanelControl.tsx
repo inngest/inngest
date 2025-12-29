@@ -1,7 +1,5 @@
-'use client';
-
 import { type ReactElement } from 'react';
-import { Link } from '@inngest/components/Link/Link';
+import { Link } from '@inngest/components/Link/NewLink';
 import { cn } from '@inngest/components/utils/classNames';
 
 export interface HelperItem {
@@ -29,7 +27,7 @@ export function InsightsHelperPanelControl({
             'flex h-8 items-center justify-center rounded-md text-subtle transition-colors w-8',
             activeTitle !== item.title && 'hover:bg-canvasSubtle',
             activeTitle === item.title &&
-              'bg-secondary-4xSubtle hover:bg-secondary-3xSubtle text-info'
+              'bg-secondary-4xSubtle hover:bg-secondary-3xSubtle text-info',
           ),
           title: item.title,
         } as const;
@@ -49,7 +47,12 @@ export function InsightsHelperPanelControl({
         }
 
         return (
-          <button {...sharedProps} key={item.title} onClick={item.action} type="button">
+          <button
+            {...sharedProps}
+            key={item.title}
+            onClick={item.action}
+            type="button"
+          >
             {item.icon}
           </button>
         );

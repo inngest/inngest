@@ -1,14 +1,19 @@
-'use client';
-
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { Button } from '@inngest/components/Button';
+import { useNavigate, useRouter } from '@tanstack/react-router';
+import { Button } from '@inngest/components/Button/NewButton';
 import { toast } from 'sonner';
 
-import CheckoutModal, { type CheckoutItem } from '@/components/Billing/Plans/CheckoutModal';
+import CheckoutModal, {
+  type CheckoutItem,
+} from '@/components/Billing/Plans/CheckoutModal';
 import ConfirmPlanChangeModal from '@/components/Billing/Plans/ConfirmPlanChangeModal';
 import { pathCreator } from '@/utils/urls';
-import { PlanNames, isEnterprisePlan, isHobbyFreePlan, type Plan } from './utils';
+import {
+  PlanNames,
+  isEnterprisePlan,
+  isHobbyFreePlan,
+  type Plan,
+} from './utils';
 
 type ChangePlanArgs = {
   item: CheckoutItem;
@@ -81,14 +86,22 @@ export default function UpgradeButton({
     }
   }
 
-  const onClickChangePlan = ({ item: { planSlug, name, amount }, action }: ChangePlanArgs) => {
-    setCheckoutData({ items: [{ planSlug, name, quantity: 1, amount }], action });
+  const onClickChangePlan = ({
+    item: { planSlug, name, amount },
+    action,
+  }: ChangePlanArgs) => {
+    setCheckoutData({
+      items: [{ planSlug, name, quantity: 1, amount }],
+      action,
+    });
   };
 
   const onChangePlanSuccess = () => {
     setCheckoutData(undefined);
     onPlanChange();
-    router.refresh();
+    //
+    // Refresh the current route to reload data
+    router.invalidate();
     toast.success(`Plan changed successfully`);
   };
 
@@ -106,8 +119,17 @@ export default function UpgradeButton({
         onClick={() => {
           if (isActive || isEnterpriseCard) return;
           onClickChangePlan({
-            action: isFreeCard ? 'cancel' : isLowerPlan ? 'downgrade' : 'upgrade',
-            item: { planSlug: plan.slug, name: plan.name, quantity: 1, amount: plan.amount },
+            action: isFreeCard
+              ? 'cancel'
+              : isLowerPlan
+              ? 'downgrade'
+              : 'upgrade',
+            item: {
+              planSlug: plan.slug,
+              name: plan.name,
+              quantity: 1,
+              amount: plan.amount,
+            },
           });
         }}
       />

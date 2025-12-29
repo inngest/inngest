@@ -17,4 +17,7 @@ const (
 
 	// SkipReasonFunctionDrained indicates that the function is draining.
 	SkipReasonFunctionDrained
+
+	// SkipReasonFunctionBacklogSizeLimitHit indicates the function backlog size limit was reached
+	SkipReasonFunctionBacklogSizeLimitHit
 )

@@ -1,6 +1,3 @@
-'use client';
-
-import { useEffect, useState } from 'react';
 import * as Progress from '@radix-ui/react-progress';
 
 import { cn } from '../utils/classNames';
@@ -12,34 +9,34 @@ type ProgressBarProps = {
 };
 
 const ProgressBar = ({ limit, value, overageAllowed }: ProgressBarProps) => {
-  const [progress, setProgress] = useState(0);
-
-  useEffect(() => {
-    const calculatedProgress = limit === null ? 0 : Math.min((value / limit) * 100, 100);
-    const timer = setTimeout(() => setProgress(calculatedProgress), 500);
-    return () => clearTimeout(timer);
-  }, []);
-
+  const progress = limit === null ? 0 : Math.min((value / limit) * 100, 100);
+  const includedWidth = limit !== null && progress === 100 ? (limit / value) * 100 : progress;
+  const additionalWidth = progress >= 100 ? 100 - includedWidth : 0;
   const isOverTheLimit = limit !== null && value > limit;
+  const isUnderTheLimit = limit !== null && value < limit;
 
   return (
     <Progress.Root
       className={cn(
-        'bg-canvasMuted relative h-6 overflow-hidden rounded-md',
-        limit === null && 'bg-secondary-subtle'
+        'relative flex h-6 overflow-hidden rounded-md',
+        'outline-subtle outline outline-1 -outline-offset-1'
       )}
-      style={{
-        transform: 'translateZ(0)',
-      }}
       value={progress}
+      max={100}
     >
       <Progress.Indicator
         className={cn(
-          'ease-[cubic-bezier(0.65, 0, 0.35, 1)] bg-primary-moderate size-full transition-transform duration-700',
-          isOverTheLimit && overageAllowed && 'bg-accent-subtle',
+          'bg-primary-moderate',
           isOverTheLimit && !overageAllowed && 'bg-errorContrast'
         )}
-        style={{ transform: `translateX(-${100 - progress}%)` }}
+        style={{ width: `${includedWidth}%` }}
+      />
+      <Progress.Indicator
+        className={cn(
+          'bg-primary-2xSubtle',
+          isOverTheLimit && !overageAllowed && 'bg-errorContrast'
+        )}
+        style={{ width: `${additionalWidth}%` }}
       />
     </Progress.Root>
   );

@@ -35,7 +35,7 @@
     "@remixicon/react": "^4.2.0",
     "@tanstack/react-query": "^5.51.11",
     "@tanstack/react-router": "^1.132.47",
-    "@tanstack/react-table": "^8.19.2",
+    "@tanstack/react-table": "^8.21.3",
     "croner": "^7.0.5",
     "cronstrue": "^2.51.0",
     "date-fns": "^3.6.0",
@@ -53,6 +53,7 @@
     "react-use": "^17.4.0",
     "recharts": "^2.4.3",
     "sonner": "^1.2.0",
+    "sql-formatter": "^15.6.10",
     "tailwind-merge": "^1.10.0",
     "ulid": "^2.3.0",
     "zod": "^3.22.4"

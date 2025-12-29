@@ -28,13 +28,19 @@ export const useRerunFromStep = () => {
       return {
         ...result,
         redirect: result.data?.rerun
-          ? pathCreator.runPopout({ envSlug: env.slug, runID: result.data.rerun })
+          ? pathCreator.runPopout({
+              envSlug: env.slug,
+              runID: result.data.rerun,
+            })
           : undefined,
       };
     } catch (error) {
       console.error('error rerunning from step', error);
       return {
-        error: error instanceof Error ? error : new Error('Error rerunning from step'),
+        error:
+          error instanceof Error
+            ? error
+            : new Error('Error rerunning from step'),
         data: undefined,
       };
     }

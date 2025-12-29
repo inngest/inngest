@@ -1,22 +1,20 @@
-'use client';
-
 import { useCallback, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { Alert } from '@inngest/components/Alert';
-import { Button } from '@inngest/components/Button';
+import { Alert } from '@inngest/components/Alert/NewAlert';
+import { Button } from '@inngest/components/Button/NewButton';
 import { Modal } from '@inngest/components/Modal/Modal';
 import TabCards from '@inngest/components/TabCards/TabCards';
 import ky from 'ky';
 import { toast } from 'sonner';
-import { type JsonValue } from 'type-fest';
+
 import { useQuery } from 'urql';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
 import CodeEditor from '@/components/Textarea/CodeEditor';
 import { graphql } from '@/gql';
 import { EnvironmentType } from '@/gql/graphql';
 import { pathCreator } from '@/utils/urls';
+import { useNavigate, useRouter } from '@tanstack/react-router';
 
 const eventSchema = z.object({
   name: z.string(),
@@ -81,7 +79,9 @@ const buildTabs = ({
 
 const inngest = new Inngest({
   name: 'Your App Name',
-  eventKey: '${eventKey || '<EVENT_KEY>'}',${isBranchChild ? `\n  env: '${envName}',` : ''}
+  eventKey: '${eventKey || '<EVENT_KEY>'}',${
+        isBranchChild ? `\n  env: '${envName}',` : ''
+      }
 });
 
 await inngest.send(${JSON.stringify(payload, null, 2)});`,
@@ -134,11 +134,13 @@ export function SendEventModal({
   });
 
   const router = useRouter();
+  const navigate = useNavigate();
   const environment = useEnvironment();
   const eventKey = usePreferDefaultEventKey();
   const hasEventKey = Boolean(eventKey);
-  const protocol = process.env.NODE_ENV === 'development' ? 'http://' : 'https://';
-  const sendEventURL = `${protocol}${process.env.NEXT_PUBLIC_EVENT_API_HOST}/e/${
+  const protocol =
+    import.meta.env.MODE === 'development' ? 'http://' : 'https://';
+  const sendEventURL = `${protocol}${import.meta.env.VITE_EVENT_API_HOST}/e/${
     eventKey || '<EVENT_KEY>'
   }`;
 
@@ -171,7 +173,7 @@ export function SendEventModal({
       const formData = new FormData(form);
       const jsonString = formData.get('code') as string;
 
-      let jsonEvent: JsonValue;
+      let jsonEvent: any;
       try {
         jsonEvent = JSON.parse(jsonString);
       } catch (error) {
@@ -192,7 +194,7 @@ export function SendEventModal({
       toast.promise(sendEvent, {
         loading: 'Loading...',
         success: () => {
-          router.refresh();
+          router.invalidate();
           onClose();
           window.location.reload(); // We need to reload page to display new events, because we can't update the URQL cache without using mutations
           return 'Event sent!';
@@ -200,7 +202,7 @@ export function SendEventModal({
         error: 'Could not send event. Please try again later.',
       });
     },
-    [envName, isBranchChild, onClose, router, sendEventURL]
+    [envName, isBranchChild, onClose, navigate, sendEventURL],
   );
 
   const copyToClipboardAction = useCallback(
@@ -213,14 +215,14 @@ export function SendEventModal({
       toast.promise(navigator.clipboard.writeText(code), {
         loading: 'Loading...',
         success: () => {
-          router.refresh();
+          router.invalidate();
           onClose();
           return 'Copied to clipboard!';
         },
         error: 'Could not copy to clipboard.',
       });
     },
-    [onClose, router]
+    [onClose, navigate],
   );
 
   let tabs = useMemo(() => {
@@ -272,8 +274,12 @@ export function SendEventModal({
           </div>
           {!hasEventKey && (
             <Alert severity="warning" className="mb-2 text-sm">
-              There are no Event Keys for this environment. Please create an Event Key in{' '}
-              <Alert.Link href={pathCreator.keys({ envSlug: environment.slug })} severity="warning">
+              There are no Event Keys for this environment. Please create an
+              Event Key in{' '}
+              <Alert.Link
+                to={pathCreator.keys({ envSlug: environment.slug })}
+                severity="warning"
+              >
                 the Manage tab
               </Alert.Link>{' '}
               first.
@@ -290,7 +296,11 @@ export function SendEventModal({
                 codeLanguage,
                 initialCode,
               }) => (
-                <TabCards.Content key={tabLabel} value={tabLabel} className="p-0">
+                <TabCards.Content
+                  key={tabLabel}
+                  value={tabLabel}
+                  className="p-0"
+                >
                   <form onSubmit={submitAction}>
                     <header className="flex items-center justify-between rounded-t-md p-2">
                       <h3 className="px-2">{tabTitle}</h3>
@@ -312,13 +322,18 @@ export function SendEventModal({
                     </div>
                   </form>
                 </TabCards.Content>
-              )
+              ),
             )}
           </>
         </TabCards>
       </Modal.Body>
       <Modal.Footer className="flex justify-end gap-2">
-        <Button kind="secondary" label="Close modal" appearance="outlined" onClick={onClose} />
+        <Button
+          kind="secondary"
+          label="Close modal"
+          appearance="outlined"
+          onClick={onClose}
+        />
       </Modal.Footer>
     </Modal>
   );

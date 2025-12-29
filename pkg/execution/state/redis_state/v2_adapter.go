@@ -39,10 +39,12 @@ func runServiceV2(m statev1.Manager, opts mgrV2Opts) (state.RunService, error) {
 	return v2, nil
 }
 
-type MgrV2Opt func(o *mgrV2Opts)
-type mgrV2Opts struct {
-	disabledRetries bool
-}
+type (
+	MgrV2Opt  func(o *mgrV2Opts)
+	mgrV2Opts struct {
+		disabledRetries bool
+	}
+)
 
 func WithDisabledRetries() MgrV2Opt {
 	return func(o *mgrV2Opts) {
@@ -94,7 +96,21 @@ func (v v2) Create(ctx context.Context, s state.CreateState) (state.State, error
 		// no-op continue
 	case statev1.ErrIdentifierExists:
 		s.Metadata.ID.RunID = st.RunID()
-		st, err := v.LoadState(ctx, s.Metadata.ID)
+		// NOTE:  Idempotency keys are non-transactional, so we want to retry this LoadState
+		// call up to 3 times, to ensure that the original thread between saving idempotency
+		// keys and saving state is set.
+		st, err := util.WithRetry(
+			ctx,
+			"load-state",
+			func(ctx context.Context) (state.State, error) {
+				return v.LoadState(ctx, s.Metadata.ID)
+			},
+			util.RetryConf{
+				MaxAttempts:    3,
+				InitialBackoff: 25 * time.Millisecond,
+				MaxBackoff:     150 * time.Millisecond,
+			},
+		)
 		if err != nil {
 			return state.State{}, err
 		}
@@ -168,6 +184,7 @@ func (v v2) Delete(ctx context.Context, id state.ID) error {
 		RunID:      id.RunID,
 		WorkflowID: id.FunctionID,
 		AccountID:  id.Tenant.AccountID,
+		WorkspaceID: id.Tenant.EnvID,
 	})
 }
 

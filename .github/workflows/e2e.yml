@@ -17,12 +17,13 @@ env:
 
 jobs:
   ts:
-    name: "TS SDK / OS: (${{ matrix.os }}), key-queues: ${{ matrix.experimentalKeyQueues }}"
+    name: "TS SDK / OS: (${{ matrix.os }}), key-queues: ${{ matrix.experimentalKeyQueues }}, constraint-api: ${{ matrix.enableConstraintAPI }}"
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]
         experimentalKeyQueues: [false, true]
+        enableConstraintAPI: [false, true]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -59,7 +60,7 @@ jobs:
           cd ../../
           echo "Running dev server"
           mkdir $GOCOVERDIR
-          nohup ./inngest-bin dev --no-discovery 2> /tmp/dev-output.txt &
+          nohup ./inngest-bin dev --no-discovery 2> /tmp/devserver-logs-kq-${{ matrix.experimentalKeyQueues }}-api-${{ matrix.enableConstraintAPI }}.txt &
           echo "Ran dev server"
           sleep 5
           curl http://127.0.0.1:8288/dev > /dev/null 2> /dev/null
@@ -70,12 +71,22 @@ jobs:
           SDK_URL: http://127.0.0.1:3000/api/inngest
           TEST_MODE: true
           EXPERIMENTAL_KEY_QUEUES_ENABLE: "${{ matrix.experimentalKeyQueues }}"
+          ENABLE_CONSTRAINT_API: "${{ matrix.enableConstraintAPI }}"
+          LOG_LEVEL: trace
 
       - name: Convert coverage for tooling
         run: |
           ls -la $GOCOVERDIR
           # pass in all the directories in coverage to be merged
           go tool covdata percent -i=$GOCOVERDIR | tee coverage.txt
+
+      - name: Upload devserver logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: devserver-logs-kq-${{ matrix.experimentalKeyQueues }}-api-${{ matrix.enableConstraintAPI }}
+          path: /tmp/devserver-logs-kq-${{ matrix.experimentalKeyQueues }}-api-${{ matrix.enableConstraintAPI }}.txt
+          retention-days: 7
 
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
@@ -91,7 +102,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]
-        experimentalKeyQueues: [ false, true ]
+        experimentalKeyQueues: [false, true]
         parallelism: [5]
         index: [0, 1, 2, 3, 4]
     runs-on: ${{ matrix.os }}
@@ -147,7 +158,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]
-        experimentalKeyQueues: [ false, true ]
+        experimentalKeyQueues: [false, true]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4

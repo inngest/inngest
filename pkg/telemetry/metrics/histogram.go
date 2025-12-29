@@ -7,11 +7,18 @@ import (
 
 var (
 	// in milliseconds
-	DefaultBoundaries          = []float64{10, 50, 100, 200, 500, 1000, 2000, 5000, 10000}
+	DefaultBoundaries          = []float64{10, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 30000, 60000}
 	QueueItemLatencyBoundaries = []float64{
 		5, 10, 50, 100, 200, 500, // < 1s
 		1000, 2000, 5000, 30_000, // < 1m
 		60_000, 300_000, // < 10m
+		600_000, 1_800_000, // < 1h
+	}
+
+	cancellationReadDurationBoundaries = []float64{
+		5, 10, 50, 100, 200, 500, // < 1s
+		1000, 2000, 5000, 30_000, // < 1m
+		60_000, 120_000, 300_000, // < 10m
 		600_000, 1_800_000, // < 1h
 	}
 
@@ -23,6 +30,8 @@ var (
 	}
 
 	peekSizeBoundaries = []float64{10, 30, 50, 100, 250, 500, 1000, 3000, 5000}
+
+	cancellationReadSizeBoundaries = []float64{10, 50, 100, 250, 500, 1000, 2500, 5000, 10_000, 25_000, 50_000, 75_000, 100_000}
 
 	PausesBoundaries = []float64{
 		5, 10, 50, 100, 200, 500, // < 1s
@@ -285,6 +294,7 @@ func HistogramPauseBlockFlushLatency(ctx context.Context, delay time.Duration, o
 		MetricName:  "pauses_block_flush_duration",
 		Description: "Distribution of pauses block flush latency",
 		Tags:        opts.Tags,
+		Unit:        "ms",
 		Boundaries:  DefaultBoundaries,
 	})
 }
@@ -295,6 +305,7 @@ func HistogramPauseBlockFetchLatency(ctx context.Context, delay time.Duration, o
 		MetricName:  "pauses_block_fetch_duration",
 		Description: "Distribution of pauses block fetching latency",
 		Tags:        opts.Tags,
+		Unit:        "ms",
 		Boundaries:  DefaultBoundaries,
 	})
 }
@@ -305,6 +316,7 @@ func HistogramPauseDeleteLatencyAfterBlockFlush(ctx context.Context, delay time.
 		MetricName:  "pauses_delete_after_flush_duration",
 		Description: "Distribution of pauses deletion duration after flushing a block",
 		Tags:        opts.Tags,
+		Unit:        "ms",
 		Boundaries:  PausesBoundaries,
 	})
 }
@@ -315,6 +327,7 @@ func HistogramSpanFlush(ctx context.Context, delay time.Duration, opts Histogram
 		MetricName:  "span_flush_duration",
 		Description: "Distribution of span flushes from tracing",
 		Tags:        opts.Tags,
+		Unit:        "ms",
 		Boundaries:  QueueItemLatencyBoundaries,
 	})
 }
@@ -327,5 +340,113 @@ func HistogramPauseBlockCompactionDuration(ctx context.Context, delay time.Durat
 		Tags:        opts.Tags,
 		Unit:        "ms",
 		Boundaries:  PausesBoundaries,
+	})
+}
+
+func HistogramConstraintAPIScavengerShardProcessDuration(ctx context.Context, dur time.Duration, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, dur.Milliseconds(), HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "constraintapi_scavenger_shard_process_duration",
+		Description: "Distribution of scavenger shard processing time duration",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  DefaultBoundaries,
+	})
+}
+
+func HistogramConstraintAPIScavengerLeaseAge(ctx context.Context, age time.Duration, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, age.Milliseconds(), HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "constraintapi_scavenger_shard_lease_age",
+		Description: "Distribution of scavenger expired lease age",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  DefaultBoundaries,
+	})
+}
+
+func HistogramCheckpointStartLatency(ctx context.Context, age time.Duration, typ string, opts HistogramOpt) {
+	if opts.Tags == nil {
+		opts.Tags = map[string]any{}
+	}
+	opts.Tags["type"] = typ
+
+	RecordIntHistogramMetric(ctx, age.Milliseconds(), HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "checkpoint_start_latency",
+		Description: "Distribution of time it took to receive the API request and start processing",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  DefaultBoundaries,
+	})
+}
+
+func HistogramQueueScavengerPartitionScavengeDuration(ctx context.Context, dur time.Duration, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, dur.Milliseconds(), HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "queue_partition_scavenge_duration",
+		Description: "Distribution of queue scavenger duration",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  DefaultBoundaries,
+	})
+}
+
+func HistogramCancellationReadSize(ctx context.Context, value int64, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, value, HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "cancellation_read_size",
+		Description: "Distribution of the number of items being read in single operations by the cancellation read writer",
+		Tags:        opts.Tags,
+		Boundaries:  cancellationReadSizeBoundaries,
+	})
+}
+
+func HistogramCancellationReadDuration(ctx context.Context, dur time.Duration, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, dur.Milliseconds(), HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "cancellation_read_duration",
+		Description: "Distribution of cancellation read duration",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  cancellationReadDurationBoundaries,
+	})
+}
+
+func HistogramExecutorLatency(ctx context.Context, dur time.Duration, typ string, opts HistogramOpt) {
+	if opts.Tags == nil {
+		opts.Tags = map[string]any{}
+	}
+	opts.Tags["type"] = typ
+
+	RecordIntHistogramMetric(ctx, dur.Milliseconds(), HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "execution_latency",
+		Description: "Distribution of latency within the executor",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  PausesBoundaries,
+	})
+}
+
+func HistogramCancellationCheckDuration(ctx context.Context, dur time.Duration, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, dur.Milliseconds(), HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "cancellation_check_duration",
+		Description: "Distribution of cancellation check duration",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  cancellationReadDurationBoundaries,
+	})
+}
+
+func HistogramScheduleDuration(ctx context.Context, dur int64, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, dur, HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "schedule_duration",
+		Description: "Distribution of schedule duration with constraint API tracking",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  DefaultBoundaries,
 	})
 }

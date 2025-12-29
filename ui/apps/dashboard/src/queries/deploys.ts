@@ -33,7 +33,10 @@ const GetDeploysDocument = graphql(`
 `);
 
 // TODO - Support pagination/cursors
-export const useDeploys = (): UseQueryResponse<GetDeployssQuery, { environmentID: string }> => {
+export const useDeploys = (): UseQueryResponse<
+  GetDeployssQuery,
+  { environmentID: string }
+> => {
   const environment = useEnvironment();
   const [result, refetch] = useQuery({
     query: GetDeploysDocument,

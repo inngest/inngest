@@ -23,7 +23,7 @@ const getAppCardContent = ({ app }: { app: GetAppsQuery['apps'][number] }) => {
 
   const footerHeaderTitle = !app.connected ? (
     app.error === 'unreachable' ? (
-      `The Inngest Dev Server can't find your application.`
+      `The Inngest Server can't find your application.`
     ) : (
       `Error: ${app.error}`
     )

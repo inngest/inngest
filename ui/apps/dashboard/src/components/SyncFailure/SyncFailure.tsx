@@ -1,7 +1,7 @@
-import { Alert } from '@inngest/components/Alert';
+import { Alert } from '@inngest/components/Alert/NewAlert';
 import { cn } from '@inngest/components/utils/classNames';
 
-import { httpDataSchema, type CodedError } from '@/codedError';
+import { httpDataSchema, type CodedError } from '@/utils/codedError';
 import { getMessage } from './utils';
 
 type Props = {
