@@ -1,5 +1,3 @@
-'use client';
-
 import { makeValueTypeLabel, repeatArrayBrackets } from '../../../typeUtil';
 import type { ArrayNode, ObjectNode, SchemaNode, TupleNode, ValueNode } from '../../../types';
 import { ObjectRow } from '../../ObjectRow';

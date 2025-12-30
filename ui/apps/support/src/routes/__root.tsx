@@ -73,7 +73,6 @@ function RootComponent() {
           <TooltipProvider delayDuration={0}>
             <Outlet />
           </TooltipProvider>
-          {/* TANSTACK TODO: add page view tracker here */}
         </InngestClerkProvider>
       </ThemeProvider>
     </RootDocument>

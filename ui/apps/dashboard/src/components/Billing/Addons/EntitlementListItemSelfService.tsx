@@ -11,7 +11,7 @@ import EntitlementListItemSelfServiceNumeric from '@/components/Billing/Addons/E
 import { addonQtyCostString } from '@/components/Billing/Addons/pricing_help';
 import { graphql } from '@/gql';
 import SlackChannelComponent from './SlackChannelModal';
-import { useNavigate, useRouter } from '@tanstack/react-router';
+import { useRouter } from '@tanstack/react-router';
 
 const UpdateAccountAddonQuantityDocument = graphql(`
   mutation UpdateAccountAddonQuantity($addonName: String!, $quantity: Int!) {

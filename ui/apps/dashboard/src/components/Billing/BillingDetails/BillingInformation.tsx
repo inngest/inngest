@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate, useRouter } from '@tanstack/react-router';
+import { useRouter } from '@tanstack/react-router';
 import { Button } from '@inngest/components/Button';
 import { Input } from '@inngest/components/Forms/Input';
 import { toast } from 'sonner';

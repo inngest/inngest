@@ -2,9 +2,9 @@ import headlessui from '@headlessui/tailwindcss';
 import type { Config } from 'tailwindcss';
 import defaultTheme from 'tailwindcss/defaultTheme';
 
-export default {
+const config = {
   content: ['./src/**/*.{ts,tsx,mdx}'],
-  darkMode: 'class',
+  darkMode: 'class' as const,
   theme: {
     extend: {
       fontFamily: {
@@ -180,6 +180,7 @@ export default {
         canvasMuted: 'rgb(var(--color-background-canvas-muted) / <alpha-value>)',
       },
       fill: {
+        //
         // temporary tooltip token
         tooltipArrow: 'rgb(var(--color-background-canvas-base) / <alpha-value>)',
         onContrast: 'rgb(var(--color-foreground-onContrast) / <alpha-value>)',
@@ -202,6 +203,7 @@ export default {
         dashboard: '1fr 1fr 1fr 432px',
       },
       boxShadowColor: {
+        //
         // temporary tooltip token
         tooltip: 'rgb(var(--color-background-canvas-muted) / <alpha-value>)',
         subtle: 'rgb(var(--color-border-subtle) / <alpha-value>)',
@@ -261,8 +263,8 @@ export default {
       },
     },
   },
-  //
-  // TODO: Temp cast to avoid lots of changes to dashboard before we migrate to tanstack
-  // Remove this when we migrate to tanstack
-  plugins: [headlessui as any],
+
+  plugins: [headlessui] as Config['plugins'],
 } satisfies Config;
+
+export default config;

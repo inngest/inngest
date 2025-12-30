@@ -1,5 +1,3 @@
-'use client';
-
 import { AdornmentProvider, type RenderAdornmentFn } from './AdornmentContext';
 import { ExpansionProvider } from './ExpansionContext';
 import { TypeProvider } from './TypeContext';

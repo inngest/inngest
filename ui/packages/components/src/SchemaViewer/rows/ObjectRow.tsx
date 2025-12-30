@@ -1,5 +1,3 @@
-'use client';
-
 import { cn } from '../../utils/classNames';
 import { useExpansion } from '../ExpansionContext';
 import type { ObjectNode, SchemaNode, ValueNode } from '../types';

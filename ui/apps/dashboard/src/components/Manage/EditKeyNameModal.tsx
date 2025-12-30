@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 
 import useManagePageTerminology from './useManagePageTerminology';
 import { Context } from './Context';
-import { useNavigate, useRouter } from '@tanstack/react-router';
+import { useRouter } from '@tanstack/react-router';
 
 type EditKeyNameProps = {
   isOpen: boolean;

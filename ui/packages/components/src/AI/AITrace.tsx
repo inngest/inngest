@@ -1,5 +1,5 @@
 import { ElementWrapper, TextElement } from '../DetailsCard/Element';
-import { getAIInfo, type ExperimentalAI, type Value } from './utils';
+import { getAIInfo, type ExperimentalAI } from './utils';
 
 export const AITrace = ({ aiOutput }: { aiOutput?: ExperimentalAI }) => {
   if (!aiOutput) {

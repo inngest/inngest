@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 import { useMutation } from 'urql';
 
 import { graphql } from '@/gql';
-import { useNavigate, useRouter } from '@tanstack/react-router';
+import { useRouter } from '@tanstack/react-router';
 
 const UpdateAccountAddonQuantityDocument = graphql(`
   mutation UpdateAccountAddonQuantity($addonName: String!, $quantity: Int!) {

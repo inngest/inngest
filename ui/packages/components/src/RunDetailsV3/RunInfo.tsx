@@ -134,7 +134,7 @@ export const RunInfo = ({ initialRunData, run, runID, standalone, result }: Prop
             label="Duration"
             lazy={run}
             initial={initialRunData}
-            optimisticChildren={(initialRun: InitialRunData) => <TextElement>-</TextElement>}
+            optimisticChildren={() => <TextElement>-</TextElement>}
           >
             {(run: Run) => {
               let durationText = '-';

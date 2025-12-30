@@ -1,5 +1,3 @@
-'use client';
-
 import { createContext, useCallback, useContext, useMemo, useState } from 'react';
 
 type ExpansionProviderProps = {

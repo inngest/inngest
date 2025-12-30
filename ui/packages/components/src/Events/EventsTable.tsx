@@ -90,8 +90,7 @@ export function EventsTable({
   const [startTime] = useSearchParam('start');
   const [endTime] = useSearchParam('end');
   const batchUpdate = useBatchedSearchParams();
-  const [filteredEvent, setFilteredEvent, removeFilteredEvent] =
-    useStringArraySearchParam('filterEvent');
+  const [filteredEvent] = useStringArraySearchParam('filterEvent');
   const [includeInternalEvents] = useBooleanSearchParam('includeInternal');
   const [search, setSearch, removeSearch] = useSearchParam('search');
   const source = undefined;

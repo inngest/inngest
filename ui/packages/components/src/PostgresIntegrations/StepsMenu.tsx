@@ -1,6 +1,6 @@
 import StepsMenu from '@inngest/components/Steps/StepsMenu';
 
-import { isValidStep, type PostgresIntegrationMenuContent } from './newTypes';
+import { isValidStep, type PostgresIntegrationMenuContent } from './types';
 
 export default function Menu({
   stepsCompleted,

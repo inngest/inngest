@@ -20,7 +20,7 @@ export const UserlandAttrs = ({ userlandSpan }: { userlandSpan: UserlandSpanType
         </div>
         {Object.entries(attrs)
           .filter(([key]) => !internalPrevixes.some((prefix) => key.startsWith(prefix)))
-          .map(([key, value], i) => {
+          .map(([key, value]) => {
             return (
               <div
                 key={`userland-span-attr-${key}`}

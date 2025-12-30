@@ -5,15 +5,6 @@ import {
 } from 'graphql-request';
 import { notFound } from '@tanstack/react-router';
 
-const decodeJWT = (token: string) => {
-  try {
-    const payload = token.split('.')[1];
-    return JSON.parse(atob(payload));
-  } catch {
-    return null;
-  }
-};
-
 const requestMiddleware: RequestMiddleware = async (request) => {
   //
   // Lazy import server-only modules to prevent them from being bundled for the client

@@ -1,5 +1,3 @@
-'use client';
-
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import { ErrorCard } from '../Error/ErrorCard';

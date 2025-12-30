@@ -1,9 +1,4 @@
-import {
-  ClientOnly,
-  createFileRoute,
-  useNavigate,
-  useRouter,
-} from '@tanstack/react-router';
+import { ClientOnly, createFileRoute, useRouter } from '@tanstack/react-router';
 import { useMemo } from 'react';
 
 import { Button } from '@inngest/components/Button';

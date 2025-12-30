@@ -1,4 +1,3 @@
-import { type InvokeFunctionOnboardingMutationVariables } from '@/gql/graphql';
 import { getProductionEnvironment } from '@/queries/server/getEnvironment';
 import {
   getInvokeFunctionLookups,

@@ -51,8 +51,7 @@ export function Pill({
   } else if (flatSide === 'right') {
     roundedClasses = 'rounded-l-2xl';
   }
-  //
-  // TANSTACK TODO: revert to useLayoutEffect in a client only component
+
   useEffect(() => {
     const checkTruncation = () => {
       if (!pillRef.current || !hiddenTextRef.current) return;

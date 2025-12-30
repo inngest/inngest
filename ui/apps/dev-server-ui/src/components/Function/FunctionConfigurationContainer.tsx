@@ -1,5 +1,3 @@
-'use client';
-
 import { Button } from '@inngest/components/Button';
 import { FunctionConfiguration } from '@inngest/components/FunctionConfiguration';
 import { Header } from '@inngest/components/Header/Header';

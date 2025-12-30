@@ -1,5 +1,3 @@
-'use client';
-
 import { useEffect, useRef } from 'react';
 import { useMonaco } from '@monaco-editor/react';
 import type { languages } from 'monaco-editor';
@@ -113,7 +111,7 @@ export function useSQLCompletions(config: SQLCompletionConfig) {
           pendingSchemaRequestsRef.current.delete(eventName);
           return props;
         })
-        .catch((error) => {
+        .catch(() => {
           pendingSchemaRequestsRef.current.delete(eventName);
           return [];
         });
