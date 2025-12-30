@@ -93,7 +93,7 @@ export const devApi = createApi({
                 name: event.name,
                 pendingRuns: null,
                 raw: JSON.stringify(event),
-                createdAt: event.ts ? new Date(event.ts).toISOString() : null,
+                createdAt: event.ts as any,
                 status: null,
               },
             },

@@ -18,21 +18,8 @@ const config: CodegenConfig = {
 
           object: true,
         },
-        useTypeImports: true,
-        scalarsMode: 'unified',
         scalars: {
-          Bytes: 'string',
-          Environment: 'string',
           Int64: 'number',
-          Map: 'Record<string, unknown>',
-          SpanMetadataKind: 'string',
-          SpanMetadataScope: 'string',
-          SpanMetadataValues: 'Record<string, any>',
-          Time: 'string',
-          ULID: 'string',
-          Uint: 'number',
-          Unknown: 'unknown',
-          UUID: 'string',
         },
       },
       plugins: [
