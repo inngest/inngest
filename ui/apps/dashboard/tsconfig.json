@@ -24,9 +24,8 @@
 
     /* Linting */
     "skipLibCheck": true,
-    // TANSTACK TODO: reverse these once we have moved to tanstack
-    "noUnusedLocals": false,
-    "noUnusedParameters": false,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
 
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true,

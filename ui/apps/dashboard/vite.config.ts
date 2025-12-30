@@ -21,16 +21,6 @@ export default defineConfig({
         '../../packages/components/src',
       ),
     },
-    // TANSTACK TODO: these can go away when dashboard is converted and versions are in line
-    dedupe: [
-      'next-themes',
-      '@tanstack/react-query',
-      'react',
-      'react-dom',
-      '@tanstack/react-router',
-      '@tanstack/react-table',
-      'zod',
-    ],
   },
   optimizeDeps: {
     exclude: ['@inngest/agent-kit'],

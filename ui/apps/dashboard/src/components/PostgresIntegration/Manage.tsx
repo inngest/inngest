@@ -1,7 +1,7 @@
 import { deleteConn } from '@/queries/server/integrations/db';
 import IntegrationsPage from '@inngest/components/PostgresIntegrations/IntegrationPage';
 import { neonIntegrationPageContent } from '@inngest/components/PostgresIntegrations/Neon/newNeonContent';
-import type { Publication } from '@inngest/components/PostgresIntegrations/newTypes';
+import type { Publication } from '@inngest/components/PostgresIntegrations/types';
 
 export default function Manage({ publication }: { publication: Publication }) {
   const handleDelete = async (id: string) => {

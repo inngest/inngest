@@ -51,7 +51,7 @@ export function EventTypesTable({
 }) {
   const navigate = useNavigate();
   const columns = useColumns({ pathCreator, eventTypeActions, getEventTypeVolume });
-  const [sorting, setSorting] = useState<SortingState>([
+  const [sorting] = useState<SortingState>([
     {
       id: 'name',
       desc: true,

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type UIEventHandler } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@inngest/components/Button';
 import { ErrorCard } from '@inngest/components/Error/ErrorCard';
 import { Search } from '@inngest/components/Forms/Search';

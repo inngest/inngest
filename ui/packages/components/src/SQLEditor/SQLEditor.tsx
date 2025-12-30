@@ -1,5 +1,3 @@
-'use client';
-
 import { useCallback, useRef } from 'react';
 import { Editor, type Monaco } from '@monaco-editor/react';
 import type { editor } from 'monaco-editor';

@@ -13,7 +13,7 @@ const ProgressBar = ({ limit, value, overageAllowed }: ProgressBarProps) => {
   const includedWidth = limit !== null && progress === 100 ? (limit / value) * 100 : progress;
   const additionalWidth = progress >= 100 ? 100 - includedWidth : 0;
   const isOverTheLimit = limit !== null && value > limit;
-  const isUnderTheLimit = limit !== null && value < limit;
+  // const isUnderTheLimit = limit !== null && value < limit;
 
   return (
     <Progress.Root

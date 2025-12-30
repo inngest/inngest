@@ -1,5 +1,3 @@
-'use client';
-
 import { useEffect, useState } from 'react';
 import { cn } from '@inngest/components/utils/classNames';
 import * as Dialog from '@radix-ui/react-dialog';

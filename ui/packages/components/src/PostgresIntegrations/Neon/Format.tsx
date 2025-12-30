@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Button } from '@inngest/components/Button';
 import { InlineCode } from '@inngest/components/Code';
 import { Link } from '@inngest/components/Link';
-import { IntegrationSteps } from '@inngest/components/PostgresIntegrations/newTypes';
+import { IntegrationSteps } from '@inngest/components/PostgresIntegrations/types';
 import { parseConnectionString } from '@inngest/components/PostgresIntegrations/utils';
 
 export default function NeonFormat({

@@ -1,5 +1,3 @@
-'use client';
-
 import { Pill } from '@inngest/components/Pill/Pill';
 import { RiFileCopyLine } from '@remixicon/react';
 import { toast } from 'sonner';

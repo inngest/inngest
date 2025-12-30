@@ -17,7 +17,7 @@ import {
   useEvents,
 } from '@/components/Events/useEvents';
 import { useAccountFeatures } from '@/utils/useAccountFeatures';
-import { useNavigate, useRouter } from '@tanstack/react-router';
+import { useRouter } from '@tanstack/react-router';
 
 export default function EventsPage({
   environmentSlug: envSlug,

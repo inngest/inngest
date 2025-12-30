@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Button } from '@inngest/components/Button';
 import { Input } from '@inngest/components/Forms/Input';
 import { Link } from '@inngest/components/Link';
-import { IntegrationSteps } from '@inngest/components/PostgresIntegrations/newTypes';
+import { IntegrationSteps } from '@inngest/components/PostgresIntegrations/types';
 import { parseConnectionString } from '@inngest/components/PostgresIntegrations/utils';
 import { cn } from '@inngest/components/utils/classNames';
 
