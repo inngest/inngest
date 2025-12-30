@@ -28,6 +28,7 @@
     "@urql/exchange-auth": "^2.1.6",
     "@urql/exchange-request-policy": "^1.0.2",
     "@urql/exchange-retry": "^1.2.0",
+    "date-fns": "^3.6.0",
     "dotenv": "^17.2.3",
     "graphql": "16.8.1",
     "graphql-config": "^4.5.0",

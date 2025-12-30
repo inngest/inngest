@@ -1,11 +1,13 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { ProfileMenu } from "@/components/Navigation/ProfileMenu";
+import { createFileRoute } from "@tanstack/react-router";
 import { auth, clerkClient } from "@clerk/tanstack-react-start/server";
 import { createServerFn } from "@tanstack/react-start";
-import { useClerk } from "@clerk/tanstack-react-start";
 import { getTicketsByEmail, type TicketSummary } from "@/data/plain";
-import { StatusBadge, PriorityBadge } from "@/components/Support/TicketBadges";
 import { usePaginationUI } from "@inngest/components/Pagination";
+import { StatusBanner } from "@/components/Support/StatusBanner";
+import { Filters } from "@/components/Support/Filters";
+import { TicketCard } from "@/components/Support/TicketCard";
+import { Navigation } from "@/components/Support/Navigation";
+import { getStatus, type Status } from "@/data/status";
 
 const getAuthStatusAndTickets = createServerFn({ method: "GET" }).handler(
   async () => {
@@ -14,6 +16,15 @@ const getAuthStatusAndTickets = createServerFn({ method: "GET" }).handler(
     // Only fetch user email and tickets if authenticated
     let userEmail: string | undefined = undefined;
     let tickets: TicketSummary[] = [];
+    let status: Status | undefined = undefined;
+
+    // Fetch system status
+    try {
+      status = await getStatus();
+      console.log("status", status);
+    } catch (error) {
+      console.error("Failed to fetch status:", error);
+    }
 
     if (isAuthenticated && userId) {
       try {
@@ -34,6 +45,7 @@ const getAuthStatusAndTickets = createServerFn({ method: "GET" }).handler(
       isAuthenticated,
       userEmail,
       tickets,
+      status,
     };
   },
 );
@@ -46,155 +58,81 @@ export const Route = createFileRoute("/")({
 });
 
 function Home() {
-  const { isAuthenticated, userEmail, tickets } = Route.useLoaderData();
-  const { signOut, session } = useClerk();
+  const { isAuthenticated, userEmail, tickets, status } = Route.useLoaderData();
 
-  // Paginate tickets with 4 per page
+  // Paginate tickets with 8 per page
   const { currentPageData, BoundPagination } = usePaginationUI({
     data: tickets,
     id: "tickets",
     pageSize: 8,
   });
 
-  const handleSignOut = async () => {
-    await signOut({
-      sessionId: session?.id,
-      redirectUrl: "/sign-in/$",
-    });
-  };
+  if (!isAuthenticated || !userEmail) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-canvasBase">
+        <div className="text-center">
+          <h1 className="text-basis mb-2 text-2xl font-bold">
+            Please sign in to view your tickets
+          </h1>
+          <p className="text-muted">
+            You need to be authenticated to access the support portal.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-canvasBase">
-      <div className="mx-auto max-w-6xl px-6 py-8">
-        <div className="mb-8">
-          <h1 className="text-basis mb-2 text-3xl font-bold">
-            Inngest Support Portal
-          </h1>
-          <p className="text-muted text-base">
-            Manage your support tickets and get help from our team
-          </p>
-          <div className="mt-4">
-            {isAuthenticated && userEmail ? (
-              <div className="flex items-center gap-3">
-                <span className="text-muted text-sm">
-                  Logged in as:{" "}
-                  <span className="font-medium text-basis">{userEmail}</span>
-                </span>
-                <span className="text-subtle">•</span>
-                <button
-                  onClick={handleSignOut}
-                  className="text-muted hover:text-basis text-sm underline transition-colors"
-                >
-                  Sign Out
-                </button>
-              </div>
-            ) : (
-              <ProfileMenu isAuthenticated={false}>
-                <div></div>
-              </ProfileMenu>
-            )}
-          </div>
-        </div>
+    <div className="flex min-h-screen flex-col md:flex-row bg-canvasBase">
+      {/* Navigation */}
+      <Navigation />
 
-        {isAuthenticated && userEmail && (
-          <div className="mt-8">
-            <div className="mb-6 flex items-center justify-between">
-              <h2 className="text-basis text-xl font-semibold">
-                Your Support Tickets
-              </h2>
-              {tickets.length > 0 && (
-                <span className="text-muted text-sm">
+      <div className="flex flex-col grow">
+        {/* Status Banner */}
+        <StatusBanner status={status} />
+
+        <div className="mx-auto w-full max-w-6xl py-6">
+          {/* Filters */}
+          <Filters />
+
+          {/* Ticket List */}
+          <div className="flex w-full flex-col gap-4 px-4 py-4">
+            <div className="text-basis flex w-full items-center justify-between leading-none">
+              <div className="flex flex-col justify-center">
+                <p className="leading-4 whitespace-nowrap">My tickets</p>
+              </div>
+              <div className="flex flex-col justify-center">
+                <p className="leading-4 whitespace-nowrap">
                   {tickets.length} {tickets.length === 1 ? "ticket" : "tickets"}
-                </span>
-              )}
+                </p>
+              </div>
             </div>
+
             {tickets.length === 0 ? (
-              <div className="bg-canvasSubtle border-subtle rounded-xl border p-12 text-center">
-                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-canvasMuted">
-                  <svg
-                    className="text-muted h-8 w-8"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"
-                    />
-                  </svg>
-                </div>
+              <div className="border-muted bg-canvasSubtle flex flex-col items-center justify-center rounded-lg border p-12 text-center">
                 <p className="text-basis mb-1 text-lg font-medium">
                   No support tickets found
                 </p>
-                <p className="text-muted text-sm">
+                <p className="text-muted">
                   Create a new ticket to get help from our support team.
                 </p>
               </div>
             ) : (
               <>
-                <div className="space-y-3">
-                  {currentPageData.map((ticket) => (
-                    <Link
-                      key={ticket.id}
-                      to="/case/$ticketId"
-                      params={{ ticketId: ticket.id }}
-                      className="bg-canvasBase border-subtle hover:border-basis hover:shadow-sm group block rounded-lg border p-5 transition-all duration-200"
-                    >
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1 min-w-0">
-                          <h3 className="text-basis mb-3 text-base font-semibold group-hover:text-link transition-colors line-clamp-2">
-                            {ticket.title}
-                          </h3>
-                          <div className="mb-3 flex flex-wrap items-center gap-2">
-                            <StatusBadge status={ticket.status} size="sm" />
-                            <PriorityBadge
-                              priority={ticket.priority}
-                              size="sm"
-                              showLabel={false}
-                            />
-                          </div>
-                          <div className="flex items-center gap-4 text-xs text-muted">
-                            <span>
-                              Created:{" "}
-                              {new Date(ticket.createdAt).toLocaleDateString()}
-                            </span>
-                            <span>•</span>
-                            <span>
-                              Updated:{" "}
-                              {new Date(ticket.updatedAt).toLocaleDateString()}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="text-muted shrink-0">
-                          <svg
-                            className="h-5 w-5 transition-transform group-hover:translate-x-1"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M9 5l7 7-7 7"
-                            />
-                          </svg>
-                        </div>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-                {tickets.length > 4 && (
-                  <div className="mt-6">
+                {currentPageData.map((ticket) => (
+                  <TicketCard key={ticket.id} ticket={ticket} />
+                ))}
+
+                {/* Pagination */}
+                {tickets.length > 8 && (
+                  <div className="flex w-full flex-col items-center justify-center px-0 py-3">
                     <BoundPagination />
                   </div>
                 )}
               </>
             )}
           </div>
-        )}
+        </div>
       </div>
     </div>
   );

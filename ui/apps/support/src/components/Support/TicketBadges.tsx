@@ -1,6 +1,5 @@
-import { getLabelForStatus } from "@/data/plain";
-import { getPriorityColor } from "@/utils/ticket";
 import { Pill } from "@inngest/components/Pill";
+import { type PillKind } from "@inngest/components/Pill/Pill";
 
 type StatusBadgeProps = {
   status: string;
@@ -15,16 +14,18 @@ type PriorityBadgeProps = {
 
 /**
  * Badge component for displaying ticket status
- * Uses Pill component with "primary" for open status and "info" for closed status
+ * Uses Pill component with "secondary" for open status and "primary" for completed status
  */
-export function StatusBadge({ status, size = "md" }: StatusBadgeProps) {
+export function StatusBadge({ status }: StatusBadgeProps) {
   const statusStr = status ? String(status).toLowerCase() : "";
-  const label = getLabelForStatus(status);
 
-  // Map status to Pill kind: "primary" for open, "info" for closed
-  let pillKind: "primary" | "info" = "primary";
+  // Map status to Pill kind and label
+  let pillKind: PillKind = "info";
+  let label = "Open";
+
   if (statusStr === "done") {
-    pillKind = "info";
+    pillKind = "primary";
+    label = "Completed";
   }
 
   return (
@@ -36,22 +37,23 @@ export function StatusBadge({ status, size = "md" }: StatusBadgeProps) {
 
 /**
  * Badge component for displaying ticket priority
+ * Maps priority levels to visual styles:
+ * - p0: error (red/urgent)
+ * - p1: default (gray)
+ * - p2+: default (gray)
  */
-export function PriorityBadge({
-  priority,
-  size = "md",
-  showLabel = true,
-}: PriorityBadgeProps) {
-  const sizeClasses = size === "sm" ? "px-2 py-1 text-xs" : "px-3 py-1 text-sm";
+export function PriorityBadge({ priority }: PriorityBadgeProps) {
+  const priorityNum = parseInt(String(priority), 10);
+
+  // Map priority to Pill kind
+  let pillKind: PillKind = "default";
+  if (priorityNum === 0) {
+    pillKind = "error";
+  }
 
   return (
-    <span
-      className={`rounded-full font-medium ${sizeClasses} ${getPriorityColor(
-        priority,
-      )}`}
-    >
-      P{priority}
-      {showLabel && " priority"}
-    </span>
+    <Pill kind={pillKind} appearance="solid">
+      p{priority}
+    </Pill>
   );
 }

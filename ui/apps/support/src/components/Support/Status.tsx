@@ -22,10 +22,12 @@ const statusEventSchema = z.object({
   ),
 });
 
-const incidentSchema = statusEventSchema.extend({
+export const incidentSchema = statusEventSchema.extend({
   status: z.enum(["identified", "investigating", "monitoring"]),
   current_worst_impact: impactSchema as unknown as z.ZodTypeAny,
 });
+
+export type IncidentEvent = z.infer<typeof incidentSchema>;
 
 const maintenanceInProgressEventSchema = statusEventSchema.extend({
   status: z.enum(["maintenance_in_progress"]),
@@ -33,11 +35,24 @@ const maintenanceInProgressEventSchema = statusEventSchema.extend({
   scheduled_end_at: z.string(),
 });
 
+export type MaintenanceInProgressEvent = z.infer<
+  typeof maintenanceInProgressEventSchema
+>;
+
 const maintenanceScheduledEventSchema = statusEventSchema.extend({
   status: z.enum(["maintenance_scheduled"]),
   starts_at: z.string(),
   ends_at: z.string(),
 });
+
+export type MaintenanceScheduledEvent = z.infer<
+  typeof maintenanceScheduledEventSchema
+>;
+
+export type Event =
+  | IncidentEvent
+  | MaintenanceInProgressEvent
+  | MaintenanceScheduledEvent;
 
 const statusPageSummaryResponseSchema = z.object({
   page_title: z.string(),
@@ -65,9 +80,15 @@ export const indicatorColor: { [K in Indicator]: string } = {
 
 export const STATUS_PAGE_URL = "https://status.inngest.com";
 
+export type ExtendedStatus = Status & {
+  incidents: z.infer<typeof incidentSchema>[];
+  maintenances: z.infer<typeof maintenanceInProgressEventSchema>[];
+  scheduled_maintenances: z.infer<typeof maintenanceScheduledEventSchema>[];
+};
+
 const mapStatus = (
   res: z.infer<typeof statusPageSummaryResponseSchema>,
-): Status => {
+): ExtendedStatus => {
   // Grab first incident and maintenance item
   const incident = res.ongoing_incidents[0];
   const maintenance = res.in_progress_maintenances[0];
@@ -79,6 +100,9 @@ const mapStatus = (
     description: impactMessage[impact],
     updated_at: incident?.last_update_at || new Date().toString(),
     url: incident?.url || STATUS_PAGE_URL,
+    incidents: res.ongoing_incidents,
+    maintenances: res.in_progress_maintenances,
+    scheduled_maintenances: res.scheduled_maintenances,
   };
 };
 
@@ -90,7 +114,7 @@ const fetchStatus = async () => {
   );
 };
 
-export const getStatus = async (): Promise<Status | undefined> => {
+export const getStatus = async (): Promise<ExtendedStatus | undefined> => {
   try {
     return mapStatus(await fetchStatus());
   } catch (e) {

@@ -1,69 +1,41 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef } from "react";
 import { Link, useLocation } from "@tanstack/react-router";
-import { RiTicketLine, RiHomeLine } from "@remixicon/react";
+import { RiTicketLine } from "@remixicon/react";
 
 import Logo from "../Navigation/Logo";
 import { Profile } from "../Navigation/Profile";
 import { ProfileDisplayType } from "@/data/profile";
 
 export default function SideBar({
-  collapsed: serverCollapsed,
   profile,
 }: {
-  collapsed: boolean | undefined;
+  collapsed?: boolean | undefined;
   profile?: ProfileDisplayType;
 }) {
   const navRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
   const pathname = location.pathname;
 
-  const [collapsed, setCollapsed] = useState<boolean>(serverCollapsed ?? false);
-
-  const autoCollapse = () =>
-    typeof window !== "undefined" &&
-    window.matchMedia("(max-width: 800px)").matches &&
-    setCollapsed(true);
-
-  useEffect(() => {
-    //
-    // if the user has not set a pref and they are on mobile, collapse by default
-    serverCollapsed === undefined && autoCollapse();
-
-    if (navRef.current !== null) {
-      window.addEventListener("resize", autoCollapse);
-
-      return () => {
-        window.removeEventListener("resize", autoCollapse);
-      };
-    }
-  }, [serverCollapsed]);
+  // Always collapsed in the new design
+  const collapsed = true;
 
   const navItems = [
     {
-      icon: RiHomeLine,
+      icon: RiTicketLine,
       label: "Tickets",
       path: "/",
       exact: true,
-    },
-    {
-      icon: RiTicketLine,
-      label: "Support",
-      path: "/support",
-      exact: false,
     },
   ];
 
   return (
     <nav
-      className={`bg-canvasBase border-subtle group
-         top-0 flex h-screen flex-col justify-start ${
-           collapsed ? "w-[64px]" : "w-[224px]"
-         }  sticky z-[51] shrink-0 overflow-visible border-r`}
+      className="bg-canvasBase border-muted sticky top-0 z-[51] flex h-screen w-[59px] shrink-0 flex-col justify-start overflow-visible border-r"
       ref={navRef}
     >
-      <Logo collapsed={collapsed} setCollapsed={setCollapsed} />
+      <Logo collapsed={collapsed} setCollapsed={() => {}} />
       <div className="flex grow flex-col justify-between">
-        <div className="mx-2 mt-4 space-y-1">
+        <div className="mx-2 mt-2 space-y-2">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = item.exact
@@ -73,17 +45,14 @@ export default function SideBar({
               <Link
                 key={item.path}
                 to={item.path}
-                className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                  collapsed ? "justify-center" : ""
-                } ${
+                className={`flex h-8 w-8 items-center justify-center rounded-md text-sm font-medium transition-colors ${
                   isActive
-                    ? "bg-secondary-4xSubtle text-info"
+                    ? "bg-primary-moderate text-alwaysWhite"
                     : "text-subtle hover:bg-canvasSubtle hover:text-basis"
                 }`}
-                title={collapsed ? item.label : undefined}
+                title={item.label}
               >
-                <Icon className="h-5 w-5 shrink-0" />
-                {!collapsed && <span>{item.label}</span>}
+                <Icon className="h-[18px] w-[18px] shrink-0" />
               </Link>
             );
           })}

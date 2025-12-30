@@ -11,9 +11,16 @@ import { Button } from "@inngest/components/Button/NewButton";
 
 type Props = React.PropsWithChildren<{
   isAuthenticated: boolean;
+  email?: string;
+  organizationName?: string;
 }>;
 
-export const ProfileMenu = ({ children, isAuthenticated }: Props) => {
+export const ProfileMenu = ({
+  children,
+  isAuthenticated,
+  email,
+  organizationName,
+}: Props) => {
   if (!isAuthenticated) {
     return (
       <Link to="/sign-in/$">
@@ -29,6 +36,10 @@ export const ProfileMenu = ({ children, isAuthenticated }: Props) => {
       </ListboxButton>
       <div className="relative">
         <ListboxOptions className="bg-canvasBase border-muted shadow-primary absolute -right-48 bottom-4 z-50 ml-8 w-[199px] rounded border ring-0 focus:outline-none">
+          <div className="text-muted m-2 flex flex-col min-h-8 cursor-default items-start gap-1 px-2 text-[13px]">
+            <div className="font-medium">{email}</div>
+            <div className="text-muted text-xs">{organizationName}</div>
+          </div>
           <ListboxOption
             className="text-muted hover:bg-canvasSubtle m-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
             value="signOut"

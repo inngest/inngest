@@ -101,7 +101,7 @@ function TicketDetail() {
             </div>
           ) : (
             <div className="space-y-4">
-              {timelineEntries.map((entry, index) => {
+              {timelineEntries.map((entry) => {
                 const isCustomer =
                   entry.node.actor.__typename === "CustomerActor";
                 const actorName =

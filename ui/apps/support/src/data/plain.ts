@@ -1,5 +1,6 @@
 import {
   PlainClient,
+  ThreadPartsFragment,
   type PlainSDKError,
 } from "@team-plain/typescript-sdk/dist/index";
 import { createServerFn } from "@tanstack/react-start";
@@ -19,13 +20,18 @@ type Err<U> = {
 };
 type Result<T, U> = NonNullable<Data<T> | Err<U>>;
 
+export type TicketChannel = "EMAIL" | "SLACK" | "API" | "DISCORD";
+
 export type TicketSummary = {
   id: string;
+  ref: string;
   title: string;
   status: string;
   priority: string;
   createdAt: string;
   updatedAt: string;
+  channel?: TicketChannel;
+  previewText?: string;
 };
 
 export type TicketDetail = {
@@ -55,6 +61,7 @@ export const getLabelForStatus = (status: string) => {
 export const getTicketsByEmail = createServerFn({ method: "GET" })
   .inputValidator((data: { email: string }) => data)
   .handler(async ({ data }): Promise<TicketSummary[]> => {
+    // TODO - Use Clerk auth here to get the customer email, and the metadata with their external id
     try {
       const { email } = data;
 
@@ -68,29 +75,83 @@ export const getTicketsByEmail = createServerFn({ method: "GET" })
         return [];
       }
 
-      // Fetch threads for this customer
-      const threadsResult = await plainClient.getThreads({
-        filters: {
-          customerIds: [customer.data.id],
+      const res = (await plainClient.rawRequest({
+        query: `
+          query GetThreads($filters: ThreadsFilter, $sortBy: ThreadsSort, $first: Int, $after: String, $last: Int, $before: String) {
+            threads(filters: $filters, sortBy: $sortBy, first: $first, after: $after, last: $last, before: $before) {
+              pageInfo {
+                hasNextPage
+                hasPreviousPage
+                startCursor
+                endCursor
+              }
+              totalCount
+              edges {
+                cursor
+                node {
+                  id
+                  ref
+                  title
+                  status
+                  priority
+                  previewText
+                  createdAt {
+                    unixTimestamp
+                    iso8601
+                  }
+                  statusChangedAt {
+                    unixTimestamp
+                    iso8601
+                  }
+                  updatedAt {
+                    unixTimestamp
+                    iso8601
+                  }
+                  customer {
+                    fullName
+                  }
+                  channel
+                }
+              }
+            }
+          }
+        `,
+        variables: {
+          filters: {
+            customerIds: [customer.data.id],
+          },
+          first: 10,
+          // after: null,
+          // last: null,
+          // before: null,
         },
-        first: 10,
-      });
+      })) as unknown as Result<ThreadsQueryResult, PlainSDKError>;
 
-      if (threadsResult.error || !threadsResult.data) {
-        console.error("Failed to fetch threads:", threadsResult.error);
+      if (res.error || !res.data) {
+        console.error("Failed to fetch threads:", res.error);
         return [];
       }
 
       // Map threads to ticket summaries
-      const tickets: TicketSummary[] = threadsResult.data.threads.map(
-        (thread: any) => ({
-          id: thread.id,
-          title: thread.title || "Untitled",
-          status: String(thread.status || "UNKNOWN"),
-          priority: String(thread.priority || "NORMAL"),
-          createdAt: thread.createdAt.iso8601,
-          updatedAt: thread.updatedAt.iso8601,
-        }),
+      const tickets: TicketSummary[] = res.data.threads.edges.map(
+        (
+          edge: ThreadsQueryResult["threads"]["edges"][number],
+          index: number,
+        ) => {
+          const thread = edge.node;
+
+          return {
+            id: thread.id,
+            ref: thread.ref || "",
+            title: thread.title || "Untitled",
+            status: String(thread.status || "UNKNOWN"),
+            priority: String(thread.priority || "NORMAL"),
+            createdAt: thread.createdAt.iso8601,
+            updatedAt: thread.updatedAt.iso8601,
+            channel: thread.channel as TicketChannel,
+            previewText: thread.previewText || "",
+          };
+        },
       );
 
       return tickets;
@@ -99,6 +160,25 @@ export const getTicketsByEmail = createServerFn({ method: "GET" })
       return [];
     }
   });
+
+type ThreadsQueryResult = {
+  threads: {
+    edges: {
+      node: ThreadPartsFragment & {
+        ref: string;
+        previewText: string;
+        channel: string;
+      };
+    }[];
+    pageInfo: {
+      hasNextPage: boolean;
+      hasPreviousPage: boolean;
+      startCursor: string;
+      endCursor: string;
+    };
+    totalCount: number;
+  };
+};
 
 export const getTicketById = createServerFn({ method: "GET" })
   .inputValidator((data: { ticketId: string }) => data)
@@ -349,7 +429,7 @@ export const getTimelineEntriesForTicket = createServerFn({ method: "GET" })
 
       const entries = res.data.thread.timelineEntries.edges;
       // Filter out entries that are not EmailEntry or SlackMessageEntry
-      console.log(JSON.stringify(entries, null, 2));
+      // console.log(JSON.stringify(entries, null, 2));
       return entries
         .filter(
           (entry) =>
