@@ -34,6 +34,9 @@ export default defineConfig({
         '../../packages/components/src',
       ),
     },
+    //
+    // TODO: these can go away when all versions are aligned across monorepo
+    dedupe: ['next-themes', '@tanstack/react-query', 'react', 'react-dom'],
   },
   ssr: {
     noExternal: ['@reduxjs/toolkit', '@rtk-query/graphql-request-base-query'],

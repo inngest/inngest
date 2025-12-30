@@ -21,6 +21,16 @@ export default defineConfig({
         '../../packages/components/src',
       ),
     },
+    // TODO: these can go away when all versions are aligned across monorepo
+    dedupe: [
+      'next-themes',
+      '@tanstack/react-query',
+      'react',
+      'react-dom',
+      '@tanstack/react-router',
+      '@tanstack/react-table',
+      'zod',
+    ],
   },
   optimizeDeps: {
     exclude: ['@inngest/agent-kit'],
