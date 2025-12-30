@@ -155,3 +155,12 @@ func (r *GetSpanBySpanIDRow) GetStartTime() any                { return r.StartT
 func (r *GetSpanBySpanIDRow) GetEndTime() any                  { return r.EndTime }
 
 func (r *GetSpanBySpanIDRow) GetSpanFragments() any { return r.SpanFragments }
+
+func (r *GetMetadataSpansByParentSpanIDRow) GetTraceID() string               { return r.TraceID }
+func (r *GetMetadataSpansByParentSpanIDRow) GetRunID() string                 { return r.RunID }
+func (r *GetMetadataSpansByParentSpanIDRow) GetDynamicSpanID() sql.NullString { return r.DynamicSpanID }
+func (r *GetMetadataSpansByParentSpanIDRow) GetParentSpanID() sql.NullString  { return r.ParentSpanID }
+func (r *GetMetadataSpansByParentSpanIDRow) GetStartTime() any                { return r.StartTime }
+func (r *GetMetadataSpansByParentSpanIDRow) GetEndTime() any                  { return r.EndTime }
+
+func (r *GetMetadataSpansByParentSpanIDRow) GetSpanFragments() any { return r.SpanFragments }
