@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 
-import { Button } from '@inngest/components/Button/NewButton';
+import { Button } from '@inngest/components/Button';
 import { AlertModal } from '@inngest/components/Modal/AlertModal';
 import { RiAlertFill } from '@remixicon/react';
 import { toast } from 'sonner';

@@ -10,8 +10,8 @@ import { StatusMenu } from '@/components/Apps/StatusMenu';
 
 import { getProdApps } from '@/queries/server/apps';
 import { pathCreator } from '@/utils/urls';
-import { Button } from '@inngest/components/Button/NewButton';
-import { Header } from '@inngest/components/Header/NewHeader';
+import { Button } from '@inngest/components/Button';
+import { Header } from '@inngest/components/Header/Header';
 import { RiAddLine } from '@remixicon/react';
 import { AppInfo } from './route';
 

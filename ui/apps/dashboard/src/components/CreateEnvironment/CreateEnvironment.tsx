@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from '@tanstack/react-router';
-import { Button } from '@inngest/components/Button/NewButton';
+import { Button } from '@inngest/components/Button';
 import { Input } from '@inngest/components/Forms/Input';
-import { Link } from '@inngest/components/Link/NewLink';
+import { Link } from '@inngest/components/Link';
 import { toast } from 'sonner';
 import { useMutation } from 'urql';
 

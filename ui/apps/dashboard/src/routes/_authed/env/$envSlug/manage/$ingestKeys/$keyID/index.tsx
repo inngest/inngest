@@ -3,8 +3,8 @@ import { EnvironmentType } from '@/gql/graphql';
 import { useEnvironment } from '@/components/Environments/environment-context';
 
 import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
-import { Alert } from '@inngest/components/Alert/NewAlert';
-import { Button } from '@inngest/components/Button/NewButton';
+import { Alert } from '@inngest/components/Alert';
+import { Button } from '@inngest/components/Button';
 import {
   DropdownMenu,
   DropdownMenuTrigger,

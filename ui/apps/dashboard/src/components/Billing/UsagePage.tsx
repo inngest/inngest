@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from '@tanstack/react-router';
-import { Select, type Option } from '@inngest/components/Select/NewSelect';
+import { Select, type Option } from '@inngest/components/Select/Select';
 import ToggleGroup from '@inngest/components/ToggleGroup/ToggleGroup';
 import { useQuery } from 'urql';
 

@@ -1,9 +1,5 @@
-'use client';
-
 import { useCallback, useEffect, useMemo, useRef, useState, type UIEventHandler } from 'react';
-import type { Route } from 'next';
-import { useRouter } from 'next/navigation';
-import { Button } from '@inngest/components/Button/Button';
+import { Button } from '@inngest/components/Button';
 import { ErrorCard } from '@inngest/components/Error/ErrorCard';
 import { Search } from '@inngest/components/Forms/Search';
 import TableBlankState from '@inngest/components/Functions/TableBlankState';
@@ -12,8 +8,9 @@ import { Table } from '@inngest/components/Table';
 import useDebounce from '@inngest/components/hooks/useDebounce';
 import { type Function, type PageInfo } from '@inngest/components/types/function';
 import { useInfiniteQuery } from '@tanstack/react-query';
+import { useNavigate, type LinkComponentProps } from '@tanstack/react-router';
 
-import { useSearchParam } from '../hooks/useSearchParam';
+import { useSearchParam } from '../hooks/useSearchParams';
 import FunctionsStatusFilter from './StatusMenu';
 import { useColumns } from './columns';
 
@@ -25,9 +22,9 @@ export function FunctionsTable({
 }: {
   emptyActions: React.ReactNode;
   pathCreator: {
-    function: (params: { functionSlug: string }) => Route;
-    eventType: (params: { eventName: string }) => Route;
-    app: (params: { externalAppID: string }) => Route;
+    function: (params: { functionSlug: string }) => LinkComponentProps['to'];
+    eventType: (params: { eventName: string }) => LinkComponentProps['to'];
+    app: (params: { externalAppID: string }) => LinkComponentProps['to'];
   };
   getFunctions: ({
     cursor,
@@ -43,7 +40,7 @@ export function FunctionsTable({
     functionID: string;
   }) => Promise<Pick<Function, 'usage' | 'failureRate'>>;
 }) {
-  const router = useRouter();
+  const navigate = useNavigate();
   const columns = useColumns({ pathCreator, getFunctionVolume });
 
   const [filteredStatus, setFilteredStatus, removeFilteredStatus] = useSearchParam('archived');
@@ -166,7 +163,7 @@ export function FunctionsTable({
             />
           }
           onRowClick={(row) =>
-            router.push(pathCreator.function({ functionSlug: row.original.slug }))
+            navigate({ to: pathCreator.function({ functionSlug: row.original.slug }) })
           }
           getRowHref={(row) => pathCreator.function({ functionSlug: row.original.slug })}
         />

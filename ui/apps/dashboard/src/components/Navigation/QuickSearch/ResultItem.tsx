@@ -1,4 +1,4 @@
-import { Pill } from '@inngest/components/Pill/NewPill';
+import { Pill } from '@inngest/components/Pill';
 import { AppsIcon } from '@inngest/components/icons/sections/Apps';
 import { EventLogsIcon } from '@inngest/components/icons/sections/EventLogs';
 import { EventsIcon } from '@inngest/components/icons/sections/Events';

@@ -1,7 +1,7 @@
 import { Connect } from '@/components/Integrations/Vercel/Connect';
 import { createVercelIntegration } from '@/queries/server/integrations/vercel';
 import { IconVercel } from '@inngest/components/icons/platforms/Vercel';
-import { Link } from '@inngest/components/Link/NewLink';
+import { Link } from '@inngest/components/Link';
 import { createFileRoute, type FileRouteTypes } from '@tanstack/react-router';
 
 export type VercelCallbackProps = {

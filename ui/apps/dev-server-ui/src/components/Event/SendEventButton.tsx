@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Button } from '@inngest/components/Button/NewButton';
-import type { ButtonAppearance } from '@inngest/components/Button/NewButton';
+import { Button } from '@inngest/components/Button';
+import type { ButtonAppearance } from '@inngest/components/Button';
 
 import SendEventModal from '@/components/Event/SendEventModal';
 

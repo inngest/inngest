@@ -4,7 +4,7 @@ import SignInRedirectErrors, {
 } from '@/components/SignIn/Errors';
 import SplitView from '@/components/SignIn/SplitView';
 import { SignIn } from '@clerk/tanstack-react-start';
-import { Alert } from '@inngest/components/Alert/NewAlert';
+import { Alert } from '@inngest/components/Alert';
 import { createFileRoute, useLocation } from '@tanstack/react-router';
 
 type SignInSearchParams = {

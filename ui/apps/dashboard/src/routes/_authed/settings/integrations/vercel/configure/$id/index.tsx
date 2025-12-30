@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { createFileRoute, Link as RouterLink } from '@tanstack/react-router';
 import { Alert } from '@inngest/components/Alert/Alert';
-import { Button } from '@inngest/components/Button/NewButton';
+import { Button } from '@inngest/components/Button';
 import { Input } from '@inngest/components/Forms/Input';
-import { Link } from '@inngest/components/Link/NewLink';
+import { Link } from '@inngest/components/Link';
 import {
   Switch,
   SwitchLabel,

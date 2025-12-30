@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link } from '@inngest/components/Link/NewLink';
+import { Link } from '@inngest/components/Link';
 import { OptionalTooltip } from '@inngest/components/Tooltip/OptionalTooltip';
 import { formatDistanceToNow } from '@inngest/components/utils/date';
 

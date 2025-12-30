@@ -1,7 +1,7 @@
 import { MetricsActionMenu } from '@/components/Metrics/ActionMenu';
 import { Dashboard } from '@/components/Metrics/Dashboard';
-import { Header } from '@inngest/components/Header/NewHeader';
-import { RefreshButton } from '@inngest/components/Refresh/NewRefreshButton';
+import { Header } from '@inngest/components/Header/Header';
+import { RefreshButton } from '@inngest/components/Refresh/RefreshButton';
 import { createFileRoute } from '@tanstack/react-router';
 
 export const Route = createFileRoute('/_authed/env/$envSlug/metrics/')({

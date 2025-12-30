@@ -1,5 +1,5 @@
-import { Button } from '@inngest/components/Button/NewButton';
-import { Header } from '@inngest/components/Header/NewHeader';
+import { Button } from '@inngest/components/Button';
+import { Header } from '@inngest/components/Header/Header';
 import { RiRefreshLine } from '@remixicon/react';
 import { createFileRoute, ClientOnly } from '@tanstack/react-router';
 import { Runs } from '@/components/Runs/Runs';

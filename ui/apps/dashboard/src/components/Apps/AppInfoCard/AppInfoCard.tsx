@@ -1,6 +1,6 @@
 import AppDetailsCard from '@inngest/components/Apps/AppDetailsCard';
-import { Link } from '@inngest/components/Link/NewLink';
-import { Pill } from '@inngest/components/Pill/NewPill';
+import { Link } from '@inngest/components/Link';
+import { Pill } from '@inngest/components/Pill';
 import { TextClickToCopy } from '@inngest/components/Text';
 import { Time } from '@inngest/components/Time';
 import { methodTypes, type App } from '@inngest/components/types/app';

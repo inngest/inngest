@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Error } from '@inngest/components/Error/NewError';
+import { Error } from '@inngest/components/Error/Error';
 import {
   Tooltip as CustomTooltip,
   TooltipContent,

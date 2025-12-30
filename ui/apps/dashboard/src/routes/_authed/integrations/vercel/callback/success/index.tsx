@@ -1,4 +1,4 @@
-import { Button } from '@inngest/components/Button/NewButton';
+import { Button } from '@inngest/components/Button';
 import { Card } from '@inngest/components/Card/Card';
 import { IconVercel } from '@inngest/components/icons/platforms/Vercel';
 import { RiCheckLine, RiInformationLine } from '@remixicon/react';

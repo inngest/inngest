@@ -1,6 +1,6 @@
-import { Alert } from '@inngest/components/Alert/NewAlert';
-import { FunctionList } from '@inngest/components/Apps/NewFunctionList';
-import { Button } from '@inngest/components/Button/NewButton';
+import { Alert } from '@inngest/components/Alert';
+import { FunctionList } from '@inngest/components/Apps/FunctionList';
+import { Button } from '@inngest/components/Button';
 import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
 import WorkerCounter from '@inngest/components/Workers/ConnectedWorkersDescription';
 import { methodTypes } from '@inngest/components/types/app';

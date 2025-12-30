@@ -1,4 +1,4 @@
-import { Alert } from '@inngest/components/Alert/NewAlert';
+import { Alert } from '@inngest/components/Alert';
 import { Chart } from '@inngest/components/Chart/Chart';
 
 import { createChartOptions } from './transformData';

@@ -1,4 +1,4 @@
-import { Button } from '@inngest/components/Button/NewButton';
+import { Button } from '@inngest/components/Button';
 import { RiExternalLinkLine } from '@remixicon/react';
 
 import { SHOW_EXAMPLES_LINK } from '@/components/Insights/temp-flags';

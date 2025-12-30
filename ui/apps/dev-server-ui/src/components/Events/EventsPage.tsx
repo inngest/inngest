@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Button } from '@inngest/components/Button/NewButton';
-import { EventsActionMenu } from '@inngest/components/Events/NewEventsActionMenu';
-import { EventsTable } from '@inngest/components/Events/NewEventsTable';
+import { Button } from '@inngest/components/Button';
+import { EventsActionMenu } from '@inngest/components/Events/EventsActionMenu';
+import { EventsTable } from '@inngest/components/Events/EventsTable';
 import { useReplayModal } from '@inngest/components/Events/useReplayModal';
-import { Header } from '@inngest/components/Header/NewHeader';
+import { Header } from '@inngest/components/Header/Header';
 import { useBooleanFlag } from '@inngest/components/SharedContext/useBooleanFlag';
 import { RiExternalLinkLine, RiRefreshLine } from '@remixicon/react';
 

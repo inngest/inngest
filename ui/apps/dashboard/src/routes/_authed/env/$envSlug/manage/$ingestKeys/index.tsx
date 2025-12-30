@@ -2,7 +2,7 @@ import useManagePageTerminology from '@/components/Manage/useManagePageTerminolo
 import { EnvironmentType } from '@/utils/environments';
 import { createFileRoute } from '@tanstack/react-router';
 import { Route as OrgActiveRoute } from '@/routes/_authed';
-import { Alert } from '@inngest/components/Alert/NewAlert';
+import { Alert } from '@inngest/components/Alert';
 
 export const Route = createFileRoute(
   '/_authed/env/$envSlug/manage/$ingestKeys/',

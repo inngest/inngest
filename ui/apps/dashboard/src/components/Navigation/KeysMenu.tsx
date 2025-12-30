@@ -1,5 +1,5 @@
 import { Listbox } from '@headlessui/react';
-import { Button } from '@inngest/components/Button/NewButton';
+import { Button } from '@inngest/components/Button';
 import { RiKey2Line } from '@remixicon/react';
 
 import type { Environment as EnvType } from '@/utils/environments';

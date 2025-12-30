@@ -1,6 +1,6 @@
 import { Chart, type ChartProps } from '@inngest/components/Chart/Chart';
 import { Info } from '@inngest/components/Info/Info';
-import { Link } from '@inngest/components/Link/NewLink';
+import { Link } from '@inngest/components/Link';
 import { resolveColor } from '@inngest/components/utils/colors';
 import { isDark } from '@inngest/components/utils/theme';
 

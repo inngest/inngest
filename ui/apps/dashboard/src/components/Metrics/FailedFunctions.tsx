@@ -1,4 +1,4 @@
-import { Button } from '@inngest/components/Button/NewButton';
+import { Button } from '@inngest/components/Button';
 import { Chart } from '@inngest/components/Chart/Chart';
 import { Info } from '@inngest/components/Info/Info';
 import { Link } from '@inngest/components/Link/Link';

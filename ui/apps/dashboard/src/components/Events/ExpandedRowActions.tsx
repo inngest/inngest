@@ -1,4 +1,4 @@
-import { Button } from '@inngest/components/Button/NewButton';
+import { Button } from '@inngest/components/Button';
 
 import { pathCreator } from '@/utils/urls';
 

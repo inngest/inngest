@@ -3,7 +3,7 @@ import { getProfileDisplay } from "@/data/profile";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { Header } from "@inngest/components/Header/NewHeader";
+import { Header } from "@inngest/components/Header/Header";
 
 export const Route = createFileRoute("/_authed/support/")({
   component: HomeComponent,

@@ -11,7 +11,7 @@ import {
   SkeletonElement,
   TextElement,
   TimeElement,
-} from '../DetailsCard/NewElement';
+} from '../DetailsCard/Element';
 import type { Run as InitialRunData } from '../RunsPage/types';
 import type { TraceResult } from '../SharedContext/useGetTraceResult';
 import { usePathCreator } from '../SharedContext/usePathCreator';

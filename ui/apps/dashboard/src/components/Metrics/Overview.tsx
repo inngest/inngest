@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Error } from '@inngest/components/Error/NewError';
+import { Error } from '@inngest/components/Error/Error';
 import { RiArrowDownSFill, RiArrowRightSFill } from '@remixicon/react';
 
 import { useEnvironment } from '@/components/Environments/environment-context';

@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
-import { Alert } from '@inngest/components/Alert/NewAlert';
-import { Button } from '@inngest/components/Button/NewButton';
+import { Alert } from '@inngest/components/Alert';
+import { Button } from '@inngest/components/Button';
 import * as Sentry from '@sentry/tanstackstart-react';
 
 import { pathCreator } from '@/utils/urls';

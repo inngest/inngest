@@ -1,5 +1,5 @@
 import { type ComponentProps } from 'react';
-import { Button } from '@inngest/components/Button/NewButton';
+import { Button } from '@inngest/components/Button';
 import { cn } from '@inngest/components/utils/classNames';
 import { RiArrowDownLine } from '@remixicon/react';
 import { AnimatePresence, motion } from 'framer-motion';

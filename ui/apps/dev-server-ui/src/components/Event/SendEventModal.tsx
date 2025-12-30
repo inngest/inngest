@@ -6,7 +6,7 @@ import {
   useState,
   type KeyboardEvent,
 } from 'react';
-import { Button } from '@inngest/components/Button/NewButton';
+import { Button } from '@inngest/components/Button';
 import { Modal } from '@inngest/components/Modal';
 import {
   FONT,

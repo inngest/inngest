@@ -1,5 +1,5 @@
 import AppDetailsCard from '@inngest/components/Apps/AppDetailsCard';
-import { Link } from '@inngest/components/Link/NewLink';
+import { Link } from '@inngest/components/Link';
 
 type Props = {
   sync: {

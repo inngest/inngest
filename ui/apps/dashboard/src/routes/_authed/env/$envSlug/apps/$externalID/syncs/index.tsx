@@ -1,4 +1,4 @@
-import { useSearchParam } from '@inngest/components/hooks/useNewSearchParams';
+import { useSearchParam } from '@inngest/components/hooks/useSearchParams';
 import { createFileRoute } from '@tanstack/react-router';
 
 import { Sync } from '@/components/Apps/Syncs/Sync';

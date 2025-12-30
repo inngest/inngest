@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Button } from '@inngest/components/Button/NewButton';
-import { Link } from '@inngest/components/Link/NewLink';
+import { Button } from '@inngest/components/Button';
+import { Link } from '@inngest/components/Link';
 import { RiCloseLine } from '@remixicon/react';
 
 const HIDE_FEEDBACK = 'inngest-feedback-hide';

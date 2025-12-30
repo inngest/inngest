@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Button } from '@inngest/components/Button/NewButton';
+import { Button } from '@inngest/components/Button';
 import { IDCell, TimeCell } from '@inngest/components/Table/Cell';
 import { useQuery } from 'urql';
 

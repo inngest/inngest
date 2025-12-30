@@ -1,5 +1,5 @@
 import { Info } from '@inngest/components/Info/Info';
-import { Link } from '@inngest/components/Link/NewLink';
+import { Link } from '@inngest/components/Link';
 import { createFileRoute, Outlet } from '@tanstack/react-router';
 
 export const AppInfo = () => (

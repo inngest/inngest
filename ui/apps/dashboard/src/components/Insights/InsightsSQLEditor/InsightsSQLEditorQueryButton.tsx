@@ -1,4 +1,4 @@
-import { Button } from '@inngest/components/Button/NewButton';
+import { Button } from '@inngest/components/Button';
 
 import { useInsightsStateMachineContext } from '../InsightsStateMachineContext/InsightsStateMachineContext';
 import { KeyboardShortcut } from '../KeyboardShortcut';

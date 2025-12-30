@@ -1,4 +1,4 @@
-import { MenuItem } from '@inngest/components/Menu/NewMenuItem';
+import { MenuItem } from '@inngest/components/Menu/MenuItem';
 import { EventLogsIcon } from '@inngest/components/icons/sections/EventLogs';
 import { InsightsIcon } from '@inngest/components/icons/sections/Insights';
 import { MetricsIcon } from '@inngest/components/icons/sections/Metrics';

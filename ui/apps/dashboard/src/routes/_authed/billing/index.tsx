@@ -1,5 +1,5 @@
-import { Alert } from '@inngest/components/Alert/NewAlert';
-import { Button } from '@inngest/components/Button/NewButton';
+import { Alert } from '@inngest/components/Alert';
+import { Button } from '@inngest/components/Button';
 import { Card } from '@inngest/components/Card/Card';
 import { formatDayString } from '@inngest/components/utils/date';
 import { createFileRoute } from '@tanstack/react-router';

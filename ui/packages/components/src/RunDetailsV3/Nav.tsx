@@ -1,8 +1,5 @@
-'use client';
-
-import NextLink from 'next/link';
-import { useRouter } from 'next/navigation';
 import { RiArrowDownSLine, RiExternalLinkLine, RiShareForward2Line } from '@remixicon/react';
+import { useRouter, type LinkComponentProps } from '@tanstack/react-router';
 
 import { Button } from '../Button';
 import { SplitButton } from '../Button/SplitButton';
@@ -41,10 +38,13 @@ export const Standalone = ({ runID }: NavProps) => {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <DropdownMenuItem>
-          <NextLink href={pathCreator.runPopout({ runID })} className="flex items-center gap-2">
+          <Link
+            to={pathCreator.runPopout({ runID }) as LinkComponentProps['to']}
+            className="flex items-center gap-2"
+          >
             <RiShareForward2Line className="h-4 w-4" />
             Open in new tab
-          </NextLink>
+          </Link>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
@@ -70,7 +70,7 @@ export const Nav = ({ standalone, functionSlug, runID }: NavProps) => {
       debugSessionID: runID,
     });
 
-    router.push(debuggerPath);
+    router.navigate({ to: debuggerPath });
     return;
   };
 
