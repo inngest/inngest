@@ -44,6 +44,7 @@ type Querier interface {
 	GetHistoryItem(ctx context.Context, id ulid.ULID) (*History, error)
 	GetLatestExecutionSpanByStepID(ctx context.Context, arg GetLatestExecutionSpanByStepIDParams) (*GetLatestExecutionSpanByStepIDRow, error)
 	GetLatestQueueSnapshotChunks(ctx context.Context) ([]*GetLatestQueueSnapshotChunksRow, error)
+	GetMetadataSpansByParentSpanID(ctx context.Context, arg GetMetadataSpansByParentSpanIDParams) ([]*GetMetadataSpansByParentSpanIDRow, error)
 	//
 	// Queue snapshots
 	//

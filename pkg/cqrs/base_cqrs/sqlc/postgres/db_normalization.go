@@ -836,6 +836,20 @@ func (q NormalizedQueries) GetSpanBySpanID(ctx context.Context, args sqlc_sqlite
 	return row.ToSQLite()
 }
 
+func (q NormalizedQueries) GetMetadataSpansByParentSpanID(ctx context.Context, args sqlc_sqlite.GetMetadataSpansByParentSpanIDParams) ([]*sqlc_sqlite.GetMetadataSpansByParentSpanIDRow, error) {
+	rows, err := q.db.GetMetadataSpansByParentSpanID(ctx, GetMetadataSpansByParentSpanIDParams(args))
+	if err != nil {
+		return nil, err
+	}
+
+	sqliteRows := make([]*sqlc_sqlite.GetMetadataSpansByParentSpanIDRow, len(rows))
+	for i, row := range rows {
+		sqliteRows[i], _ = row.ToSQLite()
+	}
+
+	return sqliteRows, nil
+}
+
 func (q NormalizedQueries) GetSpanOutput(ctx context.Context, spanIds []string) ([]*sqlc_sqlite.GetSpanOutputRow, error) {
 	rows, err := q.db.GetSpanOutput(ctx, spanIds)
 	if err != nil {

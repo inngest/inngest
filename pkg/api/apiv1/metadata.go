@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -92,7 +93,6 @@ func (a router) addRunMetadata(w http.ResponseWriter, r *http.Request) {
 		_ = publicerr.WriteHTTP(w, err)
 		return
 	}
-
 }
 
 type RunMetadataTarget struct {
@@ -110,7 +110,7 @@ type AddRunMetadataRequest struct {
 }
 
 func (a router) AddRunMetadata(ctx context.Context, auth apiv1auth.V1Auth, runID ulid.ULID, req *AddRunMetadataRequest) error {
-	parentSpan, scope, err := a.getParentSpan(ctx, auth, runID, &req.Target)
+	parentSpan, scope, err := a.getParentSpan(ctx, auth, runID, &req.Target, cqrs.GetTraceSpanOpt{IncludeMetadata: false})
 	if err != nil {
 		return err
 	}
@@ -155,7 +155,96 @@ func (a router) AddRunMetadata(ctx context.Context, auth apiv1auth.V1Auth, runID
 	return nil
 }
 
-func (a router) getParentSpan(ctx context.Context, auth apiv1auth.V1Auth, runID ulid.ULID, target *RunMetadataTarget) (*cqrs.OtelSpan, metadata.Scope, error) {
+func (a router) getRunMetadata(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	auth, err := a.opts.AuthFinder(ctx)
+	if err != nil {
+		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 401, "No auth found"))
+		return
+	}
+
+	if !a.opts.MetadataOpts.Flag.Enabled(ctx, auth.AccountID()) {
+		_ = publicerr.WriteHTTP(w, publicerr.Errorf(403, "Metadata is not enabled for this account"))
+		return
+	}
+
+	runID, err := ulid.Parse(chi.URLParam(r, "runID"))
+	if err != nil {
+		_ = publicerr.WriteHTTP(w, publicerr.Wrapf(err, 400, "Invalid run ID: %s", chi.URLParam(r, "runID")))
+		return
+	}
+
+	params := GetRunMetadataParams{}
+	if stepID := r.URL.Query().Get("step_id"); stepID != "" {
+		params.Target.StepID = &stepID
+	}
+
+	if stepIndexStr := r.URL.Query().Get("step_index"); stepIndexStr != "" {
+		stepIndex, err := strconv.Atoi(stepIndexStr)
+		if err != nil {
+			_ = publicerr.WriteHTTP(w, publicerr.Wrapf(err, 400, "Invalid step_index: %s", stepIndexStr))
+			return
+		}
+		params.Target.StepIndex = &stepIndex
+	}
+
+	if stepAttemptStr := r.URL.Query().Get("step_attempt"); stepAttemptStr != "" {
+		stepAttempt, err := strconv.Atoi(stepAttemptStr)
+		if err != nil {
+			_ = publicerr.WriteHTTP(w, publicerr.Wrapf(err, 400, "Invalid step_attempt: %s", stepAttemptStr))
+			return
+		}
+		params.Target.StepAttempt = &stepAttempt
+	}
+
+	if spanID := r.URL.Query().Get("span_id"); spanID != "" {
+		params.Target.SpanID = &spanID
+	}
+
+	if params.Target.StepID == nil {
+		switch {
+		case params.Target.StepIndex != nil:
+			err = errors.New("target.step_id must be defined if target.step_index is defined")
+		case params.Target.StepAttempt != nil:
+			err = errors.New("target.step_id must be defined if target.step_attempt is defined")
+		case params.Target.SpanID != nil:
+			err = errors.New("target.step_id must be defined if target.span_id is defined")
+		}
+	}
+
+	if err != nil {
+		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 400, "Invalid metadata target"))
+	}
+
+	entries, err := a.GetRunMetadata(ctx, auth, runID, &params)
+	switch {
+	// TODO: better cases for specific errors
+	case err != nil:
+		_ = publicerr.WriteHTTP(w, err)
+		return
+	}
+
+	enc := json.NewEncoder(w)
+	if err := enc.Encode(entries); err != nil {
+		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 500, "Failed to encode metadata response"))
+		return
+	}
+}
+
+type GetRunMetadataParams struct {
+	Target RunMetadataTarget `json:"target"`
+}
+
+func (a router) GetRunMetadata(ctx context.Context, auth apiv1auth.V1Auth, runID ulid.ULID, params *GetRunMetadataParams) ([]*cqrs.SpanMetadata, error) {
+	parentSpan, _, err := a.getParentSpan(ctx, auth, runID, &params.Target, cqrs.GetTraceSpanOpt{IncludeMetadata: true})
+	if err != nil {
+		return nil, err
+	}
+
+	return parentSpan.Metadata, nil
+}
+
+func (a router) getParentSpan(ctx context.Context, auth apiv1auth.V1Auth, runID ulid.ULID, target *RunMetadataTarget, opt cqrs.GetTraceSpanOpt) (*cqrs.OtelSpan, metadata.Scope, error) {
 	var scope metadata.Scope
 	var span *cqrs.OtelSpan
 	var err error
@@ -163,7 +252,7 @@ func (a router) getParentSpan(ctx context.Context, auth apiv1auth.V1Auth, runID 
 	switch {
 	case target.StepID == nil:
 		scope = enums.MetadataScopeRun
-		span, err = a.opts.TraceReader.GetRunSpanByRunID(ctx, runID, auth.AccountID(), auth.WorkspaceID())
+		span, err = a.opts.TraceReader.GetRunSpanByRunID(ctx, runID, auth.AccountID(), auth.WorkspaceID(), opt)
 	case target.StepAttempt == nil || target.SpanID == nil:
 		var stepID string
 		if target.StepIndex == nil || *target.StepIndex == 0 {
@@ -177,18 +266,18 @@ func (a router) getParentSpan(ctx context.Context, auth apiv1auth.V1Auth, runID 
 
 		if target.StepAttempt == nil {
 			scope = enums.MetadataScopeStep
-			span, err = a.opts.TraceReader.GetStepSpanByStepID(ctx, runID, stepID, auth.AccountID(), auth.WorkspaceID())
+			span, err = a.opts.TraceReader.GetStepSpanByStepID(ctx, runID, stepID, auth.AccountID(), auth.WorkspaceID(), opt)
 		} else if *target.StepAttempt < 0 {
 			scope = enums.MetadataScopeStepAttempt
-			span, err = a.opts.TraceReader.GetLatestExecutionSpanByStepID(ctx, runID, stepID, auth.AccountID(), auth.WorkspaceID())
+			span, err = a.opts.TraceReader.GetLatestExecutionSpanByStepID(ctx, runID, stepID, auth.AccountID(), auth.WorkspaceID(), opt)
 		} else {
 			scope = enums.MetadataScopeStepAttempt
-			span, err = a.opts.TraceReader.GetExecutionSpanByStepIDAndAttempt(ctx, runID, stepID, *target.StepAttempt, auth.AccountID(), auth.WorkspaceID())
+			span, err = a.opts.TraceReader.GetExecutionSpanByStepIDAndAttempt(ctx, runID, stepID, *target.StepAttempt, auth.AccountID(), auth.WorkspaceID(), opt)
 		}
 	default:
 		scope = enums.MetadataScopeExtendedTrace
 		// TODO: require that this is a extended trace span
-		span, err = a.opts.TraceReader.GetSpanBySpanID(ctx, runID, *target.SpanID, auth.AccountID(), auth.WorkspaceID())
+		span, err = a.opts.TraceReader.GetSpanBySpanID(ctx, runID, *target.SpanID, auth.AccountID(), auth.WorkspaceID(), opt)
 	}
 
 	switch {
