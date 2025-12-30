@@ -224,6 +224,10 @@ func (a router) getRunMetadata(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if len(entries) == 0 {
+		entries = []*cqrs.SpanMetadata{}
+	}
+
 	enc := json.NewEncoder(w)
 	if err := enc.Encode(entries); err != nil {
 		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 500, "Failed to encode metadata response"))

@@ -17,7 +17,6 @@ import (
 	"time"
 
 	"github.com/aws/smithy-go/ptr"
-	"github.com/davecgh/go-spew/spew"
 	sq "github.com/doug-martin/goqu/v9"
 	_ "github.com/doug-martin/goqu/v9/dialect/postgres"
 	_ "github.com/doug-martin/goqu/v9/dialect/sqlite3"
@@ -252,8 +251,6 @@ func (w wrapper) mapSpanWithOpts(ctx context.Context, span normalizedSpan, runID
 			spans = append(spans, mspan)
 		}
 	}
-
-	spew.Dump(spans)
 
 	return mapRootSpansFromRows(ctx, spans, true)
 }
