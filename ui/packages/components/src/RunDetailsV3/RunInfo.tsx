@@ -11,7 +11,7 @@ import {
   SkeletonElement,
   TextElement,
   TimeElement,
-} from '../DetailsCard/NewElement';
+} from '../DetailsCard/Element';
 import type { Run as InitialRunData } from '../RunsPage/types';
 import type { TraceResult } from '../SharedContext/useGetTraceResult';
 import { usePathCreator } from '../SharedContext/usePathCreator';
@@ -134,7 +134,7 @@ export const RunInfo = ({ initialRunData, run, runID, standalone, result }: Prop
             label="Duration"
             lazy={run}
             initial={initialRunData}
-            optimisticChildren={(initialRun: InitialRunData) => <TextElement>-</TextElement>}
+            optimisticChildren={() => <TextElement>-</TextElement>}
           >
             {(run: Run) => {
               let durationText = '-';

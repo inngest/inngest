@@ -1,8 +1,12 @@
 import { Chart } from '@inngest/components/Chart/Chart';
 import { Info } from '@inngest/components/Info/Info';
-import { Link } from '@inngest/components/Link/Link';
+import { Link } from '@inngest/components/Link';
 
-import type { MetricsData, ScopedMetric, VolumeMetricsQuery } from '@/gql/graphql';
+import type {
+  MetricsData,
+  ScopedMetric,
+  VolumeMetricsQuery,
+} from '@/gql/graphql';
 import type { EntityLookup } from './Dashboard';
 import { getLineChartOptions, mapEntityLines } from './utils';
 
@@ -19,7 +23,7 @@ const sum = (metrics: ScopedMetric[]) =>
         value: (acc[index]?.value || 0) + item.value,
         bucket: item.bucket,
       })),
-    accumulator
+    accumulator,
   );
 
 const scopedMetric = (id: string, data: Array<MetricsData>) => ({
@@ -55,7 +59,11 @@ export const mapSdkThroughput = ({
   return mapEntityLines(metrics, entityLookup, { opacity: 0.1 });
 };
 
-export const SdkThroughput = ({ workspace }: { workspace?: VolumeMetricsQuery['workspace'] }) => {
+export const SdkThroughput = ({
+  workspace,
+}: {
+  workspace?: VolumeMetricsQuery['workspace'];
+}) => {
   const metrics = workspace && mapSdkThroughput(workspace);
 
   return (
@@ -66,7 +74,10 @@ export const SdkThroughput = ({ workspace }: { workspace?: VolumeMetricsQuery['w
           <Info
             text="Total number of requests to Inngest SDKs from functions in your apps."
             action={
-              <Link className="text-sm" href="https://www.inngest.com/docs/sdk/overview">
+              <Link
+                className="text-sm"
+                href="https://www.inngest.com/docs/sdk/overview"
+              >
                 Learn more about SDK throughput.
               </Link>
             }

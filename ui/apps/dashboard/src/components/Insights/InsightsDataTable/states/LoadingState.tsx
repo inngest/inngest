@@ -1,5 +1,3 @@
-'use client';
-
 import { memo } from 'react';
 import { Table } from '@inngest/components/Table';
 import { type ColumnDef } from '@tanstack/react-table';

@@ -1,6 +1,6 @@
 import { Chart } from '@inngest/components/Chart/Chart';
 import { Info } from '@inngest/components/Info/Info';
-import { Link } from '@inngest/components/Link/Link';
+import { Link } from '@inngest/components/Link';
 
 import type { VolumeMetricsQuery } from '@/gql/graphql';
 import type { EntityLookup } from './Dashboard';
@@ -13,7 +13,9 @@ export const ConnectWorkerPercentage = ({
   workspace?: VolumeMetricsQuery['workspace'];
   entities: EntityLookup;
 }) => {
-  const metrics = workspace && mapEntityLines(workspace.workerPercentageUsed.metrics, entities);
+  const metrics =
+    workspace &&
+    mapEntityLines(workspace.workerPercentageUsed.metrics, entities);
 
   // Override yAxis for percentage formatting
   const chartData = metrics
@@ -51,7 +53,11 @@ export const ConnectWorkerPercentage = ({
       </div>
       <div className="flex h-full flex-row items-center overflow-visible">
         <Chart
-          option={chartData ? getLineChartOptions(chartData, chartData.legendData) : {}}
+          option={
+            chartData
+              ? getLineChartOptions(chartData, chartData.legendData)
+              : {}
+          }
           className="relative h-full w-full overflow-visible"
           group="metricsDashboard"
         />
@@ -67,7 +73,9 @@ export const ConnectWorkerTotalCapacity = ({
   workspace?: VolumeMetricsQuery['workspace'];
   entities: EntityLookup;
 }) => {
-  const chartData = workspace && mapEntityLines(workspace.workerTotalCapacity.metrics, entities);
+  const chartData =
+    workspace &&
+    mapEntityLines(workspace.workerTotalCapacity.metrics, entities);
 
   return (
     <div className="bg-canvasBase border-subtle relative flex h-[384px] w-full flex-col overflow-visible rounded-md border p-5">
@@ -90,7 +98,11 @@ export const ConnectWorkerTotalCapacity = ({
       </div>
       <div className="flex h-full flex-row items-center overflow-visible">
         <Chart
-          option={chartData ? getLineChartOptions(chartData, chartData.legendData) : {}}
+          option={
+            chartData
+              ? getLineChartOptions(chartData, chartData.legendData)
+              : {}
+          }
           className="relative h-full w-full overflow-visible"
           group="metricsDashboard"
         />

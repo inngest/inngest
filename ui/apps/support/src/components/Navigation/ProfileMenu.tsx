@@ -7,7 +7,7 @@ import {
 import { RiLogoutCircleLine } from "@remixicon/react";
 import { useClerk } from "@clerk/tanstack-react-start";
 import { Link } from "@tanstack/react-router";
-import { Button } from "@inngest/components/Button/NewButton";
+import { Button } from "@inngest/components/Button/Button";
 import { cn } from "@inngest/components/utils/classNames";
 
 type Props = React.PropsWithChildren<{

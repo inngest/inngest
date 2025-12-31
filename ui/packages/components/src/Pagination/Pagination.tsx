@@ -1,5 +1,3 @@
-'use client';
-
 import { useLayoutEffect, useMemo, useRef, useState, type SetStateAction } from 'react';
 import {
   RiArrowLeftDoubleLine,

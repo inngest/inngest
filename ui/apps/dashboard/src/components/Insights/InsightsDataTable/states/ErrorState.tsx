@@ -1,7 +1,5 @@
-'use client';
-
 import { Banner } from '@inngest/components/Banner/Banner';
-import { Button } from '@inngest/components/Button/Button';
+import { Button } from '@inngest/components/Button';
 
 import { useInsightsStateMachineContext } from '../../InsightsStateMachineContext/InsightsStateMachineContext';
 

@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 
 import { Search } from '@inngest/components/Forms/Search';
 import { ThemeImage } from '@inngest/components/Image/Image';
-import { Pill } from '@inngest/components/Pill/NewPill';
+import { Pill } from '@inngest/components/Pill';
 import { Select, type Option } from '@inngest/components/Select/Select';
 
 import { useTracking } from '@/hooks/useTracking';

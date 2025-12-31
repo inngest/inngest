@@ -752,3 +752,72 @@ func IncrConstraintAPIScavengerReclaimedLeasesCounter(ctx context.Context, count
 		Tags:        opts.Tags,
 	})
 }
+
+func IncrQueueScavengerRequeuedItemsCounter(ctx context.Context, count int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, count, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "queue_scavenger_requeued_total",
+		Description: "Total number of requeud items reclaimed by queue scavenger",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrQueueThrottleStatus(ctx context.Context, count int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, count, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "queue_fn_throttle_status",
+		Description: "Total number of throttled items",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrAsyncCancellationCheckCounter(ctx context.Context, count int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, count, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "async_cancellation_check",
+		Description: "Total number of async cancellation checks",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrScheduleConstraintsCheckFallbackCounter(ctx context.Context, reason string, opts CounterOpt) {
+	if opts.Tags == nil {
+		opts.Tags = map[string]any{}
+	}
+	opts.Tags["reason"] = reason
+
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "schedule_constraints_check_fallback_total",
+		Description: "Total number of schedule constraint check fallbacks with reason",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrQueueItemConstraintCheckFallbackCounter(ctx context.Context, reason string, opts CounterOpt) {
+	if opts.Tags == nil {
+		opts.Tags = map[string]any{}
+	}
+	opts.Tags["reason"] = reason
+
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "check_constraints_in_lease_reason_total",
+		Description: "Total number of constraint checks performed during item lease with reason",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrBacklogRefillConstraintCheckFallbackCounter(ctx context.Context, reason string, opts CounterOpt) {
+	if opts.Tags == nil {
+		opts.Tags = map[string]any{}
+	}
+	opts.Tags["reason"] = reason
+
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "backlog_refill_constraint_check_fallback_total",
+		Description: "Total number of backlog refill constraint check fallbacks with reason",
+		Tags:        opts.Tags,
+	})
+}

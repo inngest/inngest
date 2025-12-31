@@ -1,6 +1,11 @@
-'use client';
-
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useMemo,
+  useState,
+  type ReactNode,
+} from 'react';
 import { toast } from 'sonner';
 
 import type { TabManagerActions } from '@/components/Insights/InsightsTabManager/InsightsTabManager';
@@ -28,14 +33,19 @@ interface StoredQueriesContextValue {
   shareQuery: (queryId: string) => void;
 }
 
-const StoredQueriesContext = createContext<undefined | StoredQueriesContextValue>(undefined);
+const StoredQueriesContext = createContext<
+  undefined | StoredQueriesContextValue
+>(undefined);
 
 interface StoredQueriesProviderProps {
   children: ReactNode;
   tabManagerActions: TabManagerActions;
 }
 
-export function StoredQueriesProvider({ children, tabManagerActions }: StoredQueriesProviderProps) {
+export function StoredQueriesProvider({
+  children,
+  tabManagerActions,
+}: StoredQueriesProviderProps) {
   const [querySnapshots, setQuerySnapshots] = useState<QuerySnapshot[]>([]);
 
   const {
@@ -88,7 +98,7 @@ export function StoredQueriesProvider({ children, tabManagerActions }: StoredQue
         }
       }
     },
-    [beSaveQuery, beUpdateQuery, refetchSavedQueries, tabManagerActions]
+    [beSaveQuery, beUpdateQuery, refetchSavedQueries, tabManagerActions],
   );
 
   const deleteQuery = useCallback(
@@ -104,7 +114,7 @@ export function StoredQueriesProvider({ children, tabManagerActions }: StoredQue
         toast.error('Failed to delete query');
       }
     },
-    [beDeleteQuery, refetchSavedQueries, tabManagerActions]
+    [beDeleteQuery, refetchSavedQueries, tabManagerActions],
   );
 
   const shareQuery = useCallback(
@@ -120,7 +130,7 @@ export function StoredQueriesProvider({ children, tabManagerActions }: StoredQue
         toast.error('Failed to share query with your organization');
       }
     },
-    [beShareQuery, refetchSavedQueries]
+    [beShareQuery, refetchSavedQueries],
   );
 
   const deleteQuerySnapshot = useCallback((snapshotId: string) => {
@@ -141,7 +151,7 @@ export function StoredQueriesProvider({ children, tabManagerActions }: StoredQue
 
   const orderedQuerySnapshots = useMemo(
     () => ({ data: querySnapshots, error: undefined, isLoading: false }),
-    [querySnapshots]
+    [querySnapshots],
   );
 
   return (
@@ -165,7 +175,9 @@ export function StoredQueriesProvider({ children, tabManagerActions }: StoredQue
 export function useStoredQueries(): StoredQueriesContextValue {
   const context = useContext(StoredQueriesContext);
   if (context === undefined) {
-    throw new Error('useStoredQueries must be used within a StoredQueriesProvider');
+    throw new Error(
+      'useStoredQueries must be used within a StoredQueriesProvider',
+    );
   }
 
   return context;

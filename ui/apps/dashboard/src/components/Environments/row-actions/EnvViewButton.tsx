@@ -1,6 +1,4 @@
-'use client';
-
-import { useRouter } from 'next/navigation';
+import { useNavigate } from '@tanstack/react-router';
 import { Button } from '@inngest/components/Button';
 
 import { type Environment } from '@/utils/environments';
@@ -11,7 +9,7 @@ type Props = {
 };
 
 export function EnvViewButton({ env }: Props) {
-  const router = useRouter();
+  const navigate = useNavigate();
 
   return (
     <Button
@@ -19,7 +17,7 @@ export function EnvViewButton({ env }: Props) {
       kind="secondary"
       label="View"
       size="small"
-      onClick={() => router.push(pathCreator.apps({ envSlug: env.slug }))}
+      onClick={() => navigate({ to: pathCreator.apps({ envSlug: env.slug }) })}
     />
   );
 }

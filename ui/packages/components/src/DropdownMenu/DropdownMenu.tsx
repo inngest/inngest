@@ -1,5 +1,3 @@
-'use client';
-
 import { forwardRef } from 'react';
 import * as DropdownMenuPrimitive from '@radix-ui/react-dropdown-menu';
 

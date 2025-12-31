@@ -1,7 +1,5 @@
-'use client';
-
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter } from '@tanstack/react-router';
 import { Button } from '@inngest/components/Button';
 import { Input } from '@inngest/components/Forms/Input';
 import { toast } from 'sonner';
@@ -30,7 +28,9 @@ export default function BillingInformation({
   const [email, setEmail] = useState(billingEmail || '');
   const [name, setName] = useState(accountName || '');
   const isSaveDisabled = email === billingEmail && name === accountName;
-  const [, updateBillingInformation] = useMutation(updateBillingInformationDocument);
+  const [, updateBillingInformation] = useMutation(
+    updateBillingInformationDocument,
+  );
   const router = useRouter();
 
   function onEditButtonClick() {
@@ -49,14 +49,20 @@ export default function BillingInformation({
     e.preventDefault();
     if (isSaveDisabled) return;
 
-    updateBillingInformation({ input: { billingEmail: email, name } }).then((result) => {
-      if (result.error) {
-        toast.error(`Billing information has not been updated: ${result.error.message}`);
-      } else {
-        toast.success(`Billing information was successfully updated`);
-        router.refresh();
-      }
-    });
+    updateBillingInformation({ input: { billingEmail: email, name } }).then(
+      (result) => {
+        if (result.error) {
+          toast.error(
+            `Billing information has not been updated: ${result.error.message}`,
+          );
+        } else {
+          toast.success(`Billing information was successfully updated`);
+          //
+          // Refresh the current route to reload data
+          router.invalidate();
+        }
+      },
+    );
     setIsEditing(false);
   }
 

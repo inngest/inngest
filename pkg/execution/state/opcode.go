@@ -56,7 +56,7 @@ type GeneratorOpcode struct {
 
 func (g GeneratorOpcode) Validate() error {
 	if input, _ := g.Input(); input != "" && len(input) > consts.MaxStepInputSize {
-		return ErrStepOutputTooLarge
+		return ErrStepInputTooLarge
 	}
 
 	if output, _ := g.Output(); output != "" && len(output) > consts.MaxStepOutputSize {

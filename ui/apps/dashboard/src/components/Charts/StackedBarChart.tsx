@@ -1,5 +1,3 @@
-'use client';
-
 import { useMemo } from 'react';
 import { Error } from '@inngest/components/Error/Error';
 import {
@@ -21,7 +19,7 @@ import {
   YAxis,
 } from 'recharts';
 
-import LoadingIcon from '@/icons/LoadingIcon';
+import LoadingIcon from '@/components/Icons/LoadingIcon';
 
 type BarChartProps = {
   className?: string;
@@ -58,7 +56,14 @@ type AxisProps = {
 
 function CustomizedXAxisTick(props: AxisProps) {
   return (
-    <text x={props.x} y={props.y} dy={16} fontSize={12} className="fill-muted" textAnchor="middle">
+    <text
+      x={props.x}
+      y={props.y}
+      dy={16}
+      fontSize={12}
+      className="fill-muted"
+      textAnchor="middle"
+    >
       {minuteTime(new Date(props.payload.value))}
     </text>
   );
@@ -82,16 +87,26 @@ export default function StackedBarChart({
   error,
   isLoading,
 }: BarChartProps) {
-  const flattenedData = useMemo(() => data.map((d) => ({ ...d.values, name: d.name })), [data]);
+  const flattenedData = useMemo(
+    () => data.map((d) => ({ ...d.values, name: d.name })),
+    [data],
+  );
 
   const defaultLegend = legend.find((element) => element.default);
   const defaultDataKey = defaultLegend?.dataKey;
 
   return (
-    <div className={cn('border-subtle bg-canvasBase border-b px-6 py-4', className)}>
+    <div
+      className={cn(
+        'border-subtle bg-canvasBase border-b px-6 py-4',
+        className,
+      )}
+    >
       <header className="mb-2 flex items-center justify-between">
         <div className="flex gap-4">
-          <h3 className="flex flex-row items-center gap-2 text-base">{title}</h3>
+          <h3 className="flex flex-row items-center gap-2 text-base">
+            {title}
+          </h3>
           {desc && (
             <CustomTooltip>
               <TooltipTrigger>
@@ -131,7 +146,11 @@ export default function StackedBarChart({
                 bottom: 16,
               }}
             >
-              <CartesianGrid strokeDasharray="0" vertical={false} className="stroke-disabled" />
+              <CartesianGrid
+                strokeDasharray="0"
+                vertical={false}
+                className="stroke-disabled"
+              />
               <XAxis
                 allowDecimals={false}
                 dataKey="name"
@@ -156,7 +175,9 @@ export default function StackedBarChart({
                   const { label, payload } = props;
                   return (
                     <div className="bg-canvasBase shadow-tooltip rounded-md px-3 pb-2 pt-1 text-sm shadow-md">
-                      <div className="text-muted pb-2">{new Date(label).toLocaleString()}</div>
+                      <div className="text-muted pb-2">
+                        {new Date(label).toLocaleString()}
+                      </div>
                       {payload?.map((p, idx) => {
                         const l = legend.find((l) => l.dataKey == p.name);
                         return (
@@ -185,14 +206,23 @@ export default function StackedBarChart({
 
               {legend.map((l) => (
                 /* @ts-ignore */
-                <Bar key={l.name} dataKey={l.dataKey} stackId="default" fill={l.color}>
+                <Bar
+                  key={l.name}
+                  dataKey={l.dataKey}
+                  stackId="default"
+                  fill={l.color}
+                >
                   {data.map((entry, i) => {
                     const isRadius =
-                      l.default || (defaultDataKey && entry.values[defaultDataKey] === 0);
+                      l.default ||
+                      (defaultDataKey && entry.values[defaultDataKey] === 0);
 
                     return (
-                      // @ts-ignore
-                      <Cell key={`cell-${i}`} radius={isRadius ? [3, 3, 0, 0] : undefined} />
+                      <Cell
+                        key={`cell-${i}`}
+                        // @ts-ignore - not sure, was here before the tanstack migration
+                        radius={isRadius ? [3, 3, 0, 0] : undefined}
+                      />
                     );
                   })}
                 </Bar>

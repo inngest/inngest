@@ -46,7 +46,7 @@ export function Select({
 }: Props) {
   return (
     <Listbox value={value} onChange={onChange} multiple={multiple}>
-      {({ open }) => (
+      {({ open: _open }) => (
         <span
           className={cn(
             isLabelVisible && 'divide-muted text-muted divide-x',
@@ -221,7 +221,7 @@ export function SelectWithSearch({
   className,
   size,
 }: Props) {
-  const renderContent = (open: boolean) => (
+  const renderContent = (_open: boolean) => (
     <span
       className={cn(
         isLabelVisible && 'divide-muted text-muted divide-x',

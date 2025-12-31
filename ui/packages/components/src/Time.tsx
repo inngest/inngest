@@ -1,5 +1,3 @@
-'use client';
-
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip/Tooltip';
 import { RiFileCopyLine, RiTimeLine, RiUserSmileLine } from '@remixicon/react';
 import { toast } from 'sonner';

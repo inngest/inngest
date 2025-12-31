@@ -1,5 +1,3 @@
-'use client';
-
 import { useCallback, useEffect, useState } from 'react';
 
 import { trackEvent, useTrackingUser } from '@/utils/tracking';
@@ -51,11 +49,15 @@ export function useSeatOverage() {
         });
       }
     },
-    [trackingUser]
+    [trackingUser],
   );
 
   const isWidgetVisible =
-    !error && seatOverageData && seatOverageData.hasExceeded && isReady && shouldShow;
+    !error &&
+    seatOverageData &&
+    seatOverageData.hasExceeded &&
+    isReady &&
+    shouldShow;
 
   return {
     isWidgetVisible,

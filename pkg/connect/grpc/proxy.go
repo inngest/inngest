@@ -144,6 +144,8 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 		"account_id", opts.AccountID.String(),
 		"run_id", opts.Data.RunId,
 		"req_id", opts.Data.RequestId,
+		"function_id", opts.Data.FunctionId,
+		"app_id", opts.Data.AppId,
 	)
 
 	traceCtx, span := i.tracer.NewSpan(traceCtx, "Proxy", opts.AccountID, opts.EnvID)

@@ -44,8 +44,8 @@ type CustomConcurrencyLimit struct {
 type ThrottleConfig struct {
 	Scope enums.ThrottleScope
 
-	// ThrottleKeyExpressionHash is the hashed throttle key expression, if set.
-	ThrottleKeyExpressionHash string `json:"tkh,omitempty"`
+	// KeyExpressionHash is the hashed throttle key expression, if set.
+	KeyExpressionHash string `json:"tkh,omitempty"`
 
 	// Limit is the actual rate limit
 	Limit int `json:"l"`

@@ -1,6 +1,4 @@
-'use client';
-
-import { Link } from '@inngest/components/Link/Link';
+import { Link } from '@inngest/components/Link';
 import { RiChatPollLine } from '@remixicon/react';
 
 export function EmptyState() {
@@ -11,9 +9,12 @@ export function EmptyState() {
           <RiChatPollLine className="text-light h-6 w-6" />
         </div>
         <div className="flex flex-col gap-2 text-center">
-          <h3 className="text-basis text-xl font-medium">What can I help you query?</h3>
+          <h3 className="text-basis text-xl font-medium">
+            What can I help you query?
+          </h3>
           <p className="text-muted text-sm">
-            Share the event insights you need and our AI assistant will generate the SQL query.{' '}
+            Share the event insights you need and our AI assistant will generate
+            the SQL query.{' '}
             <span>
               {' '}
               <Link

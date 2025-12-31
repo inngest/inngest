@@ -1,5 +1,3 @@
-'use client';
-
 import { SQLEditor } from '@inngest/components/SQLEditor/SQLEditor';
 
 import { useInsightsStateMachineContext } from '../InsightsStateMachineContext/InsightsStateMachineContext';
@@ -21,7 +19,9 @@ export function InsightsSQLEditor() {
   const { saveTab } = useSaveTabActions();
   const { queries } = useStoredQueries();
 
-  const hasChanges = activeTab ? hasUnsavedChanges(queries.data, activeTab) : false;
+  const hasChanges = activeTab
+    ? hasUnsavedChanges(queries.data, activeTab)
+    : false;
 
   const hasSelection = () => {
     const editor = editorRef.current;

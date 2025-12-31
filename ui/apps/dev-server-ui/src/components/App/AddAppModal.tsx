@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button } from '@inngest/components/Button/NewButton';
+import { Button } from '@inngest/components/Button';
 import { Input } from '@inngest/components/Forms/Input';
 import { Modal } from '@inngest/components/Modal';
 import useDebounce from '@inngest/components/hooks/useDebounce';

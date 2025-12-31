@@ -1,5 +1,3 @@
-'use client';
-
 import { useEffect, useState } from 'react';
 import {
   DropdownMenu,
@@ -44,7 +42,11 @@ export function SQLEditorContextMenu({
 
       if (editorContainer) {
         e.preventDefault();
-        setContextMenu({ x: e.clientX, y: e.clientY, hasSelection: hasSelection() });
+        setContextMenu({
+          x: e.clientX,
+          y: e.clientY,
+          hasSelection: hasSelection(),
+        });
       }
     };
 
@@ -64,7 +66,10 @@ export function SQLEditorContextMenu({
   if (!contextMenu) return null;
 
   return (
-    <DropdownMenu open={!!contextMenu} onOpenChange={(open) => !open && setContextMenu(null)}>
+    <DropdownMenu
+      open={!!contextMenu}
+      onOpenChange={(open) => !open && setContextMenu(null)}
+    >
       <DropdownMenuContent
         align="start"
         style={{
@@ -73,7 +78,10 @@ export function SQLEditorContextMenu({
           top: `${contextMenu.y}px`,
         }}
       >
-        <DropdownMenuItem className="text-basis px-4 outline-none" onSelect={onPrettifySQL}>
+        <DropdownMenuItem
+          className="text-basis px-4 outline-none"
+          onSelect={onPrettifySQL}
+        >
           <span>Format SQL</span>
           <span className="ml-auto">
             <KeyboardShortcut color="text-muted" keys={['shift', 'alt', 'F']} />
@@ -100,17 +108,26 @@ export function SQLEditorContextMenu({
             <KeyboardShortcut color="text-muted" keys={['cmd', 'ctrl', 'C']} />
           </span>
         </DropdownMenuItem>
-        <DropdownMenuItem className="text-basis px-4 outline-none" onSelect={onPaste}>
+        <DropdownMenuItem
+          className="text-basis px-4 outline-none"
+          onSelect={onPaste}
+        >
           <span>Paste</span>
           <span className="ml-auto">
             <KeyboardShortcut color="text-muted" keys={['cmd', 'ctrl', 'V']} />
           </span>
         </DropdownMenuItem>
         <div className="border-subtle my-1 border-t" />
-        <DropdownMenuItem className="text-basis px-4 outline-none" onSelect={onRunQuery}>
+        <DropdownMenuItem
+          className="text-basis px-4 outline-none"
+          onSelect={onRunQuery}
+        >
           <span>Run query</span>
           <span className="ml-auto">
-            <KeyboardShortcut color="text-muted" keys={['cmd', 'ctrl', 'enter']} />
+            <KeyboardShortcut
+              color="text-muted"
+              keys={['cmd', 'ctrl', 'enter']}
+            />
           </span>
         </DropdownMenuItem>
         <DropdownMenuItem
@@ -120,7 +137,10 @@ export function SQLEditorContextMenu({
         >
           <span>Save query</span>
           <span className="ml-auto">
-            <KeyboardShortcut color="text-muted" keys={['cmd', 'ctrl', 'alt', 'S']} />
+            <KeyboardShortcut
+              color="text-muted"
+              keys={['cmd', 'ctrl', 'alt', 'S']}
+            />
           </span>
         </DropdownMenuItem>
       </DropdownMenuContent>

@@ -1,5 +1,3 @@
-'use client';
-
 import { useEffect } from 'react';
 import { useMonaco } from '@monaco-editor/react';
 import type { languages } from 'monaco-editor';

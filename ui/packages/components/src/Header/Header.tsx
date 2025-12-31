@@ -1,5 +1,3 @@
-import { type Route } from 'next';
-
 import { Back } from './Back';
 import { BreadCrumb } from './BreadCrumb';
 import { HeaderTab } from './HeaderTab';
@@ -46,7 +44,7 @@ export const Header = ({
       {tabs && (
         <div className="bg-canvasBase flex flex-row items-center justify-start space-x-3 px-4">
           {tabs.map(({ href, children, exactRouteMatch }) => (
-            <HeaderTab key={href} href={href as Route} exactRouteMatch={exactRouteMatch}>
+            <HeaderTab key={href} href={href} exactRouteMatch={exactRouteMatch}>
               {children}
             </HeaderTab>
           ))}

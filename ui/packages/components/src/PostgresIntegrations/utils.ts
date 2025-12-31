@@ -4,7 +4,7 @@ export function parseConnectionString(integration: string, connectionString: str
   const match = connectionString.match(regex);
 
   if (match) {
-    const [, username, password, host] = match;
+    const [, _username, _password, host] = match;
     return {
       name: `${integration}-${host}`,
       engine: 'postgresql',

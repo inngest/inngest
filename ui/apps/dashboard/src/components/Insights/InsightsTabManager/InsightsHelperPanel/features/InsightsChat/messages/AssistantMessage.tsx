@@ -1,6 +1,3 @@
-'use client';
-
-import React from 'react';
 import type { TextUIPart } from '@inngest/use-agent';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -16,10 +13,16 @@ export const AssistantMessage = ({ part }: AssistantMessageProps) => {
         remarkPlugins={[remarkGfm]}
         components={{
           // Customize paragraph styling
-          p: ({ children }) => <p className="my-2 text-sm leading-relaxed">{children}</p>,
+          p: ({ children }) => (
+            <p className="my-2 text-sm leading-relaxed">{children}</p>
+          ),
           // Customize list styling
-          ul: ({ children }) => <ul className="my-2 ml-4 list-disc text-sm">{children}</ul>,
-          ol: ({ children }) => <ol className="my-2 ml-4 list-decimal text-sm">{children}</ol>,
+          ul: ({ children }) => (
+            <ul className="my-2 ml-4 list-disc text-sm">{children}</ul>
+          ),
+          ol: ({ children }) => (
+            <ol className="my-2 ml-4 list-decimal text-sm">{children}</ol>
+          ),
           li: ({ children }) => <li className="my-1">{children}</li>,
           // Customize code styling
           code: ({ children, className, ...props }) => {
@@ -45,12 +48,20 @@ export const AssistantMessage = ({ part }: AssistantMessageProps) => {
           },
           // Customize pre (code block wrapper) styling
           pre: ({ children }) => (
-            <pre className="bg-canvasSubtle my-2 overflow-x-auto rounded p-2">{children}</pre>
+            <pre className="bg-canvasSubtle my-2 overflow-x-auto rounded p-2">
+              {children}
+            </pre>
           ),
           // Customize heading styling
-          h1: ({ children }) => <h1 className="mb-2 mt-3 text-base font-bold">{children}</h1>,
-          h2: ({ children }) => <h2 className="mb-2 mt-3 text-sm font-bold">{children}</h2>,
-          h3: ({ children }) => <h3 className="mb-2 mt-2 text-sm font-semibold">{children}</h3>,
+          h1: ({ children }) => (
+            <h1 className="mb-2 mt-3 text-base font-bold">{children}</h1>
+          ),
+          h2: ({ children }) => (
+            <h2 className="mb-2 mt-3 text-sm font-bold">{children}</h2>
+          ),
+          h3: ({ children }) => (
+            <h3 className="mb-2 mt-2 text-sm font-semibold">{children}</h3>
+          ),
           // Customize link styling
           a: ({ children, href }) => (
             <a
@@ -70,19 +81,31 @@ export const AssistantMessage = ({ part }: AssistantMessageProps) => {
           ),
           // Customize table styling
           table: ({ children }) => (
-            <table className="my-2 w-full border-collapse text-sm">{children}</table>
+            <table className="my-2 w-full border-collapse text-sm">
+              {children}
+            </table>
           ),
-          thead: ({ children }) => <thead className="bg-canvasSubtle">{children}</thead>,
+          thead: ({ children }) => (
+            <thead className="bg-canvasSubtle">{children}</thead>
+          ),
           tbody: ({ children }) => <tbody>{children}</tbody>,
-          tr: ({ children }) => <tr className="border-subtle border-b">{children}</tr>,
-          th: ({ children }) => (
-            <th className="border-subtle border px-2 py-1 text-left font-semibold">{children}</th>
+          tr: ({ children }) => (
+            <tr className="border-subtle border-b">{children}</tr>
           ),
-          td: ({ children }) => <td className="border-subtle border px-2 py-1">{children}</td>,
+          th: ({ children }) => (
+            <th className="border-subtle border px-2 py-1 text-left font-semibold">
+              {children}
+            </th>
+          ),
+          td: ({ children }) => (
+            <td className="border-subtle border px-2 py-1">{children}</td>
+          ),
           // Customize horizontal rule styling
           hr: () => <hr className="border-subtle my-3 border-t" />,
           // Customize strong/bold styling
-          strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+          strong: ({ children }) => (
+            <strong className="font-semibold">{children}</strong>
+          ),
           // Customize emphasis/italic styling
           em: ({ children }) => <em className="italic">{children}</em>,
         }}

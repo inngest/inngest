@@ -3,7 +3,6 @@ package ratelimit
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"testing"
 	"time"
 
@@ -16,7 +15,7 @@ import (
 
 const prefix = "{rl}:"
 
-// initRedis creates miniredis/rueidis for Lua and fake clock
+// initRedis creates both miniredis/rueidis for Lua, throttled store, and fake clock
 func initRedis(t *testing.T) (*miniredis.Miniredis, rueidis.Client, clockwork.FakeClock) {
 	r := miniredis.RunT(t)
 
@@ -445,35 +444,34 @@ func TestLuaRateLimit_RetryAfterValidation(t *testing.T) {
 		limiter := New(ctx, rc, "{rl}:")
 
 		config := inngest.RateLimit{
-			Limit:  0, // Zero limit should always rate limit
+			Limit:  0, // Zero limit should be converted to 1
 			Period: "1h",
 		}
 
 		key := "zero-capacity-test"
 
-		// First request should be rate limited
+		// First request should not be rate limited
 		r.SetTime(clock.Now())
 		res, err := limiter.RateLimit(ctx, key, config, WithNow(clock.Now()))
 		require.NoError(t, err)
-		require.True(t, res.Limited)
-		require.Greater(t, res.RetryAfter, time.Duration(0))
+		require.False(t, res.Limited)
+		require.Equal(t, time.Duration(0), res.RetryAfter)
 
-		t.Logf("Zero limit retryAfter: %v", res.RetryAfter)
-
-		// With zero limit, retryAfter should be the full period
-		require.Greater(t, res.RetryAfter, 59*time.Minute)
-		require.Less(t, res.RetryAfter, 61*time.Minute)
-
-		// Subsequent requests should also be rate limited
+		// Subsequent requests should be rate limited
 		r.SetTime(clock.Now())
 		res2, err := limiter.RateLimit(ctx, key, config, WithNow(clock.Now()))
 		require.NoError(t, err)
 		require.True(t, res2.Limited)
 		require.Greater(t, res2.RetryAfter, time.Duration(0))
 
-		// RetryAfter should remain close to original (zero capacity = no progress)
-		timeDiff := abs(res.RetryAfter - res2.RetryAfter)
-		require.Less(t, timeDiff, 100*time.Millisecond, "RetryAfter should be consistent for zero limit")
+		// RetryAfter should not remain close to original (zero capacity = no progress)
+		require.WithinDuration(
+			t,
+			time.Unix(0, int64(res2.RetryAfter)),
+			time.Unix(0, int64(res.RetryAfter)).Add(time.Hour),
+			100*time.Millisecond,
+			"RetryAfter should be consistent for zero limit",
+		)
 	})
 
 	t.Run("retryAfter precision validation", func(t *testing.T) {
@@ -701,7 +699,7 @@ func TestLuaRateLimit_Idempotency(t *testing.T) {
 
 		key := "expiry-test"
 		idempotencyKey := "request-789"
-		idempotencyTTL := 5 * time.Second // Short TTL for testing
+		idempotencyTTL := 2 * time.Second // Short TTL for testing
 
 		// First request with idempotency should be allowed and consume the 1 available capacity
 		r.SetTime(clock.Now())
@@ -723,11 +721,19 @@ func TestLuaRateLimit_Idempotency(t *testing.T) {
 		require.Equal(t, time.Duration(0), res2.RetryAfter)
 		t.Logf("Duplicate within TTL: limited=%v, retry=%v", res2.Limited, res2.RetryAfter)
 
+		require.True(t, r.Exists("{rl}:"+idempotencyKey), r.Dump())
+		require.True(t, r.Exists("{rl}:"+key), r.Dump())
+
+		require.Equal(t, 6*time.Second, r.TTL("{rl}:"+key))
+
 		// Advance time to expire the idempotency key
 		expiryWait := idempotencyTTL + 1*time.Second
 		clock.Advance(expiryWait)
 		r.FastForward(expiryWait)
 		t.Logf("Advanced time by %v to expire idempotency key", expiryWait)
+
+		require.False(t, r.Exists("{rl}:"+idempotencyKey))
+		require.True(t, r.Exists("{rl}:"+key), r.Dump())
 
 		// Request with same idempotency key should now be rate limited (capacity already exhausted by first request)
 		r.SetTime(clock.Now())
@@ -791,88 +797,6 @@ func TestLuaRateLimit_ScientificNotationParsing(t *testing.T) {
 			r.SetTime(clock.Now())
 		}
 	})
-
-	t.Run("force lua to write scientific notation with artificially large number", func(t *testing.T) {
-		r, rc, clock := initRedis(t)
-		defer rc.Close()
-
-		limiter := New(ctx, rc, prefix)
-
-		config := inngest.RateLimit{
-			Limit:  10,
-			Period: "1h",
-		}
-
-		key := "scientific-notation-direct-test"
-		redisKey := prefix + key
-
-		// Try to force Redis to store in scientific notation by using a very large number with decimals
-		cmd := rc.B().Eval().Script(`local key = KEYS[1]
-			-- Create a number that's too large for Redis to store as a normal integer
-			-- Math operations that create very large floating-point results
-			local base = 9223372036854775807  -- Max int64
-			local multiplier = 1.5
-			local very_large = base * multiplier  -- This should force floating-point representation
-			redis.call("SET", key, very_large)
-			return 0`).Numkeys(1).Key(redisKey).Build()
-		err := rc.Do(ctx, cmd).Error()
-		require.NoError(t, err)
-
-		// Verify the value was set
-		storedValue, err := r.Get(redisKey)
-		require.NoError(t, err)
-		t.Logf("Confirmed stored value: %s", storedValue)
-
-		// Also test the direct Redis parsing that would happen in GetWithTime
-		cmd = rc.B().Get().Key(redisKey).Build()
-		result := rc.Do(ctx, cmd)
-
-		// Try to parse as int64 - this should fail
-		_, parseErr := result.AsInt64()
-		require.Error(t, parseErr)
-		t.Logf("Direct AsInt64() parsing also failed as expected: %v", parseErr)
-
-		// But ToString should work
-		strResult, err := result.ToString()
-		require.NoError(t, err)
-		t.Logf("ToString() works fine: %s", strResult)
-
-		// Should fail because it's clamped to the maximum
-		res, err := limiter.RateLimit(ctx, key, config, WithNow(clock.Now()))
-
-		// We expect this to fail with a parsing error
-		require.NoError(t, err)
-
-		// Expect value to be clamped
-		storedValue, err = r.Get(redisKey)
-		require.NoError(t, err)
-		t.Logf("Confirmed stored value: %s", storedValue)
-
-		normalizedValue, err := strconv.Atoi(storedValue)
-		require.NoError(t, err)
-
-		emissionInterval := time.Hour.Nanoseconds() / 10
-		burst := 1
-		totalCapacity := (burst + 1)
-		delayVariationTolerance := emissionInterval * int64(totalCapacity)
-		expectedMax := clock.Now().UnixNano() + time.Hour.Nanoseconds() + delayVariationTolerance
-
-		require.InDelta(t, int(expectedMax), normalizedValue, 10)
-
-		require.True(t, res.Limited)
-		require.Equal(t, time.Hour+6*time.Minute, res.RetryAfter.Round(time.Minute))
-
-		clock.Advance(res.RetryAfter + time.Minute)
-		r.FastForward(res.RetryAfter + time.Minute)
-		r.SetTime(clock.Now())
-
-		// Should allow another request
-		res, err = limiter.RateLimit(ctx, key, config, WithNow(clock.Now()))
-
-		require.NoError(t, err)
-		require.False(t, res.Limited)
-		require.Equal(t, time.Duration(0), res.RetryAfter)
-	})
 }
 
 func TestLuaRateLimit_EdgeCases(t *testing.T) {
@@ -908,15 +832,20 @@ func TestLuaRateLimit_EdgeCases(t *testing.T) {
 
 		// The throttled library panics with divide by zero for limit=0
 		// So we test that our Lua implementation gracefully handles zero limits
-		// by immediately rate limiting (which is the logical behavior)
+		// by falling back to 1
 		r.SetTime(clock.Now())
 		res, err := limiter.RateLimit(ctx, "test-key", config, WithNow(clock.Now()))
 		require.NoError(t, err)
 		t.Logf("Lua with zero limit: limited=%v, retry=%v", res.Limited, res.RetryAfter)
 
-		// Zero limit should immediately rate limit
+		// Should allow the first request
+		require.False(t, res.Limited)
+		require.Equal(t, res.RetryAfter, time.Duration(0))
+
+		// Second call should fail
+		res, err = limiter.RateLimit(ctx, "test-key", config, WithNow(clock.Now()))
+		require.NoError(t, err)
 		require.True(t, res.Limited)
-		require.Greater(t, res.RetryAfter, time.Duration(0))
 	})
 
 	t.Run("very short period", func(t *testing.T) {
@@ -946,13 +875,4 @@ func TestLuaRateLimit_EdgeCases(t *testing.T) {
 		require.NoError(t, err)
 		require.False(t, res.Limited)
 	})
-}
-
-// Helper functions
-
-func abs(d time.Duration) time.Duration {
-	if d < 0 {
-		return -d
-	}
-	return d
 }

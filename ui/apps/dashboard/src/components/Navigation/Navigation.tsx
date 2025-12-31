@@ -6,6 +6,7 @@ import Environments from './Environments';
 import KeysMenu from './KeysMenu';
 import Manage from './Manage';
 import Monitor from './Monitor';
+import type { FileRouteTypes } from '@tanstack/react-router';
 
 export type NavProps = {
   collapsed: boolean;
@@ -13,7 +14,8 @@ export type NavProps = {
   activeEnv?: EnvType;
 };
 
-export const getNavRoute = (activeEnv: EnvType, link: string) => `/env/${activeEnv.slug}/${link}`;
+export const getNavRoute = (activeEnv: EnvType, link: string) =>
+  `/env/${activeEnv.slug}/${link}` as FileRouteTypes['to'];
 
 export default function Navigation({ collapsed, activeEnv }: NavProps) {
   return (

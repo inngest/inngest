@@ -1,4 +1,7 @@
-import type { RerunPayload, RerunResult } from '@inngest/components/SharedContext/useRerun';
+import type {
+  RerunPayload,
+  RerunResult,
+} from '@inngest/components/SharedContext/useRerun';
 import { useMutation } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
@@ -43,7 +46,10 @@ export const useRerun = () => {
     } catch (error) {
       console.error('error rerunning function', error);
       return {
-        error: error instanceof Error ? error : new Error('Error re-running function'),
+        error:
+          error instanceof Error
+            ? error
+            : new Error('Error re-running function'),
         data: undefined,
       };
     }

@@ -4,17 +4,30 @@ import type {
   LineSeriesOption,
 } from '@inngest/components/Chart/Chart';
 import { resolveColor } from '@inngest/components/utils/colors';
-import { differenceInMilliseconds, lightFormat, toDate } from '@inngest/components/utils/date';
+import {
+  differenceInMilliseconds,
+  lightFormat,
+  toDate,
+} from '@inngest/components/utils/date';
 import { isDark } from '@inngest/components/utils/theme';
-import resolveConfig from 'tailwindcss/resolveConfig';
 
 import type { MetricsData, MetricsResponse, ScopedMetric } from '@/gql/graphql';
-import tailwindConfig from '../../../tailwind.config';
+import {
+  backgroundColor,
+  colors,
+  textColor,
+  borderColor,
+} from '@/utils/tailwind';
 import type { EntityLookup, EntityType } from './Dashboard';
 
-const {
-  theme: { colors, backgroundColor, textColor, borderColor },
-} = resolveConfig(tailwindConfig);
+// Type assertion for extended colors that aren't in DefaultColors
+const extendedColors = colors as typeof colors & {
+  accent: { subtle: string };
+  primary: { moderate: string };
+  secondary: { moderate: string };
+  tertiary: { moderate: string };
+  quaternary: { coolxIntense: string };
+};
 
 export type LineChartData = {
   xAxis: {
@@ -28,11 +41,11 @@ export type LineChartData = {
 };
 
 export const lineColors = [
-  [colors.accent.subtle, '#ec9923'],
-  [colors.primary.moderate, '#2c9b63'],
-  [colors.secondary.moderate, '#2389f1'],
-  [colors.tertiary.moderate, '#f54a3f'],
-  [colors.quaternary.coolxIntense, '#6222df'],
+  [extendedColors.accent.subtle, '#ec9923'],
+  [extendedColors.primary.moderate, '#2c9b63'],
+  [extendedColors.secondary.moderate, '#2389f1'],
+  [extendedColors.tertiary.moderate, '#f54a3f'],
+  [extendedColors.quaternary.coolxIntense, '#6222df'],
 ];
 
 export const seriesOptions: LineSeriesOption = {
@@ -66,22 +79,29 @@ export const timeDiff = (start?: string, end?: string) =>
 export const convertLookup = (entities?: EntityType[]): EntityLookup | {} =>
   entities
     ? entities.reduce(
-        (acc, v) => ({ ...acc, [v.id]: { id: v.id, name: v.name, slug: v.slug } }),
-        {}
+        (acc, v) => ({
+          ...acc,
+          [v.id]: { id: v.id, name: v.name, slug: v.slug },
+        }),
+        {},
       )
     : {};
 
 export const sum = (data?: MetricsData[]) =>
   data ? data.reduce((acc, { value }) => acc + value, 0) : 0;
 
-export const formatNumber = (number?: number | bigint) => (number || 0).toLocaleString(undefined);
+export const formatNumber = (number?: number | bigint) =>
+  (number || 0).toLocaleString(undefined);
 
 export const marker = (color: string) =>
   `<span style="display:inline-block;margin-right:4px;border-radius:10px;width:10px;height:10px;
       border-width: 1px;border-color:${color};background-color:${color};"></span>`;
 
 export const formatDimension = (param: any) => {
-  const color = typeof param.color === 'object' ? param.color?.colorStops[0]?.color : param.color;
+  const color =
+    typeof param.color === 'object'
+      ? param.color?.colorStops[0]?.color
+      : param.color;
 
   //
   // FYI using vanilla html in formatter because rendering react here causes
@@ -100,7 +120,9 @@ export const formatDimension = (param: any) => {
 
 const tooltipFormatter = (params: any) => {
   return Array.isArray(params) && params[0]
-    ? `<div class="my-1"><div class="mb-1 mx-2 text-sm">${params[0].axisValue}</div>${params
+    ? `<div class="my-1"><div class="mb-1 mx-2 text-sm">${
+        params[0].axisValue
+      }</div>${params
         .sort((a: any, b: any) => b.value - a.value)
         .map((p: any) => formatDimension(p))
         .join('')}</div>`
@@ -109,7 +131,7 @@ const tooltipFormatter = (params: any) => {
 
 export const getLineChartOptions = (
   data: Partial<ChartProps['option']>,
-  legendData?: LegendComponentOption['data']
+  legendData?: LegendComponentOption['data'],
 ): ChartProps['option'] => {
   const dark = isDark();
   return {
@@ -143,7 +165,10 @@ export const getLineChartOptions = (
       icon: 'circle',
       itemWidth: 10,
       itemHeight: 10,
-      textStyle: { fontSize: '12px', color: resolveColor(textColor.basis, dark) },
+      textStyle: {
+        fontSize: '12px',
+        color: resolveColor(textColor.basis, dark),
+      },
       data: legendData,
     },
     grid: {
@@ -164,7 +189,9 @@ export const getLineChartOptions = (
   };
 };
 
-export const getXAxis = (metrics: ScopedMetric[] | MetricsResponse | undefined) => {
+export const getXAxis = (
+  metrics: ScopedMetric[] | MetricsResponse | undefined,
+) => {
   const dark = isDark();
 
   let series: MetricsData[] | undefined;
@@ -213,14 +240,15 @@ export const getXAxis = (metrics: ScopedMetric[] | MetricsResponse | undefined) 
 export const mapEntityLines = (
   metrics: ScopedMetric[],
   entities: EntityLookup,
-  areaStyle?: { opacity: number }
+  areaStyle?: { opacity: number },
 ) => {
   const dark = isDark();
 
   // Create series with names first
   const seriesWithNames = metrics.map((f, index) => {
     // For worker metrics, use tagValue as the series name if available
-    const seriesName = f.tagValue || entities[f.id]?.name || `Series ${index + 1}`;
+    const seriesName =
+      f.tagValue || entities[f.id]?.name || `Series ${index + 1}`;
 
     return {
       metric: f,
@@ -238,7 +266,11 @@ export const mapEntityLines = (
       name: item.name,
       data: item.metric.data.map(({ value }) => value),
       itemStyle: {
-        color: resolveColor(lineColors[i % lineColors.length]![0]!, dark, lineColors[0]?.[1]),
+        color: resolveColor(
+          lineColors[i % lineColors.length][0],
+          dark,
+          lineColors[0]?.[1],
+        ),
       },
       areaStyle,
     };

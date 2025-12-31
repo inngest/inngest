@@ -1,6 +1,6 @@
 local cjson = cjson
 local function call(command, ...)
-	return redis.call(command, unpack(arg))
+	return redis.call(command, ...)
 end
 local ulidMap = {
 	["0"] = 0,
@@ -55,7 +55,7 @@ local keyScavengerShard = KEYS[2]
 local keyAccountLeases = KEYS[3]
 local keyOldLeaseDetails = KEYS[4]
 local keyNewLeaseDetails = KEYS[5]
-local keyPrefix = ARGV[1]
+local scopedKeyPrefix = ARGV[1]
 local accountID = ARGV[2]
 local currentLeaseID = ARGV[3]
 local newLeaseID = ARGV[4]
@@ -66,7 +66,8 @@ local enableDebugLogs = tonumber(ARGV[8]) == 1
 local debugLogs = {}
 local function debug(...)
 	if enableDebugLogs then
-		table.insert(debugLogs, table.concat(arg, " "))
+		local args = { ... }
+		table.insert(debugLogs, table.concat(args, " "))
 	end
 end
 local opIdempotency = call("GET", keyOperationIdempotency)
@@ -80,17 +81,17 @@ if decode_ulid_time(currentLeaseID) < nowMS then
 	res["d"] = debugLogs
 	return cjson.encode(res)
 end
-local leaseDetails = call("HMGET", keyOldLeaseDetails, "lik", "oik", "rid")
+local leaseDetails = call("HMGET", keyOldLeaseDetails, "lik", "req", "rid")
 if leaseDetails == false or leaseDetails == nil or leaseDetails[1] == nil or leaseDetails[2] == nil then
 	local res = {}
 	res["s"] = 2
 	res["d"] = debugLogs
 	return cjson.encode(res)
 end
-local leaseIdempotencyKey = leaseDetails[1]
-local hashedOperationIdempotencyKey = leaseDetails[2]
+local hashedLeaseIdempotencyKey = leaseDetails[1]
+local requestID = leaseDetails[2]
 local leaseRunID = leaseDetails[3]
-local keyRequestState = string.format("{%s}:%s:rs:%s", keyPrefix, accountID, hashedOperationIdempotencyKey)
+local keyRequestState = string.format("%s:rs:%s", scopedKeyPrefix, requestID)
 local requestStateStr = call("GET", keyRequestState)
 if requestStateStr == nil or requestStateStr == false or requestStateStr == "" then
 	debug(keyRequestState)
@@ -100,14 +101,20 @@ if requestStateStr == nil or requestStateStr == false or requestStateStr == "" t
 	return cjson.encode(res)
 end
 local requestDetails = cjson.decode(requestStateStr)
+if not requestDetails then
+	return redis.error_reply("ERR requestDetails is nil after JSON decode")
+end
 local constraints = requestDetails.s
+if not constraints then
+	return redis.error_reply("ERR constraints array is nil")
+end
 for _, value in ipairs(constraints) do
 	if value.k == 2 then
 		call("ZREM", value.c.ilk, currentLeaseID)
 		call("ZADD", value.c.ilk, tostring(leaseExpiryMS), newLeaseID)
 	end
 end
-call("HSET", keyNewLeaseDetails, "lik", leaseIdempotencyKey, "rid", leaseRunID, "oik", hashedOperationIdempotencyKey)
+call("HSET", keyNewLeaseDetails, "lik", hashedLeaseIdempotencyKey, "rid", leaseRunID, "req", requestID)
 call("DEL", keyOldLeaseDetails)
 call("ZADD", keyAccountLeases, tostring(leaseExpiryMS), newLeaseID)
 call("ZREM", keyAccountLeases, currentLeaseID)

@@ -341,9 +341,10 @@ type SpanLink struct {
 }
 
 type SpanMetadata struct {
-	Scope  metadata.Scope  `json:"scope"`
-	Kind   metadata.Kind   `json:"kind"`
-	Values metadata.Values `json:"values"`
+	Scope     metadata.Scope  `json:"scope"`
+	Kind      metadata.Kind   `json:"kind"`
+	Values    metadata.Values `json:"values"`
+	UpdatedAt time.Time       `json:"updated_at"`
 }
 
 // TraceRun represents a function run backed by a trace

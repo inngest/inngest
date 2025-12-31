@@ -1,5 +1,3 @@
-'use client';
-
 import { TextCell } from '@inngest/components/Table';
 
 import { getFormattedJSONObjectOrArrayString } from './json';

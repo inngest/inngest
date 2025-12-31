@@ -16,12 +16,14 @@ local keyCustomConcurrencyKey2    = KEYS[4] -- Optional for eg. for concurrency 
 local keyAcctConcurrency          = KEYS[5] -- Account concurrency level
 
 local keyConcurrencyPointer       = KEYS[6]
+local keyPartitionScavengerIndex  = KEYS[7]
 
 local queueID         = ARGV[1]
 local currentLeaseKey = ARGV[2]
 local newLeaseKey     = ARGV[3]
 
-local partitionID 		= ARGV[4]
+local partitionID 		      = ARGV[4]
+local updateConstraintState = tonumber(ARGV[5])
 
 -- $include(decode_ulid_time.lua)
 -- $include(get_queue_item.lua)
@@ -47,36 +49,40 @@ item.leaseID = newLeaseKey
 redis.call("HSET", keyQueueMap, queueID, cjson.encode(item))
 -- Update the item's score in our sorted index.
 
+if updateConstraintState == 1 then
+  -- This extends the item in the zset and also ensures that scavenger queues are
+  -- updated.
+  local function handleExtendLease(keyConcurrency)
+    redis.call("ZADD", keyConcurrency, nextTime, item.id)
+  end
 
--- This extends the item in the zset and also ensures that scavenger queues are
--- updated.
-local function handleExtendLease(keyConcurrency)
-	redis.call("ZADD", keyConcurrency, nextTime, item.id)
+  -- Items always belong to an account
+  redis.call("ZADD", keyAcctConcurrency, nextTime, item.id)
+
+  handleExtendLease(keyConcurrencyFn)
+
+  if exists_without_ending(keyCustomConcurrencyKey1, ":-") == true then
+    handleExtendLease(keyCustomConcurrencyKey1)
+  end
+
+  if exists_without_ending(keyCustomConcurrencyKey2, ":-") == true then
+    handleExtendLease(keyCustomConcurrencyKey2)
+  end
 end
+
+-- Update scavenger index
+redis.call("ZADD", keyPartitionScavengerIndex, nextTime, item.id)
 
 -- For every queue that we lease from, ensure that it exists in the scavenger pointer queue
 -- so that expired leases can be re-processed.  We want to take the earliest time from the
--- concurrency queue such that we get a previously lost job if possible.
+-- scavenger index such that we get a previously lost job if possible.
+local scavengerIndexScores =
+	redis.call("ZRANGE", keyPartitionScavengerIndex, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
+if scavengerIndexScores ~= false and scavengerIndexScores ~= nil then
+	local earliestLease = tonumber(scavengerIndexScores[2])
 
-local inProgressScores = redis.call("ZRANGE", keyConcurrencyFn, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
-if inProgressScores ~= false then
-  local earliestLease = tonumber(inProgressScores[2])
-  -- Add the earliest time to the pointer queue for in-progress, allowing us to scavenge
-  -- lost jobs easily.
-  redis.call("ZADD", keyConcurrencyPointer, earliestLease, partitionID)
-end
-
--- Items always belong to an account
-redis.call("ZADD", keyAcctConcurrency, nextTime, item.id)
-
-handleExtendLease(keyConcurrencyFn)
-
-if exists_without_ending(keyCustomConcurrencyKey1, ":-") == true then
-	handleExtendLease(keyCustomConcurrencyKey1)
-end
-
-if exists_without_ending(keyCustomConcurrencyKey2, ":-") == true then
-	handleExtendLease(keyCustomConcurrencyKey2)
+	-- Ensure that we update the score with the earliest lease
+	redis.call("ZADD", keyConcurrencyPointer, earliestLease, partitionID)
 end
 
 return 0

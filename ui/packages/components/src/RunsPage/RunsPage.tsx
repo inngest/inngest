@@ -1,7 +1,4 @@
-'use client';
-
 import { useCallback, useMemo, useRef, useState } from 'react';
-import dynamic from 'next/dynamic';
 import { Button } from '@inngest/components/Button';
 import TimeFieldFilter from '@inngest/components/Filter/TimeFieldFilter';
 import { TimeFilter } from '@inngest/components/Filter/TimeFilter';
@@ -19,8 +16,9 @@ import { cn } from '@inngest/components/utils/classNames';
 import { durationToString, parseDuration } from '@inngest/components/utils/date';
 import { RiArrowRightUpLine, RiRefreshLine, RiSearchLine } from '@remixicon/react';
 import { type VisibilityState } from '@tanstack/react-table';
-import { useLocalStorage } from 'react-use';
+import useLocalStorage from 'react-use/lib/useLocalStorage';
 
+import CodeSearch from '../CodeSearch/CodeSearch';
 import type { RangeChangeProps } from '../DatePicker/RangePicker';
 import EntityFilter from '../Filter/EntityFilter';
 import { RunDetailsV3 } from '../RunDetailsV3/RunDetailsV3';
@@ -30,20 +28,12 @@ import {
   useStringArraySearchParam,
   useValidatedArraySearchParam,
   useValidatedSearchParam,
-} from '../hooks/useSearchParam';
+} from '../hooks/useSearchParams';
 import type { Features } from '../types/features';
 import RunsStatusFilter from './RunsStatusFilter';
+import RunsTable from './RunsTable';
 import { isColumnID, useScopedColumns, type ColumnID } from './columns';
 import type { Run, ViewScope } from './types';
-
-// Disable SSR in Runs Table, to prevent hydration errors. It requires windows info on visibility columns
-const RunsTable = dynamic(() => import('@inngest/components/RunsPage/RunsTable'), {
-  ssr: false,
-});
-
-const CodeSearch = dynamic(() => import('@inngest/components/CodeSearch/CodeSearch'), {
-  ssr: false,
-});
 
 type Props = {
   data: Run[];
@@ -237,6 +227,7 @@ export function RunsPage({
             pollInterval={pollInterval}
             runID={rowData.id}
             standalone={false}
+            newStack={true}
           />
         </div>
       );

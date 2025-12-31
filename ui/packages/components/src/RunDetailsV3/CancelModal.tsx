@@ -1,12 +1,9 @@
 import { useState } from 'react';
-import { RiCheckboxCircleFill, RiExternalLinkLine } from '@remixicon/react';
 import { toast } from 'sonner';
 
 import { Alert } from '../Alert';
-import { Link } from '../Link';
 import { AlertModal } from '../Modal';
 import { useCancelRun } from '../SharedContext/useCancelRun';
-import { useRerun } from '../SharedContext/useRerun';
 
 type RerunProps = {
   runID: string;

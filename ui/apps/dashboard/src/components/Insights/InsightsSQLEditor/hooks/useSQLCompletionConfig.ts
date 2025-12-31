@@ -1,5 +1,3 @@
-'use client';
-
 import { useCallback, useMemo } from 'react';
 import { availableClickhouseFunctions } from '@inngest/components/SQLEditor/hooks/availableClickhouseFunctions';
 import { useCache } from '@inngest/components/SQLEditor/hooks/useCache';
@@ -56,7 +54,10 @@ export function useSQLCompletionConfig(): SQLCompletionConfig {
   const getEventTypeSchemas = useEventTypeSchemas();
 
   // Cache for fetched event names with 5 minute TTL
-  const eventNamesCache = useCache<string[]>({ ttl: 5 * 60 * 1000, name: 'eventNames' });
+  const eventNamesCache = useCache<string[]>({
+    ttl: 5 * 60 * 1000,
+    name: 'eventNames',
+  });
 
   // Cache for fetched schemas with 5 minute TTL
   const schemasCache = useCache<Array<{ name: string; type: string }>>({
@@ -79,14 +80,19 @@ export function useSQLCompletionConfig(): SQLCompletionConfig {
 
       return eventNames;
     },
-    [fetchAllEventTypes, eventNamesCache]
+    [fetchAllEventTypes, eventNamesCache],
   );
 
   // Create a function to fetch schema for a specific event name
   const fetchEventSchema = useCallback(
-    async (eventName: string): Promise<Array<{ name: string; type: string }>> => {
+    async (
+      eventName: string,
+    ): Promise<Array<{ name: string; type: string }>> => {
       try {
-        const result = await getEventTypeSchemas({ cursor: null, nameSearch: eventName });
+        const result = await getEventTypeSchemas({
+          cursor: null,
+          nameSearch: eventName,
+        });
         const propsMap = new Map<string, string>();
 
         result.events.forEach((event) => {
@@ -118,7 +124,10 @@ export function useSQLCompletionConfig(): SQLCompletionConfig {
           }
         });
 
-        const props = Array.from(propsMap.entries()).map(([name, type]) => ({ name, type }));
+        const props = Array.from(propsMap.entries()).map(([name, type]) => ({
+          name,
+          type,
+        }));
 
         // Update cache
         schemasCache.set(eventName, props);
@@ -128,7 +137,7 @@ export function useSQLCompletionConfig(): SQLCompletionConfig {
         return [];
       }
     },
-    [getEventTypeSchemas, schemasCache]
+    [getEventTypeSchemas, schemasCache],
   );
 
   return useMemo<SQLCompletionConfig>(
@@ -144,6 +153,6 @@ export function useSQLCompletionConfig(): SQLCompletionConfig {
       eventNamesCache,
       schemasCache,
     }),
-    [fetchEventNames, fetchEventSchema, eventNamesCache, schemasCache]
+    [fetchEventNames, fetchEventSchema, eventNamesCache, schemasCache],
   );
 }

@@ -1,7 +1,5 @@
-'use client';
-
-import { useRouter } from 'next/navigation';
 import { RiRefreshLine } from '@remixicon/react';
+import { useRouter } from '@tanstack/react-router';
 import { toast } from 'sonner';
 
 import { Button } from '../Button';
@@ -17,7 +15,7 @@ export const RefreshButton = () => {
       icon={<RiRefreshLine />}
       iconSide="left"
       onClick={() => {
-        router.refresh();
+        router.invalidate();
         setTimeout(() => toast.success('Page successfully refreshed!'), 500);
       }}
     />

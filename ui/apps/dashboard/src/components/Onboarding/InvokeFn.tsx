@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { Alert } from '@inngest/components/Alert/Alert';
+
+import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
-import { CodeBlock } from '@inngest/components/CodeBlock/CodeBlock';
+import { CodeBlock } from '@inngest/components/CodeBlock';
 import { parseCode } from '@inngest/components/InvokeButton/utils';
 import { Link } from '@inngest/components/Link';
 import { Select, type Option } from '@inngest/components/Select/Select';
@@ -11,10 +11,11 @@ import { toast } from 'sonner';
 
 import { FunctionTriggerTypes } from '@/gql/graphql';
 import { pathCreator } from '@/utils/urls';
-import { OnboardingSteps } from '../Onboarding/types';
-import { invokeFunction, prefetchFunctions } from './actions';
+import { OnboardingSteps } from './types';
+import { invokeFunction, prefetchFunctions } from '@/queries/server/functions';
 import useOnboardingStep from './useOnboardingStep';
 import { useOnboardingTracking } from './useOnboardingTracking';
+import { useNavigate, ClientOnly } from '@tanstack/react-router';
 
 const initialCode = JSON.stringify(
   {
@@ -23,7 +24,7 @@ const initialCode = JSON.stringify(
     },
   },
   null,
-  2
+  2,
 );
 
 interface FunctionOption extends Option {
@@ -42,17 +43,18 @@ export default function InvokeFn() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>();
   const [functions, setFunctions] = useState<FunctionOption[]>([]);
-  const [selectedFunction, setSelectedFunction] = useState<FunctionOption | null>(null);
+  const [selectedFunction, setSelectedFunction] =
+    useState<FunctionOption | null>(null);
   const [rawPayload, setRawPayload] = useState(initialCode);
   const [isFnInvoked, setIsFnInvoked] = useState(false);
-  const router = useRouter();
+  const navigate = useNavigate();
   const tracking = useOnboardingTracking();
 
   const isOnboardingCompleted = lastCompletedStep?.isFinalStep;
 
   const hasEventTrigger =
     selectedFunction?.current.triggers.some(
-      (trigger) => trigger.type == FunctionTriggerTypes.Event
+      (trigger) => trigger.type == FunctionTriggerTypes.Event,
     ) ?? false;
 
   useEffect(() => {
@@ -62,7 +64,9 @@ export default function InvokeFn() {
         const fetchedFunctions = await prefetchFunctions();
         setFunctions(fetchedFunctions);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load functions');
+        setError(
+          err instanceof Error ? err.message : 'Failed to load functions',
+        );
         console.error('Failed to load functions: ', err);
       } finally {
         setLoading(false);
@@ -82,9 +86,11 @@ export default function InvokeFn() {
     }
     try {
       const { success, error } = await invokeFunction({
-        functionSlug: selectedFunction.slug,
-        user: payload.user,
-        data: payload.data,
+        data: {
+          functionSlug: selectedFunction.slug,
+          user: payload.user,
+          data: payload.data,
+        },
       });
       if (success) {
         updateCompletedSteps(currentStepName, {
@@ -117,8 +123,8 @@ export default function InvokeFn() {
   return (
     <div className="text-subtle">
       <p className="mb-6 text-sm">
-        You can send a test event and see your function in action. You will be able to access all
-        our monitoring and debugging features.{' '}
+        You can send a test event and see your function in action. You will be
+        able to access all our monitoring and debugging features.{' '}
         <Link
           className="inline-block"
           size="small"
@@ -129,10 +135,14 @@ export default function InvokeFn() {
         </Link>
       </p>
       <div className="border-subtle my-6 rounded-md border px-6 py-4">
-        <p className="text-muted mb-2 text-sm font-medium">Select function to test:</p>
+        <p className="text-muted mb-2 text-sm font-medium">
+          Select function to test:
+        </p>
 
         <Select
-          onChange={(option) => setSelectedFunction(option as FunctionOption)}
+          onChange={(option: Option) =>
+            setSelectedFunction(option as FunctionOption)
+          }
           isLabelVisible={false}
           label={selectDisplay}
           multiple={false}
@@ -140,7 +150,9 @@ export default function InvokeFn() {
           className="mb-6"
         >
           <Select.Button
-            className={functions.length === 0 ? 'text-disabled cursor-not-allowed' : ''}
+            className={
+              functions.length === 0 ? 'text-disabled cursor-not-allowed' : ''
+            }
           >
             <div className="text-sm font-medium leading-tight">
               {selectedFunction?.name || selectDisplay}
@@ -160,21 +172,25 @@ export default function InvokeFn() {
         </Select>
         {functions.length === 0 && !loading && (
           <Alert className="mt-6" severity="warning">
-            <p className="text-sm">Make sure your app is synced and has functions.</p>
+            <p className="text-sm">
+              Make sure your app is synced and has functions.
+            </p>
           </Alert>
         )}
         {hasEventTrigger && (
-          <CodeBlock.Wrapper>
-            <CodeBlock
-              header={{ title: 'Invoke function' }}
-              tab={{
-                content: rawPayload,
-                readOnly: false,
-                language: 'json',
-                handleChange: setRawPayload,
-              }}
-            />
-          </CodeBlock.Wrapper>
+          <ClientOnly>
+            <CodeBlock.Wrapper>
+              <CodeBlock
+                header={{ title: 'Invoke function' }}
+                tab={{
+                  content: rawPayload,
+                  readOnly: false,
+                  language: 'json',
+                  handleChange: setRawPayload,
+                }}
+              />
+            </CodeBlock.Wrapper>
+          </ClientOnly>
         )}
         {!hasEventTrigger && selectedFunction && (
           <p className="text-sm">
@@ -221,7 +237,7 @@ export default function InvokeFn() {
                       invokedFunction: selectedFunction,
                     },
                   });
-                  router.push(pathCreator.apps({ envSlug: 'production' }));
+                  navigate({ to: pathCreator.apps({ envSlug: 'production' }) });
                 }}
               />
             </div>
@@ -236,7 +252,7 @@ export default function InvokeFn() {
                     invokedFunction: selectedFunction,
                   },
                 });
-                router.push(pathCreator.runs({ envSlug: 'production' }));
+                navigate({ to: pathCreator.runs({ envSlug: 'production' }) });
               }}
             />
           )}

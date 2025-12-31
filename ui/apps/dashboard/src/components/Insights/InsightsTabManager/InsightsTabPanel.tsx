@@ -1,5 +1,3 @@
-'use client';
-
 import { Resizable } from '@inngest/components/Resizable/Resizable';
 
 import type { Tab } from '@/components/Insights/types';
@@ -69,11 +67,17 @@ export function InsightsTabPanel({
               actions={
                 <>
                   <InsightsSQLEditorDownloadCSVButton />
-                  {isRunning && <span className="text-muted mr-3 text-xs">Running query...</span>}
+                  {isRunning && (
+                    <span className="text-muted mr-3 text-xs">
+                      Running query...
+                    </span>
+                  )}
                 </>
               }
               className="border-subtle h-full border-t"
-              title={<InsightsSQLEditorResultsTitle historyWindow={historyWindow} />}
+              title={
+                <InsightsSQLEditorResultsTitle historyWindow={historyWindow} />
+              }
             >
               <InsightsDataTable />
             </Section>

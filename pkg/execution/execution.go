@@ -144,6 +144,7 @@ type Executor interface {
 type RunContext interface {
 	// Metadata access
 	Metadata() *sv2.Metadata
+	DriverResponse() *state.DriverResponse
 	Events() []json.RawMessage
 	HTTPClient() exechttp.RequestExecutor
 

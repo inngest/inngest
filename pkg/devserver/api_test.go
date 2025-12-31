@@ -258,7 +258,7 @@ func newTestDevServer(t *testing.T) *devserver {
 	t.Helper()
 
 	// Create in-memory database
-	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{InMemory: true, ForTest: true})
+	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{Persist: false, ForTest: true})
 	require.NoError(t, err)
 
 	// Initialize CQRS manager

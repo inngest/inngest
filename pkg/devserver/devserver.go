@@ -134,9 +134,9 @@ type StartOpts struct {
 
 	NoUI bool
 
-	// InMemory controls whether to only use in-memory databases (as opposed to
-	// filesystem)
-	InMemory bool
+	// Persist controls whether to persist data in between restarts.  If false,
+	// the dev server will use in-memory databases.
+	Persist bool `json:"persist"`
 
 	// RedisURI allows connecting to external Redis instead of in-memory Redis
 	RedisURI string `json:"redis_uri"`
@@ -180,7 +180,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	services := []service.Service{}
 
 	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{
-		InMemory:    opts.InMemory,
+		Persist:     opts.Persist,
 		PostgresURI: opts.PostgresURI,
 		Directory:   opts.SQLiteDir,
 	})
@@ -329,12 +329,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		redis_state.WithRefreshItemThrottle(NormalizeThrottle(smv2, dbcqrs)),
 		redis_state.WithPartitionConstraintConfigGetter(PartitionConstraintConfigGetter(dbcqrs)),
 
-		redis_state.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
-			return enableKeyQueues
-		}),
-		redis_state.WithEnqueueSystemPartitionsToBacklog(false),
-		redis_state.WithDisableLeaseChecksForSystemQueues(enableKeyQueues),
-		redis_state.WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
+		redis_state.WithAllowKeyQueues(func(ctx context.Context, acctID, functionID uuid.UUID) bool {
 			return enableKeyQueues
 		}),
 		redis_state.WithBacklogRefillLimit(10),
@@ -371,7 +366,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		}
 
 		queueOpts = append(queueOpts, redis_state.WithCapacityManager(cm))
-		queueOpts = append(queueOpts, redis_state.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool, fallback bool) {
+		queueOpts = append(queueOpts, redis_state.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
 			return true, true
 		}))
 
@@ -538,7 +533,7 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	if capacityManager != nil {
 		executorOpts = append(executorOpts, executor.WithCapacityManager(capacityManager))
-		executorOpts = append(executorOpts, executor.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool, fallback bool) {
+		executorOpts = append(executorOpts, executor.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
 			return true, true
 		}))
 	}
@@ -749,14 +744,15 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	if os.Getenv("DEBUG") != "" {
 		services = append(services, debugapi.NewDebugAPI(debugapi.Opts{
-			Log:           l,
-			DB:            ds.Data,
-			Queue:         rq,
-			State:         ds.State,
-			Cron:          croner,
-			ShardSelector: shardSelector,
-			Port:          ds.Opts.DebugAPIPort,
-			PauseManager:  pauseMgr,
+			Log:             l,
+			DB:              ds.Data,
+			Queue:           rq,
+			State:           ds.State,
+			Cron:            croner,
+			ShardSelector:   shardSelector,
+			Port:            ds.Opts.DebugAPIPort,
+			PauseManager:    pauseMgr,
+			CapacityManager: capacityManager,
 		}))
 	}
 
@@ -788,7 +784,7 @@ func createInmemoryRedis(ctx context.Context, tick time.Duration) (rueidis.Clien
 
 func getSendingEventHandler(ctx context.Context, pb pubsub.Publisher, topic string) execution.HandleSendingEvent {
 	return func(ctx context.Context, evt event.Event, item queue.Item) error {
-		trackedEvent := event.NewOSSTrackedEvent(evt, nil)
+		trackedEvent := event.NewBaseTrackedEvent(evt, nil)
 		byt, err := json.Marshal(trackedEvent)
 		if err != nil {
 			return fmt.Errorf("error marshalling invocation event: %w", err)
@@ -824,7 +820,7 @@ func getInvokeFailHandler(ctx context.Context, pb pubsub.Publisher, topic string
 		for _, e := range evts {
 			evt := e
 			eg.Go(func() error {
-				trackedEvent := event.NewOSSTrackedEvent(evt, nil)
+				trackedEvent := event.NewBaseTrackedEvent(evt, nil)
 				byt, err := json.Marshal(trackedEvent)
 				if err != nil {
 					return fmt.Errorf("error marshalling function finished event: %w", err)

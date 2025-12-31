@@ -1,5 +1,3 @@
-'use client';
-
 import { RiBookmarkLine, RiHistoryLine, RiTeamLine } from '@remixicon/react';
 
 type QueryHelperPanelSectionContentNoDataProps = {

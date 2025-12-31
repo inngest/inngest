@@ -1,5 +1,3 @@
-'use client';
-
 import { useEffect, useState } from 'react';
 import { cn } from '@inngest/components/utils/classNames';
 import { RiCommandLine } from '@remixicon/react';
@@ -80,7 +78,8 @@ export function KeyboardShortcut({
   const renderedKeys = keys.map(renderKey).filter(Boolean);
 
   // Determine background color - default to transparent if not provided
-  const bgColor = backgroundColor !== undefined ? backgroundColor : 'bg-transparent';
+  const bgColor =
+    backgroundColor !== undefined ? backgroundColor : 'bg-transparent';
 
   return (
     <div
@@ -88,7 +87,7 @@ export function KeyboardShortcut({
         'flex shrink-0 items-center gap-0.5 rounded-[4px] px-1 py-0.5',
         bgColor,
         color,
-        className
+        className,
       )}
     >
       {renderedKeys.map((key, index) => (

@@ -1,15 +1,21 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+node_modules
+package-lock.json
+yarn.lock
 
-# Next.js
-.next/
-next-env.d.ts
-
-# Environment variable files; we keep our environment variables on Vercel
-.env*
-
-# Vercel
+.DS_Store
+.cache
+.env
 .vercel
+.output
+.vinxi
 
-# Sentry
-.sentryclirc
+/build/
+/api/
+/server/build
+/public/build
+.vinxi
+# Sentry Config File
+.env.sentry-build-plugin
+/test-results/
+/blob-report/
 .env*.local

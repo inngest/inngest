@@ -6,8 +6,10 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"slices"
 	"sync"
+	"time"
 
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngestgo/experimental"
@@ -83,7 +85,8 @@ type InvocationManager interface {
 }
 
 type Opts struct {
-	SigningKey string
+	SigningKey         string
+	SigningKeyFallback string
 	// Mode represents the mode of execution, eg. sync steps, or async steps.
 	Mode StepMode
 	// Fn represents the function being executed, if this is an async
@@ -97,6 +100,11 @@ type Opts struct {
 	// Cancel, when executed cancels the context that is passed to the
 	// sync or async function.
 	Cancel context.CancelFunc
+
+	// APIBaseURL, if set, is the URL to use for the Inngest API.
+	// Defaults to os.Getenv("INNGEST_DEV") if set as a URL (for development), and
+	// "https://api.inngest.com" in production.
+	APIBaseURL string
 }
 
 // NewManager returns an InvocationManager to manage the incoming executor request.  This
@@ -125,9 +133,9 @@ func NewManager(opts Opts) InvocationManager {
 	// If the step mode is StepModeYield but the function contains checkpoint config,
 	// enable checkpointing.
 	var checkpointConfig checkpoint.Config
-	if opts.Mode == StepModeYield && opts.Fn != nil && opts.Fn.Config().CheckpointConfig != nil {
+	if opts.Mode == StepModeYield && opts.Fn != nil && opts.Fn.Config().Checkpoint != nil {
 		opts.Mode = StepModeCheckpoint
-		checkpointConfig = *opts.Fn.Config().CheckpointConfig
+		checkpointConfig = *opts.Fn.Config().Checkpoint
 	}
 
 	return &requestCtxManager{
@@ -142,12 +150,15 @@ func NewManager(opts Opts) InvocationManager {
 		unseen:     &unseen,
 		mw:         opts.Middleware,
 		mode:       opts.Mode,
+		t:          time.Now(),
 		checkpointer: checkpoint.New(checkpoint.Opts{
-			RunID:        opts.Request.CallCtx.RunID,
-			FnID:         opts.Request.CallCtx.FunctionID,
-			QueueItemRef: opts.Request.CallCtx.QueueItemRef,
-			SigningKey:   opts.SigningKey,
-			Config:       checkpointConfig,
+			RunID:              opts.Request.CallCtx.RunID,
+			FnID:               opts.Request.CallCtx.FunctionID,
+			QueueItemRef:       opts.Request.CallCtx.QueueItemRef,
+			SigningKey:         opts.SigningKey,
+			SigningKeyFallback: opts.SigningKeyFallback,
+			Config:             checkpointConfig,
+			APIBaseURL:         opts.APIBaseURL,
 		}),
 	}
 }
@@ -192,6 +203,9 @@ type requestCtxManager struct {
 	// checkpointer stores the reference to the invocation's checkpointer,
 	// allowing us to checkpoint step.runs and continue execution.,
 	checkpointer checkpoint.Checkpointer
+
+	// t returns the time since the epoch since the request started.
+	t time.Time
 }
 
 func (r *requestCtxManager) SigningKey() string {
@@ -269,6 +283,12 @@ func (r *requestCtxManager) AppendOp(ctx context.Context, op GeneratorOpcode) {
 			panic(ControlHijack{})
 		}
 
+		maxRuntime := r.fn.Config().Checkpoint.MaxRuntime
+		if maxRuntime > 0 && time.Since(r.t) > maxRuntime {
+			r.cancel()
+			panic(ControlHijack{})
+		}
+
 		r.checkpointer.WithStep(ctx, op, func(done []opcode.Step, err error) {
 			if err == nil {
 				// Remove each step that's checkpointed from our buffer.  The manager's buffer
@@ -281,7 +301,7 @@ func (r *requestCtxManager) AppendOp(ctx context.Context, op GeneratorOpcode) {
 				}
 				return
 			}
-			// TODO: Log
+			slog.Default().Error("error checkpointing state, falling back to async response", "error", err)
 		})
 	default:
 		// Do nothing else.

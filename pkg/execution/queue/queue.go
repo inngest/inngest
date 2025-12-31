@@ -29,6 +29,7 @@ type RunInfo struct {
 	// on the same function by limiting the number of continues possible within a given chain.
 	ContinueCount       uint
 	RefilledFromBacklog string
+	CapacityLease       *CapacityLease
 }
 
 // RunFunc represents a function called to process each item in the queue.  This may be

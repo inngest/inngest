@@ -557,7 +557,7 @@ func (b blockstore) Delete(ctx context.Context, index Index, pause state.Pause, 
 		compactionSample = b.compactionSample * 0.1 // 10x lower chance for legacy pauses
 	}
 
-	if rand.IntN(100) <= int(compactionSample*100) {
+	if rand.Float64() < compactionSample {
 		go func() {
 			var maxDeletes int64
 			for _, blockID := range blockIDs {
@@ -572,12 +572,70 @@ func (b blockstore) Delete(ctx context.Context, index Index, pause state.Pause, 
 			// Trigger a new compaction.
 			if maxDeletes >= int64(float64(b.blocksize)*b.compactionGarbageRatio) {
 				logger.StdlibLogger(ctx).Debug("compacting block deletes", "max_deletes", maxDeletes, "index", index)
-				b.Compact(ctx, index)
+				_ = b.Compact(ctx, index)
 			}
 		}()
 	}
 
 	return nil
+}
+
+// DeleteByID deletes a pause from a block by marking it as deleted in the block's delete tracking set.
+// This method must be called before the pause is deleted from the buffer, otherwise the block index
+// lookup will fail and we won't know which block contains the pause.
+// Note: This method does not trigger compaction as it can be called by any service that only has
+// access to the buffer and not necessarily the block store.
+func (b blockstore) DeleteByID(ctx context.Context, pauseID uuid.UUID, workspaceID uuid.UUID) error {
+	blockIndexKey := b.pc.KeyGenerator().PauseBlockIndex(ctx, pauseID)
+
+	blockIDStr, err := b.pc.Client().Do(ctx, b.pc.Client().B().Getdel().Key(blockIndexKey).Build()).ToString()
+	if err != nil {
+		if rueidis.IsRedisNil(err) {
+			// Temporary during rollout:
+			// If deleteAfterFlush feature flag is off, we won't find the blockIndexKey
+			// so we should instead get the pause from the buffer and call delete on it
+			if !b.deleteAfterFlush(ctx, workspaceID) {
+				pause, err := b.buf.PauseByID(ctx, Index{WorkspaceID: workspaceID}, pauseID)
+				if err != nil {
+					if errors.Is(err, state.ErrPauseNotFound) {
+						// pause doesn't exist, nothing to delete
+						return nil
+					}
+					return fmt.Errorf("error getting pause from buffer for deletion: %w", err)
+				}
+				if pause != nil {
+					var eventName string
+					if pause.Event != nil {
+						eventName = *pause.Event
+						index := Index{WorkspaceID: workspaceID, EventName: eventName}
+						return b.Delete(ctx, index, *pause)
+					}
+					logger.StdlibLogger(ctx).Warn("pause has no event set, skipping deletion from block", "pause_id", pauseID, "workspace_id", workspaceID)
+					return nil
+				}
+			}
+			return nil
+		}
+		return fmt.Errorf("error reading block index for pause %s: %w", pauseID, err)
+	}
+
+	if blockIDStr == PauseBlockIndexTombstone {
+		return nil
+	}
+
+	var blockIndex state.BlockIndex
+	if err := json.Unmarshal([]byte(blockIDStr), &blockIndex); err != nil {
+		return fmt.Errorf("error parsing block index JSON '%s': %w", blockIDStr, err)
+	}
+
+	blockID, err := ulid.Parse(blockIndex.BlockID)
+	if err != nil {
+		return fmt.Errorf("error parsing block ID '%s': %w", blockIndex.BlockID, err)
+	}
+
+	index := Index{WorkspaceID: workspaceID, EventName: blockIndex.EventName}
+
+	return b.pc.Client().Do(ctx, b.pc.Client().B().Sadd().Key(blockDeleteKey(index, blockID)).Member(pauseID.String()).Build()).Error()
 }
 
 func (b *blockstore) IndexExists(ctx context.Context, i Index) (bool, error) {
@@ -684,8 +742,11 @@ func (b *blockstore) PauseByID(ctx context.Context, index Index, pauseID uuid.UU
 
 // Compact reads all indexed deletes from block for an index, then compacts any blocks over a given threshold
 // by removing pauses and rewriting blocks.
-func (b *blockstore) Compact(ctx context.Context, index Index) {
-	_ = util.Lease(
+func (b *blockstore) Compact(ctx context.Context, index Index) error {
+	if b.buf == nil || b.bucket == nil || b.blocksize == 0 {
+		return fmt.Errorf("error bucket is not setup")
+	}
+	return util.Lease(
 		ctx,
 		"compact index blocks",
 		// NOTE: Lease, Renew, and Revoke are closures because they need
@@ -1158,5 +1219,31 @@ func (b *blockstore) deleteBlock(ctx context.Context, index Index, blockID ulid.
 		return fmt.Errorf("error removing block from blob storage: %w", err)
 	}
 
+	return nil
+}
+
+// CleanBlock reads a block, deletes all pauses in it, and then triggers compaction.
+func (b *blockstore) CleanBlock(ctx context.Context, index Index, blockID ulid.ULID) error {
+	l := logger.StdlibLogger(ctx).With("workspace_id", index.WorkspaceID, "event_name", index.EventName, "block_id", blockID)
+
+	block, err := b.ReadBlock(ctx, index, blockID)
+	if err != nil {
+		return fmt.Errorf("error reading block for cleanup: %w", err)
+	}
+
+	pauseCount := len(block.Pauses)
+	for _, pause := range block.Pauses {
+		if err := b.Delete(ctx, index, *pause); err != nil {
+			l.Error("error deleting pause during cleanup", "pause_id", pause.ID, "error", err)
+		}
+	}
+
+	l.Debug("deleted pauses during cleanup", "count", pauseCount)
+
+	if err := b.Compact(ctx, index); err != nil {
+		return fmt.Errorf("error compacting after cleanup: %w", err)
+	}
+
+	l.Debug("cleanup successful", "pauses_deleted", pauseCount)
 	return nil
 }

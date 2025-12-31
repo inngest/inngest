@@ -1,5 +1,3 @@
-'use client';
-
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { type AgentStatus } from '@inngest/use-agent';
 
@@ -71,10 +69,11 @@ export function InsightsChat({ agentThreadId, className }: InsightsChatProps) {
   } = useInsightsChatProvider();
 
   // Derive loading flags for this thread from provider
-  const { networkActive, textStreaming, textCompleted, currentToolName } = useMemo(
-    () => getThreadFlags(agentThreadId),
-    [getThreadFlags, agentThreadId]
-  );
+  const { networkActive, textStreaming, textCompleted, currentToolName } =
+    useMemo(
+      () => getThreadFlags(agentThreadId),
+      [getThreadFlags, agentThreadId],
+    );
 
   // Thread switching is handled by ActiveThreadBridge at the TabManager level
 
@@ -137,7 +136,7 @@ export function InsightsChat({ agentThreadId, className }: InsightsChatProps) {
       eventTypes,
       schemas,
       tabTitle,
-    ]
+    ],
   );
 
   const loadingText = getLoadingMessage({
@@ -164,7 +163,10 @@ export function InsightsChat({ agentThreadId, className }: InsightsChatProps) {
             ) : (
               <div className="flex-1 space-y-4 p-3">
                 {messages.map((m) => (
-                  <div key={m.id} className={m.role === 'user' ? 'text-right' : 'text-left'}>
+                  <div
+                    key={m.id}
+                    className={m.role === 'user' ? 'text-right' : 'text-left'}
+                  >
                     {m.role === 'user'
                       ? m.parts.map((part, i) => {
                           if (part.type === 'text') {

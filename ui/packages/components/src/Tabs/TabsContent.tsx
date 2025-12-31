@@ -1,5 +1,3 @@
-'use client';
-
 import * as TabsPrimitive from '@radix-ui/react-tabs';
 
 interface TabsContentProps extends React.ComponentPropsWithoutRef<typeof TabsPrimitive.Content> {}

@@ -25,7 +25,9 @@ const query = graphql(`
   }
 `);
 
-export function useGetTraceResult(): (payload: GetTraceResultPayload) => Promise<TraceResult> {
+export function useGetTraceResult(): (
+  payload: GetTraceResultPayload,
+) => Promise<TraceResult> {
   const envID = useEnvironment().id;
   const client = useClient();
 
@@ -34,7 +36,11 @@ export function useGetTraceResult(): (payload: GetTraceResultPayload) => Promise
       let res;
       try {
         res = await client
-          .query(query, { envID: envID, traceID }, { requestPolicy: 'network-only' })
+          .query(
+            query,
+            { envID: envID, traceID },
+            { requestPolicy: 'network-only' },
+          )
           .toPromise();
       } catch (e) {
         if (e instanceof Error) {
@@ -53,6 +59,6 @@ export function useGetTraceResult(): (payload: GetTraceResultPayload) => Promise
         ...res.data.workspace.runTraceSpanOutputByID,
       };
     },
-    [client, envID]
+    [client, envID],
   );
 }

@@ -24,7 +24,10 @@ export function useFetchAllEventTypes() {
         });
 
         allEvents.push(
-          ...result.events.map((e) => ({ name: e.name, latestSchema: e.latestSchema }))
+          ...result.events.map((e) => ({
+            name: e.name,
+            latestSchema: e.latestSchema,
+          })),
         );
         pageCount++;
 
@@ -39,6 +42,6 @@ export function useFetchAllEventTypes() {
 
       return allEvents;
     },
-    [getEventTypes]
+    [getEventTypes],
   );
 }

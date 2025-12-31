@@ -1190,7 +1190,7 @@ func TestBacklogsByPartition(t *testing.T) {
 
 			q := NewQueue(
 				defaultShard,
-				WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+				WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 					return true
 				}),
 				WithClock(clock),
@@ -1262,7 +1262,7 @@ func TestBacklogSize(t *testing.T) {
 				},
 			}
 		}),
-		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 			return true
 		}),
 	)
@@ -1352,7 +1352,7 @@ func TestPartitionBacklogSize(t *testing.T) {
 			q1 := NewQueue(
 				shard1,
 				WithQueueShardClients(queueShards),
-				WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+				WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 					return true
 				}),
 				WithClock(clock),
@@ -1360,7 +1360,7 @@ func TestPartitionBacklogSize(t *testing.T) {
 			q2 := NewQueue(
 				shard2,
 				WithQueueShardClients(queueShards),
-				WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+				WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 					return true
 				}),
 				WithClock(clock),
@@ -1417,4 +1417,160 @@ func TestPartitionBacklogSize(t *testing.T) {
 			require.EqualValues(t, tc.num, size2)
 		})
 	}
+}
+
+func TestShadowPartitionFunctionBacklog(t *testing.T) {
+	fnID, envID, accountID := uuid.New(), uuid.New(), uuid.New()
+	sysQueueName := "test-system-queue"
+
+	t.Run("system queue backlog should work", func(t *testing.T) {
+		sp := QueueShadowPartition{
+			SystemQueueName: &sysQueueName,
+		}
+
+		constraints := PartitionConstraintConfig{
+			Concurrency: PartitionConcurrency{},
+		}
+
+		b := sp.DefaultBacklog(constraints, false)
+
+		require.Equal(t, &QueueBacklog{
+			BacklogID:         fmt.Sprintf("system:%s", sysQueueName),
+			ShadowPartitionID: sysQueueName,
+		}, b)
+	})
+
+	t.Run("empty queue backlog should not work", func(t *testing.T) {
+		sp := QueueShadowPartition{}
+
+		constraints := PartitionConstraintConfig{
+			Concurrency: PartitionConcurrency{},
+		}
+
+		b := sp.DefaultBacklog(constraints, false)
+		require.Nil(t, b)
+	})
+
+	t.Run("non-start backlog should work", func(t *testing.T) {
+		sp := QueueShadowPartition{
+			FunctionVersion: 1,
+			FunctionID:      &fnID,
+			SystemQueueName: nil,
+			LeaseID:         nil,
+			EnvID:           &envID,
+			PartitionID:     fnID.String(),
+			AccountID:       &accountID,
+		}
+
+		constraints := PartitionConstraintConfig{
+			FunctionVersion: 2,
+			Concurrency:     PartitionConcurrency{},
+		}
+
+		b := sp.DefaultBacklog(constraints, false)
+
+		require.Equal(t, &QueueBacklog{
+			BacklogID:                              fmt.Sprintf("fn:%s", fnID),
+			ShadowPartitionID:                      fnID.String(),
+			EarliestFunctionVersion:                2,
+			Start:                                  false,
+			Throttle:                               nil,
+			ConcurrencyKeys:                        nil,
+			SuccessiveThrottleConstrained:          0,
+			SuccessiveCustomConcurrencyConstrained: 0,
+		}, b)
+	})
+
+	t.Run("start backlog should work", func(t *testing.T) {
+		sp := QueueShadowPartition{
+			FunctionVersion: 1,
+			FunctionID:      &fnID,
+			SystemQueueName: nil,
+			LeaseID:         nil,
+			EnvID:           &envID,
+			PartitionID:     fnID.String(),
+			AccountID:       &accountID,
+		}
+
+		constraints := PartitionConstraintConfig{
+			FunctionVersion: 2,
+			Concurrency:     PartitionConcurrency{},
+		}
+
+		b := sp.DefaultBacklog(constraints, true)
+
+		require.Equal(t, &QueueBacklog{
+			BacklogID:                              fmt.Sprintf("fn:%s:start", fnID),
+			ShadowPartitionID:                      fnID.String(),
+			EarliestFunctionVersion:                2,
+			Start:                                  true,
+			Throttle:                               nil,
+			ConcurrencyKeys:                        nil,
+			SuccessiveThrottleConstrained:          0,
+			SuccessiveCustomConcurrencyConstrained: 0,
+		}, b)
+	})
+
+	t.Run("throttle backlog should not work", func(t *testing.T) {
+		sp := QueueShadowPartition{
+			FunctionVersion: 1,
+			FunctionID:      &fnID,
+			SystemQueueName: nil,
+			LeaseID:         nil,
+			EnvID:           &envID,
+			PartitionID:     fnID.String(),
+			AccountID:       &accountID,
+		}
+
+		constraints := PartitionConstraintConfig{
+			FunctionVersion: 2,
+			Concurrency:     PartitionConcurrency{},
+			Throttle: &PartitionThrottle{
+				ThrottleKeyExpressionHash: "expr-hash",
+				Limit:                     1,
+				Burst:                     1,
+				Period:                    60,
+			},
+		}
+
+		b := sp.DefaultBacklog(constraints, true)
+
+		require.Nil(t, b)
+	})
+
+	t.Run("non start throttle backlog should work", func(t *testing.T) {
+		sp := QueueShadowPartition{
+			FunctionVersion: 1,
+			FunctionID:      &fnID,
+			SystemQueueName: nil,
+			LeaseID:         nil,
+			EnvID:           &envID,
+			PartitionID:     fnID.String(),
+			AccountID:       &accountID,
+		}
+
+		constraints := PartitionConstraintConfig{
+			FunctionVersion: 2,
+			Concurrency:     PartitionConcurrency{},
+			Throttle: &PartitionThrottle{
+				ThrottleKeyExpressionHash: "expr-hash",
+				Limit:                     1,
+				Burst:                     1,
+				Period:                    60,
+			},
+		}
+
+		b := sp.DefaultBacklog(constraints, false)
+
+		require.Equal(t, &QueueBacklog{
+			BacklogID:                              fmt.Sprintf("fn:%s", fnID),
+			ShadowPartitionID:                      fnID.String(),
+			EarliestFunctionVersion:                2,
+			Start:                                  false,
+			Throttle:                               nil,
+			ConcurrencyKeys:                        nil,
+			SuccessiveThrottleConstrained:          0,
+			SuccessiveCustomConcurrencyConstrained: 0,
+		}, b)
+	})
 }

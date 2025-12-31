@@ -1,5 +1,3 @@
-'use client';
-
 import { useState, type ReactNode } from 'react';
 import {
   DropdownMenu,
@@ -22,12 +20,18 @@ interface TabContextMenuProps {
   }) => ReactNode;
 }
 
-export function TabContextMenu({ tabs, onProcessPendingCloseTabs, children }: TabContextMenuProps) {
+export function TabContextMenu({
+  tabs,
+  onProcessPendingCloseTabs,
+  children,
+}: TabContextMenuProps) {
   const { tabManagerActions } = useTabManagerActions();
   const { queries } = useStoredQueries();
-  const [contextMenu, setContextMenu] = useState<{ tabId: string; x: number; y: number } | null>(
-    null
-  );
+  const [contextMenu, setContextMenu] = useState<{
+    tabId: string;
+    x: number;
+    y: number;
+  } | null>(null);
 
   const handleContextMenu = (e: React.MouseEvent, tabId: string) => {
     e.preventDefault();
@@ -35,7 +39,9 @@ export function TabContextMenu({ tabs, onProcessPendingCloseTabs, children }: Ta
   };
 
   const handleCloseOtherTabs = (tabId: string) => {
-    const tabsToClose = tabs.filter((t) => t.id !== tabId && t.id !== HOME_TAB.id);
+    const tabsToClose = tabs.filter(
+      (t) => t.id !== tabId && t.id !== HOME_TAB.id,
+    );
     onProcessPendingCloseTabs(tabsToClose.map((t) => t.id));
     setContextMenu(null);
   };
@@ -58,7 +64,10 @@ export function TabContextMenu({ tabs, onProcessPendingCloseTabs, children }: Ta
       {children({ handleContextMenu })}
 
       {contextMenu && (
-        <DropdownMenu open={true} onOpenChange={(open) => !open && setContextMenu(null)}>
+        <DropdownMenu
+          open={true}
+          onOpenChange={(open) => !open && setContextMenu(null)}
+        >
           <DropdownMenuContent
             align="start"
             className="fixed min-w-[240px]"
@@ -73,7 +82,10 @@ export function TabContextMenu({ tabs, onProcessPendingCloseTabs, children }: Ta
             >
               <span>New tab</span>
               <span className="ml-auto">
-                <KeyboardShortcut color="text-muted" keys={['cmd', 'ctrl', 'alt', 't']} />
+                <KeyboardShortcut
+                  color="text-muted"
+                  keys={['cmd', 'ctrl', 'alt', 't']}
+                />
               </span>
             </DropdownMenuItem>
             <div className="border-subtle my-1 border-t" />
@@ -104,7 +116,10 @@ export function TabContextMenu({ tabs, onProcessPendingCloseTabs, children }: Ta
             >
               <span>Close to the right</span>
             </DropdownMenuItem>
-            <DropdownMenuItem className="text-basis px-4 outline-none" onSelect={handleCloseAll}>
+            <DropdownMenuItem
+              className="text-basis px-4 outline-none"
+              onSelect={handleCloseAll}
+            >
               <span>Close all</span>
             </DropdownMenuItem>
           </DropdownMenuContent>

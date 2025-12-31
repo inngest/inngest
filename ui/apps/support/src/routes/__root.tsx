@@ -95,7 +95,6 @@ function RootComponent() {
               </div>
             </div>
           </TooltipProvider>
-          {/* TANSTACK TODO: add page view tracker here */}
         </InngestClerkProvider>
       </ThemeProvider>
     </RootDocument>

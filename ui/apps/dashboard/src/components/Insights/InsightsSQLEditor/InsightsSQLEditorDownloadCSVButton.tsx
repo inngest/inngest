@@ -1,6 +1,4 @@
-'use client';
-
-import { Button } from '@inngest/components/Button/Button';
+import { Button } from '@inngest/components/Button';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,7 +18,10 @@ export function InsightsSQLEditorDownloadCSVButton({
   temporarilyHide = false,
 }: InsightsSQLEditorDownloadCSVButtonProps) {
   const { data, status, queryName } = useInsightsStateMachineContext();
-  const { downloadAsCSV, downloadAsJSON } = useDownloadInsightsResults(data, queryName);
+  const { downloadAsCSV, downloadAsJSON } = useDownloadInsightsResults(
+    data,
+    queryName,
+  );
 
   // Maintain layout consistency when the button is temporarily hidden.
   if (temporarilyHide) {

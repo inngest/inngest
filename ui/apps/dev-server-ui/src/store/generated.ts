@@ -16,6 +16,9 @@ export type Scalars = {
   Environment: any;
   Int64: number;
   Map: any;
+  SpanMetadataKind: any;
+  SpanMetadataScope: any;
+  SpanMetadataValues: any;
   Time: any;
   ULID: any;
   UUID: any;
@@ -803,6 +806,7 @@ export type RunTraceSpan = {
   functionID: Scalars['UUID'];
   isRoot: Scalars['Boolean'];
   isUserland: Scalars['Boolean'];
+  metadata: Array<SpanMetadata>;
   name: Scalars['String'];
   outputID: Maybe<Scalars['String']>;
   parentSpan: Maybe<RunTraceSpan>;
@@ -900,6 +904,13 @@ export enum SingletonMode {
 export type SleepStepInfo = {
   __typename?: 'SleepStepInfo';
   sleepUntil: Scalars['Time'];
+};
+
+export type SpanMetadata = {
+  __typename?: 'SpanMetadata';
+  kind: Scalars['SpanMetadataKind'];
+  scope: Scalars['SpanMetadataScope'];
+  values: Scalars['SpanMetadataValues'];
 };
 
 export type StepError = {

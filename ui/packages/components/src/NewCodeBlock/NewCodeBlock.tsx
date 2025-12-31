@@ -1,5 +1,3 @@
-'use client';
-
 import { useEffect, useState, type ReactNode } from 'react';
 import { Button } from '@inngest/components/Button';
 import { CopyButton } from '@inngest/components/CopyButton';
@@ -17,7 +15,7 @@ import {
   RiExpandDiagonalLine,
 } from '@remixicon/react';
 import { JSONTree } from 'react-json-tree';
-import { useLocalStorage } from 'react-use';
+import useLocalStorage from 'react-use/lib/useLocalStorage';
 
 import { Alert } from '../Alert';
 import { Fullscreen } from '../Fullscreen/Fullscreen';

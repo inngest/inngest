@@ -89,7 +89,7 @@ export default function EntityFilter({
         <SelectWithSearch.SearchInput
           displayValue={(option: Option) => option?.name}
           placeholder={`Search for ${type}`}
-          onChange={(event) => setQuery(event.target.value)}
+          onChange={(event: React.ChangeEvent<HTMLInputElement>) => setQuery(event.target.value)}
         />
         <div className="max-h-64 overflow-auto">
           {filteredOptions.map((option) => (

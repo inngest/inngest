@@ -1,5 +1,3 @@
-'use client';
-
 import { useState } from 'react';
 import { AlertModal } from '@inngest/components/Modal';
 import { Select } from '@inngest/components/Select/Select';
@@ -66,10 +64,13 @@ export function PauseFunctionModal({
   function handlePause() {
     pauseFunction({
       fnID: functionID,
-      cancelRunning: currentRunHandlingStrategy.id == CURRENT_RUN_HANDLING_STRATEGY_CANCEL,
+      cancelRunning:
+        currentRunHandlingStrategy.id == CURRENT_RUN_HANDLING_STRATEGY_CANCEL,
     }).then((result) => {
       if (result.error) {
-        toast.error(`“${functionName}” could not be paused: ${result.error.message}`);
+        toast.error(
+          `“${functionName}” could not be paused: ${result.error.message}`,
+        );
       } else {
         toast.success(`“${functionName}” was successfully paused`);
       }
@@ -79,7 +80,9 @@ export function PauseFunctionModal({
   function handleResume() {
     unpauseFunction({ fnID: functionID }).then((result) => {
       if (result.error) {
-        toast.error(`“${functionName}” could not be resumed: ${result.error.message}`);
+        toast.error(
+          `“${functionName}” could not be resumed: ${result.error.message}`,
+        );
       } else {
         toast.success(`“${functionName}” was successfully resumed`);
       }
@@ -88,7 +91,10 @@ export function PauseFunctionModal({
   }
 
   let confirmButtonLabel = isPaused ? 'Resume Function' : 'Pause Function';
-  if (!isPaused && currentRunHandlingStrategy.id === CURRENT_RUN_HANDLING_STRATEGY_CANCEL) {
+  if (
+    !isPaused &&
+    currentRunHandlingStrategy.id === CURRENT_RUN_HANDLING_STRATEGY_CANCEL
+  ) {
     confirmButtonLabel = 'Pause & Cancel Runs';
   }
 
@@ -106,25 +112,31 @@ export function PauseFunctionModal({
       {isPaused && (
         <div>
           <p className="p-6 pb-0 text-base">
-            Are you sure you want to resume “<span className="font-semibold">{functionName}</span>”?
+            Are you sure you want to resume “
+            <span className="font-semibold">{functionName}</span>”?
           </p>
           <p className="text-muted p-6 pb-0 pt-3 text-sm">
-            This function will resume normal functionality and will be invoked as new events are
-            received. Events received during pause will not be automatically replayed.
+            This function will resume normal functionality and will be invoked
+            as new events are received. Events received during pause will not be
+            automatically replayed.
           </p>
         </div>
       )}
       {!isPaused && (
         <div>
           <p className="p-6 pb-0 text-base">
-            Are you sure you want to pause “<span className="font-semibold">{functionName}</span>”?
+            Are you sure you want to pause “
+            <span className="font-semibold">{functionName}</span>”?
           </p>
           <ul className="text-muted list-inside list-disc p-6 pb-0 pt-3 text-sm leading-6">
             <li>Functions can be resumed at any time.</li>
-            <li>No new runs will be queued or invoked while the function is paused.</li>
             <li>
-              No data will be lost. Events will continue being received, and you can process them
-              later via a Replay.
+              No new runs will be queued or invoked while the function is
+              paused.
+            </li>
+            <li>
+              No data will be lost. Events will continue being received, and you
+              can process them later via a Replay.
             </li>
           </ul>
           <div className="p-6 pb-0">

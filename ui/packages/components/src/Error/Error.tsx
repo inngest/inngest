@@ -1,4 +1,4 @@
-import { Alert } from '@inngest/components/Alert/Alert';
+import { Alert } from '@inngest/components/Alert';
 
 //
 // A thin wrapper around Alert for a standard error + contact support message

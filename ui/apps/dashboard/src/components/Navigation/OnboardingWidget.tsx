@@ -1,16 +1,23 @@
-import NextLink from 'next/link';
-import { useRouter } from 'next/navigation';
 import { Button } from '@inngest/components/Button';
 import { MenuItem } from '@inngest/components/Menu/MenuItem';
 import SegmentedProgressBar from '@inngest/components/ProgressBar/SegmentedProgressBar';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip/Tooltip';
-import { RiBookReadLine, RiCheckboxCircleFill, RiCloseLine } from '@remixicon/react';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@inngest/components/Tooltip/Tooltip';
+import {
+  RiBookReadLine,
+  RiCheckboxCircleFill,
+  RiCloseLine,
+} from '@remixicon/react';
 
 import { pathCreator } from '@/utils/urls';
 import { onboardingWidgetContent } from '../Onboarding/content';
 import { OnboardingSteps, steps } from '../Onboarding/types';
 import useOnboardingStep from '../Onboarding/useOnboardingStep';
 import { useOnboardingTracking } from '../Onboarding/useOnboardingTracking';
+import { Link, useNavigate, type FileRouteTypes } from '@tanstack/react-router';
 
 export default function OnboardingWidget({
   collapsed,
@@ -19,8 +26,9 @@ export default function OnboardingWidget({
   collapsed: boolean;
   closeWidget: () => void;
 }) {
-  const router = useRouter();
-  const { lastCompletedStep, nextStep, totalStepsCompleted } = useOnboardingStep();
+  const navigate = useNavigate();
+  const { lastCompletedStep, nextStep, totalStepsCompleted } =
+    useOnboardingStep();
   const tracking = useOnboardingTracking();
 
   const stepContent = lastCompletedStep?.isFinalStep
@@ -31,10 +39,12 @@ export default function OnboardingWidget({
     <>
       {collapsed && (
         <MenuItem
-          href={pathCreator.onboardingSteps({
-            step: nextStep ? nextStep.name : lastCompletedStep?.name,
-            ref: 'app-onboarding-widget',
-          })}
+          to={
+            pathCreator.onboardingSteps({
+              step: nextStep ? nextStep.name : lastCompletedStep?.name,
+              ref: 'app-onboarding-widget',
+            }) as FileRouteTypes['to']
+          }
           className="border-muted border"
           collapsed={collapsed}
           text="Onboarding guide"
@@ -43,8 +53,8 @@ export default function OnboardingWidget({
       )}
 
       {!collapsed && (
-        <NextLink
-          href={pathCreator.onboardingSteps({
+        <Link
+          to={pathCreator.onboardingSteps({
             step: nextStep ? nextStep.name : lastCompletedStep?.name,
             ref: 'app-onboarding-widget',
           })}
@@ -98,7 +108,9 @@ export default function OnboardingWidget({
               />
             )}
             {stepContent.eta && (
-              <p className="text-light text-[10px] font-medium uppercase">{stepContent.eta}</p>
+              <p className="text-light text-[10px] font-medium uppercase">
+                {stepContent.eta}
+              </p>
             )}
             {stepContent.cta && (
               <Button
@@ -107,12 +119,14 @@ export default function OnboardingWidget({
                 label={stepContent.cta}
                 onClick={(e) => {
                   e.preventDefault();
-                  router.push(pathCreator.billing() + '?ref=app-onboarding-widget');
+                  navigate({
+                    to: pathCreator.billing() + '?ref=app-onboarding-widget',
+                  });
                 }}
               />
             )}
           </div>
-        </NextLink>
+        </Link>
       )}
     </>
   );

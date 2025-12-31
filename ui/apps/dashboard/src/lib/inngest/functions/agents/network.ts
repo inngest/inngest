@@ -1,4 +1,9 @@
-import { createNetwork, openai, type Network, type State } from '@inngest/agent-kit';
+import {
+  createNetwork,
+  anthropic,
+  type Network,
+  type State,
+} from '@inngest/agent-kit';
 
 import { eventMatcherAgent } from './event-matcher';
 import { queryWriterAgent } from './query-writer';
@@ -16,13 +21,19 @@ const sequenceRouter: Network.Router<InsightsState> = async ({ callCount }) => {
 export function createInsightsNetwork(
   _threadId: string,
   initialState: State<InsightsState>,
-  historyAdapter?: any
+  historyAdapter?: any,
 ) {
   return createNetwork<InsightsState>({
     name: 'Insights SQL Generation Network',
-    description: 'Selects relevant events, proposes a SQL query, and summarizes the result.',
+    description:
+      'Selects relevant events, proposes a SQL query, and summarizes the result.',
     agents: [eventMatcherAgent, queryWriterAgent, summarizerAgent],
-    defaultModel: openai({ model: 'claude-haiku-4-5' }),
+    defaultModel: anthropic({
+      model: 'claude-haiku-4-5',
+      defaultParameters: {
+        max_tokens: 4096,
+      },
+    }),
     maxIter: 6,
     defaultState: initialState,
     router: sequenceRouter,
