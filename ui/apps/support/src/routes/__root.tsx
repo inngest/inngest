@@ -89,7 +89,7 @@ function RootComponent() {
                 {/* Status Banner */}
                 <StatusBanner status={status} />
 
-                <div className="mx-auto w-full max-w-5xl py-6">
+                <div className="mx-auto w-full max-w-5xl py-6 px-4">
                   <Outlet />
                 </div>
               </div>

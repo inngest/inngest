@@ -72,10 +72,10 @@ function Home() {
   return (
     <div className="mx-auto w-full max-w-5xl py-6">
       {/* Filters */}
-      <Filters />
+      {/* <Filters /> */}
 
       {/* Ticket List */}
-      <div className="flex w-full flex-col gap-4 px-4 py-4">
+      <div className="flex w-full flex-col gap-4 py-4">
         <div className="text-basis flex w-full items-center justify-between leading-none">
           <div className="flex flex-col justify-center">
             <p className="leading-4 whitespace-nowrap">My tickets</p>

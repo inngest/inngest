@@ -231,7 +231,8 @@ function TimelineEntry({
             {actorName}
           </span>
           {entry.node.actor.__typename === "CustomerActor" &&
-            !entry.node.actor.customer.email.email.match(
+            entry.node.actor.customer?.email &&
+            !entry.node.actor.customer.email.email?.match(
               /@plain-customer\.com$/,
             ) && (
               <span className="text-muted text-sm leading-5">

@@ -5,6 +5,7 @@ import { ProfileMenu } from "../Navigation/ProfileMenu";
 import { useAuth, useUser, useOrganization } from "@clerk/tanstack-react-start";
 import { Image } from "@unpic/react";
 import { Link } from "@inngest/components/Link";
+import { Link as RouterLink } from "@tanstack/react-router";
 
 export function Navigation() {
   const { isSignedIn } = useAuth();
@@ -23,13 +24,15 @@ export function Navigation() {
         </div>
 
         <div className="flex items-center justify-end gap-6">
-          <Button
-            kind="primary"
-            appearance="solid"
-            size="small"
-            label="New ticket"
-            className="h-8 px-3 text-sm"
-          />
+          <RouterLink to="/new">
+            <Button
+              kind="primary"
+              appearance="solid"
+              size="small"
+              label="New ticket"
+              className="h-8 px-3 text-sm"
+            />
+          </RouterLink>
 
           {/* Menu Icon */}
           <button
@@ -53,15 +56,17 @@ export function Navigation() {
             </Link>
           </div>
 
-          <Button
-            kind="primary"
-            appearance="solid"
-            size="small"
-            icon={<RiAddLine className="h-[18px] w-[18px]" />}
-            className="h-8 w-8 p-0"
-            aria-label="New ticket"
-            title="New ticket"
-          />
+          <RouterLink to="/new">
+            <Button
+              kind="primary"
+              appearance="solid"
+              size="small"
+              icon={<RiAddLine className="h-[18px] w-[18px]" />}
+              className="h-8 w-8 p-0"
+              aria-label="New ticket"
+              title="New ticket"
+            />
+          </RouterLink>
         </div>
 
         {/* Bottom Section: Profile Icon */}
