@@ -5,6 +5,7 @@ import type { Components } from "react-markdown";
 import { remarkParsePlainAttachments } from "./remarkParsePlainAttachments";
 import { rehypePreserveHProperties } from "./rehypePreserveHProperties";
 import { Attachment } from "@/components/Support/Attachment";
+import { SyntaxHighlighter } from "./SyntaxHighlighter";
 
 type MarkdownProps = {
   content: string;
@@ -59,6 +60,10 @@ const components: Partial<Components> = {
   // Code blocks
   code: ({ children, className }) => {
     const isInline = !className;
+    // Extract language from className (e.g., "language-javascript" -> "javascript")
+    const match = /language-(\w+)/.exec(className || "");
+    const language = match ? match[1] : "";
+
     if (isInline) {
       return (
         <code className="bg-canvasMuted text-contrast rounded px-1.5 py-0.5 font-mono text-sm">
@@ -66,13 +71,25 @@ const components: Partial<Components> = {
         </code>
       );
     }
+
+    // Use syntax highlighter for code blocks with a language
+    const codeString = String(children).replace(/\n$/, "");
+    if (language) {
+      return (
+        <SyntaxHighlighter language={language}>{codeString}</SyntaxHighlighter>
+      );
+    }
+
+    // Fallback for code blocks without a language
     return (
-      <code className="bg-canvasMuted text-contrast block overflow-x-auto rounded-lg p-4 font-mono text-sm">
-        {children}
-      </code>
+      <code className="text-contrast block font-mono text-sm">{children}</code>
     );
   },
-  pre: ({ children }) => <pre className="mb-4">{children}</pre>,
+  pre: ({ children }) => (
+    <pre className="bg-[rgb(var(--color-carbon-950))] mb-4 overflow-x-auto rounded-lg p-4">
+      {children}
+    </pre>
+  ),
 
   // Blockquotes
   blockquote: ({ children }) => (
