@@ -12,7 +12,6 @@ import {
   RiArrowLeftLine,
   RiUserLine,
   RiSlackLine,
-  RiAttachmentLine,
   RiArrowRightUpLine,
 } from "@remixicon/react";
 import { Button } from "@inngest/components/Button";
