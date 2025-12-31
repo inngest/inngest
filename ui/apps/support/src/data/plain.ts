@@ -45,6 +45,7 @@ export type TicketDetail = {
   createdAt: string;
   updatedAt: string;
   customerName: string;
+  slackChannelLink?: string;
 };
 
 export const getLabelForStatus = (status: string) => {
@@ -849,6 +850,108 @@ export const getCustomerTierByEmail = createServerFn({ method: "GET" })
       return {
         isEnterprise: false,
         isPaid: false,
+      };
+    }
+  });
+
+// Reply to thread types
+export type ReplyToThreadInput = {
+  threadId: string;
+  message: string;
+  /** The user's email address - used to impersonate the customer in Plain */
+  userEmail: string;
+};
+
+export type ReplyToThreadResult = {
+  success: boolean;
+  error?: string;
+};
+
+export const replyToThread = createServerFn({ method: "POST" })
+  .inputValidator((data: ReplyToThreadInput) => data)
+  .handler(async ({ data }): Promise<ReplyToThreadResult> => {
+    try {
+      const { threadId, message, userEmail } = data;
+
+      // Build input with customer impersonation so the reply appears from the customer
+      const input: {
+        threadId: string;
+        textContent: string;
+        markdownContent: string;
+        impersonation?: {
+          asCustomer: {
+            customerIdentifier: {
+              emailAddress: string;
+            };
+          };
+        };
+      } = {
+        threadId,
+        textContent: message,
+        markdownContent: message,
+      };
+
+      // Use impersonation to make the reply appear as from the customer
+      if (userEmail) {
+        input.impersonation = {
+          asCustomer: {
+            customerIdentifier: {
+              emailAddress: userEmail,
+            },
+          },
+        };
+      }
+
+      const res = (await plainClient.rawRequest({
+        query: `
+          mutation ReplyToThread($input: ReplyToThreadInput!) {
+            replyToThread(input: $input) {
+              error {
+                message
+                type
+                code
+              }
+            }
+          }
+        `,
+        variables: { input },
+      })) as {
+        data: {
+          replyToThread: {
+            error: { message: string; type: string; code: string } | null;
+          };
+        };
+        error?: PlainSDKError;
+      };
+
+      if (res.error) {
+        console.error("Error replying to thread:", res.error);
+        return {
+          success: false,
+          error: res.error.message,
+        };
+      }
+
+      if (res.data?.replyToThread?.error) {
+        console.error(
+          "Error replying to thread:",
+          res.data.replyToThread.error,
+        );
+        return {
+          success: false,
+          error: res.data.replyToThread.error.message,
+        };
+      }
+
+      return {
+        success: true,
+      };
+    } catch (error) {
+      console.error("Error replying to thread:", error);
+      return {
+        success: false,
+        error:
+          error instanceof Error ? error.message : "Failed to send message",
       };
     }
   });

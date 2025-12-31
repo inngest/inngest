@@ -1,11 +1,21 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { useState, useRef } from "react";
+import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
+import { useUser } from "@clerk/tanstack-react-start";
 import {
   getTicketById,
   getTimelineEntriesForTicket,
-  type TicketDetail,
+  replyToThread,
   type TimeLineEntryEdge,
 } from "@/data/plain";
-import { RiArrowLeftLine, RiUserLine, RiSlackLine } from "@remixicon/react";
+import {
+  RiArrowLeftLine,
+  RiUserLine,
+  RiSlackLine,
+  RiAttachmentLine,
+  RiArrowRightUpLine,
+} from "@remixicon/react";
+import { Button } from "@inngest/components/Button";
 import { Markdown } from "@/components/Markdown/Markdown";
 import { StatusBadge, PriorityBadge } from "@/components/Support/TicketBadges";
 import { ChannelBadge } from "@/components/Support/ChannelBadge";
@@ -16,7 +26,7 @@ import { Image } from "@unpic/react";
 import { Attachment } from "@/components/Support/Attachment";
 
 export const Route = createFileRoute("/_authed/case/$ticketId")({
-  component: TicketDetail,
+  component: TicketDetailPage,
   loader: async ({ params }) => {
     const [ticket, timelineEntries] = await Promise.all([
       getTicketById({ data: { ticketId: params.ticketId as string } }),
@@ -29,17 +39,42 @@ export const Route = createFileRoute("/_authed/case/$ticketId")({
   },
 });
 
-function TicketDetail() {
+function TicketDetailPage() {
   const { ticket, timelineEntries } = Route.useLoaderData();
+  const router = useRouter();
+  const { user } = useUser();
+  const timelineEndRef = useRef<HTMLDivElement>(null);
 
   if (!ticket || !timelineEntries) {
     return <div>Error loading ticket</div>;
   }
 
-  // TODO - Compare emails and use the avatar or org avatar if it matches
+  // Check if this is a Slack conversation
+  const isSlackChannel = ticket.channel === "SLACK";
+  const userEmail = user?.primaryEmailAddress?.emailAddress;
+
+  const scrollToBottom = () => {
+    // Wait for the DOM to update after invalidation, then scroll
+    setTimeout(() => {
+      timelineEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, 500);
+  };
+
+  // Find the first Slack message link for the "Reply in Slack" button
+  const slackLink = timelineEntries.find(
+    (entry) =>
+      entry.node.entry.__typename === "SlackMessageEntry" ||
+      entry.node.entry.__typename === "SlackReplyEntry",
+  )?.node.entry;
+  const slackMessageLink =
+    slackLink &&
+    (slackLink.__typename === "SlackMessageEntry" ||
+      slackLink.__typename === "SlackReplyEntry")
+      ? slackLink.slackMessageLink
+      : undefined;
 
   return (
-    <div className="min-h-screen">
+    <div className="flex min-h-screen flex-col">
       {/* Back button */}
       <Link
         to="/"
@@ -98,7 +133,7 @@ function TicketDetail() {
       </div>
 
       {/* Conversation timeline */}
-      <div className="space-y-8">
+      <div className="flex-1 space-y-8">
         {timelineEntries.length === 0 ? (
           <div className="bg-canvasSubtle border-subtle rounded-xl border p-12 text-center">
             <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-canvasMuted">
@@ -152,9 +187,124 @@ function TicketDetail() {
                 />
               );
             })}
+            {/* Scroll target for after sending a message */}
+            <div ref={timelineEndRef} />
           </div>
         )}
       </div>
+
+      {/* Reply form or Slack button */}
+      {isSlackChannel && slackMessageLink ? (
+        <div className="sticky bottom-0 border-t border-muted bg-canvasBase py-2">
+          <Button
+            kind="primary"
+            appearance="outlined"
+            href={slackMessageLink}
+            target="_blank"
+            label="Reply in Slack"
+            icon={<RiSlackLine className="h-4 w-4" />}
+            iconSide="left"
+          />
+        </div>
+      ) : userEmail ? (
+        <ReplyForm
+          ticketId={ticket.id}
+          userEmail={userEmail}
+          onSuccess={async () => {
+            await router.invalidate();
+            scrollToBottom();
+          }}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function ReplyForm({
+  ticketId,
+  userEmail,
+  onSuccess,
+}: {
+  ticketId: string;
+  userEmail: string;
+  onSuccess: () => void;
+}) {
+  const [message, setMessage] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const replyToThreadFn = useServerFn(replyToThread);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+
+    if (!message.trim()) {
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError(null);
+
+    try {
+      const result = await replyToThreadFn({
+        data: {
+          threadId: ticketId,
+          message: message.trim(),
+          userEmail,
+        },
+      });
+
+      if (result.success) {
+        setMessage("");
+        onSuccess();
+      } else {
+        setError(result.error || "Failed to send message");
+      }
+    } catch (err) {
+      console.error("Error sending reply:", err);
+      setError("Failed to send message. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="sticky bottom-0 bg-gradient-to-t from-white/50 via-white/50 to-transparent pb-4 pt-6">
+      <form onSubmit={handleSubmit}>
+        <div className="border-muted bg-canvasBase flex flex-col gap-2 rounded-lg border px-4 py-3 shadow-sm">
+          <textarea
+            placeholder="Add new message"
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            rows={1}
+            className="text-basis placeholder:text-disabled min-h-[21px] w-full resize-none border-0 bg-transparent p-0 text-sm leading-5 outline-none focus:ring-0"
+            disabled={isSubmitting}
+          />
+          <div className="flex items-center justify-between">
+            <div>{/* TODO - Add attachment support */}</div>
+            {/* <button
+              type="button"
+              className="text-muted hover:text-basis flex h-6 w-5 items-center justify-center"
+              disabled
+              title="Attachments coming soon"
+            >
+              <RiAttachmentLine className="h-4 w-4" />
+            </button> */}
+            <div>
+              <Button
+                type="submit"
+                kind="primary"
+                appearance="solid"
+                size="small"
+                label="Submit"
+                icon={<RiArrowRightUpLine className="h-4 w-4" />}
+                disabled={isSubmitting || !message.trim()}
+                className="h-6 px-2 text-xs"
+              />
+            </div>
+          </div>
+        </div>
+        {error && <p className="mt-2 text-sm text-red-500">{error}</p>}
+      </form>
     </div>
   );
 }
