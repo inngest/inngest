@@ -16,11 +16,8 @@ import {
   type TicketType,
   type BugSeverity,
 } from "@/data/ticketOptions";
-import {
-  createTicket,
-  getCustomerTierByEmail,
-  getAccountPlanInfo,
-} from "@/data/plain";
+import { createTicket, getCustomerTierByEmail } from "@/data/plain";
+import { getAccountPlanInfo } from "@/data/inngest";
 
 export const Route = createFileRoute("/_authed/new")({
   component: NewTicketPage,
