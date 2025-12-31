@@ -46,7 +46,7 @@ export function InlineSpans({ className, minTime, maxTime, trace, depth }: Props
 
   // For steps with userland children, render the step itself to show proper background color
   const children = trace.childrenSpans || [];
-  const hasUserlandChildren = depth === 1 && children.some((s) => s.isUserland);
+  const hasUserlandChildren = children.some((s) => s.isUserland);
   const spans = !trace.isRoot && children.length && !hasUserlandChildren ? children : [];
   const shouldRenderParentOverlay = spans.length > 0 && !trace.isUserland;
 
