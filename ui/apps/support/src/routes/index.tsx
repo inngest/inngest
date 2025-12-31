@@ -7,7 +7,7 @@ import { StatusBanner } from "@/components/Support/StatusBanner";
 import { Filters } from "@/components/Support/Filters";
 import { TicketCard } from "@/components/Support/TicketCard";
 import { Navigation } from "@/components/Support/Navigation";
-import { getStatus, type Status } from "@/data/status";
+import { getStatus, type ExtendedStatus } from "@/data/status";
 
 const getAuthStatusAndTickets = createServerFn({ method: "GET" }).handler(
   async () => {
@@ -16,7 +16,7 @@ const getAuthStatusAndTickets = createServerFn({ method: "GET" }).handler(
     // Only fetch user email and tickets if authenticated
     let userEmail: string | undefined = undefined;
     let tickets: TicketSummary[] = [];
-    let status: Status | undefined = undefined;
+    let status: ExtendedStatus | undefined = undefined;
 
     // Fetch system status
     try {
