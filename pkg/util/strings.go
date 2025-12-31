@@ -1,6 +1,7 @@
 package util
 
 import (
+	"math"
 	"strconv"
 	"strings"
 )
@@ -44,6 +45,10 @@ func StringToInt[T int | int64](s string) (T, error) {
 	// This handles cases where numbers are stored as float strings (e.g., "5.0")
 	// This is useful for Lua versions that return floats
 	if floatVal, err := strconv.ParseFloat(s, 64); err == nil {
+		// Check for special float values that should not be converted to integers
+		if math.IsInf(floatVal, 0) || math.IsNaN(floatVal) {
+			return 0, strconv.ErrSyntax
+		}
 		return T(floatVal), nil
 	}
 
