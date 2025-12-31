@@ -8,6 +8,7 @@ import type { TicketChannel } from "@/data/plain";
 
 type ChannelBadgeProps = {
   channel?: TicketChannel;
+  showLabel?: boolean;
 };
 
 const channelConfig: Record<
@@ -20,20 +21,26 @@ const channelConfig: Record<
   EMAIL: { icon: RiMailLine, label: "Email" },
 };
 
-export function ChannelBadge({ channel }: ChannelBadgeProps) {
+export function ChannelBadge({ channel, showLabel }: ChannelBadgeProps) {
   if (!channel) return null;
   const config = channelConfig[channel];
 
   if (!config) return null;
 
   const Icon = config.icon;
+  // If showLabel is explicitly set, use it. Otherwise, default to showing on desktop only (original behavior)
+  const shouldShowLabel = showLabel !== undefined ? showLabel : undefined; // undefined means use responsive classes
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-1">
       <Icon className="text-muted h-4 w-4" />
-      <div className="text-muted flex flex-col justify-center leading-none hidden md:block">
-        <p className="leading-4">{config.label}</p>
-      </div>
+      {shouldShowLabel === true ? (
+        <span className="text-muted text-xs leading-4">{config.label}</span>
+      ) : shouldShowLabel === false ? null : (
+        <div className="text-muted flex flex-col justify-center leading-none hidden md:block">
+          <p className="leading-4">{config.label}</p>
+        </div>
+      )}
     </div>
   );
 }

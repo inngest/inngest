@@ -2,6 +2,9 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
 import type { Components } from "react-markdown";
+import { remarkParsePlainAttachments } from "./remarkParsePlainAttachments";
+import { rehypePreserveHProperties } from "./rehypePreserveHProperties";
+import { Attachment } from "@/components/Support/Attachment";
 
 type MarkdownProps = {
   content: string;
@@ -111,14 +114,29 @@ const components: Partial<Components> = {
 
   // Strikethrough (from GFM)
   del: ({ children }) => <del className="line-through">{children}</del>,
+
+  img: ({ src, alt, ...props }) => {
+    // Plain inline attachments are only attachment ids - they need to be fetched
+    const attachmentId = (props as any)["data-attachment-id"];
+
+    if (attachmentId) {
+      return <Attachment attachmentId={attachmentId} />;
+    }
+
+    return (
+      <span className="text-muted text-sm italic">
+        Could not display inline image
+      </span>
+    );
+  },
 };
 
 export function Markdown({ content, className = "" }: MarkdownProps) {
   return (
     <div className={`prose prose-sm max-w-none ${className}`}>
       <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        rehypePlugins={[rehypeRaw]}
+        remarkPlugins={[remarkParsePlainAttachments, remarkGfm]}
+        rehypePlugins={[rehypePreserveHProperties, rehypeRaw]}
         components={components}
       >
         {content}

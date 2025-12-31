@@ -3,11 +3,8 @@ import { auth, clerkClient } from "@clerk/tanstack-react-start/server";
 import { createServerFn } from "@tanstack/react-start";
 import { getTicketsByEmail, type TicketSummary } from "@/data/plain";
 import { usePaginationUI } from "@inngest/components/Pagination";
-import { StatusBanner } from "@/components/Support/StatusBanner";
 import { Filters } from "@/components/Support/Filters";
 import { TicketCard } from "@/components/Support/TicketCard";
-import { Navigation } from "@/components/Support/Navigation";
-import { getStatus, type ExtendedStatus } from "@/data/status";
 
 const getAuthStatusAndTickets = createServerFn({ method: "GET" }).handler(
   async () => {
@@ -16,15 +13,6 @@ const getAuthStatusAndTickets = createServerFn({ method: "GET" }).handler(
     // Only fetch user email and tickets if authenticated
     let userEmail: string | undefined = undefined;
     let tickets: TicketSummary[] = [];
-    let status: ExtendedStatus | undefined = undefined;
-
-    // Fetch system status
-    try {
-      status = await getStatus();
-      console.log("status", status);
-    } catch (error) {
-      console.error("Failed to fetch status:", error);
-    }
 
     if (isAuthenticated && userId) {
       try {
@@ -45,7 +33,6 @@ const getAuthStatusAndTickets = createServerFn({ method: "GET" }).handler(
       isAuthenticated,
       userEmail,
       tickets,
-      status,
     };
   },
 );
@@ -58,7 +45,7 @@ export const Route = createFileRoute("/")({
 });
 
 function Home() {
-  const { isAuthenticated, userEmail, tickets, status } = Route.useLoaderData();
+  const { isAuthenticated, userEmail, tickets } = Route.useLoaderData();
 
   // Paginate tickets with 8 per page
   const { currentPageData, BoundPagination } = usePaginationUI({
@@ -83,56 +70,46 @@ function Home() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col md:flex-row bg-canvasBase">
-      {/* Navigation */}
-      <Navigation />
+    <div className="mx-auto w-full max-w-5xl py-6">
+      {/* Filters */}
+      <Filters />
 
-      <div className="flex flex-col grow">
-        {/* Status Banner */}
-        <StatusBanner status={status} />
-
-        <div className="mx-auto w-full max-w-6xl py-6">
-          {/* Filters */}
-          <Filters />
-
-          {/* Ticket List */}
-          <div className="flex w-full flex-col gap-4 px-4 py-4">
-            <div className="text-basis flex w-full items-center justify-between leading-none">
-              <div className="flex flex-col justify-center">
-                <p className="leading-4 whitespace-nowrap">My tickets</p>
-              </div>
-              <div className="flex flex-col justify-center">
-                <p className="leading-4 whitespace-nowrap">
-                  {tickets.length} {tickets.length === 1 ? "ticket" : "tickets"}
-                </p>
-              </div>
-            </div>
-
-            {tickets.length === 0 ? (
-              <div className="border-muted bg-canvasSubtle flex flex-col items-center justify-center rounded-lg border p-12 text-center">
-                <p className="text-basis mb-1 text-lg font-medium">
-                  No support tickets found
-                </p>
-                <p className="text-muted">
-                  Create a new ticket to get help from our support team.
-                </p>
-              </div>
-            ) : (
-              <>
-                {currentPageData.map((ticket) => (
-                  <TicketCard key={ticket.id} ticket={ticket} />
-                ))}
-
-                {/* Pagination */}
-                {tickets.length > 8 && (
-                  <div className="flex w-full flex-col items-center justify-center px-0 py-3">
-                    <BoundPagination />
-                  </div>
-                )}
-              </>
-            )}
+      {/* Ticket List */}
+      <div className="flex w-full flex-col gap-4 px-4 py-4">
+        <div className="text-basis flex w-full items-center justify-between leading-none">
+          <div className="flex flex-col justify-center">
+            <p className="leading-4 whitespace-nowrap">My tickets</p>
+          </div>
+          <div className="flex flex-col justify-center">
+            <p className="leading-4 whitespace-nowrap">
+              {tickets.length} {tickets.length === 1 ? "ticket" : "tickets"}
+            </p>
           </div>
         </div>
+
+        {tickets.length === 0 ? (
+          <div className="border-muted bg-canvasSubtle flex flex-col items-center justify-center rounded-lg border p-12 text-center">
+            <p className="text-basis mb-1 text-lg font-medium">
+              No support tickets found
+            </p>
+            <p className="text-muted">
+              Create a new ticket to get help from our support team.
+            </p>
+          </div>
+        ) : (
+          <>
+            {currentPageData.map((ticket) => (
+              <TicketCard key={ticket.id} ticket={ticket} />
+            ))}
+
+            {/* Pagination */}
+            {tickets.length > 8 && (
+              <div className="flex w-full flex-col items-center justify-center px-0 py-3">
+                <BoundPagination />
+              </div>
+            )}
+          </>
+        )}
       </div>
     </div>
   );

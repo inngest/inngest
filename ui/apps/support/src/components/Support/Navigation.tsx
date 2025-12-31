@@ -4,6 +4,7 @@ import { RiMenuFill, RiAddLine, RiUserLine } from "@remixicon/react";
 import { ProfileMenu } from "../Navigation/ProfileMenu";
 import { useAuth, useUser, useOrganization } from "@clerk/tanstack-react-start";
 import { Image } from "@unpic/react";
+import { Link } from "@inngest/components/Link";
 
 export function Navigation() {
   const { isSignedIn } = useAuth();
@@ -16,16 +17,17 @@ export function Navigation() {
       <nav className="bg-canvasBase border-subtle sticky top-0 z-50 flex items-center justify-between border-b border-t px-4 py-3 md:hidden">
         {/* Logo */}
         <div className="flex h-8 w-8 shrink-0 items-center justify-center">
-          <InngestLogoSmall className="text-basis" />
+          <Link href={import.meta.env.VITE_HOME_PATH}>
+            <InngestLogoSmall className="text-basis" />
+          </Link>
         </div>
 
         <div className="flex items-center justify-end gap-6">
-          {/* New Request Button */}
           <Button
             kind="primary"
             appearance="solid"
             size="small"
-            label="New request"
+            label="New ticket"
             className="h-8 px-3 text-sm"
           />
 
@@ -46,17 +48,19 @@ export function Navigation() {
         <div className="flex flex-col items-center gap-2">
           {/* Logo */}
           <div className="flex mb-2 h-[28px] w-8 shrink-0 items-center justify-center">
-            <InngestLogoSmall className="text-basis" />
+            <Link href={import.meta.env.VITE_HOME_PATH}>
+              <InngestLogoSmall className="text-basis" />
+            </Link>
           </div>
 
-          {/* New Request Button (Icon Only) */}
           <Button
             kind="primary"
             appearance="solid"
             size="small"
             icon={<RiAddLine className="h-[18px] w-[18px]" />}
             className="h-8 w-8 p-0"
-            aria-label="New request"
+            aria-label="New ticket"
+            title="New ticket"
           />
         </div>
 

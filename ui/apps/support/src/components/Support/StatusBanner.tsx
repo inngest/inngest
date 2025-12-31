@@ -31,8 +31,6 @@ export function StatusBanner({ status }: StatusBannerProps) {
 
   const [isOpen, setIsOpen] = useState(!isOperational);
 
-  console.log(status);
-
   return (
     <div
       className={`flex flex-col gap-2 w-full items-start px-4 py-2 ${

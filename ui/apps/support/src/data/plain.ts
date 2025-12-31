@@ -27,7 +27,7 @@ export type TicketSummary = {
   ref: string;
   title: string;
   status: string;
-  priority: string;
+  priority: number;
   createdAt: string;
   updatedAt: string;
   channel?: TicketChannel;
@@ -36,10 +36,12 @@ export type TicketSummary = {
 
 export type TicketDetail = {
   id: string;
+  ref: string;
   title: string;
   description: string | null;
   status: string;
-  priority: string;
+  priority: number;
+  channel?: TicketChannel;
   createdAt: string;
   updatedAt: string;
   customerName: string;
@@ -145,7 +147,7 @@ export const getTicketsByEmail = createServerFn({ method: "GET" })
             ref: thread.ref || "",
             title: thread.title || "Untitled",
             status: String(thread.status || "UNKNOWN"),
-            priority: String(thread.priority || "NORMAL"),
+            priority: thread.priority,
             createdAt: thread.createdAt.iso8601,
             updatedAt: thread.updatedAt.iso8601,
             channel: thread.channel as TicketChannel,
@@ -186,26 +188,58 @@ export const getTicketById = createServerFn({ method: "GET" })
     try {
       const { ticketId } = data;
 
-      const result = await plainClient.getThread({
-        threadId: ticketId,
-      });
+      const res = (await plainClient.rawRequest({
+        query: `
+          query GetThread($threadId: ID!) {
+            thread(threadId: $threadId) {
+              id
+              ref
+              title
+              description
+              status
+              priority
+              channel
+              createdAt {
+                iso8601
+              }
+              updatedAt {
+                iso8601
+              }
+              customer {
+                fullName
+                email {
+                  email
+                }
+              }
+            }
+          }
+        `,
+        variables: {
+          threadId: ticketId,
+        },
+      })) as unknown as Result<ThreadQueryResult, PlainSDKError>;
 
-      if (result.error || !result.data) {
-        console.error("Failed to fetch thread:", result.error);
+      if (res.error || !res.data) {
+        console.error("Failed to fetch thread:", res.error);
         return null;
       }
 
-      const thread = result.data as any;
+      const thread = res.data.thread;
 
       return {
         id: thread.id,
+        ref: thread.ref || "",
         title: thread.title || "Untitled",
         description: thread.description || null,
         status: String(thread.status || "UNKNOWN"),
-        priority: String(thread.priority || "NORMAL"),
+        priority: thread.priority,
+        channel: thread.channel as TicketChannel | undefined,
         createdAt: thread.createdAt?.iso8601 || new Date().toISOString(),
         updatedAt: thread.updatedAt?.iso8601 || new Date().toISOString(),
-        customerName: thread.customer?.email || "Unknown",
+        customerName:
+          thread.customer.fullName ||
+          thread.customer.email?.email ||
+          "Inngest user",
       };
     } catch (error) {
       console.error("Error fetching ticket details:", error);
@@ -213,7 +247,21 @@ export const getTicketById = createServerFn({ method: "GET" })
     }
   });
 
-type TimeLineEntryEdge = {
+type ThreadQueryResult = {
+  thread: ThreadPartsFragment & {
+    ref: string;
+    previewText: string;
+    channel: string;
+    customer: {
+      fullName: string;
+      email: {
+        email: string;
+      };
+    };
+  };
+};
+
+export type TimeLineEntryEdge = {
   cursor: string;
   node: {
     id: string;
@@ -228,13 +276,17 @@ type TimeLineEntryEdge = {
         }
       | {
           __typename: "CustomerActor";
-          customer: { fullName: string };
+          customer: {
+            fullName: string;
+            avatarUrl: string;
+            email: { email: string };
+          };
         }
       | {
           __typename: "MachineUserActor";
           machineUser: { fullName: string };
         };
-    entry: EmailEntry | CustomEntry; // CustomEntry | ChatEntry | SlackMessageEntry;
+    entry: EmailEntry | CustomEntry | SlackMessageEntry | SlackReplyEntry;
   };
 };
 
@@ -303,19 +355,40 @@ type EmailEntry = {
   // category: EmailCategory!
 };
 
-type Attachment = {
+export type Attachment = {
   id: string;
   fileName: string;
-  // fileSize: FileSize!
+  fileSize: {
+    megaBytes: number;
+  };
   fileExtension: string;
   fileMimeType: string;
-  // type: AttachmentType;
+  type: "EMAIL" | "SLACK"; // Note - there are other types
   createdAt: DateTime;
   createdBy: Actor;
   updatedAt: DateTime;
   updatedBy: Actor;
 };
 
+type SlackMessageEntry = {
+  __typename: "SlackMessageEntry";
+  slackMessageLink: string;
+  slackWebMessageLink: string;
+  text: string;
+  customerId: string;
+  attachments: Attachment[];
+  lastEditedOnSlackAt: DateTime;
+};
+
+type SlackReplyEntry = {
+  __typename: "SlackReplyEntry";
+  slackMessageLink: string;
+  slackWebMessageLink: string;
+  text: string;
+  customerId: string;
+  attachments: Attachment[];
+  lastEditedOnSlackAt: DateTime;
+};
 export const getTimelineEntriesForTicket = createServerFn({ method: "GET" })
   .inputValidator((data: { ticketId: string }) => data)
   .handler(async ({ data }): Promise<TimeLineEntryEdge[] | null> => {
@@ -349,6 +422,10 @@ export const getTimelineEntriesForTicket = createServerFn({ method: "GET" })
                       ... on CustomerActor {
                         customer {
                           fullName
+                          avatarUrl
+                          email {
+                            email
+                          }
                         }
                       }
                       ... on MachineUserActor {
@@ -379,12 +456,8 @@ export const getTimelineEntriesForTicket = createServerFn({ method: "GET" })
                           iso8601
                         }
                         attachments {
+                          id
                           fileName
-                          fileExtension
-                          fileMimeType
-                          createdAt {
-                            iso8601
-                          }
                         }
                       }
                       ... on SlackMessageEntry {
@@ -393,15 +466,26 @@ export const getTimelineEntriesForTicket = createServerFn({ method: "GET" })
                         text
                         customerId
                         attachments {
+                          id
                           fileName
-                          fileExtension
-                          fileMimeType
-                          createdAt {
-                            iso8601
-                          }
                         }
                         lastEditedOnSlackAt {
                           iso8601
+                          unixTimestamp
+                        }
+                      }
+                      ... on SlackReplyEntry {
+                        slackMessageLink
+                        slackWebMessageLink
+                        text
+                        customerId
+                        attachments {
+                          id
+                          fileName
+                        }
+                        lastEditedOnSlackAt {
+                          iso8601
+                          unixTimestamp
                         }
                       }
                     }
@@ -426,17 +510,15 @@ export const getTimelineEntriesForTicket = createServerFn({ method: "GET" })
       }
 
       const customerName = res.data.thread.customer.fullName;
-
       const entries = res.data.thread.timelineEntries.edges;
-      // Filter out entries that are not EmailEntry or SlackMessageEntry
-      // console.log(JSON.stringify(entries, null, 2));
       return entries
         .filter(
           (entry) =>
             // Custom entries are created via the API
             entry.node.entry.__typename === "CustomEntry" ||
-            entry.node.entry.__typename === "EmailEntry", //||
-          // entry.node.entry.__typename === "SlackMessageEntry",
+            entry.node.entry.__typename === "EmailEntry" ||
+            entry.node.entry.__typename === "SlackMessageEntry" ||
+            entry.node.entry.__typename === "SlackReplyEntry",
         )
         .sort(
           (a, b) =>
@@ -465,3 +547,68 @@ export const getTimelineEntriesForTicket = createServerFn({ method: "GET" })
       return [];
     }
   });
+
+export const getAttachmentDownloadUrl = createServerFn({ method: "GET" })
+  .inputValidator((data: { attachmentId: string }) => data)
+  .handler(async ({ data }): Promise<AttachmentDownloadUrl | null> => {
+    try {
+      const { attachmentId } = data;
+
+      const res = (await plainClient.rawRequest({
+        query: `
+          mutation CreateAttachmentDownloadUrl($attachmentId: ID!) {
+            createAttachmentDownloadUrl(input: { attachmentId: $attachmentId }) {
+              attachmentDownloadUrl {
+                attachment {
+                  id
+                  fileName
+                  fileExtension
+                  fileMimeType
+                  createdAt {
+                    iso8601
+                  }
+                }
+                downloadUrl
+                expiresAt {
+                  iso8601
+                }
+              }
+            }
+          }
+        `,
+        variables: {
+          attachmentId,
+        },
+      })) as unknown as Result<
+        CreateAttachmentDownloadUrlOutput,
+        PlainSDKError
+      >;
+
+      if (res.error || !res.data) {
+        console.error("Failed to fetch attachment download url:", res.error);
+        return null;
+      }
+
+      console.log(
+        "Attachment download url loader: ",
+        res.data.createAttachmentDownloadUrl.attachmentDownloadUrl,
+      );
+
+      return res.data.createAttachmentDownloadUrl.attachmentDownloadUrl;
+    } catch (error) {
+      console.error("Error fetching attachment download url:", error);
+      return null;
+    }
+  });
+
+type CreateAttachmentDownloadUrlOutput = {
+  createAttachmentDownloadUrl: {
+    attachmentDownloadUrl: AttachmentDownloadUrl;
+  };
+};
+
+type AttachmentDownloadUrl = {
+  attachment: Attachment;
+  downloadUrl: string;
+  expiresAt: DateTime;
+};

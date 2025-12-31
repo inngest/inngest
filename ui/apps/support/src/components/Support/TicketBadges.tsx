@@ -1,5 +1,6 @@
 import { Pill } from "@inngest/components/Pill";
 import { type PillKind } from "@inngest/components/Pill/Pill";
+import { ClientOnly } from "@tanstack/react-router";
 
 type StatusBadgeProps = {
   status: string;
@@ -7,7 +8,7 @@ type StatusBadgeProps = {
 };
 
 type PriorityBadgeProps = {
-  priority: string;
+  priority: number;
   size?: "sm" | "md";
   showLabel?: boolean;
 };
@@ -29,9 +30,11 @@ export function StatusBadge({ status }: StatusBadgeProps) {
   }
 
   return (
-    <Pill kind={pillKind} appearance="solid">
-      {label}
-    </Pill>
+    <ClientOnly>
+      <Pill kind={pillKind} appearance="solid">
+        {label}
+      </Pill>
+    </ClientOnly>
   );
 }
 
@@ -43,17 +46,19 @@ export function StatusBadge({ status }: StatusBadgeProps) {
  * - p2+: default (gray)
  */
 export function PriorityBadge({ priority }: PriorityBadgeProps) {
-  const priorityNum = parseInt(String(priority), 10);
+  // const priorityNum = parseInt(String(priority), 10);
 
   // Map priority to Pill kind
   let pillKind: PillKind = "default";
-  if (priorityNum === 0) {
+  if (priority === 0) {
     pillKind = "error";
   }
 
   return (
-    <Pill kind={pillKind} appearance="solid">
-      p{priority}
-    </Pill>
+    <ClientOnly>
+      <Pill kind={pillKind} appearance="solid">
+        p{priority}
+      </Pill>
+    </ClientOnly>
   );
 }

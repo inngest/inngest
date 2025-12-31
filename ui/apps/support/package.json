@@ -35,6 +35,7 @@
     "graphql-request": "^6.1.0",
     "ky": "^0.33.3",
     "launchdarkly-react-client-sdk": "^3.0.8",
+    "mdast": "^3.0.0",
     "next-themes": "^0.4.6",
     "nitro": "3.0.1-alpha.1",
     "react": "^18.2.0",
@@ -44,6 +45,8 @@
     "remark-gfm": "^4.0.1",
     "sonner": "^1.2.0",
     "srvx": "0.8.15",
+    "unified": "^11.0.5",
+    "unist-util-visit": "^5.0.0",
     "urql": "^4.0.5",
     "zod": "^3.22.4"
   },

@@ -32,7 +32,9 @@ export function TicketCard({ ticket }: TicketCardProps) {
       <div className="flex items-center justify-between">
         <div className="text-basis flex min-w-0 flex-1 items-center gap-1.5 leading-none">
           <div className="text-muted flex flex-col justify-center">
-            <p className="leading-4 whitespace-nowrap">{ticket.ref}</p>
+            <p className="leading-4 whitespace-nowrap font-mono">
+              {ticket.ref}
+            </p>
           </div>
           <div className="flex flex-col justify-center font-medium">
             <p className="leading-4 whitespace-nowrap">{ticket.title}</p>
