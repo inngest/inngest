@@ -8,11 +8,13 @@ import { RiLogoutCircleLine } from "@remixicon/react";
 import { useClerk } from "@clerk/tanstack-react-start";
 import { Link } from "@tanstack/react-router";
 import { Button } from "@inngest/components/Button/NewButton";
+import { cn } from "@inngest/components/utils/classNames";
 
 type Props = React.PropsWithChildren<{
   isAuthenticated: boolean;
   email?: string;
   organizationName?: string;
+  position?: "above" | "below";
 }>;
 
 export const ProfileMenu = ({
@@ -20,6 +22,7 @@ export const ProfileMenu = ({
   isAuthenticated,
   email,
   organizationName,
+  position = "above",
 }: Props) => {
   if (!isAuthenticated) {
     return (
@@ -35,7 +38,12 @@ export const ProfileMenu = ({
         {children}
       </ListboxButton>
       <div className="relative">
-        <ListboxOptions className="bg-canvasBase border-muted shadow-primary absolute -right-48 bottom-4 z-50 ml-8 w-[199px] rounded border ring-0 focus:outline-none">
+        <ListboxOptions
+          className={cn(
+            "bg-canvasBase border-muted shadow-primary absolute z-50 ml-2 w-[199px] rounded border ring-0 focus:outline-none",
+            position === "above" ? "left-0 -bottom-4" : "right-0 top-6",
+          )}
+        >
           <div className="text-muted m-2 flex flex-col min-h-8 cursor-default items-start gap-1 px-2 text-[13px]">
             <div className="font-medium">{email}</div>
             <div className="text-muted text-xs">{organizationName}</div>

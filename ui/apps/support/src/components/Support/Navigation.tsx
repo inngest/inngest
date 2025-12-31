@@ -35,13 +35,16 @@ export function Navigation() {
           </RouterLink>
 
           {/* Menu Icon */}
-          <button
-            type="button"
-            className="flex h-6 w-6 shrink-0 items-center justify-center text-basis"
-            aria-label="Open menu"
-          >
-            <RiMenuFill className="h-6 w-6" />
-          </button>
+          <div className="flex items-center justify-center">
+            <ProfileMenu
+              isAuthenticated={isSignedIn ?? false}
+              email={user?.emailAddresses[0].emailAddress}
+              organizationName={organization?.name}
+              position="below"
+            >
+              <RiMenuFill className="h-6 w-6" />
+            </ProfileMenu>
+          </div>
         </div>
       </nav>
 

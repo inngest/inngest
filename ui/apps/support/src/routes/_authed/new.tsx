@@ -16,7 +16,11 @@ import {
   type TicketType,
   type BugSeverity,
 } from "@/data/ticketOptions";
-import { createTicket, getCustomerTierByEmail } from "@/data/plain";
+import {
+  createTicket,
+  getCustomerTierByEmail,
+  getAccountPlanInfo,
+} from "@/data/plain";
 
 export const Route = createFileRoute("/_authed/new")({
   component: NewTicketPage,
@@ -27,6 +31,7 @@ function NewTicketPage() {
   const { user } = useUser();
   const createTicketFn = useServerFn(createTicket);
   const getCustomerTierFn = useServerFn(getCustomerTierByEmail);
+  const getAccountPlanFn = useServerFn(getAccountPlanInfo);
 
   const [ticketType, setTicketType] = useState<TicketType>(null);
   const [body, setBody] = useState("");
@@ -36,16 +41,27 @@ function NewTicketPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [result, setResult] = useState<{ ok?: boolean; message?: string }>({});
 
-  // Fetch customer tier information
+  // Fetch customer tier information from Plain API
   const userEmail = user?.primaryEmailAddress?.emailAddress;
-  const { data: tierInfo } = useQuery({
+  const { data: plainTierInfo } = useQuery({
     queryKey: ["customerTier", userEmail],
     queryFn: () => getCustomerTierFn({ data: { email: userEmail! } }),
     enabled: !!userEmail,
   });
 
-  const isEnterprise = tierInfo?.isEnterprise ?? false;
-  const isPaid = tierInfo?.isPaid ?? false;
+  // Fetch account plan information from Inngest API
+  const { data: inngestPlanInfo } = useQuery({
+    queryKey: ["accountPlan"],
+    queryFn: () => getAccountPlanFn({ data: undefined }),
+  });
+
+  // Combine tier info from both sources - take the highest status from each
+  // If Inngest API failed, treat as paid (error: true means isPaid: true)
+  const isEnterprise =
+    (plainTierInfo?.isEnterprise ?? false) ||
+    (inngestPlanInfo?.isEnterprise ?? false);
+  const isPaid =
+    (plainTierInfo?.isPaid ?? false) || (inngestPlanInfo?.isPaid ?? false);
 
   // Convert form options to Select options format (memoized for stable refs)
   const ticketTypeOptions: Option[] = useMemo(
