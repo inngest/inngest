@@ -10,6 +10,7 @@ import (
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/mount"
+	"github.com/inngest/inngest/tests/testutil"
 	"github.com/redis/rueidis"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
@@ -367,7 +368,7 @@ func formatValkeyConfig(config *ValkeyConfiguration) string {
 func StartValkey(t *testing.T, opts ...ValkeyOption) (*ValkeyContainer, error) {
 	// Apply options
 	config := &valkeyConfig{
-		image: "valkey/valkey:8.0.3", // Default image
+		image: testutil.ValkeyDefaultImage, // Default image
 	}
 	for _, opt := range opts {
 		opt(config)

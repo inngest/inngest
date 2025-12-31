@@ -24,6 +24,7 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 )
@@ -1724,10 +1725,11 @@ func newRunMetadata(data map[string]string) (*runMetadata, error) {
 	if !ok {
 		return nil, fmt.Errorf("no status stored in metadata")
 	}
-	status, err := strconv.Atoi(v)
+	status, err := util.StringToInt[int](v)
 	if err != nil {
 		return nil, fmt.Errorf("invalid function status stored in run metadata: %#v", v)
 	}
+
 	m.Status = enums.RunStatus(status)
 
 	parseInt := func(v string) (int, error) {
@@ -1735,7 +1737,7 @@ func newRunMetadata(data map[string]string) (*runMetadata, error) {
 		if !ok {
 			return 0, fmt.Errorf("no '%s' stored in run metadata", v)
 		}
-		val, err := strconv.Atoi(str)
+		val, err := util.StringToInt[int](str)
 		if err != nil {
 			return 0, fmt.Errorf("invalid '%s' stored in run metadata", v)
 		}
@@ -1747,7 +1749,7 @@ func newRunMetadata(data map[string]string) (*runMetadata, error) {
 	m.StepCount, _ = parseInt("step_count")
 
 	if val, ok := data["version"]; ok && val != "" {
-		v, err := strconv.Atoi(val)
+		v, err := util.StringToInt[int](val)
 		if err != nil {
 			return nil, fmt.Errorf("invalid metadata version detected: %#v", val)
 		}
@@ -1756,7 +1758,7 @@ func newRunMetadata(data map[string]string) (*runMetadata, error) {
 	}
 
 	if val, ok := data["rv"]; ok && val != "" {
-		v, err := strconv.Atoi(val)
+		v, err := util.StringToInt[int](val)
 		if err != nil {
 			return nil, fmt.Errorf("invalid hash version detected: %#v", val)
 		}
@@ -1764,7 +1766,7 @@ func newRunMetadata(data map[string]string) (*runMetadata, error) {
 	}
 
 	if val, ok := data["sat"]; ok && val != "" {
-		v, err := strconv.ParseInt(val, 10, 64)
+		v, err := util.StringToInt[int64](val)
 		if err != nil {
 			return nil, fmt.Errorf("invalid started at timestamp detected: %#v", val)
 		}
