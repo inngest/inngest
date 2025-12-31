@@ -129,7 +129,7 @@ func BenchmarkStringToInt(b *testing.B) {
 	for _, tc := range testCases {
 		b.Run(tc.name, func(b *testing.B) {
 			for b.Loop() {
-				StringToInt[int](tc.input)
+				_, _ = StringToInt[int](tc.input)
 			}
 		})
 	}
@@ -142,7 +142,7 @@ func BenchmarkStringToIntVsStrconvAtoi(b *testing.B) {
 	b.Run("StringToInt", func(b *testing.B) {
 		for b.Loop() {
 			for _, input := range testInputs {
-				StringToInt[int](input)
+				_, _ = StringToInt[int](input)
 			}
 		}
 	})
@@ -150,7 +150,7 @@ func BenchmarkStringToIntVsStrconvAtoi(b *testing.B) {
 	b.Run("strconv.Atoi", func(b *testing.B) {
 		for b.Loop() {
 			for _, input := range testInputs {
-				strconv.Atoi(input)
+				_, _ = strconv.Atoi(input)
 			}
 		}
 	})
@@ -171,19 +171,19 @@ func BenchmarkParsingStrategies(b *testing.B) {
 	for _, tc := range testCases {
 		b.Run(tc.name+"_StringToInt", func(b *testing.B) {
 			for b.Loop() {
-				StringToInt[int](tc.input)
+				_, _ = StringToInt[int](tc.input)
 			}
 		})
 
 		b.Run(tc.name+"_Atoi", func(b *testing.B) {
 			for b.Loop() {
-				strconv.Atoi(tc.input)
+				_, _ = strconv.Atoi(tc.input)
 			}
 		})
 
 		b.Run(tc.name+"_ParseInt", func(b *testing.B) {
 			for b.Loop() {
-				strconv.ParseInt(tc.input, 10, 64)
+				_, _ = strconv.ParseInt(tc.input, 10, 64)
 			}
 		})
 
@@ -206,7 +206,7 @@ func BenchmarkRedisGarnetScenario(b *testing.B) {
 	b.Run("Redis_Integer_Values", func(b *testing.B) {
 		for b.Loop() {
 			for _, val := range redisValues {
-				StringToInt[int](val)
+				_, _ = StringToInt[int](val)
 			}
 		}
 	})
@@ -214,7 +214,7 @@ func BenchmarkRedisGarnetScenario(b *testing.B) {
 	b.Run("Garnet_Float_Values", func(b *testing.B) {
 		for b.Loop() {
 			for _, val := range garnetValues {
-				StringToInt[int](val)
+				_, _ = StringToInt[int](val)
 			}
 		}
 	})
@@ -223,7 +223,7 @@ func BenchmarkRedisGarnetScenario(b *testing.B) {
 		allValues := append(redisValues, garnetValues...)
 		for b.Loop() {
 			for _, val := range allValues {
-				StringToInt[int](val)
+				_, _ = StringToInt[int](val)
 			}
 		}
 	})
