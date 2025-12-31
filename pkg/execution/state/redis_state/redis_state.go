@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"math"
 	"regexp"
 	"strconv"
 	"strings"
@@ -1732,7 +1731,7 @@ func newRunMetadata(data map[string]string) (*runMetadata, error) {
 	}
 
 	// Validate status is within valid RunStatus enum range (0-7)
-	if status < 0 || status >= math.MaxInt {
+	if status < 0 || status > 7 {
 		return nil, fmt.Errorf("status value %d is outside valid RunStatus range (0-7)", status)
 	}
 
