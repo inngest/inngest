@@ -24,7 +24,6 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
-	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 )
@@ -1725,16 +1724,10 @@ func newRunMetadata(data map[string]string) (*runMetadata, error) {
 	if !ok {
 		return nil, fmt.Errorf("no status stored in metadata")
 	}
-	status, err := util.StringToInt[int](v)
+	status, err := strconv.Atoi(strings.TrimSuffix(v, ".0"))
 	if err != nil {
 		return nil, fmt.Errorf("invalid function status stored in run metadata: %#v", v)
 	}
-
-	// Validate status is within valid RunStatus enum range (0-7)
-	if status < 0 || status > 7 {
-		return nil, fmt.Errorf("status value %d is outside valid RunStatus range (0-7)", status)
-	}
-
 	m.Status = enums.RunStatus(status)
 
 	parseInt := func(v string) (int, error) {
@@ -1742,7 +1735,7 @@ func newRunMetadata(data map[string]string) (*runMetadata, error) {
 		if !ok {
 			return 0, fmt.Errorf("no '%s' stored in run metadata", v)
 		}
-		val, err := util.StringToInt[int](str)
+		val, err := strconv.Atoi(strings.TrimSuffix(str, ".0"))
 		if err != nil {
 			return 0, fmt.Errorf("invalid '%s' stored in run metadata", v)
 		}
@@ -1754,7 +1747,7 @@ func newRunMetadata(data map[string]string) (*runMetadata, error) {
 	m.StepCount, _ = parseInt("step_count")
 
 	if val, ok := data["version"]; ok && val != "" {
-		v, err := util.StringToInt[int](val)
+		v, err := strconv.Atoi(strings.TrimSuffix(val, ".0"))
 		if err != nil {
 			return nil, fmt.Errorf("invalid metadata version detected: %#v", val)
 		}
@@ -1763,7 +1756,7 @@ func newRunMetadata(data map[string]string) (*runMetadata, error) {
 	}
 
 	if val, ok := data["rv"]; ok && val != "" {
-		v, err := util.StringToInt[int](val)
+		v, err := strconv.Atoi(strings.TrimSuffix(val, ".0"))
 		if err != nil {
 			return nil, fmt.Errorf("invalid hash version detected: %#v", val)
 		}
@@ -1771,7 +1764,7 @@ func newRunMetadata(data map[string]string) (*runMetadata, error) {
 	}
 
 	if val, ok := data["sat"]; ok && val != "" {
-		v, err := util.StringToInt[int64](val)
+		v, err := strconv.ParseInt(strings.TrimSuffix(val, ".0"), 10, 64)
 		if err != nil {
 			return nil, fmt.Errorf("invalid started at timestamp detected: %#v", val)
 		}
