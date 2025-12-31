@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"math"
 	"regexp"
 	"strconv"
 	"strings"
@@ -1728,6 +1729,11 @@ func newRunMetadata(data map[string]string) (*runMetadata, error) {
 	status, err := util.StringToInt[int](v)
 	if err != nil {
 		return nil, fmt.Errorf("invalid function status stored in run metadata: %#v", v)
+	}
+
+	// Validate status is within valid RunStatus enum range (0-7)
+	if status < 0 || status >= math.MaxInt {
+		return nil, fmt.Errorf("status value %d is outside valid RunStatus range (0-7)", status)
 	}
 
 	m.Status = enums.RunStatus(status)
