@@ -3,7 +3,7 @@ import { auth, clerkClient } from "@clerk/tanstack-react-start/server";
 import { createServerFn } from "@tanstack/react-start";
 import { getTicketsByEmail, type TicketSummary } from "@/data/plain";
 import { usePaginationUI } from "@inngest/components/Pagination";
-import { Filters } from "@/components/Support/Filters";
+//import { Filters } from "@/components/Support/Filters";
 import { TicketCard } from "@/components/Support/TicketCard";
 
 const getAuthStatusAndTickets = createServerFn({ method: "GET" }).handler(
