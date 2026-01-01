@@ -3,6 +3,7 @@ package helper
 import (
 	"testing"
 
+	"github.com/inngest/inngest/tests/testutil"
 	"github.com/stretchr/testify/require"
 )
 
@@ -60,7 +61,7 @@ func TestValkeyCustomConfiguration(t *testing.T) {
 		configName, err := configArr[0].ToString()
 		require.NoError(t, err)
 		require.Equal(t, "maxmemory", configName)
-		
+
 		configValue, err := configArr[1].ToString()
 		require.NoError(t, err)
 		// Valkey returns the config value in bytes, so "100mb" should be converted
@@ -70,7 +71,7 @@ func TestValkeyCustomConfiguration(t *testing.T) {
 		// Handle map response
 		maxMemoryValue, exists := configRes["maxmemory"]
 		require.True(t, exists, "maxmemory config not found")
-		
+
 		configValue, err := maxMemoryValue.ToString()
 		require.NoError(t, err)
 		require.Equal(t, "104857600", configValue)
@@ -85,7 +86,7 @@ func TestValkeyCustomImage(t *testing.T) {
 	ctx := t.Context()
 
 	// Test with a custom image (using the same image for testing purposes)
-	customImage := "valkey/valkey:8.0.1"
+	customImage := testutil.ValkeyDefaultImage
 	vc, err := StartValkey(t, WithValkeyImage(customImage))
 	require.NoError(t, err)
 

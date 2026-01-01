@@ -12,6 +12,7 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/api/types/strslice"
+	"github.com/inngest/inngest/tests/testutil"
 	"github.com/redis/rueidis"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
@@ -515,7 +516,7 @@ func WithImage(image string) GarnetOption {
 func StartGarnet(t *testing.T, opts ...GarnetOption) (*GarnetContainer, error) {
 	// Apply options
 	config := &garnetConfig{
-		image: "ghcr.io/microsoft/garnet:1.0.84", // Default image
+		image: testutil.GarnetDefaultImage, // Default image
 	}
 	for _, opt := range opts {
 		opt(config)

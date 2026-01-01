@@ -516,4 +516,3 @@ func StartValkey(t *testing.T, opts ...ValkeyOption) (*ValkeyContainer, error) {
 
 	return nil, fmt.Errorf("valkey is not available")
 }
-

@@ -17,6 +17,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/inngest/inngest/tests/execution/queue/helper"
+	"github.com/inngest/inngest/tests/testutil"
 	"github.com/jonboulle/clockwork"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
@@ -55,14 +56,14 @@ func TestLuaCompatibility(t *testing.T) {
 			Name:       "Basic Valkey",
 			ServerType: "valkey",
 			ValkeyOpts: []helper.ValkeyOption{
-				helper.WithValkeyImage("valkey/valkey:8.0.1"),
+				helper.WithValkeyImage(testutil.ValkeyDefaultImage),
 			},
 		},
 		{
 			Name:       "Basic Garnet",
 			ServerType: "garnet",
 			GarnetOpts: []helper.GarnetOption{
-				helper.WithImage("ghcr.io/microsoft/garnet:1.0.87"),
+				helper.WithImage(testutil.GarnetDefaultImage),
 				helper.WithConfiguration(&helper.GarnetConfiguration{
 					EnableLua: true,
 				}),
