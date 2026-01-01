@@ -124,9 +124,9 @@ func TestStateStoreLuaCompatibility(t *testing.T) {
 					"name": "test/valkey.metadata",
 					"data": map[string]any{
 						"testField":    "valkey_metadata_test",
-						"numericValue": 42,           // Additional numeric data
-						"floatValue":   3.14,         // Float that might affect cjson behavior
-						"largeNumber":  1234567890,   // Large number to test parsing limits
+						"numericValue": 42,         // Additional numeric data
+						"floatValue":   3.14,       // Float that might affect cjson behavior
+						"largeNumber":  1234567890, // Large number to test parsing limits
 					},
 					"id": ulid.Make().String(),
 				},
@@ -220,9 +220,9 @@ func TestStateStoreLuaCompatibility(t *testing.T) {
 					"name": "test/garnet.metadata",
 					"data": map[string]any{
 						"testField":    "garnet_metadata_test",
-						"numericValue": 42,           // Additional numeric data
-						"floatValue":   3.14,         // Float that might affect cjson behavior
-						"largeNumber":  1234567890,   // Large number to test parsing limits
+						"numericValue": 42,         // Additional numeric data
+						"floatValue":   3.14,       // Float that might affect cjson behavior
+						"largeNumber":  1234567890, // Large number to test parsing limits
 					},
 					"id": ulid.Make().String(),
 				},
@@ -374,7 +374,7 @@ func TestStateStoreLuaCompatibility(t *testing.T) {
 				t.Logf("     RunID: %s", results["runID"])
 				t.Logf("     AccountID: %s", results["accountID"])
 				t.Logf("     WorkflowID: %s", results["workflowID"])
-				
+
 				// Validate that the single backend results are correct
 				statusInt := results["statusInt"].(int)
 				workflowVersion := results["workflowVersion"].(int)
