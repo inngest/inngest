@@ -95,6 +95,13 @@ func TestStateStoreLuaCompatibility(t *testing.T) {
 	}
 
 	t.Run("metadata cjson compatibility verification", func(t *testing.T) {
+		// Generate shared test data for consistent comparison across backends
+		accountID := uuid.New()
+		workflowID := uuid.New()
+		workspaceID := uuid.New()
+		appID := uuid.New()
+		runID := ulid.Make()
+
 		// Test individual backends first to ensure they work, then attempt comparison
 		backends := []struct {
 			name    string
@@ -106,14 +113,10 @@ func TestStateStoreLuaCompatibility(t *testing.T) {
 		t.Run("valkey", func(t *testing.T) {
 			valkeyMgr := setupManager(t, "valkey")
 
-			accountID := uuid.New()
-			workflowID := uuid.New()
-			runID := ulid.Make()
-
 			identifier := state.Identifier{
 				AccountID:       accountID,
-				WorkspaceID:     uuid.New(),
-				AppID:           uuid.New(),
+				WorkspaceID:     workspaceID,
+				AppID:           appID,
 				WorkflowID:      workflowID,
 				WorkflowVersion: 5, // Use 5 specifically since this was the problematic value in the original error
 				RunID:           runID,
@@ -202,14 +205,10 @@ func TestStateStoreLuaCompatibility(t *testing.T) {
 				return
 			}
 
-			accountID := uuid.New()
-			workflowID := uuid.New()
-			runID := ulid.Make()
-
 			identifier := state.Identifier{
 				AccountID:       accountID,
-				WorkspaceID:     uuid.New(),
-				AppID:           uuid.New(),
+				WorkspaceID:     workspaceID,
+				AppID:           appID,
 				WorkflowID:      workflowID,
 				WorkflowVersion: 5, // Use 5 specifically since this was the problematic value in the original error
 				RunID:           runID,
