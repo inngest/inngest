@@ -296,6 +296,8 @@ func TestStateStoreLuaCompatibility(t *testing.T) {
 			require.Equal(t, valkeyResults["statusInt"], garnetResults["statusInt"], "Status as integer should be equal across backends")
 			require.Equal(t, valkeyResults["version"], garnetResults["version"], "Version should be equal across backends")
 			require.Equal(t, valkeyResults["workflowVersion"], garnetResults["workflowVersion"], "WorkflowVersion should be equal across backends")
+			require.Equal(t, valkeyResults["rv"], garnetResults["rv"], "RequestVersion (rv) should be equal across backends")
+			require.Equal(t, valkeyResults["sat"], garnetResults["sat"], "StartedAt (sat) should be equal across backends")
 
 			// Identity field comparisons
 			require.Equal(t, valkeyResults["runID"], garnetResults["runID"], "RunID should be equal across backends")
@@ -306,6 +308,8 @@ func TestStateStoreLuaCompatibility(t *testing.T) {
 			require.IsType(t, valkeyResults["status"], garnetResults["status"], "Status should have same type across backends")
 			require.IsType(t, valkeyResults["version"], garnetResults["version"], "Version should have same type across backends")
 			require.IsType(t, valkeyResults["statusInt"], garnetResults["statusInt"], "StatusInt should have same type across backends")
+			require.IsType(t, valkeyResults["rv"], garnetResults["rv"], "RequestVersion (rv) should have same type across backends")
+			require.IsType(t, valkeyResults["sat"], garnetResults["sat"], "StartedAt (sat) should have same type across backends")
 
 			// Extract values for detailed validation
 			valkeyStatus := valkeyResults["status"]
