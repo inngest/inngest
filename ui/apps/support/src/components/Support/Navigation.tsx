@@ -1,11 +1,11 @@
-import { Button } from "@inngest/components/Button/NewButton";
+import { Button } from "@inngest/components/Button";
 import { InngestLogoSmall } from "@inngest/components/icons/logos/InngestLogoSmall";
-import { RiMenuFill, RiAddLine, RiUserLine } from "@remixicon/react";
-import { ProfileMenu } from "../Navigation/ProfileMenu";
-import { useAuth, useUser, useOrganization } from "@clerk/tanstack-react-start";
+import { RiAddLine, RiMenuFill, RiUserLine } from "@remixicon/react";
+import { useAuth, useOrganization, useUser } from "@clerk/tanstack-react-start";
 import { Image } from "@unpic/react";
 import { Link } from "@inngest/components/Link";
 import { Link as RouterLink } from "@tanstack/react-router";
+import { ProfileMenu } from "../Navigation/ProfileMenu";
 
 export function Navigation() {
   const { isSignedIn } = useAuth();

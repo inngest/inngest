@@ -1,36 +1,36 @@
-import { useState, useRef } from "react";
-import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
+import { useRef, useState } from "react";
+import { Link, createFileRoute, useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useUser } from "@clerk/tanstack-react-start";
+import {
+  RiArrowLeftLine,
+  RiArrowRightUpLine,
+  RiSlackLine,
+  RiUserLine,
+} from "@remixicon/react";
+import { Button } from "@inngest/components/Button";
+import { formatDistanceToNow } from "date-fns";
+import { InngestLogoSmall } from "@inngest/components/icons/logos/InngestLogoSmall";
+import { Image } from "@unpic/react";
+import type { TimeLineEntryEdge } from "@/data/plain";
 import {
   getTicketById,
   getTimelineEntriesForTicket,
   replyToThread,
-  type TimeLineEntryEdge,
 } from "@/data/plain";
-import {
-  RiArrowLeftLine,
-  RiUserLine,
-  RiSlackLine,
-  RiArrowRightUpLine,
-} from "@remixicon/react";
-import { Button } from "@inngest/components/Button";
 import { Markdown } from "@/components/Markdown/Markdown";
-import { StatusBadge, PriorityBadge } from "@/components/Support/TicketBadges";
+import { PriorityBadge, StatusBadge } from "@/components/Support/TicketBadges";
 import { ChannelBadge } from "@/components/Support/ChannelBadge";
 import { formatTimestamp } from "@/utils/ticket";
-import { formatDistanceToNow } from "date-fns";
-import { InngestLogoSmall } from "@inngest/components/icons/logos/InngestLogoSmall";
-import { Image } from "@unpic/react";
 import { Attachment } from "@/components/Support/Attachment";
 
 export const Route = createFileRoute("/_authed/case/$ticketId")({
   component: TicketDetailPage,
   loader: async ({ params }) => {
     const [ticket, timelineEntries] = await Promise.all([
-      getTicketById({ data: { ticketId: params.ticketId as string } }),
+      getTicketById({ data: { ticketId: params.ticketId } }),
       getTimelineEntriesForTicket({
-        data: { ticketId: params.ticketId as string },
+        data: { ticketId: params.ticketId },
       }),
     ]);
 
@@ -163,17 +163,20 @@ function TicketDetailPage() {
             {/* To support threading, we handle spacing in the element */}
             {timelineEntries.map((entry, idx, arr) => {
               // If multiple messages are send from Slack within 2 minutes of each, thread them together
+              const entryTypename = entry.node.entry.__typename;
               const isSlackMessage =
-                entry.node.entry.__typename === "SlackMessageEntry" ||
-                entry.node.entry.__typename === "SlackReplyEntry";
-              const previousEntry = arr[idx - 1];
-              const isPreviousSlackMessage =
-                previousEntry &&
-                (previousEntry.node.entry.__typename === "SlackMessageEntry" ||
-                  previousEntry.node.entry.__typename === "SlackReplyEntry");
+                entryTypename === "SlackMessageEntry" ||
+                entryTypename === "SlackReplyEntry";
+              const previousEntry = arr[idx - 1] as typeof entry | undefined;
+              const prevTypename = previousEntry?.node.entry.__typename;
+              const isPreviousSlackMessage = prevTypename
+                ? prevTypename === "SlackMessageEntry" ||
+                  prevTypename === "SlackReplyEntry"
+                : false;
               const shouldThread =
                 isSlackMessage &&
                 isPreviousSlackMessage &&
+                previousEntry !== undefined &&
                 new Date(entry.node.timestamp.iso8601).getTime() -
                   new Date(previousEntry.node.timestamp.iso8601).getTime() <
                   2 * 60 * 1000;
@@ -317,15 +320,13 @@ function TimelineEntry({
   shouldThread: boolean;
   idx: number;
 }) {
+  const actorTypename = entry.node.actor.__typename;
   const isStaff =
-    entry.node.actor.__typename === "UserActor" ||
-    entry.node.actor.__typename === "MachineUserActor";
+    actorTypename === "UserActor" || actorTypename === "MachineUserActor";
   const actorName =
-    entry.node.actor.__typename === "CustomerActor"
+    actorTypename === "CustomerActor"
       ? entry.node.actor.customer.fullName || "Customer"
-      : entry.node.actor.__typename === "UserActor"
-      ? "Inngest Support Team"
-      : entry.node.actor.__typename === "MachineUserActor"
+      : isStaff
       ? "Inngest Support Team"
       : "Unknown";
 
@@ -379,9 +380,10 @@ function TimelineEntry({
           <span className="text-basis text-sm font-medium leading-5">
             {actorName}
           </span>
-          {entry.node.actor.__typename === "CustomerActor" &&
-            entry.node.actor.customer?.email &&
-            !entry.node.actor.customer.email.email?.match(
+          {actorTypename === "CustomerActor" &&
+            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+            entry.node.actor.customer.email &&
+            !entry.node.actor.customer.email.email.match(
               /@plain-customer\.com$/,
             ) && (
               <span className="text-muted text-sm leading-5">

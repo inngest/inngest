@@ -62,7 +62,7 @@ type SeverityOption = {
   enterpriseOnly?: boolean;
 };
 
-export const severityOptions: SeverityOption[] = [
+export const severityOptions: Array<SeverityOption> = [
   {
     label: "P3 - Technical guidance",
     description: "A bug or general question",

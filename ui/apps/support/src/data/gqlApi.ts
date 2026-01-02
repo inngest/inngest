@@ -1,4 +1,5 @@
-import { GraphQLClient, type RequestMiddleware } from "graphql-request";
+import { GraphQLClient } from "graphql-request";
+import type { RequestMiddleware } from "graphql-request";
 
 export const API = `${import.meta.env.VITE_API_URL}/gql`;
 
@@ -9,7 +10,7 @@ if (!API) {
   );
 }
 
-export const auth = async () => {
+export const getAuthHeaders = async () => {
   const { auth } = await import("@clerk/tanstack-react-start/server");
 
   const { getToken } = await auth();
@@ -24,7 +25,7 @@ const requestMiddleware: RequestMiddleware = async (request) => {
     ...request,
     headers: {
       ...request.headers,
-      ...(await auth()),
+      ...(await getAuthHeaders()),
     },
   };
 };

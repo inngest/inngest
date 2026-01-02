@@ -1,6 +1,6 @@
 import { Pill } from "@inngest/components/Pill";
-import { type PillKind } from "@inngest/components/Pill/Pill";
 import { ClientOnly } from "@tanstack/react-router";
+import type { PillKind } from "@inngest/components/Pill/Pill";
 
 type StatusBadgeProps = {
   status: string;

@@ -16,7 +16,7 @@ const NavToggle = ({
   collapsed: boolean;
   setCollapsed: (arg: boolean) => void;
 }) => {
-  const toggle = async () => {
+  const toggle = () => {
     const toggled = !collapsed;
     setCollapsed(toggled);
 

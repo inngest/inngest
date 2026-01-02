@@ -1,9 +1,9 @@
-import {
-  PlainClient,
-  ThreadPartsFragment,
-  type PlainSDKError,
-} from "@team-plain/typescript-sdk/dist/index";
+import { PlainClient } from "@team-plain/typescript-sdk/dist/index";
 import { createServerFn } from "@tanstack/react-start";
+import type {
+  PlainSDKError,
+  ThreadPartsFragment,
+} from "@team-plain/typescript-sdk/dist/index";
 
 // Initialize Plain client
 // The API key should be set in the environment variable PLAIN_API_KEY
@@ -14,11 +14,11 @@ type Data<T> = {
   data: T;
   error?: never;
 };
-type Err<U> = {
+type Err<TError> = {
   data?: never;
-  error: U;
+  error: TError;
 };
-type Result<T, U> = NonNullable<Data<T> | Err<U>>;
+type Result<T, TError> = NonNullable<Data<T> | Err<TError>>;
 
 export type TicketChannel = "EMAIL" | "SLACK" | "API" | "DISCORD";
 
@@ -63,7 +63,7 @@ export const getLabelForStatus = (status: string) => {
 
 export const getTicketsByEmail = createServerFn({ method: "GET" })
   .inputValidator((data: { email: string }) => data)
-  .handler(async ({ data }): Promise<TicketSummary[]> => {
+  .handler(async ({ data }): Promise<Array<TicketSummary>> => {
     // TODO - Use Clerk auth here to get the customer email, and the metadata with their external id
     try {
       const { email } = data;
@@ -73,8 +73,12 @@ export const getTicketsByEmail = createServerFn({ method: "GET" })
         email,
       });
 
-      if (!customer.data || customer.error) {
+      if (customer.error) {
         console.error("Failed to get customer:", customer.error);
+        return [];
+      }
+      if (!customer.data) {
+        console.error("Customer not found");
         return [];
       }
 
@@ -130,19 +134,20 @@ export const getTicketsByEmail = createServerFn({ method: "GET" })
         },
       })) as unknown as Result<ThreadsQueryResult, PlainSDKError>;
 
-      if (res.error || !res.data) {
+      if (res.error) {
         console.error("Failed to fetch threads:", res.error);
         return [];
       }
 
       // Map threads to ticket summaries
-      const tickets: TicketSummary[] = res.data.threads.edges.map(
+      const tickets: Array<TicketSummary> = res.data.threads.edges.map(
         (edge: ThreadsQueryResult["threads"]["edges"][number]) => {
           const thread = edge.node;
           return {
             id: thread.id,
             ref: thread.ref || "",
             title: thread.title || "Untitled",
+            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
             status: String(thread.status || "UNKNOWN"),
             priority: thread.priority,
             createdAt: thread.createdAt.iso8601,
@@ -162,13 +167,13 @@ export const getTicketsByEmail = createServerFn({ method: "GET" })
 
 type ThreadsQueryResult = {
   threads: {
-    edges: {
+    edges: Array<{
       node: ThreadPartsFragment & {
         ref: string;
         previewText: string;
         channel: string;
       };
-    }[];
+    }>;
     pageInfo: {
       hasNextPage: boolean;
       hasPreviousPage: boolean;
@@ -216,7 +221,7 @@ export const getTicketById = createServerFn({ method: "GET" })
         },
       })) as unknown as Result<ThreadQueryResult, PlainSDKError>;
 
-      if (res.error || !res.data) {
+      if (res.error) {
         console.error("Failed to fetch thread:", res.error);
         return null;
       }
@@ -228,13 +233,15 @@ export const getTicketById = createServerFn({ method: "GET" })
         ref: thread.ref || "",
         title: thread.title || "Untitled",
         description: thread.description || null,
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
         status: String(thread.status || "UNKNOWN"),
         priority: thread.priority,
         channel: thread.channel as TicketChannel | undefined,
-        createdAt: thread.createdAt?.iso8601 || new Date().toISOString(),
-        updatedAt: thread.updatedAt?.iso8601 || new Date().toISOString(),
+        createdAt: thread.createdAt.iso8601,
+        updatedAt: thread.updatedAt.iso8601,
         customerName:
           thread.customer.fullName ||
+          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
           thread.customer.email?.email ||
           "Inngest user",
       };
@@ -292,7 +299,7 @@ type TimelineEntriesResponse = {
     customer: {
       fullName: string;
     };
-    timelineEntries: { edges: TimeLineEntryEdge[] };
+    timelineEntries: { edges: Array<TimeLineEntryEdge> };
   };
 };
 
@@ -328,7 +335,7 @@ type Component = {
 type CustomEntry = {
   __typename: "CustomEntry";
   title: string;
-  components: Component[];
+  components: Array<Component>;
 };
 
 type EmailEntry = {
@@ -348,7 +355,7 @@ type EmailEntry = {
   sentAt: DateTime;
   // sendStatus: EmailSendStatus
   // receivedAt: DateTime
-  attachments: Attachment[];
+  attachments: Array<Attachment>;
   // category: EmailCategory!
 };
 
@@ -373,7 +380,7 @@ type SlackMessageEntry = {
   slackWebMessageLink: string;
   text: string;
   customerId: string;
-  attachments: Attachment[];
+  attachments: Array<Attachment>;
   lastEditedOnSlackAt: DateTime;
 };
 
@@ -384,12 +391,12 @@ type SlackReplyEntry = {
   slackWebMessageLink: string;
   text: string;
   customerId: string;
-  attachments: Attachment[];
+  attachments: Array<Attachment>;
   lastEditedOnSlackAt: DateTime;
 };
 export const getTimelineEntriesForTicket = createServerFn({ method: "GET" })
   .inputValidator((data: { ticketId: string }) => data)
-  .handler(async ({ data }): Promise<TimeLineEntryEdge[] | null> => {
+  .handler(async ({ data }): Promise<Array<TimeLineEntryEdge> | null> => {
     try {
       const { ticketId } = data;
 
@@ -468,7 +475,7 @@ export const getTimelineEntriesForTicket = createServerFn({ method: "GET" })
                           fileName
                         }
                         lastEditedOnSlackAt {
-                          iso8601
+                            iso8601
                           unixTimestamp
                         }
                       }
@@ -502,7 +509,7 @@ export const getTimelineEntriesForTicket = createServerFn({ method: "GET" })
         },
       })) as unknown as Result<TimelineEntriesResponse, PlainSDKError>;
 
-      if (res.error || !res.data) {
+      if (res.error) {
         console.error("Failed to fetch timeline entries:", res.error);
         return [];
       }
@@ -510,14 +517,17 @@ export const getTimelineEntriesForTicket = createServerFn({ method: "GET" })
       const customerName = res.data.thread.customer.fullName;
       const entries = res.data.thread.timelineEntries.edges;
       return entries
-        .filter(
-          (entry) =>
-            // Custom entries are created via the API
-            entry.node.entry.__typename === "CustomEntry" ||
-            entry.node.entry.__typename === "EmailEntry" ||
-            entry.node.entry.__typename === "SlackMessageEntry" ||
-            entry.node.entry.__typename === "SlackReplyEntry",
-        )
+        .filter((entry) => {
+          // Custom entries are created via the API
+          const typename = entry.node.entry.__typename;
+          return (
+            typename === "CustomEntry" ||
+            typename === "EmailEntry" ||
+            typename === "SlackMessageEntry" ||
+            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+            typename === "SlackReplyEntry"
+          );
+        })
         .sort(
           (a, b) =>
             new Date(a.node.timestamp.iso8601).getTime() -
@@ -586,7 +596,7 @@ export const getAttachmentDownloadUrl = createServerFn({ method: "GET" })
         PlainSDKError
       >;
 
-      if (res.error || !res.data) {
+      if (res.error) {
         console.error("Failed to fetch attachment download url:", res.error);
         return null;
       }
@@ -699,7 +709,7 @@ export const createTicket = createServerFn({ method: "POST" })
         title: string;
         components: Array<{ componentText: { text: string } }>;
         customerIdentifier: { customerId: string };
-        labelTypeIds?: string[];
+        labelTypeIds?: Array<string>;
         priority?: number;
       } = {
         title: ticketTypeTitles[ticket.type] || "Support request",
@@ -811,7 +821,7 @@ export const getCustomerTierByEmail = createServerFn({ method: "GET" })
         },
       })) as { data: CustomerWithCompanyResponse; error?: PlainSDKError };
 
-      if (res.error || !res.data?.customerByEmail) {
+      if (res.error) {
         return {
           isEnterprise: false,
           isPaid: false,
@@ -819,11 +829,18 @@ export const getCustomerTierByEmail = createServerFn({ method: "GET" })
       }
 
       const customer = res.data.customerByEmail;
+      if (!customer) {
+        return {
+          isEnterprise: false,
+          isPaid: false,
+        };
+      }
       const company = customer.company;
       const tier = company?.tier;
 
       // Check tier name/externalId for Enterprise status
       // Adjust these checks based on your actual tier naming conventions
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
       const tierName = tier?.name?.toLowerCase() || "";
       const tierExternalId = tier?.externalId?.toLowerCase() || "";
       const isEnterprise =
@@ -932,7 +949,7 @@ export const replyToThread = createServerFn({ method: "POST" })
         };
       }
 
-      if (res.data?.replyToThread?.error) {
+      if (res.data.replyToThread.error) {
         console.error(
           "Error replying to thread:",
           res.data.replyToThread.error,

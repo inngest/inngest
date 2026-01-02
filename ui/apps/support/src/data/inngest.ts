@@ -41,7 +41,7 @@ export const getAccountPlanInfo = createServerFn({ method: "GET" })
         };
       }>(query);
 
-      const plan = data?.account?.plan;
+      const plan = data.account.plan;
 
       if (!plan) {
         // If no plan found, treat as paid (graceful fallback)
@@ -53,7 +53,7 @@ export const getAccountPlanInfo = createServerFn({ method: "GET" })
       }
 
       // Check if plan name starts with "Enterprise" (case-insensitive)
-      const isEnterprise = Boolean(plan.name?.match(/^Enterprise/i));
+      const isEnterprise = Boolean(plan.name.match(/^Enterprise/i));
       // isPaid if amount > 0 or is enterprise
       const isPaid = (plan.amount || 0) > 0 || isEnterprise;
 

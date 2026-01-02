@@ -1,8 +1,8 @@
-import { Link, ClientOnly } from "@tanstack/react-router";
-import type { TicketSummary } from "@/data/plain";
-import { StatusBadge, PriorityBadge } from "./TicketBadges";
-import { ChannelBadge } from "./ChannelBadge";
+import { ClientOnly, Link } from "@tanstack/react-router";
 import { formatDistanceToNow } from "date-fns";
+import { PriorityBadge, StatusBadge } from "./TicketBadges";
+import { ChannelBadge } from "./ChannelBadge";
+import type { TicketSummary } from "@/data/plain";
 
 type TicketCardProps = {
   ticket: TicketSummary;

@@ -1,9 +1,9 @@
-import { envQueryOptions } from "@/data/envs";
-import { getProfileDisplay } from "@/data/profile";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { Header } from "@inngest/components/Header/Header";
+import { getProfileDisplay } from "@/data/profile";
+import { envQueryOptions } from "@/data/envs";
 
 export const Route = createFileRoute("/_authed/support/")({
   component: HomeComponent,

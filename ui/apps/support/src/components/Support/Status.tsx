@@ -1,9 +1,9 @@
-import {
-  impactSchema,
-  type Indicator,
-  type InngestStatus as Status,
-} from "@inngest/components/SharedContext/useInngestStatus";
+import { impactSchema } from "@inngest/components/SharedContext/useInngestStatus";
 import { z } from "zod";
+import type {
+  Indicator,
+  InngestStatus as Status,
+} from "@inngest/components/SharedContext/useInngestStatus";
 
 export type { Status };
 
@@ -81,25 +81,31 @@ export const indicatorColor: { [K in Indicator]: string } = {
 export const STATUS_PAGE_URL = "https://status.inngest.com";
 
 export type ExtendedStatus = Status & {
-  incidents: z.infer<typeof incidentSchema>[];
-  maintenances: z.infer<typeof maintenanceInProgressEventSchema>[];
-  scheduled_maintenances: z.infer<typeof maintenanceScheduledEventSchema>[];
+  incidents: Array<z.infer<typeof incidentSchema>>;
+  maintenances: Array<z.infer<typeof maintenanceInProgressEventSchema>>;
+  scheduled_maintenances: Array<
+    z.infer<typeof maintenanceScheduledEventSchema>
+  >;
 };
 
 const mapStatus = (
   res: z.infer<typeof statusPageSummaryResponseSchema>,
 ): ExtendedStatus => {
   // Grab first incident and maintenance item
-  const incident = res.ongoing_incidents[0];
-  const maintenance = res.in_progress_maintenances[0];
+  const incident = res.ongoing_incidents[0] as
+    | z.infer<typeof incidentSchema>
+    | undefined;
+  const maintenance = res.in_progress_maintenances[0] as
+    | z.infer<typeof maintenanceInProgressEventSchema>
+    | undefined;
   const impact: Indicator =
-    incident?.current_worst_impact || (maintenance ? "maintenance" : "none");
+    incident?.current_worst_impact ?? (maintenance ? "maintenance" : "none");
   return {
     indicatorColor: indicatorColor[impact],
     impact,
     description: impactMessage[impact],
-    updated_at: incident?.last_update_at || new Date().toString(),
-    url: incident?.url || STATUS_PAGE_URL,
+    updated_at: incident?.last_update_at ?? new Date().toString(),
+    url: incident?.url ?? STATUS_PAGE_URL,
     incidents: res.ongoing_incidents,
     maintenances: res.in_progress_maintenances,
     scheduled_maintenances: res.scheduled_maintenances,

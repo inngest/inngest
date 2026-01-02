@@ -1,6 +1,6 @@
+import { visit } from "unist-util-visit";
 import type { Plugin } from "unified";
 import type { Root } from "hast";
-import { visit } from "unist-util-visit";
 
 /**
  * Rehype plugin that preserves hProperties from mdast nodes to hast nodes

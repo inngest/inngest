@@ -1,7 +1,8 @@
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { RiAttachment2 } from "@remixicon/react";
-import { getAttachmentDownloadUrl, type Attachment } from "@/data/plain";
+import type { Attachment } from "@/data/plain";
+import { getAttachmentDownloadUrl } from "@/data/plain";
 
 export function Attachment({ attachmentId }: { attachmentId: string }) {
   const attachmentDownloadUrlFn = useServerFn(getAttachmentDownloadUrl);

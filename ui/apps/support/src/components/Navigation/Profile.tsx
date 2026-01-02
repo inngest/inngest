@@ -1,8 +1,8 @@
 import { useLocation } from "@tanstack/react-router";
-import { ProfileMenu } from "./ProfileMenu";
-import { ProfileDisplayType } from "@/data/profile";
 import { Image } from "@unpic/react";
 import { useAuth } from "@clerk/tanstack-react-start";
+import { ProfileMenu } from "./ProfileMenu";
+import type { ProfileDisplayType } from "@/data/profile";
 
 export const Profile = ({
   collapsed,

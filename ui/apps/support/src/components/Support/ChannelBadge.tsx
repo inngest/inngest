@@ -1,8 +1,8 @@
 import {
-  RiSlackLine,
   RiDiscordLine,
   RiMailLine,
   RiMessage2Line,
+  RiSlackLine,
 } from "@remixicon/react";
 import type { TicketChannel } from "@/data/plain";
 
@@ -24,8 +24,6 @@ const channelConfig: Record<
 export function ChannelBadge({ channel, showLabel }: ChannelBadgeProps) {
   if (!channel) return null;
   const config = channelConfig[channel];
-
-  if (!config) return null;
 
   const Icon = config.icon;
   // If showLabel is explicitly set, use it. Otherwise, default to showing on desktop only (original behavior)

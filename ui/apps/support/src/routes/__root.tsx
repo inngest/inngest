@@ -9,15 +9,16 @@ import {
   createRootRouteWithContext,
 } from "@tanstack/react-router";
 
-import { InngestClerkProvider } from "@/components/Clerk/Provider";
 import fontsCss from "@inngest/components/AppRoot/fonts.css?url";
 import globalsCss from "@inngest/components/AppRoot/globals.css?url";
 import { TooltipProvider } from "@inngest/components/Tooltip";
-import { QueryClient } from "@tanstack/react-query";
 import { ThemeProvider } from "next-themes";
+import type { QueryClient } from "@tanstack/react-query";
+import type { ExtendedStatus } from "@/data/status";
+import { InngestClerkProvider } from "@/components/Clerk/Provider";
 import { StatusBanner } from "@/components/Support/StatusBanner";
 import { Navigation } from "@/components/Support/Navigation";
-import { getStatus, type ExtendedStatus } from "@/data/status";
+import { getStatus } from "@/data/status";
 
 export const Route = createRootRouteWithContext<{
   queryClient: QueryClient;

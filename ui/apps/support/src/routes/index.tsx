@@ -1,9 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { auth, clerkClient } from "@clerk/tanstack-react-start/server";
 import { createServerFn } from "@tanstack/react-start";
-import { getTicketsByEmail, type TicketSummary } from "@/data/plain";
 import { usePaginationUI } from "@inngest/components/Pagination";
-//import { Filters } from "@/components/Support/Filters";
+import type { TicketSummary } from "@/data/plain";
+import { getTicketsByEmail } from "@/data/plain";
+// import { Filters } from "@/components/Support/Filters";
 import { TicketCard } from "@/components/Support/TicketCard";
 
 const getAuthStatusAndTickets = createServerFn({ method: "GET" }).handler(
@@ -12,7 +13,7 @@ const getAuthStatusAndTickets = createServerFn({ method: "GET" }).handler(
 
     // Only fetch user email and tickets if authenticated
     let userEmail: string | undefined = undefined;
-    let tickets: TicketSummary[] = [];
+    let tickets: Array<TicketSummary> = [];
 
     if (isAuthenticated && userId) {
       try {

@@ -1,5 +1,5 @@
-import type { Plugin } from "unified";
 import { visit } from "unist-util-visit";
+import type { Plugin } from "unified";
 
 /**
  * Remark plugin that parses Plain inline attachments from base64 JSON data URIs

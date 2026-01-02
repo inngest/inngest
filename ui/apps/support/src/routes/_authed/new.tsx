@@ -1,5 +1,5 @@
-import { useState, useMemo } from "react";
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useMemo, useState } from "react";
+import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { useUser } from "@clerk/tanstack-react-start";
@@ -7,14 +7,14 @@ import { RiArrowLeftLine } from "@remixicon/react";
 import { Button } from "@inngest/components/Button";
 import { Textarea } from "@inngest/components/Forms/Textarea";
 import { Alert } from "@inngest/components/Alert";
-import { Select, type Option } from "@inngest/components/Select/Select";
+import { Select } from "@inngest/components/Select/Select";
+import type { Option } from "@inngest/components/Select/Select";
+import type { BugSeverity, TicketType } from "@/data/ticketOptions";
 import {
-  formOptions,
-  severityOptions,
-  instructions,
   DEFAULT_BUG_SEVERITY_LEVEL,
-  type TicketType,
-  type BugSeverity,
+  formOptions,
+  instructions,
+  severityOptions,
 } from "@/data/ticketOptions";
 import { createTicket, getCustomerTierByEmail } from "@/data/plain";
 import { getAccountPlanInfo } from "@/data/inngest";
@@ -61,7 +61,7 @@ function NewTicketPage() {
     (plainTierInfo?.isPaid ?? false) || (inngestPlanInfo?.isPaid ?? false);
 
   // Convert form options to Select options format (memoized for stable refs)
-  const ticketTypeOptions: Option[] = useMemo(
+  const ticketTypeOptions: Array<Option> = useMemo(
     () =>
       formOptions.map((opt) => ({
         id: opt.value,
@@ -79,7 +79,7 @@ function NewTicketPage() {
   );
 
   // Convert severity options to Select options format based on tier
-  const severitySelectOptions: Option[] = useMemo(
+  const severitySelectOptions: Array<Option> = useMemo(
     () =>
       severityOptions.map((opt) => ({
         id: opt.value,
@@ -234,9 +234,7 @@ function NewTicketPage() {
                 label="Severity"
                 isLabelVisible={false}
                 value={selectedSeverityOption}
-                onChange={(option: Option) =>
-                  setBugSeverity(option.id as BugSeverity)
-                }
+                onChange={(option: Option) => setBugSeverity(option.id)}
                 className="w-full"
               >
                 <Select.Button>

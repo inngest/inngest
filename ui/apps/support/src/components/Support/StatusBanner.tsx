@@ -1,21 +1,15 @@
 import { useState } from "react";
 import {
-  RiCheckboxCircleFill,
-  RiArrowDownSLine,
   RiAlertFill,
+  RiArrowDownSLine,
+  RiCheckboxCircleFill,
   RiExternalLinkLine,
 } from "@remixicon/react";
-import type {
-  ExtendedStatus,
-  Event,
-  MaintenanceScheduledEvent,
-} from "./Status";
-import {
-  impactSchema,
-  type Impact,
-} from "@inngest/components/SharedContext/useInngestStatus";
+import { impactSchema } from "@inngest/components/SharedContext/useInngestStatus";
 import { formatDistanceToNow } from "date-fns";
 import { Link } from "@inngest/components/Link";
+import type { Impact } from "@inngest/components/SharedContext/useInngestStatus";
+import type { Event, ExtendedStatus } from "./Status";
 
 type StatusBannerProps = {
   status?: ExtendedStatus;
@@ -99,15 +93,14 @@ function Event({ event }: { event: Event }) {
     <div key={event.id} className="flex flex-col gap-2 text-sm">
       <p className="font-medium">
         {event.name}
-        {event.status === "maintenance_scheduled" &&
-          (event as MaintenanceScheduledEvent)?.starts_at && (
-            <>
-              {` - ${formatDistanceToNow(new Date(event.starts_at), {
-                addSuffix: true,
-              })} `}
-              <span className="font-mono">({event.starts_at})</span>
-            </>
-          )}
+        {event.status === "maintenance_scheduled" && event.starts_at && (
+          <>
+            {` - ${formatDistanceToNow(new Date(event.starts_at), {
+              addSuffix: true,
+            })} `}
+            <span className="font-mono">({event.starts_at})</span>
+          </>
+        )}
       </p>
       <p className="text-muted">{event.last_update_message}</p>
     </div>

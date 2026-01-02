@@ -1,11 +1,11 @@
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
-import type { Components } from "react-markdown";
 import { remarkParsePlainAttachments } from "./remarkParsePlainAttachments";
 import { rehypePreserveHProperties } from "./rehypePreserveHProperties";
-import { Attachment } from "@/components/Support/Attachment";
 import { SyntaxHighlighter } from "./SyntaxHighlighter";
+import type { Components } from "react-markdown";
+import { Attachment } from "@/components/Support/Attachment";
 
 type MarkdownProps = {
   content: string;
