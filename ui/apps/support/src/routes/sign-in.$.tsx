@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { SignIn } from "@clerk/tanstack-react-start";
-import SplitView from "@/components/SignIn/SplitView";
 import { Alert } from "@inngest/components/Alert";
+import SplitView from "@/components/SignIn/SplitView";
 import SignInRedirectErrors, {
   hasErrorMessage,
 } from "@/components/SignIn/Errors";
@@ -15,8 +15,8 @@ export const Route = createFileRoute("/sign-in/$")({
   component: RouteComponent,
   validateSearch: (search: Record<string, unknown>): SignInSearchParams => {
     return {
-      redirect_url: search?.redirect_url as string | undefined,
-      error: search?.error as string | undefined,
+      redirect_url: search.redirect_url as string | undefined,
+      error: search.error as string | undefined,
     };
   },
 });
