@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 export const devServerURL = 'http://localhost:8288';
 
 function getStreamEventURL(devServerURL: string, eventID: string): string {
-  return `${devServerURL}/stream/trigger?event=${eventID}`;
+  return `${devServerURL}/event?eventID=${eventID}`;
 }
 
 // We want the event to appear at the top of the stream, so we omit the timestamp
