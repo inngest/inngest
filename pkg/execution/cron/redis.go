@@ -11,7 +11,6 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
-	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/oklog/ulid/v2"
 )
@@ -85,7 +84,8 @@ func WithHealthCheckLeadTimeSeconds(leadTime int) RedisCronManagerOpt {
 }
 
 func NewRedisCronManager(
-	q redis_state.QueueManager,
+	shard queue.QueueShard,
+	q queue.QueueManager,
 	log logger.Logger,
 	opts ...RedisCronManagerOpt,
 ) CronManager {
@@ -102,16 +102,18 @@ func NewRedisCronManager(
 	opt.validate()
 
 	manager := &redisCronManager{
-		q:   q,
-		log: log,
-		opt: opt,
+		shard: shard,
+		q:     q,
+		log:   log,
+		opt:   opt,
 	}
 
 	return manager
 }
 
 type redisCronManager struct {
-	q redis_state.QueueManager
+	shard queue.QueueShard
+	q     queue.QueueManager
 
 	log logger.Logger
 	opt redisCronManagerOpt
@@ -160,7 +162,7 @@ func (c *redisCronManager) Sync(ctx context.Context, ci CronItem) error {
 	case nil:
 		l.Debug("cron-sync enqueued", "jobID", jobID, "at", at)
 		return nil
-	case redis_state.ErrQueueItemExists, redis_state.ErrQueueItemSingletonExists:
+	case queue.ErrQueueItemExists, queue.ErrQueueItemSingletonExists:
 		l.Debug("cron-sync item already exists", "jobID", jobID, "at", at)
 		return nil
 	default:
@@ -203,7 +205,7 @@ func (c *redisCronManager) EnqueueHealthCheck(ctx context.Context, ci CronItem) 
 	case nil:
 		l.Debug("adhoc cron-health-check enqueued", "jobID", jobID)
 		return nil
-	case redis_state.ErrQueueItemExists, redis_state.ErrQueueItemSingletonExists:
+	case queue.ErrQueueItemExists, queue.ErrQueueItemSingletonExists:
 		l.Debug("adhoc cron-health-check already exists", "jobID", jobID)
 		return nil
 	default:
@@ -214,7 +216,6 @@ func (c *redisCronManager) EnqueueHealthCheck(ctx context.Context, ci CronItem) 
 
 // enqueues a cronItem{op:healthcheck} of {kind:cron-health-check} into system queue.
 func (c *redisCronManager) EnqueueNextHealthCheck(ctx context.Context) error {
-
 	now := time.Now()
 	nextCheck := c.nextHealthCheckTime(now)
 
@@ -240,7 +241,7 @@ func (c *redisCronManager) EnqueueNextHealthCheck(ctx context.Context) error {
 	case nil:
 		l.Debug("cron-health-check enqueued")
 		return nil
-	case redis_state.ErrQueueItemExists, redis_state.ErrQueueItemSingletonExists:
+	case queue.ErrQueueItemExists, queue.ErrQueueItemSingletonExists:
 		l.Debug("cron-health-check already exists")
 		return nil
 	default:
@@ -263,7 +264,7 @@ func (c *redisCronManager) HealthCheck(ctx context.Context, functionID uuid.UUID
 	jobID := queue.HashID(ctx, c.CronProcessJobID(next, expr, functionID, fnVersion))
 
 	// check if the jobID exists in the system queue.
-	exists, err := c.q.ItemExists(ctx, jobID)
+	exists, err := c.q.ItemExists(ctx, c.shard, jobID)
 	if err != nil {
 		return CronHealthCheckStatus{}, fmt.Errorf("failed to check if item exits for health check: %w", err)
 	}
@@ -336,7 +337,7 @@ func (c *redisCronManager) ScheduleNext(ctx context.Context, ci CronItem) (*Cron
 	switch err {
 	case nil:
 		l.Debug("cron ScheduleNext success")
-	case redis_state.ErrQueueItemExists, redis_state.ErrQueueItemSingletonExists:
+	case queue.ErrQueueItemExists, queue.ErrQueueItemSingletonExists:
 		l.Debug("cron ScheduleNext already exists")
 	default:
 		l.ReportError(err, "error enqueueing cron for next schedule")
