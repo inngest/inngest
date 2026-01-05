@@ -28,18 +28,21 @@ export default function Monitor({
         collapsed={collapsed}
         text="Metrics"
         icon={<MetricsIcon className="h-[18px] w-[18px]" />}
+        dataTestId="pws-nav-metrics"
       />
       <MenuItem
         to={getNavRoute(activeEnv, 'runs')}
         collapsed={collapsed}
         text="Runs"
         icon={<RunsIcon className="h-[18px] w-[18px]" />}
+        dataTestId="pws-nav-runs"
       />
       <MenuItem
         to={getNavRoute(activeEnv, 'events')}
         collapsed={collapsed}
         text="Events"
         icon={<EventLogsIcon className="h-[18px] w-[18px]" />}
+        dataTestId="pws-nav-events"
       />
       <MenuItem
         to={getNavRoute(activeEnv, 'insights')}
@@ -47,6 +50,7 @@ export default function Monitor({
         collapsed={collapsed}
         text="Insights"
         icon={<InsightsIcon className="h-[18px] w-[18px]" />}
+        dataTestId="pws-nav-insights"
       />
     </div>
   );
