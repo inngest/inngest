@@ -4,6 +4,7 @@ import {
   createTool,
   type AnyZodType,
 } from '@inngest/agent-kit';
+import Mustache from 'mustache';
 import { z } from 'zod';
 
 import type { InsightsAgentState } from '../types';
@@ -48,19 +49,26 @@ export const queryWriterAgent = createAgent<InsightsAgentState>({
   description:
     'Generates a safe, read-only SQL SELECT statement for ClickHouse.',
   system: async ({ network }) => {
-    const selected =
+    const selectedEvents =
       network?.state.data.selectedEvents?.map(
         (e: { event_name: string }) => e.event_name,
       ) ?? [];
-    return [
-      systemPrompt,
-      '',
-      selected.length
-        ? `Target the following events if relevant: ${selected.join(', ')}`
-        : 'If events were selected earlier, incorporate them appropriately.',
-      '',
-      'When ready, call the generate_sql tool with the final SQL and a short 20-30 character title.',
-    ].join('\n');
+
+    // Filter schemas to only include selected events
+    const allSchemas = network?.state.data.schemas ?? [];
+    const selectedSchemas = allSchemas
+      .filter((schema) => selectedEvents.includes(schema.name))
+      .map((schema) => ({
+        eventName: schema.name,
+        schema: schema.schema,
+      }));
+
+    return Mustache.render(systemPrompt, {
+      hasSelectedEvents: selectedEvents.length > 0,
+      selectedEvents: selectedEvents.join(', '),
+      hasSchemas: selectedSchemas.length > 0,
+      schemas: selectedSchemas,
+    });
   },
   model: anthropic({
     model: 'claude-sonnet-4-5-20250929',

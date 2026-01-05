@@ -4,6 +4,7 @@ import {
   createTool,
   type AnyZodType,
 } from '@inngest/agent-kit';
+import Mustache from 'mustache';
 import { z } from 'zod';
 
 import type { InsightsAgentState } from '../types';
@@ -69,13 +70,12 @@ export const eventMatcherAgent = createAgent<InsightsAgentState>({
     const events = network?.state.data.eventTypes || [];
     const sample = events.slice(0, 500); // avoid overly long prompts
 
-    const eventsList = sample.length
-      ? `Available events (${
-          events.length
-        } total, showing up to 500):\n${sample.join('\n')}`
-      : 'No event list is available. Ask the user to clarify which events they are interested in.';
-
-    return `${systemPrompt}\n\n${eventsList}`;
+    return Mustache.render(systemPrompt, {
+      totalEvents: events.length,
+      hasEvents: sample.length > 0,
+      eventsList: sample.join('\n'),
+      maxEvents: 500,
+    });
   },
   model: anthropic({
     model: 'claude-haiku-4-5',

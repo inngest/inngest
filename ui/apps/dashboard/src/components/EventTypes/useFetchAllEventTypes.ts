@@ -12,7 +12,7 @@ export function useFetchAllEventTypes() {
   return useCallback(
     async (search?: string) => {
       const MAX_PAGES = 5; // Fetch up to 5 pages (40 per page = 200 total)
-      const allEvents: Array<{ name: string; latestSchema: string }> = [];
+      const allEvents: Array<{ name: string }> = [];
       let cursor: string | null = null;
       let pageCount = 0;
 
@@ -26,7 +26,6 @@ export function useFetchAllEventTypes() {
         allEvents.push(
           ...result.events.map((e) => ({
             name: e.name,
-            latestSchema: e.latestSchema,
           })),
         );
         pageCount++;
