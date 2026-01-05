@@ -9,7 +9,7 @@ export const SignOutButton = ({
   const { signOut, session } = useClerk();
 
   const content = (
-    <div className="hover:bg-canvasSubtle flex flex-row items-center justify-start h-full w-full p-2">
+    <div className="hover:bg-canvasSubtle flex flex-row items-center justify-start h-full w-full">
       <RiLogoutCircleLine className="text-muted mr-2 h-4 w-4" />
       <div>Sign Out </div>
     </div>
