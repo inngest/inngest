@@ -23,7 +23,7 @@ test.describe('Dashboard - Configuration Test', () => {
     await expect(page.locator('body')).toBeVisible();
   });
 
-  test('Environment variables are loaded', async ({ page }) => {
+  test('Environment variables are loaded', async () => {
     // Test that environment variables are accessible
     expect(process.env.VITE_ENV).toBe('test');
     expect(process.env.TEST_USER_EMAIL).toBeDefined();
