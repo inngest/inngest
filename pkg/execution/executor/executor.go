@@ -1085,15 +1085,17 @@ func (e *executor) schedule(
 							EnvID:     req.WorkspaceID,
 						},
 					}
+					reason := enums.CancelReasonSingleton
 					err = e.Cancel(ctx, runID, execution.CancelRequest{
 						EventID: &eventID,
+						Reason:  &reason,
 					})
 					if err != nil {
 						l.ReportError(err, "error canceling singleton run")
 					}
 				default:
-					// Immediately end before creating state
-					return nil, ErrFunctionSkipped
+					// Singleton skip mode - call the proper lifecycle handler
+					return e.handleFunctionSkipped(ctx, req, metadata, evts, enums.SkipReasonSingleton)
 				}
 			}
 			singletonConfig = &queue.Singleton{Key: singletonKey}
@@ -1921,8 +1923,10 @@ func (e *executor) checkCancellation(ctx context.Context, md sv2.Metadata, evts 
 			}
 		}
 		if cancel != nil {
+			reason := enums.CancelReasonEventMatch
 			err = e.Cancel(ctx, md.ID, execution.CancelRequest{
 				CancellationID: &cancel.ID,
+				Reason:         &reason,
 			})
 			if err != nil {
 				l.ReportError(err, "failed to cancel run after checking cancellation")
@@ -2390,9 +2394,11 @@ func (e *executor) handlePause(
 			}
 
 			// Cancelling a function can happen before a lease, as it's an atomic operation that will always happen.
+			reason := enums.CancelReasonEventMatch
 			err := e.Cancel(ctx, sv2.IDFromPause(*pause), execution.CancelRequest{
 				EventID:    &evtID,
 				Expression: pause.Expression,
+				Reason:     &reason,
 			})
 			if errors.Is(err, state.ErrFunctionCancelled) ||
 				errors.Is(err, state.ErrFunctionComplete) ||

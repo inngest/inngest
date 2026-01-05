@@ -20,4 +20,7 @@ const (
 
 	// SkipReasonFunctionBacklogSizeLimitHit indicates the function backlog size limit was reached
 	SkipReasonFunctionBacklogSizeLimitHit
+
+	// SkipReasonRateLimit indicates that the function was skipped due to rate limiting
+	SkipReasonRateLimit
 )

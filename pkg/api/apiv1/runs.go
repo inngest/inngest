@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state/v2"
@@ -66,7 +67,8 @@ func (a API) CancelFunctionRun(ctx context.Context, runID ulid.ULID) error {
 			AccountID: auth.AccountID(),
 		},
 	}
-	if err := a.opts.Executor.Cancel(ctx, id, execution.CancelRequest{}); err != nil {
+	reason := enums.CancelReasonManualAPI
+	if err := a.opts.Executor.Cancel(ctx, id, execution.CancelRequest{Reason: &reason}); err != nil {
 		return publicerr.Wrapf(err, 500, "Unable to cancel function run: %s", err)
 	}
 	return nil

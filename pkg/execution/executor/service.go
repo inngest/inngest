@@ -607,8 +607,10 @@ func (s *svc) handleEagerCancelFinishTimeout(ctx context.Context, c cqrs.Cancell
 			},
 		}
 		l.Trace("Running eager cancellation for finish timeout")
+		reason := enums.CancelReasonFinishTimeout
 		return s.exec.Cancel(ctx, id, execution.CancelRequest{
 			CancellationID: &c.ID,
+			Reason:         &reason,
 		})
 	}
 
@@ -694,8 +696,10 @@ func (s *svc) handleEagerCancelStartTimeout(ctx context.Context, c cqrs.Cancella
 			},
 		}
 		l.Trace("Running eager cancellation for start timeout")
+		reason := enums.CancelReasonStartTimeout
 		return s.exec.Cancel(ctx, id, execution.CancelRequest{
 			CancellationID: &c.ID,
+			Reason:         &reason,
 		})
 	}
 	// timeout was extended, requeue eager cancellation.
@@ -780,8 +784,10 @@ func (s *svc) handleEagerCancelBacklog(ctx context.Context, c cqrs.Cancellation)
 				}
 			}
 
+			reason := enums.CancelReasonStartTimeout
 			if err := s.exec.Cancel(ctx, sv2.IDFromV1(qi.Data.Identifier), execution.CancelRequest{
 				CancellationID: &c.ID,
+				Reason:         &reason,
 			}); err != nil {
 				return err
 			}
@@ -819,8 +825,10 @@ func (s *svc) handleEagerCancelRun(ctx context.Context, c cqrs.Cancellation) err
 		},
 	}
 
+	reason := enums.CancelReasonFinishTimeout
 	return s.exec.Cancel(ctx, id, execution.CancelRequest{
 		CancellationID: &c.ID,
+		Reason:         &reason,
 	})
 }
 
@@ -879,8 +887,10 @@ func (s *svc) handleEagerCancelBulkRun(ctx context.Context, c cqrs.Cancellation)
 			}
 		}
 
+		reason := enums.CancelReasonBulkOperation
 		if err := s.exec.Cancel(ctx, sv2.IDFromV1(qi.Data.Identifier), execution.CancelRequest{
 			CancellationID: &c.ID,
+			Reason:         &reason,
 		}); err != nil {
 			return err
 		}

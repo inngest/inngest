@@ -308,6 +308,9 @@ type CancelRequest struct {
 	// when a user wants to cancel a "false stuck" function run (i.e. it isn't
 	// in the state store but the history store thinks it's running)
 	ForceLifecycleHook bool
+
+	// Reason specifies why the function was cancelled. Optional for backward compatibility.
+	Reason *enums.CancelReason
 }
 
 type ResumeRequest struct {

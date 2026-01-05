@@ -257,7 +257,8 @@ func (t *TestAPI) CancelFunctionRun(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte("Internal server error"))
 	}
 
-	err = t.options.Executor.Cancel(ctx, md.ID, execution.CancelRequest{})
+	reason := enums.CancelReasonManualTest
+	err = t.options.Executor.Cancel(ctx, md.ID, execution.CancelRequest{Reason: &reason})
 	if err != nil {
 		w.WriteHeader(500)
 		_, _ = w.Write([]byte("Internal server error"))

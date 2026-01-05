@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
@@ -126,7 +127,8 @@ func (r *runValidator) checkStartTimeout(ctx context.Context) error {
 		since := time.Since(ulid.Time(r.md.ID.RunID.Time()))
 		if *r.f.Timeouts.StartDuration() > 0 && since > *r.f.Timeouts.StartDuration() && r.md.Config.StartedAt.IsZero() {
 			logger.StdlibLogger(ctx).Debug("start timeout reached", "run_id", r.md.ID.RunID.String())
-			if err := r.e.Cancel(ctx, r.md.ID, execution.CancelRequest{}); err != nil {
+			startReason := enums.CancelReasonStartTimeout
+			if err := r.e.Cancel(ctx, r.md.ID, execution.CancelRequest{Reason: &startReason}); err != nil {
 				return err
 			}
 			// Stop the function from running, but don't return an error as we don't
@@ -151,7 +153,8 @@ func (r *runValidator) checkFinishTimeout(ctx context.Context) error {
 			"timeout", r.f.Timeouts.Finish,
 			"since", time.Since(started).String(),
 		)
-		if err := r.e.Cancel(ctx, r.md.ID, execution.CancelRequest{}); err != nil {
+		finishReason := enums.CancelReasonFinishTimeout
+		if err := r.e.Cancel(ctx, r.md.ID, execution.CancelRequest{Reason: &finishReason}); err != nil {
 			return err
 		}
 		// Stop the function from running, but don't return an error as we don't

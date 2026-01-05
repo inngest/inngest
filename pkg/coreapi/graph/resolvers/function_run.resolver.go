@@ -220,7 +220,8 @@ func (r *mutationResolver) CancelRun(
 		FunctionID: run.FunctionID,
 	}
 
-	err = r.Executor.Cancel(ctx, id, execution.CancelRequest{})
+	reason := enums.CancelReasonManualUI
+	err = r.Executor.Cancel(ctx, id, execution.CancelRequest{Reason: &reason})
 	if err != nil {
 		return nil, err
 	}

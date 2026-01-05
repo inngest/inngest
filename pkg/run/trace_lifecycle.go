@@ -389,6 +389,7 @@ func (l traceLifecycle) OnFunctionCancelled(ctx context.Context, md statev2.Meta
 			attribute.String(consts.OtelSysEventIDs, strings.Join(evtIDs, ",")),
 			attribute.String(consts.OtelSysIdempotencyKey, md.IdempotencyKey()),
 			attribute.Int64(consts.OtelSysFunctionStatusCode, enums.RunStatusCancelled.ToCode()),
+			attribute.String(consts.OtelSysFunctionCancelReason, deriveCancelReason(req)),
 		),
 	)
 	defer span.End()
@@ -515,6 +516,7 @@ func (l traceLifecycle) OnFunctionSkipped(
 			attribute.String(consts.OtelSysEventIDs, strings.Join(evtIDs, ",")),
 			attribute.String(consts.OtelSysIdempotencyKey, md.IdempotencyKey()),
 			attribute.Int64(consts.OtelSysFunctionStatusCode, enums.RunStatusSkipped.ToCode()),
+			attribute.String(consts.OtelSysFunctionSkipReason, s.Reason.String()),
 		),
 	)
 	defer span.End()
@@ -1349,3 +1351,33 @@ func (l *traceLifecycle) extractTraceCtx(ctx context.Context, md statev2.Metadat
 
 	return ctx
 }
+
+// deriveCancelReason derives the cancel reason from the CancelRequest
+func deriveCancelReason(r execution.CancelRequest) string {
+	// If reason is explicitly set, use it
+	if r.Reason != nil {
+		return r.Reason.String()
+	}
+	
+	// Derive reason based on other fields
+	// Event-driven context
+	if r.EventID != nil {
+		if r.Expression != nil {
+			return enums.CancelReasonEventMatch.String()
+		}
+		return enums.CancelReasonSingleton.String()
+	}
+	
+	// User-initiated
+	if r.UserID != nil {
+		return enums.CancelReasonManualUI.String()
+	}
+	
+	// Bulk operation
+	if r.CancellationID != nil {
+		return enums.CancelReasonBulkOperation.String()
+	}
+	
+	return enums.CancelReasonNone.String()
+}
+
