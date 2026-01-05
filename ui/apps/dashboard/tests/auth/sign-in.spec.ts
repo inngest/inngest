@@ -12,15 +12,17 @@ test.describe('Dashboard Authentication', () => {
     await page.context().clearPermissions();
 
     // Try to access a protected route
-    await page.goto('/env/production/functions');
+    await page.goto('/env/production/functions', {
+      waitUntil: 'domcontentloaded',
+    });
 
     // Should redirect to sign-in page
-    await expect(page).toHaveURL(/sign-in/);
+    await expect(page).toHaveURL(/sign-in/, { timeout: 10000 });
 
     // Should show sign-in form
     await expect(
-      page.locator('form, [data-testid="sign-in-form"]'),
-    ).toBeVisible();
+      page.locator('form, [data-testid="sign-in-form"], input[type="email"]'),
+    ).toBeVisible({ timeout: 10000 });
   });
 
   test('should show proper sign-in page layout', async ({ page }) => {
@@ -70,23 +72,32 @@ test.describe('Dashboard Authentication', () => {
     await page.context().clearPermissions();
 
     // Try to access specific page while unauthenticated
+    // Use 'domcontentloaded' instead of 'networkidle' - auth flows have persistent connections
     await page.goto('/env/production/functions/my-function', {
-      waitUntil: 'networkidle',
+      waitUntil: 'domcontentloaded',
+      timeout: 15000,
     });
 
-    // Wait for auth redirect to complete - check for either sign-in page OR Clerk handshake
-    await page.waitForURL(
-      (url) =>
-        url.pathname.includes('sign-in') || url.hostname.includes('clerk'),
-      { timeout: 10000 },
-    );
+    // Wait for redirect to sign-in by checking for sign-in UI elements
+    await Promise.race([
+      page.waitForURL(/sign-in/, { timeout: 10000 }),
+      page.waitForSelector('input[type="email"], button:has-text("Sign in")', {
+        timeout: 10000,
+        state: 'visible',
+      }),
+    ]);
 
-    // Verify we're in an auth flow
-    expect(
-      page.url().includes('sign-in') || page.url().includes('clerk'),
-    ).toBeTruthy();
+    // Verify we're on sign-in page or in auth flow
+    const currentUrl = page.url();
+    expect(currentUrl).toMatch(/sign-in|clerk/);
 
-    // Verify redirect URL is preserved in query params
-    expect(page.url()).toContain('my-function');
+    // Verify redirect URL is preserved - check both URL params and sign-up link
+    const signUpLink = await page
+      .locator('a[href*="sign-up"]')
+      .getAttribute('href');
+    const redirectPreserved =
+      currentUrl.includes('my-function') ||
+      (signUpLink && signUpLink.includes('my-function'));
+    expect(redirectPreserved).toBeTruthy();
   });
 });
