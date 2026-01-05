@@ -1,6 +1,6 @@
 import { queryOptions } from "@tanstack/react-query";
 import { createServerFn } from "@tanstack/react-start";
-import { auth, inngestGQLAPI } from "./gqlApi";
+import { getAuthHeaders, inngestGQLAPI } from "./gqlApi";
 import type { GetEnvironmentBySlugQuery } from "@/gql/graphql";
 import { GetEnvironmentBySlugDocument } from "@/gql/graphql";
 
@@ -19,6 +19,6 @@ export const fetchEnvBySlug = createServerFn({ method: "GET" })
       {
         slug: data.slug,
       },
-      await auth(),
+      await getAuthHeaders(),
     );
   });
