@@ -119,6 +119,7 @@ func (d *dualIter) Next(ctx context.Context) bool {
 
 	if quit {
 		// We are done!  There are no pauses downloaded or inflight.
+		d.err = context.Canceled
 
 		metrics.HistogramAggregatePausesLoadDuration(ctx, time.Since(d.start).Milliseconds(), metrics.HistogramOpt{
 			PkgName: pkgName,
