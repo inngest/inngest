@@ -6,6 +6,7 @@ import type { TicketSummary } from "@/data/plain";
 import { getTicketsByEmail } from "@/data/plain";
 // import { Filters } from "@/components/Support/Filters";
 import { TicketCard } from "@/components/Support/TicketCard";
+import { Button } from "@inngest/components/Button";
 
 const getAuthStatusAndTickets = createServerFn({ method: "GET" }).handler(
   async () => {
@@ -65,6 +66,14 @@ function Home() {
           <p className="text-muted">
             You need to be authenticated to access the support portal.
           </p>
+          <div className="flex justify-center mt-4">
+            <Button
+              kind="primary"
+              appearance="outlined"
+              label="Sign In"
+              href="/sign-in"
+            />
+          </div>
         </div>
       </div>
     );

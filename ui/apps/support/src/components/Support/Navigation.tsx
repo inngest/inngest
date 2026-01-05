@@ -3,7 +3,7 @@ import { InngestLogoSmall } from "@inngest/components/icons/logos/InngestLogoSma
 import { RiAddLine, RiMenuFill, RiUserLine } from "@remixicon/react";
 import { useAuth, useOrganization, useUser } from "@clerk/tanstack-react-start";
 import { Image } from "@unpic/react";
-import { Link } from "@inngest/components/Link";
+import { Link } from "@tanstack/react-router";
 import { Link as RouterLink } from "@tanstack/react-router";
 import { ProfileMenu } from "../Navigation/ProfileMenu";
 
@@ -18,7 +18,7 @@ export function Navigation() {
       <nav className="bg-canvasBase border-subtle sticky top-0 z-50 flex items-center justify-between border-b border-t px-4 py-3 md:hidden">
         {/* Logo */}
         <div className="flex h-8 w-8 shrink-0 items-center justify-center">
-          <Link href={import.meta.env.VITE_HOME_PATH}>
+          <Link to={import.meta.env.VITE_HOME_PATH}>
             <InngestLogoSmall className="text-basis" />
           </Link>
         </div>
@@ -54,7 +54,7 @@ export function Navigation() {
         <div className="flex flex-col items-center gap-2">
           {/* Logo */}
           <div className="flex mb-2 h-[28px] w-8 shrink-0 items-center justify-center">
-            <Link href={import.meta.env.VITE_HOME_PATH}>
+            <Link to={import.meta.env.VITE_HOME_PATH}>
               <InngestLogoSmall className="text-basis" />
             </Link>
           </div>
