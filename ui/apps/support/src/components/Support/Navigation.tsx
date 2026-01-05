@@ -4,7 +4,6 @@ import { RiAddLine, RiMenuFill, RiUserLine } from "@remixicon/react";
 import { useAuth, useOrganization, useUser } from "@clerk/tanstack-react-start";
 import { Image } from "@unpic/react";
 import { Link } from "@tanstack/react-router";
-import { Link as RouterLink } from "@tanstack/react-router";
 import { ProfileMenu } from "../Navigation/ProfileMenu";
 
 export function Navigation() {
@@ -24,7 +23,7 @@ export function Navigation() {
         </div>
 
         <div className="flex items-center justify-end gap-6">
-          <RouterLink to="/new">
+          <Link to="/new">
             <Button
               kind="primary"
               appearance="solid"
@@ -32,7 +31,7 @@ export function Navigation() {
               label="New ticket"
               className="h-8 px-3 text-sm"
             />
-          </RouterLink>
+          </Link>
 
           {/* Menu Icon */}
           <div className="flex items-center justify-center">
@@ -59,7 +58,7 @@ export function Navigation() {
             </Link>
           </div>
 
-          <RouterLink to="/new">
+          <Link to="/new">
             <Button
               kind="primary"
               appearance="solid"
@@ -69,7 +68,7 @@ export function Navigation() {
               aria-label="New ticket"
               title="New ticket"
             />
-          </RouterLink>
+          </Link>
         </div>
 
         {/* Bottom Section: Profile Icon */}

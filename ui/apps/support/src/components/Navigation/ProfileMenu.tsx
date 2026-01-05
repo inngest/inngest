@@ -1,9 +1,4 @@
-import {
-  Listbox,
-  ListboxButton,
-  ListboxOption,
-  ListboxOptions,
-} from "@headlessui/react";
+import { Listbox } from "@headlessui/react";
 import { RiLogoutCircleLine } from "@remixicon/react";
 import { useClerk } from "@clerk/tanstack-react-start";
 import { Link } from "@tanstack/react-router";
@@ -34,11 +29,11 @@ export const ProfileMenu = ({
 
   return (
     <Listbox>
-      <ListboxButton className="w-full cursor-pointer ring-0">
+      <Listbox.Button className="w-full cursor-pointer ring-0">
         {children}
-      </ListboxButton>
+      </Listbox.Button>
       <div className="relative">
-        <ListboxOptions
+        <Listbox.Options
           className={cn(
             "bg-canvasBase border-muted shadow-primary absolute z-50 ml-2 w-[199px] rounded border ring-0 focus:outline-none",
             position === "above" ? "left-0 -bottom-4" : "right-0 top-6",
@@ -48,13 +43,13 @@ export const ProfileMenu = ({
             <div className="font-medium">{email}</div>
             <div className="text-muted text-xs">{organizationName}</div>
           </div>
-          <ListboxOption
+          <Listbox.Option
             className="text-muted hover:bg-canvasSubtle m-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
             value="signOut"
           >
             <SignOut />
-          </ListboxOption>
-        </ListboxOptions>
+          </Listbox.Option>
+        </Listbox.Options>
       </div>
     </Listbox>
   );

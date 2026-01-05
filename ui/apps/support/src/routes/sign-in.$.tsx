@@ -1,7 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { SignIn } from "@clerk/tanstack-react-start";
 import { Alert } from "@inngest/components/Alert";
-import SplitView from "@/components/SignIn/SplitView";
 import SignInRedirectErrors, {
   hasErrorMessage,
 } from "@/components/SignIn/Errors";
@@ -25,34 +24,32 @@ function RouteComponent() {
   const { error } = Route.useSearch();
 
   return (
-    <SplitView>
-      <div className="mx-auto my-auto text-center">
-        <SignIn
-          appearance={{
-            elements: {
-              footer: "bg-none",
-            },
-          }}
-        />
-        {typeof error === "string" && (
-          <Alert severity="error" className="mx-auto max-w-xs">
-            <p className="text-balance">
-              {hasErrorMessage(error) ? SignInRedirectErrors[error] : error}
-            </p>
-            <p className="mt-2">
-              <Alert.Link
-                size="medium"
-                severity="error"
-                href="/support"
-                className="inline underline"
-              >
-                Contact support
-              </Alert.Link>{" "}
-              if this problem persists.
-            </p>
-          </Alert>
-        )}
-      </div>
-    </SplitView>
+    <div className="mx-auto my-auto text-center">
+      <SignIn
+        appearance={{
+          elements: {
+            footer: "bg-none",
+          },
+        }}
+      />
+      {typeof error === "string" && (
+        <Alert severity="error" className="mx-auto max-w-xs">
+          <p className="text-balance">
+            {hasErrorMessage(error) ? SignInRedirectErrors[error] : error}
+          </p>
+          <p className="mt-2">
+            <Alert.Link
+              size="medium"
+              severity="error"
+              href="/support"
+              className="inline underline"
+            >
+              Contact support
+            </Alert.Link>{" "}
+            if this problem persists.
+          </p>
+        </Alert>
+      )}
+    </div>
   );
 }
