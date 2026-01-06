@@ -83,8 +83,8 @@ const (
 	// when using idempotency keys.
 	FunctionIdempotencyPeriod = 24 * time.Hour
 	// FunctionIdempotencyTombstone indicates the run associated with this idempotency key
-	// has already finished
-	FunctionIdempotencyTombstone = "-"
+	// has already finished.  This is a prefix;  the run ID is still stored after this.
+	FunctionIdempotencyTombstone = '-'
 
 	DefaultBatchSizeLimit = 100
 	DefaultBatchTimeout   = 60 * time.Second

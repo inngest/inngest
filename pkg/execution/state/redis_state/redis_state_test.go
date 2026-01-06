@@ -12,6 +12,7 @@ import (
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution/state"
@@ -917,6 +918,52 @@ func TestDeleteCleansUpAllKeysWithPauseManager(t *testing.T) {
 	assert.Greater(t, len(keysBefore), len(keysAfter))
 	assert.Equal(t, 1, len(keysAfter)) // only idempotency key should remain
 	assert.Equal(t, idempotencyKey, keysAfter[0])
+}
+
+func TestDeleteStoresRunIDInIdempotencyTombstone(t *testing.T) {
+	ctx := context.Background()
+	_, rc := initRedis(t)
+	defer rc.Close()
+
+	unshardedClient := NewUnshardedClient(rc, StateDefaultKey, QueueDefaultKey)
+	shardedClient := NewShardedClient(ShardedClientOpts{
+		UnshardedClient:        unshardedClient,
+		FunctionRunStateClient: rc,
+		BatchClient:            rc,
+		StateDefaultKey:        StateDefaultKey,
+		QueueDefaultKey:        QueueDefaultKey,
+		FnRunIsSharded:         AlwaysShardOnRun,
+	})
+
+	sm, err := New(ctx, WithUnshardedClient(unshardedClient), WithShardedClient(shardedClient))
+	require.NoError(t, err)
+	mgr := sm.(*mgr)
+
+	acctID, wsID, appID, fnID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+	runID := ulid.MustNew(ulid.Now(), rand.Reader)
+	id := state.Identifier{AccountID: acctID, WorkspaceID: wsID, AppID: appID, WorkflowID: fnID, RunID: runID}
+
+	createdState, err := mgr.New(ctx, state.Input{
+		Identifier:     id,
+		EventBatchData: []map[string]any{{"test": "event"}},
+		Steps:          []state.MemoizedStep{{ID: "step1", Data: "data"}},
+	})
+	require.NoError(t, err)
+
+	fnRunState := mgr.shardedMgr.s.FunctionRunState()
+	client, isSharded := fnRunState.Client(ctx, acctID, runID)
+	idempotencyKey := fnRunState.kg.Idempotency(ctx, isSharded, createdState.Identifier())
+
+	err = sm.Delete(ctx, createdState.Identifier())
+	require.NoError(t, err)
+
+	val, err := client.Do(ctx, func(c rueidis.Client) rueidis.Completed {
+		return c.B().Get().Key(idempotencyKey).Build()
+	}).ToString()
+	require.NoError(t, err)
+
+	expected := fmt.Sprintf("%s%s", string(consts.FunctionIdempotencyTombstone), runID.String())
+	require.Equal(t, expected, val)
 }
 
 func BenchmarkNew(b *testing.B) {

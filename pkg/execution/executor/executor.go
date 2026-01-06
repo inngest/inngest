@@ -1134,7 +1134,7 @@ func (e *executor) schedule(
 		switch {
 		case err == nil: // no-op
 		case errors.Is(err, state.ErrIdentifierExists): // no-op
-		case errors.Is(err, state.ErrIdentifierTomestone):
+		case errors.Is(err, state.ErrIdentifierTombstone):
 			return nil, ErrFunctionSkippedIdempotency
 		default:
 			return nil, fmt.Errorf("error creating run state: %w", err)
