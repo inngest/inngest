@@ -97,6 +97,19 @@ const CreateStripeSubscriptionDocument = graphql(`
     createStripeSubscription(input: $input) {
       clientSecret
       message
+      subscriptionId
+    }
+  }
+`);
+
+const ConfirmSubscriptionUpgradeDocument = graphql(`
+  mutation ConfirmSubscriptionUpgrade($subscriptionId: String!) {
+    confirmSubscriptionUpgrade(subscriptionId: $subscriptionId) {
+      success
+      message
+      account {
+        id
+      }
     }
   }
 `);
@@ -116,6 +129,9 @@ function CheckoutForm({
   const [, createStripeSubscription] = useMutation(
     CreateStripeSubscriptionDocument,
   );
+  const [, confirmSubscriptionUpgrade] = useMutation(
+    ConfirmSubscriptionUpgradeDocument,
+  );
 
   const handleSubmit = async (e: React.SyntheticEvent) => {
     e.preventDefault();
@@ -126,9 +142,11 @@ function CheckoutForm({
     }
 
     setLoading(true);
+    setError('');
 
     const { error: submitError } = await elements.submit();
     if (submitError) {
+      setLoading(false);
       return setError(
         submitError.message ||
           'Sorry, there was an issue saving your payment information',
@@ -141,26 +159,51 @@ function CheckoutForm({
       amount,
     }));
 
-    // Create the PaymentIntent
+    // Create the subscription
     const { data, error: createSubscriptionError } =
       await createStripeSubscription({
         input: { items: apiItems },
       });
     if (createSubscriptionError) {
+      setLoading(false);
       return setError(
         createSubscriptionError.message ||
-          'Sorry, there was an issue changing your subscription',
+          'Sorry, there was an issue creating your subscription',
       );
     }
 
     const clientSecret = data?.createStripeSubscription.clientSecret || '';
-    // If there is no client secret, the payment is already associated with the subscription,
-    // we can return success early
-    if (!clientSecret) {
+    const subscriptionId = data?.createStripeSubscription.subscriptionId || '';
+    const message = data?.createStripeSubscription.message || '';
+
+    // Plan change on existing subscription - already updated
+    if (message === 'Updated subscription') {
+      setLoading(false);
       return onSuccess();
     }
 
-    // Confirm the PaymentIntent using the details collected by the Payment Element
+    // No payment needed, just confirm the upgrade
+    if (!clientSecret && subscriptionId) {
+      const { data: confirmData, error: confirmError } =
+        await confirmSubscriptionUpgrade({ subscriptionId });
+      if (confirmError || !confirmData?.confirmSubscriptionUpgrade.success) {
+        setLoading(false);
+        return setError(
+          confirmError?.message ||
+            confirmData?.confirmSubscriptionUpgrade.message ||
+            'Sorry, there was an issue confirming your subscription upgrade',
+        );
+      }
+      setLoading(false);
+      return onSuccess();
+    }
+
+    if (!clientSecret) {
+      setLoading(false);
+      return setError('Sorry, there was an issue creating your subscription');
+    }
+
+    // Confirm the payment with Stripe
     const { error: stripeConfirmPaymentError } = await stripe.confirmPayment({
       elements,
       clientSecret,
@@ -175,13 +218,32 @@ function CheckoutForm({
     });
 
     if (stripeConfirmPaymentError) {
-      setError(
+      setLoading(false);
+      return setError(
         stripeConfirmPaymentError.message ||
           'Sorry, there was an issue confirming your payment',
       );
-    } else {
-      onSuccess();
     }
+
+    // Confirm the subscription upgrade in our backend
+    const { data: confirmData, error: confirmError } =
+      await confirmSubscriptionUpgrade({ subscriptionId });
+
+    if (confirmError || !confirmData?.confirmSubscriptionUpgrade.success) {
+      setLoading(false);
+      console.error('Payment succeeded but subscription confirmation failed:', {
+        subscriptionId,
+        error: confirmError || confirmData?.confirmSubscriptionUpgrade.message,
+      });
+      return setError(
+        'Your payment was successful, but we encountered an issue activating your subscription. ' +
+          'Please contact support at hello@inngest.com with your subscription ID: ' +
+          subscriptionId,
+      );
+    }
+
+    setLoading(false);
+    onSuccess();
   };
 
   return (
