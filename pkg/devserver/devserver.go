@@ -380,7 +380,14 @@ func start(ctx context.Context, opts StartOpts) error {
 		consts.DefaultQueueShardName: queueShard,
 	}
 
-	rq, err := queue.NewQueueProcessor(ctx, "queue", queueShard, queueShards, shardSelector, queueOpts...)
+	rq, err := queue.NewQueueProcessor(
+		ctx,
+		"queue",
+		queueShard,
+		queueShards,
+		shardSelector,
+		queueOpts...,
+	)
 	if err != nil {
 		return fmt.Errorf("could not create queue: %w", err)
 	}
