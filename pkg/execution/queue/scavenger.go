@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 )
 
@@ -34,10 +35,10 @@ func (q *queueProcessor) runScavenger(ctx context.Context) {
 			if q.isScavenger() {
 				count, err := q.primaryQueueShard.Scavenge(ctx, ScavengePeekSize)
 				if err != nil {
-					q.log.Error("error scavenging", "error", err)
+					logger.StdlibLogger(ctx).Error("error scavenging", "error", err)
 				}
 				if count > 0 {
-					q.log.Info("scavenged lost jobs", "len", count)
+					logger.StdlibLogger(ctx).Info("scavenged lost jobs", "len", count)
 				}
 			}
 		case <-tick.Chan():
@@ -52,7 +53,7 @@ func (q *queueProcessor) runScavenger(ctx context.Context) {
 				continue
 			}
 			if err != nil {
-				q.log.Error("error claiming scavenger lease", "error", err)
+				logger.StdlibLogger(ctx).Error("error claiming scavenger lease", "error", err)
 				q.scavengerLeaseLock.Lock()
 				q.scavengerLeaseID = nil
 				q.scavengerLeaseLock.Unlock()

@@ -682,7 +682,6 @@ type PartitionIdentifier struct {
 }
 
 func NewQueueOptions(
-	ctx context.Context,
 	options ...QueueOpt,
 ) *QueueOptions {
 	o := &QueueOptions{
@@ -723,7 +722,6 @@ func NewQueueOptions(
 		IdempotencyTTL:                 defaultIdempotencyTTL,
 		queueKindMapping:               make(map[string]string),
 		peekSizeForFunctions:           make(map[string]int64),
-		log:                            logger.StdlibLogger(ctx),
 		instrumentInterval:             DefaultInstrumentInterval,
 		PartitionConstraintConfigGetter: func(ctx context.Context, pi PartitionIdentifier) PartitionConstraintConfig {
 			def := DefaultConcurrency

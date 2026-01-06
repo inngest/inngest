@@ -192,7 +192,7 @@ func (q *queueProcessor) NormalizeBacklog(ctx context.Context, backlog *QueueBac
 	metrics.ActiveBacklogNormalizeCount(ctx, 1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name()}})
 	defer metrics.ActiveBacklogNormalizeCount(ctx, -1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name()}})
 
-	l := q.log.With(
+	l := logger.StdlibLogger(ctx).With(
 		"backlog", backlog,
 		"sp", sp,
 		"constraints", latestConstraints,

@@ -11,12 +11,13 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"golang.org/x/sync/errgroup"
 )
 
 func (q *queueProcessor) executionScan(ctx context.Context, f RunFunc) error {
-	l := q.log.With(
+	l := logger.StdlibLogger(ctx).With(
 		"queue_shard", q.primaryQueueShard.Name(),
 	)
 
@@ -44,7 +45,7 @@ LOOP:
 		case err = <-q.quit:
 			// An inner function received an error which was deemed irrecoverable, so
 			// we're quitting the queue.
-			q.log.ReportError(err, "quitting runner internally")
+			l.ReportError(err, "quitting runner internally")
 			tick.Stop()
 			break LOOP
 
@@ -61,7 +62,7 @@ LOOP:
 
 			if err = q.scan(ctx); err != nil {
 				if errors.Is(err, context.DeadlineExceeded) {
-					q.log.Warn("deadline exceeded scanning partition pointers")
+					l.Warn("deadline exceeded scanning partition pointers")
 					<-time.After(backoff)
 
 					// Backoff doubles up to 3 seconds.
@@ -71,7 +72,7 @@ LOOP:
 
 				// On scan errors, halt the worker entirely.
 				if !errors.Is(err, context.Canceled) {
-					q.log.ReportError(err, "error scanning partition pointers")
+					l.ReportError(err, "error scanning partition pointers")
 				}
 				break LOOP
 			}
@@ -81,13 +82,15 @@ LOOP:
 	}
 
 	// Wait for all in-progress items to complete.
-	q.log.Info("queue waiting to quit")
+	l.Info("queue waiting to quit")
 	q.wg.Wait()
 
 	return err
 }
 
 func (q *queueProcessor) scan(ctx context.Context) error {
+	l := logger.StdlibLogger(ctx)
+
 	if q.capacity() == 0 {
 		return nil
 	}
@@ -137,7 +140,7 @@ func (q *queueProcessor) scan(ctx context.Context) error {
 		}
 
 		if len(peekedAccounts) == 0 {
-			q.log.Trace("account_peek yielded no accounts")
+			l.Trace("account_peek yielded no accounts")
 			return nil
 		}
 
@@ -158,7 +161,7 @@ func (q *queueProcessor) scan(ctx context.Context) error {
 			go func(account uuid.UUID) {
 				defer wg.Done()
 				if err := q.ScanAccountPartitions(ctx, account, accountPartitionPeekMax, peekUntil, metricShardName, &actualScannedPartitions); err != nil {
-					q.log.Error("error processing account partitions", "error", err)
+					l.Error("error processing account partitions", "error", err)
 				}
 			}(account)
 		}
@@ -234,11 +237,13 @@ func (q *queueProcessor) processScannedPartitions(
 	metricShardName string,
 	reportPeekedPartitions *int64,
 ) error {
+	l := logger.StdlibLogger(ctx)
+
 	if reportPeekedPartitions != nil {
 		atomic.AddInt64(reportPeekedPartitions, int64(len(partitions)))
 	}
 
-	q.log.Trace("processing partitions",
+	l.Trace("processing partitions",
 		"peek_until", peekUntil.Format(time.StampMilli),
 		"partition", len(partitions),
 	)
@@ -262,7 +267,7 @@ func (q *queueProcessor) processScannedPartitions(
 					return nil
 				}
 				if !errors.Is(err, context.Canceled) {
-					q.log.Error("error processing partition", "error", err)
+					l.Error("error processing partition", "error", err)
 				}
 				return err
 			}
@@ -281,7 +286,7 @@ func (q *queueProcessor) processScannedPartitions(
 // shadowScan iterates through the shadow partitions and attempt to add queue items
 // to the function partition for processing
 func (q *queueProcessor) shadowScan(ctx context.Context) error {
-	l := q.log.With("method", "shadowScan")
+	l := logger.StdlibLogger(ctx).With("method", "shadowScan")
 
 	for i := int32(0); i < q.numShadowWorkers; i++ {
 		go q.shadowWorker(ctx, q.qspc)

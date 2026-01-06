@@ -663,7 +663,7 @@ func TestRedisCronManager(t *testing.T) {
 	}
 
 	shard := redis_state.NewRedisQueue(
-		*queue.NewQueueOptions(ctx, opts...),
+		*queue.NewQueueOptions(opts...),
 		consts.DefaultQueueShardName,
 		redis_state.NewQueueClient(rc, redis_state.QueueDefaultKey),
 	)
