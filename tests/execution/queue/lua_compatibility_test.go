@@ -129,7 +129,7 @@ func TestLuaCompatibility(t *testing.T) {
 				shard := setup(t)
 
 				// Initialize queue
-				q, err := queue.NewQueueProcessor(
+				q, err := queue.New(
 					context.Background(),
 					"test-queue",
 					shard,
@@ -244,7 +244,7 @@ func TestLuaCompatibility(t *testing.T) {
 				keyHash := util.XXHash(throttleKey)
 
 				// Initialize queue
-				_, err := queue.NewQueueProcessor(
+				_, err := queue.New(
 					context.Background(),
 					"test-queue",
 					shard,
@@ -318,7 +318,7 @@ func TestLuaCompatibility(t *testing.T) {
 
 				shard := setup(t, opts...)
 
-				q, err := queue.NewQueueProcessor(
+				q, err := queue.New(
 					context.Background(),
 					"test-queue",
 					shard,

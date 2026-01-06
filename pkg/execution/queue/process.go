@@ -12,6 +12,7 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/service"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 func (q *queueProcessor) ProcessItem(
@@ -20,6 +21,15 @@ func (q *queueProcessor) ProcessItem(
 	f RunFunc,
 ) error {
 	l := logger.StdlibLogger(ctx)
+
+	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.ProcessItem", i.I.Data.Identifier.AccountID, i.I.Data.Identifier.WorkspaceID)
+	defer span.End()
+	span.SetAttributes(attribute.String("partition_id", i.P.ID))
+	span.SetAttributes(attribute.String("item_id", i.I.ID))
+	span.SetAttributes(attribute.String("run_id", i.I.Data.Identifier.RunID.String()))
+	if i.I.Data.JobID != nil {
+		span.SetAttributes(attribute.String("job_id", *i.I.Data.JobID))
+	}
 
 	qi := i.I
 	p := i.P

@@ -35,7 +35,7 @@ func LatencyAverage() float64 {
 	return latencyAvg.Value()
 }
 
-func NewQueueProcessor(
+func New(
 	ctx context.Context,
 	name string,
 	primaryQueueShard QueueShard,
@@ -44,6 +44,22 @@ func NewQueueProcessor(
 	options ...QueueOpt,
 ) (*queueProcessor, error) {
 	o := NewQueueOptions(options...)
+
+	if primaryQueueShard == nil {
+		return nil, fmt.Errorf("must pass primary queue shard")
+	}
+
+	if queueShardClients == nil {
+		queueShardClients = map[string]QueueShard{
+			primaryQueueShard.Name(): primaryQueueShard,
+		}
+	}
+
+	if shardSelector == nil {
+		shardSelector = func(ctx context.Context, accountId uuid.UUID, queueName *string) (QueueShard, error) {
+			return primaryQueueShard, nil
+		}
+	}
 
 	qp := &queueProcessor{
 		name: name,

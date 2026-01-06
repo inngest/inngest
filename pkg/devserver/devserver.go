@@ -301,6 +301,8 @@ func start(ctx context.Context, opts StartOpts) error {
 		runMode.NormalizePartition = true
 	}
 
+	conditionalQueueTracer := itrace.NewConditionalTracer(itrace.QueueTracer(), itrace.AlwaysTrace)
+
 	queueOpts := []queue.QueueOpt{
 		queue.WithRunMode(runMode),
 		queue.WithIdempotencyTTL(time.Hour),
@@ -329,6 +331,7 @@ func start(ctx context.Context, opts StartOpts) error {
 			}
 			return queue.PartitionPausedInfo{}
 		}),
+		queue.WithConditionalTracer(conditionalQueueTracer),
 	}
 
 	const rateLimitPrefix = "ratelimit"
@@ -379,7 +382,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		consts.DefaultQueueShardName: queueShard,
 	}
 
-	rq, err := queue.NewQueueProcessor(
+	rq, err := queue.New(
 		ctx,
 		"queue",
 		queueShard,
@@ -401,7 +404,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		consts.DefaultQueueShardName: unshardedClient.Queue(),
 	}, shardSelector)
 
-	conditionalTracer := itrace.NewConditionalTracer(itrace.ConnectTracer(), itrace.AlwaysTrace)
+	conditionalConnectTracer := itrace.NewConditionalTracer(itrace.ConnectTracer(), itrace.AlwaysTrace)
 
 	connectPubSubLogger := logger.StdlibLoggerWithCustomVarName(ctx, "CONNECT_PUBSUB_LOG_LEVEL")
 
@@ -413,7 +416,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	executorLogger := connectPubSubLogger.With("svc", "executor")
 
 	executorProxy := connectgrpc.NewConnector(ctx, connectgrpc.GRPCConnectorOpts{
-		Tracer:             conditionalTracer,
+		Tracer:             conditionalConnectTracer,
 		StateManager:       connectionManager,
 		EnforceLeaseExpiry: enforceConnectLeaseExpiry,
 		GRPCConfig:         opts.ConnectGRPCConfig,
@@ -442,7 +445,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	for _, driverConfig := range opts.Config.Execution.Drivers {
 		d, err := driverConfig.NewDriver(registration.NewDriverOpts{
 			ConnectForwarder:       executorProxy,
-			ConditionalTracer:      conditionalTracer,
+			ConditionalTracer:      conditionalConnectTracer,
 			HTTPClient:             httpClient,
 			LocalSigningKey:        opts.SigningKey,
 			RequireLocalSigningKey: opts.RequireKeys,
@@ -618,7 +621,7 @@ func start(ctx context.Context, opts StartOpts) error {
 			ConnectGatewayRetriever:    ds,
 			Dev:                        true,
 			EntitlementProvider:        ds,
-			ConditionalTracer:          conditionalTracer,
+			ConditionalTracer:          conditionalConnectTracer,
 			ConnectGRPCConfig:          opts.ConnectGRPCConfig,
 		},
 	})

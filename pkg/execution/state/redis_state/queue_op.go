@@ -12,6 +12,7 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 func (q *queue) DequeueByJobID(ctx context.Context, jobID string) error {
@@ -43,6 +44,15 @@ func (q *queue) Dequeue(ctx context.Context, i osqueue.QueueItem, options ...osq
 
 	partition := osqueue.ItemShadowPartition(ctx, i)
 	backlog := osqueue.ItemBacklog(ctx, i)
+
+	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.Dequeue", i.Data.Identifier.AccountID, i.Data.Identifier.WorkspaceID)
+	defer span.End()
+	span.SetAttributes(attribute.String("partition_id", partition.PartitionID))
+	span.SetAttributes(attribute.String("item_id", i.ID))
+	span.SetAttributes(attribute.String("run_id", i.Data.Identifier.RunID.String()))
+	if i.Data.JobID != nil {
+		span.SetAttributes(attribute.String("job_id", *i.Data.JobID))
+	}
 
 	keys := []string{
 		kg.QueueItem(),
@@ -191,6 +201,15 @@ func (q *queue) Requeue(ctx context.Context, i osqueue.QueueItem, at time.Time, 
 
 	fnPartition := osqueue.ItemPartition(ctx, i)
 	shadowPartition := osqueue.ItemShadowPartition(ctx, i)
+
+	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.Requeue", i.Data.Identifier.AccountID, i.Data.Identifier.WorkspaceID)
+	defer span.End()
+	span.SetAttributes(attribute.String("partition_id", shadowPartition.PartitionID))
+	span.SetAttributes(attribute.String("item_id", i.ID))
+	span.SetAttributes(attribute.String("run_id", i.Data.Identifier.RunID.String()))
+	if i.Data.JobID != nil {
+		span.SetAttributes(attribute.String("job_id", *i.Data.JobID))
+	}
 
 	requeueToBacklog := q.ItemEnableKeyQueues(ctx, i)
 

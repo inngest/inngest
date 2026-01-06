@@ -624,3 +624,24 @@ func ConnectTracer() oteltrace.Tracer {
 
 	return tracer
 }
+
+func QueueTracer() oteltrace.Tracer {
+	l := logger.StdlibLogger(context.Background())
+
+	systemTracer := SystemTracer()
+	if systemTracer == nil {
+		l.Error("system tracer is nil")
+	}
+
+	provider := systemTracer.Provider()
+	if provider == nil {
+		l.Error("trace provider is nil in system tracer")
+	}
+
+	tracer := provider.Tracer("queue")
+	if tracer == nil {
+		l.Error("queue tracer is nil")
+	}
+
+	return tracer
+}

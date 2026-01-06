@@ -43,7 +43,7 @@ func TestDebounce(t *testing.T) {
 
 	shard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), opts...)
 
-	q, err := queue.NewQueueProcessor(
+	q, err := queue.New(
 		context.Background(),
 		"debounce-test",
 
@@ -316,7 +316,7 @@ func TestJITDebounceMigration(t *testing.T) {
 	// TODO What happens if both old and new services are running? Does this break debounces?
 	//  Do we need to keep the old behavior and flip using a feature flag (LaunchDarkly)
 	//  once all services running `Schedule` (new-runs, executor) are rolled out?
-	oldQueue, err := queue.NewQueueProcessor(
+	oldQueue, err := queue.New(
 		context.Background(),
 		"old-queue",
 		defaultQueueShard,
@@ -330,7 +330,7 @@ func TestJITDebounceMigration(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	newQueue, err := queue.NewQueueProcessor(
+	newQueue, err := queue.New(
 		context.Background(),
 		"new-queue",
 		newSystemShard,
@@ -596,7 +596,7 @@ func TestDebounceMigrationWithoutTimeout(t *testing.T) {
 	// TODO What happens if both old and new services are running? Does this break debounces?
 	//  Do we need to keep the old behavior and flip using a feature flag (LaunchDarkly)
 	//  once all services running `Schedule` (new-runs, executor) are rolled out?
-	oldQueue, err := queue.NewQueueProcessor(
+	oldQueue, err := queue.New(
 		context.Background(),
 		"old-queue",
 		defaultQueueShard,
@@ -610,7 +610,7 @@ func TestDebounceMigrationWithoutTimeout(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	newQueue, err := queue.NewQueueProcessor(
+	newQueue, err := queue.New(
 		context.Background(),
 		"new-queue",
 		newSystemShard,
@@ -859,7 +859,7 @@ func TestDebounceTimeoutIsPreserved(t *testing.T) {
 	// TODO What happens if both old and new services are running? Does this break debounces?
 	//  Do we need to keep the old behavior and flip using a feature flag (LaunchDarkly)
 	//  once all services running `Schedule` (new-runs, executor) are rolled out?
-	oldQueue, err := queue.NewQueueProcessor(
+	oldQueue, err := queue.New(
 		context.Background(),
 		"old-queue",
 		defaultQueueShard,
@@ -873,7 +873,7 @@ func TestDebounceTimeoutIsPreserved(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	newQueue, err := queue.NewQueueProcessor(
+	newQueue, err := queue.New(
 		context.Background(),
 		"new-queue",
 		newSystemShard,
@@ -1087,7 +1087,7 @@ func TestDebounceExplicitMigration(t *testing.T) {
 	// TODO What happens if both old and new services are running? Does this break debounces?
 	//  Do we need to keep the old behavior and flip using a feature flag (LaunchDarkly)
 	//  once all services running `Schedule` (new-runs, executor) are rolled out?
-	oldQueue, err := queue.NewQueueProcessor(
+	oldQueue, err := queue.New(
 		context.Background(),
 		"old-queue",
 		defaultQueueShard,
@@ -1101,7 +1101,7 @@ func TestDebounceExplicitMigration(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	newQueue, err := queue.NewQueueProcessor(
+	newQueue, err := queue.New(
 		context.Background(),
 		"new-queue",
 		newSystemShard,
@@ -1285,7 +1285,7 @@ func TestDebouncePrimaryChooser(t *testing.T) {
 	// TODO What happens if both old and new services are running? Does this break debounces?
 	//  Do we need to keep the old behavior and flip using a feature flag (LaunchDarkly)
 	//  once all services running `Schedule` (new-runs, executor) are rolled out?
-	oldQueue, err := queue.NewQueueProcessor(
+	oldQueue, err := queue.New(
 		context.Background(),
 		"old-queue",
 		defaultQueueShard,
@@ -1299,7 +1299,7 @@ func TestDebouncePrimaryChooser(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	newQueue, err := queue.NewQueueProcessor(
+	newQueue, err := queue.New(
 		context.Background(),
 		"new-queue",
 		newSystemShard,
@@ -1458,7 +1458,7 @@ func TestDebounceExecutionDuringMigrationWorks(t *testing.T) {
 	// TODO What happens if both old and new services are running? Does this break debounces?
 	//  Do we need to keep the old behavior and flip using a feature flag (LaunchDarkly)
 	//  once all services running `Schedule` (new-runs, executor) are rolled out?
-	oldQueue, err := queue.NewQueueProcessor(
+	oldQueue, err := queue.New(
 		context.Background(),
 		"old-queue",
 		defaultQueueShard,
@@ -1472,7 +1472,7 @@ func TestDebounceExecutionDuringMigrationWorks(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	newQueue, err := queue.NewQueueProcessor(
+	newQueue, err := queue.New(
 		context.Background(),
 		"new-queue",
 		newSystemShard,
@@ -1678,7 +1678,7 @@ func TestDebounceExecutionShouldNotRaceMigration(t *testing.T) {
 	// TODO What happens if both old and new services are running? Does this break debounces?
 	//  Do we need to keep the old behavior and flip using a feature flag (LaunchDarkly)
 	//  once all services running `Schedule` (new-runs, executor) are rolled out?
-	oldQueue, err := queue.NewQueueProcessor(
+	oldQueue, err := queue.New(
 		context.Background(),
 		"old-queue",
 		defaultQueueShard,
@@ -1692,7 +1692,7 @@ func TestDebounceExecutionShouldNotRaceMigration(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	newQueue, err := queue.NewQueueProcessor(
+	newQueue, err := queue.New(
 		context.Background(),
 		"new-queue",
 		newSystemShard,

@@ -14,6 +14,7 @@ import (
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 func (q *queue) IsMigrationLocked(ctx context.Context, fnID uuid.UUID) (*time.Time, error) {
@@ -184,6 +185,11 @@ func (q *queue) ShadowPartitionRequeue(ctx context.Context, sp *osqueue.QueueSha
 		requeueAtMS = requeueAt.UnixMilli()
 		requeueAtStr = requeueAt.Format(time.StampMilli)
 	}
+
+	partitionID := sp.Identifier()
+	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.ShadowPartitionRequeue", partitionID.AccountID, partitionID.EnvID)
+	defer span.End()
+	span.SetAttributes(attribute.String("partition_id", sp.PartitionID))
 
 	keys := []string{
 		q.RedisClient.kg.ShadowPartitionMeta(),

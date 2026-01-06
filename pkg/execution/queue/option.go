@@ -12,8 +12,10 @@ import (
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/jonboulle/clockwork"
 	"github.com/oklog/ulid/v2"
+	"go.opentelemetry.io/otel/trace/noop"
 )
 
 // PartitionPriorityFinder returns the priority for a given queue partition.
@@ -457,6 +459,8 @@ type QueueOptions struct {
 	CapacityLeaseExtendInterval time.Duration
 
 	EnableThrottleInstrumentation EnableThrottleInstrumentationFn
+
+	ConditionalTracer trace.ConditionalTracer
 }
 
 // ShardSelector returns a shard reference for the given queue item.
@@ -579,6 +583,12 @@ type EnableThrottleInstrumentationFn func(ctx context.Context, accountID, fnID u
 func WithEnableThrottleInstrumentation(fn EnableThrottleInstrumentationFn) QueueOpt {
 	return func(q *QueueOptions) {
 		q.EnableThrottleInstrumentation = fn
+	}
+}
+
+func WithConditionalTracer(tracer trace.ConditionalTracer) QueueOpt {
+	return func(q *QueueOptions) {
+		q.ConditionalTracer = tracer
 	}
 }
 
@@ -762,6 +772,9 @@ func NewQueueOptions(
 		ActiveCheckBacklogConcurrency: ActiveCheckBacklogConcurrency,
 		ActiveCheckScanBatchSize:      ActiveCheckScanBatchSize,
 		CapacityLeaseExtendInterval:   QueueLeaseDuration / 2,
+		ConditionalTracer: trace.NewConditionalTracer(noop.Tracer{}, func(ctx context.Context, accountID, envID uuid.UUID) bool {
+			return false
+		}),
 	}
 
 	for _, qopt := range options {

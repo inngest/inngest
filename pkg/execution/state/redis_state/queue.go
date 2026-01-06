@@ -24,6 +24,7 @@ import (
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
+	"go.opentelemetry.io/otel/attribute"
 	"golang.org/x/sync/errgroup"
 	"gonum.org/v1/gonum/stat/sampleuv"
 )
@@ -249,6 +250,16 @@ func (q *queue) EnqueueItem(ctx context.Context, i osqueue.QueueItem, at time.Ti
 	if enqueueToBacklogs {
 		backlog = osqueue.ItemBacklog(ctx, i)
 		shadowPartition = osqueue.ItemShadowPartition(ctx, i)
+	}
+
+	partitionID := shadowPartition.Identifier()
+	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.EnqueueItem", partitionID.AccountID, partitionID.EnvID)
+	defer span.End()
+	span.SetAttributes(attribute.String("partition_id", shadowPartition.PartitionID))
+	span.SetAttributes(attribute.String("item_id", i.ID))
+	span.SetAttributes(attribute.String("run_id", i.Data.Identifier.RunID.String()))
+	if i.Data.JobID != nil {
+		span.SetAttributes(attribute.String("job_id", *i.Data.JobID))
 	}
 
 	keys := []string{
@@ -828,6 +839,16 @@ func (q *queue) Lease(
 		o.Constraints = q.PartitionConstraintConfigGetter(ctx, o.ShadowPartition.Identifier())
 	}
 
+	partitionID := o.ShadowPartition.Identifier()
+	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.Lease", partitionID.AccountID, partitionID.EnvID)
+	defer span.End()
+	span.SetAttributes(attribute.String("partition_id", o.ShadowPartition.PartitionID))
+	span.SetAttributes(attribute.String("item_id", item.ID))
+	span.SetAttributes(attribute.String("run_id", item.Data.Identifier.RunID.String()))
+	if item.Data.JobID != nil {
+		span.SetAttributes(attribute.String("job_id", *item.Data.JobID))
+	}
+
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Lease"), redis_telemetry.ScopeQueue)
 
 	kg := q.RedisClient.kg
@@ -1123,6 +1144,16 @@ func (q *queue) ExtendLease(ctx context.Context, i osqueue.QueueItem, leaseID ul
 	backlog := osqueue.ItemBacklog(ctx, i)
 	partition := osqueue.ItemShadowPartition(ctx, i)
 
+	partitionID := partition.Identifier()
+	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.ExtendLease", partitionID.AccountID, partitionID.EnvID)
+	defer span.End()
+	span.SetAttributes(attribute.String("partition_id", partition.PartitionID))
+	span.SetAttributes(attribute.String("item_id", i.ID))
+	span.SetAttributes(attribute.String("run_id", i.Data.Identifier.RunID.String()))
+	if i.Data.JobID != nil {
+		span.SetAttributes(attribute.String("job_id", *i.Data.JobID))
+	}
+
 	keys := []string{
 		q.RedisClient.kg.QueueItem(),
 		// And pass in the key queue's concurrency keys.
@@ -1198,6 +1229,10 @@ func (q *queue) PartitionLease(
 	options ...osqueue.PartitionLeaseOpt,
 ) (*ulid.ULID, int, error) {
 	l := logger.StdlibLogger(ctx)
+
+	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.partitionLease", p.AccountID, p.Identifier().EnvID)
+	defer span.End()
+	span.SetAttributes(attribute.String("partition_id", p.ID))
 
 	o := &osqueue.PartitionLeaseOptions{}
 	for _, opt := range options {
@@ -1845,6 +1880,10 @@ func checkList(check string, exact, prefixes map[string]*struct{}) bool {
 // to be at a specific time instead of taking the earliest available queue item time
 func (q *queue) PartitionRequeue(ctx context.Context, p *osqueue.QueuePartition, at time.Time, forceAt bool) error {
 	l := logger.StdlibLogger(ctx)
+
+	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.partitionRequeue", p.AccountID, p.Identifier().EnvID)
+	defer span.End()
+	span.SetAttributes(attribute.String("partition_id", p.ID))
 
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "PartitionRequeue"), redis_telemetry.ScopeQueue)
 

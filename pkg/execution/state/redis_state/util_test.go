@@ -54,7 +54,7 @@ func newQueue(t testing.TB, rc rueidis.Client, opts ...osqueue.QueueOpt) (queueI
 
 	shard := shardFromClient(consts.DefaultQueueShardName, rc, opts...)
 
-	queue, err := osqueue.NewQueueProcessor(
+	queue, err := osqueue.New(
 		ctx,
 		"test-queue",
 		shard,

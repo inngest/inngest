@@ -17,6 +17,7 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 	"github.com/redis/rueidis"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 // readyQueueKey returns the ZSET key to the ready queue
@@ -180,6 +181,12 @@ func (q *queue) BacklogRefill(
 	if sp.AccountID != nil {
 		accountID = *sp.AccountID
 	}
+
+	partitionID := sp.Identifier()
+	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.BacklogRefill", partitionID.AccountID, partitionID.EnvID)
+	defer span.End()
+	span.SetAttributes(attribute.String("partition_id", sp.PartitionID))
+	span.SetAttributes(attribute.String("backlog_id", b.BacklogID))
 
 	nowMS := q.Clock.Now().UnixMilli()
 
@@ -398,6 +405,12 @@ func (q *queue) BacklogRequeue(ctx context.Context, backlog *osqueue.QueueBacklo
 	if sp.AccountID != nil {
 		accountID = *sp.AccountID
 	}
+
+	partitionID := sp.Identifier()
+	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.BacklogRequeue", partitionID.AccountID, partitionID.EnvID)
+	defer span.End()
+	span.SetAttributes(attribute.String("partition_id", sp.PartitionID))
+	span.SetAttributes(attribute.String("backlog_id", backlog.BacklogID))
 
 	keys := []string{
 		kg.ShadowPartitionMeta(),

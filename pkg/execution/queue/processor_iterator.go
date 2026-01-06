@@ -10,6 +10,7 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/oklog/ulid/v2"
+	"go.opentelemetry.io/otel/attribute"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -122,6 +123,10 @@ func (p *ProcessorIterator) Iterate(ctx context.Context) error {
 
 func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error {
 	l := logger.StdlibLogger(ctx).With("partition", p.Partition, "item", item)
+
+	ctx, span := p.Queue.Options().ConditionalTracer.NewSpan(ctx, "queue.Process", p.Partition.AccountID, p.Partition.Identifier().EnvID)
+	defer span.End()
+	span.SetAttributes(attribute.String("partition_id", p.Partition.ID))
 
 	// TODO: Create an in-memory mapping of rate limit keys that have been hit,
 	//       and don't bother to process if the queue item has a limited key.  This
