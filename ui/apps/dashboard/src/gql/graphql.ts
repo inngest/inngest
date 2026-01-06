@@ -1,4 +1,6 @@
 /* eslint-disable */
+import type { SpanMetadataKind } from '@components/src/RunDetailsV3/types';
+import type { SpanMetadataScope } from '@components/src/RunDetailsV3/types';
 import type { TypedDocumentNode as DocumentNode } from '@graphql-typed-document-node/core';
 export type Maybe<T> = T | null;
 export type InputMaybe<T> = T | null | undefined;
@@ -31,8 +33,8 @@ export type Scalars = {
   Runtime: { input: unknown; output: unknown; }
   SchemaSource: { input: unknown; output: unknown; }
   SearchObject: { input: unknown; output: unknown; }
-  SpanMetadataKind: { input: string; output: string; }
-  SpanMetadataScope: { input: string; output: string; }
+  SpanMetadataKind: { input: SpanMetadataKind; output: SpanMetadataKind; }
+  SpanMetadataScope: { input: SpanMetadataScope; output: SpanMetadataScope; }
   SpanMetadataValues: { input: Record<string, any>; output: Record<string, any>; }
   Time: { input: string; output: string; }
   Timerange: { input: unknown; output: unknown; }
@@ -3706,7 +3708,7 @@ export type GetEventKeysForBlankSlateQueryVariables = Exact<{
 
 export type GetEventKeysForBlankSlateQuery = { __typename?: 'Query', environment: { __typename?: 'Workspace', ingestKeys: Array<{ __typename?: 'IngestKey', name: null | string, presharedKey: string, createdAt: string }> } };
 
-export type TraceDetailsFragment = { __typename?: 'RunTraceSpan', name: string, status: RunTraceSpanStatus, attempts: number | null, queuedAt: string, startedAt: string | null, endedAt: string | null, isRoot: boolean, isUserland: boolean, outputID: string | null, stepID: string | null, spanID: string, stepOp: StepOp | null, stepType: string, userlandSpan: { __typename?: 'UserlandSpan', spanName: string | null, spanKind: string | null, serviceName: string | null, scopeName: string | null, scopeVersion: string | null, spanAttrs: string | null, resourceAttrs: string | null } | null, metadata: Array<{ __typename?: 'SpanMetadata', kind: string, scope: string, values: Record<string, any>, updatedAt: string }>, stepInfo:
+export type TraceDetailsFragment = { __typename?: 'RunTraceSpan', name: string, status: RunTraceSpanStatus, attempts: number | null, queuedAt: string, startedAt: string | null, endedAt: string | null, isRoot: boolean, isUserland: boolean, outputID: string | null, stepID: string | null, spanID: string, stepOp: StepOp | null, stepType: string, userlandSpan: { __typename?: 'UserlandSpan', spanName: string | null, spanKind: string | null, serviceName: string | null, scopeName: string | null, scopeVersion: string | null, spanAttrs: string | null, resourceAttrs: string | null } | null, metadata: Array<{ __typename?: 'SpanMetadata', kind: SpanMetadataKind, scope: SpanMetadataScope, values: Record<string, any>, updatedAt: string }>, stepInfo:
     | { __typename: 'InvokeStepInfo', triggeringEventID: string, functionID: string, timeout: string, returnEventID: string | null, runID: string | null, timedOut: boolean | null }
     | { __typename: 'SleepStepInfo', sleepUntil: string }
     | { __typename: 'WaitForEventStepInfo', eventName: string, expression: string | null, timeout: string, foundEventID: string | null, timedOut: boolean | null }
