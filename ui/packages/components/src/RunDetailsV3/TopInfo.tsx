@@ -15,6 +15,7 @@ import {
 } from '../DetailsCard/Element';
 import { ErrorCard } from '../Error/ErrorCard';
 import { InvokeModal } from '../InvokeButton';
+import { useBooleanFlag } from '../SharedContext/useBooleanFlag';
 import type { TraceResult } from '../SharedContext/useGetTraceResult';
 import { useInvokeRun } from '../SharedContext/useInvokeRun';
 import { usePrettyErrorBody, usePrettyJson } from '../hooks/usePrettyJson';
@@ -109,9 +110,8 @@ export const TopInfo = ({
     retry: 3,
   });
 
-  // const { booleanFlag } = useBooleanFlag();
-  // const { value: metadataIsEnabled } = booleanFlag('enable-step-metadata', false);
-  const metadataIsEnabled = true;
+  const { booleanFlag } = useBooleanFlag();
+  const { value: metadataIsEnabled } = booleanFlag('enable-step-metadata', false);
 
   const prettyPayload = useMemo(() => {
     try {
