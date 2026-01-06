@@ -272,6 +272,7 @@ export default function NewReplayModal({
                   )
                 }
                 className="w-full"
+                type="button"
               />
             </div>
           </div>
