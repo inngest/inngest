@@ -111,7 +111,8 @@ export const TopInfo = ({
   });
 
   const { booleanFlag } = useBooleanFlag();
-  const { value: metadataIsEnabled } = booleanFlag('enable-step-metadata', false);
+  // const { value: metadataIsEnabled } = booleanFlag('enable-step-metadata', false);
+  const metadataIsEnabled = true;
 
   const prettyPayload = useMemo(() => {
     try {
