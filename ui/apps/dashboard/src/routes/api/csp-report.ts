@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { inngest } from '@/lib/inngest/client';
+import { isRecord } from '@inngest/components/utils/object';
 
 /**
  * Normalizes CSP report request bodies from two potential structures:
@@ -7,17 +8,13 @@ import { inngest } from '@/lib/inngest/client';
  * 2. { "body": { "blockedURL": "...", ... }, "type": "...", "url": "..." } (camelCase)
  */
 function normalizeCspReport(body: unknown): Record<string, unknown> {
+  if (!isRecord(body)) {
+    return {};
+  }
+
   // Handle structure 1: { "csp-report": { ... } }
-  if (
-    typeof body === 'object' &&
-    body !== null &&
-    'csp-report' in body &&
-    typeof (body as { 'csp-report': unknown })['csp-report'] === 'object' &&
-    (body as { 'csp-report': unknown })['csp-report'] !== null
-  ) {
-    const report = (body as { 'csp-report': Record<string, unknown> })[
-      'csp-report'
-    ];
+  let report = body['csp-report'];
+  if (isRecord(report)) {
     return {
       blockedURL: report['blocked-uri'],
       columnNumber: report['column-number'],
@@ -35,14 +32,8 @@ function normalizeCspReport(body: unknown): Record<string, unknown> {
   }
 
   // Handle structure 2: { "body": { ... }, "type": "...", "url": "..." }
-  if (
-    typeof body === 'object' &&
-    body !== null &&
-    'body' in body &&
-    typeof (body as { body: unknown }).body === 'object' &&
-    (body as { body: unknown }).body !== null
-  ) {
-    const report = (body as { body: Record<string, unknown> }).body;
+  report = body['body'];
+  if (isRecord(report)) {
     return {
       blockedURL: report['blockedURL'],
       columnNumber: report['columnNumber'],
@@ -60,9 +51,7 @@ function normalizeCspReport(body: unknown): Record<string, unknown> {
   }
 
   // Fallback: return as-is if structure doesn't match
-  return typeof body === 'object' && body !== null
-    ? (body as Record<string, unknown>)
-    : {};
+  return body;
 }
 
 export const Route = createFileRoute('/api/csp-report')({
