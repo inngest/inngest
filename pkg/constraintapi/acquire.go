@@ -345,22 +345,28 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 		"earliest_expiry", time.UnixMilli(int64(parsedResponse.EarliestLeaseExpiry)),
 	)
 
+	tags := make(map[string]any)
+	if r.enableHighCardinalityInstrumentation != nil && r.enableHighCardinalityInstrumentation(ctx, req.AccountID, req.EnvID, req.FunctionID) {
+		tags["function_id"] = req.FunctionID
+	}
+
 	// Export metrics for leases requested and granted
 	metrics.IncrConstraintAPILeasesRequestedCounter(ctx, int64(parsedResponse.Requested), metrics.CounterOpt{
 		PkgName: "constraintapi",
+		Tags:    tags,
 	})
 
 	metrics.IncrConstraintAPILeasesGrantedCounter(ctx, int64(parsedResponse.Granted), metrics.CounterOpt{
 		PkgName: "constraintapi",
+		Tags:    tags,
 	})
 
 	// Export counter for limitingConstraints
 	for _, constraint := range limitingConstraints {
+		tags["limiting_constraint"] = constraint.LimitingConstraintIdentifier()
 		metrics.IncrConstraintAPILimitingConstraintsCounter(ctx, metrics.CounterOpt{
 			PkgName: "constraintapi",
-			Tags: map[string]any{
-				"limiting_constraint": constraint.LimitingConstraintIdentifier(),
-			},
+			Tags:    tags,
 		})
 	}
 
