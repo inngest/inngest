@@ -536,8 +536,7 @@ func TestConstraintEnforcement(t *testing.T) {
 					return test.queueConstraints
 				}),
 			}
-			queueOptions := queue.NewQueueOptions(queueOpts...)
-			shard := redis_state.NewRedisQueue(*queueOptions, "test", redis_state.NewQueueClient(rc, "q:v1"))
+			shard := redis_state.NewQueueShard("test", redis_state.NewQueueClient(rc, "q:v1"), queueOpts...)
 
 			q, err := queue.NewQueueProcessor(
 				ctx,
