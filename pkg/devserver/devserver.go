@@ -369,8 +369,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		))
 	}
 
-	queueOptions := queue.NewQueueOptions(ctx, queueOpts...)
-	queueShard := redis_state.NewRedisQueue(*queueOptions, consts.DefaultQueueShardName, unshardedClient.Queue())
+	queueShard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), queueOpts...)
 
 	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (queue.QueueShard, error) {
 		return queueShard, nil

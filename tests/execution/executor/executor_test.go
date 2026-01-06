@@ -159,8 +159,7 @@ func TestScheduleRaceCondition(t *testing.T) {
 	queueOpts := []queue.QueueOpt{
 		queue.WithIdempotencyTTL(time.Hour),
 	}
-	queueOptions := queue.NewQueueOptions(ctx, queueOpts...)
-	queueShard := redis_state.NewRedisQueue(*queueOptions, consts.DefaultQueueShardName, unshardedClient.Queue())
+	queueShard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), queueOpts...)
 
 	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (queue.QueueShard, error) {
 		return queueShard, nil
@@ -333,8 +332,7 @@ func TestScheduleRaceConditionWithExistingIdempotencyKey(t *testing.T) {
 	queueOpts := []queue.QueueOpt{
 		queue.WithIdempotencyTTL(time.Hour),
 	}
-	queueOptions := queue.NewQueueOptions(ctx, queueOpts...)
-	queueShard := redis_state.NewRedisQueue(*queueOptions, consts.DefaultQueueShardName, unshardedClient.Queue())
+	queueShard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), queueOpts...)
 
 	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (queue.QueueShard, error) {
 		return queueShard, nil
@@ -541,8 +539,7 @@ func TestFinalize(t *testing.T) {
 		queue.WithIdempotencyTTL(time.Hour),
 	}
 
-	queueOptions := queue.NewQueueOptions(ctx, queueOpts...)
-	queueShard := redis_state.NewRedisQueue(*queueOptions, consts.DefaultQueueShardName, unshardedClient.Queue())
+	queueShard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), queueOpts...)
 	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (queue.QueueShard, error) {
 		return queueShard, nil
 	}
@@ -826,8 +823,7 @@ func TestInvokeRetrySucceedsIfPauseAlreadyCreated(t *testing.T) {
 	queueOpts := []queue.QueueOpt{
 		queue.WithIdempotencyTTL(time.Hour),
 	}
-	queueOptions := queue.NewQueueOptions(ctx, queueOpts...)
-	queueShard := redis_state.NewRedisQueue(*queueOptions, consts.DefaultQueueShardName, unshardedClient.Queue())
+	queueShard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), queueOpts...)
 
 	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (queue.QueueShard, error) {
 		return queueShard, nil
@@ -1018,8 +1014,7 @@ func TestExecutorReturnsResponseWhenNonRetriableError(t *testing.T) {
 	queueOpts := []queue.QueueOpt{
 		queue.WithIdempotencyTTL(time.Hour),
 	}
-	queueOptions := queue.NewQueueOptions(ctx, queueOpts...)
-	queueShard := redis_state.NewRedisQueue(*queueOptions, consts.DefaultQueueShardName, unshardedClient.Queue())
+	queueShard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), queueOpts...)
 
 	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (queue.QueueShard, error) {
 		return queueShard, nil
@@ -1214,8 +1209,7 @@ func TestExecutorScheduleRateLimit(t *testing.T) {
 	queueOpts := []queue.QueueOpt{
 		queue.WithIdempotencyTTL(time.Hour),
 	}
-	queueOptions := queue.NewQueueOptions(ctx, queueOpts...)
-	queueShard := redis_state.NewRedisQueue(*queueOptions, consts.DefaultQueueShardName, unshardedClient.Queue())
+	queueShard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), queueOpts...)
 
 	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (queue.QueueShard, error) {
 		return queueShard, nil
@@ -1415,8 +1409,7 @@ func TestExecutorScheduleBacklogSizeLimit(t *testing.T) {
 	queueOpts := []queue.QueueOpt{
 		queue.WithIdempotencyTTL(time.Hour),
 	}
-	queueOptions := queue.NewQueueOptions(ctx, queueOpts...)
-	queueShard := redis_state.NewRedisQueue(*queueOptions, consts.DefaultQueueShardName, unshardedClient.Queue())
+	queueShard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), queueOpts...)
 
 	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (queue.QueueShard, error) {
 		return queueShard, nil

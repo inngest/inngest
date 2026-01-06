@@ -74,7 +74,7 @@ func TestQueuePartitionConcurrency(t *testing.T) {
 		osqueue.WithQueueLifecycles(ll),
 	}
 
-	shard1 := NewRedisQueue(*osqueue.NewQueueOptions(ctx, opts...), consts.DefaultQueueShardName, NewQueueClient(rc, QueueDefaultKey))
+	shard1 := NewQueueShard(consts.DefaultQueueShardName, NewQueueClient(rc, QueueDefaultKey), opts...)
 
 	shards := map[string]osqueue.QueueShard{
 		consts.DefaultQueueShardName: shard1,
