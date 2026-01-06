@@ -4,6 +4,7 @@ import { Button } from '@inngest/components/Button';
 import { Modal } from '@inngest/components/Modal/Modal';
 import { resolveColor } from '@inngest/components/utils/colors';
 import { isDark } from '@inngest/components/utils/theme';
+import * as Sentry from '@sentry/tanstackstart-react';
 import {
   Elements,
   PaymentElement,
@@ -231,10 +232,16 @@ function CheckoutForm({
 
     if (confirmError || !confirmData?.confirmSubscriptionUpgrade.success) {
       setLoading(false);
-      console.error('Payment succeeded but subscription confirmation failed:', {
-        subscriptionId,
-        error: confirmError || confirmData?.confirmSubscriptionUpgrade.message,
-      });
+      Sentry.captureException(
+        new Error('Payment succeeded but subscription confirmation failed'),
+        {
+          extra: {
+            subscriptionId,
+            error:
+              confirmError || confirmData?.confirmSubscriptionUpgrade.message,
+          },
+        },
+      );
       return setError(
         'Your payment was successful, but we encountered an issue activating your subscription. ' +
           'Please contact support at hello@inngest.com with your subscription ID: ' +
