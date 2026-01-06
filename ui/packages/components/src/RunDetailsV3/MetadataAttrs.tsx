@@ -85,24 +85,22 @@ export const MetadataAttrs = ({ metadata }: { metadata: SpanMetadata[] }) => {
 
   return (
     <div className="relative h-full overflow-y-auto" ref={ref}>
-      <section className="relative flex h-full flex-col">
-        {height
-          ? metadata.map((md, idx) => {
-              const isLast = idx === metadata.length - 1;
+      {height
+        ? metadata.map((md, idx) => {
+            const isLast = idx === metadata.length - 1;
 
-              return (
-                <MetadataAttrRow
-                  key={`metadata-attr-${md.scope}-${md.kind}`}
-                  kind={md.kind}
-                  scope={md.scope}
-                  values={md.values}
-                  updatedAt={md.updatedAt}
-                  isLast={isLast}
-                />
-              );
-            })
-          : null}
-      </section>
+            return (
+              <MetadataAttrRow
+                key={`metadata-attr-${md.scope}-${md.kind}`}
+                kind={md.kind}
+                scope={md.scope}
+                values={md.values}
+                updatedAt={md.updatedAt}
+                isLast={isLast}
+              />
+            );
+          })
+        : null}
     </div>
   );
 };
