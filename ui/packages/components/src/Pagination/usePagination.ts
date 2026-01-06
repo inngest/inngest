@@ -1,5 +1,3 @@
-'use client';
-
 import { useCallback, useEffect, useMemo, useState, type SetStateAction } from 'react';
 
 export type UsePaginationConfig<T> = {

@@ -15,6 +15,13 @@ var (
 		600_000, 1_800_000, // < 1h
 	}
 
+	cancellationReadDurationBoundaries = []float64{
+		5, 10, 50, 100, 200, 500, // < 1s
+		1000, 2000, 5000, 30_000, // < 1m
+		60_000, 120_000, 300_000, // < 10m
+		600_000, 1_800_000, // < 1h
+	}
+
 	processPartitionBoundaries = []float64{
 		5, 10, 25, 50, 100, 200, // < 1s
 		400, 600, 800, 1_000,
@@ -23,6 +30,8 @@ var (
 	}
 
 	peekSizeBoundaries = []float64{10, 30, 50, 100, 250, 500, 1000, 3000, 5000}
+
+	cancellationReadSizeBoundaries = []float64{10, 50, 100, 250, 500, 1000, 2500, 5000, 10_000, 25_000, 50_000, 75_000, 100_000}
 
 	PausesBoundaries = []float64{
 		5, 10, 50, 100, 200, 500, // < 1s
@@ -377,6 +386,65 @@ func HistogramQueueScavengerPartitionScavengeDuration(ctx context.Context, dur t
 		PkgName:     opts.PkgName,
 		MetricName:  "queue_partition_scavenge_duration",
 		Description: "Distribution of queue scavenger duration",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  DefaultBoundaries,
+	})
+}
+
+func HistogramCancellationReadSize(ctx context.Context, value int64, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, value, HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "cancellation_read_size",
+		Description: "Distribution of the number of items being read in single operations by the cancellation read writer",
+		Tags:        opts.Tags,
+		Boundaries:  cancellationReadSizeBoundaries,
+	})
+}
+
+func HistogramCancellationReadDuration(ctx context.Context, dur time.Duration, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, dur.Milliseconds(), HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "cancellation_read_duration",
+		Description: "Distribution of cancellation read duration",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  cancellationReadDurationBoundaries,
+	})
+}
+
+func HistogramExecutorLatency(ctx context.Context, dur time.Duration, typ string, opts HistogramOpt) {
+	if opts.Tags == nil {
+		opts.Tags = map[string]any{}
+	}
+	opts.Tags["type"] = typ
+
+	RecordIntHistogramMetric(ctx, dur.Milliseconds(), HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "execution_latency",
+		Description: "Distribution of latency within the executor",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  PausesBoundaries,
+	})
+}
+
+func HistogramCancellationCheckDuration(ctx context.Context, dur time.Duration, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, dur.Milliseconds(), HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "cancellation_check_duration",
+		Description: "Distribution of cancellation check duration",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  cancellationReadDurationBoundaries,
+	})
+}
+
+func HistogramScheduleDuration(ctx context.Context, dur int64, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, dur, HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "schedule_duration",
+		Description: "Distribution of schedule duration with constraint API tracking",
 		Tags:        opts.Tags,
 		Unit:        "ms",
 		Boundaries:  DefaultBoundaries,

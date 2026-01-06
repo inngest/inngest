@@ -1,5 +1,3 @@
-'use client';
-
 import { Disclosure } from '@headlessui/react';
 import { Button } from '@inngest/components/Button';
 import { OptionalTooltip } from '@inngest/components/Tooltip/OptionalTooltip';
@@ -40,7 +38,7 @@ function GenerateSqlToolUI({
                 <div
                   className={cn(
                     'flex h-4 w-4 items-center justify-center rounded-full',
-                    errorMessage ? 'bg-error' : 'bg-btnPrimary'
+                    errorMessage ? 'bg-error' : 'bg-btnPrimary',
                   )}
                 >
                   {errorMessage ? (
@@ -57,7 +55,9 @@ function GenerateSqlToolUI({
               <div className="flex items-center gap-2">
                 <OptionalTooltip tooltip="Run this query" side="bottom">
                   <Button
-                    icon={<RiPlayLine className="text-subtle size-8 scale-110" />}
+                    icon={
+                      <RiPlayLine className="text-subtle size-8 scale-110" />
+                    }
                     appearance="ghost"
                     size="small"
                     onClick={() => {
@@ -91,5 +91,11 @@ export const ToolMessage = ({
   onSqlChange: (sql: string) => void;
   runQuery: () => void;
 }) => {
-  return <GenerateSqlToolUI part={part} onSqlChange={onSqlChange} runQuery={runQuery} />;
+  return (
+    <GenerateSqlToolUI
+      part={part}
+      onSqlChange={onSqlChange}
+      runQuery={runQuery}
+    />
+  );
 };

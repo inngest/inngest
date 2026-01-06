@@ -20,7 +20,7 @@ var embedded embed.FS
 var (
 	// scripts stores all embedded lua scripts on initialization
 	scripts              = map[string]*rueidis.Lua{}
-	include              = regexp.MustCompile(`-- \$include\(([\w.]+)\)`)
+	include              = regexp.MustCompile(`(?m)^-- \$include\(([\w./]+)\)$`)
 	langServerAnnotation = regexp.MustCompile(`(?m)^---@.*$|---@[^\n]*`)
 	comments             = regexp.MustCompile(`(?m)^--.*$|--[^\n]*`)
 	emptyLines           = regexp.MustCompile(`(?m)^\s*$`)

@@ -163,6 +163,10 @@ func (l lifecycle) OnFunctionSkipped(
 	}
 }
 
+// OnFunctionBacklogSizeLimitReached implements execution.LifecycleListener.
+func (l lifecycle) OnFunctionBacklogSizeLimitReached(context.Context, sv2.ID) {
+}
+
 // OnFunctionFinished is called when a function finishes.  This will
 // be called when a function completes successfully or permanently failed,
 // with the final driver response indicating the type of success.
@@ -940,7 +944,6 @@ func toUUID(id string) (*uuid.UUID, error) {
 	}
 
 	return &parsed, nil
-
 }
 
 // Returns the user-facing step type. In other words, the returned step type

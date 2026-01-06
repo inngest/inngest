@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { useRouter } from 'next/navigation';
+
 import { Button } from '@inngest/components/Button';
 import { AlertModal } from '@inngest/components/Modal/AlertModal';
 import { RiAlertFill } from '@remixicon/react';
@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { useMutation } from 'urql';
 
 import { graphql } from '@/gql';
+import { useRouter } from '@tanstack/react-router';
 
 const UpdateAccountAddonQuantityDocument = graphql(`
   mutation UpdateAccountAddonQuantity($addonName: String!, $quantity: Int!) {
@@ -40,7 +41,9 @@ export default function SlackChannelComponent({
   onChange?: () => void;
 }) {
   const router = useRouter();
-  const [, updateAccountAddonQuantity] = useMutation(UpdateAccountAddonQuantityDocument);
+  const [, updateAccountAddonQuantity] = useMutation(
+    UpdateAccountAddonQuantityDocument,
+  );
   const [openModal, setOpenModal] = useState(false);
   const [isRemoving, setIsRemoving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -48,7 +51,9 @@ export default function SlackChannelComponent({
   const addonQty = isRemoving ? 0 : 1;
   const addonCost = addonQty * addon.price;
 
-  const modalTitle = isRemoving ? `Remove ${title} addon` : `Add ${title.toLowerCase()} to plan`;
+  const modalTitle = isRemoving
+    ? `Remove ${title} addon`
+    : `Add ${title.toLowerCase()} to plan`;
 
   const confirmButtonLabel = isRemoving
     ? 'Remove addon'
@@ -61,9 +66,13 @@ export default function SlackChannelComponent({
   const addingDescription = (
     <>
       By clicking Confirm and Pay, the amount of{' '}
-      <span className="text-basis font-semibold">${(addonCost / 100).toFixed(2)}</span> will be
-      added to your subscription, and your credit card will be charged{' '}
-      <span className="text-basis font-semibold">${(addonCost / 100).toFixed(2)} immediately</span>{' '}
+      <span className="text-basis font-semibold">
+        ${(addonCost / 100).toFixed(2)}
+      </span>{' '}
+      will be added to your subscription, and your credit card will be charged{' '}
+      <span className="text-basis font-semibold">
+        ${(addonCost / 100).toFixed(2)} immediately
+      </span>{' '}
       for the remaining days in your billing cycle.
     </>
   );
@@ -87,7 +96,7 @@ export default function SlackChannelComponent({
       if (onChange) {
         onChange();
       }
-      router.refresh();
+      router.invalidate();
       toast.success(`Addon ${isRemoving ? 'removed' : 'updated'} successfully`);
     }
     setOpenModal(false);
@@ -112,7 +121,9 @@ export default function SlackChannelComponent({
           </p>
           <p className="text-muted mb-1 text-sm italic">{description}</p>
           {entitlement.displayValue && (
-            <div className="text-basis pr-3 text-sm font-medium">{entitlement.displayValue}</div>
+            <div className="text-basis pr-3 text-sm font-medium">
+              {entitlement.displayValue}
+            </div>
           )}
         </div>
         {addonPurchased ? (
@@ -142,11 +153,15 @@ export default function SlackChannelComponent({
         >
           {isRemoving ? (
             <div className="space-y-2 p-6">
-              <p className="text-muted text-sm leading-relaxed">{removingDescription}</p>
+              <p className="text-muted text-sm leading-relaxed">
+                {removingDescription}
+              </p>
             </div>
           ) : (
             <div className="space-y-2 p-6">
-              <p className="text-muted text-sm leading-relaxed">{addingDescription}</p>
+              <p className="text-muted text-sm leading-relaxed">
+                {addingDescription}
+              </p>
             </div>
           )}
         </AlertModal>

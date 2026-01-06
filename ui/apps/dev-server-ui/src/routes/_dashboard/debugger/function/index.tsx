@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { Header } from '@inngest/components/Header/NewHeader';
-import { useSearchParam } from '@inngest/components/hooks/useNewSearchParams';
+import { Header } from '@inngest/components/Header/Header';
+import { useSearchParam } from '@inngest/components/hooks/useSearchParams';
 import { Debugger } from '@inngest/components/Debugger/Debugger';
 import { Error } from '@inngest/components/Error/Error';
 

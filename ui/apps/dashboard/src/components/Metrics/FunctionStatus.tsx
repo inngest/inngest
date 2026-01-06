@@ -1,16 +1,14 @@
 import { Chart, type ChartProps } from '@inngest/components/Chart/Chart';
 import { Info } from '@inngest/components/Info/Info';
-import { Link } from '@inngest/components/Link/Link';
+import { Link } from '@inngest/components/Link';
 import { resolveColor } from '@inngest/components/utils/colors';
 import { isDark } from '@inngest/components/utils/theme';
-import resolveConfig from 'tailwindcss/resolveConfig';
 
-import type { FunctionStatusMetricsQuery, ScopedMetricsResponse } from '@/gql/graphql';
-import tailwindConfig from '../../../tailwind.config';
-
-const {
-  theme: { backgroundColor, colors, textColor },
-} = resolveConfig(tailwindConfig);
+import type {
+  FunctionStatusMetricsQuery,
+  ScopedMetricsResponse,
+} from '@/gql/graphql';
+import { backgroundColor, colors, textColor } from '@/utils/tailwind';
 
 export type MetricsData = {
   workspace: {
@@ -34,17 +32,23 @@ const mapMetrics = (totals: FunctionTotals) => {
     {
       value: totals.completed || 0,
       name: 'Completed',
-      itemStyle: { color: resolveColor(colors.primary.moderate, dark, '#2c9b63') },
+      itemStyle: {
+        color: resolveColor(colors.primary.moderate, dark, '#2c9b63'),
+      },
     },
     {
       value: totals.cancelled || 0,
       name: 'Cancelled',
-      itemStyle: { color: resolveColor(backgroundColor.canvasMuted, dark, '#e2e2e2') },
+      itemStyle: {
+        color: resolveColor(backgroundColor.canvasMuted, dark, '#e2e2e2'),
+      },
     },
     {
       value: totals.failed || 0,
       name: 'Failed',
-      itemStyle: { color: resolveColor(colors.tertiary.subtle, dark, '#fa8d86') },
+      itemStyle: {
+        color: resolveColor(colors.tertiary.subtle, dark, '#fa8d86'),
+      },
     },
     {
       value: totals.running,
@@ -56,7 +60,9 @@ const mapMetrics = (totals: FunctionTotals) => {
     {
       value: totals.queued,
       name: 'Queued',
-      itemStyle: { color: resolveColor(colors.quaternary.coolModerate, dark, '#8b74f9') },
+      itemStyle: {
+        color: resolveColor(colors.quaternary.coolModerate, dark, '#8b74f9'),
+      },
     },
   ];
 };
@@ -86,7 +92,10 @@ const totalRuns = (totals: Array<{ value: number }>) =>
 const percent = (sum: number, part: number) =>
   `${sum ? parseFloat(((part / sum) * 100).toFixed(2)) : 0}%`;
 
-const getChartOptions = (data: PieChartData, loading: boolean = false): ChartProps['option'] => {
+const getChartOptions = (
+  data: PieChartData,
+  loading: boolean = false,
+): ChartProps['option'] => {
   const sum = totalRuns(data);
   const dark = isDark();
 
@@ -97,13 +106,17 @@ const getChartOptions = (data: PieChartData, loading: boolean = false): ChartPro
       top: 'center',
       icon: 'circle',
       selectedMode: true,
-      textStyle: { fontSize: '12px', color: resolveColor(textColor.basis, dark) },
+      textStyle: {
+        fontSize: '12px',
+        color: resolveColor(textColor.basis, dark),
+      },
       formatter: (name: string) =>
         [
           name,
           percent(
             sum,
-            data.find((d: { name: string; value: number }) => d.name === name)?.value || 0
+            data.find((d: { name: string; value: number }) => d.name === name)
+              ?.value || 0,
           ),
         ].join(' '),
     },
@@ -133,9 +146,15 @@ const getChartOptions = (data: PieChartData, loading: boolean = false): ChartPro
           label: {
             show: true,
             formatter: ({ data }: any): string => {
-              return [`{name| ${data?.name}}`, `{value| ${data?.value}}`].join('\n');
+              return [`{name| ${data?.name}}`, `{value| ${data?.value}}`].join(
+                '\n',
+              );
             },
-            backgroundColor: resolveColor(backgroundColor.canvasBase, dark, '#fff'),
+            backgroundColor: resolveColor(
+              backgroundColor.canvasBase,
+              dark,
+              '#fff',
+            ),
             width: 80,
             ...holeLabel(),
           },
@@ -170,7 +189,10 @@ export const FunctionStatus = ({ totals }: { totals?: FunctionTotals }) => {
         />
       </div>
 
-      <Chart option={metrics ? getChartOptions(metrics) : {}} className="h-[384px]" />
+      <Chart
+        option={metrics ? getChartOptions(metrics) : {}}
+        className="h-[384px]"
+      />
     </div>
   );
 };

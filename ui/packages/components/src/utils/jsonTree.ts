@@ -31,7 +31,7 @@ export const jsonTreeTheme = (dark: boolean): Record<string, any> => ({
     MozUserSelect: 'none',
     WebkitUserSelect: 'none',
   },
-  arrow: ({ style }: { style: any }, nodeType: any, expanded: boolean) => ({
+  arrow: ({ style }: { style: any }, expanded: boolean) => ({
     style: {
       ...style,
       marginLeft: 4,

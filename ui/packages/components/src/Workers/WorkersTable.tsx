@@ -1,5 +1,3 @@
-'use client';
-
 import { useCallback, useEffect, useState } from 'react';
 import DescriptionListItem from '@inngest/components/Apps/DescriptionListItem';
 import { Button } from '@inngest/components/Button';
@@ -84,9 +82,7 @@ export function WorkersTable({
 
   const {
     isPending, // first load, no data
-    error,
     data: workerConnsData,
-    isFetching, // refetching
   } = useQuery({
     queryKey: ['worker-connections', { appID, orderBy, cursor, pageSize, status: filteredStatus }],
     queryFn: useCallback(() => {

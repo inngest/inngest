@@ -2,7 +2,7 @@ import Layout from "@/components/Layout/Layout";
 import { fetchClerkAuth } from "@/data/clerk";
 import { navCollapsed } from "@/data/nav";
 import { getProfileDisplay } from "@/data/profile";
-import { Header } from "@inngest/components/Header/NewHeader";
+import { Header } from "@inngest/components/Header/Header";
 import { createFileRoute, notFound, Outlet } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/_authed")({

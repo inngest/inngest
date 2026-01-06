@@ -32,7 +32,7 @@ func TestItemsByPartitionOnEmptyPartition(t *testing.T) {
 
 		q := NewQueue(
 			defaultShard,
-			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 				return true
 			}),
 			WithClock(clock),
@@ -144,7 +144,7 @@ func TestItemsByPartition(t *testing.T) {
 
 			q := NewQueue(
 				defaultShard,
-				WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+				WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 					return tc.keyQueuesEnabled
 				}),
 				WithClock(clock),
@@ -205,7 +205,7 @@ func TestItemsByPartitionWithSystemQueue(t *testing.T) {
 
 	q := NewQueue(
 		defaultShard,
-		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 			return false
 		}),
 		WithClock(clock),
@@ -265,7 +265,7 @@ func TestItemsByBacklog(t *testing.T) {
 
 	q := NewQueue(
 		defaultShard,
-		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 			return true
 		}),
 		WithClock(clock),
@@ -375,7 +375,7 @@ func TestQueueIterator(t *testing.T) {
 
 	q := NewQueue(
 		defaultShard,
-		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 			return false // TODO need to add support for key queues
 		}),
 		WithClock(clock),
@@ -458,7 +458,7 @@ func TestItemByID(t *testing.T) {
 
 	q1 := NewQueue(
 		defaultShard,
-		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 			return false
 		}),
 		WithClock(clock),
@@ -518,7 +518,7 @@ func TestItemExists(t *testing.T) {
 
 	q := NewQueue(
 		defaultShard,
-		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 			return false
 		}),
 		WithClock(clock),

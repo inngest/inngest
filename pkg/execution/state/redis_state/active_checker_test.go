@@ -34,7 +34,7 @@ func TestShadowPartitionActiveCheck(t *testing.T) {
 	q := NewQueue(
 		defaultShard,
 		WithClock(clock),
-		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 			return enqueueToBacklog
 		}),
 		WithReadOnlySpotChecks(func(ctx context.Context, acctID uuid.UUID) bool {

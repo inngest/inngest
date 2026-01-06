@@ -326,7 +326,7 @@ func TestConstraintEnforcement(t *testing.T) {
 			},
 			amount:              1,
 			expectedLeaseAmount: 0,
-			executorUseConstraintAPI: func(ctx context.Context, accountID uuid.UUID) (enable bool, fallback bool) {
+			executorUseConstraintAPI: func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
 				// Disable Constraint API for this test
 				return false, false
 			},
@@ -364,7 +364,7 @@ func TestConstraintEnforcement(t *testing.T) {
 					AppID:          appID,
 					IdempotencyKey: &idempotencyKey,
 					Events: []event.TrackedEvent{
-						event.NewOSSTrackedEventWithID(event.Event{
+						event.NewBaseTrackedEventWithID(event.Event{
 							Name: "test/event",
 							Data: map[string]any{
 								"customerID": "user1",
@@ -418,7 +418,7 @@ func TestConstraintEnforcement(t *testing.T) {
 			},
 			amount:              1,
 			expectedLeaseAmount: 1,
-			executorUseConstraintAPI: func(ctx context.Context, accountID uuid.UUID) (enable bool, fallback bool) {
+			executorUseConstraintAPI: func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
 				// Disable Constraint API for this test
 				return false, false
 			},
@@ -456,7 +456,7 @@ func TestConstraintEnforcement(t *testing.T) {
 					AppID:          appID,
 					IdempotencyKey: &idempotencyKey,
 					Events: []event.TrackedEvent{
-						event.NewOSSTrackedEventWithID(event.Event{
+						event.NewBaseTrackedEventWithID(event.Event{
 							Name: "test/event",
 							Data: map[string]any{
 								"customerID": "user1",
@@ -480,6 +480,7 @@ func TestConstraintEnforcement(t *testing.T) {
 				require.WithinDuration(t, deps.clock.Now().Add(6*time.Second), tat, time.Second)
 			},
 			afterPreAcquireCheck: func(t *testing.T, deps *deps, resp *constraintapi.CapacityCheckResponse) { // Usage should already be visible in check
+				t.Log(resp.Debug())
 				require.Len(t, resp.Usage, 1)
 				require.Equal(t, constraintapi.ConstraintKindRateLimit, resp.Usage[0].Constraint.Kind)
 				require.Equal(t, 1, resp.Usage[0].Used)
@@ -543,7 +544,7 @@ func TestConstraintEnforcement(t *testing.T) {
 					return defaultShard, nil
 				}),
 				redis_state.WithCapacityManager(cm),
-				redis_state.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (bool, bool) {
+				redis_state.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (bool, bool) {
 					return true, true
 				}),
 				redis_state.WithPartitionConstraintConfigGetter(func(ctx context.Context, p redis_state.PartitionIdentifier) redis_state.PartitionConstraintConfig {
@@ -576,9 +577,9 @@ func TestConstraintEnforcement(t *testing.T) {
 				executor.WithPauseManager(pauses.NewRedisOnlyManager(sm)),
 				executor.WithCapacityManager(cm),
 				executor.WithLogger(logger.StdlibLogger(ctx)),
-				executor.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool, fallback bool) {
+				executor.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
 					if test.executorUseConstraintAPI != nil {
-						return test.executorUseConstraintAPI(ctx, accountID)
+						return test.executorUseConstraintAPI(ctx, accountID, envID, functionID)
 					}
 
 					return true, true
@@ -775,7 +776,7 @@ func TestQueueConstraintAPICompatibility(t *testing.T) {
 				return defaultShard, nil
 			}),
 			redis_state.WithCapacityManager(cm),
-			redis_state.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (bool, bool) {
+			redis_state.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (bool, bool) {
 				return true, true
 			}),
 			redis_state.WithPartitionConstraintConfigGetter(func(ctx context.Context, p redis_state.PartitionIdentifier) redis_state.PartitionConstraintConfig {
@@ -915,7 +916,7 @@ func TestQueueConstraintAPICompatibility(t *testing.T) {
 				return defaultShard, nil
 			}),
 			redis_state.WithCapacityManager(cm),
-			redis_state.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (bool, bool) {
+			redis_state.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (bool, bool) {
 				return true, true
 			}),
 			redis_state.WithPartitionConstraintConfigGetter(func(ctx context.Context, p redis_state.PartitionIdentifier) redis_state.PartitionConstraintConfig {
@@ -1090,7 +1091,7 @@ func TestQueueConstraintAPICompatibility(t *testing.T) {
 				return defaultShard, nil
 			}),
 			redis_state.WithCapacityManager(cm),
-			redis_state.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (bool, bool) {
+			redis_state.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (bool, bool) {
 				return true, true
 			}),
 			redis_state.WithPartitionConstraintConfigGetter(func(ctx context.Context, p redis_state.PartitionIdentifier) redis_state.PartitionConstraintConfig {
@@ -1307,13 +1308,13 @@ func TestQueueConstraintAPICompatibility(t *testing.T) {
 				return shard, nil
 			}),
 			redis_state.WithCapacityManager(cm),
-			redis_state.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (bool, bool) {
+			redis_state.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (bool, bool) {
 				return true, true
 			}),
 			redis_state.WithPartitionConstraintConfigGetter(func(ctx context.Context, p redis_state.PartitionIdentifier) redis_state.PartitionConstraintConfig {
 				return partitionConstraints
 			}),
-			redis_state.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+			redis_state.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 				return true
 			}),
 		)
@@ -1512,7 +1513,7 @@ func TestScheduleConstraintAPICompatibility(t *testing.T) {
 				return defaultShard, nil
 			}),
 			redis_state.WithCapacityManager(cm),
-			redis_state.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (bool, bool) {
+			redis_state.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (bool, bool) {
 				return true, true
 			}),
 			redis_state.WithPartitionConstraintConfigGetter(func(ctx context.Context, p redis_state.PartitionIdentifier) redis_state.PartitionConstraintConfig {
@@ -1545,7 +1546,7 @@ func TestScheduleConstraintAPICompatibility(t *testing.T) {
 			executor.WithPauseManager(pauses.NewRedisOnlyManager(sm)),
 			executor.WithCapacityManager(cm),
 			executor.WithLogger(logger.StdlibLogger(ctx)),
-			executor.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool, fallback bool) {
+			executor.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
 				return false, false
 			}),
 			executor.WithClock(clock),
@@ -1647,7 +1648,7 @@ func TestScheduleConstraintAPICompatibility(t *testing.T) {
 				},
 			},
 			Events: []event.TrackedEvent{
-				event.NewOSSTrackedEventWithID(event.Event{
+				event.NewBaseTrackedEventWithID(event.Event{
 					Name: "test/event",
 					Data: map[string]any{
 						"customerID": val,
@@ -1708,7 +1709,7 @@ func TestScheduleConstraintAPICompatibility(t *testing.T) {
 				return defaultShard, nil
 			}),
 			redis_state.WithCapacityManager(cm),
-			redis_state.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (bool, bool) {
+			redis_state.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (bool, bool) {
 				return true, true
 			}),
 			redis_state.WithPartitionConstraintConfigGetter(func(ctx context.Context, p redis_state.PartitionIdentifier) redis_state.PartitionConstraintConfig {
@@ -1741,7 +1742,7 @@ func TestScheduleConstraintAPICompatibility(t *testing.T) {
 			executor.WithPauseManager(pauses.NewRedisOnlyManager(sm)),
 			executor.WithCapacityManager(cm),
 			executor.WithLogger(logger.StdlibLogger(ctx)),
-			executor.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool, fallback bool) {
+			executor.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
 				return false, false
 			}),
 			executor.WithClock(clock),
@@ -1854,7 +1855,7 @@ func TestScheduleConstraintAPICompatibility(t *testing.T) {
 				},
 			},
 			Events: []event.TrackedEvent{
-				event.NewOSSTrackedEventWithID(event.Event{
+				event.NewBaseTrackedEventWithID(event.Event{
 					Name: "test/event",
 					Data: map[string]any{
 						"customerID": val,

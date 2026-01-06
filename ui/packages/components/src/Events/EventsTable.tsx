@@ -1,7 +1,4 @@
-'use client';
-
-import { useCallback, useEffect, useRef, useState, type UIEventHandler } from 'react';
-import dynamic from 'next/dynamic';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '@inngest/components/Button';
 import { ErrorCard } from '@inngest/components/Error/ErrorCard';
 import TableBlankState from '@inngest/components/EventTypes/TableBlankState';
@@ -19,10 +16,10 @@ import { type EventType } from '@inngest/components/types/eventType';
 import { cn } from '@inngest/components/utils/classNames';
 import { durationToString, parseDuration } from '@inngest/components/utils/date';
 import { RiArrowRightUpLine, RiSearchLine } from '@remixicon/react';
-import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery } from '@tanstack/react-query';
 
+import CodeSearch from '../CodeSearch/CodeSearch';
 import type { RangeChangeProps } from '../DatePicker/RangePicker';
-import EntityFilter from '../Filter/EntityFilter';
 import { useShared } from '../SharedContext/SharedContext';
 import { usePathCreator } from '../SharedContext/usePathCreator';
 import {
@@ -30,22 +27,17 @@ import {
   useBooleanSearchParam,
   useSearchParam,
   useStringArraySearchParam,
-} from '../hooks/useSearchParam';
+} from '../hooks/useSearchParams';
 import type { Features } from '../types/features';
 import { parseCelSearchError } from '../utils/searchErrorParser';
 import { EventDetails } from './EventDetails';
 import TotalCount from './TotalCount';
 import { useColumns } from './columns';
 
-const CodeSearch = dynamic(() => import('@inngest/components/CodeSearch/CodeSearch'), {
-  ssr: false,
-});
-
 export function EventsTable({
   getEvents,
   getEventDetails,
   getEventPayload,
-  getEventTypes,
   eventNames,
   singleEventTypePage,
   emptyActions,
@@ -98,8 +90,7 @@ export function EventsTable({
   const [startTime] = useSearchParam('start');
   const [endTime] = useSearchParam('end');
   const batchUpdate = useBatchedSearchParams();
-  const [filteredEvent, setFilteredEvent, removeFilteredEvent] =
-    useStringArraySearchParam('filterEvent');
+  const [filteredEvent] = useStringArraySearchParam('filterEvent');
   const [includeInternalEvents] = useBooleanSearchParam('includeInternal');
   const [search, setSearch, removeSearch] = useSearchParam('search');
   const source = undefined;

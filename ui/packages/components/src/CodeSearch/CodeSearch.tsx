@@ -1,5 +1,3 @@
-'use client';
-
 import { useEffect, useRef, useState } from 'react';
 import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
@@ -11,7 +9,7 @@ import {
   createRules,
 } from '@inngest/components/utils/monaco';
 import Editor, { useMonaco, type Monaco } from '@monaco-editor/react';
-import { languages, type editor } from 'monaco-editor';
+import type { editor, languages } from 'monaco-editor';
 
 import { isDark } from '../utils/theme';
 
@@ -44,39 +42,38 @@ export const EVENT_PATH_PRESETS = {
 
 type EventPath = (typeof EVENT_PATHS)[number];
 
-const EVENT_PATH_DETAILS: Record<
-  EventPath,
-  { kind: languages.CompletionItemKind; detail: string }
-> = {
+const getEventPathDetails = (
+  CompletionItemKind: typeof languages.CompletionItemKind
+): Record<EventPath, { kind: languages.CompletionItemKind; detail: string }> => ({
   'event.data.': {
-    kind: languages.CompletionItemKind.Struct,
+    kind: CompletionItemKind.Struct,
     detail: 'Event Data Fields',
   },
   'event.id': {
-    kind: languages.CompletionItemKind.Field,
+    kind: CompletionItemKind.Field,
     detail: 'Event Identifier (string)',
   },
   'event.name': {
-    kind: languages.CompletionItemKind.Field,
+    kind: CompletionItemKind.Field,
     detail: 'Event Name (string)',
   },
   'event.ts': {
-    kind: languages.CompletionItemKind.Field,
+    kind: CompletionItemKind.Field,
     detail: 'Event Timestamp (int64)',
   },
   'event.v': {
-    kind: languages.CompletionItemKind.Field,
+    kind: CompletionItemKind.Field,
     detail: 'Event Version (string)',
   },
   output: {
-    kind: languages.CompletionItemKind.Variable,
+    kind: CompletionItemKind.Variable,
     detail: 'Output Variable',
   },
   'output.': {
-    kind: languages.CompletionItemKind.Struct,
+    kind: CompletionItemKind.Struct,
     detail: 'Output Fields',
   },
-};
+});
 
 const NUMERIC_OPERATORS = ['==', '!=', '>', '>=', '<', '<='];
 const STRING_OPERATORS = ['==', '!='];
@@ -142,6 +139,8 @@ export default function CodeSearch({
       rules: dark ? createRules(true) : createRules(false),
       colors: dark ? createColors(true) : createColors(false),
     });
+
+    const EVENT_PATH_DETAILS = getEventPathDetails(monaco.languages.CompletionItemKind);
 
     const disposable = monaco.languages.registerCompletionItemProvider('cel', {
       triggerCharacters: ['.', ' '],

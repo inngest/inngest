@@ -239,6 +239,9 @@ type CapacityExtendLeaseRequest struct {
 	Duration time.Duration
 
 	Migration MigrationIdentifier
+
+	// Source includes information on the calling service and processing mode for instrumentation purposes.
+	Source LeaseSource
 }
 
 type CapacityExtendLeaseResponse struct {
@@ -258,6 +261,9 @@ type CapacityReleaseRequest struct {
 	LeaseID ulid.ULID
 
 	Migration MigrationIdentifier
+
+	// Source includes information on the calling service and processing mode for instrumentation purposes.
+	Source LeaseSource
 }
 
 type CapacityReleaseResponse struct {
@@ -309,4 +315,4 @@ type LeaseSource struct {
 	RunProcessingMode RunProcessingMode
 }
 
-type UseConstraintAPIFn func(ctx context.Context, accountID uuid.UUID) (enable bool, fallback bool)
+type UseConstraintAPIFn func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool)

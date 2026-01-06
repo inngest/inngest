@@ -18,7 +18,13 @@ export const runAgentNetwork = inngest.createFunction(
     publish,
     step,
   }: GetFunctionInput<typeof inngest, 'insights-agent/chat.requested'>) => {
-    const { threadId: providedThreadId, userMessage, userId, channelKey, history } = event.data;
+    const {
+      threadId: providedThreadId,
+      userMessage,
+      userId,
+      channelKey,
+      history,
+    } = event.data;
 
     // Validate required userId
     if (!userId) {
@@ -31,9 +37,12 @@ export const runAgentNetwork = inngest.createFunction(
     });
 
     // Determine the target channel for publishing (channelKey takes priority)
-    const targetChannel = await step.run('generate-target-channel', async () => {
-      return channelKey || userId;
-    });
+    const targetChannel = await step.run(
+      'generate-target-channel',
+      async () => {
+        return channelKey || userId;
+      },
+    );
 
     try {
       const clientState = userMessage.state || {};
@@ -47,8 +56,8 @@ export const runAgentNetwork = inngest.createFunction(
           {
             messages: history,
             threadId,
-          }
-        )
+          },
+        ),
       );
 
       // Run the network with streaming enabled
@@ -70,7 +79,10 @@ export const runAgentNetwork = inngest.createFunction(
       const errorChunk: AgentMessageChunk = {
         event: 'error',
         data: {
-          error: error instanceof Error ? error.message : 'An unknown error occurred',
+          error:
+            error instanceof Error
+              ? error.message
+              : 'An unknown error occurred',
           scope: 'network',
           recoverable: true,
           agentId: 'network',
@@ -88,5 +100,5 @@ export const runAgentNetwork = inngest.createFunction(
 
       throw error;
     }
-  }
+  },
 );

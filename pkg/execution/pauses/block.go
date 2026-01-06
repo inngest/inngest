@@ -746,7 +746,7 @@ func (b *blockstore) Compact(ctx context.Context, index Index) error {
 	if b.buf == nil || b.bucket == nil || b.blocksize == 0 {
 		return fmt.Errorf("error bucket is not setup")
 	}
-	_ = util.Lease(
+	return util.Lease(
 		ctx,
 		"compact index blocks",
 		// NOTE: Lease, Renew, and Revoke are closures because they need
@@ -768,7 +768,6 @@ func (b *blockstore) Compact(ctx context.Context, index Index) error {
 		},
 		b.compactionLeaseRenewInterval,
 	)
-	return nil
 }
 
 func (b *blockstore) compact(ctx context.Context, index Index) error {
@@ -1220,5 +1219,31 @@ func (b *blockstore) deleteBlock(ctx context.Context, index Index, blockID ulid.
 		return fmt.Errorf("error removing block from blob storage: %w", err)
 	}
 
+	return nil
+}
+
+// CleanBlock reads a block, deletes all pauses in it, and then triggers compaction.
+func (b *blockstore) CleanBlock(ctx context.Context, index Index, blockID ulid.ULID) error {
+	l := logger.StdlibLogger(ctx).With("workspace_id", index.WorkspaceID, "event_name", index.EventName, "block_id", blockID)
+
+	block, err := b.ReadBlock(ctx, index, blockID)
+	if err != nil {
+		return fmt.Errorf("error reading block for cleanup: %w", err)
+	}
+
+	pauseCount := len(block.Pauses)
+	for _, pause := range block.Pauses {
+		if err := b.Delete(ctx, index, *pause); err != nil {
+			l.Error("error deleting pause during cleanup", "pause_id", pause.ID, "error", err)
+		}
+	}
+
+	l.Debug("deleted pauses during cleanup", "count", pauseCount)
+
+	if err := b.Compact(ctx, index); err != nil {
+		return fmt.Errorf("error compacting after cleanup: %w", err)
+	}
+
+	l.Debug("cleanup successful", "pauses_deleted", pauseCount)
 	return nil
 }

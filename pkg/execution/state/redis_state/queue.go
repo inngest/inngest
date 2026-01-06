@@ -552,7 +552,7 @@ func WithPartitionConstraintConfigGetter(f PartitionConstraintConfigGetter) func
 }
 
 // AllowKeyQueues determines if key queues should be enabled for the account
-type AllowKeyQueues func(ctx context.Context, acctID uuid.UUID) bool
+type AllowKeyQueues func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool
 
 func WithAllowKeyQueues(kq AllowKeyQueues) QueueOpt {
 	return func(q *queue) {
@@ -682,7 +682,7 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 				},
 			}
 		},
-		allowKeyQueues: func(ctx context.Context, acctID uuid.UUID) bool {
+		allowKeyQueues: func(ctx context.Context, acctID, fnID uuid.UUID) bool {
 			return false
 		},
 		shadowPartitionProcessCount: func(ctx context.Context, acctID uuid.UUID) int {
@@ -768,14 +768,6 @@ func WithUseConstraintAPI(uca constraintapi.UseConstraintAPIFn) QueueOpt {
 func WithCapacityLeaseExtendInterval(interval time.Duration) QueueOpt {
 	return func(q *queue) {
 		q.capacityLeaseExtendInterval = interval
-	}
-}
-
-type EnableThrottleFixFn func(ctx context.Context, accountID uuid.UUID) bool
-
-func WithEnableThrottleFix(fn EnableThrottleFixFn) QueueOpt {
-	return func(q *queue) {
-		q.enableThrottleFix = fn
 	}
 }
 
@@ -946,7 +938,6 @@ type queue struct {
 	useConstraintAPI            constraintapi.UseConstraintAPIFn
 	capacityLeaseExtendInterval time.Duration
 
-	enableThrottleFix             EnableThrottleFixFn
 	enableThrottleInstrumentation EnableThrottleInstrumentationFn
 }
 
@@ -1489,10 +1480,7 @@ func (q *queue) EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.Que
 		q.log.Warn("attempting to enqueue item to non-system partition without account ID", "item", i)
 	}
 
-	var enqueueToBacklogs bool
-	if !isSystemPartition && defaultPartition.AccountID != uuid.Nil && q.allowKeyQueues != nil {
-		enqueueToBacklogs = q.allowKeyQueues(ctx, defaultPartition.AccountID)
-	}
+	enqueueToBacklogs := q.itemEnableKeyQueues(ctx, i)
 
 	var backlog QueueBacklog
 	var shadowPartition QueueShadowPartition
@@ -2167,7 +2155,7 @@ func (q *queue) itemEnableKeyQueues(ctx context.Context, item osqueue.QueueItem)
 	}
 
 	if item.Data.Identifier.AccountID != uuid.Nil && q.allowKeyQueues != nil {
-		return q.allowKeyQueues(ctx, item.Data.Identifier.AccountID)
+		return q.allowKeyQueues(ctx, item.Data.Identifier.AccountID, item.FunctionID)
 	}
 
 	return false
@@ -2303,11 +2291,6 @@ func (q *queue) Lease(
 
 	checkThrottle := checkConstraints && o.constraints.Throttle != nil && item.Data.Throttle != nil
 
-	enableThrottleFix := "0"
-	if checkThrottle && o.sp.AccountID != nil && q.enableThrottleFix != nil && q.enableThrottleFix(ctx, *o.sp.AccountID) {
-		enableThrottleFix = "1"
-	}
-
 	enableThrottleInstrumentation := checkThrottle &&
 		o.sp.AccountID != nil &&
 		o.sp.FunctionID != nil &&
@@ -2393,8 +2376,6 @@ func (q *queue) Lease(
 		refilledFromBacklogVal,
 
 		checkConstraintsVal,
-
-		enableThrottleFix,
 	})
 	if err != nil {
 		return nil, err

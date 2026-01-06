@@ -1,5 +1,3 @@
-'use client';
-
 import { useState } from 'react';
 import { RiArrowDownSLine } from '@remixicon/react';
 
@@ -8,7 +6,8 @@ import {
   type QueryHelperPanelSectionContentProps,
 } from './QueryHelperPanelSectionContent';
 
-interface QueryHelperPanelCollapsibleSectionProps extends QueryHelperPanelSectionContentProps {
+interface QueryHelperPanelCollapsibleSectionProps
+  extends QueryHelperPanelSectionContentProps {
   activeSavedQueryId?: string;
   onQueryDelete: (queryId: string) => void;
   title: string;

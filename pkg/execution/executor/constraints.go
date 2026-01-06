@@ -2,6 +2,7 @@ package executor
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -13,6 +14,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/ratelimit"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/service"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
 )
@@ -46,29 +48,54 @@ func WithConstraints[T any](
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
+	start := time.Now()
+	constraintAPIFallback := true
+
 	// If capacity manager / feature flag are not passed, execute Schedule code
 	// with existing constraint checks
 	if capacityManager == nil || useConstraintAPI == nil {
+		metrics.IncrScheduleConstraintsCheckFallbackCounter(ctx, enums.ScheduleConstraintCheckFallbackReasonConstraintAPIUninitialized.String(), metrics.CounterOpt{
+			PkgName: pkgName,
+		})
 		return fn(ctx, true)
 	}
 
 	// Read feature flag
-	enable, fallback := useConstraintAPI(ctx, req.AccountID)
+	enable, fallback := useConstraintAPI(ctx, req.AccountID, req.WorkspaceID, req.Function.ID)
+
+	defer func() {
+		metrics.HistogramScheduleDuration(ctx, time.Since(start).Milliseconds(), metrics.HistogramOpt{
+			PkgName: pkgName,
+			Tags: map[string]any{
+				"constraint_api":          enable,
+				"constraint_api_fallback": constraintAPIFallback,
+			},
+		})
+	}()
+
 	if !enable {
 		// If feature flag is disabled, execute Schedule code with existing constraint checks
-
+		metrics.IncrScheduleConstraintsCheckFallbackCounter(ctx, enums.ScheduleConstraintCheckFallbackReasonFeatureFlagDisabled.String(), metrics.CounterOpt{
+			PkgName: pkgName,
+		})
 		return fn(ctx, true)
 	}
 
 	constraints, err := getScheduleConstraints(ctx, req)
 	if err != nil {
 		l.Error("failed to get schedule constraints", "err", err)
+		metrics.IncrScheduleConstraintsCheckFallbackCounter(ctx, enums.ScheduleConstraintCheckFallbackReasonGetConstraintsError.String(), metrics.CounterOpt{
+			PkgName: pkgName,
+		})
 		return fn(ctx, true)
 	}
 
 	// If no rate limits are configured, simply run the function
 	if len(constraints) == 0 {
 		// TODO: Should we skip constraint checks in this case?
+		metrics.IncrScheduleConstraintsCheckFallbackCounter(ctx, enums.ScheduleConstraintCheckFallbackReasonNoRateLimitConfigured.String(), metrics.CounterOpt{
+			PkgName: pkgName,
+		})
 		return fn(ctx, true)
 	}
 
@@ -85,11 +112,17 @@ func WithConstraints[T any](
 	)
 	if err != nil {
 		l.Error("failed to check constraints", "err", err)
+		metrics.IncrScheduleConstraintsCheckFallbackCounter(ctx, enums.ScheduleConstraintCheckFallbackReasonConstraintAPIError.String(), metrics.CounterOpt{
+			PkgName: pkgName,
+		})
 		return fn(ctx, true)
 	}
 
 	// If the Constraint API didn't successfully return, call the user function and indicate checks should run
 	if checkResult.mustCheck {
+		metrics.IncrScheduleConstraintsCheckFallbackCounter(ctx, enums.ScheduleConstraintCheckFallbackReasonConstraintAPIError.String(), metrics.CounterOpt{
+			PkgName: pkgName,
+		})
 		return fn(ctx, true)
 	}
 
@@ -108,14 +141,27 @@ func WithConstraints[T any](
 	// If no lease was provided, we are not allowed to process
 	if checkResult.leaseID == nil {
 		// TODO: When does this happen?
-		l.Warn("acquire request did not return lease ID")
-
+		l.ReportError(errors.New("acquire request was allowed but did not return lease ID"), "acquire request was allowed but did not return lease ID")
 		// Pretend the API request failed
+		metrics.IncrScheduleConstraintsCheckFallbackCounter(ctx, enums.ScheduleConstraintCheckFallbackReasonMissingLease.String(), metrics.CounterOpt{
+			PkgName: pkgName,
+		})
 		return fn(ctx, true)
 	}
 
 	leaseID := checkResult.leaseID
 	leaseIDLock := sync.Mutex{}
+
+	source := constraintapi.LeaseSource{
+		Service:           constraintapi.ServiceExecutor,
+		RunProcessingMode: constraintapi.RunProcessingModeBackground,
+		Location:          constraintapi.CallerLocationSchedule,
+	}
+	if req.RunMode == enums.RunModeSync {
+		source.Service = constraintapi.ServiceAPI
+		source.RunProcessingMode = constraintapi.RunProcessingModeDurableEndpoint
+		source.Location = constraintapi.CallerLocationCheckpoint
+	}
 
 	go func() {
 		for {
@@ -148,9 +194,10 @@ func WithConstraints[T any](
 					IsRateLimit: true,
 				},
 				Duration: ScheduleLeaseDuration,
+				Source:   source,
 			})
 			if err != nil {
-				l.Error("could not extend schedule capacity lease", "err", err)
+				l.Error("could not extend schedule capacity lease", "err", err, "leaseID", lID, "req", req)
 				continue
 			}
 
@@ -190,11 +237,13 @@ func WithConstraints[T any](
 					Migration: constraintapi.MigrationIdentifier{
 						IsRateLimit: true,
 					},
+					Source: source,
 				})
 				if internalErr != nil {
 					l.ReportError(internalErr, "failed to release capacity after schedule", logger.WithErrorReportTags(map[string]string{
-						"account_id": req.AccountID.String(),
-						"lease_id":   lID.String(),
+						"account_id":  req.AccountID.String(),
+						"lease_id":    lID.String(),
+						"function_id": req.Function.ID.String(),
 					}))
 				}
 			})
@@ -203,6 +252,7 @@ func WithConstraints[T any](
 
 	// Run user code with lease guarantee
 	// NOTE: The passed context will be canceled if the lease expires.
+	constraintAPIFallback = false
 	return fn(userCtx, false)
 }
 
@@ -304,7 +354,7 @@ func CheckConstraints(
 		},
 	})
 	if internalErr != nil {
-		l.Error("acquiring capacity lease failed", "err", internalErr)
+		l.Error("acquiring capacity lease failed", "err", internalErr, "method", "CheckConstraints", "req", req)
 
 		if fallback {
 			return checkResult{

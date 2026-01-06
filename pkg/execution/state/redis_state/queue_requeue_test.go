@@ -248,7 +248,7 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 		q := NewQueue(
 			defaultShard,
 			WithClock(clock),
-			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 				return enqueueToBacklog
 			}),
 		)
@@ -394,7 +394,7 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 		q := NewQueue(
 			defaultShard,
 			WithClock(clock),
-			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 				return enqueueToBacklog
 			}),
 		)
@@ -562,7 +562,7 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 		q := NewQueue(
 			defaultShard,
 			WithClock(clock),
-			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 				return enqueueToBacklog
 			}),
 		)
@@ -762,7 +762,7 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 		q := NewQueue(
 			defaultShard,
 			WithClock(clock),
-			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 				return enqueueToBacklog
 			}),
 			// WithEnqueueSystemPartitionsToBacklog(true),
@@ -883,7 +883,7 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 		q := NewQueue(
 			defaultShard,
 			WithClock(clock),
-			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 				return enqueueToBacklog
 			}),
 		)
@@ -1034,7 +1034,7 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 		q := NewQueue(
 			defaultShard,
 			WithClock(clock),
-			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 				return enqueueToBacklog
 			}),
 			WithRefreshItemThrottle(func(ctx context.Context, item *osqueue.QueueItem) (*osqueue.Throttle, error) {
@@ -1142,7 +1142,7 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 		q := NewQueue(
 			defaultShard,
 			WithClock(clock),
-			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 				return enqueueToBacklog
 			}),
 		)
@@ -1238,7 +1238,7 @@ func TestQueueRequeueWithDisabledConstraintUpdates(t *testing.T) {
 	q := NewQueue(
 		shard,
 		WithClock(clock),
-		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 			return true
 		}),
 	)

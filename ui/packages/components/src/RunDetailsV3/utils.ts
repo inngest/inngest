@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
-import type { FunctionRunStatus } from '../types/functionRun';
 import type { Trace } from './types';
 
 export const FINAL_SPAN_DISPLAY = 'Finalization';

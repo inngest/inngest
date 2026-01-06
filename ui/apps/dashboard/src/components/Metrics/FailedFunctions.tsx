@@ -10,9 +10,12 @@ import { pathCreator } from '@/utils/urls';
 import type { EntityLookup } from './Dashboard';
 import { FailedRate } from './FailedRate';
 import { getLineChartOptions, mapEntityLines, sum } from './utils';
+import type { FileRouteTypes } from '@tanstack/react-router';
 
-export type CompletedType = FunctionStatusMetricsQuery['workspace']['completed'];
-export type CompletedMetricsType = FunctionStatusMetricsQuery['workspace']['completed']['metrics'];
+export type CompletedType =
+  FunctionStatusMetricsQuery['workspace']['completed'];
+export type CompletedMetricsType =
+  FunctionStatusMetricsQuery['workspace']['completed']['metrics'];
 
 const filter = ({ metrics }: CompletedType) =>
   metrics.filter(({ tagValue }) => tagValue === 'Failed');
@@ -22,7 +25,7 @@ const sort = (metrics: CompletedMetricsType) =>
 
 const mapFailed = (
   { completed }: FunctionStatusMetricsQuery['workspace'],
-  entities: EntityLookup
+  entities: EntityLookup,
 ) => {
   const failed = sort(filter(completed));
   return mapEntityLines(failed, entities);
@@ -66,7 +69,11 @@ export const FailedFunctions = ({
           icon={<RiArrowRightUpLine />}
           iconSide="left"
           label="View all"
-          href={`${pathCreator.runs({ envSlug: env.slug })}?filterStatus=%5B"FAILED"%5D`}
+          to={
+            `${pathCreator.runs({
+              envSlug: env.slug,
+            })}?filterStatus=%5B"FAILED"%5D` as FileRouteTypes['to']
+          }
         />
       </div>
       <div className="flex h-full flex-row items-center">

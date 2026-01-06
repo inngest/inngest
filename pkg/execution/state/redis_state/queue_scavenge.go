@@ -177,20 +177,7 @@ func (q *queue) Scavenge(ctx context.Context, limit int) (int, error) {
 			},
 		})
 
-		peekedFromInProgressKey, scavengedFromInProgressKey, err := scavengePartition(queueKey, "in_progress_key")
-		if err != nil {
-			resultErr = multierror.Append(resultErr, fmt.Errorf("could not scavenge from in progress key: %w", err))
-			continue
-		}
-		counter += scavengedFromInProgressKey
-		metrics.IncrQueueScavengerRequeuedItemsCounter(ctx, int64(peekedFromInProgressKey), metrics.CounterOpt{
-			PkgName: pkgName,
-			Tags: map[string]any{
-				"kind": "in_progress_key",
-			},
-		})
-
-		if peekedFromInProgressKey+peekedFromIndex < ScavengeConcurrencyQueuePeekSize {
+		if peekedFromIndex < ScavengeConcurrencyQueuePeekSize {
 			// Atomically attempt to drop empty pointer if we've processed all items
 			err := q.dropPartitionPointerIfEmpty(
 				ctx,

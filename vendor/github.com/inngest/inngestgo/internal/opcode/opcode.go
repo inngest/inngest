@@ -90,11 +90,6 @@ type UserError struct {
 // to see if it's caught, then continue to the next step if so.
 func HasAsyncOps(ops []Step, attempt, retries int) bool {
 	for _, o := range ops {
-		if o.Op == enums.OpcodeStepError && attempt == retries {
-			// This is not async due to the attempt being the same as the retry
-			// count;  we can return the error and continue on.
-			continue
-		}
 		if enums.OpcodeIsAsync(o.Op) {
 			return true
 		}

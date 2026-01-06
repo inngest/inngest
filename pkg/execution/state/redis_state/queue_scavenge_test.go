@@ -39,7 +39,7 @@ func TestQueueScavenge(t *testing.T) {
 		q := NewQueue(
 			shard,
 			WithClock(clock),
-			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 				return true
 			}),
 		)
@@ -116,7 +116,7 @@ func TestQueueScavenge(t *testing.T) {
 		q := NewQueue(
 			shard,
 			WithClock(clock),
-			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 				return true
 			}),
 		)
@@ -169,7 +169,7 @@ func TestQueueScavenge(t *testing.T) {
 		q := NewQueue(
 			shard,
 			WithClock(clock),
-			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 				return true
 			}),
 		)
@@ -221,13 +221,14 @@ func TestQueueScavenge(t *testing.T) {
 	})
 
 	// NOTE: This test covers backward compatibility with in-progress items tracked by the queue
-	t.Run("existing items in in-progress sets must be covered by scavenger", func(t *testing.T) {
+	// this is no longer valid since we removed the partition scavenger index
+	t.Run("existing items in in-progress sets are no longer covered by scavenger", func(t *testing.T) {
 		r.FlushAll()
 
 		q := NewQueue(
 			shard,
 			WithClock(clock),
-			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 				return true
 			}),
 		)
@@ -277,10 +278,10 @@ func TestQueueScavenge(t *testing.T) {
 
 		scavenged, err = q.Scavenge(ctx, 100)
 		require.NoError(t, err)
-		require.Equal(t, 1, scavenged)
+		require.Equal(t, 0, scavenged, "we no longer scavenge from in progress set")
 
-		require.False(t, r.Exists(kg.ConcurrencyIndex()))
-		require.False(t, r.Exists(kg.Concurrency("p", fnID.String())))
+		require.True(t, r.Exists(kg.ConcurrencyIndex()))
+		require.True(t, r.Exists(kg.Concurrency("p", fnID.String())))
 	})
 
 	// NOTE: This test validates scavenging logic continues to work when we progressively switch to the Constraint API.
@@ -309,7 +310,7 @@ func TestQueueScavenge(t *testing.T) {
 			q := NewQueue(
 				shard,
 				WithClock(clock),
-				WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+				WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 					return true
 				}),
 			)
@@ -378,14 +379,14 @@ func TestQueueScavenge(t *testing.T) {
 			require.False(t, r.Exists(kg.PartitionScavengerIndex(fnID.String())))
 		})
 
-		t.Run("lease checks for existing leases and only updates if theres no earlier lease", func(t *testing.T) {
+		t.Run("lease does not check for existing leases and only updates if theres no earlier lease", func(t *testing.T) {
 			t.Run("earlier in progress item exists", func(t *testing.T) {
 				r.FlushAll()
 
 				q := NewQueue(
 					shard,
 					WithClock(clock),
-					WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+					WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 						return true
 					}),
 				)
@@ -431,9 +432,9 @@ func TestQueueScavenge(t *testing.T) {
 				require.True(t, r.Exists(kg.PartitionScavengerIndex(fnID.String())))
 				require.Equal(t, leaseExpiry2.UnixMilli(), int64(score(t, r, kg.PartitionScavengerIndex(fnID.String()), item2.ID)))
 
-				// Global index must have earlier timestamp
+				// Global index must NOT have earlier timestamp after removing concurrency key
 				require.True(t, r.Exists(kg.ConcurrencyIndex()))
-				require.Equal(t, leaseExpiry1.UnixMilli(), int64(score(t, r, kg.ConcurrencyIndex(), fnID.String())))
+				require.Equal(t, leaseExpiry2.UnixMilli(), int64(score(t, r, kg.ConcurrencyIndex(), fnID.String())))
 
 				// Concurrency index must have both items
 				require.True(t, r.Exists(kg.Concurrency("p", fnID.String())))
@@ -447,7 +448,7 @@ func TestQueueScavenge(t *testing.T) {
 				q := NewQueue(
 					shard,
 					WithClock(clock),
-					WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+					WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 						return true
 					}),
 				)
@@ -503,14 +504,14 @@ func TestQueueScavenge(t *testing.T) {
 			})
 		})
 
-		t.Run("extend checks for existing leases and only updates if theres no earlier lease", func(t *testing.T) {
+		t.Run("extend does not checks for existing leases and only updates if theres no earlier lease", func(t *testing.T) {
 			t.Run("earlier in progress item exists", func(t *testing.T) {
 				r.FlushAll()
 
 				q := NewQueue(
 					shard,
 					WithClock(clock),
-					WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+					WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 						return true
 					}),
 				)
@@ -561,9 +562,9 @@ func TestQueueScavenge(t *testing.T) {
 				require.True(t, r.Exists(kg.PartitionScavengerIndex(fnID.String())))
 				require.Equal(t, leaseExpiry2.UnixMilli(), int64(score(t, r, kg.PartitionScavengerIndex(fnID.String()), item2.ID)))
 
-				// Global index must have earlier timestamp
+				// Global index must NOT have earlier timestamp
 				require.True(t, r.Exists(kg.ConcurrencyIndex()))
-				require.Equal(t, leaseExpiry1.UnixMilli(), int64(score(t, r, kg.ConcurrencyIndex(), fnID.String())))
+				require.Equal(t, leaseExpiry2.UnixMilli(), int64(score(t, r, kg.ConcurrencyIndex(), fnID.String())))
 
 				// Concurrency index must have both items
 				require.True(t, r.Exists(kg.Concurrency("p", fnID.String())))
@@ -577,7 +578,7 @@ func TestQueueScavenge(t *testing.T) {
 				q := NewQueue(
 					shard,
 					WithClock(clock),
-					WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+					WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 						return true
 					}),
 				)
@@ -644,7 +645,7 @@ func TestQueueScavenge(t *testing.T) {
 				q := NewQueue(
 					shard,
 					WithClock(clock),
-					WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+					WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 						return true
 					}),
 				)
@@ -713,13 +714,13 @@ func TestQueueScavenge(t *testing.T) {
 				require.False(t, r.Exists(kg.Concurrency("p", fnID.String())))
 			})
 
-			t.Run("update to next earliest old lease", func(t *testing.T) {
+			t.Run("does not update to next earliest old lease", func(t *testing.T) {
 				r.FlushAll()
 
 				q := NewQueue(
 					shard,
 					WithClock(clock),
-					WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+					WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 						return true
 					}),
 				)
@@ -782,9 +783,8 @@ func TestQueueScavenge(t *testing.T) {
 				// Scavenger index must be empty (since only old item exists now)
 				require.False(t, r.Exists(kg.PartitionScavengerIndex(fnID.String())))
 
-				// Global index must have later timestamp
-				require.True(t, r.Exists(kg.ConcurrencyIndex()))
-				require.Equal(t, leaseExpiry1.UnixMilli(), int64(score(t, r, kg.ConcurrencyIndex(), fnID.String())))
+				// Global index must be empty since no more in index
+				require.False(t, r.Exists(kg.ConcurrencyIndex()))
 
 				// Concurrency index must have only one item
 				require.True(t, r.Exists(kg.Concurrency("p", fnID.String())))
@@ -798,7 +798,7 @@ func TestQueueScavenge(t *testing.T) {
 				q := NewQueue(
 					shard,
 					WithClock(clock),
-					WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+					WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 						return true
 					}),
 				)
@@ -879,7 +879,7 @@ func TestQueueScavenge(t *testing.T) {
 				q := NewQueue(
 					shard,
 					WithClock(clock),
-					WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+					WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 						return true
 					}),
 				)
@@ -948,13 +948,13 @@ func TestQueueScavenge(t *testing.T) {
 				require.False(t, r.Exists(kg.Concurrency("p", fnID.String())))
 			})
 
-			t.Run("update to next earliest old lease", func(t *testing.T) {
+			t.Run("does not update to next earliest old lease", func(t *testing.T) {
 				r.FlushAll()
 
 				q := NewQueue(
 					shard,
 					WithClock(clock),
-					WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+					WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 						return true
 					}),
 				)
@@ -1017,9 +1017,8 @@ func TestQueueScavenge(t *testing.T) {
 				// Scavenger index must be empty (since only old item exists now)
 				require.False(t, r.Exists(kg.PartitionScavengerIndex(fnID.String())))
 
-				// Global index must have later timestamp
-				require.True(t, r.Exists(kg.ConcurrencyIndex()))
-				require.Equal(t, leaseExpiry1.UnixMilli(), int64(score(t, r, kg.ConcurrencyIndex(), fnID.String())))
+				// Global index must be empty since no more items in index
+				require.False(t, r.Exists(kg.ConcurrencyIndex()))
 
 				// Concurrency index must have only one item
 				require.True(t, r.Exists(kg.Concurrency("p", fnID.String())))
@@ -1033,7 +1032,7 @@ func TestQueueScavenge(t *testing.T) {
 				q := NewQueue(
 					shard,
 					WithClock(clock),
-					WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+					WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 						return true
 					}),
 				)
@@ -1114,7 +1113,7 @@ func TestQueueScavenge(t *testing.T) {
 		q := NewQueue(
 			shard,
 			WithClock(clock),
-			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 				return true
 			}),
 		)

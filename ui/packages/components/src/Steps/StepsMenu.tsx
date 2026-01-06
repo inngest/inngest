@@ -1,7 +1,6 @@
-import type { Route } from 'next';
-import NextLink from 'next/link';
 import { Link, type LinkProps } from '@inngest/components/Link';
 import { RiCheckboxCircleFill, type RemixiconComponentType } from '@remixicon/react';
+import { Link as TanstackLink, type LinkComponentProps } from '@tanstack/react-router';
 
 import { cn } from '../utils/classNames';
 
@@ -38,7 +37,7 @@ function StepMenuItem({
   isCompleted: boolean;
   isActive: boolean;
   isDisabled?: boolean;
-  url: Route;
+  url: LinkComponentProps['to'];
 }) {
   const { title, description, icon: Icon } = stepContent;
 
@@ -83,7 +82,7 @@ function StepMenuItem({
     </li>
   );
 
-  return isDisabled ? content : <NextLink href={url}>{content}</NextLink>;
+  return isDisabled ? content : <TanstackLink to={url}>{content}</TanstackLink>;
 }
 
 function StepLink({ children, href, ...props }: React.PropsWithChildren<LinkProps>) {

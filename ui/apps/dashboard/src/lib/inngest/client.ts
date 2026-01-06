@@ -6,6 +6,9 @@ type Events = {
   'insights-agent/chat.requested': {
     data: ChatRequestEvent;
   };
+  'app/csp-violation.reported': {
+    data: {};
+  };
 };
 
 export const inngest = new Inngest({
@@ -13,4 +16,7 @@ export const inngest = new Inngest({
   middleware: [realtimeMiddleware()],
   eventKey: process.env.INNGEST_AI_EVENT_KEY,
   schemas: new EventSchemas().fromRecord<Events>(),
+  checkpointing: {
+    maxRuntime: 120_000,
+  },
 });

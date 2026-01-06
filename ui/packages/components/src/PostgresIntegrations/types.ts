@@ -52,7 +52,7 @@ export function parseConnectionString(connectionString: string) {
   const match = connectionString.match(regex);
 
   if (match) {
-    const [, username, password, host] = match;
+    const [, _username, _password, host] = match;
     return {
       name: `Neon-${host}`,
       engine: 'postgresql',

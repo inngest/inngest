@@ -12,7 +12,7 @@ export const Back = ({ className }: { className?: string }) => {
         size="small"
         icon={<RiArrowLeftLine />}
         className={className}
-        href="/"
+        to="/"
       />
     </OptionalTooltip>
   );

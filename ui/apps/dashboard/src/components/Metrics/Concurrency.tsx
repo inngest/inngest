@@ -1,25 +1,26 @@
 import { Button } from '@inngest/components/Button';
 import { Chart } from '@inngest/components/Chart/Chart';
 import { Info } from '@inngest/components/Info/Info';
-import { Link } from '@inngest/components/Link/Link';
+import { Link } from '@inngest/components/Link';
 import { resolveColor } from '@inngest/components/utils/colors';
 import { isDark } from '@inngest/components/utils/theme';
-import resolveConfig from 'tailwindcss/resolveConfig';
-
 import type { VolumeMetricsQuery } from '@/gql/graphql';
 import { pathCreator } from '@/utils/urls';
-import tailwindConfig from '../../../tailwind.config';
+import { borderColor } from '@/utils/tailwind';
 import type { EntityLookup } from './Dashboard';
-import { getLineChartOptions, getXAxis, lineColors, seriesOptions } from './utils';
+
+import {
+  getLineChartOptions,
+  getXAxis,
+  lineColors,
+  seriesOptions,
+} from './utils';
 
 const zeroID = '00000000-0000-0000-0000-000000000000';
-const {
-  theme: { borderColor },
-} = resolveConfig(tailwindConfig);
 
 export const mapConcurrency = (
   { stepRunning: { metrics: runningMetrics } }: VolumeMetricsQuery['workspace'],
-  entities: EntityLookup
+  entities: EntityLookup,
 ) => {
   const dark = isDark();
 
@@ -38,7 +39,11 @@ export const mapConcurrency = (
           name: entities[f.id]?.name,
           data: f.data.map(({ value }) => value),
           itemStyle: {
-            color: resolveColor(lineColors[i % lineColors.length]![0]!, dark, lineColors[0]?.[1]),
+            color: resolveColor(
+              lineColors[i % lineColors.length][0],
+              dark,
+              lineColors[0]?.[1],
+            ),
           },
         })),
     ],
@@ -48,7 +53,7 @@ export const mapConcurrency = (
     metrics,
     runningMetrics.length
       ? runningMetrics.map(({ id }) => ({ name: entities[id]?.name }))
-      : ['No Data Found']
+      : ['No Data Found'],
   );
 };
 
@@ -85,7 +90,10 @@ export const Concurrency = ({
             label="Increase Concurrency"
             kind="secondary"
             appearance="outlined"
-            href={pathCreator.billing({ ref: 'app-concurrency-chart', highlight: 'concurrency' })}
+            href={pathCreator.billing({
+              ref: 'app-concurrency-chart',
+              highlight: 'concurrency',
+            })}
           />
         )}
       </div>

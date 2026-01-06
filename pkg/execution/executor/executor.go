@@ -42,6 +42,7 @@ import (
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/run"
+	"github.com/inngest/inngest/pkg/service"
 	"github.com/inngest/inngest/pkg/syscode"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
@@ -78,7 +79,8 @@ var (
 	ErrFunctionSkipped            = fmt.Errorf("function skipped")
 	ErrFunctionSkippedIdempotency = fmt.Errorf("function skipped due to idempotency")
 
-	ErrFunctionEnded = fmt.Errorf("function already ended")
+	ErrFunctionEnded   = fmt.Errorf("function already ended")
+	ErrNoCorrelationID = fmt.Errorf("no correlation ID found in event when trying to resume invoke parent")
 
 	// ErrHandledStepError is returned when an OpcodeStepError is caught and the
 	// step should be safely retried.
@@ -122,6 +124,7 @@ func NewExecutor(opts ...ExecutorOpt) (execution.Executor, error) {
 	m := &executor{
 		driverv1: map[string]driver.DriverV1{},
 		driverv2: map[string]driver.DriverV2{},
+		clock:    clockwork.NewRealClock(),
 	}
 
 	for _, o := range opts {
@@ -424,6 +427,20 @@ func WithAllowStepMetadata(md AllowStepMetadata) ExecutorOpt {
 	}
 }
 
+func WithFunctionBacklogSizeLimit(fbsl BacklogSizeLimitFn) ExecutorOpt {
+	return func(e execution.Executor) error {
+		e.(*executor).functionBacklogSizeLimit = fbsl
+		return nil
+	}
+}
+
+type BacklogSizeLimit struct {
+	Limit   int
+	Enforce bool
+}
+
+type BacklogSizeLimitFn func(ctx context.Context, accountID, envID, fnID uuid.UUID) BacklogSizeLimit
+
 // executor represents a built-in executor for running workflows.
 type executor struct {
 	log logger.Logger
@@ -470,6 +487,8 @@ type executor struct {
 
 	// stateSizeLimit finds state size limits for a given run
 	stateSizeLimit func(sv2.ID) int
+
+	functionBacklogSizeLimit BacklogSizeLimitFn
 
 	assignedQueueShard redis_state.QueueShard
 	shardFinder        redis_state.ShardSelector
@@ -665,6 +684,68 @@ func (e *executor) createEagerCancellationForTimeout(ctx context.Context, since 
 	l.Trace("Enqueued system job for eager cancellation of timed out job")
 
 	return nil
+}
+
+func (e *executor) skipped(ctx context.Context, req execution.ScheduleRequest) enums.SkipReason {
+	l := logger.StdlibLogger(ctx)
+
+	// Check if function is paused, draining
+	skipReason := req.SkipReason()
+	if skipReason != enums.SkipReasonNone {
+		return skipReason
+	}
+
+	// Check if backlog size limit was hit
+	res, err := e.checkBacklogSizeLimit(ctx, req)
+	if err != nil {
+		l.ReportError(err, "error checking backlog size limit")
+		return enums.SkipReasonNone
+	}
+
+	return res
+}
+
+func (e *executor) checkBacklogSizeLimit(ctx context.Context, req execution.ScheduleRequest) (enums.SkipReason, error) {
+	if e.functionBacklogSizeLimit == nil {
+		return enums.SkipReasonNone, nil
+	}
+
+	backlogSizeLimit := e.functionBacklogSizeLimit(ctx, req.AccountID, req.WorkspaceID, req.Function.ID)
+	if backlogSizeLimit.Limit <= 0 {
+		return enums.SkipReasonNone, nil
+	}
+
+	scheduledSteps, err := e.queue.StatusCount(ctx, req.Function.ID, "start")
+	if err != nil {
+		return enums.SkipReasonNone, fmt.Errorf("could not get scheduled step count: %w", err)
+	}
+
+	if int(scheduledSteps) < backlogSizeLimit.Limit {
+		return enums.SkipReasonNone, nil
+	}
+
+	// The backlog size exceeds the limit
+
+	id := sv2.ID{
+		FunctionID: req.Function.ID,
+		Tenant: sv2.Tenant{
+			AccountID: req.AccountID,
+			EnvID:     req.WorkspaceID,
+			AppID:     req.AppID,
+		},
+	}
+
+	for _, ll := range e.lifecycles {
+		service.Go(func() {
+			ll.OnFunctionBacklogSizeLimitReached(ctx, id)
+		})
+	}
+
+	if !backlogSizeLimit.Enforce {
+		return enums.SkipReasonNone, nil
+	}
+
+	return enums.SkipReasonFunctionBacklogSizeLimitHit, nil
 }
 
 func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) (*sv2.Metadata, error) {
@@ -1042,26 +1123,35 @@ func (e *executor) schedule(
 		}
 	}
 
-	st, err := e.smv2.Create(ctx, newState)
-	switch {
-	case err == nil: // no-op
-	case errors.Is(err, state.ErrIdentifierExists): // no-op
-	case errors.Is(err, state.ErrIdentifierTomestone):
-		return nil, ErrFunctionSkippedIdempotency
-	default:
-		return nil, fmt.Errorf("error creating run state: %w", err)
-	}
+	stv1ID := sv2.V1FromMetadata(metadata)
 
-	stv1ID := sv2.V1FromMetadata(st.Metadata)
+	// Check if the function should be skipped (paused, draining)
+	skipReason := e.skipped(ctx, req)
 
-	// NOTE: if the runID mismatches, it means there's already a state available
-	// and we need to override the one we already have to make sure we're using
-	// the correct metedata values
-	if metadata.ID.RunID != stv1ID.RunID {
-		id := sv2.IDFromV1(stv1ID)
-		metadata, err = e.smv2.LoadMetadata(ctx, id)
-		if err != nil {
-			return nil, err
+	// Create run state if not skipped
+	if skipReason == enums.SkipReasonNone {
+		st, err := e.smv2.Create(ctx, newState)
+		switch {
+		case err == nil: // no-op
+		case errors.Is(err, state.ErrIdentifierExists): // no-op
+		case errors.Is(err, state.ErrIdentifierTomestone):
+			return nil, ErrFunctionSkippedIdempotency
+		default:
+			return nil, fmt.Errorf("error creating run state: %w", err)
+		}
+
+		// Override existing identifier in case we changed the run ID due to idempotency
+		stv1ID = sv2.V1FromMetadata(st.Metadata)
+
+		// NOTE: if the runID mismatches, it means there's already a state available
+		// and we need to override the one we already have to make sure we're using
+		// the correct metedata values
+		if metadata.ID.RunID != stv1ID.RunID {
+			id := sv2.IDFromV1(stv1ID)
+			metadata, err = e.smv2.LoadMetadata(ctx, id)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 
@@ -1086,7 +1176,7 @@ func (e *executor) schedule(
 	}
 
 	status := enums.StepStatusQueued
-	if req.SkipReason() != enums.SkipReasonNone {
+	if skipReason != enums.SkipReasonNone {
 		status = enums.StepStatusSkipped
 	}
 
@@ -1109,9 +1199,9 @@ func (e *executor) schedule(
 	}
 
 	// If this is paused, immediately end just before creating state.
-	if skipped := req.SkipReason(); skipped != enums.SkipReasonNone {
+	if skipReason != enums.SkipReasonNone {
 		sendSpans()
-		return e.handleFunctionSkipped(ctx, req, metadata, evts, skipped)
+		return e.handleFunctionSkipped(ctx, req, metadata, evts, skipReason)
 	}
 
 	if req.BatchID == nil {
@@ -1360,6 +1450,12 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		return nil, err
 	}
 
+	// Start cancellation check
+	cancelled, err := e.checkCancellation(ctx, md, events)
+	if err != nil {
+		return nil, fmt.Errorf("could not check cancellation: %w", err)
+	}
+
 	//
 	// record function start time using the same method as step started,
 	// ensures ui timeline alignment
@@ -1379,7 +1475,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		}
 	}
 
-	if v.stopWithoutRetry {
+	if cancelled || v.stopWithoutRetry {
 		// Validation prevented execution and doesn't want the executor to retry, so
 		// don't return an error - assume the function finishes and delete state.
 		err := e.smv2.Delete(ctx, md.ID)
@@ -1468,6 +1564,8 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		stackIndex: stackIndex,
 		httpClient: e.httpClient,
 		parentSpan: parentRef,
+		c:          e.clock,
+		start:      start,
 	}
 
 	// This span will be updated with output as soon as execution finishes.
@@ -1489,7 +1587,17 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	}
 
 	return util.CritT(ctx, "run step", func(ctx context.Context) (*state.DriverResponse, error) {
+		// Track how long it took us from the queue item job starting -> calling run.
+		instance.trackLatencyHistogram(ctx, "queue_to_run_start", nil)
 		resp, err := e.run(ctx, &instance)
+		instance.trackLatencyHistogram(ctx, "run_start_to_request_end", nil)
+
+		defer func() {
+			// track how long it takes to finish accounting after running.
+			instance.trackLatencyHistogram(ctx, "request_end_to_finalize", map[string]any{
+				"error": err == nil,
+			})
+		}()
 
 		// XX: This is going to drop any sleep requests, because DriverResponseAttrs
 		// forces the drop field if resp.IsDiscoveryResponse() is true.
@@ -1575,8 +1683,8 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 		go e.OnStepFinished(context.WithoutCancel(ctx), i.md, i.item, i.edge, i.resp, nil)
 	}
 
-	if i.resp.Err == nil && !i.resp.IsFunctionResult() {
-		// Handle generator responses then return.
+	if i.resp.Err == nil && i.resp.IsOpResponse() {
+		// Handle generator op responses then return.
 		if serr := e.HandleGeneratorResponse(ctx, i, i.resp); serr != nil {
 			// If this is an error compiling async expressions, fail the function.
 			shouldFailEarly := errors.Is(serr, &expressions.CompileError{}) || errors.Is(serr, state.ErrStateOverflowed) || errors.Is(serr, state.ErrFunctionOverflowed) || errors.Is(serr, state.ErrSignalConflict)
@@ -1763,6 +1871,82 @@ func correlationID(event event.Event) *string {
 		return &correlationID
 	}
 	return nil
+}
+
+func (e *executor) checkCancellation(ctx context.Context, md sv2.Metadata, evts []json.RawMessage) (bool, error) {
+	// If no cancellation checker was provided, assume run should not be cancelled
+	if e.cancellationChecker == nil {
+		return false, nil
+	}
+
+	start := time.Now()
+
+	l := logger.StdlibLogger(ctx).With(
+		"run_id", md.ID.RunID,
+		"function_id", md.ID.FunctionID,
+		"workspace_id", md.ID.Tenant.EnvID,
+	)
+	evt := event.Event{}
+	if err := json.Unmarshal(evts[0], &evt); err != nil {
+		return false, fmt.Errorf("error decoding input event in cancellation checker: %w", err)
+	}
+
+	// Wait for result to be available within deadline and return, or continue processing asynchronously
+	deadline := 100 * time.Millisecond
+
+	// Create buffered channel to allow sending even without receiver
+	// but block receive until message is ready
+	done := make(chan bool, 1)
+
+	// Ensure this completes before we shut down the service
+	service.Go(func() {
+		defer func() {
+			metrics.HistogramCancellationCheckDuration(ctx, time.Since(start), metrics.HistogramOpt{
+				PkgName: pkgName,
+			})
+		}()
+
+		cancel, err := e.cancellationChecker.IsCancelled(
+			ctx,
+			md.ID.Tenant.EnvID,
+			md.ID.FunctionID,
+			md.ID.RunID,
+			evt.Map(),
+		)
+		if err != nil {
+			if errors.Is(err, &expressions.CompileError{}) {
+				l.Warn("invalid cancellation expression", "error", err.Error())
+			} else {
+				l.Error("error checking cancellation", "error", err.Error())
+			}
+		}
+		if cancel != nil {
+			err = e.Cancel(ctx, md.ID, execution.CancelRequest{
+				CancellationID: &cancel.ID,
+			})
+			if err != nil {
+				l.ReportError(err, "failed to cancel run after checking cancellation")
+			}
+
+			done <- true
+			return
+		}
+
+		done <- false
+	})
+
+	select {
+	// Wait for result to be available
+	case cancelled := <-done:
+		return cancelled, nil
+		// Or continue processing after hitting deadline
+	case <-e.clock.After(deadline):
+		l.Debug("continuing cancellation check in background")
+		metrics.IncrAsyncCancellationCheckCounter(ctx, 1, metrics.CounterOpt{
+			PkgName: pkgName,
+		})
+		return false, nil
+	}
 }
 
 // run executes the step with the given step ID.
@@ -2271,28 +2455,30 @@ func (e *executor) handlePause(
 }
 
 func (e *executor) HandleInvokeFinish(ctx context.Context, evt event.TrackedEvent) error {
-	evtID := evt.GetInternalID()
-	l := e.log.With("event_id", evtID.String())
-
 	correlationID := evt.GetEvent().CorrelationID()
 	if correlationID == "" {
-		return fmt.Errorf("no correlation ID found in event when trying to handle finish")
+		return ErrNoCorrelationID
 	}
 
+	var (
+		evtID = evt.GetInternalID()
+		wsID  = evt.GetWorkspaceID()
+		l     = e.log.With("event_id", evtID.String())
+
+		eventName string
+	)
+
 	// find the pause with correlationID
-	wsID := evt.GetWorkspaceID()
 	pause, err := e.pm.PauseByInvokeCorrelationID(ctx, wsID, correlationID)
 	if err != nil {
 		return err
 	}
-
-	var eventName string
 	if pause.Event != nil {
 		eventName = *pause.Event
 	}
 
 	if pause.Expires.Time().Before(e.now()) {
-		l.Debug("encountered expired pause")
+		l.Debug("expired pause resuming invoke")
 
 		shouldDelete := pause.Expires.Time().Add(consts.PauseExpiredDeletionGracePeriod).Before(e.now())
 		if shouldDelete {
@@ -2300,34 +2486,19 @@ func (e *executor) HandleInvokeFinish(ctx context.Context, evt event.TrackedEven
 			l.Debug("deleting expired pause")
 			_ = e.pm.Delete(context.Background(), pauses.Index{WorkspaceID: pause.WorkspaceID, EventName: eventName}, *pause)
 		}
-
 		return nil
 	}
 
-	if pause.Cancel {
-		// This is a cancellation signal.  Check if the function
-		// has ended, and if so remove the pause.
-		//
-		// NOTE: Bookkeeping must be added to individual function runs and handled on
-		// completion instead of here.  This is a hot path and should only exist whilst
-		// bookkeeping is not implemented.
-		if exists, err := e.smv2.Exists(ctx, sv2.IDFromPause(*pause)); !exists && err == nil {
-			// This function has ended.  Delete the pause and continue
-			_ = e.pm.Delete(context.Background(), pauses.Index{WorkspaceID: pause.WorkspaceID, EventName: eventName}, *pause)
-			return nil
-		}
-	}
+	l.DebugSample(10, "resuming pause from invoke", "pause.DataKey", pause.DataKey)
 
 	resumeData := pause.GetResumeData(evt.GetEvent())
-	l.Debug("resuming pause from invoke", "pause.DataKey", pause.DataKey)
-
 	return e.Resume(ctx, *pause, execution.ResumeRequest{
 		With:           resumeData.With,
 		EventID:        &evtID,
 		EventName:      evt.GetEvent().Name,
 		RunID:          resumeData.RunID,
 		StepName:       resumeData.StepName,
-		IdempotencyKey: evtID.String(),
+		IdempotencyKey: correlationID,
 	})
 }
 
@@ -3229,16 +3400,34 @@ func (e *executor) handleGeneratorFunctionFinished(ctx context.Context, runCtx e
 	// In this case, we've reported that the function has finished.  It's an async
 	// function.  In this case, we always want to update the span ourselves to mark
 	// the function as finished, and add the output here.
-	return e.Finalize(ctx, execution.FinalizeOpts{
-		Metadata: *runCtx.Metadata(),
+	md := runCtx.Metadata()
+	evts := runCtx.Events()
+	resp := runCtx.DriverResponse()
+
+	err := e.Finalize(ctx, execution.FinalizeOpts{
+		Metadata: *md,
 		Response: execution.FinalizeResponse{
 			Type:        execution.FinalizeResponseRunComplete,
 			RunComplete: gen,
 		},
 		Optional: execution.FinalizeOptional{
-			InputEvents: runCtx.Events(),
+			InputEvents: evts,
 		},
 	})
+
+	if resp != nil {
+		for _, e := range e.lifecycles {
+			go e.OnFunctionFinished(
+				context.WithoutCancel(ctx),
+				*md,
+				runCtx.LifecycleItem(),
+				evts,
+				*resp,
+			)
+		}
+	}
+
+	return err
 }
 
 func (e *executor) handleGeneratorSyncFunctionFinished(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
@@ -3253,16 +3442,35 @@ func (e *executor) handleGeneratorSyncFunctionFinished(ctx context.Context, runC
 		logger.StdlibLogger(ctx).Error("error unmarshalling api result from sync RunComplete op", "error", err)
 		return err
 	}
-	return e.Finalize(ctx, execution.FinalizeOpts{
-		Metadata: *runCtx.Metadata(),
+
+	md := runCtx.Metadata()
+	evts := runCtx.Events()
+	resp := runCtx.DriverResponse()
+
+	err := e.Finalize(ctx, execution.FinalizeOpts{
+		Metadata: *md,
 		Response: execution.FinalizeResponse{
 			Type:        execution.FinalizeResponseAPI,
 			APIResponse: result.Data,
 		},
 		Optional: execution.FinalizeOptional{
-			InputEvents: runCtx.Events(),
+			InputEvents: evts,
 		},
 	})
+
+	if resp != nil {
+		for _, e := range e.lifecycles {
+			go e.OnFunctionFinished(
+				context.WithoutCancel(ctx),
+				*md,
+				runCtx.LifecycleItem(),
+				evts,
+				*resp,
+			)
+		}
+	}
+
+	return err
 }
 
 func (e *executor) handleGeneratorStepPlanned(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {

@@ -1,12 +1,14 @@
-'use client';
-
 import { useState } from 'react';
 import { cn } from '@inngest/components/utils/classNames';
 
 import { CopyButton } from './CopyButton';
 import { RevealButton } from './RevealButton';
 
-export type SecretKind = 'event-key' | 'signing-key' | 'webhook-path' | 'command';
+export type SecretKind =
+  | 'event-key'
+  | 'signing-key'
+  | 'webhook-path'
+  | 'command';
 
 type Props = {
   className?: string;
@@ -26,11 +28,16 @@ export function Secret({ className, kind, secret }: Props) {
     <div
       className={cn(
         'border-subtle bg-canvasBase text-light flex overflow-hidden rounded-md border',
-        className
+        className,
       )}
     >
       <div className="text-btnPrimary flex grow items-center truncate p-2 font-mono text-sm">
-        <span className={cn('grow', isRevealed ? 'no-scrollbar overflow-x-auto' : 'truncate')}>
+        <span
+          className={cn(
+            'grow',
+            isRevealed ? 'no-scrollbar overflow-x-auto' : 'truncate',
+          )}
+        >
           {value}
         </span>
       </div>
@@ -61,15 +68,21 @@ function maskSecret(value: string, kind: SecretKind): string {
     // Mask everything after the prefix (e.g. "signkey-prod-")
     return value.replace(
       /^(signkey-[A-Za-z0-9]+-).+$/,
-      (match, p1) => p1 + 'X'.repeat(match.length - p1.length)
+      (match, p1) => p1 + 'X'.repeat(match.length - p1.length),
     );
   }
 
   if (kind === 'command') {
     // For commands, mask everything after the keyword (e.g. "KEY=")
-    return value.replace(/(KEY=).+$/, (match, p1) => p1 + 'X'.repeat(match.length - p1.length));
+    return value.replace(
+      /(KEY=).+$/,
+      (match, p1) => p1 + 'X'.repeat(match.length - p1.length),
+    );
   }
 
   // Mask everything after the 8th character of the path (e.g. "/e/12345678")
-  return value.replace(/^(\/e\/.{8}).+$/, (match, p1) => p1 + 'X'.repeat(match.length - p1.length));
+  return value.replace(
+    /^(\/e\/.{8}).+$/,
+    (match, p1) => p1 + 'X'.repeat(match.length - p1.length),
+  );
 }

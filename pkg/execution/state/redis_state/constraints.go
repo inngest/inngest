@@ -11,6 +11,7 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -91,19 +92,28 @@ func (q *queue) backlogRefillConstraintCheck(
 	}
 
 	if q.capacityManager == nil || q.useConstraintAPI == nil {
+		metrics.IncrBacklogRefillConstraintCheckFallbackCounter(ctx, enums.BacklogRefillConstraintCheckFallbackReasonConstraintAPIUninitialized.String(), metrics.CounterOpt{
+			PkgName: pkgName,
+		})
 		return &backlogRefillConstraintCheckResult{
 			itemsToRefill: itemIDs,
 		}, nil
 	}
 
 	if shadowPart.AccountID == nil || shadowPart.EnvID == nil || shadowPart.FunctionID == nil {
+		metrics.IncrBacklogRefillConstraintCheckFallbackCounter(ctx, enums.BacklogRefillConstraintCheckFallbackReasonIDNil.String(), metrics.CounterOpt{
+			PkgName: pkgName,
+		})
 		return &backlogRefillConstraintCheckResult{
 			itemsToRefill: itemIDs,
 		}, nil
 	}
 
-	useAPI, fallback := q.useConstraintAPI(ctx, *shadowPart.AccountID)
+	useAPI, fallback := q.useConstraintAPI(ctx, *shadowPart.AccountID, *shadowPart.EnvID, *shadowPart.FunctionID)
 	if !useAPI {
+		metrics.IncrBacklogRefillConstraintCheckFallbackCounter(ctx, enums.BacklogRefillConstraintCheckFallbackReasonFeatureFlagDisabled.String(), metrics.CounterOpt{
+			PkgName: pkgName,
+		})
 		return &backlogRefillConstraintCheckResult{
 			itemsToRefill: itemIDs,
 		}, nil
@@ -133,11 +143,16 @@ func (q *queue) backlogRefillConstraintCheck(
 		},
 	})
 	if err != nil {
+		logger.StdlibLogger(ctx).Error("acquiring capacity lease failed", "err", err, "method", "backlogRefillConstraintCheck", "functionID", *shadowPart.FunctionID)
+
 		if !fallback {
 			return nil, fmt.Errorf("could not enforce constraints and acquire lease: %w", err)
 		}
 
 		// Attempt to fall back to BacklogRefill -- ignore GCRA with constraint check idempotency
+		metrics.IncrBacklogRefillConstraintCheckFallbackCounter(ctx, enums.BacklogRefillConstraintCheckFallbackReasonConstraintAPIError.String(), metrics.CounterOpt{
+			PkgName: pkgName,
+		})
 		return &backlogRefillConstraintCheckResult{
 			itemsToRefill: itemIDs,
 		}, nil
@@ -229,17 +244,25 @@ func (q *queue) itemLeaseConstraintCheck(
 	if shadowPart.AccountID == nil ||
 		shadowPart.EnvID == nil ||
 		shadowPart.FunctionID == nil {
+		metrics.IncrQueueItemConstraintCheckFallbackCounter(ctx, enums.QueueItemConstraintFallbackReasonIdNil.String(), metrics.CounterOpt{
+			PkgName: pkgName,
+		})
 		return itemLeaseConstraintCheckResult{}, nil
 	}
 
 	if q.capacityManager == nil ||
 		q.useConstraintAPI == nil {
-
+		metrics.IncrQueueItemConstraintCheckFallbackCounter(ctx, enums.QueueItemConstraintFallbackReasonConstraintAPIUninitialized.String(), metrics.CounterOpt{
+			PkgName: pkgName,
+		})
 		return itemLeaseConstraintCheckResult{}, nil
 	}
 
-	useAPI, fallback := q.useConstraintAPI(ctx, *shadowPart.AccountID)
+	useAPI, fallback := q.useConstraintAPI(ctx, *shadowPart.AccountID, *shadowPart.EnvID, *shadowPart.FunctionID)
 	if !useAPI {
+		metrics.IncrQueueItemConstraintCheckFallbackCounter(ctx, enums.QueueItemConstraintFallbackReasonFeatureFlagDisabled.String(), metrics.CounterOpt{
+			PkgName: pkgName,
+		})
 		return itemLeaseConstraintCheckResult{}, nil
 	}
 
@@ -285,13 +308,16 @@ func (q *queue) itemLeaseConstraintCheck(
 		},
 	})
 	if err != nil {
-		l.Error("could not acquire capacity lease", "err", err)
+		l.Error("acquiring capacity lease failed", "err", err, "method", "itemLeaseConstraintCheck", "constraints", constraints, "item", item)
 
 		if !fallback {
 			return itemLeaseConstraintCheckResult{}, fmt.Errorf("could not enforce constraints and acquire lease: %w", err)
 		}
 
 		// Fallback to Lease (with idempotency)
+		metrics.IncrQueueItemConstraintCheckFallbackCounter(ctx, enums.QueueItemConstraintFallbackReasonConstraintAPIError.String(), metrics.CounterOpt{
+			PkgName: pkgName,
+		})
 		return itemLeaseConstraintCheckResult{}, nil
 	}
 

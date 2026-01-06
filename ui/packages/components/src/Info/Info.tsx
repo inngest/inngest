@@ -1,5 +1,3 @@
-'use client';
-
 import type { ComponentProps, ReactNode } from 'react';
 import { cn } from '@inngest/components/utils/classNames';
 import { RiQuestionLine } from '@remixicon/react';

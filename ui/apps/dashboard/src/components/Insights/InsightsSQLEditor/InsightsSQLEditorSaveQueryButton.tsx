@@ -1,6 +1,4 @@
-'use client';
-
-import { Button } from '@inngest/components/Button/Button';
+import { Button } from '@inngest/components/Button';
 import {
   Tooltip,
   TooltipContent,
@@ -19,7 +17,9 @@ type InsightsSQLEditorSaveQueryButtonProps = {
   tab: Tab;
 };
 
-export function InsightsSQLEditorSaveQueryButton({ tab }: InsightsSQLEditorSaveQueryButtonProps) {
+export function InsightsSQLEditorSaveQueryButton({
+  tab,
+}: InsightsSQLEditorSaveQueryButtonProps) {
   const { canSave, isSaving, saveTab } = useSaveTab(tab);
 
   useDocumentShortcuts([
@@ -38,7 +38,10 @@ export function InsightsSQLEditorSaveQueryButton({ tab }: InsightsSQLEditorSaveQ
             className="font-medium"
             disabled={!canSave}
             icon={
-              <RiSaveLine className={cn(!canSave ? 'text-disabled' : 'text-muted')} size={16} />
+              <RiSaveLine
+                className={cn(!canSave ? 'text-disabled' : 'text-muted')}
+                size={16}
+              />
             }
             iconSide="left"
             kind="secondary"
@@ -51,7 +54,9 @@ export function InsightsSQLEditorSaveQueryButton({ tab }: InsightsSQLEditorSaveQ
           />
         </TooltipTrigger>
         <TooltipContent>
-          <KeyboardShortcutTooltip combo={{ alt: true, key: 'S', metaOrCtrl: true }} />
+          <KeyboardShortcutTooltip
+            combo={{ alt: true, key: 'S', metaOrCtrl: true }}
+          />
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>

@@ -1,4 +1,4 @@
-'use client';
+
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
@@ -11,8 +11,7 @@ import { StatusCell } from '../Table/Cell';
 import { TriggerDetails } from '../TriggerDetails';
 import { DragDivider } from '../icons/DragDivider';
 import { nullishToLazy } from '../utils/lazyLoad';
-import { RunInfo as NewRunInfo } from './NewRunInfo';
-import { RunInfo } from './RunInfo';
+import { RunInfo as NewRunInfo, RunInfo } from './RunInfo';
 import { StepInfo } from './StepInfo';
 import { Tabs } from './Tabs';
 import { Timeline } from './Timeline';

@@ -1,7 +1,13 @@
-import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@inngest/components/Tooltip';
 import { RiQuestionLine } from '@remixicon/react';
 
-export function BillingBannerTooltip({ children }: React.PropsWithChildren<{}>) {
+export function BillingBannerTooltip({
+  children,
+}: React.PropsWithChildren<{}>) {
   return (
     <Tooltip>
       <TooltipTrigger>

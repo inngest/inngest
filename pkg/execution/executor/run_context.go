@@ -1,7 +1,9 @@
 package executor
 
 import (
+	"context"
 	"encoding/json"
+	"time"
 
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/exechttp"
@@ -9,7 +11,9 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/tracing/meta"
+	"github.com/jonboulle/clockwork"
 )
 
 type runInstance struct {
@@ -32,11 +36,26 @@ type runInstance struct {
 	// This is necessary to properly tie the parent span to queue items for eg.
 	// step.sleep, which require a completion span in some other future thread.
 	parentSpan *meta.SpanReference
+
+	// c represents the clock
+	c clockwork.Clock
+
+	// start is the time in which we started the job.  This is, realistically,
+	// the same time as redis_state.GetItemStart(ctx) but is explicit instead
+	// of implicit.
+	start time.Time
+	// _next tracks the time that each latency call was tracked, allowing us
+	// to substract time correctly.
+	_next time.Time
 }
 
 // RunContext interface implementation for runInstance
 func (r *runInstance) Metadata() *sv2.Metadata {
 	return &r.md
+}
+
+func (r *runInstance) DriverResponse() *state.DriverResponse {
+	return r.resp
 }
 
 func (r *runInstance) Events() []json.RawMessage {
@@ -112,4 +131,17 @@ func (r *runInstance) ExecutionSpan() *meta.SpanReference {
 
 func (r *runInstance) ParentSpan() *meta.SpanReference {
 	return r.parentSpan
+}
+
+func (r *runInstance) trackLatencyHistogram(ctx context.Context, kind string, tags map[string]any) {
+	if r._next.IsZero() {
+		r._next = r.start
+	}
+
+	metrics.HistogramExecutorLatency(ctx, time.Since(r._next), kind, metrics.HistogramOpt{
+		PkgName: "executor",
+		Tags:    tags,
+	})
+
+	r._next = r.c.Now()
 }

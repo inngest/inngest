@@ -12,7 +12,7 @@ import {
   SkeletonElement,
   TextElement,
   TimeElement,
-} from '../DetailsCard/NewElement';
+} from '../DetailsCard/Element';
 import { ErrorCard } from '../Error/ErrorCard';
 import { InvokeModal } from '../InvokeButton';
 import type { TraceResult } from '../SharedContext/useGetTraceResult';

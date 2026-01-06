@@ -1,5 +1,3 @@
-'use client';
-
 import { useExpansion } from '../ExpansionContext';
 import type { TupleNode, ValueNode } from '../types';
 import { CollapsibleRowWidget } from './CollapsibleRowWidget';

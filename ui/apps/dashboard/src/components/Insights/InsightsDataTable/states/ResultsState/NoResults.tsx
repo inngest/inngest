@@ -1,5 +1,3 @@
-'use client';
-
 import { Button } from '@inngest/components/Button';
 import { RiExternalLinkLine } from '@remixicon/react';
 

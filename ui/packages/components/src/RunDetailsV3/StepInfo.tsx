@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
+import { Button as NewButton } from '@inngest/components/Button';
 import { Button } from '@inngest/components/Button/Button';
-import { Button as NewButton } from '@inngest/components/Button/NewButton';
 import { RiArrowRightSLine } from '@remixicon/react';
 
 import { AITrace } from '../AI/AITrace';
@@ -11,9 +11,8 @@ import {
   LinkElement,
   TextElement,
   TimeElement,
-} from '../DetailsCard/NewElement';
-import { RerunModal as NewRerunModal } from '../Rerun/NewRerunModal';
-import { RerunModal } from '../Rerun/RerunModal';
+} from '../DetailsCard/Element';
+import { RerunModal as NewRerunModal, RerunModal } from '../Rerun/RerunModal';
 import { useShared } from '../SharedContext/SharedContext';
 import { useGetTraceResult } from '../SharedContext/useGetTraceResult';
 import { usePathCreator } from '../SharedContext/usePathCreator';
@@ -174,6 +173,15 @@ export const StepInfo = ({
   const prettyErrorBody = usePrettyErrorBody(result?.error);
   const prettyShortError = usePrettyShortError(result?.error);
 
+  const hasNoData = !prettyInput && !prettyOutput && !result?.error;
+
+  let emptyStateMessage = 'No output available';
+  if (loading) {
+    emptyStateMessage = 'Loading...';
+  } else if (trace.outputID) {
+    emptyStateMessage = 'No trace data available';
+  }
+
   return (
     <div className="flex h-full flex-col justify-start gap-2">
       <div className="flex min-h-11 w-full flex-row items-center justify-between border-none px-4">
@@ -296,54 +304,60 @@ export const StepInfo = ({
         <>
           {result?.error && <ErrorInfo error={prettyShortError} />}
           <div className="flex-1">
-            <Tabs
-              defaultActive={result?.error ? 'error' : 'output'}
-              tabs={[
-                ...(prettyInput
-                  ? [
-                      {
-                        label: 'Input',
-                        id: 'input',
-                        node: <IO title="Step Input" raw={prettyInput} loading={loading} />,
-                      },
-                    ]
-                  : []),
-                ...(prettyOutput
-                  ? [
-                      {
-                        label: 'Output',
-                        id: 'output',
-                        node: <IO title="Step Output" raw={prettyOutput} loading={loading} />,
-                      },
-                    ]
-                  : []),
-                ...(result?.error
-                  ? [
-                      {
-                        label: 'Error details',
-                        id: 'error',
-                        node: (
-                          <IO
-                            title={prettyShortError}
-                            raw={prettyErrorBody ?? ''}
-                            error={true}
-                            loading={loading}
-                          />
-                        ),
-                      },
-                    ]
-                  : []),
-                ...(trace.metadata?.length
-                  ? [
-                      {
-                        label: 'Metadata',
-                        id: 'metadata',
-                        node: <MetadataAttrs metadata={trace.metadata} />,
-                      },
-                    ]
-                  : []),
-              ]}
-            />
+            {hasNoData ? (
+              <div className="flex h-full items-center justify-center px-4 py-8">
+                <p className="text-muted text-center text-sm">{emptyStateMessage}</p>
+              </div>
+            ) : (
+              <Tabs
+                defaultActive={result?.error ? 'error' : 'output'}
+                tabs={[
+                  ...(prettyInput
+                    ? [
+                        {
+                          label: 'Input',
+                          id: 'input',
+                          node: <IO title="Step Input" raw={prettyInput} loading={loading} />,
+                        },
+                      ]
+                    : []),
+                  ...(prettyOutput
+                    ? [
+                        {
+                          label: 'Output',
+                          id: 'output',
+                          node: <IO title="Step Output" raw={prettyOutput} loading={loading} />,
+                        },
+                      ]
+                    : []),
+                  ...(result?.error
+                    ? [
+                        {
+                          label: 'Error details',
+                          id: 'error',
+                          node: (
+                            <IO
+                              title={prettyShortError}
+                              raw={prettyErrorBody ?? ''}
+                              error={true}
+                              loading={loading}
+                            />
+                          ),
+                        },
+                      ]
+                    : []),
+                  ...(trace.metadata?.length
+                    ? [
+                        {
+                          label: 'Metadata',
+                          id: 'metadata',
+                          node: <MetadataAttrs metadata={trace.metadata} />,
+                        },
+                      ]
+                    : []),
+                ]}
+              />
+            )}
           </div>
         </>
       )}

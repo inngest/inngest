@@ -27,8 +27,8 @@ func TestFnCheckpoint(t *testing.T) {
 		checkpoint.ConfigSafe,
 		checkpoint.ConfigPerformant,
 		{
-			MaxSteps:    3,
-			MaxInterval: time.Second,
+			BatchSteps:    3,
+			BatchInterval: time.Second,
 		},
 	}
 
@@ -48,8 +48,8 @@ func TestFnCheckpoint(t *testing.T) {
 			_, err := inngestgo.CreateFunction(
 				inngestClient,
 				inngestgo.FunctionOpts{
-					ID:               fmt.Sprintf("checkpoint-myfn-%v", cfg),
-					CheckpointConfig: cfg,
+					ID:         fmt.Sprintf("checkpoint-myfn-%v", cfg),
+					Checkpoint: cfg,
 				},
 				inngestgo.EventTrigger(evtName, nil),
 				func(ctx context.Context, input inngestgo.Input[DebounceEvent]) (any, error) {

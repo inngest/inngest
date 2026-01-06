@@ -2,11 +2,11 @@ import type { InvokeRunPayload } from '@inngest/components/SharedContext/useInvo
 import { useMutation } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
-import { InvokeFunctionDocument } from '@/gql/graphql';
+import { InvokeFunctionOnboardingDocument } from '@/gql/graphql';
 
 export const useInvokeRun = () => {
   const env = useEnvironment();
-  const [, invokeFunction] = useMutation(InvokeFunctionDocument);
+  const [, invokeFunction] = useMutation(InvokeFunctionOnboardingDocument);
 
   return async ({ functionSlug, data, user, envID }: InvokeRunPayload) => {
     return await invokeFunction({
