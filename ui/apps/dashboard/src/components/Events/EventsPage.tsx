@@ -17,7 +17,7 @@ import {
   useEvents,
 } from '@/components/Events/useEvents';
 import { useAccountFeatures } from '@/utils/useAccountFeatures';
-import { useRouter } from '@tanstack/react-router';
+import { useRouter, ClientOnly } from '@tanstack/react-router';
 
 export default function EventsPage({
   environmentSlug: envSlug,
@@ -93,12 +93,14 @@ export default function EventsPage({
         )}
       />
       {selectedEvent && (
-        <SendEventModal
-          isOpen={isModalVisible}
-          eventName={selectedEvent.name}
-          onClose={closeModal}
-          initialData={selectedEvent.data}
-        />
+        <ClientOnly>
+          <SendEventModal
+            isOpen={isModalVisible}
+            eventName={selectedEvent.name}
+            onClose={closeModal}
+            initialData={selectedEvent.data}
+          />
+        </ClientOnly>
       )}
     </>
   );
