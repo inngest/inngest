@@ -1,33 +1,34 @@
 const path = require('path');
 
-//
-// ESLint task that runs eslint via pnpm in the correct workspace
 const ESLintTask = (fileNames) => {
-  const filesByApp = {};
+  const filesByWorkspace = {};
 
-  fileNames.forEach((fileName) => {
+  for (const fileName of fileNames) {
     const relativePath = path.relative(process.cwd(), fileName);
-    const match = relativePath.match(/^apps\/([^/]+)\//);
+    const parts = relativePath.split(path.sep);
 
-    if (match) {
-      const app = match[1];
-      if (!filesByApp[app]) {
-        filesByApp[app] = [];
+    //
+    // Group files by workspace (apps/* or packages/*)
+    if (parts.length >= 2 && (parts[0] === 'apps' || parts[0] === 'packages')) {
+      const workspace = path.join(parts[0], parts[1]);
+      const workspaceRelativePath = parts.slice(2).join(path.sep);
+
+      if (!filesByWorkspace[workspace]) {
+        filesByWorkspace[workspace] = [];
       }
-      const appRelativePath = relativePath.replace(`apps/${app}/`, '');
-      filesByApp[app].push(appRelativePath);
+      filesByWorkspace[workspace].push(workspaceRelativePath);
     }
-  });
+  }
 
-  return Object.entries(filesByApp).map(
-    ([app, files]) => `cd apps/${app} && pnpm eslint --fix ${files.join(' ')}`
+  return Object.entries(filesByWorkspace).map(
+    ([workspace, files]) => `cd ${workspace} && eslint --fix ${files.join(' ')}`
   );
 };
 
 module.exports = {
   //
-  // Run ESLint and Prettier consecutively for TypeScript files in apps
-  './apps/*/{src,test}/**/*.{tsx,ts}': [ESLintTask, 'prettier --write'],
+  // Run ESLint and Prettier for TypeScript files in apps and packages
+  './{apps,packages}/*/{src,test}/**/*.{tsx,ts}': [ESLintTask, 'prettier --write'],
   //
   // Run Prettier for non-TypeScript files, excluding config files
   '!(./{src,test}/**/*.{tsx,ts}|**/.prettierrc*|**/.eslintrc*|**/eslint.config.*|**/.prettierignore)':
