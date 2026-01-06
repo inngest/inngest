@@ -1,6 +1,6 @@
 /* eslint-disable */
-import type { SpanMetadataKind } from '@components/src/RunDetailsV3/types';
-import type { SpanMetadataScope } from '@components/src/RunDetailsV3/types';
+import type { SpanMetadataKind } from '@inngest/components/RunDetailsV3/types';
+import type { SpanMetadataScope } from '@inngest/components/RunDetailsV3/types';
 import type { TypedDocumentNode as DocumentNode } from '@graphql-typed-document-node/core';
 export type Maybe<T> = T | null;
 export type InputMaybe<T> = T | null | undefined;
