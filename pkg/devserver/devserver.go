@@ -360,6 +360,9 @@ func start(ctx context.Context, opts StartOpts) error {
 			constraintapi.WithRateLimitClient(unshardedRc),
 			constraintapi.WithQueueStateKeyPrefix(redis_state.QueueDefaultKey),
 			constraintapi.WithRateLimitKeyPrefix(rateLimitPrefix),
+			constraintapi.WithEnableHighCardinalityInstrumentation(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool) {
+				return false
+			}),
 		)
 		if err != nil {
 			return fmt.Errorf("could not create contraint API: %w", err)
