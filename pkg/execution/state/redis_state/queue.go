@@ -53,11 +53,12 @@ func (q *queue) Client() *QueueClient {
 	return q.RedisClient
 }
 
-func NewRedisQueue(options osqueue.QueueOptions, name string, queueClient *QueueClient) RedisQueueShard {
+func NewQueueShard(name string, queueClient *QueueClient, opts ...osqueue.QueueOpt) RedisQueueShard {
+	options := osqueue.NewQueueOptions(context.TODO(), opts...)
 	q := &queue{
 		name:         name,
 		itemIndexer:  QueueItemIndexerFunc,
-		QueueOptions: options,
+		QueueOptions: *options,
 		RedisClient:  queueClient,
 	}
 

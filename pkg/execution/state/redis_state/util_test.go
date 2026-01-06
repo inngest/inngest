@@ -23,10 +23,8 @@ func initRedis(t *testing.T) (*miniredis.Miniredis, rueidis.Client) {
 }
 
 func shardFromClient(name string, rc rueidis.Client, opts ...osqueue.QueueOpt) RedisQueueShard {
-	ctx := context.Background()
-	options := osqueue.NewQueueOptions(ctx, opts...)
 	queueClient := NewQueueClient(rc, QueueDefaultKey)
-	shard := NewRedisQueue(*options, name, queueClient)
+	shard := NewQueueShard(name, queueClient, opts...)
 
 	return shard
 }

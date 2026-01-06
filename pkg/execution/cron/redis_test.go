@@ -284,10 +284,10 @@ func TestNextHealthCheckTime(t *testing.T) {
 		queue.WithClock(clock),
 	}
 
-	shard := redis_state.NewRedisQueue(
-		*queue.NewQueueOptions(ctx, opts...),
+	shard := redis_state.NewQueueShard(
 		consts.DefaultQueueShardName,
 		redis_state.NewQueueClient(rc, consts.DefaultQueueShardName),
+		opts...,
 	)
 
 	q, err := queue.NewQueueProcessor(
@@ -532,10 +532,10 @@ func TestCronHealthCheckJobID(t *testing.T) {
 		queue.WithClock(clock),
 	}
 
-	shard := redis_state.NewRedisQueue(
-		*queue.NewQueueOptions(ctx, opts...),
+	shard := redis_state.NewQueueShard(
 		consts.DefaultQueueShardName,
 		redis_state.NewQueueClient(rc, consts.DefaultQueueShardName),
+		opts...,
 	)
 
 	q, err := queue.NewQueueProcessor(

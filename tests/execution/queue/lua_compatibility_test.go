@@ -115,10 +115,10 @@ func TestLuaCompatibility(t *testing.T) {
 					t.Fatalf("unknown server type: %s", tc.ServerType)
 				}
 
-				shard := redis_state.NewRedisQueue(
-					*queue.NewQueueOptions(ctx, opts...),
+				shard := redis_state.NewQueueShard(
 					consts.DefaultQueueShardName,
 					redis_state.NewQueueClient(client, redis_state.QueueDefaultKey),
+					opts...,
 				)
 
 				return shard
