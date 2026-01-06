@@ -80,7 +80,7 @@ func TestQueuePartitionConcurrency(t *testing.T) {
 		consts.DefaultQueueShardName: shard1,
 	}
 
-	q, err := osqueue.NewQueueProcessor(
+	q, err := osqueue.New(
 		ctx,
 		"test-queue",
 		shard1,

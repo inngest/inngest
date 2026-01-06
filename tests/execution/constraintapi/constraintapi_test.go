@@ -538,7 +538,7 @@ func TestConstraintEnforcement(t *testing.T) {
 			}
 			shard := redis_state.NewQueueShard("test", redis_state.NewQueueClient(rc, "q:v1"), queueOpts...)
 
-			q, err := queue.NewQueueProcessor(
+			q, err := queue.New(
 				ctx,
 				"test-queue",
 				shard,
@@ -1464,7 +1464,7 @@ func TestScheduleConstraintAPICompatibility(t *testing.T) {
 		}
 		shard := redis_state.NewQueueShard("test", redis_state.NewQueueClient(rc, "q:v1"), queueOpts...)
 
-		q, err := queue.NewQueueProcessor(
+		q, err := queue.New(
 			ctx,
 			"test-queue",
 			shard,
@@ -1664,7 +1664,7 @@ func TestScheduleConstraintAPICompatibility(t *testing.T) {
 		}
 		shard := redis_state.NewQueueShard("test", redis_state.NewQueueClient(rc, "q:v1"), queueOpts...)
 
-		q, err := queue.NewQueueProcessor(
+		q, err := queue.New(
 			ctx,
 			"test-queue",
 			shard,

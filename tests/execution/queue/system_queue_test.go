@@ -55,7 +55,7 @@ func TestSystemQueueConfigs(t *testing.T) {
 
 	now := clock.Now()
 
-	q, err := queue.NewQueueProcessor(
+	q, err := queue.New(
 		context.Background(),
 		"test-queue",
 		shard,

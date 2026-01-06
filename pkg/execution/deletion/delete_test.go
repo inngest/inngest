@@ -47,7 +47,7 @@ func TestDeleteManager(t *testing.T) {
 	// Set up queue shard
 	shard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), opts...)
 	// Create queue manager
-	queueManager, err := queue.NewQueueProcessor(
+	queueManager, err := queue.New(
 		context.Background(),
 		"delete-test",
 		shard,

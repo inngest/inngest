@@ -174,7 +174,7 @@ func TestScheduleRaceCondition(t *testing.T) {
 	require.NoError(t, err)
 	smv2 := redis_state.MustRunServiceV2(sm)
 
-	rq, err := queue.NewQueueProcessor(
+	rq, err := queue.New(
 		context.Background(),
 		"test-queue",
 		queueShard,
@@ -347,7 +347,7 @@ func TestScheduleRaceConditionWithExistingIdempotencyKey(t *testing.T) {
 	require.NoError(t, err)
 	smv2 := redis_state.MustRunServiceV2(sm)
 
-	rq, err := queue.NewQueueProcessor(
+	rq, err := queue.New(
 		context.Background(),
 		"test-queue",
 		queueShard,
@@ -553,7 +553,7 @@ func TestFinalize(t *testing.T) {
 	require.NoError(t, err)
 	smv2 := redis_state.MustRunServiceV2(sm)
 
-	rq, err := queue.NewQueueProcessor(
+	rq, err := queue.New(
 		context.Background(),
 		"test-queue",
 		queueShard,
@@ -838,7 +838,7 @@ func TestInvokeRetrySucceedsIfPauseAlreadyCreated(t *testing.T) {
 	require.NoError(t, err)
 	smv2 := redis_state.MustRunServiceV2(sm)
 
-	rq, err := queue.NewQueueProcessor(
+	rq, err := queue.New(
 		context.Background(),
 		"test-queue",
 		queueShard,
@@ -1029,7 +1029,7 @@ func TestExecutorReturnsResponseWhenNonRetriableError(t *testing.T) {
 	require.NoError(t, err)
 	smv2 := redis_state.MustRunServiceV2(sm)
 
-	rq, err := queue.NewQueueProcessor(
+	rq, err := queue.New(
 		context.Background(),
 		"test-queue",
 		queueShard,
@@ -1224,7 +1224,7 @@ func TestExecutorScheduleRateLimit(t *testing.T) {
 	require.NoError(t, err)
 	smv2 := redis_state.MustRunServiceV2(sm)
 
-	rq, err := queue.NewQueueProcessor(
+	rq, err := queue.New(
 		context.Background(),
 		"test-queue",
 		queueShard,
@@ -1424,7 +1424,7 @@ func TestExecutorScheduleBacklogSizeLimit(t *testing.T) {
 	require.NoError(t, err)
 	smv2 := redis_state.MustRunServiceV2(sm)
 
-	rq, err := queue.NewQueueProcessor(
+	rq, err := queue.New(
 		context.Background(),
 		"test-queue",
 		queueShard,

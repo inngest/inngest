@@ -290,7 +290,7 @@ func TestNextHealthCheckTime(t *testing.T) {
 		opts...,
 	)
 
-	q, err := queue.NewQueueProcessor(
+	q, err := queue.New(
 		ctx,
 		"test-queue",
 		shard,
@@ -538,7 +538,7 @@ func TestCronHealthCheckJobID(t *testing.T) {
 		opts...,
 	)
 
-	q, err := queue.NewQueueProcessor(
+	q, err := queue.New(
 		ctx,
 		"test-queue",
 		shard,
@@ -668,7 +668,7 @@ func TestRedisCronManager(t *testing.T) {
 		opts...,
 	)
 
-	q, err := queue.NewQueueProcessor(
+	q, err := queue.New(
 		ctx,
 		"test-queue",
 		shard,

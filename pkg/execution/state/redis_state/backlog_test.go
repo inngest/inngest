@@ -1323,7 +1323,7 @@ func TestPartitionBacklogSize(t *testing.T) {
 			r1.FlushAll()
 			r2.FlushAll()
 
-			q1, err := osqueue.NewQueueProcessor(
+			q1, err := osqueue.New(
 				ctx,
 				"q1",
 				shard1,
@@ -1334,7 +1334,7 @@ func TestPartitionBacklogSize(t *testing.T) {
 				opts...,
 			)
 			require.NoError(t, err)
-			q2, err := osqueue.NewQueueProcessor(
+			q2, err := osqueue.New(
 				ctx,
 				"q2",
 				shard2,

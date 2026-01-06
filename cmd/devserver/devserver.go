@@ -97,10 +97,13 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		_ = itrace.CloseUserTracer(ctx)
 	}()
 
+	systemTraceEndpoint := localconfig.GetValue(cmd, "system-trace-endpoint", traceEndpoint)
+	systemTraceURLPath := localconfig.GetValue(cmd, "system-trace-url-path", "/dev/traces/system")
+
 	if err := itrace.NewSystemTracer(ctx, itrace.TracerOpts{
 		ServiceName:   "tracing-system",
-		TraceEndpoint: traceEndpoint,
-		TraceURLPath:  "/dev/traces/system",
+		TraceEndpoint: systemTraceEndpoint,
+		TraceURLPath:  systemTraceURLPath,
 		Type:          itrace.TracerTypeOTLPHTTP,
 	}); err != nil {
 		fmt.Println(err)

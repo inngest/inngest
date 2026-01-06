@@ -1799,7 +1799,7 @@ func TestQueueSetFunctionMigrate(t *testing.T) {
 
 		shardMap := mapFromShards(yoloShard, defaultShard)
 
-		q, err := osqueue.NewQueueProcessor(
+		q, err := osqueue.New(
 			context.Background(),
 			"test-queue",
 			defaultShard,
@@ -2435,7 +2435,7 @@ func TestMigrate(t *testing.T) {
 
 			shards := mapFromShards(shard1, shard2)
 
-			q1, err := osqueue.NewQueueProcessor(
+			q1, err := osqueue.New(
 				context.Background(),
 				"q1",
 				shard1,
@@ -2449,7 +2449,7 @@ func TestMigrate(t *testing.T) {
 
 			require.Equal(t, idempotencyTTL, q1.QueueOptions.IdempotencyTTL)
 
-			q2, err := osqueue.NewQueueProcessor(
+			q2, err := osqueue.New(
 				context.Background(),
 				"q2",
 				shard2,
