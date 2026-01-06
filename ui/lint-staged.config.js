@@ -29,6 +29,7 @@ module.exports = {
   //
   // Run ESLint and Prettier for TypeScript files in apps and packages
   './{apps,packages}/*/{src,test}/**/*.{tsx,ts}': [ESLintTask, 'prettier --write'],
+
   //
   // Run Prettier for non-TypeScript files, excluding config files
   '!(./{src,test}/**/*.{tsx,ts}|**/.prettierrc*|**/.eslintrc*|**/eslint.config.*|**/.prettierignore)':
