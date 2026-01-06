@@ -1724,7 +1724,7 @@ func newRunMetadata(data map[string]string) (*runMetadata, error) {
 	if !ok {
 		return nil, fmt.Errorf("no status stored in metadata")
 	}
-	status, err := strconv.Atoi(v)
+	status, err := strconv.Atoi(strings.TrimSuffix(v, ".0"))
 	if err != nil {
 		return nil, fmt.Errorf("invalid function status stored in run metadata: %#v", v)
 	}
@@ -1735,7 +1735,7 @@ func newRunMetadata(data map[string]string) (*runMetadata, error) {
 		if !ok {
 			return 0, fmt.Errorf("no '%s' stored in run metadata", v)
 		}
-		val, err := strconv.Atoi(str)
+		val, err := strconv.Atoi(strings.TrimSuffix(str, ".0"))
 		if err != nil {
 			return 0, fmt.Errorf("invalid '%s' stored in run metadata", v)
 		}
@@ -1747,7 +1747,7 @@ func newRunMetadata(data map[string]string) (*runMetadata, error) {
 	m.StepCount, _ = parseInt("step_count")
 
 	if val, ok := data["version"]; ok && val != "" {
-		v, err := strconv.Atoi(val)
+		v, err := strconv.Atoi(strings.TrimSuffix(val, ".0"))
 		if err != nil {
 			return nil, fmt.Errorf("invalid metadata version detected: %#v", val)
 		}
@@ -1756,7 +1756,7 @@ func newRunMetadata(data map[string]string) (*runMetadata, error) {
 	}
 
 	if val, ok := data["rv"]; ok && val != "" {
-		v, err := strconv.Atoi(val)
+		v, err := strconv.Atoi(strings.TrimSuffix(val, ".0"))
 		if err != nil {
 			return nil, fmt.Errorf("invalid hash version detected: %#v", val)
 		}
@@ -1764,7 +1764,7 @@ func newRunMetadata(data map[string]string) (*runMetadata, error) {
 	}
 
 	if val, ok := data["sat"]; ok && val != "" {
-		v, err := strconv.ParseInt(val, 10, 64)
+		v, err := strconv.ParseInt(strings.TrimSuffix(val, ".0"), 10, 64)
 		if err != nil {
 			return nil, fmt.Errorf("invalid started at timestamp detected: %#v", val)
 		}
