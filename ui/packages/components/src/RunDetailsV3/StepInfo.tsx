@@ -14,6 +14,7 @@ import {
 } from '../DetailsCard/Element';
 import { RerunModal as NewRerunModal, RerunModal } from '../Rerun/RerunModal';
 import { useShared } from '../SharedContext/SharedContext';
+import { useBooleanFlag } from '../SharedContext/useBooleanFlag';
 import { useGetTraceResult } from '../SharedContext/useGetTraceResult';
 import { usePathCreator } from '../SharedContext/usePathCreator';
 import { Time } from '../Time';
@@ -148,6 +149,9 @@ export const StepInfo = ({
     refetchInterval: pollInterval ? pollInterval : undefined,
     preview: tracesPreviewEnabled,
   });
+
+  const { booleanFlag } = useBooleanFlag();
+  const { value: metadataIsEnabled } = booleanFlag('enable-step-metadata', false);
 
   useEffect(() => {
     result && setPollInterval(undefined);
@@ -288,7 +292,7 @@ export const StepInfo = ({
                 id: 'attributes',
                 node: <UserlandAttrs userlandSpan={trace.userlandSpan} />,
               },
-              ...(trace.metadata?.length
+              ...(metadataIsEnabled && trace.metadata?.length
                 ? [
                     {
                       label: 'Metadata',
@@ -346,7 +350,7 @@ export const StepInfo = ({
                         },
                       ]
                     : []),
-                  ...(trace.metadata?.length
+                  ...(metadataIsEnabled && trace.metadata?.length
                     ? [
                         {
                           label: 'Metadata',
