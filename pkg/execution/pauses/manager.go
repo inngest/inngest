@@ -8,9 +8,11 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/expr"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -294,7 +296,12 @@ func (m manager) PausesSinceWithCreatedAt(ctx context.Context, index Index, sinc
 // LoadEvaluablesSince calls PausesSince and implements the aggregate expression interface implementation
 // for grouping many pauses together.
 func (m manager) LoadEvaluablesSince(ctx context.Context, workspaceID uuid.UUID, eventName string, since time.Time, do func(context.Context, expr.Evaluable) error) error {
-	iter, err := m.PausesSince(ctx, Index{WorkspaceID: workspaceID, EventName: eventName}, since)
+	// Keep a list of pauses that should be deleted because they've expired.
+	expired := []*state.Pause{}
+
+	index := Index{WorkspaceID: workspaceID, EventName: eventName}
+
+	iter, err := m.PausesSince(ctx, index, since)
 	if err != nil {
 		return err
 	}
@@ -304,9 +311,43 @@ func (m manager) LoadEvaluablesSince(ctx context.Context, workspaceID uuid.UUID,
 		if pause == nil {
 			continue
 		}
+		if pause.Expires.Time().Before(time.Now()) {
+			// runTS is the time that the run started.
+			runTS := time.UnixMilli(int64(pause.Identifier.RunID.Time()))
+
+			// isMaxAge returns whether the pause is greater than the max age of a run
+			isMaxAge := time.Now().Add(-1 * consts.CancelTimeout).After(runTS)
+
+			afterGrace := pause.Expires.Time().Add(consts.PauseExpiredDeletionGracePeriod).Before(time.Now())
+
+			if isMaxAge || afterGrace {
+				expired = append(expired, pause)
+			}
+
+			continue
+		}
+
 		if err := do(ctx, pause); err != nil {
 			return err
 		}
+	}
+
+	// GC pauses on fetch.
+	if len(expired) > 0 {
+		go func() {
+			start := time.Now()
+			count := int64(len(expired))
+			l := logger.StdlibLogger(ctx).With("workspace_id", workspaceID, "event", eventName)
+
+			for _, pause := range expired {
+				l.Debug("deleting expired pause in iterator", "pause", pause)
+				_ = m.Delete(ctx, index, *pause)
+				time.Sleep(5 * time.Millisecond)
+			}
+
+			l.Debug("finished deleting expired pauses", "count", count, "duration_ms", time.Since(start).Milliseconds())
+			metrics.IncrPausesExpiredDeletedCounter(ctx, count, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{}})
+		}()
 	}
 
 	if iter.Error() != context.Canceled && (iter.Error() != nil && iter.Error().Error() != "scan done") {

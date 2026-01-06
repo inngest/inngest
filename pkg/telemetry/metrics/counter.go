@@ -808,6 +808,15 @@ func IncrQueueItemConstraintCheckFallbackCounter(ctx context.Context, reason str
 	})
 }
 
+func IncrPausesExpiredDeletedCounter(ctx context.Context, count int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, count, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "pauses_expired_deleted_total",
+		Description: "Total number of expired pauses deleted during load",
+		Tags:        opts.Tags,
+	})
+}
+
 func IncrBacklogRefillConstraintCheckFallbackCounter(ctx context.Context, reason string, opts CounterOpt) {
 	if opts.Tags == nil {
 		opts.Tags = map[string]any{}
