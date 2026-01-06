@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/inngest/inngest/pkg/util/errs"
 	"github.com/oklog/ulid/v2"
@@ -184,7 +185,7 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 	requestLatency := now.Sub(req.CurrentTime)
 	if requestLatency > MaximumAllowedRequestDelay {
 		// TODO : Set proper error code
-		return nil, errs.Wrap(0, false, "exceeded maximum allowed request delay")
+		return nil, errs.Wrap(0, false, "exceeded maximum allowed request delay, latency: %s", requestLatency)
 	}
 
 	// Retrieve client and key prefix for current constraints
@@ -343,6 +344,25 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 		"expired", parsedResponse.ExpiredAccountLeases,
 		"earliest_expiry", time.UnixMilli(int64(parsedResponse.EarliestLeaseExpiry)),
 	)
+
+	// Export metrics for leases requested and granted
+	metrics.IncrConstraintAPILeasesRequestedCounter(ctx, int64(parsedResponse.Requested), metrics.CounterOpt{
+		PkgName: "constraintapi",
+	})
+
+	metrics.IncrConstraintAPILeasesGrantedCounter(ctx, int64(parsedResponse.Granted), metrics.CounterOpt{
+		PkgName: "constraintapi",
+	})
+
+	// Export counter for limitingConstraints
+	for _, constraint := range limitingConstraints {
+		metrics.IncrConstraintAPILimitingConstraintsCounter(ctx, metrics.CounterOpt{
+			PkgName: "constraintapi",
+			Tags: map[string]any{
+				"limiting_constraint": constraint.LimitingConstraintIdentifier(),
+			},
+		})
+	}
 
 	switch parsedResponse.Status {
 	case 1, 3:
