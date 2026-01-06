@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/oklog/ulid/v2"
 )
@@ -129,12 +130,22 @@ func (d *dualIter) Next(ctx context.Context) bool {
 		return true
 	}
 
+	// We just finished iterating through the buffer, so refresh block list
+	// to catch any new blocks that were created while processing the buffer.
+	// If we didn't buffer iterate at all, we do not need to refresh the block
+	// list.
+	if d.usingBuffer {
+		// NOTE: This handles the race condition where pauses were flushed to a block
+		// just after our initial block fetching and were already deleted from
+		// the buffer after the flush, making them invisible to iteration.
+		d.refreshBlockList(ctx)
+	}
 	d.usingBuffer = false
 
 	// NOTE: We must release the lock as soon as possible such that the fetchBlock
 	// background thread can grab the lock to adjust pauses.
 	d.l.Lock()
-	quit := len(d.pauses) == 0 && len(d.inflightBlocks) == 0
+	quit := len(d.pauses) == 0 && len(d.inflightBlocks) == 0 && len(d.unfetchedBlocks) == 0
 	d.l.Unlock()
 
 	if quit {
@@ -251,6 +262,48 @@ func (d *dualIter) fetchNextBlocks() bool {
 	}
 
 	return true
+}
+
+// refreshBlockList fetches the latest block IDs and adds any new ones to unfetchedBlocks.
+func (d *dualIter) refreshBlockList(ctx context.Context) {
+	blockIDs, err := d.getBlockIDs()
+	if err != nil {
+		d.l.Lock()
+		if d.err == nil {
+			d.err = err
+		}
+		d.l.Unlock()
+		return
+	}
+
+	d.l.Lock()
+	defer d.l.Unlock()
+
+	// Add any blocks that are completely new (not in any of our tracking maps/slices)
+	for _, blockID := range blockIDs {
+		// Skip if already fetched or in flight
+		_, fetched := d.fetchedBlocks[blockID]
+		_, inflight := d.inflightBlocks[blockID]
+		if fetched || inflight {
+			continue
+		}
+
+		// Skip if already in unfetched blocks
+		isUnfetched := false
+		for _, unfetched := range d.unfetchedBlocks {
+			if unfetched == blockID {
+				isUnfetched = true
+				break
+			}
+		}
+		if isUnfetched {
+			continue
+		}
+
+		// This is a new block, add it to unfetched
+		d.unfetchedBlocks = append(d.unfetchedBlocks, blockID)
+		logger.From(ctx).Debug("block was flushed during buffer iteration", "block_id", blockID)
+	}
 }
 
 func (d *dualIter) fetchBlock(ctx context.Context, id ulid.ULID) {
