@@ -75,7 +75,6 @@ export function useEventTypes() {
       const eventTypesData = result.data.environment.eventTypesV2;
       const events = eventTypesData.edges.map(({ node }) => ({
         name: node.name,
-        latestSchema: '',
         functions: node.functions.edges.map((f) => f.node),
         archived,
       }));

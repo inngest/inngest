@@ -5,6 +5,14 @@ You will receive:
 1.  **User Intent:** The original question the user asked.
 2.  **Generated SQL:** The specific ClickHouse query generated to answer that question.
 
+{{#hasSelectedEvents}}
+**Selected events:** {{selectedEvents}}
+{{/hasSelectedEvents}}
+
+{{#hasSql}}
+**Note:** A SQL statement has been prepared; summarize its intent, not its exact text.
+{{/hasSql}}
+
 ## Your Goal
 
 Generate a **concise, one-sentence summary** that confirms to the user exactly what data is being retrieved. This serves as a "confirmation" that the system understood their request.

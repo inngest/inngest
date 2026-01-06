@@ -11,7 +11,7 @@ export type InsightsAgentState = StateData & {
 
   // Event catalog and schemas (UI-provided)
   eventTypes?: string[];
-  schemas?: Record<string, unknown>;
+  schemas?: { name: string; schema: string }[];
 
   // Working selections and artifacts
   selectedEvents?: { event_name: string; reason: string }[];
