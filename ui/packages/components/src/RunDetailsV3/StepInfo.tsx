@@ -14,7 +14,6 @@ import {
 } from '../DetailsCard/Element';
 import { RerunModal as NewRerunModal, RerunModal } from '../Rerun/RerunModal';
 import { useShared } from '../SharedContext/SharedContext';
-import { useBooleanFlag } from '../SharedContext/useBooleanFlag';
 import { useGetTraceResult } from '../SharedContext/useGetTraceResult';
 import { usePathCreator } from '../SharedContext/usePathCreator';
 import { Time } from '../Time';
@@ -150,7 +149,7 @@ export const StepInfo = ({
     preview: tracesPreviewEnabled,
   });
 
-  const { booleanFlag } = useBooleanFlag();
+  // const { booleanFlag } = useBooleanFlag();
   // const { value: metadataIsEnabled } = booleanFlag('enable-step-metadata', false);
   const metadataIsEnabled = true;
 
