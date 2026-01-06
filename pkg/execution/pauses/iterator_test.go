@@ -55,7 +55,9 @@ func TestDualIter(t *testing.T) {
 	}
 
 	// Create dual iterator
-	iter := newDualIter(idx, bufferIter, blockReader, blockIDs)
+	iter := newDualIter(idx, bufferIter, blockReader, func() ([]ulid.ULID, error) {
+		return blockIDs, nil
+	})
 
 	// Test Count
 	expectedCount := len(bufferPauses) + (len(blockIDs) * DefaultPausesPerBlock)
@@ -116,7 +118,9 @@ func TestDualIterConcurrentFetching(t *testing.T) {
 	}
 
 	// Create dual iterator with empty buffer
-	iter := newDualIter(idx, &mockPauseIterator{}, blockReader, blockIDs)
+	iter := newDualIter(idx, &mockPauseIterator{}, blockReader, func() ([]ulid.ULID, error) {
+		return blockIDs, nil
+	})
 
 	// Test iteration
 	ctx := context.Background()
@@ -155,7 +159,9 @@ func TestDualIterErrorHandling(t *testing.T) {
 	}
 
 	// Create dual iterator with empty buffer
-	iter := newDualIter(idx, &mockPauseIterator{}, blockReader, []ulid.ULID{blockID})
+	iter := newDualIter(idx, &mockPauseIterator{}, blockReader, func() ([]ulid.ULID, error) {
+		return []ulid.ULID{blockID}, nil
+	})
 
 	// Test iteration
 	ctx := context.Background()

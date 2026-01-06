@@ -273,17 +273,12 @@ func (m manager) PausesSince(ctx context.Context, index Index, since time.Time) 
 		return bufIter, nil
 	}
 
-	blocks, err := m.bs.BlocksSince(ctx, index, since)
-	if err != nil {
-		return nil, err
-	}
-
 	// Read from block stores and the buffer, creating an iterator that does all.
 	return newDualIter(
 		index,
 		bufIter,
 		m.bs,
-		blocks,
+		func() ([]ulid.ULID, error) { return m.bs.BlocksSince(ctx, index, since) },
 	), nil
 }
 

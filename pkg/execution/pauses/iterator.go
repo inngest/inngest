@@ -20,20 +20,32 @@ const (
 	DefaultConcurrentBlockFetches = 20
 )
 
-func newDualIter(idx Index, bufferedIter state.PauseIterator, rdr BlockReader, blockIDs []ulid.ULID) *dualIter {
-	// NOTE: This is just an estimate, as pauses may have been compacted / had deletions.
-	count := bufferedIter.Count() + (len(blockIDs) * DefaultPausesPerBlock)
-
-	return &dualIter{
+func newDualIter(idx Index, bufferedIter state.PauseIterator, rdr BlockReader, getBlockIDs func() ([]ulid.ULID, error)) *dualIter {
+	iter := &dualIter{
 		idx:             idx,
-		count:           count,
+		count:           bufferedIter.Count(),
 		bufferIter:      bufferedIter,
 		blockReader:     rdr,
-		unfetchedBlocks: blockIDs,
+		getBlockIDs:     getBlockIDs,
+		unfetchedBlocks: []ulid.ULID{},
 		inflightBlocks:  map[ulid.ULID]struct{}{},
+		fetchedBlocks:   map[ulid.ULID]struct{}{},
 		l:               &sync.Mutex{},
 		start:           time.Now(),
 	}
+
+	// Initialize block IDs on creation
+	blockIDs, err := getBlockIDs()
+	if err != nil {
+		iter.err = err
+		return iter
+	}
+
+	// NOTE: This is just an estimate, as pauses may have been compacted / had deletions.
+	iter.count = bufferedIter.Count() + (len(blockIDs) * DefaultPausesPerBlock)
+	iter.unfetchedBlocks = blockIDs
+
+	return iter
 }
 
 // dualIter represents an iterator that reads from blocks as well as buffers,
@@ -44,7 +56,7 @@ type dualIter struct {
 	// index is the current iterator index.
 	index int64
 
-	// count is an esitmate of the max pauses in the iterator.
+	// count is an estimate of the max pauses in the iterator.
 	count int
 
 	// usingBuffer indicates whether we're using the buffer for the next
@@ -58,6 +70,10 @@ type dualIter struct {
 	// blockReader is the block reader to fetch metadata and blocks.
 	blockReader BlockReader
 
+	// getBlockIDs is a callback function to retrieve block IDs that can be
+	// called multiple times to refresh the list of available blocks.
+	getBlockIDs func() ([]ulid.ULID, error)
+
 	// unfetchedBlocks represents the set of blocks that haven't been fetched
 	// from the backing store yet.
 	unfetchedBlocks []ulid.ULID
@@ -65,6 +81,10 @@ type dualIter struct {
 	// inflightBlocks represents blocks that are currently being fetched from
 	// the backing store.
 	inflightBlocks map[ulid.ULID]struct{}
+
+	// fetchedBlocks represents blocks that have been successfully fetched
+	// and processed.
+	fetchedBlocks map[ulid.ULID]struct{}
 
 	// pauses represents the current pauses that have been fetched from downloaded
 	// blocks.
@@ -261,6 +281,8 @@ func (d *dualIter) fetchBlock(ctx context.Context, id ulid.ULID) {
 	defer d.l.Unlock()
 	// Remove this from in-flight stuff.
 	delete(d.inflightBlocks, id)
+	// Add to fetched blocks to keep track of already processed blocks.
+	d.fetchedBlocks[id] = struct{}{}
 	// And, of course, add our pauses so that we can iterate through them.
 	d.pauses = append(d.pauses, block.Pauses...)
 
