@@ -3,6 +3,7 @@ package queue
 import (
 	"context"
 
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 	"github.com/oklog/ulid/v2"
@@ -41,7 +42,7 @@ func (q *queueProcessor) runInstrumentation(ctx context.Context) {
 		case <-instr.Chan():
 			if q.isInstrumentator() {
 				if err := q.primaryQueueShard.Instrument(ctx); err != nil {
-					q.log.Error("error running instrumentation", "error", err)
+					logger.StdlibLogger(ctx).Error("error running instrumentation", "error", err)
 				}
 			}
 		case <-tick.Chan():
@@ -54,7 +55,7 @@ func (q *queueProcessor) runInstrumentation(ctx context.Context) {
 			}
 
 			if err != nil {
-				q.log.Error("error claiming instrumentation lease", "error", err)
+				logger.StdlibLogger(ctx).Error("error claiming instrumentation lease", "error", err)
 				setLease(nil)
 				continue
 			}

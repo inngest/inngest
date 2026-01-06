@@ -1,6 +1,10 @@
 package queue
 
-import "context"
+import (
+	"context"
+
+	"github.com/inngest/inngest/pkg/logger"
+)
 
 func (q *queueProcessor) runActiveChecker(ctx context.Context) {
 	// Attempt to claim the lease immediately.
@@ -28,10 +32,10 @@ func (q *queueProcessor) runActiveChecker(ctx context.Context) {
 			if q.isActiveChecker() {
 				count, err := q.primaryQueueShard.ActiveCheck(ctx)
 				if err != nil {
-					q.log.Error("error checking active jobs", "error", err)
+					logger.StdlibLogger(ctx).Error("error checking active jobs", "error", err)
 				}
 				if count > 0 {
-					q.log.Trace("checked active jobs", "len", count)
+					logger.StdlibLogger(ctx).Trace("checked active jobs", "len", count)
 				}
 			}
 		case <-tick.Chan():
@@ -46,7 +50,7 @@ func (q *queueProcessor) runActiveChecker(ctx context.Context) {
 				continue
 			}
 			if err != nil {
-				q.log.Error("error claiming active checker lease", "error", err)
+				logger.StdlibLogger(ctx).Error("error claiming active checker lease", "error", err)
 				q.activeCheckerLeaseLock.Lock()
 				q.activeCheckerLeaseID = nil
 				q.activeCheckerLeaseLock.Unlock()

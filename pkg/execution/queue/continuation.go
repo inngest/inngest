@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"golang.org/x/sync/errgroup"
 )
@@ -107,7 +108,7 @@ func (q *queueProcessor) scanContinuations(ctx context.Context) error {
 				return nil
 			}
 
-			q.log.Trace("continue partition processing", "partition_id", p.ID, "count", c.count)
+			logger.StdlibLogger(ctx).Trace("continue partition processing", "partition_id", p.ID, "count", c.count)
 
 			if err := q.ProcessPartition(ctx, p, cont.count, false); err != nil {
 				if err == ErrPartitionNotFound || err == ErrPartitionGarbageCollected {
@@ -115,7 +116,7 @@ func (q *queueProcessor) scanContinuations(ctx context.Context) error {
 					return nil
 				}
 				if errors.Unwrap(err) != context.Canceled {
-					q.log.Error("error processing partition", "error", err)
+					logger.StdlibLogger(ctx).Error("error processing partition", "error", err)
 				}
 				return err
 			}
@@ -235,7 +236,7 @@ func (q *queueProcessor) scanShadowContinuations(ctx context.Context) error {
 					return nil
 				}
 				if !errors.Is(err, context.Canceled) {
-					q.log.Error("error processing shadow partition", "error", err, "continuation", true, "continuation_count", cont.Count)
+					logger.StdlibLogger(ctx).Error("error processing shadow partition", "error", err, "continuation", true, "continuation_count", cont.Count)
 				}
 				return err
 			}

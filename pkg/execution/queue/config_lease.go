@@ -3,6 +3,7 @@ package queue
 import (
 	"context"
 
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/oklog/ulid/v2"
 )
@@ -44,7 +45,7 @@ func (q *queueProcessor) claimSequentialLease(ctx context.Context) {
 				continue
 			}
 			if err != nil {
-				q.log.Error("error claiming sequential lease", "error", err)
+				logger.StdlibLogger(ctx).Error("error claiming sequential lease", "error", err)
 				q.seqLeaseLock.Lock()
 				q.seqLeaseID = nil
 				q.seqLeaseLock.Unlock()

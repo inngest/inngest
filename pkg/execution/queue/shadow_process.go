@@ -379,7 +379,7 @@ func (q *queueProcessor) ProcessShadowPartitionBacklog(
 
 	// May need to normalize - this will not happen for default backlogs
 	if reason := backlog.IsOutdated(constraints); enableKeyQueues && reason != enums.QueueNormalizeReasonUnchanged {
-		l := q.log.With(
+		l := logger.StdlibLogger(ctx).With(
 			"sp", shadowPart,
 			"constraints", constraints,
 			"backlog", backlog,
@@ -510,7 +510,7 @@ func (q *queueProcessor) ProcessShadowPartitionBacklog(
 		res.Constraint = constraintCheckRes.LimitingConstraint
 	}
 
-	q.log.Trace("processed backlog",
+	logger.StdlibLogger(ctx).Trace("processed backlog",
 		"backlog", backlog.BacklogID,
 		"total", res.TotalBacklogCount,
 		"until", res.BacklogCountUntil,
@@ -523,7 +523,7 @@ func (q *queueProcessor) ProcessShadowPartitionBacklog(
 	)
 
 	if len(res.RefilledItems) > 0 && rand.Float64() < 0.05 {
-		q.log.Debug(
+		logger.StdlibLogger(ctx).Debug(
 			"refilled items to ready queue",
 			"job_id", res.RefilledItems,
 			"backlog", backlog.BacklogID,
@@ -666,7 +666,7 @@ func (q *queueProcessor) ScanShadowPartitions(ctx context.Context, until time.Ti
 
 				parts, err := q.primaryQueueShard.PeekShadowPartitions(ctx, &account, sequential, accountPartitionPeekMax, until)
 				if err != nil && !errors.Is(err, context.Canceled) {
-					q.log.ReportError(err, "error peeking account partition",
+					logger.StdlibLogger(ctx).ReportError(err, "error peeking account partition",
 						logger.WithErrorReportTags(map[string]string{
 							"account_id": account.String(),
 						}),

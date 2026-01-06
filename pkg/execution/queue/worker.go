@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 )
 
@@ -31,7 +32,7 @@ func (q *queueProcessor) worker(ctx context.Context, f RunFunc) {
 			// We handle the error individually within process, requeueing
 			// the item into the queue.  Here, the worker can continue as
 			// usual to process the next item.
-			q.log.Error("error processing queue item", "error", err, "item", i)
+			logger.StdlibLogger(ctx).Error("error processing queue item", "error", err, "item", i)
 		}
 	}
 }
@@ -71,7 +72,7 @@ func (q *queueProcessor) shadowWorker(ctx context.Context, qspc chan ShadowParti
 				},
 			)
 			if err != nil {
-				q.log.Error("could not scan shadow partition", "error", err, "shadow_part", msg.ShadowPartition, "continuation_count", msg.ContinuationCount)
+				logger.StdlibLogger(ctx).Error("could not scan shadow partition", "error", err, "shadow_part", msg.ShadowPartition, "continuation_count", msg.ContinuationCount)
 			}
 		}
 	}

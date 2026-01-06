@@ -19,6 +19,8 @@ func (q *queueProcessor) ProcessItem(
 	i ProcessItem,
 	f RunFunc,
 ) error {
+	l := logger.StdlibLogger(ctx)
+
 	qi := i.I
 	p := i.P
 	continuationCtr := i.PCtr
@@ -57,7 +59,7 @@ func (q *queueProcessor) ProcessItem(
 				}
 
 				if leaseID == nil {
-					q.log.Error("cannot extend lease since lease ID is nil", "qi", qi, "partition", p)
+					l.Error("cannot extend lease since lease ID is nil", "qi", qi, "partition", p)
 					// Don't extend lease since one doesn't exist
 					errCh <- fmt.Errorf("cannot extend lease since lease ID is nil")
 					return
@@ -76,7 +78,7 @@ func (q *queueProcessor) ProcessItem(
 					// log error if unexpected; the queue item may be removed by a Dequeue() operation
 					// invoked by finalize() (Cancellations, Parallelism)
 					if !errors.Is(ErrQueueItemNotFound, err) {
-						q.log.Error("error extending lease", "error", err, "qi", qi, "partition", p)
+						l.Error("error extending lease", "error", err, "qi", qi, "partition", p)
 					}
 
 					// always stop processing the queue item if lease cannot be extended
@@ -95,13 +97,13 @@ func (q *queueProcessor) ProcessItem(
 				// - the Constraint API is disabled or the current account is not enrolled
 				// - the Constraint API provided a lease which expired at the time of leasing the queue item
 				if i.CapacityLease == nil {
-					q.log.Trace("item has no capacity lease, skipping lease extension")
+					l.Trace("item has no capacity lease, skipping lease extension")
 					continue
 				}
 
 				currentCapacityLease := capacityLeaseID.get()
 				if currentCapacityLease == nil {
-					q.log.Error("cannot extend capacity lease since capacity lease ID is nil", "qi", qi, "partition", p)
+					l.Error("cannot extend capacity lease since capacity lease ID is nil", "qi", qi, "partition", p)
 					// Don't extend lease since one doesn't exist
 					errCh <- fmt.Errorf("cannot extend lease since lease ID is nil")
 					return
@@ -125,7 +127,7 @@ func (q *queueProcessor) ProcessItem(
 					// log error if unexpected; the queue item may be removed by a Dequeue() operation
 					// invoked by finalize() (Cancellations, Parallelism)
 					if !errors.Is(ErrQueueItemNotFound, err) {
-						q.log.ReportError(
+						l.ReportError(
 							err,
 							"error extending capacity lease",
 							logger.WithErrorReportLog(true),
@@ -183,7 +185,7 @@ func (q *queueProcessor) ProcessItem(
 			case <-longRunningJobStatusTick.Chan():
 			}
 
-			q.log.Debug("long running queue job tick", "item", qi, "dur", q.Clock().Now().Sub(startedAt).String())
+			l.Debug("long running queue job tick", "item", qi, "dur", q.Clock().Now().Sub(startedAt).String())
 		}
 	}()
 
@@ -192,7 +194,7 @@ func (q *queueProcessor) ProcessItem(
 			if r := recover(); r != nil {
 				// Always retry this job.
 				stack := debug.Stack()
-				q.log.Error("job panicked", "error", fmt.Errorf("%v", r), "stack", string(stack))
+				l.Error("job panicked", "error", fmt.Errorf("%v", r), "stack", string(stack))
 				errCh <- AlwaysRetryError(fmt.Errorf("job panicked: %v", r))
 			}
 		}()
@@ -203,7 +205,7 @@ func (q *queueProcessor) ProcessItem(
 
 		if delay > 0 {
 			<-q.Clock().After(delay)
-			q.log.Trace("delaying job in memory",
+			l.Trace("delaying job in memory",
 				"at", qi.AtMS,
 				"ms", delay.Milliseconds(),
 			)
@@ -305,14 +307,14 @@ func (q *queueProcessor) ProcessItem(
 				Source: constraintapi.LeaseSource{Location: constraintapi.CallerLocationItemLease},
 			})
 			if err != nil {
-				q.log.ReportError(err, "failed to release capacity", logger.WithErrorReportTags(map[string]string{
+				l.ReportError(err, "failed to release capacity", logger.WithErrorReportTags(map[string]string{
 					"account_id":  p.AccountID.String(),
 					"lease_id":    currentLeaseID.String(),
 					"function_id": p.FunctionID.String(),
 				}))
 			}
 
-			q.log.Trace("released capacity", "res", res)
+			l.Trace("released capacity", "res", res)
 		})
 	}
 
@@ -341,7 +343,7 @@ func (q *queueProcessor) ProcessItem(
 					return nil
 				}
 
-				q.log.Error("error requeuing job", "error", err, "item", qi)
+				l.Error("error requeuing job", "error", err, "item", qi)
 				return err
 			}
 			if _, ok := err.(QuitError); ok {
@@ -362,7 +364,7 @@ func (q *queueProcessor) ProcessItem(
 		}
 
 		if _, ok := err.(QuitError); ok {
-			q.log.Warn("received queue quit error", "error", err)
+			l.Warn("received queue quit error", "error", err)
 			q.quit <- err
 			return err
 		}

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 )
 
@@ -20,6 +21,8 @@ import (
 // randomOffset allows us to peek jobs out-of-order, and occurs when we hit concurrency key issues
 // such that we can attempt to work on other jobs not blocked by heading concurrency key issues.
 func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition, continuationCount uint, randomOffset bool) error {
+	l := logger.StdlibLogger(ctx)
+
 	// When Constraint API is enabled, disable capacity checks on PartitionLease.
 	// This is necessary as capacity was already granted to individual items, and
 	// constraints like concurrency were consumed.
@@ -185,14 +188,14 @@ func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition
 
 	if processErr := iter.Iterate(ctx); processErr != nil {
 		// Report the eerror.
-		q.log.Error("error iterating queue items", "error", processErr, "partition", p)
+		l.Error("error iterating queue items", "error", processErr, "partition", p)
 		return processErr
 
 	}
 
 	if q.usePeekEWMA {
 		if err := q.primaryQueueShard.SetPeekEWMA(ctx, p.FunctionID, int64(iter.CtrConcurrency+iter.CtrRateLimit)); err != nil {
-			q.log.Warn("error recording concurrency limit for EWMA", "error", err)
+			l.Warn("error recording concurrency limit for EWMA", "error", err)
 		}
 	}
 
@@ -203,7 +206,7 @@ func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition
 		// Note: we must requeue the partition to remove the lease.
 		err := q.primaryQueueShard.PartitionRequeue(ctx, p, q.Clock().Now().Truncate(time.Second).Add(PartitionConcurrencyLimitRequeueExtension), true)
 		if err != nil {
-			q.log.Warn("error requeuieng partition for random peek", "error", err)
+			l.Warn("error requeuieng partition for random peek", "error", err)
 		}
 
 		return q.ProcessPartition(ctx, p, continuationCount, true)

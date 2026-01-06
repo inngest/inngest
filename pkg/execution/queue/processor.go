@@ -43,7 +43,7 @@ func NewQueueProcessor(
 	shardSelector ShardSelector,
 	options ...QueueOpt,
 ) (*queueProcessor, error) {
-	o := NewQueueOptions(ctx, options...)
+	o := NewQueueOptions(options...)
 
 	qp := &queueProcessor{
 		name: name,

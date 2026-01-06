@@ -54,7 +54,7 @@ func (q *queue) Client() *QueueClient {
 }
 
 func NewQueueShard(name string, queueClient *QueueClient, opts ...osqueue.QueueOpt) RedisQueueShard {
-	options := osqueue.NewQueueOptions(context.TODO(), opts...)
+	options := osqueue.NewQueueOptions(opts...)
 	q := &queue{
 		name:         name,
 		itemIndexer:  QueueItemIndexerFunc,
