@@ -2294,3 +2294,134 @@ func TestCleanBlock(t *testing.T) {
 		assert.Equal(t, int64(0), bufLen, "buffer should be empty after cleanup")
 	}, 5*time.Second, 100*time.Millisecond)
 }
+
+func TestDualIteratorBlockRefresh(t *testing.T) {
+	r := miniredis.RunT(t)
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	bucket := memblob.OpenBucket(nil)
+	defer bucket.Close()
+
+	ctx := context.Background()
+	unshardedClient := redis_state.NewUnshardedClient(rc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
+	sm, err := redis_state.New(
+		ctx,
+		redis_state.WithUnshardedClient(unshardedClient),
+	)
+	require.NoError(t, err)
+
+	index := Index{WorkspaceID: uuid.New(), EventName: "test.event"}
+	bufferer := StateBufferer(sm)
+	leaser := redisBlockLeaser{rc: rc, prefix: "test", duration: 5 * time.Second}
+	store, err := NewBlockstore(BlockstoreOpts{
+		PauseClient:      redis_state.NewPauseClient(rc, redis_state.StateDefaultKey),
+		Bucket:           bucket,
+		Bufferer:         bufferer,
+		Leaser:           leaser,
+		CompactionLeaser: leaser,
+		BlockSize:        2,
+		DeleteAfterFlush: func(ctx context.Context, workspaceID uuid.UUID) bool { return true },
+	})
+	require.NoError(t, err)
+
+	// Add one pause to buffer first so we have something to iterate
+	bufferPause := state.Pause{
+		ID:          uuid.New(),
+		WorkspaceID: index.WorkspaceID,
+		CreatedAt:   time.Now(),
+		Identifier: state.PauseIdentifier{
+			RunID:      ulid.MustNew(ulid.Now(), nil),
+			AccountID:  index.WorkspaceID,
+			FunctionID: uuid.New(),
+		},
+		Outgoing: "start",
+		Incoming: "end",
+		StepName: "buffer-pause",
+		Expires:  state.Time(time.Now().Add(10 * time.Hour)),
+		Event:    &index.EventName,
+	}
+	_, err = sm.SavePause(ctx, bufferPause)
+	require.NoError(t, err)
+
+	// Create iterator (gets 0 blocks, 1 pause in buffer)
+	bufIter, err := bufferer.PausesSince(ctx, index, time.Time{})
+	require.NoError(t, err)
+
+	getBlockIDs := func() ([]ulid.ULID, error) {
+		blocks, err := store.BlocksSince(ctx, index, time.Time{})
+		return blocks, err
+	}
+
+	iter := newDualIter(index, bufIter, store, getBlockIDs)
+
+	pastTime := time.Now().Add(-1 * time.Hour)
+	pause1 := state.Pause{
+		ID:          uuid.New(),
+		WorkspaceID: index.WorkspaceID,
+		CreatedAt:   pastTime,
+		Identifier: state.PauseIdentifier{
+			RunID:      ulid.MustNew(ulid.Timestamp(pastTime), nil),
+			AccountID:  index.WorkspaceID,
+			FunctionID: uuid.New(),
+		},
+		Outgoing: "start",
+		Incoming: "end",
+		StepName: "pause-1",
+		Expires:  state.Time(time.Now().Add(10 * time.Hour)),
+		Event:    &index.EventName,
+	}
+	pause2 := state.Pause{
+		ID:          uuid.New(),
+		WorkspaceID: index.WorkspaceID,
+		CreatedAt:   pastTime.Add(time.Second),
+		Identifier: state.PauseIdentifier{
+			RunID:      ulid.MustNew(ulid.Timestamp(pastTime.Add(time.Second)), nil),
+			AccountID:  index.WorkspaceID,
+			FunctionID: uuid.New(),
+		},
+		Outgoing: "start",
+		Incoming: "end",
+		StepName: "pause-2",
+		Expires:  state.Time(time.Now().Add(10 * time.Hour)),
+		Event:    &index.EventName,
+	}
+
+	_, err = sm.SavePause(ctx, pause1)
+	require.NoError(t, err)
+	_, err = sm.SavePause(ctx, pause2)
+	require.NoError(t, err)
+
+	// Flush the pauses to blocks
+	err = store.FlushIndexBlock(ctx, index)
+	require.NoError(t, err)
+
+	// Wait for flush to happen
+	require.EventuallyWithT(t, func(t *assert.CollectT) {
+		bufLen, err := bufferer.BufferLen(ctx, index)
+		assert.NoError(t, err)
+		assert.Equal(t, int64(1), bufLen)
+	}, 5*time.Second, 200*time.Millisecond)
+
+	// Now iterate - should see the 2 pauses thanks to refresh mechanism
+	var seenPauses []uuid.UUID
+	for iter.Next(ctx) {
+		pause := iter.Val(ctx)
+		if pause != nil {
+			seenPauses = append(seenPauses, pause.ID)
+		}
+	}
+
+	require.NoError(t, iter.Error())
+	// Should see 3 pauses: 1 from buffer + 2 from refreshed blocks
+	require.Len(t, seenPauses, 3)
+
+	pauseIDs := map[uuid.UUID]bool{bufferPause.ID: true, pause1.ID: true, pause2.ID: true}
+	for _, id := range seenPauses {
+		require.True(t, pauseIDs[id])
+	}
+}
