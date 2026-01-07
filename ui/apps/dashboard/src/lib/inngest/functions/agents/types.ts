@@ -44,6 +44,8 @@ export type InsightsAgentState = StateData & {
           schema: string;
           schemaLength: number;
         }>;
+        hasCurrentQuery: boolean;
+        currentQueryLength: number;
       };
       output?: {
         sql: string;

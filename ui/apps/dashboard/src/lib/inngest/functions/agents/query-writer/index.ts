@@ -49,6 +49,8 @@ export const generateSqlTool = createTool({
           schemasCount: 0,
           schemaNames: [],
           schemas: [],
+          hasCurrentQuery: false,
+          currentQueryLength: 0,
         },
       };
     }
@@ -85,12 +87,17 @@ export const queryWriterAgent = createAgent<InsightsAgentState>({
         schema: schema.schema,
       }));
 
+    // Get current query if it exists
+    const currentQuery = network?.state.data.currentQuery;
+
     // Prepare context for system prompt hydration
     const promptContext = {
       hasSelectedEvents: selectedEvents.length > 0,
       selectedEvents: selectedEvents.join(', '),
       hasSchemas: selectedSchemas.length > 0,
       schemas: selectedSchemas,
+      hasCurrentQuery: !!currentQuery,
+      currentQuery: currentQuery || '',
     };
 
     // Store prompt context in observability format with schemas
@@ -110,6 +117,8 @@ export const queryWriterAgent = createAgent<InsightsAgentState>({
             schema: schema.schema.substring(0, 2000),
             schemaLength: schema.schema.length,
           })),
+          hasCurrentQuery: !!currentQuery,
+          currentQueryLength: currentQuery?.length || 0,
         },
       };
     }
