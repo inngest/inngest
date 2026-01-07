@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { type AgentStatus } from '@inngest/use-agent';
 
 import { useSQLEditorActions } from '@/components/Insights/InsightsSQLEditor/SQLEditorContext';
@@ -12,29 +12,61 @@ import { AssistantMessage } from './messages/AssistantMessage';
 import { ToolMessage } from './messages/ToolMessage';
 import { UserMessage } from './messages/UserMessage';
 
-// Helper: derive dynamic loading text from event-driven flags
-function getLoadingMessage(flags: {
-  networkActive: boolean;
-  textStreaming: boolean;
-  textCompleted: boolean;
-  toolName?: string | null;
-  status: AgentStatus;
-}): string | null {
-  const { networkActive, textStreaming, textCompleted, toolName } = flags;
-  if (!networkActive) return null;
-  if (textStreaming) return null;
-  if (textCompleted) return null;
-  if (toolName) {
-    switch (toolName) {
-      case 'select_events':
-        return 'Analyzing events…';
-      case 'generate_sql':
-        return 'Generating query...';
-      default:
-        return 'Thinking...';
+// Fun technical phrases that rotate while the agent is working
+const LOADING_PHRASES = [
+  'Analyzing schema…',
+  'Indexing events…',
+  'Parsing metadata…',
+  'Optimizing joins…',
+  'Compiling filters…',
+  'Validating syntax…',
+  'Mapping relations…',
+  'Resolving types…',
+  'Scanning indexes…',
+  'Building AST…',
+  'Inferring constraints…',
+  'Normalizing data…',
+  'Evaluating predicates…',
+  'Projecting columns…',
+  'Aggregating results…',
+  'Planning execution…',
+  'Allocating buffers…',
+  'Streaming rows…',
+  'Caching metadata…',
+  'Rewriting queries…',
+  'Reticulating splines…',
+];
+
+// Hook to rotate through loading phrases every 3 seconds
+function useRotatingLoadingMessage(isLoading: boolean): string {
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    if (isLoading) {
+      // Pick a random starting index
+      setCurrentIndex(Math.floor(Math.random() * LOADING_PHRASES.length));
+
+      // Rotate every 1.5 seconds
+      intervalRef.current = setInterval(() => {
+        setCurrentIndex((prev) => (prev + 1) % LOADING_PHRASES.length);
+      }, 2500);
+    } else {
+      // Clean up interval when not loading
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
     }
-  }
-  return 'Thinking…';
+
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
+  }, [isLoading]);
+
+  return LOADING_PHRASES[currentIndex];
 }
 
 type InsightsChatProps = {
@@ -68,11 +100,16 @@ export function InsightsChat({ agentThreadId, className }: InsightsChatProps) {
   } = useInsightsChatProvider();
 
   // Derive loading flags for this thread from provider
-  const { networkActive, textStreaming, textCompleted, currentToolName } =
-    useMemo(
-      () => getThreadFlags(agentThreadId),
-      [getThreadFlags, agentThreadId],
-    );
+  const { networkActive, textStreaming } = useMemo(
+    () => getThreadFlags(agentThreadId),
+    [getThreadFlags, agentThreadId],
+  );
+
+  // Determine if agent is actively working
+  const isLoading = status !== 'ready' && (networkActive || textStreaming);
+
+  // Get rotating loading message
+  const rotatingMessage = useRotatingLoadingMessage(isLoading);
 
   // Thread switching is handled by ActiveThreadBridge at the TabManager level
 
@@ -130,13 +167,8 @@ export function InsightsChat({ agentThreadId, className }: InsightsChatProps) {
     ],
   );
 
-  const loadingText = getLoadingMessage({
-    networkActive,
-    textStreaming,
-    textCompleted,
-    toolName: currentToolName,
-    status,
-  });
+  // Show rotating message when loading, hide when done
+  const loadingText = isLoading ? rotatingMessage : null;
 
   return (
     <div
