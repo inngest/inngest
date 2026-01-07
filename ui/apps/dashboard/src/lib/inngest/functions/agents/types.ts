@@ -18,6 +18,48 @@ export type InsightsAgentState = StateData & {
   selectionReason?: string;
   currentQuery?: string;
   sql?: string;
+
+  // Observability: Complete agent observability data in final format
+  observability?: {
+    eventMatcher?: {
+      promptContext: {
+        totalEvents: number;
+        hasEvents: boolean;
+        eventsList: string;
+        maxEvents: number;
+      };
+      output?: {
+        selectedEvents: { event_name: string; reason: string }[];
+        selectionReason: string;
+      };
+    };
+    queryWriter?: {
+      promptContext: {
+        selectedEventsCount: number;
+        selectedEventNames: string[];
+        schemasCount: number;
+        schemaNames: string[];
+        schemas: Array<{
+          eventName: string;
+          schema: string;
+          schemaLength: number;
+        }>;
+      };
+      output?: {
+        sql: string;
+        title?: string;
+        reasoning?: string;
+      };
+    };
+    summarizer?: {
+      promptContext: {
+        selectedEventsCount: number;
+        selectedEventNames: string[];
+        hasSql: boolean;
+      };
+      output?: string;
+    };
+  };
 };
 
 export type SelectEventsResult = {

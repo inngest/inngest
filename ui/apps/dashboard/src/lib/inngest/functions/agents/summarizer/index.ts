@@ -15,11 +15,28 @@ export const summarizerAgent = createAgent<InsightsState>({
       ) ?? [];
     const sql = network?.state.data.sql;
 
-    return Mustache.render(systemPrompt, {
+    // Prepare context for system prompt hydration
+    const promptContext = {
       hasSelectedEvents: events.length > 0,
       selectedEvents: events.join(', '),
       hasSql: !!sql,
-    });
+    };
+
+    // Store prompt context in observability format
+    if (network?.state.data) {
+      if (!network.state.data.observability) {
+        network.state.data.observability = {};
+      }
+      network.state.data.observability.summarizer = {
+        promptContext: {
+          selectedEventsCount: events.length,
+          selectedEventNames: events,
+          hasSql: !!sql,
+        },
+      };
+    }
+
+    return Mustache.render(systemPrompt, promptContext);
   },
   model: anthropic({
     model: 'claude-haiku-4-5',

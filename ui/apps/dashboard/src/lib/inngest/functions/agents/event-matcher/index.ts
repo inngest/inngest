@@ -53,6 +53,25 @@ export const selectEventsTool = createTool({
     network.state.data.selectedEvents = events;
     network.state.data.selectionReason = reason;
 
+    // Store output in observability format
+    if (!network.state.data.observability) {
+      network.state.data.observability = {};
+    }
+    if (!network.state.data.observability.eventMatcher) {
+      network.state.data.observability.eventMatcher = {
+        promptContext: {
+          totalEvents: 0,
+          hasEvents: false,
+          eventsList: '',
+          maxEvents: 0,
+        },
+      };
+    }
+    network.state.data.observability.eventMatcher.output = {
+      selectedEvents: selected,
+      selectionReason: reason,
+    };
+
     const result = {
       selected,
       reason,
@@ -70,12 +89,25 @@ export const eventMatcherAgent = createAgent<InsightsAgentState>({
     const events = network?.state.data.eventTypes || [];
     const sample = events.slice(0, 500); // avoid overly long prompts
 
-    return Mustache.render(systemPrompt, {
+    // Prepare context for system prompt hydration
+    const promptContext = {
       totalEvents: events.length,
       hasEvents: sample.length > 0,
       eventsList: sample.join('\n'),
       maxEvents: 500,
-    });
+    };
+
+    // Store prompt context in observability format
+    if (network?.state.data) {
+      if (!network.state.data.observability) {
+        network.state.data.observability = {};
+      }
+      network.state.data.observability.eventMatcher = {
+        promptContext,
+      };
+    }
+
+    return Mustache.render(systemPrompt, promptContext);
   },
   model: anthropic({
     model: 'claude-haiku-4-5',

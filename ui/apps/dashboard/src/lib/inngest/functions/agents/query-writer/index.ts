@@ -34,8 +34,30 @@ export const generateSqlTool = createTool({
   description:
     'Provide the final SQL SELECT statement for ClickHouse based on the selected events and schemas.',
   parameters: GenerateSqlParams as unknown as AnyZodType, // (ted): need to update to latest version of zod + agent-kit
-  handler: (args: unknown) => {
+  handler: (args: unknown, { network }) => {
     const { sql, title, reasoning } = args as z.infer<typeof GenerateSqlParams>;
+
+    // Store output in observability format
+    if (!network.state.data.observability) {
+      network.state.data.observability = {};
+    }
+    if (!network.state.data.observability.queryWriter) {
+      network.state.data.observability.queryWriter = {
+        promptContext: {
+          selectedEventsCount: 0,
+          selectedEventNames: [],
+          schemasCount: 0,
+          schemaNames: [],
+          schemas: [],
+        },
+      };
+    }
+    network.state.data.observability.queryWriter.output = {
+      sql,
+      title,
+      reasoning,
+    };
+
     return {
       sql,
       title,
@@ -63,12 +85,36 @@ export const queryWriterAgent = createAgent<InsightsAgentState>({
         schema: schema.schema,
       }));
 
-    return Mustache.render(systemPrompt, {
+    // Prepare context for system prompt hydration
+    const promptContext = {
       hasSelectedEvents: selectedEvents.length > 0,
       selectedEvents: selectedEvents.join(', '),
       hasSchemas: selectedSchemas.length > 0,
       schemas: selectedSchemas,
-    });
+    };
+
+    // Store prompt context in observability format with schemas
+    if (network?.state.data) {
+      if (!network.state.data.observability) {
+        network.state.data.observability = {};
+      }
+      network.state.data.observability.queryWriter = {
+        promptContext: {
+          selectedEventsCount: selectedEvents.length,
+          selectedEventNames: selectedEvents,
+          schemasCount: selectedSchemas.length,
+          schemaNames: selectedSchemas.map((s) => s.eventName),
+          // Include actual schemas (truncated for observability)
+          schemas: selectedSchemas.map((schema) => ({
+            eventName: schema.eventName,
+            schema: schema.schema.substring(0, 2000),
+            schemaLength: schema.schema.length,
+          })),
+        },
+      };
+    }
+
+    return Mustache.render(systemPrompt, promptContext);
   },
   model: anthropic({
     model: 'claude-sonnet-4-5-20250929',

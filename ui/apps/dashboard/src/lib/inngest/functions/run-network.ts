@@ -61,12 +61,50 @@ export const runAgentNetwork = inngest.createFunction(
       );
 
       // Run the network with streaming enabled
-      await network.run(userMessage, {
+      // network.run() returns a NetworkRun instance with the mutated state
+      const networkRun = await network.run(userMessage, {
         streaming: {
           publish: async (chunk: AgentMessageChunk) => {
             await publish(createChannel(targetChannel).agent_stream(chunk));
           },
         },
+      });
+
+      // Capture summarizer output (doesn't use a tool, just returns text)
+      const summarizerResult = networkRun.state.results.find(
+        (r) => r.agentName === 'Insights Summarizer',
+      );
+      const summaryOutput = summarizerResult?.output.find(
+        (msg) => msg.type === 'text' && msg.role === 'assistant',
+      );
+      if (
+        summaryOutput &&
+        'content' in summaryOutput &&
+        typeof summaryOutput.content === 'string'
+      ) {
+        if (!networkRun.state.data.observability) {
+          networkRun.state.data.observability = {};
+        }
+        if (!networkRun.state.data.observability.summarizer) {
+          networkRun.state.data.observability.summarizer = {
+            promptContext: {
+              selectedEventsCount: 0,
+              selectedEventNames: [],
+              hasSql: false,
+            },
+          };
+        }
+        networkRun.state.data.observability.summarizer.output =
+          summaryOutput.content;
+      }
+
+      // Capture observability data in a separate step
+      await step.run('capture-observability-data', async () => {
+        return {
+          userPrompt: userMessage.content,
+          timestamp: new Date().toISOString(),
+          agents: networkRun.state.data.observability || {},
+        };
       });
 
       return {
