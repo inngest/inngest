@@ -2,6 +2,7 @@ import LoadingIcon from '@/components/Icons/LoadingIcon';
 import SplitView from '@/components/SignIn/SplitView';
 import { OrganizationList, useAuth } from '@clerk/tanstack-react-start';
 import { createFileRoute, useLocation } from '@tanstack/react-router';
+import logoImageUrl from '@inngest/components/icons/logos/inngest-logo-black.png';
 
 type OrganizationListSearchParams = {
   redirect_url?: string;
@@ -39,6 +40,16 @@ function RouteComponent() {
           </div>
         ) : (
           <OrganizationList
+            appearance={{
+              layout: {
+                logoImageUrl,
+              },
+              elements: {
+                footer: 'bg-none',
+                logoBox: 'flex m-0 justify-center',
+                logoImage: 'max-h-16 w-auto object-contain dark:invert',
+              },
+            }}
             hidePersonal={true}
             skipInvitationScreen={true}
             afterCreateOrganizationUrl="/organization-setup"

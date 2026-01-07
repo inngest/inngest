@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { authExchange } from '@urql/exchange-auth';
 import { requestPolicyExchange } from '@urql/exchange-request-policy';
 import { retryExchange } from '@urql/exchange-retry';
@@ -28,6 +28,16 @@ export default function URQLProviderWrapper({
   children: React.ReactNode;
 }) {
   const { isSignedIn, orgId, userId } = useAuth();
+  const prevOrgId = useRef(orgId);
+
+  useEffect(() => {
+    if (prevOrgId.current && orgId && prevOrgId.current !== orgId) {
+      //
+      // Force hard reload on org switch to ensure server-side session sync
+      window.location.reload();
+    }
+    prevOrgId.current = orgId;
+  }, [orgId]);
 
   return (
     <URQLProvider key={`${isSignedIn}-${orgId}-${userId}`}>
@@ -78,7 +88,9 @@ export function URQLProvider({ children }: { children: React.ReactNode }) {
           retryIf: isUnauthenticatedError,
         }),
         authExchange(async (utils) => {
-          let sessionToken = await getToken();
+          //
+          // Use skipCache to ensure we get a fresh token, especially after org switches
+          let sessionToken = await getToken({ skipCache: true });
           return {
             addAuthToOperation: (operation) => {
               if (!sessionToken) return operation;
