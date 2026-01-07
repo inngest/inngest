@@ -8,6 +8,7 @@ type ExpansionProviderProps = {
 type ExpansionContextValue = {
   isExpanded: (path: string) => boolean;
   toggle: (path: string) => void;
+  toggleRecursive: (path: string, allPaths: string[]) => void;
 };
 
 const ExpansionContext = createContext<ExpansionContextValue | undefined>(undefined);
@@ -25,7 +26,25 @@ export function ExpansionProvider({ children, defaultExpandedPaths }: ExpansionP
     });
   }, []);
 
-  const value = useMemo(() => ({ isExpanded, toggle }), [isExpanded, toggle]);
+  const toggleRecursive = useCallback((path: string, allPaths: string[]) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(path)) {
+        // If collapsing, only remove the clicked path
+        next.delete(path);
+      } else {
+        // If expanding, add the path and all descendant paths
+        next.add(path);
+        allPaths.forEach((p) => next.add(p));
+      }
+      return next;
+    });
+  }, []);
+
+  const value = useMemo(
+    () => ({ isExpanded, toggle, toggleRecursive }),
+    [isExpanded, toggle, toggleRecursive]
+  );
 
   return <ExpansionContext.Provider value={value}>{children}</ExpansionContext.Provider>;
 }
