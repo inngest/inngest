@@ -25,7 +25,7 @@ import (
 )
 
 // getItemIDsFromBacklog is a helper function to peek items from a backlog and extract their IDs
-func getItemIDsFromBacklog(ctx context.Context, mgr redis_state.BacklogManager, backlog *redis_state.QueueBacklog, refillUntil time.Time, limit int64) ([]string, error) {
+func getItemIDsFromBacklog(ctx context.Context, mgr queue.ShardOperations, backlog *queue.QueueBacklog, refillUntil time.Time, limit int64) ([]string, error) {
 	items, _, err := mgr.BacklogPeek(ctx, backlog, time.Time{}, refillUntil, limit)
 	if err != nil {
 		return nil, err
@@ -75,7 +75,7 @@ func TestLuaCompatibility(t *testing.T) {
 		t.Run(tc.Name, func(t *testing.T) {
 			ctx := context.Background()
 
-			setup := func(t *testing.T) redis_state.QueueShard {
+			setup := func(t *testing.T, opts ...queue.QueueOpt) redis_state.RedisQueueShard {
 				// Start the appropriate server based on test case
 				var client rueidis.Client
 
@@ -115,11 +115,12 @@ func TestLuaCompatibility(t *testing.T) {
 					t.Fatalf("unknown server type: %s", tc.ServerType)
 				}
 
-				shard := redis_state.QueueShard{
-					Kind:        string(enums.QueueShardKindRedis),
-					RedisClient: redis_state.NewQueueClient(client, redis_state.QueueDefaultKey),
-					Name:        consts.DefaultQueueShardName,
-				}
+				shard := redis_state.NewQueueShard(
+					consts.DefaultQueueShardName,
+					redis_state.NewQueueClient(client, redis_state.QueueDefaultKey),
+					opts...,
+				)
+
 				return shard
 			}
 
@@ -129,7 +130,17 @@ func TestLuaCompatibility(t *testing.T) {
 				shard := setup(t)
 
 				// Initialize queue
-				q := redis_state.NewQueue(shard)
+				q, err := queue.New(
+					context.Background(),
+					"test-queue",
+					shard,
+					map[string]queue.QueueShard{
+						shard.Name(): shard,
+					},
+					func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
+						return shard, nil
+					})
+				require.NoError(t, err)
 
 				// Test data setup
 				accountID := uuid.New()
@@ -150,19 +161,19 @@ func TestLuaCompatibility(t *testing.T) {
 				}
 
 				// - Enqueue item
-				enqueuedItem, err := q.EnqueueItem(ctx, shard, queueItem, now, queue.EnqueueOpts{})
+				enqueuedItem, err := shard.EnqueueItem(ctx, queueItem, now, queue.EnqueueOpts{})
 				require.NoError(t, err, "Failed to enqueue item on %s", serverType)
 				require.NotEqual(t, enqueuedItem.ID, ulid.Zero, "Enqueued item should have valid ID on %s", serverType)
 				require.Equal(t, enqueuedItem.FunctionID, functionID, "Function ID should match on %s", serverType)
 
 				// - Peek partition
-				partitions, err := q.PartitionPeek(ctx, true, now.Add(time.Minute), 10)
+				partitions, err := shard.PartitionPeek(ctx, true, now.Add(time.Minute), 10)
 				require.NoError(t, err)
 				require.Len(t, partitions, 1)
 				qp := partitions[0]
 
 				// - Peek item
-				peekedItems, err := q.Peek(ctx, qp, now, 10)
+				peekedItems, err := shard.Peek(ctx, qp, now, 10)
 				require.NoError(t, err, "Failed to peek partition on %s", serverType)
 				require.NotEmpty(t, peekedItems, "Should find items in partition on %s", serverType)
 
@@ -179,7 +190,7 @@ func TestLuaCompatibility(t *testing.T) {
 
 				// - Lease item
 				leaseDuration := 30 * time.Second
-				leaseID, err := q.Lease(ctx, enqueuedItem, leaseDuration, now, nil)
+				leaseID, err := shard.Lease(ctx, enqueuedItem, leaseDuration, now, nil)
 				require.NoError(t, err, "Failed to lease item on %s", serverType)
 				require.NotNil(t, leaseID, "Lease ID should not be nil on %s", serverType)
 
@@ -189,24 +200,40 @@ func TestLuaCompatibility(t *testing.T) {
 				require.NoError(t, err)
 
 				// - Requeue partition
-				err = q.PartitionRequeue(ctx, shard, qp, requeueTime, false)
+				err = shard.PartitionRequeue(ctx, qp, requeueTime, false)
 				require.NoError(t, err, "Failed to requeue partition on %s", serverType)
 
 				// Verify the item is available for leasing again after requeue
-				peekedAfterRequeue, err := q.Peek(ctx, qp, requeueTime.Add(5*time.Second), 10)
+				peekedAfterRequeue, err := shard.Peek(ctx, qp, requeueTime.Add(5*time.Second), 10)
 				require.NoError(t, err, "Failed to peek partition after requeue on %s", serverType)
 				require.NotEmpty(t, peekedAfterRequeue, "Should find items in partition after requeue on %s", serverType)
 
 				err = q.Dequeue(ctx, shard, enqueuedItem)
 				require.NoError(t, err)
 
-				peekedAfterDequeue, err := q.Peek(ctx, qp, requeueTime.Add(5*time.Second), 10)
+				peekedAfterDequeue, err := shard.Peek(ctx, qp, requeueTime.Add(5*time.Second), 10)
 				require.NoError(t, err, "Failed to peek partition after requeue on %s", serverType)
 				require.Empty(t, peekedAfterDequeue, "Should not find items in partition after dequeue on %s", serverType)
 			})
 
 			t.Run("lease with throttle", func(t *testing.T) {
-				shard := setup(t)
+				expr := "event.data.customerID"
+				exprHash := util.XXHash(expr)
+
+				opts := []queue.QueueOpt{
+					queue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p queue.PartitionIdentifier) queue.PartitionConstraintConfig {
+						return queue.PartitionConstraintConfig{
+							Throttle: &queue.PartitionThrottle{
+								ThrottleKeyExpressionHash: exprHash,
+								Limit:                     5,
+								Burst:                     0,
+								Period:                    60,
+							},
+						}
+					}),
+				}
+
+				shard := setup(t, opts...)
 
 				// Test data setup
 				accountID := uuid.New()
@@ -214,23 +241,23 @@ func TestLuaCompatibility(t *testing.T) {
 				runID := ulid.Make()
 				now := time.Now().Truncate(time.Second)
 
-				expr := "event.data.customerID"
-				exprHash := util.XXHash(expr)
 				throttleKey := "customer-test"
 				keyHash := util.XXHash(throttleKey)
 
 				// Initialize queue
-				q := redis_state.NewQueue(shard,
-					redis_state.WithPartitionConstraintConfigGetter(func(ctx context.Context, p redis_state.PartitionIdentifier) redis_state.PartitionConstraintConfig {
-						return redis_state.PartitionConstraintConfig{
-							Throttle: &redis_state.PartitionThrottle{
-								ThrottleKeyExpressionHash: exprHash,
-								Limit:                     5,
-								Burst:                     0,
-								Period:                    60,
-							},
-						}
-					}))
+				_, err := queue.New(
+					context.Background(),
+					"test-queue",
+					shard,
+					map[string]queue.QueueShard{
+						shard.Name(): shard,
+					},
+					func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
+						return shard, nil
+					},
+					opts...,
+				)
+				require.NoError(t, err)
 
 				// Create a queue item for testing
 				queueItem := queue.QueueItem{
@@ -252,17 +279,15 @@ func TestLuaCompatibility(t *testing.T) {
 					},
 				}
 
-				qi, err := q.EnqueueItem(ctx, shard, queueItem, now, queue.EnqueueOpts{})
+				qi, err := shard.EnqueueItem(ctx, queueItem, now, queue.EnqueueOpts{})
 				require.NoError(t, err)
 
-				leaseID, err := q.Lease(ctx, qi, 5*time.Second, now, nil)
+				leaseID, err := shard.Lease(ctx, qi, 5*time.Second, now, nil)
 				require.NoError(t, err)
 				require.NotNil(t, leaseID)
 			})
 
 			t.Run("backlog refill with throttle", func(t *testing.T) {
-				shard := setup(t)
-
 				// Test data setup
 				accountID := uuid.New()
 				functionID := uuid.New()
@@ -274,8 +299,8 @@ func TestLuaCompatibility(t *testing.T) {
 				throttleKey := "customer-test"
 				keyHash := util.XXHash(throttleKey)
 
-				constraints := redis_state.PartitionConstraintConfig{
-					Throttle: &redis_state.PartitionThrottle{
+				constraints := queue.PartitionConstraintConfig{
+					Throttle: &queue.PartitionThrottle{
 						ThrottleKeyExpressionHash: exprHash,
 						Limit:                     5,
 						Burst:                     0,
@@ -283,14 +308,30 @@ func TestLuaCompatibility(t *testing.T) {
 					},
 				}
 
-				// Initialize queue
-				q := redis_state.NewQueue(shard,
-					redis_state.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+				opts := []queue.QueueOpt{
+					queue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p queue.PartitionIdentifier) queue.PartitionConstraintConfig {
+						return constraints
+					}),
+					queue.WithAllowKeyQueues(func(ctx context.Context, acctID, fnID uuid.UUID) bool {
 						return true
 					}),
-					redis_state.WithPartitionConstraintConfigGetter(func(ctx context.Context, p redis_state.PartitionIdentifier) redis_state.PartitionConstraintConfig {
-						return constraints
-					}))
+				}
+
+				shard := setup(t, opts...)
+
+				q, err := queue.New(
+					context.Background(),
+					"test-queue",
+					shard,
+					map[string]queue.QueueShard{
+						shard.Name(): shard,
+					},
+					func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
+						return shard, nil
+					},
+					opts...,
+				)
+				require.NoError(t, err)
 
 				// Create a queue item for testing
 				queueItem := queue.QueueItem{
@@ -313,22 +354,21 @@ func TestLuaCompatibility(t *testing.T) {
 				}
 
 				// Enqueue to backlog
-				qi, err := q.EnqueueItem(ctx, shard, queueItem, now, queue.EnqueueOpts{})
+				qi, err := shard.EnqueueItem(ctx, queueItem, now, queue.EnqueueOpts{})
 				require.NoError(t, err)
 
-				backlog := q.ItemBacklog(ctx, qi)
-				sp := q.ItemShadowPartition(ctx, qi)
+				backlog := queue.ItemBacklog(ctx, qi)
+				sp := queue.ItemShadowPartition(ctx, qi)
 
 				// Use BacklogManager interface to peek items and get their IDs
-				var mgr redis_state.BacklogManager = q
 				refillUntil := now.Add(time.Minute)
-				refillItems, err := getItemIDsFromBacklog(ctx, mgr, &backlog, refillUntil, 10)
+				refillItems, err := getItemIDsFromBacklog(ctx, shard, &backlog, refillUntil, 10)
 				require.NoError(t, err)
 
-				res, err := q.BacklogRefill(ctx, &backlog, &sp, refillUntil, refillItems, constraints)
+				res, err := shard.BacklogRefill(ctx, &backlog, &sp, refillUntil, refillItems, constraints)
 				require.NoError(t, err)
 				require.NotNil(t, res)
-				require.Equal(t, 1, res.Refill)
+				require.Equal(t, 1, res.Refill, *res)
 				require.Equal(t, 1, res.Refilled)
 
 				// Add second item with capacity lease
@@ -353,23 +393,23 @@ func TestLuaCompatibility(t *testing.T) {
 				}
 
 				// Enqueue to backlog
-				qi2, err := q.EnqueueItem(ctx, shard, item2, now, queue.EnqueueOpts{})
+				qi2, err := shard.EnqueueItem(ctx, item2, now, queue.EnqueueOpts{})
 				require.NoError(t, err)
 
-				refillItems, err = getItemIDsFromBacklog(ctx, mgr, &backlog, refillUntil, 10)
+				refillItems, err = getItemIDsFromBacklog(ctx, shard, &backlog, refillUntil, 10)
 				require.NoError(t, err)
 
 				// Refill with capacity lease awareness
-				res, err = q.BacklogRefill(
+				res, err = shard.BacklogRefill(
 					ctx,
 					&backlog,
 					&sp,
 					refillUntil,
 					refillItems,
 					constraints,
-					redis_state.WithBacklogRefillConstraintCheckIdempotencyKey("acquire-refill"),
-					redis_state.WithBacklogRefillDisableConstraintChecks(true),
-					redis_state.WithBacklogRefillItemCapacityLeases([]queue.CapacityLease{{
+					queue.WithBacklogRefillConstraintCheckIdempotencyKey("acquire-refill"),
+					queue.WithBacklogRefillDisableConstraintChecks(true),
+					queue.WithBacklogRefillItemCapacityLeases([]queue.CapacityLease{{
 						LeaseID: capacityLeaseID,
 					}}),
 				)
@@ -378,7 +418,7 @@ func TestLuaCompatibility(t *testing.T) {
 				require.Equal(t, 1, res.Refill)
 				require.Equal(t, 1, res.Refilled)
 
-				refilled, err := q.ItemByID(ctx, qi2.ID)
+				refilled, err := q.ItemByID(ctx, shard, qi2.ID)
 				require.NoError(t, err)
 				require.Equal(t, capacityLeaseID.String(), refilled.CapacityLease.LeaseID.String())
 			})
@@ -386,7 +426,7 @@ func TestLuaCompatibility(t *testing.T) {
 			t.Run("current time is returned for rate limiting", func(t *testing.T) {
 				shard := setup(t)
 
-				rc := shard.RedisClient.Client()
+				rc := shard.Client().Client()
 
 				cmd := rc.B().Time().Build()
 				res, err := rc.Do(ctx, cmd).AsStrSlice()
@@ -414,10 +454,10 @@ func TestLuaCompatibility(t *testing.T) {
 					constraintapi.WithEnableDebugLogs(false),
 					constraintapi.WithNumScavengerShards(4),
 					constraintapi.WithQueueShards(map[string]rueidis.Client{
-						shard.Name: shard.RedisClient.Client(),
+						shard.Name(): shard.Client().Client(),
 					}),
 					constraintapi.WithQueueStateKeyPrefix("q:v1"),
-					constraintapi.WithRateLimitClient(shard.RedisClient.Client()),
+					constraintapi.WithRateLimitClient(shard.Client().Client()),
 					constraintapi.WithRateLimitKeyPrefix("rl"),
 				)
 				require.NoError(t, err)
@@ -456,7 +496,7 @@ func TestLuaCompatibility(t *testing.T) {
 				checkResp, userErr, internalErr := cm.Check(ctx, &constraintapi.CapacityCheckRequest{
 					Migration: constraintapi.MigrationIdentifier{
 						IsRateLimit: false,
-						QueueShard:  shard.Name,
+						QueueShard:  shard.Name(),
 					},
 					AccountID:     accountID,
 					EnvID:         envID,
@@ -477,7 +517,7 @@ func TestLuaCompatibility(t *testing.T) {
 				acquireResp, err := cm.Acquire(ctx, &constraintapi.CapacityAcquireRequest{
 					Migration: constraintapi.MigrationIdentifier{
 						IsRateLimit: false,
-						QueueShard:  shard.Name,
+						QueueShard:  shard.Name(),
 					},
 					IdempotencyKey:       "acquire-test",
 					AccountID:            accountID,
@@ -505,7 +545,7 @@ func TestLuaCompatibility(t *testing.T) {
 				extendResp, err := cm.ExtendLease(ctx, &constraintapi.CapacityExtendLeaseRequest{
 					Migration: constraintapi.MigrationIdentifier{
 						IsRateLimit: false,
-						QueueShard:  shard.Name,
+						QueueShard:  shard.Name(),
 					},
 					IdempotencyKey: "extend-test",
 					AccountID:      accountID,
@@ -520,7 +560,7 @@ func TestLuaCompatibility(t *testing.T) {
 				releaseResp, err := cm.Release(ctx, &constraintapi.CapacityReleaseRequest{
 					Migration: constraintapi.MigrationIdentifier{
 						IsRateLimit: false,
-						QueueShard:  shard.Name,
+						QueueShard:  shard.Name(),
 					},
 					IdempotencyKey: "release-test",
 					AccountID:      accountID,

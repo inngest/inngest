@@ -45,6 +45,10 @@ type Config struct {
 	PostgresConnMaxIdleTime int    `koanf:"postgres-conn-max-idle-time"`
 	PostgresConnMaxLifetime int    `koanf:"postgres-conn-max-lifetime"`
 	SqliteDir               string `koanf:"sqlite-dir"`
+
+	// Tracing
+	SystemTraceEndpoint string `koanf:"system-trace-endpoint"`
+	SystemTraceURLPath  string `koanf:"system-trace-url-path"`
 }
 
 // Global variables to store koanf instance and loaded configuration

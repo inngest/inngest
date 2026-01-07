@@ -9,9 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/inngest/inngest/pkg/consts"
-	"github.com/inngest/inngest/pkg/enums"
-
 	"github.com/alicebob/miniredis/v2"
 	"github.com/google/uuid"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
@@ -38,19 +35,19 @@ func TestQueueRunSequential(t *testing.T) {
 	q2ctx, q2cancel := context.WithCancel(ctx)
 	defer q2cancel()
 
-	q1 := NewQueue(
-		QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName},
-		WithNumWorkers(10),
+	q1, _ := newQueue(
+		t, rc,
+		osqueue.WithNumWorkers(10),
 	)
-	q2 := NewQueue(
-		QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName},
-		WithNumWorkers(10),
+	q2, _ := newQueue(
+		t, rc,
+		osqueue.WithNumWorkers(10),
 	)
 
 	// Run the queue.  After running this worker should claim the sequential lease.
 	go func() {
 		_ = q1.Run(q1ctx, func(ctx context.Context, _ osqueue.RunInfo, item osqueue.Item) (osqueue.RunResult, error) {
-			time, ok := GetItemStart(ctx)
+			time, ok := osqueue.GetItemStart(ctx)
 			require.True(t, ok)
 			require.NotZero(t, time)
 			return osqueue.RunResult{}, nil
@@ -65,27 +62,27 @@ func TestQueueRunSequential(t *testing.T) {
 
 	<-time.After(110 * time.Millisecond)
 	// Q1 gets lease, as it started first.
-	require.NotNil(t, q1.sequentialLease())
+	require.NotNil(t, q1.SequentialLease())
 	// Lease is in the future.
-	require.True(t, ulid.Time(q1.sequentialLease().Time()).After(time.Now()))
+	require.True(t, ulid.Time(q1.SequentialLease().Time()).After(time.Now()))
 	// Q2 has no lease.
-	require.Nil(t, q2.sequentialLease())
+	require.Nil(t, q2.SequentialLease())
 
-	<-time.After(ConfigLeaseDuration)
+	<-time.After(osqueue.ConfigLeaseDuration)
 
 	// Q1 retains lease.
-	require.NotNil(t, q1.sequentialLease())
-	require.Nil(t, q2.sequentialLease())
+	require.NotNil(t, q1.SequentialLease())
+	require.Nil(t, q2.SequentialLease())
 
 	// Cancel q1, temrinating the queue with the sequential lease.
 	q1cancel()
 
-	<-time.After(ConfigLeaseDuration * 2)
+	<-time.After(osqueue.ConfigLeaseDuration * 2)
 
 	// Q2 obtains lease.
-	require.NotNil(t, q2.sequentialLease())
+	require.NotNil(t, q2.SequentialLease())
 	// And that the previous lease has expired.
-	lease := q1.sequentialLease()
+	lease := q1.SequentialLease()
 	require.True(t, lease == nil || ulid.Time(lease.Time()).Before(time.Now()))
 }
 
@@ -105,12 +102,12 @@ func TestQueueRunBasic(t *testing.T) {
 	require.NoError(t, err)
 	defer rc.Close()
 
-	q := NewQueue(
-		QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName},
+	q, shard := newQueue(
+		t, rc,
 		// We can't add more than 8128 goroutines when detecting race conditions.
-		WithNumWorkers(10),
+		osqueue.WithNumWorkers(10),
 		// Test custom queue names
-		WithKindToQueueMapping(map[string]string{
+		osqueue.WithKindToQueueMapping(map[string]string{
 			"test-kind": customQueueName,
 		}),
 	)
@@ -173,7 +170,7 @@ func TestQueueRunBasic(t *testing.T) {
 		if n == len(items)-1 {
 			at = time.Now().Add(10 * time.Second)
 		}
-		_, err := q.EnqueueItem(ctx, q.primaryQueueShard, item, at, osqueue.EnqueueOpts{})
+		_, err := shard.EnqueueItem(ctx, item, at, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 	}
 
@@ -201,10 +198,10 @@ func TestQueueRunRetry(t *testing.T) {
 	require.NoError(t, err)
 	defer rc.Close()
 
-	q := NewQueue(
-		QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName},
+	q, shard := newQueue(
+		t, rc,
 		// We can't add more than 8128 goroutines when detecting race conditions.
-		WithNumWorkers(10),
+		osqueue.WithNumWorkers(10),
 	)
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -237,7 +234,7 @@ func TestQueueRunRetry(t *testing.T) {
 	}()
 
 	for _, item := range items {
-		_, err := q.EnqueueItem(ctx, q.primaryQueueShard, item, time.Now(), osqueue.EnqueueOpts{})
+		_, err := shard.EnqueueItem(ctx, item, time.Now(), osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 	}
 
@@ -277,12 +274,12 @@ func TestQueueRunExtended(t *testing.T) {
 	require.NoError(t, err)
 	defer rc.Close()
 
-	q := NewQueue(
-		QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName},
+	q, shard := newQueue(
+		t, rc,
 		// We can't add more than 8128 goroutines when detecting race conditions,
 		// so lower the number of workers.
-		WithNumWorkers(200),
-		WithLogger(l),
+		osqueue.WithNumWorkers(200),
+		osqueue.WithLogger(l),
 	)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -303,12 +300,12 @@ func TestQueueRunExtended(t *testing.T) {
 				// Create new queues every 5 seconds that bring up workers and fail
 				// randomly, between 1 and 10 seconds in.
 				ctx, cancel := context.WithCancel(context.Background())
-				q := NewQueue(
-					QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName},
+				q, _ := newQueue(
+					t, rc,
 					// We can't add more than 8128 goroutines when detecting race conditions,
 					// so lower the number of workers.
-					WithNumWorkers(200),
-					WithLogger(l),
+					osqueue.WithNumWorkers(200),
+					osqueue.WithLogger(l),
 				)
 
 				go func() {
@@ -380,7 +377,7 @@ func TestQueueRunExtended(t *testing.T) {
 					// Enqueue with a delay.
 					diff := mrand.Int31n(atomic.LoadInt32(&delayMax))
 
-					_, err := q.EnqueueItem(ctx, q.primaryQueueShard, item, time.Now().Add(time.Duration(diff)*time.Millisecond), osqueue.EnqueueOpts{})
+					_, err := shard.EnqueueItem(ctx, item, time.Now().Add(time.Duration(diff)*time.Millisecond), osqueue.EnqueueOpts{})
 					require.NoError(t, err)
 					atomic.AddInt64(&added, 1)
 				}
@@ -405,11 +402,11 @@ func TestQueueRunExtended(t *testing.T) {
 					added,
 					added-next,
 				)
-				latencySem.Lock()
+				osqueue.LatencySem().Lock()
 				// NOTE: RUNNING THIS WITH THE RACE CHECKER SIGNIFICANTLY INCREASES LATENCY.
 				// The actual latency should be checked without --race on.
-				fmt.Printf("AVG LATENCY: %dms\n", time.Duration(latencyAvg.Value()).Milliseconds())
-				latencySem.Unlock()
+				fmt.Printf("AVG LATENCY: %dms\n", time.Duration(osqueue.LatencyAverage()).Milliseconds())
+				osqueue.LatencySem().Unlock()
 				prev = next
 			}
 		}
@@ -451,10 +448,10 @@ func TestRunPriorityFactor(t *testing.T) {
 	require.NoError(t, err)
 	defer rc.Close()
 
-	q := NewQueue(
-		QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName},
+	q, _ := newQueue(
+		t, rc,
 		// We can't add more than 8128 goroutines when detecting race conditions.
-		WithNumWorkers(10),
+		osqueue.WithNumWorkers(10),
 	)
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -534,12 +531,13 @@ func TestQueueAllowList(t *testing.T) {
 	allowedQueueName := "allowed"
 	otherQueueName := "other"
 
-	q := NewQueue(
-		QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName},
+	q, shard := newQueue(
+		t, rc,
 		// We can't add more than 8128 goroutines when detecting race conditions.
-		WithNumWorkers(10),
-		WithAllowQueueNames(allowedQueueName),
+		osqueue.WithNumWorkers(10),
+		osqueue.WithAllowQueueNames(allowedQueueName),
 	)
+	kg := shard.Client().kg
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -597,7 +595,7 @@ func TestQueueAllowList(t *testing.T) {
 
 	for _, item := range items {
 		at := time.Now()
-		_, err := q.EnqueueItem(ctx, q.primaryQueueShard, item, at, osqueue.EnqueueOpts{})
+		_, err := shard.EnqueueItem(ctx, item, at, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 	}
 
@@ -612,20 +610,20 @@ func TestQueueAllowList(t *testing.T) {
 	<-time.After(time.Second)
 
 	// Assert queue items have been dequeued, and peek is nil for workflows.
-	val := r.HGet(q.primaryQueueShard.RedisClient.kg.QueueItem(), osqueue.HashID(context.Background(), "i1"))
+	val := r.HGet(kg.QueueItem(), osqueue.HashID(context.Background(), "i1"))
 	require.Equal(t, "", val)
 
 	// No more items in system partition
-	peekedItems, err := q.Peek(context.Background(), &QueuePartition{QueueName: &allowedQueueName}, time.Now(), 1)
+	peekedItems, err := shard.Peek(context.Background(), &osqueue.QueuePartition{QueueName: &allowedQueueName}, time.Now(), 1)
 	require.NoError(t, err)
 	require.Equal(t, 0, len(peekedItems))
 
 	// Still items in other and random partition
-	peekedItems, err = q.Peek(context.Background(), &QueuePartition{QueueName: &otherQueueName}, time.Now(), 1)
+	peekedItems, err = shard.Peek(context.Background(), &osqueue.QueuePartition{QueueName: &otherQueueName}, time.Now(), 1)
 	require.NoError(t, err)
 	require.Equal(t, 1, len(peekedItems))
 
-	peekedItems, err = q.Peek(context.Background(), &QueuePartition{PartitionType: int(enums.PartitionTypeDefault), FunctionID: &uuid.Nil}, time.Now(), 1)
+	peekedItems, err = shard.Peek(context.Background(), &osqueue.QueuePartition{FunctionID: &uuid.Nil}, time.Now(), 1)
 	require.NoError(t, err)
 	require.Equal(t, 1, len(peekedItems), r.Dump())
 
@@ -648,11 +646,11 @@ func TestQueueDenyList(t *testing.T) {
 	deniedQueueName := "denied"
 	otherQueueName := "other"
 
-	q := NewQueue(
-		QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName},
+	q, shard := newQueue(
+		t, rc,
 		// We can't add more than 8128 goroutines when detecting race conditions.
-		WithNumWorkers(10),
-		WithDenyQueueNames(deniedQueueName),
+		osqueue.WithNumWorkers(10),
+		osqueue.WithDenyQueueNames(deniedQueueName),
 	)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -711,7 +709,7 @@ func TestQueueDenyList(t *testing.T) {
 
 	for _, item := range items {
 		at := time.Now()
-		_, err := q.EnqueueItem(ctx, q.primaryQueueShard, item, at, osqueue.EnqueueOpts{})
+		_, err := shard.EnqueueItem(ctx, item, at, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 	}
 
@@ -731,16 +729,16 @@ func TestQueueDenyList(t *testing.T) {
 	require.Equal(t, *qi.QueueName, "denied")
 
 	// No more items in system partition
-	peekedItems, err := q.Peek(context.Background(), &QueuePartition{QueueName: &deniedQueueName}, time.Now(), 1)
+	peekedItems, err := shard.Peek(context.Background(), &osqueue.QueuePartition{QueueName: &deniedQueueName}, time.Now(), 1)
 	require.NoError(t, err)
 	require.Equal(t, 1, len(peekedItems))
 
 	// Still items in other and random partition
-	peekedItems, err = q.Peek(context.Background(), &QueuePartition{QueueName: &otherQueueName}, time.Now(), 1)
+	peekedItems, err = shard.Peek(context.Background(), &osqueue.QueuePartition{QueueName: &otherQueueName}, time.Now(), 1)
 	require.NoError(t, err)
 	require.Equal(t, 0, len(peekedItems))
 
-	peekedItems, err = q.Peek(context.Background(), &QueuePartition{PartitionType: int(enums.PartitionTypeDefault), FunctionID: &uuid.Nil}, time.Now(), 1)
+	peekedItems, err = shard.Peek(context.Background(), &osqueue.QueuePartition{FunctionID: &uuid.Nil}, time.Now(), 1)
 	require.NoError(t, err)
 	require.Equal(t, 0, len(peekedItems), r.Dump())
 
@@ -760,12 +758,12 @@ func TestQueueRunAccount(t *testing.T) {
 	require.NoError(t, err)
 	defer rc.Close()
 
-	q := NewQueue(
-		QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName},
+	q, shard := newQueue(
+		t, rc,
 		// We can't add more than 8128 goroutines when detecting race conditions.
-		WithNumWorkers(10),
+		osqueue.WithNumWorkers(10),
 		// Test custom queue names
-		WithRunMode(QueueRunMode{
+		osqueue.WithRunMode(osqueue.QueueRunMode{
 			Account: true,
 		}),
 	)
@@ -829,7 +827,7 @@ func TestQueueRunAccount(t *testing.T) {
 		if n == len(items)-1 {
 			at = time.Now().Add(10 * time.Second)
 		}
-		_, err := q.EnqueueItem(ctx, q.primaryQueueShard, item, at, osqueue.EnqueueOpts{})
+		_, err := shard.EnqueueItem(ctx, item, at, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 	}
 

@@ -7,8 +7,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/inngest/inngest/pkg/consts"
-	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/jonboulle/clockwork"
@@ -21,24 +19,19 @@ func TestPartitionByID(t *testing.T) {
 
 	ctx := context.Background()
 	clock := clockwork.NewFakeClock()
-	defaultShard := QueueShard{
-		Kind:        string(enums.QueueShardKindRedis),
-		RedisClient: NewQueueClient(rc, QueueDefaultKey),
-		Name:        consts.DefaultQueueShardName,
-	}
 	acctId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
 
 	testcases := []struct {
 		name      string
 		num       int
 		interval  time.Duration
-		expected  PartitionInspectionResult
+		expected  osqueue.PartitionInspectionResult
 		keyQueues bool
 	}{
 		{
 			name: "simple",
 			num:  5,
-			expected: PartitionInspectionResult{
+			expected: osqueue.PartitionInspectionResult{
 				Ready:  5,
 				Future: 5,
 			},
@@ -47,7 +40,7 @@ func TestPartitionByID(t *testing.T) {
 			name:     "with interval",
 			num:      5,
 			interval: time.Second,
-			expected: PartitionInspectionResult{
+			expected: osqueue.PartitionInspectionResult{
 				Ready:  5,
 				Future: 5,
 			},
@@ -55,7 +48,7 @@ func TestPartitionByID(t *testing.T) {
 		{
 			name: "with key queues",
 			num:  10,
-			expected: PartitionInspectionResult{
+			expected: osqueue.PartitionInspectionResult{
 				Backlogs: 1,
 			},
 			keyQueues: true,
@@ -64,7 +57,7 @@ func TestPartitionByID(t *testing.T) {
 			name:     "with key queues interval",
 			num:      10,
 			interval: time.Minute,
-			expected: PartitionInspectionResult{
+			expected: osqueue.PartitionInspectionResult{
 				Backlogs: 1,
 			},
 			keyQueues: true,
@@ -75,12 +68,12 @@ func TestPartitionByID(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			r.FlushAll()
 
-			q := NewQueue(
-				defaultShard,
-				WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+			q, shard := newQueue(
+				t, rc,
+				osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 					return tc.keyQueues
 				}),
-				WithClock(clock),
+				osqueue.WithClock(clock),
 			)
 
 			for i := range tc.num {
@@ -103,11 +96,11 @@ func TestPartitionByID(t *testing.T) {
 					},
 				}
 
-				_, err := q.EnqueueItem(ctx, defaultShard, item, at, osqueue.EnqueueOpts{})
+				_, err := shard.EnqueueItem(ctx, item, at, osqueue.EnqueueOpts{})
 				require.NoError(t, err)
 			}
 
-			res, err := q.PartitionByID(ctx, defaultShard, fnID.String())
+			res, err := q.PartitionByID(ctx, shard, fnID.String())
 			require.NoError(t, err)
 
 			// fmt.Printf("RESULT: %#v\n", res)
