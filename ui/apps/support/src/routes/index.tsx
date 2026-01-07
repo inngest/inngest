@@ -1,10 +1,12 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { ProfileMenu } from "@/components/Navigation/ProfileMenu";
+import { createFileRoute } from "@tanstack/react-router";
 import { auth, clerkClient } from "@clerk/tanstack-react-start/server";
 import { createServerFn } from "@tanstack/react-start";
-import { useClerk } from "@clerk/tanstack-react-start";
-import { getTicketsByEmail, type TicketSummary } from "@/data/plain";
-import { StatusBadge, PriorityBadge } from "@/components/Support/TicketBadges";
+import { usePaginationUI } from "@inngest/components/Pagination";
+// import { Filters } from "@/components/Support/Filters";
+import { Button } from "@inngest/components/Button";
+import type { TicketSummary } from "@/data/plain";
+import { getTicketsByEmail } from "@/data/plain";
+import { TicketCard } from "@/components/Support/TicketCard";
 
 const getAuthStatusAndTickets = createServerFn({ method: "GET" }).handler(
   async () => {
@@ -12,7 +14,7 @@ const getAuthStatusAndTickets = createServerFn({ method: "GET" }).handler(
 
     // Only fetch user email and tickets if authenticated
     let userEmail: string | undefined = undefined;
-    let tickets: TicketSummary[] = [];
+    let tickets: Array<TicketSummary> = [];
 
     if (isAuthenticated && userId) {
       try {
@@ -46,86 +48,79 @@ export const Route = createFileRoute("/")({
 
 function Home() {
   const { isAuthenticated, userEmail, tickets } = Route.useLoaderData();
-  const { signOut, session } = useClerk();
 
-  const handleSignOut = async () => {
-    await signOut({
-      sessionId: session?.id,
-      redirectUrl: "/sign-in/$",
-    });
-  };
+  // Paginate tickets with 8 per page
+  const { currentPageData, BoundPagination } = usePaginationUI({
+    data: tickets,
+    id: "tickets",
+    pageSize: 8,
+  });
 
-  return (
-    <div className="px-6 pt-4">
-      <div className="mb-6">
-        <h1 className="text-basis text-2xl font-semibold">
-          Inngest Support Portal
-        </h1>
-        <div className="mt-2">
-          {isAuthenticated && userEmail ? (
-            <div className="flex items-center gap-2">
-              <span className="text-muted text-sm">
-                Logged in as: {userEmail}
-              </span>
-              <button
-                onClick={handleSignOut}
-                className="text-muted hover:text-basis text-sm underline"
-              >
-                Sign Out
-              </button>
-            </div>
-          ) : (
-            <ProfileMenu isAuthenticated={false}>
-              <div></div>
-            </ProfileMenu>
-          )}
+  if (!isAuthenticated || !userEmail) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-canvasBase">
+        <div className="text-center">
+          <h1 className="text-basis mb-2 text-2xl font-bold">
+            Please sign in to view your tickets
+          </h1>
+          <p className="text-muted">
+            You need to be authenticated to access the support portal.
+          </p>
+          <div className="flex justify-center mt-4">
+            <Button
+              kind="primary"
+              appearance="outlined"
+              label="Sign In"
+              href="/sign-in"
+            />
+          </div>
         </div>
       </div>
+    );
+  }
 
-      {isAuthenticated && userEmail && (
-        <div className="mt-8">
-          <h2 className="text-basis mb-4 text-xl font-semibold">
-            Your Support Tickets
-          </h2>
-          {tickets.length === 0 ? (
-            <div className="bg-canvasSubtle text-muted rounded-lg border border-subtle p-8 text-center">
-              <p>No support tickets found.</p>
-              <p className="mt-2 text-sm">
-                Create a new ticket to get help from our support team.
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {tickets.map((ticket) => (
-                <Link
-                  key={ticket.id}
-                  to="/case/$ticketId"
-                  params={{ ticketId: ticket.id }}
-                  className="bg-canvasBase border-subtle hover:border-basis block rounded-lg border p-4 transition-colors"
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <h3 className="text-basis font-medium">{ticket.title}</h3>
-                      <div className="mt-2 flex items-center gap-3">
-                        <StatusBadge status={ticket.status} size="sm" />
-                        <PriorityBadge
-                          priority={ticket.priority}
-                          size="sm"
-                          showLabel={false}
-                        />
-                      </div>
-                      <div className="text-muted mt-2 text-xs">
-                        Updated:{" "}
-                        {new Date(ticket.updatedAt).toLocaleDateString()}
-                      </div>
-                    </div>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          )}
+  return (
+    <div className="mx-auto w-full max-w-5xl py-6">
+      {/* Filters */}
+      {/* <Filters /> */}
+
+      {/* Ticket List */}
+      <div className="flex w-full flex-col gap-4 py-4">
+        <div className="text-basis flex w-full items-center justify-between leading-none">
+          <div className="flex flex-col justify-center">
+            <p className="leading-4 whitespace-nowrap">My tickets</p>
+          </div>
+          <div className="flex flex-col justify-center">
+            <p className="leading-4 whitespace-nowrap">
+              {tickets.length} {tickets.length === 1 ? "ticket" : "tickets"}
+            </p>
+          </div>
         </div>
-      )}
+
+        {tickets.length === 0 ? (
+          <div className="border-muted bg-canvasSubtle flex flex-col items-center justify-center rounded-lg border p-12 text-center">
+            <p className="text-basis mb-1 text-lg font-medium">
+              No support tickets found
+            </p>
+            <p className="text-muted">
+              Create a new ticket to get help from our support team.
+            </p>
+          </div>
+        ) : (
+          <>
+            {currentPageData.map((ticket) => (
+              <TicketCard key={ticket.id} ticket={ticket} />
+            ))}
+
+            {/* Pagination */}
+            {tickets.length > 8 && (
+              <div className="flex w-full flex-col items-center justify-center px-0 py-3">
+                <BoundPagination />
+              </div>
+            )}
+          </>
+        )}
+      </div>
     </div>
   );
 }

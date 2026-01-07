@@ -1,9 +1,33 @@
 # Inngest Support Portal
 
-This is the Inngest Support Portal. It’s a Tanstack Start app
+This is the Inngest Support Portal. It’s a Tanstack Start app.
 
-`cp .env.example .env`
+## Setup
 
-`pnpm i`
+Link the project and pull environment variables for development:
 
-`pnpm dev`
+```
+vercel link -p support
+vercel env:pull
+```
+
+Install dependencies:
+
+```
+pnpm i
+```
+
+Start the tanstack server:
+
+```
+pnpm run dev
+```
+
+Open the app at http://localhost:3002
+
+Log in with the local development test account:
+
+```
+test@example.com
+testing123
+```

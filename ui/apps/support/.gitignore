@@ -18,3 +18,4 @@ yarn.lock
 .env.sentry-build-plugin
 /test-results/
 /blob-report/
+.env*.local

@@ -124,7 +124,7 @@ function Option({
 }: React.PropsWithChildren<{ option: Option; as: React.ElementType }>) {
   return (
     <Component
-      className="ui-selected:text-secondary-intense ui-selected:font-medium ui-active:bg-canvasSubtle/50 text-basis flex select-none items-center justify-between px-4 py-1.5 focus:outline-none"
+      className="ui-selected:text-secondary-intense ui-selected:font-medium ui-active:bg-canvasSubtle/50 text-basis ui-disabled:text-disabled ui-disabled:cursor-not-allowed flex select-none items-center justify-between px-4 py-1.5 focus:outline-none"
       key={option.id}
       value={option}
       disabled={option.disabled}
