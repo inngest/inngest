@@ -44,20 +44,20 @@ func TestManagerFlushingWithLowLimit(t *testing.T) {
 
 	// Create pause client
 	pauseClient := redis_state.NewPauseClient(rc, redis_state.StateDefaultKey)
-	
+
 	// Create block store with a very low block size (2) to trigger flushing quickly
 	const lowBlockSize = 3
 	blockStore, err := NewBlockstore(BlockstoreOpts{
-		PauseClient:               pauseClient,
-		Bucket:           bucket,
-		Bufferer:         mockBufferer,
-		Leaser:           leaser,
-		BlockSize:        lowBlockSize, // Very low limit to ensure flushing happens quickly
+		PauseClient:            pauseClient,
+		Bucket:                 bucket,
+		Bufferer:               mockBufferer,
+		Leaser:                 leaser,
+		BlockSize:              lowBlockSize, // Very low limit to ensure flushing happens quickly
 		CompactionGarbageRatio: 0.33,
-		CompactionSample: 1.0, // Always compact for testing
-		CompactionLeaser: leaser,
-		DeleteAfterFlush: func(ctx context.Context, workspaceID uuid.UUID) bool { return true },
-		EnableBlockCompaction: func(ctx context.Context, workspaceID uuid.UUID) bool { return true },
+		CompactionSample:       1.0, // Always compact for testing
+		CompactionLeaser:       leaser,
+		DeleteAfterFlush:       func(ctx context.Context, workspaceID uuid.UUID) bool { return true },
+		EnableBlockCompaction:  func(ctx context.Context, workspaceID uuid.UUID) bool { return true },
 	})
 	require.NoError(t, err)
 
@@ -114,7 +114,9 @@ func TestManagerFlushingWithLowLimit(t *testing.T) {
 		require.NotNil(t, pause)
 		pauseCount++
 	}
-	require.NoError(t, iter.Error())
+	// Redis iterators set a context.Canceled error when it's done iterating
+	// so we want to match that behavior
+	require.ErrorIs(t, iter.Error(), context.Canceled)
 	assert.Equal(t, 4, pauseCount, "Should retrieve all pauses from buffer and blocks")
 
 	// Test 6: Test deleting a pause
@@ -185,7 +187,7 @@ func TestDeletePauseByID(t *testing.T) {
 		mockBufferer := &mockBufferer{}
 		mockBlockStore := &mockBlockStore{}
 		mockFlusher := &mockSimpleFlusher{}
-		
+
 		manager := NewManager(mockBufferer, mockBlockStore, WithFlusher(mockFlusher), WithBlockFlushEnabled(alwaysEnabled), WithBlockStoreEnabled(alwaysEnabled))
 
 		ctx := context.Background()
@@ -292,8 +294,8 @@ func (m *mockBuffererWithConsume) ConsumePause(ctx context.Context, pause state.
 }
 
 type mockBlockStore struct {
-	deleteCalled      int
-	deleteByIDCalled  int
+	deleteCalled     int
+	deleteByIDCalled int
 }
 
 func (m *mockBlockStore) BlockSize() int {
