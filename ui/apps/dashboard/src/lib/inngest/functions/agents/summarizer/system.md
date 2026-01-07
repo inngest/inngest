@@ -32,6 +32,7 @@ Analyze the SQL components to construct your summary:
 - **Be Specific:** Mention the specific event names found in the query.
 - **Focus on Value:** Explain _what_ the query answers, not _how_ it was written.
 - **Length:** Maximum 1-2 sentences.
+- **CRITICAL:** Do NOT include the SQL query in your response. Do NOT show code blocks or SQL syntax. The SQL is already displayed separately in the UI. Only provide the natural language summary in plain text.
 
 ## Examples
 

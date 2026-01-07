@@ -5,20 +5,15 @@ import { cn } from '@inngest/components/utils/classNames';
 import { type ToolPartFor } from '@inngest/use-agent';
 import { RiCheckLine, RiCloseLine, RiPlayLine } from '@remixicon/react';
 
+import { useSQLEditorActions } from '@/components/Insights/InsightsSQLEditor/SQLEditorContext';
 import { formatSQL } from '@/components/Insights/InsightsSQLEditor/utils';
 import type { InsightsAgentConfig } from '../useInsightsAgent';
 
 type GenerateSqlPart = ToolPartFor<InsightsAgentConfig, 'generate_sql'>;
 
-function GenerateSqlToolUI({
-  part,
-  onSqlChange,
-  runQuery,
-}: {
-  part: GenerateSqlPart;
-  onSqlChange: (sql: string) => void;
-  runQuery: () => void;
-}) {
+function GenerateSqlToolUI({ part }: { part: GenerateSqlPart }) {
+  const editorActions = useSQLEditorActions();
+
   const data = part.output?.data;
   const title = data?.title;
   const sql = data?.sql;
@@ -55,7 +50,7 @@ function GenerateSqlToolUI({
               <span className="font-sm">{title || 'Generated SQL'}</span>
             </div>
 
-            {!!formattedSql && (
+            {!!formattedSql && editorActions && (
               <div className="flex items-center gap-2">
                 <OptionalTooltip tooltip="Run this query" side="bottom">
                   <Button
@@ -65,10 +60,7 @@ function GenerateSqlToolUI({
                     appearance="ghost"
                     size="small"
                     onClick={() => {
-                      onSqlChange(formattedSql);
-                      try {
-                        runQuery();
-                      } catch {}
+                      editorActions.setQueryAndRun(formattedSql);
                     }}
                   />
                 </OptionalTooltip>
@@ -86,20 +78,6 @@ function GenerateSqlToolUI({
   );
 }
 
-export const ToolMessage = ({
-  part,
-  onSqlChange,
-  runQuery,
-}: {
-  part: GenerateSqlPart;
-  onSqlChange: (sql: string) => void;
-  runQuery: () => void;
-}) => {
-  return (
-    <GenerateSqlToolUI
-      part={part}
-      onSqlChange={onSqlChange}
-      runQuery={runQuery}
-    />
-  );
+export const ToolMessage = ({ part }: { part: GenerateSqlPart }) => {
+  return <GenerateSqlToolUI part={part} />;
 };

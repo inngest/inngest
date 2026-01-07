@@ -14,10 +14,24 @@ The user has an existing query that they may want to modify. **Carefully analyze
 
 ### Query Update vs New Query Decision
 
-- **If the user's prompt suggests modifying/updating the current query** (e.g., "add a filter for...", "change the time range to...", "also include...", "remove the limit", "sort by..."), then **use the current query as a starting point** and modify it according to their request.
-- **If the user's prompt suggests a completely new question or analysis** (e.g., "show me...", "how many...", "what are the top..."), then **ignore the current query** and write a fresh query from scratch.
+**Default to modifying the current query** unless the user's request is clearly unrelated to the existing context.
 
-When modifying an existing query, preserve the structure and logic that's still relevant, and only change what the user explicitly asks for.
+**Modify the current query if ANY of these signals are present:**
+
+- **Explicit modification verbs:** "add", "remove", "change", "update", "exclude", "include also", "adjust", "replace", "swap", "filter", "narrow", "refine"
+- **Additive/contrastive language:** "also", "and", "but", "additionally", "however", "instead", "rather than", "too", "as well"
+- **References to current results:** "of those", "from these results", "from that", "the same but...", "that query except...", "these events"
+- **Refinement requests:** "narrow down", "break down by", "group differently", "sort differently", "without the limit"
+- **Partial/incomplete requests:** Fragments that assume context like "just for 2024", "by status too", "in descending order", "limit to 10"
+- **Pronouns or contextual references:** "them", "those", "it", "these", referring to the current query or results
+
+**Create a fresh query ONLY if ALL of these are true:**
+
+1. The request is a complete, standalone question with no linguistic ties to the current query
+2. The request asks about entirely different subject matter (different events, different analysis goal)
+3. There are no modification verbs or contextual references to the existing query
+
+**When modifying:** Preserve the structure and logic that's still relevant, and only change what the user explicitly asks for. If unsure, default to modifying rather than replacing.
 
 {{/hasCurrentQuery}}
 
@@ -64,7 +78,7 @@ You may **only** query the `events` table.
   - `id` (Unique ID, string)
   - `name` (Event name/type, string)
   - `v` (Event version, number)
-  - `ts` (Event Timestamp, **milliseconds**, int64) — _Critical: Requires `_ 1000` when comparing to Unix seconds.\*
+  - `ts` (Event Timestamp, **milliseconds**, int64) — _Critical: Requires `* 1000` when comparing to Unix seconds._
   - `ts_dt` (Event Timestamp, DateTime)
   - `received_at` (Ingestion Timestamp, **milliseconds**, int64)
   - `received_at_dt` (Ingestion Timestamp, DateTime)

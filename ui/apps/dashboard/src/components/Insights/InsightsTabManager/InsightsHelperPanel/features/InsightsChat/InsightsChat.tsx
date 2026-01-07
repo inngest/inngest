@@ -1,8 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { flushSync } from 'react-dom';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { type AgentStatus } from '@inngest/use-agent';
 
-import { formatSQL } from '@/components/Insights/InsightsSQLEditor/utils';
+import { useSQLEditorActions } from '@/components/Insights/InsightsSQLEditor/SQLEditorContext';
 import { useInsightsStateMachineContext } from '@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext';
 import { Conversation, ConversationContent } from './Conversation';
 import { EmptyState } from './EmptyState';
@@ -45,12 +44,11 @@ type InsightsChatProps = {
 
 export function InsightsChat({ agentThreadId, className }: InsightsChatProps) {
   // Read required data from the Insights state context
-  const {
-    query: currentSql,
-    queryName: tabTitle,
-    onChange: onSqlChange,
-    runQuery,
-  } = useInsightsStateMachineContext();
+  const { query: currentSql, queryName: tabTitle } =
+    useInsightsStateMachineContext();
+
+  // Get SQL editor actions service (may be null if not in query tab context)
+  const editorActions = useSQLEditorActions();
 
   // State for the chat's input value
   const [inputValue, setInputValue] = useState('');
@@ -80,37 +78,22 @@ export function InsightsChat({ agentThreadId, className }: InsightsChatProps) {
 
   // Client state is captured at send-time; avoid continuous effects here
 
-  // When active, auto-apply latest generated SQL if newer
-  const lastAppliedSqlRef = useRef<string | null>(null);
+  // When active, auto-apply latest generated SQL whenever version changes
   useEffect(() => {
     if (currentThreadId !== agentThreadId) return;
+    if (!editorActions) return; // Not in query tab context
     const latest = getLatestGeneratedSql(agentThreadId);
     if (!latest) return;
-    if (lastAppliedSqlRef.current === latest) return;
-    lastAppliedSqlRef.current = latest;
-    // Format the SQL before inserting it
-    const formattedSql = formatSQL(latest.trim());
 
-    // Use flushSync to force synchronous state update in this component
-    flushSync(() => {
-      onSqlChange(formattedSql);
-    });
-
-    // Queue the query execution after the next render cycle to ensure
-    // the parent component has re-rendered with the updated query prop.
-    // This prevents runQuery() from executing with stale SQL from the closure.
-    queueMicrotask(() => {
-      try {
-        runQuery();
-      } catch {}
-    });
+    // Use the SQL editor service to set query and run it
+    editorActions.setQueryAndRun(latest);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     currentThreadId,
     agentThreadId,
-    getLatestGeneratedSql,
+    // getLatestGeneratedSql is stable, don't include it
     latestSqlVersion,
-    onSqlChange,
-    runQuery,
+    // editorActions is stable, don't include it
   ]);
 
   const handleSubmit = useCallback(
@@ -188,14 +171,7 @@ export function InsightsChat({ agentThreadId, className }: InsightsChatProps) {
                           }
                           if (part.type === 'tool-call') {
                             if (part.toolName === 'generate_sql') {
-                              return (
-                                <ToolMessage
-                                  key={i}
-                                  part={part}
-                                  onSqlChange={onSqlChange}
-                                  runQuery={runQuery}
-                                />
-                              );
+                              return <ToolMessage key={i} part={part} />;
                             }
                             // Ignore other tool-call parts here
                             return null;

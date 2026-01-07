@@ -8,7 +8,7 @@ import {
 import { RiAlignLeft, RiDeleteBinLine, RiShare2Line } from '@remixicon/react';
 
 import type { InsightsQueryStatement } from '@/gql/graphql';
-import { useSQLEditorInstance } from './InsightsSQLEditor/SQLEditorInstanceContext';
+import { useSQLEditorInstance } from './InsightsSQLEditor/SQLEditorContext';
 import { useStoredQueries } from './QueryHelperPanel/StoredQueriesContext';
 import { isQuerySnapshot } from './queries';
 import type { QuerySnapshot } from './types';
@@ -30,14 +30,9 @@ export function QueryActionsMenu({
 }: QueryActionsMenuProps) {
   const { shareQuery } = useStoredQueries();
 
-  // Try to get editor instance, but don't fail if context is not available
-  let editorRef: React.MutableRefObject<any> | null = null;
-  try {
-    const context = useSQLEditorInstance();
-    editorRef = context.editorRef;
-  } catch {
-    // Context not available, editor features will be disabled
-  }
+  // Try to get editor instance, returns null if context is not available (e.g., in sidebar)
+  const editorInstance = useSQLEditorInstance();
+  const editorRef = editorInstance?.editorRef ?? null;
 
   const handleFormatSQL = () => {
     if (!editorRef) return;

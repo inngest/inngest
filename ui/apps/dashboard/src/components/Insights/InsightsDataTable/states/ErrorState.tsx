@@ -1,28 +1,54 @@
 import { Banner } from '@inngest/components/Banner/Banner';
 import { Button } from '@inngest/components/Button';
 
+import { useInsightsAIHelper } from '../../InsightsAIHelperContext';
 import { useInsightsStateMachineContext } from '../../InsightsStateMachineContext/InsightsStateMachineContext';
 
 const FALLBACK_ERROR = 'Something went wrong. Please try again.';
 
 export function ErrorState() {
-  const { error, runQuery } = useInsightsStateMachineContext();
+  const { error, query, runQuery } = useInsightsStateMachineContext();
+  const aiHelper = useInsightsAIHelper();
+
+  const errorMessage = error ? pruneGraphQLError(error) : FALLBACK_ERROR;
+
+  const handleFixWithAI = () => {
+    if (aiHelper) {
+      const prompt =
+        'The query execution failed with the following error:\n\n' +
+        errorMessage +
+        '\n\nThe query that failed was:\n\n```sql\n' +
+        query +
+        '\n```\n\nPlease provide a corrected version of the query that fixes this error.';
+      aiHelper.openAIHelperWithPrompt(prompt);
+    }
+  };
 
   return (
     <Banner
       cta={
-        <Button
-          appearance="ghost"
-          kind="danger"
-          label="Retry"
-          onClick={() => {
-            runQuery();
-          }}
-        />
+        <div className="flex items-center gap-2">
+          {aiHelper && (
+            <Button
+              appearance="ghost"
+              kind="danger"
+              label="Fix with AI"
+              onClick={handleFixWithAI}
+            />
+          )}
+          <Button
+            appearance="ghost"
+            kind="danger"
+            label="Retry"
+            onClick={() => {
+              runQuery();
+            }}
+          />
+        </div>
       }
       severity="error"
     >
-      {error ? pruneGraphQLError(error) : FALLBACK_ERROR}
+      {errorMessage}
     </Banner>
   );
 }
