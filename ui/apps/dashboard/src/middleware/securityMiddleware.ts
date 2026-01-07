@@ -27,7 +27,7 @@ export const securityMiddleware = createMiddleware().server(({ next }) => {
     scriptSrc.push('https://cdn.segment.com');
   }
   const connectSrc = [
-    'data:application/octet-stream', // QuickJS
+    'data:', // QuickJS
     process.env.VITE_API_URL, // e.g. https://api.inngest.com
     'wss://api.inngest.com',
     'https://analytics-cdn.inngest.com',
@@ -40,7 +40,7 @@ export const securityMiddleware = createMiddleware().server(({ next }) => {
     'https://clientstream.launchdarkly.com',
     'https://events.launchdarkly.com',
     'https://app.launchdarkly.com',
-  ];
+  ].filter(Boolean);
   if (
     process.env.VERCEL_ENV === 'preview' ||
     process.env.NODE_ENV === 'development'
