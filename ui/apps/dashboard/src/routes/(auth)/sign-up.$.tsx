@@ -3,6 +3,7 @@ import { SignUp } from '@clerk/tanstack-react-start';
 import { createFileRoute } from '@tanstack/react-router';
 import { createServerFn } from '@tanstack/react-start';
 import { getCookie } from '@tanstack/react-start/server';
+import logoImageUrl from '@inngest/components/icons/logos/inngest-logo-black.png';
 
 const getAnonymousId = createServerFn({ method: 'GET' }).handler(async () => {
   const anonymousId = getCookie('inngest_anonymous_id');
@@ -28,8 +29,13 @@ function RouteComponent() {
             ...(anonymousId && { anonymousID: anonymousId }),
           }}
           appearance={{
+            layout: {
+              logoImageUrl,
+            },
             elements: {
               footer: 'bg-none',
+              logoBox: 'flex m-0 justify-center',
+              logoImage: 'max-h-16 w-auto object-contain dark:invert',
             },
           }}
         />
