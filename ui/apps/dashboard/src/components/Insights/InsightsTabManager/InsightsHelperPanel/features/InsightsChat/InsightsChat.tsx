@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { type AgentStatus } from '@inngest/use-agent';
 
 import { formatSQL } from '@/components/Insights/InsightsSQLEditor/utils';
@@ -89,13 +90,20 @@ export function InsightsChat({ agentThreadId, className }: InsightsChatProps) {
     lastAppliedSqlRef.current = latest;
     // Format the SQL before inserting it
     const formattedSql = formatSQL(latest.trim());
-    onSqlChange(formattedSql);
-    // Auto-run for snappy UX
-    setTimeout(() => {
+
+    // Use flushSync to force synchronous state update in this component
+    flushSync(() => {
+      onSqlChange(formattedSql);
+    });
+
+    // Queue the query execution after the next render cycle to ensure
+    // the parent component has re-rendered with the updated query prop.
+    // This prevents runQuery() from executing with stale SQL from the closure.
+    queueMicrotask(() => {
       try {
         runQuery();
       } catch {}
-    }, 0);
+    });
   }, [
     currentThreadId,
     agentThreadId,

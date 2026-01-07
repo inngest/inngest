@@ -18,17 +18,17 @@ const SelectEventsParams = z.object({
         reason: z.string(),
       }),
     )
-    .min(1)
+    .min(0)
     .max(6)
     .describe(
-      "An array of 1-6 event names selected from the list of available events that best match the user's intent.",
+      "An array of 0-6 event names selected from the list of available events that best match the user's intent. Use an empty array when the user is asking general questions about events or when updating a query that doesn't filter by event name.",
     ),
 });
 
 export const selectEventsTool = createTool({
   name: 'select_events',
   description:
-    "Select 1-6 event names from the provided list that are most relevant to the user's query.",
+    "Select 0-6 event names from the provided list that are most relevant to the user's query. Return an empty array when no specific events should be filtered.",
   parameters: SelectEventsParams as unknown as AnyZodType, // (ted): need to align zod version; version 3.25 does not support same types as 3.22
   handler: (args: unknown, { network }) => {
     const { events } = args as z.infer<typeof SelectEventsParams>;
@@ -64,6 +64,9 @@ export const selectEventsTool = createTool({
           hasEvents: false,
           eventsList: '',
           maxEvents: 0,
+          hasCurrentQuery: false,
+          currentQuery: '',
+          currentQueryLength: 0,
         },
       };
     }
@@ -88,6 +91,7 @@ export const eventMatcherAgent = createAgent<InsightsAgentState>({
   system: async ({ network }): Promise<string> => {
     const events = network?.state.data.eventTypes || [];
     const sample = events.slice(0, 500); // avoid overly long prompts
+    const currentQuery = network?.state.data.currentQuery;
 
     // Prepare context for system prompt hydration
     const promptContext = {
@@ -95,6 +99,8 @@ export const eventMatcherAgent = createAgent<InsightsAgentState>({
       hasEvents: sample.length > 0,
       eventsList: sample.join('\n'),
       maxEvents: 500,
+      hasCurrentQuery: !!currentQuery,
+      currentQuery: currentQuery || '',
     };
 
     // Store prompt context in observability format
@@ -103,7 +109,12 @@ export const eventMatcherAgent = createAgent<InsightsAgentState>({
         network.state.data.observability = {};
       }
       network.state.data.observability.eventMatcher = {
-        promptContext,
+        promptContext: {
+          ...promptContext,
+          // Truncate current query for observability
+          currentQuery: currentQuery ? currentQuery.substring(0, 500) : '',
+          currentQueryLength: currentQuery?.length || 0,
+        },
       };
     }
 

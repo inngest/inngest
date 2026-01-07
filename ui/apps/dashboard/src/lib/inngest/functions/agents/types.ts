@@ -27,6 +27,9 @@ export type InsightsAgentState = StateData & {
         hasEvents: boolean;
         eventsList: string;
         maxEvents: number;
+        hasCurrentQuery: boolean;
+        currentQuery: string;
+        currentQueryLength: number;
       };
       output?: {
         selectedEvents: { event_name: string; reason: string }[];
