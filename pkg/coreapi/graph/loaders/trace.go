@@ -530,7 +530,7 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 			Kind:      md.Kind,
 			Scope:     md.Scope,
 			Values:    md.Values,
-			UpdatedAt: md.UpdatedAt, // after TanStack stuff is merged so UI can be updated
+			UpdatedAt: md.UpdatedAt,
 		})
 	}
 
