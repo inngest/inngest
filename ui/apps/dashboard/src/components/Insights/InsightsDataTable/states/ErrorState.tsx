@@ -35,20 +35,12 @@ export function ErrorState() {
         <div className="flex items-center gap-2">
           {aiHelper && (
             <Button
-              appearance="ghost"
+              appearance="solid"
               kind="danger"
               label="Fix with AI"
               onClick={handleFixWithAI}
             />
           )}
-          <Button
-            appearance="ghost"
-            kind="danger"
-            label="Retry"
-            onClick={() => {
-              runQuery();
-            }}
-          />
         </div>
       }
       severity="error"
