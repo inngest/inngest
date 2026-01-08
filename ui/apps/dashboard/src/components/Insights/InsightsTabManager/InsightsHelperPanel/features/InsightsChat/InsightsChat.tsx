@@ -42,25 +42,26 @@ function useRotatingLoadingMessage(isLoading: boolean): string {
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
+    // Always clear any existing interval first to prevent race conditions
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+
     if (isLoading) {
       // Pick a random starting index
       setCurrentIndex(Math.floor(Math.random() * LOADING_PHRASES.length));
 
-      // Rotate every 1.5 seconds
+      // Rotate every 2.5 seconds
       intervalRef.current = setInterval(() => {
         setCurrentIndex((prev) => (prev + 1) % LOADING_PHRASES.length);
       }, 2500);
-    } else {
-      // Clean up interval when not loading
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
     }
 
     return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
+        intervalRef.current = null;
       }
     };
   }, [isLoading]);
