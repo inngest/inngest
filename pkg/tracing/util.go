@@ -195,8 +195,6 @@ func generatorAttrs(op *state.GeneratorOpcode) *meta.SerializableAttrs {
 
 				if id, err := ulid.Parse(opts.Payload.ID); err == nil {
 					meta.AddAttr(rawAttrs, meta.Attrs.StepInvokeTriggerEventID, &id)
-				} else {
-					rawAttrs.AddErr(fmt.Errorf("failed to parse invoke trigger event ID: %w", err))
 				}
 
 				if expiry, err := opts.Expires(); err == nil {
