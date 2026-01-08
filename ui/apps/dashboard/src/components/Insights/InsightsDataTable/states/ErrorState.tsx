@@ -7,7 +7,7 @@ import { useInsightsStateMachineContext } from '../../InsightsStateMachineContex
 const FALLBACK_ERROR = 'Something went wrong. Please try again.';
 
 export function ErrorState() {
-  const { error, query, runQuery } = useInsightsStateMachineContext();
+  const { error, query } = useInsightsStateMachineContext();
   const aiHelper = useInsightsAIHelper();
 
   const errorMessage = error ? pruneGraphQLError(error) : FALLBACK_ERROR;
