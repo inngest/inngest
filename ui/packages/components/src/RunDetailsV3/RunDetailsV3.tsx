@@ -292,6 +292,7 @@ export const RunDetailsV3 = ({
               getTrigger={getTrigger}
               runID={runID}
               result={resultData}
+              trace={runData?.trace}
             />
           )}
         </div>
