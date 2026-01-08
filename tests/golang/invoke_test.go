@@ -71,6 +71,9 @@ func TestInvoke(t *testing.T) {
 	_, err = inngestClient.Send(ctx, &event.Event{Name: evtName})
 	r.NoError(err)
 
+	// Wait a moment for runID to be populated
+	<-time.After(2 * time.Second)
+
 	t.Run("trace run should have appropriate data", func(t *testing.T) {
 		r := require.New(t)
 		run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{Status: models.FunctionStatusCompleted, ChildSpanCount: 1})
@@ -409,6 +412,10 @@ func TestInvokeRateLimit(t *testing.T) {
 	// Trigger the main function and successfully invoke the other function
 	_, err = inngestClient.Send(ctx, &event.Event{Name: evtName})
 	r.NoError(err)
+
+	// Wait a moment for runID to be populated
+	<-time.After(2 * time.Second)
+
 	c.WaitForRunStatus(ctx, t, "COMPLETED", &runID)
 
 	// Trigger the main function. It'll fail because the invoked function is
