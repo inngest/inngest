@@ -1,7 +1,7 @@
 import { createContext, useContext, type ReactNode } from 'react';
 
 interface InsightsAIHelperContextValue {
-  openAIHelperWithPrompt: (prompt: string) => void;
+  openAIHelperWithPrompt: (prompt: string) => Promise<void>;
 }
 
 const InsightsAIHelperContext =
@@ -12,7 +12,7 @@ export function InsightsAIHelperProvider({
   openAIHelperWithPrompt,
 }: {
   children: ReactNode;
-  openAIHelperWithPrompt: (prompt: string) => void;
+  openAIHelperWithPrompt: (prompt: string) => Promise<void>;
 }) {
   return (
     <InsightsAIHelperContext.Provider value={{ openAIHelperWithPrompt }}>

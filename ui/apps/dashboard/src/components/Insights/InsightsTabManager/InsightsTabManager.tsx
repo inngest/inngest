@@ -265,6 +265,112 @@ export function useInsightsTabManager(
   return { actions, activeTabId, tabManager, tabs };
 }
 
+interface SingleTabRendererProps {
+  tab: Tab;
+  activeTabId: string;
+  actions: TabManagerActions;
+  activeHelper: HelperTitle | null;
+  setActiveHelper: (helper: HelperTitle | null) => void;
+  isHelperPanelOpen: boolean;
+  getAgentThreadIdForTab: (tabId: string) => string;
+  helperItems: HelperItem[];
+  historyWindow?: number;
+}
+
+// Renders a single tab with all its content
+function SingleTabRenderer({
+  tab,
+  activeTabId,
+  actions,
+  activeHelper,
+  setActiveHelper,
+  isHelperPanelOpen,
+  getAgentThreadIdForTab,
+  helperItems,
+  historyWindow,
+}: SingleTabRendererProps) {
+  const isActive = tab.id === activeTabId;
+
+  return (
+    <InsightsStateMachineContextProvider
+      key={tab.id}
+      onQueryChange={(query) => actions.updateTab(tab.id, { query })}
+      onQueryNameChange={(name) => actions.updateTab(tab.id, { name })}
+      query={tab.query}
+      queryName={tab.name}
+      renderChildren={isActive}
+      tabId={tab.id}
+    >
+      {isQueryTab(tab.id) ? (
+        <SQLEditorProvider>
+          <div
+            className={
+              isActive ? 'h-full w-full' : 'h-0 w-full overflow-hidden'
+            }
+          >
+            <div className="flex h-full w-full">
+              <div className="h-full min-w-0 flex-1 overflow-hidden">
+                {isHelperPanelOpen && activeHelper ? (
+                  <Resizable
+                    defaultSplitPercentage={75}
+                    minSplitPercentage={20}
+                    maxSplitPercentage={85}
+                    orientation="horizontal"
+                    splitKey="insights-helper-split"
+                    first={
+                      <div className="h-full min-w-0 overflow-hidden">
+                        <InsightsTabPanel
+                          isHomeTab={tab.id === HOME_TAB.id}
+                          isTemplatesTab={tab.id === TEMPLATES_TAB.id}
+                          tab={tab}
+                          historyWindow={historyWindow}
+                        />
+                      </div>
+                    }
+                    second={
+                      <InsightsHelperPanel
+                        active={activeHelper}
+                        agentThreadId={getAgentThreadIdForTab(tab.id)}
+                        onClose={() => {
+                          setActiveHelper(null);
+                        }}
+                      />
+                    }
+                  />
+                ) : (
+                  <InsightsTabPanel
+                    isHomeTab={tab.id === HOME_TAB.id}
+                    isTemplatesTab={tab.id === TEMPLATES_TAB.id}
+                    tab={tab}
+                    historyWindow={historyWindow}
+                  />
+                )}
+              </div>
+              {hasMoreThanOneHelperPanelFeatureEnabled(helperItems) ? (
+                <InsightsHelperPanelControl
+                  items={helperItems}
+                  activeTitle={activeHelper}
+                />
+              ) : null}
+            </div>
+          </div>
+        </SQLEditorProvider>
+      ) : (
+        <div
+          className={isActive ? 'h-full w-full' : 'h-0 w-full overflow-hidden'}
+        >
+          <InsightsTabPanel
+            isHomeTab={tab.id === HOME_TAB.id}
+            isTemplatesTab={tab.id === TEMPLATES_TAB.id}
+            tab={tab}
+            historyWindow={historyWindow}
+          />
+        </div>
+      )}
+    </InsightsStateMachineContextProvider>
+  );
+}
+
 interface TabsRendererProps {
   tabs: Tab[];
   activeTabId: string;
@@ -293,88 +399,18 @@ function TabsRenderer({
     <InsightsAIHelperProvider openAIHelperWithPrompt={() => Promise.resolve()}>
       <div className="h-full w-full">
         {tabs.map((tab) => (
-          <InsightsStateMachineContextProvider
+          <SingleTabRenderer
             key={tab.id}
-            onQueryChange={(query) => actions.updateTab(tab.id, { query })}
-            onQueryNameChange={(name) => actions.updateTab(tab.id, { name })}
-            query={tab.query}
-            queryName={tab.name}
-            renderChildren={tab.id === activeTabId}
-            tabId={tab.id}
-          >
-            {isQueryTab(tab.id) ? (
-              <SQLEditorProvider>
-                <div
-                  className={
-                    tab.id === activeTabId
-                      ? 'h-full w-full'
-                      : 'h-0 w-full overflow-hidden'
-                  }
-                >
-                  <div className="flex h-full w-full">
-                    <div className="h-full min-w-0 flex-1 overflow-hidden">
-                      {isHelperPanelOpen && activeHelper ? (
-                        <Resizable
-                          defaultSplitPercentage={75}
-                          minSplitPercentage={20}
-                          maxSplitPercentage={85}
-                          orientation="horizontal"
-                          splitKey="insights-helper-split"
-                          first={
-                            <div className="h-full min-w-0 overflow-hidden">
-                              <InsightsTabPanel
-                                isHomeTab={tab.id === HOME_TAB.id}
-                                isTemplatesTab={tab.id === TEMPLATES_TAB.id}
-                                tab={tab}
-                                historyWindow={historyWindow}
-                              />
-                            </div>
-                          }
-                          second={
-                            <InsightsHelperPanel
-                              active={activeHelper}
-                              agentThreadId={getAgentThreadIdForTab(tab.id)}
-                              onClose={() => {
-                                setActiveHelper(null);
-                              }}
-                            />
-                          }
-                        />
-                      ) : (
-                        <InsightsTabPanel
-                          isHomeTab={tab.id === HOME_TAB.id}
-                          isTemplatesTab={tab.id === TEMPLATES_TAB.id}
-                          tab={tab}
-                          historyWindow={historyWindow}
-                        />
-                      )}
-                    </div>
-                    {hasMoreThanOneHelperPanelFeatureEnabled(helperItems) ? (
-                      <InsightsHelperPanelControl
-                        items={helperItems}
-                        activeTitle={activeHelper}
-                      />
-                    ) : null}
-                  </div>
-                </div>
-              </SQLEditorProvider>
-            ) : (
-              <div
-                className={
-                  tab.id === activeTabId
-                    ? 'h-full w-full'
-                    : 'h-0 w-full overflow-hidden'
-                }
-              >
-                <InsightsTabPanel
-                  isHomeTab={tab.id === HOME_TAB.id}
-                  isTemplatesTab={tab.id === TEMPLATES_TAB.id}
-                  tab={tab}
-                  historyWindow={historyWindow}
-                />
-              </div>
-            )}
-          </InsightsStateMachineContextProvider>
+            tab={tab}
+            activeTabId={activeTabId}
+            actions={actions}
+            activeHelper={activeHelper}
+            setActiveHelper={setActiveHelper}
+            isHelperPanelOpen={isHelperPanelOpen}
+            getAgentThreadIdForTab={getAgentThreadIdForTab}
+            helperItems={helperItems}
+            historyWindow={historyWindow}
+          />
         ))}
       </div>
     </InsightsAIHelperProvider>
@@ -432,88 +468,18 @@ function TabsWithAIHelper({
     <InsightsAIHelperProvider openAIHelperWithPrompt={openAIHelperWithPrompt}>
       <div className="h-full w-full">
         {tabs.map((tab) => (
-          <InsightsStateMachineContextProvider
+          <SingleTabRenderer
             key={tab.id}
-            onQueryChange={(query) => actions.updateTab(tab.id, { query })}
-            onQueryNameChange={(name) => actions.updateTab(tab.id, { name })}
-            query={tab.query}
-            queryName={tab.name}
-            renderChildren={tab.id === activeTabId}
-            tabId={tab.id}
-          >
-            {isQueryTab(tab.id) ? (
-              <SQLEditorProvider>
-                <div
-                  className={
-                    tab.id === activeTabId
-                      ? 'h-full w-full'
-                      : 'h-0 w-full overflow-hidden'
-                  }
-                >
-                  <div className="flex h-full w-full">
-                    <div className="h-full min-w-0 flex-1 overflow-hidden">
-                      {isHelperPanelOpen && activeHelper ? (
-                        <Resizable
-                          defaultSplitPercentage={75}
-                          minSplitPercentage={20}
-                          maxSplitPercentage={85}
-                          orientation="horizontal"
-                          splitKey="insights-helper-split"
-                          first={
-                            <div className="h-full min-w-0 overflow-hidden">
-                              <InsightsTabPanel
-                                isHomeTab={tab.id === HOME_TAB.id}
-                                isTemplatesTab={tab.id === TEMPLATES_TAB.id}
-                                tab={tab}
-                                historyWindow={historyWindow}
-                              />
-                            </div>
-                          }
-                          second={
-                            <InsightsHelperPanel
-                              active={activeHelper}
-                              agentThreadId={getAgentThreadIdForTab(tab.id)}
-                              onClose={() => {
-                                setActiveHelper(null);
-                              }}
-                            />
-                          }
-                        />
-                      ) : (
-                        <InsightsTabPanel
-                          isHomeTab={tab.id === HOME_TAB.id}
-                          isTemplatesTab={tab.id === TEMPLATES_TAB.id}
-                          tab={tab}
-                          historyWindow={historyWindow}
-                        />
-                      )}
-                    </div>
-                    {hasMoreThanOneHelperPanelFeatureEnabled(helperItems) ? (
-                      <InsightsHelperPanelControl
-                        items={helperItems}
-                        activeTitle={activeHelper}
-                      />
-                    ) : null}
-                  </div>
-                </div>
-              </SQLEditorProvider>
-            ) : (
-              <div
-                className={
-                  tab.id === activeTabId
-                    ? 'h-full w-full'
-                    : 'h-0 w-full overflow-hidden'
-                }
-              >
-                <InsightsTabPanel
-                  isHomeTab={tab.id === HOME_TAB.id}
-                  isTemplatesTab={tab.id === TEMPLATES_TAB.id}
-                  tab={tab}
-                  historyWindow={historyWindow}
-                />
-              </div>
-            )}
-          </InsightsStateMachineContextProvider>
+            tab={tab}
+            activeTabId={activeTabId}
+            actions={actions}
+            activeHelper={activeHelper}
+            setActiveHelper={setActiveHelper}
+            isHelperPanelOpen={isHelperPanelOpen}
+            getAgentThreadIdForTab={getAgentThreadIdForTab}
+            helperItems={helperItems}
+            historyWindow={historyWindow}
+          />
         ))}
       </div>
     </InsightsAIHelperProvider>

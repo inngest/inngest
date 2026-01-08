@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { type AgentStatus } from '@inngest/use-agent';
 
 import { useSQLEditorActions } from '@/components/Insights/InsightsSQLEditor/SQLEditorContext';
 import { useInsightsStateMachineContext } from '@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext';

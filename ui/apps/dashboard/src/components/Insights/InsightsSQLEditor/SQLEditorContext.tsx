@@ -57,7 +57,7 @@ export function SQLEditorProvider({ children }: SQLEditorProviderProps) {
 
   const setQueryAndRun = useCallback(
     (sql: string) => {
-      // Format the SQL first
+      // Format the SQL using our custom formatter
       const formattedSql = formatSQL(sql.trim());
 
       // Set the query in the editor (updates Monaco)
@@ -68,9 +68,6 @@ export function SQLEditorProvider({ children }: SQLEditorProviderProps) {
         onChange(formattedSql);
       });
 
-      // Format it using Monaco's formatter
-      formatQuery();
-
       // Run the query immediately - state is now guaranteed to be synced
       queueMicrotask(() => {
         try {
@@ -80,7 +77,7 @@ export function SQLEditorProvider({ children }: SQLEditorProviderProps) {
         }
       });
     },
-    [setQuery, onChange, formatQuery, runQuery],
+    [setQuery, onChange, runQuery],
   );
 
   return (
@@ -104,14 +101,13 @@ export function useSQLEditor() {
 // Note: This hook is used in QueryActionsMenu which can be rendered outside of SQLEditorProvider
 // (e.g., in QueryHelperPanel sidebar), so it returns null when context is unavailable
 export function useSQLEditorInstance(): {
-  editorRef: React.MutableRefObject<any | null>;
+  editorRef: React.MutableRefObject<SQLEditorInstance | null>;
 } | null {
   const context = useContext(SQLEditorContext);
   if (!context) {
     return null;
   }
-  const { editorRef } = context;
-  return { editorRef };
+  return { editorRef: context.editorRef };
 }
 
 export function useSQLEditorActions(): {

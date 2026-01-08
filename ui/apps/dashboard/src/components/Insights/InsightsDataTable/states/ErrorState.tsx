@@ -12,15 +12,20 @@ export function ErrorState() {
 
   const errorMessage = error ? pruneGraphQLError(error) : FALLBACK_ERROR;
 
-  const handleFixWithAI = () => {
-    if (aiHelper) {
+  const handleFixWithAI = async () => {
+    if (!aiHelper) return;
+
+    try {
       const prompt =
         'The query execution failed with the following error:\n\n' +
         errorMessage +
         '\n\nThe query that failed was:\n\n```sql\n' +
         query +
         '\n```\n\nPlease provide a corrected version of the query that fixes this error.';
-      aiHelper.openAIHelperWithPrompt(prompt);
+      await aiHelper.openAIHelperWithPrompt(prompt);
+    } catch (error) {
+      console.error('Failed to open AI helper:', error);
+      // Error is logged but doesn't prevent user interaction
     }
   };
 

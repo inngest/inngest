@@ -5,6 +5,10 @@ import { v4 as uuidv4 } from 'uuid';
 import { inngest } from '../client';
 import { createChannel } from '../realtime';
 import { createInsightsNetwork } from './agents/network';
+import {
+  ensureObservability,
+  OBSERVABILITY_DEFAULTS,
+} from './agents/observability';
 import type { InsightsAgentState } from './agents/types';
 
 export const runAgentNetwork = inngest.createFunction(
@@ -82,20 +86,12 @@ export const runAgentNetwork = inngest.createFunction(
         'content' in summaryOutput &&
         typeof summaryOutput.content === 'string'
       ) {
-        if (!networkRun.state.data.observability) {
-          networkRun.state.data.observability = {};
-        }
-        if (!networkRun.state.data.observability.summarizer) {
-          networkRun.state.data.observability.summarizer = {
-            promptContext: {
-              selectedEventsCount: 0,
-              selectedEventNames: [],
-              hasSql: false,
-            },
-          };
-        }
-        networkRun.state.data.observability.summarizer.output =
-          summaryOutput.content;
+        const obs = ensureObservability(
+          { state: networkRun.state } as any,
+          'summarizer',
+          OBSERVABILITY_DEFAULTS.summarizer,
+        );
+        obs.output = summaryOutput.content;
       }
 
       // Capture observability data in a separate step
