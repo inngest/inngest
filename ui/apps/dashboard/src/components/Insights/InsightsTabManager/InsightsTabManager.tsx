@@ -511,7 +511,9 @@ function InsightsTabManagerInternal({
   isInsightsAgentEnabled,
   isSchemaWidgetEnabled,
 }: InsightsTabManagerInternalProps) {
-  const [activeHelper, setActiveHelper] = useState<HelperTitle | null>(null);
+  const [activeHelper, setActiveHelper] = useState<HelperTitle | null>(
+    INSIGHTS_AI,
+  );
 
   const handleSelectHelper = useCallback(
     (title: HelperTitle) => {
