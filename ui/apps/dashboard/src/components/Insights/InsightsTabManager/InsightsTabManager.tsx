@@ -443,6 +443,14 @@ function TabsWithAIHelper({
   // Access the chat provider context to send messages to AI helper
   const chatProvider = useInsightsChatProvider();
 
+  // Open AI helper by default on mount (now that provider is ready)
+  useEffect(() => {
+    if (activeHelper === null) {
+      setActiveHelper(INSIGHTS_AI);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run on mount - setActiveHelper is stable
+
   const openAIHelperWithPrompt = useCallback(
     async (prompt: string) => {
       // Get the thread ID for the active tab
@@ -511,9 +519,7 @@ function InsightsTabManagerInternal({
   isInsightsAgentEnabled,
   isSchemaWidgetEnabled,
 }: InsightsTabManagerInternalProps) {
-  const [activeHelper, setActiveHelper] = useState<HelperTitle | null>(
-    INSIGHTS_AI,
-  );
+  const [activeHelper, setActiveHelper] = useState<HelperTitle | null>(null);
 
   const handleSelectHelper = useCallback(
     (title: HelperTitle) => {
