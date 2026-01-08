@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/oklog/ulid/v2"
 )
@@ -20,20 +21,32 @@ const (
 	DefaultConcurrentBlockFetches = 20
 )
 
-func newDualIter(idx Index, bufferedIter state.PauseIterator, rdr BlockReader, blockIDs []ulid.ULID) *dualIter {
-	// NOTE: This is just an estimate, as pauses may have been compacted / had deletions.
-	count := bufferedIter.Count() + (len(blockIDs) * DefaultPausesPerBlock)
-
-	return &dualIter{
+func newDualIter(idx Index, bufferedIter state.PauseIterator, rdr BlockReader, getBlockIDs func() ([]ulid.ULID, error)) *dualIter {
+	iter := &dualIter{
 		idx:             idx,
-		count:           count,
+		count:           bufferedIter.Count(),
 		bufferIter:      bufferedIter,
 		blockReader:     rdr,
-		unfetchedBlocks: blockIDs,
+		getBlockIDs:     getBlockIDs,
+		unfetchedBlocks: []ulid.ULID{},
 		inflightBlocks:  map[ulid.ULID]struct{}{},
+		fetchedBlocks:   map[ulid.ULID]struct{}{},
 		l:               &sync.Mutex{},
 		start:           time.Now(),
 	}
+
+	// Initialize block IDs on creation
+	blockIDs, err := getBlockIDs()
+	if err != nil {
+		iter.err = err
+		return iter
+	}
+
+	// NOTE: This is just an estimate, as pauses may have been compacted / had deletions.
+	iter.count = bufferedIter.Count() + (len(blockIDs) * DefaultPausesPerBlock)
+	iter.unfetchedBlocks = blockIDs
+
+	return iter
 }
 
 // dualIter represents an iterator that reads from blocks as well as buffers,
@@ -44,7 +57,7 @@ type dualIter struct {
 	// index is the current iterator index.
 	index int64
 
-	// count is an esitmate of the max pauses in the iterator.
+	// count is an estimate of the max pauses in the iterator.
 	count int
 
 	// usingBuffer indicates whether we're using the buffer for the next
@@ -58,6 +71,10 @@ type dualIter struct {
 	// blockReader is the block reader to fetch metadata and blocks.
 	blockReader BlockReader
 
+	// getBlockIDs is a callback function to retrieve block IDs that can be
+	// called multiple times to refresh the list of available blocks.
+	getBlockIDs func() ([]ulid.ULID, error)
+
 	// unfetchedBlocks represents the set of blocks that haven't been fetched
 	// from the backing store yet.
 	unfetchedBlocks []ulid.ULID
@@ -65,6 +82,10 @@ type dualIter struct {
 	// inflightBlocks represents blocks that are currently being fetched from
 	// the backing store.
 	inflightBlocks map[ulid.ULID]struct{}
+
+	// fetchedBlocks represents blocks that have been successfully fetched
+	// and processed.
+	fetchedBlocks map[ulid.ULID]struct{}
 
 	// pauses represents the current pauses that have been fetched from downloaded
 	// blocks.
@@ -109,16 +130,27 @@ func (d *dualIter) Next(ctx context.Context) bool {
 		return true
 	}
 
+	// We just finished iterating through the buffer, so refresh block list
+	// to catch any new blocks that were created while processing the buffer.
+	// If we didn't buffer iterate at all, we do not need to refresh the block
+	// list.
+	if d.usingBuffer {
+		// NOTE: This handles the race condition where pauses were flushed to a block
+		// just after our initial block fetching and were already deleted from
+		// the buffer after the flush, making them invisible to iteration.
+		d.refreshBlockList(ctx)
+	}
 	d.usingBuffer = false
 
 	// NOTE: We must release the lock as soon as possible such that the fetchBlock
 	// background thread can grab the lock to adjust pauses.
 	d.l.Lock()
-	quit := len(d.pauses) == 0 && len(d.inflightBlocks) == 0
+	quit := len(d.pauses) == 0 && len(d.inflightBlocks) == 0 && len(d.unfetchedBlocks) == 0
 	d.l.Unlock()
 
 	if quit {
 		// We are done!  There are no pauses downloaded or inflight.
+		d.err = context.Canceled
 
 		metrics.HistogramAggregatePausesLoadDuration(ctx, time.Since(d.start).Milliseconds(), metrics.HistogramOpt{
 			PkgName: pkgName,
@@ -233,6 +265,48 @@ func (d *dualIter) fetchNextBlocks() bool {
 	return true
 }
 
+// refreshBlockList fetches the latest block IDs and adds any new ones to unfetchedBlocks.
+func (d *dualIter) refreshBlockList(ctx context.Context) {
+	blockIDs, err := d.getBlockIDs()
+	if err != nil {
+		d.l.Lock()
+		if d.err == nil {
+			d.err = err
+		}
+		d.l.Unlock()
+		return
+	}
+
+	d.l.Lock()
+	defer d.l.Unlock()
+
+	// Add any blocks that are completely new (not in any of our tracking maps/slices)
+	for _, blockID := range blockIDs {
+		// Skip if already fetched or in flight
+		_, fetched := d.fetchedBlocks[blockID]
+		_, inflight := d.inflightBlocks[blockID]
+		if fetched || inflight {
+			continue
+		}
+
+		// Skip if already in unfetched blocks
+		isUnfetched := false
+		for _, unfetched := range d.unfetchedBlocks {
+			if unfetched == blockID {
+				isUnfetched = true
+				break
+			}
+		}
+		if isUnfetched {
+			continue
+		}
+
+		// This is a new block, add it to unfetched
+		d.unfetchedBlocks = append(d.unfetchedBlocks, blockID)
+		logger.From(ctx).Debug("block was flushed during buffer iteration", "block_id", blockID)
+	}
+}
+
 func (d *dualIter) fetchBlock(ctx context.Context, id ulid.ULID) {
 	if d.err != nil {
 		// Don't bother to fetch, as we already have an error
@@ -261,6 +335,8 @@ func (d *dualIter) fetchBlock(ctx context.Context, id ulid.ULID) {
 	defer d.l.Unlock()
 	// Remove this from in-flight stuff.
 	delete(d.inflightBlocks, id)
+	// Add to fetched blocks to keep track of already processed blocks.
+	d.fetchedBlocks[id] = struct{}{}
 	// And, of course, add our pauses so that we can iterate through them.
 	d.pauses = append(d.pauses, block.Pauses...)
 

@@ -10,13 +10,13 @@ import {
   type ReactNode,
 } from 'react';
 
-import { useFetchAllEventTypes } from '@/components/EventTypes/useFetchAllEventTypes';
 import {
   useInsightsAgent,
   type ClientState,
   type InsightsAgentConfig,
   type InsightsAgentEvent,
 } from './useInsightsAgent';
+import { useEventTypeSchemas } from '../SchemaExplorer/SchemasContext/useEventTypeSchemas';
 
 type ThreadFlags = {
   networkActive: boolean;
@@ -45,7 +45,7 @@ type ContextValue = {
 
   // Event metadata for the agent
   eventTypes: string[];
-  schemas: Record<string, unknown> | null;
+  schemas: { name: string; schema: string }[];
 };
 
 const defaultFlags: ThreadFlags = {
@@ -190,23 +190,57 @@ export function InsightsChatProvider({ children }: { children: ReactNode }) {
     } catch {}
   }, []);
 
-  // Fetch event types and schemas with pagination (up to 5 pages = 200 events)
-  const fetchAllEventTypes = useFetchAllEventTypes();
+  // Fetch event types and schemas using the same hook as SchemaExplorer
+  const getEventTypeSchemas = useEventTypeSchemas();
   const { data: eventsData } = useQuery({
     queryKey: ['insights', 'all-event-types'],
     queryFn: async () => {
-      const allEvents = await fetchAllEventTypes();
-
-      const names: string[] = allEvents.map((e) => e.name);
+      // Fetch up to 5 pages (200 events max)
+      const MAX_PAGES = 5;
+      let cursor: string | null = null;
+      const names: string[] = [];
       const schemaMap: Record<string, string> = {};
-      for (const e of allEvents) {
-        const raw = (e.latestSchema || '').trim();
-        if (!raw) continue;
-        schemaMap[e.name] = raw;
+
+      try {
+        for (let i = 0; i < MAX_PAGES; i++) {
+          const result = await getEventTypeSchemas({
+            cursor,
+            nameSearch: null,
+          });
+
+          for (const event of result.events) {
+            names.push(event.name);
+            const raw = (event.schema || '').trim();
+            if (raw) {
+              schemaMap[event.name] = raw;
+            }
+          }
+
+          // Check if there are more pages
+          if (result.pageInfo.hasNextPage && result.pageInfo.endCursor) {
+            cursor = result.pageInfo.endCursor;
+          } else {
+            break;
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch event type schemas:', error);
+        // Return partial data if some pages were fetched successfully
+        // This ensures the UI remains functional even if pagination fails
       }
+
       return { names, schemaMap };
     },
   });
+
+  // Convert schemaMap to schemas array (memoized to avoid recomputation)
+  const schemas = useMemo(() => {
+    const schemaMap = eventsData?.schemaMap ?? {};
+    return Object.entries(schemaMap).map(([name, schema]) => ({
+      name,
+      schema,
+    }));
+  }, [eventsData?.schemaMap]);
 
   const {
     messages,
@@ -227,7 +261,7 @@ export function InsightsChatProvider({ children }: { children: ReactNode }) {
       return {
         sqlQuery: '',
         eventTypes: eventsData?.names ?? [],
-        schemas: eventsData?.schemaMap ?? null,
+        schemas,
         currentQuery: '',
         tabTitle: '',
         mode: 'insights_sql_playground',
@@ -262,7 +296,7 @@ export function InsightsChatProvider({ children }: { children: ReactNode }) {
       latestSqlVersion,
       setThreadClientState,
       eventTypes: eventsData?.names ?? [],
-      schemas: eventsData?.schemaMap ?? null,
+      schemas,
     }),
     [
       messages,
@@ -276,7 +310,7 @@ export function InsightsChatProvider({ children }: { children: ReactNode }) {
       latestSqlVersion,
       setThreadClientState,
       eventsData?.names,
-      eventsData?.schemaMap,
+      schemas,
     ],
   );
 

@@ -9,6 +9,7 @@
   },
   "devDependencies": {
     "@ianvs/prettier-plugin-sort-imports": "^3.7.2",
+    "eslint": "^9.31.0",
     "husky": "^8.0.2",
     "lint-staged": "^15.5.0",
     "postcss-nesting": "^13.0.2",

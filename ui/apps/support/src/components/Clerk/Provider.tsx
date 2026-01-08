@@ -1,6 +1,7 @@
 import { ClerkProvider } from "@clerk/tanstack-react-start";
 import { getButtonColors } from "@inngest/components/Button/buttonStyles";
 import { cn } from "@inngest/components/utils/classNames";
+import logoImageUrl from "@inngest/components/icons/logos/inngest-logo-black.png";
 
 const primarySolidButton =
   "data-[color=primary]:data-[variant=solid]:bg-btnPrimary data-[color=primary]:data-[variant=solid]:focus:bg-btnPrimaryPressed data-[color=primary]:data-[variant=solid]:hover:bg-btnPrimaryHover data-[color=primary]:data-[variant=solid]:active:bg-btnPrimaryPressed data-[color=primary]:data-[variant=solid]:disabled:bg-btnPrimaryDisabled data-[color=primary]:data-[variant=solid]:text-alwaysWhite";
@@ -22,6 +23,7 @@ export const InngestClerkProvider = ({ children }: React.PropsWithChildren) => {
       appearance={{
         layout: {
           logoPlacement: "outside" as const,
+          logoImageUrl,
         },
         elements: {
           button: cn(
@@ -41,6 +43,7 @@ export const InngestClerkProvider = ({ children }: React.PropsWithChildren) => {
           cardBox: "shadow-none h-fit block",
           scrollBox: "w-fit md:min-w-[800px]",
           logoBox: "flex m-0 h-fit justify-center",
+          logoImage: "max-h-16 w-auto object-contain dark:invert",
           header: "my-9 group-[.cl-tabPanel]:m-0 group-[.cl-formContainer]:m-0",
           headerTitle:
             "text-basis text-2xl font-normal group-[.cl-tabPanel]:text-sm group-[.cl-tabPanel]:font-medium group-[.cl-formContainer]:text-lg group-[.cl-formContainer]:font-medium",

@@ -15,6 +15,7 @@ export const securityMiddleware = createMiddleware().server(({ next }) => {
     'https://challenges.cloudflare.com',
     'https://unpkg.com/@inngest/', // Inngest browser SDK
     monacoEditorCdn,
+    `'wasm-unsafe-eval'`, // WASM webhook transforms w/ QuickJS
   ];
   if (
     process.env.VERCEL_ENV === 'preview' ||
@@ -26,19 +27,20 @@ export const securityMiddleware = createMiddleware().server(({ next }) => {
     scriptSrc.push('https://cdn.segment.com');
   }
   const connectSrc = [
+    'data:', // QuickJS
     process.env.VITE_API_URL, // e.g. https://api.inngest.com
-    process.env.VITE_API_URL?.replace(/$https/, 'wss'),
+    'wss://api.inngest.com',
     'https://analytics-cdn.inngest.com',
     'https://analytics.inngest.com',
     'https://inn.gs',
     process.env.VITE_EVENT_API_HOST,
     'https://status.inngest.com',
     'https://clerk.inngest.com',
-    'https://localhost:8288', // Direct communication with the dev server
+    'http://localhost:8288', // Direct communication with the dev server
     'https://clientstream.launchdarkly.com',
     'https://events.launchdarkly.com',
     'https://app.launchdarkly.com',
-  ];
+  ].filter(Boolean);
   if (
     process.env.VERCEL_ENV === 'preview' ||
     process.env.NODE_ENV === 'development'
@@ -55,8 +57,8 @@ export const securityMiddleware = createMiddleware().server(({ next }) => {
     `connect-src 'self' ${connectSrc.join(' ')}`,
     `style-src 'self' 'unsafe-inline' ${monacoEditorCdn}`, // Monaco editor
     "img-src 'self' data: https://img.clerk.com",
-    `font-src 'self' https://fonts-cdn.inngest.com ${monacoEditorCdn}`,
-    "frame-src 'self' https://challenges.cloudflare.com",
+    `font-src 'self' https://fonts-cdn.inngest.com https://fonts.gstatic.com ${monacoEditorCdn}`,
+    "frame-src 'self' https://js.stripe.com https://challenges.cloudflare.com",
     "worker-src 'self' blob:",
     "base-uri 'self'",
     "form-action 'self'",

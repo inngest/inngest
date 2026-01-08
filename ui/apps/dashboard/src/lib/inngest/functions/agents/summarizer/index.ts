@@ -1,4 +1,5 @@
 import { anthropic, createAgent } from '@inngest/agent-kit';
+import Mustache from 'mustache';
 
 import type { InsightsAgentState as InsightsState } from '../types';
 import systemPrompt from './system.md?raw';
@@ -13,15 +14,12 @@ export const summarizerAgent = createAgent<InsightsState>({
         (e: { event_name: string }) => e.event_name,
       ) ?? [];
     const sql = network?.state.data.sql;
-    return [
-      systemPrompt,
-      events.length ? `Selected events: ${events.join(', ')}` : '',
-      sql
-        ? 'A SQL statement has been prepared; summarize its intent, not its exact text.'
-        : '',
-    ]
-      .filter(Boolean)
-      .join('\n');
+
+    return Mustache.render(systemPrompt, {
+      hasSelectedEvents: events.length > 0,
+      selectedEvents: events.join(', '),
+      hasSql: !!sql,
+    });
   },
   model: anthropic({
     model: 'claude-haiku-4-5',

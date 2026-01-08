@@ -5,6 +5,8 @@ import { rootRouteId, useMatch, useRouter } from '@tanstack/react-router';
 
 import * as Sentry from '@sentry/tanstackstart-react';
 
+import { useClerk } from '@clerk/tanstack-react-start';
+
 function DefaultCatchBoundary({ error }: ErrorComponentProps) {
   const router = useRouter();
   const isRoot = useMatch({
@@ -12,7 +14,11 @@ function DefaultCatchBoundary({ error }: ErrorComponentProps) {
     select: (state) => state.id === rootRouteId,
   });
 
+  const { signOut, session } = useClerk();
+
   console.error(error.message);
+
+  const authError = error.message.includes('UNAUTHENTICATED');
 
   return (
     <div className="flex flex-col justify-start items-start gap">
@@ -40,6 +46,32 @@ function DefaultCatchBoundary({ error }: ErrorComponentProps) {
             }}
             label="Go Back"
           />
+        )}
+
+        {/* Provide some escape hatches here if 
+          user/org state gets out of sync with clerk */}
+        {authError && (
+          <>
+            <Button
+              kind="secondary"
+              appearance="outlined"
+              onClick={async () => {
+                await signOut({
+                  sessionId: session?.id,
+                  redirectUrl: '/sign-in/choose',
+                });
+              }}
+              label="Sign Out"
+            />
+            <Button
+              kind="secondary"
+              appearance="outlined"
+              onClick={() => {
+                router.navigate({ to: '/organization-list/$' });
+              }}
+              label="Switch Org"
+            />
+          </>
         )}
       </div>
     </div>

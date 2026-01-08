@@ -1134,7 +1134,7 @@ func (e *executor) schedule(
 		switch {
 		case err == nil: // no-op
 		case errors.Is(err, state.ErrIdentifierExists): // no-op
-		case errors.Is(err, state.ErrIdentifierTomestone):
+		case errors.Is(err, state.ErrIdentifierTombstone):
 			return nil, ErrFunctionSkippedIdempotency
 		default:
 			return nil, fmt.Errorf("error creating run state: %w", err)
@@ -1155,6 +1155,7 @@ func (e *executor) schedule(
 		}
 	}
 
+	runTimestamp := runID.Timestamp()
 	runSpanOpts := &tracing.CreateSpanOptions{
 		Debug:    &tracing.SpanDebugData{Location: "executor.Schedule"},
 		Metadata: &metadata,
@@ -1163,6 +1164,7 @@ func (e *executor) schedule(
 			meta.Attr(meta.Attrs.DebugRunID, req.DebugRunID),
 			meta.Attr(meta.Attrs.EventsInput, &strEvts),
 			meta.Attr(meta.Attrs.TriggeringEventName, eventName),
+			meta.Attr(meta.Attrs.QueuedAt, &runTimestamp),
 		),
 		Seed: []byte(metadata.ID.RunID[:]),
 	}
@@ -1279,6 +1281,9 @@ func (e *executor) schedule(
 				Metadata:  &metadata,
 				QueueItem: &item,
 				Carriers:  []map[string]any{item.Metadata},
+				Attributes: meta.NewAttrSet(
+					meta.Attr(meta.Attrs.QueuedAt, &runTimestamp),
+				),
 			},
 		)
 		if err != nil {

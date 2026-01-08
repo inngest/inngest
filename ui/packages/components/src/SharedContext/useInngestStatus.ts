@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { useShared } from './SharedContext';
 
 export const impactSchema = z.enum(['partial_outage', 'degraded_performance', 'full_outage']);
+export type Impact = z.infer<typeof impactSchema>;
 export const indicatorSchema = z.enum(['none', 'maintenance', ...impactSchema.options]);
 export type Indicator = z.infer<typeof indicatorSchema>;
 
