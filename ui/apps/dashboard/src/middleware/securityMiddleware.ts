@@ -14,6 +14,7 @@ export const securityMiddleware = createMiddleware().server(({ next }) => {
     'https://clerk.inngest.com',
     'https://challenges.cloudflare.com',
     'https://unpkg.com/@inngest/', // Inngest browser SDK
+    'https://js.stripe.com/',
     monacoEditorCdn,
     `'wasm-unsafe-eval'`, // WASM webhook transforms w/ QuickJS
   ];
@@ -57,7 +58,7 @@ export const securityMiddleware = createMiddleware().server(({ next }) => {
     `connect-src 'self' ${connectSrc.join(' ')}`,
     `style-src 'self' 'unsafe-inline' ${monacoEditorCdn}`, // Monaco editor
     "img-src 'self' data: https://img.clerk.com",
-    `font-src 'self' https://fonts-cdn.inngest.com https://fonts.gstatic.com ${monacoEditorCdn}`,
+    `font-src 'self' data: https://fonts-cdn.inngest.com https://fonts.gstatic.com ${monacoEditorCdn}`,
     "frame-src 'self' https://js.stripe.com https://challenges.cloudflare.com",
     "worker-src 'self' blob:",
     "base-uri 'self'",
