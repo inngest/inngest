@@ -428,22 +428,11 @@ input[type='number'] {
   }
 }
 
-/* Fix Maze.co pop up interactions when overlays are visible */
-#maze-contextual-widget-host,
-#maze-media-host {
-  pointer-events: auto;
-}
-
 /* Toasts */
 [data-sonner-toast] {
   /* We can remove important when we upgrade Sonner */
-  --toast-accent-color: var(--color-background-canvas-muted);
+  background: rgb(var(--toast-background-color)) !important;
   border-color: rgb(var(--toast-accent-color)) !important;
-}
-
-.dark [data-sonner-toast] {
-  --tw-drop-shadow: drop-shadow(0 10px 20px rgb(172 172 172 / 0.1))
-    drop-shadow(0 4px 10px rgb(172 172 172 / 0.4));
 }
 
 [data-sonner-toast] [data-icon] svg {
@@ -452,19 +441,23 @@ input[type='number'] {
 }
 
 [data-sonner-toast][data-type='success'] {
-  --toast-accent-color: var(--color-primary-moderate);
+  --toast-accent-color: var(--color-primary-intense);
+  --toast-background-color: var(--color-primary-3xSubtle);
 }
 
 [data-sonner-toast][data-type='error'] {
-  --toast-accent-color: var(--color-tertiary-moderate);
+  --toast-accent-color: var(--color-tertiary-intense);
+  --toast-background-color: var(--color-tertiary-3xSubtle);
 }
 
 [data-sonner-toast][data-type='warning'] {
-  --toast-accent-color: var(--color-accent-moderate);
+  --toast-accent-color: var(--color-accent-intense);
+  --toast-background-color: var(--color-accent-3xSubtle);
 }
 
 [data-sonner-toast][data-type='info'] {
-  --toast-accent-color: var(--color-secondary-moderate);
+  --toast-accent-color: var(--color-secondary-intense);
+  --toast-background-color: var(--color-secondary-3xSubtle);
 }
 
 /* width */
