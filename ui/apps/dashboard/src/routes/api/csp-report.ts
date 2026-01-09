@@ -8,6 +8,9 @@ import { isRecord } from '@inngest/components/utils/object';
  * 2. { "body": { "blockedURL": "...", ... }, "type": "...", "url": "..." } (camelCase)
  */
 function normalizeCspReport(body: unknown): Record<string, unknown> {
+  if (Array.isArray(body)) {
+    return normalizeCspReport(body[0]);
+  }
   if (!isRecord(body)) {
     return {};
   }
@@ -63,6 +66,7 @@ export const Route = createFileRoute('/api/csp-report')({
         await inngest.send({
           name: 'app/csp-violation.reported',
           data: normalizedBody,
+          v: '2025-01-08.1',
         });
         return new Response(null, { status: 200 });
       },
