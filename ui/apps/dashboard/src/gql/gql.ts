@@ -30,7 +30,8 @@ type Documents = {
     "\n  mutation UpdateAccount($input: UpdateAccount!) {\n    account: updateAccount(input: $input) {\n      billingEmail\n      name\n    }\n  }\n": typeof types.UpdateAccountDocument,
     "\n  mutation UpdatePaymentMethod($token: String!) {\n    updatePaymentMethod(token: $token) {\n      brand\n      last4\n      expMonth\n      expYear\n      createdAt\n      default\n    }\n  }\n": typeof types.UpdatePaymentMethodDocument,
     "\n  query GetPaymentIntents {\n    account {\n      paymentIntents {\n        status\n        createdAt\n        amountLabel\n        description\n        invoiceURL\n      }\n    }\n  }\n": typeof types.GetPaymentIntentsDocument,
-    "\n  mutation CreateStripeSubscription($input: StripeSubscriptionInput!) {\n    createStripeSubscription(input: $input) {\n      clientSecret\n      message\n    }\n  }\n": typeof types.CreateStripeSubscriptionDocument,
+    "\n  mutation CreateStripeSubscription($input: StripeSubscriptionInput!) {\n    createStripeSubscription(input: $input) {\n      clientSecret\n      message\n      subscriptionId\n    }\n  }\n": typeof types.CreateStripeSubscriptionDocument,
+    "\n  mutation ConfirmSubscriptionUpgrade($subscriptionId: String!) {\n    confirmSubscriptionUpgrade(subscriptionId: $subscriptionId) {\n      success\n      message\n      account {\n        id\n      }\n    }\n  }\n": typeof types.ConfirmSubscriptionUpgradeDocument,
     "\n  mutation UpdatePlan($planSlug: String!) {\n    updatePlan(slug: $planSlug) {\n      plan {\n        id\n        name\n      }\n    }\n  }\n": typeof types.UpdatePlanDocument,
     "\n  mutation SubmitChurnSurvey(\n    $reason: String!\n    $feedback: String\n    $email: String!\n    $accountID: UUID!\n    $clerkUserID: String!\n  ) {\n    submitChurnSurvey(\n      reason: $reason\n      feedback: $feedback\n      email: $email\n      accountID: $accountID\n      clerkUserID: $clerkUserID\n    )\n  }\n": typeof types.SubmitChurnSurveyDocument,
     "\n  query GetBillableSteps($month: Int!, $year: Int!) {\n    usage: billableStepTimeSeries(timeOptions: { month: $month, year: $year }) {\n      data {\n        time\n        value\n      }\n    }\n  }\n": typeof types.GetBillableStepsDocument,
@@ -170,7 +171,8 @@ const documents: Documents = {
     "\n  mutation UpdateAccount($input: UpdateAccount!) {\n    account: updateAccount(input: $input) {\n      billingEmail\n      name\n    }\n  }\n": types.UpdateAccountDocument,
     "\n  mutation UpdatePaymentMethod($token: String!) {\n    updatePaymentMethod(token: $token) {\n      brand\n      last4\n      expMonth\n      expYear\n      createdAt\n      default\n    }\n  }\n": types.UpdatePaymentMethodDocument,
     "\n  query GetPaymentIntents {\n    account {\n      paymentIntents {\n        status\n        createdAt\n        amountLabel\n        description\n        invoiceURL\n      }\n    }\n  }\n": types.GetPaymentIntentsDocument,
-    "\n  mutation CreateStripeSubscription($input: StripeSubscriptionInput!) {\n    createStripeSubscription(input: $input) {\n      clientSecret\n      message\n    }\n  }\n": types.CreateStripeSubscriptionDocument,
+    "\n  mutation CreateStripeSubscription($input: StripeSubscriptionInput!) {\n    createStripeSubscription(input: $input) {\n      clientSecret\n      message\n      subscriptionId\n    }\n  }\n": types.CreateStripeSubscriptionDocument,
+    "\n  mutation ConfirmSubscriptionUpgrade($subscriptionId: String!) {\n    confirmSubscriptionUpgrade(subscriptionId: $subscriptionId) {\n      success\n      message\n      account {\n        id\n      }\n    }\n  }\n": types.ConfirmSubscriptionUpgradeDocument,
     "\n  mutation UpdatePlan($planSlug: String!) {\n    updatePlan(slug: $planSlug) {\n      plan {\n        id\n        name\n      }\n    }\n  }\n": types.UpdatePlanDocument,
     "\n  mutation SubmitChurnSurvey(\n    $reason: String!\n    $feedback: String\n    $email: String!\n    $accountID: UUID!\n    $clerkUserID: String!\n  ) {\n    submitChurnSurvey(\n      reason: $reason\n      feedback: $feedback\n      email: $email\n      accountID: $accountID\n      clerkUserID: $clerkUserID\n    )\n  }\n": types.SubmitChurnSurveyDocument,
     "\n  query GetBillableSteps($month: Int!, $year: Int!) {\n    usage: billableStepTimeSeries(timeOptions: { month: $month, year: $year }) {\n      data {\n        time\n        value\n      }\n    }\n  }\n": types.GetBillableStepsDocument,
@@ -375,7 +377,11 @@ export function graphql(source: "\n  query GetPaymentIntents {\n    account {\n 
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
-export function graphql(source: "\n  mutation CreateStripeSubscription($input: StripeSubscriptionInput!) {\n    createStripeSubscription(input: $input) {\n      clientSecret\n      message\n    }\n  }\n"): (typeof documents)["\n  mutation CreateStripeSubscription($input: StripeSubscriptionInput!) {\n    createStripeSubscription(input: $input) {\n      clientSecret\n      message\n    }\n  }\n"];
+export function graphql(source: "\n  mutation CreateStripeSubscription($input: StripeSubscriptionInput!) {\n    createStripeSubscription(input: $input) {\n      clientSecret\n      message\n      subscriptionId\n    }\n  }\n"): (typeof documents)["\n  mutation CreateStripeSubscription($input: StripeSubscriptionInput!) {\n    createStripeSubscription(input: $input) {\n      clientSecret\n      message\n      subscriptionId\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation ConfirmSubscriptionUpgrade($subscriptionId: String!) {\n    confirmSubscriptionUpgrade(subscriptionId: $subscriptionId) {\n      success\n      message\n      account {\n        id\n      }\n    }\n  }\n"): (typeof documents)["\n  mutation ConfirmSubscriptionUpgrade($subscriptionId: String!) {\n    confirmSubscriptionUpgrade(subscriptionId: $subscriptionId) {\n      success\n      message\n      account {\n        id\n      }\n    }\n  }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
