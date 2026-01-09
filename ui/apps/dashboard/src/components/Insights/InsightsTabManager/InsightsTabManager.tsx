@@ -402,8 +402,7 @@ function InsightsTabManagerInternal({
                   />
                 )}
               </div>
-              {isQueryTab(tab.id) &&
-              hasMoreThanOneHelperPanelFeatureEnabled(helperItems) ? (
+              {isQueryTab(tab.id) && helperItems.length > 0 ? (
                 <InsightsHelperPanelControl
                   items={helperItems}
                   activeTitle={activeHelper}
@@ -445,14 +444,6 @@ function InsightsTabManagerInternal({
       </div>
     </div>
   );
-}
-
-// This ensures the user has support + at least one of AI, Documentation, or Schema Explorer enabled.
-// Otherwise, we just hide the helper panel because only showing support is not useful.
-function hasMoreThanOneHelperPanelFeatureEnabled(
-  features: HelperItem[],
-): boolean {
-  return features.length > 1;
 }
 
 function getNewActiveTabAfterClose(
