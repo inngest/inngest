@@ -31,7 +31,6 @@ import {
   DOCUMENTATION,
   INSIGHTS_AI,
   SCHEMA_EXPLORER,
-  SUPPORT,
   type HelperTitle,
 } from './InsightsHelperPanel/constants';
 import {
@@ -581,13 +580,6 @@ function InsightsTabManagerInternal({
         action: () => handleSelectHelper(SCHEMA_EXPLORER),
       });
     }
-
-    items.push({
-      title: SUPPORT,
-      icon: <InsightsHelperPanelIcon title={SUPPORT} />,
-      action: noOp,
-      href: pathCreator.support({ ref: 'app-insights' }),
-    });
 
     return items;
   }, [handleSelectHelper, isInsightsAgentEnabled, isSchemaWidgetEnabled]);
