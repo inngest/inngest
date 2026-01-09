@@ -317,7 +317,13 @@ func (a checkpointAPI) CheckpointAsyncSteps(w http.ResponseWriter, r *http.Reque
 	})
 	if err != nil {
 		logger.StdlibLogger(ctx).Error("error checkpointing async steps", "error", err)
-		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, http.StatusBadRequest, "Failed to checkpoint steps"))
+		_ = publicerr.WriteHTTP(w, publicerr.Error{
+			Message: "Failed to checkpoint steps",
+			Data: map[string]any{
+				"run_id": input.RunID,
+			},
+			Status: 400,
+		})
 	}
 }
 

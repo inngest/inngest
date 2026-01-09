@@ -4344,6 +4344,14 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, runCtx exe
 		ParallelMode: gen.ParallelMode(),
 	}
 
+	// Always correlate the triggering event ID with the invoked step.
+	evtID := ulid.MustParse(evt.ID)
+	attrs := tracing.GeneratorAttrs(&gen).Merge(
+		meta.NewAttrSet(
+			meta.Attr(meta.Attrs.StepInvokeTriggerEventID, &evtID),
+		),
+	)
+
 	lifecycleItem := runCtx.LifecycleItem()
 	span, err := e.tracerProvider.CreateDroppableSpan(
 		ctx,
@@ -4356,7 +4364,7 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, runCtx exe
 			Metadata:    runCtx.Metadata(),
 			QueueItem:   &nextItem,
 			Parent:      tracing.RunSpanRefFromMetadata(runCtx.Metadata()),
-			Attributes:  tracing.GeneratorAttrs(&gen),
+			Attributes:  attrs,
 		},
 	)
 	if err != nil {

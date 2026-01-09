@@ -2416,7 +2416,7 @@ func TestDualIteratorBlockRefresh(t *testing.T) {
 		}
 	}
 
-	require.NoError(t, iter.Error())
+	require.Equal(t, context.Canceled, iter.Error())
 	// Should see 3 pauses: 1 from buffer + 2 from refreshed blocks
 	require.Len(t, seenPauses, 3)
 
