@@ -34,7 +34,7 @@ export function Time({ className, format, value, copyable = true }: Props) {
 
   const date = value instanceof Date ? value : toMaybeDate(value);
 
-  if (!(date instanceof Date) || isNaN(date)) {
+  if (!(date instanceof Date) || isNaN(date.getTime())) {
     return <span>Invalid date</span>;
   }
 
