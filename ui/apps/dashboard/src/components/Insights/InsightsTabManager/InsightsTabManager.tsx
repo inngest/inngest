@@ -23,7 +23,6 @@ import type {
   Tab,
 } from '@/components/Insights/types';
 import type { InsightsQueryStatement } from '@/gql/graphql';
-import { pathCreator } from '@/utils/urls';
 import { isQuerySnapshot, isQueryTemplate } from '../queries';
 import { SHOW_DOCS_CONTROL_PANEL_BUTTON } from '../temp-flags';
 import { InsightsHelperPanel } from './InsightsHelperPanel/InsightsHelperPanel';
@@ -36,7 +35,6 @@ import {
   DOCUMENTATION,
   INSIGHTS_AI,
   SCHEMA_EXPLORER,
-  SUPPORT,
   type HelperTitle,
 } from './InsightsHelperPanel/constants';
 import {
@@ -337,13 +335,6 @@ function InsightsTabManagerInternal({
       });
     }
 
-    items.push({
-      title: SUPPORT,
-      icon: <InsightsHelperPanelIcon title={SUPPORT} />,
-      action: noOp,
-      href: pathCreator.support({ ref: 'app-insights' }),
-    });
-
     return items;
   }, [handleSelectHelper, isInsightsAgentEnabled, isSchemaWidgetEnabled]);
   // Provide shared transport/connection for all descendant useAgents hooks
@@ -411,8 +402,7 @@ function InsightsTabManagerInternal({
                   />
                 )}
               </div>
-              {isQueryTab(tab.id) &&
-              hasMoreThanOneHelperPanelFeatureEnabled(helperItems) ? (
+              {isQueryTab(tab.id) && helperItems.length > 0 ? (
                 <InsightsHelperPanelControl
                   items={helperItems}
                   activeTitle={activeHelper}
@@ -454,14 +444,6 @@ function InsightsTabManagerInternal({
       </div>
     </div>
   );
-}
-
-// This ensures the user has support + at least one of AI, Documentation, or Schema Explorer enabled.
-// Otherwise, we just hide the helper panel because only showing support is not useful.
-function hasMoreThanOneHelperPanelFeatureEnabled(
-  features: HelperItem[],
-): boolean {
-  return features.length > 1;
 }
 
 function getNewActiveTabAfterClose(
@@ -556,8 +538,4 @@ function ActiveThreadBridge({
 
 function isQueryTab(tabId: string): boolean {
   return tabId !== HOME_TAB.id && tabId !== TEMPLATES_TAB.id;
-}
-
-function noOp() {
-  return;
 }

@@ -1,9 +1,7 @@
-import {
-  RiBookOpenLine,
-  RiFeedbackLine,
-  RiNodeTree,
-  RiSparkling2Line,
-} from '@remixicon/react';
+import { RiBookOpenLine, RiFeedbackLine, RiNodeTree } from '@remixicon/react';
+
+import InsightsAI from '@/components/Icons/insights-ai-icon.svg?react';
+import InsightsAIDark from '@/components/Icons/insights-ai-icon-dark.svg?react';
 
 import {
   DOCUMENTATION,
@@ -26,7 +24,20 @@ export function InsightsHelperPanelIcon({
 }: InsightsHelperPanelIconProps) {
   switch (title) {
     case INSIGHTS_AI:
-      return <RiSparkling2Line className={className} size={size} />;
+      return (
+        <>
+          <InsightsAI
+            className={`${className} block dark:hidden`}
+            width={size}
+            height={size}
+          />
+          <InsightsAIDark
+            className={`${className} hidden dark:block`}
+            width={size}
+            height={size}
+          />
+        </>
+      );
     case DOCUMENTATION:
       return <RiBookOpenLine className={className} size={size} />;
     case SCHEMA_EXPLORER:
