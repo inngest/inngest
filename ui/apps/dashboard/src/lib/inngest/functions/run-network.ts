@@ -83,7 +83,7 @@ export const runAgentNetwork = inngest.createFunction(
         'content' in summaryOutput &&
         typeof summaryOutput.content === 'string'
       ) {
-        setObservability({ state: networkRun.state } as any, 'summarizer', {
+        setObservability(networkRun, 'summarizer', {
           output: summaryOutput.content,
         });
       }
