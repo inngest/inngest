@@ -8,10 +8,12 @@ import (
 	"time"
 
 	"github.com/inngest/inngest/pkg/event"
+	"github.com/inngest/inngest/pkg/util"
 	"github.com/inngest/inngest/tests/client"
 	"github.com/inngest/inngestgo"
 	"github.com/inngest/inngestgo/pkg/checkpoint"
 	"github.com/inngest/inngestgo/step"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -43,25 +45,29 @@ func TestFnCheckpoint(t *testing.T) {
 		// will always checkpoint after a second, and we want to assert that this happens.
 		for _, delay := range delays {
 			runID := ""
-			evtName := fmt.Sprintf("invoke-checkpoint-delay-%v", delay.Milliseconds())
+			evtName := fmt.Sprintf("invoke-checkpoint-delay-%v-cfg-%v", delay.String(), util.XXHash(cfg))
+			fmt.Println(evtName)
 
 			_, err := inngestgo.CreateFunction(
 				inngestClient,
 				inngestgo.FunctionOpts{
-					ID:         fmt.Sprintf("checkpoint-myfn-%v", cfg),
+					ID:         evtName,
 					Checkpoint: cfg,
 				},
 				inngestgo.EventTrigger(evtName, nil),
 				func(ctx context.Context, input inngestgo.Input[DebounceEvent]) (any, error) {
 					_, _ = step.Run(ctx, "a", func(ctx context.Context) (string, error) { return "a", nil })
+					fmt.Println("a")
 					_, _ = step.Run(ctx, "b", func(ctx context.Context) (string, error) {
 						<-time.After(delay)
 						return "b", nil
 					})
+					fmt.Println("b")
 					_, _ = step.Run(ctx, "c", func(ctx context.Context) (string, error) {
 						<-time.After(delay)
 						return "c", nil
 					})
+					fmt.Println("c")
 					runID = input.InputCtx.RunID
 					return nil, nil
 				},
@@ -74,7 +80,10 @@ func TestFnCheckpoint(t *testing.T) {
 			r.NoError(err)
 
 			// Wait a moment for runID to be populated
-			<-time.After(2 * time.Second)
+			require.EventuallyWithT(t, func(t *assert.CollectT) {
+				assert.NotEmpty(t, runID)
+			}, 5*time.Second, time.Millisecond)
+
 			run := c.WaitForRunStatus(ctx, t, "COMPLETED", &runID)
 			var output string
 			err = json.Unmarshal([]byte(run.Output), &output)
