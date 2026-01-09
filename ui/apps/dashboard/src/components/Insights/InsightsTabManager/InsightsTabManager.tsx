@@ -23,7 +23,6 @@ import type {
   Tab,
 } from '@/components/Insights/types';
 import type { InsightsQueryStatement } from '@/gql/graphql';
-import { pathCreator } from '@/utils/urls';
 import { isQuerySnapshot, isQueryTemplate } from '../queries';
 import { SHOW_DOCS_CONTROL_PANEL_BUTTON } from '../temp-flags';
 import { InsightsHelperPanel } from './InsightsHelperPanel/InsightsHelperPanel';
@@ -548,8 +547,4 @@ function ActiveThreadBridge({
 
 function isQueryTab(tabId: string): boolean {
   return tabId !== HOME_TAB.id && tabId !== TEMPLATES_TAB.id;
-}
-
-function noOp() {
-  return;
 }
