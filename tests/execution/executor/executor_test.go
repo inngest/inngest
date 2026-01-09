@@ -877,8 +877,8 @@ func TestInvokeRetrySucceedsIfPauseAlreadyCreated(t *testing.T) {
 		executor.WithAssignedQueueShard(queueShard),
 		executor.WithShardSelector(shardSelector),
 		executor.WithTracerProvider(tracing.NewOtelTracerProvider(nil, time.Millisecond)),
-		executor.WithSendingEventHandler(func(ctx context.Context, evt event.Event, item queue.Item) error {
-			if evt.Name == "inngest/function.invoked" {
+		executor.WithInvokeEventHandler(func(ctx context.Context, evt event.TrackedEvent) error {
+			if evt.GetEvent().Name == "inngest/function.invoked" {
 				eventCaptured = true
 			}
 			return nil

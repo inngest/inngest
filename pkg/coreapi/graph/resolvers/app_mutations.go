@@ -128,7 +128,7 @@ func (r *mutationResolver) InvokeFunction(
 	defer span.End()
 
 	sent := false
-	_, err := r.EventHandler(ctx, &evt, nil)
+	_, err := r.EventHandler(ctx, &evt.Event, nil)
 	if err != nil {
 		return &sent, err
 	}
