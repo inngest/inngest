@@ -15,19 +15,19 @@ import (
 
 func NewInvocationEvent(opts NewInvocationEventOpts) BaseTrackedEvent {
 	evt := opts.Event
-
-	internalID := ulid.MustNew(uint64(evt.Timestamp), rand.Reader)
+	evt.Name = InvokeFnName
 
 	if evt.Timestamp == 0 {
 		evt.Timestamp = time.Now().UnixMilli()
 	}
-	if evt.ID == "" {
-		evt.ID = internalID.String()
-	}
 	if evt.Data == nil {
 		evt.Data = make(map[string]any)
 	}
-	evt.Name = InvokeFnName
+
+	internalID := ulid.MustNew(uint64(evt.Timestamp), rand.Reader)
+	if evt.ID == "" {
+		evt.ID = internalID.String()
+	}
 
 	correlationID := ""
 	if opts.CorrelationID != nil {
