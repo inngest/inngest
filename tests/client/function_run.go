@@ -200,6 +200,11 @@ func (c *Client) WaitForRunStatus(
 	runID *string,
 	opts ...WaitForRunStatusOpts,
 ) Run {
+	// Wait for non-nil run ID. This is a weird fn...
+	require.EventuallyWithT(t, func(t *assert.CollectT) {
+		require.NotNil(t, runID)
+	}, 15*time.Second, 500*time.Millisecond)
+
 	var o WaitForRunStatusOpts
 	if len(opts) > 0 {
 		o = opts[0]
