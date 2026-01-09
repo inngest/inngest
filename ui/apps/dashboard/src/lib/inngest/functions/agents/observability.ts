@@ -15,75 +15,31 @@ export const OBSERVABILITY_LIMITS = {
   EVENTS_LIST_LENGTH: 5000,
 } as const;
 
+type DeepPartial<T> = T extends object
+  ? {
+      [P in keyof T]?: DeepPartial<T[P]>;
+    }
+  : T;
+
+type ObservabilityData = NonNullable<InsightsAgentState['observability']>;
+
 /**
- * Ensures the observability structure exists for a specific agent and returns it.
- * This helper prevents duplication of initialization logic across agents.
+ * Sets observability data for a specific agent.
+ * Ensures the observability structure exists and merges in the provided data.
  *
  * @param network - The agent network instance
  * @param agent - The agent name (eventMatcher, queryWriter, or summarizer)
- * @param defaults - Default values for the agent's observability structure
- * @returns The agent's observability object
+ * @param data - Observability data to set (promptContext and/or output)
  */
-export function ensureObservability<
-  T extends keyof NonNullable<InsightsAgentState['observability']>,
->(
+export function setObservability<T extends keyof ObservabilityData>(
   network: Network<InsightsAgentState>,
   agent: T,
-  defaults: NonNullable<InsightsAgentState['observability']>[T],
-): NonNullable<NonNullable<InsightsAgentState['observability']>[T]> {
+  data: DeepPartial<ObservabilityData[T]>,
+) {
   if (!network.state.data.observability) {
     network.state.data.observability = {};
   }
-  if (!network.state.data.observability[agent]) {
-    network.state.data.observability[agent] = defaults as any;
-  }
-  return network.state.data.observability[agent] as NonNullable<
-    NonNullable<InsightsAgentState['observability']>[T]
-  >;
+  const obs = network.state.data.observability;
+  const merged = { ...obs[agent], ...data };
+  obs[agent] = merged;
 }
-
-/**
- * Default observability structures for each agent.
- * These provide type-safe defaults to avoid duplication.
- */
-export const OBSERVABILITY_DEFAULTS: {
-  eventMatcher: NonNullable<
-    NonNullable<InsightsAgentState['observability']>['eventMatcher']
-  >;
-  queryWriter: NonNullable<
-    NonNullable<InsightsAgentState['observability']>['queryWriter']
-  >;
-  summarizer: NonNullable<
-    NonNullable<InsightsAgentState['observability']>['summarizer']
-  >;
-} = {
-  eventMatcher: {
-    promptContext: {
-      totalEvents: 0,
-      hasEvents: false,
-      eventsList: '',
-      maxEvents: 0,
-      hasCurrentQuery: false,
-      currentQuery: '',
-      currentQueryLength: 0,
-    },
-  },
-  queryWriter: {
-    promptContext: {
-      selectedEventsCount: 0,
-      selectedEventNames: [],
-      schemasCount: 0,
-      schemaNames: [],
-      schemas: [],
-      hasCurrentQuery: false,
-      currentQueryLength: 0,
-    },
-  },
-  summarizer: {
-    promptContext: {
-      selectedEventsCount: 0,
-      selectedEventNames: [],
-      hasSql: false,
-    },
-  },
-};

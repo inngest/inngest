@@ -7,11 +7,7 @@ import {
 import Mustache from 'mustache';
 import { z } from 'zod';
 
-import {
-  ensureObservability,
-  OBSERVABILITY_DEFAULTS,
-  OBSERVABILITY_LIMITS,
-} from '../observability';
+import { setObservability, OBSERVABILITY_LIMITS } from '../observability';
 import type { InsightsAgentState } from '../types';
 import systemPrompt from './system.md?raw';
 
@@ -54,15 +50,12 @@ export const selectEventsTool = createTool({
       network.state.data.selectionReason = reason;
 
       // Store output in observability format
-      const obs = ensureObservability(
-        network,
-        'eventMatcher',
-        OBSERVABILITY_DEFAULTS.eventMatcher,
-      );
-      obs.output = {
-        selectedEvents: [],
-        selectionReason: reason,
-      };
+      setObservability(network, 'eventMatcher', {
+        output: {
+          selectedEvents: [],
+          selectionReason: reason,
+        },
+      });
 
       return {
         selected: [],
@@ -85,15 +78,12 @@ export const selectEventsTool = createTool({
     network.state.data.selectionReason = reason;
 
     // Store output in observability format
-    const obs = ensureObservability(
-      network,
-      'eventMatcher',
-      OBSERVABILITY_DEFAULTS.eventMatcher,
-    );
-    obs.output = {
-      selectedEvents: selected,
-      selectionReason: reason,
-    };
+    setObservability(network, 'eventMatcher', {
+      output: {
+        selectedEvents: selected,
+        selectionReason: reason,
+      },
+    });
 
     const result = {
       selected,
@@ -125,19 +115,19 @@ export const eventMatcherAgent = createAgent<InsightsAgentState>({
 
     // Store prompt context in observability format
     if (network?.state.data) {
-      const obs = ensureObservability(
-        network,
-        'eventMatcher',
-        OBSERVABILITY_DEFAULTS.eventMatcher,
-      );
-      obs.promptContext = {
-        ...promptContext,
-        // Truncate current query for observability
-        currentQuery: currentQuery
-          ? currentQuery.substring(0, OBSERVABILITY_LIMITS.CURRENT_QUERY_LENGTH)
-          : '',
-        currentQueryLength: currentQuery?.length || 0,
-      };
+      setObservability(network, 'eventMatcher', {
+        promptContext: {
+          ...promptContext,
+          // Truncate current query for observability
+          currentQuery: currentQuery
+            ? currentQuery.substring(
+                0,
+                OBSERVABILITY_LIMITS.CURRENT_QUERY_LENGTH,
+              )
+            : '',
+          currentQueryLength: currentQuery?.length || 0,
+        },
+      });
     }
 
     return Mustache.render(systemPrompt, promptContext);

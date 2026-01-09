@@ -5,10 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { inngest } from '../client';
 import { createChannel } from '../realtime';
 import { createInsightsNetwork } from './agents/network';
-import {
-  ensureObservability,
-  OBSERVABILITY_DEFAULTS,
-} from './agents/observability';
+import { setObservability } from './agents/observability';
 import type { InsightsAgentState } from './agents/types';
 
 export const runAgentNetwork = inngest.createFunction(
@@ -86,12 +83,9 @@ export const runAgentNetwork = inngest.createFunction(
         'content' in summaryOutput &&
         typeof summaryOutput.content === 'string'
       ) {
-        const obs = ensureObservability(
-          { state: networkRun.state } as any,
-          'summarizer',
-          OBSERVABILITY_DEFAULTS.summarizer,
-        );
-        obs.output = summaryOutput.content;
+        setObservability({ state: networkRun.state } as any, 'summarizer', {
+          output: summaryOutput.content,
+        });
       }
 
       // Capture observability data in a separate step

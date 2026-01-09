@@ -7,11 +7,7 @@ import {
 import Mustache from 'mustache';
 import { z } from 'zod';
 
-import {
-  ensureObservability,
-  OBSERVABILITY_DEFAULTS,
-  OBSERVABILITY_LIMITS,
-} from '../observability';
+import { setObservability, OBSERVABILITY_LIMITS } from '../observability';
 import type { InsightsAgentState } from '../types';
 import systemPrompt from './system.md?raw';
 
@@ -43,16 +39,13 @@ export const generateSqlTool = createTool({
     const { sql, title, reasoning } = args as z.infer<typeof GenerateSqlParams>;
 
     // Store output in observability format
-    const obs = ensureObservability(
-      network,
-      'queryWriter',
-      OBSERVABILITY_DEFAULTS.queryWriter,
-    );
-    obs.output = {
-      sql,
-      title,
-      reasoning,
-    };
+    setObservability(network, 'queryWriter', {
+      output: {
+        sql,
+        title,
+        reasoning,
+      },
+    });
 
     return {
       sql,
@@ -96,28 +89,25 @@ export const queryWriterAgent = createAgent<InsightsAgentState>({
 
     // Store prompt context in observability format with schemas
     if (network?.state.data) {
-      const obs = ensureObservability(
-        network,
-        'queryWriter',
-        OBSERVABILITY_DEFAULTS.queryWriter,
-      );
-      obs.promptContext = {
-        selectedEventsCount: selectedEvents.length,
-        selectedEventNames: selectedEvents,
-        schemasCount: selectedSchemas.length,
-        schemaNames: selectedSchemas.map((s) => s.eventName),
-        // Include actual schemas (truncated for observability)
-        schemas: selectedSchemas.map((schema) => ({
-          eventName: schema.eventName,
-          schema: schema.schema.substring(
-            0,
-            OBSERVABILITY_LIMITS.SCHEMA_LENGTH,
-          ),
-          schemaLength: schema.schema.length,
-        })),
-        hasCurrentQuery: !!currentQuery,
-        currentQueryLength: currentQuery?.length || 0,
-      };
+      setObservability(network, 'queryWriter', {
+        promptContext: {
+          selectedEventsCount: selectedEvents.length,
+          selectedEventNames: selectedEvents,
+          schemasCount: selectedSchemas.length,
+          schemaNames: selectedSchemas.map((s) => s.eventName),
+          // Include actual schemas (truncated for observability)
+          schemas: selectedSchemas.map((schema) => ({
+            eventName: schema.eventName,
+            schema: schema.schema.substring(
+              0,
+              OBSERVABILITY_LIMITS.SCHEMA_LENGTH,
+            ),
+            schemaLength: schema.schema.length,
+          })),
+          hasCurrentQuery: !!currentQuery,
+          currentQueryLength: currentQuery?.length || 0,
+        },
+      });
     }
 
     return Mustache.render(systemPrompt, promptContext);
