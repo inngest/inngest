@@ -29,7 +29,7 @@ import type { GetFunctionQuery as DashboardGetFunctionQuery } from '../../../../
 import {
   FunctionTriggerTypes,
   type GetFunctionQuery as DevServerGetFunctionQuery,
-} from '../../../../apps/dev-server-ui/src/store/generated';
+} from '../../../../apps/dev-server-ui/src/store/generated-types';
 
 type InngestFunction =
   | NonNullable<DevServerGetFunctionQuery['functionBySlug']>

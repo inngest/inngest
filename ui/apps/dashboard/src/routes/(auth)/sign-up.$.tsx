@@ -1,25 +1,26 @@
 import SplitView from '@/components/SignIn/SplitView';
 import { SignUp } from '@clerk/tanstack-react-start';
 import { createFileRoute } from '@tanstack/react-router';
-import { createServerFn } from '@tanstack/react-start';
-import { getCookie } from '@tanstack/react-start/server';
 import logoImageUrl from '@inngest/components/icons/logos/inngest-logo-black.png';
 
-const getAnonymousId = createServerFn({ method: 'GET' }).handler(async () => {
-  const anonymousId = getCookie('inngest_anonymous_id');
-  return anonymousId || null;
-});
+const getAnonymousId = () => {
+  if (typeof document === 'undefined') {
+    return null;
+  }
+
+  const cookie = document.cookie
+    .split('; ')
+    .find((c) => c.startsWith('ajs_anonymous_id='));
+
+  return cookie ? cookie.split('=')[1] : null;
+};
 
 export const Route = createFileRoute('/(auth)/sign-up/$')({
   component: RouteComponent,
-  loader: async () => {
-    const anonymousId = await getAnonymousId();
-    return { anonymousId };
-  },
 });
 
 function RouteComponent() {
-  const { anonymousId } = Route.useLoaderData();
+  const anonymousId = getAnonymousId();
 
   return (
     <SplitView>
