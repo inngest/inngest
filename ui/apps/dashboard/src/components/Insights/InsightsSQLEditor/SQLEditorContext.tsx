@@ -6,6 +6,7 @@ import {
   type ReactNode,
 } from 'react';
 import { flushSync } from 'react-dom';
+import * as Sentry from '@sentry/tanstackstart-react';
 
 import type { SQLEditorInstance } from '@inngest/components/SQLEditor/SQLEditor';
 
@@ -73,7 +74,7 @@ export function SQLEditorProvider({ children }: SQLEditorProviderProps) {
         try {
           runQuery();
         } catch (error) {
-          console.error('Failed to run query:', error);
+          Sentry.captureException(error);
         }
       });
     },

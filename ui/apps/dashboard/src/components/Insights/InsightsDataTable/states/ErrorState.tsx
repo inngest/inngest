@@ -1,5 +1,6 @@
 import { Banner } from '@inngest/components/Banner/Banner';
 import { Button } from '@inngest/components/Button';
+import * as Sentry from '@sentry/tanstackstart-react';
 
 import { useInsightsAIHelper } from '../../InsightsAIHelperContext';
 import { useInsightsStateMachineContext } from '../../InsightsStateMachineContext/InsightsStateMachineContext';
@@ -24,7 +25,7 @@ export function ErrorState() {
         '\n```\n\nPlease provide a corrected version of the query that fixes this error.';
       await aiHelper.openAIHelperWithPrompt(prompt);
     } catch (error) {
-      console.error('Failed to open AI helper:', error);
+      Sentry.captureException(error);
       // Error is logged but doesn't prevent user interaction
     }
   };
