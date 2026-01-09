@@ -162,6 +162,7 @@ func (a *router) setup() {
 			r.Delete("/runs/{runID}", a.cancelFunctionRun)
 			r.Get("/runs/{runID}/jobs", a.GetFunctionRunJobs)
 			r.Post("/runs/{runID}/metadata", a.addRunMetadata)
+			r.Get("/runs/{runID}/metadata", a.getRunMetadata)
 
 			r.Get("/apps/{appName}/functions", a.GetAppFunctions) // Returns an app and all of its functions.
 
