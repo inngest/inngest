@@ -231,9 +231,9 @@ func WithInvokeFailHandler(f execution.InvokeFailHandler) ExecutorOpt {
 	}
 }
 
-func WithSendingEventHandler(f execution.HandleSendingEvent) ExecutorOpt {
+func WithInvokeEventHandler(f execution.HandleInvokeEvent) ExecutorOpt {
 	return func(e execution.Executor) error {
-		e.(*executor).handleSendingEvent = f
+		e.(*executor).handleInvokeEvent = f
 		return nil
 	}
 }
@@ -465,7 +465,7 @@ type executor struct {
 	evalFactory         func(ctx context.Context, expr string) (expressions.Evaluator, error)
 	finishHandler       execution.FinalizePublisher
 	invokeFailHandler   execution.InvokeFailHandler
-	handleSendingEvent  execution.HandleSendingEvent
+	handleInvokeEvent   execution.HandleInvokeEvent
 	cancellationChecker cancellation.Checker
 	httpClient          exechttp.RequestExecutor
 	// signingKeyLoader is used to load signing keys for an env.  This is required for the
@@ -4251,7 +4251,7 @@ func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, runCtx exec
 }
 
 func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
-	if e.handleSendingEvent == nil {
+	if e.handleInvokeEvent == nil {
 		return fmt.Errorf("no handleSendingEvent function specified")
 	}
 
@@ -4287,6 +4287,8 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, runCtx exe
 
 	// Always create an invocation event.
 	evt := event.NewInvocationEvent(event.NewInvocationEventOpts{
+		AccountID:       runCtx.Metadata().ID.Tenant.AccountID,
+		EnvID:           runCtx.Metadata().ID.Tenant.EnvID,
 		Event:           *opts.Payload,
 		FnID:            opts.FunctionID,
 		CorrelationID:   &correlationID,
@@ -4313,7 +4315,7 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, runCtx exe
 		Expression:          &strExpr,
 		DataKey:             gen.ID,
 		InvokeCorrelationID: &correlationID,
-		TriggeringEventID:   &evt.ID,
+		TriggeringEventID:   &evt.Event.ID,
 		InvokeTargetFnID:    &opts.FunctionID,
 		MaxAttempts:         runCtx.MaxAttempts(),
 		Metadata: map[string]any{
@@ -4344,14 +4346,6 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, runCtx exe
 		ParallelMode: gen.ParallelMode(),
 	}
 
-	// Always correlate the triggering event ID with the invoked step.
-	evtID := ulid.MustParse(evt.ID)
-	attrs := tracing.GeneratorAttrs(&gen).Merge(
-		meta.NewAttrSet(
-			meta.Attr(meta.Attrs.StepInvokeTriggerEventID, &evtID),
-		),
-	)
-
 	lifecycleItem := runCtx.LifecycleItem()
 	span, err := e.tracerProvider.CreateDroppableSpan(
 		ctx,
@@ -4364,7 +4358,10 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, runCtx exe
 			Metadata:    runCtx.Metadata(),
 			QueueItem:   &nextItem,
 			Parent:      tracing.RunSpanRefFromMetadata(runCtx.Metadata()),
-			Attributes:  attrs,
+			Attributes: tracing.GeneratorAttrs(&gen).Merge(
+				// Always correlate the triggering event ID with the invoked step.
+				meta.NewAttrSet(meta.Attr(meta.Attrs.StepInvokeTriggerEventID, &evt.ID)),
+			),
 		},
 	)
 	if err != nil {
@@ -4415,14 +4412,14 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, runCtx exe
 	}
 
 	// Send the event.
-	err = e.handleSendingEvent(ctx, evt, lifecycleItem)
+	err = e.handleInvokeEvent(ctx, evt)
 	if err != nil {
 		// TODO Cancel pause/timeout?
 		return fmt.Errorf("error publishing internal invocation event: %w", err)
 	}
 
 	for _, e := range e.lifecycles {
-		go e.OnInvokeFunction(context.WithoutCancel(ctx), *runCtx.Metadata(), lifecycleItem, gen, evt)
+		go e.OnInvokeFunction(context.WithoutCancel(ctx), *runCtx.Metadata(), lifecycleItem, gen, evt.Event)
 	}
 
 	return err

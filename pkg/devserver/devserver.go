@@ -513,7 +513,7 @@ func start(ctx context.Context, opts StartOpts) error {
 			return consts.DefaultMaxStateSizeLimit
 		}),
 		executor.WithInvokeFailHandler(getInvokeFailHandler(ctx, pb, opts.Config.EventStream.Service.Concrete.TopicName())),
-		executor.WithSendingEventHandler(getSendingEventHandler(ctx, pb, opts.Config.EventStream.Service.Concrete.TopicName())),
+		executor.WithInvokeEventHandler(getInvokeEventHandler(ctx, pb, opts.Config.EventStream.Service.Concrete.TopicName())),
 		executor.WithDebouncer(debouncer),
 		executor.WithSingletonManager(sn),
 		executor.WithBatcher(batcher),
@@ -782,10 +782,9 @@ func createInmemoryRedis(ctx context.Context, tick time.Duration) (rueidis.Clien
 	return rc, r, nil
 }
 
-func getSendingEventHandler(ctx context.Context, pb pubsub.Publisher, topic string) execution.HandleSendingEvent {
-	return func(ctx context.Context, evt event.Event, item queue.Item) error {
-		trackedEvent := event.NewBaseTrackedEvent(evt, nil)
-		byt, err := json.Marshal(trackedEvent)
+func getInvokeEventHandler(ctx context.Context, pb pubsub.Publisher, topic string) execution.HandleInvokeEvent {
+	return func(ctx context.Context, evt event.TrackedEvent) error {
+		byt, err := json.Marshal(evt)
 		if err != nil {
 			return fmt.Errorf("error marshalling invocation event: %w", err)
 		}
