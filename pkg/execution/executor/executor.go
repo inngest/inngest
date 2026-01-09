@@ -2402,6 +2402,7 @@ func (e *executor) handlePause(
 			if errors.Is(err, state.ErrFunctionCancelled) ||
 				errors.Is(err, state.ErrFunctionComplete) ||
 				errors.Is(err, state.ErrFunctionFailed) ||
+				errors.Is(err, state.ErrEventNotFound) ||
 				errors.Is(err, ErrFunctionEnded) {
 				// Safe to ignore.
 				cleanup(ctx)
@@ -2515,7 +2516,7 @@ func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequ
 	)
 
 	md, err := e.smv2.LoadMetadata(ctx, id)
-	if err == sv2.ErrMetadataNotFound || err == state.ErrRunNotFound {
+	if err == sv2.ErrMetadataNotFound || errors.Is(err, state.ErrRunNotFound) {
 		return nil
 	}
 	if err != nil {
@@ -2529,6 +2530,10 @@ func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequ
 
 	// We need events to finalize the function.
 	evts, err := e.smv2.LoadEvents(ctx, id)
+	if errors.Is(err, state.ErrEventNotFound) {
+		// If the event has gone, another thread cancelled the function.
+		return nil
+	}
 	if err != nil {
 		return fmt.Errorf("unable to load run events: %w", err)
 	}
