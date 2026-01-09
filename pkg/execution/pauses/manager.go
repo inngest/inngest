@@ -329,7 +329,11 @@ func (m manager) LoadEvaluablesSince(ctx context.Context, workspaceID uuid.UUID,
 
 	// GC pauses on fetch.
 	if len(expired) > 0 {
+		// Otherwise the job will end and we won't be able to finish deleting
+		ctx, cancel := context.WithCancel(context.WithoutCancel(ctx))
 		go func() {
+			defer cancel()
+
 			start := time.Now()
 			count := int64(len(expired))
 			l := logger.StdlibLogger(ctx).With("workspace_id", workspaceID, "event", eventName)
@@ -337,7 +341,7 @@ func (m manager) LoadEvaluablesSince(ctx context.Context, workspaceID uuid.UUID,
 			for _, pause := range expired {
 				l.Debug("deleting expired pause in iterator", "pause", pause)
 				_ = m.Delete(ctx, index, *pause)
-				time.Sleep(5 * time.Millisecond)
+				time.Sleep(15 * time.Millisecond)
 			}
 
 			l.Debug("finished deleting expired pauses", "count", count, "duration_ms", time.Since(start).Milliseconds())
