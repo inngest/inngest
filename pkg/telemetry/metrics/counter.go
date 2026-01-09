@@ -830,3 +830,30 @@ func IncrBacklogRefillConstraintCheckFallbackCounter(ctx context.Context, reason
 		Tags:        opts.Tags,
 	})
 }
+
+func IncrConstraintAPILeasesRequestedCounter(ctx context.Context, count int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, count, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "constraintapi_leases_requested_total",
+		Description: "Total number of leases requested via Constraint API",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrConstraintAPILeasesGrantedCounter(ctx context.Context, count int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, count, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "constraintapi_leases_granted_total",
+		Description: "Total number of leases granted via Constraint API",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrConstraintAPILimitingConstraintsCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "constraintapi_limiting_constraints_total",
+		Description: "Total number of times constraints limited capacity acquisition",
+		Tags:        opts.Tags,
+	})
+}
