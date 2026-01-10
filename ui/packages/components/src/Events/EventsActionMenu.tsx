@@ -8,7 +8,7 @@ import {
 import { Switch, SwitchWrapper } from '@inngest/components/Switch';
 import { RiSettingsLine } from '@remixicon/react';
 
-import { useBooleanSearchParam } from '../hooks/useSearchParam';
+import { useBooleanSearchParam } from '../hooks/useSearchParams';
 
 export type EventsActionMenuProps = {
   setAutoRefresh?: () => void;

@@ -1,8 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router';
 
-import { FunctionList } from '@inngest/components/Apps/NewFunctionList';
-import { Header } from '@inngest/components/Header/NewHeader';
-import { useSearchParam } from '@inngest/components/hooks/useNewSearchParams';
+import { FunctionList } from '@inngest/components/Apps/FunctionList';
+import { Header } from '@inngest/components/Header/Header';
+import { useSearchParam } from '@inngest/components/hooks/useSearchParams';
 
 import { useGetWorkerCount } from '@/hooks/useGetWorkerCount';
 import { useGetWorkers } from '@/hooks/useGetWorkers';
@@ -11,7 +11,7 @@ import { useGetAppQuery } from '@/store/generated';
 import WorkerCounter from '@inngest/components/Workers/ConnectedWorkersDescription';
 import { WorkersTable } from '@inngest/components/Workers/WorkersTable';
 import AppDetailsCard from '@inngest/components/Apps/AppDetailsCard';
-import { Pill } from '@inngest/components/Pill/NewPill';
+import { Pill } from '@inngest/components/Pill';
 import { Time } from '@inngest/components/Time';
 import { methodTypes } from '@inngest/components/types/app';
 import {

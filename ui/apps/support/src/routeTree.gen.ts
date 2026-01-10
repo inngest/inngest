@@ -13,6 +13,7 @@ import { Route as SignOutRouteImport } from "./routes/sign-out";
 import { Route as AuthedRouteImport } from "./routes/_authed";
 import { Route as IndexRouteImport } from "./routes/index";
 import { Route as SignInSplatRouteImport } from "./routes/sign-in.$";
+import { Route as AuthedNewRouteImport } from "./routes/_authed/new";
 import { Route as AuthedSupportIndexRouteImport } from "./routes/_authed/support/index";
 import { Route as AuthedCaseTicketIdRouteImport } from "./routes/_authed/case.$ticketId";
 
@@ -35,6 +36,11 @@ const SignInSplatRoute = SignInSplatRouteImport.update({
   path: "/sign-in/$",
   getParentRoute: () => rootRouteImport,
 } as any);
+const AuthedNewRoute = AuthedNewRouteImport.update({
+  id: "/new",
+  path: "/new",
+  getParentRoute: () => AuthedRoute,
+} as any);
 const AuthedSupportIndexRoute = AuthedSupportIndexRouteImport.update({
   id: "/support/",
   path: "/support/",
@@ -49,6 +55,7 @@ const AuthedCaseTicketIdRoute = AuthedCaseTicketIdRouteImport.update({
 export interface FileRoutesByFullPath {
   "/": typeof IndexRoute;
   "/sign-out": typeof SignOutRoute;
+  "/new": typeof AuthedNewRoute;
   "/sign-in/$": typeof SignInSplatRoute;
   "/case/$ticketId": typeof AuthedCaseTicketIdRoute;
   "/support": typeof AuthedSupportIndexRoute;
@@ -56,6 +63,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   "/": typeof IndexRoute;
   "/sign-out": typeof SignOutRoute;
+  "/new": typeof AuthedNewRoute;
   "/sign-in/$": typeof SignInSplatRoute;
   "/case/$ticketId": typeof AuthedCaseTicketIdRoute;
   "/support": typeof AuthedSupportIndexRoute;
@@ -65,20 +73,34 @@ export interface FileRoutesById {
   "/": typeof IndexRoute;
   "/_authed": typeof AuthedRouteWithChildren;
   "/sign-out": typeof SignOutRoute;
+  "/_authed/new": typeof AuthedNewRoute;
   "/sign-in/$": typeof SignInSplatRoute;
   "/_authed/case/$ticketId": typeof AuthedCaseTicketIdRoute;
   "/_authed/support/": typeof AuthedSupportIndexRoute;
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath;
-  fullPaths: "/" | "/sign-out" | "/sign-in/$" | "/case/$ticketId" | "/support";
+  fullPaths:
+    | "/"
+    | "/sign-out"
+    | "/new"
+    | "/sign-in/$"
+    | "/case/$ticketId"
+    | "/support";
   fileRoutesByTo: FileRoutesByTo;
-  to: "/" | "/sign-out" | "/sign-in/$" | "/case/$ticketId" | "/support";
+  to:
+    | "/"
+    | "/sign-out"
+    | "/new"
+    | "/sign-in/$"
+    | "/case/$ticketId"
+    | "/support";
   id:
     | "__root__"
     | "/"
     | "/_authed"
     | "/sign-out"
+    | "/_authed/new"
     | "/sign-in/$"
     | "/_authed/case/$ticketId"
     | "/_authed/support/";
@@ -121,6 +143,13 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof SignInSplatRouteImport;
       parentRoute: typeof rootRouteImport;
     };
+    "/_authed/new": {
+      id: "/_authed/new";
+      path: "/new";
+      fullPath: "/new";
+      preLoaderRoute: typeof AuthedNewRouteImport;
+      parentRoute: typeof AuthedRoute;
+    };
     "/_authed/support/": {
       id: "/_authed/support/";
       path: "/support";
@@ -139,11 +168,13 @@ declare module "@tanstack/react-router" {
 }
 
 interface AuthedRouteChildren {
+  AuthedNewRoute: typeof AuthedNewRoute;
   AuthedCaseTicketIdRoute: typeof AuthedCaseTicketIdRoute;
   AuthedSupportIndexRoute: typeof AuthedSupportIndexRoute;
 }
 
 const AuthedRouteChildren: AuthedRouteChildren = {
+  AuthedNewRoute: AuthedNewRoute,
   AuthedCaseTicketIdRoute: AuthedCaseTicketIdRoute,
   AuthedSupportIndexRoute: AuthedSupportIndexRoute,
 };

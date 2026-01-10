@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { useNavigate, useRouter } from '@tanstack/react-router';
-import { Button } from '@inngest/components/Button/NewButton';
+import { useRouter } from '@tanstack/react-router';
+import { Button } from '@inngest/components/Button';
 import { capitalCase } from 'change-case';
 
 import BillingCard from './BillingCard';

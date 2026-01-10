@@ -1,4 +1,4 @@
-import { Banner, type Severity } from '@inngest/components/Banner/NewBanner';
+import { Banner, type Severity } from '@inngest/components/Banner';
 
 import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { useSystemStatus } from '../Support/SystemStatus';

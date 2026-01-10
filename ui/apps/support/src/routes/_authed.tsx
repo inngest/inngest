@@ -1,9 +1,5 @@
-import Layout from "@/components/Layout/Layout";
+import { Outlet, createFileRoute } from "@tanstack/react-router";
 import { fetchClerkAuth } from "@/data/clerk";
-import { navCollapsed } from "@/data/nav";
-import { getProfileDisplay } from "@/data/profile";
-import { Header } from "@inngest/components/Header/NewHeader";
-import { createFileRoute, notFound, Outlet } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/_authed")({
   component: Authed,
@@ -16,17 +12,8 @@ export const Route = createFileRoute("/_authed")({
     };
   },
 
-  loader: async () => {
-    const profile = await getProfileDisplay();
-
-    if (!profile) {
-      throw notFound({ data: { error: "Profile not found" } });
-    }
-
-    return {
-      profile,
-      navCollapsed: await navCollapsed(),
-    };
+  loader: () => {
+    return {};
   },
 
   errorComponent: (props) => {
@@ -35,23 +22,10 @@ export const Route = createFileRoute("/_authed")({
     }
     console.error(props.error);
 
-    return (
-      //
-      // TODO: handle "inngest is down" error specifically
-      <Layout collapsed={false}>
-        <Header breadcrumb={[{ text: "Support" }]} />
-        <div className="m-8 flex flex-col gap-2">file a ticket</div>
-      </Layout>
-    );
+    return <div>{props.error.message}</div>;
   },
 });
 
 function Authed() {
-  const { navCollapsed, profile } = Route.useLoaderData();
-
-  return (
-    <Layout collapsed={navCollapsed} profile={profile}>
-      <Outlet />
-    </Layout>
-  );
+  return <Outlet />;
 }

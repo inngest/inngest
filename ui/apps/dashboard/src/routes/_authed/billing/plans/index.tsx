@@ -1,4 +1,4 @@
-import { Link } from '@inngest/components/Link/NewLink';
+import { Link } from '@inngest/components/Link';
 import { createFileRoute } from '@tanstack/react-router';
 
 import {

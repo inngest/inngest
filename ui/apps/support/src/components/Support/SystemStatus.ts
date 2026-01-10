@@ -1,11 +1,7 @@
 import { useEffect, useState } from "react";
 
-import {
-  STATUS_PAGE_URL,
-  getStatus,
-  indicatorColor,
-  type Status,
-} from "./Status";
+import { STATUS_PAGE_URL, getStatus, indicatorColor } from "./Status";
+import type { Status } from "./Status";
 
 export function useSystemStatus() {
   const [status, setStatus] = useState<Status>({

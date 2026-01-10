@@ -1,4 +1,4 @@
-import { Link } from '@inngest/components/Link/NewLink';
+import { Link } from '@inngest/components/Link';
 import { IconPrometheus } from '@inngest/components/icons/platforms/Prometheus';
 
 import IntegrationNotEnabledMessage from '@/components/Integration/IntegrationNotEnabledMessage';

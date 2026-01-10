@@ -1,8 +1,8 @@
 import { useMemo } from 'react';
 
-import { Button } from '@inngest/components/Button/NewButton';
-import { FunctionsTable } from '@inngest/components/Functions/NewFunctionsTable';
-import { Header } from '@inngest/components/Header/NewHeader';
+import { Button } from '@inngest/components/Button';
+import { FunctionsTable } from '@inngest/components/Functions/FunctionsTable';
+import { Header } from '@inngest/components/Header/Header';
 import { RiExternalLinkLine, RiRefreshLine } from '@remixicon/react';
 
 import { FunctionInfo } from '@/components/Functions/FunctionInfo';

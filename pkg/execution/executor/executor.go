@@ -231,9 +231,9 @@ func WithInvokeFailHandler(f execution.InvokeFailHandler) ExecutorOpt {
 	}
 }
 
-func WithSendingEventHandler(f execution.HandleSendingEvent) ExecutorOpt {
+func WithInvokeEventHandler(f execution.HandleInvokeEvent) ExecutorOpt {
 	return func(e execution.Executor) error {
-		e.(*executor).handleSendingEvent = f
+		e.(*executor).handleInvokeEvent = f
 		return nil
 	}
 }
@@ -427,6 +427,20 @@ func WithAllowStepMetadata(md AllowStepMetadata) ExecutorOpt {
 	}
 }
 
+func WithFunctionBacklogSizeLimit(fbsl BacklogSizeLimitFn) ExecutorOpt {
+	return func(e execution.Executor) error {
+		e.(*executor).functionBacklogSizeLimit = fbsl
+		return nil
+	}
+}
+
+type BacklogSizeLimit struct {
+	Limit   int
+	Enforce bool
+}
+
+type BacklogSizeLimitFn func(ctx context.Context, accountID, envID, fnID uuid.UUID) BacklogSizeLimit
+
 // executor represents a built-in executor for running workflows.
 type executor struct {
 	log logger.Logger
@@ -451,7 +465,7 @@ type executor struct {
 	evalFactory         func(ctx context.Context, expr string) (expressions.Evaluator, error)
 	finishHandler       execution.FinalizePublisher
 	invokeFailHandler   execution.InvokeFailHandler
-	handleSendingEvent  execution.HandleSendingEvent
+	handleInvokeEvent   execution.HandleInvokeEvent
 	cancellationChecker cancellation.Checker
 	httpClient          exechttp.RequestExecutor
 	// signingKeyLoader is used to load signing keys for an env.  This is required for the
@@ -473,6 +487,8 @@ type executor struct {
 
 	// stateSizeLimit finds state size limits for a given run
 	stateSizeLimit func(sv2.ID) int
+
+	functionBacklogSizeLimit BacklogSizeLimitFn
 
 	assignedQueueShard redis_state.QueueShard
 	shardFinder        redis_state.ShardSelector
@@ -668,6 +684,68 @@ func (e *executor) createEagerCancellationForTimeout(ctx context.Context, since 
 	l.Trace("Enqueued system job for eager cancellation of timed out job")
 
 	return nil
+}
+
+func (e *executor) skipped(ctx context.Context, req execution.ScheduleRequest) enums.SkipReason {
+	l := logger.StdlibLogger(ctx)
+
+	// Check if function is paused, draining
+	skipReason := req.SkipReason()
+	if skipReason != enums.SkipReasonNone {
+		return skipReason
+	}
+
+	// Check if backlog size limit was hit
+	res, err := e.checkBacklogSizeLimit(ctx, req)
+	if err != nil {
+		l.ReportError(err, "error checking backlog size limit")
+		return enums.SkipReasonNone
+	}
+
+	return res
+}
+
+func (e *executor) checkBacklogSizeLimit(ctx context.Context, req execution.ScheduleRequest) (enums.SkipReason, error) {
+	if e.functionBacklogSizeLimit == nil {
+		return enums.SkipReasonNone, nil
+	}
+
+	backlogSizeLimit := e.functionBacklogSizeLimit(ctx, req.AccountID, req.WorkspaceID, req.Function.ID)
+	if backlogSizeLimit.Limit <= 0 {
+		return enums.SkipReasonNone, nil
+	}
+
+	scheduledSteps, err := e.queue.StatusCount(ctx, req.Function.ID, "start")
+	if err != nil {
+		return enums.SkipReasonNone, fmt.Errorf("could not get scheduled step count: %w", err)
+	}
+
+	if int(scheduledSteps) < backlogSizeLimit.Limit {
+		return enums.SkipReasonNone, nil
+	}
+
+	// The backlog size exceeds the limit
+
+	id := sv2.ID{
+		FunctionID: req.Function.ID,
+		Tenant: sv2.Tenant{
+			AccountID: req.AccountID,
+			EnvID:     req.WorkspaceID,
+			AppID:     req.AppID,
+		},
+	}
+
+	for _, ll := range e.lifecycles {
+		service.Go(func() {
+			ll.OnFunctionBacklogSizeLimitReached(ctx, id)
+		})
+	}
+
+	if !backlogSizeLimit.Enforce {
+		return enums.SkipReasonNone, nil
+	}
+
+	return enums.SkipReasonFunctionBacklogSizeLimitHit, nil
 }
 
 func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) (*sv2.Metadata, error) {
@@ -1045,29 +1123,39 @@ func (e *executor) schedule(
 		}
 	}
 
-	st, err := e.smv2.Create(ctx, newState)
-	switch {
-	case err == nil: // no-op
-	case errors.Is(err, state.ErrIdentifierExists): // no-op
-	case errors.Is(err, state.ErrIdentifierTomestone):
-		return nil, ErrFunctionSkippedIdempotency
-	default:
-		return nil, fmt.Errorf("error creating run state: %w", err)
-	}
+	stv1ID := sv2.V1FromMetadata(metadata)
 
-	stv1ID := sv2.V1FromMetadata(st.Metadata)
+	// Check if the function should be skipped (paused, draining)
+	skipReason := e.skipped(ctx, req)
 
-	// NOTE: if the runID mismatches, it means there's already a state available
-	// and we need to override the one we already have to make sure we're using
-	// the correct metedata values
-	if metadata.ID.RunID != stv1ID.RunID {
-		id := sv2.IDFromV1(stv1ID)
-		metadata, err = e.smv2.LoadMetadata(ctx, id)
-		if err != nil {
-			return nil, err
+	// Create run state if not skipped
+	if skipReason == enums.SkipReasonNone {
+		st, err := e.smv2.Create(ctx, newState)
+		switch {
+		case err == nil: // no-op
+		case errors.Is(err, state.ErrIdentifierExists): // no-op
+		case errors.Is(err, state.ErrIdentifierTombstone):
+			return nil, ErrFunctionSkippedIdempotency
+		default:
+			return nil, fmt.Errorf("error creating run state: %w", err)
+		}
+
+		// Override existing identifier in case we changed the run ID due to idempotency
+		stv1ID = sv2.V1FromMetadata(st.Metadata)
+
+		// NOTE: if the runID mismatches, it means there's already a state available
+		// and we need to override the one we already have to make sure we're using
+		// the correct metedata values
+		if metadata.ID.RunID != stv1ID.RunID {
+			id := sv2.IDFromV1(stv1ID)
+			metadata, err = e.smv2.LoadMetadata(ctx, id)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 
+	runTimestamp := runID.Timestamp()
 	runSpanOpts := &tracing.CreateSpanOptions{
 		Debug:    &tracing.SpanDebugData{Location: "executor.Schedule"},
 		Metadata: &metadata,
@@ -1076,6 +1164,7 @@ func (e *executor) schedule(
 			meta.Attr(meta.Attrs.DebugRunID, req.DebugRunID),
 			meta.Attr(meta.Attrs.EventsInput, &strEvts),
 			meta.Attr(meta.Attrs.TriggeringEventName, eventName),
+			meta.Attr(meta.Attrs.QueuedAt, &runTimestamp),
 		),
 		Seed: []byte(metadata.ID.RunID[:]),
 	}
@@ -1089,7 +1178,7 @@ func (e *executor) schedule(
 	}
 
 	status := enums.StepStatusQueued
-	if req.SkipReason() != enums.SkipReasonNone {
+	if skipReason != enums.SkipReasonNone {
 		status = enums.StepStatusSkipped
 	}
 
@@ -1112,9 +1201,9 @@ func (e *executor) schedule(
 	}
 
 	// If this is paused, immediately end just before creating state.
-	if skipped := req.SkipReason(); skipped != enums.SkipReasonNone {
+	if skipReason != enums.SkipReasonNone {
 		sendSpans()
-		return e.handleFunctionSkipped(ctx, req, metadata, evts, skipped)
+		return e.handleFunctionSkipped(ctx, req, metadata, evts, skipReason)
 	}
 
 	if req.BatchID == nil {
@@ -1192,6 +1281,9 @@ func (e *executor) schedule(
 				Metadata:  &metadata,
 				QueueItem: &item,
 				Carriers:  []map[string]any{item.Metadata},
+				Attributes: meta.NewAttrSet(
+					meta.Attr(meta.Attrs.QueuedAt, &runTimestamp),
+				),
 			},
 		)
 		if err != nil {
@@ -2310,6 +2402,7 @@ func (e *executor) handlePause(
 			if errors.Is(err, state.ErrFunctionCancelled) ||
 				errors.Is(err, state.ErrFunctionComplete) ||
 				errors.Is(err, state.ErrFunctionFailed) ||
+				errors.Is(err, state.ErrEventNotFound) ||
 				errors.Is(err, ErrFunctionEnded) {
 				// Safe to ignore.
 				cleanup(ctx)
@@ -2423,7 +2516,7 @@ func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequ
 	)
 
 	md, err := e.smv2.LoadMetadata(ctx, id)
-	if err == sv2.ErrMetadataNotFound || err == state.ErrRunNotFound {
+	if err == sv2.ErrMetadataNotFound || errors.Is(err, state.ErrRunNotFound) {
 		return nil
 	}
 	if err != nil {
@@ -2437,6 +2530,10 @@ func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequ
 
 	// We need events to finalize the function.
 	evts, err := e.smv2.LoadEvents(ctx, id)
+	if errors.Is(err, state.ErrEventNotFound) {
+		// If the event has gone, another thread cancelled the function.
+		return nil
+	}
 	if err != nil {
 		return fmt.Errorf("unable to load run events: %w", err)
 	}
@@ -4159,7 +4256,7 @@ func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, runCtx exec
 }
 
 func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
-	if e.handleSendingEvent == nil {
+	if e.handleInvokeEvent == nil {
 		return fmt.Errorf("no handleSendingEvent function specified")
 	}
 
@@ -4195,6 +4292,8 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, runCtx exe
 
 	// Always create an invocation event.
 	evt := event.NewInvocationEvent(event.NewInvocationEventOpts{
+		AccountID:       runCtx.Metadata().ID.Tenant.AccountID,
+		EnvID:           runCtx.Metadata().ID.Tenant.EnvID,
 		Event:           *opts.Payload,
 		FnID:            opts.FunctionID,
 		CorrelationID:   &correlationID,
@@ -4221,7 +4320,7 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, runCtx exe
 		Expression:          &strExpr,
 		DataKey:             gen.ID,
 		InvokeCorrelationID: &correlationID,
-		TriggeringEventID:   &evt.ID,
+		TriggeringEventID:   &evt.Event.ID,
 		InvokeTargetFnID:    &opts.FunctionID,
 		MaxAttempts:         runCtx.MaxAttempts(),
 		Metadata: map[string]any{
@@ -4264,7 +4363,10 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, runCtx exe
 			Metadata:    runCtx.Metadata(),
 			QueueItem:   &nextItem,
 			Parent:      tracing.RunSpanRefFromMetadata(runCtx.Metadata()),
-			Attributes:  tracing.GeneratorAttrs(&gen),
+			Attributes: tracing.GeneratorAttrs(&gen).Merge(
+				// Always correlate the triggering event ID with the invoked step.
+				meta.NewAttrSet(meta.Attr(meta.Attrs.StepInvokeTriggerEventID, &evt.ID)),
+			),
 		},
 	)
 	if err != nil {
@@ -4282,7 +4384,7 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, runCtx exe
 	}, util.NewRetryConf(util.WithRetryConfRetryableErrors(pauses.WritePauseRetryableError)))
 	// A pause may already exist if the write succeeded but we timed out before
 	// returning (MDB i/o timeouts). In that case, we ignore the
-	// ErrPauseAlreadyExists error and continue. We rely on the pause enqueuing
+	// ErrPauseAlreadyExists error and continue. We rely on the pause timeout enqueuing
 	// to avoid duplicate invokes instead.
 	if err != nil {
 		if errors.Is(err, state.ErrPauseAlreadyExists) {
@@ -4315,14 +4417,14 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, runCtx exe
 	}
 
 	// Send the event.
-	err = e.handleSendingEvent(ctx, evt, lifecycleItem)
+	err = e.handleInvokeEvent(ctx, evt)
 	if err != nil {
 		// TODO Cancel pause/timeout?
 		return fmt.Errorf("error publishing internal invocation event: %w", err)
 	}
 
 	for _, e := range e.lifecycles {
-		go e.OnInvokeFunction(context.WithoutCancel(ctx), *runCtx.Metadata(), lifecycleItem, gen, evt)
+		go e.OnInvokeFunction(context.WithoutCancel(ctx), *runCtx.Metadata(), lifecycleItem, gen, evt.Event)
 	}
 
 	return err
@@ -4486,11 +4588,20 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, runCtx execu
 	}
 
 	idx := pauses.Index{WorkspaceID: runCtx.Metadata().ID.Tenant.EnvID, EventName: opts.Event}
-	_, err = e.pm.Write(ctx, idx, &pause)
+
+	// We really don't want this to fail, this can be retried in an idempotent way but
+	// workflows with 0 retries setup will just hang forever if pause creation fails.
+	_, err = util.WithRetry(ctx, "pause.handleGeneratorWaitForEvent", func(ctx context.Context) (int, error) {
+		return e.pm.Write(ctx, idx, &pause)
+	}, util.NewRetryConf(util.WithRetryConfRetryableErrors(pauses.WritePauseRetryableError)))
+
+	// A pause may already exist if the write succeeded but we timed out before
+	// returning (MDB i/o timeouts). In that case, we ignore the
+	// ErrPauseAlreadyExists error and continue.
+	// Instead we rely on the pause timeout queue item for idempotency.
 	if err != nil {
 		if err == state.ErrPauseAlreadyExists {
 			span.Drop()
-			return nil
 		}
 
 		return err

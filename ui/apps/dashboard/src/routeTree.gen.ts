@@ -13,7 +13,9 @@ import { Route as AuthedRouteImport } from './routes/_authed';
 import { Route as IndexRouteImport } from './routes/index';
 import { Route as SupportIndexRouteImport } from './routes/support/index';
 import { Route as ApiSupportTicketsRouteImport } from './routes/api/support-tickets';
+import { Route as ApiSentryRouteImport } from './routes/api/sentry';
 import { Route as ApiInngestRouteImport } from './routes/api/inngest';
+import { Route as ApiCspReportRouteImport } from './routes/api/csp-report';
 import { Route as ApiChatRouteImport } from './routes/api/chat';
 import { Route as authUserSetupRouteImport } from './routes/(auth)/user-setup';
 import { Route as authSignOutRouteImport } from './routes/(auth)/sign-out';
@@ -114,9 +116,19 @@ const ApiSupportTicketsRoute = ApiSupportTicketsRouteImport.update({
   path: '/api/support-tickets',
   getParentRoute: () => rootRouteImport,
 } as any);
+const ApiSentryRoute = ApiSentryRouteImport.update({
+  id: '/api/sentry',
+  path: '/api/sentry',
+  getParentRoute: () => rootRouteImport,
+} as any);
 const ApiInngestRoute = ApiInngestRouteImport.update({
   id: '/api/inngest',
   path: '/api/inngest',
+  getParentRoute: () => rootRouteImport,
+} as any);
+const ApiCspReportRoute = ApiCspReportRouteImport.update({
+  id: '/api/csp-report',
+  path: '/api/csp-report',
   getParentRoute: () => rootRouteImport,
 } as any);
 const ApiChatRoute = ApiChatRouteImport.update({
@@ -593,7 +605,9 @@ export interface FileRoutesByFullPath {
   '/sign-out': typeof authSignOutRoute;
   '/user-setup': typeof authUserSetupRoute;
   '/api/chat': typeof ApiChatRoute;
+  '/api/csp-report': typeof ApiCspReportRoute;
   '/api/inngest': typeof ApiInngestRoute;
+  '/api/sentry': typeof ApiSentryRoute;
   '/api/support-tickets': typeof ApiSupportTicketsRoute;
   '/support': typeof SupportIndexRoute;
   '/env/$envSlug': typeof AuthedEnvEnvSlugRouteRouteWithChildren;
@@ -678,7 +692,9 @@ export interface FileRoutesByTo {
   '/sign-out': typeof authSignOutRoute;
   '/user-setup': typeof authUserSetupRoute;
   '/api/chat': typeof ApiChatRoute;
+  '/api/csp-report': typeof ApiCspReportRoute;
   '/api/inngest': typeof ApiInngestRoute;
+  '/api/sentry': typeof ApiSentryRoute;
   '/api/support-tickets': typeof ApiSupportTicketsRoute;
   '/support': typeof SupportIndexRoute;
   '/env/$envSlug': typeof AuthedEnvEnvSlugRouteRouteWithChildren;
@@ -755,7 +771,9 @@ export interface FileRoutesById {
   '/(auth)/sign-out': typeof authSignOutRoute;
   '/(auth)/user-setup': typeof authUserSetupRoute;
   '/api/chat': typeof ApiChatRoute;
+  '/api/csp-report': typeof ApiCspReportRoute;
   '/api/inngest': typeof ApiInngestRoute;
+  '/api/sentry': typeof ApiSentryRoute;
   '/api/support-tickets': typeof ApiSupportTicketsRoute;
   '/support/': typeof SupportIndexRoute;
   '/_authed/env/$envSlug': typeof AuthedEnvEnvSlugRouteRouteWithChildren;
@@ -843,7 +861,9 @@ export interface FileRouteTypes {
     | '/sign-out'
     | '/user-setup'
     | '/api/chat'
+    | '/api/csp-report'
     | '/api/inngest'
+    | '/api/sentry'
     | '/api/support-tickets'
     | '/support'
     | '/env/$envSlug'
@@ -928,7 +948,9 @@ export interface FileRouteTypes {
     | '/sign-out'
     | '/user-setup'
     | '/api/chat'
+    | '/api/csp-report'
     | '/api/inngest'
+    | '/api/sentry'
     | '/api/support-tickets'
     | '/support'
     | '/env/$envSlug'
@@ -1004,7 +1026,9 @@ export interface FileRouteTypes {
     | '/(auth)/sign-out'
     | '/(auth)/user-setup'
     | '/api/chat'
+    | '/api/csp-report'
     | '/api/inngest'
+    | '/api/sentry'
     | '/api/support-tickets'
     | '/support/'
     | '/_authed/env/$envSlug'
@@ -1089,7 +1113,9 @@ export interface RootRouteChildren {
   authSignOutRoute: typeof authSignOutRoute;
   authUserSetupRoute: typeof authUserSetupRoute;
   ApiChatRoute: typeof ApiChatRoute;
+  ApiCspReportRoute: typeof ApiCspReportRoute;
   ApiInngestRoute: typeof ApiInngestRoute;
+  ApiSentryRoute: typeof ApiSentryRoute;
   ApiSupportTicketsRoute: typeof ApiSupportTicketsRoute;
   SupportIndexRoute: typeof SupportIndexRoute;
   authOrganizationListSplatRoute: typeof authOrganizationListSplatRoute;
@@ -1129,11 +1155,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSupportTicketsRouteImport;
       parentRoute: typeof rootRouteImport;
     };
+    '/api/sentry': {
+      id: '/api/sentry';
+      path: '/api/sentry';
+      fullPath: '/api/sentry';
+      preLoaderRoute: typeof ApiSentryRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
     '/api/inngest': {
       id: '/api/inngest';
       path: '/api/inngest';
       fullPath: '/api/inngest';
       preLoaderRoute: typeof ApiInngestRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    '/api/csp-report': {
+      id: '/api/csp-report';
+      path: '/api/csp-report';
+      fullPath: '/api/csp-report';
+      preLoaderRoute: typeof ApiCspReportRouteImport;
       parentRoute: typeof rootRouteImport;
     };
     '/api/chat': {
@@ -2084,7 +2124,9 @@ const rootRouteChildren: RootRouteChildren = {
   authSignOutRoute: authSignOutRoute,
   authUserSetupRoute: authUserSetupRoute,
   ApiChatRoute: ApiChatRoute,
+  ApiCspReportRoute: ApiCspReportRoute,
   ApiInngestRoute: ApiInngestRoute,
+  ApiSentryRoute: ApiSentryRoute,
   ApiSupportTicketsRoute: ApiSupportTicketsRoute,
   SupportIndexRoute: SupportIndexRoute,
   authOrganizationListSplatRoute: authOrganizationListSplatRoute,

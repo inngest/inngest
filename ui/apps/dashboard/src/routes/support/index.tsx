@@ -10,11 +10,11 @@ import {
   type ThreadPartsFragment,
 } from '@team-plain/typescript-sdk';
 import { useAuth } from '@clerk/tanstack-react-start';
-import { Banner } from '@inngest/components/Banner/NewBanner';
-import { Button } from '@inngest/components/Button/NewButton';
-import { Link } from '@inngest/components/Link/NewLink';
+import { Banner } from '@inngest/components/Banner';
+import { Button } from '@inngest/components/Button';
+import { Link } from '@inngest/components/Link';
 
-import { Pill } from '@inngest/components/Pill/NewPill';
+import { Pill } from '@inngest/components/Pill';
 import { cn } from '@inngest/components/utils/classNames';
 import { RiArrowLeftLine, RiGithubFill } from '@remixicon/react';
 import { createFileRoute, useSearch } from '@tanstack/react-router';

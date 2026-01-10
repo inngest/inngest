@@ -1,5 +1,5 @@
 import { useMemo, useRef } from 'react';
-import { Link } from '@inngest/components/Link/NewLink';
+import { Link } from '@inngest/components/Link';
 import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
 import { Table, TextCell } from '@inngest/components/Table';
 import { formatDayString } from '@inngest/components/utils/date';

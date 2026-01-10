@@ -4,7 +4,7 @@ import { useState } from 'react';
 
 import EnvSelectMenu from '@/components/Environments/EnvSelectMenu';
 import { type Environment } from '@/utils/environments';
-import { CodeBlock } from '@inngest/components/CodeBlock/NewCodeBlock';
+import { CodeBlock } from '@inngest/components/CodeBlock';
 
 type Props = {
   metricsGranularitySeconds: number;

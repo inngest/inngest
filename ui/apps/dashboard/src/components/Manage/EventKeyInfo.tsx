@@ -1,5 +1,5 @@
 import { Info } from '@inngest/components/Info/Info';
-import { Link } from '@inngest/components/Link/NewLink';
+import { Link } from '@inngest/components/Link';
 
 export const EventKeyInfo = () => (
   <Info

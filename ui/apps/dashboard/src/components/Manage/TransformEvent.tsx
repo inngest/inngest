@@ -1,11 +1,11 @@
 import { useContext, useEffect, useState } from 'react';
 import { useLocation, ClientOnly } from '@tanstack/react-router';
-import { Alert } from '@inngest/components/Alert/NewAlert';
-import { Button } from '@inngest/components/Button/NewButton';
-import { Link } from '@inngest/components/Link/NewLink';
+import { Alert } from '@inngest/components/Alert';
+import { Button } from '@inngest/components/Button';
+import { Link } from '@inngest/components/Link';
 import { toast } from 'sonner';
 
-import { CodeBlock } from '@inngest/components/CodeBlock/NewCodeBlock';
+import { CodeBlock } from '@inngest/components/CodeBlock';
 import { getManageKey } from '@/utils/urls';
 import makeVM from '@/utils/vm';
 import { Context } from './Context';

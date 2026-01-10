@@ -55,8 +55,10 @@ const graphqlConfig = {
               SchemaSource: 'unknown',
               SearchObject: 'unknown',
               SegmentType: 'unknown',
-              SpanMetadataKind: 'string',
-              SpanMetadataScope: 'string',
+              SpanMetadataKind:
+                '@inngest/components/RunDetailsV3/types#SpanMetadataKind',
+              SpanMetadataScope:
+                '@inngest/components/RunDetailsV3/types#SpanMetadataScope',
               SpanMetadataValues: 'Record<string, any>',
               Time: 'string',
               Timerange: 'unknown',

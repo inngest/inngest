@@ -1,5 +1,3 @@
-'use client';
-
 import type { SchemaNode } from '../types';
 import { ArrayRow } from './ArrayRow/ArrayRow';
 import { ObjectRow } from './ObjectRow';

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Header } from '@inngest/components/Header/NewHeader';
+import { Header } from '@inngest/components/Header/Header';
 import { createFileRoute, Outlet } from '@tanstack/react-router';
 
 import { ActionsMenu } from '@/components/Events/ActionsMenu';

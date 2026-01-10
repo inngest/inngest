@@ -1,4 +1,4 @@
-import { useSearchParam } from '@inngest/components/hooks/useNewSearchParams';
+import { useSearchParam } from '@inngest/components/hooks/useSearchParams';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 
 import { Suspense } from 'react';

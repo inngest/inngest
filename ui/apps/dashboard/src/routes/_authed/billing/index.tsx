@@ -1,5 +1,5 @@
-import { Alert } from '@inngest/components/Alert/NewAlert';
-import { Button } from '@inngest/components/Button/NewButton';
+import { Alert } from '@inngest/components/Alert';
+import { Button } from '@inngest/components/Button';
 import { Card } from '@inngest/components/Card/Card';
 import { formatDayString } from '@inngest/components/utils/date';
 import { createFileRoute } from '@tanstack/react-router';
@@ -72,6 +72,7 @@ export const Route = createFileRoute('/_authed/billing/')({
           : null;
 
       runs = {
+        isVisible: !!runLimit,
         title: 'Runs',
         description: `${
           entitlements.runCount.overageAllowed
@@ -84,28 +85,22 @@ export const Route = createFileRoute('/_authed/billing/')({
         tooltipContent: 'A single durable function execution.',
       };
 
-      const isExecutionBasedPlan =
-        currentPlan.slug === 'pro-2025-08-08' ||
-        currentPlan.slug === 'pro-2025-06-04';
-
       steps = {
-        title: isExecutionBasedPlan ? 'Executions' : 'Steps',
+        isVisible: !!stepLimit,
+        title: 'Steps',
         description: `${
-          entitlements.runCount.overageAllowed && !legacyNoRunsPlan
+          entitlements.stepCount.overageAllowed && !legacyNoRunsPlan
             ? 'Additional usage incurred at additional charge. Additional runs include 5 steps per run.'
-            : entitlements.runCount.overageAllowed
-            ? 'Additional usage incurred at additional charge.'
-            : ''
+            : 'Additional usage incurred at additional charge.'
         }`,
         current: stepUsage,
         limit: stepLimit,
         overageAllowed: entitlements.stepCount.overageAllowed,
-        tooltipContent: isExecutionBasedPlan
-          ? 'Combined total of runs and steps executed.'
-          : 'An individual step in durable functions.',
+        tooltipContent: 'An individual step in durable functions.',
       };
 
       executions = {
+        isVisible: !!executionLimit,
         title: 'Executions',
         description: isCurrentHobbyPlan
           ? 'The maximum number of executions per month'
@@ -241,17 +236,31 @@ function BillingComponent() {
               })}
             />
           </div>
-          <div className="border-subtle mb-6 border" />
+          <div className="border-subtle my-4 border" />
           {usageMetricsCacheEnabled && (
             <>
-              {runs && !legacyNoRunsPlan && !isCurrentHobbyPlan && (
-                <LimitBar data={runs} className="my-4" />
+              {executions?.isVisible && (
+                <LimitBar
+                  data={executions}
+                  className="mb-6"
+                  usageURL={pathCreator.billingUsage({
+                    dimension: 'execution',
+                  })}
+                />
               )}
-              {steps && !isCurrentHobbyPlan && (
-                <LimitBar data={steps} className="mb-6" />
+              {runs?.isVisible && !legacyNoRunsPlan && !isCurrentHobbyPlan && (
+                <LimitBar
+                  data={runs}
+                  className="my-4"
+                  usageURL={pathCreator.billingUsage({ dimension: 'run' })}
+                />
               )}
-              {executions && isCurrentHobbyPlan && (
-                <LimitBar data={executions} className="mb-6" />
+              {steps?.isVisible && !isCurrentHobbyPlan && (
+                <LimitBar
+                  data={steps}
+                  className="mb-6"
+                  usageURL={pathCreator.billingUsage({ dimension: 'step' })}
+                />
               )}
             </>
           )}

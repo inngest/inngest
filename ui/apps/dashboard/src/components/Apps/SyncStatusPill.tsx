@@ -1,4 +1,4 @@
-import { Pill } from '@inngest/components/Pill/NewPill';
+import { Pill } from '@inngest/components/Pill';
 import { type AppKind } from '@inngest/components/types/app';
 import { type SyncStatus } from '@inngest/components/types/sync';
 

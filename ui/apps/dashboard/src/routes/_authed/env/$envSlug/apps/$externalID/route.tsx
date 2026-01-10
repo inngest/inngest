@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Alert } from '@inngest/components/Alert/NewAlert';
-import { Header } from '@inngest/components/Header/NewHeader';
+import { Alert } from '@inngest/components/Alert';
+import { Header } from '@inngest/components/Header/Header';
 import { methodTypes } from '@inngest/components/types/app';
 import { createFileRoute, Outlet, useMatches } from '@tanstack/react-router';
 import type { CombinedError } from 'urql';

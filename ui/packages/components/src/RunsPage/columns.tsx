@@ -1,8 +1,6 @@
 import { useMemo } from 'react';
-import { IDCell, PillCell, StatusCell, TextCell, TimeCell } from '@inngest/components/Table';
-import { type FunctionRunStatus } from '@inngest/components/types/functionRun';
+import { IDCell, PillCell, TextCell, TimeCell } from '@inngest/components/Table';
 import { formatMilliseconds } from '@inngest/components/utils/date';
-import { RiSparkling2Fill } from '@remixicon/react';
 import { createColumnHelper } from '@tanstack/react-table';
 
 import { AICell, EndedAtCell, RunStatusCell } from '../Table/Cell';

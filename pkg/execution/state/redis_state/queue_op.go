@@ -194,7 +194,7 @@ func (q *queue) Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 	switch status {
 	case 0:
 		if rand.Float64() < 0.05 {
-			q.log.Debug("dequeued item", "job_id", i.ID, "item", i)
+			q.log.Trace("dequeued item", "job_id", i.ID, "item", i)
 		}
 
 		return nil

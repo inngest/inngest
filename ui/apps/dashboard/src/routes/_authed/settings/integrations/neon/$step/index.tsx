@@ -1,10 +1,10 @@
-import NeonAuth from '@inngest/components/PostgresIntegrations/Neon/NewAuth';
-import NeonConnect from '@inngest/components/PostgresIntegrations/Neon/NewConnect';
-import NeonFormat from '@inngest/components/PostgresIntegrations/Neon/NewFormat';
+import NeonAuth from '@inngest/components/PostgresIntegrations/Neon/Auth';
+import NeonConnect from '@inngest/components/PostgresIntegrations/Neon/Connect';
+import NeonFormat from '@inngest/components/PostgresIntegrations/Neon/Format';
 import {
   IntegrationSteps,
   STEPS_ORDER,
-} from '@inngest/components/PostgresIntegrations/newTypes';
+} from '@inngest/components/PostgresIntegrations/types';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { toast } from 'sonner';
 

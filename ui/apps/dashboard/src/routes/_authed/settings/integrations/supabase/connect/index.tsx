@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
-import ConnectPage from '@inngest/components/PostgresIntegrations/NewConnectPage';
+import ConnectPage from '@inngest/components/PostgresIntegrations/ConnectPage';
 import { connectContent } from '@inngest/components/PostgresIntegrations/Supabase/newSupabaseContent';
-import { STEPS_ORDER } from '@inngest/components/PostgresIntegrations/newTypes';
+import { STEPS_ORDER } from '@inngest/components/PostgresIntegrations/types';
 
 export const Route = createFileRoute(
   '/_authed/settings/integrations/supabase/connect/',

@@ -1,4 +1,4 @@
-import { Alert } from '@inngest/components/Alert/NewAlert';
+import { Alert } from '@inngest/components/Alert';
 import { cn } from '@inngest/components/utils/classNames';
 
 import { httpDataSchema, type CodedError } from '@/utils/codedError';

@@ -69,6 +69,7 @@ type ExtractedValues struct {
 	ResponseHeaders *http.Header
 	ResponseStatusCode *int
 	ResponseOutputSize *int
+	IsCheckpoint *bool
 	IsUserland *bool
 	UserlandSpanID *string
 	UserlandName *string

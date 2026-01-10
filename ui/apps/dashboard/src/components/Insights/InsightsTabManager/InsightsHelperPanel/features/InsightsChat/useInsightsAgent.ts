@@ -10,7 +10,7 @@ import type { ToolManifest } from '@/lib/inngest/functions/agents/types';
 export type ClientState = {
   sqlQuery: string;
   eventTypes: string[];
-  schemas: Record<string, unknown> | null;
+  schemas: { name: string; schema: string }[];
   currentQuery: string;
   tabTitle: string;
   mode: 'insights_sql_playground';

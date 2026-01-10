@@ -5,7 +5,7 @@ import {
   type ConnectPostgresIntegrationContent,
   type IntegrationPageContent,
   type PostgresIntegrationMenuContent,
-} from '../newTypes';
+} from '../types';
 
 export const neonConnectContent: ConnectPostgresIntegrationContent = {
   title: 'Neon',

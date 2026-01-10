@@ -389,8 +389,13 @@ func (m shardedMgr) idempotencyCheck(ctx context.Context, rc RetriableClient, ke
 		return nil, err
 	}
 
-	if prev == consts.FunctionIdempotencyTombstone {
-		return nil, state.ErrIdentifierTomestone
+	// When a run finishes, we prefix the run ID with the tombstone marker.
+	// This is needed for scheduling idempotency:  if scheduling retries the new state op
+	// and elsewhere we've updated with the tombstone prefix, scheduling can stop.
+	// Realisitcally, the chances of this are low, as the entire run has to finish while
+	// the scheduling op retries.
+	if len(prev) > 0 && prev[0] == consts.FunctionIdempotencyTombstone {
+		return nil, state.ErrIdentifierTombstone
 	}
 
 	// if there are existing values, the state might have already been created
@@ -1026,9 +1031,10 @@ func (m shardedMgr) delete(ctx context.Context, callCtx context.Context, i state
 	}
 
 	_ = r.Do(callCtx, func(client rueidis.Client) rueidis.Completed {
-		// update the idempotency key to the tombstone value to indicate this run is done
-		// do scheduling knows to not need to continue attempting to do so
-		return client.B().Set().Key(key).Value(consts.FunctionIdempotencyTombstone).Xx().Keepttl().Build()
+		// update the idempotency key to the tombstone prefix to indicate this run is done
+		// so scheduling retries can detect and stop.
+		val := fmt.Sprintf("%s%s", string(consts.FunctionIdempotencyTombstone), i.RunID)
+		return client.B().Set().Key(key).Value(val).Xx().Keepttl().Build()
 	}).Error()
 
 	// Clear all other data for a job.
@@ -1724,7 +1730,7 @@ func newRunMetadata(data map[string]string) (*runMetadata, error) {
 	if !ok {
 		return nil, fmt.Errorf("no status stored in metadata")
 	}
-	status, err := strconv.Atoi(v)
+	status, err := strconv.Atoi(strings.TrimSuffix(v, ".0"))
 	if err != nil {
 		return nil, fmt.Errorf("invalid function status stored in run metadata: %#v", v)
 	}
@@ -1735,7 +1741,7 @@ func newRunMetadata(data map[string]string) (*runMetadata, error) {
 		if !ok {
 			return 0, fmt.Errorf("no '%s' stored in run metadata", v)
 		}
-		val, err := strconv.Atoi(str)
+		val, err := strconv.Atoi(strings.TrimSuffix(str, ".0"))
 		if err != nil {
 			return 0, fmt.Errorf("invalid '%s' stored in run metadata", v)
 		}
@@ -1747,7 +1753,7 @@ func newRunMetadata(data map[string]string) (*runMetadata, error) {
 	m.StepCount, _ = parseInt("step_count")
 
 	if val, ok := data["version"]; ok && val != "" {
-		v, err := strconv.Atoi(val)
+		v, err := strconv.Atoi(strings.TrimSuffix(val, ".0"))
 		if err != nil {
 			return nil, fmt.Errorf("invalid metadata version detected: %#v", val)
 		}
@@ -1756,7 +1762,7 @@ func newRunMetadata(data map[string]string) (*runMetadata, error) {
 	}
 
 	if val, ok := data["rv"]; ok && val != "" {
-		v, err := strconv.Atoi(val)
+		v, err := strconv.Atoi(strings.TrimSuffix(val, ".0"))
 		if err != nil {
 			return nil, fmt.Errorf("invalid hash version detected: %#v", val)
 		}
@@ -1764,7 +1770,7 @@ func newRunMetadata(data map[string]string) (*runMetadata, error) {
 	}
 
 	if val, ok := data["sat"]; ok && val != "" {
-		v, err := strconv.ParseInt(val, 10, 64)
+		v, err := strconv.ParseInt(strings.TrimSuffix(val, ".0"), 10, 64)
 		if err != nil {
 			return nil, fmt.Errorf("invalid started at timestamp detected: %#v", val)
 		}

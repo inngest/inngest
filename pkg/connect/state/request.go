@@ -125,7 +125,6 @@ func (r *redisConnectionStateManager) ExtendRequestLease(ctx context.Context, en
 		keys,
 		args,
 	).AsInt64()
-
 	if err != nil {
 		return nil, fmt.Errorf("could not execute lease script: %w", err)
 	}
@@ -258,7 +257,6 @@ func (r *redisConnectionStateManager) SaveResponse(ctx context.Context, envID uu
 
 // GetResponse retrieves the response for a given request, if exists. Otherwise, the response will be nil.
 func (r *redisConnectionStateManager) GetResponse(ctx context.Context, envID uuid.UUID, requestID string) (*connpb.SDKResponse, error) {
-
 	cmd := r.client.
 		B().
 		Get().
@@ -266,12 +264,11 @@ func (r *redisConnectionStateManager) GetResponse(ctx context.Context, envID uui
 		Build()
 
 	res, err := r.client.Do(ctx, cmd).ToString()
-	if err != nil && !rueidis.IsRedisNil(err) {
-		return nil, fmt.Errorf("could not fetch response: %w", err)
-	}
-
-	if rueidis.IsRedisNil(err) {
+	if err != nil && (rueidis.IsRedisNil(err) || errors.Is(err, context.Canceled)) {
 		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("could not fetch response: %w", err)
 	}
 
 	reply := &connpb.SDKResponse{}

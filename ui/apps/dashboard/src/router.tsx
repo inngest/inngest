@@ -30,24 +30,37 @@ export const getRouter = () => {
     queryClient,
   });
 
-  if (!router.isServer) {
-    Sentry.init({
-      dsn: import.meta.env.VITE_SENTRY_DSN,
-      tracesSampleRate: 0.2,
-      tracePropagationTargets: [
-        /^\//, // All URLs on current origin.
-        /^https:\/\/api\.inngest\.com\//, // The production API origin.
-        /^https:\/\/api\.inngest\.net\//, // The staging API origin.
-        'localhost', // The local API origin.
-      ],
-      replaysSessionSampleRate: 0.2,
-      replaysOnErrorSampleRate: 1.0,
-    });
+  if (!router.isServer && !Sentry.getClient()) {
+    const dsn = import.meta.env.VITE_SENTRY_DSN;
 
-    Sentry.replayIntegration({
-      maskAllText: false,
-      blockAllMedia: false,
-    });
+    if (dsn) {
+      const release = import.meta.env.VITE_VERCEL_GIT_COMMIT_SHA;
+      const environment = import.meta.env.VITE_VERCEL_ENV;
+
+      Sentry.init({
+        dsn,
+        environment: environment ? `vercel-${environment}` : 'development',
+        release,
+        tunnel: '/api/sentry',
+        tracesSampleRate: 0.2,
+        tracePropagationTargets: [
+          /^\//, // All URLs on current origin.
+          /^https:\/\/api\.inngest\.com\//, // The production API origin.
+          /^https:\/\/api\.inngest\.net\//, // The staging API origin.
+          'localhost', // The local API origin.
+        ],
+        replaysSessionSampleRate: 0.2,
+        replaysOnErrorSampleRate: 1.0,
+        integrations: [
+          Sentry.tanstackRouterBrowserTracingIntegration(router),
+          Sentry.replayIntegration({
+            maskAllText: false,
+            blockAllMedia: false,
+            networkCaptureBodies: false,
+          }),
+        ],
+      });
+    }
   }
 
   return router;

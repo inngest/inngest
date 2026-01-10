@@ -1,4 +1,4 @@
-import { Alert } from '@inngest/components/Alert/NewAlert';
+import { Alert } from '@inngest/components/Alert';
 
 type Props = {
   integrationName: string;

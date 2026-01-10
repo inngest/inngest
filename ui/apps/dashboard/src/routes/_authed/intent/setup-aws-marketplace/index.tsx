@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from '@inngest/components/Link/NewLink';
+import { Link } from '@inngest/components/Link';
 import { useMutation } from 'urql';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 
@@ -9,7 +9,7 @@ import AWSLogo from '@/components/Icons/aws-logo.svg?react';
 
 import { pathCreator } from '@/utils/urls';
 import ApprovalDialog from '@/components/Intent/ApprovalDialog';
-import { useSearchParam } from '@inngest/components/hooks/useNewSearchParams';
+import { useSearchParam } from '@inngest/components/hooks/useSearchParams';
 
 export const Route = createFileRoute('/_authed/intent/setup-aws-marketplace/')({
   component: SetupAWSMarketplacePage,

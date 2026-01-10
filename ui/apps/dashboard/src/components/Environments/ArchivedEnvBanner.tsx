@@ -1,4 +1,4 @@
-import { Banner } from '@inngest/components/Banner/NewBanner';
+import { Banner } from '@inngest/components/Banner';
 
 import type { Environment } from '@/utils/environments';
 import { pathCreator } from '@/utils/urls';

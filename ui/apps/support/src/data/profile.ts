@@ -1,13 +1,12 @@
 // import { graphql } from "@/gql";
 
-import {
+import { createServerFn } from "@tanstack/react-start";
+import { auth, clerkClient } from "@clerk/tanstack-react-start/server";
+import type {
   Organization,
   OrganizationMembership,
   User,
 } from "@clerk/tanstack-react-start/server";
-import { auth, clerkClient } from "@clerk/tanstack-react-start/server";
-import { createServerFn } from "@tanstack/react-start";
-// import { inngestGQLAPI } from "./gqlApi";
 
 export type ProfileType = {
   user: User;
@@ -21,18 +20,9 @@ export type ProfileDisplayType = {
   orgProfilePic: string | null;
 };
 
-// const ProfileQuery = graphql(`
-//   query Profile {
-//     account {
-//       name
-//       marketplace
-//     }
-//   }
-// `);
-
 export const getProfileDisplay = createServerFn({
   method: "GET",
-}).handler(async (): Promise<ProfileDisplayType> => {
+}).handler((): ProfileDisplayType => {
   // TODO: Implement profile display logic
   // For now, return placeholder values
   return {
@@ -50,13 +40,6 @@ export const getProfile = async (): Promise<ProfileType> => {
   }
 
   const user = await clerkClient().users.getUser(userId);
-  if (!user) {
-    throw new Error("User is not logged in");
-  }
-
-  if (!user) {
-    throw new Error("User is not logged in");
-  }
 
   return { user, org: orgId ? await getOrg(orgId) : undefined };
 };

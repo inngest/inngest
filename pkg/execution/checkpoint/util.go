@@ -17,6 +17,7 @@ func stepRunAttrs(attrs *meta.SerializableAttrs, op state.GeneratorOpcode, runID
 			meta.Attr(meta.Attrs.StartedAt, inngestgo.Ptr(op.Timing.Start())),
 			meta.Attr(meta.Attrs.EndedAt, inngestgo.Ptr(op.Timing.End())),
 			meta.Attr(meta.Attrs.DynamicStatus, inngestgo.Ptr(enums.StepStatusCompleted)),
+			meta.Attr(meta.Attrs.IsCheckpoint, inngestgo.Ptr(true)),
 		),
 	)
 }
@@ -30,6 +31,7 @@ func stepErrorAttrs(attrs *meta.SerializableAttrs, op state.GeneratorOpcode, run
 			meta.Attr(meta.Attrs.StartedAt, inngestgo.Ptr(op.Timing.Start())),
 			meta.Attr(meta.Attrs.EndedAt, inngestgo.Ptr(op.Timing.End())),
 			meta.Attr(meta.Attrs.DynamicStatus, &status),
+			meta.Attr(meta.Attrs.IsCheckpoint, inngestgo.Ptr(true)),
 		),
 	)
 }

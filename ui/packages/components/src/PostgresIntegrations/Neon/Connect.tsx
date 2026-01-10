@@ -52,7 +52,7 @@ export default function Connect({
     replicaConn?: string;
   }) => Promise<{
     success: boolean;
-    error: string;
+    error: string | null;
     steps: {
       logical_replication_enabled: {
         complete: boolean;
@@ -236,7 +236,7 @@ export default function Connect({
       {isVerified ? (
         <Button
           label="Connected. See your integration"
-          href={`/settings/integrations/${integration}`}
+          to={`/settings/integrations/${integration}`}
         />
       ) : (
         <Button label="Complete setup automatically" onClick={handleVerify} loading={isVerifying} />

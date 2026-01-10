@@ -21,6 +21,7 @@ import (
 	"github.com/inngest/inngest/pkg/expressions"
 	"github.com/inngest/inngest/pkg/syscode"
 	"github.com/inngest/inngest/pkg/util"
+	"github.com/inngest/inngest/pkg/util/strduration"
 	"github.com/xhit/go-str2duration/v2"
 )
 
@@ -92,6 +93,13 @@ type Function struct {
 	Concurrency *ConcurrencyLimits `json:"concurrency,omitempty"`
 
 	Debounce *Debounce `json:"debounce,omitempty"`
+
+	// Checkpint represents checkpointing configuration.  If nil, checkpointing
+	// is not enabled for this function.
+	//
+	// Note that checkpointing is an SDK concern and is not controlled by the executor.
+	// This is included in function configuration for the UI only.
+	Checkpoint *Checkpoint `json:"checkpoint,omitempty"`
 
 	// Trigger represnets the trigger for the function.
 	Triggers MultipleTriggers `json:"triggers"`
@@ -549,7 +557,7 @@ func (f Function) URI() *url.URL {
 	return &url.URL{}
 }
 
-// DeterminsiticAppUUID returns a deterministic V3 UUID based off of the SHA1
+// DeterministicAppUUID returns a deterministic V3 UUID based off of the SHA1
 // hash of the app's URL.
 func DeterministicAppUUID(url string) uuid.UUID {
 	return DeterministicSha1UUID(url)
@@ -583,4 +591,30 @@ type Singleton struct {
 	// Mode determines how to handle a new run when another singleton instance is already active.
 	// Use `skip` to skip the new run, or `cancel` to stop the current instance and run the new one.
 	Mode enums.SingletonMode `json:"mode"`
+}
+
+// Checkpoint represents checkpoint configuration.
+type Checkpoint struct {
+	// BatchSteps represents the maximum number of steps to execute before checkpointing. When this
+	// limit is hit, checkpointing will occur and the SDK will block until checkpointing completes.
+	//
+	// This must be higher than zero to enable batching of steps.  When enabled with BatchInterval,
+	// whichever limit is hit first will checkpoint steps.
+	BatchSteps int `json:"batch_steps,omitempty,omitzero"`
+
+	// BatchInterval represents the maximum time that we wait after a step runs before checkpointing.
+	// When this limit is hit, checkpointing will occur and the SDK will block until checkpointing completes.
+	//
+	// This must be higher than zero to enable batching based off of durations.  When enabled with BatchSteps,
+	// whichever lmiit is hit first will checkpoint steps.
+	//
+	// This is a string-encoded time.Duration field.
+	BatchInterval strduration.Duration `json:"batch_interval,omitempty,omitzero"`
+
+	// MaxRuntime indicates the maximum duration that a function can execute for before Inngest requires
+	// a fresh re-entry.  This is useful for serverless functions, ensuring that a fresh request is made
+	// after a maximum amount of time.
+	//
+	// This is a string-encoded time.Duration field.
+	MaxRuntime strduration.Duration `json:"max_runtime,omitempty,omitzero"`
 }

@@ -1,4 +1,4 @@
-import { EventDetails } from '@inngest/components/Events/NewEventDetails';
+import { EventDetails } from '@inngest/components/Events/EventDetails';
 import { useReplayModal } from '@inngest/components/Events/useReplayModal';
 import { createFileRoute } from '@tanstack/react-router';
 

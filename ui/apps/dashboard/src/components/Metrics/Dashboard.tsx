@@ -1,6 +1,6 @@
 import type { RangeChangeProps } from '@inngest/components/DatePicker/RangePicker';
-import { Error } from '@inngest/components/Error/NewError';
-import EntityFilter from '@inngest/components/Filter/NewEntityFilter';
+import { Error } from '@inngest/components/Error/Error';
+import EntityFilter from '@inngest/components/Filter/EntityFilter';
 import { TimeFilter } from '@inngest/components/Filter/TimeFilter';
 import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
 import {
@@ -8,7 +8,7 @@ import {
   useBooleanSearchParam,
   useSearchParam,
   useStringArraySearchParam,
-} from '@inngest/components/hooks/useNewSearchParams';
+} from '@inngest/components/hooks/useSearchParams';
 import {
   durationToString,
   parseDuration,

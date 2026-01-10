@@ -5,7 +5,7 @@ import { AppsIcon } from '@inngest/components/icons/sections/Apps';
 import { FunctionsIcon } from '@inngest/components/icons/sections/Functions';
 
 import { useGetAppsQuery } from '@/store/generated';
-import { MenuItem } from '@inngest/components/Menu/NewMenuItem';
+import { MenuItem } from '@inngest/components/Menu/MenuItem';
 
 export default function Mange({ collapsed }: { collapsed: boolean }) {
   const [pollingInterval, setPollingInterval] = useState(1500);

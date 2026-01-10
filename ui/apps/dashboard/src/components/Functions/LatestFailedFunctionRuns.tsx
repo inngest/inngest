@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Button } from '@inngest/components/Button/NewButton';
+import { Button } from '@inngest/components/Button';
 import { IDCell, TimeCell } from '@inngest/components/Table/Cell';
 import { useQuery } from 'urql';
 
@@ -12,25 +12,25 @@ const GetFailedFunctionRunsDocument = graphql(`
   query GetFailedFunctionRuns(
     $environmentID: ID!
     $functionSlug: String!
-    $lowerTime: Time!
-    $upperTime: Time!
+    $from: Time!
+    $until: Time!
   ) {
     environment: workspace(id: $environmentID) {
-      function: workflowBySlug(slug: $functionSlug) {
-        failedRuns: runsV2(
-          filter: {
-            lowerTime: $lowerTime
-            status: [FAILED]
-            timeField: ENDED_AT
-            upperTime: $upperTime
-          }
-          first: 20
-        ) {
-          edges {
-            node {
-              id
-              endedAt
-            }
+      failedRuns: runs(
+        filter: {
+          from: $from
+          until: $until
+          status: [FAILED]
+          timeField: ENDED_AT
+          fnSlug: $functionSlug
+        }
+        orderBy: [{ field: ENDED_AT, direction: DESC }]
+        first: 20
+      ) {
+        edges {
+          node {
+            id
+            endedAt
           }
         }
       }
@@ -71,14 +71,14 @@ export default function LatestFailedFunctionRuns({
     variables: {
       environmentID: environment.id,
       functionSlug,
-      lowerTime: lowerTime.toISOString(),
-      upperTime: upperTime.toISOString(),
+      from: lowerTime.toISOString(),
+      until: upperTime.toISOString(),
     },
   });
   const navigate = useNavigate();
 
   const failedFunctionRuns =
-    failedFunctionRunsResponse?.environment.function?.failedRuns?.edges?.map(
+    failedFunctionRunsResponse?.environment.failedRuns?.edges?.map(
       (edge) => edge?.node,
     );
 

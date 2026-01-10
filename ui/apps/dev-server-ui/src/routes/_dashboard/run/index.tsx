@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { RunDetailsV3 } from '@inngest/components/RunDetailsV3/RunDetailsV3';
 import { useBooleanFlag } from '@inngest/components/SharedContext/useBooleanFlag';
-import { useSearchParam } from '@inngest/components/hooks/useNewSearchParams';
+import { useSearchParam } from '@inngest/components/hooks/useSearchParams';
 import { cn } from '@inngest/components/utils/classNames';
 
 import { useGetTrigger } from '@/hooks/useGetTrigger';

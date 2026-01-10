@@ -1,4 +1,4 @@
-import { Button } from "@inngest/components/Button/NewButton";
+import { Button } from "@inngest/components/Button/Button";
 import { InngestLogo } from "@inngest/components/icons/logos/InngestLogo";
 import { InngestLogoSmall } from "@inngest/components/icons/logos/InngestLogoSmall";
 import { RiContractLeftLine, RiContractRightLine } from "@remixicon/react";
@@ -16,7 +16,7 @@ const NavToggle = ({
   collapsed: boolean;
   setCollapsed: (arg: boolean) => void;
 }) => {
-  const toggle = async () => {
+  const toggle = () => {
     const toggled = !collapsed;
     setCollapsed(toggled);
 

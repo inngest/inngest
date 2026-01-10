@@ -17,22 +17,33 @@ import (
 // You should ALWAYS start with the zero config and only tweak these parameters
 // to further improve latency if necessary.
 type Config struct {
-	// MaxSteps represents the maximum number of steps to execute before checkpointing.
+	// BatchSteps represents the maximum number of steps to execute before checkpointing. When this
+	// limit is hit, checkpointing will occur and the SDK will block until checkpointing completes.
 	//
-	// This must be higher than zero to enable batching of steps.
-	MaxSteps int
+	// This must be higher than zero to enable batching of steps.  When enabled with BatchInterval,
+	// whichever limit is hit first will checkpoint steps.
+	BatchSteps int
 
-	// MaxInterval represents the maximum time that we wait after a step runs before checkpointing.
-	MaxInterval time.Duration
+	// BatchInterval represents the maximum time that we wait after a step runs before checkpointing.
+	// When this limit is hit, checkpointing will occur and the SDK will block until checkpointing completes.
+	//
+	// This must be higher than zero to enable batching based off of durations.  When enabled with BatchSteps,
+	// whichever lmiit is hit first will checkpoint steps.
+	BatchInterval time.Duration
 
-	// StopAfterSteps represents the maximum number of steps the function can execute before
+	// MaxRuntime indicates the maximum duration that a function can execute for before Inngest requires
+	// a fresh re-entry.  This is useful for serverless functions, ensuring that a fresh request is made
+	// after a maximum amount of time.
+	MaxRuntime time.Duration
+
+	// MaxSteps represents the maximum number of steps the function can execute before
 	// stopping execution and waiting for another re-entry.  This is useful for serverless functions,
 	// ensuring that we create a new request (and serverless function lifecycle) after a maximum number
 	// of requests.
 	//
 	// If zero, there are no limits on the number of steps that can be executed, and the SDK will execute
 	// step.run calls until an async step is reached.
-	// StopAfterSteps int
+	// MaxSteps int
 }
 
 const (
@@ -58,13 +69,13 @@ var (
 	//
 	// It is NOT recommended to use this in serverless environments.
 	ConfigPerformant = &Config{
-		MaxSteps: AllSteps,
+		BatchSteps: AllSteps,
 	}
 
 	// ConfigBlended checkpoints after 3 steps or 3 seconds pass, giving a blend between
 	// performance and safety.
 	ConfigBlended = &Config{
-		MaxSteps:    3,
-		MaxInterval: 3 * time.Second,
+		BatchSteps:    3,
+		BatchInterval: 3 * time.Second,
 	}
 )

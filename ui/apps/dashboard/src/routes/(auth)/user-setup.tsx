@@ -1,7 +1,7 @@
 import ReloadClerkAndRedirect from '@/components/Clerk/ReloadClerkAndRedirect';
 import { graphql } from '@/gql';
 import graphqlAPI from '@/queries/graphqlAPI';
-import { createFileRoute, redirect } from '@tanstack/react-router';
+import { createFileRoute } from '@tanstack/react-router';
 import { createServerFn } from '@tanstack/react-start';
 
 const CreateUserDocument = graphql(`

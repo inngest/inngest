@@ -179,7 +179,7 @@ export function createChartOptions(
         stack: 'usage',
 
         itemStyle: {
-          color: resolveColor(colors.secondary.moderate, dark, '#2389F1'),
+          color: resolveColor(colors.primary['moderate'], dark, '#2C9B63'),
         },
         barWidth: '98%',
         barGap: '-98%',
@@ -190,7 +190,7 @@ export function createChartOptions(
         type: 'bar',
         stack: 'usage',
         itemStyle: {
-          color: resolveColor(colors.accent.subtle, dark, '#EC9923'),
+          color: resolveColor(colors.primary['2xSubtle'], dark, '#C4EFD4'),
         },
         barWidth: '98%',
         barGap: '-98%',

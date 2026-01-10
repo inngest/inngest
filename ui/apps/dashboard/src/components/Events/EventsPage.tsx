@@ -1,9 +1,9 @@
-import { Button } from '@inngest/components/Button/NewButton';
-import { EventsActionMenu } from '@inngest/components/Events/NewEventsActionMenu';
-import { EventsTable } from '@inngest/components/Events/NewEventsTable';
+import { Button } from '@inngest/components/Button';
+import { EventsActionMenu } from '@inngest/components/Events/EventsActionMenu';
+import { EventsTable } from '@inngest/components/Events/EventsTable';
 import { useReplayModal } from '@inngest/components/Events/useReplayModal';
-import { Header } from '@inngest/components/Header/NewHeader';
-import { RefreshButton } from '@inngest/components/Refresh/NewRefreshButton';
+import { Header } from '@inngest/components/Header/Header';
+import { RefreshButton } from '@inngest/components/Refresh/RefreshButton';
 import { RiExternalLinkLine, RiRefreshLine } from '@remixicon/react';
 
 import { useAllEventTypes } from '@/components/EventTypes/useEventTypes';
@@ -17,7 +17,7 @@ import {
   useEvents,
 } from '@/components/Events/useEvents';
 import { useAccountFeatures } from '@/utils/useAccountFeatures';
-import { useNavigate, useRouter } from '@tanstack/react-router';
+import { useRouter, ClientOnly } from '@tanstack/react-router';
 
 export default function EventsPage({
   environmentSlug: envSlug,
@@ -93,12 +93,14 @@ export default function EventsPage({
         )}
       />
       {selectedEvent && (
-        <SendEventModal
-          isOpen={isModalVisible}
-          eventName={selectedEvent.name}
-          onClose={closeModal}
-          initialData={selectedEvent.data}
-        />
+        <ClientOnly>
+          <SendEventModal
+            isOpen={isModalVisible}
+            eventName={selectedEvent.name}
+            onClose={closeModal}
+            initialData={selectedEvent.data}
+          />
+        </ClientOnly>
       )}
     </>
   );

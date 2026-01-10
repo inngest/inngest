@@ -1,7 +1,7 @@
 import { Connect } from '@/components/Integrations/Vercel/Connect';
 import { createVercelIntegration } from '@/queries/server/integrations/vercel';
 import { IconVercel } from '@inngest/components/icons/platforms/Vercel';
-import { Link } from '@inngest/components/Link/NewLink';
+import { Link } from '@inngest/components/Link';
 import { createFileRoute, type FileRouteTypes } from '@tanstack/react-router';
 
 export type VercelCallbackProps = {
@@ -42,7 +42,7 @@ export const Route = createFileRoute('/_authed/integrations/vercel/callback/')({
   },
 });
 
-async function VercelCallbackComponent() {
+function VercelCallbackComponent() {
   const searchParams = Route.useSearch();
   const vercelIntegration = Route.useLoaderData();
   if (!searchParams.code) {

@@ -1,9 +1,9 @@
-import Auth from '@inngest/components/PostgresIntegrations/Neon/NewAuth';
-import Connect from '@inngest/components/PostgresIntegrations/Neon/NewConnect';
+import Auth from '@inngest/components/PostgresIntegrations/Neon/Auth';
+import Connect from '@inngest/components/PostgresIntegrations/Neon/Connect';
 import {
   IntegrationSteps,
   STEPS_ORDER,
-} from '@inngest/components/PostgresIntegrations/newTypes';
+} from '@inngest/components/PostgresIntegrations/types';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { toast } from 'sonner';
 

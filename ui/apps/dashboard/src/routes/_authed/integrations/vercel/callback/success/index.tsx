@@ -1,82 +1,74 @@
-import { Alert } from '@inngest/components/Alert/NewAlert';
-import { Button } from '@inngest/components/Button/NewButton';
+import { Button } from '@inngest/components/Button';
+import { Card } from '@inngest/components/Card/Card';
 import { IconVercel } from '@inngest/components/icons/platforms/Vercel';
-import { Link } from '@inngest/components/Link/NewLink';
+import { RiCheckLine, RiInformationLine } from '@remixicon/react';
 import { createFileRoute } from '@tanstack/react-router';
 
 export const Route = createFileRoute(
   '/_authed/integrations/vercel/callback/success/',
 )({
   component: SuccessComponent,
+  validateSearch: (search) =>
+    search as { onSuccessRedirectURL?: string; source?: string },
 });
 
 function SuccessComponent() {
-  return (
-    <div className="mx-auto mt-16 flex w-[800px] flex-col">
-      <div className="text-basis mb-7 flex flex-row items-center justify-start text-2xl font-medium">
-        <div className="bg-contrast mr-4 flex h-12 w-12 items-center justify-center rounded">
-          <IconVercel className="text-onContrast" size={20} />
-        </div>
-        Vercel
-      </div>
-      <div className="text-muted mb-7 w-full text-base font-normal">
-        This integration enables you to host your Inngest functions on the
-        Vercel platform and automatically sync them every time you deploy code.{' '}
-        <Link
-          target="_blank"
-          size="medium"
-          href="https://www.inngest.com/docs/deploy/vercel"
-        >
-          Read documentation
-        </Link>
-      </div>
-      <div className="mb-7">
-        <Alert severity="info">
-          Please note that each Vercel account can only be linked to one Inngest
-          account at a time.
-        </Alert>
-      </div>
-      <div className="text-basis mb-7 text-lg font-normal">
-        Installation overview
-      </div>
-      <div className="text-basis text-lg font-normal">
-        <div className="border-subtle ml-3 border-l">
-          <div className="before:border-subtle before:text-basis before:bg-canvasBase relative ml-[32px] pb-7 before:absolute before:left-[-46px] before:h-[28px] before:w-[28px] before:rounded-full before:border before:text-center before:align-middle before:text-[13px] before:content-['1']">
-            <div className="text-basis text-base">
-              Install Inngest Integration on Vercel.
-            </div>
-            <div className="text-muted text-base">
-              Click the &rdquo;Add Integration&rdquo; button.
-            </div>
-          </div>
-        </div>
+  const { onSuccessRedirectURL, source } = Route.useSearch();
 
-        <div className="border-subtle ml-3 border-l">
-          <div className="before:border-subtle before:text-basis before:bg-canvasBase relative ml-[32px] pb-7 before:absolute before:left-[-46px] before:h-[28px] before:w-[28px] before:rounded-full before:border before:text-center before:align-middle before:text-[13px] before:content-['2']">
-            <div className="text-basis text-base">
-              Select the Vercel projects you wish to enable
+  const redirectURL =
+    source === 'marketplace' && onSuccessRedirectURL
+      ? onSuccessRedirectURL
+      : '/settings/integrations/vercel';
+
+  return (
+    <div className="mx-auto mt-8 flex w-[800px] flex-col p-8">
+      <div className="bg-contrast mb-7 flex h-12 w-12 items-center justify-center rounded">
+        <IconVercel className="text-onContrast h-6 w-6" />
+      </div>
+      <div className="text-basis mb-2 text-2xl leading-loose">
+        Inngest successfully installed on Vercel!
+      </div>
+      <div className="text-muted mb-7 text-base">
+        The Inngest integration has successfully been installed on your Vercel
+        account.
+      </div>
+      <Card className="w-full">
+        <Card.Content className="rounded-0 p-0">
+          <div className="border-subtle flex h-[72px] flex-row items-start justify-start border-b p-4">
+            <div className="bg-primary-moderate mr-3 mt-1 flex h-4 w-4 shrink-0 items-center justify-center rounded-[50%]">
+              <RiCheckLine size={12} className="text-onContrast" />
             </div>
             <div className="text-muted text-base">
-              You can configure one or more serve endpoints.
+              Each Vercel project will have{' '}
+              <span className="font-semibold">INNGEST_SIGNING_KEY</span> and{' '}
+              <span className="font-semibold">INNGEST_EVENT_KEY</span>{' '}
+              environment variables set.
             </div>
           </div>
-        </div>
-        <div className="ml-3">
-          <div className="before:border-subtle before:text-basis before:bg-canvasBase relative ml-[32px] pb-7 before:absolute before:left-[-46px] before:h-[28px] before:w-[28px] before:rounded-full before:border before:text-center before:align-middle before:text-[13px] before:content-['3']">
-            <div className="text-basis text-base">Setup Successful</div>
+          <div className="flex h-[72px] flex-row items-start justify-start p-4">
+            <div className="bg-primary-moderate mr-3 mt-1 flex h-4 w-4 shrink-0 items-center justify-center rounded-[50%]">
+              <RiCheckLine size={12} className="text-alwaysWhite" />
+            </div>
             <div className="text-muted text-base">
-              The integration auto-configures necessary environment variables
-              and syncs your app with Inngest whenever you deploy code to
-              Vercel.
+              The next time you deploy your project to Vercel your functions
+              will automatically appear in the Inngest dashboard.
             </div>
           </div>
+        </Card.Content>
+      </Card>
+      <div className="flex flex-row items-center justify-start rounded py-6">
+        <RiInformationLine size={20} className="text-disabled mr-1" />
+        <div className="text-muted text-sm font-normal leading-tight">
+          Advanced configuration options are available on the Inngest dashboard.
         </div>
       </div>
       <div>
         <Button
+          kind="primary"
           appearance="solid"
-          href="https://vercel.com/integrations/inngest/new"
-          label="Connect Vercel to Inngest"
+          size="medium"
+          label="Continue to Inngest Vercel Dashboard"
+          href={redirectURL}
         />
       </div>
     </div>

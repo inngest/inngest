@@ -1,10 +1,8 @@
-'use client';
-
-import { useRouter } from 'next/navigation';
-import { Button } from '@inngest/components/Button/index';
+import { Button } from '@inngest/components/Button';
 import { Card } from '@inngest/components/Card/Card';
-import { Link } from '@inngest/components/Link/Link';
-import { Pill } from '@inngest/components/Pill/Pill';
+import { Link } from '@inngest/components/Link';
+import { Pill } from '@inngest/components/Pill';
+import { useNavigate } from '@tanstack/react-router';
 import { toast } from 'sonner';
 
 import { type IntegrationPageContent, type Publication } from './types';
@@ -18,10 +16,10 @@ export default function IntegrationPage({
   onDelete: (id: string) => Promise<{ success: boolean; error: string | null }>;
   publications: Publication[];
 }) {
-  const router = useRouter();
+  const navigate = useNavigate();
 
   const successRedirect = () => {
-    router.push('/settings/integrations');
+    navigate({ to: '/settings/integrations' });
   };
 
   return (

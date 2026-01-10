@@ -1,12 +1,10 @@
-'use client';
-
 import { useState } from 'react';
-import { Button } from '@inngest/components/Button/NewButton';
+import { Button } from '@inngest/components/Button';
 import { Card } from '@inngest/components/Card/Card';
 import { Info } from '@inngest/components/Info/Info';
-import { Link } from '@inngest/components/Link/NewLink';
-import { Pill } from '@inngest/components/Pill/NewPill';
-import { Select } from '@inngest/components/Select/NewSelect';
+import { Link } from '@inngest/components/Link';
+import { Pill } from '@inngest/components/Pill';
+import { Select, type Option } from '@inngest/components/Select/Select';
 import { RiInformationLine, RiRefreshLine } from '@remixicon/react';
 
 import {
@@ -38,7 +36,7 @@ export function VercelProjects({
 
           <Select
             value={{ id: 'all', name: 'All' }}
-            onChange={(o) => setFilter(o.name)}
+            onChange={(o: Option) => setFilter(o.name)}
             label="Show"
             className="text-muted bg-canvasBase ml-4 h-6 rounded-sm text-xs leading-tight"
           >

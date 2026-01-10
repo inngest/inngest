@@ -510,9 +510,10 @@ type ComplexityRoot struct {
 	}
 
 	SpanMetadata struct {
-		Kind   func(childComplexity int) int
-		Scope  func(childComplexity int) int
-		Values func(childComplexity int) int
+		Kind      func(childComplexity int) int
+		Scope     func(childComplexity int) int
+		UpdatedAt func(childComplexity int) int
+		Values    func(childComplexity int) int
 	}
 
 	StepError struct {
@@ -2964,6 +2965,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.SpanMetadata.Scope(childComplexity), true
 
+	case "SpanMetadata.updatedAt":
+		if e.complexity.SpanMetadata.UpdatedAt == nil {
+			break
+		}
+
+		return e.complexity.SpanMetadata.UpdatedAt(childComplexity), true
+
 	case "SpanMetadata.values":
 		if e.complexity.SpanMetadata.Values == nil {
 			break
@@ -4128,6 +4136,7 @@ type SpanMetadata {
   scope: SpanMetadataScope!
   kind: SpanMetadataKind!
   values: SpanMetadataValues!
+  updatedAt: Time!
 }
 
 type UserlandSpan {
@@ -19071,6 +19080,8 @@ func (ec *executionContext) fieldContext_RunTraceSpan_metadata(ctx context.Conte
 				return ec.fieldContext_SpanMetadata_kind(ctx, field)
 			case "values":
 				return ec.fieldContext_SpanMetadata_values(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_SpanMetadata_updatedAt(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type SpanMetadata", field.Name)
 		},
@@ -19925,6 +19936,50 @@ func (ec *executionContext) fieldContext_SpanMetadata_values(ctx context.Context
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type SpanMetadataValues does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SpanMetadata_updatedAt(ctx context.Context, field graphql.CollectedField, obj *models.SpanMetadata) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SpanMetadata_updatedAt(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.UpdatedAt, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(time.Time)
+	fc.Result = res
+	return ec.marshalNTime2timeᚐTime(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SpanMetadata_updatedAt(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SpanMetadata",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Time does not have child fields")
 		},
 	}
 	return fc, nil
@@ -27953,6 +28008,13 @@ func (ec *executionContext) _SpanMetadata(ctx context.Context, sel ast.Selection
 		case "values":
 
 			out.Values[i] = ec._SpanMetadata_values(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "updatedAt":
+
+			out.Values[i] = ec._SpanMetadata_updatedAt(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
 				invalids++

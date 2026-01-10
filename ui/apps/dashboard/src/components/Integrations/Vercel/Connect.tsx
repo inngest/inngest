@@ -1,4 +1,4 @@
-import { Button } from '@inngest/components/Button/NewButton';
+import { Button } from '@inngest/components/Button';
 import { Card } from '@inngest/components/Card/Card';
 import { Checkbox } from '@inngest/components/Checkbox/Checkbox';
 import { Input } from '@inngest/components/Forms/Input';

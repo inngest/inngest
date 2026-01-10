@@ -4,8 +4,9 @@ import SignInRedirectErrors, {
 } from '@/components/SignIn/Errors';
 import SplitView from '@/components/SignIn/SplitView';
 import { SignIn } from '@clerk/tanstack-react-start';
-import { Alert } from '@inngest/components/Alert/NewAlert';
+import { Alert } from '@inngest/components/Alert';
 import { createFileRoute, useLocation } from '@tanstack/react-router';
+import logoImageUrl from '@inngest/components/icons/logos/inngest-logo-black.png';
 
 type SignInSearchParams = {
   redirect_url?: string;
@@ -43,8 +44,13 @@ function RouteComponent() {
         ) : (
           <SignIn
             appearance={{
+              layout: {
+                logoImageUrl,
+              },
               elements: {
                 footer: 'bg-none',
+                logoBox: 'flex m-0 justify-center',
+                logoImage: 'max-h-16 w-auto object-contain dark:invert',
               },
             }}
           />

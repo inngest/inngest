@@ -73,14 +73,11 @@ export function useEvents() {
     async ({
       cursor,
       endTime,
-      source,
       eventNames,
       startTime,
       celQuery,
       includeInternalEvents,
     }: EventsQueryVariables) => {
-      // TODO: use params when available in the API
-
       const result = await client
         .query(
           eventsQuery,

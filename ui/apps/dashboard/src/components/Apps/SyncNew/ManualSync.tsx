@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Button } from '@inngest/components/Button/NewButton';
+import { Button } from '@inngest/components/Button';
 import { InlineCode } from '@inngest/components/Code';
 import { Input } from '@inngest/components/Forms/Input';
 import { Link } from '@inngest/components/Link';

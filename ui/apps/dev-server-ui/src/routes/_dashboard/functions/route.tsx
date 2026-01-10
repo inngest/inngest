@@ -2,18 +2,18 @@ import { createFileRoute, Outlet, useNavigate } from '@tanstack/react-router';
 
 import { useMemo, useRef, useState } from 'react';
 
-import { Button } from '@inngest/components/Button/NewButton';
+import { Button } from '@inngest/components/Button';
 import { Search } from '@inngest/components/Forms/Search';
 import TableBlankState from '@inngest/components/Functions/TableBlankState';
-import { Header } from '@inngest/components/Header/NewHeader';
+import { Header } from '@inngest/components/Header/Header';
 import { Info } from '@inngest/components/Info/Info';
 import { InvokeButton } from '@inngest/components/InvokeButton';
-import { Link } from '@inngest/components/Link/NewLink';
-import { Pill, PillContent } from '@inngest/components/Pill/NewPill';
+import { Link } from '@inngest/components/Link';
+import { Pill, PillContent } from '@inngest/components/Pill';
 import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
 import { Table } from '@inngest/components/Table/OldTable';
 import useDebounce from '@inngest/components/hooks/useDebounce';
-import { useSearchParam } from '@inngest/components/hooks/useNewSearchParams';
+import { useSearchParam } from '@inngest/components/hooks/useSearchParams';
 import { RiExternalLinkLine } from '@remixicon/react';
 import {
   createColumnHelper,

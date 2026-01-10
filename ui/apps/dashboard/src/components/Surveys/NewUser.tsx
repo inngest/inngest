@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useUser } from '@clerk/tanstack-react-start';
-import { Button } from '@inngest/components/Button/NewButton';
-import { Link } from '@inngest/components/Link/NewLink';
+import { Button } from '@inngest/components/Button';
+import { Link } from '@inngest/components/Link';
 import { isAfter, sub } from '@inngest/components/utils/date';
 import { RiCloseLine } from '@remixicon/react';
 

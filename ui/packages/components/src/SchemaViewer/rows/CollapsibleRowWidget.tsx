@@ -1,5 +1,3 @@
-'use client';
-
 import { RiArrowDownSFill } from '@remixicon/react';
 
 export type CollapsibleRowWidgetProps = { open: boolean };

@@ -1,18 +1,17 @@
 import { getVercelApps, syncNewApp } from '@/components/Onboarding/data';
+import { graphql } from '@/gql';
 import {
   CreateVercelAppDocument,
-  UpdateVercelAppDocument,
   RemoveVercelAppDocument,
+  UpdateVercelAppDocument,
   type App,
   type Deploy,
   type VercelApp as GraphQLVercelApp,
   type VercelIntegration as GraphQLVercelIntegration,
 } from '@/gql/graphql';
-import { createServerFn } from '@tanstack/react-start';
 import { getProductionEnvironment } from '@/queries/server/getEnvironment';
-import restAPI from '../../restAPI';
+import { createServerFn } from '@tanstack/react-start';
 import graphqlAPI from '../../graphqlAPI';
-import { graphql } from '@/gql';
 
 import { ClientError } from 'graphql-request';
 
@@ -147,18 +146,44 @@ export const createVercelIntegration = createServerFn({ method: 'POST' })
   .handler(async ({ data }): Promise<VercelIntegration> => {
     const environment = await getProductionEnvironment();
 
-    const url = new URL(
-      '/v1/integrations/vercel/projects',
-      import.meta.env.VITE_API_URL,
-    );
-    url.searchParams.set('workspaceID', environment.id);
-    url.searchParams.set('code', data.vercelAuthorizationCode);
+    const { auth } = await import('@clerk/tanstack-react-start/server');
+    const { getToken } = await auth();
+    const sessionToken = await getToken();
 
-    console.log('rest api call url', url);
+    if (!sessionToken) {
+      throw new Error('No session token available');
+    }
 
-    const response = await restAPI(url).json<{
+    const url = `${
+      import.meta.env.VITE_API_URL
+    }/v1/integrations/vercel/projects?workspaceID=${environment.id}&code=${
+      data.vercelAuthorizationCode
+    }`;
+
+    const fetchResponse = await fetch(url, {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json',
+        Authorization: `Bearer ${sessionToken}`,
+      },
+    });
+
+    if (!fetchResponse.ok) {
+      const errorBody = await fetchResponse.text().catch(() => '');
+      console.error('API Error Response:', {
+        status: fetchResponse.status,
+        statusText: fetchResponse.statusText,
+        body: errorBody,
+        url: fetchResponse.url,
+      });
+      throw new Error(
+        `API request failed: ${fetchResponse.status} ${fetchResponse.statusText}`,
+      );
+    }
+
+    const response = (await fetchResponse.json()) as {
       projects: { id: string; name: string }[];
-    }>();
+    };
 
     const projects = await enrichVercelProjectsHelper(response.projects);
 
@@ -341,7 +366,19 @@ export const getVercelIntegration = createServerFn({
     return res.account.vercelIntegration ?? null;
   } catch (err) {
     if (err instanceof ClientError) {
-      throw new Error(err.response.errors?.[0]?.message ?? 'Unknown error');
+      const errorMessage = err.response.errors?.[0]?.message ?? 'Unknown error';
+
+      //
+      // If the Vercel access token is forbidden/expired, treat it as if there's no integration
+      // this will redirect the user to the connect page
+      if (errorMessage.toLowerCase().includes('forbidden')) {
+        console.warn(
+          'Vercel access token is forbidden, treating as no integration',
+        );
+        return null;
+      }
+
+      throw new Error(errorMessage);
     }
     if (err instanceof Error) {
       throw err;

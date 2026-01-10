@@ -1,8 +1,5 @@
 import { useLocation } from '@tanstack/react-router';
-import {
-  Header,
-  type BreadCrumbType,
-} from '@inngest/components/Header/NewHeader';
+import { Header, type BreadCrumbType } from '@inngest/components/Header/Header';
 
 //
 // In the new IA, all the settings pages

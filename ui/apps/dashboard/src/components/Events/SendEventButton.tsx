@@ -1,9 +1,12 @@
-import { useState } from 'react';
-import { Button } from '@inngest/components/Button/NewButton';
+import { useState, lazy, Suspense } from 'react';
+import { Button } from '@inngest/components/Button';
 import { OptionalTooltip } from '@inngest/components/Tooltip/OptionalTooltip';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
-import { SendEventModal } from './SendEventModal';
+
+const SendEventModal = lazy(() =>
+  import('./SendEventModal').then((m) => ({ default: m.SendEventModal })),
+);
 
 type SendEventButtonProps = {
   eventName?: string;
@@ -27,11 +30,15 @@ export default function SendEventButton({ eventName }: SendEventButtonProps) {
         />
       </OptionalTooltip>
 
-      <SendEventModal
-        isOpen={isModalVisible}
-        eventName={eventName}
-        onClose={() => setIsModalVisible(false)}
-      />
+      {isModalVisible && (
+        <Suspense fallback={null}>
+          <SendEventModal
+            isOpen={isModalVisible}
+            eventName={eventName}
+            onClose={() => setIsModalVisible(false)}
+          />
+        </Suspense>
+      )}
     </>
   );
 }

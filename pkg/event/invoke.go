@@ -7,24 +7,27 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/oklog/ulid/v2"
 )
 
-func NewInvocationEvent(opts NewInvocationEventOpts) Event {
+func NewInvocationEvent(opts NewInvocationEventOpts) BaseTrackedEvent {
 	evt := opts.Event
+	evt.Name = InvokeFnName
 
 	if evt.Timestamp == 0 {
 		evt.Timestamp = time.Now().UnixMilli()
 	}
-	if evt.ID == "" {
-		evt.ID = ulid.MustNew(uint64(evt.Timestamp), rand.Reader).String()
-	}
 	if evt.Data == nil {
 		evt.Data = make(map[string]any)
 	}
-	evt.Name = InvokeFnName
+
+	internalID := ulid.MustNew(uint64(evt.Timestamp), rand.Reader)
+	if evt.ID == "" {
+		evt.ID = internalID.String()
+	}
 
 	correlationID := ""
 	if opts.CorrelationID != nil {
@@ -45,7 +48,12 @@ func NewInvocationEvent(opts NewInvocationEventOpts) Event {
 		DebugRunID:          opts.DebugRunID,
 	}
 
-	return evt
+	return BaseTrackedEvent{
+		ID:          internalID,
+		Event:       evt,
+		WorkspaceID: opts.EnvID,
+		AccountID:   opts.AccountID,
+	}
 }
 
 // InngestMetadata represents metadata for an event that is used to invoke a
@@ -117,6 +125,9 @@ func (e Event) InngestMetadata() (*InngestMetadata, error) {
 }
 
 type NewInvocationEventOpts struct {
+	AccountID uuid.UUID
+	EnvID     uuid.UUID
+
 	SourceAppID     string
 	SourceFnID      string
 	SourceFnVersion int

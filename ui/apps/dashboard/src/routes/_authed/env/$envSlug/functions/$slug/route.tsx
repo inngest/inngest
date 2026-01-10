@@ -6,9 +6,9 @@ import {
 } from '@/gql/graphql';
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { useFunction } from '@/queries/functions';
-import { Header } from '@inngest/components/Header/NewHeader';
+import { Header } from '@inngest/components/Header/Header';
 import { InvokeModal } from '@inngest/components/InvokeButton';
-import { Pill } from '@inngest/components/Pill/NewPill';
+import { Pill } from '@inngest/components/Pill';
 import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { RiPauseCircleLine } from '@remixicon/react';
 import { createFileRoute, Outlet } from '@tanstack/react-router';

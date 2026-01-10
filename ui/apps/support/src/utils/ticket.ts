@@ -5,7 +5,7 @@ export const getStatusColor = (status: string): string => {
   const statusStr = status ? String(status).toLowerCase() : "";
   switch (statusStr) {
     case "todo":
-      return "bg-yellow-100 text-yellow-800";
+      return "bg-primary-intense text-white";
     case "done":
       return "bg-green-100 text-green-800";
     case "snoozed":

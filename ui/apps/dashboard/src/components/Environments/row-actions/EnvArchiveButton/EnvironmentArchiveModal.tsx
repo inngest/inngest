@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Alert } from '@inngest/components/Alert/NewAlert';
+import { Alert } from '@inngest/components/Alert';
 import { AlertModal } from '@inngest/components/Modal/AlertModal';
 import { toast } from 'sonner';
 import { useMutation } from 'urql';

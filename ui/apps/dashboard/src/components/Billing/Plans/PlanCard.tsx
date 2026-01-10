@@ -1,4 +1,4 @@
-import { Pill } from '@inngest/components/Pill/NewPill';
+import { Pill } from '@inngest/components/Pill';
 import { RiCheckLine } from '@remixicon/react';
 
 import {

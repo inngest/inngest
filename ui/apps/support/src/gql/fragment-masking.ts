@@ -1,4 +1,4 @@
-import type { ResultOf, TypedDocumentNode as DocumentNode,  } from '@graphql-typed-document-node/core';
+import type { TypedDocumentNode as DocumentNode, ResultOf,  } from '@graphql-typed-document-node/core';
 
 
 export type FragmentType<TDocumentType extends DocumentNode<any, any>> = TDocumentType extends DocumentNode<
@@ -41,8 +41,8 @@ export function getFragmentData<TType>(
 
 
 export function makeFragmentData<
-  F extends DocumentNode,
-  FT extends ResultOf<F>
->(data: FT, _fragment: F): FragmentType<F> {
-  return data as FragmentType<F>;
+  TFragment extends DocumentNode,
+  TFragmentType extends ResultOf<TFragment>
+>(data: TFragmentType, _fragment: TFragment): FragmentType<TFragment> {
+  return data as FragmentType<TFragment>;
 }

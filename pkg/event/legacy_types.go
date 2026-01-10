@@ -65,11 +65,17 @@ func (o BaseTrackedEvent) GetInternalID() ulid.ULID {
 }
 
 func (o BaseTrackedEvent) GetAccountID() uuid.UUID {
+	if o.AccountID != uuid.Nil {
+		return o.AccountID
+	}
 	// There are no accounts in OSS yet.
 	return consts.DevServerAccountID
 }
 
 func (o BaseTrackedEvent) GetWorkspaceID() uuid.UUID {
+	if o.WorkspaceID != uuid.Nil {
+		return o.WorkspaceID
+	}
 	// There are no workspaces in OSS yet.
 	return consts.DevServerEnvID
 }

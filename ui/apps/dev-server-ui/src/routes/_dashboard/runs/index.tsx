@@ -8,17 +8,17 @@ import {
   CountRunsQuery,
   CountRunsDocument,
 } from '@/store/generated';
-import { Header } from '@inngest/components/Header/NewHeader';
+import { Header } from '@inngest/components/Header/Header';
 import { useCalculatedStartTime } from '@inngest/components/hooks/useCalculatedStartTime';
 import {
   useStringArraySearchParam,
   useValidatedArraySearchParam,
   useValidatedSearchParam,
   useSearchParam,
-} from '@inngest/components/hooks/useNewSearchParams';
+} from '@inngest/components/hooks/useSearchParams';
 import { InfiniteScrollTrigger } from '@inngest/components/InfiniteScrollTrigger/InfiniteScrollTrigger';
-import { RunsActionMenu } from '@inngest/components/RunsPage/NewActionMenu';
-import { RunsPage } from '@inngest/components/RunsPage/NewRunsPage';
+import { RunsActionMenu } from '@inngest/components/RunsPage/ActionMenu';
+import { RunsPage } from '@inngest/components/RunsPage/RunsPage';
 import { useBooleanFlag } from '@inngest/components/SharedContext/useBooleanFlag';
 import {
   isFunctionRunStatus,

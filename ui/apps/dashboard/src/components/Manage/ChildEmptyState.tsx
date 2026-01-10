@@ -1,4 +1,4 @@
-import { Button } from '@inngest/components/Button/NewButton';
+import { Button } from '@inngest/components/Button';
 
 import { staticSlugs } from '@/utils/environments';
 import type { FileRouteTypes } from '@tanstack/react-router';

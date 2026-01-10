@@ -9,13 +9,16 @@ import {
   createRootRouteWithContext,
 } from "@tanstack/react-router";
 
-import { InngestClerkProvider } from "@/components/Clerk/Provider";
-import { navCollapsed } from "@/data/nav";
 import fontsCss from "@inngest/components/AppRoot/fonts.css?url";
 import globalsCss from "@inngest/components/AppRoot/globals.css?url";
 import { TooltipProvider } from "@inngest/components/Tooltip";
-import { QueryClient } from "@tanstack/react-query";
 import { ThemeProvider } from "next-themes";
+import type { QueryClient } from "@tanstack/react-query";
+import type { ExtendedStatus } from "@/data/status";
+import { InngestClerkProvider } from "@/components/Clerk/Provider";
+import { StatusBanner } from "@/components/Support/StatusBanner";
+import { Navigation } from "@/components/Support/Navigation";
+import { getStatus } from "@/data/status";
 
 export const Route = createRootRouteWithContext<{
   queryClient: QueryClient;
@@ -58,22 +61,41 @@ export const Route = createRootRouteWithContext<{
   }),
 
   loader: async () => {
+    let status: ExtendedStatus | undefined = undefined; // Fetch system status
+    try {
+      status = await getStatus();
+    } catch (error) {
+      console.error("Failed to fetch status:", error);
+    }
     return {
-      navCollapsed: await navCollapsed(),
+      status,
     };
   },
   component: RootComponent,
 });
 
 function RootComponent() {
+  const { status } = Route.useLoaderData();
+
   return (
     <RootDocument>
       <ThemeProvider attribute="class" defaultTheme="system">
         <InngestClerkProvider>
           <TooltipProvider delayDuration={0}>
-            <Outlet />
+            <div className="flex min-h-screen flex-col md:flex-row bg-canvasBase">
+              {/* Navigation */}
+              <Navigation />
+
+              <div className="flex flex-col grow">
+                {/* Status Banner */}
+                <StatusBanner status={status} />
+
+                <div className="mx-auto w-full max-w-5xl py-6 px-4">
+                  <Outlet />
+                </div>
+              </div>
+            </div>
           </TooltipProvider>
-          {/* TANSTACK TODO: add page view tracker here */}
         </InngestClerkProvider>
       </ThemeProvider>
     </RootDocument>
@@ -87,8 +109,6 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <HeadContent />
       </head>
       <body className=" bg-canvasBase text-basis h-full overflow-auto overscroll-none">
-        <div id="app" />
-        <div id="modals" />
         {children}
         <TanStackRouterDevtools position="bottom-right" />
         <Scripts />

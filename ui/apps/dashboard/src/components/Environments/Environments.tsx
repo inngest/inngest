@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Button } from '@inngest/components/Button/NewButton';
+import { Button } from '@inngest/components/Button';
 import { Search } from '@inngest/components/Forms/Search';
 import { StatusDot } from '@inngest/components/Status/StatusDot';
 import useDebounce from '@inngest/components/hooks/useDebounce';

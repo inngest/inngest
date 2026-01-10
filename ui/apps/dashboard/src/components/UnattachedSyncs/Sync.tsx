@@ -1,4 +1,4 @@
-import { Alert } from '@inngest/components/Alert/NewAlert';
+import { Alert } from '@inngest/components/Alert';
 import { RiErrorWarningLine } from '@remixicon/react';
 
 import { AppGitCard } from '@/components/Apps/AppGitCard/AppGitCard';

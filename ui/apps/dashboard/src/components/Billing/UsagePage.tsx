@@ -1,14 +1,14 @@
 import { useState } from 'react';
-import { Link } from '@tanstack/react-router';
-import { Select, type Option } from '@inngest/components/Select/NewSelect';
+import { Link, useNavigate } from '@tanstack/react-router';
+import { Select, type Option } from '@inngest/components/Select/Select';
 import ToggleGroup from '@inngest/components/ToggleGroup/ToggleGroup';
 import { useQuery } from 'urql';
 
 import UsageMetadata from '@/components/Billing/Usage/Metadata';
 import UsageChart from '@/components/Billing/Usage/UsageChart';
 import {
-  isUsageDimension,
   type UsageDimension,
+  isUsageDimension,
 } from '@/components/Billing/Usage/types';
 import useGetUsageChartData from '@/components/Billing/Usage/useGetUsageChartData';
 import { graphql } from '@/gql';
@@ -50,14 +50,19 @@ const options = [
 
 type UsagePageProps = {
   previous?: boolean;
+  dimension?: UsageDimension;
 };
 
-export const UsagePage = ({ previous }: UsagePageProps) => {
+export const UsagePage = ({
+  previous,
+  dimension = 'execution',
+}: UsagePageProps) => {
+  const navigate = useNavigate({ from: pathCreator.billingUsage() });
   const [{ data, fetching }] = useQuery({
     query: GetBillingInfoDocument,
   });
 
-  const [currentPage, setCurrentPage] = useState<UsageDimension>('execution');
+  // const [currentPage, setCurrentPage] = useState<UsageDimension>(dimension);
   const [selectedPeriod, setSelectedPeriod] = useState<Period>(
     previous ? options[1] : options[0],
   );
@@ -67,7 +72,7 @@ export const UsagePage = ({ previous }: UsagePageProps) => {
   const { data: billableData, fetching: fetchingBillableData } =
     useGetUsageChartData({
       selectedPeriod: selectedPeriod.id,
-      type: currentPage,
+      type: dimension,
     });
 
   const currentUsage = billableData.reduce((sum, point) => {
@@ -76,9 +81,9 @@ export const UsagePage = ({ previous }: UsagePageProps) => {
 
   let currentLimit = Infinity;
   if (data) {
-    if (currentPage === 'execution') {
+    if (dimension === 'execution') {
       currentLimit = data.account.entitlements.executions.limit ?? Infinity;
-    } else if (currentPage === 'run') {
+    } else if (dimension === 'run') {
       currentLimit = data.account.entitlements.runCount.limit ?? Infinity;
     } else {
       currentLimit = data.account.entitlements.stepCount.limit ?? Infinity;
@@ -96,14 +101,16 @@ export const UsagePage = ({ previous }: UsagePageProps) => {
       <div className="flex items-center justify-between">
         <ToggleGroup
           type="single"
-          defaultValue={currentPage}
+          defaultValue={dimension}
           size="small"
           onValueChange={(value) => {
             if (!isUsageDimension(value)) {
               console.error('invalid usage dimension', value);
               return;
             }
-            setCurrentPage(value);
+            navigate({
+              to: pathCreator.billingUsage({ dimension: value, previous }),
+            });
           }}
         >
           <ToggleGroup.Item value="execution">Execution</ToggleGroup.Item>
@@ -127,12 +134,17 @@ export const UsagePage = ({ previous }: UsagePageProps) => {
             </div>
           </Select.Button>
           <Select.Options>
-            <Link to={pathCreator.billing({ tab: 'usage' })}>
+            <Link to={pathCreator.billingUsage({ dimension })}>
               <Select.Option option={options[0]}>
                 {options[0].name}
               </Select.Option>
             </Link>
-            <Link to={pathCreator.billing({ tab: 'usage' }) + '?previous=true'}>
+            <Link
+              to={pathCreator.billingUsage({
+                dimension,
+                previous: true,
+              })}
+            >
               <Select.Option option={options[1]}>
                 {options[1].name}
               </Select.Option>
@@ -144,26 +156,26 @@ export const UsagePage = ({ previous }: UsagePageProps) => {
         <UsageMetadata
           className="justify-self-start"
           fetching={fetching}
-          title={`Plan-included ${currentPage}s`}
+          title={`Plan-included ${dimension}s`}
           value={new Intl.NumberFormat().format(currentLimit)}
         />
         <UsageMetadata
           className="justify-self-center"
           fetching={fetching}
-          title={`Additional ${currentPage}s`}
+          title={`Additional ${dimension}s`}
           value={new Intl.NumberFormat().format(additionalUsage)}
         />
         <UsageMetadata
           className="justify-self-end"
           fetching={fetching || fetchingBillableData}
-          title={`Total ${currentPage}s`}
+          title={`Total ${dimension}s`}
           value={new Intl.NumberFormat().format(currentUsage)}
         />
       </dl>
       <UsageChart
         selectedPeriod={selectedPeriod.id}
         includedCountLimit={currentLimit}
-        type={currentPage}
+        type={dimension}
       />
     </div>
   );

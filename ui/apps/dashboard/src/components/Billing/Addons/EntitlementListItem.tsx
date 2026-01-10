@@ -1,10 +1,10 @@
-import { Button } from '@inngest/components/Button/NewButton';
+import { Button } from '@inngest/components/Button';
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from '@inngest/components/Tooltip/Tooltip';
-import { useSearchParam } from '@inngest/components/hooks/useNewSearchParams';
+import { useSearchParam } from '@inngest/components/hooks/useSearchParams';
 import { cn } from '@inngest/components/utils/classNames';
 import { RiInformationLine } from '@remixicon/react';
 

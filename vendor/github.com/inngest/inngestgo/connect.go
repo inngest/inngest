@@ -12,10 +12,6 @@ import (
 	"github.com/inngest/inngestgo/pkg/env"
 )
 
-const (
-	defaultMaxWorkerConcurrency = 1_000
-)
-
 type ConnectOpts struct {
 	Apps []Client
 
@@ -27,17 +23,14 @@ type ConnectOpts struct {
 
 	RewriteGatewayEndpoint func(endpoint url.URL) (url.URL, error)
 
-	// MaxConcurrency defines the maximum number of requests the worker can process at once.
+	// MaxWorkerConcurrency defines the maximum number of requests the worker can process at once.
 	// This affects goroutines available to handle connnect workloads, as well as flow control.
-	// Defaults to 1000.
-	MaxConcurrency int
+	// If this value is not set we use the environment variable "INNGEST_CONNECT_MAX_WORKER_CONCURRENCY".
+	// Defaults to 0. There is no limit if this is 0.
+	MaxWorkerConcurrency *int64
 }
 
 func Connect(ctx context.Context, opts ConnectOpts) (connect.WorkerConnection, error) {
-	concurrency := opts.MaxConcurrency
-	if concurrency < 1 {
-		concurrency = defaultMaxWorkerConcurrency
-	}
 
 	connectPlaceholder := url.URL{
 		Scheme: "ws",
@@ -109,7 +102,7 @@ func Connect(ctx context.Context, opts ConnectOpts) (connect.WorkerConnection, e
 		Capabilities:             capabilities,
 		HashedSigningKey:         hashedKey,
 		HashedSigningKeyFallback: hashedFallbackKey,
-		MaxConcurrency:           concurrency,
+		MaxWorkerConcurrency:     opts.MaxWorkerConcurrency,
 		APIBaseUrl:               defaultClient.h.GetAPIBaseURL(),
 		IsDev:                    defaultClient.h.isDev(),
 		DevServerUrl:             env.DevServerURL(),
@@ -161,6 +154,7 @@ func (h *handler) InvokeFunction(ctx context.Context, slug string, stepId *strin
 		mw,
 		fn,
 		h.GetSigningKey(),
+		h.GetSigningKeyFallback(),
 		&request,
 		stepId,
 	)
