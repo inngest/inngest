@@ -108,7 +108,9 @@ func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition
 		q.removeContinue(ctx, p, false)
 		return nil
 	}
-
+	if errors.Is(err, context.Canceled) {
+		return nil
+	}
 	if err != nil {
 		return fmt.Errorf("error leasing partition: %w", err)
 	}

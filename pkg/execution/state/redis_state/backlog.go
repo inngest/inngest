@@ -694,6 +694,9 @@ func (q *queue) PartitionBacklogSize(ctx context.Context, partitionID string) (i
 			defer bwg.Done()
 
 			size, err := q.BacklogSize(ctx, backlogID)
+			if errors.Is(err, context.Canceled) {
+				return
+			}
 			if err != nil {
 				log.ReportError(err, "error retrieving backlog size",
 					logger.WithErrorReportTags(map[string]string{
