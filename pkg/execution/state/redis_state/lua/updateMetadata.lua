@@ -9,7 +9,7 @@ local hasAI    = ARGV[4] -- has AI
 
 local function is_field_empty(field, emptyval)
   local val = redis.call("HGET", keyMetadata, field)
-  return val == nil or string.format("%d", val) == emptyval
+  return val == nil or val == emptyval or string.format("%d", val) == emptyval
 end
 
 redis.call("HSET", keyMetadata, "die", die)
