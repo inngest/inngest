@@ -1383,7 +1383,7 @@ func (q *queue) PartitionSize(ctx context.Context, partitionID string, until tim
 func (q *queue) partitionSize(ctx context.Context, partitionKey string, until time.Time) (int64, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "partitionSize"), redis_telemetry.ScopeQueue)
 
-	cmd := q.RedisClient.Client().B().Zcount().Key(partitionKey).Min("-inf").Max(strconv.Itoa(int(until.Unix()))).Build()
+	cmd := q.RedisClient.Client().B().Zcount().Key(partitionKey).Min("-inf").Max(strconv.Itoa(int(until.UnixMilli()))).Build()
 	return q.RedisClient.Client().Do(ctx, cmd).AsInt64()
 }
 
