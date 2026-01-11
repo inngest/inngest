@@ -13,12 +13,11 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/jonboulle/clockwork"
 	"github.com/redis/rueidis"
 	"github.com/sourcegraph/conc/pool"
 	"github.com/stretchr/testify/require"
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/sdk/metric"
 	"golang.org/x/sync/semaphore"
 )
 
@@ -68,15 +67,19 @@ func TestQueueE2E(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			reader := metric.NewManualReader()
-
-			provider := metric.NewMeterProvider(metric.WithReader(reader))
-			defer provider.Shutdown(context.Background())
-
-			// Set as global provider so your existing instrumentation works
-			otel.SetMeterProvider(provider)
-
 			ctx := context.Background()
+			err := trace.NewSystemTracer(ctx, trace.TracerOpts{
+				ServiceName:   "tracing-system",
+				TraceEndpoint: "localhost:4318",
+				Type:          trace.TracerTypeOTLPHTTP,
+			})
+			require.NoError(t, err)
+			defer func() {
+				_ = trace.CloseSystemTracer(ctx)
+			}()
+
+			tracer := trace.NewConditionalTracer(trace.QueueTracer(), trace.AlwaysTrace)
+
 			l := logger.StdlibLogger(ctx, logger.WithLoggerLevel(logger.LevelDebug))
 			ctx = logger.WithStdlib(ctx, l)
 
@@ -112,6 +115,7 @@ func TestQueueE2E(t *testing.T) {
 
 			options := append([]queue.QueueOpt{
 				queue.WithClock(clock),
+				queue.WithConditionalTracer(tracer),
 			}, tc.queueOptions...)
 
 			queueClient := redis_state.NewQueueClient(rc, redis_state.QueueDefaultKey)
