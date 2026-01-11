@@ -75,9 +75,9 @@ func TestFnCheckpoint(t *testing.T) {
 			r.NoError(err)
 			registerFuncs()
 
-				// Trigger the main function and successfully invoke the other function
-				_, err = inngestClient.Send(ctx, &event.Event{Name: evtName})
-				r.NoError(err)
+			// Trigger the main function and successfully invoke the other function
+			_, err = inngestClient.Send(ctx, &event.Event{Name: evtName})
+			r.NoError(err)
 
 			// Wait a moment for runID to be populated
 			require.EventuallyWithT(t, func(t *assert.CollectT) {
