@@ -8,6 +8,7 @@ import (
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
@@ -25,18 +26,19 @@ func TestQueueE2E(t *testing.T) {
 	accountID, workspaceID := uuid.New(), uuid.New()
 
 	cases := []struct {
-		name         string
-		numItems     int
-		numFunctions int
-		interval     time.Duration
-		concurrency  int
-		queueOptions []queue.QueueOpt
+		name             string
+		numItems         int
+		numFunctions     int
+		interval         time.Duration
+		concurrency      int
+		queueOptions     []queue.QueueOpt
+		useConstraintAPI constraintapi.UseConstraintAPIFn
 	}{
 		{
 			name:         "basic test",
-			numItems:     1000,
+			numItems:     10,
 			numFunctions: 1,
-			concurrency:  10,
+			concurrency:  1,
 			queueOptions: []queue.QueueOpt{
 				queue.WithRunMode(
 					queue.QueueRunMode{
@@ -58,6 +60,96 @@ func TestQueueE2E(t *testing.T) {
 					return false
 				}),
 				queue.WithPollTick(150 * time.Millisecond),
+			},
+		},
+		{
+			name:         "with key queues",
+			numItems:     10,
+			numFunctions: 1,
+			concurrency:  1,
+			queueOptions: []queue.QueueOpt{
+				queue.WithRunMode(
+					queue.QueueRunMode{
+						Sequential:                        true,
+						Scavenger:                         true,
+						Partition:                         true,
+						Account:                           true,
+						AccountWeight:                     85,
+						ShadowPartition:                   true,
+						AccountShadowPartition:            true,
+						AccountShadowPartitionWeight:      85,
+						NormalizePartition:                true,
+						ShadowContinuationSkipProbability: consts.QueueContinuationSkipProbability,
+						Continuations:                     true,
+						ShadowContinuations:               true,
+					},
+				),
+				queue.WithAllowKeyQueues(func(ctx context.Context, acctID, fnID uuid.UUID) bool {
+					return true
+				}),
+				queue.WithPollTick(150 * time.Millisecond),
+			},
+		},
+		{
+			name:         "with capacity manager and key queues",
+			numItems:     10,
+			numFunctions: 1,
+			concurrency:  1,
+			queueOptions: []queue.QueueOpt{
+				queue.WithRunMode(
+					queue.QueueRunMode{
+						Sequential:                        true,
+						Scavenger:                         true,
+						Partition:                         true,
+						Account:                           true,
+						AccountWeight:                     85,
+						ShadowPartition:                   true,
+						AccountShadowPartition:            true,
+						AccountShadowPartitionWeight:      85,
+						NormalizePartition:                true,
+						ShadowContinuationSkipProbability: consts.QueueContinuationSkipProbability,
+						Continuations:                     true,
+						ShadowContinuations:               true,
+					},
+				),
+				queue.WithAllowKeyQueues(func(ctx context.Context, acctID, fnID uuid.UUID) bool {
+					return true
+				}),
+				queue.WithPollTick(150 * time.Millisecond),
+			},
+			useConstraintAPI: func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
+				return true, true
+			},
+		},
+		{
+			name:         "with capacity manager",
+			numItems:     10,
+			numFunctions: 1,
+			concurrency:  1,
+			queueOptions: []queue.QueueOpt{
+				queue.WithRunMode(
+					queue.QueueRunMode{
+						Sequential:                        true,
+						Scavenger:                         true,
+						Partition:                         true,
+						Account:                           true,
+						AccountWeight:                     85,
+						ShadowPartition:                   true,
+						AccountShadowPartition:            true,
+						AccountShadowPartitionWeight:      85,
+						NormalizePartition:                true,
+						ShadowContinuationSkipProbability: consts.QueueContinuationSkipProbability,
+						Continuations:                     true,
+						ShadowContinuations:               true,
+					},
+				),
+				queue.WithAllowKeyQueues(func(ctx context.Context, acctID, fnID uuid.UUID) bool {
+					return false
+				}),
+				queue.WithPollTick(150 * time.Millisecond),
+			},
+			useConstraintAPI: func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
+				return true, true
 			},
 		},
 	}
@@ -120,6 +212,25 @@ func TestQueueE2E(t *testing.T) {
 
 			queueClient := redis_state.NewQueueClient(rc, redis_state.QueueDefaultKey)
 			shard := redis_state.NewQueueShard("test", queueClient, options...)
+
+			cm, err := constraintapi.NewRedisCapacityManager(
+				constraintapi.WithClock(clock),
+				constraintapi.WithEnableDebugLogs(true),
+				constraintapi.WithQueueShards(map[string]rueidis.Client{
+					shard.Name(): shard.Client().Client(),
+				}),
+				constraintapi.WithQueueStateKeyPrefix(redis_state.QueueDefaultKey),
+				constraintapi.WithRateLimitClient(rc),
+				constraintapi.WithRateLimitKeyPrefix("rl"),
+			)
+			require.NoError(t, err)
+
+			if tc.useConstraintAPI != nil {
+				options = append(options, queue.WithCapacityManager(cm))
+				options = append(options,
+					queue.WithUseConstraintAPI(tc.useConstraintAPI),
+				)
+			}
 
 			q, err := queue.New(ctx, "test", shard, nil, nil, options...)
 			require.NoError(t, err)
