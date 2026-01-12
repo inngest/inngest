@@ -277,6 +277,9 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 
 	rawRes, err := scripts["acquire"].Exec(ctx, client, keys, args).AsBytes()
 	if err != nil {
+		if isTimeout(err) {
+			return nil, errs.Wrap(0, true, "acquire script timed out: %w", err)
+		}
 		return nil, errs.Wrap(0, false, "acquire script failed: %w", err)
 	}
 

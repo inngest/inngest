@@ -76,6 +76,9 @@ func (r *redisCapacityManager) Release(ctx context.Context, req *CapacityRelease
 
 	rawRes, err := scripts["release"].Exec(ctx, client, keys, args).AsBytes()
 	if err != nil {
+		if isTimeout(err) {
+			return nil, errs.Wrap(0, true, "release script timed out: %w", err)
+		}
 		return nil, errs.Wrap(0, false, "release script failed: %w", err)
 	}
 

@@ -87,6 +87,9 @@ func (r *redisCapacityManager) ExtendLease(ctx context.Context, req *CapacityExt
 
 	rawRes, err := scripts["extend"].Exec(ctx, client, keys, args).AsBytes()
 	if err != nil {
+		if isTimeout(err) {
+			return nil, errs.Wrap(0, true, "extend script timed out: %w", err)
+		}
 		return nil, errs.Wrap(0, false, "extend script failed: %w", err)
 	}
 

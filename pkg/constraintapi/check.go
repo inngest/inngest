@@ -153,6 +153,9 @@ func (r *redisCapacityManager) Check(ctx context.Context, req *CapacityCheckRequ
 
 	rawRes, err := scripts["check"].Exec(ctx, client, keys, args).AsBytes()
 	if err != nil {
+		if isTimeout(err) {
+			return nil, nil, errs.Wrap(0, true, "check script timed out: %w", err)
+		}
 		return nil, nil, errs.Wrap(0, false, "check script failed: %w", err)
 	}
 
