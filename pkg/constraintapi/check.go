@@ -152,7 +152,15 @@ func (r *redisCapacityManager) Check(ctx context.Context, req *CapacityCheckRequ
 		"args", args,
 	)
 
+	start := r.clock.Now()
 	rawRes, err := scripts["check"].Exec(ctx, client, keys, args).AsBytes()
+	metrics.HistogramConstraintAPILuaScriptDuration(ctx, r.clock.Since(start), metrics.HistogramOpt{
+		PkgName: pkgName,
+		Tags: map[string]any{
+			"operation": "check",
+			"success":   err != nil,
+		},
+	})
 	if err != nil {
 		if isTimeout(err) {
 			metrics.IncrConstraintAPILuaScriptExecutionCounter(ctx, 1, metrics.CounterOpt{

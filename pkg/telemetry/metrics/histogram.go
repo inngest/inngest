@@ -477,3 +477,14 @@ func HistogramConstraintAPIRequestStateSize(ctx context.Context, size int64, opt
 		Boundaries:  constraintAPIRequestStateSizeBoundaries,
 	})
 }
+
+func HistogramConstraintAPILuaScriptDuration(ctx context.Context, duration time.Duration, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, duration.Milliseconds(), HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "constraintapi_lua_duration",
+		Description: "Distribution of Lua script duration",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  constraintAPIRequestStateSizeBoundaries,
+	})
+}

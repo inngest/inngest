@@ -75,7 +75,15 @@ func (r *redisCapacityManager) Release(ctx context.Context, req *CapacityRelease
 		"args", args,
 	)
 
+	start := r.clock.Now()
 	rawRes, err := scripts["release"].Exec(ctx, client, keys, args).AsBytes()
+	metrics.HistogramConstraintAPILuaScriptDuration(ctx, r.clock.Since(start), metrics.HistogramOpt{
+		PkgName: pkgName,
+		Tags: map[string]any{
+			"operation": "release",
+			"success":   err != nil,
+		},
+	})
 	if err != nil {
 		if isTimeout(err) {
 			metrics.IncrConstraintAPILuaScriptExecutionCounter(ctx, 1, metrics.CounterOpt{
