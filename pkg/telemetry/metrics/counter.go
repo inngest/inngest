@@ -853,3 +853,16 @@ func IncrBacklogRefillConstraintCheckFallbackCounter(ctx context.Context, reason
 		Tags:        opts.Tags,
 	})
 }
+
+func IncrConstraintAPIIssuedLeaseCounter(ctx context.Context, count int64, opts CounterOpt) {
+	if opts.Tags == nil {
+		opts.Tags = map[string]any{}
+	}
+
+	RecordCounterMetric(ctx, count, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "constraintapi_issued_lease_counter",
+		Description: "Total number of leases issued for the given location",
+		Tags:        opts.Tags,
+	})
+}

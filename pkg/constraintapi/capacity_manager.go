@@ -58,6 +58,13 @@ type MigrationIdentifier struct {
 	QueueShard  string
 }
 
+func (m MigrationIdentifier) String() string {
+	if m.QueueShard != "" {
+		return m.QueueShard
+	}
+	return "rate_limit"
+}
+
 type CapacityCheckRequest struct {
 	AccountID uuid.UUID
 
@@ -279,6 +286,15 @@ const (
 	RunProcessingModeDurableEndpoint
 )
 
+func (r RunProcessingMode) String() string {
+	switch r {
+	case 1:
+		return "durable_endpoint"
+	default:
+		return "background"
+	}
+}
+
 type CallerLocation int
 
 const (
@@ -296,6 +312,21 @@ const (
 	CallerLocationCheckpoint
 )
 
+func (c CallerLocation) String() string {
+	switch c {
+	case 1:
+		return "schedule"
+	case 2:
+		return "backlog_refill"
+	case 3:
+		return "item_lease"
+	case 4:
+		return "checkpoint"
+	default:
+		return "unknown"
+	}
+}
+
 type LeaseService int
 
 const (
@@ -304,6 +335,19 @@ const (
 	ServiceExecutor
 	ServiceAPI
 )
+
+func (s LeaseService) String() string {
+	switch s {
+	case 1:
+		return "new_runs"
+	case 2:
+		return "executor"
+	case 3:
+		return "api"
+	default:
+		return "unknown"
+	}
+}
 
 type LeaseSource struct {
 	// Service refers to the origin service (new-runs, api, executor)

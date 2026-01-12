@@ -377,6 +377,16 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 			"leases", leases,
 		)
 
+		metrics.IncrConstraintAPIIssuedLeaseCounter(ctx, int64(len(leases)), metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags: map[string]any{
+				"location":            req.Source.Location.String(),
+				"service":             req.Source.Service.String(),
+				"run_processing_mode": req.Source.RunProcessingMode.String(),
+				"migration":           req.Migration.String(),
+			},
+		})
+
 		// success or idempotency
 		return &CapacityAcquireResponse{
 			RequestID:           requestID,
