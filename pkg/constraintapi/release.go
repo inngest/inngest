@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	"github.com/inngest/inngest/pkg/logger"
-	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/util/errs"
 )
 
@@ -75,42 +74,10 @@ func (r *redisCapacityManager) Release(ctx context.Context, req *CapacityRelease
 		"args", args,
 	)
 
-	start := r.clock.Now()
-	rawRes, err := scripts["release"].Exec(ctx, client, keys, args).AsBytes()
-	metrics.HistogramConstraintAPILuaScriptDuration(ctx, r.clock.Since(start), metrics.HistogramOpt{
-		PkgName: pkgName,
-		Tags: map[string]any{
-			"operation": "release",
-			"success":   err != nil,
-		},
-	})
+	rawRes, internalErr := executeLuaScript(ctx, "release", client, r.clock, keys, args)
 	if err != nil {
-		if isTimeout(err) {
-			metrics.IncrConstraintAPILuaScriptExecutionCounter(ctx, 1, metrics.CounterOpt{
-				PkgName: pkgName,
-				Tags: map[string]any{
-					"operation": "release",
-					"status":    "timeout",
-				},
-			})
-			return nil, errs.Wrap(0, true, "release script timed out: %w", err)
-		}
-		metrics.IncrConstraintAPILuaScriptExecutionCounter(ctx, 1, metrics.CounterOpt{
-			PkgName: pkgName,
-			Tags: map[string]any{
-				"operation": "release",
-				"status":    "error",
-			},
-		})
-		return nil, errs.Wrap(0, false, "release script failed: %w", err)
+		return nil, internalErr
 	}
-	metrics.IncrConstraintAPILuaScriptExecutionCounter(ctx, 1, metrics.CounterOpt{
-		PkgName: pkgName,
-		Tags: map[string]any{
-			"operation": "release",
-			"status":    "success",
-		},
-	})
 
 	parsedResponse := releaseScriptResponse{}
 	err = json.Unmarshal(rawRes, &parsedResponse)

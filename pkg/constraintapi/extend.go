@@ -7,7 +7,6 @@ import (
 	"fmt"
 
 	"github.com/inngest/inngest/pkg/logger"
-	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/util/errs"
 	"github.com/oklog/ulid/v2"
 )
@@ -86,42 +85,10 @@ func (r *redisCapacityManager) ExtendLease(ctx context.Context, req *CapacityExt
 		"args", args,
 	)
 
-	start := r.clock.Now()
-	rawRes, err := scripts["extend"].Exec(ctx, client, keys, args).AsBytes()
-	metrics.HistogramConstraintAPILuaScriptDuration(ctx, r.clock.Since(start), metrics.HistogramOpt{
-		PkgName: pkgName,
-		Tags: map[string]any{
-			"operation": "extend",
-			"success":   err != nil,
-		},
-	})
+	rawRes, internalErr := executeLuaScript(ctx, "extend", client, r.clock, keys, args)
 	if err != nil {
-		if isTimeout(err) {
-			metrics.IncrConstraintAPILuaScriptExecutionCounter(ctx, 1, metrics.CounterOpt{
-				PkgName: pkgName,
-				Tags: map[string]any{
-					"operation": "extend",
-					"status":    "timeout",
-				},
-			})
-			return nil, errs.Wrap(0, true, "extend script timed out: %w", err)
-		}
-		metrics.IncrConstraintAPILuaScriptExecutionCounter(ctx, 1, metrics.CounterOpt{
-			PkgName: pkgName,
-			Tags: map[string]any{
-				"operation": "extend",
-				"status":    "error",
-			},
-		})
-		return nil, errs.Wrap(0, false, "extend script failed: %w", err)
+		return nil, internalErr
 	}
-	metrics.IncrConstraintAPILuaScriptExecutionCounter(ctx, 1, metrics.CounterOpt{
-		PkgName: pkgName,
-		Tags: map[string]any{
-			"operation": "extend",
-			"status":    "success",
-		},
-	})
 
 	parsedResponse := extendLeaseScriptResponse{}
 	err = json.Unmarshal(rawRes, &parsedResponse)

@@ -276,43 +276,10 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 		"prepared acquire call",
 	)
 
-	start := r.clock.Now()
-	rawRes, err := scripts["acquire"].Exec(ctx, client, keys, args).AsBytes()
-	metrics.HistogramConstraintAPILuaScriptDuration(ctx, r.clock.Since(start), metrics.HistogramOpt{
-		PkgName: pkgName,
-		Tags: map[string]any{
-			"operation": "acquire",
-			"success":   err != nil,
-		},
-	})
+	rawRes, internalErr := executeLuaScript(ctx, "acquire", client, r.clock, keys, args)
 	if err != nil {
-		if isTimeout(err) {
-			metrics.IncrConstraintAPILuaScriptExecutionCounter(ctx, 1, metrics.CounterOpt{
-				PkgName: pkgName,
-				Tags: map[string]any{
-					"operation": "acquire",
-					"status":    "timeout",
-				},
-			})
-			return nil, errs.Wrap(0, true, "acquire script timed out: %w", err)
-		}
-		metrics.IncrConstraintAPILuaScriptExecutionCounter(ctx, 1, metrics.CounterOpt{
-			PkgName: pkgName,
-			Tags: map[string]any{
-				"operation": "acquire",
-				"status":    "error",
-			},
-		})
-		return nil, errs.Wrap(0, false, "acquire script failed: %w", err)
+		return nil, internalErr
 	}
-
-	metrics.IncrConstraintAPILuaScriptExecutionCounter(ctx, 1, metrics.CounterOpt{
-		PkgName: pkgName,
-		Tags: map[string]any{
-			"operation": "acquire",
-			"status":    "success",
-		},
-	})
 
 	parsedResponse := acquireScriptResponse{}
 	err = json.Unmarshal(rawRes, &parsedResponse)
