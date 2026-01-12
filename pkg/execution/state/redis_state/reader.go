@@ -125,8 +125,11 @@ func (q *queue) RunningCount(ctx context.Context, workflowID uuid.UUID) (int64, 
 	}
 
 	var count int64
-	// Fetch the concurrency via the partition concurrency name.
-	key := q.RedisClient.kg.Concurrency("p", workflowID.String())
+	// Fetch the number of in progress items using the scavenger index.
+	// NOTE: We previously used the concurrency ZSET, which will no longer be populated by Lease in case
+	// a valid capacity lease was acquired using the Constraint API. This is to prevent double-counting
+	// concurrency. For this reason, we need to track in progress queue items in a partition using a new index.
+	key := q.RedisClient.kg.PartitionScavengerIndex(workflowID.String())
 	cmd = rc.B().Zcard().Key(key).Build()
 	cnt, err := rc.Do(ctx, cmd).AsInt64()
 	if err != nil {
