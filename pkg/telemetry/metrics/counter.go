@@ -803,6 +803,20 @@ func IncrScheduleConstraintsCheckFallbackCounter(ctx context.Context, reason str
 	})
 }
 
+func IncrScheduleConstraintsHitCounter(ctx context.Context, reason string, opts CounterOpt) {
+	if opts.Tags == nil {
+		opts.Tags = map[string]any{}
+	}
+	opts.Tags["reason"] = reason
+
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "schedule_constraints_hit_total",
+		Description: "Total number of schedule constraint checks resulted in limiting run scheduling",
+		Tags:        opts.Tags,
+	})
+}
+
 func IncrQueueItemConstraintCheckFallbackCounter(ctx context.Context, reason string, opts CounterOpt) {
 	if opts.Tags == nil {
 		opts.Tags = map[string]any{}

@@ -850,6 +850,12 @@ func (e *executor) schedule(
 							"status": "limited",
 						},
 					})
+					metrics.IncrScheduleConstraintsHitCounter(ctx, "rate_limit", metrics.CounterOpt{
+						PkgName: pkgName,
+						Tags: map[string]any{
+							"constraint_api": false,
+						},
+					})
 					return nil, ErrFunctionRateLimited
 				}
 
@@ -4596,7 +4602,6 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, runCtx execu
 	_, err = util.WithRetry(ctx, "pause.handleGeneratorWaitForEvent", func(ctx context.Context) (int, error) {
 		return e.pm.Write(ctx, idx, &pause)
 	}, util.NewRetryConf(util.WithRetryConfRetryableErrors(pauses.WritePauseRetryableError)))
-
 	// A pause may already exist if the write succeeded but we timed out before
 	// returning (MDB i/o timeouts). In that case, we ignore the
 	// ErrPauseAlreadyExists error and continue.
