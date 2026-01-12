@@ -717,6 +717,15 @@ func IncrConstraintAPILuaScriptExecutionCounter(ctx context.Context, count int64
 	})
 }
 
+func IncrConstraintAPIScavengerTotalAccountsCounter(ctx context.Context, count int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, count, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "constraintapi_scavenger_total_accounts_total",
+		Description: "Total number of accounts found by Constraint API scavenger",
+		Tags:        opts.Tags,
+	})
+}
+
 func IncrConstraintAPIScavengerExpiredAccountsCounter(ctx context.Context, count int64, opts CounterOpt) {
 	RecordCounterMetric(ctx, count, CounterOpt{
 		PkgName:     opts.PkgName,
