@@ -316,3 +316,5 @@ type LeaseSource struct {
 }
 
 type UseConstraintAPIFn func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool)
+
+type EnableHighCardinalityInstrumentation func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool)

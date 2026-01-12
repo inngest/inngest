@@ -1679,6 +1679,7 @@ type CapacityExtendLeaseRequest struct {
 	LeaseId        string                 `protobuf:"bytes,3,opt,name=lease_id,json=leaseId,proto3" json:"lease_id,omitempty"`
 	Duration       *durationpb.Duration   `protobuf:"bytes,4,opt,name=duration,proto3" json:"duration,omitempty"`
 	Migration      *MigrationIdentifier   `protobuf:"bytes,5,opt,name=migration,proto3" json:"migration,omitempty"`
+	Source         *LeaseSource           `protobuf:"bytes,6,opt,name=source,proto3" json:"source,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -1748,6 +1749,13 @@ func (x *CapacityExtendLeaseRequest) GetMigration() *MigrationIdentifier {
 	return nil
 }
 
+func (x *CapacityExtendLeaseRequest) GetSource() *LeaseSource {
+	if x != nil {
+		return x.Source
+	}
+	return nil
+}
+
 type CapacityExtendLeaseResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	LeaseId       *string                `protobuf:"bytes,1,opt,name=lease_id,json=leaseId,proto3,oneof" json:"lease_id,omitempty"`
@@ -1798,6 +1806,7 @@ type CapacityReleaseRequest struct {
 	AccountId      string                 `protobuf:"bytes,2,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
 	LeaseId        string                 `protobuf:"bytes,3,opt,name=lease_id,json=leaseId,proto3" json:"lease_id,omitempty"`
 	Migration      *MigrationIdentifier   `protobuf:"bytes,4,opt,name=migration,proto3" json:"migration,omitempty"`
+	Source         *LeaseSource           `protobuf:"bytes,5,opt,name=source,proto3" json:"source,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -1856,6 +1865,13 @@ func (x *CapacityReleaseRequest) GetLeaseId() string {
 func (x *CapacityReleaseRequest) GetMigration() *MigrationIdentifier {
 	if x != nil {
 		return x.Migration
+	}
+	return nil
+}
+
+func (x *CapacityReleaseRequest) GetSource() *LeaseSource {
+	if x != nil {
+		return x.Source
 	}
 	return nil
 }
@@ -2012,23 +2028,25 @@ const file_constraintapi_v1_service_proto_rawDesc = "" +
 	"\x14limiting_constraints\x18\x02 \x03(\v2 .constraintapi.v1.ConstraintItemR\x13limitingConstraints\x12-\n" +
 	"\x12fairness_reduction\x18\x03 \x01(\x05R\x11fairnessReduction\x12;\n" +
 	"\vretry_after\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
-	"retryAfter\"\xfb\x01\n" +
+	"retryAfter\"\xb2\x02\n" +
 	"\x1aCapacityExtendLeaseRequest\x12'\n" +
 	"\x0fidempotency_key\x18\x01 \x01(\tR\x0eidempotencyKey\x12\x1d\n" +
 	"\n" +
 	"account_id\x18\x02 \x01(\tR\taccountId\x12\x19\n" +
 	"\blease_id\x18\x03 \x01(\tR\aleaseId\x125\n" +
 	"\bduration\x18\x04 \x01(\v2\x19.google.protobuf.DurationR\bduration\x12C\n" +
-	"\tmigration\x18\x05 \x01(\v2%.constraintapi.v1.MigrationIdentifierR\tmigration\"J\n" +
+	"\tmigration\x18\x05 \x01(\v2%.constraintapi.v1.MigrationIdentifierR\tmigration\x125\n" +
+	"\x06source\x18\x06 \x01(\v2\x1d.constraintapi.v1.LeaseSourceR\x06source\"J\n" +
 	"\x1bCapacityExtendLeaseResponse\x12\x1e\n" +
 	"\blease_id\x18\x01 \x01(\tH\x00R\aleaseId\x88\x01\x01B\v\n" +
-	"\t_lease_id\"\xc0\x01\n" +
+	"\t_lease_id\"\xf7\x01\n" +
 	"\x16CapacityReleaseRequest\x12'\n" +
 	"\x0fidempotency_key\x18\x01 \x01(\tR\x0eidempotencyKey\x12\x1d\n" +
 	"\n" +
 	"account_id\x18\x02 \x01(\tR\taccountId\x12\x19\n" +
 	"\blease_id\x18\x03 \x01(\tR\aleaseId\x12C\n" +
-	"\tmigration\x18\x04 \x01(\v2%.constraintapi.v1.MigrationIdentifierR\tmigration\"\x19\n" +
+	"\tmigration\x18\x04 \x01(\v2%.constraintapi.v1.MigrationIdentifierR\tmigration\x125\n" +
+	"\x06source\x18\x05 \x01(\v2\x1d.constraintapi.v1.LeaseSourceR\x06source\"\x19\n" +
 	"\x17CapacityReleaseResponse*\xd2\x01\n" +
 	"\x1bConstraintApiRateLimitScope\x12/\n" +
 	"+CONSTRAINT_API_RATE_LIMIT_SCOPE_UNSPECIFIED\x10\x00\x12,\n" +
@@ -2164,20 +2182,22 @@ var file_constraintapi_v1_service_proto_depIdxs = []int32{
 	30, // 37: constraintapi.v1.CapacityAcquireResponse.retry_after:type_name -> google.protobuf.Timestamp
 	31, // 38: constraintapi.v1.CapacityExtendLeaseRequest.duration:type_name -> google.protobuf.Duration
 	19, // 39: constraintapi.v1.CapacityExtendLeaseRequest.migration:type_name -> constraintapi.v1.MigrationIdentifier
-	19, // 40: constraintapi.v1.CapacityReleaseRequest.migration:type_name -> constraintapi.v1.MigrationIdentifier
-	21, // 41: constraintapi.v1.ConstraintAPI.Check:input_type -> constraintapi.v1.CapacityCheckRequest
-	23, // 42: constraintapi.v1.ConstraintAPI.Acquire:input_type -> constraintapi.v1.CapacityAcquireRequest
-	25, // 43: constraintapi.v1.ConstraintAPI.ExtendLease:input_type -> constraintapi.v1.CapacityExtendLeaseRequest
-	27, // 44: constraintapi.v1.ConstraintAPI.Release:input_type -> constraintapi.v1.CapacityReleaseRequest
-	22, // 45: constraintapi.v1.ConstraintAPI.Check:output_type -> constraintapi.v1.CapacityCheckResponse
-	24, // 46: constraintapi.v1.ConstraintAPI.Acquire:output_type -> constraintapi.v1.CapacityAcquireResponse
-	26, // 47: constraintapi.v1.ConstraintAPI.ExtendLease:output_type -> constraintapi.v1.CapacityExtendLeaseResponse
-	28, // 48: constraintapi.v1.ConstraintAPI.Release:output_type -> constraintapi.v1.CapacityReleaseResponse
-	45, // [45:49] is the sub-list for method output_type
-	41, // [41:45] is the sub-list for method input_type
-	41, // [41:41] is the sub-list for extension type_name
-	41, // [41:41] is the sub-list for extension extendee
-	0,  // [0:41] is the sub-list for field type_name
+	20, // 40: constraintapi.v1.CapacityExtendLeaseRequest.source:type_name -> constraintapi.v1.LeaseSource
+	19, // 41: constraintapi.v1.CapacityReleaseRequest.migration:type_name -> constraintapi.v1.MigrationIdentifier
+	20, // 42: constraintapi.v1.CapacityReleaseRequest.source:type_name -> constraintapi.v1.LeaseSource
+	21, // 43: constraintapi.v1.ConstraintAPI.Check:input_type -> constraintapi.v1.CapacityCheckRequest
+	23, // 44: constraintapi.v1.ConstraintAPI.Acquire:input_type -> constraintapi.v1.CapacityAcquireRequest
+	25, // 45: constraintapi.v1.ConstraintAPI.ExtendLease:input_type -> constraintapi.v1.CapacityExtendLeaseRequest
+	27, // 46: constraintapi.v1.ConstraintAPI.Release:input_type -> constraintapi.v1.CapacityReleaseRequest
+	22, // 47: constraintapi.v1.ConstraintAPI.Check:output_type -> constraintapi.v1.CapacityCheckResponse
+	24, // 48: constraintapi.v1.ConstraintAPI.Acquire:output_type -> constraintapi.v1.CapacityAcquireResponse
+	26, // 49: constraintapi.v1.ConstraintAPI.ExtendLease:output_type -> constraintapi.v1.CapacityExtendLeaseResponse
+	28, // 50: constraintapi.v1.ConstraintAPI.Release:output_type -> constraintapi.v1.CapacityReleaseResponse
+	47, // [47:51] is the sub-list for method output_type
+	43, // [43:47] is the sub-list for method input_type
+	43, // [43:43] is the sub-list for extension type_name
+	43, // [43:43] is the sub-list for extension extendee
+	0,  // [0:43] is the sub-list for field type_name
 }
 
 func init() { file_constraintapi_v1_service_proto_init() }
