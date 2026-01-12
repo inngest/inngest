@@ -111,7 +111,15 @@ func (q *queue) RunningCount(ctx context.Context, functionID uuid.UUID) (int64, 
 	// a valid capacity lease was acquired using the Constraint API. This is to prevent double-counting
 	// concurrency. For this reason, we need to track in progress queue items in a partition using a new index.
 	key := q.RedisClient.kg.PartitionScavengerIndex(functionID.String())
-	cmd := rc.B().Zcard().Key(key).Build()
+
+	// Only consider items in the future (do not count expired jobs which will be scavenged)
+	from := fmt.Sprintf("%d", q.Clock.Now().UnixMilli())
+	cmd := rc.B().
+		Zcount().
+		Key(key).
+		Min(from).
+		Max("+inf").
+		Build()
 	cnt, err := rc.Do(ctx, cmd).AsInt64()
 	if err != nil {
 		return 0, fmt.Errorf("error inspecting job count: %w", err)
