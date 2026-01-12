@@ -75,7 +75,7 @@ func (r *redisCapacityManager) Release(ctx context.Context, req *CapacityRelease
 	)
 
 	rawRes, internalErr := executeLuaScript(ctx, "release", client, r.clock, keys, args)
-	if err != nil {
+	if internalErr != nil {
 		return nil, internalErr
 	}
 

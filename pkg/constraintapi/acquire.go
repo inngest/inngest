@@ -277,7 +277,7 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 	)
 
 	rawRes, internalErr := executeLuaScript(ctx, "acquire", client, r.clock, keys, args)
-	if err != nil {
+	if internalErr != nil {
 		return nil, internalErr
 	}
 

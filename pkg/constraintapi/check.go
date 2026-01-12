@@ -152,7 +152,7 @@ func (r *redisCapacityManager) Check(ctx context.Context, req *CapacityCheckRequ
 	)
 
 	rawRes, internalErr := executeLuaScript(ctx, "check", client, r.clock, keys, args)
-	if err != nil {
+	if internalErr != nil {
 		return nil, nil, internalErr
 	}
 
