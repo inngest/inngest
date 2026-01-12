@@ -1910,7 +1910,7 @@ func (q *queue) PartitionRequeue(ctx context.Context, p *osqueue.QueuePartition,
 		kg.FnMetadata(functionId),
 
 		partitionZsetKey(*p, kg), // Partition ZSET itself
-		partitionConcurrencyKey(*p, kg),
+		kg.PartitionScavengerIndex(p.ID),
 		kg.QueueItem(),
 
 		// Backlogs in shadow partition
