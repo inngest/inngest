@@ -65,7 +65,7 @@ func (q *queue) PartitionByID(ctx context.Context, partitionID string) (*osqueue
 			kg.ActiveSet("account", qp.AccountID.String()),
 			kg.Concurrency("account", qp.AccountID.String()),
 			kg.PartitionQueueSet(enums.PartitionTypeDefault, qp.ID, ""),
-			kg.Concurrency("p", qp.ID),
+			kg.PartitionScavengerIndex(qp.ID),
 			kg.ActiveSet("p", qp.ID),
 			kg.ShadowPartitionSet(sqp.PartitionID),
 		}

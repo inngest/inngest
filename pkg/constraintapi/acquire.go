@@ -276,9 +276,9 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 		"prepared acquire call",
 	)
 
-	rawRes, err := scripts["acquire"].Exec(ctx, client, keys, args).AsBytes()
-	if err != nil {
-		return nil, errs.Wrap(0, false, "acquire script failed: %w", err)
+	rawRes, internalErr := executeLuaScript(ctx, "acquire", client, r.clock, keys, args)
+	if internalErr != nil {
+		return nil, internalErr
 	}
 
 	parsedResponse := acquireScriptResponse{}
@@ -376,6 +376,26 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 			"successful acquire call",
 			"leases", leases,
 		)
+
+		metrics.HistogramConstraintAPIRequestStateSize(ctx, int64(len(requestState)), metrics.HistogramOpt{
+			PkgName: pkgName,
+			Tags: map[string]any{
+				"location":            req.Source.Location.String(),
+				"service":             req.Source.Service.String(),
+				"run_processing_mode": req.Source.RunProcessingMode.String(),
+				"migration":           req.Migration.String(),
+			},
+		})
+
+		metrics.IncrConstraintAPIIssuedLeaseCounter(ctx, int64(len(leases)), metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags: map[string]any{
+				"location":            req.Source.Location.String(),
+				"service":             req.Source.Service.String(),
+				"run_processing_mode": req.Source.RunProcessingMode.String(),
+				"migration":           req.Migration.String(),
+			},
+		})
 
 		// success or idempotency
 		return &CapacityAcquireResponse{

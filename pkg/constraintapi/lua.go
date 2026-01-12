@@ -1,16 +1,22 @@
 package constraintapi
 
 import (
+	"context"
 	"embed"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/fs"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
+	"github.com/inngest/inngest/pkg/util/errs"
+	"github.com/jonboulle/clockwork"
 	"github.com/redis/rueidis"
 )
 
@@ -325,4 +331,67 @@ func strSlice(args []any) ([]string, error) {
 		}
 	}
 	return res, nil
+}
+
+func isTimeout(err error) bool {
+	if errors.Is(err, os.ErrDeadlineExceeded) {
+		return true
+	}
+
+	if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+		return true
+	}
+
+	return false
+}
+
+func executeLuaScript(ctx context.Context, name string, client rueidis.Client, clock clockwork.Clock, keys []string, args []string) ([]byte, errs.InternalError) {
+	// Get current time for duration metrics
+	start := clock.Now()
+
+	// Execute script and convert response to bytes (we return JSON from all scripts)
+	rawRes, err := scripts[name].Exec(ctx, client, keys, args).AsBytes()
+
+	// Report duration
+	metrics.HistogramConstraintAPILuaScriptDuration(ctx, clock.Since(start), metrics.HistogramOpt{
+		PkgName: pkgName,
+		Tags: map[string]any{
+			"operation": name,
+			"success":   err != nil,
+		},
+	})
+
+	// Properly handle errors
+	if err != nil {
+		// Mark error as retriable in case of timeouts
+		if isTimeout(err) {
+			metrics.IncrConstraintAPILuaScriptExecutionCounter(ctx, 1, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags: map[string]any{
+					"operation": name,
+					"status":    "timeout",
+				},
+			})
+			return nil, errs.Wrap(0, true, "%s script timed out: %w", name, err)
+		}
+
+		metrics.IncrConstraintAPILuaScriptExecutionCounter(ctx, 1, metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags: map[string]any{
+				"operation": name,
+				"status":    "error",
+			},
+		})
+		return nil, errs.Wrap(0, false, "%s script failed: %w", name, err)
+	}
+
+	// Track success
+	metrics.IncrConstraintAPILuaScriptExecutionCounter(ctx, 1, metrics.CounterOpt{
+		PkgName: pkgName,
+		Tags: map[string]any{
+			"operation": name,
+			"status":    "success",
+		},
+	})
+	return rawRes, nil
 }

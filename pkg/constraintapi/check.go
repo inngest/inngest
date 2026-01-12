@@ -151,9 +151,9 @@ func (r *redisCapacityManager) Check(ctx context.Context, req *CapacityCheckRequ
 		"args", args,
 	)
 
-	rawRes, err := scripts["check"].Exec(ctx, client, keys, args).AsBytes()
-	if err != nil {
-		return nil, nil, errs.Wrap(0, false, "check script failed: %w", err)
+	rawRes, internalErr := executeLuaScript(ctx, "check", client, r.clock, keys, args)
+	if internalErr != nil {
+		return nil, nil, internalErr
 	}
 
 	parsedResponse := checkScriptResponse{}

@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	pkgName = "constraintapi.scavenger"
+	scavengerPkgName = "constraintapi.redis.scavenger"
 
 	defaultScavengerAccountsPeekSize = 20
 	defaultScavengerLeasesPeekSize   = 20
@@ -169,7 +169,7 @@ func (r *redisCapacityManager) scavengeShard(ctx context.Context, mi MigrationId
 	start := time.Now()
 	defer func() {
 		metrics.HistogramConstraintAPIScavengerShardProcessDuration(ctx, time.Since(start), metrics.HistogramOpt{
-			PkgName: pkgName,
+			PkgName: scavengerPkgName,
 			Tags:    map[string]any{},
 		})
 	}()
@@ -382,7 +382,7 @@ func (r *redisCapacityManager) scavengeAccount(
 	for _, leaseID := range peekedLeases {
 		leaseAge := now.Sub(leaseID.Timestamp())
 		metrics.HistogramConstraintAPIScavengerLeaseAge(ctx, leaseAge, metrics.HistogramOpt{
-			PkgName: pkgName,
+			PkgName: scavengerPkgName,
 			Tags:    map[string]any{},
 		})
 
@@ -440,23 +440,23 @@ func (s *scavengerService) Run(ctx context.Context) error {
 		}
 
 		metrics.IncrConstraintAPIScavengerTotalAccountsCounter(ctx, int64(res.TotalAccountsCount), metrics.CounterOpt{
-			PkgName: pkgName,
+			PkgName: scavengerPkgName,
 			Tags:    map[string]any{},
 		})
 		metrics.IncrConstraintAPIScavengerExpiredAccountsCounter(ctx, int64(res.TotalExpiredAccountsCount), metrics.CounterOpt{
-			PkgName: pkgName,
+			PkgName: scavengerPkgName,
 			Tags:    map[string]any{},
 		})
 		metrics.IncrConstraintAPIScavengerScannedAccountsCounter(ctx, int64(res.ScannedAccounts), metrics.CounterOpt{
-			PkgName: pkgName,
+			PkgName: scavengerPkgName,
 			Tags:    map[string]any{},
 		})
 		metrics.IncrConstraintAPIScavengerTotalExpiredLeasesCounter(ctx, int64(res.TotalExpiredLeasesCount), metrics.CounterOpt{
-			PkgName: pkgName,
+			PkgName: scavengerPkgName,
 			Tags:    map[string]any{},
 		})
 		metrics.IncrConstraintAPIScavengerReclaimedLeasesCounter(ctx, int64(res.ReclaimedLeases), metrics.CounterOpt{
-			PkgName: pkgName,
+			PkgName: scavengerPkgName,
 			Tags:    map[string]any{},
 		})
 

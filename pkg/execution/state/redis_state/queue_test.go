@@ -2551,7 +2551,7 @@ func getQueueItem(t *testing.T, r *miniredis.Miniredis, id string) osqueue.Queue
 
 func requirePartitionInProgress(t *testing.T, q RedisQueueShard, workflowID uuid.UUID, count int) {
 	t.Helper()
-	actual, err := q.InProgress(context.Background(), "p", workflowID.String())
+	actual, err := q.RunningCount(context.Background(), workflowID)
 	require.NoError(t, err)
 	require.EqualValues(t, count, actual)
 }
