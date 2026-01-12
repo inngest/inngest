@@ -45,8 +45,6 @@ type RedisQueueShard interface {
 	osqueue.QueueShard
 	Client() *QueueClient
 
-	InProgress(ctx context.Context, prefix string, concurrencyKey string) (int64, error)
-
 	QueueIterator(ctx context.Context, opts QueueIteratorOpts) (partitionCount int64, queueItemCount int64, err error)
 }
 
@@ -2000,18 +1998,6 @@ func (q *queue) PartitionReprioritize(ctx context.Context, queueName string, pri
 	default:
 		return fmt.Errorf("unknown response reprioritizing partition: %d", status)
 	}
-}
-
-func (q *queue) InProgress(ctx context.Context, prefix string, concurrencyKey string) (int64, error) {
-	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "InProgress"), redis_telemetry.ScopeQueue)
-
-	s := q.Clock.Now().UnixMilli()
-	cmd := q.RedisClient.unshardedRc.B().Zcount().
-		Key(q.RedisClient.kg.Concurrency(prefix, concurrencyKey)).
-		Min(fmt.Sprintf("%d", s)).
-		Max("+inf").
-		Build()
-	return q.RedisClient.unshardedRc.Do(ctx, cmd).AsInt64()
 }
 
 func (q *queue) Instrument(ctx context.Context) error {

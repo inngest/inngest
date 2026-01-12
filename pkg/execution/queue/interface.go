@@ -289,7 +289,7 @@ type ShardOperations interface {
 	UnpauseFunction(ctx context.Context, acctID, fnID uuid.UUID) error
 
 	OutstandingJobCount(ctx context.Context, workspaceID, workflowID uuid.UUID, runID ulid.ULID) (int, error)
-	RunningCount(ctx context.Context, workflowID uuid.UUID) (int64, error)
+	RunningCount(ctx context.Context, functionID uuid.UUID) (int64, error)
 	StatusCount(ctx context.Context, workflowID uuid.UUID, status string) (int64, error)
 	RunJobs(ctx context.Context, workspaceID, workflowID uuid.UUID, runID ulid.ULID, limit, offset int64) ([]JobResponse, error)
 }
