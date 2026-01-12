@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/inngest/inngest/pkg/util/errs"
 	"github.com/oklog/ulid/v2"
@@ -278,10 +279,32 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 	rawRes, err := scripts["acquire"].Exec(ctx, client, keys, args).AsBytes()
 	if err != nil {
 		if isTimeout(err) {
+			metrics.IncrConstraintAPILuaScriptExecutionCounter(ctx, 1, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags: map[string]any{
+					"operation": "acquire",
+					"status":    "timeout",
+				},
+			})
 			return nil, errs.Wrap(0, true, "acquire script timed out: %w", err)
 		}
+		metrics.IncrConstraintAPILuaScriptExecutionCounter(ctx, 1, metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags: map[string]any{
+				"operation": "acquire",
+				"status":    "error",
+			},
+		})
 		return nil, errs.Wrap(0, false, "acquire script failed: %w", err)
 	}
+
+	metrics.IncrConstraintAPILuaScriptExecutionCounter(ctx, 1, metrics.CounterOpt{
+		PkgName: pkgName,
+		Tags: map[string]any{
+			"operation": "acquire",
+			"status":    "success",
+		},
+	})
 
 	parsedResponse := acquireScriptResponse{}
 	err = json.Unmarshal(rawRes, &parsedResponse)

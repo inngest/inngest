@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/util/errs"
 	"github.com/oklog/ulid/v2"
 )
@@ -88,10 +89,31 @@ func (r *redisCapacityManager) ExtendLease(ctx context.Context, req *CapacityExt
 	rawRes, err := scripts["extend"].Exec(ctx, client, keys, args).AsBytes()
 	if err != nil {
 		if isTimeout(err) {
+			metrics.IncrConstraintAPILuaScriptExecutionCounter(ctx, 1, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags: map[string]any{
+					"operation": "extend",
+					"status":    "timeout",
+				},
+			})
 			return nil, errs.Wrap(0, true, "extend script timed out: %w", err)
 		}
+		metrics.IncrConstraintAPILuaScriptExecutionCounter(ctx, 1, metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags: map[string]any{
+				"operation": "extend",
+				"status":    "error",
+			},
+		})
 		return nil, errs.Wrap(0, false, "extend script failed: %w", err)
 	}
+	metrics.IncrConstraintAPILuaScriptExecutionCounter(ctx, 1, metrics.CounterOpt{
+		PkgName: pkgName,
+		Tags: map[string]any{
+			"operation": "extend",
+			"status":    "success",
+		},
+	})
 
 	parsedResponse := extendLeaseScriptResponse{}
 	err = json.Unmarshal(rawRes, &parsedResponse)

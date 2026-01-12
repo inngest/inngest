@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/util/errs"
 )
 
@@ -77,10 +78,31 @@ func (r *redisCapacityManager) Release(ctx context.Context, req *CapacityRelease
 	rawRes, err := scripts["release"].Exec(ctx, client, keys, args).AsBytes()
 	if err != nil {
 		if isTimeout(err) {
+			metrics.IncrConstraintAPILuaScriptExecutionCounter(ctx, 1, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags: map[string]any{
+					"operation": "release",
+					"status":    "timeout",
+				},
+			})
 			return nil, errs.Wrap(0, true, "release script timed out: %w", err)
 		}
+		metrics.IncrConstraintAPILuaScriptExecutionCounter(ctx, 1, metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags: map[string]any{
+				"operation": "release",
+				"status":    "error",
+			},
+		})
 		return nil, errs.Wrap(0, false, "release script failed: %w", err)
 	}
+	metrics.IncrConstraintAPILuaScriptExecutionCounter(ctx, 1, metrics.CounterOpt{
+		PkgName: pkgName,
+		Tags: map[string]any{
+			"operation": "release",
+			"status":    "success",
+		},
+	})
 
 	parsedResponse := releaseScriptResponse{}
 	err = json.Unmarshal(rawRes, &parsedResponse)

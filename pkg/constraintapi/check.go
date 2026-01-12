@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/util/errs"
 	"github.com/redis/rueidis"
 )
@@ -154,10 +155,32 @@ func (r *redisCapacityManager) Check(ctx context.Context, req *CapacityCheckRequ
 	rawRes, err := scripts["check"].Exec(ctx, client, keys, args).AsBytes()
 	if err != nil {
 		if isTimeout(err) {
+			metrics.IncrConstraintAPILuaScriptExecutionCounter(ctx, 1, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags: map[string]any{
+					"operation": "check",
+					"status":    "timeout",
+				},
+			})
 			return nil, nil, errs.Wrap(0, true, "check script timed out: %w", err)
 		}
+		metrics.IncrConstraintAPILuaScriptExecutionCounter(ctx, 1, metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags: map[string]any{
+				"operation": "check",
+				"status":    "error",
+			},
+		})
 		return nil, nil, errs.Wrap(0, false, "check script failed: %w", err)
 	}
+
+	metrics.IncrConstraintAPILuaScriptExecutionCounter(ctx, 1, metrics.CounterOpt{
+		PkgName: pkgName,
+		Tags: map[string]any{
+			"operation": "check",
+			"status":    "success",
+		},
+	})
 
 	parsedResponse := checkScriptResponse{}
 	err = json.Unmarshal(rawRes, &parsedResponse)
