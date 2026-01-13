@@ -4596,17 +4596,16 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, runCtx execu
 	_, err = util.WithRetry(ctx, "pause.handleGeneratorWaitForEvent", func(ctx context.Context) (int, error) {
 		return e.pm.Write(ctx, idx, &pause)
 	}, util.NewRetryConf(util.WithRetryConfRetryableErrors(pauses.WritePauseRetryableError)))
-
 	// A pause may already exist if the write succeeded but we timed out before
 	// returning (MDB i/o timeouts). In that case, we ignore the
 	// ErrPauseAlreadyExists error and continue.
 	// Instead we rely on the pause timeout queue item for idempotency.
 	if err != nil {
-		if err == state.ErrPauseAlreadyExists {
-			span.Drop()
+		if err != state.ErrPauseAlreadyExists {
+			return err
 		}
-
-		return err
+		// Allow pause already existing to be idempotent, and continue on with enqueueing.
+		span.Drop()
 	}
 
 	// TODO Is this fine to leave? No attempts.
