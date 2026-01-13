@@ -2170,7 +2170,7 @@ func (e *executor) HandlePauses(ctx context.Context, evt event.TrackedEvent) (ex
 	if err != nil {
 		l.ReportError(err, "error handling naive pauses")
 	}
-	return res, nil
+	return res, err
 }
 
 //nolint:all
