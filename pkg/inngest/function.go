@@ -73,6 +73,8 @@ type Function struct {
 	// FunctionVersion represents the version of this specific function.  The same
 	// function ID may be updated many times over the lifetime of a function; this
 	// represents the specific version for the functon ID.
+	//
+	// deprecated:  this should be removed.
 	FunctionVersion int `json:"fv"`
 
 	// Name is the descriptive name for the function

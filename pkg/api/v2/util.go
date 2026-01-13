@@ -8,7 +8,7 @@ import (
 	apiv2 "github.com/inngest/inngest/proto/gen/api/v2"
 )
 
-func ValidateInvokeRequest(ctx context.Context, req *apiv2.InvokeFunctionRequest) error {
+func validateInvokeRequest(ctx context.Context, req *apiv2.InvokeFunctionRequest) error {
 	if req.FunctionId == "" {
 		return apiv2base.NewError(http.StatusBadRequest, apiv2base.ErrorMissingField, "Function ID is required")
 	}

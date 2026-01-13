@@ -273,6 +273,11 @@ type ScheduleRequest struct {
 	DebugRunID *ulid.ULID
 }
 
+// NewScheduleRequest creates an initial ScheduleRequest given a deployed
+// function, ensuring common fields are filled out.
+//
+// XXX: We should replace Function in ScheduleRequest with a DeployedFunction
+// to remove this method.
 func NewScheduleRequest(f inngest.DeployedFunction) ScheduleRequest {
 	req := ScheduleRequest{
 		Function:    f.Function,

@@ -748,7 +748,15 @@ func (e *executor) checkBacklogSizeLimit(ctx context.Context, req execution.Sche
 	return enums.SkipReasonFunctionBacklogSizeLimitHit, nil
 }
 
-func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) (*sv2.Metadata, error) {
+// Schedule initializes a new function run, ensuring that the function will be
+// executed via our async execution engine as quickly as possible.
+//
+// This returns a run ID, metadata for the run, and any errors scheduling.
+//
+// If the run was impacted by flow control (idempotency, rate limiting, debounce, etc.),
+// metadata will be nil.  This will return the original run ID if runs were skipped due
+// to idemptoency.
+func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) (*ulid.ULID, *sv2.Metadata, error) {
 	// Run IDs are created embedding the timestamp now, when the function is being scheduled.
 	// When running a cancellation, functions are cancelled at scheduling time based off of
 	// this run ID.
@@ -763,7 +771,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	key := idempotencyKey(req, runID)
 
 	// Check constraints and acquire lease
-	return WithConstraints(
+	WithConstraints(
 		ctx,
 		e.now(),
 		e.capacityManager,
@@ -772,9 +780,11 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		key,
 		func(ctx context.Context, performChecks bool) (*sv2.Metadata, error) {
 			return util.CritT(ctx, "schedule", func(ctx context.Context) (*sv2.Metadata, error) {
-				return e.schedule(ctx, req, runID, key, performChecks)
+				runID, md, err = e.schedule(ctx, req, runID, key, performChecks)
 			}, util.WithBoundaries(2*time.Second))
 		})
+
+	return runID, md, err
 }
 
 func (e *executor) now() time.Time {
@@ -798,7 +808,7 @@ func (e *executor) schedule(
 	// performChecks determines whether constraint checks must be performed
 	// This may be false when the Constraint API was used to enforce constraints.
 	performChecks bool,
-) (*sv2.Metadata, error) {
+) (*ulid.ULID, *sv2.Metadata, error) {
 	if req.AppID == uuid.Nil {
 		return nil, fmt.Errorf("app ID is required to schedule a run")
 	}
@@ -4594,7 +4604,6 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, runCtx execu
 	_, err = util.WithRetry(ctx, "pause.handleGeneratorWaitForEvent", func(ctx context.Context) (int, error) {
 		return e.pm.Write(ctx, idx, &pause)
 	}, util.NewRetryConf(util.WithRetryConfRetryableErrors(pauses.WritePauseRetryableError)))
-
 	// A pause may already exist if the write succeeded but we timed out before
 	// returning (MDB i/o timeouts). In that case, we ignore the
 	// ErrPauseAlreadyExists error and continue.

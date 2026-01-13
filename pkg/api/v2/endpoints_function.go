@@ -26,7 +26,7 @@ func (s *Service) InvokeFunction(ctx context.Context, req *apiv2.InvokeFunctionR
 		return nil, s.base.NewError(http.StatusInternalServerError, apiv2base.ErrorInternalError, "Unable to invoke functions")
 	}
 
-	if err := ValidateInvokeRequest(ctx, req); err != nil {
+	if err := validateInvokeRequest(ctx, req); err != nil {
 		return nil, err
 	}
 
