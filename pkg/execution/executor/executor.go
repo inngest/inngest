@@ -1063,6 +1063,10 @@ func (e *executor) schedule(
 	//
 	throttle := queue.GetThrottleConfig(ctx, req.Function.ID, req.Function.Throttle, evtMap)
 
+	// Track skip reason and context for span attributes
+	var skipReason enums.SkipReason
+	var singletonSkipRunID *ulid.ULID
+
 	//
 	// Create singleton information and try to handle it prior to creating state.
 	//
@@ -1106,8 +1110,9 @@ func (e *executor) schedule(
 						l.ReportError(err, "error canceling singleton run")
 					}
 				default:
-					// Immediately end before creating state
-					return nil, ErrFunctionSkipped
+					// Mark as singleton skip - will be handled after span creation
+					skipReason = enums.SkipReasonSingleton
+					singletonSkipRunID = singletonRunID
 				}
 			}
 			singletonConfig = &queue.Singleton{Key: singletonKey}
@@ -1139,8 +1144,11 @@ func (e *executor) schedule(
 
 	stv1ID := sv2.V1FromMetadata(metadata)
 
-	// Check if the function should be skipped (paused, draining)
-	skipReason := e.skipped(ctx, req)
+	// Check if the function should be skipped (paused, draining, backlog limit)
+	// Only check if not already marked as skipped (e.g., by singleton)
+	if skipReason == enums.SkipReasonNone {
+		skipReason = e.skipped(ctx, req)
+	}
 
 	// Create run state if not skipped
 	if skipReason == enums.SkipReasonNone {
@@ -1211,6 +1219,14 @@ func (e *executor) schedule(
 		&status,
 	)
 
+	if skipReason != enums.SkipReasonNone {
+		meta.AddAttr(runSpanOpts.Attributes, meta.Attrs.SkipReason, &skipReason)
+		if singletonSkipRunID != nil {
+			existingRunID := singletonSkipRunID.String()
+			meta.AddAttr(runSpanOpts.Attributes, meta.Attrs.SkipExistingRunID, &existingRunID)
+		}
+	}
+
 	// Always the root span.
 	runSpanRef, err = e.tracerProvider.CreateDroppableSpan(
 		ctx,
@@ -1222,7 +1238,7 @@ func (e *executor) schedule(
 		l.Debug("error creating run span", "error", err)
 	}
 
-	// If this is paused, immediately end just before creating state.
+	// If the function is being skipped, send spans and handle skip.
 	if skipReason != enums.SkipReasonNone {
 		sendSpans()
 		return e.handleFunctionSkipped(ctx, req, metadata, evts, skipReason)

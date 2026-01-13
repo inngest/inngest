@@ -1615,6 +1615,63 @@ func TestCQRSGetTraceRunsPagination(t *testing.T) {
 	})
 }
 
+func TestCQRSGetTraceRunsExcludesSkipped(t *testing.T) {
+	ctx := context.Background()
+	appID := uuid.New()
+
+	cm, cleanup := initCQRS(t, withInitCQRSOptApp(appID))
+	defer cleanup()
+
+	accountID := uuid.New()
+	workspaceID := uuid.New()
+	functionID := uuid.New()
+	baseTime := time.Now().Truncate(time.Second)
+
+	completedRunID := ulid.MustNew(ulid.Now(), rand.Reader).String()
+
+	insertTestSpan(t, cm, testSpanFields{
+		RunID:         completedRunID,
+		DynamicSpanID: "dyn-completed",
+		Name:          "executor.run",
+		Status:        enums.RunStatusCompleted.String(),
+		StartTime:     baseTime,
+		AccountID:     accountID.String(),
+		AppID:         appID.String(),
+		FunctionID:    functionID.String(),
+		EnvID:         workspaceID.String(),
+	})
+
+	insertTestSpan(t, cm, testSpanFields{
+		RunID:         ulid.MustNew(ulid.Now(), rand.Reader).String(),
+		DynamicSpanID: "dyn-skipped",
+		Name:          "executor.run",
+		Status:        enums.RunStatusSkipped.String(),
+		StartTime:     baseTime.Add(time.Second),
+		AccountID:     accountID.String(),
+		AppID:         appID.String(),
+		FunctionID:    functionID.String(),
+		EnvID:         workspaceID.String(),
+	})
+
+	runs, err := cm.GetTraceRuns(ctx, cqrs.GetTraceRunOpt{
+		Filter: cqrs.GetTraceRunFilter{
+			AccountID:   accountID,
+			WorkspaceID: workspaceID,
+			FunctionID:  []uuid.UUID{functionID},
+			TimeField:   enums.TraceRunTimeStartedAt,
+			From:        baseTime.Add(-time.Hour),
+			Until:       baseTime.Add(time.Hour),
+		},
+		Order: []cqrs.GetTraceRunOrder{
+			{Field: enums.TraceRunTimeStartedAt, Direction: enums.TraceRunOrderDesc},
+		},
+		Preview: true,
+	})
+	require.NoError(t, err)
+	require.Len(t, runs, 1, "Skipped runs should be excluded from the runs list")
+	assert.Equal(t, completedRunID, runs[0].RunID)
+}
+
 //
 // Span Tests
 //
@@ -1685,6 +1742,7 @@ type testSpanFields struct {
 	DebugRunID     string    // for debug run tests
 	DebugSessionID string    // for debug session tests
 	Name           string    // default: "test-span"
+	Status         string    // default: "" (NULL)
 	StartTime      time.Time // default: time.Now()
 	AccountID      string    // default: "acct"
 	AppID          string    // default: "app"
@@ -1727,6 +1785,7 @@ func insertTestSpan(t *testing.T, cm cqrs.Manager, spanFields testSpanFields) {
 		TraceID:        traceID,
 		ParentSpanID:   sql.NullString{String: spanFields.ParentSpanID, Valid: spanFields.ParentSpanID != ""},
 		Name:           spanFields.Name,
+		Status:         sql.NullString{String: spanFields.Status, Valid: spanFields.Status != ""},
 		StartTime:      spanFields.StartTime,
 		EndTime:        spanFields.StartTime.Add(100 * time.Millisecond),
 		RunID:          spanFields.RunID,

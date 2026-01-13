@@ -2077,6 +2077,8 @@ func newRunsQueryBuilder(ctx context.Context, opt cqrs.GetTraceRunOpt) *runsQuer
 		}
 		filter = append(filter, sq.C("status").In(status))
 	}
+	// Skipped runs should only be visible in event-scoped queries, not the runs list
+	filter = append(filter, sq.C("status").Neq(enums.RunStatusSkipped.ToCode()))
 	tsfield := strings.ToLower(opt.Filter.TimeField.String())
 	filter = append(filter, sq.C(tsfield).Gte(opt.Filter.From.UnixMilli()))
 
@@ -3181,6 +3183,12 @@ func newSpanRunsQueryBuilder(ctx context.Context, opt cqrs.GetTraceRunOpt) *runs
 		}
 		filter = append(filter, sq.C("status").In(statusStrings))
 	}
+	// Skipped runs should only be visible in event-scoped queries, not the runs list.
+	// status is nullable in spans, so we must also accept NULL.
+	filter = append(filter, sq.Or(
+		sq.C("status").IsNull(),
+		sq.C("status").Neq(enums.RunStatusSkipped.String()),
+	))
 
 	// Map time fields - spans use start_time/end_time instead of
 	// queued_at/started_at/ended_at

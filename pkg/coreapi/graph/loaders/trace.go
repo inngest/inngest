@@ -163,6 +163,9 @@ func (tr *traceReader) stepStatusToGQL(status *enums.StepStatus) *models.RunTrac
 	case enums.StepStatusSleeping, enums.StepStatusWaiting:
 		s := models.RunTraceSpanStatusWaiting
 		return &s
+	case enums.StepStatusSkipped:
+		s := models.RunTraceSpanStatusSkipped
+		return &s
 	}
 
 	return nil
@@ -239,6 +242,14 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 		SpanTypeName:   span.Name,
 		IsUserland:     isUserland,
 		UserlandSpan:   userlandSpan,
+	}
+
+	if span.Attributes.SkipReason != nil {
+		reason := span.Attributes.SkipReason.String()
+		gqlSpan.SkipReason = &reason
+	}
+	if span.Attributes.SkipExistingRunID != nil {
+		gqlSpan.SkipExistingRunID = span.Attributes.SkipExistingRunID
 	}
 
 	// If this was a discovery span, we may not want to show it.

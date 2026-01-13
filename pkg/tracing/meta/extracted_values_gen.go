@@ -32,6 +32,8 @@ type ExtractedValues struct {
 	FunctionID *uuid.UUID
 	FunctionVersion *int
 	RunID *ulid.ULID
+	SkipReason *enums.SkipReason
+	SkipExistingRunID *string
 	IsDurableEndpointRun *bool
 	DurableEndpointModeChangedAt *time.Time
 	DynamicSpanID *string
