@@ -3,6 +3,7 @@ package state_store
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/execution/state"
@@ -387,6 +388,80 @@ func TestStateStoreLuaCompatibility(t *testing.T) {
 				t.Logf("     ✓ WorkflowVersion 5 preserved correctly")
 			}
 			t.Logf("   Primary goal achieved: metadata parsing works correctly with cjson compatibility")
+		}
+	})
+
+	t.Run("update metadata StartedAt field", func(t *testing.T) {
+		accountID := uuid.New()
+		runID := ulid.Make()
+
+		for _, backend := range []string{"valkey", "garnet"} {
+			t.Run(backend, func(t *testing.T) {
+				var client rueidis.Client
+
+				switch backend {
+				case "valkey":
+					container, err := helper.StartValkey(t, helper.WithValkeyImage(testutil.ValkeyDefaultImage))
+					require.NoError(t, err)
+					t.Cleanup(func() { _ = container.Terminate(ctx) })
+
+					client, err = helper.NewValkeyClient(container.Addr, container.Username, container.Password, false)
+					require.NoError(t, err)
+					t.Cleanup(func() { client.Close() })
+
+				case "garnet":
+					container, err := helper.StartGarnet(t,
+						helper.WithImage(testutil.GarnetDefaultImage),
+						helper.WithConfiguration(&helper.GarnetConfiguration{EnableLua: true}),
+					)
+					if err != nil {
+						t.Skipf("Skipping Garnet: %v", err)
+						return
+					}
+					t.Cleanup(func() { _ = container.Terminate(ctx) })
+
+					client, err = helper.NewRedisClient(container.Addr, container.Username, container.Password)
+					require.NoError(t, err)
+					t.Cleanup(func() { client.Close() })
+				}
+
+				unsharded := redis_state.NewUnshardedClient(client, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
+				sharded := redis_state.NewShardedClient(redis_state.ShardedClientOpts{
+					UnshardedClient:        unsharded,
+					FunctionRunStateClient: client,
+					BatchClient:            client,
+					StateDefaultKey:        redis_state.StateDefaultKey,
+					QueueDefaultKey:        redis_state.QueueDefaultKey,
+					FnRunIsSharded:         redis_state.AlwaysShardOnRun,
+				})
+
+				mgr, err := redis_state.New(ctx,
+					redis_state.WithUnshardedClient(unsharded),
+					redis_state.WithShardedClient(sharded),
+				)
+				require.NoError(t, err)
+
+				kg := sharded.FunctionRunState().KeyGenerator()
+				key := kg.RunMetadata(ctx, true, runID)
+
+				client.Do(ctx, client.B().Hset().Key(key).FieldValue().
+					FieldValue("die", "0").FieldValue("rv", "1").FieldValue("sat", "0").Build())
+
+				newStartTime := time.Now()
+				err = mgr.UpdateMetadata(ctx, accountID, runID, state.MetadataUpdate{
+					StartedAt:      newStartTime,
+					RequestVersion: 2,
+				})
+				require.NoError(t, err)
+
+				satAfter, _ := client.Do(ctx, client.B().Hget().Key(key).Field("sat").Build()).ToString()
+				rvAfter, _ := client.Do(ctx, client.B().Hget().Key(key).Field("rv").Build()).ToString()
+
+				require.Equal(t, "2", rvAfter)
+				require.NotEmpty(t, satAfter)
+				require.NotEqual(t, "0", satAfter, "%s: StartedAt is zero", backend)
+				require.NotEqual(t, "0.0", satAfter, "%s: StartedAt is zero float", backend)
+			})
 		}
 	})
 }
