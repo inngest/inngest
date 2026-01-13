@@ -53,14 +53,30 @@ func (q *queueProcessor) ProcessItem(
 	extendCapacityLeaseTick := q.Clock().NewTicker(q.CapacityLeaseExtendInterval)
 	defer extendCapacityLeaseTick.Stop()
 
-	errCh := make(chan error)
-	doneCh := make(chan struct{})
+	errCh := make(chan error, 1)
+
+	// XXX: Add a max job time here, configurable.
+	jobCtx, jobDone := context.WithCancel(context.WithoutCancel(ctx))
+	defer jobDone()
+
+	// Add the job ID to the queue context.  This allows any logic that handles the run function
+	// to inspect job IDs, eg. for tracing or logging, without having to thread this down as
+	// arguments.
+	//
+	// NOTE: It is important that we keep this here for every job;  the exeuctor uses this to pass
+	// along the job ID as metadata to the SDK.  We also need to pass in shard information.
+	jobCtx = WithShardID(jobCtx, q.primaryQueueShard.Name())
+	jobCtx = WithJobID(jobCtx, qi.ID)
+	// Same with the group ID, if it exists.
+	if qi.Data.GroupID != "" {
+		jobCtx = state.WithGroupID(jobCtx, qi.Data.GroupID)
+	}
 
 	// Continually extend lease in the background while we're working on this job
 	go func() {
 		for {
 			select {
-			case <-doneCh:
+			case <-jobCtx.Done():
 				return
 			case <-extendLeaseTick.Chan():
 				if ctx.Err() != nil {
@@ -166,23 +182,6 @@ func (q *queueProcessor) ProcessItem(
 		}
 	}()
 
-	// XXX: Add a max job time here, configurable.
-	jobCtx, jobCancel := context.WithCancel(context.WithoutCancel(ctx))
-	defer jobCancel()
-
-	// Add the job ID to the queue context.  This allows any logic that handles the run function
-	// to inspect job IDs, eg. for tracing or logging, without having to thread this down as
-	// arguments.
-	//
-	// NOTE: It is important that we keep this here for every job;  the exeuctor uses this to pass
-	// along the job ID as metadata to the SDK.  We also need to pass in shard information.
-	jobCtx = WithShardID(jobCtx, q.primaryQueueShard.Name())
-	jobCtx = WithJobID(jobCtx, qi.ID)
-	// Same with the group ID, if it exists.
-	if qi.Data.GroupID != "" {
-		jobCtx = state.WithGroupID(jobCtx, qi.Data.GroupID)
-	}
-
 	startedAt := q.Clock().Now()
 	go func() {
 		longRunningJobStatusTick := q.Clock().NewTicker(5 * time.Minute)
@@ -271,19 +270,12 @@ func (q *queueProcessor) ProcessItem(
 
 		// Call the run func.
 		res, err := f(doCtx, runInfo, qi.Data)
-		extendLeaseTick.Stop()
-		if err != nil {
-			metrics.IncrQueueItemStatusCounter(ctx, metrics.CounterOpt{
-				PkgName: pkgName,
-				Tags:    map[string]any{"status": "errored", "queue_shard": q.primaryQueueShard.Name()},
-			})
-			errCh <- err
-			return
+
+		{
+			// Clean up leases and such
+			extendLeaseTick.Stop()
+			extendCapacityLeaseTick.Stop()
 		}
-		metrics.IncrQueueItemStatusCounter(ctx, metrics.CounterOpt{
-			PkgName: pkgName,
-			Tags:    map[string]any{"status": "completed", "queue_shard": q.primaryQueueShard.Name()},
-		})
 
 		if res.ScheduledImmediateJob {
 			// Add the partition to be continued again.  Note that if we've already
@@ -291,9 +283,23 @@ func (q *queueProcessor) ProcessItem(
 			q.addContinue(ctx, &p, continuationCtr+1)
 		}
 
-		// Closing this channel prevents the goroutine which extends lease from leaking,
-		// and dequeues the job
-		close(doneCh)
+		status := "completed"
+		if err != nil {
+			status = "errored"
+			errCh <- err
+		}
+
+		metrics.IncrQueueItemStatusCounter(ctx, metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags:    map[string]any{"status": status, "queue_shard": q.primaryQueueShard.Name()},
+		})
+
+		// NOTE:  We only want to clean up the jobDone channel here on success.
+		// This is becasue errCh cleans up jobDone after handling the job as
+		// an error.
+		if err == nil {
+			jobDone()
+		}
 	}()
 
 	// When capacity is leased, release it after requeueing/dequeueing the item.
@@ -330,8 +336,9 @@ func (q *queueProcessor) ProcessItem(
 
 	select {
 	case err := <-errCh:
-		// Job errored or extending lease errored.  Cancel the job ASAP.
-		jobCancel()
+		// Job errored or extending lease errored.  Signal that the job is done to
+		// stop everything.
+		jobDone()
 
 		if ShouldRetry(err, qi.Data.Attempt, qi.Data.GetMaxAttempts()) {
 			at := q.backoffFunc(qi.Data.Attempt)
@@ -378,8 +385,7 @@ func (q *queueProcessor) ProcessItem(
 			q.quit <- err
 			return err
 		}
-
-	case <-doneCh:
+	case <-jobCtx.Done():
 		if err := q.primaryQueueShard.Dequeue(context.WithoutCancel(ctx), qi, DequeueOptionDisableConstraintUpdates(disableConstraintUpdates)); err != nil {
 			if err == ErrQueueItemNotFound {
 				// Safe. The executor may have dequeued.
