@@ -8,7 +8,6 @@ import (
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/google/uuid"
-	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
@@ -29,22 +28,26 @@ func TestQueueExtendLease(t *testing.T) {
 	require.NoError(t, err)
 	defer rc.Close()
 
-	queueClient := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
-	q := NewQueue(queueClient)
 	ctx := context.Background()
+	clock := clockwork.NewFakeClock()
+
+	_, shard := newQueue(t, rc,
+		osqueue.WithClock(clock),
+	)
+	kg := shard.Client().kg
 
 	start := time.Now().Truncate(time.Second)
 	t.Run("It leases an item", func(t *testing.T) {
-		item, err := q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{}, start, osqueue.EnqueueOpts{})
+		item, err := shard.EnqueueItem(ctx, osqueue.QueueItem{}, start, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
 		item = getQueueItem(t, r, item.ID)
 		require.Nil(t, item.LeaseID)
 
-		p := q.ItemPartition(ctx, q.primaryQueueShard, item)
+		p := osqueue.ItemPartition(ctx, item)
 
 		now := time.Now()
-		id, err := q.Lease(ctx, item, time.Second, time.Now(), nil)
+		id, err := shard.Lease(ctx, item, time.Second, time.Now(), nil)
 		require.NoError(t, err)
 
 		item = getQueueItem(t, r, item.ID)
@@ -53,10 +56,10 @@ func TestQueueExtendLease(t *testing.T) {
 		require.WithinDuration(t, now.Add(time.Second), ulid.Time(item.LeaseID.Time()), 20*time.Millisecond)
 
 		now = time.Now()
-		nextID, err := q.ExtendLease(ctx, item, *id, 10*time.Second)
+		nextID, err := shard.ExtendLease(ctx, item, *id, 10*time.Second)
 		require.NoError(t, err)
 
-		require.False(t, r.Exists(QueuePartition{}.concurrencyKey(q.primaryQueueShard.RedisClient.kg)))
+		require.False(t, r.Exists(partitionConcurrencyKey(osqueue.QueuePartition{}, kg)))
 
 		// Ensure the leased item has the next ID.
 		item = getQueueItem(t, r, item.ID)
@@ -66,29 +69,29 @@ func TestQueueExtendLease(t *testing.T) {
 
 		t.Run("It extends the score of the partition concurrency queue", func(t *testing.T) {
 			at := ulid.Time(nextID.Time())
-			scores := concurrencyQueueScores(t, r, p.concurrencyKey(q.primaryQueueShard.RedisClient.kg), time.Now())
+			scores := concurrencyQueueScores(t, r, partitionConcurrencyKey(p, kg), time.Now())
 			require.Len(t, scores, 1)
 			// Ensure that the score matches the lease.
-			require.Equal(t, at, scores[item.ID], "%s not extended\n%s", p.concurrencyKey(q.primaryQueueShard.RedisClient.kg), r.Dump())
+			require.Equal(t, at, scores[item.ID], "%s not extended\n%s", partitionConcurrencyKey(p, kg), r.Dump())
 		})
 
 		t.Run("It fails with an invalid lease ID", func(t *testing.T) {
 			invalid := ulid.MustNew(ulid.Now(), rnd)
-			nextID, err := q.ExtendLease(ctx, item, invalid, 10*time.Second)
-			require.EqualValues(t, ErrQueueItemLeaseMismatch, err)
+			nextID, err := shard.ExtendLease(ctx, item, invalid, 10*time.Second)
+			require.EqualValues(t, osqueue.ErrQueueItemLeaseMismatch, err)
 			require.Nil(t, nextID)
 		})
 	})
 
 	t.Run("It does not extend an unleased item", func(t *testing.T) {
-		item, err := q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{}, start, osqueue.EnqueueOpts{})
+		item, err := shard.EnqueueItem(ctx, osqueue.QueueItem{}, start, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
 		item = getQueueItem(t, r, item.ID)
 		require.Nil(t, item.LeaseID)
 
-		nextID, err := q.ExtendLease(ctx, item, ulid.Zero, 10*time.Second)
-		require.EqualValues(t, ErrQueueItemNotLeased, err)
+		nextID, err := shard.ExtendLease(ctx, item, ulid.Zero, 10*time.Second)
+		require.EqualValues(t, osqueue.ErrQueueItemNotLeased, err)
 		require.Nil(t, nextID)
 
 		item = getQueueItem(t, r, item.ID)
@@ -115,28 +118,31 @@ func TestQueueExtendLease(t *testing.T) {
 			Limit: 5,
 		}
 
-		q.partitionConstraintConfigGetter = func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
-			return PartitionConstraintConfig{
-				Concurrency: PartitionConcurrency{
-					AccountConcurrency:  123,
-					FunctionConcurrency: 45,
-					CustomConcurrencyKeys: []CustomConcurrencyLimit{
-						{
-							Scope:               enums.ConcurrencyScopeAccount,
-							HashedKeyExpression: ckA.Hash,
-							Limit:               ckA.Limit,
-						},
-						{
-							Scope:               enums.ConcurrencyScopeFn,
-							HashedKeyExpression: ckB.Hash,
-							Limit:               ckB.Limit,
+		_, shard := newQueue(t, rc,
+			osqueue.WithClock(clock),
+			osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
+				return osqueue.PartitionConstraintConfig{
+					Concurrency: osqueue.PartitionConcurrency{
+						AccountConcurrency:  123,
+						FunctionConcurrency: 45,
+						CustomConcurrencyKeys: []osqueue.CustomConcurrencyLimit{
+							{
+								Scope:               enums.ConcurrencyScopeAccount,
+								HashedKeyExpression: ckA.Hash,
+								Limit:               ckA.Limit,
+							},
+							{
+								Scope:               enums.ConcurrencyScopeFn,
+								HashedKeyExpression: ckB.Hash,
+								Limit:               ckB.Limit,
+							},
 						},
 					},
-				},
-			}
-		}
+				}
+			}),
+		)
 
-		item, err := q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{
+		item, err := shard.EnqueueItem(ctx, osqueue.QueueItem{
 			FunctionID: uuid.New(),
 			Data: osqueue.Item{
 				CustomConcurrencyKeys: []state.CustomConcurrency{
@@ -148,30 +154,30 @@ func TestQueueExtendLease(t *testing.T) {
 		require.Nil(t, err)
 
 		// First 2 partitions will be custom.
-		fnPart, custom1, custom2 := q.ItemPartitions(ctx, q.primaryQueueShard, item)
-		require.Equal(t, int(enums.PartitionTypeDefault), fnPart.PartitionType)
-		require.Equal(t, int(enums.PartitionTypeConcurrencyKey), custom1.PartitionType)
-		require.Equal(t, int(enums.PartitionTypeConcurrencyKey), custom2.PartitionType)
+		fnPart := osqueue.ItemPartition(ctx, item)
+		require.NotEmpty(t, fnPart.ID)
 
 		// Lease the item.
-		id, err := q.Lease(ctx, item, time.Second, q.clock.Now(), nil)
+		id, err := shard.Lease(ctx, item, time.Second, clock.Now(), nil)
 		require.NoError(t, err)
 		require.NotNil(t, id)
 
-		score0, err := r.ZMScore(fnPart.concurrencyKey(q.primaryQueueShard.RedisClient.kg), item.ID)
+		backlog := osqueue.ItemBacklog(ctx, item)
+
+		score0, err := r.ZMScore(partitionConcurrencyKey(fnPart, kg), item.ID)
 		require.NoError(t, err)
-		score1, err := r.ZMScore(custom1.concurrencyKey(q.primaryQueueShard.RedisClient.kg), item.ID)
+		score1, err := r.ZMScore(backlogCustomKeyInProgress(backlog, kg, 1), item.ID)
 		require.NoError(t, err)
 		require.Equal(t, score0[0], score1[0], "Partition scores should match after leasing")
 
 		t.Run("extending the lease should extend both items in all partition's concurrency queues", func(t *testing.T) {
-			id, err = q.ExtendLease(ctx, item, *id, 98712*time.Millisecond)
+			id, err = shard.ExtendLease(ctx, item, *id, 98712*time.Millisecond)
 			require.NoError(t, err)
 			require.NotNil(t, id)
 
-			newScore0, err := r.ZMScore(fnPart.concurrencyKey(q.primaryQueueShard.RedisClient.kg), item.ID)
+			newScore0, err := r.ZMScore(partitionConcurrencyKey(fnPart, kg), item.ID)
 			require.NoError(t, err)
-			newScore1, err := r.ZMScore(custom1.concurrencyKey(q.primaryQueueShard.RedisClient.kg), item.ID)
+			newScore1, err := r.ZMScore(backlogCustomKeyInProgress(backlog, kg, 1), item.ID)
 			require.NoError(t, err)
 
 			require.Equal(t, newScore0, newScore1, "Partition scores should match after leasing")
@@ -179,28 +185,28 @@ func TestQueueExtendLease(t *testing.T) {
 			require.NotEqual(t, score1, newScore1, "Partition scores should have been updated")
 
 			// And, the account-level concurrency queue is updated
-			acctScore, err := r.ZMScore(q.primaryQueueShard.RedisClient.kg.Concurrency("account", item.Data.Identifier.AccountID.String()), item.ID)
+			acctScore, err := r.ZMScore(kg.Concurrency("account", item.Data.Identifier.AccountID.String()), item.ID)
 			require.NoError(t, err)
 			require.EqualValues(t, acctScore[0], newScore0[0])
 		})
 
 		t.Run("Scavenge queue is updated", func(t *testing.T) {
-			mem, err := r.ZMembers(q.primaryQueueShard.RedisClient.kg.ConcurrencyIndex())
+			mem, err := r.ZMembers(kg.ConcurrencyIndex())
 			require.NoError(t, err)
 			require.Equal(t, 1, len(mem), "scavenge queue should have 1 item", mem)
 			require.Contains(t, mem, fnPart.ID)
-			require.NotContains(t, mem, custom1.concurrencyKey(q.primaryQueueShard.RedisClient.kg))
-			require.NotContains(t, mem, custom2.concurrencyKey(q.primaryQueueShard.RedisClient.kg))
+			require.NotContains(t, mem, backlogCustomKeyInProgress(backlog, kg, 1))
+			require.NotContains(t, mem, backlogCustomKeyInProgress(backlog, kg, 2))
 
-			score, err := r.ZMScore(q.primaryQueueShard.RedisClient.kg.ConcurrencyIndex(), fnPart.ID)
+			score, err := r.ZMScore(kg.ConcurrencyIndex(), fnPart.ID)
 			require.NoError(t, err)
 			require.NotZero(t, score[0])
 
-			id, err = q.ExtendLease(ctx, item, *id, 1238712*time.Millisecond)
+			id, err = shard.ExtendLease(ctx, item, *id, 1238712*time.Millisecond)
 			require.NoError(t, err)
 			require.NotNil(t, id)
 
-			nextScore, err := r.ZMScore(q.primaryQueueShard.RedisClient.kg.ConcurrencyIndex(), fnPart.ID)
+			nextScore, err := r.ZMScore(kg.ConcurrencyIndex(), fnPart.ID)
 			require.NoError(t, err)
 
 			require.NotEqual(t, score[0], nextScore[0])
@@ -219,17 +225,16 @@ func TestQueueExtendLeaseWithDisabledConstraintUpdates(t *testing.T) {
 
 	clock := clockwork.NewFakeClock()
 
-	shard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
-	kg := shard.RedisClient.KeyGenerator()
-
-	q := NewQueue(
-		shard,
-		WithClock(clock),
-		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+	_, shard := newQueue(
+		t, rc,
+		osqueue.WithClock(clock),
+		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 			return true
 		}),
 	)
 	ctx := context.Background()
+
+	kg := shard.Client().kg
 
 	accountID := uuid.New()
 	fnID := uuid.New()
@@ -247,11 +252,11 @@ func TestQueueExtendLeaseWithDisabledConstraintUpdates(t *testing.T) {
 
 	start := time.Now().Truncate(time.Second)
 
-	item, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi, start, osqueue.EnqueueOpts{})
+	item, err := shard.EnqueueItem(ctx, qi, start, osqueue.EnqueueOpts{})
 	require.NoError(t, err)
 
 	// Lease item in new mode (skip checks)
-	leaseID, err := q.Lease(ctx, item, 5*time.Second, clock.Now(), nil, LeaseOptionDisableConstraintChecks(true))
+	leaseID, err := shard.Lease(ctx, item, 5*time.Second, clock.Now(), nil, osqueue.LeaseOptionDisableConstraintChecks(true))
 	require.NoError(t, err)
 	require.NotNil(t, leaseID)
 
@@ -259,7 +264,7 @@ func TestQueueExtendLeaseWithDisabledConstraintUpdates(t *testing.T) {
 	require.False(t, r.Exists(kg.Concurrency("p", fnID.String())))
 	require.False(t, r.Exists(kg.Concurrency("account", accountID.String())))
 
-	newLeaseID, err := q.ExtendLease(ctx, item, *leaseID, 10*time.Second, ExtendLeaseOptionDisableConstraintUpdates(true))
+	newLeaseID, err := shard.ExtendLease(ctx, item, *leaseID, 10*time.Second, osqueue.ExtendLeaseOptionDisableConstraintUpdates(true))
 	require.NoError(t, err)
 	require.NotNil(t, newLeaseID)
 	require.NotEqual(t, *leaseID, *newLeaseID)

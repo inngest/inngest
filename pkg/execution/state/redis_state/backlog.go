@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"iter"
 	"math/rand"
-	"runtime/debug"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -17,192 +16,27 @@ import (
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
-	"github.com/inngest/inngest/pkg/util"
-	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
-	"gonum.org/v1/gonum/stat/sampleuv"
+	"go.opentelemetry.io/otel/attribute"
 )
-
-// NOTE: there's no logic behind this number, it's just a random pick for now
-var ThrottleBackoffMultiplierThreshold = 15 * time.Second
-
-var (
-	ErrBacklogNotFound = fmt.Errorf("backlog not found")
-
-	ErrBacklogPeekMaxExceedsLimits = fmt.Errorf("backlog peek exceeded the maximum limit")
-
-	ErrBacklogGarbageCollected = fmt.Errorf("backlog was garbage-collected")
-)
-
-// BacklogManager defines the interface for backlog operations
-type BacklogManager interface {
-	BacklogPeek(ctx context.Context, b *QueueBacklog, from time.Time, until time.Time, limit int64, opts ...PeekOpt) ([]*osqueue.QueueItem, int, error)
-	BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueShadowPartition, refillUntil time.Time, refillItems []string, latestConstraints PartitionConstraintConfig, options ...backlogRefillOptionFn) (*BacklogRefillResult, error)
-	ItemBacklog(ctx context.Context, i osqueue.QueueItem) QueueBacklog
-	ItemShadowPartition(ctx context.Context, i osqueue.QueueItem) QueueShadowPartition
-}
-
-type PartitionConstraintConfig struct {
-	FunctionVersion int `json:"fv,omitempty,omitzero"`
-
-	Concurrency PartitionConcurrency `json:"c,omitempty,omitzero"`
-
-	// Throttle configuration, optionally specifying key. If no key is set, the throttle value will be the function ID.
-	Throttle *PartitionThrottle `json:"t,omitempty,omitzero"`
-}
-
-type CustomConcurrencyLimit struct {
-	Mode                enums.ConcurrencyMode  `json:"m"`
-	Scope               enums.ConcurrencyScope `json:"s"`
-	HashedKeyExpression string                 `json:"k"`
-	Limit               int                    `json:"l"`
-}
-
-type PartitionThrottle struct {
-	// ThrottleKeyExpressionHash is the hashed throttle key expression, if set.
-	ThrottleKeyExpressionHash string `json:"tkh,omitempty"`
-
-	// Limit is the actual rate limit
-	Limit int `json:"l"`
-	// Burst is the busrsable capacity of the rate limit
-	Burst int `json:"b"`
-	// Period is the rate limit period, in seconds
-	Period int `json:"p"`
-}
-
-type PartitionConcurrency struct {
-	// SystemConcurrency represents the concurrency limit to apply to system queues. Unset on regular function partitions.
-	SystemConcurrency int `json:"sc,omitempty"`
-
-	// AccountConcurrency represents the global account concurrency limit. This is unset on system queues.
-	AccountConcurrency int `json:"ac,omitempty"`
-
-	// FunctionConcurrency represents the function concurrency limit.
-	FunctionConcurrency int `json:"fc,omitempty"`
-
-	// AccountRunConcurrency represents the global account run concurrency limit (how many active runs per account). This is unset on system queues.
-	AccountRunConcurrency int `json:"arc,omitempty"`
-
-	// FunctionRunConcurrency represents the function run concurrency limit (how many active runs allowed per function).
-	FunctionRunConcurrency int `json:"frc,omitempty"`
-
-	// Up to two custom concurrency keys on user-defined scopes, optionally specifying a key. The key is required
-	// on env or account level scopes.
-	CustomConcurrencyKeys []CustomConcurrencyLimit `json:"cck,omitempty"`
-}
-
-type QueueShadowPartition struct {
-	// PartitionID is the function ID or system queue name. The shadow partition
-	// ID is the same as the partition ID used across the queue.
-	PartitionID string `json:"id,omitempty"`
-
-	// FunctionVersion represents the current function version represented by this shadow partition.
-	// Whenever a newer function version is enqueued, the concurrency keys and limits in here will be adjusted
-	// accordingly as part of enqueue_to_backlog().
-	// System queues do not have function versions.
-	FunctionVersion int `json:"fv"`
-
-	// LeaseID represents a lease on this shadow partition.  If the LeaseID is not nil,
-	// this partition can be claimed by a shared-nothing refill worker to work on the
-	// backlogs within this shadow partition.
-	LeaseID *ulid.ULID `json:"leaseID,omitempty"`
-
-	FunctionID      *uuid.UUID `json:"fid,omitempty"`
-	EnvID           *uuid.UUID `json:"eid,omitempty"`
-	AccountID       *uuid.UUID `json:"aid,omitempty"`
-	SystemQueueName *string    `json:"queueName,omitempty"`
-}
-
-func (sp QueueShadowPartition) Identifier() PartitionIdentifier {
-	fnID := uuid.Nil
-	if sp.FunctionID != nil {
-		fnID = *sp.FunctionID
-	}
-
-	accountID := uuid.Nil
-	if sp.AccountID != nil {
-		accountID = *sp.AccountID
-	}
-
-	envID := uuid.Nil
-	if sp.EnvID != nil {
-		envID = *sp.EnvID
-	}
-
-	return PartitionIdentifier{
-		SystemQueueName: sp.SystemQueueName,
-
-		AccountID:  accountID,
-		EnvID:      envID,
-		FunctionID: fnID,
-	}
-}
-
-func (sp QueueShadowPartition) GetAccountID() uuid.UUID {
-	accountID := uuid.Nil
-	if sp.AccountID != nil {
-		accountID = *sp.AccountID
-	}
-
-	return accountID
-}
 
 // readyQueueKey returns the ZSET key to the ready queue
-func (sp QueueShadowPartition) readyQueueKey(kg QueueKeyGenerator) string {
+func shadowPartitionReadyQueueKey(sp osqueue.QueueShadowPartition, kg QueueKeyGenerator) string {
 	return kg.PartitionQueueSet(enums.PartitionTypeDefault, sp.PartitionID, "")
 }
 
 // inProgressKey returns the key storing the in progress set for the shadow partition
-func (sp QueueShadowPartition) inProgressKey(kg QueueKeyGenerator) string {
+func shadowPartitionInProgressKey(sp osqueue.QueueShadowPartition, kg QueueKeyGenerator) string {
 	return kg.Concurrency("p", sp.PartitionID)
 }
 
 // activeKey returns the key storing the active set for the shadow partition
-func (sp QueueShadowPartition) activeKey(kg QueueKeyGenerator) string {
+func shadowPartitionActiveKey(sp osqueue.QueueShadowPartition, kg QueueKeyGenerator) string {
 	return kg.ActiveSet("p", sp.PartitionID)
 }
 
-func (sp QueueShadowPartition) keyQueuesEnabled(ctx context.Context, q *queue) bool {
-	if sp.SystemQueueName != nil {
-		return false
-	}
-
-	if sp.AccountID == nil || sp.FunctionID == nil || q.allowKeyQueues == nil {
-		return false
-	}
-
-	return q.allowKeyQueues(ctx, *sp.AccountID, *sp.FunctionID)
-}
-
-func (q *PartitionConstraintConfig) CustomConcurrencyLimit(n int) int {
-	if n < 0 || n > len(q.Concurrency.CustomConcurrencyKeys) {
-		return 0
-	}
-
-	key := q.Concurrency.CustomConcurrencyKeys[n-1]
-
-	return key.Limit
-}
-
-func (q PartitionConstraintConfig) CustomConcurrencyKey(kg QueueKeyGenerator, b *QueueBacklog, n int) (string, int) {
-	if n < 0 || n > len(b.ConcurrencyKeys) {
-		return kg.Concurrency("", ""), 0
-	}
-
-	backlogKey := b.ConcurrencyKeys[n-1]
-
-	for _, key := range q.Concurrency.CustomConcurrencyKeys {
-		if key.Scope == backlogKey.Scope && key.HashedKeyExpression == backlogKey.HashedKeyExpression {
-			// Return concrete key with latest limit from shadow partition
-			return backlogKey.concurrencyKey(kg), key.Limit
-		}
-	}
-
-	return kg.Concurrency("", ""), 0
-}
-
 // accountInProgressKey returns the key storing the in progress set for the shadow partition's account
-func (sp QueueShadowPartition) accountInProgressKey(kg QueueKeyGenerator) string {
+func shadowPartitionAccountInProgressKey(sp osqueue.QueueShadowPartition, kg QueueKeyGenerator) string {
 	// Do not track account concurrency for system queues
 	if sp.SystemQueueName != nil {
 		return kg.Concurrency("", "")
@@ -217,7 +51,7 @@ func (sp QueueShadowPartition) accountInProgressKey(kg QueueKeyGenerator) string
 }
 
 // accountActiveKey returns the key storing the active set for the shadow partition's account
-func (sp QueueShadowPartition) accountActiveKey(kg QueueKeyGenerator) string {
+func shadowPartitionAccountActiveKey(sp osqueue.QueueShadowPartition, kg QueueKeyGenerator) string {
 	// Do not track account concurrency for system queues
 	if sp.SystemQueueName != nil {
 		return kg.ActiveSet("", "")
@@ -231,7 +65,7 @@ func (sp QueueShadowPartition) accountActiveKey(kg QueueKeyGenerator) string {
 	return kg.ActiveSet("account", sp.AccountID.String())
 }
 
-func (sp QueueShadowPartition) accountActiveRunKey(kg QueueKeyGenerator) string {
+func shadowPartitionAccountActiveRunKey(sp osqueue.QueueShadowPartition, kg QueueKeyGenerator) string {
 	// Do not track account run concurrency for system queues
 	if sp.SystemQueueName != nil {
 		return kg.ActiveRunsSet("", "")
@@ -245,357 +79,49 @@ func (sp QueueShadowPartition) accountActiveRunKey(kg QueueKeyGenerator) string 
 	return kg.ActiveRunsSet("account", sp.AccountID.String())
 }
 
-func (sp QueueShadowPartition) activeRunKey(kg QueueKeyGenerator) string {
+func shadowPartitionActiveRunKey(sp osqueue.QueueShadowPartition, kg QueueKeyGenerator) string {
 	return kg.ActiveRunsSet("p", sp.PartitionID)
 }
 
-// DefaultBacklog returns the default "start" or "continue" backlog for a shadow partition.
-//
-// This is the backlog items are added to when no keys are configured (or when throttle is configured but we're dealing with non-start items).
-//
-// This function may return nil if throttle or concurrency keys are configured in the constraints.
-func (sp QueueShadowPartition) DefaultBacklog(constraints PartitionConstraintConfig, start bool) *QueueBacklog {
-	if sp.SystemQueueName != nil {
-		return &QueueBacklog{
-			ShadowPartitionID: *sp.SystemQueueName,
-			BacklogID:         fmt.Sprintf("system:%s", *sp.SystemQueueName),
-		}
-	}
-
-	// Function ID should be set for non-system queues
-	if sp.FunctionID == nil {
-		return nil
-	}
-
-	// NOTE: In case custom concurrency keys are configured, we should not use the default
-	// function backlog. Instead, all backlogs should include the dynamic key.
-	if len(constraints.Concurrency.CustomConcurrencyKeys) > 0 {
-		return nil
-	}
-
-	// NOTE: In case a start backlog is requested and throttle is used, we should not use
-	// the default function backlog. Instead, all backlogs should include the dynamic key.
-	if start && constraints.Throttle != nil {
-		return nil
-	}
-
-	b := &QueueBacklog{
-		BacklogID:               fmt.Sprintf("fn:%s", *sp.FunctionID),
-		ShadowPartitionID:       sp.FunctionID.String(),
-		EarliestFunctionVersion: constraints.FunctionVersion,
-		Start:                   start,
-	}
-	if start {
-		b.BacklogID += ":start"
-	}
-
-	return b
-}
-
-// BacklogConcurrencyKey represents a custom concurrency key, which can be scoped to the function, environment, or account.
-//
-// Note: BacklogConcurrencyKey is only used for custom concurrency keys with a defined `key`.
-// In the case of configuring concurrency on the function scope without providing a `key`, the default backlog will be used.
-type BacklogConcurrencyKey struct {
-	// CanonicalKeyID is the combined concurrency key (e.g. a:<account ID>:hash("customer1"))
-	CanonicalKeyID string `json:"kid"`
-
-	Scope enums.ConcurrencyScope `json:"cs"`
-
-	// EntityID stores the accountID, envID, or fnID for the respective concurrency scope
-	EntityID uuid.UUID `json:"cse"`
-
-	// HashedKeyExpression is the hashed concurrency key expression (e.g. hash("event.data.customerId"))
-	HashedKeyExpression string `json:"cke"`
-
-	// HashedValue is the hashed concurrency key value (e.g. hash("customer1"))
-	HashedValue string `json:"ckv"`
-
-	// UnhashedValue is the unhashed evaluated key (e.g. "customer1")
-	// This may be truncated for long values and may only be used for observability and debugging.
-	UnhashedValue string `json:"ckuv"`
-
-	// ConcurrencyMode represents the concurrency mode.
-	ConcurrencyMode enums.ConcurrencyMode `json:"mode"`
-}
-
-type BacklogThrottle struct {
-	// ThrottleKey is the hashed evaluated throttle key (e.g. hash("customer1")) or function ID (e.g. hash(fnID))
-	ThrottleKey string `json:"tk,omitempty"`
-
-	// ThrottleKeyRawValue is the unhashed evaluated throttle key (e.g. "customer1") or function ID.
-	// This may be truncated for long values and may only be used for observability and debugging.
-	ThrottleKeyRawValue string `json:"tkv,omitempty"`
-
-	// ThrottleKeyExpressionHash is the hashed throttle key expression, if set.
-	ThrottleKeyExpressionHash string `json:"tkh,omitempty"`
-}
-
-type QueueBacklog struct {
-	BacklogID               string `json:"id,omitempty"`
-	ShadowPartitionID       string `json:"sid,omitempty"`
-	EarliestFunctionVersion int    `json:"fv,omitempty"`
-
-	// Start marks backlogs representing items with KindStart.
-	Start bool `json:"start,omitempty"`
-
-	// Set for backlogs representing custom concurrency keys
-	ConcurrencyKeys []BacklogConcurrencyKey `json:"ck,omitempty"`
-
-	// Set for backlogs containing start items only for a given throttle configuration
-	Throttle *BacklogThrottle `json:"t,omitempty"`
-
-	SuccessiveThrottleConstrained          int `json:"stc,omitzero"`
-	SuccessiveCustomConcurrencyConstrained int `json:"sccc,omitzero"`
-}
-
-// ItemBacklog creates a backlog for the given item. The returned backlog may represent current _or_ past
-// configurations, in case the queue item has existed for some time and the function was updated in the meantime.
-//
-// For the sake of consistency and cleanup, ItemBacklog *must* always return the same configuration,
-// over the complete lifecycle of a queue item. To this end, the function exclusively retrieves data
-// from the queue item, has no side effects, and does not make any calls to external data stores.
-func (q *queue) ItemBacklog(ctx context.Context, i osqueue.QueueItem) QueueBacklog {
-	queueName := i.QueueName
-
-	// sanity check: both QueueNames should be set, but sometimes aren't
-	if queueName == nil && i.QueueName != nil {
-		queueName = i.QueueName
-		q.log.Warn("backlogs encountered queue item with inconsistent custom queue name, should have both i.QueueName and i.Data.QueueName set", "item", i)
-	}
-
-	// sanity check: queueName values must match
-	if i.Data.QueueName != nil && i.QueueName != nil && *i.Data.QueueName != *i.QueueName {
-		q.log.Error("backlogs encountered queue item with inconsistent custom queue names, should have matching values for i.QueueName and i.Data.QueueName", "item", i)
-	}
-
-	if queueName != nil {
-		// Simply use default backlog for system queues - there shouldn't be any concurrency or throttle keys involved.
-		return QueueBacklog{
-			ShadowPartitionID: *queueName,
-			BacklogID:         fmt.Sprintf("system:%s", *queueName),
-		}
-	}
-
-	b := QueueBacklog{
-		BacklogID:         fmt.Sprintf("fn:%s", i.FunctionID),
-		ShadowPartitionID: i.FunctionID.String(),
-
-		// Store earliest function version. Since we do not update backlog metadata,
-		// this may be older than the latest items in the backlog.
-		EarliestFunctionVersion: i.Data.Identifier.WorkflowVersion,
-
-		// Start items should be moved into their own backlog. This is useful for
-		// function run concurrency: To determine how many new runs can start, we can
-		// calculate the remaining run capacity and refill as many items from the start backlog.
-		Start: i.Data.Kind == osqueue.KindStart,
-	}
-	if b.Start {
-		b.BacklogID += ":start"
-	}
-
-	// Enqueue start items to throttle backlog if throttle is configured
-	if i.Data.Throttle != nil && b.Start {
-		// This is always specified, even if no key was configured in the function definition.
-		// In that case, the Throttle Key is the hashed function ID. See Schedule() for more details.
-		b.Throttle = &BacklogThrottle{
-			ThrottleKey:               i.Data.Throttle.Key,
-			ThrottleKeyExpressionHash: i.Data.Throttle.KeyExpressionHash,
-		}
-
-		b.BacklogID += fmt.Sprintf(":t<%s:%s>", i.Data.Throttle.KeyExpressionHash, i.Data.Throttle.Key)
-
-		if i.Data.Throttle.UnhashedThrottleKey != "" {
-			unhashedKey := i.Data.Throttle.UnhashedThrottleKey
-			// truncate - just in case
-			if len(unhashedKey) > 512 {
-				unhashedKey = unhashedKey[:512]
-			}
-			b.Throttle.ThrottleKeyRawValue = unhashedKey
-		}
-	}
-
-	concurrencyKeys := i.Data.GetConcurrencyKeys()
-	if len(concurrencyKeys) > 0 {
-		// Create custom concurrency key backlog
-		b.ConcurrencyKeys = make([]BacklogConcurrencyKey, len(concurrencyKeys))
-
-		for i, key := range concurrencyKeys {
-			scope, entityID, checksum, _ := key.ParseKey()
-
-			b.BacklogID += fmt.Sprintf(":c%d<%s:%s>", i+1, key.Hash, util.XXHash(key.Key))
-
-			b.ConcurrencyKeys[i] = BacklogConcurrencyKey{
-				CanonicalKeyID: key.Key,
-
-				Scope: scope,
-
-				// Account ID, Env ID, or Function ID to apply to the concurrency key to
-				EntityID: entityID,
-
-				// Hashed expression to identify which key this is in the shadow partition concurrency key list
-				HashedKeyExpression: key.Hash, // hash("event.data.customerID")
-
-				// Evaluated hashed and unhashed values
-				HashedValue: checksum, // hash("customer1")
-
-				// Just for debugging purposes (only passed on Enqueue after Schedule or backlog normalization)
-				UnhashedValue: key.UnhashedEvaluatedKeyValue, // "customer1"
-			}
-		}
-	}
-
-	return b
-}
-
-func (q *queue) ItemShadowPartition(ctx context.Context, i osqueue.QueueItem) QueueShadowPartition {
-	queueName := i.QueueName
-
-	// sanity check: both QueueNames should be set, but sometimes aren't
-	if queueName == nil && i.QueueName != nil {
-		queueName = i.QueueName
-		q.log.Warn("shadow partitions encountered queue item with inconsistent custom queue name, should have both i.QueueName and i.Data.QueueName set", "item", i)
-	}
-
-	// sanity check: queueName values must match
-	if i.Data.QueueName != nil && i.QueueName != nil && *i.Data.QueueName != *i.QueueName {
-		q.log.Error("shadow partitions encountered queue item with inconsistent custom queue names, should have matching values for i.QueueName and i.Data.QueueName", "item", i)
-	}
-
-	accountID := i.Data.Identifier.AccountID
-
-	// The only case when we manually set a queueName is for system partitions
-	if queueName != nil {
-		var aID *uuid.UUID
-		if accountID != uuid.Nil {
-			aID = &accountID
-		}
-
-		return QueueShadowPartition{
-			PartitionID:     *queueName,
-			SystemQueueName: queueName,
-
-			AccountID: aID,
-		}
-	}
-
-	if accountID == uuid.Nil {
-		stack := string(debug.Stack())
-		q.log.Error("unexpected missing accountID in ItemShadowPartition call", "item", i, "stack", stack)
-	}
-
-	fnID := i.FunctionID
-	if fnID == uuid.Nil {
-		stack := string(debug.Stack())
-		q.log.Error("unexpected missing functionID in ItemShadowPartition call", "item", i, "stack", stack)
-	}
-
-	return QueueShadowPartition{
-		PartitionID:     fnID.String(),
-		FunctionVersion: i.Data.Identifier.WorkflowVersion,
-
-		// Identifiers
-		FunctionID: &fnID,
-		EnvID:      &i.WorkspaceID,
-		AccountID:  &accountID,
-	}
-}
-
-func (b QueueBacklog) isDefault() bool {
-	return b.Throttle == nil && len(b.ConcurrencyKeys) == 0
-}
-
-func (b QueueBacklog) isOutdated(constraints PartitionConstraintConfig) enums.QueueNormalizeReason {
-	// If the backlog represents newer items than the constraints we're working on,
-	// do not attempt to mark the backlog as outdated. Constraints MUST be >= backlog function version at all times.
-	if b.EarliestFunctionVersion > 0 && constraints.FunctionVersion > 0 && b.EarliestFunctionVersion > constraints.FunctionVersion {
-		return enums.QueueNormalizeReasonUnchanged
-	}
-
-	// If this is the default backlog, don't normalize.
-	// If custom concurrency keys were added, previously-enqueued items
-	// in the default backlog do not have custom concurrency keys set.
-	if b.isDefault() {
-		return enums.QueueNormalizeReasonUnchanged
-	}
-
-	// Throttle removed - move items back to default backlog
-	if b.Throttle != nil && constraints.Throttle == nil {
-		return enums.QueueNormalizeReasonThrottleRemoved
-	}
-
-	// Throttle key changed - move from old throttle key backlogs to the new throttle key backlogs
-	if b.Throttle != nil && constraints.Throttle != nil && b.Throttle.ThrottleKeyExpressionHash != constraints.Throttle.ThrottleKeyExpressionHash {
-		return enums.QueueNormalizeReasonThrottleKeyChanged
-	}
-
-	// Concurrency key count does not match
-	if len(b.ConcurrencyKeys) != len(constraints.Concurrency.CustomConcurrencyKeys) {
-		return enums.QueueNormalizeReasonCustomConcurrencyKeyCountMismatch
-	}
-
-	// All concurrency keys on backlog must be found on partition
-	// This is quadratic but each backlog and shadow partition can only have up to 2 keys, so it's bounded.
-	for _, backlogKey := range b.ConcurrencyKeys {
-		hasKey := false
-		for _, shadowPartitionKey := range constraints.Concurrency.CustomConcurrencyKeys {
-			if shadowPartitionKey.Mode == backlogKey.ConcurrencyMode && shadowPartitionKey.Scope == backlogKey.Scope && shadowPartitionKey.HashedKeyExpression == backlogKey.HashedKeyExpression {
-				hasKey = true
-				break
-			}
-		}
-
-		if !hasKey {
-			return enums.QueueNormalizeReasonCustomConcurrencyKeyNotFoundOnShadowPartition
-		}
-	}
-
-	// We don't have to check that all keys on the shadow partition must be found on
-	// the backlog as we've compared the length, so the previous check will account for
-	// missing/different keys.
-
-	return enums.QueueNormalizeReasonUnchanged
-}
-
 // customKeyInProgress returns the key to the "in progress" ZSET
-func (b QueueBacklog) customKeyInProgress(kg QueueKeyGenerator, n int) string {
+func backlogCustomKeyInProgress(b osqueue.QueueBacklog, kg QueueKeyGenerator, n int) string {
 	if n < 0 || n > len(b.ConcurrencyKeys) {
 		return kg.Concurrency("", "")
 	}
 
 	key := b.ConcurrencyKeys[n-1]
-	return key.concurrencyKey(kg)
+	return backlogConcurrencyKey(key, kg)
 }
 
-func (b BacklogConcurrencyKey) concurrencyKey(kg QueueKeyGenerator) string {
+func backlogConcurrencyKey(bck osqueue.BacklogConcurrencyKey, kg QueueKeyGenerator) string {
 	// Concurrency accounting keys are made up of three parts:
 	// - The scope (account, environment, function) to apply the concurrency limit on
 	// - The entity (account ID, envID, or function ID) based on the scope
 	// - The dynamic key value (hashed evaluated expression)
-	return kg.Concurrency("custom", b.CanonicalKeyID)
+	return kg.Concurrency("custom", bck.CanonicalKeyID)
 }
 
 // customKeyActive returns the key to the active set for the given custom concurrency key
-func (b QueueBacklog) customKeyActive(kg QueueKeyGenerator, n int) string {
+func backlogCustomKeyActive(b osqueue.QueueBacklog, kg QueueKeyGenerator, n int) string {
 	if n < 0 || n > len(b.ConcurrencyKeys) {
 		return kg.ActiveSet("", "")
 	}
 
 	key := b.ConcurrencyKeys[n-1]
-	return key.activeKey(kg)
+	return backlogConcurrencyKeyActiveKey(key, kg)
 }
 
 // customKeyActiveRuns returns the key to the active runs counter for the given custom concurrency key
-func (b QueueBacklog) customKeyActiveRuns(kg QueueKeyGenerator, n int) string {
+func backlogCustomKeyActiveRuns(b osqueue.QueueBacklog, kg QueueKeyGenerator, n int) string {
 	if n < 0 || n > len(b.ConcurrencyKeys) {
 		return kg.ActiveRunsSet("", "")
 	}
 
 	key := b.ConcurrencyKeys[n-1]
-	return key.activeRunsKey(kg)
+	return backlogConcurrencyKeyActiveRunsKey(key, kg)
 }
 
-func (b QueueBacklog) inProgressLeasesCustomKey(cm constraintapi.RolloutKeyGenerator, kg QueueKeyGenerator, accountID *uuid.UUID, n int) string {
+func backlogInProgressLeasesCustomKey(b osqueue.QueueBacklog, cm constraintapi.RolloutKeyGenerator, kg QueueKeyGenerator, accountID *uuid.UUID, n int) string {
 	if cm == nil {
 		return kg.Concurrency("", "")
 	}
@@ -609,119 +135,60 @@ func (b QueueBacklog) inProgressLeasesCustomKey(cm constraintapi.RolloutKeyGener
 	}
 
 	key := b.ConcurrencyKeys[n-1]
-	return key.inProgressLeasesKey(cm, *accountID)
+	return backlogConcurrencyKeyInProgressLeasesKey(key, cm, *accountID)
 }
 
-func (b BacklogConcurrencyKey) activeKey(kg QueueKeyGenerator) string {
+func backlogConcurrencyKeyActiveKey(bck osqueue.BacklogConcurrencyKey, kg QueueKeyGenerator) string {
 	// Concurrency accounting keys are made up of three parts:
 	// - The scope (account, environment, function) to apply the concurrency limit on
 	// - The entity (account ID, envID, or function ID) based on the scope
 	// - The dynamic key value (hashed evaluated expression)
-	return kg.ActiveSet("custom", b.CanonicalKeyID)
+	return kg.ActiveSet("custom", bck.CanonicalKeyID)
 }
 
-func (b BacklogConcurrencyKey) activeRunsKey(kg QueueKeyGenerator) string {
-	return kg.ActiveRunsSet("custom", b.CanonicalKeyID)
+func backlogConcurrencyKeyActiveRunsKey(bck osqueue.BacklogConcurrencyKey, kg QueueKeyGenerator) string {
+	return kg.ActiveRunsSet("custom", bck.CanonicalKeyID)
 }
 
-func (b BacklogConcurrencyKey) inProgressLeasesKey(cm constraintapi.RolloutKeyGenerator, accountID uuid.UUID) string {
-	return cm.KeyInProgressLeasesCustom(accountID, b.Scope, b.EntityID, b.HashedKeyExpression, b.HashedValue)
+func backlogConcurrencyKeyInProgressLeasesKey(bck osqueue.BacklogConcurrencyKey, cm constraintapi.RolloutKeyGenerator, accountID uuid.UUID) string {
+	return cm.KeyInProgressLeasesCustom(accountID, bck.Scope, bck.EntityID, bck.HashedKeyExpression, bck.HashedValue)
 }
 
 // activeKey returns backlog compound active key
-func (b QueueBacklog) activeKey(kg QueueKeyGenerator) string {
+func backlogActiveKey(b osqueue.QueueBacklog, kg QueueKeyGenerator) string {
 	return kg.ActiveSet("compound", b.BacklogID)
-}
-
-func (b QueueBacklog) customConcurrencyKeyID(n int) string {
-	if n < 0 || n > len(b.ConcurrencyKeys) {
-		return ""
-	}
-
-	key := b.ConcurrencyKeys[n-1]
-	return key.CanonicalKeyID
-}
-
-func (b QueueBacklog) requeueBackOff(now time.Time, constraint enums.QueueConstraint) time.Time {
-	switch constraint {
-	case enums.QueueConstraintCustomConcurrencyKey1, enums.QueueConstraintCustomConcurrencyKey2:
-		next := time.Duration(b.SuccessiveCustomConcurrencyConstrained) * time.Second
-
-		if next > PartitionConcurrencyLimitRequeueExtension {
-			next = PartitionConcurrencyLimitRequeueExtension
-		}
-
-		return now.Add(next)
-	default:
-		return now.Add(BacklogDefaultRequeueExtension)
-	}
-}
-
-type BacklogRefillResult struct {
-	Constraint        enums.QueueConstraint
-	Refilled          int
-	TotalBacklogCount int
-	BacklogCountUntil int
-	Capacity          int
-	Refill            int
-	RefilledItems     []string
-	RetryAt           time.Time
-}
-
-type backlogRefillOptions struct {
-	constraintCheckIdempotencyKey string
-	disableConstraintChecks       bool
-	capacityLeases                []osqueue.CapacityLease
-}
-
-type backlogRefillOptionFn func(o *backlogRefillOptions)
-
-func WithBacklogRefillConstraintCheckIdempotencyKey(idempotencyKey string) backlogRefillOptionFn {
-	return func(o *backlogRefillOptions) {
-		o.constraintCheckIdempotencyKey = idempotencyKey
-	}
-}
-
-func WithBacklogRefillDisableConstraintChecks(disableConstraintChecks bool) backlogRefillOptionFn {
-	return func(o *backlogRefillOptions) {
-		o.disableConstraintChecks = disableConstraintChecks
-	}
-}
-
-func WithBacklogRefillItemCapacityLeases(itemCapacityLeases []osqueue.CapacityLease) backlogRefillOptionFn {
-	return func(o *backlogRefillOptions) {
-		o.capacityLeases = itemCapacityLeases
-	}
 }
 
 func (q *queue) BacklogRefill(
 	ctx context.Context,
-	b *QueueBacklog,
-	sp *QueueShadowPartition,
+	b *osqueue.QueueBacklog,
+	sp *osqueue.QueueShadowPartition,
 	refillUntil time.Time,
 	refillItems []string,
-	latestConstraints PartitionConstraintConfig,
-	options ...backlogRefillOptionFn,
-) (*BacklogRefillResult, error) {
+	latestConstraints osqueue.PartitionConstraintConfig,
+	options ...osqueue.BacklogRefillOptionFn,
+) (*osqueue.BacklogRefillResult, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "BacklogRefill"), redis_telemetry.ScopeQueue)
 
-	o := &backlogRefillOptions{}
+	o := &osqueue.BacklogRefillOptions{}
 	for _, opt := range options {
 		opt(o)
 	}
 
-	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
-		return nil, fmt.Errorf("unsupported queue shard kind for BacklogRefill: %s", q.primaryQueueShard.Kind)
-	}
-
-	kg := q.primaryQueueShard.RedisClient.kg
+	kg := q.RedisClient.kg
 
 	accountID := uuid.Nil
 	if sp.AccountID != nil {
 		accountID = *sp.AccountID
 	}
 
-	nowMS := q.clock.Now().UnixMilli()
+	partitionID := sp.Identifier()
+	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.BacklogRefill", partitionID.AccountID, partitionID.EnvID)
+	defer span.End()
+	span.SetAttributes(attribute.String("partition_id", sp.PartitionID))
+	span.SetAttributes(attribute.String("backlog_id", b.BacklogID))
+
+	nowMS := q.Clock.Now().UnixMilli()
 
 	var (
 		keyThrottleState                             string
@@ -745,7 +212,7 @@ func (q *queue) BacklogRefill(
 		kg.GlobalAccountShadowPartitions(),
 		kg.AccountShadowPartitions(accountID),
 
-		sp.readyQueueKey(kg),
+		shadowPartitionReadyQueueKey(*sp, kg),
 		kg.GlobalPartitionIndex(),
 		kg.GlobalAccountIndex(),
 		kg.AccountPartitionIndex(accountID),
@@ -753,18 +220,18 @@ func (q *queue) BacklogRefill(
 		kg.QueueItem(),
 
 		// Constraint-related accounting keys
-		sp.accountActiveKey(kg),  // account active
-		sp.activeKey(kg),         // partition active
-		b.customKeyActive(kg, 1), // custom key 1
-		b.customKeyActive(kg, 2), // custom key 2
-		b.activeKey(kg),          // compound key (active for this backlog)
+		shadowPartitionAccountActiveKey(*sp, kg), // account active
+		shadowPartitionActiveKey(*sp, kg),        // partition active
+		backlogCustomKeyActive(*b, kg, 1),        // custom key 1
+		backlogCustomKeyActive(*b, kg, 2),        // custom key 2
+		backlogActiveKey(*b, kg),                 // compound key (active for this backlog)
 
 		// Active run sets
 		// kg.RunActiveSet(i.Data.Identifier.RunID), -> dynamically constructed in script for each item
-		sp.accountActiveRunKey(kg),   // Set for active runs in account
-		sp.activeRunKey(kg),          // Set for active runs in partition
-		b.customKeyActiveRuns(kg, 1), // Set for active runs with custom concurrency key 1
-		b.customKeyActiveRuns(kg, 2), // Set for active runs with custom concurrency key 2
+		shadowPartitionAccountActiveRunKey(*sp, kg), // Set for active runs in account
+		shadowPartitionActiveRunKey(*sp, kg),        // Set for active runs in partition
+		backlogCustomKeyActiveRuns(*b, kg, 1),       // Set for active runs with custom concurrency key 1
+		backlogCustomKeyActiveRuns(*b, kg, 2),       // Set for active runs with custom concurrency key 2
 
 		kg.BacklogActiveCheckSet(),
 		kg.BacklogActiveCheckCooldown(b.BacklogID),
@@ -772,14 +239,14 @@ func (q *queue) BacklogRefill(
 		kg.PartitionNormalizeSet(sp.PartitionID),
 
 		// Constraint API rollout
-		q.keyConstraintCheckIdempotency(sp.AccountID, o.constraintCheckIdempotencyKey),
+		q.keyConstraintCheckIdempotency(sp.AccountID, o.ConstraintCheckIdempotencyKey),
 	}
 
 	// Don't check constraints if
 	// - key queues have been disabled for this function (refill as quickly as possible)
 	// - capacity leases were successfully acquired
-	checkConstraints := sp.keyQueuesEnabled(ctx, q)
-	if o.disableConstraintChecks {
+	checkConstraints := sp.KeyQueuesEnabled(ctx, &q.QueueOptions)
+	if o.DisableConstraintChecks {
 		checkConstraints = false
 	}
 
@@ -789,11 +256,11 @@ func (q *queue) BacklogRefill(
 	}
 
 	// Enable conditional spot checking (probability in queue settings + feature flag)
-	refillProbability, _ := q.activeSpotCheckProbability(ctx, accountID)
+	refillProbability, _ := q.ActiveSpotCheckProbability(ctx, accountID)
 	shouldSpotCheckActiveSet := checkConstraints && rand.Intn(100) <= refillProbability
 
 	// Ensure capacityLeaseIDs is never nil to avoid JSON marshaling to "null"
-	capacityLeaseIDs := o.capacityLeases
+	capacityLeaseIDs := o.CapacityLeases
 	if capacityLeaseIDs == nil {
 		capacityLeaseIDs = []osqueue.CapacityLease{}
 	}
@@ -828,7 +295,7 @@ func (q *queue) BacklogRefill(
 
 	res, err := scripts["queue/backlogRefill"].Exec(
 		redis_telemetry.WithScriptName(ctx, "backlogRefill"),
-		q.primaryQueueShard.RedisClient.unshardedRc,
+		q.RedisClient.unshardedRc,
 		keys,
 		args,
 	).ToAny()
@@ -894,7 +361,7 @@ func (q *queue) BacklogRefill(
 		retryAt = time.UnixMilli(retryAtMillis)
 	}
 
-	refillResult := &BacklogRefillResult{
+	refillResult := &osqueue.BacklogRefillResult{
 		Refilled:          int(refillCount),
 		TotalBacklogCount: int(backlogCountTotal),
 		BacklogCountUntil: int(backlogCountUntil),
@@ -927,19 +394,23 @@ func (q *queue) BacklogRefill(
 	}
 }
 
-func (q *queue) BacklogRequeue(ctx context.Context, backlog *QueueBacklog, sp *QueueShadowPartition, requeueAt time.Time) error {
+func (q *queue) BacklogRequeue(ctx context.Context, backlog *osqueue.QueueBacklog, sp *osqueue.QueueShadowPartition, requeueAt time.Time) error {
+	l := logger.StdlibLogger(ctx)
+
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "BacklogRequeue"), redis_telemetry.ScopeQueue)
 
-	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
-		return fmt.Errorf("unsupported queue shard kind for BacklogRequeue: %s", q.primaryQueueShard.Kind)
-	}
-
-	kg := q.primaryQueueShard.RedisClient.kg
+	kg := q.RedisClient.kg
 
 	accountID := uuid.Nil
 	if sp.AccountID != nil {
 		accountID = *sp.AccountID
 	}
+
+	partitionID := sp.Identifier()
+	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.BacklogRequeue", partitionID.AccountID, partitionID.EnvID)
+	defer span.End()
+	span.SetAttributes(attribute.String("partition_id", sp.PartitionID))
+	span.SetAttributes(attribute.String("backlog_id", backlog.BacklogID))
 
 	keys := []string{
 		kg.ShadowPartitionMeta(),
@@ -966,7 +437,7 @@ func (q *queue) BacklogRequeue(ctx context.Context, backlog *QueueBacklog, sp *Q
 
 	status, err := scripts["queue/backlogRequeue"].Exec(
 		redis_telemetry.WithScriptName(ctx, "backlogRequeue"),
-		q.primaryQueueShard.RedisClient.unshardedRc,
+		q.RedisClient.unshardedRc,
 		keys,
 		args,
 	).AsInt64()
@@ -974,7 +445,7 @@ func (q *queue) BacklogRequeue(ctx context.Context, backlog *QueueBacklog, sp *Q
 		return fmt.Errorf("could not requeue backlog: %w", err)
 	}
 
-	q.log.Trace("requeued backlog",
+	l.Trace("requeued backlog",
 		"id", backlog.BacklogID,
 		"partition", sp.PartitionID,
 		"time", requeueAt.Format(time.StampMilli),
@@ -987,21 +458,16 @@ func (q *queue) BacklogRequeue(ctx context.Context, backlog *QueueBacklog, sp *Q
 	case 0, 1:
 		return nil
 	case -1:
-		return ErrBacklogNotFound
+		return osqueue.ErrBacklogNotFound
 	default:
 		return fmt.Errorf("unknown response requeueing backlog: %v (%T)", status, status)
 	}
 }
 
-func (q *queue) BacklogPrepareNormalize(ctx context.Context, b *QueueBacklog, sp *QueueShadowPartition) error {
+func (q *queue) BacklogPrepareNormalize(ctx context.Context, b *osqueue.QueueBacklog, sp *osqueue.QueueShadowPartition) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "BacklogPrepareNormalize"), redis_telemetry.ScopeQueue)
 
-	shard := q.primaryQueueShard
-
-	if shard.Kind != string(enums.QueueShardKindRedis) {
-		return fmt.Errorf("unsupported queue shard kind for BacklogPrepareNormalize: %s", shard.Kind)
-	}
-	kg := shard.RedisClient.kg
+	kg := q.RedisClient.kg
 
 	accountID := uuid.Nil
 	if sp.AccountID != nil {
@@ -1027,7 +493,7 @@ func (q *queue) BacklogPrepareNormalize(ctx context.Context, b *QueueBacklog, sp
 		sp.PartitionID,
 		accountID,
 		// order normalize by timestamp
-		q.clock.Now().UnixMilli(),
+		q.Clock.Now().UnixMilli(),
 	})
 	if err != nil {
 		return fmt.Errorf("could not serialize args: %w", err)
@@ -1035,7 +501,7 @@ func (q *queue) BacklogPrepareNormalize(ctx context.Context, b *QueueBacklog, sp
 
 	status, err := scripts["queue/backlogPrepareNormalize"].Exec(
 		redis_telemetry.WithScriptName(ctx, "backlogPrepareNormalize"),
-		shard.RedisClient.unshardedRc,
+		q.RedisClient.unshardedRc,
 		keys,
 		args,
 	).ToInt64()
@@ -1047,41 +513,33 @@ func (q *queue) BacklogPrepareNormalize(ctx context.Context, b *QueueBacklog, sp
 	case 1:
 		return nil
 	case -1:
-		return ErrBacklogGarbageCollected
+		return osqueue.ErrBacklogGarbageCollected
 	default:
 		return fmt.Errorf("unknown status preparing backlog normalization: %v (%T)", status, status)
 	}
 }
 
-// BacklogPeek is the public interface to peek items from a backlog
-func (q *queue) BacklogPeek(ctx context.Context, b *QueueBacklog, from time.Time, until time.Time, limit int64, opts ...PeekOpt) ([]*osqueue.QueueItem, int, error) {
-	return q.backlogPeek(ctx, b, from, until, limit, opts...)
-}
-
-// backlogPeek peeks item from the given backlog.
+// BacklogPeek peeks item from the given backlog.
 //
 // Pointers to missing items will be removed from the backlog.
-func (q *queue) backlogPeek(ctx context.Context, b *QueueBacklog, from time.Time, until time.Time, limit int64, opts ...PeekOpt) ([]*osqueue.QueueItem, int, error) {
+func (q *queue) BacklogPeek(ctx context.Context, b *osqueue.QueueBacklog, from time.Time, until time.Time, limit int64, opts ...osqueue.PeekOpt) ([]*osqueue.QueueItem, int, error) {
+	l := logger.StdlibLogger(ctx)
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "backlogPeek"), redis_telemetry.ScopeQueue)
 
-	opt := peekOption{}
+	opt := osqueue.PeekOption{}
 	for _, apply := range opts {
 		apply(&opt)
-	}
-
-	if !q.isPermittedQueueKind() {
-		return nil, 0, fmt.Errorf("unsupported queue shared kind for backlogPeek: %s", q.primaryQueueShard.Kind)
 	}
 
 	if b == nil {
 		return nil, 0, fmt.Errorf("expected backlog to be provided")
 	}
 
-	if limit > AbsoluteQueuePeekMax || limit > q.peekMax {
-		limit = q.peekMax
+	if limit > osqueue.AbsoluteQueuePeekMax || limit > q.PeekMax {
+		limit = q.PeekMax
 	}
 	if limit <= 0 {
-		limit = q.peekMin
+		limit = q.PeekMin
 	}
 
 	var fromTime *time.Time
@@ -1089,7 +547,7 @@ func (q *queue) backlogPeek(ctx context.Context, b *QueueBacklog, from time.Time
 		fromTime = &from
 	}
 
-	l := q.log.With(
+	l = l.With(
 		"method", "backlogPeek",
 		"backlog", b,
 		"from", from,
@@ -1097,18 +555,14 @@ func (q *queue) backlogPeek(ctx context.Context, b *QueueBacklog, from time.Time
 		"limit", limit,
 	)
 
-	rc := q.primaryQueueShard.RedisClient
-	if opt.Shard != nil {
-		rc = opt.Shard.RedisClient
-	}
-
+	rc := q.RedisClient
 	backlogSet := rc.kg.BacklogSet(b.BacklogID)
 
 	p := peeker[osqueue.QueueItem]{
 		q:               q,
 		opName:          "backlogPeek",
 		keyMetadataHash: rc.kg.QueueItem(),
-		max:             q.peekMax,
+		max:             q.PeekMax,
 		maker: func() *osqueue.QueueItem {
 			return &osqueue.QueueItem{}
 		},
@@ -1120,7 +574,7 @@ func (q *queue) backlogPeek(ctx context.Context, b *QueueBacklog, from time.Time
 	res, err := p.peek(ctx, backlogSet, true, until, limit, opts...)
 	if err != nil {
 		if errors.Is(err, ErrPeekerPeekExceedsMaxLimits) {
-			return nil, 0, ErrBacklogPeekMaxExceedsLimits
+			return nil, 0, osqueue.ErrBacklogPeekMaxExceedsLimits
 		}
 		return nil, 0, fmt.Errorf("error peeking backlog queue items, %w", err)
 	}
@@ -1129,52 +583,51 @@ func (q *queue) backlogPeek(ctx context.Context, b *QueueBacklog, from time.Time
 }
 
 // NOTE: this function only work with key queues
-func (q *queue) BacklogsByPartition(ctx context.Context, queueShard QueueShard, partitionID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueBacklog], error) {
-	opt := queueIterOpt{
-		batchSize:                 1000,
-		interval:                  50 * time.Millisecond,
-		enableMillisecondIncrease: true,
+func (q *queue) BacklogsByPartition(ctx context.Context, partitionID string, from time.Time, until time.Time, opts ...osqueue.QueueIterOpt) (iter.Seq[*osqueue.QueueBacklog], error) {
+	l := logger.StdlibLogger(ctx)
+	opt := osqueue.QueueIterOptions{
+		BatchSize:                 1000,
+		Interval:                  50 * time.Millisecond,
+		EnableMillisecondIncrease: true,
 	}
 	for _, apply := range opts {
 		apply(&opt)
 	}
 
-	l := q.log.With(
+	l = l.With(
 		"method", "BacklogsByPartition",
 		"partitionID", partitionID,
 		"from", from,
 		"until", until,
 	)
 
-	kg := queueShard.RedisClient.kg
+	kg := q.RedisClient.kg
 
-	return func(yield func(*QueueBacklog) bool) {
+	return func(yield func(*osqueue.QueueBacklog) bool) {
 		hashKey := kg.BacklogMeta()
 		ptFrom := from
 
 		for {
 			var iterated int
 
-			peeker := peeker[QueueBacklog]{
+			peeker := peeker[osqueue.QueueBacklog]{
 				q:                      q,
-				max:                    opt.batchSize,
+				max:                    opt.BatchSize,
 				opName:                 "backlogsByPartition",
 				isMillisecondPrecision: true,
 				handleMissingItems: func(pointers []string) error {
 					// don't interfere, clean up will happen in normal processing anyways
 					return nil
 				},
-				maker: func() *QueueBacklog {
-					return &QueueBacklog{}
+				maker: func() *osqueue.QueueBacklog {
+					return &osqueue.QueueBacklog{}
 				},
 				keyMetadataHash: hashKey,
 				fromTime:        &ptFrom,
 			}
 
 			isSequential := true
-			res, err := peeker.peek(ctx, kg.ShadowPartitionSet(partitionID), isSequential, until, opt.batchSize,
-				WithPeekOptQueueShard(&queueShard),
-			)
+			res, err := peeker.peek(ctx, kg.ShadowPartitionSet(partitionID), isSequential, until, opt.BatchSize)
 			if err != nil {
 				l.Error("error peeking backlogs for partition", "partition_id", partitionID, "err", err)
 				return
@@ -1201,7 +654,7 @@ func (q *queue) BacklogsByPartition(ctx context.Context, queueShard QueueShard, 
 				break
 			}
 
-			if opt.enableMillisecondIncrease {
+			if opt.EnableMillisecondIncrease {
 				// shift the starting point 1ms so it doesn't try to grab the same stuff again
 				// NOTE: this could result skipping items if the previous batch of items are all on
 				// the same millisecond
@@ -1209,7 +662,7 @@ func (q *queue) BacklogsByPartition(ctx context.Context, queueShard QueueShard, 
 			}
 
 			// wait a little before processing the next batch
-			<-time.After(opt.interval)
+			<-time.After(opt.Interval)
 		}
 	}, nil
 }
@@ -1217,127 +670,58 @@ func (q *queue) BacklogsByPartition(ctx context.Context, queueShard QueueShard, 
 func (q *queue) PartitionBacklogSize(ctx context.Context, partitionID string) (int64, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "partitionBacklogSize"), redis_telemetry.ScopeQueue)
 
-	if q.queueShardClients == nil {
-		return 0, nil
-	}
-
-	l := q.log.With(
+	l := logger.StdlibLogger(ctx).With(
 		"method", "PartitionBacklogSize",
 		"partition_id", partitionID,
 	)
 
-	var (
-		wg    sync.WaitGroup
-		count int64
-	)
-	until := q.clock.Now().Add(24 * time.Hour * 365) // 1y ahead
+	var count int64
+	until := q.Clock.Now().Add(24 * time.Hour * 365) // 1y ahead
 
-	for _, shard := range q.queueShardClients {
-		shard := shard
+	log := l.With("shard", q.name)
 
-		wg.Add(1)
+	backlogs, err := q.BacklogsByPartition(ctx, partitionID, time.Time{}, until)
+	if err != nil {
+		return 0, fmt.Errorf("could not prepare backlog iterator: %w", err)
+	}
+
+	bwg := sync.WaitGroup{}
+	for bl := range backlogs {
+		bwg.Add(1)
+		backlogID := bl.BacklogID
+
 		go func() {
-			defer wg.Done()
+			defer bwg.Done()
 
-			log := l.With("shard", shard.Name)
-
-			backlogs, err := q.BacklogsByPartition(ctx, shard, partitionID, time.Time{}, until)
-			if err != nil {
-				log.ReportError(err, "error preparing backlog iterator")
+			size, err := q.BacklogSize(ctx, backlogID)
+			if errors.Is(err, context.Canceled) {
 				return
 			}
-
-			bwg := sync.WaitGroup{}
-			for bl := range backlogs {
-				bwg.Add(1)
-				backlogID := bl.BacklogID
-
-				go func() {
-					defer bwg.Done()
-
-					size, err := q.BacklogSize(ctx, shard, backlogID)
-					if errors.Is(err, context.Canceled) {
-						return
-					}
-					if err != nil {
-						log.ReportError(err, "error retrieving backlog size",
-							logger.WithErrorReportTags(map[string]string{
-								"backlog":   bl.BacklogID,
-								"partition": bl.ShadowPartitionID,
-							}),
-						)
-						return
-					}
-					atomic.AddInt64(&count, size)
-				}()
+			if err != nil {
+				log.ReportError(err, "error retrieving backlog size",
+					logger.WithErrorReportTags(map[string]string{
+						"backlog":   bl.BacklogID,
+						"partition": bl.ShadowPartitionID,
+					}),
+				)
+				return
 			}
-			bwg.Wait()
+			atomic.AddInt64(&count, size)
 		}()
 	}
-	wg.Wait()
+	bwg.Wait()
 
 	return count, nil
 }
 
-func (q *queue) BacklogSize(ctx context.Context, queueShard QueueShard, backlogID string) (int64, error) {
+func (q *queue) BacklogSize(ctx context.Context, backlogID string) (int64, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "backlogSize"), redis_telemetry.ScopeQueue)
 
-	rc := queueShard.RedisClient.Client()
-	cmd := rc.B().Zcard().Key(queueShard.RedisClient.kg.BacklogSet(backlogID)).Build()
+	rc := q.RedisClient.Client()
+	cmd := rc.B().Zcard().Key(q.RedisClient.kg.BacklogSet(backlogID)).Build()
 	count, err := rc.Do(ctx, cmd).AsInt64()
 	if rueidis.IsRedisNil(err) {
 		return 0, nil
 	}
 	return count, err
-}
-
-// shuffleBacklog returns shuffled backlogs while applying higher weights to non-start backlogs.
-//
-// NOTE: Applying a higher weight on non-start backlogs is important to ensure queue items to finalize existing functions have a higher likelihood
-// of being refilled to the ready queue.
-//
-// WARN: This only applies to peeked backlogs. Since we apply a random offset while peeking, we may
-// omit the default backlog. This is why we add the default backlog in processShadowPartition
-func shuffleBacklogs(b []*QueueBacklog) []*QueueBacklog {
-	weights := make([]float64, len(b))
-	for i, backlog := range b {
-		if backlog.Start {
-			weights[i] = 1.0
-		} else {
-			weights[i] = 10.0
-		}
-	}
-
-	w := sampleuv.NewWeighted(weights, rnd)
-	result := make([]*QueueBacklog, len(b))
-	for n := range result {
-		idx, ok := w.Take()
-		if !ok {
-			return b
-		}
-		result[n] = b[idx]
-	}
-
-	return result
-}
-
-// backlogRefillMultiplier calculates the backlog specific multiplier to apply when refilling items.
-//
-// This is required to ensure fairness among backlogs and to guarantee that existing runs finish before new runs are started.
-func backlogRefillMultiplier(backlogs []*QueueBacklog, backlog *QueueBacklog, constraints PartitionConstraintConfig) int {
-	switch {
-	case backlog.isDefault() && constraints.Throttle != nil && len(constraints.Concurrency.CustomConcurrencyKeys) == 0:
-		// We are attempting to refill items from the default backlog while throttle is configured. This means
-		// - we are refilling items to continue or finish existing runs
-		// - we want to apply a higher priority
-		// - the first backlog is the default function backlog including items to continue existing runs
-		// - all following backlogs include start items and represent individual tenants
-
-		// Multiply based on the number of backlogs.
-		// Example: If we end up with 100 backlogs, 1 out of 100 is for continuing runs while 99 are starts.
-		// Returning len(backlogs) means we apply a multiplier of 100 to the first backlog.
-		return len(backlogs)
-	default:
-		return 1
-	}
 }

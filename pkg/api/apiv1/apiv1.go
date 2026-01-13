@@ -14,7 +14,6 @@ import (
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/realtime"
-	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/tracing"
@@ -45,7 +44,7 @@ type Opts struct {
 	// CancellationReadWriter reads and writes cancellations to/from a backing store.
 	CancellationReadWriter cqrs.CancellationReadWriter
 	// QueueShardSelector determines the queue shard to use
-	QueueShardSelector redis_state.ShardSelector
+	QueueShardSelector queue.ShardSelector
 	// Broadcaster is used to handle realtime via APIv1
 	Broadcaster realtime.Broadcaster
 	// TraceReader reads traces from a backing store.

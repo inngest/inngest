@@ -18,28 +18,18 @@ import (
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
-	"golang.org/x/sync/errgroup"
 )
 
 // RunJobs returns a list of jobs that are due to run for a given run ID.
-func (q *queue) RunJobs(ctx context.Context, queueShardName string, workspaceID, workflowID uuid.UUID, runID ulid.ULID, limit, offset int64) ([]osqueue.JobResponse, error) {
+func (q *queue) RunJobs(ctx context.Context, workspaceID, workflowID uuid.UUID, runID ulid.ULID, limit, offset int64) ([]osqueue.JobResponse, error) {
 	if limit > 1000 || limit <= 0 {
 		limit = 1000
 	}
 
-	shard, ok := q.queueShardClients[queueShardName]
-	if !ok {
-		return nil, fmt.Errorf("queue shard %s not found", queueShardName)
-	}
-
-	if shard.Kind != string(enums.QueueShardKindRedis) {
-		return nil, fmt.Errorf("unsupported queue shard kind for RunJobs: %s", shard.Kind)
-	}
-
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "RunJobs"), redis_telemetry.ScopeQueue)
 
-	cmd := shard.RedisClient.unshardedRc.B().Zscan().Key(shard.RedisClient.kg.RunIndex(runID)).Cursor(uint64(offset)).Count(limit).Build()
-	jobIDs, err := shard.RedisClient.unshardedRc.Do(ctx, cmd).AsScanEntry()
+	cmd := q.RedisClient.unshardedRc.B().Zscan().Key(q.RedisClient.kg.RunIndex(runID)).Cursor(uint64(offset)).Count(limit).Build()
+	jobIDs, err := q.RedisClient.unshardedRc.Do(ctx, cmd).AsScanEntry()
 	if err != nil {
 		return nil, fmt.Errorf("error reading index: %w", err)
 	}
@@ -49,7 +39,7 @@ func (q *queue) RunJobs(ctx context.Context, queueShardName string, workspaceID,
 	}
 
 	// Get all job items.
-	jsonItems, err := shard.RedisClient.unshardedRc.Do(ctx, shard.RedisClient.unshardedRc.B().Hmget().Key(shard.RedisClient.kg.QueueItem()).Field(jobIDs.Elements...).Build()).AsStrSlice()
+	jsonItems, err := q.RedisClient.unshardedRc.Do(ctx, q.RedisClient.unshardedRc.B().Hmget().Key(q.RedisClient.kg.QueueItem()).Field(jobIDs.Elements...).Build()).AsStrSlice()
 	if err != nil {
 		return nil, fmt.Errorf("error reading jobs: %w", err)
 	}
@@ -68,8 +58,8 @@ func (q *queue) RunJobs(ctx context.Context, queueShardName string, workspaceID,
 			continue
 		}
 		// TODO Do we need to check backlogs here?
-		cmd := shard.RedisClient.unshardedRc.B().Zrank().Key(shard.RedisClient.kg.FnQueueSet(workflowID.String())).Member(qi.ID).Build()
-		pos, err := shard.RedisClient.unshardedRc.Do(ctx, cmd).AsInt64()
+		cmd := q.RedisClient.unshardedRc.B().Zrank().Key(q.RedisClient.kg.FnQueueSet(workflowID.String())).Member(qi.ID).Build()
+		pos, err := q.RedisClient.unshardedRc.Do(ctx, cmd).AsInt64()
 		if !rueidis.IsRedisNil(err) && err != nil {
 			return nil, fmt.Errorf("error reading queue position: %w", err)
 		}
@@ -89,12 +79,8 @@ func (q *queue) RunJobs(ctx context.Context, queueShardName string, workspaceID,
 func (q *queue) OutstandingJobCount(ctx context.Context, workspaceID, workflowID uuid.UUID, runID ulid.ULID) (int, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "OutstandingJobCount"), redis_telemetry.ScopeQueue)
 
-	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
-		return 0, fmt.Errorf("unsupported queue shard kind for OutstandingJobCount: %s", q.primaryQueueShard.Kind)
-	}
-
-	cmd := q.primaryQueueShard.RedisClient.unshardedRc.B().Zcard().Key(q.primaryQueueShard.RedisClient.kg.RunIndex(runID)).Build()
-	count, err := q.primaryQueueShard.RedisClient.unshardedRc.Do(ctx, cmd).AsInt64()
+	cmd := q.RedisClient.unshardedRc.B().Zcard().Key(q.RedisClient.kg.RunIndex(runID)).Build()
+	count, err := q.RedisClient.unshardedRc.Do(ctx, cmd).AsInt64()
 	if err != nil {
 		return 0, fmt.Errorf("error counting index cardinality: %w", err)
 	}
@@ -104,45 +90,11 @@ func (q *queue) OutstandingJobCount(ctx context.Context, workspaceID, workflowID
 func (q *queue) StatusCount(ctx context.Context, workflowID uuid.UUID, status string) (int64, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "StatusCount"), redis_telemetry.ScopeQueue)
 
-	iterate := func(client *QueueClient) (int64, error) {
-		key := client.kg.Status(status, workflowID)
-		cmd := client.unshardedRc.B().Zcard().Key(key).Build()
-		count, err := client.unshardedRc.Do(ctx, cmd).AsInt64()
-		if err != nil {
-			return 0, fmt.Errorf("error inspecting function queue status: %w", err)
-		}
-
-		return count, nil
-	}
-
-	var count int64
-
-	// Map-reduce over shards
-	if q.queueShardClients != nil {
-		eg := errgroup.Group{}
-
-		for shardName, shard := range q.queueShardClients {
-			shard := shard
-
-			if shard.Kind != string(enums.QueueShardKindRedis) {
-				// TODO Support other storage backends
-				continue
-			}
-
-			eg.Go(func() error {
-				shardCount, err := iterate(shard.RedisClient)
-				if err != nil {
-					return fmt.Errorf("could not count status for shard %s: %w", shardName, err)
-				}
-				atomic.AddInt64(&count, shardCount)
-				return nil
-			})
-		}
-
-		err := eg.Wait()
-		if err != nil {
-			return 0, err
-		}
+	key := q.RedisClient.kg.Status(status, workflowID)
+	cmd := q.RedisClient.unshardedRc.B().Zcard().Key(key).Build()
+	count, err := q.RedisClient.unshardedRc.Do(ctx, cmd).AsInt64()
+	if err != nil {
+		return 0, fmt.Errorf("error inspecting function queue status: %w", err)
 	}
 
 	return count, nil
@@ -151,96 +103,63 @@ func (q *queue) StatusCount(ctx context.Context, workflowID uuid.UUID, status st
 func (q *queue) RunningCount(ctx context.Context, workflowID uuid.UUID) (int64, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "RunningCount"), redis_telemetry.ScopeQueue)
 
-	iterate := func(client *QueueClient) (int64, error) {
-		rc := client.unshardedRc
+	rc := q.RedisClient.unshardedRc
 
-		// Load the partition for a given queue.  This allows us to generate the concurrency
-		// key properly via the given function.
-		//
-		// TODO: Remove the ability to change keys based off of initialized inputs.  It's more trouble than
-		// it's worth, and ends up meaning we have more queries to write (such as this) in order to load
-		// relevant data.
-		cmd := rc.B().Hget().Key(client.kg.PartitionItem()).Field(workflowID.String()).Build()
-		enc, err := rc.Do(ctx, cmd).AsBytes()
-		if rueidis.IsRedisNil(err) {
-			return 0, nil
-		}
-		if err != nil {
-			return 0, fmt.Errorf("error fetching partition: %w", err)
-		}
-		item := &QueuePartition{}
-		if err = json.Unmarshal(enc, item); err != nil {
-			return 0, fmt.Errorf("error reading partition item: %w", err)
-		}
-
-		var count int64
-		// Fetch the concurrency via the partition concurrency name.
-		key := client.kg.Concurrency("p", workflowID.String())
-		cmd = rc.B().Zcard().Key(key).Build()
-		cnt, err := rc.Do(ctx, cmd).AsInt64()
-		if err != nil {
-			return 0, fmt.Errorf("error inspecting job count: %w", err)
-		}
-		atomic.AddInt64(&count, cnt)
-		return count, nil
+	// Load the partition for a given queue.  This allows us to generate the concurrency
+	// key properly via the given function.
+	//
+	// TODO: Remove the ability to change keys based off of initialized inputs.  It's more trouble than
+	// it's worth, and ends up meaning we have more queries to write (such as this) in order to load
+	// relevant data.
+	cmd := rc.B().Hget().Key(q.RedisClient.kg.PartitionItem()).Field(workflowID.String()).Build()
+	enc, err := rc.Do(ctx, cmd).AsBytes()
+	if rueidis.IsRedisNil(err) {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, fmt.Errorf("error fetching partition: %w", err)
+	}
+	item := &osqueue.QueuePartition{}
+	if err = json.Unmarshal(enc, item); err != nil {
+		return 0, fmt.Errorf("error reading partition item: %w", err)
 	}
 
 	var count int64
-
-	// Map-reduce over shards
-	if q.queueShardClients != nil {
-		eg := errgroup.Group{}
-
-		for _, shard := range q.queueShardClients {
-			if shard.Kind != string(enums.QueueShardKindRedis) {
-				// TODO Support other storage backends
-				continue
-			}
-
-			shard := shard
-			eg.Go(func() error {
-				shardCount, err := iterate(shard.RedisClient)
-				if err != nil {
-					return fmt.Errorf("could not count running jobs for shard %s: %w", shard.Name, err)
-				}
-				atomic.AddInt64(&count, shardCount)
-				return nil
-			})
-		}
-
-		err := eg.Wait()
-		if err != nil {
-			return 0, err
-		}
+	// Fetch the concurrency via the partition concurrency name.
+	key := q.RedisClient.kg.Concurrency("p", workflowID.String())
+	cmd = rc.B().Zcard().Key(key).Build()
+	cnt, err := rc.Do(ctx, cmd).AsInt64()
+	if err != nil {
+		return 0, fmt.Errorf("error inspecting job count: %w", err)
 	}
-
-	// TODO Support other storage backends
-
+	atomic.AddInt64(&count, cnt)
 	return count, nil
 }
 
-func (q *queue) ItemsByPartition(ctx context.Context, shard QueueShard, partitionID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*osqueue.QueueItem], error) {
-	opt := queueIterOpt{
-		batchSize:                 1000,
-		interval:                  500 * time.Millisecond,
-		iterateBacklogs:           true,
-		enableMillisecondIncrease: true,
+func (q *queue) ItemsByPartition(ctx context.Context, partitionID string, from time.Time, until time.Time, opts ...osqueue.QueueIterOpt) (iter.Seq[*osqueue.QueueItem], error) {
+	l := logger.StdlibLogger(ctx)
+
+	opt := osqueue.QueueIterOptions{
+		BatchSize:                 1000,
+		Interval:                  500 * time.Millisecond,
+		IterateBacklogs:           true,
+		EnableMillisecondIncrease: true,
 	}
 	for _, apply := range opts {
 		apply(&opt)
 	}
 
-	l := q.log.With(
+	l = l.With(
 		"method", "ItemsByPartition",
 		"partition_id", partitionID,
 		"from", from,
 		"until", until,
-		"queue_shard", shard.Name,
+		"queue_shard", q.Name(),
 	)
 
 	// retrieve partition by ID
-	hash := shard.RedisClient.kg.PartitionItem()
-	rc := shard.RedisClient.Client()
+	hash := q.RedisClient.kg.PartitionItem()
+	rc := q.RedisClient.Client()
 
 	cmd := rc.B().Hget().Key(hash).Field(partitionID).Build()
 	byt, err := rc.Do(ctx, cmd).AsBytes()
@@ -248,7 +167,7 @@ func (q *queue) ItemsByPartition(ctx context.Context, shard QueueShard, partitio
 		return nil, fmt.Errorf("error retrieving partition '%s': %w", partitionID, err)
 	}
 
-	var pt QueuePartition
+	var pt osqueue.QueuePartition
 	if err := json.Unmarshal(byt, &pt); err != nil {
 		return nil, fmt.Errorf("error unmarshalling queue partition '%s': %w", partitionID, err)
 	}
@@ -262,12 +181,12 @@ func (q *queue) ItemsByPartition(ctx context.Context, shard QueueShard, partitio
 			var iterated int
 
 			// peek function partition
-			items, err := q.peek(ctx, shard, peekOpts{
+			items, err := q.peek(ctx, peekOpts{
 				From:         &ptFrom,
 				Until:        until,
-				Limit:        opt.batchSize,
+				Limit:        opt.BatchSize,
 				PartitionID:  partitionID,
-				PartitionKey: pt.zsetKey(shard.RedisClient.kg),
+				PartitionKey: partitionZsetKey(pt, q.RedisClient.kg),
 			})
 			if err != nil {
 				if !errors.Is(err, context.Canceled) {
@@ -306,7 +225,7 @@ func (q *queue) ItemsByPartition(ctx context.Context, shard QueueShard, partitio
 				break
 			}
 
-			if opt.enableMillisecondIncrease {
+			if opt.EnableMillisecondIncrease {
 				// shift the starting point 1ms so it doesn't try to grab the same stuff again
 				// NOTE: this could result skipping items if the previous batch of items are all on
 				// the same millisecond
@@ -314,17 +233,17 @@ func (q *queue) ItemsByPartition(ctx context.Context, shard QueueShard, partitio
 			}
 
 			// wait a little before proceeding
-			<-time.After(opt.interval)
+			<-time.After(opt.Interval)
 		}
 
-		if !opt.iterateBacklogs {
+		if !opt.IterateBacklogs {
 			return
 		}
 
 		// NOTE: iterate through backlogs
 		backlogFrom := from
 
-		hash := shard.RedisClient.kg.ShadowPartitionMeta()
+		hash := q.RedisClient.kg.ShadowPartitionMeta()
 		cmd := rc.B().Hget().Key(hash).Field(partitionID).Build()
 		byt, err := rc.Do(ctx, cmd).AsBytes()
 		if err != nil {
@@ -332,7 +251,7 @@ func (q *queue) ItemsByPartition(ctx context.Context, shard QueueShard, partitio
 			return
 		}
 
-		var spt QueueShadowPartition
+		var spt osqueue.QueueShadowPartition
 		if err := json.Unmarshal(byt, &spt); err != nil {
 			l.ReportError(err, "error unmarshalling shadow partition")
 			return
@@ -344,9 +263,7 @@ func (q *queue) ItemsByPartition(ctx context.Context, shard QueueShard, partitio
 			var iterated int
 
 			// TODO: maybe provide a different limit?
-			backlogs, _, err := q.ShadowPartitionPeek(ctx, &spt, true, until, ShadowPartitionPeekMaxBacklogs,
-				WithPeekOptQueueShard(&shard),
-			)
+			backlogs, _, err := q.ShadowPartitionPeek(ctx, &spt, true, until, osqueue.ShadowPartitionPeekMaxBacklogs)
 			if err != nil {
 				if !errors.Is(err, context.Canceled) {
 					l.ReportError(err, "error peeking backlogs for partition")
@@ -366,9 +283,7 @@ func (q *queue) ItemsByPartition(ctx context.Context, shard QueueShard, partitio
 				}
 
 				var last time.Time
-				items, _, err := q.backlogPeek(ctx, backlog, backlogFrom, until, opt.batchSize,
-					WithPeekOptQueueShard(&shard),
-				)
+				items, _, err := q.BacklogPeek(ctx, backlog, backlogFrom, until, opt.BatchSize)
 				if err != nil {
 					l.ReportError(err, "error retrieving queue items from backlog",
 						logger.WithErrorReportTags(errTags),
@@ -417,7 +332,7 @@ func (q *queue) ItemsByPartition(ctx context.Context, shard QueueShard, partitio
 				}
 			}
 
-			if opt.enableMillisecondIncrease {
+			if opt.EnableMillisecondIncrease {
 				// shift the starting point 1ms so it doesn't try to grab the same stuff again
 				// NOTE: this could result skipping items if the previous batch of items are all on
 				// the same millisecond
@@ -425,29 +340,31 @@ func (q *queue) ItemsByPartition(ctx context.Context, shard QueueShard, partitio
 			}
 
 			// wait a little before proceeding
-			<-time.After(opt.interval)
+			<-time.After(opt.Interval)
 		}
 	}, nil
 }
 
-func (q *queue) ItemsByBacklog(ctx context.Context, shard QueueShard, backlogID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*osqueue.QueueItem], error) {
-	opt := queueIterOpt{
-		batchSize: 1000,
-		interval:  500 * time.Millisecond,
+func (q *queue) ItemsByBacklog(ctx context.Context, backlogID string, from time.Time, until time.Time, opts ...osqueue.QueueIterOpt) (iter.Seq[*osqueue.QueueItem], error) {
+	l := logger.StdlibLogger(ctx)
+
+	opt := osqueue.QueueIterOptions{
+		BatchSize: 1000,
+		Interval:  500 * time.Millisecond,
 	}
 	for _, apply := range opts {
 		apply(&opt)
 	}
 
-	l := q.log.With(
+	l = l.With(
 		"method", "ItemsByBacklog",
 		"backlogID", backlogID,
 		"from", from,
 		"until", until,
 	)
 
-	hash := shard.RedisClient.kg.BacklogMeta()
-	rc := shard.RedisClient.Client()
+	hash := q.RedisClient.kg.BacklogMeta()
+	rc := q.RedisClient.Client()
 
 	cmd := rc.B().Hget().Key(hash).Field(backlogID).Build()
 	byt, err := rc.Do(ctx, cmd).AsBytes()
@@ -455,7 +372,7 @@ func (q *queue) ItemsByBacklog(ctx context.Context, shard QueueShard, backlogID 
 		return nil, fmt.Errorf("error retrieving backlog: %w", err)
 	}
 
-	var backlog QueueBacklog
+	var backlog osqueue.QueueBacklog
 	if err := json.Unmarshal(byt, &backlog); err != nil {
 		return nil, fmt.Errorf("error unmarshalling backlog: %w", err)
 	}
@@ -466,15 +383,13 @@ func (q *queue) ItemsByBacklog(ctx context.Context, shard QueueShard, backlogID 
 			var iterated int
 
 			// peek items for backlog
-			items, _, err := q.backlogPeek(ctx, &backlog, backlogFrom, until, opt.batchSize,
-				WithPeekOptQueueShard(&shard),
-			)
+			items, _, err := q.BacklogPeek(ctx, &backlog, backlogFrom, until, opt.BatchSize)
 			if err != nil {
 				l.ReportError(err, "error retrieving queue items from backlog",
 					logger.WithErrorReportTags(map[string]string{
 						"backlog_id":   backlogID,
 						"partition_id": backlog.ShadowPartitionID,
-						"queue_shard":  shard.Name,
+						"queue_shard":  q.Name(),
 					}),
 				)
 				return
@@ -512,32 +427,32 @@ func (q *queue) ItemsByBacklog(ctx context.Context, shard QueueShard, backlogID 
 			// the same millisecond
 			backlogFrom = backlogFrom.Add(time.Millisecond)
 
-			<-time.After(opt.interval)
+			<-time.After(opt.Interval)
 		}
 	}, nil
 }
 
 type QueueIteratorOpts struct {
 	// OnPartitionProcessed is called for each partition during instrumentation
-	OnPartitionProcessed func(ctx context.Context, partitionKey string, queueKey string, itemCount int64, queueShard QueueShard)
+	OnPartitionProcessed func(ctx context.Context, partitionKey string, queueKey string, itemCount int64)
 	// OnIterationComplete is called after all partitions are processed with the final totals
-	OnIterationComplete func(ctx context.Context, totalPartitions int64, totalQueueItems int64, queueShard QueueShard)
+	OnIterationComplete func(ctx context.Context, totalPartitions int64, totalQueueItems int64)
 }
 
 func (q *queue) QueueIterator(ctx context.Context, opts QueueIteratorOpts) (partitionCount int64, queueItemCount int64, err error) {
-	l := q.log.With("method", "QueueIterator")
+	l := logger.StdlibLogger(ctx).With("method", "QueueIterator")
 
 	// Check on global partition and queue partition sizes
 	var offset, totalPartitions, totalQueueItems int64
 	chunkSize := int64(1000)
 
-	r := q.primaryQueueShard.RedisClient.unshardedRc
+	r := q.RedisClient.unshardedRc
 	// iterate through all the partitions in the global partitions in chunks
 	wg := sync.WaitGroup{}
 	for {
 		// grab the global partition by chunks
 		cmd := r.B().Zrange().
-			Key(q.primaryQueueShard.RedisClient.kg.GlobalPartitionIndex()).
+			Key(q.RedisClient.kg.GlobalPartitionIndex()).
 			Min("-inf").
 			Max("+inf").
 			Byscore().
@@ -561,11 +476,11 @@ func (q *queue) QueueIterator(ctx context.Context, opts QueueIteratorOpts) (part
 				// If this is not a fully-qualified key, assume that this is an old (system) partition queue
 				queueKey := pkey
 				if !isKeyConcurrencyPointerItem(pkey) {
-					queueKey = q.primaryQueueShard.RedisClient.kg.PartitionQueueSet(enums.PartitionTypeDefault, pkey, "")
+					queueKey = q.RedisClient.kg.PartitionQueueSet(enums.PartitionTypeDefault, pkey, "")
 				}
 
 				cntCmd := r.B().Zcard().Key(queueKey).Build()
-				itemCount, err := q.primaryQueueShard.RedisClient.unshardedRc.Do(ctx, cntCmd).AsInt64()
+				itemCount, err := q.RedisClient.unshardedRc.Do(ctx, cntCmd).AsInt64()
 				if err != nil {
 					log.Warn("error checking partition count", "pkey", pkey, "context", "instrumentation")
 					return
@@ -573,12 +488,12 @@ func (q *queue) QueueIterator(ctx context.Context, opts QueueIteratorOpts) (part
 
 				// Call the callback if provided
 				if opts.OnPartitionProcessed != nil {
-					opts.OnPartitionProcessed(ctx, pkey, queueKey, itemCount, q.primaryQueueShard)
+					opts.OnPartitionProcessed(ctx, pkey, queueKey, itemCount)
 				}
 
 				atomic.AddInt64(&totalQueueItems, itemCount)
 				atomic.AddInt64(&totalPartitions, 1)
-				if err := q.tenantInstrumentor(ctx, pk); err != nil {
+				if err := q.TenantInstrumentor(ctx, pk); err != nil {
 					log.ReportError(err, "error running tenant instrumentor")
 				}
 			}(ctx, pk)
@@ -596,28 +511,21 @@ func (q *queue) QueueIterator(ctx context.Context, opts QueueIteratorOpts) (part
 
 	// Call the completion callback if provided
 	if opts.OnIterationComplete != nil {
-		opts.OnIterationComplete(ctx, atomic.LoadInt64(&totalPartitions), atomic.LoadInt64(&totalQueueItems), q.primaryQueueShard)
+		opts.OnIterationComplete(ctx, atomic.LoadInt64(&totalPartitions), atomic.LoadInt64(&totalQueueItems))
 	}
 
 	return atomic.LoadInt64(&totalPartitions), atomic.LoadInt64(&totalQueueItems), nil
 }
 
-func (q *queue) ItemByID(ctx context.Context, jobID string, opts ...QueueOpOpt) (*osqueue.QueueItem, error) {
-	opt := newQueueOpOptWithOpts(opts...)
-
-	shard := q.primaryQueueShard
-	if opt.shard != nil {
-		shard = *opt.shard
-	}
-
-	rc := shard.RedisClient.Client()
-	kg := shard.RedisClient.kg
+func (q *queue) ItemByID(ctx context.Context, jobID string) (*osqueue.QueueItem, error) {
+	rc := q.RedisClient.Client()
+	kg := q.RedisClient.kg
 
 	cmd := rc.B().Hget().Key(kg.QueueItem()).Field(jobID).Build()
 	byt, err := rc.Do(ctx, cmd).AsBytes()
 	if err != nil {
 		if rueidis.IsRedisNil(err) {
-			return nil, ErrQueueItemNotFound
+			return nil, osqueue.ErrQueueItemNotFound
 		}
 	}
 
@@ -629,16 +537,9 @@ func (q *queue) ItemByID(ctx context.Context, jobID string, opts ...QueueOpOpt) 
 	return &item, nil
 }
 
-func (q *queue) ItemExists(ctx context.Context, jobID string, opts ...QueueOpOpt) (bool, error) {
-	opt := newQueueOpOptWithOpts(opts...)
-
-	shard := q.primaryQueueShard
-	if opt.shard != nil {
-		shard = *opt.shard
-	}
-
-	rc := shard.RedisClient.Client()
-	kg := shard.RedisClient.kg
+func (q *queue) ItemExists(ctx context.Context, jobID string) (bool, error) {
+	rc := q.RedisClient.Client()
+	kg := q.RedisClient.kg
 
 	cmd := rc.B().Hexists().Key(kg.QueueItem()).Field(jobID).Build()
 	exists, err := rc.Do(ctx, cmd).AsBool()
@@ -652,21 +553,9 @@ func (q *queue) ItemExists(ctx context.Context, jobID string, opts ...QueueOpOpt
 	return exists, nil
 }
 
-func (q *queue) Shard(ctx context.Context, shardName string) (QueueShard, bool) {
-	shard, ok := q.queueShardClients[shardName]
-	return shard, ok
-}
-
-func (q *queue) ItemsByRunID(ctx context.Context, runID ulid.ULID, opts ...QueueOpOpt) ([]*osqueue.QueueItem, error) {
-	opt := newQueueOpOptWithOpts(opts...)
-
-	shard := q.primaryQueueShard
-	if opt.shard != nil {
-		shard = *opt.shard
-	}
-
-	rc := shard.RedisClient.Client()
-	kg := shard.RedisClient.KeyGenerator()
+func (q *queue) ItemsByRunID(ctx context.Context, runID ulid.ULID) ([]*osqueue.QueueItem, error) {
+	rc := q.RedisClient.Client()
+	kg := q.RedisClient.KeyGenerator()
 
 	itemIDs, err := rc.Do(
 		ctx,

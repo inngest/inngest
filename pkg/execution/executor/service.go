@@ -23,7 +23,6 @@ import (
 	"github.com/inngest/inngest/pkg/execution/debounce"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
-	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/expressions"
 	"github.com/inngest/inngest/pkg/inngest"
@@ -95,7 +94,7 @@ func WithServiceLogger(l logger.Logger) func(s *svc) {
 	}
 }
 
-func WithServiceShardSelector(sl redis_state.ShardSelector) func(s *svc) {
+func WithServiceShardSelector(sl queue.ShardSelector) func(s *svc) {
 	return func(s *svc) {
 		s.findShard = sl
 	}
@@ -146,12 +145,12 @@ type svc struct {
 	batcher       batch.BatchManager
 	croner        cron.CronManager
 	log           logger.Logger
-	shardSelector redis_state.ShardSelector
+	shardSelector queue.ShardSelector
 
 	wg sync.WaitGroup
 
 	opts      []ExecutorOpt
-	findShard redis_state.ShardSelector
+	findShard queue.ShardSelector
 
 	publisher pubsub.Publisher
 
@@ -258,7 +257,7 @@ func (s *svc) isUnexpectedRunError(err error) bool {
 
 func (s *svc) Run(ctx context.Context) error {
 	s.log.Info("subscribing to function queue")
-	return s.queue.Run(ctx, func(ctx context.Context, info queue.RunInfo, item queue.Item) (queue.RunResult, error) {
+	return s.queue.Run(logger.WithStdlib(ctx, s.log), func(ctx context.Context, info queue.RunInfo, item queue.Item) (queue.RunResult, error) {
 		// Don't stop the service on errors.
 		s.wg.Add(1)
 		defer s.wg.Done()
@@ -613,7 +612,7 @@ func (s *svc) handleEagerCancelFinishTimeout(ctx context.Context, c cqrs.Cancell
 	}
 
 	// timeout was extended, requeue eager cancellation.
-	qm, ok := s.queue.(redis_state.QueueManager)
+	qm, ok := s.queue.(queue.QueueManager)
 	if !ok {
 		l.Error("queue does not conform to queue manager")
 		return nil
@@ -630,7 +629,7 @@ func (s *svc) handleEagerCancelFinishTimeout(ctx context.Context, c cqrs.Cancell
 	item.JobID = &jobID
 	err = qm.Enqueue(ctx, item, requeueAt, queue.EnqueueOpts{})
 	// Ignore if the system job was already requeued.
-	if err != nil && err != redis_state.ErrQueueItemExists {
+	if err != nil && err != queue.ErrQueueItemExists {
 		return err
 	}
 	l.Info("re-enqueued eager cancellation of finish timeout", "requeueAt", requeueAt)
@@ -699,7 +698,7 @@ func (s *svc) handleEagerCancelStartTimeout(ctx context.Context, c cqrs.Cancella
 		})
 	}
 	// timeout was extended, requeue eager cancellation.
-	qm, ok := s.queue.(redis_state.QueueManager)
+	qm, ok := s.queue.(queue.QueueManager)
 	if !ok {
 		l.Error("queue does not conform to queue manager")
 		return nil
@@ -716,7 +715,7 @@ func (s *svc) handleEagerCancelStartTimeout(ctx context.Context, c cqrs.Cancella
 	item.JobID = &jobID
 	err = qm.Enqueue(ctx, item, requeueAt, queue.EnqueueOpts{})
 	// Ignore if the system job was already requeued.
-	if err != nil && err != redis_state.ErrQueueItemExists {
+	if err != nil && err != queue.ErrQueueItemExists {
 		return err
 	}
 	l.Info("re-enqueued eager cancellation of start timeout", "requeueAt", requeueAt)
@@ -734,17 +733,12 @@ func (s *svc) handleEagerCancelBacklog(ctx context.Context, c cqrs.Cancellation)
 		from = *c.StartedAfter
 	}
 
-	qm, ok := s.queue.(redis_state.QueueManager)
-	if !ok {
-		return fmt.Errorf("expected queue manager for cancellation")
-	}
-
 	shard, err := s.findShard(ctx, c.AccountID, c.QueueName)
 	if err != nil {
 		return fmt.Errorf("error selecting shard for cancellation: %w", err)
 	}
 
-	items, err := qm.ItemsByBacklog(ctx, shard, c.TargetID, from, c.StartedBefore)
+	items, err := shard.ItemsByBacklog(ctx, c.TargetID, from, c.StartedBefore)
 	if err != nil {
 		return fmt.Errorf("error retrieving backlog iterator: %w", err)
 	}
@@ -790,7 +784,7 @@ func (s *svc) handleEagerCancelBacklog(ctx context.Context, c cqrs.Cancellation)
 		}
 
 		// dequeue the item
-		if err := qm.Dequeue(ctx, shard, *qi); err != nil {
+		if err := shard.Dequeue(ctx, *qi); err != nil {
 			return err
 		}
 	}
@@ -835,7 +829,7 @@ func (s *svc) handleEagerCancelBulkRun(ctx context.Context, c cqrs.Cancellation)
 		from = *c.StartedAfter
 	}
 
-	qm, ok := s.queue.(redis_state.QueueManager)
+	qm, ok := s.queue.(queue.QueueManager)
 	if !ok {
 		return fmt.Errorf("expected queue manager for cancellation")
 	}
@@ -1114,7 +1108,7 @@ func (s *svc) handleCron(ctx context.Context, item queue.Item) error {
 	})
 
 	if err != nil {
-		if !errors.Is(err, redis_state.ErrQueueItemExists) &&
+		if !errors.Is(err, queue.ErrQueueItemExists) &&
 			!errors.Is(err, state.ErrIdentifierExists) &&
 			!errors.Is(err, ErrFunctionSkippedIdempotency) {
 			l.ReportError(err, "error scheduling cron function execution")
@@ -1153,12 +1147,6 @@ func (s *svc) handleJobPromote(ctx context.Context, item queue.Item) error {
 
 	l = l.With("job_id", data.PromoteJobID, "scheduled_at", time.UnixMilli(data.ScheduledAt))
 
-	qm, ok := s.queue.(redis_state.QueueManager)
-	if !ok {
-		l.Warn("queue does not conform to queue manager")
-		return nil
-	}
-
 	// Retrieve current queue shard for sleep item. The account might have been migrated
 	// to a different shard since the original sleep item was enqueued, so we must fetch the shard now.
 	shard, err := s.shardSelector(ctx, item.Identifier.AccountID, nil)
@@ -1167,9 +1155,9 @@ func (s *svc) handleJobPromote(ctx context.Context, item queue.Item) error {
 	}
 
 	// The sleep item should usually exist
-	qi, err := qm.LoadQueueItem(ctx, shard.Name, data.PromoteJobID)
+	qi, err := shard.LoadQueueItem(ctx, data.PromoteJobID)
 	if err != nil {
-		if errors.Is(err, redis_state.ErrQueueItemNotFound) {
+		if errors.Is(err, queue.ErrQueueItemNotFound) {
 			return nil
 		}
 
@@ -1184,10 +1172,12 @@ func (s *svc) handleJobPromote(ctx context.Context, item queue.Item) error {
 	// Grab the score, which already handles promotion by fudigng the time to
 	// be that of the actual run ID, prioritizing older runs.
 	nextTime := time.UnixMilli(qi.Score(time.Now()))
-	err = qm.Requeue(ctx, shard, *qi, nextTime)
-	if err != nil && !errors.Is(err, redis_state.ErrQueueItemNotFound) {
+	err = shard.Requeue(ctx, *qi, nextTime)
+	if err != nil && !errors.Is(err, queue.ErrQueueItemNotFound) {
 		return fmt.Errorf("could not requeue job with promoted time: %w", err)
 	}
+
+	l.Trace("promoted queue item")
 
 	return nil
 }

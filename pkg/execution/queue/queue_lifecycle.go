@@ -1,4 +1,4 @@
-package redis_state
+package queue
 
 import (
 	"context"

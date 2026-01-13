@@ -7,16 +7,14 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
-	"github.com/inngest/inngest/pkg/execution/state/redis_state"
+	"github.com/inngest/inngest/pkg/execution/queue"
 	pb "github.com/inngest/inngest/proto/gen/debug/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-var (
-	ErrPartitionNotAvailable = fmt.Errorf("partition not available")
-)
+var ErrPartitionNotAvailable = fmt.Errorf("partition not available")
 
 func (d *debugAPI) GetPartition(ctx context.Context, req *pb.PartitionRequest) (*pb.PartitionResponse, error) {
 	id, err := uuid.Parse(req.GetId())
@@ -69,8 +67,8 @@ func (d *debugAPI) GetPartition(ctx context.Context, req *pb.PartitionRequest) (
 		},
 		Config: fn.Config,
 		QueueShard: &pb.QueueShard{
-			Name: shard.Name,
-			Kind: shard.Kind,
+			Name: shard.Name(),
+			Kind: string(shard.Kind()),
 		},
 		Crons: cronSchedules,
 	}, nil
@@ -89,8 +87,8 @@ func (d *debugAPI) GetPartitionStatus(ctx context.Context, req *pb.PartitionRequ
 
 	pt, err := d.queue.PartitionByID(ctx, shard, req.GetId())
 	if err != nil {
-		if errors.Is(err, redis_state.ErrPartitionNotFound) {
-			return nil, status.Error(codes.NotFound, redis_state.ErrPartitionNotFound.Error())
+		if errors.Is(err, queue.ErrPartitionNotFound) {
+			return nil, status.Error(codes.NotFound, queue.ErrPartitionNotFound.Error())
 		}
 
 		return nil, fmt.Errorf("error retrieving partition: %w", err)

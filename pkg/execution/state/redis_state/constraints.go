@@ -15,75 +15,17 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
-type backlogRefillConstraintCheckResult struct {
-	itemsToRefill        []string
-	itemCapacityLeases   []osqueue.CapacityLease
-	limitingConstraint   enums.QueueConstraint
-	skipConstraintChecks bool
-
-	retryAfter time.Time
-}
-
-func convertLimitingConstraint(
-	constraints PartitionConstraintConfig,
-	limitingConstraints []constraintapi.ConstraintItem,
-) enums.QueueConstraint {
-	constraint := enums.QueueConstraintNotLimited
-
-	for _, c := range limitingConstraints {
-		switch {
-		// Account concurrency
-		case
-			c.Kind == constraintapi.ConstraintKindConcurrency &&
-				c.Concurrency.Scope == enums.ConcurrencyScopeAccount &&
-				c.Concurrency.KeyExpressionHash == "":
-			constraint = enums.QueueConstraintAccountConcurrency
-
-		// Function concurrency
-		case
-			c.Kind == constraintapi.ConstraintKindConcurrency &&
-				c.Concurrency.Scope == enums.ConcurrencyScopeFn &&
-				c.Concurrency.KeyExpressionHash == "":
-			constraint = enums.QueueConstraintFunctionConcurrency
-
-		// Custom concurrency key 1
-		case
-			len(constraints.Concurrency.CustomConcurrencyKeys) > 0 &&
-				c.Kind == constraintapi.ConstraintKindConcurrency &&
-				c.Concurrency.Mode == constraints.Concurrency.CustomConcurrencyKeys[0].Mode &&
-				c.Concurrency.Scope == constraints.Concurrency.CustomConcurrencyKeys[0].Scope &&
-				c.Concurrency.KeyExpressionHash == constraints.Concurrency.CustomConcurrencyKeys[0].HashedKeyExpression:
-			constraint = enums.QueueConstraintCustomConcurrencyKey1
-
-		// Custom concurrency key 2
-		case
-			len(constraints.Concurrency.CustomConcurrencyKeys) > 1 &&
-				c.Kind == constraintapi.ConstraintKindConcurrency &&
-				c.Concurrency.Mode == constraints.Concurrency.CustomConcurrencyKeys[1].Mode &&
-				c.Concurrency.Scope == constraints.Concurrency.CustomConcurrencyKeys[1].Scope &&
-				c.Concurrency.KeyExpressionHash == constraints.Concurrency.CustomConcurrencyKeys[1].HashedKeyExpression:
-			constraint = enums.QueueConstraintCustomConcurrencyKey2
-
-		// Throttle
-		case
-			c.Kind == constraintapi.ConstraintKindThrottle:
-			constraint = enums.QueueConstraintThrottle
-		}
-	}
-
-	return constraint
-}
-
-func (q *queue) backlogRefillConstraintCheck(
+func (q *queue) BacklogRefillConstraintCheck(
 	ctx context.Context,
-	shadowPart *QueueShadowPartition,
-	backlog *QueueBacklog,
-	constraints PartitionConstraintConfig,
+	shadowPart *osqueue.QueueShadowPartition,
+	backlog *osqueue.QueueBacklog,
+	constraints osqueue.PartitionConstraintConfig,
 	items []*osqueue.QueueItem,
-	kg QueueKeyGenerator,
 	operationIdempotencyKey string,
 	now time.Time,
-) (*backlogRefillConstraintCheckResult, error) {
+) (*osqueue.BacklogRefillConstraintCheckResult, error) {
+	kg := q.RedisClient.kg
+
 	itemIDs := make([]string, len(items))
 	itemRunIDs := make(map[string]ulid.ULID)
 	for i, item := range items {
@@ -91,12 +33,12 @@ func (q *queue) backlogRefillConstraintCheck(
 		itemRunIDs[item.ID] = item.Data.Identifier.RunID
 	}
 
-	if q.capacityManager == nil || q.useConstraintAPI == nil {
+	if q.CapacityManager == nil || q.UseConstraintAPI == nil {
 		metrics.IncrBacklogRefillConstraintCheckFallbackCounter(ctx, enums.BacklogRefillConstraintCheckFallbackReasonConstraintAPIUninitialized.String(), metrics.CounterOpt{
 			PkgName: pkgName,
 		})
-		return &backlogRefillConstraintCheckResult{
-			itemsToRefill: itemIDs,
+		return &osqueue.BacklogRefillConstraintCheckResult{
+			ItemsToRefill: itemIDs,
 		}, nil
 	}
 
@@ -104,29 +46,29 @@ func (q *queue) backlogRefillConstraintCheck(
 		metrics.IncrBacklogRefillConstraintCheckFallbackCounter(ctx, enums.BacklogRefillConstraintCheckFallbackReasonIDNil.String(), metrics.CounterOpt{
 			PkgName: pkgName,
 		})
-		return &backlogRefillConstraintCheckResult{
-			itemsToRefill: itemIDs,
+		return &osqueue.BacklogRefillConstraintCheckResult{
+			ItemsToRefill: itemIDs,
 		}, nil
 	}
 
-	useAPI, fallback := q.useConstraintAPI(ctx, *shadowPart.AccountID, *shadowPart.EnvID, *shadowPart.FunctionID)
+	useAPI, fallback := q.UseConstraintAPI(ctx, *shadowPart.AccountID, *shadowPart.EnvID, *shadowPart.FunctionID)
 	if !useAPI {
 		metrics.IncrBacklogRefillConstraintCheckFallbackCounter(ctx, enums.BacklogRefillConstraintCheckFallbackReasonFeatureFlagDisabled.String(), metrics.CounterOpt{
 			PkgName: pkgName,
 		})
-		return &backlogRefillConstraintCheckResult{
-			itemsToRefill: itemIDs,
+		return &osqueue.BacklogRefillConstraintCheckResult{
+			ItemsToRefill: itemIDs,
 		}, nil
 	}
 
-	res, err := q.capacityManager.Acquire(ctx, &constraintapi.CapacityAcquireRequest{
+	res, err := q.CapacityManager.Acquire(ctx, &constraintapi.CapacityAcquireRequest{
 		AccountID:            *shadowPart.AccountID,
 		EnvID:                *shadowPart.EnvID,
 		IdempotencyKey:       operationIdempotencyKey,
 		FunctionID:           *shadowPart.FunctionID,
 		CurrentTime:          now,
-		Duration:             QueueLeaseDuration,
-		Configuration:        constraintConfigFromConstraints(constraints),
+		Duration:             osqueue.QueueLeaseDuration,
+		Configuration:        osqueue.ConstraintConfigFromConstraints(constraints),
 		Constraints:          constraintItemsFromBacklog(shadowPart, backlog, kg),
 		Amount:               len(items),
 		LeaseIdempotencyKeys: itemIDs,
@@ -139,7 +81,7 @@ func (q *queue) backlogRefillConstraintCheck(
 		},
 		Migration: constraintapi.MigrationIdentifier{
 			IsRateLimit: false,
-			QueueShard:  q.primaryQueueShard.Name,
+			QueueShard:  q.name,
 		},
 	})
 	if err != nil {
@@ -153,21 +95,21 @@ func (q *queue) backlogRefillConstraintCheck(
 		metrics.IncrBacklogRefillConstraintCheckFallbackCounter(ctx, enums.BacklogRefillConstraintCheckFallbackReasonConstraintAPIError.String(), metrics.CounterOpt{
 			PkgName: pkgName,
 		})
-		return &backlogRefillConstraintCheckResult{
-			itemsToRefill: itemIDs,
+		return &osqueue.BacklogRefillConstraintCheckResult{
+			ItemsToRefill: itemIDs,
 		}, nil
 	}
 
 	constraint := enums.QueueConstraintNotLimited
 	if len(res.LimitingConstraints) > 0 {
-		constraint = convertLimitingConstraint(constraints, res.LimitingConstraints)
+		constraint = osqueue.ConvertLimitingConstraint(constraints, res.LimitingConstraints)
 	}
 
 	if len(res.Leases) == 0 {
-		return &backlogRefillConstraintCheckResult{
-			itemsToRefill:      nil,
-			limitingConstraint: constraint,
-			retryAfter:         res.RetryAfter,
+		return &osqueue.BacklogRefillConstraintCheckResult{
+			ItemsToRefill:      nil,
+			LimitingConstraint: constraint,
+			RetryAfter:         res.RetryAfter,
 		}, nil
 	}
 
@@ -181,35 +123,13 @@ func (q *queue) backlogRefillConstraintCheck(
 		}
 	}
 
-	return &backlogRefillConstraintCheckResult{
-		itemsToRefill:      itemsToRefill,
-		itemCapacityLeases: itemCapacityLeases,
-		limitingConstraint: constraint,
+	return &osqueue.BacklogRefillConstraintCheckResult{
+		ItemsToRefill:      itemsToRefill,
+		ItemCapacityLeases: itemCapacityLeases,
+		LimitingConstraint: constraint,
 		// NOTE: We've enforced constraints, so BacklogRefill can skip GCRA, etc.
-		skipConstraintChecks: true,
+		SkipConstraintChecks: true,
 	}, nil
-}
-
-type itemLeaseConstraintCheckResult struct {
-	// capacityLease optionally returns a capacity lease ID which
-	// must be passed to the processing function to be extended
-	// while processing the item.
-	capacityLease *osqueue.CapacityLease
-
-	// limitingConstraint returns the most limiting constraint in case
-	// no capacity was available.
-	limitingConstraint enums.QueueConstraint
-
-	// skipConstraintChecks determines whether subsequent operations
-	// should check and enforce constraints, and whether constraint state
-	// should be updated while processing a queue item.
-	//
-	// When enrolled to the Constraint API and holding a valid capacity lease,
-	// constraint checks _and_ updates may be skipped, as state is maintained within
-	// the Constraint API.
-	skipConstraintChecks bool
-
-	retryAfter time.Time
 }
 
 // itemLeaseConstraintCheck determines whether the given queue item
@@ -222,22 +142,23 @@ type itemLeaseConstraintCheckResult struct {
 //
 // In the case of using the Constraint API, the item may also receive a capacity lease to be
 // extended for the duration of processing.
-func (q *queue) itemLeaseConstraintCheck(
+func (q *queue) ItemLeaseConstraintCheck(
 	ctx context.Context,
-	shadowPart *QueueShadowPartition,
-	backlog *QueueBacklog,
-	constraints PartitionConstraintConfig,
+	shadowPart *osqueue.QueueShadowPartition,
+	backlog *osqueue.QueueBacklog,
+	constraints osqueue.PartitionConstraintConfig,
 	item *osqueue.QueueItem,
 	now time.Time,
-	kg QueueKeyGenerator,
-) (itemLeaseConstraintCheckResult, error) {
+) (osqueue.ItemLeaseConstraintCheckResult, error) {
 	l := logger.StdlibLogger(ctx)
+
+	kg := q.RedisClient.kg
 
 	// Disable lease checks for system queues
 	// NOTE: This also disables constraint updates during processing, for consistency.
 	if shadowPart.SystemQueueName != nil {
-		return itemLeaseConstraintCheckResult{
-			skipConstraintChecks: true,
+		return osqueue.ItemLeaseConstraintCheckResult{
+			SkipConstraintChecks: true,
 		}, nil
 	}
 
@@ -247,39 +168,39 @@ func (q *queue) itemLeaseConstraintCheck(
 		metrics.IncrQueueItemConstraintCheckFallbackCounter(ctx, enums.QueueItemConstraintFallbackReasonIdNil.String(), metrics.CounterOpt{
 			PkgName: pkgName,
 		})
-		return itemLeaseConstraintCheckResult{}, nil
+		return osqueue.ItemLeaseConstraintCheckResult{}, nil
 	}
 
-	if q.capacityManager == nil ||
-		q.useConstraintAPI == nil {
+	if q.CapacityManager == nil ||
+		q.UseConstraintAPI == nil {
 		metrics.IncrQueueItemConstraintCheckFallbackCounter(ctx, enums.QueueItemConstraintFallbackReasonConstraintAPIUninitialized.String(), metrics.CounterOpt{
 			PkgName: pkgName,
 		})
-		return itemLeaseConstraintCheckResult{}, nil
+		return osqueue.ItemLeaseConstraintCheckResult{}, nil
 	}
 
-	useAPI, fallback := q.useConstraintAPI(ctx, *shadowPart.AccountID, *shadowPart.EnvID, *shadowPart.FunctionID)
+	useAPI, fallback := q.UseConstraintAPI(ctx, *shadowPart.AccountID, *shadowPart.EnvID, *shadowPart.FunctionID)
 	if !useAPI {
 		metrics.IncrQueueItemConstraintCheckFallbackCounter(ctx, enums.QueueItemConstraintFallbackReasonFeatureFlagDisabled.String(), metrics.CounterOpt{
 			PkgName: pkgName,
 		})
-		return itemLeaseConstraintCheckResult{}, nil
+		return osqueue.ItemLeaseConstraintCheckResult{}, nil
 	}
 
 	// If capacity lease is still valid for the forseeable future, use it
 	hasValidCapacityLease := item.CapacityLease != nil && item.CapacityLease.LeaseID.Timestamp().After(now.Add(2*time.Second))
 	if hasValidCapacityLease {
-		return itemLeaseConstraintCheckResult{
-			capacityLease: item.CapacityLease,
+		return osqueue.ItemLeaseConstraintCheckResult{
+			CapacityLease: item.CapacityLease,
 			// Skip any constraint checks and subsequent updates,
 			// as constraint state is maintained in the Constraint API.
-			skipConstraintChecks: true,
+			SkipConstraintChecks: true,
 		}, nil
 	}
 
 	idempotencyKey := item.ID
 
-	res, err := q.capacityManager.Acquire(ctx, &constraintapi.CapacityAcquireRequest{
+	res, err := q.CapacityManager.Acquire(ctx, &constraintapi.CapacityAcquireRequest{
 		AccountID: *shadowPart.AccountID,
 		EnvID:     *shadowPart.EnvID,
 		// TODO: Double check if the item ID works for idempotency:
@@ -292,8 +213,8 @@ func (q *queue) itemLeaseConstraintCheck(
 		},
 		FunctionID:      *shadowPart.FunctionID,
 		CurrentTime:     now,
-		Duration:        QueueLeaseDuration,
-		Configuration:   constraintConfigFromConstraints(constraints),
+		Duration:        osqueue.QueueLeaseDuration,
+		Configuration:   osqueue.ConstraintConfigFromConstraints(constraints),
 		Constraints:     constraintItemsFromBacklog(shadowPart, backlog, kg),
 		Amount:          1,
 		MaximumLifetime: consts.MaxFunctionTimeout + 30*time.Minute,
@@ -304,86 +225,48 @@ func (q *queue) itemLeaseConstraintCheck(
 		},
 		Migration: constraintapi.MigrationIdentifier{
 			IsRateLimit: false,
-			QueueShard:  q.primaryQueueShard.Name,
+			QueueShard:  q.name,
 		},
 	})
 	if err != nil {
 		l.Error("acquiring capacity lease failed", "err", err, "method", "itemLeaseConstraintCheck", "constraints", constraints, "item", item, "function_id", *shadowPart.FunctionID)
 
 		if !fallback {
-			return itemLeaseConstraintCheckResult{}, fmt.Errorf("could not enforce constraints and acquire lease: %w", err)
+			return osqueue.ItemLeaseConstraintCheckResult{}, fmt.Errorf("could not enforce constraints and acquire lease: %w", err)
 		}
 
 		// Fallback to Lease (with idempotency)
 		metrics.IncrQueueItemConstraintCheckFallbackCounter(ctx, enums.QueueItemConstraintFallbackReasonConstraintAPIError.String(), metrics.CounterOpt{
 			PkgName: pkgName,
 		})
-		return itemLeaseConstraintCheckResult{}, nil
+		return osqueue.ItemLeaseConstraintCheckResult{}, nil
 	}
 
 	constraint := enums.QueueConstraintNotLimited
 	if len(res.LimitingConstraints) > 0 {
-		constraint = convertLimitingConstraint(constraints, res.LimitingConstraints)
+		constraint = osqueue.ConvertLimitingConstraint(constraints, res.LimitingConstraints)
 	}
 
 	if len(res.Leases) == 0 {
-		return itemLeaseConstraintCheckResult{
-			limitingConstraint: constraint,
-			retryAfter:         res.RetryAfter,
+		return osqueue.ItemLeaseConstraintCheckResult{
+			LimitingConstraint: constraint,
+			RetryAfter:         res.RetryAfter,
 		}, nil
 	}
 
 	capacityLeaseID := res.Leases[0].LeaseID
 
-	return itemLeaseConstraintCheckResult{
-		capacityLease: &osqueue.CapacityLease{
+	return osqueue.ItemLeaseConstraintCheckResult{
+		CapacityLease: &osqueue.CapacityLease{
 			LeaseID: capacityLeaseID,
 		},
 		// Skip any constraint checks and subsequent updates,
 		// as constraint state is maintained in the Constraint API.
-		skipConstraintChecks: true,
+		SkipConstraintChecks: true,
 	}, nil
 }
 
-func constraintConfigFromConstraints(
-	constraints PartitionConstraintConfig,
-) constraintapi.ConstraintConfig {
-	config := constraintapi.ConstraintConfig{
-		FunctionVersion: constraints.FunctionVersion,
-		Concurrency: constraintapi.ConcurrencyConfig{
-			AccountConcurrency:     constraints.Concurrency.AccountConcurrency,
-			FunctionConcurrency:    constraints.Concurrency.FunctionConcurrency,
-			AccountRunConcurrency:  constraints.Concurrency.AccountRunConcurrency,
-			FunctionRunConcurrency: constraints.Concurrency.FunctionRunConcurrency,
-		},
-	}
-
-	if len(constraints.Concurrency.CustomConcurrencyKeys) > 0 {
-		config.Concurrency.CustomConcurrencyKeys = make([]constraintapi.CustomConcurrencyLimit, len(constraints.Concurrency.CustomConcurrencyKeys))
-
-		for i, ccl := range constraints.Concurrency.CustomConcurrencyKeys {
-			config.Concurrency.CustomConcurrencyKeys[i] = constraintapi.CustomConcurrencyLimit{
-				Mode:              ccl.Mode,
-				Scope:             ccl.Scope,
-				Limit:             ccl.Limit,
-				KeyExpressionHash: ccl.HashedKeyExpression,
-			}
-		}
-	}
-
-	if constraints.Throttle != nil {
-		config.Throttle = append(config.Throttle, constraintapi.ThrottleConfig{
-			Limit:             constraints.Throttle.Limit,
-			Burst:             constraints.Throttle.Burst,
-			Period:            constraints.Throttle.Period,
-			KeyExpressionHash: constraints.Throttle.ThrottleKeyExpressionHash,
-		})
-	}
-
-	return config
-}
-
-func constraintItemsFromBacklog(sp *QueueShadowPartition, backlog *QueueBacklog, kg QueueKeyGenerator) []constraintapi.ConstraintItem {
+func constraintItemsFromBacklog(sp *osqueue.QueueShadowPartition, backlog *osqueue.QueueBacklog, kg QueueKeyGenerator) []constraintapi.ConstraintItem {
 	constraints := []constraintapi.ConstraintItem{
 		// Account concurrency (always set)
 		{
@@ -391,7 +274,7 @@ func constraintItemsFromBacklog(sp *QueueShadowPartition, backlog *QueueBacklog,
 			Concurrency: &constraintapi.ConcurrencyConstraint{
 				Mode:              enums.ConcurrencyModeStep,
 				Scope:             enums.ConcurrencyScopeAccount,
-				InProgressItemKey: sp.accountInProgressKey(kg),
+				InProgressItemKey: shadowPartitionAccountInProgressKey(*sp, kg),
 			},
 		},
 		// Function concurrency (always set - falls back to account concurrency)
@@ -400,7 +283,7 @@ func constraintItemsFromBacklog(sp *QueueShadowPartition, backlog *QueueBacklog,
 			Concurrency: &constraintapi.ConcurrencyConstraint{
 				Mode:              enums.ConcurrencyModeStep,
 				Scope:             enums.ConcurrencyScopeFn,
-				InProgressItemKey: sp.inProgressKey(kg),
+				InProgressItemKey: shadowPartitionInProgressKey(*sp, kg),
 			},
 		},
 	}
@@ -424,7 +307,7 @@ func constraintItemsFromBacklog(sp *QueueShadowPartition, backlog *QueueBacklog,
 					Scope:             bck.Scope,
 					KeyExpressionHash: bck.HashedKeyExpression,
 					EvaluatedKeyHash:  bck.HashedValue,
-					InProgressItemKey: bck.concurrencyKey(kg),
+					InProgressItemKey: backlogConcurrencyKey(bck, kg),
 				},
 			})
 		}
@@ -434,13 +317,13 @@ func constraintItemsFromBacklog(sp *QueueShadowPartition, backlog *QueueBacklog,
 }
 
 func (q *queue) keyConstraintCheckIdempotency(accountID *uuid.UUID, itemID string) string {
-	kg := q.primaryQueueShard.RedisClient.KeyGenerator()
+	kg := q.RedisClient.kg
 
 	if accountID == nil || *accountID == uuid.Nil {
 		return fmt.Sprintf("%s:-", kg.QueuePrefix())
 	}
 
-	if q.capacityManager == nil {
+	if q.CapacityManager == nil {
 		return fmt.Sprintf("%s:-", kg.QueuePrefix())
 	}
 
@@ -448,8 +331,8 @@ func (q *queue) keyConstraintCheckIdempotency(accountID *uuid.UUID, itemID strin
 		return fmt.Sprintf("%s:-", kg.QueuePrefix())
 	}
 
-	return q.capacityManager.KeyConstraintCheckIdempotency(constraintapi.MigrationIdentifier{
+	return q.CapacityManager.KeyConstraintCheckIdempotency(constraintapi.MigrationIdentifier{
 		IsRateLimit: false,
-		QueueShard:  q.primaryQueueShard.Name,
+		QueueShard:  q.name,
 	}, *accountID, itemID)
 }

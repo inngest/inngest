@@ -100,23 +100,8 @@ func (fq *fakeQueue) reset() {
 	fq.lock.Unlock()
 }
 
-func (fq *fakeQueue) RemoveQueueItem(ctx context.Context, shard string, partitionKey string, itemID string) error {
-	qm := fq.Queue.(redis_state.QueueManager)
-	return qm.RemoveQueueItem(ctx, shard, partitionKey, itemID)
-}
-
-func (fq *fakeQueue) Requeue(ctx context.Context, queueShard redis_state.QueueShard, i queue.QueueItem, at time.Time) error {
-	qm := fq.Queue.(redis_state.QueueManager)
-	return qm.Requeue(ctx, queueShard, i, at)
-}
-
-func (fq *fakeQueue) RequeueByJobID(ctx context.Context, queueShard redis_state.QueueShard, jobID string, at time.Time) error {
-	qm := fq.Queue.(redis_state.QueueManager)
-	return qm.RequeueByJobID(ctx, queueShard, jobID, at)
-}
-
-func (fq *fakeQueue) Dequeue(ctx context.Context, queueShard redis_state.QueueShard, i queue.QueueItem) error {
-	qm := fq.Queue.(redis_state.QueueManager)
+func (fq *fakeQueue) Dequeue(ctx context.Context, queueShard redis_state.RedisQueueShard, i queue.QueueItem) error {
+	qm := fq.Queue.(queue.QueueManager)
 
 	err := qm.Dequeue(ctx, queueShard, i)
 
@@ -171,14 +156,13 @@ func TestScheduleRaceCondition(t *testing.T) {
 		QueueDefaultKey:        redis_state.QueueDefaultKey,
 	})
 
-	queueShard := redis_state.QueueShard{Name: consts.DefaultQueueShardName, RedisClient: unshardedClient.Queue(), Kind: string(enums.QueueShardKindRedis)}
-
-	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (redis_state.QueueShard, error) {
-		return queueShard, nil
+	queueOpts := []queue.QueueOpt{
+		queue.WithIdempotencyTTL(time.Hour),
 	}
+	queueShard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), queueOpts...)
 
-	queueShards := map[string]redis_state.QueueShard{
-		consts.DefaultQueueShardName: queueShard,
+	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (queue.QueueShard, error) {
+		return queueShard, nil
 	}
 
 	var sm state.Manager
@@ -190,13 +174,19 @@ func TestScheduleRaceCondition(t *testing.T) {
 	require.NoError(t, err)
 	smv2 := redis_state.MustRunServiceV2(sm)
 
-	queueOpts := []redis_state.QueueOpt{
-		redis_state.WithIdempotencyTTL(time.Hour),
-		redis_state.WithShardSelector(shardSelector),
-		redis_state.WithQueueShardClients(queueShards),
-	}
-
-	rq := redis_state.NewQueue(queueShard, queueOpts...)
+	rq, err := queue.New(
+		context.Background(),
+		"test-queue",
+		queueShard,
+		map[string]queue.QueueShard{
+			queueShard.Name(): queueShard,
+		},
+		func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
+			return queueShard, nil
+		},
+		queueOpts...,
+	)
+	require.NoError(t, err)
 
 	exec, err := executor.NewExecutor(
 		executor.WithStateManager(smv2),
@@ -339,14 +329,13 @@ func TestScheduleRaceConditionWithExistingIdempotencyKey(t *testing.T) {
 		QueueDefaultKey:        redis_state.QueueDefaultKey,
 	})
 
-	queueShard := redis_state.QueueShard{Name: consts.DefaultQueueShardName, RedisClient: unshardedClient.Queue(), Kind: string(enums.QueueShardKindRedis)}
-
-	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (redis_state.QueueShard, error) {
-		return queueShard, nil
+	queueOpts := []queue.QueueOpt{
+		queue.WithIdempotencyTTL(time.Hour),
 	}
+	queueShard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), queueOpts...)
 
-	queueShards := map[string]redis_state.QueueShard{
-		consts.DefaultQueueShardName: queueShard,
+	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (queue.QueueShard, error) {
+		return queueShard, nil
 	}
 
 	var sm state.Manager
@@ -358,13 +347,19 @@ func TestScheduleRaceConditionWithExistingIdempotencyKey(t *testing.T) {
 	require.NoError(t, err)
 	smv2 := redis_state.MustRunServiceV2(sm)
 
-	queueOpts := []redis_state.QueueOpt{
-		redis_state.WithIdempotencyTTL(time.Hour),
-		redis_state.WithShardSelector(shardSelector),
-		redis_state.WithQueueShardClients(queueShards),
-	}
-
-	rq := redis_state.NewQueue(queueShard, queueOpts...)
+	rq, err := queue.New(
+		context.Background(),
+		"test-queue",
+		queueShard,
+		map[string]queue.QueueShard{
+			queueShard.Name(): queueShard,
+		},
+		func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
+			return queueShard, nil
+		},
+		queueOpts...,
+	)
+	require.NoError(t, err)
 
 	exec, err := executor.NewExecutor(
 		executor.WithStateManager(smv2),
@@ -540,14 +535,13 @@ func TestFinalize(t *testing.T) {
 		QueueDefaultKey:        redis_state.QueueDefaultKey,
 	})
 
-	queueShard := redis_state.QueueShard{Name: consts.DefaultQueueShardName, RedisClient: unshardedClient.Queue(), Kind: string(enums.QueueShardKindRedis)}
-
-	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (redis_state.QueueShard, error) {
-		return queueShard, nil
+	queueOpts := []queue.QueueOpt{
+		queue.WithIdempotencyTTL(time.Hour),
 	}
 
-	queueShards := map[string]redis_state.QueueShard{
-		consts.DefaultQueueShardName: queueShard,
+	queueShard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), queueOpts...)
+	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (queue.QueueShard, error) {
+		return queueShard, nil
 	}
 
 	var sm state.Manager
@@ -559,13 +553,19 @@ func TestFinalize(t *testing.T) {
 	require.NoError(t, err)
 	smv2 := redis_state.MustRunServiceV2(sm)
 
-	queueOpts := []redis_state.QueueOpt{
-		redis_state.WithIdempotencyTTL(time.Hour),
-		redis_state.WithShardSelector(shardSelector),
-		redis_state.WithQueueShardClients(queueShards),
-	}
-
-	rq := redis_state.NewQueue(queueShard, queueOpts...)
+	rq, err := queue.New(
+		context.Background(),
+		"test-queue",
+		queueShard,
+		map[string]queue.QueueShard{
+			queueShard.Name(): queueShard,
+		},
+		func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
+			return queueShard, nil
+		},
+		queueOpts...,
+	)
+	require.NoError(t, err)
 
 	testQueue := newFakeQueue(rq)
 
@@ -616,7 +616,7 @@ func TestFinalize(t *testing.T) {
 
 	jobs1, err := rq.RunJobs(
 		ctx,
-		queueShard.Name,
+		queueShard.Name(),
 		run1.ID.Tenant.EnvID,
 		run1.ID.FunctionID,
 		run1.ID.RunID,
@@ -651,7 +651,7 @@ func TestFinalize(t *testing.T) {
 
 	jobs2, err := rq.RunJobs(
 		ctx,
-		queueShard.Name,
+		queueShard.Name(),
 		run2.ID.Tenant.EnvID,
 		run2.ID.FunctionID,
 		run2.ID.RunID,
@@ -706,10 +706,10 @@ func TestFinalize(t *testing.T) {
 		testQueue.lock.Unlock()
 
 		err = rq.Dequeue(ctx, queueShard, item2)
-		require.ErrorIs(t, err, redis_state.ErrQueueItemNotFound)
+		require.ErrorIs(t, err, queue.ErrQueueItemNotFound)
 
 		err = rq.Requeue(ctx, queueShard, item2, time.Now())
-		require.ErrorIs(t, err, redis_state.ErrQueueItemNotFound)
+		require.ErrorIs(t, err, queue.ErrQueueItemNotFound)
 	})
 }
 
@@ -820,14 +820,13 @@ func TestInvokeRetrySucceedsIfPauseAlreadyCreated(t *testing.T) {
 		QueueDefaultKey:        redis_state.QueueDefaultKey,
 	})
 
-	queueShard := redis_state.QueueShard{Name: consts.DefaultQueueShardName, RedisClient: unshardedClient.Queue(), Kind: string(enums.QueueShardKindRedis)}
-
-	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (redis_state.QueueShard, error) {
-		return queueShard, nil
+	queueOpts := []queue.QueueOpt{
+		queue.WithIdempotencyTTL(time.Hour),
 	}
+	queueShard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), queueOpts...)
 
-	queueShards := map[string]redis_state.QueueShard{
-		consts.DefaultQueueShardName: queueShard,
+	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (queue.QueueShard, error) {
+		return queueShard, nil
 	}
 
 	var sm state.Manager
@@ -839,13 +838,19 @@ func TestInvokeRetrySucceedsIfPauseAlreadyCreated(t *testing.T) {
 	require.NoError(t, err)
 	smv2 := redis_state.MustRunServiceV2(sm)
 
-	queueOpts := []redis_state.QueueOpt{
-		redis_state.WithIdempotencyTTL(time.Hour),
-		redis_state.WithShardSelector(shardSelector),
-		redis_state.WithQueueShardClients(queueShards),
-	}
-
-	rq := redis_state.NewQueue(queueShard, queueOpts...)
+	rq, err := queue.New(
+		context.Background(),
+		"test-queue",
+		queueShard,
+		map[string]queue.QueueShard{
+			queueShard.Name(): queueShard,
+		},
+		func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
+			return queueShard, nil
+		},
+		queueOpts...,
+	)
+	require.NoError(t, err)
 
 	genID := "invoke-step"
 
@@ -1006,14 +1011,13 @@ func TestExecutorReturnsResponseWhenNonRetriableError(t *testing.T) {
 		QueueDefaultKey:        redis_state.QueueDefaultKey,
 	})
 
-	queueShard := redis_state.QueueShard{Name: consts.DefaultQueueShardName, RedisClient: unshardedClient.Queue(), Kind: string(enums.QueueShardKindRedis)}
-
-	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (redis_state.QueueShard, error) {
-		return queueShard, nil
+	queueOpts := []queue.QueueOpt{
+		queue.WithIdempotencyTTL(time.Hour),
 	}
+	queueShard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), queueOpts...)
 
-	queueShards := map[string]redis_state.QueueShard{
-		consts.DefaultQueueShardName: queueShard,
+	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (queue.QueueShard, error) {
+		return queueShard, nil
 	}
 
 	var sm state.Manager
@@ -1025,13 +1029,19 @@ func TestExecutorReturnsResponseWhenNonRetriableError(t *testing.T) {
 	require.NoError(t, err)
 	smv2 := redis_state.MustRunServiceV2(sm)
 
-	queueOpts := []redis_state.QueueOpt{
-		redis_state.WithIdempotencyTTL(time.Hour),
-		redis_state.WithShardSelector(shardSelector),
-		redis_state.WithQueueShardClients(queueShards),
-	}
-
-	rq := redis_state.NewQueue(queueShard, queueOpts...)
+	rq, err := queue.New(
+		context.Background(),
+		"test-queue",
+		queueShard,
+		map[string]queue.QueueShard{
+			queueShard.Name(): queueShard,
+		},
+		func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
+			return queueShard, nil
+		},
+		queueOpts...,
+	)
+	require.NoError(t, err)
 
 	nonRetriableDriver := &mockDriverV1{
 		t: t,
@@ -1079,7 +1089,7 @@ func TestExecutorReturnsResponseWhenNonRetriableError(t *testing.T) {
 	// Job should have been scheduled
 	jobsAfterSchedule, err := rq.RunJobs(
 		ctx,
-		queueShard.Name,
+		queueShard.Name(),
 		run.ID.Tenant.EnvID,
 		run.ID.FunctionID,
 		run.ID.RunID,
@@ -1196,14 +1206,13 @@ func TestExecutorScheduleRateLimit(t *testing.T) {
 		QueueDefaultKey:        redis_state.QueueDefaultKey,
 	})
 
-	queueShard := redis_state.QueueShard{Name: consts.DefaultQueueShardName, RedisClient: unshardedClient.Queue(), Kind: string(enums.QueueShardKindRedis)}
-
-	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (redis_state.QueueShard, error) {
-		return queueShard, nil
+	queueOpts := []queue.QueueOpt{
+		queue.WithIdempotencyTTL(time.Hour),
 	}
+	queueShard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), queueOpts...)
 
-	queueShards := map[string]redis_state.QueueShard{
-		consts.DefaultQueueShardName: queueShard,
+	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (queue.QueueShard, error) {
+		return queueShard, nil
 	}
 
 	var sm state.Manager
@@ -1215,13 +1224,19 @@ func TestExecutorScheduleRateLimit(t *testing.T) {
 	require.NoError(t, err)
 	smv2 := redis_state.MustRunServiceV2(sm)
 
-	queueOpts := []redis_state.QueueOpt{
-		redis_state.WithIdempotencyTTL(time.Hour),
-		redis_state.WithShardSelector(shardSelector),
-		redis_state.WithQueueShardClients(queueShards),
-	}
-
-	rq := redis_state.NewQueue(queueShard, queueOpts...)
+	rq, err := queue.New(
+		context.Background(),
+		"test-queue",
+		queueShard,
+		map[string]queue.QueueShard{
+			queueShard.Name(): queueShard,
+		},
+		func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
+			return queueShard, nil
+		},
+		queueOpts...,
+	)
+	require.NoError(t, err)
 
 	rl := ratelimit.New(ctx, unshardedClient.Global().Client(), "{ratelimit}:")
 
@@ -1267,7 +1282,7 @@ func TestExecutorScheduleRateLimit(t *testing.T) {
 	// Job should have been scheduled
 	jobsAfterSchedule, err := rq.RunJobs(
 		ctx,
-		queueShard.Name,
+		queueShard.Name(),
 		run.ID.Tenant.EnvID,
 		run.ID.FunctionID,
 		run.ID.RunID,
@@ -1391,14 +1406,13 @@ func TestExecutorScheduleBacklogSizeLimit(t *testing.T) {
 		QueueDefaultKey:        redis_state.QueueDefaultKey,
 	})
 
-	queueShard := redis_state.QueueShard{Name: consts.DefaultQueueShardName, RedisClient: unshardedClient.Queue(), Kind: string(enums.QueueShardKindRedis)}
-
-	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (redis_state.QueueShard, error) {
-		return queueShard, nil
+	queueOpts := []queue.QueueOpt{
+		queue.WithIdempotencyTTL(time.Hour),
 	}
+	queueShard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), queueOpts...)
 
-	queueShards := map[string]redis_state.QueueShard{
-		consts.DefaultQueueShardName: queueShard,
+	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (queue.QueueShard, error) {
+		return queueShard, nil
 	}
 
 	var sm state.Manager
@@ -1410,13 +1424,19 @@ func TestExecutorScheduleBacklogSizeLimit(t *testing.T) {
 	require.NoError(t, err)
 	smv2 := redis_state.MustRunServiceV2(sm)
 
-	queueOpts := []redis_state.QueueOpt{
-		redis_state.WithIdempotencyTTL(time.Hour),
-		redis_state.WithShardSelector(shardSelector),
-		redis_state.WithQueueShardClients(queueShards),
-	}
-
-	rq := redis_state.NewQueue(queueShard, queueOpts...)
+	rq, err := queue.New(
+		context.Background(),
+		"test-queue",
+		queueShard,
+		map[string]queue.QueueShard{
+			queueShard.Name(): queueShard,
+		},
+		func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
+			return queueShard, nil
+		},
+		queueOpts...,
+	)
+	require.NoError(t, err)
 
 	fll := &fakeLimitLifecycle{}
 
@@ -1469,7 +1489,7 @@ func TestExecutorScheduleBacklogSizeLimit(t *testing.T) {
 	// Job should have been scheduled
 	jobsAfterSchedule, err := rq.RunJobs(
 		ctx,
-		queueShard.Name,
+		queueShard.Name(),
 		run.ID.Tenant.EnvID,
 		run.ID.FunctionID,
 		run.ID.RunID,

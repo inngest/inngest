@@ -9,8 +9,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/expr"
 	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
-	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/oklog/ulid/v2"
@@ -216,7 +216,7 @@ func (m manager) Write(ctx context.Context, index Index, pauses ...*state.Pause)
 	// If this is larger than the max buffer len, schedule a new block write.  We only
 	// enqueue this job once per index ID, using queue singletons to handle these.
 	if n >= m.bs.BlockSize() && m.flusher != nil {
-		if err := m.flusher.Enqueue(ctx, index); err != nil && !errors.Is(err, redis_state.ErrQueueItemExists) {
+		if err := m.flusher.Enqueue(ctx, index); err != nil && !errors.Is(err, queue.ErrQueueItemExists) {
 			logger.StdlibLogger(ctx).Error("error attempting to flush block", "error", err)
 		}
 	}

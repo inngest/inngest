@@ -1,12 +1,10 @@
-package redis_state
+package queue
 
 import (
 	"github.com/inngest/inngest/pkg/enums"
-
-	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 )
 
-func (q PartitionConstraintConfig) HasOutdatedThrottle(qi osqueue.QueueItem) enums.OutdatedThrottleReason {
+func (q PartitionConstraintConfig) HasOutdatedThrottle(qi QueueItem) enums.OutdatedThrottleReason {
 	itemThrottle := qi.Data.Throttle
 	constraintThrottle := q.Throttle
 

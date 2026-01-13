@@ -7,7 +7,6 @@ import (
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/google/uuid"
-	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
@@ -23,7 +22,7 @@ func TestQueuePartitionLease(t *testing.T) {
 	idA, idB, idC := uuid.New(), uuid.New(), uuid.New()
 	atA, atB, atC := now, now.Add(time.Second), now.Add(2*time.Second)
 
-	pA := QueuePartition{ID: idA.String(), FunctionID: &idA}
+	pA := osqueue.QueuePartition{ID: idA.String(), FunctionID: &idA}
 
 	r := miniredis.RunT(t)
 
@@ -34,21 +33,21 @@ func TestQueuePartitionLease(t *testing.T) {
 	require.NoError(t, err)
 	defer rc.Close()
 
-	q := NewQueue(QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName})
+	_, shard := newQueue(t, rc)
 	ctx := context.Background()
 
-	_, err = q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{FunctionID: idA}, atA, osqueue.EnqueueOpts{})
+	_, err = shard.EnqueueItem(ctx, osqueue.QueueItem{FunctionID: idA}, atA, osqueue.EnqueueOpts{})
 	require.NoError(t, err)
-	_, err = q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{FunctionID: idB}, atB, osqueue.EnqueueOpts{})
+	_, err = shard.EnqueueItem(ctx, osqueue.QueueItem{FunctionID: idB}, atB, osqueue.EnqueueOpts{})
 	require.NoError(t, err)
-	_, err = q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{FunctionID: idC}, atC, osqueue.EnqueueOpts{})
+	_, err = shard.EnqueueItem(ctx, osqueue.QueueItem{FunctionID: idC}, atC, osqueue.EnqueueOpts{})
 	require.NoError(t, err)
 
 	t.Run("Partitions are in order after enqueueing", func(t *testing.T) {
-		items, err := q.PartitionPeek(ctx, true, time.Now().Add(time.Hour), PartitionPeekMax)
+		items, err := shard.PartitionPeek(ctx, true, time.Now().Add(time.Hour), osqueue.PartitionPeekMax)
 		require.NoError(t, err)
 		require.Len(t, items, 3)
-		require.EqualValues(t, []*QueuePartition{
+		require.EqualValues(t, []*osqueue.QueuePartition{
 			{ID: idA.String(), FunctionID: &idA, AccountID: uuid.Nil},
 			{ID: idB.String(), FunctionID: &idB, AccountID: uuid.Nil},
 			{ID: idC.String(), FunctionID: &idC, AccountID: uuid.Nil},
@@ -60,7 +59,7 @@ func TestQueuePartitionLease(t *testing.T) {
 	t.Run("It leases a partition", func(t *testing.T) {
 		// Lease the first item now.
 		leasedAt := time.Now()
-		leaseID, capacity, err := q.PartitionLease(ctx, &pA, time.Until(leaseUntil))
+		leaseID, capacity, err := shard.PartitionLease(ctx, &pA, time.Until(leaseUntil))
 		require.NoError(t, err)
 		require.NotNil(t, leaseID)
 		require.NotZero(t, capacity)
@@ -69,14 +68,14 @@ func TestQueuePartitionLease(t *testing.T) {
 		<-time.After(50 * time.Millisecond)
 
 		t.Run("It updates the partition score", func(t *testing.T) {
-			items, err := q.PartitionPeek(ctx, true, now.Add(time.Hour), PartitionPeekMax)
+			items, err := shard.PartitionPeek(ctx, true, now.Add(time.Hour), osqueue.PartitionPeekMax)
 
 			// Require the lease ID is within 25 MS of the expected value.
 			require.WithinDuration(t, leaseUntil, ulid.Time(leaseID.Time()), 25*time.Millisecond)
 
 			require.NoError(t, err)
 			require.Len(t, items, 3)
-			require.EqualValues(t, []*QueuePartition{
+			require.EqualValues(t, []*osqueue.QueuePartition{
 				{ID: idB.String(), FunctionID: &idB, AccountID: uuid.Nil},
 				{ID: idC.String(), FunctionID: &idC, AccountID: uuid.Nil},
 				{
@@ -93,8 +92,8 @@ func TestQueuePartitionLease(t *testing.T) {
 		})
 
 		t.Run("It can't lease an existing partition lease", func(t *testing.T) {
-			id, capacity, err := q.PartitionLease(ctx, &pA, time.Second*29)
-			require.Equal(t, ErrPartitionAlreadyLeased, err)
+			id, capacity, err := shard.PartitionLease(ctx, &pA, time.Second*29)
+			require.Equal(t, osqueue.ErrPartitionAlreadyLeased, err)
 			require.Nil(t, id)
 			require.Zero(t, capacity)
 
@@ -108,7 +107,7 @@ func TestQueuePartitionLease(t *testing.T) {
 
 		requirePartitionScoreEquals(t, r, &idA, leaseUntil)
 
-		id, capacity, err := q.PartitionLease(ctx, &pA, time.Second*5)
+		id, capacity, err := shard.PartitionLease(ctx, &pA, time.Second*5)
 		require.Nil(t, err)
 		require.NotNil(t, id)
 		require.NotZero(t, capacity)
@@ -122,7 +121,7 @@ func TestQueuePartitionLease(t *testing.T) {
 		// Enqueueing an item
 		ck := createConcurrencyKey(enums.ConcurrencyScopeFn, fnID, "test", 1)
 
-		_, err := q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{
+		_, err := shard.EnqueueItem(ctx, osqueue.QueueItem{
 			FunctionID: fnID,
 			Data: osqueue.Item{
 				CustomConcurrencyKeys: []state.CustomConcurrency{ck},
@@ -133,7 +132,7 @@ func TestQueuePartitionLease(t *testing.T) {
 		defaultPartition := getDefaultPartition(t, r, fnID)
 
 		leaseUntil := now.Add(3 * time.Second)
-		leaseID, capacity, err := q.PartitionLease(ctx, &defaultPartition, time.Until(leaseUntil))
+		leaseID, capacity, err := shard.PartitionLease(ctx, &defaultPartition, time.Until(leaseUntil))
 		require.NoError(t, err)
 		require.NotNil(t, leaseID)
 		require.NotZero(t, capacity)
@@ -145,73 +144,75 @@ func TestQueuePartitionLease(t *testing.T) {
 		t.Run("With partition concurrency limits", func(t *testing.T) {
 			r.FlushAll()
 
-			// Only allow a single leased item
-			q.partitionConstraintConfigGetter = func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
-				return PartitionConstraintConfig{
-					Concurrency: PartitionConcurrency{
-						AccountConcurrency:  1,
-						FunctionConcurrency: 1,
-					},
-				}
-			}
+			_, shard := newQueue(t, rc,
+				osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
+					// Only allow a single leased item
+					return osqueue.PartitionConstraintConfig{
+						Concurrency: osqueue.PartitionConcurrency{
+							AccountConcurrency:  1,
+							FunctionConcurrency: 1,
+						},
+					}
+				}))
 
 			fnID := uuid.New()
 			// Create a new item
-			itemA, err := q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{FunctionID: fnID}, start, osqueue.EnqueueOpts{})
+			itemA, err := shard.EnqueueItem(ctx, osqueue.QueueItem{FunctionID: fnID}, start, osqueue.EnqueueOpts{})
 			require.NoError(t, err)
-			_, err = q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{FunctionID: fnID}, start, osqueue.EnqueueOpts{})
+			_, err = shard.EnqueueItem(ctx, osqueue.QueueItem{FunctionID: fnID}, start, osqueue.EnqueueOpts{})
 			require.NoError(t, err)
 			// Use the new item's workflow ID
-			p := QueuePartition{ID: itemA.FunctionID.String(), FunctionID: &itemA.FunctionID}
+			p := osqueue.QueuePartition{ID: itemA.FunctionID.String(), FunctionID: &itemA.FunctionID}
 
 			t.Run("Leases with capacity", func(t *testing.T) {
-				_, err = q.Lease(ctx, itemA, 5*time.Second, time.Now(), nil)
+				_, err = shard.Lease(ctx, itemA, 5*time.Second, time.Now(), nil)
 				require.NoError(t, err)
 			})
 
 			t.Run("Partition lease errors without capacity", func(t *testing.T) {
-				leaseId, _, err := q.PartitionLease(ctx, &p, 5*time.Second)
+				leaseId, _, err := shard.PartitionLease(ctx, &p, 5*time.Second)
 				require.Nil(t, leaseId, "No lease id when leasing fails.\n%s", r.Dump())
 				require.Error(t, err)
-				require.ErrorIs(t, err, ErrPartitionConcurrencyLimit)
+				require.ErrorIs(t, err, osqueue.ErrPartitionConcurrencyLimit)
 			})
 		})
 
 		t.Run("With account concurrency limits", func(t *testing.T) {
 			r.FlushAll()
 
-			// Only allow a single leased item via account limits
-			q.partitionConstraintConfigGetter = func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
-				return PartitionConstraintConfig{
-					Concurrency: PartitionConcurrency{
-						AccountConcurrency:  1,
-						FunctionConcurrency: 100,
-					},
-				}
-			}
+			_, shard := newQueue(t, rc,
+				osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
+					// Only allow a single leased item via account limits
+					return osqueue.PartitionConstraintConfig{
+						Concurrency: osqueue.PartitionConcurrency{
+							AccountConcurrency:  1,
+							FunctionConcurrency: 100,
+						},
+					}
+				}))
 
 			acctId := uuid.New()
 
 			// Create a new item
-			itemA, err := q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{FunctionID: uuid.New(), Data: osqueue.Item{Identifier: state.Identifier{AccountID: acctId}}}, start, osqueue.EnqueueOpts{})
+			itemA, err := shard.EnqueueItem(ctx, osqueue.QueueItem{FunctionID: uuid.New(), Data: osqueue.Item{Identifier: state.Identifier{AccountID: acctId}}}, start, osqueue.EnqueueOpts{})
 			require.NoError(t, err)
 
-			_, err = q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{FunctionID: uuid.New(), Data: osqueue.Item{Identifier: state.Identifier{AccountID: acctId}}}, start, osqueue.EnqueueOpts{})
+			_, err = shard.EnqueueItem(ctx, osqueue.QueueItem{FunctionID: uuid.New(), Data: osqueue.Item{Identifier: state.Identifier{AccountID: acctId}}}, start, osqueue.EnqueueOpts{})
 			require.NoError(t, err)
 
 			// Use the new item's workflow ID
-			p := QueuePartition{AccountID: acctId, FunctionID: &itemA.FunctionID}
+			p := osqueue.QueuePartition{AccountID: acctId, FunctionID: &itemA.FunctionID}
 
 			t.Run("Leases with capacity", func(t *testing.T) {
-				_, err = q.Lease(ctx, itemA, 5*time.Second, time.Now(), nil)
+				_, err = shard.Lease(ctx, itemA, 5*time.Second, time.Now(), nil)
 				require.NoError(t, err)
 			})
 
 			t.Run("Partition lease errors without capacity", func(t *testing.T) {
-				leaseId, _, err := q.PartitionLease(ctx, &p, 5*time.Second)
+				leaseId, _, err := shard.PartitionLease(ctx, &p, 5*time.Second)
 				require.Nil(t, leaseId, "No lease id when leasing fails.\n%s", r.Dump())
 				require.Error(t, err)
-				require.ErrorIs(t, err, ErrAccountConcurrencyLimit)
+				require.ErrorIs(t, err, osqueue.ErrAccountConcurrencyLimit)
 			})
 		})
 
@@ -219,27 +220,30 @@ func TestQueuePartitionLease(t *testing.T) {
 			r.FlushAll()
 			// Only allow a single leased item via account limits
 			ckHash := util.XXHash("key-expr")
-			q.partitionConstraintConfigGetter = func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
-				return PartitionConstraintConfig{
-					Concurrency: PartitionConcurrency{
-						AccountConcurrency:  100,
-						FunctionConcurrency: 100,
-						CustomConcurrencyKeys: []CustomConcurrencyLimit{
-							{
-								Scope:               enums.ConcurrencyScopeAccount,
-								HashedKeyExpression: ckHash,
-								Limit:               1,
+
+			_, shard := newQueue(t, rc,
+				osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
+					// Only allow a single leased item via account limits
+					return osqueue.PartitionConstraintConfig{
+						Concurrency: osqueue.PartitionConcurrency{
+							AccountConcurrency:  100,
+							FunctionConcurrency: 100,
+							CustomConcurrencyKeys: []osqueue.CustomConcurrencyLimit{
+								{
+									Scope:               enums.ConcurrencyScopeAccount,
+									HashedKeyExpression: ckHash,
+									Limit:               1,
+								},
 							},
 						},
-					},
-				}
-			}
+					}
+				}))
 
 			accountId := uuid.New()
 			ck := createConcurrencyKey(enums.ConcurrencyScopeAccount, accountId, "foo", 1)
 
 			// Create a new item
-			itemA, err := q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{
+			itemA, err := shard.EnqueueItem(ctx, osqueue.QueueItem{
 				FunctionID: uuid.New(),
 				Data: osqueue.Item{
 					Identifier: state.Identifier{AccountID: accountId},
@@ -254,7 +258,7 @@ func TestQueuePartitionLease(t *testing.T) {
 			}, start, osqueue.EnqueueOpts{})
 			require.NoError(t, err)
 
-			_, err = q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{
+			_, err = shard.EnqueueItem(ctx, osqueue.QueueItem{
 				FunctionID: uuid.New(),
 				Data: osqueue.Item{
 					Identifier: state.Identifier{AccountID: accountId},
@@ -269,17 +273,17 @@ func TestQueuePartitionLease(t *testing.T) {
 			require.NoError(t, err)
 
 			t.Run("Leases with capacity", func(t *testing.T) {
-				_, err = q.Lease(ctx, itemA, 5*time.Second, time.Now(), nil)
+				_, err = shard.Lease(ctx, itemA, 5*time.Second, time.Now(), nil)
 				require.NoError(t, err)
 			})
 
 			t.Run("Partition lease on default fn does not error without capacity", func(t *testing.T) {
-				p := QueuePartition{FunctionID: &itemA.FunctionID, AccountID: accountId}
+				p := osqueue.QueuePartition{FunctionID: &itemA.FunctionID, AccountID: accountId}
 
 				// Since we don't peek and lease concurrency key queue partitions anymore,
 				// we won't check for custom concurrency limits ahead of processing items.
 				// Leasing a default partition works even though the concurrency key has no additional capacity.
-				leaseId, _, err := q.PartitionLease(ctx, &p, 5*time.Second)
+				leaseId, _, err := shard.PartitionLease(ctx, &p, 5*time.Second)
 				require.NotNil(t, leaseId, "Expected lease id.\n%s", r.Dump())
 				require.NoError(t, err)
 			})
@@ -289,38 +293,39 @@ func TestQueuePartitionLease(t *testing.T) {
 	t.Run("disabling constraint checks should work", func(t *testing.T) {
 		r.FlushAll()
 
-		// Only allow a single leased item
-		q.partitionConstraintConfigGetter = func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
-			return PartitionConstraintConfig{
-				Concurrency: PartitionConcurrency{
-					AccountConcurrency:  1,
-					FunctionConcurrency: 1,
-				},
-			}
-		}
+		_, shard := newQueue(t, rc,
+			osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
+				// Only allow a single leased item via account limits
+				return osqueue.PartitionConstraintConfig{
+					Concurrency: osqueue.PartitionConcurrency{
+						AccountConcurrency:  1,
+						FunctionConcurrency: 1,
+					},
+				}
+			}))
 
 		start := time.Now()
 
 		fnID := uuid.New()
 		// Create a new item
-		itemA, err := q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{FunctionID: fnID}, start, osqueue.EnqueueOpts{})
+		itemA, err := shard.EnqueueItem(ctx, osqueue.QueueItem{FunctionID: fnID}, start, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
-		_, err = q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{FunctionID: fnID}, start, osqueue.EnqueueOpts{})
+		_, err = shard.EnqueueItem(ctx, osqueue.QueueItem{FunctionID: fnID}, start, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 		// Use the new item's workflow ID
-		p := QueuePartition{ID: itemA.FunctionID.String(), FunctionID: &itemA.FunctionID}
+		p := osqueue.QueuePartition{ID: itemA.FunctionID.String(), FunctionID: &itemA.FunctionID}
 
-		_, err = q.Lease(ctx, itemA, 5*time.Second, time.Now(), nil)
+		_, err = shard.Lease(ctx, itemA, 5*time.Second, time.Now(), nil)
 		require.NoError(t, err)
 
 		// Should fail without skipping
-		leaseId, _, err := q.PartitionLease(ctx, &p, 5*time.Second)
+		leaseId, _, err := shard.PartitionLease(ctx, &p, 5*time.Second)
 		require.Nil(t, leaseId, "No lease id when leasing fails.\n%s", r.Dump())
 		require.Error(t, err)
-		require.ErrorIs(t, err, ErrPartitionConcurrencyLimit)
+		require.ErrorIs(t, err, osqueue.ErrPartitionConcurrencyLimit)
 
 		// Should work with skip
-		leaseId, _, err = q.PartitionLease(ctx, &p, 5*time.Second, PartitionLeaseOptionDisableLeaseChecks(true))
+		leaseId, _, err = shard.PartitionLease(ctx, &p, 5*time.Second, osqueue.PartitionLeaseOptionDisableLeaseChecks(true))
 		require.NoError(t, err)
 		require.NotNil(t, leaseId)
 	})
