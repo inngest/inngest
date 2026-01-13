@@ -47,7 +47,13 @@ export interface UseInsightsSavedQueriesReturn {
 }
 
 export function useInsightsSavedQueries(): UseInsightsSavedQueriesReturn {
-  const [result, reexecute] = useQuery({ query: insightsSavedQueriesQuery });
+  // Pause during SSR to avoid executing authenticated queries before client hydration
+  // This ensures the query only runs after authentication is available in the browser
+  const [result, reexecute] = useQuery({
+    query: insightsSavedQueriesQuery,
+    pause: typeof window === 'undefined',
+  });
+
   const { deleteQuery, saveQuery, shareQuery, updateQuery } =
     useModifySavedQueries();
 
