@@ -3,7 +3,6 @@ package redis_state
 import (
 	"context"
 	"encoding/json"
-	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -23,49 +22,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type constraintApiDebugLifecycles struct {
-	acquireCalls []constraintapi.OnCapacityLeaseAcquiredData
-	extendCalls  []constraintapi.OnCapacityLeaseExtendedData
-	releaseCalls []constraintapi.OnCapacityLeaseReleasedData
-	l            sync.Mutex
-}
-
-// OnCapacityLeaseAcquired implements constraintapi.ConstraintAPILifecycleHooks.
-func (c *constraintApiDebugLifecycles) OnCapacityLeaseAcquired(ctx context.Context, data constraintapi.OnCapacityLeaseAcquiredData) error {
-	c.l.Lock()
-	defer c.l.Unlock()
-	c.acquireCalls = append(c.acquireCalls, data)
-	return nil
-}
-
-// OnCapacityLeaseExtended implements constraintapi.ConstraintAPILifecycleHooks.
-func (c *constraintApiDebugLifecycles) OnCapacityLeaseExtended(ctx context.Context, data constraintapi.OnCapacityLeaseExtendedData) error {
-	c.l.Lock()
-	defer c.l.Unlock()
-	c.extendCalls = append(c.extendCalls, data)
-	return nil
-}
-
-// OnCapacityLeaseReleased implements constraintapi.ConstraintAPILifecycleHooks.
-func (c *constraintApiDebugLifecycles) OnCapacityLeaseReleased(ctx context.Context, data constraintapi.OnCapacityLeaseReleasedData) error {
-	c.l.Lock()
-	defer c.l.Unlock()
-	c.releaseCalls = append(c.releaseCalls, data)
-	return nil
-}
-
-func (c *constraintApiDebugLifecycles) reset() {
-	c.l.Lock()
-	defer c.l.Unlock()
-	c.acquireCalls = nil
-	c.extendCalls = nil
-	c.releaseCalls = nil
-}
-
-func newConstraintAPIDebugLifecycles() *constraintApiDebugLifecycles {
-	return &constraintApiDebugLifecycles{}
-}
-
 func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 	r := miniredis.RunT(t)
 	rc, err := rueidis.NewClient(rueidis.ClientOption{
@@ -81,7 +37,7 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 	l := logger.StdlibLogger(ctx, logger.WithLoggerLevel(logger.LevelTrace))
 	ctx = logger.WithStdlib(ctx, l)
 
-	cmLifecycles := newConstraintAPIDebugLifecycles()
+	cmLifecycles := constraintapi.NewConstraintAPIDebugLifecycles()
 	cm, err := constraintapi.NewRedisCapacityManager(
 		constraintapi.WithClock(clock),
 		constraintapi.WithEnableDebugLogs(true),
@@ -99,7 +55,7 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 	reset := func() {
 		r.FlushAll()
 		r.SetTime(clock.Now())
-		cmLifecycles.reset()
+		cmLifecycles.Reset()
 	}
 
 	accountID := uuid.New()
@@ -191,7 +147,7 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 
 		// No extend calls should be fired
 		require.Equal(t, 1, int(counter))
-		require.Equal(t, 0, len(cmLifecycles.extendCalls))
+		require.Equal(t, 0, len(cmLifecycles.ExtendCalls))
 	})
 
 	t.Run("with constraint api and valid lease", func(t *testing.T) {
@@ -264,7 +220,7 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, resp.Leases, 1)
 
-		require.Len(t, cmLifecycles.acquireCalls, 1)
+		require.Len(t, cmLifecycles.AcquireCalls, 1)
 
 		var counter int64
 
@@ -299,10 +255,10 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 		service.Wait()
 
 		// Expect at least 1 extend call
-		require.Greater(t, len(cmLifecycles.extendCalls), 0)
+		require.Greater(t, len(cmLifecycles.ExtendCalls), 0)
 
 		// Expect exactly 1 release call
-		require.Equal(t, len(cmLifecycles.releaseCalls), 1)
+		require.Equal(t, len(cmLifecycles.ReleaseCalls), 1)
 	})
 }
 
@@ -321,7 +277,7 @@ func TestQueueProcessorPreLeaseWithConstraintAPI(t *testing.T) {
 	l := logger.StdlibLogger(ctx, logger.WithLoggerLevel(logger.LevelTrace))
 	ctx = logger.WithStdlib(ctx, l)
 
-	cmLifecycles := newConstraintAPIDebugLifecycles()
+	cmLifecycles := constraintapi.NewConstraintAPIDebugLifecycles()
 	cm, err := constraintapi.NewRedisCapacityManager(
 		constraintapi.WithClock(clock),
 		constraintapi.WithEnableDebugLogs(true),
@@ -339,7 +295,7 @@ func TestQueueProcessorPreLeaseWithConstraintAPI(t *testing.T) {
 	reset := func() {
 		r.FlushAll()
 		r.SetTime(clock.Now())
-		cmLifecycles.reset()
+		cmLifecycles.Reset()
 	}
 
 	accountID := uuid.New()
@@ -397,9 +353,9 @@ func TestQueueProcessorPreLeaseWithConstraintAPI(t *testing.T) {
 		err = iter.Process(ctx, &qi)
 		require.NoError(t, err)
 
-		require.Equal(t, 0, len(cmLifecycles.acquireCalls))
-		require.Equal(t, 0, len(cmLifecycles.extendCalls))
-		require.Equal(t, 0, len(cmLifecycles.releaseCalls))
+		require.Equal(t, 0, len(cmLifecycles.AcquireCalls))
+		require.Equal(t, 0, len(cmLifecycles.ExtendCalls))
+		require.Equal(t, 0, len(cmLifecycles.ReleaseCalls))
 	})
 
 	t.Run("with constraint api and no active lease", func(t *testing.T) {
@@ -447,9 +403,9 @@ func TestQueueProcessorPreLeaseWithConstraintAPI(t *testing.T) {
 		err = iter.Process(ctx, &qi)
 		require.NoError(t, err)
 
-		require.Equal(t, 1, len(cmLifecycles.acquireCalls))
-		require.Equal(t, 0, len(cmLifecycles.extendCalls))
-		require.Equal(t, 0, len(cmLifecycles.releaseCalls))
+		require.Equal(t, 1, len(cmLifecycles.AcquireCalls))
+		require.Equal(t, 0, len(cmLifecycles.ExtendCalls))
+		require.Equal(t, 0, len(cmLifecycles.ReleaseCalls))
 	})
 
 	t.Run("with constraint api and active capacity lease", func(t *testing.T) {
@@ -520,9 +476,9 @@ func TestQueueProcessorPreLeaseWithConstraintAPI(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, resp.Leases, 1)
 
-		require.Len(t, cmLifecycles.acquireCalls, 1)
+		require.Len(t, cmLifecycles.AcquireCalls, 1)
 
-		cmLifecycles.reset()
+		cmLifecycles.Reset()
 
 		// Set capacity lease ID
 		qi.CapacityLease = &osqueue.CapacityLease{
@@ -545,9 +501,9 @@ func TestQueueProcessorPreLeaseWithConstraintAPI(t *testing.T) {
 		require.NoError(t, err)
 
 		// No further Constraint API calls should be made
-		require.Equal(t, 0, len(cmLifecycles.acquireCalls))
-		require.Equal(t, 0, len(cmLifecycles.extendCalls))
-		require.Equal(t, 0, len(cmLifecycles.releaseCalls))
+		require.Equal(t, 0, len(cmLifecycles.AcquireCalls))
+		require.Equal(t, 0, len(cmLifecycles.ExtendCalls))
+		require.Equal(t, 0, len(cmLifecycles.ReleaseCalls))
 
 		// Expect item to be sent to worker with capacity lease + request to disable constraint updates
 		item := <-q.Workers()
@@ -572,7 +528,7 @@ func TestPartitionProcessRequeueAfterLimitedWithConstraintAPI(t *testing.T) {
 	l := logger.StdlibLogger(ctx, logger.WithLoggerLevel(logger.LevelTrace))
 	ctx = logger.WithStdlib(ctx, l)
 
-	cmLifecycles := newConstraintAPIDebugLifecycles()
+	cmLifecycles := constraintapi.NewConstraintAPIDebugLifecycles()
 	cm, err := constraintapi.NewRedisCapacityManager(
 		constraintapi.WithClock(clock),
 		constraintapi.WithEnableDebugLogs(true),
@@ -590,7 +546,7 @@ func TestPartitionProcessRequeueAfterLimitedWithConstraintAPI(t *testing.T) {
 	reset := func() {
 		r.FlushAll()
 		r.SetTime(clock.Now())
-		cmLifecycles.reset()
+		cmLifecycles.Reset()
 	}
 
 	accountID := uuid.New()
@@ -687,7 +643,7 @@ func TestPartitionProcessRequeueAfterLimitedWithConstraintAPI(t *testing.T) {
 		require.Equal(t, 8, zcard(t, rc, partitionZsetKey(p, kg)))
 
 		// expect no calls to constraintapi
-		require.Len(t, cmLifecycles.acquireCalls, 0)
+		require.Len(t, cmLifecycles.AcquireCalls, 0)
 	})
 
 	t.Run("without constraintapi and no leases using processPartition", func(t *testing.T) {
@@ -743,7 +699,7 @@ func TestPartitionProcessRequeueAfterLimitedWithConstraintAPI(t *testing.T) {
 		require.Equal(t, 8, zcard(t, rc, partitionZsetKey(p, kg)))
 
 		// expect no calls to constraintapi
-		require.Len(t, cmLifecycles.acquireCalls, 0)
+		require.Len(t, cmLifecycles.AcquireCalls, 0)
 
 		// partition was requeued
 		require.Equal(t, start.Add(osqueue.PartitionConcurrencyLimitRequeueExtension).Unix(), int64(score(t, r, kg.GlobalPartitionIndex(), p.ID)))
@@ -824,11 +780,11 @@ func TestPartitionProcessRequeueAfterLimitedWithConstraintAPI(t *testing.T) {
 		require.Equal(t, 8, zcard(t, rc, partitionZsetKey(p, kg)))
 
 		// expect 2 successful and 1 failed calls to constraintapi
-		require.Len(t, cmLifecycles.acquireCalls, 3)
-		require.Len(t, cmLifecycles.acquireCalls[0].GrantedLeases, 1)
-		require.Len(t, cmLifecycles.acquireCalls[1].GrantedLeases, 1)
-		require.Len(t, cmLifecycles.acquireCalls[2].GrantedLeases, 0)
-		require.Equal(t, cmLifecycles.acquireCalls[2].LimitingConstraints[0].Kind, constraintapi.ConstraintKindConcurrency)
+		require.Len(t, cmLifecycles.AcquireCalls, 3)
+		require.Len(t, cmLifecycles.AcquireCalls[0].GrantedLeases, 1)
+		require.Len(t, cmLifecycles.AcquireCalls[1].GrantedLeases, 1)
+		require.Len(t, cmLifecycles.AcquireCalls[2].GrantedLeases, 0)
+		require.Equal(t, cmLifecycles.AcquireCalls[2].LimitingConstraints[0].Kind, constraintapi.ConstraintKindConcurrency)
 	})
 
 	t.Run("with constraintapi and no leases using processPartition", func(t *testing.T) {
@@ -884,11 +840,11 @@ func TestPartitionProcessRequeueAfterLimitedWithConstraintAPI(t *testing.T) {
 		require.Equal(t, 8, zcard(t, rc, partitionZsetKey(p, kg)))
 
 		// expect 2 successful and 1 failed calls to constraintapi
-		require.Len(t, cmLifecycles.acquireCalls, 3)
-		require.Len(t, cmLifecycles.acquireCalls[0].GrantedLeases, 1)
-		require.Len(t, cmLifecycles.acquireCalls[1].GrantedLeases, 1)
-		require.Len(t, cmLifecycles.acquireCalls[2].GrantedLeases, 0)
-		require.Equal(t, cmLifecycles.acquireCalls[2].LimitingConstraints[0].Kind, constraintapi.ConstraintKindConcurrency)
+		require.Len(t, cmLifecycles.AcquireCalls, 3)
+		require.Len(t, cmLifecycles.AcquireCalls[0].GrantedLeases, 1)
+		require.Len(t, cmLifecycles.AcquireCalls[1].GrantedLeases, 1)
+		require.Len(t, cmLifecycles.AcquireCalls[2].GrantedLeases, 0)
+		require.Equal(t, cmLifecycles.AcquireCalls[2].LimitingConstraints[0].Kind, constraintapi.ConstraintKindConcurrency)
 
 		// partition was requeued
 		require.Equal(t, start.Add(osqueue.PartitionConcurrencyLimitRequeueExtension).Unix(), int64(score(t, r, kg.GlobalPartitionIndex(), p.ID)))
@@ -984,9 +940,9 @@ func TestPartitionProcessRequeueAfterLimitedWithConstraintAPI(t *testing.T) {
 			require.NoError(t, err)
 			require.Len(t, resp.Leases, 1)
 
-			require.Len(t, cmLifecycles.acquireCalls, 1)
+			require.Len(t, cmLifecycles.AcquireCalls, 1)
 
-			cmLifecycles.reset()
+			cmLifecycles.Reset()
 
 			// Set capacity lease ID on first item
 			item.CapacityLease = &osqueue.CapacityLease{
@@ -1028,10 +984,10 @@ func TestPartitionProcessRequeueAfterLimitedWithConstraintAPI(t *testing.T) {
 		require.Equal(t, 8, zcard(t, rc, partitionZsetKey(p, kg)))
 
 		// expect 1 successful and 1 failed calls to constraintapi
-		require.Len(t, cmLifecycles.acquireCalls, 2)
-		require.Len(t, cmLifecycles.acquireCalls[0].GrantedLeases, 1)
-		require.Len(t, cmLifecycles.acquireCalls[1].GrantedLeases, 0)
-		require.Equal(t, cmLifecycles.acquireCalls[1].LimitingConstraints[0].Kind, constraintapi.ConstraintKindConcurrency)
+		require.Len(t, cmLifecycles.AcquireCalls, 2)
+		require.Len(t, cmLifecycles.AcquireCalls[0].GrantedLeases, 1)
+		require.Len(t, cmLifecycles.AcquireCalls[1].GrantedLeases, 0)
+		require.Equal(t, cmLifecycles.AcquireCalls[1].LimitingConstraints[0].Kind, constraintapi.ConstraintKindConcurrency)
 
 		// partition was requeued
 		require.Equal(t, start.Add(osqueue.PartitionConcurrencyLimitRequeueExtension).Unix(), int64(score(t, r, kg.GlobalPartitionIndex(), p.ID)))

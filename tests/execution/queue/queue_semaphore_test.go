@@ -1,0 +1,134 @@
+package queue
+
+import (
+	"context"
+	"testing"
+
+	"github.com/alicebob/miniredis/v2"
+	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/constraintapi"
+	"github.com/inngest/inngest/pkg/execution/queue"
+	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/execution/state/redis_state"
+	"github.com/inngest/inngest/pkg/logger"
+	"github.com/jonboulle/clockwork"
+	"github.com/redis/rueidis"
+	"github.com/stretchr/testify/require"
+)
+
+func TestQueueSemaphore(t *testing.T) {
+	ctx := context.Background()
+
+	l := logger.StdlibLogger(ctx, logger.WithLoggerLevel(logger.LevelDebug))
+	ctx = logger.WithStdlib(ctx, l)
+
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	r := miniredis.RunT(t)
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	clock := clockwork.NewFakeClock()
+
+	queueClient := redis_state.NewQueueClient(rc, redis_state.QueueDefaultKey)
+
+	cmLifecycles := constraintapi.NewConstraintAPIDebugLifecycles()
+	cm, err := constraintapi.NewRedisCapacityManager(
+		constraintapi.WithClock(clock),
+		constraintapi.WithEnableDebugLogs(true),
+		constraintapi.WithQueueShards(map[string]rueidis.Client{
+			"test": queueClient.Client(),
+		}),
+		constraintapi.WithQueueStateKeyPrefix(redis_state.QueueDefaultKey),
+		constraintapi.WithRateLimitClient(rc),
+		constraintapi.WithRateLimitKeyPrefix("rl"),
+		constraintapi.WithLifecycles(cmLifecycles),
+	)
+	require.NoError(t, err)
+
+	options := []queue.QueueOpt{
+		queue.WithClock(clock),
+		queue.WithCapacityManager(cm),
+		queue.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
+			return true, true
+		}),
+		queue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p queue.PartitionIdentifier) queue.PartitionConstraintConfig {
+			return queue.PartitionConstraintConfig{
+				FunctionVersion: 1,
+				Concurrency: queue.PartitionConcurrency{
+					AccountConcurrency:  1,
+					FunctionConcurrency: 1,
+				},
+			}
+		}),
+	}
+
+	shard := redis_state.NewQueueShard("test", queueClient, options...)
+
+	q, err := queue.New(ctx, "test", shard, nil, nil, options...)
+	require.NoError(t, err)
+
+	accountID, envID, fnID := uuid.New(), uuid.New(), uuid.New()
+
+	qi1, err := shard.EnqueueItem(ctx, queue.QueueItem{
+		Data: queue.Item{
+			Kind: queue.KindStart,
+			Identifier: state.Identifier{
+				AccountID:   accountID,
+				WorkspaceID: envID,
+				WorkflowID:  fnID,
+			},
+			WorkspaceID: envID,
+		},
+		FunctionID: fnID,
+	}, clock.Now(), queue.EnqueueOpts{})
+	require.NoError(t, err)
+
+	qi2, err := shard.EnqueueItem(ctx, queue.QueueItem{
+		Data: queue.Item{
+			Kind: queue.KindStart,
+			Identifier: state.Identifier{
+				AccountID:   accountID,
+				WorkspaceID: envID,
+				WorkflowID:  fnID,
+			},
+			WorkspaceID: envID,
+		},
+		FunctionID: fnID,
+	}, clock.Now(), queue.EnqueueOpts{})
+	require.NoError(t, err)
+
+	partition := queue.ItemPartition(ctx, qi1)
+
+	iter := queue.ProcessorIterator{
+		Partition:  &partition,
+		Items:      []*queue.QueueItem{&qi1, &qi2},
+		Queue:      q,
+		Denies:     queue.NewLeaseDenyList(),
+		StaticTime: clock.Now(),
+	}
+
+	require.Equal(t, int64(0), q.Semaphore().Count())
+	require.False(t, iter.IsRequeuable())
+
+	err = iter.Iterate(ctx)
+	require.NoError(t, err)
+
+	require.Len(t, cmLifecycles.AcquireCalls, 2)
+
+	require.Equal(t, len(cmLifecycles.AcquireCalls[0].GrantedLeases), 1)
+	require.Equal(t, len(cmLifecycles.AcquireCalls[0].LimitingConstraints), 0)
+
+	require.Equal(t, len(cmLifecycles.AcquireCalls[1].GrantedLeases), 0)
+	require.Equal(t, len(cmLifecycles.AcquireCalls[1].LimitingConstraints), 1)
+	require.Equal(t, cmLifecycles.AcquireCalls[1].LimitingConstraints[0].Kind, constraintapi.ConstraintKindConcurrency)
+
+	require.True(t, iter.IsRequeuable())
+
+	require.Equal(t, int64(1), q.Semaphore().Count())
+}
