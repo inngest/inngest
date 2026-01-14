@@ -1432,8 +1432,8 @@ func TestQueuePartitionRequeue(t *testing.T) {
 			require.Equal(t, osqueue.ErrPartitionNotFound, err)
 		})
 
-		// We no longer delete queues on requeue when the concurrency queue is not empty;  this should happen on a final dequeue.
-		t.Run("Does not garbage collect the partition with a non-empty concurrency queue", func(t *testing.T) {
+		// We no longer delete queues on requeue when the partition scavenger index is not empty;  this should happen on a final dequeue.
+		t.Run("Does not garbage collect the partition with a non-empty partition scavenger index", func(t *testing.T) {
 			r.FlushAll()
 
 			now := time.Now()
