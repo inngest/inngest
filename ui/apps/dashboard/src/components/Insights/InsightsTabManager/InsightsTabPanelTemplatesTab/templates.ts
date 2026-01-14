@@ -31,7 +31,7 @@ const COUNT_ALIAS_MAP: Record<'failed' | 'cancelled' | 'finished', string> = {
 
 function makeFunctionStatusQuery(outcome: 'failed' | 'cancelled' | 'finished') {
   const base = `SELECT
-    simpleJSONExtractString(data, 'function_id') as function_id,
+    data.function_id AS function_id,
     COUNT(*) as ${COUNT_ALIAS_MAP[outcome]}
 FROM
     events
