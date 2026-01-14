@@ -3,6 +3,7 @@ package state_store
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/execution/state"
@@ -21,6 +22,151 @@ type StateStoreLuaCompatibilityTestCase struct {
 	ServerType string                // "valkey" or "garnet"
 	ValkeyOpts []helper.ValkeyOption // Optional Valkey configuration
 	GarnetOpts []helper.GarnetOption // Optional Garnet configuration
+}
+
+// TestUpdateMetadataIsFieldEmpty tests that the is_field_empty function in updateMetadata.lua
+// works correctly across both Garnet and Valkey
+func TestUpdateMetadataIsFieldEmpty(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping functional tests")
+	}
+
+	testCases := []StateStoreLuaCompatibilityTestCase{
+		{
+			Name:       "Valkey",
+			ServerType: "valkey",
+			ValkeyOpts: []helper.ValkeyOption{
+				helper.WithValkeyImage(testutil.ValkeyDefaultImage),
+			},
+		},
+		{
+			Name:       "Garnet",
+			ServerType: "garnet",
+			GarnetOpts: []helper.GarnetOption{
+				helper.WithImage(testutil.GarnetDefaultImage),
+				helper.WithConfiguration(&helper.GarnetConfiguration{
+					EnableLua: true,
+				}),
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.Name, func(t *testing.T) {
+			ctx := context.Background()
+
+			setup := func(t *testing.T) state.Manager {
+				var client rueidis.Client
+
+				switch tc.ServerType {
+				case "valkey":
+					container, err := helper.StartValkey(t, tc.ValkeyOpts...)
+					require.NoError(t, err)
+					t.Cleanup(func() { _ = container.Terminate(ctx) })
+
+					client, err = helper.NewValkeyClient(container.Addr, container.Username, container.Password, false)
+					require.NoError(t, err)
+					t.Cleanup(func() { client.Close() })
+
+				case "garnet":
+					container, err := helper.StartGarnet(t, tc.GarnetOpts...)
+					require.NoError(t, err)
+					t.Cleanup(func() { _ = container.Terminate(ctx) })
+
+					client, err = helper.NewRedisClient(container.Addr, container.Username, container.Password)
+					require.NoError(t, err)
+					t.Cleanup(func() { client.Close() })
+
+				default:
+					t.Fatalf("unknown server type: %s", tc.ServerType)
+				}
+
+				unsharded := redis_state.NewUnshardedClient(client, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
+				mgr, err := redis_state.New(ctx,
+					redis_state.WithUnshardedClient(unsharded),
+					redis_state.WithShardedClient(redis_state.NewShardedClient(redis_state.ShardedClientOpts{
+						UnshardedClient:        unsharded,
+						FunctionRunStateClient: client,
+						BatchClient:            client,
+						StateDefaultKey:        redis_state.StateDefaultKey,
+						QueueDefaultKey:        redis_state.QueueDefaultKey,
+						FnRunIsSharded:         redis_state.AlwaysShardOnRun,
+					})),
+				)
+				require.NoError(t, err)
+				return mgr
+			}
+
+			t.Run("sat empty gets updated", func(t *testing.T) {
+				mgr := setup(t)
+
+				runID := ulid.Make()
+				id := state.Identifier{
+					AccountID:   uuid.New(),
+					WorkspaceID: uuid.New(),
+					AppID:       uuid.New(),
+					WorkflowID:  uuid.New(),
+					RunID:       runID,
+				}
+
+				_, err := mgr.New(ctx, state.Input{
+					Identifier:     id,
+					EventBatchData: []map[string]any{{"name": "test", "data": map[string]any{}}},
+				})
+				require.NoError(t, err)
+
+				startedAt := time.Now()
+				err = mgr.UpdateMetadata(ctx, id.AccountID, runID, state.MetadataUpdate{
+					RequestVersion: 1,
+					StartedAt:      startedAt,
+				})
+				require.NoError(t, err)
+
+				metadata, err := mgr.Metadata(ctx, id.AccountID, runID)
+				require.NoError(t, err)
+				require.Equal(t, startedAt.UnixMilli(), metadata.StartedAt.UnixMilli())
+			})
+
+			t.Run("sat with value not updated", func(t *testing.T) {
+				mgr := setup(t)
+
+				runID := ulid.Make()
+				id := state.Identifier{
+					AccountID:   uuid.New(),
+					WorkspaceID: uuid.New(),
+					AppID:       uuid.New(),
+					WorkflowID:  uuid.New(),
+					RunID:       runID,
+				}
+
+				_, err := mgr.New(ctx, state.Input{
+					Identifier:     id,
+					EventBatchData: []map[string]any{{"name": "test", "data": map[string]any{}}},
+				})
+				require.NoError(t, err)
+
+				firstStartedAt := time.Now()
+				err = mgr.UpdateMetadata(ctx, id.AccountID, runID, state.MetadataUpdate{
+					RequestVersion: 1,
+					StartedAt:      firstStartedAt,
+				})
+				require.NoError(t, err)
+
+				// Try to update with a different time - should NOT update
+				secondStartedAt := firstStartedAt.Add(time.Hour)
+				err = mgr.UpdateMetadata(ctx, id.AccountID, runID, state.MetadataUpdate{
+					RequestVersion: 2,
+					StartedAt:      secondStartedAt,
+				})
+				require.NoError(t, err)
+
+				metadata, err := mgr.Metadata(ctx, id.AccountID, runID)
+				require.NoError(t, err)
+				require.Equal(t, firstStartedAt.UnixMilli(), metadata.StartedAt.UnixMilli(), "sat should NOT be updated when already set")
+				require.Equal(t, 2, metadata.RequestVersion, "rv should be updated")
+			})
+		})
+	}
 }
 
 func TestStateStoreLuaCompatibility(t *testing.T) {
