@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestQueueSemaphore(t *testing.T) {
+func TestQueueSemaphoreWithConstraintAPI(t *testing.T) {
 	ctx := context.Background()
 
 	l := logger.StdlibLogger(ctx, logger.WithLoggerLevel(logger.LevelDebug))
