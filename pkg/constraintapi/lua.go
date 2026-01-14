@@ -352,46 +352,30 @@ func executeLuaScript(ctx context.Context, name string, client rueidis.Client, c
 	// Execute script and convert response to bytes (we return JSON from all scripts)
 	rawRes, err := scripts[name].Exec(ctx, client, keys, args).AsBytes()
 
+	status, retry := luaError(err)
+
 	// Report duration
 	metrics.HistogramConstraintAPILuaScriptDuration(ctx, clock.Since(start), metrics.HistogramOpt{
 		PkgName: pkgName,
 		Tags: map[string]any{
 			"operation": name,
-			"success":   err != nil,
+			"status":    status,
 		},
 	})
 
-	// Properly handle errors
 	if err != nil {
-		// Mark error as retriable in case of timeouts
-		if isTimeout(err) {
-			metrics.IncrConstraintAPILuaScriptExecutionCounter(ctx, 1, metrics.CounterOpt{
-				PkgName: pkgName,
-				Tags: map[string]any{
-					"operation": name,
-					"status":    "timeout",
-				},
-			})
-			return nil, errs.Wrap(0, true, "%s script timed out: %w", name, err)
-		}
-
-		metrics.IncrConstraintAPILuaScriptExecutionCounter(ctx, 1, metrics.CounterOpt{
-			PkgName: pkgName,
-			Tags: map[string]any{
-				"operation": name,
-				"status":    "error",
-			},
-		})
-		return nil, errs.Wrap(0, false, "%s script failed: %w", name, err)
+		return nil, errs.Wrap(0, retry, "%s script failed: %w", name, err)
 	}
 
-	// Track success
-	metrics.IncrConstraintAPILuaScriptExecutionCounter(ctx, 1, metrics.CounterOpt{
-		PkgName: pkgName,
-		Tags: map[string]any{
-			"operation": name,
-			"status":    "success",
-		},
-	})
 	return rawRes, nil
+}
+
+func luaError(err error) (status string, retry bool) {
+	if isTimeout(err) {
+		return "timeout", true
+	}
+	if err != nil {
+		return "error", false
+	}
+	return "success", false
 }
