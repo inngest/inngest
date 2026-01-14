@@ -708,15 +708,6 @@ func IncrMetadataSpansTotal(ctx context.Context, opts CounterOpt) {
 	})
 }
 
-func IncrConstraintAPILuaScriptExecutionCounter(ctx context.Context, count int64, opts CounterOpt) {
-	RecordCounterMetric(ctx, count, CounterOpt{
-		PkgName:     opts.PkgName,
-		MetricName:  "constraintapi_redis_lua_script_executions_total",
-		Description: "Total number of Lua scripts executed by Constraint API",
-		Tags:        opts.Tags,
-	})
-}
-
 func IncrConstraintAPIScavengerTotalAccountsCounter(ctx context.Context, count int64, opts CounterOpt) {
 	RecordCounterMetric(ctx, count, CounterOpt{
 		PkgName:     opts.PkgName,
