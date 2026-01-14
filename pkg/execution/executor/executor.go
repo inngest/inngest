@@ -850,6 +850,12 @@ func (e *executor) schedule(
 							"status": "limited",
 						},
 					})
+					metrics.IncrScheduleConstraintsHitCounter(ctx, "rate_limit", metrics.CounterOpt{
+						PkgName: pkgName,
+						Tags: map[string]any{
+							"constraint_api": false,
+						},
+					})
 					return nil, ErrFunctionRateLimited
 				}
 

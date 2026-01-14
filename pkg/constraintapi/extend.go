@@ -85,9 +85,9 @@ func (r *redisCapacityManager) ExtendLease(ctx context.Context, req *CapacityExt
 		"args", args,
 	)
 
-	rawRes, err := scripts["extend"].Exec(ctx, client, keys, args).AsBytes()
-	if err != nil {
-		return nil, errs.Wrap(0, false, "extend script failed: %w", err)
+	rawRes, internalErr := executeLuaScript(ctx, "extend", client, r.clock, keys, args)
+	if internalErr != nil {
+		return nil, internalErr
 	}
 
 	parsedResponse := extendLeaseScriptResponse{}

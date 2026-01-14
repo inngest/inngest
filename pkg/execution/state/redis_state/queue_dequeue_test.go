@@ -756,7 +756,7 @@ func TestQueueDequeue(t *testing.T) {
 		require.NoError(t, err)
 
 		t.Run("The lease exists in the partition queue", func(t *testing.T) {
-			count, err := shard.InProgress(ctx, "p", p.FunctionID.String())
+			count, err := shard.RunningCount(ctx, *p.FunctionID)
 			require.NoError(t, err)
 			require.EqualValues(t, 1, count, r.Dump())
 		})
@@ -782,7 +782,7 @@ func TestQueueDequeue(t *testing.T) {
 		})
 
 		t.Run("It should remove the item from the concurrency partition's queue", func(t *testing.T) {
-			count, err := shard.InProgress(ctx, "p", p.FunctionID.String())
+			count, err := shard.RunningCount(ctx, *p.FunctionID)
 			require.NoError(t, err)
 			require.EqualValues(t, 0, count)
 		})

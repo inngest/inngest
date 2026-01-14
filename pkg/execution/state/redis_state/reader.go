@@ -100,34 +100,26 @@ func (q *queue) StatusCount(ctx context.Context, workflowID uuid.UUID, status st
 	return count, nil
 }
 
-func (q *queue) RunningCount(ctx context.Context, workflowID uuid.UUID) (int64, error) {
+func (q *queue) RunningCount(ctx context.Context, functionID uuid.UUID) (int64, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "RunningCount"), redis_telemetry.ScopeQueue)
 
 	rc := q.RedisClient.unshardedRc
 
-	// Load the partition for a given queue.  This allows us to generate the concurrency
-	// key properly via the given function.
-	//
-	// TODO: Remove the ability to change keys based off of initialized inputs.  It's more trouble than
-	// it's worth, and ends up meaning we have more queries to write (such as this) in order to load
-	// relevant data.
-	cmd := rc.B().Hget().Key(q.RedisClient.kg.PartitionItem()).Field(workflowID.String()).Build()
-	enc, err := rc.Do(ctx, cmd).AsBytes()
-	if rueidis.IsRedisNil(err) {
-		return 0, nil
-	}
-	if err != nil {
-		return 0, fmt.Errorf("error fetching partition: %w", err)
-	}
-	item := &osqueue.QueuePartition{}
-	if err = json.Unmarshal(enc, item); err != nil {
-		return 0, fmt.Errorf("error reading partition item: %w", err)
-	}
-
 	var count int64
-	// Fetch the concurrency via the partition concurrency name.
-	key := q.RedisClient.kg.Concurrency("p", workflowID.String())
-	cmd = rc.B().Zcard().Key(key).Build()
+	// Fetch the number of in progress items using the scavenger index.
+	// NOTE: We previously used the concurrency ZSET, which will no longer be populated by Lease in case
+	// a valid capacity lease was acquired using the Constraint API. This is to prevent double-counting
+	// concurrency. For this reason, we need to track in progress queue items in a partition using a new index.
+	key := q.RedisClient.kg.PartitionScavengerIndex(functionID.String())
+
+	// Only consider items in the future (do not count expired jobs which will be scavenged)
+	from := fmt.Sprintf("%d", q.Clock.Now().UnixMilli())
+	cmd := rc.B().
+		Zcount().
+		Key(key).
+		Min(from).
+		Max("+inf").
+		Build()
 	cnt, err := rc.Do(ctx, cmd).AsInt64()
 	if err != nil {
 		return 0, fmt.Errorf("error inspecting job count: %w", err)

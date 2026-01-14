@@ -19,7 +19,7 @@ local keyAccountPartitions    = KEYS[4] -- accounts:$accountID:partition:sorted 
 local partitionMeta           = KEYS[5]
 local keyFnMetadata           = KEYS[6]           -- fnMeta:$id - hash
 local keyPartitionZset        = KEYS[7]
-local partitionConcurrencyKey = KEYS[8] -- We can only GC a partition if no running jobs occur.
+local partitionScavengerIndex = KEYS[8] -- We can only GC a partition if no running jobs occur.
 local queueKey                = KEYS[9]
 local keyShadowPartitionSet   = KEYS[10]
 
@@ -49,7 +49,7 @@ redis.call("HSET", partitionKey, partitionID, cjson.encode(existing))
 
 -- If there are no items in the workflow queue, we can safely remove the
 -- partition.
-if tonumber(redis.call("ZCARD", keyPartitionZset)) == 0 and tonumber(redis.call("ZCARD", partitionConcurrencyKey)) == 0 then
+if tonumber(redis.call("ZCARD", keyPartitionZset)) == 0 and tonumber(redis.call("ZCARD", partitionScavengerIndex)) == 0 then
     redis.call("ZREM", keyGlobalPartitionPtr, partitionID)    -- Remove the partition from global index
 
     if account_is_set(keyAccountPartitions) then

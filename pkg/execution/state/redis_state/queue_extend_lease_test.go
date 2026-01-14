@@ -36,7 +36,7 @@ func TestQueueExtendLease(t *testing.T) {
 	)
 	kg := shard.Client().kg
 
-	start := time.Now().Truncate(time.Second)
+	start := clock.Now().Truncate(time.Second)
 	t.Run("It leases an item", func(t *testing.T) {
 		item, err := shard.EnqueueItem(ctx, osqueue.QueueItem{}, start, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
@@ -46,8 +46,8 @@ func TestQueueExtendLease(t *testing.T) {
 
 		p := osqueue.ItemPartition(ctx, item)
 
-		now := time.Now()
-		id, err := shard.Lease(ctx, item, time.Second, time.Now(), nil)
+		now := clock.Now()
+		id, err := shard.Lease(ctx, item, time.Second, clock.Now(), nil)
 		require.NoError(t, err)
 
 		item = getQueueItem(t, r, item.ID)
@@ -55,7 +55,7 @@ func TestQueueExtendLease(t *testing.T) {
 		require.EqualValues(t, id, item.LeaseID)
 		require.WithinDuration(t, now.Add(time.Second), ulid.Time(item.LeaseID.Time()), 20*time.Millisecond)
 
-		now = time.Now()
+		now = clock.Now()
 		nextID, err := shard.ExtendLease(ctx, item, *id, 10*time.Second)
 		require.NoError(t, err)
 
@@ -69,7 +69,7 @@ func TestQueueExtendLease(t *testing.T) {
 
 		t.Run("It extends the score of the partition concurrency queue", func(t *testing.T) {
 			at := ulid.Time(nextID.Time())
-			scores := concurrencyQueueScores(t, r, partitionConcurrencyKey(p, kg), time.Now())
+			scores := concurrencyQueueScores(t, r, partitionConcurrencyKey(p, kg), clock.Now())
 			require.Len(t, scores, 1)
 			// Ensure that the score matches the lease.
 			require.Equal(t, at, scores[item.ID], "%s not extended\n%s", partitionConcurrencyKey(p, kg), r.Dump())

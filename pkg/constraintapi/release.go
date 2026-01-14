@@ -74,9 +74,9 @@ func (r *redisCapacityManager) Release(ctx context.Context, req *CapacityRelease
 		"args", args,
 	)
 
-	rawRes, err := scripts["release"].Exec(ctx, client, keys, args).AsBytes()
-	if err != nil {
-		return nil, errs.Wrap(0, false, "release script failed: %w", err)
+	rawRes, internalErr := executeLuaScript(ctx, "release", client, r.clock, keys, args)
+	if internalErr != nil {
+		return nil, internalErr
 	}
 
 	parsedResponse := releaseScriptResponse{}

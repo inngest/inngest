@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/hashicorp/go-multierror"
@@ -55,24 +54,7 @@ func (q *queue) Scavenge(ctx context.Context, limit int) (int, error) {
 
 	// Each of the items is a concurrency queue with lost items.
 	var resultErr error
-	for _, partition := range pKeys {
-		// NOTE: If this is not a fully-qualified Redis key to a concurrency queue,
-		// assume that this is an old queueName or function ID
-		// This is for backwards compatibility with the previous concurrency index item format
-		queueKey := partition
-		if !isKeyConcurrencyPointerItem(partition) {
-			queueKey = kg.Concurrency("p", partition)
-		}
-
-		// Drop key queues from concurrency pointer - these should not be in here
-		if strings.HasPrefix(queueKey, "{q:v1}:concurrency:custom:") {
-			err := client.Do(ctx, client.B().Zrem().Key(kg.ConcurrencyIndex()).Member(partition).Build()).Error()
-			if err != nil {
-				resultErr = multierror.Append(resultErr, fmt.Errorf("error removing key queue '%s' from concurrency pointer: %w", partition, err))
-			}
-			continue
-		}
-
+	for _, partitionID := range pKeys {
 		scavengePartition := func(queueKey string, kind string) (int, int, error) {
 			start := q.Clock.Now()
 			defer func() {
@@ -94,7 +76,7 @@ func (q *queue) Scavenge(ctx context.Context, limit int) (int, error) {
 				Build()
 			itemIDs, err := client.Do(ctx, cmd).AsStrSlice()
 			if err != nil && err != rueidis.Nil {
-				return 0, 0, fmt.Errorf("error querying partition concurrency queue '%s' during scavenge: %w", partition, err)
+				return 0, 0, fmt.Errorf("error querying partition concurrency queue '%s' during scavenge: %w", partitionID, err)
 			}
 			if len(itemIDs) == 0 {
 				return 0, 0, nil
@@ -104,7 +86,7 @@ func (q *queue) Scavenge(ctx context.Context, limit int) (int, error) {
 			cmd = client.B().Hmget().Key(kg.QueueItem()).Field(itemIDs...).Build()
 			jobs, err := client.Do(ctx, cmd).AsStrSlice()
 			if err != nil && err != rueidis.Nil {
-				return 0, 0, fmt.Errorf("error fetching jobs for concurrency queue '%s' during scavenge: %w", partition, err)
+				return 0, 0, fmt.Errorf("error fetching jobs for concurrency queue '%s' during scavenge: %w", partitionID, err)
 			}
 
 			var counter int
@@ -112,7 +94,7 @@ func (q *queue) Scavenge(ctx context.Context, limit int) (int, error) {
 				itemID := itemIDs[i]
 				if item == "" {
 					l.Error("missing queue item in concurrency queue",
-						"index_partition", partition,
+						"index_partition", partitionID,
 						"concurrency_queue_key", queueKey,
 						"item_id", itemID,
 					)
@@ -120,7 +102,7 @@ func (q *queue) Scavenge(ctx context.Context, limit int) (int, error) {
 					// Drop item reference to prevent spinning on this item
 					err := client.Do(ctx, client.B().Zrem().Key(queueKey).Member(itemID).Build()).Error()
 					if err != nil {
-						resultErr = multierror.Append(resultErr, fmt.Errorf("error removing missing item '%s' from concurrency queue '%s': %w", itemID, partition, err))
+						resultErr = multierror.Append(resultErr, fmt.Errorf("error removing missing item '%s' from concurrency queue '%s': %w", itemID, partitionID, err))
 					}
 					continue
 				}
@@ -140,7 +122,9 @@ func (q *queue) Scavenge(ctx context.Context, limit int) (int, error) {
 			return len(itemIDs), counter, nil
 		}
 
-		peekedFromIndex, scavengedFromIndex, err := scavengePartition(kg.PartitionScavengerIndex(partition), "partition_index")
+		keyPartitionScavengerIndex := kg.PartitionScavengerIndex(partitionID)
+
+		peekedFromIndex, scavengedFromIndex, err := scavengePartition(keyPartitionScavengerIndex, "partition_index")
 		if err != nil {
 			resultErr = multierror.Append(resultErr, fmt.Errorf("could not scavenge from scavenger index: %w", err))
 			continue
@@ -158,11 +142,11 @@ func (q *queue) Scavenge(ctx context.Context, limit int) (int, error) {
 			err := q.dropPartitionPointerIfEmpty(
 				ctx,
 				kg.ConcurrencyIndex(),
-				queueKey,
-				partition,
+				keyPartitionScavengerIndex,
+				partitionID,
 			)
 			if err != nil {
-				resultErr = multierror.Append(resultErr, fmt.Errorf("error dropping potentially empty pointer %q for partition %q: %w", partition, queueKey, err))
+				resultErr = multierror.Append(resultErr, fmt.Errorf("error dropping potentially empty pointer for partition %q: %w", partitionID, err))
 			}
 			continue
 		}

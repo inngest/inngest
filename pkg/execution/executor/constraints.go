@@ -128,7 +128,12 @@ func WithConstraints[T any](
 
 	// If the current action is not allowed, return
 	if !checkResult.allowed {
-		// TODO : should we record this?
+		metrics.IncrScheduleConstraintsHitCounter(ctx, "rate_limit", metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags: map[string]any{
+				"constraint_api": true,
+			},
+		})
 
 		// NOTE: Since Schedule only enforces RateLimit via the Constraint API, we know that
 		// we got rate limited if the action is not allowed.

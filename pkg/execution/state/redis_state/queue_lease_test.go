@@ -91,7 +91,7 @@ func TestQueueLease(t *testing.T) {
 		})
 
 		t.Run("It should add the item to the function's in-progress concurrency queue", func(t *testing.T) {
-			count, err := shard.InProgress(ctx, "p", fnID.String())
+			count, err := shard.RunningCount(ctx, fnID)
 			require.NoError(t, err)
 			require.EqualValues(t, 1, count, r.Dump())
 		})
@@ -144,7 +144,7 @@ func TestQueueLease(t *testing.T) {
 
 			// Now expired
 			t.Run("After expiry, no items should be in progress", func(t *testing.T) {
-				count, err := shard.InProgress(ctx, "p", p.FunctionID.String())
+				count, err := shard.RunningCount(ctx, *p.FunctionID)
 				require.NoError(t, err)
 				require.EqualValues(t, 0, count)
 			})
@@ -159,7 +159,7 @@ func TestQueueLease(t *testing.T) {
 			require.WithinDuration(t, now.Add(5*time.Second), ulid.Time(item.LeaseID.Time()), 20*time.Millisecond)
 
 			t.Run("Leasing an expired key has one in-progress", func(t *testing.T) {
-				count, err := shard.InProgress(ctx, "p", p.FunctionID.String())
+				count, err := shard.RunningCount(ctx, *p.FunctionID)
 				require.NoError(t, err)
 				require.EqualValues(t, 1, count)
 			})

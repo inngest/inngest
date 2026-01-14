@@ -1374,7 +1374,11 @@ func TestQueuePartitionRequeue(t *testing.T) {
 		qi, err := shard.EnqueueItem(ctx, osqueue.QueueItem{FunctionID: idA}, now, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
-		p := osqueue.QueuePartition{FunctionID: &qi.FunctionID, EnvID: &qi.WorkspaceID}
+		p := osqueue.QueuePartition{
+			ID:         qi.FunctionID.String(),
+			FunctionID: &qi.FunctionID,
+			EnvID:      &qi.WorkspaceID,
+		}
 
 		t.Run("Uses the next job item's time when requeueing with another job", func(t *testing.T) {
 			requirePartitionScoreEquals(t, r, &idA, now)
@@ -1432,11 +1436,11 @@ func TestQueuePartitionRequeue(t *testing.T) {
 			require.Equal(t, osqueue.ErrPartitionNotFound, err)
 		})
 
-		// We no longer delete queues on requeue when the concurrency queue is not empty;  this should happen on a final dequeue.
-		t.Run("Does not garbage collect the partition with a non-empty concurrency queue", func(t *testing.T) {
+		// We no longer delete queues on requeue when the partition scavenger index is not empty;  this should happen on a final dequeue.
+		t.Run("Does not garbage collect the partition with a non-empty partition scavenger index", func(t *testing.T) {
 			r.FlushAll()
 
-			now := time.Now()
+			now := clock.Now()
 			next = now.Add(10 * time.Second)
 
 			qi, err := shard.EnqueueItem(ctx, osqueue.QueueItem{FunctionID: idA}, now, osqueue.EnqueueOpts{})
@@ -1444,15 +1448,19 @@ func TestQueuePartitionRequeue(t *testing.T) {
 
 			requirePartitionScoreEquals(t, r, &idA, now)
 
-			// Move the queue item to the concurrency (in-progress) queue
+			// Simulate processing queue item, add to partition scavenger index
 			_, err = shard.Lease(ctx, qi, 10*time.Second, clock.Now(), nil)
 			require.NoError(t, err)
+			kg := shard.Client().kg
+			require.True(t, r.Exists(kg.PartitionScavengerIndex(idA.String())))
 
 			next = now.Add(time.Hour)
 
+			t.Log(p.ID)
+
 			// Requeuing cannot gc until queue item finishes processing
 			err = shard.PartitionRequeue(ctx, &p, next, false)
-			require.NoError(t, err)
+			require.NoError(t, err, r.Dump())
 
 			// So the partition metadata should still exist
 			loaded := getDefaultPartition(t, r, idA)
@@ -2551,7 +2559,7 @@ func getQueueItem(t *testing.T, r *miniredis.Miniredis, id string) osqueue.Queue
 
 func requirePartitionInProgress(t *testing.T, q RedisQueueShard, workflowID uuid.UUID, count int) {
 	t.Helper()
-	actual, err := q.InProgress(context.Background(), "p", workflowID.String())
+	actual, err := q.RunningCount(context.Background(), workflowID)
 	require.NoError(t, err)
 	require.EqualValues(t, count, actual)
 }

@@ -38,7 +38,7 @@ func TestItemLeaseConstraintCheck(t *testing.T) {
 	l := logger.StdlibLogger(ctx, logger.WithLoggerLevel(logger.LevelTrace))
 	ctx = logger.WithStdlib(ctx, l)
 
-	cmLifecycles := newConstraintAPIDebugLifecycles()
+	cmLifecycles := constraintapi.NewConstraintAPIDebugLifecycles()
 	cm, err := constraintapi.NewRedisCapacityManager(
 		constraintapi.WithClock(clock),
 		constraintapi.WithEnableDebugLogs(true),
@@ -56,7 +56,7 @@ func TestItemLeaseConstraintCheck(t *testing.T) {
 	reset := func() {
 		r.FlushAll()
 		r.SetTime(clock.Now())
-		cmLifecycles.reset()
+		cmLifecycles.Reset()
 	}
 
 	accountID := uuid.New()
@@ -131,9 +131,9 @@ func TestItemLeaseConstraintCheck(t *testing.T) {
 		require.True(t, res.SkipConstraintChecks)
 
 		// Do not expect a call for the system queue
-		require.Equal(t, 0, len(cmLifecycles.acquireCalls))
-		require.Equal(t, 0, len(cmLifecycles.extendCalls))
-		require.Equal(t, 0, len(cmLifecycles.releaseCalls))
+		require.Equal(t, 0, len(cmLifecycles.AcquireCalls))
+		require.Equal(t, 0, len(cmLifecycles.ExtendCalls))
+		require.Equal(t, 0, len(cmLifecycles.ReleaseCalls))
 	})
 
 	t.Run("skip constraintapi but require checks when missing identifier", func(t *testing.T) {
@@ -181,9 +181,9 @@ func TestItemLeaseConstraintCheck(t *testing.T) {
 		require.False(t, res.SkipConstraintChecks)
 
 		// Do not expect a ConstraintAPI call for missing identifiers
-		require.Equal(t, 0, len(cmLifecycles.acquireCalls))
-		require.Equal(t, 0, len(cmLifecycles.extendCalls))
-		require.Equal(t, 0, len(cmLifecycles.releaseCalls))
+		require.Equal(t, 0, len(cmLifecycles.AcquireCalls))
+		require.Equal(t, 0, len(cmLifecycles.ExtendCalls))
+		require.Equal(t, 0, len(cmLifecycles.ReleaseCalls))
 	})
 
 	t.Run("skip constraintapi but require checks when capacity manager not configured", func(t *testing.T) {
@@ -230,9 +230,9 @@ func TestItemLeaseConstraintCheck(t *testing.T) {
 		require.False(t, res.SkipConstraintChecks)
 
 		// Do not expect a ConstraintAPI call for missing capacity manager
-		require.Equal(t, 0, len(cmLifecycles.acquireCalls))
-		require.Equal(t, 0, len(cmLifecycles.extendCalls))
-		require.Equal(t, 0, len(cmLifecycles.releaseCalls))
+		require.Equal(t, 0, len(cmLifecycles.AcquireCalls))
+		require.Equal(t, 0, len(cmLifecycles.ExtendCalls))
+		require.Equal(t, 0, len(cmLifecycles.ReleaseCalls))
 	})
 
 	t.Run("skip constraintapi but require checks when feature flag disabled", func(t *testing.T) {
@@ -280,9 +280,9 @@ func TestItemLeaseConstraintCheck(t *testing.T) {
 		require.False(t, res.SkipConstraintChecks) // Require checks
 
 		// Do not expect a ConstraintAPI call for disabled feature flag
-		require.Equal(t, 0, len(cmLifecycles.acquireCalls))
-		require.Equal(t, 0, len(cmLifecycles.extendCalls))
-		require.Equal(t, 0, len(cmLifecycles.releaseCalls))
+		require.Equal(t, 0, len(cmLifecycles.AcquireCalls))
+		require.Equal(t, 0, len(cmLifecycles.ExtendCalls))
+		require.Equal(t, 0, len(cmLifecycles.ReleaseCalls))
 	})
 
 	t.Run("should not acquire lease with valid existing item lease", func(t *testing.T) {
@@ -326,9 +326,9 @@ func TestItemLeaseConstraintCheck(t *testing.T) {
 		require.True(t, res.SkipConstraintChecks)
 
 		// This time, we do not expect a call to the Constraint API, simply use the valid lease
-		require.Equal(t, 0, len(cmLifecycles.acquireCalls))
-		require.Equal(t, 0, len(cmLifecycles.extendCalls))
-		require.Equal(t, 0, len(cmLifecycles.releaseCalls))
+		require.Equal(t, 0, len(cmLifecycles.AcquireCalls))
+		require.Equal(t, 0, len(cmLifecycles.ExtendCalls))
+		require.Equal(t, 0, len(cmLifecycles.ReleaseCalls))
 	})
 
 	t.Run("should acquire lease with expired existing item lease", func(t *testing.T) {
@@ -372,9 +372,9 @@ func TestItemLeaseConstraintCheck(t *testing.T) {
 		require.True(t, res.SkipConstraintChecks)
 
 		// Expect call because lease expired
-		require.Equal(t, 1, len(cmLifecycles.acquireCalls))
-		require.Equal(t, 0, len(cmLifecycles.extendCalls))
-		require.Equal(t, 0, len(cmLifecycles.releaseCalls))
+		require.Equal(t, 1, len(cmLifecycles.AcquireCalls))
+		require.Equal(t, 0, len(cmLifecycles.ExtendCalls))
+		require.Equal(t, 0, len(cmLifecycles.ReleaseCalls))
 	})
 
 	t.Run("acquire lease from constraint api", func(t *testing.T) {
@@ -410,9 +410,9 @@ func TestItemLeaseConstraintCheck(t *testing.T) {
 		require.NotNil(t, res.CapacityLease)
 		require.True(t, res.SkipConstraintChecks)
 
-		require.Equal(t, 1, len(cmLifecycles.acquireCalls))
-		require.Equal(t, 0, len(cmLifecycles.extendCalls))
-		require.Equal(t, 0, len(cmLifecycles.releaseCalls))
+		require.Equal(t, 1, len(cmLifecycles.AcquireCalls))
+		require.Equal(t, 0, len(cmLifecycles.ExtendCalls))
+		require.Equal(t, 0, len(cmLifecycles.ReleaseCalls))
 	})
 
 	t.Run("lacking constraint capacity", func(t *testing.T) {
@@ -459,13 +459,13 @@ func TestItemLeaseConstraintCheck(t *testing.T) {
 		require.Nil(t, res.CapacityLease)
 		require.False(t, res.SkipConstraintChecks)
 
-		require.Equal(t, 1, len(cmLifecycles.acquireCalls))
-		require.Equal(t, 0, len(cmLifecycles.extendCalls))
-		require.Equal(t, 0, len(cmLifecycles.releaseCalls))
+		require.Equal(t, 1, len(cmLifecycles.AcquireCalls))
+		require.Equal(t, 0, len(cmLifecycles.ExtendCalls))
+		require.Equal(t, 0, len(cmLifecycles.ReleaseCalls))
 
-		require.Len(t, cmLifecycles.acquireCalls[0].GrantedLeases, 0)
-		require.Len(t, cmLifecycles.acquireCalls[0].LimitingConstraints, 1)
-		require.Equal(t, constraintapi.ConstraintKindConcurrency, cmLifecycles.acquireCalls[0].LimitingConstraints[0].Kind)
+		require.Len(t, cmLifecycles.AcquireCalls[0].GrantedLeases, 0)
+		require.Len(t, cmLifecycles.AcquireCalls[0].LimitingConstraints, 1)
+		require.Equal(t, constraintapi.ConstraintKindConcurrency, cmLifecycles.AcquireCalls[0].LimitingConstraints[0].Kind)
 	})
 }
 
@@ -484,7 +484,7 @@ func TestBacklogRefillConstraintCheck(t *testing.T) {
 	l := logger.StdlibLogger(ctx, logger.WithLoggerLevel(logger.LevelTrace))
 	ctx = logger.WithStdlib(ctx, l)
 
-	cmLifecycles := newConstraintAPIDebugLifecycles()
+	cmLifecycles := constraintapi.NewConstraintAPIDebugLifecycles()
 	cm, err := constraintapi.NewRedisCapacityManager(
 		constraintapi.WithClock(clock),
 		constraintapi.WithEnableDebugLogs(true),
@@ -502,7 +502,7 @@ func TestBacklogRefillConstraintCheck(t *testing.T) {
 	reset := func() {
 		r.FlushAll()
 		r.SetTime(clock.Now())
-		cmLifecycles.reset()
+		cmLifecycles.Reset()
 	}
 
 	accountID := uuid.New()
@@ -578,9 +578,9 @@ func TestBacklogRefillConstraintCheck(t *testing.T) {
 		require.False(t, res.SkipConstraintChecks)
 
 		// Do not expect a ConstraintAPI call for missing identifiers
-		require.Equal(t, 0, len(cmLifecycles.acquireCalls))
-		require.Equal(t, 0, len(cmLifecycles.extendCalls))
-		require.Equal(t, 0, len(cmLifecycles.releaseCalls))
+		require.Equal(t, 0, len(cmLifecycles.AcquireCalls))
+		require.Equal(t, 0, len(cmLifecycles.ExtendCalls))
+		require.Equal(t, 0, len(cmLifecycles.ReleaseCalls))
 	})
 
 	t.Run("skip constraintapi but require checks without capacity manager", func(t *testing.T) {
@@ -618,9 +618,9 @@ func TestBacklogRefillConstraintCheck(t *testing.T) {
 		require.False(t, res.SkipConstraintChecks)
 
 		// Do not expect a ConstraintAPI call for missing capacity manager
-		require.Equal(t, 0, len(cmLifecycles.acquireCalls))
-		require.Equal(t, 0, len(cmLifecycles.extendCalls))
-		require.Equal(t, 0, len(cmLifecycles.releaseCalls))
+		require.Equal(t, 0, len(cmLifecycles.AcquireCalls))
+		require.Equal(t, 0, len(cmLifecycles.ExtendCalls))
+		require.Equal(t, 0, len(cmLifecycles.ReleaseCalls))
 	})
 
 	t.Run("skip constraintapi but require checks with disabled feature flag", func(t *testing.T) {
@@ -659,9 +659,9 @@ func TestBacklogRefillConstraintCheck(t *testing.T) {
 		require.False(t, res.SkipConstraintChecks)
 
 		// Do not expect a ConstraintAPI call for missing capacity manager
-		require.Equal(t, 0, len(cmLifecycles.acquireCalls))
-		require.Equal(t, 0, len(cmLifecycles.extendCalls))
-		require.Equal(t, 0, len(cmLifecycles.releaseCalls))
+		require.Equal(t, 0, len(cmLifecycles.AcquireCalls))
+		require.Equal(t, 0, len(cmLifecycles.ExtendCalls))
+		require.Equal(t, 0, len(cmLifecycles.ReleaseCalls))
 	})
 
 	t.Run("acquire leases from constraintapi", func(t *testing.T) {
@@ -702,9 +702,9 @@ func TestBacklogRefillConstraintCheck(t *testing.T) {
 		require.True(t, res.SkipConstraintChecks)
 
 		// Expect exactly one acquire request
-		require.Equal(t, 1, len(cmLifecycles.acquireCalls))
-		require.Equal(t, 0, len(cmLifecycles.extendCalls))
-		require.Equal(t, 0, len(cmLifecycles.releaseCalls))
+		require.Equal(t, 1, len(cmLifecycles.AcquireCalls))
+		require.Equal(t, 0, len(cmLifecycles.ExtendCalls))
+		require.Equal(t, 0, len(cmLifecycles.ReleaseCalls))
 	})
 
 	t.Run("lacking capacity returns 0 leases from constraintapi", func(t *testing.T) {
@@ -754,9 +754,9 @@ func TestBacklogRefillConstraintCheck(t *testing.T) {
 		require.Equal(t, enums.QueueConstraintAccountConcurrency, res.LimitingConstraint)
 
 		// Expect exactly one acquire request
-		require.Equal(t, 1, len(cmLifecycles.acquireCalls))
-		require.Equal(t, 0, len(cmLifecycles.extendCalls))
-		require.Equal(t, 0, len(cmLifecycles.releaseCalls))
+		require.Equal(t, 1, len(cmLifecycles.AcquireCalls))
+		require.Equal(t, 0, len(cmLifecycles.ExtendCalls))
+		require.Equal(t, 0, len(cmLifecycles.ReleaseCalls))
 	})
 }
 

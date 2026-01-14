@@ -267,6 +267,16 @@ func ItemShadowPartition(ctx context.Context, i QueueItem) QueueShadowPartition 
 
 	accountID := i.Data.Identifier.AccountID
 
+	envID := i.Data.Identifier.WorkspaceID
+	if envID == uuid.Nil && i.WorkspaceID != uuid.Nil {
+		envID = i.WorkspaceID
+	}
+
+	fnID := i.Data.Identifier.WorkflowID
+	if fnID == uuid.Nil && i.FunctionID != uuid.Nil {
+		fnID = i.FunctionID
+	}
+
 	// The only case when we manually set a queueName is for system partitions
 	if queueName != nil {
 		var aID *uuid.UUID
@@ -287,7 +297,6 @@ func ItemShadowPartition(ctx context.Context, i QueueItem) QueueShadowPartition 
 		l.Error("unexpected missing accountID in ItemShadowPartition call", "item", i, "stack", stack)
 	}
 
-	fnID := i.FunctionID
 	if fnID == uuid.Nil {
 		stack := string(debug.Stack())
 		l.Error("unexpected missing functionID in ItemShadowPartition call", "item", i, "stack", stack)
@@ -299,7 +308,7 @@ func ItemShadowPartition(ctx context.Context, i QueueItem) QueueShadowPartition 
 
 		// Identifiers
 		FunctionID: &fnID,
-		EnvID:      &i.WorkspaceID,
+		EnvID:      &envID,
 		AccountID:  &accountID,
 	}
 }
