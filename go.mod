@@ -43,7 +43,7 @@ require (
 	github.com/graph-gophers/dataloader v5.0.0+incompatible
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.1
 	github.com/hashicorp/go-multierror v1.1.1
-	github.com/inngest/expr v0.0.0-20250827210420-250dd9c460ad
+	github.com/inngest/expr v0.0.0-20260114025228-45e41bb52d8c
 	github.com/inngest/go-httpstat v0.0.0-20250328150054-dfda91359d48
 	github.com/inngest/inngestgo v0.15.0
 	github.com/jackc/pgx/v5 v5.5.4
