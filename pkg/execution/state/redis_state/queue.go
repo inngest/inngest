@@ -1908,11 +1908,11 @@ func (q *queue) PartitionRequeue(ctx context.Context, p *osqueue.QueuePartition,
 		kg.FnMetadata(functionId),
 
 		partitionZsetKey(*p, kg), // Partition ZSET itself
-		kg.PartitionScavengerIndex(p.ID),
+		kg.PartitionScavengerIndex(p.Queue()),
 		kg.QueueItem(),
 
 		// Backlogs in shadow partition
-		kg.ShadowPartitionSet(p.ID),
+		kg.ShadowPartitionSet(p.Queue()),
 	}
 	force := 0
 	if forceAt {
