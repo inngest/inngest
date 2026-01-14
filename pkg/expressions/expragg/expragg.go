@@ -39,10 +39,22 @@ func NewAggregator(
 	if log == nil {
 		log = logger.StdlibLogger(ctx)
 	}
+
+	cache := ccache.New(ccache.Configure().
+		MaxSize(size).
+		ItemsToPrune(uint32(size) / 4).
+		OnDelete(func(item *ccache.Item) {
+			if bk, ok := item.Value().(*bookkeeper); ok {
+				if err := bk.ae.Close(); err != nil {
+					log.Error("error closing aggregate evaluator on eviction", "error", err)
+				}
+			}
+		}))
+
 	return &aggregator{
 		log:         log,
 		concurrency: concurrency,
-		records:     ccache.New(ccache.Configure().MaxSize(size).ItemsToPrune(uint32(size) / 4)),
+		records:     cache,
 		loader:      loader,
 		parser:      parser,
 		// use the package's exprEvaluator function as the actual logic which evaluates
@@ -226,6 +238,7 @@ func (a *aggregator) LoadEventEvaluator(ctx context.Context, wsID uuid.UUID, eve
 				Eval:        a.evaluator,
 				Concurrency: a.concurrency,
 				KV:          a.kv,
+				Log:         logger.From(ctx).SLog(),
 			}),
 			// updatedAt is a zero time.
 		}
