@@ -179,6 +179,12 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 		leaseOptions = append(leaseOptions, LeaseOptionDisableConstraintChecks(true))
 	}
 
+	// If we're limited by constraints, release semaphore early since we won't be leasing or processing
+	if constraintRes.LimitingConstraint != enums.QueueConstraintNotLimited {
+		p.Queue.Semaphore().Release(1)
+		metrics.WorkerQueueCapacityCounter(ctx, -1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": p.Queue.Shard().Name()}})
+	}
+
 	var leaseID *ulid.ULID
 	switch constraintRes.LimitingConstraint {
 	// If no constraints were hit (or we didn't invoke the Constraint API)
