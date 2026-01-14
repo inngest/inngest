@@ -59,6 +59,9 @@ type redisCapacityManager struct {
 	checkIdempotencyTTL           time.Duration
 
 	duplicateTracker *duplicateTracker
+
+	// acquireResponseCache caches lacking capacity responses to reduce Redis load
+	acquireResponseCache *acquireResponseCache
 }
 
 type RedisCapacityManagerOption func(m *redisCapacityManager)
@@ -154,6 +157,9 @@ func NewRedisCapacityManager(
 		constraintCheckIdempotencyTTL: ConstraintCheckIdempotencyTTL,
 		checkIdempotencyTTL:           CheckIdempotencyTTL,
 		duplicateTracker:              newDuplicateTracker(0), // disabled by default
+		acquireResponseCache: &acquireResponseCache{
+			enabled: false, // disabled by default
+		},
 	}
 
 	for _, rcmo := range options {

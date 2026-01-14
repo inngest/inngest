@@ -218,6 +218,38 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 		r.duplicateTracker.track(req.AccountID, fingerprint)
 	}
 
+	// Check acquire response cache if enabled
+	if r.acquireResponseCache != nil && r.acquireResponseCache.enabled {
+		// Try to get cached response for each constraint in the request
+		for _, constraint := range req.Constraints {
+			cacheKey := r.generateAcquireCacheKey(req.AccountID, req.FunctionID, &constraint)
+			if cacheKey == "" {
+				continue
+			}
+
+			item := r.acquireResponseCache.cache.Get(cacheKey)
+			if item != nil && !item.Expired() {
+				cachedResp := item.Value()
+
+				// Generate new RequestID for this response instance
+				newRequestID, err := ulid.New(ulid.Timestamp(r.clock.Now()), rand.Reader)
+				if err == nil {
+					// Create a copy of the response with new RequestID
+					respCopy := *cachedResp
+					respCopy.RequestID = newRequestID
+
+					l.Trace("returning cached acquire response",
+						"cache_key", cacheKey,
+						"original_request_id", cachedResp.RequestID,
+						"new_request_id", newRequestID,
+					)
+
+					return &respCopy, nil
+				}
+			}
+		}
+	}
+
 	// Deterministically compute this based on numScavengerShards and accountID
 	scavengerShard := r.scavengerShard(ctx, req.AccountID)
 
@@ -419,14 +451,37 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 		)
 
 		// lacking capacity
-		return &CapacityAcquireResponse{
+		response := &CapacityAcquireResponse{
 			RequestID:           requestID,
 			Leases:              leases,
 			LimitingConstraints: limitingConstraints,
 			RetryAfter:          retryAfter,
 			FairnessReduction:   parsedResponse.FairnessReduction,
 			internalDebugState:  parsedResponse,
-		}, nil
+		}
+
+		// Cache response if eligible and cache is enabled
+		if r.acquireResponseCache != nil && r.acquireResponseCache.enabled {
+			if r.shouldCacheAcquireResponse(response) {
+				// Cache under all applicable keys
+				for _, constraint := range limitingConstraints {
+					cacheKey := r.generateAcquireCacheKey(req.AccountID, req.FunctionID, &constraint)
+					if cacheKey != "" {
+						r.acquireResponseCache.cache.Set(
+							cacheKey,
+							response,
+							r.acquireResponseCache.ttl,
+						)
+						l.Trace("cached acquire response",
+							"cache_key", cacheKey,
+							"ttl_ms", r.acquireResponseCache.ttl.Milliseconds(),
+						)
+					}
+				}
+			}
+		}
+
+		return response, nil
 
 	case 4:
 		l.Trace("acquire while previous request state still exists")
