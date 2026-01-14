@@ -53,10 +53,14 @@ func TestQueueSemaphoreWithConstraintAPI(t *testing.T) {
 
 	options := []queue.QueueOpt{
 		queue.WithClock(clock),
+
+		// Use Constraint API
 		queue.WithCapacityManager(cm),
 		queue.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
 			return true, true
 		}),
+
+		// Simulate a limit of 1
 		queue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p queue.PartitionIdentifier) queue.PartitionConstraintConfig {
 			return queue.PartitionConstraintConfig{
 				FunctionVersion: 1,
@@ -113,22 +117,29 @@ func TestQueueSemaphoreWithConstraintAPI(t *testing.T) {
 		StaticTime: clock.Now(),
 	}
 
+	// Initially, the semaphore must be at 0
 	require.Equal(t, int64(0), q.Semaphore().Count())
 	require.False(t, iter.IsRequeuable())
 
+	// Attempt to process items sequentially
 	err = iter.Iterate(ctx)
 	require.NoError(t, err)
 
+	// Expect 2 Acquire requests
 	require.Len(t, cmLifecycles.AcquireCalls, 2)
 
+	// First Acquire request should have been successful
 	require.Equal(t, len(cmLifecycles.AcquireCalls[0].GrantedLeases), 1)
 	require.Equal(t, len(cmLifecycles.AcquireCalls[0].LimitingConstraints), 0)
 
+	// Second Acquire request should have been limited
 	require.Equal(t, len(cmLifecycles.AcquireCalls[1].GrantedLeases), 0)
 	require.Equal(t, len(cmLifecycles.AcquireCalls[1].LimitingConstraints), 1)
 	require.Equal(t, cmLifecycles.AcquireCalls[1].LimitingConstraints[0].Kind, constraintapi.ConstraintKindConcurrency)
 
 	require.True(t, iter.IsRequeuable())
 
+	// Verify semaphore only accounted for the first item
+	// This must not include the second item that got limited
 	require.Equal(t, int64(1), q.Semaphore().Count())
 }
