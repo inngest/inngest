@@ -9,6 +9,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"github.com/inngest/inngest/pkg/api/v2/apiv2base"
+	"github.com/inngest/inngest/pkg/cqrs"
 	apiv2 "github.com/inngest/inngest/proto/gen/api/v2"
 	"google.golang.org/grpc"
 )
@@ -18,6 +19,7 @@ type Service struct {
 	apiv2.UnimplementedV2Server
 	signingKeys SigningKeysProvider
 	eventKeys   EventKeysProvider
+	data        cqrs.Manager
 	base        *apiv2base.Base
 }
 
@@ -25,12 +27,14 @@ type Service struct {
 type ServiceOptions struct {
 	SigningKeysProvider SigningKeysProvider
 	EventKeysProvider   EventKeysProvider
+	DataManager         cqrs.Manager
 }
 
 func NewService(opts ServiceOptions) *Service {
 	return &Service{
 		signingKeys: opts.SigningKeysProvider,
 		eventKeys:   opts.EventKeysProvider,
+		data:        opts.DataManager,
 		base:        apiv2base.NewBase(),
 	}
 }
