@@ -11,12 +11,11 @@ import (
 	"github.com/tidwall/btree"
 )
 
-func newNumberMatcher(concurrency int64) MatchingEngine {
+func newNumberMatcher() MatchingEngine {
 	return &numbers{
 		lock: &sync.RWMutex{},
 
-		paths:       map[string]struct{}{},
-		concurrency: concurrency,
+		paths: map[string]struct{}{},
 
 		exact: btree.NewMap[float64, []*StoredExpressionPart](64),
 		gt:    btree.NewMap[float64, []*StoredExpressionPart](64),
@@ -33,8 +32,6 @@ type numbers struct {
 	exact *btree.Map[float64, []*StoredExpressionPart]
 	gt    *btree.Map[float64, []*StoredExpressionPart]
 	lt    *btree.Map[float64, []*StoredExpressionPart]
-
-	concurrency int64
 }
 
 func (n numbers) Type() EngineType {
@@ -42,30 +39,23 @@ func (n numbers) Type() EngineType {
 }
 
 func (n *numbers) Match(ctx context.Context, input map[string]any, result *MatchResult) (err error) {
-	pool := newErrPool(errPoolOpts{concurrency: n.concurrency})
+	for path := range n.paths {
+		x, err := jp.ParseString(path)
+		if err != nil {
+			return err
+		}
 
-	for item := range n.paths {
-		path := item
-		pool.Go(func() error {
-			x, err := jp.ParseString(path)
-			if err != nil {
-				return err
-			}
+		res := x.Get(input)
 
-			res := x.Get(input)
+		if len(res) == 0 {
+			continue
+		}
 
-			if len(res) == 0 {
-				return nil
-			}
-
-			// This matches null, nil (as null), and any non-null items.
-			n.Search(ctx, path, res[0], result)
-
-			return nil
-		})
+		// This matches null, nil (as null), and any non-null items.
+		n.Search(ctx, path, res[0], result)
 	}
 
-	return pool.Wait()
+	return nil
 }
 
 // Search returns all ExpressionParts which match the given input, ignoring the variable name
@@ -182,58 +172,55 @@ func (n *numbers) Add(ctx context.Context, p ExpressionPart) error {
 	return nil
 }
 
-func (n *numbers) Remove(ctx context.Context, p ExpressionPart) error {
-	// If this is not equals, ignore.
-	if p.Predicate.Operator == operators.NotEquals {
-		return fmt.Errorf("number engine does not support !=")
-	}
-
-	// Add the number to the btree.
-	val, err := p.Predicate.LiteralAsFloat64()
-	if err != nil {
-		return err
-	}
-
+func (n *numbers) Remove(ctx context.Context, parts []ExpressionPart) (int, error) {
 	n.lock.Lock()
 	defer n.lock.Unlock()
 
-	remove := func(b *btree.Map[float64, []*StoredExpressionPart]) error {
-		item, ok := b.Get(val)
-		if !ok {
-			return ErrExpressionPartNotFound
+	processedCount := 0
+	for _, p := range parts {
+		// Check for context cancellation/timeout
+		if ctx.Err() != nil {
+			return processedCount, ctx.Err()
 		}
-		// Remove the expression part from the leaf.
-		for i, eval := range item {
-			if p.EqualsStored(eval) {
-				item = append(item[:i], item[i+1:]...)
-				b.Set(val, item)
-				return nil
+
+		if p.Predicate.Operator == operators.NotEquals {
+			processedCount++
+			continue
+		}
+
+		val, err := p.Predicate.LiteralAsFloat64()
+		if err != nil {
+			processedCount++
+			continue
+		}
+
+		remove := func(b *btree.Map[float64, []*StoredExpressionPart]) {
+			item, ok := b.Get(val)
+			if !ok {
+				return
+			}
+			for i, eval := range item {
+				if p.EqualsStored(eval) {
+					item = append(item[:i], item[i+1:]...)
+					b.Set(val, item)
+					return
+				}
 			}
 		}
-		return nil
+
+		switch p.Predicate.Operator {
+		case operators.Equals, operators.GreaterEquals, operators.LessEquals:
+			remove(n.exact)
+		}
+
+		switch p.Predicate.Operator {
+		case operators.Greater, operators.GreaterEquals:
+			remove(n.gt)
+		case operators.Less, operators.LessEquals:
+			remove(n.lt)
+		}
+		processedCount++
 	}
 
-	var equalErr, gtErr, ltErr error
-
-	switch p.Predicate.Operator {
-	// Each of these have at least one equality match.
-	case operators.Equals, operators.GreaterEquals, operators.LessEquals:
-		equalErr = remove(n.exact)
-	}
-
-	// Check for >=, >, <, <= separately.
-
-	switch p.Predicate.Operator {
-	case operators.Greater, operators.GreaterEquals:
-		gtErr = remove(n.gt)
-	case operators.Less, operators.LessEquals:
-		ltErr = remove(n.lt)
-	}
-
-	if equalErr != nil && gtErr != nil && ltErr != nil {
-		return ErrExpressionPartNotFound
-	}
-
-	// At least one expr part was found.
-	return nil
+	return processedCount, nil
 }
