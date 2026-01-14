@@ -1,5 +1,7 @@
 import { useCallback } from 'react';
 
+import type { SpanMetadata } from '@inngest/components/types/metadata';
+
 import { client } from '@/store/baseApi';
 import {
   GetEventV2Document,
@@ -56,7 +58,7 @@ export function useEvents() {
         totalCount: eventsData.totalCount,
       };
     },
-    []
+    [],
   );
 }
 
@@ -69,16 +71,21 @@ export function useEventDetails() {
     return {
       ...eventData,
       receivedAt: new Date(eventData.receivedAt),
-      occurredAt: eventData.occurredAt ? new Date(eventData.occurredAt) : undefined,
+      occurredAt: eventData.occurredAt
+        ? new Date(eventData.occurredAt)
+        : undefined,
     };
   }, []);
 }
 
 export function useEventPayload() {
   return useCallback(async ({ eventID }: GetEventV2PayloadQueryVariables) => {
-    const data: GetEventV2PayloadQuery = await client.request(GetEventV2PayloadDocument, {
-      eventID,
-    });
+    const data: GetEventV2PayloadQuery = await client.request(
+      GetEventV2PayloadDocument,
+      {
+        eventID,
+      },
+    );
 
     const eventData = data.eventV2.raw;
 
@@ -88,9 +95,12 @@ export function useEventPayload() {
 
 export function useEventRuns() {
   return useCallback(async ({ eventID }: GetEventV2RunsQueryVariables) => {
-    const data: GetEventV2RunsQuery = await client.request(GetEventV2RunsDocument, {
-      eventID,
-    });
+    const data: GetEventV2RunsQuery = await client.request(
+      GetEventV2RunsDocument,
+      {
+        eventID,
+      },
+    );
 
     const eventData = data.eventV2;
     return {
@@ -102,6 +112,7 @@ export function useEventRuns() {
         id: run.id,
         completedAt: run.endedAt ? new Date(run.endedAt) : undefined,
         startedAt: run.startedAt ? new Date(run.startedAt) : undefined,
+        metadata: run.trace?.metadata as SpanMetadata[] | undefined,
       })),
     };
   }, []);

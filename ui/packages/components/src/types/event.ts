@@ -1,3 +1,5 @@
+import type { SpanMetadata } from './metadata';
+
 export type Event = {
   id: string;
   name: string;
@@ -16,6 +18,7 @@ export type Event = {
     status: string;
     startedAt?: Date;
     completedAt?: Date;
+    metadata?: SpanMetadata[];
   }[];
 };
 
