@@ -56,6 +56,10 @@ var (
 		2 * 1024 * 1024, // 2 MiB
 		4 * 1024 * 1024, // 4 MiB
 	}
+
+	duplicateAcquireCountBoundaries = []float64{
+		1, 2, 3, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000,
+	}
 )
 
 func HistogramQueueItemLatency(ctx context.Context, value int64, opts HistogramOpt) {
@@ -486,5 +490,16 @@ func HistogramConstraintAPILuaScriptDuration(ctx context.Context, duration time.
 		Tags:        opts.Tags,
 		Unit:        "ms",
 		Boundaries:  constraintAPIRequestStateSizeBoundaries,
+	})
+}
+
+func HistogramConstraintAPIDuplicateAcquireRequests(ctx context.Context, count int64, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, count, HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "constraintapi_duplicate_acquire_requests",
+		Description: "Distribution of duplicate Acquire request counts per fingerprint within debounce window",
+		Tags:        opts.Tags,
+		Unit:        "requests",
+		Boundaries:  duplicateAcquireCountBoundaries,
 	})
 }

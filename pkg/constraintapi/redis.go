@@ -57,6 +57,8 @@ type redisCapacityManager struct {
 	operationIdempotencyTTL       time.Duration
 	constraintCheckIdempotencyTTL time.Duration
 	checkIdempotencyTTL           time.Duration
+
+	duplicateTracker *duplicateTracker
 }
 
 type RedisCapacityManagerOption func(m *redisCapacityManager)
@@ -133,6 +135,16 @@ func WithCheckIdempotencyTTL(ttl time.Duration) RedisCapacityManagerOption {
 	}
 }
 
+func WithDuplicateTrackingWindow(window time.Duration) RedisCapacityManagerOption {
+	return func(m *redisCapacityManager) {
+		if window > 0 {
+			m.duplicateTracker = newDuplicateTracker(window)
+		} else {
+			m.duplicateTracker = newDuplicateTracker(0) // disabled
+		}
+	}
+}
+
 func NewRedisCapacityManager(
 	options ...RedisCapacityManagerOption,
 ) (*redisCapacityManager, error) {
@@ -141,6 +153,7 @@ func NewRedisCapacityManager(
 		operationIdempotencyTTL:       OperationIdempotencyTTL,
 		constraintCheckIdempotencyTTL: ConstraintCheckIdempotencyTTL,
 		checkIdempotencyTTL:           CheckIdempotencyTTL,
+		duplicateTracker:              newDuplicateTracker(0), // disabled by default
 	}
 
 	for _, rcmo := range options {

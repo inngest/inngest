@@ -213,6 +213,11 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 		return nil, errs.Wrap(0, false, "could not build request state: %w", err)
 	}
 
+	// Track duplicate requests for metrics
+	if r.duplicateTracker != nil {
+		r.duplicateTracker.track(req.AccountID, fingerprint)
+	}
+
 	// Deterministically compute this based on numScavengerShards and accountID
 	scavengerShard := r.scavengerShard(ctx, req.AccountID)
 
