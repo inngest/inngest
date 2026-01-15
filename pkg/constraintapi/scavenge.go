@@ -203,7 +203,9 @@ func (r *redisCapacityManager) scavengeShard(ctx context.Context, mi MigrationId
 	defer func() {
 		metrics.HistogramConstraintAPIScavengerShardProcessDuration(ctx, time.Since(start), metrics.HistogramOpt{
 			PkgName: scavengerPkgName,
-			Tags:    map[string]any{},
+			Tags: map[string]any{
+				"source": mi.String(),
+			},
 		})
 	}()
 
@@ -416,7 +418,9 @@ func (r *redisCapacityManager) scavengeAccount(
 		leaseAge := now.Sub(leaseID.Timestamp())
 		metrics.HistogramConstraintAPIScavengerLeaseAge(ctx, leaseAge, metrics.HistogramOpt{
 			PkgName: scavengerPkgName,
-			Tags:    map[string]any{},
+			Tags: map[string]any{
+				"source": mi.String(),
+			},
 		})
 
 		_, err := r.Release(ctx, &CapacityReleaseRequest{
