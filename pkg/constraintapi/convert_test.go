@@ -1691,6 +1691,11 @@ func TestCapacityExtendLeaseRequestConversion(t *testing.T) {
 					IsRateLimit: true,
 					QueueShard:  "test-shard",
 				},
+				Source: LeaseSource{
+					Service:           ServiceAPI,
+					Location:          CallerLocationItemLease,
+					RunProcessingMode: RunProcessingModeBackground,
+				},
 			},
 			expected: &pb.CapacityExtendLeaseRequest{
 				IdempotencyKey: "extend-key",
@@ -1700,6 +1705,11 @@ func TestCapacityExtendLeaseRequestConversion(t *testing.T) {
 				Migration: &pb.MigrationIdentifier{
 					IsRateLimit: true,
 					QueueShard:  "test-shard",
+				},
+				Source: &pb.LeaseSource{
+					Service:           pb.ConstraintApiLeaseService_CONSTRAINT_API_LEASE_SERVICE_API,
+					Location:          pb.ConstraintApiCallerLocation_CONSTRAINT_API_CALLER_LOCATION_ITEM_LEASE,
+					RunProcessingMode: pb.ConstraintApiRunProcessingMode_CONSTRAINT_API_RUN_PROCESSING_MODE_BACKGROUND,
 				},
 			},
 		},
