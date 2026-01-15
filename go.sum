@@ -585,8 +585,8 @@ github.com/hashicorp/hcl v1.0.0/go.mod h1:E5yfLk+7swimpb2L/Alb/PJmXilQ/rhwaUYs4T
 github.com/ianlancetaylor/demangle v0.0.0-20181102032728-5e5cf60278f6/go.mod h1:aSSvb/t6k1mPoxDqO4vJh6VOCGPwU4O0C2/Eqndh1Sc=
 github.com/ianlancetaylor/demangle v0.0.0-20200824232613-28f6c0f3b639/go.mod h1:aSSvb/t6k1mPoxDqO4vJh6VOCGPwU4O0C2/Eqndh1Sc=
 github.com/inconshreveable/mousetrap v1.0.0/go.mod h1:PxqpIevigyE2G7u3NXJIT2ANytuPF1OarO4DADm73n8=
-github.com/inngest/expr v0.0.0-20260114025228-45e41bb52d8c h1:ONAveJpt3jx41ad+QZ2oFz85YsYcAn9Wmsc6sSqZuwc=
-github.com/inngest/expr v0.0.0-20260114025228-45e41bb52d8c/go.mod h1:oqn8kpev1HdmwwMMn8Q+6z5WQLIt8IHFnA2XJ20fnKs=
+github.com/inngest/expr v0.0.0-20260128235931-a904502a0272 h1:ZRiQXVESKWI2p17nm23/NLPADKzAR23o0BG0PoyvMDE=
+github.com/inngest/expr v0.0.0-20260128235931-a904502a0272/go.mod h1:oqn8kpev1HdmwwMMn8Q+6z5WQLIt8IHFnA2XJ20fnKs=
 github.com/inngest/go-httpstat v0.0.0-20250328150054-dfda91359d48 h1:8NwXUrQTQjWrfGj99JgesfTbCYujtnLHusePp7YyFU8=
 github.com/inngest/go-httpstat v0.0.0-20250328150054-dfda91359d48/go.mod h1:7SNLkGaD+tiTey1IF9WUNDNurTfqNZqjbdPZo3CmLW4=
 github.com/inngest/inngestgo v0.15.0 h1:WiIhGUL8D8MnnySBdjDyRcxjsOXLQQWF+1hV4oslWc8=

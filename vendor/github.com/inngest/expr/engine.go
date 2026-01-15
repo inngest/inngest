@@ -2,6 +2,7 @@ package expr
 
 import (
 	"context"
+	"sync"
 
 	"github.com/cespare/xxhash/v2"
 	"github.com/google/uuid"
@@ -18,50 +19,54 @@ const (
 	// EngineTypeART
 )
 
-// matchKey is a composite key combining evalID and groupID to avoid nested map allocations
+// matchKey is a composite key combining evalID and groupID
 type matchKey struct {
 	evalID  uuid.UUID
 	groupID groupID
 }
 
-func NewMatchResult() *MatchResult {
-	return &MatchResult{
-		Result: map[matchKey]int{},
-	}
+var matchResultPool = sync.Pool{
+	New: func() any {
+		return &MatchResult{
+			Result: make(map[matchKey]int),
+		}
+	},
 }
 
-// MatchResult uses a flat map with composite keys to avoid allocating nested maps
+func NewMatchResult() *MatchResult {
+	return matchResultPool.Get().(*MatchResult)
+}
+
+// MatchResult stores matches as a pooled map
 type MatchResult struct {
-	Result map[matchKey]int
+	Result map[matchKey]int // (evalID, groupID) -> count
+}
+
+// Release returns the MatchResult to the pool
+func (m *MatchResult) Release() {
+	clear(m.Result)
+	matchResultPool.Put(m)
 }
 
 func (m *MatchResult) Len() int {
-	// Count unique evalIDs
-	seen := make(map[uuid.UUID]struct{}, len(m.Result))
-	for key := range m.Result {
-		seen[key.evalID] = struct{}{}
-	}
-	return len(seen)
+	return len(m.Result)
 }
 
-// Add increments the matched counter for the given eval's group ID
+// Add increments the count for the given (evalID, groupID)
 func (m *MatchResult) Add(evalID uuid.UUID, gID groupID) {
-	key := matchKey{evalID: evalID, groupID: gID}
-	m.Result[key]++
+	m.Result[matchKey{evalID: evalID, groupID: gID}]++
 }
 
-// AddExprs increments the matched counter for each stored expression part.
+// AddExprs increments counts for each expression part
 func (m *MatchResult) AddExprs(exprs ...*StoredExpressionPart) {
 	for _, expr := range exprs {
-		key := matchKey{evalID: expr.EvaluableID, groupID: expr.GroupID}
-		m.Result[key]++
+		m.Result[matchKey{evalID: expr.EvaluableID, groupID: expr.GroupID}]++
 	}
 }
 
-// GroupMatches returns the total count of matches for a given eval's group ID.
+// GroupMatches returns the count for a given eval's group ID
 func (m *MatchResult) GroupMatches(evalID uuid.UUID, gID groupID) int {
-	key := matchKey{evalID: evalID, groupID: gID}
-	return m.Result[key]
+	return m.Result[matchKey{evalID: evalID, groupID: gID}]
 }
 
 // MatchingEngine represents an engine (such as a b-tree, radix trie, or

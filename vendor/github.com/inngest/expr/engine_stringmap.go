@@ -19,7 +19,7 @@ func newStringEqualityMatcher() MatchingEngine {
 		inequality: inequalityMap{},
 		// in stores all `in` operators, eg `"foo" in vars.a`.  This lets us
 		// properly iterate over variables for in equaltiy matching.
-		in:          variableMap{},
+		in: variableMap{},
 	}
 }
 
@@ -58,8 +58,6 @@ type stringLookup struct {
 	//
 	// this lets us quickly map neq in a fast manner
 	inequality inequalityMap
-
-	concurrency int64
 }
 
 func (s stringLookup) Type() EngineType {

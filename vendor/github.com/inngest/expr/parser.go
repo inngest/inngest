@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/google/cel-go/cel"
 	celast "github.com/google/cel-go/common/ast"
@@ -73,6 +74,12 @@ type parser struct {
 	rander RandomReader
 }
 
+var randPool = sync.Pool{
+	New: func() any {
+		return rand.New(rand.NewSource(0))
+	},
+}
+
 func (p *parser) Parse(ctx context.Context, eval Evaluable) (*ParsedExpression, error) {
 	expression := eval.GetExpression() // "event.data.id == '1'"
 	if expression == "" {
@@ -87,6 +94,7 @@ func (p *parser) Parse(ctx context.Context, eval Evaluable) (*ParsedExpression, 
 	}
 
 	r := p.rander
+	var pooled *rand.Rand
 	if r == nil {
 		// Create a new deterministic random reader based off of the evaluable's identifier.
 		// This means that every time we parse an expression with the given identifier, the
@@ -95,7 +103,10 @@ func (p *parser) Parse(ctx context.Context, eval Evaluable) (*ParsedExpression, 
 		// We only overwrite this if rander is not nil so that we can inject rander during tests.
 		id := eval.GetID()
 		seed := int64(binary.NativeEndian.Uint64(id[:8]))
-		r = rand.New(rand.NewSource(seed)).Read
+		pooled = randPool.Get().(*rand.Rand)
+
+		pooled.Seed(seed)
+		r = pooled.Read
 	}
 
 	node := newNode()
@@ -107,6 +118,9 @@ func (p *parser) Parse(ctx context.Context, eval Evaluable) (*ParsedExpression, 
 		vars,
 		r,
 	)
+	if pooled != nil {
+		randPool.Put(pooled)
+	}
 	if err != nil {
 		return nil, err
 	}

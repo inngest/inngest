@@ -219,7 +219,7 @@ func runPauseBenchmark(b *testing.B, opts pauseBenchmarkOpts) {
 			vals, _, _ := ae.Evaluate(ctx, localTestData)
 			require.Len(b, vals, 1)
 			for _, val := range vals {
-				ae.Remove(ctx, val)
+				_ = ae.Remove(ctx, val)
 			}
 		}
 	})
