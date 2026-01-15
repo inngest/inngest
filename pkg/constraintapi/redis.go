@@ -8,6 +8,7 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/jonboulle/clockwork"
+	"github.com/karlseguin/ccache/v3"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 )
@@ -24,9 +25,17 @@ const (
 	OperationIdempotencyTTL       = 5 * time.Second
 	CheckIdempotencyTTL           = 5 * time.Second
 	ConstraintCheckIdempotencyTTL = 5 * time.Minute
+
+	LimitingConstraintCacheTTLConcurrency = 5 * time.Second
+	LimitingConstraintCacheTTLThrottle    = time.Second
 )
 
 var enableDebugLogs = false
+
+type limitingConstraintCacheItem struct {
+	constraint ConstraintItem
+	retryAfter time.Time
+}
 
 type redisCapacityManager struct {
 	keyGenerator
@@ -57,6 +66,9 @@ type redisCapacityManager struct {
 	operationIdempotencyTTL       time.Duration
 	constraintCheckIdempotencyTTL time.Duration
 	checkIdempotencyTTL           time.Duration
+
+	limitingConstraintCache        *ccache.Cache[*limitingConstraintCacheItem]
+	limitingConstraintCacheTTLFunc func(c ConstraintItem) time.Duration
 }
 
 type RedisCapacityManagerOption func(m *redisCapacityManager)
@@ -133,6 +145,25 @@ func WithCheckIdempotencyTTL(ttl time.Duration) RedisCapacityManagerOption {
 	}
 }
 
+func WithLimitingConstraintCacheTTLFunc(f func(c ConstraintItem) time.Duration) RedisCapacityManagerOption {
+	return func(m *redisCapacityManager) {
+		m.limitingConstraintCacheTTLFunc = f
+	}
+}
+
+func DefaultLimitingConstraintCacheTTLFunc(c ConstraintItem) time.Duration {
+	switch c.Kind {
+	case ConstraintKindConcurrency:
+		return time.Second
+	case ConstraintKindThrottle:
+		return time.Second
+	case ConstraintKindRateLimit:
+		return time.Second
+	default:
+		return time.Second
+	}
+}
+
 func NewRedisCapacityManager(
 	options ...RedisCapacityManagerOption,
 ) (*redisCapacityManager, error) {
@@ -141,6 +172,12 @@ func NewRedisCapacityManager(
 		operationIdempotencyTTL:       OperationIdempotencyTTL,
 		constraintCheckIdempotencyTTL: ConstraintCheckIdempotencyTTL,
 		checkIdempotencyTTL:           CheckIdempotencyTTL,
+		limitingConstraintCache: ccache.New(
+			ccache.Configure[*limitingConstraintCacheItem]().
+				MaxSize(10_000).
+				ItemsToPrune(500),
+		),
+		limitingConstraintCacheTTLFunc: DefaultLimitingConstraintCacheTTLFunc,
 	}
 
 	for _, rcmo := range options {
