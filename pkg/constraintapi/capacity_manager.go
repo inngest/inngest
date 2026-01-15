@@ -193,6 +193,10 @@ type CapacityAcquireRequest struct {
 	Source LeaseSource
 
 	Migration MigrationIdentifier
+
+	// RequestAttempt is the current request attempt. For retries, this should be > 0.
+	// This is mainly used for instrumentation.
+	RequestAttempt int
 }
 
 // CapacityLease represents the tuple of LeaseID <-> IdempotencyKey which identifies the leased resource (event, queue item, etc.).
@@ -249,6 +253,10 @@ type CapacityExtendLeaseRequest struct {
 
 	// Source includes information on the calling service and processing mode for instrumentation purposes.
 	Source LeaseSource
+
+	// RequestAttempt is the current request attempt. For retries, this should be > 0.
+	// This is mainly used for instrumentation.
+	RequestAttempt int
 }
 
 type CapacityExtendLeaseResponse struct {
@@ -271,6 +279,10 @@ type CapacityReleaseRequest struct {
 
 	// Source includes information on the calling service and processing mode for instrumentation purposes.
 	Source LeaseSource
+
+	// RequestAttempt is the current request attempt. For retries, this should be > 0.
+	// This is mainly used for instrumentation.
+	RequestAttempt int
 }
 
 type CapacityReleaseResponse struct {

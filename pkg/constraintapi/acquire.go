@@ -178,12 +178,18 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 
 	now := r.clock.Now()
 
-	// TODO: Add metric for this
 	// NOTE: This will include request latency (marshaling, network delays),
 	// and it might not work for retries, as those retain the same CurrentTime value.
-	// TODO: Ensure retries have the updated CurrentTime
 	requestLatency := now.Sub(req.CurrentTime)
 	if requestLatency > MaximumAllowedRequestDelay {
+		metrics.HistogramConstraintAPIAcquireRequestLatency(ctx, requestLatency, metrics.HistogramOpt{
+			PkgName: pkgName,
+			Tags: map[string]any{
+				"source":  req.Migration.String(),
+				"attempt": req.RequestAttempt,
+			},
+		})
+
 		// TODO : Set proper error code
 		return nil, errs.Wrap(0, false, "exceeded maximum allowed request delay, latency: %s", requestLatency)
 	}
