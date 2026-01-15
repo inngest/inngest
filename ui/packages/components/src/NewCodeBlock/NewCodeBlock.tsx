@@ -59,7 +59,7 @@ export const NewCodeBlock = ({
   tab,
   actions = [],
   allowFullScreen = false,
-  parsed = true,
+  parsed = false,
   loading = false,
   className,
 }: CodeBlockProps) => {
@@ -118,29 +118,27 @@ export const NewCodeBlock = ({
     <Fullscreen fullScreen={fullScreen}>
       <div
         className={cn(
-          'flex h-full flex-col gap-0',
-          fullScreen && 'bg-codeEditor fixed inset-0 z-[52]'
+          'bg-codeEditor flex h-full flex-col gap-0',
+          fullScreen && 'fixed inset-0 z-[52]'
         )}
       >
-        <div
-          className={cn('bg-codeEditor mx-4 mt-2 flex flex-row items-center justify-between gap-4')}
-        >
+        <div className={cn('mx-4 mt-2 flex flex-row items-center justify-between gap-4')}>
           <div
             className={cn(
               header?.status === 'error' ? 'text-status-failedText' : 'text-subtle',
-              'inline-flex max-h-24 w-0 grow overflow-hidden text-ellipsis whitespace-nowrap text-sm'
+              'inline-flex max-h-24 w-0 grow overflow-hidden text-ellipsis whitespace-nowrap text-sm '
             )}
           >
             {parsed ? (
               <SegmentedControl defaultValue={mode}>
                 <SegmentedControl.Button value="rich" onClick={() => setMode('rich')}>
                   <div className="overflow-x-hidden overflow-y-hidden text-ellipsis whitespace-nowrap">
-                    Parsed {header?.title}
+                    {header?.title}
                   </div>
                 </SegmentedControl.Button>
                 <SegmentedControl.Button value="raw" onClick={() => setMode('raw')}>
                   <div className="w-0 overflow-x-hidden overflow-y-hidden text-ellipsis whitespace-nowrap">
-                    Raw {header?.title}
+                    {header?.title}
                   </div>
                 </SegmentedControl.Button>
               </SegmentedControl>
