@@ -3,6 +3,7 @@ package expragg
 import (
 	"context"
 	"fmt"
+	"sync"
 	"sync/atomic"
 	"testing"
 
@@ -222,4 +223,44 @@ func runPauseBenchmark(b *testing.B, opts pauseBenchmarkOpts) {
 			}
 		}
 	})
+}
+
+// mockKV is a simple in-memory KV store for testing
+type mockKV struct {
+	mu   sync.RWMutex
+	data map[uuid.UUID]*state.Pause
+}
+
+func (m *mockKV) Get(evalID uuid.UUID) (*state.Pause, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	if m.data == nil {
+		return nil, nil
+	}
+	return m.data[evalID], nil
+}
+
+func (m *mockKV) Set(eval *state.Pause) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.data == nil {
+		m.data = make(map[uuid.UUID]*state.Pause)
+	}
+	m.data[eval.ID] = eval
+	return nil
+}
+
+func (m *mockKV) Remove(evalID uuid.UUID) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.data != nil {
+		delete(m.data, evalID)
+	}
+	return nil
+}
+
+func (m *mockKV) Len() int32 {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return int32(len(m.data))
 }
