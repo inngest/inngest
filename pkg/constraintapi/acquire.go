@@ -182,11 +182,12 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 	// and it might not work for retries, as those retain the same CurrentTime value.
 	requestLatency := now.Sub(req.CurrentTime)
 	if requestLatency > MaximumAllowedRequestDelay {
-		metrics.HistogramConstraintAPIAcquireRequestLatency(ctx, requestLatency, metrics.HistogramOpt{
+		metrics.HistogramConstraintAPIRequestLatency(ctx, requestLatency, metrics.HistogramOpt{
 			PkgName: pkgName,
 			Tags: map[string]any{
-				"source":  req.Migration.String(),
-				"attempt": req.RequestAttempt,
+				"operation": "acquire",
+				"source":    req.Migration.String(),
+				"attempt":   req.RequestAttempt,
 			},
 		})
 

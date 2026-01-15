@@ -489,11 +489,11 @@ func HistogramConstraintAPILuaScriptDuration(ctx context.Context, duration time.
 	})
 }
 
-func HistogramConstraintAPIAcquireRequestLatency(ctx context.Context, latency time.Duration, opts HistogramOpt) {
+func HistogramConstraintAPIRequestLatency(ctx context.Context, latency time.Duration, opts HistogramOpt) {
 	RecordIntHistogramMetric(ctx, latency.Milliseconds(), HistogramOpt{
 		PkgName:     opts.PkgName,
-		MetricName:  "constraintapi_acquire_request_latency",
-		Description: "Distribution of request latency for Acquire calls",
+		MetricName:  "constraintapi_request_latency",
+		Description: "Distribution of request latency",
 		Tags:        opts.Tags,
 		Unit:        "ms",
 		Boundaries:  DefaultBoundaries,
