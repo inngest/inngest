@@ -702,6 +702,7 @@ func CapacityAcquireRequestToProto(req *CapacityAcquireRequest) *pb.CapacityAcqu
 		BlockingThreshold:    durationpb.New(req.BlockingThreshold),
 		Source:               LeaseSourceToProto(req.Source),
 		Migration:            MigrationIdentifierToProto(req.Migration),
+		RequestAttempt:       uint32(req.RequestAttempt),
 	}
 }
 
@@ -775,6 +776,7 @@ func CapacityAcquireRequestFromProto(pbReq *pb.CapacityAcquireRequest) (*Capacit
 		BlockingThreshold:    blockingThreshold,
 		Source:               LeaseSourceFromProto(pbReq.Source),
 		Migration:            MigrationIdentifierFromProto(pbReq.Migration),
+		RequestAttempt:       int(pbReq.RequestAttempt),
 	}, nil
 }
 
@@ -843,6 +845,8 @@ func CapacityExtendLeaseRequestToProto(req *CapacityExtendLeaseRequest) *pb.Capa
 		LeaseId:        req.LeaseID.String(),
 		Duration:       durationpb.New(req.Duration),
 		Migration:      MigrationIdentifierToProto(req.Migration),
+		Source:         LeaseSourceToProto(req.Source),
+		RequestAttempt: uint32(req.RequestAttempt),
 	}
 }
 
@@ -872,6 +876,8 @@ func CapacityExtendLeaseRequestFromProto(pbReq *pb.CapacityExtendLeaseRequest) (
 		LeaseID:        leaseID,
 		Duration:       duration,
 		Migration:      MigrationIdentifierFromProto(pbReq.Migration),
+		Source:         LeaseSourceFromProto(pbReq.Source),
+		RequestAttempt: int(pbReq.RequestAttempt),
 	}, nil
 }
 
@@ -919,6 +925,8 @@ func CapacityReleaseRequestToProto(req *CapacityReleaseRequest) *pb.CapacityRele
 		AccountId:      req.AccountID.String(),
 		LeaseId:        req.LeaseID.String(),
 		Migration:      MigrationIdentifierToProto(req.Migration),
+		Source:         LeaseSourceToProto(req.Source),
+		RequestAttempt: uint32(req.RequestAttempt),
 	}
 }
 
@@ -942,6 +950,8 @@ func CapacityReleaseRequestFromProto(pbReq *pb.CapacityReleaseRequest) (*Capacit
 		AccountID:      accountID,
 		LeaseID:        leaseID,
 		Migration:      MigrationIdentifierFromProto(pbReq.Migration),
+		Source:         LeaseSourceFromProto(pbReq.Source),
+		RequestAttempt: int(pbReq.RequestAttempt),
 	}, nil
 }
 
