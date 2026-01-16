@@ -195,41 +195,6 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 		return nil, errs.Wrap(0, false, "exceeded maximum allowed request delay, latency: %s", requestLatency)
 	}
 
-	// Check if we previously got limited
-	{
-		recentlyLimited := make([]ConstraintItem, 0)
-		var retryAfter time.Time
-		for _, ci := range req.Constraints {
-			// Construct cache key for constraint scoped to account
-			cacheKey := ci.CacheKey(req.AccountID, req.EnvID, req.FunctionID)
-
-			item := r.limitingConstraintCache.Get(cacheKey)
-			if item == nil || item.Expired() {
-				// Not limited previously
-				continue
-			}
-
-			// This constraint was recently limited
-			val := item.Value()
-
-			recentlyLimited = append(recentlyLimited, ci)
-			if val.retryAfter.After(retryAfter) {
-				retryAfter = val.retryAfter
-			}
-		}
-
-		// If one or more requested constraints were recently limited,
-		// return a synthetic response including all affected constraints.
-		if len(recentlyLimited) > 0 {
-			return &CapacityAcquireResponse{
-				RequestID:           requestID,
-				Leases:              nil,
-				LimitingConstraints: recentlyLimited,
-				RetryAfter:          retryAfter,
-			}, nil
-		}
-	}
-
 	// Retrieve client and key prefix for current constraints
 	// NOTE: We will no longer need this once we move to a dedicated store for constraint state
 	keyPrefix, client, err := r.clientAndPrefix(req.Migration)
@@ -454,29 +419,6 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 			"acquire call lacking capacity",
 			"limiting", limitingConstraints,
 		)
-
-		// If we are limited by constraints,
-		// cache each individual constraint for subsequent requests
-		// for a short duration to avoid unnecessary load on Redis
-		if len(leases) == 0 && len(limitingConstraints) > 0 {
-			for _, ci := range limitingConstraints {
-				cacheKey := ci.CacheKey(req.AccountID, req.EnvID, req.FunctionID)
-
-				retryDelay := retryAfter.Sub(now)
-				if retryDelay <= 0 {
-					retryDelay = time.Second
-				}
-
-				r.limitingConstraintCache.Set(
-					cacheKey,
-					&limitingConstraintCacheItem{
-						retryAfter: retryAfter,
-						constraint: ci,
-					},
-					retryDelay,
-				)
-			}
-		}
 
 		// lacking capacity
 		return &CapacityAcquireResponse{
