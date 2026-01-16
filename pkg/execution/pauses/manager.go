@@ -11,6 +11,7 @@ import (
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/oklog/ulid/v2"
@@ -70,12 +71,10 @@ func NewManager(buf Bufferer, bs BlockStore, opts ...ManagerOpt) Manager {
 	return mgr
 }
 
-// NewRedisOnlyManager is a manager that only uses Redis as a buffer, without block flushing.
-func NewRedisOnlyManager(rsm state.PauseManager) Manager {
-	return NewManager(
-		StateBufferer(rsm),
-		nil,
-	)
+// NewPauseStoreManager creates a pause manager using PauseStore with the given redis clients.
+func NewPauseStoreManager(sharded *redis_state.ShardedClient, unsharded *redis_state.UnshardedClient, opts ...ManagerOpt) Manager {
+	pauseStore := redis_state.NewPauseStore(sharded, unsharded)
+	return NewManager(StateBufferer(pauseStore), nil, opts...)
 }
 
 type manager struct {

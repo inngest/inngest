@@ -190,7 +190,7 @@ func TestScheduleRaceCondition(t *testing.T) {
 
 	exec, err := executor.NewExecutor(
 		executor.WithStateManager(smv2),
-		executor.WithPauseManager(pauses.NewRedisOnlyManager(sm)),
+		executor.WithPauseManager(pauses.NewPauseStoreManager(shardedClient, unshardedClient)),
 		executor.WithQueue(rq),
 		executor.WithLogger(logger.StdlibLogger(ctx)),
 		executor.WithFunctionLoader(loader),
@@ -363,7 +363,7 @@ func TestScheduleRaceConditionWithExistingIdempotencyKey(t *testing.T) {
 
 	exec, err := executor.NewExecutor(
 		executor.WithStateManager(smv2),
-		executor.WithPauseManager(pauses.NewRedisOnlyManager(sm)),
+		executor.WithPauseManager(pauses.NewPauseStoreManager(shardedClient, unshardedClient)),
 		executor.WithQueue(rq),
 		executor.WithLogger(logger.StdlibLogger(ctx)),
 		executor.WithFunctionLoader(loader),
@@ -571,7 +571,7 @@ func TestFinalize(t *testing.T) {
 
 	exec, err := executor.NewExecutor(
 		executor.WithStateManager(smv2),
-		executor.WithPauseManager(pauses.NewRedisOnlyManager(sm)),
+		executor.WithPauseManager(pauses.NewPauseStoreManager(shardedClient, unshardedClient)),
 		executor.WithQueue(testQueue),
 		executor.WithLogger(logger.StdlibLogger(ctx)),
 		executor.WithFunctionLoader(loader),
@@ -869,7 +869,7 @@ func TestInvokeRetrySucceedsIfPauseAlreadyCreated(t *testing.T) {
 		},
 	}
 
-	pm := pauses.NewRedisOnlyManager(sm)
+	pm := pauses.NewPauseStoreManager(shardedClient, unshardedClient)
 
 	eventCaptured := false
 
@@ -1058,7 +1058,7 @@ func TestExecutorReturnsResponseWhenNonRetriableError(t *testing.T) {
 
 	exec, err := executor.NewExecutor(
 		executor.WithStateManager(smv2),
-		executor.WithPauseManager(pauses.NewRedisOnlyManager(sm)),
+		executor.WithPauseManager(pauses.NewPauseStoreManager(shardedClient, unshardedClient)),
 		executor.WithQueue(rq),
 		executor.WithLogger(logger.StdlibLogger(ctx)),
 		executor.WithFunctionLoader(loader),
@@ -1242,7 +1242,7 @@ func TestExecutorScheduleRateLimit(t *testing.T) {
 
 	exec, err := executor.NewExecutor(
 		executor.WithStateManager(smv2),
-		executor.WithPauseManager(pauses.NewRedisOnlyManager(sm)),
+		executor.WithPauseManager(pauses.NewPauseStoreManager(shardedClient, unshardedClient)),
 		executor.WithQueue(rq),
 		executor.WithLogger(logger.StdlibLogger(ctx)),
 		executor.WithFunctionLoader(loader),
@@ -1442,7 +1442,7 @@ func TestExecutorScheduleBacklogSizeLimit(t *testing.T) {
 
 	exec, err := executor.NewExecutor(
 		executor.WithStateManager(smv2),
-		executor.WithPauseManager(pauses.NewRedisOnlyManager(sm)),
+		executor.WithPauseManager(pauses.NewPauseStoreManager(shardedClient, unshardedClient)),
 		executor.WithQueue(rq),
 		executor.WithLogger(logger.StdlibLogger(ctx)),
 		executor.WithFunctionLoader(loader),

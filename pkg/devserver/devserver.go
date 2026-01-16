@@ -477,7 +477,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		url = "127.0.0.1"
 	}
 
-	pauseMgr := pauses.NewRedisOnlyManager(sm)
+	pauseMgr := pauses.NewPauseStoreManager(shardedClient, unshardedClient)
 
 	executorOpts := []executor.ExecutorOpt{
 		executor.WithHTTPClient(httpClient),

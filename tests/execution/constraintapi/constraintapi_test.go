@@ -574,7 +574,7 @@ func TestConstraintEnforcement(t *testing.T) {
 				executor.WithAssignedQueueShard(shard),
 				executor.WithQueue(q),
 				executor.WithStateManager(redis_state.MustRunServiceV2(sm)),
-				executor.WithPauseManager(pauses.NewRedisOnlyManager(sm)),
+				executor.WithPauseManager(pauses.NewPauseStoreManager(sharded, unsharded)),
 				executor.WithCapacityManager(cm),
 				executor.WithLogger(logger.StdlibLogger(ctx)),
 				executor.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
@@ -1500,7 +1500,7 @@ func TestScheduleConstraintAPICompatibility(t *testing.T) {
 			executor.WithAssignedQueueShard(shard),
 			executor.WithQueue(q),
 			executor.WithStateManager(redis_state.MustRunServiceV2(sm)),
-			executor.WithPauseManager(pauses.NewRedisOnlyManager(sm)),
+			executor.WithPauseManager(pauses.NewPauseStoreManager(sharded, unsharded)),
 			executor.WithCapacityManager(cm),
 			executor.WithLogger(logger.StdlibLogger(ctx)),
 			executor.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
@@ -1700,7 +1700,7 @@ func TestScheduleConstraintAPICompatibility(t *testing.T) {
 			executor.WithAssignedQueueShard(shard),
 			executor.WithQueue(q),
 			executor.WithStateManager(redis_state.MustRunServiceV2(sm)),
-			executor.WithPauseManager(pauses.NewRedisOnlyManager(sm)),
+			executor.WithPauseManager(pauses.NewPauseStoreManager(sharded, unsharded)),
 			executor.WithCapacityManager(cm),
 			executor.WithLogger(logger.StdlibLogger(ctx)),
 			executor.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
