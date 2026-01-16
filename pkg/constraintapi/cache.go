@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"time"
 
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/util/errs"
 	"github.com/jonboulle/clockwork"
 	"github.com/karlseguin/ccache/v3"
@@ -50,6 +51,13 @@ func (l *limitingConstraintCache) Acquire(ctx context.Context, req *CapacityAcqu
 		if val.retryAfter.After(retryAfter) {
 			retryAfter = val.retryAfter
 		}
+
+		metrics.IncrConstraintAPILimitingConstraintCacheCounter(ctx, 1, metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags: map[string]any{
+				"op": "hit",
+			},
+		})
 	}
 
 	// If one or more requested constraints were recently limited,
@@ -92,6 +100,12 @@ func (l *limitingConstraintCache) Acquire(ctx context.Context, req *CapacityAcqu
 			},
 			retryDelay,
 		)
+		metrics.IncrConstraintAPILimitingConstraintCacheCounter(ctx, 1, metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags: map[string]any{
+				"op": "set",
+			},
+		})
 	}
 
 	return res, nil
