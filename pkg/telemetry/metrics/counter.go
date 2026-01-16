@@ -892,7 +892,7 @@ func IncrConstraintAPILimitingConstraintCacheCounter(ctx context.Context, count 
 
 	RecordCounterMetric(ctx, count, CounterOpt{
 		PkgName:     opts.PkgName,
-		MetricName:  "constraintapi_limiting_constraint_cache_counter",
+		MetricName:  "constraintapi_limiting_constraint_cache_total",
 		Description: "Total number of operations to limiting constraint cache",
 		Tags:        opts.Tags,
 	})
