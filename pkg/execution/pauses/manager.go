@@ -143,7 +143,7 @@ func (m manager) ConsumePause(ctx context.Context, pause state.Pause, opts state
 	//
 	// 1. We read the buffer and add to a block
 	// 2. And while uploading the block
-	// 3. In parallel, we may delete/consume one of the buffer’s pauses
+	// 3. In parallel, we may delete/consume one of the buffer's pauses
 	//
 	// Unfortunately, we only write the block to indexes after uploads complete.
 	// This means that a pause may exist in a block but have been consumed.
@@ -151,20 +151,17 @@ func (m manager) ConsumePause(ctx context.Context, pause state.Pause, opts state
 	// This is fine technically speaking:  consuming pauses is idempotent and leases
 	// each pause.
 	//
-	// However, in order to eventually compact we need to handle the “pause not found”
-	// case when consuming, and always re-delete the pause.  that’s no big deal, but
+	// However, in order to eventually compact we need to handle the "pause not found"
+	// case when consuming, and always re-delete the pause.  that's no big deal, but
 	// not the best.
 	//
 	// In the future, we could add two block indexes:  pending and flushed.  this is a
 	// pain, though, because we may die when uploading pending blocks, and that requires
-	// a bit of thought to work around, so we’ll just go with double deletes for now,
-	// assuming this won’t happen a ton.  this can be improved later.
-	res, cleanup, err := m.buf.ConsumePause(ctx, pause, opts)
-	// Is this an ErrDuplicateResponse?  If so, we've already consumed this pause,
-	// so delete it.  Similarly, if the error is nil we just consumed, so go ahead
-	// and delete the pause then continue
+	// a bit of thought to work around, so we'll just go with double deletes for now,
+	// assuming this won't happen a ton.  this can be improved later.
+	res, _, err := m.buf.ConsumePause(ctx, pause, opts)
 	if err != nil {
-		return res, cleanup, err
+		return res, nil, err
 	}
 
 	idx := Index{WorkspaceID: pause.WorkspaceID}
@@ -172,19 +169,9 @@ func (m manager) ConsumePause(ctx context.Context, pause state.Pause, opts state
 		idx.EventName = *pause.Event
 	}
 
-	// Note that we cannot consume pauses from the blobstore with no event or backing
-	// blob.
-	if SkipFlushing(idx, []*state.Pause{&pause}) {
-		// This only exists in the buffer.  Return the buffer results.
-		return res, cleanup, err
-	}
-
-	// override the cleanup with idx deletion
-	cleanup = func() error {
+	cleanup := func() error {
 		err := m.Delete(ctx, idx, pause)
 		if err != nil {
-			// We only log here if the delete fails. Consuming is idempotent and is the
-			// action that updates state.
 			logger.StdlibLogger(ctx).Error(
 				"error deleting pause once consumed",
 				"error", err,

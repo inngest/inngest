@@ -79,8 +79,7 @@ type Manager interface {
 	// EvaluableLoader allows the Manager to be used within aggregate expression engines.
 	expragg.EvaluableLoader
 
-	// Bufferer is the core interface used to interact with pauses;  as an end user
-	// of this package you need to only write and read pauses since a given date.
+	// Bufferer is the core interface used to interact with pauses.
 	Bufferer
 
 	// Aggregated returns whether the index should be aggregated.  This is a quick lookup
@@ -115,9 +114,6 @@ type Manager interface {
 	//
 	// Note that this may return state.ErrPauseNotFound if the current pause ID has already
 	// been consumed by another parallel process or because of a race condition.
-	//
-	// NOTE: This consumes a pause in the buffer, then calls m.Delete to ensure the pause is
-	// deleted from the backing block store.
 	ConsumePause(ctx context.Context, pause state.Pause, opts state.ConsumePauseOpts) (state.ConsumePauseResult, func() error, error)
 
 	// Delete deletes a pause from either the block index or the buffer, depending on
@@ -184,7 +180,9 @@ type Bufferer interface {
 	// PauseTimestamp returns the created at timestamp for a pause.
 	PauseTimestamp(ctx context.Context, index Index, pause state.Pause) (time.Time, error)
 
-	// ConsumePause consumes a pause, writing the deleted status to the buffer.
+	// ConsumePause consumes a pause, writing the consumed data to state.
+	// The returned cleanup function is always nil - pauses.Manager provides the actual
+	// cleanup logic. This signature exists to allow Bufferer embedding in Manager.
 	ConsumePause(ctx context.Context, pause state.Pause, opts state.ConsumePauseOpts) (state.ConsumePauseResult, func() error, error)
 
 	// PauseByID fetches a pause for a given ID.  It may return the pause from the buffer
