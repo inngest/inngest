@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -199,12 +200,12 @@ func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition
 	}
 
 	if q.usePeekEWMA {
-		if err := q.primaryQueueShard.SetPeekEWMA(ctx, p.FunctionID, int64(iter.CtrConcurrency+iter.CtrRateLimit)); err != nil {
+		if err := q.primaryQueueShard.SetPeekEWMA(ctx, p.FunctionID, int64(atomic.LoadInt32(&iter.CtrConcurrency)+atomic.LoadInt32(&iter.CtrRateLimit))); err != nil {
 			l.Warn("error recording concurrency limit for EWMA", "error", err)
 		}
 	}
 
-	if iter.IsRequeuable() && iter.IsCustomKeyLimitOnly && !randomOffset && parallel {
+	if iter.IsRequeuable() && iter.IsCustomKeyLimitOnly.Load() && !randomOffset && parallel {
 		// We hit custom concurrency key issues.  Re-process this partition at a random offset, as long
 		// as random offset is currently false (so we don't loop forever)
 

@@ -371,17 +371,21 @@ func TestProcessorIteratorCounterRaceCondition(t *testing.T) {
 	}
 
 	// Verify counters match expected values
+	// Use atomic loads to safely read the counter values
+	ctrSuccess := atomic.LoadInt32(&iter.CtrSuccess)
+	ctrConcurrency := atomic.LoadInt32(&iter.CtrConcurrency)
+	ctrRateLimit := atomic.LoadInt32(&iter.CtrRateLimit)
+
 	t.Logf("CtrSuccess: %d, CtrConcurrency: %d, CtrRateLimit: %d",
-		iter.CtrSuccess, iter.CtrConcurrency, iter.CtrRateLimit)
+		ctrSuccess, ctrConcurrency, ctrRateLimit)
 	t.Logf("Items processed: %d, Items received by workers: %d", numItems, receivedCount)
 
-	// The race condition may cause incorrect counter values
-	// With race detector enabled, this test should detect races if present
-	require.Equal(t, int32(numItems), iter.CtrSuccess,
+	// With atomic operations, counter values should now be correct
+	require.Equal(t, int32(numItems), ctrSuccess,
 		"CtrSuccess should equal number of items when all leases succeed")
-	require.Equal(t, int32(0), iter.CtrConcurrency,
+	require.Equal(t, int32(0), ctrConcurrency,
 		"CtrConcurrency should be 0 when no concurrency limits hit")
-	require.Equal(t, int32(0), iter.CtrRateLimit,
+	require.Equal(t, int32(0), ctrRateLimit,
 		"CtrRateLimit should be 0 when no rate limits hit")
 }
 
@@ -478,15 +482,19 @@ func TestProcessorIteratorCounterRaceConditionMixed(t *testing.T) {
 		receivedCount++
 	}
 
-	t.Logf("Actual - CtrSuccess: %d, CtrRateLimit: %d, CtrConcurrency: %d",
-		iter.CtrSuccess, iter.CtrRateLimit, iter.CtrConcurrency)
+	// Use atomic loads to safely read the counter values
+	ctrSuccess := atomic.LoadInt32(&iter.CtrSuccess)
+	ctrConcurrency := atomic.LoadInt32(&iter.CtrConcurrency)
+	ctrRateLimit := atomic.LoadInt32(&iter.CtrRateLimit)
 
-	// With race conditions, the total may not add up correctly
-	// The race detector should catch if increments are happening unsafely
-	totalCounted := iter.CtrSuccess + iter.CtrRateLimit + iter.CtrConcurrency
+	t.Logf("Actual - CtrSuccess: %d, CtrRateLimit: %d, CtrConcurrency: %d",
+		ctrSuccess, ctrRateLimit, ctrConcurrency)
+
+	// With atomic operations, the total should now add up correctly
+	totalCounted := ctrSuccess + ctrRateLimit + ctrConcurrency
 	t.Logf("Total counted: %d, Expected: %d", totalCounted, numItems)
 
-	// This assertion may fail if there's a race condition causing lost updates
+	// With atomic operations, this should now pass
 	require.Equal(t, int32(numItems), totalCounted,
 		"Total counted items should equal number of items processed")
 }
@@ -572,13 +580,16 @@ func TestProcessorIteratorIsCustomKeyLimitOnlyRace(t *testing.T) {
 
 	close(workers)
 
+	// Use atomic operations to safely read the values
+	isCustomKeyLimitOnly := iter.IsCustomKeyLimitOnly.Load()
+	ctrConcurrency := atomic.LoadInt32(&iter.CtrConcurrency)
+
 	// With function concurrency mixed in, IsCustomKeyLimitOnly should be false
-	// But due to race conditions, it may have an inconsistent value
-	t.Logf("IsCustomKeyLimitOnly: %v", iter.IsCustomKeyLimitOnly)
-	t.Logf("CtrConcurrency: %d", iter.CtrConcurrency)
+	t.Logf("IsCustomKeyLimitOnly: %v", isCustomKeyLimitOnly)
+	t.Logf("CtrConcurrency: %d", ctrConcurrency)
 
 	// We expect IsCustomKeyLimitOnly to be false since we're hitting function concurrency limits
-	// If there's a race, this might not be deterministic
-	require.False(t, iter.IsCustomKeyLimitOnly,
+	// With atomic operations, this should now be deterministic
+	require.False(t, isCustomKeyLimitOnly,
 		"IsCustomKeyLimitOnly should be false when function concurrency limits are hit")
 }
