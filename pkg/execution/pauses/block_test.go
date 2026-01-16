@@ -322,6 +322,35 @@ func (m *mockBufferer) DeletePauseByID(ctx context.Context, pauseID uuid.UUID, w
 	return state.ErrPauseNotFound
 }
 
+func (m *mockBufferer) PauseIDsForRun(ctx context.Context, runID ulid.ULID) ([]uuid.UUID, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	var ids []uuid.UUID
+	for _, p := range m.pauses {
+		if p.Identifier.RunID == runID {
+			ids = append(ids, p.ID)
+		}
+	}
+	return ids, nil
+}
+
+func (m *mockBufferer) DeleteRunPausesIndex(ctx context.Context, runID ulid.ULID) error {
+	return nil
+}
+
+func (m *mockBufferer) DeletePausesForRun(ctx context.Context, runID ulid.ULID, workspaceID uuid.UUID) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	var remaining []*state.Pause
+	for _, p := range m.pauses {
+		if p.Identifier.RunID != runID {
+			remaining = append(remaining, p)
+		}
+	}
+	m.pauses = remaining
+	return nil
+}
+
 // Helper methods for thread-safe access in tests
 func (m *mockBufferer) pauseCount() int {
 	m.mu.RLock()
@@ -458,6 +487,35 @@ func (m *mockBuffererSameTimestamp) DeletePauseByID(ctx context.Context, pauseID
 		}
 	}
 	return state.ErrPauseNotFound
+}
+
+func (m *mockBuffererSameTimestamp) PauseIDsForRun(ctx context.Context, runID ulid.ULID) ([]uuid.UUID, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	var ids []uuid.UUID
+	for _, p := range m.pauses {
+		if p.Identifier.RunID == runID {
+			ids = append(ids, p.ID)
+		}
+	}
+	return ids, nil
+}
+
+func (m *mockBuffererSameTimestamp) DeleteRunPausesIndex(ctx context.Context, runID ulid.ULID) error {
+	return nil
+}
+
+func (m *mockBuffererSameTimestamp) DeletePausesForRun(ctx context.Context, runID ulid.ULID, workspaceID uuid.UUID) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	var remaining []*state.Pause
+	for _, p := range m.pauses {
+		if p.Identifier.RunID != runID {
+			remaining = append(remaining, p)
+		}
+	}
+	m.pauses = remaining
+	return nil
 }
 
 func TestLastBlockMetadata(t *testing.T) {

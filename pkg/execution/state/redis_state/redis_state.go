@@ -1007,9 +1007,11 @@ func (m mgr) Delete(ctx context.Context, i state.Identifier) error {
 		return err
 	}
 
-	err = m.unshardedMgr.deletePausesForRun(ctx, ctx, m.pauseDeleter, i)
-	if err != nil {
-		return err
+	if m.pauseDeleter != nil {
+		err = m.pauseDeleter.DeletePausesForRun(ctx, i.RunID, i.WorkspaceID)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -1056,33 +1058,6 @@ func (m shardedMgr) delete(ctx context.Context, callCtx context.Context, i state
 	return nil
 }
 
-func (m unshardedMgr) deletePausesForRun(ctx context.Context, callCtx context.Context, pauseDeleter state.PauseDeleter, i state.Identifier) error {
-	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "deletePausesForRun"), redis_telemetry.ScopePauses)
-
-	pause := m.u.Pauses()
-
-	pauseIDs, err := pause.Client().Do(callCtx, pause.Client().B().Smembers().Key(pause.kg.RunPauses(ctx, i.RunID)).Build()).AsStrSlice()
-	if err != nil {
-		return err
-	}
-
-	for _, id := range pauseIDs {
-		pauseID, err := uuid.Parse(id)
-		if err != nil {
-			// This should never happen
-			logger.StdlibLogger(ctx).Error("invalid pause ID in run pause set", "error", err, "pauseID", id, "runID", i.RunID)
-			continue
-		}
-		// This call will either go to the pause manager to handle deleting from blocks
-		// or use the current implementation in this file by default.
-		if err := pauseDeleter.DeletePauseByID(ctx, pauseID, i.WorkspaceID); err != nil {
-			return err
-		}
-	}
-
-	return pause.Client().Do(callCtx, pause.Client().B().Del().Key(pause.kg.RunPauses(ctx, i.RunID)).Build()).Error()
-}
-
 func (m unshardedMgr) DeletePauseByID(ctx context.Context, pauseID uuid.UUID, workspaceID uuid.UUID) error {
 	// Attempt to fetch this pause.
 	pause, err := m.PauseByID(ctx, pauseID)
@@ -1095,6 +1070,50 @@ func (m unshardedMgr) DeletePauseByID(ctx context.Context, pauseID uuid.UUID, wo
 		return err
 	}
 	return m.DeletePause(ctx, *pause)
+}
+
+func (m unshardedMgr) PauseIDsForRun(ctx context.Context, runID ulid.ULID) ([]uuid.UUID, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "PauseIDsForRun"), redis_telemetry.ScopePauses)
+
+	pause := m.u.Pauses()
+	pauseIDStrs, err := pause.Client().Do(ctx, pause.Client().B().Smembers().Key(pause.kg.RunPauses(ctx, runID)).Build()).AsStrSlice()
+	if err != nil {
+		return nil, err
+	}
+
+	pauseIDs := make([]uuid.UUID, 0, len(pauseIDStrs))
+	for _, id := range pauseIDStrs {
+		pauseID, err := uuid.Parse(id)
+		if err != nil {
+			logger.StdlibLogger(ctx).Error("invalid pause ID in run pause set", "error", err, "pauseID", id, "runID", runID)
+			continue
+		}
+		pauseIDs = append(pauseIDs, pauseID)
+	}
+
+	return pauseIDs, nil
+}
+
+func (m unshardedMgr) DeleteRunPausesIndex(ctx context.Context, runID ulid.ULID) error {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "DeleteRunPausesIndex"), redis_telemetry.ScopePauses)
+
+	pause := m.u.Pauses()
+	return pause.Client().Do(ctx, pause.Client().B().Del().Key(pause.kg.RunPauses(ctx, runID)).Build()).Error()
+}
+
+func (m unshardedMgr) DeletePausesForRun(ctx context.Context, runID ulid.ULID, workspaceID uuid.UUID) error {
+	pauseIDs, err := m.PauseIDsForRun(ctx, runID)
+	if err != nil {
+		return err
+	}
+
+	for _, pauseID := range pauseIDs {
+		if err := m.DeletePauseByID(ctx, pauseID, workspaceID); err != nil {
+			return err
+		}
+	}
+
+	return m.DeleteRunPausesIndex(ctx, runID)
 }
 
 func (m unshardedMgr) DeletePause(ctx context.Context, p state.Pause, options ...state.DeletePauseOpt) error {

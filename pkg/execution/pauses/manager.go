@@ -399,6 +399,29 @@ func (m manager) DeletePauseByID(ctx context.Context, pauseID uuid.UUID, workspa
 	return m.buf.DeletePauseByID(ctx, pauseID, workspaceID)
 }
 
+func (m manager) DeletePausesForRun(ctx context.Context, runID ulid.ULID, workspaceID uuid.UUID) error {
+	pauseIDs, err := m.buf.PauseIDsForRun(ctx, runID)
+	if err != nil {
+		return err
+	}
+
+	for _, pauseID := range pauseIDs {
+		if err := m.DeletePauseByID(ctx, pauseID, workspaceID); err != nil {
+			return err
+		}
+	}
+
+	return m.buf.DeleteRunPausesIndex(ctx, runID)
+}
+
+func (m manager) PauseIDsForRun(ctx context.Context, runID ulid.ULID) ([]uuid.UUID, error) {
+	return m.buf.PauseIDsForRun(ctx, runID)
+}
+
+func (m manager) DeleteRunPausesIndex(ctx context.Context, runID ulid.ULID) error {
+	return m.buf.DeleteRunPausesIndex(ctx, runID)
+}
+
 func (m manager) FlushIndexBlock(ctx context.Context, index Index) error {
 	if m.bs == nil {
 		return nil

@@ -325,6 +325,7 @@ type State interface {
 // PauseDeleter manages pause deletion
 type PauseDeleter interface {
 	DeletePauseByID(context.Context, uuid.UUID, uuid.UUID) error
+	DeletePausesForRun(ctx context.Context, runID ulid.ULID, workspaceID uuid.UUID) error
 }
 
 // Manager represents a state manager which can both load and mutate state.

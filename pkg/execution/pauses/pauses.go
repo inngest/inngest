@@ -79,7 +79,7 @@ type Manager interface {
 	// EvaluableLoader allows the Manager to be used within aggregate expression engines.
 	expragg.EvaluableLoader
 
-	// Bufferer is the core interface used to interact with pauses.
+	// Bufferer is the core interface used to interact with pauses in a buffer.
 	Bufferer
 
 	// Aggregated returns whether the index should be aggregated.  This is a quick lookup
@@ -141,6 +141,9 @@ type Manager interface {
 
 	// DeletePauseByID deletes a pause by its ID, handling both buffer and block storage
 	DeletePauseByID(ctx context.Context, pauseID uuid.UUID, workspaceID uuid.UUID) error
+
+	// DeletePausesForRun deletes all pauses associated with a run.
+	DeletePausesForRun(ctx context.Context, runID ulid.ULID, workspaceID uuid.UUID) error
 }
 
 // Bufferer represents a datastore which accepts all writes for pauses.
@@ -203,6 +206,12 @@ type Bufferer interface {
 	// NOTE: The bufferer handles O1 lookups of signals -> pauses.  These are not removed
 	// from the buffer and flushed to blocks
 	PauseBySignalID(ctx context.Context, envID uuid.UUID, signalID string) (*state.Pause, error)
+
+	// PauseIDsForRun returns all pause IDs associated with a run.
+	PauseIDsForRun(ctx context.Context, runID ulid.ULID) ([]uuid.UUID, error)
+
+	// DeleteRunPausesIndex deletes the index tracking pauses for a run.
+	DeleteRunPausesIndex(ctx context.Context, runID ulid.ULID) error
 }
 
 // BlockStore is an implementation that reads and writes blocks.
