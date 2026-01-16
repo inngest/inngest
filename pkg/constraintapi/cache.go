@@ -37,6 +37,9 @@ func (l *limitingConstraintCache) Acquire(ctx context.Context, req *CapacityAcqu
 		for _, ci := range req.Constraints {
 			// Construct cache key for constraint scoped to account
 			cacheKey := ci.CacheKey(req.AccountID, req.EnvID, req.FunctionID)
+			if cacheKey == "" {
+				continue
+			}
 
 			item := l.limitingConstraintCache.Get(cacheKey)
 			if item == nil || item.Expired() {
@@ -87,6 +90,9 @@ func (l *limitingConstraintCache) Acquire(ctx context.Context, req *CapacityAcqu
 	// for a short duration to avoid unnecessary load on Redis
 	for _, ci := range res.LimitingConstraints {
 		cacheKey := ci.CacheKey(req.AccountID, req.EnvID, req.FunctionID)
+		if cacheKey == "" {
+			continue
+		}
 
 		cacheTTL := res.RetryAfter.Sub(l.clock.Now())
 		if cacheTTL <= 0 {
