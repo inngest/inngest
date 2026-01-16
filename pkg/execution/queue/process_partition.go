@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -200,7 +199,7 @@ func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition
 	}
 
 	if q.usePeekEWMA {
-		if err := q.primaryQueueShard.SetPeekEWMA(ctx, p.FunctionID, int64(atomic.LoadInt32(&iter.CtrConcurrency)+atomic.LoadInt32(&iter.CtrRateLimit))); err != nil {
+		if err := q.primaryQueueShard.SetPeekEWMA(ctx, p.FunctionID, int64(iter.CtrConcurrency.Load()+iter.CtrRateLimit.Load())); err != nil {
 			l.Warn("error recording concurrency limit for EWMA", "error", err)
 		}
 	}
@@ -222,7 +221,7 @@ func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition
 	// with a force:  ensure that we won't re-scan it until 2 seconds in the future.
 	if iter.IsRequeuable() {
 		requeue := PartitionConcurrencyLimitRequeueExtension
-		if iter.CtrConcurrency == 0 {
+		if iter.CtrConcurrency.Load() == 0 {
 			// This has been throttled only.  Don't requeue so far ahead, otherwise we'll be waiting longer
 			// than the minimum throttle.
 			//

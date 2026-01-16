@@ -50,9 +50,9 @@ type ProcessorIterator struct {
 	// These flags are used to handle partition requeueing.
 	// These counters must be accessed atomically as they may be incremented
 	// concurrently when Parallel=true.
-	CtrSuccess     int32
-	CtrConcurrency int32
-	CtrRateLimit   int32
+	CtrSuccess     atomic.Int32
+	CtrConcurrency atomic.Int32
+	CtrRateLimit   atomic.Int32
 
 	// IsCustomKeyLimitOnly records whether we ONLY hit custom concurrency key limits.
 	// This lets us know whether to peek from a random offset if we have FIFO disabled
@@ -299,7 +299,7 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 		// This maintains FIFO ordering amongst all custom concurrency keys.
 		p.Denies.AddThrottled(err)
 
-		atomic.AddInt32(&p.CtrRateLimit, 1)
+		p.CtrRateLimit.Add(1)
 		metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{
 			PkgName: pkgName,
 			Tags:    map[string]any{"status": "throttled", "queue_shard": p.Queue.Shard().Name(), "constraint_source": constraint_check_source},
@@ -328,7 +328,7 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 	case ErrPartitionConcurrencyLimit, ErrAccountConcurrencyLimit, ErrSystemConcurrencyLimit:
 		p.IsCustomKeyLimitOnly.Store(false)
 
-		atomic.AddInt32(&p.CtrConcurrency, 1)
+		p.CtrConcurrency.Add(1)
 		// Since the queue is at capacity on a fn or account level, no
 		// more jobs in this loop should be worked on - so break.
 		//
@@ -385,7 +385,7 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 
 		return fmt.Errorf("concurrency hit: %w", ErrProcessStopIterator)
 	case ErrConcurrencyLimitCustomKey:
-		atomic.AddInt32(&p.CtrConcurrency, 1)
+		p.CtrConcurrency.Add(1)
 
 		// Custom concurrency keys are different.  Each job may have a different key,
 		// so we cannot break the loop in case the next job has a different key and
@@ -429,7 +429,7 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 		return nil
 	case ErrQueueItemNotFound:
 		// This is an okay error.  Move to the next job item.
-		atomic.AddInt32(&p.CtrSuccess, 1) // count as a success for stats purposes.
+		p.CtrSuccess.Add(1) // count as a success for stats purposes.
 		metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{
 			PkgName: pkgName,
 			Tags:    map[string]any{"status": "success", "queue_shard": p.Queue.Shard().Name(), "constraint_source": constraint_check_source},
@@ -437,7 +437,7 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 		return nil
 	case ErrQueueItemAlreadyLeased:
 		// This is an okay error.  Move to the next job item.
-		atomic.AddInt32(&p.CtrSuccess, 1) // count as a success for stats purposes.
+		p.CtrSuccess.Add(1) // count as a success for stats purposes.
 		metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{
 			PkgName: pkgName,
 			Tags:    map[string]any{"status": "success", "queue_shard": p.Queue.Shard().Name(), "constraint_source": constraint_check_source},
@@ -461,7 +461,7 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 	item.LeaseID = leaseID
 
 	// increase success counter.
-	atomic.AddInt32(&p.CtrSuccess, 1)
+	p.CtrSuccess.Add(1)
 	metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{
 		PkgName: pkgName,
 		Tags:    map[string]any{"status": "success", "queue_shard": p.Queue.Shard().Name(), "constraint_source": constraint_check_source},
@@ -483,8 +483,8 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 
 func (p *ProcessorIterator) IsRequeuable() bool {
 	// if we have concurrency OR we hit rate limiting/throttling.
-	ctrConcurrency := atomic.LoadInt32(&p.CtrConcurrency)
-	ctrRateLimit := atomic.LoadInt32(&p.CtrRateLimit)
-	ctrSuccess := atomic.LoadInt32(&p.CtrSuccess)
+	ctrConcurrency := p.CtrConcurrency.Load()
+	ctrRateLimit := p.CtrRateLimit.Load()
+	ctrSuccess := p.CtrSuccess.Load()
 	return ctrConcurrency > 0 || (ctrRateLimit > 0 && ctrConcurrency == 0 && ctrSuccess == 0)
 }

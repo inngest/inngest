@@ -371,10 +371,9 @@ func TestProcessorIteratorCounterRaceCondition(t *testing.T) {
 	}
 
 	// Verify counters match expected values
-	// Use atomic loads to safely read the counter values
-	ctrSuccess := atomic.LoadInt32(&iter.CtrSuccess)
-	ctrConcurrency := atomic.LoadInt32(&iter.CtrConcurrency)
-	ctrRateLimit := atomic.LoadInt32(&iter.CtrRateLimit)
+	ctrSuccess := iter.CtrSuccess.Load()
+	ctrConcurrency := iter.CtrConcurrency.Load()
+	ctrRateLimit := iter.CtrRateLimit.Load()
 
 	t.Logf("CtrSuccess: %d, CtrConcurrency: %d, CtrRateLimit: %d",
 		ctrSuccess, ctrConcurrency, ctrRateLimit)
@@ -482,10 +481,9 @@ func TestProcessorIteratorCounterRaceConditionMixed(t *testing.T) {
 		receivedCount++
 	}
 
-	// Use atomic loads to safely read the counter values
-	ctrSuccess := atomic.LoadInt32(&iter.CtrSuccess)
-	ctrConcurrency := atomic.LoadInt32(&iter.CtrConcurrency)
-	ctrRateLimit := atomic.LoadInt32(&iter.CtrRateLimit)
+	ctrSuccess := iter.CtrSuccess.Load()
+	ctrConcurrency := iter.CtrConcurrency.Load()
+	ctrRateLimit := iter.CtrRateLimit.Load()
 
 	t.Logf("Actual - CtrSuccess: %d, CtrRateLimit: %d, CtrConcurrency: %d",
 		ctrSuccess, ctrRateLimit, ctrConcurrency)
@@ -580,9 +578,8 @@ func TestProcessorIteratorIsCustomKeyLimitOnlyRace(t *testing.T) {
 
 	close(workers)
 
-	// Use atomic operations to safely read the values
 	isCustomKeyLimitOnly := iter.IsCustomKeyLimitOnly.Load()
-	ctrConcurrency := atomic.LoadInt32(&iter.CtrConcurrency)
+	ctrConcurrency := iter.CtrConcurrency.Load()
 
 	// With function concurrency mixed in, IsCustomKeyLimitOnly should be false
 	t.Logf("IsCustomKeyLimitOnly: %v", isCustomKeyLimitOnly)
