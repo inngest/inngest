@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { RiArrowRightSLine } from '@remixicon/react';
 
+import { Tooltip, TooltipContent, TooltipTrigger } from '../Tooltip/Tooltip';
 import { InlineSpans } from './InlineSpans';
 import { StepType } from './StepType';
 import { TimelineHeader } from './TimelineHeader';
@@ -13,18 +14,34 @@ type Props = {
   maxTime: Date;
   trace: Trace;
   runID: string;
+  leftWidth: number;
+  onResizeStart: () => void;
 };
 
 const INDENT_WIDTH = 40;
 
-export function Trace({ depth, maxTime, minTime, trace, runID }: Props) {
+export function Trace({ depth, maxTime, minTime, trace, runID, leftWidth, onResizeStart }: Props) {
   const [expanded, setExpanded] = useState(true);
+  const [tooltipOpen, setTooltipOpen] = useState(false);
   const { selectStep, selectedStep } = useStepSelection({ runID });
   const expanderRef = useRef<HTMLDivElement>(null);
+  const spanNameRef = useRef<HTMLDivElement>(null);
 
   const hasChildren = traceHasChildren(depth, trace);
-
   const spanName = getSpanName(trace.name);
+
+  const handleTooltipOpenChange = (open: boolean) => {
+    if (!open) {
+      setTooltipOpen(false);
+      return;
+    }
+
+    const element = spanNameRef.current;
+    if (element && element.scrollWidth > element.clientWidth) {
+      setTooltipOpen(true);
+    }
+  };
+
   return (
     <div className="relative flex w-full flex-col">
       <TimelineHeader trace={trace} minTime={minTime} maxTime={maxTime} />
@@ -42,8 +59,8 @@ export function Trace({ depth, maxTime, minTime, trace, runID }: Props) {
           }}
         >
           <div
-            className="flex w-[30%] flex-row items-center justify-start gap-1 overflow-hidden"
-            style={{ paddingLeft: `${depth * INDENT_WIDTH}px` }}
+            className="flex flex-row items-center justify-start gap-1 overflow-hidden"
+            style={{ width: `${leftWidth}%`, paddingLeft: `${depth * INDENT_WIDTH}px` }}
           >
             {hasChildren && expanded && (
               <div
@@ -78,33 +95,54 @@ export function Trace({ depth, maxTime, minTime, trace, runID }: Props) {
               </div>
             )}
             <StepType stepType={trace.stepType} />
-            <div
-              className={`text-basis overflow-hidden text-ellipsis whitespace-nowrap text-sm font-normal leading-tight ${
-                !hasChildren && 'pl-1.5'
-              }`}
-            >
-              {spanName}
-            </div>
+            <Tooltip open={tooltipOpen} onOpenChange={handleTooltipOpenChange}>
+              <TooltipTrigger asChild>
+                <div
+                  ref={spanNameRef}
+                  className={`text-basis min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-sm font-normal leading-tight ${
+                    !hasChildren && 'pl-1.5'
+                  }`}
+                >
+                  {spanName}
+                </div>
+              </TooltipTrigger>
+              <TooltipContent
+                side="top"
+                className="flex min-h-8 items-center px-4 text-xs leading-[18px]"
+              >
+                {spanName}
+              </TooltipContent>
+            </Tooltip>
           </div>
 
-          <div className="border-light/80 flex w-[70%] flex-row border-l-2">
+          <div
+            className="border-light/80 relative flex flex-row border-l-2"
+            style={{ width: `${100 - leftWidth}%` }}
+          >
+            <div
+              className="absolute -left-1.5 top-0 z-10 h-7 w-3 cursor-col-resize"
+              onMouseDown={(e) => {
+                e.stopPropagation();
+                onResizeStart();
+              }}
+            />
             <InlineSpans maxTime={maxTime} minTime={minTime} trace={trace} depth={depth} />
           </div>
         </div>
         {expanded && hasChildren && (
           <>
-            {trace.childrenSpans?.map((child, i) => {
-              return (
-                <Trace
-                  key={`${child.name}-${i}`}
-                  depth={depth + 1}
-                  maxTime={maxTime}
-                  minTime={minTime}
-                  trace={child}
-                  runID={runID}
-                />
-              );
-            })}
+            {trace.childrenSpans?.map((child, i) => (
+              <Trace
+                key={`${child.name}-${i}`}
+                depth={depth + 1}
+                maxTime={maxTime}
+                minTime={minTime}
+                trace={child}
+                runID={runID}
+                leftWidth={leftWidth}
+                onResizeStart={onResizeStart}
+              />
+            ))}
           </>
         )}
       </div>
