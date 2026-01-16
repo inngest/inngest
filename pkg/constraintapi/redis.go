@@ -24,9 +24,6 @@ const (
 	OperationIdempotencyTTL       = 5 * time.Second
 	CheckIdempotencyTTL           = 5 * time.Second
 	ConstraintCheckIdempotencyTTL = 5 * time.Minute
-
-	LimitingConstraintCacheTTLConcurrency = 5 * time.Second
-	LimitingConstraintCacheTTLThrottle    = time.Second
 )
 
 var enableDebugLogs = false

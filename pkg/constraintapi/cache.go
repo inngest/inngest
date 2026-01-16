@@ -11,6 +11,11 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
+const (
+	LimitingConstraintCacheTTLConcurrency = 5 * time.Second
+	LimitingConstraintCacheTTLThrottle    = time.Second
+)
+
 type limitingConstraintCache struct {
 	manager CapacityManager
 	clock   clockwork.Clock
