@@ -33,48 +33,50 @@ type limitingConstraintCacheItem struct {
 // Acquire implements CapacityManager.
 func (l *limitingConstraintCache) Acquire(ctx context.Context, req *CapacityAcquireRequest) (*CapacityAcquireResponse, errs.InternalError) {
 	// Check if we previously got limited
-	recentlyLimited := make([]ConstraintItem, 0)
-	var retryAfter time.Time
-	for _, ci := range req.Constraints {
-		// Construct cache key for constraint scoped to account
-		cacheKey := ci.CacheKey(req.AccountID, req.EnvID, req.FunctionID)
+	{
+		recentlyLimited := make([]ConstraintItem, 0)
+		var retryAfter time.Time
+		for _, ci := range req.Constraints {
+			// Construct cache key for constraint scoped to account
+			cacheKey := ci.CacheKey(req.AccountID, req.EnvID, req.FunctionID)
 
-		item := l.limitingConstraintCache.Get(cacheKey)
-		if item == nil || item.Expired() {
-			// Not limited previously
-			continue
+			item := l.limitingConstraintCache.Get(cacheKey)
+			if item == nil || item.Expired() {
+				// Not limited previously
+				continue
+			}
+
+			// This constraint was recently limited
+			val := item.Value()
+
+			recentlyLimited = append(recentlyLimited, ci)
+			if val.retryAfter.After(retryAfter) {
+				retryAfter = val.retryAfter
+			}
+
+			metrics.IncrConstraintAPILimitingConstraintCacheCounter(ctx, 1, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags: map[string]any{
+					"op": "hit",
+				},
+			})
 		}
 
-		// This constraint was recently limited
-		val := item.Value()
+		// If one or more requested constraints were recently limited,
+		// return a synthetic response including all affected constraints.
+		if len(recentlyLimited) > 0 {
+			requestID, err := ulid.New(ulid.Timestamp(l.clock.Now()), rand.Reader)
+			if err != nil {
+				return nil, errs.Wrap(0, false, "could not generate request ID: %w", err)
+			}
 
-		recentlyLimited = append(recentlyLimited, ci)
-		if val.retryAfter.After(retryAfter) {
-			retryAfter = val.retryAfter
+			return &CapacityAcquireResponse{
+				RequestID:           requestID,
+				Leases:              nil,
+				LimitingConstraints: recentlyLimited,
+				RetryAfter:          retryAfter,
+			}, nil
 		}
-
-		metrics.IncrConstraintAPILimitingConstraintCacheCounter(ctx, 1, metrics.CounterOpt{
-			PkgName: pkgName,
-			Tags: map[string]any{
-				"op": "hit",
-			},
-		})
-	}
-
-	// If one or more requested constraints were recently limited,
-	// return a synthetic response including all affected constraints.
-	if len(recentlyLimited) > 0 {
-		requestID, err := ulid.New(ulid.Timestamp(l.clock.Now()), rand.Reader)
-		if err != nil {
-			return nil, errs.Wrap(0, false, "could not generate request ID: %w", err)
-		}
-
-		return &CapacityAcquireResponse{
-			RequestID:           requestID,
-			Leases:              nil,
-			LimitingConstraints: recentlyLimited,
-			RetryAfter:          retryAfter,
-		}, nil
 	}
 
 	res, err := l.manager.Acquire(ctx, req)
@@ -88,23 +90,23 @@ func (l *limitingConstraintCache) Acquire(ctx context.Context, req *CapacityAcqu
 	for _, ci := range res.LimitingConstraints {
 		cacheKey := ci.CacheKey(req.AccountID, req.EnvID, req.FunctionID)
 
-		retryDelay := retryAfter.Sub(l.clock.Now())
-		if retryDelay <= 0 {
-			retryDelay = time.Second
+		cacheTTL := res.RetryAfter.Sub(l.clock.Now())
+		if cacheTTL <= 0 {
+			cacheTTL = time.Second
 		}
 
 		// Enforce max cache ttl limit
-		if retryDelay >= MaxCacheTTL {
-			retryDelay = MaxCacheTTL
+		if cacheTTL >= MaxCacheTTL {
+			cacheTTL = MaxCacheTTL
 		}
 
 		l.limitingConstraintCache.Set(
 			cacheKey,
 			&limitingConstraintCacheItem{
-				retryAfter: retryAfter,
+				retryAfter: res.RetryAfter,
 				constraint: ci,
 			},
-			retryDelay,
+			cacheTTL,
 		)
 		metrics.IncrConstraintAPILimitingConstraintCacheCounter(ctx, 1, metrics.CounterOpt{
 			PkgName: pkgName,
