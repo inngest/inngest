@@ -13,9 +13,7 @@ import (
 )
 
 const (
-	LimitingConstraintCacheTTLConcurrency = 5 * time.Second
-	LimitingConstraintCacheTTLThrottle    = time.Second
-	MaxCacheTTL                           = time.Minute
+	MaxCacheTTL = time.Minute
 )
 
 type limitingConstraintCache struct {
