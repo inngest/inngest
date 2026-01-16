@@ -20,26 +20,12 @@ type limitingConstraintCache struct {
 	manager CapacityManager
 	clock   clockwork.Clock
 
-	limitingConstraintCache        *ccache.Cache[*limitingConstraintCacheItem]
-	limitingConstraintCacheTTLFunc func(c ConstraintItem) time.Duration
+	limitingConstraintCache *ccache.Cache[*limitingConstraintCacheItem]
 }
 
 type limitingConstraintCacheItem struct {
 	constraint ConstraintItem
 	retryAfter time.Time
-}
-
-func DefaultLimitingConstraintCacheTTLFunc(c ConstraintItem) time.Duration {
-	switch c.Kind {
-	case ConstraintKindConcurrency:
-		return time.Second
-	case ConstraintKindThrottle:
-		return time.Second
-	case ConstraintKindRateLimit:
-		return time.Second
-	default:
-		return time.Second
-	}
 }
 
 // Acquire implements CapacityManager.
@@ -90,24 +76,22 @@ func (l *limitingConstraintCache) Acquire(ctx context.Context, req *CapacityAcqu
 	// If we are limited by constraints,
 	// cache each individual constraint for subsequent requests
 	// for a short duration to avoid unnecessary load on Redis
-	if len(res.Leases) == 0 && len(res.LimitingConstraints) > 0 {
-		for _, ci := range res.LimitingConstraints {
-			cacheKey := ci.CacheKey(req.AccountID, req.EnvID, req.FunctionID)
+	for _, ci := range res.LimitingConstraints {
+		cacheKey := ci.CacheKey(req.AccountID, req.EnvID, req.FunctionID)
 
-			retryDelay := retryAfter.Sub(l.clock.Now())
-			if retryDelay <= 0 {
-				retryDelay = time.Second
-			}
-
-			l.limitingConstraintCache.Set(
-				cacheKey,
-				&limitingConstraintCacheItem{
-					retryAfter: retryAfter,
-					constraint: ci,
-				},
-				retryDelay,
-			)
+		retryDelay := retryAfter.Sub(l.clock.Now())
+		if retryDelay <= 0 {
+			retryDelay = time.Second
 		}
+
+		l.limitingConstraintCache.Set(
+			cacheKey,
+			&limitingConstraintCacheItem{
+				retryAfter: retryAfter,
+				constraint: ci,
+			},
+			retryDelay,
+		)
 	}
 
 	return res, nil
@@ -128,16 +112,14 @@ func (l *limitingConstraintCache) Release(ctx context.Context, req *CapacityRele
 func NewLimitingConstraintCache(
 	clock clockwork.Clock,
 	manager CapacityManager,
-	ttlFunc func(c ConstraintItem) time.Duration,
-) CapacityManager {
+) *limitingConstraintCache {
 	return &limitingConstraintCache{
 		manager: manager,
-
+		clock:   clock,
 		limitingConstraintCache: ccache.New(
 			ccache.Configure[*limitingConstraintCacheItem]().
 				MaxSize(10_000).
 				ItemsToPrune(500),
 		),
-		limitingConstraintCacheTTLFunc: ttlFunc,
 	}
 }
