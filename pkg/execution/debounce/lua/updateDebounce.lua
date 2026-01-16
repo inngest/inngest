@@ -87,8 +87,16 @@ if existing ~= false then
 		if nextTTL > item.t then
 			ttl = math.floor((item.t - currentTime) / 1000)
 			if ttl <= 0 then
-				-- Ensure we always use a minimum.
-				ttl = 1
+				-- If we reach here then the debounce timed out (per the
+				-- function's optional timeout config)
+
+				-- Delete the debounce pointer. We want any new events with the
+				-- same key to create a new debounce
+				redis.call("DEL", keyPtr)
+
+				-- Ensure we always use a minimum, since this is used for queue
+				-- scheduling
+				return 0
 			end
 			ttl = tonumber(ttl)
 		end
