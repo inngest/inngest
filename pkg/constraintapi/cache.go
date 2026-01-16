@@ -15,6 +15,7 @@ import (
 const (
 	LimitingConstraintCacheTTLConcurrency = 5 * time.Second
 	LimitingConstraintCacheTTLThrottle    = time.Second
+	MaxCacheTTL                           = time.Minute
 )
 
 type limitingConstraintCache struct {
@@ -90,6 +91,11 @@ func (l *limitingConstraintCache) Acquire(ctx context.Context, req *CapacityAcqu
 		retryDelay := retryAfter.Sub(l.clock.Now())
 		if retryDelay <= 0 {
 			retryDelay = time.Second
+		}
+
+		// Enforce max cache ttl limit
+		if retryDelay >= MaxCacheTTL {
+			retryDelay = MaxCacheTTL
 		}
 
 		l.limitingConstraintCache.Set(
