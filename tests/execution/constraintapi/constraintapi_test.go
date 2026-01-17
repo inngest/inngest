@@ -564,9 +564,10 @@ func TestConstraintEnforcement(t *testing.T) {
 				FnRunIsSharded:         redis_state.AlwaysShardOnRun,
 			})
 
-			sm, err := redis_state.New(ctx,
+			pauseMgr := pauses.NewPauseStoreManager(sharded, unsharded)
+
+			sm, err := redis_state.New(ctx, pauseMgr,
 				redis_state.WithShardedClient(sharded),
-				redis_state.WithUnshardedClient(unsharded),
 			)
 			require.NoError(t, err)
 			exec, err := executor.NewExecutor(
@@ -574,7 +575,7 @@ func TestConstraintEnforcement(t *testing.T) {
 				executor.WithAssignedQueueShard(shard),
 				executor.WithQueue(q),
 				executor.WithStateManager(redis_state.MustRunServiceV2(sm)),
-				executor.WithPauseManager(pauses.NewPauseStoreManager(sharded, unsharded)),
+				executor.WithPauseManager(pauseMgr),
 				executor.WithCapacityManager(cm),
 				executor.WithLogger(logger.StdlibLogger(ctx)),
 				executor.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
@@ -1490,9 +1491,10 @@ func TestScheduleConstraintAPICompatibility(t *testing.T) {
 			FnRunIsSharded:         redis_state.AlwaysShardOnRun,
 		})
 
-		sm, err := redis_state.New(ctx,
+		pauseMgr := pauses.NewPauseStoreManager(sharded, unsharded)
+
+		sm, err := redis_state.New(ctx, pauseMgr,
 			redis_state.WithShardedClient(sharded),
-			redis_state.WithUnshardedClient(unsharded),
 		)
 		require.NoError(t, err)
 		exec, err := executor.NewExecutor(
@@ -1500,7 +1502,7 @@ func TestScheduleConstraintAPICompatibility(t *testing.T) {
 			executor.WithAssignedQueueShard(shard),
 			executor.WithQueue(q),
 			executor.WithStateManager(redis_state.MustRunServiceV2(sm)),
-			executor.WithPauseManager(pauses.NewPauseStoreManager(sharded, unsharded)),
+			executor.WithPauseManager(pauseMgr),
 			executor.WithCapacityManager(cm),
 			executor.WithLogger(logger.StdlibLogger(ctx)),
 			executor.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
@@ -1690,9 +1692,10 @@ func TestScheduleConstraintAPICompatibility(t *testing.T) {
 			FnRunIsSharded:         redis_state.AlwaysShardOnRun,
 		})
 
-		sm, err := redis_state.New(ctx,
+		pauseMgr := pauses.NewPauseStoreManager(sharded, unsharded)
+
+		sm, err := redis_state.New(ctx, pauseMgr,
 			redis_state.WithShardedClient(sharded),
-			redis_state.WithUnshardedClient(unsharded),
 		)
 		require.NoError(t, err)
 		exec, err := executor.NewExecutor(
@@ -1700,7 +1703,7 @@ func TestScheduleConstraintAPICompatibility(t *testing.T) {
 			executor.WithAssignedQueueShard(shard),
 			executor.WithQueue(q),
 			executor.WithStateManager(redis_state.MustRunServiceV2(sm)),
-			executor.WithPauseManager(pauses.NewPauseStoreManager(sharded, unsharded)),
+			executor.WithPauseManager(pauseMgr),
 			executor.WithCapacityManager(cm),
 			executor.WithLogger(logger.StdlibLogger(ctx)),
 			executor.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {

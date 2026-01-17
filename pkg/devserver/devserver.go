@@ -269,12 +269,10 @@ func start(ctx context.Context, opts StartOpts) error {
 		QueueDefaultKey:        redis_state.QueueDefaultKey,
 	})
 
+	pauseMgr := pauses.NewPauseStoreManager(shardedClient, unshardedClient)
+
 	var sm state.Manager
-	sm, err = redis_state.New(
-		ctx,
-		redis_state.WithShardedClient(shardedClient),
-		redis_state.WithUnshardedClient(unshardedClient),
-	)
+	sm, err = redis_state.New(ctx, pauseMgr, redis_state.WithShardedClient(shardedClient))
 	if err != nil {
 		return err
 	}
@@ -413,8 +411,8 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	connectionManager := connstate.NewRedisConnectionStateManager(connectRc)
 
-	// Create a new expression aggregator, using Redis to load evaluables.
-	agg := expragg.NewAggregator(ctx, 100, 100, sm.(expragg.EvaluableLoader), expressions.ExprEvaluator, nil, nil)
+	// Create a new expression aggregator, using the a Redis only pause manager to load evaluables.
+	agg := expragg.NewAggregator(ctx, 100, 100, pauseMgr, expressions.ExprEvaluator, nil, nil)
 
 	executorLogger := connectPubSubLogger.With("svc", "executor")
 
@@ -476,8 +474,6 @@ func start(ctx context.Context, opts StartOpts) error {
 	if url == "0.0.0.0" {
 		url = "127.0.0.1"
 	}
-
-	pauseMgr := pauses.NewPauseStoreManager(shardedClient, unshardedClient)
 
 	executorOpts := []executor.ExecutorOpt{
 		executor.WithHTTPClient(httpClient),

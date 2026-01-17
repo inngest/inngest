@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/execution/pauses"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/tests/execution/queue/helper"
@@ -82,17 +83,16 @@ func TestUpdateMetadataIsFieldEmpty(t *testing.T) {
 				}
 
 				unsharded := redis_state.NewUnshardedClient(client, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
-				mgr, err := redis_state.New(ctx,
-					redis_state.WithUnshardedClient(unsharded),
-					redis_state.WithShardedClient(redis_state.NewShardedClient(redis_state.ShardedClientOpts{
-						UnshardedClient:        unsharded,
-						FunctionRunStateClient: client,
-						BatchClient:            client,
-						StateDefaultKey:        redis_state.StateDefaultKey,
-						QueueDefaultKey:        redis_state.QueueDefaultKey,
-						FnRunIsSharded:         redis_state.AlwaysShardOnRun,
-					})),
-				)
+				sharded := redis_state.NewShardedClient(redis_state.ShardedClientOpts{
+					UnshardedClient:        unsharded,
+					FunctionRunStateClient: client,
+					BatchClient:            client,
+					StateDefaultKey:        redis_state.StateDefaultKey,
+					QueueDefaultKey:        redis_state.QueueDefaultKey,
+					FnRunIsSharded:         redis_state.AlwaysShardOnRun,
+				})
+				pauseMgr := pauses.NewRedisOnlyPauseManager(sharded, unsharded)
+				mgr, err := redis_state.New(ctx, pauseMgr, redis_state.WithShardedClient(sharded))
 				require.NoError(t, err)
 				return mgr
 			}
@@ -222,20 +222,18 @@ func TestStateStoreLuaCompatibility(t *testing.T) {
 
 		// Create unsharded client for state management
 		unsharded := redis_state.NewUnshardedClient(client, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
+		sharded := redis_state.NewShardedClient(redis_state.ShardedClientOpts{
+			UnshardedClient:        unsharded,
+			FunctionRunStateClient: client,
+			BatchClient:            client,
+			StateDefaultKey:        redis_state.StateDefaultKey,
+			QueueDefaultKey:        redis_state.QueueDefaultKey,
+			FnRunIsSharded:         redis_state.AlwaysShardOnRun,
+		})
+		pauseMgr := pauses.NewRedisOnlyPauseManager(sharded, unsharded)
 
 		// Create state manager
-		mgr, err := redis_state.New(
-			ctx,
-			redis_state.WithUnshardedClient(unsharded),
-			redis_state.WithShardedClient(redis_state.NewShardedClient(redis_state.ShardedClientOpts{
-				UnshardedClient:        unsharded,
-				FunctionRunStateClient: client,
-				BatchClient:            client,
-				StateDefaultKey:        redis_state.StateDefaultKey,
-				QueueDefaultKey:        redis_state.QueueDefaultKey,
-				FnRunIsSharded:         redis_state.AlwaysShardOnRun,
-			})),
-		)
+		mgr, err := redis_state.New(ctx, pauseMgr, redis_state.WithShardedClient(sharded))
 		require.NoError(t, err)
 		return mgr
 	}

@@ -322,9 +322,8 @@ type State interface {
 	IsCron() bool
 }
 
-// PauseDeleter manages pause deletion
+// PauseDeleter manages pause deletion for runs.
 type PauseDeleter interface {
-	DeletePauseByID(context.Context, uuid.UUID, uuid.UUID) error
 	DeletePausesForRun(ctx context.Context, runID ulid.ULID, workspaceID uuid.UUID) error
 }
 
@@ -332,12 +331,6 @@ type PauseDeleter interface {
 type Manager interface {
 	StateLoader
 	Mutater
-
-	// PauseManager embeds buffering pause services.  Note that this is
-	// superseded by pauses.Manager.
-	PauseManager
-
-	SetPauseDeleter(PauseDeleter)
 }
 
 // FunctionNotifier is an optional interface that state stores can fulfil,

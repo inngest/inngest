@@ -151,6 +151,10 @@ type Manager interface {
 // to blocks on disk.
 type Bufferer interface {
 	state.PauseDeleter
+
+	// DeletePauseByID removes a pause by its ID.
+	DeletePauseByID(ctx context.Context, pauseID uuid.UUID, workspaceID uuid.UUID) error
+
 	// Write writes one or more pauses to the backing store.  Note that the index
 	// for each pause must be the same.
 	//

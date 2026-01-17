@@ -41,10 +41,11 @@ func TestV2Adapter(t *testing.T) {
 		QueueDefaultKey:        QueueDefaultKey,
 		FnRunIsSharded:         AlwaysShardOnRun,
 	})
+	pauseStore := NewPauseStore(shardedClient, unshardedClient)
 
 	mgr, err := New(
 		ctx,
-		WithUnshardedClient(unshardedClient),
+		pauseStore,
 		WithShardedClient(shardedClient),
 	)
 	require.NoError(t, err)
@@ -502,10 +503,11 @@ func TestV2AdapterWithDisabledRetries(t *testing.T) {
 		QueueDefaultKey:        QueueDefaultKey,
 		FnRunIsSharded:         AlwaysShardOnRun,
 	})
+	pauseStore := NewPauseStore(shardedClient, unshardedClient)
 
 	mgr, err := New(
 		ctx,
-		WithUnshardedClient(unshardedClient),
+		pauseStore,
 		WithShardedClient(shardedClient),
 	)
 	require.NoError(t, err)
