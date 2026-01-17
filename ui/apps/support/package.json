@@ -7,8 +7,17 @@
     "dev": "vite dev --port 3002",
     "build": "vite build && tsc --noEmit",
     "start": "vite start",
+    "start:local": "vite start",
+    "start:e2e": "PORT=3002 pnpm start:local",
+    "start:build:e2e": "pnpm build && PORT=3002 pnpm start:local",
     "format": "prettier --write .",
-    "lint": "eslint . --report-unused-disable-directives --max-warnings 0"
+    "lint": "eslint . --report-unused-disable-directives --max-warnings 0",
+    "test:e2e": "playwright test",
+    "test:e2e:debug": "playwright test --debug",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:codegen": "playwright codegen",
+    "test:e2e:report": "playwright show-report"
   },
   "dependencies": {
     "@clerk/tanstack-react-start": "^0.26.5",
@@ -54,6 +63,7 @@
   "devDependencies": {
     "@eslint/compat": "^1.3.1",
     "@eslint/js": "^9.31.0",
+    "@playwright/test": "^1.57.0",
     "@tanstack/eslint-config": "^0.3.2",
     "@types/node": "^24.0.14",
     "@types/react": "^18.2.11",

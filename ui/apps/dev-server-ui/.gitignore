@@ -23,3 +23,10 @@ next-env.d.ts
 .env.sentry-build-plugin
 /test-results/
 /blob-report/
+
+# Playwright
+test-results/
+playwright-report/
+playwright/.cache/
+playwright/.auth/
+.env.test.local
