@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/inngest/inngest/pkg/api"
 	"github.com/inngest/inngest/pkg/api/apiv1/apiv1auth"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/event"
@@ -50,7 +51,7 @@ type Opts struct {
 	// TraceReader reads traces from a backing store.
 	TraceReader cqrs.TraceReader
 	// MetricsMiddleware is used to instrument the APIv1 endpoints.
-	MetricsMiddleware MetricsMiddleware
+	MetricsMiddleware api.MetricsMiddleware
 
 	// AppCreator is used with HTTP/API-based functions to create apps on the fly via checkpointing.
 	AppCreator cqrs.AppCreator

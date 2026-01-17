@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
+	"github.com/inngest/inngest/pkg/api"
 	"github.com/inngest/inngest/pkg/api/v2/apiv2base"
 	apiv2 "github.com/inngest/inngest/proto/gen/api/v2"
 	"google.golang.org/grpc"
@@ -62,12 +63,16 @@ func NewGRPCServer(serviceOpts ServiceOptions, grpcOpts GRPCServerOptions, base 
 
 // NewGRPCServerFromHTTPOptions creates a gRPC server using HTTP middleware options
 func NewGRPCServerFromHTTPOptions(serviceOpts ServiceOptions, httpOpts HTTPHandlerOptions, base *apiv2base.Base) *grpc.Server {
-	return NewGRPCServer(serviceOpts, GRPCServerOptions(httpOpts), base)
+	return NewGRPCServer(serviceOpts, GRPCServerOptions{
+		AuthnMiddleware: httpOpts.AuthnMiddleware,
+		AuthzMiddleware: httpOpts.AuthzMiddleware,
+	}, base)
 }
 
 type HTTPHandlerOptions struct {
-	AuthnMiddleware func(http.Handler) http.Handler
-	AuthzMiddleware func(http.Handler) http.Handler
+	AuthnMiddleware   func(http.Handler) http.Handler
+	AuthzMiddleware   func(http.Handler) http.Handler
+	MetricsMiddleware api.MetricsMiddleware
 }
 
 func NewHTTPHandler(ctx context.Context, serviceOpts ServiceOptions, httpOpts HTTPHandlerOptions, base *apiv2base.Base) (http.Handler, error) {
@@ -97,6 +102,11 @@ func NewHTTPHandler(ctx context.Context, serviceOpts ServiceOptions, httpOpts HT
 	// Add authentication middleware first
 	if httpOpts.AuthnMiddleware != nil {
 		r.Use(httpOpts.AuthnMiddleware)
+	}
+
+	// Add metrics middleware
+	if httpOpts.MetricsMiddleware != nil {
+		r.Use(httpOpts.MetricsMiddleware.Middleware)
 	}
 
 	r.Mount("/", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {

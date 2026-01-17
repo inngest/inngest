@@ -1,4 +1,4 @@
-package apiv1
+package api
 
 import (
 	"net/http"
@@ -6,6 +6,10 @@ import (
 	"github.com/felixge/httpsnoop"
 	"github.com/go-chi/chi/v5"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
+)
+
+const (
+	metricsPkgName = "api.inngest"
 )
 
 type MetricsMiddleware interface {
@@ -29,20 +33,20 @@ func (m metricsMiddleware) Middleware(next http.Handler) http.Handler {
 			"route":  chi.RouteContext(ctx).RoutePattern(),
 			"status": m.Code,
 		}
-		
+
 		metrics.IncrHTTPAPIRequestsCounter(ctx, metrics.CounterOpt{
-			PkgName:     pkgName,
-			Tags:        tags,
+			PkgName: metricsPkgName,
+			Tags:    tags,
 		})
-		
+
 		metrics.HistogramHTTPAPIDuration(ctx, m.Duration.Milliseconds(), metrics.HistogramOpt{
-			PkgName:     pkgName,
-			Tags:        tags,
+			PkgName: metricsPkgName,
+			Tags:    tags,
 		})
 
 		metrics.HistogramHTTPAPIBytesWritten(ctx, m.Written, metrics.HistogramOpt{
-			PkgName:     pkgName,
-			Tags:        tags,
+			PkgName: metricsPkgName,
+			Tags:    tags,
 		})
 	})
 }
