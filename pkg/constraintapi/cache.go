@@ -20,7 +20,8 @@ type limitingConstraintCache struct {
 	manager CapacityManager
 	clock   clockwork.Clock
 
-	limitingConstraintCache *ccache.Cache[*limitingConstraintCacheItem]
+	limitingConstraintCache              *ccache.Cache[*limitingConstraintCacheItem]
+	enableHighCardinalityInstrumentation EnableHighCardinalityInstrumentation
 }
 
 type limitingConstraintCacheItem struct {
@@ -55,11 +56,16 @@ func (l *limitingConstraintCache) Acquire(ctx context.Context, req *CapacityAcqu
 				retryAfter = val.retryAfter
 			}
 
+			tags := map[string]any{
+				"op": "hit",
+			}
+			if l.enableHighCardinalityInstrumentation != nil && l.enableHighCardinalityInstrumentation(ctx, req.AccountID, req.EnvID, req.FunctionID) {
+				tags["function_id"] = req.FunctionID
+			}
+
 			metrics.IncrConstraintAPILimitingConstraintCacheCounter(ctx, 1, metrics.CounterOpt{
 				PkgName: pkgName,
-				Tags: map[string]any{
-					"op": "hit",
-				},
+				Tags:    tags,
 			})
 		}
 
@@ -112,11 +118,16 @@ func (l *limitingConstraintCache) Acquire(ctx context.Context, req *CapacityAcqu
 			},
 			cacheTTL,
 		)
+		tags := map[string]any{
+			"op": "set",
+		}
+		if l.enableHighCardinalityInstrumentation != nil && l.enableHighCardinalityInstrumentation(ctx, req.AccountID, req.EnvID, req.FunctionID) {
+			tags["function_id"] = req.FunctionID
+		}
+
 		metrics.IncrConstraintAPILimitingConstraintCacheCounter(ctx, 1, metrics.CounterOpt{
 			PkgName: pkgName,
-			Tags: map[string]any{
-				"op": "set",
-			},
+			Tags:    tags,
 		})
 	}
 
@@ -138,10 +149,12 @@ func (l *limitingConstraintCache) Release(ctx context.Context, req *CapacityRele
 func NewLimitingConstraintCache(
 	clock clockwork.Clock,
 	manager CapacityManager,
+	enableHighCardinalityInstrumentation EnableHighCardinalityInstrumentation,
 ) *limitingConstraintCache {
 	return &limitingConstraintCache{
 		manager: manager,
 		clock:   clock,
+
 		limitingConstraintCache: ccache.New(
 			ccache.Configure[*limitingConstraintCacheItem]().
 				MaxSize(10_000).
