@@ -884,3 +884,16 @@ func IncrConstraintAPIIssuedLeaseCounter(ctx context.Context, count int64, opts 
 		Tags:        opts.Tags,
 	})
 }
+
+func IncrConstraintAPILimitingConstraintCacheCounter(ctx context.Context, count int64, opts CounterOpt) {
+	if opts.Tags == nil {
+		opts.Tags = map[string]any{}
+	}
+
+	RecordCounterMetric(ctx, count, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "constraintapi_limiting_constraint_cache_total",
+		Description: "Total number of operations to limiting constraint cache",
+		Tags:        opts.Tags,
+	})
+}
