@@ -130,7 +130,7 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
     tracePreviewEnabled,
   });
 
-  const [countRes] = useQuery({
+  const [countRes, countRefetch] = useQuery({
     query: CountRunsDocument,
     requestPolicy: 'network-only',
     variables: commonQueryVars,
@@ -151,6 +151,7 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
 
   const onRefresh = useCallback(() => {
     reset();
+    countRefetch();
   }, [reset]);
 
   useImperativeHandle(ref, () => ({
