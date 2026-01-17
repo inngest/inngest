@@ -199,12 +199,12 @@ func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition
 	}
 
 	if q.usePeekEWMA {
-		if err := q.primaryQueueShard.SetPeekEWMA(ctx, p.FunctionID, int64(iter.CtrConcurrency+iter.CtrRateLimit)); err != nil {
+		if err := q.primaryQueueShard.SetPeekEWMA(ctx, p.FunctionID, int64(iter.CtrConcurrency.Load()+iter.CtrRateLimit.Load())); err != nil {
 			l.Warn("error recording concurrency limit for EWMA", "error", err)
 		}
 	}
 
-	if iter.IsRequeuable() && iter.IsCustomKeyLimitOnly && !randomOffset && parallel {
+	if iter.IsRequeuable() && iter.IsCustomKeyLimitOnly.Load() && !randomOffset && parallel {
 		// We hit custom concurrency key issues.  Re-process this partition at a random offset, as long
 		// as random offset is currently false (so we don't loop forever)
 
@@ -221,7 +221,7 @@ func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition
 	// with a force:  ensure that we won't re-scan it until 2 seconds in the future.
 	if iter.IsRequeuable() {
 		requeue := PartitionConcurrencyLimitRequeueExtension
-		if iter.CtrConcurrency == 0 {
+		if iter.CtrConcurrency.Load() == 0 {
 			// This has been throttled only.  Don't requeue so far ahead, otherwise we'll be waiting longer
 			// than the minimum throttle.
 			//
