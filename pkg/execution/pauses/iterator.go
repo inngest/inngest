@@ -152,13 +152,16 @@ func (d *dualIter) Next(ctx context.Context) bool {
 		// We are done!  There are no pauses downloaded or inflight.
 		d.err = context.Canceled
 
-		metrics.HistogramAggregatePausesLoadDuration(ctx, time.Since(d.start).Milliseconds(), metrics.HistogramOpt{
-			PkgName: pkgName,
-			// TODO: tag workspace ID eventually??
-			Tags: map[string]any{
-				"iterator": "dual",
-			},
-		})
+		// If no blocks were fetched then a buffer only iterator was used
+		if len(d.fetchedBlocks) > 0 {
+			metrics.HistogramAggregatePausesLoadDuration(ctx, time.Since(d.start).Milliseconds(), metrics.HistogramOpt{
+				PkgName: pkgName,
+				// TODO: tag workspace ID eventually??
+				Tags: map[string]any{
+					"iterator": "dual",
+				},
+			})
+		}
 		return false
 	}
 
