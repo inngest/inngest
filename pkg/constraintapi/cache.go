@@ -29,6 +29,26 @@ type limitingConstraintCacheItem struct {
 	retryAfter time.Time
 }
 
+type LimitingConstraintCacheOption func(c *limitingConstraintCache)
+
+func WithLimitingCacheClock(clock clockwork.Clock) LimitingConstraintCacheOption {
+	return func(c *limitingConstraintCache) {
+		c.clock = clock
+	}
+}
+
+func WithLimitingCacheManager(manager CapacityManager) LimitingConstraintCacheOption {
+	return func(c *limitingConstraintCache) {
+		c.manager = manager
+	}
+}
+
+func WithLimitingCacheEnableHighCardinalityInstrumentation(ehci EnableHighCardinalityInstrumentation) LimitingConstraintCacheOption {
+	return func(c *limitingConstraintCache) {
+		c.enableHighCardinalityInstrumentation = ehci
+	}
+}
+
 // Acquire implements CapacityManager.
 func (l *limitingConstraintCache) Acquire(ctx context.Context, req *CapacityAcquireRequest) (*CapacityAcquireResponse, errs.InternalError) {
 	// Check if we previously got limited
@@ -147,18 +167,23 @@ func (l *limitingConstraintCache) Release(ctx context.Context, req *CapacityRele
 }
 
 func NewLimitingConstraintCache(
-	clock clockwork.Clock,
-	manager CapacityManager,
-	enableHighCardinalityInstrumentation EnableHighCardinalityInstrumentation,
+	options ...LimitingConstraintCacheOption,
 ) *limitingConstraintCache {
-	return &limitingConstraintCache{
-		manager: manager,
-		clock:   clock,
-
+	cache := &limitingConstraintCache{
 		limitingConstraintCache: ccache.New(
 			ccache.Configure[*limitingConstraintCacheItem]().
 				MaxSize(10_000).
 				ItemsToPrune(500),
 		),
 	}
+
+	for _, opt := range options {
+		opt(cache)
+	}
+
+	if cache.clock == nil {
+		cache.clock = clockwork.NewRealClock()
+	}
+
+	return cache
 }

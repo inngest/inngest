@@ -979,7 +979,10 @@ func TestCache(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, cm)
 
-			cache := NewLimitingConstraintCache(clock, cm)
+			cache := NewLimitingConstraintCache(
+				WithLimitingCacheClock(clock),
+				WithLimitingCacheManager(cm),
+			)
 
 			tc.run(ctx, t, deps{
 				clock:      clock,
