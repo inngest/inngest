@@ -85,7 +85,7 @@ func (r *redisCapacityManager) ExtendLease(ctx context.Context, req *CapacityExt
 		"args", args,
 	)
 
-	rawRes, internalErr := executeLuaScript(ctx, "extend", client, r.clock, keys, args)
+	rawRes, internalErr := executeLuaScript(ctx, "extend", req.Migration, client, r.clock, keys, args)
 	if internalErr != nil {
 		return nil, internalErr
 	}

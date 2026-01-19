@@ -345,7 +345,15 @@ func isTimeout(err error) bool {
 	return false
 }
 
-func executeLuaScript(ctx context.Context, name string, client rueidis.Client, clock clockwork.Clock, keys []string, args []string) ([]byte, errs.InternalError) {
+func executeLuaScript(
+	ctx context.Context,
+	name string,
+	mi MigrationIdentifier,
+	client rueidis.Client,
+	clock clockwork.Clock,
+	keys []string,
+	args []string,
+) ([]byte, errs.InternalError) {
 	// Get current time for duration metrics
 	start := clock.Now()
 
@@ -360,6 +368,7 @@ func executeLuaScript(ctx context.Context, name string, client rueidis.Client, c
 		Tags: map[string]any{
 			"operation": name,
 			"status":    status,
+			"source":    mi.String(),
 		},
 	})
 
