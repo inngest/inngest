@@ -411,7 +411,7 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	connectionManager := connstate.NewRedisConnectionStateManager(connectRc)
 
-	// Create a new expression aggregator, using the a Redis only pause manager to load evaluables.
+	// Create a new expression aggregator, using the Redis only pause manager to load evaluables.
 	agg := expragg.NewAggregator(ctx, 100, 100, pauseMgr, expressions.ExprEvaluator, nil, nil)
 
 	executorLogger := connectPubSubLogger.With("svc", "executor")
