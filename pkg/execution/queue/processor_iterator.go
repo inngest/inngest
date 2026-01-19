@@ -152,6 +152,10 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 
 	metrics.WorkerQueueCapacityCounter(ctx, 1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": p.Queue.Shard().Name()}})
 
+	// Release semaphore capacity, will be called when this function
+	// exits unless explicitly committed (see below).
+	//
+	// release() can be called early to make worker capacity available again
 	release := sync.OnceFunc(func() {
 		p.Queue.Semaphore().Release(1)
 		metrics.WorkerQueueCapacityCounter(ctx, -1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": p.Queue.Shard().Name()}})
