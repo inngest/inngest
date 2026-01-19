@@ -629,10 +629,10 @@ func TestPartitionProcessRequeueAfterLimitedWithConstraintAPI(t *testing.T) {
 		require.NoError(t, err)
 
 		// first two items were successfully leased
-		require.Equal(t, 2, int(iter.CtrSuccess))
+		require.Equal(t, int32(2), iter.CtrSuccess.Load())
 
 		// third item was concurrency limited, we stopped
-		require.Equal(t, 1, int(iter.CtrConcurrency), r.Dump())
+		require.Equal(t, int32(1), iter.CtrConcurrency.Load(), r.Dump())
 
 		// we should requeue the item
 		require.True(t, iter.IsRequeuable())
@@ -766,10 +766,10 @@ func TestPartitionProcessRequeueAfterLimitedWithConstraintAPI(t *testing.T) {
 		require.NoError(t, err)
 
 		// first two items were successfully leased
-		require.Equal(t, 2, int(iter.CtrSuccess))
+		require.Equal(t, int32(2), iter.CtrSuccess.Load())
 
 		// third item was concurrency limited, we stopped
-		require.Equal(t, 1, int(iter.CtrConcurrency), r.Dump())
+		require.Equal(t, int32(1), iter.CtrConcurrency.Load(), r.Dump())
 
 		// we should requeue the item
 		require.True(t, iter.IsRequeuable())
