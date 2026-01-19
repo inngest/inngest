@@ -566,8 +566,9 @@ func TestConstraintEnforcement(t *testing.T) {
 
 			pauseMgr := pauses.NewPauseStoreManager(sharded, unsharded)
 
-			sm, err := redis_state.New(ctx, pauseMgr,
+			sm, err := redis_state.New(ctx,
 				redis_state.WithShardedClient(sharded),
+				redis_state.WithPauseDeleter(pauseMgr),
 			)
 			require.NoError(t, err)
 			exec, err := executor.NewExecutor(
@@ -1493,8 +1494,9 @@ func TestScheduleConstraintAPICompatibility(t *testing.T) {
 
 		pauseMgr := pauses.NewPauseStoreManager(sharded, unsharded)
 
-		sm, err := redis_state.New(ctx, pauseMgr,
+		sm, err := redis_state.New(ctx,
 			redis_state.WithShardedClient(sharded),
+			redis_state.WithPauseDeleter(pauseMgr),
 		)
 		require.NoError(t, err)
 		exec, err := executor.NewExecutor(
@@ -1694,8 +1696,9 @@ func TestScheduleConstraintAPICompatibility(t *testing.T) {
 
 		pauseMgr := pauses.NewPauseStoreManager(sharded, unsharded)
 
-		sm, err := redis_state.New(ctx, pauseMgr,
+		sm, err := redis_state.New(ctx,
 			redis_state.WithShardedClient(sharded),
+			redis_state.WithPauseDeleter(pauseMgr),
 		)
 		require.NoError(t, err)
 		exec, err := executor.NewExecutor(

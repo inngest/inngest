@@ -92,7 +92,7 @@ func TestUpdateMetadataIsFieldEmpty(t *testing.T) {
 					FnRunIsSharded:         redis_state.AlwaysShardOnRun,
 				})
 				pauseMgr := pauses.NewRedisOnlyPauseManager(sharded, unsharded)
-				mgr, err := redis_state.New(ctx, pauseMgr, redis_state.WithShardedClient(sharded))
+				mgr, err := redis_state.New(ctx, redis_state.WithShardedClient(sharded), redis_state.WithPauseDeleter(pauseMgr))
 				require.NoError(t, err)
 				return mgr
 			}
@@ -233,7 +233,7 @@ func TestStateStoreLuaCompatibility(t *testing.T) {
 		pauseMgr := pauses.NewRedisOnlyPauseManager(sharded, unsharded)
 
 		// Create state manager
-		mgr, err := redis_state.New(ctx, pauseMgr, redis_state.WithShardedClient(sharded))
+		mgr, err := redis_state.New(ctx, redis_state.WithShardedClient(sharded), redis_state.WithPauseDeleter(pauseMgr))
 		require.NoError(t, err)
 		return mgr
 	}

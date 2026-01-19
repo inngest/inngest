@@ -1909,7 +1909,7 @@ func TestBlockstoreDeleteByID(t *testing.T) {
 
 	pauseStore := redis_state.NewPauseStore(shardedClient, unshardedClient)
 
-	sm, err := redis_state.New(ctx, pauseStore, redis_state.WithShardedClient(shardedClient))
+	sm, err := redis_state.New(ctx, redis_state.WithShardedClient(shardedClient), redis_state.WithPauseDeleter(pauseStore))
 	require.NoError(t, err)
 
 	pauses := make([]*state.Pause, 3)

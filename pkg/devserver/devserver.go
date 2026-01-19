@@ -272,7 +272,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	pauseMgr := pauses.NewPauseStoreManager(shardedClient, unshardedClient)
 
 	var sm state.Manager
-	sm, err = redis_state.New(ctx, pauseMgr, redis_state.WithShardedClient(shardedClient))
+	sm, err = redis_state.New(ctx, redis_state.WithShardedClient(shardedClient), redis_state.WithPauseDeleter(pauseMgr))
 	if err != nil {
 		return err
 	}

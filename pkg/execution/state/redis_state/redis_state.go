@@ -145,12 +145,11 @@ func (c Config) SingleClusterManager(ctx context.Context) (state.Manager, error)
 		QueueDefaultKey:        QueueDefaultKey,
 		FnRunIsSharded:         AlwaysShardOnRun,
 	})
-	pauseStore := NewPauseStore(s, u)
 
 	return New(
 		ctx,
-		pauseStore,
 		WithShardedClient(s),
+		WithPauseDeleter(NewPauseStore(s, u)),
 	)
 }
 
@@ -172,7 +171,7 @@ type Opt func(r *mgr)
 //
 // By default, this connects to a local Redis server.  Use WithConnectOpts to
 // change how we connect to Redis.
-func New(ctx context.Context, pauseDeleter state.PauseDeleter, opts ...Opt) (state.Manager, error) {
+func New(ctx context.Context, opts ...Opt) (state.Manager, error) {
 	m := &mgr{}
 
 	for _, opt := range opts {
@@ -183,8 +182,6 @@ func New(ctx context.Context, pauseDeleter state.PauseDeleter, opts ...Opt) (sta
 		s: m.unsafeShardedClientDoNotUse,
 	}
 
-	m.pauseDeleter = pauseDeleter
-
 	return m, nil
 }
 
@@ -192,6 +189,13 @@ func New(ctx context.Context, pauseDeleter state.PauseDeleter, opts ...Opt) (sta
 func WithShardedClient(s *ShardedClient) Opt {
 	return func(m *mgr) {
 		m.unsafeShardedClientDoNotUse = s
+	}
+}
+
+// WithPauseDeleter adds a pause deletion handler that deletes pauses when runs are deleted.
+func WithPauseDeleter(d state.PauseDeleter) Opt {
+	return func(m *mgr) {
+		m.pauseDeleter = d
 	}
 }
 
@@ -819,9 +823,11 @@ func (m mgr) Delete(ctx context.Context, i state.Identifier) error {
 		return err
 	}
 
-	err = m.pauseDeleter.DeletePausesForRun(ctx, i.RunID, i.WorkspaceID)
-	if err != nil {
-		return err
+	if m.pauseDeleter != nil {
+		err = m.pauseDeleter.DeletePausesForRun(ctx, i.RunID, i.WorkspaceID)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil

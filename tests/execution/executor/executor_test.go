@@ -168,8 +168,9 @@ func TestScheduleRaceCondition(t *testing.T) {
 	pauseMgr := pauses.NewPauseStoreManager(shardedClient, unshardedClient)
 
 	var sm state.Manager
-	sm, err = redis_state.New(ctx, pauseMgr,
+	sm, err = redis_state.New(ctx,
 		redis_state.WithShardedClient(shardedClient),
+		redis_state.WithPauseDeleter(pauseMgr),
 	)
 	require.NoError(t, err)
 	smv2 := redis_state.MustRunServiceV2(sm)
@@ -341,8 +342,9 @@ func TestScheduleRaceConditionWithExistingIdempotencyKey(t *testing.T) {
 	pauseMgr := pauses.NewPauseStoreManager(shardedClient, unshardedClient)
 
 	var sm state.Manager
-	sm, err = redis_state.New(ctx, pauseMgr,
+	sm, err = redis_state.New(ctx,
 		redis_state.WithShardedClient(shardedClient),
+		redis_state.WithPauseDeleter(pauseMgr),
 	)
 	require.NoError(t, err)
 	smv2 := redis_state.MustRunServiceV2(sm)
@@ -547,8 +549,9 @@ func TestFinalize(t *testing.T) {
 	pauseMgr := pauses.NewPauseStoreManager(shardedClient, unshardedClient)
 
 	var sm state.Manager
-	sm, err = redis_state.New(ctx, pauseMgr,
+	sm, err = redis_state.New(ctx,
 		redis_state.WithShardedClient(shardedClient),
+		redis_state.WithPauseDeleter(pauseMgr),
 	)
 	require.NoError(t, err)
 	smv2 := redis_state.MustRunServiceV2(sm)
@@ -832,8 +835,9 @@ func TestInvokeRetrySucceedsIfPauseAlreadyCreated(t *testing.T) {
 	pauseMgr := pauses.NewPauseStoreManager(shardedClient, unshardedClient)
 
 	var sm state.Manager
-	sm, err = redis_state.New(ctx, pauseMgr,
+	sm, err = redis_state.New(ctx,
 		redis_state.WithShardedClient(shardedClient),
+		redis_state.WithPauseDeleter(pauseMgr),
 	)
 	require.NoError(t, err)
 	smv2 := redis_state.MustRunServiceV2(sm)
@@ -1021,8 +1025,9 @@ func TestExecutorReturnsResponseWhenNonRetriableError(t *testing.T) {
 	pauseMgr := pauses.NewPauseStoreManager(shardedClient, unshardedClient)
 
 	var sm state.Manager
-	sm, err = redis_state.New(ctx, pauseMgr,
+	sm, err = redis_state.New(ctx,
 		redis_state.WithShardedClient(shardedClient),
+		redis_state.WithPauseDeleter(pauseMgr),
 	)
 	require.NoError(t, err)
 	smv2 := redis_state.MustRunServiceV2(sm)
@@ -1216,8 +1221,9 @@ func TestExecutorScheduleRateLimit(t *testing.T) {
 	pauseMgr := pauses.NewPauseStoreManager(shardedClient, unshardedClient)
 
 	var sm state.Manager
-	sm, err = redis_state.New(ctx, pauseMgr,
+	sm, err = redis_state.New(ctx,
 		redis_state.WithShardedClient(shardedClient),
+		redis_state.WithPauseDeleter(pauseMgr),
 	)
 	require.NoError(t, err)
 	smv2 := redis_state.MustRunServiceV2(sm)
@@ -1416,8 +1422,9 @@ func TestExecutorScheduleBacklogSizeLimit(t *testing.T) {
 	pauseMgr := pauses.NewPauseStoreManager(shardedClient, unshardedClient)
 
 	var sm state.Manager
-	sm, err = redis_state.New(ctx, pauseMgr,
+	sm, err = redis_state.New(ctx,
 		redis_state.WithShardedClient(shardedClient),
+		redis_state.WithPauseDeleter(pauseMgr),
 	)
 	require.NoError(t, err)
 	smv2 := redis_state.MustRunServiceV2(sm)
