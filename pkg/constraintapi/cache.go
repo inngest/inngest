@@ -88,7 +88,9 @@ func (l *limitingConstraintCache) Acquire(ctx context.Context, req *CapacityAcqu
 			}
 
 			tags := map[string]any{
-				"op": "hit",
+				"op":                  "hit",
+				"source":              req.Migration.String(),
+				"limiting_constraint": ci.LimitingConstraintIdentifier(),
 			}
 			if l.enableHighCardinalityInstrumentation != nil && l.enableHighCardinalityInstrumentation(ctx, req.AccountID, req.EnvID, req.FunctionID) {
 				tags["function_id"] = req.FunctionID
@@ -116,7 +118,8 @@ func (l *limitingConstraintCache) Acquire(ctx context.Context, req *CapacityAcqu
 			}, nil
 		} else {
 			tags := map[string]any{
-				"op": "miss",
+				"op":     "miss",
+				"source": req.Migration.String(),
 			}
 			if l.enableHighCardinalityInstrumentation != nil && l.enableHighCardinalityInstrumentation(ctx, req.AccountID, req.EnvID, req.FunctionID) {
 				tags["function_id"] = req.FunctionID
@@ -166,7 +169,9 @@ func (l *limitingConstraintCache) Acquire(ctx context.Context, req *CapacityAcqu
 			cacheTTL,
 		)
 		tags := map[string]any{
-			"op": "set",
+			"op":                  "set",
+			"source":              req.Migration.String(),
+			"limiting_constraint": ci.LimitingConstraintIdentifier(),
 		}
 		if l.enableHighCardinalityInstrumentation != nil && l.enableHighCardinalityInstrumentation(ctx, req.AccountID, req.EnvID, req.FunctionID) {
 			tags["function_id"] = req.FunctionID
