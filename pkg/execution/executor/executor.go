@@ -1507,66 +1507,6 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	runSpanRef := tracing.RunSpanRefFromMetadata(&md)
 	parentRef := e.getParentSpan(ctx, item, md)
 
-	// If this is the trigger, check if we only have one child.  If so, skip to directly executing
-	// that child;  we don't need to handle the trigger individually.
-	//
-	// This cuts down on queue churn.
-	//
-	// NOTE: This is a holdover from treating functions as a *series* of DAG calls.  In that case,
-	// we automatically enqueue all children of the dag from the root node.
-	// This can be cleaned up.
-	if edge.Incoming == inngest.TriggerName {
-		// We only support functions with a single step, as we've removed the DAG based approach.
-		// This means that we always execute the first step.
-		if len(ef.Function.Steps) > 1 {
-			return nil, fmt.Errorf("DAG-based steps are no longer supported")
-		}
-
-		edge.Outgoing = inngest.TriggerName
-		edge.Incoming = ef.Function.Steps[0].ID
-		// Update the payload
-		payload := item.Payload.(queue.PayloadEdge)
-		payload.Edge = edge
-		item.Payload = payload
-		// Add retries from the step to our queue item.  Increase as retries is
-		// always one less than attempts.
-		retries := ef.Function.Steps[0].RetryCount() + 1
-		item.MaxAttempts = &retries
-
-		// Only just starting:  run lifecycles on first attempt.
-		if item.Attempt == 0 {
-			// Set the start time and spanID in metadata for subsequent runs
-			// This should be an one time operation and is never updated after,
-			// which is enforced on the Lua script.
-			if err := e.smv2.UpdateMetadata(ctx, md.ID, sv2.MutableConfig{
-				StartedAt:      md.Config.StartedAt,
-				ForceStepPlan:  md.Config.ForceStepPlan,
-				RequestVersion: md.Config.RequestVersion,
-			}); err != nil {
-				l.ReportError(err, "error updating metadata on function start")
-			}
-
-			// Set some run span details to be explicit that this has been
-			// kicked off
-			if err := e.tracerProvider.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
-				Debug:      &tracing.SpanDebugData{Location: "executor.ExecuteTrigger"},
-				QueueItem:  &item,
-				Metadata:   &md,
-				Status:     enums.StepStatusRunning,
-				TargetSpan: runSpanRef,
-				Attributes: meta.NewAttrSet(
-					meta.Attr(meta.Attrs.StartedAt, &md.Config.StartedAt),
-				),
-			}); err != nil {
-				l.ReportError(err, "error updating run span on function start")
-			}
-
-			for _, e := range e.lifecycles {
-				go e.OnFunctionStarted(context.WithoutCancel(ctx), md, item, events)
-			}
-		}
-	}
-
 	// Organize the run instance.
 	instance := runInstance{
 		md:         md,
@@ -1579,6 +1519,35 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		parentSpan: parentRef,
 		c:          e.clock,
 		start:      start,
+	}
+
+	// If this is the trigger, check if we only have one child.  If so, skip to directly executing
+	// that child;  we don't need to handle the trigger individually.
+	//
+	// This cuts down on queue churn.
+	//
+	// NOTE: This is a holdover from treating functions as a *series* of DAG calls.  In that case,
+	// we automatically enqueue all children of the dag from the root node.
+	// This can be cleaned up.
+	if edge.Incoming == inngest.TriggerName {
+
+		instance.edge.Outgoing = inngest.TriggerName
+		instance.edge.Incoming = ef.Function.Steps[0].ID
+		// Update the payload
+		payload := item.Payload.(queue.PayloadEdge)
+		payload.Edge = edge
+		instance.item.Payload = payload
+		// Add retries from the step to our queue item.  Increase as retries is
+		// always one less than attempts.
+		retries := ef.Function.Steps[0].RetryCount() + 1
+		instance.item.MaxAttempts = &retries
+
+		// Only just starting:  run lifecycles on first attempt.
+		if instance.item.Attempt == 0 {
+			if err := e.runStart(ctx, &instance, runSpanRef); err != nil {
+				return nil, err
+			}
+		}
 	}
 
 	// This span will be updated with output as soon as execution finishes.
@@ -1684,6 +1653,69 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		// return a specific timeout error here
 		util.WithTimeout(consts.MaxFunctionTimeout+5*time.Second),
 	)
+}
+
+// runStart is called when the function first executes, ie. on attempt 0 of a fresh run.
+func (e *executor) runStart(ctx context.Context, i *runInstance, runSpanRef *meta.SpanReference) error {
+	// Set the start time and spanID in metadata for subsequent runs
+	// This should be an one time operation and is never updated after,
+	// which is enforced on the Lua script.
+	if err := e.smv2.UpdateMetadata(ctx, i.md.ID, sv2.MutableConfig{
+		StartedAt:      i.md.Config.StartedAt,
+		ForceStepPlan:  i.md.Config.ForceStepPlan,
+		RequestVersion: i.md.Config.RequestVersion,
+	}); err != nil {
+		logger.From(ctx).ReportError(err, "error updating metadata on function start")
+	}
+
+	for _, e := range e.lifecycles {
+		go e.OnFunctionStarted(context.WithoutCancel(ctx), i.md, i.item, i.events)
+	}
+
+	// kicked off
+	if err := e.tracerProvider.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
+		Debug:      &tracing.SpanDebugData{Location: "executor.ExecuteTrigger"},
+		QueueItem:  &i.item,
+		Metadata:   &i.md,
+		Status:     enums.StepStatusRunning,
+		TargetSpan: runSpanRef,
+		Attributes: meta.NewAttrSet(
+			meta.Attr(meta.Attrs.StartedAt, &i.md.Config.StartedAt),
+		),
+	}); err != nil {
+		logger.From(ctx).ReportError(err, "error updating run span on function start")
+	}
+
+	if i.f.Singleton != nil && i.f.Singleton.Mode == enums.SingletonModeQueue {
+		// Grab the first event and deserailzie.
+		evt := map[string]any{}
+		err := json.Unmarshal(i.events[0], &evt)
+		if err != nil {
+			// xxx: this can never happen so log loudly and report an error.
+			logger.From(ctx).ReportError(err, "error unmarshalling event for singleton mode queue")
+		}
+
+		// if this is singelton on mode "queue", clear the singleton value.
+		key, err := singleton.SingletonKey(ctx, i.f.ID, *i.f.Singleton, evt)
+		if err != nil {
+			// xxx: if we've got to here, this singleton key has already been generated via schedule,
+			// so this can never happen - log loudly and report an error.
+			logger.From(ctx).ReportError(err, "error unmarshalling event for singleton mode queue")
+		}
+
+		err = util.Crit(ctx, "singleton-queue", func(ctx context.Context) error {
+			_, err := util.WithRetry(ctx, "singleton-queue-clear", func(ctx context.Context) (any, error) {
+				return e.singletonMgr.ReleaseSingleton(ctx, key, i.md.ID.Tenant.AccountID)
+			}, util.NewRetryConf())
+			return err
+		})
+		if err != nil {
+			logger.From(ctx).ReportError(err, "error clearing singleton queue key")
+			// return this to retry
+			return err
+		}
+	}
+	return nil
 }
 
 func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
