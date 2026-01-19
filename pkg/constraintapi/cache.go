@@ -114,6 +114,18 @@ func (l *limitingConstraintCache) Acquire(ctx context.Context, req *CapacityAcqu
 				LimitingConstraints: recentlyLimited,
 				RetryAfter:          retryAfter,
 			}, nil
+		} else {
+			tags := map[string]any{
+				"op": "miss",
+			}
+			if l.enableHighCardinalityInstrumentation != nil && l.enableHighCardinalityInstrumentation(ctx, req.AccountID, req.EnvID, req.FunctionID) {
+				tags["function_id"] = req.FunctionID
+			}
+
+			metrics.IncrConstraintAPILimitingConstraintCacheCounter(ctx, 1, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags:    tags,
+			})
 		}
 	}
 
