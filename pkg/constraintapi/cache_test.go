@@ -352,8 +352,8 @@ func TestCache(t *testing.T) {
 							},
 						},
 					},
-					Constraints: []ConstraintItem{throttle},
-					Amount:      1,
+					Constraints:          []ConstraintItem{throttle},
+					Amount:               1,
 					LeaseIdempotencyKeys: []string{"item1"},
 					CurrentTime:          deps.clock.Now(),
 					Duration:             3 * time.Second,
@@ -982,6 +982,9 @@ func TestCache(t *testing.T) {
 			cache := NewLimitingConstraintCache(
 				WithLimitingCacheClock(clock),
 				WithLimitingCacheManager(cm),
+				WithLimitingCacheEnable(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool) {
+					return true
+				}),
 			)
 
 			tc.run(ctx, t, deps{
