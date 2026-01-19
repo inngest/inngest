@@ -208,8 +208,8 @@ func TestStateHarness(t *testing.T) {
 
 	sm, err := New(
 		context.Background(),
-		pauseStore,
 		WithShardedClient(shardedClient),
+		WithPauseDeleter(pauseStore),
 	)
 	require.NoError(t, err)
 
@@ -319,8 +319,8 @@ func TestLoadStackStepInputsStepsWithIDs(t *testing.T) {
 
 	sm, err := New(
 		ctx,
-		pauseStore,
 		WithShardedClient(shardedClient),
+		WithPauseDeleter(pauseStore),
 	)
 	require.NoError(t, err)
 
@@ -752,7 +752,7 @@ func TestDeleteCleansUpAllKeys(t *testing.T) {
 	})
 	pauseStore := NewPauseStore(shardedClient, unshardedClient)
 
-	sm, err := New(ctx, pauseStore, WithShardedClient(shardedClient))
+	sm, err := New(ctx, WithShardedClient(shardedClient), WithPauseDeleter(pauseStore))
 	require.NoError(t, err)
 	mgr := sm.(*mgr)
 
@@ -832,7 +832,7 @@ func TestDeleteCleansUpAllKeysWithPauseManager(t *testing.T) {
 	// Create pause store for deleting pauses
 	pauseStore := NewPauseStore(shardedClient, unshardedClient)
 
-	sm, err := New(ctx, pauseStore, WithShardedClient(shardedClient))
+	sm, err := New(ctx, WithShardedClient(shardedClient), WithPauseDeleter(pauseStore))
 	require.NoError(t, err)
 	mgr := sm.(*mgr)
 
@@ -919,7 +919,7 @@ func TestDeleteStoresRunIDInIdempotencyTombstone(t *testing.T) {
 	})
 	pauseStore := NewPauseStore(shardedClient, unshardedClient)
 
-	sm, err := New(ctx, pauseStore, WithShardedClient(shardedClient))
+	sm, err := New(ctx, WithShardedClient(shardedClient), WithPauseDeleter(pauseStore))
 	require.NoError(t, err)
 	mgr := sm.(*mgr)
 
@@ -974,8 +974,8 @@ func BenchmarkNew(b *testing.B) {
 
 	sm, err := New(
 		context.Background(),
-		pauseStore,
 		WithShardedClient(shardedClient),
+		WithPauseDeleter(pauseStore),
 	)
 	require.NoError(b, err)
 

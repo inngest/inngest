@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/inngest/inngest/pkg/execution/pauses"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/tests/execution/queue/helper"
@@ -91,7 +90,7 @@ func TestUpdateMetadataIsFieldEmpty(t *testing.T) {
 					QueueDefaultKey:        redis_state.QueueDefaultKey,
 					FnRunIsSharded:         redis_state.AlwaysShardOnRun,
 				})
-				pauseMgr := pauses.NewRedisOnlyPauseManager(sharded, unsharded)
+				pauseMgr := redis_state.NewPauseStore(sharded, unsharded)
 				mgr, err := redis_state.New(ctx, redis_state.WithShardedClient(sharded), redis_state.WithPauseDeleter(pauseMgr))
 				require.NoError(t, err)
 				return mgr
@@ -230,7 +229,7 @@ func TestStateStoreLuaCompatibility(t *testing.T) {
 			QueueDefaultKey:        redis_state.QueueDefaultKey,
 			FnRunIsSharded:         redis_state.AlwaysShardOnRun,
 		})
-		pauseMgr := pauses.NewRedisOnlyPauseManager(sharded, unsharded)
+		pauseMgr := redis_state.NewPauseStore(sharded, unsharded)
 
 		// Create state manager
 		mgr, err := redis_state.New(ctx, redis_state.WithShardedClient(sharded), redis_state.WithPauseDeleter(pauseMgr))

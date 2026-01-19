@@ -45,8 +45,8 @@ func TestV2Adapter(t *testing.T) {
 
 	mgr, err := New(
 		ctx,
-		pauseStore,
 		WithShardedClient(shardedClient),
+		WithPauseDeleter(pauseStore),
 	)
 	require.NoError(t, err)
 
@@ -507,8 +507,8 @@ func TestV2AdapterWithDisabledRetries(t *testing.T) {
 
 	mgr, err := New(
 		ctx,
-		pauseStore,
 		WithShardedClient(shardedClient),
+		WithPauseDeleter(pauseStore),
 	)
 	require.NoError(t, err)
 
