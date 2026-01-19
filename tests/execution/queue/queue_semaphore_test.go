@@ -167,7 +167,7 @@ func TestQueueSemaphore(t *testing.T) {
 
 	testCases := []testCase{
 		{
-			name: "",
+			name: "already leased item should not increase semaphore",
 			run: func(t *testing.T, deps deps) {
 				shard := deps.shard
 				clock := deps.clock
@@ -236,6 +236,29 @@ func TestQueueSemaphore(t *testing.T) {
 				// This must not include the second item that got limited
 				require.Equal(t, int64(1), deps.qp.Semaphore().Count())
 			},
+		},
+
+		{
+			name: "when no capacity available, should exit with expected error",
+		},
+
+		{
+			name: "when Constraint API call fails, should free semaphore",
+		},
+		{
+			name: "when limited by Constraint API, should release semaphore",
+		},
+		{
+			name: "when lease fails, should release semaphore",
+		},
+		{
+			name: "when lease encounters concurrency limits, should free semaphore",
+		},
+		{
+			name: "when queue item not found, should free semaphore",
+		},
+		{
+			name: "when item leased and handed off to worker, should not free up semaphore",
 		},
 	}
 
