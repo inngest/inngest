@@ -152,6 +152,22 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 
 	metrics.WorkerQueueCapacityCounter(ctx, 1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": p.Queue.Shard().Name()}})
 
+	release := sync.OnceFunc(func() {
+		p.Queue.Semaphore().Release(1)
+		metrics.WorkerQueueCapacityCounter(ctx, -1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": p.Queue.Shard().Name()}})
+	})
+
+	// Default to resetting the semaphore if we don't explicitly keep it
+	// This should prevent forgetting the .Release() case
+	commitSemaphoreAcquire := false
+	defer func() {
+		if commitSemaphoreAcquire {
+			return
+		}
+
+		release()
+	}()
+
 	backlog := ItemBacklog(ctx, *item)
 	partition := ItemShadowPartition(ctx, *item)
 	constraints := p.Queue.Options().PartitionConstraintConfigGetter(ctx, partition.Identifier())
@@ -171,9 +187,6 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 		p.StaticTime,
 	)
 	if err != nil {
-		p.Queue.Semaphore().Release(1)
-		metrics.WorkerQueueCapacityCounter(ctx, -1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": p.Queue.Shard().Name()}})
-
 		return fmt.Errorf("could not check constraints to lease item: %w", err)
 	}
 
@@ -185,8 +198,7 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 
 	// If we're limited by constraints, release semaphore early since we won't be leasing or processing
 	if constraintRes.LimitingConstraint != enums.QueueConstraintNotLimited {
-		p.Queue.Semaphore().Release(1)
-		metrics.WorkerQueueCapacityCounter(ctx, -1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": p.Queue.Shard().Name()}})
+		release()
 	}
 
 	var leaseID *ulid.ULID
@@ -217,8 +229,7 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 		// finishes processing a queue item on success.
 		if err != nil {
 			// Continue on and handle the error below.
-			p.Queue.Semaphore().Release(1)
-			metrics.WorkerQueueCapacityCounter(ctx, -1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": p.Queue.Shard().Name()}})
+			release()
 		}
 	// Simulate errors returned by Lease
 	case enums.QueueConstraintThrottle:
@@ -477,6 +488,7 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 		// processing a queue item.
 		DisableConstraintUpdates: constraintRes.SkipConstraintChecks,
 	}
+	commitSemaphoreAcquire = true
 
 	return nil
 }
