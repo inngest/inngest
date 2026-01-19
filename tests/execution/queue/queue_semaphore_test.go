@@ -2,7 +2,9 @@ package queue
 
 import (
 	"context"
+	"crypto/rand"
 	"testing"
+	"time"
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/google/uuid"
@@ -12,6 +14,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/jonboulle/clockwork"
+	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 	"github.com/stretchr/testify/require"
 )
@@ -163,16 +166,26 @@ func TestQueueSemaphore(t *testing.T) {
 		name                string
 		run                 func(t *testing.T, deps deps)
 		enableConstraintAPI constraintapi.UseConstraintAPIFn
+		config              queue.PartitionConstraintConfig
+		numWorkers          int32
 	}
 
 	testCases := []testCase{
 		{
-			name: "already leased item should not increase semaphore",
+			name: "happy path: semaphore should increase for queue item",
+			config: queue.PartitionConstraintConfig{
+				FunctionVersion: 1,
+				Concurrency: queue.PartitionConcurrency{
+					AccountConcurrency:  1,
+					FunctionConcurrency: 1,
+				},
+			},
+			numWorkers: 10,
 			run: func(t *testing.T, deps deps) {
 				shard := deps.shard
 				clock := deps.clock
 
-				qi1, err := shard.EnqueueItem(ctx, queue.QueueItem{
+				qi, err := shard.EnqueueItem(ctx, queue.QueueItem{
 					Data: queue.Item{
 						Kind: queue.KindStart,
 						Identifier: state.Identifier{
@@ -186,25 +199,11 @@ func TestQueueSemaphore(t *testing.T) {
 				}, clock.Now(), queue.EnqueueOpts{})
 				require.NoError(t, err)
 
-				qi2, err := shard.EnqueueItem(ctx, queue.QueueItem{
-					Data: queue.Item{
-						Kind: queue.KindStart,
-						Identifier: state.Identifier{
-							AccountID:   accountID,
-							WorkspaceID: envID,
-							WorkflowID:  fnID,
-						},
-						WorkspaceID: envID,
-					},
-					FunctionID: fnID,
-				}, clock.Now(), queue.EnqueueOpts{})
-				require.NoError(t, err)
-
-				partition := queue.ItemPartition(ctx, qi1)
+				partition := queue.ItemPartition(ctx, qi)
 
 				iter := queue.ProcessorIterator{
 					Partition:  &partition,
-					Items:      []*queue.QueueItem{&qi1, &qi2},
+					Items:      []*queue.QueueItem{&qi},
 					Queue:      deps.qp,
 					Denies:     queue.NewLeaseDenyList(),
 					StaticTime: clock.Now(),
@@ -212,38 +211,119 @@ func TestQueueSemaphore(t *testing.T) {
 
 				// Initially, the semaphore must be at 0
 				require.Equal(t, int64(0), deps.qp.Semaphore().Count())
-				require.False(t, iter.IsRequeuable())
 
-				// Attempt to process items sequentially
-				err = iter.Iterate(ctx)
+				err = iter.Process(ctx, &qi)
 				require.NoError(t, err)
 
-				// Expect 2 Acquire requests
-				require.Len(t, deps.cmLifecycles.AcquireCalls, 2)
+				// Ensure that semaphore was increased
+				require.Equal(t, int64(1), deps.qp.Semaphore().Count())
 
-				// First Acquire request should have been successful
-				require.Equal(t, len(deps.cmLifecycles.AcquireCalls[0].GrantedLeases), 1)
-				require.Equal(t, len(deps.cmLifecycles.AcquireCalls[0].LimitingConstraints), 0)
+				// Check if item was added to worker
+				item := <-deps.qp.Workers()
+				require.Equal(t, qi, item.I)
+			},
+		},
 
-				// Second Acquire request should have been limited
-				require.Equal(t, len(deps.cmLifecycles.AcquireCalls[1].GrantedLeases), 0)
-				require.Equal(t, len(deps.cmLifecycles.AcquireCalls[1].LimitingConstraints), 1)
-				require.Equal(t, deps.cmLifecycles.AcquireCalls[1].LimitingConstraints[0].Kind, constraintapi.ConstraintKindConcurrency)
+		{
+			name: "when item already leased, should release semaphore",
+			config: queue.PartitionConstraintConfig{
+				FunctionVersion: 1,
+				Concurrency: queue.PartitionConcurrency{
+					AccountConcurrency:  1,
+					FunctionConcurrency: 1,
+				},
+			},
+			numWorkers: 10,
+			run: func(t *testing.T, deps deps) {
+				shard := deps.shard
+				clock := deps.clock
 
-				require.True(t, iter.IsRequeuable())
+				leaseID := ulid.MustNew(ulid.Timestamp(clock.Now().Add(10*time.Second)), rand.Reader)
+				qi, err := shard.EnqueueItem(ctx, queue.QueueItem{
+					Data: queue.Item{
+						Kind: queue.KindStart,
+						Identifier: state.Identifier{
+							AccountID:   accountID,
+							WorkspaceID: envID,
+							WorkflowID:  fnID,
+						},
+						WorkspaceID: envID,
+					},
+					FunctionID: fnID,
+					LeaseID:    &leaseID,
+				}, clock.Now(), queue.EnqueueOpts{})
+				require.NoError(t, err)
 
-				// Verify semaphore only accounted for the first item
-				// This must not include the second item that got limited
+				partition := queue.ItemPartition(ctx, qi)
+
+				iter := queue.ProcessorIterator{
+					Partition:  &partition,
+					Items:      []*queue.QueueItem{&qi},
+					Queue:      deps.qp,
+					Denies:     queue.NewLeaseDenyList(),
+					StaticTime: clock.Now(),
+				}
+
+				// Initially, the semaphore must be at 0
+				require.Equal(t, int64(0), deps.qp.Semaphore().Count())
+
+				err = iter.Process(ctx, &qi)
+				require.NoError(t, err)
+
+				// Semaphore should still be 0
+				require.Equal(t, int64(0), deps.qp.Semaphore().Count())
+			},
+		},
+
+		{
+			name:       "when no capacity available, should exit with expected error",
+			numWorkers: 1,
+			run: func(t *testing.T, deps deps) {
+				shard := deps.shard
+				clock := deps.clock
+
+				qi, err := shard.EnqueueItem(ctx, queue.QueueItem{
+					Data: queue.Item{
+						Kind: queue.KindStart,
+						Identifier: state.Identifier{
+							AccountID:   accountID,
+							WorkspaceID: envID,
+							WorkflowID:  fnID,
+						},
+						WorkspaceID: envID,
+					},
+					FunctionID: fnID,
+				}, clock.Now(), queue.EnqueueOpts{})
+				require.NoError(t, err)
+
+				partition := queue.ItemPartition(ctx, qi)
+
+				iter := queue.ProcessorIterator{
+					Partition:  &partition,
+					Items:      []*queue.QueueItem{&qi},
+					Queue:      deps.qp,
+					Denies:     queue.NewLeaseDenyList(),
+					StaticTime: clock.Now(),
+				}
+
+				// Initially, the semaphore must be at 0
+				require.Equal(t, int64(0), deps.qp.Semaphore().Count())
+
+				// Simulate acquiring worker capacity
+				require.NoError(t, deps.qp.Semaphore().Acquire(ctx, 1))
+				require.Equal(t, int64(1), deps.qp.Semaphore().Count())
+
+				err = iter.Process(ctx, &qi)
+				require.Error(t, err)
+				require.ErrorIs(t, err, queue.ErrProcessNoCapacity)
+
+				// Semaphore should still be 1
 				require.Equal(t, int64(1), deps.qp.Semaphore().Count())
 			},
 		},
 
 		{
-			name: "when no capacity available, should exit with expected error",
-		},
-
-		{
-			name: "when Constraint API call fails, should free semaphore",
+			name: "when Constraint API call fails, should release semaphore",
 		},
 		{
 			name: "when limited by Constraint API, should release semaphore",
@@ -305,20 +385,18 @@ func TestQueueSemaphore(t *testing.T) {
 
 				// Simulate a limit of 1
 				queue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p queue.PartitionIdentifier) queue.PartitionConstraintConfig {
-					return queue.PartitionConstraintConfig{
-						FunctionVersion: 1,
-						Concurrency: queue.PartitionConcurrency{
-							AccountConcurrency:  1,
-							FunctionConcurrency: 1,
-						},
-					}
+					return tc.config
 				}),
+
+				queue.WithNumWorkers(tc.numWorkers),
 			}
 
 			shard := redis_state.NewQueueShard("test", queueClient, options...)
 
 			q, err := queue.New(ctx, "test", shard, nil, nil, options...)
 			require.NoError(t, err)
+
+			require.NotNil(t, tc.run)
 
 			tc.run(t, deps{
 				shard:        shard,
