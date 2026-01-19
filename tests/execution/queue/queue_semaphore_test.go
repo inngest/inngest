@@ -443,13 +443,13 @@ func TestQueueSemaphore(t *testing.T) {
 				require.NoError(t, err)
 
 				require.Equal(t, int64(1), deps.qp.Semaphore().Count())
-				require.Equal(t, int32(0), iter.CtrConcurrency)
+				require.Equal(t, int32(0), iter.CtrConcurrency.Load())
 
 				err = iter.Process(ctx, &qi2)
 				require.Error(t, err)
 				require.ErrorIs(t, err, queue.ErrProcessStopIterator)
 				require.ErrorContains(t, err, "concurrency hit")
-				require.Equal(t, int32(1), iter.CtrConcurrency)
+				require.Equal(t, int32(1), iter.CtrConcurrency.Load())
 
 				require.Equal(t, int64(1), deps.qp.Semaphore().Count())
 			},
@@ -566,13 +566,13 @@ func TestQueueSemaphore(t *testing.T) {
 				require.NoError(t, err)
 
 				require.Equal(t, int64(1), deps.qp.Semaphore().Count())
-				require.Equal(t, int32(0), iter.CtrConcurrency)
+				require.Equal(t, int32(0), iter.CtrConcurrency.Load())
 
 				err = iter.Process(ctx, &qi2)
 				require.Error(t, err)
 				require.ErrorIs(t, err, queue.ErrProcessStopIterator)
 				require.ErrorContains(t, err, "concurrency hit")
-				require.Equal(t, int32(1), iter.CtrConcurrency)
+				require.Equal(t, int32(1), iter.CtrConcurrency.Load())
 
 				require.Equal(t, int64(1), deps.qp.Semaphore().Count())
 			},
