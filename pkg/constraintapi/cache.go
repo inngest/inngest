@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/util/errs"
 	"github.com/jonboulle/clockwork"
@@ -16,12 +17,15 @@ const (
 	MaxCacheTTL = time.Minute
 )
 
+type EnableLimitingConstraintCacheFn func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool)
+
 type limitingConstraintCache struct {
 	manager CapacityManager
 	clock   clockwork.Clock
 
 	limitingConstraintCache              *ccache.Cache[*limitingConstraintCacheItem]
 	enableHighCardinalityInstrumentation EnableHighCardinalityInstrumentation
+	enableCache                          EnableLimitingConstraintCacheFn
 }
 
 type limitingConstraintCacheItem struct {
@@ -49,10 +53,17 @@ func WithLimitingCacheEnableHighCardinalityInstrumentation(ehci EnableHighCardin
 	}
 }
 
+func WithLimitingCacheEnable(enable EnableLimitingConstraintCacheFn) LimitingConstraintCacheOption {
+	return func(c *limitingConstraintCache) {
+		c.enableCache = enable
+	}
+}
+
 // Acquire implements CapacityManager.
 func (l *limitingConstraintCache) Acquire(ctx context.Context, req *CapacityAcquireRequest) (*CapacityAcquireResponse, errs.InternalError) {
+	enableCache := l.enableCache != nil && l.enableCache(ctx, req.AccountID, req.EnvID, req.FunctionID)
 	// Check if we previously got limited
-	{
+	if enableCache {
 		recentlyLimited := make([]ConstraintItem, 0)
 		var retryAfter time.Time
 		for _, ci := range req.Constraints {
@@ -103,12 +114,28 @@ func (l *limitingConstraintCache) Acquire(ctx context.Context, req *CapacityAcqu
 				LimitingConstraints: recentlyLimited,
 				RetryAfter:          retryAfter,
 			}, nil
+		} else {
+			tags := map[string]any{
+				"op": "miss",
+			}
+			if l.enableHighCardinalityInstrumentation != nil && l.enableHighCardinalityInstrumentation(ctx, req.AccountID, req.EnvID, req.FunctionID) {
+				tags["function_id"] = req.FunctionID
+			}
+
+			metrics.IncrConstraintAPILimitingConstraintCacheCounter(ctx, 1, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags:    tags,
+			})
 		}
 	}
 
 	res, err := l.manager.Acquire(ctx, req)
 	if err != nil {
 		return nil, err
+	}
+
+	if !enableCache {
+		return res, nil
 	}
 
 	// If we are limited by constraints,
