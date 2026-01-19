@@ -458,5 +458,5 @@ func (q *queueProcessor) UnpauseFunction(ctx context.Context, shardName string, 
 }
 
 func (q *queueProcessor) capacity() int64 {
-	return int64(q.numWorkers) - q.sem.Count()
+	return int64(q.numWorkers) - q.Semaphore().Count()
 }

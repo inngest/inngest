@@ -22,7 +22,7 @@ func (q *queueProcessor) worker(ctx context.Context, f RunFunc) {
 			// process itself.
 			processCtx, cancel := context.WithCancel(context.Background())
 			err := q.ProcessItem(processCtx, i, f)
-			q.sem.Release(1)
+			q.Semaphore().Release(1)
 			metrics.WorkerQueueCapacityCounter(ctx, -1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name()}})
 			cancel()
 			if err == nil {
