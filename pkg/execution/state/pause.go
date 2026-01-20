@@ -36,13 +36,6 @@ type PauseMutater interface {
 	// See https://github.com/inngest/inngest/issues/123 for more info
 	LeasePause(ctx context.Context, id uuid.UUID) error
 
-	// ConsumePause consumes a pause by its ID such that it can't be used again and
-	// will not be returned from any query.
-	//
-	// Any data passed when consuming a pause will be stored within function run state
-	// for future reference using the pause's DataKey.
-	ConsumePause(ctx context.Context, p Pause, opts ConsumePauseOpts) (ConsumePauseResult, func() error, error)
-
 	// DeletePause permanently deletes a pause.
 	DeletePause(ctx context.Context, p Pause, opts ...DeletePauseOpt) error
 
