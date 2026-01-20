@@ -33,6 +33,7 @@ type RangePickerProps = Omit<DateButtonProps, 'defaultValue' | 'onChange'> & {
   onChange: (args: RangeChangeProps) => void;
   defaultValue?: RangeChangeProps;
   upgradeCutoff?: Date;
+  daysAgoMax?: number;
   triggerComponent?: React.ComponentType<DateButtonProps>;
   allowFuture?: boolean;
 };
@@ -48,6 +49,30 @@ const RELATIVES = {
   '3d': 'Last 3 days',
   '7d': 'Last 7 days',
   '30d': 'Last 30 days',
+};
+
+// planRelatives returns the list of relative time options,
+// adding an option for the max account limit if it's not already
+// included and less than 30 days.
+const planRelatives = (daysAgoMax?: number) => {
+  if (!daysAgoMax || daysAgoMax > 30) {
+    return RELATIVES;
+  }
+
+  const dayKey = `${daysAgoMax}d`;
+  if (dayKey in RELATIVES) {
+    return RELATIVES;
+  }
+
+  const unsorted = { ...RELATIVES, [`${daysAgoMax}d`]: `Last ${daysAgoMax} days` };
+
+  return Object.fromEntries(
+    Object.entries(unsorted).sort(([a], [b]) => {
+      const aTime = subtractDuration(new Date(), parseDuration(a));
+      const bTime = subtractDuration(new Date(), parseDuration(b));
+      return bTime.getTime() - aTime.getTime();
+    })
+  );
 };
 
 export type AbsoluteRange = {
@@ -80,6 +105,7 @@ export const RangePicker = ({
   onChange,
   defaultValue,
   upgradeCutoff,
+  daysAgoMax,
   triggerComponent: TriggerComponent = DateInputButton,
   allowFuture = false,
   ...props
@@ -207,7 +233,7 @@ export const RangePicker = ({
                 onKeyDown={processDuration}
               />
             </div>
-            {Object.entries(RELATIVES).map(([k, v], i) => {
+            {Object.entries(planRelatives(daysAgoMax)).map(([k, v], i) => {
               const planValid = validateDuration(k, upgradeCutoff);
               return (
                 <div
