@@ -57,7 +57,7 @@ var (
 		4 * 1024 * 1024, // 4 MiB
 	}
 
-	constraintAPILuaScriptDurationBoundaries = []float64{
+	ConstraintAPIDurationBoundaries = []float64{
 		5,
 		10,
 		15,
@@ -502,7 +502,7 @@ func HistogramConstraintAPILuaScriptDuration(ctx context.Context, duration time.
 		Description: "Distribution of Lua script duration",
 		Tags:        opts.Tags,
 		Unit:        "ms",
-		Boundaries:  constraintAPILuaScriptDurationBoundaries,
+		Boundaries:  ConstraintAPIDurationBoundaries,
 	})
 }
 
