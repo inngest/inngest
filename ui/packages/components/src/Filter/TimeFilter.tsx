@@ -19,6 +19,7 @@ export function TimeFilter({ daysAgoMax, onDaysChange, defaultValue, className }
       onChange={(range) => {
         onDaysChange(range);
       }}
+      daysAgoMax={daysAgoMax}
       upgradeCutoff={subtractDuration(new Date(), { days: daysAgoMax || 7 })}
       triggerComponent={forwardRef<HTMLButtonElement, DateButtonProps>((props, ref) => (
         <DateSelectButton {...props} ref={ref} className={`${props.className || ''} `} />
