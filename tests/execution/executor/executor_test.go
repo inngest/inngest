@@ -165,7 +165,7 @@ func TestScheduleRaceCondition(t *testing.T) {
 		return queueShard, nil
 	}
 
-	pauseMgr := pauses.NewPauseStoreManager(shardedClient, unshardedClient)
+	pauseMgr := pauses.NewPauseStoreManager(unshardedClient)
 
 	var sm state.Manager
 	sm, err = redis_state.New(ctx,
@@ -339,7 +339,7 @@ func TestScheduleRaceConditionWithExistingIdempotencyKey(t *testing.T) {
 		return queueShard, nil
 	}
 
-	pauseMgr := pauses.NewPauseStoreManager(shardedClient, unshardedClient)
+	pauseMgr := pauses.NewPauseStoreManager(unshardedClient)
 
 	var sm state.Manager
 	sm, err = redis_state.New(ctx,
@@ -546,7 +546,7 @@ func TestFinalize(t *testing.T) {
 		return queueShard, nil
 	}
 
-	pauseMgr := pauses.NewPauseStoreManager(shardedClient, unshardedClient)
+	pauseMgr := pauses.NewPauseStoreManager(unshardedClient)
 
 	var sm state.Manager
 	sm, err = redis_state.New(ctx,
@@ -832,7 +832,7 @@ func TestInvokeRetrySucceedsIfPauseAlreadyCreated(t *testing.T) {
 		return queueShard, nil
 	}
 
-	pauseMgr := pauses.NewPauseStoreManager(shardedClient, unshardedClient)
+	pauseMgr := pauses.NewPauseStoreManager(unshardedClient)
 
 	var sm state.Manager
 	sm, err = redis_state.New(ctx,
@@ -1022,7 +1022,7 @@ func TestExecutorReturnsResponseWhenNonRetriableError(t *testing.T) {
 		return queueShard, nil
 	}
 
-	pauseMgr := pauses.NewPauseStoreManager(shardedClient, unshardedClient)
+	pauseMgr := pauses.NewPauseStoreManager(unshardedClient)
 
 	var sm state.Manager
 	sm, err = redis_state.New(ctx,
@@ -1218,7 +1218,7 @@ func TestExecutorScheduleRateLimit(t *testing.T) {
 		return queueShard, nil
 	}
 
-	pauseMgr := pauses.NewPauseStoreManager(shardedClient, unshardedClient)
+	pauseMgr := pauses.NewPauseStoreManager(unshardedClient)
 
 	var sm state.Manager
 	sm, err = redis_state.New(ctx,
@@ -1419,7 +1419,7 @@ func TestExecutorScheduleBacklogSizeLimit(t *testing.T) {
 		return queueShard, nil
 	}
 
-	pauseMgr := pauses.NewPauseStoreManager(shardedClient, unshardedClient)
+	pauseMgr := pauses.NewPauseStoreManager(unshardedClient)
 
 	var sm state.Manager
 	sm, err = redis_state.New(ctx,

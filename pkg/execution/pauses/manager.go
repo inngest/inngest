@@ -73,8 +73,8 @@ func NewManager(buf Bufferer, bs BlockStore, opts ...ManagerOpt) Manager {
 }
 
 // NewPauseStoreManager creates a pause manager using PauseStore with the given redis clients.
-func NewPauseStoreManager(sharded *redis_state.ShardedClient, unsharded *redis_state.UnshardedClient, opts ...ManagerOpt) Manager {
-	pauseStore := redis_state.NewPauseStore(sharded, unsharded)
+func NewPauseStoreManager(unsharded *redis_state.UnshardedClient, opts ...ManagerOpt) Manager {
+	pauseStore := redis_state.NewPauseStore(unsharded)
 	return NewManager(StateBufferer(pauseStore), nil, opts...)
 }
 

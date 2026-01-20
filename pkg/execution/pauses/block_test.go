@@ -1093,15 +1093,7 @@ func TestBlockFlushOrderingBug(t *testing.T) {
 
 	// Create Redis state manager with actual Redis backend
 	unshardedClient := redis_state.NewUnshardedClient(rc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
-	shardedClient := redis_state.NewShardedClient(redis_state.ShardedClientOpts{
-		UnshardedClient:        unshardedClient,
-		FunctionRunStateClient: rc,
-		BatchClient:            rc,
-		StateDefaultKey:        redis_state.StateDefaultKey,
-		QueueDefaultKey:        redis_state.QueueDefaultKey,
-		FnRunIsSharded:         redis_state.AlwaysShardOnRun,
-	})
-	pauseStore := redis_state.NewPauseStore(shardedClient, unshardedClient)
+	pauseStore := redis_state.NewPauseStore(unshardedClient)
 
 	baseTime := time.Now()
 	workspaceID := uuid.New()
@@ -1523,15 +1515,7 @@ func TestPauseByIDAfterFlush(t *testing.T) {
 	pauseClient := redis_state.NewPauseClient(rc, redis_state.StateDefaultKey)
 
 	unshardedClient := redis_state.NewUnshardedClient(rc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
-	shardedClient := redis_state.NewShardedClient(redis_state.ShardedClientOpts{
-		UnshardedClient:        unshardedClient,
-		FunctionRunStateClient: rc,
-		BatchClient:            rc,
-		StateDefaultKey:        redis_state.StateDefaultKey,
-		QueueDefaultKey:        redis_state.QueueDefaultKey,
-		FnRunIsSharded:         redis_state.AlwaysShardOnRun,
-	})
-	pauseStore := redis_state.NewPauseStore(shardedClient, unshardedClient)
+	pauseStore := redis_state.NewPauseStore(unshardedClient)
 
 	now := time.Now()
 	workspaceID := uuid.New()
@@ -1662,15 +1646,7 @@ func TestCompactionCleansUpBlockIndexWhenAllPausesDeleted(t *testing.T) {
 	pauseClient := redis_state.NewPauseClient(rc, redis_state.StateDefaultKey)
 
 	unshardedClient := redis_state.NewUnshardedClient(rc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
-	shardedClient := redis_state.NewShardedClient(redis_state.ShardedClientOpts{
-		UnshardedClient:        unshardedClient,
-		FunctionRunStateClient: rc,
-		BatchClient:            rc,
-		StateDefaultKey:        redis_state.StateDefaultKey,
-		QueueDefaultKey:        redis_state.QueueDefaultKey,
-		FnRunIsSharded:         redis_state.AlwaysShardOnRun,
-	})
-	pauseStore := redis_state.NewPauseStore(shardedClient, unshardedClient)
+	pauseStore := redis_state.NewPauseStore(unshardedClient)
 
 	store, err := NewBlockstore(BlockstoreOpts{
 		PauseClient:            pauseClient,
@@ -1770,15 +1746,7 @@ func TestCompactionCleansUpBlockIndexWhenSomePausesDeleted(t *testing.T) {
 	pauseClient := redis_state.NewPauseClient(rc, redis_state.StateDefaultKey)
 
 	unshardedClient := redis_state.NewUnshardedClient(rc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
-	shardedClient := redis_state.NewShardedClient(redis_state.ShardedClientOpts{
-		UnshardedClient:        unshardedClient,
-		FunctionRunStateClient: rc,
-		BatchClient:            rc,
-		StateDefaultKey:        redis_state.StateDefaultKey,
-		QueueDefaultKey:        redis_state.QueueDefaultKey,
-		FnRunIsSharded:         redis_state.AlwaysShardOnRun,
-	})
-	pauseStore := redis_state.NewPauseStore(shardedClient, unshardedClient)
+	pauseStore := redis_state.NewPauseStore(unshardedClient)
 
 	store, err := NewBlockstore(BlockstoreOpts{
 		PauseClient:            pauseClient,
@@ -1907,7 +1875,7 @@ func TestBlockstoreDeleteByID(t *testing.T) {
 		FnRunIsSharded:         redis_state.AlwaysShardOnRun,
 	})
 
-	pauseStore := redis_state.NewPauseStore(shardedClient, unshardedClient)
+	pauseStore := redis_state.NewPauseStore(unshardedClient)
 
 	sm, err := redis_state.New(ctx, redis_state.WithShardedClient(shardedClient), redis_state.WithPauseDeleter(pauseStore))
 	require.NoError(t, err)
@@ -2015,16 +1983,7 @@ func TestLoadEvaluablesSinceExpiredPauseCleanup(t *testing.T) {
 	defer bucket.Close()
 
 	unshardedClient := redis_state.NewUnshardedClient(rc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
-	shardedClient := redis_state.NewShardedClient(redis_state.ShardedClientOpts{
-		UnshardedClient:        unshardedClient,
-		FunctionRunStateClient: rc,
-		BatchClient:            rc,
-		StateDefaultKey:        redis_state.StateDefaultKey,
-		QueueDefaultKey:        redis_state.QueueDefaultKey,
-		FnRunIsSharded:         redis_state.AlwaysShardOnRun,
-	})
-
-	pauseStore := redis_state.NewPauseStore(shardedClient, unshardedClient)
+	pauseStore := redis_state.NewPauseStore(unshardedClient)
 
 	ctx := context.Background()
 	now := time.Now()
@@ -2209,16 +2168,8 @@ func TestCleanBlock(t *testing.T) {
 	defer bucket.Close()
 
 	unshardedClient := redis_state.NewUnshardedClient(rc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
-	shardedClient := redis_state.NewShardedClient(redis_state.ShardedClientOpts{
-		UnshardedClient:        unshardedClient,
-		FunctionRunStateClient: rc,
-		BatchClient:            rc,
-		StateDefaultKey:        redis_state.StateDefaultKey,
-		QueueDefaultKey:        redis_state.QueueDefaultKey,
-		FnRunIsSharded:         redis_state.AlwaysShardOnRun,
-	})
 
-	pauseStore := redis_state.NewPauseStore(shardedClient, unshardedClient)
+	pauseStore := redis_state.NewPauseStore(unshardedClient)
 	require.NoError(t, err)
 
 	ctx := context.Background()
@@ -2371,15 +2322,7 @@ func TestDualIteratorBlockRefresh(t *testing.T) {
 
 	ctx := context.Background()
 	unshardedClient := redis_state.NewUnshardedClient(rc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
-	shardedClient := redis_state.NewShardedClient(redis_state.ShardedClientOpts{
-		UnshardedClient:        unshardedClient,
-		FunctionRunStateClient: rc,
-		BatchClient:            rc,
-		StateDefaultKey:        redis_state.StateDefaultKey,
-		QueueDefaultKey:        redis_state.QueueDefaultKey,
-		FnRunIsSharded:         redis_state.AlwaysShardOnRun,
-	})
-	sm := redis_state.NewPauseStore(shardedClient, unshardedClient)
+	sm := redis_state.NewPauseStore(unshardedClient)
 	require.NoError(t, err)
 
 	index := Index{WorkspaceID: uuid.New(), EventName: "test.event"}

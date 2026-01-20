@@ -149,7 +149,7 @@ func (c Config) SingleClusterManager(ctx context.Context) (state.Manager, error)
 	return New(
 		ctx,
 		WithShardedClient(s),
-		WithPauseDeleter(NewPauseStore(s, u)),
+		WithPauseDeleter(NewPauseStore(u)),
 	)
 }
 

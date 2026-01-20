@@ -564,7 +564,7 @@ func TestConstraintEnforcement(t *testing.T) {
 				FnRunIsSharded:         redis_state.AlwaysShardOnRun,
 			})
 
-			pauseMgr := pauses.NewPauseStoreManager(sharded, unsharded)
+			pauseMgr := pauses.NewPauseStoreManager(unsharded)
 
 			sm, err := redis_state.New(ctx,
 				redis_state.WithShardedClient(sharded),
@@ -1492,7 +1492,7 @@ func TestScheduleConstraintAPICompatibility(t *testing.T) {
 			FnRunIsSharded:         redis_state.AlwaysShardOnRun,
 		})
 
-		pauseMgr := pauses.NewPauseStoreManager(sharded, unsharded)
+		pauseMgr := pauses.NewPauseStoreManager(unsharded)
 
 		sm, err := redis_state.New(ctx,
 			redis_state.WithShardedClient(sharded),
@@ -1694,7 +1694,7 @@ func TestScheduleConstraintAPICompatibility(t *testing.T) {
 			FnRunIsSharded:         redis_state.AlwaysShardOnRun,
 		})
 
-		pauseMgr := pauses.NewPauseStoreManager(sharded, unsharded)
+		pauseMgr := pauses.NewPauseStoreManager(unsharded)
 
 		sm, err := redis_state.New(ctx,
 			redis_state.WithShardedClient(sharded),

@@ -74,7 +74,7 @@ func TestDeleteManager(t *testing.T) {
 	})
 
 	// Create pause manager
-	pauseMgr := pauses.NewPauseStoreManager(shardedClient, unshardedClient)
+	pauseMgr := pauses.NewPauseStoreManager(unshardedClient)
 	batchClient := shardedClient.Batch()
 	batchManager := batch.NewRedisBatchManager(batchClient, queueManager)
 

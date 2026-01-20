@@ -269,7 +269,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		QueueDefaultKey:        redis_state.QueueDefaultKey,
 	})
 
-	pauseMgr := pauses.NewPauseStoreManager(shardedClient, unshardedClient)
+	pauseMgr := pauses.NewPauseStoreManager(unshardedClient)
 
 	var sm state.Manager
 	sm, err = redis_state.New(ctx, redis_state.WithShardedClient(shardedClient), redis_state.WithPauseDeleter(pauseMgr))

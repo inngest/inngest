@@ -18,23 +18,14 @@ import (
 )
 
 // PauseStore implements pause operations using Redis.
-//
-// All pause operations use the unsharded client, except for ConsumePause which
-// writes consumed event data to run state on the sharded client. This is the only
-// operation that affects the sharded cluster.
 type PauseStore struct {
-	// sharded is only used by ConsumePause to write consumed data to run state.
-	sharded *ShardedClient
 	// unsharded is used for all pause-specific operations.
 	unsharded *UnshardedClient
 }
 
 // NewPauseStore creates a new PauseStore with the given clients.
-func NewPauseStore(sharded *ShardedClient, unsharded *UnshardedClient) *PauseStore {
-	return &PauseStore{
-		sharded:   sharded,
-		unsharded: unsharded,
-	}
+func NewPauseStore(unsharded *UnshardedClient) *PauseStore {
+	return &PauseStore{unsharded: unsharded}
 }
 
 // PauseCreatedAt returns the timestamp a pause was created, using the given
