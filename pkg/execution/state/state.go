@@ -412,6 +412,9 @@ type Mutater interface {
 		stepID string,
 		marshalledOutput string,
 	) (hasPending bool, err error)
+
+	// ConsumePause consumes a pause, writing the consumed data to state.
+	ConsumePause(ctx context.Context, p Pause, opts ConsumePauseOpts) (ConsumePauseResult, func() error, error)
 }
 
 type MemoizedStep struct {
