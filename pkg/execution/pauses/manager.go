@@ -12,6 +12,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
+	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/oklog/ulid/v2"
@@ -134,7 +135,7 @@ func (m manager) IndexExists(ctx context.Context, i Index) (bool, error) {
 	return m.bs.IndexExists(ctx, i)
 }
 
-func (m manager) ConsumePause(ctx context.Context, pause state.Pause, opts state.ConsumePauseOpts) (state.ConsumePauseResult, func() error, error) {
+func (m manager) ConsumePause(ctx context.Context, rs statev2.RunService, pause state.Pause, opts state.ConsumePauseOpts) (state.ConsumePauseResult, func() error, error) {
 	// NOTE: There is a race condition when flushing blocks:  we may copy a pause
 	// into a block, then while writing the block to disk delete/consume a pause
 	// that is being written.  In this case the metadata for a block
@@ -158,7 +159,7 @@ func (m manager) ConsumePause(ctx context.Context, pause state.Pause, opts state
 	// pain, though, because we may die when uploading pending blocks, and that requires
 	// a bit of thought to work around, so we'll just go with double deletes for now,
 	// assuming this won't happen a ton.  this can be improved later.
-	res, _, err := m.buf.ConsumePause(ctx, pause, opts)
+	res, _, err := rs.ConsumePause(ctx, pause, opts)
 	if err != nil {
 		return res, nil, err
 	}

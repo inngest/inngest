@@ -2428,7 +2428,7 @@ func (e *executor) handlePause(
 
 			// Ensure we consume this pause, as this isn't handled by the higher-level cancel function.
 			// NOTE: cleanup closure is ignored here since there's already another one that will be called
-			_, _, err = e.pm.ConsumePause(context.Background(), *pause, state.ConsumePauseOpts{
+			_, _, err = e.pm.ConsumePause(context.Background(), e.smv2, *pause, state.ConsumePauseOpts{
 				IdempotencyKey: evtID.String(),
 				Data:           nil,
 			})
@@ -2747,7 +2747,7 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 			// Delete this pause, as an event has occured which matches
 			// the timeout.  We can do this prior to leasing a pause as it's the
 			// only work that needs to happen
-			_, cleanup, err := e.pm.ConsumePause(ctx, pause, state.ConsumePauseOpts{
+			_, cleanup, err := e.pm.ConsumePause(ctx, e.smv2, pause, state.ConsumePauseOpts{
 				IdempotencyKey: r.IdempotencyKey,
 				Data:           nil,
 			})
@@ -2760,7 +2760,7 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 			return cleanup()
 		}
 
-		consumeResult, cleanup, err := e.pm.ConsumePause(ctx, pause, state.ConsumePauseOpts{
+		consumeResult, cleanup, err := e.pm.ConsumePause(ctx, e.smv2, pause, state.ConsumePauseOpts{
 			IdempotencyKey: r.IdempotencyKey,
 			Data:           r.With,
 		})

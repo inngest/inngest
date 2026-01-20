@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/execution/state"
+	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/expressions/expragg"
 	"github.com/oklog/ulid/v2"
 )
@@ -114,7 +115,7 @@ type Manager interface {
 	//
 	// Note that this may return state.ErrPauseNotFound if the current pause ID has already
 	// been consumed by another parallel process or because of a race condition.
-	ConsumePause(ctx context.Context, pause state.Pause, opts state.ConsumePauseOpts) (state.ConsumePauseResult, func() error, error)
+	ConsumePause(ctx context.Context, rs statev2.RunService, pause state.Pause, opts state.ConsumePauseOpts) (state.ConsumePauseResult, func() error, error)
 
 	// Delete deletes a pause from either the block index or the buffer, depending on
 	// where the pause is stored.
@@ -186,11 +187,6 @@ type Bufferer interface {
 
 	// PauseTimestamp returns the created at timestamp for a pause.
 	PauseTimestamp(ctx context.Context, index Index, pause state.Pause) (time.Time, error)
-
-	// ConsumePause consumes a pause, writing the consumed data to state.
-	// The returned cleanup function is always nil - pauses.Manager provides the actual
-	// cleanup logic. This signature exists to allow Bufferer embedding in Manager.
-	ConsumePause(ctx context.Context, pause state.Pause, opts state.ConsumePauseOpts) (state.ConsumePauseResult, func() error, error)
 
 	// PauseByID fetches a pause for a given ID.  It may return the pause from the buffer
 	// or from block storage, depending on the pause
