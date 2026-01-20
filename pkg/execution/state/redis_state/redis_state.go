@@ -887,9 +887,16 @@ func (m shardedMgr) ConsumePause(ctx context.Context, p state.Pause, opts state.
 	fnRunState := m.s.FunctionRunState()
 	client, isSharded := fnRunState.Client(ctx, p.Identifier.AccountID, p.Identifier.RunID)
 
-	marshalledData, err := json.Marshal(opts.Data)
-	if err != nil {
-		return state.ConsumePauseResult{}, nil, fmt.Errorf("cannot marshal data to store in state: %w", err)
+	var marshalledData []byte
+	if b, ok := opts.Data.([]byte); ok && json.Valid(b) {
+		// Already marshalled data we can just use it
+		marshalledData = b
+	} else {
+		var err error
+		marshalledData, err = json.Marshal(opts.Data)
+		if err != nil {
+			return state.ConsumePauseResult{}, nil, fmt.Errorf("cannot marshal data to store in state: %w", err)
+		}
 	}
 
 	keys := []string{
