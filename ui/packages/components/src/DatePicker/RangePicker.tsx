@@ -66,10 +66,12 @@ const planRelatives = (daysAgoMax?: number) => {
 
   const unsorted = { ...RELATIVES, [`${daysAgoMax}d`]: `Last ${daysAgoMax} days` };
 
+  const now = new Date();
+
   return Object.fromEntries(
     Object.entries(unsorted).sort(([a], [b]) => {
-      const aTime = subtractDuration(new Date(), parseDuration(a));
-      const bTime = subtractDuration(new Date(), parseDuration(b));
+      const aTime = subtractDuration(now, parseDuration(a));
+      const bTime = subtractDuration(now, parseDuration(b));
       return bTime.getTime() - aTime.getTime();
     })
   );
