@@ -2020,7 +2020,7 @@ func (e *executor) executeDriverV2(ctx context.Context, run *runInstance, d driv
 		SigningKey: sk,
 		Attempt:    run.AttemptCount(),
 		Index:      run.stackIndex,
-		StepID:     &run.edge.Outgoing,
+		StepID:     &run.edge.IncomingGeneratorStep,
 		QueueRef:   queueref.StringFromCtx(ctx),
 		URL:        url,
 	})
