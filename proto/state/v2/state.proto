@@ -148,6 +148,55 @@ message LoadStateResponse {
   map<string, bytes> steps    = 3;
 }
 
+message PauseIdentifier {
+  string run_id      = 1;
+  string function_id = 2;
+  string account_id  = 3;
+}
+
+message Pause {
+  string                    id                          = 1;
+  string                    workspace_id                = 2;
+  PauseIdentifier           identifier                  = 3;
+  string                    outgoing                    = 4;
+  string                    incoming                    = 5;
+  string                    step_name                   = 6;
+  optional string           opcode                      = 7;
+  google.protobuf.Timestamp expires                     = 8;
+  optional string           event                       = 9;
+  optional string           expression                  = 10;
+  optional string           invoke_correlation_id       = 11;
+  optional string           invoke_target_fn_id         = 12;
+  optional string           signal_id                   = 13;
+  bool                      on_timeout                  = 14;
+  string                    data_key                    = 15;
+  bool                      cancel                      = 16;
+  optional int32            max_attempts                = 17;
+  string                    group_id                    = 18;
+  optional string           triggering_event_id         = 19;
+  int32                     parallel_mode               = 20;
+  google.protobuf.Timestamp created_at                  = 21;
+}
+
+message ConsumePauseOpts {
+  string idempotency_key = 1;
+  bytes  data            = 2;
+}
+
+message ConsumePauseResult {
+  bool did_consume       = 1;
+  bool has_pending_steps = 2;
+}
+
+message ConsumePauseRequest {
+  Pause            pause = 1;
+  ConsumePauseOpts opts  = 2;
+}
+
+message ConsumePauseResponse {
+  ConsumePauseResult result = 1;
+}
+
 service RunService {
   rpc Create(CreateStateRequest) returns (CreateStateResponse) {}
   rpc Delete(DeleteStateRequest) returns (DeleteStateResponse) {}
@@ -155,6 +204,7 @@ service RunService {
   rpc UpdateMetadata(UpdateMetadataRequest) returns (UpdateMetadataResponse) {}
   rpc SaveStep(SaveStepRequest) returns (SaveStepResponse) {}
   rpc SavePending(SavePendingRequest) returns (SavePendingResponse) {}
+  rpc ConsumePause(ConsumePauseRequest) returns (ConsumePauseResponse) {}
 
   rpc LoadMetadata(LoadMetadataRequest) returns (LoadMetadataResponse) {}
   rpc LoadEvents(LoadEventsRequest) returns (LoadEventsResponse) {}
