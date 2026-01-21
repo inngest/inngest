@@ -90,7 +90,7 @@ type ConcurrencyConstraint struct {
 	InProgressItemKey string
 }
 
-const ConcurrencyLimitRetryAfter = 5 * time.Second
+const ConcurrencyLimitRetryAfter = 2 * time.Second
 
 func (c ConcurrencyConstraint) RetryAfter() time.Duration {
 	return ConcurrencyLimitRetryAfter
