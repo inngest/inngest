@@ -143,6 +143,9 @@ type SerializedConcurrencyConstraint struct {
 
 	// InProgressItemKey represents the in progress item (concurrency) ZSET key for this constraint
 	InProgressItemKey string `json:"iik"`
+
+	// RetryAfterMS determines the retry duration in milliseconds if this concurrency constraint is limiting
+	RetryAfterMS int `json:"ra,omitempty"`
 }
 
 // SerializedThrottleConstraint represents a minimal version of ThrottleConstraint
@@ -240,6 +243,7 @@ func (ci ConstraintItem) ToSerializedConstraintItem(
 				EvaluatedKeyHash:   ci.Concurrency.EvaluatedKeyHash,
 				InProgressItemKey:  ci.Concurrency.InProgressItemKey,
 				InProgressLeaseKey: ci.Concurrency.InProgressLeasesKey(keyPrefix, accountID, envID, functionID),
+				RetryAfterMS:       int(ci.Concurrency.RetryAfter().Milliseconds()),
 			}
 
 			// Embed appropriate limit based on scope and mode
