@@ -176,7 +176,7 @@ for index, value in ipairs(constraints) do
 		local inProgressLeases = getConcurrencyCount(value.c.ilk)
 		local inProgressTotal = inProgressItems + inProgressLeases
 		constraintCapacity = value.c.l - inProgressTotal
-		constraintRetryAfter = value.c.ra
+		constraintRetryAfter = toInteger(nowMS + value.c.ra)
 	elseif value.k == 3 then
 		-- throttle
 		debug("evaluating throttle")
