@@ -14,10 +14,11 @@ import (
 )
 
 const (
+	MinCacheTTL = time.Second
 	MaxCacheTTL = time.Minute
 )
 
-type EnableLimitingConstraintCacheFn func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool)
+type EnableLimitingConstraintCacheFn func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, minTTL, maxTTL time.Duration)
 
 type limitingConstraintCache struct {
 	manager CapacityManager
@@ -61,84 +62,86 @@ func WithLimitingCacheEnable(enable EnableLimitingConstraintCacheFn) LimitingCon
 
 // Acquire implements CapacityManager.
 func (l *limitingConstraintCache) Acquire(ctx context.Context, req *CapacityAcquireRequest) (*CapacityAcquireResponse, errs.InternalError) {
-	enableCache := l.enableCache != nil && l.enableCache(ctx, req.AccountID, req.EnvID, req.FunctionID)
+	if l.enableCache == nil {
+		return l.manager.Acquire(ctx, req)
+	}
+
+	enableCache, minTTL, maxTTL := l.enableCache(ctx, req.AccountID, req.EnvID, req.FunctionID)
+	if !enableCache {
+		return l.manager.Acquire(ctx, req)
+	}
+
 	// Check if we previously got limited
-	if enableCache {
-		recentlyLimited := make([]ConstraintItem, 0)
-		var retryAfter time.Time
-		for _, ci := range req.Constraints {
-			// Construct cache key for constraint scoped to account
-			cacheKey := ci.CacheKey(req.AccountID, req.EnvID, req.FunctionID)
-			if cacheKey == "" {
-				continue
-			}
-
-			item := l.limitingConstraintCache.Get(cacheKey)
-			if item == nil || item.Expired() {
-				// Not limited previously
-				continue
-			}
-
-			// This constraint was recently limited
-			val := item.Value()
-
-			recentlyLimited = append(recentlyLimited, ci)
-			if val.retryAfter.After(retryAfter) {
-				retryAfter = val.retryAfter
-			}
-
-			tags := map[string]any{
-				"op":                  "hit",
-				"source":              req.Migration.String(),
-				"limiting_constraint": ci.LimitingConstraintIdentifier(),
-			}
-			if l.enableHighCardinalityInstrumentation != nil && l.enableHighCardinalityInstrumentation(ctx, req.AccountID, req.EnvID, req.FunctionID) {
-				tags["function_id"] = req.FunctionID
-			}
-
-			metrics.IncrConstraintAPILimitingConstraintCacheCounter(ctx, 1, metrics.CounterOpt{
-				PkgName: pkgName,
-				Tags:    tags,
-			})
+	recentlyLimited := make([]ConstraintItem, 0)
+	var retryAfter time.Time
+	for _, ci := range req.Constraints {
+		// Construct cache key for constraint scoped to account
+		cacheKey := ci.CacheKey(req.AccountID, req.EnvID, req.FunctionID)
+		if cacheKey == "" {
+			continue
 		}
 
-		// If one or more requested constraints were recently limited,
-		// return a synthetic response including all affected constraints.
-		if len(recentlyLimited) > 0 {
-			requestID, err := ulid.New(ulid.Timestamp(l.clock.Now()), rand.Reader)
-			if err != nil {
-				return nil, errs.Wrap(0, false, "could not generate request ID: %w", err)
-			}
-
-			return &CapacityAcquireResponse{
-				RequestID:           requestID,
-				Leases:              nil,
-				LimitingConstraints: recentlyLimited,
-				RetryAfter:          retryAfter,
-			}, nil
-		} else {
-			tags := map[string]any{
-				"op":     "miss",
-				"source": req.Migration.String(),
-			}
-			if l.enableHighCardinalityInstrumentation != nil && l.enableHighCardinalityInstrumentation(ctx, req.AccountID, req.EnvID, req.FunctionID) {
-				tags["function_id"] = req.FunctionID
-			}
-
-			metrics.IncrConstraintAPILimitingConstraintCacheCounter(ctx, 1, metrics.CounterOpt{
-				PkgName: pkgName,
-				Tags:    tags,
-			})
+		item := l.limitingConstraintCache.Get(cacheKey)
+		if item == nil || item.Expired() {
+			// Not limited previously
+			continue
 		}
+
+		// This constraint was recently limited
+		val := item.Value()
+
+		recentlyLimited = append(recentlyLimited, ci)
+		if val.retryAfter.After(retryAfter) {
+			retryAfter = val.retryAfter
+		}
+
+		tags := map[string]any{
+			"op":                  "hit",
+			"source":              req.Migration.String(),
+			"limiting_constraint": ci.LimitingConstraintIdentifier(),
+		}
+		if l.enableHighCardinalityInstrumentation != nil && l.enableHighCardinalityInstrumentation(ctx, req.AccountID, req.EnvID, req.FunctionID) {
+			tags["function_id"] = req.FunctionID
+		}
+
+		metrics.IncrConstraintAPILimitingConstraintCacheCounter(ctx, 1, metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags:    tags,
+		})
+	}
+
+	// If one or more requested constraints were recently limited,
+	// return a synthetic response including all affected constraints.
+	if len(recentlyLimited) > 0 {
+		requestID, err := ulid.New(ulid.Timestamp(l.clock.Now()), rand.Reader)
+		if err != nil {
+			return nil, errs.Wrap(0, false, "could not generate request ID: %w", err)
+		}
+
+		return &CapacityAcquireResponse{
+			RequestID:           requestID,
+			Leases:              nil,
+			LimitingConstraints: recentlyLimited,
+			RetryAfter:          retryAfter,
+		}, nil
+	} else {
+		tags := map[string]any{
+			"op":     "miss",
+			"source": req.Migration.String(),
+		}
+		if l.enableHighCardinalityInstrumentation != nil && l.enableHighCardinalityInstrumentation(ctx, req.AccountID, req.EnvID, req.FunctionID) {
+			tags["function_id"] = req.FunctionID
+		}
+
+		metrics.IncrConstraintAPILimitingConstraintCacheCounter(ctx, 1, metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags:    tags,
+		})
 	}
 
 	res, err := l.manager.Acquire(ctx, req)
 	if err != nil {
 		return nil, err
-	}
-
-	if !enableCache {
-		return res, nil
 	}
 
 	// If we are limited by constraints,
@@ -151,13 +154,13 @@ func (l *limitingConstraintCache) Acquire(ctx context.Context, req *CapacityAcqu
 		}
 
 		cacheTTL := res.RetryAfter.Sub(l.clock.Now())
-		if cacheTTL <= 0 {
-			cacheTTL = time.Second
+		if cacheTTL <= minTTL {
+			cacheTTL = minTTL
 		}
 
 		// Enforce max cache ttl limit
-		if cacheTTL >= MaxCacheTTL {
-			cacheTTL = MaxCacheTTL
+		if cacheTTL >= maxTTL {
+			cacheTTL = maxTTL
 		}
 
 		l.limitingConstraintCache.Set(

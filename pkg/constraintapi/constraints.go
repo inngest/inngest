@@ -90,6 +90,12 @@ type ConcurrencyConstraint struct {
 	InProgressItemKey string
 }
 
+const ConcurrencyLimitRetryAfter = 5 * time.Second
+
+func (c ConcurrencyConstraint) RetryAfter() time.Duration {
+	return ConcurrencyLimitRetryAfter
+}
+
 func (c ConcurrencyConstraint) InProgressLeasesKey(prefix string, accountID, envID, functionID uuid.UUID) string {
 	switch c.Mode {
 	case enums.ConcurrencyModeStep:
