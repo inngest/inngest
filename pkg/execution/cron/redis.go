@@ -278,6 +278,9 @@ func (c *redisCronManager) ScheduleNext(ctx context.Context, ci CronItem) (*Cron
 	l := c.log.With("action", "redisCronManager.ScheduleNext", "queue", kind, "functionID", ci.FunctionID, "functionVersion", ci.FunctionVersion, "cronExpr", ci.Expression, "operation", ci.Op)
 
 	from := ci.ID.Timestamp()
+	if now := time.Now(); now.After(from) {
+		from = now
+	}
 
 	// Parse the cron expression and get the next execution time
 	next, err := Next(ci.Expression, from)

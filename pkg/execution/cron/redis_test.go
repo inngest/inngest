@@ -902,8 +902,10 @@ func TestRedisCronManager(t *testing.T) {
 
 					nextTime := time.UnixMilli(int64(nextItem.ID.Time()))
 
-					// Should be scheduled for 1AM
-					assert.True(t, nextTime.Equal(time.Date(2025, 12, 25, 1, 0, 0, 0, time.UTC)))
+					// Should be scheduled for the top of the next minute
+					assert.True(t, nextTime.After(time.Now()))
+					assert.Equal(t, 0, nextTime.Minute())
+					assert.Equal(t, 0, nextTime.Second())
 				})
 			}
 		})
