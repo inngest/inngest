@@ -9,7 +9,7 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
-func NewOSSTrackedEvent(e Event, seed *SeededID) TrackedEvent {
+func NewBaseTrackedEvent(e Event, seed *SeededID) TrackedEvent {
 	// Never use e.ID as the internal ID, since it's specified by the sender
 	internalID := ulid.MustNew(ulid.Now(), rand.Reader)
 
@@ -27,21 +27,21 @@ func NewOSSTrackedEvent(e Event, seed *SeededID) TrackedEvent {
 	if e.ID == "" {
 		e.ID = internalID.String()
 	}
-	return ossTrackedEvent{
+	return BaseTrackedEvent{
 		ID:    internalID,
 		Event: e,
 	}
 }
 
-func NewOSSTrackedEventWithID(e Event, id ulid.ULID) TrackedEvent {
-	return ossTrackedEvent{
+func NewBaseTrackedEventWithID(e Event, id ulid.ULID) TrackedEvent {
+	return BaseTrackedEvent{
 		ID:    id,
 		Event: e,
 	}
 }
 
-func NewOSSTrackedEventFromString(data string) (*ossTrackedEvent, error) {
-	evt := &ossTrackedEvent{}
+func NewBaseTrackedEventFromString(data string) (*BaseTrackedEvent, error) {
+	evt := &BaseTrackedEvent{}
 	if err := json.Unmarshal([]byte(data), evt); err != nil {
 		return nil, err
 	}
@@ -49,27 +49,33 @@ func NewOSSTrackedEventFromString(data string) (*ossTrackedEvent, error) {
 	return evt, nil
 }
 
-type ossTrackedEvent struct {
+type BaseTrackedEvent struct {
 	ID          ulid.ULID `json:"internal_id"`
 	AccountID   uuid.UUID `json:"account_id"`
 	WorkspaceID uuid.UUID `json:"workspace_id"`
 	Event       Event     `json:"event"`
 }
 
-func (o ossTrackedEvent) GetEvent() Event {
+func (o BaseTrackedEvent) GetEvent() Event {
 	return o.Event
 }
 
-func (o ossTrackedEvent) GetInternalID() ulid.ULID {
+func (o BaseTrackedEvent) GetInternalID() ulid.ULID {
 	return o.ID
 }
 
-func (o ossTrackedEvent) GetAccountID() uuid.UUID {
+func (o BaseTrackedEvent) GetAccountID() uuid.UUID {
+	if o.AccountID != uuid.Nil {
+		return o.AccountID
+	}
 	// There are no accounts in OSS yet.
 	return consts.DevServerAccountID
 }
 
-func (o ossTrackedEvent) GetWorkspaceID() uuid.UUID {
+func (o BaseTrackedEvent) GetWorkspaceID() uuid.UUID {
+	if o.WorkspaceID != uuid.Nil {
+		return o.WorkspaceID
+	}
 	// There are no workspaces in OSS yet.
 	return consts.DevServerEnvID
 }

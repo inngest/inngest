@@ -1,19 +1,18 @@
-import type { UrlObject } from 'url';
 import type { ReactNode } from 'react';
-import NextLink, { type LinkProps as NextLinkProps } from 'next/link';
+import { Link, type LinkComponentProps } from '@tanstack/react-router';
 
 export const OptionalLink = ({
   children,
   href,
   ...props
-}: Omit<NextLinkProps, 'href'> & {
-  href?: string | UrlObject;
+}: Omit<LinkComponentProps, 'href'> & {
+  href?: string;
   children: ReactNode;
 }) =>
-  href ? (
-    <NextLink href={href} {...props}>
+  href || props.to ? (
+    <Link href={href} {...props}>
       {children}
-    </NextLink>
+    </Link>
   ) : (
     <>{children}</>
   );

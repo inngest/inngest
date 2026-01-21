@@ -15,7 +15,7 @@ import { useRerun } from '../SharedContext/useRerun';
 import { Skeleton } from '../Skeleton';
 import { StatusDot } from '../Status/StatusDot';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../Tooltip';
-import { useSearchParam } from '../hooks/useNewSearchParams';
+import { useSearchParam } from '../hooks/useSearchParams';
 import { DragDivider } from '../icons/DragDivider';
 import { StepOver } from '../icons/debug/StepOver';
 import { DebugRun } from './DebugRun';

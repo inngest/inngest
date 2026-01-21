@@ -342,7 +342,7 @@ func (a API) Invoke(w http.ResponseWriter, r *http.Request) {
 		r.Header.Get(headers.HeaderEventIDSeed),
 		0,
 	)
-	evtID, err := a.handler(r.Context(), &evt, seed)
+	evtID, err := a.handler(r.Context(), &evt.Event, seed)
 	if err != nil {
 		_ = publicerr.WriteHTTP(w, publicerr.Wrapf(err, 500, "Unable to create invocation event: %s", err))
 		return

@@ -6,10 +6,15 @@ import { graphql } from '@/gql';
 import { MetricsScope } from '@/gql/graphql';
 import { useSkippableGraphQLQuery } from '@/utils/useGraphQLQuery';
 import { useEnvironment } from '../Environments/environment-context';
+import { useBooleanFlag } from '../FeatureFlags/hooks';
 import { AccountConcurrency } from './AccountConcurrency';
 import { AUTO_REFRESH_INTERVAL } from './ActionMenu';
 import { Backlog } from './Backlog';
 import { Concurrency } from './Concurrency';
+import {
+  ConnectWorkerPercentage,
+  ConnectWorkerTotalCapacity,
+} from './ConnectWorkerMetrics';
 import { type EntityLookup } from './Dashboard';
 import { RunsThrougput } from './RunsThroughput';
 import { SdkThroughput } from './SdkThroughput';
@@ -220,6 +225,36 @@ const GetVolumeMetrics = graphql(`
         }
       }
     }
+    workspace(id: $workspaceId) {
+      workerPercentageUsed: connectWorkerMetrics(
+        filter: { name: "worker_percentage_used", from: $from, until: $until }
+      ) {
+        metrics {
+          id
+          tagName
+          tagValue
+          data {
+            value
+            bucket
+          }
+        }
+      }
+    }
+    workspace(id: $workspaceId) {
+      workerTotalCapacity: connectWorkerMetrics(
+        filter: { name: "worker_total_capacity", from: $from, until: $until }
+      ) {
+        metrics {
+          id
+          tagName
+          tagValue
+          data {
+            value
+            bucket
+          }
+        }
+      }
+    }
   }
 `);
 
@@ -237,6 +272,9 @@ export const MetricsVolume = ({
   const [volumeOpen, setVolumeOpen] = useState(true);
 
   const env = useEnvironment();
+
+  const { value: connectMetricsEnabled, isReady: connectMetricsReady } =
+    useBooleanFlag('connect-worker-concurrency-metrics');
 
   const variables = {
     workspaceId: env.id,
@@ -269,7 +307,9 @@ export const MetricsVolume = ({
       </div>
       {volumeOpen && (
         <>
-          {error && <Error message="There was an error fetching volume metrics data." />}
+          {error && (
+            <Error message="There was an error fetching volume metrics data." />
+          )}
 
           <div className="relative grid w-full auto-cols-max grid-cols-1 gap-2 overflow-hidden md:grid-cols-2">
             <RunsThrougput workspace={data?.workspace} entities={entities} />
@@ -287,6 +327,25 @@ export const MetricsVolume = ({
               limit={concurrencyLimit}
               isMarketplace={isMarketplace}
             />
+            {/* Only show Connect worker metrics if there's data */}
+            {connectMetricsEnabled &&
+              connectMetricsReady &&
+              data &&
+              data.workspace.workerPercentageUsed.metrics.length > 0 && (
+                <ConnectWorkerPercentage
+                  workspace={data.workspace}
+                  entities={entities}
+                />
+              )}
+            {connectMetricsEnabled &&
+              connectMetricsReady &&
+              data &&
+              data.workspace.workerTotalCapacity.metrics.length > 0 && (
+                <ConnectWorkerTotalCapacity
+                  workspace={data.workspace}
+                  entities={entities}
+                />
+              )}
           </div>
         </>
       )}

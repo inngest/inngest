@@ -1,31 +1,39 @@
 {
-  "$schema": "https://json.schemastore.org/tsconfig",
-  "extends": "@inngest/tsconfig/nextjs.json",
-  "compilerOptions": {
-    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo.json",
-    "plugins": [
-      {
-        "name": "next"
-      }
-    ],
-    "baseUrl": "./",
-    "paths": {
-      "@/*": ["./src/*"]
-    },
-    "strictNullChecks": true,
-    "target": "ES2017"
-  },
   "include": [
-    "./src/**/*",
-    "./next-env.d.ts",
-    ".next/types/**/*.ts",
-    "./next.config.js",
-    "./graphql.config.js",
-    "./tailwind.config.ts",
-    "./svgo.config.js",
-    "./sentry.client.config.ts",
-    "./sentry.edge.config.ts",
-    "./sentry.server.config.ts"
+    "**/*.ts",
+    "**/*.tsx",
+    "eslint.config.js",
+    "vite.config.js",
+    "./graphql.config.ts",
+    "./tailwind.config.ts"
   ],
-  "exclude": ["node_modules"]
+
+  "compilerOptions": {
+    "target": "ES2022",
+    "jsx": "react-jsx",
+    "module": "ESNext",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["vite/client"],
+
+    /* Bundler mode */
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "noEmit": true,
+    "strict": true,
+
+    /* Linting */
+    "skipLibCheck": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedSideEffectImports": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"],
+      "@inngest/components": ["../../packages/components/src"],
+      "@inngest/components/*": ["../../packages/components/src/*"]
+    }
+  }
 }

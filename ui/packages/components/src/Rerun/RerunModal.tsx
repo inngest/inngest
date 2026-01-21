@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { RiCloseLine } from '@remixicon/react';
+import { useNavigate } from '@tanstack/react-router';
 
 import { Button } from '../Button';
 import { CodeBlock } from '../CodeBlock/CodeBlock';
@@ -51,7 +51,7 @@ export const RerunModal = ({
   const [newInput, setNewInput] = useState(input);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
-  const router = useRouter();
+  const navigate = useNavigate();
 
   const close = () => {
     setLoading(false);
@@ -128,7 +128,7 @@ export const RerunModal = ({
             }
 
             if (redirect && result.redirect) {
-              router.push(result.redirect);
+              navigate({ to: result.redirect });
             }
 
             close();

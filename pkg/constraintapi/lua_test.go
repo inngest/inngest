@@ -52,11 +52,11 @@ func TestSerializedConstraintItem(t *testing.T) {
 		},
 		Throttle: []ThrottleConfig{
 			{
-				Scope:                     enums.ThrottleScopeFn,
-				Limit:                     200,
-				Burst:                     300,
-				Period:                    60,
-				ThrottleKeyExpressionHash: "throttle-expr",
+				Scope:             enums.ThrottleScopeFn,
+				Limit:             200,
+				Burst:             300,
+				Period:            60,
+				KeyExpressionHash: "throttle-expr",
 			},
 		},
 	}
@@ -76,7 +76,7 @@ func TestSerializedConstraintItem(t *testing.T) {
 					EvaluatedKeyHash:  "eval-hash",
 				},
 			},
-			expected: `{"k":1,"r":{"b":10,"s":2,"h":"test-key-hash","eh":"eval-hash","k":"{test-prefix}:eval-hash","l":100,"p":60000000000}}`,
+			expected: `{"k":1,"r":{"b":10,"s":2,"h":"test-key-hash","eh":"eval-hash","k":"{test-prefix}:rl:a:12345678-1234-1234-1234-123456789abc:eval-hash","l":100,"p":60000000000}}`,
 		},
 		{
 			name: "Concurrency constraint with custom key",
@@ -90,7 +90,7 @@ func TestSerializedConstraintItem(t *testing.T) {
 					InProgressItemKey: "redis:item:key123",
 				},
 			},
-			expected: `{"k":2,"c":{"m":1,"s":1,"h":"custom-key","eh":"concurrency-eval","l":15,"ilk":"{test-prefix}:12345678-1234-1234-1234-123456789abc:state:concurrency:e:87654321-4321-4321-4321-cba987654321<custom-key:concurrency-eval>","iik":"redis:item:key123"}}`,
+			expected: `{"k":2,"c":{"m":1,"s":1,"h":"custom-key","eh":"concurrency-eval","l":15,"ilk":"{test-prefix}:12345678-1234-1234-1234-123456789abc:state:concurrency:e:87654321-4321-4321-4321-cba987654321<custom-key:concurrency-eval>","iik":"redis:item:key123","ra":2000}}`,
 		},
 		{
 			name: "Throttle constraint with embedded config",
@@ -102,7 +102,7 @@ func TestSerializedConstraintItem(t *testing.T) {
 					EvaluatedKeyHash:  "throttle-key",
 				},
 			},
-			expected: `{"k":3,"t":{"h":"throttle-expr","eh":"throttle-key","l":200,"b":300,"p":60,"k":"{test-prefix}:throttle:throttle-key"}}`,
+			expected: `{"k":3,"t":{"h":"throttle-expr","eh":"throttle-key","l":200,"b":300,"p":60000,"k":"{test-prefix}:throttle:throttle-key"}}`,
 		},
 		{
 			name: "Concurrency constraint with standard function step limit",
@@ -115,7 +115,7 @@ func TestSerializedConstraintItem(t *testing.T) {
 					// KeyExpressionHash and EvaluatedKeyHash left empty for standard limit
 				},
 			},
-			expected: `{"k":2,"c":{"l":25,"ilk":"{test-prefix}:12345678-1234-1234-1234-123456789abc:state:concurrency:f:11111111-2222-3333-4444-555555555555","iik":"redis:function:item456"}}`, // Function concurrency limit embedded
+			expected: `{"k":2,"c":{"l":25,"ra":2000,"ilk":"{test-prefix}:12345678-1234-1234-1234-123456789abc:state:concurrency:f:11111111-2222-3333-4444-555555555555","iik":"redis:function:item456"}}`, // Function concurrency limit embedded
 		},
 	}
 
@@ -155,6 +155,7 @@ func TestSerializedConstraintItem_EmptyLimit(t *testing.T) {
 			"l":   0, // Should always be included
 			"ilk": fmt.Sprintf("{test-prefix}:%s:state:concurrency:f:%s", accountID, fnID),
 			"iik": "",
+			"ra":  ConcurrencyLimitRetryAfter.Milliseconds(),
 		},
 	})
 	require.NoError(t, err)

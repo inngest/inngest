@@ -9,8 +9,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/inngest/inngest/pkg/consts"
-	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/jonboulle/clockwork"
@@ -25,29 +23,24 @@ func TestItemsByPartitionOnEmptyPartition(t *testing.T) {
 
 	ctx := context.Background()
 	clock := clockwork.NewFakeClock()
-	defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 
 	t.Run("test empty partition", func(t *testing.T) {
 		r.FlushAll()
 
-		q := NewQueue(
-			defaultShard,
-			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+		q, shard := newQueue(
+			t, rc,
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 				return true
 			}),
-			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-				return false
-			}),
-			WithClock(clock),
+			osqueue.WithClock(clock),
 		)
 
-		_, err := q.ItemsByPartition(ctx, defaultShard, "i-dont-exist", time.Time{}, clock.Now().Add(time.Minute),
-			WithQueueItemIterBatchSize(150),
+		_, err := q.ItemsByPartition(ctx, shard, "i-dont-exist", time.Time{}, clock.Now().Add(time.Minute),
+			osqueue.WithQueueItemIterBatchSize(150),
 		)
 		require.Error(t, err)
 		require.True(t, errors.Is(err, rueidis.Nil))
 	})
-
 }
 
 func TestItemsByPartition(t *testing.T) {
@@ -56,8 +49,6 @@ func TestItemsByPartition(t *testing.T) {
 
 	ctx := context.Background()
 	clock := clockwork.NewFakeClock()
-	defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
-	// kg := defaultShard.RedisClient.kg
 
 	acctId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
 
@@ -146,15 +137,12 @@ func TestItemsByPartition(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			r.FlushAll()
 
-			q := NewQueue(
-				defaultShard,
-				WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+			q, shard := newQueue(
+				t, rc,
+				osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 					return tc.keyQueuesEnabled
 				}),
-				WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-					return false
-				}),
-				WithClock(clock),
+				osqueue.WithClock(clock),
 			)
 
 			for i := range tc.num {
@@ -180,12 +168,12 @@ func TestItemsByPartition(t *testing.T) {
 					},
 				}
 
-				_, err := q.EnqueueItem(ctx, defaultShard, item, at, osqueue.EnqueueOpts{})
+				_, err := shard.EnqueueItem(ctx, item, at, osqueue.EnqueueOpts{})
 				require.NoError(t, err)
 			}
 
-			items, err := q.ItemsByPartition(ctx, defaultShard, fnID.String(), tc.from, tc.until,
-				WithQueueItemIterBatchSize(tc.batchSize),
+			items, err := q.ItemsByPartition(ctx, shard, fnID.String(), tc.from, tc.until,
+				osqueue.WithQueueItemIterBatchSize(tc.batchSize),
 			)
 			require.NoError(t, err)
 
@@ -205,20 +193,15 @@ func TestItemsByPartitionWithSystemQueue(t *testing.T) {
 
 	ctx := context.Background()
 	clock := clockwork.NewFakeClock()
-	defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
-	// kg := defaultShard.RedisClient.kg
 
 	acctID, wsID := uuid.New(), uuid.New()
 
-	q := NewQueue(
-		defaultShard,
-		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+	q, shard := newQueue(
+		t, rc,
+		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 			return false
 		}),
-		WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-			return false
-		}),
-		WithClock(clock),
+		osqueue.WithClock(clock),
 	)
 
 	num := 5000
@@ -244,13 +227,13 @@ func TestItemsByPartitionWithSystemQueue(t *testing.T) {
 			},
 		}
 
-		_, err := q.EnqueueItem(ctx, defaultShard, item, at, osqueue.EnqueueOpts{})
+		_, err := shard.EnqueueItem(ctx, item, at, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 	}
 
-	items, err := q.ItemsByPartition(ctx, defaultShard, systemQueueName, time.Time{}, clock.Now().Add(1*time.Hour),
-		WithQueueItemIterBatchSize(100),
-		WithQueueItemIterEnableBacklog(false),
+	items, err := q.ItemsByPartition(ctx, shard, systemQueueName, time.Time{}, clock.Now().Add(1*time.Hour),
+		osqueue.WithQueueItemIterBatchSize(100),
+		osqueue.WithQueueItemIterEnableBacklog(false),
 	)
 	require.NoError(t, err)
 
@@ -268,21 +251,17 @@ func TestItemsByBacklog(t *testing.T) {
 
 	ctx := context.Background()
 	clock := clockwork.NewFakeClock()
-	defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
-	kg := defaultShard.RedisClient.kg
 
 	acctId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
 
-	q := NewQueue(
-		defaultShard,
-		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+	q, shard := newQueue(
+		t, rc,
+		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 			return true
 		}),
-		WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-			return false
-		}),
-		WithClock(clock),
+		osqueue.WithClock(clock),
 	)
+	kg := shard.Client().kg
 
 	testcases := []struct {
 		name          string
@@ -350,7 +329,7 @@ func TestItemsByBacklog(t *testing.T) {
 					},
 				}
 
-				_, err := q.EnqueueItem(ctx, defaultShard, item, at, osqueue.EnqueueOpts{})
+				_, err := shard.EnqueueItem(ctx, item, at, osqueue.EnqueueOpts{})
 				require.NoError(t, err)
 			}
 
@@ -363,8 +342,8 @@ func TestItemsByBacklog(t *testing.T) {
 			}
 			require.NotEmpty(t, backlogID)
 
-			items, err := q.ItemsByBacklog(ctx, defaultShard, backlogID, tc.from, tc.until,
-				WithQueueItemIterBatchSize(tc.batchSize),
+			items, err := q.ItemsByBacklog(ctx, shard, backlogID, tc.from, tc.until,
+				osqueue.WithQueueItemIterBatchSize(tc.batchSize),
 			)
 			require.NoError(t, err)
 
@@ -384,17 +363,13 @@ func TestQueueIterator(t *testing.T) {
 
 	ctx := context.Background()
 	clock := clockwork.NewFakeClock()
-	defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 
-	q := NewQueue(
-		defaultShard,
-		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+	_, shard := newQueue(
+		t, rc,
+		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 			return false // TODO need to add support for key queues
 		}),
-		WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-			return false
-		}),
-		WithClock(clock),
+		osqueue.WithClock(clock),
 	)
 
 	acctId, wsID := uuid.New(), uuid.New()
@@ -446,11 +421,11 @@ func TestQueueIterator(t *testing.T) {
 					},
 				}
 
-				_, err := q.EnqueueItem(ctx, defaultShard, item, q.clock.Now(), osqueue.EnqueueOpts{})
+				_, err := shard.EnqueueItem(ctx, item, clock.Now(), osqueue.EnqueueOpts{})
 				require.NoError(t, err)
 			}
 
-			ptCnt, piCnt, err := q.QueueIterator(ctx, QueueIteratorOpts{})
+			ptCnt, piCnt, err := shard.QueueIterator(ctx, QueueIteratorOpts{})
 			require.NoError(t, err)
 
 			require.EqualValues(t, tc.partitions, ptCnt)
@@ -465,25 +440,17 @@ func TestItemByID(t *testing.T) {
 
 	ctx := context.Background()
 	clock := clockwork.NewFakeClock()
-	defaultShard := QueueShard{
-		Kind:        string(enums.QueueShardKindRedis),
-		RedisClient: NewQueueClient(rc, QueueDefaultKey),
-		Name:        consts.DefaultQueueShardName,
-	}
 	acctId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
 
-	q1 := NewQueue(
-		defaultShard,
-		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+	q1, shard := newQueue(
+		t, rc,
+		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 			return false
 		}),
-		WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-			return false
-		}),
-		WithClock(clock),
+		osqueue.WithClock(clock),
 	)
 
-	enqueue := func(ctx context.Context, shard QueueShard) (osqueue.QueueItem, error) {
+	enqueue := func(ctx context.Context, shard RedisQueueShard) (osqueue.QueueItem, error) {
 		item := osqueue.QueueItem{
 			ID:          ulid.MustNew(ulid.Now(), rand.Reader).String(),
 			FunctionID:  fnID,
@@ -499,25 +466,25 @@ func TestItemByID(t *testing.T) {
 			},
 		}
 
-		return q1.EnqueueItem(ctx, shard, item, clock.Now(), osqueue.EnqueueOpts{})
+		return shard.EnqueueItem(ctx, item, clock.Now(), osqueue.EnqueueOpts{})
 	}
 
 	t.Run("should be able to find the queue item", func(t *testing.T) {
-		enqueued, err := enqueue(ctx, defaultShard)
+		enqueued, err := enqueue(ctx, shard)
 		require.NoError(t, err)
 
-		res, err := q1.ItemByID(ctx, enqueued.ID)
+		res, err := q1.ItemByID(ctx, shard, enqueued.ID)
 		require.NoError(t, err)
 		require.NotNil(t, res)
 		require.Equal(t, enqueued.ID, res.ID)
 	})
 
 	t.Run("should return not found error if absent", func(t *testing.T) {
-		_, err := enqueue(ctx, defaultShard)
+		_, err := enqueue(ctx, shard)
 		require.NoError(t, err)
 
-		res, err := q1.ItemByID(ctx, "random")
-		require.ErrorIs(t, err, ErrQueueItemNotFound)
+		res, err := q1.ItemByID(ctx, shard, "random")
+		require.ErrorIs(t, err, osqueue.ErrQueueItemNotFound)
 		require.Nil(t, res)
 	})
 }
@@ -528,25 +495,17 @@ func TestItemExists(t *testing.T) {
 
 	ctx := context.Background()
 	clock := clockwork.NewFakeClock()
-	defaultShard := QueueShard{
-		Kind:        string(enums.QueueShardKindRedis),
-		RedisClient: NewQueueClient(rc, QueueDefaultKey),
-		Name:        consts.DefaultQueueShardName,
-	}
 	acctId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
 
-	q := NewQueue(
-		defaultShard,
-		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+	q, shard := newQueue(
+		t, rc,
+		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 			return false
 		}),
-		WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-			return false
-		}),
-		WithClock(clock),
+		osqueue.WithClock(clock),
 	)
 
-	enqueue := func(ctx context.Context, shard QueueShard, jobID string) (osqueue.QueueItem, error) {
+	enqueue := func(ctx context.Context, shard RedisQueueShard, jobID string) (osqueue.QueueItem, error) {
 		item := osqueue.QueueItem{
 			ID:          jobID,
 			FunctionID:  fnID,
@@ -562,17 +521,17 @@ func TestItemExists(t *testing.T) {
 			},
 		}
 
-		return q.EnqueueItem(ctx, shard, item, clock.Now(), osqueue.EnqueueOpts{})
+		return shard.EnqueueItem(ctx, item, clock.Now(), osqueue.EnqueueOpts{})
 	}
 
 	t.Run("should return true when item exists", func(t *testing.T) {
 		r.FlushAll()
 
 		jobID := ulid.MustNew(ulid.Now(), rand.Reader).String()
-		enqueued, err := enqueue(ctx, defaultShard, jobID)
+		enqueued, err := enqueue(ctx, shard, jobID)
 		require.NoError(t, err)
 
-		exists, err := q.ItemExists(ctx, enqueued.ID)
+		exists, err := q.ItemExists(ctx, shard, enqueued.ID)
 		require.NoError(t, err)
 		require.True(t, exists, "item should exist")
 	})
@@ -582,7 +541,7 @@ func TestItemExists(t *testing.T) {
 
 		nonExistentJobID := ulid.MustNew(ulid.Now(), rand.Reader).String()
 
-		exists, err := q.ItemExists(ctx, nonExistentJobID)
+		exists, err := q.ItemExists(ctx, shard, nonExistentJobID)
 		require.NoError(t, err)
 		require.False(t, exists, "item should not exist")
 	})
@@ -591,78 +550,21 @@ func TestItemExists(t *testing.T) {
 		r.FlushAll()
 
 		jobID := ulid.MustNew(ulid.Now(), rand.Reader).String()
-		enqueued, err := enqueue(ctx, defaultShard, jobID)
+		enqueued, err := enqueue(ctx, shard, jobID)
 		require.NoError(t, err)
 
 		// Verify it exists
-		exists, err := q.ItemExists(ctx, enqueued.ID)
+		exists, err := q.ItemExists(ctx, shard, enqueued.ID)
 		require.NoError(t, err)
 		require.True(t, exists)
 
 		// Dequeue the item
-		err = q.Dequeue(ctx, defaultShard, enqueued)
+		err = q.Dequeue(ctx, shard, enqueued)
 		require.NoError(t, err)
 
 		// Should no longer exist
-		exists, err = q.ItemExists(ctx, enqueued.ID)
+		exists, err = q.ItemExists(ctx, shard, enqueued.ID)
 		require.NoError(t, err)
 		require.False(t, exists, "dequeued item should not exist")
 	})
-}
-
-func TestShard(t *testing.T) {
-	_, rc := initRedis(t)
-	defer rc.Close()
-
-	ctx := context.Background()
-	clock := clockwork.NewFakeClock()
-
-	shard1 := QueueShard{
-		Kind:        string(enums.QueueShardKindRedis),
-		RedisClient: NewQueueClient(rc, QueueDefaultKey),
-		Name:        consts.DefaultQueueShardName,
-	}
-	shard2 := QueueShard{
-		Kind:        string(enums.QueueShardKindRedis),
-		RedisClient: NewQueueClient(rc, QueueDefaultKey),
-		Name:        "yolo",
-	}
-
-	q := NewQueue(
-		shard1,
-		WithClock(clock),
-		WithQueueShardClients(map[string]QueueShard{
-			consts.DefaultQueueShardName: shard1,
-			"yolo":                       shard2,
-		}),
-	)
-
-	testcases := []struct {
-		name            string
-		shardName       string
-		expectAvailable bool
-	}{
-		{
-			name:            "default shard",
-			shardName:       consts.DefaultQueueShardName,
-			expectAvailable: true,
-		},
-		{
-			name:            "other available shard",
-			shardName:       "yolo",
-			expectAvailable: true,
-		},
-		{
-			name:            "non existent shard",
-			shardName:       "amazing",
-			expectAvailable: false,
-		},
-	}
-
-	for _, tc := range testcases {
-		t.Run(tc.name, func(t *testing.T) {
-			_, ok := q.Shard(ctx, tc.shardName)
-			require.Equal(t, tc.expectAvailable, ok)
-		})
-	}
 }

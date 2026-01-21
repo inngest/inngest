@@ -699,6 +699,15 @@ func IncrPausesLegacyDeletionCounter(ctx context.Context, opts CounterOpt) {
 	})
 }
 
+func IncrMetadataSpansTotal(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "metadata_spans_total",
+		Description: "Total number of metadata spans",
+		Tags:        opts.Tags,
+	})
+}
+
 func IncrConstraintAPIScavengerTotalAccountsCounter(ctx context.Context, count int64, opts CounterOpt) {
 	RecordCounterMetric(ctx, count, CounterOpt{
 		PkgName:     opts.PkgName,
@@ -740,6 +749,151 @@ func IncrConstraintAPIScavengerReclaimedLeasesCounter(ctx context.Context, count
 		PkgName:     opts.PkgName,
 		MetricName:  "constraintapi_scavenger_reclaimed_total",
 		Description: "Total number of expired leases reclaimed by Constraint API scavenger",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrQueueScavengerRequeuedItemsCounter(ctx context.Context, count int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, count, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "queue_scavenger_requeued_total",
+		Description: "Total number of requeud items reclaimed by queue scavenger",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrQueueThrottleStatus(ctx context.Context, count int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, count, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "queue_fn_throttle_status",
+		Description: "Total number of throttled items",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrAsyncCancellationCheckCounter(ctx context.Context, count int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, count, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "async_cancellation_check",
+		Description: "Total number of async cancellation checks",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrScheduleConstraintsCheckFallbackCounter(ctx context.Context, reason string, opts CounterOpt) {
+	if opts.Tags == nil {
+		opts.Tags = map[string]any{}
+	}
+	opts.Tags["reason"] = reason
+
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "schedule_constraints_check_fallback_total",
+		Description: "Total number of schedule constraint check fallbacks with reason",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrScheduleConstraintsHitCounter(ctx context.Context, reason string, opts CounterOpt) {
+	if opts.Tags == nil {
+		opts.Tags = map[string]any{}
+	}
+	opts.Tags["reason"] = reason
+
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "schedule_constraints_hit_total",
+		Description: "Total number of schedule constraint checks resulted in limiting run scheduling",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrQueueItemConstraintCheckFallbackCounter(ctx context.Context, reason string, opts CounterOpt) {
+	if opts.Tags == nil {
+		opts.Tags = map[string]any{}
+	}
+	opts.Tags["reason"] = reason
+
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "check_constraints_in_lease_reason_total",
+		Description: "Total number of constraint checks performed during item lease with reason",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrPausesExpiredDeletedCounter(ctx context.Context, count int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, count, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "pauses_expired_deleted_total",
+		Description: "Total number of expired pauses deleted during load",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrBacklogRefillConstraintCheckFallbackCounter(ctx context.Context, reason string, opts CounterOpt) {
+	if opts.Tags == nil {
+		opts.Tags = map[string]any{}
+	}
+	opts.Tags["reason"] = reason
+
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "backlog_refill_constraint_check_fallback_total",
+		Description: "Total number of backlog refill constraint check fallbacks with reason",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrConstraintAPILeasesRequestedCounter(ctx context.Context, count int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, count, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "constraintapi_leases_requested_total",
+		Description: "Total number of leases requested via Constraint API",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrConstraintAPILeasesGrantedCounter(ctx context.Context, count int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, count, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "constraintapi_leases_granted_total",
+		Description: "Total number of leases granted via Constraint API",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrConstraintAPILimitingConstraintsCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "constraintapi_limiting_constraints_total",
+		Description: "Total number of times constraints limited capacity acquisition",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrConstraintAPIIssuedLeaseCounter(ctx context.Context, count int64, opts CounterOpt) {
+	if opts.Tags == nil {
+		opts.Tags = map[string]any{}
+	}
+
+	RecordCounterMetric(ctx, count, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "constraintapi_issued_lease_counter",
+		Description: "Total number of leases issued for the given location",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrConstraintAPILimitingConstraintCacheCounter(ctx context.Context, count int64, opts CounterOpt) {
+	if opts.Tags == nil {
+		opts.Tags = map[string]any{}
+	}
+
+	RecordCounterMetric(ctx, count, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "constraintapi_limiting_constraint_cache_total",
+		Description: "Total number of operations to limiting constraint cache",
 		Tags:        opts.Tags,
 	})
 }

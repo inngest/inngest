@@ -1,24 +1,774 @@
 package redis_state
 
 import (
+	"context"
+	"crypto/rand"
+	"encoding/json"
 	"fmt"
 	"testing"
+	"time"
 
+	"github.com/alicebob/miniredis/v2"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/constraintapi"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
+	osqueue "github.com/inngest/inngest/pkg/execution/queue"
+	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/logger"
+	"github.com/jonboulle/clockwork"
+	"github.com/oklog/ulid/v2"
+	"github.com/redis/rueidis"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+func TestItemLeaseConstraintCheck(t *testing.T) {
+	r := miniredis.RunT(t)
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	clock := clockwork.NewFakeClock()
+
+	ctx := context.Background()
+	l := logger.StdlibLogger(ctx, logger.WithLoggerLevel(logger.LevelTrace))
+	ctx = logger.WithStdlib(ctx, l)
+
+	cmLifecycles := constraintapi.NewConstraintAPIDebugLifecycles()
+	cm, err := constraintapi.NewRedisCapacityManager(
+		constraintapi.WithClock(clock),
+		constraintapi.WithEnableDebugLogs(true),
+		constraintapi.WithLifecycles(cmLifecycles),
+		constraintapi.WithNumScavengerShards(1),
+		constraintapi.WithQueueShards(map[string]rueidis.Client{
+			consts.DefaultQueueShardName: rc,
+		}),
+		constraintapi.WithQueueStateKeyPrefix("q:v1"),
+		constraintapi.WithRateLimitClient(rc),
+		constraintapi.WithRateLimitKeyPrefix("rl"),
+	)
+	require.NoError(t, err)
+
+	reset := func() {
+		r.FlushAll()
+		r.SetTime(clock.Now())
+		cmLifecycles.Reset()
+	}
+
+	accountID := uuid.New()
+	envID := uuid.New()
+	fnID := uuid.New()
+
+	item := osqueue.QueueItem{
+		FunctionID:  fnID,
+		WorkspaceID: envID,
+		Data: osqueue.Item{
+			Payload: json.RawMessage("{\"test\":\"payload\"}"),
+			Identifier: state.Identifier{
+				AccountID:   accountID,
+				WorkspaceID: envID,
+				WorkflowID:  fnID,
+			},
+		},
+	}
+
+	constraints := osqueue.PartitionConstraintConfig{
+		FunctionVersion: 1,
+		Concurrency: osqueue.PartitionConcurrency{
+			AccountConcurrency:  10,
+			FunctionConcurrency: 5,
+		},
+	}
+
+	start := clock.Now()
+
+	t.Run("waive checks for system queues", func(t *testing.T) {
+		reset()
+
+		qn := "example-system-queue"
+		item := osqueue.QueueItem{
+			Data: osqueue.Item{
+				Payload:    json.RawMessage("{\"test\":\"payload\"}"),
+				Identifier: state.Identifier{},
+				QueueName:  &qn,
+			},
+			QueueName: &qn,
+		}
+
+		_, shard := newQueue(
+			t, rc,
+			osqueue.WithClock(clock),
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+				return true
+			}),
+			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
+				return true, true
+			}),
+			osqueue.WithCapacityManager(cm),
+			// make lease extensions more frequent
+			osqueue.WithCapacityLeaseExtendInterval(time.Second),
+			osqueue.WithLogger(l),
+			osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
+				return constraints
+			}),
+		)
+
+		qi, err := shard.EnqueueItem(ctx, item, start, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+
+		sp := osqueue.ItemShadowPartition(ctx, qi)
+		backlog := osqueue.ItemBacklog(ctx, qi)
+
+		res, err := shard.ItemLeaseConstraintCheck(ctx, &sp, &backlog, constraints, &qi, clock.Now())
+		require.NoError(t, err)
+
+		// No lease acquired
+		require.Nil(t, res.CapacityLease)
+		require.True(t, res.SkipConstraintChecks)
+
+		// Do not expect a call for the system queue
+		require.Equal(t, 0, len(cmLifecycles.AcquireCalls))
+		require.Equal(t, 0, len(cmLifecycles.ExtendCalls))
+		require.Equal(t, 0, len(cmLifecycles.ReleaseCalls))
+	})
+
+	t.Run("skip constraintapi but require checks when missing identifier", func(t *testing.T) {
+		reset()
+
+		item := osqueue.QueueItem{
+			FunctionID: fnID,
+			Data: osqueue.Item{
+				Payload: json.RawMessage("{\"test\":\"payload\"}"),
+				Identifier: state.Identifier{
+					WorkflowID: fnID,
+				},
+			},
+		}
+
+		_, shard := newQueue(
+			t, rc,
+			osqueue.WithClock(clock),
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+				return true
+			}),
+			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
+				return true, true
+			}),
+			osqueue.WithCapacityManager(cm),
+			// make lease extensions more frequent
+			osqueue.WithCapacityLeaseExtendInterval(time.Second),
+			osqueue.WithLogger(l),
+			osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
+				return constraints
+			}),
+		)
+
+		qi, err := shard.EnqueueItem(ctx, item, start, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+
+		sp := osqueue.ItemShadowPartition(ctx, qi)
+		backlog := osqueue.ItemBacklog(ctx, qi)
+
+		res, err := shard.ItemLeaseConstraintCheck(ctx, &sp, &backlog, constraints, &qi, clock.Now())
+		require.NoError(t, err)
+
+		// No lease acquired
+		require.Nil(t, res.CapacityLease)
+		require.False(t, res.SkipConstraintChecks)
+
+		// Do not expect a ConstraintAPI call for missing identifiers
+		require.Equal(t, 0, len(cmLifecycles.AcquireCalls))
+		require.Equal(t, 0, len(cmLifecycles.ExtendCalls))
+		require.Equal(t, 0, len(cmLifecycles.ReleaseCalls))
+	})
+
+	t.Run("skip constraintapi but require checks when capacity manager not configured", func(t *testing.T) {
+		reset()
+
+		item := osqueue.QueueItem{
+			FunctionID: fnID,
+			Data: osqueue.Item{
+				Payload: json.RawMessage("{\"test\":\"payload\"}"),
+				Identifier: state.Identifier{
+					WorkflowID: fnID,
+				},
+			},
+		}
+
+		_, shard := newQueue(
+			t, rc,
+			osqueue.WithClock(clock),
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+				return true
+			}),
+			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
+				return true, true
+			}),
+			// make lease extensions more frequent
+			osqueue.WithCapacityLeaseExtendInterval(time.Second),
+			osqueue.WithLogger(l),
+			osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
+				return constraints
+			}),
+		)
+
+		qi, err := shard.EnqueueItem(ctx, item, start, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+
+		sp := osqueue.ItemShadowPartition(ctx, qi)
+		backlog := osqueue.ItemBacklog(ctx, qi)
+
+		res, err := shard.ItemLeaseConstraintCheck(ctx, &sp, &backlog, constraints, &qi, clock.Now())
+		require.NoError(t, err)
+
+		// No lease acquired
+		require.Nil(t, res.CapacityLease)
+		require.False(t, res.SkipConstraintChecks)
+
+		// Do not expect a ConstraintAPI call for missing capacity manager
+		require.Equal(t, 0, len(cmLifecycles.AcquireCalls))
+		require.Equal(t, 0, len(cmLifecycles.ExtendCalls))
+		require.Equal(t, 0, len(cmLifecycles.ReleaseCalls))
+	})
+
+	t.Run("skip constraintapi but require checks when feature flag disabled", func(t *testing.T) {
+		reset()
+
+		item := osqueue.QueueItem{
+			FunctionID: fnID,
+			Data: osqueue.Item{
+				Payload: json.RawMessage("{\"test\":\"payload\"}"),
+				Identifier: state.Identifier{
+					WorkflowID: fnID,
+				},
+			},
+		}
+
+		_, shard := newQueue(
+			t, rc,
+			osqueue.WithClock(clock),
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+				return true
+			}),
+			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
+				return false, false // disable flag
+			}),
+			osqueue.WithCapacityManager(cm),
+			// make lease extensions more frequent
+			osqueue.WithCapacityLeaseExtendInterval(time.Second),
+			osqueue.WithLogger(l),
+			osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
+				return constraints
+			}),
+		)
+
+		qi, err := shard.EnqueueItem(ctx, item, start, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+
+		sp := osqueue.ItemShadowPartition(ctx, qi)
+		backlog := osqueue.ItemBacklog(ctx, qi)
+
+		res, err := shard.ItemLeaseConstraintCheck(ctx, &sp, &backlog, constraints, &qi, clock.Now())
+		require.NoError(t, err)
+
+		// No lease acquired
+		require.Nil(t, res.CapacityLease)
+		require.False(t, res.SkipConstraintChecks) // Require checks
+
+		// Do not expect a ConstraintAPI call for disabled feature flag
+		require.Equal(t, 0, len(cmLifecycles.AcquireCalls))
+		require.Equal(t, 0, len(cmLifecycles.ExtendCalls))
+		require.Equal(t, 0, len(cmLifecycles.ReleaseCalls))
+	})
+
+	t.Run("should not acquire lease with valid existing item lease", func(t *testing.T) {
+		reset()
+
+		_, shard := newQueue(
+			t, rc,
+			osqueue.WithClock(clock),
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+				return true
+			}),
+			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
+				return true, true
+			}),
+			osqueue.WithCapacityManager(cm),
+			// make lease extensions more frequent
+			osqueue.WithCapacityLeaseExtendInterval(time.Second),
+			osqueue.WithLogger(l),
+			osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
+				return constraints
+			}),
+		)
+
+		qi, err := shard.EnqueueItem(ctx, item, start, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+
+		// Simulate valid lease
+		capacityLeaseID := ulid.MustNew(ulid.Timestamp(clock.Now().Add(10*time.Second)), rand.Reader)
+
+		qi.CapacityLease = &osqueue.CapacityLease{
+			LeaseID: capacityLeaseID,
+		}
+
+		sp := osqueue.ItemShadowPartition(ctx, qi)
+		backlog := osqueue.ItemBacklog(ctx, qi)
+
+		res, err := shard.ItemLeaseConstraintCheck(ctx, &sp, &backlog, constraints, &qi, clock.Now())
+		require.NoError(t, err)
+
+		require.NotNil(t, res.CapacityLease)
+		require.True(t, res.SkipConstraintChecks)
+
+		// This time, we do not expect a call to the Constraint API, simply use the valid lease
+		require.Equal(t, 0, len(cmLifecycles.AcquireCalls))
+		require.Equal(t, 0, len(cmLifecycles.ExtendCalls))
+		require.Equal(t, 0, len(cmLifecycles.ReleaseCalls))
+	})
+
+	t.Run("should acquire lease with expired existing item lease", func(t *testing.T) {
+		reset()
+
+		_, shard := newQueue(
+			t, rc,
+			osqueue.WithClock(clock),
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+				return true
+			}),
+			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
+				return true, true
+			}),
+			osqueue.WithCapacityManager(cm),
+			// make lease extensions more frequent
+			osqueue.WithCapacityLeaseExtendInterval(time.Second),
+			osqueue.WithLogger(l),
+			osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
+				return constraints
+			}),
+		)
+
+		qi, err := shard.EnqueueItem(ctx, item, start, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+
+		// Simulate expired lease
+		capacityLeaseID := ulid.MustNew(ulid.Timestamp(clock.Now().Add(-10*time.Second)), rand.Reader)
+
+		qi.CapacityLease = &osqueue.CapacityLease{
+			LeaseID: capacityLeaseID,
+		}
+
+		sp := osqueue.ItemShadowPartition(ctx, qi)
+		backlog := osqueue.ItemBacklog(ctx, qi)
+
+		res, err := shard.ItemLeaseConstraintCheck(ctx, &sp, &backlog, constraints, &qi, clock.Now())
+		require.NoError(t, err)
+
+		require.NotNil(t, res.CapacityLease)
+		require.True(t, res.SkipConstraintChecks)
+
+		// Expect call because lease expired
+		require.Equal(t, 1, len(cmLifecycles.AcquireCalls))
+		require.Equal(t, 0, len(cmLifecycles.ExtendCalls))
+		require.Equal(t, 0, len(cmLifecycles.ReleaseCalls))
+	})
+
+	t.Run("acquire lease from constraint api", func(t *testing.T) {
+		reset()
+
+		_, shard := newQueue(
+			t, rc,
+			osqueue.WithClock(clock),
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+				return true
+			}),
+			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
+				return true, true
+			}),
+			osqueue.WithCapacityManager(cm),
+			// make lease extensions more frequent
+			osqueue.WithCapacityLeaseExtendInterval(time.Second),
+			osqueue.WithLogger(l),
+			osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
+				return constraints
+			}),
+		)
+
+		qi, err := shard.EnqueueItem(ctx, item, start, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+
+		sp := osqueue.ItemShadowPartition(ctx, qi)
+		backlog := osqueue.ItemBacklog(ctx, qi)
+
+		res, err := shard.ItemLeaseConstraintCheck(ctx, &sp, &backlog, constraints, &qi, clock.Now())
+		require.NoError(t, err)
+
+		require.NotNil(t, res.CapacityLease)
+		require.True(t, res.SkipConstraintChecks)
+
+		require.Equal(t, 1, len(cmLifecycles.AcquireCalls))
+		require.Equal(t, 0, len(cmLifecycles.ExtendCalls))
+		require.Equal(t, 0, len(cmLifecycles.ReleaseCalls))
+	})
+
+	t.Run("lacking constraint capacity", func(t *testing.T) {
+		reset()
+
+		_, shard := newQueue(
+			t, rc,
+			osqueue.WithClock(clock),
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+				return true
+			}),
+			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
+				return true, true
+			}),
+			osqueue.WithCapacityManager(cm),
+			// make lease extensions more frequent
+			osqueue.WithCapacityLeaseExtendInterval(time.Second),
+			osqueue.WithLogger(l),
+			osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
+				return constraints
+			}),
+		)
+		kg := shard.Client().kg
+
+		for i := range 10 {
+			_, err := r.ZAdd(
+				kg.Concurrency("account", accountID.String()),
+				float64(clock.Now().Add(5*time.Second).UnixMilli()),
+				fmt.Sprintf("i%d", i),
+			)
+			require.NoError(t, err)
+		}
+
+		qi, err := shard.EnqueueItem(ctx, item, start, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+
+		sp := osqueue.ItemShadowPartition(ctx, qi)
+		backlog := osqueue.ItemBacklog(ctx, qi)
+
+		res, err := shard.ItemLeaseConstraintCheck(ctx, &sp, &backlog, constraints, &qi, clock.Now())
+		require.NoError(t, err)
+
+		require.Equal(t, enums.QueueConstraintAccountConcurrency, res.LimitingConstraint)
+		require.Nil(t, res.CapacityLease)
+		require.False(t, res.SkipConstraintChecks)
+
+		require.Equal(t, 1, len(cmLifecycles.AcquireCalls))
+		require.Equal(t, 0, len(cmLifecycles.ExtendCalls))
+		require.Equal(t, 0, len(cmLifecycles.ReleaseCalls))
+
+		require.Len(t, cmLifecycles.AcquireCalls[0].GrantedLeases, 0)
+		require.Len(t, cmLifecycles.AcquireCalls[0].LimitingConstraints, 1)
+		require.Equal(t, constraintapi.ConstraintKindConcurrency, cmLifecycles.AcquireCalls[0].LimitingConstraints[0].Kind)
+	})
+}
+
+func TestBacklogRefillConstraintCheck(t *testing.T) {
+	r := miniredis.RunT(t)
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	clock := clockwork.NewFakeClock()
+
+	ctx := context.Background()
+	l := logger.StdlibLogger(ctx, logger.WithLoggerLevel(logger.LevelTrace))
+	ctx = logger.WithStdlib(ctx, l)
+
+	cmLifecycles := constraintapi.NewConstraintAPIDebugLifecycles()
+	cm, err := constraintapi.NewRedisCapacityManager(
+		constraintapi.WithClock(clock),
+		constraintapi.WithEnableDebugLogs(true),
+		constraintapi.WithLifecycles(cmLifecycles),
+		constraintapi.WithNumScavengerShards(1),
+		constraintapi.WithQueueShards(map[string]rueidis.Client{
+			consts.DefaultQueueShardName: rc,
+		}),
+		constraintapi.WithQueueStateKeyPrefix("q:v1"),
+		constraintapi.WithRateLimitClient(rc),
+		constraintapi.WithRateLimitKeyPrefix("rl"),
+	)
+	require.NoError(t, err)
+
+	reset := func() {
+		r.FlushAll()
+		r.SetTime(clock.Now())
+		cmLifecycles.Reset()
+	}
+
+	accountID := uuid.New()
+	envID := uuid.New()
+	fnID := uuid.New()
+
+	item := osqueue.QueueItem{
+		FunctionID:  fnID,
+		WorkspaceID: envID,
+		Data: osqueue.Item{
+			Payload: json.RawMessage("{\"test\":\"payload\"}"),
+			Identifier: state.Identifier{
+				AccountID:   accountID,
+				WorkspaceID: envID,
+				WorkflowID:  fnID,
+			},
+		},
+	}
+
+	constraints := osqueue.PartitionConstraintConfig{
+		FunctionVersion: 1,
+		Concurrency: osqueue.PartitionConcurrency{
+			AccountConcurrency:  10,
+			FunctionConcurrency: 5,
+		},
+	}
+
+	start := clock.Now()
+
+	t.Run("skip constraintapi but require checks when missing identifier", func(t *testing.T) {
+		reset()
+
+		item := osqueue.QueueItem{
+			FunctionID: fnID,
+			Data: osqueue.Item{
+				Payload: json.RawMessage("{\"test\":\"payload\"}"),
+				Identifier: state.Identifier{
+					WorkflowID: fnID,
+				},
+			},
+		}
+
+		_, shard := newQueue(
+			t, rc,
+			osqueue.WithClock(clock),
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+				return true
+			}),
+			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
+				return true, true
+			}),
+			osqueue.WithCapacityManager(cm),
+			// make lease extensions more frequent
+			osqueue.WithCapacityLeaseExtendInterval(time.Second),
+			osqueue.WithLogger(l),
+			osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
+				return constraints
+			}),
+		)
+
+		qi, err := shard.EnqueueItem(ctx, item, start, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+
+		sp := osqueue.ItemShadowPartition(ctx, qi)
+		backlog := osqueue.ItemBacklog(ctx, qi)
+
+		opIdempotencyKey := "refill1"
+		res, err := shard.BacklogRefillConstraintCheck(ctx, &sp, &backlog, constraints, []*osqueue.QueueItem{&qi}, opIdempotencyKey, clock.Now())
+		require.NoError(t, err)
+
+		// No lease acquired
+		require.Nil(t, res.ItemCapacityLeases)
+		require.False(t, res.SkipConstraintChecks)
+
+		// Do not expect a ConstraintAPI call for missing identifiers
+		require.Equal(t, 0, len(cmLifecycles.AcquireCalls))
+		require.Equal(t, 0, len(cmLifecycles.ExtendCalls))
+		require.Equal(t, 0, len(cmLifecycles.ReleaseCalls))
+	})
+
+	t.Run("skip constraintapi but require checks without capacity manager", func(t *testing.T) {
+		reset()
+
+		_, shard := newQueue(
+			t, rc,
+			osqueue.WithClock(clock),
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+				return true
+			}),
+			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
+				return true, true
+			}),
+			// make lease extensions more frequent
+			osqueue.WithCapacityLeaseExtendInterval(time.Second),
+			osqueue.WithLogger(l),
+			osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
+				return constraints
+			}),
+		)
+
+		qi, err := shard.EnqueueItem(ctx, item, start, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+
+		sp := osqueue.ItemShadowPartition(ctx, qi)
+		backlog := osqueue.ItemBacklog(ctx, qi)
+
+		opIdempotencyKey := "refill1"
+		res, err := shard.BacklogRefillConstraintCheck(ctx, &sp, &backlog, constraints, []*osqueue.QueueItem{&qi}, opIdempotencyKey, clock.Now())
+		require.NoError(t, err)
+
+		// No lease acquired
+		require.Nil(t, res.ItemCapacityLeases)
+		require.False(t, res.SkipConstraintChecks)
+
+		// Do not expect a ConstraintAPI call for missing capacity manager
+		require.Equal(t, 0, len(cmLifecycles.AcquireCalls))
+		require.Equal(t, 0, len(cmLifecycles.ExtendCalls))
+		require.Equal(t, 0, len(cmLifecycles.ReleaseCalls))
+	})
+
+	t.Run("skip constraintapi but require checks with disabled feature flag", func(t *testing.T) {
+		reset()
+
+		_, shard := newQueue(
+			t, rc,
+			osqueue.WithClock(clock),
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+				return true
+			}),
+			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
+				return false, false
+			}),
+			osqueue.WithCapacityManager(cm),
+			// make lease extensions more frequent
+			osqueue.WithCapacityLeaseExtendInterval(time.Second),
+			osqueue.WithLogger(l),
+			osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
+				return constraints
+			}),
+		)
+
+		qi, err := shard.EnqueueItem(ctx, item, start, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+
+		sp := osqueue.ItemShadowPartition(ctx, qi)
+		backlog := osqueue.ItemBacklog(ctx, qi)
+
+		opIdempotencyKey := "refill1"
+		res, err := shard.BacklogRefillConstraintCheck(ctx, &sp, &backlog, constraints, []*osqueue.QueueItem{&qi}, opIdempotencyKey, clock.Now())
+		require.NoError(t, err)
+
+		// No lease acquired
+		require.Nil(t, res.ItemCapacityLeases)
+		require.False(t, res.SkipConstraintChecks)
+
+		// Do not expect a ConstraintAPI call for missing capacity manager
+		require.Equal(t, 0, len(cmLifecycles.AcquireCalls))
+		require.Equal(t, 0, len(cmLifecycles.ExtendCalls))
+		require.Equal(t, 0, len(cmLifecycles.ReleaseCalls))
+	})
+
+	t.Run("acquire leases from constraintapi", func(t *testing.T) {
+		reset()
+
+		_, shard := newQueue(
+			t, rc,
+			osqueue.WithClock(clock),
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+				return true
+			}),
+			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
+				return true, true
+			}),
+			osqueue.WithCapacityManager(cm),
+			// make lease extensions more frequent
+			osqueue.WithCapacityLeaseExtendInterval(time.Second),
+			osqueue.WithLogger(l),
+			osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
+				return constraints
+			}),
+		)
+
+		qi, err := shard.EnqueueItem(ctx, item, start, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+
+		sp := osqueue.ItemShadowPartition(ctx, qi)
+		backlog := osqueue.ItemBacklog(ctx, qi)
+
+		opIdempotencyKey := "refill1"
+		res, err := shard.BacklogRefillConstraintCheck(ctx, &sp, &backlog, constraints, []*osqueue.QueueItem{&qi}, opIdempotencyKey, clock.Now())
+		require.NoError(t, err)
+
+		// Acquired lease and request to skip checks
+		require.Len(t, res.ItemCapacityLeases, 1)
+		require.Len(t, res.ItemsToRefill, 1)
+		require.Equal(t, qi.ID, res.ItemsToRefill[0])
+		require.True(t, res.SkipConstraintChecks)
+
+		// Expect exactly one acquire request
+		require.Equal(t, 1, len(cmLifecycles.AcquireCalls))
+		require.Equal(t, 0, len(cmLifecycles.ExtendCalls))
+		require.Equal(t, 0, len(cmLifecycles.ReleaseCalls))
+	})
+
+	t.Run("lacking capacity returns 0 leases from constraintapi", func(t *testing.T) {
+		reset()
+
+		_, shard := newQueue(
+			t, rc,
+			osqueue.WithClock(clock),
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+				return true
+			}),
+			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
+				return true, true
+			}),
+			osqueue.WithCapacityManager(cm),
+			// make lease extensions more frequent
+			osqueue.WithCapacityLeaseExtendInterval(time.Second),
+			osqueue.WithLogger(l),
+			osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
+				return constraints
+			}),
+		)
+		kg := shard.Client().kg
+
+		for i := range 10 {
+			_, err := r.ZAdd(
+				kg.Concurrency("account", accountID.String()),
+				float64(clock.Now().Add(5*time.Second).UnixMilli()),
+				fmt.Sprintf("i%d", i),
+			)
+			require.NoError(t, err)
+		}
+
+		qi, err := shard.EnqueueItem(ctx, item, start, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+
+		sp := osqueue.ItemShadowPartition(ctx, qi)
+		backlog := osqueue.ItemBacklog(ctx, qi)
+
+		opIdempotencyKey := "refill1"
+		res, err := shard.BacklogRefillConstraintCheck(ctx, &sp, &backlog, constraints, []*osqueue.QueueItem{&qi}, opIdempotencyKey, clock.Now())
+		require.NoError(t, err)
+
+		// Acquired lease and request to skip checks
+		require.Len(t, res.ItemCapacityLeases, 0)
+		require.False(t, res.SkipConstraintChecks)
+		require.Equal(t, enums.QueueConstraintAccountConcurrency, res.LimitingConstraint)
+
+		// Expect exactly one acquire request
+		require.Equal(t, 1, len(cmLifecycles.AcquireCalls))
+		require.Equal(t, 0, len(cmLifecycles.ExtendCalls))
+		require.Equal(t, 0, len(cmLifecycles.ReleaseCalls))
+	})
+}
 
 func TestConstraintConfigFromConstraints(t *testing.T) {
 	tests := []struct {
 		name        string
-		constraints PartitionConstraintConfig
+		constraints osqueue.PartitionConstraintConfig
 		expected    constraintapi.ConstraintConfig
 	}{
 		{
 			name:        "empty constraints",
-			constraints: PartitionConstraintConfig{},
+			constraints: osqueue.PartitionConstraintConfig{},
 			expected: constraintapi.ConstraintConfig{
 				FunctionVersion: 0,
 				Concurrency: constraintapi.ConcurrencyConfig{
@@ -31,9 +781,9 @@ func TestConstraintConfigFromConstraints(t *testing.T) {
 		},
 		{
 			name: "basic concurrency limits",
-			constraints: PartitionConstraintConfig{
+			constraints: osqueue.PartitionConstraintConfig{
 				FunctionVersion: 1,
-				Concurrency: PartitionConcurrency{
+				Concurrency: osqueue.PartitionConcurrency{
 					AccountConcurrency:     100,
 					FunctionConcurrency:    10,
 					AccountRunConcurrency:  50,
@@ -52,12 +802,12 @@ func TestConstraintConfigFromConstraints(t *testing.T) {
 		},
 		{
 			name: "with custom concurrency keys",
-			constraints: PartitionConstraintConfig{
+			constraints: osqueue.PartitionConstraintConfig{
 				FunctionVersion: 2,
-				Concurrency: PartitionConcurrency{
+				Concurrency: osqueue.PartitionConcurrency{
 					AccountConcurrency:  100,
 					FunctionConcurrency: 10,
-					CustomConcurrencyKeys: []CustomConcurrencyLimit{
+					CustomConcurrencyKeys: []osqueue.CustomConcurrencyLimit{
 						{
 							Mode:                enums.ConcurrencyModeStep,
 							Scope:               enums.ConcurrencyScopeAccount,
@@ -97,9 +847,9 @@ func TestConstraintConfigFromConstraints(t *testing.T) {
 		},
 		{
 			name: "with throttle",
-			constraints: PartitionConstraintConfig{
+			constraints: osqueue.PartitionConstraintConfig{
 				FunctionVersion: 1,
-				Throttle: &PartitionThrottle{
+				Throttle: &osqueue.PartitionThrottle{
 					Limit:                     10,
 					Burst:                     5,
 					Period:                    60,
@@ -116,24 +866,24 @@ func TestConstraintConfigFromConstraints(t *testing.T) {
 				},
 				Throttle: []constraintapi.ThrottleConfig{
 					{
-						Limit:                     10,
-						Burst:                     5,
-						Period:                    60,
-						ThrottleKeyExpressionHash: "throttle-hash",
+						Limit:             10,
+						Burst:             5,
+						Period:            60,
+						KeyExpressionHash: "throttle-hash",
 					},
 				},
 			},
 		},
 		{
 			name: "complete configuration",
-			constraints: PartitionConstraintConfig{
+			constraints: osqueue.PartitionConstraintConfig{
 				FunctionVersion: 3,
-				Concurrency: PartitionConcurrency{
+				Concurrency: osqueue.PartitionConcurrency{
 					AccountConcurrency:     200,
 					FunctionConcurrency:    20,
 					AccountRunConcurrency:  100,
 					FunctionRunConcurrency: 10,
-					CustomConcurrencyKeys: []CustomConcurrencyLimit{
+					CustomConcurrencyKeys: []osqueue.CustomConcurrencyLimit{
 						{
 							Mode:                enums.ConcurrencyModeStep,
 							Scope:               enums.ConcurrencyScopeAccount,
@@ -142,7 +892,7 @@ func TestConstraintConfigFromConstraints(t *testing.T) {
 						},
 					},
 				},
-				Throttle: &PartitionThrottle{
+				Throttle: &osqueue.PartitionThrottle{
 					Limit:                     20,
 					Burst:                     10,
 					Period:                    30,
@@ -167,10 +917,10 @@ func TestConstraintConfigFromConstraints(t *testing.T) {
 				},
 				Throttle: []constraintapi.ThrottleConfig{
 					{
-						Limit:                     20,
-						Burst:                     10,
-						Period:                    30,
-						ThrottleKeyExpressionHash: "complete-throttle-hash",
+						Limit:             20,
+						Burst:             10,
+						Period:            30,
+						KeyExpressionHash: "complete-throttle-hash",
 					},
 				},
 			},
@@ -179,7 +929,7 @@ func TestConstraintConfigFromConstraints(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := constraintConfigFromConstraints(tt.constraints)
+			result := osqueue.ConstraintConfigFromConstraints(tt.constraints)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -189,16 +939,16 @@ func TestConstraintItemsFromBacklog(t *testing.T) {
 	accountID, fnID := uuid.New(), uuid.New()
 	tests := []struct {
 		name     string
-		backlog  *QueueBacklog
-		sp       *QueueShadowPartition
+		backlog  *osqueue.QueueBacklog
+		sp       *osqueue.QueueShadowPartition
 		expected []constraintapi.ConstraintItem
 	}{
 		{
 			name: "minimal backlog",
-			backlog: &QueueBacklog{
+			backlog: &osqueue.QueueBacklog{
 				ShadowPartitionID: fnID.String(),
 			},
-			sp: &QueueShadowPartition{
+			sp: &osqueue.QueueShadowPartition{
 				PartitionID: fnID.String(),
 				AccountID:   &accountID,
 				FunctionID:  &fnID,
@@ -224,13 +974,13 @@ func TestConstraintItemsFromBacklog(t *testing.T) {
 		},
 		{
 			name: "with throttle",
-			backlog: &QueueBacklog{
-				Throttle: &BacklogThrottle{
+			backlog: &osqueue.QueueBacklog{
+				Throttle: &osqueue.BacklogThrottle{
 					ThrottleKeyExpressionHash: "throttle-expr-hash",
 					ThrottleKey:               "throttle-key-value",
 				},
 			},
-			sp: &QueueShadowPartition{
+			sp: &osqueue.QueueShadowPartition{
 				PartitionID: fnID.String(),
 				AccountID:   &accountID,
 				FunctionID:  &fnID,
@@ -263,8 +1013,8 @@ func TestConstraintItemsFromBacklog(t *testing.T) {
 		},
 		{
 			name: "with custom concurrency keys",
-			backlog: &QueueBacklog{
-				ConcurrencyKeys: []BacklogConcurrencyKey{
+			backlog: &osqueue.QueueBacklog{
+				ConcurrencyKeys: []osqueue.BacklogConcurrencyKey{
 					{
 						CanonicalKeyID:      fmt.Sprintf("a:%s:%s", accountID, "custom-key-1-value"),
 						ConcurrencyMode:     enums.ConcurrencyModeStep,
@@ -283,7 +1033,7 @@ func TestConstraintItemsFromBacklog(t *testing.T) {
 					},
 				},
 			},
-			sp: &QueueShadowPartition{
+			sp: &osqueue.QueueShadowPartition{
 				PartitionID: fnID.String(),
 				AccountID:   &accountID,
 				FunctionID:  &fnID,
@@ -329,12 +1079,12 @@ func TestConstraintItemsFromBacklog(t *testing.T) {
 		},
 		{
 			name: "complete backlog with throttle and concurrency keys",
-			backlog: &QueueBacklog{
-				Throttle: &BacklogThrottle{
+			backlog: &osqueue.QueueBacklog{
+				Throttle: &osqueue.BacklogThrottle{
 					ThrottleKeyExpressionHash: "complete-throttle-hash",
 					ThrottleKey:               "complete-throttle-value",
 				},
-				ConcurrencyKeys: []BacklogConcurrencyKey{
+				ConcurrencyKeys: []osqueue.BacklogConcurrencyKey{
 					{
 						CanonicalKeyID:      fmt.Sprintf("e:%s:%s", fnID, "complete-key-value"),
 						ConcurrencyMode:     enums.ConcurrencyModeStep,
@@ -345,7 +1095,7 @@ func TestConstraintItemsFromBacklog(t *testing.T) {
 					},
 				},
 			},
-			sp: &QueueShadowPartition{
+			sp: &osqueue.QueueShadowPartition{
 				PartitionID: fnID.String(),
 				AccountID:   &accountID,
 				FunctionID:  &fnID,
@@ -399,19 +1149,19 @@ func TestConstraintItemsFromBacklog(t *testing.T) {
 func TestConvertLimitingConstraint(t *testing.T) {
 	tests := []struct {
 		name                string
-		constraints         PartitionConstraintConfig
+		constraints         osqueue.PartitionConstraintConfig
 		limitingConstraints []constraintapi.ConstraintItem
 		expected            enums.QueueConstraint
 	}{
 		{
 			name:                "no limiting constraints",
-			constraints:         PartitionConstraintConfig{},
+			constraints:         osqueue.PartitionConstraintConfig{},
 			limitingConstraints: []constraintapi.ConstraintItem{},
 			expected:            enums.QueueConstraintNotLimited,
 		},
 		{
 			name:        "account concurrency constraint",
-			constraints: PartitionConstraintConfig{},
+			constraints: osqueue.PartitionConstraintConfig{},
 			limitingConstraints: []constraintapi.ConstraintItem{
 				{
 					Kind: constraintapi.ConstraintKindConcurrency,
@@ -425,7 +1175,7 @@ func TestConvertLimitingConstraint(t *testing.T) {
 		},
 		{
 			name:        "function concurrency constraint",
-			constraints: PartitionConstraintConfig{},
+			constraints: osqueue.PartitionConstraintConfig{},
 			limitingConstraints: []constraintapi.ConstraintItem{
 				{
 					Kind: constraintapi.ConstraintKindConcurrency,
@@ -439,9 +1189,9 @@ func TestConvertLimitingConstraint(t *testing.T) {
 		},
 		{
 			name: "custom concurrency key 1",
-			constraints: PartitionConstraintConfig{
-				Concurrency: PartitionConcurrency{
-					CustomConcurrencyKeys: []CustomConcurrencyLimit{
+			constraints: osqueue.PartitionConstraintConfig{
+				Concurrency: osqueue.PartitionConcurrency{
+					CustomConcurrencyKeys: []osqueue.CustomConcurrencyLimit{
 						{
 							Mode:                enums.ConcurrencyModeStep,
 							Scope:               enums.ConcurrencyScopeAccount,
@@ -464,9 +1214,9 @@ func TestConvertLimitingConstraint(t *testing.T) {
 		},
 		{
 			name: "custom concurrency key 2",
-			constraints: PartitionConstraintConfig{
-				Concurrency: PartitionConcurrency{
-					CustomConcurrencyKeys: []CustomConcurrencyLimit{
+			constraints: osqueue.PartitionConstraintConfig{
+				Concurrency: osqueue.PartitionConcurrency{
+					CustomConcurrencyKeys: []osqueue.CustomConcurrencyLimit{
 						{
 							Mode:                enums.ConcurrencyModeStep,
 							Scope:               enums.ConcurrencyScopeAccount,
@@ -494,7 +1244,7 @@ func TestConvertLimitingConstraint(t *testing.T) {
 		},
 		{
 			name:        "throttle constraint",
-			constraints: PartitionConstraintConfig{},
+			constraints: osqueue.PartitionConstraintConfig{},
 			limitingConstraints: []constraintapi.ConstraintItem{
 				{
 					Kind: constraintapi.ConstraintKindThrottle,
@@ -504,7 +1254,7 @@ func TestConvertLimitingConstraint(t *testing.T) {
 		},
 		{
 			name:        "multiple constraints - last one wins",
-			constraints: PartitionConstraintConfig{},
+			constraints: osqueue.PartitionConstraintConfig{},
 			limitingConstraints: []constraintapi.ConstraintItem{
 				{
 					Kind: constraintapi.ConstraintKindConcurrency,
@@ -521,7 +1271,7 @@ func TestConvertLimitingConstraint(t *testing.T) {
 		},
 		{
 			name:        "unknown constraint kind",
-			constraints: PartitionConstraintConfig{},
+			constraints: osqueue.PartitionConstraintConfig{},
 			limitingConstraints: []constraintapi.ConstraintItem{
 				{
 					Kind: "unknown-kind",
@@ -531,9 +1281,9 @@ func TestConvertLimitingConstraint(t *testing.T) {
 		},
 		{
 			name: "custom concurrency key without matching configuration",
-			constraints: PartitionConstraintConfig{
-				Concurrency: PartitionConcurrency{
-					CustomConcurrencyKeys: []CustomConcurrencyLimit{
+			constraints: osqueue.PartitionConstraintConfig{
+				Concurrency: osqueue.PartitionConcurrency{
+					CustomConcurrencyKeys: []osqueue.CustomConcurrencyLimit{
 						{
 							Mode:                enums.ConcurrencyModeStep,
 							Scope:               enums.ConcurrencyScopeAccount,
@@ -558,7 +1308,7 @@ func TestConvertLimitingConstraint(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := convertLimitingConstraint(tt.constraints, tt.limitingConstraints)
+			result := osqueue.ConvertLimitingConstraint(tt.constraints, tt.limitingConstraints)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -568,22 +1318,22 @@ func TestConstraintItemsBacklogToLimitingConstraintRoundTrip(t *testing.T) {
 	accountID, fnID := uuid.New(), uuid.New()
 	tests := []struct {
 		name                    string
-		backlog                 *QueueBacklog
-		sp                      *QueueShadowPartition
-		constraints             PartitionConstraintConfig
+		backlog                 *osqueue.QueueBacklog
+		sp                      *osqueue.QueueShadowPartition
+		constraints             osqueue.PartitionConstraintConfig
 		expectedQueueConstraint enums.QueueConstraint
 		description             string
 	}{
 		{
 			name:    "account concurrency constraint round trip",
-			backlog: &QueueBacklog{},
-			sp: &QueueShadowPartition{
+			backlog: &osqueue.QueueBacklog{},
+			sp: &osqueue.QueueShadowPartition{
 				PartitionID: fnID.String(),
 				AccountID:   &accountID,
 				FunctionID:  &fnID,
 			},
-			constraints: PartitionConstraintConfig{
-				Concurrency: PartitionConcurrency{
+			constraints: osqueue.PartitionConstraintConfig{
+				Concurrency: osqueue.PartitionConcurrency{
 					AccountConcurrency: 10,
 				},
 			},
@@ -592,14 +1342,14 @@ func TestConstraintItemsBacklogToLimitingConstraintRoundTrip(t *testing.T) {
 		},
 		{
 			name:    "function concurrency constraint round trip",
-			backlog: &QueueBacklog{},
-			sp: &QueueShadowPartition{
+			backlog: &osqueue.QueueBacklog{},
+			sp: &osqueue.QueueShadowPartition{
 				PartitionID: fnID.String(),
 				AccountID:   &accountID,
 				FunctionID:  &fnID,
 			},
-			constraints: PartitionConstraintConfig{
-				Concurrency: PartitionConcurrency{
+			constraints: osqueue.PartitionConstraintConfig{
+				Concurrency: osqueue.PartitionConcurrency{
 					FunctionConcurrency: 5,
 				},
 			},
@@ -608,19 +1358,19 @@ func TestConstraintItemsBacklogToLimitingConstraintRoundTrip(t *testing.T) {
 		},
 		{
 			name: "throttle constraint round trip",
-			backlog: &QueueBacklog{
-				Throttle: &BacklogThrottle{
+			backlog: &osqueue.QueueBacklog{
+				Throttle: &osqueue.BacklogThrottle{
 					ThrottleKeyExpressionHash: "throttle-hash",
 					ThrottleKey:               "throttle-value",
 				},
 			},
-			sp: &QueueShadowPartition{
+			sp: &osqueue.QueueShadowPartition{
 				PartitionID: fnID.String(),
 				AccountID:   &accountID,
 				FunctionID:  &fnID,
 			},
-			constraints: PartitionConstraintConfig{
-				Throttle: &PartitionThrottle{
+			constraints: osqueue.PartitionConstraintConfig{
+				Throttle: &osqueue.PartitionThrottle{
 					Limit:                     10,
 					Burst:                     5,
 					Period:                    60,
@@ -632,8 +1382,8 @@ func TestConstraintItemsBacklogToLimitingConstraintRoundTrip(t *testing.T) {
 		},
 		{
 			name: "custom concurrency key 1 round trip",
-			backlog: &QueueBacklog{
-				ConcurrencyKeys: []BacklogConcurrencyKey{
+			backlog: &osqueue.QueueBacklog{
+				ConcurrencyKeys: []osqueue.BacklogConcurrencyKey{
 					{
 						CanonicalKeyID:      fmt.Sprintf("a:%s:%s", accountID, "custom-key-1-value"),
 						ConcurrencyMode:     enums.ConcurrencyModeStep,
@@ -644,14 +1394,14 @@ func TestConstraintItemsBacklogToLimitingConstraintRoundTrip(t *testing.T) {
 					},
 				},
 			},
-			sp: &QueueShadowPartition{
+			sp: &osqueue.QueueShadowPartition{
 				PartitionID: fnID.String(),
 				AccountID:   &accountID,
 				FunctionID:  &fnID,
 			},
-			constraints: PartitionConstraintConfig{
-				Concurrency: PartitionConcurrency{
-					CustomConcurrencyKeys: []CustomConcurrencyLimit{
+			constraints: osqueue.PartitionConstraintConfig{
+				Concurrency: osqueue.PartitionConcurrency{
+					CustomConcurrencyKeys: []osqueue.CustomConcurrencyLimit{
 						{
 							Mode:                enums.ConcurrencyModeStep,
 							Scope:               enums.ConcurrencyScopeAccount,
@@ -666,8 +1416,8 @@ func TestConstraintItemsBacklogToLimitingConstraintRoundTrip(t *testing.T) {
 		},
 		{
 			name: "custom concurrency key 2 round trip",
-			backlog: &QueueBacklog{
-				ConcurrencyKeys: []BacklogConcurrencyKey{
+			backlog: &osqueue.QueueBacklog{
+				ConcurrencyKeys: []osqueue.BacklogConcurrencyKey{
 					{
 						CanonicalKeyID:      fmt.Sprintf("a:%s:%s", accountID, "key-1-value"),
 						ConcurrencyMode:     enums.ConcurrencyModeStep,
@@ -686,14 +1436,14 @@ func TestConstraintItemsBacklogToLimitingConstraintRoundTrip(t *testing.T) {
 					},
 				},
 			},
-			sp: &QueueShadowPartition{
+			sp: &osqueue.QueueShadowPartition{
 				PartitionID: fnID.String(),
 				AccountID:   &accountID,
 				FunctionID:  &fnID,
 			},
-			constraints: PartitionConstraintConfig{
-				Concurrency: PartitionConcurrency{
-					CustomConcurrencyKeys: []CustomConcurrencyLimit{
+			constraints: osqueue.PartitionConstraintConfig{
+				Concurrency: osqueue.PartitionConcurrency{
+					CustomConcurrencyKeys: []osqueue.CustomConcurrencyLimit{
 						{
 							Mode:                enums.ConcurrencyModeStep,
 							Scope:               enums.ConcurrencyScopeAccount,
@@ -714,12 +1464,12 @@ func TestConstraintItemsBacklogToLimitingConstraintRoundTrip(t *testing.T) {
 		},
 		{
 			name: "multiple constraints with throttle taking precedence",
-			backlog: &QueueBacklog{
-				Throttle: &BacklogThrottle{
+			backlog: &osqueue.QueueBacklog{
+				Throttle: &osqueue.BacklogThrottle{
 					ThrottleKeyExpressionHash: "throttle-hash",
 					ThrottleKey:               "throttle-value",
 				},
-				ConcurrencyKeys: []BacklogConcurrencyKey{
+				ConcurrencyKeys: []osqueue.BacklogConcurrencyKey{
 					{
 						CanonicalKeyID:      fmt.Sprintf("a:%s:%s", accountID, "custom-key-value"),
 						ConcurrencyMode:     enums.ConcurrencyModeStep,
@@ -730,15 +1480,15 @@ func TestConstraintItemsBacklogToLimitingConstraintRoundTrip(t *testing.T) {
 					},
 				},
 			},
-			sp: &QueueShadowPartition{
+			sp: &osqueue.QueueShadowPartition{
 				PartitionID: fnID.String(),
 				AccountID:   &accountID,
 				FunctionID:  &fnID,
 			},
-			constraints: PartitionConstraintConfig{
-				Concurrency: PartitionConcurrency{
+			constraints: osqueue.PartitionConstraintConfig{
+				Concurrency: osqueue.PartitionConcurrency{
 					AccountConcurrency: 100,
-					CustomConcurrencyKeys: []CustomConcurrencyLimit{
+					CustomConcurrencyKeys: []osqueue.CustomConcurrencyLimit{
 						{
 							Mode:                enums.ConcurrencyModeStep,
 							Scope:               enums.ConcurrencyScopeAccount,
@@ -747,7 +1497,7 @@ func TestConstraintItemsBacklogToLimitingConstraintRoundTrip(t *testing.T) {
 						},
 					},
 				},
-				Throttle: &PartitionThrottle{
+				Throttle: &osqueue.PartitionThrottle{
 					Limit:                     15,
 					Burst:                     3,
 					Period:                    30,
@@ -759,8 +1509,8 @@ func TestConstraintItemsBacklogToLimitingConstraintRoundTrip(t *testing.T) {
 		},
 		{
 			name: "non-matching custom concurrency key should not limit",
-			backlog: &QueueBacklog{
-				ConcurrencyKeys: []BacklogConcurrencyKey{
+			backlog: &osqueue.QueueBacklog{
+				ConcurrencyKeys: []osqueue.BacklogConcurrencyKey{
 					{
 						CanonicalKeyID:      fmt.Sprintf("a:%s:%s", accountID, "different-value"),
 						ConcurrencyMode:     enums.ConcurrencyModeStep,
@@ -771,14 +1521,14 @@ func TestConstraintItemsBacklogToLimitingConstraintRoundTrip(t *testing.T) {
 					},
 				},
 			},
-			sp: &QueueShadowPartition{
+			sp: &osqueue.QueueShadowPartition{
 				PartitionID: fnID.String(),
 				AccountID:   &accountID,
 				FunctionID:  &fnID,
 			},
-			constraints: PartitionConstraintConfig{
-				Concurrency: PartitionConcurrency{
-					CustomConcurrencyKeys: []CustomConcurrencyLimit{
+			constraints: osqueue.PartitionConstraintConfig{
+				Concurrency: osqueue.PartitionConcurrency{
+					CustomConcurrencyKeys: []osqueue.CustomConcurrencyLimit{
 						{
 							Mode:                enums.ConcurrencyModeStep,
 							Scope:               enums.ConcurrencyScopeAccount,
@@ -869,7 +1619,7 @@ func TestConstraintItemsBacklogToLimitingConstraintRoundTrip(t *testing.T) {
 			}
 
 			// Step 3: Convert the limiting constraints back to a queue constraint
-			queueConstraint := convertLimitingConstraint(tt.constraints, simulatedLimitingConstraints)
+			queueConstraint := osqueue.ConvertLimitingConstraint(tt.constraints, simulatedLimitingConstraints)
 
 			// Step 4: Verify the round trip matches expectations
 			assert.Equal(t, tt.expectedQueueConstraint, queueConstraint, tt.description)

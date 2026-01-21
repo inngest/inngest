@@ -1,5 +1,3 @@
-'use client';
-
 import { useCallback, useMemo } from 'react';
 import { useQuery, type CombinedError } from 'urql';
 
@@ -37,20 +35,36 @@ export interface UseInsightsSavedQueriesReturn {
   refetchSavedQueries: () => void;
   savedQueries: undefined | InsightsQueryStatement[];
   savedQueriesError: undefined | CombinedError;
-  saveQuery: (args: SaveQueryArgs) => Promise<MutationResult<InsightsQueryStatement>>;
-  shareQuery: (args: ShareQueryArgs) => Promise<MutationResult<InsightsQueryStatement>>;
-  updateQuery: (args: UpdateQueryArgs) => Promise<MutationResult<InsightsQueryStatement>>;
+  saveQuery: (
+    args: SaveQueryArgs,
+  ) => Promise<MutationResult<InsightsQueryStatement>>;
+  shareQuery: (
+    args: ShareQueryArgs,
+  ) => Promise<MutationResult<InsightsQueryStatement>>;
+  updateQuery: (
+    args: UpdateQueryArgs,
+  ) => Promise<MutationResult<InsightsQueryStatement>>;
 }
 
 export function useInsightsSavedQueries(): UseInsightsSavedQueriesReturn {
-  const [result, reexecute] = useQuery({ query: insightsSavedQueriesQuery });
-  const { deleteQuery, saveQuery, shareQuery, updateQuery } = useModifySavedQueries();
+  // Pause during SSR to avoid executing authenticated queries before client hydration
+  // This ensures the query only runs after authentication is available in the browser
+  const [result, reexecute] = useQuery({
+    query: insightsSavedQueriesQuery,
+    pause: typeof window === 'undefined',
+  });
+
+  const { deleteQuery, saveQuery, shareQuery, updateQuery } =
+    useModifySavedQueries();
 
   const refetchSavedQueries = useCallback(() => {
     reexecute({ requestPolicy: 'network-only' });
   }, [reexecute]);
 
-  const savedQueries = useMemo(() => result.data?.account.insightsQueries, [result.data]);
+  const savedQueries = useMemo(
+    () => result.data?.account.insightsQueries,
+    [result.data],
+  );
 
   return {
     deleteQuery,

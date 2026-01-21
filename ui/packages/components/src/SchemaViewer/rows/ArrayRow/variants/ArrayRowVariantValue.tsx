@@ -1,5 +1,3 @@
-'use client';
-
 import { makeValueTypeLabel } from '../../../typeUtil';
 import type { ArrayNode, ValueNode } from '../../../types';
 import { ValueRow } from '../../ValueRow';

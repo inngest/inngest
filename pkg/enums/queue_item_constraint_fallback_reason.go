@@ -1,0 +1,12 @@
+//go:generate go run github.com/dmarkham/enumer -trimprefix=QueueItemConstraintFallbackReason -type=QueueItemConstraintFallbackReason -transform=snake -json -text
+
+package enums
+
+type QueueItemConstraintFallbackReason int
+
+const (
+	QueueItemConstraintFallbackReasonConstraintAPIUninitialized QueueItemConstraintFallbackReason = iota
+	QueueItemConstraintFallbackReasonIdNil
+	QueueItemConstraintFallbackReasonFeatureFlagDisabled
+	QueueItemConstraintFallbackReasonConstraintAPIError
+)

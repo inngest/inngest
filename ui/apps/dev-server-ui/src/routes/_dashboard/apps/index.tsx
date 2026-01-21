@@ -1,12 +1,12 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { useMemo } from 'react';
 import { AppCard } from '@inngest/components/Apps/AppCard';
-import { Button } from '@inngest/components/Button/NewButton';
+import { Button } from '@inngest/components/Button';
 import { InlineCode } from '@inngest/components/Code';
-import { Header } from '@inngest/components/Header/NewHeader';
+import { Header } from '@inngest/components/Header/Header';
 import { Info } from '@inngest/components/Info/Info';
-import { Link } from '@inngest/components/Link/NewLink';
-import { Pill } from '@inngest/components/Pill/NewPill';
+import { Link } from '@inngest/components/Link';
+import { Pill } from '@inngest/components/Pill';
 import { useBooleanFlag } from '@inngest/components/SharedContext/useBooleanFlag';
 import WorkerCounter from '@inngest/components/Workers/ConnectedWorkersDescription';
 import { IconSpinner } from '@inngest/components/icons/Spinner';

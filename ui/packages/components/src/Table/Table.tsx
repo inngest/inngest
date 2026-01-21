@@ -208,22 +208,14 @@ export function Table<T>({
                   expandedIDs.includes(row.original.id) &&
                   renderSubComponent &&
                   !isLoading && (
-                    <>
-                      <tr>
-                        <td
-                          colSpan={row.getVisibleCells().length}
-                          className={expandedRowSideBorder}
-                        >
-                          {renderSubComponent({ row })}
-                        </td>
-                      </tr>
-                      <tr>
-                        <td
-                          colSpan={row.getVisibleCells().length}
-                          className="border-light border-b pb-6"
-                        ></td>
-                      </tr>
-                    </>
+                    <tr>
+                      <td
+                        colSpan={row.getVisibleCells().length}
+                        className={cn(expandedRowSideBorder, 'border-light border-b')}
+                      >
+                        {renderSubComponent({ row })}
+                      </td>
+                    </tr>
                   )}
               </Fragment>
             ))}

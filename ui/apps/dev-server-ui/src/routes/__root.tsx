@@ -2,6 +2,7 @@
 import * as React from 'react';
 import { TanStackRouterDevtools } from '@tanstack/react-router-devtools';
 import { ThemeProvider } from 'next-themes';
+import { Toaster } from 'sonner';
 
 import {
   HeadContent,
@@ -28,18 +29,6 @@ export const Route = createRootRoute({
         title: 'Inngest Server',
       },
     ],
-    icons: {
-      icon: [
-        {
-          url: '/favicon-june-2025.svg',
-          media: '(prefers-color-scheme: light)',
-        },
-        {
-          url: '/favicon-june-2025.svg',
-          media: '(prefers-color-scheme: dark)',
-        },
-      ],
-    },
     links: [
       {
         rel: 'stylesheet',
@@ -48,6 +37,16 @@ export const Route = createRootRoute({
       {
         rel: 'stylesheet',
         href: fontsCss,
+      },
+      {
+        rel: 'icon',
+        href: '/favicon-june-2025.svg',
+        media: '(prefers-color-scheme: light)',
+      },
+      {
+        rel: 'icon',
+        href: '/favicon-june-2025.svg',
+        media: '(prefers-color-scheme: dark)',
       },
     ],
   }),
@@ -60,6 +59,17 @@ function RootComponent() {
       <StoreProvider>
         <ThemeProvider attribute="class" defaultTheme="system">
           <Outlet />
+          <Toaster
+            toastOptions={{
+              className: 'drop-shadow-lg',
+              style: {
+                background: `rgb(var(--color-background-canvas-base))`,
+                borderRadius: 0,
+                borderWidth: '0px 0px 2px',
+                color: `rgb(var(--color-foreground-base))`,
+              },
+            }}
+          />
         </ThemeProvider>
       </StoreProvider>
     </RootDocument>

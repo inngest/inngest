@@ -1,5 +1,3 @@
-'use client';
-
 import { useEffect, useRef, useState } from 'react';
 import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
@@ -19,8 +17,8 @@ import {
   RiEdit2Line,
   RiExpandDiagonalLine,
 } from '@remixicon/react';
-import { type editor } from 'monaco-editor';
-import { useLocalStorage } from 'react-use';
+import type { editor } from 'monaco-editor';
+import useLocalStorage from 'react-use/esm/useLocalStorage';
 
 import { Fullscreen } from '../Fullscreen/Fullscreen';
 import { isDark } from '../utils/theme';

@@ -57,6 +57,7 @@ func Command() *cli.Command {
 		Commands: []*cli.Command{
 			queueCommand(),
 			pauseCommand(),
+			constraintCommand(),
 		},
 	}
 }

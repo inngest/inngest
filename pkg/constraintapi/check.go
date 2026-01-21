@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/util/errs"
+	"github.com/redis/rueidis"
 )
 
 type checkRequestData struct {
@@ -27,7 +28,7 @@ type checkRequestData struct {
 }
 
 func buildCheckRequestData(req *CapacityCheckRequest, keyPrefix string) (
-	*checkRequestData,
+	[]byte,
 	[]ConstraintItem,
 	string,
 	error,
@@ -55,16 +56,16 @@ func buildCheckRequestData(req *CapacityCheckRequest, keyPrefix string) (
 
 	state.SortedConstraints = serialized
 
+	dataBytes, err := json.Marshal(state)
+	if err != nil {
+		return nil, nil, "", fmt.Errorf("could not marshal request: %w", err)
+	}
+
 	// NOTE: We fingerprint the query to apply basic response caching.
 	// As Check can be expensive, we don't want to run unnecessary queries
 	// that may impact lease and constraint enforcement operations.
 	var hash string
 	{
-		dataBytes, err := json.Marshal(state)
-		if err != nil {
-			return nil, nil, "", fmt.Errorf("could not marshal request: %w", err)
-		}
-
 		fingerprint := sha256.New()
 		_, err = fingerprint.Write(dataBytes)
 		if err != nil {
@@ -73,20 +74,20 @@ func buildCheckRequestData(req *CapacityCheckRequest, keyPrefix string) (
 		hash = hex.EncodeToString(fingerprint.Sum(nil))
 	}
 
-	return state, constraints, hash, nil
+	return dataBytes, constraints, hash, nil
 }
 
 type checkScriptResponse struct {
-	Status              int   `json:"s"`
-	AvailableCapacity   int   `json:"a"`
-	LimitingConstraints []int `json:"lc"`
+	Status              int              `json:"s"`
+	AvailableCapacity   int              `json:"a"`
+	LimitingConstraints flexibleIntArray `json:"lc"`
 	ConstraintUsage     []struct {
 		Usage int `json:"u"`
 		Limit int `json:"l"`
 	} `json:"cu"`
-	FairnessReduction int      `json:"fr"`
-	RetryAt           int      `json:"ra"`
-	Debug             []string `json:"d"`
+	FairnessReduction int                 `json:"fr"`
+	RetryAt           int                 `json:"ra"`
+	Debug             flexibleStringArray `json:"d"`
 }
 
 // Check implements CapacityManager.
@@ -101,7 +102,7 @@ func (r *redisCapacityManager) Check(ctx context.Context, req *CapacityCheckRequ
 	l = l.With(
 		"account_id", req.AccountID,
 		"env_id", req.EnvID,
-		"fn_id", req.FunctionID,
+		"fn_id", req.FunctionID, // May be empty
 	)
 
 	// Retrieve client and key prefix for current constraints
@@ -126,24 +127,33 @@ func (r *redisCapacityManager) Check(ctx context.Context, req *CapacityCheckRequ
 		enableDebugLogsVal = "1"
 	}
 
+	scopedKeyPrefix := fmt.Sprintf("{%s}:%s", keyPrefix, accountScope(req.AccountID))
+
 	now := r.clock.Now()
 
 	args, err := strSlice([]any{
-		data,
-		keyPrefix,
+		rueidis.BinaryString(data),
+		scopedKeyPrefix,
 		req.AccountID,
 		now.UnixMilli(),
 		now.UnixNano(),
-		CheckIdempotencyTTL.Seconds(),
+		r.checkIdempotencyTTL.Seconds(),
 		enableDebugLogsVal,
 	})
 	if err != nil {
 		return nil, nil, errs.Wrap(0, false, "invalid args: %w", err)
 	}
 
-	rawRes, err := scripts["check"].Exec(ctx, client, keys, args).AsBytes()
-	if err != nil {
-		return nil, nil, errs.Wrap(0, false, "check script failed: %w", err)
+	l.Trace(
+		"prepared check call",
+		"req", req,
+		"keys", keys,
+		"args", args,
+	)
+
+	rawRes, internalErr := executeLuaScript(ctx, "check", req.Migration, client, r.clock, keys, args)
+	if internalErr != nil {
+		return nil, nil, internalErr
 	}
 
 	parsedResponse := checkScriptResponse{}
@@ -155,7 +165,7 @@ func (r *redisCapacityManager) Check(ctx context.Context, req *CapacityCheckRequ
 	var limitingConstraints []ConstraintItem
 	if len(parsedResponse.LimitingConstraints) > 0 {
 		limitingConstraints = make([]ConstraintItem, len(parsedResponse.LimitingConstraints))
-		for i, limitingConstraintIndex := range parsedResponse.LimitingConstraints {
+		for i, limitingConstraintIndex := range []int(parsedResponse.LimitingConstraints) {
 			limitingConstraints[i] = req.Constraints[limitingConstraintIndex-1]
 		}
 	}
@@ -175,10 +185,15 @@ func (r *redisCapacityManager) Check(ctx context.Context, req *CapacityCheckRequ
 	case 1:
 		l.Trace("successful check request")
 
+		retryAfter := time.UnixMilli(int64(parsedResponse.RetryAt))
+		if retryAfter.Before(now) {
+			retryAfter = time.Time{}
+		}
+
 		return &CapacityCheckResponse{
 			LimitingConstraints: limitingConstraints,
 			FairnessReduction:   parsedResponse.FairnessReduction,
-			RetryAfter:          time.UnixMilli(int64(parsedResponse.RetryAt)),
+			RetryAfter:          retryAfter,
 			AvailableCapacity:   parsedResponse.AvailableCapacity,
 			Usage:               constraintUsage,
 			internalDebugState:  parsedResponse,

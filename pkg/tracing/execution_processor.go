@@ -123,7 +123,7 @@ func (p *executionProcessor) OnStart(parent context.Context, s sdktrace.ReadWrit
 
 	case meta.SpanNameStepDiscovery:
 		{
-			meta.AddAttr(rawAttrs, meta.Attrs.QueuedAt, &now)
+			meta.AddAttrIfUnset(rawAttrs, meta.Attrs.QueuedAt, &now)
 
 			break
 		}

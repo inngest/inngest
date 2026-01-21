@@ -4,23 +4,20 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/batch"
 	"github.com/inngest/inngest/pkg/execution/debounce"
 	"github.com/inngest/inngest/pkg/execution/pauses"
 	"github.com/inngest/inngest/pkg/execution/queue"
-	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 )
 
-type ItemHandler func(ctx context.Context, shard redis_state.QueueShard, qi *queue.QueueItem) error
+type ItemHandler func(ctx context.Context, shard queue.QueueShard, qi *queue.QueueItem) error
 
 type DeleteManager interface {
-	DeleteQueueItem(ctx context.Context, shard redis_state.QueueShard, qi *queue.QueueItem) error
+	DeleteQueueItem(ctx context.Context, shard queue.QueueShard, qi *queue.QueueItem) error
 }
 
 type deleteManager struct {
 	pm    pauses.Manager
-	qm    redis_state.QueueManager
 	deb   debounce.Debouncer
 	batch batch.BatchManager
 
@@ -28,7 +25,7 @@ type deleteManager struct {
 }
 
 // DeleteQueueItem implements DeleteManager.
-func (d *deleteManager) DeleteQueueItem(ctx context.Context, shard redis_state.QueueShard, item *queue.QueueItem) error {
+func (d *deleteManager) DeleteQueueItem(ctx context.Context, shard queue.QueueShard, item *queue.QueueItem) error {
 	switch item.Data.Kind {
 	// For pause timeouts, delete the associated pause. The pause might otherwise sit in the system for up to a year.
 	case queue.KindPause:
@@ -115,9 +112,7 @@ func (d *deleteManager) DeleteQueueItem(ctx context.Context, shard redis_state.Q
 		partition = *item.QueueName
 	}
 
-	partitionKey := shard.RedisClient.KeyGenerator().PartitionQueueSet(enums.PartitionTypeDefault, partition, "")
-
-	err := d.qm.RemoveQueueItem(ctx, shard.Name, partitionKey, item.ID)
+	err := shard.RemoveQueueItem(ctx, partition, item.ID)
 	if err != nil {
 		return fmt.Errorf("could not remove queue item: %w", err)
 	}
@@ -129,12 +124,6 @@ type deleteManagerOpt func(o *deleteManager)
 func WithPauseManager(pm pauses.Manager) deleteManagerOpt {
 	return func(o *deleteManager) {
 		o.pm = pm
-	}
-}
-
-func WithQueueManager(qm redis_state.QueueManager) deleteManagerOpt {
-	return func(o *deleteManager) {
-		o.qm = qm
 	}
 }
 
@@ -160,10 +149,6 @@ func NewDeleteManager(options ...deleteManagerOpt) (DeleteManager, error) {
 	dm := &deleteManager{}
 	for _, opt := range options {
 		opt(dm)
-	}
-
-	if dm.qm == nil {
-		return nil, fmt.Errorf("missing queue manager")
 	}
 
 	return dm, nil

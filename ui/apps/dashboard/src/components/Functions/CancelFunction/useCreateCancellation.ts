@@ -1,5 +1,3 @@
-'use client';
-
 import { useCallback } from 'react';
 import { maybeDateToString } from '@inngest/components/utils/date';
 import { useMutation } from 'urql';
@@ -15,7 +13,11 @@ const query = graphql(`
   }
 `);
 
-export function useCreateCancellation({ functionSlug }: { functionSlug: string }) {
+export function useCreateCancellation({
+  functionSlug,
+}: {
+  functionSlug: string;
+}) {
   const envID = useEnvironment().id;
   const [, cancelFunction] = useMutation(query);
 
@@ -39,6 +41,6 @@ export function useCreateCancellation({ functionSlug }: { functionSlug: string }
         },
       });
     },
-    [cancelFunction, envID, functionSlug]
+    [cancelFunction, envID, functionSlug],
   );
 }

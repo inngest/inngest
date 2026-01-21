@@ -1,12 +1,13 @@
 import { Chart } from '@inngest/components/Chart/Chart';
 import { Info } from '@inngest/components/Info/Info';
-import { Link } from '@inngest/components/Link/Link';
+import { Link } from '@inngest/components/Link';
 
 import type { VolumeMetricsQuery } from '@/gql/graphql';
 import type { EntityLookup } from './Dashboard';
 import { getLineChartOptions, mapEntityLines } from './utils';
 
-export type BacklogMetricsType = VolumeMetricsQuery['workspace']['backlog']['metrics'];
+export type BacklogMetricsType =
+  VolumeMetricsQuery['workspace']['backlog']['metrics'];
 
 export const Backlog = ({
   workspace,
@@ -15,7 +16,8 @@ export const Backlog = ({
   workspace?: VolumeMetricsQuery['workspace'];
   entities: EntityLookup;
 }) => {
-  const metrics = workspace && mapEntityLines(workspace.backlog.metrics, entities);
+  const metrics =
+    workspace && mapEntityLines(workspace.backlog.metrics, entities);
 
   return (
     <div className="bg-canvasBase border-subtle relative flex h-[384px] w-full flex-col overflow-x-hidden rounded-md border p-5">

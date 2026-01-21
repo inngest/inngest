@@ -1,5 +1,3 @@
-'use client';
-
 import { SQLEditor } from '@inngest/components/SQLEditor/SQLEditor';
 
 import { useInsightsStateMachineContext } from '../InsightsStateMachineContext/InsightsStateMachineContext';
@@ -7,7 +5,7 @@ import { hasUnsavedChanges } from '../InsightsTabManager/InsightsTabManager';
 import { useActiveTab } from '../InsightsTabManager/TabManagerContext';
 import { useStoredQueries } from '../QueryHelperPanel/StoredQueriesContext';
 import { SQLEditorContextMenu } from './SQLEditorContextMenu';
-import { useSQLEditorInstance } from './SQLEditorInstanceContext';
+import { useSQLEditorInstance } from './SQLEditorContext';
 import { useSaveTabActions } from './SaveTabContext';
 import { useInsightsSQLEditorOnMountCallback } from './hooks/useInsightsSQLEditorOnMountCallback';
 import { useSQLCompletionConfig } from './hooks/useSQLCompletionConfig';
@@ -16,12 +14,18 @@ export function InsightsSQLEditor() {
   const { onChange, query, runQuery } = useInsightsStateMachineContext();
   const { onMount } = useInsightsSQLEditorOnMountCallback();
   const completionConfig = useSQLCompletionConfig();
-  const { editorRef } = useSQLEditorInstance();
+  const editorInstance = useSQLEditorInstance();
+  if (!editorInstance) {
+    throw new Error('InsightsSQLEditor must be used within SQLEditorProvider');
+  }
+  const { editorRef } = editorInstance;
   const { activeTab } = useActiveTab();
   const { saveTab } = useSaveTabActions();
   const { queries } = useStoredQueries();
 
-  const hasChanges = activeTab ? hasUnsavedChanges(queries.data, activeTab) : false;
+  const hasChanges = activeTab
+    ? hasUnsavedChanges(queries.data, activeTab)
+    : false;
 
   const hasSelection = () => {
     const editor = editorRef.current;

@@ -1,5 +1,3 @@
-'use client';
-
 import { useMemo } from 'react';
 
 import { Pagination, type PaginationProps } from './Pagination';

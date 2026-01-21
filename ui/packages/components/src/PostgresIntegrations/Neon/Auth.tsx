@@ -26,15 +26,15 @@ export default function NeonAuth({
   onSuccess: (value: string) => void;
   savedCredentials?: string;
   integration: string;
-  intro: string;
-  credsLink: string;
-  nextStep: IntegrationSteps;
+  intro?: string;
+  credsLink?: string;
+  nextStep?: IntegrationSteps;
   verifyCredentials: (variables: {
     adminConn: string;
     engine: string;
     name: string;
     replicaConn?: string;
-  }) => Promise<{ success: boolean; error: string }>;
+  }) => Promise<{ success: boolean; error: string | null }>;
 }) {
   const [inputValue, setInputValue] = useState(savedCredentials || '');
   const [isVerifying, setIsVerifying] = useState(false);
@@ -107,7 +107,7 @@ export default function NeonAuth({
       </form>
       <Button
         label="Next"
-        href={`/settings/integrations/${integration}/${nextStep}`}
+        to={`/settings/integrations/${integration}/${nextStep}`}
         disabled={!isVerified}
       />
     </>

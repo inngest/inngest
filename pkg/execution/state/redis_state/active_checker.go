@@ -5,45 +5,29 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
+	mathRand "math/rand"
+	"strconv"
+	"sync/atomic"
+	"time"
+
 	"github.com/google/uuid"
-	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 	"golang.org/x/sync/errgroup"
-	mathRand "math/rand"
-	"strconv"
-	"sync/atomic"
-	"time"
-)
-
-const (
-	// ActiveCheckBacklogConcurrency determines how many accounts are peeked and processed in parallel
-	ActiveCheckAccountConcurrency = 30
-
-	// ActiveCheckBacklogConcurrency determines how many backlogs are peeked and processed in parallel
-	ActiveCheckBacklogConcurrency = 30
-
-	// ActiveCheckScanBatchSize determines how many queue items are scanned in each loop.
-	// More queue items will slow down the active checker but yield faster iteration over the set. Tune carefully.
-	ActiveCheckScanBatchSize = 25
-
-	BacklogActiveCheckCooldownDuration = 1 * time.Minute
-	AccountActiveCheckCooldownDuration = 1 * time.Minute
 )
 
 func (q *queue) ActiveCheck(ctx context.Context) (int, error) {
-	l := q.log.With("scope", "active-check")
+	l := logger.StdlibLogger(ctx).With("scope", "active-check")
 
-	shard := q.primaryQueueShard
-	client := shard.RedisClient.Client()
-	kg := shard.RedisClient.KeyGenerator()
+	client := q.RedisClient.Client()
+	kg := q.RedisClient.KeyGenerator()
 
 	// Check account entrypoint
-	if mathRand.Intn(100) <= q.activeCheckAccountProbability {
-		accountIDs, err := q.AccountActiveCheckPeek(ctx, q.activeCheckAccountConcurrency)
+	if mathRand.Intn(100) <= q.ActiveCheckAccountProbability {
+		accountIDs, err := q.AccountActiveCheckPeek(ctx, q.ActiveCheckAccountConcurrency)
 		if err != nil {
 			return 0, fmt.Errorf("could not peek accounts for active checker: %w", err)
 		}
@@ -52,7 +36,7 @@ func (q *queue) ActiveCheck(ctx context.Context) (int, error) {
 		for _, accountID := range accountIDs {
 			accountID := accountID
 			eg.Go(func() error {
-				checkID, err := ulid.New(ulid.Timestamp(q.clock.Now()), rand.Reader)
+				checkID, err := ulid.New(ulid.Timestamp(q.Clock.Now()), rand.Reader)
 				if err != nil {
 					return fmt.Errorf("could not create checkID: %w", err)
 				}
@@ -62,7 +46,7 @@ func (q *queue) ActiveCheck(ctx context.Context) (int, error) {
 				l.Debug("attempting to active check account")
 
 				readOnly := true
-				if q.readOnlySpotChecks != nil && !q.readOnlySpotChecks(ctx, accountID) {
+				if q.ReadOnlySpotChecks != nil && !q.ReadOnlySpotChecks(ctx, accountID) {
 					readOnly = false
 				}
 
@@ -73,11 +57,10 @@ func (q *queue) ActiveCheck(ctx context.Context) (int, error) {
 
 				err = q.activeCheckRemove(
 					ctx,
-					shard,
 					kg.AccountActiveCheckSet(),
 					kg.AccountActiveCheckCooldown(accountID.String()),
 					accountID.String(),
-					AccountActiveCheckCooldownDuration,
+					osqueue.AccountActiveCheckCooldownDuration,
 				)
 				if err != nil {
 					l.Error("could not remove backlog from active check set", "err", err)
@@ -96,7 +79,7 @@ func (q *queue) ActiveCheck(ctx context.Context) (int, error) {
 	}
 
 	// Peek backlogs for active checks
-	backlogs, err := q.BacklogActiveCheckPeek(ctx, q.activeCheckBacklogConcurrency)
+	backlogs, err := q.BacklogActiveCheckPeek(ctx, q.ActiveCheckBacklogConcurrency)
 	if err != nil {
 		return 0, fmt.Errorf("could not peek backlogs for active checker: %w", err)
 	}
@@ -109,7 +92,7 @@ func (q *queue) ActiveCheck(ctx context.Context) (int, error) {
 	for _, backlog := range backlogs {
 		backlog := backlog
 		eg.Go(func() error {
-			checkID, err := ulid.New(ulid.Timestamp(q.clock.Now()), rand.Reader)
+			checkID, err := ulid.New(ulid.Timestamp(q.Clock.Now()), rand.Reader)
 			if err != nil {
 				return fmt.Errorf("could not create checkID: %w", err)
 			}
@@ -118,15 +101,14 @@ func (q *queue) ActiveCheck(ctx context.Context) (int, error) {
 
 			l.Debug("attempting to active check backlog")
 
-			cleanup, err := q.backlogActiveCheck(logger.WithStdlib(ctx, l), backlog, shard, kg)
+			cleanup, err := q.backlogActiveCheck(logger.WithStdlib(ctx, l), backlog, kg)
 			if cleanup {
 				cerr := q.activeCheckRemove(
 					ctx,
-					shard,
 					kg.BacklogActiveCheckSet(),
 					kg.BacklogActiveCheckCooldown(backlog.BacklogID),
 					backlog.BacklogID,
-					BacklogActiveCheckCooldownDuration,
+					osqueue.BacklogActiveCheckCooldownDuration,
 				)
 				if cerr != nil {
 					l.Error("could not remove backlog from active check set", "err", cerr)
@@ -151,17 +133,17 @@ func (q *queue) ActiveCheck(ctx context.Context) (int, error) {
 	return int(atomic.LoadInt64(&checked)), nil
 }
 
-func (q *queue) backlogActiveCheck(ctx context.Context, b *QueueBacklog, shard QueueShard, kg QueueKeyGenerator) (bool, error) {
+func (q *queue) backlogActiveCheck(ctx context.Context, b *osqueue.QueueBacklog, kg QueueKeyGenerator) (bool, error) {
 	accountID := uuid.Nil
 
-	start := q.clock.Now()
+	start := q.Clock.Now()
 	defer func() {
-		dur := q.clock.Now().Sub(start)
+		dur := q.Clock.Now().Sub(start)
 
 		metrics.HistogramQueueActiveCheckDuration(ctx, dur, metrics.HistogramOpt{
 			PkgName: pkgName,
 			Tags: map[string]any{
-				"queue_shard": q.primaryQueueShard.Name,
+				"queue_shard": q.Name(),
 				"type":        "backlog",
 				"account_id":  accountID,
 			},
@@ -169,9 +151,9 @@ func (q *queue) backlogActiveCheck(ctx context.Context, b *QueueBacklog, shard Q
 	}()
 
 	l := logger.StdlibLogger(ctx)
-	client := shard.RedisClient.Client()
+	client := q.RedisClient.Client()
 
-	var sp QueueShadowPartition
+	var sp osqueue.QueueShadowPartition
 
 	{
 		str, err := client.Do(ctx, client.B().Hget().Key(kg.ShadowPartitionMeta()).Field(b.ShadowPartitionID).Build()).ToString()
@@ -201,7 +183,7 @@ func (q *queue) backlogActiveCheck(ctx context.Context, b *QueueBacklog, shard Q
 	}
 
 	readOnly := true
-	if q.readOnlySpotChecks != nil && !q.readOnlySpotChecks(ctx, accountID) {
+	if q.ReadOnlySpotChecks != nil && !q.ReadOnlySpotChecks(ctx, accountID) {
 		readOnly = false
 	}
 
@@ -214,7 +196,7 @@ func (q *queue) backlogActiveCheck(ctx context.Context, b *QueueBacklog, shard Q
 	l.Debug("starting active check for partition")
 
 	// Check account
-	_, accountSpotCheckProbability := q.activeSpotCheckProbability(ctx, accountID)
+	_, accountSpotCheckProbability := q.ActiveSpotCheckProbability(ctx, accountID)
 	if accountID != uuid.Nil && mathRand.Intn(100) <= accountSpotCheckProbability {
 		err := q.accountActiveCheck(logger.WithStdlib(ctx, l.With("check-scope", "account-check")), accountID, client, kg, readOnly)
 		if err != nil {
@@ -248,14 +230,14 @@ func (q *queue) accountActiveCheck(
 	kg QueueKeyGenerator,
 	readOnly bool,
 ) error {
-	start := q.clock.Now()
+	start := q.Clock.Now()
 	defer func() {
-		dur := q.clock.Now().Sub(start)
+		dur := q.Clock.Now().Sub(start)
 
 		metrics.HistogramQueueActiveCheckDuration(ctx, dur, metrics.HistogramOpt{
 			PkgName: pkgName,
 			Tags: map[string]any{
-				"queue_shard": q.primaryQueueShard.Name,
+				"queue_shard": q.Name(),
 				"type":        "account",
 				"account_id":  accountID.String(),
 			},
@@ -275,14 +257,14 @@ func (q *queue) accountActiveCheck(
 	var cursor int64
 
 	for {
-		chunkID, err := ulid.New(ulid.Timestamp(q.clock.Now()), rand.Reader)
+		chunkID, err := ulid.New(ulid.Timestamp(q.Clock.Now()), rand.Reader)
 		if err != nil {
 			return fmt.Errorf("could not create checkID: %w", err)
 		}
 
 		l := l.With("chunk_id", chunkID)
 
-		res, err := q.activeCheckScan(ctx, q.primaryQueueShard, keyActive, keyInProgress, cursor, q.activeCheckScanBatchSize)
+		res, err := q.activeCheckScan(ctx, keyActive, keyInProgress, cursor, q.ActiveCheckScanBatchSize)
 		if err != nil {
 			return fmt.Errorf("could not scan account: %w", err)
 		}
@@ -295,7 +277,7 @@ func (q *queue) accountActiveCheck(
 			metrics.IncrQueueActiveCheckInvalidItemsFoundCounter(ctx, int64(len(res.MissingItems)), metrics.CounterOpt{
 				PkgName: pkgName,
 				Tags: map[string]any{
-					"queue_shard": q.primaryQueueShard.Name,
+					"queue_shard": q.Name(),
 					"account_id":  accountID.String(),
 					"check":       "account",
 					"reason":      "missing-item",
@@ -309,7 +291,7 @@ func (q *queue) accountActiveCheck(
 				metrics.IncrQueueActiveCheckInvalidItemsFoundCounter(ctx, 1, metrics.CounterOpt{
 					PkgName: pkgName,
 					Tags: map[string]any{
-						"queue_shard": q.primaryQueueShard.Name,
+						"queue_shard": q.Name(),
 						"account_id":  accountID.String(),
 						"check":       "account",
 						"reason":      "missing-in-targets",
@@ -333,7 +315,7 @@ func (q *queue) accountActiveCheck(
 				metrics.IncrQueueActiveCheckInvalidItemsRemovedCounter(ctx, int64(len(invalidItems)), metrics.CounterOpt{
 					PkgName: pkgName,
 					Tags: map[string]any{
-						"queue_shard": q.primaryQueueShard.Name,
+						"queue_shard": q.Name(),
 						"account_id":  accountID.String(),
 						"check":       "account",
 					},
@@ -359,7 +341,7 @@ func (q *queue) accountActiveCheck(
 	metrics.IncrQueueActiveCheckAccountScannedCounter(ctx, metrics.CounterOpt{
 		PkgName: pkgName,
 		Tags: map[string]any{
-			"queue_shard": q.primaryQueueShard.Name,
+			"queue_shard": q.Name(),
 			"account_id":  accountID.String(),
 		},
 	})
@@ -369,7 +351,7 @@ func (q *queue) accountActiveCheck(
 
 func (q *queue) partitionActiveCheck(
 	ctx context.Context,
-	sp *QueueShadowPartition,
+	sp *osqueue.QueueShadowPartition,
 	accountID uuid.UUID,
 	client rueidis.Client,
 	kg QueueKeyGenerator,
@@ -377,14 +359,14 @@ func (q *queue) partitionActiveCheck(
 ) error {
 	l := logger.StdlibLogger(ctx)
 
-	keyActive := sp.activeKey(kg)
-	keyInProgress := sp.inProgressKey(kg)
-	keyReady := sp.readyQueueKey(kg)
+	keyActive := shadowPartitionActiveKey(*sp, kg)
+	keyInProgress := shadowPartitionInProgressKey(*sp, kg)
+	keyReady := shadowPartitionReadyQueueKey(*sp, kg)
 
 	var cursor int64
 
 	for {
-		chunkID, err := ulid.New(ulid.Timestamp(q.clock.Now()), rand.Reader)
+		chunkID, err := ulid.New(ulid.Timestamp(q.Clock.Now()), rand.Reader)
 		if err != nil {
 			return fmt.Errorf("could not create checkID: %w", err)
 		}
@@ -397,7 +379,7 @@ func (q *queue) partitionActiveCheck(
 			"ready", keyActive,
 		)
 
-		res, err := q.activeCheckScan(ctx, q.primaryQueueShard, keyActive, keyInProgress, cursor, q.activeCheckScanBatchSize)
+		res, err := q.activeCheckScan(ctx, keyActive, keyInProgress, cursor, q.ActiveCheckScanBatchSize)
 		if err != nil {
 			return fmt.Errorf("could not scan partition: %w", err)
 		}
@@ -410,7 +392,7 @@ func (q *queue) partitionActiveCheck(
 			metrics.IncrQueueActiveCheckInvalidItemsFoundCounter(ctx, int64(len(res.MissingItems)), metrics.CounterOpt{
 				PkgName: pkgName,
 				Tags: map[string]any{
-					"queue_shard": q.primaryQueueShard.Name,
+					"queue_shard": q.Name(),
 					"account_id":  accountID.String(),
 					"check":       "partition",
 					"reason":      "missing-item",
@@ -424,7 +406,7 @@ func (q *queue) partitionActiveCheck(
 				metrics.IncrQueueActiveCheckInvalidItemsFoundCounter(ctx, 1, metrics.CounterOpt{
 					PkgName: pkgName,
 					Tags: map[string]any{
-						"queue_shard": q.primaryQueueShard.Name,
+						"queue_shard": q.Name(),
 						"account_id":  accountID.String(),
 						"check":       "partition",
 						"reason":      "missing-in-targets",
@@ -450,7 +432,7 @@ func (q *queue) partitionActiveCheck(
 				metrics.IncrQueueActiveCheckInvalidItemsRemovedCounter(ctx, int64(len(invalidItems)), metrics.CounterOpt{
 					PkgName: pkgName,
 					Tags: map[string]any{
-						"queue_shard": q.primaryQueueShard.Name,
+						"queue_shard": q.Name(),
 						"account_id":  accountID.String(),
 						"check":       "partition",
 					},
@@ -476,16 +458,16 @@ func (q *queue) partitionActiveCheck(
 	return nil
 }
 
-func (q *queue) customConcurrencyActiveCheck(ctx context.Context, sp *QueueShadowPartition, accountID uuid.UUID, bcc BacklogConcurrencyKey, client rueidis.Client, kg QueueKeyGenerator, readOnly bool) error {
+func (q *queue) customConcurrencyActiveCheck(ctx context.Context, sp *osqueue.QueueShadowPartition, accountID uuid.UUID, bcc osqueue.BacklogConcurrencyKey, client rueidis.Client, kg QueueKeyGenerator, readOnly bool) error {
 	l := logger.StdlibLogger(ctx)
 
-	keyActive := bcc.activeKey(kg)
-	keyInProgress := bcc.concurrencyKey(kg)
+	keyActive := backlogConcurrencyKeyActiveKey(bcc, kg)
+	keyInProgress := backlogConcurrencyKey(bcc, kg)
 
 	var cursor int64
 
 	for {
-		chunkID, err := ulid.New(ulid.Timestamp(q.clock.Now()), rand.Reader)
+		chunkID, err := ulid.New(ulid.Timestamp(q.Clock.Now()), rand.Reader)
 		if err != nil {
 			return fmt.Errorf("could not create checkID: %w", err)
 		}
@@ -497,7 +479,7 @@ func (q *queue) customConcurrencyActiveCheck(ctx context.Context, sp *QueueShado
 			"in_progress", keyInProgress,
 		)
 
-		res, err := q.activeCheckScan(ctx, q.primaryQueueShard, keyActive, keyInProgress, cursor, q.activeCheckScanBatchSize)
+		res, err := q.activeCheckScan(ctx, keyActive, keyInProgress, cursor, q.ActiveCheckScanBatchSize)
 		if err != nil {
 			return fmt.Errorf("could not scan custom concurrency key: %w", err)
 		}
@@ -510,7 +492,7 @@ func (q *queue) customConcurrencyActiveCheck(ctx context.Context, sp *QueueShado
 			metrics.IncrQueueActiveCheckInvalidItemsFoundCounter(ctx, int64(len(res.MissingItems)), metrics.CounterOpt{
 				PkgName: pkgName,
 				Tags: map[string]any{
-					"queue_shard": q.primaryQueueShard.Name,
+					"queue_shard": q.Name(),
 					"account_id":  accountID.String(),
 					"check":       "custom-concurrency",
 					"reason":      "missing-item",
@@ -524,7 +506,7 @@ func (q *queue) customConcurrencyActiveCheck(ctx context.Context, sp *QueueShado
 				metrics.IncrQueueActiveCheckInvalidItemsFoundCounter(ctx, 1, metrics.CounterOpt{
 					PkgName: pkgName,
 					Tags: map[string]any{
-						"queue_shard": q.primaryQueueShard.Name,
+						"queue_shard": q.Name(),
 						"account_id":  accountID.String(),
 						"check":       "custom-concurrency",
 						"reason":      "missing-in-targets",
@@ -550,7 +532,7 @@ func (q *queue) customConcurrencyActiveCheck(ctx context.Context, sp *QueueShado
 				metrics.IncrQueueActiveCheckInvalidItemsRemovedCounter(ctx, int64(len(invalidItems)), metrics.CounterOpt{
 					PkgName: pkgName,
 					Tags: map[string]any{
-						"queue_shard": q.primaryQueueShard.Name,
+						"queue_shard": q.Name(),
 						"account_id":  accountID.String(),
 						"check":       "custom-concurrency",
 					},
@@ -576,21 +558,21 @@ func (q *queue) customConcurrencyActiveCheck(ctx context.Context, sp *QueueShado
 	return nil
 }
 
-func (q *queue) BacklogActiveCheckPeek(ctx context.Context, peekSize int64) ([]*QueueBacklog, error) {
-	shard := q.primaryQueueShard
-	client := shard.RedisClient.Client()
-	kg := shard.RedisClient.KeyGenerator()
+func (q *queue) BacklogActiveCheckPeek(ctx context.Context, peekSize int64) ([]*osqueue.QueueBacklog, error) {
+	l := logger.StdlibLogger(ctx)
+	client := q.RedisClient.Client()
+	kg := q.RedisClient.KeyGenerator()
 
 	key := kg.BacklogActiveCheckSet()
 
-	peeker := peeker[QueueBacklog]{
+	peeker := peeker[osqueue.QueueBacklog]{
 		q:                      q,
-		max:                    q.activeCheckBacklogConcurrency,
+		max:                    q.ActiveCheckBacklogConcurrency,
 		opName:                 "peekBacklogActiveCheck",
 		isMillisecondPrecision: true,
-		handleMissingItems:     CleanupMissingPointers(ctx, key, client, q.log),
-		maker: func() *QueueBacklog {
-			return &QueueBacklog{}
+		handleMissingItems:     CleanupMissingPointers(ctx, key, client, l),
+		maker: func() *osqueue.QueueBacklog {
+			return &osqueue.QueueBacklog{}
 		},
 		keyMetadataHash: kg.BacklogMeta(),
 	}
@@ -598,7 +580,7 @@ func (q *queue) BacklogActiveCheckPeek(ctx context.Context, peekSize int64) ([]*
 	// Pick random backlogs within bounds
 	isSequential := false
 
-	res, err := peeker.peek(ctx, key, isSequential, q.clock.Now(), peekSize)
+	res, err := peeker.peek(ctx, key, isSequential, q.Clock.Now(), peekSize)
 	if err != nil {
 		return nil, fmt.Errorf("could not peek active check backlogs: %w", err)
 	}
@@ -607,25 +589,25 @@ func (q *queue) BacklogActiveCheckPeek(ctx context.Context, peekSize int64) ([]*
 }
 
 func (q *queue) AccountActiveCheckPeek(ctx context.Context, peekSize int64) ([]uuid.UUID, error) {
-	shard := q.primaryQueueShard
-	client := shard.RedisClient.Client()
-	kg := shard.RedisClient.KeyGenerator()
+	l := logger.StdlibLogger(ctx)
+	client := q.RedisClient.Client()
+	kg := q.RedisClient.KeyGenerator()
 
 	key := kg.AccountActiveCheckSet()
 
-	peeker := peeker[QueueBacklog]{
+	peeker := peeker[osqueue.QueueBacklog]{
 		q:                      q,
-		max:                    q.activeCheckAccountConcurrency,
+		max:                    q.ActiveCheckAccountConcurrency,
 		opName:                 "peekAccountActiveCheck",
 		isMillisecondPrecision: true,
-		handleMissingItems:     CleanupMissingPointers(ctx, key, client, q.log),
+		handleMissingItems:     CleanupMissingPointers(ctx, key, client, l),
 		keyMetadataHash:        kg.BacklogMeta(),
 	}
 
 	// Pick random account IDs within bounds
 	isSequential := false
 
-	accountIDs, err := peeker.peekUUIDPointer(ctx, key, isSequential, q.clock.Now(), peekSize)
+	accountIDs, err := peeker.peekUUIDPointer(ctx, key, isSequential, q.Clock.Now(), peekSize)
 	if err != nil {
 		return nil, fmt.Errorf("could not peek active check accounts: %w", err)
 	}
@@ -633,9 +615,9 @@ func (q *queue) AccountActiveCheckPeek(ctx context.Context, peekSize int64) ([]u
 	return accountIDs, nil
 }
 
-func (q *queue) AddBacklogToActiveCheck(ctx context.Context, shard QueueShard, accountID uuid.UUID, backlogID string) error {
-	kg := shard.RedisClient.KeyGenerator()
-	client := shard.RedisClient.Client()
+func (q *queue) AddBacklogToActiveCheck(ctx context.Context, accountID uuid.UUID, backlogID string) error {
+	kg := q.RedisClient.KeyGenerator()
+	client := q.RedisClient.Client()
 
 	status, err := scripts["queue/activeCheckAddBacklog"].Exec(ctx, client, []string{
 		kg.BacklogActiveCheckSet(),
@@ -643,7 +625,7 @@ func (q *queue) AddBacklogToActiveCheck(ctx context.Context, shard QueueShard, a
 	},
 		[]string{
 			backlogID,
-			strconv.Itoa(int(q.clock.Now().UnixMilli())),
+			strconv.Itoa(int(q.Clock.Now().UnixMilli())),
 		}).ToInt64()
 	if err != nil {
 		return fmt.Errorf("could not add backlog to active check: %w", err)
@@ -664,15 +646,15 @@ type activeCheckScanResult struct {
 	StaleItems   []osqueue.QueueItem
 }
 
-func (q *queue) activeCheckScan(ctx context.Context, shard QueueShard, keyActive, keyInProgress string, cursor, count int64) (*activeCheckScanResult, error) {
-	kg := shard.RedisClient.KeyGenerator()
-	client := shard.RedisClient.Client()
+func (q *queue) activeCheckScan(ctx context.Context, keyActive, keyInProgress string, cursor, count int64) (*activeCheckScanResult, error) {
+	kg := q.RedisClient.KeyGenerator()
+	client := q.RedisClient.Client()
 
-	res, err := duration(
+	res, err := osqueue.Duration(
 		ctx,
-		q.primaryQueueShard.Name,
+		q.Name(),
 		"active_check_scan",
-		q.clock.Now(),
+		q.Clock.Now(),
 		func(ctx context.Context) (any, error) {
 			res, err := scripts["queue/activeCheckScan"].Exec(ctx, client, []string{
 				keyActive,
@@ -682,7 +664,7 @@ func (q *queue) activeCheckScan(ctx context.Context, shard QueueShard, keyActive
 				[]string{
 					strconv.Itoa(int(cursor)),
 					strconv.Itoa(int(count)),
-					strconv.Itoa(int(q.clock.Now().UnixMilli())),
+					strconv.Itoa(int(q.Clock.Now().UnixMilli())),
 					kg.QueuePrefix(),
 				}).ToAny()
 			return res, err
@@ -761,12 +743,8 @@ func parseScanResult(res any) (*activeCheckScanResult, error) {
 	}, nil
 }
 
-func (q *queue) activeCheckRemove(ctx context.Context, shard QueueShard, keyActiveCheckSet, keyActiveCheckCooldown, pointer string, cooldown time.Duration) error {
-	if shard.Kind != string(enums.QueueShardKindRedis) {
-		return fmt.Errorf("unexpected queue shard kind %v", shard.Kind)
-	}
-
-	client := shard.RedisClient.Client()
+func (q *queue) activeCheckRemove(ctx context.Context, keyActiveCheckSet, keyActiveCheckCooldown, pointer string, cooldown time.Duration) error {
+	client := q.RedisClient.Client()
 
 	status, err := scripts["queue/activeCheckRemove"].Exec(
 		ctx,
@@ -777,7 +755,7 @@ func (q *queue) activeCheckRemove(ctx context.Context, shard QueueShard, keyActi
 		},
 		[]string{
 			pointer,
-			strconv.Itoa(int(q.clock.Now().UnixMilli())),
+			strconv.Itoa(int(q.Clock.Now().UnixMilli())),
 			strconv.Itoa(int(cooldown.Seconds())),
 		},
 	).ToInt64()

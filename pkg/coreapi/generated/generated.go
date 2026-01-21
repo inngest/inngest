@@ -21,6 +21,7 @@ import (
 	"github.com/inngest/inngest/pkg/function"
 	types "github.com/inngest/inngest/pkg/gql_scalars"
 	"github.com/inngest/inngest/pkg/history_reader"
+	"github.com/inngest/inngest/pkg/tracing/metadata"
 	ulid "github.com/oklog/ulid/v2"
 	gqlparser "github.com/vektah/gqlparser/v2"
 	"github.com/vektah/gqlparser/v2/ast"
@@ -458,6 +459,7 @@ type ComplexityRoot struct {
 		FunctionID     func(childComplexity int) int
 		IsRoot         func(childComplexity int) int
 		IsUserland     func(childComplexity int) int
+		Metadata       func(childComplexity int) int
 		Name           func(childComplexity int) int
 		OutputID       func(childComplexity int) int
 		ParentSpan     func(childComplexity int) int
@@ -505,6 +507,13 @@ type ComplexityRoot struct {
 
 	SleepStepInfo struct {
 		SleepUntil func(childComplexity int) int
+	}
+
+	SpanMetadata struct {
+		Kind      func(childComplexity int) int
+		Scope     func(childComplexity int) int
+		UpdatedAt func(childComplexity int) int
+		Values    func(childComplexity int) int
 	}
 
 	StepError struct {
@@ -2706,6 +2715,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.RunTraceSpan.IsUserland(childComplexity), true
 
+	case "RunTraceSpan.metadata":
+		if e.complexity.RunTraceSpan.Metadata == nil {
+			break
+		}
+
+		return e.complexity.RunTraceSpan.Metadata(childComplexity), true
+
 	case "RunTraceSpan.name":
 		if e.complexity.RunTraceSpan.Name == nil {
 			break
@@ -2934,6 +2950,34 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.SleepStepInfo.SleepUntil(childComplexity), true
+
+	case "SpanMetadata.kind":
+		if e.complexity.SpanMetadata.Kind == nil {
+			break
+		}
+
+		return e.complexity.SpanMetadata.Kind(childComplexity), true
+
+	case "SpanMetadata.scope":
+		if e.complexity.SpanMetadata.Scope == nil {
+			break
+		}
+
+		return e.complexity.SpanMetadata.Scope(childComplexity), true
+
+	case "SpanMetadata.updatedAt":
+		if e.complexity.SpanMetadata.UpdatedAt == nil {
+			break
+		}
+
+		return e.complexity.SpanMetadata.UpdatedAt(childComplexity), true
+
+	case "SpanMetadata.values":
+		if e.complexity.SpanMetadata.Values == nil {
+			break
+		}
+
+		return e.complexity.SpanMetadata.Values(childComplexity), true
 
 	case "StepError.cause":
 		if e.complexity.StepError.Cause == nil {
@@ -3496,6 +3540,9 @@ scalar UUID
 scalar Bytes
 scalar Unknown
 scalar Int64
+scalar SpanMetadataKind
+scalar SpanMetadataScope
+scalar SpanMetadataValues
 
 "The pagination information in a connection."
 type PageInfo {
@@ -4082,6 +4129,14 @@ type RunTraceSpan {
   debugRunID: ULID
   debugSessionID: ULID
   debugPaused: Boolean!
+  metadata: [SpanMetadata!]!
+}
+
+type SpanMetadata {
+  scope: SpanMetadataScope!
+  kind: SpanMetadataKind!
+  values: SpanMetadataValues!
+  updatedAt: Time!
 }
 
 type UserlandSpan {
@@ -7499,6 +7554,8 @@ func (ec *executionContext) fieldContext_DebugRun_debugTraces(ctx context.Contex
 				return ec.fieldContext_RunTraceSpan_debugSessionID(ctx, field)
 			case "debugPaused":
 				return ec.fieldContext_RunTraceSpan_debugPaused(ctx, field)
+			case "metadata":
+				return ec.fieldContext_RunTraceSpan_metadata(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type RunTraceSpan", field.Name)
 		},
@@ -12394,6 +12451,8 @@ func (ec *executionContext) fieldContext_FunctionRunV2_trace(ctx context.Context
 				return ec.fieldContext_RunTraceSpan_debugSessionID(ctx, field)
 			case "debugPaused":
 				return ec.fieldContext_RunTraceSpan_debugPaused(ctx, field)
+			case "metadata":
+				return ec.fieldContext_RunTraceSpan_metadata(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type RunTraceSpan", field.Name)
 		},
@@ -15134,6 +15193,8 @@ func (ec *executionContext) fieldContext_Query_runTrace(ctx context.Context, fie
 				return ec.fieldContext_RunTraceSpan_debugSessionID(ctx, field)
 			case "debugPaused":
 				return ec.fieldContext_RunTraceSpan_debugPaused(ctx, field)
+			case "metadata":
+				return ec.fieldContext_RunTraceSpan_metadata(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type RunTraceSpan", field.Name)
 		},
@@ -18387,6 +18448,8 @@ func (ec *executionContext) fieldContext_RunTraceSpan_childrenSpans(ctx context.
 				return ec.fieldContext_RunTraceSpan_debugSessionID(ctx, field)
 			case "debugPaused":
 				return ec.fieldContext_RunTraceSpan_debugPaused(ctx, field)
+			case "metadata":
+				return ec.fieldContext_RunTraceSpan_metadata(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type RunTraceSpan", field.Name)
 		},
@@ -18736,6 +18799,8 @@ func (ec *executionContext) fieldContext_RunTraceSpan_parentSpan(ctx context.Con
 				return ec.fieldContext_RunTraceSpan_debugSessionID(ctx, field)
 			case "debugPaused":
 				return ec.fieldContext_RunTraceSpan_debugPaused(ctx, field)
+			case "metadata":
+				return ec.fieldContext_RunTraceSpan_metadata(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type RunTraceSpan", field.Name)
 		},
@@ -18965,6 +19030,60 @@ func (ec *executionContext) fieldContext_RunTraceSpan_debugPaused(ctx context.Co
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RunTraceSpan_metadata(ctx context.Context, field graphql.CollectedField, obj *models.RunTraceSpan) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RunTraceSpan_metadata(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Metadata, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.([]*models.SpanMetadata)
+	fc.Result = res
+	return ec.marshalNSpanMetadata2ᚕᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐSpanMetadataᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RunTraceSpan_metadata(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RunTraceSpan",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "scope":
+				return ec.fieldContext_SpanMetadata_scope(ctx, field)
+			case "kind":
+				return ec.fieldContext_SpanMetadata_kind(ctx, field)
+			case "values":
+				return ec.fieldContext_SpanMetadata_values(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_SpanMetadata_updatedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type SpanMetadata", field.Name)
 		},
 	}
 	return fc, nil
@@ -19680,6 +19799,182 @@ func (ec *executionContext) _SleepStepInfo_sleepUntil(ctx context.Context, field
 func (ec *executionContext) fieldContext_SleepStepInfo_sleepUntil(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "SleepStepInfo",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Time does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SpanMetadata_scope(ctx context.Context, field graphql.CollectedField, obj *models.SpanMetadata) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SpanMetadata_scope(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Scope, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(enums.MetadataScope)
+	fc.Result = res
+	return ec.marshalNSpanMetadataScope2githubᚗcomᚋinngestᚋinngestᚋpkgᚋenumsᚐMetadataScope(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SpanMetadata_scope(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SpanMetadata",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type SpanMetadataScope does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SpanMetadata_kind(ctx context.Context, field graphql.CollectedField, obj *models.SpanMetadata) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SpanMetadata_kind(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Kind, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(metadata.Kind)
+	fc.Result = res
+	return ec.marshalNSpanMetadataKind2githubᚗcomᚋinngestᚋinngestᚋpkgᚋtracingᚋmetadataᚐKind(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SpanMetadata_kind(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SpanMetadata",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type SpanMetadataKind does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SpanMetadata_values(ctx context.Context, field graphql.CollectedField, obj *models.SpanMetadata) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SpanMetadata_values(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Values, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(metadata.Values)
+	fc.Result = res
+	return ec.marshalNSpanMetadataValues2githubᚗcomᚋinngestᚋinngestᚋpkgᚋtracingᚋmetadataᚐValues(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SpanMetadata_values(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SpanMetadata",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type SpanMetadataValues does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SpanMetadata_updatedAt(ctx context.Context, field graphql.CollectedField, obj *models.SpanMetadata) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SpanMetadata_updatedAt(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.UpdatedAt, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(time.Time)
+	fc.Result = res
+	return ec.marshalNTime2timeᚐTime(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SpanMetadata_updatedAt(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SpanMetadata",
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
@@ -27459,6 +27754,13 @@ func (ec *executionContext) _RunTraceSpan(ctx context.Context, sel ast.Selection
 			if out.Values[i] == graphql.Null {
 				invalids++
 			}
+		case "metadata":
+
+			out.Values[i] = ec._RunTraceSpan_metadata(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -27664,6 +27966,55 @@ func (ec *executionContext) _SleepStepInfo(ctx context.Context, sel ast.Selectio
 		case "sleepUntil":
 
 			out.Values[i] = ec._SleepStepInfo_sleepUntil(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var spanMetadataImplementors = []string{"SpanMetadata"}
+
+func (ec *executionContext) _SpanMetadata(ctx context.Context, sel ast.SelectionSet, obj *models.SpanMetadata) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, spanMetadataImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("SpanMetadata")
+		case "scope":
+
+			out.Values[i] = ec._SpanMetadata_scope(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "kind":
+
+			out.Values[i] = ec._SpanMetadata_kind(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "values":
+
+			out.Values[i] = ec._SpanMetadata_values(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "updatedAt":
+
+			out.Values[i] = ec._SpanMetadata_updatedAt(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
 				invalids++
@@ -29535,6 +29886,102 @@ func (ec *executionContext) unmarshalNSingletonMode2githubᚗcomᚋinngestᚋinn
 
 func (ec *executionContext) marshalNSingletonMode2githubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐSingletonMode(ctx context.Context, sel ast.SelectionSet, v models.SingletonMode) graphql.Marshaler {
 	return v
+}
+
+func (ec *executionContext) marshalNSpanMetadata2ᚕᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐSpanMetadataᚄ(ctx context.Context, sel ast.SelectionSet, v []*models.SpanMetadata) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNSpanMetadata2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐSpanMetadata(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNSpanMetadata2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐSpanMetadata(ctx context.Context, sel ast.SelectionSet, v *models.SpanMetadata) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._SpanMetadata(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalNSpanMetadataKind2githubᚗcomᚋinngestᚋinngestᚋpkgᚋtracingᚋmetadataᚐKind(ctx context.Context, v interface{}) (metadata.Kind, error) {
+	tmp, err := graphql.UnmarshalString(v)
+	res := metadata.Kind(tmp)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNSpanMetadataKind2githubᚗcomᚋinngestᚋinngestᚋpkgᚋtracingᚋmetadataᚐKind(ctx context.Context, sel ast.SelectionSet, v metadata.Kind) graphql.Marshaler {
+	res := graphql.MarshalString(string(v))
+	if res == graphql.Null {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+	}
+	return res
+}
+
+func (ec *executionContext) unmarshalNSpanMetadataScope2githubᚗcomᚋinngestᚋinngestᚋpkgᚋenumsᚐMetadataScope(ctx context.Context, v interface{}) (enums.MetadataScope, error) {
+	var res enums.MetadataScope
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNSpanMetadataScope2githubᚗcomᚋinngestᚋinngestᚋpkgᚋenumsᚐMetadataScope(ctx context.Context, sel ast.SelectionSet, v enums.MetadataScope) graphql.Marshaler {
+	return v
+}
+
+func (ec *executionContext) unmarshalNSpanMetadataValues2githubᚗcomᚋinngestᚋinngestᚋpkgᚋtracingᚋmetadataᚐValues(ctx context.Context, v interface{}) (metadata.Values, error) {
+	var res metadata.Values
+	err := res.UnmarshalGQLContext(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNSpanMetadataValues2githubᚗcomᚋinngestᚋinngestᚋpkgᚋtracingᚋmetadataᚐValues(ctx context.Context, sel ast.SelectionSet, v metadata.Values) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return graphql.WrapContextMarshaler(ctx, v)
 }
 
 func (ec *executionContext) marshalNStreamItem2ᚕᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐStreamItemᚄ(ctx context.Context, sel ast.SelectionSet, v []*models.StreamItem) graphql.Marshaler {

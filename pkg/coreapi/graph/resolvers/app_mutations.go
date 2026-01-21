@@ -26,9 +26,18 @@ func (r *mutationResolver) CreateApp(ctx context.Context, input models.CreateApp
 		input.URL = "http://" + input.URL
 	}
 
+	// This ID will not match the app ID after the sync process succeeds. That's
+	// because the eventual app ID will use the app name, rather than the URL.
+	// But we still need to create a placeholder app with a deterministic ID in
+	// the meantime.
+	//
+	// Ideally the app ID would be the same before and after the SDK ping, but
+	// we don't know the app name until after the SDK ping
+	appID := inngest.DeterministicAppUUID(input.URL)
+
 	// Create a new app which holds the error message.
 	params := cqrs.UpsertAppParams{
-		ID:  inngest.DeterministicAppUUID(input.URL),
+		ID:  appID,
 		Url: input.URL,
 		Error: sql.NullString{
 			Valid:  true,
@@ -119,7 +128,7 @@ func (r *mutationResolver) InvokeFunction(
 	defer span.End()
 
 	sent := false
-	_, err := r.EventHandler(ctx, &evt, nil)
+	_, err := r.EventHandler(ctx, &evt.Event, nil)
 	if err != nil {
 		return &sent, err
 	}

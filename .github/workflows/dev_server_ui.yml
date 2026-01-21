@@ -5,9 +5,11 @@ on:
     branches: [main]
     paths:
       - "ui/**"
+      - "pkg/coreapi/**/*.graphql"
   pull_request:
     paths:
       - "ui/**"
+      - "pkg/coreapi/**/*.graphql"
 
 jobs:
   build:
@@ -23,6 +25,6 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
         working-directory: ui/apps/dev-server-ui
-      - name: Type check
-        run: pnpm type-check
+      - name: Build
+        run: pnpm build
         working-directory: ui/apps/dev-server-ui

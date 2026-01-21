@@ -104,7 +104,7 @@ func DriverResponseAttrs(
 	fnOutput, err := resp.GetTraceFunctionOutput()
 	if err != nil {
 		rawAttrs.AddErr(fmt.Errorf("failed to get function output: %w", err))
-	} else if fnOutput != nil {
+	} else if fnOutput != "" {
 		isFunctionOutput := true
 		meta.AddAttr(rawAttrs, meta.Attrs.IsFunctionOutput, &isFunctionOutput)
 
@@ -115,7 +115,7 @@ func DriverResponseAttrs(
 				meta.AddAttr(rawAttrs, meta.Attrs.StepOutputRef, &outputSpanRef.DynamicSpanID)
 			}
 		} else {
-			meta.AddAttr(rawAttrs, meta.Attrs.StepOutput, fnOutput)
+			meta.AddAttr(rawAttrs, meta.Attrs.StepOutput, &fnOutput)
 		}
 	}
 
@@ -124,8 +124,8 @@ func DriverResponseAttrs(
 	}
 
 	size := resp.OutputSize
-	if size == 0 && fnOutput != nil {
-		size = len(*fnOutput)
+	if size == 0 && fnOutput != "" {
+		size = len(fnOutput)
 	}
 
 	meta.AddAttr(rawAttrs, meta.Attrs.ResponseHeaders, &resp.Header)
@@ -195,8 +195,6 @@ func generatorAttrs(op *state.GeneratorOpcode) *meta.SerializableAttrs {
 
 				if id, err := ulid.Parse(opts.Payload.ID); err == nil {
 					meta.AddAttr(rawAttrs, meta.Attrs.StepInvokeTriggerEventID, &id)
-				} else {
-					rawAttrs.AddErr(fmt.Errorf("failed to parse invoke trigger event ID: %w", err))
 				}
 
 				if expiry, err := opts.Expires(); err == nil {

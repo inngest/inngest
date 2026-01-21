@@ -1,4 +1,4 @@
-import { Header } from '@inngest/components/Header/NewHeader';
+import { Header } from '@inngest/components/Header/Header';
 import { createFileRoute, Outlet, useLocation } from '@tanstack/react-router';
 
 export const Route = createFileRoute('/_dashboard/apps/_onboarding')({

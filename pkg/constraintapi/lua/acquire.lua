@@ -10,7 +10,7 @@ local cjson = cjson
 ---@param command string
 ---@param ... string
 local function call(command, ...)
-	return redis.call(command, unpack(arg))
+	return redis.call(command, ...)
 end
 
 ---@type string[]
@@ -27,24 +27,28 @@ local keyAccountLeases = KEYS[5]
 
 ---@type { k: string, e: string, f: string, s: {}[], cv: integer?, r: integer?, g: integer?, a: integer?, l: integer?, lik: string[]?, lri: table<string, string>? }
 local requestDetails = cjson.decode(ARGV[1])
-local accountID = ARGV[2]
-local nowMS = tonumber(ARGV[3]) --[[@as integer]]
-local nowNS = tonumber(ARGV[4]) --[[@as integer]]
-local leaseExpiryMS = tonumber(ARGV[5])
-local keyPrefix = ARGV[6]
+local requestID = ARGV[2]
+local accountID = ARGV[3]
+local nowMS = tonumber(ARGV[4]) --[[@as integer]]
+local nowNS = tonumber(ARGV[5]) --[[@as integer]]
+local leaseExpiryMS = tonumber(ARGV[6])
+local scopedKeyPrefix = ARGV[7]
 ---@type string[]
-local initialLeaseIDs = cjson.decode(ARGV[7])
-local hashedOperationIdempotencyKey = ARGV[8]
+local initialLeaseIDs = cjson.decode(ARGV[8])
+if not initialLeaseIDs then
+	return redis.error_reply("ERR initialLeaseIDs is nil after JSON decode")
+end
 local operationIdempotencyTTL = tonumber(ARGV[9])--[[@as integer]]
 local constraintCheckIdempotencyTTL = tonumber(ARGV[10])--[[@as integer]]
 local enableDebugLogs = tonumber(ARGV[11]) == 1
 
 ---@type string[]
 local debugLogs = {}
----@param message string
+---@param ... string
 local function debug(...)
 	if enableDebugLogs then
-		table.insert(debugLogs, table.concat(arg, " "))
+		local args = { ... }
+		table.insert(debugLogs, table.concat(args, " "))
 	end
 end
 
@@ -57,6 +61,33 @@ local function getConcurrencyCount(key)
 	return count
 end
 
+---@return integer
+local function getActiveAccountLeasesCount()
+	local count = call("ZCOUNT", keyAccountLeases, tostring(nowMS), "+inf")
+	if count == nil then
+		return 0
+	end
+	return count
+end
+
+---@return integer
+local function getExpiredAccountLeasesCount()
+	local count = call("ZCOUNT", keyAccountLeases, "-inf", tostring(nowMS))
+	if count == nil then
+		return 0
+	end
+	return count
+end
+
+---@return integer
+local function getEarliestLeaseExpiry()
+	local count = call("ZRANGE", keyAccountLeases, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
+	if count == nil or count == false or #count == 0 then
+		return 0
+	end
+	return tonumber(count[2])
+end
+
 --- toInteger ensures a value is stored as an integer to prevent Redis scientific notation serialization
 ---@param value number
 ---@return integer
@@ -64,224 +95,7 @@ local function toInteger(value)
 	return math.floor(value + 0.5) -- Round to nearest integer
 end
 
---- clampTat ensures tat value is within reasonable bounds to prevent corruption issues
----@param tat number
----@param now_ns integer
----@param period_ns integer
----@param delay_variation_tolerance number
----@return integer
-local function clampTat(tat, now_ns, period_ns, delay_variation_tolerance)
-	local max_reasonable_tat = now_ns + period_ns + delay_variation_tolerance
-	local min_reasonable_tat = now_ns - period_ns -- Allow some past values for clock skew
-
-	if tat > max_reasonable_tat then
-		return toInteger(max_reasonable_tat)
-	elseif tat < min_reasonable_tat then
-		return toInteger(now_ns) -- Reset to current time if too far in past
-	else
-		return toInteger(tat)
-	end
-end
-
---- retrieveAndNormalizeTat gets the TAT value from Redis and normalizes it if needed
----@param key string
----@param now_ns integer
----@param period_ns integer
----@param delay_variation_tolerance number
----@return integer
-local function retrieveAndNormalizeTat(key, now_ns, period_ns, delay_variation_tolerance)
-	local tat = redis.call("GET", key)
-	if not tat then
-		return now_ns
-	end
-
-	local raw_tat = tonumber(tat)
-	if not raw_tat then
-		return now_ns -- Reset if tonumber failed
-	end
-
-	local clamped_tat = clampTat(raw_tat, now_ns, period_ns, delay_variation_tolerance)
-	-- If value was clamped, commit the normalization immediately
-	if raw_tat ~= clamped_tat then
-		redis.call("SET", key, clamped_tat, "KEEPTTL")
-	end
-
-	return clamped_tat
-end
-
---- rateLimitCapacity is the first half of a nanosecond-precision GCRA implementation. This method calculates the number of requests that can be admitted in the current period.
----@param key string
----@param now_ns integer
----@param period_ns integer
----@param limit integer
----@param burst integer
----@return integer[] returns a 2-tuple of remaining capacity and retry at
-local function rateLimitCapacity(key, now_ns, period_ns, limit, burst)
-	-- Handle zero limit case - immediately rate limit
-	if limit == 0 then
-		return { 0, now_ns + period_ns }
-	end
-
-	-- Match throttled library calculations exactly
-	-- emissionInterval = quota.MaxRate.period / limit
-	local emission_interval = period_ns / limit
-
-	-- delayVariationTolerance = emission_interval * (maxBurst + 1)
-	-- In throttled: immediate capacity = MaxBurst + 1
-	local total_capacity = burst + 1
-	local delay_variation_tolerance = emission_interval * total_capacity
-
-	-- retrieve and normalize theoretical arrival time
-	local tat = retrieveAndNormalizeTat(key, now_ns, period_ns, delay_variation_tolerance)
-
-	-- Calculate what the next TAT would be if we processed this request (quantity = 1)
-	local increment = 1 * emission_interval
-	local new_tat
-	if now_ns > tat then
-		new_tat = now_ns + increment
-	else
-		new_tat = tat + increment
-	end
-
-	-- Block the request if the next permitted time is in the future
-	-- allowAt = newTat.Add(-delayVariationTolerance)
-	local allow_at = new_tat - delay_variation_tolerance
-	local diff = now_ns - allow_at
-
-	if diff < 0 then
-		-- We are rate limited - calculate retry time
-		-- RetryAfter = -diff (when diff is negative)
-		return { 0, allow_at }
-	else
-		-- Not rate limited - calculate remaining capacity
-		-- next = delayVariationTolerance - ttl, where ttl = newTat.Sub(now)
-		local ttl = new_tat - now_ns
-		local next = delay_variation_tolerance - ttl
-		local remaining = 0
-		if next > -emission_interval then
-			remaining = math.floor(next / emission_interval)
-		end
-		return { remaining, 0 }
-	end
-end
-
---- rateLimitUpdate is the second half of a nanosecond-precision GCRA implementation, used for updating rate limit state.
----@param key string
----@param now_ns integer
----@param period_ns integer
----@param limit integer
----@param capacity integer the number of requests to admit at once
----@param burst integer
-local function rateLimitUpdate(key, now_ns, period_ns, limit, capacity, burst)
-	-- Handle zero limit case - no update needed since we always rate limit
-	if limit == 0 then
-		return
-	end
-
-	-- calculate emission interval (tau) - time between each token
-	-- This matches throttled library: quota.MaxRate.period
-	local emission_interval = period_ns / limit
-
-	-- Calculate delay_variation_tolerance for bounds checking
-	local total_capacity = (burst or 0) + 1
-	local delay_variation_tolerance = emission_interval * total_capacity
-
-	-- retrieve and normalize theoretical arrival time
-	local tat = retrieveAndNormalizeTat(key, now_ns, period_ns, delay_variation_tolerance)
-
-	-- calculate next theoretical arrival time
-	-- This matches throttled library logic: tat.Add(increment) where increment = quantity * emissionInterval
-	local increment = math.max(capacity, 1) * emission_interval
-	local new_tat
-	if now_ns > tat then
-		new_tat = now_ns + increment
-	else
-		new_tat = tat + increment
-	end
-
-	if capacity > 0 then
-		-- Clamp new_tat to reasonable bounds and ensure integer storage
-		local clamped_tat = clampTat(new_tat, now_ns, period_ns, delay_variation_tolerance)
-
-		-- Calculate TTL like throttled library: ttl = newTat.Sub(now)
-		local ttl_ns = clamped_tat - now_ns
-		local ttl_seconds = math.ceil(ttl_ns / 1000000000) -- Convert nanoseconds to seconds
-		redis.call("SET", key, clamped_tat, "EX", ttl_seconds)
-	end
-end
-
----@param key string
----@param now_ms integer
----@param period_ms integer
----@param limit integer
----@param burst integer
----@return integer[]
-local function throttleCapacity(key, now_ms, period_ms, limit, burst)
-	-- TODO: Reuse shared script
-
-	-- calculate emission interval (tau) - time between each token
-	local emission = period_ms / math.max(limit, 1)
-
-	-- calculate total capacity in time units
-	local total_capacity_time = emission * (limit + burst)
-
-	-- retrieve theoretical arrival time
-	local tat = call("GET", key)
-	if not tat then
-		tat = now_ms
-	else
-		tat = tonumber(tat)
-	end
-
-	-- remaining capacity in time units
-	local time_capacity_remain = now_ms + total_capacity_time - tat
-
-	-- Convert the remaining time budget back into a number of tokens.
-	local capacity = math.floor(time_capacity_remain / emission)
-
-	-- The capacity cannot exceed the defined limit + burst.
-	local final_capacity = math.min(capacity, limit + burst)
-
-	if final_capacity < 1 then
-		-- We are throttled. Calculate the time when the capacity will be >= 1.
-		-- This is the point where enough time has passed to "earn" one token.
-		-- The formula is derived from solving for the future time `t` where capacity becomes 1.
-		local next_available_at_ms = tat - total_capacity_time + emission
-		return { final_capacity, math.ceil(next_available_at_ms) }
-	else
-		-- Not throttled, so there is no "next available time" to report.
-		return { final_capacity, 0 }
-	end
-end
-
----@param key string
----@param now_ms integer
----@param period_ms integer
----@param limit integer
----@param capacity integer
-local function throttleUpdate(key, now_ms, period_ms, limit, capacity)
-	-- calculate emission interval (tau) - time between each token
-	local emission = period_ms / math.max(limit, 1)
-
-	-- retrieve theoretical arrival time
-	local tat = redis.call("GET", key)
-	if not tat then
-		tat = now_ms
-	else
-		tat = tonumber(tat)
-	end
-
-	-- calculate next theoretical arrival time
-	local new_tat = tat + (math.max(capacity, 1) * emission)
-
-	if capacity > 0 then
-		local expiry = string.format("%d", period_ms / 1000)
-		if expiry == "0" then
-			expiry = "1"
-		end
-		call("SET", key, new_tat, "EX", expiry)
-	end
-end
+-- $include(helper/gcra.lua)
 
 ---@type integer
 local requested = requestDetails.r
@@ -289,8 +103,11 @@ local requested = requestDetails.r
 ---@type integer
 local configVersion = requestDetails.cv
 
----@type { k: integer, c: { m: integer?, s: integer?, h: string?, eh: string?, l: integer?, ilk: string?, iik: string? }?, t: { s: integer?, h: string?, k: string, eh: string?, l: integer, b: integer, p: integer }?, r: { s: integer?, h: string, eh: string, l: integer, p: integer, k: string, b: integer }? }[]
+---@type { k: integer, c: { m: integer?, s: integer?, h: string?, eh: string?, l: integer?, ilk: string?, iik: string?, ra: integer? }?, t: { s: integer?, h: string?, k: string, eh: string?, l: integer, b: integer, p: integer }?, r: { s: integer?, h: string, eh: string, l: integer, p: integer, k: string, b: integer }? }[]
 local constraints = requestDetails.s
+if not constraints then
+	return redis.error_reply("ERR constraints array is nil")
+end
 
 -- Handle operation idempotency
 local opIdempotency = call("GET", keyOperationIdempotency)
@@ -299,6 +116,20 @@ if opIdempotency ~= nil and opIdempotency ~= false then
 
 	-- Return idempotency state to user (same as initial response)
 	return opIdempotency
+end
+
+-- If the same request state is still in progress (active leases), we cannot acquire more leases for the same request
+-- This should never happen, as we generate a new ID for each request
+local existingRequestState = call("GET", keyRequestState)
+if existingRequestState ~= nil and existingRequestState ~= false and existingRequestState ~= "" then
+	local res = {}
+	res["s"] = 4
+	res["d"] = debugLogs
+	res["aal"] = getActiveAccountLeasesCount()
+	res["eal"] = getExpiredAccountLeasesCount()
+	res["ele"] = getEarliestLeaseExpiry()
+
+	return cjson.encode(res)
 end
 
 -- TODO: Is the operation related to a single idempotency key that is still valid? Return that
@@ -335,10 +166,9 @@ for index, value in ipairs(constraints) do
 		debug("skipping gcra" .. index)
 	elseif value.k == 1 then
 		-- rate limit
-		local burst = math.floor(value.r.l / 10) -- align with burst in ratelimit
-		local rlRes = rateLimitCapacity(value.r.k, nowNS, value.r.p, value.r.l, burst)
-		constraintCapacity = rlRes[1]
-		constraintRetryAfter = toInteger(rlRes[2] / 1000000) -- convert from ns to ms
+		local rlRes = rateLimit(value.r.k, nowNS, value.r.p, value.r.l, value.r.b, 0)
+		constraintCapacity = rlRes["remaining"]
+		constraintRetryAfter = toInteger(rlRes["retry_at"] / 1000000) -- convert from ns to ms
 	elseif value.k == 2 then
 		-- concurrency
 		debug("evaluating concurrency")
@@ -346,12 +176,15 @@ for index, value in ipairs(constraints) do
 		local inProgressLeases = getConcurrencyCount(value.c.ilk)
 		local inProgressTotal = inProgressItems + inProgressLeases
 		constraintCapacity = value.c.l - inProgressTotal
+		constraintRetryAfter = toInteger(nowMS + value.c.ra)
 	elseif value.k == 3 then
 		-- throttle
 		debug("evaluating throttle")
-		local throttleRes = throttleCapacity(value.t.k, nowMS, value.t.p, value.t.l, value.t.b)
-		constraintCapacity = throttleRes[1]
-		constraintRetryAfter = toInteger(throttleRes[2]) -- already in ms
+		-- allow consuming all capacity in one request (for generating multiple leases)
+		local maxBurst = (value.t.l or 0) + (value.t.b or 0) - 1
+		local throttleRes = throttle(value.t.k, nowMS, value.t.p, value.t.l, maxBurst, 0)
+		constraintCapacity = throttleRes["remaining"]
+		constraintRetryAfter = toInteger(throttleRes["retry_at"]) -- already in ms
 	end
 
 	-- If index ends up limiting capacity, reduce available capacity and remember current constraint
@@ -363,7 +196,9 @@ for index, value in ipairs(constraints) do
 			"cc",
 			tostring(constraintCapacity),
 			"ac",
-			tostring(availableCapacity)
+			tostring(availableCapacity),
+			"ra",
+			tostring(constraintRetryAfter)
 		)
 
 		availableCapacity = constraintCapacity
@@ -389,6 +224,9 @@ if availableCapacity <= 0 then
 	res["ra"] = retryAt
 	res["d"] = debugLogs
 	res["fr"] = fairnessReduction
+	res["aal"] = getActiveAccountLeasesCount()
+	res["eal"] = getExpiredAccountLeasesCount()
+	res["ele"] = getEarliestLeaseExpiry()
 
 	return cjson.encode(res)
 end
@@ -400,8 +238,14 @@ local grantedLeases = {}
 
 -- Update constraints
 for i = 1, granted, 1 do
-	local leaseIdempotencyKey = requestDetails.lik[i]
-	local leaseRunID = (requestDetails.lri ~= nil and requestDetails.lri[leaseIdempotencyKey]) or ""
+	if not requestDetails.lik then
+		return redis.error_reply("ERR requestDetails.lik is nil during update")
+	end
+	if not initialLeaseIDs then
+		return redis.error_reply("ERR initialLeaseIDs is nil during update")
+	end
+	local hashedLeaseIdempotencyKey = requestDetails.lik[i]
+	local leaseRunID = (requestDetails.lri ~= nil and requestDetails.lri[hashedLeaseIdempotencyKey]) or ""
 	local initialLeaseID = initialLeaseIDs[i]
 
 	for _, value in ipairs(constraints) do
@@ -410,28 +254,34 @@ for i = 1, granted, 1 do
 		elseif value.k == 1 then
 			debug("updating rate limit", value.r.h)
 			-- rate limit
-			rateLimitUpdate(value.r.k, nowNS, value.r.p, value.r.l, 1, value.r.b)
+			rateLimit(value.r.k, nowNS, value.r.p, value.r.l, value.r.b, 1)
 		elseif value.k == 2 then
 			-- concurrency
 			call("ZADD", value.c.ilk, tostring(leaseExpiryMS), initialLeaseID)
 		elseif value.k == 3 then
-			-- throttle
-			throttleUpdate(value.t.k, nowMS, value.t.p, value.t.l, 1)
+			-- update throttle: consume 1 unit
+			-- allow consuming all capacity in one request (for generating multiple leases)
+			local maxBurst = (value.t.l or 0) + (value.t.b or 0) - 1
+			throttle(value.t.k, nowMS, value.t.p, value.t.l, maxBurst, 1)
 		end
 	end
 
-	local keyLeaseDetails = string.format("{%s}:%s:ld:%s", keyPrefix, accountID, initialLeaseID)
+	local keyLeaseDetails = string.format("%s:ld:%s", scopedKeyPrefix, initialLeaseID)
 
-	-- Store lease details (lease idempotency key, associated run ID, operation idempotency key for request details)
-	call("HSET", keyLeaseDetails, "lik", leaseIdempotencyKey, "rid", leaseRunID, "oik", hashedOperationIdempotencyKey)
+	-- Store lease details (hashed lease idempotency key, associated run ID, operation idempotency key for request details)
+	call("HSET", keyLeaseDetails, "lik", hashedLeaseIdempotencyKey, "rid", leaseRunID, "req", requestID)
 
 	-- Add lease to scavenger set of account leases
 	call("ZADD", keyAccountLeases, tostring(leaseExpiryMS), initialLeaseID)
 
+	-- Add constraint check idempotency for each lease (for graceful handling in rate limit, Lease, BacklogRefill, as well as Acquire in case lease expired)
+	local keyLeaseConstraintCheckIdempotency = string.format("%s:ik:cc:%s", scopedKeyPrefix, hashedLeaseIdempotencyKey)
+	call("SET", keyLeaseConstraintCheckIdempotency, tostring(nowMS), "EX", tostring(constraintCheckIdempotencyTTL))
+
 	---@type { lid: string, lik: string }
 	local leaseObject = {}
 	leaseObject["lid"] = initialLeaseID
-	leaseObject["lik"] = leaseIdempotencyKey
+	leaseObject["lik"] = hashedLeaseIdempotencyKey
 
 	table.insert(grantedLeases, leaseObject)
 end
@@ -464,8 +314,12 @@ result["r"] = requested
 result["g"] = granted
 result["l"] = grantedLeases
 result["lc"] = limitingConstraints
+result["ra"] = retryAt -- include retryAt to hint when next capacity is available
 result["d"] = debugLogs
 result["fr"] = fairnessReduction
+result["aal"] = getActiveAccountLeasesCount()
+result["eal"] = getExpiredAccountLeasesCount()
+result["ele"] = getEarliestLeaseExpiry()
 
 local encoded = cjson.encode(result)
 

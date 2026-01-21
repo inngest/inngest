@@ -28,10 +28,8 @@ const (
 	// A pause equates to roughly ~0.75-1KB of data, so this is a good default.
 	DefaultPausesPerBlock = 10_000
 
-	// DefaultCompactionLimit is the number of pauses that have to be deleted from
-	// a block to compact it.  This prevents us from rewriting pauses on every
-	// deletion - a waste of ops.
-	DefaultCompactionLimit = (DefaultPausesPerBlock / 5)
+	// DefaultCompactionGarbageRatio is the ratio of deletions to block size that triggers compaction.
+	DefaultCompactionGarbageRatio = 0.2
 
 	// DefaultCompactionSample gives us a 10% chance of running compactions after
 	// a delete.
@@ -81,9 +79,8 @@ type BlockstoreOpts struct {
 	// FlushLeaseRenewInterval is the interval for flush lease renewals.
 	FlushLeaseRenewInterval time.Duration
 
-	// CompactionLimit is the total number of pauses that should trigger a compaction.
-	// Note that this doesnt always trigger a compaction;
-	CompactionLimit int
+	// CompactionGarbageRatio is the ratio of deletions to block size that triggers compaction.
+	CompactionGarbageRatio float64
 	// CompactionSample is the chance of compaction, from 0-1.0
 	CompactionSample float64
 	// CompactionLeaser manages compaction leases for a given index.
@@ -126,8 +123,8 @@ func NewBlockstore(opts BlockstoreOpts) (BlockStore, error) {
 	if opts.BlockSize == 0 {
 		opts.BlockSize = DefaultPausesPerBlock
 	}
-	if opts.CompactionLimit == 0 {
-		opts.CompactionLimit = DefaultCompactionLimit
+	if opts.CompactionGarbageRatio == 0 {
+		opts.CompactionGarbageRatio = DefaultCompactionGarbageRatio
 	}
 	if opts.CompactionSample == 0 {
 		opts.CompactionSample = DefaultCompactionSample
@@ -149,7 +146,7 @@ func NewBlockstore(opts BlockstoreOpts) (BlockStore, error) {
 		blocksize:                    opts.BlockSize,
 		fetchMargin:                  opts.FetchMargin,
 		flushLeaseRenewInterval:      opts.FlushLeaseRenewInterval,
-		compactionLimit:              opts.CompactionLimit,
+		compactionGarbageRatio:       opts.CompactionGarbageRatio,
 		compactionSample:             opts.CompactionSample,
 		compactionLeaser:             opts.CompactionLeaser,
 		compactionLeaseRenewInterval: opts.CompactionLeaseRenewInterval,
@@ -171,10 +168,8 @@ type blockstore struct {
 	// flushLeaseRenewInterval is the interval for flush lease renewals.
 	flushLeaseRenewInterval time.Duration
 
-	// compactionLimit is the number of pauses that have to be deleted from
-	// a block to compact it.  This prevents us from rewriting pauses on every
-	// deletion - a waste of ops.
-	compactionLimit int
+	// compactionGarbageRatio is the ratio of deletions to block size that triggers compaction.
+	compactionGarbageRatio float64
 	// CompactionSample is the chance of compaction, from 0-100
 	compactionSample float64
 	// compactionLeaser manages compaction leases for a given index.
@@ -292,6 +287,7 @@ func (b blockstore) flushIndexBlock(ctx context.Context, index Index) error {
 			l.Warn("skipping pause before block boundary",
 				"pause_created_at", item.CreatedAt,
 				"block_boundary", since)
+			continue
 		}
 
 		if item.CreatedAt.IsZero() {
@@ -409,10 +405,18 @@ func (b blockstore) flushIndexBlock(ctx context.Context, index Index) error {
 			var deleted int64
 
 			for _, p := range block.Pauses {
-				if err := b.buf.Delete(ctx, index, *p, state.WithWriteBlockIndex(block.ID.String(), index.EventName)); err != nil {
-					logger.StdlibLogger(ctx).Warn("error deleting pause from buffer after flushing block", "error", err)
-				} else {
+				err := b.buf.Delete(ctx, index, *p, state.WithWriteBlockIndex(block.ID.String(), index.EventName))
+				switch {
+				case err == nil:
 					deleted = deleted + 1
+				case errors.Is(err, state.ErrPauseNotInBuffer):
+					if err := b.Delete(ctx, index, *p); err != nil {
+						logger.StdlibLogger(ctx).Error("error marking pause deleted in block", "error", err, "pause_id", p.ID)
+					} else {
+						deleted = deleted + 1
+					}
+				default:
+					logger.StdlibLogger(ctx).Error("error deleting pause from buffer after flushing block", "error", err)
 				}
 				time.Sleep(5 * time.Millisecond)
 			}
@@ -531,7 +535,6 @@ func (b blockstore) Delete(ctx context.Context, index Index, pause state.Pause, 
 	blockIndexKey := b.pc.KeyGenerator().PauseBlockIndex(ctx, pause.ID)
 	err = b.pc.Client().Do(ctx, b.pc.Client().B().Set().Key(blockIndexKey).Value(PauseBlockIndexTombstone).Ex(PauseBlockIndexTombstoneDuration).Build()).Error()
 	if err != nil {
-		fmt.Println(err)
 		return fmt.Errorf("error deleting block index while deleting pause: %w", err)
 	}
 
@@ -554,7 +557,7 @@ func (b blockstore) Delete(ctx context.Context, index Index, pause state.Pause, 
 		compactionSample = b.compactionSample * 0.1 // 10x lower chance for legacy pauses
 	}
 
-	if rand.IntN(100) <= int(compactionSample*100) {
+	if rand.Float64() < compactionSample {
 		go func() {
 			var maxDeletes int64
 			for _, blockID := range blockIDs {
@@ -566,17 +569,73 @@ func (b blockstore) Delete(ctx context.Context, index Index, pause state.Pause, 
 				maxDeletes = max(maxDeletes, size)
 			}
 
-			if maxDeletes < int64(b.compactionLimit) {
-				return
-			}
-
 			// Trigger a new compaction.
-			logger.StdlibLogger(ctx).Debug("compacting block deletes", "max_deletes", maxDeletes, "index", index)
-			b.Compact(ctx, index)
+			if maxDeletes >= int64(float64(b.blocksize)*b.compactionGarbageRatio) {
+				logger.StdlibLogger(ctx).Debug("compacting block deletes", "max_deletes", maxDeletes, "index", index)
+				_ = b.Compact(ctx, index)
+			}
 		}()
 	}
 
 	return nil
+}
+
+// DeleteByID deletes a pause from a block by marking it as deleted in the block's delete tracking set.
+// This method must be called before the pause is deleted from the buffer, otherwise the block index
+// lookup will fail and we won't know which block contains the pause.
+// Note: This method does not trigger compaction as it can be called by any service that only has
+// access to the buffer and not necessarily the block store.
+func (b blockstore) DeleteByID(ctx context.Context, pauseID uuid.UUID, workspaceID uuid.UUID) error {
+	blockIndexKey := b.pc.KeyGenerator().PauseBlockIndex(ctx, pauseID)
+
+	blockIDStr, err := b.pc.Client().Do(ctx, b.pc.Client().B().Getdel().Key(blockIndexKey).Build()).ToString()
+	if err != nil {
+		if rueidis.IsRedisNil(err) {
+			// Temporary during rollout:
+			// If deleteAfterFlush feature flag is off, we won't find the blockIndexKey
+			// so we should instead get the pause from the buffer and call delete on it
+			if !b.deleteAfterFlush(ctx, workspaceID) {
+				pause, err := b.buf.PauseByID(ctx, Index{WorkspaceID: workspaceID}, pauseID)
+				if err != nil {
+					if errors.Is(err, state.ErrPauseNotFound) {
+						// pause doesn't exist, nothing to delete
+						return nil
+					}
+					return fmt.Errorf("error getting pause from buffer for deletion: %w", err)
+				}
+				if pause != nil {
+					var eventName string
+					if pause.Event != nil {
+						eventName = *pause.Event
+						index := Index{WorkspaceID: workspaceID, EventName: eventName}
+						return b.Delete(ctx, index, *pause)
+					}
+					logger.StdlibLogger(ctx).Warn("pause has no event set, skipping deletion from block", "pause_id", pauseID, "workspace_id", workspaceID)
+					return nil
+				}
+			}
+			return nil
+		}
+		return fmt.Errorf("error reading block index for pause %s: %w", pauseID, err)
+	}
+
+	if blockIDStr == PauseBlockIndexTombstone {
+		return nil
+	}
+
+	var blockIndex state.BlockIndex
+	if err := json.Unmarshal([]byte(blockIDStr), &blockIndex); err != nil {
+		return fmt.Errorf("error parsing block index JSON '%s': %w", blockIDStr, err)
+	}
+
+	blockID, err := ulid.Parse(blockIndex.BlockID)
+	if err != nil {
+		return fmt.Errorf("error parsing block ID '%s': %w", blockIndex.BlockID, err)
+	}
+
+	index := Index{WorkspaceID: workspaceID, EventName: blockIndex.EventName}
+
+	return b.pc.Client().Do(ctx, b.pc.Client().B().Sadd().Key(blockDeleteKey(index, blockID)).Member(pauseID.String()).Build()).Error()
 }
 
 func (b *blockstore) IndexExists(ctx context.Context, i Index) (bool, error) {
@@ -683,8 +742,11 @@ func (b *blockstore) PauseByID(ctx context.Context, index Index, pauseID uuid.UU
 
 // Compact reads all indexed deletes from block for an index, then compacts any blocks over a given threshold
 // by removing pauses and rewriting blocks.
-func (b *blockstore) Compact(ctx context.Context, index Index) {
-	_ = util.Lease(
+func (b *blockstore) Compact(ctx context.Context, index Index) error {
+	if b.buf == nil || b.bucket == nil || b.blocksize == 0 {
+		return fmt.Errorf("error bucket is not setup")
+	}
+	return util.Lease(
 		ctx,
 		"compact index blocks",
 		// NOTE: Lease, Renew, and Revoke are closures because they need
@@ -740,11 +802,18 @@ func (b *blockstore) compact(ctx context.Context, index Index) error {
 		deleteKey := blockDeleteKey(index, blockID)
 		deleteCount, err := b.pc.Client().Do(ctx, b.pc.Client().B().Scard().Key(deleteKey).Build()).AsInt64()
 		if err != nil {
-			l.Warn("error getting delete count for block", "block_id", blockIDStr, "error", err)
+			l.Error("error getting delete count for block", "block_id", blockIDStr, "error", err)
 			continue
 		}
 
-		if deleteCount >= int64(b.compactionLimit) {
+		blockMD := blockMetadataList[blockIDStr]
+		if blockMD == nil {
+			l.Error("no metadata found for block", "block_id", blockIDStr)
+			continue
+		}
+
+		ratioThreshold := int64(float64(blockMD.Len) * b.compactionGarbageRatio)
+		if deleteCount >= ratioThreshold {
 			blocksToCompact = append(blocksToCompact, blockID)
 		}
 	}
@@ -1150,5 +1219,31 @@ func (b *blockstore) deleteBlock(ctx context.Context, index Index, blockID ulid.
 		return fmt.Errorf("error removing block from blob storage: %w", err)
 	}
 
+	return nil
+}
+
+// CleanBlock reads a block, deletes all pauses in it, and then triggers compaction.
+func (b *blockstore) CleanBlock(ctx context.Context, index Index, blockID ulid.ULID) error {
+	l := logger.StdlibLogger(ctx).With("workspace_id", index.WorkspaceID, "event_name", index.EventName, "block_id", blockID)
+
+	block, err := b.ReadBlock(ctx, index, blockID)
+	if err != nil {
+		return fmt.Errorf("error reading block for cleanup: %w", err)
+	}
+
+	pauseCount := len(block.Pauses)
+	for _, pause := range block.Pauses {
+		if err := b.Delete(ctx, index, *pause); err != nil {
+			l.Error("error deleting pause during cleanup", "pause_id", pause.ID, "error", err)
+		}
+	}
+
+	l.Debug("deleted pauses during cleanup", "count", pauseCount)
+
+	if err := b.Compact(ctx, index); err != nil {
+		return fmt.Errorf("error compacting after cleanup: %w", err)
+	}
+
+	l.Debug("cleanup successful", "pauses_deleted", pauseCount)
 	return nil
 }

@@ -12,7 +12,7 @@ import (
 func TestOutdatedThrottle(t *testing.T) {
 	cases := []struct {
 		name       string
-		constraint *PartitionThrottle
+		constraint *osqueue.PartitionThrottle
 		item       *osqueue.Throttle
 		expected   enums.OutdatedThrottleReason
 	}{
@@ -24,7 +24,7 @@ func TestOutdatedThrottle(t *testing.T) {
 		},
 		{
 			name: "missing key expression hash (old item)",
-			constraint: &PartitionThrottle{
+			constraint: &osqueue.PartitionThrottle{
 				ThrottleKeyExpressionHash: util.XXHash("event.data.customerID"),
 				Limit:                     10,
 				Burst:                     1,
@@ -41,7 +41,7 @@ func TestOutdatedThrottle(t *testing.T) {
 		},
 		{
 			name: "added throttle",
-			constraint: &PartitionThrottle{
+			constraint: &osqueue.PartitionThrottle{
 				ThrottleKeyExpressionHash: util.XXHash("event.data.customerID"),
 				Limit:                     10,
 				Burst:                     1,
@@ -64,7 +64,7 @@ func TestOutdatedThrottle(t *testing.T) {
 		},
 		{
 			name: "changed throttle key",
-			constraint: &PartitionThrottle{
+			constraint: &osqueue.PartitionThrottle{
 				ThrottleKeyExpressionHash: util.XXHash("event.data.customerID"),
 				Limit:                     10,
 				Burst:                     1,
@@ -83,7 +83,7 @@ func TestOutdatedThrottle(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			constraints := PartitionConstraintConfig{
+			constraints := osqueue.PartitionConstraintConfig{
 				Throttle: tc.constraint,
 			}
 			item := osqueue.QueueItem{

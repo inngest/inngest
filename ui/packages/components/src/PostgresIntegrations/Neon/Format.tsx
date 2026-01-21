@@ -21,7 +21,7 @@ export default function NeonFormat({
     engine: string;
     name: string;
     replicaConn?: string;
-  }) => Promise<{ success: boolean; error: string }>;
+  }) => Promise<{ success: boolean; error: string | null }>;
 }) {
   const [isVerifying, setIsVerifying] = useState(false);
   const [error, setError] = useState<string>();
@@ -97,7 +97,7 @@ export default function NeonFormat({
       {isVerified ? (
         <Button
           label="Next"
-          href={`/settings/integrations/${integration}/${IntegrationSteps.ConnectDb}`}
+          to={`/settings/integrations/${integration}/${IntegrationSteps.ConnectDb}`}
         />
       ) : (
         <Button

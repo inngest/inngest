@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	pkgName = "constraintapi.scavenger"
+	scavengerPkgName = "constraintapi.redis.scavenger"
 
 	defaultScavengerAccountsPeekSize = 20
 	defaultScavengerLeasesPeekSize   = 20
@@ -61,6 +61,33 @@ type ScavengeResult struct {
 	TotalAccountsCount        int
 	ReclaimedLeases           int
 	ScannedAccounts           int
+}
+
+func (res ScavengeResult) Report(ctx context.Context, source string) {
+	tags := map[string]any{
+		"source": source,
+	}
+
+	metrics.IncrConstraintAPIScavengerTotalAccountsCounter(ctx, int64(res.TotalAccountsCount), metrics.CounterOpt{
+		PkgName: scavengerPkgName,
+		Tags:    tags,
+	})
+	metrics.IncrConstraintAPIScavengerExpiredAccountsCounter(ctx, int64(res.TotalExpiredAccountsCount), metrics.CounterOpt{
+		PkgName: scavengerPkgName,
+		Tags:    tags,
+	})
+	metrics.IncrConstraintAPIScavengerScannedAccountsCounter(ctx, int64(res.ScannedAccounts), metrics.CounterOpt{
+		PkgName: scavengerPkgName,
+		Tags:    tags,
+	})
+	metrics.IncrConstraintAPIScavengerTotalExpiredLeasesCounter(ctx, int64(res.TotalExpiredLeasesCount), metrics.CounterOpt{
+		PkgName: scavengerPkgName,
+		Tags:    tags,
+	})
+	metrics.IncrConstraintAPIScavengerReclaimedLeasesCounter(ctx, int64(res.ReclaimedLeases), metrics.CounterOpt{
+		PkgName: scavengerPkgName,
+		Tags:    tags,
+	})
 }
 
 // scavengerShard deterministically retrieves a shard number based on numScavengerShards and accountID
@@ -106,6 +133,9 @@ func (r *redisCapacityManager) Scavenge(ctx context.Context, options ...scavenge
 				return fmt.Errorf("could not scavenge expired leases for queue shard: %w", err)
 			}
 
+			// Report metrics per queue shard
+			res.Report(ctx, k)
+
 			resLock.Lock()
 			result.ReclaimedLeases += res.ReclaimedLeases
 			result.TotalAccountsCount += res.TotalAccountsCount
@@ -123,6 +153,9 @@ func (r *redisCapacityManager) Scavenge(ctx context.Context, options ...scavenge
 		if err != nil {
 			return fmt.Errorf("could not scavenge rate limit: %w", err)
 		}
+
+		// Report metrics
+		res.Report(ctx, "rate_limit")
 
 		resLock.Lock()
 		result.ReclaimedLeases += res.ReclaimedLeases
@@ -169,8 +202,10 @@ func (r *redisCapacityManager) scavengeShard(ctx context.Context, mi MigrationId
 	start := time.Now()
 	defer func() {
 		metrics.HistogramConstraintAPIScavengerShardProcessDuration(ctx, time.Since(start), metrics.HistogramOpt{
-			PkgName: pkgName,
-			Tags:    map[string]any{},
+			PkgName: scavengerPkgName,
+			Tags: map[string]any{
+				"source": mi.String(),
+			},
 		})
 	}()
 
@@ -382,8 +417,10 @@ func (r *redisCapacityManager) scavengeAccount(
 	for _, leaseID := range peekedLeases {
 		leaseAge := now.Sub(leaseID.Timestamp())
 		metrics.HistogramConstraintAPIScavengerLeaseAge(ctx, leaseAge, metrics.HistogramOpt{
-			PkgName: pkgName,
-			Tags:    map[string]any{},
+			PkgName: scavengerPkgName,
+			Tags: map[string]any{
+				"source": mi.String(),
+			},
 		})
 
 		_, err := r.Release(ctx, &CapacityReleaseRequest{
@@ -439,34 +476,18 @@ func (s *scavengerService) Run(ctx context.Context) error {
 			continue
 		}
 
-		metrics.IncrConstraintAPIScavengerTotalAccountsCounter(ctx, int64(res.TotalAccountsCount), metrics.CounterOpt{
-			PkgName: pkgName,
-			Tags:    map[string]any{},
-		})
-		metrics.IncrConstraintAPIScavengerExpiredAccountsCounter(ctx, int64(res.TotalExpiredAccountsCount), metrics.CounterOpt{
-			PkgName: pkgName,
-			Tags:    map[string]any{},
-		})
-		metrics.IncrConstraintAPIScavengerScannedAccountsCounter(ctx, int64(res.ScannedAccounts), metrics.CounterOpt{
-			PkgName: pkgName,
-			Tags:    map[string]any{},
-		})
-		metrics.IncrConstraintAPIScavengerTotalExpiredLeasesCounter(ctx, int64(res.TotalExpiredLeasesCount), metrics.CounterOpt{
-			PkgName: pkgName,
-			Tags:    map[string]any{},
-		})
-		metrics.IncrConstraintAPIScavengerReclaimedLeasesCounter(ctx, int64(res.ReclaimedLeases), metrics.CounterOpt{
-			PkgName: pkgName,
-			Tags:    map[string]any{},
-		})
-
-		l.Trace("scavenger tick completed",
+		l := l.With(
 			"total_accounts", res.TotalAccountsCount,
 			"expired_accounts", res.TotalExpiredAccountsCount,
 			"scanned_accounts", res.ScannedAccounts,
 			"expired_leases", res.TotalExpiredLeasesCount,
 			"reclaimed_leases", res.ReclaimedLeases,
 		)
+		if res.ReclaimedLeases > 0 {
+			l.Debug("scavenger tick completed")
+		} else {
+			l.Trace("scavenger tick completed")
+		}
 	}
 }
 

@@ -182,6 +182,115 @@ func TestGeneratorSleepDuration(t *testing.T) {
 	require.WithinDuration(t, time.Now().Truncate(time.Second).Add(time.Minute), time.Now().Add(duration), time.Second)
 }
 
+func TestGetTraceFunctionOutput(t *testing.T) {
+	tests := []struct {
+		name     string
+		r        DriverResponse
+		expected string
+		hasError bool
+	}{
+		{
+			name: "valid JSON output wrapped in data",
+			r: DriverResponse{
+				Generator: []*GeneratorOpcode{
+					{
+						Op:   enums.OpcodeRunComplete,
+						Data: json.RawMessage(`{"hello": "world"}`),
+					},
+				},
+			},
+			expected: `{"data":{"hello": "world"}}`,
+		},
+		{
+			name: "HTML output wrapped in error with quoted string",
+			r: DriverResponse{
+				Generator: []*GeneratorOpcode{},
+				Err:       strptr("failed"),
+				Output:    "<html><body>502 Bad Gateway</body></html>",
+			},
+			expected: `{"error":"<html><body>502 Bad Gateway</body></html>"}`,
+		},
+		{
+			name: "non-JSON string output wrapped in data with quotes",
+			r: DriverResponse{
+				Generator: []*GeneratorOpcode{},
+				Output:    "plain text response",
+			},
+			expected: `{"data":"plain text response"}`,
+		},
+		{
+			name: "valid JSON string output wrapped in data",
+			r: DriverResponse{
+				Generator: []*GeneratorOpcode{},
+				Output:    `{"result": "success"}`,
+			},
+			expected: `{"data":{"result":"success"}}`,
+		},
+		{
+			name: "byte slice HTML output wrapped in data with quotes",
+			r: DriverResponse{
+				Generator: []*GeneratorOpcode{},
+				Output:    []byte("<html><body>Not Found</body></html>"),
+			},
+			expected: `{"data":"<html><body>Not Found</body></html>"}`,
+		},
+		{
+			name: "complex object marshalled and wrapped in data",
+			r: DriverResponse{
+				Generator: []*GeneratorOpcode{},
+				Output:    map[string]interface{}{"status": "ok", "count": 42},
+			},
+			expected: `{"data":{"count":42,"status":"ok"}}`,
+		},
+		{
+			name: "error with non-JSON output",
+			r: DriverResponse{
+				Generator: []*GeneratorOpcode{},
+				Err:       strptr("request failed"),
+				Output:    "<html>Error page</html>",
+			},
+			expected: `{"error":"<html>Error page</html>"}`,
+		},
+		{
+			name: "already wrapped error returned as-is",
+			r: DriverResponse{
+				Generator: []*GeneratorOpcode{},
+				Err:       strptr("failed"),
+				Output:    `{"error":{"message":"SDK error"}}`,
+			},
+			expected: `{"error":{"message":"SDK error"}}`,
+		},
+		{
+			name: "empty string output should error",
+			r: DriverResponse{
+				Generator: []*GeneratorOpcode{},
+				Output:    "",
+			},
+			hasError: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			actual, err := test.r.GetTraceFunctionOutput()
+
+			if test.hasError {
+				require.Error(t, err)
+				return
+			}
+
+			require.NoError(t, err)
+			require.Equal(t, test.expected, actual)
+
+			// Verify the output is valid JSON
+			if actual != "" {
+				var temp interface{}
+				require.NoError(t, json.Unmarshal([]byte(actual), &temp), "output should be valid JSON")
+			}
+		})
+	}
+}
+
 func strptr(s string) *string {
 	return &s
 }

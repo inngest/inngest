@@ -68,7 +68,8 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	retryInterval := localconfig.GetIntValue(cmd, "retry-interval", 0)
 	queueWorkers := localconfig.GetIntValue(cmd, "queue-workers", devserver.DefaultQueueWorkers)
 	tick := localconfig.GetIntValue(cmd, "tick", devserver.DefaultTick)
-	inMemory := localconfig.GetBoolValue(cmd, "in-memory", true)
+	persist := localconfig.GetBoolValue(cmd, "persist", false)
+	sqliteDir := localconfig.GetValue(cmd, "sqlite-dir", "")
 
 	debugAPIPort := localconfig.GetIntValue(cmd, "debug-api-port", devserver.DefaultDebugAPIPort)
 
@@ -96,10 +97,13 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		_ = itrace.CloseUserTracer(ctx)
 	}()
 
+	systemTraceEndpoint := localconfig.GetValue(cmd, "system-trace-endpoint", traceEndpoint)
+	systemTraceURLPath := localconfig.GetValue(cmd, "system-trace-url-path", "/dev/traces/system")
+
 	if err := itrace.NewSystemTracer(ctx, itrace.TracerOpts{
 		ServiceName:   "tracing-system",
-		TraceEndpoint: traceEndpoint,
-		TraceURLPath:  "/dev/traces/system",
+		TraceEndpoint: systemTraceEndpoint,
+		TraceURLPath:  systemTraceURLPath,
 		Type:          itrace.TracerTypeOTLPHTTP,
 	}); err != nil {
 		fmt.Println(err)
@@ -127,7 +131,8 @@ func action(ctx context.Context, cmd *cli.Command) error {
 			connectgrpc.DefaultConnectGRPCIP, connectGatewayGRPCPort,
 			connectgrpc.DefaultConnectGRPCIP, connectExecutorGRPCPort,
 		),
-		InMemory:                inMemory,
+		Persist:                 persist,
+		SQLiteDir:               sqliteDir,
 		PostgresURI:             postgresURI,
 		PostgresMaxIdleConns:    postgresMaxIdleConns,
 		PostgresMaxOpenConns:    postgresMaxOpenConns,

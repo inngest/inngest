@@ -1,5 +1,3 @@
-'use client';
-
 import { useEffect, useMemo, useState } from 'react';
 import useDebounce from '@inngest/components/hooks/useDebounce';
 import { useQueries, type UseQueryResult } from '@tanstack/react-query';
@@ -75,7 +73,7 @@ function useDetectPossibleEvents(): { possibleEventNames: string[] } {
 }
 
 function makeMapOfEventNameToSchema(
-  results: Array<UseQueryResult<{ events: SchemaEvent[] }>>
+  results: Array<UseQueryResult<{ events: SchemaEvent[] }>>,
 ): Record<string, string> {
   return results.reduce<Record<string, string>>((acc, r) => {
     const events = r.data?.events ?? [];

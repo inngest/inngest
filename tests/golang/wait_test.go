@@ -69,6 +69,9 @@ func TestWait(t *testing.T) {
 	r.NoError(err)
 
 	t.Run("in progress wait", func(t *testing.T) {
+		// Wait a moment for runID to be populated
+		<-time.After(2 * time.Second)
+
 		run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{
 			Status:         models.FunctionStatusRunning,
 			ChildSpanCount: 1,
@@ -108,6 +111,9 @@ func TestWait(t *testing.T) {
 	r.NoError(err)
 
 	t.Run("trace run should have appropriate data", func(t *testing.T) {
+		// Wait a moment for runID to be populated
+		<-time.After(2 * time.Second)
+
 		run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{
 			Status:         models.FunctionStatusCompleted,
 			ChildSpanCount: 1,
@@ -200,6 +206,9 @@ func TestWaitGroup(t *testing.T) {
 	r.NoError(err)
 
 	t.Run("in progress wait", func(t *testing.T) {
+		// Wait a moment for runID to be populated
+		<-time.After(2 * time.Second)
+
 		run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{
 			Status:         models.FunctionStatusRunning,
 			ChildSpanCount: 1,
@@ -254,6 +263,9 @@ func TestWaitGroup(t *testing.T) {
 	r.NoError(err)
 
 	t.Run("trace run should have appropriate data", func(t *testing.T) {
+		// Wait a moment for runID to be populated
+		<-time.After(2 * time.Second)
+
 		run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{
 			Status:         models.FunctionStatusCompleted,
 			ChildSpanCount: 1,
@@ -337,6 +349,9 @@ func TestWaitInvalidExpression(t *testing.T) {
 	// Trigger the main function and successfully invoke the other function
 	_, err = inngestClient.Send(ctx, &event.Event{Name: evtName})
 	r.NoError(err)
+
+	// Wait a moment for runID to be populated
+	<-time.After(2 * time.Second)
 	c.WaitForRunStatus(ctx, t, "FAILED", &runID)
 }
 
@@ -380,6 +395,10 @@ func TestWaitInvalidExpressionSyntaxError(t *testing.T) {
 	// Trigger the main function and successfully invoke the other function
 	_, err = inngestClient.Send(ctx, &event.Event{Name: evtName})
 	r.NoError(err)
+
+	// Wait a moment for runID to be populated
+	<-time.After(2 * time.Second)
+
 	run := c.WaitForRunStatus(ctx, t, "FAILED", &runID)
 	assert.Equal(t,
 		`{"error":{"error":"InvalidExpression: Wait for event If expression failed to compile","name":"InvalidExpression","message":"Wait for event If expression failed to compile","stack":"error compiling expression: ERROR: \u003cinput\u003e:1:21: Syntax error: token recognition error at: '= '\n | event.data.userId === async.data.userId\n | ....................^"}}`,
@@ -574,6 +593,9 @@ func TestWaitForEvent_Timeout(t *testing.T) {
 	// Trigger the main function
 	_, err = inngestClient.Send(ctx, &event.Event{Name: evtName})
 	r.NoError(err)
+
+	// Wait a moment for runID to be populated
+	<-time.After(2 * time.Second)
 
 	run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{
 		Status:         models.FunctionStatusRunning,

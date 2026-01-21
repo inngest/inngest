@@ -3,19 +3,19 @@ package redis_state
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
+	"testing"
+	"time"
+
 	"github.com/alicebob/miniredis/v2"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
-	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/jonboulle/clockwork"
 	"github.com/redis/rueidis"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
-	"sync/atomic"
-	"testing"
-	"time"
 )
 
 func BenchmarkKeyQueues(b *testing.B) {
@@ -31,28 +31,21 @@ func BenchmarkKeyQueues(b *testing.B) {
 
 	clock := clockwork.NewFakeClock()
 
-	defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
-
-	q := NewQueue(
-		defaultShard,
-		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+	q, _ := newQueue(
+		b, rc,
+		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 			return true
 		}),
-		WithEnqueueSystemPartitionsToBacklog(false),
-		WithDisableLeaseChecksForSystemQueues(false),
-		WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-			return false
-		}),
-		WithKindToQueueMapping(map[string]string{
+		osqueue.WithKindToQueueMapping(map[string]string{
 			osqueue.KindPause:           osqueue.KindPause,
 			osqueue.KindDebounce:        osqueue.KindDebounce,
 			osqueue.KindQueueMigrate:    osqueue.KindQueueMigrate,
 			osqueue.KindPauseBlockFlush: osqueue.KindPauseBlockFlush,
 			osqueue.KindScheduleBatch:   osqueue.KindScheduleBatch,
 		}),
-		WithBacklogRefillLimit(10),
-		WithClock(clock),
-		WithRunMode(QueueRunMode{
+		osqueue.WithBacklogRefillLimit(10),
+		osqueue.WithClock(clock),
+		osqueue.WithRunMode(osqueue.QueueRunMode{
 			Sequential:                        true,
 			Scavenger:                         true,
 			Partition:                         true,
@@ -65,9 +58,6 @@ func BenchmarkKeyQueues(b *testing.B) {
 			ShadowContinuations:               true,
 			ShadowContinuationSkipProbability: consts.QueueContinuationSkipProbability,
 			NormalizePartition:                true,
-		}),
-		WithShardSelector(func(ctx context.Context, accountId uuid.UUID, queueName *string) (QueueShard, error) {
-			return defaultShard, nil
 		}),
 	)
 	ctx := context.Background()
@@ -110,7 +100,7 @@ func BenchmarkKeyQueues(b *testing.B) {
 				AccountID:       accountID,
 				WorkspaceID:     wsID,
 			},
-		}, q.clock.Now(), osqueue.EnqueueOpts{})
+		}, clock.Now(), osqueue.EnqueueOpts{})
 		require.NoError(b, err)
 	}
 

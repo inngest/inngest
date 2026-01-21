@@ -1,5 +1,3 @@
-'use client';
-
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip/Tooltip';
 import { RiFileCopyLine, RiTimeLine, RiUserSmileLine } from '@remixicon/react';
 import { toast } from 'sonner';
@@ -36,7 +34,7 @@ export function Time({ className, format, value, copyable = true }: Props) {
 
   const date = value instanceof Date ? value : toMaybeDate(value);
 
-  if (!(date instanceof Date)) {
+  if (!(date instanceof Date) || isNaN(date.getTime())) {
     return <span>Invalid date</span>;
   }
 

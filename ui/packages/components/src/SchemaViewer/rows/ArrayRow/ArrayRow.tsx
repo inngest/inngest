@@ -1,5 +1,3 @@
-'use client';
-
 import type { ArrayNode } from '../../types';
 import { ArrayRowVariantNested } from './variants/ArrayRowVariantNested';
 import { ArrayRowVariantObject } from './variants/ArrayRowVariantObject';

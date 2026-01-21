@@ -29,6 +29,7 @@ type RunInfo struct {
 	// on the same function by limiting the number of continues possible within a given chain.
 	ContinueCount       uint
 	RefilledFromBacklog string
+	CapacityLease       *CapacityLease
 }
 
 // RunFunc represents a function called to process each item in the queue.  This may be
@@ -95,11 +96,6 @@ type Unpauser interface {
 // AttemptResetter resets queue item attempts after a successful checkpoint.
 type AttemptResetter interface {
 	ResetAttemptsByJobID(ctx context.Context, shard string, jobID string) error
-}
-
-type QueueDirectAccess interface {
-	RemoveQueueItem(ctx context.Context, shard string, partitionKey string, itemID string) error
-	LoadQueueItem(ctx context.Context, shard string, itemID string) (*QueueItem, error)
 }
 
 // QuitError is an error that, when returned, quits the queue.  This always retries

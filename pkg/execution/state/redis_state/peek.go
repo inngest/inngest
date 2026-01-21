@@ -9,35 +9,12 @@ import (
 	"unsafe"
 
 	"github.com/google/uuid"
-	"github.com/inngest/inngest/pkg/enums"
+	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/redis/rueidis"
 )
-
-type PeekOpt func(p *peekOption)
-
-type peekOption struct {
-	// Shard specifies which shard to use for the peek operation instead of the shard that the executor points to.
-	// The use of this should be rare, and should be limited to system queue operations as much as possible.
-	Shard *QueueShard
-
-	ignoreCleanup bool
-}
-
-func WithPeekOptQueueShard(qs *QueueShard) PeekOpt {
-	return func(p *peekOption) {
-		p.Shard = qs
-	}
-}
-
-// WithPeekOptIgnoreCleanup will prevent missing items from being deleted.
-func WithPeekOptIgnoreCleanup() PeekOpt {
-	return func(p *peekOption) {
-		p.ignoreCleanup = true
-	}
-}
 
 type peeker[T any] struct {
 	q      *queue
@@ -61,21 +38,13 @@ type peeker[T any] struct {
 
 var ErrPeekerPeekExceedsMaxLimits = fmt.Errorf("provided limit exceeds max configured limit")
 
-type peekResult[T any] struct {
-	Items        []*T
-	TotalCount   int
-	RemovedCount int
-
-	// Cursor represents the score of the last item in the peek result.
-	// This can be used for pagination within iterators
-	Cursor int64
-}
-
 // peek peeks up to <limit> items from the given ZSET up to until, in order if sequential is true, otherwise randomly.
-func (p *peeker[T]) peek(ctx context.Context, keyOrderedPointerSet string, sequential bool, until time.Time, limit int64, opts ...PeekOpt) (*peekResult[T], error) {
+func (p *peeker[T]) peek(ctx context.Context, keyOrderedPointerSet string, sequential bool, until time.Time, limit int64, opts ...osqueue.PeekOpt) (*osqueue.PeekResult[T], error) {
+	l := logger.StdlibLogger(ctx)
+
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, p.opName), redis_telemetry.ScopeQueue)
 
-	opt := peekOption{}
+	opt := osqueue.PeekOption{}
 	for _, apply := range opts {
 		apply(&opt)
 	}
@@ -84,14 +53,7 @@ func (p *peeker[T]) peek(ctx context.Context, keyOrderedPointerSet string, seque
 		return nil, fmt.Errorf("missing 'maker' argument")
 	}
 
-	if p.q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
-		return nil, fmt.Errorf("unsupported queue shard kind for %s: %s", p.opName, p.q.primaryQueueShard.Kind)
-	}
-
-	rc := p.q.primaryQueueShard.RedisClient.Client()
-	if opt.Shard != nil {
-		rc = opt.Shard.RedisClient.Client()
-	}
+	rc := p.q.RedisClient.Client()
 
 	if limit > p.max {
 		return nil, ErrPeekerPeekExceedsMaxLimits
@@ -209,7 +171,7 @@ func (p *peeker[T]) peek(ctx context.Context, keyOrderedPointerSet string, seque
 	// Use parallel decoding as per Peek
 	items, err := util.ParallelDecode(encoded, func(val any, _ int) (*T, bool, error) {
 		if val == nil {
-			p.q.log.Error("encountered nil item in pointer queue",
+			l.Error("encountered nil item in pointer queue",
 				"encoded", encoded,
 				"missing", missingItems,
 				"key", keyOrderedPointerSet,
@@ -234,13 +196,13 @@ func (p *peeker[T]) peek(ctx context.Context, keyOrderedPointerSet string, seque
 		return nil, fmt.Errorf("error decoding items: %w", err)
 	}
 
-	if !opt.ignoreCleanup && p.handleMissingItems != nil && len(missingItems) > 0 {
+	if !opt.IgnoreCleanup && p.handleMissingItems != nil && len(missingItems) > 0 {
 		if err := p.handleMissingItems(missingItems); err != nil {
 			return nil, fmt.Errorf("could not handle missing items: %w", err)
 		}
 	}
 
-	return &peekResult[T]{
+	return &osqueue.PeekResult[T]{
 		Items:        items,
 		TotalCount:   int(totalCount),
 		RemovedCount: len(missingItems),
@@ -250,10 +212,6 @@ func (p *peeker[T]) peek(ctx context.Context, keyOrderedPointerSet string, seque
 
 func (p *peeker[T]) peekPointer(ctx context.Context, keyOrderedPointerSet string, sequential bool, until time.Time, limit int64) ([]string, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, p.opName), redis_telemetry.ScopeQueue)
-
-	if p.q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
-		return nil, fmt.Errorf("unsupported queue shard kind for %s: %s", p.opName, p.q.primaryQueueShard.Kind)
-	}
 
 	if limit > p.max {
 		return nil, ErrPeekerPeekExceedsMaxLimits
@@ -286,7 +244,7 @@ func (p *peeker[T]) peekPointer(ctx context.Context, keyOrderedPointerSet string
 
 	pointers, err := scripts["queue/peekPointerUntil"].Exec(
 		redis_telemetry.WithScriptName(ctx, "peekPointerUntil"),
-		p.q.primaryQueueShard.RedisClient.unshardedRc,
+		p.q.RedisClient.unshardedRc,
 		[]string{
 			keyOrderedPointerSet,
 		},

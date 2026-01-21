@@ -144,6 +144,7 @@ type Executor interface {
 type RunContext interface {
 	// Metadata access
 	Metadata() *sv2.Metadata
+	DriverResponse() *state.DriverResponse
 	Events() []json.RawMessage
 	HTTPClient() exechttp.RequestExecutor
 
@@ -182,7 +183,6 @@ type ResumeSignalResult struct {
 	RunID         *ulid.ULID
 }
 
-// PublishFinishedEventOpts represents the options for publishing a finished event.
 type InvokeFailHandlerOpts struct {
 	OriginalEvent event.TrackedEvent
 	FunctionID    string
@@ -206,9 +206,9 @@ type FinalizePublisher func(context.Context, sv2.ID, []event.Event) error
 // events to send.
 type InvokeFailHandler func(context.Context, InvokeFailHandlerOpts, []event.Event) error
 
-// HandleSendingEvent handles sending an event given an event and the queue
+// HandleInvokeEvent handles sending an event given an event and the queue
 // item.
-type HandleSendingEvent func(context.Context, event.Event, queue.Item) error
+type HandleInvokeEvent func(context.Context, event.TrackedEvent) error
 
 // ScheduleRequest represents all data necessary to schedule a new function.
 type ScheduleRequest struct {

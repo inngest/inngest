@@ -1,5 +1,3 @@
-'use client';
-
 import { createContext, useContext } from 'react';
 
 import type { Tab } from '../types';
@@ -18,7 +16,11 @@ interface TabManagerProviderProps {
   activeTab?: Tab;
 }
 
-export function TabManagerProvider({ children, actions, activeTab }: TabManagerProviderProps) {
+export function TabManagerProvider({
+  children,
+  actions,
+  activeTab,
+}: TabManagerProviderProps) {
   return (
     <TabManagerContext.Provider value={{ actions, activeTab }}>
       {children}
@@ -26,10 +28,14 @@ export function TabManagerProvider({ children, actions, activeTab }: TabManagerP
   );
 }
 
-export function useTabManagerActions(): { tabManagerActions: TabManagerActions } {
+export function useTabManagerActions(): {
+  tabManagerActions: TabManagerActions;
+} {
   const context = useContext(TabManagerContext);
   if (!context) {
-    throw new Error('useTabManagerActions must be used within a TabManagerProvider');
+    throw new Error(
+      'useTabManagerActions must be used within a TabManagerProvider',
+    );
   }
 
   return { tabManagerActions: context.actions };

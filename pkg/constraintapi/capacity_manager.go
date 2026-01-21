@@ -21,6 +21,7 @@ type RolloutKeyGenerator interface {
 	KeyInProgressLeasesAccount(accountID uuid.UUID) string
 	KeyInProgressLeasesFunction(accountID uuid.UUID, fnID uuid.UUID) string
 	KeyInProgressLeasesCustom(accountID uuid.UUID, scope enums.ConcurrencyScope, entityID uuid.UUID, keyExpressionHash, evaluatedKeyHash string) string
+	KeyConstraintCheckIdempotency(mi MigrationIdentifier, accountID uuid.UUID, leaseIdempotencyKey string) string
 }
 
 type RolloutManager interface {
@@ -57,6 +58,13 @@ type MigrationIdentifier struct {
 	QueueShard  string
 }
 
+func (m MigrationIdentifier) String() string {
+	if m.QueueShard != "" {
+		return m.QueueShard
+	}
+	return "rate_limit"
+}
+
 type CapacityCheckRequest struct {
 	AccountID uuid.UUID
 
@@ -64,6 +72,7 @@ type CapacityCheckRequest struct {
 	EnvID uuid.UUID
 
 	// FunctionID is used for identifying the function.
+	// This is optional, in case no function-level constraints are checked.
 	FunctionID uuid.UUID
 
 	// Configuration represents the latest known constraint configuration (a subset of the function config).
@@ -104,6 +113,11 @@ type CapacityCheckResponse struct {
 	RetryAfter time.Time
 
 	internalDebugState checkScriptResponse
+}
+
+// Debug returns INTERNAL debug information
+func (ac *CapacityCheckResponse) Debug() []string {
+	return ac.internalDebugState.Debug
 }
 
 type CapacityAcquireRequest struct {
@@ -179,6 +193,10 @@ type CapacityAcquireRequest struct {
 	Source LeaseSource
 
 	Migration MigrationIdentifier
+
+	// RequestAttempt is the current request attempt. For retries, this should be > 0.
+	// This is mainly used for instrumentation.
+	RequestAttempt int
 }
 
 // CapacityLease represents the tuple of LeaseID <-> IdempotencyKey which identifies the leased resource (event, queue item, etc.).
@@ -188,6 +206,8 @@ type CapacityLease struct {
 
 	// IdempotencyKey represents the resource associated with the lease, e.g. a queue item or event.
 	IdempotencyKey string
+
+	// TODO: We can store additional lease details in here (e.g. selected worked in the case of worker concurrency)
 }
 
 type CapacityAcquireResponse struct {
@@ -209,6 +229,8 @@ type CapacityAcquireResponse struct {
 	RetryAfter time.Time
 
 	internalDebugState acquireScriptResponse
+
+	RequestID ulid.ULID
 }
 
 // Debug returns INTERNAL debug information
@@ -228,6 +250,13 @@ type CapacityExtendLeaseRequest struct {
 	Duration time.Duration
 
 	Migration MigrationIdentifier
+
+	// Source includes information on the calling service and processing mode for instrumentation purposes.
+	Source LeaseSource
+
+	// RequestAttempt is the current request attempt. For retries, this should be > 0.
+	// This is mainly used for instrumentation.
+	RequestAttempt int
 }
 
 type CapacityExtendLeaseResponse struct {
@@ -247,6 +276,13 @@ type CapacityReleaseRequest struct {
 	LeaseID ulid.ULID
 
 	Migration MigrationIdentifier
+
+	// Source includes information on the calling service and processing mode for instrumentation purposes.
+	Source LeaseSource
+
+	// RequestAttempt is the current request attempt. For retries, this should be > 0.
+	// This is mainly used for instrumentation.
+	RequestAttempt int
 }
 
 type CapacityReleaseResponse struct {
@@ -258,26 +294,50 @@ type RunProcessingMode int
 const (
 	// RunProcessingModeBackground is used for regular (async) run scheduling and execution.
 	RunProcessingModeBackground RunProcessingMode = iota
-	// RunProcessingModeSync is used for requests sent by the Checkpointing API/Project Zero.
-	RunProcessingModeSync
+	// RunProcessingModeDurableEndpoint is used for requests sent by Durable Endpoints / Checkpointing
+	RunProcessingModeDurableEndpoint
 )
 
-type LeaseLocation int
+func (r RunProcessingMode) String() string {
+	switch r {
+	case 1:
+		return "durable_endpoint"
+	default:
+		return "background"
+	}
+}
+
+type CallerLocation int
 
 const (
-	LeaseLocationUnknown LeaseLocation = iota
+	CallerLocationUnknown CallerLocation = iota
 
-	// LeaseLocationScheduleRun is hit before scheduling a run
-	LeaseLocationScheduleRun
+	// CallerLocationSchedule is hit before scheduling a run
+	CallerLocationSchedule
 
-	// LeaseLocationPartitionLease is hit before leasing a partition
-	LeaseLocationPartitionLease
+	// CallerLocationBacklogRefill is hit before refilling items from a backlog to a ready queue
+	CallerLocationBacklogRefill
 
-	// LeaseLocationItemLease is hit before leasing a queue item
-	LeaseLocationItemLease
+	// CallerLocationItemLease is hit before leasing a queue item
+	CallerLocationItemLease
 
-	LeaseLocationCheckpoint
+	CallerLocationCheckpoint
 )
+
+func (c CallerLocation) String() string {
+	switch c {
+	case 1:
+		return "schedule"
+	case 2:
+		return "backlog_refill"
+	case 3:
+		return "item_lease"
+	case 4:
+		return "checkpoint"
+	default:
+		return "unknown"
+	}
+}
 
 type LeaseService int
 
@@ -288,14 +348,29 @@ const (
 	ServiceAPI
 )
 
+func (s LeaseService) String() string {
+	switch s {
+	case 1:
+		return "new_runs"
+	case 2:
+		return "executor"
+	case 3:
+		return "api"
+	default:
+		return "unknown"
+	}
+}
+
 type LeaseSource struct {
 	// Service refers to the origin service (new-runs, api, executor)
 	Service LeaseService
 
 	// Location refers to the lifecycle step requiring constraint checks
-	Location LeaseLocation
+	Location CallerLocation
 
 	RunProcessingMode RunProcessingMode
 }
 
-type UseConstraintAPIFn func(ctx context.Context, accountID uuid.UUID) (enable bool, fallback bool)
+type UseConstraintAPIFn func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool)
+
+type EnableHighCardinalityInstrumentation func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool)

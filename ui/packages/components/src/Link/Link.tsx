@@ -1,6 +1,6 @@
 import type { HTMLAttributeAnchorTarget } from 'react';
-import NextLink, { type LinkProps as NextLinkProps } from 'next/link';
 import { cn } from '@inngest/components/utils/classNames';
+import { Link as TanstackLink, type LinkComponentProps } from '@tanstack/react-router';
 
 export const defaultLinkStyles =
   'text-link hover:decoration-link decoration-transparent decoration-1 underline underline-offset-2 cursor-pointer transition-color duration-300';
@@ -14,7 +14,7 @@ type CustomLinkProps = {
   rel?: string;
 };
 
-export type LinkProps = CustomLinkProps & NextLinkProps;
+export type LinkProps = CustomLinkProps & LinkComponentProps;
 
 export function Link({
   href,
@@ -25,8 +25,9 @@ export function Link({
   children,
   ...props
 }: React.PropsWithChildren<LinkProps>) {
-  return (
-    <NextLink
+  return href ? (
+    <a
+      href={href}
       className={cn(
         defaultLinkStyles,
         'group flex items-center gap-1',
@@ -34,12 +35,28 @@ export function Link({
         size === 'medium' && 'text-base',
         className
       )}
-      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
       {...props}
     >
       {iconBefore}
       {children}
       {iconAfter}
-    </NextLink>
+    </a>
+  ) : (
+    <TanstackLink
+      className={cn(
+        defaultLinkStyles,
+        'group flex items-center gap-1',
+        size === 'small' && 'text-sm',
+        size === 'medium' && 'text-base',
+        className
+      )}
+      {...props}
+    >
+      {iconBefore}
+      {children}
+      {iconAfter}
+    </TanstackLink>
   );
 }

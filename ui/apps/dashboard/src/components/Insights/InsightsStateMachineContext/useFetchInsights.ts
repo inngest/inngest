@@ -1,5 +1,3 @@
-'use client';
-
 import { useCallback } from 'react';
 import { useClient } from 'urql';
 
@@ -37,13 +35,13 @@ export function useFetchInsights() {
   const fetchInsights = useCallback(
     async (
       { query, queryName }: FetchInsightsParams,
-      cb: FetchInsightsCallback
+      cb: FetchInsightsCallback,
     ): Promise<InsightsFetchResult> => {
       const res = await client
         .query(
           insightResultsQuery,
           { query, workspaceID: environment.id },
-          { requestPolicy: 'network-only' }
+          { requestPolicy: 'network-only' },
         )
         .toPromise();
       if (res.error) throw res.error;
@@ -52,13 +50,15 @@ export function useFetchInsights() {
       cb(query, queryName === UNTITLED_QUERY ? undefined : queryName);
       return transformInsightsResponse(res.data.insights);
     },
-    [client, environment.id]
+    [client, environment.id],
   );
 
   return { fetchInsights };
 }
 
-function mapColumnType(columnType: InsightsColumnType): 'date' | 'number' | 'string' {
+function mapColumnType(
+  columnType: InsightsColumnType,
+): 'date' | 'number' | 'string' {
   switch (columnType) {
     case InsightsColumnType.Date:
       return 'date';
@@ -73,7 +73,7 @@ function mapColumnType(columnType: InsightsColumnType): 'date' | 'number' | 'str
 
 function parseValueByType(
   value: string,
-  columnType: InsightsColumnType
+  columnType: InsightsColumnType,
 ): string | number | Date | null {
   switch (columnType) {
     case InsightsColumnType.Number:
@@ -89,7 +89,7 @@ function parseValueByType(
 
 function transformValuesByColumns(
   values: string[],
-  columns: Array<{ name: string; columnType: InsightsColumnType }>
+  columns: Array<{ name: string; columnType: InsightsColumnType }>,
 ): Record<string, string | number | Date | null> {
   return columns.reduce((acc, column, index) => {
     const value = values[index];
@@ -104,7 +104,7 @@ function transformValuesByColumns(
 }
 
 function transformInsightsResponse(
-  insights: InsightsResultsQuery['insights']
+  insights: InsightsResultsQuery['insights'],
 ): InsightsFetchResult {
   return {
     columns: insights.columns.map((col) => ({

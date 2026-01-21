@@ -72,6 +72,7 @@ import (
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/inngest/inngest/pkg/testapi"
 	"github.com/inngest/inngest/pkg/tracing"
+	"github.com/inngest/inngest/pkg/tracing/metadata/extractors"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/inngest/inngest/pkg/util/awsgateway"
 	"github.com/jonboulle/clockwork"
@@ -93,8 +94,8 @@ const (
 	DefaultDebugAPIPort = 7777
 )
 
-var defaultPartitionConstraintConfig = redis_state.PartitionConstraintConfig{
-	Concurrency: redis_state.PartitionConcurrency{
+var defaultPartitionConstraintConfig = queue.PartitionConstraintConfig{
+	Concurrency: queue.PartitionConcurrency{
 		SystemConcurrency:   consts.DefaultConcurrencyLimit,
 		AccountConcurrency:  consts.DefaultConcurrencyLimit,
 		FunctionConcurrency: consts.DefaultConcurrencyLimit,
@@ -133,9 +134,9 @@ type StartOpts struct {
 
 	NoUI bool
 
-	// InMemory controls whether to only use in-memory databases (as opposed to
-	// filesystem)
-	InMemory bool
+	// Persist controls whether to persist data in between restarts.  If false,
+	// the dev server will use in-memory databases.
+	Persist bool `json:"persist"`
 
 	// RedisURI allows connecting to external Redis instead of in-memory Redis
 	RedisURI string `json:"redis_uri"`
@@ -179,7 +180,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	services := []service.Service{}
 
 	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{
-		InMemory:    opts.InMemory,
+		Persist:     opts.Persist,
 		PostgresURI: opts.PostgresURI,
 		Directory:   opts.SQLiteDir,
 	})
@@ -268,16 +269,6 @@ func start(ctx context.Context, opts StartOpts) error {
 		QueueDefaultKey:        redis_state.QueueDefaultKey,
 	})
 
-	queueShard := redis_state.QueueShard{Name: consts.DefaultQueueShardName, RedisClient: unshardedClient.Queue(), Kind: string(enums.QueueShardKindRedis)}
-
-	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (redis_state.QueueShard, error) {
-		return queueShard, nil
-	}
-
-	queueShards := map[string]redis_state.QueueShard{
-		consts.DefaultQueueShardName: queueShard,
-	}
-
 	var sm state.Manager
 	sm, err = redis_state.New(
 		ctx,
@@ -292,13 +283,14 @@ func start(ctx context.Context, opts StartOpts) error {
 	// Create a new broadcaster which lets us broadcast realtime messages.
 	broadcaster := realtime.NewInProcessBroadcaster()
 
-	runMode := redis_state.QueueRunMode{
+	runMode := queue.QueueRunMode{
 		Sequential:    true,
 		Scavenger:     true,
 		Partition:     true,
 		Continuations: true,
 	}
 	enableKeyQueues := os.Getenv("EXPERIMENTAL_KEY_QUEUES_ENABLE") == "true"
+	enableStepMetadata := os.Getenv("EXPERIMENTAL_STEP_METADATA") == "true"
 
 	if enableKeyQueues {
 		runMode.ShadowPartition = true
@@ -309,51 +301,45 @@ func start(ctx context.Context, opts StartOpts) error {
 		runMode.NormalizePartition = true
 	}
 
-	queueOpts := []redis_state.QueueOpt{
-		redis_state.WithRunMode(runMode),
-		redis_state.WithIdempotencyTTL(time.Hour),
-		redis_state.WithNumWorkers(int32(opts.QueueWorkers)),
-		redis_state.WithPollTick(opts.Tick),
-		redis_state.WithShadowPollTick(2 * opts.Tick),
-		redis_state.WithBacklogNormalizePollTick(5 * opts.Tick),
+	conditionalQueueTracer := itrace.NewConditionalTracer(itrace.QueueTracer(), itrace.AlwaysTrace)
 
-		redis_state.WithLogger(l),
+	queueOpts := []queue.QueueOpt{
+		queue.WithRunMode(runMode),
+		queue.WithIdempotencyTTL(time.Hour),
+		queue.WithNumWorkers(int32(opts.QueueWorkers)),
+		queue.WithPollTick(opts.Tick),
+		queue.WithShadowPollTick(2 * opts.Tick),
+		queue.WithBacklogNormalizePollTick(5 * opts.Tick),
 
-		redis_state.WithShardSelector(shardSelector),
-		redis_state.WithQueueShardClients(queueShards),
+		queue.WithLogger(l),
 
 		// Key queues
-		redis_state.WithNormalizeRefreshItemCustomConcurrencyKeys(NormalizeConcurrencyKeys(smv2, dbcqrs)),
-		redis_state.WithRefreshItemThrottle(NormalizeThrottle(smv2, dbcqrs)),
-		redis_state.WithPartitionConstraintConfigGetter(PartitionConstraintConfigGetter(dbcqrs)),
+		queue.WithNormalizeRefreshItemCustomConcurrencyKeys(NormalizeConcurrencyKeys(smv2, dbcqrs)),
+		queue.WithRefreshItemThrottle(NormalizeThrottle(smv2, dbcqrs)),
+		queue.WithPartitionConstraintConfigGetter(PartitionConstraintConfigGetter(dbcqrs)),
 
-		redis_state.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+		queue.WithAllowKeyQueues(func(ctx context.Context, acctID, functionID uuid.UUID) bool {
 			return enableKeyQueues
 		}),
-		redis_state.WithEnqueueSystemPartitionsToBacklog(false),
-		redis_state.WithDisableLeaseChecksForSystemQueues(enableKeyQueues),
-		redis_state.WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-			return enableKeyQueues
-		}),
-		redis_state.WithBacklogRefillLimit(10),
-		redis_state.WithPartitionPausedGetter(func(ctx context.Context, functionID uuid.UUID) redis_state.PartitionPausedInfo {
+		queue.WithBacklogRefillLimit(10),
+		queue.WithPartitionPausedGetter(func(ctx context.Context, functionID uuid.UUID) queue.PartitionPausedInfo {
 			if paused, ok := pauseOverrides[functionID]; ok && paused {
-				return redis_state.PartitionPausedInfo{
+				return queue.PartitionPausedInfo{
 					Stale:  false,
 					Paused: true,
 				}
 			}
-			return redis_state.PartitionPausedInfo{}
+			return queue.PartitionPausedInfo{}
 		}),
+		queue.WithConditionalTracer(conditionalQueueTracer),
 	}
 
 	const rateLimitPrefix = "ratelimit"
 	var capacityManager constraintapi.RolloutManager
 	enableConstraintAPI := os.Getenv("ENABLE_CONSTRAINT_API") == "true"
 	if enableConstraintAPI {
-		shards := make(map[string]rueidis.Client)
-		for k, qs := range queueShards {
-			shards[k] = qs.RedisClient.Client()
+		shards := map[string]rueidis.Client{
+			consts.DefaultQueueShardName: unshardedClient.Queue().Client(),
 		}
 
 		cm, err := constraintapi.NewRedisCapacityManager(
@@ -363,13 +349,16 @@ func start(ctx context.Context, opts StartOpts) error {
 			constraintapi.WithRateLimitClient(unshardedRc),
 			constraintapi.WithQueueStateKeyPrefix(redis_state.QueueDefaultKey),
 			constraintapi.WithRateLimitKeyPrefix(rateLimitPrefix),
+			constraintapi.WithEnableHighCardinalityInstrumentation(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool) {
+				return false
+			}),
 		)
 		if err != nil {
 			return fmt.Errorf("could not create contraint API: %w", err)
 		}
 
-		queueOpts = append(queueOpts, redis_state.WithCapacityManager(cm))
-		queueOpts = append(queueOpts, redis_state.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool, fallback bool) {
+		queueOpts = append(queueOpts, queue.WithCapacityManager(cm))
+		queueOpts = append(queueOpts, queue.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
 			return true, true
 		}))
 
@@ -381,21 +370,44 @@ func start(ctx context.Context, opts StartOpts) error {
 	}
 
 	if opts.RetryInterval > 0 {
-		queueOpts = append(queueOpts, redis_state.WithBackoffFunc(
+		queueOpts = append(queueOpts, queue.WithBackoffFunc(
 			backoff.GetLinearBackoffFunc(time.Duration(opts.RetryInterval)*time.Second),
 		))
 	}
-	rq := redis_state.NewQueue(queueShard, queueOpts...)
+
+	queueShard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), queueOpts...)
+
+	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (queue.QueueShard, error) {
+		return queueShard, nil
+	}
+
+	queueShards := map[string]queue.QueueShard{
+		consts.DefaultQueueShardName: queueShard,
+	}
+
+	rq, err := queue.New(
+		ctx,
+		"queue",
+		queueShard,
+		queueShards,
+		shardSelector,
+		queueOpts...,
+	)
+	if err != nil {
+		return fmt.Errorf("could not create queue: %w", err)
+	}
 
 	rl := ratelimit.New(ctx, unshardedRc, fmt.Sprintf("{%s}:", rateLimitPrefix))
 
 	batcher := batch.NewRedisBatchManager(shardedClient.Batch(), rq, batch.WithLogger(l))
 	debouncer := debounce.NewRedisDebouncer(unshardedClient.Debounce(), queueShard, rq)
-	croner := cron.NewRedisCronManager(rq, l)
+	croner := cron.NewRedisCronManager(queueShard, rq, l)
 
-	sn := singleton.New(ctx, queueShards, shardSelector)
+	sn := singleton.New(ctx, map[string]*redis_state.QueueClient{
+		consts.DefaultQueueShardName: unshardedClient.Queue(),
+	}, shardSelector)
 
-	conditionalTracer := itrace.NewConditionalTracer(itrace.ConnectTracer(), itrace.AlwaysTrace)
+	conditionalConnectTracer := itrace.NewConditionalTracer(itrace.ConnectTracer(), itrace.AlwaysTrace)
 
 	connectPubSubLogger := logger.StdlibLoggerWithCustomVarName(ctx, "CONNECT_PUBSUB_LOG_LEVEL")
 
@@ -407,7 +419,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	executorLogger := connectPubSubLogger.With("svc", "executor")
 
 	executorProxy := connectgrpc.NewConnector(ctx, connectgrpc.GRPCConnectorOpts{
-		Tracer:             conditionalTracer,
+		Tracer:             conditionalConnectTracer,
 		StateManager:       connectionManager,
 		EnforceLeaseExpiry: enforceConnectLeaseExpiry,
 		GRPCConfig:         opts.ConnectGRPCConfig,
@@ -436,7 +448,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	for _, driverConfig := range opts.Config.Execution.Drivers {
 		d, err := driverConfig.NewDriver(registration.NewDriverOpts{
 			ConnectForwarder:       executorProxy,
-			ConditionalTracer:      conditionalTracer,
+			ConditionalTracer:      conditionalConnectTracer,
 			HTTPClient:             httpClient,
 			LocalSigningKey:        opts.SigningKey,
 			RequireLocalSigningKey: opts.RequireKeys,
@@ -516,7 +528,7 @@ func start(ctx context.Context, opts StartOpts) error {
 			return consts.DefaultMaxStateSizeLimit
 		}),
 		executor.WithInvokeFailHandler(getInvokeFailHandler(ctx, pb, opts.Config.EventStream.Service.Concrete.TopicName())),
-		executor.WithSendingEventHandler(getSendingEventHandler(ctx, pb, opts.Config.EventStream.Service.Concrete.TopicName())),
+		executor.WithInvokeEventHandler(getInvokeEventHandler(ctx, pb, opts.Config.EventStream.Service.Concrete.TopicName())),
 		executor.WithDebouncer(debouncer),
 		executor.WithSingletonManager(sn),
 		executor.WithBatcher(batcher),
@@ -528,11 +540,15 @@ func start(ctx context.Context, opts StartOpts) error {
 			PublishURL: fmt.Sprintf("http://%s:%d/v1/realtime/publish", url, opts.Config.CoreAPI.Port),
 		}),
 		executor.WithTracerProvider(tp),
+
+		executor.WithAllowStepMetadata(func(ctx context.Context, acctID uuid.UUID) bool {
+			return enableStepMetadata
+		}),
 	}
 
 	if capacityManager != nil {
 		executorOpts = append(executorOpts, executor.WithCapacityManager(capacityManager))
-		executorOpts = append(executorOpts, executor.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool, fallback bool) {
+		executorOpts = append(executorOpts, executor.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
 			return true, true
 		}))
 	}
@@ -608,7 +624,7 @@ func start(ctx context.Context, opts StartOpts) error {
 			ConnectGatewayRetriever:    ds,
 			Dev:                        true,
 			EntitlementProvider:        ds,
-			ConditionalTracer:          conditionalTracer,
+			ConditionalTracer:          conditionalConnectTracer,
 			ConnectGRPCConfig:          opts.ConnectGRPCConfig,
 		},
 	})
@@ -643,6 +659,13 @@ func start(ctx context.Context, opts StartOpts) error {
 				RunOutputReader: devutil.NewLocalOutputReader(core.Resolver(), ds.Data, ds.Data),
 				RunJWTSecret:    consts.DevServerRunJWTSecret,
 			},
+
+			MetadataOpts: apiv1.MetadataOpts{
+				Flag: func(ctx context.Context, accountID uuid.UUID) bool {
+					return enableStepMetadata
+				},
+				SpanExtractor: extractors.DefaultSpanExtractors,
+			},
 		})
 	})
 
@@ -663,7 +686,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	// This provides system queue depth metrics via /metrics endpoint.
 	metricsAPI, err := metrics.NewMetricsAPI(metrics.Opts{
 		AuthMiddleware: authn.SigningKeyMiddleware(opts.SigningKey),
-		QueueManager:   rq,
+		QueueManager:   queueShard,
 	})
 	if err != nil {
 		return err
@@ -736,14 +759,15 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	if os.Getenv("DEBUG") != "" {
 		services = append(services, debugapi.NewDebugAPI(debugapi.Opts{
-			Log:           l,
-			DB:            ds.Data,
-			Queue:         rq,
-			State:         ds.State,
-			Cron:          croner,
-			ShardSelector: shardSelector,
-			Port:          ds.Opts.DebugAPIPort,
-			PauseManager:  pauseMgr,
+			Log:             l,
+			DB:              ds.Data,
+			Queue:           rq,
+			State:           ds.State,
+			Cron:            croner,
+			ShardSelector:   shardSelector,
+			Port:            ds.Opts.DebugAPIPort,
+			PauseManager:    pauseMgr,
+			CapacityManager: capacityManager,
 		}))
 	}
 
@@ -773,10 +797,9 @@ func createInmemoryRedis(ctx context.Context, tick time.Duration) (rueidis.Clien
 	return rc, r, nil
 }
 
-func getSendingEventHandler(ctx context.Context, pb pubsub.Publisher, topic string) execution.HandleSendingEvent {
-	return func(ctx context.Context, evt event.Event, item queue.Item) error {
-		trackedEvent := event.NewOSSTrackedEvent(evt, nil)
-		byt, err := json.Marshal(trackedEvent)
+func getInvokeEventHandler(ctx context.Context, pb pubsub.Publisher, topic string) execution.HandleInvokeEvent {
+	return func(ctx context.Context, evt event.TrackedEvent) error {
+		byt, err := json.Marshal(evt)
 		if err != nil {
 			return fmt.Errorf("error marshalling invocation event: %w", err)
 		}
@@ -811,7 +834,7 @@ func getInvokeFailHandler(ctx context.Context, pb pubsub.Publisher, topic string
 		for _, e := range evts {
 			evt := e
 			eg.Go(func() error {
-				trackedEvent := event.NewOSSTrackedEvent(evt, nil)
+				trackedEvent := event.NewBaseTrackedEvent(evt, nil)
 				byt, err := json.Marshal(trackedEvent)
 				if err != nil {
 					return fmt.Errorf("error marshalling function finished event: %w", err)
@@ -838,8 +861,8 @@ func getInvokeFailHandler(ctx context.Context, pb pubsub.Publisher, topic string
 	}
 }
 
-func NormalizeConcurrencyKeys(smv2 sv2.StateLoader, dbcqrs cqrs.Manager) redis_state.NormalizeRefreshItemCustomConcurrencyKeysFn {
-	return func(ctx context.Context, item *queue.QueueItem, existingKeys []state.CustomConcurrency, shadowPartition *redis_state.QueueShadowPartition) ([]state.CustomConcurrency, error) {
+func NormalizeConcurrencyKeys(smv2 sv2.StateLoader, dbcqrs cqrs.Manager) queue.NormalizeRefreshItemCustomConcurrencyKeysFn {
+	return func(ctx context.Context, item *queue.QueueItem, existingKeys []state.CustomConcurrency, shadowPartition *queue.QueueShadowPartition) ([]state.CustomConcurrency, error) {
 		id := sv2.IDFromV1(item.Data.Identifier)
 
 		workflow, err := dbcqrs.GetFunctionByInternalUUID(ctx, id.FunctionID)
@@ -876,7 +899,7 @@ func NormalizeConcurrencyKeys(smv2 sv2.StateLoader, dbcqrs cqrs.Manager) redis_s
 	}
 }
 
-func NormalizeThrottle(smv2 sv2.StateLoader, dbcqrs cqrs.Manager) redis_state.RefreshItemThrottleFn {
+func NormalizeThrottle(smv2 sv2.StateLoader, dbcqrs cqrs.Manager) queue.RefreshItemThrottleFn {
 	return func(ctx context.Context, item *queue.QueueItem) (*queue.Throttle, error) {
 		id := sv2.IDFromV1(item.Data.Identifier)
 
@@ -914,8 +937,8 @@ func NormalizeThrottle(smv2 sv2.StateLoader, dbcqrs cqrs.Manager) redis_state.Re
 	}
 }
 
-func PartitionConstraintConfigGetter(dbcqrs cqrs.Manager) redis_state.PartitionConstraintConfigGetter {
-	return func(ctx context.Context, p redis_state.PartitionIdentifier) redis_state.PartitionConstraintConfig {
+func PartitionConstraintConfigGetter(dbcqrs cqrs.Manager) queue.PartitionConstraintConfigGetter {
+	return func(ctx context.Context, p queue.PartitionIdentifier) queue.PartitionConstraintConfig {
 		if p.SystemQueueName != nil {
 			return defaultPartitionConstraintConfig
 		}
@@ -942,10 +965,10 @@ func PartitionConstraintConfigGetter(dbcqrs cqrs.Manager) redis_state.PartitionC
 			fnVersion = 1
 		}
 
-		constraints := redis_state.PartitionConstraintConfig{
+		constraints := queue.PartitionConstraintConfig{
 			FunctionVersion: fnVersion,
 
-			Concurrency: redis_state.PartitionConcurrency{
+			Concurrency: queue.PartitionConcurrency{
 				SystemConcurrency:     consts.DefaultConcurrencyLimit,
 				AccountConcurrency:    accountLimit,
 				FunctionConcurrency:   fnLimit,
@@ -960,7 +983,7 @@ func PartitionConstraintConfigGetter(dbcqrs cqrs.Manager) redis_state.PartitionC
 				}
 
 				constraints.Concurrency.CustomConcurrencyKeys = append(constraints.Concurrency.CustomConcurrencyKeys,
-					redis_state.CustomConcurrencyLimit{
+					queue.CustomConcurrencyLimit{
 						Mode:                enums.ConcurrencyModeStep,
 						Scope:               limit.Scope,
 						HashedKeyExpression: limit.Hash,
@@ -975,7 +998,7 @@ func PartitionConstraintConfigGetter(dbcqrs cqrs.Manager) redis_state.PartitionC
 				keyExpr = *fn.Throttle.Key
 			}
 
-			constraints.Throttle = &redis_state.PartitionThrottle{
+			constraints.Throttle = &queue.PartitionThrottle{
 				ThrottleKeyExpressionHash: util.XXHash(keyExpr),
 				Limit:                     int(fn.Throttle.Limit),
 				Burst:                     int(fn.Throttle.Burst),

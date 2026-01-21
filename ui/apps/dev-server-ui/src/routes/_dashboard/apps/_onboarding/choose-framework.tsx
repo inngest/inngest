@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { Link } from '@inngest/components/Link/NewLink';
+import { Link } from '@inngest/components/Link';
 
 import FrameworkList from '@/components/Onboarding/FrameworkList';
 import frameworksData from '@/components/Onboarding/frameworks.json';

@@ -188,6 +188,9 @@ func New(ctx context.Context, opts ...Opt) (state.Manager, error) {
 		u: m.unsafeUnshardedClientDoNotUse,
 	}
 
+	// Default to deleting pauses from buffer only
+	m.pauseDeleter = m.unshardedMgr
+
 	return m, nil
 }
 
@@ -205,12 +208,18 @@ func WithUnshardedClient(u *UnshardedClient) Opt {
 	}
 }
 
+func (m *mgr) SetPauseDeleter(pm state.PauseDeleter) {
+	m.pauseDeleter = pm
+}
+
 type mgr struct {
 	// unsafe: Operate on sharded manager instead.
 	unsafeShardedClientDoNotUse *ShardedClient
 
 	// unsafe: Operate on unsharded manager instead.
 	unsafeUnshardedClientDoNotUse *UnshardedClient
+
+	pauseDeleter state.PauseDeleter
 
 	shardedMgr
 	unshardedMgr
@@ -380,8 +389,13 @@ func (m shardedMgr) idempotencyCheck(ctx context.Context, rc RetriableClient, ke
 		return nil, err
 	}
 
-	if prev == consts.FunctionIdempotencyTombstone {
-		return nil, state.ErrIdentifierTomestone
+	// When a run finishes, we prefix the run ID with the tombstone marker.
+	// This is needed for scheduling idempotency:  if scheduling retries the new state op
+	// and elsewhere we've updated with the tombstone prefix, scheduling can stop.
+	// Realisitcally, the chances of this are low, as the entire run has to finish while
+	// the scheduling op retries.
+	if len(prev) > 0 && prev[0] == consts.FunctionIdempotencyTombstone {
+		return nil, state.ErrIdentifierTombstone
 	}
 
 	// if there are existing values, the state might have already been created
@@ -942,7 +956,6 @@ func (m unshardedMgr) SavePause(ctx context.Context, p state.Pause) (int64, erro
 	case -1:
 		return status, state.ErrPauseAlreadyExists
 	default:
-		logger.StdlibLogger(ctx).Debug("save pause", "pause", p.ID)
 		return status, nil
 	}
 }
@@ -994,7 +1007,7 @@ func (m mgr) Delete(ctx context.Context, i state.Identifier) error {
 		return err
 	}
 
-	err = m.deletePausesForRun(ctx, ctx, i)
+	err = m.unshardedMgr.deletePausesForRun(ctx, ctx, m.pauseDeleter, i)
 	if err != nil {
 		return err
 	}
@@ -1018,9 +1031,10 @@ func (m shardedMgr) delete(ctx context.Context, callCtx context.Context, i state
 	}
 
 	_ = r.Do(callCtx, func(client rueidis.Client) rueidis.Completed {
-		// update the idempotency key to the tombstone value to indicate this run is done
-		// do scheduling knows to not need to continue attempting to do so
-		return client.B().Set().Key(key).Value(consts.FunctionIdempotencyTombstone).Xx().Keepttl().Build()
+		// update the idempotency key to the tombstone prefix to indicate this run is done
+		// so scheduling retries can detect and stop.
+		val := fmt.Sprintf("%s%s", string(consts.FunctionIdempotencyTombstone), i.RunID)
+		return client.B().Set().Key(key).Value(val).Xx().Keepttl().Build()
 	}).Error()
 
 	// Clear all other data for a job.
@@ -1042,27 +1056,34 @@ func (m shardedMgr) delete(ctx context.Context, callCtx context.Context, i state
 	return nil
 }
 
-func (m unshardedMgr) deletePausesForRun(ctx context.Context, callCtx context.Context, i state.Identifier) error {
+func (m unshardedMgr) deletePausesForRun(ctx context.Context, callCtx context.Context, pauseDeleter state.PauseDeleter, i state.Identifier) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "deletePausesForRun"), redis_telemetry.ScopePauses)
 
 	pause := m.u.Pauses()
 
-	// Fetch all pauses for the run
-	if pauseIDs, err := pause.Client().Do(callCtx, pause.Client().B().Smembers().Key(pause.kg.RunPauses(ctx, i.RunID)).Build()).AsStrSlice(); err == nil {
-		for _, id := range pauseIDs {
-			pauseID, _ := uuid.Parse(id)
-			err = m.DeletePauseByID(ctx, pauseID)
-			if err != nil {
-				// bubble the error up we can safely retry the whole process
-				return err
-			}
+	pauseIDs, err := pause.Client().Do(callCtx, pause.Client().B().Smembers().Key(pause.kg.RunPauses(ctx, i.RunID)).Build()).AsStrSlice()
+	if err != nil {
+		return err
+	}
+
+	for _, id := range pauseIDs {
+		pauseID, err := uuid.Parse(id)
+		if err != nil {
+			// This should never happen
+			logger.StdlibLogger(ctx).Error("invalid pause ID in run pause set", "error", err, "pauseID", id, "runID", i.RunID)
+			continue
+		}
+		// This call will either go to the pause manager to handle deleting from blocks
+		// or use the current implementation in this file by default.
+		if err := pauseDeleter.DeletePauseByID(ctx, pauseID, i.WorkspaceID); err != nil {
+			return err
 		}
 	}
 
 	return pause.Client().Do(callCtx, pause.Client().B().Del().Key(pause.kg.RunPauses(ctx, i.RunID)).Build()).Error()
 }
 
-func (m unshardedMgr) DeletePauseByID(ctx context.Context, pauseID uuid.UUID) error {
+func (m unshardedMgr) DeletePauseByID(ctx context.Context, pauseID uuid.UUID, workspaceID uuid.UUID) error {
 	// Attempt to fetch this pause.
 	pause, err := m.PauseByID(ctx, pauseID)
 	if err != nil {
@@ -1152,6 +1173,8 @@ func (m unshardedMgr) DeletePause(ctx context.Context, p state.Pause, options ..
 	switch status {
 	case 0:
 		return nil
+	case 1:
+		return state.ErrPauseNotInBuffer
 	default:
 		return fmt.Errorf("unknown response deleting pause: %d", status)
 	}
@@ -1595,13 +1618,13 @@ func (i *scanIter) Index() int64 {
 }
 
 func (i *scanIter) fetch(ctx context.Context) error {
-	// Reset the index.
-	i.i = -1
-
 	if i.cursor == 0 {
 		// We're done, no need to fetch.
 		return errScanDone
 	}
+
+	// Reset the index.
+	i.i = -1
 
 	// Scan 100 times up until there are values
 	for scans := 0; scans < 100; scans++ {
@@ -1707,7 +1730,7 @@ func newRunMetadata(data map[string]string) (*runMetadata, error) {
 	if !ok {
 		return nil, fmt.Errorf("no status stored in metadata")
 	}
-	status, err := strconv.Atoi(v)
+	status, err := strconv.Atoi(strings.TrimSuffix(v, ".0"))
 	if err != nil {
 		return nil, fmt.Errorf("invalid function status stored in run metadata: %#v", v)
 	}
@@ -1718,7 +1741,7 @@ func newRunMetadata(data map[string]string) (*runMetadata, error) {
 		if !ok {
 			return 0, fmt.Errorf("no '%s' stored in run metadata", v)
 		}
-		val, err := strconv.Atoi(str)
+		val, err := strconv.Atoi(strings.TrimSuffix(str, ".0"))
 		if err != nil {
 			return 0, fmt.Errorf("invalid '%s' stored in run metadata", v)
 		}
@@ -1730,7 +1753,7 @@ func newRunMetadata(data map[string]string) (*runMetadata, error) {
 	m.StepCount, _ = parseInt("step_count")
 
 	if val, ok := data["version"]; ok && val != "" {
-		v, err := strconv.Atoi(val)
+		v, err := strconv.Atoi(strings.TrimSuffix(val, ".0"))
 		if err != nil {
 			return nil, fmt.Errorf("invalid metadata version detected: %#v", val)
 		}
@@ -1739,7 +1762,7 @@ func newRunMetadata(data map[string]string) (*runMetadata, error) {
 	}
 
 	if val, ok := data["rv"]; ok && val != "" {
-		v, err := strconv.Atoi(val)
+		v, err := strconv.Atoi(strings.TrimSuffix(val, ".0"))
 		if err != nil {
 			return nil, fmt.Errorf("invalid hash version detected: %#v", val)
 		}
@@ -1747,7 +1770,7 @@ func newRunMetadata(data map[string]string) (*runMetadata, error) {
 	}
 
 	if val, ok := data["sat"]; ok && val != "" {
-		v, err := strconv.ParseInt(val, 10, 64)
+		v, err := strconv.ParseInt(strings.TrimSuffix(val, ".0"), 10, 64)
 		if err != nil {
 			return nil, fmt.Errorf("invalid started at timestamp detected: %#v", val)
 		}

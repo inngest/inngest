@@ -1,5 +1,6 @@
 import MiniStackedBarChart from '@inngest/components/Chart/MiniStackedBarChart';
-import { HorizontalPillList, Pill, PillContent } from '@inngest/components/Pill';
+import { Pill, PillContent } from '@inngest/components/Pill';
+import { HorizontalPillList } from '@inngest/components/Pill/HorizontalPillList';
 import { NumberCell, TextCell } from '@inngest/components/Table';
 import { type EventType } from '@inngest/components/types/eventType';
 import { cn } from '@inngest/components/utils/classNames';
@@ -17,7 +18,9 @@ export function isColumnID(value: unknown): value is ColumnID {
   return columnsIDs.includes(value as ColumnID);
 }
 
+//
 // Ensure that the column ID is valid at compile time
+//
 function ensureColumnID(id: ColumnID): ColumnID {
   return id;
 }

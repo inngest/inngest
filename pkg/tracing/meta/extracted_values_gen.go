@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/tracing/metadata"
 	"github.com/inngest/inngest/pkg/util/aigateway"
 	"github.com/oklog/ulid/v2"
 )
@@ -68,6 +69,7 @@ type ExtractedValues struct {
 	ResponseHeaders *http.Header
 	ResponseStatusCode *int
 	ResponseOutputSize *int
+	IsCheckpoint *bool
 	IsUserland *bool
 	UserlandSpanID *string
 	UserlandName *string
@@ -80,4 +82,8 @@ type ExtractedValues struct {
 	DebugRunID *ulid.ULID
 	AIRequestMetadata *aigateway.ParsedInferenceRequest
 	AIResponseMetadata *aigateway.ParsedInferenceResponse
+	Metadata *metadata.Values
+	MetadataKind *metadata.Kind
+	MetadataOp *metadata.Opcode
+	MetadataScope *metadata.Scope
 }

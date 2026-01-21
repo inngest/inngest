@@ -1,6 +1,7 @@
 package state
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -11,7 +12,6 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
-	"github.com/inngest/inngest/pkg/util"
 )
 
 const (
@@ -294,16 +294,17 @@ func (r *DriverResponse) UpdateOpcodeError(op *GeneratorOpcode, err UserError) {
 // return false if it's a step result.
 func (r *DriverResponse) IsFunctionResult() bool {
 	for _, op := range r.Generator {
-		if op.Op != enums.OpcodeNone {
-			return false
-		}
-
-		// Always a result...
 		if op.Op == enums.OpcodeRunComplete || op.Op == enums.OpcodeSyncRunComplete {
+			// Always a result...
 			return true
 		}
 	}
-	return true
+
+	return len(r.Generator) == 0
+}
+
+func (r *DriverResponse) IsOpResponse() bool {
+	return len(r.Generator) > 0
 }
 
 // IsDiscoveryResponse returns true if the response is the SDK reporting or
@@ -352,14 +353,14 @@ func (r *DriverResponse) IsGatewayRequest() bool {
 	return false
 }
 
-// GetWrappedFunctionOutput returns the serialized output of the function if this
+// GetTraceFunctionOutput returns the serialized output of the function if this
 // response represents a function result. The output could also be an error.
 //
 // NOTE: This always returns a wrapped response: {"data":T} or {"error":T}.  We
 // ALWAYS wrap trace data.
-func (r *DriverResponse) GetTraceFunctionOutput() (*string, error) {
+func (r *DriverResponse) GetTraceFunctionOutput() (string, error) {
 	if !r.IsFunctionResult() {
-		return nil, nil
+		return "", nil
 	}
 
 	// Firstly, we are standardizing on an enums.OpcodeRunComplete opcode
@@ -370,21 +371,26 @@ func (r *DriverResponse) GetTraceFunctionOutput() (*string, error) {
 			// wrapped in a {"data": T} message in the same way as steps.  This saves
 			// us from unmarshalling and remarshalling.
 			data := fmt.Sprintf(`{"data":%s}`, op.Data)
-			return &data, nil
+			return data, nil
 		}
 	}
 
-	output := r.Err
+	var output string
+
+	if r.Err != nil {
+		output = *r.Err
+	}
+
 	if r.Output != nil {
 		switch v := r.Output.(type) {
 		case string:
 			{
-				output = &v
+				output = v
 			}
 		case []byte:
 			{
 				s := string(v)
-				output = &s
+				output = s
 			}
 		default:
 			{
@@ -394,11 +400,9 @@ func (r *DriverResponse) GetTraceFunctionOutput() (*string, error) {
 						"failed to get driver output for type",
 						"type", fmt.Sprintf("%T", r.Output),
 					)
-					s := fmt.Sprintf("%v", r.Output)
-					output = &s
+					output = fmt.Sprintf("%v", r.Output)
 				} else {
-					s := string(byt)
-					output = &s
+					output = string(byt)
 				}
 			}
 		}
@@ -406,11 +410,11 @@ func (r *DriverResponse) GetTraceFunctionOutput() (*string, error) {
 
 	// If output is nil, somehow we have a function result with no output. That
 	// seems wrong.
-	if output == nil {
-		return nil, fmt.Errorf("function result has no output")
+	if output == "" {
+		return "", fmt.Errorf("function result has no output")
 	}
 
-	if isWrappedError([]byte(*output)) {
+	if isWrappedError([]byte(output)) {
 		// Error is already wrapped, return as-is.
 		return output, nil
 	}
@@ -422,27 +426,28 @@ func (r *DriverResponse) GetTraceFunctionOutput() (*string, error) {
 		key = "error"
 	}
 
-	var keyedOutput *string
-	keyedByt, err := json.Marshal(map[string]json.RawMessage{
-		key: json.RawMessage(*output),
+	// We expect - but it isn't always the case - that the user returns JSON.
+	// Check to see if output is valid JSON, and if not we'll treat it as a string
+	// within a `{"$key": T}` wrapper as expected.
+	if !json.Valid([]byte(output)) {
+		output = strconv.Quote(output)
+	}
+
+	var buf bytes.Buffer
+	encoder := json.NewEncoder(&buf)
+	encoder.SetEscapeHTML(false)
+	err := encoder.Encode(map[string]json.RawMessage{
+		key: json.RawMessage(output),
 	})
 	if err != nil {
-		if v, ok := r.Output.(string); ok {
-			// Reach here when output isn't valid JSON. For example, when we get
-			// a 502 HTML page
-
-			keyedByt := StandardError{
-				Message: "Invalid JSON in response",
-				Stack:   v,
-			}.Serialize(key)
-			return util.ToPtr(string(keyedByt)), nil
-		}
-		return nil, fmt.Errorf("failed to marshal output as data: %w", err)
+		keyedByt := StandardError{
+			Message: "Unable to grab HTTP response",
+			Stack:   fmt.Sprintf("%v", output),
+		}.Serialize(key)
+		return string(keyedByt), nil
 	}
-	s := string(keyedByt)
-	keyedOutput = &s
-
-	return keyedOutput, nil
+	// Remove the trailing newline that Encode adds
+	return string(bytes.TrimRight(buf.Bytes(), "\n")), nil
 }
 
 func isWrappedError(maybeErr []byte) bool {
@@ -533,12 +538,12 @@ func (r *DriverResponse) StandardError() StandardError {
 
 	var raw map[string]any
 
-	switch rawJson := r.Output.(type) {
+	switch rawJSON := r.Output.(type) {
 	case json.RawMessage:
 		// Try to unmarshal, but don't return on error, use raw map as fallback
-		_ = json.Unmarshal(rawJson, &raw)
+		_ = json.Unmarshal(rawJSON, &raw)
 	case map[string]any:
-		raw = rawJson
+		raw = rawJSON
 	default:
 		// Handle other types by setting their value directly as a message
 		switch v := r.Output.(type) {
@@ -550,7 +555,7 @@ func (r *DriverResponse) StandardError() StandardError {
 			if len(v) > 0 {
 				raw = map[string]any{"message": v}
 			}
-		case interface{}:
+		case any:
 			if v != nil {
 				raw = map[string]any{"message": v}
 			}

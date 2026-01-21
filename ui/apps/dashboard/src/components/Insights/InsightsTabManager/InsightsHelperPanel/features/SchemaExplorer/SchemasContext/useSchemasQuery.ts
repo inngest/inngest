@@ -1,5 +1,3 @@
-'use client';
-
 import { useCallback, useMemo } from 'react';
 import { useInfiniteQuery } from '@tanstack/react-query';
 
@@ -24,7 +22,11 @@ export function useSchemasQuery(search: string) {
 
   const query = useInfiniteQuery({
     enabled: isSchemaWidgetEnabled.value,
-    queryKey: ['schema-explorer-event-types', env.id, { nameSearch: search || null }],
+    queryKey: [
+      'schema-explorer-event-types',
+      env.id,
+      { nameSearch: search || null },
+    ],
     queryFn: ({ pageParam }: { pageParam: string | null }) =>
       getEventTypeSchemas({ cursor: pageParam, nameSearch: search || null }),
     getNextPageParam: (lastPage, allPages) => {
@@ -40,11 +42,10 @@ export function useSchemasQuery(search: string) {
 
   const entries = useMemo<SchemaEntry[]>(
     () => buildSchemaEntriesFromQueryData(query.data),
-    [query.data]
+    [query.data],
   );
 
-  const remoteCount = useMemo(() => entries.filter((e) => !e.isShared).length, [entries]);
-  const hasFetchedMax = remoteCount >= MAX_SCHEMA_ITEMS;
+  const hasFetchedMax = entries.length >= MAX_SCHEMA_ITEMS;
 
   const guardedFetchNextPage = useCallback(() => {
     if (hasFetchedMax) {

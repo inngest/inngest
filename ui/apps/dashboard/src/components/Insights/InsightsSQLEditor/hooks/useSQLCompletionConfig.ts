@@ -1,11 +1,9 @@
-'use client';
-
 import { useCallback, useMemo } from 'react';
 import { availableClickhouseFunctions } from '@inngest/components/SQLEditor/hooks/availableClickhouseFunctions';
 import { useCache } from '@inngest/components/SQLEditor/hooks/useCache';
 import type { SQLCompletionConfig } from '@inngest/components/SQLEditor/types';
 
-import { useEventTypes } from '@/components/EventTypes/useEventTypes';
+import { useFetchAllEventTypes } from '@/components/EventTypes/useFetchAllEventTypes';
 import { useEventTypeSchemas } from '../../InsightsTabManager/InsightsHelperPanel/features/SchemaExplorer/SchemasContext/useEventTypeSchemas';
 
 const KEYWORDS = [
@@ -34,7 +32,16 @@ const KEYWORDS = [
 const TABLES = ['events'] as const;
 
 // Common columns available on the events table
-const COLUMNS = ['name', 'data', 'id', 'ts', 'v'] as const;
+const COLUMNS = [
+  'name',
+  'data',
+  'id',
+  'ts',
+  'ts_dt',
+  'received_at',
+  'received_at_dt',
+  'v',
+] as const;
 
 // Convert ClickHouse functions to the format expected by autocomplete
 const CLICKHOUSE_FUNCTIONS = availableClickhouseFunctions.map((name) => ({
@@ -43,11 +50,14 @@ const CLICKHOUSE_FUNCTIONS = availableClickhouseFunctions.map((name) => ({
 }));
 
 export function useSQLCompletionConfig(): SQLCompletionConfig {
-  const getEventTypes = useEventTypes();
+  const fetchAllEventTypes = useFetchAllEventTypes();
   const getEventTypeSchemas = useEventTypeSchemas();
 
   // Cache for fetched event names with 5 minute TTL
-  const eventNamesCache = useCache<string[]>({ ttl: 5 * 60 * 1000, name: 'eventNames' });
+  const eventNamesCache = useCache<string[]>({
+    ttl: 5 * 60 * 1000,
+    name: 'eventNames',
+  });
 
   // Cache for fetched schemas with 5 minute TTL
   const schemasCache = useCache<Array<{ name: string; type: string }>>({
@@ -62,44 +72,27 @@ export function useSQLCompletionConfig(): SQLCompletionConfig {
   const fetchEventNames = useCallback(
     async (search: string): Promise<string[]> => {
       const cacheKey = search || '__empty__';
-
-      const MAX_PAGES = 5; // Fetch up to 5 pages (40 per page = 200 total)
-      const allEvents: string[] = [];
-      let cursor: string | null = null;
-      let pageCount = 0;
-
-      while (pageCount < MAX_PAGES) {
-        const result = await getEventTypes({
-          cursor,
-          archived: false,
-          nameSearch: search || null,
-        });
-
-        allEvents.push(...result.events.map((e) => e.name));
-        pageCount++;
-
-        // Check if there are more pages
-        if (result.pageInfo.hasNextPage && result.pageInfo.endCursor) {
-          cursor = result.pageInfo.endCursor;
-        } else {
-          // No more pages
-          break;
-        }
-      }
+      const allEvents = await fetchAllEventTypes(search);
+      const eventNames = allEvents.map((e) => e.name);
 
       // Update cache
-      eventNamesCache.set(cacheKey, allEvents);
+      eventNamesCache.set(cacheKey, eventNames);
 
-      return allEvents;
+      return eventNames;
     },
-    [getEventTypes, eventNamesCache]
+    [fetchAllEventTypes, eventNamesCache],
   );
 
   // Create a function to fetch schema for a specific event name
   const fetchEventSchema = useCallback(
-    async (eventName: string): Promise<Array<{ name: string; type: string }>> => {
+    async (
+      eventName: string,
+    ): Promise<Array<{ name: string; type: string }>> => {
       try {
-        const result = await getEventTypeSchemas({ cursor: null, nameSearch: eventName });
+        const result = await getEventTypeSchemas({
+          cursor: null,
+          nameSearch: eventName,
+        });
         const propsMap = new Map<string, string>();
 
         result.events.forEach((event) => {
@@ -131,7 +124,10 @@ export function useSQLCompletionConfig(): SQLCompletionConfig {
           }
         });
 
-        const props = Array.from(propsMap.entries()).map(([name, type]) => ({ name, type }));
+        const props = Array.from(propsMap.entries()).map(([name, type]) => ({
+          name,
+          type,
+        }));
 
         // Update cache
         schemasCache.set(eventName, props);
@@ -141,7 +137,7 @@ export function useSQLCompletionConfig(): SQLCompletionConfig {
         return [];
       }
     },
-    [getEventTypeSchemas, schemasCache]
+    [getEventTypeSchemas, schemasCache],
   );
 
   return useMemo<SQLCompletionConfig>(
@@ -157,6 +153,6 @@ export function useSQLCompletionConfig(): SQLCompletionConfig {
       eventNamesCache,
       schemasCache,
     }),
-    [fetchEventNames, fetchEventSchema, eventNamesCache, schemasCache]
+    [fetchEventNames, fetchEventSchema, eventNamesCache, schemasCache],
   );
 }

@@ -57,6 +57,8 @@ func TestStepRetry(t *testing.T) {
 		_, err = inngestClient.Send(ctx, inngestgo.Event{Name: eventName})
 		r.NoError(err)
 
+		// Wait a moment for runID to be populated
+		<-time.After(2 * time.Second)
 		c.WaitForRunStatus(ctx, t, models.FunctionStatusFailed.String(), &runID, client.WaitForRunStatusOpts{
 			Timeout: 15 * time.Second,
 		})
@@ -110,6 +112,9 @@ func TestStepRetry(t *testing.T) {
 		_, err = inngestClient.Send(ctx, inngestgo.Event{Name: eventName})
 		r.NoError(err)
 
+		// Wait a moment for runID to be populated
+		<-time.After(2 * time.Second)
+
 		c.WaitForRunStatus(ctx, t, models.FunctionStatusFailed.String(), &runID, client.WaitForRunStatusOpts{
 			Timeout: 15 * time.Second,
 		})
@@ -160,6 +165,9 @@ func TestStepRetry(t *testing.T) {
 		_, err = inngestClient.Send(ctx, inngestgo.Event{Name: eventName})
 		r.NoError(err)
 
+		// Wait a moment for runID to be populated
+		<-time.After(2 * time.Second)
+
 		c.WaitForRunStatus(ctx, t, models.FunctionStatusFailed.String(), &runID, client.WaitForRunStatusOpts{
 			Timeout: 15 * time.Second,
 		})
@@ -202,6 +210,9 @@ func TestStepRetry(t *testing.T) {
 
 		_, err = inngestClient.Send(ctx, inngestgo.Event{Name: eventName})
 		r.NoError(err)
+
+		// Wait a moment for runID to be populated
+		<-time.After(2 * time.Second)
 
 		c.WaitForRunStatus(ctx, t, models.FunctionStatusFailed.String(), &runID, client.WaitForRunStatusOpts{
 			Timeout: 15 * time.Second,
@@ -292,6 +303,9 @@ func TestStepRetry(t *testing.T) {
 
 		_, err = inngestClient.Send(ctx, inngestgo.Event{Name: eventName})
 		r.NoError(err)
+
+		// Wait a moment for runID to be populated
+		<-time.After(2 * time.Second)
 
 		c.WaitForRunStatus(ctx, t, models.FunctionStatusCompleted.String(), &runID, client.WaitForRunStatusOpts{
 			Timeout: 15 * time.Second,

@@ -1,5 +1,3 @@
-'use client';
-
 import type { RangeChangeProps } from '@inngest/components/DatePicker/RangePicker';
 import { Error } from '@inngest/components/Error/Error';
 import EntityFilter from '@inngest/components/Filter/EntityFilter';
@@ -10,7 +8,7 @@ import {
   useBooleanSearchParam,
   useSearchParam,
   useStringArraySearchParam,
-} from '@inngest/components/hooks/useSearchParam';
+} from '@inngest/components/hooks/useSearchParams';
 import {
   durationToString,
   parseDuration,
@@ -50,7 +48,11 @@ export const DEFAULT_DURATION = { hours: 24 };
 const getFrom = (start?: Date, duration?: DurationType | '') =>
   start || subtractDuration(new Date(), duration ? duration : DEFAULT_DURATION);
 
-const getDefaultRange = (start?: Date, end?: Date, duration?: DurationType | '') =>
+const getDefaultRange = (
+  start?: Date,
+  end?: Date,
+  duration?: DurationType | '',
+) =>
   start && end
     ? {
         type: 'absolute' as const,
@@ -140,10 +142,14 @@ export const Dashboard = ({ envSlug }: { envSlug: string }) => {
   const functions = data?.envBySlug?.workflows.data;
 
   const logRetention = accountData?.account.entitlements.history.limit || 7;
-  const concurrencyLimit = accountConcurrencyLimitRes?.account.entitlements.concurrency.limit;
-  const isMarketplace = Boolean(accountConcurrencyLimitRes?.account.marketplace);
+  const concurrencyLimit =
+    accountConcurrencyLimitRes?.account.entitlements.concurrency.limit;
+  const isMarketplace = Boolean(
+    accountConcurrencyLimitRes?.account.marketplace,
+  );
 
-  const envLookup = apps?.length !== 1 && !selectedApps?.length && !selectedFns?.length;
+  const envLookup =
+    apps?.length !== 1 && !selectedApps?.length && !selectedFns?.length;
   const mappedFunctions = convertLookup(functions);
   const mappedApps = convertLookup(apps);
   const mappedEntities = envLookup ? mappedApps : mappedFunctions;
@@ -158,8 +164,12 @@ export const Dashboard = ({ envSlug }: { envSlug: string }) => {
           daysAgoMax={logRetention}
           onDaysChange={(range: RangeChangeProps) => {
             batchUpdate({
-              duration: range.type === 'relative' ? durationToString(range.duration) : null,
-              start: range.type === 'absolute' ? range.start.toISOString() : null,
+              duration:
+                range.type === 'relative'
+                  ? durationToString(range.duration)
+                  : null,
+              start:
+                range.type === 'absolute' ? range.start.toISOString() : null,
               end: range.type === 'absolute' ? range.end.toISOString() : null,
             });
           }}
@@ -170,7 +180,9 @@ export const Dashboard = ({ envSlug }: { envSlug: string }) => {
           <>
             <EntityFilter
               type="app"
-              onFilterChange={(apps) => (apps.length ? setApps(apps) : removeApps())}
+              onFilterChange={(apps) =>
+                apps.length ? setApps(apps) : removeApps()
+              }
               selectedEntities={selectedApps || []}
               entities={apps || []}
             />
@@ -183,7 +195,9 @@ export const Dashboard = ({ envSlug }: { envSlug: string }) => {
           </>
         )}
       </div>
-      {error && <Error message="There was an error fetching metrics filter data." />}
+      {error && (
+        <Error message="There was an error fetching metrics filter data." />
+      )}
       <div className="bg-canvasBase px-4">
         <MetricsOverview
           from={getFrom(parsedStart, parsedDuration)}

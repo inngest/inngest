@@ -12,9 +12,10 @@ import {
   SkeletonElement,
   TextElement,
   TimeElement,
-} from '../DetailsCard/NewElement';
+} from '../DetailsCard/Element';
 import { ErrorCard } from '../Error/ErrorCard';
 import { InvokeModal } from '../InvokeButton';
+import { useBooleanFlag } from '../SharedContext/useBooleanFlag';
 import type { TraceResult } from '../SharedContext/useGetTraceResult';
 import { useInvokeRun } from '../SharedContext/useInvokeRun';
 import { usePrettyErrorBody, usePrettyJson } from '../hooks/usePrettyJson';
@@ -22,7 +23,9 @@ import { IconCloudArrowDown } from '../icons/CloudArrowDown';
 import { devServerURL, useDevServer } from '../utils/useDevServer';
 import { ErrorInfo } from './ErrorInfo';
 import { IO } from './IO';
+import { MetadataAttrs } from './MetadataAttrs';
 import { Tabs } from './Tabs';
+import type { Trace } from './types';
 
 type TopInfoProps = {
   slug?: string;
@@ -30,6 +33,7 @@ type TopInfoProps = {
   result?: TraceResult;
   runID: string;
   resultLoading?: boolean;
+  trace?: Trace;
 };
 
 export type Trigger = {
@@ -80,7 +84,14 @@ export const actionConfigs = (
   };
 };
 
-export const TopInfo = ({ slug, getTrigger, runID, result, resultLoading }: TopInfoProps) => {
+export const TopInfo = ({
+  slug,
+  getTrigger,
+  runID,
+  result,
+  resultLoading,
+  trace,
+}: TopInfoProps) => {
   const [expanded, setExpanded] = useState(true);
   const { isRunning, send } = useDevServer();
   const { invoke, loading: invokeLoading, error: invokeError } = useInvokeRun();
@@ -98,6 +109,9 @@ export const TopInfo = ({ slug, getTrigger, runID, result, resultLoading }: TopI
     }, [getTrigger, runID]),
     retry: 3,
   });
+
+  const { booleanFlag } = useBooleanFlag();
+  const { value: metadataIsEnabled } = booleanFlag('enable-step-metadata', false);
 
   const prettyPayload = useMemo(() => {
     try {
@@ -286,6 +300,15 @@ export const TopInfo = ({ slug, getTrigger, runID, result, resultLoading }: TopI
                         loading={isPending || resultLoading}
                       />
                     ),
+                  },
+                ]
+              : []),
+            ...(metadataIsEnabled && trace?.metadata?.length
+              ? [
+                  {
+                    label: 'Metadata',
+                    id: 'metadata',
+                    node: <MetadataAttrs metadata={trace.metadata} />,
                   },
                 ]
               : []),

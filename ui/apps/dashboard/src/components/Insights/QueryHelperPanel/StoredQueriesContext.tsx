@@ -1,6 +1,11 @@
-'use client';
-
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useMemo,
+  useState,
+  type ReactNode,
+} from 'react';
 import { toast } from 'sonner';
 
 import type { TabManagerActions } from '@/components/Insights/InsightsTabManager/InsightsTabManager';
@@ -28,14 +33,19 @@ interface StoredQueriesContextValue {
   shareQuery: (queryId: string) => void;
 }
 
-const StoredQueriesContext = createContext<undefined | StoredQueriesContextValue>(undefined);
+const StoredQueriesContext = createContext<
+  undefined | StoredQueriesContextValue
+>(undefined);
 
 interface StoredQueriesProviderProps {
   children: ReactNode;
-  tabManagerActions: TabManagerActions;
+  tabManagerActionsRef: React.MutableRefObject<TabManagerActions>;
 }
 
-export function StoredQueriesProvider({ children, tabManagerActions }: StoredQueriesProviderProps) {
+export function StoredQueriesProvider({
+  children,
+  tabManagerActionsRef,
+}: StoredQueriesProviderProps) {
   const [querySnapshots, setQuerySnapshots] = useState<QuerySnapshot[]>([]);
 
   const {
@@ -64,34 +74,40 @@ export function StoredQueriesProvider({ children, tabManagerActions }: StoredQue
           refetchSavedQueries();
           toast.success('Successfully updated query');
         } else {
-          toast.error(
-            `Failed to update query${result.error === 'unique' ? ': name must be unique' : ''}`
-          );
+          const errorMessage = `Failed to update query${
+            result.error === 'unique' ? ': name must be unique' : ''
+          }`;
+          toast.error(errorMessage);
+          throw new Error(errorMessage);
         }
       } else {
         const result = await beSaveQuery({ name: tab.name, query: tab.query });
         if (result.ok) {
-          tabManagerActions.updateTab(tab.id, { savedQueryId: result.data.id });
+          tabManagerActionsRef.current.updateTab(tab.id, {
+            savedQueryId: result.data.id,
+          });
           // TODO: This often leads to double-fetching, but it's currently needed because the "InsightsQueryStatement"
           // __typename does not exist and does not auto-refetch if the list was previously empty. We need to make sure
           // that we have a consistent type name to match on regardless of existing saved queries.
           refetchSavedQueries();
           toast.success('Successfully saved query');
         } else {
-          toast.error(
-            `Failed to save query${result.error === 'unique' ? ': name must be unique' : ''}`
-          );
+          const errorMessage = `Failed to save query${
+            result.error === 'unique' ? ': name must be unique' : ''
+          }`;
+          toast.error(errorMessage);
+          throw new Error(errorMessage);
         }
       }
     },
-    [beSaveQuery, beUpdateQuery, refetchSavedQueries, tabManagerActions]
+    [beSaveQuery, beUpdateQuery, refetchSavedQueries, tabManagerActionsRef],
   );
 
   const deleteQuery = useCallback(
     async (queryId: string) => {
       const result = await beDeleteQuery({ id: queryId });
       if (result.ok) {
-        tabManagerActions.breakQueryAssociation(queryId);
+        tabManagerActionsRef.current.breakQueryAssociation(queryId);
         // This is necessary because the query never returns anything that matches the list by __typename.
         // It returns only a list of deleted IDs.
         refetchSavedQueries();
@@ -100,7 +116,7 @@ export function StoredQueriesProvider({ children, tabManagerActions }: StoredQue
         toast.error('Failed to delete query');
       }
     },
-    [beDeleteQuery, refetchSavedQueries, tabManagerActions]
+    [beDeleteQuery, refetchSavedQueries, tabManagerActionsRef],
   );
 
   const shareQuery = useCallback(
@@ -116,7 +132,7 @@ export function StoredQueriesProvider({ children, tabManagerActions }: StoredQue
         toast.error('Failed to share query with your organization');
       }
     },
-    [beShareQuery, refetchSavedQueries]
+    [beShareQuery, refetchSavedQueries],
   );
 
   const deleteQuerySnapshot = useCallback((snapshotId: string) => {
@@ -137,7 +153,7 @@ export function StoredQueriesProvider({ children, tabManagerActions }: StoredQue
 
   const orderedQuerySnapshots = useMemo(
     () => ({ data: querySnapshots, error: undefined, isLoading: false }),
-    [querySnapshots]
+    [querySnapshots],
   );
 
   return (
@@ -161,7 +177,9 @@ export function StoredQueriesProvider({ children, tabManagerActions }: StoredQue
 export function useStoredQueries(): StoredQueriesContextValue {
   const context = useContext(StoredQueriesContext);
   if (context === undefined) {
-    throw new Error('useStoredQueries must be used within a StoredQueriesProvider');
+    throw new Error(
+      'useStoredQueries must be used within a StoredQueriesProvider',
+    );
   }
 
   return context;

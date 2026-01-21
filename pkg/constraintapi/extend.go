@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
+	"fmt"
 
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/util/errs"
@@ -11,9 +12,9 @@ import (
 )
 
 type extendLeaseScriptResponse struct {
-	Status  int       `json:"s"`
-	Debug   []string  `json:"d"`
-	LeaseID ulid.ULID `json:"lid"`
+	Status  int                 `json:"s"`
+	Debug   flexibleStringArray `json:"d"`
+	LeaseID ulid.ULID           `json:"lid"`
 }
 
 // ExtendLease implements CapacityManager.
@@ -61,23 +62,32 @@ func (r *redisCapacityManager) ExtendLease(ctx context.Context, req *CapacityExt
 		enableDebugLogsVal = "1"
 	}
 
+	scopedKeyPrefix := fmt.Sprintf("{%s}:%s", keyPrefix, accountScope(req.AccountID))
+
 	args, err := strSlice([]any{
-		keyPrefix,
+		scopedKeyPrefix,
 		req.AccountID,
 		req.LeaseID.String(),
 		newLeaseID.String(),
 		now.UnixMilli(), // current time in milliseconds for throttle
 		leaseExpiry.UnixMilli(),
-		int(OperationIdempotencyTTL.Seconds()),
+		int(r.operationIdempotencyTTL.Seconds()),
 		enableDebugLogsVal,
 	})
 	if err != nil {
 		return nil, errs.Wrap(0, false, "invalid args: %w", err)
 	}
 
-	rawRes, err := scripts["extend"].Exec(ctx, client, keys, args).AsBytes()
-	if err != nil {
-		return nil, errs.Wrap(0, false, "extend script failed: %w", err)
+	l.Trace(
+		"prepared extend call",
+		"req", req,
+		"keys", keys,
+		"args", args,
+	)
+
+	rawRes, internalErr := executeLuaScript(ctx, "extend", req.Migration, client, r.clock, keys, args)
+	if internalErr != nil {
+		return nil, internalErr
 	}
 
 	parsedResponse := extendLeaseScriptResponse{}
@@ -101,6 +111,20 @@ func (r *redisCapacityManager) ExtendLease(ctx context.Context, req *CapacityExt
 		return res, nil
 	case 4:
 		l.Trace("extended capacity lease")
+
+		if len(r.lifecycles) > 0 {
+			for _, hook := range r.lifecycles {
+				err := hook.OnCapacityLeaseExtended(ctx, OnCapacityLeaseExtendedData{
+					AccountID:  req.AccountID,
+					Duration:   req.Duration,
+					OldLeaseID: req.LeaseID,
+					NewLeaseID: parsedResponse.LeaseID,
+				})
+				if err != nil {
+					return nil, errs.Wrap(0, false, "extend lifecycle failed: %w", err)
+				}
+			}
+		}
 
 		// TODO: track success
 		return res, nil

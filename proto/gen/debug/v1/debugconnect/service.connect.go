@@ -8,6 +8,7 @@ import (
 	connect "connectrpc.com/connect"
 	context "context"
 	errors "errors"
+	v11 "github.com/inngest/inngest/proto/gen/constraintapi/v1"
 	v1 "github.com/inngest/inngest/proto/gen/debug/v1"
 	http "net/http"
 	strings "strings"
@@ -48,6 +49,8 @@ const (
 	DebugBlockPeekProcedure = "/debug.v1.Debug/BlockPeek"
 	// DebugBlockDeletedProcedure is the fully-qualified name of the Debug's BlockDeleted RPC.
 	DebugBlockDeletedProcedure = "/debug.v1.Debug/BlockDeleted"
+	// DebugCheckConstraintsProcedure is the fully-qualified name of the Debug's CheckConstraints RPC.
+	DebugCheckConstraintsProcedure = "/debug.v1.Debug/CheckConstraints"
 )
 
 // DebugClient is a client for the debug.v1.Debug service.
@@ -67,6 +70,8 @@ type DebugClient interface {
 	BlockPeek(context.Context, *connect.Request[v1.BlockPeekRequest]) (*connect.Response[v1.BlockPeekResponse], error)
 	// BlockDeleted retrieves deleted pause IDs from a specific block.
 	BlockDeleted(context.Context, *connect.Request[v1.BlockDeletedRequest]) (*connect.Response[v1.BlockDeletedResponse], error)
+	// CheckConstraints invokes Check() on the configured capacity manager
+	CheckConstraints(context.Context, *connect.Request[v11.CapacityCheckRequest]) (*connect.Response[v1.CheckConstraintsResponse], error)
 }
 
 // NewDebugClient constructs a client for the debug.v1.Debug service. By default, it uses the
@@ -122,6 +127,12 @@ func NewDebugClient(httpClient connect.HTTPClient, baseURL string, opts ...conne
 			connect.WithSchema(debugMethods.ByName("BlockDeleted")),
 			connect.WithClientOptions(opts...),
 		),
+		checkConstraints: connect.NewClient[v11.CapacityCheckRequest, v1.CheckConstraintsResponse](
+			httpClient,
+			baseURL+DebugCheckConstraintsProcedure,
+			connect.WithSchema(debugMethods.ByName("CheckConstraints")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -134,6 +145,7 @@ type debugClient struct {
 	getIndex           *connect.Client[v1.IndexRequest, v1.IndexResponse]
 	blockPeek          *connect.Client[v1.BlockPeekRequest, v1.BlockPeekResponse]
 	blockDeleted       *connect.Client[v1.BlockDeletedRequest, v1.BlockDeletedResponse]
+	checkConstraints   *connect.Client[v11.CapacityCheckRequest, v1.CheckConstraintsResponse]
 }
 
 // GetPartition calls debug.v1.Debug.GetPartition.
@@ -171,6 +183,11 @@ func (c *debugClient) BlockDeleted(ctx context.Context, req *connect.Request[v1.
 	return c.blockDeleted.CallUnary(ctx, req)
 }
 
+// CheckConstraints calls debug.v1.Debug.CheckConstraints.
+func (c *debugClient) CheckConstraints(ctx context.Context, req *connect.Request[v11.CapacityCheckRequest]) (*connect.Response[v1.CheckConstraintsResponse], error) {
+	return c.checkConstraints.CallUnary(ctx, req)
+}
+
 // DebugHandler is an implementation of the debug.v1.Debug service.
 type DebugHandler interface {
 	// GetPartition retrieves the partition data from the database
@@ -188,6 +205,8 @@ type DebugHandler interface {
 	BlockPeek(context.Context, *connect.Request[v1.BlockPeekRequest]) (*connect.Response[v1.BlockPeekResponse], error)
 	// BlockDeleted retrieves deleted pause IDs from a specific block.
 	BlockDeleted(context.Context, *connect.Request[v1.BlockDeletedRequest]) (*connect.Response[v1.BlockDeletedResponse], error)
+	// CheckConstraints invokes Check() on the configured capacity manager
+	CheckConstraints(context.Context, *connect.Request[v11.CapacityCheckRequest]) (*connect.Response[v1.CheckConstraintsResponse], error)
 }
 
 // NewDebugHandler builds an HTTP handler from the service implementation. It returns the path on
@@ -239,6 +258,12 @@ func NewDebugHandler(svc DebugHandler, opts ...connect.HandlerOption) (string, h
 		connect.WithSchema(debugMethods.ByName("BlockDeleted")),
 		connect.WithHandlerOptions(opts...),
 	)
+	debugCheckConstraintsHandler := connect.NewUnaryHandler(
+		DebugCheckConstraintsProcedure,
+		svc.CheckConstraints,
+		connect.WithSchema(debugMethods.ByName("CheckConstraints")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/debug.v1.Debug/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case DebugGetPartitionProcedure:
@@ -255,6 +280,8 @@ func NewDebugHandler(svc DebugHandler, opts ...connect.HandlerOption) (string, h
 			debugBlockPeekHandler.ServeHTTP(w, r)
 		case DebugBlockDeletedProcedure:
 			debugBlockDeletedHandler.ServeHTTP(w, r)
+		case DebugCheckConstraintsProcedure:
+			debugCheckConstraintsHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -290,4 +317,8 @@ func (UnimplementedDebugHandler) BlockPeek(context.Context, *connect.Request[v1.
 
 func (UnimplementedDebugHandler) BlockDeleted(context.Context, *connect.Request[v1.BlockDeletedRequest]) (*connect.Response[v1.BlockDeletedResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("debug.v1.Debug.BlockDeleted is not implemented"))
+}
+
+func (UnimplementedDebugHandler) CheckConstraints(context.Context, *connect.Request[v11.CapacityCheckRequest]) (*connect.Response[v1.CheckConstraintsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("debug.v1.Debug.CheckConstraints is not implemented"))
 }

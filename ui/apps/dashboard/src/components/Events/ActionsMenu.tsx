@@ -1,5 +1,3 @@
-'use client';
-
 import { Listbox } from '@headlessui/react';
 import { Button } from '@inngest/components/Button';
 import { RiArchive2Line, RiMore2Line } from '@remixicon/react';
@@ -12,7 +10,12 @@ export const ActionsMenu = ({ archive }: EventActions) => {
   return (
     <Listbox>
       <Listbox.Button as="div">
-        <Button kind="primary" appearance="outlined" size="medium" icon={<RiMore2Line />} />
+        <Button
+          kind="primary"
+          appearance="outlined"
+          size="medium"
+          icon={<RiMore2Line />}
+        />
       </Listbox.Button>
       <div className="relative">
         <Listbox.Options className="bg-canvasBase absolute right-1 top-5 z-50 w-[170px] gap-y-0.5 rounded border shadow">

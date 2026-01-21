@@ -10,7 +10,9 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/cqrs"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/history_reader"
+	"github.com/inngest/inngest/pkg/tracing/metadata"
 	ulid "github.com/oklog/ulid/v2"
 )
 
@@ -413,6 +415,13 @@ type SleepStepInfo struct {
 }
 
 func (SleepStepInfo) IsStepInfo() {}
+
+type SpanMetadata struct {
+	Scope     enums.MetadataScope `json:"scope"`
+	Kind      metadata.Kind       `json:"kind"`
+	Values    metadata.Values     `json:"values"`
+	UpdatedAt time.Time           `json:"updatedAt"`
+}
 
 type StepError struct {
 	Message string      `json:"message"`

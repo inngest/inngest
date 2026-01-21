@@ -204,9 +204,9 @@ func TestRunProcessingModeConversion(t *testing.T) {
 			expected: pb.ConstraintApiRunProcessingMode_CONSTRAINT_API_RUN_PROCESSING_MODE_BACKGROUND,
 		},
 		{
-			name:     "sync mode",
-			input:    RunProcessingModeSync,
-			expected: pb.ConstraintApiRunProcessingMode_CONSTRAINT_API_RUN_PROCESSING_MODE_SYNC,
+			name:     "durable endpoint mode",
+			input:    RunProcessingModeDurableEndpoint,
+			expected: pb.ConstraintApiRunProcessingMode_CONSTRAINT_API_RUN_PROCESSING_MODE_DURABLE_ENDPOINT,
 		},
 	}
 
@@ -222,52 +222,52 @@ func TestRunProcessingModeConversion(t *testing.T) {
 	}
 }
 
-func TestLeaseLocationConversion(t *testing.T) {
+func TestCallerLocationConversion(t *testing.T) {
 	tests := []struct {
 		name     string
-		input    LeaseLocation
-		expected pb.ConstraintApiLeaseLocation
+		input    CallerLocation
+		expected pb.ConstraintApiCallerLocation
 	}{
 		{
 			name:     "unknown location",
-			input:    LeaseLocationUnknown,
-			expected: pb.ConstraintApiLeaseLocation_CONSTRAINT_API_LEASE_LOCATION_UNSPECIFIED,
+			input:    CallerLocationUnknown,
+			expected: pb.ConstraintApiCallerLocation_CONSTRAINT_API_CALLER_LOCATION_UNSPECIFIED,
 		},
 		{
 			name:     "schedule run",
-			input:    LeaseLocationScheduleRun,
-			expected: pb.ConstraintApiLeaseLocation_CONSTRAINT_API_LEASE_LOCATION_SCHEDULE_RUN,
+			input:    CallerLocationSchedule,
+			expected: pb.ConstraintApiCallerLocation_CONSTRAINT_API_CALLER_LOCATION_SCHEDULE,
 		},
 		{
-			name:     "partition lease",
-			input:    LeaseLocationPartitionLease,
-			expected: pb.ConstraintApiLeaseLocation_CONSTRAINT_API_LEASE_LOCATION_PARTITION_LEASE,
+			name:     "backlog refill",
+			input:    CallerLocationBacklogRefill,
+			expected: pb.ConstraintApiCallerLocation_CONSTRAINT_API_CALLER_LOCATION_BACKLOG_REFILL,
 		},
 		{
 			name:     "item lease",
-			input:    LeaseLocationItemLease,
-			expected: pb.ConstraintApiLeaseLocation_CONSTRAINT_API_LEASE_LOCATION_ITEM_LEASE,
+			input:    CallerLocationItemLease,
+			expected: pb.ConstraintApiCallerLocation_CONSTRAINT_API_CALLER_LOCATION_ITEM_LEASE,
 		},
 		{
 			name:     "checkpoint",
-			input:    LeaseLocationCheckpoint,
-			expected: pb.ConstraintApiLeaseLocation_CONSTRAINT_API_LEASE_LOCATION_CHECKPOINT,
+			input:    CallerLocationCheckpoint,
+			expected: pb.ConstraintApiCallerLocation_CONSTRAINT_API_CALLER_LOCATION_CHECKPOINT,
 		},
 		{
 			name:     "invalid location (fallback to unspecified)",
-			input:    LeaseLocation(999),
-			expected: pb.ConstraintApiLeaseLocation_CONSTRAINT_API_LEASE_LOCATION_UNSPECIFIED,
+			input:    CallerLocation(999),
+			expected: pb.ConstraintApiCallerLocation_CONSTRAINT_API_CALLER_LOCATION_UNSPECIFIED,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := LeaseLocationToProto(tt.input)
+			result := CallerLocationToProto(tt.input)
 			assert.Equal(t, tt.expected, result)
 
 			// Test round trip
 			backConverted := LeaseLocationFromProto(result)
-			if tt.input != LeaseLocation(999) { // Skip round trip for invalid input
+			if tt.input != CallerLocation(999) { // Skip round trip for invalid input
 				assert.Equal(t, tt.input, backConverted)
 			}
 		})
@@ -522,18 +522,18 @@ func TestThrottleConfigConversion(t *testing.T) {
 		{
 			name: "complete config",
 			input: ThrottleConfig{
-				Scope:                     enums.ThrottleScopeEnv,
-				ThrottleKeyExpressionHash: "throttle_hash",
-				Limit:                     1000,
-				Burst:                     100,
-				Period:                    60,
+				Scope:             enums.ThrottleScopeEnv,
+				KeyExpressionHash: "throttle_hash",
+				Limit:             1000,
+				Burst:             100,
+				Period:            60,
 			},
 			expected: &pb.ThrottleConfig{
-				Scope:                     pb.ConstraintApiThrottleScope_CONSTRAINT_API_THROTTLE_SCOPE_ENV,
-				ThrottleKeyExpressionHash: "throttle_hash",
-				Limit:                     1000,
-				Burst:                     100,
-				Period:                    60,
+				Scope:             pb.ConstraintApiThrottleScope_CONSTRAINT_API_THROTTLE_SCOPE_ENV,
+				KeyExpressionHash: "throttle_hash",
+				Limit:             1000,
+				Burst:             100,
+				Period:            60,
 			},
 		},
 		{
@@ -542,11 +542,11 @@ func TestThrottleConfigConversion(t *testing.T) {
 				Scope: enums.ThrottleScopeFn,
 			},
 			expected: &pb.ThrottleConfig{
-				Scope:                     pb.ConstraintApiThrottleScope_CONSTRAINT_API_THROTTLE_SCOPE_FUNCTION,
-				ThrottleKeyExpressionHash: "",
-				Limit:                     0,
-				Burst:                     0,
-				Period:                    0,
+				Scope:             pb.ConstraintApiThrottleScope_CONSTRAINT_API_THROTTLE_SCOPE_FUNCTION,
+				KeyExpressionHash: "",
+				Limit:             0,
+				Burst:             0,
+				Period:            0,
 			},
 		},
 	}
@@ -601,11 +601,11 @@ func TestConstraintConfigConversion(t *testing.T) {
 				},
 				Throttle: []ThrottleConfig{
 					{
-						Scope:                     enums.ThrottleScopeEnv,
-						ThrottleKeyExpressionHash: "throttle_hash",
-						Limit:                     1000,
-						Burst:                     200,
-						Period:                    300,
+						Scope:             enums.ThrottleScopeEnv,
+						KeyExpressionHash: "throttle_hash",
+						Limit:             1000,
+						Burst:             200,
+						Period:            300,
 					},
 				},
 			},
@@ -635,11 +635,11 @@ func TestConstraintConfigConversion(t *testing.T) {
 				},
 				Throttle: []*pb.ThrottleConfig{
 					{
-						Scope:                     pb.ConstraintApiThrottleScope_CONSTRAINT_API_THROTTLE_SCOPE_ENV,
-						ThrottleKeyExpressionHash: "throttle_hash",
-						Limit:                     1000,
-						Burst:                     200,
-						Period:                    300,
+						Scope:             pb.ConstraintApiThrottleScope_CONSTRAINT_API_THROTTLE_SCOPE_ENV,
+						KeyExpressionHash: "throttle_hash",
+						Limit:             1000,
+						Burst:             200,
+						Period:            300,
 					},
 				},
 			},
@@ -1008,38 +1008,38 @@ func TestLeaseSourceConversion(t *testing.T) {
 			name: "new runs background schedule",
 			input: LeaseSource{
 				Service:           ServiceNewRuns,
-				Location:          LeaseLocationScheduleRun,
+				Location:          CallerLocationSchedule,
 				RunProcessingMode: RunProcessingModeBackground,
 			},
 			expected: &pb.LeaseSource{
 				Service:           pb.ConstraintApiLeaseService_CONSTRAINT_API_LEASE_SERVICE_NEW_RUNS,
-				Location:          pb.ConstraintApiLeaseLocation_CONSTRAINT_API_LEASE_LOCATION_SCHEDULE_RUN,
+				Location:          pb.ConstraintApiCallerLocation_CONSTRAINT_API_CALLER_LOCATION_SCHEDULE,
 				RunProcessingMode: pb.ConstraintApiRunProcessingMode_CONSTRAINT_API_RUN_PROCESSING_MODE_BACKGROUND,
 			},
 		},
 		{
-			name: "executor sync item lease",
+			name: "executor durable endpoint item lease",
 			input: LeaseSource{
 				Service:           ServiceExecutor,
-				Location:          LeaseLocationItemLease,
-				RunProcessingMode: RunProcessingModeSync,
+				Location:          CallerLocationItemLease,
+				RunProcessingMode: RunProcessingModeDurableEndpoint,
 			},
 			expected: &pb.LeaseSource{
 				Service:           pb.ConstraintApiLeaseService_CONSTRAINT_API_LEASE_SERVICE_EXECUTOR,
-				Location:          pb.ConstraintApiLeaseLocation_CONSTRAINT_API_LEASE_LOCATION_ITEM_LEASE,
-				RunProcessingMode: pb.ConstraintApiRunProcessingMode_CONSTRAINT_API_RUN_PROCESSING_MODE_SYNC,
+				Location:          pb.ConstraintApiCallerLocation_CONSTRAINT_API_CALLER_LOCATION_ITEM_LEASE,
+				RunProcessingMode: pb.ConstraintApiRunProcessingMode_CONSTRAINT_API_RUN_PROCESSING_MODE_DURABLE_ENDPOINT,
 			},
 		},
 		{
-			name: "api partition lease",
+			name: "api backlog refill",
 			input: LeaseSource{
 				Service:           ServiceAPI,
-				Location:          LeaseLocationPartitionLease,
+				Location:          CallerLocationBacklogRefill,
 				RunProcessingMode: RunProcessingModeBackground,
 			},
 			expected: &pb.LeaseSource{
 				Service:           pb.ConstraintApiLeaseService_CONSTRAINT_API_LEASE_SERVICE_API,
-				Location:          pb.ConstraintApiLeaseLocation_CONSTRAINT_API_LEASE_LOCATION_PARTITION_LEASE,
+				Location:          pb.ConstraintApiCallerLocation_CONSTRAINT_API_CALLER_LOCATION_BACKLOG_REFILL,
 				RunProcessingMode: pb.ConstraintApiRunProcessingMode_CONSTRAINT_API_RUN_PROCESSING_MODE_BACKGROUND,
 			},
 		},
@@ -1099,6 +1099,10 @@ func TestCapacityCheckRequestConversion(t *testing.T) {
 						},
 					},
 				},
+				Migration: MigrationIdentifier{
+					IsRateLimit: false,
+					QueueShard:  "test",
+				},
 			},
 			expected: &pb.CapacityCheckRequest{
 				AccountId:  accountID.String(),
@@ -1124,6 +1128,10 @@ func TestCapacityCheckRequestConversion(t *testing.T) {
 						},
 					},
 				},
+				Migration: &pb.MigrationIdentifier{
+					IsRateLimit: false,
+					QueueShard:  "test",
+				},
 			},
 		},
 		{
@@ -1140,6 +1148,10 @@ func TestCapacityCheckRequestConversion(t *testing.T) {
 					Throttle: []ThrottleConfig{},
 				},
 				Constraints: []ConstraintItem{},
+				Migration: MigrationIdentifier{
+					IsRateLimit: false,
+					QueueShard:  "test",
+				},
 			},
 			expected: &pb.CapacityCheckRequest{
 				AccountId:  accountID.String(),
@@ -1154,6 +1166,10 @@ func TestCapacityCheckRequestConversion(t *testing.T) {
 					Throttle: []*pb.ThrottleConfig{},
 				},
 				Constraints: []*pb.ConstraintItem{},
+				Migration: &pb.MigrationIdentifier{
+					IsRateLimit: false,
+					QueueShard:  "test",
+				},
 			},
 		},
 		{
@@ -1368,8 +1384,12 @@ func TestCapacityAcquireRequestConversion(t *testing.T) {
 				BlockingThreshold:    10 * time.Second,
 				Source: LeaseSource{
 					Service:           ServiceExecutor,
-					Location:          LeaseLocationItemLease,
+					Location:          CallerLocationItemLease,
 					RunProcessingMode: RunProcessingModeBackground,
+				},
+				Migration: MigrationIdentifier{
+					IsRateLimit: false,
+					QueueShard:  "test",
 				},
 			},
 			expected: &pb.CapacityAcquireRequest{
@@ -1406,8 +1426,12 @@ func TestCapacityAcquireRequestConversion(t *testing.T) {
 				BlockingThreshold:    durationpb.New(10 * time.Second),
 				Source: &pb.LeaseSource{
 					Service:           pb.ConstraintApiLeaseService_CONSTRAINT_API_LEASE_SERVICE_EXECUTOR,
-					Location:          pb.ConstraintApiLeaseLocation_CONSTRAINT_API_LEASE_LOCATION_ITEM_LEASE,
+					Location:          pb.ConstraintApiCallerLocation_CONSTRAINT_API_CALLER_LOCATION_ITEM_LEASE,
 					RunProcessingMode: pb.ConstraintApiRunProcessingMode_CONSTRAINT_API_RUN_PROCESSING_MODE_BACKGROUND,
+				},
+				Migration: &pb.MigrationIdentifier{
+					IsRateLimit: false,
+					QueueShard:  "test",
 				},
 			},
 		},
@@ -1428,6 +1452,10 @@ func TestCapacityAcquireRequestConversion(t *testing.T) {
 				Constraints: []ConstraintItem{},
 				Amount:      0,
 				LeaseRunIDs: map[string]ulid.ULID{},
+				Migration: MigrationIdentifier{
+					IsRateLimit: false,
+					QueueShard:  "test",
+				},
 			},
 			expected: &pb.CapacityAcquireRequest{
 				IdempotencyKey: "minimal",
@@ -1451,8 +1479,12 @@ func TestCapacityAcquireRequestConversion(t *testing.T) {
 				BlockingThreshold: durationpb.New(0),
 				Source: &pb.LeaseSource{
 					Service:           pb.ConstraintApiLeaseService_CONSTRAINT_API_LEASE_SERVICE_UNSPECIFIED,
-					Location:          pb.ConstraintApiLeaseLocation_CONSTRAINT_API_LEASE_LOCATION_UNSPECIFIED,
+					Location:          pb.ConstraintApiCallerLocation_CONSTRAINT_API_CALLER_LOCATION_UNSPECIFIED,
 					RunProcessingMode: pb.ConstraintApiRunProcessingMode_CONSTRAINT_API_RUN_PROCESSING_MODE_BACKGROUND,
+				},
+				Migration: &pb.MigrationIdentifier{
+					IsRateLimit: false,
+					QueueShard:  "test",
 				},
 			},
 		},
@@ -1659,6 +1691,11 @@ func TestCapacityExtendLeaseRequestConversion(t *testing.T) {
 					IsRateLimit: true,
 					QueueShard:  "test-shard",
 				},
+				Source: LeaseSource{
+					Service:           ServiceAPI,
+					Location:          CallerLocationItemLease,
+					RunProcessingMode: RunProcessingModeBackground,
+				},
 			},
 			expected: &pb.CapacityExtendLeaseRequest{
 				IdempotencyKey: "extend-key",
@@ -1668,6 +1705,11 @@ func TestCapacityExtendLeaseRequestConversion(t *testing.T) {
 				Migration: &pb.MigrationIdentifier{
 					IsRateLimit: true,
 					QueueShard:  "test-shard",
+				},
+				Source: &pb.LeaseSource{
+					Service:           pb.ConstraintApiLeaseService_CONSTRAINT_API_LEASE_SERVICE_API,
+					Location:          pb.ConstraintApiCallerLocation_CONSTRAINT_API_CALLER_LOCATION_ITEM_LEASE,
+					RunProcessingMode: pb.ConstraintApiRunProcessingMode_CONSTRAINT_API_RUN_PROCESSING_MODE_BACKGROUND,
 				},
 			},
 		},
@@ -1781,6 +1823,11 @@ func TestCapacityReleaseRequestConversion(t *testing.T) {
 					IsRateLimit: false,
 					QueueShard:  "release-shard",
 				},
+				Source: LeaseSource{
+					Service:           ServiceAPI,
+					Location:          CallerLocationItemLease,
+					RunProcessingMode: RunProcessingModeBackground,
+				},
 			},
 			expected: &pb.CapacityReleaseRequest{
 				IdempotencyKey: "commit-key",
@@ -1789,6 +1836,11 @@ func TestCapacityReleaseRequestConversion(t *testing.T) {
 				Migration: &pb.MigrationIdentifier{
 					IsRateLimit: false,
 					QueueShard:  "release-shard",
+				},
+				Source: &pb.LeaseSource{
+					Service:           pb.ConstraintApiLeaseService_CONSTRAINT_API_LEASE_SERVICE_API,
+					Location:          pb.ConstraintApiCallerLocation_CONSTRAINT_API_CALLER_LOCATION_ITEM_LEASE,
+					RunProcessingMode: pb.ConstraintApiRunProcessingMode_CONSTRAINT_API_RUN_PROCESSING_MODE_BACKGROUND,
 				},
 			},
 		},
@@ -1873,11 +1925,11 @@ func TestRoundTripConversions(t *testing.T) {
 			},
 			Throttle: []ThrottleConfig{
 				{
-					Scope:                     2, // ThrottleScopeAccount
-					ThrottleKeyExpressionHash: "throttle_hash",
-					Limit:                     1000,
-					Burst:                     200,
-					Period:                    300,
+					Scope:             2, // ThrottleScopeAccount
+					KeyExpressionHash: "throttle_hash",
+					Limit:             1000,
+					Burst:             200,
+					Period:            300,
 				},
 			},
 		}
@@ -1922,7 +1974,7 @@ func TestRoundTripConversions(t *testing.T) {
 			BlockingThreshold: 10 * time.Second,
 			Source: LeaseSource{
 				Service:           ServiceExecutor,
-				Location:          LeaseLocationItemLease,
+				Location:          CallerLocationItemLease,
 				RunProcessingMode: RunProcessingModeBackground,
 			},
 		}

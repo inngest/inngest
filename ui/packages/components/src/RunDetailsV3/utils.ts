@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
-import type { FunctionRunStatus } from '../types/functionRun';
 import type { Trace } from './types';
 
 export const FINAL_SPAN_DISPLAY = 'Finalization';
@@ -49,6 +48,15 @@ export function traceHasChildren(depth: number, trace: Trace) {
   }
 
   return (trace.childrenSpans?.length ?? 0) > 0;
+}
+
+export function traceWalk(trace: Trace, fn: (trace: Trace) => void) {
+  let walkChildren = (trace: Trace) => {
+    fn(trace);
+    trace.childrenSpans?.forEach(walkChildren);
+  };
+
+  return walkChildren(trace);
 }
 
 export function createSpanWidths({ ended, max, min, queued, started }: SpanTimes): SpanWidths {

@@ -18,13 +18,16 @@ var (
 	defaultTimeout = 30 * time.Second
 
 	ErrPreTimeout = fmt.Errorf("service.Pre did not end within the given timeout")
-	ErrRunTimeout = fmt.Errorf("service.Run did not end within the given timeout")
 )
 
 var wg conc.WaitGroup
 
 func Go(f func()) {
 	wg.Go(f)
+}
+
+func Wait() {
+	wg.Wait()
 }
 
 // Service represents a basic interface for a long-running service.  By invoking
@@ -57,21 +60,6 @@ type StartTimeouter interface {
 func startTimeout(s Service) time.Duration {
 	if t, ok := s.(StartTimeouter); ok {
 		return t.StartTimeout()
-	}
-	return defaultTimeout
-}
-
-// RunTimeouter lets a Service define how long the Run method can block for prior
-// to starting cleanup.
-type RunTimeouter interface {
-	Service
-	RunTimeout() time.Duration
-}
-
-// runTimeout returns the timeout duration used when an interrupt is received.
-func runTimeout(s Service) time.Duration {
-	if t, ok := s.(RunTimeouter); ok {
-		return t.RunTimeout()
 	}
 	return defaultTimeout
 }
@@ -195,25 +183,6 @@ func run(ctx context.Context, stop func(), s Service) error {
 
 		// Ensure that we prevent the paretn context from capturing signals again.
 		stop()
-		// And set up a new context to quit if we receive the same signal again.
-		repeat, cleanup := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
-		defer cleanup()
-
-		timeout := runTimeout(s)
-		l.Info("signal received, service stopping",
-			"signal", ctx.Err(),
-			"seconds", timeout.Seconds(),
-		)
-
-		select {
-		case <-repeat.Done():
-			return fmt.Errorf("repeated signal received")
-		case <-time.After(timeout):
-			return ErrRunTimeout
-		case err := <-runErr:
-			return err
-		}
-
 	}
 	return nil
 }

@@ -1,5 +1,3 @@
-'use client';
-
 import type { SQLEditorMountCallback } from '@inngest/components/SQLEditor/SQLEditor';
 
 type Editor = Parameters<SQLEditorMountCallback>[0];
@@ -64,7 +62,10 @@ function identifyTemplateVars(text: string) {
   return results;
 }
 
-type MarkerRange = Pick<Marker, 'startLineNumber' | 'startColumn' | 'endLineNumber' | 'endColumn'>;
+type MarkerRange = Pick<
+  Marker,
+  'startLineNumber' | 'startColumn' | 'endLineNumber' | 'endColumn'
+>;
 
 function getTemplateVarsRanges(model: Model, matches: TemplateVarMatch[]) {
   return matches.map((m): MarkerRange => {
@@ -80,7 +81,11 @@ function getTemplateVarsRanges(model: Model, matches: TemplateVarMatch[]) {
   });
 }
 
-function assignTemplateVarsMarkers(monaco: Monaco, model: Model, ranges: MarkerRange[]) {
+function assignTemplateVarsMarkers(
+  monaco: Monaco,
+  model: Model,
+  ranges: MarkerRange[],
+) {
   const markers: Marker[] = ranges.map((range) => ({
     ...range,
     message: 'A specific value is required for this template variable.',

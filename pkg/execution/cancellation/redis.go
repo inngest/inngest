@@ -11,12 +11,14 @@ import (
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
-	"github.com/inngest/inngest/pkg/execution/state/redis_state"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/redis/rueidis"
 )
 
-const DefaultPrefix = "{cancel}"
-
+const (
+	DefaultPrefix = "{cancel}"
+	pkgName       = "execution.cancellation"
+)
 
 // NewRedisWriter writes cancellations to Redis.
 func NewRedisWriter(r rueidis.Client, q queue.Producer, prefix string) cqrs.CancellationWriter {
@@ -91,7 +93,7 @@ func (r redisReadWriter) CreateCancellation(ctx context.Context, c cqrs.Cancella
 		Payload:     c,
 		QueueName:   &queueName,
 	}, time.Now(), queue.EnqueueOpts{})
-	if err == redis_state.ErrQueueItemExists {
+	if err == queue.ErrQueueItemExists {
 		return nil
 	}
 	return err
@@ -123,10 +125,32 @@ func (r redisReadWriter) ReadAt(ctx context.Context, wsID uuid.UUID, fnID uuid.U
 	// increase latency beyond a few milliseconds.
 	key := r.key(wsID, fnID)
 
+	start := time.Now()
+
 	cmd := r.r.B().Hgetall().Key(key).Build()
 	all, err := r.r.Do(ctx, cmd).AsMap()
 	if err != nil {
 		return nil, err
+	}
+
+	{
+		dur := time.Since(start)
+
+		tags := map[string]any{}
+		if len(all) > 100 {
+			tags["workspace_id"] = wsID
+			tags["fn_id"] = fnID
+		}
+
+		metrics.HistogramCancellationReadSize(ctx, int64(len(all)), metrics.HistogramOpt{
+			PkgName: pkgName,
+			Tags:    tags,
+		})
+
+		metrics.HistogramCancellationReadDuration(ctx, dur, metrics.HistogramOpt{
+			PkgName: pkgName,
+			Tags:    tags,
+		})
 	}
 
 	result := []cqrs.Cancellation{}

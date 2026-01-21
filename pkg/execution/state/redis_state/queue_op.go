@@ -7,75 +7,52 @@ import (
 	"math/rand/v2"
 	"time"
 
-	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
+	"go.opentelemetry.io/otel/attribute"
 )
 
-type QueueOpOpt func(o *queueOpOpt)
-
-type queueOpOpt struct {
-	shard *QueueShard
-}
-
-// newQueueOpOpt returns the default option settings for queue operations
-func newQueueOpOpt() queueOpOpt {
-	return queueOpOpt{}
-}
-
-func newQueueOpOptWithOpts(opts ...QueueOpOpt) queueOpOpt {
-	opt := newQueueOpOpt()
-	for _, apply := range opts {
-		apply(&opt)
-	}
-
-	return opt
-}
-
-func WithQueueOpShard(shard QueueShard) QueueOpOpt {
-	return func(o *queueOpOpt) {
-		o.shard = &shard
-	}
-}
-
-func (q *queue) DequeueByJobID(ctx context.Context, jobID string, opts ...QueueOpOpt) error {
-	opt := newQueueOpOpt()
-	for _, apply := range opts {
-		apply(&opt)
-	}
-
-	item, err := q.ItemByID(ctx, jobID, opts...)
+func (q *queue) DequeueByJobID(ctx context.Context, jobID string) error {
+	item, err := q.ItemByID(ctx, jobID)
 	switch err {
 	case nil:
 		// no-op
-	case ErrQueueItemNotFound:
+	case osqueue.ErrQueueItemNotFound:
 		return nil
 	default:
 		return fmt.Errorf("error retrieving item by ID: %w", err)
 	}
 
-	shard := q.primaryQueueShard
-	if opt.shard != nil {
-		shard = *opt.shard
-	}
-
-	return q.Dequeue(ctx, shard, *item)
+	return q.Dequeue(ctx, *item)
 }
 
 // Dequeue removes an item from the queue entirely.
-func (q *queue) Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.QueueItem) error {
+func (q *queue) Dequeue(ctx context.Context, i osqueue.QueueItem, options ...osqueue.DequeueOptionFn) error {
+	l := logger.StdlibLogger(ctx)
+
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Dequeue"), redis_telemetry.ScopeQueue)
 
-	if queueShard.Kind != string(enums.QueueShardKindRedis) {
-		return fmt.Errorf("unsupported queue shard kind for Dequeue: %s", queueShard.Kind)
+	o := &osqueue.DequeueOptions{}
+	for _, opt := range options {
+		opt(o)
 	}
 
-	kg := queueShard.RedisClient.kg
+	kg := q.RedisClient.kg
 
-	partition := q.ItemShadowPartition(ctx, i)
-	backlog := q.ItemBacklog(ctx, i)
+	partition := osqueue.ItemShadowPartition(ctx, i)
+	backlog := osqueue.ItemBacklog(ctx, i)
+
+	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.Dequeue", i.Data.Identifier.AccountID, i.Data.Identifier.WorkspaceID)
+	defer span.End()
+	span.SetAttributes(attribute.String("partition_id", partition.PartitionID))
+	span.SetAttributes(attribute.String("item_id", i.ID))
+	span.SetAttributes(attribute.String("run_id", i.Data.Identifier.RunID.String()))
+	if i.Data.JobID != nil {
+		span.SetAttributes(attribute.String("job_id", *i.Data.JobID))
+	}
 
 	keys := []string{
 		kg.QueueItem(),
@@ -83,7 +60,7 @@ func (q *queue) Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 
 		kg.ConcurrencyIndex(),
 
-		partition.readyQueueKey(kg),
+		shadowPartitionReadyQueueKey(partition, kg),
 		kg.GlobalPartitionIndex(),
 		kg.GlobalAccountIndex(),
 		kg.AccountPartitionIndex(i.Data.Identifier.AccountID),
@@ -99,45 +76,55 @@ func (q *queue) Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		kg.PartitionNormalizeSet(partition.PartitionID),
 
 		// In progress keys
-		partition.accountInProgressKey(kg),
-		partition.inProgressKey(kg),
-		backlog.customKeyInProgress(kg, 1),
-		backlog.customKeyInProgress(kg, 2),
+		shadowPartitionAccountInProgressKey(partition, kg),
+		shadowPartitionInProgressKey(partition, kg),
+		backlogCustomKeyInProgress(backlog, kg, 1),
+		backlogCustomKeyInProgress(backlog, kg, 2),
 
 		// Active set keys
-		partition.accountActiveKey(kg),
-		partition.activeKey(kg),
-		backlog.customKeyActive(kg, 1),
-		backlog.customKeyActive(kg, 2),
-		backlog.activeKey(kg),
+		shadowPartitionAccountActiveKey(partition, kg),
+		shadowPartitionActiveKey(partition, kg),
+		backlogCustomKeyActive(backlog, kg, 1),
+		backlogCustomKeyActive(backlog, kg, 2),
+		backlogActiveKey(backlog, kg),
 
 		// Active run sets
-		kg.RunActiveSet(i.Data.Identifier.RunID), // Set for active items in run
-		partition.accountActiveRunKey(kg),        // Set for active runs in account
-		partition.activeRunKey(kg),               // Set for active runs in partition
-		backlog.customKeyActiveRuns(kg, 1),       // Set for active runs with custom concurrency key 1
-		backlog.customKeyActiveRuns(kg, 2),       // Set for active runs with custom concurrency key 2
+		kg.RunActiveSet(i.Data.Identifier.RunID),          // Set for active items in run
+		shadowPartitionAccountActiveRunKey(partition, kg), // Set for active runs in account
+		shadowPartitionActiveRunKey(partition, kg),        // Set for active runs in partition
+		backlogCustomKeyActiveRuns(backlog, kg, 1),        // Set for active runs with custom concurrency key 1
+		backlogCustomKeyActiveRuns(backlog, kg, 2),        // Set for active runs with custom concurrency key 2
 
 		kg.Idempotency(i.ID),
 
 		// Singleton
 		kg.SingletonRunKey(i.Data.Identifier.RunID.String()),
+
+		kg.PartitionScavengerIndex(partition.PartitionID),
 	}
 
 	// Append indexes
-	for _, idx := range q.itemIndexer(ctx, i, queueShard.RedisClient.kg) {
+	for _, idx := range q.itemIndexer(ctx, i, q.RedisClient.kg) {
 		if idx != "" {
 			keys = append(keys, idx)
 		}
 	}
 
-	idempotency := q.idempotencyTTL
-	if q.idempotencyTTLFunc != nil {
-		idempotency = q.idempotencyTTLFunc(ctx, i)
+	idempotency := q.IdempotencyTTL
+	if q.IdempotencyTTLFunc != nil {
+		idempotency = q.IdempotencyTTLFunc(ctx, i)
 	}
 	// If custom idempotency period is set on the queue item, use that
 	if i.IdempotencyPeriod != nil {
 		idempotency = *i.IdempotencyPeriod
+	}
+
+	// Enable concurrency state updates by default, disable under some circumstances
+	// - processing system queue items
+	// - holding a valid capacity lease
+	updateConstraintStateVal := "1"
+	if o.DisableConstraintUpdates {
+		updateConstraintStateVal = "0"
 	}
 
 	args, err := StrSlice([]any{
@@ -148,6 +135,8 @@ func (q *queue) Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		i.Data.Identifier.RunID.String(),
 
 		int(idempotency.Seconds()),
+
+		updateConstraintStateVal,
 	})
 	if err != nil {
 		return err
@@ -155,7 +144,7 @@ func (q *queue) Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 
 	status, err := scripts["queue/dequeue"].Exec(
 		redis_telemetry.WithScriptName(ctx, "dequeue"),
-		queueShard.RedisClient.unshardedRc,
+		q.RedisClient.unshardedRc,
 		keys,
 		args,
 	).AsInt64()
@@ -165,30 +154,31 @@ func (q *queue) Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 	switch status {
 	case 0:
 		if rand.Float64() < 0.05 {
-			q.log.Debug("dequeued item", "job_id", i.ID, "item", i)
+			l.Trace("dequeued item", "job_id", i.ID, "item", i)
 		}
 
 		return nil
 	case 1:
-		return ErrQueueItemNotFound
+		return osqueue.ErrQueueItemNotFound
 	default:
 		return fmt.Errorf("unknown response dequeueing item: %d", status)
 	}
 }
 
 // Requeue requeues an item in the future.
-func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.QueueItem, at time.Time) error {
+func (q *queue) Requeue(ctx context.Context, i osqueue.QueueItem, at time.Time, options ...osqueue.RequeueOptionFn) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Requeue"), redis_telemetry.ScopeQueue)
 
-	l := q.log.With("item", i)
-
-	if queueShard.Kind != string(enums.QueueShardKindRedis) {
-		return fmt.Errorf("unsupported queue shard kind for Requeue: %s", queueShard.Kind)
+	o := &osqueue.RequeueOptions{}
+	for _, opt := range options {
+		opt(o)
 	}
 
-	kg := queueShard.RedisClient.kg
+	l := logger.StdlibLogger(ctx).With("item", i)
 
-	now := q.clock.Now()
+	kg := q.RedisClient.kg
+
+	now := q.Clock.Now()
 	if at.Before(now) {
 		at = now
 	}
@@ -209,10 +199,19 @@ func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 	// Reset enqueuedAt (used for latency calculation)
 	i.EnqueuedAt = now.UnixMilli()
 
-	fnPartition := q.ItemPartition(ctx, queueShard, i)
-	shadowPartition := q.ItemShadowPartition(ctx, i)
+	fnPartition := osqueue.ItemPartition(ctx, i)
+	shadowPartition := osqueue.ItemShadowPartition(ctx, i)
 
-	requeueToBacklog := q.itemEnableKeyQueues(ctx, i)
+	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.Requeue", i.Data.Identifier.AccountID, i.Data.Identifier.WorkspaceID)
+	defer span.End()
+	span.SetAttributes(attribute.String("partition_id", shadowPartition.PartitionID))
+	span.SetAttributes(attribute.String("item_id", i.ID))
+	span.SetAttributes(attribute.String("run_id", i.Data.Identifier.RunID.String()))
+	if i.Data.JobID != nil {
+		span.SetAttributes(attribute.String("job_id", *i.Data.JobID))
+	}
+
+	requeueToBacklog := q.ItemEnableKeyQueues(ctx, i)
 
 	requeueToBacklogsVal := "0"
 	if requeueToBacklog {
@@ -220,15 +219,15 @@ func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 
 		// To avoid requeueing item into a stale backlog, retrieve latest throttle
 		if i.Data.Throttle != nil && i.Data.Throttle.KeyExpressionHash == "" {
-			refreshedThrottle, err := q.refreshItemThrottle(ctx, &i)
+			refreshedThrottle, err := q.RefreshItemThrottle(ctx, &i)
 			if err != nil {
 				// If we cannot find the event for the queue item, dequeue it. The state
 				// must exist for the entire duration of a function run.
 				if errors.Is(err, state.ErrEventNotFound) {
 					l.Warn("could not find event for refreshing throttle before requeue")
 
-					err := q.Dequeue(ctx, queueShard, i)
-					if err != nil && !errors.Is(err, ErrQueueItemNotFound) {
+					err := q.Dequeue(ctx, i)
+					if err != nil && !errors.Is(err, osqueue.ErrQueueItemNotFound) {
 						return fmt.Errorf("could not dequeue item with missing throttle state: %w", err)
 					}
 
@@ -243,7 +242,7 @@ func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		}
 	}
 
-	backlog := q.ItemBacklog(ctx, i)
+	backlog := osqueue.ItemBacklog(ctx, i)
 
 	keys := []string{
 		kg.QueueItem(),
@@ -254,27 +253,27 @@ func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		kg.GlobalAccountIndex(),
 		kg.AccountPartitionIndex(i.Data.Identifier.AccountID),
 
-		shadowPartition.readyQueueKey(kg),
+		shadowPartitionReadyQueueKey(shadowPartition, kg),
 
 		// In progress (concurrency) keys
-		shadowPartition.accountInProgressKey(kg),
-		shadowPartition.inProgressKey(kg),
-		backlog.customKeyInProgress(kg, 1),
-		backlog.customKeyInProgress(kg, 2),
+		shadowPartitionAccountInProgressKey(shadowPartition, kg),
+		shadowPartitionInProgressKey(shadowPartition, kg),
+		backlogCustomKeyInProgress(backlog, kg, 1),
+		backlogCustomKeyInProgress(backlog, kg, 2),
 
 		// Active set keys
-		shadowPartition.accountActiveKey(kg),
-		shadowPartition.activeKey(kg),
-		backlog.customKeyActive(kg, 1),
-		backlog.customKeyActive(kg, 2),
-		backlog.activeKey(kg),
+		shadowPartitionAccountActiveKey(shadowPartition, kg),
+		shadowPartitionActiveKey(shadowPartition, kg),
+		backlogCustomKeyActive(backlog, kg, 1),
+		backlogCustomKeyActive(backlog, kg, 2),
+		backlogActiveKey(backlog, kg),
 
 		// Active run sets
-		kg.RunActiveSet(i.Data.Identifier.RunID), // Set for active items in run
-		shadowPartition.accountActiveRunKey(kg),  // Set for active runs in account
-		shadowPartition.activeRunKey(kg),         // Set for active runs in partition
-		backlog.customKeyActiveRuns(kg, 1),       // Set for active runs with custom concurrency key 1
-		backlog.customKeyActiveRuns(kg, 2),       // Set for active runs with custom concurrency key 2
+		kg.RunActiveSet(i.Data.Identifier.RunID),                // Set for active items in run
+		shadowPartitionAccountActiveRunKey(shadowPartition, kg), // Set for active runs in account
+		shadowPartitionActiveRunKey(shadowPartition, kg),        // Set for active runs in partition
+		backlogCustomKeyActiveRuns(backlog, kg, 1),              // Set for active runs with custom concurrency key 1
+		backlogCustomKeyActiveRuns(backlog, kg, 2),              // Set for active runs with custom concurrency key 2
 
 		// key queues v2
 		kg.BacklogSet(backlog.BacklogID),
@@ -284,12 +283,22 @@ func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		kg.ShadowPartitionMeta(),
 		kg.GlobalAccountShadowPartitions(),
 		kg.AccountShadowPartitions(i.Data.Identifier.AccountID), // empty for system partitions
+
+		kg.PartitionScavengerIndex(shadowPartition.PartitionID),
 	}
 	// Append indexes
-	for _, idx := range q.itemIndexer(ctx, i, queueShard.RedisClient.kg) {
+	for _, idx := range q.itemIndexer(ctx, i, q.RedisClient.kg) {
 		if idx != "" {
 			keys = append(keys, idx)
 		}
+	}
+
+	// Enable concurrency state updates by default, disable under some circumstances
+	// - processing system queue items
+	// - holding a valid capacity lease
+	updateConstraintStateVal := "1"
+	if o.DisableConstraintUpdates {
+		updateConstraintStateVal = "0"
 	}
 
 	args, err := StrSlice([]any{
@@ -308,12 +317,14 @@ func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		shadowPartition,
 		backlog.BacklogID,
 		backlog,
+
+		updateConstraintStateVal,
 	})
 	if err != nil {
 		return err
 	}
 
-	q.log.Trace("requeueing queue item",
+	l.Trace("requeueing queue item",
 		"id", i.ID,
 		"kind", i.Data.Kind,
 		"time", at.Format(time.StampMilli),
@@ -323,12 +334,12 @@ func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 
 	status, err := scripts["queue/requeue"].Exec(
 		redis_telemetry.WithScriptName(ctx, "requeue"),
-		queueShard.RedisClient.unshardedRc,
+		q.RedisClient.unshardedRc,
 		keys,
 		args,
 	).AsInt64()
 	if err != nil {
-		q.log.Error("error requeueing queue item",
+		l.Error("error requeueing queue item",
 			"error", err,
 			"item", i,
 			"partition", fnPartition,
@@ -343,7 +354,7 @@ func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 			metrics.IncrBacklogRequeuedCounter(ctx, metrics.CounterOpt{
 				PkgName: pkgName,
 				Tags: map[string]any{
-					"queue_shard": q.primaryQueueShard.Name,
+					"queue_shard": q.Name(),
 					// "partition_id": i.FunctionID.String(),
 				},
 			})
@@ -353,7 +364,7 @@ func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 	case 1:
 		// This should only ever happen if a run is cancelled and all queue items
 		// are deleted before requeueing.
-		return ErrQueueItemNotFound
+		return osqueue.ErrQueueItemNotFound
 	default:
 		return fmt.Errorf("unknown response requeueing item: %v (%T)", status, status)
 	}

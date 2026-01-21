@@ -1,8 +1,5 @@
-'use client';
-
 import React, { createContext, useContext } from 'react';
 
-import type { Trace } from '../RunDetailsV3/types';
 import type { BooleanFlag } from './useBooleanFlag';
 import type { CancelRunPayload, CancelRunResult } from './useCancelRun';
 import type { CreateDebugSessionPayload, CreateDebugSessionResult } from './useCreateDebugSession';

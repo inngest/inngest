@@ -1,5 +1,3 @@
-'use client';
-
 import { forwardRef } from 'react';
 import { cn } from '@inngest/components/utils/classNames';
 

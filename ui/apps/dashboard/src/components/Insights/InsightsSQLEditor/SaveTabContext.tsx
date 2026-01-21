@@ -1,6 +1,10 @@
-'use client';
-
-import { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useMemo,
+  useState,
+} from 'react';
 import { toast } from 'sonner';
 
 import { getIsSavedQuery } from '../InsightsTabManager/InsightsTabManager';
@@ -13,7 +17,9 @@ type SaveTabContextValue = {
   savingTabIds: ReadonlySet<string>;
 };
 
-const SaveTabContext = createContext<SaveTabContextValue | undefined>(undefined);
+const SaveTabContext = createContext<SaveTabContextValue | undefined>(
+  undefined,
+);
 
 export function SaveTabProvider({ children }: { children: React.ReactNode }) {
   const { saveQuery } = useStoredQueries();
@@ -26,7 +32,7 @@ export function SaveTabProvider({ children }: { children: React.ReactNode }) {
       const error = validateTab(tab);
       if (error) {
         toast.error(error);
-        return;
+        throw new Error(error);
       }
 
       setSavingTabIds((prev) => new Set(prev).add(tab.id));
@@ -41,20 +47,23 @@ export function SaveTabProvider({ children }: { children: React.ReactNode }) {
         });
       }
     },
-    [saveQuery, setSavingTabIds, savingTabIds]
+    [saveQuery, setSavingTabIds, savingTabIds],
   );
 
   const value = useMemo<SaveTabContextValue>(
     () => ({ saveTab, savingTabIds }),
-    [saveTab, savingTabIds]
+    [saveTab, savingTabIds],
   );
 
-  return <SaveTabContext.Provider value={value}>{children}</SaveTabContext.Provider>;
+  return (
+    <SaveTabContext.Provider value={value}>{children}</SaveTabContext.Provider>
+  );
 }
 
 export function useSaveTabActions(): SaveTabContextValue {
   const ctx = useContext(SaveTabContext);
-  if (!ctx) throw new Error('useSaveTabActions must be used within SaveTabProvider');
+  if (!ctx)
+    throw new Error('useSaveTabActions must be used within SaveTabProvider');
 
   return ctx;
 }
@@ -69,7 +78,7 @@ export function useSaveTab(tab: Tab) {
       isSaving: savingTabIds.has(tab.id),
       saveTab: () => saveTab(tab),
     }),
-    [saveTab, savingTabIds, tab]
+    [saveTab, savingTabIds, tab],
   );
 }
 

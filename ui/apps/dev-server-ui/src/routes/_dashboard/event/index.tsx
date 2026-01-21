@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { EventDetails } from '@inngest/components/Events/EventDetails';
 import { useReplayModal } from '@inngest/components/Events/useReplayModal';
-import { useSearchParam } from '@inngest/components/hooks/useNewSearchParams';
+import { useSearchParam } from '@inngest/components/hooks/useSearchParams';
 
 import SendEventModal from '@/components/Event/SendEventModal';
 import { ExpandedRowActions } from '@/components/Events/ExpandedRowActions';

@@ -342,10 +342,10 @@ func (r *mutationResolver) Rerun(
 		Function: *fn,
 		AppID:    fnCQRS.AppID,
 		Events: []event.TrackedEvent{
-			// We need NewOSSTrackedEventWithID to ensure that the tracked event
-			// has the same ID as the original event. Calling NewOSSTrackedEvent
+			// We need NewBaseTrackedEventWithID to ensure that the tracked event
+			// has the same ID as the original event. Calling NewBaseTrackedEvent
 			// will result in the creation of a new ID
-			event.NewOSSTrackedEventWithID(evt.Event(), evt.InternalID()),
+			event.NewBaseTrackedEventWithID(evt.Event(), evt.InternalID()),
 		},
 		OriginalRunID:  originalRunID,
 		AccountID:      consts.DevServerAccountID,

@@ -31,20 +31,24 @@ type Config struct {
 	QueueWorkers       int   `koanf:"queue-workers"`
 	Tick               int   `koanf:"tick"`
 	ConnectGatewayPort int   `koanf:"connect-gateway-port"`
-	InMemory           *bool `koanf:"in-memory"`
+	Persist            *bool `koanf:"persist"`
 
 	// Start command configuration
 	SigningKey string   `koanf:"signing-key"`
 	EventKey   []string `koanf:"event-key"`
 
 	// Database configuration
-	RedisURI                    string `koanf:"redis-uri"`
-	PostgresURI                 string `koanf:"postgres-uri"`
-	PostgresMaxIdleConns        int    `koanf:"postgres-max-idle-conns"`
-	PostgresMaxOpenConns        int    `koanf:"postgres-max-open-conns"`
-	PostgresConnMaxIdleTime     int    `koanf:"postgres-conn-max-idle-time"`
-	PostgresConnMaxLifetime     int    `koanf:"postgres-conn-max-lifetime"`
-	SqliteDir                   string `koanf:"sqlite-dir"`
+	RedisURI                string `koanf:"redis-uri"`
+	PostgresURI             string `koanf:"postgres-uri"`
+	PostgresMaxIdleConns    int    `koanf:"postgres-max-idle-conns"`
+	PostgresMaxOpenConns    int    `koanf:"postgres-max-open-conns"`
+	PostgresConnMaxIdleTime int    `koanf:"postgres-conn-max-idle-time"`
+	PostgresConnMaxLifetime int    `koanf:"postgres-conn-max-lifetime"`
+	SqliteDir               string `koanf:"sqlite-dir"`
+
+	// Tracing
+	SystemTraceEndpoint string `koanf:"system-trace-endpoint"`
+	SystemTraceURLPath  string `koanf:"system-trace-url-path"`
 }
 
 // Global variables to store koanf instance and loaded configuration
@@ -226,12 +230,12 @@ func GetValue(cmd *cli.Command, key, defaultValue string) string {
 	if cmd.IsSet(key) {
 		return cmd.String(key)
 	}
-	
+
 	// Then check koanf (which includes env vars and config file in correct priority)
 	if value := k.String(key); value != "" {
 		return value
 	}
-	
+
 	// Finally return default
 	return defaultValue
 }
@@ -242,12 +246,12 @@ func GetIntValue(cmd *cli.Command, key string, defaultValue int) int {
 	if cmd.IsSet(key) {
 		return cmd.Int(key)
 	}
-	
+
 	// Then check koanf (which includes env vars and config file in correct priority)
 	if k.Exists(key) {
 		return k.Int(key)
 	}
-	
+
 	// Finally return default
 	return defaultValue
 }
@@ -258,7 +262,7 @@ func GetStringSlice(cmd *cli.Command, key string) []string {
 	if cmd.IsSet(key) {
 		return cmd.StringSlice(key)
 	}
-	
+
 	// Then check koanf (which includes env vars and config file in correct priority)
 	return k.Strings(key)
 }
@@ -269,13 +273,12 @@ func GetBoolValue(cmd *cli.Command, key string, defaultValue bool) bool {
 	if cmd.IsSet(key) {
 		return cmd.Bool(key)
 	}
-	
+
 	// Then check koanf (which includes env vars and config file in correct priority)
 	if k.Exists(key) {
 		return k.Bool(key)
 	}
-	
+
 	// Finally return default
 	return defaultValue
 }
-

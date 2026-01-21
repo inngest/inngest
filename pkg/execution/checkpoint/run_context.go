@@ -31,6 +31,11 @@ func (c *checkpointRunContext) Metadata() *state.Metadata {
 	return &c.md
 }
 
+func (c *checkpointRunContext) DriverResponse() *state.DriverResponse {
+	// Checkpoint context does not have a driver response
+	return nil
+}
+
 func (c *checkpointRunContext) Events() []json.RawMessage {
 	return c.events
 }

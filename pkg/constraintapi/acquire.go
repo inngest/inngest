@@ -3,14 +3,19 @@ package constraintapi
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/inngest/inngest/pkg/util/errs"
 	"github.com/oklog/ulid/v2"
+	"github.com/redis/rueidis"
 )
 
 // redisRequestState represents the data structure stored for every request
@@ -44,14 +49,20 @@ type redisRequestState struct {
 	// This is enforced during ExtendLease.
 	MaximumLifetimeMillis int64 `json:"l,omitempty"`
 
-	// LeaseIdempotencyKeys stores the idempotency used to generate leases
-	LeaseIdempotencyKeys []string `json:"lik,omitempty"`
+	// HashedLeaseIdempotencyKeys stores the hashed idempotency keys used to generate leases
+	HashedLeaseIdempotencyKeys []string `json:"lik,omitempty"`
 
-	// LeaseRunIDs stores the run IDs associated with lease IDs
+	// LeaseRunIDs stores the run IDs associated with hashed lease idempotency keys
 	LeaseRunIDs map[string]ulid.ULID `json:"lri,omitempty"`
 }
 
-func buildRequestState(req *CapacityAcquireRequest, keyPrefix string) (*redisRequestState, []ConstraintItem) {
+func buildRequestState(req *CapacityAcquireRequest, keyPrefix string) (
+	[]byte,
+	[]ConstraintItem,
+	map[string]string,
+	string,
+	error,
+) {
 	state := &redisRequestState{
 		OperationIdempotencyKey: req.IdempotencyKey,
 		EnvID:                   req.EnvID,
@@ -60,13 +71,35 @@ func buildRequestState(req *CapacityAcquireRequest, keyPrefix string) (*redisReq
 		MaximumLifetimeMillis:   req.MaximumLifetime.Milliseconds(),
 		ConfigVersion:           req.Configuration.FunctionVersion,
 
-		LeaseRunIDs:          req.LeaseRunIDs,
-		LeaseIdempotencyKeys: req.LeaseIdempotencyKeys,
-
 		// These keys are set during Acquire and Release respectively
 		GrantedAmount: 0,
 		ActiveAmount:  0,
 	}
+
+	// We hash all idempotency keys provided by users internally.
+	// This is a security precaution and helps reduce memory usage.
+	// Users still expect the unhashed idempotency keys to be returned,
+	// hence we need to track the mapping between idempotency key -> hash(idempotency key)
+	//
+	// NOTE: If the lease idempotency keys change between requests with the same idempotency key
+	// (which should never happen), this should trigger the fingerprint below to change.
+	hashedLeaseIdempotencyKeysMap := make(map[string]string)
+	hashedLeaseIdempotencyKeys := make([]string, len(req.LeaseIdempotencyKeys))
+	for i, leaseIdempotencyKey := range req.LeaseIdempotencyKeys {
+		hashed := util.XXHash(leaseIdempotencyKey)
+		hashedLeaseIdempotencyKeys[i] = hashed
+		hashedLeaseIdempotencyKeysMap[hashed] = leaseIdempotencyKey
+	}
+
+	state.HashedLeaseIdempotencyKeys = hashedLeaseIdempotencyKeys
+
+	// Ensure to hash lease idempotency key in run ID map
+	leaseRunIDs := make(map[string]ulid.ULID)
+	for k, u := range req.LeaseRunIDs {
+		leaseRunIDs[util.XXHash(k)] = u
+	}
+
+	state.LeaseRunIDs = leaseRunIDs
 
 	// Sort and serialize constraints with embedded configuration limits
 	constraints := req.Constraints
@@ -85,7 +118,24 @@ func buildRequestState(req *CapacityAcquireRequest, keyPrefix string) (*redisReq
 
 	state.SortedConstraints = serialized
 
-	return state, constraints
+	dataBytes, err := json.Marshal(state)
+	if err != nil {
+		return nil, nil, nil, "", fmt.Errorf("could not marshal request: %w", err)
+	}
+
+	// NOTE: We fingerprint the query to waive idempotency in case the configuration,
+	// requested constraints, etc. changed.
+	var hash string
+	{
+		fingerprint := sha256.New()
+		_, err = fingerprint.Write(dataBytes)
+		if err != nil {
+			return nil, nil, nil, "", fmt.Errorf("could not fingerprint query: %w", err)
+		}
+		hash = hex.EncodeToString(fingerprint.Sum(nil))
+	}
+
+	return dataBytes, constraints, hashedLeaseIdempotencyKeysMap, hash, nil
 }
 
 type acquireScriptResponse struct {
@@ -96,14 +146,23 @@ type acquireScriptResponse struct {
 		LeaseID             ulid.ULID `json:"lid"`
 		LeaseIdempotencyKey string    `json:"lik"`
 	} `json:"l"`
-	LimitingConstraints []int    `json:"lc"`
-	FairnessReduction   int      `json:"fr"`
-	RetryAt             int      `json:"ra"`
-	Debug               []string `json:"d"`
+	LimitingConstraints flexibleIntArray    `json:"lc"`
+	FairnessReduction   int                 `json:"fr"`
+	RetryAt             int                 `json:"ra"`
+	Debug               flexibleStringArray `json:"d"`
+
+	ActiveAccountLeases  int `json:"aal"`
+	ExpiredAccountLeases int `json:"eal"`
+	EarliestLeaseExpiry  int `json:"ele"`
 }
 
 func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquireRequest) (*CapacityAcquireResponse, errs.InternalError) {
 	l := logger.StdlibLogger(ctx)
+
+	requestID, err := ulid.New(ulid.Timestamp(r.clock.Now()), rand.Reader)
+	if err != nil {
+		return nil, errs.Wrap(0, false, "could not generate request ID: %w", err)
+	}
 
 	// Validate request
 	if err := req.Valid(); err != nil {
@@ -114,18 +173,31 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 		"account_id", req.AccountID,
 		"env_id", req.EnvID,
 		"fn_id", req.FunctionID,
+		"req_id", requestID,
 	)
 
 	now := r.clock.Now()
 
-	// TODO: Add metric for this
 	// NOTE: This will include request latency (marshaling, network delays),
 	// and it might not work for retries, as those retain the same CurrentTime value.
-	// TODO: Ensure retries have the updated CurrentTime
 	requestLatency := now.Sub(req.CurrentTime)
+
+	metrics.HistogramConstraintAPIRequestLatency(ctx, requestLatency, metrics.HistogramOpt{
+		PkgName: pkgName,
+		Tags: map[string]any{
+			"operation": "acquire",
+			"source":    req.Migration.String(),
+			"attempt":   req.RequestAttempt,
+		},
+	})
+
 	if requestLatency > MaximumAllowedRequestDelay {
 		// TODO : Set proper error code
-		return nil, errs.Wrap(0, false, "exceeded maximum allowed request delay")
+		return nil, errs.Wrap(
+			0,
+			false,
+			"exceeded maximum allowed request delay, latency: %s, attempt: %d", requestLatency, req.RequestAttempt,
+		)
 	}
 
 	// Retrieve client and key prefix for current constraints
@@ -148,17 +220,37 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 		initialLeaseIDs[i] = leaseID
 	}
 
-	requestState, sortedConstraints := buildRequestState(req, keyPrefix)
+	requestState, sortedConstraints, hashedLeaseIdempotencyKeysMap, fingerprint, err := buildRequestState(req, keyPrefix)
+	if err != nil {
+		return nil, errs.Wrap(0, false, "could not build request state: %w", err)
+	}
 
 	// Deterministically compute this based on numScavengerShards and accountID
 	scavengerShard := r.scavengerShard(ctx, req.AccountID)
 
 	// Build Lua request
 
+	// When the same Acquire request is received again after a successful first request, we will
+	// return the same generated lease for a short idempotency period. This is to facilitate
+	// graceful retries in case the caller fails to use the returned lease in the first attempt (e.g. OOM).
+	//
+	// NOTE: We must include the request fingerprint to ensure idempotency is reset
+	// in case the configuration changed between requests (e.g. user syncs functions between retries of a queue item)
+	operationIdempotencyKey := fmt.Sprintf("%s-%s", req.IdempotencyKey, fingerprint)
+	// The idempotency period must always be <= the lease duration, as we may return an expired lease otherwise.
+	operationIdempotencyPeriod := min(r.operationIdempotencyTTL, req.Duration)
+
 	keys := []string{
-		r.keyRequestState(keyPrefix, req.AccountID, req.IdempotencyKey),
-		r.keyOperationIdempotency(keyPrefix, req.AccountID, "acq", req.IdempotencyKey),
+		// The request state is persisted for consistent cleanup during Scavenge/Release operations
+		r.keyRequestState(keyPrefix, req.AccountID, requestID),
+
+		// Operation idempotency is used for retries while the generated leases are still valid
+		r.keyOperationIdempotency(keyPrefix, req.AccountID, "acq", operationIdempotencyKey),
+
+		// Enable idempotency for the entire Acquire call. This is used by batch operations like BacklogRefill which
+		// may need to skip GCRA checks without knowing individual leases/items
 		r.keyConstraintCheckIdempotency(keyPrefix, req.AccountID, req.IdempotencyKey),
+
 		r.keyScavengerShard(keyPrefix, scavengerShard),
 		r.keyAccountLeases(keyPrefix, req.AccountID),
 	}
@@ -168,20 +260,23 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 		enableDebugLogsVal = "1"
 	}
 
+	scopedKeyPrefix := fmt.Sprintf("{%s}:%s", keyPrefix, accountScope(req.AccountID))
+
 	args, err := strSlice([]any{
 		// This will be marshaled
-		requestState,
+		rueidis.BinaryString(requestState),
+		requestID.String(),
+
 		req.AccountID,
 		now.UnixMilli(), // current time in milliseconds for throttle
 		now.UnixNano(),  // current time in nanoseconds for rate limiting
 
 		leaseExpiry.UnixMilli(),
-		keyPrefix,
+		scopedKeyPrefix,
 		initialLeaseIDs,
 
-		util.XXHash(req.IdempotencyKey), // hashed operation idempotency key
-		int(OperationIdempotencyTTL.Seconds()),
-		int(ConstraintCheckIdempotencyTTL.Seconds()),
+		int(operationIdempotencyPeriod.Seconds()),
+		int(r.constraintCheckIdempotencyTTL.Seconds()),
 
 		enableDebugLogsVal,
 	})
@@ -189,9 +284,13 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 		return nil, errs.Wrap(0, false, "invalid args: %w", err)
 	}
 
-	rawRes, err := scripts["acquire"].Exec(ctx, client, keys, args).AsBytes()
-	if err != nil {
-		return nil, errs.Wrap(0, false, "acquire script failed: %w", err)
+	l.Trace(
+		"prepared acquire call",
+	)
+
+	rawRes, internalErr := executeLuaScript(ctx, "acquire", req.Migration, client, r.clock, keys, args)
+	if internalErr != nil {
+		return nil, internalErr
 	}
 
 	parsedResponse := acquireScriptResponse{}
@@ -202,47 +301,143 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 
 	leases := make([]CapacityLease, len(parsedResponse.GrantedLeases))
 	for i, v := range parsedResponse.GrantedLeases {
+		// NOTE: To return the original lease idempotency key back to the user,
+		// we have to perform a reverse lookup in the map of hash(idempotency key) -> idempotency key
+		// we created when serializing the request state.
+		leaseIdempotencyKey, ok := hashedLeaseIdempotencyKeysMap[v.LeaseIdempotencyKey]
+		if !ok {
+			return nil, errs.Wrap(0, false, "invalid hashed lease idempotency key returned")
+		}
+
 		leases[i] = CapacityLease{
 			LeaseID:        v.LeaseID,
-			IdempotencyKey: v.LeaseIdempotencyKey,
+			IdempotencyKey: leaseIdempotencyKey,
 		}
 	}
 
 	var limitingConstraints []ConstraintItem
 	if len(parsedResponse.LimitingConstraints) > 0 {
 		limitingConstraints = make([]ConstraintItem, len(parsedResponse.LimitingConstraints))
-		for i, limitingConstraintIndex := range parsedResponse.LimitingConstraints {
+		for i, limitingConstraintIndex := range []int(parsedResponse.LimitingConstraints) {
 			limitingConstraints[i] = sortedConstraints[limitingConstraintIndex-1]
 		}
+	}
+
+	retryAfter := time.UnixMilli(int64(parsedResponse.RetryAt))
+	if retryAfter.Before(now) {
+		retryAfter = time.Time{}
+	}
+
+	if len(r.lifecycles) > 0 {
+		for _, hook := range r.lifecycles {
+			err := hook.OnCapacityLeaseAcquired(ctx, OnCapacityLeaseAcquiredData{
+				AccountID:           req.AccountID,
+				EnvID:               req.EnvID,
+				FunctionID:          req.FunctionID,
+				Configuration:       req.Configuration,
+				Constraints:         req.Constraints,
+				LimitingConstraints: limitingConstraints,
+				FairnessReduction:   parsedResponse.FairnessReduction,
+				RetryAfter:          retryAfter,
+				RequestedAmount:     req.Amount,
+				Duration:            req.Duration,
+				Source:              req.Source,
+				GrantedLeases:       leases,
+			})
+			if err != nil {
+				return nil, errs.Wrap(0, false, "acquire lifecycle failed: %w", err)
+			}
+		}
+	}
+
+	l = l.With(
+		"status", parsedResponse.Status,
+		"active", parsedResponse.ActiveAccountLeases,
+		"expired", parsedResponse.ExpiredAccountLeases,
+		"earliest_expiry", time.UnixMilli(int64(parsedResponse.EarliestLeaseExpiry)),
+	)
+
+	tags := make(map[string]any)
+	if r.enableHighCardinalityInstrumentation != nil && r.enableHighCardinalityInstrumentation(ctx, req.AccountID, req.EnvID, req.FunctionID) {
+		tags["function_id"] = req.FunctionID
+	}
+
+	// Export metrics for leases requested and granted
+	metrics.IncrConstraintAPILeasesRequestedCounter(ctx, int64(parsedResponse.Requested), metrics.CounterOpt{
+		PkgName: "constraintapi",
+		Tags:    tags,
+	})
+
+	metrics.IncrConstraintAPILeasesGrantedCounter(ctx, int64(parsedResponse.Granted), metrics.CounterOpt{
+		PkgName: "constraintapi",
+		Tags:    tags,
+	})
+
+	// Export counter for limitingConstraints
+	for _, constraint := range limitingConstraints {
+		tags["limiting_constraint"] = constraint.LimitingConstraintIdentifier()
+		metrics.IncrConstraintAPILimitingConstraintsCounter(ctx, metrics.CounterOpt{
+			PkgName: "constraintapi",
+			Tags:    tags,
+		})
 	}
 
 	switch parsedResponse.Status {
 	case 1, 3:
 		l.Trace(
 			"successful acquire call",
-			"status", parsedResponse.Status,
 			"leases", leases,
 		)
 
+		metrics.HistogramConstraintAPIRequestStateSize(ctx, int64(len(requestState)), metrics.HistogramOpt{
+			PkgName: pkgName,
+			Tags: map[string]any{
+				"location":            req.Source.Location.String(),
+				"service":             req.Source.Service.String(),
+				"run_processing_mode": req.Source.RunProcessingMode.String(),
+				"migration":           req.Migration.String(),
+			},
+		})
+
+		metrics.IncrConstraintAPIIssuedLeaseCounter(ctx, int64(len(leases)), metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags: map[string]any{
+				"location":            req.Source.Location.String(),
+				"service":             req.Source.Service.String(),
+				"run_processing_mode": req.Source.RunProcessingMode.String(),
+				"migration":           req.Migration.String(),
+			},
+		})
+
 		// success or idempotency
 		return &CapacityAcquireResponse{
+			RequestID:           requestID,
 			Leases:              leases,
 			LimitingConstraints: limitingConstraints,
 			FairnessReduction:   parsedResponse.FairnessReduction,
+			RetryAfter:          retryAfter,
 			internalDebugState:  parsedResponse,
 		}, nil
 
 	case 2:
-		l.Trace("acquire call lacking capacity", "status", parsedResponse.Status)
+		l.Trace(
+			"acquire call lacking capacity",
+			"limiting", limitingConstraints,
+		)
 
 		// lacking capacity
 		return &CapacityAcquireResponse{
+			RequestID:           requestID,
 			Leases:              leases,
 			LimitingConstraints: limitingConstraints,
-			RetryAfter:          time.UnixMilli(int64(parsedResponse.RetryAt)),
+			RetryAfter:          retryAfter,
 			FairnessReduction:   parsedResponse.FairnessReduction,
 			internalDebugState:  parsedResponse,
 		}, nil
+
+	case 4:
+		l.Trace("acquire while previous request state still exists")
+		return nil, errs.Wrap(0, false, "request state for this idempotency key already exists")
 
 	default:
 		return nil, errs.Wrap(0, false, "unexpected status code %v", parsedResponse.Status)

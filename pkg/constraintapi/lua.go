@@ -1,16 +1,22 @@
 package constraintapi
 
 import (
+	"context"
 	"embed"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/fs"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
+	"github.com/inngest/inngest/pkg/util/errs"
+	"github.com/jonboulle/clockwork"
 	"github.com/redis/rueidis"
 )
 
@@ -20,7 +26,7 @@ var embedded embed.FS
 var (
 	// scripts stores all embedded lua scripts on initialization
 	scripts              = map[string]*rueidis.Lua{}
-	include              = regexp.MustCompile(`-- \$include\(([\w.]+)\)`)
+	include              = regexp.MustCompile(`(?m)^-- \$include\(([\w./]+)\)$`)
 	langServerAnnotation = regexp.MustCompile(`(?m)^---@.*$|---@[^\n]*`)
 	comments             = regexp.MustCompile(`(?m)^--.*$|--[^\n]*`)
 	emptyLines           = regexp.MustCompile(`(?m)^\s*$`)
@@ -137,6 +143,9 @@ type SerializedConcurrencyConstraint struct {
 
 	// InProgressItemKey represents the in progress item (concurrency) ZSET key for this constraint
 	InProgressItemKey string `json:"iik"`
+
+	// RetryAfterMS determines the retry duration in milliseconds if this concurrency constraint is limiting
+	RetryAfterMS int `json:"ra,omitempty"`
 }
 
 // SerializedThrottleConstraint represents a minimal version of ThrottleConstraint
@@ -156,7 +165,7 @@ type SerializedThrottleConstraint struct {
 	// b = Burst (embedded from config)
 	Burst int `json:"b"`
 
-	// p = Period (embedded from config)
+	// p = Period in ms (embedded from config)
 	Period int `json:"p"`
 
 	// k = Key (fully-qualified Redis key)
@@ -177,7 +186,7 @@ type SerializedRateLimitConstraint struct {
 	// l = Limit (embedded from config)
 	Limit int `json:"l"`
 
-	// p = Period (embedded from config)
+	// p = Period in ns (embedded from config)
 	Period int `json:"p"`
 
 	// b = Burst (embedded from config)
@@ -208,9 +217,7 @@ func (ci ConstraintItem) ToSerializedConstraintItem(
 				Scope:             int(ci.RateLimit.Scope),
 				KeyExpressionHash: ci.RateLimit.KeyExpressionHash,
 				EvaluatedKeyHash:  ci.RateLimit.EvaluatedKeyHash,
-				// NOTE: Rate limit state is prefixed with the rate limit key prefix. This is important for compatibility.
-				// See ratelimit/ratelimit_lua.go for the rate limit implementation.
-				Key: fmt.Sprintf("{%s}:%s", keyPrefix, ci.RateLimit.EvaluatedKeyHash),
+				Key:               ci.RateLimit.StateKey(keyPrefix, accountID, envID),
 			}
 
 			// Find matching rate limit config
@@ -236,6 +243,7 @@ func (ci ConstraintItem) ToSerializedConstraintItem(
 				EvaluatedKeyHash:   ci.Concurrency.EvaluatedKeyHash,
 				InProgressItemKey:  ci.Concurrency.InProgressItemKey,
 				InProgressLeaseKey: ci.Concurrency.InProgressLeasesKey(keyPrefix, accountID, envID, functionID),
+				RetryAfterMS:       int(ci.Concurrency.RetryAfter().Milliseconds()),
 			}
 
 			// Embed appropriate limit based on scope and mode
@@ -272,20 +280,19 @@ func (ci ConstraintItem) ToSerializedConstraintItem(
 	case ConstraintKindThrottle:
 		serialized.Kind = 3
 		if ci.Throttle != nil {
-			// NOTE: Throttle keys do NOT use a prefix like ratelimit
 			throttleConstraint := &SerializedThrottleConstraint{
 				Scope:             int(ci.Throttle.Scope),
 				KeyExpressionHash: ci.Throttle.KeyExpressionHash,
 				EvaluatedKeyHash:  ci.Throttle.EvaluatedKeyHash,
-				Key:               fmt.Sprintf("{%s}:throttle:%s", keyPrefix, ci.Throttle.EvaluatedKeyHash),
+				Key:               ci.Throttle.StateKey(keyPrefix, accountID, envID),
 			}
 
 			// Find matching throttle config
 			for _, tConfig := range config.Throttle {
-				if tConfig.Scope == ci.Throttle.Scope && tConfig.ThrottleKeyExpressionHash == ci.Throttle.KeyExpressionHash {
+				if tConfig.Scope == ci.Throttle.Scope && tConfig.KeyExpressionHash == ci.Throttle.KeyExpressionHash {
 					throttleConstraint.Limit = tConfig.Limit
 					throttleConstraint.Burst = tConfig.Burst
-					throttleConstraint.Period = tConfig.Period
+					throttleConstraint.Period = tConfig.Period * 1000 // Convert seconds to milliseconds
 					break
 				}
 			}
@@ -328,4 +335,60 @@ func strSlice(args []any) ([]string, error) {
 		}
 	}
 	return res, nil
+}
+
+func isTimeout(err error) bool {
+	if errors.Is(err, os.ErrDeadlineExceeded) {
+		return true
+	}
+
+	if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+		return true
+	}
+
+	return false
+}
+
+func executeLuaScript(
+	ctx context.Context,
+	name string,
+	mi MigrationIdentifier,
+	client rueidis.Client,
+	clock clockwork.Clock,
+	keys []string,
+	args []string,
+) ([]byte, errs.InternalError) {
+	// Get current time for duration metrics
+	start := clock.Now()
+
+	// Execute script and convert response to bytes (we return JSON from all scripts)
+	rawRes, err := scripts[name].Exec(ctx, client, keys, args).AsBytes()
+
+	status, retry := luaError(err)
+
+	// Report duration
+	metrics.HistogramConstraintAPILuaScriptDuration(ctx, clock.Since(start), metrics.HistogramOpt{
+		PkgName: pkgName,
+		Tags: map[string]any{
+			"operation": name,
+			"status":    status,
+			"source":    mi.String(),
+		},
+	})
+
+	if err != nil {
+		return nil, errs.Wrap(0, retry, "%s script failed: %w", name, err)
+	}
+
+	return rawRes, nil
+}
+
+func luaError(err error) (status string, retry bool) {
+	if isTimeout(err) {
+		return "timeout", true
+	}
+	if err != nil {
+		return "error", false
+	}
+	return "success", false
 }
