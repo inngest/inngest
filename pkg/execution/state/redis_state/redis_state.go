@@ -875,8 +875,6 @@ func (m shardedMgr) delete(ctx context.Context, callCtx context.Context, i state
 }
 
 // ConsumePause consumes a pause, writing the consumed data to state.
-// The returned cleanup function is always nil - pauses.Manager provides the actual
-// cleanup logic. This signature exists to satisfy the state.PauseMutater interface.
 func (m shardedMgr) ConsumePause(ctx context.Context, p state.Pause, opts state.ConsumePauseOpts) (state.ConsumePauseResult, error) {
 	if opts.IdempotencyKey == "" {
 		return state.ConsumePauseResult{}, state.ErrConsumePauseKeyMissing
