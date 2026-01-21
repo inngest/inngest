@@ -877,9 +877,9 @@ func (m shardedMgr) delete(ctx context.Context, callCtx context.Context, i state
 // ConsumePause consumes a pause, writing the consumed data to state.
 // The returned cleanup function is always nil - pauses.Manager provides the actual
 // cleanup logic. This signature exists to satisfy the state.PauseMutater interface.
-func (m shardedMgr) ConsumePause(ctx context.Context, p state.Pause, opts state.ConsumePauseOpts) (state.ConsumePauseResult, func() error, error) {
+func (m shardedMgr) ConsumePause(ctx context.Context, p state.Pause, opts state.ConsumePauseOpts) (state.ConsumePauseResult, error) {
 	if opts.IdempotencyKey == "" {
-		return state.ConsumePauseResult{}, nil, state.ErrConsumePauseKeyMissing
+		return state.ConsumePauseResult{}, state.ErrConsumePauseKeyMissing
 	}
 
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "ConsumePause"), redis_telemetry.ScopePauses)
@@ -895,7 +895,7 @@ func (m shardedMgr) ConsumePause(ctx context.Context, p state.Pause, opts state.
 		var err error
 		marshalledData, err = json.Marshal(opts.Data)
 		if err != nil {
-			return state.ConsumePauseResult{}, nil, fmt.Errorf("cannot marshal data to store in state: %w", err)
+			return state.ConsumePauseResult{}, fmt.Errorf("cannot marshal data to store in state: %w", err)
 		}
 	}
 
@@ -917,7 +917,7 @@ func (m shardedMgr) ConsumePause(ctx context.Context, p state.Pause, opts state.
 		time.Now().Add(consts.FunctionIdempotencyPeriod).Unix(),
 	})
 	if err != nil {
-		return state.ConsumePauseResult{}, nil, err
+		return state.ConsumePauseResult{}, err
 	}
 
 	status, err := retriableScripts["consumePause"].Exec(
@@ -927,19 +927,19 @@ func (m shardedMgr) ConsumePause(ctx context.Context, p state.Pause, opts state.
 		args,
 	).AsInt64()
 	if err != nil {
-		return state.ConsumePauseResult{}, nil, fmt.Errorf("error consuming pause: %w", err)
+		return state.ConsumePauseResult{}, fmt.Errorf("error consuming pause: %w", err)
 	}
 
 	switch status {
 	case -1:
 		// This could be an ErrDuplicateResponse;  we're attempting to consume a pause twice.
-		return state.ConsumePauseResult{}, nil, nil
+		return state.ConsumePauseResult{}, nil
 	case 0:
-		return state.ConsumePauseResult{DidConsume: true}, nil, nil
+		return state.ConsumePauseResult{DidConsume: true}, nil
 	case 1:
-		return state.ConsumePauseResult{DidConsume: true, HasPendingSteps: true}, nil, nil
+		return state.ConsumePauseResult{DidConsume: true, HasPendingSteps: true}, nil
 	default:
-		return state.ConsumePauseResult{}, nil, fmt.Errorf("unknown response leasing pause: %d", status)
+		return state.ConsumePauseResult{}, fmt.Errorf("unknown response leasing pause: %d", status)
 	}
 }
 

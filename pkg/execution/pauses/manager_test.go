@@ -346,9 +346,9 @@ type mockRunService struct {
 	consumeCalled bool
 }
 
-func (m *mockRunService) ConsumePause(ctx context.Context, p state.Pause, opts state.ConsumePauseOpts) (state.ConsumePauseResult, func() error, error) {
+func (m *mockRunService) ConsumePause(ctx context.Context, p state.Pause, opts state.ConsumePauseOpts) (state.ConsumePauseResult, error) {
 	m.consumeCalled = true
-	return state.ConsumePauseResult{DidConsume: true}, nil, nil
+	return state.ConsumePauseResult{DidConsume: true}, nil
 }
 
 func (m *mockRunService) Create(ctx context.Context, s statev2.CreateState) (statev2.State, error) {

@@ -159,7 +159,7 @@ func (m manager) ConsumePause(ctx context.Context, rs statev2.RunService, pause 
 	// pain, though, because we may die when uploading pending blocks, and that requires
 	// a bit of thought to work around, so we'll just go with double deletes for now,
 	// assuming this won't happen a ton.  this can be improved later.
-	res, _, err := rs.ConsumePause(ctx, pause, opts)
+	res, err := rs.ConsumePause(ctx, pause, opts)
 	if err != nil {
 		return res, nil, err
 	}

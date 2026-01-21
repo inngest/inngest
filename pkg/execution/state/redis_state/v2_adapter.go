@@ -410,20 +410,18 @@ func (v v2) SavePending(ctx context.Context, id state.ID, pending []string) erro
 }
 
 // ConsumePause consumes a pause by its ID such that it can't be used again.
-func (v v2) ConsumePause(ctx context.Context, p statev1.Pause, opts statev1.ConsumePauseOpts) (statev1.ConsumePauseResult, func() error, error) {
+func (v v2) ConsumePause(ctx context.Context, p statev1.Pause, opts statev1.ConsumePauseOpts) (statev1.ConsumePauseResult, error) {
 	r, err := util.WithRetry(
 		ctx,
 		"state.ConsumePause",
 		func(ctx context.Context) (statev1.ConsumePauseResult, error) {
-			res, _, err := v.mgr.ConsumePause(ctx, p, opts)
+			res,  err := v.mgr.ConsumePause(ctx, p, opts)
 			return res, err
 		},
 		v.retryPolicy(),
 	)
 
-	// No longer care about cleanup, it's only kept to keep the same pause manager signature, cleanup callback is returned by the
-	// the pause manager now which is always wrapping this state store call.
-	return r, nil, err
+	return r, err
 }
 
 func (v v2) retryPolicy(opts ...util.RetryConfSetting) util.RetryConf {
