@@ -439,7 +439,7 @@ func (a *api) PostPublishTee(w http.ResponseWriter, r *http.Request) {
 		logger.StdlibLogger(ctx).Warn(
 			"error copying request body to subscribers",
 			"error", err,
-			"channel", util.LogReplace(channel),
+			"channel", util.SanitizeLogField(channel),
 		)
 		http.Error(w, "Error forwarding data", 500)
 		return
