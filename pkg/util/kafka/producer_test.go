@@ -35,6 +35,10 @@ func (m *mockProducer) GetRecords() []*kgo.Record {
 }
 
 func TestKafkaProducer(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping slow test using testcontainers")
+	}
+
 	ctx := t.Context()
 
 	// Start Kafka cluster with test-topic
@@ -64,6 +68,28 @@ func TestKafkaProducer(t *testing.T) {
 		Value: []byte("test value"),
 	})
 	require.NoError(t, err)
+
+	// After producing, consume and verify the record
+	consumer, err := kgo.NewClient(
+		kgo.SeedBrokers(cluster.Brokers()...),
+		kgo.ConsumeTopics("test-topic"),
+		kgo.ConsumeResetOffset(kgo.NewOffset().AtStart()),
+	)
+	require.NoError(t, err)
+	defer consumer.Close()
+
+	// Poll for records with timeout
+	fetchCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	fetches := consumer.PollFetches(fetchCtx)
+	require.NoError(t, fetches.Err())
+
+	records := fetches.Records()
+	require.Len(t, records, 1)
+	assert.Equal(t, "test-topic", records[0].Topic)
+	assert.Equal(t, []byte("test-key"), records[0].Key)
+	assert.Equal(t, []byte("test value"), records[0].Value)
 }
 
 func TestFallbackProducer_FallsBackOnError(t *testing.T) {
@@ -166,6 +192,10 @@ func TestFallbackProducer_ContextDeadlineExceeded_ReturnsImmediately(t *testing.
 }
 
 func TestKafkaProducer_BufferFull_UsesFallback(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping slow test using testcontainers")
+	}
+
 	ctx := t.Context()
 
 	// Start Kafka cluster with test-topic
@@ -244,6 +274,10 @@ func TestKafkaProducer_BufferFull_UsesFallback(t *testing.T) {
 }
 
 func TestKafkaProducer_PartitionLeaderDown_UsesFallback(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping slow test using testcontainers")
+	}
+
 	ctx := t.Context()
 
 	// Start Kafka cluster with topic (replication=3, minISR=1)
