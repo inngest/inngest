@@ -12,7 +12,7 @@ import (
 type Producer interface {
 	fmt.Stringer
 
-	Produce(ctx context.Context, r *kgo.Record) error
+	Produce(ctx context.Context, r *Record) error
 }
 
 type franzProducer struct {
@@ -24,12 +24,14 @@ func (f *franzProducer) String() string {
 }
 
 // Produce implements Producer.
-func (f *franzProducer) Produce(ctx context.Context, r *kgo.Record) error {
+func (f *franzProducer) Produce(ctx context.Context, r *Record) error {
 	errChan := make(chan error)
+
+	kgoRecord := r.ToKgoRecord()
 
 	// Attempt to produce, this will fail immediately if buffer is full
 	// This call will not block if buffer is full!
-	f.client.TryProduce(ctx, r, func(r *kgo.Record, err error) {
+	f.client.TryProduce(ctx, kgoRecord, func(r *kgo.Record, err error) {
 		if err == nil {
 			close(errChan)
 			return
@@ -76,7 +78,7 @@ func (f *fallbackProducer) String() string {
 }
 
 // Produce implements Producer.
-func (f *fallbackProducer) Produce(ctx context.Context, r *kgo.Record) error {
+func (f *fallbackProducer) Produce(ctx context.Context, r *Record) error {
 	l := logger.StdlibLogger(ctx)
 
 	for i, p := range f.producers {
