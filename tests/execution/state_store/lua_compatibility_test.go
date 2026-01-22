@@ -82,17 +82,16 @@ func TestUpdateMetadataIsFieldEmpty(t *testing.T) {
 				}
 
 				unsharded := redis_state.NewUnshardedClient(client, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
-				mgr, err := redis_state.New(ctx,
-					redis_state.WithUnshardedClient(unsharded),
-					redis_state.WithShardedClient(redis_state.NewShardedClient(redis_state.ShardedClientOpts{
-						UnshardedClient:        unsharded,
-						FunctionRunStateClient: client,
-						BatchClient:            client,
-						StateDefaultKey:        redis_state.StateDefaultKey,
-						QueueDefaultKey:        redis_state.QueueDefaultKey,
-						FnRunIsSharded:         redis_state.AlwaysShardOnRun,
-					})),
-				)
+				sharded := redis_state.NewShardedClient(redis_state.ShardedClientOpts{
+					UnshardedClient:        unsharded,
+					FunctionRunStateClient: client,
+					BatchClient:            client,
+					StateDefaultKey:        redis_state.StateDefaultKey,
+					QueueDefaultKey:        redis_state.QueueDefaultKey,
+					FnRunIsSharded:         redis_state.AlwaysShardOnRun,
+				})
+				pauseMgr := redis_state.NewPauseStore(unsharded)
+				mgr, err := redis_state.New(ctx, redis_state.WithShardedClient(sharded), redis_state.WithPauseDeleter(pauseMgr))
 				require.NoError(t, err)
 				return mgr
 			}
@@ -222,20 +221,18 @@ func TestStateStoreLuaCompatibility(t *testing.T) {
 
 		// Create unsharded client for state management
 		unsharded := redis_state.NewUnshardedClient(client, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
+		sharded := redis_state.NewShardedClient(redis_state.ShardedClientOpts{
+			UnshardedClient:        unsharded,
+			FunctionRunStateClient: client,
+			BatchClient:            client,
+			StateDefaultKey:        redis_state.StateDefaultKey,
+			QueueDefaultKey:        redis_state.QueueDefaultKey,
+			FnRunIsSharded:         redis_state.AlwaysShardOnRun,
+		})
+		pauseMgr := redis_state.NewPauseStore(unsharded)
 
 		// Create state manager
-		mgr, err := redis_state.New(
-			ctx,
-			redis_state.WithUnshardedClient(unsharded),
-			redis_state.WithShardedClient(redis_state.NewShardedClient(redis_state.ShardedClientOpts{
-				UnshardedClient:        unsharded,
-				FunctionRunStateClient: client,
-				BatchClient:            client,
-				StateDefaultKey:        redis_state.StateDefaultKey,
-				QueueDefaultKey:        redis_state.QueueDefaultKey,
-				FnRunIsSharded:         redis_state.AlwaysShardOnRun,
-			})),
-		)
+		mgr, err := redis_state.New(ctx, redis_state.WithShardedClient(sharded), redis_state.WithPauseDeleter(pauseMgr))
 		require.NoError(t, err)
 		return mgr
 	}

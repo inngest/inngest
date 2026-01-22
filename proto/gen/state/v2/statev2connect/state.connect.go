@@ -46,6 +46,8 @@ const (
 	RunServiceSaveStepProcedure = "/state.v2.RunService/SaveStep"
 	// RunServiceSavePendingProcedure is the fully-qualified name of the RunService's SavePending RPC.
 	RunServiceSavePendingProcedure = "/state.v2.RunService/SavePending"
+	// RunServiceConsumePauseProcedure is the fully-qualified name of the RunService's ConsumePause RPC.
+	RunServiceConsumePauseProcedure = "/state.v2.RunService/ConsumePause"
 	// RunServiceLoadMetadataProcedure is the fully-qualified name of the RunService's LoadMetadata RPC.
 	RunServiceLoadMetadataProcedure = "/state.v2.RunService/LoadMetadata"
 	// RunServiceLoadEventsProcedure is the fully-qualified name of the RunService's LoadEvents RPC.
@@ -64,6 +66,7 @@ type RunServiceClient interface {
 	UpdateMetadata(context.Context, *connect.Request[v2.UpdateMetadataRequest]) (*connect.Response[v2.UpdateMetadataResponse], error)
 	SaveStep(context.Context, *connect.Request[v2.SaveStepRequest]) (*connect.Response[v2.SaveStepResponse], error)
 	SavePending(context.Context, *connect.Request[v2.SavePendingRequest]) (*connect.Response[v2.SavePendingResponse], error)
+	ConsumePause(context.Context, *connect.Request[v2.ConsumePauseRequest]) (*connect.Response[v2.ConsumePauseResponse], error)
 	LoadMetadata(context.Context, *connect.Request[v2.LoadMetadataRequest]) (*connect.Response[v2.LoadMetadataResponse], error)
 	LoadEvents(context.Context, *connect.Request[v2.LoadEventsRequest]) (*connect.Response[v2.LoadEventsResponse], error)
 	LoadSteps(context.Context, *connect.Request[v2.LoadStepsRequest]) (*connect.Response[v2.LoadStepsResponse], error)
@@ -117,6 +120,12 @@ func NewRunServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...
 			connect.WithSchema(runServiceMethods.ByName("SavePending")),
 			connect.WithClientOptions(opts...),
 		),
+		consumePause: connect.NewClient[v2.ConsumePauseRequest, v2.ConsumePauseResponse](
+			httpClient,
+			baseURL+RunServiceConsumePauseProcedure,
+			connect.WithSchema(runServiceMethods.ByName("ConsumePause")),
+			connect.WithClientOptions(opts...),
+		),
 		loadMetadata: connect.NewClient[v2.LoadMetadataRequest, v2.LoadMetadataResponse](
 			httpClient,
 			baseURL+RunServiceLoadMetadataProcedure,
@@ -152,6 +161,7 @@ type runServiceClient struct {
 	updateMetadata *connect.Client[v2.UpdateMetadataRequest, v2.UpdateMetadataResponse]
 	saveStep       *connect.Client[v2.SaveStepRequest, v2.SaveStepResponse]
 	savePending    *connect.Client[v2.SavePendingRequest, v2.SavePendingResponse]
+	consumePause   *connect.Client[v2.ConsumePauseRequest, v2.ConsumePauseResponse]
 	loadMetadata   *connect.Client[v2.LoadMetadataRequest, v2.LoadMetadataResponse]
 	loadEvents     *connect.Client[v2.LoadEventsRequest, v2.LoadEventsResponse]
 	loadSteps      *connect.Client[v2.LoadStepsRequest, v2.LoadStepsResponse]
@@ -188,6 +198,11 @@ func (c *runServiceClient) SavePending(ctx context.Context, req *connect.Request
 	return c.savePending.CallUnary(ctx, req)
 }
 
+// ConsumePause calls state.v2.RunService.ConsumePause.
+func (c *runServiceClient) ConsumePause(ctx context.Context, req *connect.Request[v2.ConsumePauseRequest]) (*connect.Response[v2.ConsumePauseResponse], error) {
+	return c.consumePause.CallUnary(ctx, req)
+}
+
 // LoadMetadata calls state.v2.RunService.LoadMetadata.
 func (c *runServiceClient) LoadMetadata(ctx context.Context, req *connect.Request[v2.LoadMetadataRequest]) (*connect.Response[v2.LoadMetadataResponse], error) {
 	return c.loadMetadata.CallUnary(ctx, req)
@@ -216,6 +231,7 @@ type RunServiceHandler interface {
 	UpdateMetadata(context.Context, *connect.Request[v2.UpdateMetadataRequest]) (*connect.Response[v2.UpdateMetadataResponse], error)
 	SaveStep(context.Context, *connect.Request[v2.SaveStepRequest]) (*connect.Response[v2.SaveStepResponse], error)
 	SavePending(context.Context, *connect.Request[v2.SavePendingRequest]) (*connect.Response[v2.SavePendingResponse], error)
+	ConsumePause(context.Context, *connect.Request[v2.ConsumePauseRequest]) (*connect.Response[v2.ConsumePauseResponse], error)
 	LoadMetadata(context.Context, *connect.Request[v2.LoadMetadataRequest]) (*connect.Response[v2.LoadMetadataResponse], error)
 	LoadEvents(context.Context, *connect.Request[v2.LoadEventsRequest]) (*connect.Response[v2.LoadEventsResponse], error)
 	LoadSteps(context.Context, *connect.Request[v2.LoadStepsRequest]) (*connect.Response[v2.LoadStepsResponse], error)
@@ -265,6 +281,12 @@ func NewRunServiceHandler(svc RunServiceHandler, opts ...connect.HandlerOption) 
 		connect.WithSchema(runServiceMethods.ByName("SavePending")),
 		connect.WithHandlerOptions(opts...),
 	)
+	runServiceConsumePauseHandler := connect.NewUnaryHandler(
+		RunServiceConsumePauseProcedure,
+		svc.ConsumePause,
+		connect.WithSchema(runServiceMethods.ByName("ConsumePause")),
+		connect.WithHandlerOptions(opts...),
+	)
 	runServiceLoadMetadataHandler := connect.NewUnaryHandler(
 		RunServiceLoadMetadataProcedure,
 		svc.LoadMetadata,
@@ -303,6 +325,8 @@ func NewRunServiceHandler(svc RunServiceHandler, opts ...connect.HandlerOption) 
 			runServiceSaveStepHandler.ServeHTTP(w, r)
 		case RunServiceSavePendingProcedure:
 			runServiceSavePendingHandler.ServeHTTP(w, r)
+		case RunServiceConsumePauseProcedure:
+			runServiceConsumePauseHandler.ServeHTTP(w, r)
 		case RunServiceLoadMetadataProcedure:
 			runServiceLoadMetadataHandler.ServeHTTP(w, r)
 		case RunServiceLoadEventsProcedure:
@@ -342,6 +366,10 @@ func (UnimplementedRunServiceHandler) SaveStep(context.Context, *connect.Request
 
 func (UnimplementedRunServiceHandler) SavePending(context.Context, *connect.Request[v2.SavePendingRequest]) (*connect.Response[v2.SavePendingResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("state.v2.RunService.SavePending is not implemented"))
+}
+
+func (UnimplementedRunServiceHandler) ConsumePause(context.Context, *connect.Request[v2.ConsumePauseRequest]) (*connect.Response[v2.ConsumePauseResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("state.v2.RunService.ConsumePause is not implemented"))
 }
 
 func (UnimplementedRunServiceHandler) LoadMetadata(context.Context, *connect.Request[v2.LoadMetadataRequest]) (*connect.Response[v2.LoadMetadataResponse], error) {
