@@ -45,7 +45,9 @@ func TestKafkaProducer(t *testing.T) {
 	// Start Kafka cluster with test-topic
 	cluster, err := StartKafkaClusterWithTopic(t, "test-topic", 1, 3, 1)
 	require.NoError(t, err)
-	defer cluster.Terminate(ctx)
+	defer func() {
+		require.NoError(t, cluster.Terminate(ctx))
+	}()
 
 	client, err := kgo.NewClient(
 		kgo.SeedBrokers(cluster.Brokers()...),
@@ -205,7 +207,9 @@ func TestKafkaProducer_BufferFull_UsesFallback(t *testing.T) {
 	// Start Kafka cluster with test-topic
 	cluster, err := StartKafkaClusterWithTopic(t, "buffer-test-topic", 1, 3, 1)
 	require.NoError(t, err)
-	defer cluster.Terminate(ctx)
+	defer func() {
+		require.NoError(t, cluster.Terminate(ctx))
+	}()
 
 	// Get the partition leader to stop it and cause produce delays
 	leaderIndex, err := cluster.GetPartitionLeader(ctx, "buffer-test-topic", 0)
@@ -287,7 +291,9 @@ func TestKafkaProducer_PartitionLeaderDown_UsesFallback(t *testing.T) {
 	// Start Kafka cluster with topic (replication=3, minISR=1)
 	cluster, err := StartKafkaClusterWithTopic(t, "leader-test-topic", 1, 3, 1)
 	require.NoError(t, err)
-	defer cluster.Terminate(ctx)
+	defer func() {
+		require.NoError(t, cluster.Terminate(ctx))
+	}()
 
 	// Create client with retries
 	client, err := kgo.NewClient(
