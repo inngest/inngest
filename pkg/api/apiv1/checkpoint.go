@@ -177,9 +177,10 @@ func (a checkpointAPI) CheckpointNewRun(w http.ResponseWriter, r *http.Request) 
 		AccountID:   auth.AccountID(),
 		WorkspaceID: auth.WorkspaceID(),
 		AppID:       input.AppID(auth.WorkspaceID()),
-		RunMode:     enums.RunModeSync,
-		Events:      []event.TrackedEvent{evt},
-		URL:         input.URL(),
+		RunMode:        enums.RunModeSync,
+		Events:         []event.TrackedEvent{evt},
+		URL:            input.URL(),
+		RequestVersion: input.RequestVersion,
 	})
 
 	metrics.IncrExecutorScheduleCount(ctx, metrics.CounterOpt{
