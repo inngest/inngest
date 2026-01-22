@@ -77,7 +77,8 @@ require (
 	github.com/sqlc-dev/pqtype v0.3.0
 	github.com/stretchr/testify v1.10.0
 	github.com/testcontainers/testcontainers-go v0.39.0
-	github.com/twmb/franz-go v1.18.1
+	github.com/twmb/franz-go v1.20.4
+	github.com/twmb/franz-go/pkg/kadm v1.17.0
 	github.com/urfave/cli/v3 v3.3.8
 	github.com/valyala/fastjson v1.6.4
 	github.com/vektah/gqlparser/v2 v2.5.15
@@ -258,7 +259,7 @@ require (
 	github.com/tidwall/btree v1.7.0 // indirect
 	github.com/tklauser/go-sysconf v0.3.12 // indirect
 	github.com/tklauser/numcpus v0.6.1 // indirect
-	github.com/twmb/franz-go/pkg/kmsg v1.9.0 // indirect
+	github.com/twmb/franz-go/pkg/kmsg v1.12.0 // indirect
 	github.com/urfave/cli/v2 v2.25.1 // indirect
 	github.com/xrash/smetrics v0.0.0-20201216005158-039620a65673 // indirect
 	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect

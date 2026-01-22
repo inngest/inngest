@@ -10,4 +10,7 @@ const (
 
 	// GarnetDefaultImage is the default Garnet image version for tests
 	GarnetDefaultImage = "ghcr.io/microsoft/garnet:1.0.87"
+
+	// KafkaDefaultImage is the default Kafka image for tests (KRaft mode)
+	KafkaDefaultImage = "confluentinc/cp-kafka:7.7.1"
 )

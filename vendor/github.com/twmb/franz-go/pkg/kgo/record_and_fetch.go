@@ -3,6 +3,7 @@ package kgo
 import (
 	"context"
 	"errors"
+	"iter"
 	"reflect"
 	"time"
 	"unsafe"
@@ -51,6 +52,7 @@ func (a RecordAttrs) TimestampType() int8 {
 // CompressionType signifies with which algorithm this record was compressed.
 //
 // 0 is no compression, 1 is gzip, 2 is snappy, 3 is lz4, and 4 is zstd.
+// The returned uint8 can be converted directly to a [CompressionCodecType].
 func (a RecordAttrs) CompressionType() uint8 {
 	return a.attrs & 0b0000_0111
 }
@@ -463,6 +465,8 @@ func (fs Fetches) EachError(fn func(string, int32, error)) {
 // RecordIter returns an iterator over all records in a fetch.
 //
 // Note that errors should be inspected as well.
+//
+// Alternatively, use [RecordsAll] for a native Go iterator over records in the fetch.
 func (fs Fetches) RecordIter() *FetchesRecordIter {
 	iter := &FetchesRecordIter{fetches: fs}
 	iter.prepareNext()
@@ -517,6 +521,19 @@ beforePartition:
 		i.pi++
 		i.ri = 0
 		goto beforePartition
+	}
+}
+
+// RecordsAll returns a Go native iterator that yields the records in a fetch.
+//
+// Similarly to [RecordIter], the errors should be inspected separately.
+func (fs Fetches) RecordsAll() iter.Seq[*Record] {
+	return func(yield func(*Record) bool) {
+		for iter := fs.RecordIter(); !iter.Done(); {
+			if !yield(iter.Next()) {
+				return
+			}
+		}
 	}
 }
 
