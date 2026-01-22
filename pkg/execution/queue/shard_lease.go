@@ -4,7 +4,6 @@ import (
 	"context"
 	"math/rand"
 
-	"github.com/inngest/inngest/pkg/logger"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -36,7 +35,7 @@ func (q *queueProcessor) claimShardLease(ctx context.Context) {
 		return
 	}
 
-	tick := q.Clock().NewTicker(ConfigLeaseDuration / 3)
+	tick := q.Clock().NewTicker(ShardLeaseDuration / 3)
 	for {
 		select {
 		case <-ctx.Done():
@@ -67,21 +66,21 @@ func (q *queueProcessor) tryClaimShardLease(ctx context.Context, shards []QueueS
 
 	// if a shard was already leased, early exit.
 	if q.shardLease() != nil {
-		q.log.Error("Calling tryClaimShardLease when already leased")
+		q.log.Warn("Calling tryClaimShardLease when already leased")
 		return nil
 	}
 
-	// Randomize them to minimize contention
+	// Randomize shards to minimize contention
 	rand.Shuffle(len(shards), func(i, j int) {
 		shards[i], shards[j] = shards[j], shards[i]
 	})
 
 	// Try to get a lease on one of them
 	for _, shard := range shards {
-		leaseID, err := shard.ShardLease(ctx, "shard-group-"+q.runMode.ShardGroup, ConfigLeaseDuration, shard.NumExecutors(), nil)
+		leaseID, err := shard.ShardLease(ctx, "shard-group-"+q.runMode.ShardGroup, ShardLeaseDuration, shard.NumExecutors(), nil)
 
 		if err == ErrAllShardsAlreadyLeased {
-			q.log.Error("Could not get a shard lease")
+			q.log.Warn("Could not get a shard lease", "shard", shard.Name())
 			continue
 		}
 		if err != nil {
@@ -90,7 +89,6 @@ func (q *queueProcessor) tryClaimShardLease(ctx context.Context, shards []QueueS
 
 		// If lease has been gotten, set the primary shard and return it
 		if leaseID != nil {
-
 			q.shardLeaseLock.Lock()
 			q.shardLeaseID = leaseID
 			q.primaryQueueShard = shard
@@ -114,34 +112,33 @@ func (q *queueProcessor) renewShardLease(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-tick.Chan():
-			q.log.Info("Renewing Shard Lease")
+			q.log.Trace("Renewing Shard Lease")
 
 			leaseID := q.shardLease()
 			if leaseID == nil {
 				// Lease was lost somehow, stop renewing
-				logger.StdlibLogger(ctx).Warn("shard lease lost during renewal")
+				q.log.Error("shard lease lost during renewal")
+				q.quit <- ErrShardLeaseNotFound
 				return
 			}
 
-			q.shardLeaseLock.RLock()
 			shard := q.primaryQueueShard
-			q.shardLeaseLock.RUnlock()
-
 			if shard == nil {
-				logger.StdlibLogger(ctx).Warn("primary shard not set during lease renewal")
+				q.log.Error("primary shard not set during lease renewal")
+				q.quit <- ErrShardLeaseNotFound
 				return
 			}
 
 			// Renew the lease
-			newLeaseID, err := shard.ShardLease(ctx, "shard-group-"+q.runMode.ShardGroup, ConfigLeaseDuration, shard.NumExecutors(), leaseID)
+			newLeaseID, err := shard.ShardLease(ctx, "shard-group-"+q.runMode.ShardGroup, ShardLeaseDuration, shard.NumExecutors(), leaseID)
 			if err == ErrShardLeaseExpired || err == ErrShardLeaseNotFound {
 				// Another process took the lease
-				logger.StdlibLogger(ctx).Warn("shard lease taken by another process", "shard", shard.Name(), "group", q.runMode.ShardGroup)
+				q.log.Error("shard lease taken by another process", "shard", shard.Name(), "group", q.runMode.ShardGroup)
 				q.quit <- err
 				return
 			}
 			if err != nil {
-				logger.StdlibLogger(ctx).Error("failed to renew shard lease", "error", err, "shard", shard.Name(), "group", q.runMode.ShardGroup)
+				q.log.Error("failed to renew shard lease", "error", err, "shard", shard.Name(), "group", q.runMode.ShardGroup)
 				q.quit <- err
 				return
 			}

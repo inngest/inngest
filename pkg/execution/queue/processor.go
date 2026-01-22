@@ -125,11 +125,11 @@ type queueProcessor struct {
 	seqLeaseLock *sync.RWMutex
 
 	primaryQueueShard QueueShard
-	// seqLeaseID stores the lease ID if this queue is the sequential processor.
-	// all runners attempt to claim this lease automatically.
+	// shardLeaseID stores the lease ID for the primaryQueueShard this queue is processing from.
+	// all runners attempt to claim this lease on start up.
 	shardLeaseID *ulid.ULID
-	// seqLeaseLock ensures that there are no data races writing to
-	// or reading from seqLeaseID in parallel.
+	// shardLeaseLock ensures that there are no data races writing to
+	// or reading from shardLeaseID in parallel.
 	shardLeaseLock *sync.RWMutex
 
 	// instrumentationLeaseID stores the lease ID if executor is running queue
@@ -408,6 +408,7 @@ func (q *queueProcessor) ResetAttemptsByJobID(ctx context.Context, shardName str
 }
 
 func (q *queueProcessor) Run(ctx context.Context, f RunFunc) error {
+	// claimShardLease will block until a shard lease is obtained to process the primaryQueueShard.
 	if len(q.runMode.ShardGroup) != 0 {
 		q.claimShardLease(ctx)
 	}
