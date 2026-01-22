@@ -10,6 +10,7 @@ import (
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/go-connections/nat"
+	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/network"
 	"github.com/testcontainers/testcontainers-go/wait"
@@ -94,7 +95,7 @@ func StartKafkaCluster(t *testing.T, opts ...KafkaOption) (*KafkaCluster, error)
 		brokerContainer, externalAddr, err := startKafkaBroker(ctx, t, config.image, net, i, config.numBrokers, quorumVoters)
 		if err != nil {
 			// Clean up any containers that were started
-			cluster.Terminate(ctx)
+			require.NoError(t, cluster.Terminate(ctx))
 			return nil, fmt.Errorf("failed to start broker %d: %w", i, err)
 		}
 		cluster.containers = append(cluster.containers, brokerContainer)
@@ -103,7 +104,7 @@ func StartKafkaCluster(t *testing.T, opts ...KafkaOption) (*KafkaCluster, error)
 
 	// Wait for cluster to be ready
 	if err := cluster.waitForCluster(ctx, t); err != nil {
-		cluster.Terminate(ctx)
+		require.NoError(t, cluster.Terminate(ctx))
 		return nil, fmt.Errorf("cluster failed to become ready: %w", err)
 	}
 
@@ -378,7 +379,7 @@ func StartKafkaClusterWithTopic(t *testing.T, topicName string, partitions int32
 
 	ctx := t.Context()
 	if err := cluster.CreateTopic(ctx, topicName, partitions, replicationFactor, minISR); err != nil {
-		cluster.Terminate(ctx)
+		require.NoError(t, cluster.Terminate(ctx))
 		return nil, fmt.Errorf("failed to create topic: %w", err)
 	}
 
