@@ -93,12 +93,12 @@ func (e executor) Execute(ctx context.Context, sl sv2.StateLoader, s sv2.Metadat
 	}
 
 	dr, _, err := ExecuteDriverRequest(ctx, e.Client, Request{
-		AccountID:  s.ID.Tenant.AccountID,
-		WorkflowID: s.ID.FunctionID,
-		RunID:      s.ID.RunID,
-		SigningKey: e.localSigningKey,
-		URL:        *uri,
-		Input:      input,
+		AccountID:      s.ID.Tenant.AccountID,
+		WorkflowID:     s.ID.FunctionID,
+		RunID:          s.ID.RunID,
+		SigningKey:     e.localSigningKey,
+		URL:            *uri,
+		Input:          input,
 		Edge:           edge,
 		Step:           step,
 		Headers:        headers,
@@ -120,8 +120,8 @@ type Request struct {
 	// the SigningKey below will be used to sign the input.
 	Signature string
 	// SigningKey, if set, signs the input using this key.
-	SigningKey []byte
-	URL        url.URL
+	SigningKey     []byte
+	URL            url.URL
 	Input          []byte
 	Edge           inngest.Edge
 	Step           inngest.Step

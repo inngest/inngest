@@ -82,6 +82,10 @@ type CheckpointNewRunRequest struct {
 	// starting this run.
 	RequestVersion *int `json:"request_version,omitempty"`
 
+	// Retries indicates how many retry attempts should be made for steps in
+	// this run.
+	Retries int `json:"retries,omitempty"`
+
 	// XXX: SDK Version and language??
 }
 
@@ -142,7 +146,7 @@ func (r CheckpointNewRunRequest) Fn(appID uuid.UUID) inngest.Function {
 				ID:      "step",
 				Name:    r.FnSlug(),
 				URI:     uri,
-				Retries: inngestgo.Ptr(0),
+				Retries: inngestgo.Ptr(r.Retries),
 			},
 		},
 	}
