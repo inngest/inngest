@@ -2048,17 +2048,14 @@ func isKeyConcurrencyPointerItem(partition string) bool {
 	return strings.HasPrefix(partition, "{")
 }
 
-// ShardLease allows a worker to lease config keys for sequential or scavenger processing.
+// ShardLease allows a worker to lease config keys to process the shard
 // Leasing this key works similar to leasing partitions or queue items:
 //
-//   - If the key isn't leased, a new lease is accepted.
-//   - If the lease is expired, a new lease is accepted.
-//   - If the key is leased, you must pass in the existing lease ID to renew the lease.  Mismatches do not
-//     grant a lease.
+//   - If the key has fewer than maxLeases granted, a new lease is accepted.
+//   - If some of the leases in the key are expired, a new lease is granted to replenish those expired leases
+//   - If an existing lease ID is provided, it is renewed if it is currently unexpired.
 //
 // This returns the new lease ID on success.
-//
-// If the sequential key is leased, this allows a worker to peek partitions sequentially.
 func (q *queue) ShardLease(ctx context.Context, key string, duration time.Duration, maxLeases int, existingLeaseID ...*ulid.ULID) (*ulid.ULID, error) {
 	if duration > osqueue.ShardLeaseMax {
 		return nil, osqueue.ErrShardLeaseExceedsLimits
