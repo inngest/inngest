@@ -55,6 +55,8 @@ const (
 	QueueLeaseDuration            = 30 * time.Second
 	ConfigLeaseDuration           = 10 * time.Second
 	ConfigLeaseMax                = 20 * time.Second
+	ShardLeaseDuration            = 10 * time.Second
+	ShardLeaseMax                 = 20 * time.Second
 
 	PriorityMax     uint = 0
 	PriorityDefault uint = 5

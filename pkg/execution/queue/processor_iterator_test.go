@@ -166,6 +166,9 @@ func (m *mockShardForIterator) PartitionSize(ctx context.Context, partitionID st
 func (m *mockShardForIterator) ConfigLease(ctx context.Context, key string, duration time.Duration, existingLeaseID ...*ulid.ULID) (*ulid.ULID, error) {
 	return nil, nil
 }
+func (m *mockShardForIterator) ShardLease(ctx context.Context, key string, duration time.Duration, maxLeases int, existingLeaseID ...*ulid.ULID) (*ulid.ULID, error) {
+	return nil, nil
+}
 func (m *mockShardForIterator) AccountPeek(ctx context.Context, sequential bool, until time.Time, limit int64) ([]uuid.UUID, error) {
 	return nil, nil
 }
