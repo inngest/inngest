@@ -90,6 +90,9 @@ func TestKafkaProducer(t *testing.T) {
 	assert.Equal(t, "test-topic", records[0].Topic)
 	assert.Equal(t, []byte("test-key"), records[0].Key)
 	assert.Equal(t, []byte("test value"), records[0].Value)
+
+	// Verify fallback was NOT used since primary succeeded
+	assert.Len(t, testProd.GetRecords(), 0, "fallback should not be called when primary succeeds")
 }
 
 func TestFallbackProducer_FallsBackOnError(t *testing.T) {
