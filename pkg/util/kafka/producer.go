@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/twmb/franz-go/pkg/kgo"
 )
 
@@ -82,8 +84,20 @@ func (f *fallbackProducer) Produce(ctx context.Context, r *Record) error {
 	l := logger.StdlibLogger(ctx)
 
 	for i, p := range f.producers {
+		start := time.Now()
+
 		// Attempt to produce record
 		err := p.Produce(ctx, r)
+
+		// Record metric
+		metrics.HistogramKafkaProducerDuration(ctx, time.Since(start), metrics.HistogramOpt{
+			PkgName: "kafka",
+			Tags: map[string]any{
+				"producer_name": p.String(),
+				"attempt":       i,
+			},
+		})
+
 		if err != nil {
 			// In case error is context timeout, return immediately
 			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {

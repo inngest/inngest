@@ -516,3 +516,14 @@ func HistogramConstraintAPIRequestLatency(ctx context.Context, latency time.Dura
 		Boundaries:  DefaultBoundaries,
 	})
 }
+
+func HistogramKafkaProducerDuration(ctx context.Context, dur time.Duration, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, dur.Milliseconds(), HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "kafka_producer_duration",
+		Description: "Distribution of Kafka producer duration",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  DefaultBoundaries,
+	})
+}
