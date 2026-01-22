@@ -312,6 +312,12 @@ func do(ctx context.Context, c exechttp.RequestExecutor, r Request) (*Response, 
 		req.Header.Add(headerspkg.HeaderKeyRequestVersion, fmt.Sprintf("%d", *r.RequestVersion))
 	}
 
+	if r.Edge.IncomingGeneratorStep != "" {
+		req.Header.Add(headerspkg.HeaderInngestStepID, r.Edge.IncomingGeneratorStep)
+	} else {
+		req.Header.Add(headerspkg.HeaderInngestStepID, r.Edge.Incoming)
+	}
+
 	// Perform the request.
 	resp, err := c.DoRequest(ctx, req)
 
