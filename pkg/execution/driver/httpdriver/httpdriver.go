@@ -99,9 +99,10 @@ func (e executor) Execute(ctx context.Context, sl sv2.StateLoader, s sv2.Metadat
 		SigningKey: e.localSigningKey,
 		URL:        *uri,
 		Input:      input,
-		Edge:       edge,
-		Step:       step,
-		Headers:    headers,
+		Edge:           edge,
+		Step:           step,
+		Headers:        headers,
+		RequestVersion: &s.Config.RequestVersion,
 	})
 	return dr, err
 }
@@ -121,9 +122,10 @@ type Request struct {
 	// SigningKey, if set, signs the input using this key.
 	SigningKey []byte
 	URL        url.URL
-	Input      []byte
-	Edge       inngest.Edge
-	Step       inngest.Step
+	Input          []byte
+	Edge           inngest.Edge
+	Step           inngest.Step
+	RequestVersion *int
 
 	// Headers are additional headers to add to the request.
 	Headers map[string]string
@@ -305,6 +307,10 @@ func do(ctx context.Context, c exechttp.RequestExecutor, r Request) (*Response, 
 
 	// Always add the run ID
 	req.Header.Add("X-Run-ID", r.RunID.String())
+
+	if r.RequestVersion != nil {
+		req.Header.Add(headerspkg.HeaderKeyRequestVersion, fmt.Sprintf("%d", *r.RequestVersion))
+	}
 
 	// Perform the request.
 	resp, err := c.DoRequest(ctx, req)

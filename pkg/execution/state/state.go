@@ -458,4 +458,8 @@ type Input struct {
 
 	// SpanID is the id used for the new function run
 	SpanID string
+
+	// RequestVersion represents the executor request versioning/hashing style
+	// used to manage state.
+	RequestVersion *int
 }

@@ -78,6 +78,10 @@ type CheckpointNewRunRequest struct {
 	// in the same step.
 	Steps []state.GeneratorOpcode `json:"steps"`
 
+	// RequestVersion represents the execution model that the SDK used when
+	// starting this run.
+	RequestVersion *int `json:"request_version,omitempty"`
+
 	// XXX: SDK Version and language??
 }
 
