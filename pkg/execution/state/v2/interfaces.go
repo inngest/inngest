@@ -49,6 +49,14 @@ type RunService interface {
 	SaveStep(ctx context.Context, id ID, stepID string, data []byte) (hasPending bool, err error)
 	// SavePending saves pending step IDs for the given run ID.
 	SavePending(ctx context.Context, id ID, pending []string) error
+
+	// ConsumePause consumes a pause by its ID. It does not care about the pause's origin;
+	// it only uses the pause data to populate the state of a run.
+	//
+	// XXX: This function does not interact with any pause backend. A pause manager is
+	// expected to wrap this call and handle any required pause cleanup. As a result,
+	// this is usually not the function you want to call directly.
+	ConsumePause(ctx context.Context, p state.Pause, opts state.ConsumePauseOpts) (state.ConsumePauseResult, error)
 }
 
 // Staeloader defines an interface for loading the entire run state from the state store.

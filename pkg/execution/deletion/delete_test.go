@@ -63,12 +63,7 @@ func TestDeleteManager(t *testing.T) {
 
 	ctx := context.Background()
 
-	// Create pause manager
-	stateManager, err := redis_state.New(ctx, redis_state.WithUnshardedClient(unshardedClient))
-	require.NoError(t, err)
-	pauseManager := pauses.NewRedisOnlyManager(stateManager)
-
-	// Create batch manager (need to create sharded client for batch access)
+	// Create sharded client for batch access and pause store
 	shardedClient := redis_state.NewShardedClient(redis_state.ShardedClientOpts{
 		UnshardedClient:        unshardedClient,
 		FunctionRunStateClient: redisClient,
@@ -77,6 +72,9 @@ func TestDeleteManager(t *testing.T) {
 		QueueDefaultKey:        redis_state.QueueDefaultKey,
 		FnRunIsSharded:         redis_state.NeverShardOnRun,
 	})
+
+	// Create pause manager
+	pauseMgr := pauses.NewPauseStoreManager(unshardedClient)
 	batchClient := shardedClient.Batch()
 	batchManager := batch.NewRedisBatchManager(batchClient, queueManager)
 
@@ -86,7 +84,7 @@ func TestDeleteManager(t *testing.T) {
 
 	// Create DeleteManager with all dependencies
 	deleteManager, err := NewDeleteManager(
-		WithPauseManager(pauseManager),
+		WithPauseManager(pauseMgr),
 		WithBatchManager(batchManager),
 		WithDebouncer(debouncer),
 	)
@@ -149,13 +147,13 @@ func TestDeleteManager(t *testing.T) {
 		}
 
 		// Write the pause to the pause manager
-		_, err := pauseManager.Write(ctx, pauseIndex, pause)
+		_, err := pauseMgr.Write(ctx, pauseIndex, pause)
 		require.NoError(t, err)
 
 		require.True(t, redisCluster.Exists(unshardedClient.Pauses().KeyGenerator().Pause(ctx, pauseID)), redisCluster.Dump())
 
 		// Verify pause was created
-		retrievedPause, err := pauseManager.PauseByID(ctx, pauseIndex, pauseID)
+		retrievedPause, err := pauseMgr.PauseByID(ctx, pauseIndex, pauseID)
 		require.NoError(t, err, redisCluster.Dump())
 		require.NotNil(t, retrievedPause)
 		require.Equal(t, pauseID, retrievedPause.ID)
@@ -194,7 +192,7 @@ func TestDeleteManager(t *testing.T) {
 		require.NoError(t, err, "DeleteQueueItem should succeed for KindPause")
 
 		// Verify pause was also deleted
-		_, err = pauseManager.PauseByID(ctx, pauseIndex, pauseID)
+		_, err = pauseMgr.PauseByID(ctx, pauseIndex, pauseID)
 		require.Error(t, err)
 		require.ErrorIs(t, err, state.ErrPauseNotFound)
 	})
@@ -382,7 +380,7 @@ func TestDeleteManager(t *testing.T) {
 
 		// Create a DeleteManager with a custom handler for unknown kinds
 		deleteManagerWithHandler, err := NewDeleteManager(
-			WithPauseManager(pauseManager),
+			WithPauseManager(pauseMgr),
 			WithBatchManager(batchManager),
 			WithDebouncer(debouncer),
 			WithUnknownHandler(func(ctx context.Context, shard queue.QueueShard, item *queue.QueueItem) error {
@@ -538,7 +536,7 @@ func TestDeleteManager(t *testing.T) {
 		t.Run("NilDebouncer", func(t *testing.T) {
 			// DeleteManager without debouncer should skip debounce deletion
 			deleteManagerNoDebounce, err := NewDeleteManager(
-				WithPauseManager(pauseManager),
+				WithPauseManager(pauseMgr),
 				WithBatchManager(batchManager),
 			)
 			require.NoError(t, err)
@@ -612,7 +610,7 @@ func TestDeleteManager(t *testing.T) {
 		t.Run("NilBatchManager", func(t *testing.T) {
 			// DeleteManager without batch manager should skip batch deletion
 			deleteManagerNoBatch, err := NewDeleteManager(
-				WithPauseManager(pauseManager),
+				WithPauseManager(pauseMgr),
 				WithDebouncer(debouncer),
 			)
 			require.NoError(t, err)

@@ -322,21 +322,15 @@ type State interface {
 	IsCron() bool
 }
 
-// PauseDeleter manages pause deletion
+// PauseDeleter manages pause deletion for runs.
 type PauseDeleter interface {
-	DeletePauseByID(context.Context, uuid.UUID, uuid.UUID) error
+	DeletePausesForRun(ctx context.Context, runID ulid.ULID, workspaceID uuid.UUID) error
 }
 
 // Manager represents a state manager which can both load and mutate state.
 type Manager interface {
 	StateLoader
 	Mutater
-
-	// PauseManager embeds buffering pause services.  Note that this is
-	// superseded by pauses.Manager.
-	PauseManager
-
-	SetPauseDeleter(PauseDeleter)
 }
 
 // FunctionNotifier is an optional interface that state stores can fulfil,
@@ -418,6 +412,9 @@ type Mutater interface {
 		stepID string,
 		marshalledOutput string,
 	) (hasPending bool, err error)
+
+	// ConsumePause consumes a pause, writing the consumed data to state.
+	ConsumePause(ctx context.Context, p Pause, opts ConsumePauseOpts) (ConsumePauseResult, error)
 }
 
 type MemoizedStep struct {

@@ -165,11 +165,12 @@ func TestScheduleRaceCondition(t *testing.T) {
 		return queueShard, nil
 	}
 
+	pauseMgr := pauses.NewPauseStoreManager(unshardedClient)
+
 	var sm state.Manager
-	sm, err = redis_state.New(
-		ctx,
+	sm, err = redis_state.New(ctx,
 		redis_state.WithShardedClient(shardedClient),
-		redis_state.WithUnshardedClient(unshardedClient),
+		redis_state.WithPauseDeleter(pauseMgr),
 	)
 	require.NoError(t, err)
 	smv2 := redis_state.MustRunServiceV2(sm)
@@ -190,7 +191,7 @@ func TestScheduleRaceCondition(t *testing.T) {
 
 	exec, err := executor.NewExecutor(
 		executor.WithStateManager(smv2),
-		executor.WithPauseManager(pauses.NewRedisOnlyManager(sm)),
+		executor.WithPauseManager(pauseMgr),
 		executor.WithQueue(rq),
 		executor.WithLogger(logger.StdlibLogger(ctx)),
 		executor.WithFunctionLoader(loader),
@@ -338,11 +339,12 @@ func TestScheduleRaceConditionWithExistingIdempotencyKey(t *testing.T) {
 		return queueShard, nil
 	}
 
+	pauseMgr := pauses.NewPauseStoreManager(unshardedClient)
+
 	var sm state.Manager
-	sm, err = redis_state.New(
-		ctx,
+	sm, err = redis_state.New(ctx,
 		redis_state.WithShardedClient(shardedClient),
-		redis_state.WithUnshardedClient(unshardedClient),
+		redis_state.WithPauseDeleter(pauseMgr),
 	)
 	require.NoError(t, err)
 	smv2 := redis_state.MustRunServiceV2(sm)
@@ -363,7 +365,7 @@ func TestScheduleRaceConditionWithExistingIdempotencyKey(t *testing.T) {
 
 	exec, err := executor.NewExecutor(
 		executor.WithStateManager(smv2),
-		executor.WithPauseManager(pauses.NewRedisOnlyManager(sm)),
+		executor.WithPauseManager(pauseMgr),
 		executor.WithQueue(rq),
 		executor.WithLogger(logger.StdlibLogger(ctx)),
 		executor.WithFunctionLoader(loader),
@@ -544,11 +546,12 @@ func TestFinalize(t *testing.T) {
 		return queueShard, nil
 	}
 
+	pauseMgr := pauses.NewPauseStoreManager(unshardedClient)
+
 	var sm state.Manager
-	sm, err = redis_state.New(
-		ctx,
+	sm, err = redis_state.New(ctx,
 		redis_state.WithShardedClient(shardedClient),
-		redis_state.WithUnshardedClient(unshardedClient),
+		redis_state.WithPauseDeleter(pauseMgr),
 	)
 	require.NoError(t, err)
 	smv2 := redis_state.MustRunServiceV2(sm)
@@ -571,7 +574,7 @@ func TestFinalize(t *testing.T) {
 
 	exec, err := executor.NewExecutor(
 		executor.WithStateManager(smv2),
-		executor.WithPauseManager(pauses.NewRedisOnlyManager(sm)),
+		executor.WithPauseManager(pauseMgr),
 		executor.WithQueue(testQueue),
 		executor.WithLogger(logger.StdlibLogger(ctx)),
 		executor.WithFunctionLoader(loader),
@@ -829,11 +832,12 @@ func TestInvokeRetrySucceedsIfPauseAlreadyCreated(t *testing.T) {
 		return queueShard, nil
 	}
 
+	pauseMgr := pauses.NewPauseStoreManager(unshardedClient)
+
 	var sm state.Manager
-	sm, err = redis_state.New(
-		ctx,
+	sm, err = redis_state.New(ctx,
 		redis_state.WithShardedClient(shardedClient),
-		redis_state.WithUnshardedClient(unshardedClient),
+		redis_state.WithPauseDeleter(pauseMgr),
 	)
 	require.NoError(t, err)
 	smv2 := redis_state.MustRunServiceV2(sm)
@@ -869,13 +873,11 @@ func TestInvokeRetrySucceedsIfPauseAlreadyCreated(t *testing.T) {
 		},
 	}
 
-	pm := pauses.NewRedisOnlyManager(sm)
-
 	eventCaptured := false
 
 	exec, err := executor.NewExecutor(
 		executor.WithStateManager(smv2),
-		executor.WithPauseManager(pm),
+		executor.WithPauseManager(pauseMgr),
 		executor.WithQueue(rq),
 		executor.WithLogger(logger.StdlibLogger(ctx)),
 		executor.WithFunctionLoader(loader),
@@ -924,7 +926,7 @@ func TestInvokeRetrySucceedsIfPauseAlreadyCreated(t *testing.T) {
 		Expires:  state.Time(time.Now().Add(time.Hour)),
 	}
 
-	_, err = pm.Write(ctx, pauses.Index{WorkspaceID: wsID, EventName: "test/event"}, &pause)
+	_, err = pauseMgr.Write(ctx, pauses.Index{WorkspaceID: wsID, EventName: "test/event"}, &pause)
 	require.NoError(t, err, "First pause write should succeed")
 
 	_, err = exec.Execute(ctx, state.Identifier{
@@ -1020,11 +1022,12 @@ func TestExecutorReturnsResponseWhenNonRetriableError(t *testing.T) {
 		return queueShard, nil
 	}
 
+	pauseMgr := pauses.NewPauseStoreManager(unshardedClient)
+
 	var sm state.Manager
-	sm, err = redis_state.New(
-		ctx,
+	sm, err = redis_state.New(ctx,
 		redis_state.WithShardedClient(shardedClient),
-		redis_state.WithUnshardedClient(unshardedClient),
+		redis_state.WithPauseDeleter(pauseMgr),
 	)
 	require.NoError(t, err)
 	smv2 := redis_state.MustRunServiceV2(sm)
@@ -1058,7 +1061,7 @@ func TestExecutorReturnsResponseWhenNonRetriableError(t *testing.T) {
 
 	exec, err := executor.NewExecutor(
 		executor.WithStateManager(smv2),
-		executor.WithPauseManager(pauses.NewRedisOnlyManager(sm)),
+		executor.WithPauseManager(pauseMgr),
 		executor.WithQueue(rq),
 		executor.WithLogger(logger.StdlibLogger(ctx)),
 		executor.WithFunctionLoader(loader),
@@ -1215,11 +1218,12 @@ func TestExecutorScheduleRateLimit(t *testing.T) {
 		return queueShard, nil
 	}
 
+	pauseMgr := pauses.NewPauseStoreManager(unshardedClient)
+
 	var sm state.Manager
-	sm, err = redis_state.New(
-		ctx,
+	sm, err = redis_state.New(ctx,
 		redis_state.WithShardedClient(shardedClient),
-		redis_state.WithUnshardedClient(unshardedClient),
+		redis_state.WithPauseDeleter(pauseMgr),
 	)
 	require.NoError(t, err)
 	smv2 := redis_state.MustRunServiceV2(sm)
@@ -1242,7 +1246,7 @@ func TestExecutorScheduleRateLimit(t *testing.T) {
 
 	exec, err := executor.NewExecutor(
 		executor.WithStateManager(smv2),
-		executor.WithPauseManager(pauses.NewRedisOnlyManager(sm)),
+		executor.WithPauseManager(pauseMgr),
 		executor.WithQueue(rq),
 		executor.WithLogger(logger.StdlibLogger(ctx)),
 		executor.WithFunctionLoader(loader),
@@ -1415,11 +1419,12 @@ func TestExecutorScheduleBacklogSizeLimit(t *testing.T) {
 		return queueShard, nil
 	}
 
+	pauseMgr := pauses.NewPauseStoreManager(unshardedClient)
+
 	var sm state.Manager
-	sm, err = redis_state.New(
-		ctx,
+	sm, err = redis_state.New(ctx,
 		redis_state.WithShardedClient(shardedClient),
-		redis_state.WithUnshardedClient(unshardedClient),
+		redis_state.WithPauseDeleter(pauseMgr),
 	)
 	require.NoError(t, err)
 	smv2 := redis_state.MustRunServiceV2(sm)
@@ -1442,7 +1447,7 @@ func TestExecutorScheduleBacklogSizeLimit(t *testing.T) {
 
 	exec, err := executor.NewExecutor(
 		executor.WithStateManager(smv2),
-		executor.WithPauseManager(pauses.NewRedisOnlyManager(sm)),
+		executor.WithPauseManager(pauseMgr),
 		executor.WithQueue(rq),
 		executor.WithLogger(logger.StdlibLogger(ctx)),
 		executor.WithFunctionLoader(loader),

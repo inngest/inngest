@@ -56,6 +56,23 @@ var (
 		2 * 1024 * 1024, // 2 MiB
 		4 * 1024 * 1024, // 4 MiB
 	}
+
+	ConstraintAPIDurationBoundaries = []float64{
+		5,
+		10,
+		15,
+		25,
+		50,
+		100,
+		200,
+		500,
+		1000,
+		2000,
+		5000,
+		10000,
+		30000,
+		60000,
+	}
 )
 
 func HistogramQueueItemLatency(ctx context.Context, value int64, opts HistogramOpt) {
@@ -485,7 +502,7 @@ func HistogramConstraintAPILuaScriptDuration(ctx context.Context, duration time.
 		Description: "Distribution of Lua script duration",
 		Tags:        opts.Tags,
 		Unit:        "ms",
-		Boundaries:  DefaultBoundaries,
+		Boundaries:  ConstraintAPIDurationBoundaries,
 	})
 }
 

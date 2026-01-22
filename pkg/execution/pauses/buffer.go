@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/oklog/ulid/v2"
 )
 
 // StateBufferer transforms a state.Manager into a state.Bufferer
@@ -68,10 +69,6 @@ func (r redisAdapter) PauseTimestamp(ctx context.Context, index Index, pause sta
 	return r.rsm.PauseCreatedAt(ctx, index.WorkspaceID, index.EventName, pause.ID)
 }
 
-func (r redisAdapter) ConsumePause(ctx context.Context, pause state.Pause, opts state.ConsumePauseOpts) (state.ConsumePauseResult, func() error, error) {
-	return r.rsm.ConsumePause(ctx, pause, opts)
-}
-
 func (r redisAdapter) PauseByInvokeCorrelationID(ctx context.Context, workspaceID uuid.UUID, correlationID string) (*state.Pause, error) {
 	return r.rsm.PauseByInvokeCorrelationID(ctx, workspaceID, correlationID)
 }
@@ -97,4 +94,27 @@ func (r redisAdapter) PausesSinceWithCreatedAt(ctx context.Context, index Index,
 
 func (r redisAdapter) DeletePauseByID(ctx context.Context, pauseID uuid.UUID, workspaceID uuid.UUID) error {
 	return r.rsm.DeletePauseByID(ctx, pauseID, workspaceID)
+}
+
+func (r redisAdapter) PauseIDsForRun(ctx context.Context, runID ulid.ULID) ([]uuid.UUID, error) {
+	return r.rsm.PauseIDsForRun(ctx, runID)
+}
+
+func (r redisAdapter) DeleteRunPausesIndex(ctx context.Context, runID ulid.ULID) error {
+	return r.rsm.DeleteRunPausesIndex(ctx, runID)
+}
+
+func (r redisAdapter) DeletePausesForRun(ctx context.Context, runID ulid.ULID, workspaceID uuid.UUID) error {
+	pauseIDs, err := r.rsm.PauseIDsForRun(ctx, runID)
+	if err != nil {
+		return err
+	}
+
+	for _, pauseID := range pauseIDs {
+		if err := r.rsm.DeletePauseByID(ctx, pauseID, workspaceID); err != nil {
+			return err
+		}
+	}
+
+	return r.rsm.DeleteRunPausesIndex(ctx, runID)
 }
