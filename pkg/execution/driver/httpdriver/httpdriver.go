@@ -21,7 +21,6 @@ import (
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
-	"github.com/inngest/inngest/pkg/headers"
 	headerspkg "github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
@@ -310,7 +309,7 @@ func do(ctx context.Context, c exechttp.RequestExecutor, r Request) (*Response, 
 	req.Header.Add("X-Run-ID", r.RunID.String())
 
 	if r.RequestVersion != nil {
-		req.Header.Add(headers.HeaderKeyRequestVersion, fmt.Sprintf("%d", *r.RequestVersion))
+		req.Header.Add(headerspkg.HeaderKeyRequestVersion, fmt.Sprintf("%d", *r.RequestVersion))
 	}
 
 	// Perform the request.
