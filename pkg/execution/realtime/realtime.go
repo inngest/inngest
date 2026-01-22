@@ -8,13 +8,23 @@ import (
 	"github.com/inngest/inngest/pkg/execution/realtime/streamingtypes"
 )
 
-type Message = streamingtypes.Message
-type Topic = streamingtypes.Topic
-type Chunk = streamingtypes.Chunk
+type (
+	Message = streamingtypes.Message
+	Topic   = streamingtypes.Topic
+	Chunk   = streamingtypes.Chunk
+)
 
 // Publisher accepts messages from other services (eg. the executor, or the event API) and
 // publishes messages to any subscribers.
 type Publisher interface {
+	// Write publishes arbitrary data to a channel.  Note that this does
+	// not have any Message wrapping, and is raw data to be read by an
+	// end user.
+	//
+	// Because of this, there is no topic, as theres no way to indicate
+	// which topic we're writing to without the Message wrapper.
+	Write(ctx context.Context, envID uuid.UUID, channel string, data []byte)
+
 	// Publish publishes a message to any realtime subscribers.
 	//
 	// Note that this returns no error;  we expect that the publisher retries
@@ -94,6 +104,13 @@ type Subscription interface {
 
 	// WriteChunk publishes a chunk in a stream - data for a given stream ID to the subscription.
 	WriteChunk(c Chunk) error
+
+	// Write forwards bytes directly to the subscription.  It is different to WriteMessage in
+	// that no encapsulation is written;  the bytes are written directly as-is.
+	//
+	// This is useful when forwarding raw bytes from eg. durable endpoints to its redirected
+	// endpoint.
+	Write(b []byte) error
 
 	// Closer closes the current subscription immediately, terminating any active connections.
 	io.Closer

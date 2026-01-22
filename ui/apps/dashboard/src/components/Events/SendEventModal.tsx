@@ -52,7 +52,9 @@ export function SendEventModal({
   const sendEvent = useCallback(
     async (payload: EventPayload | EventPayload[]) => {
       if (!eventKey) {
-        throw new Error('No event key available. Please check your environment configuration.');
+        throw new Error(
+          'No event key available. Please check your environment configuration.',
+        );
       }
 
       const headers: { ['x-inngest-env']?: string } = {};
@@ -77,7 +79,9 @@ export function SendEventModal({
 
 const inngest = new Inngest({
   name: 'Your App Name',
-  eventKey: '${eventKey || '<EVENT_KEY>'}',${isBranchChild ? `\n  env: '${envName}',` : ''}
+  eventKey: '${eventKey || '<EVENT_KEY>'}',${
+        isBranchChild ? `\n  env: '${envName}',` : ''
+      }
 });
 
 await inngest.send(${JSON.stringify(payload, null, 2)});`;
@@ -87,7 +91,9 @@ await inngest.send(${JSON.stringify(payload, null, 2)});`;
 
   const generateCloudCurlCode = useCallback(
     (payload: EventPayload | EventPayload[]) => {
-      return `curl ${sendEventURL} \\${isBranchChild ? `\n  -H "x-inngest-env: ${envName}" \\` : ''}
+      return `curl ${sendEventURL} \\${
+        isBranchChild ? `\n  -H "x-inngest-env: ${envName}" \\` : ''
+      }
   --data '${JSON.stringify(payload)}'`;
     },
     [sendEventURL, isBranchChild, envName],
@@ -139,7 +145,14 @@ await inngest.send(${JSON.stringify(payload, null, 2)});`;
     [sendEvent, generateCloudSDKCode, generateCloudCurlCode, processCloudData],
   );
 
-  return <BaseSendEventModal data={data} isOpen={isOpen} onClose={onClose} config={config} />;
+  return (
+    <BaseSendEventModal
+      data={data}
+      isOpen={isOpen}
+      onClose={onClose}
+      config={config}
+    />
+  );
 }
 
 function usePreferDefaultEventKey(): string | undefined {
