@@ -49,18 +49,6 @@ func New(
 		return nil, fmt.Errorf("must pass primary queue shard")
 	}
 
-	if queueShardClients == nil {
-		queueShardClients = map[string]QueueShard{
-			primaryQueueShard.Name(): primaryQueueShard,
-		}
-	}
-
-	if shardSelector == nil {
-		shardSelector = func(ctx context.Context, accountId uuid.UUID, queueName *string) (QueueShard, error) {
-			return primaryQueueShard, nil
-		}
-	}
-
 	qp := &queueProcessor{
 		name: name,
 
@@ -71,6 +59,7 @@ func New(
 		scavengerLeaseLock:       &sync.RWMutex{},
 		activeCheckerLeaseLock:   &sync.RWMutex{},
 		instrumentationLeaseLock: &sync.RWMutex{},
+		shardLeaseLock:           &sync.RWMutex{},
 
 		continuesLock:    &sync.Mutex{},
 		continues:        map[string]continuation{},
@@ -100,7 +89,6 @@ type queueProcessor struct {
 	// name is the identifiable name for this worker, for logging.
 	name string
 
-	primaryQueueShard QueueShard
 	queueShardClients map[string]QueueShard
 	shardSelector     ShardSelector
 
@@ -135,6 +123,14 @@ type queueProcessor struct {
 	// seqLeaseLock ensures that there are no data races writing to
 	// or reading from seqLeaseID in parallel.
 	seqLeaseLock *sync.RWMutex
+
+	primaryQueueShard QueueShard
+	// seqLeaseID stores the lease ID if this queue is the sequential processor.
+	// all runners attempt to claim this lease automatically.
+	shardLeaseID *ulid.ULID
+	// seqLeaseLock ensures that there are no data races writing to
+	// or reading from seqLeaseID in parallel.
+	shardLeaseLock *sync.RWMutex
 
 	// instrumentationLeaseID stores the lease ID if executor is running queue
 	// instrumentations
@@ -244,6 +240,16 @@ func (q *queueProcessor) shardByName(name string) (QueueShard, error) {
 		return nil, ErrQueueShardNotFound
 	}
 	return shard, nil
+}
+
+func (q *queueProcessor) shardsByGroupName(groupName string) []QueueShard {
+	var shards []QueueShard
+	for _, shard := range q.queueShardClients {
+		if shard.ShardGroup() == groupName {
+			shards = append(shards, shard)
+		}
+	}
+	return shards
 }
 
 // LoadQueueItem implements QueueManager.
@@ -402,6 +408,11 @@ func (q *queueProcessor) ResetAttemptsByJobID(ctx context.Context, shardName str
 }
 
 func (q *queueProcessor) Run(ctx context.Context, f RunFunc) error {
+	if len(q.runMode.ShardGroup) != 0 {
+		q.claimShardLease(ctx)
+	}
+	q.initializeShardAssignment(q.primaryQueueShard)
+
 	if q.runMode.Sequential {
 		go q.claimSequentialLease(ctx)
 	}
@@ -436,6 +447,20 @@ func (q *queueProcessor) Run(ctx context.Context, f RunFunc) error {
 	}
 
 	return eg.Wait()
+}
+
+func (q *queueProcessor) initializeShardAssignment(shard QueueShard) {
+	if q.queueShardClients == nil {
+		q.queueShardClients = map[string]QueueShard{
+			shard.Name(): shard,
+		}
+	}
+
+	if q.shardSelector == nil {
+		q.shardSelector = func(ctx context.Context, accountId uuid.UUID, queueName *string) (QueueShard, error) {
+			return shard, nil
+		}
+	}
 }
 
 // SetFunctionMigrate implements Queue.

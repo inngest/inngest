@@ -358,6 +358,9 @@ type QueueRunMode struct {
 	// ExclusiveAccounts defines a list of account IDs to peek exclusively.
 	// This can be used to configure executors processing only a static subset of accounts.
 	ExclusiveAccounts []uuid.UUID
+
+	// ShardGroup enables the executor to determine which shard to process items from during run time.
+	ShardGroup string
 }
 
 type QueueOptions struct {
