@@ -89,12 +89,19 @@ func (f *fallbackProducer) Produce(ctx context.Context, r *Record) error {
 		// Attempt to produce record
 		err := p.Produce(ctx, r)
 
+		status := "success"
+		if err != nil {
+			status = "error"
+		}
+
 		// Record metric
 		metrics.HistogramKafkaProducerDuration(ctx, time.Since(start), metrics.HistogramOpt{
 			PkgName: "kafka",
 			Tags: map[string]any{
 				"producer_name": p.String(),
 				"attempt":       i,
+				"status":        status,
+				"topic":         r.Topic,
 			},
 		})
 
