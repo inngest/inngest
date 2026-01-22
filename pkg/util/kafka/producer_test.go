@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -241,7 +242,7 @@ func TestKafkaProducer_BufferFull_UsesFallback(t *testing.T) {
 	// Rapidly produce multiple records to fill the buffer
 	// Since the leader is down, records will get stuck and buffer will fill up
 	var wg sync.WaitGroup
-	producedCount := 0
+	var producedCount int64
 	fallbackUsed := false
 
 	for i := 0; i < 5; i++ {
@@ -255,7 +256,7 @@ func TestKafkaProducer_BufferFull_UsesFallback(t *testing.T) {
 			}
 			produceErr := fallbackProd.Produce(ctx, record)
 			if produceErr == nil {
-				producedCount++
+				atomic.AddInt64(&producedCount, 1)
 			}
 		}(i)
 	}
