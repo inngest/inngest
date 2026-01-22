@@ -246,6 +246,16 @@ func (q *queueProcessor) shardByName(name string) (QueueShard, error) {
 	return shard, nil
 }
 
+// func (q *queueProcessor) shardsByGroupName(groupName string) []QueueShard {
+// 	var shards []QueueShard
+// 	for _, shard := range q.queueShardClients {
+// 		if shard.ShardGroup() == groupName {
+// 			shards = append(shards, shard)
+// 		}
+// 	}
+// 	return shards
+// }
+
 // LoadQueueItem implements QueueManager.
 func (q *queueProcessor) LoadQueueItem(ctx context.Context, shardName string, itemID string) (*QueueItem, error) {
 	shard, err := q.shardByName(shardName)

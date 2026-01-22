@@ -37,6 +37,14 @@ func (q *queue) Name() string {
 	return q.name
 }
 
+func (q *queue) ShardGroup() string {
+	return q.name
+}
+
+func (q *queue) NumExecutors() int {
+	return 1
+}
+
 func (q *queue) Kind() enums.QueueShardKind {
 	return enums.QueueShardKindRedis
 }

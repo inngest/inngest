@@ -30,13 +30,13 @@ type mockQueueProcessor struct {
 	shadowMap map[string]ShadowContinuation
 }
 
-func (m *mockQueueProcessor) Shard() QueueShard                                    { return m.shard }
-func (m *mockQueueProcessor) Clock() clockwork.Clock                               { return m.clock }
-func (m *mockQueueProcessor) Semaphore() util.TrackingSemaphore                    { return m.sem }
-func (m *mockQueueProcessor) Options() *QueueOptions                               { return m.opts }
-func (m *mockQueueProcessor) Workers() chan ProcessItem                            { return m.workers }
-func (m *mockQueueProcessor) SequentialLease() *ulid.ULID                          { return m.seqLease }
-func (m *mockQueueProcessor) ShadowPartitionWorkers() chan ShadowPartitionChanMsg  { return m.shadowCh }
+func (m *mockQueueProcessor) Shard() QueueShard                                   { return m.shard }
+func (m *mockQueueProcessor) Clock() clockwork.Clock                              { return m.clock }
+func (m *mockQueueProcessor) Semaphore() util.TrackingSemaphore                   { return m.sem }
+func (m *mockQueueProcessor) Options() *QueueOptions                              { return m.opts }
+func (m *mockQueueProcessor) Workers() chan ProcessItem                           { return m.workers }
+func (m *mockQueueProcessor) SequentialLease() *ulid.ULID                         { return m.seqLease }
+func (m *mockQueueProcessor) ShadowPartitionWorkers() chan ShadowPartitionChanMsg { return m.shadowCh }
 func (m *mockQueueProcessor) AddShadowContinue(ctx context.Context, p *QueueShadowPartition, ctr uint) {
 }
 func (m *mockQueueProcessor) GetShadowContinuations() map[string]ShadowContinuation {
@@ -60,6 +60,14 @@ type mockShardForIterator struct {
 
 func (m *mockShardForIterator) Name() string {
 	return m.name
+}
+
+func (m *mockShardForIterator) ShardGroup() string {
+	return m.name
+}
+
+func (m *mockShardForIterator) NumExecutors() int {
+	return 1
 }
 
 func (m *mockShardForIterator) Kind() enums.QueueShardKind {
