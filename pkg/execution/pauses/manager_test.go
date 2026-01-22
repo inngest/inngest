@@ -2,6 +2,7 @@ package pauses
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -9,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
+	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 	"github.com/stretchr/testify/assert"
@@ -144,23 +146,16 @@ func TestManagerFlushingWithLowLimit(t *testing.T) {
 }
 
 func TestConsumePause(t *testing.T) {
-	// Setup miniredis
-	r := miniredis.RunT(t)
-	rc, err := rueidis.NewClient(rueidis.ClientOption{
-		InitAddress:  []string{r.Addr()},
-		DisableCache: true,
-	})
-	require.NoError(t, err)
-	defer rc.Close()
+	ctx := context.Background()
 
 	// Setup manager with mock components
-	mockBufferer := &mockBuffererWithConsume{}
+	mockBufferer := &mockBufferer{}
 	mockBlockStore := &mockBlockStore{}
 	mockFlusher := &mockSimpleFlusher{}
+	mockRunService := &mockRunService{}
 
 	manager := NewManager(mockBufferer, mockBlockStore, WithFlusher(mockFlusher), WithBlockFlushEnabled(alwaysEnabled), WithBlockStoreEnabled(alwaysEnabled))
 
-	ctx := context.Background()
 	eventName := "test.event"
 	workspaceID := uuid.New()
 
@@ -172,13 +167,14 @@ func TestConsumePause(t *testing.T) {
 	}
 
 	// Test consuming a pause
-	result, cleanup, err := manager.ConsumePause(ctx, pause, state.ConsumePauseOpts{
-		Data: "test-data",
+	result, cleanup, err := manager.ConsumePause(ctx, mockRunService, pause, state.ConsumePauseOpts{
+		IdempotencyKey: "test-key",
+		Data:           "test-data",
 	})
 	require.NoError(t, err)
 	require.NoError(t, cleanup())
 	assert.Equal(t, true, result.DidConsume)
-	assert.True(t, mockBufferer.consumeCalled, "ConsumePause should be called on the buffer")
+	assert.True(t, mockRunService.consumeCalled, "ConsumePause should be called on RunService")
 	assert.Equal(t, 1, mockBlockStore.deleteCalled, "Delete should be called once on the blockstore")
 }
 
@@ -283,16 +279,6 @@ func (m *mockSimpleFlusher) Enqueue(ctx context.Context, index Index) error {
 	return nil
 }
 
-type mockBuffererWithConsume struct {
-	mockBufferer
-	consumeCalled bool
-}
-
-func (m *mockBuffererWithConsume) ConsumePause(ctx context.Context, pause state.Pause, opts state.ConsumePauseOpts) (state.ConsumePauseResult, func() error, error) {
-	m.consumeCalled = true
-	return state.ConsumePauseResult{DidConsume: true}, func() error { return nil }, nil
-}
-
 type mockBlockStore struct {
 	deleteCalled     int
 	deleteByIDCalled int
@@ -354,4 +340,65 @@ func (m *mockBlockStore) GetBlockDeletedIDs(ctx context.Context, index Index, bl
 
 func (m *mockBlockStore) CleanBlock(ctx context.Context, index Index, blockID ulid.ULID) error {
 	return nil
+}
+
+type mockRunService struct {
+	consumeCalled bool
+}
+
+func (m *mockRunService) ConsumePause(ctx context.Context, p state.Pause, opts state.ConsumePauseOpts) (state.ConsumePauseResult, error) {
+	m.consumeCalled = true
+	return state.ConsumePauseResult{DidConsume: true}, nil
+}
+
+func (m *mockRunService) Create(ctx context.Context, s statev2.CreateState) (statev2.State, error) {
+	return statev2.State{}, nil
+}
+
+func (m *mockRunService) Delete(ctx context.Context, id statev2.ID) error {
+	return nil
+}
+
+func (m *mockRunService) Exists(ctx context.Context, id statev2.ID) (bool, error) {
+	return false, nil
+}
+
+func (m *mockRunService) UpdateMetadata(ctx context.Context, id statev2.ID, config statev2.MutableConfig) error {
+	return nil
+}
+
+func (m *mockRunService) SaveStep(ctx context.Context, id statev2.ID, stepID string, data []byte) (bool, error) {
+	return false, nil
+}
+
+func (m *mockRunService) SavePending(ctx context.Context, id statev2.ID, pending []string) error {
+	return nil
+}
+
+func (m *mockRunService) LoadMetadata(ctx context.Context, id statev2.ID) (statev2.Metadata, error) {
+	return statev2.Metadata{}, nil
+}
+
+func (m *mockRunService) LoadEvents(ctx context.Context, id statev2.ID) ([]json.RawMessage, error) {
+	return nil, nil
+}
+
+func (m *mockRunService) LoadSteps(ctx context.Context, id statev2.ID) (map[string]json.RawMessage, error) {
+	return nil, nil
+}
+
+func (m *mockRunService) LoadStepInputs(ctx context.Context, id statev2.ID) (map[string]json.RawMessage, error) {
+	return nil, nil
+}
+
+func (m *mockRunService) LoadStepsWithIDs(ctx context.Context, id statev2.ID, stepIDs []string) (map[string]json.RawMessage, error) {
+	return nil, nil
+}
+
+func (m *mockRunService) LoadStack(ctx context.Context, id statev2.ID) ([]string, error) {
+	return nil, nil
+}
+
+func (m *mockRunService) LoadState(ctx context.Context, id statev2.ID) (statev2.State, error) {
+	return statev2.State{}, nil
 }

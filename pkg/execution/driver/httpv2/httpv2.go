@@ -87,8 +87,11 @@ func (d httpv2) sync(ctx context.Context, opts driver.V2RequestOpts) (*state.Dri
 	req.Header.Add("Content-Type", "application/json")
 	req.Header.Add("X-Inngest-Signature", sig)
 	req.Header.Add("X-Run-ID", opts.Metadata.ID.RunID.String())
-	req.Header.Add("X-Inngest-Step-ID", *opts.StepID)
 	req.Header.Add(headers.HeaderKeyRequestVersion, fmt.Sprintf("%d", opts.Metadata.Config.RequestVersion))
+
+	if opts.StepID != nil {
+		req.Header.Add("X-Inngest-Step-ID", *opts.StepID)
+	}
 
 	resp, err := d.Client.DoRequest(ctx, req)
 

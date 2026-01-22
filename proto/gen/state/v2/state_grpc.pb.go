@@ -25,6 +25,7 @@ const (
 	RunService_UpdateMetadata_FullMethodName = "/state.v2.RunService/UpdateMetadata"
 	RunService_SaveStep_FullMethodName       = "/state.v2.RunService/SaveStep"
 	RunService_SavePending_FullMethodName    = "/state.v2.RunService/SavePending"
+	RunService_ConsumePause_FullMethodName   = "/state.v2.RunService/ConsumePause"
 	RunService_LoadMetadata_FullMethodName   = "/state.v2.RunService/LoadMetadata"
 	RunService_LoadEvents_FullMethodName     = "/state.v2.RunService/LoadEvents"
 	RunService_LoadSteps_FullMethodName      = "/state.v2.RunService/LoadSteps"
@@ -41,6 +42,7 @@ type RunServiceClient interface {
 	UpdateMetadata(ctx context.Context, in *UpdateMetadataRequest, opts ...grpc.CallOption) (*UpdateMetadataResponse, error)
 	SaveStep(ctx context.Context, in *SaveStepRequest, opts ...grpc.CallOption) (*SaveStepResponse, error)
 	SavePending(ctx context.Context, in *SavePendingRequest, opts ...grpc.CallOption) (*SavePendingResponse, error)
+	ConsumePause(ctx context.Context, in *ConsumePauseRequest, opts ...grpc.CallOption) (*ConsumePauseResponse, error)
 	LoadMetadata(ctx context.Context, in *LoadMetadataRequest, opts ...grpc.CallOption) (*LoadMetadataResponse, error)
 	LoadEvents(ctx context.Context, in *LoadEventsRequest, opts ...grpc.CallOption) (*LoadEventsResponse, error)
 	LoadSteps(ctx context.Context, in *LoadStepsRequest, opts ...grpc.CallOption) (*LoadStepsResponse, error)
@@ -115,6 +117,16 @@ func (c *runServiceClient) SavePending(ctx context.Context, in *SavePendingReque
 	return out, nil
 }
 
+func (c *runServiceClient) ConsumePause(ctx context.Context, in *ConsumePauseRequest, opts ...grpc.CallOption) (*ConsumePauseResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ConsumePauseResponse)
+	err := c.cc.Invoke(ctx, RunService_ConsumePause_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *runServiceClient) LoadMetadata(ctx context.Context, in *LoadMetadataRequest, opts ...grpc.CallOption) (*LoadMetadataResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(LoadMetadataResponse)
@@ -165,6 +177,7 @@ type RunServiceServer interface {
 	UpdateMetadata(context.Context, *UpdateMetadataRequest) (*UpdateMetadataResponse, error)
 	SaveStep(context.Context, *SaveStepRequest) (*SaveStepResponse, error)
 	SavePending(context.Context, *SavePendingRequest) (*SavePendingResponse, error)
+	ConsumePause(context.Context, *ConsumePauseRequest) (*ConsumePauseResponse, error)
 	LoadMetadata(context.Context, *LoadMetadataRequest) (*LoadMetadataResponse, error)
 	LoadEvents(context.Context, *LoadEventsRequest) (*LoadEventsResponse, error)
 	LoadSteps(context.Context, *LoadStepsRequest) (*LoadStepsResponse, error)
@@ -196,6 +209,9 @@ func (UnimplementedRunServiceServer) SaveStep(context.Context, *SaveStepRequest)
 }
 func (UnimplementedRunServiceServer) SavePending(context.Context, *SavePendingRequest) (*SavePendingResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SavePending not implemented")
+}
+func (UnimplementedRunServiceServer) ConsumePause(context.Context, *ConsumePauseRequest) (*ConsumePauseResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ConsumePause not implemented")
 }
 func (UnimplementedRunServiceServer) LoadMetadata(context.Context, *LoadMetadataRequest) (*LoadMetadataResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method LoadMetadata not implemented")
@@ -338,6 +354,24 @@ func _RunService_SavePending_Handler(srv interface{}, ctx context.Context, dec f
 	return interceptor(ctx, in, info, handler)
 }
 
+func _RunService_ConsumePause_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ConsumePauseRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RunServiceServer).ConsumePause(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RunService_ConsumePause_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RunServiceServer).ConsumePause(ctx, req.(*ConsumePauseRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _RunService_LoadMetadata_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(LoadMetadataRequest)
 	if err := dec(in); err != nil {
@@ -440,6 +474,10 @@ var RunService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SavePending",
 			Handler:    _RunService_SavePending_Handler,
+		},
+		{
+			MethodName: "ConsumePause",
+			Handler:    _RunService_ConsumePause_Handler,
 		},
 		{
 			MethodName: "LoadMetadata",

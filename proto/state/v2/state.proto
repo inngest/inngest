@@ -148,6 +148,40 @@ message LoadStateResponse {
   map<string, bytes> steps    = 3;
 }
 
+message PauseIdentifier {
+  string run_id      = 1;
+  string function_id = 2;
+  string account_id  = 3;
+}
+
+// Pause contains only the fields needed to consume a pause.
+// Other metadata is ignored.
+message Pause {
+  string          id           = 1;
+  string          workspace_id = 2;
+  PauseIdentifier identifier   = 3;
+  string          data_key     = 4;
+}
+
+message ConsumePauseOpts {
+  string idempotency_key = 1;
+  bytes  data            = 2;
+}
+
+message ConsumePauseResult {
+  bool did_consume       = 1;
+  bool has_pending_steps = 2;
+}
+
+message ConsumePauseRequest {
+  Pause            pause = 1;
+  ConsumePauseOpts opts  = 2;
+}
+
+message ConsumePauseResponse {
+  ConsumePauseResult result = 1;
+}
+
 service RunService {
   rpc Create(CreateStateRequest) returns (CreateStateResponse) {}
   rpc Delete(DeleteStateRequest) returns (DeleteStateResponse) {}
@@ -155,6 +189,7 @@ service RunService {
   rpc UpdateMetadata(UpdateMetadataRequest) returns (UpdateMetadataResponse) {}
   rpc SaveStep(SaveStepRequest) returns (SaveStepResponse) {}
   rpc SavePending(SavePendingRequest) returns (SavePendingResponse) {}
+  rpc ConsumePause(ConsumePauseRequest) returns (ConsumePauseResponse) {}
 
   rpc LoadMetadata(LoadMetadataRequest) returns (LoadMetadataResponse) {}
   rpc LoadEvents(LoadEventsRequest) returns (LoadEventsResponse) {}

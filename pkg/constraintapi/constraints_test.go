@@ -163,6 +163,65 @@ func TestConstraintEnforcement(t *testing.T) {
 		},
 
 		{
+			name: "missing account concurrency",
+			config: ConstraintConfig{
+				FunctionVersion: 1,
+				Concurrency: ConcurrencyConfig{
+					AccountConcurrency: 1,
+				},
+			},
+			constraints: []ConstraintItem{
+				{
+					Kind: ConstraintKindConcurrency,
+					Concurrency: &ConcurrencyConstraint{
+						Scope:             enums.ConcurrencyScopeAccount,
+						Mode:              enums.ConcurrencyModeStep,
+						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:account:%s", accountID),
+					},
+				},
+			},
+			amount:              1,
+			expectedLeaseAmount: 1,
+			mi: MigrationIdentifier{
+				QueueShard: "test",
+			},
+			afterAcquire: func(t *testing.T, deps *deps, resp *CapacityAcquireResponse) {
+				cm := deps.cm
+
+				res, err := cm.Acquire(context.Background(), &CapacityAcquireRequest{
+					IdempotencyKey: "before-acquire-acquire-call",
+					AccountID:      accountID,
+					EnvID:          envID,
+					FunctionID:     fnID,
+
+					Duration: 5 * time.Second,
+
+					Configuration:        deps.config,
+					Constraints:          deps.constraints,
+					Amount:               1,
+					LeaseIdempotencyKeys: []string{"test1"},
+
+					CurrentTime:     deps.clock.Now(),
+					MaximumLifetime: time.Minute,
+
+					Source: LeaseSource{
+						Service:           ServiceAPI,
+						Location:          CallerLocationBacklogRefill,
+						RunProcessingMode: RunProcessingModeBackground,
+					},
+
+					Migration: MigrationIdentifier{
+						QueueShard: "test",
+					},
+				})
+				require.NoError(t, err)
+				require.Len(t, res.Leases, 0)
+				require.Len(t, res.LimitingConstraints, 1)
+				require.Equal(t, deps.clock.Now().Add(ConcurrencyLimitRetryAfter), res.RetryAfter)
+			},
+		},
+
+		{
 			name: "account concurrency limited due to legacy concurrency",
 			config: ConstraintConfig{
 				FunctionVersion: 1,
@@ -200,6 +259,7 @@ func TestConstraintEnforcement(t *testing.T) {
 			expectedLeaseAmount: 0,
 			afterAcquire: func(t *testing.T, deps *deps, resp *CapacityAcquireResponse) {
 				require.Equal(t, 0, len(resp.Leases))
+				require.Equal(t, deps.clock.Now().Add(ConcurrencyLimitRetryAfter), resp.RetryAfter)
 			},
 		},
 
