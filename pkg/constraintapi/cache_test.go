@@ -982,8 +982,8 @@ func TestCache(t *testing.T) {
 			cache := NewLimitingConstraintCache(
 				WithLimitingCacheClock(clock),
 				WithLimitingCacheManager(cm),
-				WithLimitingCacheEnable(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool) {
-					return true
+				WithLimitingCacheEnable(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, minTTL, maxTTL time.Duration) {
+					return true, MinCacheTTL, MaxCacheTTL
 				}),
 			)
 

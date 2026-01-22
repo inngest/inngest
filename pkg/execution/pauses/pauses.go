@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/execution/state"
+	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/expressions/expragg"
 	"github.com/oklog/ulid/v2"
 )
@@ -79,8 +80,7 @@ type Manager interface {
 	// EvaluableLoader allows the Manager to be used within aggregate expression engines.
 	expragg.EvaluableLoader
 
-	// Bufferer is the core interface used to interact with pauses;  as an end user
-	// of this package you need to only write and read pauses since a given date.
+	// Bufferer is the core interface used to interact with pauses in a buffer.
 	Bufferer
 
 	// Aggregated returns whether the index should be aggregated.  This is a quick lookup
@@ -115,10 +115,7 @@ type Manager interface {
 	//
 	// Note that this may return state.ErrPauseNotFound if the current pause ID has already
 	// been consumed by another parallel process or because of a race condition.
-	//
-	// NOTE: This consumes a pause in the buffer, then calls m.Delete to ensure the pause is
-	// deleted from the backing block store.
-	ConsumePause(ctx context.Context, pause state.Pause, opts state.ConsumePauseOpts) (state.ConsumePauseResult, func() error, error)
+	ConsumePause(ctx context.Context, rs statev2.RunService, pause state.Pause, opts state.ConsumePauseOpts) (state.ConsumePauseResult, func() error, error)
 
 	// Delete deletes a pause from either the block index or the buffer, depending on
 	// where the pause is stored.
@@ -145,6 +142,9 @@ type Manager interface {
 
 	// DeletePauseByID deletes a pause by its ID, handling both buffer and block storage
 	DeletePauseByID(ctx context.Context, pauseID uuid.UUID, workspaceID uuid.UUID) error
+
+	// DeletePausesForRun deletes all pauses associated with a run.
+	DeletePausesForRun(ctx context.Context, runID ulid.ULID, workspaceID uuid.UUID) error
 }
 
 // Bufferer represents a datastore which accepts all writes for pauses.
@@ -152,6 +152,10 @@ type Manager interface {
 // to blocks on disk.
 type Bufferer interface {
 	state.PauseDeleter
+
+	// DeletePauseByID removes a pause by its ID.
+	DeletePauseByID(ctx context.Context, pauseID uuid.UUID, workspaceID uuid.UUID) error
+
 	// Write writes one or more pauses to the backing store.  Note that the index
 	// for each pause must be the same.
 	//
@@ -184,9 +188,6 @@ type Bufferer interface {
 	// PauseTimestamp returns the created at timestamp for a pause.
 	PauseTimestamp(ctx context.Context, index Index, pause state.Pause) (time.Time, error)
 
-	// ConsumePause consumes a pause, writing the deleted status to the buffer.
-	ConsumePause(ctx context.Context, pause state.Pause, opts state.ConsumePauseOpts) (state.ConsumePauseResult, func() error, error)
-
 	// PauseByID fetches a pause for a given ID.  It may return the pause from the buffer
 	// or from block storage, depending on the pause
 	PauseByID(ctx context.Context, index Index, pauseID uuid.UUID) (*state.Pause, error)
@@ -205,6 +206,12 @@ type Bufferer interface {
 	// NOTE: The bufferer handles O1 lookups of signals -> pauses.  These are not removed
 	// from the buffer and flushed to blocks
 	PauseBySignalID(ctx context.Context, envID uuid.UUID, signalID string) (*state.Pause, error)
+
+	// PauseIDsForRun returns all pause IDs associated with a run.
+	PauseIDsForRun(ctx context.Context, runID ulid.ULID) ([]uuid.UUID, error)
+
+	// DeleteRunPausesIndex deletes the index tracking pauses for a run.
+	DeleteRunPausesIndex(ctx context.Context, runID ulid.ULID) error
 }
 
 // BlockStore is an implementation that reads and writes blocks.
