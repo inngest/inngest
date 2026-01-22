@@ -80,7 +80,7 @@ func StartKafkaCluster(t *testing.T, opts ...KafkaOption) (*KafkaCluster, error)
 	}
 
 	// Build the controller quorum voters string
-	// Format: "1@kafka-1:29093,2@kafka-2:29093,3@kafka-3:29093"
+	// Format: "1@kafka-1:9093,2@kafka-2:9093,3@kafka-3:9093"
 	var quorumVoters string
 	for i := 1; i <= config.numBrokers; i++ {
 		if i > 1 {
@@ -123,12 +123,12 @@ func startKafkaBroker(ctx context.Context, t *testing.T, image string, net *test
 
 	env := map[string]string{
 		// KRaft mode settings
-		"KAFKA_NODE_ID":                                  strconv.Itoa(nodeID),
-		"KAFKA_PROCESS_ROLES":                            processRoles,
-		"KAFKA_CONTROLLER_QUORUM_VOTERS":                 quorumVoters,
-		"CLUSTER_ID":                                     "MkU3OEVBNTcwNTJENDM2Qk", // Fixed cluster ID
-		"KAFKA_CONTROLLER_LISTENER_NAMES":                "CONTROLLER",
-		"KAFKA_INTER_BROKER_LISTENER_NAME":               "INTERNAL",
+		"KAFKA_NODE_ID":                    strconv.Itoa(nodeID),
+		"KAFKA_PROCESS_ROLES":              processRoles,
+		"KAFKA_CONTROLLER_QUORUM_VOTERS":   quorumVoters,
+		"CLUSTER_ID":                       "MkU3OEVBNTcwNTJENDM2Qk", // Fixed cluster ID
+		"KAFKA_CONTROLLER_LISTENER_NAMES":  "CONTROLLER",
+		"KAFKA_INTER_BROKER_LISTENER_NAME": "INTERNAL",
 
 		// Listener configuration with fixed external port
 		"KAFKA_LISTENERS": fmt.Sprintf(
