@@ -2138,7 +2138,7 @@ func TestQueueLeaseSequential(t *testing.T) {
 		require.WithinDuration(t, now.Add(dur), ulid.Time(leaseID.Time()), 5*time.Millisecond)
 	})
 
-	t.Run("It doesn't allow leasing without an existing lease ID", func(t *testing.T) {
+	t.Run("It doesn't allow renewing leasing without an existing lease ID", func(t *testing.T) {
 		id, err := shard.ConfigLease(ctx, "sequential", time.Second)
 		require.Equal(t, osqueue.ErrConfigAlreadyLeased, err)
 		require.Nil(t, id)
@@ -2168,6 +2168,81 @@ func TestQueueLeaseSequential(t *testing.T) {
 		now := time.Now()
 		dur := 50 * time.Millisecond
 		leaseID, err = shard.ConfigLease(ctx, "sequential", dur)
+		require.NoError(t, err)
+		require.NotNil(t, leaseID)
+		require.WithinDuration(t, now.Add(dur), ulid.Time(leaseID.Time()), 5*time.Millisecond)
+	})
+}
+
+func TestQueueShardLease(t *testing.T) {
+	ctx := context.Background()
+	r := miniredis.RunT(t)
+
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	_, shard := newQueue(t, rc)
+
+	var leaseID *ulid.ULID
+
+	t.Run("cannot claim lease when max leases is 0", func(t *testing.T) {
+		dur := 500 * time.Millisecond
+		leaseID, err = shard.ShardLease(ctx, "shard", dur, 0)
+		require.Equal(t, osqueue.ErrAllShardsAlreadyLeased, err)
+		require.Nil(t, leaseID)
+	})
+
+	t.Run("It claims shard leases", func(t *testing.T) {
+		now := time.Now()
+		dur := 500 * time.Millisecond
+		leaseID, err = shard.ShardLease(ctx, "shard", dur, 1)
+		require.NoError(t, err)
+		require.NotNil(t, leaseID)
+		require.WithinDuration(t, now.Add(dur), ulid.Time(leaseID.Time()), 5*time.Millisecond)
+	})
+
+	t.Run("It doesn't allow extending lease without an existing lease ID", func(t *testing.T) {
+		id, err := shard.ShardLease(ctx, "shard", time.Second, 1)
+		require.Equal(t, osqueue.ErrAllShardsAlreadyLeased, err)
+		require.Nil(t, id)
+	})
+
+	t.Run("It doesn't allow renewing an invalid lease", func(t *testing.T) {
+		newULID := ulid.MustNew(ulid.Now(), rnd)
+		id, err := shard.ShardLease(ctx, "sequential", time.Second, 1, &newULID)
+		require.Equal(t, osqueue.ErrShardLeaseNotFound, err)
+		require.Nil(t, id)
+	})
+
+	t.Run("It doesn't allow renewing an expired lease", func(t *testing.T) {
+		newULID := ulid.MustNew(ulid.Now(), rnd)
+		id, err := shard.ShardLease(ctx, "shard", time.Second, 1, &newULID)
+		require.Equal(t, osqueue.ErrShardLeaseNotFound, err)
+		require.Nil(t, id)
+	})
+
+	t.Run("It extends the lease with a valid lease ID", func(t *testing.T) {
+		leaseID, err = shard.ShardLease(ctx, "shard", time.Second, 1, leaseID)
+		require.NotNil(t, leaseID)
+
+		now := time.Now()
+		dur := 50 * time.Millisecond
+		leaseID, err = shard.ShardLease(ctx, "shard", dur, 1, leaseID)
+		require.NoError(t, err)
+		require.NotNil(t, leaseID)
+		require.WithinDuration(t, now.Add(dur), ulid.Time(leaseID.Time()), 5*time.Millisecond)
+	})
+
+	t.Run("It allows leasing when the current lease is expired", func(t *testing.T) {
+		<-time.After(100 * time.Millisecond)
+
+		now := time.Now()
+		dur := 50 * time.Millisecond
+		leaseID, err = shard.ShardLease(ctx, "shard", dur, 1)
 		require.NoError(t, err)
 		require.NotNil(t, leaseID)
 		require.WithinDuration(t, now.Add(dur), ulid.Time(leaseID.Time()), 5*time.Millisecond)
