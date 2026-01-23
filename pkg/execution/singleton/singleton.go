@@ -18,7 +18,13 @@ var (
 )
 
 type Singleton interface {
+	// HandleSingleton processes a singleton when scheduling.  For mode "cancel", this will cancel
+	// any existing singelton run ID.  For "skip" and "queue", this will skip the incoming event if
+	// there's already a singleton for the given key.
 	HandleSingleton(ctx context.Context, key string, c inngest.Singleton, accountID uuid.UUID) (*ulid.ULID, error)
+
+	// ReleaseSingleton force cleares a singleton semaphore.
+	ReleaseSingleton(ctx context.Context, key string, accountID uuid.UUID) (*ulid.ULID, error)
 }
 
 // SingletonKey returns the singleton key given a function ID, singleton config,
@@ -55,6 +61,10 @@ func hash(res any, id uuid.UUID) string {
 func singleton(ctx context.Context, store SingletonStore, key string, s inngest.Singleton, accountID uuid.UUID) (*ulid.ULID, error) {
 	switch s.Mode {
 	case enums.SingletonModeSkip:
+		return store.GetCurrentRunID(ctx, key, accountID)
+	case enums.SingletonModeQueue:
+		// XXX (tonyhb): queue mode is the same as skip, except we force clear the key when run starts.
+		// this allows new events to enqueue at most one item when a run is executing.
 		return store.GetCurrentRunID(ctx, key, accountID)
 	case enums.SingletonModeCancel:
 		return store.ReleaseSingleton(ctx, key, accountID)
