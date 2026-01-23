@@ -277,7 +277,7 @@ func (m shardedMgr) New(ctx context.Context, input state.Input) (state.State, er
 	}
 
 	rv := consts.RequestVersionUnknown
-	if input.RequestVersion != nil {
+	if input.RequestVersion != nil && *input.RequestVersion != 0 {
 		rv = *input.RequestVersion
 	}
 
