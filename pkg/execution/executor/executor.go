@@ -1539,6 +1539,20 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		retries := ef.Function.Steps[0].RetryCount() + 1
 		item.MaxAttempts = &retries
 
+		if md.Config.RequestVersion == 0 {
+			// The intent of this is to ensure that the 1st request received by
+			// the SDK does not have a request version of 0. This fixes an issue
+			// caused by a zero value when initializing state.
+			//
+			// If the SDK receives a request version of 0 in the 1st request
+			// then it'll be "stuck" on 0 for the life of the run.
+			//
+			// Don't put this override within the `item.Attempt == 0` check,
+			// just in case we both fail to update metadata and the attempt
+			// errors
+			md.Config.RequestVersion = consts.RequestVersionUnknown
+		}
+
 		// Only just starting:  run lifecycles on first attempt.
 		if item.Attempt == 0 {
 			// Set the start time and spanID in metadata for subsequent runs
