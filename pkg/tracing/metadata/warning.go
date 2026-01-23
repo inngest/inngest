@@ -7,6 +7,7 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 )
 
+//tygo:generate
 const (
 	KindInngestWarnings Kind = "inngest.warnings"
 )
@@ -20,6 +21,7 @@ func (e *WarningError) Error() string {
 	return e.Err.Error()
 }
 
+//tygo:generate
 type Warnings map[string]error
 
 func (wm Warnings) Kind() Kind {
