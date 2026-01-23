@@ -277,6 +277,10 @@ func (m shardedMgr) New(ctx context.Context, input state.Input) (state.State, er
 	}
 
 	rv := consts.RequestVersionUnknown
+	// XXX: The 0-check here is to handle an edge case with older
+	// executors that didn't have RequestVersion set,
+	// thus defaulting to 0, causing the affected runs
+	// to be forced to run using executor v0.
 	if input.RequestVersion != nil && *input.RequestVersion != 0 {
 		rv = *input.RequestVersion
 	}
