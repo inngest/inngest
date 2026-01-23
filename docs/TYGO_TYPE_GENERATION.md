@@ -58,3 +58,8 @@ go generate ./pkg/tracing/metadata/types && tygo generate
 |---------|-----------------|
 | `error` | `string` |
 | `map[string]error` | `{ [key: string]: string }` |
+
+## TODO
+
+- [ ] Integrate type generation into the Makefile
+- [ ] Add a step to run prettier on the generated TypeScript file (`ui/packages/components/src/generated/index.ts`) to ensure it conforms to project formatting standards
