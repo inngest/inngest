@@ -16,11 +16,11 @@ import (
 // mockProducer is a test producer that can be configured to return errors
 type mockProducer struct {
 	err     error
-	records []*Record
+	records []*kgo.Record
 	lock    sync.Mutex
 }
 
-func (m *mockProducer) Produce(ctx context.Context, r *Record) error {
+func (m *mockProducer) Produce(ctx context.Context, r *kgo.Record) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 	m.records = append(m.records, r)
@@ -29,7 +29,7 @@ func (m *mockProducer) Produce(ctx context.Context, r *Record) error {
 
 func (m *mockProducer) String() string { return "mock" }
 
-func (m *mockProducer) GetRecords() []*Record {
+func (m *mockProducer) GetRecords() []*kgo.Record {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 	return m.records
@@ -65,7 +65,7 @@ func TestKafkaProducer(t *testing.T) {
 	testProd := &mockProducer{}
 	fallbackProd := NewFallbackProducer(kafkaProd, testProd)
 
-	err = fallbackProd.Produce(ctx, &Record{
+	err = fallbackProd.Produce(ctx, &kgo.Record{
 		Topic: "test-topic",
 		Key:   []byte("test-key"),
 		Value: []byte("test value"),
@@ -112,7 +112,7 @@ func TestFallbackProducer_FallsBackOnError(t *testing.T) {
 	// Create fallback producer with primary (fails) and fallback (succeeds)
 	fallbackProd := NewFallbackProducer(primaryProducer, fallbackDebug)
 
-	record := &Record{
+	record := &kgo.Record{
 		Topic: "test-topic",
 		Key:   []byte("test-key"),
 		Value: []byte("test value"),
@@ -147,7 +147,7 @@ func TestFallbackProducer_ContextCanceled_ReturnsImmediately(t *testing.T) {
 	// Create fallback producer
 	fallbackProd := NewFallbackProducer(primaryProducer, fallbackDebug)
 
-	record := &Record{
+	record := &kgo.Record{
 		Topic: "test-topic",
 		Key:   []byte("test-key"),
 		Value: []byte("test value"),
@@ -179,7 +179,7 @@ func TestFallbackProducer_ContextDeadlineExceeded_ReturnsImmediately(t *testing.
 	// Create fallback producer
 	fallbackProd := NewFallbackProducer(primaryProducer, fallbackDebug)
 
-	record := &Record{
+	record := &kgo.Record{
 		Topic: "test-topic",
 		Key:   []byte("test-key"),
 		Value: []byte("test value"),
@@ -253,7 +253,7 @@ func TestKafkaProducer_BufferFull_UsesFallback(t *testing.T) {
 		wg.Add(1)
 		go func(idx int) {
 			defer wg.Done()
-			record := &Record{
+			record := &kgo.Record{
 				Topic: "buffer-test-topic",
 				Key:   []byte("test-key"),
 				Value: []byte("test value"),
@@ -318,7 +318,7 @@ func TestKafkaProducer_PartitionLeaderDown_UsesFallback(t *testing.T) {
 	fallbackProd := NewFallbackProducer(kafkaProd, fallbackDebug)
 
 	// Produce a record successfully as baseline
-	baselineRecord := &Record{
+	baselineRecord := &kgo.Record{
 		Topic: "leader-test-topic",
 		Key:   []byte("baseline-key"),
 		Value: []byte("baseline value"),
@@ -341,7 +341,7 @@ func TestKafkaProducer_PartitionLeaderDown_UsesFallback(t *testing.T) {
 	time.Sleep(1 * time.Second)
 
 	// Attempt to produce - should eventually use fallback after retries exhausted
-	failedRecord := &Record{
+	failedRecord := &kgo.Record{
 		Topic: "leader-test-topic",
 		Key:   []byte("after-leader-down-key"),
 		Value: []byte("after leader down value"),
