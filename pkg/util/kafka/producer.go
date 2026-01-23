@@ -46,6 +46,15 @@ func (f *franzProducer) Produce(ctx context.Context, r *Record) error {
 		errChan <- err
 	})
 
+	// Record buffer size gauge
+	metrics.GaugeKafkaProducerBufferSize(ctx, f.client.BufferedProduceRecords(), metrics.GaugeOpt{
+		PkgName: "kafka",
+		Tags: map[string]any{
+			"producer_name": f.String(),
+			"topic":         r.Topic,
+		},
+	})
+
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
@@ -94,7 +103,7 @@ func (f *fallbackProducer) Produce(ctx context.Context, r *Record) error {
 			status = "error"
 		}
 
-		// Record metric
+		// Record duration metric
 		metrics.HistogramKafkaProducerDuration(ctx, time.Since(start), metrics.HistogramOpt{
 			PkgName: "kafka",
 			Tags: map[string]any{
