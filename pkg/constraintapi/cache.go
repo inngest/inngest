@@ -104,7 +104,7 @@ func (l *limitingConstraintCache) Acquire(ctx context.Context, req *CapacityAcqu
 			tags["function_id"] = req.FunctionID
 		}
 
-		metrics.IncrConstraintAPILimitingConstraintCacheCounter(ctx, 1, metrics.CounterOpt{
+		metrics.HistogramConstraintAPILimitingConstraintCacheTTL(ctx, item.TTL(), metrics.HistogramOpt{
 			PkgName: pkgName,
 			Tags:    tags,
 		})
@@ -133,7 +133,7 @@ func (l *limitingConstraintCache) Acquire(ctx context.Context, req *CapacityAcqu
 			tags["function_id"] = req.FunctionID
 		}
 
-		metrics.IncrConstraintAPILimitingConstraintCacheCounter(ctx, 1, metrics.CounterOpt{
+		metrics.HistogramConstraintAPILimitingConstraintCacheTTL(ctx, 0, metrics.HistogramOpt{
 			PkgName: pkgName,
 			Tags:    tags,
 		})
@@ -180,7 +180,7 @@ func (l *limitingConstraintCache) Acquire(ctx context.Context, req *CapacityAcqu
 			tags["function_id"] = req.FunctionID
 		}
 
-		metrics.IncrConstraintAPILimitingConstraintCacheCounter(ctx, 1, metrics.CounterOpt{
+		metrics.HistogramConstraintAPILimitingConstraintCacheTTL(ctx, cacheTTL, metrics.HistogramOpt{
 			PkgName: pkgName,
 			Tags:    tags,
 		})
