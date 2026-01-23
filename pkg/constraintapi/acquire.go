@@ -328,6 +328,17 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 		retryAfter = time.Time{}
 	}
 
+	untilRetryAfter := max(retryAfter.Sub(now), 0)
+	metrics.HistogramConstraintAPIRetryAfterDuration(ctx, untilRetryAfter, metrics.HistogramOpt{
+		PkgName: pkgName,
+		Tags: map[string]any{
+			"location":            req.Source.Location.String(),
+			"service":             req.Source.Service.String(),
+			"run_processing_mode": req.Source.RunProcessingMode.String(),
+			"migration":           req.Migration.String(),
+		},
+	})
+
 	if len(r.lifecycles) > 0 {
 		for _, hook := range r.lifecycles {
 			err := hook.OnCapacityLeaseAcquired(ctx, OnCapacityLeaseAcquiredData{

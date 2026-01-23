@@ -513,6 +513,28 @@ func HistogramConstraintAPIRequestLatency(ctx context.Context, latency time.Dura
 		Description: "Distribution of request latency",
 		Tags:        opts.Tags,
 		Unit:        "ms",
-		Boundaries:  DefaultBoundaries,
+		Boundaries:  ConstraintAPIDurationBoundaries,
+	})
+}
+
+func HistogramConstraintAPIRetryAfterDuration(ctx context.Context, dur time.Duration, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, dur.Milliseconds(), HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "constraintapi_retry_after_duration",
+		Description: "Distribution of retry after values",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  ConstraintAPIDurationBoundaries,
+	})
+}
+
+func HistogramConstraintAPILimitingConstraintCacheTTL(ctx context.Context, ttl time.Duration, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, ttl.Milliseconds(), HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "constraintapi_limiting_constraint_cache_ttl",
+		Description: "Distribution of cache TTL values",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  ConstraintAPIDurationBoundaries,
 	})
 }
