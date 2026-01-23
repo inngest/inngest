@@ -9,9 +9,9 @@ import (
 )
 
 // TODO
-// type ExecutorAssignmentConfig struct {
-// 	NumExecutors int
-// }
+type ExecutorConfig struct {
+	NumExecutors int
+}
 
 type QueueShard interface {
 	ShardOperations
