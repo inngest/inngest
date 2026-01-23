@@ -38,11 +38,11 @@ func (q *queue) Name() string {
 }
 
 func (q *queue) ShardGroup() string {
-	return q.name
+	return q.group
 }
 
 func (q *queue) NumExecutors() int {
-	return 1
+	return q.num_executors
 }
 
 func (q *queue) Kind() enums.QueueShardKind {
@@ -60,13 +60,15 @@ func (q *queue) Client() *QueueClient {
 	return q.RedisClient
 }
 
-func NewQueueShard(name string, queueClient *QueueClient, opts ...osqueue.QueueOpt) RedisQueueShard {
+func NewQueueShard(name string, group string, num_executors int, queueClient *QueueClient, opts ...osqueue.QueueOpt) RedisQueueShard {
 	options := osqueue.NewQueueOptions(opts...)
 	q := &queue{
-		name:         name,
-		itemIndexer:  QueueItemIndexerFunc,
-		QueueOptions: *options,
-		RedisClient:  queueClient,
+		name:          name,
+		group:         group,
+		num_executors: num_executors,
+		itemIndexer:   QueueItemIndexerFunc,
+		QueueOptions:  *options,
+		RedisClient:   queueClient,
 	}
 
 	return q
@@ -75,7 +77,9 @@ func NewQueueShard(name string, queueClient *QueueClient, opts ...osqueue.QueueO
 type queue struct {
 	osqueue.QueueOptions
 
-	name string
+	name          string
+	group         string
+	num_executors int
 
 	RedisClient *QueueClient
 

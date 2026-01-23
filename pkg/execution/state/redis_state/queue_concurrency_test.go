@@ -74,7 +74,8 @@ func TestQueuePartitionConcurrency(t *testing.T) {
 		osqueue.WithQueueLifecycles(ll),
 	}
 
-	shard1 := NewQueueShard(consts.DefaultQueueShardName, NewQueueClient(rc, QueueDefaultKey), opts...)
+	shard1 := NewQueueShard(consts.DefaultQueueShardName, consts.DefaultQueueShardName,
+		1, NewQueueClient(rc, QueueDefaultKey), opts...)
 
 	shards := map[string]osqueue.QueueShard{
 		consts.DefaultQueueShardName: shard1,
