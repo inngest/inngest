@@ -93,16 +93,15 @@ func (e executor) Execute(ctx context.Context, sl sv2.StateLoader, s sv2.Metadat
 	}
 
 	dr, _, err := ExecuteDriverRequest(ctx, e.Client, Request{
-		AccountID:      s.ID.Tenant.AccountID,
-		WorkflowID:     s.ID.FunctionID,
-		RunID:          s.ID.RunID,
-		SigningKey:     e.localSigningKey,
-		URL:            *uri,
-		Input:          input,
-		Edge:           edge,
-		Step:           step,
-		Headers:        headers,
-		RequestVersion: &s.Config.RequestVersion,
+		AccountID:  s.ID.Tenant.AccountID,
+		WorkflowID: s.ID.FunctionID,
+		RunID:      s.ID.RunID,
+		SigningKey: e.localSigningKey,
+		URL:        *uri,
+		Input:      input,
+		Edge:       edge,
+		Step:       step,
+		Headers:    headers,
 	})
 	return dr, err
 }
@@ -120,12 +119,11 @@ type Request struct {
 	// the SigningKey below will be used to sign the input.
 	Signature string
 	// SigningKey, if set, signs the input using this key.
-	SigningKey     []byte
-	URL            url.URL
-	Input          []byte
-	Edge           inngest.Edge
-	Step           inngest.Step
-	RequestVersion *int
+	SigningKey []byte
+	URL        url.URL
+	Input      []byte
+	Edge       inngest.Edge
+	Step       inngest.Step
 
 	// Headers are additional headers to add to the request.
 	Headers map[string]string
@@ -307,16 +305,6 @@ func do(ctx context.Context, c exechttp.RequestExecutor, r Request) (*Response, 
 
 	// Always add the run ID
 	req.Header.Add("X-Run-ID", r.RunID.String())
-
-	if r.RequestVersion != nil {
-		req.Header.Add(headerspkg.HeaderKeyRequestVersion, fmt.Sprintf("%d", *r.RequestVersion))
-	}
-
-	if r.Edge.IncomingGeneratorStep != "" {
-		req.Header.Add(headerspkg.HeaderInngestStepID, r.Edge.IncomingGeneratorStep)
-	} else {
-		req.Header.Add(headerspkg.HeaderInngestStepID, r.Edge.Incoming)
-	}
 
 	// Perform the request.
 	resp, err := c.DoRequest(ctx, req)

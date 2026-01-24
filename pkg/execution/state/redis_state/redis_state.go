@@ -276,16 +276,11 @@ func (m shardedMgr) New(ctx context.Context, input state.Input) (state.State, er
 		}
 	}
 
-	rv := consts.RequestVersionUnknown
-	if input.RequestVersion != nil {
-		rv = *input.RequestVersion
-	}
-
 	metadata := runMetadata{
 		Identifier:     input.Identifier,
 		Debugger:       input.Debugger,
 		Version:        currentVersion,
-		RequestVersion: rv,
+		RequestVersion: consts.RequestVersionUnknown, // Always use -1 to indicate unset hash version until first request.
 		Context:        input.Context,
 		Status:         enums.RunStatusScheduled,
 		SpanID:         input.SpanID,
