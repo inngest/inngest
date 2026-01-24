@@ -3,6 +3,7 @@ package queue
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -24,7 +25,7 @@ type RunInfo struct {
 	SojournDelay   time.Duration
 	Priority       uint
 	QueueShardName string
-	// ContinueCount represents the total number of continues that the queue has processed
+	// ContinueCount yepresents the total number of continues that the queue has processed
 	// via RunFunc returning true.  This allows us to prevent unbounded sequential processing
 	// on the same function by limiting the number of continues possible within a given chain.
 	ContinueCount       uint
@@ -123,6 +124,9 @@ type RetryAtSpecifier interface {
 }
 
 func RetryAtError(err error, at *time.Time) error {
+	if err == nil {
+		err = fmt.Errorf("retry at")
+	}
 	return retryAtError{cause: err, at: at}
 }
 
