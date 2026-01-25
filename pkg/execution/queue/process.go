@@ -312,7 +312,7 @@ func (q *queueProcessor) ProcessItem(
 	if capacityLeaseID.has() {
 		defer service.Go(func() {
 			currentLeaseID := capacityLeaseID.get()
-			if capacityLeaseID == nil {
+			if currentLeaseID == nil {
 				return
 			}
 
