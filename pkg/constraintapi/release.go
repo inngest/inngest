@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/util/errs"
 )
@@ -30,6 +31,8 @@ func (r *redisCapacityManager) Release(ctx context.Context, req *CapacityRelease
 	l = l.With(
 		"account_id", req.AccountID,
 		"lease_id", req.LeaseID,
+		"source", req.Source,
+		"migration", req.Migration,
 	)
 
 	// Retrieve client and key prefix for current constraints
@@ -96,7 +99,9 @@ func (r *redisCapacityManager) Release(ctx context.Context, req *CapacityRelease
 		// TODO: Track status (1: cleaned up, 2: cleaned up)
 		return res, nil
 	case 3:
-		l.Trace("capacity released")
+		if r.enableHighCardinalityInstrumentation != nil && r.enableHighCardinalityInstrumentation(ctx, req.AccountID, uuid.Nil, uuid.Nil) {
+			l.Debug("capacity released")
+		}
 
 		if len(r.lifecycles) > 0 {
 			for _, hook := range r.lifecycles {

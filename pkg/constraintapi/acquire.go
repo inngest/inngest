@@ -174,6 +174,8 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 		"env_id", req.EnvID,
 		"fn_id", req.FunctionID,
 		"req_id", requestID,
+		"source", req.Source,
+		"migration", req.Migration,
 	)
 
 	now := r.clock.Now()

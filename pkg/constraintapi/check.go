@@ -103,6 +103,7 @@ func (r *redisCapacityManager) Check(ctx context.Context, req *CapacityCheckRequ
 		"account_id", req.AccountID,
 		"env_id", req.EnvID,
 		"fn_id", req.FunctionID, // May be empty
+		"migration", req.Migration,
 	)
 
 	// Retrieve client and key prefix for current constraints
