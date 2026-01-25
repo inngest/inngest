@@ -173,6 +173,8 @@ func CallerLocationToProto(location CallerLocation) pb.ConstraintApiCallerLocati
 		return pb.ConstraintApiCallerLocation_CONSTRAINT_API_CALLER_LOCATION_ITEM_LEASE
 	case CallerLocationCheckpoint:
 		return pb.ConstraintApiCallerLocation_CONSTRAINT_API_CALLER_LOCATION_CHECKPOINT
+	case CallerLocationLeaseScavenge:
+		return pb.ConstraintApiCallerLocation_CONSTRAINT_API_CALLER_LOCATION_LEASE_SCAVENGE
 	default:
 		return pb.ConstraintApiCallerLocation_CONSTRAINT_API_CALLER_LOCATION_UNSPECIFIED
 	}
@@ -190,6 +192,8 @@ func LeaseLocationFromProto(location pb.ConstraintApiCallerLocation) CallerLocat
 		return CallerLocationItemLease
 	case pb.ConstraintApiCallerLocation_CONSTRAINT_API_CALLER_LOCATION_CHECKPOINT:
 		return CallerLocationCheckpoint
+	case pb.ConstraintApiCallerLocation_CONSTRAINT_API_CALLER_LOCATION_LEASE_SCAVENGE:
+		return CallerLocationLeaseScavenge
 	default:
 		return CallerLocationUnknown
 	}
@@ -205,6 +209,8 @@ func LeaseServiceToProto(service LeaseService) pb.ConstraintApiLeaseService {
 		return pb.ConstraintApiLeaseService_CONSTRAINT_API_LEASE_SERVICE_EXECUTOR
 	case ServiceAPI:
 		return pb.ConstraintApiLeaseService_CONSTRAINT_API_LEASE_SERVICE_API
+	case ServiceConstraintScavenger:
+		return pb.ConstraintApiLeaseService_CONSTRAINT_API_LEASE_CONSTRAINT_SCAVENGER
 	default:
 		return pb.ConstraintApiLeaseService_CONSTRAINT_API_LEASE_SERVICE_UNSPECIFIED
 	}
@@ -220,6 +226,8 @@ func LeaseServiceFromProto(service pb.ConstraintApiLeaseService) LeaseService {
 		return ServiceExecutor
 	case pb.ConstraintApiLeaseService_CONSTRAINT_API_LEASE_SERVICE_API:
 		return ServiceAPI
+	case pb.ConstraintApiLeaseService_CONSTRAINT_API_LEASE_CONSTRAINT_SCAVENGER:
+		return ServiceConstraintScavenger
 	default:
 		return ServiceUnknown
 	}

@@ -454,9 +454,10 @@ type QueueOptions struct {
 
 	enableJobPromotion bool
 
-	CapacityManager             constraintapi.RolloutManager
-	UseConstraintAPI            constraintapi.UseConstraintAPIFn
-	CapacityLeaseExtendInterval time.Duration
+	CapacityManager                    constraintapi.RolloutManager
+	UseConstraintAPI                   constraintapi.UseConstraintAPIFn
+	EnableCapacityLeaseInstrumentation constraintapi.EnableHighCardinalityInstrumentation
+	CapacityLeaseExtendInterval        time.Duration
 
 	EnableThrottleInstrumentation EnableThrottleInstrumentationFn
 
@@ -575,6 +576,12 @@ func WithUseConstraintAPI(uca constraintapi.UseConstraintAPIFn) QueueOpt {
 func WithCapacityLeaseExtendInterval(interval time.Duration) QueueOpt {
 	return func(q *QueueOptions) {
 		q.CapacityLeaseExtendInterval = interval
+	}
+}
+
+func WithCapacityLeseInstrumentation(enable constraintapi.EnableHighCardinalityInstrumentation) QueueOpt {
+	return func(q *QueueOptions) {
+		q.EnableCapacityLeaseInstrumentation = enable
 	}
 }
 
@@ -775,6 +782,9 @@ func NewQueueOptions(
 		ConditionalTracer: trace.NewConditionalTracer(noop.Tracer{}, func(ctx context.Context, accountID, envID uuid.UUID) bool {
 			return false
 		}),
+		EnableCapacityLeaseInstrumentation: func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool) {
+			return false
+		},
 	}
 
 	for _, qopt := range options {

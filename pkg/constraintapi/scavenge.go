@@ -428,11 +428,14 @@ func (r *redisCapacityManager) scavengeAccount(
 			AccountID:      accountID,
 			LeaseID:        leaseID,
 			Migration:      mi,
+			Source: LeaseSource{
+				Service:  ServiceConstraintScavenger,
+				Location: CallerLocationLeaseScavenge,
+			},
 		})
 		if err != nil {
 			return nil, fmt.Errorf("could not scavenge expired lease: %w", err)
 		}
-
 	}
 
 	return &ScavengeResult{
