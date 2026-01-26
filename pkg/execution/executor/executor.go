@@ -302,6 +302,13 @@ func WithUseConstraintAPI(uca constraintapi.UseConstraintAPIFn) ExecutorOpt {
 	}
 }
 
+func WithEnableBatchingInstrumentation(ebi func(ctx context.Context, accountID, envID uuid.UUID) (enable bool)) ExecutorOpt {
+	return func(e execution.Executor) error {
+		e.(*executor).enableBatchingInstrumentation = ebi
+		return nil
+	}
+}
+
 // WithEvaluatorFactory allows customizing of the expression evaluator factory function.
 func WithEvaluatorFactory(f func(ctx context.Context, expr string) (expressions.Evaluator, error)) ExecutorOpt {
 	return func(e execution.Executor) error {
@@ -457,8 +464,9 @@ type executor struct {
 	batcher      batch.BatchManager
 	singletonMgr singleton.Singleton
 
-	capacityManager  constraintapi.RolloutManager
-	useConstraintAPI constraintapi.UseConstraintAPIFn
+	capacityManager               constraintapi.RolloutManager
+	useConstraintAPI              constraintapi.UseConstraintAPIFn
+	enableBatchingInstrumentation func(ctx context.Context, accountID, envID uuid.UUID) (enable bool)
 
 	fl                  state.FunctionLoader
 	evalFactory         func(ctx context.Context, expr string) (expressions.Evaluator, error)
@@ -4654,7 +4662,13 @@ func (e *executor) newExpressionEvaluator(ctx context.Context, expr string) (exp
 // AppendAndScheduleBatch appends a new batch item. If a new batch is created, it will be scheduled to run
 // after the batch timeout. If the item finalizes the batch, a function run is immediately scheduled.
 func (e *executor) AppendAndScheduleBatch(ctx context.Context, fn inngest.Function, bi batch.BatchItem, opts *execution.BatchExecOpts) error {
+
+	enableInstrumentation := e.enableBatchingInstrumentation(ctx, bi.AccountID, bi.WorkspaceID)
+	l := logger.StdlibLogger(ctx).With("eventID", bi.EventID)
 	result, err := e.batcher.Append(ctx, bi, fn)
+	if enableInstrumentation {
+		l.Debug("Appending to batch", "err", err, "result", result)
+	}
 	if err != nil {
 		return err
 	}
@@ -4721,7 +4735,13 @@ func (e *executor) AppendAndScheduleBatch(ctx context.Context, fn inngest.Functi
 
 // RetrieveAndScheduleBatch retrieves all items from a started batch and schedules a function run
 func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Function, payload batch.ScheduleBatchPayload, opts *execution.BatchExecOpts) error {
+	enableInstrumentation := e.enableBatchingInstrumentation(ctx, payload.AccountID, payload.WorkspaceID)
 	evtList, err := e.batcher.RetrieveItems(ctx, payload.FunctionID, payload.BatchID)
+
+	l := logger.StdlibLogger(ctx).With("accountID", payload.AccountID, "workspace_id", payload.WorkspaceID, "batchID", payload.BatchID)
+	if enableInstrumentation {
+		l.Debug("retrieved batch items", "events", len(evtList), "err", err)
+	}
 	if err != nil {
 		return err
 	}
@@ -4774,6 +4794,10 @@ func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Func
 		// Batching does not work with rate limiting
 		PreventRateLimit: true,
 	})
+
+	if enableInstrumentation {
+		l.Debug("attempted to schedule batch", "err", err)
+	}
 
 	metrics.IncrExecutorScheduleCount(ctx, metrics.CounterOpt{
 		PkgName: pkgName,
