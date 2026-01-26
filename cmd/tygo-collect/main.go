@@ -61,7 +61,12 @@ type collectedType struct {
 func collectAnnotatedTypes(packages []string) ([]collectedType, error) {
 	var collected []collectedType
 
-	for _, pkgPath := range packages {
+	// Sort package paths for deterministic output regardless of argument order
+	sortedPkgs := make([]string, len(packages))
+	copy(sortedPkgs, packages)
+	sort.Strings(sortedPkgs)
+
+	for _, pkgPath := range sortedPkgs {
 		types, err := scanPackage(pkgPath)
 		if err != nil {
 			return nil, fmt.Errorf("scanning %s: %w", pkgPath, err)
