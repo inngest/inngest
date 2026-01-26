@@ -96,7 +96,11 @@ gql: ## Generate GraphQL code
 .PHONY: tygo
 tygo: ## Generate TypeScript types from Go structs
 	go run github.com/gzuidhof/tygo@latest generate
-	cd ui && pnpm exec prettier --write "packages/components/src/generated/**/*.ts"
+	@if [ -d ui/node_modules ]; then \
+		cd ui && pnpm exec prettier --write "packages/components/src/generated/**/*.ts"; \
+	else \
+		echo "Skipping prettier formatting (node_modules not found). Run 'cd ui && pnpm install' to enable formatting."; \
+	fi
 
 .PHONY: constraintapi-snapshots
 constraintapi-snapshots: ## Regenerate constraint API Lua snapshots
