@@ -4663,7 +4663,7 @@ func (e *executor) newExpressionEvaluator(ctx context.Context, expr string) (exp
 // after the batch timeout. If the item finalizes the batch, a function run is immediately scheduled.
 func (e *executor) AppendAndScheduleBatch(ctx context.Context, fn inngest.Function, bi batch.BatchItem, opts *execution.BatchExecOpts) error {
 
-	enableInstrumentation := e.enableBatchingInstrumentation(ctx, bi.AccountID, bi.WorkspaceID)
+	enableInstrumentation := e.enableBatchingInstrumentation != nil && e.enableBatchingInstrumentation(ctx, bi.AccountID, bi.WorkspaceID)
 	l := logger.StdlibLogger(ctx).With("eventID", bi.EventID)
 	result, err := e.batcher.Append(ctx, bi, fn)
 	if enableInstrumentation {
@@ -4735,7 +4735,7 @@ func (e *executor) AppendAndScheduleBatch(ctx context.Context, fn inngest.Functi
 
 // RetrieveAndScheduleBatch retrieves all items from a started batch and schedules a function run
 func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Function, payload batch.ScheduleBatchPayload, opts *execution.BatchExecOpts) error {
-	enableInstrumentation := e.enableBatchingInstrumentation(ctx, payload.AccountID, payload.WorkspaceID)
+	enableInstrumentation := e.enableBatchingInstrumentation != nil && e.enableBatchingInstrumentation(ctx, payload.AccountID, payload.WorkspaceID)
 	evtList, err := e.batcher.RetrieveItems(ctx, payload.FunctionID, payload.BatchID)
 
 	l := logger.StdlibLogger(ctx).With("accountID", payload.AccountID, "workspace_id", payload.WorkspaceID, "batchID", payload.BatchID)
