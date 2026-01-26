@@ -260,6 +260,133 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 		// Expect exactly 1 release call
 		require.Equal(t, len(cmLifecycles.ReleaseCalls), 1)
 	})
+
+	t.Run("with matching lease extension intervals", func(t *testing.T) {
+		reset()
+
+		// Use the production default interval (QueueLeaseDuration / 2) for both tickers
+		// This reproduces the bug where both tickers fire simultaneously
+		leaseExtendInterval := osqueue.QueueLeaseDuration / 2
+
+		q, shard := newQueue(
+			t, rc,
+			osqueue.WithClock(clock),
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+				return true
+			}),
+			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
+				return true, true
+			}),
+			osqueue.WithCapacityManager(cm),
+			// Use matching interval (same as queue item lease ticker)
+			osqueue.WithCapacityLeaseExtendInterval(leaseExtendInterval),
+			osqueue.WithLogger(l),
+		)
+		kg := shard.Client().kg
+
+		qi, err := shard.EnqueueItem(ctx, item, start, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+
+		p := osqueue.ItemPartition(ctx, qi)
+
+		// Acquire a lease (same pattern as existing test)
+		resp, err := cm.Acquire(ctx, &constraintapi.CapacityAcquireRequest{
+			AccountID:            accountID,
+			EnvID:                envID,
+			IdempotencyKey:       qi.ID,
+			FunctionID:           fnID,
+			LeaseIdempotencyKeys: []string{qi.ID},
+			Amount:               1,
+			Configuration: constraintapi.ConstraintConfig{
+				FunctionVersion: 1,
+				Concurrency: constraintapi.ConcurrencyConfig{
+					AccountConcurrency:  5,
+					FunctionConcurrency: 2,
+				},
+			},
+			Constraints: []constraintapi.ConstraintItem{
+				{
+					Kind: constraintapi.ConstraintKindConcurrency,
+					Concurrency: &constraintapi.ConcurrencyConstraint{
+						Scope:             enums.ConcurrencyScopeAccount,
+						InProgressItemKey: kg.Concurrency("account", accountID.String()),
+					},
+				},
+				{
+					Kind: constraintapi.ConstraintKindConcurrency,
+					Concurrency: &constraintapi.ConcurrencyConstraint{
+						Scope:             enums.ConcurrencyScopeFn,
+						InProgressItemKey: kg.Concurrency("p", fnID.String()),
+					},
+				},
+			},
+			CurrentTime:     clock.Now(),
+			Duration:        time.Minute, // Longer duration to allow multiple extensions
+			MaximumLifetime: 5 * time.Minute,
+			Source: constraintapi.LeaseSource{
+				Service:           constraintapi.ServiceExecutor,
+				Location:          constraintapi.CallerLocationItemLease,
+				RunProcessingMode: constraintapi.RunProcessingModeBackground,
+			},
+			Migration: constraintapi.MigrationIdentifier{
+				QueueShard: shard.Name(),
+			},
+		})
+		require.NoError(t, err)
+		require.Len(t, resp.Leases, 1)
+
+		require.Len(t, cmLifecycles.AcquireCalls, 1)
+
+		// Lease the queue item (required when queue item lease ticker fires)
+		leaseID, err := shard.Lease(ctx, qi, osqueue.QueueLeaseDuration, clock.Now(), nil, osqueue.LeaseOptionDisableConstraintChecks(true))
+		require.NoError(t, err)
+		qi.LeaseID = leaseID
+
+		var counter int64
+
+		err = q.ProcessItem(ctx, osqueue.ProcessItem{
+			I:                        qi,
+			P:                        p,
+			DisableConstraintUpdates: true,
+			CapacityLease: &osqueue.CapacityLease{
+				LeaseID: resp.Leases[0].LeaseID,
+			},
+		}, func(ctx context.Context, ri osqueue.RunInfo, i osqueue.Item) (osqueue.RunResult, error) {
+			go func() {
+				// Advance clock in intervals matching the lease extension interval
+				// This ensures both tickers fire at the same time
+				for i := 0; i < 3; i++ {
+					select {
+					case <-ctx.Done():
+						return
+					case <-time.After(100 * time.Millisecond):
+						// Advance by the full lease extension interval to trigger both tickers simultaneously
+						clock.Advance(leaseExtendInterval)
+					}
+				}
+			}()
+
+			// Wait for clock advances to complete
+			<-time.After(500 * time.Millisecond)
+			atomic.AddInt64(&counter, 1)
+			return osqueue.RunResult{}, nil
+		})
+		require.NoError(t, err)
+
+		require.Equal(t, 1, int(counter))
+
+		service.Wait()
+
+		// With matching intervals, both tickers fire simultaneously.
+		// Before the fix (single select loop), capacity lease extensions might not run.
+		// After the fix (separate goroutines), capacity lease extensions should always run.
+		// Expect at least 2 extend calls (we advanced clock 3 times by the interval)
+		require.GreaterOrEqual(t, len(cmLifecycles.ExtendCalls), 2,
+			"capacity lease extensions should run even when both tickers fire simultaneously")
+
+		// Expect exactly 1 release call
+		require.Equal(t, 1, len(cmLifecycles.ReleaseCalls))
+	})
 }
 
 func TestQueueProcessorPreLeaseWithConstraintAPI(t *testing.T) {
