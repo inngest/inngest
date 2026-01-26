@@ -3,6 +3,7 @@ package queue
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -123,6 +124,9 @@ type RetryAtSpecifier interface {
 }
 
 func RetryAtError(err error, at *time.Time) error {
+	if err == nil {
+		err = fmt.Errorf("retry at")
+	}
 	return retryAtError{cause: err, at: at}
 }
 

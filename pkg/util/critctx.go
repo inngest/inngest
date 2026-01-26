@@ -77,10 +77,31 @@ func CritT[T any](ctx context.Context, name string, f func(ctx context.Context) 
 		)
 		defer cancel()
 
-		doneCh := make(chan pair[T])
+		doneCh := make(chan pair[T], 2)
 
 		go func(ctx context.Context) {
-			res, err := f(ctx)
+			var (
+				res T
+				err error
+			)
+			defer func() {
+				if r := recover(); r != nil {
+					logger.StdlibLogger(ctx).ReportError(
+						fmt.Errorf("panic in crit: %v", r),
+						"panic in crit",
+						logger.WithErrorReportTags(map[string]string{
+							"crit_name": name,
+							"recover":   fmt.Sprintf("%v", r),
+						}),
+					)
+					if err != nil {
+						err = fmt.Errorf("panic in crit: %v", r)
+					}
+					doneCh <- pair[T]{res: res, err: err}
+				}
+			}()
+			res, err = f(ctx)
+
 			doneCh <- pair[T]{res: res, err: err}
 		}(ctx)
 
