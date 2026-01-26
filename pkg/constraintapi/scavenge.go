@@ -436,6 +436,16 @@ func (r *redisCapacityManager) scavengeAccount(
 		if err != nil {
 			return nil, fmt.Errorf("could not scavenge expired lease: %w", err)
 		}
+
+		l := logger.StdlibLogger(ctx).With(
+			"lease_id", leaseID,
+			"account_id", accountID,
+			"migration", mi,
+		)
+
+		l.Debug("scavenged expired lease",
+			"age", leaseAge.String(),
+		)
 	}
 
 	return &ScavengeResult{

@@ -82,7 +82,6 @@ func (q *queueProcessor) ProcessItem(
 
 	// Continually extend lease in the background while we're working on this job
 	go func() {
-		lastCapacityLeaseExtension := time.Now()
 		for {
 			select {
 			case <-jobCtx.Done():
@@ -120,6 +119,16 @@ func (q *queueProcessor) ProcessItem(
 					errCh <- fmt.Errorf("error extending lease while processing: %w", err)
 					return
 				}
+			}
+		}
+	}()
+
+	go func() {
+		lastCapacityLeaseExtension := time.Now()
+		for {
+			select {
+			case <-jobCtx.Done():
+				return
 			case <-extendCapacityLeaseTick.Chan():
 				if ctx.Err() != nil {
 					// Don't extend lease when the ctx is done.
