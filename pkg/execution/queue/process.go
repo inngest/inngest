@@ -124,8 +124,8 @@ func (q *queueProcessor) ProcessItem(
 	}()
 
 	go func() {
+		lastCapacityLeaseExtension := time.Now()
 		for {
-			lastCapacityLeaseExtension := time.Now()
 			select {
 			case <-jobCtx.Done():
 				return
@@ -214,7 +214,6 @@ func (q *queueProcessor) ProcessItem(
 
 				lastCapacityLeaseExtension = time.Now()
 			}
-
 		}
 	}()
 
