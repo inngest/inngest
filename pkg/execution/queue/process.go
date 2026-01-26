@@ -55,7 +55,7 @@ func (q *queueProcessor) ProcessItem(
 	defer extendLeaseTick.Stop()
 
 	capacityLeaseID := newCapacityLease(i.CapacityLease)
-	instrumentCapacityLease := q.EnableCapacityLeaseInstrumentation != nil && q.EnableCapacityLeaseInstrumentation(ctx, accountID, envID, fnID)
+	instrumentCapacityLease := i.CapacityLease != nil && q.EnableCapacityLeaseInstrumentation != nil && q.EnableCapacityLeaseInstrumentation(ctx, accountID, envID, fnID)
 
 	disableConstraintUpdates := i.DisableConstraintUpdates
 	extendCapacityLeaseTick := q.Clock().NewTicker(q.CapacityLeaseExtendInterval)
