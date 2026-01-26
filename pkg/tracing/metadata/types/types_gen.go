@@ -3,6 +3,14 @@
 
 package types
 
+// From warning.go
+const (
+	KindInngestWarnings = "inngest.warnings"
+)
+
+// From warning.go
+type Warnings map[string]error
+
 // From ai.go
 const (
 	KindInngestAI = "inngest.ai"
@@ -33,12 +41,4 @@ type HTTPMetadata struct {
 	Domain			*string	`json:"domain,omitempty"`
 	Path			*string	`json:"path,omitempty"`
 }
-
-// From warning.go
-const (
-	KindInngestWarnings = "inngest.warnings"
-)
-
-// From warning.go
-type Warnings map[string]error
 
