@@ -579,7 +579,7 @@ func WithCapacityLeaseExtendInterval(interval time.Duration) QueueOpt {
 	}
 }
 
-func WithCapacityLeseInstrumentation(enable constraintapi.EnableHighCardinalityInstrumentation) QueueOpt {
+func WithCapacityLeaseInstrumentation(enable constraintapi.EnableHighCardinalityInstrumentation) QueueOpt {
 	return func(q *QueueOptions) {
 		q.EnableCapacityLeaseInstrumentation = enable
 	}
