@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/util/errs"
 	"github.com/oklog/ulid/v2"
@@ -29,6 +30,8 @@ func (r *redisCapacityManager) ExtendLease(ctx context.Context, req *CapacityExt
 	l = l.With(
 		"account_id", req.AccountID,
 		"lease_id", req.LeaseID,
+		"source", req.Source,
+		"migration", req.Migration,
 	)
 
 	now := r.clock.Now()
@@ -110,7 +113,9 @@ func (r *redisCapacityManager) ExtendLease(ctx context.Context, req *CapacityExt
 		// TODO: Track status (1: cleaned up, 2: cleaned up or lease superseded, 3: lease expired)
 		return res, nil
 	case 4:
-		l.Trace("extended capacity lease")
+		if r.enableHighCardinalityInstrumentation != nil && r.enableHighCardinalityInstrumentation(ctx, req.AccountID, uuid.Nil, uuid.Nil) {
+			l.Debug("lease extended")
+		}
 
 		if len(r.lifecycles) > 0 {
 			for _, hook := range r.lifecycles {

@@ -322,6 +322,8 @@ const (
 	CallerLocationItemLease
 
 	CallerLocationCheckpoint
+
+	CallerLocationLeaseScavenge
 )
 
 func (c CallerLocation) String() string {
@@ -334,6 +336,8 @@ func (c CallerLocation) String() string {
 		return "item_lease"
 	case 4:
 		return "checkpoint"
+	case 5:
+		return "lease_scavenge"
 	default:
 		return "unknown"
 	}
@@ -346,6 +350,7 @@ const (
 	ServiceNewRuns
 	ServiceExecutor
 	ServiceAPI
+	ServiceConstraintScavenger
 )
 
 func (s LeaseService) String() string {
@@ -356,6 +361,8 @@ func (s LeaseService) String() string {
 		return "executor"
 	case 3:
 		return "api"
+	case 4:
+		return "constraint-scavenger"
 	default:
 		return "unknown"
 	}

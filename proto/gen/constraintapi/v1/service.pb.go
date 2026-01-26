@@ -338,6 +338,7 @@ const (
 	ConstraintApiCallerLocation_CONSTRAINT_API_CALLER_LOCATION_BACKLOG_REFILL ConstraintApiCallerLocation = 2
 	ConstraintApiCallerLocation_CONSTRAINT_API_CALLER_LOCATION_ITEM_LEASE     ConstraintApiCallerLocation = 3
 	ConstraintApiCallerLocation_CONSTRAINT_API_CALLER_LOCATION_CHECKPOINT     ConstraintApiCallerLocation = 4
+	ConstraintApiCallerLocation_CONSTRAINT_API_CALLER_LOCATION_LEASE_SCAVENGE ConstraintApiCallerLocation = 5
 )
 
 // Enum value maps for ConstraintApiCallerLocation.
@@ -348,6 +349,7 @@ var (
 		2: "CONSTRAINT_API_CALLER_LOCATION_BACKLOG_REFILL",
 		3: "CONSTRAINT_API_CALLER_LOCATION_ITEM_LEASE",
 		4: "CONSTRAINT_API_CALLER_LOCATION_CHECKPOINT",
+		5: "CONSTRAINT_API_CALLER_LOCATION_LEASE_SCAVENGE",
 	}
 	ConstraintApiCallerLocation_value = map[string]int32{
 		"CONSTRAINT_API_CALLER_LOCATION_UNSPECIFIED":    0,
@@ -355,6 +357,7 @@ var (
 		"CONSTRAINT_API_CALLER_LOCATION_BACKLOG_REFILL": 2,
 		"CONSTRAINT_API_CALLER_LOCATION_ITEM_LEASE":     3,
 		"CONSTRAINT_API_CALLER_LOCATION_CHECKPOINT":     4,
+		"CONSTRAINT_API_CALLER_LOCATION_LEASE_SCAVENGE": 5,
 	}
 )
 
@@ -388,10 +391,11 @@ func (ConstraintApiCallerLocation) EnumDescriptor() ([]byte, []int) {
 type ConstraintApiLeaseService int32
 
 const (
-	ConstraintApiLeaseService_CONSTRAINT_API_LEASE_SERVICE_UNSPECIFIED ConstraintApiLeaseService = 0
-	ConstraintApiLeaseService_CONSTRAINT_API_LEASE_SERVICE_NEW_RUNS    ConstraintApiLeaseService = 1
-	ConstraintApiLeaseService_CONSTRAINT_API_LEASE_SERVICE_EXECUTOR    ConstraintApiLeaseService = 2
-	ConstraintApiLeaseService_CONSTRAINT_API_LEASE_SERVICE_API         ConstraintApiLeaseService = 3
+	ConstraintApiLeaseService_CONSTRAINT_API_LEASE_SERVICE_UNSPECIFIED  ConstraintApiLeaseService = 0
+	ConstraintApiLeaseService_CONSTRAINT_API_LEASE_SERVICE_NEW_RUNS     ConstraintApiLeaseService = 1
+	ConstraintApiLeaseService_CONSTRAINT_API_LEASE_SERVICE_EXECUTOR     ConstraintApiLeaseService = 2
+	ConstraintApiLeaseService_CONSTRAINT_API_LEASE_SERVICE_API          ConstraintApiLeaseService = 3
+	ConstraintApiLeaseService_CONSTRAINT_API_LEASE_CONSTRAINT_SCAVENGER ConstraintApiLeaseService = 4
 )
 
 // Enum value maps for ConstraintApiLeaseService.
@@ -401,12 +405,14 @@ var (
 		1: "CONSTRAINT_API_LEASE_SERVICE_NEW_RUNS",
 		2: "CONSTRAINT_API_LEASE_SERVICE_EXECUTOR",
 		3: "CONSTRAINT_API_LEASE_SERVICE_API",
+		4: "CONSTRAINT_API_LEASE_CONSTRAINT_SCAVENGER",
 	}
 	ConstraintApiLeaseService_value = map[string]int32{
-		"CONSTRAINT_API_LEASE_SERVICE_UNSPECIFIED": 0,
-		"CONSTRAINT_API_LEASE_SERVICE_NEW_RUNS":    1,
-		"CONSTRAINT_API_LEASE_SERVICE_EXECUTOR":    2,
-		"CONSTRAINT_API_LEASE_SERVICE_API":         3,
+		"CONSTRAINT_API_LEASE_SERVICE_UNSPECIFIED":  0,
+		"CONSTRAINT_API_LEASE_SERVICE_NEW_RUNS":     1,
+		"CONSTRAINT_API_LEASE_SERVICE_EXECUTOR":     2,
+		"CONSTRAINT_API_LEASE_SERVICE_API":          3,
+		"CONSTRAINT_API_LEASE_CONSTRAINT_SCAVENGER": 4,
 	}
 )
 
@@ -2102,18 +2108,20 @@ const file_constraintapi_v1_service_proto_rawDesc = "" +
 	"\x1eConstraintApiRunProcessingMode\x122\n" +
 	".CONSTRAINT_API_RUN_PROCESSING_MODE_UNSPECIFIED\x10\x00\x121\n" +
 	"-CONSTRAINT_API_RUN_PROCESSING_MODE_BACKGROUND\x10\x01\x127\n" +
-	"3CONSTRAINT_API_RUN_PROCESSING_MODE_DURABLE_ENDPOINT\x10\x02*\x8b\x02\n" +
+	"3CONSTRAINT_API_RUN_PROCESSING_MODE_DURABLE_ENDPOINT\x10\x02*\xbe\x02\n" +
 	"\x1bConstraintApiCallerLocation\x12.\n" +
 	"*CONSTRAINT_API_CALLER_LOCATION_UNSPECIFIED\x10\x00\x12+\n" +
 	"'CONSTRAINT_API_CALLER_LOCATION_SCHEDULE\x10\x01\x121\n" +
 	"-CONSTRAINT_API_CALLER_LOCATION_BACKLOG_REFILL\x10\x02\x12-\n" +
 	")CONSTRAINT_API_CALLER_LOCATION_ITEM_LEASE\x10\x03\x12-\n" +
-	")CONSTRAINT_API_CALLER_LOCATION_CHECKPOINT\x10\x04*\xc5\x01\n" +
+	")CONSTRAINT_API_CALLER_LOCATION_CHECKPOINT\x10\x04\x121\n" +
+	"-CONSTRAINT_API_CALLER_LOCATION_LEASE_SCAVENGE\x10\x05*\xf4\x01\n" +
 	"\x19ConstraintApiLeaseService\x12,\n" +
 	"(CONSTRAINT_API_LEASE_SERVICE_UNSPECIFIED\x10\x00\x12)\n" +
 	"%CONSTRAINT_API_LEASE_SERVICE_NEW_RUNS\x10\x01\x12)\n" +
 	"%CONSTRAINT_API_LEASE_SERVICE_EXECUTOR\x10\x02\x12$\n" +
-	" CONSTRAINT_API_LEASE_SERVICE_API\x10\x032\x95\x03\n" +
+	" CONSTRAINT_API_LEASE_SERVICE_API\x10\x03\x12-\n" +
+	")CONSTRAINT_API_LEASE_CONSTRAINT_SCAVENGER\x10\x042\x95\x03\n" +
 	"\rConstraintAPI\x12X\n" +
 	"\x05Check\x12&.constraintapi.v1.CapacityCheckRequest\x1a'.constraintapi.v1.CapacityCheckResponse\x12^\n" +
 	"\aAcquire\x12(.constraintapi.v1.CapacityAcquireRequest\x1a).constraintapi.v1.CapacityAcquireResponse\x12j\n" +

@@ -20,13 +20,21 @@ func (q *queueProcessor) ProcessItem(
 	i ProcessItem,
 	f RunFunc,
 ) error {
-	l := logger.StdlibLogger(ctx)
+	accountID, envID, fnID, runID := i.I.Data.Identifier.AccountID, i.I.Data.Identifier.WorkspaceID, i.I.Data.Identifier.WorkflowID, i.I.Data.Identifier.RunID
 
-	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.ProcessItem", i.I.Data.Identifier.AccountID, i.I.Data.Identifier.WorkspaceID)
+	l := logger.StdlibLogger(ctx).With(
+		"item_id", i.I.ID,
+		"account_id", accountID,
+		"env_id", envID,
+		"fn_id", fnID,
+		"partition_id", i.P.ID,
+	)
+
+	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.ProcessItem", accountID, envID)
 	defer span.End()
 	span.SetAttributes(attribute.String("partition_id", i.P.ID))
 	span.SetAttributes(attribute.String("item_id", i.I.ID))
-	span.SetAttributes(attribute.String("run_id", i.I.Data.Identifier.RunID.String()))
+	span.SetAttributes(attribute.String("run_id", runID.String()))
 	if i.I.Data.JobID != nil {
 		span.SetAttributes(attribute.String("job_id", *i.I.Data.JobID))
 	}
@@ -34,10 +42,6 @@ func (q *queueProcessor) ProcessItem(
 	qi := i.I
 	p := i.P
 	continuationCtr := i.PCtr
-
-	capacityLeaseID := newCapacityLease(i.CapacityLease)
-
-	disableConstraintUpdates := i.DisableConstraintUpdates
 
 	var err error
 	leaseID := qi.LeaseID
@@ -50,6 +54,10 @@ func (q *queueProcessor) ProcessItem(
 	extendLeaseTick := q.Clock().NewTicker(QueueLeaseDuration / 2)
 	defer extendLeaseTick.Stop()
 
+	capacityLeaseID := newCapacityLease(i.CapacityLease)
+	instrumentCapacityLease := q.EnableCapacityLeaseInstrumentation != nil && q.EnableCapacityLeaseInstrumentation(ctx, accountID, envID, fnID)
+
+	disableConstraintUpdates := i.DisableConstraintUpdates
 	extendCapacityLeaseTick := q.Clock().NewTicker(q.CapacityLeaseExtendInterval)
 	defer extendCapacityLeaseTick.Stop()
 
@@ -74,6 +82,7 @@ func (q *queueProcessor) ProcessItem(
 
 	// Continually extend lease in the background while we're working on this job
 	go func() {
+		lastCapacityLeaseExtension := time.Now()
 		for {
 			select {
 			case <-jobCtx.Done():
@@ -139,7 +148,7 @@ func (q *queueProcessor) ProcessItem(
 				operationIdempotencyKey := currentCapacityLease.String()
 
 				res, err := q.CapacityManager.ExtendLease(context.Background(), &constraintapi.CapacityExtendLeaseRequest{
-					AccountID:      p.AccountID,
+					AccountID:      accountID,
 					IdempotencyKey: operationIdempotencyKey,
 					LeaseID:        *currentCapacityLease,
 					Migration: constraintapi.MigrationIdentifier{
@@ -163,7 +172,7 @@ func (q *queueProcessor) ProcessItem(
 							logger.WithErrorReportLog(true),
 							logger.WithErrorReportTags(map[string]string{
 								"partitionID": p.ID,
-								"accountID":   p.AccountID.String(),
+								"accountID":   accountID.String(),
 								"item":        qi.ID,
 								"leaseID":     currentCapacityLease.String(),
 							}),
@@ -181,7 +190,20 @@ func (q *queueProcessor) ProcessItem(
 					return
 				}
 
+				// Record current + next lease if high-cardinality instrumentation is enabled
+				if instrumentCapacityLease {
+					l.Debug(
+						"extended capacity lease",
+						"last_extension", time.Since(lastCapacityLeaseExtension),
+						"lease_id", currentCapacityLease.String(),
+						"next_lease", res.LeaseID.String(),
+					)
+				}
+
+				// Update capacity lease
 				capacityLeaseID.set(res.LeaseID)
+
+				lastCapacityLeaseExtension = time.Now()
 			}
 		}
 	}()
@@ -279,6 +301,10 @@ func (q *queueProcessor) ProcessItem(
 			// Clean up leases and such
 			extendLeaseTick.Stop()
 			extendCapacityLeaseTick.Stop()
+
+			if leaseID := capacityLeaseID.get(); leaseID != nil && instrumentCapacityLease {
+				l.Debug("stopping lease extension", "lease_id", leaseID.String())
+			}
 		}
 
 		if res.ScheduledImmediateJob {
@@ -312,7 +338,7 @@ func (q *queueProcessor) ProcessItem(
 	if capacityLeaseID.has() {
 		defer service.Go(func() {
 			currentLeaseID := capacityLeaseID.get()
-			if capacityLeaseID == nil {
+			if currentLeaseID == nil {
 				return
 			}
 
@@ -336,9 +362,16 @@ func (q *queueProcessor) ProcessItem(
 					"lease_id":    currentLeaseID.String(),
 					"function_id": p.FunctionID.String(),
 				}))
+				return
 			}
 
-			l.Trace("released capacity", "res", res)
+			if instrumentCapacityLease {
+				l.Debug(
+					"released capacity lease",
+					"res", res,
+					"lease_id", currentLeaseID.String(),
+				)
+			}
 		})
 	}
 
