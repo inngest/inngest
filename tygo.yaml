@@ -1,0 +1,18 @@
+packages:
+  # Generated barrel file containing all span metadata types
+  # Run: go generate ./pkg/tracing/metadata/types && tygo generate
+  - path: "github.com/inngest/inngest/pkg/tracing/metadata/types"
+    output_path: "ui/packages/components/src/generated/index.ts"
+    frontmatter: |
+      // Helper type for Go's error interface (serialized as string)
+      type error = string;
+
+      // Span metadata kind types (derived from generated constants)
+      export type SpanMetadataKindUserland = `userland.${string}`;
+      export type SpanMetadataKind =
+        | typeof KindInngestAI
+        | typeof KindInngestHTTP
+        | typeof KindInngestWarnings
+        | SpanMetadataKindUserland;
+    type_mappings:
+      error: "string"
