@@ -25,7 +25,7 @@ type RunInfo struct {
 	SojournDelay   time.Duration
 	Priority       uint
 	QueueShardName string
-	// ContinueCount yepresents the total number of continues that the queue has processed
+	// ContinueCount represents the total number of continues that the queue has processed
 	// via RunFunc returning true.  This allows us to prevent unbounded sequential processing
 	// on the same function by limiting the number of continues possible within a given chain.
 	ContinueCount       uint
