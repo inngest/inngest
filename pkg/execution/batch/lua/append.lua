@@ -57,11 +57,12 @@ end
 local newEvent = redis.call("ZADD", batchIdempotenceKey, nowUnixSeconds, eventID)
 redis.call("EXPIRE", batchIdempotenceKey, idempotenceSetTTL)
 if newEvent == 0 then
-  size = redis.call("LLEN", batchKey)
+  local size = redis.call("LLEN", batchKey)
   if size == 1 then
     resp = { status = "new", batchID = batchID, batchPointerKey = batchPointerKey }
   else
     resp = { status = "itemexists", batchID = batchID, batchPointerKey = batchPointerKey }
+  end
   return cjson.encode(resp)
 end
 
