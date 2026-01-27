@@ -11,6 +11,7 @@ import (
 	"github.com/inngest/inngest/pkg/api"
 	"github.com/inngest/inngest/pkg/api/v2/apiv2base"
 	apiv2 "github.com/inngest/inngest/proto/gen/api/v2"
+	"github.com/inngest/inngest/proto/gen/api/v2/apiv2connect"
 	"google.golang.org/grpc"
 )
 
@@ -94,6 +95,11 @@ func NewHTTPHandler(ctx context.Context, serviceOpts ServiceOptions, httpOpts HT
 		return nil, fmt.Errorf("failed to register v2 gateway handler: %w", err)
 	}
 
+	//
+	// Create Connect handler for gRPC/Connect protocol support
+	connectHandler := NewConnectRpcHandler(service)
+	connectPath, connectHTTPHandler := apiv2connect.NewV2Handler(connectHandler)
+
 	// Build map of paths that require authorization
 	authzPaths := base.BuildAuthzPathMap()
 
@@ -108,6 +114,10 @@ func NewHTTPHandler(ctx context.Context, serviceOpts ServiceOptions, httpOpts HT
 	if httpOpts.MetricsMiddleware != nil {
 		r.Use(httpOpts.MetricsMiddleware.Middleware)
 	}
+
+	//
+	// Mount Connect handler at /api.v2.V2/ for Connect protocol (gRPC-like) requests
+	r.Mount(connectPath, connectHTTPHandler)
 
 	r.Mount("/", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		// Strip /api/v2 prefix and forward to gateway
@@ -139,4 +149,14 @@ func NewHTTPHandler(ctx context.Context, serviceOpts ServiceOptions, httpOpts HT
 	}))
 
 	return r, nil
+}
+
+//
+// NewConnectRpcHTTPHandler creates a ConnectRPC protocol handler that can be mounted
+// at the root level to handle ConnectRPC protocol requests. The ConnectRPC
+// protocol expects handlers at /api.v2.V2/... paths.
+func NewConnectRpcHTTPHandler(serviceOpts ServiceOptions) (string, http.Handler) {
+	service := NewService(serviceOpts)
+	connectHandler := NewConnectRpcHandler(service)
+	return apiv2connect.NewV2Handler(connectHandler)
 }

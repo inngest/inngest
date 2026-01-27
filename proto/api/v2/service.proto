@@ -977,6 +977,10 @@ message Env {
   EnvType type = 3;
   google.protobuf.Timestamp createdAt = 4;
   bool isArchived = 5;
+  string slug = 6;
+  optional string parentId = 7;
+  bool isAutoArchiveEnabled = 8;
+  optional google.protobuf.Timestamp lastDeployedAt = 9;
 }
 
 message CreateAccountData {
