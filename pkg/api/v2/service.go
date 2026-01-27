@@ -151,10 +151,8 @@ func NewHTTPHandler(ctx context.Context, serviceOpts ServiceOptions, httpOpts HT
 	return r, nil
 }
 
-//
 // NewConnectRpcHTTPHandler creates a ConnectRPC protocol handler that can be mounted
-// at the root level to handle ConnectRPC protocol requests. The ConnectRPC
-// protocol expects handlers at /api.v2.V2/... paths.
+// at the root level to handle ConnectRPC protocol requests.
 func NewConnectRpcHTTPHandler(serviceOpts ServiceOptions) (string, http.Handler) {
 	service := NewService(serviceOpts)
 	connectHandler := NewConnectRpcHandler(service)
