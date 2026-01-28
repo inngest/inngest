@@ -381,7 +381,7 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 	)
 
 	tags := make(map[string]any)
-	if conditional.IsMetricsEnabled(ctx, "constraintapi.HighCardinality") {
+	if conditional.IsMetricsEnabled(ctx, "constraintapi.Acquire") {
 		tags["function_id"] = req.FunctionID
 	}
 
