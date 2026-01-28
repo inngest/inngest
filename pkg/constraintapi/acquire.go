@@ -407,7 +407,7 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 
 	switch parsedResponse.Status {
 	case 1, 3:
-		logger.StdlibLogger(conditional.WithScope(ctx, "constraintapi.HighCardinality")).Debug(
+		conditional.Logger(ctx, "constraintapi.Acquire").Debug(
 			"successful acquire call",
 			"leases", leases,
 		)

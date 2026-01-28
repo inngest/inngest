@@ -210,7 +210,7 @@ func (q *queueProcessor) ProcessItem(
 				}
 
 				// Record current + next lease if high-cardinality instrumentation is enabled
-				logger.StdlibLogger(conditional.WithScope(ctx, "queue.CapacityLease")).Debug(
+				conditional.Logger(ctx, "queue.CapacityLease").Debug(
 					"extended capacity lease",
 					"last_extension", time.Since(lastCapacityLeaseExtension),
 					"lease_id", currentCapacityLease.String(),
@@ -320,7 +320,7 @@ func (q *queueProcessor) ProcessItem(
 			extendCapacityLeaseTick.Stop()
 
 			if leaseID := capacityLeaseID.get(); leaseID != nil {
-				logger.StdlibLogger(conditional.WithScope(ctx, "queue.CapacityLease")).Debug(
+				conditional.Logger(ctx, "queue.CapacityLease").Debug(
 					"stopping lease extension", "lease_id", leaseID.String(),
 				)
 			}
@@ -384,7 +384,7 @@ func (q *queueProcessor) ProcessItem(
 				return
 			}
 
-			logger.StdlibLogger(conditional.WithScope(ctx, "queue.CapacityLease")).Debug(
+			conditional.Logger(ctx, "queue.CapacityLease").Debug(
 				"released capacity lease",
 				"res", res,
 				"lease_id", currentLeaseID.String(),

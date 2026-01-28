@@ -100,6 +100,43 @@ func TestLoggerHelper(t *testing.T) {
 		Logger(ctx).Debug("via Logger helper")
 		require.Contains(t, buf.String(), "via Logger helper")
 	})
+
+	t.Run("Logger with scope enabled logs message", func(t *testing.T) {
+		buf.Reset()
+		RegisterFeatureFlag(ScopeEnabled("queue.CapacityLease"))
+
+		ctx := logger.WithStdlib(context.Background(), l)
+		ctx = WithContext(ctx, WithAccountID(uuid.New()))
+
+		// Logger(ctx, scope) applies scope and returns logger
+		Logger(ctx, "queue.CapacityLease").Debug("scoped log enabled")
+		require.Contains(t, buf.String(), "scoped log enabled")
+	})
+
+	t.Run("Logger with scope disabled returns void logger", func(t *testing.T) {
+		buf.Reset()
+		RegisterFeatureFlag(ScopeEnabled("other.Scope"))
+
+		ctx := logger.WithStdlib(context.Background(), l)
+		ctx = WithContext(ctx, WithAccountID(uuid.New()))
+
+		// Logger(ctx, scope) should return VoidLogger since scope is not enabled
+		Logger(ctx, "queue.CapacityLease").Debug("scoped log disabled")
+		require.Empty(t, buf.String())
+	})
+
+	t.Run("Logger with scope preserves logger fields", func(t *testing.T) {
+		buf.Reset()
+		RegisterFeatureFlag(ScopeEnabled("test.Scope"))
+
+		ctx := logger.WithStdlib(context.Background(), l.With("base_field", "base_value"))
+		ctx = WithContext(ctx, WithAccountID(uuid.New()))
+
+		Logger(ctx, "test.Scope").Debug("with fields", "extra_field", "extra_value")
+		require.Contains(t, buf.String(), "with fields")
+		require.Contains(t, buf.String(), "base_field=base_value")
+		require.Contains(t, buf.String(), "extra_field=extra_value")
+	})
 }
 
 func TestConditionalLoggingWithFields(t *testing.T) {

@@ -106,7 +106,7 @@ func (r *redisCapacityManager) Release(ctx context.Context, req *CapacityRelease
 		// TODO: Track status (1: cleaned up, 2: cleaned up)
 		return res, nil
 	case 3:
-		logger.StdlibLogger(conditional.WithScope(ctx, "constraintapi.HighCardinality")).Debug("capacity released")
+		conditional.Logger(ctx, "constraintapi.Release").Debug("capacity released")
 
 		if len(r.lifecycles) > 0 {
 			for _, hook := range r.lifecycles {

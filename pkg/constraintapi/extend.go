@@ -120,7 +120,7 @@ func (r *redisCapacityManager) ExtendLease(ctx context.Context, req *CapacityExt
 		// TODO: Track status (1: cleaned up, 2: cleaned up or lease superseded, 3: lease expired)
 		return res, nil
 	case 4:
-		logger.StdlibLogger(conditional.WithScope(ctx, "constraintapi.HighCardinality")).Debug("lease extended")
+		conditional.Logger(ctx, "constraintapi.ExtendLease").Debug("lease extended")
 
 		if len(r.lifecycles) > 0 {
 			for _, hook := range r.lifecycles {

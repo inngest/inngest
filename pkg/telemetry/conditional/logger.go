@@ -6,21 +6,21 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 )
 
-// Logger returns the logger from context, respecting conditional scope if set.
-// This is a convenience wrapper that's equivalent to logger.From(ctx).
+// Logger returns a logger from context. If a scope is provided,
+// the logger respects conditional observability settings for that scope.
+// Returns VoidLogger if the scope is disabled.
 //
-// For conditional logging, use the context-based approach:
+// Usage with scope (recommended for conditional logging):
 //
-//	logger.From(conditional.WithScope(ctx, "scope")).Info("message")
+//	conditional.Logger(ctx, "queue.CapacityLease").Debug("extended capacity lease")
 //
-// Or the longer form:
+// Usage without scope (equivalent to logger.From(ctx)):
 //
-//	ctx = conditional.WithScope(ctx, "scope")
-//	logger.From(ctx).Info("message")
-//
-// The logger.From() function automatically checks for conditional scope in the
-// context and returns a VoidLogger if the scope is disabled.
-func Logger(ctx context.Context) logger.Logger {
+//	conditional.Logger(ctx).Info("message")
+func Logger(ctx context.Context, scope ...string) logger.Logger {
+	if len(scope) > 0 {
+		return logger.From(WithScope(ctx, scope[0]))
+	}
 	return logger.From(ctx)
 }
 
