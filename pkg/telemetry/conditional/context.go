@@ -6,12 +6,37 @@ import (
 	"github.com/google/uuid"
 	statev1 "github.com/inngest/inngest/pkg/execution/state"
 	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/oklog/ulid/v2"
 )
+
+func init() {
+	// Register the conditional logging check with the logger package.
+	// This enables logger.From() to automatically check conditional scopes.
+	logger.RegisterConditionalCheck(conditionalLoggingCheck)
+}
+
+// conditionalLoggingCheck is called by logger.From() to determine if logging
+// should be enabled for the current context. Returns true if logging should
+// proceed, false if it should be skipped.
+func conditionalLoggingCheck(ctx context.Context) bool {
+	scope, ok := ScopeFromContext(ctx)
+	if !ok {
+		// No scope set, logging proceeds normally
+		return true
+	}
+	// Scope is set, check if logging is enabled for this scope
+	return IsLoggingEnabled(ctx, scope)
+}
 
 type contextKey struct{}
 
 var ffContextKey = contextKey{}
+
+// scopeContextKey is the context key for conditional scope.
+type scopeContextKey struct{}
+
+var conditionalScopeKey = scopeContextKey{}
 
 // ContextOption is a functional option for configuring FeatureFlagContext.
 type ContextOption func(*FeatureFlagContext)
@@ -142,4 +167,33 @@ func GetFromContext(ctx context.Context) FeatureFlagContext {
 // HasContext returns true if a FeatureFlagContext is present in the context.
 func HasContext(ctx context.Context) bool {
 	return ctx.Value(ffContextKey) != nil
+}
+
+// WithScope returns a context with conditional scope set.
+// When this context is passed to logger.From() or metrics functions,
+// they will check if the scope is enabled before logging/recording.
+//
+// Usage:
+//
+//	ctx = conditional.WithScope(ctx, "queue.Process")
+//	logger.From(ctx).Debug("conditional log")  // Only logs if enabled for scope
+//
+// Or for one-off calls:
+//
+//	logger.From(conditional.WithScope(ctx, "queue.Process")).Debug("debug info")
+func WithScope(ctx context.Context, scope string) context.Context {
+	return context.WithValue(ctx, conditionalScopeKey, scope)
+}
+
+// ScopeFromContext returns the conditional scope if set.
+// Returns the scope and true if a scope is set, or empty string and false otherwise.
+func ScopeFromContext(ctx context.Context) (string, bool) {
+	scope, ok := ctx.Value(conditionalScopeKey).(string)
+	return scope, ok
+}
+
+// HasScope returns true if a conditional scope is set in context.
+func HasScope(ctx context.Context) bool {
+	_, ok := ScopeFromContext(ctx)
+	return ok
 }

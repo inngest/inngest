@@ -10,7 +10,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestConditionalDebug(t *testing.T) {
+// TestContextBasedConditionalLogging tests the context-based approach
+// where logger.From() automatically checks the conditional scope.
+func TestContextBasedConditionalLogging(t *testing.T) {
 	defer ClearFeatureFlag()
 
 	buf := &bytes.Buffer{}
@@ -19,115 +21,64 @@ func TestConditionalDebug(t *testing.T) {
 		logger.WithLoggerWriter(buf),
 		logger.WithHandler(logger.TextHandler),
 	)
-	ctx := logger.WithStdlib(context.Background(), l)
-	ctx = WithContext(ctx, WithAccountID(uuid.New()))
 
-	t.Run("logs when enabled", func(t *testing.T) {
+	t.Run("logs when scope is enabled", func(t *testing.T) {
 		buf.Reset()
-		RegisterFeatureFlag(AlwaysEnabled)
+		RegisterFeatureFlag(ScopeEnabled("queue.Process"))
 
-		ConditionalDebug(ctx, "test.Scope", "test message", "key", "value")
-		require.Contains(t, buf.String(), "test message")
-		require.Contains(t, buf.String(), "key=value")
+		ctx := logger.WithStdlib(context.Background(), l)
+		ctx = WithContext(ctx, WithAccountID(uuid.New()))
+		ctx = WithScope(ctx, "queue.Process")
+
+		// logger.From(ctx) should return the real logger since scope is enabled
+		logger.From(ctx).Debug("should log this")
+		require.Contains(t, buf.String(), "should log this")
 	})
 
-	t.Run("does not log when disabled", func(t *testing.T) {
+	t.Run("does not log when scope is disabled", func(t *testing.T) {
 		buf.Reset()
-		RegisterFeatureFlag(NeverEnabled)
+		RegisterFeatureFlag(ScopeEnabled("other.Scope"))
 
-		ConditionalDebug(ctx, "test.Scope", "test message", "key", "value")
+		ctx := logger.WithStdlib(context.Background(), l)
+		ctx = WithContext(ctx, WithAccountID(uuid.New()))
+		ctx = WithScope(ctx, "queue.Process")
+
+		// logger.From(ctx) should return VoidLogger since scope is not enabled
+		logger.From(ctx).Debug("should not log this")
+		require.Empty(t, buf.String())
+	})
+
+	t.Run("logs normally when no scope is set", func(t *testing.T) {
+		buf.Reset()
+		RegisterFeatureFlag(NeverEnabled) // Even with NeverEnabled, no scope means normal logging
+
+		ctx := logger.WithStdlib(context.Background(), l)
+		ctx = WithContext(ctx, WithAccountID(uuid.New()))
+		// No WithScope call
+
+		// logger.From(ctx) should return the real logger since no scope is set
+		logger.From(ctx).Debug("normal logging")
+		require.Contains(t, buf.String(), "normal logging")
+	})
+
+	t.Run("one-liner pattern", func(t *testing.T) {
+		buf.Reset()
+		RegisterFeatureFlag(ScopeEnabled("batch.Schedule"))
+
+		ctx := logger.WithStdlib(context.Background(), l)
+		ctx = WithContext(ctx, WithAccountID(uuid.New()))
+
+		// One-liner pattern: logger.From(conditional.WithScope(ctx, "scope"))
+		logger.From(WithScope(ctx, "batch.Schedule")).Debug("one-liner enabled")
+		require.Contains(t, buf.String(), "one-liner enabled")
+
+		buf.Reset()
+		logger.From(WithScope(ctx, "other.Scope")).Debug("one-liner disabled")
 		require.Empty(t, buf.String())
 	})
 }
 
-func TestConditionalInfo(t *testing.T) {
-	defer ClearFeatureFlag()
-
-	buf := &bytes.Buffer{}
-	l := logger.From(context.Background(),
-		logger.WithLoggerLevel(logger.LevelInfo),
-		logger.WithLoggerWriter(buf),
-		logger.WithHandler(logger.TextHandler),
-	)
-	ctx := logger.WithStdlib(context.Background(), l)
-	ctx = WithContext(ctx, WithAccountID(uuid.New()))
-
-	t.Run("logs when enabled", func(t *testing.T) {
-		buf.Reset()
-		RegisterFeatureFlag(AlwaysEnabled)
-
-		ConditionalInfo(ctx, "test.Scope", "info message")
-		require.Contains(t, buf.String(), "info message")
-	})
-
-	t.Run("does not log when disabled", func(t *testing.T) {
-		buf.Reset()
-		RegisterFeatureFlag(NeverEnabled)
-
-		ConditionalInfo(ctx, "test.Scope", "info message")
-		require.Empty(t, buf.String())
-	})
-}
-
-func TestConditionalWarn(t *testing.T) {
-	defer ClearFeatureFlag()
-
-	buf := &bytes.Buffer{}
-	l := logger.From(context.Background(),
-		logger.WithLoggerLevel(logger.LevelWarning),
-		logger.WithLoggerWriter(buf),
-		logger.WithHandler(logger.TextHandler),
-	)
-	ctx := logger.WithStdlib(context.Background(), l)
-	ctx = WithContext(ctx, WithAccountID(uuid.New()))
-
-	t.Run("logs when enabled", func(t *testing.T) {
-		buf.Reset()
-		RegisterFeatureFlag(AlwaysEnabled)
-
-		ConditionalWarn(ctx, "test.Scope", "warn message")
-		require.Contains(t, buf.String(), "warn message")
-	})
-
-	t.Run("does not log when disabled", func(t *testing.T) {
-		buf.Reset()
-		RegisterFeatureFlag(NeverEnabled)
-
-		ConditionalWarn(ctx, "test.Scope", "warn message")
-		require.Empty(t, buf.String())
-	})
-}
-
-func TestConditionalError(t *testing.T) {
-	defer ClearFeatureFlag()
-
-	buf := &bytes.Buffer{}
-	l := logger.From(context.Background(),
-		logger.WithLoggerLevel(logger.LevelError),
-		logger.WithLoggerWriter(buf),
-		logger.WithHandler(logger.TextHandler),
-	)
-	ctx := logger.WithStdlib(context.Background(), l)
-	ctx = WithContext(ctx, WithAccountID(uuid.New()))
-
-	t.Run("logs when enabled", func(t *testing.T) {
-		buf.Reset()
-		RegisterFeatureFlag(AlwaysEnabled)
-
-		ConditionalError(ctx, "test.Scope", "error message")
-		require.Contains(t, buf.String(), "error message")
-	})
-
-	t.Run("does not log when disabled", func(t *testing.T) {
-		buf.Reset()
-		RegisterFeatureFlag(NeverEnabled)
-
-		ConditionalError(ctx, "test.Scope", "error message")
-		require.Empty(t, buf.String())
-	})
-}
-
-func TestConditionalLogger(t *testing.T) {
+func TestLoggerHelper(t *testing.T) {
 	defer ClearFeatureFlag()
 
 	buf := &bytes.Buffer{}
@@ -136,65 +87,23 @@ func TestConditionalLogger(t *testing.T) {
 		logger.WithLoggerWriter(buf),
 		logger.WithHandler(logger.TextHandler),
 	)
-	ctx := WithContext(context.Background(), WithAccountID(uuid.New()))
 
-	t.Run("scoped logger logs when enabled", func(t *testing.T) {
+	t.Run("Logger helper returns logger from context", func(t *testing.T) {
 		buf.Reset()
-		RegisterFeatureFlag(AlwaysEnabled)
+		RegisterFeatureFlag(ScopeEnabled("test.Scope"))
 
-		cl := NewConditionalLogger(l, "test.Scope")
-		require.Equal(t, "test.Scope", cl.Scope())
+		ctx := logger.WithStdlib(context.Background(), l)
+		ctx = WithContext(ctx, WithAccountID(uuid.New()))
+		ctx = WithScope(ctx, "test.Scope")
 
-		cl.Debug(ctx, "debug message", "key", "value")
-		require.Contains(t, buf.String(), "debug message")
-	})
-
-	t.Run("scoped logger does not log when disabled", func(t *testing.T) {
-		buf.Reset()
-		RegisterFeatureFlag(NeverEnabled)
-
-		cl := NewConditionalLogger(l, "test.Scope")
-		cl.Debug(ctx, "debug message")
-		require.Empty(t, buf.String())
-	})
-
-	t.Run("With returns new logger with attributes", func(t *testing.T) {
-		buf.Reset()
-		RegisterFeatureFlag(AlwaysEnabled)
-
-		cl := NewConditionalLogger(l, "test.Scope")
-		cl2 := cl.With("attr", "value")
-
-		require.NotSame(t, cl, cl2)
-		require.Equal(t, cl.Scope(), cl2.Scope())
-
-		cl2.Info(ctx, "info message")
-		require.Contains(t, buf.String(), "attr=value")
-	})
-
-	t.Run("WithScope returns new logger with different scope", func(t *testing.T) {
-		buf.Reset()
-		RegisterFeatureFlag(ScopeEnabled("new.Scope"))
-
-		cl := NewConditionalLogger(l, "test.Scope")
-		cl2 := cl.WithScope("new.Scope")
-
-		require.Equal(t, "test.Scope", cl.Scope())
-		require.Equal(t, "new.Scope", cl2.Scope())
-
-		// Original scope disabled
-		cl.Info(ctx, "message 1")
-		require.Empty(t, buf.String())
-
-		// New scope enabled
-		cl2.Info(ctx, "message 2")
-		require.Contains(t, buf.String(), "message 2")
+		// Logger(ctx) is equivalent to logger.From(ctx)
+		Logger(ctx).Debug("via Logger helper")
+		require.Contains(t, buf.String(), "via Logger helper")
 	})
 }
 
-func TestNewConditionalLoggerFromContext(t *testing.T) {
+func TestConditionalLoggingWithFields(t *testing.T) {
 	defer ClearFeatureFlag()
-	RegisterFeatureFlag(AlwaysEnabled)
 
 	buf := &bytes.Buffer{}
 	l := logger.From(context.Background(),
@@ -202,17 +111,25 @@ func TestNewConditionalLoggerFromContext(t *testing.T) {
 		logger.WithLoggerWriter(buf),
 		logger.WithHandler(logger.TextHandler),
 	)
-	ctx := logger.WithStdlib(context.Background(), l)
-	ctx = WithContext(ctx, WithAccountID(uuid.New()))
 
-	cl := NewConditionalLoggerFromContext(ctx, "test.Scope")
-	cl.Debug(ctx, "test message")
-	require.Contains(t, buf.String(), "test message")
+	t.Run("preserves logger fields with conditional scope", func(t *testing.T) {
+		buf.Reset()
+		RegisterFeatureFlag(ScopeEnabled("test.Scope"))
+
+		ctx := logger.WithStdlib(context.Background(), l.With("base_field", "base_value"))
+		ctx = WithContext(ctx, WithAccountID(uuid.New()))
+		ctx = WithScope(ctx, "test.Scope")
+
+		logger.From(ctx).Debug("message with fields", "extra_field", "extra_value")
+		require.Contains(t, buf.String(), "message with fields")
+		require.Contains(t, buf.String(), "base_field=base_value")
+		require.Contains(t, buf.String(), "extra_field=extra_value")
+	})
 }
 
-func TestConditionalLogger_AllLevels(t *testing.T) {
+func TestConditionalLoggingAllLevels(t *testing.T) {
 	defer ClearFeatureFlag()
-	RegisterFeatureFlag(AlwaysEnabled)
+	RegisterFeatureFlag(ScopeEnabled("test.Scope"))
 
 	buf := &bytes.Buffer{}
 	l := logger.From(context.Background(),
@@ -220,27 +137,27 @@ func TestConditionalLogger_AllLevels(t *testing.T) {
 		logger.WithLoggerWriter(buf),
 		logger.WithHandler(logger.TextHandler),
 	)
-	ctx := WithContext(context.Background(), WithAccountID(uuid.New()))
 
-	cl := NewConditionalLogger(l, "test.Scope")
+	ctx := logger.WithStdlib(context.Background(), l)
+	ctx = WithContext(ctx, WithAccountID(uuid.New()))
+	ctx = WithScope(ctx, "test.Scope")
 
 	tests := []struct {
 		name  string
-		logFn func(context.Context, string, ...any)
-		level string
+		logFn func(string, ...any)
 		msg   string
 	}{
-		{"trace", cl.Trace, "TRACE", "trace msg"},
-		{"debug", cl.Debug, "DEBUG", "debug msg"},
-		{"info", cl.Info, "INFO", "info msg"},
-		{"warn", cl.Warn, "WARN", "warn msg"},
-		{"error", cl.Error, "ERROR", "error msg"},
+		{"trace", logger.From(ctx).Trace, "trace msg"},
+		{"debug", logger.From(ctx).Debug, "debug msg"},
+		{"info", logger.From(ctx).Info, "info msg"},
+		{"warn", logger.From(ctx).Warn, "warn msg"},
+		{"error", logger.From(ctx).Error, "error msg"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			buf.Reset()
-			tt.logFn(ctx, tt.msg)
+			tt.logFn(tt.msg)
 			require.Contains(t, buf.String(), tt.msg)
 		})
 	}

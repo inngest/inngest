@@ -220,3 +220,53 @@ func TestHasContext(t *testing.T) {
 		require.True(t, HasContext(ctx))
 	})
 }
+
+func TestWithScope(t *testing.T) {
+	ctx := WithScope(context.Background(), "test.Scope")
+
+	scope, ok := ScopeFromContext(ctx)
+	require.True(t, ok)
+	require.Equal(t, "test.Scope", scope)
+}
+
+func TestScopeFromContext(t *testing.T) {
+	t.Run("no scope", func(t *testing.T) {
+		scope, ok := ScopeFromContext(context.Background())
+		require.False(t, ok)
+		require.Empty(t, scope)
+	})
+
+	t.Run("with scope", func(t *testing.T) {
+		ctx := WithScope(context.Background(), "my.Scope")
+		scope, ok := ScopeFromContext(ctx)
+		require.True(t, ok)
+		require.Equal(t, "my.Scope", scope)
+	})
+}
+
+func TestHasScope(t *testing.T) {
+	t.Run("no scope", func(t *testing.T) {
+		require.False(t, HasScope(context.Background()))
+	})
+
+	t.Run("with scope", func(t *testing.T) {
+		ctx := WithScope(context.Background(), "test.Scope")
+		require.True(t, HasScope(ctx))
+	})
+}
+
+func TestScopeAndFeatureFlagContextTogether(t *testing.T) {
+	accountID := uuid.New()
+
+	// Set both feature flag context and scope
+	ctx := WithContext(context.Background(), WithAccountID(accountID))
+	ctx = WithScope(ctx, "queue.Process")
+
+	// Both should be retrievable
+	ffCtx := GetFromContext(ctx)
+	require.Equal(t, accountID, ffCtx.AccountID)
+
+	scope, ok := ScopeFromContext(ctx)
+	require.True(t, ok)
+	require.Equal(t, "queue.Process", scope)
+}

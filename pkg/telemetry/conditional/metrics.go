@@ -6,6 +6,25 @@ import (
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 )
 
+func init() {
+	// Register the conditional metrics check with the metrics package.
+	// This enables metrics.Record*Metric() to automatically check conditional scopes.
+	metrics.RegisterConditionalCheck(conditionalMetricsCheck)
+}
+
+// conditionalMetricsCheck is called by metrics.Record*Metric() functions to determine
+// if metrics should be recorded for the current context. Returns true if metrics should
+// proceed, false if they should be skipped.
+func conditionalMetricsCheck(ctx context.Context) bool {
+	scope, ok := ScopeFromContext(ctx)
+	if !ok {
+		// No scope set, metrics proceed normally
+		return true
+	}
+	// Scope is set, check if metrics are enabled for this scope
+	return IsMetricsEnabled(ctx, scope)
+}
+
 // ConditionalCounterOpt extends metrics.CounterOpt with a Scope for conditional recording.
 type ConditionalCounterOpt struct {
 	metrics.CounterOpt

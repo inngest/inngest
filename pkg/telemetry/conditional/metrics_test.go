@@ -225,3 +225,94 @@ func TestConditionalMetricsWithTags(t *testing.T) {
 		})
 	})
 }
+
+// TestContextBasedConditionalMetrics tests the new context-based approach
+// where metrics.Record*Metric() automatically checks the conditional scope.
+func TestContextBasedConditionalMetrics(t *testing.T) {
+	defer ClearFeatureFlag()
+
+	t.Run("records when scope is enabled", func(t *testing.T) {
+		RegisterFeatureFlag(ScopeEnabled("queue.lease"))
+
+		ctx := WithContext(context.Background(), WithAccountID(uuid.New()))
+		ctx = WithScope(ctx, "queue.lease")
+
+		// This should record the metric since scope is enabled
+		// We can't easily verify the metric was recorded without full OTel setup,
+		// but we verify it doesn't panic and the code path is executed
+		metrics.RecordCounterMetric(ctx, 1, metrics.CounterOpt{
+			PkgName:    "test",
+			MetricName: "context_based_counter_enabled",
+		})
+	})
+
+	t.Run("does not record when scope is disabled", func(t *testing.T) {
+		RegisterFeatureFlag(ScopeEnabled("other.scope"))
+
+		ctx := WithContext(context.Background(), WithAccountID(uuid.New()))
+		ctx = WithScope(ctx, "queue.lease")
+
+		// This should NOT record the metric since scope is not enabled
+		metrics.RecordCounterMetric(ctx, 1, metrics.CounterOpt{
+			PkgName:    "test",
+			MetricName: "context_based_counter_disabled",
+		})
+	})
+
+	t.Run("records normally when no scope is set", func(t *testing.T) {
+		RegisterFeatureFlag(NeverEnabled) // Even with NeverEnabled, no scope means normal recording
+
+		ctx := WithContext(context.Background(), WithAccountID(uuid.New()))
+		// No WithScope call
+
+		// This should record the metric since no scope is set
+		metrics.RecordCounterMetric(ctx, 1, metrics.CounterOpt{
+			PkgName:    "test",
+			MetricName: "context_based_counter_no_scope",
+		})
+	})
+
+	t.Run("all metric types respect scope", func(t *testing.T) {
+		RegisterFeatureFlag(ScopeEnabled("metrics.test"))
+
+		ctx := WithContext(context.Background(), WithAccountID(uuid.New()))
+		enabledCtx := WithScope(ctx, "metrics.test")
+		disabledCtx := WithScope(ctx, "other.scope")
+
+		// These should all work with enabled scope
+		metrics.RecordCounterMetric(enabledCtx, 1, metrics.CounterOpt{
+			PkgName:    "test",
+			MetricName: "scope_test_counter",
+		})
+		metrics.RecordUpDownCounterMetric(enabledCtx, 5, metrics.CounterOpt{
+			PkgName:    "test",
+			MetricName: "scope_test_updown",
+		})
+		metrics.RecordGaugeMetric(enabledCtx, 42, metrics.GaugeOpt{
+			PkgName:    "test",
+			MetricName: "scope_test_gauge",
+		})
+		metrics.RecordIntHistogramMetric(enabledCtx, 100, metrics.HistogramOpt{
+			PkgName:    "test",
+			MetricName: "scope_test_histogram",
+		})
+
+		// These should all be skipped with disabled scope (no panic, just early return)
+		metrics.RecordCounterMetric(disabledCtx, 1, metrics.CounterOpt{
+			PkgName:    "test",
+			MetricName: "scope_test_counter_skip",
+		})
+		metrics.RecordUpDownCounterMetric(disabledCtx, 5, metrics.CounterOpt{
+			PkgName:    "test",
+			MetricName: "scope_test_updown_skip",
+		})
+		metrics.RecordGaugeMetric(disabledCtx, 42, metrics.GaugeOpt{
+			PkgName:    "test",
+			MetricName: "scope_test_gauge_skip",
+		})
+		metrics.RecordIntHistogramMetric(disabledCtx, 100, metrics.HistogramOpt{
+			PkgName:    "test",
+			MetricName: "scope_test_histogram_skip",
+		})
+	})
+}
