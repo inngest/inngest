@@ -196,7 +196,7 @@ func (q *queue) ItemLeaseConstraintCheck(
 		expired := expiry.Before(now)
 		ttl := item.CapacityLease.LeaseID.Timestamp().Sub(now)
 
-		metrics.HistogramConstraintAPIExpiredLeaseAge(ctx, ttl, metrics.HistogramOpt{
+		metrics.HistogramConstraintAPIQueueItemLeaseTTL(ctx, ttl, metrics.HistogramOpt{
 			PkgName: pkgName,
 			Tags: map[string]any{
 				"expired": expired,
