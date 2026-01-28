@@ -57,6 +57,9 @@ end
 local newEvent = redis.call("ZADD", batchIdempotenceKey, nowUnixSeconds, eventID)
 redis.call("EXPIRE", batchIdempotenceKey, idempotenceSetTTL)
 if newEvent == 0 then
+  -- if this event was already appended to a batch and there is only 
+  -- one element in the batch, rerturn status=new to schedule this batch
+  -- for execution after the batch timeout.
   local size = redis.call("LLEN", batchKey)
   if size == 1 then
     resp = { status = "new", batchID = batchID, batchPointerKey = batchPointerKey }
