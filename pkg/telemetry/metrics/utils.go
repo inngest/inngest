@@ -30,7 +30,7 @@ var (
 	conditionalCheckMu sync.RWMutex
 )
 
-// RegisterConditionalCheck registers a function that will be called by Record*Metric functions
+// RegisterConditionalCheck registers a function that will be called by all Record metric functions
 // to determine if metrics should be recorded. This is used by the conditional
 // package to integrate scope-based metrics.
 func RegisterConditionalCheck(fn ConditionalCheckFn) {
