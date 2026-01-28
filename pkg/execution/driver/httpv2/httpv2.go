@@ -7,7 +7,11 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	neturl "net/url"
 
+	inngestgo "github.com/inngest/inngestgo"
+	apiv1 "github.com/inngest/inngest/pkg/api/apiv1"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/exechttp"
@@ -57,7 +61,7 @@ func (d httpv2) Name() string {
 func (d httpv2) Do(ctx context.Context, sl sv2.StateLoader, opts driver.V2RequestOpts) (*state.DriverResponse, errs.UserError, errs.InternalError) {
 	typ, _ := opts.Fn.Driver.Metadata["type"].(string)
 	if typ == "sync" {
-		return d.sync(ctx, opts)
+		return d.sync(ctx, sl, opts)
 	}
 	return d.async(ctx, opts)
 }
@@ -68,7 +72,29 @@ func (d httpv2) Do(ctx context.Context, sl sv2.StateLoader, opts driver.V2Reques
 // sync entry is relatively simple: we re-execute a specific API request, and we add Inngest-specific
 // headers to the request.  The SDK will then fetch the requisite function state such that it can resume
 // where it left off.
-func (d httpv2) sync(ctx context.Context, opts driver.V2RequestOpts) (*state.DriverResponse, errs.UserError, errs.InternalError) {
+// loadHTTPRequestEvent attempts to load the triggering event from state and parse
+// it as an HTTP request event. Returns nil if loading fails, the event name doesn't
+// match, or the event can't be parsed.
+func loadHTTPRequestEvent(ctx context.Context, sl sv2.StateLoader, id sv2.ID) *inngestgo.GenericEvent[apiv1.NewAPIRunData] {
+	if sl == nil {
+		return nil
+	}
+	rawEvts, err := sl.LoadEvents(ctx, id)
+	if err != nil || len(rawEvts) == 0 {
+		return nil
+	}
+
+	evt := &inngestgo.GenericEvent[apiv1.NewAPIRunData]{}
+	if err := json.Unmarshal(rawEvts[0], evt); err != nil {
+		return nil
+	}
+	if evt.Name != consts.HttpRequestName {
+		return nil
+	}
+	return evt
+}
+
+func (d httpv2) sync(ctx context.Context, sl sv2.StateLoader, opts driver.V2RequestOpts) (*state.DriverResponse, errs.UserError, errs.InternalError) {
 	sig := Sign(ctx, opts.SigningKey, opts.Metadata.ID.RunID[:])
 
 	method := http.MethodPost
@@ -76,15 +102,43 @@ func (d httpv2) sync(ctx context.Context, opts driver.V2RequestOpts) (*state.Dri
 		method = m
 	}
 
+	// Attempt to load the original HTTP request data from the triggering event.
+	var (
+		body        json.RawMessage
+		contentType = "application/json"
+	)
+	url := opts.URL
+
+	if evt := loadHTTPRequestEvent(ctx, sl, opts.Metadata.ID); evt != nil {
+		if len(evt.Data.Body) > 0 {
+			body = json.RawMessage(evt.Data.Body)
+		}
+		if evt.Data.ContentType != "" {
+			contentType = evt.Data.ContentType
+		}
+		if evt.Data.QueryParams != "" {
+			parsed, err := neturl.Parse(url)
+			if err == nil {
+				existing := parsed.RawQuery
+				if existing != "" {
+					parsed.RawQuery = existing + "&" + evt.Data.QueryParams
+				} else {
+					parsed.RawQuery = evt.Data.QueryParams
+				}
+				url = parsed.String()
+			}
+		}
+	}
+
 	req, err := exechttp.NewRequest(
 		method,
-		opts.URL,
-		nil,
+		url,
+		body,
 	)
 	if err != nil {
 		return nil, nil, errs.Wrap(0, true, "error creating request: %w", err)
 	}
-	req.Header.Add("Content-Type", "application/json")
+	req.Header.Add("Content-Type", contentType)
 	req.Header.Add("X-Inngest-Signature", sig)
 	req.Header.Add("X-Run-ID", opts.Metadata.ID.RunID.String())
 	req.Header.Add(headers.HeaderKeyRequestVersion, fmt.Sprintf("%d", opts.Metadata.Config.RequestVersion))
