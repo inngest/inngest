@@ -191,16 +191,7 @@ func (q *queue) ItemLeaseConstraintCheck(
 	hasPreviousLease := item.CapacityLease != nil
 	hasValidLease := hasPreviousLease && item.CapacityLease.LeaseID.Timestamp().After(now.Add(2*time.Second))
 
-	if hasPreviousLease && hasValidLease {
-		return osqueue.ItemLeaseConstraintCheckResult{
-			CapacityLease: item.CapacityLease,
-			// Skip any constraint checks and subsequent updates,
-			// as constraint state is maintained in the Constraint API.
-			SkipConstraintChecks: true,
-		}, nil
-	}
-
-	if hasPreviousLease && !hasValidLease {
+	if hasPreviousLease {
 		expiry := item.CapacityLease.LeaseID.Timestamp()
 		expired := expiry.Before(now)
 		ttl := item.CapacityLease.LeaseID.Timestamp().Sub(now)
@@ -209,9 +200,18 @@ func (q *queue) ItemLeaseConstraintCheck(
 			PkgName: pkgName,
 			Tags: map[string]any{
 				"expired": expired,
+				"kq":      item.RefilledAt != 0,
 			},
 		})
+	}
 
+	if hasPreviousLease && hasValidLease {
+		return osqueue.ItemLeaseConstraintCheckResult{
+			CapacityLease: item.CapacityLease,
+			// Skip any constraint checks and subsequent updates,
+			// as constraint state is maintained in the Constraint API.
+			SkipConstraintChecks: true,
+		}, nil
 	}
 
 	idempotencyKey := item.ID
