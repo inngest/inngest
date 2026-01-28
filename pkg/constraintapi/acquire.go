@@ -202,6 +202,8 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 		)
 	}
 
+	enableHighCardinalityInstrumentation := r.enableHighCardinalityInstrumentation != nil && r.enableHighCardinalityInstrumentation(ctx, req.AccountID, req.EnvID, req.FunctionID)
+
 	// Retrieve client and key prefix for current constraints
 	// NOTE: We will no longer need this once we move to a dedicated store for constraint state
 	keyPrefix, client, err := r.clientAndPrefix(req.Migration)
@@ -371,7 +373,7 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 	)
 
 	tags := make(map[string]any)
-	if r.enableHighCardinalityInstrumentation != nil && r.enableHighCardinalityInstrumentation(ctx, req.AccountID, req.EnvID, req.FunctionID) {
+	if enableHighCardinalityInstrumentation {
 		tags["function_id"] = req.FunctionID
 	}
 
@@ -397,10 +399,12 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 
 	switch parsedResponse.Status {
 	case 1, 3:
-		l.Trace(
-			"successful acquire call",
-			"leases", leases,
-		)
+		if enableHighCardinalityInstrumentation {
+			l.Debug(
+				"successful acquire call",
+				"leases", leases,
+			)
+		}
 
 		metrics.HistogramConstraintAPIRequestStateSize(ctx, int64(len(requestState)), metrics.HistogramOpt{
 			PkgName: pkgName,
