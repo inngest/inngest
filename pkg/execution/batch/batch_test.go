@@ -95,17 +95,35 @@ func TestBatchAppendIdempotence(t *testing.T) {
 		Version: 0,
 	}
 
+	// add event to a batch, batch is currently empty, should return status New
 	res, err := bm.Append(context.Background(), bi, function)
 	require.NoError(t, err)
 	require.NotEmpty(t, res.BatchID)
 	require.NotEmpty(t, res.BatchPointerKey)
 	require.Equal(t, enums.BatchNew, res.Status)
 
+	// add same event again to a batch, duplicate first event in a batch should also return status New
+	res, err = bm.Append(context.Background(), bi, function)
+	require.NoError(t, err)
+	require.NotEmpty(t, res.BatchID)
+	require.NotEmpty(t, res.BatchPointerKey)
+	require.Equal(t, enums.BatchNew, res.Status)
+
+	// add a second event to a batch, should be appended to the same batch
+	bi.EventID = ulid.MustNew(ulid.Now(), rand.Reader)
+	res, err = bm.Append(context.Background(), bi, function)
+	require.NoError(t, err)
+	require.NotEmpty(t, res.BatchID)
+	require.NotEmpty(t, res.BatchPointerKey)
+	require.Equal(t, enums.BatchAppend, res.Status)
+
+	// add the same second event to the same batch, should return BatchItemExists.
 	res, err = bm.Append(context.Background(), bi, function)
 	require.NoError(t, err)
 	require.NotEmpty(t, res.BatchID)
 	require.NotEmpty(t, res.BatchPointerKey)
 	require.Equal(t, enums.BatchItemExists, res.Status)
+
 }
 
 // When the same event is appended to different batches, we would end up processing the duplicate event a second time in the second batch.
