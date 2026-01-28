@@ -538,3 +538,14 @@ func HistogramConstraintAPILimitingConstraintCacheTTL(ctx context.Context, ttl t
 		Boundaries:  ConstraintAPIDurationBoundaries,
 	})
 }
+
+func HistogramConstraintAPIExpiredLeaseAge(ctx context.Context, ttl time.Duration, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, ttl.Milliseconds(), HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "constraintapi_expired_lease_age",
+		Description: "Distribution of expired lease age",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  ConstraintAPIDurationBoundaries,
+	})
+}

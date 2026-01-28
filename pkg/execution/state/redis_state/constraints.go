@@ -188,14 +188,30 @@ func (q *queue) ItemLeaseConstraintCheck(
 	}
 
 	// If capacity lease is still valid for the forseeable future, use it
-	hasValidCapacityLease := item.CapacityLease != nil && item.CapacityLease.LeaseID.Timestamp().After(now.Add(2*time.Second))
-	if hasValidCapacityLease {
+	hasPreviousLease := item.CapacityLease != nil
+	hasValidLease := hasPreviousLease && item.CapacityLease.LeaseID.Timestamp().After(now.Add(2*time.Second))
+
+	if hasPreviousLease && hasValidLease {
 		return osqueue.ItemLeaseConstraintCheckResult{
 			CapacityLease: item.CapacityLease,
 			// Skip any constraint checks and subsequent updates,
 			// as constraint state is maintained in the Constraint API.
 			SkipConstraintChecks: true,
 		}, nil
+	}
+
+	if hasPreviousLease && !hasValidLease {
+		expiry := item.CapacityLease.LeaseID.Timestamp()
+		expired := expiry.Before(now)
+		ttl := item.CapacityLease.LeaseID.Timestamp().Sub(now)
+
+		metrics.HistogramConstraintAPIExpiredLeaseAge(ctx, ttl, metrics.HistogramOpt{
+			PkgName: pkgName,
+			Tags: map[string]any{
+				"expired": expired,
+			},
+		})
+
 	}
 
 	idempotencyKey := item.ID
