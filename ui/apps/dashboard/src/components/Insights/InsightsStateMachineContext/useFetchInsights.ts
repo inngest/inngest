@@ -3,7 +3,11 @@ import { useClient } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { graphql } from '@/gql';
-import { InsightsColumnType, type InsightsResultsQuery } from '@/gql/graphql';
+import {
+  InsightsColumnType,
+  type InsightsResultsQuery,
+  type InsightsDiagnosticSeverity,
+} from '@/gql/graphql';
 import { UNTITLED_QUERY } from '../InsightsTabManager/constants';
 import type { InsightsFetchResult } from './types';
 
@@ -23,6 +27,15 @@ const insightResultsQuery = graphql(`
       }
       rows {
         values
+      }
+      diagnostics {
+        position {
+          start
+          end
+          context
+        }
+        severity
+        message
       }
     }
   }
@@ -106,6 +119,7 @@ function transformValuesByColumns(
 function transformInsightsResponse(
   insights: InsightsResultsQuery['insights'],
 ): InsightsFetchResult {
+  console.log(insights);
   return {
     columns: insights.columns.map((col) => ({
       name: col.name,
@@ -115,5 +129,24 @@ function transformInsightsResponse(
       id: `row-${index}`,
       values: transformValuesByColumns(row.values, insights.columns),
     })),
+    diagnostics:
+      insights.diagnostics?.map((diag) => {
+        if (!diag.position) {
+          return {
+            severity: diag.severity,
+            message: diag.message,
+          };
+        }
+
+        return {
+          position: {
+            start: diag.position.start,
+            end: diag.position.end,
+            context: diag.position.context,
+          },
+          severity: diag.severity,
+          message: diag.message,
+        };
+      }) ?? [],
   };
 }
