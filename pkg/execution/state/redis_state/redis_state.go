@@ -95,6 +95,12 @@ func readRedisScripts(path string, entries []fs.DirEntry) {
 	}
 }
 
+// GetScript returns a Lua script by name for testing purposes.
+// This is primarily used for Lua compatibility testing across different Redis implementations.
+func GetScript(name string) *rueidis.Lua {
+	return scripts[name]
+}
+
 type queueConfig struct{}
 
 func (c queueConfig) QueueName() string             { return "redis" }
@@ -1225,7 +1231,7 @@ func (m shardedMgr) consumePause(ctx context.Context, p *state.Pause, opts state
 		p.DataKey,
 		string(marshalledData),
 		opts.IdempotencyKey,
-		time.Now().Add(consts.FunctionIdempotencyPeriod).Unix(),
+		int64(consts.FunctionIdempotencyPeriod.Seconds()), // TTL in seconds for Garnet compatibility
 	})
 	if err != nil {
 		return state.ConsumePauseResult{}, err

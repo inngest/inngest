@@ -2,6 +2,8 @@ package state_store
 
 import (
 	"context"
+	"fmt"
+	"net"
 	"testing"
 	"time"
 
@@ -535,4 +537,1020 @@ func TestStateStoreLuaCompatibility(t *testing.T) {
 			t.Logf("   Primary goal achieved: metadata parsing works correctly with cjson compatibility")
 		}
 	})
+}
+
+// TestConsumePauseLuaCompatibility tests that the consumePause Lua script works correctly
+// across both Garnet and Valkey Redis-compatible servers.
+//
+// The consumePause script:
+// - KEYS[1]: actionKey - Hash storing step actions/outputs
+// - KEYS[2]: stackKey - List for execution stack
+// - KEYS[3]: keyMetadata - Hash storing run metadata
+// - KEYS[4]: keyStepsPending - Set of pending steps
+// - KEYS[5]: keyIdempotency - Key for idempotency checking
+//
+// - ARGV[1]: pauseDataKey - The pause identifier/key
+// - ARGV[2]: pauseDataVal - JSON-encoded pause data to store
+// - ARGV[3]: pauseIdempotencyValue - Idempotency token value
+// - ARGV[4]: pauseIdempotencyTTL - TTL of the idempotency key in seconds
+//
+// Returns:
+// -1: Pause already consumed (idempotency check failed)
+//
+//	0: Successfully consumed, no pending steps remain
+//	1: Successfully consumed, at least one pending step remains
+func TestConsumePauseLuaCompatibility(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping functional tests")
+	}
+
+	testCases := []StateStoreLuaCompatibilityTestCase{
+		{
+			Name:       "Valkey",
+			ServerType: "valkey",
+			ValkeyOpts: []helper.ValkeyOption{
+				helper.WithValkeyImage(testutil.ValkeyDefaultImage),
+			},
+		},
+		{
+			Name:       "Garnet",
+			ServerType: "garnet",
+			GarnetOpts: []helper.GarnetOption{
+				helper.WithImage(testutil.GarnetDefaultImage),
+				helper.WithConfiguration(&helper.GarnetConfiguration{
+					EnableLua: true,
+				}),
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.Name, func(t *testing.T) {
+			ctx := context.Background()
+
+			// Setup function that returns a Redis client for direct Lua script testing
+			setup := func(t *testing.T) rueidis.Client {
+				var client rueidis.Client
+
+				switch tc.ServerType {
+				case "valkey":
+					container, err := helper.StartValkey(t, tc.ValkeyOpts...)
+					require.NoError(t, err)
+					t.Cleanup(func() { _ = container.Terminate(ctx) })
+
+					client, err = helper.NewValkeyClient(container.Addr, container.Username, container.Password, false)
+					require.NoError(t, err)
+					t.Cleanup(func() { client.Close() })
+
+				case "garnet":
+					container, err := helper.StartGarnet(t, tc.GarnetOpts...)
+					require.NoError(t, err)
+					t.Cleanup(func() { _ = container.Terminate(ctx) })
+
+					// Use ForceSingleClient to avoid cluster redirect issues with Docker networking
+					client, err = rueidis.NewClient(rueidis.ClientOption{
+						InitAddress:       []string{container.Addr},
+						Username:          container.Username,
+						Password:          container.Password,
+						SelectDB:          0,
+						DisableCache:      true, // Garnet doesn't support client-side caching
+						ForceSingleClient: true, // Prevent cluster redirects to internal Docker IPs
+						Dialer: net.Dialer{
+							Timeout: 30 * time.Second,
+						},
+						ConnWriteTimeout: 30 * time.Second,
+					})
+					require.NoError(t, err)
+					t.Cleanup(func() { client.Close() })
+
+				default:
+					t.Fatalf("unknown server type: %s", tc.ServerType)
+				}
+
+				return client
+			}
+
+			// Helper to run the consumePause script using rueidis.Lua
+			runConsumePause := func(t *testing.T, rc rueidis.Client, keys []string, args []string) int64 {
+				script := redis_state.GetScript("consumePause")
+				require.NotNil(t, script, "consumePause script should exist")
+
+				val, err := script.Exec(ctx, rc, keys, args).AsInt64()
+				require.NoError(t, err)
+				return val
+			}
+
+			t.Run("consume pause with no pending steps returns 0", func(t *testing.T) {
+				rc := setup(t)
+
+				// Use hash tags {t1} to ensure all keys go to the same slot (required for cluster mode)
+				actionKey := "{t1}:actions"
+				stackKey := "{t1}:stack"
+				metadataKey := "{t1}:metadata"
+				pendingKey := "{t1}:pending"
+				idempotencyKey := "{t1}:idempotency"
+
+				pauseDataKey := "step-1"
+				pauseDataVal := `{"result":"success"}`
+				idempotencyValue := "idem-123"
+				idempotencyTTL := "3600" // TTL in seconds (1 hour)
+
+				keys := []string{actionKey, stackKey, metadataKey, pendingKey, idempotencyKey}
+				args := []string{pauseDataKey, pauseDataVal, idempotencyValue, idempotencyTTL}
+
+				result := runConsumePause(t, rc, keys, args)
+				require.Equal(t, int64(0), result, "should return 0 when no pending steps remain")
+
+				// Verify data was stored correctly
+				actionVal, err := rc.Do(ctx, rc.B().Hget().Key(actionKey).Field(pauseDataKey).Build()).ToString()
+				require.NoError(t, err)
+				require.Equal(t, pauseDataVal, actionVal)
+
+				// Verify stack was updated
+				stackVals, err := rc.Do(ctx, rc.B().Lrange().Key(stackKey).Start(0).Stop(-1).Build()).AsStrSlice()
+				require.NoError(t, err)
+				require.Equal(t, []string{pauseDataKey}, stackVals)
+
+				// Verify metadata was incremented
+				stepCount, err := rc.Do(ctx, rc.B().Hget().Key(metadataKey).Field("step_count").Build()).ToString()
+				require.NoError(t, err)
+				require.Equal(t, "1", stepCount)
+
+				stateSize, err := rc.Do(ctx, rc.B().Hget().Key(metadataKey).Field("state_size").Build()).ToString()
+				require.NoError(t, err)
+				require.Equal(t, fmt.Sprintf("%d", len(pauseDataVal)), stateSize)
+
+				// Verify idempotency key was set
+				idemVal, err := rc.Do(ctx, rc.B().Get().Key(idempotencyKey).Build()).ToString()
+				require.NoError(t, err)
+				require.Equal(t, idempotencyValue, idemVal)
+			})
+
+			t.Run("consume pause with pending steps returns 1", func(t *testing.T) {
+				rc := setup(t)
+
+				// Use hash tags {t2} to ensure all keys go to the same slot (required for cluster mode)
+				actionKey := "{t2}:actions"
+				stackKey := "{t2}:stack"
+				metadataKey := "{t2}:metadata"
+				pendingKey := "{t2}:pending"
+				idempotencyKey := "{t2}:idempotency"
+
+				// Pre-populate pending steps
+				_, err := rc.Do(ctx, rc.B().Sadd().Key(pendingKey).Member("step-1", "step-2", "step-3").Build()).AsInt64()
+				require.NoError(t, err)
+
+				pauseDataKey := "step-1"
+				pauseDataVal := `{"result":"success"}`
+				idempotencyValue := "idem-456"
+				idempotencyTTL := "3600" // TTL in seconds (1 hour)
+
+				keys := []string{actionKey, stackKey, metadataKey, pendingKey, idempotencyKey}
+				args := []string{pauseDataKey, pauseDataVal, idempotencyValue, idempotencyTTL}
+
+				result := runConsumePause(t, rc, keys, args)
+				require.Equal(t, int64(1), result, "should return 1 when pending steps remain")
+
+				// Verify step was removed from pending
+				members, err := rc.Do(ctx, rc.B().Smembers().Key(pendingKey).Build()).AsStrSlice()
+				require.NoError(t, err)
+				require.ElementsMatch(t, []string{"step-2", "step-3"}, members)
+			})
+
+			t.Run("returns -1 when pause data already exists in actions hash", func(t *testing.T) {
+				rc := setup(t)
+
+				// Use hash tags {t3} to ensure all keys go to the same slot (required for cluster mode)
+				actionKey := "{t3}:actions"
+				stackKey := "{t3}:stack"
+				metadataKey := "{t3}:metadata"
+				pendingKey := "{t3}:pending"
+				idempotencyKey := "{t3}:idempotency"
+
+				pauseDataKey := "step-1"
+				pauseDataVal := `{"result":"success"}`
+				idempotencyValue := "idem-789"
+				idempotencyTTL := "3600" // TTL in seconds (1 hour)
+
+				// Pre-populate the action hash with the pause data key
+				_, err := rc.Do(ctx, rc.B().Hset().Key(actionKey).FieldValue().FieldValue(pauseDataKey, `{"old":"data"}`).Build()).AsInt64()
+				require.NoError(t, err)
+
+				keys := []string{actionKey, stackKey, metadataKey, pendingKey, idempotencyKey}
+				args := []string{pauseDataKey, pauseDataVal, idempotencyValue, idempotencyTTL}
+
+				result := runConsumePause(t, rc, keys, args)
+				require.Equal(t, int64(-1), result, "should return -1 when pause already exists")
+
+				// Verify old data was not overwritten
+				actionVal, err := rc.Do(ctx, rc.B().Hget().Key(actionKey).Field(pauseDataKey).Build()).ToString()
+				require.NoError(t, err)
+				require.Equal(t, `{"old":"data"}`, actionVal)
+			})
+
+			t.Run("returns -1 when different idempotency value already exists", func(t *testing.T) {
+				rc := setup(t)
+
+				// Use hash tags {t4} to ensure all keys go to the same slot (required for cluster mode)
+				actionKey := "{t4}:actions"
+				stackKey := "{t4}:stack"
+				metadataKey := "{t4}:metadata"
+				pendingKey := "{t4}:pending"
+				idempotencyKey := "{t4}:idempotency"
+
+				pauseDataKey := "step-1"
+				pauseDataVal := `{"result":"success"}`
+				idempotencyValue := "idem-new"
+				idempotencyTTL := "3600" // TTL in seconds (1 hour)
+
+				// Pre-set idempotency key with different value
+				err := rc.Do(ctx, rc.B().Set().Key(idempotencyKey).Value("idem-different").Build()).Error()
+				require.NoError(t, err)
+
+				keys := []string{actionKey, stackKey, metadataKey, pendingKey, idempotencyKey}
+				args := []string{pauseDataKey, pauseDataVal, idempotencyValue, idempotencyTTL}
+
+				result := runConsumePause(t, rc, keys, args)
+				require.Equal(t, int64(-1), result, "should return -1 when idempotency check fails")
+
+				// Verify idempotency key was not changed
+				idemVal, err := rc.Do(ctx, rc.B().Get().Key(idempotencyKey).Build()).ToString()
+				require.NoError(t, err)
+				require.Equal(t, "idem-different", idemVal)
+
+				// Verify action was not set
+				exists, err := rc.Do(ctx, rc.B().Hexists().Key(actionKey).Field(pauseDataKey).Build()).AsBool()
+				require.NoError(t, err)
+				require.False(t, exists)
+			})
+
+			t.Run("allows retry with same idempotency value", func(t *testing.T) {
+				rc := setup(t)
+
+				// Use hash tags {t5} to ensure all keys go to the same slot (required for cluster mode)
+				actionKey := "{t5}:actions"
+				stackKey := "{t5}:stack"
+				metadataKey := "{t5}:metadata"
+				pendingKey := "{t5}:pending"
+				idempotencyKey := "{t5}:idempotency"
+
+				pauseDataKey := "step-1"
+				pauseDataVal := `{"result":"success"}`
+				idempotencyValue := "idem-same"
+				idempotencyTTL := "3600" // TTL in seconds (1 hour)
+
+				// Pre-set idempotency key with same value (simulating retry)
+				err := rc.Do(ctx, rc.B().Set().Key(idempotencyKey).Value(idempotencyValue).Build()).Error()
+				require.NoError(t, err)
+
+				keys := []string{actionKey, stackKey, metadataKey, pendingKey, idempotencyKey}
+				args := []string{pauseDataKey, pauseDataVal, idempotencyValue, idempotencyTTL}
+
+				result := runConsumePause(t, rc, keys, args)
+				// Should succeed because idempotency value matches
+				require.Equal(t, int64(0), result, "should return 0 when idempotency value matches (retry)")
+			})
+
+			t.Run("correctly tracks multiple consume operations", func(t *testing.T) {
+				rc := setup(t)
+
+				// Use hash tags {t6} to ensure all keys go to the same slot (required for cluster mode)
+				actionKey := "{t6}:actions"
+				stackKey := "{t6}:stack"
+				metadataKey := "{t6}:metadata"
+				pendingKey := "{t6}:pending"
+
+				// Pre-populate pending steps
+				_, err := rc.Do(ctx, rc.B().Sadd().Key(pendingKey).Member("step-1", "step-2", "step-3").Build()).AsInt64()
+				require.NoError(t, err)
+
+				ttl := "3600" // TTL in seconds (1 hour)
+
+				// Consume first step
+				keys1 := []string{actionKey, stackKey, metadataKey, pendingKey, "{t6}:idem:1"}
+				args1 := []string{"step-1", `{"step":1}`, "idem-1", ttl}
+				result1 := runConsumePause(t, rc, keys1, args1)
+				require.Equal(t, int64(1), result1, "should return 1 after first consume (pending steps remain)")
+
+				// Consume second step
+				keys2 := []string{actionKey, stackKey, metadataKey, pendingKey, "{t6}:idem:2"}
+				args2 := []string{"step-2", `{"step":2}`, "idem-2", ttl}
+				result2 := runConsumePause(t, rc, keys2, args2)
+				require.Equal(t, int64(1), result2, "should return 1 after second consume (pending steps remain)")
+
+				// Consume third (last) step
+				keys3 := []string{actionKey, stackKey, metadataKey, pendingKey, "{t6}:idem:3"}
+				args3 := []string{"step-3", `{"step":3}`, "idem-3", ttl}
+				result3 := runConsumePause(t, rc, keys3, args3)
+				require.Equal(t, int64(0), result3, "should return 0 after final consume (no pending steps)")
+
+				// Verify all steps are in the action hash
+				exists1, err := rc.Do(ctx, rc.B().Hexists().Key(actionKey).Field("step-1").Build()).AsBool()
+				require.NoError(t, err)
+				require.True(t, exists1)
+
+				exists2, err := rc.Do(ctx, rc.B().Hexists().Key(actionKey).Field("step-2").Build()).AsBool()
+				require.NoError(t, err)
+				require.True(t, exists2)
+
+				exists3, err := rc.Do(ctx, rc.B().Hexists().Key(actionKey).Field("step-3").Build()).AsBool()
+				require.NoError(t, err)
+				require.True(t, exists3)
+
+				// Verify stack order
+				stackVals, err := rc.Do(ctx, rc.B().Lrange().Key(stackKey).Start(0).Stop(-1).Build()).AsStrSlice()
+				require.NoError(t, err)
+				require.Equal(t, []string{"step-1", "step-2", "step-3"}, stackVals)
+
+				// Verify metadata
+				stepCount, err := rc.Do(ctx, rc.B().Hget().Key(metadataKey).Field("step_count").Build()).ToString()
+				require.NoError(t, err)
+				require.Equal(t, "3", stepCount)
+
+				// Verify pending set is empty
+				members, err := rc.Do(ctx, rc.B().Smembers().Key(pendingKey).Build()).AsStrSlice()
+				require.NoError(t, err)
+				require.Empty(t, members)
+			})
+
+			t.Run("handles empty pauseDataKey gracefully", func(t *testing.T) {
+				rc := setup(t)
+
+				// Use hash tags {t7} to ensure all keys go to the same slot (required for cluster mode)
+				actionKey := "{t7}:actions"
+				stackKey := "{t7}:stack"
+				metadataKey := "{t7}:metadata"
+				pendingKey := "{t7}:pending"
+				idempotencyKey := "{t7}:idempotency"
+
+				// Empty pauseDataKey should skip the main logic
+				pauseDataKey := ""
+				pauseDataVal := `{"result":"success"}`
+				idempotencyValue := "idem-empty"
+				idempotencyTTL := "3600" // TTL in seconds (1 hour)
+
+				keys := []string{actionKey, stackKey, metadataKey, pendingKey, idempotencyKey}
+				args := []string{pauseDataKey, pauseDataVal, idempotencyValue, idempotencyTTL}
+
+				result := runConsumePause(t, rc, keys, args)
+				// With empty pauseDataKey, should return 0 (no pending steps since SCARD returns 0)
+				require.Equal(t, int64(0), result)
+			})
+		})
+	}
+}
+
+// TestLeasePauseLuaCompatibility tests that the leasePause Lua script works correctly
+// across both Garnet and Valkey Redis-compatible servers.
+//
+// The leasePause script:
+// - KEYS[1]: leaseID - The key to store the lease
+// - ARGV[1]: currentTime - Current time in milliseconds
+// - ARGV[2]: leaseTTL - Lease TTL in seconds
+//
+// Returns:
+//
+//	0: Successfully leased
+//	1: Already leased (lease is still valid)
+func TestLeasePauseLuaCompatibility(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping functional tests")
+	}
+
+	testCases := []StateStoreLuaCompatibilityTestCase{
+		{
+			Name:       "Valkey",
+			ServerType: "valkey",
+			ValkeyOpts: []helper.ValkeyOption{
+				helper.WithValkeyImage(testutil.ValkeyDefaultImage),
+			},
+		},
+		{
+			Name:       "Garnet",
+			ServerType: "garnet",
+			GarnetOpts: []helper.GarnetOption{
+				helper.WithImage(testutil.GarnetDefaultImage),
+				helper.WithConfiguration(&helper.GarnetConfiguration{
+					EnableLua: true,
+				}),
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.Name, func(t *testing.T) {
+			ctx := context.Background()
+
+			setup := func(t *testing.T) rueidis.Client {
+				var client rueidis.Client
+
+				switch tc.ServerType {
+				case "valkey":
+					container, err := helper.StartValkey(t, tc.ValkeyOpts...)
+					require.NoError(t, err)
+					t.Cleanup(func() { _ = container.Terminate(ctx) })
+
+					client, err = helper.NewValkeyClient(container.Addr, container.Username, container.Password, false)
+					require.NoError(t, err)
+					t.Cleanup(func() { client.Close() })
+
+				case "garnet":
+					container, err := helper.StartGarnet(t, tc.GarnetOpts...)
+					require.NoError(t, err)
+					t.Cleanup(func() { _ = container.Terminate(ctx) })
+
+					client, err = rueidis.NewClient(rueidis.ClientOption{
+						InitAddress:       []string{container.Addr},
+						Username:          container.Username,
+						Password:          container.Password,
+						SelectDB:          0,
+						DisableCache:      true,
+						ForceSingleClient: true,
+						Dialer: net.Dialer{
+							Timeout: 30 * time.Second,
+						},
+						ConnWriteTimeout: 30 * time.Second,
+					})
+					require.NoError(t, err)
+					t.Cleanup(func() { client.Close() })
+
+				default:
+					t.Fatalf("unknown server type: %s", tc.ServerType)
+				}
+
+				return client
+			}
+
+			runLeasePause := func(t *testing.T, rc rueidis.Client, keys []string, args []string) int64 {
+				script := redis_state.GetScript("leasePause")
+				require.NotNil(t, script, "leasePause script should exist")
+
+				val, err := script.Exec(ctx, rc, keys, args).AsInt64()
+				require.NoError(t, err)
+				return val
+			}
+
+			t.Run("successfully leases when no existing lease", func(t *testing.T) {
+				rc := setup(t)
+
+				leaseKey := "{lp1}:lease"
+				currentTimeMS := fmt.Sprintf("%d", time.Now().UnixMilli())
+				leaseTTL := "60" // 60 seconds
+
+				keys := []string{leaseKey}
+				args := []string{currentTimeMS, leaseTTL}
+
+				result := runLeasePause(t, rc, keys, args)
+				require.Equal(t, int64(0), result, "should return 0 when successfully leased")
+
+				// Verify lease was set
+				exists, err := rc.Do(ctx, rc.B().Exists().Key(leaseKey).Build()).AsInt64()
+				require.NoError(t, err)
+				require.Equal(t, int64(1), exists, "lease key should exist")
+			})
+
+			t.Run("returns 1 when lease is still valid", func(t *testing.T) {
+				rc := setup(t)
+
+				leaseKey := "{lp2}:lease"
+				currentTimeMS := time.Now().UnixMilli()
+				leaseTTL := "60" // 60 seconds
+
+				// First lease
+				keys := []string{leaseKey}
+				args := []string{fmt.Sprintf("%d", currentTimeMS), leaseTTL}
+				result1 := runLeasePause(t, rc, keys, args)
+				require.Equal(t, int64(0), result1, "first lease should succeed")
+
+				// Try to lease again immediately (lease should still be valid)
+				result2 := runLeasePause(t, rc, keys, args)
+				require.Equal(t, int64(1), result2, "should return 1 when lease is still valid")
+			})
+
+			t.Run("allows re-lease when lease has expired", func(t *testing.T) {
+				rc := setup(t)
+
+				leaseKey := "{lp3}:lease"
+				leaseTTL := "60" // 60 seconds
+
+				// Set a lease that has already expired (currentTime in the past)
+				pastTimeMS := time.Now().Add(-2 * time.Hour).UnixMilli()
+				keys := []string{leaseKey}
+				args := []string{fmt.Sprintf("%d", pastTimeMS), leaseTTL}
+				result1 := runLeasePause(t, rc, keys, args)
+				require.Equal(t, int64(0), result1, "first lease should succeed")
+
+				// Now try to lease with current time - should succeed because old lease expired
+				currentTimeMS := time.Now().UnixMilli()
+				args2 := []string{fmt.Sprintf("%d", currentTimeMS), leaseTTL}
+				result2 := runLeasePause(t, rc, keys, args2)
+				require.Equal(t, int64(0), result2, "should return 0 when old lease has expired")
+			})
+		})
+	}
+}
+
+// TestSavePauseLuaCompatibility tests that the savePause Lua script works correctly
+// across both Garnet and Valkey Redis-compatible servers.
+//
+// The savePause script:
+// - KEYS[1]: pauseKey - Main pause data key
+// - KEYS[2]: pauseEvtKey - Event index key
+// - KEYS[3]: pauseInvokeKey - Invoke correlation index
+// - KEYS[4]: pauseSignalKey - Signal correlation index
+// - KEYS[5]: keyPauseAddIdx - Sorted set for pause add timestamps
+// - KEYS[6]: keyPauseExpIdx - Sorted set for pause expiration timestamps
+// - KEYS[7]: keyRunPauses - Set of pauses for this run
+// - KEYS[8]: keyPausesIdx - Global pause index
+//
+// Returns:
+//
+//	[1..N]: Successfully saved pause; returns # of pauses in AddIdx
+//	-1: Pause already exists
+func TestSavePauseLuaCompatibility(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping functional tests")
+	}
+
+	testCases := []StateStoreLuaCompatibilityTestCase{
+		{
+			Name:       "Valkey",
+			ServerType: "valkey",
+			ValkeyOpts: []helper.ValkeyOption{
+				helper.WithValkeyImage(testutil.ValkeyDefaultImage),
+			},
+		},
+		{
+			Name:       "Garnet",
+			ServerType: "garnet",
+			GarnetOpts: []helper.GarnetOption{
+				helper.WithImage(testutil.GarnetDefaultImage),
+				helper.WithConfiguration(&helper.GarnetConfiguration{
+					EnableLua: true,
+				}),
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.Name, func(t *testing.T) {
+			ctx := context.Background()
+
+			setup := func(t *testing.T) rueidis.Client {
+				var client rueidis.Client
+
+				switch tc.ServerType {
+				case "valkey":
+					container, err := helper.StartValkey(t, tc.ValkeyOpts...)
+					require.NoError(t, err)
+					t.Cleanup(func() { _ = container.Terminate(ctx) })
+
+					client, err = helper.NewValkeyClient(container.Addr, container.Username, container.Password, false)
+					require.NoError(t, err)
+					t.Cleanup(func() { client.Close() })
+
+				case "garnet":
+					container, err := helper.StartGarnet(t, tc.GarnetOpts...)
+					require.NoError(t, err)
+					t.Cleanup(func() { _ = container.Terminate(ctx) })
+
+					client, err = rueidis.NewClient(rueidis.ClientOption{
+						InitAddress:       []string{container.Addr},
+						Username:          container.Username,
+						Password:          container.Password,
+						SelectDB:          0,
+						DisableCache:      true,
+						ForceSingleClient: true,
+						Dialer: net.Dialer{
+							Timeout: 30 * time.Second,
+						},
+						ConnWriteTimeout: 30 * time.Second,
+					})
+					require.NoError(t, err)
+					t.Cleanup(func() { client.Close() })
+
+				default:
+					t.Fatalf("unknown server type: %s", tc.ServerType)
+				}
+
+				return client
+			}
+
+			runSavePause := func(t *testing.T, rc rueidis.Client, keys []string, args []string) (int64, error) {
+				script := redis_state.GetScript("savePause")
+				require.NotNil(t, script, "savePause script should exist")
+
+				return script.Exec(ctx, rc, keys, args).AsInt64()
+			}
+
+			t.Run("successfully saves new pause", func(t *testing.T) {
+				rc := setup(t)
+
+				// All keys need same hash tag for cluster mode
+				keys := []string{
+					"{sp1}:pause",
+					"{sp1}:evt",
+					"{sp1}:invoke",
+					"{sp1}:signal",
+					"{sp1}:addIdx",
+					"{sp1}:expIdx",
+					"{sp1}:runPauses",
+					"{sp1}:pausesIdx",
+				}
+				pauseData := `{"id":"pause-1","data":"test"}`
+				pauseID := "pause-1"
+				event := "test/event"
+				invokeCorrelationID := ""
+				signalCorrelationID := ""
+				extendedExpiry := "3600"
+				nowUnixSeconds := fmt.Sprintf("%d", time.Now().Unix())
+				canReplaceSignal := "0"
+
+				args := []string{pauseData, pauseID, event, invokeCorrelationID, signalCorrelationID, extendedExpiry, nowUnixSeconds, canReplaceSignal}
+
+				result, err := runSavePause(t, rc, keys, args)
+				require.NoError(t, err)
+				require.Equal(t, int64(1), result, "should return 1 (count of pauses in AddIdx)")
+
+				// Verify pause was saved
+				savedPause, err := rc.Do(ctx, rc.B().Get().Key("{sp1}:pause").Build()).ToString()
+				require.NoError(t, err)
+				require.Equal(t, pauseData, savedPause)
+
+				// Verify event index was populated
+				eventPause, err := rc.Do(ctx, rc.B().Hget().Key("{sp1}:evt").Field(pauseID).Build()).ToString()
+				require.NoError(t, err)
+				require.Equal(t, pauseData, eventPause)
+
+				// Verify global index
+				isMember, err := rc.Do(ctx, rc.B().Sismember().Key("{sp1}:pausesIdx").Member(pauseID).Build()).AsBool()
+				require.NoError(t, err)
+				require.True(t, isMember)
+			})
+
+			t.Run("returns -1 when pause already exists", func(t *testing.T) {
+				rc := setup(t)
+
+				keys := []string{
+					"{sp2}:pause",
+					"{sp2}:evt",
+					"{sp2}:invoke",
+					"{sp2}:signal",
+					"{sp2}:addIdx",
+					"{sp2}:expIdx",
+					"{sp2}:runPauses",
+					"{sp2}:pausesIdx",
+				}
+				pauseData := `{"id":"pause-2","data":"test"}`
+				pauseID := "pause-2"
+				event := "test/event"
+				nowUnixSeconds := fmt.Sprintf("%d", time.Now().Unix())
+				args := []string{pauseData, pauseID, event, "", "", "3600", nowUnixSeconds, "0"}
+
+				// First save should succeed
+				result1, err := runSavePause(t, rc, keys, args)
+				require.NoError(t, err)
+				require.Equal(t, int64(1), result1)
+
+				// Second save should return -1
+				result2, err := runSavePause(t, rc, keys, args)
+				require.NoError(t, err)
+				require.Equal(t, int64(-1), result2, "should return -1 when pause already exists")
+			})
+
+			t.Run("saves pause with invoke correlation ID", func(t *testing.T) {
+				rc := setup(t)
+
+				keys := []string{
+					"{sp3}:pause",
+					"{sp3}:evt",
+					"{sp3}:invoke",
+					"{sp3}:signal",
+					"{sp3}:addIdx",
+					"{sp3}:expIdx",
+					"{sp3}:runPauses",
+					"{sp3}:pausesIdx",
+				}
+				pauseData := `{"id":"pause-3","data":"test"}`
+				pauseID := "pause-3"
+				event := ""
+				invokeCorrelationID := "invoke-correlation-123"
+				nowUnixSeconds := fmt.Sprintf("%d", time.Now().Unix())
+				args := []string{pauseData, pauseID, event, invokeCorrelationID, "", "3600", nowUnixSeconds, "0"}
+
+				result, err := runSavePause(t, rc, keys, args)
+				require.NoError(t, err)
+				require.Equal(t, int64(1), result)
+
+				// Verify invoke correlation was set
+				invokeVal, err := rc.Do(ctx, rc.B().Hget().Key("{sp3}:invoke").Field(invokeCorrelationID).Build()).ToString()
+				require.NoError(t, err)
+				require.Equal(t, pauseID, invokeVal)
+			})
+
+			t.Run("saves pause with signal correlation ID", func(t *testing.T) {
+				rc := setup(t)
+
+				keys := []string{
+					"{sp4}:pause",
+					"{sp4}:evt",
+					"{sp4}:invoke",
+					"{sp4}:signal",
+					"{sp4}:addIdx",
+					"{sp4}:expIdx",
+					"{sp4}:runPauses",
+					"{sp4}:pausesIdx",
+				}
+				pauseData := `{"id":"pause-4","data":"test"}`
+				pauseID := "pause-4"
+				signalCorrelationID := "signal-correlation-456"
+				nowUnixSeconds := fmt.Sprintf("%d", time.Now().Unix())
+				args := []string{pauseData, pauseID, "", "", signalCorrelationID, "3600", nowUnixSeconds, "0"}
+
+				result, err := runSavePause(t, rc, keys, args)
+				require.NoError(t, err)
+				require.Equal(t, int64(1), result)
+
+				// Verify signal correlation was set
+				signalVal, err := rc.Do(ctx, rc.B().Hget().Key("{sp4}:signal").Field(signalCorrelationID).Build()).ToString()
+				require.NoError(t, err)
+				require.Equal(t, pauseID, signalVal)
+			})
+		})
+	}
+}
+
+// TestDeletePauseLuaCompatibility tests that the deletePause Lua script works correctly
+// across both Garnet and Valkey Redis-compatible servers.
+//
+// The deletePause script:
+// - KEYS[1]: pauseKey - Main pause data key
+// - KEYS[2]: pauseEventKey - Event index key
+// - KEYS[3]: pauseInvokeKey - Invoke correlation index
+// - KEYS[4]: pauseSignalKey - Signal correlation index
+// - KEYS[5]: keyPauseAddIdx - Sorted set for pause add timestamps
+// - KEYS[6]: keyPauseExpIdx - Sorted set for pause expiration timestamps
+// - KEYS[7]: keyRunPauses - Set of pauses for this run
+// - KEYS[8]: keyPausesIdx - Global pause index
+// - KEYS[9]: keyPausesBlockIdx - Block index key
+//
+// Returns:
+//
+//	0: Successfully deleted
+//	1: Pause not in buffer (race condition)
+func TestDeletePauseLuaCompatibility(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping functional tests")
+	}
+
+	testCases := []StateStoreLuaCompatibilityTestCase{
+		{
+			Name:       "Valkey",
+			ServerType: "valkey",
+			ValkeyOpts: []helper.ValkeyOption{
+				helper.WithValkeyImage(testutil.ValkeyDefaultImage),
+			},
+		},
+		{
+			Name:       "Garnet",
+			ServerType: "garnet",
+			GarnetOpts: []helper.GarnetOption{
+				helper.WithImage(testutil.GarnetDefaultImage),
+				helper.WithConfiguration(&helper.GarnetConfiguration{
+					EnableLua: true,
+				}),
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.Name, func(t *testing.T) {
+			ctx := context.Background()
+
+			setup := func(t *testing.T) rueidis.Client {
+				var client rueidis.Client
+
+				switch tc.ServerType {
+				case "valkey":
+					container, err := helper.StartValkey(t, tc.ValkeyOpts...)
+					require.NoError(t, err)
+					t.Cleanup(func() { _ = container.Terminate(ctx) })
+
+					client, err = helper.NewValkeyClient(container.Addr, container.Username, container.Password, false)
+					require.NoError(t, err)
+					t.Cleanup(func() { client.Close() })
+
+				case "garnet":
+					container, err := helper.StartGarnet(t, tc.GarnetOpts...)
+					require.NoError(t, err)
+					t.Cleanup(func() { _ = container.Terminate(ctx) })
+
+					client, err = rueidis.NewClient(rueidis.ClientOption{
+						InitAddress:       []string{container.Addr},
+						Username:          container.Username,
+						Password:          container.Password,
+						SelectDB:          0,
+						DisableCache:      true,
+						ForceSingleClient: true,
+						Dialer: net.Dialer{
+							Timeout: 30 * time.Second,
+						},
+						ConnWriteTimeout: 30 * time.Second,
+					})
+					require.NoError(t, err)
+					t.Cleanup(func() { client.Close() })
+
+				default:
+					t.Fatalf("unknown server type: %s", tc.ServerType)
+				}
+
+				return client
+			}
+
+			runDeletePause := func(t *testing.T, rc rueidis.Client, keys []string, args []string) int64 {
+				script := redis_state.GetScript("deletePause")
+				require.NotNil(t, script, "deletePause script should exist")
+
+				val, err := script.Exec(ctx, rc, keys, args).AsInt64()
+				require.NoError(t, err)
+				return val
+			}
+
+			t.Run("successfully deletes existing pause", func(t *testing.T) {
+				rc := setup(t)
+
+				pauseID := "pause-del-1"
+				pauseData := `{"id":"pause-del-1","data":"test"}`
+
+				// Pre-populate pause data
+				err := rc.Do(ctx, rc.B().Set().Key("{dp1}:pause").Value(pauseData).Build()).Error()
+				require.NoError(t, err)
+				_, err = rc.Do(ctx, rc.B().Hset().Key("{dp1}:evt").FieldValue().FieldValue(pauseID, pauseData).Build()).AsInt64()
+				require.NoError(t, err)
+				_, err = rc.Do(ctx, rc.B().Sadd().Key("{dp1}:pausesIdx").Member(pauseID).Build()).AsInt64()
+				require.NoError(t, err)
+				_, err = rc.Do(ctx, rc.B().Sadd().Key("{dp1}:runPauses").Member(pauseID).Build()).AsInt64()
+				require.NoError(t, err)
+				_, err = rc.Do(ctx, rc.B().Zadd().Key("{dp1}:addIdx").ScoreMember().ScoreMember(float64(time.Now().Unix()), pauseID).Build()).AsInt64()
+				require.NoError(t, err)
+				_, err = rc.Do(ctx, rc.B().Zadd().Key("{dp1}:expIdx").ScoreMember().ScoreMember(float64(time.Now().Add(time.Hour).Unix()), pauseID).Build()).AsInt64()
+				require.NoError(t, err)
+
+				keys := []string{
+					"{dp1}:pause",
+					"{dp1}:evt",
+					"{dp1}:invoke",
+					"{dp1}:signal",
+					"{dp1}:addIdx",
+					"{dp1}:expIdx",
+					"{dp1}:runPauses",
+					"{dp1}:pausesIdx",
+					"{dp1}:blockIdx",
+				}
+				args := []string{pauseID, "", "", ""} // pauseID, invokeCorrelationId, signalCorrelationId, blockIdxValue
+
+				result := runDeletePause(t, rc, keys, args)
+				require.Equal(t, int64(0), result, "should return 0 when successfully deleted")
+
+				// Verify pause was deleted
+				exists, err := rc.Do(ctx, rc.B().Exists().Key("{dp1}:pause").Build()).AsInt64()
+				require.NoError(t, err)
+				require.Equal(t, int64(0), exists, "pause key should be deleted")
+
+				// Verify removed from global index
+				isMember, err := rc.Do(ctx, rc.B().Sismember().Key("{dp1}:pausesIdx").Member(pauseID).Build()).AsBool()
+				require.NoError(t, err)
+				require.False(t, isMember, "should be removed from global index")
+			})
+
+			t.Run("deletes pause with invoke correlation", func(t *testing.T) {
+				rc := setup(t)
+
+				pauseID := "pause-del-2"
+				pauseData := `{"id":"pause-del-2","data":"test"}`
+				invokeCorrelationID := "invoke-del-123"
+
+				// Pre-populate
+				err := rc.Do(ctx, rc.B().Set().Key("{dp2}:pause").Value(pauseData).Build()).Error()
+				require.NoError(t, err)
+				_, err = rc.Do(ctx, rc.B().Hset().Key("{dp2}:invoke").FieldValue().FieldValue(invokeCorrelationID, pauseID).Build()).AsInt64()
+				require.NoError(t, err)
+
+				keys := []string{
+					"{dp2}:pause",
+					"{dp2}:evt",
+					"{dp2}:invoke",
+					"{dp2}:signal",
+					"{dp2}:addIdx",
+					"{dp2}:expIdx",
+					"{dp2}:runPauses",
+					"{dp2}:pausesIdx",
+					"{dp2}:blockIdx",
+				}
+				args := []string{pauseID, invokeCorrelationID, "", ""}
+
+				result := runDeletePause(t, rc, keys, args)
+				require.Equal(t, int64(0), result)
+
+				// Verify invoke correlation was deleted
+				exists, err := rc.Do(ctx, rc.B().Hexists().Key("{dp2}:invoke").Field(invokeCorrelationID).Build()).AsBool()
+				require.NoError(t, err)
+				require.False(t, exists, "invoke correlation should be deleted")
+			})
+
+			t.Run("deletes pause with signal correlation only if it matches", func(t *testing.T) {
+				rc := setup(t)
+
+				pauseID := "pause-del-3"
+				pauseData := `{"id":"pause-del-3","data":"test"}`
+				signalCorrelationID := "signal-del-456"
+
+				// Pre-populate with matching signal
+				err := rc.Do(ctx, rc.B().Set().Key("{dp3}:pause").Value(pauseData).Build()).Error()
+				require.NoError(t, err)
+				_, err = rc.Do(ctx, rc.B().Hset().Key("{dp3}:signal").FieldValue().FieldValue(signalCorrelationID, pauseID).Build()).AsInt64()
+				require.NoError(t, err)
+
+				keys := []string{
+					"{dp3}:pause",
+					"{dp3}:evt",
+					"{dp3}:invoke",
+					"{dp3}:signal",
+					"{dp3}:addIdx",
+					"{dp3}:expIdx",
+					"{dp3}:runPauses",
+					"{dp3}:pausesIdx",
+					"{dp3}:blockIdx",
+				}
+				args := []string{pauseID, "", signalCorrelationID, ""}
+
+				result := runDeletePause(t, rc, keys, args)
+				require.Equal(t, int64(0), result)
+
+				// Verify signal correlation was deleted
+				exists, err := rc.Do(ctx, rc.B().Hexists().Key("{dp3}:signal").Field(signalCorrelationID).Build()).AsBool()
+				require.NoError(t, err)
+				require.False(t, exists, "signal correlation should be deleted")
+			})
+
+			t.Run("does not delete signal correlation if it belongs to different pause", func(t *testing.T) {
+				rc := setup(t)
+
+				pauseID := "pause-del-4"
+				otherPauseID := "other-pause"
+				pauseData := `{"id":"pause-del-4","data":"test"}`
+				signalCorrelationID := "signal-del-789"
+
+				// Pre-populate with signal pointing to a DIFFERENT pause
+				err := rc.Do(ctx, rc.B().Set().Key("{dp4}:pause").Value(pauseData).Build()).Error()
+				require.NoError(t, err)
+				_, err = rc.Do(ctx, rc.B().Hset().Key("{dp4}:signal").FieldValue().FieldValue(signalCorrelationID, otherPauseID).Build()).AsInt64()
+				require.NoError(t, err)
+
+				keys := []string{
+					"{dp4}:pause",
+					"{dp4}:evt",
+					"{dp4}:invoke",
+					"{dp4}:signal",
+					"{dp4}:addIdx",
+					"{dp4}:expIdx",
+					"{dp4}:runPauses",
+					"{dp4}:pausesIdx",
+					"{dp4}:blockIdx",
+				}
+				args := []string{pauseID, "", signalCorrelationID, ""}
+
+				result := runDeletePause(t, rc, keys, args)
+				require.Equal(t, int64(0), result)
+
+				// Verify signal correlation was NOT deleted (belongs to different pause)
+				signalVal, err := rc.Do(ctx, rc.B().Hget().Key("{dp4}:signal").Field(signalCorrelationID).Build()).ToString()
+				require.NoError(t, err)
+				require.Equal(t, otherPauseID, signalVal, "signal correlation should NOT be deleted when it belongs to different pause")
+			})
+
+			t.Run("returns 1 when deleting non-existent pause with blockIdxValue", func(t *testing.T) {
+				rc := setup(t)
+
+				pauseID := "pause-del-5"
+
+				keys := []string{
+					"{dp5}:pause",
+					"{dp5}:evt",
+					"{dp5}:invoke",
+					"{dp5}:signal",
+					"{dp5}:addIdx",
+					"{dp5}:expIdx",
+					"{dp5}:runPauses",
+					"{dp5}:pausesIdx",
+					"{dp5}:blockIdx",
+				}
+				// Non-empty blockIdxValue triggers block deletion logic
+				args := []string{pauseID, "", "", "block-value"}
+
+				result := runDeletePause(t, rc, keys, args)
+				require.Equal(t, int64(1), result, "should return 1 when pause not in buffer (race condition)")
+			})
+		})
+	}
 }

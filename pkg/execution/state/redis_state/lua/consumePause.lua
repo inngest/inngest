@@ -18,13 +18,20 @@ local keyIdempotency  = KEYS[5]
 local pauseDataKey          = ARGV[1] -- used to set data in run state store
 local pauseDataVal          = ARGV[2] -- data to set
 local pauseIdempotencyValue = ARGV[3] -- the idempotency key value
-local pauseIdempotencyUnix  = tonumber(ARGV[4]) -- TTL of the idempotency key in unix timestamp
+local pauseIdempotencyTTL   = tonumber(ARGV[4]) -- TTL of the idempotency key in seconds
 
 
 if actionKey ~= nil and pauseDataKey ~= "" then
-  local prev = redis.call("SET", keyIdempotency, pauseIdempotencyValue, "NX", "GET", "EXAT", pauseIdempotencyUnix)
+  -- Check if idempotency key exists and get its value
+  -- NOTE: We use GET + SET NX separately instead of SET ... NX GET for Garnet compatibility.
+  -- Lua scripts are atomic so this is safe.
+  local prev = redis.call("GET", keyIdempotency)
 
-  if not prev then
+  if not prev or prev == false then
+    -- Key doesn't exist, set it with NX and expiration
+    -- NOTE: We use EX (relative TTL) instead of EXAT (absolute timestamp) for Garnet compatibility
+    redis.call("SET", keyIdempotency, pauseIdempotencyValue, "NX", "EX", pauseIdempotencyTTL)
+
     -- idempotency check: only ever consume a pause once
     if redis.call("HEXISTS", actionKey, pauseDataKey) == 1 then
       return -1
