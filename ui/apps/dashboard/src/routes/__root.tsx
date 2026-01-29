@@ -13,6 +13,7 @@ import PageViewTracker from '@/components/Analytics/PageViewTracker';
 import SegmentAnalytics from '@/components/Analytics/SegmentAnalytics';
 import SentryUserIdentification from '@/components/Analytics/SentryUserIdentification';
 import { InngestClerkProvider } from '@/components/Clerk/Provider';
+import { ConnectRpcProvider } from '@/components/ConnectRpc/ConnectRpcProvider';
 import { ClientFeatureFlagProvider } from '@/components/FeatureFlags/ClientFeatureFlagProvider';
 import Toaster from '@/components/Toast/Toaster';
 import URQLProviderWrapper from '@/components/URQL/URQLProvider';
@@ -82,18 +83,20 @@ function RootComponent() {
     <RootDocument>
       <ThemeProvider attribute="class" defaultTheme="system">
         <InngestClerkProvider>
-          <URQLProviderWrapper>
-            <SentryUserIdentification />
-            <ClientFeatureFlagProvider>
-              <TooltipProvider delayDuration={0}>
-                <Outlet />
-              </TooltipProvider>
+          <ConnectRpcProvider>
+            <URQLProviderWrapper>
+              <SentryUserIdentification />
+              <ClientFeatureFlagProvider>
+                <TooltipProvider delayDuration={0}>
+                  <Outlet />
+                </TooltipProvider>
 
-              <Toaster />
-              <SegmentAnalytics />
-              <PageViewTracker />
-            </ClientFeatureFlagProvider>
-          </URQLProviderWrapper>
+                <Toaster />
+                <SegmentAnalytics />
+                <PageViewTracker />
+              </ClientFeatureFlagProvider>
+            </URQLProviderWrapper>
+          </ConnectRpcProvider>
         </InngestClerkProvider>
       </ThemeProvider>
     </RootDocument>

@@ -17,7 +17,7 @@ import {
 } from '@remixicon/react';
 import { useLocation, useNavigate } from '@tanstack/react-router';
 
-import { useEnvironments } from '@/queries';
+import { useEnvironmentsGrpc } from '@/queries';
 import {
   EnvironmentType,
   getDefaultEnvironment,
@@ -132,7 +132,7 @@ export default function EnvironmentSelectMenu({
   type ListboxValue = Environment | null | 'view_all' | 'sync_branch';
   const [selected, setSelected] = useState<ListboxValue>(null);
   const nextPathname = useSwitchablePathname();
-  const [{ data: envs = [], error }] = useEnvironments();
+  const { data: envs = [], error } = useEnvironmentsGrpc();
 
   //
   // Sync selected state with activeEnv from route

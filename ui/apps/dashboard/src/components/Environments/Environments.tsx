@@ -5,7 +5,7 @@ import { StatusDot } from '@inngest/components/Status/StatusDot';
 import useDebounce from '@inngest/components/hooks/useDebounce';
 
 import LoadingIcon from '@/components/Icons/LoadingIcon';
-import { useEnvironments } from '@/queries';
+import { useEnvironmentsGrpc } from '@/queries';
 import { EnvironmentType, type Environment } from '@/utils/environments';
 import { BranchEnvironmentActions } from './BranchEnvironmentActions';
 import BranchEnvironmentListTable from './BranchEnvironmentListTable';
@@ -15,8 +15,7 @@ import { EnvKeysDropdownButton } from './row-actions/EnvKeysDropdownButton';
 import { EnvViewButton } from './row-actions/EnvViewButton';
 
 export default function Environments() {
-  const [{ data: envs = [], fetching }] = useEnvironments();
-
+  const { data: envs = [], isLoading } = useEnvironmentsGrpc();
   const [filterStatus, setFilterStatus] = useState<'active' | 'archived'>(
     'active',
   );
@@ -58,7 +57,7 @@ export default function Environments() {
     );
   }, [searchParam, envs, filterStatus]);
 
-  if (fetching) {
+  if (isLoading) {
     return (
       <div className="my-16 flex h-full w-full items-center justify-center">
         <LoadingIcon />

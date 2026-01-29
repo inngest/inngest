@@ -1,0 +1,13 @@
+version: v2
+clean: true
+plugins:
+  - local: protoc-gen-es
+    out: src/gen/proto
+    opt:
+      - target=ts
+  - local: protoc-gen-connect-query
+    out: src/gen/proto
+    opt:
+      - target=ts
+inputs:
+  - directory: ../../../proto
