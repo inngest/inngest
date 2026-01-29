@@ -11,6 +11,7 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/service"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/oklog/ulid/v2"
 )
@@ -187,14 +188,15 @@ func (q *queue) ItemLeaseConstraintCheck(
 		return osqueue.ItemLeaseConstraintCheckResult{}, nil
 	}
 
-	// If capacity lease is still valid for the forseeable future, use it
-	hasPreviousLease := item.CapacityLease != nil
-	hasValidLease := hasPreviousLease && item.CapacityLease.LeaseID.Timestamp().After(now.Add(2*time.Second))
+	idempotencyKey := item.ID
 
-	if hasPreviousLease {
+	// If capacity lease is still valid for the forseeable future, use it
+	if item.CapacityLease != nil {
 		expiry := item.CapacityLease.LeaseID.Timestamp()
-		expired := expiry.Before(now)
-		ttl := item.CapacityLease.LeaseID.Timestamp().Sub(now)
+		hasValidLease := expiry.After(now.Add(2 * time.Second))
+
+		ttl := expiry.Sub(now)
+		expired := ttl <= 0
 
 		metrics.HistogramConstraintAPIQueueItemLeaseTTL(ctx, ttl, metrics.HistogramOpt{
 			PkgName: pkgName,
@@ -203,18 +205,43 @@ func (q *queue) ItemLeaseConstraintCheck(
 				"kq":      item.RefilledAt != 0,
 			},
 		})
-	}
 
-	if hasPreviousLease && hasValidLease {
-		return osqueue.ItemLeaseConstraintCheckResult{
-			CapacityLease: item.CapacityLease,
-			// Skip any constraint checks and subsequent updates,
-			// as constraint state is maintained in the Constraint API.
-			SkipConstraintChecks: true,
-		}, nil
-	}
+		// Lease is still valid, return immediately
+		if hasValidLease {
+			return osqueue.ItemLeaseConstraintCheckResult{
+				CapacityLease: item.CapacityLease,
+				// Skip any constraint checks and subsequent updates,
+				// as constraint state is maintained in the Constraint API.
+				SkipConstraintChecks: true,
+			}, nil
+		}
 
-	idempotencyKey := item.ID
+		// Lease is invalid or not valid long enough, optimistically return capacity
+		// without blocking critical path operations
+		service.Go(func() {
+			_, err := q.CapacityManager.Release(context.Background(), &constraintapi.CapacityReleaseRequest{
+				AccountID:      *shadowPart.AccountID,
+				IdempotencyKey: idempotencyKey,
+				LeaseID:        item.CapacityLease.LeaseID,
+				Migration: constraintapi.MigrationIdentifier{
+					IsRateLimit: false,
+					QueueShard:  q.Name(),
+				},
+				Source: constraintapi.LeaseSource{
+					Location:          constraintapi.CallerLocationItemLease,
+					Service:           constraintapi.ServiceExecutor,
+					RunProcessingMode: constraintapi.RunProcessingModeBackground,
+				},
+			})
+			if err != nil {
+				l.ReportError(err, "failed to release expired capacity", logger.WithErrorReportTags(map[string]string{
+					"account_id":  shadowPart.AccountID.String(),
+					"lease_id":    item.CapacityLease.LeaseID.String(),
+					"function_id": shadowPart.FunctionID.String(),
+				}))
+			}
+		})
+	}
 
 	res, err := q.CapacityManager.Acquire(ctx, &constraintapi.CapacityAcquireRequest{
 		AccountID: *shadowPart.AccountID,
