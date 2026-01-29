@@ -812,6 +812,13 @@ func (b *blockstore) compact(ctx context.Context, index Index) error {
 			continue
 		}
 
+		// Skip blocks that already have a phantom pause in place: 2 pauses with 1 deleted
+		// means a previous compaction left a deleted pause to maintain the minimum block size.
+		// No further compaction is useful until the last real pause is also deleted.
+		if blockMD.Len == 2 && deleteCount == 1 {
+			continue
+		}
+
 		ratioThreshold := int64(float64(blockMD.Len) * b.compactionGarbageRatio)
 		if deleteCount >= ratioThreshold {
 			blocksToCompact = append(blocksToCompact, blockID)
@@ -896,6 +903,26 @@ func (b *blockstore) compactBlock(ctx context.Context, l logger.Logger, index In
 		return
 	}
 
+	// When only 1 pause remains, keep a deleted pause as a "phantom" to maintain the minimum
+	// block size of 2. The phantom stays in the delete tracking set so it's still treated as
+	// deleted for reads. This prevents blockMetadata from failing on equal boundaries.
+	phantom := false
+	if len(remainingPauses) == 1 {
+		for _, p := range block.Pauses {
+			if deletedSet[p.ID.String()] && !p.CreatedAt.Equal(remainingPauses[0].CreatedAt) {
+				remainingPauses = append(remainingPauses, p)
+				deletedPauseIDs = slices.DeleteFunc(deletedPauseIDs, func(id string) bool {
+					return id == p.ID.String()
+				})
+				phantom = true
+				break
+			}
+		}
+		slices.SortFunc(remainingPauses, func(a, b *state.Pause) int {
+			return a.CreatedAt.Compare(b.CreatedAt)
+		})
+	}
+
 	block.Pauses = remainingPauses
 
 	byt, err := Serialize(block, encodingJSON, 0x00)
@@ -942,10 +969,11 @@ func (b *blockstore) compactBlock(ctx context.Context, l logger.Logger, index In
 		}
 	}
 
-	l.Debug("compaction successful", "block_id", "duration",
-		time.Since(startTime).Milliseconds(), blockID,
+	l.Debug("compaction successful", "block_id", blockID, "duration",
+		time.Since(startTime).Milliseconds(),
 		"original_count", originalCount, "cleaned_pause_ids",
-		len(deletedPauseIDs), "remaining_count", len(remainingPauses))
+		len(deletedPauseIDs), "remaining_count", len(remainingPauses),
+		"phantom", phantom)
 
 	status = "success"
 }
