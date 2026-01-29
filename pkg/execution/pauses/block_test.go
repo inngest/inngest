@@ -1479,7 +1479,7 @@ func TestCompactionFailsBoundaryCheck(t *testing.T) {
 	require.Equal(t, int64(2), deleteCount, "delete tracking should remain when compaction fails")
 
 	// Now delete one more pause, leaving only pause4 (1 pause left)
-	// This should also fail compaction due to boundary check needing at least 2 pauses
+	// With phantom pause logic, this should now succeed - pause1 or pause2 will be kept as a phantom
 	err = store.Delete(ctx, index, *pause3)
 	require.NoError(t, err)
 
@@ -1487,15 +1487,28 @@ func TestCompactionFailsBoundaryCheck(t *testing.T) {
 	err = store.(*blockstore).compact(ctx, index)
 	require.NoError(t, err)
 
-	// Verify that compaction failed again since we can't generate metadata with only 1 pause
+	// Verify that compaction succeeded with a phantom pause
+	// Block should have 2 pauses: pause4 (real) + one of pause1/pause2 (phantom)
 	block, err = store.ReadBlock(ctx, index, blockID)
 	require.NoError(t, err)
-	require.Len(t, block.Pauses, 4, "block should still have all original pauses when single pause compaction fails")
+	require.Len(t, block.Pauses, 2, "block should have 2 pauses after phantom compaction")
 
-	// Verify delete tracking now shows 3 deletions
+	// Verify delete tracking still has 1 entry (the phantom pause)
 	deleteCount, err = rc.Do(ctx, rc.B().Scard().Key(deleteKey).Build()).AsInt64()
 	require.NoError(t, err)
-	require.Equal(t, int64(3), deleteCount, "delete tracking should show 3 deletions after third delete")
+	require.Equal(t, int64(1), deleteCount, "delete tracking should have 1 entry for the phantom pause")
+
+	// Verify one of the pauses in the block is pause4 (the real one)
+	hasPause4 := block.Pauses[0].ID == pause4.ID || block.Pauses[1].ID == pause4.ID
+	require.True(t, hasPause4, "block should contain pause4 (the real pause)")
+
+	// Verify the phantom is one of the deleted pauses (pause1 or pause2)
+	phantomID := block.Pauses[0].ID
+	if phantomID == pause4.ID {
+		phantomID = block.Pauses[1].ID
+	}
+	isValidPhantom := phantomID == pause1.ID || phantomID == pause2.ID
+	require.True(t, isValidPhantom, "phantom should be pause1 or pause2")
 
 	rc.Close()
 }
@@ -2434,4 +2447,135 @@ func TestDualIteratorBlockRefresh(t *testing.T) {
 	for _, id := range seenPauses {
 		require.True(t, pauseIDs[id])
 	}
+}
+
+func TestCompactionSkipsPhantomBlocks(t *testing.T) {
+	r := miniredis.RunT(t)
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	bucket := memblob.OpenBucket(nil)
+	defer bucket.Close()
+
+	pauseClient := redis_state.NewPauseClient(rc, redis_state.StateDefaultKey)
+
+	now := time.Now()
+	pause1 := &state.Pause{ID: uuid.New(), CreatedAt: now}
+	pause2 := &state.Pause{ID: uuid.New(), CreatedAt: now.Add(time.Second)}
+	pause3 := &state.Pause{ID: uuid.New(), CreatedAt: now.Add(2 * time.Second)}
+
+	mockBufferer := &mockBufferer{
+		pauses: []*state.Pause{pause1, pause2, pause3},
+	}
+
+	leaser := redisBlockLeaser{
+		rc:       rc,
+		prefix:   "test",
+		duration: 5 * time.Second,
+	}
+
+	store, err := NewBlockstore(BlockstoreOpts{
+		PauseClient:            pauseClient,
+		Bucket:                 bucket,
+		Bufferer:               mockBufferer,
+		Leaser:                 leaser,
+		BlockSize:              3,
+		CompactionGarbageRatio: 0.5,
+		CompactionSample:       1.0,
+		CompactionLeaser:       leaser,
+		DeleteAfterFlush:       func(ctx context.Context, workspaceID uuid.UUID) bool { return true },
+		EnableBlockCompaction:  func(ctx context.Context, workspaceID uuid.UUID) bool { return true },
+	})
+	require.NoError(t, err)
+
+	index := Index{
+		WorkspaceID: uuid.New(),
+		EventName:   "test.skip",
+	}
+	ctx := context.Background()
+
+	err = store.FlushIndexBlock(ctx, index)
+	require.NoError(t, err)
+
+	blocks, err := store.BlocksSince(ctx, index, time.Time{})
+	require.NoError(t, err)
+	require.Len(t, blocks, 1)
+
+	blockID := blocks[0]
+	deleteKey := blockDeleteKey(index, blockID)
+
+	// Delete 2 pauses, leaving only pause3 - this will trigger phantom compaction
+	err = store.Delete(ctx, index, *pause1)
+	require.NoError(t, err)
+	err = store.Delete(ctx, index, *pause2)
+	require.NoError(t, err)
+
+	// First compaction creates phantom block (Len=2, deleteCount=1)
+	err = store.(*blockstore).compact(ctx, index)
+	require.NoError(t, err)
+
+	block, err := store.ReadBlock(ctx, index, blockID)
+	require.NoError(t, err)
+	require.Len(t, block.Pauses, 2, "block should have 2 pauses after phantom compaction")
+
+	deleteCount, err := rc.Do(ctx, rc.B().Scard().Key(deleteKey).Build()).AsInt64()
+	require.NoError(t, err)
+	require.Equal(t, int64(1), deleteCount, "should have 1 delete (phantom)")
+
+	// Verify metadata shows Len=2
+	metadataKey := blockMetadataKey(index)
+	metadataBytes, err := rc.Do(ctx, rc.B().Hget().Key(metadataKey).Field(blockID.String()).Build()).AsBytes()
+	require.NoError(t, err)
+
+	var metadata blockMetadata
+	err = json.Unmarshal(metadataBytes, &metadata)
+	require.NoError(t, err)
+	require.Equal(t, 2, metadata.Len)
+
+	// Now run compaction again - it should skip this block (Len=2, deleteCount=1)
+	err = store.(*blockstore).compact(ctx, index)
+	require.NoError(t, err)
+
+	// Block should be unchanged
+	block2, err := store.ReadBlock(ctx, index, blockID)
+	require.NoError(t, err)
+	require.Len(t, block2.Pauses, 2)
+	require.Equal(t, block.Pauses[0].ID, block2.Pauses[0].ID)
+	require.Equal(t, block.Pauses[1].ID, block2.Pauses[1].ID)
+
+	// Delete count should still be 1
+	deleteCount, err = rc.Do(ctx, rc.B().Scard().Key(deleteKey).Build()).AsInt64()
+	require.NoError(t, err)
+	require.Equal(t, int64(1), deleteCount)
+
+	// Now delete the last real pause - this should trigger full block deletion
+	// We need to get pause3 from the block since its CreatedAt may differ slightly
+	var realPause *state.Pause
+	for _, p := range block2.Pauses {
+		if p.ID == pause3.ID {
+			realPause = p
+			break
+		}
+	}
+	require.NotNil(t, realPause, "pause3 should be in the block")
+
+	err = store.Delete(ctx, index, *realPause)
+	require.NoError(t, err)
+
+	// Verify delete was tracked
+	deleteCount, err = rc.Do(ctx, rc.B().Scard().Key(deleteKey).Build()).AsInt64()
+	require.NoError(t, err)
+	require.Equal(t, int64(2), deleteCount, "should have 2 deletes after deleting pause3")
+
+	err = store.(*blockstore).compact(ctx, index)
+	require.NoError(t, err)
+
+	// Block should be completely removed
+	blocks, err = store.BlocksSince(ctx, index, time.Time{})
+	require.NoError(t, err)
+	require.Len(t, blocks, 0, "block should be deleted when all pauses are deleted")
 }
