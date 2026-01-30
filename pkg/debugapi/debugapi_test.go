@@ -9,6 +9,7 @@ import (
 	"github.com/alicebob/miniredis/v2"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution/batch"
 	"github.com/inngest/inngest/pkg/execution/debounce"
@@ -22,6 +23,18 @@ import (
 	"github.com/redis/rueidis"
 	"github.com/stretchr/testify/require"
 )
+
+// mockCQRSManager is a minimal mock for cqrs.Manager used in tests.
+// It embeds a nil cqrs.Manager to satisfy the interface but only implements
+// the methods actually used by the code under test.
+type mockCQRSManager struct {
+	cqrs.Manager
+	fn *cqrs.Function
+}
+
+func (m *mockCQRSManager) GetFunctionByInternalUUID(ctx context.Context, fnID uuid.UUID) (*cqrs.Function, error) {
+	return m.fn, nil
+}
 
 func setupTestRedis(t *testing.T) (rueidis.Client, *miniredis.Miniredis) {
 	r := miniredis.RunT(t)
@@ -397,12 +410,22 @@ func TestRunBatchHandler(t *testing.T) {
 	ctx := context.Background()
 
 	batchManager := setupBatchManager(t, rc)
-	d := &debugAPI{batchManager: batchManager}
 
 	accountID := uuid.New()
 	workspaceID := uuid.New()
 	appID := uuid.New()
 	functionID := uuid.New()
+
+	// Create mock db that returns the function with required IDs
+	mockDB := &mockCQRSManager{
+		fn: &cqrs.Function{
+			ID:    functionID,
+			EnvID: workspaceID,
+			AppID: appID,
+		},
+	}
+
+	d := &debugAPI{batchManager: batchManager, db: mockDB}
 
 	// Create a batch
 	fn := inngest.Function{
