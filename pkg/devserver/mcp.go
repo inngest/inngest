@@ -115,51 +115,16 @@ type MCPHandler struct {
 	events api.EventHandler
 	data   cqrs.Manager
 	tick   time.Duration
-	
+
 	serverOnce sync.Once
 	server     *mcp.Server
-	
+
 	// File content cache
 	fileCacheMu sync.RWMutex
 	fileCache   map[string][]byte
-	
+
 	// File info cache
 	fileInfoCache map[string]fs.FileInfo
-}
-
-// convertToMap converts various input types to a map with a fallback key
-// This is necessary because Inngest events require map[string]any for data fields.
-// Non-object values (strings, numbers, etc.) are wrapped in a map with the fallbackKey.
-func convertToMap(input any, fallbackKey string) map[string]any {
-	if input == nil {
-		return nil
-	}
-
-	switch data := input.(type) {
-	case map[string]any:
-		return data
-	case string:
-		// Try to parse as JSON first
-		var parsed map[string]any
-		if err := json.Unmarshal([]byte(data), &parsed); err == nil {
-			return parsed
-		}
-		// If not valid JSON object, wrap in fallback key
-		return map[string]any{fallbackKey: data}
-	default:
-		// Wrap non-object types in fallback key
-		return map[string]any{fallbackKey: input}
-	}
-}
-
-// convertToDataMap converts various input types to a map suitable for event data
-func convertToDataMap(input any) map[string]any {
-	return convertToMap(input, "value")
-}
-
-// convertToUserMap converts various input types to a map suitable for user data
-func convertToUserMap(input any) map[string]any {
-	return convertToMap(input, "id")
 }
 
 // isRunCompleted checks if a run status indicates completion (success or skipped)
@@ -251,18 +216,18 @@ func (h *MCPHandler) createMCPServer() *mcp.Server {
 
 // SendEventArgs represents the arguments for sending an event
 type SendEventArgs struct {
-	Name        string `json:"name"`
-	Data        any    `json:"data,omitempty" jsonschema:"true"`
-	User        any    `json:"user,omitempty" jsonschema:"true"`
-	EventIDSeed string `json:"eventIdSeed,omitempty"`
+	Name        string         `json:"name"`
+	Data        map[string]any `json:"data,omitempty"`
+	User        map[string]any `json:"user,omitempty"`
+	EventIDSeed string         `json:"eventIdSeed,omitempty"`
 }
 
 // InvokeFunctionArgs represents the arguments for invoking a function
 type InvokeFunctionArgs struct {
-	FunctionID string `json:"functionId"`
-	Data       any    `json:"data,omitempty" jsonschema:"true"`
-	User       any    `json:"user,omitempty" jsonschema:"true"`
-	Timeout    int    `json:"timeout,omitempty"`
+	FunctionID string         `json:"functionId"`
+	Data       map[string]any `json:"data,omitempty"`
+	User       map[string]any `json:"user,omitempty"`
+	Timeout    int            `json:"timeout,omitempty"`
 }
 
 // SendEventResult represents the result of sending an event
@@ -336,11 +301,9 @@ func (h *MCPHandler) sendEvent(ctx context.Context, req *mcp.CallToolRequest, ar
 
 	evt := event.Event{
 		Name: args.Name,
+		Data: args.Data,
+		User: args.User,
 	}
-
-	// Set event data and user using helper functions
-	evt.Data = convertToDataMap(args.Data)
-	evt.User = convertToUserMap(args.User)
 
 	// Create seed for event ID
 	var seed *event.SeededID
@@ -798,8 +761,8 @@ func (h *MCPHandler) invokeFunction(ctx context.Context, req *mcp.CallToolReques
 	// Create a synthetic event to trigger the function
 	evt := event.Event{
 		Name: fmt.Sprintf("inngest/function.invoke/%s", targetFunction.Slug),
-		Data: convertToDataMap(args.Data),
-		User: convertToUserMap(args.User),
+		Data: args.Data,
+		User: args.User,
 	}
 
 	startTime := time.Now()
