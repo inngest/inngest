@@ -17,6 +17,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/util"
+	pb "github.com/inngest/inngest/proto/gen/debug/v1"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 	"github.com/stretchr/testify/require"
@@ -114,13 +115,13 @@ func TestGetBatchInfo(t *testing.T) {
 	functionID := uuid.New()
 
 	t.Run("no batch exists", func(t *testing.T) {
-		resp, err := d.GetBatchInfo(ctx, &BatchInfoRequest{
-			FunctionID: functionID.String(),
+		resp, err := d.GetBatchInfo(ctx, &pb.BatchInfoRequest{
+			FunctionId: functionID.String(),
 			BatchKey:   "test-key",
-			AccountID:  accountID.String(),
+			AccountId:  accountID.String(),
 		})
 		require.NoError(t, err)
-		require.Equal(t, "", resp.BatchID)
+		require.Equal(t, "", resp.BatchId)
 		require.Equal(t, int32(0), resp.ItemCount)
 		require.Equal(t, "none", resp.Status)
 	})
@@ -154,17 +155,17 @@ func TestGetBatchInfo(t *testing.T) {
 		require.NotEmpty(t, result.BatchID)
 
 		// Query the batch using the default key (no batch key expression)
-		resp, err := d.GetBatchInfo(ctx, &BatchInfoRequest{
-			FunctionID: functionID.String(),
+		resp, err := d.GetBatchInfo(ctx, &pb.BatchInfoRequest{
+			FunctionId: functionID.String(),
 			BatchKey:   "default",
-			AccountID:  accountID.String(),
+			AccountId:  accountID.String(),
 		})
 		require.NoError(t, err)
-		require.Equal(t, result.BatchID, resp.BatchID)
+		require.Equal(t, result.BatchID, resp.BatchId)
 		require.Equal(t, int32(1), resp.ItemCount)
 		require.Len(t, resp.Items, 1)
-		require.Equal(t, eventID.String(), resp.Items[0].EventID)
-		require.Equal(t, functionID.String(), resp.Items[0].FunctionID)
+		require.Equal(t, eventID.String(), resp.Items[0].EventId)
+		require.Equal(t, functionID.String(), resp.Items[0].FunctionId)
 	})
 }
 
@@ -195,13 +196,13 @@ func TestGetSingletonInfo(t *testing.T) {
 	t.Run("no singleton lock exists", func(t *testing.T) {
 		singletonKey := functionID.String()
 
-		resp, err := d.GetSingletonInfo(ctx, &SingletonInfoRequest{
+		resp, err := d.GetSingletonInfo(ctx, &pb.SingletonInfoRequest{
 			SingletonKey: singletonKey,
-			AccountID:    accountID.String(),
+			AccountId:    accountID.String(),
 		})
 		require.NoError(t, err)
 		require.False(t, resp.HasLock)
-		require.Equal(t, "", resp.CurrentRunID)
+		require.Equal(t, "", resp.CurrentRunId)
 	})
 
 	t.Run("singleton lock exists", func(t *testing.T) {
@@ -213,13 +214,13 @@ func TestGetSingletonInfo(t *testing.T) {
 		err := rc.Do(ctx, rc.B().Set().Key(redisKey).Value(runID.String()).Build()).Error()
 		require.NoError(t, err)
 
-		resp, err := d.GetSingletonInfo(ctx, &SingletonInfoRequest{
+		resp, err := d.GetSingletonInfo(ctx, &pb.SingletonInfoRequest{
 			SingletonKey: singletonKey,
-			AccountID:    accountID.String(),
+			AccountId:    accountID.String(),
 		})
 		require.NoError(t, err)
 		require.True(t, resp.HasLock)
-		require.Equal(t, runID.String(), resp.CurrentRunID)
+		require.Equal(t, runID.String(), resp.CurrentRunId)
 	})
 }
 
@@ -240,10 +241,10 @@ func TestGetDebounceInfo(t *testing.T) {
 	functionID := uuid.New()
 
 	t.Run("no debounce exists", func(t *testing.T) {
-		resp, err := d.GetDebounceInfo(ctx, &DebounceInfoRequest{
-			FunctionID:  functionID.String(),
+		resp, err := d.GetDebounceInfo(ctx, &pb.DebounceInfoRequest{
+			FunctionId:  functionID.String(),
 			DebounceKey: functionID.String(),
-			AccountID:   accountID.String(),
+			AccountId:   accountID.String(),
 		})
 		require.NoError(t, err)
 		require.False(t, resp.HasDebounce)
@@ -279,18 +280,18 @@ func TestGetDebounceInfo(t *testing.T) {
 		require.NoError(t, err)
 
 		// Query the debounce info
-		resp, err := d.GetDebounceInfo(ctx, &DebounceInfoRequest{
-			FunctionID:  functionID.String(),
+		resp, err := d.GetDebounceInfo(ctx, &pb.DebounceInfoRequest{
+			FunctionId:  functionID.String(),
 			DebounceKey: functionID.String(),
-			AccountID:   accountID.String(),
+			AccountId:   accountID.String(),
 		})
 		require.NoError(t, err)
 		require.True(t, resp.HasDebounce)
-		require.NotEmpty(t, resp.DebounceID)
-		require.Equal(t, eventID.String(), resp.EventID)
-		require.Equal(t, accountID.String(), resp.AccountID)
-		require.Equal(t, workspaceID.String(), resp.WorkspaceID)
-		require.Equal(t, functionID.String(), resp.FunctionID)
+		require.NotEmpty(t, resp.DebounceId)
+		require.Equal(t, eventID.String(), resp.EventId)
+		require.Equal(t, accountID.String(), resp.AccountId)
+		require.Equal(t, workspaceID.String(), resp.WorkspaceId)
+		require.Equal(t, functionID.String(), resp.FunctionId)
 	})
 }
 
@@ -299,8 +300,8 @@ func TestGetBatchInfoNilManager(t *testing.T) {
 		batchManager: nil,
 	}
 
-	_, err := d.GetBatchInfo(context.Background(), &BatchInfoRequest{
-		FunctionID: uuid.New().String(),
+	_, err := d.GetBatchInfo(context.Background(), &pb.BatchInfoRequest{
+		FunctionId: uuid.New().String(),
 	})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "batch manager not configured")
@@ -311,9 +312,9 @@ func TestGetSingletonInfoNilStore(t *testing.T) {
 		singletonStore: nil,
 	}
 
-	_, err := d.GetSingletonInfo(context.Background(), &SingletonInfoRequest{
+	_, err := d.GetSingletonInfo(context.Background(), &pb.SingletonInfoRequest{
 		SingletonKey: "test",
-		AccountID:    uuid.New().String(),
+		AccountId:    uuid.New().String(),
 	})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "singleton store not configured")
@@ -324,8 +325,8 @@ func TestGetDebounceInfoNilDebouncer(t *testing.T) {
 		debouncer: nil,
 	}
 
-	_, err := d.GetDebounceInfo(context.Background(), &DebounceInfoRequest{
-		FunctionID: uuid.New().String(),
+	_, err := d.GetDebounceInfo(context.Background(), &pb.DebounceInfoRequest{
+		FunctionId: uuid.New().String(),
 	})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "debouncer not configured")
@@ -339,8 +340,8 @@ func TestGetBatchInfoInvalidFunctionID(t *testing.T) {
 		batchManager: batchManager,
 	}
 
-	_, err := d.GetBatchInfo(context.Background(), &BatchInfoRequest{
-		FunctionID: "invalid-uuid",
+	_, err := d.GetBatchInfo(context.Background(), &pb.BatchInfoRequest{
+		FunctionId: "invalid-uuid",
 	})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "invalid function_id")
@@ -363,9 +364,9 @@ func TestGetSingletonInfoInvalidAccountID(t *testing.T) {
 		singletonStore: singletonStore,
 	}
 
-	_, err := d.GetSingletonInfo(context.Background(), &SingletonInfoRequest{
+	_, err := d.GetSingletonInfo(context.Background(), &pb.SingletonInfoRequest{
 		SingletonKey: "test",
-		AccountID:    "invalid-uuid",
+		AccountId:    "invalid-uuid",
 	})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "invalid account_id")
@@ -379,8 +380,8 @@ func TestGetDebounceInfoInvalidFunctionID(t *testing.T) {
 		debouncer: redisDebouncer,
 	}
 
-	_, err := d.GetDebounceInfo(context.Background(), &DebounceInfoRequest{
-		FunctionID: "invalid-uuid",
+	_, err := d.GetDebounceInfo(context.Background(), &pb.DebounceInfoRequest{
+		FunctionId: "invalid-uuid",
 	})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "invalid function_id")

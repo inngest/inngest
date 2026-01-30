@@ -6,30 +6,31 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+	pb "github.com/inngest/inngest/proto/gen/debug/v1"
 )
 
 // GetDebounceInfo retrieves the currently debounced event for a function and debounce key.
-func (d *debugAPI) GetDebounceInfo(ctx context.Context, req *DebounceInfoRequest) (*DebounceInfoResponse, error) {
+func (d *debugAPI) GetDebounceInfo(ctx context.Context, req *pb.DebounceInfoRequest) (*pb.DebounceInfoResponse, error) {
 	if d.debouncer == nil {
 		return nil, fmt.Errorf("debouncer not configured")
 	}
 
-	fnID, err := uuid.Parse(req.FunctionID)
+	fnID, err := uuid.Parse(req.GetFunctionId())
 	if err != nil {
 		return nil, fmt.Errorf("invalid function_id: %w", err)
 	}
 
 	// Use the debouncer to get debounce info
-	info, err := d.debouncer.GetDebounceInfo(ctx, fnID, req.DebounceKey)
+	info, err := d.debouncer.GetDebounceInfo(ctx, fnID, req.GetDebounceKey())
 	if err != nil {
 		return nil, fmt.Errorf("failed to get debounce info: %w", err)
 	}
 
 	// No active debounce
 	if info.DebounceID == "" || info.Item == nil {
-		return &DebounceInfoResponse{
+		return &pb.DebounceInfoResponse{
 			HasDebounce: info.DebounceID != "",
-			DebounceID:  info.DebounceID,
+			DebounceId:  info.DebounceID,
 		}, nil
 	}
 
@@ -39,14 +40,14 @@ func (d *debugAPI) GetDebounceInfo(ctx context.Context, req *DebounceInfoRequest
 		eventData = []byte("{}")
 	}
 
-	return &DebounceInfoResponse{
+	return &pb.DebounceInfoResponse{
 		HasDebounce: true,
-		DebounceID:  info.DebounceID,
-		EventID:     info.Item.EventID.String(),
+		DebounceId:  info.DebounceID,
+		EventId:     info.Item.EventID.String(),
 		EventData:   eventData,
 		Timeout:     info.Item.Timeout,
-		AccountID:   info.Item.AccountID.String(),
-		WorkspaceID: info.Item.WorkspaceID.String(),
-		FunctionID:  info.Item.FunctionID.String(),
+		AccountId:   info.Item.AccountID.String(),
+		WorkspaceId: info.Item.WorkspaceID.String(),
+		FunctionId:  info.Item.FunctionID.String(),
 	}, nil
 }

@@ -6,10 +6,11 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/execution/singleton"
+	pb "github.com/inngest/inngest/proto/gen/debug/v1"
 )
 
 // GetSingletonInfo retrieves the current singleton lock status for a given key.
-func (d *debugAPI) GetSingletonInfo(ctx context.Context, req *SingletonInfoRequest) (*SingletonInfoResponse, error) {
+func (d *debugAPI) GetSingletonInfo(ctx context.Context, req *pb.SingletonInfoRequest) (*pb.SingletonInfoResponse, error) {
 	if d.singletonStore == nil {
 		return nil, fmt.Errorf("singleton store not configured")
 	}
@@ -20,26 +21,26 @@ func (d *debugAPI) GetSingletonInfo(ctx context.Context, req *SingletonInfoReque
 		return nil, fmt.Errorf("singleton store does not implement SingletonStore interface")
 	}
 
-	accountID, err := uuid.Parse(req.AccountID)
+	accountID, err := uuid.Parse(req.GetAccountId())
 	if err != nil {
 		return nil, fmt.Errorf("invalid account_id: %w", err)
 	}
 
 	// Get the current run ID holding the singleton lock
-	runID, err := store.GetCurrentRunID(ctx, req.SingletonKey, accountID)
+	runID, err := store.GetCurrentRunID(ctx, req.GetSingletonKey(), accountID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get singleton info: %w", err)
 	}
 
 	if runID == nil {
-		return &SingletonInfoResponse{
+		return &pb.SingletonInfoResponse{
 			HasLock:      false,
-			CurrentRunID: "",
+			CurrentRunId: "",
 		}, nil
 	}
 
-	return &SingletonInfoResponse{
+	return &pb.SingletonInfoResponse{
 		HasLock:      true,
-		CurrentRunID: runID.String(),
+		CurrentRunId: runID.String(),
 	}, nil
 }
