@@ -338,3 +338,254 @@ func TestGetDebounceInfoInvalidFunctionID(t *testing.T) {
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "invalid function_id")
 }
+
+// TestDeleteBatchHandler tests the debug API handler for deleting batches.
+func TestDeleteBatchHandler(t *testing.T) {
+	rc, _ := setupTestRedis(t)
+	ctx := context.Background()
+
+	batchManager := setupBatchManager(t, rc)
+	d := &debugAPI{batchManager: batchManager}
+
+	accountID := uuid.New()
+	workspaceID := uuid.New()
+	appID := uuid.New()
+	functionID := uuid.New()
+
+	// Create a batch
+	fn := inngest.Function{
+		ID: functionID,
+		EventBatch: &inngest.EventBatchConfig{
+			MaxSize: 10,
+			Timeout: "60s",
+		},
+	}
+
+	eventID := ulid.MustNew(ulid.Now(), rand.Reader)
+	batchItem := batch.BatchItem{
+		AccountID:       accountID,
+		WorkspaceID:     workspaceID,
+		AppID:           appID,
+		FunctionID:      functionID,
+		FunctionVersion: 1,
+		EventID:         eventID,
+		Event: event.Event{
+			Name: "test/event",
+			Data: map[string]any{"foo": "bar"},
+		},
+	}
+
+	result, err := batchManager.Append(ctx, batchItem, fn)
+	require.NoError(t, err)
+
+	// Test handler correctly deletes the batch
+	resp, err := d.DeleteBatch(ctx, &pb.DeleteBatchRequest{
+		FunctionId: functionID.String(),
+		BatchKey:   "default",
+		AccountId:  accountID.String(),
+	})
+	require.NoError(t, err)
+	require.True(t, resp.Deleted)
+	require.Equal(t, result.BatchID, resp.BatchId)
+	require.Equal(t, int32(1), resp.ItemCount)
+
+	// Verify batch no longer exists
+	infoResp, err := d.GetBatchInfo(ctx, &pb.BatchInfoRequest{
+		FunctionId: functionID.String(),
+		BatchKey:   "default",
+		AccountId:  accountID.String(),
+	})
+	require.NoError(t, err)
+	require.Equal(t, "", infoResp.BatchId)
+}
+
+// TestRunBatchHandler tests the debug API handler for running batches.
+func TestRunBatchHandler(t *testing.T) {
+	rc, _ := setupTestRedis(t)
+	ctx := context.Background()
+
+	batchManager := setupBatchManager(t, rc)
+	d := &debugAPI{batchManager: batchManager}
+
+	accountID := uuid.New()
+	workspaceID := uuid.New()
+	appID := uuid.New()
+	functionID := uuid.New()
+
+	// Create a batch
+	fn := inngest.Function{
+		ID: functionID,
+		EventBatch: &inngest.EventBatchConfig{
+			MaxSize: 10,
+			Timeout: "60s",
+		},
+	}
+
+	eventID := ulid.MustNew(ulid.Now(), rand.Reader)
+	batchItem := batch.BatchItem{
+		AccountID:       accountID,
+		WorkspaceID:     workspaceID,
+		AppID:           appID,
+		FunctionID:      functionID,
+		FunctionVersion: 1,
+		EventID:         eventID,
+		Event: event.Event{
+			Name: "test/event",
+			Data: map[string]any{"foo": "bar"},
+		},
+	}
+
+	result, err := batchManager.Append(ctx, batchItem, fn)
+	require.NoError(t, err)
+
+	// Test handler correctly schedules the batch
+	resp, err := d.RunBatch(ctx, &pb.RunBatchRequest{
+		FunctionId:  functionID.String(),
+		BatchKey:    "default",
+		AccountId:   accountID.String(),
+		WorkspaceId: workspaceID.String(),
+		AppId:       appID.String(),
+	})
+	require.NoError(t, err)
+	require.True(t, resp.Scheduled)
+	require.Equal(t, result.BatchID, resp.BatchId)
+	require.Equal(t, int32(1), resp.ItemCount)
+}
+
+// TestDeleteSingletonLockHandler tests the debug API handler for deleting singleton locks.
+func TestDeleteSingletonLockHandler(t *testing.T) {
+	rc, _ := setupTestRedis(t)
+	ctx := context.Background()
+
+	unshardedClient := redis_state.NewUnshardedClient(rc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
+	queueClient := unshardedClient.Queue()
+
+	shardSelector := func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
+		return redis_state.NewQueueShard(consts.DefaultQueueShardName, queueClient), nil
+	}
+	singletonStore := singleton.New(ctx, map[string]*redis_state.QueueClient{
+		consts.DefaultQueueShardName: queueClient,
+	}, shardSelector)
+
+	d := &debugAPI{singletonStore: singletonStore}
+
+	accountID := uuid.New()
+	functionID := uuid.New()
+	singletonKey := functionID.String()
+	runID := ulid.MustNew(ulid.Now(), rand.Reader)
+
+	// Set the singleton lock
+	redisKey := queueClient.KeyGenerator().SingletonKey(&queue.Singleton{Key: singletonKey})
+	err := rc.Do(ctx, rc.B().Set().Key(redisKey).Value(runID.String()).Build()).Error()
+	require.NoError(t, err)
+
+	// Test handler correctly deletes the lock
+	resp, err := d.DeleteSingletonLock(ctx, &pb.DeleteSingletonLockRequest{
+		SingletonKey: singletonKey,
+		AccountId:    accountID.String(),
+	})
+	require.NoError(t, err)
+	require.True(t, resp.Deleted)
+	require.Equal(t, runID.String(), resp.RunId)
+
+	// Verify lock no longer exists
+	infoResp, err := d.GetSingletonInfo(ctx, &pb.SingletonInfoRequest{
+		SingletonKey: singletonKey,
+		AccountId:    accountID.String(),
+	})
+	require.NoError(t, err)
+	require.False(t, infoResp.HasLock)
+	require.Empty(t, infoResp.CurrentRunId)
+}
+
+func TestDeleteBatchNilManager(t *testing.T) {
+	d := &debugAPI{
+		batchManager: nil,
+	}
+
+	_, err := d.DeleteBatch(context.Background(), &pb.DeleteBatchRequest{
+		FunctionId: uuid.New().String(),
+	})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "batch manager not configured")
+}
+
+func TestRunBatchNilManager(t *testing.T) {
+	d := &debugAPI{
+		batchManager: nil,
+	}
+
+	_, err := d.RunBatch(context.Background(), &pb.RunBatchRequest{
+		FunctionId: uuid.New().String(),
+	})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "batch manager not configured")
+}
+
+func TestDeleteSingletonLockNilStore(t *testing.T) {
+	d := &debugAPI{
+		singletonStore: nil,
+	}
+
+	_, err := d.DeleteSingletonLock(context.Background(), &pb.DeleteSingletonLockRequest{
+		SingletonKey: "test",
+		AccountId:    uuid.New().String(),
+	})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "singleton store not configured")
+}
+
+func TestDeleteBatchInvalidFunctionID(t *testing.T) {
+	rc, _ := setupTestRedis(t)
+	batchManager := setupBatchManager(t, rc)
+
+	d := &debugAPI{
+		batchManager: batchManager,
+	}
+
+	_, err := d.DeleteBatch(context.Background(), &pb.DeleteBatchRequest{
+		FunctionId: "invalid-uuid",
+	})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "invalid function_id")
+}
+
+func TestRunBatchInvalidFunctionID(t *testing.T) {
+	rc, _ := setupTestRedis(t)
+	batchManager := setupBatchManager(t, rc)
+
+	d := &debugAPI{
+		batchManager: batchManager,
+	}
+
+	_, err := d.RunBatch(context.Background(), &pb.RunBatchRequest{
+		FunctionId: "invalid-uuid",
+	})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "invalid function_id")
+}
+
+func TestDeleteSingletonLockInvalidAccountID(t *testing.T) {
+	rc, _ := setupTestRedis(t)
+
+	unshardedClient := redis_state.NewUnshardedClient(rc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
+	queueClient := unshardedClient.Queue()
+
+	shardSelector := func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
+		return redis_state.NewQueueShard(consts.DefaultQueueShardName, queueClient), nil
+	}
+	singletonStore := singleton.New(context.Background(), map[string]*redis_state.QueueClient{
+		consts.DefaultQueueShardName: queueClient,
+	}, shardSelector)
+
+	d := &debugAPI{
+		singletonStore: singletonStore,
+	}
+
+	_, err := d.DeleteSingletonLock(context.Background(), &pb.DeleteSingletonLockRequest{
+		SingletonKey: "test",
+		AccountId:    "invalid-uuid",
+	})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "invalid account_id")
+}

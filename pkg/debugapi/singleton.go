@@ -44,3 +44,39 @@ func (d *debugAPI) GetSingletonInfo(ctx context.Context, req *pb.SingletonInfoRe
 		CurrentRunId: runID.String(),
 	}, nil
 }
+
+// DeleteSingletonLock removes an existing singleton lock.
+func (d *debugAPI) DeleteSingletonLock(ctx context.Context, req *pb.DeleteSingletonLockRequest) (*pb.DeleteSingletonLockResponse, error) {
+	if d.singletonStore == nil {
+		return nil, fmt.Errorf("singleton store not configured")
+	}
+
+	// Type assert to SingletonStore interface which has ReleaseSingleton
+	store, ok := d.singletonStore.(singleton.SingletonStore)
+	if !ok {
+		return nil, fmt.Errorf("singleton store does not implement SingletonStore interface")
+	}
+
+	accountID, err := uuid.Parse(req.GetAccountId())
+	if err != nil {
+		return nil, fmt.Errorf("invalid account_id: %w", err)
+	}
+
+	// Release the singleton lock (which deletes it)
+	runID, err := store.ReleaseSingleton(ctx, req.GetSingletonKey(), accountID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to delete singleton lock: %w", err)
+	}
+
+	if runID == nil {
+		return &pb.DeleteSingletonLockResponse{
+			Deleted: false,
+			RunId:   "",
+		}, nil
+	}
+
+	return &pb.DeleteSingletonLockResponse{
+		Deleted: true,
+		RunId:   runID.String(),
+	}, nil
+}

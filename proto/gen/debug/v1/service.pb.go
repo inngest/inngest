@@ -25,7 +25,7 @@ var File_debug_v1_service_proto protoreflect.FileDescriptor
 
 const file_debug_v1_service_proto_rawDesc = "" +
 	"\n" +
-	"\x16debug/v1/service.proto\x12\bdebug.v1\x1a\x14debug/v1/queue.proto\x1a\x14debug/v1/pause.proto\x1a\x1cdebug/v1/constraintapi.proto\x1a\x14debug/v1/batch.proto\x1a\x18debug/v1/singleton.proto\x1a\x17debug/v1/debounce.proto\x1a\x1econstraintapi/v1/service.proto2\xe1\x06\n" +
+	"\x16debug/v1/service.proto\x12\bdebug.v1\x1a\x14debug/v1/queue.proto\x1a\x14debug/v1/pause.proto\x1a\x1cdebug/v1/constraintapi.proto\x1a\x14debug/v1/batch.proto\x1a\x18debug/v1/singleton.proto\x1a\x17debug/v1/debounce.proto\x1a\x1econstraintapi/v1/service.proto2\xda\b\n" +
 	"\x05Debug\x12I\n" +
 	"\fGetPartition\x12\x1a.debug.v1.PartitionRequest\x1a\x1b.debug.v1.PartitionResponse\"\x00\x12U\n" +
 	"\x12GetPartitionStatus\x12\x1a.debug.v1.PartitionRequest\x1a!.debug.v1.PartitionStatusResponse\"\x00\x12I\n" +
@@ -35,32 +35,41 @@ const file_debug_v1_service_proto_rawDesc = "" +
 	"\tBlockPeek\x12\x1a.debug.v1.BlockPeekRequest\x1a\x1b.debug.v1.BlockPeekResponse\"\x00\x12O\n" +
 	"\fBlockDeleted\x12\x1d.debug.v1.BlockDeletedRequest\x1a\x1e.debug.v1.BlockDeletedResponse\"\x00\x12^\n" +
 	"\x10CheckConstraints\x12&.constraintapi.v1.CapacityCheckRequest\x1a\".debug.v1.CheckConstraintsResponse\x12I\n" +
-	"\fGetBatchInfo\x12\x1a.debug.v1.BatchInfoRequest\x1a\x1b.debug.v1.BatchInfoResponse\"\x00\x12U\n" +
-	"\x10GetSingletonInfo\x12\x1e.debug.v1.SingletonInfoRequest\x1a\x1f.debug.v1.SingletonInfoResponse\"\x00\x12R\n" +
+	"\fGetBatchInfo\x12\x1a.debug.v1.BatchInfoRequest\x1a\x1b.debug.v1.BatchInfoResponse\"\x00\x12L\n" +
+	"\vDeleteBatch\x12\x1c.debug.v1.DeleteBatchRequest\x1a\x1d.debug.v1.DeleteBatchResponse\"\x00\x12C\n" +
+	"\bRunBatch\x12\x19.debug.v1.RunBatchRequest\x1a\x1a.debug.v1.RunBatchResponse\"\x00\x12U\n" +
+	"\x10GetSingletonInfo\x12\x1e.debug.v1.SingletonInfoRequest\x1a\x1f.debug.v1.SingletonInfoResponse\"\x00\x12d\n" +
+	"\x13DeleteSingletonLock\x12$.debug.v1.DeleteSingletonLockRequest\x1a%.debug.v1.DeleteSingletonLockResponse\"\x00\x12R\n" +
 	"\x0fGetDebounceInfo\x12\x1d.debug.v1.DebounceInfoRequest\x1a\x1e.debug.v1.DebounceInfoResponse\"\x00B5Z3github.com/inngest/inngest/proto/gen/debug/v1;debugb\x06proto3"
 
 var file_debug_v1_service_proto_goTypes = []any{
-	(*PartitionRequest)(nil),         // 0: debug.v1.PartitionRequest
-	(*QueueItemRequest)(nil),         // 1: debug.v1.QueueItemRequest
-	(*PauseRequest)(nil),             // 2: debug.v1.PauseRequest
-	(*IndexRequest)(nil),             // 3: debug.v1.IndexRequest
-	(*BlockPeekRequest)(nil),         // 4: debug.v1.BlockPeekRequest
-	(*BlockDeletedRequest)(nil),      // 5: debug.v1.BlockDeletedRequest
-	(*v1.CapacityCheckRequest)(nil),  // 6: constraintapi.v1.CapacityCheckRequest
-	(*BatchInfoRequest)(nil),         // 7: debug.v1.BatchInfoRequest
-	(*SingletonInfoRequest)(nil),     // 8: debug.v1.SingletonInfoRequest
-	(*DebounceInfoRequest)(nil),      // 9: debug.v1.DebounceInfoRequest
-	(*PartitionResponse)(nil),        // 10: debug.v1.PartitionResponse
-	(*PartitionStatusResponse)(nil),  // 11: debug.v1.PartitionStatusResponse
-	(*QueueItemResponse)(nil),        // 12: debug.v1.QueueItemResponse
-	(*PauseResponse)(nil),            // 13: debug.v1.PauseResponse
-	(*IndexResponse)(nil),            // 14: debug.v1.IndexResponse
-	(*BlockPeekResponse)(nil),        // 15: debug.v1.BlockPeekResponse
-	(*BlockDeletedResponse)(nil),     // 16: debug.v1.BlockDeletedResponse
-	(*CheckConstraintsResponse)(nil), // 17: debug.v1.CheckConstraintsResponse
-	(*BatchInfoResponse)(nil),        // 18: debug.v1.BatchInfoResponse
-	(*SingletonInfoResponse)(nil),    // 19: debug.v1.SingletonInfoResponse
-	(*DebounceInfoResponse)(nil),     // 20: debug.v1.DebounceInfoResponse
+	(*PartitionRequest)(nil),            // 0: debug.v1.PartitionRequest
+	(*QueueItemRequest)(nil),            // 1: debug.v1.QueueItemRequest
+	(*PauseRequest)(nil),                // 2: debug.v1.PauseRequest
+	(*IndexRequest)(nil),                // 3: debug.v1.IndexRequest
+	(*BlockPeekRequest)(nil),            // 4: debug.v1.BlockPeekRequest
+	(*BlockDeletedRequest)(nil),         // 5: debug.v1.BlockDeletedRequest
+	(*v1.CapacityCheckRequest)(nil),     // 6: constraintapi.v1.CapacityCheckRequest
+	(*BatchInfoRequest)(nil),            // 7: debug.v1.BatchInfoRequest
+	(*DeleteBatchRequest)(nil),          // 8: debug.v1.DeleteBatchRequest
+	(*RunBatchRequest)(nil),             // 9: debug.v1.RunBatchRequest
+	(*SingletonInfoRequest)(nil),        // 10: debug.v1.SingletonInfoRequest
+	(*DeleteSingletonLockRequest)(nil),  // 11: debug.v1.DeleteSingletonLockRequest
+	(*DebounceInfoRequest)(nil),         // 12: debug.v1.DebounceInfoRequest
+	(*PartitionResponse)(nil),           // 13: debug.v1.PartitionResponse
+	(*PartitionStatusResponse)(nil),     // 14: debug.v1.PartitionStatusResponse
+	(*QueueItemResponse)(nil),           // 15: debug.v1.QueueItemResponse
+	(*PauseResponse)(nil),               // 16: debug.v1.PauseResponse
+	(*IndexResponse)(nil),               // 17: debug.v1.IndexResponse
+	(*BlockPeekResponse)(nil),           // 18: debug.v1.BlockPeekResponse
+	(*BlockDeletedResponse)(nil),        // 19: debug.v1.BlockDeletedResponse
+	(*CheckConstraintsResponse)(nil),    // 20: debug.v1.CheckConstraintsResponse
+	(*BatchInfoResponse)(nil),           // 21: debug.v1.BatchInfoResponse
+	(*DeleteBatchResponse)(nil),         // 22: debug.v1.DeleteBatchResponse
+	(*RunBatchResponse)(nil),            // 23: debug.v1.RunBatchResponse
+	(*SingletonInfoResponse)(nil),       // 24: debug.v1.SingletonInfoResponse
+	(*DeleteSingletonLockResponse)(nil), // 25: debug.v1.DeleteSingletonLockResponse
+	(*DebounceInfoResponse)(nil),        // 26: debug.v1.DebounceInfoResponse
 }
 var file_debug_v1_service_proto_depIdxs = []int32{
 	0,  // 0: debug.v1.Debug.GetPartition:input_type -> debug.v1.PartitionRequest
@@ -72,21 +81,27 @@ var file_debug_v1_service_proto_depIdxs = []int32{
 	5,  // 6: debug.v1.Debug.BlockDeleted:input_type -> debug.v1.BlockDeletedRequest
 	6,  // 7: debug.v1.Debug.CheckConstraints:input_type -> constraintapi.v1.CapacityCheckRequest
 	7,  // 8: debug.v1.Debug.GetBatchInfo:input_type -> debug.v1.BatchInfoRequest
-	8,  // 9: debug.v1.Debug.GetSingletonInfo:input_type -> debug.v1.SingletonInfoRequest
-	9,  // 10: debug.v1.Debug.GetDebounceInfo:input_type -> debug.v1.DebounceInfoRequest
-	10, // 11: debug.v1.Debug.GetPartition:output_type -> debug.v1.PartitionResponse
-	11, // 12: debug.v1.Debug.GetPartitionStatus:output_type -> debug.v1.PartitionStatusResponse
-	12, // 13: debug.v1.Debug.GetQueueItem:output_type -> debug.v1.QueueItemResponse
-	13, // 14: debug.v1.Debug.GetPause:output_type -> debug.v1.PauseResponse
-	14, // 15: debug.v1.Debug.GetIndex:output_type -> debug.v1.IndexResponse
-	15, // 16: debug.v1.Debug.BlockPeek:output_type -> debug.v1.BlockPeekResponse
-	16, // 17: debug.v1.Debug.BlockDeleted:output_type -> debug.v1.BlockDeletedResponse
-	17, // 18: debug.v1.Debug.CheckConstraints:output_type -> debug.v1.CheckConstraintsResponse
-	18, // 19: debug.v1.Debug.GetBatchInfo:output_type -> debug.v1.BatchInfoResponse
-	19, // 20: debug.v1.Debug.GetSingletonInfo:output_type -> debug.v1.SingletonInfoResponse
-	20, // 21: debug.v1.Debug.GetDebounceInfo:output_type -> debug.v1.DebounceInfoResponse
-	11, // [11:22] is the sub-list for method output_type
-	0,  // [0:11] is the sub-list for method input_type
+	8,  // 9: debug.v1.Debug.DeleteBatch:input_type -> debug.v1.DeleteBatchRequest
+	9,  // 10: debug.v1.Debug.RunBatch:input_type -> debug.v1.RunBatchRequest
+	10, // 11: debug.v1.Debug.GetSingletonInfo:input_type -> debug.v1.SingletonInfoRequest
+	11, // 12: debug.v1.Debug.DeleteSingletonLock:input_type -> debug.v1.DeleteSingletonLockRequest
+	12, // 13: debug.v1.Debug.GetDebounceInfo:input_type -> debug.v1.DebounceInfoRequest
+	13, // 14: debug.v1.Debug.GetPartition:output_type -> debug.v1.PartitionResponse
+	14, // 15: debug.v1.Debug.GetPartitionStatus:output_type -> debug.v1.PartitionStatusResponse
+	15, // 16: debug.v1.Debug.GetQueueItem:output_type -> debug.v1.QueueItemResponse
+	16, // 17: debug.v1.Debug.GetPause:output_type -> debug.v1.PauseResponse
+	17, // 18: debug.v1.Debug.GetIndex:output_type -> debug.v1.IndexResponse
+	18, // 19: debug.v1.Debug.BlockPeek:output_type -> debug.v1.BlockPeekResponse
+	19, // 20: debug.v1.Debug.BlockDeleted:output_type -> debug.v1.BlockDeletedResponse
+	20, // 21: debug.v1.Debug.CheckConstraints:output_type -> debug.v1.CheckConstraintsResponse
+	21, // 22: debug.v1.Debug.GetBatchInfo:output_type -> debug.v1.BatchInfoResponse
+	22, // 23: debug.v1.Debug.DeleteBatch:output_type -> debug.v1.DeleteBatchResponse
+	23, // 24: debug.v1.Debug.RunBatch:output_type -> debug.v1.RunBatchResponse
+	24, // 25: debug.v1.Debug.GetSingletonInfo:output_type -> debug.v1.SingletonInfoResponse
+	25, // 26: debug.v1.Debug.DeleteSingletonLock:output_type -> debug.v1.DeleteSingletonLockResponse
+	26, // 27: debug.v1.Debug.GetDebounceInfo:output_type -> debug.v1.DebounceInfoResponse
+	14, // [14:28] is the sub-list for method output_type
+	0,  // [0:14] is the sub-list for method input_type
 	0,  // [0:0] is the sub-list for extension type_name
 	0,  // [0:0] is the sub-list for extension extendee
 	0,  // [0:0] is the sub-list for field type_name

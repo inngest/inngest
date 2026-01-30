@@ -32,8 +32,14 @@ service Debug {
 
   // GetBatchInfo retrieves information about the current batch for a function and batch key.
   rpc GetBatchInfo(BatchInfoRequest) returns (BatchInfoResponse) {}
+  // DeleteBatch deletes a batch for a function and batch key.
+  rpc DeleteBatch(DeleteBatchRequest) returns (DeleteBatchResponse) {}
+  // RunBatch triggers immediate execution of a batch.
+  rpc RunBatch(RunBatchRequest) returns (RunBatchResponse) {}
   // GetSingletonInfo retrieves the current singleton lock status for a given key.
   rpc GetSingletonInfo(SingletonInfoRequest) returns (SingletonInfoResponse) {}
+  // DeleteSingletonLock removes an existing singleton lock.
+  rpc DeleteSingletonLock(DeleteSingletonLockRequest) returns (DeleteSingletonLockResponse) {}
   // GetDebounceInfo retrieves the currently debounced event for a function and debounce key.
   rpc GetDebounceInfo(DebounceInfoRequest) returns (DebounceInfoResponse) {}
 }

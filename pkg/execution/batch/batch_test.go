@@ -479,3 +479,177 @@ func TestBatchCleanupIdempotenceKeyExpires(t *testing.T) {
 	require.False(t, r.Exists(bc.KeyGenerator().BatchIdempotenceKey(context.Background(), fnId)))
 	require.Equal(t, 1, len(r.Keys()))
 }
+
+func TestDeleteBatch(t *testing.T) {
+	r := miniredis.RunT(t)
+
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	bc := redis_state.NewBatchClient(rc, redis_state.QueueDefaultKey)
+	bm := NewRedisBatchManager(bc, nil)
+
+	accountId := uuid.New()
+	workspaceId := uuid.New()
+	appId := uuid.New()
+	fnId := uuid.New()
+
+	t.Run("delete non-existent batch returns deleted=false", func(t *testing.T) {
+		nonExistentFnId := uuid.New()
+		result, err := bm.DeleteBatch(context.Background(), nonExistentFnId, "")
+		require.NoError(t, err)
+		require.False(t, result.Deleted)
+		require.Equal(t, "", result.BatchID)
+		require.Equal(t, 0, result.ItemCount)
+	})
+
+	t.Run("delete existing batch with default key", func(t *testing.T) {
+		fn := inngest.Function{
+			ID: fnId,
+			EventBatch: &inngest.EventBatchConfig{
+				MaxSize: 10,
+				Timeout: "60s",
+			},
+		}
+
+		// Add two items to the batch
+		for i := 0; i < 2; i++ {
+			eventID := ulid.MustNew(ulid.Now(), rand.Reader)
+			bi := BatchItem{
+				AccountID:       accountId,
+				WorkspaceID:     workspaceId,
+				AppID:           appId,
+				FunctionID:      fnId,
+				FunctionVersion: 1,
+				EventID:         eventID,
+				Event: event.Event{
+					Name: "test/event",
+					Data: map[string]any{"index": i},
+				},
+			}
+			_, err := bm.Append(context.Background(), bi, fn)
+			require.NoError(t, err)
+		}
+
+		// Verify batch exists
+		info, err := bm.GetBatchInfo(context.Background(), fnId, "")
+		require.NoError(t, err)
+		require.NotEmpty(t, info.BatchID)
+		require.Len(t, info.Items, 2)
+		batchID := info.BatchID
+
+		// Delete the batch
+		result, err := bm.DeleteBatch(context.Background(), fnId, "")
+		require.NoError(t, err)
+		require.True(t, result.Deleted)
+		require.Equal(t, batchID, result.BatchID)
+		require.Equal(t, 2, result.ItemCount)
+
+		// Verify batch no longer exists
+		infoAfter, err := bm.GetBatchInfo(context.Background(), fnId, "")
+		require.NoError(t, err)
+		require.Equal(t, "", infoAfter.BatchID)
+		require.Empty(t, infoAfter.Items)
+	})
+
+	t.Run("delete batch with custom key", func(t *testing.T) {
+		customFnId := uuid.New()
+		customBatchKey := "tenant-456"
+
+		fn := inngest.Function{
+			ID: customFnId,
+			EventBatch: &inngest.EventBatchConfig{
+				MaxSize: 10,
+				Timeout: "60s",
+				Key:     strPtr("event.data.tenant_id"),
+			},
+		}
+
+		eventID := ulid.MustNew(ulid.Now(), rand.Reader)
+		bi := BatchItem{
+			AccountID:       accountId,
+			WorkspaceID:     workspaceId,
+			AppID:           appId,
+			FunctionID:      customFnId,
+			FunctionVersion: 1,
+			EventID:         eventID,
+			Event: event.Event{
+				Name: "test/event",
+				Data: map[string]any{"tenant_id": customBatchKey},
+			},
+		}
+
+		_, err := bm.Append(context.Background(), bi, fn)
+		require.NoError(t, err)
+
+		// Verify batch exists
+		info, err := bm.GetBatchInfo(context.Background(), customFnId, customBatchKey)
+		require.NoError(t, err)
+		require.NotEmpty(t, info.BatchID)
+		batchID := info.BatchID
+
+		// Delete using the custom key
+		result, err := bm.DeleteBatch(context.Background(), customFnId, customBatchKey)
+		require.NoError(t, err)
+		require.True(t, result.Deleted)
+		require.Equal(t, batchID, result.BatchID)
+		require.Equal(t, 1, result.ItemCount)
+
+		// Verify batch no longer exists
+		infoAfter, err := bm.GetBatchInfo(context.Background(), customFnId, customBatchKey)
+		require.NoError(t, err)
+		require.Equal(t, "", infoAfter.BatchID)
+	})
+}
+
+type mockQueueManager struct {
+	enqueuedItems []mockEnqueuedItem
+}
+
+type mockEnqueuedItem struct {
+	item interface{}
+	at   time.Time
+}
+
+func (m *mockQueueManager) Enqueue(ctx context.Context, item interface{}, at time.Time, opts interface{}) error {
+	m.enqueuedItems = append(m.enqueuedItems, mockEnqueuedItem{item: item, at: at})
+	return nil
+}
+
+func TestRunBatch(t *testing.T) {
+	r := miniredis.RunT(t)
+
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	bc := redis_state.NewBatchClient(rc, redis_state.QueueDefaultKey)
+
+	accountId := uuid.New()
+	workspaceId := uuid.New()
+	appId := uuid.New()
+
+	t.Run("run non-existent batch returns scheduled=false", func(t *testing.T) {
+		bm := NewRedisBatchManager(bc, nil)
+		nonExistentFnId := uuid.New()
+
+		result, err := bm.RunBatch(context.Background(), RunBatchOpts{
+			FunctionID:  nonExistentFnId,
+			BatchKey:    "",
+			AccountID:   accountId,
+			WorkspaceID: workspaceId,
+			AppID:       appId,
+		})
+		require.NoError(t, err)
+		require.False(t, result.Scheduled)
+		require.Equal(t, "", result.BatchID)
+		require.Equal(t, 0, result.ItemCount)
+	})
+}

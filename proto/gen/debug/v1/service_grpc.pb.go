@@ -20,17 +20,20 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Debug_GetPartition_FullMethodName       = "/debug.v1.Debug/GetPartition"
-	Debug_GetPartitionStatus_FullMethodName = "/debug.v1.Debug/GetPartitionStatus"
-	Debug_GetQueueItem_FullMethodName       = "/debug.v1.Debug/GetQueueItem"
-	Debug_GetPause_FullMethodName           = "/debug.v1.Debug/GetPause"
-	Debug_GetIndex_FullMethodName           = "/debug.v1.Debug/GetIndex"
-	Debug_BlockPeek_FullMethodName          = "/debug.v1.Debug/BlockPeek"
-	Debug_BlockDeleted_FullMethodName       = "/debug.v1.Debug/BlockDeleted"
-	Debug_CheckConstraints_FullMethodName   = "/debug.v1.Debug/CheckConstraints"
-	Debug_GetBatchInfo_FullMethodName       = "/debug.v1.Debug/GetBatchInfo"
-	Debug_GetSingletonInfo_FullMethodName   = "/debug.v1.Debug/GetSingletonInfo"
-	Debug_GetDebounceInfo_FullMethodName    = "/debug.v1.Debug/GetDebounceInfo"
+	Debug_GetPartition_FullMethodName        = "/debug.v1.Debug/GetPartition"
+	Debug_GetPartitionStatus_FullMethodName  = "/debug.v1.Debug/GetPartitionStatus"
+	Debug_GetQueueItem_FullMethodName        = "/debug.v1.Debug/GetQueueItem"
+	Debug_GetPause_FullMethodName            = "/debug.v1.Debug/GetPause"
+	Debug_GetIndex_FullMethodName            = "/debug.v1.Debug/GetIndex"
+	Debug_BlockPeek_FullMethodName           = "/debug.v1.Debug/BlockPeek"
+	Debug_BlockDeleted_FullMethodName        = "/debug.v1.Debug/BlockDeleted"
+	Debug_CheckConstraints_FullMethodName    = "/debug.v1.Debug/CheckConstraints"
+	Debug_GetBatchInfo_FullMethodName        = "/debug.v1.Debug/GetBatchInfo"
+	Debug_DeleteBatch_FullMethodName         = "/debug.v1.Debug/DeleteBatch"
+	Debug_RunBatch_FullMethodName            = "/debug.v1.Debug/RunBatch"
+	Debug_GetSingletonInfo_FullMethodName    = "/debug.v1.Debug/GetSingletonInfo"
+	Debug_DeleteSingletonLock_FullMethodName = "/debug.v1.Debug/DeleteSingletonLock"
+	Debug_GetDebounceInfo_FullMethodName     = "/debug.v1.Debug/GetDebounceInfo"
 )
 
 // DebugClient is the client API for Debug service.
@@ -56,8 +59,14 @@ type DebugClient interface {
 	CheckConstraints(ctx context.Context, in *v1.CapacityCheckRequest, opts ...grpc.CallOption) (*CheckConstraintsResponse, error)
 	// GetBatchInfo retrieves information about the current batch for a function and batch key.
 	GetBatchInfo(ctx context.Context, in *BatchInfoRequest, opts ...grpc.CallOption) (*BatchInfoResponse, error)
+	// DeleteBatch deletes a batch for a function and batch key.
+	DeleteBatch(ctx context.Context, in *DeleteBatchRequest, opts ...grpc.CallOption) (*DeleteBatchResponse, error)
+	// RunBatch triggers immediate execution of a batch.
+	RunBatch(ctx context.Context, in *RunBatchRequest, opts ...grpc.CallOption) (*RunBatchResponse, error)
 	// GetSingletonInfo retrieves the current singleton lock status for a given key.
 	GetSingletonInfo(ctx context.Context, in *SingletonInfoRequest, opts ...grpc.CallOption) (*SingletonInfoResponse, error)
+	// DeleteSingletonLock removes an existing singleton lock.
+	DeleteSingletonLock(ctx context.Context, in *DeleteSingletonLockRequest, opts ...grpc.CallOption) (*DeleteSingletonLockResponse, error)
 	// GetDebounceInfo retrieves the currently debounced event for a function and debounce key.
 	GetDebounceInfo(ctx context.Context, in *DebounceInfoRequest, opts ...grpc.CallOption) (*DebounceInfoResponse, error)
 }
@@ -160,10 +169,40 @@ func (c *debugClient) GetBatchInfo(ctx context.Context, in *BatchInfoRequest, op
 	return out, nil
 }
 
+func (c *debugClient) DeleteBatch(ctx context.Context, in *DeleteBatchRequest, opts ...grpc.CallOption) (*DeleteBatchResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeleteBatchResponse)
+	err := c.cc.Invoke(ctx, Debug_DeleteBatch_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *debugClient) RunBatch(ctx context.Context, in *RunBatchRequest, opts ...grpc.CallOption) (*RunBatchResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RunBatchResponse)
+	err := c.cc.Invoke(ctx, Debug_RunBatch_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *debugClient) GetSingletonInfo(ctx context.Context, in *SingletonInfoRequest, opts ...grpc.CallOption) (*SingletonInfoResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(SingletonInfoResponse)
 	err := c.cc.Invoke(ctx, Debug_GetSingletonInfo_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *debugClient) DeleteSingletonLock(ctx context.Context, in *DeleteSingletonLockRequest, opts ...grpc.CallOption) (*DeleteSingletonLockResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeleteSingletonLockResponse)
+	err := c.cc.Invoke(ctx, Debug_DeleteSingletonLock_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -203,8 +242,14 @@ type DebugServer interface {
 	CheckConstraints(context.Context, *v1.CapacityCheckRequest) (*CheckConstraintsResponse, error)
 	// GetBatchInfo retrieves information about the current batch for a function and batch key.
 	GetBatchInfo(context.Context, *BatchInfoRequest) (*BatchInfoResponse, error)
+	// DeleteBatch deletes a batch for a function and batch key.
+	DeleteBatch(context.Context, *DeleteBatchRequest) (*DeleteBatchResponse, error)
+	// RunBatch triggers immediate execution of a batch.
+	RunBatch(context.Context, *RunBatchRequest) (*RunBatchResponse, error)
 	// GetSingletonInfo retrieves the current singleton lock status for a given key.
 	GetSingletonInfo(context.Context, *SingletonInfoRequest) (*SingletonInfoResponse, error)
+	// DeleteSingletonLock removes an existing singleton lock.
+	DeleteSingletonLock(context.Context, *DeleteSingletonLockRequest) (*DeleteSingletonLockResponse, error)
 	// GetDebounceInfo retrieves the currently debounced event for a function and debounce key.
 	GetDebounceInfo(context.Context, *DebounceInfoRequest) (*DebounceInfoResponse, error)
 	mustEmbedUnimplementedDebugServer()
@@ -244,8 +289,17 @@ func (UnimplementedDebugServer) CheckConstraints(context.Context, *v1.CapacityCh
 func (UnimplementedDebugServer) GetBatchInfo(context.Context, *BatchInfoRequest) (*BatchInfoResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetBatchInfo not implemented")
 }
+func (UnimplementedDebugServer) DeleteBatch(context.Context, *DeleteBatchRequest) (*DeleteBatchResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeleteBatch not implemented")
+}
+func (UnimplementedDebugServer) RunBatch(context.Context, *RunBatchRequest) (*RunBatchResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RunBatch not implemented")
+}
 func (UnimplementedDebugServer) GetSingletonInfo(context.Context, *SingletonInfoRequest) (*SingletonInfoResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetSingletonInfo not implemented")
+}
+func (UnimplementedDebugServer) DeleteSingletonLock(context.Context, *DeleteSingletonLockRequest) (*DeleteSingletonLockResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeleteSingletonLock not implemented")
 }
 func (UnimplementedDebugServer) GetDebounceInfo(context.Context, *DebounceInfoRequest) (*DebounceInfoResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetDebounceInfo not implemented")
@@ -433,6 +487,42 @@ func _Debug_GetBatchInfo_Handler(srv interface{}, ctx context.Context, dec func(
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Debug_DeleteBatch_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteBatchRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DebugServer).DeleteBatch(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Debug_DeleteBatch_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DebugServer).DeleteBatch(ctx, req.(*DeleteBatchRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Debug_RunBatch_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RunBatchRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DebugServer).RunBatch(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Debug_RunBatch_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DebugServer).RunBatch(ctx, req.(*RunBatchRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Debug_GetSingletonInfo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(SingletonInfoRequest)
 	if err := dec(in); err != nil {
@@ -447,6 +537,24 @@ func _Debug_GetSingletonInfo_Handler(srv interface{}, ctx context.Context, dec f
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(DebugServer).GetSingletonInfo(ctx, req.(*SingletonInfoRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Debug_DeleteSingletonLock_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteSingletonLockRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DebugServer).DeleteSingletonLock(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Debug_DeleteSingletonLock_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DebugServer).DeleteSingletonLock(ctx, req.(*DeleteSingletonLockRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -513,8 +621,20 @@ var Debug_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Debug_GetBatchInfo_Handler,
 		},
 		{
+			MethodName: "DeleteBatch",
+			Handler:    _Debug_DeleteBatch_Handler,
+		},
+		{
+			MethodName: "RunBatch",
+			Handler:    _Debug_RunBatch_Handler,
+		},
+		{
 			MethodName: "GetSingletonInfo",
 			Handler:    _Debug_GetSingletonInfo_Handler,
+		},
+		{
+			MethodName: "DeleteSingletonLock",
+			Handler:    _Debug_DeleteSingletonLock_Handler,
 		},
 		{
 			MethodName: "GetDebounceInfo",
