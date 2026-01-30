@@ -5,14 +5,13 @@ import (
 	"fmt"
 	"strconv"
 	"sync"
-	"sync/atomic"
 
 	"github.com/cespare/xxhash/v2"
 	"github.com/google/cel-go/common/operators"
 	"github.com/ohler55/ojg/jp"
 )
 
-func newStringEqualityMatcher(concurrency int64) MatchingEngine {
+func newStringEqualityMatcher() MatchingEngine {
 	return &stringLookup{
 		lock:       &sync.RWMutex{},
 		vars:       map[string]struct{}{},
@@ -20,8 +19,7 @@ func newStringEqualityMatcher(concurrency int64) MatchingEngine {
 		inequality: inequalityMap{},
 		// in stores all `in` operators, eg `"foo" in vars.a`.  This lets us
 		// properly iterate over variables for in equaltiy matching.
-		in:          variableMap{},
-		concurrency: concurrency,
+		in: variableMap{},
 	}
 }
 
@@ -60,8 +58,6 @@ type stringLookup struct {
 	//
 	// this lets us quickly map neq in a fast manner
 	inequality inequalityMap
-
-	concurrency int64
 }
 
 func (s stringLookup) Type() EngineType {
@@ -69,80 +65,65 @@ func (s stringLookup) Type() EngineType {
 }
 
 func (n *stringLookup) Match(ctx context.Context, input map[string]any, result *MatchResult) error {
-	neqOptimized := int32(0)
+	neqOptimized := false
 
 	// First, handle equality matching.
-	pool := newErrPool(errPoolOpts{concurrency: n.concurrency})
-	for item := range n.vars {
-		path := item
-		pool.Go(func() error {
-			x, err := jp.ParseString(path)
-			if err != nil {
-				return err
-			}
+	for path := range n.vars {
+		x, err := jp.ParseString(path)
+		if err != nil {
+			return err
+		}
 
-			// default to an empty string
-			res := x.Get(input)
-			if len(res) == 0 {
-				res = []any{""}
-			}
+		// default to an empty string
+		res := x.Get(input)
+		if len(res) == 0 {
+			res = []any{""}
+		}
 
-			var optimized int32
-			switch val := res[0].(type) {
-			case string:
-				if n.equalitySearch(ctx, path, val, result) {
-					atomic.AddInt32(&optimized, 1)
-				}
-			case []any:
-				for _, item := range val {
-					if n.inSearch(ctx, path, item, result) {
-						atomic.AddInt32(&optimized, 1)
-					}
-				}
-			case []string:
-				for _, item := range val {
-					if n.inSearch(ctx, path, item, result) {
-						atomic.AddInt32(&optimized, 1)
-					}
+		optimized := false
+		switch val := res[0].(type) {
+		case string:
+			if n.equalitySearch(ctx, path, val, result) {
+				optimized = true
+			}
+		case []any:
+			for _, item := range val {
+				if n.inSearch(ctx, path, item, result) {
+					optimized = true
 				}
 			}
-
-			if optimized > 0 {
-				// Set optimized to true in every case.
-				atomic.AddInt32(&neqOptimized, 1)
+		case []string:
+			for _, item := range val {
+				if n.inSearch(ctx, path, item, result) {
+					optimized = true
+				}
 			}
-			return nil
-		})
-	}
-	if err := pool.Wait(); err != nil {
-		return err
+		}
+
+		if optimized {
+			neqOptimized = true
+		}
 	}
 
-	pool = newErrPool(errPoolOpts{concurrency: n.concurrency})
 	// Then, iterate through the inequality matches.
-	for item := range n.inequality {
-		path := item
-		pool.Go(func() error {
-			x, err := jp.ParseString(path)
-			if err != nil {
-				return err
+	for path := range n.inequality {
+		x, err := jp.ParseString(path)
+		if err != nil {
+			return err
+		}
+
+		// default to an empty string
+		str := ""
+		if res := x.Get(input); len(res) > 0 {
+			if value, ok := res[0].(string); ok {
+				str = value
 			}
+		}
 
-			// default to an empty string
-			str := ""
-			if res := x.Get(input); len(res) > 0 {
-				if value, ok := res[0].(string); ok {
-					str = value
-				}
-			}
-
-			n.inequalitySearch(ctx, path, str, atomic.LoadInt32(&neqOptimized) > 0, result)
-
-			return nil
-		})
+		n.inequalitySearch(ctx, path, str, neqOptimized, result)
 	}
 
-	return pool.Wait()
+	return nil
 }
 
 // Search returns all ExpressionParts which match the given input, ignoring the variable name
@@ -310,58 +291,72 @@ func (n *stringLookup) Add(ctx context.Context, p ExpressionPart) error {
 	return nil
 }
 
-func (n *stringLookup) Remove(ctx context.Context, p ExpressionPart) error {
-	switch p.Predicate.Operator {
-	case operators.Equals:
-		n.lock.Lock()
-		defer n.lock.Unlock()
+func (n *stringLookup) Remove(ctx context.Context, parts []ExpressionPart) (int, error) {
+	n.lock.Lock()
+	defer n.lock.Unlock()
 
-		val := n.hash(p.Predicate.LiteralAsString())
-
-		coll, ok := n.equality[val]
-		if !ok {
-			// This could not exist as there's nothing mapping this variable for
-			// the given event name.
-			return ErrExpressionPartNotFound
+	processedCount := 0
+	for _, p := range parts {
+		// Check for context cancellation/timeout
+		if ctx.Err() != nil {
+			return processedCount, ctx.Err()
 		}
 
-		// Remove the expression part from the leaf.
-		for i, eval := range coll {
-			if p.EqualsStored(eval) {
-				coll = append(coll[:i], coll[i+1:]...)
-				n.equality[val] = coll
-				return nil
+		switch p.Predicate.Operator {
+		case operators.Equals:
+			val := n.hash(p.Predicate.LiteralAsString())
+			coll, ok := n.equality[val]
+			if !ok {
+				continue
+			}
+
+			// Remove the expression part from the leaf.
+			for i, eval := range coll {
+				if p.EqualsStored(eval) {
+					coll = append(coll[:i], coll[i+1:]...)
+					n.equality[val] = coll
+					break
+				}
+			}
+
+		case operators.NotEquals:
+			val := n.hash(p.Predicate.LiteralAsString())
+
+			// If the var isn't found, skip.
+			if _, ok := n.inequality[p.Predicate.Ident]; !ok {
+				continue
+			}
+
+			// then merge the expression into the value that the expression has.
+			if _, ok := n.inequality[p.Predicate.Ident][val]; !ok {
+				continue
+			}
+
+			for i, eval := range n.inequality[p.Predicate.Ident][val] {
+				if p.EqualsStored(eval) {
+					n.inequality[p.Predicate.Ident][val] = append(n.inequality[p.Predicate.Ident][val][:i], n.inequality[p.Predicate.Ident][val][i+1:]...)
+					break
+				}
+			}
+
+		case operators.In:
+			val := n.hash(p.Predicate.LiteralAsString())
+			coll, ok := n.in[val]
+			if !ok {
+				continue
+			}
+
+			// Remove the expression part from the leaf.
+			for i, eval := range coll {
+				if p.EqualsStored(eval) {
+					coll = append(coll[:i], coll[i+1:]...)
+					n.in[val] = coll
+					break
+				}
 			}
 		}
-
-		return ErrExpressionPartNotFound
-
-	case operators.NotEquals:
-		n.lock.Lock()
-		defer n.lock.Unlock()
-
-		val := n.hash(p.Predicate.LiteralAsString())
-
-		// If the var isn't found, we can't remove.
-		if _, ok := n.inequality[p.Predicate.Ident]; !ok {
-			return ErrExpressionPartNotFound
-		}
-
-		// then merge the expression into the value that the expression has.
-		if _, ok := n.inequality[p.Predicate.Ident][val]; !ok {
-			return nil
-		}
-
-		for i, eval := range n.inequality[p.Predicate.Ident][val] {
-			if p.EqualsStored(eval) {
-				n.inequality[p.Predicate.Ident][val] = append(n.inequality[p.Predicate.Ident][val][:i], n.inequality[p.Predicate.Ident][val][i+1:]...)
-				return nil
-			}
-		}
-
-		return ErrExpressionPartNotFound
-
-	default:
-		return fmt.Errorf("StringHash engines only support string equality/inequality")
+		processedCount++
 	}
+
+	return processedCount, nil
 }

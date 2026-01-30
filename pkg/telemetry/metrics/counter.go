@@ -265,6 +265,15 @@ func IncrAggregatePausesFoundCounter(ctx context.Context, value int64, opts Coun
 	})
 }
 
+func IncrAggregatorBookkeeperEvictedCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "aggr_evicted_total",
+		Description: "Total number of bookkeepers evicted from the aggregator cache",
+		Tags:        opts.Tags,
+	})
+}
+
 func IncrConnectGatewayReceivedRouterGRPCMessageCounter(ctx context.Context, value int64, opts CounterOpt) {
 	RecordCounterMetric(ctx, value, CounterOpt{
 		PkgName:     opts.PkgName,
