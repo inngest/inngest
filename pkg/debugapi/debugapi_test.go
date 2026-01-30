@@ -98,86 +98,68 @@ func setupDebouncer(t *testing.T, rc rueidis.Client) debounce.Debouncer {
 	return debounce.NewRedisDebouncer(debounceClient, shard, q)
 }
 
-func TestGetBatchInfo(t *testing.T) {
+// TestGetBatchInfoHandler tests the debug API handler for batch info.
+// Edge cases for BatchManager.GetBatchInfo are tested in pkg/execution/batch/batch_test.go.
+func TestGetBatchInfoHandler(t *testing.T) {
 	rc, _ := setupTestRedis(t)
 	ctx := context.Background()
 
 	batchManager := setupBatchManager(t, rc)
-
-	// Create debug API instance
-	d := &debugAPI{
-		batchManager: batchManager,
-	}
+	d := &debugAPI{batchManager: batchManager}
 
 	accountID := uuid.New()
 	workspaceID := uuid.New()
 	appID := uuid.New()
 	functionID := uuid.New()
 
-	t.Run("no batch exists", func(t *testing.T) {
-		resp, err := d.GetBatchInfo(ctx, &pb.BatchInfoRequest{
-			FunctionId: functionID.String(),
-			BatchKey:   "test-key",
-			AccountId:  accountID.String(),
-		})
-		require.NoError(t, err)
-		require.Equal(t, "", resp.BatchId)
-		require.Equal(t, int32(0), resp.ItemCount)
-		require.Equal(t, "none", resp.Status)
+	// Create a batch
+	fn := inngest.Function{
+		ID: functionID,
+		EventBatch: &inngest.EventBatchConfig{
+			MaxSize: 10,
+			Timeout: "60s",
+		},
+	}
+
+	eventID := ulid.MustNew(ulid.Now(), rand.Reader)
+	batchItem := batch.BatchItem{
+		AccountID:       accountID,
+		WorkspaceID:     workspaceID,
+		AppID:           appID,
+		FunctionID:      functionID,
+		FunctionVersion: 1,
+		EventID:         eventID,
+		Event: event.Event{
+			Name: "test/event",
+			Data: map[string]any{"foo": "bar"},
+		},
+	}
+
+	result, err := batchManager.Append(ctx, batchItem, fn)
+	require.NoError(t, err)
+
+	// Test handler correctly converts manager response to protobuf
+	resp, err := d.GetBatchInfo(ctx, &pb.BatchInfoRequest{
+		FunctionId: functionID.String(),
+		BatchKey:   "default",
+		AccountId:  accountID.String(),
 	})
-
-	t.Run("batch with items exists", func(t *testing.T) {
-		// Create a batch using the batch manager
-		fn := inngest.Function{
-			ID: functionID,
-			EventBatch: &inngest.EventBatchConfig{
-				MaxSize: 10,
-				Timeout: "60s",
-			},
-		}
-
-		eventID := ulid.MustNew(ulid.Now(), rand.Reader)
-		batchItem := batch.BatchItem{
-			AccountID:       accountID,
-			WorkspaceID:     workspaceID,
-			AppID:           appID,
-			FunctionID:      functionID,
-			FunctionVersion: 1,
-			EventID:         eventID,
-			Event: event.Event{
-				Name: "test/event",
-				Data: map[string]any{"foo": "bar"},
-			},
-		}
-
-		result, err := batchManager.Append(ctx, batchItem, fn)
-		require.NoError(t, err)
-		require.NotEmpty(t, result.BatchID)
-
-		// Query the batch using the default key (no batch key expression)
-		resp, err := d.GetBatchInfo(ctx, &pb.BatchInfoRequest{
-			FunctionId: functionID.String(),
-			BatchKey:   "default",
-			AccountId:  accountID.String(),
-		})
-		require.NoError(t, err)
-		require.Equal(t, result.BatchID, resp.BatchId)
-		require.Equal(t, int32(1), resp.ItemCount)
-		require.Len(t, resp.Items, 1)
-		require.Equal(t, eventID.String(), resp.Items[0].EventId)
-		require.Equal(t, functionID.String(), resp.Items[0].FunctionId)
-	})
+	require.NoError(t, err)
+	require.Equal(t, result.BatchID, resp.BatchId)
+	require.Equal(t, int32(1), resp.ItemCount)
+	require.Len(t, resp.Items, 1)
+	require.Equal(t, eventID.String(), resp.Items[0].EventId)
+	require.Equal(t, functionID.String(), resp.Items[0].FunctionId)
 }
 
-func TestGetSingletonInfo(t *testing.T) {
+// TestGetSingletonInfoHandler tests the debug API handler for singleton info.
+func TestGetSingletonInfoHandler(t *testing.T) {
 	rc, _ := setupTestRedis(t)
 	ctx := context.Background()
 
-	// Create clients
 	unshardedClient := redis_state.NewUnshardedClient(rc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
 	queueClient := unshardedClient.Queue()
 
-	// Create singleton store
 	shardSelector := func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
 		return redis_state.NewQueueShard(consts.DefaultQueueShardName, queueClient), nil
 	}
@@ -185,114 +167,84 @@ func TestGetSingletonInfo(t *testing.T) {
 		consts.DefaultQueueShardName: queueClient,
 	}, shardSelector)
 
-	// Create debug API instance
-	d := &debugAPI{
-		singletonStore: singletonStore,
-	}
+	d := &debugAPI{singletonStore: singletonStore}
 
 	accountID := uuid.New()
 	functionID := uuid.New()
+	singletonKey := functionID.String()
+	runID := ulid.MustNew(ulid.Now(), rand.Reader)
 
-	t.Run("no singleton lock exists", func(t *testing.T) {
-		singletonKey := functionID.String()
+	// Set the singleton lock
+	redisKey := queueClient.KeyGenerator().SingletonKey(&queue.Singleton{Key: singletonKey})
+	err := rc.Do(ctx, rc.B().Set().Key(redisKey).Value(runID.String()).Build()).Error()
+	require.NoError(t, err)
 
-		resp, err := d.GetSingletonInfo(ctx, &pb.SingletonInfoRequest{
-			SingletonKey: singletonKey,
-			AccountId:    accountID.String(),
-		})
-		require.NoError(t, err)
-		require.False(t, resp.HasLock)
-		require.Equal(t, "", resp.CurrentRunId)
+	// Test handler correctly converts store response to protobuf
+	resp, err := d.GetSingletonInfo(ctx, &pb.SingletonInfoRequest{
+		SingletonKey: singletonKey,
+		AccountId:    accountID.String(),
 	})
-
-	t.Run("singleton lock exists", func(t *testing.T) {
-		singletonKey := functionID.String() + "-custom"
-		runID := ulid.MustNew(ulid.Now(), rand.Reader)
-
-		// Set the singleton lock manually
-		redisKey := queueClient.KeyGenerator().SingletonKey(&queue.Singleton{Key: singletonKey})
-		err := rc.Do(ctx, rc.B().Set().Key(redisKey).Value(runID.String()).Build()).Error()
-		require.NoError(t, err)
-
-		resp, err := d.GetSingletonInfo(ctx, &pb.SingletonInfoRequest{
-			SingletonKey: singletonKey,
-			AccountId:    accountID.String(),
-		})
-		require.NoError(t, err)
-		require.True(t, resp.HasLock)
-		require.Equal(t, runID.String(), resp.CurrentRunId)
-	})
+	require.NoError(t, err)
+	require.True(t, resp.HasLock)
+	require.Equal(t, runID.String(), resp.CurrentRunId)
 }
 
-func TestGetDebounceInfo(t *testing.T) {
+// TestGetDebounceInfoHandler tests the debug API handler for debounce info.
+// Edge cases for Debouncer.GetDebounceInfo are tested in pkg/execution/debounce/debounce_test.go.
+func TestGetDebounceInfoHandler(t *testing.T) {
 	rc, _ := setupTestRedis(t)
 	ctx := context.Background()
 
 	redisDebouncer := setupDebouncer(t, rc)
-
-	// Create debug API instance
-	d := &debugAPI{
-		debouncer: redisDebouncer,
-	}
+	d := &debugAPI{debouncer: redisDebouncer}
 
 	accountID := uuid.New()
 	workspaceID := uuid.New()
 	appID := uuid.New()
 	functionID := uuid.New()
 
-	t.Run("no debounce exists", func(t *testing.T) {
-		resp, err := d.GetDebounceInfo(ctx, &pb.DebounceInfoRequest{
-			FunctionId:  functionID.String(),
-			DebounceKey: functionID.String(),
-			AccountId:   accountID.String(),
-		})
-		require.NoError(t, err)
-		require.False(t, resp.HasDebounce)
+	// Create a debounce
+	eventID := ulid.MustNew(ulid.Now(), rand.Reader)
+	di := debounce.DebounceItem{
+		AccountID:       accountID,
+		WorkspaceID:     workspaceID,
+		AppID:           appID,
+		FunctionID:      functionID,
+		FunctionVersion: 1,
+		EventID:         eventID,
+		Event: event.Event{
+			Name:      "test/debounce-event",
+			ID:        eventID.String(),
+			Timestamp: time.Now().UnixMilli(),
+			Data:      map[string]any{"key": "value"},
+		},
+	}
+
+	fn := inngest.Function{
+		ID: functionID,
+		Debounce: &inngest.Debounce{
+			Key:     nil,
+			Period:  "10s",
+			Timeout: util.StrPtr("60s"),
+		},
+	}
+
+	err := redisDebouncer.Debounce(ctx, di, fn)
+	require.NoError(t, err)
+
+	// Test handler correctly converts debouncer response to protobuf
+	resp, err := d.GetDebounceInfo(ctx, &pb.DebounceInfoRequest{
+		FunctionId:  functionID.String(),
+		DebounceKey: functionID.String(),
+		AccountId:   accountID.String(),
 	})
-
-	t.Run("debounce exists", func(t *testing.T) {
-		eventID := ulid.MustNew(ulid.Now(), rand.Reader)
-		di := debounce.DebounceItem{
-			AccountID:       accountID,
-			WorkspaceID:     workspaceID,
-			AppID:           appID,
-			FunctionID:      functionID,
-			FunctionVersion: 1,
-			EventID:         eventID,
-			Event: event.Event{
-				Name:      "test/debounce-event",
-				ID:        eventID.String(),
-				Timestamp: time.Now().UnixMilli(),
-				Data:      map[string]any{"key": "value"},
-			},
-		}
-
-		fn := inngest.Function{
-			ID: functionID,
-			Debounce: &inngest.Debounce{
-				Key:     nil, // Uses function ID as key
-				Period:  "10s",
-				Timeout: util.StrPtr("60s"),
-			},
-		}
-
-		err := redisDebouncer.Debounce(ctx, di, fn)
-		require.NoError(t, err)
-
-		// Query the debounce info
-		resp, err := d.GetDebounceInfo(ctx, &pb.DebounceInfoRequest{
-			FunctionId:  functionID.String(),
-			DebounceKey: functionID.String(),
-			AccountId:   accountID.String(),
-		})
-		require.NoError(t, err)
-		require.True(t, resp.HasDebounce)
-		require.NotEmpty(t, resp.DebounceId)
-		require.Equal(t, eventID.String(), resp.EventId)
-		require.Equal(t, accountID.String(), resp.AccountId)
-		require.Equal(t, workspaceID.String(), resp.WorkspaceId)
-		require.Equal(t, functionID.String(), resp.FunctionId)
-	})
+	require.NoError(t, err)
+	require.True(t, resp.HasDebounce)
+	require.NotEmpty(t, resp.DebounceId)
+	require.Equal(t, eventID.String(), resp.EventId)
+	require.Equal(t, accountID.String(), resp.AccountId)
+	require.Equal(t, workspaceID.String(), resp.WorkspaceId)
+	require.Equal(t, functionID.String(), resp.FunctionId)
 }
 
 func TestGetBatchInfoNilManager(t *testing.T) {

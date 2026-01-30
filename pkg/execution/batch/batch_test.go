@@ -250,6 +250,177 @@ func TestBatchCleanup(t *testing.T) {
 	require.Equal(t, 1, len(r.Keys()))
 }
 
+func TestGetBatchInfo(t *testing.T) {
+	r := miniredis.RunT(t)
+
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	bc := redis_state.NewBatchClient(rc, redis_state.QueueDefaultKey)
+	bm := NewRedisBatchManager(bc, nil)
+
+	accountId := uuid.New()
+	workspaceId := uuid.New()
+	appId := uuid.New()
+	fnId := uuid.New()
+
+	t.Run("no batch exists returns empty info", func(t *testing.T) {
+		info, err := bm.GetBatchInfo(context.Background(), fnId, "")
+		require.NoError(t, err)
+		require.Equal(t, "", info.BatchID)
+		require.Empty(t, info.Items)
+		require.Equal(t, "none", info.Status)
+	})
+
+	t.Run("batch with default key", func(t *testing.T) {
+		fn := inngest.Function{
+			ID: fnId,
+			EventBatch: &inngest.EventBatchConfig{
+				MaxSize: 10,
+				Timeout: "60s",
+			},
+		}
+
+		eventID := ulid.MustNew(ulid.Now(), rand.Reader)
+		bi := BatchItem{
+			AccountID:       accountId,
+			WorkspaceID:     workspaceId,
+			AppID:           appId,
+			FunctionID:      fnId,
+			FunctionVersion: 1,
+			EventID:         eventID,
+			Event: event.Event{
+				Name: "test/event",
+				Data: map[string]any{"foo": "bar"},
+			},
+		}
+
+		res, err := bm.Append(context.Background(), bi, fn)
+		require.NoError(t, err)
+		require.NotEmpty(t, res.BatchID)
+
+		// Query with empty batch key (should use default)
+		info, err := bm.GetBatchInfo(context.Background(), fnId, "")
+		require.NoError(t, err)
+		require.Equal(t, res.BatchID, info.BatchID)
+		require.Len(t, info.Items, 1)
+		require.Equal(t, eventID, info.Items[0].EventID)
+
+		// Query with explicit "default" key should return same result
+		info2, err := bm.GetBatchInfo(context.Background(), fnId, "default")
+		require.NoError(t, err)
+		require.Equal(t, res.BatchID, info2.BatchID)
+		require.Len(t, info2.Items, 1)
+	})
+
+	t.Run("batch with custom key expression", func(t *testing.T) {
+		customFnId := uuid.New()
+		customBatchKey := "user-123"
+
+		fn := inngest.Function{
+			ID: customFnId,
+			EventBatch: &inngest.EventBatchConfig{
+				MaxSize: 10,
+				Timeout: "60s",
+				Key:     strPtr("event.data.user_id"),
+			},
+		}
+
+		eventID := ulid.MustNew(ulid.Now(), rand.Reader)
+		bi := BatchItem{
+			AccountID:       accountId,
+			WorkspaceID:     workspaceId,
+			AppID:           appId,
+			FunctionID:      customFnId,
+			FunctionVersion: 1,
+			EventID:         eventID,
+			Event: event.Event{
+				Name: "test/event",
+				Data: map[string]any{"user_id": customBatchKey},
+			},
+		}
+
+		res, err := bm.Append(context.Background(), bi, fn)
+		require.NoError(t, err)
+		require.NotEmpty(t, res.BatchID)
+
+		// Query with the custom batch key
+		info, err := bm.GetBatchInfo(context.Background(), customFnId, customBatchKey)
+		require.NoError(t, err)
+		require.Equal(t, res.BatchID, info.BatchID)
+		require.Len(t, info.Items, 1)
+		require.Equal(t, eventID, info.Items[0].EventID)
+
+		// Query with default key should NOT find this batch
+		info2, err := bm.GetBatchInfo(context.Background(), customFnId, "default")
+		require.NoError(t, err)
+		require.Equal(t, "", info2.BatchID)
+		require.Empty(t, info2.Items)
+	})
+
+	t.Run("batch with multiple items", func(t *testing.T) {
+		multiFnId := uuid.New()
+		fn := inngest.Function{
+			ID: multiFnId,
+			EventBatch: &inngest.EventBatchConfig{
+				MaxSize: 10,
+				Timeout: "60s",
+			},
+		}
+
+		var eventIDs []ulid.ULID
+		for i := 0; i < 3; i++ {
+			eventID := ulid.MustNew(ulid.Now(), rand.Reader)
+			eventIDs = append(eventIDs, eventID)
+			bi := BatchItem{
+				AccountID:       accountId,
+				WorkspaceID:     workspaceId,
+				AppID:           appId,
+				FunctionID:      multiFnId,
+				FunctionVersion: 1,
+				EventID:         eventID,
+				Event: event.Event{
+					Name: "test/event",
+					Data: map[string]any{"index": i},
+				},
+			}
+			_, err := bm.Append(context.Background(), bi, fn)
+			require.NoError(t, err)
+		}
+
+		info, err := bm.GetBatchInfo(context.Background(), multiFnId, "")
+		require.NoError(t, err)
+		require.NotEmpty(t, info.BatchID)
+		require.Len(t, info.Items, 3)
+
+		// Verify all event IDs are present
+		foundIDs := make(map[string]bool)
+		for _, item := range info.Items {
+			foundIDs[item.EventID.String()] = true
+		}
+		for _, expectedID := range eventIDs {
+			require.True(t, foundIDs[expectedID.String()], "expected event ID %s not found", expectedID)
+		}
+	})
+
+	t.Run("non-existent function returns empty", func(t *testing.T) {
+		nonExistentFnId := uuid.New()
+		info, err := bm.GetBatchInfo(context.Background(), nonExistentFnId, "")
+		require.NoError(t, err)
+		require.Equal(t, "", info.BatchID)
+		require.Empty(t, info.Items)
+		require.Equal(t, "none", info.Status)
+	})
+}
+
+func strPtr(s string) *string {
+	return &s
+}
+
 func TestBatchCleanupIdempotenceKeyExpires(t *testing.T) {
 	r := miniredis.RunT(t)
 

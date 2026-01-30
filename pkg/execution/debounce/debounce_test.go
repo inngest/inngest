@@ -1870,3 +1870,202 @@ func TestDebounceExecutionShouldNotRaceMigration(t *testing.T) {
 		require.False(t, unshardedCluster.Exists(unshardedDebounceClient.KeyGenerator().DebounceMigrating(ctx)))
 	})
 }
+
+func TestGetDebounceInfo(t *testing.T) {
+	unshardedCluster := miniredis.RunT(t)
+
+	unshardedRc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{unshardedCluster.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+
+	unshardedClient := redis_state.NewUnshardedClient(unshardedRc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
+	debounceClient := unshardedClient.Debounce()
+
+	opts := []queue.QueueOpt{
+		queue.WithKindToQueueMapping(map[string]string{
+			queue.KindDebounce: queue.KindDebounce,
+		}),
+	}
+
+	shard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), opts...)
+
+	q, err := queue.New(
+		context.Background(),
+		"debounce-test",
+		shard,
+		map[string]queue.QueueShard{
+			consts.DefaultQueueShardName: shard,
+		},
+		func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
+			return shard, nil
+		},
+		opts...,
+	)
+	require.NoError(t, err)
+
+	redisDebouncer := NewRedisDebouncer(debounceClient, shard, q)
+
+	ctx := context.Background()
+	accountId, workspaceId, appId, functionId := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+
+	t.Run("no debounce exists returns empty info", func(t *testing.T) {
+		info, err := redisDebouncer.GetDebounceInfo(ctx, functionId, functionId.String())
+		require.NoError(t, err)
+		require.Equal(t, "", info.DebounceID)
+		require.Nil(t, info.Item)
+	})
+
+	t.Run("debounce with default key", func(t *testing.T) {
+		fn := inngest.Function{
+			ID: functionId,
+			Debounce: &inngest.Debounce{
+				Key:     nil, // Uses function ID as key
+				Period:  "10s",
+				Timeout: util.StrPtr("60s"),
+			},
+		}
+
+		eventId := ulid.MustNew(ulid.Now(), rand.Reader)
+		di := DebounceItem{
+			AccountID:       accountId,
+			WorkspaceID:     workspaceId,
+			AppID:           appId,
+			FunctionID:      functionId,
+			FunctionVersion: 1,
+			EventID:         eventId,
+			Event: event.Event{
+				Name:      "test/debounce-event",
+				ID:        eventId.String(),
+				Timestamp: time.Now().UnixMilli(),
+				Data:      map[string]any{"key": "value"},
+			},
+		}
+
+		err := redisDebouncer.Debounce(ctx, di, fn)
+		require.NoError(t, err)
+
+		// Query with function ID as debounce key (default)
+		info, err := redisDebouncer.GetDebounceInfo(ctx, functionId, functionId.String())
+		require.NoError(t, err)
+		require.NotEmpty(t, info.DebounceID)
+		require.NotNil(t, info.Item)
+		require.Equal(t, eventId, info.Item.EventID)
+		require.Equal(t, accountId, info.Item.AccountID)
+		require.Equal(t, workspaceId, info.Item.WorkspaceID)
+		require.Equal(t, functionId, info.Item.FunctionID)
+	})
+
+	t.Run("debounce with custom key", func(t *testing.T) {
+		customFnId := uuid.New()
+		customKey := "custom-debounce-key"
+
+		fn := inngest.Function{
+			ID: customFnId,
+			Debounce: &inngest.Debounce{
+				Key:     util.StrPtr("event.data.debounce_key"),
+				Period:  "10s",
+				Timeout: util.StrPtr("60s"),
+			},
+		}
+
+		eventId := ulid.MustNew(ulid.Now(), rand.Reader)
+		di := DebounceItem{
+			AccountID:       accountId,
+			WorkspaceID:     workspaceId,
+			AppID:           appId,
+			FunctionID:      customFnId,
+			FunctionVersion: 1,
+			EventID:         eventId,
+			Event: event.Event{
+				Name:      "test/debounce-event",
+				ID:        eventId.String(),
+				Timestamp: time.Now().UnixMilli(),
+				Data:      map[string]any{"debounce_key": customKey},
+			},
+		}
+
+		err := redisDebouncer.Debounce(ctx, di, fn)
+		require.NoError(t, err)
+
+		// Query with the custom key
+		info, err := redisDebouncer.GetDebounceInfo(ctx, customFnId, customKey)
+		require.NoError(t, err)
+		require.NotEmpty(t, info.DebounceID)
+		require.NotNil(t, info.Item)
+		require.Equal(t, eventId, info.Item.EventID)
+
+		// Query with wrong key should return empty
+		info2, err := redisDebouncer.GetDebounceInfo(ctx, customFnId, "wrong-key")
+		require.NoError(t, err)
+		require.Equal(t, "", info2.DebounceID)
+		require.Nil(t, info2.Item)
+	})
+
+	t.Run("debounce updates preserve latest event", func(t *testing.T) {
+		updateFnId := uuid.New()
+
+		fn := inngest.Function{
+			ID: updateFnId,
+			Debounce: &inngest.Debounce{
+				Key:     nil,
+				Period:  "10s",
+				Timeout: util.StrPtr("60s"),
+			},
+		}
+
+		// Add first event
+		eventId1 := ulid.MustNew(ulid.Now(), rand.Reader)
+		di1 := DebounceItem{
+			AccountID:       accountId,
+			WorkspaceID:     workspaceId,
+			AppID:           appId,
+			FunctionID:      updateFnId,
+			FunctionVersion: 1,
+			EventID:         eventId1,
+			Event: event.Event{
+				Name:      "test/debounce-event",
+				ID:        eventId1.String(),
+				Timestamp: time.Now().UnixMilli(),
+				Data:      map[string]any{"version": 1},
+			},
+		}
+		err := redisDebouncer.Debounce(ctx, di1, fn)
+		require.NoError(t, err)
+
+		// Add second event (update)
+		eventId2 := ulid.MustNew(ulid.Now(), rand.Reader)
+		di2 := DebounceItem{
+			AccountID:       accountId,
+			WorkspaceID:     workspaceId,
+			AppID:           appId,
+			FunctionID:      updateFnId,
+			FunctionVersion: 1,
+			EventID:         eventId2,
+			Event: event.Event{
+				Name:      "test/debounce-event",
+				ID:        eventId2.String(),
+				Timestamp: time.Now().UnixMilli(),
+				Data:      map[string]any{"version": 2},
+			},
+		}
+		err = redisDebouncer.Debounce(ctx, di2, fn)
+		require.NoError(t, err)
+
+		// Query should return the latest event
+		info, err := redisDebouncer.GetDebounceInfo(ctx, updateFnId, updateFnId.String())
+		require.NoError(t, err)
+		require.NotEmpty(t, info.DebounceID)
+		require.NotNil(t, info.Item)
+		require.Equal(t, eventId2, info.Item.EventID)
+	})
+
+	t.Run("non-existent function returns empty", func(t *testing.T) {
+		nonExistentFnId := uuid.New()
+		info, err := redisDebouncer.GetDebounceInfo(ctx, nonExistentFnId, nonExistentFnId.String())
+		require.NoError(t, err)
+		require.Equal(t, "", info.DebounceID)
+		require.Nil(t, info.Item)
+	})
+}
