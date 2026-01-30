@@ -2,6 +2,8 @@ package batch
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/base64"
 	"fmt"
 	"time"
 
@@ -11,6 +13,13 @@ import (
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/oklog/ulid/v2"
 )
+
+// HashBatchKey hashes a batch key using SHA256 and encodes it as base64.
+// This is used to create a consistent key for batch pointers.
+func HashBatchKey(batchKey string) string {
+	hashedBatchKey := sha256.Sum256([]byte(batchKey))
+	return base64.StdEncoding.EncodeToString(hashedBatchKey[:])
+}
 
 // BatchManager represents an implementation-agnostic event batching, running functions
 // only when either the specified buffer is full or the specified time it up.

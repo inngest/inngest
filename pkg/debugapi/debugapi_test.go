@@ -3,8 +3,6 @@ package debugapi
 import (
 	"context"
 	"crypto/rand"
-	"crypto/sha256"
-	"encoding/base64"
 	"encoding/json"
 	"testing"
 	"time"
@@ -77,8 +75,7 @@ func TestGetBatchInfo(t *testing.T) {
 	t.Run("batch with items exists", func(t *testing.T) {
 		// Create a batch manually in Redis
 		batchKey := "my-batch-key"
-		hashedBatchKey := sha256.Sum256([]byte(batchKey))
-		encodedBatchKey := base64.StdEncoding.EncodeToString(hashedBatchKey[:])
+		encodedBatchKey := batch.HashBatchKey(batchKey)
 
 		batchID := ulid.MustNew(ulid.Now(), rand.Reader)
 

@@ -2,8 +2,6 @@ package debugapi
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 
@@ -30,9 +28,8 @@ func (d *debugAPI) GetBatchInfo(ctx context.Context, req *BatchInfoRequest) (*Ba
 		batchKey = "default"
 	}
 
-	// Hash the batch key the same way the batch manager does
-	hashedBatchKey := sha256.Sum256([]byte(batchKey))
-	encodedBatchKey := base64.StdEncoding.EncodeToString(hashedBatchKey[:])
+	// Hash the batch key using the same function as the batch manager
+	encodedBatchKey := batch.HashBatchKey(batchKey)
 
 	// Get the batch pointer (which contains the batch ID)
 	batchPointerKey := d.batchClient.KeyGenerator().BatchPointerWithKey(ctx, fnID, encodedBatchKey)

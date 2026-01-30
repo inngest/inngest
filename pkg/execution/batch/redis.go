@@ -3,8 +3,6 @@ package batch
 import (
 	"context"
 	"crypto/rand"
-	"crypto/sha256"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -114,8 +112,7 @@ func (b redisBatchManager) batchPointer(ctx context.Context, fn inngest.Function
 			return "", fmt.Errorf("could not retrieve batch key: %w", err)
 		}
 
-		hashedBatchKey := sha256.Sum256([]byte(batchKey))
-		encodedBatchKey := base64.StdEncoding.EncodeToString(hashedBatchKey[:])
+		encodedBatchKey := HashBatchKey(batchKey)
 
 		batchPointer = b.b.KeyGenerator().BatchPointerWithKey(ctx, fn.ID, encodedBatchKey)
 	}
