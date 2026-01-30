@@ -2,16 +2,29 @@ import { Banner } from '@inngest/components/Banner/Banner';
 import { Button } from '@inngest/components/Button';
 import * as Sentry from '@sentry/tanstackstart-react';
 
+import { useSQLEditorInstance } from '../../InsightsSQLEditor/SQLEditorContext';
 import { useInsightsAIHelper } from '../../InsightsAIHelperContext';
 import { useInsightsStateMachineContext } from '../../InsightsStateMachineContext/InsightsStateMachineContext';
+import type { InsightsFetchResult } from '../../InsightsStateMachineContext/types';
+import { type SQLEditorInstance } from '@inngest/components/SQLEditor/SQLEditor';
 
 const FALLBACK_ERROR = 'Something went wrong. Please try again.';
 
 export function ErrorState() {
-  const { error, query } = useInsightsStateMachineContext();
+  const { error, query, data } = useInsightsStateMachineContext();
   const aiHelper = useInsightsAIHelper();
+  const editorInstance = useSQLEditorInstance();
+  if (!editorInstance) {
+    throw new Error('InsightsSQLEditor must be used within ErrorState');
+  }
 
-  const errorMessage = error ? pruneGraphQLError(error) : FALLBACK_ERROR;
+  const { editorRef } = editorInstance;
+
+  const errorMessage = error
+    ? pruneGraphQLError(error)
+    : data?.diagnostics.find((x) => x.severity === 'ERROR') !== undefined
+    ? formatDiagnosticMessage(editorRef.current, data.diagnostics)
+    : FALLBACK_ERROR;
 
   const handleFixWithAI = async () => {
     if (!aiHelper) return;
@@ -46,11 +59,30 @@ export function ErrorState() {
       }
       severity="error"
     >
-      {errorMessage}
+      <div className="whitespace-pre-wrap">{errorMessage}</div>
     </Banner>
   );
 }
 
 function pruneGraphQLError(error: Error) {
   return error.message.replace(/^\[GraphQL\] /, '');
+}
+
+function formatDiagnosticMessage(
+  editor: SQLEditorInstance | null,
+  diagnostics: InsightsFetchResult['diagnostics'],
+) {
+  const model = editor?.getModel();
+  return diagnostics
+    .filter((d) => d.severity === 'ERROR')
+    .map((diag) => {
+      if (!diag.position || !model) {
+        return `${diag.message}`;
+      }
+
+      const startPos = model.getPositionAt(diag.position.start);
+
+      return `${startPos.lineNumber}:${startPos.column}\t  ${diag.message} (${diag.position.context})`;
+    })
+    .join('\n');
 }

@@ -7,6 +7,15 @@ export interface InsightsFetchResult {
     id: string;
     values: Record<string, null | Date | string | number>;
   }>;
+  diagnostics: Array<{
+    position?: {
+      start: number;
+      end: number;
+      context: string;
+    };
+    severity: 'ERROR' | 'WARNING' | 'INFO' | 'NONE';
+    message: string;
+  }>;
 }
 
 export type InsightsStatus = 'error' | 'initial' | 'loading' | 'success';
