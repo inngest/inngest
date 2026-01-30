@@ -767,6 +767,10 @@ func start(ctx context.Context, opts StartOpts) error {
 			Port:            ds.Opts.DebugAPIPort,
 			PauseManager:    pauseMgr,
 			CapacityManager: capacityManager,
+			// New dependencies for batching, singleton, and debounce insights
+			BatchClient:    shardedClient.Batch(),
+			SingletonStore: sn,
+			DebounceClient: unshardedClient.Debounce(),
 		}))
 	}
 

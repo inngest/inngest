@@ -1,0 +1,40 @@
+syntax = "proto3";
+package debug.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/inngest/inngest/proto/gen/debug/v1;debug";
+
+// BatchInfoRequest is used to query the current batch for a function and batch key.
+message BatchInfoRequest {
+  // function_id is the UUID of the function.
+  string function_id = 1;
+  // batch_key is the optional batch key expression result. If empty, uses "default".
+  string batch_key = 2;
+  // account_id is required for shard selection.
+  string account_id = 3;
+}
+
+// BatchInfoResponse contains information about the current batch.
+message BatchInfoResponse {
+  // batch_id is the current batch ULID if one exists.
+  string batch_id = 1;
+  // item_count is the number of events currently in the batch.
+  int32 item_count = 2;
+  // items contains the batch items with event data.
+  repeated BatchEventItem items = 3;
+  // status is the current batch status (pending, started, etc.).
+  string status = 4;
+}
+
+// BatchEventItem represents a single event in a batch.
+message BatchEventItem {
+  string event_id = 1;
+  string account_id = 2;
+  string workspace_id = 3;
+  string app_id = 4;
+  string function_id = 5;
+  int32 function_version = 6;
+  // event_data is the JSON-encoded event payload.
+  bytes event_data = 7;
+}

@@ -4,6 +4,9 @@ package debug.v1;
 import "debug/v1/queue.proto";
 import "debug/v1/pause.proto";
 import "debug/v1/constraintapi.proto";
+import "debug/v1/batch.proto";
+import "debug/v1/singleton.proto";
+import "debug/v1/debounce.proto";
 import "constraintapi/v1/service.proto";
 
 option go_package = "github.com/inngest/inngest/proto/gen/debug/v1;debug";
@@ -26,5 +29,12 @@ service Debug {
   rpc BlockDeleted(BlockDeletedRequest) returns (BlockDeletedResponse) {}
   // CheckConstraints invokes Check() on the configured capacity manager
   rpc CheckConstraints(constraintapi.v1.CapacityCheckRequest) returns (CheckConstraintsResponse);
+
+  // GetBatchInfo retrieves information about the current batch for a function and batch key.
+  rpc GetBatchInfo(BatchInfoRequest) returns (BatchInfoResponse) {}
+  // GetSingletonInfo retrieves the current singleton lock status for a given key.
+  rpc GetSingletonInfo(SingletonInfoRequest) returns (SingletonInfoResponse) {}
+  // GetDebounceInfo retrieves the currently debounced event for a function and debounce key.
+  rpc GetDebounceInfo(DebounceInfoRequest) returns (DebounceInfoResponse) {}
 }
 
