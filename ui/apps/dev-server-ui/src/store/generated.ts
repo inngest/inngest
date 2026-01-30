@@ -393,7 +393,8 @@ export enum FunctionRunStatus {
   Completed = 'COMPLETED',
   Failed = 'FAILED',
   Queued = 'QUEUED',
-  Running = 'RUNNING'
+  Running = 'RUNNING',
+  Skipped = 'SKIPPED'
 }
 
 export type FunctionRunV2 = {
@@ -1224,7 +1225,7 @@ export type GetEventV2RunsQueryVariables = Exact<{
 }>;
 
 
-export type GetEventV2RunsQuery = { __typename?: 'Query', eventV2: { __typename?: 'EventV2', name: string, runs: Array<{ __typename?: 'FunctionRunV2', status: FunctionRunStatus, id: any, startedAt: any | null, endedAt: any | null, function: { __typename?: 'Function', name: string, slug: string } }> } };
+export type GetEventV2RunsQuery = { __typename?: 'Query', eventV2: { __typename?: 'EventV2', name: string, runs: Array<{ __typename?: 'FunctionRunV2', status: FunctionRunStatus, id: any, startedAt: any | null, endedAt: any | null, function: { __typename?: 'Function', name: string, slug: string }, trace: { __typename?: 'RunTraceSpan', metadata: Array<{ __typename?: 'SpanMetadata', kind: any, values: any }> } | null }> } };
 
 export type CreateDebugSessionMutationVariables = Exact<{
   input: CreateDebugSessionInput;
@@ -1779,6 +1780,12 @@ export const GetEventV2RunsDocument = `
       function {
         name
         slug
+      }
+      trace(preview: true) {
+        metadata {
+          kind
+          values
+        }
       }
     }
   }

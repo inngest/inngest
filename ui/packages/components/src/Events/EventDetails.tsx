@@ -5,6 +5,7 @@ import { Skeleton } from '@inngest/components/Skeleton';
 import { Time } from '@inngest/components/Time';
 import { usePrettyJson } from '@inngest/components/hooks/usePrettyJson';
 import { type Event } from '@inngest/components/types/event';
+import { isSpanMetadataSkip } from '@inngest/components/types/metadata';
 import { cn } from '@inngest/components/utils/classNames';
 import { LINE_HEIGHT } from '@inngest/components/utils/monaco';
 import { devServerURL, useDevServer } from '@inngest/components/utils/useDevServer';
@@ -25,6 +26,7 @@ import { useShared } from '../SharedContext/SharedContext';
 import { StatusDot } from '../Status/StatusDot';
 import { DragDivider } from '../icons/DragDivider';
 import { loadingSentinel, type Lazy } from '../utils/lazyLoad';
+import { formatSkipReason } from '../utils/skipReasons';
 import type { EventsTable } from './EventsTable';
 
 function toLazy<T>(data: T | undefined, isPending: boolean): Lazy<T | undefined> {
@@ -151,7 +153,7 @@ export function EventDetails({
     usePrettyJson(eventPayloadData?.payload ?? '') || (eventPayloadData?.payload ?? '');
 
   const eventName = initialData?.name || eventDetailsData?.name;
-  const eventRuns = initialData?.runs || eventRunsData?.runs;
+  const eventRuns = eventRunsData?.runs || initialData?.runs;
 
   //
   // Calculate CodeBlock height based on content for non-standalone mode.
@@ -316,17 +318,43 @@ export function EventDetails({
                           <StatusDot status={run.status} />
                           <p className="text-basis text-sm font-medium">{run.fnName}</p>
                         </div>
-                        <div className="ml-[1.375rem] flex items-center gap-1">
-                          <p className="text-subtle text-xs lowercase first-letter:capitalize">
-                            {run.status}
-                          </p>
-                          {(run.completedAt || run.startedAt) && (
-                            <Time
-                              className="text-subtle text-xs"
-                              format="relative"
-                              value={run.completedAt ?? run.startedAt!}
-                            />
-                          )}
+                        <div className="ml-[1.375rem] flex flex-col gap-0.5">
+                          <div className="flex items-center gap-1">
+                            <p className="text-subtle text-xs lowercase first-letter:capitalize">
+                              {run.status}
+                            </p>
+                            {(run.completedAt || run.startedAt) && (
+                              <Time
+                                className="text-subtle text-xs"
+                                format="relative"
+                                value={run.completedAt ?? run.startedAt!}
+                              />
+                            )}
+                          </div>
+                          {run.status === 'SKIPPED' &&
+                            (() => {
+                              const skipMeta = run.metadata?.find(isSpanMetadataSkip);
+                              return (
+                                <p className="text-subtle text-xs">
+                                  {skipMeta?.values.existing_run_id ? (
+                                    <>
+                                      <TanstackLink
+                                        to={pathCreator.runPopout({
+                                          runID: skipMeta.values.existing_run_id,
+                                        })}
+                                        className="text-link hover:underline"
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        Another run
+                                      </TanstackLink>
+                                      {' already in progress'}
+                                    </>
+                                  ) : (
+                                    formatSkipReason(skipMeta?.values.reason)
+                                  )}
+                                </p>
+                              );
+                            })()}
                         </div>
                       </div>
                       <RiArrowRightSLine className="text-muted h-5 shrink-0" />
