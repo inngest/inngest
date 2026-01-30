@@ -45,6 +45,19 @@ type BatchManager interface {
 	StartExecution(ctx context.Context, functionId uuid.UUID, batchID ulid.ULID, batchPointer string) (string, error)
 	ScheduleExecution(ctx context.Context, opts ScheduleBatchOpts) error
 	DeleteKeys(ctx context.Context, functionId uuid.UUID, batchID ulid.ULID) error
+	// GetBatchInfo retrieves information about the current batch for a function and batch key.
+	// This is used for debugging and introspection.
+	GetBatchInfo(ctx context.Context, functionID uuid.UUID, batchKey string) (*BatchInfo, error)
+}
+
+// BatchInfo contains information about a batch for debugging purposes.
+type BatchInfo struct {
+	// BatchID is the current batch ULID if one exists.
+	BatchID string
+	// Items contains the batch items.
+	Items []BatchItem
+	// Status is the current batch status (pending, started, etc.).
+	Status string
 }
 
 // BatchItem represents the item that are being batched.

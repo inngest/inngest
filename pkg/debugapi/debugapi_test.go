@@ -3,7 +3,6 @@ package debugapi
 import (
 	"context"
 	"crypto/rand"
-	"encoding/json"
 	"testing"
 	"time"
 
@@ -33,11 +32,7 @@ func setupTestRedis(t *testing.T) (rueidis.Client, *miniredis.Miniredis) {
 	return rc, r
 }
 
-func TestGetBatchInfo(t *testing.T) {
-	rc, _ := setupTestRedis(t)
-	ctx := context.Background()
-
-	// Create clients
+func setupBatchManager(t *testing.T, rc rueidis.Client) batch.BatchManager {
 	unshardedClient := redis_state.NewUnshardedClient(rc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
 	shardedClient := redis_state.NewShardedClient(redis_state.ShardedClientOpts{
 		UnshardedClient:        unshardedClient,
@@ -47,12 +42,70 @@ func TestGetBatchInfo(t *testing.T) {
 		QueueDefaultKey:        redis_state.QueueDefaultKey,
 		FnRunIsSharded:         redis_state.NeverShardOnRun,
 	})
+	queueClient := unshardedClient.Queue()
 
-	batchClient := shardedClient.Batch()
+	opts := []queue.QueueOpt{
+		queue.WithKindToQueueMapping(map[string]string{
+			queue.KindScheduleBatch: queue.KindScheduleBatch,
+		}),
+	}
+	shard := redis_state.NewQueueShard(consts.DefaultQueueShardName, queueClient, opts...)
+
+	q, err := queue.New(
+		context.Background(),
+		"batch-test",
+		shard,
+		map[string]queue.QueueShard{
+			consts.DefaultQueueShardName: shard,
+		},
+		func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
+			return shard, nil
+		},
+		opts...,
+	)
+	require.NoError(t, err)
+
+	return batch.NewRedisBatchManager(shardedClient.Batch(), q)
+}
+
+func setupDebouncer(t *testing.T, rc rueidis.Client) debounce.Debouncer {
+	unshardedClient := redis_state.NewUnshardedClient(rc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
+	debounceClient := unshardedClient.Debounce()
+	queueClient := unshardedClient.Queue()
+
+	opts := []queue.QueueOpt{
+		queue.WithKindToQueueMapping(map[string]string{
+			queue.KindDebounce: queue.KindDebounce,
+		}),
+	}
+	shard := redis_state.NewQueueShard(consts.DefaultQueueShardName, queueClient, opts...)
+
+	q, err := queue.New(
+		context.Background(),
+		"debounce-test",
+		shard,
+		map[string]queue.QueueShard{
+			consts.DefaultQueueShardName: shard,
+		},
+		func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
+			return shard, nil
+		},
+		opts...,
+	)
+	require.NoError(t, err)
+
+	return debounce.NewRedisDebouncer(debounceClient, shard, q)
+}
+
+func TestGetBatchInfo(t *testing.T) {
+	rc, _ := setupTestRedis(t)
+	ctx := context.Background()
+
+	batchManager := setupBatchManager(t, rc)
 
 	// Create debug API instance
 	d := &debugAPI{
-		batchClient: batchClient,
+		batchManager: batchManager,
 	}
 
 	accountID := uuid.New()
@@ -73,18 +126,15 @@ func TestGetBatchInfo(t *testing.T) {
 	})
 
 	t.Run("batch with items exists", func(t *testing.T) {
-		// Create a batch manually in Redis
-		batchKey := "my-batch-key"
-		encodedBatchKey := batch.HashBatchKey(batchKey)
+		// Create a batch using the batch manager
+		fn := inngest.Function{
+			ID: functionID,
+			EventBatch: &inngest.EventBatchConfig{
+				MaxSize: 10,
+				Timeout: "60s",
+			},
+		}
 
-		batchID := ulid.MustNew(ulid.Now(), rand.Reader)
-
-		// Set the batch pointer
-		pointerKey := batchClient.KeyGenerator().BatchPointerWithKey(ctx, functionID, encodedBatchKey)
-		err := rc.Do(ctx, rc.B().Set().Key(pointerKey).Value(batchID.String()).Build()).Error()
-		require.NoError(t, err)
-
-		// Add batch items
 		eventID := ulid.MustNew(ulid.Now(), rand.Reader)
 		batchItem := batch.BatchItem{
 			AccountID:       accountID,
@@ -98,21 +148,19 @@ func TestGetBatchInfo(t *testing.T) {
 				Data: map[string]any{"foo": "bar"},
 			},
 		}
-		itemBytes, err := json.Marshal(batchItem)
-		require.NoError(t, err)
 
-		batchListKey := batchClient.KeyGenerator().Batch(ctx, functionID, batchID)
-		err = rc.Do(ctx, rc.B().Rpush().Key(batchListKey).Element(string(itemBytes)).Build()).Error()
+		result, err := batchManager.Append(ctx, batchItem, fn)
 		require.NoError(t, err)
+		require.NotEmpty(t, result.BatchID)
 
-		// Query the batch
+		// Query the batch using the default key (no batch key expression)
 		resp, err := d.GetBatchInfo(ctx, &BatchInfoRequest{
 			FunctionID: functionID.String(),
-			BatchKey:   batchKey,
+			BatchKey:   "default",
 			AccountID:  accountID.String(),
 		})
 		require.NoError(t, err)
-		require.Equal(t, batchID.String(), resp.BatchID)
+		require.Equal(t, result.BatchID, resp.BatchID)
 		require.Equal(t, int32(1), resp.ItemCount)
 		require.Len(t, resp.Items, 1)
 		require.Equal(t, eventID.String(), resp.Items[0].EventID)
@@ -179,35 +227,11 @@ func TestGetDebounceInfo(t *testing.T) {
 	rc, _ := setupTestRedis(t)
 	ctx := context.Background()
 
-	// Create clients
-	unshardedClient := redis_state.NewUnshardedClient(rc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
-	debounceClient := unshardedClient.Debounce()
-	queueClient := unshardedClient.Queue()
-
-	opts := []queue.QueueOpt{
-		queue.WithKindToQueueMapping(map[string]string{
-			queue.KindDebounce: queue.KindDebounce,
-		}),
-	}
-	shard := redis_state.NewQueueShard(consts.DefaultQueueShardName, queueClient, opts...)
-
-	q, err := queue.New(
-		ctx,
-		"debounce-test",
-		shard,
-		map[string]queue.QueueShard{
-			consts.DefaultQueueShardName: shard,
-		},
-		func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
-			return shard, nil
-		},
-		opts...,
-	)
-	require.NoError(t, err)
+	redisDebouncer := setupDebouncer(t, rc)
 
 	// Create debug API instance
 	d := &debugAPI{
-		debounceClient: debounceClient,
+		debouncer: redisDebouncer,
 	}
 
 	accountID := uuid.New()
@@ -226,9 +250,6 @@ func TestGetDebounceInfo(t *testing.T) {
 	})
 
 	t.Run("debounce exists", func(t *testing.T) {
-		// Create a debounce using the real debouncer
-		redisDebouncer := debounce.NewRedisDebouncer(debounceClient, shard, q)
-
 		eventID := ulid.MustNew(ulid.Now(), rand.Reader)
 		di := debounce.DebounceItem{
 			AccountID:       accountID,
@@ -273,19 +294,19 @@ func TestGetDebounceInfo(t *testing.T) {
 	})
 }
 
-func TestGetBatchInfoNilClient(t *testing.T) {
+func TestGetBatchInfoNilManager(t *testing.T) {
 	d := &debugAPI{
-		batchClient: nil,
+		batchManager: nil,
 	}
 
 	_, err := d.GetBatchInfo(context.Background(), &BatchInfoRequest{
 		FunctionID: uuid.New().String(),
 	})
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "batch client not configured")
+	require.Contains(t, err.Error(), "batch manager not configured")
 }
 
-func TestGetSingletonInfoNilClient(t *testing.T) {
+func TestGetSingletonInfoNilStore(t *testing.T) {
 	d := &debugAPI{
 		singletonStore: nil,
 	}
@@ -298,33 +319,24 @@ func TestGetSingletonInfoNilClient(t *testing.T) {
 	require.Contains(t, err.Error(), "singleton store not configured")
 }
 
-func TestGetDebounceInfoNilClient(t *testing.T) {
+func TestGetDebounceInfoNilDebouncer(t *testing.T) {
 	d := &debugAPI{
-		debounceClient: nil,
+		debouncer: nil,
 	}
 
 	_, err := d.GetDebounceInfo(context.Background(), &DebounceInfoRequest{
 		FunctionID: uuid.New().String(),
 	})
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "debounce client not configured")
+	require.Contains(t, err.Error(), "debouncer not configured")
 }
 
 func TestGetBatchInfoInvalidFunctionID(t *testing.T) {
 	rc, _ := setupTestRedis(t)
-
-	unshardedClient := redis_state.NewUnshardedClient(rc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
-	shardedClient := redis_state.NewShardedClient(redis_state.ShardedClientOpts{
-		UnshardedClient:        unshardedClient,
-		FunctionRunStateClient: rc,
-		BatchClient:            rc,
-		StateDefaultKey:        redis_state.StateDefaultKey,
-		QueueDefaultKey:        redis_state.QueueDefaultKey,
-		FnRunIsSharded:         redis_state.NeverShardOnRun,
-	})
+	batchManager := setupBatchManager(t, rc)
 
 	d := &debugAPI{
-		batchClient: shardedClient.Batch(),
+		batchManager: batchManager,
 	}
 
 	_, err := d.GetBatchInfo(context.Background(), &BatchInfoRequest{
@@ -361,11 +373,10 @@ func TestGetSingletonInfoInvalidAccountID(t *testing.T) {
 
 func TestGetDebounceInfoInvalidFunctionID(t *testing.T) {
 	rc, _ := setupTestRedis(t)
-
-	unshardedClient := redis_state.NewUnshardedClient(rc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
+	redisDebouncer := setupDebouncer(t, rc)
 
 	d := &debugAPI{
-		debounceClient: unshardedClient.Debounce(),
+		debouncer: redisDebouncer,
 	}
 
 	_, err := d.GetDebounceInfo(context.Background(), &DebounceInfoRequest{
