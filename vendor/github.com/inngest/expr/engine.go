@@ -143,16 +143,6 @@ func (p ExpressionPart) EqualsStored(n *StoredExpressionPart) bool {
 	return p.Hash() == n.PredicateID
 }
 
-func (p ExpressionPart) Equals(n ExpressionPart) bool {
-	if p.GroupID != n.GroupID {
-		return false
-	}
-	if p.Predicate.String() != n.Predicate.String() {
-		return false
-	}
-	return p.Parsed.EvaluableID == n.Parsed.EvaluableID
-}
-
 func (p ExpressionPart) ToStored() *StoredExpressionPart {
 	var id uuid.UUID
 	if p.Parsed != nil {

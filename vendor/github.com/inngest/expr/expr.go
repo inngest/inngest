@@ -79,7 +79,10 @@ type AggregateEvaluator[T Evaluable] interface {
 	SlowLen() int
 
 	// Close stops background goroutines and releases resources
-	Close() error
+	Close()
+
+	// PendingDeletes returns the number of soft-deleted items awaiting GC
+	PendingDeletes() int
 }
 
 type AggregateEvaluatorOpts[T Evaluable] struct {
@@ -281,9 +284,17 @@ func (a *aggregator[T]) SlowLen() int {
 	return len(a.constants)
 }
 
-func (a *aggregator[T]) Close() error {
+func (a *aggregator[T]) Close() {
 	close(a.stopGC)
-	return nil
+}
+
+func (a *aggregator[T]) PendingDeletes() int {
+	count := 0
+	a.deleted.Range(func(_, _ any) bool {
+		count++
+		return true
+	})
+	return count
 }
 
 func (a *aggregator[T]) Evaluate(ctx context.Context, data map[string]any) ([]T, int32, error) {
@@ -819,19 +830,6 @@ func (a *aggregator[T]) iterGroupStats(ctx context.Context, node *Node) (exprAgg
 	}
 
 	return *stats, nil
-}
-
-func (a *aggregator[T]) removeConstantEvaluable(_ context.Context, eval Evaluable) error {
-	a.lock.Lock()
-	defer a.lock.Unlock()
-
-	// Find the index of the evaluable in constants and yank out.
-	if _, ok := a.constants[eval.GetID()]; !ok {
-		return ErrEvaluableNotFound
-	}
-
-	delete(a.constants, eval.GetID())
-	return nil
 }
 
 // gcEvalInfo tracks metadata for evaluables being garbage collected

@@ -98,7 +98,6 @@ func (customLibrary) CompileOptions() []cel.EnvOption {
 			func(d *decls.FunctionDecl) (*decls.FunctionDecl, error) {
 				return &copied, nil
 			},
-			decls.DisableTypeGuards(true),
 		)
 		envOpts = append(envOpts, opt)
 	}

@@ -45,9 +45,7 @@ func NewAggregator(
 		ItemsToPrune(uint32(size) / 4).
 		OnDelete(func(item *ccache.Item) {
 			if bk, ok := item.Value().(*bookkeeper); ok {
-				if err := bk.ae.Close(); err != nil {
-					log.Error("error closing aggregate evaluator on eviction", "error", err)
-				}
+				bk.ae.Close()
 			}
 		}))
 
