@@ -426,6 +426,18 @@ func (r *GetSpanBySpanIDRow) ToSQLite() (*sqlc.GetSpanBySpanIDRow, error) {
 	}, nil
 }
 
+func (r *GetMetadataSpansByParentSpanIDRow) ToSQLite() (*sqlc.GetMetadataSpansByParentSpanIDRow, error) {
+	return &sqlc.GetMetadataSpansByParentSpanIDRow{
+		RunID:         r.RunID,
+		TraceID:       r.TraceID,
+		DynamicSpanID: r.DynamicSpanID,
+		ParentSpanID:  r.ParentSpanID,
+		StartTime:     r.StartTime,
+		EndTime:       r.EndTime,
+		SpanFragments: r.SpanFragments,
+	}, nil
+}
+
 func (r *GetSpanOutputRow) ToSQLite() (*sqlc.GetSpanOutputRow, error) {
 	var input, output interface{}
 
