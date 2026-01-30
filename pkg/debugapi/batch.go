@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/execution/batch"
 	pb "github.com/inngest/inngest/proto/gen/debug/v1"
 )
@@ -88,27 +89,18 @@ func (d *debugAPI) RunBatch(ctx context.Context, req *pb.RunBatchRequest) (*pb.R
 		return nil, fmt.Errorf("invalid function_id: %w", err)
 	}
 
-	accountID, err := uuid.Parse(req.GetAccountId())
+	// Resolve workspace and app IDs from function
+	fn, err := d.db.GetFunctionByInternalUUID(ctx, fnID)
 	if err != nil {
-		return nil, fmt.Errorf("invalid account_id: %w", err)
-	}
-
-	workspaceID, err := uuid.Parse(req.GetWorkspaceId())
-	if err != nil {
-		return nil, fmt.Errorf("invalid workspace_id: %w", err)
-	}
-
-	appID, err := uuid.Parse(req.GetAppId())
-	if err != nil {
-		return nil, fmt.Errorf("invalid app_id: %w", err)
+		return nil, fmt.Errorf("could not retrieve function: %w", err)
 	}
 
 	result, err := d.batchManager.RunBatch(ctx, batch.RunBatchOpts{
 		FunctionID:  fnID,
 		BatchKey:    req.GetBatchKey(),
-		AccountID:   accountID,
-		WorkspaceID: workspaceID,
-		AppID:       appID,
+		AccountID:   consts.DevServerAccountID,
+		WorkspaceID: fn.EnvID,
+		AppID:       fn.AppID,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to run batch: %w", err)
