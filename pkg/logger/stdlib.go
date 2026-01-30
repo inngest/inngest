@@ -10,6 +10,7 @@ import (
 	"os"
 	"runtime/debug"
 	"strings"
+	"sync"
 
 	"github.com/getsentry/sentry-go"
 	"github.com/lmittmann/tint"
@@ -18,6 +19,32 @@ import (
 var stdlibCtxKey = stdlibKey{}
 
 type stdlibKey struct{}
+
+// ConditionalCheckFn is a function that checks if logging should be enabled.
+// It receives the context and returns false if logging should be skipped.
+// This is set by the conditional package to enable context-based conditional logging.
+type ConditionalCheckFn func(ctx context.Context) bool
+
+var (
+	conditionalCheckFn ConditionalCheckFn
+	conditionalCheckMu sync.RWMutex
+)
+
+// RegisterConditionalCheck registers a function that will be called by From()
+// to determine if logging should be enabled. This is used by the conditional
+// package to integrate scope-based logging.
+func RegisterConditionalCheck(fn ConditionalCheckFn) {
+	conditionalCheckMu.Lock()
+	defer conditionalCheckMu.Unlock()
+	conditionalCheckFn = fn
+}
+
+// getConditionalCheck returns the registered conditional check function.
+func getConditionalCheck() ConditionalCheckFn {
+	conditionalCheckMu.RLock()
+	defer conditionalCheckMu.RUnlock()
+	return conditionalCheckFn
+}
 
 type handler int
 
@@ -201,7 +228,18 @@ func newLogger(opts ...LoggerOpt) Logger {
 
 // From returns the stdlib logger in context, or a new logger
 // if none stored.
+//
+// If a conditional check function has been registered (via RegisterConditionalCheck)
+// and the context has a conditional scope set, From will return a VoidLogger if
+// logging is disabled for that scope.
 func From(ctx context.Context, opts ...LoggerOpt) Logger {
+	// Check for conditional scope in context
+	if fn := getConditionalCheck(); fn != nil {
+		if !fn(ctx) {
+			return VoidLogger()
+		}
+	}
+
 	l := ctx.Value(stdlibCtxKey)
 	if l == nil {
 		return newLogger(opts...)
