@@ -34,6 +34,8 @@ const (
 	Debug_GetSingletonInfo_FullMethodName    = "/debug.v1.Debug/GetSingletonInfo"
 	Debug_DeleteSingletonLock_FullMethodName = "/debug.v1.Debug/DeleteSingletonLock"
 	Debug_GetDebounceInfo_FullMethodName     = "/debug.v1.Debug/GetDebounceInfo"
+	Debug_DeleteDebounce_FullMethodName      = "/debug.v1.Debug/DeleteDebounce"
+	Debug_RunDebounce_FullMethodName         = "/debug.v1.Debug/RunDebounce"
 )
 
 // DebugClient is the client API for Debug service.
@@ -69,6 +71,10 @@ type DebugClient interface {
 	DeleteSingletonLock(ctx context.Context, in *DeleteSingletonLockRequest, opts ...grpc.CallOption) (*DeleteSingletonLockResponse, error)
 	// GetDebounceInfo retrieves the currently debounced event for a function and debounce key.
 	GetDebounceInfo(ctx context.Context, in *DebounceInfoRequest, opts ...grpc.CallOption) (*DebounceInfoResponse, error)
+	// DeleteDebounce deletes a debounce for a function and debounce key.
+	DeleteDebounce(ctx context.Context, in *DeleteDebounceRequest, opts ...grpc.CallOption) (*DeleteDebounceResponse, error)
+	// RunDebounce triggers immediate execution of a debounce.
+	RunDebounce(ctx context.Context, in *RunDebounceRequest, opts ...grpc.CallOption) (*RunDebounceResponse, error)
 }
 
 type debugClient struct {
@@ -219,6 +225,26 @@ func (c *debugClient) GetDebounceInfo(ctx context.Context, in *DebounceInfoReque
 	return out, nil
 }
 
+func (c *debugClient) DeleteDebounce(ctx context.Context, in *DeleteDebounceRequest, opts ...grpc.CallOption) (*DeleteDebounceResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeleteDebounceResponse)
+	err := c.cc.Invoke(ctx, Debug_DeleteDebounce_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *debugClient) RunDebounce(ctx context.Context, in *RunDebounceRequest, opts ...grpc.CallOption) (*RunDebounceResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RunDebounceResponse)
+	err := c.cc.Invoke(ctx, Debug_RunDebounce_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // DebugServer is the server API for Debug service.
 // All implementations must embed UnimplementedDebugServer
 // for forward compatibility.
@@ -252,6 +278,10 @@ type DebugServer interface {
 	DeleteSingletonLock(context.Context, *DeleteSingletonLockRequest) (*DeleteSingletonLockResponse, error)
 	// GetDebounceInfo retrieves the currently debounced event for a function and debounce key.
 	GetDebounceInfo(context.Context, *DebounceInfoRequest) (*DebounceInfoResponse, error)
+	// DeleteDebounce deletes a debounce for a function and debounce key.
+	DeleteDebounce(context.Context, *DeleteDebounceRequest) (*DeleteDebounceResponse, error)
+	// RunDebounce triggers immediate execution of a debounce.
+	RunDebounce(context.Context, *RunDebounceRequest) (*RunDebounceResponse, error)
 	mustEmbedUnimplementedDebugServer()
 }
 
@@ -303,6 +333,12 @@ func (UnimplementedDebugServer) DeleteSingletonLock(context.Context, *DeleteSing
 }
 func (UnimplementedDebugServer) GetDebounceInfo(context.Context, *DebounceInfoRequest) (*DebounceInfoResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetDebounceInfo not implemented")
+}
+func (UnimplementedDebugServer) DeleteDebounce(context.Context, *DeleteDebounceRequest) (*DeleteDebounceResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeleteDebounce not implemented")
+}
+func (UnimplementedDebugServer) RunDebounce(context.Context, *RunDebounceRequest) (*RunDebounceResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RunDebounce not implemented")
 }
 func (UnimplementedDebugServer) mustEmbedUnimplementedDebugServer() {}
 func (UnimplementedDebugServer) testEmbeddedByValue()               {}
@@ -577,6 +613,42 @@ func _Debug_GetDebounceInfo_Handler(srv interface{}, ctx context.Context, dec fu
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Debug_DeleteDebounce_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteDebounceRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DebugServer).DeleteDebounce(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Debug_DeleteDebounce_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DebugServer).DeleteDebounce(ctx, req.(*DeleteDebounceRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Debug_RunDebounce_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RunDebounceRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DebugServer).RunDebounce(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Debug_RunDebounce_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DebugServer).RunDebounce(ctx, req.(*RunDebounceRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Debug_ServiceDesc is the grpc.ServiceDesc for Debug service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -639,6 +711,14 @@ var Debug_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetDebounceInfo",
 			Handler:    _Debug_GetDebounceInfo_Handler,
+		},
+		{
+			MethodName: "DeleteDebounce",
+			Handler:    _Debug_DeleteDebounce_Handler,
+		},
+		{
+			MethodName: "RunDebounce",
+			Handler:    _Debug_RunDebounce_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

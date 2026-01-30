@@ -195,6 +195,262 @@ func (x *DebounceInfoResponse) GetFunctionId() string {
 	return ""
 }
 
+// DeleteDebounceRequest is used to delete a debounce for a function and debounce key.
+type DeleteDebounceRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// function_id is the UUID of the function.
+	FunctionId string `protobuf:"bytes,1,opt,name=function_id,json=functionId,proto3" json:"function_id,omitempty"`
+	// debounce_key is the evaluated debounce key (from the key expression or function_id).
+	DebounceKey string `protobuf:"bytes,2,opt,name=debounce_key,json=debounceKey,proto3" json:"debounce_key,omitempty"`
+	// account_id is required for shard selection.
+	AccountId     string `protobuf:"bytes,3,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteDebounceRequest) Reset() {
+	*x = DeleteDebounceRequest{}
+	mi := &file_debug_v1_debounce_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteDebounceRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteDebounceRequest) ProtoMessage() {}
+
+func (x *DeleteDebounceRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_debug_v1_debounce_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteDebounceRequest.ProtoReflect.Descriptor instead.
+func (*DeleteDebounceRequest) Descriptor() ([]byte, []int) {
+	return file_debug_v1_debounce_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *DeleteDebounceRequest) GetFunctionId() string {
+	if x != nil {
+		return x.FunctionId
+	}
+	return ""
+}
+
+func (x *DeleteDebounceRequest) GetDebounceKey() string {
+	if x != nil {
+		return x.DebounceKey
+	}
+	return ""
+}
+
+func (x *DeleteDebounceRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+// DeleteDebounceResponse contains information about the deleted debounce.
+type DeleteDebounceResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// deleted indicates whether a debounce was found and deleted.
+	Deleted bool `protobuf:"varint,1,opt,name=deleted,proto3" json:"deleted,omitempty"`
+	// debounce_id is the ULID of the deleted debounce, if one was deleted.
+	DebounceId string `protobuf:"bytes,2,opt,name=debounce_id,json=debounceId,proto3" json:"debounce_id,omitempty"`
+	// event_id is the ULID of the event that was debounced.
+	EventId       string `protobuf:"bytes,3,opt,name=event_id,json=eventId,proto3" json:"event_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteDebounceResponse) Reset() {
+	*x = DeleteDebounceResponse{}
+	mi := &file_debug_v1_debounce_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteDebounceResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteDebounceResponse) ProtoMessage() {}
+
+func (x *DeleteDebounceResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_debug_v1_debounce_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteDebounceResponse.ProtoReflect.Descriptor instead.
+func (*DeleteDebounceResponse) Descriptor() ([]byte, []int) {
+	return file_debug_v1_debounce_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *DeleteDebounceResponse) GetDeleted() bool {
+	if x != nil {
+		return x.Deleted
+	}
+	return false
+}
+
+func (x *DeleteDebounceResponse) GetDebounceId() string {
+	if x != nil {
+		return x.DebounceId
+	}
+	return ""
+}
+
+func (x *DeleteDebounceResponse) GetEventId() string {
+	if x != nil {
+		return x.EventId
+	}
+	return ""
+}
+
+// RunDebounceRequest is used to trigger immediate execution of a debounce.
+type RunDebounceRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// function_id is the UUID of the function.
+	FunctionId string `protobuf:"bytes,1,opt,name=function_id,json=functionId,proto3" json:"function_id,omitempty"`
+	// debounce_key is the evaluated debounce key (from the key expression or function_id).
+	DebounceKey string `protobuf:"bytes,2,opt,name=debounce_key,json=debounceKey,proto3" json:"debounce_key,omitempty"`
+	// account_id is required for shard selection.
+	AccountId     string `protobuf:"bytes,3,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RunDebounceRequest) Reset() {
+	*x = RunDebounceRequest{}
+	mi := &file_debug_v1_debounce_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RunDebounceRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RunDebounceRequest) ProtoMessage() {}
+
+func (x *RunDebounceRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_debug_v1_debounce_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RunDebounceRequest.ProtoReflect.Descriptor instead.
+func (*RunDebounceRequest) Descriptor() ([]byte, []int) {
+	return file_debug_v1_debounce_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *RunDebounceRequest) GetFunctionId() string {
+	if x != nil {
+		return x.FunctionId
+	}
+	return ""
+}
+
+func (x *RunDebounceRequest) GetDebounceKey() string {
+	if x != nil {
+		return x.DebounceKey
+	}
+	return ""
+}
+
+func (x *RunDebounceRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+// RunDebounceResponse contains information about the scheduled debounce execution.
+type RunDebounceResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// scheduled indicates whether a debounce was found and scheduled.
+	Scheduled bool `protobuf:"varint,1,opt,name=scheduled,proto3" json:"scheduled,omitempty"`
+	// debounce_id is the ULID of the debounce that was scheduled.
+	DebounceId string `protobuf:"bytes,2,opt,name=debounce_id,json=debounceId,proto3" json:"debounce_id,omitempty"`
+	// event_id is the ULID of the event that was debounced.
+	EventId       string `protobuf:"bytes,3,opt,name=event_id,json=eventId,proto3" json:"event_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RunDebounceResponse) Reset() {
+	*x = RunDebounceResponse{}
+	mi := &file_debug_v1_debounce_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RunDebounceResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RunDebounceResponse) ProtoMessage() {}
+
+func (x *RunDebounceResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_debug_v1_debounce_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RunDebounceResponse.ProtoReflect.Descriptor instead.
+func (*RunDebounceResponse) Descriptor() ([]byte, []int) {
+	return file_debug_v1_debounce_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *RunDebounceResponse) GetScheduled() bool {
+	if x != nil {
+		return x.Scheduled
+	}
+	return false
+}
+
+func (x *RunDebounceResponse) GetDebounceId() string {
+	if x != nil {
+		return x.DebounceId
+	}
+	return ""
+}
+
+func (x *RunDebounceResponse) GetEventId() string {
+	if x != nil {
+		return x.EventId
+	}
+	return ""
+}
+
 var File_debug_v1_debounce_proto protoreflect.FileDescriptor
 
 const file_debug_v1_debounce_proto_rawDesc = "" +
@@ -218,7 +474,29 @@ const file_debug_v1_debounce_proto_rawDesc = "" +
 	"account_id\x18\x06 \x01(\tR\taccountId\x12!\n" +
 	"\fworkspace_id\x18\a \x01(\tR\vworkspaceId\x12\x1f\n" +
 	"\vfunction_id\x18\b \x01(\tR\n" +
-	"functionIdB5Z3github.com/inngest/inngest/proto/gen/debug/v1;debugb\x06proto3"
+	"functionId\"z\n" +
+	"\x15DeleteDebounceRequest\x12\x1f\n" +
+	"\vfunction_id\x18\x01 \x01(\tR\n" +
+	"functionId\x12!\n" +
+	"\fdebounce_key\x18\x02 \x01(\tR\vdebounceKey\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x03 \x01(\tR\taccountId\"n\n" +
+	"\x16DeleteDebounceResponse\x12\x18\n" +
+	"\adeleted\x18\x01 \x01(\bR\adeleted\x12\x1f\n" +
+	"\vdebounce_id\x18\x02 \x01(\tR\n" +
+	"debounceId\x12\x19\n" +
+	"\bevent_id\x18\x03 \x01(\tR\aeventId\"w\n" +
+	"\x12RunDebounceRequest\x12\x1f\n" +
+	"\vfunction_id\x18\x01 \x01(\tR\n" +
+	"functionId\x12!\n" +
+	"\fdebounce_key\x18\x02 \x01(\tR\vdebounceKey\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x03 \x01(\tR\taccountId\"o\n" +
+	"\x13RunDebounceResponse\x12\x1c\n" +
+	"\tscheduled\x18\x01 \x01(\bR\tscheduled\x12\x1f\n" +
+	"\vdebounce_id\x18\x02 \x01(\tR\n" +
+	"debounceId\x12\x19\n" +
+	"\bevent_id\x18\x03 \x01(\tR\aeventIdB5Z3github.com/inngest/inngest/proto/gen/debug/v1;debugb\x06proto3"
 
 var (
 	file_debug_v1_debounce_proto_rawDescOnce sync.Once
@@ -232,10 +510,14 @@ func file_debug_v1_debounce_proto_rawDescGZIP() []byte {
 	return file_debug_v1_debounce_proto_rawDescData
 }
 
-var file_debug_v1_debounce_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_debug_v1_debounce_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_debug_v1_debounce_proto_goTypes = []any{
-	(*DebounceInfoRequest)(nil),  // 0: debug.v1.DebounceInfoRequest
-	(*DebounceInfoResponse)(nil), // 1: debug.v1.DebounceInfoResponse
+	(*DebounceInfoRequest)(nil),    // 0: debug.v1.DebounceInfoRequest
+	(*DebounceInfoResponse)(nil),   // 1: debug.v1.DebounceInfoResponse
+	(*DeleteDebounceRequest)(nil),  // 2: debug.v1.DeleteDebounceRequest
+	(*DeleteDebounceResponse)(nil), // 3: debug.v1.DeleteDebounceResponse
+	(*RunDebounceRequest)(nil),     // 4: debug.v1.RunDebounceRequest
+	(*RunDebounceResponse)(nil),    // 5: debug.v1.RunDebounceResponse
 }
 var file_debug_v1_debounce_proto_depIdxs = []int32{
 	0, // [0:0] is the sub-list for method output_type
@@ -256,7 +538,7 @@ func file_debug_v1_debounce_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_debug_v1_debounce_proto_rawDesc), len(file_debug_v1_debounce_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   2,
+			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

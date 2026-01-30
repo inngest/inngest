@@ -153,6 +153,11 @@ type Debouncer interface {
 	// GetDebounceInfo retrieves information about the current debounce for a function and debounce key.
 	// This is used for debugging and introspection.
 	GetDebounceInfo(ctx context.Context, functionID uuid.UUID, debounceKey string) (*DebounceInfo, error)
+	// DeleteDebounce deletes the current debounce for a function and debounce key.
+	// Returns information about the deleted debounce.
+	DeleteDebounce(ctx context.Context, functionID uuid.UUID, debounceKey string) (*DeleteDebounceResult, error)
+	// RunDebounce schedules immediate execution of a debounce by creating a timeout job that runs in one second.
+	RunDebounce(ctx context.Context, opts RunDebounceOpts) (*RunDebounceResult, error)
 }
 
 // DebounceInfo contains information about a debounce for debugging purposes.
@@ -161,6 +166,33 @@ type DebounceInfo struct {
 	DebounceID string
 	// Item contains the debounced item, if found.
 	Item *DebounceItem
+}
+
+// DeleteDebounceResult contains information about a deleted debounce.
+type DeleteDebounceResult struct {
+	// Deleted indicates whether a debounce was found and deleted.
+	Deleted bool
+	// DebounceID is the ULID of the deleted debounce, if one was deleted.
+	DebounceID string
+	// EventID is the ULID of the event that was debounced.
+	EventID string
+}
+
+// RunDebounceOpts contains options for running a debounce immediately.
+type RunDebounceOpts struct {
+	FunctionID  uuid.UUID
+	DebounceKey string
+	AccountID   uuid.UUID
+}
+
+// RunDebounceResult contains information about a scheduled debounce execution.
+type RunDebounceResult struct {
+	// Scheduled indicates whether a debounce was found and scheduled.
+	Scheduled bool
+	// DebounceID is the ULID of the debounce that was scheduled.
+	DebounceID string
+	// EventID is the ULID of the event that was debounced.
+	EventID string
 }
 
 func NewRedisDebouncer(primaryDebounceClient *redis_state.DebounceClient, primaryQueueShard queue.QueueShard, primaryQueueManager queue.QueueManager) Debouncer {
@@ -1034,6 +1066,116 @@ func (d debouncer) GetDebounceInfo(ctx context.Context, functionID uuid.UUID, de
 	return &DebounceInfo{
 		DebounceID: debounceIDStr,
 		Item:       &di,
+	}, nil
+}
+
+// DeleteDebounce deletes the current debounce for a function and debounce key.
+func (d debouncer) DeleteDebounce(ctx context.Context, functionID uuid.UUID, debounceKey string) (*DeleteDebounceResult, error) {
+	// Get the debounce info first
+	info, err := d.GetDebounceInfo(ctx, functionID, debounceKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get debounce info: %w", err)
+	}
+
+	if info.DebounceID == "" || info.Item == nil {
+		// No active debounce to delete
+		return &DeleteDebounceResult{
+			Deleted:    false,
+			DebounceID: "",
+			EventID:    "",
+		}, nil
+	}
+
+	debounceID, err := ulid.Parse(info.DebounceID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid debounce ID: %w", err)
+	}
+
+	// Use function ID as debounce key if not specified (same as GetDebounceInfo)
+	if debounceKey == "" {
+		debounceKey = functionID.String()
+	}
+
+	// Always use the primary client for debugging
+	client := d.primaryDebounceClient
+	if client == nil {
+		return nil, fmt.Errorf("debounce client not configured")
+	}
+
+	// Delete the debounce item from the hash
+	err = d.deleteDebounceItem(ctx, debounceID, client)
+	if err != nil {
+		return nil, fmt.Errorf("failed to delete debounce item: %w", err)
+	}
+
+	// Delete the debounce pointer
+	debouncePointerKey := client.KeyGenerator().DebouncePointer(ctx, functionID, debounceKey)
+	err = client.Client().Do(ctx, client.Client().B().Del().Key(debouncePointerKey).Build()).Error()
+	if err != nil && !rueidis.IsRedisNil(err) {
+		return nil, fmt.Errorf("failed to delete debounce pointer: %w", err)
+	}
+
+	// Try to remove the queue item (best effort)
+	if d.primaryQueueShard != nil && d.primaryQueueShard.Name() != "" {
+		queueItemId := queue.HashID(ctx, debounceID.String())
+		_ = d.primaryQueueShard.RemoveQueueItem(ctx, queue.KindDebounce, queueItemId)
+	}
+
+	return &DeleteDebounceResult{
+		Deleted:    true,
+		DebounceID: info.DebounceID,
+		EventID:    info.Item.EventID.String(),
+	}, nil
+}
+
+// RunDebounce schedules immediate execution of a debounce by creating a timeout job that runs in one second.
+func (d debouncer) RunDebounce(ctx context.Context, opts RunDebounceOpts) (*RunDebounceResult, error) {
+	// Get the debounce info first
+	info, err := d.GetDebounceInfo(ctx, opts.FunctionID, opts.DebounceKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get debounce info: %w", err)
+	}
+
+	if info.DebounceID == "" || info.Item == nil {
+		// No active debounce to run
+		return &RunDebounceResult{
+			Scheduled:  false,
+			DebounceID: "",
+			EventID:    "",
+		}, nil
+	}
+
+	debounceID, err := ulid.Parse(info.DebounceID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid debounce ID: %w", err)
+	}
+
+	// Use the primary queue manager
+	queueManager := d.primaryQueueManager
+	if queueManager == nil {
+		return nil, fmt.Errorf("queue manager not configured")
+	}
+
+	queueShard := d.primaryQueueShard
+	if queueShard == nil || queueShard.Name() == "" {
+		return nil, fmt.Errorf("queue shard not configured")
+	}
+
+	// Requeue the debounce to run in 1 second
+	err = queueManager.RequeueByJobID(
+		ctx,
+		queueShard,
+		debounceID.String(),
+		time.Now().Add(time.Second),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to requeue debounce: %w", err)
+	}
+
+	return &RunDebounceResult{
+		Scheduled:  true,
+		DebounceID: info.DebounceID,
+		EventID:    info.Item.EventID.String(),
 	}, nil
 }
 

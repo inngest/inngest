@@ -589,3 +589,174 @@ func TestDeleteSingletonLockInvalidAccountID(t *testing.T) {
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "invalid account_id")
 }
+
+// TestDeleteDebounceHandler tests the debug API handler for deleting debounces.
+func TestDeleteDebounceHandler(t *testing.T) {
+	rc, _ := setupTestRedis(t)
+	ctx := context.Background()
+
+	redisDebouncer := setupDebouncer(t, rc)
+	d := &debugAPI{debouncer: redisDebouncer}
+
+	accountID := uuid.New()
+	workspaceID := uuid.New()
+	appID := uuid.New()
+	functionID := uuid.New()
+
+	// Create a debounce
+	eventID := ulid.MustNew(ulid.Now(), rand.Reader)
+	di := debounce.DebounceItem{
+		AccountID:       accountID,
+		WorkspaceID:     workspaceID,
+		AppID:           appID,
+		FunctionID:      functionID,
+		FunctionVersion: 1,
+		EventID:         eventID,
+		Event: event.Event{
+			Name:      "test/debounce-event",
+			ID:        eventID.String(),
+			Timestamp: time.Now().UnixMilli(),
+			Data:      map[string]any{"key": "value"},
+		},
+	}
+
+	fn := inngest.Function{
+		ID: functionID,
+		Debounce: &inngest.Debounce{
+			Key:     nil,
+			Period:  "10s",
+			Timeout: util.StrPtr("60s"),
+		},
+	}
+
+	err := redisDebouncer.Debounce(ctx, di, fn)
+	require.NoError(t, err)
+
+	// Test handler correctly deletes the debounce
+	resp, err := d.DeleteDebounce(ctx, &pb.DeleteDebounceRequest{
+		FunctionId:  functionID.String(),
+		DebounceKey: functionID.String(),
+		AccountId:   accountID.String(),
+	})
+	require.NoError(t, err)
+	require.True(t, resp.Deleted)
+	require.NotEmpty(t, resp.DebounceId)
+	require.Equal(t, eventID.String(), resp.EventId)
+
+	// Verify debounce no longer exists
+	infoResp, err := d.GetDebounceInfo(ctx, &pb.DebounceInfoRequest{
+		FunctionId:  functionID.String(),
+		DebounceKey: functionID.String(),
+		AccountId:   accountID.String(),
+	})
+	require.NoError(t, err)
+	require.False(t, infoResp.HasDebounce)
+}
+
+// TestRunDebounceHandler tests the debug API handler for running debounces.
+func TestRunDebounceHandler(t *testing.T) {
+	rc, _ := setupTestRedis(t)
+	ctx := context.Background()
+
+	redisDebouncer := setupDebouncer(t, rc)
+	d := &debugAPI{debouncer: redisDebouncer}
+
+	accountID := uuid.New()
+	workspaceID := uuid.New()
+	appID := uuid.New()
+	functionID := uuid.New()
+
+	// Create a debounce
+	eventID := ulid.MustNew(ulid.Now(), rand.Reader)
+	di := debounce.DebounceItem{
+		AccountID:       accountID,
+		WorkspaceID:     workspaceID,
+		AppID:           appID,
+		FunctionID:      functionID,
+		FunctionVersion: 1,
+		EventID:         eventID,
+		Event: event.Event{
+			Name:      "test/debounce-event",
+			ID:        eventID.String(),
+			Timestamp: time.Now().UnixMilli(),
+			Data:      map[string]any{"key": "value"},
+		},
+	}
+
+	fn := inngest.Function{
+		ID: functionID,
+		Debounce: &inngest.Debounce{
+			Key:     nil,
+			Period:  "10s",
+			Timeout: util.StrPtr("60s"),
+		},
+	}
+
+	err := redisDebouncer.Debounce(ctx, di, fn)
+	require.NoError(t, err)
+
+	// Test handler correctly schedules the debounce
+	resp, err := d.RunDebounce(ctx, &pb.RunDebounceRequest{
+		FunctionId:  functionID.String(),
+		DebounceKey: functionID.String(),
+		AccountId:   accountID.String(),
+	})
+	require.NoError(t, err)
+	require.True(t, resp.Scheduled)
+	require.NotEmpty(t, resp.DebounceId)
+	require.Equal(t, eventID.String(), resp.EventId)
+}
+
+func TestDeleteDebounceNilDebouncer(t *testing.T) {
+	d := &debugAPI{
+		debouncer: nil,
+	}
+
+	_, err := d.DeleteDebounce(context.Background(), &pb.DeleteDebounceRequest{
+		FunctionId: uuid.New().String(),
+	})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "debouncer not configured")
+}
+
+func TestRunDebounceNilDebouncer(t *testing.T) {
+	d := &debugAPI{
+		debouncer: nil,
+	}
+
+	_, err := d.RunDebounce(context.Background(), &pb.RunDebounceRequest{
+		FunctionId: uuid.New().String(),
+	})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "debouncer not configured")
+}
+
+func TestDeleteDebounceInvalidFunctionID(t *testing.T) {
+	rc, _ := setupTestRedis(t)
+	redisDebouncer := setupDebouncer(t, rc)
+
+	d := &debugAPI{
+		debouncer: redisDebouncer,
+	}
+
+	_, err := d.DeleteDebounce(context.Background(), &pb.DeleteDebounceRequest{
+		FunctionId: "invalid-uuid",
+	})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "invalid function_id")
+}
+
+func TestRunDebounceInvalidFunctionID(t *testing.T) {
+	rc, _ := setupTestRedis(t)
+	redisDebouncer := setupDebouncer(t, rc)
+
+	d := &debugAPI{
+		debouncer: redisDebouncer,
+	}
+
+	_, err := d.RunDebounce(context.Background(), &pb.RunDebounceRequest{
+		FunctionId: "invalid-uuid",
+	})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "invalid function_id")
+}

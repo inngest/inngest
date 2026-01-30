@@ -42,5 +42,9 @@ service Debug {
   rpc DeleteSingletonLock(DeleteSingletonLockRequest) returns (DeleteSingletonLockResponse) {}
   // GetDebounceInfo retrieves the currently debounced event for a function and debounce key.
   rpc GetDebounceInfo(DebounceInfoRequest) returns (DebounceInfoResponse) {}
+  // DeleteDebounce deletes a debounce for a function and debounce key.
+  rpc DeleteDebounce(DeleteDebounceRequest) returns (DeleteDebounceResponse) {}
+  // RunDebounce triggers immediate execution of a debounce.
+  rpc RunDebounce(RunDebounceRequest) returns (RunDebounceResponse) {}
 }
 

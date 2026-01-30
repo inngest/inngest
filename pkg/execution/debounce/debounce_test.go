@@ -2069,3 +2069,204 @@ func TestGetDebounceInfo(t *testing.T) {
 		require.Nil(t, info.Item)
 	})
 }
+
+func TestDeleteDebounce(t *testing.T) {
+	unshardedCluster := miniredis.RunT(t)
+
+	unshardedRc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{unshardedCluster.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+
+	unshardedClient := redis_state.NewUnshardedClient(unshardedRc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
+	debounceClient := unshardedClient.Debounce()
+
+	opts := []queue.QueueOpt{
+		queue.WithKindToQueueMapping(map[string]string{
+			queue.KindDebounce: queue.KindDebounce,
+		}),
+	}
+
+	shard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), opts...)
+
+	q, err := queue.New(
+		context.Background(),
+		"debounce-test",
+		shard,
+		map[string]queue.QueueShard{
+			consts.DefaultQueueShardName: shard,
+		},
+		func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
+			return shard, nil
+		},
+		opts...,
+	)
+	require.NoError(t, err)
+
+	redisDebouncer := NewRedisDebouncer(debounceClient, shard, q)
+
+	ctx := context.Background()
+	accountId, workspaceId, appId := uuid.New(), uuid.New(), uuid.New()
+
+	t.Run("delete non-existent debounce returns deleted=false", func(t *testing.T) {
+		nonExistentFnId := uuid.New()
+		result, err := redisDebouncer.DeleteDebounce(ctx, nonExistentFnId, nonExistentFnId.String())
+		require.NoError(t, err)
+		require.False(t, result.Deleted)
+		require.Equal(t, "", result.DebounceID)
+		require.Equal(t, "", result.EventID)
+	})
+
+	t.Run("delete existing debounce", func(t *testing.T) {
+		functionId := uuid.New()
+		fn := inngest.Function{
+			ID: functionId,
+			Debounce: &inngest.Debounce{
+				Key:     nil,
+				Period:  "10s",
+				Timeout: util.StrPtr("60s"),
+			},
+		}
+
+		eventId := ulid.MustNew(ulid.Now(), rand.Reader)
+		di := DebounceItem{
+			AccountID:       accountId,
+			WorkspaceID:     workspaceId,
+			AppID:           appId,
+			FunctionID:      functionId,
+			FunctionVersion: 1,
+			EventID:         eventId,
+			Event: event.Event{
+				Name:      "test/debounce-event",
+				ID:        eventId.String(),
+				Timestamp: time.Now().UnixMilli(),
+				Data:      map[string]any{"key": "value"},
+			},
+		}
+
+		err := redisDebouncer.Debounce(ctx, di, fn)
+		require.NoError(t, err)
+
+		// Verify debounce exists
+		info, err := redisDebouncer.GetDebounceInfo(ctx, functionId, functionId.String())
+		require.NoError(t, err)
+		require.NotEmpty(t, info.DebounceID)
+		require.NotNil(t, info.Item)
+		debounceID := info.DebounceID
+
+		// Delete the debounce
+		result, err := redisDebouncer.DeleteDebounce(ctx, functionId, functionId.String())
+		require.NoError(t, err)
+		require.True(t, result.Deleted)
+		require.Equal(t, debounceID, result.DebounceID)
+		require.Equal(t, eventId.String(), result.EventID)
+
+		// Verify debounce no longer exists
+		infoAfter, err := redisDebouncer.GetDebounceInfo(ctx, functionId, functionId.String())
+		require.NoError(t, err)
+		require.Equal(t, "", infoAfter.DebounceID)
+		require.Nil(t, infoAfter.Item)
+	})
+}
+
+func TestRunDebounce(t *testing.T) {
+	unshardedCluster := miniredis.RunT(t)
+
+	unshardedRc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{unshardedCluster.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+
+	unshardedClient := redis_state.NewUnshardedClient(unshardedRc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
+	debounceClient := unshardedClient.Debounce()
+
+	opts := []queue.QueueOpt{
+		queue.WithKindToQueueMapping(map[string]string{
+			queue.KindDebounce: queue.KindDebounce,
+		}),
+	}
+
+	shard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), opts...)
+
+	q, err := queue.New(
+		context.Background(),
+		"debounce-test",
+		shard,
+		map[string]queue.QueueShard{
+			consts.DefaultQueueShardName: shard,
+		},
+		func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
+			return shard, nil
+		},
+		opts...,
+	)
+	require.NoError(t, err)
+
+	redisDebouncer := NewRedisDebouncer(debounceClient, shard, q)
+
+	ctx := context.Background()
+	accountId, workspaceId, appId := uuid.New(), uuid.New(), uuid.New()
+
+	t.Run("run non-existent debounce returns scheduled=false", func(t *testing.T) {
+		nonExistentFnId := uuid.New()
+		result, err := redisDebouncer.RunDebounce(ctx, RunDebounceOpts{
+			FunctionID:  nonExistentFnId,
+			DebounceKey: nonExistentFnId.String(),
+			AccountID:   accountId,
+		})
+		require.NoError(t, err)
+		require.False(t, result.Scheduled)
+		require.Equal(t, "", result.DebounceID)
+		require.Equal(t, "", result.EventID)
+	})
+
+	t.Run("run existing debounce", func(t *testing.T) {
+		functionId := uuid.New()
+		fn := inngest.Function{
+			ID: functionId,
+			Debounce: &inngest.Debounce{
+				Key:     nil,
+				Period:  "10s",
+				Timeout: util.StrPtr("60s"),
+			},
+		}
+
+		eventId := ulid.MustNew(ulid.Now(), rand.Reader)
+		di := DebounceItem{
+			AccountID:       accountId,
+			WorkspaceID:     workspaceId,
+			AppID:           appId,
+			FunctionID:      functionId,
+			FunctionVersion: 1,
+			EventID:         eventId,
+			Event: event.Event{
+				Name:      "test/debounce-event",
+				ID:        eventId.String(),
+				Timestamp: time.Now().UnixMilli(),
+				Data:      map[string]any{"key": "value"},
+			},
+		}
+
+		err := redisDebouncer.Debounce(ctx, di, fn)
+		require.NoError(t, err)
+
+		// Verify debounce exists
+		info, err := redisDebouncer.GetDebounceInfo(ctx, functionId, functionId.String())
+		require.NoError(t, err)
+		require.NotEmpty(t, info.DebounceID)
+		debounceID := info.DebounceID
+
+		// Run the debounce
+		result, err := redisDebouncer.RunDebounce(ctx, RunDebounceOpts{
+			FunctionID:  functionId,
+			DebounceKey: functionId.String(),
+			AccountID:   accountId,
+		})
+		require.NoError(t, err)
+		require.True(t, result.Scheduled)
+		require.Equal(t, debounceID, result.DebounceID)
+		require.Equal(t, eventId.String(), result.EventID)
+	})
+}
