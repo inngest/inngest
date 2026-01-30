@@ -22,6 +22,7 @@ require (
 	github.com/davecgh/go-spew v1.1.1
 	github.com/dmarkham/enumer v1.5.8
 	github.com/docker/docker v28.3.3+incompatible
+	github.com/docker/go-connections v0.6.0
 	github.com/doug-martin/goqu/v9 v9.19.0
 	github.com/dustinkirkland/golang-petname v0.0.0-20191129215211-8e5a1ed0cff0
 	github.com/eko/gocache/lib/v4 v4.1.5
@@ -77,7 +78,8 @@ require (
 	github.com/sqlc-dev/pqtype v0.3.0
 	github.com/stretchr/testify v1.10.0
 	github.com/testcontainers/testcontainers-go v0.39.0
-	github.com/twmb/franz-go v1.18.1
+	github.com/twmb/franz-go v1.20.4
+	github.com/twmb/franz-go/pkg/kadm v1.17.0
 	github.com/urfave/cli/v3 v3.3.8
 	github.com/valyala/fastjson v1.6.4
 	github.com/vektah/gqlparser/v2 v2.5.15
@@ -160,7 +162,6 @@ require (
 	github.com/cpuguy83/dockercfg v0.3.2 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.4 // indirect
 	github.com/distribution/reference v0.6.0 // indirect
-	github.com/docker/go-connections v0.6.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/ebitengine/purego v0.8.4 // indirect
@@ -258,7 +259,7 @@ require (
 	github.com/tidwall/btree v1.7.0 // indirect
 	github.com/tklauser/go-sysconf v0.3.12 // indirect
 	github.com/tklauser/numcpus v0.6.1 // indirect
-	github.com/twmb/franz-go/pkg/kmsg v1.9.0 // indirect
+	github.com/twmb/franz-go/pkg/kmsg v1.12.0 // indirect
 	github.com/urfave/cli/v2 v2.25.1 // indirect
 	github.com/xrash/smetrics v0.0.0-20201216005158-039620a65673 // indirect
 	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect

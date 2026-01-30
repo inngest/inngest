@@ -110,3 +110,12 @@ func GaugeShadowPartitionSize(ctx context.Context, value int64, opts GaugeOpt) {
 		Tags:        opts.Tags,
 	})
 }
+
+func GaugeKafkaProducerBufferSize(ctx context.Context, value int64, opts GaugeOpt) {
+	RecordGaugeMetric(ctx, value, GaugeOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "kafka_producer_buffer_size",
+		Description: "The number of records buffered in the Kafka producer",
+		Tags:        opts.Tags,
+	})
+}
