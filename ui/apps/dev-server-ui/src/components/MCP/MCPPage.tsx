@@ -1,7 +1,15 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 
 export default function MCPPage() {
   const [copiedText, setCopiedText] = useState<string | null>(null);
+
+  // Get dynamic MCP endpoint based on current location
+  const mcpEndpoint = useMemo(() => {
+    if (typeof window === 'undefined') return 'http://127.0.0.1:8288/mcp';
+    const hostname = window.location.hostname || '127.0.0.1';
+    const port = window.location.port || '8288';
+    return `http://${hostname}:${port}/mcp`;
+  }, []);
 
   const copyToClipboard = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
@@ -9,15 +17,37 @@ export default function MCPPage() {
     setTimeout(() => setCopiedText(null), 2000);
   };
 
+  // Generate config strings with dynamic endpoint
+  const claudeCodeCommand = `claude mcp add --transport http inngest-dev ${mcpEndpoint}`;
+  const cursorConfig = `{
+  "mcpServers": {
+    "inngest-dev": {
+      "url": "${mcpEndpoint}"
+    }
+  }
+}`;
+  const claudeDesktopConfig = `{
+  "mcpServers": {
+    "inngest-dev": {
+      "command": "curl",
+      "args": [
+        "-X", "POST",
+        "${mcpEndpoint}",
+        "-H", "Content-Type: application/json",
+        "-d", "@-"
+      ]
+    }
+  }
+}`;
+
   return (
     <div className="bg-canvasBase min-h-screen">
       <div className="border-subtle border-b bg-canvasBase sticky top-0 z-10">
         <div className="mx-auto max-w-5xl px-8 py-6">
-          <h1 className="text-basis text-3xl font-semibold">
-            AI Development Tools
-          </h1>
+          <h1 className="text-basis text-3xl font-semibold">MCP Setup</h1>
           <p className="text-muted mt-2 text-base">
-            Model Context Protocol (MCP) integration for AI-assisted development
+            Connect your AI assistant to this dev server using the Model Context
+            Protocol (MCP)
           </p>
         </div>
       </div>
@@ -25,249 +55,129 @@ export default function MCPPage() {
       <div className="mx-auto max-w-5xl px-8 py-8">
         <section className="mb-12">
           <h2 className="text-basis mb-4 text-2xl font-semibold">
-            What is MCP?
+            MCP Endpoint
           </h2>
-          <p className="text-basis mb-4 text-base leading-relaxed">
-            <a
-              href="https://modelcontextprotocol.io/introduction"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-link hover:underline"
-            >
-              Model Context Protocol (MCP)
-            </a>{' '}
-            is a standard for connecting AI assistants to external tools and
-            data sources. The Inngest MCP integration provides AI tools like
-            Claude Code and Cursor with:
-          </p>
-          <ul className="text-basis ml-6 list-disc space-y-2 text-base">
-            <li>
-              <strong>Complete function visibility</strong> - List and inspect
-              all registered functions
-            </li>
-            <li>
-              <strong>Event triggering</strong> - Send events to test functions
-              and workflows
-            </li>
-            <li>
-              <strong>Real-time monitoring</strong> - Track function execution
-              and debug failures
-            </li>
-            <li>
-              <strong>Documentation access</strong> - Search and read Inngest
-              documentation offline
-            </li>
-            <li>
-              <strong>Direct function invocation</strong> - Execute functions
-              synchronously with immediate results
-            </li>
-          </ul>
-          <div className="bg-canvasSubtle border-info mt-6 rounded border-l-4 p-4">
-            <p className="text-basis text-sm">
-              The Inngest MCP server runs locally with your dev server and
-              requires no external dependencies, API keys, or internet
-              connection to function.
+          <div className="bg-canvasSubtle border-subtle rounded border p-4">
+            <div className="flex items-center justify-between gap-4">
+              <code className="text-basis flex-1 break-all text-lg font-mono">
+                {mcpEndpoint}
+              </code>
+              <button
+                onClick={() => copyToClipboard(mcpEndpoint, 'endpoint')}
+                className="bg-canvasBase border-subtle hover:bg-canvasMuted shrink-0 rounded border px-4 py-2 text-sm font-medium transition-colors"
+              >
+                {copiedText === 'endpoint' ? 'Copied!' : 'Copy'}
+              </button>
+            </div>
+            <p className="text-muted mt-3 text-sm">
+              Use this URL to connect your AI assistant to the Inngest dev
+              server.
             </p>
           </div>
         </section>
 
         <section className="mb-12">
           <h2 className="text-basis mb-4 text-2xl font-semibold">
-            Quick Start
+            Connect Your AI Tool
           </h2>
 
-          <div className="mb-6">
-            <h3 className="text-basis mb-3 text-xl font-semibold">
-              1. Start the Inngest Dev Server
-            </h3>
-            <p className="text-basis mb-3 text-base">
-              The MCP server is automatically available when you start the
-              Inngest dev server:
-            </p>
+          <div className="mb-4">
+            <h3 className="text-basis mb-2 text-lg font-medium">Claude Code</h3>
             <div className="bg-canvasSubtle border-subtle relative rounded border">
               <div className="border-subtle flex items-center justify-between border-b px-4 py-2">
                 <span className="text-muted text-xs font-medium">bash</span>
                 <button
+                  onClick={() => copyToClipboard(claudeCodeCommand, 'claude')}
+                  className="text-muted hover:text-basis text-xs"
+                >
+                  {copiedText === 'claude' ? 'Copied!' : 'Copy'}
+                </button>
+              </div>
+              <pre className="overflow-x-auto p-4">
+                <code className="text-basis text-sm">{claudeCodeCommand}</code>
+              </pre>
+            </div>
+          </div>
+
+          <div className="mb-4">
+            <h3 className="text-basis mb-2 text-lg font-medium">Cursor</h3>
+            <p className="text-muted mb-2 text-sm">
+              Add to{' '}
+              <code className="bg-canvasSubtle rounded px-1.5 py-0.5">
+                .cursor/mcp.json
+              </code>
+            </p>
+            <div className="bg-canvasSubtle border-subtle relative rounded border">
+              <div className="border-subtle flex items-center justify-between border-b px-4 py-2">
+                <span className="text-muted text-xs font-medium">json</span>
+                <button
+                  onClick={() => copyToClipboard(cursorConfig, 'cursor')}
+                  className="text-muted hover:text-basis text-xs"
+                >
+                  {copiedText === 'cursor' ? 'Copied!' : 'Copy'}
+                </button>
+              </div>
+              <pre className="overflow-x-auto p-4">
+                <code className="text-basis text-sm">{cursorConfig}</code>
+              </pre>
+            </div>
+          </div>
+
+          <div className="mb-4">
+            <h3 className="text-basis mb-2 text-lg font-medium">
+              Claude Desktop
+            </h3>
+            <p className="text-muted mb-2 text-sm">
+              Add to Claude Desktop configuration
+            </p>
+            <div className="bg-canvasSubtle border-subtle relative rounded border">
+              <div className="border-subtle flex items-center justify-between border-b px-4 py-2">
+                <span className="text-muted text-xs font-medium">json</span>
+                <button
                   onClick={() =>
-                    copyToClipboard(
-                      'npx --ignore-scripts=false inngest-cli@latest dev',
-                      'cmd1',
-                    )
+                    copyToClipboard(claudeDesktopConfig, 'desktop')
                   }
                   className="text-muted hover:text-basis text-xs"
                 >
-                  {copiedText === 'cmd1' ? 'Copied!' : 'Copy'}
+                  {copiedText === 'desktop' ? 'Copied!' : 'Copy'}
                 </button>
               </div>
               <pre className="overflow-x-auto p-4">
                 <code className="text-basis text-sm">
-                  npx --ignore-scripts=false inngest-cli@latest dev
+                  {claudeDesktopConfig}
                 </code>
               </pre>
             </div>
-            <p className="text-muted mt-2 text-sm">
-              The MCP endpoint will be available at{' '}
-              <code className="bg-canvasSubtle rounded px-1.5 py-0.5">
-                http://127.0.0.1:8288/mcp
+          </div>
+        </section>
+
+        <section className="mb-12">
+          <h2 className="text-basis mb-4 text-2xl font-semibold">
+            Start Building with AI
+          </h2>
+          <p className="text-basis mb-3 text-base">
+            Once connected, you can ask your AI assistant to:
+          </p>
+          <div className="space-y-2">
+            <div className="bg-canvasSubtle border-subtle rounded border p-3">
+              <code className="text-basis text-sm">
+                List all my Inngest functions and their triggers
               </code>
-            </p>
-          </div>
-
-          <div className="mb-6">
-            <h3 className="text-basis mb-3 text-xl font-semibold">
-              2. Connect Your AI Tool
-            </h3>
-
-            <div className="mb-4">
-              <h4 className="text-basis mb-2 text-lg font-medium">
-                Claude Code
-              </h4>
-              <div className="bg-canvasSubtle border-subtle relative rounded border">
-                <div className="border-subtle flex items-center justify-between border-b px-4 py-2">
-                  <span className="text-muted text-xs font-medium">bash</span>
-                  <button
-                    onClick={() =>
-                      copyToClipboard(
-                        'claude mcp add --transport http inngest-dev http://127.0.0.1:8288/mcp',
-                        'claude',
-                      )
-                    }
-                    className="text-muted hover:text-basis text-xs"
-                  >
-                    {copiedText === 'claude' ? 'Copied!' : 'Copy'}
-                  </button>
-                </div>
-                <pre className="overflow-x-auto p-4">
-                  <code className="text-basis text-sm">
-                    claude mcp add --transport http inngest-dev
-                    http://127.0.0.1:8288/mcp
-                  </code>
-                </pre>
-              </div>
             </div>
-
-            <div className="mb-4">
-              <h4 className="text-basis mb-2 text-lg font-medium">Cursor</h4>
-              <p className="text-muted mb-2 text-sm">
-                Add to{' '}
-                <code className="bg-canvasSubtle rounded px-1.5 py-0.5">
-                  .cursor/mcp.json
-                </code>
-              </p>
-              <div className="bg-canvasSubtle border-subtle relative rounded border">
-                <div className="border-subtle flex items-center justify-between border-b px-4 py-2">
-                  <span className="text-muted text-xs font-medium">json</span>
-                  <button
-                    onClick={() =>
-                      copyToClipboard(
-                        `{
-  "mcpServers": {
-    "inngest-dev": {
-      "url": "http://127.0.0.1:8288/mcp"
-    }
-  }
-}`,
-                        'cursor',
-                      )
-                    }
-                    className="text-muted hover:text-basis text-xs"
-                  >
-                    {copiedText === 'cursor' ? 'Copied!' : 'Copy'}
-                  </button>
-                </div>
-                <pre className="overflow-x-auto p-4">
-                  <code className="text-basis text-sm">{`{
-  "mcpServers": {
-    "inngest-dev": {
-      "url": "http://127.0.0.1:8288/mcp"
-    }
-  }
-}`}</code>
-                </pre>
-              </div>
+            <div className="bg-canvasSubtle border-subtle rounded border p-3">
+              <code className="text-basis text-sm">
+                Send a test event to trigger the user signup workflow
+              </code>
             </div>
-
-            <div className="mb-4">
-              <h4 className="text-basis mb-2 text-lg font-medium">
-                Claude Desktop
-              </h4>
-              <p className="text-muted mb-2 text-sm">
-                Add to Claude Desktop configuration
-              </p>
-              <div className="bg-canvasSubtle border-subtle relative rounded border">
-                <div className="border-subtle flex items-center justify-between border-b px-4 py-2">
-                  <span className="text-muted text-xs font-medium">json</span>
-                  <button
-                    onClick={() =>
-                      copyToClipboard(
-                        `{
-  "mcpServers": {
-    "inngest-dev": {
-      "command": "curl",
-      "args": [
-        "-X", "POST",
-        "http://127.0.0.1:8288/mcp",
-        "-H", "Content-Type: application/json",
-        "-d", "@-"
-      ]
-    }
-  }
-}`,
-                        'desktop',
-                      )
-                    }
-                    className="text-muted hover:text-basis text-xs"
-                  >
-                    {copiedText === 'desktop' ? 'Copied!' : 'Copy'}
-                  </button>
-                </div>
-                <pre className="overflow-x-auto p-4">
-                  <code className="text-basis text-sm">{`{
-  "mcpServers": {
-    "inngest-dev": {
-      "command": "curl",
-      "args": [
-        "-X", "POST",
-        "http://127.0.0.1:8288/mcp",
-        "-H", "Content-Type: application/json",
-        "-d", "@-"
-      ]
-    }
-  }
-}`}</code>
-                </pre>
-              </div>
+            <div className="bg-canvasSubtle border-subtle rounded border p-3">
+              <code className="text-basis text-sm">
+                Monitor the function run and show me any errors
+              </code>
             </div>
-          </div>
-
-          <div className="mb-6">
-            <h3 className="text-basis mb-3 text-xl font-semibold">
-              3. Start Building with AI
-            </h3>
-            <p className="text-basis mb-3 text-base">
-              Once connected, you can ask your AI assistant to:
-            </p>
-            <div className="space-y-2">
-              <div className="bg-canvasSubtle border-subtle rounded border p-3">
-                <code className="text-basis text-sm">
-                  List all my Inngest functions and their triggers
-                </code>
-              </div>
-              <div className="bg-canvasSubtle border-subtle rounded border p-3">
-                <code className="text-basis text-sm">
-                  Send a test event to trigger the user signup workflow
-                </code>
-              </div>
-              <div className="bg-canvasSubtle border-subtle rounded border p-3">
-                <code className="text-basis text-sm">
-                  Monitor the function run and show me any errors
-                </code>
-              </div>
-              <div className="bg-canvasSubtle border-subtle rounded border p-3">
-                <code className="text-basis text-sm">
-                  Search the docs for rate limiting examples
-                </code>
-              </div>
+            <div className="bg-canvasSubtle border-subtle rounded border p-3">
+              <code className="text-basis text-sm">
+                Search the docs for rate limiting examples
+              </code>
             </div>
           </div>
         </section>
@@ -602,16 +512,11 @@ export default function MCPPage() {
               MCP server not found
             </h3>
             <ul className="text-basis ml-4 list-disc space-y-1 text-sm">
-              <li>
-                Ensure the Inngest dev server is running:{' '}
-                <code className="bg-canvasBase rounded px-1 py-0.5">
-                  npx --ignore-scripts=false inngest-cli@latest dev
-                </code>
-              </li>
+              <li>Restart the dev server if the endpoint is unresponsive</li>
               <li>
                 Verify the MCP endpoint is accessible:{' '}
                 <code className="bg-canvasBase rounded px-1 py-0.5">
-                  curl http://127.0.0.1:8288/mcp
+                  curl {mcpEndpoint}
                 </code>
               </li>
               <li>Check your MCP client configuration</li>
