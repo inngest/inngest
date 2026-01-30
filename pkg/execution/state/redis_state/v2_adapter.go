@@ -90,6 +90,7 @@ func (v v2) Create(ctx context.Context, s state.CreateState) (state.State, error
 		SpanID:         s.Metadata.Config.SpanID,
 		Steps:          s.Steps,
 		StepInputs:     s.StepInputs,
+		RequestVersion: &s.Metadata.Config.RequestVersion,
 	})
 	switch err {
 	case nil:

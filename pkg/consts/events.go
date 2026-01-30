@@ -9,4 +9,5 @@ const (
 	FnCancelledName = InternalNamePrefix + "function.cancelled"
 	FnInvokeName    = InternalNamePrefix + "function.invoked"
 	FnCronName      = InternalNamePrefix + "scheduled.timer"
+	HttpRequestName = InternalNamePrefix + "http.request"
 )

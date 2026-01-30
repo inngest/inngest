@@ -27,6 +27,10 @@ const (
 	// XXX: This is exctracted from httpdriver and needs documenting.
 	HeaderKeyRequestVersion = "x-inngest-req-version"
 
+	// HeaderInngestStepID represents the step we wish to execute when
+	// processing parallel steps.
+	HeaderInngestStepID = "X-Inngest-Step-ID"
+
 	HeaderAuthorization = "Authorization"
 	HeaderContentType   = "Content-Type"
 	HeaderUserAgent     = "User-Agent"
