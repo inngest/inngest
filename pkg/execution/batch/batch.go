@@ -2,6 +2,8 @@ package batch
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/base64"
 	"fmt"
 	"time"
 
@@ -11,6 +13,13 @@ import (
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/oklog/ulid/v2"
 )
+
+// HashBatchKey hashes a batch key using SHA256 and encodes it as base64.
+// This is used to create a consistent key for batch pointers.
+func HashBatchKey(batchKey string) string {
+	hashedBatchKey := sha256.Sum256([]byte(batchKey))
+	return base64.StdEncoding.EncodeToString(hashedBatchKey[:])
+}
 
 // BatchManager represents an implementation-agnostic event batching, running functions
 // only when either the specified buffer is full or the specified time it up.
@@ -36,6 +45,53 @@ type BatchManager interface {
 	StartExecution(ctx context.Context, functionId uuid.UUID, batchID ulid.ULID, batchPointer string) (string, error)
 	ScheduleExecution(ctx context.Context, opts ScheduleBatchOpts) error
 	DeleteKeys(ctx context.Context, functionId uuid.UUID, batchID ulid.ULID) error
+	// GetBatchInfo retrieves information about the current batch for a function and batch key.
+	// This is used for debugging and introspection.
+	GetBatchInfo(ctx context.Context, functionID uuid.UUID, batchKey string) (*BatchInfo, error)
+	// DeleteBatch deletes the current batch for a function and batch key.
+	// Returns information about the deleted batch.
+	DeleteBatch(ctx context.Context, functionID uuid.UUID, batchKey string) (*DeleteBatchResult, error)
+	// RunBatch schedules immediate execution of a batch by creating a timeout job that runs in one second.
+	RunBatch(ctx context.Context, opts RunBatchOpts) (*RunBatchResult, error)
+}
+
+// BatchInfo contains information about a batch for debugging purposes.
+type BatchInfo struct {
+	// BatchID is the current batch ULID if one exists.
+	BatchID string
+	// Items contains the batch items.
+	Items []BatchItem
+	// Status is the current batch status (pending, started, etc.).
+	Status string
+}
+
+// DeleteBatchResult contains information about a deleted batch.
+type DeleteBatchResult struct {
+	// Deleted indicates whether a batch was found and deleted.
+	Deleted bool
+	// BatchID is the ULID of the deleted batch, if one was deleted.
+	BatchID string
+	// ItemCount is the number of events that were in the deleted batch.
+	ItemCount int
+}
+
+// RunBatchOpts contains options for running a batch immediately.
+type RunBatchOpts struct {
+	FunctionID  uuid.UUID
+	BatchKey    string
+	AccountID   uuid.UUID
+	WorkspaceID uuid.UUID
+	AppID       uuid.UUID
+}
+
+// RunBatchResult contains information about a scheduled batch execution.
+type RunBatchResult struct {
+	// Scheduled indicates whether a batch was found and scheduled.
+	Scheduled bool
+	// BatchID is the ULID of the batch that was scheduled.
+	BatchID string
+	// ItemCount is the number of events in the batch.
+	ItemCount int
 }
 
 // BatchItem represents the item that are being batched.

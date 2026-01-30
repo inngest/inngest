@@ -1,0 +1,76 @@
+syntax = "proto3";
+package debug.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/inngest/inngest/proto/gen/debug/v1;debug";
+
+// DebounceInfoRequest is used to query the currently debounced event.
+message DebounceInfoRequest {
+  // function_id is the UUID of the function.
+  string function_id = 1;
+  // debounce_key is the evaluated debounce key (from the key expression or function_id).
+  string debounce_key = 2;
+  // account_id is required for shard selection.
+  string account_id = 3;
+}
+
+// DebounceInfoResponse contains information about the current debounce.
+message DebounceInfoResponse {
+  // has_debounce indicates whether there is a currently pending debounce.
+  bool has_debounce = 1;
+  // debounce_id is the ULID of the current debounce.
+  string debounce_id = 2;
+  // event_id is the ULID of the currently debounced event.
+  string event_id = 3;
+  // event_data is the JSON-encoded event payload.
+  bytes event_data = 4;
+  // timeout is the maximum timeout for the debounce, as unix milliseconds.
+  int64 timeout = 5;
+  // account_id from the debounce item.
+  string account_id = 6;
+  // workspace_id from the debounce item.
+  string workspace_id = 7;
+  // function_id from the debounce item.
+  string function_id = 8;
+}
+
+// DeleteDebounceRequest is used to delete a debounce for a function and debounce key.
+message DeleteDebounceRequest {
+  // function_id is the UUID of the function.
+  string function_id = 1;
+  // debounce_key is the evaluated debounce key (from the key expression or function_id).
+  string debounce_key = 2;
+  // account_id is required for shard selection.
+  string account_id = 3;
+}
+
+// DeleteDebounceResponse contains information about the deleted debounce.
+message DeleteDebounceResponse {
+  // deleted indicates whether a debounce was found and deleted.
+  bool deleted = 1;
+  // debounce_id is the ULID of the deleted debounce, if one was deleted.
+  string debounce_id = 2;
+  // event_id is the ULID of the event that was debounced.
+  string event_id = 3;
+}
+
+// RunDebounceRequest is used to trigger immediate execution of a debounce.
+message RunDebounceRequest {
+  // function_id is the UUID of the function.
+  string function_id = 1;
+  // debounce_key is the evaluated debounce key (from the key expression or function_id).
+  string debounce_key = 2;
+  // account_id is required for shard selection.
+  string account_id = 3;
+}
+
+// RunDebounceResponse contains information about the scheduled debounce execution.
+message RunDebounceResponse {
+  // scheduled indicates whether a debounce was found and scheduled.
+  bool scheduled = 1;
+  // debounce_id is the ULID of the debounce that was scheduled.
+  string debounce_id = 2;
+  // event_id is the ULID of the event that was debounced.
+  string event_id = 3;
+}

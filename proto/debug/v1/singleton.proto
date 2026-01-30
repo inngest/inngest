@@ -1,0 +1,36 @@
+syntax = "proto3";
+package debug.v1;
+
+option go_package = "github.com/inngest/inngest/proto/gen/debug/v1;debug";
+
+// SingletonInfoRequest is used to query the current singleton lock.
+message SingletonInfoRequest {
+  // singleton_key is the evaluated singleton key (function_id-hash or just function_id).
+  string singleton_key = 1;
+  // account_id is required for shard selection.
+  string account_id = 2;
+}
+
+// SingletonInfoResponse contains information about the current singleton lock.
+message SingletonInfoResponse {
+  // has_lock indicates whether there is currently an active singleton lock.
+  bool has_lock = 1;
+  // current_run_id is the ULID of the run that holds the lock, if any.
+  string current_run_id = 2;
+}
+
+// DeleteSingletonLockRequest is used to delete a singleton lock.
+message DeleteSingletonLockRequest {
+  // singleton_key is the evaluated singleton key (function_id-hash or just function_id).
+  string singleton_key = 1;
+  // account_id is required for shard selection.
+  string account_id = 2;
+}
+
+// DeleteSingletonLockResponse contains information about the deleted lock.
+message DeleteSingletonLockResponse {
+  // deleted indicates whether a lock was found and deleted.
+  bool deleted = 1;
+  // run_id is the ULID of the run that held the deleted lock, if any.
+  string run_id = 2;
+}
