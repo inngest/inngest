@@ -2825,22 +2825,22 @@ func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*c
 	l := logger.StdlibLogger(ctx)
 
 	// use evtIDs as post query filter
-	// evtIDs := []string{}
-	// expHandler, err := run.NewExpressionHandler(ctx,
-	// 	run.WithExpressionHandlerBlob(opt.Filter.CEL, "\n"),
-	// )
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// if expHandler.HasEventFilters() {
-	// 	evts, err := w.GetEventsByExpressions(ctx, expHandler.EventExprList)
-	// 	if err != nil {
-	// 		return nil, err
-	// 	}
-	// 	for _, e := range evts {
-	// 		evtIDs = append(evtIDs, e.ID.String())
-	// 	}
-	// }
+	evtIDs := []string{}
+	expHandler, err := run.NewExpressionHandler(ctx,
+		run.WithExpressionHandlerBlob(opt.Filter.CEL, "\n"),
+	)
+	if err != nil {
+		return nil, err
+	}
+	if expHandler.HasEventFilters() {
+		evts, err := w.GetEventsByExpressions(ctx, expHandler.EventExprList)
+		if err != nil {
+			return nil, err
+		}
+		for _, e := range evts {
+			evtIDs = append(evtIDs, e.ID.String())
+		}
+	}
 
 	builder := newSpanRunsQueryBuilder(ctx, opt)
 	filter := builder.filter
@@ -2930,8 +2930,6 @@ func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*c
 			return nil, err
 		}
 
-		// TODO Event ID filtering based on CEL filtering
-
 		if runSpanMap[span.RunID] == nil {
 			runSpanMap[span.RunID] = make(map[string][]*spanRow)
 		}
@@ -3016,6 +3014,7 @@ func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*c
 		status := enums.RunStatusRunning
 		var triggerIDs []string
 
+		var output []byte
 		for _, span := range spans {
 			if span.StartTime.Before(startTime) {
 				startTime = span.StartTime
@@ -3040,6 +3039,48 @@ func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*c
 				} else {
 					l.Debug("invalid event IDs in span", "run_id", span.RunID, "dynamic_span_id", span.DynamicSpanID, "error", err)
 				}
+			}
+
+			// Extract output from spans - use the latest non-empty output
+			if span.Output != nil && *span.Output != "" {
+				output = []byte(*span.Output)
+			}
+		}
+
+		// Filter out runs that don't have the CEL-filtered event IDs
+		if len(evtIDs) > 0 {
+			hasMatchingEvent := false
+			for _, triggerID := range triggerIDs {
+				for _, evtID := range evtIDs {
+					if triggerID == evtID {
+						hasMatchingEvent = true
+						break
+					}
+				}
+				if hasMatchingEvent {
+					break
+				}
+			}
+			if !hasMatchingEvent {
+				continue
+			}
+		}
+
+		// Filter runs by output expression
+		if expHandler.HasOutputFilters() {
+			ok, err := expHandler.MatchOutputExpressions(ctx, output)
+			if err != nil {
+				l.Error("error inspecting run for output match",
+					"error", err,
+					"output", string(output),
+					"appID", firstSpan.AppID,
+					"functionID", firstSpan.FunctionID,
+					"runID", group.runID,
+				)
+				continue
+			}
+			if !ok {
+				continue
 			}
 		}
 
@@ -3084,6 +3125,7 @@ func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*c
 			Status:      status,
 			Cursor:      cursor,
 			TriggerIDs:  triggerIDs,
+			Output:      output,
 		}
 
 		if endTime != nil {
