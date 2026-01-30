@@ -142,7 +142,6 @@ func TestGetBatchInfoHandler(t *testing.T) {
 	resp, err := d.GetBatchInfo(ctx, &pb.BatchInfoRequest{
 		FunctionId: functionID.String(),
 		BatchKey:   "default",
-		AccountId:  accountID.String(),
 	})
 	require.NoError(t, err)
 	require.Equal(t, result.BatchID, resp.BatchId)
@@ -169,7 +168,6 @@ func TestGetSingletonInfoHandler(t *testing.T) {
 
 	d := &debugAPI{singletonStore: singletonStore}
 
-	accountID := uuid.New()
 	functionID := uuid.New()
 	singletonKey := functionID.String()
 	runID := ulid.MustNew(ulid.Now(), rand.Reader)
@@ -181,8 +179,7 @@ func TestGetSingletonInfoHandler(t *testing.T) {
 
 	// Test handler correctly converts store response to protobuf
 	resp, err := d.GetSingletonInfo(ctx, &pb.SingletonInfoRequest{
-		SingletonKey: singletonKey,
-		AccountId:    accountID.String(),
+		FunctionId: functionID.String(),
 	})
 	require.NoError(t, err)
 	require.True(t, resp.HasLock)
@@ -236,7 +233,6 @@ func TestGetDebounceInfoHandler(t *testing.T) {
 	resp, err := d.GetDebounceInfo(ctx, &pb.DebounceInfoRequest{
 		FunctionId:  functionID.String(),
 		DebounceKey: functionID.String(),
-		AccountId:   accountID.String(),
 	})
 	require.NoError(t, err)
 	require.True(t, resp.HasDebounce)
@@ -265,8 +261,7 @@ func TestGetSingletonInfoNilStore(t *testing.T) {
 	}
 
 	_, err := d.GetSingletonInfo(context.Background(), &pb.SingletonInfoRequest{
-		SingletonKey: "test",
-		AccountId:    uuid.New().String(),
+		FunctionId: uuid.New().String(),
 	})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "singleton store not configured")
@@ -299,7 +294,7 @@ func TestGetBatchInfoInvalidFunctionID(t *testing.T) {
 	require.Contains(t, err.Error(), "invalid function_id")
 }
 
-func TestGetSingletonInfoInvalidAccountID(t *testing.T) {
+func TestGetSingletonInfoInvalidFunctionID(t *testing.T) {
 	rc, _ := setupTestRedis(t)
 
 	unshardedClient := redis_state.NewUnshardedClient(rc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
@@ -317,11 +312,10 @@ func TestGetSingletonInfoInvalidAccountID(t *testing.T) {
 	}
 
 	_, err := d.GetSingletonInfo(context.Background(), &pb.SingletonInfoRequest{
-		SingletonKey: "test",
-		AccountId:    "invalid-uuid",
+		FunctionId: "invalid-uuid",
 	})
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "invalid account_id")
+	require.Contains(t, err.Error(), "invalid function_id")
 }
 
 func TestGetDebounceInfoInvalidFunctionID(t *testing.T) {
@@ -382,7 +376,6 @@ func TestDeleteBatchHandler(t *testing.T) {
 	resp, err := d.DeleteBatch(ctx, &pb.DeleteBatchRequest{
 		FunctionId: functionID.String(),
 		BatchKey:   "default",
-		AccountId:  accountID.String(),
 	})
 	require.NoError(t, err)
 	require.True(t, resp.Deleted)
@@ -393,7 +386,6 @@ func TestDeleteBatchHandler(t *testing.T) {
 	infoResp, err := d.GetBatchInfo(ctx, &pb.BatchInfoRequest{
 		FunctionId: functionID.String(),
 		BatchKey:   "default",
-		AccountId:  accountID.String(),
 	})
 	require.NoError(t, err)
 	require.Equal(t, "", infoResp.BatchId)
@@ -440,11 +432,8 @@ func TestRunBatchHandler(t *testing.T) {
 
 	// Test handler correctly schedules the batch
 	resp, err := d.RunBatch(ctx, &pb.RunBatchRequest{
-		FunctionId:  functionID.String(),
-		BatchKey:    "default",
-		AccountId:   accountID.String(),
-		WorkspaceId: workspaceID.String(),
-		AppId:       appID.String(),
+		FunctionId: functionID.String(),
+		BatchKey:   "default",
 	})
 	require.NoError(t, err)
 	require.True(t, resp.Scheduled)
@@ -469,7 +458,6 @@ func TestDeleteSingletonLockHandler(t *testing.T) {
 
 	d := &debugAPI{singletonStore: singletonStore}
 
-	accountID := uuid.New()
 	functionID := uuid.New()
 	singletonKey := functionID.String()
 	runID := ulid.MustNew(ulid.Now(), rand.Reader)
@@ -481,8 +469,7 @@ func TestDeleteSingletonLockHandler(t *testing.T) {
 
 	// Test handler correctly deletes the lock
 	resp, err := d.DeleteSingletonLock(ctx, &pb.DeleteSingletonLockRequest{
-		SingletonKey: singletonKey,
-		AccountId:    accountID.String(),
+		FunctionId: functionID.String(),
 	})
 	require.NoError(t, err)
 	require.True(t, resp.Deleted)
@@ -490,8 +477,7 @@ func TestDeleteSingletonLockHandler(t *testing.T) {
 
 	// Verify lock no longer exists
 	infoResp, err := d.GetSingletonInfo(ctx, &pb.SingletonInfoRequest{
-		SingletonKey: singletonKey,
-		AccountId:    accountID.String(),
+		FunctionId: functionID.String(),
 	})
 	require.NoError(t, err)
 	require.False(t, infoResp.HasLock)
@@ -528,8 +514,7 @@ func TestDeleteSingletonLockNilStore(t *testing.T) {
 	}
 
 	_, err := d.DeleteSingletonLock(context.Background(), &pb.DeleteSingletonLockRequest{
-		SingletonKey: "test",
-		AccountId:    uuid.New().String(),
+		FunctionId: uuid.New().String(),
 	})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "singleton store not configured")
@@ -565,7 +550,7 @@ func TestRunBatchInvalidFunctionID(t *testing.T) {
 	require.Contains(t, err.Error(), "invalid function_id")
 }
 
-func TestDeleteSingletonLockInvalidAccountID(t *testing.T) {
+func TestDeleteSingletonLockInvalidFunctionID(t *testing.T) {
 	rc, _ := setupTestRedis(t)
 
 	unshardedClient := redis_state.NewUnshardedClient(rc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
@@ -583,11 +568,10 @@ func TestDeleteSingletonLockInvalidAccountID(t *testing.T) {
 	}
 
 	_, err := d.DeleteSingletonLock(context.Background(), &pb.DeleteSingletonLockRequest{
-		SingletonKey: "test",
-		AccountId:    "invalid-uuid",
+		FunctionId: "invalid-uuid",
 	})
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "invalid account_id")
+	require.Contains(t, err.Error(), "invalid function_id")
 }
 
 // TestDeleteDebounceHandler tests the debug API handler for deleting debounces.
@@ -636,7 +620,6 @@ func TestDeleteDebounceHandler(t *testing.T) {
 	resp, err := d.DeleteDebounce(ctx, &pb.DeleteDebounceRequest{
 		FunctionId:  functionID.String(),
 		DebounceKey: functionID.String(),
-		AccountId:   accountID.String(),
 	})
 	require.NoError(t, err)
 	require.True(t, resp.Deleted)
@@ -647,7 +630,6 @@ func TestDeleteDebounceHandler(t *testing.T) {
 	infoResp, err := d.GetDebounceInfo(ctx, &pb.DebounceInfoRequest{
 		FunctionId:  functionID.String(),
 		DebounceKey: functionID.String(),
-		AccountId:   accountID.String(),
 	})
 	require.NoError(t, err)
 	require.False(t, infoResp.HasDebounce)
@@ -699,7 +681,6 @@ func TestRunDebounceHandler(t *testing.T) {
 	resp, err := d.RunDebounce(ctx, &pb.RunDebounceRequest{
 		FunctionId:  functionID.String(),
 		DebounceKey: functionID.String(),
-		AccountId:   accountID.String(),
 	})
 	require.NoError(t, err)
 	require.True(t, resp.Scheduled)
