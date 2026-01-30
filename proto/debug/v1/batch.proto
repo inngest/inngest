@@ -11,8 +11,6 @@ message BatchInfoRequest {
   string function_id = 1;
   // batch_key is the optional batch key expression result. If empty, uses "default".
   string batch_key = 2;
-  // account_id is required for shard selection.
-  string account_id = 3;
 }
 
 // BatchInfoResponse contains information about the current batch.
@@ -45,8 +43,6 @@ message DeleteBatchRequest {
   string function_id = 1;
   // batch_key is the optional batch key expression result. If empty, uses "default".
   string batch_key = 2;
-  // account_id is required for shard selection.
-  string account_id = 3;
 }
 
 // DeleteBatchResponse contains information about the deleted batch.
@@ -65,12 +61,6 @@ message RunBatchRequest {
   string function_id = 1;
   // batch_key is the optional batch key expression result. If empty, uses "default".
   string batch_key = 2;
-  // account_id is required for shard selection.
-  string account_id = 3;
-  // workspace_id is required for scheduling.
-  string workspace_id = 4;
-  // app_id is required for scheduling.
-  string app_id = 5;
 }
 
 // RunBatchResponse contains information about the scheduled batch execution.

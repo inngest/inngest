@@ -28,9 +28,7 @@ type BatchInfoRequest struct {
 	// function_id is the UUID of the function.
 	FunctionId string `protobuf:"bytes,1,opt,name=function_id,json=functionId,proto3" json:"function_id,omitempty"`
 	// batch_key is the optional batch key expression result. If empty, uses "default".
-	BatchKey string `protobuf:"bytes,2,opt,name=batch_key,json=batchKey,proto3" json:"batch_key,omitempty"`
-	// account_id is required for shard selection.
-	AccountId     string `protobuf:"bytes,3,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	BatchKey      string `protobuf:"bytes,2,opt,name=batch_key,json=batchKey,proto3" json:"batch_key,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -75,13 +73,6 @@ func (x *BatchInfoRequest) GetFunctionId() string {
 func (x *BatchInfoRequest) GetBatchKey() string {
 	if x != nil {
 		return x.BatchKey
-	}
-	return ""
-}
-
-func (x *BatchInfoRequest) GetAccountId() string {
-	if x != nil {
-		return x.AccountId
 	}
 	return ""
 }
@@ -259,9 +250,7 @@ type DeleteBatchRequest struct {
 	// function_id is the UUID of the function.
 	FunctionId string `protobuf:"bytes,1,opt,name=function_id,json=functionId,proto3" json:"function_id,omitempty"`
 	// batch_key is the optional batch key expression result. If empty, uses "default".
-	BatchKey string `protobuf:"bytes,2,opt,name=batch_key,json=batchKey,proto3" json:"batch_key,omitempty"`
-	// account_id is required for shard selection.
-	AccountId     string `protobuf:"bytes,3,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	BatchKey      string `protobuf:"bytes,2,opt,name=batch_key,json=batchKey,proto3" json:"batch_key,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -306,13 +295,6 @@ func (x *DeleteBatchRequest) GetFunctionId() string {
 func (x *DeleteBatchRequest) GetBatchKey() string {
 	if x != nil {
 		return x.BatchKey
-	}
-	return ""
-}
-
-func (x *DeleteBatchRequest) GetAccountId() string {
-	if x != nil {
-		return x.AccountId
 	}
 	return ""
 }
@@ -387,13 +369,7 @@ type RunBatchRequest struct {
 	// function_id is the UUID of the function.
 	FunctionId string `protobuf:"bytes,1,opt,name=function_id,json=functionId,proto3" json:"function_id,omitempty"`
 	// batch_key is the optional batch key expression result. If empty, uses "default".
-	BatchKey string `protobuf:"bytes,2,opt,name=batch_key,json=batchKey,proto3" json:"batch_key,omitempty"`
-	// account_id is required for shard selection.
-	AccountId string `protobuf:"bytes,3,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
-	// workspace_id is required for scheduling.
-	WorkspaceId string `protobuf:"bytes,4,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
-	// app_id is required for scheduling.
-	AppId         string `protobuf:"bytes,5,opt,name=app_id,json=appId,proto3" json:"app_id,omitempty"`
+	BatchKey      string `protobuf:"bytes,2,opt,name=batch_key,json=batchKey,proto3" json:"batch_key,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -438,27 +414,6 @@ func (x *RunBatchRequest) GetFunctionId() string {
 func (x *RunBatchRequest) GetBatchKey() string {
 	if x != nil {
 		return x.BatchKey
-	}
-	return ""
-}
-
-func (x *RunBatchRequest) GetAccountId() string {
-	if x != nil {
-		return x.AccountId
-	}
-	return ""
-}
-
-func (x *RunBatchRequest) GetWorkspaceId() string {
-	if x != nil {
-		return x.WorkspaceId
-	}
-	return ""
-}
-
-func (x *RunBatchRequest) GetAppId() string {
-	if x != nil {
-		return x.AppId
 	}
 	return ""
 }
@@ -531,13 +486,11 @@ var File_debug_v1_batch_proto protoreflect.FileDescriptor
 
 const file_debug_v1_batch_proto_rawDesc = "" +
 	"\n" +
-	"\x14debug/v1/batch.proto\x12\bdebug.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"o\n" +
+	"\x14debug/v1/batch.proto\x12\bdebug.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"P\n" +
 	"\x10BatchInfoRequest\x12\x1f\n" +
 	"\vfunction_id\x18\x01 \x01(\tR\n" +
 	"functionId\x12\x1b\n" +
-	"\tbatch_key\x18\x02 \x01(\tR\bbatchKey\x12\x1d\n" +
-	"\n" +
-	"account_id\x18\x03 \x01(\tR\taccountId\"\x95\x01\n" +
+	"\tbatch_key\x18\x02 \x01(\tR\bbatchKey\"\x95\x01\n" +
 	"\x11BatchInfoResponse\x12\x19\n" +
 	"\bbatch_id\x18\x01 \x01(\tR\abatchId\x12\x1d\n" +
 	"\n" +
@@ -554,26 +507,20 @@ const file_debug_v1_batch_proto_rawDesc = "" +
 	"functionId\x12)\n" +
 	"\x10function_version\x18\x06 \x01(\x05R\x0ffunctionVersion\x12\x1d\n" +
 	"\n" +
-	"event_data\x18\a \x01(\fR\teventData\"q\n" +
+	"event_data\x18\a \x01(\fR\teventData\"R\n" +
 	"\x12DeleteBatchRequest\x12\x1f\n" +
 	"\vfunction_id\x18\x01 \x01(\tR\n" +
 	"functionId\x12\x1b\n" +
-	"\tbatch_key\x18\x02 \x01(\tR\bbatchKey\x12\x1d\n" +
-	"\n" +
-	"account_id\x18\x03 \x01(\tR\taccountId\"i\n" +
+	"\tbatch_key\x18\x02 \x01(\tR\bbatchKey\"i\n" +
 	"\x13DeleteBatchResponse\x12\x18\n" +
 	"\adeleted\x18\x01 \x01(\bR\adeleted\x12\x19\n" +
 	"\bbatch_id\x18\x02 \x01(\tR\abatchId\x12\x1d\n" +
 	"\n" +
-	"item_count\x18\x03 \x01(\x05R\titemCount\"\xa8\x01\n" +
+	"item_count\x18\x03 \x01(\x05R\titemCount\"O\n" +
 	"\x0fRunBatchRequest\x12\x1f\n" +
 	"\vfunction_id\x18\x01 \x01(\tR\n" +
 	"functionId\x12\x1b\n" +
-	"\tbatch_key\x18\x02 \x01(\tR\bbatchKey\x12\x1d\n" +
-	"\n" +
-	"account_id\x18\x03 \x01(\tR\taccountId\x12!\n" +
-	"\fworkspace_id\x18\x04 \x01(\tR\vworkspaceId\x12\x15\n" +
-	"\x06app_id\x18\x05 \x01(\tR\x05appId\"j\n" +
+	"\tbatch_key\x18\x02 \x01(\tR\bbatchKey\"j\n" +
 	"\x10RunBatchResponse\x12\x1c\n" +
 	"\tscheduled\x18\x01 \x01(\bR\tscheduled\x12\x19\n" +
 	"\bbatch_id\x18\x02 \x01(\tR\abatchId\x12\x1d\n" +

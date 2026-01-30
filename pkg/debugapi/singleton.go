@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/execution/singleton"
 	pb "github.com/inngest/inngest/proto/gen/debug/v1"
 )
@@ -21,13 +22,19 @@ func (d *debugAPI) GetSingletonInfo(ctx context.Context, req *pb.SingletonInfoRe
 		return nil, fmt.Errorf("singleton store does not implement SingletonStore interface")
 	}
 
-	accountID, err := uuid.Parse(req.GetAccountId())
+	fnID, err := uuid.Parse(req.GetFunctionId())
 	if err != nil {
-		return nil, fmt.Errorf("invalid account_id: %w", err)
+		return nil, fmt.Errorf("invalid function_id: %w", err)
+	}
+
+	// Build singleton key: function_id or function_id-suffix
+	singletonKey := fnID.String()
+	if req.GetSingletonKey() != "" {
+		singletonKey = fnID.String() + "-" + req.GetSingletonKey()
 	}
 
 	// Get the current run ID holding the singleton lock
-	runID, err := store.GetCurrentRunID(ctx, req.GetSingletonKey(), accountID)
+	runID, err := store.GetCurrentRunID(ctx, singletonKey, consts.DevServerAccountID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get singleton info: %w", err)
 	}
@@ -57,13 +64,19 @@ func (d *debugAPI) DeleteSingletonLock(ctx context.Context, req *pb.DeleteSingle
 		return nil, fmt.Errorf("singleton store does not implement SingletonStore interface")
 	}
 
-	accountID, err := uuid.Parse(req.GetAccountId())
+	fnID, err := uuid.Parse(req.GetFunctionId())
 	if err != nil {
-		return nil, fmt.Errorf("invalid account_id: %w", err)
+		return nil, fmt.Errorf("invalid function_id: %w", err)
+	}
+
+	// Build singleton key: function_id or function_id-suffix
+	singletonKey := fnID.String()
+	if req.GetSingletonKey() != "" {
+		singletonKey = fnID.String() + "-" + req.GetSingletonKey()
 	}
 
 	// Release the singleton lock (which deletes it)
-	runID, err := store.ReleaseSingleton(ctx, req.GetSingletonKey(), accountID)
+	runID, err := store.ReleaseSingleton(ctx, singletonKey, consts.DevServerAccountID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to delete singleton lock: %w", err)
 	}

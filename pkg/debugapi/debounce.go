@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/execution/debounce"
 	pb "github.com/inngest/inngest/proto/gen/debug/v1"
 )
@@ -87,15 +88,10 @@ func (d *debugAPI) RunDebounce(ctx context.Context, req *pb.RunDebounceRequest) 
 		return nil, fmt.Errorf("invalid function_id: %w", err)
 	}
 
-	accountID, err := uuid.Parse(req.GetAccountId())
-	if err != nil {
-		return nil, fmt.Errorf("invalid account_id: %w", err)
-	}
-
 	result, err := d.debouncer.RunDebounce(ctx, debounce.RunDebounceOpts{
 		FunctionID:  fnID,
 		DebounceKey: req.GetDebounceKey(),
-		AccountID:   accountID,
+		AccountID:   consts.DevServerAccountID,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to run debounce: %w", err)
