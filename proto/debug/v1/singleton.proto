@@ -5,10 +5,11 @@ option go_package = "github.com/inngest/inngest/proto/gen/debug/v1;debug";
 
 // SingletonInfoRequest is used to query the current singleton lock.
 message SingletonInfoRequest {
-  // singleton_key is the evaluated singleton key (function_id-hash or just function_id).
-  string singleton_key = 1;
-  // account_id is required for shard selection.
-  string account_id = 2;
+  // function_id is the UUID of the function.
+  string function_id = 1;
+  // singleton_key is the optional evaluated singleton key suffix (hash part).
+  // If empty, uses the function_id as the singleton key.
+  string singleton_key = 2;
 }
 
 // SingletonInfoResponse contains information about the current singleton lock.
@@ -21,10 +22,11 @@ message SingletonInfoResponse {
 
 // DeleteSingletonLockRequest is used to delete a singleton lock.
 message DeleteSingletonLockRequest {
-  // singleton_key is the evaluated singleton key (function_id-hash or just function_id).
-  string singleton_key = 1;
-  // account_id is required for shard selection.
-  string account_id = 2;
+  // function_id is the UUID of the function.
+  string function_id = 1;
+  // singleton_key is the optional evaluated singleton key suffix (hash part).
+  // If empty, uses the function_id as the singleton key.
+  string singleton_key = 2;
 }
 
 // DeleteSingletonLockResponse contains information about the deleted lock.

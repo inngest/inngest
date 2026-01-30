@@ -9,10 +9,9 @@ option go_package = "github.com/inngest/inngest/proto/gen/debug/v1;debug";
 message DebounceInfoRequest {
   // function_id is the UUID of the function.
   string function_id = 1;
-  // debounce_key is the evaluated debounce key (from the key expression or function_id).
+  // debounce_key is the optional evaluated debounce key suffix (from the key expression).
+  // If empty, uses the function_id as the debounce key.
   string debounce_key = 2;
-  // account_id is required for shard selection.
-  string account_id = 3;
 }
 
 // DebounceInfoResponse contains information about the current debounce.
@@ -39,10 +38,9 @@ message DebounceInfoResponse {
 message DeleteDebounceRequest {
   // function_id is the UUID of the function.
   string function_id = 1;
-  // debounce_key is the evaluated debounce key (from the key expression or function_id).
+  // debounce_key is the optional evaluated debounce key suffix (from the key expression).
+  // If empty, uses the function_id as the debounce key.
   string debounce_key = 2;
-  // account_id is required for shard selection.
-  string account_id = 3;
 }
 
 // DeleteDebounceResponse contains information about the deleted debounce.
@@ -59,10 +57,9 @@ message DeleteDebounceResponse {
 message RunDebounceRequest {
   // function_id is the UUID of the function.
   string function_id = 1;
-  // debounce_key is the evaluated debounce key (from the key expression or function_id).
+  // debounce_key is the optional evaluated debounce key suffix (from the key expression).
+  // If empty, uses the function_id as the debounce key.
   string debounce_key = 2;
-  // account_id is required for shard selection.
-  string account_id = 3;
 }
 
 // RunDebounceResponse contains information about the scheduled debounce execution.
