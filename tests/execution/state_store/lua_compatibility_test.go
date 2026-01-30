@@ -3,7 +3,6 @@ package state_store
 import (
 	"context"
 	"fmt"
-	"net"
 	"testing"
 	"time"
 
@@ -607,19 +606,7 @@ func TestConsumePauseLuaCompatibility(t *testing.T) {
 					require.NoError(t, err)
 					t.Cleanup(func() { _ = container.Terminate(ctx) })
 
-					// Use ForceSingleClient to avoid cluster redirect issues with Docker networking
-					client, err = rueidis.NewClient(rueidis.ClientOption{
-						InitAddress:       []string{container.Addr},
-						Username:          container.Username,
-						Password:          container.Password,
-						SelectDB:          0,
-						DisableCache:      true, // Garnet doesn't support client-side caching
-						ForceSingleClient: true, // Prevent cluster redirects to internal Docker IPs
-						Dialer: net.Dialer{
-							Timeout: 30 * time.Second,
-						},
-						ConnWriteTimeout: 30 * time.Second,
-					})
+					client, err = helper.NewRedisClient(container.Addr, container.Username, container.Password)
 					require.NoError(t, err)
 					t.Cleanup(func() { client.Close() })
 
@@ -959,18 +946,7 @@ func TestLeasePauseLuaCompatibility(t *testing.T) {
 					require.NoError(t, err)
 					t.Cleanup(func() { _ = container.Terminate(ctx) })
 
-					client, err = rueidis.NewClient(rueidis.ClientOption{
-						InitAddress:       []string{container.Addr},
-						Username:          container.Username,
-						Password:          container.Password,
-						SelectDB:          0,
-						DisableCache:      true,
-						ForceSingleClient: true,
-						Dialer: net.Dialer{
-							Timeout: 30 * time.Second,
-						},
-						ConnWriteTimeout: 30 * time.Second,
-					})
+					client, err = helper.NewRedisClient(container.Addr, container.Username, container.Password)
 					require.NoError(t, err)
 					t.Cleanup(func() { client.Close() })
 
@@ -1114,18 +1090,7 @@ func TestSavePauseLuaCompatibility(t *testing.T) {
 					require.NoError(t, err)
 					t.Cleanup(func() { _ = container.Terminate(ctx) })
 
-					client, err = rueidis.NewClient(rueidis.ClientOption{
-						InitAddress:       []string{container.Addr},
-						Username:          container.Username,
-						Password:          container.Password,
-						SelectDB:          0,
-						DisableCache:      true,
-						ForceSingleClient: true,
-						Dialer: net.Dialer{
-							Timeout: 30 * time.Second,
-						},
-						ConnWriteTimeout: 30 * time.Second,
-					})
+					client, err = helper.NewRedisClient(container.Addr, container.Username, container.Password)
 					require.NoError(t, err)
 					t.Cleanup(func() { client.Close() })
 
@@ -1345,18 +1310,7 @@ func TestDeletePauseLuaCompatibility(t *testing.T) {
 					require.NoError(t, err)
 					t.Cleanup(func() { _ = container.Terminate(ctx) })
 
-					client, err = rueidis.NewClient(rueidis.ClientOption{
-						InitAddress:       []string{container.Addr},
-						Username:          container.Username,
-						Password:          container.Password,
-						SelectDB:          0,
-						DisableCache:      true,
-						ForceSingleClient: true,
-						Dialer: net.Dialer{
-							Timeout: 30 * time.Second,
-						},
-						ConnWriteTimeout: 30 * time.Second,
-					})
+					client, err = helper.NewRedisClient(container.Addr, container.Username, container.Password)
 					require.NoError(t, err)
 					t.Cleanup(func() { client.Close() })
 
