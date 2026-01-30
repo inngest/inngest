@@ -606,20 +606,6 @@ func TestDeleteBatch(t *testing.T) {
 	})
 }
 
-type mockQueueManager struct {
-	enqueuedItems []mockEnqueuedItem
-}
-
-type mockEnqueuedItem struct {
-	item interface{}
-	at   time.Time
-}
-
-func (m *mockQueueManager) Enqueue(ctx context.Context, item interface{}, at time.Time, opts interface{}) error {
-	m.enqueuedItems = append(m.enqueuedItems, mockEnqueuedItem{item: item, at: at})
-	return nil
-}
-
 func TestRunBatch(t *testing.T) {
 	r := miniredis.RunT(t)
 
