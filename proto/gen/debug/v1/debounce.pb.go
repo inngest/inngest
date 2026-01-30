@@ -27,10 +27,9 @@ type DebounceInfoRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// function_id is the UUID of the function.
 	FunctionId string `protobuf:"bytes,1,opt,name=function_id,json=functionId,proto3" json:"function_id,omitempty"`
-	// debounce_key is the evaluated debounce key (from the key expression or function_id).
-	DebounceKey string `protobuf:"bytes,2,opt,name=debounce_key,json=debounceKey,proto3" json:"debounce_key,omitempty"`
-	// account_id is required for shard selection.
-	AccountId     string `protobuf:"bytes,3,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	// debounce_key is the optional evaluated debounce key suffix (from the key expression).
+	// If empty, uses the function_id as the debounce key.
+	DebounceKey   string `protobuf:"bytes,2,opt,name=debounce_key,json=debounceKey,proto3" json:"debounce_key,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -75,13 +74,6 @@ func (x *DebounceInfoRequest) GetFunctionId() string {
 func (x *DebounceInfoRequest) GetDebounceKey() string {
 	if x != nil {
 		return x.DebounceKey
-	}
-	return ""
-}
-
-func (x *DebounceInfoRequest) GetAccountId() string {
-	if x != nil {
-		return x.AccountId
 	}
 	return ""
 }
@@ -200,10 +192,9 @@ type DeleteDebounceRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// function_id is the UUID of the function.
 	FunctionId string `protobuf:"bytes,1,opt,name=function_id,json=functionId,proto3" json:"function_id,omitempty"`
-	// debounce_key is the evaluated debounce key (from the key expression or function_id).
-	DebounceKey string `protobuf:"bytes,2,opt,name=debounce_key,json=debounceKey,proto3" json:"debounce_key,omitempty"`
-	// account_id is required for shard selection.
-	AccountId     string `protobuf:"bytes,3,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	// debounce_key is the optional evaluated debounce key suffix (from the key expression).
+	// If empty, uses the function_id as the debounce key.
+	DebounceKey   string `protobuf:"bytes,2,opt,name=debounce_key,json=debounceKey,proto3" json:"debounce_key,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -248,13 +239,6 @@ func (x *DeleteDebounceRequest) GetFunctionId() string {
 func (x *DeleteDebounceRequest) GetDebounceKey() string {
 	if x != nil {
 		return x.DebounceKey
-	}
-	return ""
-}
-
-func (x *DeleteDebounceRequest) GetAccountId() string {
-	if x != nil {
-		return x.AccountId
 	}
 	return ""
 }
@@ -328,10 +312,9 @@ type RunDebounceRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// function_id is the UUID of the function.
 	FunctionId string `protobuf:"bytes,1,opt,name=function_id,json=functionId,proto3" json:"function_id,omitempty"`
-	// debounce_key is the evaluated debounce key (from the key expression or function_id).
-	DebounceKey string `protobuf:"bytes,2,opt,name=debounce_key,json=debounceKey,proto3" json:"debounce_key,omitempty"`
-	// account_id is required for shard selection.
-	AccountId     string `protobuf:"bytes,3,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	// debounce_key is the optional evaluated debounce key suffix (from the key expression).
+	// If empty, uses the function_id as the debounce key.
+	DebounceKey   string `protobuf:"bytes,2,opt,name=debounce_key,json=debounceKey,proto3" json:"debounce_key,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -376,13 +359,6 @@ func (x *RunDebounceRequest) GetFunctionId() string {
 func (x *RunDebounceRequest) GetDebounceKey() string {
 	if x != nil {
 		return x.DebounceKey
-	}
-	return ""
-}
-
-func (x *RunDebounceRequest) GetAccountId() string {
-	if x != nil {
-		return x.AccountId
 	}
 	return ""
 }
@@ -455,13 +431,11 @@ var File_debug_v1_debounce_proto protoreflect.FileDescriptor
 
 const file_debug_v1_debounce_proto_rawDesc = "" +
 	"\n" +
-	"\x17debug/v1/debounce.proto\x12\bdebug.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"x\n" +
+	"\x17debug/v1/debounce.proto\x12\bdebug.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"Y\n" +
 	"\x13DebounceInfoRequest\x12\x1f\n" +
 	"\vfunction_id\x18\x01 \x01(\tR\n" +
 	"functionId\x12!\n" +
-	"\fdebounce_key\x18\x02 \x01(\tR\vdebounceKey\x12\x1d\n" +
-	"\n" +
-	"account_id\x18\x03 \x01(\tR\taccountId\"\x91\x02\n" +
+	"\fdebounce_key\x18\x02 \x01(\tR\vdebounceKey\"\x91\x02\n" +
 	"\x14DebounceInfoResponse\x12!\n" +
 	"\fhas_debounce\x18\x01 \x01(\bR\vhasDebounce\x12\x1f\n" +
 	"\vdebounce_id\x18\x02 \x01(\tR\n" +
@@ -474,24 +448,20 @@ const file_debug_v1_debounce_proto_rawDesc = "" +
 	"account_id\x18\x06 \x01(\tR\taccountId\x12!\n" +
 	"\fworkspace_id\x18\a \x01(\tR\vworkspaceId\x12\x1f\n" +
 	"\vfunction_id\x18\b \x01(\tR\n" +
-	"functionId\"z\n" +
+	"functionId\"[\n" +
 	"\x15DeleteDebounceRequest\x12\x1f\n" +
 	"\vfunction_id\x18\x01 \x01(\tR\n" +
 	"functionId\x12!\n" +
-	"\fdebounce_key\x18\x02 \x01(\tR\vdebounceKey\x12\x1d\n" +
-	"\n" +
-	"account_id\x18\x03 \x01(\tR\taccountId\"n\n" +
+	"\fdebounce_key\x18\x02 \x01(\tR\vdebounceKey\"n\n" +
 	"\x16DeleteDebounceResponse\x12\x18\n" +
 	"\adeleted\x18\x01 \x01(\bR\adeleted\x12\x1f\n" +
 	"\vdebounce_id\x18\x02 \x01(\tR\n" +
 	"debounceId\x12\x19\n" +
-	"\bevent_id\x18\x03 \x01(\tR\aeventId\"w\n" +
+	"\bevent_id\x18\x03 \x01(\tR\aeventId\"X\n" +
 	"\x12RunDebounceRequest\x12\x1f\n" +
 	"\vfunction_id\x18\x01 \x01(\tR\n" +
 	"functionId\x12!\n" +
-	"\fdebounce_key\x18\x02 \x01(\tR\vdebounceKey\x12\x1d\n" +
-	"\n" +
-	"account_id\x18\x03 \x01(\tR\taccountId\"o\n" +
+	"\fdebounce_key\x18\x02 \x01(\tR\vdebounceKey\"o\n" +
 	"\x13RunDebounceResponse\x12\x1c\n" +
 	"\tscheduled\x18\x01 \x01(\bR\tscheduled\x12\x1f\n" +
 	"\vdebounce_id\x18\x02 \x01(\tR\n" +

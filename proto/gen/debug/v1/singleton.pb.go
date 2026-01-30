@@ -24,10 +24,11 @@ const (
 // SingletonInfoRequest is used to query the current singleton lock.
 type SingletonInfoRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// singleton_key is the evaluated singleton key (function_id-hash or just function_id).
-	SingletonKey string `protobuf:"bytes,1,opt,name=singleton_key,json=singletonKey,proto3" json:"singleton_key,omitempty"`
-	// account_id is required for shard selection.
-	AccountId     string `protobuf:"bytes,2,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	// function_id is the UUID of the function.
+	FunctionId string `protobuf:"bytes,1,opt,name=function_id,json=functionId,proto3" json:"function_id,omitempty"`
+	// singleton_key is the optional evaluated singleton key suffix (hash part).
+	// If empty, uses the function_id as the singleton key.
+	SingletonKey  string `protobuf:"bytes,2,opt,name=singleton_key,json=singletonKey,proto3" json:"singleton_key,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -62,16 +63,16 @@ func (*SingletonInfoRequest) Descriptor() ([]byte, []int) {
 	return file_debug_v1_singleton_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *SingletonInfoRequest) GetSingletonKey() string {
+func (x *SingletonInfoRequest) GetFunctionId() string {
 	if x != nil {
-		return x.SingletonKey
+		return x.FunctionId
 	}
 	return ""
 }
 
-func (x *SingletonInfoRequest) GetAccountId() string {
+func (x *SingletonInfoRequest) GetSingletonKey() string {
 	if x != nil {
-		return x.AccountId
+		return x.SingletonKey
 	}
 	return ""
 }
@@ -134,10 +135,11 @@ func (x *SingletonInfoResponse) GetCurrentRunId() string {
 // DeleteSingletonLockRequest is used to delete a singleton lock.
 type DeleteSingletonLockRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// singleton_key is the evaluated singleton key (function_id-hash or just function_id).
-	SingletonKey string `protobuf:"bytes,1,opt,name=singleton_key,json=singletonKey,proto3" json:"singleton_key,omitempty"`
-	// account_id is required for shard selection.
-	AccountId     string `protobuf:"bytes,2,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	// function_id is the UUID of the function.
+	FunctionId string `protobuf:"bytes,1,opt,name=function_id,json=functionId,proto3" json:"function_id,omitempty"`
+	// singleton_key is the optional evaluated singleton key suffix (hash part).
+	// If empty, uses the function_id as the singleton key.
+	SingletonKey  string `protobuf:"bytes,2,opt,name=singleton_key,json=singletonKey,proto3" json:"singleton_key,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -172,16 +174,16 @@ func (*DeleteSingletonLockRequest) Descriptor() ([]byte, []int) {
 	return file_debug_v1_singleton_proto_rawDescGZIP(), []int{2}
 }
 
-func (x *DeleteSingletonLockRequest) GetSingletonKey() string {
+func (x *DeleteSingletonLockRequest) GetFunctionId() string {
 	if x != nil {
-		return x.SingletonKey
+		return x.FunctionId
 	}
 	return ""
 }
 
-func (x *DeleteSingletonLockRequest) GetAccountId() string {
+func (x *DeleteSingletonLockRequest) GetSingletonKey() string {
 	if x != nil {
-		return x.AccountId
+		return x.SingletonKey
 	}
 	return ""
 }
@@ -245,18 +247,18 @@ var File_debug_v1_singleton_proto protoreflect.FileDescriptor
 
 const file_debug_v1_singleton_proto_rawDesc = "" +
 	"\n" +
-	"\x18debug/v1/singleton.proto\x12\bdebug.v1\"Z\n" +
-	"\x14SingletonInfoRequest\x12#\n" +
-	"\rsingleton_key\x18\x01 \x01(\tR\fsingletonKey\x12\x1d\n" +
-	"\n" +
-	"account_id\x18\x02 \x01(\tR\taccountId\"X\n" +
+	"\x18debug/v1/singleton.proto\x12\bdebug.v1\"\\\n" +
+	"\x14SingletonInfoRequest\x12\x1f\n" +
+	"\vfunction_id\x18\x01 \x01(\tR\n" +
+	"functionId\x12#\n" +
+	"\rsingleton_key\x18\x02 \x01(\tR\fsingletonKey\"X\n" +
 	"\x15SingletonInfoResponse\x12\x19\n" +
 	"\bhas_lock\x18\x01 \x01(\bR\ahasLock\x12$\n" +
-	"\x0ecurrent_run_id\x18\x02 \x01(\tR\fcurrentRunId\"`\n" +
-	"\x1aDeleteSingletonLockRequest\x12#\n" +
-	"\rsingleton_key\x18\x01 \x01(\tR\fsingletonKey\x12\x1d\n" +
-	"\n" +
-	"account_id\x18\x02 \x01(\tR\taccountId\"N\n" +
+	"\x0ecurrent_run_id\x18\x02 \x01(\tR\fcurrentRunId\"b\n" +
+	"\x1aDeleteSingletonLockRequest\x12\x1f\n" +
+	"\vfunction_id\x18\x01 \x01(\tR\n" +
+	"functionId\x12#\n" +
+	"\rsingleton_key\x18\x02 \x01(\tR\fsingletonKey\"N\n" +
 	"\x1bDeleteSingletonLockResponse\x12\x18\n" +
 	"\adeleted\x18\x01 \x01(\bR\adeleted\x12\x15\n" +
 	"\x06run_id\x18\x02 \x01(\tR\x05runIdB5Z3github.com/inngest/inngest/proto/gen/debug/v1;debugb\x06proto3"
