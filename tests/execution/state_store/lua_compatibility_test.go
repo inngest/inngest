@@ -74,7 +74,7 @@ func TestUpdateMetadataIsFieldEmpty(t *testing.T) {
 					require.NoError(t, err)
 					t.Cleanup(func() { _ = container.Terminate(ctx) })
 
-					client, err = helper.NewRedisClient(container.Addr, container.Username, container.Password)
+					client, err = helper.NewRedisClient(container.Addr, container.Username, container.Password, false)
 					require.NoError(t, err)
 					t.Cleanup(func() { client.Close() })
 
@@ -208,7 +208,7 @@ func TestStateStoreLuaCompatibility(t *testing.T) {
 				_ = container.Terminate(ctx)
 			})
 
-			garnetClient, err := helper.NewRedisClient(container.Addr, container.Username, container.Password)
+			garnetClient, err := helper.NewRedisClient(container.Addr, container.Username, container.Password, false)
 			require.NoError(t, err)
 			t.Cleanup(func() {
 				garnetClient.Close()
@@ -332,22 +332,8 @@ func TestStateStoreLuaCompatibility(t *testing.T) {
 			})
 		})
 
-		// Test Garnet (may fail due to container issues, but we'll try)
 		t.Run("garnet", func(t *testing.T) {
-			// Use a shorter timeout for garnet to fail fast if there are container issues
-			garnetMgr, err := func() (state.Manager, error) {
-				defer func() {
-					if r := recover(); r != nil {
-						t.Logf("⚠️  Garnet setup failed (container issues): %v", r)
-					}
-				}()
-				return setupManager(t, "garnet"), nil
-			}()
-
-			if err != nil {
-				t.Skipf("Skipping Garnet test due to setup issues: %v", err)
-				return
-			}
+			garnetMgr := setupManager(t, "garnet")
 
 			identifier := state.Identifier{
 				AccountID:       accountID,
@@ -377,18 +363,12 @@ func TestStateStoreLuaCompatibility(t *testing.T) {
 			}
 
 			// Create state via Lua script (with cjson.decode that may convert to floats)
-			_, err = garnetMgr.New(ctx, input)
-			if err != nil {
-				t.Skipf("Skipping Garnet test due to connection issues: %v", err)
-				return
-			}
+			_, err := garnetMgr.New(ctx, input)
+			require.NoError(t, err, "Failed to create state on Garnet")
 
 			// Get metadata - this exercises newRunMetadata parsing with potential float conversion
 			metadata, err := garnetMgr.Metadata(ctx, accountID, runID)
-			if err != nil {
-				t.Skipf("Skipping Garnet metadata test due to issues: %v", err)
-				return
-			}
+			require.NoError(t, err, "Failed to get metadata from Garnet")
 
 			// Comprehensive metadata validation for Garnet (same as Valkey)
 			require.NotNil(t, metadata, "Garnet metadata should not be nil")
@@ -603,7 +583,7 @@ func TestConsumePauseLuaCompatibility(t *testing.T) {
 					require.NoError(t, err)
 					t.Cleanup(func() { _ = container.Terminate(ctx) })
 
-					client, err = helper.NewRedisClient(container.Addr, container.Username, container.Password)
+					client, err = helper.NewRedisClient(container.Addr, container.Username, container.Password, false)
 					require.NoError(t, err)
 					t.Cleanup(func() { client.Close() })
 
@@ -943,7 +923,7 @@ func TestLeasePauseLuaCompatibility(t *testing.T) {
 					require.NoError(t, err)
 					t.Cleanup(func() { _ = container.Terminate(ctx) })
 
-					client, err = helper.NewRedisClient(container.Addr, container.Username, container.Password)
+					client, err = helper.NewRedisClient(container.Addr, container.Username, container.Password, false)
 					require.NoError(t, err)
 					t.Cleanup(func() { client.Close() })
 
@@ -1087,7 +1067,7 @@ func TestSavePauseLuaCompatibility(t *testing.T) {
 					require.NoError(t, err)
 					t.Cleanup(func() { _ = container.Terminate(ctx) })
 
-					client, err = helper.NewRedisClient(container.Addr, container.Username, container.Password)
+					client, err = helper.NewRedisClient(container.Addr, container.Username, container.Password, false)
 					require.NoError(t, err)
 					t.Cleanup(func() { client.Close() })
 
@@ -1307,7 +1287,7 @@ func TestDeletePauseLuaCompatibility(t *testing.T) {
 					require.NoError(t, err)
 					t.Cleanup(func() { _ = container.Terminate(ctx) })
 
-					client, err = helper.NewRedisClient(container.Addr, container.Username, container.Password)
+					client, err = helper.NewRedisClient(container.Addr, container.Username, container.Password, false)
 					require.NoError(t, err)
 					t.Cleanup(func() { client.Close() })
 
