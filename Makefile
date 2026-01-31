@@ -43,7 +43,7 @@ e2e-golang: ## Run Go SDK e2e tests
 .PHONY: gen
 gen: ## Run all code generators
 	go generate ./...
-	make gql queries constraintapi-snapshots
+	make gql queries constraintapi-snapshots tygo
 
 .PHONY: protobuf
 protobuf: ## Generate protobuf files
@@ -92,6 +92,11 @@ build: docs ## Build release binaries
 .PHONY: gql
 gql: ## Generate GraphQL code
 	go run github.com/99designs/gqlgen --verbose --config ./pkg/coreapi/gqlgen.yml
+
+.PHONY: tygo
+tygo: ## Generate TypeScript types from Go structs
+	go run github.com/gzuidhof/tygo@latest generate
+	cd ui && pnpx prettier@2.8.8 --write --no-config --single-quote "packages/components/src/generated/**/*.ts"
 
 .PHONY: constraintapi-snapshots
 constraintapi-snapshots: ## Regenerate constraint API Lua snapshots
