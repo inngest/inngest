@@ -103,7 +103,7 @@ func TestLuaCompatibility(t *testing.T) {
 						_ = container.Terminate(ctx)
 					})
 
-					garnetClient, err := helper.NewRedisClient(container.Addr, container.Username, container.Password)
+					garnetClient, err := helper.NewRedisClient(container.Addr, container.Username, container.Password, false)
 					require.NoError(t, err)
 					t.Cleanup(func() {
 						garnetClient.Close()
