@@ -10,9 +10,11 @@ import { traceWalk } from './utils';
 type Props = {
   runID: string;
   trace: Lazy<React.ComponentProps<typeof Trace>['trace']>;
+  /** Organization name for timing legend labels (US4 - EXE-1217) */
+  orgName?: string;
 };
 
-export const Timeline = ({ runID, trace }: Props) => {
+export const Timeline = ({ runID, trace, orgName }: Props) => {
   const [leftWidth, setLeftWidth] = useState(30);
   const [isDragging, setIsDragging] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -72,7 +74,7 @@ export const Timeline = ({ runID, trace }: Props) => {
     <div className="w-full pb-4 pr-8" ref={containerRef}>
       {/* Timing Legend (US3 - EXE-1217) */}
       <div className="mb-3 flex justify-end pr-2">
-        <TimingLegend />
+        <TimingLegend orgName={orgName} />
       </div>
 
       <Trace

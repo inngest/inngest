@@ -134,12 +134,15 @@ export const StepInfo = ({
   tracesPreviewEnabled,
   debug = false,
   newStack = false,
+  orgName,
 }: {
   selectedStep: StepInfoType;
   pollInterval?: number;
   tracesPreviewEnabled?: boolean;
   debug?: boolean;
   newStack?: boolean;
+  /** Organization name for timing breakdown labels (US4 - EXE-1217) */
+  orgName?: string;
 }) => {
   const { cloud } = useShared();
   const [expanded, setExpanded] = useState(true);
@@ -292,7 +295,7 @@ export const StepInfo = ({
           const breakdown = calculateTimingBreakdown(trace);
           return breakdown ? (
             <div className="px-4 pb-2">
-              <TimingBreakdownPanel breakdown={breakdown} />
+              <TimingBreakdownPanel breakdown={breakdown} orgName={orgName} />
             </div>
           ) : null;
         })()}
