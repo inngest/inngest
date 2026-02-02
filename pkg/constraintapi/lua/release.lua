@@ -111,12 +111,15 @@ else
 	call("SET", keyRequestState, cjson.encode(requestDetails))
 end
 
----@type { s: integer, lid: string, r: integer }
+---@type { s: integer, lid: string, r: integer, e: string?, f: string?, m: { ss: integer?, sl: integer?, sm: integer? }? }
 local res = {}
 
 res["s"] = 3
 res["d"] = debugLogs
 res["r"] = requestDetails.a
+res["e"] = requestDetails.e
+res["f"] = requestDetails.f
+res["m"] = requestDetails.m
 
 local encoded = cjson.encode(res)
 

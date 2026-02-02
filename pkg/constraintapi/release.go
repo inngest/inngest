@@ -17,6 +17,19 @@ type releaseScriptResponse struct {
 	// Remaining specifies the number of remaining leases
 	// generated in the same Acquire operation
 	Remaining int `json:"r"`
+
+	// EnvID from the request state
+	EnvID string `json:"e,omitempty"`
+
+	// FunctionID from the request state
+	FunctionID string `json:"f,omitempty"`
+
+	// Metadata from the request state
+	Metadata *struct {
+		SourceService           int `json:"ss,omitempty"`
+		SourceLocation          int `json:"sl,omitempty"`
+		SourceRunProcessingMode int `json:"sm,omitempty"`
+	} `json:"m,omitempty"`
 }
 
 // Release implements CapacityManager.
@@ -89,7 +102,35 @@ func (r *redisCapacityManager) Release(ctx context.Context, req *CapacityRelease
 	}
 
 	res := &CapacityReleaseResponse{
+		AccountID:          req.AccountID,
 		internalDebugState: parsedResponse,
+	}
+
+	// Parse EnvID if present
+	if parsedResponse.EnvID != "" {
+		envID, err := uuid.Parse(parsedResponse.EnvID)
+		if err != nil {
+			return nil, errs.Wrap(0, false, "invalid env_id in response: %w", err)
+		}
+		res.EnvID = envID
+	}
+
+	// Parse FunctionID if present
+	if parsedResponse.FunctionID != "" {
+		functionID, err := uuid.Parse(parsedResponse.FunctionID)
+		if err != nil {
+			return nil, errs.Wrap(0, false, "invalid function_id in response: %w", err)
+		}
+		res.FunctionID = functionID
+	}
+
+	// Parse metadata if present
+	if parsedResponse.Metadata != nil {
+		res.CreationSource = LeaseSource{
+			Service:           LeaseService(parsedResponse.Metadata.SourceService),
+			Location:          CallerLocation(parsedResponse.Metadata.SourceLocation),
+			RunProcessingMode: RunProcessingMode(parsedResponse.Metadata.SourceRunProcessingMode),
+		}
 	}
 
 	switch parsedResponse.Status {

@@ -72,6 +72,9 @@ local res = {}
 res["s"] = 3
 res["d"] = debugLogs
 res["r"] = requestDetails.a
+res["e"] = requestDetails.e
+res["f"] = requestDetails.f
+res["m"] = requestDetails.m
 local encoded = cjson.encode(res)
 call("SET", keyOperationIdempotency, encoded, "EX", tostring(operationIdempotencyTTL))
 return encoded

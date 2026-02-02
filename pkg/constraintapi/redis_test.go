@@ -211,6 +211,11 @@ func TestRedisCapacityManager_RateLimit(t *testing.T) {
 			Migration: MigrationIdentifier{
 				IsRateLimit: true,
 			},
+			Source: LeaseSource{
+				Service:           ServiceExecutor,
+				Location:          CallerLocationSchedule,
+				RunProcessingMode: RunProcessingModeBackground,
+			},
 		})
 		require.NoError(t, err)
 		require.NotNil(t, resp)
@@ -218,6 +223,14 @@ func TestRedisCapacityManager_RateLimit(t *testing.T) {
 
 		require.Equal(t, 3, resp.internalDebugState.Status, r.Dump())
 		require.Equal(t, 0, resp.internalDebugState.Remaining)
+
+		// Verify release response metadata
+		require.Equal(t, accountID, resp.AccountID)
+		require.Equal(t, envID, resp.EnvID)
+		require.Equal(t, fnID, resp.FunctionID)
+		require.Equal(t, ServiceExecutor, resp.CreationSource.Service)
+		require.Equal(t, CallerLocationSchedule, resp.CreationSource.Location)
+		require.Equal(t, RunProcessingModeBackground, resp.CreationSource.RunProcessingMode)
 
 		// TODO: Verify all respective keys have been updated
 		// TODO: Expect 4 idempotency keys (1 constraint check + 3 operations)
@@ -470,6 +483,11 @@ func TestRedisCapacityManager_Concurrency(t *testing.T) {
 			Migration: MigrationIdentifier{
 				QueueShard: "test",
 			},
+			Source: LeaseSource{
+				Service:           ServiceExecutor,
+				Location:          CallerLocationSchedule,
+				RunProcessingMode: RunProcessingModeBackground,
+			},
 		})
 		require.NoError(t, err)
 		require.NotNil(t, resp)
@@ -477,6 +495,14 @@ func TestRedisCapacityManager_Concurrency(t *testing.T) {
 
 		require.Equal(t, 3, resp.internalDebugState.Status, r.Dump())
 		require.Equal(t, 0, resp.internalDebugState.Remaining)
+
+		// Verify release response metadata
+		require.Equal(t, accountID, resp.AccountID)
+		require.Equal(t, envID, resp.EnvID)
+		require.Equal(t, fnID, resp.FunctionID)
+		require.Equal(t, ServiceExecutor, resp.CreationSource.Service)
+		require.Equal(t, CallerLocationSchedule, resp.CreationSource.Location)
+		require.Equal(t, RunProcessingModeBackground, resp.CreationSource.RunProcessingMode)
 
 		// TODO: Verify all respective keys have been updated
 		// TODO: Expect 4 idempotency keys (1 constraint check + 3 operations)
