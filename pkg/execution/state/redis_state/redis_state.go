@@ -1289,8 +1289,8 @@ type keyIter struct {
 
 	hasScores bool
 
-	// indexKey is the sorted set index key to clean up orphaned entries from
-	indexKey string
+	// indexKeys are the sorted set index keys to clean up orphaned entries from
+	indexKeys []string
 
 	idx   int64
 	err   error
@@ -1397,8 +1397,10 @@ func (i *keyIter) Val(ctx context.Context) *state.Pause {
 	}
 	if val == "" {
 		// Pause data is gone but ID remains in index - clean it up
-		if i.indexKey != "" && currentID != "" {
-			_ = i.r.Do(ctx, i.r.B().Zrem().Key(i.indexKey).Member(currentID).Build())
+		if len(i.indexKeys) > 0 && currentID != "" {
+			for _, indexKey := range i.indexKeys {
+				_ = i.r.Do(ctx, i.r.B().Zrem().Key(indexKey).Member(currentID).Build())
+			}
 			metrics.IncrPausesOrphanedIndexCleanupCounter(ctx, metrics.CounterOpt{
 				PkgName: pkgName,
 			})

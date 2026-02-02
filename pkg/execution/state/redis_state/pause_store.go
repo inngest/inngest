@@ -428,10 +428,11 @@ func (s *PauseStore) PausesByEventSince(ctx context.Context, workspaceID uuid.UU
 	pauses := s.unsharded.Pauses()
 
 	// Load all items in the set.
-	indexKey := pauses.kg.PauseIndex(ctx, "add", workspaceID, event)
+	addIndexKey := pauses.kg.PauseIndex(ctx, "add", workspaceID, event)
+	expIndexKey := pauses.kg.PauseIndex(ctx, "exp", workspaceID, event)
 	cmd := pauses.Client().B().
 		Zrangebyscore().
-		Key(indexKey).
+		Key(addIndexKey).
 		Min(strconv.Itoa(int(since.Unix()))).
 		Max("+inf").
 		Build()
@@ -441,10 +442,10 @@ func (s *PauseStore) PausesByEventSince(ctx context.Context, workspaceID uuid.UU
 	}
 
 	iter := &keyIter{
-		r:        pauses.Client(),
-		kf:       pauses.kg,
-		start:    start,
-		indexKey: indexKey,
+		r:         pauses.Client(),
+		kf:        pauses.kg,
+		start:     start,
+		indexKeys: []string{addIndexKey, expIndexKey},
 	}
 	err = iter.init(ctx, ids, []float64{}, 100)
 	return iter, err
@@ -459,10 +460,11 @@ func (s *PauseStore) PausesByEventSinceWithCreatedAt(ctx context.Context, worksp
 
 	pauses := s.unsharded.Pauses()
 
-	indexKey := pauses.kg.PauseIndex(ctx, "add", workspaceID, event)
+	addIndexKey := pauses.kg.PauseIndex(ctx, "add", workspaceID, event)
+	expIndexKey := pauses.kg.PauseIndex(ctx, "exp", workspaceID, event)
 	cmd := pauses.Client().B().
 		Zrange().
-		Key(indexKey).
+		Key(addIndexKey).
 		Min(strconv.Itoa(int(since.Unix()))).
 		Max("+inf").
 		Byscore().
@@ -483,10 +485,10 @@ func (s *PauseStore) PausesByEventSinceWithCreatedAt(ctx context.Context, worksp
 	}
 
 	iter := &keyIter{
-		r:        pauses.Client(),
-		kf:       pauses.kg,
-		start:    start,
-		indexKey: indexKey,
+		r:         pauses.Client(),
+		kf:        pauses.kg,
+		start:     start,
+		indexKeys: []string{addIndexKey, expIndexKey},
 	}
 	err = iter.init(ctx, ids, scores, 100)
 	return iter, err
