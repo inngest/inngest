@@ -942,6 +942,416 @@ func TestCache(t *testing.T) {
 				require.Equal(t, 3, len(deps.lifecycles.AcquireCalls))
 			},
 		},
+		{
+			name: "should filter constraints when WithCacheConstraintFilter is used",
+			run: func(ctx context.Context, t *testing.T, deps deps) {
+				// Create two concurrency constraints
+				accountConcurrency := ConstraintItem{
+					Kind: ConstraintKindConcurrency,
+					Concurrency: &ConcurrencyConstraint{
+						Scope:             enums.ConcurrencyScopeAccount,
+						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:account:%s", accountID),
+					},
+				}
+
+				fnConcurrency := ConstraintItem{
+					Kind: ConstraintKindConcurrency,
+					Concurrency: &ConcurrencyConstraint{
+						Scope:             enums.ConcurrencyScopeFn,
+						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:p:%s", fnID),
+					},
+				}
+
+				// Create cache that only caches concurrency constraints
+				filteredCache := NewLimitingConstraintCache(
+					WithLimitingCacheClock(deps.clock),
+					WithLimitingCacheManager(deps.cm),
+					WithLimitingCacheEnable(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, minTTL, maxTTL time.Duration) {
+						return true, MinCacheTTL, MaxCacheTTL
+					}),
+					WithCacheConstraintFilter(func(ci ConstraintItem) bool {
+						// Only cache concurrency constraints
+						return ci.Kind == ConstraintKindConcurrency
+					}),
+				)
+
+				// First request should pass
+				_, err := filteredCache.Acquire(ctx, &CapacityAcquireRequest{
+					AccountID:  accountID,
+					EnvID:      envID,
+					FunctionID: fnID,
+					Source: LeaseSource{
+						Service:           ServiceAPI,
+						Location:          CallerLocationItemLease,
+						RunProcessingMode: RunProcessingModeBackground,
+					},
+					Migration: MigrationIdentifier{
+						QueueShard: "test",
+					},
+					IdempotencyKey: "acq1",
+					Configuration: ConstraintConfig{
+						FunctionVersion: 1,
+						Concurrency: ConcurrencyConfig{
+							AccountConcurrency:  1,
+							FunctionConcurrency: 1,
+						},
+					},
+					Constraints: []ConstraintItem{
+						accountConcurrency,
+						fnConcurrency,
+					},
+					Amount:               1,
+					LeaseIdempotencyKeys: []string{"item1"},
+					CurrentTime:          deps.clock.Now(),
+					Duration:             3 * time.Second,
+					MaximumLifetime:      time.Minute,
+				})
+				require.NoError(t, err)
+
+				// Second request should hit account concurrency limit
+				res, err := filteredCache.Acquire(ctx, &CapacityAcquireRequest{
+					AccountID:  accountID,
+					EnvID:      envID,
+					FunctionID: fnID,
+					Source: LeaseSource{
+						Service:           ServiceAPI,
+						Location:          CallerLocationItemLease,
+						RunProcessingMode: RunProcessingModeBackground,
+					},
+					Migration: MigrationIdentifier{
+						QueueShard: "test",
+					},
+					IdempotencyKey: "acq2",
+					Configuration: ConstraintConfig{
+						FunctionVersion: 1,
+						Concurrency: ConcurrencyConfig{
+							AccountConcurrency:  1,
+							FunctionConcurrency: 1,
+						},
+					},
+					Constraints: []ConstraintItem{
+						accountConcurrency,
+						fnConcurrency,
+					},
+					Amount:               1,
+					LeaseIdempotencyKeys: []string{"item2"},
+					CurrentTime:          deps.clock.Now(),
+					Duration:             3 * time.Second,
+					MaximumLifetime:      time.Minute,
+				})
+				require.NoError(t, err)
+				require.Len(t, res.Leases, 0)
+				require.GreaterOrEqual(t, len(res.LimitingConstraints), 1)
+
+				// Verify limiting constraints were cached (filter allows concurrency kind)
+				cacheCount := 0
+				if filteredCache.limitingConstraintCache.Get(accountConcurrency.CacheKey(accountID, envID, fnID)) != nil {
+					cacheCount++
+				}
+				if filteredCache.limitingConstraintCache.Get(fnConcurrency.CacheKey(accountID, envID, fnID)) != nil {
+					cacheCount++
+				}
+				require.GreaterOrEqual(t, cacheCount, 1)
+				require.Equal(t, len(res.LimitingConstraints), filteredCache.limitingConstraintCache.ItemCount())
+
+				// Third request should use cached response
+				initialAcquireCount := len(deps.lifecycles.AcquireCalls)
+				res, err = filteredCache.Acquire(ctx, &CapacityAcquireRequest{
+					AccountID:  accountID,
+					EnvID:      envID,
+					FunctionID: fnID,
+					Source: LeaseSource{
+						Service:           ServiceAPI,
+						Location:          CallerLocationItemLease,
+						RunProcessingMode: RunProcessingModeBackground,
+					},
+					Migration: MigrationIdentifier{
+						QueueShard: "test",
+					},
+					IdempotencyKey: "acq3",
+					Configuration: ConstraintConfig{
+						FunctionVersion: 1,
+						Concurrency: ConcurrencyConfig{
+							AccountConcurrency:  1,
+							FunctionConcurrency: 1,
+						},
+					},
+					Constraints: []ConstraintItem{
+						accountConcurrency,
+						fnConcurrency,
+					},
+					Amount:               1,
+					LeaseIdempotencyKeys: []string{"item3"},
+					CurrentTime:          deps.clock.Now(),
+					Duration:             3 * time.Second,
+					MaximumLifetime:      time.Minute,
+				})
+				require.NoError(t, err)
+				require.Len(t, res.Leases, 0)
+				require.GreaterOrEqual(t, len(res.LimitingConstraints), 1)
+
+				// Verify manager was not called again because constraints were cached
+				require.Equal(t, initialAcquireCount, len(deps.lifecycles.AcquireCalls))
+			},
+		},
+		{
+			name: "should cache all kinds when no filter is specified",
+			run: func(ctx context.Context, t *testing.T, deps deps) {
+				accountConcurrency := ConstraintItem{
+					Kind: ConstraintKindConcurrency,
+					Concurrency: &ConcurrencyConstraint{
+						Scope:             enums.ConcurrencyScopeAccount,
+						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:account:%s", accountID),
+					},
+				}
+
+				fnConcurrency := ConstraintItem{
+					Kind: ConstraintKindConcurrency,
+					Concurrency: &ConcurrencyConstraint{
+						Scope:             enums.ConcurrencyScopeFn,
+						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:p:%s", fnID),
+					},
+				}
+
+				// Create cache without kind filter
+				unfilteredCache := NewLimitingConstraintCache(
+					WithLimitingCacheClock(deps.clock),
+					WithLimitingCacheManager(deps.cm),
+					WithLimitingCacheEnable(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, minTTL, maxTTL time.Duration) {
+						return true, MinCacheTTL, MaxCacheTTL
+					}),
+					// No WithCacheConstraintKinds specified
+				)
+
+				// First request should pass
+				_, err := unfilteredCache.Acquire(ctx, &CapacityAcquireRequest{
+					AccountID:  accountID,
+					EnvID:      envID,
+					FunctionID: fnID,
+					Source: LeaseSource{
+						Service:           ServiceAPI,
+						Location:          CallerLocationItemLease,
+						RunProcessingMode: RunProcessingModeBackground,
+					},
+					Migration: MigrationIdentifier{
+						QueueShard: "test",
+					},
+					IdempotencyKey: "acq1",
+					Configuration: ConstraintConfig{
+						FunctionVersion: 1,
+						Concurrency: ConcurrencyConfig{
+							AccountConcurrency:  1,
+							FunctionConcurrency: 1,
+						},
+					},
+					Constraints: []ConstraintItem{
+						accountConcurrency,
+						fnConcurrency,
+					},
+					Amount:               1,
+					LeaseIdempotencyKeys: []string{"item1"},
+					CurrentTime:          deps.clock.Now(),
+					Duration:             3 * time.Second,
+					MaximumLifetime:      time.Minute,
+				})
+				require.NoError(t, err)
+
+				// Second request should hit limits and cache all
+				res, err := unfilteredCache.Acquire(ctx, &CapacityAcquireRequest{
+					AccountID:  accountID,
+					EnvID:      envID,
+					FunctionID: fnID,
+					Source: LeaseSource{
+						Service:           ServiceAPI,
+						Location:          CallerLocationItemLease,
+						RunProcessingMode: RunProcessingModeBackground,
+					},
+					Migration: MigrationIdentifier{
+						QueueShard: "test",
+					},
+					IdempotencyKey: "acq2",
+					Configuration: ConstraintConfig{
+						FunctionVersion: 1,
+						Concurrency: ConcurrencyConfig{
+							AccountConcurrency:  1,
+							FunctionConcurrency: 1,
+						},
+					},
+					Constraints: []ConstraintItem{
+						accountConcurrency,
+						fnConcurrency,
+					},
+					Amount:               1,
+					LeaseIdempotencyKeys: []string{"item2"},
+					CurrentTime:          deps.clock.Now(),
+					Duration:             3 * time.Second,
+					MaximumLifetime:      time.Minute,
+				})
+				require.NoError(t, err)
+				require.Len(t, res.Leases, 0)
+				require.GreaterOrEqual(t, len(res.LimitingConstraints), 1)
+
+				// Verify ALL limiting constraints were cached (no filter specified)
+				require.Equal(t, len(res.LimitingConstraints), unfilteredCache.limitingConstraintCache.ItemCount())
+				for _, lc := range res.LimitingConstraints {
+					require.NotNil(t, unfilteredCache.limitingConstraintCache.Get(lc.CacheKey(accountID, envID, fnID)))
+				}
+			},
+		},
+		{
+			name: "should support advanced filtering for account concurrency without custom keys",
+			run: func(ctx context.Context, t *testing.T, deps deps) {
+				// Test the production use case: cache only account concurrency constraints without custom keys
+				accountConcurrency := ConstraintItem{
+					Kind: ConstraintKindConcurrency,
+					Concurrency: &ConcurrencyConstraint{
+						Scope:             enums.ConcurrencyScopeAccount,
+						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:account:%s", accountID),
+					},
+				}
+
+				accountConcurrencyCustomKey := ConstraintItem{
+					Kind: ConstraintKindConcurrency,
+					Concurrency: &ConcurrencyConstraint{
+						Scope:             enums.ConcurrencyScopeAccount,
+						KeyExpressionHash: "custom-hash",
+						EvaluatedKeyHash:  "eval-hash",
+						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:custom:a:%s:eval-hash", accountID),
+					},
+				}
+
+				fnConcurrency := ConstraintItem{
+					Kind: ConstraintKindConcurrency,
+					Concurrency: &ConcurrencyConstraint{
+						Scope:             enums.ConcurrencyScopeFn,
+						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:p:%s", fnID),
+					},
+				}
+
+				// Cache only account concurrency constraints without custom keys
+				advancedCache := NewLimitingConstraintCache(
+					WithLimitingCacheClock(deps.clock),
+					WithLimitingCacheManager(deps.cm),
+					WithLimitingCacheEnable(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, minTTL, maxTTL time.Duration) {
+						return true, MinCacheTTL, MaxCacheTTL
+					}),
+					WithCacheConstraintFilter(func(ci ConstraintItem) bool {
+						// Only cache account concurrency constraints without custom keys
+						if ci.Kind != ConstraintKindConcurrency {
+							return false
+						}
+						if ci.Concurrency == nil {
+							return false
+						}
+						if ci.Concurrency.Scope != enums.ConcurrencyScopeAccount {
+							return false
+						}
+						// Exclude custom keys
+						if ci.Concurrency.IsCustomKey() {
+							return false
+						}
+						return true
+					}),
+				)
+
+				// First request should pass
+				_, err := advancedCache.Acquire(ctx, &CapacityAcquireRequest{
+					AccountID:  accountID,
+					EnvID:      envID,
+					FunctionID: fnID,
+					Source: LeaseSource{
+						Service:           ServiceAPI,
+						Location:          CallerLocationItemLease,
+						RunProcessingMode: RunProcessingModeBackground,
+					},
+					Migration: MigrationIdentifier{
+						QueueShard: "test",
+					},
+					IdempotencyKey: "acq1",
+					Configuration: ConstraintConfig{
+						FunctionVersion: 1,
+						Concurrency: ConcurrencyConfig{
+							AccountConcurrency:  1,
+							FunctionConcurrency: 1,
+							CustomConcurrencyKeys: []CustomConcurrencyLimit{
+								{
+									Scope:             enums.ConcurrencyScopeAccount,
+									Limit:             1,
+									Mode:              enums.ConcurrencyModeStep,
+									KeyExpressionHash: "custom-hash",
+								},
+							},
+						},
+					},
+					Constraints: []ConstraintItem{
+						accountConcurrency,
+						accountConcurrencyCustomKey,
+						fnConcurrency,
+					},
+					Amount:               1,
+					LeaseIdempotencyKeys: []string{"item1"},
+					CurrentTime:          deps.clock.Now(),
+					Duration:             3 * time.Second,
+					MaximumLifetime:      time.Minute,
+				})
+				require.NoError(t, err)
+
+				// Second request should hit limits
+				res, err := advancedCache.Acquire(ctx, &CapacityAcquireRequest{
+					AccountID:  accountID,
+					EnvID:      envID,
+					FunctionID: fnID,
+					Source: LeaseSource{
+						Service:           ServiceAPI,
+						Location:          CallerLocationItemLease,
+						RunProcessingMode: RunProcessingModeBackground,
+					},
+					Migration: MigrationIdentifier{
+						QueueShard: "test",
+					},
+					IdempotencyKey: "acq2",
+					Configuration: ConstraintConfig{
+						FunctionVersion: 1,
+						Concurrency: ConcurrencyConfig{
+							AccountConcurrency:  1,
+							FunctionConcurrency: 1,
+							CustomConcurrencyKeys: []CustomConcurrencyLimit{
+								{
+									Scope:             enums.ConcurrencyScopeAccount,
+									Limit:             1,
+									Mode:              enums.ConcurrencyModeStep,
+									KeyExpressionHash: "custom-hash",
+								},
+							},
+						},
+					},
+					Constraints: []ConstraintItem{
+						accountConcurrency,
+						accountConcurrencyCustomKey,
+						fnConcurrency,
+					},
+					Amount:               1,
+					LeaseIdempotencyKeys: []string{"item2"},
+					CurrentTime:          deps.clock.Now(),
+					Duration:             3 * time.Second,
+					MaximumLifetime:      time.Minute,
+				})
+				require.NoError(t, err)
+				require.Len(t, res.Leases, 0)
+				require.GreaterOrEqual(t, len(res.LimitingConstraints), 1)
+
+				// Verify ONLY account concurrency without custom keys was cached
+				// Account concurrency (without custom key) should be cached
+				cachedAccountConcurrency := advancedCache.limitingConstraintCache.Get(accountConcurrency.CacheKey(accountID, envID, fnID))
+				if cachedAccountConcurrency != nil {
+					require.NotNil(t, cachedAccountConcurrency)
+					// Function concurrency should NOT be cached
+					require.Nil(t, advancedCache.limitingConstraintCache.Get(fnConcurrency.CacheKey(accountID, envID, fnID)))
+					// Account concurrency with custom key should NOT be cached
+					require.Nil(t, advancedCache.limitingConstraintCache.Get(accountConcurrencyCustomKey.CacheKey(accountID, envID, fnID)))
+				}
+			},
+		},
 	}
 
 	for _, tc := range cases {

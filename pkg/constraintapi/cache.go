@@ -20,6 +20,8 @@ const (
 
 type EnableLimitingConstraintCacheFn func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, minTTL, maxTTL time.Duration)
 
+type CacheConstraintFilterFn func(ci ConstraintItem) bool
+
 type limitingConstraintCache struct {
 	manager CapacityManager
 	clock   clockwork.Clock
@@ -27,7 +29,7 @@ type limitingConstraintCache struct {
 	limitingConstraintCache              *ccache.Cache[*limitingConstraintCacheItem]
 	enableHighCardinalityInstrumentation EnableHighCardinalityInstrumentation
 	enableCache                          EnableLimitingConstraintCacheFn
-	allowedKinds                         map[ConstraintKind]struct{}
+	constraintFilter                     CacheConstraintFilterFn
 }
 
 type limitingConstraintCacheItem struct {
@@ -61,22 +63,18 @@ func WithLimitingCacheEnable(enable EnableLimitingConstraintCacheFn) LimitingCon
 	}
 }
 
-func WithCacheConstraintKinds(kinds ...ConstraintKind) LimitingConstraintCacheOption {
+func WithCacheConstraintFilter(fn CacheConstraintFilterFn) LimitingConstraintCacheOption {
 	return func(c *limitingConstraintCache) {
-		c.allowedKinds = make(map[ConstraintKind]struct{}, len(kinds))
-		for _, kind := range kinds {
-			c.allowedKinds[kind] = struct{}{}
-		}
+		c.constraintFilter = fn
 	}
 }
 
-func (l *limitingConstraintCache) shouldCache(kind ConstraintKind) bool {
-	if l.allowedKinds == nil {
-		// If no filter is set, cache all kinds
+func (l *limitingConstraintCache) shouldCache(ci ConstraintItem) bool {
+	if l.constraintFilter == nil {
+		// If no filter is set, cache all constraints
 		return true
 	}
-	_, allowed := l.allowedKinds[kind]
-	return allowed
+	return l.constraintFilter(ci)
 }
 
 // Acquire implements CapacityManager.
@@ -100,8 +98,8 @@ func (l *limitingConstraintCache) Acquire(ctx context.Context, req *CapacityAcqu
 			continue
 		}
 
-		// Skip if this constraint kind should not be cached
-		if !l.shouldCache(ci.Kind) {
+		// Skip if this constraint should not be cached
+		if !l.shouldCache(ci) {
 			continue
 		}
 
@@ -177,8 +175,8 @@ func (l *limitingConstraintCache) Acquire(ctx context.Context, req *CapacityAcqu
 			continue
 		}
 
-		// Skip if this constraint kind should not be cached
-		if !l.shouldCache(ci.Kind) {
+		// Skip if this constraint should not be cached
+		if !l.shouldCache(ci) {
 			continue
 		}
 
