@@ -154,43 +154,6 @@ func (s *PauseStore) SavePause(ctx context.Context, p state.Pause) (int64, error
 	}
 }
 
-func (s *PauseStore) LeasePause(ctx context.Context, id uuid.UUID) error {
-	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "LeasePause"), redis_telemetry.ScopePauses)
-
-	args, err := StrSlice([]any{
-		time.Now().UnixMilli(),
-		state.PauseLeaseDuration.Seconds(),
-	})
-	if err != nil {
-		return err
-	}
-
-	pause := s.unsharded.Pauses()
-
-	status, err := scripts["leasePause"].Exec(
-		redis_telemetry.WithScriptName(ctx, "leasePause"),
-		pause.Client(),
-		// keys will be sharded/unsharded depending on RunID
-		[]string{pause.kg.PauseLease(ctx, id)},
-		args,
-	).AsInt64()
-	if err != nil {
-		return fmt.Errorf("error leasing pause: %w", err)
-	}
-	switch status {
-	case 0:
-		return nil
-	case 1:
-		return state.ErrPauseLeased
-	// case 2:
-	//  NOTE: This is now not possible, as we flush blocks from redis to a backing block store
-	//  meaning that pauses may never be found,
-	// 	return state.ErrPauseNotFound
-	default:
-		return fmt.Errorf("unknown response leasing pause: %d", status)
-	}
-}
-
 func (s *PauseStore) DeletePauseByID(ctx context.Context, pauseID uuid.UUID, workspaceID uuid.UUID) error {
 	// Attempt to fetch this pause.
 	pause, err := s.PauseByID(ctx, pauseID)
