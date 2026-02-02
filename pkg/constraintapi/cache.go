@@ -27,6 +27,7 @@ type limitingConstraintCache struct {
 	limitingConstraintCache              *ccache.Cache[*limitingConstraintCacheItem]
 	enableHighCardinalityInstrumentation EnableHighCardinalityInstrumentation
 	enableCache                          EnableLimitingConstraintCacheFn
+	allowedKinds                         map[ConstraintKind]struct{}
 }
 
 type limitingConstraintCacheItem struct {
@@ -60,6 +61,24 @@ func WithLimitingCacheEnable(enable EnableLimitingConstraintCacheFn) LimitingCon
 	}
 }
 
+func WithCacheConstraintKinds(kinds ...ConstraintKind) LimitingConstraintCacheOption {
+	return func(c *limitingConstraintCache) {
+		c.allowedKinds = make(map[ConstraintKind]struct{}, len(kinds))
+		for _, kind := range kinds {
+			c.allowedKinds[kind] = struct{}{}
+		}
+	}
+}
+
+func (l *limitingConstraintCache) shouldCache(kind ConstraintKind) bool {
+	if l.allowedKinds == nil {
+		// If no filter is set, cache all kinds
+		return true
+	}
+	_, allowed := l.allowedKinds[kind]
+	return allowed
+}
+
 // Acquire implements CapacityManager.
 func (l *limitingConstraintCache) Acquire(ctx context.Context, req *CapacityAcquireRequest) (*CapacityAcquireResponse, errs.InternalError) {
 	if l.enableCache == nil {
@@ -78,6 +97,11 @@ func (l *limitingConstraintCache) Acquire(ctx context.Context, req *CapacityAcqu
 		// Construct cache key for constraint scoped to account
 		cacheKey := ci.CacheKey(req.AccountID, req.EnvID, req.FunctionID)
 		if cacheKey == "" {
+			continue
+		}
+
+		// Skip if this constraint kind should not be cached
+		if !l.shouldCache(ci.Kind) {
 			continue
 		}
 
@@ -150,6 +174,11 @@ func (l *limitingConstraintCache) Acquire(ctx context.Context, req *CapacityAcqu
 	for _, ci := range res.LimitingConstraints {
 		cacheKey := ci.CacheKey(req.AccountID, req.EnvID, req.FunctionID)
 		if cacheKey == "" {
+			continue
+		}
+
+		// Skip if this constraint kind should not be cached
+		if !l.shouldCache(ci.Kind) {
 			continue
 		}
 
