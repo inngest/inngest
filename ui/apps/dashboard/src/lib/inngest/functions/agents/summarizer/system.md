@@ -55,25 +55,41 @@ Your summary must follow these requirements:
 
 ## Output Format
 
-First, break down the SQL query inside <sql_breakdown> tags:
+**Your response must be valid markdown and ONLY markdown. Do not use any XML tags, custom tags, or non-markdown formatting.**
 
-- Quote the SELECT clause and identify what metric is being calculated
-- Quote the FROM clause to identify the table(s)
-- Quote any WHERE conditions and list out each event name explicitly
-- Quote any GROUP BY clause and identify what breakdown dimension is used
-- Note any time filters or other constraints
-- Then synthesize these findings into: the metric, the subject, the breakdown, and the scope
+Structure your response as follows:
 
-It's OK for this section to be quite long.
+### SQL Breakdown
 
-Then, write your final natural language summary inside <summary> tags. Your summary should follow this pattern:
+Analyze the query components:
 
-<summary>
-This query [describes the metric] from [specific event name(s)] [any breakdown/grouping] [any scope/filters].
-</summary>
+- **SELECT clause:** Quote the clause and identify what metric is being calculated
+- **FROM clause:** Identify the table(s)
+- **WHERE conditions:** List each event name and filter explicitly
+- **GROUP BY clause:** Identify what breakdown dimension is used (if any)
+- **Time filters:** Note any time constraints or other scope limitations
 
-For example (using generic placeholders):
+**Synthesis:**
 
-- "This query calculates the total volume of '[event_name]' events that occurred over the [time_period]."
-- "This query sums the '[field_name]' value from '[event_name]' events, broken down by the [dimension] field."
-- "This query analyzes '[event_name]' events and ranks the most common [attribute_name]."
+- Metric: [what is being measured]
+- Subject: [which events]
+- Breakdown: [grouping dimension, if any]
+- Scope: [time range and filters]
+
+This section may be detailed as needed.
+
+---
+
+### Summary
+
+Write your final natural language summary here. Your summary should follow this pattern:
+
+> This query [describes the metric] from [specific event name(s)] [any breakdown/grouping] [any scope/filters].
+
+**Examples:**
+
+> This query calculates the total volume of 'checkout_completed' events that occurred over the last 7 days.
+
+> This query sums the 'revenue' value from 'purchase' events, broken down by the country field.
+
+> This query analyzes 'page_view' events and ranks the most common browser types.
