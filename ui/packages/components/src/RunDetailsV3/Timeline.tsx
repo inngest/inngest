@@ -3,6 +3,7 @@ import { max, min } from 'date-fns';
 
 import { toMaybeDate } from '../utils/date';
 import { isLazyDone, type Lazy } from '../utils/lazyLoad';
+import { TimingLegend } from './TimingLegend';
 import { Trace } from './Trace';
 import { traceWalk } from './utils';
 
@@ -69,6 +70,11 @@ export const Timeline = ({ runID, trace }: Props) => {
 
   return (
     <div className="w-full pb-4 pr-8" ref={containerRef}>
+      {/* Timing Legend (US3 - EXE-1217) */}
+      <div className="mb-3 flex justify-end pr-2">
+        <TimingLegend />
+      </div>
+
       <Trace
         depth={0}
         maxTime={maxTime}

@@ -38,3 +38,4 @@ export {
 export { SegmentedSpanBar } from './SegmentedSpanBar';
 export { SegmentedTimelineSpan } from './SegmentedTimelineSpan';
 export { TimingBreakdownPanel } from './TimingBreakdownPanel';
+export { TimingLegend } from './TimingLegend';
