@@ -159,6 +159,10 @@ type Run struct {
 func (c *Client) Run(ctx context.Context, runID string) Run {
 	c.Helper()
 
+	if runID == "" {
+		c.Fatalf("runID cannot be empty")
+	}
+
 	query := `
 		query GetRun($runID: ID!) {
 			functionRun(query: { functionRunId: $runID }) {
@@ -222,7 +226,10 @@ func (c *Client) WaitForRunStatus(
 		// It looks as though this original code may mutate the run ID
 		// passed in as a pointer while this loop runs?  This feels like
 		// a strange pattern and a bit of a code smell
-		if runID == nil || *runID == "" {
+		if runID == nil {
+			c.Fatalf("runID pointer is nil")
+		}
+		if *runID == "" {
 			continue
 		}
 

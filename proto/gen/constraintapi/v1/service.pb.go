@@ -338,6 +338,7 @@ const (
 	ConstraintApiCallerLocation_CONSTRAINT_API_CALLER_LOCATION_BACKLOG_REFILL ConstraintApiCallerLocation = 2
 	ConstraintApiCallerLocation_CONSTRAINT_API_CALLER_LOCATION_ITEM_LEASE     ConstraintApiCallerLocation = 3
 	ConstraintApiCallerLocation_CONSTRAINT_API_CALLER_LOCATION_CHECKPOINT     ConstraintApiCallerLocation = 4
+	ConstraintApiCallerLocation_CONSTRAINT_API_CALLER_LOCATION_LEASE_SCAVENGE ConstraintApiCallerLocation = 5
 )
 
 // Enum value maps for ConstraintApiCallerLocation.
@@ -348,6 +349,7 @@ var (
 		2: "CONSTRAINT_API_CALLER_LOCATION_BACKLOG_REFILL",
 		3: "CONSTRAINT_API_CALLER_LOCATION_ITEM_LEASE",
 		4: "CONSTRAINT_API_CALLER_LOCATION_CHECKPOINT",
+		5: "CONSTRAINT_API_CALLER_LOCATION_LEASE_SCAVENGE",
 	}
 	ConstraintApiCallerLocation_value = map[string]int32{
 		"CONSTRAINT_API_CALLER_LOCATION_UNSPECIFIED":    0,
@@ -355,6 +357,7 @@ var (
 		"CONSTRAINT_API_CALLER_LOCATION_BACKLOG_REFILL": 2,
 		"CONSTRAINT_API_CALLER_LOCATION_ITEM_LEASE":     3,
 		"CONSTRAINT_API_CALLER_LOCATION_CHECKPOINT":     4,
+		"CONSTRAINT_API_CALLER_LOCATION_LEASE_SCAVENGE": 5,
 	}
 )
 
@@ -388,10 +391,11 @@ func (ConstraintApiCallerLocation) EnumDescriptor() ([]byte, []int) {
 type ConstraintApiLeaseService int32
 
 const (
-	ConstraintApiLeaseService_CONSTRAINT_API_LEASE_SERVICE_UNSPECIFIED ConstraintApiLeaseService = 0
-	ConstraintApiLeaseService_CONSTRAINT_API_LEASE_SERVICE_NEW_RUNS    ConstraintApiLeaseService = 1
-	ConstraintApiLeaseService_CONSTRAINT_API_LEASE_SERVICE_EXECUTOR    ConstraintApiLeaseService = 2
-	ConstraintApiLeaseService_CONSTRAINT_API_LEASE_SERVICE_API         ConstraintApiLeaseService = 3
+	ConstraintApiLeaseService_CONSTRAINT_API_LEASE_SERVICE_UNSPECIFIED  ConstraintApiLeaseService = 0
+	ConstraintApiLeaseService_CONSTRAINT_API_LEASE_SERVICE_NEW_RUNS     ConstraintApiLeaseService = 1
+	ConstraintApiLeaseService_CONSTRAINT_API_LEASE_SERVICE_EXECUTOR     ConstraintApiLeaseService = 2
+	ConstraintApiLeaseService_CONSTRAINT_API_LEASE_SERVICE_API          ConstraintApiLeaseService = 3
+	ConstraintApiLeaseService_CONSTRAINT_API_LEASE_CONSTRAINT_SCAVENGER ConstraintApiLeaseService = 4
 )
 
 // Enum value maps for ConstraintApiLeaseService.
@@ -401,12 +405,14 @@ var (
 		1: "CONSTRAINT_API_LEASE_SERVICE_NEW_RUNS",
 		2: "CONSTRAINT_API_LEASE_SERVICE_EXECUTOR",
 		3: "CONSTRAINT_API_LEASE_SERVICE_API",
+		4: "CONSTRAINT_API_LEASE_CONSTRAINT_SCAVENGER",
 	}
 	ConstraintApiLeaseService_value = map[string]int32{
-		"CONSTRAINT_API_LEASE_SERVICE_UNSPECIFIED": 0,
-		"CONSTRAINT_API_LEASE_SERVICE_NEW_RUNS":    1,
-		"CONSTRAINT_API_LEASE_SERVICE_EXECUTOR":    2,
-		"CONSTRAINT_API_LEASE_SERVICE_API":         3,
+		"CONSTRAINT_API_LEASE_SERVICE_UNSPECIFIED":  0,
+		"CONSTRAINT_API_LEASE_SERVICE_NEW_RUNS":     1,
+		"CONSTRAINT_API_LEASE_SERVICE_EXECUTOR":     2,
+		"CONSTRAINT_API_LEASE_SERVICE_API":          3,
+		"CONSTRAINT_API_LEASE_CONSTRAINT_SCAVENGER": 4,
 	}
 )
 
@@ -1465,6 +1471,7 @@ type CapacityAcquireRequest struct {
 	BlockingThreshold    *durationpb.Duration   `protobuf:"bytes,13,opt,name=blocking_threshold,json=blockingThreshold,proto3" json:"blocking_threshold,omitempty"`
 	Source               *LeaseSource           `protobuf:"bytes,14,opt,name=source,proto3" json:"source,omitempty"`
 	Migration            *MigrationIdentifier   `protobuf:"bytes,15,opt,name=migration,proto3" json:"migration,omitempty"`
+	RequestAttempt       uint32                 `protobuf:"varint,16,opt,name=request_attempt,json=requestAttempt,proto3" json:"request_attempt,omitempty"`
 	unknownFields        protoimpl.UnknownFields
 	sizeCache            protoimpl.SizeCache
 }
@@ -1604,6 +1611,13 @@ func (x *CapacityAcquireRequest) GetMigration() *MigrationIdentifier {
 	return nil
 }
 
+func (x *CapacityAcquireRequest) GetRequestAttempt() uint32 {
+	if x != nil {
+		return x.RequestAttempt
+	}
+	return 0
+}
+
 type CapacityAcquireResponse struct {
 	state               protoimpl.MessageState `protogen:"open.v1"`
 	Leases              []*CapacityLease       `protobuf:"bytes,1,rep,name=leases,proto3" json:"leases,omitempty"`
@@ -1680,6 +1694,7 @@ type CapacityExtendLeaseRequest struct {
 	Duration       *durationpb.Duration   `protobuf:"bytes,4,opt,name=duration,proto3" json:"duration,omitempty"`
 	Migration      *MigrationIdentifier   `protobuf:"bytes,5,opt,name=migration,proto3" json:"migration,omitempty"`
 	Source         *LeaseSource           `protobuf:"bytes,6,opt,name=source,proto3" json:"source,omitempty"`
+	RequestAttempt uint32                 `protobuf:"varint,7,opt,name=request_attempt,json=requestAttempt,proto3" json:"request_attempt,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -1756,6 +1771,13 @@ func (x *CapacityExtendLeaseRequest) GetSource() *LeaseSource {
 	return nil
 }
 
+func (x *CapacityExtendLeaseRequest) GetRequestAttempt() uint32 {
+	if x != nil {
+		return x.RequestAttempt
+	}
+	return 0
+}
+
 type CapacityExtendLeaseResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	LeaseId       *string                `protobuf:"bytes,1,opt,name=lease_id,json=leaseId,proto3,oneof" json:"lease_id,omitempty"`
@@ -1807,6 +1829,7 @@ type CapacityReleaseRequest struct {
 	LeaseId        string                 `protobuf:"bytes,3,opt,name=lease_id,json=leaseId,proto3" json:"lease_id,omitempty"`
 	Migration      *MigrationIdentifier   `protobuf:"bytes,4,opt,name=migration,proto3" json:"migration,omitempty"`
 	Source         *LeaseSource           `protobuf:"bytes,5,opt,name=source,proto3" json:"source,omitempty"`
+	RequestAttempt uint32                 `protobuf:"varint,6,opt,name=request_attempt,json=requestAttempt,proto3" json:"request_attempt,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -1874,6 +1897,13 @@ func (x *CapacityReleaseRequest) GetSource() *LeaseSource {
 		return x.Source
 	}
 	return nil
+}
+
+func (x *CapacityReleaseRequest) GetRequestAttempt() uint32 {
+	if x != nil {
+		return x.RequestAttempt
+	}
+	return 0
 }
 
 type CapacityReleaseResponse struct {
@@ -2000,7 +2030,7 @@ const file_constraintapi_v1_service_proto_rawDesc = "" +
 	"\x05usage\x18\x03 \x03(\v2!.constraintapi.v1.ConstraintUsageR\x05usage\x12-\n" +
 	"\x12fairness_reduction\x18\x04 \x01(\x05R\x11fairnessReduction\x12;\n" +
 	"\vretry_after\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
-	"retryAfter\"\x95\a\n" +
+	"retryAfter\"\xbe\a\n" +
 	"\x16CapacityAcquireRequest\x12'\n" +
 	"\x0fidempotency_key\x18\x01 \x01(\tR\x0eidempotencyKey\x12\x1d\n" +
 	"\n" +
@@ -2019,7 +2049,8 @@ const file_constraintapi_v1_service_proto_rawDesc = "" +
 	"\x10maximum_lifetime\x18\f \x01(\v2\x19.google.protobuf.DurationR\x0fmaximumLifetime\x12H\n" +
 	"\x12blocking_threshold\x18\r \x01(\v2\x19.google.protobuf.DurationR\x11blockingThreshold\x125\n" +
 	"\x06source\x18\x0e \x01(\v2\x1d.constraintapi.v1.LeaseSourceR\x06source\x12C\n" +
-	"\tmigration\x18\x0f \x01(\v2%.constraintapi.v1.MigrationIdentifierR\tmigration\x1a>\n" +
+	"\tmigration\x18\x0f \x01(\v2%.constraintapi.v1.MigrationIdentifierR\tmigration\x12'\n" +
+	"\x0frequest_attempt\x18\x10 \x01(\rR\x0erequestAttempt\x1a>\n" +
 	"\x10LeaseRunIdsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x93\x02\n" +
@@ -2028,7 +2059,7 @@ const file_constraintapi_v1_service_proto_rawDesc = "" +
 	"\x14limiting_constraints\x18\x02 \x03(\v2 .constraintapi.v1.ConstraintItemR\x13limitingConstraints\x12-\n" +
 	"\x12fairness_reduction\x18\x03 \x01(\x05R\x11fairnessReduction\x12;\n" +
 	"\vretry_after\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
-	"retryAfter\"\xb2\x02\n" +
+	"retryAfter\"\xdb\x02\n" +
 	"\x1aCapacityExtendLeaseRequest\x12'\n" +
 	"\x0fidempotency_key\x18\x01 \x01(\tR\x0eidempotencyKey\x12\x1d\n" +
 	"\n" +
@@ -2036,17 +2067,19 @@ const file_constraintapi_v1_service_proto_rawDesc = "" +
 	"\blease_id\x18\x03 \x01(\tR\aleaseId\x125\n" +
 	"\bduration\x18\x04 \x01(\v2\x19.google.protobuf.DurationR\bduration\x12C\n" +
 	"\tmigration\x18\x05 \x01(\v2%.constraintapi.v1.MigrationIdentifierR\tmigration\x125\n" +
-	"\x06source\x18\x06 \x01(\v2\x1d.constraintapi.v1.LeaseSourceR\x06source\"J\n" +
+	"\x06source\x18\x06 \x01(\v2\x1d.constraintapi.v1.LeaseSourceR\x06source\x12'\n" +
+	"\x0frequest_attempt\x18\a \x01(\rR\x0erequestAttempt\"J\n" +
 	"\x1bCapacityExtendLeaseResponse\x12\x1e\n" +
 	"\blease_id\x18\x01 \x01(\tH\x00R\aleaseId\x88\x01\x01B\v\n" +
-	"\t_lease_id\"\xf7\x01\n" +
+	"\t_lease_id\"\xa0\x02\n" +
 	"\x16CapacityReleaseRequest\x12'\n" +
 	"\x0fidempotency_key\x18\x01 \x01(\tR\x0eidempotencyKey\x12\x1d\n" +
 	"\n" +
 	"account_id\x18\x02 \x01(\tR\taccountId\x12\x19\n" +
 	"\blease_id\x18\x03 \x01(\tR\aleaseId\x12C\n" +
 	"\tmigration\x18\x04 \x01(\v2%.constraintapi.v1.MigrationIdentifierR\tmigration\x125\n" +
-	"\x06source\x18\x05 \x01(\v2\x1d.constraintapi.v1.LeaseSourceR\x06source\"\x19\n" +
+	"\x06source\x18\x05 \x01(\v2\x1d.constraintapi.v1.LeaseSourceR\x06source\x12'\n" +
+	"\x0frequest_attempt\x18\x06 \x01(\rR\x0erequestAttempt\"\x19\n" +
 	"\x17CapacityReleaseResponse*\xd2\x01\n" +
 	"\x1bConstraintApiRateLimitScope\x12/\n" +
 	"+CONSTRAINT_API_RATE_LIMIT_SCOPE_UNSPECIFIED\x10\x00\x12,\n" +
@@ -2075,18 +2108,20 @@ const file_constraintapi_v1_service_proto_rawDesc = "" +
 	"\x1eConstraintApiRunProcessingMode\x122\n" +
 	".CONSTRAINT_API_RUN_PROCESSING_MODE_UNSPECIFIED\x10\x00\x121\n" +
 	"-CONSTRAINT_API_RUN_PROCESSING_MODE_BACKGROUND\x10\x01\x127\n" +
-	"3CONSTRAINT_API_RUN_PROCESSING_MODE_DURABLE_ENDPOINT\x10\x02*\x8b\x02\n" +
+	"3CONSTRAINT_API_RUN_PROCESSING_MODE_DURABLE_ENDPOINT\x10\x02*\xbe\x02\n" +
 	"\x1bConstraintApiCallerLocation\x12.\n" +
 	"*CONSTRAINT_API_CALLER_LOCATION_UNSPECIFIED\x10\x00\x12+\n" +
 	"'CONSTRAINT_API_CALLER_LOCATION_SCHEDULE\x10\x01\x121\n" +
 	"-CONSTRAINT_API_CALLER_LOCATION_BACKLOG_REFILL\x10\x02\x12-\n" +
 	")CONSTRAINT_API_CALLER_LOCATION_ITEM_LEASE\x10\x03\x12-\n" +
-	")CONSTRAINT_API_CALLER_LOCATION_CHECKPOINT\x10\x04*\xc5\x01\n" +
+	")CONSTRAINT_API_CALLER_LOCATION_CHECKPOINT\x10\x04\x121\n" +
+	"-CONSTRAINT_API_CALLER_LOCATION_LEASE_SCAVENGE\x10\x05*\xf4\x01\n" +
 	"\x19ConstraintApiLeaseService\x12,\n" +
 	"(CONSTRAINT_API_LEASE_SERVICE_UNSPECIFIED\x10\x00\x12)\n" +
 	"%CONSTRAINT_API_LEASE_SERVICE_NEW_RUNS\x10\x01\x12)\n" +
 	"%CONSTRAINT_API_LEASE_SERVICE_EXECUTOR\x10\x02\x12$\n" +
-	" CONSTRAINT_API_LEASE_SERVICE_API\x10\x032\x95\x03\n" +
+	" CONSTRAINT_API_LEASE_SERVICE_API\x10\x03\x12-\n" +
+	")CONSTRAINT_API_LEASE_CONSTRAINT_SCAVENGER\x10\x042\x95\x03\n" +
 	"\rConstraintAPI\x12X\n" +
 	"\x05Check\x12&.constraintapi.v1.CapacityCheckRequest\x1a'.constraintapi.v1.CapacityCheckResponse\x12^\n" +
 	"\aAcquire\x12(.constraintapi.v1.CapacityAcquireRequest\x1a).constraintapi.v1.CapacityAcquireResponse\x12j\n" +

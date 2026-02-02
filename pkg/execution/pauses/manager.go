@@ -9,8 +9,10 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/expr"
 	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
+	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/oklog/ulid/v2"
@@ -70,12 +72,10 @@ func NewManager(buf Bufferer, bs BlockStore, opts ...ManagerOpt) Manager {
 	return mgr
 }
 
-// NewRedisOnlyManager is a manager that only uses Redis as a buffer, without block flushing.
-func NewRedisOnlyManager(rsm state.PauseManager) Manager {
-	return NewManager(
-		StateBufferer(rsm),
-		nil,
-	)
+// NewPauseStoreManager creates a pause manager using PauseStore with the given redis clients.
+func NewPauseStoreManager(unsharded *redis_state.UnshardedClient, opts ...ManagerOpt) Manager {
+	pauseStore := redis_state.NewPauseStore(unsharded)
+	return NewManager(StateBufferer(pauseStore), nil, opts...)
 }
 
 type manager struct {
@@ -135,7 +135,7 @@ func (m manager) IndexExists(ctx context.Context, i Index) (bool, error) {
 	return m.bs.IndexExists(ctx, i)
 }
 
-func (m manager) ConsumePause(ctx context.Context, pause state.Pause, opts state.ConsumePauseOpts) (state.ConsumePauseResult, func() error, error) {
+func (m manager) ConsumePause(ctx context.Context, rs statev2.RunService, pause state.Pause, opts state.ConsumePauseOpts) (state.ConsumePauseResult, func() error, error) {
 	// NOTE: There is a race condition when flushing blocks:  we may copy a pause
 	// into a block, then while writing the block to disk delete/consume a pause
 	// that is being written.  In this case the metadata for a block
@@ -143,7 +143,7 @@ func (m manager) ConsumePause(ctx context.Context, pause state.Pause, opts state
 	//
 	// 1. We read the buffer and add to a block
 	// 2. And while uploading the block
-	// 3. In parallel, we may delete/consume one of the buffer’s pauses
+	// 3. In parallel, we may delete/consume one of the buffer's pauses
 	//
 	// Unfortunately, we only write the block to indexes after uploads complete.
 	// This means that a pause may exist in a block but have been consumed.
@@ -151,20 +151,17 @@ func (m manager) ConsumePause(ctx context.Context, pause state.Pause, opts state
 	// This is fine technically speaking:  consuming pauses is idempotent and leases
 	// each pause.
 	//
-	// However, in order to eventually compact we need to handle the “pause not found”
-	// case when consuming, and always re-delete the pause.  that’s no big deal, but
+	// However, in order to eventually compact we need to handle the "pause not found"
+	// case when consuming, and always re-delete the pause.  that's no big deal, but
 	// not the best.
 	//
 	// In the future, we could add two block indexes:  pending and flushed.  this is a
 	// pain, though, because we may die when uploading pending blocks, and that requires
-	// a bit of thought to work around, so we’ll just go with double deletes for now,
-	// assuming this won’t happen a ton.  this can be improved later.
-	res, cleanup, err := m.buf.ConsumePause(ctx, pause, opts)
-	// Is this an ErrDuplicateResponse?  If so, we've already consumed this pause,
-	// so delete it.  Similarly, if the error is nil we just consumed, so go ahead
-	// and delete the pause then continue
+	// a bit of thought to work around, so we'll just go with double deletes for now,
+	// assuming this won't happen a ton.  this can be improved later.
+	res, err := rs.ConsumePause(ctx, pause, opts)
 	if err != nil {
-		return res, cleanup, err
+		return res, nil, err
 	}
 
 	idx := Index{WorkspaceID: pause.WorkspaceID}
@@ -172,19 +169,9 @@ func (m manager) ConsumePause(ctx context.Context, pause state.Pause, opts state
 		idx.EventName = *pause.Event
 	}
 
-	// Note that we cannot consume pauses from the blobstore with no event or backing
-	// blob.
-	if SkipFlushing(idx, []*state.Pause{&pause}) {
-		// This only exists in the buffer.  Return the buffer results.
-		return res, cleanup, err
-	}
-
-	// override the cleanup with idx deletion
-	cleanup = func() error {
+	cleanup := func() error {
 		err := m.Delete(ctx, idx, pause)
 		if err != nil {
-			// We only log here if the delete fails. Consuming is idempotent and is the
-			// action that updates state.
 			logger.StdlibLogger(ctx).Error(
 				"error deleting pause once consumed",
 				"error", err,
@@ -216,7 +203,7 @@ func (m manager) Write(ctx context.Context, index Index, pauses ...*state.Pause)
 	// If this is larger than the max buffer len, schedule a new block write.  We only
 	// enqueue this job once per index ID, using queue singletons to handle these.
 	if n >= m.bs.BlockSize() && m.flusher != nil {
-		if err := m.flusher.Enqueue(ctx, index); err != nil && !errors.Is(err, redis_state.ErrQueueItemExists) {
+		if err := m.flusher.Enqueue(ctx, index); err != nil && !errors.Is(err, queue.ErrQueueItemExists) {
 			logger.StdlibLogger(ctx).Error("error attempting to flush block", "error", err)
 		}
 	}
@@ -410,6 +397,29 @@ func (m manager) DeletePauseByID(ctx context.Context, pauseID uuid.UUID, workspa
 	}
 
 	return m.buf.DeletePauseByID(ctx, pauseID, workspaceID)
+}
+
+func (m manager) DeletePausesForRun(ctx context.Context, runID ulid.ULID, workspaceID uuid.UUID) error {
+	pauseIDs, err := m.buf.PauseIDsForRun(ctx, runID)
+	if err != nil {
+		return err
+	}
+
+	for _, pauseID := range pauseIDs {
+		if err := m.DeletePauseByID(ctx, pauseID, workspaceID); err != nil {
+			return err
+		}
+	}
+
+	return m.buf.DeleteRunPausesIndex(ctx, runID)
+}
+
+func (m manager) PauseIDsForRun(ctx context.Context, runID ulid.ULID) ([]uuid.UUID, error) {
+	return m.buf.PauseIDsForRun(ctx, runID)
+}
+
+func (m manager) DeleteRunPausesIndex(ctx context.Context, runID ulid.ULID) error {
+	return m.buf.DeleteRunPausesIndex(ctx, runID)
 }
 
 func (m manager) FlushIndexBlock(ctx context.Context, index Index) error {

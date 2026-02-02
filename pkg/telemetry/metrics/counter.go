@@ -265,6 +265,15 @@ func IncrAggregatePausesFoundCounter(ctx context.Context, value int64, opts Coun
 	})
 }
 
+func IncrAggregatorBookkeeperEvictedCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "aggr_evicted_total",
+		Description: "Total number of bookkeepers evicted from the aggregator cache",
+		Tags:        opts.Tags,
+	})
+}
+
 func IncrConnectGatewayReceivedRouterGRPCMessageCounter(ctx context.Context, value int64, opts CounterOpt) {
 	RecordCounterMetric(ctx, value, CounterOpt{
 		PkgName:     opts.PkgName,
@@ -794,6 +803,20 @@ func IncrScheduleConstraintsCheckFallbackCounter(ctx context.Context, reason str
 	})
 }
 
+func IncrScheduleConstraintsHitCounter(ctx context.Context, reason string, opts CounterOpt) {
+	if opts.Tags == nil {
+		opts.Tags = map[string]any{}
+	}
+	opts.Tags["reason"] = reason
+
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "schedule_constraints_hit_total",
+		Description: "Total number of schedule constraint checks resulted in limiting run scheduling",
+		Tags:        opts.Tags,
+	})
+}
+
 func IncrQueueItemConstraintCheckFallbackCounter(ctx context.Context, reason string, opts CounterOpt) {
 	if opts.Tags == nil {
 		opts.Tags = map[string]any{}
@@ -854,6 +877,19 @@ func IncrConstraintAPILimitingConstraintsCounter(ctx context.Context, opts Count
 		PkgName:     opts.PkgName,
 		MetricName:  "constraintapi_limiting_constraints_total",
 		Description: "Total number of times constraints limited capacity acquisition",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrConstraintAPIIssuedLeaseCounter(ctx context.Context, count int64, opts CounterOpt) {
+	if opts.Tags == nil {
+		opts.Tags = map[string]any{}
+	}
+
+	RecordCounterMetric(ctx, count, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "constraintapi_issued_lease_counter",
+		Description: "Total number of leases issued for the given location",
 		Tags:        opts.Tags,
 	})
 }

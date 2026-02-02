@@ -18,6 +18,12 @@ import (
 	"github.com/redis/rueidis"
 )
 
+type stateMetadata struct {
+	SourceService           LeaseService      `json:"ss,omitempty"`
+	SourceLocation          CallerLocation    `json:"sl,omitempty"`
+	SourceRunProcessingMode RunProcessingMode `json:"sm,omitempty"`
+}
+
 // redisRequestState represents the data structure stored for every request
 // This is used by subsequent calls to Extend, Release to properly handle the lease lifecycle
 //
@@ -54,6 +60,9 @@ type redisRequestState struct {
 
 	// LeaseRunIDs stores the run IDs associated with hashed lease idempotency keys
 	LeaseRunIDs map[string]ulid.ULID `json:"lri,omitempty"`
+
+	// Annotate metadata
+	Metadata stateMetadata `json:"m,omitzero"`
 }
 
 func buildRequestState(req *CapacityAcquireRequest, keyPrefix string) (
@@ -74,6 +83,12 @@ func buildRequestState(req *CapacityAcquireRequest, keyPrefix string) (
 		// These keys are set during Acquire and Release respectively
 		GrantedAmount: 0,
 		ActiveAmount:  0,
+
+		Metadata: stateMetadata{
+			SourceService:           req.Source.Service,
+			SourceLocation:          req.Source.Location,
+			SourceRunProcessingMode: req.Source.RunProcessingMode,
+		},
 	}
 
 	// We hash all idempotency keys provided by users internally.
@@ -174,19 +189,35 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 		"env_id", req.EnvID,
 		"fn_id", req.FunctionID,
 		"req_id", requestID,
+		"source", req.Source,
+		"migration", req.Migration,
 	)
 
 	now := r.clock.Now()
 
-	// TODO: Add metric for this
 	// NOTE: This will include request latency (marshaling, network delays),
 	// and it might not work for retries, as those retain the same CurrentTime value.
-	// TODO: Ensure retries have the updated CurrentTime
 	requestLatency := now.Sub(req.CurrentTime)
+
+	metrics.HistogramConstraintAPIRequestLatency(ctx, requestLatency, metrics.HistogramOpt{
+		PkgName: pkgName,
+		Tags: map[string]any{
+			"operation": "acquire",
+			"source":    req.Migration.String(),
+			"attempt":   req.RequestAttempt,
+		},
+	})
+
 	if requestLatency > MaximumAllowedRequestDelay {
 		// TODO : Set proper error code
-		return nil, errs.Wrap(0, false, "exceeded maximum allowed request delay, latency: %s", requestLatency)
+		return nil, errs.Wrap(
+			0,
+			false,
+			"exceeded maximum allowed request delay, latency: %s, attempt: %d", requestLatency, req.RequestAttempt,
+		)
 	}
+
+	enableHighCardinalityInstrumentation := r.enableHighCardinalityInstrumentation != nil && r.enableHighCardinalityInstrumentation(ctx, req.AccountID, req.EnvID, req.FunctionID)
 
 	// Retrieve client and key prefix for current constraints
 	// NOTE: We will no longer need this once we move to a dedicated store for constraint state
@@ -276,9 +307,9 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 		"prepared acquire call",
 	)
 
-	rawRes, err := scripts["acquire"].Exec(ctx, client, keys, args).AsBytes()
-	if err != nil {
-		return nil, errs.Wrap(0, false, "acquire script failed: %w", err)
+	rawRes, internalErr := executeLuaScript(ctx, "acquire", req.Migration, client, r.clock, keys, args)
+	if internalErr != nil {
+		return nil, internalErr
 	}
 
 	parsedResponse := acquireScriptResponse{}
@@ -316,6 +347,17 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 		retryAfter = time.Time{}
 	}
 
+	untilRetryAfter := max(retryAfter.Sub(now), 0)
+	metrics.HistogramConstraintAPIRetryAfterDuration(ctx, untilRetryAfter, metrics.HistogramOpt{
+		PkgName: pkgName,
+		Tags: map[string]any{
+			"location":            req.Source.Location.String(),
+			"service":             req.Source.Service.String(),
+			"run_processing_mode": req.Source.RunProcessingMode.String(),
+			"migration":           req.Migration.String(),
+		},
+	})
+
 	if len(r.lifecycles) > 0 {
 		for _, hook := range r.lifecycles {
 			err := hook.OnCapacityLeaseAcquired(ctx, OnCapacityLeaseAcquiredData{
@@ -346,7 +388,7 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 	)
 
 	tags := make(map[string]any)
-	if r.enableHighCardinalityInstrumentation != nil && r.enableHighCardinalityInstrumentation(ctx, req.AccountID, req.EnvID, req.FunctionID) {
+	if enableHighCardinalityInstrumentation {
 		tags["function_id"] = req.FunctionID
 	}
 
@@ -372,10 +414,32 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 
 	switch parsedResponse.Status {
 	case 1, 3:
-		l.Trace(
-			"successful acquire call",
-			"leases", leases,
-		)
+		if enableHighCardinalityInstrumentation {
+			l.Debug(
+				"successful acquire call",
+				"leases", leases,
+			)
+		}
+
+		metrics.HistogramConstraintAPIRequestStateSize(ctx, int64(len(requestState)), metrics.HistogramOpt{
+			PkgName: pkgName,
+			Tags: map[string]any{
+				"location":            req.Source.Location.String(),
+				"service":             req.Source.Service.String(),
+				"run_processing_mode": req.Source.RunProcessingMode.String(),
+				"migration":           req.Migration.String(),
+			},
+		})
+
+		metrics.IncrConstraintAPIIssuedLeaseCounter(ctx, int64(len(leases)), metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags: map[string]any{
+				"location":            req.Source.Location.String(),
+				"service":             req.Source.Service.String(),
+				"run_processing_mode": req.Source.RunProcessingMode.String(),
+				"migration":           req.Migration.String(),
+			},
+		})
 
 		// success or idempotency
 		return &CapacityAcquireResponse{

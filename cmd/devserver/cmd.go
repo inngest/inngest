@@ -140,6 +140,17 @@ func Command() *cli.Command {
 				Usage:  "Port to expose the debug api endpoint",
 				Hidden: true,
 			},
+
+			&cli.StringFlag{
+				Name:   "system-trace-endpoint",
+				Usage:  "Endpoint for sending OTLP HTTP traces",
+				Hidden: true,
+			},
+			&cli.StringFlag{
+				Name:   "system-trace-url-path",
+				Usage:  "URL path for sending OTLP HTTP traces",
+				Hidden: true,
+			},
 		},
 	}
 

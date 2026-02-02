@@ -39,10 +39,24 @@ func NewAggregator(
 	if log == nil {
 		log = logger.StdlibLogger(ctx)
 	}
-	return &aggregator{
+
+	cache := ccache.New(ccache.Configure().
+		MaxSize(size).
+		ItemsToPrune(uint32(size) / 4).
+		OnDelete(func(item *ccache.Item) {
+			if bk, ok := item.Value().(*bookkeeper); ok {
+				bk.ae.Close()
+				metrics.IncrAggregatorBookkeeperEvictedCounter(context.Background(), metrics.CounterOpt{
+					PkgName: pkgName,
+					Tags:    map[string]any{},
+				})
+			}
+		}))
+
+	agg := &aggregator{
 		log:         log,
 		concurrency: concurrency,
-		records:     ccache.New(ccache.Configure().MaxSize(size).ItemsToPrune(uint32(size) / 4)),
+		records:     cache,
 		loader:      loader,
 		parser:      parser,
 		// use the package's exprEvaluator function as the actual logic which evaluates
@@ -52,6 +66,11 @@ func NewAggregator(
 		locks:     map[string]*sync.Mutex{},
 		kv:        kv,
 	}
+
+	// Start goroutine to monitor pending deletes
+	go agg.monitorPendingDeletes(ctx)
+
+	return agg
 }
 
 // EvaluableLoader loads all Evaluables from a store since the given time, invoking the given do function for each
@@ -226,6 +245,7 @@ func (a *aggregator) LoadEventEvaluator(ctx context.Context, wsID uuid.UUID, eve
 				Eval:        a.evaluator,
 				Concurrency: a.concurrency,
 				KV:          a.kv,
+				Log:         logger.From(ctx).SLog(),
 			}),
 			// updatedAt is a zero time.
 		}
@@ -332,4 +352,45 @@ func (b *bookkeeper) update(ctx context.Context, l EvaluableLoader) error {
 		b.updatedAt = at
 	}
 	return err
+}
+
+// monitorPendingDeletes periodically checks bookkeepers for high pending delete counts.
+func (a *aggregator) monitorPendingDeletes(ctx context.Context) {
+	ticker := time.NewTicker(5 * time.Minute)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			a.mapLock.Lock()
+			keys := make([]string, 0, len(a.locks))
+			for k := range a.locks {
+				keys = append(keys, k)
+			}
+			a.mapLock.Unlock()
+
+			for _, key := range keys {
+				item := a.records.Get(key)
+				if item == nil {
+					continue
+				}
+				bk, ok := item.Value().(*bookkeeper)
+				if !ok {
+					continue
+				}
+				pending := bk.ae.PendingDeletes()
+				if pending > 25000 {
+					metrics.GaugeAggregatorPendingDeletes(ctx, int64(pending), metrics.GaugeOpt{
+						PkgName: pkgName,
+						Tags: map[string]any{
+							"workspaceID": bk.wsID.String(),
+							"event":       bk.event,
+						},
+					})
+				}
+			}
+		}
+	}
 }

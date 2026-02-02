@@ -25,7 +25,7 @@ local keyConstraintCheckIdempotency = KEYS[3]
 local keyScavengerShard = KEYS[4]
 local keyAccountLeases = KEYS[5]
 
----@type { k: string, e: string, f: string, s: {}[], cv: integer?, r: integer?, g: integer?, a: integer?, l: integer?, lik: string[]?, lri: table<string, string>? }
+---@type { k: string, e: string, f: string, s: {}[], cv: integer?, r: integer?, g: integer?, a: integer?, l: integer?, lik: string[]?, lri: table<string, string>?, m: { ss: integer?, sl: integer?, sm: integer? }? }
 local requestDetails = cjson.decode(ARGV[1])
 local requestID = ARGV[2]
 local accountID = ARGV[3]
@@ -103,7 +103,7 @@ local requested = requestDetails.r
 ---@type integer
 local configVersion = requestDetails.cv
 
----@type { k: integer, c: { m: integer?, s: integer?, h: string?, eh: string?, l: integer?, ilk: string?, iik: string? }?, t: { s: integer?, h: string?, k: string, eh: string?, l: integer, b: integer, p: integer }?, r: { s: integer?, h: string, eh: string, l: integer, p: integer, k: string, b: integer }? }[]
+---@type { k: integer, c: { m: integer?, s: integer?, h: string?, eh: string?, l: integer?, ilk: string?, iik: string?, ra: integer? }?, t: { s: integer?, h: string?, k: string, eh: string?, l: integer, b: integer, p: integer }?, r: { s: integer?, h: string, eh: string, l: integer, p: integer, k: string, b: integer }? }[]
 local constraints = requestDetails.s
 if not constraints then
 	return redis.error_reply("ERR constraints array is nil")
@@ -176,6 +176,7 @@ for index, value in ipairs(constraints) do
 		local inProgressLeases = getConcurrencyCount(value.c.ilk)
 		local inProgressTotal = inProgressItems + inProgressLeases
 		constraintCapacity = value.c.l - inProgressTotal
+		constraintRetryAfter = toInteger(nowMS + value.c.ra)
 	elseif value.k == 3 then
 		-- throttle
 		debug("evaluating throttle")

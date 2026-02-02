@@ -58,6 +58,13 @@ type MigrationIdentifier struct {
 	QueueShard  string
 }
 
+func (m MigrationIdentifier) String() string {
+	if m.QueueShard != "" {
+		return m.QueueShard
+	}
+	return "rate_limit"
+}
+
 type CapacityCheckRequest struct {
 	AccountID uuid.UUID
 
@@ -186,6 +193,10 @@ type CapacityAcquireRequest struct {
 	Source LeaseSource
 
 	Migration MigrationIdentifier
+
+	// RequestAttempt is the current request attempt. For retries, this should be > 0.
+	// This is mainly used for instrumentation.
+	RequestAttempt int
 }
 
 // CapacityLease represents the tuple of LeaseID <-> IdempotencyKey which identifies the leased resource (event, queue item, etc.).
@@ -242,6 +253,10 @@ type CapacityExtendLeaseRequest struct {
 
 	// Source includes information on the calling service and processing mode for instrumentation purposes.
 	Source LeaseSource
+
+	// RequestAttempt is the current request attempt. For retries, this should be > 0.
+	// This is mainly used for instrumentation.
+	RequestAttempt int
 }
 
 type CapacityExtendLeaseResponse struct {
@@ -264,9 +279,20 @@ type CapacityReleaseRequest struct {
 
 	// Source includes information on the calling service and processing mode for instrumentation purposes.
 	Source LeaseSource
+
+	// RequestAttempt is the current request attempt. For retries, this should be > 0.
+	// This is mainly used for instrumentation.
+	RequestAttempt int
 }
 
 type CapacityReleaseResponse struct {
+	AccountID  uuid.UUID
+	EnvID      uuid.UUID
+	FunctionID uuid.UUID
+
+	// CreationSource returns where this lease was created
+	CreationSource LeaseSource
+
 	internalDebugState releaseScriptResponse
 }
 
@@ -278,6 +304,15 @@ const (
 	// RunProcessingModeDurableEndpoint is used for requests sent by Durable Endpoints / Checkpointing
 	RunProcessingModeDurableEndpoint
 )
+
+func (r RunProcessingMode) String() string {
+	switch r {
+	case 1:
+		return "durable_endpoint"
+	default:
+		return "background"
+	}
+}
 
 type CallerLocation int
 
@@ -294,7 +329,26 @@ const (
 	CallerLocationItemLease
 
 	CallerLocationCheckpoint
+
+	CallerLocationLeaseScavenge
 )
+
+func (c CallerLocation) String() string {
+	switch c {
+	case 1:
+		return "schedule"
+	case 2:
+		return "backlog_refill"
+	case 3:
+		return "item_lease"
+	case 4:
+		return "checkpoint"
+	case 5:
+		return "lease_scavenge"
+	default:
+		return "unknown"
+	}
+}
 
 type LeaseService int
 
@@ -303,7 +357,23 @@ const (
 	ServiceNewRuns
 	ServiceExecutor
 	ServiceAPI
+	ServiceConstraintScavenger
 )
+
+func (s LeaseService) String() string {
+	switch s {
+	case 1:
+		return "new_runs"
+	case 2:
+		return "executor"
+	case 3:
+		return "api"
+	case 4:
+		return "constraint-scavenger"
+	default:
+		return "unknown"
+	}
+}
 
 type LeaseSource struct {
 	// Service refers to the origin service (new-runs, api, executor)

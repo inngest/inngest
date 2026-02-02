@@ -3,8 +3,6 @@ package batch
 import (
 	"context"
 	"crypto/rand"
-	"crypto/sha256"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -20,6 +18,7 @@ import (
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/oklog/ulid/v2"
+	"github.com/redis/rueidis"
 )
 
 const (
@@ -54,7 +53,7 @@ func WithLogger(l logger.Logger) RedisBatchManagerOpt {
 	}
 }
 
-func NewRedisBatchManager(b *redis_state.BatchClient, q redis_state.QueueManager, opts ...RedisBatchManagerOpt) BatchManager {
+func NewRedisBatchManager(b *redis_state.BatchClient, q queue.QueueManager, opts ...RedisBatchManagerOpt) BatchManager {
 	manager := redisBatchManager{
 		b:                                  b,
 		q:                                  q,
@@ -73,7 +72,7 @@ func NewRedisBatchManager(b *redis_state.BatchClient, q redis_state.QueueManager
 
 type redisBatchManager struct {
 	b *redis_state.BatchClient
-	q redis_state.QueueManager
+	q queue.QueueManager
 
 	// sizeLimit is the size limit that a batch can have
 	sizeLimit int
@@ -114,8 +113,7 @@ func (b redisBatchManager) batchPointer(ctx context.Context, fn inngest.Function
 			return "", fmt.Errorf("could not retrieve batch key: %w", err)
 		}
 
-		hashedBatchKey := sha256.Sum256([]byte(batchKey))
-		encodedBatchKey := base64.StdEncoding.EncodeToString(hashedBatchKey[:])
+		encodedBatchKey := HashBatchKey(batchKey)
 
 		batchPointer = b.b.KeyGenerator().BatchPointerWithKey(ctx, fn.ID, encodedBatchKey)
 	}
@@ -277,7 +275,7 @@ func (b redisBatchManager) ScheduleExecution(ctx context.Context, opts ScheduleB
 		Payload:     opts.ScheduleBatchPayload,
 		QueueName:   &queueName,
 	}, opts.At, queue.EnqueueOpts{})
-	if err == redis_state.ErrQueueItemExists {
+	if err == queue.ErrQueueItemExists {
 		b.log.Debug("queue item already exists for scheduled batch", "job_id", jobID)
 		return nil
 	}
@@ -314,4 +312,176 @@ func (b redisBatchManager) DeleteKeys(ctx context.Context, functionId uuid.UUID,
 	}
 
 	return nil
+}
+
+// DeleteBatch deletes the current batch for a function and batch key.
+func (b redisBatchManager) DeleteBatch(ctx context.Context, functionID uuid.UUID, batchKey string) (*DeleteBatchResult, error) {
+	// First get the batch info to know what we're deleting
+	info, err := b.GetBatchInfo(ctx, functionID, batchKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get batch info: %w", err)
+	}
+
+	if info.BatchID == "" {
+		// No active batch to delete
+		return &DeleteBatchResult{
+			Deleted:   false,
+			BatchID:   "",
+			ItemCount: 0,
+		}, nil
+	}
+
+	batchID, err := ulid.Parse(info.BatchID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid batch ID: %w", err)
+	}
+
+	// Delete the batch keys
+	if err := b.DeleteKeys(ctx, functionID, batchID); err != nil {
+		return nil, fmt.Errorf("failed to delete batch keys: %w", err)
+	}
+
+	// Delete the batch pointer
+	var batchPointerKey string
+	if batchKey == "" || batchKey == "default" {
+		batchPointerKey = b.b.KeyGenerator().BatchPointer(ctx, functionID)
+	} else {
+		encodedBatchKey := HashBatchKey(batchKey)
+		batchPointerKey = b.b.KeyGenerator().BatchPointerWithKey(ctx, functionID, encodedBatchKey)
+	}
+
+	if err := b.b.Client().Do(ctx, func(c rueidis.Client) rueidis.Completed {
+		return c.B().Del().Key(batchPointerKey).Build()
+	}).Error(); err != nil {
+		return nil, fmt.Errorf("failed to delete batch pointer: %w", err)
+	}
+
+	return &DeleteBatchResult{
+		Deleted:   true,
+		BatchID:   info.BatchID,
+		ItemCount: len(info.Items),
+	}, nil
+}
+
+// RunBatch schedules immediate execution of a batch by creating a timeout job that runs in one second.
+func (b redisBatchManager) RunBatch(ctx context.Context, opts RunBatchOpts) (*RunBatchResult, error) {
+	// Get the batch info first
+	info, err := b.GetBatchInfo(ctx, opts.FunctionID, opts.BatchKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get batch info: %w", err)
+	}
+
+	if info.BatchID == "" {
+		// No active batch to run
+		return &RunBatchResult{
+			Scheduled: false,
+			BatchID:   "",
+			ItemCount: 0,
+		}, nil
+	}
+
+	batchID, err := ulid.Parse(info.BatchID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid batch ID: %w", err)
+	}
+
+	// Determine the batch pointer key
+	var batchPointerKey string
+	if opts.BatchKey == "" || opts.BatchKey == "default" {
+		batchPointerKey = b.b.KeyGenerator().BatchPointer(ctx, opts.FunctionID)
+	} else {
+		encodedBatchKey := HashBatchKey(opts.BatchKey)
+		batchPointerKey = b.b.KeyGenerator().BatchPointerWithKey(ctx, opts.FunctionID, encodedBatchKey)
+	}
+
+	// Get function version from the first batch item if available
+	functionVersion := 0
+	if len(info.Items) > 0 {
+		functionVersion = info.Items[0].FunctionVersion
+	}
+
+	// Schedule execution to run in 1 second
+	scheduleOpts := ScheduleBatchOpts{
+		ScheduleBatchPayload: ScheduleBatchPayload{
+			BatchID:         batchID,
+			BatchPointer:    batchPointerKey,
+			AccountID:       opts.AccountID,
+			WorkspaceID:     opts.WorkspaceID,
+			AppID:           opts.AppID,
+			FunctionID:      opts.FunctionID,
+			FunctionVersion: functionVersion,
+		},
+		At: time.Now().Add(time.Second),
+	}
+
+	if err := b.ScheduleExecution(ctx, scheduleOpts); err != nil {
+		return nil, fmt.Errorf("failed to schedule batch execution: %w", err)
+	}
+
+	return &RunBatchResult{
+		Scheduled: true,
+		BatchID:   info.BatchID,
+		ItemCount: len(info.Items),
+	}, nil
+}
+
+// GetBatchInfo retrieves information about the current batch for a function and batch key.
+func (b redisBatchManager) GetBatchInfo(ctx context.Context, functionID uuid.UUID, batchKey string) (*BatchInfo, error) {
+	// Determine the batch pointer key based on the batch key
+	// When batchKey is "default" or empty, use BatchPointer (no key suffix)
+	// This matches the behavior of Append when fn.EventBatch.Key is nil
+	var batchPointerKey string
+	if batchKey == "" || batchKey == "default" {
+		batchPointerKey = b.b.KeyGenerator().BatchPointer(ctx, functionID)
+	} else {
+		// Hash the batch key to get the pointer key
+		encodedBatchKey := HashBatchKey(batchKey)
+		batchPointerKey = b.b.KeyGenerator().BatchPointerWithKey(ctx, functionID, encodedBatchKey)
+	}
+
+	// Get the batch ID from the pointer
+	batchIDStr, err := b.b.Client().Do(ctx, func(c rueidis.Client) rueidis.Completed {
+		return c.B().Get().Key(batchPointerKey).Build()
+	}).ToString()
+	if err != nil {
+		if rueidis.IsRedisNil(err) {
+			// No active batch
+			return &BatchInfo{
+				BatchID: "",
+				Items:   []BatchItem{},
+				Status:  "none",
+			}, nil
+		}
+		return nil, fmt.Errorf("failed to get batch pointer: %w", err)
+	}
+
+	batchID, err := ulid.Parse(batchIDStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid batch ID in pointer: %w", err)
+	}
+
+	// Retrieve the batch items
+	items, err := b.RetrieveItems(ctx, functionID, batchID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve batch items: %w", err)
+	}
+
+	// Get the batch metadata (status)
+	metadataKey := b.b.KeyGenerator().BatchMetadata(ctx, functionID, batchID)
+	status, err := b.b.Client().Do(ctx, func(c rueidis.Client) rueidis.Completed {
+		return c.B().Hget().Key(metadataKey).Field("status").Build()
+	}).ToString()
+	if err != nil {
+		if rueidis.IsRedisNil(err) {
+			status = "pending"
+		} else {
+			status = "unknown"
+		}
+	}
+
+	return &BatchInfo{
+		BatchID: batchIDStr,
+		Items:   items,
+		Status:  status,
+	}, nil
 }

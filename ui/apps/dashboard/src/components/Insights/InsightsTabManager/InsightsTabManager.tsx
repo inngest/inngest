@@ -17,7 +17,6 @@ import type {
   Tab,
 } from '@/components/Insights/types';
 import type { InsightsQueryStatement } from '@/gql/graphql';
-import { pathCreator } from '@/utils/urls';
 import { isQuerySnapshot, isQueryTemplate } from '../queries';
 import { SHOW_DOCS_CONTROL_PANEL_BUTTON } from '../temp-flags';
 import { InsightsAIHelperProvider } from '../InsightsAIHelperContext';
@@ -31,7 +30,6 @@ import {
   DOCUMENTATION,
   INSIGHTS_AI,
   SCHEMA_EXPLORER,
-  SUPPORT,
   type HelperTitle,
 } from './InsightsHelperPanel/constants';
 import {
@@ -96,33 +94,54 @@ export interface UseInsightsTabManagerProps {
   historyWindow?: number;
   isQueryHelperPanelVisible: boolean;
   onToggleQueryHelperPanelVisibility: () => void;
+  isSavedQueriesFetching: boolean;
+  deepLinkQueryId?: string;
 }
 
 export function useInsightsTabManager(
   props: UseInsightsTabManagerProps,
 ): UseInsightsTabManagerReturn {
-  const [isMounted, setIsMounted] = useState(false);
+  // Always initialize with default state to ensure SSR and hydration match
   const [tabs, setTabs] = useState<Tab[]>([HOME_TAB]);
   const [activeTabId, setActiveTabId] = useState<string>(HOME_TAB.id);
+  const hasHydratedRef = useRef(false);
   const isInsightsAgentEnabled = useBooleanFlag('insights-agent');
   const isSchemaWidgetEnabled = useBooleanFlag('insights-schema-widget');
 
-  // Load from localStorage after mount (avoids hydration mismatch)
+  // Wait for saved queries to load before restoring tabs (prevents race condition)
   useEffect(() => {
+    if (hasHydratedRef.current || props.isSavedQueriesFetching) return;
+
     const stored = getStoredTabs();
     if (stored) {
       setTabs(stored.tabs);
-      setActiveTabId(stored.activeTabId);
-    }
-    setIsMounted(true);
-  }, []);
 
-  // Save tabs to local storage whenever they change (only after initial mount)
-  useEffect(() => {
-    if (isMounted) {
-      saveTabsToStorage(tabs, activeTabId);
+      // Handle activeTabId based on deep link
+      if (props.deepLinkQueryId) {
+        // If there's a deep link, check if the query is already in restored tabs
+        const existingTab = stored.tabs.find(
+          (tab) => tab.savedQueryId === props.deepLinkQueryId,
+        );
+        if (existingTab) {
+          // Focus the existing tab
+          setActiveTabId(existingTab.id);
+        }
+        // If not found, useDeepLinkHandler will create it and focus it
+        // See: ui/apps/dashboard/src/components/Insights/useDeepLinkHandler.ts
+      } else {
+        // No deep link, restore the previous activeTabId
+        setActiveTabId(stored.activeTabId);
+      }
     }
-  }, [tabs, activeTabId, isMounted]);
+
+    hasHydratedRef.current = true;
+  }, [props.isSavedQueriesFetching, props.deepLinkQueryId]);
+
+  // Save tabs to local storage whenever they change (skip first render)
+  useEffect(() => {
+    if (!hasHydratedRef.current) return;
+    saveTabsToStorage(tabs, activeTabId);
+  }, [tabs, activeTabId]);
 
   // Map each UI tab to a stable agent thread id
   const agentThreadIdByTabRef = useRef<Record<string, string>>({});
@@ -346,7 +365,7 @@ function SingleTabRenderer({
                   />
                 )}
               </div>
-              {hasMoreThanOneHelperPanelFeatureEnabled(helperItems) ? (
+              {isQueryTab(tab.id) && helperItems.length > 0 ? (
                 <InsightsHelperPanelControl
                   items={helperItems}
                   activeTitle={activeHelper}
@@ -561,13 +580,6 @@ function InsightsTabManagerInternal({
       });
     }
 
-    items.push({
-      title: SUPPORT,
-      icon: <InsightsHelperPanelIcon title={SUPPORT} />,
-      action: noOp,
-      href: pathCreator.support({ ref: 'app-insights' }),
-    });
-
     return items;
   }, [handleSelectHelper, isInsightsAgentEnabled, isSchemaWidgetEnabled]);
   // Provide shared transport/connection for all descendant useAgents hooks
@@ -589,7 +601,6 @@ function InsightsTabManagerInternal({
     helperItems,
     historyWindow,
   };
-
   return (
     <div className="flex h-full w-full flex-1 flex-col overflow-hidden">
       <InsightsTabsList
@@ -620,14 +631,6 @@ function InsightsTabManagerInternal({
       </div>
     </div>
   );
-}
-
-// This ensures the user has support + at least one of AI, Documentation, or Schema Explorer enabled.
-// Otherwise, we just hide the helper panel because only showing support is not useful.
-function hasMoreThanOneHelperPanelFeatureEnabled(
-  features: HelperItem[],
-): boolean {
-  return features.length > 1;
 }
 
 function getNewActiveTabAfterClose(
@@ -722,8 +725,4 @@ function ActiveThreadBridge({
 
 function isQueryTab(tabId: string): boolean {
   return tabId !== HOME_TAB.id && tabId !== TEMPLATES_TAB.id;
-}
-
-function noOp() {
-  return;
 }

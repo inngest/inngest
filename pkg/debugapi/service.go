@@ -7,10 +7,13 @@ import (
 
 	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/cqrs"
+	"github.com/inngest/inngest/pkg/execution/batch"
 	"github.com/inngest/inngest/pkg/execution/cron"
+	"github.com/inngest/inngest/pkg/execution/debounce"
 	"github.com/inngest/inngest/pkg/execution/pauses"
+	"github.com/inngest/inngest/pkg/execution/queue"
+	"github.com/inngest/inngest/pkg/execution/singleton"
 	"github.com/inngest/inngest/pkg/execution/state"
-	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/service"
 	pb "github.com/inngest/inngest/proto/gen/debug/v1"
@@ -26,29 +29,37 @@ func NewDebugAPI(o Opts) service.Service {
 	}
 
 	return &debugAPI{
-		rpc:       grpc.NewServer(),
-		port:      port,
-		log:       o.Log,
-		db:        o.DB,
-		queue:     o.Queue,
-		state:     o.State,
-		croner:    o.Cron,
-		findShard: o.ShardSelector,
-		pm:        o.PauseManager,
-		cm:        o.CapacityManager,
+		rpc:            grpc.NewServer(),
+		port:           port,
+		log:            o.Log,
+		db:             o.DB,
+		queue:          o.Queue,
+		state:          o.State,
+		croner:         o.Cron,
+		findShard:      o.ShardSelector,
+		pm:             o.PauseManager,
+		cm:             o.CapacityManager,
+		batchManager:   o.BatchManager,
+		singletonStore: o.SingletonStore,
+		debouncer:      o.Debouncer,
 	}
 }
 
 type Opts struct {
 	Log             logger.Logger
 	DB              cqrs.Manager
-	Queue           redis_state.QueueManager
+	Queue           queue.QueueManager
 	State           state.Manager
 	Cron            cron.CronManager
 	PauseManager    pauses.Manager
 	CapacityManager constraintapi.CapacityManager
 
-	ShardSelector redis_state.ShardSelector
+	ShardSelector queue.ShardSelector
+
+	// Dependencies for batching, singleton, and debounce insights
+	BatchManager   batch.BatchManager
+	SingletonStore singleton.Singleton
+	Debouncer      debounce.Debouncer
 
 	Port int
 }
@@ -59,14 +70,21 @@ type debugAPI struct {
 
 	rpc       *grpc.Server
 	log       logger.Logger
-	findShard redis_state.ShardSelector
+	findShard queue.ShardSelector
+
+	shards map[string]queue.QueueShard
 
 	db     cqrs.Manager
-	queue  redis_state.QueueManager
+	queue  queue.QueueManager
 	state  state.Manager
 	croner cron.CronManager
 	pm     pauses.Manager
 	cm     constraintapi.CapacityManager
+
+	// Dependencies for batching, singleton, and debounce insights
+	batchManager   batch.BatchManager
+	singletonStore singleton.Singleton
+	debouncer      debounce.Debouncer
 }
 
 func (d *debugAPI) Name() string {

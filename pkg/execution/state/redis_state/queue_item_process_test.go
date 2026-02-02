@@ -3,7 +3,6 @@ package redis_state
 import (
 	"context"
 	"encoding/json"
-	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -23,49 +22,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type constraintApiDebugLifecycles struct {
-	acquireCalls []constraintapi.OnCapacityLeaseAcquiredData
-	extendCalls  []constraintapi.OnCapacityLeaseExtendedData
-	releaseCalls []constraintapi.OnCapacityLeaseReleasedData
-	l            sync.Mutex
-}
-
-// OnCapacityLeaseAcquired implements constraintapi.ConstraintAPILifecycleHooks.
-func (c *constraintApiDebugLifecycles) OnCapacityLeaseAcquired(ctx context.Context, data constraintapi.OnCapacityLeaseAcquiredData) error {
-	c.l.Lock()
-	defer c.l.Unlock()
-	c.acquireCalls = append(c.acquireCalls, data)
-	return nil
-}
-
-// OnCapacityLeaseExtended implements constraintapi.ConstraintAPILifecycleHooks.
-func (c *constraintApiDebugLifecycles) OnCapacityLeaseExtended(ctx context.Context, data constraintapi.OnCapacityLeaseExtendedData) error {
-	c.l.Lock()
-	defer c.l.Unlock()
-	c.extendCalls = append(c.extendCalls, data)
-	return nil
-}
-
-// OnCapacityLeaseReleased implements constraintapi.ConstraintAPILifecycleHooks.
-func (c *constraintApiDebugLifecycles) OnCapacityLeaseReleased(ctx context.Context, data constraintapi.OnCapacityLeaseReleasedData) error {
-	c.l.Lock()
-	defer c.l.Unlock()
-	c.releaseCalls = append(c.releaseCalls, data)
-	return nil
-}
-
-func (c *constraintApiDebugLifecycles) reset() {
-	c.l.Lock()
-	defer c.l.Unlock()
-	c.acquireCalls = nil
-	c.extendCalls = nil
-	c.releaseCalls = nil
-}
-
-func newConstraintAPIDebugLifecycles() *constraintApiDebugLifecycles {
-	return &constraintApiDebugLifecycles{}
-}
-
 func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 	r := miniredis.RunT(t)
 	rc, err := rueidis.NewClient(rueidis.ClientOption{
@@ -77,18 +33,11 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 
 	clock := clockwork.NewFakeClock()
 
-	shard := QueueShard{
-		Name:        consts.DefaultQueueShardName,
-		Kind:        string(enums.QueueShardKindRedis),
-		RedisClient: NewQueueClient(rc, QueueDefaultKey),
-	}
-	kg := shard.RedisClient.kg
-
 	ctx := context.Background()
 	l := logger.StdlibLogger(ctx, logger.WithLoggerLevel(logger.LevelTrace))
 	ctx = logger.WithStdlib(ctx, l)
 
-	cmLifecycles := newConstraintAPIDebugLifecycles()
+	cmLifecycles := constraintapi.NewConstraintAPIDebugLifecycles()
 	cm, err := constraintapi.NewRedisCapacityManager(
 		constraintapi.WithClock(clock),
 		constraintapi.WithEnableDebugLogs(true),
@@ -97,7 +46,7 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 		constraintapi.WithQueueShards(map[string]rueidis.Client{
 			consts.DefaultQueueShardName: rc,
 		}),
-		constraintapi.WithQueueStateKeyPrefix("q:v1"),
+		constraintapi.WithQueueStateKeyPrefix("queue"),
 		constraintapi.WithRateLimitClient(rc),
 		constraintapi.WithRateLimitKeyPrefix("rl"),
 	)
@@ -106,7 +55,7 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 	reset := func() {
 		r.FlushAll()
 		r.SetTime(clock.Now())
-		cmLifecycles.reset()
+		cmLifecycles.Reset()
 	}
 
 	accountID := uuid.New()
@@ -131,26 +80,26 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 	t.Run("without constraint api", func(t *testing.T) {
 		reset()
 
-		q := NewQueue(
-			shard,
-			WithClock(clock),
-			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+		q, shard := newQueue(
+			t, rc,
+			osqueue.WithClock(clock),
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 				return true
 			}),
 		)
 
-		qi, err := q.EnqueueItem(ctx, q.primaryQueueShard, item, start, osqueue.EnqueueOpts{})
+		qi, err := shard.EnqueueItem(ctx, item, start, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
-		p := q.ItemPartition(ctx, shard, qi)
+		p := osqueue.ItemPartition(ctx, qi)
 
 		var counter int64
 
-		err = q.process(ctx, processItem{
+		err = q.ProcessItem(ctx, osqueue.ProcessItem{
 			I:                        qi,
 			P:                        p,
-			disableConstraintUpdates: false,
-			capacityLease:            nil,
+			DisableConstraintUpdates: false,
+			CapacityLease:            nil,
 		}, func(ctx context.Context, ri osqueue.RunInfo, i osqueue.Item) (osqueue.RunResult, error) {
 			atomic.AddInt64(&counter, 1)
 			return osqueue.RunResult{}, nil
@@ -163,32 +112,32 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 	t.Run("with constraint api but no valid lease", func(t *testing.T) {
 		reset()
 
-		q := NewQueue(
-			shard,
-			WithClock(clock),
-			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+		q, shard := newQueue(
+			t, rc,
+			osqueue.WithClock(clock),
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 				return true
 			}),
-			WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
+			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
 				return true, true
 			}),
-			WithCapacityManager(cm),
+			osqueue.WithCapacityManager(cm),
 			// make lease extensions more frequent
-			WithCapacityLeaseExtendInterval(time.Second),
+			osqueue.WithCapacityLeaseExtendInterval(time.Second),
 		)
 
-		qi, err := q.EnqueueItem(ctx, q.primaryQueueShard, item, start, osqueue.EnqueueOpts{})
+		qi, err := shard.EnqueueItem(ctx, item, start, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
-		p := q.ItemPartition(ctx, shard, qi)
+		p := osqueue.ItemPartition(ctx, qi)
 
 		var counter int64
 
-		err = q.process(ctx, processItem{
+		err = q.ProcessItem(ctx, osqueue.ProcessItem{
 			I:                        qi,
 			P:                        p,
-			disableConstraintUpdates: false,
-			capacityLease:            nil,
+			DisableConstraintUpdates: false,
+			CapacityLease:            nil,
 		}, func(ctx context.Context, ri osqueue.RunInfo, i osqueue.Item) (osqueue.RunResult, error) {
 			<-time.After(3 * time.Second)
 			atomic.AddInt64(&counter, 1)
@@ -198,31 +147,32 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 
 		// No extend calls should be fired
 		require.Equal(t, 1, int(counter))
-		require.Equal(t, 0, len(cmLifecycles.extendCalls))
+		require.Equal(t, 0, len(cmLifecycles.ExtendCalls))
 	})
 
 	t.Run("with constraint api and valid lease", func(t *testing.T) {
 		reset()
 
-		q := NewQueue(
-			shard,
-			WithClock(clock),
-			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+		q, shard := newQueue(
+			t, rc,
+			osqueue.WithClock(clock),
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 				return true
 			}),
-			WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
+			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
 				return true, true
 			}),
-			WithCapacityManager(cm),
+			osqueue.WithCapacityManager(cm),
 			// make lease extensions more frequent
-			WithCapacityLeaseExtendInterval(time.Second),
-			WithLogger(l),
+			osqueue.WithCapacityLeaseExtendInterval(time.Second),
+			osqueue.WithLogger(l),
 		)
+		kg := shard.Client().kg
 
-		qi, err := q.EnqueueItem(ctx, q.primaryQueueShard, item, start, osqueue.EnqueueOpts{})
+		qi, err := shard.EnqueueItem(ctx, item, start, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
-		p := q.ItemPartition(ctx, shard, qi)
+		p := osqueue.ItemPartition(ctx, qi)
 
 		// Acquire a lease
 		resp, err := cm.Acquire(ctx, &constraintapi.CapacityAcquireRequest{
@@ -264,21 +214,21 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 				RunProcessingMode: constraintapi.RunProcessingModeBackground,
 			},
 			Migration: constraintapi.MigrationIdentifier{
-				QueueShard: shard.Name,
+				QueueShard: shard.Name(),
 			},
 		})
 		require.NoError(t, err)
 		require.Len(t, resp.Leases, 1)
 
-		require.Len(t, cmLifecycles.acquireCalls, 1)
+		require.Len(t, cmLifecycles.AcquireCalls, 1)
 
 		var counter int64
 
-		err = q.process(ctx, processItem{
+		err = q.ProcessItem(ctx, osqueue.ProcessItem{
 			I:                        qi,
 			P:                        p,
-			disableConstraintUpdates: true,
-			capacityLease: &osqueue.CapacityLease{
+			DisableConstraintUpdates: true,
+			CapacityLease: &osqueue.CapacityLease{
 				LeaseID: resp.Leases[0].LeaseID,
 			},
 		}, func(ctx context.Context, ri osqueue.RunInfo, i osqueue.Item) (osqueue.RunResult, error) {
@@ -305,10 +255,137 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 		service.Wait()
 
 		// Expect at least 1 extend call
-		require.Greater(t, len(cmLifecycles.extendCalls), 0)
+		require.Greater(t, len(cmLifecycles.ExtendCalls), 0)
 
 		// Expect exactly 1 release call
-		require.Equal(t, len(cmLifecycles.releaseCalls), 1)
+		require.Equal(t, len(cmLifecycles.ReleaseCalls), 1)
+	})
+
+	t.Run("with matching lease extension intervals", func(t *testing.T) {
+		reset()
+
+		// Use the production default interval (QueueLeaseDuration / 2) for both tickers
+		// This reproduces the bug where both tickers fire simultaneously
+		leaseExtendInterval := osqueue.QueueLeaseDuration / 2
+
+		q, shard := newQueue(
+			t, rc,
+			osqueue.WithClock(clock),
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+				return true
+			}),
+			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
+				return true, true
+			}),
+			osqueue.WithCapacityManager(cm),
+			// Use matching interval (same as queue item lease ticker)
+			osqueue.WithCapacityLeaseExtendInterval(leaseExtendInterval),
+			osqueue.WithLogger(l),
+		)
+		kg := shard.Client().kg
+
+		qi, err := shard.EnqueueItem(ctx, item, start, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+
+		p := osqueue.ItemPartition(ctx, qi)
+
+		// Acquire a lease (same pattern as existing test)
+		resp, err := cm.Acquire(ctx, &constraintapi.CapacityAcquireRequest{
+			AccountID:            accountID,
+			EnvID:                envID,
+			IdempotencyKey:       qi.ID,
+			FunctionID:           fnID,
+			LeaseIdempotencyKeys: []string{qi.ID},
+			Amount:               1,
+			Configuration: constraintapi.ConstraintConfig{
+				FunctionVersion: 1,
+				Concurrency: constraintapi.ConcurrencyConfig{
+					AccountConcurrency:  5,
+					FunctionConcurrency: 2,
+				},
+			},
+			Constraints: []constraintapi.ConstraintItem{
+				{
+					Kind: constraintapi.ConstraintKindConcurrency,
+					Concurrency: &constraintapi.ConcurrencyConstraint{
+						Scope:             enums.ConcurrencyScopeAccount,
+						InProgressItemKey: kg.Concurrency("account", accountID.String()),
+					},
+				},
+				{
+					Kind: constraintapi.ConstraintKindConcurrency,
+					Concurrency: &constraintapi.ConcurrencyConstraint{
+						Scope:             enums.ConcurrencyScopeFn,
+						InProgressItemKey: kg.Concurrency("p", fnID.String()),
+					},
+				},
+			},
+			CurrentTime:     clock.Now(),
+			Duration:        time.Minute, // Longer duration to allow multiple extensions
+			MaximumLifetime: 5 * time.Minute,
+			Source: constraintapi.LeaseSource{
+				Service:           constraintapi.ServiceExecutor,
+				Location:          constraintapi.CallerLocationItemLease,
+				RunProcessingMode: constraintapi.RunProcessingModeBackground,
+			},
+			Migration: constraintapi.MigrationIdentifier{
+				QueueShard: shard.Name(),
+			},
+		})
+		require.NoError(t, err)
+		require.Len(t, resp.Leases, 1)
+
+		require.Len(t, cmLifecycles.AcquireCalls, 1)
+
+		// Lease the queue item (required when queue item lease ticker fires)
+		leaseID, err := shard.Lease(ctx, qi, osqueue.QueueLeaseDuration, clock.Now(), nil, osqueue.LeaseOptionDisableConstraintChecks(true))
+		require.NoError(t, err)
+		qi.LeaseID = leaseID
+
+		var counter int64
+
+		err = q.ProcessItem(ctx, osqueue.ProcessItem{
+			I:                        qi,
+			P:                        p,
+			DisableConstraintUpdates: true,
+			CapacityLease: &osqueue.CapacityLease{
+				LeaseID: resp.Leases[0].LeaseID,
+			},
+		}, func(ctx context.Context, ri osqueue.RunInfo, i osqueue.Item) (osqueue.RunResult, error) {
+			go func() {
+				// Advance clock in intervals matching the lease extension interval
+				// This ensures both tickers fire at the same time
+				for i := 0; i < 3; i++ {
+					select {
+					case <-ctx.Done():
+						return
+					case <-time.After(100 * time.Millisecond):
+						// Advance by the full lease extension interval to trigger both tickers simultaneously
+						clock.Advance(leaseExtendInterval)
+					}
+				}
+			}()
+
+			// Wait for clock advances to complete
+			<-time.After(500 * time.Millisecond)
+			atomic.AddInt64(&counter, 1)
+			return osqueue.RunResult{}, nil
+		})
+		require.NoError(t, err)
+
+		require.Equal(t, 1, int(counter))
+
+		service.Wait()
+
+		// With matching intervals, both tickers fire simultaneously.
+		// Before the fix (single select loop), capacity lease extensions might not run.
+		// After the fix (separate goroutines), capacity lease extensions should always run.
+		// Expect at least 2 extend calls (we advanced clock 3 times by the interval)
+		require.GreaterOrEqual(t, len(cmLifecycles.ExtendCalls), 2,
+			"capacity lease extensions should run even when both tickers fire simultaneously")
+
+		// Expect exactly 1 release call
+		require.Equal(t, 1, len(cmLifecycles.ReleaseCalls))
 	})
 }
 
@@ -323,18 +400,11 @@ func TestQueueProcessorPreLeaseWithConstraintAPI(t *testing.T) {
 
 	clock := clockwork.NewFakeClock()
 
-	shard := QueueShard{
-		Kind:        string(enums.QueueShardKindRedis),
-		RedisClient: NewQueueClient(rc, "q:v1"),
-		Name:        consts.DefaultQueueShardName,
-	}
-	kg := shard.RedisClient.kg
-
 	ctx := context.Background()
 	l := logger.StdlibLogger(ctx, logger.WithLoggerLevel(logger.LevelTrace))
 	ctx = logger.WithStdlib(ctx, l)
 
-	cmLifecycles := newConstraintAPIDebugLifecycles()
+	cmLifecycles := constraintapi.NewConstraintAPIDebugLifecycles()
 	cm, err := constraintapi.NewRedisCapacityManager(
 		constraintapi.WithClock(clock),
 		constraintapi.WithEnableDebugLogs(true),
@@ -343,7 +413,7 @@ func TestQueueProcessorPreLeaseWithConstraintAPI(t *testing.T) {
 		constraintapi.WithQueueShards(map[string]rueidis.Client{
 			consts.DefaultQueueShardName: rc,
 		}),
-		constraintapi.WithQueueStateKeyPrefix("q:v1"),
+		constraintapi.WithQueueStateKeyPrefix("queue"),
 		constraintapi.WithRateLimitClient(rc),
 		constraintapi.WithRateLimitKeyPrefix("rl"),
 	)
@@ -352,7 +422,7 @@ func TestQueueProcessorPreLeaseWithConstraintAPI(t *testing.T) {
 	reset := func() {
 		r.FlushAll()
 		r.SetTime(clock.Now())
-		cmLifecycles.reset()
+		cmLifecycles.Reset()
 	}
 
 	accountID := uuid.New()
@@ -377,64 +447,64 @@ func TestQueueProcessorPreLeaseWithConstraintAPI(t *testing.T) {
 	t.Run("without constraint api", func(t *testing.T) {
 		reset()
 
-		q := NewQueue(
-			shard,
-			WithClock(clock),
-			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+		q, shard := newQueue(
+			t, rc,
+			osqueue.WithClock(clock),
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 				return false
 			}),
-			WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
+			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
 				return false, false
 			}),
-			WithCapacityManager(cm),
+			osqueue.WithCapacityManager(cm),
 			// make lease extensions more frequent
-			WithCapacityLeaseExtendInterval(time.Second),
-			WithLogger(l),
+			osqueue.WithCapacityLeaseExtendInterval(time.Second),
+			osqueue.WithLogger(l),
 		)
 
-		qi, err := q.EnqueueItem(ctx, q.primaryQueueShard, item, start, osqueue.EnqueueOpts{})
+		qi, err := shard.EnqueueItem(ctx, item, start, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
-		p := q.ItemPartition(ctx, shard, qi)
+		p := osqueue.ItemPartition(ctx, qi)
 
-		iter := processor{
-			partition:            &p,
-			items:                []*osqueue.QueueItem{&qi},
-			partitionContinueCtr: 0,
-			queue:                q,
-			denies:               newLeaseDenyList(),
-			staticTime:           q.clock.Now(),
-			parallel:             false,
+		iter := osqueue.ProcessorIterator{
+			Partition:            &p,
+			Items:                []*osqueue.QueueItem{&qi},
+			PartitionContinueCtr: 0,
+			Queue:                q,
+			Denies:               osqueue.NewLeaseDenyList(),
+			StaticTime:           clock.Now(),
+			Parallel:             false,
 		}
 
-		err = iter.process(ctx, &qi)
+		err = iter.Process(ctx, &qi)
 		require.NoError(t, err)
 
-		require.Equal(t, 0, len(cmLifecycles.acquireCalls))
-		require.Equal(t, 0, len(cmLifecycles.extendCalls))
-		require.Equal(t, 0, len(cmLifecycles.releaseCalls))
+		require.Equal(t, 0, len(cmLifecycles.AcquireCalls))
+		require.Equal(t, 0, len(cmLifecycles.ExtendCalls))
+		require.Equal(t, 0, len(cmLifecycles.ReleaseCalls))
 	})
 
 	t.Run("with constraint api and no active lease", func(t *testing.T) {
 		reset()
 
-		q := NewQueue(
-			shard,
-			WithClock(clock),
-			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+		q, shard := newQueue(
+			t, rc,
+			osqueue.WithClock(clock),
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 				return false
 			}),
-			WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
+			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
 				return true, true
 			}),
-			WithCapacityManager(cm),
+			osqueue.WithCapacityManager(cm),
 			// make lease extensions more frequent
-			WithCapacityLeaseExtendInterval(time.Second),
-			WithLogger(l),
-			WithPartitionConstraintConfigGetter(func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
-				return PartitionConstraintConfig{
+			osqueue.WithCapacityLeaseExtendInterval(time.Second),
+			osqueue.WithLogger(l),
+			osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
+				return osqueue.PartitionConstraintConfig{
 					FunctionVersion: 1,
-					Concurrency: PartitionConcurrency{
+					Concurrency: osqueue.PartitionConcurrency{
 						AccountConcurrency:  10,
 						FunctionConcurrency: 5,
 					},
@@ -442,48 +512,49 @@ func TestQueueProcessorPreLeaseWithConstraintAPI(t *testing.T) {
 			}),
 		)
 
-		qi, err := q.EnqueueItem(ctx, q.primaryQueueShard, item, start, osqueue.EnqueueOpts{})
+		qi, err := shard.EnqueueItem(ctx, item, start, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
-		p := q.ItemPartition(ctx, shard, qi)
+		p := osqueue.ItemPartition(ctx, qi)
 
-		iter := processor{
-			partition:            &p,
-			items:                []*osqueue.QueueItem{&qi},
-			partitionContinueCtr: 0,
-			queue:                q,
-			denies:               newLeaseDenyList(),
-			staticTime:           q.clock.Now(),
-			parallel:             false,
+		iter := osqueue.ProcessorIterator{
+			Partition:            &p,
+			Items:                []*osqueue.QueueItem{&qi},
+			PartitionContinueCtr: 0,
+			Queue:                q,
+			Denies:               osqueue.NewLeaseDenyList(),
+			StaticTime:           clock.Now(),
+			Parallel:             false,
 		}
 
-		err = iter.process(ctx, &qi)
+		err = iter.Process(ctx, &qi)
 		require.NoError(t, err)
 
-		require.Equal(t, 1, len(cmLifecycles.acquireCalls))
-		require.Equal(t, 0, len(cmLifecycles.extendCalls))
-		require.Equal(t, 0, len(cmLifecycles.releaseCalls))
+		require.Equal(t, 1, len(cmLifecycles.AcquireCalls))
+		require.Equal(t, 0, len(cmLifecycles.ExtendCalls))
+		require.Equal(t, 0, len(cmLifecycles.ReleaseCalls))
 	})
 
 	t.Run("with constraint api and active capacity lease", func(t *testing.T) {
 		reset()
 
-		q := NewQueue(
-			shard,
-			WithClock(clock),
-			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+		q, shard := newQueue(
+			t, rc,
+			osqueue.WithClock(clock),
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 				return false
 			}),
-			WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
+			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
 				return true, true
 			}),
-			WithCapacityManager(cm),
+			osqueue.WithCapacityManager(cm),
 			// make lease extensions more frequent
-			WithCapacityLeaseExtendInterval(time.Second),
-			WithLogger(l),
+			osqueue.WithCapacityLeaseExtendInterval(time.Second),
+			osqueue.WithLogger(l),
 		)
+		kg := shard.Client().kg
 
-		qi, err := q.EnqueueItem(ctx, q.primaryQueueShard, item, start, osqueue.EnqueueOpts{})
+		qi, err := shard.EnqueueItem(ctx, item, start, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
 		// Acquire a lease
@@ -526,46 +597,46 @@ func TestQueueProcessorPreLeaseWithConstraintAPI(t *testing.T) {
 				RunProcessingMode: constraintapi.RunProcessingModeBackground,
 			},
 			Migration: constraintapi.MigrationIdentifier{
-				QueueShard: shard.Name,
+				QueueShard: shard.Name(),
 			},
 		})
 		require.NoError(t, err)
 		require.Len(t, resp.Leases, 1)
 
-		require.Len(t, cmLifecycles.acquireCalls, 1)
+		require.Len(t, cmLifecycles.AcquireCalls, 1)
 
-		cmLifecycles.reset()
+		cmLifecycles.Reset()
 
 		// Set capacity lease ID
 		qi.CapacityLease = &osqueue.CapacityLease{
 			LeaseID: resp.Leases[0].LeaseID,
 		}
 
-		p := q.ItemPartition(ctx, shard, qi)
+		p := osqueue.ItemPartition(ctx, qi)
 
-		iter := processor{
-			partition:            &p,
-			items:                []*osqueue.QueueItem{&qi},
-			partitionContinueCtr: 0,
-			queue:                q,
-			denies:               newLeaseDenyList(),
-			staticTime:           q.clock.Now(),
-			parallel:             false,
+		iter := osqueue.ProcessorIterator{
+			Partition:            &p,
+			Items:                []*osqueue.QueueItem{&qi},
+			PartitionContinueCtr: 0,
+			Queue:                q,
+			Denies:               osqueue.NewLeaseDenyList(),
+			StaticTime:           clock.Now(),
+			Parallel:             false,
 		}
 
-		err = iter.process(ctx, &qi)
+		err = iter.Process(ctx, &qi)
 		require.NoError(t, err)
 
 		// No further Constraint API calls should be made
-		require.Equal(t, 0, len(cmLifecycles.acquireCalls))
-		require.Equal(t, 0, len(cmLifecycles.extendCalls))
-		require.Equal(t, 0, len(cmLifecycles.releaseCalls))
+		require.Equal(t, 0, len(cmLifecycles.AcquireCalls))
+		require.Equal(t, 0, len(cmLifecycles.ExtendCalls))
+		require.Equal(t, 0, len(cmLifecycles.ReleaseCalls))
 
 		// Expect item to be sent to worker with capacity lease + request to disable constraint updates
-		item := <-q.workers
+		item := <-q.Workers()
 		require.Equal(t, qi, item.I)
-		require.Equal(t, qi.CapacityLease, item.capacityLease)
-		require.True(t, item.disableConstraintUpdates)
+		require.Equal(t, qi.CapacityLease, item.CapacityLease)
+		require.True(t, item.DisableConstraintUpdates)
 	})
 }
 
@@ -580,18 +651,11 @@ func TestPartitionProcessRequeueAfterLimitedWithConstraintAPI(t *testing.T) {
 
 	clock := clockwork.NewFakeClock()
 
-	shard := QueueShard{
-		Name:        consts.DefaultQueueShardName,
-		Kind:        string(enums.QueueShardKindRedis),
-		RedisClient: NewQueueClient(rc, "q:v1"),
-	}
-	kg := shard.RedisClient.kg
-
 	ctx := context.Background()
 	l := logger.StdlibLogger(ctx, logger.WithLoggerLevel(logger.LevelTrace))
 	ctx = logger.WithStdlib(ctx, l)
 
-	cmLifecycles := newConstraintAPIDebugLifecycles()
+	cmLifecycles := constraintapi.NewConstraintAPIDebugLifecycles()
 	cm, err := constraintapi.NewRedisCapacityManager(
 		constraintapi.WithClock(clock),
 		constraintapi.WithEnableDebugLogs(true),
@@ -600,7 +664,7 @@ func TestPartitionProcessRequeueAfterLimitedWithConstraintAPI(t *testing.T) {
 		constraintapi.WithQueueShards(map[string]rueidis.Client{
 			consts.DefaultQueueShardName: rc,
 		}),
-		constraintapi.WithQueueStateKeyPrefix("q:v1"),
+		constraintapi.WithQueueStateKeyPrefix("queue"),
 		constraintapi.WithRateLimitClient(rc),
 		constraintapi.WithRateLimitKeyPrefix("rl"),
 	)
@@ -609,7 +673,7 @@ func TestPartitionProcessRequeueAfterLimitedWithConstraintAPI(t *testing.T) {
 	reset := func() {
 		r.FlushAll()
 		r.SetTime(clock.Now())
-		cmLifecycles.reset()
+		cmLifecycles.Reset()
 	}
 
 	accountID := uuid.New()
@@ -634,305 +698,310 @@ func TestPartitionProcessRequeueAfterLimitedWithConstraintAPI(t *testing.T) {
 	t.Run("without constraintapi and no leases", func(t *testing.T) {
 		reset()
 
-		q := NewQueue(
-			shard,
-			WithClock(clock),
-			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+		q, shard := newQueue(
+			t, rc,
+			osqueue.WithClock(clock),
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 				return false
 			}),
-			WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
+			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
 				return false, false
 			}),
-			WithCapacityManager(cm),
-			WithPartitionConstraintConfigGetter(func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
-				return PartitionConstraintConfig{
+			osqueue.WithCapacityManager(cm),
+			osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
+				return osqueue.PartitionConstraintConfig{
 					FunctionVersion: 1,
-					Concurrency: PartitionConcurrency{
+					Concurrency: osqueue.PartitionConcurrency{
 						AccountConcurrency:  5,
 						FunctionConcurrency: 2,
 					},
 				}
 			}),
 		)
+		kg := shard.Client().kg
 
 		items := []*osqueue.QueueItem{}
 
 		amount := 10
 
-		qi, err := q.EnqueueItem(ctx, q.primaryQueueShard, item, start, osqueue.EnqueueOpts{})
+		qi, err := shard.EnqueueItem(ctx, item, start, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 		items = append(items, &qi)
 
 		for range amount - 1 {
-			qi, err := q.EnqueueItem(ctx, q.primaryQueueShard, item, start, osqueue.EnqueueOpts{})
+			qi, err := shard.EnqueueItem(ctx, item, start, osqueue.EnqueueOpts{})
 			require.NoError(t, err)
 			items = append(items, &qi)
 		}
 
-		p := q.ItemPartition(ctx, shard, qi)
-		require.True(t, r.Exists(p.zsetKey(kg)))
-		require.Equal(t, 10, zcard(t, rc, p.zsetKey(kg)))
+		p := osqueue.ItemPartition(ctx, qi)
+		require.True(t, r.Exists(partitionZsetKey(p, kg)))
+		require.Equal(t, 10, zcard(t, rc, partitionZsetKey(p, kg)))
 
-		iter := processor{
-			partition: &p,
+		iter := osqueue.ProcessorIterator{
+			Partition: &p,
 			// Pass in all items
-			items:                items,
-			partitionContinueCtr: 0,
-			queue:                q,
-			denies:               newLeaseDenyList(),
-			staticTime:           q.clock.Now(),
-			parallel:             false,
+			Items:                items,
+			PartitionContinueCtr: 0,
+			Queue:                q,
+			Denies:               osqueue.NewLeaseDenyList(),
+			StaticTime:           clock.Now(),
+			Parallel:             false,
 		}
 
-		require.False(t, iter.isRequeuable())
+		require.False(t, iter.IsRequeuable())
 
 		// Iterate over all items
-		err = iter.iterate(ctx)
+		err = iter.Iterate(ctx)
 		require.NoError(t, err)
 
 		// first two items were successfully leased
-		require.Equal(t, 2, int(iter.ctrSuccess))
+		require.Equal(t, int32(2), iter.CtrSuccess.Load())
 
 		// third item was concurrency limited, we stopped
-		require.Equal(t, 1, int(iter.ctrConcurrency), r.Dump())
+		require.Equal(t, int32(1), iter.CtrConcurrency.Load(), r.Dump())
 
 		// we should requeue the item
-		require.True(t, iter.isRequeuable())
+		require.True(t, iter.IsRequeuable())
 
 		// the 2 items are in progress
-		require.Equal(t, 2, zcard(t, rc, p.concurrencyKey(kg)))
+		require.Equal(t, 2, zcard(t, rc, partitionConcurrencyKey(p, kg)))
 		require.Equal(t, 2, zcard(t, rc, kg.PartitionScavengerIndex(p.ID))) // item should also be added to scavenger index
-		require.Equal(t, 8, zcard(t, rc, p.zsetKey(kg)))
+		require.Equal(t, 8, zcard(t, rc, partitionZsetKey(p, kg)))
 
 		// expect no calls to constraintapi
-		require.Len(t, cmLifecycles.acquireCalls, 0)
+		require.Len(t, cmLifecycles.AcquireCalls, 0)
 	})
 
 	t.Run("without constraintapi and no leases using processPartition", func(t *testing.T) {
 		reset()
 
-		q := NewQueue(
-			shard,
-			WithClock(clock),
-			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+		q, shard := newQueue(
+			t, rc,
+			osqueue.WithClock(clock),
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 				return false
 			}),
-			WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
+			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
 				return false, false
 			}),
-			WithCapacityManager(cm),
-			WithPartitionConstraintConfigGetter(func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
-				return PartitionConstraintConfig{
+			osqueue.WithCapacityManager(cm),
+			osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
+				return osqueue.PartitionConstraintConfig{
 					FunctionVersion: 1,
-					Concurrency: PartitionConcurrency{
+					Concurrency: osqueue.PartitionConcurrency{
 						AccountConcurrency:  5,
 						FunctionConcurrency: 2,
 					},
 				}
 			}),
 		)
+		kg := shard.Client().kg
 
 		amount := 10
 
-		qi, err := q.EnqueueItem(ctx, q.primaryQueueShard, item, start, osqueue.EnqueueOpts{})
+		qi, err := shard.EnqueueItem(ctx, item, start, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
 		for range amount - 1 {
-			_, err := q.EnqueueItem(ctx, q.primaryQueueShard, item, start, osqueue.EnqueueOpts{})
+			_, err := shard.EnqueueItem(ctx, item, start, osqueue.EnqueueOpts{})
 			require.NoError(t, err)
 		}
 
-		p := q.ItemPartition(ctx, shard, qi)
-		require.True(t, r.Exists(p.zsetKey(kg)))
-		require.Equal(t, 10, zcard(t, rc, p.zsetKey(kg)))
+		p := osqueue.ItemPartition(ctx, qi)
+		require.True(t, r.Exists(partitionZsetKey(p, kg)))
+		require.Equal(t, 10, zcard(t, rc, partitionZsetKey(p, kg)))
 
 		// score in global set is at earliest item
 		require.Equal(t, start.Unix(), int64(score(t, r, kg.GlobalPartitionIndex(), p.ID)))
 
-		err = q.processPartition(ctx, &p, 0, false)
+		err = q.ProcessPartition(ctx, &p, 0, false)
 		require.NoError(t, err)
 
 		// first two items were successfully leased
-		require.Equal(t, 2, zcard(t, rc, p.concurrencyKey(kg)))
+		require.Equal(t, 2, zcard(t, rc, partitionConcurrencyKey(p, kg)))
 		require.Equal(t, 2, zcard(t, rc, kg.PartitionScavengerIndex(p.ID))) // item should also be added to scavenger index
 
 		// remaining items are still in partition
-		require.Equal(t, 8, zcard(t, rc, p.zsetKey(kg)))
+		require.Equal(t, 8, zcard(t, rc, partitionZsetKey(p, kg)))
 
 		// expect no calls to constraintapi
-		require.Len(t, cmLifecycles.acquireCalls, 0)
+		require.Len(t, cmLifecycles.AcquireCalls, 0)
 
 		// partition was requeued
-		require.Equal(t, start.Add(PartitionConcurrencyLimitRequeueExtension).Unix(), int64(score(t, r, kg.GlobalPartitionIndex(), p.ID)))
+		require.Equal(t, start.Add(osqueue.PartitionConcurrencyLimitRequeueExtension).Unix(), int64(score(t, r, kg.GlobalPartitionIndex(), p.ID)))
 	})
 
 	t.Run("with constraintapi and no valid leases", func(t *testing.T) {
 		reset()
 
-		q := NewQueue(
-			shard,
-			WithClock(clock),
-			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+		q, shard := newQueue(
+			t, rc,
+			osqueue.WithClock(clock),
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 				return false
 			}),
-			WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
+			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
 				return true, true // acquire leases
 			}),
-			WithCapacityManager(cm),
-			WithPartitionConstraintConfigGetter(func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
-				return PartitionConstraintConfig{
+			osqueue.WithCapacityManager(cm),
+			osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
+				return osqueue.PartitionConstraintConfig{
 					FunctionVersion: 1,
-					Concurrency: PartitionConcurrency{
+					Concurrency: osqueue.PartitionConcurrency{
 						AccountConcurrency:  5,
 						FunctionConcurrency: 2,
 					},
 				}
 			}),
 		)
+		kg := shard.Client().kg
 
 		items := []*osqueue.QueueItem{}
 
 		amount := 10
 
-		qi, err := q.EnqueueItem(ctx, q.primaryQueueShard, item, start, osqueue.EnqueueOpts{})
+		qi, err := shard.EnqueueItem(ctx, item, start, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 		items = append(items, &qi)
 
 		for range amount - 1 {
-			qi, err := q.EnqueueItem(ctx, q.primaryQueueShard, item, start, osqueue.EnqueueOpts{})
+			qi, err := shard.EnqueueItem(ctx, item, start, osqueue.EnqueueOpts{})
 			require.NoError(t, err)
 			items = append(items, &qi)
 		}
 
-		p := q.ItemPartition(ctx, shard, qi)
-		require.True(t, r.Exists(p.zsetKey(kg)))
-		require.Equal(t, 10, zcard(t, rc, p.zsetKey(kg)))
+		p := osqueue.ItemPartition(ctx, qi)
+		require.True(t, r.Exists(partitionZsetKey(p, kg)))
+		require.Equal(t, 10, zcard(t, rc, partitionZsetKey(p, kg)))
 
-		iter := processor{
-			partition: &p,
+		iter := osqueue.ProcessorIterator{
+			Partition: &p,
 			// Pass in all items
-			items:                items,
-			partitionContinueCtr: 0,
-			queue:                q,
-			denies:               newLeaseDenyList(),
-			staticTime:           q.clock.Now(),
-			parallel:             false,
+			Items:                items,
+			PartitionContinueCtr: 0,
+			Queue:                q,
+			Denies:               osqueue.NewLeaseDenyList(),
+			StaticTime:           clock.Now(),
+			Parallel:             false,
 		}
 
-		require.False(t, iter.isRequeuable())
+		require.False(t, iter.IsRequeuable())
 
 		// Iterate over all items
-		err = iter.iterate(ctx)
+		err = iter.Iterate(ctx)
 		require.NoError(t, err)
 
 		// first two items were successfully leased
-		require.Equal(t, 2, int(iter.ctrSuccess))
+		require.Equal(t, int32(2), iter.CtrSuccess.Load())
 
 		// third item was concurrency limited, we stopped
-		require.Equal(t, 1, int(iter.ctrConcurrency), r.Dump())
+		require.Equal(t, int32(1), iter.CtrConcurrency.Load(), r.Dump())
 
 		// we should requeue the item
-		require.True(t, iter.isRequeuable())
+		require.True(t, iter.IsRequeuable())
 
 		// the 2 items are in progress
-		require.Equal(t, 0, zcard(t, rc, p.concurrencyKey(kg)))             // since we used constraint API, item should not be added to in progress items set
+		require.Equal(t, 0, zcard(t, rc, partitionConcurrencyKey(p, kg)))   // since we used constraint API, item should not be added to in progress items set
 		require.Equal(t, 2, zcard(t, rc, kg.PartitionScavengerIndex(p.ID))) // but instead to partition scavenger index
-		require.Equal(t, 8, zcard(t, rc, p.zsetKey(kg)))
+		require.Equal(t, 8, zcard(t, rc, partitionZsetKey(p, kg)))
 
 		// expect 2 successful and 1 failed calls to constraintapi
-		require.Len(t, cmLifecycles.acquireCalls, 3)
-		require.Len(t, cmLifecycles.acquireCalls[0].GrantedLeases, 1)
-		require.Len(t, cmLifecycles.acquireCalls[1].GrantedLeases, 1)
-		require.Len(t, cmLifecycles.acquireCalls[2].GrantedLeases, 0)
-		require.Equal(t, cmLifecycles.acquireCalls[2].LimitingConstraints[0].Kind, constraintapi.ConstraintKindConcurrency)
+		require.Len(t, cmLifecycles.AcquireCalls, 3)
+		require.Len(t, cmLifecycles.AcquireCalls[0].GrantedLeases, 1)
+		require.Len(t, cmLifecycles.AcquireCalls[1].GrantedLeases, 1)
+		require.Len(t, cmLifecycles.AcquireCalls[2].GrantedLeases, 0)
+		require.Equal(t, cmLifecycles.AcquireCalls[2].LimitingConstraints[0].Kind, constraintapi.ConstraintKindConcurrency)
 	})
 
 	t.Run("with constraintapi and no leases using processPartition", func(t *testing.T) {
 		reset()
 
-		q := NewQueue(
-			shard,
-			WithClock(clock),
-			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+		q, shard := newQueue(
+			t, rc,
+			osqueue.WithClock(clock),
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 				return false
 			}),
-			WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
+			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
 				return true, true
 			}),
-			WithCapacityManager(cm),
-			WithPartitionConstraintConfigGetter(func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
-				return PartitionConstraintConfig{
+			osqueue.WithCapacityManager(cm),
+			osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
+				return osqueue.PartitionConstraintConfig{
 					FunctionVersion: 1,
-					Concurrency: PartitionConcurrency{
+					Concurrency: osqueue.PartitionConcurrency{
 						AccountConcurrency:  5,
 						FunctionConcurrency: 2,
 					},
 				}
 			}),
 		)
+		kg := shard.Client().kg
 
 		amount := 10
 
-		qi, err := q.EnqueueItem(ctx, q.primaryQueueShard, item, start, osqueue.EnqueueOpts{})
+		qi, err := shard.EnqueueItem(ctx, item, start, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
 		for range amount - 1 {
-			_, err := q.EnqueueItem(ctx, q.primaryQueueShard, item, start, osqueue.EnqueueOpts{})
+			_, err := shard.EnqueueItem(ctx, item, start, osqueue.EnqueueOpts{})
 			require.NoError(t, err)
 		}
 
-		p := q.ItemPartition(ctx, shard, qi)
-		require.True(t, r.Exists(p.zsetKey(kg)))
-		require.Equal(t, 10, zcard(t, rc, p.zsetKey(kg)))
+		p := osqueue.ItemPartition(ctx, qi)
+		require.True(t, r.Exists(partitionZsetKey(p, kg)))
+		require.Equal(t, 10, zcard(t, rc, partitionZsetKey(p, kg)))
 
 		// score in global set is at earliest item
 		require.Equal(t, start.Unix(), int64(score(t, r, kg.GlobalPartitionIndex(), p.ID)))
 
-		err = q.processPartition(ctx, &p, 0, false)
+		err = q.ProcessPartition(ctx, &p, 0, false)
 		require.NoError(t, err)
 
 		// first two items were successfully leased
-		require.Equal(t, 0, zcard(t, rc, p.concurrencyKey(kg)))             // items should not be in old concurrency zset
+		require.Equal(t, 0, zcard(t, rc, partitionConcurrencyKey(p, kg)))   // items should not be in old concurrency zset
 		require.Equal(t, 2, zcard(t, rc, kg.PartitionScavengerIndex(p.ID))) // but in scavenger set
 
 		// remaining items are still in partition
-		require.Equal(t, 8, zcard(t, rc, p.zsetKey(kg)))
+		require.Equal(t, 8, zcard(t, rc, partitionZsetKey(p, kg)))
 
 		// expect 2 successful and 1 failed calls to constraintapi
-		require.Len(t, cmLifecycles.acquireCalls, 3)
-		require.Len(t, cmLifecycles.acquireCalls[0].GrantedLeases, 1)
-		require.Len(t, cmLifecycles.acquireCalls[1].GrantedLeases, 1)
-		require.Len(t, cmLifecycles.acquireCalls[2].GrantedLeases, 0)
-		require.Equal(t, cmLifecycles.acquireCalls[2].LimitingConstraints[0].Kind, constraintapi.ConstraintKindConcurrency)
+		require.Len(t, cmLifecycles.AcquireCalls, 3)
+		require.Len(t, cmLifecycles.AcquireCalls[0].GrantedLeases, 1)
+		require.Len(t, cmLifecycles.AcquireCalls[1].GrantedLeases, 1)
+		require.Len(t, cmLifecycles.AcquireCalls[2].GrantedLeases, 0)
+		require.Equal(t, cmLifecycles.AcquireCalls[2].LimitingConstraints[0].Kind, constraintapi.ConstraintKindConcurrency)
 
 		// partition was requeued
-		require.Equal(t, start.Add(PartitionConcurrencyLimitRequeueExtension).Unix(), int64(score(t, r, kg.GlobalPartitionIndex(), p.ID)))
+		require.Equal(t, start.Add(osqueue.PartitionConcurrencyLimitRequeueExtension).Unix(), int64(score(t, r, kg.GlobalPartitionIndex(), p.ID)))
 	})
 
 	t.Run("with constraintapi and valid leases", func(t *testing.T) {
 		reset()
 
-		q := NewQueue(
-			shard,
-			WithClock(clock),
-			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+		q, shard := newQueue(
+			t, rc,
+			osqueue.WithClock(clock),
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 				return false
 			}),
-			WithLogger(l),
-			WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
+			osqueue.WithLogger(l),
+			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
 				return true, true
 			}),
-			WithCapacityManager(cm),
-			WithPartitionConstraintConfigGetter(func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
-				return PartitionConstraintConfig{
+			osqueue.WithCapacityManager(cm),
+			osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
+				return osqueue.PartitionConstraintConfig{
 					FunctionVersion: 1,
-					Concurrency: PartitionConcurrency{
+					Concurrency: osqueue.PartitionConcurrency{
 						AccountConcurrency:  5,
 						FunctionConcurrency: 2,
 					},
 				}
 			}),
 		)
+		kg := shard.Client().kg
 
 		amount := 10
 
@@ -992,15 +1061,15 @@ func TestPartitionProcessRequeueAfterLimitedWithConstraintAPI(t *testing.T) {
 					RunProcessingMode: constraintapi.RunProcessingModeBackground,
 				},
 				Migration: constraintapi.MigrationIdentifier{
-					QueueShard: shard.Name,
+					QueueShard: shard.Name(),
 				},
 			})
 			require.NoError(t, err)
 			require.Len(t, resp.Leases, 1)
 
-			require.Len(t, cmLifecycles.acquireCalls, 1)
+			require.Len(t, cmLifecycles.AcquireCalls, 1)
 
-			cmLifecycles.reset()
+			cmLifecycles.Reset()
 
 			// Set capacity lease ID on first item
 			item.CapacityLease = &osqueue.CapacityLease{
@@ -1009,7 +1078,7 @@ func TestPartitionProcessRequeueAfterLimitedWithConstraintAPI(t *testing.T) {
 			// Manually set ID for first item
 			item.ID = util.XXHash("item0")
 
-			qi, err = q.EnqueueItem(ctx, q.primaryQueueShard, item, start, osqueue.EnqueueOpts{
+			qi, err = shard.EnqueueItem(ctx, item, start, osqueue.EnqueueOpts{
 				PassthroughJobId: true,
 			})
 			require.NoError(t, err)
@@ -1020,34 +1089,34 @@ func TestPartitionProcessRequeueAfterLimitedWithConstraintAPI(t *testing.T) {
 		}
 
 		for i := range amount - 1 {
-			_, err := q.EnqueueItem(ctx, q.primaryQueueShard, item, start.Add(time.Millisecond*time.Duration(i+1)), osqueue.EnqueueOpts{})
+			_, err := shard.EnqueueItem(ctx, item, start.Add(time.Millisecond*time.Duration(i+1)), osqueue.EnqueueOpts{})
 			require.NoError(t, err)
 		}
 
-		p := q.ItemPartition(ctx, shard, qi)
-		require.True(t, r.Exists(p.zsetKey(kg)))
-		require.Equal(t, 10, zcard(t, rc, p.zsetKey(kg)))
+		p := osqueue.ItemPartition(ctx, qi)
+		require.True(t, r.Exists(partitionZsetKey(p, kg)))
+		require.Equal(t, 10, zcard(t, rc, partitionZsetKey(p, kg)))
 
 		// score in global set is at earliest item
 		require.Equal(t, start.Unix(), int64(score(t, r, kg.GlobalPartitionIndex(), p.ID)))
 
-		err = q.processPartition(logger.WithStdlib(ctx, l), &p, 0, false)
+		err = q.ProcessPartition(logger.WithStdlib(ctx, l), &p, 0, false)
 		require.NoError(t, err)
 
 		// first two items were successfully leased
-		require.Equal(t, 0, zcard(t, rc, p.concurrencyKey(kg)))             // items should not be in old concurrency zset
+		require.Equal(t, 0, zcard(t, rc, partitionConcurrencyKey(p, kg)))   // items should not be in old concurrency zset
 		require.Equal(t, 2, zcard(t, rc, kg.PartitionScavengerIndex(p.ID))) // but in scavenger set
 
 		// remaining items are still in partition
-		require.Equal(t, 8, zcard(t, rc, p.zsetKey(kg)))
+		require.Equal(t, 8, zcard(t, rc, partitionZsetKey(p, kg)))
 
 		// expect 1 successful and 1 failed calls to constraintapi
-		require.Len(t, cmLifecycles.acquireCalls, 2)
-		require.Len(t, cmLifecycles.acquireCalls[0].GrantedLeases, 1)
-		require.Len(t, cmLifecycles.acquireCalls[1].GrantedLeases, 0)
-		require.Equal(t, cmLifecycles.acquireCalls[1].LimitingConstraints[0].Kind, constraintapi.ConstraintKindConcurrency)
+		require.Len(t, cmLifecycles.AcquireCalls, 2)
+		require.Len(t, cmLifecycles.AcquireCalls[0].GrantedLeases, 1)
+		require.Len(t, cmLifecycles.AcquireCalls[1].GrantedLeases, 0)
+		require.Equal(t, cmLifecycles.AcquireCalls[1].LimitingConstraints[0].Kind, constraintapi.ConstraintKindConcurrency)
 
 		// partition was requeued
-		require.Equal(t, start.Add(PartitionConcurrencyLimitRequeueExtension).Unix(), int64(score(t, r, kg.GlobalPartitionIndex(), p.ID)))
+		require.Equal(t, start.Add(osqueue.PartitionConcurrencyLimitRequeueExtension).Unix(), int64(score(t, r, kg.GlobalPartitionIndex(), p.ID)))
 	})
 }

@@ -12,10 +12,12 @@ import (
 	tracev1 "go.opentelemetry.io/proto/otlp/trace/v1"
 )
 
+//tygo:generate
 const (
 	KindInngestAI metadata.Kind = "inngest.ai"
 )
 
+//tygo:generate
 type AIMetadata struct {
 	InputTokens   int64  `json:"input_tokens"`
 	OutputTokens  int64  `json:"output_tokens"`

@@ -13,7 +13,6 @@ import (
 	"github.com/inngest/inngest/pkg/execution/apiresult"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
-	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/service"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
@@ -103,14 +102,9 @@ func (e *executor) finalizeRemoveJobs(ctx context.Context, opts execution.Finali
 	// outstanding jobs from the queue, if possible.
 	//
 	// XXX: Remove this typecast and normalize queue interface to a single package
-	q, ok := e.queue.(redis_state.QueueManager)
-	if !ok {
-		return
-	}
 	// Find all items for the current function run.
-	jobs, err := q.RunJobs(
+	jobs, err := shard.RunJobs(
 		ctx,
-		shard.Name,
 		opts.Metadata.ID.Tenant.EnvID,
 		opts.Metadata.ID.FunctionID,
 		opts.Metadata.ID.RunID,
@@ -137,8 +131,8 @@ func (e *executor) finalizeRemoveJobs(ctx context.Context, opts execution.Finali
 			continue
 		}
 
-		err := q.Dequeue(ctx, shard, *qi)
-		if err != nil && !errors.Is(err, redis_state.ErrQueueItemNotFound) {
+		err := shard.Dequeue(ctx, *qi)
+		if err != nil && !errors.Is(err, queue.ErrQueueItemNotFound) {
 			l.Error(
 				"error dequeueing run job",
 				"error", err,

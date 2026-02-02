@@ -53,6 +53,7 @@ enum ConstraintApiCallerLocation {
   CONSTRAINT_API_CALLER_LOCATION_BACKLOG_REFILL = 2;
   CONSTRAINT_API_CALLER_LOCATION_ITEM_LEASE = 3;
   CONSTRAINT_API_CALLER_LOCATION_CHECKPOINT = 4;
+  CONSTRAINT_API_CALLER_LOCATION_LEASE_SCAVENGE = 5;
 }
 
 enum ConstraintApiLeaseService {
@@ -60,6 +61,7 @@ enum ConstraintApiLeaseService {
   CONSTRAINT_API_LEASE_SERVICE_NEW_RUNS = 1;
   CONSTRAINT_API_LEASE_SERVICE_EXECUTOR = 2;
   CONSTRAINT_API_LEASE_SERVICE_API = 3;
+  CONSTRAINT_API_LEASE_CONSTRAINT_SCAVENGER = 4;
 }
 
 // Message definitions
@@ -188,6 +190,7 @@ message CapacityAcquireRequest {
   google.protobuf.Duration blocking_threshold = 13;
   LeaseSource source = 14;
   MigrationIdentifier migration = 15;
+  uint32 request_attempt = 16;
 }
 
 message CapacityAcquireResponse {
@@ -204,6 +207,7 @@ message CapacityExtendLeaseRequest {
   google.protobuf.Duration duration = 4;
   MigrationIdentifier migration = 5;
   LeaseSource source = 6;
+  uint32 request_attempt = 7;
 }
 
 message CapacityExtendLeaseResponse {
@@ -216,6 +220,7 @@ message CapacityReleaseRequest {
   string lease_id = 3;
   MigrationIdentifier migration = 4;
   LeaseSource source = 5;
+  uint32 request_attempt = 6;
 }
 
 message CapacityReleaseResponse {

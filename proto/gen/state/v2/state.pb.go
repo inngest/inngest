@@ -1464,6 +1464,336 @@ func (x *LoadStateResponse) GetSteps() map[string][]byte {
 	return nil
 }
 
+type PauseIdentifier struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RunId         string                 `protobuf:"bytes,1,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
+	FunctionId    string                 `protobuf:"bytes,2,opt,name=function_id,json=functionId,proto3" json:"function_id,omitempty"`
+	AccountId     string                 `protobuf:"bytes,3,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PauseIdentifier) Reset() {
+	*x = PauseIdentifier{}
+	mi := &file_state_v2_state_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PauseIdentifier) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PauseIdentifier) ProtoMessage() {}
+
+func (x *PauseIdentifier) ProtoReflect() protoreflect.Message {
+	mi := &file_state_v2_state_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PauseIdentifier.ProtoReflect.Descriptor instead.
+func (*PauseIdentifier) Descriptor() ([]byte, []int) {
+	return file_state_v2_state_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *PauseIdentifier) GetRunId() string {
+	if x != nil {
+		return x.RunId
+	}
+	return ""
+}
+
+func (x *PauseIdentifier) GetFunctionId() string {
+	if x != nil {
+		return x.FunctionId
+	}
+	return ""
+}
+
+func (x *PauseIdentifier) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+// Pause contains only the fields needed to consume a pause.
+// Other metadata is ignored.
+type Pause struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	WorkspaceId   string                 `protobuf:"bytes,2,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	Identifier    *PauseIdentifier       `protobuf:"bytes,3,opt,name=identifier,proto3" json:"identifier,omitempty"`
+	DataKey       string                 `protobuf:"bytes,4,opt,name=data_key,json=dataKey,proto3" json:"data_key,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Pause) Reset() {
+	*x = Pause{}
+	mi := &file_state_v2_state_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Pause) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Pause) ProtoMessage() {}
+
+func (x *Pause) ProtoReflect() protoreflect.Message {
+	mi := &file_state_v2_state_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Pause.ProtoReflect.Descriptor instead.
+func (*Pause) Descriptor() ([]byte, []int) {
+	return file_state_v2_state_proto_rawDescGZIP(), []int{27}
+}
+
+func (x *Pause) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *Pause) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+func (x *Pause) GetIdentifier() *PauseIdentifier {
+	if x != nil {
+		return x.Identifier
+	}
+	return nil
+}
+
+func (x *Pause) GetDataKey() string {
+	if x != nil {
+		return x.DataKey
+	}
+	return ""
+}
+
+type ConsumePauseOpts struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	IdempotencyKey string                 `protobuf:"bytes,1,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
+	Data           []byte                 `protobuf:"bytes,2,opt,name=data,proto3" json:"data,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *ConsumePauseOpts) Reset() {
+	*x = ConsumePauseOpts{}
+	mi := &file_state_v2_state_proto_msgTypes[28]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ConsumePauseOpts) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ConsumePauseOpts) ProtoMessage() {}
+
+func (x *ConsumePauseOpts) ProtoReflect() protoreflect.Message {
+	mi := &file_state_v2_state_proto_msgTypes[28]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ConsumePauseOpts.ProtoReflect.Descriptor instead.
+func (*ConsumePauseOpts) Descriptor() ([]byte, []int) {
+	return file_state_v2_state_proto_rawDescGZIP(), []int{28}
+}
+
+func (x *ConsumePauseOpts) GetIdempotencyKey() string {
+	if x != nil {
+		return x.IdempotencyKey
+	}
+	return ""
+}
+
+func (x *ConsumePauseOpts) GetData() []byte {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+type ConsumePauseResult struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	DidConsume      bool                   `protobuf:"varint,1,opt,name=did_consume,json=didConsume,proto3" json:"did_consume,omitempty"`
+	HasPendingSteps bool                   `protobuf:"varint,2,opt,name=has_pending_steps,json=hasPendingSteps,proto3" json:"has_pending_steps,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *ConsumePauseResult) Reset() {
+	*x = ConsumePauseResult{}
+	mi := &file_state_v2_state_proto_msgTypes[29]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ConsumePauseResult) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ConsumePauseResult) ProtoMessage() {}
+
+func (x *ConsumePauseResult) ProtoReflect() protoreflect.Message {
+	mi := &file_state_v2_state_proto_msgTypes[29]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ConsumePauseResult.ProtoReflect.Descriptor instead.
+func (*ConsumePauseResult) Descriptor() ([]byte, []int) {
+	return file_state_v2_state_proto_rawDescGZIP(), []int{29}
+}
+
+func (x *ConsumePauseResult) GetDidConsume() bool {
+	if x != nil {
+		return x.DidConsume
+	}
+	return false
+}
+
+func (x *ConsumePauseResult) GetHasPendingSteps() bool {
+	if x != nil {
+		return x.HasPendingSteps
+	}
+	return false
+}
+
+type ConsumePauseRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Pause         *Pause                 `protobuf:"bytes,1,opt,name=pause,proto3" json:"pause,omitempty"`
+	Opts          *ConsumePauseOpts      `protobuf:"bytes,2,opt,name=opts,proto3" json:"opts,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ConsumePauseRequest) Reset() {
+	*x = ConsumePauseRequest{}
+	mi := &file_state_v2_state_proto_msgTypes[30]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ConsumePauseRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ConsumePauseRequest) ProtoMessage() {}
+
+func (x *ConsumePauseRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_state_v2_state_proto_msgTypes[30]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ConsumePauseRequest.ProtoReflect.Descriptor instead.
+func (*ConsumePauseRequest) Descriptor() ([]byte, []int) {
+	return file_state_v2_state_proto_rawDescGZIP(), []int{30}
+}
+
+func (x *ConsumePauseRequest) GetPause() *Pause {
+	if x != nil {
+		return x.Pause
+	}
+	return nil
+}
+
+func (x *ConsumePauseRequest) GetOpts() *ConsumePauseOpts {
+	if x != nil {
+		return x.Opts
+	}
+	return nil
+}
+
+type ConsumePauseResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Result        *ConsumePauseResult    `protobuf:"bytes,1,opt,name=result,proto3" json:"result,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ConsumePauseResponse) Reset() {
+	*x = ConsumePauseResponse{}
+	mi := &file_state_v2_state_proto_msgTypes[31]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ConsumePauseResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ConsumePauseResponse) ProtoMessage() {}
+
+func (x *ConsumePauseResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_state_v2_state_proto_msgTypes[31]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ConsumePauseResponse.ProtoReflect.Descriptor instead.
+func (*ConsumePauseResponse) Descriptor() ([]byte, []int) {
+	return file_state_v2_state_proto_rawDescGZIP(), []int{31}
+}
+
+func (x *ConsumePauseResponse) GetResult() *ConsumePauseResult {
+	if x != nil {
+		return x.Result
+	}
+	return nil
+}
+
 var File_state_v2_state_proto protoreflect.FileDescriptor
 
 const file_state_v2_state_proto_rawDesc = "" +
@@ -1582,7 +1912,32 @@ const file_state_v2_state_proto_rawDesc = "" +
 	"\n" +
 	"StepsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\fR\x05value:\x028\x012\xf3\x05\n" +
+	"\x05value\x18\x02 \x01(\fR\x05value:\x028\x01\"h\n" +
+	"\x0fPauseIdentifier\x12\x15\n" +
+	"\x06run_id\x18\x01 \x01(\tR\x05runId\x12\x1f\n" +
+	"\vfunction_id\x18\x02 \x01(\tR\n" +
+	"functionId\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x03 \x01(\tR\taccountId\"\x90\x01\n" +
+	"\x05Pause\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12!\n" +
+	"\fworkspace_id\x18\x02 \x01(\tR\vworkspaceId\x129\n" +
+	"\n" +
+	"identifier\x18\x03 \x01(\v2\x19.state.v2.PauseIdentifierR\n" +
+	"identifier\x12\x19\n" +
+	"\bdata_key\x18\x04 \x01(\tR\adataKey\"O\n" +
+	"\x10ConsumePauseOpts\x12'\n" +
+	"\x0fidempotency_key\x18\x01 \x01(\tR\x0eidempotencyKey\x12\x12\n" +
+	"\x04data\x18\x02 \x01(\fR\x04data\"a\n" +
+	"\x12ConsumePauseResult\x12\x1f\n" +
+	"\vdid_consume\x18\x01 \x01(\bR\n" +
+	"didConsume\x12*\n" +
+	"\x11has_pending_steps\x18\x02 \x01(\bR\x0fhasPendingSteps\"l\n" +
+	"\x13ConsumePauseRequest\x12%\n" +
+	"\x05pause\x18\x01 \x01(\v2\x0f.state.v2.PauseR\x05pause\x12.\n" +
+	"\x04opts\x18\x02 \x01(\v2\x1a.state.v2.ConsumePauseOptsR\x04opts\"L\n" +
+	"\x14ConsumePauseResponse\x124\n" +
+	"\x06result\x18\x01 \x01(\v2\x1c.state.v2.ConsumePauseResultR\x06result2\xc4\x06\n" +
 	"\n" +
 	"RunService\x12G\n" +
 	"\x06Create\x12\x1c.state.v2.CreateStateRequest\x1a\x1d.state.v2.CreateStateResponse\"\x00\x12G\n" +
@@ -1591,6 +1946,7 @@ const file_state_v2_state_proto_rawDesc = "" +
 	"\x0eUpdateMetadata\x12\x1f.state.v2.UpdateMetadataRequest\x1a .state.v2.UpdateMetadataResponse\"\x00\x12C\n" +
 	"\bSaveStep\x12\x19.state.v2.SaveStepRequest\x1a\x1a.state.v2.SaveStepResponse\"\x00\x12L\n" +
 	"\vSavePending\x12\x1c.state.v2.SavePendingRequest\x1a\x1d.state.v2.SavePendingResponse\"\x00\x12O\n" +
+	"\fConsumePause\x12\x1d.state.v2.ConsumePauseRequest\x1a\x1e.state.v2.ConsumePauseResponse\"\x00\x12O\n" +
 	"\fLoadMetadata\x12\x1d.state.v2.LoadMetadataRequest\x1a\x1e.state.v2.LoadMetadataResponse\"\x00\x12I\n" +
 	"\n" +
 	"LoadEvents\x12\x1b.state.v2.LoadEventsRequest\x1a\x1c.state.v2.LoadEventsResponse\"\x00\x12F\n" +
@@ -1609,7 +1965,7 @@ func file_state_v2_state_proto_rawDescGZIP() []byte {
 	return file_state_v2_state_proto_rawDescData
 }
 
-var file_state_v2_state_proto_msgTypes = make([]protoimpl.MessageInfo, 29)
+var file_state_v2_state_proto_msgTypes = make([]protoimpl.MessageInfo, 35)
 var file_state_v2_state_proto_goTypes = []any{
 	(*Metadata)(nil),               // 0: state.v2.Metadata
 	(*ID)(nil),                     // 1: state.v2.ID
@@ -1637,62 +1993,74 @@ var file_state_v2_state_proto_goTypes = []any{
 	(*LoadStepsResponse)(nil),      // 23: state.v2.LoadStepsResponse
 	(*LoadStateRequest)(nil),       // 24: state.v2.LoadStateRequest
 	(*LoadStateResponse)(nil),      // 25: state.v2.LoadStateResponse
-	nil,                            // 26: state.v2.CreateStateResponse.StepsEntry
-	nil,                            // 27: state.v2.LoadStepsResponse.StepsEntry
-	nil,                            // 28: state.v2.LoadStateResponse.StepsEntry
-	(*timestamppb.Timestamp)(nil),  // 29: google.protobuf.Timestamp
-	(*structpb.Struct)(nil),        // 30: google.protobuf.Struct
+	(*PauseIdentifier)(nil),        // 26: state.v2.PauseIdentifier
+	(*Pause)(nil),                  // 27: state.v2.Pause
+	(*ConsumePauseOpts)(nil),       // 28: state.v2.ConsumePauseOpts
+	(*ConsumePauseResult)(nil),     // 29: state.v2.ConsumePauseResult
+	(*ConsumePauseRequest)(nil),    // 30: state.v2.ConsumePauseRequest
+	(*ConsumePauseResponse)(nil),   // 31: state.v2.ConsumePauseResponse
+	nil,                            // 32: state.v2.CreateStateResponse.StepsEntry
+	nil,                            // 33: state.v2.LoadStepsResponse.StepsEntry
+	nil,                            // 34: state.v2.LoadStateResponse.StepsEntry
+	(*timestamppb.Timestamp)(nil),  // 35: google.protobuf.Timestamp
+	(*structpb.Struct)(nil),        // 36: google.protobuf.Struct
 }
 var file_state_v2_state_proto_depIdxs = []int32{
 	1,  // 0: state.v2.Metadata.id:type_name -> state.v2.ID
 	2,  // 1: state.v2.Metadata.config:type_name -> state.v2.Config
 	4,  // 2: state.v2.Metadata.metrics:type_name -> state.v2.RunMetrics
 	5,  // 3: state.v2.ID.tenant:type_name -> state.v2.Tenant
-	29, // 4: state.v2.Config.started_at:type_name -> google.protobuf.Timestamp
+	35, // 4: state.v2.Config.started_at:type_name -> google.protobuf.Timestamp
 	3,  // 5: state.v2.Config.concurrency_keys:type_name -> state.v2.ConcurrencyKey
-	30, // 6: state.v2.Config.context:type_name -> google.protobuf.Struct
+	36, // 6: state.v2.Config.context:type_name -> google.protobuf.Struct
 	0,  // 7: state.v2.CreateStateRequest.metadata:type_name -> state.v2.Metadata
 	0,  // 8: state.v2.CreateStateResponse.metadata:type_name -> state.v2.Metadata
-	26, // 9: state.v2.CreateStateResponse.steps:type_name -> state.v2.CreateStateResponse.StepsEntry
+	32, // 9: state.v2.CreateStateResponse.steps:type_name -> state.v2.CreateStateResponse.StepsEntry
 	1,  // 10: state.v2.DeleteStateRequest.id:type_name -> state.v2.ID
 	1,  // 11: state.v2.LoadMetadataRequest.id:type_name -> state.v2.ID
 	0,  // 12: state.v2.LoadMetadataResponse.metadata:type_name -> state.v2.Metadata
 	1,  // 13: state.v2.UpdateMetadataRequest.id:type_name -> state.v2.ID
-	29, // 14: state.v2.UpdateMetadataRequest.started_at:type_name -> google.protobuf.Timestamp
+	35, // 14: state.v2.UpdateMetadataRequest.started_at:type_name -> google.protobuf.Timestamp
 	1,  // 15: state.v2.SaveStepRequest.id:type_name -> state.v2.ID
 	1,  // 16: state.v2.SavePendingRequest.id:type_name -> state.v2.ID
 	1,  // 17: state.v2.ExistsRequest.id:type_name -> state.v2.ID
 	1,  // 18: state.v2.LoadEventsRequest.id:type_name -> state.v2.ID
 	1,  // 19: state.v2.LoadStepsRequest.id:type_name -> state.v2.ID
-	27, // 20: state.v2.LoadStepsResponse.steps:type_name -> state.v2.LoadStepsResponse.StepsEntry
+	33, // 20: state.v2.LoadStepsResponse.steps:type_name -> state.v2.LoadStepsResponse.StepsEntry
 	1,  // 21: state.v2.LoadStateRequest.id:type_name -> state.v2.ID
 	0,  // 22: state.v2.LoadStateResponse.metadata:type_name -> state.v2.Metadata
-	28, // 23: state.v2.LoadStateResponse.steps:type_name -> state.v2.LoadStateResponse.StepsEntry
-	6,  // 24: state.v2.RunService.Create:input_type -> state.v2.CreateStateRequest
-	8,  // 25: state.v2.RunService.Delete:input_type -> state.v2.DeleteStateRequest
-	18, // 26: state.v2.RunService.Exists:input_type -> state.v2.ExistsRequest
-	12, // 27: state.v2.RunService.UpdateMetadata:input_type -> state.v2.UpdateMetadataRequest
-	14, // 28: state.v2.RunService.SaveStep:input_type -> state.v2.SaveStepRequest
-	16, // 29: state.v2.RunService.SavePending:input_type -> state.v2.SavePendingRequest
-	10, // 30: state.v2.RunService.LoadMetadata:input_type -> state.v2.LoadMetadataRequest
-	20, // 31: state.v2.RunService.LoadEvents:input_type -> state.v2.LoadEventsRequest
-	22, // 32: state.v2.RunService.LoadSteps:input_type -> state.v2.LoadStepsRequest
-	24, // 33: state.v2.RunService.LoadState:input_type -> state.v2.LoadStateRequest
-	7,  // 34: state.v2.RunService.Create:output_type -> state.v2.CreateStateResponse
-	9,  // 35: state.v2.RunService.Delete:output_type -> state.v2.DeleteStateResponse
-	19, // 36: state.v2.RunService.Exists:output_type -> state.v2.ExistsResponse
-	13, // 37: state.v2.RunService.UpdateMetadata:output_type -> state.v2.UpdateMetadataResponse
-	15, // 38: state.v2.RunService.SaveStep:output_type -> state.v2.SaveStepResponse
-	17, // 39: state.v2.RunService.SavePending:output_type -> state.v2.SavePendingResponse
-	11, // 40: state.v2.RunService.LoadMetadata:output_type -> state.v2.LoadMetadataResponse
-	21, // 41: state.v2.RunService.LoadEvents:output_type -> state.v2.LoadEventsResponse
-	23, // 42: state.v2.RunService.LoadSteps:output_type -> state.v2.LoadStepsResponse
-	25, // 43: state.v2.RunService.LoadState:output_type -> state.v2.LoadStateResponse
-	34, // [34:44] is the sub-list for method output_type
-	24, // [24:34] is the sub-list for method input_type
-	24, // [24:24] is the sub-list for extension type_name
-	24, // [24:24] is the sub-list for extension extendee
-	0,  // [0:24] is the sub-list for field type_name
+	34, // 23: state.v2.LoadStateResponse.steps:type_name -> state.v2.LoadStateResponse.StepsEntry
+	26, // 24: state.v2.Pause.identifier:type_name -> state.v2.PauseIdentifier
+	27, // 25: state.v2.ConsumePauseRequest.pause:type_name -> state.v2.Pause
+	28, // 26: state.v2.ConsumePauseRequest.opts:type_name -> state.v2.ConsumePauseOpts
+	29, // 27: state.v2.ConsumePauseResponse.result:type_name -> state.v2.ConsumePauseResult
+	6,  // 28: state.v2.RunService.Create:input_type -> state.v2.CreateStateRequest
+	8,  // 29: state.v2.RunService.Delete:input_type -> state.v2.DeleteStateRequest
+	18, // 30: state.v2.RunService.Exists:input_type -> state.v2.ExistsRequest
+	12, // 31: state.v2.RunService.UpdateMetadata:input_type -> state.v2.UpdateMetadataRequest
+	14, // 32: state.v2.RunService.SaveStep:input_type -> state.v2.SaveStepRequest
+	16, // 33: state.v2.RunService.SavePending:input_type -> state.v2.SavePendingRequest
+	30, // 34: state.v2.RunService.ConsumePause:input_type -> state.v2.ConsumePauseRequest
+	10, // 35: state.v2.RunService.LoadMetadata:input_type -> state.v2.LoadMetadataRequest
+	20, // 36: state.v2.RunService.LoadEvents:input_type -> state.v2.LoadEventsRequest
+	22, // 37: state.v2.RunService.LoadSteps:input_type -> state.v2.LoadStepsRequest
+	24, // 38: state.v2.RunService.LoadState:input_type -> state.v2.LoadStateRequest
+	7,  // 39: state.v2.RunService.Create:output_type -> state.v2.CreateStateResponse
+	9,  // 40: state.v2.RunService.Delete:output_type -> state.v2.DeleteStateResponse
+	19, // 41: state.v2.RunService.Exists:output_type -> state.v2.ExistsResponse
+	13, // 42: state.v2.RunService.UpdateMetadata:output_type -> state.v2.UpdateMetadataResponse
+	15, // 43: state.v2.RunService.SaveStep:output_type -> state.v2.SaveStepResponse
+	17, // 44: state.v2.RunService.SavePending:output_type -> state.v2.SavePendingResponse
+	31, // 45: state.v2.RunService.ConsumePause:output_type -> state.v2.ConsumePauseResponse
+	11, // 46: state.v2.RunService.LoadMetadata:output_type -> state.v2.LoadMetadataResponse
+	21, // 47: state.v2.RunService.LoadEvents:output_type -> state.v2.LoadEventsResponse
+	23, // 48: state.v2.RunService.LoadSteps:output_type -> state.v2.LoadStepsResponse
+	25, // 49: state.v2.RunService.LoadState:output_type -> state.v2.LoadStateResponse
+	39, // [39:50] is the sub-list for method output_type
+	28, // [28:39] is the sub-list for method input_type
+	28, // [28:28] is the sub-list for extension type_name
+	28, // [28:28] is the sub-list for extension extendee
+	0,  // [0:28] is the sub-list for field type_name
 }
 
 func init() { file_state_v2_state_proto_init() }
@@ -1707,7 +2075,7 @@ func file_state_v2_state_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_state_v2_state_proto_rawDesc), len(file_state_v2_state_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   29,
+			NumMessages:   35,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

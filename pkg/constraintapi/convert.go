@@ -173,6 +173,8 @@ func CallerLocationToProto(location CallerLocation) pb.ConstraintApiCallerLocati
 		return pb.ConstraintApiCallerLocation_CONSTRAINT_API_CALLER_LOCATION_ITEM_LEASE
 	case CallerLocationCheckpoint:
 		return pb.ConstraintApiCallerLocation_CONSTRAINT_API_CALLER_LOCATION_CHECKPOINT
+	case CallerLocationLeaseScavenge:
+		return pb.ConstraintApiCallerLocation_CONSTRAINT_API_CALLER_LOCATION_LEASE_SCAVENGE
 	default:
 		return pb.ConstraintApiCallerLocation_CONSTRAINT_API_CALLER_LOCATION_UNSPECIFIED
 	}
@@ -190,6 +192,8 @@ func LeaseLocationFromProto(location pb.ConstraintApiCallerLocation) CallerLocat
 		return CallerLocationItemLease
 	case pb.ConstraintApiCallerLocation_CONSTRAINT_API_CALLER_LOCATION_CHECKPOINT:
 		return CallerLocationCheckpoint
+	case pb.ConstraintApiCallerLocation_CONSTRAINT_API_CALLER_LOCATION_LEASE_SCAVENGE:
+		return CallerLocationLeaseScavenge
 	default:
 		return CallerLocationUnknown
 	}
@@ -205,6 +209,8 @@ func LeaseServiceToProto(service LeaseService) pb.ConstraintApiLeaseService {
 		return pb.ConstraintApiLeaseService_CONSTRAINT_API_LEASE_SERVICE_EXECUTOR
 	case ServiceAPI:
 		return pb.ConstraintApiLeaseService_CONSTRAINT_API_LEASE_SERVICE_API
+	case ServiceConstraintScavenger:
+		return pb.ConstraintApiLeaseService_CONSTRAINT_API_LEASE_CONSTRAINT_SCAVENGER
 	default:
 		return pb.ConstraintApiLeaseService_CONSTRAINT_API_LEASE_SERVICE_UNSPECIFIED
 	}
@@ -220,6 +226,8 @@ func LeaseServiceFromProto(service pb.ConstraintApiLeaseService) LeaseService {
 		return ServiceExecutor
 	case pb.ConstraintApiLeaseService_CONSTRAINT_API_LEASE_SERVICE_API:
 		return ServiceAPI
+	case pb.ConstraintApiLeaseService_CONSTRAINT_API_LEASE_CONSTRAINT_SCAVENGER:
+		return ServiceConstraintScavenger
 	default:
 		return ServiceUnknown
 	}
@@ -702,6 +710,7 @@ func CapacityAcquireRequestToProto(req *CapacityAcquireRequest) *pb.CapacityAcqu
 		BlockingThreshold:    durationpb.New(req.BlockingThreshold),
 		Source:               LeaseSourceToProto(req.Source),
 		Migration:            MigrationIdentifierToProto(req.Migration),
+		RequestAttempt:       uint32(req.RequestAttempt),
 	}
 }
 
@@ -775,6 +784,7 @@ func CapacityAcquireRequestFromProto(pbReq *pb.CapacityAcquireRequest) (*Capacit
 		BlockingThreshold:    blockingThreshold,
 		Source:               LeaseSourceFromProto(pbReq.Source),
 		Migration:            MigrationIdentifierFromProto(pbReq.Migration),
+		RequestAttempt:       int(pbReq.RequestAttempt),
 	}, nil
 }
 
@@ -843,6 +853,8 @@ func CapacityExtendLeaseRequestToProto(req *CapacityExtendLeaseRequest) *pb.Capa
 		LeaseId:        req.LeaseID.String(),
 		Duration:       durationpb.New(req.Duration),
 		Migration:      MigrationIdentifierToProto(req.Migration),
+		Source:         LeaseSourceToProto(req.Source),
+		RequestAttempt: uint32(req.RequestAttempt),
 	}
 }
 
@@ -872,6 +884,8 @@ func CapacityExtendLeaseRequestFromProto(pbReq *pb.CapacityExtendLeaseRequest) (
 		LeaseID:        leaseID,
 		Duration:       duration,
 		Migration:      MigrationIdentifierFromProto(pbReq.Migration),
+		Source:         LeaseSourceFromProto(pbReq.Source),
+		RequestAttempt: int(pbReq.RequestAttempt),
 	}, nil
 }
 
@@ -919,6 +933,8 @@ func CapacityReleaseRequestToProto(req *CapacityReleaseRequest) *pb.CapacityRele
 		AccountId:      req.AccountID.String(),
 		LeaseId:        req.LeaseID.String(),
 		Migration:      MigrationIdentifierToProto(req.Migration),
+		Source:         LeaseSourceToProto(req.Source),
+		RequestAttempt: uint32(req.RequestAttempt),
 	}
 }
 
@@ -942,6 +958,8 @@ func CapacityReleaseRequestFromProto(pbReq *pb.CapacityReleaseRequest) (*Capacit
 		AccountID:      accountID,
 		LeaseID:        leaseID,
 		Migration:      MigrationIdentifierFromProto(pbReq.Migration),
+		Source:         LeaseSourceFromProto(pbReq.Source),
+		RequestAttempt: int(pbReq.RequestAttempt),
 	}, nil
 }
 

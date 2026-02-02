@@ -261,6 +261,7 @@ export default function NewReplayModal({
             <div className="w-full">
               <RangePicker
                 upgradeCutoff={upgradeCutoff}
+                daysAgoMax={logRetention}
                 onChange={(range) =>
                   setTimeRange(
                     range.type === 'relative'

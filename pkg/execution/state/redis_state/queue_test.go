@@ -212,7 +212,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 	require.NoError(t, err)
 	defer rc.Close()
 
-	q := NewQueue(QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName})
+	_, shard := newQueue(t, rc)
 	ctx := context.Background()
 
 	start := time.Now().Truncate(time.Second)
@@ -222,7 +222,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 	t.Run("It enqueues an item", func(t *testing.T) {
 		id := uuid.New()
 
-		item, err := q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{
+		item, err := shard.EnqueueItem(ctx, osqueue.QueueItem{
 			FunctionID: id,
 			Data: osqueue.Item{
 				Identifier: state.Identifier{
@@ -241,7 +241,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 		// Ensure the partition is inserted.
 		qp := getDefaultPartition(t, r, item.FunctionID)
 		require.Equal(t, accountId.String(), qp.AccountID.String())
-		require.Equal(t, QueuePartition{
+		require.Equal(t, osqueue.QueuePartition{
 			ID:         item.FunctionID.String(),
 			FunctionID: &item.FunctionID,
 			AccountID:  accountId,
@@ -262,10 +262,10 @@ func TestQueueEnqueueItem(t *testing.T) {
 		requireAccountScoreEquals(t, r, accountId, start)
 
 		// New key queue data structures should not exist with the flag being toggled off
-		backlog := q.ItemBacklog(ctx, item)
+		backlog := osqueue.ItemBacklog(ctx, item)
 		require.NotEmpty(t, backlog.BacklogID)
 
-		shadowPartition := q.ItemShadowPartition(ctx, item)
+		shadowPartition := osqueue.ItemShadowPartition(ctx, item)
 		require.NotEmpty(t, shadowPartition.PartitionID)
 
 		require.False(t, r.Exists(kg.BacklogMeta()))
@@ -278,7 +278,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 	t.Run("It sets the right item score", func(t *testing.T) {
 		start := time.Now()
 
-		item, err := q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{}, start, osqueue.EnqueueOpts{})
+		item, err := shard.EnqueueItem(ctx, osqueue.QueueItem{}, start, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
 		requireItemScoreEquals(t, r, item, start)
@@ -290,7 +290,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 
 		at := time.Now().Add(time.Hour).Truncate(time.Second)
 
-		item, err := q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{
+		item, err := shard.EnqueueItem(ctx, osqueue.QueueItem{
 			Data: osqueue.Item{
 				Identifier: state.Identifier{
 					AccountID: accountId,
@@ -302,26 +302,26 @@ func TestQueueEnqueueItem(t *testing.T) {
 		// Ensure the partition is inserted, and the earliest time is still
 		// the start time.
 		qp := getDefaultPartition(t, r, item.FunctionID)
-		require.Equal(t, QueuePartition{
+		require.Equal(t, osqueue.QueuePartition{
 			ID:         item.FunctionID.String(),
 			FunctionID: &item.FunctionID,
 			AccountID:  accountId,
 		}, qp)
 
 		// Ensure that the zscore did not change.
-		keys, err := r.ZMembers(q.primaryQueueShard.RedisClient.kg.GlobalPartitionIndex())
+		keys, err := r.ZMembers(shard.Client().kg.GlobalPartitionIndex())
 		require.NoError(t, err)
 		require.Equal(t, 1, len(keys))
 
-		score, err := r.ZScore(q.primaryQueueShard.RedisClient.kg.GlobalPartitionIndex(), keys[0])
+		score, err := r.ZScore(shard.Client().kg.GlobalPartitionIndex(), keys[0])
 		require.NoError(t, err)
 		require.EqualValues(t, at.Unix(), score)
 
-		score, err = r.ZScore(q.primaryQueueShard.RedisClient.kg.AccountPartitionIndex(accountId), keys[0])
+		score, err = r.ZScore(shard.Client().kg.AccountPartitionIndex(accountId), keys[0])
 		require.NoError(t, err)
 		require.EqualValues(t, at.Unix(), score)
 
-		score, err = r.ZScore(q.primaryQueueShard.RedisClient.kg.GlobalAccountIndex(), accountId.String())
+		score, err = r.ZScore(shard.Client().kg.GlobalAccountIndex(), accountId.String())
 		require.NoError(t, err)
 		require.EqualValues(t, at.Unix(), score)
 	})
@@ -331,7 +331,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 		at := now.Add(-10 * time.Minute).Truncate(time.Second)
 
 		// Note: This will reuse the existing partition (zero UUID) from the step above
-		item, err := q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{
+		item, err := shard.EnqueueItem(ctx, osqueue.QueueItem{
 			Data: osqueue.Item{
 				Identifier: state.Identifier{
 					AccountID: accountId,
@@ -343,27 +343,27 @@ func TestQueueEnqueueItem(t *testing.T) {
 		// Ensure the partition is inserted, and the earliest time is updated
 		// inside the partition item.
 		qp := getDefaultPartition(t, r, item.FunctionID)
-		require.Equal(t, QueuePartition{
+		require.Equal(t, osqueue.QueuePartition{
 			ID:         item.FunctionID.String(),
 			FunctionID: &item.FunctionID,
 			AccountID:  accountId,
 		}, qp, "queue partition does not match")
 
 		// Assert that the zscore was changed to this earliest timestamp.
-		keys, err := r.ZMembers(q.primaryQueueShard.RedisClient.kg.GlobalPartitionIndex())
+		keys, err := r.ZMembers(shard.Client().kg.GlobalPartitionIndex())
 		require.NoError(t, err)
 		require.Equal(t, 1, len(keys))
 
-		score, err := r.ZScore(q.primaryQueueShard.RedisClient.kg.GlobalPartitionIndex(), keys[0])
+		score, err := r.ZScore(shard.Client().kg.GlobalPartitionIndex(), keys[0])
 		require.NoError(t, err)
 		require.EqualValues(t, now.Unix(), score)
 
-		score, err = r.ZScore(q.primaryQueueShard.RedisClient.kg.AccountPartitionIndex(accountId), keys[0])
+		score, err = r.ZScore(shard.Client().kg.AccountPartitionIndex(accountId), keys[0])
 		require.NoError(t, err)
 		require.NotZero(t, score)
 		require.EqualValues(t, now.Unix(), score, r.Dump())
 
-		score, err = r.ZScore(q.primaryQueueShard.RedisClient.kg.GlobalAccountIndex(), accountId.String())
+		score, err = r.ZScore(shard.Client().kg.GlobalAccountIndex(), accountId.String())
 		require.NoError(t, err)
 		require.EqualValues(t, now.Unix(), score)
 	})
@@ -373,7 +373,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 
 		accountId := uuid.New()
 
-		item, err := q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{
+		item, err := shard.EnqueueItem(ctx, osqueue.QueueItem{
 			FunctionID: uuid.New(),
 			Data: osqueue.Item{
 				Identifier: state.Identifier{
@@ -384,19 +384,19 @@ func TestQueueEnqueueItem(t *testing.T) {
 		require.NoError(t, err)
 
 		// Assert that we have two zscores in partition:sorted.
-		keys, err := r.ZMembers(q.primaryQueueShard.RedisClient.kg.GlobalPartitionIndex())
+		keys, err := r.ZMembers(shard.Client().kg.GlobalPartitionIndex())
 		require.NoError(t, err)
 		require.Equal(t, 2, len(keys))
 
 		// Assert that we have one zscore in accounts:$accountId:partition:sorted.
-		keys, err = r.ZMembers(q.primaryQueueShard.RedisClient.kg.AccountPartitionIndex(accountId))
+		keys, err = r.ZMembers(shard.Client().kg.AccountPartitionIndex(accountId))
 		require.NoError(t, err)
 		require.Equal(t, 1, len(keys))
 
 		// Ensure the partition is inserted, and the earliest time is updated
 		// inside the partition item.
 		qp := getDefaultPartition(t, r, item.FunctionID)
-		require.Equal(t, QueuePartition{
+		require.Equal(t, osqueue.QueuePartition{
 			ID:         item.FunctionID.String(),
 			FunctionID: &item.FunctionID,
 			AccountID:  accountId,
@@ -406,7 +406,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 	t.Run("Stores default indexes", func(t *testing.T) {
 		at := time.Now().Truncate(time.Second)
 		rid := ulid.MustNew(ulid.Now(), rand.Reader)
-		_, err := q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{
+		_, err := shard.EnqueueItem(ctx, osqueue.QueueItem{
 			FunctionID: uuid.New(),
 			Data: osqueue.Item{
 				Kind: osqueue.KindEdge,
@@ -443,31 +443,16 @@ func TestQueueEnqueueItem(t *testing.T) {
 				},
 			}
 
-			_, partitionCustomConcurrencyKey1, _ := q.ItemPartitions(ctx, q.primaryQueueShard, qi)
-
-			// Enqueue always enqueues to the default partitions - enqueueing to key queues has been disabled for now
-			customkeyQueuePartition := QueuePartition{
-				ID:                         q.primaryQueueShard.RedisClient.kg.PartitionQueueSet(enums.PartitionTypeConcurrencyKey, fnID.String(), hash),
-				PartitionType:              int(enums.PartitionTypeConcurrencyKey),
-				ConcurrencyScope:           int(enums.ConcurrencyScopeFn),
-				FunctionID:                 &fnID,
-				AccountID:                  accountId,
-				EvaluatedConcurrencyKey:    ck.Key,
-				UnevaluatedConcurrencyHash: ck.Hash,
-			}
-
-			assert.Equal(t, customkeyQueuePartition, partitionCustomConcurrencyKey1)
-
-			i, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi, now.Add(10*time.Second), osqueue.EnqueueOpts{})
+			i, err := shard.EnqueueItem(ctx, qi, now.Add(10*time.Second), osqueue.EnqueueOpts{})
 			require.NoError(t, err)
 
 			// There should be 2 partitions - custom key, and the function
 			// level limit.
-			items, _ := r.HKeys(q.primaryQueueShard.RedisClient.kg.PartitionItem())
+			items, _ := r.HKeys(shard.Client().kg.PartitionItem())
 			require.Equal(t, 1, len(items))
 
 			// Concurrency key queue should not exist
-			require.False(t, r.Exists(q.primaryQueueShard.RedisClient.kg.PartitionQueueSet(enums.PartitionTypeConcurrencyKey, fnID.String(), hash)))
+			require.False(t, r.Exists(shard.Client().kg.PartitionQueueSet(enums.PartitionTypeConcurrencyKey, fnID.String(), hash)))
 
 			accountIds := getGlobalAccounts(t, rc)
 			require.Equal(t, 1, len(accountIds))
@@ -481,13 +466,13 @@ func TestQueueEnqueueItem(t *testing.T) {
 
 			// We enqueue to the function-specific queue for backwards-compatibility reasons
 			defaultPartition := getDefaultPartition(t, r, fnID)
-			assert.Equal(t, QueuePartition{
+			assert.Equal(t, osqueue.QueuePartition{
 				ID:         fnID.String(),
 				FunctionID: &fnID,
 				AccountID:  accountId,
 			}, defaultPartition)
 
-			mem, err := r.ZMembers(defaultPartition.zsetKey(q.primaryQueueShard.RedisClient.kg))
+			mem, err := r.ZMembers(partitionZsetKey(defaultPartition, shard.Client().kg))
 			require.NoError(t, err)
 			require.Equal(t, 1, len(mem))
 			require.Contains(t, mem, i.ID)
@@ -498,10 +483,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 
 			// Enqueueing an item
 			ckA := createConcurrencyKey(enums.ConcurrencyScopeFn, fnID, "test", 1)
-			_, _, hashA, _ := ckA.ParseKey() // get the hash of the "test" string / evaluated input.
-
 			ckB := createConcurrencyKey(enums.ConcurrencyScopeFn, fnID, "plz", 2)
-			_, _, hashB, _ := ckB.ParseKey() // get the hash of the "test" string / evaluated input.
 
 			qi := osqueue.QueueItem{
 				FunctionID: fnID,
@@ -513,43 +495,21 @@ func TestQueueEnqueueItem(t *testing.T) {
 				},
 			}
 
-			partitionFn, partitionCustomConcurrencyKey1, partitionCustomConcurrencyKey2 := q.ItemPartitions(ctx, q.primaryQueueShard, qi)
+			partitionFn := osqueue.ItemPartition(ctx, qi)
 
 			// We enqueue to the function-specific queue for backwards-compatibility reasons
-			expectedDefaultPartition := QueuePartition{
+			expectedDefaultPartition := osqueue.QueuePartition{
 				ID:         fnID.String(),
 				FunctionID: &fnID,
 				AccountID:  accountId,
 			}
 			assert.Equal(t, expectedDefaultPartition, partitionFn)
 
-			keyQueueA := QueuePartition{
-				ID:                         q.primaryQueueShard.RedisClient.kg.PartitionQueueSet(enums.PartitionTypeConcurrencyKey, fnID.String(), hashA),
-				PartitionType:              int(enums.PartitionTypeConcurrencyKey),
-				ConcurrencyScope:           int(enums.ConcurrencyScopeFn),
-				FunctionID:                 &fnID,
-				AccountID:                  accountId,
-				EvaluatedConcurrencyKey:    ckA.Key,
-				UnevaluatedConcurrencyHash: ckA.Hash,
-			}
-			assert.Equal(t, keyQueueA, partitionCustomConcurrencyKey1)
-
-			keyQueueB := QueuePartition{
-				ID:                         q.primaryQueueShard.RedisClient.kg.PartitionQueueSet(enums.PartitionTypeConcurrencyKey, fnID.String(), hashB),
-				PartitionType:              int(enums.PartitionTypeConcurrencyKey),
-				ConcurrencyScope:           int(enums.ConcurrencyScopeFn),
-				FunctionID:                 &fnID,
-				AccountID:                  accountId,
-				EvaluatedConcurrencyKey:    ckB.Key,
-				UnevaluatedConcurrencyHash: ckB.Hash,
-			}
-			assert.Equal(t, keyQueueB, partitionCustomConcurrencyKey2)
-
-			i, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi, now.Add(10*time.Second), osqueue.EnqueueOpts{})
+			i, err := shard.EnqueueItem(ctx, qi, now.Add(10*time.Second), osqueue.EnqueueOpts{})
 			require.NoError(t, err)
 
 			// just the default partition
-			items, _ := r.HKeys(q.primaryQueueShard.RedisClient.kg.PartitionItem())
+			items, _ := r.HKeys(shard.Client().kg.PartitionItem())
 			require.Equal(t, 1, len(items))
 			require.Contains(t, items, expectedDefaultPartition.ID)
 
@@ -568,17 +528,17 @@ func TestQueueEnqueueItem(t *testing.T) {
 			require.Equal(t, 1, len(apIds))
 			require.Contains(t, apIds, expectedDefaultPartition.ID)
 
-			assert.True(t, r.Exists(expectedDefaultPartition.zsetKey(q.primaryQueueShard.RedisClient.kg)), "expected default partition to exist")
+			assert.True(t, r.Exists(partitionZsetKey(expectedDefaultPartition, shard.Client().kg)), "expected default partition to exist")
 			defaultPartition := getDefaultPartition(t, r, fnID)
 			assert.Equal(t, expectedDefaultPartition, defaultPartition)
 
-			mem, err := r.ZMembers(defaultPartition.zsetKey(q.primaryQueueShard.RedisClient.kg))
+			mem, err := r.ZMembers(partitionZsetKey(defaultPartition, shard.Client().kg))
 			require.NoError(t, err)
 			require.Equal(t, 1, len(mem))
 			require.Contains(t, mem, i.ID)
 
 			t.Run("Peeking partitions returns the three partitions", func(t *testing.T) {
-				parts, err := q.PartitionPeek(ctx, true, time.Now().Add(time.Hour), 10)
+				parts, err := shard.PartitionPeek(ctx, true, time.Now().Add(time.Hour), 10)
 				require.NoError(t, err)
 				require.Equal(t, 1, len(parts))
 				require.Equal(t, expectedDefaultPartition, *parts[0], "Got: %v", spew.Sdump(parts), r.Dump())
@@ -594,8 +554,8 @@ func TestQueueEnqueueItem(t *testing.T) {
 
 		oldPartitionSnapshot := "{\"at\":1723814830,\"p\":6,\"wsID\":\"e8c0aacd-fcb4-4d5a-b78a-7f0528841543\",\"wid\":\"baac957a-3aa5-4e42-8c1d-f86dee5d58da\",\"last\":1723814800026,\"forceAtMS\":0,\"off\":false}"
 
-		r.HSet(q.primaryQueueShard.RedisClient.kg.PartitionItem(), id.String(), oldPartitionSnapshot)
-		assert.Equal(t, QueuePartition{
+		r.HSet(shard.Client().kg.PartitionItem(), id.String(), oldPartitionSnapshot)
+		assert.Equal(t, osqueue.QueuePartition{
 			FunctionID: &id,
 			EnvID:      &envId,
 			// No accountId is present,
@@ -604,7 +564,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 			Last:      1723814800026,
 		}, getPartition(t, r, enums.PartitionTypeDefault, id))
 
-		item, err := q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{
+		item, err := shard.EnqueueItem(ctx, osqueue.QueueItem{
 			FunctionID: id,
 			Data: osqueue.Item{
 				Identifier: state.Identifier{
@@ -616,7 +576,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 		require.NotEqual(t, item.ID, ulid.Zero)
 		require.Equal(t, time.UnixMilli(item.WallTimeMS).Truncate(time.Second), start)
 
-		assert.Equal(t, QueuePartition{
+		assert.Equal(t, osqueue.QueuePartition{
 			FunctionID: &id,
 			EnvID:      &envId,
 			// No accountId is present,
@@ -639,7 +599,7 @@ func TestQueueEnqueueItemIdempotency(t *testing.T) {
 	defer rc.Close()
 
 	// Set idempotency to a second
-	q := NewQueue(QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}, WithIdempotencyTTL(dur))
+	_, shard := newQueue(t, rc, osqueue.WithIdempotencyTTL(dur))
 	ctx := context.Background()
 
 	start := time.Now().Truncate(time.Second)
@@ -647,7 +607,7 @@ func TestQueueEnqueueItemIdempotency(t *testing.T) {
 	t.Run("It enqueues an item only once", func(t *testing.T) {
 		i := osqueue.QueueItem{ID: "once"}
 
-		item, err := q.EnqueueItem(ctx, q.primaryQueueShard, i, start, osqueue.EnqueueOpts{})
+		item, err := shard.EnqueueItem(ctx, i, start, osqueue.EnqueueOpts{})
 
 		require.NoError(t, err)
 		require.Equal(t, osqueue.HashID(ctx, "once"), item.ID)
@@ -656,21 +616,21 @@ func TestQueueEnqueueItemIdempotency(t *testing.T) {
 		require.Equal(t, item, found)
 
 		// Ensure we can't enqueue again.
-		_, err = q.EnqueueItem(ctx, q.primaryQueueShard, i, start, osqueue.EnqueueOpts{})
-		require.Equal(t, ErrQueueItemExists, err)
+		_, err = shard.EnqueueItem(ctx, i, start, osqueue.EnqueueOpts{})
+		require.Equal(t, osqueue.ErrQueueItemExists, err)
 
 		// Dequeue
-		err = q.Dequeue(ctx, q.primaryQueueShard, item)
+		err = shard.Dequeue(ctx, item)
 		require.NoError(t, err)
 
 		// Ensure we can't enqueue even after dequeue.
-		_, err = q.EnqueueItem(ctx, q.primaryQueueShard, i, start, osqueue.EnqueueOpts{})
-		require.Equal(t, ErrQueueItemExists, err)
+		_, err = shard.EnqueueItem(ctx, i, start, osqueue.EnqueueOpts{})
+		require.Equal(t, osqueue.ErrQueueItemExists, err)
 
 		// Wait for the idempotency TTL to expire
 		r.FastForward(dur)
 
-		item, err = q.EnqueueItem(ctx, q.primaryQueueShard, i, start, osqueue.EnqueueOpts{})
+		item, err = shard.EnqueueItem(ctx, i, start, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 		require.Equal(t, osqueue.HashID(ctx, "once"), item.ID)
 		require.NotEqual(t, i.ID, item.ID)
@@ -708,12 +668,12 @@ func BenchmarkPeekTiming(b *testing.B) {
 
 	// Enqueue 500 items into one queue.
 
-	q := NewQueue(QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName})
+	_, shard := newQueue(b, rc)
 	ctx := context.Background()
 
 	enqueue := func(id uuid.UUID, n int) {
 		for i := 0; i < n; i++ {
-			_, err := q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{FunctionID: id}, time.Now(), osqueue.EnqueueOpts{})
+			_, err := shard.EnqueueItem(ctx, osqueue.QueueItem{FunctionID: id}, time.Now(), osqueue.EnqueueOpts{})
 			if err != nil {
 				panic(err)
 			}
@@ -722,13 +682,13 @@ func BenchmarkPeekTiming(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		id := uuid.New()
-		enqueue(id, int(DefaultQueuePeekMax))
-		items, err := q.Peek(ctx, &QueuePartition{FunctionID: &id}, time.Now(), DefaultQueuePeekMax)
+		enqueue(id, int(osqueue.DefaultQueuePeekMax))
+		items, err := shard.Peek(ctx, &osqueue.QueuePartition{FunctionID: &id}, time.Now(), osqueue.DefaultQueuePeekMax)
 		if err != nil {
 			panic(err)
 		}
-		if len(items) != int(DefaultQueuePeekMax) {
-			panic(fmt.Sprintf("expected %d, got %d", DefaultQueuePeekMax, len(items)))
+		if len(items) != int(osqueue.DefaultQueuePeekMax) {
+			panic(fmt.Sprintf("expected %d, got %d", osqueue.DefaultQueuePeekMax, len(items)))
 		}
 	}
 }
@@ -745,12 +705,16 @@ func TestQueueSystemPartitions(t *testing.T) {
 	customQueueName := "custom"
 	customTestLimit := 1
 
-	q := NewQueue(
-		QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName},
-		WithAllowQueueNames(customQueueName),
-		WithPartitionConstraintConfigGetter(func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
-			return PartitionConstraintConfig{
-				Concurrency: PartitionConcurrency{
+	clock := clockwork.NewFakeClock()
+
+	_, shard := newQueue(
+		t,
+		rc,
+		osqueue.WithClock(clock),
+		osqueue.WithAllowQueueNames(customQueueName),
+		osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
+			return osqueue.PartitionConstraintConfig{
+				Concurrency: osqueue.PartitionConcurrency{
 					AccountConcurrency:  5000,
 					SystemConcurrency:   customTestLimit,
 					FunctionConcurrency: 1,
@@ -760,7 +724,7 @@ func TestQueueSystemPartitions(t *testing.T) {
 	)
 	ctx := context.Background()
 
-	start := time.Now().Truncate(time.Second)
+	start := clock.Now().Truncate(time.Second)
 
 	id := uuid.New()
 
@@ -774,7 +738,7 @@ func TestQueueSystemPartitions(t *testing.T) {
 	}
 
 	t.Run("It enqueues an item", func(t *testing.T) {
-		item, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi, start, osqueue.EnqueueOpts{})
+		item, err := shard.EnqueueItem(ctx, qi, start, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 		require.NotEqual(t, item.ID, ulid.Zero)
 		require.Equal(t, time.UnixMilli(item.WallTimeMS).Truncate(time.Second), start)
@@ -785,10 +749,9 @@ func TestQueueSystemPartitions(t *testing.T) {
 
 		// Ensure the partition is inserted.
 		qp := getSystemPartition(t, r, customQueueName)
-		require.Equal(t, QueuePartition{
-			ID:            customQueueName,
-			PartitionType: int(enums.PartitionTypeDefault),
-			QueueName:     &customQueueName,
+		require.Equal(t, osqueue.QueuePartition{
+			ID:        customQueueName,
+			QueueName: &customQueueName,
 		}, qp)
 
 		apIds := getAccountPartitions(t, rc, uuid.Nil)
@@ -799,12 +762,12 @@ func TestQueueSystemPartitions(t *testing.T) {
 	t.Run("peeks correct partition", func(t *testing.T) {
 		qp := getSystemPartition(t, r, customQueueName)
 
-		partitions, err := q.PartitionPeek(ctx, true, start, 100)
+		partitions, err := shard.PartitionPeek(ctx, true, start, 100)
 		require.NoError(t, err)
 		require.Equal(t, 1, len(partitions))
 		require.Equal(t, qp, *partitions[0])
 
-		items, err := q.Peek(ctx, &qp, start, 100)
+		items, err := shard.Peek(ctx, &qp, start, 100)
 		require.NoError(t, err)
 		require.Equal(t, 1, len(items))
 	})
@@ -812,7 +775,7 @@ func TestQueueSystemPartitions(t *testing.T) {
 	t.Run("leases correct partition", func(t *testing.T) {
 		qp := getSystemPartition(t, r, customQueueName)
 
-		leaseId, availableCapacity, err := q.PartitionLease(ctx, &qp, time.Second)
+		leaseId, availableCapacity, err := shard.PartitionLease(ctx, &qp, time.Second)
 		require.NoError(t, err)
 		require.NotNil(t, leaseId)
 		require.Equal(t, 1, availableCapacity)
@@ -821,19 +784,19 @@ func TestQueueSystemPartitions(t *testing.T) {
 	t.Run("peeks partition successfully", func(t *testing.T) {
 		qp := getSystemPartition(t, r, customQueueName)
 
-		items, err := q.Peek(ctx, &qp, start, 100)
+		items, err := shard.Peek(ctx, &qp, start, 100)
 		require.NoError(t, err)
 		require.Equal(t, 1, len(items))
 		require.Equal(t, qi.Data.Payload, items[0].Data.Payload)
 	})
 
 	t.Run("leases partition items while respecting concurrency", func(t *testing.T) {
-		item, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi, start, osqueue.EnqueueOpts{})
+		item, err := shard.EnqueueItem(ctx, qi, start, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 		require.NotEqual(t, item.ID, ulid.Zero)
 		require.Equal(t, time.UnixMilli(item.WallTimeMS).Truncate(time.Second), start)
 
-		item2, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi, start, osqueue.EnqueueOpts{})
+		item2, err := shard.EnqueueItem(ctx, qi, start, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 		require.NotEqual(t, item.ID, ulid.Zero)
 		require.Equal(t, time.UnixMilli(item.WallTimeMS).Truncate(time.Second), start)
@@ -842,21 +805,23 @@ func TestQueueSystemPartitions(t *testing.T) {
 		found := getQueueItem(t, r, item.ID)
 		require.Equal(t, item, found)
 
-		leaseId, err := q.Lease(ctx, item, time.Second, time.Now(), nil)
+		leaseId, err := shard.Lease(ctx, item, time.Second, clock.Now(), nil)
 		require.NoError(t, err)
 		require.NotNil(t, leaseId)
 
-		leaseId, err = q.Lease(ctx, item2, time.Second, time.Now(), nil)
+		leaseId, err = shard.Lease(ctx, item2, time.Second, clock.Now(), nil)
 		require.Error(t, err)
-		require.ErrorIs(t, err, ErrSystemConcurrencyLimit)
+		require.ErrorIs(t, err, osqueue.ErrSystemConcurrencyLimit)
 		require.Nil(t, leaseId)
 	})
 
 	t.Run("scavenges partition items with expired leases", func(t *testing.T) {
 		// wait til leases are expired
-		<-time.After(2 * time.Second)
+		clock.Advance(2 * time.Second)
+		r.FastForward(2 * time.Second)
+		r.SetTime(clock.Now())
 
-		requeued, err := q.Scavenge(ctx, ScavengePeekSize)
+		requeued, err := shard.Scavenge(ctx, osqueue.ScavengePeekSize)
 		require.NoError(t, err)
 		assert.Equal(t, 1, requeued, "expected one item with expired leases to be requeued by scavenge", r.Dump())
 	})
@@ -864,20 +829,20 @@ func TestQueueSystemPartitions(t *testing.T) {
 	t.Run("backcompat: scavenges previous partition items with expired leases", func(t *testing.T) {
 		r.FlushAll()
 
-		start := time.Now().Truncate(time.Second)
+		start := clock.Now().Truncate(time.Second)
 
-		item, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi, start, osqueue.EnqueueOpts{})
+		item, err := shard.EnqueueItem(ctx, qi, start, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 		require.NotEqual(t, item.ID, ulid.Zero)
 		require.Equal(t, time.UnixMilli(item.WallTimeMS).Truncate(time.Second), start)
 
 		qp := getSystemPartition(t, r, customQueueName)
 
-		leaseStart := time.Now()
-		leaseExpires := q.clock.Now().Add(time.Second)
+		leaseStart := clock.Now()
+		leaseExpires := clock.Now().Add(time.Second)
 
 		itemCountMatches := func(num int) {
-			zsetKey := qp.zsetKey(q.primaryQueueShard.RedisClient.kg)
+			zsetKey := partitionZsetKey(qp, shard.Client().kg)
 			items, err := rc.Do(ctx, rc.B().
 				Zrangebyscore().
 				Key(zsetKey).
@@ -891,7 +856,7 @@ func TestQueueSystemPartitions(t *testing.T) {
 		concurrencyItemCountMatches := func(num int) {
 			items, err := rc.Do(ctx, rc.B().
 				Zrangebyscore().
-				Key(qp.concurrencyKey(q.primaryQueueShard.RedisClient.kg)).
+				Key(partitionConcurrencyKey(qp, shard.Client().kg)).
 				Min("-inf").
 				Max("+inf").
 				Build()).AsStrSlice()
@@ -902,7 +867,7 @@ func TestQueueSystemPartitions(t *testing.T) {
 		itemCountMatches(1)
 		concurrencyItemCountMatches(0)
 
-		leaseId, err := q.Lease(ctx, item, time.Second, leaseStart, nil)
+		leaseId, err := shard.Lease(ctx, item, time.Second, leaseStart, nil)
 		require.NoError(t, err)
 		require.NotNil(t, leaseId)
 
@@ -910,25 +875,28 @@ func TestQueueSystemPartitions(t *testing.T) {
 		concurrencyItemCountMatches(1)
 
 		// wait til leases are expired
-		<-time.After(2 * time.Second)
-		require.True(t, time.Now().After(leaseExpires))
+		clock.Advance(2 * time.Second)
+		r.FastForward(2 * time.Second)
+		r.SetTime(clock.Now())
 
-		incompatibleConcurrencyIndexItem := q.primaryQueueShard.RedisClient.kg.Concurrency("p", customQueueName)
+		require.True(t, clock.Now().After(leaseExpires))
+
+		incompatibleConcurrencyIndexItem := shard.Client().kg.Concurrency("p", customQueueName)
 		compatibleConcurrencyIndexItem := customQueueName
 
-		indexMembers, err := r.ZMembers(q.primaryQueueShard.RedisClient.kg.ConcurrencyIndex())
+		indexMembers, err := r.ZMembers(shard.Client().kg.ConcurrencyIndex())
 		require.NoError(t, err)
 		require.Equal(t, 1, len(indexMembers))
 		require.Contains(t, indexMembers, compatibleConcurrencyIndexItem)
 
-		requeued, err := q.Scavenge(ctx, ScavengePeekSize)
+		requeued, err := shard.Scavenge(ctx, osqueue.ScavengePeekSize)
 		require.NoError(t, err)
 		assert.Equal(t, 1, requeued, "expected one item with expired leases to be requeued by scavenge", r.Dump())
 
 		itemCountMatches(1)
 		concurrencyItemCountMatches(0)
 
-		indexItems, err := rc.Do(ctx, rc.B().Zcard().Key(q.primaryQueueShard.RedisClient.kg.ConcurrencyIndex()).Build()).AsInt64()
+		indexItems, err := rc.Do(ctx, rc.B().Zcard().Key(shard.Client().kg.ConcurrencyIndex()).Build()).AsInt64()
 		require.NoError(t, err)
 		assert.Equal(t, 0, int(indexItems), "expected no items in the concurrency index", r.Dump())
 
@@ -944,7 +912,7 @@ func TestQueueSystemPartitions(t *testing.T) {
 	t.Run("It enqueues an item to account queues when account id is present", func(t *testing.T) {
 		r.FlushAll()
 
-		start := time.Now().Truncate(time.Second)
+		start := clock.Now().Truncate(time.Second)
 
 		// This test case handles account-scoped system partitions
 
@@ -962,7 +930,7 @@ func TestQueueSystemPartitions(t *testing.T) {
 			QueueName: &customQueueName,
 		}
 
-		item, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi, start, osqueue.EnqueueOpts{})
+		item, err := shard.EnqueueItem(ctx, qi, start, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 		require.NotEqual(t, item.ID, ulid.Zero)
 		require.Equal(t, time.UnixMilli(item.WallTimeMS).Truncate(time.Second), start)
@@ -973,11 +941,10 @@ func TestQueueSystemPartitions(t *testing.T) {
 
 		// Ensure the partition is inserted.
 		qp := getSystemPartition(t, r, customQueueName)
-		require.Equal(t, QueuePartition{
-			ID:            customQueueName,
-			QueueName:     &customQueueName,
-			PartitionType: int(enums.PartitionTypeDefault),
-			AccountID:     uuid.Nil,
+		require.Equal(t, osqueue.QueuePartition{
+			ID:        customQueueName,
+			QueueName: &customQueueName,
+			AccountID: uuid.Nil,
 		}, qp)
 
 		apIds := getAccountPartitions(t, rc, accountId)
@@ -997,14 +964,14 @@ func TestQueuePeek(t *testing.T) {
 	require.NoError(t, err)
 	defer rc.Close()
 
-	q := NewQueue(QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName})
+	_, shard := newQueue(t, rc)
 	ctx := context.Background()
 
 	// The default blank UUID
 	workflowID := uuid.UUID{}
 
 	t.Run("It returns none with no items enqueued", func(t *testing.T) {
-		items, err := q.Peek(ctx, &QueuePartition{FunctionID: &workflowID}, time.Now().Add(time.Hour), 10)
+		items, err := shard.Peek(ctx, &osqueue.QueuePartition{FunctionID: &workflowID}, time.Now().Add(time.Hour), 10)
 		require.NoError(t, err)
 		require.EqualValues(t, 0, len(items))
 	})
@@ -1015,40 +982,40 @@ func TestQueuePeek(t *testing.T) {
 		c := b.Add(2 * time.Second)
 		d := c.Add(2 * time.Second)
 
-		ia, err := q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{ID: "a"}, a, osqueue.EnqueueOpts{})
+		ia, err := shard.EnqueueItem(ctx, osqueue.QueueItem{ID: "a"}, a, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
-		ib, err := q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{ID: "b"}, b, osqueue.EnqueueOpts{})
+		ib, err := shard.EnqueueItem(ctx, osqueue.QueueItem{ID: "b"}, b, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
-		ic, err := q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{ID: "c"}, c, osqueue.EnqueueOpts{})
+		ic, err := shard.EnqueueItem(ctx, osqueue.QueueItem{ID: "c"}, c, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
-		items, err := q.Peek(ctx, &QueuePartition{FunctionID: &workflowID}, time.Now().Add(time.Hour), 10)
+		items, err := shard.Peek(ctx, &osqueue.QueuePartition{FunctionID: &workflowID}, time.Now().Add(time.Hour), 10)
 		require.NoError(t, err)
 		require.EqualValues(t, 3, len(items))
 		require.EqualValues(t, []*osqueue.QueueItem{&ia, &ib, &ic}, items)
 		require.NotEqualValues(t, []*osqueue.QueueItem{&ib, &ia, &ic}, items)
 
-		id, err := q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{ID: "d"}, d, osqueue.EnqueueOpts{})
+		id, err := shard.EnqueueItem(ctx, osqueue.QueueItem{ID: "d"}, d, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
-		items, err = q.Peek(ctx, &QueuePartition{FunctionID: &workflowID}, time.Now().Add(time.Hour), 10)
+		items, err = shard.Peek(ctx, &osqueue.QueuePartition{FunctionID: &workflowID}, time.Now().Add(time.Hour), 10)
 		require.NoError(t, err)
 		require.EqualValues(t, 4, len(items))
 		require.EqualValues(t, []*osqueue.QueueItem{&ia, &ib, &ic, &id}, items)
 
 		t.Run("It should limit the list", func(t *testing.T) {
-			items, err = q.Peek(ctx, &QueuePartition{FunctionID: &workflowID}, time.Now().Add(time.Hour), 2)
+			items, err = shard.Peek(ctx, &osqueue.QueuePartition{FunctionID: &workflowID}, time.Now().Add(time.Hour), 2)
 			require.NoError(t, err)
 			require.EqualValues(t, 2, len(items))
 			require.EqualValues(t, []*osqueue.QueueItem{&ia, &ib}, items)
 		})
 
 		t.Run("It should apply a peek offset", func(t *testing.T) {
-			items, err = q.Peek(ctx, &QueuePartition{FunctionID: &workflowID}, time.Now().Add(-1*time.Hour), DefaultQueuePeekMax)
+			items, err = shard.Peek(ctx, &osqueue.QueuePartition{FunctionID: &workflowID}, time.Now().Add(-1*time.Hour), osqueue.DefaultQueuePeekMax)
 			require.NoError(t, err)
 			require.EqualValues(t, 0, len(items))
 
-			items, err = q.Peek(ctx, &QueuePartition{FunctionID: &workflowID}, c, DefaultQueuePeekMax)
+			items, err = shard.Peek(ctx, &osqueue.QueuePartition{FunctionID: &workflowID}, c, osqueue.DefaultQueuePeekMax)
 			require.NoError(t, err)
 			require.EqualValues(t, 3, len(items))
 			require.EqualValues(t, []*osqueue.QueueItem{&ia, &ib, &ic}, items)
@@ -1056,10 +1023,10 @@ func TestQueuePeek(t *testing.T) {
 
 		t.Run("It should remove any leased items from the list", func(t *testing.T) {
 			// Lease step A, and it should be removed.
-			_, err := q.Lease(ctx, ia, 50*time.Millisecond, time.Now(), nil)
+			_, err := shard.Lease(ctx, ia, 50*time.Millisecond, time.Now(), nil)
 			require.NoError(t, err)
 
-			items, err = q.Peek(ctx, &QueuePartition{FunctionID: &workflowID}, d, DefaultQueuePeekMax)
+			items, err = shard.Peek(ctx, &osqueue.QueuePartition{FunctionID: &workflowID}, d, osqueue.DefaultQueuePeekMax)
 			require.NoError(t, err)
 			require.EqualValues(t, 3, len(items))
 			require.EqualValues(t, []*osqueue.QueueItem{&ib, &ic, &id}, items)
@@ -1067,7 +1034,7 @@ func TestQueuePeek(t *testing.T) {
 
 		t.Run("Expired leases should move back via scavenging", func(t *testing.T) {
 			// Run scavenging.
-			caught, err := q.Scavenge(ctx, ScavengePeekSize)
+			caught, err := shard.Scavenge(ctx, osqueue.ScavengePeekSize)
 			require.NoError(t, err)
 			require.EqualValues(t, 0, caught)
 
@@ -1076,11 +1043,11 @@ func TestQueuePeek(t *testing.T) {
 
 			// Run scavenging.
 			scavengeAt := time.Now().UnixMilli()
-			caught, err = q.Scavenge(ctx, ScavengePeekSize)
+			caught, err = shard.Scavenge(ctx, osqueue.ScavengePeekSize)
 			require.NoError(t, err)
 			require.EqualValues(t, 1, caught, "Items not found during scavenge\n%s", r.Dump())
 
-			items, err = q.Peek(ctx, &QueuePartition{FunctionID: &workflowID}, d, DefaultQueuePeekMax)
+			items, err = shard.Peek(ctx, &osqueue.QueuePartition{FunctionID: &workflowID}, d, osqueue.DefaultQueuePeekMax)
 			require.NoError(t, err)
 			require.EqualValues(t, 4, len(items))
 
@@ -1104,15 +1071,15 @@ func TestQueuePeek(t *testing.T) {
 
 		t.Run("Random scavenge offset should work", func(t *testing.T) {
 			// When count is within limits, do not apply offset
-			require.Equal(t, int64(0), q.randomScavengeOffset(1, 1, 1))
-			require.Equal(t, int64(0), q.randomScavengeOffset(1, 2, 3))
+			require.Equal(t, int64(0), osqueue.RandomScavengeOffset(1, 1, 1))
+			require.Equal(t, int64(0), osqueue.RandomScavengeOffset(1, 2, 3))
 
 			// Some random fixtures to verify we stay within the range
-			require.Equal(t, int64(2), q.randomScavengeOffset(1, 4, 1))
-			require.Equal(t, int64(3), q.randomScavengeOffset(2, 4, 1))
-			require.Equal(t, int64(1), q.randomScavengeOffset(3, 4, 1))
-			require.Equal(t, int64(2), q.randomScavengeOffset(4, 4, 1))
-			require.Equal(t, int64(0), q.randomScavengeOffset(5, 4, 1))
+			require.Equal(t, int64(2), osqueue.RandomScavengeOffset(1, 4, 1))
+			require.Equal(t, int64(3), osqueue.RandomScavengeOffset(2, 4, 1))
+			require.Equal(t, int64(1), osqueue.RandomScavengeOffset(3, 4, 1))
+			require.Equal(t, int64(2), osqueue.RandomScavengeOffset(4, 4, 1))
+			require.Equal(t, int64(0), osqueue.RandomScavengeOffset(5, 4, 1))
 		})
 	})
 }
@@ -1147,39 +1114,40 @@ func TestQueuePartitionPeek(t *testing.T) {
 	require.NoError(t, err)
 	defer rc.Close()
 
-	q := NewQueue(
-		QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey)},
-		WithPartitionPriorityFinder(func(ctx context.Context, p QueuePartition) uint {
+	_, shard := newQueue(
+		t,
+		rc,
+		osqueue.WithPartitionPriorityFinder(func(ctx context.Context, p osqueue.QueuePartition) uint {
 			if p.FunctionID == nil {
-				return PriorityMin
+				return osqueue.PriorityMin
 			}
 			switch *p.FunctionID {
 			case idB, idC:
-				return PriorityMax
+				return osqueue.PriorityMax
 			default:
-				return PriorityMin // Sorry A
+				return osqueue.PriorityMin // Sorry A
 			}
 		}),
 	)
 	ctx := context.Background()
 
-	enqueue := func(q *queue, now time.Time) {
+	enqueue := func(shard osqueue.QueueShard, now time.Time) {
 		atA, atB, atC := now, now.Add(2*time.Second), now.Add(4*time.Second)
 
-		_, err := q.EnqueueItem(ctx, q.primaryQueueShard, newQueueItem(idA), atA, osqueue.EnqueueOpts{})
+		_, err := shard.EnqueueItem(ctx, newQueueItem(idA), atA, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
-		_, err = q.EnqueueItem(ctx, q.primaryQueueShard, newQueueItem(idB), atB, osqueue.EnqueueOpts{})
+		_, err = shard.EnqueueItem(ctx, newQueueItem(idB), atB, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
-		_, err = q.EnqueueItem(ctx, q.primaryQueueShard, newQueueItem(idC), atC, osqueue.EnqueueOpts{})
+		_, err = shard.EnqueueItem(ctx, newQueueItem(idC), atC, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 	}
-	enqueue(q, now)
+	enqueue(shard, now)
 
 	t.Run("Sequentially returns partitions in order", func(t *testing.T) {
-		items, err := q.PartitionPeek(ctx, true, time.Now().Add(time.Hour), PartitionPeekMax)
+		items, err := shard.PartitionPeek(ctx, true, time.Now().Add(time.Hour), osqueue.PartitionPeekMax)
 		require.NoError(t, err)
 		require.Len(t, items, 3)
-		require.EqualValues(t, []*QueuePartition{
+		require.EqualValues(t, []*osqueue.QueuePartition{
 			{ID: idA.String(), FunctionID: &idA, AccountID: accountId},
 			{ID: idB.String(), FunctionID: &idB, AccountID: accountId},
 			{ID: idC.String(), FunctionID: &idC, AccountID: accountId},
@@ -1188,7 +1156,7 @@ func TestQueuePartitionPeek(t *testing.T) {
 
 	t.Run("With a single peek max, it returns the first item if sequential every time", func(t *testing.T) {
 		for i := 0; i <= 50; i++ {
-			items, err := q.PartitionPeek(ctx, true, time.Now().Add(time.Hour), 1)
+			items, err := shard.PartitionPeek(ctx, true, time.Now().Add(time.Hour), 1)
 			require.NoError(t, err)
 			require.Len(t, items, 1)
 			require.Equal(t, &idA, items[0].FunctionID)
@@ -1199,7 +1167,7 @@ func TestQueuePartitionPeek(t *testing.T) {
 		found := map[uuid.UUID]bool{idA: false, idB: false, idC: false}
 
 		for i := 0; i <= 50; i++ {
-			items, err := q.PartitionPeek(ctx, false, time.Now().Add(time.Hour), 1)
+			items, err := shard.PartitionPeek(ctx, false, time.Now().Add(time.Hour), 1)
 			require.NoError(t, err)
 			require.Len(t, items, 1)
 			found[*items[0].FunctionID] = true
@@ -1214,7 +1182,7 @@ func TestQueuePartitionPeek(t *testing.T) {
 	t.Run("Random returns items randomly using weighted sample", func(t *testing.T) {
 		a, b, c := 0, 0, 0
 		for i := 0; i <= 1000; i++ {
-			items, err := q.PartitionPeek(ctx, false, time.Now().Add(time.Hour), PartitionPeekMax)
+			items, err := shard.PartitionPeek(ctx, false, time.Now().Add(time.Hour), osqueue.PartitionPeekMax)
 			require.NoError(t, err)
 			require.Len(t, items, 3)
 			switch *items[0].FunctionID {
@@ -1246,36 +1214,37 @@ func TestQueuePartitionPeek(t *testing.T) {
 		require.NoError(t, err)
 		defer rc.Close()
 
-		q := NewQueue(
-			QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey)},
-			WithPartitionPriorityFinder(func(ctx context.Context, p QueuePartition) uint {
+		_, shard := newQueue(
+			t,
+			rc,
+			osqueue.WithPartitionPriorityFinder(func(ctx context.Context, p osqueue.QueuePartition) uint {
 				if p.FunctionID == nil {
-					return PriorityMin
+					return osqueue.PriorityMin
 				}
 				switch *p.FunctionID {
 				case idA:
-					return PriorityMax
+					return osqueue.PriorityMax
 				default:
-					return PriorityMin // Sorry A
+					return osqueue.PriorityMin // Sorry A
 				}
 			}),
 			// Ignore A
-			WithDenyQueueNames(idA.String()),
+			osqueue.WithDenyQueueNames(idA.String()),
 		)
 
-		enqueue(q, now)
+		enqueue(shard, now)
 
 		// This should only select B and C, as id A is ignored.
-		items, err := q.PartitionPeek(ctx, true, now.Add(time.Hour), PartitionPeekMax)
+		items, err := shard.PartitionPeek(ctx, true, now.Add(time.Hour), osqueue.PartitionPeekMax)
 		require.NoError(t, err)
 		require.Len(t, items, 2)
-		require.EqualValues(t, []*QueuePartition{
+		require.EqualValues(t, []*osqueue.QueuePartition{
 			{ID: idB.String(), FunctionID: &idB, AccountID: accountId},
 			{ID: idC.String(), FunctionID: &idC, AccountID: accountId},
 		}, items)
 
 		// Try without sequential scans
-		items, err = q.PartitionPeek(ctx, false, now.Add(time.Hour), PartitionPeekMax)
+		items, err = shard.PartitionPeek(ctx, false, now.Add(time.Hour), osqueue.PartitionPeekMax)
 		require.NoError(t, err)
 		require.Len(t, items, 2)
 	})
@@ -1292,43 +1261,43 @@ func TestQueuePartitionPeek(t *testing.T) {
 		clock := clockwork.NewFakeClockAt(now)
 
 		paused := make(map[uuid.UUID]bool)
-		q := NewQueue(
-			QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey)},
-			WithPartitionPriorityFinder(func(_ context.Context, _ QueuePartition) uint {
-				return PriorityDefault
+		q, shard := newQueue(
+			t, rc,
+			osqueue.WithPartitionPriorityFinder(func(_ context.Context, _ osqueue.QueuePartition) uint {
+				return osqueue.PriorityDefault
 			}),
-			WithPartitionPausedGetter(func(ctx context.Context, fnID uuid.UUID) PartitionPausedInfo {
-				return PartitionPausedInfo{
+			osqueue.WithPartitionPausedGetter(func(ctx context.Context, fnID uuid.UUID) osqueue.PartitionPausedInfo {
+				return osqueue.PartitionPausedInfo{
 					Paused: paused[fnID],
 				}
 			}),
-			WithClock(clock),
+			osqueue.WithClock(clock),
 		)
-		enqueue(q, now)
+		enqueue(shard, now)
 		requirePartitionScoreEquals(t, r, &idA, now)
 
 		// Pause A, excluding it from peek:
 		paused[idA] = true
 
 		// This should only select B and C, as id A is ignored:
-		items, err := q.PartitionPeek(ctx, true, now.Add(time.Hour), PartitionPeekMax)
+		items, err := shard.PartitionPeek(ctx, true, now.Add(time.Hour), osqueue.PartitionPeekMax)
 		require.NoError(t, err)
 		require.Len(t, items, 2)
-		require.EqualValues(t, []*QueuePartition{
+		require.EqualValues(t, []*osqueue.QueuePartition{
 			{ID: idB.String(), FunctionID: &idB, AccountID: accountId},
 			{ID: idC.String(), FunctionID: &idC, AccountID: accountId},
 		}, items)
-		requirePartitionScoreEquals(t, r, &idA, now.Add(PartitionPausedRequeueExtension))
+		requirePartitionScoreEquals(t, r, &idA, now.Add(osqueue.PartitionPausedRequeueExtension))
 
 		// After unpausing A, it should be included in the peek:
 		paused[idA] = false
-		require.NoError(t, q.UnpauseFunction(ctx, q.primaryQueueShard.Name, accountId, idA))
+		require.NoError(t, q.UnpauseFunction(ctx, shard.Name(), accountId, idA))
 
 		require.NoError(t, err)
-		items, err = q.PartitionPeek(ctx, true, now.Add(time.Hour), PartitionPeekMax)
+		items, err = shard.PartitionPeek(ctx, true, now.Add(time.Hour), osqueue.PartitionPeekMax)
 		require.NoError(t, err)
 		require.Len(t, items, 3)
-		require.EqualValues(t, []*QueuePartition{
+		require.EqualValues(t, []*osqueue.QueuePartition{
 			{ID: idA.String(), FunctionID: &idA, AccountID: accountId},
 			{ID: idB.String(), FunctionID: &idB, AccountID: accountId},
 			{ID: idC.String(), FunctionID: &idC, AccountID: accountId},
@@ -1345,25 +1314,25 @@ func TestQueuePartitionPeek(t *testing.T) {
 		require.NoError(t, err)
 		defer rc.Close()
 
-		q := NewQueue(
-			QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey)},
-			WithPartitionPriorityFinder(func(_ context.Context, _ QueuePartition) uint {
-				return PriorityDefault
+		_, shard := newQueue(
+			t, rc,
+			osqueue.WithPartitionPriorityFinder(func(_ context.Context, _ osqueue.QueuePartition) uint {
+				return osqueue.PriorityDefault
 			}),
 		)
-		enqueue(q, now)
+		enqueue(shard, now)
 
 		// Create inconsistency: Delete partition item from partition hash and global partition index but _not_ account partitions
-		err = rc.Do(ctx, rc.B().Hdel().Key(q.primaryQueueShard.RedisClient.kg.PartitionItem()).Field(idA.String()).Build()).Error()
+		err = rc.Do(ctx, rc.B().Hdel().Key(shard.Client().kg.PartitionItem()).Field(idA.String()).Build()).Error()
 		require.NoError(t, err)
-		err = rc.Do(ctx, rc.B().Zrem().Key(q.primaryQueueShard.RedisClient.kg.GlobalPartitionIndex()).Member(idA.String()).Build()).Error()
+		err = rc.Do(ctx, rc.B().Zrem().Key(shard.Client().kg.GlobalPartitionIndex()).Member(idA.String()).Build()).Error()
 		require.NoError(t, err)
 
 		// This should only select B and C, as id A is ignored and cleaned up:
-		items, err := q.partitionPeek(ctx, q.primaryQueueShard.RedisClient.kg.AccountPartitionIndex(accountId), true, time.Now().Add(time.Hour), PartitionPeekMax, &accountId)
+		items, err := shard.PeekAccountPartitions(ctx, accountId, osqueue.PartitionPeekMax, time.Now().Add(time.Hour), true)
 		require.NoError(t, err)
 		require.Len(t, items, 2)
-		require.EqualValues(t, []*QueuePartition{
+		require.EqualValues(t, []*osqueue.QueuePartition{
 			{ID: idB.String(), AccountID: accountId, FunctionID: &idB},
 			{ID: idC.String(), AccountID: accountId, FunctionID: &idC},
 		}, items)
@@ -1388,12 +1357,13 @@ func TestQueuePartitionRequeue(t *testing.T) {
 	defer rc.Close()
 
 	var enableKeyQueues bool
-	shard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey)}
-	q := NewQueue(
-		shard,
-		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+	clock := clockwork.NewFakeClock()
+	_, shard := newQueue(
+		t, rc,
+		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 			return enableKeyQueues
 		}),
+		osqueue.WithClock(clock),
 	)
 	ctx := context.Background()
 	idA := uuid.New()
@@ -1401,25 +1371,29 @@ func TestQueuePartitionRequeue(t *testing.T) {
 	accountID := uuid.New()
 
 	t.Run("For default items without concurrency settings", func(t *testing.T) {
-		qi, err := q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{FunctionID: idA}, now, osqueue.EnqueueOpts{})
+		qi, err := shard.EnqueueItem(ctx, osqueue.QueueItem{FunctionID: idA}, now, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
-		p := QueuePartition{FunctionID: &qi.FunctionID, EnvID: &qi.WorkspaceID}
+		p := osqueue.QueuePartition{
+			ID:         qi.FunctionID.String(),
+			FunctionID: &qi.FunctionID,
+			EnvID:      &qi.WorkspaceID,
+		}
 
 		t.Run("Uses the next job item's time when requeueing with another job", func(t *testing.T) {
 			requirePartitionScoreEquals(t, r, &idA, now)
 			next := now.Add(time.Hour)
-			err := q.PartitionRequeue(ctx, q.primaryQueueShard, &p, next, false)
+			err := shard.PartitionRequeue(ctx, &p, next, false)
 			require.NoError(t, err)
 			requirePartitionScoreEquals(t, r, &idA, now)
 		})
 
 		next := now.Add(5 * time.Second)
 		t.Run("It removes any lease when requeueing", func(t *testing.T) {
-			_, _, err := q.PartitionLease(ctx, &QueuePartition{FunctionID: &idA}, time.Minute)
+			_, _, err := shard.PartitionLease(ctx, &osqueue.QueuePartition{FunctionID: &idA}, time.Minute)
 			require.NoError(t, err)
 
-			err = q.PartitionRequeue(ctx, q.primaryQueueShard, &p, next, true)
+			err = shard.PartitionRequeue(ctx, &p, next, true)
 			require.NoError(t, err)
 			requirePartitionScoreEquals(t, r, &idA, next)
 
@@ -1433,7 +1407,7 @@ func TestQueuePartitionRequeue(t *testing.T) {
 				loaded := getDefaultPartition(t, r, idA)
 				require.NotEmpty(t, loaded.ForceAtMS)
 
-				qi, err := q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{FunctionID: idA}, now, osqueue.EnqueueOpts{})
+				qi, err := shard.EnqueueItem(ctx, osqueue.QueueItem{FunctionID: idA}, now, osqueue.EnqueueOpts{})
 
 				loaded = getDefaultPartition(t, r, idA)
 				require.NotEmpty(t, loaded.ForceAtMS)
@@ -1443,46 +1417,50 @@ func TestQueuePartitionRequeue(t *testing.T) {
 				requirePartitionScoreEquals(t, r, &idA, time.UnixMilli(loaded.ForceAtMS))
 
 				// Now remove this item, as we don't need it for any future tests.
-				err = q.Dequeue(ctx, q.primaryQueueShard, qi)
+				err = shard.Dequeue(ctx, qi)
 				require.NoError(t, err)
 			})
 		})
 
 		t.Run("It returns a partition not found error if deleted", func(t *testing.T) {
-			err := q.Dequeue(ctx, q.primaryQueueShard, qi)
+			err := shard.Dequeue(ctx, qi)
 			require.NoError(t, err)
 
-			err = q.PartitionRequeue(ctx, q.primaryQueueShard, &p, time.Now().Add(time.Minute), false)
-			require.Equal(t, ErrPartitionGarbageCollected, err)
+			err = shard.PartitionRequeue(ctx, &p, time.Now().Add(time.Minute), false)
+			require.Equal(t, osqueue.ErrPartitionGarbageCollected, err)
 
 			// ensure gc also drops fn metadata
-			require.False(t, r.Exists(q.primaryQueueShard.RedisClient.kg.FnMetadata(*p.FunctionID)))
+			require.False(t, r.Exists(shard.Client().kg.FnMetadata(*p.FunctionID)))
 
-			err = q.PartitionRequeue(ctx, q.primaryQueueShard, &p, time.Now().Add(time.Minute), false)
-			require.Equal(t, ErrPartitionNotFound, err)
+			err = shard.PartitionRequeue(ctx, &p, time.Now().Add(time.Minute), false)
+			require.Equal(t, osqueue.ErrPartitionNotFound, err)
 		})
 
-		// We no longer delete queues on requeue when the concurrency queue is not empty;  this should happen on a final dequeue.
-		t.Run("Does not garbage collect the partition with a non-empty concurrency queue", func(t *testing.T) {
+		// We no longer delete queues on requeue when the partition scavenger index is not empty;  this should happen on a final dequeue.
+		t.Run("Does not garbage collect the partition with a non-empty partition scavenger index", func(t *testing.T) {
 			r.FlushAll()
 
-			now := time.Now()
+			now := clock.Now()
 			next = now.Add(10 * time.Second)
 
-			qi, err := q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{FunctionID: idA}, now, osqueue.EnqueueOpts{})
+			qi, err := shard.EnqueueItem(ctx, osqueue.QueueItem{FunctionID: idA}, now, osqueue.EnqueueOpts{})
 			require.NoError(t, err)
 
 			requirePartitionScoreEquals(t, r, &idA, now)
 
-			// Move the queue item to the concurrency (in-progress) queue
-			_, err = q.Lease(ctx, qi, 10*time.Second, q.clock.Now(), nil)
+			// Simulate processing queue item, add to partition scavenger index
+			_, err = shard.Lease(ctx, qi, 10*time.Second, clock.Now(), nil)
 			require.NoError(t, err)
+			kg := shard.Client().kg
+			require.True(t, r.Exists(kg.PartitionScavengerIndex(idA.String())))
 
 			next = now.Add(time.Hour)
 
+			t.Log(p.ID)
+
 			// Requeuing cannot gc until queue item finishes processing
-			err = q.PartitionRequeue(ctx, q.primaryQueueShard, &p, next, false)
-			require.NoError(t, err)
+			err = shard.PartitionRequeue(ctx, &p, next, false)
+			require.NoError(t, err, r.Dump())
 
 			// So the partition metadata should still exist
 			loaded := getDefaultPartition(t, r, idA)
@@ -1515,62 +1493,59 @@ func TestQueuePartitionRequeue(t *testing.T) {
 				},
 			}
 
-			fnPart, custom1, _ := q.ItemPartitions(ctx, q.primaryQueueShard, item)
-
-			originalPart := custom1
-			require.Equal(t, "{queue}:concurrency:custom:a:4d59bf95-28b6-5423-b1a8-604046826e33:3cwxlkg53rr2c", originalPart.concurrencyKey(q.primaryQueueShard.RedisClient.kg))
+			fnPart := osqueue.ItemPartition(ctx, item)
 
 			// Originally, this test was designed to run on concurrency key queues. Since we don't enqueue these anymore,
 			// p has been changed to the default function partition.
 			p := fnPart
 
-			item, err := q.EnqueueItem(ctx, q.primaryQueueShard, item, now, osqueue.EnqueueOpts{})
+			item, err := shard.EnqueueItem(ctx, item, now, osqueue.EnqueueOpts{})
 			require.NoError(t, err)
 
 			t.Run("Uses the next job item's time when requeueing with another job", func(t *testing.T) {
 				t.Skip("This test is not applicable to the current system, as we do not update pointers for key queues")
-				requireGlobalPartitionScore(t, r, p.zsetKey(q.primaryQueueShard.RedisClient.kg), now)
+				requireGlobalPartitionScore(t, r, partitionZsetKey(p, shard.Client().kg), now)
 				next := now.Add(time.Hour)
-				err := q.PartitionRequeue(ctx, q.primaryQueueShard, &p, next, false)
+				err := shard.PartitionRequeue(ctx, &p, next, false)
 				require.NoError(t, err)
 				// This should still be now(), as we're not forcing "next" and the earliest job is still now.
-				requireGlobalPartitionScore(t, r, p.zsetKey(q.primaryQueueShard.RedisClient.kg), now)
+				requireGlobalPartitionScore(t, r, partitionZsetKey(p, shard.Client().kg), now)
 			})
 
 			t.Run("Forces a custom partition with `force` set to true", func(t *testing.T) {
 				t.Skip("This test is not applicable to the current system, as we do not update pointers for key queues")
-				requireGlobalPartitionScore(t, r, p.zsetKey(q.primaryQueueShard.RedisClient.kg), now)
+				requireGlobalPartitionScore(t, r, partitionZsetKey(p, shard.Client().kg), now)
 				next := now.Add(time.Hour)
-				err := q.PartitionRequeue(ctx, q.primaryQueueShard, &p, next, true)
+				err := shard.PartitionRequeue(ctx, &p, next, true)
 				require.NoError(t, err)
-				requireGlobalPartitionScore(t, r, p.zsetKey(q.primaryQueueShard.RedisClient.kg), next)
+				requireGlobalPartitionScore(t, r, partitionZsetKey(p, shard.Client().kg), next)
 			})
 
 			t.Run("Sets back to next job with force: false", func(t *testing.T) {
 				t.Skip("This test is not applicable to the current system, as we do not update pointers for key queues")
-				err := q.PartitionRequeue(ctx, q.primaryQueueShard, &p, time.Now(), false)
+				err := shard.PartitionRequeue(ctx, &p, time.Now(), false)
 				require.NoError(t, err)
-				requireGlobalPartitionScore(t, r, p.zsetKey(q.primaryQueueShard.RedisClient.kg), now)
+				requireGlobalPartitionScore(t, r, partitionZsetKey(p, shard.Client().kg), now)
 			})
 
 			t.Run("It doesn't dequeue the partition with an in-progress job", func(t *testing.T) {
-				id, err := q.Lease(ctx, item, 10*time.Second, q.clock.Now(), nil)
+				id, err := shard.Lease(ctx, item, 10*time.Second, clock.Now(), nil)
 				require.NoError(t, err)
 				require.NotNil(t, id)
 
 				next := now.Add(time.Minute)
 
-				err = q.PartitionRequeue(ctx, q.primaryQueueShard, &p, next, false)
+				err = shard.PartitionRequeue(ctx, &p, next, false)
 				require.NoError(t, err)
 
 				// We do not set the global partition score for key queues
-				require.False(t, r.Exists(p.zsetKey(q.primaryQueueShard.RedisClient.kg)))
+				require.False(t, r.Exists(partitionZsetKey(p, shard.Client().kg)))
 
 				t.Run("With an empty queue the zset is deleted", func(t *testing.T) {
-					err := q.Dequeue(ctx, q.primaryQueueShard, item)
+					err := shard.Dequeue(ctx, item)
 					require.NoError(t, err)
-					err = q.PartitionRequeue(ctx, q.primaryQueueShard, &p, next, false)
-					require.Error(t, ErrPartitionGarbageCollected, err)
+					err = shard.PartitionRequeue(ctx, &p, next, false)
+					require.Error(t, osqueue.ErrPartitionGarbageCollected, err)
 				})
 			})
 		})
@@ -1583,18 +1558,18 @@ func TestQueuePartitionRequeue(t *testing.T) {
 		// Setup: Enqueue 2 items, one to backlog, one to ready queue
 		//
 
-		qi, err := q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{FunctionID: idA, Data: osqueue.Item{Identifier: state.Identifier{AccountID: accountID, WorkflowID: idA}}}, now, osqueue.EnqueueOpts{})
+		qi, err := shard.EnqueueItem(ctx, osqueue.QueueItem{FunctionID: idA, Data: osqueue.Item{Identifier: state.Identifier{AccountID: accountID, WorkflowID: idA}}}, now, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
-		fnReadyQueue := shard.RedisClient.kg.PartitionQueueSet(enums.PartitionTypeDefault, idA.String(), "")
+		fnReadyQueue := shard.Client().kg.PartitionQueueSet(enums.PartitionTypeDefault, idA.String(), "")
 
 		require.True(t, r.Exists(fnReadyQueue))
-		require.True(t, r.Exists(shard.RedisClient.kg.GlobalPartitionIndex()))
-		require.True(t, r.Exists(shard.RedisClient.kg.AccountPartitionIndex(accountID)))
-		require.True(t, r.Exists(shard.RedisClient.kg.GlobalAccountIndex()))
+		require.True(t, r.Exists(shard.Client().kg.GlobalPartitionIndex()))
+		require.True(t, r.Exists(shard.Client().kg.AccountPartitionIndex(accountID)))
+		require.True(t, r.Exists(shard.Client().kg.GlobalAccountIndex()))
 
 		enableKeyQueues = true
-		qi2, err := q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{
+		qi2, err := shard.EnqueueItem(ctx, osqueue.QueueItem{
 			FunctionID: idA,
 			Data: osqueue.Item{
 				Kind: osqueue.KindEdge,
@@ -1607,14 +1582,14 @@ func TestQueuePartitionRequeue(t *testing.T) {
 		require.NoError(t, err)
 		enableKeyQueues = false
 
-		backlog := q.ItemBacklog(ctx, qi2)
-		shadowPart := q.ItemShadowPartition(ctx, qi2)
+		backlog := osqueue.ItemBacklog(ctx, qi2)
+		shadowPart := osqueue.ItemShadowPartition(ctx, qi2)
 
-		require.True(t, r.Exists(shard.RedisClient.kg.BacklogSet(backlog.BacklogID)))
-		require.True(t, r.Exists(shard.RedisClient.kg.ShadowPartitionSet(backlog.ShadowPartitionID)))
+		require.True(t, r.Exists(shard.Client().kg.BacklogSet(backlog.BacklogID)))
+		require.True(t, r.Exists(shard.Client().kg.ShadowPartitionSet(backlog.ShadowPartitionID)))
 		require.Equal(t, 1, zcard(t, rc, fnReadyQueue))
 
-		p := q.ItemPartition(ctx, shard, qi)
+		p := osqueue.ItemPartition(ctx, qi)
 		require.Equal(t, idA.String(), p.ID)
 		require.Equal(t, accountID, p.AccountID)
 
@@ -1622,35 +1597,35 @@ func TestQueuePartitionRequeue(t *testing.T) {
 		// Dequeue item from ready queue, only backlog remains
 		//
 
-		err = q.Dequeue(ctx, q.primaryQueueShard, qi)
+		err = shard.Dequeue(ctx, qi)
 		require.NoError(t, err)
 
 		require.Equal(t, 0, zcard(t, rc, fnReadyQueue))
-		require.True(t, r.Exists(shard.RedisClient.kg.GlobalPartitionIndex()))
-		require.True(t, r.Exists(shard.RedisClient.kg.AccountPartitionIndex(accountID)))
-		require.True(t, r.Exists(shard.RedisClient.kg.GlobalAccountIndex()))
+		require.True(t, r.Exists(shard.Client().kg.GlobalPartitionIndex()))
+		require.True(t, r.Exists(shard.Client().kg.AccountPartitionIndex(accountID)))
+		require.True(t, r.Exists(shard.Client().kg.GlobalAccountIndex()))
 
 		// do not expect function metadata to be set anymore
-		require.False(t, r.Exists(shard.RedisClient.kg.FnMetadata(*p.FunctionID)), r.Keys())
+		require.False(t, r.Exists(shard.Client().kg.FnMetadata(*p.FunctionID)), r.Keys())
 
 		//
 		// PartitionRequeue should drop pointers but not partition metadata
 		//
 
-		err = q.PartitionRequeue(ctx, q.primaryQueueShard, &p, now.Add(time.Minute), false)
-		require.Equal(t, ErrPartitionGarbageCollected, err)
+		err = shard.PartitionRequeue(ctx, &p, now.Add(time.Minute), false)
+		require.Equal(t, osqueue.ErrPartitionGarbageCollected, err)
 
 		require.Equal(t, 0, zcard(t, rc, fnReadyQueue))
-		require.False(t, r.Exists(shard.RedisClient.kg.GlobalPartitionIndex()))
-		require.False(t, r.Exists(shard.RedisClient.kg.AccountPartitionIndex(accountID)))
-		require.False(t, r.Exists(shard.RedisClient.kg.GlobalAccountIndex()))
+		require.False(t, r.Exists(shard.Client().kg.GlobalPartitionIndex()))
+		require.False(t, r.Exists(shard.Client().kg.AccountPartitionIndex(accountID)))
+		require.False(t, r.Exists(shard.Client().kg.GlobalAccountIndex()))
 
 		// fn metadata still should not exist
-		require.False(t, r.Exists(shard.RedisClient.kg.FnMetadata(*p.FunctionID)), r.Keys())
+		require.False(t, r.Exists(shard.Client().kg.FnMetadata(*p.FunctionID)), r.Keys())
 
 		// ensure gc does not drop partition item yet
-		require.True(t, r.Exists(shard.RedisClient.kg.PartitionItem()))
-		keys, err := r.HKeys(shard.RedisClient.kg.PartitionItem())
+		require.True(t, r.Exists(shard.Client().kg.PartitionItem()))
+		keys, err := r.HKeys(shard.Client().kg.PartitionItem())
 		require.NoError(t, err)
 		require.Contains(t, keys, p.FunctionID.String())
 
@@ -1660,21 +1635,21 @@ func TestQueuePartitionRequeue(t *testing.T) {
 
 		// drop backlog
 		// Get items to refill from backlog
-		itemIDs, err := getItemIDsFromBacklog(ctx, q, &backlog, time.Now().Add(time.Minute), 1000)
+		itemIDs, err := getItemIDsFromBacklog(ctx, shard, &backlog, time.Now().Add(time.Minute), 1000)
 		require.NoError(t, err)
 
-		res, err := q.BacklogRefill(ctx, &backlog, &shadowPart, time.Now().Add(time.Minute), itemIDs, PartitionConstraintConfig{})
+		res, err := shard.BacklogRefill(ctx, &backlog, &shadowPart, time.Now().Add(time.Minute), itemIDs, osqueue.PartitionConstraintConfig{})
 		require.NoError(t, err)
 		require.Equal(t, 1, res.Refilled)
 
-		err = q.Dequeue(ctx, shard, qi2)
+		err = shard.Dequeue(ctx, qi2)
 		require.NoError(t, err)
 
-		err = q.PartitionRequeue(ctx, shard, &p, now.Add(time.Minute), false)
-		require.Equal(t, ErrPartitionGarbageCollected, err)
+		err = shard.PartitionRequeue(ctx, &p, now.Add(time.Minute), false)
+		require.Equal(t, osqueue.ErrPartitionGarbageCollected, err)
 
-		require.False(t, r.Exists(shard.RedisClient.kg.FnMetadata(*p.FunctionID)))
-		require.False(t, r.Exists(shard.RedisClient.kg.PartitionItem()))
+		require.False(t, r.Exists(shard.Client().kg.FnMetadata(*p.FunctionID)))
+		require.False(t, r.Exists(shard.Client().kg.PartitionItem()))
 	})
 }
 
@@ -1689,15 +1664,13 @@ func TestQueueFunctionPause(t *testing.T) {
 
 	var paused bool
 
-	shard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey)}
-	kg := shard.RedisClient.KeyGenerator()
-	q := NewQueue(
-		shard,
-		WithPartitionPriorityFinder(func(_ context.Context, _ QueuePartition) uint {
-			return PriorityDefault
+	q, shard := newQueue(
+		t, rc,
+		osqueue.WithPartitionPriorityFinder(func(_ context.Context, _ osqueue.QueuePartition) uint {
+			return osqueue.PriorityDefault
 		}),
-		WithPartitionPausedGetter(func(ctx context.Context, fnID uuid.UUID) PartitionPausedInfo {
-			return PartitionPausedInfo{
+		osqueue.WithPartitionPausedGetter(func(ctx context.Context, fnID uuid.UUID) osqueue.PartitionPausedInfo {
+			return osqueue.PartitionPausedInfo{
 				Paused: paused,
 			}
 		}),
@@ -1706,21 +1679,21 @@ func TestQueueFunctionPause(t *testing.T) {
 
 	now := time.Now().Truncate(time.Second)
 	idA := uuid.New()
-	_, err = q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{FunctionID: idA}, now, osqueue.EnqueueOpts{})
+	_, err = shard.EnqueueItem(ctx, osqueue.QueueItem{FunctionID: idA}, now, osqueue.EnqueueOpts{})
 	require.NoError(t, err)
 
 	paused = true
 
-	peeked, err := q.partitionPeek(ctx, kg.GlobalPartitionIndex(), true, now.Add(5*time.Minute), 100, nil)
+	peeked, err := shard.PeekGlobalPartitions(ctx, 100, now.Add(5*time.Minute), true)
 	require.NoError(t, err)
 	require.Len(t, peeked, 0)
 
 	paused = false
 
-	err = q.UnpauseFunction(ctx, shard.Name, uuid.Nil, idA)
+	err = q.UnpauseFunction(ctx, shard.Name(), uuid.Nil, idA)
 	require.NoError(t, err)
 
-	peeked, err = q.partitionPeek(ctx, kg.GlobalPartitionIndex(), true, now.Add(5*time.Minute), 100, nil)
+	peeked, err = shard.PeekGlobalPartitions(ctx, 100, now.Add(5*time.Minute), true)
 	require.NoError(t, err)
 	require.Len(t, peeked, 1)
 	require.Equal(t, idA, *peeked[0].FunctionID)
@@ -1736,21 +1709,20 @@ func TestQueueSetFunctionMigrate(t *testing.T) {
 	defer rc.Close()
 
 	t.Run("with default shard", func(t *testing.T) {
-		shard := QueueShard{Name: "default", Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey)}
-		kg := shard.RedisClient.kg
-		q := NewQueue(
-			shard,
-			WithPartitionPriorityFinder(func(ctx context.Context, part QueuePartition) uint {
-				return PriorityDefault
+		q, shard := newQueue(
+			t, rc,
+			osqueue.WithPartitionPriorityFinder(func(ctx context.Context, part osqueue.QueuePartition) uint {
+				return osqueue.PriorityDefault
 			}),
 		)
+		kg := shard.Client().kg
 		ctx := context.Background()
 
 		acctID := uuid.New()
 		now := time.Now().Truncate(time.Second)
 		fnID := uuid.New()
 		id := state.Identifier{AccountID: acctID, WorkflowID: fnID}
-		_, err = q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{FunctionID: fnID, Data: osqueue.Item{Identifier: id}}, now, osqueue.EnqueueOpts{})
+		_, err = shard.EnqueueItem(ctx, osqueue.QueueItem{FunctionID: fnID, Data: osqueue.Item{Identifier: id}}, now, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
 		lockUntil := now.Add(10 * time.Minute)
@@ -1770,29 +1742,29 @@ func TestQueueSetFunctionMigrate(t *testing.T) {
 	})
 
 	t.Run("with key queues", func(t *testing.T) {
-		shard := QueueShard{Name: "default", Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey)}
-		q := NewQueue(
-			shard,
-			WithPartitionPriorityFinder(func(ctx context.Context, part QueuePartition) uint {
-				return PriorityDefault
+		q, shard := newQueue(
+			t, rc,
+			osqueue.WithPartitionPriorityFinder(func(ctx context.Context, part osqueue.QueuePartition) uint {
+				return osqueue.PriorityDefault
 			}),
-			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 				return true
 			}),
 		)
+		kg := shard.Client().kg
 		ctx := context.Background()
 
 		acctID := uuid.New()
 		now := time.Now().Truncate(time.Second)
 		fnID := uuid.New()
 		id := state.Identifier{AccountID: acctID, WorkflowID: fnID}
-		_, err = q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{FunctionID: fnID, Data: osqueue.Item{Identifier: id}}, now, osqueue.EnqueueOpts{})
+		_, err = shard.EnqueueItem(ctx, osqueue.QueueItem{FunctionID: fnID, Data: osqueue.Item{Identifier: id}}, now, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
-		getShadowPartition := func() QueueShadowPartition {
-			var sp QueueShadowPartition
+		getShadowPartition := func() osqueue.QueueShadowPartition {
+			var sp osqueue.QueueShadowPartition
 
-			str, err := rc.Do(ctx, rc.B().Hget().Key(q.primaryQueueShard.RedisClient.kg.ShadowPartitionMeta()).Field(fnID.String()).Build()).ToString()
+			str, err := rc.Do(ctx, rc.B().Hget().Key(kg.ShadowPartitionMeta()).Field(fnID.String()).Build()).ToString()
 			require.NoError(t, err)
 
 			require.NoError(t, json.Unmarshal([]byte(str), &sp))
@@ -1802,7 +1774,7 @@ func TestQueueSetFunctionMigrate(t *testing.T) {
 		sp := getShadowPartition()
 		require.Equal(t, fnID.String(), sp.PartitionID)
 
-		lockedUntil, err := q.isMigrationLocked(ctx, shard, fnID)
+		lockedUntil, err := shard.IsMigrationLocked(ctx, fnID)
 		require.NoError(t, err)
 		require.Nil(t, lockedUntil)
 
@@ -1810,7 +1782,7 @@ func TestQueueSetFunctionMigrate(t *testing.T) {
 		err = q.SetFunctionMigrate(ctx, "default", fnID, &lockUntil)
 		require.NoError(t, err)
 
-		lockedUntil, err = q.isMigrationLocked(ctx, shard, fnID)
+		lockedUntil, err = shard.IsMigrationLocked(ctx, fnID)
 		require.NoError(t, err)
 		require.NotNil(t, lockedUntil)
 		require.Equal(t, lockUntil, *lockedUntil)
@@ -1819,7 +1791,7 @@ func TestQueueSetFunctionMigrate(t *testing.T) {
 		err = q.SetFunctionMigrate(ctx, "default", fnID, nil)
 		require.NoError(t, err)
 
-		lockedUntil, err = q.isMigrationLocked(ctx, shard, fnID)
+		lockedUntil, err = shard.IsMigrationLocked(ctx, fnID)
 		require.NoError(t, err)
 		require.Nil(t, lockedUntil)
 	})
@@ -1830,26 +1802,28 @@ func TestQueueSetFunctionMigrate(t *testing.T) {
 		require.NoError(t, err)
 		defer rc2.Close()
 
-		yoloShard := QueueShard{Name: "yolo", Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc2, QueueDefaultKey)}
-		defaultShard := QueueShard{Name: "default", Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey)}
+		yoloShard := shardFromClient("yolo", rc2)
+		defaultShard := shardFromClient("default", rc)
 
-		q := NewQueue(
+		shardMap := mapFromShards(yoloShard, defaultShard)
+
+		q, err := osqueue.New(
+			context.Background(),
+			"test-queue",
 			defaultShard,
-			WithQueueShardClients(map[string]QueueShard{
-				"yolo":                       yoloShard,
-				consts.DefaultQueueShardName: defaultShard,
-			}),
-			WithPartitionPriorityFinder(func(ctx context.Context, part QueuePartition) uint {
-				return PriorityDefault
-			}),
+			shardMap,
+			func(ctx context.Context, accountId uuid.UUID, queueName *string) (osqueue.QueueShard, error) {
+				return defaultShard, nil
+			},
 		)
+		require.NoError(t, err)
 
 		ctx := context.Background()
 		acctID := uuid.New()
 		now := time.Now().Truncate(time.Second)
 		fnID := uuid.New()
 		id := state.Identifier{AccountID: acctID, WorkflowID: fnID}
-		_, err = q.EnqueueItem(ctx, yoloShard, osqueue.QueueItem{FunctionID: fnID, Data: osqueue.Item{Identifier: id}}, now, osqueue.EnqueueOpts{})
+		_, err = yoloShard.EnqueueItem(ctx, osqueue.QueueItem{FunctionID: fnID, Data: osqueue.Item{Identifier: id}}, now, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
 		lockUntil := now.Add(10 * time.Minute)
@@ -1857,12 +1831,12 @@ func TestQueueSetFunctionMigrate(t *testing.T) {
 		require.NoError(t, err)
 
 		// should not find it in the default shard
-		lockedUntil, err := q.isMigrationLocked(ctx, defaultShard, fnID)
+		lockedUntil, err := defaultShard.IsMigrationLocked(ctx, fnID)
 		require.NoError(t, err)
 		require.Nil(t, lockedUntil)
 
 		// should find metadata in the other shard
-		lockedUntil, err = q.isMigrationLocked(ctx, yoloShard, fnID)
+		lockedUntil, err = yoloShard.IsMigrationLocked(ctx, fnID)
 		require.NoError(t, err)
 		require.Equal(t, lockUntil, *lockedUntil)
 	})
@@ -1926,20 +1900,20 @@ func TestQueueRequeueByJobID(t *testing.T) {
 	require.NoError(t, err)
 	defer rc.Close()
 
-	q := NewQueue(QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey)})
-	q.ppf = func(ctx context.Context, p QueuePartition) uint {
-		return PriorityMin
-	}
-	q.partitionConstraintConfigGetter = func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
-		return PartitionConstraintConfig{
-			Concurrency: PartitionConcurrency{
-				AccountConcurrency:  100,
-				FunctionConcurrency: 100,
-			},
-		}
-	}
-	q.itemIndexer = QueueItemIndexerFunc
-	q.clock = clockwork.NewRealClock()
+	_, shard := newQueue(t, rc,
+		osqueue.WithPartitionPriorityFinder(func(ctx context.Context, part osqueue.QueuePartition) uint {
+			return osqueue.PriorityMin
+		}),
+		osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
+			return osqueue.PartitionConstraintConfig{
+				Concurrency: osqueue.PartitionConcurrency{
+					AccountConcurrency:  100,
+					FunctionConcurrency: 100,
+				},
+			}
+		}),
+		osqueue.WithClock(clockwork.NewRealClock()),
+	)
 
 	wsA := uuid.New()
 
@@ -1953,10 +1927,10 @@ func TestQueueRequeueByJobID(t *testing.T) {
 				FunctionID:  wsA,
 				WorkspaceID: wsA,
 			}
-			_, err := q.EnqueueItem(ctx, q.primaryQueueShard, item, time.Now().Add(time.Second), osqueue.EnqueueOpts{})
+			_, err := shard.EnqueueItem(ctx, item, time.Now().Add(time.Second), osqueue.EnqueueOpts{})
 			require.NoError(t, err)
 
-			err = q.RequeueByJobID(ctx, q.primaryQueueShard, "no bruv", time.Now().Add(5*time.Second))
+			err = shard.RequeueByJobID(ctx, "no bruv", time.Now().Add(5*time.Second))
 			require.NotNil(t, err)
 		})
 
@@ -1970,19 +1944,19 @@ func TestQueueRequeueByJobID(t *testing.T) {
 				WorkspaceID: wsA,
 			}
 
-			item, err := q.EnqueueItem(ctx, q.primaryQueueShard, item, time.Now().Add(time.Second), osqueue.EnqueueOpts{})
+			item, err := shard.EnqueueItem(ctx, item, time.Now().Add(time.Second), osqueue.EnqueueOpts{})
 			require.NoError(t, err)
 
-			partitions, err := q.PartitionPeek(ctx, true, time.Now().Add(5*time.Second), 10)
+			partitions, err := shard.PartitionPeek(ctx, true, time.Now().Add(5*time.Second), 10)
 			require.NoError(t, err)
 			require.Equal(t, 1, len(partitions))
 
 			// Lease
-			lid, err := q.Lease(ctx, item, time.Second*10, time.Now(), nil)
+			lid, err := shard.Lease(ctx, item, time.Second*10, time.Now(), nil)
 			require.NoError(t, err)
 			require.NotNil(t, lid)
 
-			err = q.RequeueByJobID(ctx, q.primaryQueueShard, jid, time.Now().Add(5*time.Second))
+			err = shard.RequeueByJobID(ctx, jid, time.Now().Add(5*time.Second))
 			require.NotNil(t, err)
 		})
 	})
@@ -1998,22 +1972,22 @@ func TestQueueRequeueByJobID(t *testing.T) {
 			WorkspaceID: wsA,
 			AtMS:        at.UnixMilli(),
 		}
-		item, err := q.EnqueueItem(ctx, q.primaryQueueShard, item, at, osqueue.EnqueueOpts{})
+		item, err := shard.EnqueueItem(ctx, item, at, osqueue.EnqueueOpts{})
 		require.Equal(t, time.UnixMilli(item.WallTimeMS), at)
 		require.NoError(t, err)
 
 		// Find all functions
-		parts, err := q.PartitionPeek(ctx, true, at.Add(time.Hour), 10)
+		parts, err := shard.PartitionPeek(ctx, true, at.Add(time.Hour), 10)
 		require.NoError(t, err)
 		require.Equal(t, 1, len(parts))
 
 		// Requeue the function for 5 seconds in the future.
 		next := at.Add(5 * time.Second)
-		err = q.RequeueByJobID(ctx, q.primaryQueueShard, jid, next)
+		err = shard.RequeueByJobID(ctx, jid, next)
 		require.Nil(t, err, r.Dump())
 
 		t.Run("It updates the queue's At time", func(t *testing.T) {
-			found, err := q.Peek(ctx, &QueuePartition{FunctionID: &wsA}, at.Add(10*time.Second), 5)
+			found, err := shard.Peek(ctx, &osqueue.QueuePartition{FunctionID: &wsA}, at.Add(10*time.Second), 5)
 			require.NoError(t, err)
 			require.Equal(t, 1, len(found))
 			require.NotEqual(t, item.AtMS, found[0].AtMS)
@@ -2025,11 +1999,11 @@ func TestQueueRequeueByJobID(t *testing.T) {
 		t.Run("Requeueing updates the fn's score in the global partition index", func(t *testing.T) {
 			// We've already requeued the item, for 5 seconds in the future.
 			// The function pointer in the global queue should be 5 seconds ahead.
-			fnPtrsAfterRequeue, err := q.PartitionPeek(ctx, true, at.Add(time.Hour), 10)
+			fnPtrsAfterRequeue, err := shard.PartitionPeek(ctx, true, at.Add(time.Hour), 10)
 			require.NoError(t, err)
 			require.Equal(t, 1, len(fnPtrsAfterRequeue))
 
-			score, err := r.ZScore(q.primaryQueueShard.RedisClient.kg.GlobalPartitionIndex(), wsA.String())
+			score, err := r.ZScore(shard.Client().kg.GlobalPartitionIndex(), wsA.String())
 			require.NoError(t, err)
 
 			// The score should have updated.
@@ -2048,7 +2022,7 @@ func TestQueueRequeueByJobID(t *testing.T) {
 				WorkspaceID: wsA,
 				AtMS:        next.UnixMilli(),
 			}
-			_, err := q.EnqueueItem(ctx, q.primaryQueueShard, item, next, osqueue.EnqueueOpts{})
+			_, err := shard.EnqueueItem(ctx, item, next, osqueue.EnqueueOpts{})
 			require.NoError(t, err)
 		}
 
@@ -2060,31 +2034,31 @@ func TestQueueRequeueByJobID(t *testing.T) {
 			WorkspaceID: wsA,
 			AtMS:        target.UnixMilli(),
 		}
-		_, err := q.EnqueueItem(ctx, q.primaryQueueShard, item, target, osqueue.EnqueueOpts{})
+		_, err := shard.EnqueueItem(ctx, item, target, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
-		parts, err := q.PartitionPeek(ctx, true, at.Add(time.Hour), 10)
+		parts, err := shard.PartitionPeek(ctx, true, at.Add(time.Hour), 10)
 		require.NoError(t, err)
 		require.Equal(t, 1, len(parts))
 
 		t.Run("The earliest time is 'at' for the partition", func(t *testing.T) {
-			score, err := r.ZScore(q.primaryQueueShard.RedisClient.kg.GlobalPartitionIndex(), wsA.String())
+			score, err := r.ZScore(shard.Client().kg.GlobalPartitionIndex(), wsA.String())
 			require.NoError(t, err)
 			require.EqualValues(t, at.Unix(), int64(score), r.Dump())
 		})
 
 		next := target.Add(5 * time.Second)
-		err = q.RequeueByJobID(ctx, q.primaryQueueShard, jid, next)
+		err = shard.RequeueByJobID(ctx, jid, next)
 		require.Nil(t, err, r.Dump())
 
 		t.Run("The earliest time is still 'at' for the partition after requeueing", func(t *testing.T) {
-			score, err := r.ZScore(q.primaryQueueShard.RedisClient.kg.GlobalPartitionIndex(), wsA.String())
+			score, err := r.ZScore(shard.Client().kg.GlobalPartitionIndex(), wsA.String())
 			require.NoError(t, err)
 			require.EqualValues(t, at.Unix(), int64(score), r.Dump())
 		})
 
 		t.Run("It updates the queue's At time", func(t *testing.T) {
-			found, err := q.Peek(ctx, &QueuePartition{FunctionID: &wsA}, at.Add(30*time.Second), 5)
+			found, err := shard.Peek(ctx, &osqueue.QueuePartition{FunctionID: &wsA}, at.Add(30*time.Second), 5)
 			require.NoError(t, err)
 			require.Equal(t, 5, len(found))
 			require.Equal(t, at.UnixMilli(), found[0].AtMS, "First job shouldn't change")
@@ -2103,7 +2077,7 @@ func TestQueueRequeueByJobID(t *testing.T) {
 				WorkspaceID: wsA,
 				AtMS:        next.UnixMilli(),
 			}
-			_, err := q.EnqueueItem(ctx, q.primaryQueueShard, item, next, osqueue.EnqueueOpts{})
+			_, err := shard.EnqueueItem(ctx, item, next, osqueue.EnqueueOpts{})
 			require.NoError(t, err)
 		}
 
@@ -2115,25 +2089,25 @@ func TestQueueRequeueByJobID(t *testing.T) {
 			WorkspaceID: wsA,
 			AtMS:        target.UnixMilli(),
 		}
-		_, err := q.EnqueueItem(ctx, q.primaryQueueShard, item, target, osqueue.EnqueueOpts{})
+		_, err := shard.EnqueueItem(ctx, item, target, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
-		parts, err := q.PartitionPeek(ctx, true, at.Add(time.Hour), 10)
+		parts, err := shard.PartitionPeek(ctx, true, at.Add(time.Hour), 10)
 		require.NoError(t, err)
 		require.Equal(t, 1, len(parts))
 
 		t.Run("The earliest time is 'target' for the partition", func(t *testing.T) {
-			score, err := r.ZScore(q.primaryQueueShard.RedisClient.kg.GlobalPartitionIndex(), wsA.String())
+			score, err := r.ZScore(shard.Client().kg.GlobalPartitionIndex(), wsA.String())
 			require.NoError(t, err)
 			require.EqualValues(t, target.Unix(), int64(score), r.Dump())
 		})
 
 		next := target.Add(5 * time.Second)
-		err = q.RequeueByJobID(ctx, q.primaryQueueShard, jid, next)
+		err = shard.RequeueByJobID(ctx, jid, next)
 		require.Nil(t, err, r.Dump())
 
 		t.Run("The earliest time is 'next' for the partition after requeueing", func(t *testing.T) {
-			score, err := r.ZScore(q.primaryQueueShard.RedisClient.kg.GlobalPartitionIndex(), wsA.String())
+			score, err := r.ZScore(shard.Client().kg.GlobalPartitionIndex(), wsA.String())
 			require.NoError(t, err)
 			require.EqualValues(t, next.Unix(), int64(score), r.Dump())
 		})
@@ -2151,36 +2125,29 @@ func TestQueueLeaseSequential(t *testing.T) {
 	require.NoError(t, err)
 	defer rc.Close()
 
-	qc := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey)}
-	q := queue{
-		primaryQueueShard: qc,
-		ppf: func(ctx context.Context, p QueuePartition) uint {
-			return PriorityMin
-		},
-		clock: clockwork.NewRealClock(),
-	}
+	_, shard := newQueue(t, rc)
 
 	var leaseID *ulid.ULID
 
 	t.Run("It claims sequential leases", func(t *testing.T) {
 		now := time.Now()
 		dur := 500 * time.Millisecond
-		leaseID, err = q.ConfigLease(ctx, q.primaryQueueShard.RedisClient.kg.Sequential(), dur)
+		leaseID, err = shard.ConfigLease(ctx, "sequential", dur)
 		require.NoError(t, err)
 		require.NotNil(t, leaseID)
 		require.WithinDuration(t, now.Add(dur), ulid.Time(leaseID.Time()), 5*time.Millisecond)
 	})
 
 	t.Run("It doesn't allow leasing without an existing lease ID", func(t *testing.T) {
-		id, err := q.ConfigLease(ctx, q.primaryQueueShard.RedisClient.kg.Sequential(), time.Second)
-		require.Equal(t, ErrConfigAlreadyLeased, err)
+		id, err := shard.ConfigLease(ctx, "sequential", time.Second)
+		require.Equal(t, osqueue.ErrConfigAlreadyLeased, err)
 		require.Nil(t, id)
 	})
 
 	t.Run("It doesn't allow leasing with an invalid lease ID", func(t *testing.T) {
 		newULID := ulid.MustNew(ulid.Now(), rnd)
-		id, err := q.ConfigLease(ctx, q.primaryQueueShard.RedisClient.kg.Sequential(), time.Second, &newULID)
-		require.Equal(t, ErrConfigAlreadyLeased, err)
+		id, err := shard.ConfigLease(ctx, "sequential", time.Second, &newULID)
+		require.Equal(t, osqueue.ErrConfigAlreadyLeased, err)
 		require.Nil(t, id)
 	})
 
@@ -2189,7 +2156,7 @@ func TestQueueLeaseSequential(t *testing.T) {
 
 		now := time.Now()
 		dur := 50 * time.Millisecond
-		leaseID, err = q.ConfigLease(ctx, q.primaryQueueShard.RedisClient.kg.Sequential(), dur, leaseID)
+		leaseID, err = shard.ConfigLease(ctx, "sequential", dur, leaseID)
 		require.NoError(t, err)
 		require.NotNil(t, leaseID)
 		require.WithinDuration(t, now.Add(dur), ulid.Time(leaseID.Time()), 5*time.Millisecond)
@@ -2200,7 +2167,7 @@ func TestQueueLeaseSequential(t *testing.T) {
 
 		now := time.Now()
 		dur := 50 * time.Millisecond
-		leaseID, err = q.ConfigLease(ctx, q.primaryQueueShard.RedisClient.kg.Sequential(), dur)
+		leaseID, err = shard.ConfigLease(ctx, "sequential", dur)
 		require.NoError(t, err)
 		require.NotNil(t, leaseID)
 		require.WithinDuration(t, now.Add(dur), ulid.Time(leaseID.Time()), 5*time.Millisecond)
@@ -2218,9 +2185,6 @@ func TestQueueRateLimit(t *testing.T) {
 	defer rc.Close()
 	ctx := context.Background()
 	clock := clockwork.NewFakeClock()
-	q := NewQueue(
-		QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey)}, WithClock(clock),
-	)
 
 	idA, idB := uuid.New(), uuid.New()
 
@@ -2234,18 +2198,21 @@ func TestQueueRateLimit(t *testing.T) {
 			Burst:  0, // No burst.
 		}
 
-		q.partitionConstraintConfigGetter = func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
-			return PartitionConstraintConfig{
-				Throttle: &PartitionThrottle{
-					Limit:                     1,
-					Period:                    5,
-					Burst:                     0,
-					ThrottleKeyExpressionHash: util.XXHash(throttle.Key),
-				},
-			}
-		}
+		_, shard := newQueue(t, rc,
+			osqueue.WithClock(clock),
+			osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
+				return osqueue.PartitionConstraintConfig{
+					Throttle: &osqueue.PartitionThrottle{
+						Limit:                     1,
+						Period:                    5,
+						Burst:                     0,
+						ThrottleKeyExpressionHash: util.XXHash(throttle.Key),
+					},
+				}
+			}),
+		)
 
-		aa, err := q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{
+		aa, err := shard.EnqueueItem(ctx, osqueue.QueueItem{
 			FunctionID: idA,
 			Data: osqueue.Item{
 				Identifier: state.Identifier{
@@ -2256,7 +2223,7 @@ func TestQueueRateLimit(t *testing.T) {
 		}, clock.Now(), osqueue.EnqueueOpts{})
 		r.NoError(err)
 
-		ab, err := q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{
+		ab, err := shard.EnqueueItem(ctx, osqueue.QueueItem{
 			FunctionID: idA,
 			Data: osqueue.Item{
 				Identifier: state.Identifier{
@@ -2268,14 +2235,14 @@ func TestQueueRateLimit(t *testing.T) {
 		r.NoError(err)
 
 		// Leasing A should succeed, then B should fail.
-		partitions, err := q.PartitionPeek(ctx, true, clock.Now().Add(5*time.Second), 5)
+		partitions, err := shard.PartitionPeek(ctx, true, clock.Now().Add(5*time.Second), 5)
 		r.NoError(err)
 		r.EqualValues(1, len(partitions))
 
 		// clock.Advance(10 * time.Millisecond)
 
 		t.Run("Leasing a first item succeeds", func(t *testing.T) {
-			leaseA, err := q.Lease(ctx, aa, 10*time.Second, clock.Now(), nil)
+			leaseA, err := shard.Lease(ctx, aa, 10*time.Second, clock.Now(), nil)
 			r.NoError(err, "leasing throttled queue item with capacity failed")
 			r.NotNil(leaseA)
 		})
@@ -2283,7 +2250,7 @@ func TestQueueRateLimit(t *testing.T) {
 		// clock.Advance(10 * time.Millisecond)
 
 		t.Run("Attempting to lease another throttled key immediately fails", func(t *testing.T) {
-			leaseB, err := q.Lease(ctx, ab, 10*time.Second, clock.Now(), nil)
+			leaseB, err := shard.Lease(ctx, ab, 10*time.Second, clock.Now(), nil)
 			r.NotNil(err, "leasing throttled queue item without capacity didn't error")
 			r.Nil(leaseB)
 		})
@@ -2291,17 +2258,21 @@ func TestQueueRateLimit(t *testing.T) {
 		// clock.Advance(10 * time.Millisecond)
 
 		t.Run("Leasing another function succeeds", func(t *testing.T) {
-			q.partitionConstraintConfigGetter = func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
-				return PartitionConstraintConfig{
-					Throttle: &PartitionThrottle{
-						Limit:                     1,
-						Period:                    5,
-						Burst:                     0,
-						ThrottleKeyExpressionHash: util.XXHash("another-key"),
-					},
-				}
-			}
-			ba, err := q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{
+			_, shard := newQueue(t, rc,
+				osqueue.WithClock(clock),
+				osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
+					return osqueue.PartitionConstraintConfig{
+						Throttle: &osqueue.PartitionThrottle{
+							Limit:                     1,
+							Period:                    5,
+							Burst:                     0,
+							ThrottleKeyExpressionHash: util.XXHash("another-key"),
+						},
+					}
+				}),
+			)
+
+			ba, err := shard.EnqueueItem(ctx, osqueue.QueueItem{
 				FunctionID: idB,
 				Data: osqueue.Item{
 					Identifier: state.Identifier{
@@ -2316,7 +2287,7 @@ func TestQueueRateLimit(t *testing.T) {
 				},
 			}, clock.Now().Add(time.Second), osqueue.EnqueueOpts{})
 			r.NoError(err)
-			lease, err := q.Lease(ctx, ba, 10*time.Second, clock.Now(), nil)
+			lease, err := shard.Lease(ctx, ba, 10*time.Second, clock.Now(), nil)
 			r.Nil(err, "leasing throttled queue item without capacity didn't error")
 			r.NotNil(lease)
 		})
@@ -2326,7 +2297,7 @@ func TestQueueRateLimit(t *testing.T) {
 		t.Run("Leasing after the period succeeds", func(t *testing.T) {
 			clock.Advance(time.Duration(throttle.Period)*time.Second + time.Second)
 
-			leaseB, err := q.Lease(ctx, ab, 10*time.Second, clock.Now(), nil)
+			leaseB, err := shard.Lease(ctx, ab, 10*time.Second, clock.Now(), nil)
 			r.Nil(err, "leasing after waiting for throttle should succeed")
 			r.NotNil(leaseB)
 		})
@@ -2345,21 +2316,25 @@ func TestQueueRateLimit(t *testing.T) {
 		// NOTE: Since fixing GCRA, we will now admit the maximum of limit + burst requests
 		// This means we can admit up to 1 + 3 = 4 items at once
 
-		q.partitionConstraintConfigGetter = func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
-			return PartitionConstraintConfig{
-				Throttle: &PartitionThrottle{
-					ThrottleKeyExpressionHash: util.XXHash("burst-plz"),
-					Limit:                     1,
-					Period:                    10,
-					Burst:                     3,
-				},
-			}
-		}
+		_, shard := newQueue(t, rc,
+			osqueue.WithClock(clock),
+			osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
+				return osqueue.PartitionConstraintConfig{
+					Throttle: &osqueue.PartitionThrottle{
+						ThrottleKeyExpressionHash: util.XXHash("burst-plz"),
+						Limit:                     1,
+						Period:                    10,
+						Burst:                     3,
+					},
+				}
+			}),
+		)
+
 		accountID := uuid.New()
 
 		items := []osqueue.QueueItem{}
 		for i := 0; i <= 20; i++ {
-			item, err := q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{
+			item, err := shard.EnqueueItem(ctx, osqueue.QueueItem{
 				FunctionID: idA,
 				Data: osqueue.Item{
 					Identifier: state.Identifier{WorkflowID: idA, AccountID: accountID},
@@ -2372,7 +2347,7 @@ func TestQueueRateLimit(t *testing.T) {
 		}
 
 		// Leasing A should succeed, then B should fail.
-		partitions, err := q.PartitionPeek(ctx, true, clock.Now().Add(5*time.Second), 5)
+		partitions, err := shard.PartitionPeek(ctx, true, clock.Now().Add(5*time.Second), 5)
 		r.NoError(err)
 		r.EqualValues(1, len(partitions))
 
@@ -2380,7 +2355,7 @@ func TestQueueRateLimit(t *testing.T) {
 
 		t.Run("Leasing up to bursts succeeds", func(t *testing.T) {
 			for i := 0; i < 4; i++ {
-				lease, err := q.Lease(ctx, items[i], 2*time.Second, clock.Now(), nil)
+				lease, err := shard.Lease(ctx, items[i], 2*time.Second, clock.Now(), nil)
 				r.NoError(err, "leasing throttled queue item with capacity failed")
 				r.NotNil(lease)
 				idx++
@@ -2388,25 +2363,25 @@ func TestQueueRateLimit(t *testing.T) {
 		})
 
 		t.Run("Leasing the 5th time fails", func(t *testing.T) {
-			lease, err := q.Lease(ctx, items[idx], 1*time.Second, clock.Now(), nil)
+			lease, err := shard.Lease(ctx, items[idx], 1*time.Second, clock.Now(), nil)
 			r.NotNil(err, "leasing throttled queue item without capacity didn't error")
-			r.ErrorContains(err, ErrQueueItemThrottled.Error())
+			r.ErrorContains(err, osqueue.ErrQueueItemThrottled.Error())
 			r.Nil(lease)
 		})
 
 		t.Run("After 10s, we can re-lease once as bursting is done.", func(t *testing.T) {
 			clock.Advance(time.Duration(throttle.Period)*time.Second + time.Second)
 
-			lease, err := q.Lease(ctx, items[idx], 2*time.Second, clock.Now(), nil)
+			lease, err := shard.Lease(ctx, items[idx], 2*time.Second, clock.Now(), nil)
 			r.NoError(err, "leasing throttled queue item with capacity failed")
 			r.NotNil(lease)
 
 			idx++
 
 			// It should fail, as bursting is done.
-			lease, err = q.Lease(ctx, items[idx], 1*time.Second, clock.Now(), nil)
+			lease, err = shard.Lease(ctx, items[idx], 1*time.Second, clock.Now(), nil)
 			r.NotNil(err, "leasing throttled queue item without capacity didn't error")
-			r.ErrorContains(err, ErrQueueItemThrottled.Error())
+			r.ErrorContains(err, osqueue.ErrQueueItemThrottled.Error())
 			r.Nil(lease)
 		})
 
@@ -2414,7 +2389,7 @@ func TestQueueRateLimit(t *testing.T) {
 			clock.Advance(time.Duration(throttle.Period*4) * time.Second)
 
 			for i := 0; i < 3; i++ {
-				lease, err := q.Lease(ctx, items[i], 2*time.Second, clock.Now(), nil)
+				lease, err := shard.Lease(ctx, items[i], 2*time.Second, clock.Now(), nil)
 				r.NoError(err, "leasing throttled queue item with capacity failed")
 				r.NotNil(lease)
 				idx++
@@ -2455,44 +2430,51 @@ func TestMigrate(t *testing.T) {
 			require.NoError(t, err)
 			defer rc2.Close()
 
-			shard1Name := "default"
-			shard2Name := "yolo"
+			idempotencyTTL := 5 * time.Second
+			opts := []osqueue.QueueOpt{
+				osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+					return tc.keyQueue
+				}),
+				osqueue.WithIdempotencyTTL(idempotencyTTL),
+			}
 
-			shard1 := QueueShard{Name: shard1Name, Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc1, QueueDefaultKey)}
-			shard2 := QueueShard{Name: shard2Name, Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc2, QueueDefaultKey)}
+			shard1 := shardFromClient("default", rc1, opts...)
+			shard2 := shardFromClient("yolo", rc2, opts...)
 
-			shards := map[string]QueueShard{shard1Name: shard1, shard2Name: shard2}
+			shards := mapFromShards(shard1, shard2)
 
-			q1 := NewQueue(
+			q1, err := osqueue.New(
+				context.Background(),
+				"q1",
 				shard1,
-				WithQueueShardClients(shards),
-				WithPartitionPriorityFinder(func(ctx context.Context, part QueuePartition) uint {
-					return PriorityDefault
-				}),
-				WithClock(clock),
-				WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
-					return tc.keyQueue
-				}),
+				shards,
+				func(ctx context.Context, accountId uuid.UUID, queueName *string) (osqueue.QueueShard, error) {
+					return shard1, nil
+				},
+				opts...,
 			)
+			require.NoError(t, err)
 
-			q2 := NewQueue(
+			require.Equal(t, idempotencyTTL, q1.QueueOptions.IdempotencyTTL)
+
+			q2, err := osqueue.New(
+				context.Background(),
+				"q2",
 				shard2,
-				WithQueueShardClients(shards),
-				WithPartitionPriorityFinder(func(ctx context.Context, part QueuePartition) uint {
-					return PriorityDefault
-				}),
-				WithClock(clock),
-				WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
-					return tc.keyQueue
-				}),
+				shards,
+				func(ctx context.Context, accountId uuid.UUID, queueName *string) (osqueue.QueueShard, error) {
+					return shard2, nil
+				},
+				opts...,
 			)
+			require.NoError(t, err)
 
-			expectItemCountForPartition := func(ctx context.Context, q *queue, shard QueueShard, partitionID uuid.UUID, expected int) {
+			expectItemCountForPartition := func(ctx context.Context, shard RedisQueueShard, partitionID uuid.UUID, expected int) {
 				var count int
 
 				from := time.Time{}
-				until := q.clock.Now().Add(24 * time.Hour * 365)
-				items, err := q.ItemsByPartition(ctx, shard, partitionID.String(), from, until)
+				until := clock.Now().Add(24 * time.Hour * 365)
+				items, err := shard.ItemsByPartition(ctx, partitionID.String(), from, until)
 				require.NoError(t, err)
 
 				for range items {
@@ -2511,42 +2493,48 @@ func TestMigrate(t *testing.T) {
 				require.NoError(t, err)
 			}
 
+			items, err := r1.HKeys(shard1.Client().kg.QueueItem())
+			require.NoError(t, err)
+
 			// Don't really need it since there are no executors to process the enqueued items
 			lockUntil := clock.Now().Add(10 * time.Minute)
-			err = q1.SetFunctionMigrate(ctx, shard1Name, fnID, &lockUntil)
+			err = q1.SetFunctionMigrate(ctx, shard1.Name(), fnID, &lockUntil)
 			require.NoError(t, err)
 
 			// Verify that there are expected number of items in it
-			expectItemCountForPartition(ctx, q1, shard1, fnID, 5)
+			expectItemCountForPartition(ctx, shard1, fnID, 5)
 
 			// Attempt to migrate from shard1 to shard2
-			processed, err := q1.Migrate(ctx, shard1Name, fnID, 10, 0, func(ctx context.Context, qi *osqueue.QueueItem) error {
+			processed, err := q1.Migrate(ctx, shard1.Name(), fnID, 10, 0, func(ctx context.Context, qi *osqueue.QueueItem) error {
 				return q2.Enqueue(ctx, qi.Data, time.UnixMilli(qi.AtMS), osqueue.EnqueueOpts{PassthroughJobId: true})
 			})
 			require.NoError(t, err)
 			require.Equal(t, int64(5), processed)
 
 			// Verify that shard2 now have all the items
-			expectItemCountForPartition(ctx, q2, shard2, fnID, 5)
+			expectItemCountForPartition(ctx, shard2, fnID, 5)
 
 			// shard1 should no longer have anything
-			expectItemCountForPartition(ctx, q1, shard1, fnID, 0)
+			expectItemCountForPartition(ctx, shard1, fnID, 0)
 
-			clock.Advance(q1.idempotencyTTL + 5*time.Second)
-			r1.FastForward(q1.idempotencyTTL + 5*time.Second)
+			clock.Advance(idempotencyTTL + 5*time.Second)
+			r1.FastForward(idempotencyTTL + 5*time.Second)
+
+			remainingTTL := r1.TTL(shard1.Client().kg.Idempotency(items[0]))
+			require.Equal(t, time.Duration(0), remainingTTL, remainingTTL.String())
 
 			// Now, move everything back to queue 1
-			returned, err := q2.Migrate(ctx, shard2Name, fnID, 10, 0, func(ctx context.Context, qi *osqueue.QueueItem) error {
+			returned, err := q2.Migrate(ctx, shard2.Name(), fnID, 10, 0, func(ctx context.Context, qi *osqueue.QueueItem) error {
 				return q1.Enqueue(ctx, qi.Data, time.UnixMilli(qi.AtMS), osqueue.EnqueueOpts{PassthroughJobId: true})
 			})
-			require.NoError(t, err)
+			require.NoError(t, err, "r1", r1.Dump())
 			require.Equal(t, int64(5), returned)
 
 			// shard1 should have the queue items again
-			expectItemCountForPartition(ctx, q1, shard1, fnID, 5)
+			expectItemCountForPartition(ctx, shard1, fnID, 5)
 
 			// Verify that shard2 now have nothing
-			expectItemCountForPartition(ctx, q2, shard2, fnID, 0)
+			expectItemCountForPartition(ctx, shard2, fnID, 0)
 		})
 	}
 }
@@ -2569,18 +2557,18 @@ func getQueueItem(t *testing.T, r *miniredis.Miniredis, id string) osqueue.Queue
 	return i
 }
 
-func requirePartitionInProgress(t *testing.T, q *queue, workflowID uuid.UUID, count int) {
+func requirePartitionInProgress(t *testing.T, q RedisQueueShard, workflowID uuid.UUID, count int) {
 	t.Helper()
-	actual, err := q.InProgress(context.Background(), "p", workflowID.String())
+	actual, err := q.RunningCount(context.Background(), workflowID)
 	require.NoError(t, err)
 	require.EqualValues(t, count, actual)
 }
 
-func getDefaultPartition(t *testing.T, r *miniredis.Miniredis, id uuid.UUID) QueuePartition {
+func getDefaultPartition(t *testing.T, r *miniredis.Miniredis, id uuid.UUID) osqueue.QueuePartition {
 	t.Helper()
 	kg := &queueKeyGenerator{queueDefaultKey: QueueDefaultKey}
 	val := r.HGet(kg.PartitionItem(), id.String())
-	qp := QueuePartition{}
+	qp := osqueue.QueuePartition{}
 	err := json.Unmarshal([]byte(val), &qp)
 	require.NoError(t, err, r.Dump(), val)
 	return qp
@@ -2628,12 +2616,12 @@ func getAccountPartitions(t *testing.T, rc rueidis.Client, accountId uuid.UUID) 
 	return strSlice
 }
 
-func getSystemPartition(t *testing.T, r *miniredis.Miniredis, name string) QueuePartition {
+func getSystemPartition(t *testing.T, r *miniredis.Miniredis, name string) osqueue.QueuePartition {
 	t.Helper()
 	kg := &queueKeyGenerator{queueDefaultKey: QueueDefaultKey}
 	val := r.HGet(kg.PartitionItem(), name)
 	require.NotEmpty(t, val, "expected item to be set", r.Dump())
-	qp := QueuePartition{}
+	qp := osqueue.QueuePartition{}
 	err := json.Unmarshal([]byte(val), &qp)
 	require.NoError(t, err, "expected item to be valid json")
 	require.True(t, qp.IsSystem())
@@ -2658,7 +2646,7 @@ func partitionIsMissingInHash(t *testing.T, r *miniredis.Miniredis, pType enums.
 	require.NotContains(t, val, key, "expected partition to be missing")
 }
 
-func getPartition(t *testing.T, r *miniredis.Miniredis, pType enums.PartitionType, id uuid.UUID, optionalHash ...string) QueuePartition {
+func getPartition(t *testing.T, r *miniredis.Miniredis, pType enums.PartitionType, id uuid.UUID, optionalHash ...string) osqueue.QueuePartition {
 	t.Helper()
 	hash := ""
 	if len(optionalHash) > 0 {
@@ -2676,7 +2664,7 @@ func getPartition(t *testing.T, r *miniredis.Miniredis, pType enums.PartitionTyp
 	items, _ := r.HKeys(kg.PartitionItem())
 
 	require.NotEmpty(t, val, "couldn't find partition in map with key:\n--> %s\nhave:\n%v", key, strings.Join(items, "\n"))
-	qp := QueuePartition{}
+	qp := osqueue.QueuePartition{}
 	err := json.Unmarshal([]byte(val), &qp)
 	require.NoError(t, err)
 	return qp
@@ -2691,7 +2679,7 @@ func requireItemScoreEquals(t *testing.T, r *miniredis.Miniredis, item osqueue.Q
 	require.WithinDuration(t, expected.Truncate(time.Millisecond), parsed, 15*time.Millisecond)
 }
 
-func requirePartitionItemScoreEquals(t *testing.T, r *miniredis.Miniredis, keyPartitionIndex string, qp QueuePartition, expected time.Time) {
+func requirePartitionItemScoreEquals(t *testing.T, r *miniredis.Miniredis, keyPartitionIndex string, qp osqueue.QueuePartition, expected time.Time) {
 	t.Helper()
 	score, err := r.ZScore(keyPartitionIndex, qp.ID)
 	require.NotZero(t, score, r.Dump(), qp.ID)
@@ -2818,19 +2806,17 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 		require.NoError(t, err)
 		defer rc.Close()
 
-		defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
-		kg := defaultShard.RedisClient.kg
-
 		clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Second))
 		now := clock.Now()
 
-		q := NewQueue(
-			defaultShard,
-			WithClock(clock),
-			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+		_, shard := newQueue(
+			t, rc,
+			osqueue.WithClock(clock),
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 				return true
 			}),
 		)
+		kg := shard.Client().kg
 		ctx := context.Background()
 
 		accountId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
@@ -2860,16 +2846,16 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 				QueueName: nil,
 			}
 
-			qi, err := q.EnqueueItem(ctx, defaultShard, item, at, osqueue.EnqueueOpts{})
+			qi, err := shard.EnqueueItem(ctx, item, at, osqueue.EnqueueOpts{})
 			require.NoError(t, err)
 
-			backlog := q.ItemBacklog(ctx, item)
+			backlog := osqueue.ItemBacklog(ctx, item)
 			require.NotEmpty(t, backlog.BacklogID)
 
 			marshaledBacklog, err := json.Marshal(backlog)
 			require.NoError(t, err)
 
-			shadowPartition := q.ItemShadowPartition(ctx, item)
+			shadowPartition := osqueue.ItemShadowPartition(ctx, item)
 			require.NotEmpty(t, shadowPartition.PartitionID)
 
 			marshaledShadowPartition, err := json.Marshal(shadowPartition)
@@ -2915,13 +2901,13 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 				QueueName: nil,
 			}
 
-			qi, err := q.EnqueueItem(ctx, defaultShard, item, newScore, osqueue.EnqueueOpts{})
+			qi, err := shard.EnqueueItem(ctx, item, newScore, osqueue.EnqueueOpts{})
 			require.NoError(t, err)
 
-			backlog := q.ItemBacklog(ctx, item)
+			backlog := osqueue.ItemBacklog(ctx, item)
 			require.NotEmpty(t, backlog.BacklogID)
 
-			shadowPartition := q.ItemShadowPartition(ctx, item)
+			shadowPartition := osqueue.ItemShadowPartition(ctx, item)
 			require.NotEmpty(t, shadowPartition.PartitionID)
 
 			// pointers should keep earlier score
@@ -2956,13 +2942,13 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 				QueueName: nil,
 			}
 
-			qi, err := q.EnqueueItem(ctx, defaultShard, item, newScore, osqueue.EnqueueOpts{})
+			qi, err := shard.EnqueueItem(ctx, item, newScore, osqueue.EnqueueOpts{})
 			require.NoError(t, err)
 
-			backlog := q.ItemBacklog(ctx, item)
+			backlog := osqueue.ItemBacklog(ctx, item)
 			require.NotEmpty(t, backlog.BacklogID)
 
-			shadowPartition := q.ItemShadowPartition(ctx, item)
+			shadowPartition := osqueue.ItemShadowPartition(ctx, item)
 			require.NotEmpty(t, shadowPartition.PartitionID)
 
 			// pointers should take on earlier score
@@ -2991,28 +2977,9 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 		require.NoError(t, err)
 		defer rc.Close()
 
-		defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
-		kg := defaultShard.RedisClient.kg
-
 		clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Second))
 		now := clock.Now()
 
-		q := NewQueue(
-			defaultShard,
-			WithClock(clock),
-			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
-				return true
-			}),
-			WithPartitionConstraintConfigGetter(func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
-				return PartitionConstraintConfig{
-					Concurrency: PartitionConcurrency{
-						AccountConcurrency:  123,
-						FunctionConcurrency: 45,
-						SystemConcurrency:   678,
-					},
-				}
-			}),
-		)
 		ctx := context.Background()
 
 		accountId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
@@ -3035,21 +3002,29 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 				UnhashedEvaluatedKeyValue: unhashedValue,
 			}
 
-			q.partitionConstraintConfigGetter = func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
-				return PartitionConstraintConfig{
-					Concurrency: PartitionConcurrency{
-						AccountConcurrency:  123,
-						FunctionConcurrency: 45,
-						CustomConcurrencyKeys: []CustomConcurrencyLimit{
-							{
-								Scope:               enums.ConcurrencyScopeFn,
-								HashedKeyExpression: ckA.Hash,
-								Limit:               ckA.Limit,
+			_, shard := newQueue(
+				t, rc,
+				osqueue.WithClock(clock),
+				osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+					return true
+				}),
+				osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
+					return osqueue.PartitionConstraintConfig{
+						Concurrency: osqueue.PartitionConcurrency{
+							AccountConcurrency:  123,
+							FunctionConcurrency: 45,
+							CustomConcurrencyKeys: []osqueue.CustomConcurrencyLimit{
+								{
+									Scope:               enums.ConcurrencyScopeFn,
+									HashedKeyExpression: ckA.Hash,
+									Limit:               ckA.Limit,
+								},
 							},
 						},
-					},
-				}
-			}
+					}
+				}),
+			)
+			kg := shard.Client().kg
 
 			item := osqueue.QueueItem{
 				ID:          "test",
@@ -3072,20 +3047,17 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 				QueueName: nil,
 			}
 
-			qi, err := q.EnqueueItem(ctx, defaultShard, item, at, osqueue.EnqueueOpts{})
+			qi, err := shard.EnqueueItem(ctx, item, at, osqueue.EnqueueOpts{})
 			require.NoError(t, err)
 
-			backlog := q.ItemBacklog(ctx, item)
+			backlog := osqueue.ItemBacklog(ctx, item)
 			require.NotEmpty(t, backlog.BacklogID)
 			require.Len(t, backlog.ConcurrencyKeys, 1)
 			require.NotNil(t, backlog.ConcurrencyKeys[0].Scope)
 			require.NotNil(t, backlog.ConcurrencyKeys[0].HashedKeyExpression)
 
-			shadowPartition := q.ItemShadowPartition(ctx, item)
+			shadowPartition := osqueue.ItemShadowPartition(ctx, item)
 			require.NotEmpty(t, shadowPartition.PartitionID)
-
-			constraints := q.partitionConstraintConfigGetter(ctx, shadowPartition.Identifier())
-			require.Len(t, constraints.Concurrency.CustomConcurrencyKeys, 1)
 
 			require.True(t, r.Exists(kg.BacklogMeta()), r.Keys())
 			require.True(t, r.Exists(kg.BacklogSet(backlog.BacklogID)))
@@ -3113,21 +3085,18 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 		require.NoError(t, err)
 		defer rc.Close()
 
-		defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
-		kg := defaultShard.RedisClient.kg
-
 		clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Second))
 		now := clock.Now()
 
-		q := NewQueue(
-			defaultShard,
-			WithClock(clock),
-			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+		_, shard := newQueue(
+			t, rc,
+			osqueue.WithClock(clock),
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 				return true
 			}),
-			WithPartitionConstraintConfigGetter(func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
-				return PartitionConstraintConfig{
-					Concurrency: PartitionConcurrency{
+			osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
+				return osqueue.PartitionConstraintConfig{
+					Concurrency: osqueue.PartitionConcurrency{
 						AccountConcurrency:  123,
 						FunctionConcurrency: 45,
 						SystemConcurrency:   678,
@@ -3135,6 +3104,8 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 				}
 			}),
 		)
+		kg := shard.Client().kg
+
 		ctx := context.Background()
 
 		accountId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
@@ -3167,26 +3138,33 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 				UnhashedEvaluatedKeyValue: unhashedValue2,
 			}
 
-			q.partitionConstraintConfigGetter = func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
-				return PartitionConstraintConfig{
-					Concurrency: PartitionConcurrency{
-						AccountConcurrency:  123,
-						FunctionConcurrency: 45,
-						CustomConcurrencyKeys: []CustomConcurrencyLimit{
-							{
-								Scope:               enums.ConcurrencyScopeFn,
-								HashedKeyExpression: ckA.Hash,
-								Limit:               ckA.Limit,
-							},
-							{
-								Scope:               enums.ConcurrencyScopeEnv,
-								HashedKeyExpression: ckB.Hash,
-								Limit:               ckB.Limit,
+			_, shard := newQueue(
+				t, rc,
+				osqueue.WithClock(clock),
+				osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+					return true
+				}),
+				osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
+					return osqueue.PartitionConstraintConfig{
+						Concurrency: osqueue.PartitionConcurrency{
+							AccountConcurrency:  123,
+							FunctionConcurrency: 45,
+							CustomConcurrencyKeys: []osqueue.CustomConcurrencyLimit{
+								{
+									Scope:               enums.ConcurrencyScopeFn,
+									HashedKeyExpression: ckA.Hash,
+									Limit:               ckA.Limit,
+								},
+								{
+									Scope:               enums.ConcurrencyScopeEnv,
+									HashedKeyExpression: ckB.Hash,
+									Limit:               ckB.Limit,
+								},
 							},
 						},
-					},
-				}
-			}
+					}
+				}),
+			)
 
 			item := osqueue.QueueItem{
 				ID:          "test",
@@ -3210,10 +3188,10 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 				QueueName: nil,
 			}
 
-			qi, err := q.EnqueueItem(ctx, defaultShard, item, at, osqueue.EnqueueOpts{})
+			qi, err := shard.EnqueueItem(ctx, item, at, osqueue.EnqueueOpts{})
 			require.NoError(t, err)
 
-			backlog := q.ItemBacklog(ctx, item)
+			backlog := osqueue.ItemBacklog(ctx, item)
 			require.Len(t, backlog.ConcurrencyKeys, 2)
 			require.NotNil(t, backlog.ConcurrencyKeys[0].Scope)
 			require.NotNil(t, backlog.ConcurrencyKeys[0].HashedKeyExpression)
@@ -3223,11 +3201,8 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 			marshaledBacklog1, err := json.Marshal(backlog)
 			require.NoError(t, err)
 
-			shadowPartition := q.ItemShadowPartition(ctx, item)
+			shadowPartition := osqueue.ItemShadowPartition(ctx, item)
 			require.NotEmpty(t, shadowPartition.PartitionID)
-
-			constraints := q.partitionConstraintConfigGetter(ctx, shadowPartition.Identifier())
-			require.Len(t, constraints.Concurrency.CustomConcurrencyKeys, 2)
 
 			require.True(t, r.Exists(kg.BacklogMeta()), r.Keys())
 			require.True(t, r.Exists(kg.BacklogSet(backlog.BacklogID)))
@@ -3253,20 +3228,23 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 		require.NoError(t, err)
 		defer rc.Close()
 
-		defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
-		kg := defaultShard.RedisClient.kg
-
 		clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Second))
 		now := clock.Now()
 
-		q := NewQueue(
-			defaultShard,
-			WithClock(clock),
-			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+		_, shard := newQueue(
+			t, rc,
+			osqueue.WithClock(clock),
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 				return true
 			}),
-			// WithEnqueueSystemPartitionsToBacklog(true),
+			osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
+				return osqueue.PartitionConstraintConfig{
+					Concurrency: osqueue.PartitionConcurrency{},
+				}
+			}),
 		)
+		kg := shard.Client().kg
+
 		ctx := context.Background()
 
 		// use future timestamp because scores will be bounded to the present
@@ -3289,19 +3267,19 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 				QueueName: &sysQueueName,
 			}
 
-			backlog := q.ItemBacklog(ctx, item)
+			backlog := osqueue.ItemBacklog(ctx, item)
 			require.NotEmpty(t, backlog.BacklogID)
 
 			marshaledBacklog, err := json.Marshal(backlog)
 			require.NoError(t, err)
 
-			shadowPartition := q.ItemShadowPartition(ctx, item)
+			shadowPartition := osqueue.ItemShadowPartition(ctx, item)
 			require.NotEmpty(t, shadowPartition.PartitionID)
 
 			marshaledShadowPartition, err := json.Marshal(shadowPartition)
 			require.NoError(t, err)
 
-			qi, err := q.EnqueueItem(ctx, defaultShard, item, at, osqueue.EnqueueOpts{})
+			qi, err := shard.EnqueueItem(ctx, item, at, osqueue.EnqueueOpts{})
 			require.NoError(t, err)
 
 			require.True(t, r.Exists(kg.BacklogMeta()))
@@ -3331,10 +3309,20 @@ func TestQueueEnqueueItemSingleton(t *testing.T) {
 	require.NoError(t, err)
 	defer rc.Close()
 
-	defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
-	q := NewQueue(defaultShard)
-
-	kg := defaultShard.RedisClient.KeyGenerator()
+	clock := clockwork.NewFakeClock()
+	_, shard := newQueue(
+		t, rc,
+		osqueue.WithClock(clock),
+		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+			return true
+		}),
+		osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
+			return osqueue.PartitionConstraintConfig{
+				Concurrency: osqueue.PartitionConcurrency{},
+			}
+		}),
+	)
+	kg := shard.Client().kg
 
 	ctx := context.Background()
 
@@ -3364,7 +3352,7 @@ func TestQueueEnqueueItemSingleton(t *testing.T) {
 			},
 		}
 
-		item1, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi1, start, osqueue.EnqueueOpts{})
+		item1, err := shard.EnqueueItem(ctx, qi1, start, osqueue.EnqueueOpts{})
 
 		require.NoError(t, err)
 		require.NotEqual(t, qi1.ID, item1.ID)
@@ -3372,11 +3360,11 @@ func TestQueueEnqueueItemSingleton(t *testing.T) {
 		require.Equal(t, item1, found)
 
 		// Ensure we can't enqueue a start item again having the same singleton key
-		_, err = q.EnqueueItem(ctx, q.primaryQueueShard, qi1, start, osqueue.EnqueueOpts{})
-		require.Equal(t, ErrQueueItemSingletonExists, err)
+		_, err = shard.EnqueueItem(ctx, qi1, start, osqueue.EnqueueOpts{})
+		require.Equal(t, osqueue.ErrQueueItemSingletonExists, err)
 
 		// Ensure we can enqueue other queue items
-		item2, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi2, start, osqueue.EnqueueOpts{})
+		item2, err := shard.EnqueueItem(ctx, qi2, start, osqueue.EnqueueOpts{})
 
 		require.NoError(t, err)
 		require.NotEqual(t, qi2.ID, item2.ID)
@@ -3384,19 +3372,19 @@ func TestQueueEnqueueItemSingleton(t *testing.T) {
 		require.Equal(t, item2, found2)
 
 		// Dequeue the first item
-		err = q.Dequeue(ctx, q.primaryQueueShard, item1)
+		err = shard.Dequeue(ctx, item1)
 		require.NoError(t, err)
 
 		// Enqueuing a start item should still not be possible
-		_, err = q.EnqueueItem(ctx, q.primaryQueueShard, qi1, start, osqueue.EnqueueOpts{})
-		require.Equal(t, ErrQueueItemSingletonExists, err)
+		_, err = shard.EnqueueItem(ctx, qi1, start, osqueue.EnqueueOpts{})
+		require.Equal(t, osqueue.ErrQueueItemSingletonExists, err)
 
 		// Dequeue the last item
-		err = q.Dequeue(ctx, q.primaryQueueShard, item2)
+		err = shard.Dequeue(ctx, item2)
 		require.NoError(t, err)
 
 		// Ensure we can enqueue a new start item with the singleton key after the last dequeue.
-		item1, err = q.EnqueueItem(ctx, q.primaryQueueShard, qi1, start, osqueue.EnqueueOpts{})
+		item1, err = shard.EnqueueItem(ctx, qi1, start, osqueue.EnqueueOpts{})
 
 		require.NoError(t, err)
 		require.NotEqual(t, qi1.ID, item1.ID)
@@ -3434,7 +3422,7 @@ func TestQueueEnqueueItemSingleton(t *testing.T) {
 			},
 		}
 
-		item1, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi1, start, osqueue.EnqueueOpts{})
+		item1, err := shard.EnqueueItem(ctx, qi1, start, osqueue.EnqueueOpts{})
 
 		require.NoError(t, err)
 		require.NotEqual(t, qi1.ID, item1.ID)
@@ -3450,14 +3438,14 @@ func TestQueueEnqueueItemSingleton(t *testing.T) {
 
 		start = time.Now().Truncate(time.Second)
 		// Enqueue the new run
-		item2, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi2, start, osqueue.EnqueueOpts{})
+		item2, err := shard.EnqueueItem(ctx, qi2, start, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 		require.NotEqual(t, qi1.ID, item2.ID)
 		found = getQueueItem(t, r, item2.ID)
 		require.Equal(t, item2, found)
 
 		// Dequeue the first item
-		err = q.Dequeue(ctx, q.primaryQueueShard, item1)
+		err = shard.Dequeue(ctx, item1)
 		require.NoError(t, err)
 
 		singletonRun, err := r.Get(kg.SingletonKey(&osqueue.Singleton{
@@ -3469,7 +3457,7 @@ func TestQueueEnqueueItemSingleton(t *testing.T) {
 		require.Equal(t, runId2.String(), singletonRun)
 
 		// Dequeue the second item
-		err = q.Dequeue(ctx, q.primaryQueueShard, item2)
+		err = shard.Dequeue(ctx, item2)
 		require.NoError(t, err)
 
 		// Now the lock should be released
@@ -3489,19 +3477,17 @@ func TestQueueActiveCounters(t *testing.T) {
 	require.NoError(t, err)
 	defer rc.Close()
 
-	defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
-	kg := defaultShard.RedisClient.kg
-
 	enqueueToBacklog := false
 
 	clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Minute))
-	q := NewQueue(
-		defaultShard,
-		WithClock(clock),
-		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+	_, shard := newQueue(
+		t, rc,
+		osqueue.WithClock(clock),
+		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 			return enqueueToBacklog
 		}),
 	)
+	kg := shard.Client().kg
 	ctx := context.Background()
 
 	scard := func(key string) int {
@@ -3547,11 +3533,11 @@ func TestQueueActiveCounters(t *testing.T) {
 
 			// enqueue to backlog
 			enqueueToBacklog = true
-			i, err := q.EnqueueItem(ctx, defaultShard, item, at, osqueue.EnqueueOpts{})
+			i, err := shard.EnqueueItem(ctx, item, at, osqueue.EnqueueOpts{})
 			require.NoError(t, err)
 
-			shadowPart := q.ItemShadowPartition(ctx, item)
-			backlog := q.ItemBacklog(ctx, item)
+			shadowPart := osqueue.ItemShadowPartition(ctx, item)
+			backlog := osqueue.ItemBacklog(ctx, item)
 
 			refillUntil := at.Add(time.Minute)
 
@@ -3566,11 +3552,11 @@ func TestQueueActiveCounters(t *testing.T) {
 
 			// refill
 			// Get items to refill from backlog
-			itemIDs, err := getItemIDsFromBacklog(ctx, q, &backlog, refillUntil, 1000)
+			itemIDs, err := getItemIDsFromBacklog(ctx, shard, &backlog, refillUntil, 1000)
 			require.NoError(t, err)
 
-			res, err := q.BacklogRefill(ctx, &backlog, &shadowPart, refillUntil, itemIDs, PartitionConstraintConfig{
-				Concurrency: PartitionConcurrency{
+			res, err := shard.BacklogRefill(ctx, &backlog, &shadowPart, refillUntil, itemIDs, osqueue.PartitionConstraintConfig{
+				Concurrency: osqueue.PartitionConcurrency{
 					SystemConcurrency:   consts.DefaultConcurrencyLimit,
 					AccountConcurrency:  consts.DefaultConcurrencyLimit,
 					FunctionConcurrency: consts.DefaultConcurrencyLimit,
@@ -3592,7 +3578,7 @@ func TestQueueActiveCounters(t *testing.T) {
 			require.Equal(t, clock.Now(), time.UnixMilli(i.RefilledAt))
 
 			// lease
-			leaseID, err := q.Lease(ctx, i, 10*time.Second, clock.Now(), nil)
+			leaseID, err := shard.Lease(ctx, i, 10*time.Second, clock.Now(), nil)
 			require.NoError(t, err)
 			require.NotNil(t, leaseID)
 
@@ -3605,7 +3591,7 @@ func TestQueueActiveCounters(t *testing.T) {
 			// requeue to backlog
 			requeueAt := clock.Now().Add(time.Minute)
 			enqueueToBacklog = true
-			require.NoError(t, q.Requeue(ctx, defaultShard, i, requeueAt))
+			require.NoError(t, shard.Requeue(ctx, i, requeueAt))
 
 			require.Equal(t, 0, scard(kg.ActiveRunsSet("p", shadowPart.PartitionID)))
 			require.Equal(t, 0, scard(kg.ActiveRunsSet("account", accountID.String())))
@@ -3619,11 +3605,11 @@ func TestQueueActiveCounters(t *testing.T) {
 
 			// enqueue to backlog
 			enqueueToBacklog = true
-			i, err := q.EnqueueItem(ctx, defaultShard, item, at, osqueue.EnqueueOpts{})
+			i, err := shard.EnqueueItem(ctx, item, at, osqueue.EnqueueOpts{})
 			require.NoError(t, err)
 
-			shadowPart := q.ItemShadowPartition(ctx, item)
-			backlog := q.ItemBacklog(ctx, item)
+			shadowPart := osqueue.ItemShadowPartition(ctx, item)
+			backlog := osqueue.ItemBacklog(ctx, item)
 
 			refillUntil := at.Add(time.Minute)
 
@@ -3638,11 +3624,11 @@ func TestQueueActiveCounters(t *testing.T) {
 
 			// refill
 			// Get items to refill from backlog
-			itemIDs, err := getItemIDsFromBacklog(ctx, q, &backlog, refillUntil, 1000)
+			itemIDs, err := getItemIDsFromBacklog(ctx, shard, &backlog, refillUntil, 1000)
 			require.NoError(t, err)
 
-			res, err := q.BacklogRefill(ctx, &backlog, &shadowPart, refillUntil, itemIDs, PartitionConstraintConfig{
-				Concurrency: PartitionConcurrency{
+			res, err := shard.BacklogRefill(ctx, &backlog, &shadowPart, refillUntil, itemIDs, osqueue.PartitionConstraintConfig{
+				Concurrency: osqueue.PartitionConcurrency{
 					SystemConcurrency:   consts.DefaultConcurrencyLimit,
 					AccountConcurrency:  consts.DefaultConcurrencyLimit,
 					FunctionConcurrency: consts.DefaultConcurrencyLimit,
@@ -3664,7 +3650,7 @@ func TestQueueActiveCounters(t *testing.T) {
 			require.Equal(t, clock.Now(), time.UnixMilli(i.RefilledAt))
 
 			// lease
-			leaseID, err := q.Lease(ctx, i, 10*time.Second, clock.Now(), nil)
+			leaseID, err := shard.Lease(ctx, i, 10*time.Second, clock.Now(), nil)
 			require.NoError(t, err)
 			require.NotNil(t, leaseID)
 
@@ -3675,7 +3661,7 @@ func TestQueueActiveCounters(t *testing.T) {
 			require.Equal(t, 1, scard(kg.ActiveSet("account", accountID.String())))
 
 			// dequeue
-			require.NoError(t, q.Dequeue(ctx, defaultShard, i))
+			require.NoError(t, shard.Dequeue(ctx, i))
 
 			require.Equal(t, 0, scard(kg.ActiveRunsSet("p", shadowPart.PartitionID)))
 			require.Equal(t, 0, scard(kg.ActiveRunsSet("account", accountID.String())))
@@ -3689,10 +3675,10 @@ func TestQueueActiveCounters(t *testing.T) {
 
 			// enqueue to backlog
 			enqueueToBacklog = false
-			i, err := q.EnqueueItem(ctx, defaultShard, item, at, osqueue.EnqueueOpts{})
+			i, err := shard.EnqueueItem(ctx, item, at, osqueue.EnqueueOpts{})
 			require.NoError(t, err)
 
-			shadowPart := q.ItemShadowPartition(ctx, item)
+			shadowPart := osqueue.ItemShadowPartition(ctx, item)
 
 			require.Equal(t, 0, scard(kg.ActiveRunsSet("p", shadowPart.PartitionID)))
 			require.Equal(t, 0, scard(kg.ActiveRunsSet("account", accountID.String())))
@@ -3701,7 +3687,7 @@ func TestQueueActiveCounters(t *testing.T) {
 			require.Equal(t, 0, scard(kg.ActiveSet("account", accountID.String())))
 
 			// lease
-			leaseID, err := q.Lease(ctx, i, 10*time.Second, clock.Now(), nil)
+			leaseID, err := shard.Lease(ctx, i, 10*time.Second, clock.Now(), nil)
 			require.NoError(t, err)
 			require.NotNil(t, leaseID)
 
@@ -3714,7 +3700,7 @@ func TestQueueActiveCounters(t *testing.T) {
 			// requeue to ready partition
 			requeueAt := clock.Now().Add(time.Minute)
 			enqueueToBacklog = false
-			require.NoError(t, q.Requeue(ctx, defaultShard, i, requeueAt))
+			require.NoError(t, shard.Requeue(ctx, i, requeueAt))
 
 			require.Equal(t, 0, scard(kg.ActiveRunsSet("p", shadowPart.PartitionID)))
 			require.Equal(t, 0, scard(kg.ActiveRunsSet("account", accountID.String())))
@@ -3728,10 +3714,10 @@ func TestQueueActiveCounters(t *testing.T) {
 
 			// enqueue to backlog
 			enqueueToBacklog = false
-			i, err := q.EnqueueItem(ctx, defaultShard, item, at, osqueue.EnqueueOpts{})
+			i, err := shard.EnqueueItem(ctx, item, at, osqueue.EnqueueOpts{})
 			require.NoError(t, err)
 
-			shadowPart := q.ItemShadowPartition(ctx, item)
+			shadowPart := osqueue.ItemShadowPartition(ctx, item)
 
 			require.Equal(t, 0, scard(kg.ActiveRunsSet("p", shadowPart.PartitionID)))
 			require.Equal(t, 0, scard(kg.ActiveRunsSet("account", accountID.String())))
@@ -3740,7 +3726,7 @@ func TestQueueActiveCounters(t *testing.T) {
 			require.Equal(t, 0, scard(kg.ActiveSet("account", accountID.String())))
 
 			// lease
-			leaseID, err := q.Lease(ctx, i, 10*time.Second, clock.Now(), nil)
+			leaseID, err := shard.Lease(ctx, i, 10*time.Second, clock.Now(), nil)
 			require.NoError(t, err)
 			require.NotNil(t, leaseID)
 
@@ -3751,7 +3737,7 @@ func TestQueueActiveCounters(t *testing.T) {
 			require.Equal(t, 1, scard(kg.ActiveSet("account", accountID.String())))
 
 			// dequeue
-			require.NoError(t, q.Dequeue(ctx, defaultShard, i))
+			require.NoError(t, shard.Dequeue(ctx, i))
 
 			require.Equal(t, 0, scard(kg.ActiveRunsSet("p", shadowPart.PartitionID)))
 			require.Equal(t, 0, scard(kg.ActiveRunsSet("account", accountID.String())))
@@ -3853,17 +3839,17 @@ func TestQueueActiveCounters(t *testing.T) {
 
 			// enqueue to backlog
 			enqueueToBacklog = true
-			iA1, err := q.EnqueueItem(ctx, defaultShard, itemA1, at, osqueue.EnqueueOpts{})
+			iA1, err := shard.EnqueueItem(ctx, itemA1, at, osqueue.EnqueueOpts{})
 			require.NoError(t, err)
-			iA2, err := q.EnqueueItem(ctx, defaultShard, itemA2, at, osqueue.EnqueueOpts{})
+			iA2, err := shard.EnqueueItem(ctx, itemA2, at, osqueue.EnqueueOpts{})
 			require.NoError(t, err)
-			iB1, err := q.EnqueueItem(ctx, defaultShard, itemB1, at, osqueue.EnqueueOpts{})
+			iB1, err := shard.EnqueueItem(ctx, itemB1, at, osqueue.EnqueueOpts{})
 			require.NoError(t, err)
-			iB2, err := q.EnqueueItem(ctx, defaultShard, itemB2, at, osqueue.EnqueueOpts{})
+			iB2, err := shard.EnqueueItem(ctx, itemB2, at, osqueue.EnqueueOpts{})
 			require.NoError(t, err)
 
-			shadowPart := q.ItemShadowPartition(ctx, itemA1)
-			backlog := q.ItemBacklog(ctx, itemA1)
+			shadowPart := osqueue.ItemShadowPartition(ctx, itemA1)
+			backlog := osqueue.ItemBacklog(ctx, itemA1)
 
 			refillUntil := at.Add(time.Minute)
 
@@ -3883,11 +3869,11 @@ func TestQueueActiveCounters(t *testing.T) {
 
 			// refill
 			// Get items to refill from backlog
-			itemIDs, err := getItemIDsFromBacklog(ctx, q, &backlog, refillUntil, 1000)
+			itemIDs, err := getItemIDsFromBacklog(ctx, shard, &backlog, refillUntil, 1000)
 			require.NoError(t, err)
 
-			res, err := q.BacklogRefill(ctx, &backlog, &shadowPart, refillUntil, itemIDs, PartitionConstraintConfig{
-				Concurrency: PartitionConcurrency{
+			res, err := shard.BacklogRefill(ctx, &backlog, &shadowPart, refillUntil, itemIDs, osqueue.PartitionConstraintConfig{
+				Concurrency: osqueue.PartitionConcurrency{
 					SystemConcurrency:   consts.DefaultConcurrencyLimit,
 					AccountConcurrency:  consts.DefaultConcurrencyLimit,
 					FunctionConcurrency: consts.DefaultConcurrencyLimit,
@@ -3914,7 +3900,7 @@ func TestQueueActiveCounters(t *testing.T) {
 			require.Equal(t, clock.Now(), time.UnixMilli(iA1.RefilledAt))
 
 			// lease
-			leaseID, err := q.Lease(ctx, iA1, 10*time.Second, clock.Now(), nil)
+			leaseID, err := shard.Lease(ctx, iA1, 10*time.Second, clock.Now(), nil)
 			require.NoError(t, err)
 			require.NotNil(t, leaseID)
 
@@ -3928,7 +3914,7 @@ func TestQueueActiveCounters(t *testing.T) {
 			// requeue to backlog
 			requeueAt := clock.Now().Add(time.Minute)
 			enqueueToBacklog = true
-			require.NoError(t, q.Requeue(ctx, defaultShard, iA1, requeueAt))
+			require.NoError(t, shard.Requeue(ctx, iA1, requeueAt))
 
 			require.Equal(t, 2, scard(kg.ActiveRunsSet("p", shadowPart.PartitionID)))
 			require.Equal(t, 2, scard(kg.ActiveRunsSet("account", accountID.String())))
@@ -3945,7 +3931,7 @@ func TestQueueActiveCounters(t *testing.T) {
 			require.NoError(t, json.Unmarshal([]byte(currentItemStr), &iA2))
 
 			// lease
-			leaseID, err = q.Lease(ctx, iA2, 10*time.Second, clock.Now(), nil)
+			leaseID, err = shard.Lease(ctx, iA2, 10*time.Second, clock.Now(), nil)
 			require.NoError(t, err)
 			require.NotNil(t, leaseID)
 
@@ -3959,7 +3945,7 @@ func TestQueueActiveCounters(t *testing.T) {
 			// requeue to backlog
 			requeueAt = clock.Now().Add(time.Minute)
 			enqueueToBacklog = true
-			require.NoError(t, q.Requeue(ctx, defaultShard, iA2, requeueAt))
+			require.NoError(t, shard.Requeue(ctx, iA2, requeueAt))
 
 			require.Equal(t, 1, scard(kg.ActiveRunsSet("p", shadowPart.PartitionID)))
 			require.Equal(t, 1, scard(kg.ActiveRunsSet("account", accountID.String())))
@@ -3974,9 +3960,9 @@ func TestQueueActiveCounters(t *testing.T) {
 
 			currentItemStr = r.HGet(kg.QueueItem(), iB1.ID)
 			require.NoError(t, json.Unmarshal([]byte(currentItemStr), &iB1))
-			_, err = q.Lease(ctx, iB1, 10*time.Second, clock.Now(), nil)
+			_, err = shard.Lease(ctx, iB1, 10*time.Second, clock.Now(), nil)
 			require.NoError(t, err)
-			require.NoError(t, q.Requeue(ctx, defaultShard, iB1, requeueAt))
+			require.NoError(t, shard.Requeue(ctx, iB1, requeueAt))
 
 			require.Equal(t, 1, scard(kg.ActiveRunsSet("p", shadowPart.PartitionID)))
 			require.Equal(t, 1, scard(kg.ActiveRunsSet("account", accountID.String())))
@@ -3991,9 +3977,9 @@ func TestQueueActiveCounters(t *testing.T) {
 
 			currentItemStr = r.HGet(kg.QueueItem(), iB2.ID)
 			require.NoError(t, json.Unmarshal([]byte(currentItemStr), &iB2))
-			_, err = q.Lease(ctx, iB2, 10*time.Second, clock.Now(), nil)
+			_, err = shard.Lease(ctx, iB2, 10*time.Second, clock.Now(), nil)
 			require.NoError(t, err)
-			require.NoError(t, q.Requeue(ctx, defaultShard, iB2, requeueAt))
+			require.NoError(t, shard.Requeue(ctx, iB2, requeueAt))
 
 			require.Equal(t, 0, scard(kg.ActiveRunsSet("p", shadowPart.PartitionID)))
 			require.Equal(t, 0, scard(kg.ActiveRunsSet("account", accountID.String())))
@@ -4050,25 +4036,24 @@ func TestInvalidScoreOnRefill(t *testing.T) {
 	require.NoError(t, err)
 	defer rc.Close()
 
-	defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
-
-	constraints := PartitionConstraintConfig{
-		Concurrency: PartitionConcurrency{
+	constraints := osqueue.PartitionConstraintConfig{
+		Concurrency: osqueue.PartitionConcurrency{
 			AccountConcurrency:  100,
 			FunctionConcurrency: 20,
 		},
 	}
 	clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Minute))
-	q := NewQueue(
-		defaultShard,
-		WithClock(clock),
-		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+	_, shard := newQueue(
+		t, rc,
+		osqueue.WithClock(clock),
+		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 			return true
 		}),
-		WithPartitionConstraintConfigGetter(func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
+		osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
 			return constraints
 		}),
 	)
+	kg := shard.Client().kg
 	ctx := context.Background()
 
 	accountID, fnID, envID := uuid.New(), uuid.New(), uuid.New()
@@ -4115,23 +4100,23 @@ func TestInvalidScoreOnRefill(t *testing.T) {
 		QueueName: nil,
 	}
 
-	qi, err := q.EnqueueItem(ctx, defaultShard, item1, clock.Now(), osqueue.EnqueueOpts{})
+	qi, err := shard.EnqueueItem(ctx, item1, clock.Now(), osqueue.EnqueueOpts{})
 	require.NoError(t, err)
 
-	qi2, err := q.EnqueueItem(ctx, defaultShard, item2, clock.Now(), osqueue.EnqueueOpts{})
+	qi2, err := shard.EnqueueItem(ctx, item2, clock.Now(), osqueue.EnqueueOpts{})
 	require.NoError(t, err)
 
-	backlog := q.ItemBacklog(ctx, qi)
-	sp := q.ItemShadowPartition(ctx, qi)
+	backlog := osqueue.ItemBacklog(ctx, qi)
+	sp := osqueue.ItemShadowPartition(ctx, qi)
 
 	removed, err := r.ZRem(
-		defaultShard.RedisClient.kg.BacklogSet(backlog.BacklogID),
+		kg.BacklogSet(backlog.BacklogID),
 		qi.ID,
 	)
 	require.NoError(t, err)
 	require.True(t, removed)
 
-	res, err := q.BacklogRefill(
+	res, err := shard.BacklogRefill(
 		ctx,
 		&backlog,
 		&sp,

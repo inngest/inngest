@@ -1,16 +1,22 @@
 package constraintapi
 
 import (
+	"context"
 	"embed"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/fs"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
+	"github.com/inngest/inngest/pkg/util/errs"
+	"github.com/jonboulle/clockwork"
 	"github.com/redis/rueidis"
 )
 
@@ -137,6 +143,9 @@ type SerializedConcurrencyConstraint struct {
 
 	// InProgressItemKey represents the in progress item (concurrency) ZSET key for this constraint
 	InProgressItemKey string `json:"iik"`
+
+	// RetryAfterMS determines the retry duration in milliseconds if this concurrency constraint is limiting
+	RetryAfterMS int `json:"ra,omitempty"`
 }
 
 // SerializedThrottleConstraint represents a minimal version of ThrottleConstraint
@@ -234,6 +243,7 @@ func (ci ConstraintItem) ToSerializedConstraintItem(
 				EvaluatedKeyHash:   ci.Concurrency.EvaluatedKeyHash,
 				InProgressItemKey:  ci.Concurrency.InProgressItemKey,
 				InProgressLeaseKey: ci.Concurrency.InProgressLeasesKey(keyPrefix, accountID, envID, functionID),
+				RetryAfterMS:       int(ci.Concurrency.RetryAfter().Milliseconds()),
 			}
 
 			// Embed appropriate limit based on scope and mode
@@ -325,4 +335,60 @@ func strSlice(args []any) ([]string, error) {
 		}
 	}
 	return res, nil
+}
+
+func isTimeout(err error) bool {
+	if errors.Is(err, os.ErrDeadlineExceeded) {
+		return true
+	}
+
+	if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+		return true
+	}
+
+	return false
+}
+
+func executeLuaScript(
+	ctx context.Context,
+	name string,
+	mi MigrationIdentifier,
+	client rueidis.Client,
+	clock clockwork.Clock,
+	keys []string,
+	args []string,
+) ([]byte, errs.InternalError) {
+	// Get current time for duration metrics
+	start := clock.Now()
+
+	// Execute script and convert response to bytes (we return JSON from all scripts)
+	rawRes, err := scripts[name].Exec(ctx, client, keys, args).AsBytes()
+
+	status, retry := luaError(err)
+
+	// Report duration
+	metrics.HistogramConstraintAPILuaScriptDuration(ctx, clock.Since(start), metrics.HistogramOpt{
+		PkgName: pkgName,
+		Tags: map[string]any{
+			"operation": name,
+			"status":    status,
+			"source":    mi.String(),
+		},
+	})
+
+	if err != nil {
+		return nil, errs.Wrap(0, retry, "%s script failed: %w", name, err)
+	}
+
+	return rawRes, nil
+}
+
+func luaError(err error) (status string, retry bool) {
+	if isTimeout(err) {
+		return "timeout", true
+	}
+	if err != nil {
+		return "error", false
+	}
+	return "success", false
 }
