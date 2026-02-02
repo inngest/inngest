@@ -2,6 +2,7 @@ package constraintapi
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"testing"
 	"time"
@@ -323,6 +324,8 @@ func TestRedisCapacityManager_Concurrency(t *testing.T) {
 
 	t.Run("Acquire", func(t *testing.T) {
 		enableDebugLogs = true
+
+		var err error
 		resp, err := cm.Acquire(ctx, acquireReq)
 		require.NoError(t, err)
 		require.NotNil(t, resp)
@@ -355,6 +358,20 @@ func TestRedisCapacityManager_Concurrency(t *testing.T) {
 		require.True(t, r.Exists(cm.keyLeaseDetails(cm.queueStateKeyPrefix, accountID, leaseID)))
 		require.True(t, r.Exists(cm.keyConstraintCheckIdempotency(cm.queueStateKeyPrefix, accountID, leaseIdempotencyKey)))
 		require.True(t, r.Exists(cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "acq", acquireIdempotencyKey)))
+
+		keyRequestState := cm.keyRequestState(cm.queueStateKeyPrefix, accountID, resp.RequestID)
+		require.True(t, r.Exists(keyRequestState))
+
+		requestState, err := r.Get(keyRequestState)
+		require.NoError(t, err)
+
+		var state redisRequestState
+		require.NoError(t, json.Unmarshal([]byte(requestState), &state))
+
+		// Ensure we include metadata in state
+		require.Equal(t, CallerLocationSchedule, state.Metadata.SourceLocation)
+		require.Equal(t, ServiceExecutor, state.Metadata.SourceService)
+		require.Equal(t, RunProcessingModeBackground, state.Metadata.SourceRunProcessingMode)
 	})
 
 	var checkHash string
