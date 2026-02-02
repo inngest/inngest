@@ -840,6 +840,15 @@ func IncrPausesExpiredDeletedCounter(ctx context.Context, count int64, opts Coun
 	})
 }
 
+func IncrPausesOrphanedIndexCleanupCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "pauses_orphaned_index_cleanup_total",
+		Description: "Total number of orphaned pause IDs removed from index",
+		Tags:        opts.Tags,
+	})
+}
+
 func IncrBacklogRefillConstraintCheckFallbackCounter(ctx context.Context, reason string, opts CounterOpt) {
 	if opts.Tags == nil {
 		opts.Tags = map[string]any{}
