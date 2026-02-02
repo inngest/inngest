@@ -17,7 +17,7 @@ func TestRedisClientPing(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create client with the stored address (which is now the full connectAddr)
-	rc, err := NewRedisClient(gc.Addr, gc.Username, gc.Password)
+	rc, err := NewRedisClient(gc.Addr, gc.Username, gc.Password, false)
 	require.NoError(t, err)
 
 	res, err := rc.Do(ctx, rc.B().Ping().Build()).ToString()
@@ -38,7 +38,7 @@ func TestCustomConfiguration(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create client with the stored address (which is now the full connectAddr)
-	rc, err := NewRedisClient(gc.Addr, gc.Username, gc.Password)
+	rc, err := NewRedisClient(gc.Addr, gc.Username, gc.Password, false)
 	require.NoError(t, err)
 
 	res, err := rc.Do(ctx, rc.B().Ping().Build()).ToString()
@@ -65,7 +65,7 @@ func TestCustomImage(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create client with the stored address
-	rc, err := NewRedisClient(gc.Addr, gc.Username, gc.Password)
+	rc, err := NewRedisClient(gc.Addr, gc.Username, gc.Password, false)
 	require.NoError(t, err)
 
 	res, err := rc.Do(ctx, rc.B().Ping().Build()).ToString()
