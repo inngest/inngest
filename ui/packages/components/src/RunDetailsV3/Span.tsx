@@ -1,6 +1,8 @@
 import { getStatusBackgroundClass, getStatusBorderClass } from '../Status/statusClasses';
 import { cn } from '../utils/classNames';
 import { toMaybeDate } from '../utils/date';
+import { SegmentedTimelineSpan } from './SegmentedTimelineSpan';
+import { isStepRunSpan } from './timingBreakdown';
 import type { Trace } from './types';
 import { createSpanWidths } from './utils';
 
@@ -13,6 +15,19 @@ type Props = {
 };
 
 export function Span({ className, isInline, maxTime, minTime, span: trace }: Props) {
+  // US2: Use segmented timeline span for step.run spans (EXE-1217)
+  if (isStepRunSpan(trace) && !trace.isUserland) {
+    return (
+      <SegmentedTimelineSpan
+        className={className}
+        isInline={isInline}
+        maxTime={maxTime}
+        minTime={minTime}
+        span={trace}
+      />
+    );
+  }
+
   const widths = createSpanWidths({
     ended: toMaybeDate(trace.endedAt)?.getTime() ?? null,
     max: maxTime.getTime(),
