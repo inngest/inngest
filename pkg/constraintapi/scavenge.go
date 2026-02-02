@@ -423,7 +423,7 @@ func (r *redisCapacityManager) scavengeAccount(
 			},
 		})
 
-		_, err := r.Release(ctx, &CapacityReleaseRequest{
+		resp, err := r.Release(ctx, &CapacityReleaseRequest{
 			IdempotencyKey: leaseID.String(),
 			AccountID:      accountID,
 			LeaseID:        leaseID,
@@ -441,6 +441,11 @@ func (r *redisCapacityManager) scavengeAccount(
 			"lease_id", leaseID,
 			"account_id", accountID,
 			"migration", mi,
+			"function_id", resp.FunctionID,
+			"env_id", resp.EnvID,
+			"location", resp.CreationSource.Location.String(),
+			"service", resp.CreationSource.Service.String(),
+			"run_processing_mode", resp.CreationSource.RunProcessingMode.String(),
 		)
 
 		l.Debug("scavenged expired lease",

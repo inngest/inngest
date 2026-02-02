@@ -18,6 +18,12 @@ import (
 	"github.com/redis/rueidis"
 )
 
+type stateMetadata struct {
+	SourceService           LeaseService      `json:"ss,omitempty"`
+	SourceLocation          CallerLocation    `json:"sl,omitempty"`
+	SourceRunProcessingMode RunProcessingMode `json:"sm,omitempty"`
+}
+
 // redisRequestState represents the data structure stored for every request
 // This is used by subsequent calls to Extend, Release to properly handle the lease lifecycle
 //
@@ -54,6 +60,9 @@ type redisRequestState struct {
 
 	// LeaseRunIDs stores the run IDs associated with hashed lease idempotency keys
 	LeaseRunIDs map[string]ulid.ULID `json:"lri,omitempty"`
+
+	// Annotate metadata
+	Metadata stateMetadata `json:"m,omitzero"`
 }
 
 func buildRequestState(req *CapacityAcquireRequest, keyPrefix string) (
@@ -74,6 +83,12 @@ func buildRequestState(req *CapacityAcquireRequest, keyPrefix string) (
 		// These keys are set during Acquire and Release respectively
 		GrantedAmount: 0,
 		ActiveAmount:  0,
+
+		Metadata: stateMetadata{
+			SourceService:           req.Source.Service,
+			SourceLocation:          req.Source.Location,
+			SourceRunProcessingMode: req.Source.RunProcessingMode,
+		},
 	}
 
 	// We hash all idempotency keys provided by users internally.
