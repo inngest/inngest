@@ -24,7 +24,9 @@ import { ErrorInfo } from './ErrorInfo';
 import { IO } from './IO';
 import { MetadataAttrs } from './MetadataAttrs';
 import { Tabs } from './Tabs';
+import { TimingBreakdownPanel } from './TimingBreakdownPanel';
 import { UserlandAttrs } from './UserlandAttrs';
+import { calculateTimingBreakdown, isStepRunSpan } from './timingBreakdown';
 import {
   isStepInfoInvoke,
   isStepInfoSignal,
@@ -281,6 +283,19 @@ export const StepInfo = ({
           {aiOutput && <AITrace aiOutput={aiOutput} />}
         </div>
       )}
+
+      {/* Timing Breakdown Panel for step.run spans (EXE-1217) */}
+      {expanded &&
+        !trace.isUserland &&
+        isStepRunSpan(trace) &&
+        (() => {
+          const breakdown = calculateTimingBreakdown(trace);
+          return breakdown ? (
+            <div className="px-4 pb-2">
+              <TimingBreakdownPanel breakdown={breakdown} />
+            </div>
+          ) : null;
+        })()}
 
       {trace.isUserland && trace.userlandSpan ? (
         <div className="flex-1">

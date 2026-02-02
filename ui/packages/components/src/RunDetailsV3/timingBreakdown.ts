@@ -4,7 +4,6 @@
  */ import {
   isStepInfoRun,
   type SpanTimingBreakdown,
-  type TimingCategory,
   type TimingCategoryTotal,
   type Trace,
 } from './types';
@@ -92,7 +91,10 @@ export function calculateTimingBreakdown(trace: Trace): SpanTimingBreakdown | nu
   const endedAt = trace.endedAt ? new Date(trace.endedAt).getTime() : Date.now();
 
   // Calculate durations (FR-002, FR-003)
-  const queueDelay = startedAt ? Math.max(0, startedAt - queuedAt) : 0;
+  // When not started, all elapsed time is queue time
+  const queueDelay = startedAt
+    ? Math.max(0, startedAt - queuedAt)
+    : Math.max(0, Date.now() - queuedAt);
   const executionTime = startedAt ? Math.max(0, endedAt - startedAt) : 0;
   const totalDurationMs = startedAt ? queueDelay + executionTime : Date.now() - queuedAt;
 

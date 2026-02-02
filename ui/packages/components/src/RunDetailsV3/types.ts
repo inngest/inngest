@@ -207,7 +207,7 @@ export type TimingSegment = {
   /** Tailwind background class */
   color: string;
 
-  /** If true, render with striped/hatched pattern (for waiting states) */
+  /** If true, render with striped/hatched pattern (indicates in-progress execution on customer server) */
   isWaiting?: boolean;
 
   /** Nested segments (e.g., DB Query within Running) - Phase 2 */

@@ -33,3 +33,7 @@ export {
   formatDuration,
   calculateTimingBreakdown,
 } from './timingBreakdown';
+
+// Timing breakdown components
+export { SegmentedSpanBar } from './SegmentedSpanBar';
+export { TimingBreakdownPanel } from './TimingBreakdownPanel';
