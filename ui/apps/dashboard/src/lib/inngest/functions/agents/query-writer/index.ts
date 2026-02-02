@@ -77,6 +77,9 @@ export const queryWriterAgent = createAgent<InsightsAgentState>({
     // Get current query if it exists
     const currentQuery = network?.state.data.currentQuery;
 
+    // Get user query from state
+    const query = network?.state.data.query;
+
     // Prepare context for system prompt hydration
     const promptContext = {
       hasSelectedEvents: selectedEvents.length > 0,
@@ -85,6 +88,7 @@ export const queryWriterAgent = createAgent<InsightsAgentState>({
       schemas: selectedSchemas,
       hasCurrentQuery: !!currentQuery,
       currentQuery: currentQuery || '',
+      query: query || '',
     };
 
     // Store prompt context in observability format with schemas
