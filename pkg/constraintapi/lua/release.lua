@@ -62,7 +62,7 @@ if requestStateStr == nil or requestStateStr == false or requestStateStr == "" t
 	return cjson.encode(res)
 end
 
----@type { k: string, e: string, f: string, s: {}[], cv: integer?, r: integer?, g: integer?, a: integer?, l: integer?, lik: string[]?, lri: table<string, string>? }
+---@type { k: string, e: string, f: string, s: {}[], cv: integer?, r: integer?, g: integer?, a: integer?, l: integer?, lik: string[]?, lri: table<string, string>?, m: { ss: integer?, sl: integer?, sm: integer? }? }
 local requestDetails = cjson.decode(requestStateStr)
 if not requestDetails then
 	return redis.error_reply("ERR requestDetails is nil after JSON decode")
