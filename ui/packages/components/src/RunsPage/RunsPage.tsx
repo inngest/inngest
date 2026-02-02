@@ -21,7 +21,7 @@ import useLocalStorage from 'react-use/lib/useLocalStorage';
 import CodeSearch from '../CodeSearch/CodeSearch';
 import type { RangeChangeProps } from '../DatePicker/RangePicker';
 import EntityFilter from '../Filter/EntityFilter';
-import { RunDetailsV3 } from '../RunDetailsV3/RunDetailsV3';
+import { RunDetailsV4 } from '../RunDetailsV4';
 import {
   useBatchedSearchParams,
   useSearchParam,
@@ -39,7 +39,7 @@ type Props = {
   data: Run[];
   defaultVisibleColumns?: ColumnID[];
   features: Pick<Features, 'history' | 'tracesPreview'>;
-  getTrigger: React.ComponentProps<typeof RunDetailsV3>['getTrigger'];
+  getTrigger: React.ComponentProps<typeof RunDetailsV4>['getTrigger'];
   hasMore: boolean;
   isLoadingInitial: boolean;
   isLoadingMore: boolean;
@@ -221,7 +221,7 @@ export function RunsPage({
     (rowData: Run) => {
       return (
         <div className={`border-subtle `}>
-          <RunDetailsV3
+          <RunDetailsV4
             initialRunData={rowData}
             getTrigger={getTrigger}
             pollInterval={pollInterval}
