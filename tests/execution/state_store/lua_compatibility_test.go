@@ -537,13 +537,10 @@ func TestStateStoreLuaCompatibility(t *testing.T) {
 						helper.WithImage(testutil.GarnetDefaultImage),
 						helper.WithConfiguration(&helper.GarnetConfiguration{EnableLua: true}),
 					)
-					if err != nil {
-						t.Skipf("Skipping Garnet: %v", err)
-						return
-					}
+					require.NoError(t, err)
 					t.Cleanup(func() { _ = container.Terminate(ctx) })
 
-					client, err = helper.NewRedisClient(container.Addr, container.Username, container.Password)
+					client, err = helper.NewRedisClient(container.Addr, container.Username, container.Password, false)
 					require.NoError(t, err)
 					t.Cleanup(func() { client.Close() })
 				}
