@@ -3,11 +3,7 @@ import { useClient } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { graphql } from '@/gql';
-import {
-  InsightsColumnType,
-  type InsightsResultsQuery,
-  type InsightsDiagnosticSeverity,
-} from '@/gql/graphql';
+import { InsightsColumnType, type InsightsResultsQuery } from '@/gql/graphql';
 import { UNTITLED_QUERY } from '../InsightsTabManager/constants';
 import type { InsightsFetchResult } from './types';
 
@@ -35,6 +31,7 @@ const insightResultsQuery = graphql(`
           context
         }
         severity
+        code
         message
       }
     }
@@ -145,6 +142,7 @@ function transformInsightsResponse(
             context: diag.position.context,
           },
           severity: diag.severity,
+          code: diag.code,
           message: diag.message,
         };
       }) ?? [],

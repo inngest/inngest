@@ -1,4 +1,8 @@
-import { SQLEditor } from '@inngest/components/SQLEditor/SQLEditor';
+import {
+  SQLEditor,
+  type SQLEditorMarkerData,
+  SQLEditorURI,
+} from '@inngest/components/SQLEditor/SQLEditor';
 import { useInsightsStateMachineContext } from '../InsightsStateMachineContext/InsightsStateMachineContext';
 import { hasUnsavedChanges } from '../InsightsTabManager/InsightsTabManager';
 import { useActiveTab } from '../InsightsTabManager/TabManagerContext';
@@ -132,9 +136,14 @@ export function InsightsSQLEditor() {
           startLineNumber: startPos.lineNumber,
           endColumn: endPos.column,
           endLineNumber: endPos.lineNumber,
-          severity: diag.severity === 'ERROR' ? 8 : 4,
-          message: diag.message,
-        };
+          severity: diag.severity === 'error' ? 8 : 4,
+          code: {
+            // TODO: add docs links based on diagnostic code
+            target: SQLEditorURI.parse('http://example.com'),
+            value: diag.code,
+          },
+          message: diag.message, // TODO: pretty message by code
+        } as SQLEditorMarkerData;
       });
 
     monaco.editor.setModelMarkers(model, 'insights', decorations ?? []);

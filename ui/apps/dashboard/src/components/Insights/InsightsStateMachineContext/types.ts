@@ -7,15 +7,22 @@ export interface InsightsFetchResult {
     id: string;
     values: Record<string, null | Date | string | number>;
   }>;
-  diagnostics: Array<{
-    position?: {
-      start: number;
-      end: number;
-      context: string;
-    };
-    severity: 'ERROR' | 'WARNING' | 'INFO' | 'NONE';
-    message: string;
-  }>;
+  diagnostics: Array<InsightsDiagnostic>;
 }
+
+export interface InsightsDiagnostic {
+  position?: {
+    start: number;
+    end: number;
+    context: string;
+  };
+  severity: InsightsDiagnosticSeverity;
+  code: InsightsDiagnosticCode;
+  message: string;
+}
+
+export type InsightsDiagnosticSeverity = 'none' | 'info' | 'warning' | 'error';
+
+export type InsightsDiagnosticCode = string; // TODO: Define specific diagnostic codes
 
 export type InsightsStatus = 'error' | 'initial' | 'loading' | 'success';

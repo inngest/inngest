@@ -66,6 +66,10 @@ const graphqlConfig = {
               Upload: 'unknown',
               Unknown: 'unknown',
               UUID: 'string',
+              InsightsDiagnosticSeverity:
+                '@inngest/components/Insights/InsightsStateMachineContext/types#InsightsDiagnosticSeverity',
+              InsightsDiagnosticCode:
+                '@inngest/components/Insights/InsightsStateMachineContext/types#InsightsDiagnosticCode',
             },
           },
           presetConfig: {

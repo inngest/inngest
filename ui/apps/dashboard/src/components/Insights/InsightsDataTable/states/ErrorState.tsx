@@ -22,7 +22,7 @@ export function ErrorState() {
 
   const errorMessage = error
     ? pruneGraphQLError(error)
-    : data?.diagnostics.find((x) => x.severity === 'ERROR') !== undefined
+    : data?.diagnostics.find((x) => x.severity === 'error') !== undefined
     ? formatDiagnosticMessage(editorRef.current, data.diagnostics)
     : FALLBACK_ERROR;
 
@@ -74,7 +74,6 @@ function formatDiagnosticMessage(
 ) {
   const model = editor?.getModel();
   return diagnostics
-    .filter((d) => d.severity === 'ERROR')
     .map((diag) => {
       if (!diag.position || !model) {
         return `${diag.message}`;
@@ -82,7 +81,7 @@ function formatDiagnosticMessage(
 
       const startPos = model.getPositionAt(diag.position.start);
 
-      return `${startPos.lineNumber}:${startPos.column}\t  ${diag.message} (${diag.position.context})`;
+      return `${diag.severity}\t${startPos.lineNumber}:${startPos.column}\t${diag.message} (${diag.position.context})`;
     })
     .join('\n');
 }
