@@ -167,3 +167,96 @@ export function isStepInfoSignal(stepInfo: Trace['stepInfo']): stepInfo is StepI
 
   return 'signal' in stepInfo;
 }
+
+// ============================================================================
+// Timing Breakdown Types (EXE-1217)
+// ============================================================================
+
+/**
+ * Timing breakdown categories for span visualization
+ * Note: 'customer_server' displays as "{ORG_NAME} SERVER" in UI
+ * Note: 'connecting' is reserved for Phase 2
+ */
+export type TimingCategory = 'inngest' | 'connecting' | 'customer_server';
+
+/**
+ * Segment types within each category
+ */
+export type InngestSegmentType = 'queue' | 'concurrency_delay' | 'processing';
+export type ConnectingSegmentType = 'request' | 'handshake';
+export type CustomerServerSegmentType = 'middleware' | 'running' | 'db_query' | 'checkpointing';
+
+export type SegmentType = InngestSegmentType | ConnectingSegmentType | CustomerServerSegmentType;
+
+/**
+ * Individual timing segment within a category
+ */
+export type TimingSegment = {
+  /** Parent category */
+  category: TimingCategory;
+
+  /** Specific segment type */
+  segmentType: SegmentType;
+
+  /** Display label (e.g., "Queue", "Running") */
+  label: string;
+
+  /** Duration in milliseconds */
+  durationMs: number;
+
+  /** Tailwind background class */
+  color: string;
+
+  /** If true, render with striped/hatched pattern (for waiting states) */
+  isWaiting?: boolean;
+
+  /** Nested segments (e.g., DB Query within Running) - Phase 2 */
+  children?: TimingSegment[];
+};
+
+/**
+ * Category totals for the breakdown panel
+ */
+export type TimingCategoryTotal = {
+  /** Category identifier */
+  category: TimingCategory;
+
+  /** Display label (e.g., "INNGEST", "ACME CORP SERVER") */
+  label: string;
+
+  /** Icon identifier for rendering */
+  icon: 'gear' | 'lightning' | 'building';
+
+  /** Total milliseconds for this category */
+  totalMs: number;
+
+  /** Individual segments within this category */
+  segments: TimingSegment[];
+};
+
+/**
+ * Complete timing breakdown for a span
+ */
+export type SpanTimingBreakdown = {
+  /** Total duration from queuedAt to endedAt */
+  totalDurationMs: number;
+
+  /** Category breakdowns with segment details */
+  categories: TimingCategoryTotal[];
+
+  /** For the top segmented bar rendering */
+  barSegments: Array<{
+    category: TimingCategory;
+    widthPercent: number;
+    isWaiting?: boolean;
+  }>;
+
+  /** Raw timestamps (epoch ms) */
+  queuedAt: number;
+  startedAt: number | null;
+  endedAt: number | null;
+
+  /** Formatted display timestamps */
+  startTime: string;
+  endTime: string;
+};
