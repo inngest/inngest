@@ -320,8 +320,8 @@ func TestBufferedBatchManager(t *testing.T) {
 
 		// First append starts blocking (we don't wait for it)
 		go func() {
-			_, err = buffered.Append(context.Background(), bi, fn)
-			require.NoError(t, err)
+			_, appendErr := buffered.Append(context.Background(), bi, fn)
+			require.NoError(t, appendErr)
 		}()
 
 		// Give time for first append to add to buffer
@@ -411,8 +411,8 @@ func TestBufferedBatchManager(t *testing.T) {
 		time.Sleep(20 * time.Millisecond)
 
 		// Close should flush the buffer
-		err = buffered.Close()
-		require.NoError(t, err)
+		closeErr := buffered.Close()
+		require.NoError(t, closeErr)
 
 		// Wait for append to complete
 		select {

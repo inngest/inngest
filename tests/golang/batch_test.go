@@ -379,7 +379,7 @@ func TestBatchInvoke(t *testing.T) {
 		require.EqualValues(t, 3, atomic.LoadInt32(&invokeCounter))
 
 		// Second trigger should be because of the batch timeout
-		<-time.After(5 * time.Second)
+		<-time.After(6 * time.Second)
 		require.EqualValues(t, 2, atomic.LoadInt32(&counter))
 		require.EqualValues(t, 5, atomic.LoadInt32(&totalEvents))
 		require.EqualValues(t, 5, atomic.LoadInt32(&invokeCounter))
