@@ -6,25 +6,8 @@
 import { max, min } from 'date-fns';
 
 import type { BarStyleKey, TimelineBarData, TimelineData } from '../TimelineBar.types';
-
-// Import V3 Trace type - we need to reference it without creating a circular dep
-type Trace = {
-  attempts: number | null;
-  childrenSpans?: Trace[];
-  endedAt: string | null;
-  isRoot: boolean;
-  name: string;
-  outputID: string | null;
-  queuedAt: string;
-  spanID: string;
-  stepID?: string | null;
-  startedAt: string | null;
-  status: string;
-  stepInfo: unknown;
-  stepOp?: string | null;
-  stepType?: string | null;
-  isUserland: boolean;
-};
+import { traceWalk } from '../runDetailsUtils';
+import type { Trace } from '../types';
 
 /**
  * Check if a trace represents a step.run span
@@ -116,14 +99,6 @@ function traceToBarData(trace: Trace, orgName?: string): TimelineBarData {
     timingBreakdown,
     isRoot: trace.isRoot,
   };
-}
-
-/**
- * Walk through a trace tree and apply a callback to each node
- */
-function traceWalk(trace: Trace, callback: (t: Trace) => void): void {
-  callback(trace);
-  trace.childrenSpans?.forEach((child) => traceWalk(child, callback));
 }
 
 /**
