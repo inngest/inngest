@@ -29,7 +29,7 @@ func TestBatchSizeLimit(t *testing.T) {
 
 	bc := redis_state.NewBatchClient(rc, redis_state.QueueDefaultKey)
 	// make the size limit crazy small (10 bytes) for verification purposes
-	bm := NewRedisBatchManager(bc, nil, WithRedisBatchSizeLimit(10))
+	bm := NewRedisBatchManager(bc, nil, WithoutBuffer(), WithRedisBatchSizeLimit(10))
 
 	accountId := uuid.New()
 	fnId := uuid.New()
@@ -71,7 +71,7 @@ func TestBatchAppendIdempotence(t *testing.T) {
 	defer rc.Close()
 
 	bc := redis_state.NewBatchClient(rc, redis_state.QueueDefaultKey)
-	bm := NewRedisBatchManager(bc, nil)
+	bm := NewRedisBatchManager(bc, nil, WithoutBuffer())
 
 	accountId := uuid.New()
 	fnId := uuid.New()
