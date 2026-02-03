@@ -7,9 +7,12 @@ import (
 
 	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/cqrs"
+	"github.com/inngest/inngest/pkg/execution/batch"
 	"github.com/inngest/inngest/pkg/execution/cron"
+	"github.com/inngest/inngest/pkg/execution/debounce"
 	"github.com/inngest/inngest/pkg/execution/pauses"
 	"github.com/inngest/inngest/pkg/execution/queue"
+	"github.com/inngest/inngest/pkg/execution/singleton"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/service"
@@ -26,16 +29,19 @@ func NewDebugAPI(o Opts) service.Service {
 	}
 
 	return &debugAPI{
-		rpc:       grpc.NewServer(),
-		port:      port,
-		log:       o.Log,
-		db:        o.DB,
-		queue:     o.Queue,
-		state:     o.State,
-		croner:    o.Cron,
-		findShard: o.ShardSelector,
-		pm:        o.PauseManager,
-		cm:        o.CapacityManager,
+		rpc:            grpc.NewServer(),
+		port:           port,
+		log:            o.Log,
+		db:             o.DB,
+		queue:          o.Queue,
+		state:          o.State,
+		croner:         o.Cron,
+		findShard:      o.ShardSelector,
+		pm:             o.PauseManager,
+		cm:             o.CapacityManager,
+		batchManager:   o.BatchManager,
+		singletonStore: o.SingletonStore,
+		debouncer:      o.Debouncer,
 	}
 }
 
@@ -49,6 +55,11 @@ type Opts struct {
 	CapacityManager constraintapi.CapacityManager
 
 	ShardSelector queue.ShardSelector
+
+	// Dependencies for batching, singleton, and debounce insights
+	BatchManager   batch.BatchManager
+	SingletonStore singleton.Singleton
+	Debouncer      debounce.Debouncer
 
 	Port int
 }
@@ -69,6 +80,11 @@ type debugAPI struct {
 	croner cron.CronManager
 	pm     pauses.Manager
 	cm     constraintapi.CapacityManager
+
+	// Dependencies for batching, singleton, and debounce insights
+	batchManager   batch.BatchManager
+	singletonStore singleton.Singleton
+	debouncer      debounce.Debouncer
 }
 
 func (d *debugAPI) Name() string {

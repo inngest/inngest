@@ -8,13 +8,12 @@ import (
 	"github.com/ohler55/ojg/jp"
 )
 
-func newNullMatcher(concurrency int64) MatchingEngine {
+func newNullMatcher() MatchingEngine {
 	return &nullLookup{
-		lock:        &sync.RWMutex{},
-		paths:       map[string]struct{}{},
-		null:        map[string][]*StoredExpressionPart{},
-		not:         map[string][]*StoredExpressionPart{},
-		concurrency: concurrency,
+		lock:  &sync.RWMutex{},
+		paths: map[string]struct{}{},
+		null:  map[string][]*StoredExpressionPart{},
+		not:   map[string][]*StoredExpressionPart{},
 	}
 }
 
@@ -26,8 +25,6 @@ type nullLookup struct {
 
 	null map[string][]*StoredExpressionPart
 	not  map[string][]*StoredExpressionPart
-
-	concurrency int64
 }
 
 func (n *nullLookup) Type() EngineType {
@@ -35,32 +32,25 @@ func (n *nullLookup) Type() EngineType {
 }
 
 func (n *nullLookup) Match(ctx context.Context, data map[string]any, result *MatchResult) (err error) {
-	pool := newErrPool(errPoolOpts{concurrency: n.concurrency})
+	for path := range n.paths {
+		x, err := jp.ParseString(path)
+		if err != nil {
+			return err
+		}
 
-	for item := range n.paths {
-		path := item
-		pool.Go(func() error {
-			x, err := jp.ParseString(path)
-			if err != nil {
-				return err
-			}
+		res := x.Get(data)
+		if len(res) == 0 {
+			// This isn't present, which matches null in our overloads.  Set the
+			// value to nil.
+			res = []any{nil}
+		}
 
-			res := x.Get(data)
-			if len(res) == 0 {
-				// This isn't present, which matches null in our overloads.  Set the
-				// value to nil.
-				res = []any{nil}
-			}
-
-			// XXX: This engine hasn't been updated with denied items for !=.  It needs consideration
-			// in how to handle these cases appropriately.
-			n.Search(ctx, path, res[0], result)
-
-			return nil
-		})
+		// XXX: This engine hasn't been updated with denied items for !=.  It needs consideration
+		// in how to handle these cases appropriately.
+		n.Search(ctx, path, res[0], result)
 	}
 
-	return pool.Wait()
+	return nil
 }
 
 func (n *nullLookup) Search(ctx context.Context, variable string, input any, result *MatchResult) {
@@ -103,33 +93,40 @@ func (n *nullLookup) Add(ctx context.Context, p ExpressionPart) error {
 	return nil
 }
 
-func (n *nullLookup) Remove(ctx context.Context, p ExpressionPart) error {
+func (n *nullLookup) Remove(ctx context.Context, parts []ExpressionPart) (int, error) {
 	n.lock.Lock()
 	defer n.lock.Unlock()
 
-	coll, ok := n.not[p.Predicate.Ident]
-	if p.Predicate.Operator == operators.Equals {
-		coll, ok = n.null[p.Predicate.Ident]
-	}
-
-	if !ok {
-		// This could not exist as there's nothing mapping this variable for
-		// the given event name.
-		return ErrExpressionPartNotFound
-	}
-
-	// Remove the expression part from the leaf.
-	for i, eval := range coll {
-		if p.EqualsStored(eval) {
-			coll = append(coll[:i], coll[i+1:]...)
-			if p.Predicate.Operator == operators.Equals {
-				n.null[p.Predicate.Ident] = coll
-			} else {
-				n.not[p.Predicate.Ident] = coll
-			}
-			return nil
+	processedCount := 0
+	for _, p := range parts {
+		// Check for context cancellation/timeout
+		if ctx.Err() != nil {
+			return processedCount, ctx.Err()
 		}
+
+		coll, ok := n.not[p.Predicate.Ident]
+		if p.Predicate.Operator == operators.Equals {
+			coll, ok = n.null[p.Predicate.Ident]
+		}
+
+		if !ok {
+			processedCount++
+			continue
+		}
+
+		for i, eval := range coll {
+			if p.EqualsStored(eval) {
+				coll = append(coll[:i], coll[i+1:]...)
+				if p.Predicate.Operator == operators.Equals {
+					n.null[p.Predicate.Ident] = coll
+				} else {
+					n.not[p.Predicate.Ident] = coll
+				}
+				break
+			}
+		}
+		processedCount++
 	}
 
-	return ErrExpressionPartNotFound
+	return processedCount, nil
 }

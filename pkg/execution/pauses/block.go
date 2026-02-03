@@ -272,6 +272,7 @@ func (b blockstore) flushIndexBlock(ctx context.Context, index Index) error {
 
 	n := 0
 	deleted := 0
+	skippedBeforeBoundary := 0
 	for iter.Next(ctx) {
 		item := iter.Val(ctx)
 		if item == nil {
@@ -284,9 +285,10 @@ func (b blockstore) flushIndexBlock(ctx context.Context, index Index) error {
 			// we may retrieve pauses that occurred slightly before the last block boundary.
 			// Skipping these prevents breaking the assumption that blocks are contiguous.
 			// Pauses before the boundary will remain in buffer indefinitely.
-			l.Warn("skipping pause before block boundary",
+			l.Trace("skipping pause before block boundary",
 				"pause_created_at", item.CreatedAt,
 				"block_boundary", since)
+			skippedBeforeBoundary++
 			continue
 		}
 
@@ -322,6 +324,12 @@ func (b blockstore) flushIndexBlock(ctx context.Context, index Index) error {
 		return fmt.Errorf("error iterating over buffered pauses: %w", iter.Error())
 	}
 
+	if skippedBeforeBoundary > 0 {
+		l.Warn("pauses skipped before block boundary",
+			"skipped_count", skippedBeforeBoundary,
+			"block_boundary", since)
+	}
+
 	// Trim any pauses that are nil.
 	block.Pauses = block.Pauses[:n]
 
@@ -354,7 +362,7 @@ func (b blockstore) flushIndexBlock(ctx context.Context, index Index) error {
 		}
 
 		metrics.IncrPausesBlockFlushExpectedFail(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"cause": cause}})
-		l.Warn("could not find enough pauses to flush into buffer", "len", len(block.Pauses), "cause", cause)
+		l.Warn("could not find enough pauses to flush into buffer", "len", len(block.Pauses), "cause", cause, "deleted", deleted, "skipped_before_boundary", skippedBeforeBoundary)
 
 		return nil
 	}
