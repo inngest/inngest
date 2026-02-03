@@ -8,7 +8,7 @@
  * - Optional expansion to show nested children
  */
 
-import type { CSSProperties } from 'react';
+import { useMemo, type CSSProperties } from 'react';
 import {
   RiArrowRightLine,
   RiBuilding2Line,
@@ -270,10 +270,11 @@ function VisualBar({
   const heightClass = BAR_HEIGHT_CLASSES[barStyle.barHeight ?? 'tall'];
   const opacityStyle = expanded ? { opacity: 0.5 } : {};
 
-  // Render compound bar with segments if provided
-  if (segments && segments.length > 0) {
-    // Transform each segment individually based on view offsets
-    const transformedSegments = segments
+  // Memoize segment transformation to avoid recalculating on every render
+  const transformedSegments = useMemo(() => {
+    if (!segments || segments.length === 0) return [];
+
+    return segments
       .map((segment) => {
         // Convert segment position from bar-relative to timeline-absolute
         const barStart = originalBarStart ?? 0;
@@ -298,7 +299,10 @@ function VisualBar({
         };
       })
       .filter(Boolean);
+  }, [segments, originalBarStart, originalBarWidth, viewStartOffset, viewEndOffset]);
 
+  // Render compound bar with segments if provided
+  if (segments && segments.length > 0) {
     // If no segments are visible, don't render the container
     if (transformedSegments.length === 0) return null;
 
