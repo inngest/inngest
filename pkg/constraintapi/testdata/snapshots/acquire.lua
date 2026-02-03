@@ -235,7 +235,15 @@ if availableCapacity <= 0 then
 end
 local granted = availableCapacity
 local grantedLeases = {}
+for i = 1, granted do
+	grantedLeases[i] = false
+end
 local accountLeasesArgs = {}
+for i = 1, granted * 2 do
+	accountLeasesArgs[i] = false
+end
+local keyPrefixLeaseDetails = scopedKeyPrefix .. ":ld:"
+local keyPrefixConstraintCheck = scopedKeyPrefix .. ":ik:cc:"
 for i = 1, granted, 1 do
 	if not requestDetails.lik then
 		return redis.error_reply("ERR requestDetails.lik is nil during update")
@@ -257,16 +265,16 @@ for i = 1, granted, 1 do
 			throttle(value.t.k, nowMS, value.t.p, value.t.l, maxBurst, 1)
 		end
 	end
-	local keyLeaseDetails = string.format("%s:ld:%s", scopedKeyPrefix, initialLeaseID)
+	local keyLeaseDetails = keyPrefixLeaseDetails .. initialLeaseID
 	call("HSET", keyLeaseDetails, "lik", hashedLeaseIdempotencyKey, "rid", leaseRunID, "req", requestID)
-	table.insert(accountLeasesArgs, tostring(leaseExpiryMS))
-	table.insert(accountLeasesArgs, initialLeaseID)
-	local keyLeaseConstraintCheckIdempotency = string.format("%s:ik:cc:%s", scopedKeyPrefix, hashedLeaseIdempotencyKey)
+	accountLeasesArgs[(i - 1) * 2 + 1] = tostring(leaseExpiryMS)
+	accountLeasesArgs[(i - 1) * 2 + 2] = initialLeaseID
+	local keyLeaseConstraintCheckIdempotency = keyPrefixConstraintCheck .. hashedLeaseIdempotencyKey
 	call("SET", keyLeaseConstraintCheckIdempotency, tostring(nowMS), "EX", tostring(constraintCheckIdempotencyTTL))
 	local leaseObject = {}
 	leaseObject["lid"] = initialLeaseID
 	leaseObject["lik"] = hashedLeaseIdempotencyKey
-	table.insert(grantedLeases, leaseObject)
+	grantedLeases[i] = leaseObject
 end
 if #accountLeasesArgs > 0 then
 	call("ZADD", keyAccountLeases, unpack(accountLeasesArgs))

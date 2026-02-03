@@ -185,9 +185,22 @@ local granted = availableCapacity
 
 ---@type { lid: string, lik: string }[]
 local grantedLeases = {}
+-- Pre-allocate array slots for grantedLeases
+for i = 1, granted do
+	-- Placeholder, will be replaced in loop
+	grantedLeases[i] = false
+end
 
 -- Collect arguments for batched ZADD to keyAccountLeases
 local accountLeasesArgs = {}
+-- Pre-allocate for 2 items per lease (score + member)
+for i = 1, granted * 2 do
+	accountLeasesArgs[i] = false
+end
+
+-- Pre-compute key prefixes to avoid repeated string.format calls
+local keyPrefixLeaseDetails = scopedKeyPrefix .. ":ld:"
+local keyPrefixConstraintCheck = scopedKeyPrefix .. ":ik:cc:"
 
 -- Update constraints
 for i = 1, granted, 1 do
@@ -218,17 +231,17 @@ for i = 1, granted, 1 do
 		end
 	end
 
-	local keyLeaseDetails = string.format("%s:ld:%s", scopedKeyPrefix, initialLeaseID)
+	local keyLeaseDetails = keyPrefixLeaseDetails .. initialLeaseID
 
 	-- Store lease details (hashed lease idempotency key, associated run ID, operation idempotency key for request details)
 	call("HSET", keyLeaseDetails, "lik", hashedLeaseIdempotencyKey, "rid", leaseRunID, "req", requestID)
 
 	-- Collect arguments for batched ZADD to account leases (executed after loop)
-	table.insert(accountLeasesArgs, tostring(leaseExpiryMS))
-	table.insert(accountLeasesArgs, initialLeaseID)
+	accountLeasesArgs[(i - 1) * 2 + 1] = tostring(leaseExpiryMS)
+	accountLeasesArgs[(i - 1) * 2 + 2] = initialLeaseID
 
 	-- Add constraint check idempotency for each lease (for graceful handling in rate limit, Lease, BacklogRefill, as well as Acquire in case lease expired)
-	local keyLeaseConstraintCheckIdempotency = string.format("%s:ik:cc:%s", scopedKeyPrefix, hashedLeaseIdempotencyKey)
+	local keyLeaseConstraintCheckIdempotency = keyPrefixConstraintCheck .. hashedLeaseIdempotencyKey
 	call("SET", keyLeaseConstraintCheckIdempotency, tostring(nowMS), "EX", tostring(constraintCheckIdempotencyTTL))
 
 	---@type { lid: string, lik: string }
@@ -236,7 +249,7 @@ for i = 1, granted, 1 do
 	leaseObject["lid"] = initialLeaseID
 	leaseObject["lik"] = hashedLeaseIdempotencyKey
 
-	table.insert(grantedLeases, leaseObject)
+	grantedLeases[i] = leaseObject
 end
 
 -- Batch add all leases to account leases sorted set
