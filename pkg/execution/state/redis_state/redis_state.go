@@ -23,6 +23,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
+	"slices"
 )
 
 //go:embed lua/*
@@ -1278,6 +1279,8 @@ type keyIter struct {
 	keys []string
 	// vals stores pauses as strings from MGET
 	vals []string
+	// currentIDs stores the original pause IDs for the current batch
+	currentIDs []string
 
 	// scores stores pause creation times or index scores
 	// they are conditionally used so the iterator works
@@ -1285,6 +1288,9 @@ type keyIter struct {
 	scores []float64
 
 	hasScores bool
+
+	// indexKeys are the sorted set index keys to clean up orphaned entries from
+	indexKeys []string
 
 	idx   int64
 	err   error
@@ -1339,11 +1345,15 @@ func (i *keyIter) fetch(ctx context.Context) error {
 		i.keys = []string{}
 	}
 
+	// Preserve original pause IDs before transforming to full keys
+	i.currentIDs = slices.Clone(load)
+
+	pauseKeys := make([]string, len(load))
 	for n, id := range load {
-		load[n] = i.kf.Pause(ctx, uuid.MustParse(id))
+		pauseKeys[n] = i.kf.Pause(ctx, uuid.MustParse(id))
 	}
 
-	cmd := i.r.B().Mget().Key(load...).Build()
+	cmd := i.r.B().Mget().Key(pauseKeys...).Build()
 	i.vals, i.err = i.r.Do(ctx, cmd).AsStrSlice()
 	if rueidis.IsRedisNil(i.err) {
 		// Somehow none of these pauses no longer exist, which is okay:
@@ -1373,11 +1383,28 @@ func (i *keyIter) Val(ctx context.Context) *state.Pause {
 
 	val := i.vals[0]
 	i.vals = i.vals[1:]
+
+	// Get the current pause ID and shift
+	var currentID string
+	if len(i.currentIDs) > 0 {
+		currentID = i.currentIDs[0]
+		i.currentIDs = i.currentIDs[1:]
+	}
+
 	if i.hasScores {
 		score = i.scores[0]
 		i.scores = i.scores[1:]
 	}
 	if val == "" {
+		// Pause data is gone but ID remains in index - clean it up
+		if len(i.indexKeys) > 0 && currentID != "" {
+			for _, indexKey := range i.indexKeys {
+				_ = i.r.Do(ctx, i.r.B().Zrem().Key(indexKey).Member(currentID).Build())
+			}
+			metrics.IncrPausesOrphanedIndexCleanupCounter(ctx, metrics.CounterOpt{
+				PkgName: pkgName,
+			})
+		}
 		return nil
 	}
 

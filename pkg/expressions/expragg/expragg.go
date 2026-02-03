@@ -212,6 +212,7 @@ func (a *aggregator) EvaluateAsyncEvent(ctx context.Context, event event.Tracked
 		"slow_expression_len", eval.SlowLen(),
 		"mixed_expression_len", eval.MixedLen(),
 		"fast_expression_len", eval.FastLen(),
+		"duration", time.Since(start),
 	)
 
 	return found, evalCount, err
