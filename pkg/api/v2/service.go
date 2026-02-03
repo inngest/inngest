@@ -7,32 +7,49 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"github.com/inngest/inngest/pkg/api"
 	"github.com/inngest/inngest/pkg/api/v2/apiv2base"
 	apiv2 "github.com/inngest/inngest/proto/gen/api/v2"
+<<<<<<< Updated upstream
+=======
+	"github.com/inngest/inngest/proto/gen/api/v2/apiv2connect"
+	"github.com/oklog/ulid/v2"
+>>>>>>> Stashed changes
 	"google.golang.org/grpc"
 )
+
+//
+// RunStreamProvider provides run data for streaming
+type RunStreamProvider interface {
+	//
+	// GetRunData retrieves run data for streaming. Returns the run data or an error.
+	GetRunData(ctx context.Context, accountID uuid.UUID, envID uuid.UUID, runID ulid.ULID) (*apiv2.RunData, error)
+}
 
 // Service implements the V2 API service for gRPC with grpc-gateway
 type Service struct {
 	apiv2.UnimplementedV2Server
-	signingKeys SigningKeysProvider
-	eventKeys   EventKeysProvider
-	base        *apiv2base.Base
+	signingKeys       SigningKeysProvider
+	eventKeys         EventKeysProvider
+	base              *apiv2base.Base
+	runStreamProvider RunStreamProvider
 }
 
 // ServiceOptions contains configuration for the V2 service
 type ServiceOptions struct {
-	SigningKeysProvider SigningKeysProvider
-	EventKeysProvider   EventKeysProvider
+	SigningKeysProvider   SigningKeysProvider
+	EventKeysProvider     EventKeysProvider
+	RunStreamProvider     RunStreamProvider
 }
 
 func NewService(opts ServiceOptions) *Service {
 	return &Service{
-		signingKeys: opts.SigningKeysProvider,
-		eventKeys:   opts.EventKeysProvider,
-		base:        apiv2base.NewBase(),
+		signingKeys:       opts.SigningKeysProvider,
+		eventKeys:         opts.EventKeysProvider,
+		base:              apiv2base.NewBase(),
+		runStreamProvider: opts.RunStreamProvider,
 	}
 }
 

@@ -5,6 +5,7 @@ import type { Run as InitialRunData } from '../RunsPage/types';
 import { useBooleanFlag } from '../SharedContext/useBooleanFlag';
 import { useGetRun } from '../SharedContext/useGetRun';
 import { useGetTraceResult } from '../SharedContext/useGetTraceResult';
+import { useStreamRun } from '../SharedContext/useStreamRun';
 import { StatusCell } from '../Table/Cell';
 import { TriggerDetails } from '../TriggerDetails';
 import { DragDivider } from '../icons/DragDivider';
@@ -154,6 +155,11 @@ export const RunDetailsV3 = ({
     //
     // TODO: enable this for cloud once we're sure we can handle the load
     refetchInterval: pollInterval,
+  });
+
+  const { data: streamRunData, error: streamRunError } = useStreamRun({
+    runID,
+    enabled: Boolean(runID),
   });
 
   const outputID = runData?.trace?.outputID;

@@ -485,9 +485,9 @@ export type CreateFunctionReplayInput = {
 
 export type CreateStripeSubscriptionResponse = {
   __typename?: 'CreateStripeSubscriptionResponse';
-  clientSecret: Scalars['String']['output'];
+  clientSecret: Maybe<Scalars['String']['output']>;
   message: Scalars['String']['output'];
-  subscriptionId: Scalars['String']['output'];
+  subscriptionId: Maybe<Scalars['String']['output']>;
 };
 
 export type CreateUserPayload = {
@@ -954,8 +954,6 @@ export type FunctionRun = {
   eventID: Maybe<Scalars['ULID']['output']>;
   events: Maybe<Array<ArchivedEvent>>;
   function: Workflow;
-  history: Array<RunHistoryItem>;
-  historyItemOutput: Maybe<Scalars['String']['output']>;
   id: Scalars['ULID']['output'];
   output: Maybe<Scalars['Bytes']['output']>;
   startedAt: Scalars['Time']['output'];
@@ -964,11 +962,6 @@ export type FunctionRun = {
   workflowVersion: Maybe<WorkflowVersion>;
   workflowVersionInt: Scalars['Int']['output'];
   workspaceID: Scalars['UUID']['output'];
-};
-
-
-export type FunctionRunHistoryItemOutputArgs = {
-  id: Scalars['ULID']['input'];
 };
 
 export enum FunctionRunStatus {
@@ -1060,30 +1053,6 @@ export type FunctionsFilter = {
   archived?: InputMaybe<Scalars['Boolean']['input']>;
   eventName?: InputMaybe<Scalars['String']['input']>;
 };
-
-export enum HistoryStepType {
-  Run = 'Run',
-  Send = 'Send',
-  Sleep = 'Sleep',
-  Wait = 'Wait'
-}
-
-export enum HistoryType {
-  FunctionCancelled = 'FunctionCancelled',
-  FunctionCompleted = 'FunctionCompleted',
-  FunctionFailed = 'FunctionFailed',
-  FunctionScheduled = 'FunctionScheduled',
-  FunctionStarted = 'FunctionStarted',
-  FunctionStatusUpdated = 'FunctionStatusUpdated',
-  None = 'None',
-  StepCompleted = 'StepCompleted',
-  StepErrored = 'StepErrored',
-  StepFailed = 'StepFailed',
-  StepScheduled = 'StepScheduled',
-  StepSleeping = 'StepSleeping',
-  StepStarted = 'StepStarted',
-  StepWaiting = 'StepWaiting'
-}
 
 export type IngestKey = {
   __typename?: 'IngestKey';
@@ -1851,116 +1820,6 @@ export type RetryConfiguration = {
   value: Scalars['Int']['output'];
 };
 
-export type RunHistoryCancel = {
-  __typename?: 'RunHistoryCancel';
-  eventID: Maybe<Scalars['ULID']['output']>;
-  expression: Maybe<Scalars['String']['output']>;
-  userID: Maybe<Scalars['UUID']['output']>;
-};
-
-export type RunHistoryInvokeFunction = {
-  __typename?: 'RunHistoryInvokeFunction';
-  correlationID: Scalars['String']['output'];
-  eventID: Scalars['ULID']['output'];
-  functionID: Scalars['String']['output'];
-  timeout: Scalars['Time']['output'];
-};
-
-export type RunHistoryInvokeFunctionResult = {
-  __typename?: 'RunHistoryInvokeFunctionResult';
-  eventID: Maybe<Scalars['ULID']['output']>;
-  runID: Maybe<Scalars['ULID']['output']>;
-  timeout: Scalars['Boolean']['output'];
-};
-
-export type RunHistoryItem = {
-  __typename?: 'RunHistoryItem';
-  attempt: Scalars['Int']['output'];
-  cancel: Maybe<RunHistoryCancel>;
-  createdAt: Scalars['Time']['output'];
-  functionVersion: Scalars['Int']['output'];
-  groupID: Maybe<Scalars['UUID']['output']>;
-  id: Scalars['ULID']['output'];
-  invokeFunction: Maybe<RunHistoryInvokeFunction>;
-  invokeFunctionResult: Maybe<RunHistoryInvokeFunctionResult>;
-  result: Maybe<RunHistoryResult>;
-  sleep: Maybe<RunHistorySleep>;
-  stepName: Maybe<Scalars['String']['output']>;
-  stepType: Maybe<HistoryStepType>;
-  type: HistoryType;
-  url: Maybe<Scalars['String']['output']>;
-  waitForEvent: Maybe<RunHistoryWaitForEvent>;
-  waitResult: Maybe<RunHistoryWaitResult>;
-};
-
-export type RunHistoryResult = {
-  __typename?: 'RunHistoryResult';
-  durationMS: Scalars['Int']['output'];
-  errorCode: Maybe<Scalars['String']['output']>;
-  framework: Maybe<Scalars['String']['output']>;
-  platform: Maybe<Scalars['String']['output']>;
-  sdkLanguage: Scalars['String']['output'];
-  sdkVersion: Scalars['String']['output'];
-  sizeBytes: Scalars['Int']['output'];
-};
-
-export type RunHistorySleep = {
-  __typename?: 'RunHistorySleep';
-  until: Scalars['Time']['output'];
-};
-
-export enum RunHistoryType {
-  EventReceived = 'EVENT_RECEIVED',
-  FunctionCancelled = 'FUNCTION_CANCELLED',
-  FunctionCompleted = 'FUNCTION_COMPLETED',
-  FunctionFailed = 'FUNCTION_FAILED',
-  FunctionScheduled = 'FUNCTION_SCHEDULED',
-  FunctionStarted = 'FUNCTION_STARTED',
-  StepCompleted = 'STEP_COMPLETED',
-  StepErrored = 'STEP_ERRORED',
-  StepFailed = 'STEP_FAILED',
-  StepScheduled = 'STEP_SCHEDULED',
-  StepSleeping = 'STEP_SLEEPING',
-  StepStarted = 'STEP_STARTED',
-  StepWaiting = 'STEP_WAITING',
-  Unknown = 'UNKNOWN'
-}
-
-export type RunHistoryWaitForEvent = {
-  __typename?: 'RunHistoryWaitForEvent';
-  eventName: Scalars['String']['output'];
-  expression: Maybe<Scalars['String']['output']>;
-  timeout: Scalars['Time']['output'];
-};
-
-export type RunHistoryWaitResult = {
-  __typename?: 'RunHistoryWaitResult';
-  eventID: Maybe<Scalars['ULID']['output']>;
-  timeout: Scalars['Boolean']['output'];
-};
-
-export type RunListConnection = {
-  __typename?: 'RunListConnection';
-  edges: Maybe<Array<Maybe<RunListItemEdge>>>;
-  pageInfo: PageInfo;
-  totalCount: Scalars['Int']['output'];
-};
-
-export type RunListItem = {
-  __typename?: 'RunListItem';
-  endedAt: Maybe<Scalars['Time']['output']>;
-  eventID: Scalars['ULID']['output'];
-  id: Scalars['ULID']['output'];
-  startedAt: Scalars['Time']['output'];
-  status: FunctionRunStatus;
-};
-
-export type RunListItemEdge = {
-  __typename?: 'RunListItemEdge';
-  cursor: Scalars['String']['output'];
-  node: RunListItem;
-};
-
 export type RunTraceSpan = {
   __typename?: 'RunTraceSpan';
   account: Account;
@@ -2424,6 +2283,7 @@ export type Workflow = {
   metrics: MetricsResponse;
   name: Scalars['String']['output'];
   previous: Array<Maybe<WorkflowVersion>>;
+  /** Lists the estimated number of runs to replay */
   replayCounts: ReplayRunCounts;
   /**
    * A list of all the function's replays.
@@ -2431,9 +2291,6 @@ export type Workflow = {
    * This doesn't include environment-level replays.
    */
   replays: Array<Replay>;
-  run: FunctionRun;
-  runs: Maybe<RunListConnection>;
-  runsV2: Maybe<RunListConnection>;
   slug: Scalars['String']['output'];
   triggers: Array<FunctionTrigger>;
   url: Scalars['String']['output'];
@@ -2460,25 +2317,6 @@ export type WorkflowMetricsArgs = {
 export type WorkflowReplayCountsArgs = {
   from: Scalars['Time']['input'];
   to: Scalars['Time']['input'];
-};
-
-
-export type WorkflowRunArgs = {
-  id: Scalars['ULID']['input'];
-};
-
-
-export type WorkflowRunsArgs = {
-  after: InputMaybe<Scalars['String']['input']>;
-  filter: RunsFilter;
-  first?: Scalars['Int']['input'];
-};
-
-
-export type WorkflowRunsV2Args = {
-  after: InputMaybe<Scalars['String']['input']>;
-  filter: RunsFilter;
-  first?: Scalars['Int']['input'];
 };
 
 
@@ -2852,7 +2690,7 @@ export type CreateStripeSubscriptionMutationVariables = Exact<{
 }>;
 
 
-export type CreateStripeSubscriptionMutation = { __typename?: 'Mutation', createStripeSubscription: { __typename?: 'CreateStripeSubscriptionResponse', clientSecret: string, message: string, subscriptionId: string } };
+export type CreateStripeSubscriptionMutation = { __typename?: 'Mutation', createStripeSubscription: { __typename?: 'CreateStripeSubscriptionResponse', clientSecret: string | null, message: string, subscriptionId: string | null } };
 
 export type ConfirmSubscriptionUpgradeMutationVariables = Exact<{
   subscriptionId: Scalars['String']['input'];
