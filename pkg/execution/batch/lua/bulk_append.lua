@@ -136,10 +136,11 @@ end
 local batchFull = finalLen >= batchLimit or batchMemorySize >= batchSizeLimit
 
 if batchFull then
-  -- Mark current batch as started
-  if not is_status_empty(batchMetadataKey) then
-    set_batch_status(batchMetadataKey, batchStatusStarted)
-  end
+  -- NOTE: We intentionally do NOT set status to "started" here.
+  -- The batch pointer is updated to prevent new items from being added,
+  -- and start.lua will set status to "started" when execution begins.
+  -- Setting it here would cause start.lua to skip execution thinking
+  -- the batch is already running.
 
   -- Check if we have overflow events
   if #eventsForOverflow > 0 then

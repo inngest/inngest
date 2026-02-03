@@ -260,6 +260,7 @@ func (b *redisBatchManager) StartExecution(ctx context.Context, functionId uuid.
 	args := []string{
 		enums.BatchStatusStarted.String(),
 		ulid.Make().String(),
+		batchID.String(), // Pass batchID for conditional pointer update
 	}
 
 	status, err := retriableScripts["start"].Exec(

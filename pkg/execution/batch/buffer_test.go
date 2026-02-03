@@ -232,7 +232,7 @@ func TestBufferedBatchManager(t *testing.T) {
 
 		require.NoError(t, err)
 		require.NotNil(t, result)
-		require.Equal(t, enums.BatchNew, result.Status)
+		require.Equal(t, enums.BatchAppend, result.Status) // Buffer handles scheduling internally
 
 		// Should have waited for timer (100ms)
 		require.GreaterOrEqual(t, elapsed, 90*time.Millisecond)
@@ -580,7 +580,7 @@ func TestBufferedFlushDurationClamping(t *testing.T) {
 
 		require.NoError(t, err)
 		require.NotNil(t, result)
-		require.Equal(t, enums.BatchNew, result.Status)
+		require.Equal(t, enums.BatchAppend, result.Status) // Buffer handles scheduling internally
 
 		// Should have flushed at ~100ms (function timeout), not 5s (buffer max)
 		require.GreaterOrEqual(t, elapsed, 90*time.Millisecond, "should wait at least near the batch timeout")
@@ -618,7 +618,7 @@ func TestBufferedFlushDurationClamping(t *testing.T) {
 
 		require.NoError(t, err)
 		require.NotNil(t, result)
-		require.Equal(t, enums.BatchNew, result.Status)
+		require.Equal(t, enums.BatchAppend, result.Status) // Buffer handles scheduling internally
 
 		// Should have flushed at ~100ms (buffer max), not waiting for 60s
 		require.GreaterOrEqual(t, elapsed, 90*time.Millisecond)
@@ -666,10 +666,10 @@ func TestBufferedIdempotence(t *testing.T) {
 			Event:       event.Event{Name: "test/event", Data: map[string]any{"a": 1}},
 		}
 
-		// First append - should succeed and create new batch
+		// First append - should succeed (buffer handles scheduling, returns Append status)
 		result1, err := buffered.Append(context.Background(), bi, fn)
 		require.NoError(t, err)
-		require.Equal(t, enums.BatchNew, result1.Status)
+		require.Equal(t, enums.BatchAppend, result1.Status)
 
 		// Second append with same eventID - should be detected as duplicate by Redis
 		result2, err := buffered.Append(context.Background(), bi, fn)
@@ -757,8 +757,8 @@ func TestBufferedIdempotence(t *testing.T) {
 		require.NoError(t, errs[1])
 		require.NoError(t, errs[2])
 
-		// First should be new, second should be append, third should be duplicate
-		require.Equal(t, enums.BatchNew, results[0].Status)
+		// With buffering, scheduling is handled internally so all non-duplicate items return Append
+		require.Equal(t, enums.BatchAppend, results[0].Status)
 		require.Equal(t, enums.BatchAppend, results[1].Status)
 		require.Equal(t, enums.BatchItemExists, results[2].Status)
 
@@ -825,20 +825,12 @@ func TestBufferedBatchFull(t *testing.T) {
 
 		wg.Wait()
 
-		// All should succeed
+		// All should succeed with BatchAppend status (buffer handles scheduling internally)
 		for i := 0; i < 5; i++ {
 			require.NoError(t, errs[i], "append %d failed", i)
 			require.NotNil(t, results[i], "result %d is nil", i)
+			require.Equal(t, enums.BatchAppend, results[i].Status, "result %d should be BatchAppend", i)
 		}
-
-		// At least one should report BatchFull (the batch is complete)
-		fullCount := 0
-		for i := 0; i < 5; i++ {
-			if results[i].Status == enums.BatchFull {
-				fullCount++
-			}
-		}
-		require.Greater(t, fullCount, 0, "at least one result should indicate batch is full")
 
 		// When batch is full, the pointer rotates to a new batch.
 		// Retrieve items using the batch ID from one of the results.

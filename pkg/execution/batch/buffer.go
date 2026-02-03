@@ -104,9 +104,10 @@ func (ab *appendBuffer) append(ctx context.Context, bi BatchItem, fn inngest.Fun
 
 	buf.mu.Lock()
 
-	// Local dedup check - return immediately if already seen in this buffer
 	eventIDStr := bi.EventID.String()
 	if _, seen := buf.seenIDs[eventIDStr]; seen {
+		// TODO: if we've already seen this item, we need to block on the result chan then return
+		// the result
 		buf.mu.Unlock()
 		return &BatchAppendResult{
 			Status:          enums.BatchItemExists,
@@ -206,7 +207,6 @@ func (ab *appendBuffer) flush(buf *batchBuffer, mgr BatchManager) {
 		fn      = buf.fn
 	)
 	buf.reset()
-
 	buf.mu.Unlock()
 
 	// extract BatchItems for the bulk call
@@ -217,6 +217,8 @@ func (ab *appendBuffer) flush(buf *batchBuffer, mgr BatchManager) {
 
 	// call BulkAppend - this commits all items atomically
 	bulkResult, err := mgr.BulkAppend(context.Background(), items, fn)
+
+	ab.log.Debug("flushed in-memory buffer", "len_pending", len(pending), "len_items", len(items), "result", bulkResult)
 
 	// Send results to all waiters
 	for i, p := range pending {
@@ -256,23 +258,15 @@ func (ab *appendBuffer) flush(buf *batchBuffer, mgr BatchManager) {
 }
 
 // mapBulkStatus maps a bulk append status to an individual item status.
+// Note: The buffer's handleScheduling handles all scheduling, so we return
+// BatchAppend for most statuses to prevent the executor from interfering.
 func (ab *appendBuffer) mapBulkStatus(bulkStatus string, itemIndex int) enums.Batch {
 	switch bulkStatus {
-	case "new":
-		// First item in a new batch
-		if itemIndex == 0 {
-			return enums.BatchNew
-		}
-		return enums.BatchAppend
-	case "full", "maxsize":
-		// Batch is complete
-		return enums.BatchFull
-	case "overflow":
-		// Batch overflowed - items split between batches
-		return enums.BatchFull
 	case "itemexists":
 		return enums.BatchItemExists
 	default:
+		// Buffer's handleScheduling handles all scheduling for new, full, maxsize, overflow.
+		// Return Append so executor doesn't try to schedule.
 		return enums.BatchAppend
 	}
 }
@@ -310,7 +304,56 @@ func (ab *appendBuffer) handleScheduling(result *BulkAppendResult, fn inngest.Fu
 			ab.log.Error("failed to schedule batch execution", "error", scheduleErr)
 		}
 
+	case "full", "maxsize":
+		// Batch is full - schedule immediate execution
+		batchID, err := ulid.Parse(result.BatchID)
+		if err != nil {
+			ab.log.Error("failed to parse batch ID", "error", err, "batchID", result.BatchID)
+			return
+		}
+
+		scheduleErr := mgr.ScheduleExecution(context.Background(), ScheduleBatchOpts{
+			ScheduleBatchPayload: ScheduleBatchPayload{
+				BatchID:         batchID,
+				BatchPointer:    result.BatchPointer,
+				AccountID:       firstItem.AccountID,
+				WorkspaceID:     firstItem.WorkspaceID,
+				AppID:           firstItem.AppID,
+				FunctionID:      fn.ID,
+				FunctionVersion: firstItem.FunctionVersion,
+			},
+			At: time.Now(), // Immediate execution
+		})
+		if scheduleErr != nil {
+			ab.log.Error("failed to schedule full batch execution", "error", scheduleErr)
+		}
+
 	case "overflow":
+		// Batch overflowed - schedule immediate execution for the full batch,
+		// and schedule timeout for the overflow batch
+		batchID, err := ulid.Parse(result.BatchID)
+		if err != nil {
+			ab.log.Error("failed to parse batch ID", "error", err, "batchID", result.BatchID)
+			return
+		}
+
+		// Schedule immediate execution for the full batch
+		scheduleErr := mgr.ScheduleExecution(context.Background(), ScheduleBatchOpts{
+			ScheduleBatchPayload: ScheduleBatchPayload{
+				BatchID:         batchID,
+				BatchPointer:    result.BatchPointer,
+				AccountID:       firstItem.AccountID,
+				WorkspaceID:     firstItem.WorkspaceID,
+				AppID:           firstItem.AppID,
+				FunctionID:      fn.ID,
+				FunctionVersion: firstItem.FunctionVersion,
+			},
+			At: time.Now(), // Immediate execution
+		})
+		if scheduleErr != nil {
+			ab.log.Error("failed to schedule full batch execution", "error", scheduleErr)
+		}
+
 		// Schedule timeout for the overflow batch
 		if result.NextBatchID != "" {
 			nextBatchID, err := ulid.Parse(result.NextBatchID)
@@ -319,7 +362,6 @@ func (ab *appendBuffer) handleScheduling(result *BulkAppendResult, fn inngest.Fu
 				return
 			}
 
-			// The overflow batch needs scheduling - the original batch is already full/started
 			scheduleErr := mgr.ScheduleExecution(context.Background(), ScheduleBatchOpts{
 				ScheduleBatchPayload: ScheduleBatchPayload{
 					BatchID:         nextBatchID,
@@ -337,8 +379,8 @@ func (ab *appendBuffer) handleScheduling(result *BulkAppendResult, fn inngest.Fu
 			}
 		}
 	}
-	// For "full", "maxsize", "append", "itemexists" - no scheduling needed
-	// The batch is either already scheduled or doesn't need new scheduling
+	// For "append", "itemexists" - no scheduling needed
+	// The batch is already scheduled from when it was created
 }
 
 // close shuts down the appendBuffer, flushing all pending buffers.

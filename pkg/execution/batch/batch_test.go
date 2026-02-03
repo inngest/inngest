@@ -139,7 +139,7 @@ func TestBatchAppendIdempotenceDifferentBatches(t *testing.T) {
 	defer rc.Close()
 
 	bc := redis_state.NewBatchClient(rc, redis_state.QueueDefaultKey)
-	bm := NewRedisBatchManager(bc, nil)
+	bm := NewRedisBatchManager(bc, nil, WithoutBuffer()) // Test direct append behavior
 
 	accountId := uuid.New()
 	fnId := uuid.New()
@@ -202,7 +202,7 @@ func TestBatchCleanup(t *testing.T) {
 	defer rc.Close()
 
 	bc := redis_state.NewBatchClient(rc, redis_state.QueueDefaultKey)
-	bm := NewRedisBatchManager(bc, nil)
+	bm := NewRedisBatchManager(bc, nil, WithoutBuffer()) // Test direct append behavior
 
 	accountId := uuid.New()
 	fnId := uuid.New()
@@ -434,7 +434,8 @@ func TestBatchCleanupIdempotenceKeyExpires(t *testing.T) {
 	bc := redis_state.NewBatchClient(rc, redis_state.QueueDefaultKey)
 	// Set a large deletion cutoff to keep the eventIDs in the idempotence set.
 	// Set a 5s TLL to ensure that after 5s of inactivity, the key is cleared.
-	bm := NewRedisBatchManager(bc, nil, WithRedisBatchIdempotenceSetTTL(5), WithRedisBatchIdempotenceSetCleanupCutoff(300))
+	// Disable buffer to test direct append behavior.
+	bm := NewRedisBatchManager(bc, nil, WithoutBuffer(), WithRedisBatchIdempotenceSetTTL(5), WithRedisBatchIdempotenceSetCleanupCutoff(300))
 
 	accountId := uuid.New()
 	fnId := uuid.New()
