@@ -94,6 +94,9 @@ export interface BarSegment {
 
   /** Optional tooltip content */
   tooltip?: string;
+
+  /** Run status for status-based coloring (e.g., COMPLETED, FAILED, CANCELLED) */
+  status?: string;
 }
 
 /**
@@ -148,6 +151,9 @@ export interface TimelineBarProps {
 
   /** Optional organization name for SERVER timing label */
   orgName?: string;
+
+  /** Run status for status-based coloring (e.g., COMPLETED, FAILED, CANCELLED) */
+  status?: string;
 
   /**
    * View offset - start position as percentage (0-100).
@@ -213,6 +219,9 @@ export interface TimelineBarData {
 
   /** Whether this bar represents the root run (clicking shows TopInfo) */
   isRoot?: boolean;
+
+  /** Run status for status-based coloring (e.g., COMPLETED, FAILED, CANCELLED) */
+  status?: string;
 }
 
 /**

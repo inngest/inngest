@@ -8,7 +8,9 @@
  * - Timing markers at 0%, 25%, 50%, 75%, 100% with duration labels
  */
 
+import { getStatusBackgroundClass } from '../Status/statusClasses';
 import { TimeBrush } from '../TimeBrush';
+import { cn } from '../utils/classNames';
 import { formatDuration } from './utils/formatting';
 import { TIMELINE_CONSTANTS } from './utils/timing';
 
@@ -21,6 +23,8 @@ type Props = {
   leftWidth: number;
   /** Callback when selection changes (start and end as percentages 0-100) */
   onSelectionChange?: (start: number, end: number) => void;
+  /** Run status for status-based coloring (e.g., COMPLETED, FAILED, CANCELLED) */
+  status?: string;
 };
 
 const TIME_MARKERS = [0, 25, 50, 75, 100];
@@ -41,8 +45,10 @@ export function TimelineHeader({
   maxTime,
   leftWidth,
   onSelectionChange,
+  status,
 }: Props): JSX.Element {
   const durations = getMarkerDurations(minTime, maxTime);
+  const barColorClass = status ? getStatusBackgroundClass(status) : 'bg-primary-moderate';
 
   return (
     <div className="mb-1 mt-5 flex w-full items-end">
@@ -82,7 +88,12 @@ export function TimelineHeader({
         {/* Time brush */}
         <TimeBrush onSelectionChange={onSelectionChange} className="mt-1">
           {/* Main timeline bar (always full width) */}
-          <div className="bg-primary-moderate pointer-events-none absolute left-0 top-1/2 h-1 w-full -translate-y-1/2" />
+          <div
+            className={cn(
+              'pointer-events-none absolute left-0 top-1/2 h-1 w-full -translate-y-1/2',
+              barColorClass
+            )}
+          />
         </TimeBrush>
 
         {/* Vertical guide lines (subtle) */}
