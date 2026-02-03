@@ -82,18 +82,18 @@ if not constraints then
 	return redis.error_reply("ERR constraints array is nil")
 end
 
--- Handle operation idempotency
-local opIdempotency = call("GET", keyOperationIdempotency)
-if opIdempotency ~= nil and opIdempotency ~= false then
-	debug("hit operation idempotency")
+-- Get operation idempotency and check existing request state in a single call
+local results = call("MGET", keyOperationIdempotency, keyRequestState)
+local opIdempotency = results[1]
+local existingRequestState = results[2]
 
+if opIdempotency ~= nil and opIdempotency ~= false then
 	-- Return idempotency state to user (same as initial response)
 	return opIdempotency
 end
 
 -- If the same request state is still in progress (active leases), we cannot acquire more leases for the same request
 -- This should never happen, as we generate a new ID for each request
-local existingRequestState = call("GET", keyRequestState)
 if existingRequestState ~= nil and existingRequestState ~= false and existingRequestState ~= "" then
 	local res = {}
 	res["s"] = 4
@@ -125,15 +125,12 @@ for index, value in ipairs(constraints) do
 		break
 	end
 
-	debug("checking constraint " .. index)
-
 	-- Retrieve constraint capacity
 	local constraintCapacity = 0
 	local constraintRetryAfter = 0
 	if skipGCRA and (value.k == 1 or value.k == 3) then
 		-- noop
 		constraintCapacity = availableCapacity
-		debug("skipping gcra" .. index)
 	elseif value.k == 1 then
 		-- rate limit
 		local rlRes = rateLimit(value.r.k, nowNS, value.r.p, value.r.l, value.r.b, 0)
@@ -141,7 +138,6 @@ for index, value in ipairs(constraints) do
 		constraintRetryAfter = toInteger(rlRes["retry_at"] / 1000000) -- convert from ns to ms
 	elseif value.k == 2 then
 		-- concurrency
-		debug("evaluating concurrency")
 		local inProgressItems = getConcurrencyCount(value.c.iik)
 		local inProgressLeases = getConcurrencyCount(value.c.ilk)
 		local inProgressTotal = inProgressItems + inProgressLeases
@@ -149,7 +145,6 @@ for index, value in ipairs(constraints) do
 		constraintRetryAfter = toInteger(nowMS + value.c.ra)
 	elseif value.k == 3 then
 		-- throttle
-		debug("evaluating throttle")
 		-- allow consuming all capacity in one request (for generating multiple leases)
 		local maxBurst = (value.t.l or 0) + (value.t.b or 0) - 1
 		local throttleRes = throttle(value.t.k, nowMS, value.t.p, value.t.l, maxBurst, 0)
@@ -159,18 +154,6 @@ for index, value in ipairs(constraints) do
 
 	-- If index ends up limiting capacity, reduce available capacity and remember current constraint
 	if constraintCapacity < availableCapacity then
-		debug(
-			"constraint has less capacity",
-			"c",
-			index,
-			"cc",
-			tostring(constraintCapacity),
-			"ac",
-			tostring(availableCapacity),
-			"ra",
-			tostring(constraintRetryAfter)
-		)
-
 		availableCapacity = constraintCapacity
 		table.insert(limitingConstraints, index)
 
@@ -219,7 +202,6 @@ for i = 1, granted, 1 do
 		if skipGCRA then
 		-- noop
 		elseif value.k == 1 then
-			debug("updating rate limit", value.r.h)
 			-- rate limit
 			rateLimit(value.r.k, nowNS, value.r.p, value.r.l, value.r.b, 1)
 		elseif value.k == 2 then
