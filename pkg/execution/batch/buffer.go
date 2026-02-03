@@ -255,6 +255,15 @@ func (ab *appendBuffer) flush(buf *batchBuffer, mgr BatchManager) {
 		}
 		close(p.pending.done)
 	}
+
+	// clean up empty buffer to prevent unbounded map growth.
+	ab.mu.Lock()
+	buf.mu.Lock()
+	if len(buf.items) == 0 {
+		delete(ab.buffers, buf.key)
+	}
+	buf.mu.Unlock()
+	ab.mu.Unlock()
 }
 
 // mapBulkStatus maps a bulk append status to an individual item status.
