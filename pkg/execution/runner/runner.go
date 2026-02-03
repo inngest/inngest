@@ -190,7 +190,11 @@ func (s *svc) Run(ctx context.Context) error {
 	}
 
 	s.log.Info("subscribing to events", "topic", s.config.EventStream.Service.TopicName())
-	err := s.pubsub.Subscribe(ctx, s.config.EventStream.Service.TopicName(), s.handleMessage)
+	// Use SubscribeN with concurrency to allow parallel event handling.
+	// This is necessary for batch buffering - when Append() blocks waiting for
+	// the buffer to fill/flush, we need other events to be processed concurrently
+	// to fill the buffer.
+	err := s.pubsub.SubscribeN(ctx, s.config.EventStream.Service.TopicName(), s.handleMessage, 1000)
 	if err != nil {
 		return err
 	}

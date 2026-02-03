@@ -57,10 +57,10 @@ func TestBatchEvents(t *testing.T) {
 	registerFuncs()
 
 	t.Run("trigger batch", func(t *testing.T) {
-		for i := 0; i < 8; i++ {
+		for i := range 8 {
 			_, err := inngestClient.Send(ctx, BatchEvent{
 				Name: "test/batch",
-				Data: BatchEventData{Time: time.Now()},
+				Data: BatchEventData{Time: time.Now(), Num: i},
 			})
 			require.NoError(t, err)
 		}
@@ -206,7 +206,6 @@ func TestBatchWithConditionalTrigger(t *testing.T) {
 		<-time.After(6 * time.Second)
 		assert.EqualValues(t, 1, atomic.LoadInt32(&counter))
 		assert.EqualValues(t, 5, atomic.LoadInt32(&totalEvents))
-
 	})
 }
 
@@ -253,7 +252,6 @@ func TestConditionalBatching(t *testing.T) {
 		<-time.After(6 * time.Second)
 		assert.EqualValues(t, 6, atomic.LoadInt32(&counter))
 		assert.EqualValues(t, 10, atomic.LoadInt32(&totalEvents))
-
 	})
 }
 
@@ -302,7 +300,6 @@ func TestConditionalBatchingWithEventTriggerCondition(t *testing.T) {
 		<-time.After(6 * time.Second)
 		assert.EqualValues(t, 6, atomic.LoadInt32(&counter))
 		assert.EqualValues(t, 10, atomic.LoadInt32(&totalEvents))
-
 	})
 }
 
@@ -389,7 +386,7 @@ func TestBatchInvoke(t *testing.T) {
 	})
 }
 
-func TestBatchEventsWithKeys(t *testing.T) {
+func TestBatchKeyEvents(t *testing.T) {
 	type BatchEventDataWithUserId struct {
 		Time   time.Time `json:"time"`
 		UserId string    `json:"userId"`
@@ -400,9 +397,7 @@ func TestBatchEventsWithKeys(t *testing.T) {
 	inngestClient, server, registerFuncs := NewSDKHandler(t, "user-notifications")
 	defer server.Close()
 
-	var (
-		totalEvents int32
-	)
+	var totalEvents int32
 
 	batchInvokedCounter := make(map[string]int32)
 	batchEventsCounter := make(map[string]int)

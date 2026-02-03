@@ -15,7 +15,7 @@ import (
 const (
 	// DefaultMaxBufferDuration is the default max time to buffer events in-memory
 	// before flushing.  must be less than the event ack deadline
-	DefaultMaxBufferDuration = 2 * time.Second
+	DefaultMaxBufferDuration = 500 * time.Millisecond
 
 	// DefaultMaxBufferSize is the default max events per buffer key before flush
 	DefaultMaxBufferSize = 100
@@ -122,7 +122,12 @@ func (ab *appendBuffer) append(ctx context.Context, bi BatchItem, fn inngest.Fun
 	})
 	buf.seenIDs[eventIDStr] = struct{}{}
 
-	shouldFlush := len(buf.items) >= ab.maxSize
+	// Check if we should flush based on function's batch config or buffer's global max
+	batchMaxSize := ab.maxSize
+	if fn.EventBatch != nil && fn.EventBatch.MaxSize > 0 {
+		batchMaxSize = fn.EventBatch.MaxSize
+	}
+	shouldFlush := len(buf.items) >= batchMaxSize
 
 	// Start timer if not running (first item in buffer)
 	if len(buf.items) == 1 && !shouldFlush {
