@@ -71,9 +71,8 @@ func (l *constraintCache) Acquire(ctx context.Context, req *CapacityAcquireReque
 		return l.manager.Acquire(ctx, req)
 	}
 
-	// Check if we previously got limited
-	recentlyLimited := make([]ConstraintItem, 0)
-	var retryAfter time.Time
+	// Check if any constraint is cached as exhausted
+	// Return immediately on first cache hit since any exhausted constraint blocks the request
 	for _, ci := range req.Constraints {
 		// Construct cache key for constraint scoped to account
 		cacheKey := ci.CacheKey(req.AccountID, req.EnvID, req.FunctionID)
@@ -83,17 +82,12 @@ func (l *constraintCache) Acquire(ctx context.Context, req *CapacityAcquireReque
 
 		item := l.cache.Get(cacheKey)
 		if item == nil || item.Expired() {
-			// Not limited previously
+			// Not cached or expired
 			continue
 		}
 
-		// This constraint was recently limited
+		// Cache hit - this constraint is exhausted
 		val := item.Value()
-
-		recentlyLimited = append(recentlyLimited, ci)
-		if val.retryAfter.After(retryAfter) {
-			retryAfter = val.retryAfter
-		}
 
 		tags := map[string]any{
 			"op":                  "hit",
@@ -108,11 +102,9 @@ func (l *constraintCache) Acquire(ctx context.Context, req *CapacityAcquireReque
 			PkgName: pkgName,
 			Tags:    tags,
 		})
-	}
 
-	// If one or more requested constraints were recently limited,
-	// return a synthetic response including all affected constraints.
-	if len(recentlyLimited) > 0 {
+		// Return immediately with synthetic response
+		// Exhausted constraints are also limiting constraints (they reduce capacity to 0)
 		requestID, err := ulid.New(ulid.Timestamp(l.clock.Now()), rand.Reader)
 		if err != nil {
 			return nil, errs.Wrap(0, false, "could not generate request ID: %w", err)
@@ -121,23 +113,25 @@ func (l *constraintCache) Acquire(ctx context.Context, req *CapacityAcquireReque
 		return &CapacityAcquireResponse{
 			RequestID:            requestID,
 			Leases:               nil,
-			ExhaustedConstraints: recentlyLimited,
-			RetryAfter:           retryAfter,
+			LimitingConstraints:  []ConstraintItem{ci},
+			ExhaustedConstraints: []ConstraintItem{ci},
+			RetryAfter:           val.retryAfter,
 		}, nil
-	} else {
-		tags := map[string]any{
-			"op":     "miss",
-			"source": req.Migration.String(),
-		}
-		if l.enableHighCardinalityInstrumentation != nil && l.enableHighCardinalityInstrumentation(ctx, req.AccountID, req.EnvID, req.FunctionID) {
-			tags["function_id"] = req.FunctionID
-		}
-
-		metrics.HistogramConstraintAPILimitingConstraintCacheTTL(ctx, 0, metrics.HistogramOpt{
-			PkgName: pkgName,
-			Tags:    tags,
-		})
 	}
+
+	// Cache miss - record metric
+	tags := map[string]any{
+		"op":     "miss",
+		"source": req.Migration.String(),
+	}
+	if l.enableHighCardinalityInstrumentation != nil && l.enableHighCardinalityInstrumentation(ctx, req.AccountID, req.EnvID, req.FunctionID) {
+		tags["function_id"] = req.FunctionID
+	}
+
+	metrics.HistogramConstraintAPILimitingConstraintCacheTTL(ctx, 0, metrics.HistogramOpt{
+		PkgName: pkgName,
+		Tags:    tags,
+	})
 
 	res, err := l.manager.Acquire(ctx, req)
 	if err != nil {
