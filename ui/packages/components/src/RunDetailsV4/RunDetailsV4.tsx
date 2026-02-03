@@ -230,13 +230,19 @@ export const RunDetailsV4 = ({
     }
   }, [pollingFlagReady, pollingDisabled]);
 
-  if (runData?.trace.endedAt && pollInterval) {
-    // Stop polling for ended runs, but still give it
-    // a few seconds for any lingering userland traces.
-    setTimeout(() => {
+  // Stop polling for ended runs, but still give it a few seconds
+  // for any lingering userland traces to arrive.
+  useEffect(() => {
+    if (!runData?.trace.endedAt || !pollInterval) {
+      return;
+    }
+
+    const timeoutId = setTimeout(() => {
       setPollInterval(undefined);
     }, RESIDUAL_POLL_INTERVAL);
-  }
+
+    return () => clearTimeout(timeoutId);
+  }, [runData?.trace.endedAt, pollInterval]);
 
   useEffect(() => {
     if (!runData?.status || runData?.status === initialRunData?.status) {
