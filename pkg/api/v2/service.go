@@ -12,15 +12,10 @@ import (
 	"github.com/inngest/inngest/pkg/api"
 	"github.com/inngest/inngest/pkg/api/v2/apiv2base"
 	apiv2 "github.com/inngest/inngest/proto/gen/api/v2"
-<<<<<<< Updated upstream
-=======
-	"github.com/inngest/inngest/proto/gen/api/v2/apiv2connect"
 	"github.com/oklog/ulid/v2"
->>>>>>> Stashed changes
 	"google.golang.org/grpc"
 )
 
-//
 // RunStreamProvider provides run data for streaming
 type RunStreamProvider interface {
 	//
@@ -39,9 +34,9 @@ type Service struct {
 
 // ServiceOptions contains configuration for the V2 service
 type ServiceOptions struct {
-	SigningKeysProvider   SigningKeysProvider
-	EventKeysProvider     EventKeysProvider
-	RunStreamProvider     RunStreamProvider
+	SigningKeysProvider SigningKeysProvider
+	EventKeysProvider   EventKeysProvider
+	RunStreamProvider   RunStreamProvider
 }
 
 func NewService(opts ServiceOptions) *Service {
