@@ -423,6 +423,7 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 			Tags:    tags,
 		})
 	}
+	delete(tags, "limiting_constraint")
 
 	// Export counter for exhaustedConstraints
 	for _, constraint := range exhaustedConstraints {
@@ -432,6 +433,7 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 			Tags:    tags,
 		})
 	}
+	delete(tags, "constraint")
 
 	switch parsedResponse.Status {
 	case 1, 3:

@@ -90,9 +90,9 @@ func (l *constraintCache) Acquire(ctx context.Context, req *CapacityAcquireReque
 		val := item.Value()
 
 		tags := map[string]any{
-			"op":                  "hit",
-			"source":              req.Migration.String(),
-			"limiting_constraint": ci.MetricsIdentifier(),
+			"op":         "hit",
+			"source":     req.Migration.String(),
+			"constraint": ci.MetricsIdentifier(),
 		}
 		if l.enableHighCardinalityInstrumentation != nil && l.enableHighCardinalityInstrumentation(ctx, req.AccountID, req.EnvID, req.FunctionID) {
 			tags["function_id"] = req.FunctionID

@@ -276,8 +276,10 @@ if #accountLeasesArgs > 0 then
 end
 
 -- Check for constraints exhausted after granting
-for index, capacity in pairs(constraintCapacities) do
-	if capacity - granted <= 0 then
+-- Use deterministic iteration order to ensure stable ordering in response
+for index = 1, #constraints do
+	local capacity = constraintCapacities[index]
+	if capacity and capacity - granted <= 0 then
 		if not exhaustedSet[index] then
 			table.insert(exhaustedConstraints, index)
 			exhaustedSet[index] = true
