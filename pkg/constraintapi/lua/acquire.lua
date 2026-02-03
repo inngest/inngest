@@ -186,6 +186,9 @@ local granted = availableCapacity
 ---@type { lid: string, lik: string }[]
 local grantedLeases = {}
 
+-- Collect arguments for batched ZADD to keyAccountLeases
+local accountLeasesArgs = {}
+
 -- Update constraints
 for i = 1, granted, 1 do
 	if not requestDetails.lik then
@@ -220,8 +223,9 @@ for i = 1, granted, 1 do
 	-- Store lease details (hashed lease idempotency key, associated run ID, operation idempotency key for request details)
 	call("HSET", keyLeaseDetails, "lik", hashedLeaseIdempotencyKey, "rid", leaseRunID, "req", requestID)
 
-	-- Add lease to scavenger set of account leases
-	call("ZADD", keyAccountLeases, tostring(leaseExpiryMS), initialLeaseID)
+	-- Collect arguments for batched ZADD to account leases (executed after loop)
+	table.insert(accountLeasesArgs, tostring(leaseExpiryMS))
+	table.insert(accountLeasesArgs, initialLeaseID)
 
 	-- Add constraint check idempotency for each lease (for graceful handling in rate limit, Lease, BacklogRefill, as well as Acquire in case lease expired)
 	local keyLeaseConstraintCheckIdempotency = string.format("%s:ik:cc:%s", scopedKeyPrefix, hashedLeaseIdempotencyKey)
@@ -233,6 +237,11 @@ for i = 1, granted, 1 do
 	leaseObject["lik"] = hashedLeaseIdempotencyKey
 
 	table.insert(grantedLeases, leaseObject)
+end
+
+-- Batch add all leases to account leases sorted set
+if #accountLeasesArgs > 0 then
+	call("ZADD", keyAccountLeases, unpack(accountLeasesArgs))
 end
 
 call("SET", keyConstraintCheckIdempotency, tostring(nowMS), "EX", tostring(constraintCheckIdempotencyTTL))
