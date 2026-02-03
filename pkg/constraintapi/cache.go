@@ -113,8 +113,8 @@ func (l *constraintCache) Acquire(ctx context.Context, req *CapacityAcquireReque
 		return &CapacityAcquireResponse{
 			RequestID:            requestID,
 			Leases:               nil,
-			LimitingConstraints:  []ConstraintItem{ci},
-			ExhaustedConstraints: []ConstraintItem{ci},
+			LimitingConstraints:  []ConstraintItem{val.constraint},
+			ExhaustedConstraints: []ConstraintItem{val.constraint},
 			RetryAfter:           val.retryAfter,
 		}, nil
 	}
