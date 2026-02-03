@@ -2,10 +2,14 @@ package apiv2
 
 import (
 	"context"
+	"fmt"
+	"time"
 
 	"connectrpc.com/connect"
-	"github.com/inngest/inngest/proto/gen/api/v2/apiv2connect"
+	"github.com/google/uuid"
 	apiv2 "github.com/inngest/inngest/proto/gen/api/v2"
+	"github.com/inngest/inngest/proto/gen/api/v2/apiv2connect"
+	"github.com/oklog/ulid/v2"
 )
 
 //
@@ -107,4 +111,68 @@ func (h *ConnectRpcHandler) PatchEnv(ctx context.Context, req *connect.Request[a
 		return nil, err
 	}
 	return connect.NewResponse(resp), nil
+}
+
+//
+// StreamRun implements server-streaming for run trace updates.
+// It polls the backend and sends updates over the stream until the run completes.
+func (h *ConnectRpcHandler) StreamRun(ctx context.Context, req *connect.Request[apiv2.StreamRunRequest], stream *connect.ServerStream[apiv2.RunStreamItem]) error {
+	if h.service.runStreamProvider == nil {
+		return connect.NewError(connect.CodeUnimplemented, fmt.Errorf("run streaming not configured"))
+	}
+
+	envID, err := uuid.Parse(req.Msg.EnvId)
+	if err != nil {
+		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid env_id: %w", err))
+	}
+
+	runID, err := ulid.Parse(req.Msg.RunId)
+	if err != nil {
+		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid run_id: %w", err))
+	}
+
+	//
+	// Get account ID from context (set by auth middleware)
+	accountID, ok := ctx.Value("account_id").(uuid.UUID)
+	if !ok {
+		return connect.NewError(connect.CodeUnauthenticated, fmt.Errorf("missing account_id in context"))
+	}
+
+	//
+	// Poll interval for streaming updates
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
+	var lastStatus string
+
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-ticker.C:
+			runData, err := h.service.runStreamProvider.GetRunData(ctx, accountID, envID, runID)
+			if err != nil {
+				return connect.NewError(connect.CodeInternal, fmt.Errorf("failed to get run data: %w", err))
+			}
+
+			//
+			// Send update to client
+			if err := stream.Send(&apiv2.RunStreamItem{Run: runData}); err != nil {
+				return err
+			}
+
+			//
+			// Check if run has completed (stop streaming if terminal status)
+			if runData.Status != lastStatus {
+				lastStatus = runData.Status
+			}
+
+			//
+			// Terminal statuses - stop streaming
+			switch runData.Status {
+			case "COMPLETED", "FAILED", "CANCELLED":
+				return nil
+			}
+		}
+	}
 }

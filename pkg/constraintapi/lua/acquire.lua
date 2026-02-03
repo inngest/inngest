@@ -25,7 +25,7 @@ local keyConstraintCheckIdempotency = KEYS[3]
 local keyScavengerShard = KEYS[4]
 local keyAccountLeases = KEYS[5]
 
----@type { k: string, e: string, f: string, s: {}[], cv: integer?, r: integer?, g: integer?, a: integer?, l: integer?, lik: string[]?, lri: table<string, string>? }
+---@type { k: string, e: string, f: string, s: {}[], cv: integer?, r: integer?, g: integer?, a: integer?, l: integer?, lik: string[]?, lri: table<string, string>?, m: { ss: integer?, sl: integer?, sm: integer? }? }
 local requestDetails = cjson.decode(ARGV[1])
 local requestID = ARGV[2]
 local accountID = ARGV[3]

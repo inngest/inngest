@@ -12,6 +12,7 @@ import {
 import SegmentAnalytics from '@/components/Analytics/SegmentAnalytics';
 import SentryUserIdentification from '@/components/Analytics/SentryUserIdentification';
 import { InngestClerkProvider } from '@/components/Clerk/Provider';
+import { ConnectRpcProvider } from '@/components/ConnectRpc/ConnectRpcProvider';
 import { ClientFeatureFlagProvider } from '@/components/FeatureFlags/ClientFeatureFlagProvider';
 import Toaster from '@/components/Toast/Toaster';
 import URQLProviderWrapper from '@/components/URQL/URQLProvider';
@@ -21,7 +22,6 @@ import globalsCss from '@inngest/components/AppRoot/globals.css?url';
 import { TooltipProvider } from '@inngest/components/Tooltip';
 import { QueryClient } from '@tanstack/react-query';
 import { ThemeProvider } from 'next-themes';
-import { ConnectRpcProvider } from '@/components/ConnectRpc/ConnectRpcProvider';
 
 //
 // don't load locally, causes issues with adblockers

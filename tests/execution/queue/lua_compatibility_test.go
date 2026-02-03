@@ -103,7 +103,7 @@ func TestLuaCompatibility(t *testing.T) {
 						_ = container.Terminate(ctx)
 					})
 
-					garnetClient, err := helper.NewRedisClient(container.Addr, container.Username, container.Password)
+					garnetClient, err := helper.NewRedisClient(container.Addr, container.Username, container.Password, false)
 					require.NoError(t, err)
 					t.Cleanup(func() {
 						garnetClient.Close()
@@ -565,10 +565,23 @@ func TestLuaCompatibility(t *testing.T) {
 					IdempotencyKey: "release-test",
 					AccountID:      accountID,
 					LeaseID:        *extendResp.LeaseID,
+					Source: constraintapi.LeaseSource{
+						Service:           constraintapi.ServiceAPI,
+						Location:          constraintapi.CallerLocationItemLease,
+						RunProcessingMode: constraintapi.RunProcessingModeDurableEndpoint,
+					},
 				})
 
 				require.NoError(t, err)
 				require.NotNil(t, releaseResp)
+
+				// Verify release response contains correct metadata
+				require.Equal(t, accountID, releaseResp.AccountID)
+				require.Equal(t, envID, releaseResp.EnvID)
+				require.Equal(t, functionID, releaseResp.FunctionID)
+				require.Equal(t, constraintapi.ServiceAPI, releaseResp.CreationSource.Service)
+				require.Equal(t, constraintapi.CallerLocationItemLease, releaseResp.CreationSource.Location)
+				require.Equal(t, constraintapi.RunProcessingModeDurableEndpoint, releaseResp.CreationSource.RunProcessingMode)
 			})
 		})
 	}

@@ -51,6 +51,23 @@ const (
 	DebugBlockDeletedProcedure = "/debug.v1.Debug/BlockDeleted"
 	// DebugCheckConstraintsProcedure is the fully-qualified name of the Debug's CheckConstraints RPC.
 	DebugCheckConstraintsProcedure = "/debug.v1.Debug/CheckConstraints"
+	// DebugGetBatchInfoProcedure is the fully-qualified name of the Debug's GetBatchInfo RPC.
+	DebugGetBatchInfoProcedure = "/debug.v1.Debug/GetBatchInfo"
+	// DebugDeleteBatchProcedure is the fully-qualified name of the Debug's DeleteBatch RPC.
+	DebugDeleteBatchProcedure = "/debug.v1.Debug/DeleteBatch"
+	// DebugRunBatchProcedure is the fully-qualified name of the Debug's RunBatch RPC.
+	DebugRunBatchProcedure = "/debug.v1.Debug/RunBatch"
+	// DebugGetSingletonInfoProcedure is the fully-qualified name of the Debug's GetSingletonInfo RPC.
+	DebugGetSingletonInfoProcedure = "/debug.v1.Debug/GetSingletonInfo"
+	// DebugDeleteSingletonLockProcedure is the fully-qualified name of the Debug's DeleteSingletonLock
+	// RPC.
+	DebugDeleteSingletonLockProcedure = "/debug.v1.Debug/DeleteSingletonLock"
+	// DebugGetDebounceInfoProcedure is the fully-qualified name of the Debug's GetDebounceInfo RPC.
+	DebugGetDebounceInfoProcedure = "/debug.v1.Debug/GetDebounceInfo"
+	// DebugDeleteDebounceProcedure is the fully-qualified name of the Debug's DeleteDebounce RPC.
+	DebugDeleteDebounceProcedure = "/debug.v1.Debug/DeleteDebounce"
+	// DebugRunDebounceProcedure is the fully-qualified name of the Debug's RunDebounce RPC.
+	DebugRunDebounceProcedure = "/debug.v1.Debug/RunDebounce"
 )
 
 // DebugClient is a client for the debug.v1.Debug service.
@@ -72,6 +89,22 @@ type DebugClient interface {
 	BlockDeleted(context.Context, *connect.Request[v1.BlockDeletedRequest]) (*connect.Response[v1.BlockDeletedResponse], error)
 	// CheckConstraints invokes Check() on the configured capacity manager
 	CheckConstraints(context.Context, *connect.Request[v11.CapacityCheckRequest]) (*connect.Response[v1.CheckConstraintsResponse], error)
+	// GetBatchInfo retrieves information about the current batch for a function and batch key.
+	GetBatchInfo(context.Context, *connect.Request[v1.BatchInfoRequest]) (*connect.Response[v1.BatchInfoResponse], error)
+	// DeleteBatch deletes a batch for a function and batch key.
+	DeleteBatch(context.Context, *connect.Request[v1.DeleteBatchRequest]) (*connect.Response[v1.DeleteBatchResponse], error)
+	// RunBatch triggers immediate execution of a batch.
+	RunBatch(context.Context, *connect.Request[v1.RunBatchRequest]) (*connect.Response[v1.RunBatchResponse], error)
+	// GetSingletonInfo retrieves the current singleton lock status for a given key.
+	GetSingletonInfo(context.Context, *connect.Request[v1.SingletonInfoRequest]) (*connect.Response[v1.SingletonInfoResponse], error)
+	// DeleteSingletonLock removes an existing singleton lock.
+	DeleteSingletonLock(context.Context, *connect.Request[v1.DeleteSingletonLockRequest]) (*connect.Response[v1.DeleteSingletonLockResponse], error)
+	// GetDebounceInfo retrieves the currently debounced event for a function and debounce key.
+	GetDebounceInfo(context.Context, *connect.Request[v1.DebounceInfoRequest]) (*connect.Response[v1.DebounceInfoResponse], error)
+	// DeleteDebounce deletes a debounce for a function and debounce key.
+	DeleteDebounce(context.Context, *connect.Request[v1.DeleteDebounceRequest]) (*connect.Response[v1.DeleteDebounceResponse], error)
+	// RunDebounce triggers immediate execution of a debounce.
+	RunDebounce(context.Context, *connect.Request[v1.RunDebounceRequest]) (*connect.Response[v1.RunDebounceResponse], error)
 }
 
 // NewDebugClient constructs a client for the debug.v1.Debug service. By default, it uses the
@@ -133,19 +166,75 @@ func NewDebugClient(httpClient connect.HTTPClient, baseURL string, opts ...conne
 			connect.WithSchema(debugMethods.ByName("CheckConstraints")),
 			connect.WithClientOptions(opts...),
 		),
+		getBatchInfo: connect.NewClient[v1.BatchInfoRequest, v1.BatchInfoResponse](
+			httpClient,
+			baseURL+DebugGetBatchInfoProcedure,
+			connect.WithSchema(debugMethods.ByName("GetBatchInfo")),
+			connect.WithClientOptions(opts...),
+		),
+		deleteBatch: connect.NewClient[v1.DeleteBatchRequest, v1.DeleteBatchResponse](
+			httpClient,
+			baseURL+DebugDeleteBatchProcedure,
+			connect.WithSchema(debugMethods.ByName("DeleteBatch")),
+			connect.WithClientOptions(opts...),
+		),
+		runBatch: connect.NewClient[v1.RunBatchRequest, v1.RunBatchResponse](
+			httpClient,
+			baseURL+DebugRunBatchProcedure,
+			connect.WithSchema(debugMethods.ByName("RunBatch")),
+			connect.WithClientOptions(opts...),
+		),
+		getSingletonInfo: connect.NewClient[v1.SingletonInfoRequest, v1.SingletonInfoResponse](
+			httpClient,
+			baseURL+DebugGetSingletonInfoProcedure,
+			connect.WithSchema(debugMethods.ByName("GetSingletonInfo")),
+			connect.WithClientOptions(opts...),
+		),
+		deleteSingletonLock: connect.NewClient[v1.DeleteSingletonLockRequest, v1.DeleteSingletonLockResponse](
+			httpClient,
+			baseURL+DebugDeleteSingletonLockProcedure,
+			connect.WithSchema(debugMethods.ByName("DeleteSingletonLock")),
+			connect.WithClientOptions(opts...),
+		),
+		getDebounceInfo: connect.NewClient[v1.DebounceInfoRequest, v1.DebounceInfoResponse](
+			httpClient,
+			baseURL+DebugGetDebounceInfoProcedure,
+			connect.WithSchema(debugMethods.ByName("GetDebounceInfo")),
+			connect.WithClientOptions(opts...),
+		),
+		deleteDebounce: connect.NewClient[v1.DeleteDebounceRequest, v1.DeleteDebounceResponse](
+			httpClient,
+			baseURL+DebugDeleteDebounceProcedure,
+			connect.WithSchema(debugMethods.ByName("DeleteDebounce")),
+			connect.WithClientOptions(opts...),
+		),
+		runDebounce: connect.NewClient[v1.RunDebounceRequest, v1.RunDebounceResponse](
+			httpClient,
+			baseURL+DebugRunDebounceProcedure,
+			connect.WithSchema(debugMethods.ByName("RunDebounce")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // debugClient implements DebugClient.
 type debugClient struct {
-	getPartition       *connect.Client[v1.PartitionRequest, v1.PartitionResponse]
-	getPartitionStatus *connect.Client[v1.PartitionRequest, v1.PartitionStatusResponse]
-	getQueueItem       *connect.Client[v1.QueueItemRequest, v1.QueueItemResponse]
-	getPause           *connect.Client[v1.PauseRequest, v1.PauseResponse]
-	getIndex           *connect.Client[v1.IndexRequest, v1.IndexResponse]
-	blockPeek          *connect.Client[v1.BlockPeekRequest, v1.BlockPeekResponse]
-	blockDeleted       *connect.Client[v1.BlockDeletedRequest, v1.BlockDeletedResponse]
-	checkConstraints   *connect.Client[v11.CapacityCheckRequest, v1.CheckConstraintsResponse]
+	getPartition        *connect.Client[v1.PartitionRequest, v1.PartitionResponse]
+	getPartitionStatus  *connect.Client[v1.PartitionRequest, v1.PartitionStatusResponse]
+	getQueueItem        *connect.Client[v1.QueueItemRequest, v1.QueueItemResponse]
+	getPause            *connect.Client[v1.PauseRequest, v1.PauseResponse]
+	getIndex            *connect.Client[v1.IndexRequest, v1.IndexResponse]
+	blockPeek           *connect.Client[v1.BlockPeekRequest, v1.BlockPeekResponse]
+	blockDeleted        *connect.Client[v1.BlockDeletedRequest, v1.BlockDeletedResponse]
+	checkConstraints    *connect.Client[v11.CapacityCheckRequest, v1.CheckConstraintsResponse]
+	getBatchInfo        *connect.Client[v1.BatchInfoRequest, v1.BatchInfoResponse]
+	deleteBatch         *connect.Client[v1.DeleteBatchRequest, v1.DeleteBatchResponse]
+	runBatch            *connect.Client[v1.RunBatchRequest, v1.RunBatchResponse]
+	getSingletonInfo    *connect.Client[v1.SingletonInfoRequest, v1.SingletonInfoResponse]
+	deleteSingletonLock *connect.Client[v1.DeleteSingletonLockRequest, v1.DeleteSingletonLockResponse]
+	getDebounceInfo     *connect.Client[v1.DebounceInfoRequest, v1.DebounceInfoResponse]
+	deleteDebounce      *connect.Client[v1.DeleteDebounceRequest, v1.DeleteDebounceResponse]
+	runDebounce         *connect.Client[v1.RunDebounceRequest, v1.RunDebounceResponse]
 }
 
 // GetPartition calls debug.v1.Debug.GetPartition.
@@ -188,6 +277,46 @@ func (c *debugClient) CheckConstraints(ctx context.Context, req *connect.Request
 	return c.checkConstraints.CallUnary(ctx, req)
 }
 
+// GetBatchInfo calls debug.v1.Debug.GetBatchInfo.
+func (c *debugClient) GetBatchInfo(ctx context.Context, req *connect.Request[v1.BatchInfoRequest]) (*connect.Response[v1.BatchInfoResponse], error) {
+	return c.getBatchInfo.CallUnary(ctx, req)
+}
+
+// DeleteBatch calls debug.v1.Debug.DeleteBatch.
+func (c *debugClient) DeleteBatch(ctx context.Context, req *connect.Request[v1.DeleteBatchRequest]) (*connect.Response[v1.DeleteBatchResponse], error) {
+	return c.deleteBatch.CallUnary(ctx, req)
+}
+
+// RunBatch calls debug.v1.Debug.RunBatch.
+func (c *debugClient) RunBatch(ctx context.Context, req *connect.Request[v1.RunBatchRequest]) (*connect.Response[v1.RunBatchResponse], error) {
+	return c.runBatch.CallUnary(ctx, req)
+}
+
+// GetSingletonInfo calls debug.v1.Debug.GetSingletonInfo.
+func (c *debugClient) GetSingletonInfo(ctx context.Context, req *connect.Request[v1.SingletonInfoRequest]) (*connect.Response[v1.SingletonInfoResponse], error) {
+	return c.getSingletonInfo.CallUnary(ctx, req)
+}
+
+// DeleteSingletonLock calls debug.v1.Debug.DeleteSingletonLock.
+func (c *debugClient) DeleteSingletonLock(ctx context.Context, req *connect.Request[v1.DeleteSingletonLockRequest]) (*connect.Response[v1.DeleteSingletonLockResponse], error) {
+	return c.deleteSingletonLock.CallUnary(ctx, req)
+}
+
+// GetDebounceInfo calls debug.v1.Debug.GetDebounceInfo.
+func (c *debugClient) GetDebounceInfo(ctx context.Context, req *connect.Request[v1.DebounceInfoRequest]) (*connect.Response[v1.DebounceInfoResponse], error) {
+	return c.getDebounceInfo.CallUnary(ctx, req)
+}
+
+// DeleteDebounce calls debug.v1.Debug.DeleteDebounce.
+func (c *debugClient) DeleteDebounce(ctx context.Context, req *connect.Request[v1.DeleteDebounceRequest]) (*connect.Response[v1.DeleteDebounceResponse], error) {
+	return c.deleteDebounce.CallUnary(ctx, req)
+}
+
+// RunDebounce calls debug.v1.Debug.RunDebounce.
+func (c *debugClient) RunDebounce(ctx context.Context, req *connect.Request[v1.RunDebounceRequest]) (*connect.Response[v1.RunDebounceResponse], error) {
+	return c.runDebounce.CallUnary(ctx, req)
+}
+
 // DebugHandler is an implementation of the debug.v1.Debug service.
 type DebugHandler interface {
 	// GetPartition retrieves the partition data from the database
@@ -207,6 +336,22 @@ type DebugHandler interface {
 	BlockDeleted(context.Context, *connect.Request[v1.BlockDeletedRequest]) (*connect.Response[v1.BlockDeletedResponse], error)
 	// CheckConstraints invokes Check() on the configured capacity manager
 	CheckConstraints(context.Context, *connect.Request[v11.CapacityCheckRequest]) (*connect.Response[v1.CheckConstraintsResponse], error)
+	// GetBatchInfo retrieves information about the current batch for a function and batch key.
+	GetBatchInfo(context.Context, *connect.Request[v1.BatchInfoRequest]) (*connect.Response[v1.BatchInfoResponse], error)
+	// DeleteBatch deletes a batch for a function and batch key.
+	DeleteBatch(context.Context, *connect.Request[v1.DeleteBatchRequest]) (*connect.Response[v1.DeleteBatchResponse], error)
+	// RunBatch triggers immediate execution of a batch.
+	RunBatch(context.Context, *connect.Request[v1.RunBatchRequest]) (*connect.Response[v1.RunBatchResponse], error)
+	// GetSingletonInfo retrieves the current singleton lock status for a given key.
+	GetSingletonInfo(context.Context, *connect.Request[v1.SingletonInfoRequest]) (*connect.Response[v1.SingletonInfoResponse], error)
+	// DeleteSingletonLock removes an existing singleton lock.
+	DeleteSingletonLock(context.Context, *connect.Request[v1.DeleteSingletonLockRequest]) (*connect.Response[v1.DeleteSingletonLockResponse], error)
+	// GetDebounceInfo retrieves the currently debounced event for a function and debounce key.
+	GetDebounceInfo(context.Context, *connect.Request[v1.DebounceInfoRequest]) (*connect.Response[v1.DebounceInfoResponse], error)
+	// DeleteDebounce deletes a debounce for a function and debounce key.
+	DeleteDebounce(context.Context, *connect.Request[v1.DeleteDebounceRequest]) (*connect.Response[v1.DeleteDebounceResponse], error)
+	// RunDebounce triggers immediate execution of a debounce.
+	RunDebounce(context.Context, *connect.Request[v1.RunDebounceRequest]) (*connect.Response[v1.RunDebounceResponse], error)
 }
 
 // NewDebugHandler builds an HTTP handler from the service implementation. It returns the path on
@@ -264,6 +409,54 @@ func NewDebugHandler(svc DebugHandler, opts ...connect.HandlerOption) (string, h
 		connect.WithSchema(debugMethods.ByName("CheckConstraints")),
 		connect.WithHandlerOptions(opts...),
 	)
+	debugGetBatchInfoHandler := connect.NewUnaryHandler(
+		DebugGetBatchInfoProcedure,
+		svc.GetBatchInfo,
+		connect.WithSchema(debugMethods.ByName("GetBatchInfo")),
+		connect.WithHandlerOptions(opts...),
+	)
+	debugDeleteBatchHandler := connect.NewUnaryHandler(
+		DebugDeleteBatchProcedure,
+		svc.DeleteBatch,
+		connect.WithSchema(debugMethods.ByName("DeleteBatch")),
+		connect.WithHandlerOptions(opts...),
+	)
+	debugRunBatchHandler := connect.NewUnaryHandler(
+		DebugRunBatchProcedure,
+		svc.RunBatch,
+		connect.WithSchema(debugMethods.ByName("RunBatch")),
+		connect.WithHandlerOptions(opts...),
+	)
+	debugGetSingletonInfoHandler := connect.NewUnaryHandler(
+		DebugGetSingletonInfoProcedure,
+		svc.GetSingletonInfo,
+		connect.WithSchema(debugMethods.ByName("GetSingletonInfo")),
+		connect.WithHandlerOptions(opts...),
+	)
+	debugDeleteSingletonLockHandler := connect.NewUnaryHandler(
+		DebugDeleteSingletonLockProcedure,
+		svc.DeleteSingletonLock,
+		connect.WithSchema(debugMethods.ByName("DeleteSingletonLock")),
+		connect.WithHandlerOptions(opts...),
+	)
+	debugGetDebounceInfoHandler := connect.NewUnaryHandler(
+		DebugGetDebounceInfoProcedure,
+		svc.GetDebounceInfo,
+		connect.WithSchema(debugMethods.ByName("GetDebounceInfo")),
+		connect.WithHandlerOptions(opts...),
+	)
+	debugDeleteDebounceHandler := connect.NewUnaryHandler(
+		DebugDeleteDebounceProcedure,
+		svc.DeleteDebounce,
+		connect.WithSchema(debugMethods.ByName("DeleteDebounce")),
+		connect.WithHandlerOptions(opts...),
+	)
+	debugRunDebounceHandler := connect.NewUnaryHandler(
+		DebugRunDebounceProcedure,
+		svc.RunDebounce,
+		connect.WithSchema(debugMethods.ByName("RunDebounce")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/debug.v1.Debug/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case DebugGetPartitionProcedure:
@@ -282,6 +475,22 @@ func NewDebugHandler(svc DebugHandler, opts ...connect.HandlerOption) (string, h
 			debugBlockDeletedHandler.ServeHTTP(w, r)
 		case DebugCheckConstraintsProcedure:
 			debugCheckConstraintsHandler.ServeHTTP(w, r)
+		case DebugGetBatchInfoProcedure:
+			debugGetBatchInfoHandler.ServeHTTP(w, r)
+		case DebugDeleteBatchProcedure:
+			debugDeleteBatchHandler.ServeHTTP(w, r)
+		case DebugRunBatchProcedure:
+			debugRunBatchHandler.ServeHTTP(w, r)
+		case DebugGetSingletonInfoProcedure:
+			debugGetSingletonInfoHandler.ServeHTTP(w, r)
+		case DebugDeleteSingletonLockProcedure:
+			debugDeleteSingletonLockHandler.ServeHTTP(w, r)
+		case DebugGetDebounceInfoProcedure:
+			debugGetDebounceInfoHandler.ServeHTTP(w, r)
+		case DebugDeleteDebounceProcedure:
+			debugDeleteDebounceHandler.ServeHTTP(w, r)
+		case DebugRunDebounceProcedure:
+			debugRunDebounceHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -321,4 +530,36 @@ func (UnimplementedDebugHandler) BlockDeleted(context.Context, *connect.Request[
 
 func (UnimplementedDebugHandler) CheckConstraints(context.Context, *connect.Request[v11.CapacityCheckRequest]) (*connect.Response[v1.CheckConstraintsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("debug.v1.Debug.CheckConstraints is not implemented"))
+}
+
+func (UnimplementedDebugHandler) GetBatchInfo(context.Context, *connect.Request[v1.BatchInfoRequest]) (*connect.Response[v1.BatchInfoResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("debug.v1.Debug.GetBatchInfo is not implemented"))
+}
+
+func (UnimplementedDebugHandler) DeleteBatch(context.Context, *connect.Request[v1.DeleteBatchRequest]) (*connect.Response[v1.DeleteBatchResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("debug.v1.Debug.DeleteBatch is not implemented"))
+}
+
+func (UnimplementedDebugHandler) RunBatch(context.Context, *connect.Request[v1.RunBatchRequest]) (*connect.Response[v1.RunBatchResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("debug.v1.Debug.RunBatch is not implemented"))
+}
+
+func (UnimplementedDebugHandler) GetSingletonInfo(context.Context, *connect.Request[v1.SingletonInfoRequest]) (*connect.Response[v1.SingletonInfoResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("debug.v1.Debug.GetSingletonInfo is not implemented"))
+}
+
+func (UnimplementedDebugHandler) DeleteSingletonLock(context.Context, *connect.Request[v1.DeleteSingletonLockRequest]) (*connect.Response[v1.DeleteSingletonLockResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("debug.v1.Debug.DeleteSingletonLock is not implemented"))
+}
+
+func (UnimplementedDebugHandler) GetDebounceInfo(context.Context, *connect.Request[v1.DebounceInfoRequest]) (*connect.Response[v1.DebounceInfoResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("debug.v1.Debug.GetDebounceInfo is not implemented"))
+}
+
+func (UnimplementedDebugHandler) DeleteDebounce(context.Context, *connect.Request[v1.DeleteDebounceRequest]) (*connect.Response[v1.DeleteDebounceResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("debug.v1.Debug.DeleteDebounce is not implemented"))
+}
+
+func (UnimplementedDebugHandler) RunDebounce(context.Context, *connect.Request[v1.RunDebounceRequest]) (*connect.Response[v1.RunDebounceResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("debug.v1.Debug.RunDebounce is not implemented"))
 }

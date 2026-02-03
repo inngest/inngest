@@ -32,6 +32,10 @@ export const SharedContextProvider = ({
   const getDebugRun = useGetDebugRun();
   const getDebugSession = useGetDebugSession();
 
+  //
+  // No-op streamRun for dev-server (streaming not supported)
+  const streamRun = () => () => {};
+
   const handlers: Partial<SharedHandlers> = {
     invokeRun,
     rerun,
@@ -47,6 +51,7 @@ export const SharedContextProvider = ({
     getDebugRun,
     getDebugSession,
     createDebugSession,
+    streamRun,
   };
 
   return <SharedProvider handlers={handlers}>{children}</SharedProvider>;

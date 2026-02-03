@@ -9,5 +9,5 @@ const (
 	ValkeyDefaultImageAlpine = "docker.io/valkey/valkey:8.0.1-alpine"
 
 	// GarnetDefaultImage is the default Garnet image version for tests
-	GarnetDefaultImage = "ghcr.io/microsoft/garnet:1.0.87"
+	GarnetDefaultImage = "ghcr.io/microsoft/garnet:1.0.94"
 )

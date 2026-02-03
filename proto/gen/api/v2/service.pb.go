@@ -119,6 +119,128 @@ func (FilterType) EnumDescriptor() ([]byte, []int) {
 	return file_api_v2_service_proto_rawDescGZIP(), []int{1}
 }
 
+type RunTraceSpanStatus int32
+
+const (
+	RunTraceSpanStatus_RUN_TRACE_SPAN_STATUS_UNSPECIFIED RunTraceSpanStatus = 0
+	RunTraceSpanStatus_RUN_TRACE_SPAN_STATUS_RUNNING     RunTraceSpanStatus = 1
+	RunTraceSpanStatus_RUN_TRACE_SPAN_STATUS_COMPLETED   RunTraceSpanStatus = 2
+	RunTraceSpanStatus_RUN_TRACE_SPAN_STATUS_FAILED      RunTraceSpanStatus = 3
+	RunTraceSpanStatus_RUN_TRACE_SPAN_STATUS_CANCELLED   RunTraceSpanStatus = 4
+	RunTraceSpanStatus_RUN_TRACE_SPAN_STATUS_QUEUED      RunTraceSpanStatus = 5
+	RunTraceSpanStatus_RUN_TRACE_SPAN_STATUS_WAITING     RunTraceSpanStatus = 6
+)
+
+// Enum value maps for RunTraceSpanStatus.
+var (
+	RunTraceSpanStatus_name = map[int32]string{
+		0: "RUN_TRACE_SPAN_STATUS_UNSPECIFIED",
+		1: "RUN_TRACE_SPAN_STATUS_RUNNING",
+		2: "RUN_TRACE_SPAN_STATUS_COMPLETED",
+		3: "RUN_TRACE_SPAN_STATUS_FAILED",
+		4: "RUN_TRACE_SPAN_STATUS_CANCELLED",
+		5: "RUN_TRACE_SPAN_STATUS_QUEUED",
+		6: "RUN_TRACE_SPAN_STATUS_WAITING",
+	}
+	RunTraceSpanStatus_value = map[string]int32{
+		"RUN_TRACE_SPAN_STATUS_UNSPECIFIED": 0,
+		"RUN_TRACE_SPAN_STATUS_RUNNING":     1,
+		"RUN_TRACE_SPAN_STATUS_COMPLETED":   2,
+		"RUN_TRACE_SPAN_STATUS_FAILED":      3,
+		"RUN_TRACE_SPAN_STATUS_CANCELLED":   4,
+		"RUN_TRACE_SPAN_STATUS_QUEUED":      5,
+		"RUN_TRACE_SPAN_STATUS_WAITING":     6,
+	}
+)
+
+func (x RunTraceSpanStatus) Enum() *RunTraceSpanStatus {
+	p := new(RunTraceSpanStatus)
+	*p = x
+	return p
+}
+
+func (x RunTraceSpanStatus) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (RunTraceSpanStatus) Descriptor() protoreflect.EnumDescriptor {
+	return file_api_v2_service_proto_enumTypes[2].Descriptor()
+}
+
+func (RunTraceSpanStatus) Type() protoreflect.EnumType {
+	return &file_api_v2_service_proto_enumTypes[2]
+}
+
+func (x RunTraceSpanStatus) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use RunTraceSpanStatus.Descriptor instead.
+func (RunTraceSpanStatus) EnumDescriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{2}
+}
+
+type StepOp int32
+
+const (
+	StepOp_STEP_OP_UNSPECIFIED     StepOp = 0
+	StepOp_STEP_OP_RUN             StepOp = 1
+	StepOp_STEP_OP_SLEEP           StepOp = 2
+	StepOp_STEP_OP_WAIT_FOR_EVENT  StepOp = 3
+	StepOp_STEP_OP_INVOKE          StepOp = 4
+	StepOp_STEP_OP_AI_GATEWAY      StepOp = 5
+	StepOp_STEP_OP_WAIT_FOR_SIGNAL StepOp = 6
+)
+
+// Enum value maps for StepOp.
+var (
+	StepOp_name = map[int32]string{
+		0: "STEP_OP_UNSPECIFIED",
+		1: "STEP_OP_RUN",
+		2: "STEP_OP_SLEEP",
+		3: "STEP_OP_WAIT_FOR_EVENT",
+		4: "STEP_OP_INVOKE",
+		5: "STEP_OP_AI_GATEWAY",
+		6: "STEP_OP_WAIT_FOR_SIGNAL",
+	}
+	StepOp_value = map[string]int32{
+		"STEP_OP_UNSPECIFIED":     0,
+		"STEP_OP_RUN":             1,
+		"STEP_OP_SLEEP":           2,
+		"STEP_OP_WAIT_FOR_EVENT":  3,
+		"STEP_OP_INVOKE":          4,
+		"STEP_OP_AI_GATEWAY":      5,
+		"STEP_OP_WAIT_FOR_SIGNAL": 6,
+	}
+)
+
+func (x StepOp) Enum() *StepOp {
+	p := new(StepOp)
+	*p = x
+	return p
+}
+
+func (x StepOp) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (StepOp) Descriptor() protoreflect.EnumDescriptor {
+	return file_api_v2_service_proto_enumTypes[3].Descriptor()
+}
+
+func (StepOp) Type() protoreflect.EnumType {
+	return &file_api_v2_service_proto_enumTypes[3]
+}
+
+func (x StepOp) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use StepOp.Descriptor instead.
+func (StepOp) EnumDescriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{3}
+}
+
 type HealthRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -2119,6 +2241,1084 @@ func (x *PatchEnvsResponse) GetMetadata() *ResponseMetadata {
 	return nil
 }
 
+type StreamRunRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	EnvId         string                 `protobuf:"bytes,1,opt,name=env_id,json=envId,proto3" json:"env_id,omitempty"`
+	RunId         string                 `protobuf:"bytes,2,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StreamRunRequest) Reset() {
+	*x = StreamRunRequest{}
+	mi := &file_api_v2_service_proto_msgTypes[34]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StreamRunRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StreamRunRequest) ProtoMessage() {}
+
+func (x *StreamRunRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[34]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StreamRunRequest.ProtoReflect.Descriptor instead.
+func (*StreamRunRequest) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{34}
+}
+
+func (x *StreamRunRequest) GetEnvId() string {
+	if x != nil {
+		return x.EnvId
+	}
+	return ""
+}
+
+func (x *StreamRunRequest) GetRunId() string {
+	if x != nil {
+		return x.RunId
+	}
+	return ""
+}
+
+type RunStreamItem struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Run           *RunData               `protobuf:"bytes,1,opt,name=run,proto3" json:"run,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RunStreamItem) Reset() {
+	*x = RunStreamItem{}
+	mi := &file_api_v2_service_proto_msgTypes[35]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RunStreamItem) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RunStreamItem) ProtoMessage() {}
+
+func (x *RunStreamItem) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[35]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RunStreamItem.ProtoReflect.Descriptor instead.
+func (*RunStreamItem) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{35}
+}
+
+func (x *RunStreamItem) GetRun() *RunData {
+	if x != nil {
+		return x.Run
+	}
+	return nil
+}
+
+type RunData struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Status        string                 `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`
+	HasAi         bool                   `protobuf:"varint,3,opt,name=has_ai,json=hasAi,proto3" json:"has_ai,omitempty"`
+	Function      *FunctionInfo          `protobuf:"bytes,4,opt,name=function,proto3" json:"function,omitempty"`
+	Trace         *RunTraceSpan          `protobuf:"bytes,5,opt,name=trace,proto3" json:"trace,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RunData) Reset() {
+	*x = RunData{}
+	mi := &file_api_v2_service_proto_msgTypes[36]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RunData) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RunData) ProtoMessage() {}
+
+func (x *RunData) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[36]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RunData.ProtoReflect.Descriptor instead.
+func (*RunData) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{36}
+}
+
+func (x *RunData) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *RunData) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *RunData) GetHasAi() bool {
+	if x != nil {
+		return x.HasAi
+	}
+	return false
+}
+
+func (x *RunData) GetFunction() *FunctionInfo {
+	if x != nil {
+		return x.Function
+	}
+	return nil
+}
+
+func (x *RunData) GetTrace() *RunTraceSpan {
+	if x != nil {
+		return x.Trace
+	}
+	return nil
+}
+
+type FunctionInfo struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Slug          string                 `protobuf:"bytes,3,opt,name=slug,proto3" json:"slug,omitempty"`
+	App           *AppInfo               `protobuf:"bytes,4,opt,name=app,proto3" json:"app,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FunctionInfo) Reset() {
+	*x = FunctionInfo{}
+	mi := &file_api_v2_service_proto_msgTypes[37]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FunctionInfo) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FunctionInfo) ProtoMessage() {}
+
+func (x *FunctionInfo) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[37]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FunctionInfo.ProtoReflect.Descriptor instead.
+func (*FunctionInfo) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{37}
+}
+
+func (x *FunctionInfo) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *FunctionInfo) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *FunctionInfo) GetSlug() string {
+	if x != nil {
+		return x.Slug
+	}
+	return ""
+}
+
+func (x *FunctionInfo) GetApp() *AppInfo {
+	if x != nil {
+		return x.App
+	}
+	return nil
+}
+
+type AppInfo struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	ExternalId    string                 `protobuf:"bytes,2,opt,name=external_id,json=externalId,proto3" json:"external_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AppInfo) Reset() {
+	*x = AppInfo{}
+	mi := &file_api_v2_service_proto_msgTypes[38]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AppInfo) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AppInfo) ProtoMessage() {}
+
+func (x *AppInfo) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[38]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AppInfo.ProtoReflect.Descriptor instead.
+func (*AppInfo) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{38}
+}
+
+func (x *AppInfo) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *AppInfo) GetExternalId() string {
+	if x != nil {
+		return x.ExternalId
+	}
+	return ""
+}
+
+type RunTraceSpan struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Name           string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Status         RunTraceSpanStatus     `protobuf:"varint,2,opt,name=status,proto3,enum=api.v2.RunTraceSpanStatus" json:"status,omitempty"`
+	Attempts       *int32                 `protobuf:"varint,3,opt,name=attempts,proto3,oneof" json:"attempts,omitempty"`
+	QueuedAt       string                 `protobuf:"bytes,4,opt,name=queued_at,json=queuedAt,proto3" json:"queued_at,omitempty"`
+	StartedAt      *string                `protobuf:"bytes,5,opt,name=started_at,json=startedAt,proto3,oneof" json:"started_at,omitempty"`
+	EndedAt        *string                `protobuf:"bytes,6,opt,name=ended_at,json=endedAt,proto3,oneof" json:"ended_at,omitempty"`
+	IsRoot         bool                   `protobuf:"varint,7,opt,name=is_root,json=isRoot,proto3" json:"is_root,omitempty"`
+	OutputId       *string                `protobuf:"bytes,8,opt,name=output_id,json=outputId,proto3,oneof" json:"output_id,omitempty"`
+	SpanId         string                 `protobuf:"bytes,9,opt,name=span_id,json=spanId,proto3" json:"span_id,omitempty"`
+	StepId         *string                `protobuf:"bytes,10,opt,name=step_id,json=stepId,proto3,oneof" json:"step_id,omitempty"`
+	StepOp         *StepOp                `protobuf:"varint,11,opt,name=step_op,json=stepOp,proto3,enum=api.v2.StepOp,oneof" json:"step_op,omitempty"`
+	StepType       *string                `protobuf:"bytes,12,opt,name=step_type,json=stepType,proto3,oneof" json:"step_type,omitempty"`
+	ChildrenSpans  []*RunTraceSpan        `protobuf:"bytes,13,rep,name=children_spans,json=childrenSpans,proto3" json:"children_spans,omitempty"`
+	StepInfo       *StepInfo              `protobuf:"bytes,14,opt,name=step_info,json=stepInfo,proto3,oneof" json:"step_info,omitempty"`
+	IsUserland     bool                   `protobuf:"varint,15,opt,name=is_userland,json=isUserland,proto3" json:"is_userland,omitempty"`
+	UserlandSpan   *UserlandSpan          `protobuf:"bytes,16,opt,name=userland_span,json=userlandSpan,proto3,oneof" json:"userland_span,omitempty"`
+	DebugRunId     *string                `protobuf:"bytes,17,opt,name=debug_run_id,json=debugRunId,proto3,oneof" json:"debug_run_id,omitempty"`
+	DebugSessionId *string                `protobuf:"bytes,18,opt,name=debug_session_id,json=debugSessionId,proto3,oneof" json:"debug_session_id,omitempty"`
+	Metadata       []*SpanMetadata        `protobuf:"bytes,19,rep,name=metadata,proto3" json:"metadata,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *RunTraceSpan) Reset() {
+	*x = RunTraceSpan{}
+	mi := &file_api_v2_service_proto_msgTypes[39]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RunTraceSpan) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RunTraceSpan) ProtoMessage() {}
+
+func (x *RunTraceSpan) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[39]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RunTraceSpan.ProtoReflect.Descriptor instead.
+func (*RunTraceSpan) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{39}
+}
+
+func (x *RunTraceSpan) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *RunTraceSpan) GetStatus() RunTraceSpanStatus {
+	if x != nil {
+		return x.Status
+	}
+	return RunTraceSpanStatus_RUN_TRACE_SPAN_STATUS_UNSPECIFIED
+}
+
+func (x *RunTraceSpan) GetAttempts() int32 {
+	if x != nil && x.Attempts != nil {
+		return *x.Attempts
+	}
+	return 0
+}
+
+func (x *RunTraceSpan) GetQueuedAt() string {
+	if x != nil {
+		return x.QueuedAt
+	}
+	return ""
+}
+
+func (x *RunTraceSpan) GetStartedAt() string {
+	if x != nil && x.StartedAt != nil {
+		return *x.StartedAt
+	}
+	return ""
+}
+
+func (x *RunTraceSpan) GetEndedAt() string {
+	if x != nil && x.EndedAt != nil {
+		return *x.EndedAt
+	}
+	return ""
+}
+
+func (x *RunTraceSpan) GetIsRoot() bool {
+	if x != nil {
+		return x.IsRoot
+	}
+	return false
+}
+
+func (x *RunTraceSpan) GetOutputId() string {
+	if x != nil && x.OutputId != nil {
+		return *x.OutputId
+	}
+	return ""
+}
+
+func (x *RunTraceSpan) GetSpanId() string {
+	if x != nil {
+		return x.SpanId
+	}
+	return ""
+}
+
+func (x *RunTraceSpan) GetStepId() string {
+	if x != nil && x.StepId != nil {
+		return *x.StepId
+	}
+	return ""
+}
+
+func (x *RunTraceSpan) GetStepOp() StepOp {
+	if x != nil && x.StepOp != nil {
+		return *x.StepOp
+	}
+	return StepOp_STEP_OP_UNSPECIFIED
+}
+
+func (x *RunTraceSpan) GetStepType() string {
+	if x != nil && x.StepType != nil {
+		return *x.StepType
+	}
+	return ""
+}
+
+func (x *RunTraceSpan) GetChildrenSpans() []*RunTraceSpan {
+	if x != nil {
+		return x.ChildrenSpans
+	}
+	return nil
+}
+
+func (x *RunTraceSpan) GetStepInfo() *StepInfo {
+	if x != nil {
+		return x.StepInfo
+	}
+	return nil
+}
+
+func (x *RunTraceSpan) GetIsUserland() bool {
+	if x != nil {
+		return x.IsUserland
+	}
+	return false
+}
+
+func (x *RunTraceSpan) GetUserlandSpan() *UserlandSpan {
+	if x != nil {
+		return x.UserlandSpan
+	}
+	return nil
+}
+
+func (x *RunTraceSpan) GetDebugRunId() string {
+	if x != nil && x.DebugRunId != nil {
+		return *x.DebugRunId
+	}
+	return ""
+}
+
+func (x *RunTraceSpan) GetDebugSessionId() string {
+	if x != nil && x.DebugSessionId != nil {
+		return *x.DebugSessionId
+	}
+	return ""
+}
+
+func (x *RunTraceSpan) GetMetadata() []*SpanMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+type UserlandSpan struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	SpanName      *string                `protobuf:"bytes,1,opt,name=span_name,json=spanName,proto3,oneof" json:"span_name,omitempty"`
+	SpanKind      *string                `protobuf:"bytes,2,opt,name=span_kind,json=spanKind,proto3,oneof" json:"span_kind,omitempty"`
+	ServiceName   *string                `protobuf:"bytes,3,opt,name=service_name,json=serviceName,proto3,oneof" json:"service_name,omitempty"`
+	ScopeName     *string                `protobuf:"bytes,4,opt,name=scope_name,json=scopeName,proto3,oneof" json:"scope_name,omitempty"`
+	ScopeVersion  *string                `protobuf:"bytes,5,opt,name=scope_version,json=scopeVersion,proto3,oneof" json:"scope_version,omitempty"`
+	SpanAttrs     *string                `protobuf:"bytes,6,opt,name=span_attrs,json=spanAttrs,proto3,oneof" json:"span_attrs,omitempty"`
+	ResourceAttrs *string                `protobuf:"bytes,7,opt,name=resource_attrs,json=resourceAttrs,proto3,oneof" json:"resource_attrs,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UserlandSpan) Reset() {
+	*x = UserlandSpan{}
+	mi := &file_api_v2_service_proto_msgTypes[40]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UserlandSpan) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UserlandSpan) ProtoMessage() {}
+
+func (x *UserlandSpan) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[40]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UserlandSpan.ProtoReflect.Descriptor instead.
+func (*UserlandSpan) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{40}
+}
+
+func (x *UserlandSpan) GetSpanName() string {
+	if x != nil && x.SpanName != nil {
+		return *x.SpanName
+	}
+	return ""
+}
+
+func (x *UserlandSpan) GetSpanKind() string {
+	if x != nil && x.SpanKind != nil {
+		return *x.SpanKind
+	}
+	return ""
+}
+
+func (x *UserlandSpan) GetServiceName() string {
+	if x != nil && x.ServiceName != nil {
+		return *x.ServiceName
+	}
+	return ""
+}
+
+func (x *UserlandSpan) GetScopeName() string {
+	if x != nil && x.ScopeName != nil {
+		return *x.ScopeName
+	}
+	return ""
+}
+
+func (x *UserlandSpan) GetScopeVersion() string {
+	if x != nil && x.ScopeVersion != nil {
+		return *x.ScopeVersion
+	}
+	return ""
+}
+
+func (x *UserlandSpan) GetSpanAttrs() string {
+	if x != nil && x.SpanAttrs != nil {
+		return *x.SpanAttrs
+	}
+	return ""
+}
+
+func (x *UserlandSpan) GetResourceAttrs() string {
+	if x != nil && x.ResourceAttrs != nil {
+		return *x.ResourceAttrs
+	}
+	return ""
+}
+
+type StepInfo struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Types that are valid to be assigned to Info:
+	//
+	//	*StepInfo_Invoke
+	//	*StepInfo_Sleep
+	//	*StepInfo_WaitForEvent
+	//	*StepInfo_Run
+	//	*StepInfo_WaitForSignal
+	Info          isStepInfo_Info `protobuf_oneof:"info"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StepInfo) Reset() {
+	*x = StepInfo{}
+	mi := &file_api_v2_service_proto_msgTypes[41]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StepInfo) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StepInfo) ProtoMessage() {}
+
+func (x *StepInfo) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[41]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StepInfo.ProtoReflect.Descriptor instead.
+func (*StepInfo) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{41}
+}
+
+func (x *StepInfo) GetInfo() isStepInfo_Info {
+	if x != nil {
+		return x.Info
+	}
+	return nil
+}
+
+func (x *StepInfo) GetInvoke() *InvokeStepInfo {
+	if x != nil {
+		if x, ok := x.Info.(*StepInfo_Invoke); ok {
+			return x.Invoke
+		}
+	}
+	return nil
+}
+
+func (x *StepInfo) GetSleep() *SleepStepInfo {
+	if x != nil {
+		if x, ok := x.Info.(*StepInfo_Sleep); ok {
+			return x.Sleep
+		}
+	}
+	return nil
+}
+
+func (x *StepInfo) GetWaitForEvent() *WaitForEventStepInfo {
+	if x != nil {
+		if x, ok := x.Info.(*StepInfo_WaitForEvent); ok {
+			return x.WaitForEvent
+		}
+	}
+	return nil
+}
+
+func (x *StepInfo) GetRun() *RunStepInfo {
+	if x != nil {
+		if x, ok := x.Info.(*StepInfo_Run); ok {
+			return x.Run
+		}
+	}
+	return nil
+}
+
+func (x *StepInfo) GetWaitForSignal() *WaitForSignalStepInfo {
+	if x != nil {
+		if x, ok := x.Info.(*StepInfo_WaitForSignal); ok {
+			return x.WaitForSignal
+		}
+	}
+	return nil
+}
+
+type isStepInfo_Info interface {
+	isStepInfo_Info()
+}
+
+type StepInfo_Invoke struct {
+	Invoke *InvokeStepInfo `protobuf:"bytes,1,opt,name=invoke,proto3,oneof"`
+}
+
+type StepInfo_Sleep struct {
+	Sleep *SleepStepInfo `protobuf:"bytes,2,opt,name=sleep,proto3,oneof"`
+}
+
+type StepInfo_WaitForEvent struct {
+	WaitForEvent *WaitForEventStepInfo `protobuf:"bytes,3,opt,name=wait_for_event,json=waitForEvent,proto3,oneof"`
+}
+
+type StepInfo_Run struct {
+	Run *RunStepInfo `protobuf:"bytes,4,opt,name=run,proto3,oneof"`
+}
+
+type StepInfo_WaitForSignal struct {
+	WaitForSignal *WaitForSignalStepInfo `protobuf:"bytes,5,opt,name=wait_for_signal,json=waitForSignal,proto3,oneof"`
+}
+
+func (*StepInfo_Invoke) isStepInfo_Info() {}
+
+func (*StepInfo_Sleep) isStepInfo_Info() {}
+
+func (*StepInfo_WaitForEvent) isStepInfo_Info() {}
+
+func (*StepInfo_Run) isStepInfo_Info() {}
+
+func (*StepInfo_WaitForSignal) isStepInfo_Info() {}
+
+type InvokeStepInfo struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	TriggeringEventId string                 `protobuf:"bytes,1,opt,name=triggering_event_id,json=triggeringEventId,proto3" json:"triggering_event_id,omitempty"`
+	FunctionId        string                 `protobuf:"bytes,2,opt,name=function_id,json=functionId,proto3" json:"function_id,omitempty"`
+	Timeout           string                 `protobuf:"bytes,3,opt,name=timeout,proto3" json:"timeout,omitempty"`
+	ReturnEventId     *string                `protobuf:"bytes,4,opt,name=return_event_id,json=returnEventId,proto3,oneof" json:"return_event_id,omitempty"`
+	RunId             *string                `protobuf:"bytes,5,opt,name=run_id,json=runId,proto3,oneof" json:"run_id,omitempty"`
+	TimedOut          *bool                  `protobuf:"varint,6,opt,name=timed_out,json=timedOut,proto3,oneof" json:"timed_out,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *InvokeStepInfo) Reset() {
+	*x = InvokeStepInfo{}
+	mi := &file_api_v2_service_proto_msgTypes[42]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *InvokeStepInfo) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*InvokeStepInfo) ProtoMessage() {}
+
+func (x *InvokeStepInfo) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[42]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use InvokeStepInfo.ProtoReflect.Descriptor instead.
+func (*InvokeStepInfo) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{42}
+}
+
+func (x *InvokeStepInfo) GetTriggeringEventId() string {
+	if x != nil {
+		return x.TriggeringEventId
+	}
+	return ""
+}
+
+func (x *InvokeStepInfo) GetFunctionId() string {
+	if x != nil {
+		return x.FunctionId
+	}
+	return ""
+}
+
+func (x *InvokeStepInfo) GetTimeout() string {
+	if x != nil {
+		return x.Timeout
+	}
+	return ""
+}
+
+func (x *InvokeStepInfo) GetReturnEventId() string {
+	if x != nil && x.ReturnEventId != nil {
+		return *x.ReturnEventId
+	}
+	return ""
+}
+
+func (x *InvokeStepInfo) GetRunId() string {
+	if x != nil && x.RunId != nil {
+		return *x.RunId
+	}
+	return ""
+}
+
+func (x *InvokeStepInfo) GetTimedOut() bool {
+	if x != nil && x.TimedOut != nil {
+		return *x.TimedOut
+	}
+	return false
+}
+
+type SleepStepInfo struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	SleepUntil    string                 `protobuf:"bytes,1,opt,name=sleep_until,json=sleepUntil,proto3" json:"sleep_until,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SleepStepInfo) Reset() {
+	*x = SleepStepInfo{}
+	mi := &file_api_v2_service_proto_msgTypes[43]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SleepStepInfo) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SleepStepInfo) ProtoMessage() {}
+
+func (x *SleepStepInfo) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[43]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SleepStepInfo.ProtoReflect.Descriptor instead.
+func (*SleepStepInfo) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{43}
+}
+
+func (x *SleepStepInfo) GetSleepUntil() string {
+	if x != nil {
+		return x.SleepUntil
+	}
+	return ""
+}
+
+type WaitForEventStepInfo struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	EventName     string                 `protobuf:"bytes,1,opt,name=event_name,json=eventName,proto3" json:"event_name,omitempty"`
+	Expression    *string                `protobuf:"bytes,2,opt,name=expression,proto3,oneof" json:"expression,omitempty"`
+	Timeout       string                 `protobuf:"bytes,3,opt,name=timeout,proto3" json:"timeout,omitempty"`
+	FoundEventId  *string                `protobuf:"bytes,4,opt,name=found_event_id,json=foundEventId,proto3,oneof" json:"found_event_id,omitempty"`
+	TimedOut      *bool                  `protobuf:"varint,5,opt,name=timed_out,json=timedOut,proto3,oneof" json:"timed_out,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WaitForEventStepInfo) Reset() {
+	*x = WaitForEventStepInfo{}
+	mi := &file_api_v2_service_proto_msgTypes[44]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WaitForEventStepInfo) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WaitForEventStepInfo) ProtoMessage() {}
+
+func (x *WaitForEventStepInfo) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[44]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WaitForEventStepInfo.ProtoReflect.Descriptor instead.
+func (*WaitForEventStepInfo) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{44}
+}
+
+func (x *WaitForEventStepInfo) GetEventName() string {
+	if x != nil {
+		return x.EventName
+	}
+	return ""
+}
+
+func (x *WaitForEventStepInfo) GetExpression() string {
+	if x != nil && x.Expression != nil {
+		return *x.Expression
+	}
+	return ""
+}
+
+func (x *WaitForEventStepInfo) GetTimeout() string {
+	if x != nil {
+		return x.Timeout
+	}
+	return ""
+}
+
+func (x *WaitForEventStepInfo) GetFoundEventId() string {
+	if x != nil && x.FoundEventId != nil {
+		return *x.FoundEventId
+	}
+	return ""
+}
+
+func (x *WaitForEventStepInfo) GetTimedOut() bool {
+	if x != nil && x.TimedOut != nil {
+		return *x.TimedOut
+	}
+	return false
+}
+
+type RunStepInfo struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Type          *string                `protobuf:"bytes,1,opt,name=type,proto3,oneof" json:"type,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RunStepInfo) Reset() {
+	*x = RunStepInfo{}
+	mi := &file_api_v2_service_proto_msgTypes[45]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RunStepInfo) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RunStepInfo) ProtoMessage() {}
+
+func (x *RunStepInfo) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[45]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RunStepInfo.ProtoReflect.Descriptor instead.
+func (*RunStepInfo) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{45}
+}
+
+func (x *RunStepInfo) GetType() string {
+	if x != nil && x.Type != nil {
+		return *x.Type
+	}
+	return ""
+}
+
+type WaitForSignalStepInfo struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Signal        string                 `protobuf:"bytes,1,opt,name=signal,proto3" json:"signal,omitempty"`
+	Timeout       string                 `protobuf:"bytes,2,opt,name=timeout,proto3" json:"timeout,omitempty"`
+	TimedOut      *bool                  `protobuf:"varint,3,opt,name=timed_out,json=timedOut,proto3,oneof" json:"timed_out,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WaitForSignalStepInfo) Reset() {
+	*x = WaitForSignalStepInfo{}
+	mi := &file_api_v2_service_proto_msgTypes[46]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WaitForSignalStepInfo) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WaitForSignalStepInfo) ProtoMessage() {}
+
+func (x *WaitForSignalStepInfo) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[46]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WaitForSignalStepInfo.ProtoReflect.Descriptor instead.
+func (*WaitForSignalStepInfo) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{46}
+}
+
+func (x *WaitForSignalStepInfo) GetSignal() string {
+	if x != nil {
+		return x.Signal
+	}
+	return ""
+}
+
+func (x *WaitForSignalStepInfo) GetTimeout() string {
+	if x != nil {
+		return x.Timeout
+	}
+	return ""
+}
+
+func (x *WaitForSignalStepInfo) GetTimedOut() bool {
+	if x != nil && x.TimedOut != nil {
+		return *x.TimedOut
+	}
+	return false
+}
+
+type SpanMetadata struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Kind          string                 `protobuf:"bytes,1,opt,name=kind,proto3" json:"kind,omitempty"`
+	Scope         string                 `protobuf:"bytes,2,opt,name=scope,proto3" json:"scope,omitempty"`
+	Values        string                 `protobuf:"bytes,3,opt,name=values,proto3" json:"values,omitempty"`
+	UpdatedAt     string                 `protobuf:"bytes,4,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SpanMetadata) Reset() {
+	*x = SpanMetadata{}
+	mi := &file_api_v2_service_proto_msgTypes[47]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SpanMetadata) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SpanMetadata) ProtoMessage() {}
+
+func (x *SpanMetadata) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[47]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SpanMetadata.ProtoReflect.Descriptor instead.
+func (*SpanMetadata) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{47}
+}
+
+func (x *SpanMetadata) GetKind() string {
+	if x != nil {
+		return x.Kind
+	}
+	return ""
+}
+
+func (x *SpanMetadata) GetScope() string {
+	if x != nil {
+		return x.Scope
+	}
+	return ""
+}
+
+func (x *SpanMetadata) GetValues() string {
+	if x != nil {
+		return x.Values
+	}
+	return ""
+}
+
+func (x *SpanMetadata) GetUpdatedAt() string {
+	if x != nil {
+		return x.UpdatedAt
+	}
+	return ""
+}
+
 var File_api_v2_service_proto protoreflect.FileDescriptor
 
 const file_api_v2_service_proto_rawDesc = "" +
@@ -2281,7 +3481,137 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\v_isArchived\"j\n" +
 	"\x11PatchEnvsResponse\x12\x1f\n" +
 	"\x04data\x18\x01 \x01(\v2\v.api.v2.EnvR\x04data\x124\n" +
-	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata*/\n" +
+	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"@\n" +
+	"\x10StreamRunRequest\x12\x15\n" +
+	"\x06env_id\x18\x01 \x01(\tR\x05envId\x12\x15\n" +
+	"\x06run_id\x18\x02 \x01(\tR\x05runId\"2\n" +
+	"\rRunStreamItem\x12!\n" +
+	"\x03run\x18\x01 \x01(\v2\x0f.api.v2.RunDataR\x03run\"\xa6\x01\n" +
+	"\aRunData\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x16\n" +
+	"\x06status\x18\x02 \x01(\tR\x06status\x12\x15\n" +
+	"\x06has_ai\x18\x03 \x01(\bR\x05hasAi\x120\n" +
+	"\bfunction\x18\x04 \x01(\v2\x14.api.v2.FunctionInfoR\bfunction\x12*\n" +
+	"\x05trace\x18\x05 \x01(\v2\x14.api.v2.RunTraceSpanR\x05trace\"i\n" +
+	"\fFunctionInfo\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x12\n" +
+	"\x04slug\x18\x03 \x01(\tR\x04slug\x12!\n" +
+	"\x03app\x18\x04 \x01(\v2\x0f.api.v2.AppInfoR\x03app\">\n" +
+	"\aAppInfo\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1f\n" +
+	"\vexternal_id\x18\x02 \x01(\tR\n" +
+	"externalId\"\x97\a\n" +
+	"\fRunTraceSpan\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x122\n" +
+	"\x06status\x18\x02 \x01(\x0e2\x1a.api.v2.RunTraceSpanStatusR\x06status\x12\x1f\n" +
+	"\battempts\x18\x03 \x01(\x05H\x00R\battempts\x88\x01\x01\x12\x1b\n" +
+	"\tqueued_at\x18\x04 \x01(\tR\bqueuedAt\x12\"\n" +
+	"\n" +
+	"started_at\x18\x05 \x01(\tH\x01R\tstartedAt\x88\x01\x01\x12\x1e\n" +
+	"\bended_at\x18\x06 \x01(\tH\x02R\aendedAt\x88\x01\x01\x12\x17\n" +
+	"\ais_root\x18\a \x01(\bR\x06isRoot\x12 \n" +
+	"\toutput_id\x18\b \x01(\tH\x03R\boutputId\x88\x01\x01\x12\x17\n" +
+	"\aspan_id\x18\t \x01(\tR\x06spanId\x12\x1c\n" +
+	"\astep_id\x18\n" +
+	" \x01(\tH\x04R\x06stepId\x88\x01\x01\x12,\n" +
+	"\astep_op\x18\v \x01(\x0e2\x0e.api.v2.StepOpH\x05R\x06stepOp\x88\x01\x01\x12 \n" +
+	"\tstep_type\x18\f \x01(\tH\x06R\bstepType\x88\x01\x01\x12;\n" +
+	"\x0echildren_spans\x18\r \x03(\v2\x14.api.v2.RunTraceSpanR\rchildrenSpans\x122\n" +
+	"\tstep_info\x18\x0e \x01(\v2\x10.api.v2.StepInfoH\aR\bstepInfo\x88\x01\x01\x12\x1f\n" +
+	"\vis_userland\x18\x0f \x01(\bR\n" +
+	"isUserland\x12>\n" +
+	"\ruserland_span\x18\x10 \x01(\v2\x14.api.v2.UserlandSpanH\bR\fuserlandSpan\x88\x01\x01\x12%\n" +
+	"\fdebug_run_id\x18\x11 \x01(\tH\tR\n" +
+	"debugRunId\x88\x01\x01\x12-\n" +
+	"\x10debug_session_id\x18\x12 \x01(\tH\n" +
+	"R\x0edebugSessionId\x88\x01\x01\x120\n" +
+	"\bmetadata\x18\x13 \x03(\v2\x14.api.v2.SpanMetadataR\bmetadataB\v\n" +
+	"\t_attemptsB\r\n" +
+	"\v_started_atB\v\n" +
+	"\t_ended_atB\f\n" +
+	"\n" +
+	"_output_idB\n" +
+	"\n" +
+	"\b_step_idB\n" +
+	"\n" +
+	"\b_step_opB\f\n" +
+	"\n" +
+	"_step_typeB\f\n" +
+	"\n" +
+	"_step_infoB\x10\n" +
+	"\x0e_userland_spanB\x0f\n" +
+	"\r_debug_run_idB\x13\n" +
+	"\x11_debug_session_id\"\x88\x03\n" +
+	"\fUserlandSpan\x12 \n" +
+	"\tspan_name\x18\x01 \x01(\tH\x00R\bspanName\x88\x01\x01\x12 \n" +
+	"\tspan_kind\x18\x02 \x01(\tH\x01R\bspanKind\x88\x01\x01\x12&\n" +
+	"\fservice_name\x18\x03 \x01(\tH\x02R\vserviceName\x88\x01\x01\x12\"\n" +
+	"\n" +
+	"scope_name\x18\x04 \x01(\tH\x03R\tscopeName\x88\x01\x01\x12(\n" +
+	"\rscope_version\x18\x05 \x01(\tH\x04R\fscopeVersion\x88\x01\x01\x12\"\n" +
+	"\n" +
+	"span_attrs\x18\x06 \x01(\tH\x05R\tspanAttrs\x88\x01\x01\x12*\n" +
+	"\x0eresource_attrs\x18\a \x01(\tH\x06R\rresourceAttrs\x88\x01\x01B\f\n" +
+	"\n" +
+	"_span_nameB\f\n" +
+	"\n" +
+	"_span_kindB\x0f\n" +
+	"\r_service_nameB\r\n" +
+	"\v_scope_nameB\x10\n" +
+	"\x0e_scope_versionB\r\n" +
+	"\v_span_attrsB\x11\n" +
+	"\x0f_resource_attrs\"\xab\x02\n" +
+	"\bStepInfo\x120\n" +
+	"\x06invoke\x18\x01 \x01(\v2\x16.api.v2.InvokeStepInfoH\x00R\x06invoke\x12-\n" +
+	"\x05sleep\x18\x02 \x01(\v2\x15.api.v2.SleepStepInfoH\x00R\x05sleep\x12D\n" +
+	"\x0ewait_for_event\x18\x03 \x01(\v2\x1c.api.v2.WaitForEventStepInfoH\x00R\fwaitForEvent\x12'\n" +
+	"\x03run\x18\x04 \x01(\v2\x13.api.v2.RunStepInfoH\x00R\x03run\x12G\n" +
+	"\x0fwait_for_signal\x18\x05 \x01(\v2\x1d.api.v2.WaitForSignalStepInfoH\x00R\rwaitForSignalB\x06\n" +
+	"\x04info\"\x93\x02\n" +
+	"\x0eInvokeStepInfo\x12.\n" +
+	"\x13triggering_event_id\x18\x01 \x01(\tR\x11triggeringEventId\x12\x1f\n" +
+	"\vfunction_id\x18\x02 \x01(\tR\n" +
+	"functionId\x12\x18\n" +
+	"\atimeout\x18\x03 \x01(\tR\atimeout\x12+\n" +
+	"\x0freturn_event_id\x18\x04 \x01(\tH\x00R\rreturnEventId\x88\x01\x01\x12\x1a\n" +
+	"\x06run_id\x18\x05 \x01(\tH\x01R\x05runId\x88\x01\x01\x12 \n" +
+	"\ttimed_out\x18\x06 \x01(\bH\x02R\btimedOut\x88\x01\x01B\x12\n" +
+	"\x10_return_event_idB\t\n" +
+	"\a_run_idB\f\n" +
+	"\n" +
+	"_timed_out\"0\n" +
+	"\rSleepStepInfo\x12\x1f\n" +
+	"\vsleep_until\x18\x01 \x01(\tR\n" +
+	"sleepUntil\"\xf1\x01\n" +
+	"\x14WaitForEventStepInfo\x12\x1d\n" +
+	"\n" +
+	"event_name\x18\x01 \x01(\tR\teventName\x12#\n" +
+	"\n" +
+	"expression\x18\x02 \x01(\tH\x00R\n" +
+	"expression\x88\x01\x01\x12\x18\n" +
+	"\atimeout\x18\x03 \x01(\tR\atimeout\x12)\n" +
+	"\x0efound_event_id\x18\x04 \x01(\tH\x01R\ffoundEventId\x88\x01\x01\x12 \n" +
+	"\ttimed_out\x18\x05 \x01(\bH\x02R\btimedOut\x88\x01\x01B\r\n" +
+	"\v_expressionB\x11\n" +
+	"\x0f_found_event_idB\f\n" +
+	"\n" +
+	"_timed_out\"/\n" +
+	"\vRunStepInfo\x12\x17\n" +
+	"\x04type\x18\x01 \x01(\tH\x00R\x04type\x88\x01\x01B\a\n" +
+	"\x05_type\"y\n" +
+	"\x15WaitForSignalStepInfo\x12\x16\n" +
+	"\x06signal\x18\x01 \x01(\tR\x06signal\x12\x18\n" +
+	"\atimeout\x18\x02 \x01(\tR\atimeout\x12 \n" +
+	"\ttimed_out\x18\x03 \x01(\bH\x00R\btimedOut\x88\x01\x01B\f\n" +
+	"\n" +
+	"_timed_out\"o\n" +
+	"\fSpanMetadata\x12\x12\n" +
+	"\x04kind\x18\x01 \x01(\tR\x04kind\x12\x14\n" +
+	"\x05scope\x18\x02 \x01(\tR\x05scope\x12\x16\n" +
+	"\x06values\x18\x03 \x01(\tR\x06values\x12\x1d\n" +
+	"\n" +
+	"updated_at\x18\x04 \x01(\tR\tupdatedAt*/\n" +
 	"\aEnvType\x12\x0e\n" +
 	"\n" +
 	"PRODUCTION\x10\x00\x12\b\n" +
@@ -2291,7 +3621,23 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\n" +
 	"FilterType\x12\t\n" +
 	"\x05ALLOW\x10\x00\x12\b\n" +
-	"\x04DENY\x10\x012\xd8;\n" +
+	"\x04DENY\x10\x01*\x8f\x02\n" +
+	"\x12RunTraceSpanStatus\x12%\n" +
+	"!RUN_TRACE_SPAN_STATUS_UNSPECIFIED\x10\x00\x12!\n" +
+	"\x1dRUN_TRACE_SPAN_STATUS_RUNNING\x10\x01\x12#\n" +
+	"\x1fRUN_TRACE_SPAN_STATUS_COMPLETED\x10\x02\x12 \n" +
+	"\x1cRUN_TRACE_SPAN_STATUS_FAILED\x10\x03\x12#\n" +
+	"\x1fRUN_TRACE_SPAN_STATUS_CANCELLED\x10\x04\x12 \n" +
+	"\x1cRUN_TRACE_SPAN_STATUS_QUEUED\x10\x05\x12!\n" +
+	"\x1dRUN_TRACE_SPAN_STATUS_WAITING\x10\x06*\xaa\x01\n" +
+	"\x06StepOp\x12\x17\n" +
+	"\x13STEP_OP_UNSPECIFIED\x10\x00\x12\x0f\n" +
+	"\vSTEP_OP_RUN\x10\x01\x12\x11\n" +
+	"\rSTEP_OP_SLEEP\x10\x02\x12\x1a\n" +
+	"\x16STEP_OP_WAIT_FOR_EVENT\x10\x03\x12\x12\n" +
+	"\x0eSTEP_OP_INVOKE\x10\x04\x12\x16\n" +
+	"\x12STEP_OP_AI_GATEWAY\x10\x05\x12\x1b\n" +
+	"\x17STEP_OP_WAIT_FOR_SIGNAL\x10\x062\x98<\n" +
 	"\x02V2\x12\xb2\x02\n" +
 	"\x06Health\x12\x15.api.v2.HealthRequest\x1a\x16.api.v2.HealthResponse\"\xf8\x01\x92A\xe5\x01\x12\fHealth check\x1a,Returns the health status of the API serviceJR\n" +
 	"\x03401\x12K\n" +
@@ -2528,7 +3874,8 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x0e\n" +
 	"\n" +
 	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x0f:\x01*2\n" +
-	"/envs/{id}B\xc8\x02\x92A\x91\x02\x12\x9b\x01\n" +
+	"/envs/{id}\x12>\n" +
+	"\tStreamRun\x12\x18.api.v2.StreamRunRequest\x1a\x15.api.v2.RunStreamItem0\x01B\xc8\x02\x92A\x91\x02\x12\x9b\x01\n" +
 	"\x13Inngest REST API v2\x12}The v2 API delivers a significantly improved developer experience with consistent design patterns and enhanced functionality.2\x052.0.0\x1a\x0fapi.inngest.com\"\x03/v2*\x01\x02ZX\n" +
 	"V\n" +
 	"\n" +
@@ -2546,121 +3893,154 @@ func file_api_v2_service_proto_rawDescGZIP() []byte {
 	return file_api_v2_service_proto_rawDescData
 }
 
-var file_api_v2_service_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_api_v2_service_proto_msgTypes = make([]protoimpl.MessageInfo, 34)
+var file_api_v2_service_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
+var file_api_v2_service_proto_msgTypes = make([]protoimpl.MessageInfo, 48)
 var file_api_v2_service_proto_goTypes = []any{
 	(EnvType)(0),                            // 0: api.v2.EnvType
 	(FilterType)(0),                         // 1: api.v2.FilterType
-	(*HealthRequest)(nil),                   // 2: api.v2.HealthRequest
-	(*FetchAccountRequest)(nil),             // 3: api.v2.FetchAccountRequest
-	(*HealthResponse)(nil),                  // 4: api.v2.HealthResponse
-	(*HealthData)(nil),                      // 5: api.v2.HealthData
-	(*Error)(nil),                           // 6: api.v2.Error
-	(*ErrorResponse)(nil),                   // 7: api.v2.ErrorResponse
-	(*ResponseMetadata)(nil),                // 8: api.v2.ResponseMetadata
-	(*CreateAccountRequest)(nil),            // 9: api.v2.CreateAccountRequest
-	(*CreateAccountResponse)(nil),           // 10: api.v2.CreateAccountResponse
-	(*CreateEnvRequest)(nil),                // 11: api.v2.CreateEnvRequest
-	(*CreateEnvResponse)(nil),               // 12: api.v2.CreateEnvResponse
-	(*Env)(nil),                             // 13: api.v2.Env
-	(*CreateAccountData)(nil),               // 14: api.v2.CreateAccountData
-	(*FetchAccountsRequest)(nil),            // 15: api.v2.FetchAccountsRequest
-	(*FetchAccountsResponse)(nil),           // 16: api.v2.FetchAccountsResponse
-	(*FetchAccountResponse)(nil),            // 17: api.v2.FetchAccountResponse
-	(*Account)(nil),                         // 18: api.v2.Account
-	(*Page)(nil),                            // 19: api.v2.Page
-	(*FetchAccountEventKeysRequest)(nil),    // 20: api.v2.FetchAccountEventKeysRequest
-	(*FetchAccountEventKeysResponse)(nil),   // 21: api.v2.FetchAccountEventKeysResponse
-	(*EventKey)(nil),                        // 22: api.v2.EventKey
-	(*FetchAccountEnvsRequest)(nil),         // 23: api.v2.FetchAccountEnvsRequest
-	(*FetchAccountEnvsResponse)(nil),        // 24: api.v2.FetchAccountEnvsResponse
-	(*FetchAccountSigningKeysRequest)(nil),  // 25: api.v2.FetchAccountSigningKeysRequest
-	(*FetchAccountSigningKeysResponse)(nil), // 26: api.v2.FetchAccountSigningKeysResponse
-	(*SigningKey)(nil),                      // 27: api.v2.SigningKey
-	(*CreateWebhookRequest)(nil),            // 28: api.v2.CreateWebhookRequest
-	(*CreateWebhookResponse)(nil),           // 29: api.v2.CreateWebhookResponse
-	(*EventFilter)(nil),                     // 30: api.v2.EventFilter
-	(*ListWebhooksRequest)(nil),             // 31: api.v2.ListWebhooksRequest
-	(*ListWebhooksResponse)(nil),            // 32: api.v2.ListWebhooksResponse
-	(*Webhook)(nil),                         // 33: api.v2.Webhook
-	(*PatchEnvRequest)(nil),                 // 34: api.v2.PatchEnvRequest
-	(*PatchEnvsResponse)(nil),               // 35: api.v2.PatchEnvsResponse
-	(*timestamppb.Timestamp)(nil),           // 36: google.protobuf.Timestamp
+	(RunTraceSpanStatus)(0),                 // 2: api.v2.RunTraceSpanStatus
+	(StepOp)(0),                             // 3: api.v2.StepOp
+	(*HealthRequest)(nil),                   // 4: api.v2.HealthRequest
+	(*FetchAccountRequest)(nil),             // 5: api.v2.FetchAccountRequest
+	(*HealthResponse)(nil),                  // 6: api.v2.HealthResponse
+	(*HealthData)(nil),                      // 7: api.v2.HealthData
+	(*Error)(nil),                           // 8: api.v2.Error
+	(*ErrorResponse)(nil),                   // 9: api.v2.ErrorResponse
+	(*ResponseMetadata)(nil),                // 10: api.v2.ResponseMetadata
+	(*CreateAccountRequest)(nil),            // 11: api.v2.CreateAccountRequest
+	(*CreateAccountResponse)(nil),           // 12: api.v2.CreateAccountResponse
+	(*CreateEnvRequest)(nil),                // 13: api.v2.CreateEnvRequest
+	(*CreateEnvResponse)(nil),               // 14: api.v2.CreateEnvResponse
+	(*Env)(nil),                             // 15: api.v2.Env
+	(*CreateAccountData)(nil),               // 16: api.v2.CreateAccountData
+	(*FetchAccountsRequest)(nil),            // 17: api.v2.FetchAccountsRequest
+	(*FetchAccountsResponse)(nil),           // 18: api.v2.FetchAccountsResponse
+	(*FetchAccountResponse)(nil),            // 19: api.v2.FetchAccountResponse
+	(*Account)(nil),                         // 20: api.v2.Account
+	(*Page)(nil),                            // 21: api.v2.Page
+	(*FetchAccountEventKeysRequest)(nil),    // 22: api.v2.FetchAccountEventKeysRequest
+	(*FetchAccountEventKeysResponse)(nil),   // 23: api.v2.FetchAccountEventKeysResponse
+	(*EventKey)(nil),                        // 24: api.v2.EventKey
+	(*FetchAccountEnvsRequest)(nil),         // 25: api.v2.FetchAccountEnvsRequest
+	(*FetchAccountEnvsResponse)(nil),        // 26: api.v2.FetchAccountEnvsResponse
+	(*FetchAccountSigningKeysRequest)(nil),  // 27: api.v2.FetchAccountSigningKeysRequest
+	(*FetchAccountSigningKeysResponse)(nil), // 28: api.v2.FetchAccountSigningKeysResponse
+	(*SigningKey)(nil),                      // 29: api.v2.SigningKey
+	(*CreateWebhookRequest)(nil),            // 30: api.v2.CreateWebhookRequest
+	(*CreateWebhookResponse)(nil),           // 31: api.v2.CreateWebhookResponse
+	(*EventFilter)(nil),                     // 32: api.v2.EventFilter
+	(*ListWebhooksRequest)(nil),             // 33: api.v2.ListWebhooksRequest
+	(*ListWebhooksResponse)(nil),            // 34: api.v2.ListWebhooksResponse
+	(*Webhook)(nil),                         // 35: api.v2.Webhook
+	(*PatchEnvRequest)(nil),                 // 36: api.v2.PatchEnvRequest
+	(*PatchEnvsResponse)(nil),               // 37: api.v2.PatchEnvsResponse
+	(*StreamRunRequest)(nil),                // 38: api.v2.StreamRunRequest
+	(*RunStreamItem)(nil),                   // 39: api.v2.RunStreamItem
+	(*RunData)(nil),                         // 40: api.v2.RunData
+	(*FunctionInfo)(nil),                    // 41: api.v2.FunctionInfo
+	(*AppInfo)(nil),                         // 42: api.v2.AppInfo
+	(*RunTraceSpan)(nil),                    // 43: api.v2.RunTraceSpan
+	(*UserlandSpan)(nil),                    // 44: api.v2.UserlandSpan
+	(*StepInfo)(nil),                        // 45: api.v2.StepInfo
+	(*InvokeStepInfo)(nil),                  // 46: api.v2.InvokeStepInfo
+	(*SleepStepInfo)(nil),                   // 47: api.v2.SleepStepInfo
+	(*WaitForEventStepInfo)(nil),            // 48: api.v2.WaitForEventStepInfo
+	(*RunStepInfo)(nil),                     // 49: api.v2.RunStepInfo
+	(*WaitForSignalStepInfo)(nil),           // 50: api.v2.WaitForSignalStepInfo
+	(*SpanMetadata)(nil),                    // 51: api.v2.SpanMetadata
+	(*timestamppb.Timestamp)(nil),           // 52: google.protobuf.Timestamp
 }
 var file_api_v2_service_proto_depIdxs = []int32{
-	5,  // 0: api.v2.HealthResponse.data:type_name -> api.v2.HealthData
-	8,  // 1: api.v2.HealthResponse.metadata:type_name -> api.v2.ResponseMetadata
-	6,  // 2: api.v2.ErrorResponse.errors:type_name -> api.v2.Error
-	36, // 3: api.v2.ResponseMetadata.fetched_at:type_name -> google.protobuf.Timestamp
-	36, // 4: api.v2.ResponseMetadata.cached_until:type_name -> google.protobuf.Timestamp
-	14, // 5: api.v2.CreateAccountResponse.data:type_name -> api.v2.CreateAccountData
-	8,  // 6: api.v2.CreateAccountResponse.metadata:type_name -> api.v2.ResponseMetadata
-	13, // 7: api.v2.CreateEnvResponse.data:type_name -> api.v2.Env
-	8,  // 8: api.v2.CreateEnvResponse.metadata:type_name -> api.v2.ResponseMetadata
+	7,  // 0: api.v2.HealthResponse.data:type_name -> api.v2.HealthData
+	10, // 1: api.v2.HealthResponse.metadata:type_name -> api.v2.ResponseMetadata
+	8,  // 2: api.v2.ErrorResponse.errors:type_name -> api.v2.Error
+	52, // 3: api.v2.ResponseMetadata.fetched_at:type_name -> google.protobuf.Timestamp
+	52, // 4: api.v2.ResponseMetadata.cached_until:type_name -> google.protobuf.Timestamp
+	16, // 5: api.v2.CreateAccountResponse.data:type_name -> api.v2.CreateAccountData
+	10, // 6: api.v2.CreateAccountResponse.metadata:type_name -> api.v2.ResponseMetadata
+	15, // 7: api.v2.CreateEnvResponse.data:type_name -> api.v2.Env
+	10, // 8: api.v2.CreateEnvResponse.metadata:type_name -> api.v2.ResponseMetadata
 	0,  // 9: api.v2.Env.type:type_name -> api.v2.EnvType
-	36, // 10: api.v2.Env.createdAt:type_name -> google.protobuf.Timestamp
-	36, // 11: api.v2.Env.lastDeployedAt:type_name -> google.protobuf.Timestamp
-	36, // 12: api.v2.CreateAccountData.createdAt:type_name -> google.protobuf.Timestamp
-	36, // 13: api.v2.CreateAccountData.updatedAt:type_name -> google.protobuf.Timestamp
-	18, // 14: api.v2.FetchAccountsResponse.data:type_name -> api.v2.Account
-	8,  // 15: api.v2.FetchAccountsResponse.metadata:type_name -> api.v2.ResponseMetadata
-	19, // 16: api.v2.FetchAccountsResponse.page:type_name -> api.v2.Page
-	18, // 17: api.v2.FetchAccountResponse.data:type_name -> api.v2.Account
-	8,  // 18: api.v2.FetchAccountResponse.metadata:type_name -> api.v2.ResponseMetadata
-	36, // 19: api.v2.Account.createdAt:type_name -> google.protobuf.Timestamp
-	36, // 20: api.v2.Account.updatedAt:type_name -> google.protobuf.Timestamp
-	22, // 21: api.v2.FetchAccountEventKeysResponse.data:type_name -> api.v2.EventKey
-	8,  // 22: api.v2.FetchAccountEventKeysResponse.metadata:type_name -> api.v2.ResponseMetadata
-	19, // 23: api.v2.FetchAccountEventKeysResponse.page:type_name -> api.v2.Page
-	36, // 24: api.v2.EventKey.createdAt:type_name -> google.protobuf.Timestamp
-	13, // 25: api.v2.FetchAccountEnvsResponse.data:type_name -> api.v2.Env
-	8,  // 26: api.v2.FetchAccountEnvsResponse.metadata:type_name -> api.v2.ResponseMetadata
-	19, // 27: api.v2.FetchAccountEnvsResponse.page:type_name -> api.v2.Page
-	27, // 28: api.v2.FetchAccountSigningKeysResponse.data:type_name -> api.v2.SigningKey
-	8,  // 29: api.v2.FetchAccountSigningKeysResponse.metadata:type_name -> api.v2.ResponseMetadata
-	19, // 30: api.v2.FetchAccountSigningKeysResponse.page:type_name -> api.v2.Page
-	36, // 31: api.v2.SigningKey.createdAt:type_name -> google.protobuf.Timestamp
-	30, // 32: api.v2.CreateWebhookRequest.event_filter:type_name -> api.v2.EventFilter
-	33, // 33: api.v2.CreateWebhookResponse.data:type_name -> api.v2.Webhook
-	8,  // 34: api.v2.CreateWebhookResponse.metadata:type_name -> api.v2.ResponseMetadata
+	52, // 10: api.v2.Env.createdAt:type_name -> google.protobuf.Timestamp
+	52, // 11: api.v2.Env.lastDeployedAt:type_name -> google.protobuf.Timestamp
+	52, // 12: api.v2.CreateAccountData.createdAt:type_name -> google.protobuf.Timestamp
+	52, // 13: api.v2.CreateAccountData.updatedAt:type_name -> google.protobuf.Timestamp
+	20, // 14: api.v2.FetchAccountsResponse.data:type_name -> api.v2.Account
+	10, // 15: api.v2.FetchAccountsResponse.metadata:type_name -> api.v2.ResponseMetadata
+	21, // 16: api.v2.FetchAccountsResponse.page:type_name -> api.v2.Page
+	20, // 17: api.v2.FetchAccountResponse.data:type_name -> api.v2.Account
+	10, // 18: api.v2.FetchAccountResponse.metadata:type_name -> api.v2.ResponseMetadata
+	52, // 19: api.v2.Account.createdAt:type_name -> google.protobuf.Timestamp
+	52, // 20: api.v2.Account.updatedAt:type_name -> google.protobuf.Timestamp
+	24, // 21: api.v2.FetchAccountEventKeysResponse.data:type_name -> api.v2.EventKey
+	10, // 22: api.v2.FetchAccountEventKeysResponse.metadata:type_name -> api.v2.ResponseMetadata
+	21, // 23: api.v2.FetchAccountEventKeysResponse.page:type_name -> api.v2.Page
+	52, // 24: api.v2.EventKey.createdAt:type_name -> google.protobuf.Timestamp
+	15, // 25: api.v2.FetchAccountEnvsResponse.data:type_name -> api.v2.Env
+	10, // 26: api.v2.FetchAccountEnvsResponse.metadata:type_name -> api.v2.ResponseMetadata
+	21, // 27: api.v2.FetchAccountEnvsResponse.page:type_name -> api.v2.Page
+	29, // 28: api.v2.FetchAccountSigningKeysResponse.data:type_name -> api.v2.SigningKey
+	10, // 29: api.v2.FetchAccountSigningKeysResponse.metadata:type_name -> api.v2.ResponseMetadata
+	21, // 30: api.v2.FetchAccountSigningKeysResponse.page:type_name -> api.v2.Page
+	52, // 31: api.v2.SigningKey.createdAt:type_name -> google.protobuf.Timestamp
+	32, // 32: api.v2.CreateWebhookRequest.event_filter:type_name -> api.v2.EventFilter
+	35, // 33: api.v2.CreateWebhookResponse.data:type_name -> api.v2.Webhook
+	10, // 34: api.v2.CreateWebhookResponse.metadata:type_name -> api.v2.ResponseMetadata
 	1,  // 35: api.v2.EventFilter.filter:type_name -> api.v2.FilterType
-	33, // 36: api.v2.ListWebhooksResponse.data:type_name -> api.v2.Webhook
-	8,  // 37: api.v2.ListWebhooksResponse.metadata:type_name -> api.v2.ResponseMetadata
-	19, // 38: api.v2.ListWebhooksResponse.page:type_name -> api.v2.Page
-	30, // 39: api.v2.Webhook.event_filter:type_name -> api.v2.EventFilter
-	36, // 40: api.v2.Webhook.createdAt:type_name -> google.protobuf.Timestamp
-	36, // 41: api.v2.Webhook.updatedAt:type_name -> google.protobuf.Timestamp
-	13, // 42: api.v2.PatchEnvsResponse.data:type_name -> api.v2.Env
-	8,  // 43: api.v2.PatchEnvsResponse.metadata:type_name -> api.v2.ResponseMetadata
-	2,  // 44: api.v2.V2.Health:input_type -> api.v2.HealthRequest
-	2,  // 45: api.v2.V2._SchemaOnly:input_type -> api.v2.HealthRequest
-	9,  // 46: api.v2.V2.CreatePartnerAccount:input_type -> api.v2.CreateAccountRequest
-	11, // 47: api.v2.V2.CreateEnv:input_type -> api.v2.CreateEnvRequest
-	15, // 48: api.v2.V2.FetchPartnerAccounts:input_type -> api.v2.FetchAccountsRequest
-	3,  // 49: api.v2.V2.FetchAccount:input_type -> api.v2.FetchAccountRequest
-	23, // 50: api.v2.V2.FetchAccountEnvs:input_type -> api.v2.FetchAccountEnvsRequest
-	20, // 51: api.v2.V2.FetchAccountEventKeys:input_type -> api.v2.FetchAccountEventKeysRequest
-	25, // 52: api.v2.V2.FetchAccountSigningKeys:input_type -> api.v2.FetchAccountSigningKeysRequest
-	28, // 53: api.v2.V2.CreateWebhook:input_type -> api.v2.CreateWebhookRequest
-	31, // 54: api.v2.V2.ListWebhooks:input_type -> api.v2.ListWebhooksRequest
-	34, // 55: api.v2.V2.PatchEnv:input_type -> api.v2.PatchEnvRequest
-	4,  // 56: api.v2.V2.Health:output_type -> api.v2.HealthResponse
-	7,  // 57: api.v2.V2._SchemaOnly:output_type -> api.v2.ErrorResponse
-	10, // 58: api.v2.V2.CreatePartnerAccount:output_type -> api.v2.CreateAccountResponse
-	12, // 59: api.v2.V2.CreateEnv:output_type -> api.v2.CreateEnvResponse
-	16, // 60: api.v2.V2.FetchPartnerAccounts:output_type -> api.v2.FetchAccountsResponse
-	17, // 61: api.v2.V2.FetchAccount:output_type -> api.v2.FetchAccountResponse
-	24, // 62: api.v2.V2.FetchAccountEnvs:output_type -> api.v2.FetchAccountEnvsResponse
-	21, // 63: api.v2.V2.FetchAccountEventKeys:output_type -> api.v2.FetchAccountEventKeysResponse
-	26, // 64: api.v2.V2.FetchAccountSigningKeys:output_type -> api.v2.FetchAccountSigningKeysResponse
-	29, // 65: api.v2.V2.CreateWebhook:output_type -> api.v2.CreateWebhookResponse
-	32, // 66: api.v2.V2.ListWebhooks:output_type -> api.v2.ListWebhooksResponse
-	35, // 67: api.v2.V2.PatchEnv:output_type -> api.v2.PatchEnvsResponse
-	56, // [56:68] is the sub-list for method output_type
-	44, // [44:56] is the sub-list for method input_type
-	44, // [44:44] is the sub-list for extension type_name
-	44, // [44:44] is the sub-list for extension extendee
-	0,  // [0:44] is the sub-list for field type_name
+	35, // 36: api.v2.ListWebhooksResponse.data:type_name -> api.v2.Webhook
+	10, // 37: api.v2.ListWebhooksResponse.metadata:type_name -> api.v2.ResponseMetadata
+	21, // 38: api.v2.ListWebhooksResponse.page:type_name -> api.v2.Page
+	32, // 39: api.v2.Webhook.event_filter:type_name -> api.v2.EventFilter
+	52, // 40: api.v2.Webhook.createdAt:type_name -> google.protobuf.Timestamp
+	52, // 41: api.v2.Webhook.updatedAt:type_name -> google.protobuf.Timestamp
+	15, // 42: api.v2.PatchEnvsResponse.data:type_name -> api.v2.Env
+	10, // 43: api.v2.PatchEnvsResponse.metadata:type_name -> api.v2.ResponseMetadata
+	40, // 44: api.v2.RunStreamItem.run:type_name -> api.v2.RunData
+	41, // 45: api.v2.RunData.function:type_name -> api.v2.FunctionInfo
+	43, // 46: api.v2.RunData.trace:type_name -> api.v2.RunTraceSpan
+	42, // 47: api.v2.FunctionInfo.app:type_name -> api.v2.AppInfo
+	2,  // 48: api.v2.RunTraceSpan.status:type_name -> api.v2.RunTraceSpanStatus
+	3,  // 49: api.v2.RunTraceSpan.step_op:type_name -> api.v2.StepOp
+	43, // 50: api.v2.RunTraceSpan.children_spans:type_name -> api.v2.RunTraceSpan
+	45, // 51: api.v2.RunTraceSpan.step_info:type_name -> api.v2.StepInfo
+	44, // 52: api.v2.RunTraceSpan.userland_span:type_name -> api.v2.UserlandSpan
+	51, // 53: api.v2.RunTraceSpan.metadata:type_name -> api.v2.SpanMetadata
+	46, // 54: api.v2.StepInfo.invoke:type_name -> api.v2.InvokeStepInfo
+	47, // 55: api.v2.StepInfo.sleep:type_name -> api.v2.SleepStepInfo
+	48, // 56: api.v2.StepInfo.wait_for_event:type_name -> api.v2.WaitForEventStepInfo
+	49, // 57: api.v2.StepInfo.run:type_name -> api.v2.RunStepInfo
+	50, // 58: api.v2.StepInfo.wait_for_signal:type_name -> api.v2.WaitForSignalStepInfo
+	4,  // 59: api.v2.V2.Health:input_type -> api.v2.HealthRequest
+	4,  // 60: api.v2.V2._SchemaOnly:input_type -> api.v2.HealthRequest
+	11, // 61: api.v2.V2.CreatePartnerAccount:input_type -> api.v2.CreateAccountRequest
+	13, // 62: api.v2.V2.CreateEnv:input_type -> api.v2.CreateEnvRequest
+	17, // 63: api.v2.V2.FetchPartnerAccounts:input_type -> api.v2.FetchAccountsRequest
+	5,  // 64: api.v2.V2.FetchAccount:input_type -> api.v2.FetchAccountRequest
+	25, // 65: api.v2.V2.FetchAccountEnvs:input_type -> api.v2.FetchAccountEnvsRequest
+	22, // 66: api.v2.V2.FetchAccountEventKeys:input_type -> api.v2.FetchAccountEventKeysRequest
+	27, // 67: api.v2.V2.FetchAccountSigningKeys:input_type -> api.v2.FetchAccountSigningKeysRequest
+	30, // 68: api.v2.V2.CreateWebhook:input_type -> api.v2.CreateWebhookRequest
+	33, // 69: api.v2.V2.ListWebhooks:input_type -> api.v2.ListWebhooksRequest
+	36, // 70: api.v2.V2.PatchEnv:input_type -> api.v2.PatchEnvRequest
+	38, // 71: api.v2.V2.StreamRun:input_type -> api.v2.StreamRunRequest
+	6,  // 72: api.v2.V2.Health:output_type -> api.v2.HealthResponse
+	9,  // 73: api.v2.V2._SchemaOnly:output_type -> api.v2.ErrorResponse
+	12, // 74: api.v2.V2.CreatePartnerAccount:output_type -> api.v2.CreateAccountResponse
+	14, // 75: api.v2.V2.CreateEnv:output_type -> api.v2.CreateEnvResponse
+	18, // 76: api.v2.V2.FetchPartnerAccounts:output_type -> api.v2.FetchAccountsResponse
+	19, // 77: api.v2.V2.FetchAccount:output_type -> api.v2.FetchAccountResponse
+	26, // 78: api.v2.V2.FetchAccountEnvs:output_type -> api.v2.FetchAccountEnvsResponse
+	23, // 79: api.v2.V2.FetchAccountEventKeys:output_type -> api.v2.FetchAccountEventKeysResponse
+	28, // 80: api.v2.V2.FetchAccountSigningKeys:output_type -> api.v2.FetchAccountSigningKeysResponse
+	31, // 81: api.v2.V2.CreateWebhook:output_type -> api.v2.CreateWebhookResponse
+	34, // 82: api.v2.V2.ListWebhooks:output_type -> api.v2.ListWebhooksResponse
+	37, // 83: api.v2.V2.PatchEnv:output_type -> api.v2.PatchEnvsResponse
+	39, // 84: api.v2.V2.StreamRun:output_type -> api.v2.RunStreamItem
+	72, // [72:85] is the sub-list for method output_type
+	59, // [59:72] is the sub-list for method input_type
+	59, // [59:59] is the sub-list for extension type_name
+	59, // [59:59] is the sub-list for extension extendee
+	0,  // [0:59] is the sub-list for field type_name
 }
 
 func init() { file_api_v2_service_proto_init() }
@@ -2681,13 +4061,26 @@ func file_api_v2_service_proto_init() {
 	file_api_v2_service_proto_msgTypes[29].OneofWrappers = []any{}
 	file_api_v2_service_proto_msgTypes[31].OneofWrappers = []any{}
 	file_api_v2_service_proto_msgTypes[32].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[39].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[40].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[41].OneofWrappers = []any{
+		(*StepInfo_Invoke)(nil),
+		(*StepInfo_Sleep)(nil),
+		(*StepInfo_WaitForEvent)(nil),
+		(*StepInfo_Run)(nil),
+		(*StepInfo_WaitForSignal)(nil),
+	}
+	file_api_v2_service_proto_msgTypes[42].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[44].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[45].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[46].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_api_v2_service_proto_rawDesc), len(file_api_v2_service_proto_rawDesc)),
-			NumEnums:      2,
-			NumMessages:   34,
+			NumEnums:      4,
+			NumMessages:   48,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

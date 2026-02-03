@@ -58,6 +58,9 @@ func Command() *cli.Command {
 			queueCommand(),
 			pauseCommand(),
 			constraintCommand(),
+			batchCommand(),
+			singletonCommand(),
+			debounceCommand(),
 		},
 	}
 }
