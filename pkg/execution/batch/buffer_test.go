@@ -535,6 +535,97 @@ func TestBufferedBatchManagerConcurrency(t *testing.T) {
 	require.Len(t, info.Items, numGoroutines)
 }
 
+// TestBufferedFlushDurationClamping verifies that the buffer flush duration is clamped
+// to the function's batch timeout when it's shorter than the buffer's maxDuration.
+func TestBufferedFlushDurationClamping(t *testing.T) {
+	r := miniredis.RunT(t)
+
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	bc := redis_state.NewBatchClient(rc, redis_state.QueueDefaultKey)
+
+	t.Run("flushes at function batch timeout when shorter than buffer max", func(t *testing.T) {
+		// Buffer has long maxDuration, but function has short batch timeout
+		buffered := NewRedisBatchManager(bc, nil,
+			WithBufferSettings(5*time.Second, 100), // Long buffer duration
+		)
+		defer buffered.Close()
+
+		fnId := uuid.New()
+		fn := inngest.Function{
+			ID: fnId,
+			EventBatch: &inngest.EventBatchConfig{
+				MaxSize: 10,
+				Timeout: "100ms", // Short batch timeout - should clamp flush duration
+			},
+		}
+
+		bi := BatchItem{
+			AccountID:   uuid.New(),
+			WorkspaceID: uuid.New(),
+			AppID:       uuid.New(),
+			FunctionID:  fnId,
+			EventID:     ulid.MustNew(ulid.Now(), rand.Reader),
+			Event:       event.Event{Name: "test/event", Data: map[string]any{"a": 1}},
+		}
+
+		start := time.Now()
+		result, err := buffered.Append(context.Background(), bi, fn)
+		elapsed := time.Since(start)
+
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		require.Equal(t, enums.BatchNew, result.Status)
+
+		// Should have flushed at ~100ms (function timeout), not 5s (buffer max)
+		require.GreaterOrEqual(t, elapsed, 90*time.Millisecond, "should wait at least near the batch timeout")
+		require.Less(t, elapsed, 500*time.Millisecond, "should not wait anywhere near the buffer maxDuration")
+	})
+
+	t.Run("uses buffer max when function timeout is longer", func(t *testing.T) {
+		// Buffer has short maxDuration, function has long batch timeout
+		buffered := NewRedisBatchManager(bc, nil,
+			WithBufferSettings(100*time.Millisecond, 100), // Short buffer duration
+		)
+		defer buffered.Close()
+
+		fnId := uuid.New()
+		fn := inngest.Function{
+			ID: fnId,
+			EventBatch: &inngest.EventBatchConfig{
+				MaxSize: 10,
+				Timeout: "60s", // Long batch timeout - buffer max should be used
+			},
+		}
+
+		bi := BatchItem{
+			AccountID:   uuid.New(),
+			WorkspaceID: uuid.New(),
+			AppID:       uuid.New(),
+			FunctionID:  fnId,
+			EventID:     ulid.MustNew(ulid.Now(), rand.Reader),
+			Event:       event.Event{Name: "test/event", Data: map[string]any{"a": 1}},
+		}
+
+		start := time.Now()
+		result, err := buffered.Append(context.Background(), bi, fn)
+		elapsed := time.Since(start)
+
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		require.Equal(t, enums.BatchNew, result.Status)
+
+		// Should have flushed at ~100ms (buffer max), not waiting for 60s
+		require.GreaterOrEqual(t, elapsed, 90*time.Millisecond)
+		require.Less(t, elapsed, 500*time.Millisecond)
+	})
+}
+
 // TestBufferedIdempotence verifies that idempotence works correctly with buffering,
 // both within a single buffer (in-memory dedup) and across flushes (Redis dedup).
 func TestBufferedIdempotence(t *testing.T) {
