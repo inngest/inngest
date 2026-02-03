@@ -16,7 +16,6 @@ afterEach(() => {
 
 describe('TimelineBar', () => {
   const defaultProps = {
-    id: 'test-bar',
     name: 'Test Step',
     duration: 1234,
     startPercent: 10,

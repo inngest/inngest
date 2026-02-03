@@ -37,7 +37,6 @@ The core building block. Renders a single timeline row with:
 
 ```tsx
 <TimelineBar
-  id="step-1"
   name="Process Data"
   duration={1500}
   startPercent={10}

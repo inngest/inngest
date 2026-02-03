@@ -101,9 +101,6 @@ export interface BarSegment {
  * Renders a single row in the timeline with optional expansion and nested children.
  */
 export interface TimelineBarProps {
-  /** Unique identifier for React keys and state management */
-  id: string;
-
   /** Display name shown in the left panel */
   name: string;
 
