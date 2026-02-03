@@ -190,6 +190,7 @@ local availableCapacity = requested
 local limitingConstraints = {}
 local exhaustedConstraints = {}
 local constraintCapacities = {}
+local constraintRetryAfters = {}
 local exhaustedSet = {}
 local retryAt = 0
 local skipGCRA = call("EXISTS", keyConstraintCheckIdempotency) == 1
@@ -218,6 +219,7 @@ for index, value in ipairs(constraints) do
 		constraintRetryAfter = toInteger(throttleRes["retry_at"]) 
 	end
 	constraintCapacities[index] = constraintCapacity
+	constraintRetryAfters[index] = constraintRetryAfter
 	if constraintCapacity <= 0 then
 		if not exhaustedSet[index] then
 			table.insert(exhaustedConstraints, index)
@@ -296,6 +298,10 @@ for index = 1, #constraints do
 		if not exhaustedSet[index] then
 			table.insert(exhaustedConstraints, index)
 			exhaustedSet[index] = true
+		end
+		local constraintRetryAfter = constraintRetryAfters[index]
+		if constraintRetryAfter and constraintRetryAfter > retryAt then
+			retryAt = constraintRetryAfter
 		end
 	end
 end

@@ -117,6 +117,8 @@ local limitingConstraints = {}
 local exhaustedConstraints = {}
 ---@type table<integer, integer>
 local constraintCapacities = {}
+---@type table<integer, integer>
+local constraintRetryAfters = {}
 ---@type table<integer, boolean>
 local exhaustedSet = {}
 local retryAt = 0
@@ -158,8 +160,9 @@ for index, value in ipairs(constraints) do
 		constraintRetryAfter = toInteger(throttleRes["retry_at"]) -- already in ms
 	end
 
-	-- Store constraint capacity for later exhaustion check
+	-- Store constraint capacity and retry time for later exhaustion check
 	constraintCapacities[index] = constraintCapacity
+	constraintRetryAfters[index] = constraintRetryAfter
 
 	-- Track if constraint is exhausted before granting
 	if constraintCapacity <= 0 then
@@ -283,6 +286,11 @@ for index = 1, #constraints do
 		if not exhaustedSet[index] then
 			table.insert(exhaustedConstraints, index)
 			exhaustedSet[index] = true
+		end
+		-- Update retryAt to reflect the retry time of this exhausted constraint
+		local constraintRetryAfter = constraintRetryAfters[index]
+		if constraintRetryAfter and constraintRetryAfter > retryAt then
+			retryAt = constraintRetryAfter
 		end
 	end
 end

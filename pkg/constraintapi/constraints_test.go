@@ -224,6 +224,45 @@ func TestConstraintEnforcement(t *testing.T) {
 		},
 
 		{
+			name: "account concurrency exhausted at limit with retryAfter",
+			config: ConstraintConfig{
+				FunctionVersion: 1,
+				Concurrency: ConcurrencyConfig{
+					AccountConcurrency: 1,
+				},
+			},
+			constraints: []ConstraintItem{
+				{
+					Kind: ConstraintKindConcurrency,
+					Concurrency: &ConcurrencyConstraint{
+						Scope:             enums.ConcurrencyScopeAccount,
+						Mode:              enums.ConcurrencyModeStep,
+						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:account:%s", accountID),
+					},
+				},
+			},
+			amount:              1,
+			expectedLeaseAmount: 1,
+			mi: MigrationIdentifier{
+				QueueShard: "test",
+			},
+			afterAcquire: func(t *testing.T, deps *deps, resp *CapacityAcquireResponse) {
+				// Verify lease was granted
+				require.Len(t, resp.Leases, 1)
+
+				// Verify constraint is now exhausted
+				require.Len(t, resp.ExhaustedConstraints, 1)
+				require.Equal(t, ConstraintKindConcurrency, resp.ExhaustedConstraints[0].Kind)
+
+				// Verify RetryAfter is properly set
+				require.False(t, resp.RetryAfter.IsZero(), "RetryAfter should not be zero")
+				require.True(t, resp.RetryAfter.After(deps.clock.Now()), "RetryAfter should be in the future")
+				require.Equal(t, deps.clock.Now().Add(ConcurrencyLimitRetryAfter), resp.RetryAfter,
+					"RetryAfter should be set to ConcurrencyLimitRetryAfter (2s) from now")
+			},
+		},
+
+		{
 			name: "account concurrency limited due to legacy concurrency",
 			config: ConstraintConfig{
 				FunctionVersion: 1,
