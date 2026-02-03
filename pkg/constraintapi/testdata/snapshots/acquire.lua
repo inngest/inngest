@@ -188,6 +188,9 @@ if existingRequestState ~= nil and existingRequestState ~= false and existingReq
 end
 local availableCapacity = requested
 local limitingConstraints = {}
+local exhaustedConstraints = {}
+local constraintCapacities = {}
+local exhaustedSet = {}
 local retryAt = 0
 local skipGCRA = call("EXISTS", keyConstraintCheckIdempotency) == 1
 for index, value in ipairs(constraints) do
@@ -214,6 +217,13 @@ for index, value in ipairs(constraints) do
 		constraintCapacity = throttleRes["remaining"]
 		constraintRetryAfter = toInteger(throttleRes["retry_at"]) 
 	end
+	constraintCapacities[index] = constraintCapacity
+	if constraintCapacity <= 0 then
+		if not exhaustedSet[index] then
+			table.insert(exhaustedConstraints, index)
+			exhaustedSet[index] = true
+		end
+	end
 	if constraintCapacity < availableCapacity then
 		availableCapacity = constraintCapacity
 		table.insert(limitingConstraints, index)
@@ -228,6 +238,7 @@ if availableCapacity <= 0 then
 	local res = {}
 	res["s"] = 2
 	res["lc"] = limitingConstraints
+	res["ec"] = exhaustedConstraints
 	res["ra"] = retryAt
 	res["d"] = debugLogs
 	res["fr"] = fairnessReduction
@@ -279,6 +290,14 @@ end
 if #accountLeasesArgs > 0 then
 	call("ZADD", keyAccountLeases, unpack(accountLeasesArgs))
 end
+for index, capacity in pairs(constraintCapacities) do
+	if capacity - granted <= 0 then
+		if not exhaustedSet[index] then
+			table.insert(exhaustedConstraints, index)
+			exhaustedSet[index] = true
+		end
+	end
+end
 call("SET", keyConstraintCheckIdempotency, tostring(nowMS), "EX", tostring(constraintCheckIdempotencyTTL))
 requestDetails.g = availableCapacity
 requestDetails.a = availableCapacity
@@ -293,6 +312,7 @@ result["r"] = requested
 result["g"] = granted
 result["l"] = grantedLeases
 result["lc"] = limitingConstraints
+result["ec"] = exhaustedConstraints
 result["ra"] = retryAt 
 result["d"] = debugLogs
 result["fr"] = fairnessReduction

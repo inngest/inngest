@@ -114,6 +114,7 @@ func TestRedisCapacityManager_RateLimit(t *testing.T) {
 
 		// Don't expect limiting constraint
 		require.Nil(t, resp.LimitingConstraints)
+		require.Empty(t, resp.ExhaustedConstraints)
 
 		// RetryAfter should not be set
 		require.Zero(t, resp.RetryAfter)
@@ -353,6 +354,7 @@ func TestRedisCapacityManager_Concurrency(t *testing.T) {
 
 		// Don't expect limiting constraint
 		require.Nil(t, resp.LimitingConstraints)
+		require.Empty(t, resp.ExhaustedConstraints)
 
 		// RetryAfter should not be set
 		require.Zero(t, resp.RetryAfter)

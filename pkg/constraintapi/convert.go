@@ -803,11 +803,17 @@ func CapacityAcquireResponseToProto(resp *CapacityAcquireResponse) *pb.CapacityA
 		limitingConstraints[i] = ConstraintItemToProto(constraint)
 	}
 
+	exhaustedConstraints := make([]*pb.ConstraintItem, len(resp.ExhaustedConstraints))
+	for i, constraint := range resp.ExhaustedConstraints {
+		exhaustedConstraints[i] = ConstraintItemToProto(constraint)
+	}
+
 	return &pb.CapacityAcquireResponse{
-		Leases:              leases,
-		LimitingConstraints: limitingConstraints,
-		RetryAfter:          timestamppb.New(resp.RetryAfter),
-		FairnessReduction:   int32(resp.FairnessReduction),
+		Leases:               leases,
+		LimitingConstraints:  limitingConstraints,
+		ExhaustedConstraints: exhaustedConstraints,
+		RetryAfter:           timestamppb.New(resp.RetryAfter),
+		FairnessReduction:    int32(resp.FairnessReduction),
 	}
 }
 
@@ -830,16 +836,22 @@ func CapacityAcquireResponseFromProto(pbResp *pb.CapacityAcquireResponse) (*Capa
 		limitingConstraints[i] = ConstraintItemFromProto(constraint)
 	}
 
+	exhaustedConstraints := make([]ConstraintItem, len(pbResp.ExhaustedConstraints))
+	for i, constraint := range pbResp.ExhaustedConstraints {
+		exhaustedConstraints[i] = ConstraintItemFromProto(constraint)
+	}
+
 	var retryAfter time.Time
 	if pbResp.RetryAfter != nil {
 		retryAfter = pbResp.RetryAfter.AsTime()
 	}
 
 	return &CapacityAcquireResponse{
-		Leases:              leases,
-		LimitingConstraints: limitingConstraints,
-		RetryAfter:          retryAfter,
-		FairnessReduction:   int(pbResp.FairnessReduction),
+		Leases:               leases,
+		LimitingConstraints:  limitingConstraints,
+		ExhaustedConstraints: exhaustedConstraints,
+		RetryAfter:           retryAfter,
+		FairnessReduction:    int(pbResp.FairnessReduction),
 	}, nil
 }
 

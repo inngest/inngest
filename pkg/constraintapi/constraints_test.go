@@ -217,6 +217,8 @@ func TestConstraintEnforcement(t *testing.T) {
 				require.NoError(t, err)
 				require.Len(t, res.Leases, 0)
 				require.Len(t, res.LimitingConstraints, 1)
+				require.Len(t, res.ExhaustedConstraints, 1)
+				require.Equal(t, ConstraintKindConcurrency, res.ExhaustedConstraints[0].Kind)
 				require.Equal(t, deps.clock.Now().Add(ConcurrencyLimitRetryAfter), res.RetryAfter)
 			},
 		},
@@ -708,6 +710,8 @@ func TestConstraintEnforcement(t *testing.T) {
 
 				require.Len(t, resp.LimitingConstraints, 1)
 				require.Equal(t, ConstraintKindThrottle, resp.LimitingConstraints[0].Kind)
+				require.Len(t, resp.ExhaustedConstraints, 1)
+				require.Equal(t, ConstraintKindThrottle, resp.ExhaustedConstraints[0].Kind)
 				require.False(t, resp.RetryAfter.IsZero())
 				// Next unit will be available in 1h
 				require.WithinDuration(t, deps.clock.Now().Add(time.Hour), resp.RetryAfter, time.Second)
@@ -904,6 +908,8 @@ func TestConstraintEnforcement(t *testing.T) {
 
 				require.Len(t, resp.LimitingConstraints, 1)
 				require.Equal(t, ConstraintKindRateLimit, resp.LimitingConstraints[0].Kind)
+				require.Len(t, resp.ExhaustedConstraints, 1)
+				require.Equal(t, ConstraintKindRateLimit, resp.ExhaustedConstraints[0].Kind)
 				require.False(t, resp.RetryAfter.IsZero())
 				// Next unit will be available in 1m
 				require.WithinDuration(t, deps.clock.Now().Add(time.Minute), resp.RetryAfter, time.Second)

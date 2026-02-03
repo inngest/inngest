@@ -223,6 +223,10 @@ type CapacityAcquireResponse struct {
 	// ended up reducing the number of leases from the expected Amount.
 	LimitingConstraints []ConstraintItem
 
+	// ExhaustedConstraints contains constraints that have zero capacity
+	// either before or after this acquire operation.
+	ExhaustedConstraints []ConstraintItem
+
 	// FairnessReduction specifies the capacity that was reserved for fairness reasons.
 	FairnessReduction int
 

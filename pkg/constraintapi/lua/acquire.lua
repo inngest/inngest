@@ -113,6 +113,12 @@ local availableCapacity = requested
 
 ---@type integer[]
 local limitingConstraints = {}
+---@type integer[]
+local exhaustedConstraints = {}
+---@type table<integer, integer>
+local constraintCapacities = {}
+---@type table<integer, boolean>
+local exhaustedSet = {}
 local retryAt = 0
 
 -- Skip GCRA if constraint check idempotency key is present
@@ -152,6 +158,17 @@ for index, value in ipairs(constraints) do
 		constraintRetryAfter = toInteger(throttleRes["retry_at"]) -- already in ms
 	end
 
+	-- Store constraint capacity for later exhaustion check
+	constraintCapacities[index] = constraintCapacity
+
+	-- Track if constraint is exhausted before granting
+	if constraintCapacity <= 0 then
+		if not exhaustedSet[index] then
+			table.insert(exhaustedConstraints, index)
+			exhaustedSet[index] = true
+		end
+	end
+
 	-- If index ends up limiting capacity, reduce available capacity and remember current constraint
 	if constraintCapacity < availableCapacity then
 		availableCapacity = constraintCapacity
@@ -174,6 +191,7 @@ if availableCapacity <= 0 then
 	local res = {}
 	res["s"] = 2
 	res["lc"] = limitingConstraints
+	res["ec"] = exhaustedConstraints
 	res["ra"] = retryAt
 	res["d"] = debugLogs
 	res["fr"] = fairnessReduction
@@ -257,6 +275,16 @@ if #accountLeasesArgs > 0 then
 	call("ZADD", keyAccountLeases, unpack(accountLeasesArgs))
 end
 
+-- Check for constraints exhausted after granting
+for index, capacity in pairs(constraintCapacities) do
+	if capacity - granted <= 0 then
+		if not exhaustedSet[index] then
+			table.insert(exhaustedConstraints, index)
+			exhaustedSet[index] = true
+		end
+	end
+end
+
 call("SET", keyConstraintCheckIdempotency, tostring(nowMS), "EX", tostring(constraintCheckIdempotencyTTL))
 
 -- For step concurrency, add the lease idempotency keys to the new in progress leases sets using the lease expiry as score
@@ -277,7 +305,7 @@ end
 
 -- Construct result
 
----@type { s: integer, lc: integer[], fr: integer, r: integer, g: integer, l: { lid: string, lik: string }[] }
+---@type { s: integer, lc: integer[], ec: integer[], fr: integer, r: integer, g: integer, l: { lid: string, lik: string }[] }
 local result = {}
 
 result["s"] = 3
@@ -285,6 +313,7 @@ result["r"] = requested
 result["g"] = granted
 result["l"] = grantedLeases
 result["lc"] = limitingConstraints
+result["ec"] = exhaustedConstraints
 result["ra"] = retryAt -- include retryAt to hint when next capacity is available
 result["d"] = debugLogs
 result["fr"] = fairnessReduction
