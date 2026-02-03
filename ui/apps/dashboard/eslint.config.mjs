@@ -26,6 +26,6 @@ export default [
     },
   },
   {
-    ignores: ['src/gql/gql.ts', 'src/gql/graphql.ts'],
+    ignores: ['src/gql/gql.ts', 'src/gql/graphql.ts', 'src/routeTree.gen.ts'],
   },
 ];
