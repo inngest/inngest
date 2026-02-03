@@ -20,6 +20,7 @@ import {
   RiTimeLine,
 } from '@remixicon/react';
 
+import { getStatusBackgroundClass } from '../Status/statusClasses';
 import { cn } from '../utils/classNames';
 import type {
   BarHeight,
@@ -114,6 +115,35 @@ const BAR_PATTERNS: Record<BarPattern, CSSProperties> = {
  */
 function getBarStyle(styleKey: BarStyleKey): BarStyle {
   return BAR_STYLES[styleKey] ?? BAR_STYLES.default;
+}
+
+/**
+ * Styles that should use status-based coloring.
+ * These bars change color based on run status (COMPLETED=green, FAILED=red, etc.)
+ */
+const STATUS_BASED_STYLES: Set<BarStyleKey> = new Set([
+  'root',
+  'step.run',
+  'timing.server',
+  'default',
+]);
+
+/**
+ * Get the bar color class, using status-based coloring when appropriate.
+ * @param styleKey - The bar style key
+ * @param status - The run status (e.g., COMPLETED, FAILED, CANCELLED)
+ * @returns The appropriate Tailwind background color class
+ */
+function getBarColor(styleKey: BarStyleKey, status?: string): string {
+  const barStyle = getBarStyle(styleKey);
+
+  // If this style should use status-based coloring and we have a status, use it
+  if (status && STATUS_BASED_STYLES.has(styleKey)) {
+    return getStatusBackgroundClass(status);
+  }
+
+  // Otherwise fall back to the hardcoded style color
+  return barStyle.barColor;
 }
 
 /**
@@ -250,6 +280,7 @@ function VisualBar({
   originalBarWidth,
   viewStartOffset = 0,
   viewEndOffset = 100,
+  status,
 }: {
   startPercent: number;
   widthPercent: number;
@@ -264,11 +295,14 @@ function VisualBar({
   viewStartOffset?: number;
   /** View end offset for segment filtering */
   viewEndOffset?: number;
+  /** Run status for status-based coloring */
+  status?: string;
 }) {
   const barStyle = getBarStyle(style);
   const pattern = getBarPattern(barStyle.pattern);
   const heightClass = BAR_HEIGHT_CLASSES[barStyle.barHeight ?? 'tall'];
   const opacityStyle = expanded ? { opacity: 0.5 } : {};
+  const barColor = getBarColor(style, status);
 
   // Memoize segment transformation to avoid recalculating on every render
   const transformedSegments = useMemo(() => {
@@ -321,14 +355,11 @@ function VisualBar({
           const segmentStyle = getBarStyle(segment.style);
           const segmentPattern = getBarPattern(segmentStyle.pattern);
           const segmentHeightClass = BAR_HEIGHT_CLASSES[segmentStyle.barHeight ?? 'tall'];
+          const segmentColor = getBarColor(segment.style, segment.status);
           return (
             <div
               key={segment.id}
-              className={cn(
-                'absolute top-1/2 -translate-y-1/2',
-                segmentHeightClass,
-                segmentStyle.barColor
-              )}
+              className={cn('absolute top-1/2 -translate-y-1/2', segmentHeightClass, segmentColor)}
               style={{
                 left: `${segment.transformedStart}%`,
                 width: `${segment.transformedWidth}%`,
@@ -346,7 +377,7 @@ function VisualBar({
   return (
     <div
       data-testid="timeline-bar-visual"
-      className={cn('absolute top-1/2 -translate-y-1/2', heightClass, barStyle.barColor)}
+      className={cn('absolute top-1/2 -translate-y-1/2', heightClass, barColor)}
       style={{
         left: `${startPercent}%`,
         width: `${widthPercent}%`,
@@ -390,6 +421,7 @@ export function TimelineBar({
   selected,
   children,
   orgName,
+  status,
   viewStartOffset = 0,
   viewEndOffset = 100,
 }: TimelineBarProps): JSX.Element {
@@ -484,6 +516,7 @@ export function TimelineBar({
                   originalBarWidth={widthPercent}
                   viewStartOffset={viewStartOffset}
                   viewEndOffset={viewEndOffset}
+                  status={status}
                 />
               );
             })()}

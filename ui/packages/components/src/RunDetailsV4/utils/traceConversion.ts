@@ -85,9 +85,11 @@ function calculateTimingBreakdown(
 /**
  * Convert a single Trace to TimelineBarData
  */
-function traceToBarData(trace: Trace, orgName?: string): TimelineBarData {
+function traceToBarData(trace: Trace, orgName?: string, rootStatus?: string): TimelineBarData {
   const isStepRun = isStepRunSpan(trace) && !trace.isUserland;
   const timingBreakdown = isStepRun ? calculateTimingBreakdown(trace) : undefined;
+  // Use root status if available (for consistent coloring), otherwise use trace's own status
+  const status = rootStatus ?? trace.status;
 
   return {
     id: trace.spanID,
@@ -95,9 +97,10 @@ function traceToBarData(trace: Trace, orgName?: string): TimelineBarData {
     startTime: new Date(trace.queuedAt),
     endTime: trace.endedAt ? new Date(trace.endedAt) : null,
     style: getStyleForTrace(trace),
-    children: trace.childrenSpans?.map((child) => traceToBarData(child, orgName)),
+    children: trace.childrenSpans?.map((child) => traceToBarData(child, orgName, status)),
     timingBreakdown,
     isRoot: trace.isRoot,
+    status,
   };
 }
 
@@ -128,7 +131,8 @@ export function traceToTimelineData(
 
   // Convert root trace (rename to "Run")
   // Ensure isRoot is set to true for the root bar so clicking it shows TopInfo
-  const rootBar = traceToBarData({ ...trace, name: 'Run', isRoot: true }, orgName);
+  // Pass root status so all bars share the same status-based coloring
+  const rootBar = traceToBarData({ ...trace, name: 'Run', isRoot: true }, orgName, trace.status);
 
   // Include the root bar in the rendered bars so users can click it
   // to return to the TopInfo view (Input/Function Payload)

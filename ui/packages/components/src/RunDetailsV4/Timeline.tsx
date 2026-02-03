@@ -92,6 +92,7 @@ function generateBarSegments(bar: TimelineBarData): BarSegment[] | undefined {
       startPercent: currentPercent,
       widthPercent: queuePercent,
       style: 'timing.inngest',
+      status: bar.status,
     });
     currentPercent += queuePercent;
   }
@@ -104,6 +105,7 @@ function generateBarSegments(bar: TimelineBarData): BarSegment[] | undefined {
       startPercent: currentPercent,
       widthPercent: execPercent,
       style: 'timing.server',
+      status: bar.status,
     });
   }
 
@@ -183,6 +185,7 @@ function TimelineBarRenderer({
       onClick={() => onSelectStep?.(bar.id)}
       selected={selectedStepId === bar.id}
       orgName={orgName}
+      status={bar.status}
       viewStartOffset={viewStartOffset}
       viewEndOffset={viewEndOffset}
     >
@@ -213,6 +216,7 @@ function TimelineBarRenderer({
               leftWidth={leftWidth}
               style={timingBar.style}
               orgName={orgName}
+              status={bar.status}
               expandable={isTimingBarExpandable}
               expanded={isTimingBarExpanded}
               onToggle={isTimingBarExpandable ? () => onToggleExpand(timingBar.id) : undefined}
@@ -329,6 +333,9 @@ export function Timeline({ data, onSelectStep }: Props): JSX.Element {
     setViewEndOffset(end);
   }, []);
 
+  // Get status from the first (root) bar for header coloring
+  const rootStatus = bars.find((bar) => bar.isRoot)?.status ?? bars[0]?.status;
+
   return (
     <div className="w-full pb-4 pr-2" data-testid="timeline-container">
       {/* Run duration header with timing markers */}
@@ -337,6 +344,7 @@ export function Timeline({ data, onSelectStep }: Props): JSX.Element {
         maxTime={maxTime}
         leftWidth={leftWidth}
         onSelectionChange={handleSelectionChange}
+        status={rootStatus}
       />
 
       {/* Step bars */}
