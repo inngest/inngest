@@ -43,25 +43,27 @@ type bufferKey struct {
 type pendingItem struct {
 	item BatchItem
 	fn   inngest.Function
-	// resultCh is used to communicate to each Append call for every batch
-	// item appended
-	resultCh chan appendResult
+	// pending is shared between original and duplicate callers waiting for the
+	// same event to be flushed
+	pending *pendingResult
 }
 
-// appendResult is sent to waiters when flush completes.
-type appendResult struct {
+// pendingResult is shared between original and duplicate callers for the same event.
+// Multiple callers can wait on the done channel, which is closed when the result is ready.
+type pendingResult struct {
+	done   chan struct{} // closed when result is ready
 	result *BatchAppendResult
 	err    error
 }
 
 // batchBuffer holds pending items for a specific buffer key
 type batchBuffer struct {
-	mu      sync.Mutex
-	key     bufferKey
-	items   []pendingItem
-	seenIDs map[string]struct{} // Local dedup
-	timer   *time.Timer
-	fn      inngest.Function // Function config for batch settings
+	mu             sync.Mutex
+	key            bufferKey
+	items          []pendingItem
+	pendingResults map[string]*pendingResult // Local dedup + result sharing
+	timer          *time.Timer
+	fn             inngest.Function // Function config for batch settings
 }
 
 // newAppendBuffer creates a new appendBuffer with the given configuration.
@@ -89,39 +91,47 @@ func newAppendBuffer(maxDuration time.Duration, maxSize int, log logger.Logger) 
 // append adds an item to a buffer. This method BLOCKS until the event is committed
 // to Redis, ensuring events are not ACK'd until persisted.
 func (ab *appendBuffer) append(ctx context.Context, bi BatchItem, fn inngest.Function, mgr *redisBatchManager) (*BatchAppendResult, error) {
-	// Compute buffer key using the batch pointer
 	batchPointer, err := mgr.batchPointer(ctx, fn, bi.Event)
 	if err != nil {
 		return nil, err
 	}
 	key := bufferKey{FunctionID: fn.ID, BatchPointer: batchPointer}
 
-	// Get or create buffer
 	buf := ab.getOrCreateBuffer(key, fn)
-
-	// Create result channel for this caller
-	resultCh := make(chan appendResult, 1)
-
 	buf.mu.Lock()
 
 	eventIDStr := bi.EventID.String()
-	if _, seen := buf.seenIDs[eventIDStr]; seen {
-		// TODO: if we've already seen this item, we need to block on the result chan then return
-		// the result
+	if existing, seen := buf.pendingResults[eventIDStr]; seen {
+		// this event is already buffered but not yet flushed.  wait for
+		// the original flush to complete so we don't ACK the event before flushing
 		buf.mu.Unlock()
-		return &BatchAppendResult{
-			Status:          enums.BatchItemExists,
-			BatchPointerKey: batchPointer,
-		}, nil
+
+		select {
+		case <-existing.done:
+			if existing.err != nil {
+				return nil, existing.err
+			}
+			return &BatchAppendResult{
+				Status:          enums.BatchItemExists,
+				BatchPointerKey: batchPointer,
+			}, nil
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-ab.closed:
+			return nil, context.Canceled
+		}
 	}
 
-	// Add to buffer with waiter channel
+	// Create a shared pending result for this event
+	pr := &pendingResult{done: make(chan struct{})}
+
+	// Add to buffer with pending result
 	buf.items = append(buf.items, pendingItem{
-		item:     bi,
-		fn:       fn,
-		resultCh: resultCh,
+		item:    bi,
+		fn:      fn,
+		pending: pr,
 	})
-	buf.seenIDs[eventIDStr] = struct{}{}
+	buf.pendingResults[eventIDStr] = pr
 
 	// Check if we should flush based on function's batch config or buffer's global max
 	batchMaxSize := ab.maxSize
@@ -129,6 +139,13 @@ func (ab *appendBuffer) append(ctx context.Context, bi BatchItem, fn inngest.Fun
 		batchMaxSize = fn.EventBatch.MaxSize
 	}
 	shouldFlush := len(buf.items) >= batchMaxSize
+
+	// If we're about to flush manually, stop the timer to prevent a concurrent
+	// timer-triggered flush racing with our manual flush.
+	if shouldFlush && buf.timer != nil {
+		buf.timer.Stop()
+		buf.timer = nil
+	}
 
 	// Start timer if not running (first item in buffer)
 	if len(buf.items) == 1 && !shouldFlush {
@@ -145,10 +162,10 @@ func (ab *appendBuffer) append(ctx context.Context, bi BatchItem, fn inngest.Fun
 		ab.flush(buf, mgr)
 	}
 
-	// block until result is available
+	// Block until result is available
 	select {
-	case result := <-resultCh:
-		return result.result, result.err
+	case <-pr.done:
+		return pr.result, pr.err
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	case <-ab.closed:
@@ -181,10 +198,10 @@ func (ab *appendBuffer) getOrCreateBuffer(key bufferKey, fn inngest.Function) *b
 	}
 
 	buf := &batchBuffer{
-		key:     key,
-		items:   make([]pendingItem, 0),
-		seenIDs: make(map[string]struct{}),
-		fn:      fn,
+		key:            key,
+		items:          make([]pendingItem, 0),
+		pendingResults: make(map[string]*pendingResult),
+		fn:             fn,
 	}
 	ab.buffers[key] = buf
 	return buf
@@ -218,42 +235,25 @@ func (ab *appendBuffer) flush(buf *batchBuffer, mgr BatchManager) {
 	// call BulkAppend - this commits all items atomically
 	bulkResult, err := mgr.BulkAppend(context.Background(), items, fn)
 
+	if err == nil && bulkResult != nil {
+		ab.handleScheduling(bulkResult, fn, items[0], mgr)
+	}
+
 	ab.log.Debug("flushed in-memory buffer", "len_pending", len(pending), "len_items", len(items), "result", bulkResult)
 
 	// Send results to all waiters
 	for i, p := range pending {
-		var result appendResult
-
-		switch err {
-		case nil:
-			// Map bulk status to individual BatchAppendResult status
+		if err != nil {
+			p.pending.err = err
+		} else {
 			status := ab.mapBulkStatus(bulkResult.Status, i)
-			result = appendResult{
-				result: &BatchAppendResult{
-					Status:          status,
-					BatchID:         bulkResult.BatchID,
-					BatchPointerKey: bulkResult.BatchPointer,
-				},
-				err: nil,
-			}
-		default:
-			result = appendResult{
-				result: nil,
-				err:    err,
+			p.pending.result = &BatchAppendResult{
+				Status:          status,
+				BatchID:         bulkResult.BatchID,
+				BatchPointerKey: bulkResult.BatchPointer,
 			}
 		}
-
-		// non-blocking send (channel has buffer of 1)
-		select {
-		case p.resultCh <- result:
-		default:
-			// Channel already has a result or is closed
-		}
-	}
-
-	// handle scheduling based on result
-	if err == nil && bulkResult != nil {
-		ab.handleScheduling(bulkResult, fn, items[0], mgr)
+		close(p.pending.done)
 	}
 }
 
@@ -407,7 +407,7 @@ func (ab *appendBuffer) close(mgr *redisBatchManager) error {
 // reset resets a batch buffer
 func (buf *batchBuffer) reset() {
 	buf.items = make([]pendingItem, 0)
-	buf.seenIDs = make(map[string]struct{})
+	buf.pendingResults = make(map[string]*pendingResult)
 	if buf.timer != nil {
 		buf.timer.Stop()
 		buf.timer = nil

@@ -17,7 +17,14 @@ import (
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/goleak"
 )
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m,
+		goleak.IgnoreTopFunction("github.com/karlseguin/ccache/v2.(*Cache).worker"),
+	)
+}
 
 func TestBulkAppend(t *testing.T) {
 	r := miniredis.RunT(t)
@@ -293,9 +300,9 @@ func TestBufferedBatchManager(t *testing.T) {
 		require.Len(t, info.Items, 3)
 	})
 
-	t.Run("local dedup returns immediately", func(t *testing.T) {
+	t.Run("local dedup blocks until flush then returns item exists", func(t *testing.T) {
 		buffered := NewRedisBatchManager(bc, nil,
-			WithBufferSettings(5*time.Second, 100),
+			WithBufferSettings(100*time.Millisecond, 100),
 		)
 		defer buffered.Close()
 
@@ -327,15 +334,13 @@ func TestBufferedBatchManager(t *testing.T) {
 		// Give time for first append to add to buffer
 		time.Sleep(10 * time.Millisecond)
 
-		// Second append with same event ID should return immediately
-		start := time.Now()
+		// Second append with same event ID should block until flush
+		// completes and then return BatchItemExists
 		result, err := buffered.Append(context.Background(), bi, fn)
-		elapsed := time.Since(start)
 
 		require.NoError(t, err)
 		require.NotNil(t, result)
 		require.Equal(t, enums.BatchItemExists, result.Status)
-		require.Less(t, elapsed, 50*time.Millisecond, "dedup should return immediately")
 	})
 
 	t.Run("context cancellation unblocks", func(t *testing.T) {

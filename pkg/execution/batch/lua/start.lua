@@ -26,7 +26,7 @@ end
 -- This prevents overwriting the pointer when bulk_append has already
 -- created an overflow batch and updated the pointer to it.
 local currentPointer = redis.call("GET", batchPointerKey)
-if batchID == nil or batchID == "" or currentPointer == batchID then
+if is_empty(batchID) or is_empty(currentPointer) or currentPointer == batchID then
   update_pointer(batchPointerKey, newBatchID)
 end
 

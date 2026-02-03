@@ -174,7 +174,7 @@ return cjson.encode({
   status = status,
   batchID = batchID,
   batchPointerKey = batchPointerKey,
-  committed = #eventsForCurrentBatch + overflowCount,
+  committed = #eventsToAdd,
   duplicates = duplicateCount,
   nextBatchID = nextBatchID,
   overflowCount = overflowCount
