@@ -535,6 +535,286 @@ func TestBufferedBatchManagerConcurrency(t *testing.T) {
 	require.Len(t, info.Items, numGoroutines)
 }
 
+// TestBufferedIdempotence verifies that idempotence works correctly with buffering,
+// both within a single buffer (in-memory dedup) and across flushes (Redis dedup).
+func TestBufferedIdempotence(t *testing.T) {
+	r := miniredis.RunT(t)
+
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	bc := redis_state.NewBatchClient(rc, redis_state.QueueDefaultKey)
+
+	t.Run("cross-flush idempotence via Redis", func(t *testing.T) {
+		// Use small buffer that flushes quickly
+		buffered := NewRedisBatchManager(bc, nil,
+			WithBufferSettings(50*time.Millisecond, 1), // Flush after each item
+		)
+		defer buffered.Close()
+
+		fnId := uuid.New()
+		fn := inngest.Function{
+			ID: fnId,
+			EventBatch: &inngest.EventBatchConfig{
+				MaxSize: 10,
+				Timeout: "60s",
+			},
+		}
+
+		eventID := ulid.MustNew(ulid.Now(), rand.Reader)
+		bi := BatchItem{
+			AccountID:   uuid.New(),
+			WorkspaceID: uuid.New(),
+			AppID:       uuid.New(),
+			FunctionID:  fnId,
+			EventID:     eventID,
+			Event:       event.Event{Name: "test/event", Data: map[string]any{"a": 1}},
+		}
+
+		// First append - should succeed and create new batch
+		result1, err := buffered.Append(context.Background(), bi, fn)
+		require.NoError(t, err)
+		require.Equal(t, enums.BatchNew, result1.Status)
+
+		// Second append with same eventID - should be detected as duplicate by Redis
+		result2, err := buffered.Append(context.Background(), bi, fn)
+		require.NoError(t, err)
+		require.Equal(t, enums.BatchItemExists, result2.Status)
+
+		// Verify only 1 item in Redis
+		info, err := buffered.GetBatchInfo(context.Background(), fnId, "")
+		require.NoError(t, err)
+		require.Len(t, info.Items, 1)
+	})
+
+	t.Run("sequential appends with buffering", func(t *testing.T) {
+		// Use timer-based flush to batch multiple items
+		buffered := NewRedisBatchManager(bc, nil,
+			WithBufferSettings(100*time.Millisecond, 100),
+		)
+		defer buffered.Close()
+
+		fnId := uuid.New()
+		fn := inngest.Function{
+			ID: fnId,
+			EventBatch: &inngest.EventBatchConfig{
+				MaxSize: 10,
+				Timeout: "60s",
+			},
+		}
+
+		accountID := uuid.New()
+		workspaceID := uuid.New()
+		appID := uuid.New()
+
+		// Append first event
+		bi1 := BatchItem{
+			AccountID:   accountID,
+			WorkspaceID: workspaceID,
+			AppID:       appID,
+			FunctionID:  fnId,
+			EventID:     ulid.MustNew(ulid.Now(), rand.Reader),
+			Event:       event.Event{Name: "test/event", Data: map[string]any{"seq": 1}},
+		}
+
+		var wg sync.WaitGroup
+		var results [3]*BatchAppendResult
+		var errs [3]error
+
+		// Launch all appends concurrently - they should all be buffered together
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			results[0], errs[0] = buffered.Append(context.Background(), bi1, fn)
+		}()
+
+		// Small delay to ensure ordering
+		time.Sleep(5 * time.Millisecond)
+
+		// Append second event
+		bi2 := BatchItem{
+			AccountID:   accountID,
+			WorkspaceID: workspaceID,
+			AppID:       appID,
+			FunctionID:  fnId,
+			EventID:     ulid.MustNew(ulid.Now(), rand.Reader),
+			Event:       event.Event{Name: "test/event", Data: map[string]any{"seq": 2}},
+		}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			results[1], errs[1] = buffered.Append(context.Background(), bi2, fn)
+		}()
+
+		time.Sleep(5 * time.Millisecond)
+
+		// Append duplicate of first event - should be caught by in-buffer dedup
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			results[2], errs[2] = buffered.Append(context.Background(), bi1, fn)
+		}()
+
+		wg.Wait()
+
+		// First two should succeed
+		require.NoError(t, errs[0])
+		require.NoError(t, errs[1])
+		require.NoError(t, errs[2])
+
+		// First should be new, second should be append, third should be duplicate
+		require.Equal(t, enums.BatchNew, results[0].Status)
+		require.Equal(t, enums.BatchAppend, results[1].Status)
+		require.Equal(t, enums.BatchItemExists, results[2].Status)
+
+		// Verify only 2 items in Redis
+		info, err := buffered.GetBatchInfo(context.Background(), fnId, "")
+		require.NoError(t, err)
+		require.Len(t, info.Items, 2)
+	})
+}
+
+// TestBufferedBatchFull verifies that batch full status is correctly returned with buffering.
+func TestBufferedBatchFull(t *testing.T) {
+	r := miniredis.RunT(t)
+
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	bc := redis_state.NewBatchClient(rc, redis_state.QueueDefaultKey)
+
+	t.Run("batch fills via buffered append", func(t *testing.T) {
+		// Buffer size matches batch max size so one flush fills the batch
+		buffered := NewRedisBatchManager(bc, nil,
+			WithBufferSettings(5*time.Second, 5), // Flush when 5 items buffered
+		)
+		defer buffered.Close()
+
+		fnId := uuid.New()
+		fn := inngest.Function{
+			ID: fnId,
+			EventBatch: &inngest.EventBatchConfig{
+				MaxSize: 5, // Batch is full at 5
+				Timeout: "60s",
+			},
+		}
+
+		accountID := uuid.New()
+		workspaceID := uuid.New()
+		appID := uuid.New()
+
+		var wg sync.WaitGroup
+		results := make([]*BatchAppendResult, 5)
+		errs := make([]error, 5)
+
+		// Launch 5 appends concurrently
+		for i := 0; i < 5; i++ {
+			wg.Add(1)
+			go func(idx int) {
+				defer wg.Done()
+				bi := BatchItem{
+					AccountID:   accountID,
+					WorkspaceID: workspaceID,
+					AppID:       appID,
+					FunctionID:  fnId,
+					EventID:     ulid.MustNew(ulid.Now(), rand.Reader),
+					Event:       event.Event{Name: "test/event", Data: map[string]any{"idx": idx}},
+				}
+				results[idx], errs[idx] = buffered.Append(context.Background(), bi, fn)
+			}(i)
+		}
+
+		wg.Wait()
+
+		// All should succeed
+		for i := 0; i < 5; i++ {
+			require.NoError(t, errs[i], "append %d failed", i)
+			require.NotNil(t, results[i], "result %d is nil", i)
+		}
+
+		// At least one should report BatchFull (the batch is complete)
+		fullCount := 0
+		for i := 0; i < 5; i++ {
+			if results[i].Status == enums.BatchFull {
+				fullCount++
+			}
+		}
+		require.Greater(t, fullCount, 0, "at least one result should indicate batch is full")
+
+		// When batch is full, the pointer rotates to a new batch.
+		// Retrieve items using the batch ID from one of the results.
+		batchID, err := ulid.Parse(results[0].BatchID)
+		require.NoError(t, err)
+		items, err := buffered.RetrieveItems(context.Background(), fnId, batchID)
+		require.NoError(t, err)
+		require.Len(t, items, 5, "filled batch should have 5 items")
+	})
+
+	t.Run("batch overflow via buffered append", func(t *testing.T) {
+		// Buffer more items than batch can hold
+		buffered := NewRedisBatchManager(bc, nil,
+			WithBufferSettings(5*time.Second, 5), // Flush when 5 items buffered
+		)
+		defer buffered.Close()
+
+		fnId := uuid.New()
+		fn := inngest.Function{
+			ID: fnId,
+			EventBatch: &inngest.EventBatchConfig{
+				MaxSize: 3, // Batch max is 3, but we'll buffer 5
+				Timeout: "60s",
+			},
+		}
+
+		accountID := uuid.New()
+		workspaceID := uuid.New()
+		appID := uuid.New()
+
+		var wg sync.WaitGroup
+		results := make([]*BatchAppendResult, 5)
+		errs := make([]error, 5)
+
+		// Launch 5 appends concurrently - should overflow
+		for i := 0; i < 5; i++ {
+			wg.Add(1)
+			go func(idx int) {
+				defer wg.Done()
+				bi := BatchItem{
+					AccountID:   accountID,
+					WorkspaceID: workspaceID,
+					AppID:       appID,
+					FunctionID:  fnId,
+					EventID:     ulid.MustNew(ulid.Now(), rand.Reader),
+					Event:       event.Event{Name: "test/event", Data: map[string]any{"idx": idx}},
+				}
+				results[idx], errs[idx] = buffered.Append(context.Background(), bi, fn)
+			}(i)
+		}
+
+		wg.Wait()
+
+		// All should succeed
+		for i := 0; i < 5; i++ {
+			require.NoError(t, errs[i], "append %d failed", i)
+			require.NotNil(t, results[i], "result %d is nil", i)
+		}
+
+		// All 5 events should be committed (3 in first batch, 2 in overflow)
+		// The batch pointer now points to the overflow batch with 2 items
+		info, err := buffered.GetBatchInfo(context.Background(), fnId, "")
+		require.NoError(t, err)
+		require.Len(t, info.Items, 2, "overflow batch should have 2 items")
+	})
+}
+
 func TestBufferedBatchManagerMultipleBufferKeys(t *testing.T) {
 	r := miniredis.RunT(t)
 
