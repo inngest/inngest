@@ -370,7 +370,6 @@ function VisualBar({
  * - Selection highlighting
  */
 export function TimelineBar({
-  id: _id,
   name,
   duration,
   icon,

@@ -169,7 +169,6 @@ function TimelineBarRenderer({
 
   return (
     <TimelineBar
-      id={bar.id}
       name={bar.name}
       duration={duration}
       startPercent={startPercent}
@@ -206,7 +205,6 @@ function TimelineBarRenderer({
           return (
             <TimelineBar
               key={timingBar.id}
-              id={timingBar.id}
               name={timingBar.name}
               duration={timingDuration}
               startPercent={timingPosition.startPercent}
