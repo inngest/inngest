@@ -912,6 +912,11 @@ service V2 {
       }
     };
   }
+
+  //
+  // StreamRun is a server-streaming RPC that streams run trace updates.
+  // This allows clients to receive real-time updates for long-running functions.
+  rpc StreamRun(StreamRunRequest) returns (stream RunStreamItem);
 }
 
 message HealthRequest {
@@ -1205,4 +1210,136 @@ message PatchEnvRequest {
 message PatchEnvsResponse {
   Env data = 1;
   ResponseMetadata metadata = 2;
+}
+
+//
+// StreamRun messages
+
+message StreamRunRequest {
+  string env_id = 1;
+  string run_id = 2;
+}
+
+message RunStreamItem {
+  RunData run = 1;
+}
+
+message RunData {
+  string id = 1;
+  string status = 2;
+  bool has_ai = 3;
+  FunctionInfo function = 4;
+  RunTraceSpan trace = 5;
+}
+
+message FunctionInfo {
+  string id = 1;
+  string name = 2;
+  string slug = 3;
+  AppInfo app = 4;
+}
+
+message AppInfo {
+  string name = 1;
+  string external_id = 2;
+}
+
+enum RunTraceSpanStatus {
+  RUN_TRACE_SPAN_STATUS_UNSPECIFIED = 0;
+  RUN_TRACE_SPAN_STATUS_RUNNING = 1;
+  RUN_TRACE_SPAN_STATUS_COMPLETED = 2;
+  RUN_TRACE_SPAN_STATUS_FAILED = 3;
+  RUN_TRACE_SPAN_STATUS_CANCELLED = 4;
+  RUN_TRACE_SPAN_STATUS_QUEUED = 5;
+  RUN_TRACE_SPAN_STATUS_WAITING = 6;
+}
+
+enum StepOp {
+  STEP_OP_UNSPECIFIED = 0;
+  STEP_OP_RUN = 1;
+  STEP_OP_SLEEP = 2;
+  STEP_OP_WAIT_FOR_EVENT = 3;
+  STEP_OP_INVOKE = 4;
+  STEP_OP_AI_GATEWAY = 5;
+  STEP_OP_WAIT_FOR_SIGNAL = 6;
+}
+
+message RunTraceSpan {
+  string name = 1;
+  RunTraceSpanStatus status = 2;
+  optional int32 attempts = 3;
+  string queued_at = 4;
+  optional string started_at = 5;
+  optional string ended_at = 6;
+  bool is_root = 7;
+  optional string output_id = 8;
+  string span_id = 9;
+  optional string step_id = 10;
+  optional StepOp step_op = 11;
+  optional string step_type = 12;
+  repeated RunTraceSpan children_spans = 13;
+  optional StepInfo step_info = 14;
+  bool is_userland = 15;
+  optional UserlandSpan userland_span = 16;
+  optional string debug_run_id = 17;
+  optional string debug_session_id = 18;
+  repeated SpanMetadata metadata = 19;
+}
+
+message UserlandSpan {
+  optional string span_name = 1;
+  optional string span_kind = 2;
+  optional string service_name = 3;
+  optional string scope_name = 4;
+  optional string scope_version = 5;
+  optional string span_attrs = 6;
+  optional string resource_attrs = 7;
+}
+
+message StepInfo {
+  oneof info {
+    InvokeStepInfo invoke = 1;
+    SleepStepInfo sleep = 2;
+    WaitForEventStepInfo wait_for_event = 3;
+    RunStepInfo run = 4;
+    WaitForSignalStepInfo wait_for_signal = 5;
+  }
+}
+
+message InvokeStepInfo {
+  string triggering_event_id = 1;
+  string function_id = 2;
+  string timeout = 3;
+  optional string return_event_id = 4;
+  optional string run_id = 5;
+  optional bool timed_out = 6;
+}
+
+message SleepStepInfo {
+  string sleep_until = 1;
+}
+
+message WaitForEventStepInfo {
+  string event_name = 1;
+  optional string expression = 2;
+  string timeout = 3;
+  optional string found_event_id = 4;
+  optional bool timed_out = 5;
+}
+
+message RunStepInfo {
+  optional string type = 1;
+}
+
+message WaitForSignalStepInfo {
+  string signal = 1;
+  string timeout = 2;
+  optional bool timed_out = 3;
+}
+
+message SpanMetadata {
+  string kind = 1;
+  string scope = 2;
+  string values = 3;
+  string updated_at = 4;
 }
