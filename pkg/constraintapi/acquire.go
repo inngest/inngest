@@ -165,10 +165,6 @@ type acquireScriptResponse struct {
 	FairnessReduction   int                 `json:"fr"`
 	RetryAt             int                 `json:"ra"`
 	Debug               flexibleStringArray `json:"d"`
-
-	ActiveAccountLeases  int `json:"aal"`
-	ExpiredAccountLeases int `json:"eal"`
-	EarliestLeaseExpiry  int `json:"ele"`
 }
 
 func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquireRequest) (*CapacityAcquireResponse, errs.InternalError) {
@@ -391,9 +387,6 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 
 	l = l.With(
 		"status", parsedResponse.Status,
-		"active", parsedResponse.ActiveAccountLeases,
-		"expired", parsedResponse.ExpiredAccountLeases,
-		"earliest_expiry", time.UnixMilli(int64(parsedResponse.EarliestLeaseExpiry)),
 	)
 
 	tags := make(map[string]any)
