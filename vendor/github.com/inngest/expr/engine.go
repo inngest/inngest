@@ -19,56 +19,54 @@ const (
 	// EngineTypeART
 )
 
-func NewMatchResult() *MatchResult {
-	return &MatchResult{
-		Result: map[uuid.UUID]map[groupID]int{},
-		Lock:   &sync.Mutex{},
-	}
+// matchKey is a composite key combining evalID and groupID
+type matchKey struct {
+	evalID  uuid.UUID
+	groupID groupID
 }
 
-// MatchResult is a map of evaluable IDs to the groups found, and the number of elements
-// found matching that group.
+var matchResultPool = sync.Pool{
+	New: func() any {
+		return &MatchResult{
+			Result: make(map[matchKey]int),
+		}
+	},
+}
+
+func NewMatchResult() *MatchResult {
+	return matchResultPool.Get().(*MatchResult)
+}
+
+// MatchResult stores matches as a pooled map
 type MatchResult struct {
-	Result map[uuid.UUID]map[groupID]int
-	Lock   *sync.Mutex
+	Result map[matchKey]int // (evalID, groupID) -> count
+}
+
+// Release returns the MatchResult to the pool
+func (m *MatchResult) Release() {
+	clear(m.Result)
+	matchResultPool.Put(m)
 }
 
 func (m *MatchResult) Len() int {
-	m.Lock.Lock()
-	defer m.Lock.Unlock()
 	return len(m.Result)
 }
 
-// AddExprs increments the matched counter for the given eval's group ID
+// Add increments the count for the given (evalID, groupID)
 func (m *MatchResult) Add(evalID uuid.UUID, gID groupID) {
-	m.Lock.Lock()
-	defer m.Lock.Unlock()
-	if _, ok := m.Result[evalID]; !ok {
-		m.Result[evalID] = map[groupID]int{}
-	}
-	m.Result[evalID][gID]++
+	m.Result[matchKey{evalID: evalID, groupID: gID}]++
 }
 
-// AddExprs increments the matched counter for each stored expression part.
+// AddExprs increments counts for each expression part
 func (m *MatchResult) AddExprs(exprs ...*StoredExpressionPart) {
-	m.Lock.Lock()
-	defer m.Lock.Unlock()
 	for _, expr := range exprs {
-		if _, ok := m.Result[expr.EvaluableID]; !ok {
-			m.Result[expr.EvaluableID] = map[groupID]int{}
-		}
-		m.Result[expr.EvaluableID][expr.GroupID]++
+		m.Result[matchKey{evalID: expr.EvaluableID, groupID: expr.GroupID}]++
 	}
 }
 
-// GroupMatches returns the total lenght of all matches for a given eval's group ID.
+// GroupMatches returns the count for a given eval's group ID
 func (m *MatchResult) GroupMatches(evalID uuid.UUID, gID groupID) int {
-	m.Lock.Lock()
-	defer m.Lock.Unlock()
-	if _, ok := m.Result[evalID]; !ok {
-		return 0
-	}
-	return m.Result[evalID][gID]
+	return m.Result[matchKey{evalID: evalID, groupID: gID}]
 }
 
 // MatchingEngine represents an engine (such as a b-tree, radix trie, or
@@ -90,9 +88,9 @@ type MatchingEngine interface {
 
 	// Add adds a new expression part to the matching engine for future matches.
 	Add(ctx context.Context, p ExpressionPart) error
-	// Remove removes an expression part from the matching engine, ensuring that the
-	// ExpressionPart will not be matched in the future.
-	Remove(ctx context.Context, p ExpressionPart) error
+	// Remove removes multiple expression parts in a single batch operation.
+	// Returns the number of parts successfully processed before any timeout/cancellation.
+	Remove(ctx context.Context, parts []ExpressionPart) (int, error)
 
 	// Search searches for a given variable<>value match, returning any expression
 	// parts that match.
@@ -143,16 +141,6 @@ func (p ExpressionPart) EqualsStored(n *StoredExpressionPart) bool {
 		return false
 	}
 	return p.Hash() == n.PredicateID
-}
-
-func (p ExpressionPart) Equals(n ExpressionPart) bool {
-	if p.GroupID != n.GroupID {
-		return false
-	}
-	if p.Predicate.String() != n.Predicate.String() {
-		return false
-	}
-	return p.Parsed.EvaluableID == n.Parsed.EvaluableID
 }
 
 func (p ExpressionPart) ToStored() *StoredExpressionPart {

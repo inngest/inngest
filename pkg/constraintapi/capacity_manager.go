@@ -286,6 +286,13 @@ type CapacityReleaseRequest struct {
 }
 
 type CapacityReleaseResponse struct {
+	AccountID  uuid.UUID
+	EnvID      uuid.UUID
+	FunctionID uuid.UUID
+
+	// CreationSource returns where this lease was created
+	CreationSource LeaseSource
+
 	internalDebugState releaseScriptResponse
 }
 

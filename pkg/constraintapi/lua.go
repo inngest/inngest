@@ -353,6 +353,7 @@ func executeLuaScript(
 	ctx context.Context,
 	name string,
 	mi MigrationIdentifier,
+	source LeaseSource,
 	client rueidis.Client,
 	clock clockwork.Clock,
 	keys []string,
@@ -370,9 +371,11 @@ func executeLuaScript(
 	metrics.HistogramConstraintAPILuaScriptDuration(ctx, clock.Since(start), metrics.HistogramOpt{
 		PkgName: pkgName,
 		Tags: map[string]any{
-			"operation": name,
-			"status":    status,
-			"source":    mi.String(),
+			"operation":       name,
+			"status":          status,
+			"migration":       mi.String(),
+			"source_location": source.Location.String(),
+			"source_service":  source.Service.String(),
 		},
 	})
 

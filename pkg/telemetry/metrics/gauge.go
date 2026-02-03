@@ -110,3 +110,12 @@ func GaugeShadowPartitionSize(ctx context.Context, value int64, opts GaugeOpt) {
 		Tags:        opts.Tags,
 	})
 }
+
+func GaugeAggregatorPendingDeletes(ctx context.Context, value int64, opts GaugeOpt) {
+	RecordGaugeMetric(ctx, value, GaugeOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "aggr_evaluables_pending_deletes",
+		Description: "Number of pending deletes in the aggregator",
+		Tags:        opts.Tags,
+	})
+}

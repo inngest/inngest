@@ -2,8 +2,7 @@
 **/src/gql/
 **/src/store/generated.ts
 
-# Next.js build output
-.next/
+routeTree.gen.ts
 
 # MDX files
 *.mdx
