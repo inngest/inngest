@@ -307,7 +307,16 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 		"prepared acquire call",
 	)
 
-	rawRes, internalErr := executeLuaScript(ctx, "acquire", req.Migration, client, r.clock, keys, args)
+	rawRes, internalErr := executeLuaScript(
+		ctx,
+		"acquire",
+		req.Migration,
+		req.Source,
+		client,
+		r.clock,
+		keys,
+		args,
+	)
 	if internalErr != nil {
 		return nil, internalErr
 	}
