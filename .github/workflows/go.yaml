@@ -57,8 +57,9 @@ jobs:
         os: [ubuntu-latest]
         experimentalKeyQueues: [false, true]
         enableConstraintAPI: [false, true]
+        database: [sqlite, postgres]
     runs-on: ${{ matrix.os }}
-    name: "Test / OS: ${{ matrix.os }}, key-queues: ${{ matrix.experimentalKeyQueues }}, constraint-api: ${{ matrix.enableConstraintAPI }}"
+    name: "Test / OS: ${{ matrix.os }}, key-queues: ${{ matrix.experimentalKeyQueues }}, constraint-api: ${{ matrix.enableConstraintAPI }}, db: ${{ matrix.database }}"
     steps:
       - uses: actions/checkout@v4
         with:
@@ -76,9 +77,10 @@ jobs:
           TEST_MODE: true
           EXPERIMENTAL_KEY_QUEUES_ENABLE: "${{ matrix.experimentalKeyQueues }}"
           ENABLE_CONSTRAINT_API: "${{ matrix.enableConstraintAPI }}"
+          TEST_DATABASE: "${{ matrix.database }}"
 
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          flags: unit,kq-${{ matrix.experimentalKeyQueues }}
+          flags: unit,kq-${{ matrix.experimentalKeyQueues }},db-${{ matrix.database }}

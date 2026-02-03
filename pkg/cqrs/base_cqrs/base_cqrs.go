@@ -57,9 +57,14 @@ func New(opts BaseCQRSOptions) (*sql.DB, error) {
 			return nil, fmt.Errorf("unsupported database URL format")
 		}
 
-		o.Do(func() {
+		if opts.ForTest {
+			// For tests, create a new connection each time
 			db, err = sql.Open("pgx", opts.PostgresURI)
-		})
+		} else {
+			o.Do(func() {
+				db, err = sql.Open("pgx", opts.PostgresURI)
+			})
+		}
 	} else if opts.Persist {
 		o.Do(func() {
 			// make the dir if it doesn't exist

@@ -5,25 +5,33 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"os"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/cqrs"
 	sqlc_psql "github.com/inngest/inngest/pkg/cqrs/base_cqrs/sqlc/postgres"
+	"github.com/inngest/inngest/tests/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+)
+
+// Environment variable constants for database selection
+const (
+	// EnvTestDatabase specifies which database to use for testing ("sqlite" or "postgres")
+	EnvTestDatabase = "TEST_DATABASE"
 )
 
 //
 // App
 //
 
-func TestSQLiteCQRSGetApps(t *testing.T) {
+func TestCQRSGetApps(t *testing.T) {
 	ctx := context.Background()
 	envID := uuid.New()
 
-	cm, cleanup := initSQLiteCQRS(t)
+	cm, cleanup := initCQRS(t)
 	defer cleanup()
 
 	// Create test apps
@@ -88,11 +96,11 @@ func TestSQLiteCQRSGetApps(t *testing.T) {
 	})
 }
 
-func TestSQLiteCQRSGetAppByChecksum(t *testing.T) {
+func TestCQRSGetAppByChecksum(t *testing.T) {
 	ctx := context.Background()
 	envID := uuid.New()
 
-	cm, cleanup := initSQLiteCQRS(t)
+	cm, cleanup := initCQRS(t)
 	defer cleanup()
 
 	// Create test app
@@ -128,10 +136,10 @@ func TestSQLiteCQRSGetAppByChecksum(t *testing.T) {
 	})
 }
 
-func TestSQLiteCQRSGetAppByID(t *testing.T) {
+func TestCQRSGetAppByID(t *testing.T) {
 	ctx := context.Background()
 
-	cm, cleanup := initSQLiteCQRS(t)
+	cm, cleanup := initCQRS(t)
 	defer cleanup()
 
 	// Create test app
@@ -163,11 +171,11 @@ func TestSQLiteCQRSGetAppByID(t *testing.T) {
 	})
 }
 
-func TestSQLiteCQRSGetAppByURL(t *testing.T) {
+func TestCQRSGetAppByURL(t *testing.T) {
 	ctx := context.Background()
 	envID := uuid.New()
 
-	cm, cleanup := initSQLiteCQRS(t)
+	cm, cleanup := initCQRS(t)
 	defer cleanup()
 
 	// Create test app
@@ -203,11 +211,11 @@ func TestSQLiteCQRSGetAppByURL(t *testing.T) {
 	})
 }
 
-func TestSQLiteCQRSGetAppByName(t *testing.T) {
+func TestCQRSGetAppByName(t *testing.T) {
 	ctx := context.Background()
 	envID := uuid.New()
 
-	cm, cleanup := initSQLiteCQRS(t)
+	cm, cleanup := initCQRS(t)
 	defer cleanup()
 
 	// Create test app
@@ -243,11 +251,11 @@ func TestSQLiteCQRSGetAppByName(t *testing.T) {
 	})
 }
 
-func TestSQLiteCQRSGetAllApps(t *testing.T) {
+func TestCQRSGetAllApps(t *testing.T) {
 	ctx := context.Background()
 	envID := uuid.New()
 
-	cm, cleanup := initSQLiteCQRS(t)
+	cm, cleanup := initCQRS(t)
 	defer cleanup()
 
 	// Create multiple test apps
@@ -288,10 +296,10 @@ func TestSQLiteCQRSGetAllApps(t *testing.T) {
 	})
 }
 
-func TestSQLiteCQRSUpsertApp(t *testing.T) {
+func TestCQRSUpsertApp(t *testing.T) {
 	ctx := context.Background()
 
-	cm, cleanup := initSQLiteCQRS(t)
+	cm, cleanup := initCQRS(t)
 	defer cleanup()
 
 	t.Run("create new app", func(t *testing.T) {
@@ -386,13 +394,13 @@ func TestSQLiteCQRSUpsertApp(t *testing.T) {
 	})
 }
 
-func TestSQLiteCQRSUpdateAppError(t *testing.T) {
+func TestCQRSUpdateAppError(t *testing.T) {
 	ctx := context.Background()
 
 	// Generate test IDs
 	appID := uuid.New()
 
-	cm, cleanup := initSQLiteCQRS(t, withInitCQRSOptApp(appID))
+	cm, cleanup := initCQRS(t, withInitCQRSOptApp(appID))
 	defer cleanup()
 
 	t.Run("set app error", func(t *testing.T) {
@@ -472,10 +480,10 @@ func TestSQLiteCQRSUpdateAppError(t *testing.T) {
 	})
 }
 
-func TestSQLiteCQRSUpdateAppURL(t *testing.T) {
+func TestCQRSUpdateAppURL(t *testing.T) {
 	ctx := context.Background()
 
-	cm, cleanup := initSQLiteCQRS(t)
+	cm, cleanup := initCQRS(t)
 	defer cleanup()
 
 	// Create test app with comprehensive field data
@@ -574,10 +582,10 @@ func TestSQLiteCQRSUpdateAppURL(t *testing.T) {
 	})
 }
 
-func TestSQLiteCQRSDeleteApp(t *testing.T) {
+func TestCQRSDeleteApp(t *testing.T) {
 	ctx := context.Background()
 
-	cm, cleanup := initSQLiteCQRS(t)
+	cm, cleanup := initCQRS(t)
 	defer cleanup()
 
 	// Create test app
@@ -669,7 +677,7 @@ func TestSQLiteCQRSDeleteApp(t *testing.T) {
 // Function
 //
 
-func TestSQLiteCQRSGetFunctionByInternalUUID(t *testing.T) {
+func TestCQRSGetFunctionByInternalUUID(t *testing.T) {
 	ctx := context.Background()
 
 	// Generate test IDs
@@ -677,7 +685,7 @@ func TestSQLiteCQRSGetFunctionByInternalUUID(t *testing.T) {
 	envID := uuid.New()
 	appID := uuid.New()
 
-	cm, cleanup := initSQLiteCQRS(t, withInitCQRSOptApp(appID))
+	cm, cleanup := initCQRS(t, withInitCQRSOptApp(appID))
 	defer cleanup()
 
 	t.Run("when function is active", func(t *testing.T) {
@@ -788,14 +796,14 @@ func TestSQLiteCQRSGetFunctionByInternalUUID(t *testing.T) {
 	})
 }
 
-func TestSQLiteCQRSGetFunctionsByAppInternalID(t *testing.T) {
+func TestCQRSGetFunctionsByAppInternalID(t *testing.T) {
 	ctx := context.Background()
 
 	// Create two different apps
 	targetAppID := uuid.New()
 	otherAppID := uuid.New()
 
-	cm, cleanup := initSQLiteCQRS(t, withInitCQRSOptApp(targetAppID))
+	cm, cleanup := initCQRS(t, withInitCQRSOptApp(targetAppID))
 	defer cleanup()
 
 	// Create the other app manually
@@ -924,11 +932,11 @@ func TestSQLiteCQRSGetFunctionsByAppInternalID(t *testing.T) {
 	})
 }
 
-func TestSQLiteCQRSInsertFunction(t *testing.T) {
+func TestCQRSInsertFunction(t *testing.T) {
 	ctx := context.Background()
 	appID := uuid.New()
 
-	cm, cleanup := initSQLiteCQRS(t, withInitCQRSOptApp(appID))
+	cm, cleanup := initCQRS(t, withInitCQRSOptApp(appID))
 	defer cleanup()
 
 	t.Run("insert new function", func(t *testing.T) {
@@ -994,11 +1002,11 @@ func TestSQLiteCQRSInsertFunction(t *testing.T) {
 	})
 }
 
-func TestSQLiteCQRSGetFunctions(t *testing.T) {
+func TestCQRSGetFunctions(t *testing.T) {
 	ctx := context.Background()
 	appID := uuid.New()
 
-	cm, cleanup := initSQLiteCQRS(t, withInitCQRSOptApp(appID))
+	cm, cleanup := initCQRS(t, withInitCQRSOptApp(appID))
 	defer cleanup()
 
 	// Create test functions
@@ -1035,14 +1043,14 @@ func TestSQLiteCQRSGetFunctions(t *testing.T) {
 	})
 }
 
-func TestSQLiteCQRSGetFunctionsByAppExternalID(t *testing.T) {
+func TestCQRSGetFunctionsByAppExternalID(t *testing.T) {
 	ctx := context.Background()
 
 	// Create two different apps with external IDs
 	targetAppID := uuid.New()
 	otherAppID := uuid.New()
 
-	cm, cleanup := initSQLiteCQRS(t)
+	cm, cleanup := initCQRS(t)
 	defer cleanup()
 
 	workspaceID := uuid.New()
@@ -1147,14 +1155,14 @@ func TestSQLiteCQRSGetFunctionsByAppExternalID(t *testing.T) {
 	})
 }
 
-func TestSQLiteCQRSDeleteFunctionsByAppID(t *testing.T) {
+func TestCQRSDeleteFunctionsByAppID(t *testing.T) {
 	ctx := context.Background()
 
 	// Create two different apps
 	targetAppID := uuid.New()
 	preserveAppID := uuid.New()
 
-	cm, cleanup := initSQLiteCQRS(t, withInitCQRSOptApp(targetAppID))
+	cm, cleanup := initCQRS(t, withInitCQRSOptApp(targetAppID))
 	defer cleanup()
 
 	// Create the preserve app manually
@@ -1247,11 +1255,11 @@ func TestSQLiteCQRSDeleteFunctionsByAppID(t *testing.T) {
 	})
 }
 
-func TestSQLiteCQRSDeleteFunctionsByIDs(t *testing.T) {
+func TestCQRSDeleteFunctionsByIDs(t *testing.T) {
 	ctx := context.Background()
 	appID := uuid.New()
 
-	cm, cleanup := initSQLiteCQRS(t, withInitCQRSOptApp(appID))
+	cm, cleanup := initCQRS(t, withInitCQRSOptApp(appID))
 	defer cleanup()
 
 	// Create test functions
@@ -1303,11 +1311,11 @@ func TestSQLiteCQRSDeleteFunctionsByIDs(t *testing.T) {
 	})
 }
 
-func TestSQLiteCQRSUpdateFunctionConfig(t *testing.T) {
+func TestCQRSUpdateFunctionConfig(t *testing.T) {
 	ctx := context.Background()
 	appID := uuid.New()
 
-	cm, cleanup := initSQLiteCQRS(t, withInitCQRSOptApp(appID))
+	cm, cleanup := initCQRS(t, withInitCQRSOptApp(appID))
 	defer cleanup()
 
 	// Create test function
@@ -1396,7 +1404,10 @@ func withInitCQRSOptApp(id uuid.UUID) withInitCQRSOpt {
 	}
 }
 
-func initSQLiteCQRS(t *testing.T, opts ...withInitCQRSOpt) (cqrs.Manager, func()) {
+// initCQRS initializes a CQRS manager based on the TEST_DATABASE environment variable.
+// When TEST_DATABASE=postgres, it starts a PostgreSQL testcontainer.
+// Otherwise, it defaults to in-memory SQLite.
+func initCQRS(t *testing.T, opts ...withInitCQRSOpt) (cqrs.Manager, func()) {
 	ctx := context.Background()
 
 	opt := initCQRSOpt{}
@@ -1404,13 +1415,38 @@ func initSQLiteCQRS(t *testing.T, opts ...withInitCQRSOpt) (cqrs.Manager, func()
 		apply(&opt)
 	}
 
-	db, err := New(BaseCQRSOptions{Persist: false, ForTest: true})
-	require.NoError(t, err)
+	var (
+		db     *sql.DB
+		driver string
+		err    error
+	)
 
-	cm := NewCQRS(db, "sqlite", sqlc_psql.NewNormalizedOpts{})
+	var pc *testutil.PostgresContainer
+
+	testDB := os.Getenv(EnvTestDatabase)
+	if testDB == "postgres" {
+		var pgErr error
+		pc, pgErr = testutil.StartPostgres(t)
+		require.NoError(t, pgErr)
+
+		db, err = New(BaseCQRSOptions{PostgresURI: pc.URI, ForTest: true})
+		require.NoError(t, err)
+		driver = "postgres"
+	} else {
+		db, err = New(BaseCQRSOptions{Persist: false, ForTest: true})
+		require.NoError(t, err)
+		driver = "sqlite"
+	}
+
+	cm := NewCQRS(db, driver, sqlc_psql.NewNormalizedOpts{})
 
 	cleanup := func() {
 		db.Close()
+		if pc != nil {
+			if err := pc.Terminate(t.Context()); err != nil {
+				t.Logf("failed to terminate postgres container: %v", err)
+			}
+		}
 	}
 
 	if opt.appID != uuid.Nil {
