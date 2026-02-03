@@ -548,6 +548,9 @@ func start(ctx context.Context, opts StartOpts) error {
 			return true, true
 		}))
 	}
+	executorOpts = append(executorOpts, executor.WithEnableBatchingInstrumentation(func(ctx context.Context, accountID, envID uuid.UUID) (enable bool) {
+		return false
+	}))
 
 	exec, err := executor.NewExecutor(executorOpts...)
 	if err != nil {

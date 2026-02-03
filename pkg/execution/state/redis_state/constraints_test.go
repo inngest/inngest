@@ -16,6 +16,7 @@ import (
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/service"
 	"github.com/jonboulle/clockwork"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
@@ -285,6 +286,8 @@ func TestItemLeaseConstraintCheck(t *testing.T) {
 		require.Equal(t, 0, len(cmLifecycles.ReleaseCalls))
 	})
 
+	// Tests that valid leases (>= 2s remaining) are NOT released and are reused as-is.
+	// The 2-second buffer is defined in constraints.go: hasValidLease := expiry.After(now.Add(2 * time.Second))
 	t.Run("should not acquire lease with valid existing item lease", func(t *testing.T) {
 		reset()
 
@@ -309,7 +312,7 @@ func TestItemLeaseConstraintCheck(t *testing.T) {
 		qi, err := shard.EnqueueItem(ctx, item, start, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
-		// Simulate valid lease
+		// Simulate valid lease (10 seconds in future, well above the 2-second threshold)
 		capacityLeaseID := ulid.MustNew(ulid.Timestamp(clock.Now().Add(10*time.Second)), rand.Reader)
 
 		qi.CapacityLease = &osqueue.CapacityLease{
@@ -322,10 +325,13 @@ func TestItemLeaseConstraintCheck(t *testing.T) {
 		res, err := shard.ItemLeaseConstraintCheck(ctx, &sp, &backlog, constraints, &qi, clock.Now())
 		require.NoError(t, err)
 
+		// Wait for any async goroutines to complete (for consistency, though none expected here)
+		service.Wait()
+
 		require.NotNil(t, res.CapacityLease)
 		require.True(t, res.SkipConstraintChecks)
 
-		// This time, we do not expect a call to the Constraint API, simply use the valid lease
+		// We do not expect any calls to the Constraint API - the valid lease is reused as-is
 		require.Equal(t, 0, len(cmLifecycles.AcquireCalls))
 		require.Equal(t, 0, len(cmLifecycles.ExtendCalls))
 		require.Equal(t, 0, len(cmLifecycles.ReleaseCalls))
@@ -355,26 +361,119 @@ func TestItemLeaseConstraintCheck(t *testing.T) {
 		qi, err := shard.EnqueueItem(ctx, item, start, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
-		// Simulate expired lease
-		capacityLeaseID := ulid.MustNew(ulid.Timestamp(clock.Now().Add(-10*time.Second)), rand.Reader)
+		sp := osqueue.ItemShadowPartition(ctx, qi)
+		backlog := osqueue.ItemBacklog(ctx, qi)
 
-		qi.CapacityLease = &osqueue.CapacityLease{
-			LeaseID: capacityLeaseID,
-		}
+		// First, acquire a real lease (this creates it in Redis)
+		res, err := shard.ItemLeaseConstraintCheck(ctx, &sp, &backlog, constraints, &qi, clock.Now())
+		require.NoError(t, err)
+		require.NotNil(t, res.CapacityLease)
+		require.Equal(t, 1, len(cmLifecycles.AcquireCalls))
+
+		originalLeaseID := res.CapacityLease.LeaseID
+		originalLeaseExpiry := originalLeaseID.Timestamp()
+
+		// Advance time to make the lease appear expired
+		// The lease has 30s duration (QueueLeaseDuration), and there's a 2s validity buffer
+		// So we need to advance past the lease expiry time
+		timeToAdvance := originalLeaseExpiry.Sub(clock.Now()) + 5*time.Second
+		clock.Advance(timeToAdvance)
+		r.SetTime(clock.Now())
+
+		// Set the expired lease on the item
+		qi.CapacityLease = res.CapacityLease
+
+		// Call again - should detect expired lease, release it, and acquire a new one
+		res2, err := shard.ItemLeaseConstraintCheck(ctx, &sp, &backlog, constraints, &qi, clock.Now())
+		require.NoError(t, err)
+
+		// Wait for async goroutines to complete (release happens via service.Go())
+		service.Wait()
+
+		require.NotNil(t, res2.CapacityLease)
+		require.True(t, res2.SkipConstraintChecks)
+
+		// Expect 2 acquire calls total (initial + after expiry), and 1 release call for the expired lease
+		require.Equal(t, 2, len(cmLifecycles.AcquireCalls))
+		require.Equal(t, 0, len(cmLifecycles.ExtendCalls))
+		require.Equal(t, 1, len(cmLifecycles.ReleaseCalls))
+
+		// Verify the released lease ID matches the original (now expired) lease
+		require.Equal(t, originalLeaseID, cmLifecycles.ReleaseCalls[0].LeaseID)
+	})
+
+	// Tests that near-expiring leases (valid for < 2s) are also released and a new lease is acquired.
+	// This covers the edge case where the lease technically hasn't expired but won't be valid long enough.
+	// The 2-second buffer is defined in constraints.go: hasValidLease := expiry.After(now.Add(2 * time.Second))
+	t.Run("should release near-expiring lease (TTL < 2s) and acquire new one", func(t *testing.T) {
+		reset()
+
+		_, shard := newQueue(
+			t, rc,
+			osqueue.WithClock(clock),
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+				return true
+			}),
+			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
+				return true, true
+			}),
+			osqueue.WithCapacityManager(cm),
+			// make lease extensions more frequent
+			osqueue.WithCapacityLeaseExtendInterval(time.Second),
+			osqueue.WithLogger(l),
+			osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
+				return constraints
+			}),
+		)
+
+		qi, err := shard.EnqueueItem(ctx, item, start, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
 
 		sp := osqueue.ItemShadowPartition(ctx, qi)
 		backlog := osqueue.ItemBacklog(ctx, qi)
 
+		// First, acquire a real lease (this creates it in Redis)
 		res, err := shard.ItemLeaseConstraintCheck(ctx, &sp, &backlog, constraints, &qi, clock.Now())
 		require.NoError(t, err)
-
 		require.NotNil(t, res.CapacityLease)
-		require.True(t, res.SkipConstraintChecks)
-
-		// Expect call because lease expired
 		require.Equal(t, 1, len(cmLifecycles.AcquireCalls))
+
+		originalLeaseID := res.CapacityLease.LeaseID
+		originalLeaseExpiry := originalLeaseID.Timestamp()
+
+		// Advance time so the lease has less than 2 seconds remaining
+		// (e.g., advance to 1 second before the lease ULID timestamp)
+		// Since ULID timestamps are based on creation time, we advance to 1 second before
+		// the original lease expiry to make it appear near-expiring
+		timeToAdvance := originalLeaseExpiry.Sub(clock.Now()) - 1*time.Second
+		clock.Advance(timeToAdvance)
+		r.SetTime(clock.Now())
+
+		// Verify the lease now has less than 2 seconds remaining
+		ttlRemaining := originalLeaseExpiry.Sub(clock.Now())
+		require.Less(t, ttlRemaining, 2*time.Second, "Lease should have less than 2 seconds remaining")
+		require.Greater(t, ttlRemaining, time.Duration(0), "Lease should still be technically valid (positive TTL)")
+
+		// Set the near-expiring lease on the item
+		qi.CapacityLease = res.CapacityLease
+
+		// Call again - should detect near-expiring lease, release it, and acquire a new one
+		res2, err := shard.ItemLeaseConstraintCheck(ctx, &sp, &backlog, constraints, &qi, clock.Now())
+		require.NoError(t, err)
+
+		// Wait for async goroutines to complete (release happens via service.Go())
+		service.Wait()
+
+		require.NotNil(t, res2.CapacityLease)
+		require.True(t, res2.SkipConstraintChecks)
+
+		// Expect 2 acquire calls total (initial + after near-expiry), and 1 release call
+		require.Equal(t, 2, len(cmLifecycles.AcquireCalls))
 		require.Equal(t, 0, len(cmLifecycles.ExtendCalls))
-		require.Equal(t, 0, len(cmLifecycles.ReleaseCalls))
+		require.Equal(t, 1, len(cmLifecycles.ReleaseCalls))
+
+		// Verify the released lease ID matches the near-expiring lease
+		require.Equal(t, originalLeaseID, cmLifecycles.ReleaseCalls[0].LeaseID)
 	})
 
 	t.Run("acquire lease from constraint api", func(t *testing.T) {
