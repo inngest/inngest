@@ -161,6 +161,8 @@ export const RunDetailsV3 = ({
     runID,
     enabled: Boolean(runID),
   });
+  console.log('proving out streamRunData', streamRunData);
+  console.log('proving out streamRunError', streamRunError);
 
   const outputID = runData?.trace?.outputID;
   const {
