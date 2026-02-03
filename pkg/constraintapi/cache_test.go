@@ -20,7 +20,7 @@ func TestCache(t *testing.T) {
 
 	type deps struct {
 		cm         CapacityManager
-		cache      *limitingConstraintCache
+		cache      *constraintCache
 		clock      clockwork.Clock
 		rc         rueidis.Client
 		r          *miniredis.Miniredis
@@ -74,9 +74,12 @@ func TestCache(t *testing.T) {
 				require.NoError(t, err)
 				require.Len(t, res.Leases, 1)
 				require.Len(t, res.LimitingConstraints, 0)
+				// After successfully acquiring the last available lease, the constraint is now exhausted
+				require.Len(t, res.ExhaustedConstraints, 1)
 
-				require.Equal(t, 0, deps.cache.limitingConstraintCache.ItemCount())
-				require.Nil(t, deps.cache.limitingConstraintCache.Get(accountConcurrency.CacheKey(accountID, envID, fnID)))
+				// The exhausted constraint should be cached
+				require.Equal(t, 1, deps.cache.cache.ItemCount())
+				require.NotNil(t, deps.cache.cache.Get(accountConcurrency.CacheKey(accountID, envID, fnID)))
 
 				// Second request should fail and get cached
 				res, err = deps.cache.Acquire(ctx, &CapacityAcquireRequest{
@@ -109,12 +112,13 @@ func TestCache(t *testing.T) {
 				})
 				require.NoError(t, err)
 				require.Len(t, res.Leases, 0)
-				require.Len(t, res.LimitingConstraints, 1)
+				require.Len(t, res.ExhaustedConstraints, 1)
 
-				require.Equal(t, 1, deps.cache.limitingConstraintCache.ItemCount())
-				require.NotNil(t, deps.cache.limitingConstraintCache.Get(accountConcurrency.CacheKey(accountID, envID, fnID)))
+				require.Equal(t, 1, deps.cache.cache.ItemCount())
+				require.NotNil(t, deps.cache.cache.Get(accountConcurrency.CacheKey(accountID, envID, fnID)))
 
-				require.Equal(t, 2, len(deps.lifecycles.AcquireCalls))
+				// Only 1 call - second request was served from cache after first exhausted the constraint
+				require.Equal(t, 1, len(deps.lifecycles.AcquireCalls))
 
 				// Third request should be cached
 				res, err = deps.cache.Acquire(ctx, &CapacityAcquireRequest{
@@ -147,12 +151,13 @@ func TestCache(t *testing.T) {
 				})
 				require.NoError(t, err)
 				require.Len(t, res.Leases, 0)
-				require.Len(t, res.LimitingConstraints, 1)
+				require.Len(t, res.ExhaustedConstraints, 1)
 
-				require.Equal(t, 2, len(deps.lifecycles.AcquireCalls))
+				// Still only 1 call - third request also served from cache
+				require.Equal(t, 1, len(deps.lifecycles.AcquireCalls))
 
 				// After cache expires, request should go to API again
-				deps.cache.limitingConstraintCache.Delete(accountConcurrency.CacheKey(accountID, envID, fnID))
+				deps.cache.cache.Delete(accountConcurrency.CacheKey(accountID, envID, fnID))
 
 				res, err = deps.cache.Acquire(ctx, &CapacityAcquireRequest{
 					AccountID:  accountID,
@@ -184,9 +189,10 @@ func TestCache(t *testing.T) {
 				})
 				require.NoError(t, err)
 				require.Len(t, res.Leases, 0)
-				require.Len(t, res.LimitingConstraints, 1)
+				require.Len(t, res.ExhaustedConstraints, 1)
 
-				require.Equal(t, 3, len(deps.lifecycles.AcquireCalls))
+				// Total 2 calls - first request and this one after cache expiry
+				require.Equal(t, 2, len(deps.lifecycles.AcquireCalls))
 			},
 		},
 		{
@@ -260,11 +266,14 @@ func TestCache(t *testing.T) {
 				require.NoError(t, err)
 				require.Len(t, res.Leases, 1)
 				require.Len(t, res.LimitingConstraints, 2)
+				// Only the custom concurrency constraint (limit=1) is exhausted after granting 1 lease
+				require.Len(t, res.ExhaustedConstraints, 1)
 
-				require.Equal(t, 2, deps.cache.limitingConstraintCache.ItemCount())
-				require.NotNil(t, deps.cache.limitingConstraintCache.Get(accountConcurrency.CacheKey(accountID, envID, fnID)))
-				require.Nil(t, deps.cache.limitingConstraintCache.Get(fnConcurrency.CacheKey(accountID, envID, fnID)))
-				require.NotNil(t, deps.cache.limitingConstraintCache.Get(customConcurrency.CacheKey(accountID, envID, fnID)))
+				// Only exhausted constraints are cached (custom concurrency)
+				require.Equal(t, 1, deps.cache.cache.ItemCount())
+				require.Nil(t, deps.cache.cache.Get(accountConcurrency.CacheKey(accountID, envID, fnID)))
+				require.Nil(t, deps.cache.cache.Get(fnConcurrency.CacheKey(accountID, envID, fnID)))
+				require.NotNil(t, deps.cache.cache.Get(customConcurrency.CacheKey(accountID, envID, fnID)))
 			},
 		},
 		{
@@ -309,10 +318,10 @@ func TestCache(t *testing.T) {
 				})
 				require.NoError(t, err)
 				require.Len(t, res.Leases, 1)
-				require.Len(t, res.LimitingConstraints, 1)
+				require.Len(t, res.ExhaustedConstraints, 1)
 
-				require.Equal(t, 1, deps.cache.limitingConstraintCache.ItemCount())
-				require.NotNil(t, deps.cache.limitingConstraintCache.Get(accountConcurrency.CacheKey(accountID, envID, fnID)))
+				require.Equal(t, 1, deps.cache.cache.ItemCount())
+				require.NotNil(t, deps.cache.cache.Get(accountConcurrency.CacheKey(accountID, envID, fnID)))
 			},
 		},
 		{
@@ -362,7 +371,10 @@ func TestCache(t *testing.T) {
 				require.NoError(t, err)
 				require.Len(t, res.Leases, 1)
 				require.Len(t, res.LimitingConstraints, 0)
-				require.Equal(t, 0, deps.cache.limitingConstraintCache.ItemCount())
+				// After using the throttle token, the constraint is exhausted
+				require.Len(t, res.ExhaustedConstraints, 1)
+				// The exhausted constraint should be cached
+				require.Equal(t, 1, deps.cache.cache.ItemCount())
 
 				// Second request should fail and be cached
 				res, err = deps.cache.Acquire(ctx, &CapacityAcquireRequest{
@@ -398,9 +410,9 @@ func TestCache(t *testing.T) {
 				})
 				require.NoError(t, err)
 				require.Len(t, res.Leases, 0)
-				require.Len(t, res.LimitingConstraints, 1)
-				require.Equal(t, 1, deps.cache.limitingConstraintCache.ItemCount())
-				require.NotNil(t, deps.cache.limitingConstraintCache.Get(throttle.CacheKey(accountID, envID, fnID)))
+				require.Len(t, res.ExhaustedConstraints, 1)
+				require.Equal(t, 1, deps.cache.cache.ItemCount())
+				require.NotNil(t, deps.cache.cache.Get(throttle.CacheKey(accountID, envID, fnID)))
 
 				// Third request should return cached response
 				res, err = deps.cache.Acquire(ctx, &CapacityAcquireRequest{
@@ -436,10 +448,10 @@ func TestCache(t *testing.T) {
 				})
 				require.NoError(t, err)
 				require.Len(t, res.Leases, 0)
-				require.Len(t, res.LimitingConstraints, 1)
+				require.Len(t, res.ExhaustedConstraints, 1)
 
-				// Verify manager was only called twice (not three times due to cache)
-				require.Equal(t, 2, len(deps.lifecycles.AcquireCalls))
+				// Verify manager was only called once - second request served from cache
+				require.Equal(t, 1, len(deps.lifecycles.AcquireCalls))
 			},
 		},
 		{
@@ -489,7 +501,10 @@ func TestCache(t *testing.T) {
 				require.NoError(t, err)
 				require.Len(t, res.Leases, 1)
 				require.Len(t, res.LimitingConstraints, 0)
-				require.Equal(t, 0, deps.cache.limitingConstraintCache.ItemCount())
+				// After using the rate limit token, the constraint is exhausted
+				require.Len(t, res.ExhaustedConstraints, 1)
+				// The exhausted constraint should be cached
+				require.Equal(t, 1, deps.cache.cache.ItemCount())
 
 				// Second request should fail and be cached
 				res, err = deps.cache.Acquire(ctx, &CapacityAcquireRequest{
@@ -525,9 +540,9 @@ func TestCache(t *testing.T) {
 				})
 				require.NoError(t, err)
 				require.Len(t, res.Leases, 0)
-				require.Len(t, res.LimitingConstraints, 1)
-				require.Equal(t, 1, deps.cache.limitingConstraintCache.ItemCount())
-				require.NotNil(t, deps.cache.limitingConstraintCache.Get(rateLimit.CacheKey(accountID, envID, fnID)))
+				require.Len(t, res.ExhaustedConstraints, 1)
+				require.Equal(t, 1, deps.cache.cache.ItemCount())
+				require.NotNil(t, deps.cache.cache.Get(rateLimit.CacheKey(accountID, envID, fnID)))
 
 				// Third request should return cached response
 				res, err = deps.cache.Acquire(ctx, &CapacityAcquireRequest{
@@ -563,10 +578,10 @@ func TestCache(t *testing.T) {
 				})
 				require.NoError(t, err)
 				require.Len(t, res.Leases, 0)
-				require.Len(t, res.LimitingConstraints, 1)
+				require.Len(t, res.ExhaustedConstraints, 1)
 
-				// Verify manager was only called twice (not three times due to cache)
-				require.Equal(t, 2, len(deps.lifecycles.AcquireCalls))
+				// Verify manager was only called once - second request served from cache
+				require.Equal(t, 1, len(deps.lifecycles.AcquireCalls))
 			},
 		},
 		{
@@ -602,7 +617,7 @@ func TestCache(t *testing.T) {
 				require.Len(t, checkResp.Usage, 1)
 
 				// Verify nothing was cached
-				require.Equal(t, 0, deps.cache.limitingConstraintCache.ItemCount())
+				require.Equal(t, 0, deps.cache.cache.ItemCount())
 			},
 		},
 		{
@@ -787,7 +802,7 @@ func TestCache(t *testing.T) {
 				})
 				require.NoError(t, err)
 				require.Len(t, res1.Leases, 0)
-				require.Len(t, res1.LimitingConstraints, 1)
+				require.Len(t, res1.ExhaustedConstraints, 1)
 
 				// Account 2: Should not be limited (different cache key)
 				accountConcurrency2 := ConstraintItem{
@@ -829,8 +844,8 @@ func TestCache(t *testing.T) {
 				require.Len(t, res2.LimitingConstraints, 0)
 
 				// Verify separate cache entries
-				require.NotNil(t, deps.cache.limitingConstraintCache.Get(accountConcurrency.CacheKey(accountID1, envID, fnID)))
-				require.Nil(t, deps.cache.limitingConstraintCache.Get(accountConcurrency2.CacheKey(accountID2, envID, fnID)))
+				require.NotNil(t, deps.cache.cache.Get(accountConcurrency.CacheKey(accountID1, envID, fnID)))
+				require.Nil(t, deps.cache.cache.Get(accountConcurrency2.CacheKey(accountID2, envID, fnID)))
 			},
 		},
 		{
@@ -901,13 +916,14 @@ func TestCache(t *testing.T) {
 					MaximumLifetime:      time.Minute,
 				})
 				require.NoError(t, err)
-				require.Equal(t, 1, deps.cache.limitingConstraintCache.ItemCount())
-				require.Equal(t, 2, len(deps.lifecycles.AcquireCalls))
+				require.Equal(t, 1, deps.cache.cache.ItemCount())
+				// Only 1 call to manager - second request was served from cache after first request exhausted the constraint
+				require.Equal(t, 1, len(deps.lifecycles.AcquireCalls))
 
 				// Delete cache entry to simulate expiration
 				// Note: ccache uses real time internally, not the fake clock
-				deps.cache.limitingConstraintCache.Delete(accountConcurrency.CacheKey(accountID, envID, fnID))
-				require.Equal(t, 0, deps.cache.limitingConstraintCache.ItemCount())
+				deps.cache.cache.Delete(accountConcurrency.CacheKey(accountID, envID, fnID))
+				require.Equal(t, 0, deps.cache.cache.ItemCount())
 
 				// Third request - cache is cleared, should go to manager
 				_, err = deps.cache.Acquire(ctx, &CapacityAcquireRequest{
@@ -938,8 +954,8 @@ func TestCache(t *testing.T) {
 				})
 				require.NoError(t, err)
 
-				// Verify manager was called again (cache expired)
-				require.Equal(t, 3, len(deps.lifecycles.AcquireCalls))
+				// Verify manager was called again (cache expired) - total 2 calls
+				require.Equal(t, 2, len(deps.lifecycles.AcquireCalls))
 			},
 		},
 	}
@@ -979,10 +995,10 @@ func TestCache(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, cm)
 
-			cache := NewLimitingConstraintCache(
-				WithLimitingCacheClock(clock),
-				WithLimitingCacheManager(cm),
-				WithLimitingCacheEnable(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, minTTL, maxTTL time.Duration) {
+			cache := NewConstraintCache(
+				WithConstraintCacheClock(clock),
+				WithConstraintCacheManager(cm),
+				WithConstraintCacheEnable(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, minTTL, maxTTL time.Duration) {
 					return true, MinCacheTTL, MaxCacheTTL
 				}),
 			)

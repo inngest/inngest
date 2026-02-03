@@ -18,50 +18,50 @@ const (
 	MaxCacheTTL = time.Minute
 )
 
-type EnableLimitingConstraintCacheFn func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, minTTL, maxTTL time.Duration)
+type EnableConstraintCacheFn func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, minTTL, maxTTL time.Duration)
 
-type limitingConstraintCache struct {
+type constraintCache struct {
 	manager CapacityManager
 	clock   clockwork.Clock
 
-	limitingConstraintCache              *ccache.Cache[*limitingConstraintCacheItem]
+	cache                                *ccache.Cache[*constraintCacheItem]
 	enableHighCardinalityInstrumentation EnableHighCardinalityInstrumentation
-	enableCache                          EnableLimitingConstraintCacheFn
+	enableCache                          EnableConstraintCacheFn
 }
 
-type limitingConstraintCacheItem struct {
+type constraintCacheItem struct {
 	constraint ConstraintItem
 	retryAfter time.Time
 }
 
-type LimitingConstraintCacheOption func(c *limitingConstraintCache)
+type ConstraintCacheOption func(c *constraintCache)
 
-func WithLimitingCacheClock(clock clockwork.Clock) LimitingConstraintCacheOption {
-	return func(c *limitingConstraintCache) {
+func WithConstraintCacheClock(clock clockwork.Clock) ConstraintCacheOption {
+	return func(c *constraintCache) {
 		c.clock = clock
 	}
 }
 
-func WithLimitingCacheManager(manager CapacityManager) LimitingConstraintCacheOption {
-	return func(c *limitingConstraintCache) {
+func WithConstraintCacheManager(manager CapacityManager) ConstraintCacheOption {
+	return func(c *constraintCache) {
 		c.manager = manager
 	}
 }
 
-func WithLimitingCacheEnableHighCardinalityInstrumentation(ehci EnableHighCardinalityInstrumentation) LimitingConstraintCacheOption {
-	return func(c *limitingConstraintCache) {
+func WithConstraintCacheEnableHighCardinalityInstrumentation(ehci EnableHighCardinalityInstrumentation) ConstraintCacheOption {
+	return func(c *constraintCache) {
 		c.enableHighCardinalityInstrumentation = ehci
 	}
 }
 
-func WithLimitingCacheEnable(enable EnableLimitingConstraintCacheFn) LimitingConstraintCacheOption {
-	return func(c *limitingConstraintCache) {
+func WithConstraintCacheEnable(enable EnableConstraintCacheFn) ConstraintCacheOption {
+	return func(c *constraintCache) {
 		c.enableCache = enable
 	}
 }
 
 // Acquire implements CapacityManager.
-func (l *limitingConstraintCache) Acquire(ctx context.Context, req *CapacityAcquireRequest) (*CapacityAcquireResponse, errs.InternalError) {
+func (l *constraintCache) Acquire(ctx context.Context, req *CapacityAcquireRequest) (*CapacityAcquireResponse, errs.InternalError) {
 	if l.enableCache == nil {
 		return l.manager.Acquire(ctx, req)
 	}
@@ -81,7 +81,7 @@ func (l *limitingConstraintCache) Acquire(ctx context.Context, req *CapacityAcqu
 			continue
 		}
 
-		item := l.limitingConstraintCache.Get(cacheKey)
+		item := l.cache.Get(cacheKey)
 		if item == nil || item.Expired() {
 			// Not limited previously
 			continue
@@ -119,10 +119,10 @@ func (l *limitingConstraintCache) Acquire(ctx context.Context, req *CapacityAcqu
 		}
 
 		return &CapacityAcquireResponse{
-			RequestID:           requestID,
-			Leases:              nil,
-			LimitingConstraints: recentlyLimited,
-			RetryAfter:          retryAfter,
+			RequestID:            requestID,
+			Leases:               nil,
+			ExhaustedConstraints: recentlyLimited,
+			RetryAfter:           retryAfter,
 		}, nil
 	} else {
 		tags := map[string]any{
@@ -144,10 +144,11 @@ func (l *limitingConstraintCache) Acquire(ctx context.Context, req *CapacityAcqu
 		return nil, err
 	}
 
-	// If we are limited by constraints,
+	// If we have exhausted constraints (constraints with zero remaining capacity),
 	// cache each individual constraint for subsequent requests
-	// for a short duration to avoid unnecessary load on Redis
-	for _, ci := range res.LimitingConstraints {
+	// for a short duration to avoid unnecessary load on Redis.
+	// Exhausted constraints mean no further requests can succeed until capacity is freed.
+	for _, ci := range res.ExhaustedConstraints {
 		cacheKey := ci.CacheKey(req.AccountID, req.EnvID, req.FunctionID)
 		if cacheKey == "" {
 			continue
@@ -163,9 +164,9 @@ func (l *limitingConstraintCache) Acquire(ctx context.Context, req *CapacityAcqu
 			cacheTTL = maxTTL
 		}
 
-		l.limitingConstraintCache.Set(
+		l.cache.Set(
 			cacheKey,
-			&limitingConstraintCacheItem{
+			&constraintCacheItem{
 				retryAfter: res.RetryAfter,
 				constraint: ci,
 			},
@@ -189,24 +190,24 @@ func (l *limitingConstraintCache) Acquire(ctx context.Context, req *CapacityAcqu
 	return res, nil
 }
 
-func (l *limitingConstraintCache) Check(ctx context.Context, req *CapacityCheckRequest) (*CapacityCheckResponse, errs.UserError, errs.InternalError) {
+func (l *constraintCache) Check(ctx context.Context, req *CapacityCheckRequest) (*CapacityCheckResponse, errs.UserError, errs.InternalError) {
 	return l.manager.Check(ctx, req)
 }
 
-func (l *limitingConstraintCache) ExtendLease(ctx context.Context, req *CapacityExtendLeaseRequest) (*CapacityExtendLeaseResponse, errs.InternalError) {
+func (l *constraintCache) ExtendLease(ctx context.Context, req *CapacityExtendLeaseRequest) (*CapacityExtendLeaseResponse, errs.InternalError) {
 	return l.manager.ExtendLease(ctx, req)
 }
 
-func (l *limitingConstraintCache) Release(ctx context.Context, req *CapacityReleaseRequest) (*CapacityReleaseResponse, errs.InternalError) {
+func (l *constraintCache) Release(ctx context.Context, req *CapacityReleaseRequest) (*CapacityReleaseResponse, errs.InternalError) {
 	return l.manager.Release(ctx, req)
 }
 
-func NewLimitingConstraintCache(
-	options ...LimitingConstraintCacheOption,
-) *limitingConstraintCache {
-	cache := &limitingConstraintCache{
-		limitingConstraintCache: ccache.New(
-			ccache.Configure[*limitingConstraintCacheItem]().
+func NewConstraintCache(
+	options ...ConstraintCacheOption,
+) *constraintCache {
+	cache := &constraintCache{
+		cache: ccache.New(
+			ccache.Configure[*constraintCacheItem]().
 				MaxSize(10_000).
 				ItemsToPrune(500),
 		),
