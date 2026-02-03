@@ -27,7 +27,7 @@ const (
 // App
 //
 
-func TestSQLiteCQRSGetApps(t *testing.T) {
+func TestCQRSGetApps(t *testing.T) {
 	ctx := context.Background()
 	envID := uuid.New()
 
@@ -96,7 +96,7 @@ func TestSQLiteCQRSGetApps(t *testing.T) {
 	})
 }
 
-func TestSQLiteCQRSGetAppByChecksum(t *testing.T) {
+func TestCQRSGetAppByChecksum(t *testing.T) {
 	ctx := context.Background()
 	envID := uuid.New()
 
@@ -136,7 +136,7 @@ func TestSQLiteCQRSGetAppByChecksum(t *testing.T) {
 	})
 }
 
-func TestSQLiteCQRSGetAppByID(t *testing.T) {
+func TestCQRSGetAppByID(t *testing.T) {
 	ctx := context.Background()
 
 	cm, cleanup := initCQRS(t)
@@ -171,7 +171,7 @@ func TestSQLiteCQRSGetAppByID(t *testing.T) {
 	})
 }
 
-func TestSQLiteCQRSGetAppByURL(t *testing.T) {
+func TestCQRSGetAppByURL(t *testing.T) {
 	ctx := context.Background()
 	envID := uuid.New()
 
@@ -211,7 +211,7 @@ func TestSQLiteCQRSGetAppByURL(t *testing.T) {
 	})
 }
 
-func TestSQLiteCQRSGetAppByName(t *testing.T) {
+func TestCQRSGetAppByName(t *testing.T) {
 	ctx := context.Background()
 	envID := uuid.New()
 
@@ -251,7 +251,7 @@ func TestSQLiteCQRSGetAppByName(t *testing.T) {
 	})
 }
 
-func TestSQLiteCQRSGetAllApps(t *testing.T) {
+func TestCQRSGetAllApps(t *testing.T) {
 	ctx := context.Background()
 	envID := uuid.New()
 
@@ -296,7 +296,7 @@ func TestSQLiteCQRSGetAllApps(t *testing.T) {
 	})
 }
 
-func TestSQLiteCQRSUpsertApp(t *testing.T) {
+func TestCQRSUpsertApp(t *testing.T) {
 	ctx := context.Background()
 
 	cm, cleanup := initCQRS(t)
@@ -394,7 +394,7 @@ func TestSQLiteCQRSUpsertApp(t *testing.T) {
 	})
 }
 
-func TestSQLiteCQRSUpdateAppError(t *testing.T) {
+func TestCQRSUpdateAppError(t *testing.T) {
 	ctx := context.Background()
 
 	// Generate test IDs
@@ -480,7 +480,7 @@ func TestSQLiteCQRSUpdateAppError(t *testing.T) {
 	})
 }
 
-func TestSQLiteCQRSUpdateAppURL(t *testing.T) {
+func TestCQRSUpdateAppURL(t *testing.T) {
 	ctx := context.Background()
 
 	cm, cleanup := initCQRS(t)
@@ -582,7 +582,7 @@ func TestSQLiteCQRSUpdateAppURL(t *testing.T) {
 	})
 }
 
-func TestSQLiteCQRSDeleteApp(t *testing.T) {
+func TestCQRSDeleteApp(t *testing.T) {
 	ctx := context.Background()
 
 	cm, cleanup := initCQRS(t)
@@ -677,7 +677,7 @@ func TestSQLiteCQRSDeleteApp(t *testing.T) {
 // Function
 //
 
-func TestSQLiteCQRSGetFunctionByInternalUUID(t *testing.T) {
+func TestCQRSGetFunctionByInternalUUID(t *testing.T) {
 	ctx := context.Background()
 
 	// Generate test IDs
@@ -796,7 +796,7 @@ func TestSQLiteCQRSGetFunctionByInternalUUID(t *testing.T) {
 	})
 }
 
-func TestSQLiteCQRSGetFunctionsByAppInternalID(t *testing.T) {
+func TestCQRSGetFunctionsByAppInternalID(t *testing.T) {
 	ctx := context.Background()
 
 	// Create two different apps
@@ -932,7 +932,7 @@ func TestSQLiteCQRSGetFunctionsByAppInternalID(t *testing.T) {
 	})
 }
 
-func TestSQLiteCQRSInsertFunction(t *testing.T) {
+func TestCQRSInsertFunction(t *testing.T) {
 	ctx := context.Background()
 	appID := uuid.New()
 
@@ -1002,7 +1002,7 @@ func TestSQLiteCQRSInsertFunction(t *testing.T) {
 	})
 }
 
-func TestSQLiteCQRSGetFunctions(t *testing.T) {
+func TestCQRSGetFunctions(t *testing.T) {
 	ctx := context.Background()
 	appID := uuid.New()
 
@@ -1043,7 +1043,7 @@ func TestSQLiteCQRSGetFunctions(t *testing.T) {
 	})
 }
 
-func TestSQLiteCQRSGetFunctionsByAppExternalID(t *testing.T) {
+func TestCQRSGetFunctionsByAppExternalID(t *testing.T) {
 	ctx := context.Background()
 
 	// Create two different apps with external IDs
@@ -1155,7 +1155,7 @@ func TestSQLiteCQRSGetFunctionsByAppExternalID(t *testing.T) {
 	})
 }
 
-func TestSQLiteCQRSDeleteFunctionsByAppID(t *testing.T) {
+func TestCQRSDeleteFunctionsByAppID(t *testing.T) {
 	ctx := context.Background()
 
 	// Create two different apps
@@ -1255,7 +1255,7 @@ func TestSQLiteCQRSDeleteFunctionsByAppID(t *testing.T) {
 	})
 }
 
-func TestSQLiteCQRSDeleteFunctionsByIDs(t *testing.T) {
+func TestCQRSDeleteFunctionsByIDs(t *testing.T) {
 	ctx := context.Background()
 	appID := uuid.New()
 
@@ -1311,7 +1311,7 @@ func TestSQLiteCQRSDeleteFunctionsByIDs(t *testing.T) {
 	})
 }
 
-func TestSQLiteCQRSUpdateFunctionConfig(t *testing.T) {
+func TestCQRSUpdateFunctionConfig(t *testing.T) {
 	ctx := context.Background()
 	appID := uuid.New()
 
