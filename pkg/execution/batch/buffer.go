@@ -3,16 +3,20 @@ package batch
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/oklog/ulid/v2"
 )
 
 const (
+	pkgName = "batch"
+
 	// DefaultMaxBufferDuration is the default max time to buffer events in-memory
 	// before flushing.  must be less than the event ack deadline
 	DefaultMaxBufferDuration = 500 * time.Millisecond
@@ -24,12 +28,13 @@ const (
 // appendBuffer manages in-memory buffering for batch appends across varying
 // functions and batch pointers.
 type appendBuffer struct {
-	maxDuration time.Duration
-	maxSize     int
-	buffers     map[bufferKey]*batchBuffer
-	mu          sync.Mutex
-	closed      chan struct{} // signals shutdown to unblock waiting appends
-	log         logger.Logger
+	maxDuration       time.Duration
+	maxSize           int
+	buffers           map[bufferKey]*batchBuffer
+	mu                sync.Mutex
+	closed            chan struct{} // signals shutdown to unblock waiting appends
+	log               logger.Logger
+	totalPendingItems atomic.Int64 // tracks total items across all buffers
 }
 
 // bufferKey identifies a unique buffer based on function and batch pointer,
@@ -64,6 +69,7 @@ type batchBuffer struct {
 	pendingResults map[string]*pendingResult // Local dedup + result sharing
 	timer          *time.Timer
 	fn             inngest.Function // Function config for batch settings
+	createdAt      time.Time        // set when first item appended, reset in reset()
 }
 
 // newAppendBuffer creates a new appendBuffer with the given configuration.
@@ -106,6 +112,8 @@ func (ab *appendBuffer) append(ctx context.Context, bi BatchItem, fn inngest.Fun
 		// the original flush to complete so we don't ACK the event before flushing
 		buf.mu.Unlock()
 
+		metrics.IncrBatchBufferDedupCounter(ctx, metrics.CounterOpt{PkgName: pkgName})
+
 		select {
 		case <-existing.done:
 			if existing.err != nil {
@@ -133,6 +141,15 @@ func (ab *appendBuffer) append(ctx context.Context, bi BatchItem, fn inngest.Fun
 	})
 	buf.pendingResults[eventIDStr] = pr
 
+	// Set createdAt on first item
+	if buf.createdAt.IsZero() {
+		buf.createdAt = time.Now()
+	}
+
+	// Track pending items gauge
+	pending := ab.totalPendingItems.Add(1)
+	metrics.GaugeBatchBufferItemsPending(ctx, pending, metrics.GaugeOpt{PkgName: pkgName})
+
 	// Check if we should flush based on function's batch config or buffer's global max
 	batchMaxSize := ab.maxSize
 	if fn.EventBatch != nil && fn.EventBatch.MaxSize > 0 {
@@ -151,7 +168,7 @@ func (ab *appendBuffer) append(ctx context.Context, bi BatchItem, fn inngest.Fun
 	if len(buf.items) == 1 && !shouldFlush {
 		flushDuration := ab.flushDuration(fn)
 		buf.timer = time.AfterFunc(flushDuration, func() {
-			ab.flush(buf, mgr)
+			ab.flush(buf, mgr, "timer")
 		})
 	}
 
@@ -159,7 +176,7 @@ func (ab *appendBuffer) append(ctx context.Context, bi BatchItem, fn inngest.Fun
 
 	// Trigger immediate flush if buffer is full
 	if shouldFlush {
-		ab.flush(buf, mgr)
+		ab.flush(buf, mgr, "size")
 	}
 
 	// Block until result is available
@@ -167,8 +184,16 @@ func (ab *appendBuffer) append(ctx context.Context, bi BatchItem, fn inngest.Fun
 	case <-pr.done:
 		return pr.result, pr.err
 	case <-ctx.Done():
+		metrics.IncrBatchBufferErrorsCounter(ctx, metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags:    map[string]any{"error_type": "context_cancelled"},
+		})
 		return nil, ctx.Err()
 	case <-ab.closed:
+		metrics.IncrBatchBufferErrorsCounter(ctx, metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags:    map[string]any{"error_type": "context_cancelled"},
+		})
 		return nil, context.Canceled
 	}
 }
@@ -204,11 +229,15 @@ func (ab *appendBuffer) getOrCreateBuffer(key bufferKey, fn inngest.Function) *b
 		fn:             fn,
 	}
 	ab.buffers[key] = buf
+
+	metrics.GaugeBatchBufferKeysActive(context.Background(), int64(len(ab.buffers)), metrics.GaugeOpt{PkgName: pkgName})
+
 	return buf
 }
 
 // flush commits all pending items in a buffer to Redis atomically.
-func (ab *appendBuffer) flush(buf *batchBuffer, mgr BatchManager) {
+// trigger indicates why the flush occurred: "timer", "size", or "close".
+func (ab *appendBuffer) flush(buf *batchBuffer, mgr BatchManager, trigger string) {
 	buf.mu.Lock()
 
 	// nothing to flush.  buffer may have been appended to after timer started
@@ -220,11 +249,26 @@ func (ab *appendBuffer) flush(buf *batchBuffer, mgr BatchManager) {
 
 	var (
 		// snapshot before resetting
-		pending = buf.items
-		fn      = buf.fn
+		pending    = buf.items
+		fn         = buf.fn
+		createdAt  = buf.createdAt
+		flushCount = int64(len(buf.items))
 	)
 	buf.reset()
 	buf.mu.Unlock()
+
+	ctx := context.Background()
+	triggerTags := map[string]any{"trigger": trigger}
+
+	// Decrement pending items and record gauge
+	newPending := ab.totalPendingItems.Add(-flushCount)
+	metrics.GaugeBatchBufferItemsPending(ctx, newPending, metrics.GaugeOpt{PkgName: pkgName})
+
+	// Record wait duration if createdAt was set
+	var waitDurationMs int64
+	if !createdAt.IsZero() {
+		waitDurationMs = time.Since(createdAt).Milliseconds()
+	}
 
 	// extract BatchItems for the bulk call
 	items := make([]BatchItem, len(pending))
@@ -233,9 +277,45 @@ func (ab *appendBuffer) flush(buf *batchBuffer, mgr BatchManager) {
 	}
 
 	// call BulkAppend - this commits all items atomically
-	bulkResult, err := mgr.BulkAppend(context.Background(), items, fn)
+	redisStart := time.Now()
+	bulkResult, err := mgr.BulkAppend(ctx, items, fn)
+	redisDurationMs := time.Since(redisStart).Milliseconds()
+
+	// Record Redis flush duration (#8)
+	metrics.HistogramBatchBufferRedisFlushDuration(ctx, redisDurationMs, metrics.HistogramOpt{PkgName: pkgName})
+
+	if err != nil {
+		metrics.IncrBatchBufferErrorsCounter(ctx, metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags:    map[string]any{"error_type": "bulk_append"},
+		})
+	}
 
 	if err == nil && bulkResult != nil {
+		// Record flush counter (#3)
+		metrics.IncrBatchBufferFlushCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: triggerTags})
+		// Record items flushed (#4)
+		metrics.IncrBatchBufferItemsFlushedCounter(ctx, flushCount, metrics.CounterOpt{PkgName: pkgName, Tags: triggerTags})
+		// Record flush size histogram (#7)
+		metrics.HistogramBatchBufferFlushSize(ctx, flushCount, metrics.HistogramOpt{PkgName: pkgName})
+		// Record wait duration histogram (#6)
+		if waitDurationMs > 0 {
+			metrics.HistogramBatchBufferWaitDuration(ctx, waitDurationMs, metrics.HistogramOpt{PkgName: pkgName})
+		}
+		// Record bulk append status (#9)
+		metrics.IncrBatchBufferBulkAppendCounter(ctx, metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags:    map[string]any{"status": bulkResult.Status},
+		})
+		// Record items committed (#10)
+		if bulkResult.Committed > 0 {
+			metrics.IncrBatchBufferItemsCommittedCounter(ctx, int64(bulkResult.Committed), metrics.CounterOpt{PkgName: pkgName})
+		}
+		// Record items duplicated (#11)
+		if bulkResult.Duplicates > 0 {
+			metrics.IncrBatchBufferItemsDuplicatedCounter(ctx, int64(bulkResult.Duplicates), metrics.CounterOpt{PkgName: pkgName})
+		}
+
 		ab.handleScheduling(bulkResult, fn, items[0], mgr)
 	}
 
@@ -262,8 +342,12 @@ func (ab *appendBuffer) flush(buf *batchBuffer, mgr BatchManager) {
 	if len(buf.items) == 0 {
 		delete(ab.buffers, buf.key)
 	}
+	activeKeys := int64(len(ab.buffers))
 	buf.mu.Unlock()
 	ab.mu.Unlock()
+
+	// Record active keys gauge after cleanup (#2)
+	metrics.GaugeBatchBufferKeysActive(ctx, activeKeys, metrics.GaugeOpt{PkgName: pkgName})
 }
 
 // mapBulkStatus maps a bulk append status to an individual item status.
@@ -288,16 +372,22 @@ func (ab *appendBuffer) handleScheduling(result *BulkAppendResult, fn inngest.Fu
 		timeout = 60 * time.Second // fallback
 	}
 
+	ctx := context.Background()
+
 	switch result.Status {
 	case "new":
 		// Schedule batch timeout for the new batch
 		batchID, err := ulid.Parse(result.BatchID)
 		if err != nil {
 			ab.log.Error("failed to parse batch ID", "error", err, "batchID", result.BatchID)
+			metrics.IncrBatchBufferErrorsCounter(ctx, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags:    map[string]any{"error_type": "parse_batch_id"},
+			})
 			return
 		}
 
-		scheduleErr := mgr.ScheduleExecution(context.Background(), ScheduleBatchOpts{
+		scheduleErr := mgr.ScheduleExecution(ctx, ScheduleBatchOpts{
 			ScheduleBatchPayload: ScheduleBatchPayload{
 				BatchID:         batchID,
 				BatchPointer:    result.BatchPointer,
@@ -311,6 +401,19 @@ func (ab *appendBuffer) handleScheduling(result *BulkAppendResult, fn inngest.Fu
 		})
 		if scheduleErr != nil {
 			ab.log.Error("failed to schedule batch execution", "error", scheduleErr)
+			metrics.IncrBatchBufferScheduleCounter(ctx, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags:    map[string]any{"schedule_type": "new", "status": "error"},
+			})
+			metrics.IncrBatchBufferErrorsCounter(ctx, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags:    map[string]any{"error_type": "schedule"},
+			})
+		} else {
+			metrics.IncrBatchBufferScheduleCounter(ctx, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags:    map[string]any{"schedule_type": "new", "status": "success"},
+			})
 		}
 
 	case "full", "maxsize":
@@ -318,10 +421,14 @@ func (ab *appendBuffer) handleScheduling(result *BulkAppendResult, fn inngest.Fu
 		batchID, err := ulid.Parse(result.BatchID)
 		if err != nil {
 			ab.log.Error("failed to parse batch ID", "error", err, "batchID", result.BatchID)
+			metrics.IncrBatchBufferErrorsCounter(ctx, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags:    map[string]any{"error_type": "parse_batch_id"},
+			})
 			return
 		}
 
-		scheduleErr := mgr.ScheduleExecution(context.Background(), ScheduleBatchOpts{
+		scheduleErr := mgr.ScheduleExecution(ctx, ScheduleBatchOpts{
 			ScheduleBatchPayload: ScheduleBatchPayload{
 				BatchID:         batchID,
 				BatchPointer:    result.BatchPointer,
@@ -335,6 +442,19 @@ func (ab *appendBuffer) handleScheduling(result *BulkAppendResult, fn inngest.Fu
 		})
 		if scheduleErr != nil {
 			ab.log.Error("failed to schedule full batch execution", "error", scheduleErr)
+			metrics.IncrBatchBufferScheduleCounter(ctx, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags:    map[string]any{"schedule_type": result.Status, "status": "error"},
+			})
+			metrics.IncrBatchBufferErrorsCounter(ctx, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags:    map[string]any{"error_type": "schedule"},
+			})
+		} else {
+			metrics.IncrBatchBufferScheduleCounter(ctx, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags:    map[string]any{"schedule_type": result.Status, "status": "success"},
+			})
 		}
 
 	case "overflow":
@@ -343,11 +463,15 @@ func (ab *appendBuffer) handleScheduling(result *BulkAppendResult, fn inngest.Fu
 		batchID, err := ulid.Parse(result.BatchID)
 		if err != nil {
 			ab.log.Error("failed to parse batch ID", "error", err, "batchID", result.BatchID)
+			metrics.IncrBatchBufferErrorsCounter(ctx, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags:    map[string]any{"error_type": "parse_batch_id"},
+			})
 			return
 		}
 
 		// Schedule immediate execution for the full batch
-		scheduleErr := mgr.ScheduleExecution(context.Background(), ScheduleBatchOpts{
+		scheduleErr := mgr.ScheduleExecution(ctx, ScheduleBatchOpts{
 			ScheduleBatchPayload: ScheduleBatchPayload{
 				BatchID:         batchID,
 				BatchPointer:    result.BatchPointer,
@@ -361,6 +485,19 @@ func (ab *appendBuffer) handleScheduling(result *BulkAppendResult, fn inngest.Fu
 		})
 		if scheduleErr != nil {
 			ab.log.Error("failed to schedule full batch execution", "error", scheduleErr)
+			metrics.IncrBatchBufferScheduleCounter(ctx, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags:    map[string]any{"schedule_type": "overflow_full", "status": "error"},
+			})
+			metrics.IncrBatchBufferErrorsCounter(ctx, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags:    map[string]any{"error_type": "schedule"},
+			})
+		} else {
+			metrics.IncrBatchBufferScheduleCounter(ctx, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags:    map[string]any{"schedule_type": "overflow_full", "status": "success"},
+			})
 		}
 
 		// Schedule timeout for the overflow batch
@@ -368,10 +505,14 @@ func (ab *appendBuffer) handleScheduling(result *BulkAppendResult, fn inngest.Fu
 			nextBatchID, err := ulid.Parse(result.NextBatchID)
 			if err != nil {
 				ab.log.Error("failed to parse next batch ID", "error", err, "batchID", result.NextBatchID)
+				metrics.IncrBatchBufferErrorsCounter(ctx, metrics.CounterOpt{
+					PkgName: pkgName,
+					Tags:    map[string]any{"error_type": "parse_batch_id"},
+				})
 				return
 			}
 
-			scheduleErr := mgr.ScheduleExecution(context.Background(), ScheduleBatchOpts{
+			scheduleErr := mgr.ScheduleExecution(ctx, ScheduleBatchOpts{
 				ScheduleBatchPayload: ScheduleBatchPayload{
 					BatchID:         nextBatchID,
 					BatchPointer:    result.BatchPointer,
@@ -385,6 +526,19 @@ func (ab *appendBuffer) handleScheduling(result *BulkAppendResult, fn inngest.Fu
 			})
 			if scheduleErr != nil {
 				ab.log.Error("failed to schedule overflow batch execution", "error", scheduleErr)
+				metrics.IncrBatchBufferScheduleCounter(ctx, metrics.CounterOpt{
+					PkgName: pkgName,
+					Tags:    map[string]any{"schedule_type": "overflow_next", "status": "error"},
+				})
+				metrics.IncrBatchBufferErrorsCounter(ctx, metrics.CounterOpt{
+					PkgName: pkgName,
+					Tags:    map[string]any{"error_type": "schedule"},
+				})
+			} else {
+				metrics.IncrBatchBufferScheduleCounter(ctx, metrics.CounterOpt{
+					PkgName: pkgName,
+					Tags:    map[string]any{"schedule_type": "overflow_next", "status": "success"},
+				})
 			}
 		}
 	}
@@ -404,7 +558,7 @@ func (ab *appendBuffer) close(mgr *redisBatchManager) error {
 	ab.mu.Unlock()
 
 	for _, buf := range buffersToFlush {
-		ab.flush(buf, mgr)
+		ab.flush(buf, mgr, "close")
 	}
 
 	// Close channel to unblock any remaining waiters
@@ -417,6 +571,7 @@ func (ab *appendBuffer) close(mgr *redisBatchManager) error {
 func (buf *batchBuffer) reset() {
 	buf.items = make([]pendingItem, 0)
 	buf.pendingResults = make(map[string]*pendingResult)
+	buf.createdAt = time.Time{}
 	if buf.timer != nil {
 		buf.timer.Stop()
 		buf.timer = nil
