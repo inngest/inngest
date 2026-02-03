@@ -98,7 +98,7 @@ func (l *limitingConstraintCache) Acquire(ctx context.Context, req *CapacityAcqu
 		tags := map[string]any{
 			"op":                  "hit",
 			"source":              req.Migration.String(),
-			"limiting_constraint": ci.LimitingConstraintIdentifier(),
+			"limiting_constraint": ci.MetricsIdentifier(),
 		}
 		if l.enableHighCardinalityInstrumentation != nil && l.enableHighCardinalityInstrumentation(ctx, req.AccountID, req.EnvID, req.FunctionID) {
 			tags["function_id"] = req.FunctionID
@@ -174,7 +174,7 @@ func (l *limitingConstraintCache) Acquire(ctx context.Context, req *CapacityAcqu
 		tags := map[string]any{
 			"op":                  "set",
 			"source":              req.Migration.String(),
-			"limiting_constraint": ci.LimitingConstraintIdentifier(),
+			"limiting_constraint": ci.MetricsIdentifier(),
 		}
 		if l.enableHighCardinalityInstrumentation != nil && l.enableHighCardinalityInstrumentation(ctx, req.AccountID, req.EnvID, req.FunctionID) {
 			tags["function_id"] = req.FunctionID
