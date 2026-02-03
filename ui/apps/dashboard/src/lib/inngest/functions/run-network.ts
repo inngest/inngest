@@ -52,6 +52,7 @@ export const runAgentNetwork = inngest.createFunction(
         createState<InsightsAgentState>(
           {
             userId,
+            query: userMessage.content,
             ...clientState,
           },
           {
