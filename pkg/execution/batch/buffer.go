@@ -126,7 +126,8 @@ func (ab *appendBuffer) append(ctx context.Context, bi BatchItem, fn inngest.Fun
 
 	// Start timer if not running (first item in buffer)
 	if len(buf.items) == 1 && !shouldFlush {
-		buf.timer = time.AfterFunc(ab.maxDuration, func() {
+		flushDuration := ab.flushDuration(fn)
+		buf.timer = time.AfterFunc(flushDuration, func() {
 			ab.flush(buf, mgr)
 		})
 	}
@@ -147,6 +148,21 @@ func (ab *appendBuffer) append(ctx context.Context, bi BatchItem, fn inngest.Fun
 	case <-ab.closed:
 		return nil, context.Canceled
 	}
+}
+
+// flushDuration returns the duration to wait before flushing, clamped to the
+// function's batch timeout to avoid buffering longer than the batch window.
+func (ab *appendBuffer) flushDuration(fn inngest.Function) time.Duration {
+	if fn.EventBatch == nil || fn.EventBatch.Timeout == "" {
+		return ab.maxDuration
+	}
+
+	batchTimeout, err := time.ParseDuration(fn.EventBatch.Timeout)
+	if err != nil || batchTimeout <= 0 || batchTimeout >= ab.maxDuration {
+		return ab.maxDuration
+	}
+
+	return batchTimeout
 }
 
 // getOrCreateBuffer returns the buffer for the given key, creating it if needed.
