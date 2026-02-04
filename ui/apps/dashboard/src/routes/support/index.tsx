@@ -291,17 +291,6 @@ function SupportTickets({ isSignedIn }: { isSignedIn?: boolean }) {
               >
                 {ticket.previewText || ticket.title}
               </span>
-              <span className="flex gap-2">
-                {ticket.labels.map((label) => (
-                  <Pill
-                    appearance="outlined"
-                    key={label.id}
-                    className="whitespace-nowrap"
-                  >
-                    {label.labelType.name}
-                  </Pill>
-                ))}
-              </span>
             </div>
           ))
         ) : (
