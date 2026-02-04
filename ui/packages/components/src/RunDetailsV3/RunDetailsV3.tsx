@@ -3,7 +3,6 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { ErrorCard } from '../Error/ErrorCard';
 import type { Run as InitialRunData } from '../RunsPage/types';
 import { useBooleanFlag } from '../SharedContext/useBooleanFlag';
-import { useGetRun } from '../SharedContext/useGetRun';
 import { useGetTraceResult } from '../SharedContext/useGetTraceResult';
 import { useStreamRun } from '../SharedContext/useStreamRun';
 import { StatusCell } from '../Table/Cell';
@@ -145,24 +144,10 @@ export const RunDetailsV3 = ({
     };
   }, [isDragging, handleMouseMove, handleMouseUp]);
 
-  const {
-    data: runData,
-    error: runError,
-    refetch: refetchRun,
-  } = useGetRun({
-    runID,
-    preview: tracesPreviewEnabled,
-    //
-    // TODO: enable this for cloud once we're sure we can handle the load
-    refetchInterval: pollInterval,
-  });
-
-  const { data: streamRunData, error: streamRunError } = useStreamRun({
+  const { data: runData, error: runError } = useStreamRun({
     runID,
     enabled: Boolean(runID),
   });
-  console.log('proving out streamRunData', streamRunData);
-  console.log('proving out streamRunError', streamRunError);
 
   const outputID = runData?.trace?.outputID;
   const {
@@ -246,7 +231,7 @@ export const RunDetailsV3 = ({
             {showError && (
               <ErrorCard
                 error={runError || resultError}
-                reset={runError ? () => refetchRun() : () => refetchResult()}
+                reset={runError ? () => undefined : () => refetchResult()}
               />
             )}
           </div>
