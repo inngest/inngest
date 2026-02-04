@@ -16,7 +16,11 @@ import { Link } from '@inngest/components/Link';
 
 import { Pill } from '@inngest/components/Pill';
 import { cn } from '@inngest/components/utils/classNames';
-import { RiArrowLeftLine, RiGithubFill } from '@remixicon/react';
+import {
+  RiArrowLeftLine,
+  RiGithubFill,
+  RiArrowRightLine,
+} from '@remixicon/react';
 import { createFileRoute, useSearch } from '@tanstack/react-router';
 import { useState, useEffect } from 'react';
 import { useQuery } from 'urql';
@@ -73,14 +77,6 @@ function SupportComponent() {
             label={isSignedIn ? 'Back To Dashboard' : 'Sign In To Dashboard'}
           />
         </div>
-        {/* Thanksgiving banner for limited support availability, won't show after November 29 and will removed this after */}
-        {new Date() < new Date('2025-11-29') && (
-          <Banner severity="info" showIcon={false}>
-            In observance of Thanksgiving, our support team will have limited
-            availability from November 26–28. Thank you for your patience as
-            response times may be delayed.
-          </Banner>
-        )}
         <header className="border-subtle flex items-center justify-between border-b py-6">
           <h1 className="text-2xl font-semibold">Inngest Support</h1>
           <div className="" title={`Status updated at ${status.updated_at}`}>
@@ -97,6 +93,21 @@ function SupportComponent() {
             </a>
           </div>
         </header>
+        <div className="my-8">
+          <Banner severity="info" showIcon={false}>
+            Try out{' '}
+            <Link
+              target="_blank"
+              href="https://support.inngest.com"
+              className="inline-flex decoration-link"
+              size="small"
+              // iconAfter={<RiArrowRightLine className="h-4" />}
+            >
+              our new Support Center{' '}
+            </Link>{' '}
+            to create and manage support requests across all support channels.
+          </Banner>
+        </div>
         <div className="my-8 grid gap-12 md:grid-cols-2">
           <SupportChannel
             title="Create a ticket"
@@ -249,6 +260,19 @@ function SupportChannel({
 }
 
 function SupportTickets({ isSignedIn }: { isSignedIn?: boolean }) {
+  return (
+    <div>
+      <Link
+        target="_blank"
+        href="https://support.inngest.com"
+        className="inline-flex"
+        size="medium"
+        iconAfter={<RiArrowRightLine className="h-4" />}
+      >
+        View open tickets in the new support center
+      </Link>
+    </div>
+  );
   const [isFetchingTickets, setIsFetchingTickets] = useState(false);
   const [tickets, setTickets] = useState<ThreadPartsFragment[]>([]);
   useEffect(
@@ -281,9 +305,13 @@ function SupportTickets({ isSignedIn }: { isSignedIn?: boolean }) {
           tickets.map((ticket) => (
             <div key={ticket.id} className="flex items-center gap-2 px-2 py-2">
               {ticket.status === ThreadStatus.Done ? (
-                <Pill kind="primary">Closed</Pill>
+                <Pill kind="primary" className="shrink-0">
+                  Closed
+                </Pill>
               ) : (
-                <Pill kind="info">Open</Pill>
+                <Pill kind="info" className="shrink-0">
+                  Open
+                </Pill>
               )}
               <span
                 className="grow overflow-hidden text-ellipsis whitespace-nowrap"
