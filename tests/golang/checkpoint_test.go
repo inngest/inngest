@@ -67,8 +67,8 @@ func TestFnCheckpoint(t *testing.T) {
 						<-time.After(delay)
 						return "c", nil
 					})
-					fmt.Println("c")
 					runID = input.InputCtx.RunID
+					fmt.Println("c (done), ", runID)
 					return nil, nil
 				},
 			)

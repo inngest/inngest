@@ -33,6 +33,7 @@ type Opts struct {
 	APIBaseURL string
 }
 
+// New returns a new checkpointer for a specific run.
 func New(o Opts) Checkpointer {
 	return &checkpointer{
 		opts:       o,
@@ -41,6 +42,7 @@ func New(o Opts) Checkpointer {
 		lock:       sync.Mutex{},
 		totalSteps: atomic.Int32{},
 		t:          atomic.Int64{},
+		done:       make(chan struct{}),
 	}
 }
 
@@ -55,6 +57,11 @@ type Checkpointer interface {
 	// if there's an error, the caller can assume that nothing checkpointed and all steps
 	// need to be saved.
 	WithStep(ctx context.Context, step opcode.Step, cb Callback)
+
+	// Close cancels any pending background checkpoint timers and clears the
+	// buffer.  It should be called when the function invocation completes so
+	// that no checkpoint API call fires after the response has been sent.
+	Close()
 }
 
 // Callback represents a callback which is executed whenever a checkpoint commits.
@@ -79,6 +86,10 @@ type checkpointer struct {
 	//
 	// This is reset after each checkpoint.
 	t atomic.Int64
+
+	// done is closed when Close() is called, signalling background goroutines
+	// to stop.
+	done chan struct{}
 }
 
 func (c *checkpointer) WithStep(ctx context.Context, step opcode.Step, cb Callback) {
@@ -101,10 +112,27 @@ func (c *checkpointer) WithStep(ctx context.Context, step opcode.Step, cb Callba
 
 		// Start a goroutine to checkpoint in the background.
 		go func() {
-			<-time.After(c.opts.Config.BatchInterval)
-			c.checkpoint(ctx, cb)
+			select {
+			case <-time.After(c.opts.Config.BatchInterval):
+				c.checkpoint(ctx, cb)
+			case <-c.done:
+				return
+			}
 		}()
 	}
+}
+
+func (c *checkpointer) Close() {
+	select {
+	case <-c.done:
+		// Already closed.
+		return
+	default:
+		close(c.done)
+	}
+	c.lock.Lock()
+	c.buffer = nil
+	c.lock.Unlock()
 }
 
 func (c *checkpointer) checkpoint(ctx context.Context, cb Callback) {

@@ -1208,6 +1208,7 @@ func invoke(
 		Mode:               sdkrequest.StepModeYield,
 		APIBaseURL:         env.APIServerURL(client.Options().APIBaseURL),
 	})
+	defer mgr.CloseCheckpointer()
 	fCtx = sdkrequest.SetManager(fCtx, mgr)
 
 	// Create a new Input type.  We don't know ahead of time the type signature as
