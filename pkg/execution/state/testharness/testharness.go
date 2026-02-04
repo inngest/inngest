@@ -110,7 +110,6 @@ func CheckPauses(t *testing.T, gen PauseGenerator) {
 
 	funcs := map[string]func(t *testing.T, m state.Manager, pm state.PauseManager){
 		"SavePause":                        checkSavePause,
-		"LeasePause":                       checkLeasePause,
 		"ConsumePause":                     checkConsumePause,
 		"ConsumePause/WithData":            checkConsumePauseWithData,
 		"ConsumePause/WithData/StackIndex": checkConsumePauseWithDataIndex,
@@ -495,81 +494,6 @@ func pauseID(t *testing.T) uuid.UUID {
 	id, err := uuid.NewV7()
 	require.NoError(t, err)
 	return id
-}
-
-func checkLeasePause(t *testing.T, m state.Manager, pm state.PauseManager) {
-	ctx := context.Background()
-	s := setup(t, m)
-
-	// Leasing a non-existent pause doesn't error;  pauses may be stored in block storage,
-	// so this should not check.
-	randomID := uuid.New()
-	err := pm.LeasePause(ctx, randomID)
-	assert.Nil(t, err)
-	// But leasing again should fail, as we have the lease.
-	err = pm.LeasePause(ctx, randomID)
-	assert.NotNil(t, err)
-
-	// Save a pause.
-	pause := state.Pause{
-		ID: pauseID(t),
-		Identifier: state.PauseIdentifier{
-			RunID:      s.Identifier().RunID,
-			FunctionID: s.Identifier().WorkflowID,
-			AccountID:  s.Identifier().AccountID,
-		},
-		Outgoing: inngest.TriggerName,
-		Incoming: w.Steps[0].ID,
-		Expires:  state.Time(time.Now().Add(state.PauseLeaseDuration * 3).UTC()),
-	}
-	_, err = pm.SavePause(ctx, pause)
-	require.NoError(t, err)
-
-	now := time.Now()
-
-	var errors int32
-	var wg sync.WaitGroup
-
-	tick := time.Now().Add(2 * time.Second).Truncate(time.Second)
-
-	// Leasing the pause should work once over 50 parallel attempts
-	for i := 0; i < 100; i++ {
-		wg.Add(1)
-		go func() {
-			// Only one of these should work.
-			<-time.After(time.Until(tick))
-			err := pm.LeasePause(ctx, pause.ID)
-			if err != nil {
-				atomic.AddInt32(&errors, 1)
-			}
-			wg.Done()
-		}()
-	}
-
-	wg.Wait()
-	require.EqualValues(t, int32(99), errors)
-
-	// Fetch the pause and ensure it's formatted appropriately
-	fetched, err := pm.PauseByID(ctx, pause.ID)
-	require.Nil(t, err)
-	require.Equal(t, pause.Expires.Time().Truncate(time.Millisecond), fetched.Expires.Time().Truncate(time.Millisecond))
-	require.Equal(t, pause.Identifier, fetched.Identifier)
-	require.Equal(t, pause.Outgoing, fetched.Outgoing)
-	require.Equal(t, pause.Incoming, fetched.Incoming)
-
-	// And we should not be able to re-lease the pause until the pause lease duration is up.
-	for time.Now().Before(now.Add(state.PauseLeaseDuration - (5 * time.Millisecond))) {
-		err = pm.LeasePause(ctx, pause.ID)
-		require.NotNil(t, err, "Re-leasing a pause with a valid lease should error")
-		require.Error(t, state.ErrPauseLeased, err)
-		<-time.After(state.PauseLeaseDuration / 50)
-	}
-
-	<-time.After(state.PauseLeaseDuration)
-
-	// And again, once the lease is up, we should be able to lease the pause.
-	err = pm.LeasePause(ctx, pause.ID)
-	require.NoError(t, err)
 }
 
 func checkDeletePause(t *testing.T, m state.Manager, pm state.PauseManager) {

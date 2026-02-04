@@ -9,7 +9,6 @@ import {
   createRootRouteWithContext,
 } from '@tanstack/react-router';
 
-import PageViewTracker from '@/components/Analytics/PageViewTracker';
 import SegmentAnalytics from '@/components/Analytics/SegmentAnalytics';
 import SentryUserIdentification from '@/components/Analytics/SentryUserIdentification';
 import { InngestClerkProvider } from '@/components/Clerk/Provider';
@@ -22,6 +21,14 @@ import globalsCss from '@inngest/components/AppRoot/globals.css?url';
 import { TooltipProvider } from '@inngest/components/Tooltip';
 import { QueryClient } from '@tanstack/react-query';
 import { ThemeProvider } from 'next-themes';
+
+//
+// don't load locally, causes issues with adblockers
+const PageViewTracker = React.lazy(() =>
+  import.meta.env.PROD
+    ? import('@/components/Analytics/PageViewTracker')
+    : Promise.resolve({ default: () => null }),
+);
 
 export const Route = createRootRouteWithContext<{
   queryClient: QueryClient;
@@ -91,7 +98,9 @@ function RootComponent() {
 
               <Toaster />
               <SegmentAnalytics />
-              <PageViewTracker />
+              <React.Suspense>
+                <PageViewTracker />
+              </React.Suspense>
             </ClientFeatureFlagProvider>
           </URQLProviderWrapper>
         </InngestClerkProvider>

@@ -9,6 +9,7 @@ import (
 	"reflect"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/cockroachdb/pebble/vfs"
 	"github.com/google/cel-go/common/operators"
@@ -61,7 +62,7 @@ type AggregateEvaluator[T Evaluable] interface {
 	Evaluate(ctx context.Context, data map[string]any) ([]T, int32, error)
 
 	// AggregateMatch returns all expression parts which are evaluable given the input data.
-	AggregateMatch(ctx context.Context, data map[string]any) ([]*uuid.UUID, error)
+	AggregateMatch(ctx context.Context, data map[string]any) ([]uuid.UUID, error)
 
 	// Len returns the total number of aggregateable and constantly matched expressions
 	// stored in the evaluator.
@@ -76,6 +77,12 @@ type AggregateEvaluator[T Evaluable] interface {
 	// SlowLen returns the total number of expressions that must constantly
 	// be matched due to non-aggregateable clauses in their expressions.
 	SlowLen() int
+
+	// Close stops background goroutines and releases resources
+	Close()
+
+	// PendingDeletes returns the number of soft-deleted items awaiting GC
+	PendingDeletes() int
 }
 
 type AggregateEvaluatorOpts[T Evaluable] struct {
@@ -91,6 +98,21 @@ type AggregateEvaluatorOpts[T Evaluable] struct {
 	KV KV[T]
 	// Log is a stdlib logger used for logging.  If nil, this will be slog.Default().
 	Log *slog.Logger
+	// GCInterval is the minimum time between GC runs.
+	// If 0, defaults to 100ms.
+	GCInterval time.Duration
+	// GCTimeout is the maximum time allowed for a single GC run.
+	// If 0, defaults to 1 second.
+	GCTimeout time.Duration
+	// GCBatchSize is the maximum number of items to process in a single GC run.
+	// If 0, defaults to 1000.
+	GCBatchSize int
+	// GCThreshold is the minimum number of items required before GC runs.
+	// If 0, defaults to GCBatchSize (1000).
+	GCThreshold int
+	// GCForceInterval is the time after which GC runs regardless of threshold.
+	// If 0, defaults to 15 seconds.
+	GCForceInterval time.Duration
 }
 
 func NewAggregateEvaluator[T Evaluable](
@@ -102,6 +124,28 @@ func NewAggregateEvaluator[T Evaluable](
 
 	if opts.Log == nil {
 		opts.Log = slog.Default()
+	}
+
+	// opts.Log.Info("creating new aggregate evaluator")
+
+	if opts.GCInterval <= 0 {
+		opts.GCInterval = 100 * time.Millisecond
+	}
+
+	if opts.GCTimeout <= 0 {
+		opts.GCTimeout = 1 * time.Second
+	}
+
+	if opts.GCBatchSize <= 0 {
+		opts.GCBatchSize = 1000
+	}
+
+	if opts.GCThreshold <= 0 {
+		opts.GCThreshold = opts.GCBatchSize
+	}
+
+	if opts.GCForceInterval <= 0 {
+		opts.GCForceInterval = 15 * time.Second
 	}
 
 	// Create a new KV store.
@@ -139,21 +183,32 @@ func NewAggregateEvaluator[T Evaluable](
 		}
 	}
 
-	return &aggregator[T]{
+	agg := &aggregator[T]{
 		kv:     opts.KV,
 		eval:   opts.Eval,
 		parser: opts.Parser,
 		engines: map[EngineType]MatchingEngine{
-			EngineTypeStringHash: newBitmapStringEqualityMatcher(opts.Concurrency),
-			EngineTypeNullMatch:  newNullMatcher(opts.Concurrency),
-			EngineTypeBTree:      newNumberMatcher(opts.Concurrency),
+			EngineTypeStringHash: newStringEqualityMatcher(),
+			EngineTypeNullMatch:  newNullMatcher(),
+			EngineTypeBTree:      newNumberMatcher(),
 		},
-		lock:        &sync.RWMutex{},
-		constants:   map[uuid.UUID]struct{}{},
-		mixed:       map[uuid.UUID]struct{}{},
-		concurrency: opts.Concurrency,
-		log:         opts.Log,
+		lock:            &sync.RWMutex{},
+		constants:       map[uuid.UUID]struct{}{},
+		mixed:           map[uuid.UUID]struct{}{},
+		stopGC:          make(chan struct{}),
+		concurrency:     opts.Concurrency,
+		gcInterval:      opts.GCInterval,
+		gcTimeout:       opts.GCTimeout,
+		gcBatchSize:     opts.GCBatchSize,
+		gcThreshold:     opts.GCThreshold,
+		gcForceInterval: opts.GCForceInterval,
+		lastGC:          time.Now(),
+		log:             opts.Log,
 	}
+
+	go agg.gcWorker()
+
+	return agg
 }
 
 type aggregator[T Evaluable] struct {
@@ -184,7 +239,21 @@ type aggregator[T Evaluable] struct {
 	// the expression containing non-aggregateable clauses.
 	constants map[uuid.UUID]struct{}
 
-	concurrency int64
+	// deleted tracks evaluable IDs that have been soft-deleted.
+	// Remove operations mark items here instead of actually removing them,
+	// avoiding lock contention during evaluation.
+	deleted sync.Map // map[uuid.UUID]struct{}
+
+	// stopGC signals the GC goroutine to stop
+	stopGC chan struct{}
+
+	concurrency     int64
+	gcInterval      time.Duration
+	gcTimeout       time.Duration
+	gcBatchSize     int
+	gcThreshold     int
+	gcForceInterval time.Duration
+	lastGC          time.Time
 }
 
 // Len returns the total number of aggregateable and constantly matched expressions
@@ -192,14 +261,12 @@ type aggregator[T Evaluable] struct {
 func (a *aggregator[T]) Len() int {
 	a.lock.RLock()
 	defer a.lock.RUnlock()
-	return int(a.fastLen) + len(a.mixed) + len(a.constants)
+	return int(atomic.LoadInt32(&a.fastLen)) + len(a.mixed) + len(a.constants)
 }
 
 // FastLen returns the number of expressions being matched by aggregated trees.
 func (a *aggregator[T]) FastLen() int {
-	a.lock.RLock()
-	defer a.lock.RUnlock()
-	return int(a.fastLen)
+	return int(atomic.LoadInt32(&a.fastLen))
 }
 
 // MixedLen returns the number of expressions being matched by aggregated trees.
@@ -217,6 +284,19 @@ func (a *aggregator[T]) SlowLen() int {
 	return len(a.constants)
 }
 
+func (a *aggregator[T]) Close() {
+	close(a.stopGC)
+}
+
+func (a *aggregator[T]) PendingDeletes() int {
+	count := 0
+	a.deleted.Range(func(_, _ any) bool {
+		count++
+		return true
+	})
+	return count
+}
+
 func (a *aggregator[T]) Evaluate(ctx context.Context, data map[string]any) ([]T, int32, error) {
 	var (
 		err     error
@@ -229,6 +309,11 @@ func (a *aggregator[T]) Evaluate(ctx context.Context, data map[string]any) ([]T,
 
 	a.lock.RLock()
 	for uuid := range a.constants {
+		// Skip deleted items
+		if _, deleted := a.deleted.Load(uuid); deleted {
+			continue
+		}
+
 		item, err := a.kv.Get(uuid)
 		if err != nil {
 			continue
@@ -290,7 +375,12 @@ func (a *aggregator[T]) Evaluate(ctx context.Context, data map[string]any) ([]T,
 
 	a.lock.RLock()
 	for _, id := range matches {
-		eval, err := a.kv.Get(*id)
+		// Skip deleted items
+		if _, deleted := a.deleted.Load(id); deleted {
+			continue
+		}
+
+		eval, err := a.kv.Get(id)
 		if err != nil {
 			continue
 		}
@@ -342,8 +432,8 @@ func (a *aggregator[T]) Evaluate(ctx context.Context, data map[string]any) ([]T,
 
 // AggregateMatch attempts to match incoming data to all PredicateTrees, resulting in a selection
 // of parts of an expression that have matched.
-func (a *aggregator[T]) AggregateMatch(ctx context.Context, data map[string]any) ([]*uuid.UUID, error) {
-	result := []*uuid.UUID{}
+func (a *aggregator[T]) AggregateMatch(ctx context.Context, data map[string]any) ([]uuid.UUID, error) {
+	var result []uuid.UUID
 
 	a.lock.RLock()
 	defer a.lock.RUnlock()
@@ -357,6 +447,7 @@ func (a *aggregator[T]) AggregateMatch(ctx context.Context, data map[string]any)
 	//
 	// Note that we break this down per evaluable ID (UUID)
 	found := NewMatchResult()
+	defer found.Release()
 
 	for _, engine := range a.engines {
 		// we explicitly ignore the deny path for now.
@@ -365,37 +456,20 @@ func (a *aggregator[T]) AggregateMatch(ctx context.Context, data map[string]any)
 		}
 	}
 
-	a.log.Debug("ran matching engines", "len_matched_no_filter", found.Len())
+	a.log.Log(ctx, slog.Level(-8), "ran matching engines", "len_matched_no_filter", found.Len())
 
-	// Validate that groups meet the minimum size.
-	for evalID, groups := range found.Result {
-		for groupID, matchingCount := range groups {
-			requiredSize := int(groupID.Size()) // The total req size from the group ID
-
-			// If this group isn't the required size, delete the group
-			// from our map
-			if matchingCount < requiredSize {
-				delete(groups, groupID)
-			}
-
+	for key, count := range found.Result {
+		if _, deleted := a.deleted.Load(key.evalID); deleted {
+			continue
 		}
-		// After iterating through each group, we now know:
-		//
-		// if len(groups) > 0, we have enough matches in this eval group for
-		// it to be a candidate.
-		hasMatchedGroups := len(groups) > 0
 
-		// NOTE: We currently don't add items with OR predicates to the
-		// matching engine, so we cannot use group sizes if the expr part
-		// has an OR.
-		_, isMixedOrs := a.mixed[evalID]
-
-		if hasMatchedGroups || isMixedOrs {
-			result = append(result, &evalID)
+		_, isMixed := a.mixed[key.evalID]
+		if count >= int(key.groupID.Size()) || isMixed {
+			result = append(result, key.evalID)
 		}
 	}
 
-	a.log.Debug("filtered invalid groups", "len_matched", len(result))
+	a.log.Log(ctx, slog.Level(-8), "filtered invalid groups", "len_matched", len(result))
 
 	return result, nil
 }
@@ -464,67 +538,308 @@ func (a *aggregator[T]) Add(ctx context.Context, eval T) (float64, error) {
 }
 
 func (a *aggregator[T]) Remove(ctx context.Context, eval T) error {
-	if err := a.kv.Remove(eval.GetID()); err != nil {
-		return err
-	}
-
-	if eval.GetExpression() == "" {
-		return a.removeConstantEvaluable(ctx, eval)
-	}
-
-	// parse the expression using our tree parser.
-	parsed, err := a.parser.Parse(ctx, eval)
-	if err != nil {
-		return err
-	}
-
-	stats := &exprAggregateStats{}
-
-	for _, g := range parsed.RootGroups() {
-		s, err := a.iterGroup(ctx, g, parsed, a.removeNode)
-		if errors.Is(err, ErrExpressionPartNotFound) {
-			return ErrEvaluableNotFound
-		}
-
-		if err != nil {
-			_ = a.removeConstantEvaluable(ctx, eval)
-			return err
-		}
-		stats.Merge(s)
-	}
-
-	if stats.Fast() == 0 {
-		// This is a non-aggregateable, slow expression.
-		if err := a.removeConstantEvaluable(ctx, eval); err != nil {
-			return err
-		}
-		return nil
-	}
-
-	if stats.Slow() == 0 {
-		// This is a purely aggregateable expression.
-		atomic.AddInt32(&a.fastLen, -1)
-		return nil
-	}
-
-	a.lock.Lock()
-	delete(a.mixed, parsed.EvaluableID)
-	a.lock.Unlock()
-
+	a.deleted.Store(eval.GetID(), struct{}{})
 	return nil
 }
 
-func (a *aggregator[T]) removeConstantEvaluable(_ context.Context, eval Evaluable) error {
-	a.lock.Lock()
-	defer a.lock.Unlock()
+func (a *aggregator[T]) gcWorker() {
+	ticker := time.NewTicker(a.gcInterval)
+	defer ticker.Stop()
 
-	// Find the index of the evaluable in constants and yank out.
-	if _, ok := a.constants[eval.GetID()]; !ok {
-		return ErrEvaluableNotFound
+	for {
+		select {
+		case <-ticker.C:
+			a.GC(context.Background())
+		case <-a.stopGC:
+			return
+		}
+	}
+}
+
+// GC removes soft-deleted items. Returns true if GC was performed.
+func (a *aggregator[T]) GC(ctx context.Context) bool {
+	timeSinceLastGC := time.Since(a.lastGC)
+
+	// Check if we should force GC regardless of items
+	force := timeSinceLastGC >= a.gcForceInterval
+
+	// Don't run GC if less than gcInterval has passed (unless forced)
+	if !force && timeSinceLastGC < a.gcInterval {
+		return false
 	}
 
-	delete(a.constants, eval.GetID())
-	return nil
+	startTime := time.Now()
+
+	// Count deleted items first to check threshold
+	deletedCount := 0
+	a.deleted.Range(func(key, value any) bool {
+		deletedCount++
+		if deletedCount >= a.gcBatchSize {
+			return false // Stop counting once we hit batch size
+		}
+		return true
+	})
+
+	// Skip if below threshold (unless forced)
+	if !force && deletedCount < a.gcThreshold {
+		return false
+	}
+
+	// If forced but no items, just update lastGC and return
+	if deletedCount == 0 {
+		if force {
+			a.lastGC = time.Now()
+		}
+		return false
+	}
+
+	// Collect deleted IDs up to batch size
+	deletedIDs := make([]uuid.UUID, 0, a.gcBatchSize)
+	a.deleted.Range(func(key, value any) bool {
+		if len(deletedIDs) >= a.gcBatchSize {
+			return false
+		}
+		id := key.(uuid.UUID)
+		deletedIDs = append(deletedIDs, id)
+		return true
+	})
+
+	parseStart := time.Now()
+	partsByEngine := map[EngineType][]ExpressionPart{}
+	// Track which IDs are ready for cleanup and their metadata
+	idCleanupInfo := make(map[uuid.UUID]gcEvalInfo[T])
+
+	for _, id := range deletedIDs {
+		eval, err := a.kv.Get(id)
+		if err != nil {
+			// Can't load it, warn and remove from deleted
+			a.log.Warn("error removing pause from aggregator", "error", err, "pause_id", id)
+			idCleanupInfo[id] = gcEvalInfo[T]{skipAll: true}
+			continue
+		}
+
+		if eval.GetExpression() == "" {
+			// Empty expression, no engine parts to remove
+			// Empty expressions are constants (slow), so stats should be all slow
+			stats := &exprAggregateStats{}
+			stats.AddSlow()
+			idCleanupInfo[id] = gcEvalInfo[T]{eval: eval, skipEngine: true, stats: stats}
+			continue
+		}
+
+		parsed, err := a.parser.Parse(ctx, eval)
+		if err != nil {
+			// Parse failed, safe to skip and remove from deleted
+			a.log.Warn("error removing pause from aggregator", "error", err, "pause_id", id)
+			idCleanupInfo[id] = gcEvalInfo[T]{skipAll: true}
+			continue
+		}
+
+		// Collect parts for this ID across all engine types
+		startIdx := len(partsByEngine[EngineTypeStringHash])
+		for _, g := range parsed.RootGroups() {
+			a.collectPartsForRemoval(g, parsed, partsByEngine)
+		}
+		endIdx := len(partsByEngine[EngineTypeStringHash])
+
+		stats := &exprAggregateStats{}
+		for _, g := range parsed.RootGroups() {
+			s, _ := a.iterGroupStats(ctx, g)
+			stats.Merge(s)
+		}
+
+		idCleanupInfo[id] = gcEvalInfo[T]{
+			eval:          eval,
+			parsed:        parsed,
+			stats:         stats,
+			stringPartEnd: endIdx,
+			skipEngine:    startIdx == endIdx,
+		}
+	}
+	parseDuration := time.Since(parseStart)
+
+	// Remove null and number engine parts first (small and fast, no timeout needed)
+	for _, et := range []EngineType{EngineTypeNullMatch, EngineTypeBTree} {
+		if parts := partsByEngine[et]; len(parts) > 0 {
+			if engine, ok := a.engines[et]; ok {
+				count, err := engine.Remove(context.Background(), parts)
+				if err != nil {
+					a.log.Warn("error removing pause from aggregator", "error", err, "processed_count", count)
+				}
+			}
+		}
+	}
+
+	// Remove string engine parts with timeout (can be large)
+	stringParts := partsByEngine[EngineTypeStringHash]
+	processedPartsCount := len(stringParts)
+	removeDuration := time.Duration(0)
+	if len(stringParts) > 0 {
+		if engine, ok := a.engines[EngineTypeStringHash]; ok {
+			removeCtx, cancel := context.WithTimeout(context.Background(), a.gcTimeout)
+			removeStart := time.Now()
+			count, err := engine.Remove(removeCtx, stringParts)
+			removeDuration = time.Since(removeStart)
+			cancel()
+			if err != nil {
+				a.log.Warn("error removing pause from aggregator", "error", err, "processed_count", count, "total_parts", len(stringParts))
+			}
+			processedPartsCount = count
+		}
+	}
+
+	cleanupStart := time.Now()
+	// Determine which IDs were successfully removed from engine
+	successfulIDs := []uuid.UUID{}
+	for _, id := range deletedIDs {
+		info := idCleanupInfo[id]
+
+		if info.skipAll {
+			// Can remove this ID completely
+			successfulIDs = append(successfulIDs, id)
+			continue
+		}
+
+		if info.skipEngine {
+			// No engine parts, can remove
+			successfulIDs = append(successfulIDs, id)
+			continue
+		}
+
+		// Check if all this ID's parts were processed
+		if info.stringPartEnd <= processedPartsCount {
+			successfulIDs = append(successfulIDs, id)
+		} else {
+			// This ID's parts were not fully processed, stop here
+			break
+		}
+	}
+
+	constantsToDelete := []uuid.UUID{}
+	mixedToDelete := []uuid.UUID{}
+	fastCount := int32(0)
+
+	for _, id := range successfulIDs {
+		info := idCleanupInfo[id]
+
+		if info.skipAll {
+			continue
+		}
+
+		if info.stats.Fast() == 0 {
+			constantsToDelete = append(constantsToDelete, id)
+		} else if info.stats.Slow() == 0 {
+			fastCount++
+		} else {
+			mixedToDelete = append(mixedToDelete, id)
+		}
+	}
+
+	if len(constantsToDelete) > 0 || len(mixedToDelete) > 0 {
+		a.lock.Lock()
+		for _, id := range constantsToDelete {
+			delete(a.constants, id)
+		}
+		for _, id := range mixedToDelete {
+			delete(a.mixed, id)
+		}
+		a.lock.Unlock()
+	}
+
+	if fastCount > 0 {
+		atomic.AddInt32(&a.fastLen, -fastCount)
+	}
+
+	// Delete from deleted map and KV
+	for _, id := range successfulIDs {
+		a.deleted.Delete(id)
+		_ = a.kv.Remove(id)
+	}
+	cleanupDuration := time.Since(cleanupStart)
+
+	totalDuration := time.Since(startTime)
+
+	a.log.Log(ctx, slog.Level(-8), "GC completed",
+		"total_duration", totalDuration,
+		"parse_duration", parseDuration,
+		"remove_duration", removeDuration,
+		"cleanup_duration", cleanupDuration,
+		"cleaned_up", len(successfulIDs),
+	)
+
+	a.lastGC = time.Now()
+	return true
+}
+
+func (a *aggregator[T]) collectPartsForRemoval(node *Node, parsed *ParsedExpression, partsByEngine map[EngineType][]ExpressionPart) {
+	all := node.Ands
+	if node.Predicate != nil && isAggregateable(node) {
+		all = append(node.Ands, node)
+	}
+
+	for _, n := range all {
+		if n.Predicate == nil {
+			continue
+		}
+		et := engineType(*n.Predicate)
+		if et == EngineTypeNone {
+			continue
+		}
+		partsByEngine[et] = append(partsByEngine[et], ExpressionPart{
+			GroupID:   n.GroupID,
+			Predicate: n.Predicate,
+			Parsed:    parsed,
+		})
+	}
+}
+
+func (a *aggregator[T]) iterGroupStats(ctx context.Context, node *Node) (exprAggregateStats, error) {
+	stats := &exprAggregateStats{}
+
+	if len(node.Ands) > 0 {
+		for _, n := range node.Ands {
+			if !n.HasPredicate() || len(n.Ors) > 0 {
+				stats.AddSlow()
+				continue
+			}
+		}
+	}
+
+	if len(node.Ors) > 0 {
+		stats.AddSlow()
+	}
+
+	all := node.Ands
+	if node.Predicate != nil {
+		if !isAggregateable(node) {
+			stats.AddSlow()
+		} else {
+			all = append(node.Ands, node)
+		}
+	}
+
+	for _, n := range all {
+		if n.Predicate == nil {
+			continue
+		}
+		if engineType(*n.Predicate) == EngineTypeNone {
+			stats.AddSlow()
+		} else {
+			stats.AddFast()
+		}
+	}
+
+	return *stats, nil
+}
+
+// gcEvalInfo tracks metadata for evaluables being garbage collected
+type gcEvalInfo[T Evaluable] struct {
+	eval          T
+	parsed        *ParsedExpression
+	stats         *exprAggregateStats
+	stringPartEnd int // index into stringParts where this ID's parts end
+	skipEngine    bool
+	skipAll       bool
 }
 
 type exprAggregateStats [2]int
@@ -678,26 +993,6 @@ func (a *aggregator[T]) addNode(ctx context.Context, n *Node, parsed *ParsedExpr
 	a.lock.Lock()
 	defer a.lock.Unlock()
 	return e.Add(ctx, ExpressionPart{
-		GroupID:   n.GroupID,
-		Predicate: n.Predicate,
-		Parsed:    parsed,
-	})
-}
-
-func (a *aggregator[T]) removeNode(ctx context.Context, n *Node, parsed *ParsedExpression) error {
-	if n.Predicate == nil {
-		return nil
-	}
-	e := a.engine(n)
-	if e == nil {
-		return errEngineUnimplemented
-	}
-
-	// Don't allow anything to update in parallel.  This enrues that Add() can be called
-	// concurrently.
-	a.lock.Lock()
-	defer a.lock.Unlock()
-	return e.Remove(ctx, ExpressionPart{
 		GroupID:   n.GroupID,
 		Predicate: n.Predicate,
 		Parsed:    parsed,

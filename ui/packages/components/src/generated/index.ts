@@ -14,6 +14,14 @@ export type SpanMetadataKind =
 // source: types_gen.go
 
 /**
+ * From warning.go
+ */
+export const KindInngestWarnings = 'inngest.warnings';
+/**
+ * From warning.go
+ */
+export type Warnings = { [key: string]: error };
+/**
  * From ai.go
  */
 export const KindInngestAI = 'inngest.ai';
@@ -44,11 +52,3 @@ export interface HTTPMetadata {
   domain?: string;
   path?: string;
 }
-/**
- * From warning.go
- */
-export const KindInngestWarnings = 'inngest.warnings';
-/**
- * From warning.go
- */
-export type Warnings = { [key: string]: error };
