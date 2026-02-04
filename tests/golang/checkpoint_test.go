@@ -84,6 +84,8 @@ func TestFnCheckpoint(t *testing.T) {
 				assert.NotEmpty(t, runID)
 			}, 5*time.Second, time.Millisecond)
 
+			<-time.After(4 * time.Second)
+
 			run := c.WaitForRunStatus(ctx, t, "COMPLETED", &runID)
 			var output string
 			err = json.Unmarshal([]byte(run.Output), &output)
