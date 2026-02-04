@@ -45,7 +45,7 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/inngest/expr v0.0.0-20260130112310-06d5fe6bb6fd
 	github.com/inngest/go-httpstat v0.0.0-20250328150054-dfda91359d48
-	github.com/inngest/inngestgo v0.15.0
+	github.com/inngest/inngestgo v0.15.1-0.20260204010937-b4832022aecc
 	github.com/jackc/pgx/v5 v5.5.4
 	github.com/jinzhu/copier v0.3.5
 	github.com/jonboulle/clockwork v0.4.0
@@ -99,6 +99,7 @@ require (
 	go.opentelemetry.io/otel/sdk/metric v1.37.0
 	go.opentelemetry.io/otel/trace v1.37.0
 	go.opentelemetry.io/proto/otlp v1.7.0
+	go.uber.org/goleak v1.3.0
 	gocloud.dev v0.40.0
 	gocloud.dev/pubsub/natspubsub v0.25.0
 	golang.org/x/mod v0.29.0

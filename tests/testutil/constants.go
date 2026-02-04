@@ -10,4 +10,7 @@ const (
 
 	// GarnetDefaultImage is the default Garnet image version for tests
 	GarnetDefaultImage = "ghcr.io/microsoft/garnet:1.0.94"
+
+	// PostgresDefaultImage is the default PostgreSQL image version for tests
+	PostgresDefaultImage = "postgres:17"
 )

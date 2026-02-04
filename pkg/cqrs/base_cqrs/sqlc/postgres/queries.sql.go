@@ -37,21 +37,11 @@ func (q *Queries) DeleteFunctionsByAppID(ctx context.Context, appID uuid.UUID) e
 }
 
 const deleteFunctionsByIDs = `-- name: DeleteFunctionsByIDs :exec
-UPDATE functions SET archived_at = NOW() WHERE id IN ($1)
+UPDATE functions SET archived_at = NOW() WHERE id = ANY($1::text[])
 `
 
-func (q *Queries) DeleteFunctionsByIDs(ctx context.Context, ids []uuid.UUID) error {
-	query := deleteFunctionsByIDs
-	var queryParams []interface{}
-	if len(ids) > 0 {
-		for _, v := range ids {
-			queryParams = append(queryParams, v)
-		}
-		query = strings.Replace(query, "/*SLICE:ids*/?", strings.Repeat(",?", len(ids))[1:], 1)
-	} else {
-		query = strings.Replace(query, "/*SLICE:ids*/?", "NULL", 1)
-	}
-	_, err := q.db.ExecContext(ctx, query, queryParams...)
+func (q *Queries) DeleteFunctionsByIDs(ctx context.Context, ids []string) error {
+	_, err := q.db.ExecContext(ctx, deleteFunctionsByIDs, pq.Array(ids))
 	return err
 }
 

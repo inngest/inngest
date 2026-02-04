@@ -40,11 +40,41 @@ func HashBatchKey(batchKey string) string {
 //
 //	#4 needs to happen in one transaction in order to make sure there will not be any race conditions.
 type BatchManager interface {
+	// Append appends items to a batch.  This may buffer in-memory for functions with
+	// the same ID prior to appending.
+	//
+	// If this happens, the Append function will block until the batch commits.
 	Append(ctx context.Context, bi BatchItem, fn inngest.Function) (*BatchAppendResult, error)
-	RetrieveItems(ctx context.Context, functionId uuid.UUID, batchID ulid.ULID) ([]BatchItem, error)
-	StartExecution(ctx context.Context, functionId uuid.UUID, batchID ulid.ULID, batchPointer string) (string, error)
+	// BulkAppend appends multiple items to a batch in a single call.
+	//
+	// This method is intended for callers that already have a slice of BatchItem (for example,
+	// an in-memory buffer) and want to commit them as one logical operation rather than calling
+	// Append for each item. Callers that are appending a single item at a time should prefer
+	// Append; BulkAppend is a lower-level API that is typically used by buffering
+	// implementations built on top of BatchManager.
+	//
+	// Like Append, BulkAppend is synchronous: it blocks until the underlying batch changes
+	// (such as persisting the items and deciding whether execution should be scheduled or
+	// started) have completed, or until an error is returned.
+	//
+	// Error handling and atomicity semantics:
+	//   - The returned BulkAppendResult and error value apply to the entire slice of items
+	//     provided in this call.
+	//   - Implementations should treat the operation as all-or-nothing with respect to
+	//     persistence of the provided items: either all items are appended to the batch, or
+	//     none of them are, and a non-nil error is returned.
+	//   - Callers must not assume that any particular item has been appended if a non-nil
+	//     error is returned.
+	//   - If implementations need to surface per-item issues, they should do so via fields
+	//     on BulkAppendResult rather than by partially appending items while also returning
+	//     an error.
+	BulkAppend(ctx context.Context, items []BatchItem, fn inngest.Function) (*BulkAppendResult, error)
+
+	RetrieveItems(ctx context.Context, functionID uuid.UUID, batchID ulid.ULID) ([]BatchItem, error)
+	StartExecution(ctx context.Context, functionID uuid.UUID, batchID ulid.ULID, batchPointer string) (string, error)
 	ScheduleExecution(ctx context.Context, opts ScheduleBatchOpts) error
-	DeleteKeys(ctx context.Context, functionId uuid.UUID, batchID ulid.ULID) error
+
+	DeleteKeys(ctx context.Context, functionID uuid.UUID, batchID ulid.ULID) error
 	// GetBatchInfo retrieves information about the current batch for a function and batch key.
 	// This is used for debugging and introspection.
 	GetBatchInfo(ctx context.Context, functionID uuid.UUID, batchKey string) (*BatchInfo, error)
@@ -53,6 +83,8 @@ type BatchManager interface {
 	DeleteBatch(ctx context.Context, functionID uuid.UUID, batchKey string) (*DeleteBatchResult, error)
 	// RunBatch schedules immediate execution of a batch by creating a timeout job that runs in one second.
 	RunBatch(ctx context.Context, opts RunBatchOpts) (*RunBatchResult, error)
+	// Close gracefully shuts down the batch manager, flushing any pending buffers.
+	Close() error
 }
 
 // BatchInfo contains information about a batch for debugging purposes.

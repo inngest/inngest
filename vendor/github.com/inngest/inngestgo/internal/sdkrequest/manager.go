@@ -82,6 +82,9 @@ type InvocationManager interface {
 	// SetFn updates the servable function.  This is necessary because functions are discovered
 	// before the first step execution in REST-based sync functions.
 	SetFn(fn.ServableFunction)
+	// CloseCheckpointer cancels any pending background checkpoint timers.
+	// It should be called when the function invocation completes.
+	CloseCheckpointer()
 }
 
 type Opts struct {
@@ -377,6 +380,10 @@ func (r *requestCtxManager) SetSteps(steps map[string]json.RawMessage) {
 // before the first step execution in REST-based sync functions.
 func (r *requestCtxManager) SetFn(f fn.ServableFunction) {
 	r.fn = f
+}
+
+func (r *requestCtxManager) CloseCheckpointer() {
+	r.checkpointer.Close()
 }
 
 func (r *requestCtxManager) NewOp(op enums.Opcode, id string) UnhashedOp {

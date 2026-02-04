@@ -24,6 +24,15 @@ func (d *Duration) UnmarshalJSON(b []byte) error {
 		return nil
 	}
 
+	// if the value is a JSON number, parse it as a time.Duration
+	if len(b) > 0 && (b[0] >= '0' && b[0] <= '9' || b[0] == '-') {
+		var n float64
+		if err := json.Unmarshal(b, &n); err == nil {
+			*d = Duration(time.Duration(n))
+			return nil
+		}
+	}
+
 	var s string
 	if err := json.Unmarshal(b, &s); err != nil {
 		return err

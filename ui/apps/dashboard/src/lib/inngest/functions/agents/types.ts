@@ -8,6 +8,7 @@ import { generateSqlTool } from './query-writer';
 export type InsightsAgentState = StateData & {
   // Common conversation/user context
   userId?: string;
+  query?: string; // The user's natural language query/request
 
   // Event catalog and schemas (UI-provided)
   eventTypes?: string[];

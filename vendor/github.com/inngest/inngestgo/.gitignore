@@ -38,3 +38,4 @@ node_modules
 
 # AI
 CLAUDE.md
+/.claude/

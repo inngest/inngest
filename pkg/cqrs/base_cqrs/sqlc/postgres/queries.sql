@@ -83,7 +83,7 @@ UPDATE functions SET config = $1, archived_at = NULL WHERE id = $2 RETURNING *;
 UPDATE functions SET archived_at = CURRENT_TIMESTAMP WHERE app_id = $1;
 
 -- name: DeleteFunctionsByIDs :exec
-UPDATE functions SET archived_at = NOW() WHERE id IN (sqlc.slice('ids'));
+UPDATE functions SET archived_at = NOW() WHERE id = ANY(@ids::text[]);
 
 
 --

@@ -15,12 +15,15 @@ export const summarizerAgent = createAgent<InsightsState>({
         (e: { event_name: string }) => e.event_name,
       ) ?? [];
     const sql = network?.state.data.sql;
+    const userIntent = network?.state.data.query;
 
     // Prepare context for system prompt hydration
     const promptContext = {
       hasSelectedEvents: events.length > 0,
       selectedEvents: events.join(', '),
       hasSql: !!sql,
+      generated_sql: sql || '',
+      user_intent: userIntent || '',
     };
 
     // Store prompt context in observability format
