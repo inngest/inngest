@@ -314,6 +314,7 @@ func TestBatchInvoke(t *testing.T) {
 		invokeCounter int32
 	)
 
+	// this will be invoked.  we expect invokes to respect batches.
 	_, err := inngestgo.CreateFunction(
 		inngestClient,
 		inngestgo.FunctionOpts{
@@ -329,11 +330,13 @@ func TestBatchInvoke(t *testing.T) {
 			evts := input.Events
 			atomic.AddInt32(&counter, 1)
 			atomic.AddInt32(&totalEvents, int32(len(evts)))
+			fmt.Println("hi from invoked func", len(evts))
 			return fmt.Sprintf("batched %d events", len(evts)), nil
 		},
 	)
 	require.NoError(t, err)
 
+	// this will run N times, as its not batched.
 	_, err = inngestgo.CreateFunction(
 		inngestClient,
 		inngestgo.FunctionOpts{
@@ -350,6 +353,7 @@ func TestBatchInvoke(t *testing.T) {
 				FunctionId: "batchinvoke-batcher",
 				Data: map[string]any{
 					"name": "invoke",
+					"n":    input.Event.Data.Data.Num,
 				},
 			})
 			fmt.Println("Invoked batch fn:", val)
@@ -364,10 +368,10 @@ func TestBatchInvoke(t *testing.T) {
 
 	t.Run("trigger a batch", func(t *testing.T) {
 		// Call invoke twice
-		for i := 0; i < 5; i++ {
+		for i := range 5 {
 			_, err := inngestClient.Send(ctx, BatchEvent{
 				Name: "batchinvoke/caller",
-				Data: BatchEventData{Time: time.Now()},
+				Data: BatchEventData{Time: time.Now(), Num: i},
 			})
 			require.NoError(t, err)
 		}
