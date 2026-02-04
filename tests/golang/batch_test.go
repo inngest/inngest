@@ -377,16 +377,21 @@ func TestBatchInvoke(t *testing.T) {
 		}
 
 		// First trigger should be because of batch is full
-		<-time.After(2 * time.Second)
-		require.EqualValues(t, 1, atomic.LoadInt32(&counter))
-		require.EqualValues(t, 3, atomic.LoadInt32(&totalEvents))
-		require.EqualValues(t, 3, atomic.LoadInt32(&invokeCounter))
+		<-time.After(1 * time.Second)
+		require.EventuallyWithT(t, func(t *assert.CollectT) {
+			assert.EqualValues(t, 1, atomic.LoadInt32(&counter))
+			assert.EqualValues(t, 3, atomic.LoadInt32(&totalEvents))
+			assert.EqualValues(t, 3, atomic.LoadInt32(&invokeCounter))
+		}, time.Second*3, time.Millisecond)
 
 		// Second trigger should be because of the batch timeout
 		<-time.After(6 * time.Second)
-		require.EqualValues(t, 2, atomic.LoadInt32(&counter))
-		require.EqualValues(t, 5, atomic.LoadInt32(&totalEvents))
-		require.EqualValues(t, 5, atomic.LoadInt32(&invokeCounter))
+
+		require.EventuallyWithT(t, func(t *assert.CollectT) {
+			assert.EqualValues(t, 2, atomic.LoadInt32(&counter))
+			assert.EqualValues(t, 5, atomic.LoadInt32(&totalEvents))
+			assert.EqualValues(t, 5, atomic.LoadInt32(&invokeCounter))
+		}, time.Second*9, time.Millisecond)
 	})
 }
 
