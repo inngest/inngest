@@ -42,6 +42,14 @@ local operationIdempotencyTTL = tonumber(ARGV[9])--[[@as integer]]
 local constraintCheckIdempotencyTTL = tonumber(ARGV[10])--[[@as integer]]
 local enableDebugLogs = tonumber(ARGV[11]) == 1
 
+if not requestDetails.lik then
+	return redis.error_reply("ERR requestDetails.lik is nil during update")
+end
+
+if not initialLeaseIDs then
+	return redis.error_reply("ERR initialLeaseIDs is nil during update")
+end
+
 ---@type string[]
 local debugLogs = {}
 ---@param ... string
@@ -111,16 +119,23 @@ end
 -- Compute constraint capacity
 local availableCapacity = requested
 
+-- limitingConstraints tracks the indices of constraints reducing the
+-- requested capacity. This is a superset of exhausted constraints.
 ---@type integer[]
 local limitingConstraints = {}
+
+-- exhaustedConstraints tracks all constraints that had no available
+-- capacity. These will cause the Acquire request to produce no leases.
 ---@type integer[]
 local exhaustedConstraints = {}
----@type table<integer, integer>
-local constraintCapacities = {}
----@type table<integer, integer>
-local constraintRetryAfters = {}
+
 ---@type table<integer, boolean>
 local exhaustedSet = {}
+
+-- NOTE: retry at is always the maximum retry time for exhausted constraints.
+-- We do not include merely limiting constraints as more capacity is available.
+-- The retry time MUST be recomputed after updating state to account for constraints
+-- that have been exhausted.
 local retryAt = 0
 
 -- Skip GCRA if constraint check idempotency key is present
@@ -135,7 +150,7 @@ for index, value in ipairs(constraints) do
 
 	-- Retrieve constraint capacity
 	local constraintCapacity = 0
-	local constraintRetryAfter = 0
+	local constraintRetryAt = 0
 	if skipGCRA and (value.k == 1 or value.k == 3) then
 		-- noop
 		constraintCapacity = availableCapacity
@@ -143,26 +158,22 @@ for index, value in ipairs(constraints) do
 		-- rate limit
 		local rlRes = rateLimit(value.r.k, nowNS, value.r.p, value.r.l, value.r.b, 0)
 		constraintCapacity = rlRes["remaining"]
-		constraintRetryAfter = toInteger(rlRes["retry_at"] / 1000000) -- convert from ns to ms
+		constraintRetryAt = toInteger(rlRes["retry_at"] / 1000000) -- convert from ns to ms
 	elseif value.k == 2 then
 		-- concurrency
 		local inProgressItems = getConcurrencyCount(value.c.iik)
 		local inProgressLeases = getConcurrencyCount(value.c.ilk)
 		local inProgressTotal = inProgressItems + inProgressLeases
 		constraintCapacity = value.c.l - inProgressTotal
-		constraintRetryAfter = toInteger(nowMS + value.c.ra)
+		constraintRetryAt = toInteger(nowMS + value.c.ra)
 	elseif value.k == 3 then
 		-- throttle
 		-- allow consuming all capacity in one request (for generating multiple leases)
 		local maxBurst = (value.t.l or 0) + (value.t.b or 0) - 1
 		local throttleRes = throttle(value.t.k, nowMS, value.t.p, value.t.l, maxBurst, 0)
 		constraintCapacity = throttleRes["remaining"]
-		constraintRetryAfter = toInteger(throttleRes["retry_at"]) -- already in ms
+		constraintRetryAt = toInteger(throttleRes["retry_at"]) -- already in ms
 	end
-
-	-- Store constraint capacity and retry time for later exhaustion check
-	constraintCapacities[index] = constraintCapacity
-	constraintRetryAfters[index] = constraintRetryAfter
 
 	-- Track if constraint is exhausted before granting
 	if constraintCapacity <= 0 then
@@ -170,17 +181,17 @@ for index, value in ipairs(constraints) do
 			table.insert(exhaustedConstraints, index)
 			exhaustedSet[index] = true
 		end
+
+		-- if the constraint must be retried later than the initial/last constraint, update retryAfter
+		if constraintRetryAt > retryAt then
+			retryAt = constraintRetryAt
+		end
 	end
 
 	-- If index ends up limiting capacity, reduce available capacity and remember current constraint
 	if constraintCapacity < availableCapacity then
 		availableCapacity = constraintCapacity
 		table.insert(limitingConstraints, index)
-
-		-- if the constraint must be retried later than the initial/last constraint, update retryAfter
-		if constraintRetryAfter > retryAt then
-			retryAt = constraintRetryAfter
-		end
 	end
 end
 
@@ -224,33 +235,69 @@ local keyPrefixLeaseDetails = scopedKeyPrefix .. ":ld:"
 local keyPrefixConstraintCheck = scopedKeyPrefix .. ":ik:cc:"
 
 -- Update constraints
+
+-- NOTE: We have to reset retryAt to reflect post-update state.
+-- Again, this ONLY includes retry times for exhausted constraints.
+retryAt = 0
+
+-- Update constraint state
+for i, value in ipairs(constraints) do
+	local constraintRetryAt = 0
+	local constraintCapacity = 0
+	if skipGCRA and (value.k == 1 or value.k == 3) then
+		-- noop
+	elseif value.k == 1 then
+		-- rate limit
+		local rlRes = rateLimit(value.r.k, nowNS, value.r.p, value.r.l, value.r.b, granted)
+		constraintRetryAt = toInteger(rlRes["retry_at"] / 1000000)
+		constraintCapacity = rlRes["remaining"]
+	elseif value.k == 2 then
+		-- concurrency
+		local updates = {}
+		for j = 1, granted, 1 do
+			local initialLeaseID = initialLeaseIDs[j]
+			updates[(j - 1) * 2 + 1] = tostring(leaseExpiryMS)
+			updates[(j - 1) * 2 + 2] = initialLeaseID
+		end
+
+		-- batch-update concurrency
+		call("ZADD", value.c.ilk, unpack(updates))
+
+		local inProgressItems = getConcurrencyCount(value.c.iik)
+		local inProgressLeases = getConcurrencyCount(value.c.ilk)
+		local inProgressTotal = inProgressItems + inProgressLeases
+		constraintCapacity = value.c.l - inProgressTotal
+		constraintRetryAt = toInteger(nowMS + value.c.ra)
+	elseif value.k == 3 then
+		-- update throttle: consume 1 unit
+		-- allow consuming all capacity in one request (for generating multiple leases)
+		local maxBurst = (value.t.l or 0) + (value.t.b or 0) - 1
+		local throttleRes = throttle(value.t.k, nowMS, value.t.p, value.t.l, maxBurst, granted)
+		constraintRetryAt = toInteger(throttleRes["retry_at"])
+		constraintCapacity = throttleRes["remaining"]
+	end
+
+	-- If we used up capacity after the update,
+	-- add constraint to exhausted constraints
+	if constraintCapacity <= 0 then
+		if not exhaustedSet[i] then
+			exhaustedSet[i] = true
+			table.insert(exhaustedConstraints, i)
+		end
+
+		-- Use retryAt _after_ constraint update to reflect
+		-- potentially changed state
+		if constraintRetryAt > retryAt then
+			retryAt = constraintRetryAt
+		end
+	end
+end
+
+-- Account for generated leases
 for i = 1, granted, 1 do
-	if not requestDetails.lik then
-		return redis.error_reply("ERR requestDetails.lik is nil during update")
-	end
-	if not initialLeaseIDs then
-		return redis.error_reply("ERR initialLeaseIDs is nil during update")
-	end
 	local hashedLeaseIdempotencyKey = requestDetails.lik[i]
 	local leaseRunID = (requestDetails.lri ~= nil and requestDetails.lri[hashedLeaseIdempotencyKey]) or ""
 	local initialLeaseID = initialLeaseIDs[i]
-
-	for _, value in ipairs(constraints) do
-		if skipGCRA then
-		-- noop
-		elseif value.k == 1 then
-			-- rate limit
-			rateLimit(value.r.k, nowNS, value.r.p, value.r.l, value.r.b, 1)
-		elseif value.k == 2 then
-			-- concurrency
-			call("ZADD", value.c.ilk, tostring(leaseExpiryMS), initialLeaseID)
-		elseif value.k == 3 then
-			-- update throttle: consume 1 unit
-			-- allow consuming all capacity in one request (for generating multiple leases)
-			local maxBurst = (value.t.l or 0) + (value.t.b or 0) - 1
-			throttle(value.t.k, nowMS, value.t.p, value.t.l, maxBurst, 1)
-		end
-	end
 
 	local keyLeaseDetails = keyPrefixLeaseDetails .. initialLeaseID
 
@@ -276,23 +323,6 @@ end
 -- Batch add all leases to account leases sorted set
 if #accountLeasesArgs > 0 then
 	call("ZADD", keyAccountLeases, unpack(accountLeasesArgs))
-end
-
--- Check for constraints exhausted after granting
--- Use deterministic iteration order to ensure stable ordering in response
-for index = 1, #constraints do
-	local capacity = constraintCapacities[index]
-	if capacity and capacity - granted <= 0 then
-		if not exhaustedSet[index] then
-			table.insert(exhaustedConstraints, index)
-			exhaustedSet[index] = true
-		end
-		-- Update retryAt to reflect the retry time of this exhausted constraint
-		local constraintRetryAfter = constraintRetryAfters[index]
-		if constraintRetryAfter and constraintRetryAfter > retryAt then
-			retryAt = constraintRetryAfter
-		end
-	end
 end
 
 call("SET", keyConstraintCheckIdempotency, tostring(nowMS), "EX", tostring(constraintCheckIdempotencyTTL))
