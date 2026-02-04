@@ -51,11 +51,16 @@ func TestNewRunMetadata(t *testing.T) {
 		{
 			name: "should return fixed request version",
 			data: map[string]string{
+				"id": string(byt),
 				"rv": "0",
 			},
 			expectedVal: &runMetadata{
+				Status:         enums.RunStatusCompleted,
+				Version:        1,
+				Debugger:       false,
 				RequestVersion: 0,
 			},
+			expectedError: nil,
 		},
 		{
 			name:          "should error with missing identifier",
