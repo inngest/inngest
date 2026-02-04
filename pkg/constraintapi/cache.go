@@ -72,6 +72,9 @@ func (l *constraintCache) Acquire(ctx context.Context, req *CapacityAcquireReque
 	}
 
 	// Check if any constraint is cached as exhausted
+	recentlyLimited := make([]ConstraintItem, 0)
+	var retryAfter time.Time
+
 	// Return immediately on first cache hit since any exhausted constraint blocks the request
 	for _, ci := range req.Constraints {
 		// Construct cache key for constraint scoped to account
@@ -89,6 +92,11 @@ func (l *constraintCache) Acquire(ctx context.Context, req *CapacityAcquireReque
 		// Cache hit - this constraint is exhausted
 		val := item.Value()
 
+		recentlyLimited = append(recentlyLimited, ci)
+		if val.retryAfter.After(retryAfter) {
+			retryAfter = val.retryAfter
+		}
+
 		tags := map[string]any{
 			"op":         "hit",
 			"source":     req.Migration.String(),
@@ -103,8 +111,12 @@ func (l *constraintCache) Acquire(ctx context.Context, req *CapacityAcquireReque
 			Tags:    tags,
 		})
 
+	}
+
+	// If one or more requested constraints were recently limited,
+	// return a synthetic response including all affected constraints.
+	if len(recentlyLimited) > 0 {
 		// Return immediately with synthetic response
-		// Exhausted constraints are also limiting constraints (they reduce capacity to 0)
 		requestID, err := ulid.New(ulid.Timestamp(l.clock.Now()), rand.Reader)
 		if err != nil {
 			return nil, errs.Wrap(0, false, "could not generate request ID: %w", err)
@@ -113,9 +125,10 @@ func (l *constraintCache) Acquire(ctx context.Context, req *CapacityAcquireReque
 		return &CapacityAcquireResponse{
 			RequestID:            requestID,
 			Leases:               nil,
-			LimitingConstraints:  []ConstraintItem{val.constraint},
-			ExhaustedConstraints: []ConstraintItem{val.constraint},
-			RetryAfter:           val.retryAfter,
+			ExhaustedConstraints: recentlyLimited,
+			// Exhausted constraints are also limiting constraints (they reduce capacity to 0)
+			LimitingConstraints: recentlyLimited,
+			RetryAfter:          retryAfter,
 		}, nil
 	}
 
@@ -167,9 +180,9 @@ func (l *constraintCache) Acquire(ctx context.Context, req *CapacityAcquireReque
 			cacheTTL,
 		)
 		tags := map[string]any{
-			"op":                  "set",
-			"source":              req.Migration.String(),
-			"limiting_constraint": ci.MetricsIdentifier(),
+			"op":         "set",
+			"source":     req.Migration.String(),
+			"constraint": ci.MetricsIdentifier(),
 		}
 		if l.enableHighCardinalityInstrumentation != nil && l.enableHighCardinalityInstrumentation(ctx, req.AccountID, req.EnvID, req.FunctionID) {
 			tags["function_id"] = req.FunctionID
