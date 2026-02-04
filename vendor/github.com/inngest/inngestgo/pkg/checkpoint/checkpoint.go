@@ -1,6 +1,7 @@
 package checkpoint
 
 import (
+	"encoding/json"
 	"time"
 )
 
@@ -22,19 +23,23 @@ type Config struct {
 	//
 	// This must be higher than zero to enable batching of steps.  When enabled with BatchInterval,
 	// whichever limit is hit first will checkpoint steps.
-	BatchSteps int
+	BatchSteps int `json:"batch_steps,omitempty,omitzero"`
 
 	// BatchInterval represents the maximum time that we wait after a step runs before checkpointing.
 	// When this limit is hit, checkpointing will occur and the SDK will block until checkpointing completes.
 	//
 	// This must be higher than zero to enable batching based off of durations.  When enabled with BatchSteps,
 	// whichever lmiit is hit first will checkpoint steps.
-	BatchInterval time.Duration
+	//
+	// This is a string-encoded time.Duration field.
+	BatchInterval time.Duration `json:"batch_interval,omitempty,omitzero"`
 
 	// MaxRuntime indicates the maximum duration that a function can execute for before Inngest requires
 	// a fresh re-entry.  This is useful for serverless functions, ensuring that a fresh request is made
 	// after a maximum amount of time.
-	MaxRuntime time.Duration
+	//
+	// This is a string-encoded time.Duration field.
+	MaxRuntime time.Duration `json:"max_runtime,omitempty,omitzero"`
 
 	// MaxSteps represents the maximum number of steps the function can execute before
 	// stopping execution and waiting for another re-entry.  This is useful for serverless functions,
@@ -44,6 +49,20 @@ type Config struct {
 	// If zero, there are no limits on the number of steps that can be executed, and the SDK will execute
 	// step.run calls until an async step is reached.
 	// MaxSteps int
+}
+
+func (c Config) MarshalJSON() ([]byte, error) {
+	data := map[string]any{}
+	if c.BatchSteps > 0 {
+		data["batch_steps"] = c.BatchSteps
+	}
+	if c.BatchInterval > 0 {
+		data["batch_interval"] = c.BatchInterval.String()
+	}
+	if c.MaxRuntime > 0 {
+		data["max_runtime"] = c.MaxRuntime
+	}
+	return json.Marshal(data)
 }
 
 const (
