@@ -322,7 +322,7 @@ func TestBatchInvoke(t *testing.T) {
 			Name: "test batching",
 			BatchEvents: &inngestgo.ConfigBatchEvents{
 				MaxSize: 3,
-				Timeout: 5 * time.Second,
+				Timeout: 2 * time.Second,
 			},
 		},
 		inngestgo.EventTrigger("batchinvoke/batch", nil),
