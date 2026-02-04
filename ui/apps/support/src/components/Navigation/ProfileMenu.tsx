@@ -1,5 +1,5 @@
 import { Listbox } from "@headlessui/react";
-import { RiLogoutCircleLine } from "@remixicon/react";
+import { RiLogoutCircleLine, RiLoginCircleLine } from "@remixicon/react";
 import { useClerk } from "@clerk/tanstack-react-start";
 import { Link } from "@tanstack/react-router";
 import { Button } from "@inngest/components/Button/Button";
@@ -22,7 +22,11 @@ export const ProfileMenu = ({
   if (!isAuthenticated) {
     return (
       <Link to="/sign-in/$">
-        <Button appearance="outlined" label="Sign In" />
+        <Button
+          appearance="outlined"
+          tooltip="Sign in"
+          icon={<RiLoginCircleLine className="h-4 w-4" />}
+        />
       </Link>
     );
   }
