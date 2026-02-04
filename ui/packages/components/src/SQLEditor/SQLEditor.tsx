@@ -1,6 +1,6 @@
 import { useCallback, useRef } from 'react';
 import { Editor, type Monaco } from '@monaco-editor/react';
-import type { editor } from 'monaco-editor';
+import { Uri, type editor } from 'monaco-editor';
 
 import { EDITOR_OPTIONS } from './constants';
 import { useMonacoWithTheme } from './hooks/useMonacoWithTheme';
@@ -11,6 +11,9 @@ import type { SQLCompletionConfig } from './types';
 export type SQLEditorMountCallback = (editor: editor.IStandaloneCodeEditor, monaco: Monaco) => void;
 
 export type SQLEditorInstance = editor.IStandaloneCodeEditor;
+
+export type SQLEditorMarkerData = editor.IMarkerData;
+export const SQLEditorURI = Uri;
 
 export type SQLEditorProps = {
   completionConfig: SQLCompletionConfig;
