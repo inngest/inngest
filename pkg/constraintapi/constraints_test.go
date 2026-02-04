@@ -1005,7 +1005,15 @@ func TestConstraintEnforcement(t *testing.T) {
 			afterAcquire: func(t *testing.T, deps *deps, resp *CapacityAcquireResponse) {
 				t.Log(resp.Debug())
 
-				require.True(t, resp.RetryAfter.Before(deps.clock.Now()))
+				// Rate limit allows 1 request every 6s. The burst is limit / 10 = 1, so we can
+				// admit two requests at once. The first request was legacy, the second request
+				// was just acquired, so we have 0 more requests and used up capacity.
+
+				// Since we used up capacity, expected rate limit constraint to be part of exhausted constraints
+				require.Len(t, resp.ExhaustedConstraints, 1)
+
+				// Also expect retry after to be now + 6s
+				require.WithinDuration(t, deps.clock.Now().Add(6*time.Second), resp.RetryAfter, time.Millisecond)
 
 				raw, err := deps.r.Get("{rl}:key-hash")
 				require.NoError(t, err)
