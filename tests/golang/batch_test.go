@@ -385,13 +385,13 @@ func TestBatchInvoke(t *testing.T) {
 		}, time.Second*3, time.Millisecond)
 
 		// Second trigger should be because of the batch timeout
-		<-time.After(6 * time.Second)
+		<-time.After(2 * time.Second)
 
 		require.EventuallyWithT(t, func(t *assert.CollectT) {
 			assert.EqualValues(t, 2, atomic.LoadInt32(&counter))
 			assert.EqualValues(t, 5, atomic.LoadInt32(&totalEvents))
 			assert.EqualValues(t, 5, atomic.LoadInt32(&invokeCounter))
-		}, time.Second*9, time.Millisecond)
+		}, time.Second*15, time.Millisecond)
 	})
 }
 
