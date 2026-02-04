@@ -18,6 +18,7 @@ import {
 } from "@/data/ticketOptions";
 import { createTicket, getCustomerTierByEmail } from "@/data/plain";
 import { getAccountPlanInfo } from "@/data/inngest";
+import { CommunityChannels } from "@/components/Support/CommunityChannels";
 
 export const Route = createFileRoute("/_authed/new")({
   component: NewTicketPage,
@@ -276,6 +277,9 @@ function NewTicketPage() {
             severity of your issue.
           </p>
         </form>
+        <div className="flex flex-col items-center">
+          <CommunityChannels />
+        </div>
       </div>
     </div>
   );
