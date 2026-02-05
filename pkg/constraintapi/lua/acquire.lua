@@ -217,18 +217,9 @@ local granted = availableCapacity
 
 ---@type { lid: string, lik: string }[]
 local grantedLeases = {}
--- Pre-allocate array slots for grantedLeases
-for i = 1, granted do
-	-- Placeholder, will be replaced in loop
-	grantedLeases[i] = false
-end
 
 -- Collect arguments for batched ZADD to keyAccountLeases
 local accountLeasesArgs = {}
--- Pre-allocate for 2 items per lease (score + member)
-for i = 1, granted * 2 do
-	accountLeasesArgs[i] = false
-end
 
 -- Pre-compute key prefixes to avoid repeated string.format calls
 local keyPrefixLeaseDetails = scopedKeyPrefix .. ":ld:"

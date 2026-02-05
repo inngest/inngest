@@ -250,13 +250,7 @@ if availableCapacity <= 0 then
 end
 local granted = availableCapacity
 local grantedLeases = {}
-for i = 1, granted do
-	grantedLeases[i] = false
-end
 local accountLeasesArgs = {}
-for i = 1, granted * 2 do
-	accountLeasesArgs[i] = false
-end
 local keyPrefixLeaseDetails = scopedKeyPrefix .. ":ld:"
 local keyPrefixConstraintCheck = scopedKeyPrefix .. ":ik:cc:"
 retryAt = 0
