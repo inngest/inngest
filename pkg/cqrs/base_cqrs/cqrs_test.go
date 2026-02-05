@@ -13,6 +13,7 @@ import (
 	"github.com/inngest/inngest/pkg/cqrs"
 	sqlc_psql "github.com/inngest/inngest/pkg/cqrs/base_cqrs/sqlc/postgres"
 	"github.com/inngest/inngest/tests/testutil"
+	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -1387,6 +1388,147 @@ func TestCQRSUpdateFunctionConfig(t *testing.T) {
 //
 // Event Tests (TODO)
 //
+
+//
+// Trace Run Tests
+//
+
+func TestCQRSGetTraceRunsByTriggerID(t *testing.T) {
+	ctx := context.Background()
+	appID := uuid.New()
+
+	cm, cleanup := initCQRS(t, withInitCQRSOptApp(appID))
+	defer cleanup()
+
+	accountID := uuid.New()
+	workspaceID := uuid.New()
+	functionID := uuid.New()
+
+	t.Run("find trace run with single trigger ID", func(t *testing.T) {
+		// Create a trace run with a single trigger ID
+		triggerID := ulid.Make()
+		runID := ulid.Make()
+
+		traceRun := &cqrs.TraceRun{
+			AccountID:   accountID,
+			WorkspaceID: workspaceID,
+			AppID:       appID,
+			FunctionID:  functionID,
+			TraceID:     "trace-single-" + runID.String(),
+			RunID:       runID.String(),
+			QueuedAt:    time.Now(),
+			StartedAt:   time.Now(),
+			EndedAt:     time.Now(),
+			TriggerIDs:  []string{triggerID.String()},
+			Status:      1,
+		}
+
+		err := cm.InsertTraceRun(ctx, traceRun)
+		require.NoError(t, err)
+
+		// Search by the trigger ID
+		runs, err := cm.GetTraceRunsByTriggerID(ctx, triggerID)
+		require.NoError(t, err)
+		require.Len(t, runs, 1, "Should find the trace run by its trigger ID")
+		assert.Equal(t, runID.String(), runs[0].RunID)
+	})
+
+	t.Run("find trace run by trigger ID", func(t *testing.T) {
+		// Create a trace run with multiple trigger IDs (event batching)
+		triggerID1 := ulid.Make()
+		triggerID2 := ulid.Make()
+		runID := ulid.Make()
+
+		traceRun := &cqrs.TraceRun{
+			AccountID:   accountID,
+			WorkspaceID: workspaceID,
+			AppID:       appID,
+			FunctionID:  functionID,
+			TraceID:     "trace-" + runID.String(),
+			RunID:       runID.String(),
+			QueuedAt:    time.Now(),
+			StartedAt:   time.Now(),
+			EndedAt:     time.Now(),
+			TriggerIDs:  []string{triggerID1.String(), triggerID2.String()},
+			Status:      1, // Running
+		}
+
+		err := cm.InsertTraceRun(ctx, traceRun)
+		require.NoError(t, err)
+
+		// Search by the first trigger ID - should find the run
+		runs, err := cm.GetTraceRunsByTriggerID(ctx, triggerID1)
+		require.NoError(t, err)
+		require.Len(t, runs, 1, "Should find exactly one trace run by first trigger ID")
+		assert.Equal(t, runID.String(), runs[0].RunID)
+
+		// Search by the second trigger ID - should also find the run
+		runs, err = cm.GetTraceRunsByTriggerID(ctx, triggerID2)
+		require.NoError(t, err)
+		require.Len(t, runs, 1, "Should find exactly one trace run by second trigger ID")
+		assert.Equal(t, runID.String(), runs[0].RunID)
+
+		// Search by non-existent trigger ID - should return empty
+		nonExistentTriggerID := ulid.Make()
+		runs, err = cm.GetTraceRunsByTriggerID(ctx, nonExistentTriggerID)
+		require.NoError(t, err)
+		assert.Len(t, runs, 0, "Should return empty for non-existent trigger ID")
+	})
+
+	t.Run("different runs with same trigger ID", func(t *testing.T) {
+		// these would most likely be different functions in real use, but doesn't matter for the test
+		triggerID := ulid.Make()
+
+		run1ID := ulid.Make()
+		run2ID := ulid.Make()
+
+		traceRun1 := &cqrs.TraceRun{
+			AccountID:   accountID,
+			WorkspaceID: workspaceID,
+			AppID:       appID,
+			FunctionID:  functionID,
+			TraceID:     "trace-batch-1-" + run1ID.String(),
+			RunID:       run1ID.String(),
+			QueuedAt:    time.Now(),
+			StartedAt:   time.Now(),
+			EndedAt:     time.Now(),
+			TriggerIDs:  []string{triggerID.String()},
+			Status:      1,
+		}
+
+		traceRun2 := &cqrs.TraceRun{
+			AccountID:   accountID,
+			WorkspaceID: workspaceID,
+			AppID:       appID,
+			FunctionID:  functionID,
+			TraceID:     "trace-batch-2-" + run2ID.String(),
+			RunID:       run2ID.String(),
+			QueuedAt:    time.Now(),
+			StartedAt:   time.Now(),
+			EndedAt:     time.Now(),
+			TriggerIDs:  []string{triggerID.String()},
+			Status:      1,
+		}
+
+		err := cm.InsertTraceRun(ctx, traceRun1)
+		require.NoError(t, err)
+		err = cm.InsertTraceRun(ctx, traceRun2)
+		require.NoError(t, err)
+
+		// Search by the shared trigger ID - should find both runs
+		runs, err := cm.GetTraceRunsByTriggerID(ctx, triggerID)
+		require.NoError(t, err)
+		assert.Len(t, runs, 2, "Should find both trace runs that share the same trigger ID")
+
+		// Verify both run IDs are present
+		runIDs := make([]string, len(runs))
+		for i, r := range runs {
+			runIDs[i] = r.RunID
+		}
+		assert.Contains(t, runIDs, run1ID.String())
+		assert.Contains(t, runIDs, run2ID.String())
+	})
+}
 
 //
 // Helpers
