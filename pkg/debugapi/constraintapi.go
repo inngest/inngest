@@ -9,7 +9,6 @@ import (
 	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
-	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/pkg/inngest"
 	cpb "github.com/inngest/inngest/proto/gen/constraintapi/v1"
 	pb "github.com/inngest/inngest/proto/gen/debug/v1"
@@ -32,14 +31,11 @@ func (d *debugAPI) CheckConstraints(ctx context.Context, req *cpb.CapacityCheckR
 			},
 		}
 
-		kg := redis_state.NewQueueClient(nil, redis_state.QueueDefaultKey).KeyGenerator()
-
 		constraints := []constraintapi.ConstraintItem{
 			{
 				Kind: constraintapi.ConstraintKindConcurrency,
 				Concurrency: &constraintapi.ConcurrencyConstraint{
-					Scope:             enums.ConcurrencyScopeAccount,
-					InProgressItemKey: kg.Concurrency("account", req.AccountId),
+					Scope: enums.ConcurrencyScopeAccount,
 				},
 			},
 		}
@@ -70,8 +66,7 @@ func (d *debugAPI) CheckConstraints(ctx context.Context, req *cpb.CapacityCheckR
 						constraints = append(constraints, constraintapi.ConstraintItem{
 							Kind: constraintapi.ConstraintKindConcurrency,
 							Concurrency: &constraintapi.ConcurrencyConstraint{
-								Scope:             enums.ConcurrencyScopeFn,
-								InProgressItemKey: kg.Concurrency("p", fn.ID.String()),
+								Scope: enums.ConcurrencyScopeFn,
 							},
 						})
 						continue
@@ -109,10 +104,6 @@ func (d *debugAPI) CheckConstraints(ctx context.Context, req *cpb.CapacityCheckR
 			serializedConstraints[i] = constraintapi.ConstraintItemToProto(c)
 		}
 		req.Constraints = serializedConstraints
-
-		req.Migration = constraintapi.MigrationIdentifierToProto(constraintapi.MigrationIdentifier{
-			QueueShard: consts.DefaultQueueShardName,
-		})
 	}
 
 	parsed, err := constraintapi.CapacityCheckRequestFromProto(req)

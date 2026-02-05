@@ -37,13 +37,8 @@ func NewTestEnvironment(t *testing.T) *TestEnvironment {
 	require.NoError(t, err)
 
 	cm, err := NewRedisCapacityManager(
-		WithRateLimitClient(rc),
-		WithQueueShards(map[string]rueidis.Client{
-			"test": rc,
-		}),
-		WithNumScavengerShards(1),
-		WithQueueStateKeyPrefix("q:v1"),
-		WithRateLimitKeyPrefix("rl"),
+		WithShardName("default"),
+		WithClient(rc),
 	)
 	require.NoError(t, err)
 
@@ -207,27 +202,20 @@ func (te *TestEnvironment) NewConstraintVerifier() *ConstraintVerifier {
 func (cv *ConstraintVerifier) VerifyInProgressCounts(constraints []ConstraintItem, expectedCounts map[string]int) {
 	for i, constraint := range constraints {
 		if constraint.Kind == ConstraintKindConcurrency && constraint.Concurrency != nil {
-			// Check in-progress items
-			itemsCount := 0
-			if cv.te.Redis.Exists(constraint.Concurrency.InProgressItemKey) {
-				members, _ := cv.te.Redis.ZMembers(constraint.Concurrency.InProgressItemKey)
-				itemsCount = len(members)
-			}
-
 			// Check in-progress leases
 			leasesCount := 0
-			inProgressLeasesKey := constraint.Concurrency.InProgressLeasesKey(cv.te.KeyPrefix, cv.te.AccountID, cv.te.EnvID, cv.te.FunctionID)
+			inProgressLeasesKey := constraint.Concurrency.InProgressLeasesKey(cv.te.AccountID, cv.te.EnvID, cv.te.FunctionID)
 			if cv.te.Redis.Exists(inProgressLeasesKey) {
 				members, _ := cv.te.Redis.ZMembers(inProgressLeasesKey)
 				leasesCount = len(members)
 			}
 
-			total := itemsCount + leasesCount
+			total := leasesCount
 			constraintKey := fmt.Sprintf("constraint_%d", i)
 			if expected, ok := expectedCounts[constraintKey]; ok {
 				require.Equal(cv.te.t, expected, total,
-					"In-progress count mismatch for constraint %d: items=%d, leases=%d, total=%d, expected=%d, all=%s",
-					i, itemsCount, leasesCount, total, expected, cv.te.Redis.Dump())
+					"In-progress count mismatch for constraint %d: leases=%d, total=%d, expected=%d, all=%s",
+					i, leasesCount, total, expected, cv.te.Redis.Dump())
 			}
 		}
 	}
@@ -235,7 +223,7 @@ func (cv *ConstraintVerifier) VerifyInProgressCounts(constraints []ConstraintIte
 
 // VerifyLeaseDetails checks that lease details are properly stored and consistent
 func (cv *ConstraintVerifier) VerifyLeaseDetails(leaseID ulid.ULID, expectedIdempotencyKey, expectedRunID string, expectedRequestID ulid.ULID) {
-	leaseDetailsKey := cv.te.CapacityManager.keyLeaseDetails(cv.te.KeyPrefix, cv.te.AccountID, leaseID)
+	leaseDetailsKey := cv.te.CapacityManager.keyLeaseDetails(cv.te.AccountID, leaseID)
 
 	require.True(cv.te.t, cv.te.Redis.Exists(leaseDetailsKey), "Lease details key should exist: %s", leaseDetailsKey)
 
@@ -260,7 +248,7 @@ func (cv *ConstraintVerifier) VerifyLeaseDetails(leaseID ulid.ULID, expectedIdem
 
 // VerifyAccountLeases checks that account leases are properly tracked
 func (cv *ConstraintVerifier) VerifyAccountLeases(expectedLeases []ulid.ULID) {
-	accountLeasesKey := cv.te.CapacityManager.keyAccountLeases(cv.te.KeyPrefix, cv.te.AccountID)
+	accountLeasesKey := cv.te.CapacityManager.keyAccountLeases(cv.te.AccountID)
 
 	if len(expectedLeases) == 0 {
 		require.False(cv.te.t, cv.te.Redis.Exists(accountLeasesKey), "Account leases key should not exist when no leases expected")
@@ -284,7 +272,7 @@ func (cv *ConstraintVerifier) VerifyAccountLeases(expectedLeases []ulid.ULID) {
 
 // VerifyScavengerShard checks that scavenger shard is properly maintained
 func (cv *ConstraintVerifier) VerifyScavengerShard(expectedScore float64, shouldExist bool) {
-	scavengerShardKey := cv.te.CapacityManager.keyScavengerShard(cv.te.KeyPrefix, 0)
+	scavengerShardKey := cv.te.CapacityManager.keyScavengerShard()
 
 	if !shouldExist {
 		score, _ := cv.te.Redis.ZScore(scavengerShardKey, cv.te.AccountID.String())
@@ -312,7 +300,7 @@ func (te *TestEnvironment) NewIdempotencyVerifier() *IdempotencyVerifier {
 
 // VerifyOperationIdempotency checks that operation idempotency keys are properly set
 func (iv *IdempotencyVerifier) VerifyOperationIdempotency(operation, idempotencyKey string, expectedTTL int, shouldExist bool) {
-	opIdempotencyKey := iv.te.CapacityManager.keyOperationIdempotency(iv.te.KeyPrefix, iv.te.AccountID, operation, idempotencyKey)
+	opIdempotencyKey := iv.te.CapacityManager.keyOperationIdempotency(iv.te.AccountID, operation, idempotencyKey)
 
 	if !shouldExist {
 		require.False(iv.te.t, iv.te.Redis.Exists(opIdempotencyKey), "Operation idempotency key should not exist: %s", opIdempotencyKey)
@@ -330,7 +318,7 @@ func (iv *IdempotencyVerifier) VerifyOperationIdempotency(operation, idempotency
 
 // VerifyConstraintCheckIdempotency checks constraint check idempotency keys
 func (iv *IdempotencyVerifier) VerifyConstraintCheckIdempotency(idempotencyKey string, expectedTTL int, shouldExist bool) {
-	checkIdempotencyKey := iv.te.CapacityManager.keyConstraintCheckIdempotency(iv.te.KeyPrefix, iv.te.AccountID, idempotencyKey)
+	checkIdempotencyKey := iv.te.CapacityManager.keyConstraintCheckIdempotency(iv.te.AccountID, idempotencyKey)
 
 	if !shouldExist {
 		require.False(iv.te.t, iv.te.Redis.Exists(checkIdempotencyKey), "Constraint check idempotency key should not exist")

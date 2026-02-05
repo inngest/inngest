@@ -288,7 +288,7 @@ func WithBatcher(b batch.BatchManager) ExecutorOpt {
 	}
 }
 
-func WithCapacityManager(cm constraintapi.RolloutManager) ExecutorOpt {
+func WithCapacityManager(cm constraintapi.CapacityManager) ExecutorOpt {
 	return func(e execution.Executor) error {
 		e.(*executor).capacityManager = cm
 		return nil
@@ -464,7 +464,7 @@ type executor struct {
 	batcher      batch.BatchManager
 	singletonMgr singleton.Singleton
 
-	capacityManager               constraintapi.RolloutManager
+	capacityManager               constraintapi.CapacityManager
 	useConstraintAPI              constraintapi.UseConstraintAPIFn
 	enableBatchingInstrumentation func(ctx context.Context, accountID, envID uuid.UUID) (enable bool)
 
@@ -826,17 +826,12 @@ func (e *executor) schedule(
 			rateLimitKey, err := ratelimit.RateLimitKey(ctx, req.Function.ID, *req.Function.RateLimit, evtMap)
 			switch err {
 			case nil:
-				constraintCheckIdempotencyKey := key
-				if e.capacityManager != nil {
-					constraintCheckIdempotencyKey = e.capacityManager.KeyConstraintCheckIdempotency(constraintapi.MigrationIdentifier{IsRateLimit: true}, req.AccountID, key)
-				}
-
 				res, err := e.rateLimiter.RateLimit(
 					logger.WithStdlib(ctx, l),
 					rateLimitKey,
 					*req.Function.RateLimit,
 					ratelimit.WithNow(e.now()),
-					ratelimit.WithIdempotency(constraintCheckIdempotencyKey, RateLimitIdempotencyTTL),
+					ratelimit.WithIdempotency(key, RateLimitIdempotencyTTL),
 				)
 				if err != nil {
 					metrics.IncrRateLimitUsage(ctx, metrics.CounterOpt{
@@ -4682,7 +4677,6 @@ func (e *executor) newExpressionEvaluator(ctx context.Context, expr string) (exp
 // AppendAndScheduleBatch appends a new batch item. If a new batch is created, it will be scheduled to run
 // after the batch timeout. If the item finalizes the batch, a function run is immediately scheduled.
 func (e *executor) AppendAndScheduleBatch(ctx context.Context, fn inngest.Function, bi batch.BatchItem, opts *execution.BatchExecOpts) error {
-
 	enableInstrumentation := e.enableBatchingInstrumentation != nil && e.enableBatchingInstrumentation(ctx, bi.AccountID, bi.WorkspaceID)
 	l := logger.StdlibLogger(ctx).With("eventID", bi.EventID)
 	result, err := e.batcher.Append(ctx, bi, fn)
