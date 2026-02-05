@@ -1420,6 +1420,198 @@ func TestConstraintEnforcement(t *testing.T) {
 				require.WithinDuration(t, clock.Now().Add(ConcurrencyLimitRetryAfter), resp.RetryAfter, time.Millisecond)
 			},
 		},
+
+		{
+			name: "concurrency constraints exhausted initially should be returned",
+
+			amount:              10,
+			expectedLeaseAmount: 0,
+
+			config: ConstraintConfig{
+				FunctionVersion: 1,
+				Concurrency: ConcurrencyConfig{
+					AccountConcurrency:  5,
+					FunctionConcurrency: 2,
+				},
+				Throttle: []ThrottleConfig{
+					{
+						Limit:             3,
+						Period:            60,
+						KeyExpressionHash: "expr-hash",
+					},
+				},
+			},
+
+			constraints: []ConstraintItem{
+				{
+					Kind: ConstraintKindThrottle,
+					Throttle: &ThrottleConstraint{
+						KeyExpressionHash: "expr-hash",
+						EvaluatedKeyHash:  "key-hash",
+					},
+				},
+
+				{
+					Kind: ConstraintKindConcurrency,
+					Concurrency: &ConcurrencyConstraint{
+						Scope:             enums.ConcurrencyScopeAccount,
+						Mode:              enums.ConcurrencyModeStep,
+						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:account:%s", accountID),
+					},
+				},
+
+				{
+					Kind: ConstraintKindConcurrency,
+					Concurrency: &ConcurrencyConstraint{
+						Scope:             enums.ConcurrencyScopeFn,
+						Mode:              enums.ConcurrencyModeStep,
+						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:p:%s", fnID),
+					},
+				},
+			},
+			mi: MigrationIdentifier{
+				QueueShard: "test",
+			},
+			beforeAcquire: func(t *testing.T, deps *deps) {
+				// Pretend function concurrency capacity is already consumed
+				key := deps.constraints[2].Concurrency.InProgressLeasesKey(
+					deps.cm.queueStateKeyPrefix,
+					accountID,
+					envID,
+					fnID,
+				)
+				for i := range 2 {
+					inProgress := deps.clock.Now().Add(5 * time.Second).UnixMilli()
+					_, err := deps.r.ZAdd(key, float64(inProgress), fmt.Sprintf("%d", i))
+					require.NoError(t, err)
+				}
+			},
+			afterAcquire: func(t *testing.T, deps *deps, resp *CapacityAcquireResponse) {
+				clock := deps.clock
+
+				// both throttle and function concurrency are limiting
+				require.Len(t, resp.LimitingConstraints, 2)
+				require.Equal(t, ConstraintKindThrottle, resp.LimitingConstraints[0].Kind)
+				require.Equal(t, ConstraintKindConcurrency, resp.LimitingConstraints[1].Kind)
+				require.Equal(t, enums.ConcurrencyScopeFn, resp.LimitingConstraints[1].Concurrency.Scope)
+
+				// only fn concurrency is exhausted
+				require.Len(t, resp.ExhaustedConstraints, 1)
+				require.Equal(t, ConstraintKindConcurrency, resp.ExhaustedConstraints[0].Kind)
+				require.Equal(t, enums.ConcurrencyScopeFn, resp.ExhaustedConstraints[0].Concurrency.Scope)
+
+				// expect retryAt to match concurrency
+				require.WithinDuration(t, clock.Now().Add(ConcurrencyLimitRetryAfter), resp.RetryAfter, time.Millisecond)
+			},
+		},
+
+		{
+			name: "throttle constraints exhausted initially should be returned",
+
+			// expect no returned leases due to using up throttle capacity
+			amount:              10,
+			expectedLeaseAmount: 0,
+
+			config: ConstraintConfig{
+				FunctionVersion: 1,
+				Throttle: []ThrottleConfig{
+					{
+						Limit:             2,
+						Period:            60,
+						KeyExpressionHash: "expr-hash",
+					},
+				},
+			},
+
+			constraints: []ConstraintItem{
+				{
+					Kind: ConstraintKindThrottle,
+					Throttle: &ThrottleConstraint{
+						KeyExpressionHash: "expr-hash",
+						EvaluatedKeyHash:  "key-hash",
+					},
+				},
+			},
+			mi: MigrationIdentifier{
+				QueueShard: "test",
+			},
+			beforeAcquire: func(t *testing.T, deps *deps) {
+				// Set existing legacy state, simulate 2 admitted requests
+				tat := deps.clock.Now().Add(60 * time.Second).UnixMilli()
+				err := deps.r.Set("{q:v1}:throttle:key-hash", strconv.Itoa(int(tat)))
+				require.NoError(t, err)
+			},
+			afterAcquire: func(t *testing.T, deps *deps, resp *CapacityAcquireResponse) {
+				clock := deps.clock
+
+				// only throttle is limiting
+				require.Len(t, resp.LimitingConstraints, 1)
+				require.Equal(t, ConstraintKindThrottle, resp.LimitingConstraints[0].Kind)
+
+				// only throttle is exhausted
+				require.Len(t, resp.ExhaustedConstraints, 1)
+				require.Equal(t, ConstraintKindThrottle, resp.ExhaustedConstraints[0].Kind)
+
+				// expect retryAt to match throttle
+				throttleRetry := 30 * time.Second
+
+				require.WithinDuration(t, clock.Now().Add(throttleRetry), resp.RetryAfter, time.Millisecond)
+			},
+		},
+
+		{
+			name: "rateLimit constraints exhausted initially should be returned",
+
+			// expect no returned leases due to using up throttle capacity
+			amount:              10,
+			expectedLeaseAmount: 0,
+
+			config: ConstraintConfig{
+				FunctionVersion: 1,
+				RateLimit: []RateLimitConfig{
+					{
+						Limit:             1,
+						Period:            60,
+						KeyExpressionHash: "expr-hash",
+					},
+				},
+			},
+
+			constraints: []ConstraintItem{
+				{
+					Kind: ConstraintKindRateLimit,
+					RateLimit: &RateLimitConstraint{
+						KeyExpressionHash: "expr-hash",
+						EvaluatedKeyHash:  "key-hash",
+					},
+				},
+			},
+			mi: MigrationIdentifier{
+				IsRateLimit: true,
+			},
+			beforeAcquire: func(t *testing.T, deps *deps) {
+				// Set existing legacy state, simulate 1 admitted request
+				tat := deps.clock.Now().Add(60 * time.Second).UnixNano()
+				err := deps.r.Set("{rl}:key-hash", strconv.Itoa(int(tat)))
+				require.NoError(t, err)
+			},
+			afterAcquire: func(t *testing.T, deps *deps, resp *CapacityAcquireResponse) {
+				clock := deps.clock
+
+				// only rateLimit is limiting
+				require.Len(t, resp.LimitingConstraints, 1)
+				require.Equal(t, ConstraintKindRateLimit, resp.LimitingConstraints[0].Kind)
+
+				// only rateLimit is exhausted
+				require.Len(t, resp.ExhaustedConstraints, 1)
+				require.Equal(t, ConstraintKindRateLimit, resp.ExhaustedConstraints[0].Kind)
+
+				// expect retryAt to match throttle
+				retryAt := 60 * time.Second
+
+				require.WithinDuration(t, clock.Now().Add(retryAt), resp.RetryAfter, time.Millisecond)
+			},
+		},
 	}
 
 	for _, test := range testCases {
