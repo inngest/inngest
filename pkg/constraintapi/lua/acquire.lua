@@ -152,8 +152,8 @@ for index, value in ipairs(constraints) do
 	local constraintCapacity = 0
 	local constraintRetryAt = 0
 	if skipGCRA and (value.k == 1 or value.k == 3) then
-		-- noop
-		constraintCapacity = availableCapacity
+		-- skip constraint, don't mark as exhausted
+		constraintCapacity = math.max(availableCapacity, 1)
 	elseif value.k == 1 then
 		-- rate limit
 		local rlRes = rateLimit(value.r.k, nowNS, value.r.p, value.r.l, value.r.b, 0)
@@ -238,7 +238,8 @@ for i, value in ipairs(constraints) do
 	local constraintRetryAt = 0
 	local constraintCapacity = 0
 	if skipGCRA and (value.k == 1 or value.k == 3) then
-		-- noop
+		-- skip constraint and don't mark as exhausted
+		constraintCapacity = 1
 	elseif value.k == 1 then
 		-- rate limit
 		local rlRes = rateLimit(value.r.k, nowNS, value.r.p, value.r.l, value.r.b, granted)
