@@ -143,7 +143,7 @@ func (d httpv2) sync(ctx context.Context, sl sv2.StateLoader, opts driver.V2Requ
 	req.Header.Add("X-Run-ID", opts.Metadata.ID.RunID.String())
 	req.Header.Add(headers.HeaderKeyRequestVersion, fmt.Sprintf("%d", opts.Metadata.Config.RequestVersion))
 
-	if opts.StepID != nil {
+	if opts.StepID != nil && *opts.StepID != "" {
 		req.Header.Add(headers.HeaderInngestStepID, *opts.StepID)
 	}
 
