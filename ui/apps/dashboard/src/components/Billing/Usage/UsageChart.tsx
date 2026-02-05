@@ -26,7 +26,7 @@ export default function BillableUsageChart({
       <div className="flex h-full min-h-[297px] w-full items-center justify-center overflow-hidden">
         <Alert severity="warning">
           Failed to load usage data. Please{' '}
-          <Alert.Link severity="warning" href="/support">
+          <Alert.Link severity="warning" href="https://support.inngest.com">
             contact support
           </Alert.Link>{' '}
           if this does not resolve.

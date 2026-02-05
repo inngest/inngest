@@ -64,7 +64,7 @@ function RouteComponent() {
               <Alert.Link
                 size="medium"
                 severity="error"
-                href="/support"
+                href="https://support.inngest.com"
                 className="inline underline"
               >
                 Contact support

@@ -6,6 +6,12 @@ export const DOCS_URLS = {
   SERVE: "https://www.inngest.com/docs/sdk/serve",
 };
 
+// Dashboard URLs - uses VITE_APP_URL for the dashboard base URL
+export function getDashboardBillingUrl(): string {
+  const baseUrl = import.meta.env.VITE_APP_URL || "https://app.inngest.com";
+  return `${baseUrl}/billing`;
+}
+
 export const pathCreator = {
   billing({
     ref,

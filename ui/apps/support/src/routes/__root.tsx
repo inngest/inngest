@@ -49,13 +49,14 @@ export const Route = createRootRouteWithContext<{
       },
       {
         rel: "icon",
-        url: "/favicon-june-2025-light.svg",
-        media: "(prefers-color-scheme: light)",
+        type: "image/svg+xml",
+        href: import.meta.env.VITE_FAVICON ?? "/favicon.svg",
       },
       {
         rel: "icon",
-        url: "/favicon-june-2025-dark.svg",
-        media: "(prefers-color-scheme: dark)",
+        type: "image/png",
+        sizes: "32x32",
+        href: "/favicon-32x32.png",
       },
     ],
   }),
