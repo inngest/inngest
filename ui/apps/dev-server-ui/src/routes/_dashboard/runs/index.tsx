@@ -146,7 +146,7 @@ function RunsComponent() {
 
   const searchError = parseCelSearchError(error);
 
-  useEffect(() => {
+  const getTotalCount = useCallback(async () => {
     setTotalCount(undefined);
     (async () => {
       const data: CountRunsQuery = await client.request(CountRunsDocument, {
@@ -159,6 +159,15 @@ function RunsComponent() {
       setTotalCount(data.runs.totalCount);
     })();
   }, [calculatedStartTime, endTime, filteredStatus, timeField, search]);
+
+  useEffect(() => {
+    getTotalCount();
+  }, [getTotalCount]);
+
+  const onRefresh = useCallback(() => {
+    fetchNextPage();
+    getTotalCount();
+  }, [fetchNextPage, getTotalCount]);
 
   const runs = useMemo(() => {
     if (!data?.pages) {
@@ -223,7 +232,7 @@ function RunsComponent() {
         isLoadingInitial={isFetching && runs === undefined}
         isLoadingMore={isFetching && runs !== undefined}
         onScrollToTop={onScrollToTop}
-        onRefresh={fetchNextPage}
+        onRefresh={onRefresh}
         getTrigger={getTrigger}
         pollInterval={pollInterval}
         scope="env"

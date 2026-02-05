@@ -102,8 +102,8 @@ func (q *queue) BacklogRefillConstraintCheck(
 	}
 
 	constraint := enums.QueueConstraintNotLimited
-	if len(res.LimitingConstraints) > 0 {
-		constraint = osqueue.ConvertLimitingConstraint(constraints, res.LimitingConstraints)
+	if len(res.ExhaustedConstraints) > 0 {
+		constraint = osqueue.ConvertLimitingConstraint(constraints, res.ExhaustedConstraints)
 	}
 
 	if len(res.Leases) == 0 {
@@ -286,8 +286,8 @@ func (q *queue) ItemLeaseConstraintCheck(
 	}
 
 	constraint := enums.QueueConstraintNotLimited
-	if len(res.LimitingConstraints) > 0 {
-		constraint = osqueue.ConvertLimitingConstraint(constraints, res.LimitingConstraints)
+	if len(res.ExhaustedConstraints) > 0 {
+		constraint = osqueue.ConvertLimitingConstraint(constraints, res.ExhaustedConstraints)
 	}
 
 	if len(res.Leases) == 0 {

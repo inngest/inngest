@@ -514,6 +514,164 @@ func TestItemLeaseConstraintCheck(t *testing.T) {
 		require.Equal(t, 0, len(cmLifecycles.ReleaseCalls))
 	})
 
+	t.Run("successful acquire has no limiting constraint", func(t *testing.T) {
+		reset()
+
+		_, shard := newQueue(
+			t, rc,
+			osqueue.WithClock(clock),
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+				return true
+			}),
+			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
+				return true, true
+			}),
+			osqueue.WithCapacityManager(cm),
+			osqueue.WithCapacityLeaseExtendInterval(time.Second),
+			osqueue.WithLogger(l),
+			osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
+				return constraints
+			}),
+		)
+
+		qi, err := shard.EnqueueItem(ctx, item, start, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+
+		sp := osqueue.ItemShadowPartition(ctx, qi)
+		backlog := osqueue.ItemBacklog(ctx, qi)
+
+		res, err := shard.ItemLeaseConstraintCheck(ctx, &sp, &backlog, constraints, &qi, clock.Now())
+		require.NoError(t, err)
+
+		// Leases were granted
+		require.NotNil(t, res.CapacityLease)
+		require.True(t, res.SkipConstraintChecks)
+
+		// CRITICAL: No limiting constraint should be set when leases are granted
+		require.Equal(t, enums.QueueConstraintNotLimited, res.LimitingConstraint)
+
+		// Verify lifecycle data
+		require.Equal(t, 1, len(cmLifecycles.AcquireCalls))
+		require.Len(t, cmLifecycles.AcquireCalls[0].GrantedLeases, 1)
+
+		// ExhaustedConstraints should be empty since capacity was available
+		require.Empty(t, cmLifecycles.AcquireCalls[0].ExhaustedConstraints)
+	})
+
+	t.Run("multiple constraints with partial exhaustion", func(t *testing.T) {
+		reset()
+
+		// Set up multiple constraints: account concurrency=10, function concurrency=2
+		// We'll exhaust function concurrency but leave account concurrency available
+		multiConstraints := osqueue.PartitionConstraintConfig{
+			FunctionVersion: 1,
+			Concurrency: osqueue.PartitionConcurrency{
+				AccountConcurrency:  10, // Not exhausted
+				FunctionConcurrency: 2,  // Will be exhausted
+			},
+		}
+
+		_, shard := newQueue(
+			t, rc,
+			osqueue.WithClock(clock),
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+				return true
+			}),
+			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
+				return true, true
+			}),
+			osqueue.WithCapacityManager(cm),
+			osqueue.WithCapacityLeaseExtendInterval(time.Second),
+			osqueue.WithLogger(l),
+			osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
+				return multiConstraints
+			}),
+		)
+
+		// Create three items
+		item1 := osqueue.QueueItem{
+			FunctionID:  fnID,
+			WorkspaceID: envID,
+			Data: osqueue.Item{
+				Payload: json.RawMessage("{\"test\":\"payload1\"}"),
+				Identifier: state.Identifier{
+					AccountID:   accountID,
+					WorkspaceID: envID,
+					WorkflowID:  fnID,
+				},
+			},
+		}
+		item2 := osqueue.QueueItem{
+			FunctionID:  fnID,
+			WorkspaceID: envID,
+			Data: osqueue.Item{
+				Payload: json.RawMessage("{\"test\":\"payload2\"}"),
+				Identifier: state.Identifier{
+					AccountID:   accountID,
+					WorkspaceID: envID,
+					WorkflowID:  fnID,
+				},
+			},
+		}
+		item3 := osqueue.QueueItem{
+			FunctionID:  fnID,
+			WorkspaceID: envID,
+			Data: osqueue.Item{
+				Payload: json.RawMessage("{\"test\":\"payload3\"}"),
+				Identifier: state.Identifier{
+					AccountID:   accountID,
+					WorkspaceID: envID,
+					WorkflowID:  fnID,
+				},
+			},
+		}
+
+		qi1, err := shard.EnqueueItem(ctx, item1, start, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+		qi2, err := shard.EnqueueItem(ctx, item2, start, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+		qi3, err := shard.EnqueueItem(ctx, item3, start, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+
+		sp := osqueue.ItemShadowPartition(ctx, qi1)
+		backlog := osqueue.ItemBacklog(ctx, qi1)
+
+		// First two acquires should succeed (function concurrency limit=2)
+		res1, err := shard.ItemLeaseConstraintCheck(ctx, &sp, &backlog, multiConstraints, &qi1, clock.Now())
+		require.NoError(t, err)
+		require.NotNil(t, res1.CapacityLease)
+		require.True(t, res1.SkipConstraintChecks)
+
+		backlog2 := osqueue.ItemBacklog(ctx, qi2)
+		res2, err := shard.ItemLeaseConstraintCheck(ctx, &sp, &backlog2, multiConstraints, &qi2, clock.Now())
+		require.NoError(t, err)
+		require.NotNil(t, res2.CapacityLease)
+		require.True(t, res2.SkipConstraintChecks)
+
+		// The second acquire should show function concurrency is exhausted
+		require.Equal(t, 2, len(cmLifecycles.AcquireCalls))
+		require.Len(t, cmLifecycles.AcquireCalls[1].GrantedLeases, 1)
+		require.Len(t, cmLifecycles.AcquireCalls[1].ExhaustedConstraints, 1)
+
+		// Third acquire should fail due to function concurrency exhaustion
+		backlog3 := osqueue.ItemBacklog(ctx, qi3)
+		res3, err := shard.ItemLeaseConstraintCheck(ctx, &sp, &backlog3, multiConstraints, &qi3, clock.Now())
+		require.NoError(t, err)
+		require.Nil(t, res3.CapacityLease)
+		require.False(t, res3.SkipConstraintChecks)
+		require.Equal(t, enums.QueueConstraintFunctionConcurrency, res3.LimitingConstraint)
+
+		// Verify lifecycle captures exhausted constraint
+		require.Equal(t, 3, len(cmLifecycles.AcquireCalls))
+		require.Len(t, cmLifecycles.AcquireCalls[2].GrantedLeases, 0)
+		require.Len(t, cmLifecycles.AcquireCalls[2].ExhaustedConstraints, 1)
+
+		// The exhausted constraint should be function concurrency
+		exhausted := cmLifecycles.AcquireCalls[2].ExhaustedConstraints[0]
+		require.Equal(t, constraintapi.ConstraintKindConcurrency, exhausted.Kind)
+		require.Equal(t, enums.ConcurrencyScopeFn, exhausted.Concurrency.Scope)
+	})
+
 	t.Run("lacking constraint capacity", func(t *testing.T) {
 		reset()
 
@@ -565,6 +723,18 @@ func TestItemLeaseConstraintCheck(t *testing.T) {
 		require.Len(t, cmLifecycles.AcquireCalls[0].GrantedLeases, 0)
 		require.Len(t, cmLifecycles.AcquireCalls[0].LimitingConstraints, 1)
 		require.Equal(t, constraintapi.ConstraintKindConcurrency, cmLifecycles.AcquireCalls[0].LimitingConstraints[0].Kind)
+
+		// Verify ExhaustedConstraints is populated
+		require.Len(t, cmLifecycles.AcquireCalls[0].ExhaustedConstraints, 1)
+		require.Equal(t, constraintapi.ConstraintKindConcurrency,
+			cmLifecycles.AcquireCalls[0].ExhaustedConstraints[0].Kind)
+		require.Equal(t, enums.ConcurrencyScopeAccount,
+			cmLifecycles.AcquireCalls[0].ExhaustedConstraints[0].Concurrency.Scope)
+
+		// Verify that the exhausted constraint matches the limiting constraint
+		require.Equal(t,
+			cmLifecycles.AcquireCalls[0].ExhaustedConstraints[0].Kind,
+			cmLifecycles.AcquireCalls[0].LimitingConstraints[0].Kind)
 	})
 }
 
@@ -804,6 +974,11 @@ func TestBacklogRefillConstraintCheck(t *testing.T) {
 		require.Equal(t, 1, len(cmLifecycles.AcquireCalls))
 		require.Equal(t, 0, len(cmLifecycles.ExtendCalls))
 		require.Equal(t, 0, len(cmLifecycles.ReleaseCalls))
+
+		// Verify lifecycle data for successful acquire
+		require.Len(t, cmLifecycles.AcquireCalls[0].GrantedLeases, 1)
+		require.Empty(t, cmLifecycles.AcquireCalls[0].ExhaustedConstraints,
+			"ExhaustedConstraints should be empty when leases are granted")
 	})
 
 	t.Run("lacking capacity returns 0 leases from constraintapi", func(t *testing.T) {
@@ -856,6 +1031,12 @@ func TestBacklogRefillConstraintCheck(t *testing.T) {
 		require.Equal(t, 1, len(cmLifecycles.AcquireCalls))
 		require.Equal(t, 0, len(cmLifecycles.ExtendCalls))
 		require.Equal(t, 0, len(cmLifecycles.ReleaseCalls))
+
+		// Verify ExhaustedConstraints is populated
+		require.Len(t, cmLifecycles.AcquireCalls[0].GrantedLeases, 0)
+		require.Len(t, cmLifecycles.AcquireCalls[0].ExhaustedConstraints, 1)
+		require.Equal(t, constraintapi.ConstraintKindConcurrency,
+			cmLifecycles.AcquireCalls[0].ExhaustedConstraints[0].Kind)
 	})
 }
 

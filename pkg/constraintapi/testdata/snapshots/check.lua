@@ -168,6 +168,8 @@ if not constraints then
 end
 local availableCapacity = nil
 local limitingConstraints = {}
+local exhaustedConstraints = {}
+local exhaustedSet = {}
 local retryAt = 0
 local constraintUsage = {}
 for index, value in ipairs(constraints) do
@@ -191,6 +193,7 @@ for index, value in ipairs(constraints) do
 		local inProgressLeases = getConcurrencyCount(value.c.ilk)
 		local inProgressTotal = inProgressItems + inProgressLeases
 		constraintCapacity = value.c.l - inProgressTotal
+		constraintRetryAfter = toInteger(nowMS + value.c.ra)
 		local usage = {}
 		usage["l"] = value.c.l
 		usage["u"] = math.max(math.min(value.c.l - constraintCapacity, value.c.l or 0), 0)
@@ -218,6 +221,15 @@ for index, value in ipairs(constraints) do
 		usage["u"] = math.max(math.min(value.t.l - constraintCapacity, value.t.l or 0), 0)
 		table.insert(constraintUsage, usage)
 	end
+	if constraintCapacity <= 0 then
+		if not exhaustedSet[index] then
+			table.insert(exhaustedConstraints, index)
+			exhaustedSet[index] = true
+		end
+		if constraintRetryAfter > retryAt then
+			retryAt = constraintRetryAfter
+		end
+	end
 	if availableCapacity == nil or constraintCapacity < availableCapacity then
 		debug(
 			"constraint has less capacity",
@@ -230,9 +242,6 @@ for index, value in ipairs(constraints) do
 		)
 		availableCapacity = constraintCapacity
 		table.insert(limitingConstraints, index)
-		if constraintRetryAfter > retryAt then
-			retryAt = constraintRetryAfter
-		end
 	end
 end
 local fairnessReduction = 0
@@ -241,6 +250,7 @@ local res = {}
 res["s"] = 1
 res["d"] = debugLogs
 res["lc"] = limitingConstraints
+res["ec"] = exhaustedConstraints
 res["ra"] = retryAt
 res["fr"] = fairnessReduction
 res["a"] = availableCapacity
