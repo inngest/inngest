@@ -1,10 +1,10 @@
 import { useQuery } from '@connectrpc/connect-query';
 import { timestampDate } from '@bufbuild/protobuf/wkt';
-import { fetchAccountEnvs } from '@/gen/proto/api/v2/service-V2_connectquery';
+import { fetchAccountEnvs } from '@inngest/components/proto/api/v2/service-V2_connectquery';
 import {
   EnvType as ProtoEnvType,
   type Env as ProtoEnv,
-} from '@/gen/proto/api/v2/service_pb';
+} from '@inngest/components/proto/api/v2/service_pb';
 import { EnvironmentType, type Environment } from '@/utils/environments';
 
 //

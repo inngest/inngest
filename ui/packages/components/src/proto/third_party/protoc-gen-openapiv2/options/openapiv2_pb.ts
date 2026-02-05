@@ -2,15 +2,16 @@
 // @generated from file third_party/protoc-gen-openapiv2/options/openapiv2.proto (package grpc.gateway.protoc_gen_openapiv2.options, syntax proto3)
 /* eslint-disable */
 
-import type {
-  GenEnum,
-  GenFile,
-  GenMessage,
-} from '@bufbuild/protobuf/codegenv2';
-import { enumDesc, fileDesc, messageDesc } from '@bufbuild/protobuf/codegenv2';
-import type { Value } from '@bufbuild/protobuf/wkt';
-import { file_google_protobuf_struct } from '@bufbuild/protobuf/wkt';
 import type { Message } from '@bufbuild/protobuf';
+import {
+  enumDesc,
+  fileDesc,
+  messageDesc,
+  type GenEnum,
+  type GenFile,
+  type GenMessage,
+} from '@bufbuild/protobuf/codegenv2';
+import { file_google_protobuf_struct, type Value } from '@bufbuild/protobuf/wkt';
 
 /**
  * Describes the file third_party/protoc-gen-openapiv2/options/openapiv2.proto.
@@ -19,7 +20,7 @@ export const file_third_party_protoc_gen_openapiv2_options_openapiv2: GenFile =
   /*@__PURE__*/
   fileDesc(
     'Cjh0aGlyZF9wYXJ0eS9wcm90b2MtZ2VuLW9wZW5hcGl2Mi9vcHRpb25zL29wZW5hcGl2Mi5wcm90bxIpZ3JwYy5nYXRld2F5LnByb3RvY19nZW5fb3BlbmFwaXYyLm9wdGlvbnMilQcKB1N3YWdnZXISDwoHc3dhZ2dlchgBIAEoCRI9CgRpbmZvGAIgASgLMi8uZ3JwYy5nYXRld2F5LnByb3RvY19nZW5fb3BlbmFwaXYyLm9wdGlvbnMuSW5mbxIMCgRob3N0GAMgASgJEhEKCWJhc2VfcGF0aBgEIAEoCRJCCgdzY2hlbWVzGAUgAygOMjEuZ3JwYy5nYXRld2F5LnByb3RvY19nZW5fb3BlbmFwaXYyLm9wdGlvbnMuU2NoZW1lEhAKCGNvbnN1bWVzGAYgAygJEhAKCHByb2R1Y2VzGAcgAygJElQKCXJlc3BvbnNlcxgKIAMoCzJBLmdycGMuZ2F0ZXdheS5wcm90b2NfZ2VuX29wZW5hcGl2Mi5vcHRpb25zLlN3YWdnZXIuUmVzcG9uc2VzRW50cnkSXAoUc2VjdXJpdHlfZGVmaW5pdGlvbnMYCyABKAsyPi5ncnBjLmdhdGV3YXkucHJvdG9jX2dlbl9vcGVuYXBpdjIub3B0aW9ucy5TZWN1cml0eURlZmluaXRpb25zElAKCHNlY3VyaXR5GAwgAygLMj4uZ3JwYy5nYXRld2F5LnByb3RvY19nZW5fb3BlbmFwaXYyLm9wdGlvbnMuU2VjdXJpdHlSZXF1aXJlbWVudBI8CgR0YWdzGA0gAygLMi4uZ3JwYy5nYXRld2F5LnByb3RvY19nZW5fb3BlbmFwaXYyLm9wdGlvbnMuVGFnElcKDWV4dGVybmFsX2RvY3MYDiABKAsyQC5ncnBjLmdhdGV3YXkucHJvdG9jX2dlbl9vcGVuYXBpdjIub3B0aW9ucy5FeHRlcm5hbERvY3VtZW50YXRpb24SVgoKZXh0ZW5zaW9ucxgPIAMoCzJCLmdycGMuZ2F0ZXdheS5wcm90b2NfZ2VuX29wZW5hcGl2Mi5vcHRpb25zLlN3YWdnZXIuRXh0ZW5zaW9uc0VudHJ5GmUKDlJlc3BvbnNlc0VudHJ5EgsKA2tleRgBIAEoCRJCCgV2YWx1ZRgCIAEoCzIzLmdycGMuZ2F0ZXdheS5wcm90b2NfZ2VuX29wZW5hcGl2Mi5vcHRpb25zLlJlc3BvbnNlOgI4ARpJCg9FeHRlbnNpb25zRW50cnkSCwoDa2V5GAEgASgJEiUKBXZhbHVlGAIgASgLMhYuZ29vZ2xlLnByb3RvYnVmLlZhbHVlOgI4AUoECAgQCUoECAkQCiKxBgoJT3BlcmF0aW9uEgwKBHRhZ3MYASADKAkSDwoHc3VtbWFyeRgCIAEoCRITCgtkZXNjcmlwdGlvbhgDIAEoCRJXCg1leHRlcm5hbF9kb2NzGAQgASgLMkAuZ3JwYy5nYXRld2F5LnByb3RvY19nZW5fb3BlbmFwaXYyLm9wdGlvbnMuRXh0ZXJuYWxEb2N1bWVudGF0aW9uEhQKDG9wZXJhdGlvbl9pZBgFIAEoCRIQCghjb25zdW1lcxgGIAMoCRIQCghwcm9kdWNlcxgHIAMoCRJWCglyZXNwb25zZXMYCSADKAsyQy5ncnBjLmdhdGV3YXkucHJvdG9jX2dlbl9vcGVuYXBpdjIub3B0aW9ucy5PcGVyYXRpb24uUmVzcG9uc2VzRW50cnkSQgoHc2NoZW1lcxgKIAMoDjIxLmdycGMuZ2F0ZXdheS5wcm90b2NfZ2VuX29wZW5hcGl2Mi5vcHRpb25zLlNjaGVtZRISCgpkZXByZWNhdGVkGAsgASgIElAKCHNlY3VyaXR5GAwgAygLMj4uZ3JwYy5nYXRld2F5LnByb3RvY19nZW5fb3BlbmFwaXYyLm9wdGlvbnMuU2VjdXJpdHlSZXF1aXJlbWVudBJYCgpleHRlbnNpb25zGA0gAygLMkQuZ3JwYy5nYXRld2F5LnByb3RvY19nZW5fb3BlbmFwaXYyLm9wdGlvbnMuT3BlcmF0aW9uLkV4dGVuc2lvbnNFbnRyeRJJCgpwYXJhbWV0ZXJzGA4gASgLMjUuZ3JwYy5nYXRld2F5LnByb3RvY19nZW5fb3BlbmFwaXYyLm9wdGlvbnMuUGFyYW1ldGVycxplCg5SZXNwb25zZXNFbnRyeRILCgNrZXkYASABKAkSQgoFdmFsdWUYAiABKAsyMy5ncnBjLmdhdGV3YXkucHJvdG9jX2dlbl9vcGVuYXBpdjIub3B0aW9ucy5SZXNwb25zZToCOAEaSQoPRXh0ZW5zaW9uc0VudHJ5EgsKA2tleRgBIAEoCRIlCgV2YWx1ZRgCIAEoCzIWLmdvb2dsZS5wcm90b2J1Zi5WYWx1ZToCOAFKBAgIEAkiWQoKUGFyYW1ldGVycxJLCgdoZWFkZXJzGAEgAygLMjouZ3JwYy5nYXRld2F5LnByb3RvY19nZW5fb3BlbmFwaXYyLm9wdGlvbnMuSGVhZGVyUGFyYW1ldGVyIvgBCg9IZWFkZXJQYXJhbWV0ZXISDAoEbmFtZRgBIAEoCRITCgtkZXNjcmlwdGlvbhgCIAEoCRJNCgR0eXBlGAMgASgOMj8uZ3JwYy5nYXRld2F5LnByb3RvY19nZW5fb3BlbmFwaXYyLm9wdGlvbnMuSGVhZGVyUGFyYW1ldGVyLlR5cGUSDgoGZm9ybWF0GAQgASgJEhAKCHJlcXVpcmVkGAUgASgIIkUKBFR5cGUSCwoHVU5LTk9XThAAEgoKBlNUUklORxABEgoKBk5VTUJFUhACEgsKB0lOVEVHRVIQAxILCgdCT09MRUFOEARKBAgGEAdKBAgHEAgiqwEKBkhlYWRlchITCgtkZXNjcmlwdGlvbhgBIAEoCRIMCgR0eXBlGAIgASgJEg4KBmZvcm1hdBgDIAEoCRIPCgdkZWZhdWx0GAYgASgJEg8KB3BhdHRlcm4YDSABKAlKBAgEEAVKBAgFEAZKBAgHEAhKBAgIEAlKBAgJEApKBAgKEAtKBAgLEAxKBAgMEA1KBAgOEA9KBAgPEBBKBAgQEBFKBAgREBJKBAgSEBMiwgQKCFJlc3BvbnNlEhMKC2Rlc2NyaXB0aW9uGAEgASgJEkEKBnNjaGVtYRgCIAEoCzIxLmdycGMuZ2F0ZXdheS5wcm90b2NfZ2VuX29wZW5hcGl2Mi5vcHRpb25zLlNjaGVtYRJRCgdoZWFkZXJzGAMgAygLMkAuZ3JwYy5nYXRld2F5LnByb3RvY19nZW5fb3BlbmFwaXYyLm9wdGlvbnMuUmVzcG9uc2UuSGVhZGVyc0VudHJ5ElMKCGV4YW1wbGVzGAQgAygLMkEuZ3JwYy5nYXRld2F5LnByb3RvY19nZW5fb3BlbmFwaXYyLm9wdGlvbnMuUmVzcG9uc2UuRXhhbXBsZXNFbnRyeRJXCgpleHRlbnNpb25zGAUgAygLMkMuZ3JwYy5nYXRld2F5LnByb3RvY19nZW5fb3BlbmFwaXYyLm9wdGlvbnMuUmVzcG9uc2UuRXh0ZW5zaW9uc0VudHJ5GmEKDEhlYWRlcnNFbnRyeRILCgNrZXkYASABKAkSQAoFdmFsdWUYAiABKAsyMS5ncnBjLmdhdGV3YXkucHJvdG9jX2dlbl9vcGVuYXBpdjIub3B0aW9ucy5IZWFkZXI6AjgBGi8KDUV4YW1wbGVzRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ARpJCg9FeHRlbnNpb25zRW50cnkSCwoDa2V5GAEgASgJEiUKBXZhbHVlGAIgASgLMhYuZ29vZ2xlLnByb3RvYnVmLlZhbHVlOgI4ASL/AgoESW5mbxINCgV0aXRsZRgBIAEoCRITCgtkZXNjcmlwdGlvbhgCIAEoCRIYChB0ZXJtc19vZl9zZXJ2aWNlGAMgASgJEkMKB2NvbnRhY3QYBCABKAsyMi5ncnBjLmdhdGV3YXkucHJvdG9jX2dlbl9vcGVuYXBpdjIub3B0aW9ucy5Db250YWN0EkMKB2xpY2Vuc2UYBSABKAsyMi5ncnBjLmdhdGV3YXkucHJvdG9jX2dlbl9vcGVuYXBpdjIub3B0aW9ucy5MaWNlbnNlEg8KB3ZlcnNpb24YBiABKAkSUwoKZXh0ZW5zaW9ucxgHIAMoCzI/LmdycGMuZ2F0ZXdheS5wcm90b2NfZ2VuX29wZW5hcGl2Mi5vcHRpb25zLkluZm8uRXh0ZW5zaW9uc0VudHJ5GkkKD0V4dGVuc2lvbnNFbnRyeRILCgNrZXkYASABKAkSJQoFdmFsdWUYAiABKAsyFi5nb29nbGUucHJvdG9idWYuVmFsdWU6AjgBIjMKB0NvbnRhY3QSDAoEbmFtZRgBIAEoCRILCgN1cmwYAiABKAkSDQoFZW1haWwYAyABKAkiJAoHTGljZW5zZRIMCgRuYW1lGAEgASgJEgsKA3VybBgCIAEoCSI5ChVFeHRlcm5hbERvY3VtZW50YXRpb24SEwoLZGVzY3JpcHRpb24YASABKAkSCwoDdXJsGAIgASgJIu4BCgZTY2hlbWESSgoLanNvbl9zY2hlbWEYASABKAsyNS5ncnBjLmdhdGV3YXkucHJvdG9jX2dlbl9vcGVuYXBpdjIub3B0aW9ucy5KU09OU2NoZW1hEhUKDWRpc2NyaW1pbmF0b3IYAiABKAkSEQoJcmVhZF9vbmx5GAMgASgIElcKDWV4dGVybmFsX2RvY3MYBSABKAsyQC5ncnBjLmdhdGV3YXkucHJvdG9jX2dlbl9vcGVuYXBpdjIub3B0aW9ucy5FeHRlcm5hbERvY3VtZW50YXRpb24SDwoHZXhhbXBsZRgGIAEoCUoECAQQBSKDAwoKRW51bVNjaGVtYRITCgtkZXNjcmlwdGlvbhgBIAEoCRIPCgdkZWZhdWx0GAIgASgJEg0KBXRpdGxlGAMgASgJEhAKCHJlcXVpcmVkGAQgASgIEhEKCXJlYWRfb25seRgFIAEoCBJXCg1leHRlcm5hbF9kb2NzGAYgASgLMkAuZ3JwYy5nYXRld2F5LnByb3RvY19nZW5fb3BlbmFwaXYyLm9wdGlvbnMuRXh0ZXJuYWxEb2N1bWVudGF0aW9uEg8KB2V4YW1wbGUYByABKAkSCwoDcmVmGAggASgJElkKCmV4dGVuc2lvbnMYCSADKAsyRS5ncnBjLmdhdGV3YXkucHJvdG9jX2dlbl9vcGVuYXBpdjIub3B0aW9ucy5FbnVtU2NoZW1hLkV4dGVuc2lvbnNFbnRyeRpJCg9FeHRlbnNpb25zRW50cnkSCwoDa2V5GAEgASgJEiUKBXZhbHVlGAIgASgLMhYuZ29vZ2xlLnByb3RvYnVmLlZhbHVlOgI4ASKiCAoKSlNPTlNjaGVtYRILCgNyZWYYAyABKAkSDQoFdGl0bGUYBSABKAkSEwoLZGVzY3JpcHRpb24YBiABKAkSDwoHZGVmYXVsdBgHIAEoCRIRCglyZWFkX29ubHkYCCABKAgSDwoHZXhhbXBsZRgJIAEoCRITCgttdWx0aXBsZV9vZhgKIAEoARIPCgdtYXhpbXVtGAsgASgBEhkKEWV4Y2x1c2l2ZV9tYXhpbXVtGAwgASgIEg8KB21pbmltdW0YDSABKAESGQoRZXhjbHVzaXZlX21pbmltdW0YDiABKAgSEgoKbWF4X2xlbmd0aBgPIAEoBBISCgptaW5fbGVuZ3RoGBAgASgEEg8KB3BhdHRlcm4YESABKAkSEQoJbWF4X2l0ZW1zGBQgASgEEhEKCW1pbl9pdGVtcxgVIAEoBBIUCgx1bmlxdWVfaXRlbXMYFiABKAgSFgoObWF4X3Byb3BlcnRpZXMYGCABKAQSFgoObWluX3Byb3BlcnRpZXMYGSABKAQSEAoIcmVxdWlyZWQYGiADKAkSDQoFYXJyYXkYIiADKAkSWQoEdHlwZRgjIAMoDjJLLmdycGMuZ2F0ZXdheS5wcm90b2NfZ2VuX29wZW5hcGl2Mi5vcHRpb25zLkpTT05TY2hlbWEuSlNPTlNjaGVtYVNpbXBsZVR5cGVzEg4KBmZvcm1hdBgkIAEoCRIMCgRlbnVtGC4gAygJEmYKE2ZpZWxkX2NvbmZpZ3VyYXRpb24Y6QcgASgLMkguZ3JwYy5nYXRld2F5LnByb3RvY19nZW5fb3BlbmFwaXYyLm9wdGlvbnMuSlNPTlNjaGVtYS5GaWVsZENvbmZpZ3VyYXRpb24SWQoKZXh0ZW5zaW9ucxgwIAMoCzJFLmdycGMuZ2F0ZXdheS5wcm90b2NfZ2VuX29wZW5hcGl2Mi5vcHRpb25zLkpTT05TY2hlbWEuRXh0ZW5zaW9uc0VudHJ5Gi0KEkZpZWxkQ29uZmlndXJhdGlvbhIXCg9wYXRoX3BhcmFtX25hbWUYLyABKAkaSQoPRXh0ZW5zaW9uc0VudHJ5EgsKA2tleRgBIAEoCRIlCgV2YWx1ZRgCIAEoCzIWLmdvb2dsZS5wcm90b2J1Zi5WYWx1ZToCOAEidwoVSlNPTlNjaGVtYVNpbXBsZVR5cGVzEgsKB1VOS05PV04QABIJCgVBUlJBWRABEgsKB0JPT0xFQU4QAhILCgdJTlRFR0VSEAMSCAoETlVMTBAEEgoKBk5VTUJFUhAFEgoKBk9CSkVDVBAGEgoKBlNUUklORxAHSgQIARACSgQIAhADSgQIBBAFSgQIEhATSgQIExAUSgQIFxAYSgQIGxAcSgQIHBAdSgQIHRAeSgQIHhAiSgQIJRAqSgQIKhArSgQIKxAuIqACCgNUYWcSDAoEbmFtZRgBIAEoCRITCgtkZXNjcmlwdGlvbhgCIAEoCRJXCg1leHRlcm5hbF9kb2NzGAMgASgLMkAuZ3JwYy5nYXRld2F5LnByb3RvY19nZW5fb3BlbmFwaXYyLm9wdGlvbnMuRXh0ZXJuYWxEb2N1bWVudGF0aW9uElIKCmV4dGVuc2lvbnMYBCADKAsyPi5ncnBjLmdhdGV3YXkucHJvdG9jX2dlbl9vcGVuYXBpdjIub3B0aW9ucy5UYWcuRXh0ZW5zaW9uc0VudHJ5GkkKD0V4dGVuc2lvbnNFbnRyeRILCgNrZXkYASABKAkSJQoFdmFsdWUYAiABKAsyFi5nb29nbGUucHJvdG9idWYuVmFsdWU6AjgBIuEBChNTZWN1cml0eURlZmluaXRpb25zEl4KCHNlY3VyaXR5GAEgAygLMkwuZ3JwYy5nYXRld2F5LnByb3RvY19nZW5fb3BlbmFwaXYyLm9wdGlvbnMuU2VjdXJpdHlEZWZpbml0aW9ucy5TZWN1cml0eUVudHJ5GmoKDVNlY3VyaXR5RW50cnkSCwoDa2V5GAEgASgJEkgKBXZhbHVlGAIgASgLMjkuZ3JwYy5nYXRld2F5LnByb3RvY19nZW5fb3BlbmFwaXYyLm9wdGlvbnMuU2VjdXJpdHlTY2hlbWU6AjgBIqAGCg5TZWN1cml0eVNjaGVtZRJMCgR0eXBlGAEgASgOMj4uZ3JwYy5nYXRld2F5LnByb3RvY19nZW5fb3BlbmFwaXYyLm9wdGlvbnMuU2VjdXJpdHlTY2hlbWUuVHlwZRITCgtkZXNjcmlwdGlvbhgCIAEoCRIMCgRuYW1lGAMgASgJEkgKAmluGAQgASgOMjwuZ3JwYy5nYXRld2F5LnByb3RvY19nZW5fb3BlbmFwaXYyLm9wdGlvbnMuU2VjdXJpdHlTY2hlbWUuSW4STAoEZmxvdxgFIAEoDjI+LmdycGMuZ2F0ZXdheS5wcm90b2NfZ2VuX29wZW5hcGl2Mi5vcHRpb25zLlNlY3VyaXR5U2NoZW1lLkZsb3cSGQoRYXV0aG9yaXphdGlvbl91cmwYBiABKAkSEQoJdG9rZW5fdXJsGAcgASgJEkEKBnNjb3BlcxgIIAEoCzIxLmdycGMuZ2F0ZXdheS5wcm90b2NfZ2VuX29wZW5hcGl2Mi5vcHRpb25zLlNjb3BlcxJdCgpleHRlbnNpb25zGAkgAygLMkkuZ3JwYy5nYXRld2F5LnByb3RvY19nZW5fb3BlbmFwaXYyLm9wdGlvbnMuU2VjdXJpdHlTY2hlbWUuRXh0ZW5zaW9uc0VudHJ5GkkKD0V4dGVuc2lvbnNFbnRyeRILCgNrZXkYASABKAkSJQoFdmFsdWUYAiABKAsyFi5nb29nbGUucHJvdG9idWYuVmFsdWU6AjgBIksKBFR5cGUSEAoMVFlQRV9JTlZBTElEEAASDgoKVFlQRV9CQVNJQxABEhAKDFRZUEVfQVBJX0tFWRACEg8KC1RZUEVfT0FVVEgyEAMiMQoCSW4SDgoKSU5fSU5WQUxJRBAAEgwKCElOX1FVRVJZEAESDQoJSU5fSEVBREVSEAIiagoERmxvdxIQCgxGTE9XX0lOVkFMSUQQABIRCg1GTE9XX0lNUExJQ0lUEAESEQoNRkxPV19QQVNTV09SRBACEhQKEEZMT1dfQVBQTElDQVRJT04QAxIUChBGTE9XX0FDQ0VTU19DT0RFEAQizQIKE1NlY3VyaXR5UmVxdWlyZW1lbnQSdQoUc2VjdXJpdHlfcmVxdWlyZW1lbnQYASADKAsyVy5ncnBjLmdhdGV3YXkucHJvdG9jX2dlbl9vcGVuYXBpdjIub3B0aW9ucy5TZWN1cml0eVJlcXVpcmVtZW50LlNlY3VyaXR5UmVxdWlyZW1lbnRFbnRyeRopChhTZWN1cml0eVJlcXVpcmVtZW50VmFsdWUSDQoFc2NvcGUYASADKAkakwEKGFNlY3VyaXR5UmVxdWlyZW1lbnRFbnRyeRILCgNrZXkYASABKAkSZgoFdmFsdWUYAiABKAsyVy5ncnBjLmdhdGV3YXkucHJvdG9jX2dlbl9vcGVuYXBpdjIub3B0aW9ucy5TZWN1cml0eVJlcXVpcmVtZW50LlNlY3VyaXR5UmVxdWlyZW1lbnRWYWx1ZToCOAEigwEKBlNjb3BlcxJLCgVzY29wZRgBIAMoCzI8LmdycGMuZ2F0ZXdheS5wcm90b2NfZ2VuX29wZW5hcGl2Mi5vcHRpb25zLlNjb3Blcy5TY29wZUVudHJ5GiwKClNjb3BlRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASo7CgZTY2hlbWUSCwoHVU5LTk9XThAAEggKBEhUVFAQARIJCgVIVFRQUxACEgYKAldTEAMSBwoDV1NTEARCSFpGZ2l0aHViLmNvbS9ncnBjLWVjb3N5c3RlbS9ncnBjLWdhdGV3YXkvdjIvcHJvdG9jLWdlbi1vcGVuYXBpdjIvb3B0aW9uc2IGcHJvdG8z',
-    [file_google_protobuf_struct],
+    [file_google_protobuf_struct]
   );
 
 /**
@@ -52,126 +53,125 @@ export const file_third_party_protoc_gen_openapiv2_options_openapiv2: GenFile =
  *
  * @generated from message grpc.gateway.protoc_gen_openapiv2.options.Swagger
  */
-export type Swagger =
-  Message<'grpc.gateway.protoc_gen_openapiv2.options.Swagger'> & {
-    /**
-     * Specifies the OpenAPI Specification version being used. It can be
-     * used by the OpenAPI UI and other clients to interpret the API listing. The
-     * value MUST be "2.0".
-     *
-     * @generated from field: string swagger = 1;
-     */
-    swagger: string;
+export type Swagger = Message<'grpc.gateway.protoc_gen_openapiv2.options.Swagger'> & {
+  /**
+   * Specifies the OpenAPI Specification version being used. It can be
+   * used by the OpenAPI UI and other clients to interpret the API listing. The
+   * value MUST be "2.0".
+   *
+   * @generated from field: string swagger = 1;
+   */
+  swagger: string;
 
-    /**
-     * Provides metadata about the API. The metadata can be used by the
-     * clients if needed.
-     *
-     * @generated from field: grpc.gateway.protoc_gen_openapiv2.options.Info info = 2;
-     */
-    info?: Info;
+  /**
+   * Provides metadata about the API. The metadata can be used by the
+   * clients if needed.
+   *
+   * @generated from field: grpc.gateway.protoc_gen_openapiv2.options.Info info = 2;
+   */
+  info?: Info;
 
-    /**
-     * The host (name or ip) serving the API. This MUST be the host only and does
-     * not include the scheme nor sub-paths. It MAY include a port. If the host is
-     * not included, the host serving the documentation is to be used (including
-     * the port). The host does not support path templating.
-     *
-     * @generated from field: string host = 3;
-     */
-    host: string;
+  /**
+   * The host (name or ip) serving the API. This MUST be the host only and does
+   * not include the scheme nor sub-paths. It MAY include a port. If the host is
+   * not included, the host serving the documentation is to be used (including
+   * the port). The host does not support path templating.
+   *
+   * @generated from field: string host = 3;
+   */
+  host: string;
 
-    /**
-     * The base path on which the API is served, which is relative to the host. If
-     * it is not included, the API is served directly under the host. The value
-     * MUST start with a leading slash (/). The basePath does not support path
-     * templating.
-     * Note that using `base_path` does not change the endpoint paths that are
-     * generated in the resulting OpenAPI file. If you wish to use `base_path`
-     * with relatively generated OpenAPI paths, the `base_path` prefix must be
-     * manually removed from your `google.api.http` paths and your code changed to
-     * serve the API from the `base_path`.
-     *
-     * @generated from field: string base_path = 4;
-     */
-    basePath: string;
+  /**
+   * The base path on which the API is served, which is relative to the host. If
+   * it is not included, the API is served directly under the host. The value
+   * MUST start with a leading slash (/). The basePath does not support path
+   * templating.
+   * Note that using `base_path` does not change the endpoint paths that are
+   * generated in the resulting OpenAPI file. If you wish to use `base_path`
+   * with relatively generated OpenAPI paths, the `base_path` prefix must be
+   * manually removed from your `google.api.http` paths and your code changed to
+   * serve the API from the `base_path`.
+   *
+   * @generated from field: string base_path = 4;
+   */
+  basePath: string;
 
-    /**
-     * The transfer protocol of the API. Values MUST be from the list: "http",
-     * "https", "ws", "wss". If the schemes is not included, the default scheme to
-     * be used is the one used to access the OpenAPI definition itself.
-     *
-     * @generated from field: repeated grpc.gateway.protoc_gen_openapiv2.options.Scheme schemes = 5;
-     */
-    schemes: Scheme[];
+  /**
+   * The transfer protocol of the API. Values MUST be from the list: "http",
+   * "https", "ws", "wss". If the schemes is not included, the default scheme to
+   * be used is the one used to access the OpenAPI definition itself.
+   *
+   * @generated from field: repeated grpc.gateway.protoc_gen_openapiv2.options.Scheme schemes = 5;
+   */
+  schemes: Scheme[];
 
-    /**
-     * A list of MIME types the APIs can consume. This is global to all APIs but
-     * can be overridden on specific API calls. Value MUST be as described under
-     * Mime Types.
-     *
-     * @generated from field: repeated string consumes = 6;
-     */
-    consumes: string[];
+  /**
+   * A list of MIME types the APIs can consume. This is global to all APIs but
+   * can be overridden on specific API calls. Value MUST be as described under
+   * Mime Types.
+   *
+   * @generated from field: repeated string consumes = 6;
+   */
+  consumes: string[];
 
-    /**
-     * A list of MIME types the APIs can produce. This is global to all APIs but
-     * can be overridden on specific API calls. Value MUST be as described under
-     * Mime Types.
-     *
-     * @generated from field: repeated string produces = 7;
-     */
-    produces: string[];
+  /**
+   * A list of MIME types the APIs can produce. This is global to all APIs but
+   * can be overridden on specific API calls. Value MUST be as described under
+   * Mime Types.
+   *
+   * @generated from field: repeated string produces = 7;
+   */
+  produces: string[];
 
-    /**
-     * An object to hold responses that can be used across operations. This
-     * property does not define global responses for all operations.
-     *
-     * @generated from field: map<string, grpc.gateway.protoc_gen_openapiv2.options.Response> responses = 10;
-     */
-    responses: { [key: string]: Response };
+  /**
+   * An object to hold responses that can be used across operations. This
+   * property does not define global responses for all operations.
+   *
+   * @generated from field: map<string, grpc.gateway.protoc_gen_openapiv2.options.Response> responses = 10;
+   */
+  responses: { [key: string]: Response };
 
-    /**
-     * Security scheme definitions that can be used across the specification.
-     *
-     * @generated from field: grpc.gateway.protoc_gen_openapiv2.options.SecurityDefinitions security_definitions = 11;
-     */
-    securityDefinitions?: SecurityDefinitions;
+  /**
+   * Security scheme definitions that can be used across the specification.
+   *
+   * @generated from field: grpc.gateway.protoc_gen_openapiv2.options.SecurityDefinitions security_definitions = 11;
+   */
+  securityDefinitions?: SecurityDefinitions;
 
-    /**
-     * A declaration of which security schemes are applied for the API as a whole.
-     * The list of values describes alternative security schemes that can be used
-     * (that is, there is a logical OR between the security requirements).
-     * Individual operations can override this definition.
-     *
-     * @generated from field: repeated grpc.gateway.protoc_gen_openapiv2.options.SecurityRequirement security = 12;
-     */
-    security: SecurityRequirement[];
+  /**
+   * A declaration of which security schemes are applied for the API as a whole.
+   * The list of values describes alternative security schemes that can be used
+   * (that is, there is a logical OR between the security requirements).
+   * Individual operations can override this definition.
+   *
+   * @generated from field: repeated grpc.gateway.protoc_gen_openapiv2.options.SecurityRequirement security = 12;
+   */
+  security: SecurityRequirement[];
 
-    /**
-     * A list of tags for API documentation control. Tags can be used for logical
-     * grouping of operations by resources or any other qualifier.
-     *
-     * @generated from field: repeated grpc.gateway.protoc_gen_openapiv2.options.Tag tags = 13;
-     */
-    tags: Tag[];
+  /**
+   * A list of tags for API documentation control. Tags can be used for logical
+   * grouping of operations by resources or any other qualifier.
+   *
+   * @generated from field: repeated grpc.gateway.protoc_gen_openapiv2.options.Tag tags = 13;
+   */
+  tags: Tag[];
 
-    /**
-     * Additional external documentation.
-     *
-     * @generated from field: grpc.gateway.protoc_gen_openapiv2.options.ExternalDocumentation external_docs = 14;
-     */
-    externalDocs?: ExternalDocumentation;
+  /**
+   * Additional external documentation.
+   *
+   * @generated from field: grpc.gateway.protoc_gen_openapiv2.options.ExternalDocumentation external_docs = 14;
+   */
+  externalDocs?: ExternalDocumentation;
 
-    /**
-     * Custom properties that start with "x-" such as "x-foo" used to describe
-     * extra functionality that is not covered by the standard OpenAPI Specification.
-     * See: https://swagger.io/docs/specification/2-0/swagger-extensions/
-     *
-     * @generated from field: map<string, google.protobuf.Value> extensions = 15;
-     */
-    extensions: { [key: string]: Value };
-  };
+  /**
+   * Custom properties that start with "x-" such as "x-foo" used to describe
+   * extra functionality that is not covered by the standard OpenAPI Specification.
+   * See: https://swagger.io/docs/specification/2-0/swagger-extensions/
+   *
+   * @generated from field: map<string, google.protobuf.Value> extensions = 15;
+   */
+  extensions: { [key: string]: Value };
+};
 
 /**
  * Describes the message grpc.gateway.protoc_gen_openapiv2.options.Swagger.
@@ -210,121 +210,120 @@ export const SwaggerSchema: GenMessage<Swagger> =
  *
  * @generated from message grpc.gateway.protoc_gen_openapiv2.options.Operation
  */
-export type Operation =
-  Message<'grpc.gateway.protoc_gen_openapiv2.options.Operation'> & {
-    /**
-     * A list of tags for API documentation control. Tags can be used for logical
-     * grouping of operations by resources or any other qualifier.
-     *
-     * @generated from field: repeated string tags = 1;
-     */
-    tags: string[];
+export type Operation = Message<'grpc.gateway.protoc_gen_openapiv2.options.Operation'> & {
+  /**
+   * A list of tags for API documentation control. Tags can be used for logical
+   * grouping of operations by resources or any other qualifier.
+   *
+   * @generated from field: repeated string tags = 1;
+   */
+  tags: string[];
 
-    /**
-     * A short summary of what the operation does. For maximum readability in the
-     * swagger-ui, this field SHOULD be less than 120 characters.
-     *
-     * @generated from field: string summary = 2;
-     */
-    summary: string;
+  /**
+   * A short summary of what the operation does. For maximum readability in the
+   * swagger-ui, this field SHOULD be less than 120 characters.
+   *
+   * @generated from field: string summary = 2;
+   */
+  summary: string;
 
-    /**
-     * A verbose explanation of the operation behavior. GFM syntax can be used for
-     * rich text representation.
-     *
-     * @generated from field: string description = 3;
-     */
-    description: string;
+  /**
+   * A verbose explanation of the operation behavior. GFM syntax can be used for
+   * rich text representation.
+   *
+   * @generated from field: string description = 3;
+   */
+  description: string;
 
-    /**
-     * Additional external documentation for this operation.
-     *
-     * @generated from field: grpc.gateway.protoc_gen_openapiv2.options.ExternalDocumentation external_docs = 4;
-     */
-    externalDocs?: ExternalDocumentation;
+  /**
+   * Additional external documentation for this operation.
+   *
+   * @generated from field: grpc.gateway.protoc_gen_openapiv2.options.ExternalDocumentation external_docs = 4;
+   */
+  externalDocs?: ExternalDocumentation;
 
-    /**
-     * Unique string used to identify the operation. The id MUST be unique among
-     * all operations described in the API. Tools and libraries MAY use the
-     * operationId to uniquely identify an operation, therefore, it is recommended
-     * to follow common programming naming conventions.
-     *
-     * @generated from field: string operation_id = 5;
-     */
-    operationId: string;
+  /**
+   * Unique string used to identify the operation. The id MUST be unique among
+   * all operations described in the API. Tools and libraries MAY use the
+   * operationId to uniquely identify an operation, therefore, it is recommended
+   * to follow common programming naming conventions.
+   *
+   * @generated from field: string operation_id = 5;
+   */
+  operationId: string;
 
-    /**
-     * A list of MIME types the operation can consume. This overrides the consumes
-     * definition at the OpenAPI Object. An empty value MAY be used to clear the
-     * global definition. Value MUST be as described under Mime Types.
-     *
-     * @generated from field: repeated string consumes = 6;
-     */
-    consumes: string[];
+  /**
+   * A list of MIME types the operation can consume. This overrides the consumes
+   * definition at the OpenAPI Object. An empty value MAY be used to clear the
+   * global definition. Value MUST be as described under Mime Types.
+   *
+   * @generated from field: repeated string consumes = 6;
+   */
+  consumes: string[];
 
-    /**
-     * A list of MIME types the operation can produce. This overrides the produces
-     * definition at the OpenAPI Object. An empty value MAY be used to clear the
-     * global definition. Value MUST be as described under Mime Types.
-     *
-     * @generated from field: repeated string produces = 7;
-     */
-    produces: string[];
+  /**
+   * A list of MIME types the operation can produce. This overrides the produces
+   * definition at the OpenAPI Object. An empty value MAY be used to clear the
+   * global definition. Value MUST be as described under Mime Types.
+   *
+   * @generated from field: repeated string produces = 7;
+   */
+  produces: string[];
 
-    /**
-     * The list of possible responses as they are returned from executing this
-     * operation.
-     *
-     * @generated from field: map<string, grpc.gateway.protoc_gen_openapiv2.options.Response> responses = 9;
-     */
-    responses: { [key: string]: Response };
+  /**
+   * The list of possible responses as they are returned from executing this
+   * operation.
+   *
+   * @generated from field: map<string, grpc.gateway.protoc_gen_openapiv2.options.Response> responses = 9;
+   */
+  responses: { [key: string]: Response };
 
-    /**
-     * The transfer protocol for the operation. Values MUST be from the list:
-     * "http", "https", "ws", "wss". The value overrides the OpenAPI Object
-     * schemes definition.
-     *
-     * @generated from field: repeated grpc.gateway.protoc_gen_openapiv2.options.Scheme schemes = 10;
-     */
-    schemes: Scheme[];
+  /**
+   * The transfer protocol for the operation. Values MUST be from the list:
+   * "http", "https", "ws", "wss". The value overrides the OpenAPI Object
+   * schemes definition.
+   *
+   * @generated from field: repeated grpc.gateway.protoc_gen_openapiv2.options.Scheme schemes = 10;
+   */
+  schemes: Scheme[];
 
-    /**
-     * Declares this operation to be deprecated. Usage of the declared operation
-     * should be refrained. Default value is false.
-     *
-     * @generated from field: bool deprecated = 11;
-     */
-    deprecated: boolean;
+  /**
+   * Declares this operation to be deprecated. Usage of the declared operation
+   * should be refrained. Default value is false.
+   *
+   * @generated from field: bool deprecated = 11;
+   */
+  deprecated: boolean;
 
-    /**
-     * A declaration of which security schemes are applied for this operation. The
-     * list of values describes alternative security schemes that can be used
-     * (that is, there is a logical OR between the security requirements). This
-     * definition overrides any declared top-level security. To remove a top-level
-     * security declaration, an empty array can be used.
-     *
-     * @generated from field: repeated grpc.gateway.protoc_gen_openapiv2.options.SecurityRequirement security = 12;
-     */
-    security: SecurityRequirement[];
+  /**
+   * A declaration of which security schemes are applied for this operation. The
+   * list of values describes alternative security schemes that can be used
+   * (that is, there is a logical OR between the security requirements). This
+   * definition overrides any declared top-level security. To remove a top-level
+   * security declaration, an empty array can be used.
+   *
+   * @generated from field: repeated grpc.gateway.protoc_gen_openapiv2.options.SecurityRequirement security = 12;
+   */
+  security: SecurityRequirement[];
 
-    /**
-     * Custom properties that start with "x-" such as "x-foo" used to describe
-     * extra functionality that is not covered by the standard OpenAPI Specification.
-     * See: https://swagger.io/docs/specification/2-0/swagger-extensions/
-     *
-     * @generated from field: map<string, google.protobuf.Value> extensions = 13;
-     */
-    extensions: { [key: string]: Value };
+  /**
+   * Custom properties that start with "x-" such as "x-foo" used to describe
+   * extra functionality that is not covered by the standard OpenAPI Specification.
+   * See: https://swagger.io/docs/specification/2-0/swagger-extensions/
+   *
+   * @generated from field: map<string, google.protobuf.Value> extensions = 13;
+   */
+  extensions: { [key: string]: Value };
 
-    /**
-     * Custom parameters such as HTTP request headers.
-     * See: https://swagger.io/docs/specification/2-0/describing-parameters/
-     * and https://swagger.io/specification/v2/#parameter-object.
-     *
-     * @generated from field: grpc.gateway.protoc_gen_openapiv2.options.Parameters parameters = 14;
-     */
-    parameters?: Parameters;
-  };
+  /**
+   * Custom parameters such as HTTP request headers.
+   * See: https://swagger.io/docs/specification/2-0/describing-parameters/
+   * and https://swagger.io/specification/v2/#parameter-object.
+   *
+   * @generated from field: grpc.gateway.protoc_gen_openapiv2.options.Parameters parameters = 14;
+   */
+  parameters?: Parameters;
+};
 
 /**
  * Describes the message grpc.gateway.protoc_gen_openapiv2.options.Operation.
@@ -343,16 +342,15 @@ export const OperationSchema: GenMessage<Operation> =
  *
  * @generated from message grpc.gateway.protoc_gen_openapiv2.options.Parameters
  */
-export type Parameters =
-  Message<'grpc.gateway.protoc_gen_openapiv2.options.Parameters'> & {
-    /**
-     * `Headers` is one or more HTTP header parameter.
-     * See: https://swagger.io/docs/specification/2-0/describing-parameters/#header-parameters
-     *
-     * @generated from field: repeated grpc.gateway.protoc_gen_openapiv2.options.HeaderParameter headers = 1;
-     */
-    headers: HeaderParameter[];
-  };
+export type Parameters = Message<'grpc.gateway.protoc_gen_openapiv2.options.Parameters'> & {
+  /**
+   * `Headers` is one or more HTTP header parameter.
+   * See: https://swagger.io/docs/specification/2-0/describing-parameters/#header-parameters
+   *
+   * @generated from field: repeated grpc.gateway.protoc_gen_openapiv2.options.HeaderParameter headers = 1;
+   */
+  headers: HeaderParameter[];
+};
 
 /**
  * Describes the message grpc.gateway.protoc_gen_openapiv2.options.Parameters.
@@ -463,45 +461,44 @@ export const HeaderParameter_TypeSchema: GenEnum<HeaderParameter_Type> =
  *
  * @generated from message grpc.gateway.protoc_gen_openapiv2.options.Header
  */
-export type Header =
-  Message<'grpc.gateway.protoc_gen_openapiv2.options.Header'> & {
-    /**
-     * `Description` is a short description of the header.
-     *
-     * @generated from field: string description = 1;
-     */
-    description: string;
+export type Header = Message<'grpc.gateway.protoc_gen_openapiv2.options.Header'> & {
+  /**
+   * `Description` is a short description of the header.
+   *
+   * @generated from field: string description = 1;
+   */
+  description: string;
 
-    /**
-     * The type of the object. The value MUST be one of "string", "number", "integer", or "boolean". The "array" type is not supported.
-     *
-     * @generated from field: string type = 2;
-     */
-    type: string;
+  /**
+   * The type of the object. The value MUST be one of "string", "number", "integer", or "boolean". The "array" type is not supported.
+   *
+   * @generated from field: string type = 2;
+   */
+  type: string;
 
-    /**
-     * `Format` The extending format for the previously mentioned type.
-     *
-     * @generated from field: string format = 3;
-     */
-    format: string;
+  /**
+   * `Format` The extending format for the previously mentioned type.
+   *
+   * @generated from field: string format = 3;
+   */
+  format: string;
 
-    /**
-     * `Default` Declares the value of the header that the server will use if none is provided.
-     * See: https://tools.ietf.org/html/draft-fge-json-schema-validation-00#section-6.2.
-     * Unlike JSON Schema this value MUST conform to the defined type for the header.
-     *
-     * @generated from field: string default = 6;
-     */
-    default: string;
+  /**
+   * `Default` Declares the value of the header that the server will use if none is provided.
+   * See: https://tools.ietf.org/html/draft-fge-json-schema-validation-00#section-6.2.
+   * Unlike JSON Schema this value MUST conform to the defined type for the header.
+   *
+   * @generated from field: string default = 6;
+   */
+  default: string;
 
-    /**
-     * 'Pattern' See https://tools.ietf.org/html/draft-fge-json-schema-validation-00#section-5.2.3.
-     *
-     * @generated from field: string pattern = 13;
-     */
-    pattern: string;
-  };
+  /**
+   * 'Pattern' See https://tools.ietf.org/html/draft-fge-json-schema-validation-00#section-5.2.3.
+   *
+   * @generated from field: string pattern = 13;
+   */
+  pattern: string;
+};
 
 /**
  * Describes the message grpc.gateway.protoc_gen_openapiv2.options.Header.
@@ -519,50 +516,49 @@ export const HeaderSchema: GenMessage<Header> =
  *
  * @generated from message grpc.gateway.protoc_gen_openapiv2.options.Response
  */
-export type Response =
-  Message<'grpc.gateway.protoc_gen_openapiv2.options.Response'> & {
-    /**
-     * `Description` is a short description of the response.
-     * GFM syntax can be used for rich text representation.
-     *
-     * @generated from field: string description = 1;
-     */
-    description: string;
+export type Response = Message<'grpc.gateway.protoc_gen_openapiv2.options.Response'> & {
+  /**
+   * `Description` is a short description of the response.
+   * GFM syntax can be used for rich text representation.
+   *
+   * @generated from field: string description = 1;
+   */
+  description: string;
 
-    /**
-     * `Schema` optionally defines the structure of the response.
-     * If `Schema` is not provided, it means there is no content to the response.
-     *
-     * @generated from field: grpc.gateway.protoc_gen_openapiv2.options.Schema schema = 2;
-     */
-    schema?: Schema;
+  /**
+   * `Schema` optionally defines the structure of the response.
+   * If `Schema` is not provided, it means there is no content to the response.
+   *
+   * @generated from field: grpc.gateway.protoc_gen_openapiv2.options.Schema schema = 2;
+   */
+  schema?: Schema;
 
-    /**
-     * `Headers` A list of headers that are sent with the response.
-     * `Header` name is expected to be a string in the canonical format of the MIME header key
-     * See: https://golang.org/pkg/net/textproto/#CanonicalMIMEHeaderKey
-     *
-     * @generated from field: map<string, grpc.gateway.protoc_gen_openapiv2.options.Header> headers = 3;
-     */
-    headers: { [key: string]: Header };
+  /**
+   * `Headers` A list of headers that are sent with the response.
+   * `Header` name is expected to be a string in the canonical format of the MIME header key
+   * See: https://golang.org/pkg/net/textproto/#CanonicalMIMEHeaderKey
+   *
+   * @generated from field: map<string, grpc.gateway.protoc_gen_openapiv2.options.Header> headers = 3;
+   */
+  headers: { [key: string]: Header };
 
-    /**
-     * `Examples` gives per-mimetype response examples.
-     * See: https://github.com/OAI/OpenAPI-Specification/blob/3.0.0/versions/2.0.md#example-object
-     *
-     * @generated from field: map<string, string> examples = 4;
-     */
-    examples: { [key: string]: string };
+  /**
+   * `Examples` gives per-mimetype response examples.
+   * See: https://github.com/OAI/OpenAPI-Specification/blob/3.0.0/versions/2.0.md#example-object
+   *
+   * @generated from field: map<string, string> examples = 4;
+   */
+  examples: { [key: string]: string };
 
-    /**
-     * Custom properties that start with "x-" such as "x-foo" used to describe
-     * extra functionality that is not covered by the standard OpenAPI Specification.
-     * See: https://swagger.io/docs/specification/2-0/swagger-extensions/
-     *
-     * @generated from field: map<string, google.protobuf.Value> extensions = 5;
-     */
-    extensions: { [key: string]: Value };
-  };
+  /**
+   * Custom properties that start with "x-" such as "x-foo" used to describe
+   * extra functionality that is not covered by the standard OpenAPI Specification.
+   * See: https://swagger.io/docs/specification/2-0/swagger-extensions/
+   *
+   * @generated from field: map<string, google.protobuf.Value> extensions = 5;
+   */
+  extensions: { [key: string]: Value };
+};
 
 /**
  * Describes the message grpc.gateway.protoc_gen_openapiv2.options.Response.
@@ -686,31 +682,30 @@ export const InfoSchema: GenMessage<Info> =
  *
  * @generated from message grpc.gateway.protoc_gen_openapiv2.options.Contact
  */
-export type Contact =
-  Message<'grpc.gateway.protoc_gen_openapiv2.options.Contact'> & {
-    /**
-     * The identifying name of the contact person/organization.
-     *
-     * @generated from field: string name = 1;
-     */
-    name: string;
+export type Contact = Message<'grpc.gateway.protoc_gen_openapiv2.options.Contact'> & {
+  /**
+   * The identifying name of the contact person/organization.
+   *
+   * @generated from field: string name = 1;
+   */
+  name: string;
 
-    /**
-     * The URL pointing to the contact information. MUST be in the format of a
-     * URL.
-     *
-     * @generated from field: string url = 2;
-     */
-    url: string;
+  /**
+   * The URL pointing to the contact information. MUST be in the format of a
+   * URL.
+   *
+   * @generated from field: string url = 2;
+   */
+  url: string;
 
-    /**
-     * The email address of the contact person/organization. MUST be in the format
-     * of an email address.
-     *
-     * @generated from field: string email = 3;
-     */
-    email: string;
-  };
+  /**
+   * The email address of the contact person/organization. MUST be in the format
+   * of an email address.
+   *
+   * @generated from field: string email = 3;
+   */
+  email: string;
+};
 
 /**
  * Describes the message grpc.gateway.protoc_gen_openapiv2.options.Contact.
@@ -742,22 +737,21 @@ export const ContactSchema: GenMessage<Contact> =
  *
  * @generated from message grpc.gateway.protoc_gen_openapiv2.options.License
  */
-export type License =
-  Message<'grpc.gateway.protoc_gen_openapiv2.options.License'> & {
-    /**
-     * The license name used for the API.
-     *
-     * @generated from field: string name = 1;
-     */
-    name: string;
+export type License = Message<'grpc.gateway.protoc_gen_openapiv2.options.License'> & {
+  /**
+   * The license name used for the API.
+   *
+   * @generated from field: string name = 1;
+   */
+  name: string;
 
-    /**
-     * A URL to the license used for the API. MUST be in the format of a URL.
-     *
-     * @generated from field: string url = 2;
-     */
-    url: string;
-  };
+  /**
+   * A URL to the license used for the API. MUST be in the format of a URL.
+   *
+   * @generated from field: string url = 2;
+   */
+  url: string;
+};
 
 /**
  * Describes the message grpc.gateway.protoc_gen_openapiv2.options.License.
@@ -822,50 +816,49 @@ export const ExternalDocumentationSchema: GenMessage<ExternalDocumentation> =
  *
  * @generated from message grpc.gateway.protoc_gen_openapiv2.options.Schema
  */
-export type Schema =
-  Message<'grpc.gateway.protoc_gen_openapiv2.options.Schema'> & {
-    /**
-     * @generated from field: grpc.gateway.protoc_gen_openapiv2.options.JSONSchema json_schema = 1;
-     */
-    jsonSchema?: JSONSchema;
+export type Schema = Message<'grpc.gateway.protoc_gen_openapiv2.options.Schema'> & {
+  /**
+   * @generated from field: grpc.gateway.protoc_gen_openapiv2.options.JSONSchema json_schema = 1;
+   */
+  jsonSchema?: JSONSchema;
 
-    /**
-     * Adds support for polymorphism. The discriminator is the schema property
-     * name that is used to differentiate between other schema that inherit this
-     * schema. The property name used MUST be defined at this schema and it MUST
-     * be in the required property list. When used, the value MUST be the name of
-     * this schema or any schema that inherits it.
-     *
-     * @generated from field: string discriminator = 2;
-     */
-    discriminator: string;
+  /**
+   * Adds support for polymorphism. The discriminator is the schema property
+   * name that is used to differentiate between other schema that inherit this
+   * schema. The property name used MUST be defined at this schema and it MUST
+   * be in the required property list. When used, the value MUST be the name of
+   * this schema or any schema that inherits it.
+   *
+   * @generated from field: string discriminator = 2;
+   */
+  discriminator: string;
 
-    /**
-     * Relevant only for Schema "properties" definitions. Declares the property as
-     * "read only". This means that it MAY be sent as part of a response but MUST
-     * NOT be sent as part of the request. Properties marked as readOnly being
-     * true SHOULD NOT be in the required list of the defined schema. Default
-     * value is false.
-     *
-     * @generated from field: bool read_only = 3;
-     */
-    readOnly: boolean;
+  /**
+   * Relevant only for Schema "properties" definitions. Declares the property as
+   * "read only". This means that it MAY be sent as part of a response but MUST
+   * NOT be sent as part of the request. Properties marked as readOnly being
+   * true SHOULD NOT be in the required list of the defined schema. Default
+   * value is false.
+   *
+   * @generated from field: bool read_only = 3;
+   */
+  readOnly: boolean;
 
-    /**
-     * Additional external documentation for this schema.
-     *
-     * @generated from field: grpc.gateway.protoc_gen_openapiv2.options.ExternalDocumentation external_docs = 5;
-     */
-    externalDocs?: ExternalDocumentation;
+  /**
+   * Additional external documentation for this schema.
+   *
+   * @generated from field: grpc.gateway.protoc_gen_openapiv2.options.ExternalDocumentation external_docs = 5;
+   */
+  externalDocs?: ExternalDocumentation;
 
-    /**
-     * A free-form property to include an example of an instance for this schema in JSON.
-     * This is copied verbatim to the output.
-     *
-     * @generated from field: string example = 6;
-     */
-    example: string;
-  };
+  /**
+   * A free-form property to include an example of an instance for this schema in JSON.
+   * This is copied verbatim to the output.
+   *
+   * @generated from field: string example = 6;
+   */
+  example: string;
+};
 
 /**
  * Describes the message grpc.gateway.protoc_gen_openapiv2.options.Schema.
@@ -894,70 +887,69 @@ export const SchemaSchema: GenMessage<Schema> =
  *
  * @generated from message grpc.gateway.protoc_gen_openapiv2.options.EnumSchema
  */
-export type EnumSchema =
-  Message<'grpc.gateway.protoc_gen_openapiv2.options.EnumSchema'> & {
-    /**
-     * A short description of the schema.
-     *
-     * @generated from field: string description = 1;
-     */
-    description: string;
+export type EnumSchema = Message<'grpc.gateway.protoc_gen_openapiv2.options.EnumSchema'> & {
+  /**
+   * A short description of the schema.
+   *
+   * @generated from field: string description = 1;
+   */
+  description: string;
 
-    /**
-     * @generated from field: string default = 2;
-     */
-    default: string;
+  /**
+   * @generated from field: string default = 2;
+   */
+  default: string;
 
-    /**
-     * The title of the schema.
-     *
-     * @generated from field: string title = 3;
-     */
-    title: string;
+  /**
+   * The title of the schema.
+   *
+   * @generated from field: string title = 3;
+   */
+  title: string;
 
-    /**
-     * @generated from field: bool required = 4;
-     */
-    required: boolean;
+  /**
+   * @generated from field: bool required = 4;
+   */
+  required: boolean;
 
-    /**
-     * @generated from field: bool read_only = 5;
-     */
-    readOnly: boolean;
+  /**
+   * @generated from field: bool read_only = 5;
+   */
+  readOnly: boolean;
 
-    /**
-     * Additional external documentation for this schema.
-     *
-     * @generated from field: grpc.gateway.protoc_gen_openapiv2.options.ExternalDocumentation external_docs = 6;
-     */
-    externalDocs?: ExternalDocumentation;
+  /**
+   * Additional external documentation for this schema.
+   *
+   * @generated from field: grpc.gateway.protoc_gen_openapiv2.options.ExternalDocumentation external_docs = 6;
+   */
+  externalDocs?: ExternalDocumentation;
 
-    /**
-     * @generated from field: string example = 7;
-     */
-    example: string;
+  /**
+   * @generated from field: string example = 7;
+   */
+  example: string;
 
-    /**
-     * Ref is used to define an external reference to include in the message.
-     * This could be a fully qualified proto message reference, and that type must
-     * be imported into the protofile. If no message is identified, the Ref will
-     * be used verbatim in the output.
-     * For example:
-     *  `ref: ".google.protobuf.Timestamp"`.
-     *
-     * @generated from field: string ref = 8;
-     */
-    ref: string;
+  /**
+   * Ref is used to define an external reference to include in the message.
+   * This could be a fully qualified proto message reference, and that type must
+   * be imported into the protofile. If no message is identified, the Ref will
+   * be used verbatim in the output.
+   * For example:
+   *  `ref: ".google.protobuf.Timestamp"`.
+   *
+   * @generated from field: string ref = 8;
+   */
+  ref: string;
 
-    /**
-     * Custom properties that start with "x-" such as "x-foo" used to describe
-     * extra functionality that is not covered by the standard OpenAPI Specification.
-     * See: https://swagger.io/docs/specification/2-0/swagger-extensions/
-     *
-     * @generated from field: map<string, google.protobuf.Value> extensions = 9;
-     */
-    extensions: { [key: string]: Value };
-  };
+  /**
+   * Custom properties that start with "x-" such as "x-foo" used to describe
+   * extra functionality that is not covered by the standard OpenAPI Specification.
+   * See: https://swagger.io/docs/specification/2-0/swagger-extensions/
+   *
+   * @generated from field: map<string, google.protobuf.Value> extensions = 9;
+   */
+  extensions: { [key: string]: Value };
+};
 
 /**
  * Describes the message grpc.gateway.protoc_gen_openapiv2.options.EnumSchema.
@@ -999,171 +991,170 @@ export const EnumSchemaSchema: GenMessage<EnumSchema> =
  *
  * @generated from message grpc.gateway.protoc_gen_openapiv2.options.JSONSchema
  */
-export type JSONSchema =
-  Message<'grpc.gateway.protoc_gen_openapiv2.options.JSONSchema'> & {
-    /**
-     * Ref is used to define an external reference to include in the message.
-     * This could be a fully qualified proto message reference, and that type must
-     * be imported into the protofile. If no message is identified, the Ref will
-     * be used verbatim in the output.
-     * For example:
-     *  `ref: ".google.protobuf.Timestamp"`.
-     *
-     * @generated from field: string ref = 3;
-     */
-    ref: string;
+export type JSONSchema = Message<'grpc.gateway.protoc_gen_openapiv2.options.JSONSchema'> & {
+  /**
+   * Ref is used to define an external reference to include in the message.
+   * This could be a fully qualified proto message reference, and that type must
+   * be imported into the protofile. If no message is identified, the Ref will
+   * be used verbatim in the output.
+   * For example:
+   *  `ref: ".google.protobuf.Timestamp"`.
+   *
+   * @generated from field: string ref = 3;
+   */
+  ref: string;
 
-    /**
-     * The title of the schema.
-     *
-     * @generated from field: string title = 5;
-     */
-    title: string;
+  /**
+   * The title of the schema.
+   *
+   * @generated from field: string title = 5;
+   */
+  title: string;
 
-    /**
-     * A short description of the schema.
-     *
-     * @generated from field: string description = 6;
-     */
-    description: string;
+  /**
+   * A short description of the schema.
+   *
+   * @generated from field: string description = 6;
+   */
+  description: string;
 
-    /**
-     * @generated from field: string default = 7;
-     */
-    default: string;
+  /**
+   * @generated from field: string default = 7;
+   */
+  default: string;
 
-    /**
-     * @generated from field: bool read_only = 8;
-     */
-    readOnly: boolean;
+  /**
+   * @generated from field: bool read_only = 8;
+   */
+  readOnly: boolean;
 
-    /**
-     * A free-form property to include a JSON example of this field. This is copied
-     * verbatim to the output swagger.json. Quotes must be escaped.
-     * This property is the same for 2.0 and 3.0.0 https://github.com/OAI/OpenAPI-Specification/blob/3.0.0/versions/3.0.0.md#schemaObject  https://github.com/OAI/OpenAPI-Specification/blob/3.0.0/versions/2.0.md#schemaObject
-     *
-     * @generated from field: string example = 9;
-     */
-    example: string;
+  /**
+   * A free-form property to include a JSON example of this field. This is copied
+   * verbatim to the output swagger.json. Quotes must be escaped.
+   * This property is the same for 2.0 and 3.0.0 https://github.com/OAI/OpenAPI-Specification/blob/3.0.0/versions/3.0.0.md#schemaObject  https://github.com/OAI/OpenAPI-Specification/blob/3.0.0/versions/2.0.md#schemaObject
+   *
+   * @generated from field: string example = 9;
+   */
+  example: string;
 
-    /**
-     * @generated from field: double multiple_of = 10;
-     */
-    multipleOf: number;
+  /**
+   * @generated from field: double multiple_of = 10;
+   */
+  multipleOf: number;
 
-    /**
-     * Maximum represents an inclusive upper limit for a numeric instance. The
-     * value of MUST be a number,
-     *
-     * @generated from field: double maximum = 11;
-     */
-    maximum: number;
+  /**
+   * Maximum represents an inclusive upper limit for a numeric instance. The
+   * value of MUST be a number,
+   *
+   * @generated from field: double maximum = 11;
+   */
+  maximum: number;
 
-    /**
-     * @generated from field: bool exclusive_maximum = 12;
-     */
-    exclusiveMaximum: boolean;
+  /**
+   * @generated from field: bool exclusive_maximum = 12;
+   */
+  exclusiveMaximum: boolean;
 
-    /**
-     * minimum represents an inclusive lower limit for a numeric instance. The
-     * value of MUST be a number,
-     *
-     * @generated from field: double minimum = 13;
-     */
-    minimum: number;
+  /**
+   * minimum represents an inclusive lower limit for a numeric instance. The
+   * value of MUST be a number,
+   *
+   * @generated from field: double minimum = 13;
+   */
+  minimum: number;
 
-    /**
-     * @generated from field: bool exclusive_minimum = 14;
-     */
-    exclusiveMinimum: boolean;
+  /**
+   * @generated from field: bool exclusive_minimum = 14;
+   */
+  exclusiveMinimum: boolean;
 
-    /**
-     * @generated from field: uint64 max_length = 15;
-     */
-    maxLength: bigint;
+  /**
+   * @generated from field: uint64 max_length = 15;
+   */
+  maxLength: bigint;
 
-    /**
-     * @generated from field: uint64 min_length = 16;
-     */
-    minLength: bigint;
+  /**
+   * @generated from field: uint64 min_length = 16;
+   */
+  minLength: bigint;
 
-    /**
-     * @generated from field: string pattern = 17;
-     */
-    pattern: string;
+  /**
+   * @generated from field: string pattern = 17;
+   */
+  pattern: string;
 
-    /**
-     * @generated from field: uint64 max_items = 20;
-     */
-    maxItems: bigint;
+  /**
+   * @generated from field: uint64 max_items = 20;
+   */
+  maxItems: bigint;
 
-    /**
-     * @generated from field: uint64 min_items = 21;
-     */
-    minItems: bigint;
+  /**
+   * @generated from field: uint64 min_items = 21;
+   */
+  minItems: bigint;
 
-    /**
-     * @generated from field: bool unique_items = 22;
-     */
-    uniqueItems: boolean;
+  /**
+   * @generated from field: bool unique_items = 22;
+   */
+  uniqueItems: boolean;
 
-    /**
-     * @generated from field: uint64 max_properties = 24;
-     */
-    maxProperties: bigint;
+  /**
+   * @generated from field: uint64 max_properties = 24;
+   */
+  maxProperties: bigint;
 
-    /**
-     * @generated from field: uint64 min_properties = 25;
-     */
-    minProperties: bigint;
+  /**
+   * @generated from field: uint64 min_properties = 25;
+   */
+  minProperties: bigint;
 
-    /**
-     * @generated from field: repeated string required = 26;
-     */
-    required: string[];
+  /**
+   * @generated from field: repeated string required = 26;
+   */
+  required: string[];
 
-    /**
-     * Items in 'array' must be unique.
-     *
-     * @generated from field: repeated string array = 34;
-     */
-    array: string[];
+  /**
+   * Items in 'array' must be unique.
+   *
+   * @generated from field: repeated string array = 34;
+   */
+  array: string[];
 
-    /**
-     * @generated from field: repeated grpc.gateway.protoc_gen_openapiv2.options.JSONSchema.JSONSchemaSimpleTypes type = 35;
-     */
-    type: JSONSchema_JSONSchemaSimpleTypes[];
+  /**
+   * @generated from field: repeated grpc.gateway.protoc_gen_openapiv2.options.JSONSchema.JSONSchemaSimpleTypes type = 35;
+   */
+  type: JSONSchema_JSONSchemaSimpleTypes[];
 
-    /**
-     * `Format`
-     *
-     * @generated from field: string format = 36;
-     */
-    format: string;
+  /**
+   * `Format`
+   *
+   * @generated from field: string format = 36;
+   */
+  format: string;
 
-    /**
-     * Items in `enum` must be unique https://tools.ietf.org/html/draft-fge-json-schema-validation-00#section-5.5.1
-     *
-     * @generated from field: repeated string enum = 46;
-     */
-    enum: string[];
+  /**
+   * Items in `enum` must be unique https://tools.ietf.org/html/draft-fge-json-schema-validation-00#section-5.5.1
+   *
+   * @generated from field: repeated string enum = 46;
+   */
+  enum: string[];
 
-    /**
-     * Additional field level properties used when generating the OpenAPI v2 file.
-     *
-     * @generated from field: grpc.gateway.protoc_gen_openapiv2.options.JSONSchema.FieldConfiguration field_configuration = 1001;
-     */
-    fieldConfiguration?: JSONSchema_FieldConfiguration;
+  /**
+   * Additional field level properties used when generating the OpenAPI v2 file.
+   *
+   * @generated from field: grpc.gateway.protoc_gen_openapiv2.options.JSONSchema.FieldConfiguration field_configuration = 1001;
+   */
+  fieldConfiguration?: JSONSchema_FieldConfiguration;
 
-    /**
-     * Custom properties that start with "x-" such as "x-foo" used to describe
-     * extra functionality that is not covered by the standard OpenAPI Specification.
-     * See: https://swagger.io/docs/specification/2-0/swagger-extensions/
-     *
-     * @generated from field: map<string, google.protobuf.Value> extensions = 48;
-     */
-    extensions: { [key: string]: Value };
-  };
+  /**
+   * Custom properties that start with "x-" such as "x-foo" used to describe
+   * extra functionality that is not covered by the standard OpenAPI Specification.
+   * See: https://swagger.io/docs/specification/2-0/swagger-extensions/
+   *
+   * @generated from field: map<string, google.protobuf.Value> extensions = 48;
+   */
+  extensions: { [key: string]: Value };
+};
 
 /**
  * Describes the message grpc.gateway.protoc_gen_openapiv2.options.JSONSchema.
@@ -1347,84 +1338,83 @@ export const SecurityDefinitionsSchema: GenMessage<SecurityDefinitions> =
  *
  * @generated from message grpc.gateway.protoc_gen_openapiv2.options.SecurityScheme
  */
-export type SecurityScheme =
-  Message<'grpc.gateway.protoc_gen_openapiv2.options.SecurityScheme'> & {
-    /**
-     * The type of the security scheme. Valid values are "basic",
-     * "apiKey" or "oauth2".
-     *
-     * @generated from field: grpc.gateway.protoc_gen_openapiv2.options.SecurityScheme.Type type = 1;
-     */
-    type: SecurityScheme_Type;
+export type SecurityScheme = Message<'grpc.gateway.protoc_gen_openapiv2.options.SecurityScheme'> & {
+  /**
+   * The type of the security scheme. Valid values are "basic",
+   * "apiKey" or "oauth2".
+   *
+   * @generated from field: grpc.gateway.protoc_gen_openapiv2.options.SecurityScheme.Type type = 1;
+   */
+  type: SecurityScheme_Type;
 
-    /**
-     * A short description for security scheme.
-     *
-     * @generated from field: string description = 2;
-     */
-    description: string;
+  /**
+   * A short description for security scheme.
+   *
+   * @generated from field: string description = 2;
+   */
+  description: string;
 
-    /**
-     * The name of the header or query parameter to be used.
-     * Valid for apiKey.
-     *
-     * @generated from field: string name = 3;
-     */
-    name: string;
+  /**
+   * The name of the header or query parameter to be used.
+   * Valid for apiKey.
+   *
+   * @generated from field: string name = 3;
+   */
+  name: string;
 
-    /**
-     * The location of the API key. Valid values are "query" or
-     * "header".
-     * Valid for apiKey.
-     *
-     * @generated from field: grpc.gateway.protoc_gen_openapiv2.options.SecurityScheme.In in = 4;
-     */
-    in: SecurityScheme_In;
+  /**
+   * The location of the API key. Valid values are "query" or
+   * "header".
+   * Valid for apiKey.
+   *
+   * @generated from field: grpc.gateway.protoc_gen_openapiv2.options.SecurityScheme.In in = 4;
+   */
+  in: SecurityScheme_In;
 
-    /**
-     * The flow used by the OAuth2 security scheme. Valid values are
-     * "implicit", "password", "application" or "accessCode".
-     * Valid for oauth2.
-     *
-     * @generated from field: grpc.gateway.protoc_gen_openapiv2.options.SecurityScheme.Flow flow = 5;
-     */
-    flow: SecurityScheme_Flow;
+  /**
+   * The flow used by the OAuth2 security scheme. Valid values are
+   * "implicit", "password", "application" or "accessCode".
+   * Valid for oauth2.
+   *
+   * @generated from field: grpc.gateway.protoc_gen_openapiv2.options.SecurityScheme.Flow flow = 5;
+   */
+  flow: SecurityScheme_Flow;
 
-    /**
-     * The authorization URL to be used for this flow. This SHOULD be in
-     * the form of a URL.
-     * Valid for oauth2/implicit and oauth2/accessCode.
-     *
-     * @generated from field: string authorization_url = 6;
-     */
-    authorizationUrl: string;
+  /**
+   * The authorization URL to be used for this flow. This SHOULD be in
+   * the form of a URL.
+   * Valid for oauth2/implicit and oauth2/accessCode.
+   *
+   * @generated from field: string authorization_url = 6;
+   */
+  authorizationUrl: string;
 
-    /**
-     * The token URL to be used for this flow. This SHOULD be in the
-     * form of a URL.
-     * Valid for oauth2/password, oauth2/application and oauth2/accessCode.
-     *
-     * @generated from field: string token_url = 7;
-     */
-    tokenUrl: string;
+  /**
+   * The token URL to be used for this flow. This SHOULD be in the
+   * form of a URL.
+   * Valid for oauth2/password, oauth2/application and oauth2/accessCode.
+   *
+   * @generated from field: string token_url = 7;
+   */
+  tokenUrl: string;
 
-    /**
-     * The available scopes for the OAuth2 security scheme.
-     * Valid for oauth2.
-     *
-     * @generated from field: grpc.gateway.protoc_gen_openapiv2.options.Scopes scopes = 8;
-     */
-    scopes?: Scopes;
+  /**
+   * The available scopes for the OAuth2 security scheme.
+   * Valid for oauth2.
+   *
+   * @generated from field: grpc.gateway.protoc_gen_openapiv2.options.Scopes scopes = 8;
+   */
+  scopes?: Scopes;
 
-    /**
-     * Custom properties that start with "x-" such as "x-foo" used to describe
-     * extra functionality that is not covered by the standard OpenAPI Specification.
-     * See: https://swagger.io/docs/specification/2-0/swagger-extensions/
-     *
-     * @generated from field: map<string, google.protobuf.Value> extensions = 9;
-     */
-    extensions: { [key: string]: Value };
-  };
+  /**
+   * Custom properties that start with "x-" such as "x-foo" used to describe
+   * extra functionality that is not covered by the standard OpenAPI Specification.
+   * See: https://swagger.io/docs/specification/2-0/swagger-extensions/
+   *
+   * @generated from field: map<string, google.protobuf.Value> extensions = 9;
+   */
+  extensions: { [key: string]: Value };
+};
 
 /**
  * Describes the message grpc.gateway.protoc_gen_openapiv2.options.SecurityScheme.
@@ -1563,9 +1553,7 @@ export type SecurityRequirement =
      *
      * @generated from field: map<string, grpc.gateway.protoc_gen_openapiv2.options.SecurityRequirement.SecurityRequirementValue> security_requirement = 1;
      */
-    securityRequirement: {
-      [key: string]: SecurityRequirement_SecurityRequirementValue;
-    };
+    securityRequirement: { [key: string]: SecurityRequirement_SecurityRequirementValue };
   };
 
 /**
@@ -1608,16 +1596,15 @@ export const SecurityRequirement_SecurityRequirementValueSchema: GenMessage<Secu
  *
  * @generated from message grpc.gateway.protoc_gen_openapiv2.options.Scopes
  */
-export type Scopes =
-  Message<'grpc.gateway.protoc_gen_openapiv2.options.Scopes'> & {
-    /**
-     * Maps between a name of a scope to a short description of it (as the value
-     * of the property).
-     *
-     * @generated from field: map<string, string> scope = 1;
-     */
-    scope: { [key: string]: string };
-  };
+export type Scopes = Message<'grpc.gateway.protoc_gen_openapiv2.options.Scopes'> & {
+  /**
+   * Maps between a name of a scope to a short description of it (as the value
+   * of the property).
+   *
+   * @generated from field: map<string, string> scope = 1;
+   */
+  scope: { [key: string]: string };
+};
 
 /**
  * Describes the message grpc.gateway.protoc_gen_openapiv2.options.Scopes.

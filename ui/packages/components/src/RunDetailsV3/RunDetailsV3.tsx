@@ -3,6 +3,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { ErrorCard } from '../Error/ErrorCard';
 import type { Run as InitialRunData } from '../RunsPage/types';
 import { useBooleanFlag } from '../SharedContext/useBooleanFlag';
+import { useGetRun } from '../SharedContext/useGetRun';
 import { useGetTraceResult } from '../SharedContext/useGetTraceResult';
 import { useStreamRun } from '../SharedContext/useStreamRun';
 import { StatusCell } from '../Table/Cell';
@@ -229,10 +230,7 @@ export const RunDetailsV3 = ({
               />
             )}
             {showError && (
-              <ErrorCard
-                error={runError || resultError}
-                reset={runError ? () => undefined : () => refetchResult()}
-              />
+              <ErrorCard error={runError || resultError} reset={() => refetchResult()} />
             )}
           </div>
           <Tabs

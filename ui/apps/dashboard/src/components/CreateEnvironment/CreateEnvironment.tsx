@@ -9,7 +9,7 @@ import { toast } from 'sonner';
 import { useMutation } from 'urql';
 
 import { graphql } from '@/gql';
-import { fetchAccountEnvs } from '@/gen/proto/api/v2/service-V2_connectquery';
+import { fetchAccountEnvs } from '@inngest/components/proto/api/v2/service-V2_connectquery';
 
 const CreateEnvironmentDocument = graphql(`
   mutation CreateEnvironment($name: String!) {

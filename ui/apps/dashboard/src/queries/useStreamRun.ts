@@ -1,13 +1,16 @@
 import { useCallback } from 'react';
 import { useTransport } from '@connectrpc/connect-query';
 import { createClient } from '@connectrpc/connect';
-import { V2 } from '@/gen/proto/api/v2/service_pb';
+import { V2 } from '@inngest/components/proto/api/v2/service_pb';
 import type {
   RunData,
   RunTraceSpan as ProtoRunTraceSpan,
   StepInfo as ProtoStepInfo,
-} from '@/gen/proto/api/v2/service_pb';
-import { RunTraceSpanStatus, StepOp } from '@/gen/proto/api/v2/service_pb';
+} from '@inngest/components/proto/api/v2/service_pb';
+import {
+  RunTraceSpanStatus,
+  StepOp,
+} from '@inngest/components/proto/api/v2/service_pb';
 import type {
   StreamRunPayload,
   StreamRunCallbacks,
@@ -185,7 +188,7 @@ const convertProtoRunData = (
 
 //
 // Hook that provides the StreamRunHandler for SharedContext.
-export const useStreamRunHandler = (): StreamRunHandler => {
+export const useStreamRun = (): StreamRunHandler => {
   const transport = useTransport();
   const envID = useEnvironment().id;
 

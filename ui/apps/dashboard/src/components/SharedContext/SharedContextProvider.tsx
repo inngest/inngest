@@ -10,7 +10,7 @@ import { useGetTraceResult } from '@/queries/useGetTraceResult';
 import { useInvokeRun } from '@/queries/useInvokeRun';
 import { useRerun } from '@/queries/useRerun';
 import { useRerunFromStep } from '@/queries/useRerunFromStep';
-import { useStreamRunHandler } from '@/queries/useStreamRunHandler';
+import { useStreamRun } from '@/queries/useStreamRun';
 import { usePathCreator } from '@/utils/usePathCreator';
 import { useSystemStatus } from '../Support/SystemStatus';
 
@@ -26,7 +26,7 @@ export const SharedContextProvider = ({
   const pathCreator = usePathCreator();
   const getRun = useGetRun();
   const getTraceResult = useGetTraceResult();
-  const streamRun = useStreamRunHandler();
+  const streamRun = useStreamRun();
   const status = useSystemStatus();
 
   const handlers: Partial<SharedHandlers> = {

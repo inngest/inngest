@@ -11,40 +11,42 @@ import (
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"github.com/inngest/inngest/pkg/api"
 	"github.com/inngest/inngest/pkg/api/v2/apiv2base"
+	"github.com/inngest/inngest/pkg/consts"
 	apiv2 "github.com/inngest/inngest/proto/gen/api/v2"
+	"github.com/inngest/inngest/proto/gen/api/v2/apiv2connect"
 	"github.com/oklog/ulid/v2"
 	"google.golang.org/grpc"
 )
 
-// RunStreamProvider provides run data for streaming
-type RunStreamProvider interface {
-	//
-	// GetRunData retrieves run data for streaming. Returns the run data or an error.
+// ConnectRPCProvider provides data for ConnectRPC streaming operations.
+// Implementations live in environment-specific packages (e.g., devserver, cloud).
+type ConnectRPCProvider interface {
+	// GetRunData retrieves run data for streaming.
 	GetRunData(ctx context.Context, accountID uuid.UUID, envID uuid.UUID, runID ulid.ULID) (*apiv2.RunData, error)
 }
 
 // Service implements the V2 API service for gRPC with grpc-gateway
 type Service struct {
 	apiv2.UnimplementedV2Server
-	signingKeys       SigningKeysProvider
-	eventKeys         EventKeysProvider
-	base              *apiv2base.Base
-	runStreamProvider RunStreamProvider
+	signingKeys SigningKeysProvider
+	eventKeys   EventKeysProvider
+	base        *apiv2base.Base
+	rpcProvider ConnectRPCProvider
 }
 
 // ServiceOptions contains configuration for the V2 service
 type ServiceOptions struct {
 	SigningKeysProvider SigningKeysProvider
 	EventKeysProvider   EventKeysProvider
-	RunStreamProvider   RunStreamProvider
+	ConnectRPCProvider  ConnectRPCProvider
 }
 
 func NewService(opts ServiceOptions) *Service {
 	return &Service{
-		signingKeys:       opts.SigningKeysProvider,
-		eventKeys:         opts.EventKeysProvider,
-		base:              apiv2base.NewBase(),
-		runStreamProvider: opts.RunStreamProvider,
+		signingKeys: opts.SigningKeysProvider,
+		eventKeys:   opts.EventKeysProvider,
+		base:        apiv2base.NewBase(),
+		rpcProvider: opts.ConnectRPCProvider,
 	}
 }
 
@@ -151,4 +153,19 @@ func NewHTTPHandler(ctx context.Context, serviceOpts ServiceOptions, httpOpts HT
 	}))
 
 	return r, nil
+}
+
+// NewConnectRPCHTTPHandler creates an HTTP handler for ConnectRPC endpoints.
+// For the dev server, this injects the fixed account/env IDs into the context.
+func NewConnectRPCHTTPHandler(handler *ConnectRpcHandler) (string, http.Handler) {
+	path, connectHandler := apiv2connect.NewV2Handler(handler)
+
+	wrappedHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		ctx = context.WithValue(ctx, "account_id", consts.DevServerAccountID)
+		ctx = context.WithValue(ctx, "workspace_id", consts.DevServerEnvID)
+		connectHandler.ServeHTTP(w, r.WithContext(ctx))
+	})
+
+	return path, wrappedHandler
 }

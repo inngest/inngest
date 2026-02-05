@@ -2,15 +2,16 @@
 // @generated from file api/v2/options.proto (package api.v2, syntax proto3)
 /* eslint-disable */
 
-import type {
-  GenExtension,
-  GenFile,
-  GenMessage,
-} from '@bufbuild/protobuf/codegenv2';
-import { extDesc, fileDesc, messageDesc } from '@bufbuild/protobuf/codegenv2';
-import type { MethodOptions } from '@bufbuild/protobuf/wkt';
-import { file_google_protobuf_descriptor } from '@bufbuild/protobuf/wkt';
 import type { Message } from '@bufbuild/protobuf';
+import {
+  extDesc,
+  fileDesc,
+  messageDesc,
+  type GenExtension,
+  type GenFile,
+  type GenMessage,
+} from '@bufbuild/protobuf/codegenv2';
+import { file_google_protobuf_descriptor, type MethodOptions } from '@bufbuild/protobuf/wkt';
 
 /**
  * Describes the file api/v2/options.proto.
@@ -19,7 +20,7 @@ export const file_api_v2_options: GenFile =
   /*@__PURE__*/
   fileDesc(
     'ChRhcGkvdjIvb3B0aW9ucy5wcm90bxIGYXBpLnYyIiUKDEF1dGh6T3B0aW9ucxIVCg1yZXF1aXJlX2F1dGh6GAEgASgIOkwKBWF1dGh6Eh4uZ29vZ2xlLnByb3RvYnVmLk1ldGhvZE9wdGlvbnMY0YYDIAEoCzIULmFwaS52Mi5BdXRoek9wdGlvbnNSBWF1dGh6QjNaMWdpdGh1Yi5jb20vaW5uZ2VzdC9pbm5nZXN0L3Byb3RvL2dlbi9hcGkvdjI7YXBpdjJiBnByb3RvMw',
-    [file_google_protobuf_descriptor],
+    [file_google_protobuf_descriptor]
   );
 
 /**

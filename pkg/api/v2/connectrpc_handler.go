@@ -12,7 +12,6 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
-//
 // ConnectRpcHandler adapts the Service to the apiv2connect.V2Handler interface.
 // This allows the same Service implementation to be used for both grpc-gateway (REST)
 // and ConnectRPC protocol requests.
@@ -113,11 +112,10 @@ func (h *ConnectRpcHandler) PatchEnv(ctx context.Context, req *connect.Request[a
 	return connect.NewResponse(resp), nil
 }
 
-//
 // StreamRun implements server-streaming for run trace updates.
 // It polls the backend and sends updates over the stream until the run completes.
 func (h *ConnectRpcHandler) StreamRun(ctx context.Context, req *connect.Request[apiv2.StreamRunRequest], stream *connect.ServerStream[apiv2.RunStreamItem]) error {
-	if h.service.runStreamProvider == nil {
+	if h.service.rpcProvider == nil {
 		return connect.NewError(connect.CodeUnimplemented, fmt.Errorf("run streaming not configured"))
 	}
 
@@ -150,7 +148,7 @@ func (h *ConnectRpcHandler) StreamRun(ctx context.Context, req *connect.Request[
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-ticker.C:
-			runData, err := h.service.runStreamProvider.GetRunData(ctx, accountID, envID, runID)
+			runData, err := h.service.rpcProvider.GetRunData(ctx, accountID, envID, runID)
 			if err != nil {
 				return connect.NewError(connect.CodeInternal, fmt.Errorf("failed to get run data: %w", err))
 			}
