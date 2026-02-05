@@ -3237,8 +3237,8 @@ func newSpanRunsQueryBuilder(ctx context.Context, opt cqrs.GetTraceRunOpt) *runs
 				}
 
 				// Add run_id tie-breaker
-				if runIDCursor := reqCursor.Find("run_id"); runIDCursor != nil {
-					equalityConditions = append(equalityConditions, sq.C("run_id").Gt(runIDCursor.Value))
+				if reqCursor.ID != "" {
+					equalityConditions = append(equalityConditions, sq.C("run_id").Gt(reqCursor.ID))
 				}
 
 				// Combine: (field > cursor_value) OR (field = cursor_value AND next_conditions)
