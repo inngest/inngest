@@ -160,11 +160,7 @@ func (q *queueProcessor) ProcessItem(
 					AccountID:      accountID,
 					IdempotencyKey: operationIdempotencyKey,
 					LeaseID:        *currentCapacityLease,
-					Migration: constraintapi.MigrationIdentifier{
-						IsRateLimit: false,
-						QueueShard:  q.primaryQueueShard.Name(),
-					},
-					Duration: QueueLeaseDuration,
+					Duration:       QueueLeaseDuration,
 					Source: constraintapi.LeaseSource{
 						Location:          constraintapi.CallerLocationItemLease,
 						RunProcessingMode: constraintapi.RunProcessingModeBackground,
@@ -355,10 +351,6 @@ func (q *queueProcessor) ProcessItem(
 				AccountID:      p.AccountID,
 				IdempotencyKey: qi.ID,
 				LeaseID:        *currentLeaseID,
-				Migration: constraintapi.MigrationIdentifier{
-					IsRateLimit: false,
-					QueueShard:  q.primaryQueueShard.Name(),
-				},
 				Source: constraintapi.LeaseSource{
 					Location:          constraintapi.CallerLocationItemLease,
 					Service:           constraintapi.ServiceExecutor,
