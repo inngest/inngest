@@ -42,19 +42,16 @@ type RateLimitConstraint struct {
 }
 
 // StateKey returns the fully-qualified Redis key pointing to the rate limit GCRA state
-func (r *RateLimitConstraint) StateKey(keyPrefix string, accountID uuid.UUID, envID uuid.UUID) string {
+func (r *RateLimitConstraint) StateKey(accountID uuid.UUID, envID uuid.UUID, fnID uuid.UUID) string {
 	switch r.Scope {
 	case enums.RateLimitScopeAccount:
-		return fmt.Sprintf("{%s}:rl:a:%s:%s", keyPrefix, accountID, r.EvaluatedKeyHash)
+		return fmt.Sprintf("{cs}:%s:rl:a:%s", accountScope(accountID), r.EvaluatedKeyHash)
 	case enums.RateLimitScopeEnv:
-		return fmt.Sprintf("{%s}:rl:e:%s:%s", keyPrefix, envID, r.EvaluatedKeyHash)
-	// Function rate limit key is compatible with the queue implementation
+		return fmt.Sprintf("{cs}:%s:rl:e:%s:%s", accountScope(accountID), envID, r.EvaluatedKeyHash)
+	case enums.RateLimitScopeFn:
+		return fmt.Sprintf("{cs}:%s:rl:f:%s:%s", accountScope(accountID), fnID, r.EvaluatedKeyHash)
 	default:
-		// NOTE: Rate limit state is prefixed with the rate limit key prefix. This is important for compatibility.
-		// See ratelimit/ratelimit_lua.go for the rate limit implementation.
-		//
-		// This already includes the function ID (see rateLimitKey / Schedule())
-		return fmt.Sprintf("{%s}:%s", keyPrefix, r.EvaluatedKeyHash)
+		return ""
 	}
 }
 
@@ -84,10 +81,6 @@ type ConcurrencyConstraint struct {
 	// KeyExpressionHash is the hashed key expression. If this is set, this refers to a custom concurrency key.
 	KeyExpressionHash string
 	EvaluatedKeyHash  string
-
-	// InProgressItemKey is the fully-qualified Redis key storing the in-progress (concurrency) ZSET for this constraint
-	// This is included for consistency purposes and will be phased out once all constraint state is moved to the new data store
-	InProgressItemKey string
 }
 
 const ConcurrencyLimitRetryAfter = 2 * time.Second
@@ -96,7 +89,7 @@ func (c ConcurrencyConstraint) RetryAfter() time.Duration {
 	return ConcurrencyLimitRetryAfter
 }
 
-func (c ConcurrencyConstraint) InProgressLeasesKey(prefix string, accountID, envID, functionID uuid.UUID) string {
+func (c ConcurrencyConstraint) InProgressLeasesKey(accountID, envID, functionID uuid.UUID) string {
 	switch c.Mode {
 	case enums.ConcurrencyModeStep:
 	case enums.ConcurrencyModeRun:
@@ -122,7 +115,7 @@ func (c ConcurrencyConstraint) InProgressLeasesKey(prefix string, accountID, env
 		keyID = fmt.Sprintf("<%s:%s>", c.KeyExpressionHash, c.EvaluatedKeyHash)
 	}
 
-	return fmt.Sprintf("{%s}:%s:state:concurrency:%s:%s%s", prefix, accountID, scopeID, entityID, keyID)
+	return fmt.Sprintf("{cs}:%s:concurrency:%s:%s%s", accountScope(accountID), scopeID, entityID, keyID)
 }
 
 func (c ConcurrencyConstraint) IsCustomKey() bool {
@@ -162,16 +155,16 @@ type ThrottleConstraint struct {
 }
 
 // StateKey returns the fully-qualified Redis key pointing to the throttle GCRA state
-func (t *ThrottleConstraint) StateKey(keyPrefix string, accountID uuid.UUID, envID uuid.UUID) string {
+func (t *ThrottleConstraint) StateKey(accountID uuid.UUID, envID uuid.UUID, fnID uuid.UUID) string {
 	switch t.Scope {
 	case enums.ThrottleScopeAccount:
-		return fmt.Sprintf("{%s}:throttle:a:%s:%s", keyPrefix, accountID, t.EvaluatedKeyHash)
+		return fmt.Sprintf("{cs}:%s:throttle:a:%s", accountScope(accountID), t.EvaluatedKeyHash)
 	case enums.ThrottleScopeEnv:
-		return fmt.Sprintf("{%s}:throttle:e:%s:%s", keyPrefix, envID, t.EvaluatedKeyHash)
+		return fmt.Sprintf("{cs}:%s:throttle:e:%s:%s", accountScope(accountID), envID, t.EvaluatedKeyHash)
+	case enums.ThrottleScopeFn:
+		return fmt.Sprintf("{cs}:%s:throttle:f:%s:%s", accountScope(accountID), fnID, t.EvaluatedKeyHash)
 	default:
-		// Function throttle state key is compatible with the queue implementation
-		// NOTE: The EvaluatedKeyHash already includes the function ID, see GetThrottleConfig
-		return fmt.Sprintf("{%s}:throttle:%s", keyPrefix, t.EvaluatedKeyHash)
+		return ""
 	}
 }
 

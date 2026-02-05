@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/logger"
@@ -121,23 +120,6 @@ func backlogCustomKeyActiveRuns(b osqueue.QueueBacklog, kg QueueKeyGenerator, n 
 	return backlogConcurrencyKeyActiveRunsKey(key, kg)
 }
 
-func backlogInProgressLeasesCustomKey(b osqueue.QueueBacklog, cm constraintapi.RolloutKeyGenerator, kg QueueKeyGenerator, accountID *uuid.UUID, n int) string {
-	if cm == nil {
-		return kg.Concurrency("", "")
-	}
-
-	if accountID == nil {
-		return kg.Concurrency("", "")
-	}
-
-	if n < 0 || n > len(b.ConcurrencyKeys) {
-		return kg.Concurrency("", "")
-	}
-
-	key := b.ConcurrencyKeys[n-1]
-	return backlogConcurrencyKeyInProgressLeasesKey(key, cm, *accountID)
-}
-
 func backlogConcurrencyKeyActiveKey(bck osqueue.BacklogConcurrencyKey, kg QueueKeyGenerator) string {
 	// Concurrency accounting keys are made up of three parts:
 	// - The scope (account, environment, function) to apply the concurrency limit on
@@ -148,10 +130,6 @@ func backlogConcurrencyKeyActiveKey(bck osqueue.BacklogConcurrencyKey, kg QueueK
 
 func backlogConcurrencyKeyActiveRunsKey(bck osqueue.BacklogConcurrencyKey, kg QueueKeyGenerator) string {
 	return kg.ActiveRunsSet("custom", bck.CanonicalKeyID)
-}
-
-func backlogConcurrencyKeyInProgressLeasesKey(bck osqueue.BacklogConcurrencyKey, cm constraintapi.RolloutKeyGenerator, accountID uuid.UUID) string {
-	return cm.KeyInProgressLeasesCustom(accountID, bck.Scope, bck.EntityID, bck.HashedKeyExpression, bck.HashedValue)
 }
 
 // activeKey returns backlog compound active key
@@ -237,9 +215,6 @@ func (q *queue) BacklogRefill(
 		kg.BacklogActiveCheckCooldown(b.BacklogID),
 
 		kg.PartitionNormalizeSet(sp.PartitionID),
-
-		// Constraint API rollout
-		q.keyConstraintCheckIdempotency(sp.AccountID, o.ConstraintCheckIdempotencyKey),
 	}
 
 	// Don't check constraints if

@@ -30,7 +30,7 @@ const (
 func WithConstraints[T any](
 	ctx context.Context,
 	now time.Time,
-	capacityManager constraintapi.RolloutManager,
+	capacityManager constraintapi.CapacityManager,
 	useConstraintAPI constraintapi.UseConstraintAPIFn,
 	req execution.ScheduleRequest,
 	idempotencyKey string,
@@ -195,11 +195,8 @@ func WithConstraints[T any](
 				IdempotencyKey: operationIempotencyKey,
 				AccountID:      req.AccountID,
 				LeaseID:        lID,
-				Migration: constraintapi.MigrationIdentifier{
-					IsRateLimit: true,
-				},
-				Duration: ScheduleLeaseDuration,
-				Source:   source,
+				Duration:       ScheduleLeaseDuration,
+				Source:         source,
 			})
 			if err != nil {
 				l.Error("could not extend schedule capacity lease", "err", err, "leaseID", lID, "req", req)
@@ -239,10 +236,7 @@ func WithConstraints[T any](
 					AccountID:      req.AccountID,
 					LeaseID:        lID,
 					IdempotencyKey: operationIdempotencyKey,
-					Migration: constraintapi.MigrationIdentifier{
-						IsRateLimit: true,
-					},
-					Source: source,
+					Source:         source,
 				})
 				if internalErr != nil {
 					l.ReportError(internalErr, "failed to release capacity after schedule", logger.WithErrorReportTags(map[string]string{
@@ -354,9 +348,6 @@ func CheckConstraints(
 		MaximumLifetime:   5 * time.Minute, // This lease should be short!
 		Source:            source,
 		BlockingThreshold: 0, // Disable this for now
-		Migration: constraintapi.MigrationIdentifier{
-			IsRateLimit: true,
-		},
 	})
 	if internalErr != nil {
 		l.Error("acquiring capacity lease failed", "err", internalErr, "method", "CheckConstraints", "req", req)

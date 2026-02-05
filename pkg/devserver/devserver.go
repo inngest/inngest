@@ -333,20 +333,13 @@ func start(ctx context.Context, opts StartOpts) error {
 	}
 
 	const rateLimitPrefix = "ratelimit"
-	var capacityManager constraintapi.RolloutManager
+	var capacityManager constraintapi.CapacityManager
 	enableConstraintAPI := os.Getenv("ENABLE_CONSTRAINT_API") == "true"
 	if enableConstraintAPI {
-		shards := map[string]rueidis.Client{
-			consts.DefaultQueueShardName: unshardedClient.Queue().Client(),
-		}
-
 		cm, err := constraintapi.NewRedisCapacityManager(
 			constraintapi.WithClock(clockwork.NewRealClock()),
-			constraintapi.WithNumScavengerShards(1),
-			constraintapi.WithQueueShards(shards),
-			constraintapi.WithRateLimitClient(unshardedRc),
-			constraintapi.WithQueueStateKeyPrefix(redis_state.QueueDefaultKey),
-			constraintapi.WithRateLimitKeyPrefix(rateLimitPrefix),
+			constraintapi.WithShardName("default"),
+			constraintapi.WithClient(unshardedRc),
 			constraintapi.WithEnableHighCardinalityInstrumentation(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool) {
 				return false
 			}),

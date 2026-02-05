@@ -141,9 +141,6 @@ type SerializedConcurrencyConstraint struct {
 	// InProgressLeaseKey represents the Redis key holding the ZSET for this constraint
 	InProgressLeaseKey string `json:"ilk"`
 
-	// InProgressItemKey represents the in progress item (concurrency) ZSET key for this constraint
-	InProgressItemKey string `json:"iik"`
-
 	// RetryAfterMS determines the retry duration in milliseconds if this concurrency constraint is limiting
 	RetryAfterMS int `json:"ra,omitempty"`
 }
@@ -204,7 +201,6 @@ func (ci ConstraintItem) ToSerializedConstraintItem(
 	accountID uuid.UUID,
 	envID uuid.UUID,
 	functionID uuid.UUID,
-	keyPrefix string,
 ) SerializedConstraintItem {
 	serialized := SerializedConstraintItem{}
 
@@ -217,7 +213,7 @@ func (ci ConstraintItem) ToSerializedConstraintItem(
 				Scope:             int(ci.RateLimit.Scope),
 				KeyExpressionHash: ci.RateLimit.KeyExpressionHash,
 				EvaluatedKeyHash:  ci.RateLimit.EvaluatedKeyHash,
-				Key:               ci.RateLimit.StateKey(keyPrefix, accountID, envID),
+				Key:               ci.RateLimit.StateKey(accountID, envID, functionID),
 			}
 
 			// Find matching rate limit config
@@ -241,8 +237,7 @@ func (ci ConstraintItem) ToSerializedConstraintItem(
 				Scope:              int(ci.Concurrency.Scope),
 				KeyExpressionHash:  ci.Concurrency.KeyExpressionHash,
 				EvaluatedKeyHash:   ci.Concurrency.EvaluatedKeyHash,
-				InProgressItemKey:  ci.Concurrency.InProgressItemKey,
-				InProgressLeaseKey: ci.Concurrency.InProgressLeasesKey(keyPrefix, accountID, envID, functionID),
+				InProgressLeaseKey: ci.Concurrency.InProgressLeasesKey(accountID, envID, functionID),
 				RetryAfterMS:       int(ci.Concurrency.RetryAfter().Milliseconds()),
 			}
 
@@ -284,7 +279,7 @@ func (ci ConstraintItem) ToSerializedConstraintItem(
 				Scope:             int(ci.Throttle.Scope),
 				KeyExpressionHash: ci.Throttle.KeyExpressionHash,
 				EvaluatedKeyHash:  ci.Throttle.EvaluatedKeyHash,
-				Key:               ci.Throttle.StateKey(keyPrefix, accountID, envID),
+				Key:               ci.Throttle.StateKey(accountID, envID, functionID),
 			}
 
 			// Find matching throttle config
@@ -352,7 +347,7 @@ func isTimeout(err error) bool {
 func executeLuaScript(
 	ctx context.Context,
 	name string,
-	mi MigrationIdentifier,
+	shard string,
 	source LeaseSource,
 	client rueidis.Client,
 	clock clockwork.Clock,
@@ -373,9 +368,9 @@ func executeLuaScript(
 		Tags: map[string]any{
 			"operation":       name,
 			"status":          status,
-			"migration":       mi.String(),
 			"source_location": source.Location.String(),
 			"source_service":  source.Service.String(),
+			"shard":           shard,
 		},
 	})
 

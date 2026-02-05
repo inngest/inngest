@@ -27,7 +27,7 @@ type checkRequestData struct {
 	ConfigVersion int `json:"cv,omitempty"`
 }
 
-func buildCheckRequestData(req *CapacityCheckRequest, keyPrefix string) (
+func buildCheckRequestData(req *CapacityCheckRequest) (
 	[]byte,
 	[]ConstraintItem,
 	string,
@@ -50,7 +50,6 @@ func buildCheckRequestData(req *CapacityCheckRequest, keyPrefix string) (
 			req.AccountID,
 			req.EnvID,
 			req.FunctionID,
-			keyPrefix,
 		)
 	}
 
@@ -104,24 +103,16 @@ func (r *redisCapacityManager) Check(ctx context.Context, req *CapacityCheckRequ
 		"account_id", req.AccountID,
 		"env_id", req.EnvID,
 		"fn_id", req.FunctionID, // May be empty
-		"migration", req.Migration,
 	)
 
-	// Retrieve client and key prefix for current constraints
-	// NOTE: We will no longer need this once we move to a dedicated store for constraint state
-	keyPrefix, client, err := r.clientAndPrefix(req.Migration)
-	if err != nil {
-		return nil, nil, errs.Wrap(0, false, "failed to get client: %w", err)
-	}
-
-	data, sortedConstraints, hash, err := buildCheckRequestData(req, keyPrefix)
+	data, sortedConstraints, hash, err := buildCheckRequestData(req)
 	if err != nil {
 		return nil, nil, errs.Wrap(0, false, "failed to construct request data: %w", err)
 	}
 
 	keys := []string{
-		r.keyAccountLeases(keyPrefix, req.AccountID),
-		r.keyOperationIdempotency(keyPrefix, req.AccountID, "chk", hash),
+		r.keyAccountLeases(req.AccountID),
+		r.keyOperationIdempotency(req.AccountID, "chk", hash),
 	}
 
 	enableDebugLogsVal := "0"
@@ -129,7 +120,7 @@ func (r *redisCapacityManager) Check(ctx context.Context, req *CapacityCheckRequ
 		enableDebugLogsVal = "1"
 	}
 
-	scopedKeyPrefix := fmt.Sprintf("{%s}:%s", keyPrefix, accountScope(req.AccountID))
+	scopedKeyPrefix := fmt.Sprintf("{cs}:%s", accountScope(req.AccountID))
 
 	now := r.clock.Now()
 
@@ -156,9 +147,9 @@ func (r *redisCapacityManager) Check(ctx context.Context, req *CapacityCheckRequ
 	rawRes, internalErr := executeLuaScript(
 		ctx,
 		"check",
-		req.Migration,
+		r.shardName,
 		LeaseSource{},
-		client,
+		r.client,
 		r.clock,
 		keys,
 		args,

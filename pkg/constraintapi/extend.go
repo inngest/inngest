@@ -31,20 +31,10 @@ func (r *redisCapacityManager) ExtendLease(ctx context.Context, req *CapacityExt
 		"account_id", req.AccountID,
 		"lease_id", req.LeaseID,
 		"source", req.Source,
-		"migration", req.Migration,
+		"shard", r.shardName,
 	)
 
 	now := r.clock.Now()
-
-	// Retrieve client and key prefix for current constraints
-	// NOTE: We will no longer need this once we move to a dedicated store for constraint state
-	keyPrefix, client, err := r.clientAndPrefix(req.Migration)
-	if err != nil {
-		return nil, errs.Wrap(0, false, "failed to get client: %w", err)
-	}
-
-	// Deterministically compute this based on numScavengerShards and accountID
-	scavengerShard := r.scavengerShard(ctx, req.AccountID)
 
 	leaseExpiry := now.Add(req.Duration)
 	newLeaseID, err := ulid.New(ulid.Timestamp(leaseExpiry), rand.Reader)
@@ -53,11 +43,11 @@ func (r *redisCapacityManager) ExtendLease(ctx context.Context, req *CapacityExt
 	}
 
 	keys := []string{
-		r.keyOperationIdempotency(keyPrefix, req.AccountID, "ext", req.IdempotencyKey),
-		r.keyScavengerShard(keyPrefix, scavengerShard),
-		r.keyAccountLeases(keyPrefix, req.AccountID),
-		r.keyLeaseDetails(keyPrefix, req.AccountID, req.LeaseID),
-		r.keyLeaseDetails(keyPrefix, req.AccountID, newLeaseID),
+		r.keyOperationIdempotency(req.AccountID, "ext", req.IdempotencyKey),
+		r.keyScavengerShard(),
+		r.keyAccountLeases(req.AccountID),
+		r.keyLeaseDetails(req.AccountID, req.LeaseID),
+		r.keyLeaseDetails(req.AccountID, newLeaseID),
 	}
 
 	enableDebugLogsVal := "0"
@@ -65,7 +55,7 @@ func (r *redisCapacityManager) ExtendLease(ctx context.Context, req *CapacityExt
 		enableDebugLogsVal = "1"
 	}
 
-	scopedKeyPrefix := fmt.Sprintf("{%s}:%s", keyPrefix, accountScope(req.AccountID))
+	scopedKeyPrefix := fmt.Sprintf("{cs}:%s", accountScope(req.AccountID))
 
 	args, err := strSlice([]any{
 		scopedKeyPrefix,
@@ -91,9 +81,9 @@ func (r *redisCapacityManager) ExtendLease(ctx context.Context, req *CapacityExt
 	rawRes, internalErr := executeLuaScript(
 		ctx,
 		"extend",
-		req.Migration,
+		r.shardName,
 		req.Source,
-		client,
+		r.client,
 		r.clock,
 		keys,
 		args,
