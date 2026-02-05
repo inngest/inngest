@@ -17,7 +17,7 @@ import { AppFilterDocument, CountRunsDocument } from './queries';
 import { useRunsPagination } from './useRunsPagination';
 import { toRunStatuses, toTimeField } from './utils';
 
-export const DEFAULT_POLL_INTERVAL = 0;
+export const DEFAULT_POLL_INTERVAL = 1000;
 
 export type RefreshRunsRef = {
   refresh: () => void;
