@@ -110,6 +110,21 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 		return s.Op == enums.OpcodeRunComplete
 	})
 
+	// When we have >1 steps (parallel mode), we need to set ForceStepPlan to disable
+	// immediate execution in the SDK. This ensures that parallel steps are properly
+	// planned rather than executed immediately.
+	if len(input.Steps) > 1 && !input.Metadata.Config.ForceStepPlan {
+		if err := c.State.UpdateMetadata(ctx, input.Metadata.ID, state.MutableConfig{
+			ForceStepPlan:  true,
+			RequestVersion: input.Metadata.Config.RequestVersion,
+			StartedAt:      input.Metadata.Config.StartedAt,
+		}); err != nil {
+			l.Error("error updating metadata to force step plan", "error", err)
+		}
+		// Update the local metadata so subsequent operations see the change
+		input.Metadata.Config.ForceStepPlan = true
+	}
+
 	// Depending on the type of steps, we may end up switching the run from sync to async.  For example,
 	// if the opcodes are sleeps, waitForEvents, inferences, etc. we will be resuming the API endpoint
 	// at some point in the future.
