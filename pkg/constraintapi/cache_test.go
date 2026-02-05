@@ -958,6 +958,243 @@ func TestCache(t *testing.T) {
 				require.Equal(t, 2, len(deps.lifecycles.AcquireCalls))
 			},
 		},
+		{
+			name: "should filter cached constraints with shouldCache predicate",
+			run: func(ctx context.Context, t *testing.T, deps deps) {
+				// Create different types of constraints
+				accountConcurrency := ConstraintItem{
+					Kind: ConstraintKindConcurrency,
+					Concurrency: &ConcurrencyConstraint{
+						Scope:             enums.ConcurrencyScopeAccount,
+						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:account:%s", accountID),
+					},
+				}
+
+				fnConcurrency := ConstraintItem{
+					Kind: ConstraintKindConcurrency,
+					Concurrency: &ConcurrencyConstraint{
+						Scope:             enums.ConcurrencyScopeFn,
+						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:p:%s", fnID),
+					},
+				}
+
+				customConcurrency := ConstraintItem{
+					Kind: ConstraintKindConcurrency,
+					Concurrency: &ConcurrencyConstraint{
+						Scope:             enums.ConcurrencyScopeAccount,
+						KeyExpressionHash: "expr-hash",
+						EvaluatedKeyHash:  "key-hash",
+						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:custom:a:%s:key-hash", accountID),
+					},
+				}
+
+				throttle := ConstraintItem{
+					Kind: ConstraintKindThrottle,
+					Throttle: &ThrottleConstraint{
+						Scope:             enums.ThrottleScopeAccount,
+						KeyExpressionHash: "throttle-expr",
+						EvaluatedKeyHash:  "throttle-key",
+					},
+				}
+
+				// Create a cache with a filter that ONLY caches:
+				// - Account-level concurrency WITHOUT custom keys
+				// This means fnConcurrency, customConcurrency, and throttle should NOT be cached
+				cache := NewConstraintCache(
+					WithConstraintCacheClock(deps.clock),
+					WithConstraintCacheManager(deps.cm),
+					WithConstraintCacheEnable(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, minTTL, maxTTL time.Duration) {
+						return true, MinCacheTTL, MaxCacheTTL
+					}),
+					WithConstraintCacheShouldCache(func(ci ConstraintItem) bool {
+						// Only cache account-level concurrency without custom keys
+						return ci.Kind == ConstraintKindConcurrency &&
+							ci.Concurrency != nil &&
+							ci.Concurrency.Scope == enums.ConcurrencyScopeAccount &&
+							!ci.Concurrency.IsCustomKey()
+					}),
+				)
+
+				// First request that exhausts all constraints
+				res, err := cache.Acquire(ctx, &CapacityAcquireRequest{
+					AccountID:  accountID,
+					EnvID:      envID,
+					FunctionID: fnID,
+					Source: LeaseSource{
+						Service:           ServiceAPI,
+						Location:          CallerLocationItemLease,
+						RunProcessingMode: RunProcessingModeBackground,
+					},
+					Migration: MigrationIdentifier{
+						QueueShard: "test",
+					},
+					IdempotencyKey: "acq1",
+					Configuration: ConstraintConfig{
+						FunctionVersion: 1,
+						Concurrency: ConcurrencyConfig{
+							AccountConcurrency:  1, // Will be exhausted after 1 lease
+							FunctionConcurrency: 1, // Will be exhausted after 1 lease
+							CustomConcurrencyKeys: []CustomConcurrencyLimit{
+								{
+									Scope:             enums.ConcurrencyScopeAccount,
+									Limit:             1, // Will be exhausted after 1 lease
+									KeyExpressionHash: "expr-hash",
+								},
+							},
+						},
+						Throttle: []ThrottleConfig{
+							{
+								Scope:             enums.ThrottleScopeAccount,
+								Limit:             1, // Will be exhausted after 1 lease
+								Period:            60,
+								KeyExpressionHash: "throttle-expr",
+							},
+						},
+					},
+					Constraints: []ConstraintItem{
+						accountConcurrency,
+						fnConcurrency,
+						customConcurrency,
+						throttle,
+					},
+					Amount:               1,
+					LeaseIdempotencyKeys: []string{"item1"},
+					CurrentTime:          deps.clock.Now(),
+					Duration:             3 * time.Second,
+					MaximumLifetime:      time.Minute,
+				})
+				require.NoError(t, err)
+				require.Len(t, res.Leases, 1)
+				// All constraints should be exhausted after acquiring 1 lease
+				require.Len(t, res.ExhaustedConstraints, 4)
+
+				// Verify only account concurrency (without custom key) is cached
+				require.Equal(t, 1, cache.cache.ItemCount(), "Should only cache 1 constraint")
+				require.NotNil(t, cache.cache.Get(accountConcurrency.CacheKey(accountID, envID, fnID)), "Account concurrency should be cached")
+				require.Nil(t, cache.cache.Get(fnConcurrency.CacheKey(accountID, envID, fnID)), "Function concurrency should NOT be cached")
+				require.Nil(t, cache.cache.Get(customConcurrency.CacheKey(accountID, envID, fnID)), "Custom concurrency should NOT be cached")
+				require.Nil(t, cache.cache.Get(throttle.CacheKey(accountID, envID, fnID)), "Throttle should NOT be cached")
+
+				// Clear the debug lifecycles to count fresh calls
+				deps.lifecycles.AcquireCalls = nil
+
+				// Second request - should hit cache for account concurrency only
+				res, err = cache.Acquire(ctx, &CapacityAcquireRequest{
+					AccountID:  accountID,
+					EnvID:      envID,
+					FunctionID: fnID,
+					Source: LeaseSource{
+						Service:           ServiceAPI,
+						Location:          CallerLocationItemLease,
+						RunProcessingMode: RunProcessingModeBackground,
+					},
+					Migration: MigrationIdentifier{
+						QueueShard: "test",
+					},
+					IdempotencyKey: "acq2",
+					Configuration: ConstraintConfig{
+						FunctionVersion: 1,
+						Concurrency: ConcurrencyConfig{
+							AccountConcurrency:  1,
+							FunctionConcurrency: 1,
+							CustomConcurrencyKeys: []CustomConcurrencyLimit{
+								{
+									Scope:             enums.ConcurrencyScopeAccount,
+									Limit:             1,
+									KeyExpressionHash: "expr-hash",
+								},
+							},
+						},
+						Throttle: []ThrottleConfig{
+							{
+								Scope:             enums.ThrottleScopeAccount,
+								Limit:             1,
+								Period:            60,
+								KeyExpressionHash: "throttle-expr",
+							},
+						},
+					},
+					Constraints: []ConstraintItem{
+						accountConcurrency,
+						fnConcurrency,
+						customConcurrency,
+						throttle,
+					},
+					Amount:               1,
+					LeaseIdempotencyKeys: []string{"item2"},
+					CurrentTime:          deps.clock.Now(),
+					Duration:             3 * time.Second,
+					MaximumLifetime:      time.Minute,
+				})
+				require.NoError(t, err)
+				require.Len(t, res.Leases, 0)
+				// Should return the cached account concurrency constraint
+				require.Len(t, res.ExhaustedConstraints, 1)
+				require.Equal(t, accountConcurrency.Kind, res.ExhaustedConstraints[0].Kind)
+
+				// No additional calls to manager - served from cache
+				require.Equal(t, 0, len(deps.lifecycles.AcquireCalls), "Second request should be served from cache")
+
+				// Third request with ONLY the non-cached constraints
+				// This should go to the manager since these constraints aren't cached
+				deps.lifecycles.AcquireCalls = nil
+				res, err = cache.Acquire(ctx, &CapacityAcquireRequest{
+					AccountID:  accountID,
+					EnvID:      envID,
+					FunctionID: fnID,
+					Source: LeaseSource{
+						Service:           ServiceAPI,
+						Location:          CallerLocationItemLease,
+						RunProcessingMode: RunProcessingModeBackground,
+					},
+					Migration: MigrationIdentifier{
+						QueueShard: "test",
+					},
+					IdempotencyKey: "acq3",
+					Configuration: ConstraintConfig{
+						FunctionVersion: 1,
+						Concurrency: ConcurrencyConfig{
+							FunctionConcurrency: 1,
+							CustomConcurrencyKeys: []CustomConcurrencyLimit{
+								{
+									Scope:             enums.ConcurrencyScopeAccount,
+									Limit:             1,
+									KeyExpressionHash: "expr-hash",
+								},
+							},
+						},
+						Throttle: []ThrottleConfig{
+							{
+								Scope:             enums.ThrottleScopeAccount,
+								Limit:             1,
+								Period:            60,
+								KeyExpressionHash: "throttle-expr",
+							},
+						},
+					},
+					Constraints: []ConstraintItem{
+						fnConcurrency,
+						customConcurrency,
+						throttle,
+					},
+					Amount:               1,
+					LeaseIdempotencyKeys: []string{"item3"},
+					CurrentTime:          deps.clock.Now(),
+					Duration:             3 * time.Second,
+					MaximumLifetime:      time.Minute,
+				})
+				require.NoError(t, err)
+				require.Len(t, res.Leases, 0)
+				require.Len(t, res.ExhaustedConstraints, 3)
+
+				// Should have called the manager since non-cached constraints were requested
+				require.Equal(t, 1, len(deps.lifecycles.AcquireCalls), "Request with non-cached constraints should hit manager")
+
+				// Verify still only 1 item cached (account concurrency)
+				// The non-cached constraints should not have been added to cache
+				require.Equal(t, 1, cache.cache.ItemCount(), "Should still only have 1 cached constraint")
+			},
+		},
 	}
 
 	for _, tc := range cases {

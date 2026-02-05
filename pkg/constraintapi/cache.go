@@ -20,6 +20,12 @@ const (
 
 type EnableConstraintCacheFn func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, minTTL, maxTTL time.Duration)
 
+// ShouldCacheConstraintFn is a predicate function that determines whether a constraint should be cached.
+// If nil, all constraints are cached (default behavior).
+// If provided, only constraints for which this function returns true will be cached.
+// The function is called for each constraint during both cache check and cache set operations.
+type ShouldCacheConstraintFn func(ci ConstraintItem) bool
+
 type constraintCache struct {
 	manager CapacityManager
 	clock   clockwork.Clock
@@ -27,6 +33,7 @@ type constraintCache struct {
 	cache                                *ccache.Cache[*constraintCacheItem]
 	enableHighCardinalityInstrumentation EnableHighCardinalityInstrumentation
 	enableCache                          EnableConstraintCacheFn
+	shouldCache                          ShouldCacheConstraintFn
 }
 
 type constraintCacheItem struct {
@@ -60,6 +67,12 @@ func WithConstraintCacheEnable(enable EnableConstraintCacheFn) ConstraintCacheOp
 	}
 }
 
+func WithConstraintCacheShouldCache(fn ShouldCacheConstraintFn) ConstraintCacheOption {
+	return func(c *constraintCache) {
+		c.shouldCache = fn
+	}
+}
+
 // Acquire implements CapacityManager.
 func (l *constraintCache) Acquire(ctx context.Context, req *CapacityAcquireRequest) (*CapacityAcquireResponse, errs.InternalError) {
 	if l.enableCache == nil {
@@ -77,6 +90,11 @@ func (l *constraintCache) Acquire(ctx context.Context, req *CapacityAcquireReque
 
 	// Return immediately on first cache hit since any exhausted constraint blocks the request
 	for _, ci := range req.Constraints {
+		// Skip constraints that don't pass the filter
+		if l.shouldCache != nil && !l.shouldCache(ci) {
+			continue
+		}
+
 		// Construct cache key for constraint scoped to account
 		cacheKey := ci.CacheKey(req.AccountID, req.EnvID, req.FunctionID)
 		if cacheKey == "" {
@@ -156,6 +174,11 @@ func (l *constraintCache) Acquire(ctx context.Context, req *CapacityAcquireReque
 	// for a short duration to avoid unnecessary load on Redis.
 	// Exhausted constraints mean no further requests can succeed until capacity is freed.
 	for _, ci := range res.ExhaustedConstraints {
+		// Skip constraints that don't pass the filter
+		if l.shouldCache != nil && !l.shouldCache(ci) {
+			continue
+		}
+
 		cacheKey := ci.CacheKey(req.AccountID, req.EnvID, req.FunctionID)
 		if cacheKey == "" {
 			continue
