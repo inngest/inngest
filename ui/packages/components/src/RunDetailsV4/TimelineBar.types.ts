@@ -74,6 +74,9 @@ export interface BarStyle {
 
   /** Bar height variant (defaults to 'tall') */
   barHeight?: BarHeight;
+
+  /** Whether this bar should use status-based coloring (green/red/etc based on run status) */
+  statusBased?: boolean;
 }
 
 /**

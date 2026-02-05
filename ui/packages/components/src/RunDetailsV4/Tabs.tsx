@@ -12,7 +12,7 @@ export const Tab = ({
   return (
     <div
       className={`${
-        active ? 'text-basis border-contrast ' : 'text-muted border-transparent'
+        active ? 'text-basis border-contrast' : 'text-muted border-transparent'
       } flex h-[30px] cursor-pointer items-center self-center border-b-2 text-sm leading-tight outline-none`}
       onClick={onClick}
     >
@@ -42,7 +42,7 @@ export const Tabs = ({ tabs, defaultActive = '' }: { tabs: TabsType; defaultActi
         {tabs.map((t: TabType, i: number) => (
           <Tab
             key={`tab-${i}`}
-            active={active === t.id || (active == '' && i === 0)}
+            active={active === t.id || (active === '' && i === 0)}
             onClick={() => setActive(t.id)}
           >
             {t.label}
@@ -51,7 +51,7 @@ export const Tabs = ({ tabs, defaultActive = '' }: { tabs: TabsType; defaultActi
       </div>
       <div className="relative h-full overflow-y-auto">
         {tabs.map((tab, i) => {
-          const tabActive = active === tab.id || (active == '' && i === 0);
+          const tabActive = active === tab.id || (active === '' && i === 0);
           return (
             <div
               key={`content-${i}`}

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { RunDetailsV3 } from '@inngest/components/RunDetailsV3/RunDetailsV3';
 import { RunDetailsV4 } from '@inngest/components/RunDetailsV4';
+import { Switch } from '@inngest/components/Switch';
 import { cn } from '@inngest/components/utils/classNames';
 
 import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
@@ -34,24 +35,7 @@ export function DashboardRunDetails({ runID, standalone = true }: Props) {
           >
             V3
           </span>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={showV4}
-            onClick={() => setShowV4(!showV4)}
-            className={cn(
-              'relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-opacity-75',
-              showV4 ? 'bg-primary-moderate' : 'bg-surfaceMuted',
-            )}
-          >
-            <span
-              aria-hidden="true"
-              className={cn(
-                'pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out',
-                showV4 ? 'translate-x-4' : 'translate-x-0',
-              )}
-            />
-          </button>
+          <Switch checked={showV4} onCheckedChange={setShowV4} />
           <span
             className={cn(
               'text-sm',
@@ -68,7 +52,6 @@ export function DashboardRunDetails({ runID, standalone = true }: Props) {
           standalone={standalone}
           getTrigger={getTrigger}
           runID={runID}
-          newStack={true}
           pollInterval={DEFAULT_POLL_INTERVAL}
         />
       ) : (

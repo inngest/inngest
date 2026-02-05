@@ -5,7 +5,8 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { traceToTimelineData, type Trace } from './traceConversion';
+import type { Trace } from '../types';
+import { traceToTimelineData } from './traceConversion';
 
 describe('traceConversion', () => {
   // Helper to create a minimal valid trace
@@ -24,6 +25,7 @@ describe('traceConversion', () => {
     stepInfo: null,
     stepOp: 'RUN',
     stepType: null,
+    userlandSpan: null,
     isUserland: false,
     ...overrides,
   });

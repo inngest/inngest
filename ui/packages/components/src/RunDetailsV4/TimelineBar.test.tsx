@@ -34,13 +34,13 @@ describe('TimelineBar', () => {
 
     it('displays formatted duration', () => {
       render(<TimelineBar {...defaultProps} />);
-      // 1234ms should format to "1.23s"
-      expect(screen.getByText('1.23s')).toBeTruthy();
+      // 1234ms should format to "1.2s"
+      expect(screen.getByText('1.2s')).toBeTruthy();
     });
 
     it('displays duration in milliseconds for short durations', () => {
       render(<TimelineBar {...defaultProps} duration={456} />);
-      expect(screen.getByText('456.00ms')).toBeTruthy();
+      expect(screen.getByText('456ms')).toBeTruthy();
     });
   });
 

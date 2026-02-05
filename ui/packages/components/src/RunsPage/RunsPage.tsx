@@ -227,7 +227,6 @@ export function RunsPage({
             pollInterval={pollInterval}
             runID={rowData.id}
             standalone={false}
-            newStack={true}
           />
         </div>
       );
