@@ -21,10 +21,11 @@ type OnCapacityLeaseAcquiredData struct {
 	Duration        time.Duration
 	Source          LeaseSource
 
-	GrantedLeases       []CapacityLease
-	LimitingConstraints []ConstraintItem
-	FairnessReduction   int
-	RetryAfter          time.Time
+	GrantedLeases        []CapacityLease
+	LimitingConstraints  []ConstraintItem
+	ExhaustedConstraints []ConstraintItem
+	FairnessReduction    int
+	RetryAfter           time.Time
 }
 
 type OnCapacityLeaseExtendedData struct {

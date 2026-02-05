@@ -32,6 +32,10 @@ var Attrs = struct {
 	FunctionVersion     attr[*int]
 	RunID               attr[*ulid.ULID]
 
+	// Durable endpoint attributes
+	IsDurableEndpointRun         attr[*bool]
+	DurableEndpointModeChangedAt attr[*time.Time]
+
 	// Dynamic span controls
 	DynamicSpanID attr[*string]
 	DynamicStatus attr[*enums.StepStatus]
@@ -162,6 +166,8 @@ var Attrs = struct {
 	FunctionID:                         UUIDAttr("function.id"),
 	FunctionVersion:                    IntAttr("function.version"),
 	InternalLocation:                   StringAttr("internal.location"),
+	IsDurableEndpointRun:               BoolAttr("run.is_durable_endpoint"),
+	DurableEndpointModeChangedAt:       TimeAttr("run.durable_endpoint.mode_changed_at"),
 	IsFunctionOutput:                   BoolAttr("is.function.output"),
 	QueuedAt:                           TimeAttr("queued_at"),
 	RequestURL:                         StringAttr("request.url"),

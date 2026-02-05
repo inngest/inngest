@@ -876,3 +876,124 @@ func TestLuaRateLimit_EdgeCases(t *testing.T) {
 		require.False(t, res.Limited)
 	})
 }
+
+func TestLuaRateLimit_NilRemainingEdgeCase(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("heavily exceeded rate limit should not cause nil comparison error", func(t *testing.T) {
+		r, rc, clock := initRedis(t)
+		defer rc.Close()
+
+		limiter := New(ctx, rc, "{rl}:")
+
+		config := inngest.RateLimit{
+			Limit:  10,
+			Period: "1s",
+		}
+
+		key := "nil-remaining-test"
+		redisKey := "{rl}:" + key
+
+		// Set TAT 500ms in the future to trigger next <= -emission condition
+		now := clock.Now()
+		futureTAT := now.Add(500 * time.Millisecond)
+		tatNs := fmt.Sprintf("%d", futureTAT.UnixNano())
+
+		err := r.Set(redisKey, tatNs)
+		require.NoError(t, err)
+
+		r.SetTime(clock.Now())
+		res, err := limiter.RateLimit(ctx, key, config, WithNow(clock.Now()))
+
+		require.NoError(t, err)
+		require.True(t, res.Limited)
+		require.Greater(t, res.RetryAfter, time.Duration(0))
+	})
+
+	t.Run("burst capacity still works when TAT is slightly in future", func(t *testing.T) {
+		r, rc, clock := initRedis(t)
+		defer rc.Close()
+
+		limiter := New(ctx, rc, "{rl}:")
+
+		config := inngest.RateLimit{
+			Limit:  10,
+			Period: "1s",
+		}
+
+		key := "burst-capacity-test"
+		redisKey := "{rl}:" + key
+
+		// Set TAT 50ms in the future (within burst allowance)
+		now := clock.Now()
+		futureTAT := now.Add(50 * time.Millisecond)
+		tatNs := fmt.Sprintf("%d", futureTAT.UnixNano())
+
+		err := r.Set(redisKey, tatNs)
+		require.NoError(t, err)
+
+		r.SetTime(clock.Now())
+		res, err := limiter.RateLimit(ctx, key, config, WithNow(clock.Now()))
+		require.NoError(t, err)
+		require.False(t, res.Limited)
+		require.Equal(t, time.Duration(0), res.RetryAfter)
+	})
+
+	t.Run("boundary case: exactly at dvt threshold", func(t *testing.T) {
+		r, rc, clock := initRedis(t)
+		defer rc.Close()
+
+		limiter := New(ctx, rc, "{rl}:")
+
+		config := inngest.RateLimit{
+			Limit:  10,
+			Period: "1s",
+		}
+
+		key := "boundary-test"
+		redisKey := "{rl}:" + key
+
+		// Set TAT exactly at dvt (200ms) - boundary where next = 0
+		now := clock.Now()
+		futureTAT := now.Add(200 * time.Millisecond)
+		tatNs := fmt.Sprintf("%d", futureTAT.UnixNano())
+
+		err := r.Set(redisKey, tatNs)
+		require.NoError(t, err)
+
+		r.SetTime(clock.Now())
+		res, err := limiter.RateLimit(ctx, key, config, WithNow(clock.Now()))
+		require.NoError(t, err)
+		require.True(t, res.Limited)
+		require.Greater(t, res.RetryAfter, time.Duration(0))
+	})
+
+	t.Run("just beyond threshold triggers else clause", func(t *testing.T) {
+		r, rc, clock := initRedis(t)
+		defer rc.Close()
+
+		limiter := New(ctx, rc, "{rl}:")
+
+		config := inngest.RateLimit{
+			Limit:  10,
+			Period: "1s",
+		}
+
+		key := "beyond-threshold-test"
+		redisKey := "{rl}:" + key
+
+		// Set TAT just beyond dvt + emission to trigger else clause
+		now := clock.Now()
+		futureTAT := now.Add(300*time.Millisecond + 1*time.Nanosecond)
+		tatNs := fmt.Sprintf("%d", futureTAT.UnixNano())
+
+		err := r.Set(redisKey, tatNs)
+		require.NoError(t, err)
+
+		r.SetTime(clock.Now())
+		res, err := limiter.RateLimit(ctx, key, config, WithNow(clock.Now()))
+		require.NoError(t, err)
+		require.True(t, res.Limited)
+		require.Greater(t, res.RetryAfter, time.Duration(0))
+	})
+}

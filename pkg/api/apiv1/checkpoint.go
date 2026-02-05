@@ -360,17 +360,13 @@ func (a checkpointAPI) Output(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// We expect that the output is a wrapped {"data":APIRsult} type.  Check to see the first token
-		// is an object, else this will be encrypted.
-		if output[1] != '{' {
-			_, _ = w.Write(output)
-			return
-		}
-
+		// We expect that the output is a wrapped {"data":APIResult} type.
+		// Try to parse it and extract the status code, headers, and body.
+		// If parsing fails or the status code is invalid, fall back to writing the raw output.
 		res := struct {
 			Data apiresult.APIResult `json:"data"`
 		}{}
-		if err := json.Unmarshal(output, &res); err == nil {
+		if err := json.Unmarshal(output, &res); err == nil && res.Data.StatusCode > 0 {
 			for k, v := range res.Data.Headers {
 				w.Header().Set(k, v)
 			}
