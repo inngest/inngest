@@ -1188,6 +1188,10 @@ func (e *executor) schedule(
 		time := runID.Timestamp()
 		runSpanOpts.StartTime = time
 		meta.AddAttr(runSpanOpts.Attributes, meta.Attrs.StartedAt, &time)
+
+		// Mark this as a Durable Endpoint run
+		isDurableEndpointRun := true
+		meta.AddAttr(runSpanOpts.Attributes, meta.Attrs.IsDurableEndpointRun, &isDurableEndpointRun)
 	}
 
 	status := enums.StepStatusQueued
