@@ -134,6 +134,8 @@ local function rateLimit(key, now_ns, period_ns, limit, burst, quantity)
 	if next > -emission then
 		local remaining = math.floor(next / emission)
 		result["remaining"] = remaining
+	else
+		result["remaining"] = 0
 	end
 
 	return result

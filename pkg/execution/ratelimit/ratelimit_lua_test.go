@@ -876,3 +876,56 @@ func TestLuaRateLimit_EdgeCases(t *testing.T) {
 		require.False(t, res.Limited)
 	})
 }
+
+func TestLuaRateLimit_NilRemainingEdgeCase(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("heavily exceeded rate limit should not cause nil comparison error", func(t *testing.T) {
+		r, rc, clock := initRedis(t)
+		defer rc.Close()
+
+		limiter := New(ctx, rc, "{rl}:")
+
+		// Use limit=10 to get burst=1, capacity=2
+		// emission = 1s / 10 = 100ms
+		// For next <= -emission: dvt + emission <= tat - now
+		// dvt = emission * (burst + 1) = 100ms * 2 = 200ms
+		// We need tat - now >= 300ms
+		config := inngest.RateLimit{
+			Limit:  10,
+			Period: "1s",
+		}
+
+		key := "nil-remaining-test"
+		redisKey := "{rl}:" + key
+
+		// Manually set TAT to be far in the future to trigger the edge case
+		// Set TAT to be 500ms in the future (500,000,000 nanoseconds)
+		now := clock.Now()
+		futureTAT := now.Add(500 * time.Millisecond)
+		tatNs := fmt.Sprintf("%d", futureTAT.UnixNano())
+
+		t.Logf("Setting Redis key %s to TAT: %s (500ms in future)", redisKey, tatNs)
+		err := r.Set(redisKey, tatNs)
+		require.NoError(t, err)
+
+		// Now when we check capacity:
+		// - tat = now + 500ms
+		// - ttl = tat - now = 500ms
+		// - dvt = 200ms
+		// - next = dvt - ttl = 200ms - 500ms = -300ms
+		// - Is -300ms > -100ms? NO! So remaining should NOT be set (nil bug)
+
+		// This should trigger the nil comparison error at line 173
+		r.SetTime(clock.Now())
+		res, err := limiter.RateLimit(ctx, key, config, WithNow(clock.Now()))
+
+		// Without the fix, this should error with "attempt to compare number with nil"
+		// With the fix, it should succeed and show we're rate limited
+		require.NoError(t, err, "should not error even when TAT is far in future")
+		require.True(t, res.Limited, "should be rate limited")
+		require.Greater(t, res.RetryAfter, time.Duration(0), "should have positive retry time")
+
+		t.Logf("Result: limited=%v, retry=%v", res.Limited, res.RetryAfter)
+	})
+}
