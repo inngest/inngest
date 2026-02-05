@@ -144,6 +144,10 @@ local exhaustedSet = {}
 -- that have been exhausted.
 local retryAt = 0
 
+-- Cache concurrency capacity from first pass to avoid redundant ZCOUNT in second pass
+---@type table<integer, integer>
+local concurrencyCapacityCache = {}
+
 -- Skip GCRA if constraint check idempotency key is present
 local skipGCRA = call("EXISTS", keyConstraintCheckIdempotency) == 1
 
@@ -166,6 +170,9 @@ for index, value in ipairs(constraints) do
 		local inProgressTotal = inProgressItems + inProgressLeases
 		constraintCapacity = value.c.l - inProgressTotal
 		constraintRetryAt = toInteger(nowMS + value.c.ra)
+
+		-- Cache capacity to avoid redundant ZCOUNT in second pass
+		concurrencyCapacityCache[index] = constraintCapacity
 	elseif value.k == 3 then
 		-- throttle
 		-- allow consuming all capacity in one request (for generating multiple leases)
@@ -257,10 +264,9 @@ for i, value in ipairs(constraints) do
 		-- batch-update concurrency
 		call("ZADD", value.c.ilk, unpack(updates))
 
-		local inProgressItems = getConcurrencyCount(value.c.iik)
-		local inProgressLeases = getConcurrencyCount(value.c.ilk)
-		local inProgressTotal = inProgressItems + inProgressLeases
-		constraintCapacity = value.c.l - inProgressTotal
+		-- Reuse cached capacity from first pass and reduce by granted amount
+		-- instead of redundant ZCOUNT queries. We know we just added 'granted' leases.
+		constraintCapacity = concurrencyCapacityCache[i] - granted
 		constraintRetryAt = toInteger(nowMS + value.c.ra)
 	elseif value.k == 3 then
 		-- update throttle: consume 1 unit
