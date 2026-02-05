@@ -1257,6 +1257,7 @@ func TestCapacityCheckResponseConversion(t *testing.T) {
 						},
 					},
 				},
+				ExhaustedConstraints: []ConstraintItem{},
 				Usage: []ConstraintUsage{
 					{
 						Constraint: ConstraintItem{
@@ -1300,21 +1301,24 @@ func TestCapacityCheckResponseConversion(t *testing.T) {
 						Limit: 100,
 					},
 				},
+				ExhaustedConstraints: []*pb.ConstraintItem{},
 			},
 		},
 		{
 			name: "empty response",
 			input: &CapacityCheckResponse{
-				AvailableCapacity:   0,
-				LimitingConstraints: []ConstraintItem{},
-				Usage:               []ConstraintUsage{},
-				RetryAfter:          time.Time{},
+				AvailableCapacity:    0,
+				LimitingConstraints:  []ConstraintItem{},
+				ExhaustedConstraints: []ConstraintItem{},
+				Usage:                []ConstraintUsage{},
+				RetryAfter:           time.Time{},
 			},
 			expected: &pb.CapacityCheckResponse{
-				AvailableCapacity:   0,
-				LimitingConstraints: []*pb.ConstraintItem{},
-				Usage:               []*pb.ConstraintUsage{},
-				RetryAfter:          nil,
+				AvailableCapacity:    0,
+				LimitingConstraints:  []*pb.ConstraintItem{},
+				ExhaustedConstraints: []*pb.ConstraintItem{},
+				Usage:                []*pb.ConstraintUsage{},
+				RetryAfter:           nil,
 			},
 		},
 		{
@@ -1586,6 +1590,16 @@ func TestCapacityAcquireResponseConversion(t *testing.T) {
 						},
 					},
 				},
+				ExhaustedConstraints: []ConstraintItem{
+					{
+						Kind: ConstraintKindRateLimit,
+						RateLimit: &RateLimitConstraint{
+							Scope:             enums.RateLimitScopeFn,
+							KeyExpressionHash: "rate-limit-key",
+							EvaluatedKeyHash:  "eval-hash",
+						},
+					},
+				},
 				RetryAfter: retryAfter,
 			},
 			expected: &pb.CapacityAcquireResponse{
@@ -1611,20 +1625,32 @@ func TestCapacityAcquireResponseConversion(t *testing.T) {
 						},
 					},
 				},
+				ExhaustedConstraints: []*pb.ConstraintItem{
+					{
+						Kind: pb.ConstraintApiConstraintKind_CONSTRAINT_API_CONSTRAINT_KIND_RATE_LIMIT,
+						RateLimit: &pb.RateLimitConstraint{
+							Scope:             pb.ConstraintApiRateLimitScope_CONSTRAINT_API_RATE_LIMIT_SCOPE_FUNCTION,
+							KeyExpressionHash: "rate-limit-key",
+							EvaluatedKeyHash:  "eval-hash",
+						},
+					},
+				},
 				RetryAfter: timestamppb.New(retryAfter),
 			},
 		},
 		{
 			name: "response without leases",
 			input: &CapacityAcquireResponse{
-				Leases:              []CapacityLease{},
-				LimitingConstraints: []ConstraintItem{},
-				RetryAfter:          time.Time{},
+				Leases:               []CapacityLease{},
+				LimitingConstraints:  []ConstraintItem{},
+				ExhaustedConstraints: []ConstraintItem{},
+				RetryAfter:           time.Time{},
 			},
 			expected: &pb.CapacityAcquireResponse{
-				Leases:              []*pb.CapacityLease{},
-				LimitingConstraints: []*pb.ConstraintItem{},
-				RetryAfter:          timestamppb.New(time.Time{}),
+				Leases:               []*pb.CapacityLease{},
+				LimitingConstraints:  []*pb.ConstraintItem{},
+				ExhaustedConstraints: []*pb.ConstraintItem{},
+				RetryAfter:           timestamppb.New(time.Time{}),
 			},
 		},
 		{

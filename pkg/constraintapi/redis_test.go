@@ -114,6 +114,7 @@ func TestRedisCapacityManager_RateLimit(t *testing.T) {
 
 		// Don't expect limiting constraint
 		require.Nil(t, resp.LimitingConstraints)
+		require.Empty(t, resp.ExhaustedConstraints)
 
 		// RetryAfter should not be set
 		require.Zero(t, resp.RetryAfter)
@@ -157,6 +158,10 @@ func TestRedisCapacityManager_RateLimit(t *testing.T) {
 		require.Equal(t, ConstraintKindRateLimit, resp.LimitingConstraints[0].Kind)
 		require.Equal(t, 120, resp.Usage[0].Limit)
 		require.Equal(t, 1, resp.Usage[0].Used)
+
+		// Verify that constraint is not exhausted (still has capacity)
+		require.Empty(t, resp.ExhaustedConstraints, "Rate limit should not be exhausted after using 1 of 120 capacity")
+		require.True(t, resp.RetryAfter.IsZero(), "RetryAfter should not be set when constraints are not exhausted")
 	})
 
 	t.Run("Extend", func(t *testing.T) {
@@ -353,6 +358,7 @@ func TestRedisCapacityManager_Concurrency(t *testing.T) {
 
 		// Don't expect limiting constraint
 		require.Nil(t, resp.LimitingConstraints)
+		require.Empty(t, resp.ExhaustedConstraints)
 
 		// RetryAfter should not be set
 		require.Zero(t, resp.RetryAfter)
@@ -429,6 +435,10 @@ func TestRedisCapacityManager_Concurrency(t *testing.T) {
 		require.Equal(t, 1, resp.Usage[0].Used)
 		require.Equal(t, 5, resp.Usage[1].Limit)
 		require.Equal(t, 1, resp.Usage[1].Used)
+
+		// Verify that constraints are not exhausted (still have capacity)
+		require.Empty(t, resp.ExhaustedConstraints, "Concurrency constraints should not be exhausted (account: 1/20, function: 1/5)")
+		require.True(t, resp.RetryAfter.IsZero(), "RetryAfter should not be set when constraints are not exhausted")
 	})
 
 	t.Run("Extend", func(t *testing.T) {

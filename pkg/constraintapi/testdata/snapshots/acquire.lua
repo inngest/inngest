@@ -23,6 +23,12 @@ end
 local operationIdempotencyTTL = tonumber(ARGV[9])
 local constraintCheckIdempotencyTTL = tonumber(ARGV[10])
 local enableDebugLogs = tonumber(ARGV[11]) == 1
+if not requestDetails.lik then
+	return redis.error_reply("ERR requestDetails.lik is nil during update")
+end
+if not initialLeaseIDs then
+	return redis.error_reply("ERR initialLeaseIDs is nil during update")
+end
 local debugLogs = {}
 local function debug(...)
 	if enableDebugLogs then
@@ -36,27 +42,6 @@ local function getConcurrencyCount(key)
 		return 0
 	end
 	return count
-end
-local function getActiveAccountLeasesCount()
-	local count = call("ZCOUNT", keyAccountLeases, tostring(nowMS), "+inf")
-	if count == nil then
-		return 0
-	end
-	return count
-end
-local function getExpiredAccountLeasesCount()
-	local count = call("ZCOUNT", keyAccountLeases, "-inf", tostring(nowMS))
-	if count == nil then
-		return 0
-	end
-	return count
-end
-local function getEarliestLeaseExpiry()
-	local count = call("ZRANGE", keyAccountLeases, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
-	if count == nil or count == false or #count == 0 then
-		return 0
-	end
-	return tonumber(count[2])
 end
 local function toInteger(value)
 	return math.floor(value + 0.5) 
@@ -195,70 +180,57 @@ local constraints = requestDetails.s
 if not constraints then
 	return redis.error_reply("ERR constraints array is nil")
 end
-local opIdempotency = call("GET", keyOperationIdempotency)
+local results = call("MGET", keyOperationIdempotency, keyRequestState)
+local opIdempotency = results[1]
+local existingRequestState = results[2]
 if opIdempotency ~= nil and opIdempotency ~= false then
-	debug("hit operation idempotency")
 	return opIdempotency
 end
-local existingRequestState = call("GET", keyRequestState)
 if existingRequestState ~= nil and existingRequestState ~= false and existingRequestState ~= "" then
 	local res = {}
 	res["s"] = 4
 	res["d"] = debugLogs
-	res["aal"] = getActiveAccountLeasesCount()
-	res["eal"] = getExpiredAccountLeasesCount()
-	res["ele"] = getEarliestLeaseExpiry()
 	return cjson.encode(res)
 end
 local availableCapacity = requested
 local limitingConstraints = {}
+local exhaustedConstraints = {}
+local exhaustedSet = {}
 local retryAt = 0
 local skipGCRA = call("EXISTS", keyConstraintCheckIdempotency) == 1
 for index, value in ipairs(constraints) do
-	if availableCapacity <= 0 then
-		break
-	end
-	debug("checking constraint " .. index)
 	local constraintCapacity = 0
-	local constraintRetryAfter = 0
+	local constraintRetryAt = 0
 	if skipGCRA and (value.k == 1 or value.k == 3) then
-		constraintCapacity = availableCapacity
-		debug("skipping gcra" .. index)
+		constraintCapacity = math.max(availableCapacity, 1)
 	elseif value.k == 1 then
 		local rlRes = rateLimit(value.r.k, nowNS, value.r.p, value.r.l, value.r.b, 0)
 		constraintCapacity = rlRes["remaining"]
-		constraintRetryAfter = toInteger(rlRes["retry_at"] / 1000000) 
+		constraintRetryAt = toInteger(rlRes["retry_at"] / 1000000) 
 	elseif value.k == 2 then
-		debug("evaluating concurrency")
 		local inProgressItems = getConcurrencyCount(value.c.iik)
 		local inProgressLeases = getConcurrencyCount(value.c.ilk)
 		local inProgressTotal = inProgressItems + inProgressLeases
 		constraintCapacity = value.c.l - inProgressTotal
-		constraintRetryAfter = toInteger(nowMS + value.c.ra)
+		constraintRetryAt = toInteger(nowMS + value.c.ra)
 	elseif value.k == 3 then
-		debug("evaluating throttle")
 		local maxBurst = (value.t.l or 0) + (value.t.b or 0) - 1
 		local throttleRes = throttle(value.t.k, nowMS, value.t.p, value.t.l, maxBurst, 0)
 		constraintCapacity = throttleRes["remaining"]
-		constraintRetryAfter = toInteger(throttleRes["retry_at"]) 
+		constraintRetryAt = toInteger(throttleRes["retry_at"]) 
+	end
+	if constraintCapacity <= 0 then
+		if not exhaustedSet[index] then
+			table.insert(exhaustedConstraints, index)
+			exhaustedSet[index] = true
+		end
+		if constraintRetryAt > retryAt then
+			retryAt = constraintRetryAt
+		end
 	end
 	if constraintCapacity < availableCapacity then
-		debug(
-			"constraint has less capacity",
-			"c",
-			index,
-			"cc",
-			tostring(constraintCapacity),
-			"ac",
-			tostring(availableCapacity),
-			"ra",
-			tostring(constraintRetryAfter)
-		)
 		availableCapacity = constraintCapacity
 		table.insert(limitingConstraints, index)
-		if constraintRetryAfter > retryAt then
-			retryAt = constraintRetryAfter
-		end
 	end
 end
 local fairnessReduction = 0
@@ -267,47 +239,73 @@ if availableCapacity <= 0 then
 	local res = {}
 	res["s"] = 2
 	res["lc"] = limitingConstraints
+	res["ec"] = exhaustedConstraints
 	res["ra"] = retryAt
 	res["d"] = debugLogs
 	res["fr"] = fairnessReduction
-	res["aal"] = getActiveAccountLeasesCount()
-	res["eal"] = getExpiredAccountLeasesCount()
-	res["ele"] = getEarliestLeaseExpiry()
 	return cjson.encode(res)
 end
 local granted = availableCapacity
 local grantedLeases = {}
+local accountLeasesArgs = {}
+local keyPrefixLeaseDetails = scopedKeyPrefix .. ":ld:"
+local keyPrefixConstraintCheck = scopedKeyPrefix .. ":ik:cc:"
+retryAt = 0
+for i, value in ipairs(constraints) do
+	local constraintRetryAt = 0
+	local constraintCapacity = 0
+	if skipGCRA and (value.k == 1 or value.k == 3) then
+		constraintCapacity = 1
+	elseif value.k == 1 then
+		local rlRes = rateLimit(value.r.k, nowNS, value.r.p, value.r.l, value.r.b, granted)
+		constraintRetryAt = toInteger(rlRes["retry_at"] / 1000000)
+		constraintCapacity = rlRes["remaining"]
+	elseif value.k == 2 then
+		local updates = {}
+		for j = 1, granted, 1 do
+			local initialLeaseID = initialLeaseIDs[j]
+			updates[(j - 1) * 2 + 1] = tostring(leaseExpiryMS)
+			updates[(j - 1) * 2 + 2] = initialLeaseID
+		end
+		call("ZADD", value.c.ilk, unpack(updates))
+		local inProgressItems = getConcurrencyCount(value.c.iik)
+		local inProgressLeases = getConcurrencyCount(value.c.ilk)
+		local inProgressTotal = inProgressItems + inProgressLeases
+		constraintCapacity = value.c.l - inProgressTotal
+		constraintRetryAt = toInteger(nowMS + value.c.ra)
+	elseif value.k == 3 then
+		local maxBurst = (value.t.l or 0) + (value.t.b or 0) - 1
+		local throttleRes = throttle(value.t.k, nowMS, value.t.p, value.t.l, maxBurst, granted)
+		constraintRetryAt = toInteger(throttleRes["retry_at"])
+		constraintCapacity = throttleRes["remaining"]
+	end
+	if constraintCapacity <= 0 then
+		if not exhaustedSet[i] then
+			exhaustedSet[i] = true
+			table.insert(exhaustedConstraints, i)
+		end
+		if constraintRetryAt > retryAt then
+			retryAt = constraintRetryAt
+		end
+	end
+end
 for i = 1, granted, 1 do
-	if not requestDetails.lik then
-		return redis.error_reply("ERR requestDetails.lik is nil during update")
-	end
-	if not initialLeaseIDs then
-		return redis.error_reply("ERR initialLeaseIDs is nil during update")
-	end
 	local hashedLeaseIdempotencyKey = requestDetails.lik[i]
 	local leaseRunID = (requestDetails.lri ~= nil and requestDetails.lri[hashedLeaseIdempotencyKey]) or ""
 	local initialLeaseID = initialLeaseIDs[i]
-	for _, value in ipairs(constraints) do
-		if skipGCRA then
-		elseif value.k == 1 then
-			debug("updating rate limit", value.r.h)
-			rateLimit(value.r.k, nowNS, value.r.p, value.r.l, value.r.b, 1)
-		elseif value.k == 2 then
-			call("ZADD", value.c.ilk, tostring(leaseExpiryMS), initialLeaseID)
-		elseif value.k == 3 then
-			local maxBurst = (value.t.l or 0) + (value.t.b or 0) - 1
-			throttle(value.t.k, nowMS, value.t.p, value.t.l, maxBurst, 1)
-		end
-	end
-	local keyLeaseDetails = string.format("%s:ld:%s", scopedKeyPrefix, initialLeaseID)
+	local keyLeaseDetails = keyPrefixLeaseDetails .. initialLeaseID
 	call("HSET", keyLeaseDetails, "lik", hashedLeaseIdempotencyKey, "rid", leaseRunID, "req", requestID)
-	call("ZADD", keyAccountLeases, tostring(leaseExpiryMS), initialLeaseID)
-	local keyLeaseConstraintCheckIdempotency = string.format("%s:ik:cc:%s", scopedKeyPrefix, hashedLeaseIdempotencyKey)
+	accountLeasesArgs[(i - 1) * 2 + 1] = tostring(leaseExpiryMS)
+	accountLeasesArgs[(i - 1) * 2 + 2] = initialLeaseID
+	local keyLeaseConstraintCheckIdempotency = keyPrefixConstraintCheck .. hashedLeaseIdempotencyKey
 	call("SET", keyLeaseConstraintCheckIdempotency, tostring(nowMS), "EX", tostring(constraintCheckIdempotencyTTL))
 	local leaseObject = {}
 	leaseObject["lid"] = initialLeaseID
 	leaseObject["lik"] = hashedLeaseIdempotencyKey
-	table.insert(grantedLeases, leaseObject)
+	grantedLeases[i] = leaseObject
+end
+if #accountLeasesArgs > 0 then
+	call("ZADD", keyAccountLeases, unpack(accountLeasesArgs))
 end
 call("SET", keyConstraintCheckIdempotency, tostring(nowMS), "EX", tostring(constraintCheckIdempotencyTTL))
 requestDetails.g = availableCapacity
@@ -323,12 +321,10 @@ result["r"] = requested
 result["g"] = granted
 result["l"] = grantedLeases
 result["lc"] = limitingConstraints
+result["ec"] = exhaustedConstraints
 result["ra"] = retryAt 
 result["d"] = debugLogs
 result["fr"] = fairnessReduction
-result["aal"] = getActiveAccountLeasesCount()
-result["eal"] = getExpiredAccountLeasesCount()
-result["ele"] = getEarliestLeaseExpiry()
 local encoded = cjson.encode(result)
 call("SET", keyOperationIdempotency, encoded, "EX", tostring(operationIdempotencyTTL))
 return encoded

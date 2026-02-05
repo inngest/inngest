@@ -890,6 +890,15 @@ func IncrConstraintAPILimitingConstraintsCounter(ctx context.Context, opts Count
 	})
 }
 
+func IncrConstraintAPIExhaustedConstraintsCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "constraintapi_exhausted_constraints_total",
+		Description: "Total number of times constraints exhausted capacity acquisition",
+		Tags:        opts.Tags,
+	})
+}
+
 func IncrConstraintAPIIssuedLeaseCounter(ctx context.Context, count int64, opts CounterOpt) {
 	if opts.Tags == nil {
 		opts.Tags = map[string]any{}

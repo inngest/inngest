@@ -777,6 +777,67 @@ func TestThrottleGCRA(t *testing.T) {
 		require.Equal(t, 0*time.Second, time.Duration(res.Diff)*time.Millisecond)
 		require.WithinDuration(t, clock.Now().Add(6*time.Second), time.UnixMilli(res.RetryAtMS), time.Second)
 	})
+
+	t.Run("retry_after should be set properly", func(t *testing.T) {
+		t.Parallel()
+
+		clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Minute))
+
+		_, rc := initRedis(t)
+		defer rc.Close()
+
+		key := "test"
+
+		period := 1 * time.Minute
+		limit := 10
+		burst := 0
+
+		// Read initial capacity
+		res := runScript(t, rc, gcraScriptOptions{
+			key:      key,
+			now:      clock.Now(),
+			period:   period,
+			limit:    limit,
+			burst:    burst,
+			quantity: 0,
+		})
+		require.False(t, res.Limited)
+
+		// Can run the request right now!
+		require.Equal(t, time.Duration(0), time.Duration(res.RetryAfterMS)*time.Millisecond)
+
+		// NOTE: The read-only request is used to return the retry time
+		// assuming the request went through and consumed all capacity.
+		// If we just returned the current state BEFORE modifying, we would
+		// have to return the current time here.
+		require.WithinDuration(t, clock.Now().Add(6*time.Second), time.UnixMilli(res.RetryAtMS), time.Millisecond)
+
+		// Can run 1 more
+		require.Equal(t, int64(0), res.Usage)
+		require.Equal(t, 1, res.Remaining)
+
+		// Consume one
+		res = runScript(t, rc, gcraScriptOptions{
+			key:      key,
+			now:      clock.Now(),
+			period:   period,
+			limit:    limit,
+			burst:    burst,
+			quantity: 1,
+		})
+		// Still not limited
+		require.False(t, res.Limited)
+
+		// No more capacity now
+		require.Equal(t, int64(1), res.Usage)
+		require.Equal(t, 0, res.Remaining)
+
+		// Request was successful so retryAfter will be unset
+		require.Equal(t, 0*time.Second, time.Duration(res.RetryAfterMS)*time.Millisecond)
+
+		// RetryAtMS will be set to now + emission
+		require.WithinDuration(t, clock.Now().Add(6*time.Second), time.UnixMilli(res.RetryAtMS), time.Millisecond)
+	})
 }
 
 func TestRateLimitGCRA(t *testing.T) {

@@ -542,6 +542,9 @@ func TestLuaCompatibility(t *testing.T) {
 				require.NotNil(t, acquireResp)
 				require.Equal(t, 1, len(acquireResp.Leases))
 
+				// Verify that ExhaustedConstraints is empty when capacity is available
+				require.Empty(t, acquireResp.ExhaustedConstraints, "ExhaustedConstraints should be empty when leases are granted")
+
 				extendResp, err := cm.ExtendLease(ctx, &constraintapi.CapacityExtendLeaseRequest{
 					Migration: constraintapi.MigrationIdentifier{
 						IsRateLimit: false,
@@ -582,6 +585,152 @@ func TestLuaCompatibility(t *testing.T) {
 				require.Equal(t, constraintapi.ServiceAPI, releaseResp.CreationSource.Service)
 				require.Equal(t, constraintapi.CallerLocationItemLease, releaseResp.CreationSource.Location)
 				require.Equal(t, constraintapi.RunProcessingModeDurableEndpoint, releaseResp.CreationSource.RunProcessingMode)
+			})
+
+			t.Run("acquiring capacity when exhausted", func(t *testing.T) {
+				shard := setup(t)
+
+				cm, err := constraintapi.NewRedisCapacityManager(
+					constraintapi.WithClock(clockwork.NewRealClock()),
+					constraintapi.WithEnableDebugLogs(false),
+					constraintapi.WithNumScavengerShards(4),
+					constraintapi.WithQueueShards(map[string]rueidis.Client{
+						shard.Name(): shard.Client().Client(),
+					}),
+					constraintapi.WithQueueStateKeyPrefix("q:v1"),
+					constraintapi.WithRateLimitClient(shard.Client().Client()),
+					constraintapi.WithRateLimitKeyPrefix("rl"),
+				)
+				require.NoError(t, err)
+
+				// Set up a low function concurrency limit that we can easily exhaust
+				config := constraintapi.ConstraintConfig{
+					FunctionVersion: 1,
+					Concurrency: constraintapi.ConcurrencyConfig{
+						AccountConcurrency:  10,
+						FunctionConcurrency: 2, // Low limit to easily exhaust
+					},
+				}
+
+				accountID := uuid.New()
+				envID := uuid.New()
+				functionID := uuid.New()
+
+				constraints := []constraintapi.ConstraintItem{
+					{
+						Kind: constraintapi.ConstraintKindConcurrency,
+						Concurrency: &constraintapi.ConcurrencyConstraint{
+							Scope:             enums.ConcurrencyScopeAccount,
+							Mode:              enums.ConcurrencyModeStep,
+							InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:account:%s", accountID),
+						},
+					},
+					{
+						Kind: constraintapi.ConstraintKindConcurrency,
+						Concurrency: &constraintapi.ConcurrencyConstraint{
+							Scope:             enums.ConcurrencyScopeFn,
+							Mode:              enums.ConcurrencyModeStep,
+							InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:p:%s", functionID),
+						},
+					},
+				}
+
+				// Acquire first lease (should succeed)
+				acquire1Resp, err := cm.Acquire(ctx, &constraintapi.CapacityAcquireRequest{
+					Migration: constraintapi.MigrationIdentifier{
+						IsRateLimit: false,
+						QueueShard:  shard.Name(),
+					},
+					IdempotencyKey:       "acquire-1",
+					AccountID:            accountID,
+					EnvID:                envID,
+					FunctionID:           functionID,
+					Configuration:        config,
+					Constraints:          constraints,
+					Amount:               1,
+					LeaseIdempotencyKeys: []string{"item1"},
+					LeaseRunIDs:          nil,
+					CurrentTime:          time.Now(),
+					Duration:             30 * time.Second,
+					MaximumLifetime:      time.Hour,
+					Source: constraintapi.LeaseSource{
+						Service:           constraintapi.ServiceAPI,
+						Location:          constraintapi.CallerLocationItemLease,
+						RunProcessingMode: constraintapi.RunProcessingModeDurableEndpoint,
+					},
+				})
+				require.NoError(t, err)
+				require.NotNil(t, acquire1Resp)
+				require.Equal(t, 1, len(acquire1Resp.Leases))
+
+				// Acquire second lease (should succeed, reaching the limit)
+				acquire2Resp, err := cm.Acquire(ctx, &constraintapi.CapacityAcquireRequest{
+					Migration: constraintapi.MigrationIdentifier{
+						IsRateLimit: false,
+						QueueShard:  shard.Name(),
+					},
+					IdempotencyKey:       "acquire-2",
+					AccountID:            accountID,
+					EnvID:                envID,
+					FunctionID:           functionID,
+					Configuration:        config,
+					Constraints:          constraints,
+					Amount:               1,
+					LeaseIdempotencyKeys: []string{"item2"},
+					LeaseRunIDs:          nil,
+					CurrentTime:          time.Now(),
+					Duration:             30 * time.Second,
+					MaximumLifetime:      time.Hour,
+					Source: constraintapi.LeaseSource{
+						Service:           constraintapi.ServiceAPI,
+						Location:          constraintapi.CallerLocationItemLease,
+						RunProcessingMode: constraintapi.RunProcessingModeDurableEndpoint,
+					},
+				})
+				require.NoError(t, err)
+				require.NotNil(t, acquire2Resp)
+				require.Equal(t, 1, len(acquire2Resp.Leases))
+
+				// Verify that function concurrency is now exhausted
+				require.Len(t, acquire2Resp.ExhaustedConstraints, 1, "Function concurrency should be exhausted after acquiring 2 leases")
+				require.Equal(t, constraintapi.ConstraintKindConcurrency, acquire2Resp.ExhaustedConstraints[0].Kind)
+				require.Equal(t, enums.ConcurrencyScopeFn, acquire2Resp.ExhaustedConstraints[0].Concurrency.Scope)
+
+				// Acquire third lease (should fail due to exhaustion)
+				acquire3Resp, err := cm.Acquire(ctx, &constraintapi.CapacityAcquireRequest{
+					Migration: constraintapi.MigrationIdentifier{
+						IsRateLimit: false,
+						QueueShard:  shard.Name(),
+					},
+					IdempotencyKey:       "acquire-3",
+					AccountID:            accountID,
+					EnvID:                envID,
+					FunctionID:           functionID,
+					Configuration:        config,
+					Constraints:          constraints,
+					Amount:               1,
+					LeaseIdempotencyKeys: []string{"item3"},
+					LeaseRunIDs:          nil,
+					CurrentTime:          time.Now(),
+					Duration:             30 * time.Second,
+					MaximumLifetime:      time.Hour,
+					Source: constraintapi.LeaseSource{
+						Service:           constraintapi.ServiceAPI,
+						Location:          constraintapi.CallerLocationItemLease,
+						RunProcessingMode: constraintapi.RunProcessingModeDurableEndpoint,
+					},
+				})
+				require.NoError(t, err)
+				require.NotNil(t, acquire3Resp)
+				require.Empty(t, acquire3Resp.Leases, "No leases should be granted when capacity is exhausted")
+
+				// Verify that ExhaustedConstraints is populated when acquisition fails
+				require.Len(t, acquire3Resp.ExhaustedConstraints, 1, "ExhaustedConstraints should identify the blocking constraint")
+				require.Equal(t, constraintapi.ConstraintKindConcurrency, acquire3Resp.ExhaustedConstraints[0].Kind)
+				require.Equal(t, enums.ConcurrencyScopeFn, acquire3Resp.ExhaustedConstraints[0].Concurrency.Scope)
+
+				// Verify RetryAfter is set
+				require.False(t, acquire3Resp.RetryAfter.IsZero(), "RetryAfter should be set when capacity is exhausted")
 			})
 		})
 	}
