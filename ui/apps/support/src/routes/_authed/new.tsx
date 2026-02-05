@@ -19,6 +19,7 @@ import {
 import { createTicket, getCustomerTierByEmail } from "@/data/plain";
 import { getAccountPlanInfo } from "@/data/inngest";
 import { CommunityChannels } from "@/components/Support/CommunityChannels";
+import { SlackChannelUpsell } from "@/components/Support/SlackChannelUpsell";
 
 export const Route = createFileRoute("/_authed/new")({
   component: NewTicketPage,
@@ -278,6 +279,10 @@ function NewTicketPage() {
           </p>
         </form>
         <div className="flex flex-col items-center">
+          <SlackChannelUpsell
+            hasPremiumSupport={plainTierInfo?.hasPremiumSupport ?? false}
+            isEnterprise={isEnterprise}
+          />
           <CommunityChannels />
         </div>
       </div>

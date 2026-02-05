@@ -776,6 +776,7 @@ export type CustomerTierInfo = {
   tierExternalId?: string;
   isEnterprise: boolean;
   isPaid: boolean;
+  hasPremiumSupport: boolean;
 };
 
 type CustomerWithCompanyResponse = {
@@ -825,6 +826,7 @@ export const getCustomerTierByEmail = createServerFn({ method: "GET" })
         return {
           isEnterprise: false,
           isPaid: false,
+          hasPremiumSupport: false,
         };
       }
 
@@ -833,6 +835,7 @@ export const getCustomerTierByEmail = createServerFn({ method: "GET" })
         return {
           isEnterprise: false,
           isPaid: false,
+          hasPremiumSupport: false,
         };
       }
       const company = customer.company;
@@ -846,9 +849,10 @@ export const getCustomerTierByEmail = createServerFn({ method: "GET" })
       const isEnterprise =
         tierExternalId.includes("enterprise") ||
         tierName.toLowerCase().includes("enterprise");
+      const hasPremiumSupport = tierExternalId.includes("premium_support");
       const isPaid =
         isEnterprise ||
-        tierExternalId.includes("premium_support") ||
+        hasPremiumSupport ||
         tierExternalId.includes("pro") ||
         tierExternalId.includes("vip");
 
@@ -861,12 +865,14 @@ export const getCustomerTierByEmail = createServerFn({ method: "GET" })
         tierExternalId: tier?.externalId || undefined,
         isEnterprise,
         isPaid,
+        hasPremiumSupport,
       };
     } catch (error) {
       console.error("Error fetching customer tier:", error);
       return {
         isEnterprise: false,
         isPaid: false,
+        hasPremiumSupport: false,
       };
     }
   });
