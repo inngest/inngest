@@ -17,7 +17,8 @@ import {
 } from '@remixicon/react';
 import { useLocation, useNavigate } from '@tanstack/react-router';
 
-import { useEnvironmentsGrpc } from '@/queries';
+import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
+import { useEnvironments, useEnvironmentsGrpc } from '@/queries';
 import {
   EnvironmentType,
   getDefaultEnvironment,
@@ -132,7 +133,22 @@ export default function EnvironmentSelectMenu({
   type ListboxValue = Environment | null | 'view_all' | 'sync_branch';
   const [selected, setSelected] = useState<ListboxValue>(null);
   const nextPathname = useSwitchablePathname();
-  const { data: envs = [], error } = useEnvironmentsGrpc();
+
+  const { value: rpcEnabled, isReady: rpcFlagReady } = useBooleanFlag(
+    'connect-rpc',
+    false,
+  );
+  const useRpc = rpcFlagReady && rpcEnabled;
+
+  const { data: grpcEnvs = [], error: grpcError } = useEnvironmentsGrpc({
+    enabled: useRpc,
+  });
+  const [{ data: gqlEnvs = [], error: gqlError }] = useEnvironments({
+    pause: useRpc,
+  });
+
+  const envs = useRpc ? grpcEnvs : gqlEnvs;
+  const error = useRpc ? grpcError : gqlError;
 
   //
   // Sync selected state with activeEnv from route

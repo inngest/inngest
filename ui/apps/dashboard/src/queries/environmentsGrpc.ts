@@ -41,8 +41,15 @@ const protoEnvToEnvironment = (env: ProtoEnv): Environment => ({
 
 //
 // React Query hook for fetching environments via ConnectRPC
-export const useEnvironmentsGrpc = () => {
-  const query = useQuery(fetchAccountEnvs, {}, { staleTime: 30000 });
+export const useEnvironmentsGrpc = (options?: { enabled?: boolean }) => {
+  const query = useQuery(
+    fetchAccountEnvs,
+    {},
+    {
+      staleTime: 30000,
+      enabled: options?.enabled ?? true,
+    },
+  );
 
   return {
     ...query,

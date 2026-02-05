@@ -62,6 +62,7 @@ export const RunDetailsV3 = ({
     false
   );
   const { value: tracesPreviewEnabled } = booleanFlag('traces-preview', true, true);
+  const { value: rpcEnabled, isReady: rpcFlagReady } = booleanFlag('connect-rpc', false);
   const { updateDynamicRunData } = useDynamicRunData({ runID });
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -145,10 +146,22 @@ export const RunDetailsV3 = ({
     };
   }, [isDragging, handleMouseMove, handleMouseUp]);
 
-  const { data: runData, error: runError } = useStreamRun({
+  const useRpc = rpcFlagReady && rpcEnabled;
+
+  const { data: streamRunData, error: streamRunError } = useStreamRun({
     runID,
-    enabled: Boolean(runID),
+    enabled: Boolean(runID) && useRpc,
   });
+
+  const { data: getRunData, error: getRunError } = useGetRun({
+    runID,
+    preview: tracesPreviewEnabled,
+    refetchInterval: pollInterval,
+    enabled: Boolean(runID) && !useRpc,
+  });
+
+  const runData = useRpc ? streamRunData : getRunData;
+  const runError = useRpc ? streamRunError : getRunError;
 
   const outputID = runData?.trace?.outputID;
   const {

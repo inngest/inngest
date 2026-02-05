@@ -4,8 +4,9 @@ import { Search } from '@inngest/components/Forms/Search';
 import { StatusDot } from '@inngest/components/Status/StatusDot';
 import useDebounce from '@inngest/components/hooks/useDebounce';
 
+import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import LoadingIcon from '@/components/Icons/LoadingIcon';
-import { useEnvironmentsGrpc } from '@/queries';
+import { useEnvironments, useEnvironmentsGrpc } from '@/queries';
 import { EnvironmentType, type Environment } from '@/utils/environments';
 import { BranchEnvironmentActions } from './BranchEnvironmentActions';
 import BranchEnvironmentListTable from './BranchEnvironmentListTable';
@@ -15,7 +16,22 @@ import { EnvKeysDropdownButton } from './row-actions/EnvKeysDropdownButton';
 import { EnvViewButton } from './row-actions/EnvViewButton';
 
 export default function Environments() {
-  const { data: envs = [], isLoading } = useEnvironmentsGrpc();
+  const { value: rpcEnabled, isReady: rpcFlagReady } = useBooleanFlag(
+    'connect-rpc',
+    false,
+  );
+  const useRpc = rpcFlagReady && rpcEnabled;
+
+  const { data: grpcEnvs = [], isLoading: grpcLoading } = useEnvironmentsGrpc({
+    enabled: useRpc,
+  });
+  const [{ data: gqlEnvs = [], fetching: gqlLoading }] = useEnvironments({
+    pause: useRpc,
+  });
+
+  const envs = useRpc ? grpcEnvs : gqlEnvs;
+  const isLoading = useRpc ? grpcLoading : gqlLoading;
+
   const [filterStatus, setFilterStatus] = useState<'active' | 'archived'>(
     'active',
   );
