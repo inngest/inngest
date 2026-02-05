@@ -11,6 +11,7 @@
 import { useMemo, type CSSProperties } from 'react';
 import {
   RiArrowRightLine,
+  RiArrowRightSFill,
   RiBuilding2Line,
   RiCheckboxCircleFill,
   RiFlashlightLine,
@@ -31,7 +32,8 @@ import type {
   BarStyleKey,
   TimelineBarProps,
 } from './TimelineBar.types';
-import { formatDuration, formatLabel } from './utils/formatting';
+import { formatDuration } from './runDetailsUtils';
+import { formatLabel } from './utils/formatting';
 import { TIMELINE_CONSTANTS } from './utils/timing';
 
 // ============================================================================
@@ -39,31 +41,28 @@ import { TIMELINE_CONSTANTS } from './utils/timing';
 // ============================================================================
 
 /**
- * Style configurations for all bar types.
- * Colors use status-based semantics from the Status system for consistency.
+ * Consolidated style configurations for all bar types.
+ * Each entry contains visual style, status-based coloring flag, icon, height, and pattern.
  */
 const BAR_STYLES: Record<BarStyleKey, BarStyle> = {
-  // Root run bar - uses status color (green for completed)
   root: {
     barColor: 'bg-status-completed',
     icon: 'checkbox',
+    statusBased: true,
   },
-
-  // Step types - step.run uses status color, others use default fallback (pending design)
   'step.run': {
     barColor: 'bg-status-completed',
+    statusBased: true,
   },
   'step.sleep': {
-    barColor: 'bg-slate-400', // Fallback style (pending design)
+    barColor: 'bg-slate-400',
   },
   'step.waitForEvent': {
-    barColor: 'bg-slate-400', // Fallback style (pending design)
+    barColor: 'bg-slate-400',
   },
   'step.invoke': {
-    barColor: 'bg-slate-400', // Fallback style (pending design)
+    barColor: 'bg-slate-400',
   },
-
-  // Timing categories
   'timing.inngest': {
     barColor: 'bg-slate-300',
     labelFormat: 'uppercase',
@@ -74,6 +73,7 @@ const BAR_STYLES: Record<BarStyleKey, BarStyle> = {
     pattern: 'barber-pole',
     labelFormat: 'uppercase',
     barHeight: 'tall',
+    statusBased: true,
   },
   'timing.connecting': {
     barColor: 'bg-transparent',
@@ -81,10 +81,9 @@ const BAR_STYLES: Record<BarStyleKey, BarStyle> = {
     labelFormat: 'uppercase',
     barHeight: 'short',
   },
-
-  // Fallback
   default: {
     barColor: 'bg-slate-400',
+    statusBased: true,
   },
 };
 
@@ -118,31 +117,15 @@ function getBarStyle(styleKey: BarStyleKey): BarStyle {
 }
 
 /**
- * Styles that should use status-based coloring.
- * These bars change color based on run status (COMPLETED=green, FAILED=red, etc.)
- */
-const STATUS_BASED_STYLES: Set<BarStyleKey> = new Set([
-  'root',
-  'step.run',
-  'timing.server',
-  'default',
-]);
-
-/**
  * Get the bar color class, using status-based coloring when appropriate.
- * @param styleKey - The bar style key
- * @param status - The run status (e.g., COMPLETED, FAILED, CANCELLED)
- * @returns The appropriate Tailwind background color class
  */
 function getBarColor(styleKey: BarStyleKey, status?: string): string {
   const barStyle = getBarStyle(styleKey);
 
-  // If this style should use status-based coloring and we have a status, use it
-  if (status && STATUS_BASED_STYLES.has(styleKey)) {
+  if (status && barStyle.statusBased) {
     return getStatusBackgroundClass(status);
   }
 
-  // Otherwise fall back to the hardcoded style color
   return barStyle.barColor;
 }
 
@@ -242,28 +225,15 @@ function ExpandToggle({ expanded, onToggle }: { expanded: boolean; onToggle?: ()
         onToggle?.();
       }}
     >
-      <span
-        className={cn('block transition-transform', expanded && 'rotate-90')}
-        style={{
-          transitionDuration: `${TIMELINE_CONSTANTS.TRANSITION_MS}ms`,
-          width: 0,
-          height: 0,
-          borderTop: '4px solid transparent',
-          borderBottom: '4px solid transparent',
-          borderLeft: '6px solid currentColor',
-        }}
+      <RiArrowRightSFill
+        className={cn('h-4 w-4 transition-transform', expanded && 'rotate-90')}
+        style={{ transitionDuration: `${TIMELINE_CONSTANTS.TRANSITION_MS}ms` }}
       />
     </button>
   );
 }
 
-/**
- * Height class mapping for bar variants.
- */
-const BAR_HEIGHT_CLASSES: Record<BarHeight, string> = {
-  short: 'h-2',
-  tall: 'h-5',
-};
+const BAR_HEIGHT_CLASSES: Record<BarHeight, string> = { short: 'h-2', tall: 'h-5' };
 
 /**
  * Renders the visual bar in the right panel.
@@ -443,6 +413,12 @@ export function TimelineBar({
   const indentPx =
     TIMELINE_CONSTANTS.BASE_LEFT_PADDING_PX + depth * TIMELINE_CONSTANTS.INDENT_WIDTH_PX;
 
+  // Transform bar position based on view offsets
+  const transformed = useMemo(
+    () => transformBarPosition(startPercent, widthPercent, viewStartOffset, viewEndOffset),
+    [startPercent, widthPercent, viewStartOffset, viewEndOffset]
+  );
+
   return (
     <div data-testid="timeline-bar-container">
       {/* Main row */}
@@ -493,33 +469,20 @@ export function TimelineBar({
           <div className="bg-canvasMuted absolute left-0 right-0 top-1/2 h-px -translate-y-1/2" />
           {/* Bar container - centered vertically */}
           <div className="absolute inset-y-0 flex w-full items-center">
-            {(() => {
-              // Transform bar position based on view offsets
-              const transformed = transformBarPosition(
-                startPercent,
-                widthPercent,
-                viewStartOffset,
-                viewEndOffset
-              );
-
-              // Don't render bar if completely outside the view
-              if (!transformed) return null;
-
-              return (
-                <VisualBar
-                  startPercent={transformed.startPercent}
-                  widthPercent={transformed.widthPercent}
-                  style={style}
-                  segments={segments}
-                  expanded={expandable && expanded}
-                  originalBarStart={startPercent}
-                  originalBarWidth={widthPercent}
-                  viewStartOffset={viewStartOffset}
-                  viewEndOffset={viewEndOffset}
-                  status={status}
-                />
-              );
-            })()}
+            {transformed && (
+              <VisualBar
+                startPercent={transformed.startPercent}
+                widthPercent={transformed.widthPercent}
+                style={style}
+                segments={segments}
+                expanded={expandable && expanded}
+                originalBarStart={startPercent}
+                originalBarWidth={widthPercent}
+                viewStartOffset={viewStartOffset}
+                viewEndOffset={viewEndOffset}
+                status={status}
+              />
+            )}
           </div>
         </div>
       </div>

@@ -38,7 +38,6 @@ type Props = {
   getTrigger: React.ComponentProps<typeof TriggerDetails>['getTrigger'];
   pollInterval?: number;
   runID: string;
-  newStack?: boolean;
   orgName?: string;
 };
 
@@ -84,11 +83,10 @@ function TimelineV4Wrapper({
   }, [trace]);
 
   // Convert V3 trace to V4 TimelineData
-  const timelineData = traceToTimelineData(trace, {
-    runID,
-    orgName,
-    leftWidth: 30,
-  });
+  const timelineData = useMemo(
+    () => traceToTimelineData(trace, { runID, orgName }),
+    [trace, runID, orgName]
+  );
 
   // Handle step selection - look up the trace and emit to global selection
   const handleSelectStep = useCallback(
@@ -110,7 +108,6 @@ export const RunDetailsV4 = ({
   standalone,
   pollInterval: initialPollInterval,
   initialRunData,
-  newStack = false,
   orgName,
 }: Props) => {
   const { booleanFlag } = useBooleanFlag();
@@ -254,7 +251,13 @@ export const RunDetailsV4 = ({
       status: runData.status,
       endedAt: runData.trace.endedAt ?? undefined,
     });
-  }, [runData?.trace.endedAt, runData?.status]);
+  }, [
+    runData?.trace.endedAt,
+    runData?.status,
+    initialRunData?.status,
+    updateDynamicRunData,
+    runID,
+  ]);
 
   const waiting = isWaiting(initialRunData?.status || runData?.status, runError, resultError);
   const showError = waiting ? false : runError || resultError;
@@ -336,7 +339,6 @@ export const RunDetailsV4 = ({
               selectedStep={selectedStep}
               pollInterval={pollInterval}
               tracesPreviewEnabled={tracesPreviewEnabled}
-              newStack={newStack}
             />
           ) : (
             <TopInfo

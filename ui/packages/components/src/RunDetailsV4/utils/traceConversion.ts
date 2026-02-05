@@ -7,19 +7,14 @@ import { max, min } from 'date-fns';
 
 import type { BarStyleKey, TimelineBarData, TimelineData } from '../TimelineBar.types';
 import { traceWalk } from '../runDetailsUtils';
-import type { Trace } from '../types';
+import { isStepInfoRun, type Trace } from '../types';
+import { TIMELINE_CONSTANTS } from './timing';
 
 /**
  * Check if a trace represents a step.run span
  */
 function isStepRunSpan(trace: Trace): boolean {
-  return (
-    trace.stepOp === 'RUN' ||
-    trace.stepType === 'RUN' ||
-    (trace.stepInfo !== null &&
-      typeof trace.stepInfo === 'object' &&
-      'type' in (trace.stepInfo as object))
-  );
+  return trace.stepOp === 'RUN' || trace.stepType === 'RUN' || isStepInfoRun(trace.stepInfo);
 }
 
 /**
@@ -115,7 +110,7 @@ export function traceToTimelineData(
     leftWidth?: number;
   }
 ): TimelineData {
-  const { orgName, leftWidth = 30 } = options;
+  const { orgName, leftWidth = TIMELINE_CONSTANTS.DEFAULT_LEFT_WIDTH } = options;
 
   // Calculate min/max time from the entire trace tree
   let minTime = new Date(trace.queuedAt);
@@ -146,8 +141,3 @@ export function traceToTimelineData(
     orgName,
   };
 }
-
-/**
- * Re-export types that may be needed by consumers
- */
-export type { Trace };

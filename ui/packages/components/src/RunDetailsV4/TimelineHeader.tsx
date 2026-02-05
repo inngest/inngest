@@ -9,9 +9,9 @@
  */
 
 import { getStatusBackgroundClass } from '../Status/statusClasses';
-import { TimeBrush } from '../TimeBrush';
 import { cn } from '../utils/classNames';
-import { formatDuration } from './utils/formatting';
+import { TimeBrush } from './TimeBrush';
+import { formatDuration } from './runDetailsUtils';
 import { TIMELINE_CONSTANTS } from './utils/timing';
 
 type Props = {

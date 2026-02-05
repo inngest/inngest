@@ -23,12 +23,12 @@ describe('TimelineHeader', () => {
     it('renders 5 time markers (0%, 25%, 50%, 75%, 100%)', () => {
       render(<TimelineHeader {...defaultProps} />);
 
-      // Look for duration labels: 0ms (0%), 2.50s (25%), 5s (50%), 7.50s (75%), 10s (100%)
-      expect(screen.getByText('<1ms')).toBeTruthy(); // 0%
-      expect(screen.getByText('2.50s')).toBeTruthy(); // 25%
-      expect(screen.getByText('5.00s')).toBeTruthy(); // 50%
-      expect(screen.getByText('7.50s')).toBeTruthy(); // 75%
-      expect(screen.getByText('10.00s')).toBeTruthy(); // 100%
+      // Look for duration labels: 0ms (0%), 2.5s (25%), 5s (50%), 7.5s (75%), 10s (100%)
+      expect(screen.getByText('0ms')).toBeTruthy(); // 0%
+      expect(screen.getByText('2.5s')).toBeTruthy(); // 25%
+      expect(screen.getByText('5s')).toBeTruthy(); // 50%
+      expect(screen.getByText('7.5s')).toBeTruthy(); // 75%
+      expect(screen.getByText('10s')).toBeTruthy(); // 100%
     });
 
     it('calculates correct durations for 1 minute timeline', () => {
@@ -40,11 +40,11 @@ describe('TimelineHeader', () => {
         />
       );
 
-      expect(screen.getByText('<1ms')).toBeTruthy(); // 0%
-      expect(screen.getByText('15.00s')).toBeTruthy(); // 25% of 60s
-      expect(screen.getByText('30.00s')).toBeTruthy(); // 50% of 60s
-      expect(screen.getByText('45.00s')).toBeTruthy(); // 75% of 60s
-      expect(screen.getByText('1.00m')).toBeTruthy(); // 100% of 60s
+      expect(screen.getByText('0ms')).toBeTruthy(); // 0%
+      expect(screen.getByText('15s')).toBeTruthy(); // 25% of 60s
+      expect(screen.getByText('30s')).toBeTruthy(); // 50% of 60s
+      expect(screen.getByText('45s')).toBeTruthy(); // 75% of 60s
+      expect(screen.getByText('1m')).toBeTruthy(); // 100% of 60s
     });
 
     it('handles millisecond-level timelines', () => {
@@ -56,11 +56,11 @@ describe('TimelineHeader', () => {
         />
       );
 
-      expect(screen.getByText('<1ms')).toBeTruthy(); // 0%
-      expect(screen.getByText('100.00ms')).toBeTruthy(); // 25% of 400ms
-      expect(screen.getByText('200.00ms')).toBeTruthy(); // 50% of 400ms
-      expect(screen.getByText('300.00ms')).toBeTruthy(); // 75% of 400ms
-      expect(screen.getByText('400.00ms')).toBeTruthy(); // 100% of 400ms
+      expect(screen.getByText('0ms')).toBeTruthy(); // 0%
+      expect(screen.getByText('100ms')).toBeTruthy(); // 25% of 400ms
+      expect(screen.getByText('200ms')).toBeTruthy(); // 50% of 400ms
+      expect(screen.getByText('300ms')).toBeTruthy(); // 75% of 400ms
+      expect(screen.getByText('400ms')).toBeTruthy(); // 100% of 400ms
     });
   });
 
@@ -143,9 +143,9 @@ describe('TimelineHeader', () => {
         />
       );
 
-      // 2 hours = 7200000ms, formatted as minutes
-      expect(screen.getByText('60.00m')).toBeTruthy(); // 50% of 2 hours = 60 minutes
-      expect(screen.getByText('120.00m')).toBeTruthy(); // 100% of 2 hours = 120 minutes
+      // 2 hours = 7200000ms
+      expect(screen.getByText('1h')).toBeTruthy(); // 50% of 2 hours = 1 hour
+      expect(screen.getByText('2h')).toBeTruthy(); // 100% of 2 hours
     });
   });
 });

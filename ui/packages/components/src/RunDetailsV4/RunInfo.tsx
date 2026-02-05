@@ -65,7 +65,7 @@ export const RunInfo = ({ initialRunData, run, runID, standalone, result }: Prop
       <div className="flex h-11 w-full flex-row items-center justify-between border-none">
         <div className="text-basis flex items-center justify-start gap-2">
           <div
-            className="flex  cursor-pointer items-center gap-2"
+            className="flex cursor-pointer items-center gap-2"
             onClick={() => setExpanded(!expanded)}
           >
             <RiArrowRightSLine

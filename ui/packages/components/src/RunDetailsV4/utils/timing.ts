@@ -23,7 +23,7 @@ export const TIMELINE_CONSTANTS = {
   TRANSITION_MS: 150,
 
   /** Default left panel width percentage */
-  DEFAULT_LEFT_WIDTH: 40,
+  DEFAULT_LEFT_WIDTH: 30,
 } as const;
 
 /**
