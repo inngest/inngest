@@ -2046,13 +2046,19 @@ func (e *executor) executeDriverV2(ctx context.Context, run *runInstance, d driv
 		}
 	}
 
+	// Use IncomingGeneratorStep if set, otherwise fall back to Incoming
+	stepID := run.edge.IncomingGeneratorStep
+	if stepID == "" {
+		stepID = run.edge.Incoming
+	}
+
 	resp, uerr, ierr := d.Do(ctx, e.smv2, driver.V2RequestOpts{
 		Metadata:   *run.Metadata(),
 		Fn:         run.f,
 		SigningKey: sk,
 		Attempt:    run.AttemptCount(),
 		Index:      run.stackIndex,
-		StepID:     &run.edge.IncomingGeneratorStep,
+		StepID:     &stepID,
 		QueueRef:   queueref.StringFromCtx(ctx),
 		URL:        url,
 	})
