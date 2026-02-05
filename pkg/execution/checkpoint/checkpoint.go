@@ -118,8 +118,9 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 			ForceStepPlan:  true,
 			RequestVersion: input.Metadata.Config.RequestVersion,
 			StartedAt:      input.Metadata.Config.StartedAt,
+			HasAI:          input.Metadata.Config.HasAI,
 		}); err != nil {
-			l.Error("error updating metadata to force step plan", "error", err)
+			return fmt.Errorf("updating metadata to force step plan: %w", err)
 		}
 		// Update the local metadata so subsequent operations see the change
 		input.Metadata.Config.ForceStepPlan = true
