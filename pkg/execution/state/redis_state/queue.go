@@ -15,7 +15,6 @@ import (
 
 	"github.com/VividCortex/ewma"
 	"github.com/google/uuid"
-	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/logger"
@@ -135,60 +134,6 @@ func acctConcurrencyKey(qp osqueue.QueuePartition, kg QueueKeyGenerator) string 
 		return kg.Concurrency("account", "-")
 	}
 	return kg.Concurrency("account", qp.AccountID.String())
-}
-
-func partitionAccountInProgressLeasesKey(qp osqueue.QueuePartition, kg QueueKeyGenerator, cm constraintapi.RolloutKeyGenerator) string {
-	if cm == nil {
-		return kg.Concurrency("", "")
-	}
-	if qp.IsSystem() {
-		return kg.Concurrency("", "")
-	}
-	if qp.AccountID == uuid.Nil {
-		return kg.Concurrency("", "")
-	}
-	return cm.KeyInProgressLeasesAccount(qp.AccountID)
-}
-
-func shadowPartitionAccountInProgressLeasesKey(sp osqueue.QueueShadowPartition, kg QueueKeyGenerator, cm constraintapi.RolloutKeyGenerator) string {
-	if cm == nil {
-		return kg.Concurrency("", "")
-	}
-	if sp.SystemQueueName != nil {
-		return kg.Concurrency("", "")
-	}
-	if sp.AccountID == nil {
-		return kg.Concurrency("", "")
-	}
-	return cm.KeyInProgressLeasesAccount(*sp.AccountID)
-}
-
-func partitionFunctionInProgressLeasesKey(qp osqueue.QueuePartition, kg QueueKeyGenerator, cm constraintapi.RolloutKeyGenerator) string {
-	if cm == nil {
-		return kg.Concurrency("", "")
-	}
-	// Enable system partitions to use the queueName override instead of the fnId
-	if qp.IsSystem() {
-		return kg.Concurrency("", "")
-	}
-	if qp.FunctionID == nil || qp.AccountID == uuid.Nil {
-		return kg.Concurrency("", "")
-	}
-	return cm.KeyInProgressLeasesFunction(qp.AccountID, *qp.FunctionID)
-}
-
-func shadowPartitionFunctionInProgressLeasesKey(sp osqueue.QueueShadowPartition, kg QueueKeyGenerator, cm constraintapi.RolloutKeyGenerator) string {
-	if cm == nil {
-		return kg.Concurrency("", "")
-	}
-	// Enable system partitions to use the queueName override instead of the fnId
-	if sp.SystemQueueName != nil {
-		return kg.Concurrency("", "")
-	}
-	if sp.FunctionID == nil || sp.AccountID == nil {
-		return kg.Concurrency("", "")
-	}
-	return cm.KeyInProgressLeasesFunction(*sp.AccountID, *sp.FunctionID)
 }
 
 func (q *queue) EnqueueItem(ctx context.Context, i osqueue.QueueItem, at time.Time, opts osqueue.EnqueueOpts) (osqueue.QueueItem, error) {
@@ -958,13 +903,6 @@ func (q *queue) Lease(
 
 		kg.ThrottleKey(item.Data.Throttle),
 
-		// Constraint API rollout
-		shadowPartitionAccountInProgressLeasesKey(o.ShadowPartition, kg, q.CapacityManager),
-		shadowPartitionFunctionInProgressLeasesKey(o.ShadowPartition, kg, q.CapacityManager),
-		backlogInProgressLeasesCustomKey(o.Backlog, q.CapacityManager, kg, o.ShadowPartition.AccountID, 1),
-		backlogInProgressLeasesCustomKey(o.Backlog, q.CapacityManager, kg, o.ShadowPartition.AccountID, 2),
-		q.keyConstraintCheckIdempotency(o.ShadowPartition.AccountID, item.ID),
-
 		kg.PartitionScavengerIndex(o.ShadowPartition.PartitionID),
 	}
 
@@ -1302,9 +1240,6 @@ func (q *queue) PartitionLease(
 		// concurrency limits prior to leasing, as an optimization.
 		acctConcurrencyKey(*p, kg),
 		fnConcurrencyKey(*p, kg),
-
-		partitionAccountInProgressLeasesKey(*p, kg, q.CapacityManager),
-		partitionFunctionInProgressLeasesKey(*p, kg, q.CapacityManager),
 	}
 
 	args, err := StrSlice([]any{

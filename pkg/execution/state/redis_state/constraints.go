@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
@@ -79,10 +78,6 @@ func (q *queue) BacklogRefillConstraintCheck(
 			Service:           constraintapi.ServiceExecutor,
 			Location:          constraintapi.CallerLocationBacklogRefill,
 			RunProcessingMode: constraintapi.RunProcessingModeBackground,
-		},
-		Migration: constraintapi.MigrationIdentifier{
-			IsRateLimit: false,
-			QueueShard:  q.name,
 		},
 	})
 	if err != nil {
@@ -223,10 +218,6 @@ func (q *queue) ItemLeaseConstraintCheck(
 				AccountID:      *shadowPart.AccountID,
 				IdempotencyKey: idempotencyKey,
 				LeaseID:        item.CapacityLease.LeaseID,
-				Migration: constraintapi.MigrationIdentifier{
-					IsRateLimit: false,
-					QueueShard:  q.Name(),
-				},
 				Source: constraintapi.LeaseSource{
 					Location:          constraintapi.CallerLocationItemLease,
 					Service:           constraintapi.ServiceExecutor,
@@ -265,10 +256,6 @@ func (q *queue) ItemLeaseConstraintCheck(
 			Service:           constraintapi.ServiceExecutor,
 			Location:          constraintapi.CallerLocationItemLease,
 			RunProcessingMode: constraintapi.RunProcessingModeBackground,
-		},
-		Migration: constraintapi.MigrationIdentifier{
-			IsRateLimit: false,
-			QueueShard:  q.name,
 		},
 	})
 	if err != nil {
@@ -315,18 +302,16 @@ func constraintItemsFromBacklog(sp *osqueue.QueueShadowPartition, backlog *osque
 		{
 			Kind: constraintapi.ConstraintKindConcurrency,
 			Concurrency: &constraintapi.ConcurrencyConstraint{
-				Mode:              enums.ConcurrencyModeStep,
-				Scope:             enums.ConcurrencyScopeAccount,
-				InProgressItemKey: shadowPartitionAccountInProgressKey(*sp, kg),
+				Mode:  enums.ConcurrencyModeStep,
+				Scope: enums.ConcurrencyScopeAccount,
 			},
 		},
 		// Function concurrency (always set - falls back to account concurrency)
 		{
 			Kind: constraintapi.ConstraintKindConcurrency,
 			Concurrency: &constraintapi.ConcurrencyConstraint{
-				Mode:              enums.ConcurrencyModeStep,
-				Scope:             enums.ConcurrencyScopeFn,
-				InProgressItemKey: shadowPartitionInProgressKey(*sp, kg),
+				Mode:  enums.ConcurrencyModeStep,
+				Scope: enums.ConcurrencyScopeFn,
 			},
 		},
 	}
@@ -350,32 +335,10 @@ func constraintItemsFromBacklog(sp *osqueue.QueueShadowPartition, backlog *osque
 					Scope:             bck.Scope,
 					KeyExpressionHash: bck.HashedKeyExpression,
 					EvaluatedKeyHash:  bck.HashedValue,
-					InProgressItemKey: backlogConcurrencyKey(bck, kg),
 				},
 			})
 		}
 	}
 
 	return constraints
-}
-
-func (q *queue) keyConstraintCheckIdempotency(accountID *uuid.UUID, itemID string) string {
-	kg := q.RedisClient.kg
-
-	if accountID == nil || *accountID == uuid.Nil {
-		return fmt.Sprintf("%s:-", kg.QueuePrefix())
-	}
-
-	if q.CapacityManager == nil {
-		return fmt.Sprintf("%s:-", kg.QueuePrefix())
-	}
-
-	if itemID == "" {
-		return fmt.Sprintf("%s:-", kg.QueuePrefix())
-	}
-
-	return q.CapacityManager.KeyConstraintCheckIdempotency(constraintapi.MigrationIdentifier{
-		IsRateLimit: false,
-		QueueShard:  q.name,
-	}, *accountID, itemID)
 }
