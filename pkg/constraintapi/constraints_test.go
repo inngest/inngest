@@ -1562,7 +1562,7 @@ func TestConstraintEnforcement(t *testing.T) {
 		{
 			name: "rateLimit constraints exhausted initially should be returned",
 
-			// expect no returned leases due to using up throttle capacity
+			// expect no returned leases due to using up rateLimit capacity
 			amount:              10,
 			expectedLeaseAmount: 0,
 
@@ -1606,7 +1606,55 @@ func TestConstraintEnforcement(t *testing.T) {
 				require.Len(t, resp.ExhaustedConstraints, 1)
 				require.Equal(t, ConstraintKindRateLimit, resp.ExhaustedConstraints[0].Kind)
 
-				// expect retryAt to match throttle
+				// expect retryAt to match rateLimit
+				retryAt := 60 * time.Second
+
+				require.WithinDuration(t, clock.Now().Add(retryAt), resp.RetryAfter, time.Millisecond)
+			},
+		},
+
+		{
+			name: "rateLimit constraints exhausted after updating should be returned",
+
+			// expect only one returned lease
+			amount:              10,
+			expectedLeaseAmount: 1,
+
+			config: ConstraintConfig{
+				FunctionVersion: 1,
+				RateLimit: []RateLimitConfig{
+					{
+						Limit:             1,
+						Period:            60,
+						KeyExpressionHash: "expr-hash",
+					},
+				},
+			},
+
+			constraints: []ConstraintItem{
+				{
+					Kind: ConstraintKindRateLimit,
+					RateLimit: &RateLimitConstraint{
+						KeyExpressionHash: "expr-hash",
+						EvaluatedKeyHash:  "key-hash",
+					},
+				},
+			},
+			mi: MigrationIdentifier{
+				IsRateLimit: true,
+			},
+			afterAcquire: func(t *testing.T, deps *deps, resp *CapacityAcquireResponse) {
+				clock := deps.clock
+
+				// only rateLimit is limiting
+				require.Len(t, resp.LimitingConstraints, 1)
+				require.Equal(t, ConstraintKindRateLimit, resp.LimitingConstraints[0].Kind)
+
+				// only rateLimit is exhausted
+				require.Len(t, resp.ExhaustedConstraints, 1)
+				require.Equal(t, ConstraintKindRateLimit, resp.ExhaustedConstraints[0].Kind)
+
+				// expect retryAt to match rateLimit
 				retryAt := 60 * time.Second
 
 				require.WithinDuration(t, clock.Now().Add(retryAt), resp.RetryAfter, time.Millisecond)
