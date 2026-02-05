@@ -177,6 +177,17 @@ func TestCheckpointSyncSteps_WithStepAndSleep(t *testing.T) {
 		).
 		Once()
 
+	// Expect UpdateSpan to be called when the async opcode (sleep) is encountered,
+	// which triggers the mode change tracking for Durable Endpoint runs
+	mocks.tracer.
+		On(
+			"UpdateSpan",
+			ctx,
+			mock.AnythingOfType("*tracing.UpdateSpanOptions"),
+		).
+		Return(nil).
+		Once()
+
 	// Expect HandleGenerator to be called for the sleep opcode, which should enqueue a job
 	mocks.executor.
 		On(
@@ -209,6 +220,13 @@ func TestCheckpointSyncSteps_WithStepAndSleep(t *testing.T) {
 	mocks.executor.AssertCalled(t, "HandleGenerator", ctx, mock.AnythingOfType("*checkpoint.checkpointRunContext"), mock.MatchedBy(func(op state.GeneratorOpcode) bool {
 		return op.ID == "sleep-1" && op.Op == enums.OpcodeSleep
 	}))
+
+	// Verify UpdateSpan was called with DurableEndpointModeChangedAt attribute for mode change tracking
+	require.Len(mocks.tracer.updatedSpans, 1, "Expected exactly 1 span update for mode change tracking")
+	updateCapture := mocks.tracer.updatedSpans[0]
+	require.NotNil(updateCapture.attributes, "Updated span should have attributes")
+	modeChangedAt := updateCapture.attributes.Get(meta.Attrs.DurableEndpointModeChangedAt.Key())
+	require.NotNil(modeChangedAt, "DurableEndpointModeChangedAt attribute should be set")
 
 	// Verify all mocks were satisfied
 	mocks.state.AssertExpectations(t)

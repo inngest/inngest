@@ -51,8 +51,11 @@ func TestNewRunMetadata(t *testing.T) {
 		{
 			name: "should return fixed request version",
 			data: map[string]string{
-				"id": string(byt),
-				"rv": "0",
+				"status":   "1",
+				"version":  "1",
+				"debugger": "false",
+				"id":       string(byt),
+				"rv":       "0",
 			},
 			expectedVal: &runMetadata{
 				Status:         enums.RunStatusCompleted,

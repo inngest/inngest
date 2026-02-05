@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"slices"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -129,6 +130,8 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 	// Depending on the type of steps, we may end up switching the run from sync to async.  For example,
 	// if the opcodes are sleeps, waitForEvents, inferences, etc. we will be resuming the API endpoint
 	// at some point in the future.
+	onChangeToAsync := sync.OnceFunc(func() { c.updateSpanAsync(ctx, input) })
+
 	for _, op := range input.Steps {
 		attrs := tracing.GeneratorAttrs(&op)
 		tracing.AddMetadataTenantAttrs(attrs, input.Metadata.ID)
@@ -263,6 +266,11 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 			}
 
 		default:
+			// This is an async opcode (sleep, waitForEvent, invoke, etc.) that causes
+			// the run to transition from sync to async mode. Track this on the run span
+			// only once per checkpoint.
+			onChangeToAsync()
+
 			if err := c.Executor.HandleGenerator(ctx, runCtx, op); err != nil {
 				l.Error("error handling generator in checkpoint", "error", err, "opcode", op.Op)
 			}
@@ -271,6 +279,26 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 
 	l.Info("handled sync checkpoint", "ops", len(input.Steps), "complete", complete)
 	return nil
+}
+
+func (c checkpointer) updateSpanAsync(ctx context.Context, input SyncCheckpoint) {
+	l := logger.StdlibLogger(ctx).With("run_id", input.Metadata.ID.RunID)
+
+	modeChangedAt := time.Now()
+	runSpanRef := tracing.RunSpanRefFromMetadata(input.Metadata)
+	if runSpanRef == nil {
+		return
+	}
+	err := c.TracerProvider.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
+		TargetSpan: runSpanRef,
+		Metadata:   input.Metadata,
+		Attributes: meta.NewAttrSet(
+			meta.Attr(meta.Attrs.DurableEndpointModeChangedAt, &modeChangedAt),
+		),
+	})
+	if err != nil {
+		l.Warn("error updating run span with mode change time", "error", err)
+	}
 }
 
 // CheckpointAsyncSteps is used to checkpoint from background functions (async functions).

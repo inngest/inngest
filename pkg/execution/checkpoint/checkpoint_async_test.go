@@ -257,11 +257,17 @@ type mockTracerProvider struct {
 	mock.Mock
 
 	createdSpans []*spanCapture
+	updatedSpans []*updateCapture
 }
 
 type spanCapture struct {
 	name       string
 	options    *tracing.CreateSpanOptions
+	attributes *meta.SerializableAttrs
+}
+
+type updateCapture struct {
+	options    *tracing.UpdateSpanOptions
 	attributes *meta.SerializableAttrs
 }
 
@@ -283,6 +289,19 @@ func (m *mockTracerProvider) CreateSpan(ctx context.Context, name string, opts *
 	}
 
 	return spanRef, args.Error(1)
+}
+
+func (m *mockTracerProvider) UpdateSpan(ctx context.Context, opts *tracing.UpdateSpanOptions) error {
+	args := m.Called(ctx, opts)
+
+	// Capture the update details for verification
+	capture := &updateCapture{
+		options:    opts,
+		attributes: opts.Attributes,
+	}
+	m.updatedSpans = append(m.updatedSpans, capture)
+
+	return args.Error(0)
 }
 
 // mockQueue mocks the queue.Queue interface
