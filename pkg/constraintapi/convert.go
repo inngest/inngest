@@ -631,6 +631,11 @@ func CapacityCheckResponseToProto(resp *CapacityCheckResponse) *pb.CapacityCheck
 		limitingConstraints[i] = ConstraintItemToProto(constraint)
 	}
 
+	exhaustedConstraints := make([]*pb.ConstraintItem, len(resp.ExhaustedConstraints))
+	for i, constraint := range resp.ExhaustedConstraints {
+		exhaustedConstraints[i] = ConstraintItemToProto(constraint)
+	}
+
 	usage := make([]*pb.ConstraintUsage, len(resp.Usage))
 	for i, u := range resp.Usage {
 		usage[i] = ConstraintUsageToProto(u)
@@ -642,11 +647,12 @@ func CapacityCheckResponseToProto(resp *CapacityCheckResponse) *pb.CapacityCheck
 	}
 
 	return &pb.CapacityCheckResponse{
-		AvailableCapacity:   int32(resp.AvailableCapacity),
-		LimitingConstraints: limitingConstraints,
-		Usage:               usage,
-		FairnessReduction:   int32(resp.FairnessReduction),
-		RetryAfter:          retryAfter,
+		AvailableCapacity:    int32(resp.AvailableCapacity),
+		LimitingConstraints:  limitingConstraints,
+		ExhaustedConstraints: exhaustedConstraints,
+		Usage:                usage,
+		FairnessReduction:    int32(resp.FairnessReduction),
+		RetryAfter:           retryAfter,
 	}
 }
 
@@ -660,6 +666,11 @@ func CapacityCheckResponseFromProto(pbResp *pb.CapacityCheckResponse) *CapacityC
 		limitingConstraints[i] = ConstraintItemFromProto(constraint)
 	}
 
+	exhaustedConstraints := make([]ConstraintItem, len(pbResp.ExhaustedConstraints))
+	for i, constraint := range pbResp.ExhaustedConstraints {
+		exhaustedConstraints[i] = ConstraintItemFromProto(constraint)
+	}
+
 	usage := make([]ConstraintUsage, len(pbResp.Usage))
 	for i, u := range pbResp.Usage {
 		usage[i] = ConstraintUsageFromProto(u)
@@ -671,11 +682,12 @@ func CapacityCheckResponseFromProto(pbResp *pb.CapacityCheckResponse) *CapacityC
 	}
 
 	return &CapacityCheckResponse{
-		AvailableCapacity:   int(pbResp.AvailableCapacity),
-		LimitingConstraints: limitingConstraints,
-		Usage:               usage,
-		FairnessReduction:   int(pbResp.FairnessReduction),
-		RetryAfter:          retryAfter,
+		AvailableCapacity:    int(pbResp.AvailableCapacity),
+		LimitingConstraints:  limitingConstraints,
+		ExhaustedConstraints: exhaustedConstraints,
+		Usage:                usage,
+		FairnessReduction:    int(pbResp.FairnessReduction),
+		RetryAfter:           retryAfter,
 	}
 }
 

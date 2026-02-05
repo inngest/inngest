@@ -1660,6 +1660,195 @@ func TestConstraintEnforcement(t *testing.T) {
 				require.WithinDuration(t, clock.Now().Add(retryAt), resp.RetryAfter, time.Millisecond)
 			},
 		},
+
+		{
+			name: "Check with exhausted concurrency constraint",
+
+			amount:              1,
+			expectedLeaseAmount: 0,
+
+			config: ConstraintConfig{
+				FunctionVersion: 1,
+				Concurrency: ConcurrencyConfig{
+					FunctionConcurrency: 2,
+				},
+			},
+
+			constraints: []ConstraintItem{
+				{
+					Kind: ConstraintKindConcurrency,
+					Concurrency: &ConcurrencyConstraint{
+						Scope:             enums.ConcurrencyScopeFn,
+						Mode:              enums.ConcurrencyModeStep,
+						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:p:%s", fnID),
+					},
+				},
+			},
+			mi: MigrationIdentifier{
+				QueueShard: "test",
+			},
+			beforeAcquire: func(t *testing.T, deps *deps) {
+				// Exhaust function concurrency capacity by adding leases
+				key := deps.constraints[0].Concurrency.InProgressLeasesKey(
+					deps.cm.queueStateKeyPrefix,
+					accountID,
+					envID,
+					fnID,
+				)
+				for i := range 2 {
+					inProgress := deps.clock.Now().Add(5 * time.Second).UnixMilli()
+					_, err := deps.r.ZAdd(key, float64(inProgress), fmt.Sprintf("%d", i))
+					require.NoError(t, err)
+				}
+			},
+			afterPreAcquireCheck: func(t *testing.T, deps *deps, resp *CapacityCheckResponse) {
+				// Check should detect exhausted constraint
+				require.Len(t, resp.ExhaustedConstraints, 1)
+				require.Equal(t, ConstraintKindConcurrency, resp.ExhaustedConstraints[0].Kind)
+
+				// Constraint should be limiting
+				require.Len(t, resp.LimitingConstraints, 1)
+				require.Equal(t, ConstraintKindConcurrency, resp.LimitingConstraints[0].Kind)
+
+				// RetryAfter should be set for exhausted constraint
+				require.False(t, resp.RetryAfter.IsZero())
+				require.WithinDuration(t, deps.clock.Now().Add(ConcurrencyLimitRetryAfter), resp.RetryAfter, time.Millisecond)
+
+				// Available capacity should be 0
+				require.Equal(t, 0, resp.AvailableCapacity)
+			},
+		},
+
+		{
+			name: "Check with limiting but not exhausted constraint",
+
+			amount:              10,
+			expectedLeaseAmount: 5,
+
+			config: ConstraintConfig{
+				FunctionVersion: 1,
+				Concurrency: ConcurrencyConfig{
+					FunctionConcurrency: 5,
+				},
+			},
+
+			constraints: []ConstraintItem{
+				{
+					Kind: ConstraintKindConcurrency,
+					Concurrency: &ConcurrencyConstraint{
+						Scope:             enums.ConcurrencyScopeFn,
+						Mode:              enums.ConcurrencyModeStep,
+						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:p:%s", fnID),
+					},
+				},
+			},
+			mi: MigrationIdentifier{
+				QueueShard: "test",
+			},
+			afterPreAcquireCheck: func(t *testing.T, deps *deps, resp *CapacityCheckResponse) {
+				// Requesting 10 but limit is 5, so constraint IS limiting (reduces capacity)
+				// but NOT exhausted (still has capacity > 0)
+				require.Len(t, resp.LimitingConstraints, 1)
+				require.Len(t, resp.ExhaustedConstraints, 0)
+
+				// RetryAfter should NOT be set for non-exhausted constraint
+				require.True(t, resp.RetryAfter.IsZero())
+
+				// Available capacity should be 5
+				require.Equal(t, 5, resp.AvailableCapacity)
+			},
+			afterAcquire: func(t *testing.T, deps *deps, resp *CapacityAcquireResponse) {
+				// After acquiring 5 leases, constraint should now be exhausted
+				require.Len(t, resp.LimitingConstraints, 1)
+				require.Len(t, resp.ExhaustedConstraints, 1)
+			},
+			afterPostAcquireCheck: func(t *testing.T, deps *deps, resp *CapacityCheckResponse) {
+				// After acquiring 5 leases, constraint should now be exhausted
+				require.Len(t, resp.ExhaustedConstraints, 1)
+				require.Equal(t, ConstraintKindConcurrency, resp.ExhaustedConstraints[0].Kind)
+
+				// Constraint should be limiting
+				require.Len(t, resp.LimitingConstraints, 1)
+				require.Equal(t, ConstraintKindConcurrency, resp.LimitingConstraints[0].Kind)
+
+				// RetryAfter should now be set
+				require.False(t, resp.RetryAfter.IsZero())
+
+				// Available capacity should be 0
+				require.Equal(t, 0, resp.AvailableCapacity)
+			},
+		},
+
+		{
+			name: "Check with multiple constraints - one exhausted, one limiting",
+
+			amount:              10,
+			expectedLeaseAmount: 0,
+
+			config: ConstraintConfig{
+				FunctionVersion: 1,
+				Concurrency: ConcurrencyConfig{
+					AccountConcurrency:  10,
+					FunctionConcurrency: 2,
+				},
+			},
+
+			constraints: []ConstraintItem{
+				{
+					Kind: ConstraintKindConcurrency,
+					Concurrency: &ConcurrencyConstraint{
+						Scope:             enums.ConcurrencyScopeAccount,
+						Mode:              enums.ConcurrencyModeStep,
+						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:account:%s", accountID),
+					},
+				},
+				{
+					Kind: ConstraintKindConcurrency,
+					Concurrency: &ConcurrencyConstraint{
+						Scope:             enums.ConcurrencyScopeFn,
+						Mode:              enums.ConcurrencyModeStep,
+						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:p:%s", fnID),
+					},
+				},
+			},
+			mi: MigrationIdentifier{
+				QueueShard: "test",
+			},
+			beforeAcquire: func(t *testing.T, deps *deps) {
+				// Exhaust function concurrency
+				key := deps.constraints[1].Concurrency.InProgressLeasesKey(
+					deps.cm.queueStateKeyPrefix,
+					accountID,
+					envID,
+					fnID,
+				)
+				for i := range 2 {
+					inProgress := deps.clock.Now().Add(5 * time.Second).UnixMilli()
+					_, err := deps.r.ZAdd(key, float64(inProgress), fmt.Sprintf("%d", i))
+					require.NoError(t, err)
+				}
+			},
+			afterPreAcquireCheck: func(t *testing.T, deps *deps, resp *CapacityCheckResponse) {
+				// Function concurrency is exhausted
+				require.Len(t, resp.ExhaustedConstraints, 1)
+				require.Equal(t, ConstraintKindConcurrency, resp.ExhaustedConstraints[0].Kind)
+				require.Equal(t, enums.ConcurrencyScopeFn, resp.ExhaustedConstraints[0].Concurrency.Scope)
+
+				// Both constraints are in limiting array (account was checked first and reduced capacity,
+				// then function reduced it further to 0)
+				require.Len(t, resp.LimitingConstraints, 2)
+				require.Equal(t, ConstraintKindConcurrency, resp.LimitingConstraints[0].Kind)
+				require.Equal(t, enums.ConcurrencyScopeAccount, resp.LimitingConstraints[0].Concurrency.Scope)
+				require.Equal(t, ConstraintKindConcurrency, resp.LimitingConstraints[1].Kind)
+				require.Equal(t, enums.ConcurrencyScopeFn, resp.LimitingConstraints[1].Concurrency.Scope)
+
+				// RetryAfter should be set
+				require.False(t, resp.RetryAfter.IsZero())
+
+				// Available capacity should be 0
+				require.Equal(t, 0, resp.AvailableCapacity)
+			},
+		},
 	}
 
 	for _, test := range testCases {

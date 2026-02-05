@@ -104,6 +104,9 @@ type CapacityCheckResponse struct {
 	// ended up reducing the number of leases from the expected Amount.
 	LimitingConstraints []ConstraintItem
 
+	// ExhaustedConstraints contains constraints that have zero capacity.
+	ExhaustedConstraints []ConstraintItem
+
 	// Detailed constraint usage for requested constraints
 	Usage []ConstraintUsage
 

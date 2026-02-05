@@ -172,6 +172,7 @@ message CapacityCheckResponse {
   repeated ConstraintUsage usage = 3;
   int32 fairness_reduction = 4;
   google.protobuf.Timestamp retry_after = 5;
+  repeated ConstraintItem exhausted_constraints = 6;
 }
 
 message CapacityAcquireRequest {

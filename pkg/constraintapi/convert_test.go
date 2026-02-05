@@ -1257,6 +1257,7 @@ func TestCapacityCheckResponseConversion(t *testing.T) {
 						},
 					},
 				},
+				ExhaustedConstraints: []ConstraintItem{},
 				Usage: []ConstraintUsage{
 					{
 						Constraint: ConstraintItem{
@@ -1300,21 +1301,24 @@ func TestCapacityCheckResponseConversion(t *testing.T) {
 						Limit: 100,
 					},
 				},
+				ExhaustedConstraints: []*pb.ConstraintItem{},
 			},
 		},
 		{
 			name: "empty response",
 			input: &CapacityCheckResponse{
-				AvailableCapacity:   0,
-				LimitingConstraints: []ConstraintItem{},
-				Usage:               []ConstraintUsage{},
-				RetryAfter:          time.Time{},
+				AvailableCapacity:    0,
+				LimitingConstraints:  []ConstraintItem{},
+				ExhaustedConstraints: []ConstraintItem{},
+				Usage:                []ConstraintUsage{},
+				RetryAfter:           time.Time{},
 			},
 			expected: &pb.CapacityCheckResponse{
-				AvailableCapacity:   0,
-				LimitingConstraints: []*pb.ConstraintItem{},
-				Usage:               []*pb.ConstraintUsage{},
-				RetryAfter:          nil,
+				AvailableCapacity:    0,
+				LimitingConstraints:  []*pb.ConstraintItem{},
+				ExhaustedConstraints: []*pb.ConstraintItem{},
+				Usage:                []*pb.ConstraintUsage{},
+				RetryAfter:           nil,
 			},
 		},
 		{
