@@ -1,7 +1,12 @@
 --
 -- Acquire
+-- - checks idempotency to allow retries
 -- - checks constraint capacity given constraints and the current configuration
--- -
+-- - determines exhausted constraints, constraints without capacity before or after granting leases
+-- - rejects request if one or more constraints are exhausted (there is no capacity)
+-- - updates constraint state if leases can be granted
+-- - stores lease details and link to request state
+-- - sets idempotency keys
 --
 
 ---@module 'cjson'
@@ -120,7 +125,8 @@ end
 local availableCapacity = requested
 
 -- limitingConstraints tracks the indices of constraints reducing the
--- requested capacity. This is a superset of exhausted constraints.
+-- requested capacity. A constraint is only limiting if the number of
+-- requested resources strictly exceeds its capacity.
 ---@type integer[]
 local limitingConstraints = {}
 
@@ -142,12 +148,6 @@ local retryAt = 0
 local skipGCRA = call("EXISTS", keyConstraintCheckIdempotency) == 1
 
 for index, value in ipairs(constraints) do
-	-- Exit checks early if no more capacity is available (e.g. no need to check fn
-	-- concurrency if account concurrency is used up)
-	if availableCapacity <= 0 then
-		break
-	end
-
 	-- Retrieve constraint capacity
 	local constraintCapacity = 0
 	local constraintRetryAt = 0
@@ -189,6 +189,8 @@ for index, value in ipairs(constraints) do
 	end
 
 	-- If index ends up limiting capacity, reduce available capacity and remember current constraint
+	-- NOTE: If requested capacity is >= constraint capacity, the current constraint does not
+	-- strictly limit lease generation, so we do not consider it a limiting constraint.
 	if constraintCapacity < availableCapacity then
 		availableCapacity = constraintCapacity
 		table.insert(limitingConstraints, index)

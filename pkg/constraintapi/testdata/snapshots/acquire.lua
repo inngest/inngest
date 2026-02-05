@@ -199,9 +199,6 @@ local exhaustedSet = {}
 local retryAt = 0
 local skipGCRA = call("EXISTS", keyConstraintCheckIdempotency) == 1
 for index, value in ipairs(constraints) do
-	if availableCapacity <= 0 then
-		break
-	end
 	local constraintCapacity = 0
 	local constraintRetryAt = 0
 	if skipGCRA and (value.k == 1 or value.k == 3) then
