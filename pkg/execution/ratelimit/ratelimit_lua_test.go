@@ -886,11 +886,6 @@ func TestLuaRateLimit_NilRemainingEdgeCase(t *testing.T) {
 
 		limiter := New(ctx, rc, "{rl}:")
 
-		// Use limit=10 to get burst=1, capacity=2
-		// emission = 1s / 10 = 100ms
-		// For next <= -emission: dvt + emission <= tat - now
-		// dvt = emission * (burst + 1) = 100ms * 2 = 200ms
-		// We need tat - now >= 300ms
 		config := inngest.RateLimit{
 			Limit:  10,
 			Period: "1s",
@@ -899,33 +894,106 @@ func TestLuaRateLimit_NilRemainingEdgeCase(t *testing.T) {
 		key := "nil-remaining-test"
 		redisKey := "{rl}:" + key
 
-		// Manually set TAT to be far in the future to trigger the edge case
-		// Set TAT to be 500ms in the future (500,000,000 nanoseconds)
+		// Set TAT 500ms in the future to trigger next <= -emission condition
 		now := clock.Now()
 		futureTAT := now.Add(500 * time.Millisecond)
 		tatNs := fmt.Sprintf("%d", futureTAT.UnixNano())
 
-		t.Logf("Setting Redis key %s to TAT: %s (500ms in future)", redisKey, tatNs)
 		err := r.Set(redisKey, tatNs)
 		require.NoError(t, err)
 
-		// Now when we check capacity:
-		// - tat = now + 500ms
-		// - ttl = tat - now = 500ms
-		// - dvt = 200ms
-		// - next = dvt - ttl = 200ms - 500ms = -300ms
-		// - Is -300ms > -100ms? NO! So remaining should NOT be set (nil bug)
-
-		// This should trigger the nil comparison error at line 173
 		r.SetTime(clock.Now())
 		res, err := limiter.RateLimit(ctx, key, config, WithNow(clock.Now()))
 
-		// Without the fix, this should error with "attempt to compare number with nil"
-		// With the fix, it should succeed and show we're rate limited
-		require.NoError(t, err, "should not error even when TAT is far in future")
-		require.True(t, res.Limited, "should be rate limited")
-		require.Greater(t, res.RetryAfter, time.Duration(0), "should have positive retry time")
+		require.NoError(t, err)
+		require.True(t, res.Limited)
+		require.Greater(t, res.RetryAfter, time.Duration(0))
+	})
 
-		t.Logf("Result: limited=%v, retry=%v", res.Limited, res.RetryAfter)
+	t.Run("burst capacity still works when TAT is slightly in future", func(t *testing.T) {
+		r, rc, clock := initRedis(t)
+		defer rc.Close()
+
+		limiter := New(ctx, rc, "{rl}:")
+
+		config := inngest.RateLimit{
+			Limit:  10,
+			Period: "1s",
+		}
+
+		key := "burst-capacity-test"
+		redisKey := "{rl}:" + key
+
+		// Set TAT 50ms in the future (within burst allowance)
+		now := clock.Now()
+		futureTAT := now.Add(50 * time.Millisecond)
+		tatNs := fmt.Sprintf("%d", futureTAT.UnixNano())
+
+		err := r.Set(redisKey, tatNs)
+		require.NoError(t, err)
+
+		r.SetTime(clock.Now())
+		res, err := limiter.RateLimit(ctx, key, config, WithNow(clock.Now()))
+		require.NoError(t, err)
+		require.False(t, res.Limited)
+		require.Equal(t, time.Duration(0), res.RetryAfter)
+	})
+
+	t.Run("boundary case: exactly at dvt threshold", func(t *testing.T) {
+		r, rc, clock := initRedis(t)
+		defer rc.Close()
+
+		limiter := New(ctx, rc, "{rl}:")
+
+		config := inngest.RateLimit{
+			Limit:  10,
+			Period: "1s",
+		}
+
+		key := "boundary-test"
+		redisKey := "{rl}:" + key
+
+		// Set TAT exactly at dvt (200ms) - boundary where next = 0
+		now := clock.Now()
+		futureTAT := now.Add(200 * time.Millisecond)
+		tatNs := fmt.Sprintf("%d", futureTAT.UnixNano())
+
+		err := r.Set(redisKey, tatNs)
+		require.NoError(t, err)
+
+		r.SetTime(clock.Now())
+		res, err := limiter.RateLimit(ctx, key, config, WithNow(clock.Now()))
+		require.NoError(t, err)
+		require.True(t, res.Limited)
+		require.Greater(t, res.RetryAfter, time.Duration(0))
+	})
+
+	t.Run("just beyond threshold triggers else clause", func(t *testing.T) {
+		r, rc, clock := initRedis(t)
+		defer rc.Close()
+
+		limiter := New(ctx, rc, "{rl}:")
+
+		config := inngest.RateLimit{
+			Limit:  10,
+			Period: "1s",
+		}
+
+		key := "beyond-threshold-test"
+		redisKey := "{rl}:" + key
+
+		// Set TAT just beyond dvt + emission to trigger else clause
+		now := clock.Now()
+		futureTAT := now.Add(300*time.Millisecond + 1*time.Nanosecond)
+		tatNs := fmt.Sprintf("%d", futureTAT.UnixNano())
+
+		err := r.Set(redisKey, tatNs)
+		require.NoError(t, err)
+
+		r.SetTime(clock.Now())
+		res, err := limiter.RateLimit(ctx, key, config, WithNow(clock.Now()))
+		require.NoError(t, err)
+		require.True(t, res.Limited)
+		require.Greater(t, res.RetryAfter, time.Duration(0))
 	})
 }
