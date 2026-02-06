@@ -249,8 +249,6 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 		// The request state is persisted for consistent cleanup during Scavenge/Release operations
 		r.keyRequestState(req.AccountID, requestID),
 
-		r.keyScavengerShard(),
-
 		// Operation idempotency is used for retries while the generated leases are still valid
 		r.keyOperationIdempotency(req.AccountID, "acq", operationIdempotencyKey),
 
@@ -314,10 +312,6 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 	err = json.Unmarshal(rawRes, &parsedResponse)
 	if err != nil {
 		return nil, errs.Wrap(0, false, "invalid response structure: %w", err)
-	}
-
-	if len(parsedResponse.GrantedLeases) > 0 {
-		// TODO: Update scavenger for account if leases were generated
 	}
 
 	leases := make([]CapacityLease, len(parsedResponse.GrantedLeases))
@@ -395,8 +389,9 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 		"status", parsedResponse.Status,
 	)
 
-	tags := make(map[string]any)
-	tags["shard"] = r.shardName
+	tags := map[string]any{
+		"shard": r.shardName,
+	}
 	if enableHighCardinalityInstrumentation {
 		tags["function_id"] = req.FunctionID
 	}

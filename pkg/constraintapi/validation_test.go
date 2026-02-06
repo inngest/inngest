@@ -35,10 +35,8 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				},
 				Constraints: []ConstraintItem{
 					{
-						Kind: kindConcurrency,
-						Concurrency: &ConcurrencyConstraint{
-							InProgressItemKey: "test-key",
-						},
+						Kind:        kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{},
 					},
 				},
 				Amount:               1,
@@ -49,9 +47,6 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
 					Location: CallerLocationItemLease,
-				},
-				Migration: MigrationIdentifier{
-					QueueShard: "test",
 				},
 			},
 			wantErr: false,
@@ -68,10 +63,8 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				},
 				Constraints: []ConstraintItem{
 					{
-						Kind: kindConcurrency,
-						Concurrency: &ConcurrencyConstraint{
-							InProgressItemKey: "test-key",
-						},
+						Kind:        kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{},
 					},
 				},
 				Amount:          1,
@@ -98,10 +91,8 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				},
 				Constraints: []ConstraintItem{
 					{
-						Kind: kindConcurrency,
-						Concurrency: &ConcurrencyConstraint{
-							InProgressItemKey: "test-key",
-						},
+						Kind:        kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{},
 					},
 				},
 				Amount:          1,
@@ -128,10 +119,8 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				},
 				Constraints: []ConstraintItem{
 					{
-						Kind: kindConcurrency,
-						Concurrency: &ConcurrencyConstraint{
-							InProgressItemKey: "test-key",
-						},
+						Kind:        kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{},
 					},
 				},
 				Amount:          1,
@@ -158,10 +147,8 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				},
 				Constraints: []ConstraintItem{
 					{
-						Kind: kindConcurrency,
-						Concurrency: &ConcurrencyConstraint{
-							InProgressItemKey: "test-key",
-						},
+						Kind:        kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{},
 					},
 				},
 				Amount:          1,
@@ -188,10 +175,8 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				},
 				Constraints: []ConstraintItem{
 					{
-						Kind: kindConcurrency,
-						Concurrency: &ConcurrencyConstraint{
-							InProgressItemKey: "test-key",
-						},
+						Kind:        kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{},
 					},
 				},
 				Amount:          1,
@@ -218,10 +203,8 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				},
 				Constraints: []ConstraintItem{
 					{
-						Kind: kindConcurrency,
-						Concurrency: &ConcurrencyConstraint{
-							InProgressItemKey: "test-key",
-						},
+						Kind:        kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{},
 					},
 				},
 				Amount:          1,
@@ -248,10 +231,8 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				},
 				Constraints: []ConstraintItem{
 					{
-						Kind: kindConcurrency,
-						Concurrency: &ConcurrencyConstraint{
-							InProgressItemKey: "test-key",
-						},
+						Kind:        kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{},
 					},
 				},
 				Amount:          1,
@@ -278,10 +259,8 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				},
 				Constraints: []ConstraintItem{
 					{
-						Kind: kindConcurrency,
-						Concurrency: &ConcurrencyConstraint{
-							InProgressItemKey: "test-key",
-						},
+						Kind:        kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{},
 					},
 				},
 				Amount:          1,
@@ -308,10 +287,8 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				},
 				Constraints: []ConstraintItem{
 					{
-						Kind: kindConcurrency,
-						Concurrency: &ConcurrencyConstraint{
-							InProgressItemKey: "test-key",
-						},
+						Kind:        kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{},
 					},
 				},
 				Amount:          1,
@@ -338,10 +315,8 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				},
 				Constraints: []ConstraintItem{
 					{
-						Kind: kindConcurrency,
-						Concurrency: &ConcurrencyConstraint{
-							InProgressItemKey: "test-key",
-						},
+						Kind:        kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{},
 					},
 				},
 				Amount:          1,
@@ -391,10 +366,8 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				},
 				Constraints: []ConstraintItem{
 					{
-						Kind: kindConcurrency,
-						Concurrency: &ConcurrencyConstraint{
-							InProgressItemKey: "test-key",
-						},
+						Kind:        kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{},
 					},
 				},
 				Amount:               1,
@@ -458,10 +431,8 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				},
 				Constraints: []ConstraintItem{
 					{
-						Kind: kindConcurrency,
-						Concurrency: &ConcurrencyConstraint{
-							InProgressItemKey: "test-key",
-						},
+						Kind:        kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{},
 					},
 				},
 				Amount:               1,
@@ -473,9 +444,6 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
 					Location: CallerLocationItemLease,
-				},
-				Migration: MigrationIdentifier{
-					QueueShard: "test",
 				},
 			},
 			wantErr: false,
@@ -523,10 +491,8 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 				},
 				Constraints: []ConstraintItem{
 					{
-						Kind: kindConcurrency,
-						Concurrency: &ConcurrencyConstraint{
-							InProgressItemKey: "test-key",
-						},
+						Kind:        kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{},
 					},
 				},
 				Amount:               1,
@@ -537,9 +503,6 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
 					Location: CallerLocationItemLease,
-				},
-				Migration: MigrationIdentifier{
-					QueueShard: "test",
 				},
 			},
 			wantErr: false,
@@ -556,10 +519,8 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 				},
 				Constraints: []ConstraintItem{
 					{
-						Kind: kindConcurrency,
-						Concurrency: &ConcurrencyConstraint{
-							InProgressItemKey: "test-key",
-						},
+						Kind:        kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{},
 					},
 				},
 				Amount:               1,
@@ -570,9 +531,6 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
 					Location: CallerLocationItemLease,
-				},
-				Migration: MigrationIdentifier{
-					QueueShard: "test",
 				},
 			},
 			wantErr: false,
@@ -589,10 +547,8 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 				},
 				Constraints: []ConstraintItem{
 					{
-						Kind: kindConcurrency,
-						Concurrency: &ConcurrencyConstraint{
-							InProgressItemKey: "test-key",
-						},
+						Kind:        kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{},
 					},
 				},
 				Amount:          1,
@@ -602,9 +558,6 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
 					Location: CallerLocationItemLease,
-				},
-				Migration: MigrationIdentifier{
-					QueueShard: "test",
 				},
 			},
 			wantErr: true,
@@ -622,10 +575,8 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 				},
 				Constraints: []ConstraintItem{
 					{
-						Kind: kindConcurrency,
-						Concurrency: &ConcurrencyConstraint{
-							InProgressItemKey: "test-key",
-						},
+						Kind:        kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{},
 					},
 				},
 				Amount:          1,
@@ -635,9 +586,6 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
 					Location: CallerLocationItemLease,
-				},
-				Migration: MigrationIdentifier{
-					QueueShard: "test",
 				},
 			},
 			wantErr: true,
@@ -655,10 +603,8 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 				},
 				Constraints: []ConstraintItem{
 					{
-						Kind: kindConcurrency,
-						Concurrency: &ConcurrencyConstraint{
-							InProgressItemKey: "test-key",
-						},
+						Kind:        kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{},
 					},
 				},
 				Amount:               1,
@@ -669,9 +615,6 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
 					Location: CallerLocationItemLease,
-				},
-				Migration: MigrationIdentifier{
-					QueueShard: "test",
 				},
 			},
 			wantErr: false, // Note: validation only checks for empty string, not whitespace
@@ -688,10 +631,8 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 				},
 				Constraints: []ConstraintItem{
 					{
-						Kind: kindConcurrency,
-						Concurrency: &ConcurrencyConstraint{
-							InProgressItemKey: "test-key",
-						},
+						Kind:        kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{},
 					},
 				},
 				Amount:               1,
@@ -702,9 +643,6 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 				Source: LeaseSource{
 					Service:  ServiceNewRuns,
 					Location: CallerLocationItemLease,
-				},
-				Migration: MigrationIdentifier{
-					QueueShard: "test",
 				},
 			},
 			wantErr: false,
@@ -721,10 +659,8 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 				},
 				Constraints: []ConstraintItem{
 					{
-						Kind: kindConcurrency,
-						Concurrency: &ConcurrencyConstraint{
-							InProgressItemKey: "test-key",
-						},
+						Kind:        kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{},
 					},
 				},
 				Amount:               1,
@@ -735,9 +671,6 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
 					Location: CallerLocationSchedule,
-				},
-				Migration: MigrationIdentifier{
-					QueueShard: "test",
 				},
 			},
 			wantErr: false,
@@ -754,10 +687,8 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 				},
 				Constraints: []ConstraintItem{
 					{
-						Kind: kindConcurrency,
-						Concurrency: &ConcurrencyConstraint{
-							InProgressItemKey: "test-key",
-						},
+						Kind:        kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{},
 					},
 				},
 				Amount:               1,
@@ -768,9 +699,6 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
 					Location: CallerLocationBacklogRefill,
-				},
-				Migration: MigrationIdentifier{
-					QueueShard: "test",
 				},
 			},
 			wantErr: false,
@@ -787,10 +715,8 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 				},
 				Constraints: []ConstraintItem{
 					{
-						Kind: kindConcurrency,
-						Concurrency: &ConcurrencyConstraint{
-							InProgressItemKey: "test-key",
-						},
+						Kind:        kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{},
 					},
 				},
 				Amount:               1,
@@ -801,9 +727,6 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 				Source: LeaseSource{
 					Service:  ServiceAPI,
 					Location: CallerLocationItemLease,
-				},
-				Migration: MigrationIdentifier{
-					QueueShard: "test",
 				},
 			},
 			wantErr: false,
@@ -851,10 +774,8 @@ func TestCapacityAcquireRequestValidBoundaryConditions(t *testing.T) {
 				},
 				Constraints: []ConstraintItem{
 					{
-						Kind: kindConcurrency,
-						Concurrency: &ConcurrencyConstraint{
-							InProgressItemKey: "test-key",
-						},
+						Kind:        kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{},
 					},
 				},
 				Amount:               1,
@@ -865,9 +786,6 @@ func TestCapacityAcquireRequestValidBoundaryConditions(t *testing.T) {
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
 					Location: CallerLocationItemLease,
-				},
-				Migration: MigrationIdentifier{
-					QueueShard: "test",
 				},
 			},
 			wantErr: false,
@@ -884,10 +802,8 @@ func TestCapacityAcquireRequestValidBoundaryConditions(t *testing.T) {
 				},
 				Constraints: []ConstraintItem{
 					{
-						Kind: kindConcurrency,
-						Concurrency: &ConcurrencyConstraint{
-							InProgressItemKey: "test-key",
-						},
+						Kind:        kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{},
 					},
 				},
 				Amount:               1,
@@ -898,9 +814,6 @@ func TestCapacityAcquireRequestValidBoundaryConditions(t *testing.T) {
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
 					Location: CallerLocationItemLease,
-				},
-				Migration: MigrationIdentifier{
-					QueueShard: "test",
 				},
 			},
 			wantErr: false,
@@ -917,10 +830,8 @@ func TestCapacityAcquireRequestValidBoundaryConditions(t *testing.T) {
 				},
 				Constraints: []ConstraintItem{
 					{
-						Kind: kindConcurrency,
-						Concurrency: &ConcurrencyConstraint{
-							InProgressItemKey: "test-key",
-						},
+						Kind:        kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{},
 					},
 				},
 				Amount:               1,
@@ -931,9 +842,6 @@ func TestCapacityAcquireRequestValidBoundaryConditions(t *testing.T) {
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
 					Location: CallerLocationItemLease,
-				},
-				Migration: MigrationIdentifier{
-					QueueShard: "test",
 				},
 			},
 			wantErr: false,
@@ -950,10 +858,8 @@ func TestCapacityAcquireRequestValidBoundaryConditions(t *testing.T) {
 				},
 				Constraints: []ConstraintItem{
 					{
-						Kind: kindConcurrency,
-						Concurrency: &ConcurrencyConstraint{
-							InProgressItemKey: "test-key",
-						},
+						Kind:        kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{},
 					},
 				},
 				Amount:               1,
@@ -964,9 +870,6 @@ func TestCapacityAcquireRequestValidBoundaryConditions(t *testing.T) {
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
 					Location: CallerLocationItemLease,
-				},
-				Migration: MigrationIdentifier{
-					QueueShard: "test",
 				},
 			},
 			wantErr: true, // Key exceeds maximum length of 128 characters
@@ -983,10 +886,8 @@ func TestCapacityAcquireRequestValidBoundaryConditions(t *testing.T) {
 				},
 				Constraints: []ConstraintItem{
 					{
-						Kind: kindConcurrency,
-						Concurrency: &ConcurrencyConstraint{
-							InProgressItemKey: "test-key",
-						},
+						Kind:        kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{},
 					},
 				},
 				Amount:               1,
@@ -997,9 +898,6 @@ func TestCapacityAcquireRequestValidBoundaryConditions(t *testing.T) {
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
 					Location: CallerLocationItemLease,
-				},
-				Migration: MigrationIdentifier{
-					QueueShard: "test",
 				},
 			},
 			wantErr: false,
@@ -1016,10 +914,8 @@ func TestCapacityAcquireRequestValidBoundaryConditions(t *testing.T) {
 				},
 				Constraints: []ConstraintItem{
 					{
-						Kind: kindConcurrency,
-						Concurrency: &ConcurrencyConstraint{
-							InProgressItemKey: "test-key",
-						},
+						Kind:        kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{},
 					},
 				},
 				Amount:               1,
@@ -1030,9 +926,6 @@ func TestCapacityAcquireRequestValidBoundaryConditions(t *testing.T) {
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
 					Location: CallerLocationItemLease,
-				},
-				Migration: MigrationIdentifier{
-					QueueShard: "test",
 				},
 			},
 			wantErr: false,
@@ -1080,10 +973,8 @@ func TestCapacityAcquireRequestValidSpecialCharacters(t *testing.T) {
 				},
 				Constraints: []ConstraintItem{
 					{
-						Kind: kindConcurrency,
-						Concurrency: &ConcurrencyConstraint{
-							InProgressItemKey: "test-key",
-						},
+						Kind:        kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{},
 					},
 				},
 				Amount:               1,
@@ -1094,9 +985,6 @@ func TestCapacityAcquireRequestValidSpecialCharacters(t *testing.T) {
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
 					Location: CallerLocationItemLease,
-				},
-				Migration: MigrationIdentifier{
-					QueueShard: "test",
 				},
 			},
 			wantErr: false,
@@ -1113,10 +1001,8 @@ func TestCapacityAcquireRequestValidSpecialCharacters(t *testing.T) {
 				},
 				Constraints: []ConstraintItem{
 					{
-						Kind: kindConcurrency,
-						Concurrency: &ConcurrencyConstraint{
-							InProgressItemKey: "test-key",
-						},
+						Kind:        kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{},
 					},
 				},
 				Amount:               1,
@@ -1127,9 +1013,6 @@ func TestCapacityAcquireRequestValidSpecialCharacters(t *testing.T) {
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
 					Location: CallerLocationItemLease,
-				},
-				Migration: MigrationIdentifier{
-					QueueShard: "test",
 				},
 			},
 			wantErr: false,
@@ -1146,10 +1029,8 @@ func TestCapacityAcquireRequestValidSpecialCharacters(t *testing.T) {
 				},
 				Constraints: []ConstraintItem{
 					{
-						Kind: kindConcurrency,
-						Concurrency: &ConcurrencyConstraint{
-							InProgressItemKey: "test-key",
-						},
+						Kind:        kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{},
 					},
 				},
 				Amount:               1,
@@ -1160,9 +1041,6 @@ func TestCapacityAcquireRequestValidSpecialCharacters(t *testing.T) {
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
 					Location: CallerLocationItemLease,
-				},
-				Migration: MigrationIdentifier{
-					QueueShard: "test",
 				},
 			},
 			wantErr: false,
@@ -1195,7 +1073,6 @@ func TestRolloutNoMixedConstraints(t *testing.T) {
 		name          string
 		constraints   []ConstraintItem
 		configuration ConstraintConfig
-		mi            MigrationIdentifier
 		wantErr       bool
 		errMsgs       []string
 	}{
@@ -1203,17 +1080,12 @@ func TestRolloutNoMixedConstraints(t *testing.T) {
 			name: "valid - only concurrency constraint",
 			constraints: []ConstraintItem{
 				{
-					Kind: ConstraintKindConcurrency,
-					Concurrency: &ConcurrencyConstraint{
-						InProgressItemKey: "test-key",
-					},
+					Kind:        ConstraintKindConcurrency,
+					Concurrency: &ConcurrencyConstraint{},
 				},
 			},
 			configuration: ConstraintConfig{
 				FunctionVersion: 1,
-			},
-			mi: MigrationIdentifier{
-				QueueShard: "test",
 			},
 			wantErr: false,
 		},
@@ -1233,9 +1105,6 @@ func TestRolloutNoMixedConstraints(t *testing.T) {
 					},
 				},
 			},
-			mi: MigrationIdentifier{
-				QueueShard: "test",
-			},
 			wantErr: false,
 		},
 		{
@@ -1254,19 +1123,14 @@ func TestRolloutNoMixedConstraints(t *testing.T) {
 					},
 				},
 			},
-			mi: MigrationIdentifier{
-				IsRateLimit: true,
-			},
 			wantErr: false,
 		},
 		{
 			name: "valid - multiple queue constraints (concurrency + throttle)",
 			constraints: []ConstraintItem{
 				{
-					Kind: ConstraintKindConcurrency,
-					Concurrency: &ConcurrencyConstraint{
-						InProgressItemKey: "test-key",
-					},
+					Kind:        ConstraintKindConcurrency,
+					Concurrency: &ConcurrencyConstraint{},
 				},
 				{
 					Kind: ConstraintKindThrottle, Throttle: &ThrottleConstraint{
@@ -1283,32 +1147,22 @@ func TestRolloutNoMixedConstraints(t *testing.T) {
 					},
 				},
 			},
-			mi: MigrationIdentifier{
-				QueueShard: "test",
-			},
 			wantErr: false,
 		},
 		{
 			name: "valid - multiple concurrency constraints",
 			constraints: []ConstraintItem{
 				{
-					Kind: ConstraintKindConcurrency,
-					Concurrency: &ConcurrencyConstraint{
-						InProgressItemKey: "test-key-1",
-					},
+					Kind:        ConstraintKindConcurrency,
+					Concurrency: &ConcurrencyConstraint{},
 				},
 				{
-					Kind: ConstraintKindConcurrency,
-					Concurrency: &ConcurrencyConstraint{
-						InProgressItemKey: "test-key-2",
-					},
+					Kind:        ConstraintKindConcurrency,
+					Concurrency: &ConcurrencyConstraint{},
 				},
 			},
 			configuration: ConstraintConfig{
 				FunctionVersion: 1,
-			},
-			mi: MigrationIdentifier{
-				QueueShard: "test",
 			},
 			wantErr: false,
 		},
@@ -1340,9 +1194,6 @@ func TestRolloutNoMixedConstraints(t *testing.T) {
 						KeyExpressionHash: "expr-hash-2",
 					},
 				},
-			},
-			mi: MigrationIdentifier{
-				QueueShard: "test",
 			},
 			wantErr: true,
 			errMsgs: []string{
@@ -1378,110 +1229,165 @@ func TestRolloutNoMixedConstraints(t *testing.T) {
 					},
 				},
 			},
-			mi: MigrationIdentifier{
-				IsRateLimit: true,
-			},
 			wantErr: true,
 			errMsgs: []string{
 				"exceeded maximum of 1 rate limits",
 			},
 		},
 		{
-			name: "invalid - rate limit + concurrency",
-			constraints: []ConstraintItem{
-				{Kind: ConstraintKindRateLimit},
-				{
-					Kind: ConstraintKindConcurrency,
-					Concurrency: &ConcurrencyConstraint{
-						InProgressItemKey: "test-key",
-					},
+			name: "valid - rate limit + concurrency (mixed constraints now allowed)",
+			configuration: ConstraintConfig{
+				FunctionVersion: 1,
+				RateLimit: []RateLimitConfig{
+					{Scope: enums.RateLimitScopeFn, KeyExpressionHash: "test"},
 				},
 			},
-			mi: MigrationIdentifier{
-				QueueShard:  "test",
-				IsRateLimit: true,
-			},
-			wantErr: true,
-			errMsgs: []string{"cannot mix queue and rate limit constraints for first stage"},
-		},
-		{
-			name: "invalid - rate limit + throttle",
 			constraints: []ConstraintItem{
-				{Kind: ConstraintKindRateLimit},
-				{Kind: ConstraintKindThrottle},
+				{Kind: ConstraintKindRateLimit, RateLimit: &RateLimitConstraint{
+					Scope:             enums.RateLimitScopeFn,
+					KeyExpressionHash: "test",
+					EvaluatedKeyHash:  "test",
+				}},
+				{
+					Kind:        ConstraintKindConcurrency,
+					Concurrency: &ConcurrencyConstraint{},
+				},
 			},
-			mi: MigrationIdentifier{
-				QueueShard:  "test",
-				IsRateLimit: true,
-			},
-			wantErr: true,
-			errMsgs: []string{"cannot mix queue and rate limit constraints for first stage"},
+			wantErr: false,
 		},
 		{
-			name: "invalid - concurrency + rate limit",
+			name: "valid - rate limit + throttle (mixed constraints now allowed)",
+			configuration: ConstraintConfig{
+				FunctionVersion: 1,
+				RateLimit: []RateLimitConfig{
+					{Scope: enums.RateLimitScopeFn, KeyExpressionHash: "test"},
+				},
+				Throttle: []ThrottleConfig{
+					{Scope: enums.ThrottleScopeFn, KeyExpressionHash: "test"},
+				},
+			},
+			constraints: []ConstraintItem{
+				{Kind: ConstraintKindRateLimit, RateLimit: &RateLimitConstraint{
+					Scope:             enums.RateLimitScopeFn,
+					KeyExpressionHash: "test",
+					EvaluatedKeyHash:  "test",
+				}},
+				{Kind: ConstraintKindThrottle, Throttle: &ThrottleConstraint{
+					Scope:             enums.ThrottleScopeFn,
+					KeyExpressionHash: "test",
+					EvaluatedKeyHash:  "test",
+				}},
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid - concurrency + rate limit (mixed constraints now allowed)",
+			configuration: ConstraintConfig{
+				FunctionVersion: 1,
+				RateLimit: []RateLimitConfig{
+					{Scope: enums.RateLimitScopeFn, KeyExpressionHash: "test"},
+				},
+			},
 			constraints: []ConstraintItem{
 				{
-					Kind: ConstraintKindConcurrency,
-					Concurrency: &ConcurrencyConstraint{
-						InProgressItemKey: "test-key",
-					},
+					Kind:        ConstraintKindConcurrency,
+					Concurrency: &ConcurrencyConstraint{},
 				},
-				{Kind: ConstraintKindRateLimit},
+				{Kind: ConstraintKindRateLimit, RateLimit: &RateLimitConstraint{
+					Scope:             enums.RateLimitScopeFn,
+					KeyExpressionHash: "test",
+					EvaluatedKeyHash:  "test",
+				}},
 			},
-			mi: MigrationIdentifier{
-				IsRateLimit: true,
-				QueueShard:  "test",
-			},
-			wantErr: true,
-			errMsgs: []string{"cannot mix queue and rate limit constraints for first stage"},
+			wantErr: false,
 		},
 		{
-			name: "invalid - throttle + rate limit",
+			name: "valid - throttle + rate limit (mixed constraints now allowed)",
+			configuration: ConstraintConfig{
+				FunctionVersion: 1,
+				RateLimit: []RateLimitConfig{
+					{Scope: enums.RateLimitScopeFn, KeyExpressionHash: "test"},
+				},
+				Throttle: []ThrottleConfig{
+					{Scope: enums.ThrottleScopeFn, KeyExpressionHash: "test"},
+				},
+			},
 			constraints: []ConstraintItem{
-				{Kind: ConstraintKindThrottle},
-				{Kind: ConstraintKindRateLimit},
+				{Kind: ConstraintKindThrottle, Throttle: &ThrottleConstraint{
+					Scope:             enums.ThrottleScopeFn,
+					KeyExpressionHash: "test",
+					EvaluatedKeyHash:  "test",
+				}},
+				{Kind: ConstraintKindRateLimit, RateLimit: &RateLimitConstraint{
+					Scope:             enums.RateLimitScopeFn,
+					KeyExpressionHash: "test",
+					EvaluatedKeyHash:  "test",
+				}},
 			},
-			mi: MigrationIdentifier{
-				QueueShard:  "test",
-				IsRateLimit: true,
-			},
-			wantErr: true,
-			errMsgs: []string{"cannot mix queue and rate limit constraints for first stage"},
+			wantErr: false,
 		},
 		{
-			name: "invalid - all three constraint types",
+			name: "valid - all three constraint types (mixed constraints now allowed)",
+			configuration: ConstraintConfig{
+				FunctionVersion: 1,
+				RateLimit: []RateLimitConfig{
+					{Scope: enums.RateLimitScopeFn, KeyExpressionHash: "test"},
+				},
+				Throttle: []ThrottleConfig{
+					{Scope: enums.ThrottleScopeFn, KeyExpressionHash: "test"},
+				},
+			},
 			constraints: []ConstraintItem{
 				{
-					Kind: ConstraintKindConcurrency,
-					Concurrency: &ConcurrencyConstraint{
-						InProgressItemKey: "test-key",
-					},
+					Kind:        ConstraintKindConcurrency,
+					Concurrency: &ConcurrencyConstraint{},
 				},
-				{Kind: ConstraintKindThrottle},
-				{Kind: ConstraintKindRateLimit},
+				{Kind: ConstraintKindThrottle, Throttle: &ThrottleConstraint{
+					Scope:             enums.ThrottleScopeFn,
+					KeyExpressionHash: "test",
+					EvaluatedKeyHash:  "test",
+				}},
+				{Kind: ConstraintKindRateLimit, RateLimit: &RateLimitConstraint{
+					Scope:             enums.RateLimitScopeFn,
+					KeyExpressionHash: "test",
+					EvaluatedKeyHash:  "test",
+				}},
 			},
-			mi: MigrationIdentifier{
-				IsRateLimit: true,
-				QueueShard:  "test",
-			},
-			wantErr: true,
-			errMsgs: []string{"cannot mix queue and rate limit constraints for first stage"},
+			wantErr: false,
 		},
 		{
-			name: "invalid - multiple mixed constraints",
-			constraints: []ConstraintItem{
-				{Kind: ConstraintKindRateLimit},
-				{
-					Kind: ConstraintKindConcurrency,
-					Concurrency: &ConcurrencyConstraint{
-						InProgressItemKey: "test-key",
-					},
+			name: "valid - multiple mixed constraints (mixed constraints now allowed)",
+			configuration: ConstraintConfig{
+				FunctionVersion: 1,
+				RateLimit: []RateLimitConfig{
+					{Scope: enums.RateLimitScopeFn, KeyExpressionHash: "test"},
 				},
-				{Kind: ConstraintKindRateLimit},
-				{Kind: ConstraintKindThrottle},
+				Throttle: []ThrottleConfig{
+					{Scope: enums.ThrottleScopeFn, KeyExpressionHash: "test"},
+				},
 			},
-			wantErr: true,
-			errMsgs: []string{"cannot mix queue and rate limit constraints for first stage"},
+			constraints: []ConstraintItem{
+				{Kind: ConstraintKindRateLimit, RateLimit: &RateLimitConstraint{
+					Scope:             enums.RateLimitScopeFn,
+					KeyExpressionHash: "test",
+					EvaluatedKeyHash:  "test",
+				}},
+				{
+					Kind:        ConstraintKindConcurrency,
+					Concurrency: &ConcurrencyConstraint{},
+				},
+				{Kind: ConstraintKindRateLimit, RateLimit: &RateLimitConstraint{
+					Scope:             enums.RateLimitScopeFn,
+					KeyExpressionHash: "test",
+					EvaluatedKeyHash:  "test",
+				}},
+				{Kind: ConstraintKindThrottle, Throttle: &ThrottleConstraint{
+					Scope:             enums.ThrottleScopeFn,
+					KeyExpressionHash: "test",
+					EvaluatedKeyHash:  "test",
+				}},
+			},
+			wantErr: false, // All constraints are now valid with proper config
 		},
 	}
 
@@ -1503,7 +1409,6 @@ func TestRolloutNoMixedConstraints(t *testing.T) {
 					Service:  ServiceExecutor,
 					Location: CallerLocationItemLease,
 				},
-				Migration: tt.mi,
 			}
 
 			err := request.Valid()
@@ -1528,7 +1433,7 @@ func TestConstraintItemValid(t *testing.T) {
 		expectedMsg string
 	}{
 		{
-			name: "valid concurrency constraint with InProgressItemKey",
+			name: "valid concurrency constraint",
 			constraint: ConstraintItem{
 				Kind: ConstraintKindConcurrency,
 				Concurrency: &ConcurrencyConstraint{
@@ -1536,25 +1441,9 @@ func TestConstraintItemValid(t *testing.T) {
 					Scope:             enums.ConcurrencyScopeFn,
 					KeyExpressionHash: "test-key",
 					EvaluatedKeyHash:  "eval-key",
-					InProgressItemKey: "redis:concurrency:item:key123",
 				},
 			},
 			wantErr: false,
-		},
-		{
-			name: "invalid concurrency constraint missing InProgressItemKey",
-			constraint: ConstraintItem{
-				Kind: ConstraintKindConcurrency,
-				Concurrency: &ConcurrencyConstraint{
-					Mode:              enums.ConcurrencyModeStep,
-					Scope:             enums.ConcurrencyScopeFn,
-					KeyExpressionHash: "test-key",
-					EvaluatedKeyHash:  "eval-key",
-					InProgressItemKey: "", // Missing required field
-				},
-			},
-			wantErr:     true,
-			expectedMsg: "concurrency constraint must specify InProgressItemKey",
 		},
 		{
 			name: "valid throttle constraint with EvaluatedKeyHash",
@@ -1631,26 +1520,23 @@ func TestConstraintItemValid(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "concurrency constraint with empty string InProgressItemKey",
+			name: "concurrency constraint without keys is valid",
 			constraint: ConstraintItem{
 				Kind: ConstraintKindConcurrency,
 				Concurrency: &ConcurrencyConstraint{
-					Mode:              enums.ConcurrencyModeStep,
-					Scope:             enums.ConcurrencyScopeAccount,
-					InProgressItemKey: "", // Explicitly empty
+					Mode:  enums.ConcurrencyModeStep,
+					Scope: enums.ConcurrencyScopeAccount,
 				},
 			},
-			wantErr:     true,
-			expectedMsg: "concurrency constraint must specify InProgressItemKey",
+			wantErr: false,
 		},
 		{
 			name: "concurrency constraint with run mode is invalid",
 			constraint: ConstraintItem{
 				Kind: ConstraintKindConcurrency,
 				Concurrency: &ConcurrencyConstraint{
-					Mode:              enums.ConcurrencyModeRun,
-					Scope:             enums.ConcurrencyScopeAccount,
-					InProgressItemKey: "test-key", // Valid key but mode is run
+					Mode:  enums.ConcurrencyModeRun,
+					Scope: enums.ConcurrencyScopeAccount,
 				},
 			},
 			wantErr:     true,
@@ -1811,14 +1697,9 @@ func TestCapacityCheckRequestValid(t *testing.T) {
 				},
 				Constraints: []ConstraintItem{
 					{
-						Kind: kindConcurrency,
-						Concurrency: &ConcurrencyConstraint{
-							InProgressItemKey: "test-key",
-						},
+						Kind:        kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{},
 					},
-				},
-				Migration: MigrationIdentifier{
-					QueueShard: "test",
 				},
 			},
 			wantErr: false,
@@ -1849,9 +1730,6 @@ func TestCapacityCheckRequestValid(t *testing.T) {
 							EvaluatedKeyHash:  "rate-key-hash",
 						},
 					},
-				},
-				Migration: MigrationIdentifier{
-					IsRateLimit: true,
 				},
 			},
 			wantErr: false,
@@ -1884,9 +1762,6 @@ func TestCapacityCheckRequestValid(t *testing.T) {
 						},
 					},
 				},
-				Migration: MigrationIdentifier{
-					QueueShard: "test",
-				},
 			},
 			wantErr: false,
 		},
@@ -1901,14 +1776,9 @@ func TestCapacityCheckRequestValid(t *testing.T) {
 				},
 				Constraints: []ConstraintItem{
 					{
-						Kind: kindConcurrency,
-						Concurrency: &ConcurrencyConstraint{
-							InProgressItemKey: "test-key",
-						},
+						Kind:        kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{},
 					},
-				},
-				Migration: MigrationIdentifier{
-					QueueShard: "test",
 				},
 			},
 			wantErr: true,
@@ -1925,14 +1795,9 @@ func TestCapacityCheckRequestValid(t *testing.T) {
 				},
 				Constraints: []ConstraintItem{
 					{
-						Kind: kindConcurrency,
-						Concurrency: &ConcurrencyConstraint{
-							InProgressItemKey: "test-key",
-						},
+						Kind:        kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{},
 					},
-				},
-				Migration: MigrationIdentifier{
-					QueueShard: "test",
 				},
 			},
 			wantErr: true,
@@ -1951,13 +1816,9 @@ func TestCapacityCheckRequestValid(t *testing.T) {
 					{
 						Kind: kindConcurrency,
 						Concurrency: &ConcurrencyConstraint{
-							Scope:             enums.ConcurrencyScopeAccount, // Account-level constraint
-							InProgressItemKey: "test-key",
+							Scope: enums.ConcurrencyScopeAccount, // Account-level constraint
 						},
 					},
-				},
-				Migration: MigrationIdentifier{
-					QueueShard: "test",
 				},
 			},
 			wantErr: false,
@@ -1975,13 +1836,9 @@ func TestCapacityCheckRequestValid(t *testing.T) {
 					{
 						Kind: kindConcurrency,
 						Concurrency: &ConcurrencyConstraint{
-							Scope:             enums.ConcurrencyScopeFn, // Function-level constraint
-							InProgressItemKey: "test-key",
+							Scope: enums.ConcurrencyScopeFn, // Function-level constraint
 						},
 					},
-				},
-				Migration: MigrationIdentifier{
-					QueueShard: "test",
 				},
 			},
 			wantErr: true,
@@ -2015,9 +1872,6 @@ func TestCapacityCheckRequestValid(t *testing.T) {
 						},
 					},
 				},
-				Migration: MigrationIdentifier{
-					QueueShard: "test",
-				},
 			},
 			wantErr: true,
 			errMsgs: []string{"function ID is required for function-level constraints"},
@@ -2049,9 +1903,6 @@ func TestCapacityCheckRequestValid(t *testing.T) {
 						},
 					},
 				},
-				Migration: MigrationIdentifier{
-					IsRateLimit: true,
-				},
 			},
 			wantErr: true,
 			errMsgs: []string{"function ID is required for function-level constraints"},
@@ -2069,20 +1920,15 @@ func TestCapacityCheckRequestValid(t *testing.T) {
 					{
 						Kind: kindConcurrency,
 						Concurrency: &ConcurrencyConstraint{
-							Scope:             enums.ConcurrencyScopeAccount, // Account-level (OK)
-							InProgressItemKey: "test-key",
+							Scope: enums.ConcurrencyScopeAccount, // Account-level (OK)
 						},
 					},
 					{
 						Kind: kindConcurrency,
 						Concurrency: &ConcurrencyConstraint{
-							Scope:             enums.ConcurrencyScopeFn, // Function-level (requires FunctionID)
-							InProgressItemKey: "test-key-2",
+							Scope: enums.ConcurrencyScopeFn, // Function-level (requires FunctionID)
 						},
 					},
-				},
-				Migration: MigrationIdentifier{
-					QueueShard: "test",
 				},
 			},
 			wantErr: true,
@@ -2101,20 +1947,15 @@ func TestCapacityCheckRequestValid(t *testing.T) {
 					{
 						Kind: kindConcurrency,
 						Concurrency: &ConcurrencyConstraint{
-							Scope:             enums.ConcurrencyScopeAccount,
-							InProgressItemKey: "test-key-1",
+							Scope: enums.ConcurrencyScopeAccount,
 						},
 					},
 					{
 						Kind: kindConcurrency,
 						Concurrency: &ConcurrencyConstraint{
-							Scope:             enums.ConcurrencyScopeAccount,
-							InProgressItemKey: "test-key-2",
+							Scope: enums.ConcurrencyScopeAccount,
 						},
 					},
-				},
-				Migration: MigrationIdentifier{
-					QueueShard: "test",
 				},
 			},
 			wantErr: false,
@@ -2132,13 +1973,9 @@ func TestCapacityCheckRequestValid(t *testing.T) {
 					{
 						Kind: kindConcurrency,
 						Concurrency: &ConcurrencyConstraint{
-							Scope:             enums.ConcurrencyScopeFn,
-							InProgressItemKey: "test-key",
+							Scope: enums.ConcurrencyScopeFn,
 						},
 					},
-				},
-				Migration: MigrationIdentifier{
-					QueueShard: "test",
 				},
 			},
 			wantErr: true,
@@ -2156,15 +1993,12 @@ func TestCapacityCheckRequestValid(t *testing.T) {
 					FunctionVersion: 1,
 				},
 				Constraints: []ConstraintItem{}, // Empty slice
-				Migration: MigrationIdentifier{
-					QueueShard: "test",
-				},
 			},
 			wantErr: true,
 			errMsgs: []string{"must provide constraints"},
 		},
 		{
-			name: "invalid constraint - concurrency missing InProgressItemKey",
+			name: "valid constraint - concurrency without InProgressItemKey (no longer required)",
 			request: CapacityCheckRequest{
 				AccountID:  accountID,
 				EnvID:      envID,
@@ -2174,18 +2008,12 @@ func TestCapacityCheckRequestValid(t *testing.T) {
 				},
 				Constraints: []ConstraintItem{
 					{
-						Kind: kindConcurrency,
-						Concurrency: &ConcurrencyConstraint{
-							InProgressItemKey: "", // Missing required field
-						},
+						Kind:        kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{},
 					},
 				},
-				Migration: MigrationIdentifier{
-					QueueShard: "test",
-				},
 			},
-			wantErr: true,
-			errMsgs: []string{"invalid constraint 0", "concurrency constraint must specify InProgressItemKey"},
+			wantErr: false,
 		},
 		{
 			name: "invalid constraint - throttle missing EvaluatedKeyHash",
@@ -2203,9 +2031,6 @@ func TestCapacityCheckRequestValid(t *testing.T) {
 							EvaluatedKeyHash: "", // Missing required field
 						},
 					},
-				},
-				Migration: MigrationIdentifier{
-					QueueShard: "test",
 				},
 			},
 			wantErr: true,
@@ -2228,91 +2053,9 @@ func TestCapacityCheckRequestValid(t *testing.T) {
 						},
 					},
 				},
-				Migration: MigrationIdentifier{
-					IsRateLimit: true,
-				},
 			},
 			wantErr: true,
 			errMsgs: []string{"invalid constraint 0", "rate limit constraint must include EvaluatedKeyHash"},
-		},
-		{
-			name: "invalid - mixed queue and rate limit constraints",
-			request: CapacityCheckRequest{
-				AccountID:  accountID,
-				EnvID:      envID,
-				FunctionID: functionID,
-				Configuration: ConstraintConfig{
-					FunctionVersion: 1,
-				},
-				Constraints: []ConstraintItem{
-					{
-						Kind: ConstraintKindRateLimit,
-						RateLimit: &RateLimitConstraint{
-							EvaluatedKeyHash: "rate-key-hash",
-						},
-					},
-					{
-						Kind: kindConcurrency,
-						Concurrency: &ConcurrencyConstraint{
-							InProgressItemKey: "test-key",
-						},
-					},
-				},
-				Migration: MigrationIdentifier{
-					QueueShard:  "test",
-					IsRateLimit: true,
-				},
-			},
-			wantErr: true,
-			errMsgs: []string{"cannot mix queue and rate limit constraints for first stage"},
-		},
-		{
-			name: "missing rate limit flag in migration identifier",
-			request: CapacityCheckRequest{
-				AccountID:  accountID,
-				EnvID:      envID,
-				FunctionID: functionID,
-				Configuration: ConstraintConfig{
-					FunctionVersion: 1,
-				},
-				Constraints: []ConstraintItem{
-					{
-						Kind: ConstraintKindRateLimit,
-						RateLimit: &RateLimitConstraint{
-							EvaluatedKeyHash: "rate-key-hash",
-						},
-					},
-				},
-				Migration: MigrationIdentifier{
-					IsRateLimit: false, // Should be true for rate limit constraints
-				},
-			},
-			wantErr: true,
-			errMsgs: []string{"missing rate limit flag in migration identifier"},
-		},
-		{
-			name: "missing queue shard in migration identifier",
-			request: CapacityCheckRequest{
-				AccountID:  accountID,
-				EnvID:      envID,
-				FunctionID: functionID,
-				Configuration: ConstraintConfig{
-					FunctionVersion: 1,
-				},
-				Constraints: []ConstraintItem{
-					{
-						Kind: kindConcurrency,
-						Concurrency: &ConcurrencyConstraint{
-							InProgressItemKey: "test-key",
-						},
-					},
-				},
-				Migration: MigrationIdentifier{
-					QueueShard: "", // Should be provided for queue constraints
-				},
-			},
-			wantErr: true,
-			errMsgs: []string{"missing queue shard in migration identifier"},
 		},
 		{
 			name: "multiple validation errors",
@@ -2324,7 +2067,6 @@ func TestCapacityCheckRequestValid(t *testing.T) {
 					FunctionVersion: 0,
 				},
 				Constraints: []ConstraintItem{}, // Empty slice
-				Migration:   MigrationIdentifier{},
 			},
 			wantErr: true,
 			errMsgs: []string{
@@ -2344,20 +2086,13 @@ func TestCapacityCheckRequestValid(t *testing.T) {
 				},
 				Constraints: []ConstraintItem{
 					{
-						Kind: kindConcurrency,
-						Concurrency: &ConcurrencyConstraint{
-							InProgressItemKey: "test-key-1",
-						},
+						Kind:        kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{},
 					},
 					{
-						Kind: kindConcurrency,
-						Concurrency: &ConcurrencyConstraint{
-							InProgressItemKey: "test-key-2",
-						},
+						Kind:        kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{},
 					},
-				},
-				Migration: MigrationIdentifier{
-					QueueShard: "test",
 				},
 			},
 			wantErr: false,
@@ -2398,9 +2133,6 @@ func TestCapacityCheckRequestValid(t *testing.T) {
 						},
 					},
 				},
-				Migration: MigrationIdentifier{
-					QueueShard: "test",
-				},
 			},
 			wantErr: false,
 		},
@@ -2424,10 +2156,8 @@ func TestCapacityCheckRequestValid(t *testing.T) {
 				},
 				Constraints: []ConstraintItem{
 					{
-						Kind: kindConcurrency,
-						Concurrency: &ConcurrencyConstraint{
-							InProgressItemKey: "test-key",
-						},
+						Kind:        kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{},
 					},
 					{
 						Kind: ConstraintKindThrottle,
@@ -2437,9 +2167,6 @@ func TestCapacityCheckRequestValid(t *testing.T) {
 							EvaluatedKeyHash:  "throttle-key",
 						},
 					},
-				},
-				Migration: MigrationIdentifier{
-					QueueShard: "test",
 				},
 			},
 			wantErr: false,
@@ -2457,13 +2184,9 @@ func TestCapacityCheckRequestValid(t *testing.T) {
 					{
 						Kind: kindConcurrency,
 						Concurrency: &ConcurrencyConstraint{
-							Mode:              enums.ConcurrencyModeRun,
-							InProgressItemKey: "test-key",
+							Mode: enums.ConcurrencyModeRun,
 						},
 					},
-				},
-				Migration: MigrationIdentifier{
-					QueueShard: "test",
 				},
 			},
 			wantErr: true,
@@ -2511,13 +2234,9 @@ func TestCapacityCheckRequestValidFunctionLevelConstraints(t *testing.T) {
 					{
 						Kind: ConstraintKindConcurrency,
 						Concurrency: &ConcurrencyConstraint{
-							Scope:             enums.ConcurrencyScopeFn,
-							InProgressItemKey: "test-key",
+							Scope: enums.ConcurrencyScopeFn,
 						},
 					},
-				},
-				Migration: MigrationIdentifier{
-					QueueShard: "test",
 				},
 			},
 			wantErr: false,
@@ -2550,9 +2269,6 @@ func TestCapacityCheckRequestValidFunctionLevelConstraints(t *testing.T) {
 						},
 					},
 				},
-				Migration: MigrationIdentifier{
-					QueueShard: "test",
-				},
 			},
 			wantErr: false,
 		},
@@ -2583,9 +2299,6 @@ func TestCapacityCheckRequestValidFunctionLevelConstraints(t *testing.T) {
 						},
 					},
 				},
-				Migration: MigrationIdentifier{
-					IsRateLimit: true,
-				},
 			},
 			wantErr: false,
 		},
@@ -2602,13 +2315,9 @@ func TestCapacityCheckRequestValidFunctionLevelConstraints(t *testing.T) {
 					{
 						Kind: ConstraintKindConcurrency,
 						Concurrency: &ConcurrencyConstraint{
-							Scope:             enums.ConcurrencyScopeFn,
-							InProgressItemKey: "test-key",
+							Scope: enums.ConcurrencyScopeFn,
 						},
 					},
-				},
-				Migration: MigrationIdentifier{
-					QueueShard: "test",
 				},
 			},
 			wantErr: true,
@@ -2642,9 +2351,6 @@ func TestCapacityCheckRequestValidFunctionLevelConstraints(t *testing.T) {
 						},
 					},
 				},
-				Migration: MigrationIdentifier{
-					QueueShard: "test",
-				},
 			},
 			wantErr: true,
 			errMsgs: []string{"function ID is required for function-level constraints"},
@@ -2676,9 +2382,6 @@ func TestCapacityCheckRequestValidFunctionLevelConstraints(t *testing.T) {
 						},
 					},
 				},
-				Migration: MigrationIdentifier{
-					IsRateLimit: true,
-				},
 			},
 			wantErr: true,
 			errMsgs: []string{"function ID is required for function-level constraints"},
@@ -2696,13 +2399,9 @@ func TestCapacityCheckRequestValidFunctionLevelConstraints(t *testing.T) {
 					{
 						Kind: ConstraintKindConcurrency,
 						Concurrency: &ConcurrencyConstraint{
-							Scope:             enums.ConcurrencyScopeAccount,
-							InProgressItemKey: "test-key",
+							Scope: enums.ConcurrencyScopeAccount,
 						},
 					},
-				},
-				Migration: MigrationIdentifier{
-					QueueShard: "test",
 				},
 			},
 			wantErr: false,
@@ -2735,9 +2434,6 @@ func TestCapacityCheckRequestValidFunctionLevelConstraints(t *testing.T) {
 						},
 					},
 				},
-				Migration: MigrationIdentifier{
-					QueueShard: "test",
-				},
 			},
 			wantErr: false,
 		},
@@ -2768,9 +2464,6 @@ func TestCapacityCheckRequestValidFunctionLevelConstraints(t *testing.T) {
 						},
 					},
 				},
-				Migration: MigrationIdentifier{
-					IsRateLimit: true,
-				},
 			},
 			wantErr: false,
 		},
@@ -2787,20 +2480,15 @@ func TestCapacityCheckRequestValidFunctionLevelConstraints(t *testing.T) {
 					{
 						Kind: ConstraintKindConcurrency,
 						Concurrency: &ConcurrencyConstraint{
-							Scope:             enums.ConcurrencyScopeAccount, // Account level - OK
-							InProgressItemKey: "test-key-1",
+							Scope: enums.ConcurrencyScopeAccount, // Account level - OK
 						},
 					},
 					{
 						Kind: ConstraintKindConcurrency,
 						Concurrency: &ConcurrencyConstraint{
-							Scope:             enums.ConcurrencyScopeFn, // Function level - requires FunctionID
-							InProgressItemKey: "test-key-2",
+							Scope: enums.ConcurrencyScopeFn, // Function level - requires FunctionID
 						},
 					},
-				},
-				Migration: MigrationIdentifier{
-					QueueShard: "test",
 				},
 			},
 			wantErr: true,
@@ -2819,20 +2507,15 @@ func TestCapacityCheckRequestValidFunctionLevelConstraints(t *testing.T) {
 					{
 						Kind: ConstraintKindConcurrency,
 						Concurrency: &ConcurrencyConstraint{
-							Scope:             enums.ConcurrencyScopeAccount,
-							InProgressItemKey: "test-key-1",
+							Scope: enums.ConcurrencyScopeAccount,
 						},
 					},
 					{
 						Kind: ConstraintKindConcurrency,
 						Concurrency: &ConcurrencyConstraint{
-							Scope:             enums.ConcurrencyScopeFn,
-							InProgressItemKey: "test-key-2",
+							Scope: enums.ConcurrencyScopeFn,
 						},
 					},
-				},
-				Migration: MigrationIdentifier{
-					QueueShard: "test",
 				},
 			},
 			wantErr: false,
@@ -2852,9 +2535,6 @@ func TestCapacityCheckRequestValidFunctionLevelConstraints(t *testing.T) {
 						Concurrency: nil, // Nil constraint - should not trigger function level check
 					},
 				},
-				Migration: MigrationIdentifier{
-					QueueShard: "test",
-				},
 			},
 			wantErr: false,
 		},
@@ -2873,9 +2553,6 @@ func TestCapacityCheckRequestValidFunctionLevelConstraints(t *testing.T) {
 						Throttle: nil, // Nil constraint - should not trigger function level check
 					},
 				},
-				Migration: MigrationIdentifier{
-					QueueShard: "test",
-				},
 			},
 			wantErr: false,
 		},
@@ -2893,9 +2570,6 @@ func TestCapacityCheckRequestValidFunctionLevelConstraints(t *testing.T) {
 						Kind:      ConstraintKindRateLimit,
 						RateLimit: nil, // Nil constraint - should not trigger function level check
 					},
-				},
-				Migration: MigrationIdentifier{
-					IsRateLimit: true,
 				},
 			},
 			wantErr: false,
@@ -2943,10 +2617,8 @@ func TestCapacityAcquireRequestValidAmountEdgeCases(t *testing.T) {
 				},
 				Constraints: []ConstraintItem{
 					{
-						Kind: kindConcurrency,
-						Concurrency: &ConcurrencyConstraint{
-							InProgressItemKey: "test-key",
-						},
+						Kind:        kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{},
 					},
 				},
 				Amount:               -1, // Negative amount
@@ -2957,9 +2629,6 @@ func TestCapacityAcquireRequestValidAmountEdgeCases(t *testing.T) {
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
 					Location: CallerLocationItemLease,
-				},
-				Migration: MigrationIdentifier{
-					QueueShard: "test",
 				},
 			},
 			wantErr: true,
@@ -2977,10 +2646,8 @@ func TestCapacityAcquireRequestValidAmountEdgeCases(t *testing.T) {
 				},
 				Constraints: []ConstraintItem{
 					{
-						Kind: kindConcurrency,
-						Concurrency: &ConcurrencyConstraint{
-							InProgressItemKey: "test-key",
-						},
+						Kind:        kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{},
 					},
 				},
 				Amount:               0, // Zero amount
@@ -2991,9 +2658,6 @@ func TestCapacityAcquireRequestValidAmountEdgeCases(t *testing.T) {
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
 					Location: CallerLocationItemLease,
-				},
-				Migration: MigrationIdentifier{
-					QueueShard: "test",
 				},
 			},
 			wantErr: true,
@@ -3011,10 +2675,8 @@ func TestCapacityAcquireRequestValidAmountEdgeCases(t *testing.T) {
 				},
 				Constraints: []ConstraintItem{
 					{
-						Kind: kindConcurrency,
-						Concurrency: &ConcurrencyConstraint{
-							InProgressItemKey: "test-key",
-						},
+						Kind:        kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{},
 					},
 				},
 				Amount:               3, // Request 3 leases
@@ -3025,9 +2687,6 @@ func TestCapacityAcquireRequestValidAmountEdgeCases(t *testing.T) {
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
 					Location: CallerLocationItemLease,
-				},
-				Migration: MigrationIdentifier{
-					QueueShard: "test",
 				},
 			},
 			wantErr: true,
@@ -3045,10 +2704,8 @@ func TestCapacityAcquireRequestValidAmountEdgeCases(t *testing.T) {
 				},
 				Constraints: []ConstraintItem{
 					{
-						Kind: kindConcurrency,
-						Concurrency: &ConcurrencyConstraint{
-							InProgressItemKey: "test-key",
-						},
+						Kind:        kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{},
 					},
 				},
 				Amount:               2, // Request 2 leases
@@ -3059,9 +2716,6 @@ func TestCapacityAcquireRequestValidAmountEdgeCases(t *testing.T) {
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
 					Location: CallerLocationItemLease,
-				},
-				Migration: MigrationIdentifier{
-					QueueShard: "test",
 				},
 			},
 			wantErr: true,
@@ -3079,10 +2733,8 @@ func TestCapacityAcquireRequestValidAmountEdgeCases(t *testing.T) {
 				},
 				Constraints: []ConstraintItem{
 					{
-						Kind: kindConcurrency,
-						Concurrency: &ConcurrencyConstraint{
-							InProgressItemKey: "test-key",
-						},
+						Kind:        kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{},
 					},
 				},
 				Amount:               3, // Request 3 leases
@@ -3093,9 +2745,6 @@ func TestCapacityAcquireRequestValidAmountEdgeCases(t *testing.T) {
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
 					Location: CallerLocationItemLease,
-				},
-				Migration: MigrationIdentifier{
-					QueueShard: "test",
 				},
 			},
 			wantErr: false,
@@ -3112,10 +2761,8 @@ func TestCapacityAcquireRequestValidAmountEdgeCases(t *testing.T) {
 				},
 				Constraints: []ConstraintItem{
 					{
-						Kind: kindConcurrency,
-						Concurrency: &ConcurrencyConstraint{
-							InProgressItemKey: "test-key",
-						},
+						Kind:        kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{},
 					},
 				},
 				Amount:               0, // Zero amount
@@ -3126,9 +2773,6 @@ func TestCapacityAcquireRequestValidAmountEdgeCases(t *testing.T) {
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
 					Location: CallerLocationItemLease,
-				},
-				Migration: MigrationIdentifier{
-					QueueShard: "test",
 				},
 			},
 			wantErr: true,
@@ -3146,10 +2790,8 @@ func TestCapacityAcquireRequestValidAmountEdgeCases(t *testing.T) {
 				},
 				Constraints: []ConstraintItem{
 					{
-						Kind: kindConcurrency,
-						Concurrency: &ConcurrencyConstraint{
-							InProgressItemKey: "test-key",
-						},
+						Kind:        kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{},
 					},
 				},
 				Amount:               -999999, // Very large negative amount
@@ -3160,9 +2802,6 @@ func TestCapacityAcquireRequestValidAmountEdgeCases(t *testing.T) {
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
 					Location: CallerLocationItemLease,
-				},
-				Migration: MigrationIdentifier{
-					QueueShard: "test",
 				},
 			},
 			wantErr: true,
@@ -3180,10 +2819,8 @@ func TestCapacityAcquireRequestValidAmountEdgeCases(t *testing.T) {
 				},
 				Constraints: []ConstraintItem{
 					{
-						Kind: kindConcurrency,
-						Concurrency: &ConcurrencyConstraint{
-							InProgressItemKey: "test-key",
-						},
+						Kind:        kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{},
 					},
 				},
 				Amount:          25, // Exceeds MaximumAmount of 20
@@ -3200,9 +2837,6 @@ func TestCapacityAcquireRequestValidAmountEdgeCases(t *testing.T) {
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
 					Location: CallerLocationItemLease,
-				},
-				Migration: MigrationIdentifier{
-					QueueShard: "test",
 				},
 			},
 			wantErr: true,
