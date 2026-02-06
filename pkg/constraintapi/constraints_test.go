@@ -43,7 +43,6 @@ func TestConstraintEnforcement(t *testing.T) {
 		amount      int
 		config      ConstraintConfig
 		constraints []ConstraintItem
-		mi          MigrationIdentifier
 
 		beforeAcquire func(t *testing.T, deps *deps)
 
@@ -70,32 +69,28 @@ func TestConstraintEnforcement(t *testing.T) {
 				{
 					Kind: ConstraintKindConcurrency,
 					Concurrency: &ConcurrencyConstraint{
-						Scope:             enums.ConcurrencyScopeAccount,
-						Mode:              enums.ConcurrencyModeStep,
-						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:account:%s", accountID),
+						Scope: enums.ConcurrencyScopeAccount,
+						Mode:  enums.ConcurrencyModeStep,
 					},
 				},
 			},
 			amount:              1,
 			expectedLeaseAmount: 1,
-			mi: MigrationIdentifier{
-				QueueShard: "test",
-			},
 			afterAcquire: func(t *testing.T, deps *deps, resp *CapacityAcquireResponse) {
 				cm := deps.cm
 				r := deps.r
 				// All keys should exist
 				keys := deps.r.Keys()
-				keyInProgressLeases := deps.constraints[0].Concurrency.InProgressLeasesKey(cm.queueStateKeyPrefix, accountID, envID, fnID)
+				keyInProgressLeases := deps.constraints[0].Concurrency.InProgressLeasesKey(accountID, envID, fnID)
 				require.Len(t, keys, 8)
 				require.Subset(t, []string{
-					cm.keyScavengerShard(cm.queueStateKeyPrefix, 0),
-					cm.keyAccountLeases(cm.queueStateKeyPrefix, accountID),
-					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "acq", deps.acquireIdempotencyKey),
-					cm.keyConstraintCheckIdempotency(cm.queueStateKeyPrefix, accountID, "acquire"),
-					cm.keyConstraintCheckIdempotency(cm.queueStateKeyPrefix, accountID, "item0"),
-					cm.keyRequestState(cm.queueStateKeyPrefix, accountID, deps.acquireRequestID),
-					cm.keyLeaseDetails(cm.queueStateKeyPrefix, accountID, resp.Leases[0].LeaseID),
+					cm.keyScavengerShard(),
+					cm.keyAccountLeases(accountID),
+					cm.keyOperationIdempotency(accountID, "acq", deps.acquireIdempotencyKey),
+					cm.keyConstraintCheckIdempotency(accountID, "acquire"),
+					cm.keyConstraintCheckIdempotency(accountID, "item0"),
+					cm.keyRequestState(accountID, deps.acquireRequestID),
+					cm.keyLeaseDetails(accountID, resp.Leases[0].LeaseID),
 					keyInProgressLeases,
 					fmt.Sprintf("{q:v1}:concurrency:account:%s", accountID),
 				}, keys)
@@ -118,17 +113,17 @@ func TestConstraintEnforcement(t *testing.T) {
 				constraints := deps.constraints
 				// All keys should exist
 				keys := r.Keys()
-				keyInProgressLeases := constraints[0].Concurrency.InProgressLeasesKey(cm.queueStateKeyPrefix, accountID, envID, fnID)
+				keyInProgressLeases := constraints[0].Concurrency.InProgressLeasesKey(accountID, envID, fnID)
 				require.Len(t, keys, 9)
 				require.Subset(t, []string{
-					cm.keyScavengerShard(cm.queueStateKeyPrefix, 0),
-					cm.keyAccountLeases(cm.queueStateKeyPrefix, accountID),
-					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "acq", deps.acquireIdempotencyKey),
-					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "ext", "extend"),
-					cm.keyConstraintCheckIdempotency(cm.queueStateKeyPrefix, accountID, "acquire"),
-					cm.keyConstraintCheckIdempotency(cm.queueStateKeyPrefix, accountID, "item0"),
-					cm.keyRequestState(cm.queueStateKeyPrefix, accountID, deps.acquireRequestID),
-					cm.keyLeaseDetails(cm.queueStateKeyPrefix, accountID, *resp.LeaseID),
+					cm.keyScavengerShard(),
+					cm.keyAccountLeases(accountID),
+					cm.keyOperationIdempotency(accountID, "acq", deps.acquireIdempotencyKey),
+					cm.keyOperationIdempotency(accountID, "ext", "extend"),
+					cm.keyConstraintCheckIdempotency(accountID, "acquire"),
+					cm.keyConstraintCheckIdempotency(accountID, "item0"),
+					cm.keyRequestState(accountID, deps.acquireRequestID),
+					cm.keyLeaseDetails(accountID, *resp.LeaseID),
 					keyInProgressLeases,
 					fmt.Sprintf("{q:v1}:concurrency:account:%s", accountID),
 				}, keys)
@@ -153,11 +148,11 @@ func TestConstraintEnforcement(t *testing.T) {
 				keys := r.Keys()
 				require.Len(t, keys, 5)
 				require.Subset(t, []string{
-					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "acq", deps.acquireIdempotencyKey),
-					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "ext", "extend"),
-					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "rel", "release"),
-					cm.keyConstraintCheckIdempotency(cm.queueStateKeyPrefix, accountID, "acquire"),
-					cm.keyConstraintCheckIdempotency(cm.queueStateKeyPrefix, accountID, "item0"),
+					cm.keyOperationIdempotency(accountID, "acq", deps.acquireIdempotencyKey),
+					cm.keyOperationIdempotency(accountID, "ext", "extend"),
+					cm.keyOperationIdempotency(accountID, "rel", "release"),
+					cm.keyConstraintCheckIdempotency(accountID, "acquire"),
+					cm.keyConstraintCheckIdempotency(accountID, "item0"),
 				}, keys)
 			},
 		},
@@ -174,17 +169,13 @@ func TestConstraintEnforcement(t *testing.T) {
 				{
 					Kind: ConstraintKindConcurrency,
 					Concurrency: &ConcurrencyConstraint{
-						Scope:             enums.ConcurrencyScopeAccount,
-						Mode:              enums.ConcurrencyModeStep,
-						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:account:%s", accountID),
+						Scope: enums.ConcurrencyScopeAccount,
+						Mode:  enums.ConcurrencyModeStep,
 					},
 				},
 			},
 			amount:              1,
 			expectedLeaseAmount: 1,
-			mi: MigrationIdentifier{
-				QueueShard: "test",
-			},
 			afterAcquire: func(t *testing.T, deps *deps, resp *CapacityAcquireResponse) {
 				cm := deps.cm
 
@@ -209,10 +200,6 @@ func TestConstraintEnforcement(t *testing.T) {
 						Location:          CallerLocationBacklogRefill,
 						RunProcessingMode: RunProcessingModeBackground,
 					},
-
-					Migration: MigrationIdentifier{
-						QueueShard: "test",
-					},
 				})
 				require.NoError(t, err)
 				require.Len(t, res.Leases, 0)
@@ -235,17 +222,13 @@ func TestConstraintEnforcement(t *testing.T) {
 				{
 					Kind: ConstraintKindConcurrency,
 					Concurrency: &ConcurrencyConstraint{
-						Scope:             enums.ConcurrencyScopeAccount,
-						Mode:              enums.ConcurrencyModeStep,
-						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:account:%s", accountID),
+						Scope: enums.ConcurrencyScopeAccount,
+						Mode:  enums.ConcurrencyModeStep,
 					},
 				},
 			},
 			amount:              1,
 			expectedLeaseAmount: 1,
-			mi: MigrationIdentifier{
-				QueueShard: "test",
-			},
 			afterAcquire: func(t *testing.T, deps *deps, resp *CapacityAcquireResponse) {
 				// Verify lease was granted
 				require.Len(t, resp.Leases, 1)
@@ -263,51 +246,6 @@ func TestConstraintEnforcement(t *testing.T) {
 		},
 
 		{
-			name: "account concurrency limited due to legacy concurrency",
-			config: ConstraintConfig{
-				FunctionVersion: 1,
-				Concurrency: ConcurrencyConfig{
-					AccountConcurrency: 10,
-				},
-			},
-			constraints: []ConstraintItem{
-				{
-					Kind: ConstraintKindConcurrency,
-					Concurrency: &ConcurrencyConstraint{
-						Scope:             enums.ConcurrencyScopeAccount,
-						Mode:              enums.ConcurrencyModeStep,
-						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:account:%s", accountID),
-					},
-				},
-			},
-			mi: MigrationIdentifier{
-				QueueShard: "test",
-			},
-			beforeAcquire: func(t *testing.T, deps *deps) {
-				r := deps.r
-				clock := deps.clock
-				// Simulate existing concurrency usage (in progress item Leased by queue)
-				for i := range 10 {
-					_, err := r.ZAdd(
-						fmt.Sprintf("{q:v1}:concurrency:account:%s", accountID),
-						float64(clock.Now().Add(time.Second).UnixMilli()),
-						fmt.Sprintf("queueItem%d", i),
-					)
-					require.NoError(t, err)
-				}
-			},
-			amount:              1,
-			expectedLeaseAmount: 0,
-			afterAcquire: func(t *testing.T, deps *deps, resp *CapacityAcquireResponse) {
-				require.Equal(t, 0, len(resp.Leases))
-				require.Equal(t, deps.clock.Now().Add(ConcurrencyLimitRetryAfter), resp.RetryAfter)
-
-				require.Len(t, resp.ExhaustedConstraints, 1)
-				require.Equal(t, ConstraintKindConcurrency, resp.ExhaustedConstraints[0].Kind)
-			},
-		},
-
-		{
 			name: "ignore account concurrency claimed by expired capacity lease",
 			config: ConstraintConfig{
 				FunctionVersion: 1,
@@ -319,14 +257,10 @@ func TestConstraintEnforcement(t *testing.T) {
 				{
 					Kind: ConstraintKindConcurrency,
 					Concurrency: &ConcurrencyConstraint{
-						Scope:             enums.ConcurrencyScopeAccount,
-						Mode:              enums.ConcurrencyModeStep,
-						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:account:%s", accountID),
+						Scope: enums.ConcurrencyScopeAccount,
+						Mode:  enums.ConcurrencyModeStep,
 					},
 				},
-			},
-			mi: MigrationIdentifier{
-				QueueShard: "test",
 			},
 			beforeAcquire: func(t *testing.T, deps *deps) {
 				r := deps.r
@@ -362,16 +296,12 @@ func TestConstraintEnforcement(t *testing.T) {
 						Location:          CallerLocationBacklogRefill,
 						RunProcessingMode: RunProcessingModeBackground,
 					},
-
-					Migration: MigrationIdentifier{
-						QueueShard: "test",
-					},
 				})
 				require.NoError(t, err)
 				require.Len(t, res.Leases, 10)
 
 				// Expect in progress leases set to be populated
-				mem, err := r.ZMembers(cm.KeyInProgressLeasesAccount(accountID))
+				mem, err := r.ZMembers(deps.constraints[0].Concurrency.InProgressLeasesKey(accountID, envID, fnID))
 				require.NoError(t, err)
 				require.Len(t, mem, 10)
 
@@ -383,8 +313,8 @@ func TestConstraintEnforcement(t *testing.T) {
 			amount:              10,
 			expectedLeaseAmount: 10,
 			afterAcquire: func(t *testing.T, deps *deps, resp *CapacityAcquireResponse) {
+				keyInProgressLeasesAccount := deps.constraints[0].Concurrency.InProgressLeasesKey(accountID, envID, fnID)
 				r := deps.r
-				cm := deps.cm
 				rc := deps.rc
 				clock := deps.clock
 
@@ -392,7 +322,7 @@ func TestConstraintEnforcement(t *testing.T) {
 				require.Len(t, resp.Leases, 10)
 
 				// Expect in progress leases set to be populated with expired and non-expired items
-				mem, err := r.ZMembers(cm.KeyInProgressLeasesAccount(accountID))
+				mem, err := r.ZMembers(keyInProgressLeasesAccount)
 				require.NoError(t, err)
 				require.Len(t, mem, 20)
 
@@ -400,7 +330,7 @@ func TestConstraintEnforcement(t *testing.T) {
 
 				// Count expired
 				cmd := rc.B().Zcount().
-					Key(cm.KeyInProgressLeasesAccount(accountID)).
+					Key(keyInProgressLeasesAccount).
 					Min("-inf").
 					Max(expiry).
 					Build()
@@ -410,7 +340,7 @@ func TestConstraintEnforcement(t *testing.T) {
 
 				// Count active
 				cmd = rc.B().Zcount().
-					Key(cm.KeyInProgressLeasesAccount(accountID)).
+					Key(keyInProgressLeasesAccount).
 					Min(expiry).
 					Max("+inf").
 					Build()
@@ -418,44 +348,6 @@ func TestConstraintEnforcement(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, int64(10), count)
 			},
-		},
-
-		{
-			name: "account concurrency partially limited due to legacy concurrency",
-			config: ConstraintConfig{
-				FunctionVersion: 1,
-				Concurrency: ConcurrencyConfig{
-					AccountConcurrency: 10,
-				},
-			},
-			constraints: []ConstraintItem{
-				{
-					Kind: ConstraintKindConcurrency,
-					Concurrency: &ConcurrencyConstraint{
-						Scope:             enums.ConcurrencyScopeAccount,
-						Mode:              enums.ConcurrencyModeStep,
-						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:account:%s", accountID),
-					},
-				},
-			},
-			mi: MigrationIdentifier{
-				QueueShard: "test",
-			},
-			beforeAcquire: func(t *testing.T, deps *deps) {
-				r := deps.r
-				clock := deps.clock
-				// Simulate existing concurrency usage (in progress item Leased by queue)
-				for i := range 5 { // 5/10
-					_, err := r.ZAdd(
-						fmt.Sprintf("{q:v1}:concurrency:account:%s", accountID),
-						float64(clock.Now().Add(time.Second).UnixMilli()),
-						fmt.Sprintf("queueItem%d", i),
-					)
-					require.NoError(t, err)
-				}
-			},
-			amount:              10,
-			expectedLeaseAmount: 5,
 		},
 
 		{
@@ -471,25 +363,20 @@ func TestConstraintEnforcement(t *testing.T) {
 				{
 					Kind: ConstraintKindConcurrency,
 					Concurrency: &ConcurrencyConstraint{
-						Scope:             enums.ConcurrencyScopeAccount,
-						Mode:              enums.ConcurrencyModeStep,
-						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:account:%s", accountID),
+						Scope: enums.ConcurrencyScopeAccount,
+						Mode:  enums.ConcurrencyModeStep,
 					},
 				},
 				{
 					Kind: ConstraintKindConcurrency,
 					Concurrency: &ConcurrencyConstraint{
-						Scope:             enums.ConcurrencyScopeFn,
-						Mode:              enums.ConcurrencyModeStep,
-						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:p:%s", fnID),
+						Scope: enums.ConcurrencyScopeFn,
+						Mode:  enums.ConcurrencyModeStep,
 					},
 				},
 			},
 			amount:              2,
 			expectedLeaseAmount: 2,
-			mi: MigrationIdentifier{
-				QueueShard: "test",
-			},
 			afterAcquire: func(t *testing.T, deps *deps, resp *CapacityAcquireResponse) {
 				// no limiting constraints
 				require.Len(t, resp.LimitingConstraints, 0)
@@ -515,25 +402,20 @@ func TestConstraintEnforcement(t *testing.T) {
 				{
 					Kind: ConstraintKindConcurrency,
 					Concurrency: &ConcurrencyConstraint{
-						Scope:             enums.ConcurrencyScopeAccount,
-						Mode:              enums.ConcurrencyModeStep,
-						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:account:%s", accountID),
+						Scope: enums.ConcurrencyScopeAccount,
+						Mode:  enums.ConcurrencyModeStep,
 					},
 				},
 				{
 					Kind: ConstraintKindConcurrency,
 					Concurrency: &ConcurrencyConstraint{
-						Scope:             enums.ConcurrencyScopeFn,
-						Mode:              enums.ConcurrencyModeStep,
-						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:p:%s", fnID),
+						Scope: enums.ConcurrencyScopeFn,
+						Mode:  enums.ConcurrencyModeStep,
 					},
 				},
 			},
 			amount:              2,
 			expectedLeaseAmount: 2,
-			mi: MigrationIdentifier{
-				QueueShard: "test",
-			},
 			afterAcquire: func(t *testing.T, deps *deps, resp *CapacityAcquireResponse) {
 				clock := deps.clock
 
@@ -563,25 +445,20 @@ func TestConstraintEnforcement(t *testing.T) {
 				{
 					Kind: ConstraintKindConcurrency,
 					Concurrency: &ConcurrencyConstraint{
-						Scope:             enums.ConcurrencyScopeAccount,
-						Mode:              enums.ConcurrencyModeStep,
-						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:account:%s", accountID),
+						Scope: enums.ConcurrencyScopeAccount,
+						Mode:  enums.ConcurrencyModeStep,
 					},
 				},
 				{
 					Kind: ConstraintKindConcurrency,
 					Concurrency: &ConcurrencyConstraint{
-						Scope:             enums.ConcurrencyScopeFn,
-						Mode:              enums.ConcurrencyModeStep,
-						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:p:%s", fnID),
+						Scope: enums.ConcurrencyScopeFn,
+						Mode:  enums.ConcurrencyModeStep,
 					},
 				},
 			},
 			amount:              2,
 			expectedLeaseAmount: 2,
-			mi: MigrationIdentifier{
-				QueueShard: "test",
-			},
 			afterAcquire: func(t *testing.T, deps *deps, resp *CapacityAcquireResponse) {
 				clock := deps.clock
 
@@ -611,37 +488,33 @@ func TestConstraintEnforcement(t *testing.T) {
 				{
 					Kind: ConstraintKindConcurrency,
 					Concurrency: &ConcurrencyConstraint{
-						Scope:             enums.ConcurrencyScopeFn,
-						Mode:              enums.ConcurrencyModeStep,
-						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:p:%s", fnID),
+						Scope: enums.ConcurrencyScopeFn,
+						Mode:  enums.ConcurrencyModeStep,
 					},
 				},
 			},
 			amount:              1,
 			expectedLeaseAmount: 1,
-			mi: MigrationIdentifier{
-				QueueShard: "test",
-			},
 			afterAcquire: func(t *testing.T, deps *deps, resp *CapacityAcquireResponse) {
 				r := deps.r
 				cm := deps.cm
 				constraints := deps.constraints
 				// All keys should exist
 				keys := r.Keys()
-				keyInProgressLeases := constraints[0].Concurrency.InProgressLeasesKey(cm.queueStateKeyPrefix, accountID, envID, fnID)
+				keyInProgressLeases := constraints[0].Concurrency.InProgressLeasesKey(accountID, envID, fnID)
 
 				t.Log(deps.acquireIdempotencyKey)
 				t.Log(util.XXHash(deps.acquireIdempotencyKey))
 
 				require.Len(t, keys, 8)
 				require.Subset(t, []string{
-					cm.keyScavengerShard(cm.queueStateKeyPrefix, 0),
-					cm.keyAccountLeases(cm.queueStateKeyPrefix, accountID),
-					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "acq", deps.acquireIdempotencyKey),
-					cm.keyConstraintCheckIdempotency(cm.queueStateKeyPrefix, accountID, "acquire"),
-					cm.keyConstraintCheckIdempotency(cm.queueStateKeyPrefix, accountID, "item0"),
-					cm.keyRequestState(cm.queueStateKeyPrefix, accountID, deps.acquireRequestID),
-					cm.keyLeaseDetails(cm.queueStateKeyPrefix, accountID, resp.Leases[0].LeaseID),
+					cm.keyScavengerShard(),
+					cm.keyAccountLeases(accountID),
+					cm.keyOperationIdempotency(accountID, "acq", deps.acquireIdempotencyKey),
+					cm.keyConstraintCheckIdempotency(accountID, "acquire"),
+					cm.keyConstraintCheckIdempotency(accountID, "item0"),
+					cm.keyRequestState(accountID, deps.acquireRequestID),
+					cm.keyLeaseDetails(accountID, resp.Leases[0].LeaseID),
 					keyInProgressLeases,
 				}, keys, r.Dump())
 
@@ -664,17 +537,17 @@ func TestConstraintEnforcement(t *testing.T) {
 
 				// All keys should exist
 				keys := r.Keys()
-				keyInProgressLeases := constraints[0].Concurrency.InProgressLeasesKey(cm.queueStateKeyPrefix, accountID, envID, fnID)
+				keyInProgressLeases := constraints[0].Concurrency.InProgressLeasesKey(accountID, envID, fnID)
 				require.Len(t, keys, 9)
 				require.Subset(t, []string{
-					cm.keyScavengerShard(cm.queueStateKeyPrefix, 0),
-					cm.keyAccountLeases(cm.queueStateKeyPrefix, accountID),
-					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "acq", deps.acquireIdempotencyKey),
-					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "ext", "extend"),
-					cm.keyConstraintCheckIdempotency(cm.queueStateKeyPrefix, accountID, "acquire"),
-					cm.keyConstraintCheckIdempotency(cm.queueStateKeyPrefix, accountID, "item0"),
-					cm.keyRequestState(cm.queueStateKeyPrefix, accountID, deps.acquireRequestID),
-					cm.keyLeaseDetails(cm.queueStateKeyPrefix, accountID, *resp.LeaseID),
+					cm.keyScavengerShard(),
+					cm.keyAccountLeases(accountID),
+					cm.keyOperationIdempotency(accountID, "acq", deps.acquireIdempotencyKey),
+					cm.keyOperationIdempotency(accountID, "ext", "extend"),
+					cm.keyConstraintCheckIdempotency(accountID, "acquire"),
+					cm.keyConstraintCheckIdempotency(accountID, "item0"),
+					cm.keyRequestState(accountID, deps.acquireRequestID),
+					cm.keyLeaseDetails(accountID, *resp.LeaseID),
 					keyInProgressLeases,
 				}, keys)
 
@@ -698,11 +571,11 @@ func TestConstraintEnforcement(t *testing.T) {
 				keys := r.Keys()
 				require.Len(t, keys, 5)
 				require.Subset(t, []string{
-					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "acq", deps.acquireIdempotencyKey),
-					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "ext", "extend"),
-					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "rel", "release"),
-					cm.keyConstraintCheckIdempotency(cm.queueStateKeyPrefix, accountID, "acquire"),
-					cm.keyConstraintCheckIdempotency(cm.queueStateKeyPrefix, accountID, "item0"),
+					cm.keyOperationIdempotency(accountID, "acq", deps.acquireIdempotencyKey),
+					cm.keyOperationIdempotency(accountID, "ext", "extend"),
+					cm.keyOperationIdempotency(accountID, "rel", "release"),
+					cm.keyConstraintCheckIdempotency(accountID, "acquire"),
+					cm.keyConstraintCheckIdempotency(accountID, "item0"),
 				}, keys)
 			},
 		},
@@ -730,15 +603,11 @@ func TestConstraintEnforcement(t *testing.T) {
 						Mode:              enums.ConcurrencyModeStep,
 						KeyExpressionHash: "static-key",
 						EvaluatedKeyHash:  "inngest",
-						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:custom:e:%s:%s", fnID, util.XXHash("inngest")),
 					},
 				},
 			},
 			amount:              1,
 			expectedLeaseAmount: 1,
-			mi: MigrationIdentifier{
-				QueueShard: "test",
-			},
 			afterAcquire: func(t *testing.T, deps *deps, resp *CapacityAcquireResponse) {
 				r := deps.r
 				cm := deps.cm
@@ -746,16 +615,16 @@ func TestConstraintEnforcement(t *testing.T) {
 
 				// All keys should exist
 				keys := r.Keys()
-				keyInProgressLeases := constraints[0].Concurrency.InProgressLeasesKey(cm.queueStateKeyPrefix, accountID, envID, fnID)
+				keyInProgressLeases := constraints[0].Concurrency.InProgressLeasesKey(accountID, envID, fnID)
 				require.Len(t, keys, 8)
 				require.Subset(t, []string{
-					cm.keyScavengerShard(cm.queueStateKeyPrefix, 0),
-					cm.keyAccountLeases(cm.queueStateKeyPrefix, accountID),
-					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "acq", deps.acquireIdempotencyKey),
-					cm.keyConstraintCheckIdempotency(cm.queueStateKeyPrefix, accountID, "acquire"),
-					cm.keyConstraintCheckIdempotency(cm.queueStateKeyPrefix, accountID, "item0"),
-					cm.keyRequestState(cm.queueStateKeyPrefix, accountID, deps.acquireRequestID),
-					cm.keyLeaseDetails(cm.queueStateKeyPrefix, accountID, resp.Leases[0].LeaseID),
+					cm.keyScavengerShard(),
+					cm.keyAccountLeases(accountID),
+					cm.keyOperationIdempotency(accountID, "acq", deps.acquireIdempotencyKey),
+					cm.keyConstraintCheckIdempotency(accountID, "acquire"),
+					cm.keyConstraintCheckIdempotency(accountID, "item0"),
+					cm.keyRequestState(accountID, deps.acquireRequestID),
+					cm.keyLeaseDetails(accountID, resp.Leases[0].LeaseID),
 					keyInProgressLeases,
 				}, keys)
 
@@ -778,17 +647,17 @@ func TestConstraintEnforcement(t *testing.T) {
 
 				// All keys should exist
 				keys := r.Keys()
-				keyInProgressLeases := constraints[0].Concurrency.InProgressLeasesKey(cm.queueStateKeyPrefix, accountID, envID, fnID)
+				keyInProgressLeases := constraints[0].Concurrency.InProgressLeasesKey(accountID, envID, fnID)
 				require.Len(t, keys, 9)
 				require.Subset(t, []string{
-					cm.keyScavengerShard(cm.queueStateKeyPrefix, 0),
-					cm.keyAccountLeases(cm.queueStateKeyPrefix, accountID),
-					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "acq", deps.acquireIdempotencyKey),
-					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "ext", "extend"),
-					cm.keyConstraintCheckIdempotency(cm.queueStateKeyPrefix, accountID, "acquire"),
-					cm.keyConstraintCheckIdempotency(cm.queueStateKeyPrefix, accountID, "item0"),
-					cm.keyRequestState(cm.queueStateKeyPrefix, accountID, deps.acquireRequestID),
-					cm.keyLeaseDetails(cm.queueStateKeyPrefix, accountID, *resp.LeaseID),
+					cm.keyScavengerShard(),
+					cm.keyAccountLeases(accountID),
+					cm.keyOperationIdempotency(accountID, "acq", deps.acquireIdempotencyKey),
+					cm.keyOperationIdempotency(accountID, "ext", "extend"),
+					cm.keyConstraintCheckIdempotency(accountID, "acquire"),
+					cm.keyConstraintCheckIdempotency(accountID, "item0"),
+					cm.keyRequestState(accountID, deps.acquireRequestID),
+					cm.keyLeaseDetails(accountID, *resp.LeaseID),
 					keyInProgressLeases,
 				}, keys)
 
@@ -812,20 +681,17 @@ func TestConstraintEnforcement(t *testing.T) {
 				keys := r.Keys()
 				require.Len(t, keys, 5)
 				require.Subset(t, []string{
-					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "acq", deps.acquireIdempotencyKey),
-					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "ext", "extend"),
-					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "rel", "release"),
-					cm.keyConstraintCheckIdempotency(cm.queueStateKeyPrefix, accountID, "acquire"),
-					cm.keyConstraintCheckIdempotency(cm.queueStateKeyPrefix, accountID, "item0"),
+					cm.keyOperationIdempotency(accountID, "acq", deps.acquireIdempotencyKey),
+					cm.keyOperationIdempotency(accountID, "ext", "extend"),
+					cm.keyOperationIdempotency(accountID, "rel", "release"),
+					cm.keyConstraintCheckIdempotency(accountID, "acquire"),
+					cm.keyConstraintCheckIdempotency(accountID, "item0"),
 				}, keys)
 			},
 		},
 
 		{
 			name: "throttle allowed",
-			mi: MigrationIdentifier{
-				QueueShard: "test",
-			},
 			config: ConstraintConfig{
 				FunctionVersion: 1,
 				Throttle: []ThrottleConfig{
@@ -859,9 +725,6 @@ func TestConstraintEnforcement(t *testing.T) {
 
 		{
 			name: "throttle rejected",
-			mi: MigrationIdentifier{
-				QueueShard: "test",
-			},
 			config: ConstraintConfig{
 				FunctionVersion: 1,
 				Throttle: []ThrottleConfig{
@@ -906,124 +769,7 @@ func TestConstraintEnforcement(t *testing.T) {
 		},
 
 		{
-			name: "throttle allowed with legacy state",
-			mi: MigrationIdentifier{
-				QueueShard: "test",
-			},
-			config: ConstraintConfig{
-				FunctionVersion: 1,
-				Throttle: []ThrottleConfig{
-					{
-						Limit:             5,
-						Period:            60,
-						KeyExpressionHash: "expr-hash",
-					},
-				},
-			},
-			constraints: []ConstraintItem{
-				{
-					Kind: ConstraintKindThrottle,
-					Throttle: &ThrottleConstraint{
-						KeyExpressionHash: "expr-hash",
-						EvaluatedKeyHash:  "key-hash",
-					},
-				},
-			},
-			amount:              1,
-			expectedLeaseAmount: 1,
-			beforeAcquire: func(t *testing.T, deps *deps) {
-				// Set existing legacy state
-				tat := deps.clock.Now().Add(24 * time.Second).UnixMilli()
-				err := deps.r.Set("{q:v1}:throttle:key-hash", strconv.Itoa(int(tat)))
-				require.NoError(t, err)
-			},
-			afterPreAcquireCheck: func(t *testing.T, deps *deps, resp *CapacityCheckResponse) {
-				require.Equal(t, 2, resp.Usage[0].Used)
-
-				raw, err := deps.r.Get("{q:v1}:throttle:key-hash")
-				require.NoError(t, err)
-				parsed, err := strconv.Atoi(raw)
-				require.NoError(t, err)
-				tat := time.UnixMilli(int64(parsed))
-				require.WithinDuration(t, deps.clock.Now().Add(24*time.Second), tat, time.Second)
-			},
-			afterAcquire: func(t *testing.T, deps *deps, resp *CapacityAcquireResponse) {
-				require.True(t, resp.RetryAfter.IsZero())
-
-				raw, err := deps.r.Get("{q:v1}:throttle:key-hash")
-				require.NoError(t, err)
-				parsed, err := strconv.Atoi(raw)
-				require.NoError(t, err)
-				tat := time.UnixMilli(int64(parsed))
-				require.WithinDuration(t, deps.clock.Now().Add(36*time.Second), tat, time.Second)
-			},
-			afterPostAcquireCheck: func(t *testing.T, deps *deps, resp *CapacityCheckResponse) {
-				require.Equal(t, 3, resp.Usage[0].Used)
-			},
-		},
-
-		{
-			name: "throttle partially rejected with legacy state",
-			mi: MigrationIdentifier{
-				QueueShard: "test",
-			},
-			config: ConstraintConfig{
-				FunctionVersion: 1,
-				Throttle: []ThrottleConfig{
-					{
-						Limit:             5,
-						Period:            60,
-						KeyExpressionHash: "expr-hash",
-					},
-				},
-			},
-			constraints: []ConstraintItem{
-				{
-					Kind: ConstraintKindThrottle,
-					Throttle: &ThrottleConstraint{
-						KeyExpressionHash: "expr-hash",
-						EvaluatedKeyHash:  "key-hash",
-					},
-				},
-			},
-			amount:              2,
-			expectedLeaseAmount: 1,
-			beforeAcquire: func(t *testing.T, deps *deps) {
-				// Set existing legacy state
-				tat := deps.clock.Now().Add(48 * time.Second).UnixMilli()
-				err := deps.r.Set("{q:v1}:throttle:key-hash", strconv.Itoa(int(tat)))
-				require.NoError(t, err)
-			},
-			afterPreAcquireCheck: func(t *testing.T, deps *deps, resp *CapacityCheckResponse) {
-				// The initial state accounts for 4 requests
-				require.Equal(t, 4, resp.Usage[0].Used)
-			},
-			afterAcquire: func(t *testing.T, deps *deps, resp *CapacityAcquireResponse) {
-				// This should be the actual value, accounting for 5 requests
-				raw, err := deps.r.Get("{q:v1}:throttle:key-hash")
-				require.NoError(t, err)
-				parsed, err := strconv.Atoi(raw)
-				require.NoError(t, err)
-				tat := time.UnixMilli(int64(parsed))
-				require.WithinDuration(t, deps.clock.Now().Add(60*time.Second), tat, time.Second)
-
-				t.Log("now", deps.clock.Now())
-				t.Log("retry", resp.RetryAfter)
-
-				// Wait one "window", 12s, until the next request can happen
-				require.WithinDuration(t, deps.clock.Now().Add(12*time.Second), resp.RetryAfter, time.Second)
-			},
-			afterPostAcquireCheck: func(t *testing.T, deps *deps, resp *CapacityCheckResponse) {
-				// We are now accounting for 5 requests
-				require.Equal(t, 5, resp.Usage[0].Used)
-			},
-		},
-
-		{
 			name: "ratelimit allowed",
-			mi: MigrationIdentifier{
-				IsRateLimit: true,
-			},
 			config: ConstraintConfig{
 				FunctionVersion: 1,
 				RateLimit: []RateLimitConfig{
@@ -1059,9 +805,6 @@ func TestConstraintEnforcement(t *testing.T) {
 
 		{
 			name: "rate limit rejected",
-			mi: MigrationIdentifier{
-				IsRateLimit: true,
-			},
 			config: ConstraintConfig{
 				FunctionVersion: 1,
 				RateLimit: []RateLimitConfig{
@@ -1103,137 +846,6 @@ func TestConstraintEnforcement(t *testing.T) {
 		},
 
 		{
-			name: "rate limit allowed with legacy state",
-			mi: MigrationIdentifier{
-				IsRateLimit: true,
-			},
-			config: ConstraintConfig{
-				FunctionVersion: 1,
-				RateLimit: []RateLimitConfig{
-					{
-						Limit:             10,
-						Period:            60,
-						KeyExpressionHash: "expr-hash",
-					},
-				},
-			},
-			constraints: []ConstraintItem{
-				{
-					Kind: ConstraintKindRateLimit,
-					RateLimit: &RateLimitConstraint{
-						KeyExpressionHash: "expr-hash",
-						EvaluatedKeyHash:  "key-hash",
-					},
-				},
-			},
-			amount:              1,
-			expectedLeaseAmount: 1,
-			beforeAcquire: func(t *testing.T, deps *deps) {
-				// Set existing legacy state
-				tat := deps.clock.Now().Add(6 * time.Second).UnixNano()
-				err := deps.r.Set("{rl}:key-hash", strconv.Itoa(int(tat)))
-				require.NoError(t, err)
-			},
-			afterPreAcquireCheck: func(t *testing.T, deps *deps, resp *CapacityCheckResponse) {
-				t.Log(resp.Debug())
-
-				require.Equal(t, 1, resp.Usage[0].Used)
-
-				raw, err := deps.r.Get("{rl}:key-hash")
-				require.NoError(t, err)
-				parsed, err := strconv.Atoi(raw)
-				require.NoError(t, err)
-				tat := time.Unix(0, int64(parsed))
-				require.WithinDuration(t, deps.clock.Now().Add(6*time.Second), tat, time.Second)
-			},
-			afterAcquire: func(t *testing.T, deps *deps, resp *CapacityAcquireResponse) {
-				t.Log(resp.Debug())
-
-				// Rate limit allows 1 request every 6s. The burst is limit / 10 = 1, so we can
-				// admit two requests at once. The first request was legacy, the second request
-				// was just acquired, so we have 0 more requests and used up capacity.
-
-				// Since we used up capacity, expected rate limit constraint to be part of exhausted constraints
-				require.Len(t, resp.ExhaustedConstraints, 1)
-
-				// Also expect retry after to be now + 6s
-				require.WithinDuration(t, deps.clock.Now().Add(6*time.Second), resp.RetryAfter, time.Millisecond)
-
-				raw, err := deps.r.Get("{rl}:key-hash")
-				require.NoError(t, err)
-				parsed, err := strconv.Atoi(raw)
-				require.NoError(t, err)
-				tat := time.Unix(0, int64(parsed))
-				require.WithinDuration(t, deps.clock.Now().Add(12*time.Second), tat, time.Second)
-			},
-			afterPostAcquireCheck: func(t *testing.T, deps *deps, resp *CapacityCheckResponse) {
-				require.Equal(t, 2, resp.Usage[0].Used)
-			},
-		},
-
-		{
-			name: "rate limit partially rejected with legacy state",
-			mi: MigrationIdentifier{
-				IsRateLimit: true,
-			},
-			config: ConstraintConfig{
-				FunctionVersion: 1,
-				RateLimit: []RateLimitConfig{
-					{
-						Limit:             10,
-						Period:            60,
-						KeyExpressionHash: "expr-hash",
-					},
-				},
-			},
-			constraints: []ConstraintItem{
-				{
-					Kind: ConstraintKindRateLimit,
-					RateLimit: &RateLimitConstraint{
-						KeyExpressionHash: "expr-hash",
-						EvaluatedKeyHash:  "key-hash",
-					},
-				},
-			},
-			amount:              2,
-			expectedLeaseAmount: 1,
-			beforeAcquire: func(t *testing.T, deps *deps) {
-				// Set existing legacy state
-				tat := deps.clock.Now().Add(6 * time.Second).UnixNano()
-				err := deps.r.Set("{rl}:key-hash", strconv.Itoa(int(tat)))
-				require.NoError(t, err)
-			},
-			afterPreAcquireCheck: func(t *testing.T, deps *deps, resp *CapacityCheckResponse) {
-				t.Log(resp.Debug())
-
-				require.Equal(t, 1, resp.Usage[0].Used)
-
-				raw, err := deps.r.Get("{rl}:key-hash")
-				require.NoError(t, err)
-				parsed, err := strconv.Atoi(raw)
-				require.NoError(t, err)
-				tat := time.Unix(0, int64(parsed))
-				require.WithinDuration(t, deps.clock.Now().Add(6*time.Second), tat, time.Second)
-			},
-			afterAcquire: func(t *testing.T, deps *deps, resp *CapacityAcquireResponse) {
-				t.Log(resp.Debug())
-
-				require.WithinDuration(t, deps.clock.Now().Add(6*time.Second), resp.RetryAfter, time.Second)
-
-				raw, err := deps.r.Get("{rl}:key-hash")
-				require.NoError(t, err)
-				parsed, err := strconv.Atoi(raw)
-				require.NoError(t, err)
-				tat := time.Unix(0, int64(parsed))
-				require.WithinDuration(t, deps.clock.Now().Add(12*time.Second), tat, time.Second)
-			},
-			afterPostAcquireCheck: func(t *testing.T, deps *deps, resp *CapacityCheckResponse) {
-				// We are now accounting for 2 requests
-				require.Equal(t, 2, resp.Usage[0].Used)
-			},
-		},
-
-		{
 			name: "concurrency with limiting constraints",
 			config: ConstraintConfig{
 				FunctionVersion: 1,
@@ -1246,25 +858,20 @@ func TestConstraintEnforcement(t *testing.T) {
 				{
 					Kind: ConstraintKindConcurrency,
 					Concurrency: &ConcurrencyConstraint{
-						Scope:             enums.ConcurrencyScopeAccount,
-						Mode:              enums.ConcurrencyModeStep,
-						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:account:%s", accountID),
+						Scope: enums.ConcurrencyScopeAccount,
+						Mode:  enums.ConcurrencyModeStep,
 					},
 				},
 				{
 					Kind: ConstraintKindConcurrency,
 					Concurrency: &ConcurrencyConstraint{
-						Scope:             enums.ConcurrencyScopeFn,
-						Mode:              enums.ConcurrencyModeStep,
-						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:p:%s", fnID),
+						Scope: enums.ConcurrencyScopeFn,
+						Mode:  enums.ConcurrencyModeStep,
 					},
 				},
 			},
 			amount:              10,
 			expectedLeaseAmount: 4,
-			mi: MigrationIdentifier{
-				QueueShard: "test",
-			},
 			afterAcquire: func(t *testing.T, deps *deps, resp *CapacityAcquireResponse) {
 				clock := deps.clock
 
@@ -1314,23 +921,18 @@ func TestConstraintEnforcement(t *testing.T) {
 				{
 					Kind: ConstraintKindConcurrency,
 					Concurrency: &ConcurrencyConstraint{
-						Scope:             enums.ConcurrencyScopeAccount,
-						Mode:              enums.ConcurrencyModeStep,
-						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:account:%s", accountID),
+						Scope: enums.ConcurrencyScopeAccount,
+						Mode:  enums.ConcurrencyModeStep,
 					},
 				},
 
 				{
 					Kind: ConstraintKindConcurrency,
 					Concurrency: &ConcurrencyConstraint{
-						Scope:             enums.ConcurrencyScopeFn,
-						Mode:              enums.ConcurrencyModeStep,
-						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:p:%s", fnID),
+						Scope: enums.ConcurrencyScopeFn,
+						Mode:  enums.ConcurrencyModeStep,
 					},
 				},
-			},
-			mi: MigrationIdentifier{
-				QueueShard: "test",
 			},
 			afterAcquire: func(t *testing.T, deps *deps, resp *CapacityAcquireResponse) {
 				clock := deps.clock
@@ -1384,23 +986,18 @@ func TestConstraintEnforcement(t *testing.T) {
 				{
 					Kind: ConstraintKindConcurrency,
 					Concurrency: &ConcurrencyConstraint{
-						Scope:             enums.ConcurrencyScopeAccount,
-						Mode:              enums.ConcurrencyModeStep,
-						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:account:%s", accountID),
+						Scope: enums.ConcurrencyScopeAccount,
+						Mode:  enums.ConcurrencyModeStep,
 					},
 				},
 
 				{
 					Kind: ConstraintKindConcurrency,
 					Concurrency: &ConcurrencyConstraint{
-						Scope:             enums.ConcurrencyScopeFn,
-						Mode:              enums.ConcurrencyModeStep,
-						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:p:%s", fnID),
+						Scope: enums.ConcurrencyScopeFn,
+						Mode:  enums.ConcurrencyModeStep,
 					},
 				},
-			},
-			mi: MigrationIdentifier{
-				QueueShard: "test",
 			},
 			afterAcquire: func(t *testing.T, deps *deps, resp *CapacityAcquireResponse) {
 				clock := deps.clock
@@ -1454,28 +1051,22 @@ func TestConstraintEnforcement(t *testing.T) {
 				{
 					Kind: ConstraintKindConcurrency,
 					Concurrency: &ConcurrencyConstraint{
-						Scope:             enums.ConcurrencyScopeAccount,
-						Mode:              enums.ConcurrencyModeStep,
-						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:account:%s", accountID),
+						Scope: enums.ConcurrencyScopeAccount,
+						Mode:  enums.ConcurrencyModeStep,
 					},
 				},
 
 				{
 					Kind: ConstraintKindConcurrency,
 					Concurrency: &ConcurrencyConstraint{
-						Scope:             enums.ConcurrencyScopeFn,
-						Mode:              enums.ConcurrencyModeStep,
-						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:p:%s", fnID),
+						Scope: enums.ConcurrencyScopeFn,
+						Mode:  enums.ConcurrencyModeStep,
 					},
 				},
-			},
-			mi: MigrationIdentifier{
-				QueueShard: "test",
 			},
 			beforeAcquire: func(t *testing.T, deps *deps) {
 				// Pretend function concurrency capacity is already consumed
 				key := deps.constraints[2].Concurrency.InProgressLeasesKey(
-					deps.cm.queueStateKeyPrefix,
 					accountID,
 					envID,
 					fnID,
@@ -1527,18 +1118,17 @@ func TestConstraintEnforcement(t *testing.T) {
 				{
 					Kind: ConstraintKindThrottle,
 					Throttle: &ThrottleConstraint{
+						Scope:             enums.ThrottleScopeFn,
 						KeyExpressionHash: "expr-hash",
 						EvaluatedKeyHash:  "key-hash",
 					},
 				},
 			},
-			mi: MigrationIdentifier{
-				QueueShard: "test",
-			},
 			beforeAcquire: func(t *testing.T, deps *deps) {
-				// Set existing legacy state, simulate 2 admitted requests
+				// Set existing state using new key format, simulate 2 admitted requests
+				key := deps.constraints[0].Throttle.StateKey(accountID, envID, fnID)
 				tat := deps.clock.Now().Add(60 * time.Second).UnixMilli()
-				err := deps.r.Set("{q:v1}:throttle:key-hash", strconv.Itoa(int(tat)))
+				err := deps.r.Set(key, strconv.Itoa(int(tat)))
 				require.NoError(t, err)
 			},
 			afterAcquire: func(t *testing.T, deps *deps, resp *CapacityAcquireResponse) {
@@ -1581,18 +1171,17 @@ func TestConstraintEnforcement(t *testing.T) {
 				{
 					Kind: ConstraintKindRateLimit,
 					RateLimit: &RateLimitConstraint{
+						Scope:             enums.RateLimitScopeFn,
 						KeyExpressionHash: "expr-hash",
 						EvaluatedKeyHash:  "key-hash",
 					},
 				},
 			},
-			mi: MigrationIdentifier{
-				IsRateLimit: true,
-			},
 			beforeAcquire: func(t *testing.T, deps *deps) {
-				// Set existing legacy state, simulate 1 admitted request
+				// Set existing state using new key format, simulate 1 admitted request
+				key := deps.constraints[0].RateLimit.StateKey(accountID, envID, fnID)
 				tat := deps.clock.Now().Add(60 * time.Second).UnixNano()
-				err := deps.r.Set("{rl}:key-hash", strconv.Itoa(int(tat)))
+				err := deps.r.Set(key, strconv.Itoa(int(tat)))
 				require.NoError(t, err)
 			},
 			afterAcquire: func(t *testing.T, deps *deps, resp *CapacityAcquireResponse) {
@@ -1640,9 +1229,6 @@ func TestConstraintEnforcement(t *testing.T) {
 					},
 				},
 			},
-			mi: MigrationIdentifier{
-				IsRateLimit: true,
-			},
 			afterAcquire: func(t *testing.T, deps *deps, resp *CapacityAcquireResponse) {
 				clock := deps.clock
 
@@ -1678,19 +1264,14 @@ func TestConstraintEnforcement(t *testing.T) {
 				{
 					Kind: ConstraintKindConcurrency,
 					Concurrency: &ConcurrencyConstraint{
-						Scope:             enums.ConcurrencyScopeFn,
-						Mode:              enums.ConcurrencyModeStep,
-						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:p:%s", fnID),
+						Scope: enums.ConcurrencyScopeFn,
+						Mode:  enums.ConcurrencyModeStep,
 					},
 				},
-			},
-			mi: MigrationIdentifier{
-				QueueShard: "test",
 			},
 			beforeAcquire: func(t *testing.T, deps *deps) {
 				// Exhaust function concurrency capacity by adding leases
 				key := deps.constraints[0].Concurrency.InProgressLeasesKey(
-					deps.cm.queueStateKeyPrefix,
 					accountID,
 					envID,
 					fnID,
@@ -1736,14 +1317,10 @@ func TestConstraintEnforcement(t *testing.T) {
 				{
 					Kind: ConstraintKindConcurrency,
 					Concurrency: &ConcurrencyConstraint{
-						Scope:             enums.ConcurrencyScopeFn,
-						Mode:              enums.ConcurrencyModeStep,
-						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:p:%s", fnID),
+						Scope: enums.ConcurrencyScopeFn,
+						Mode:  enums.ConcurrencyModeStep,
 					},
 				},
-			},
-			mi: MigrationIdentifier{
-				QueueShard: "test",
 			},
 			afterPreAcquireCheck: func(t *testing.T, deps *deps, resp *CapacityCheckResponse) {
 				// Requesting 10 but limit is 5, so constraint IS limiting (reduces capacity)
@@ -1797,27 +1374,21 @@ func TestConstraintEnforcement(t *testing.T) {
 				{
 					Kind: ConstraintKindConcurrency,
 					Concurrency: &ConcurrencyConstraint{
-						Scope:             enums.ConcurrencyScopeAccount,
-						Mode:              enums.ConcurrencyModeStep,
-						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:account:%s", accountID),
+						Scope: enums.ConcurrencyScopeAccount,
+						Mode:  enums.ConcurrencyModeStep,
 					},
 				},
 				{
 					Kind: ConstraintKindConcurrency,
 					Concurrency: &ConcurrencyConstraint{
-						Scope:             enums.ConcurrencyScopeFn,
-						Mode:              enums.ConcurrencyModeStep,
-						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:p:%s", fnID),
+						Scope: enums.ConcurrencyScopeFn,
+						Mode:  enums.ConcurrencyModeStep,
 					},
 				},
-			},
-			mi: MigrationIdentifier{
-				QueueShard: "test",
 			},
 			beforeAcquire: func(t *testing.T, deps *deps) {
 				// Exhaust function concurrency
 				key := deps.constraints[1].Concurrency.InProgressLeasesKey(
-					deps.cm.queueStateKeyPrefix,
 					accountID,
 					envID,
 					fnID,
@@ -1870,14 +1441,9 @@ func TestConstraintEnforcement(t *testing.T) {
 			ctx = logger.WithStdlib(ctx, l)
 
 			cm, err := NewRedisCapacityManager(
-				WithRateLimitClient(rc),
-				WithQueueShards(map[string]rueidis.Client{
-					"test": rc,
-				}),
+				WithClient(rc),
+				WithShardName("test"),
 				WithClock(clock),
-				WithNumScavengerShards(1),
-				WithQueueStateKeyPrefix("q:v1"),
-				WithRateLimitKeyPrefix("rl"),
 				WithEnableDebugLogs(true),
 				// Do not cache check requests
 				WithCheckIdempotencyTTL(0),
@@ -1899,7 +1465,6 @@ func TestConstraintEnforcement(t *testing.T) {
 			}
 
 			checkResp, _, err := cm.Check(ctx, &CapacityCheckRequest{
-				Migration:     test.mi,
 				AccountID:     accountID,
 				Configuration: test.config,
 				Constraints:   test.constraints,
@@ -1918,7 +1483,6 @@ func TestConstraintEnforcement(t *testing.T) {
 			}
 
 			acquireReq := &CapacityAcquireRequest{
-				Migration:            test.mi,
 				AccountID:            accountID,
 				IdempotencyKey:       "acquire",
 				Constraints:          test.constraints,
@@ -1938,10 +1502,7 @@ func TestConstraintEnforcement(t *testing.T) {
 				},
 			}
 
-			keyPrefix, _, err := cm.clientAndPrefix(test.mi)
-			require.NoError(t, err)
-
-			_, _, _, fingerprint, err := buildRequestState(acquireReq, keyPrefix)
+			_, _, _, fingerprint, err := buildRequestState(acquireReq)
 			require.NoError(t, err)
 
 			deps.acquireIdempotencyKey = fmt.Sprintf("acquire-%s", fingerprint)
@@ -1964,7 +1525,6 @@ func TestConstraintEnforcement(t *testing.T) {
 			}
 
 			checkResp, _, err = cm.Check(ctx, &CapacityCheckRequest{
-				Migration:     test.mi,
 				AccountID:     accountID,
 				Configuration: test.config,
 				Constraints:   test.constraints,
@@ -1987,7 +1547,6 @@ func TestConstraintEnforcement(t *testing.T) {
 					LeaseID:        lease.LeaseID,
 					AccountID:      accountID,
 					Duration:       5 * time.Second,
-					Migration:      test.mi,
 				})
 				require.NoError(t, err)
 
@@ -1998,7 +1557,6 @@ func TestConstraintEnforcement(t *testing.T) {
 				releaseResp, err := cm.Release(ctx, &CapacityReleaseRequest{
 					AccountID:      accountID,
 					IdempotencyKey: "release",
-					Migration:      test.mi,
 					LeaseID:        *extendResp.LeaseID,
 				})
 				require.NoError(t, err)
@@ -2016,12 +1574,10 @@ func TestConcurrencyConstraint_InProgressLeasesKey(t *testing.T) {
 	accountID := uuid.MustParse("550e8400-e29b-41d4-a716-446655440001")
 	envID := uuid.MustParse("550e8400-e29b-41d4-a716-446655440002")
 	functionID := uuid.MustParse("550e8400-e29b-41d4-a716-446655440003")
-	prefix := "test-prefix"
 
 	tests := []struct {
 		name        string
 		constraint  ConcurrencyConstraint
-		prefix      string
 		accountID   uuid.UUID
 		envID       uuid.UUID
 		functionID  uuid.UUID
@@ -2035,11 +1591,10 @@ func TestConcurrencyConstraint_InProgressLeasesKey(t *testing.T) {
 				Mode:  enums.ConcurrencyModeStep,
 				Scope: enums.ConcurrencyScopeAccount,
 			},
-			prefix:      prefix,
 			accountID:   accountID,
 			envID:       envID,
 			functionID:  functionID,
-			expected:    "{test-prefix}:550e8400-e29b-41d4-a716-446655440001:state:concurrency:a:550e8400-e29b-41d4-a716-446655440001",
+			expected:    "{cs}:a:550e8400-e29b-41d4-a716-446655440001:concurrency:a:550e8400-e29b-41d4-a716-446655440001",
 			description: "should use account scope ID 'a' and accountID as entityID",
 		},
 		{
@@ -2048,11 +1603,10 @@ func TestConcurrencyConstraint_InProgressLeasesKey(t *testing.T) {
 				Mode:  enums.ConcurrencyModeStep,
 				Scope: enums.ConcurrencyScopeEnv,
 			},
-			prefix:      prefix,
 			accountID:   accountID,
 			envID:       envID,
 			functionID:  functionID,
-			expected:    "{test-prefix}:550e8400-e29b-41d4-a716-446655440001:state:concurrency:e:550e8400-e29b-41d4-a716-446655440002",
+			expected:    "{cs}:a:550e8400-e29b-41d4-a716-446655440001:concurrency:e:550e8400-e29b-41d4-a716-446655440002",
 			description: "should use environment scope ID 'e' and envID as entityID",
 		},
 		{
@@ -2061,11 +1615,10 @@ func TestConcurrencyConstraint_InProgressLeasesKey(t *testing.T) {
 				Mode:  enums.ConcurrencyModeStep,
 				Scope: enums.ConcurrencyScopeFn,
 			},
-			prefix:      prefix,
 			accountID:   accountID,
 			envID:       envID,
 			functionID:  functionID,
-			expected:    "{test-prefix}:550e8400-e29b-41d4-a716-446655440001:state:concurrency:f:550e8400-e29b-41d4-a716-446655440003",
+			expected:    "{cs}:a:550e8400-e29b-41d4-a716-446655440001:concurrency:f:550e8400-e29b-41d4-a716-446655440003",
 			description: "should use function scope ID 'f' and functionID as entityID",
 		},
 
@@ -2076,11 +1629,10 @@ func TestConcurrencyConstraint_InProgressLeasesKey(t *testing.T) {
 				Mode:  enums.ConcurrencyModeStep,
 				Scope: enums.ConcurrencyScopeFn,
 			},
-			prefix:      prefix,
 			accountID:   accountID,
 			envID:       envID,
 			functionID:  functionID,
-			expected:    "{test-prefix}:550e8400-e29b-41d4-a716-446655440001:state:concurrency:f:550e8400-e29b-41d4-a716-446655440003",
+			expected:    "{cs}:a:550e8400-e29b-41d4-a716-446655440001:concurrency:f:550e8400-e29b-41d4-a716-446655440003",
 			description: "step mode should generate same key format as other modes",
 		},
 		{
@@ -2089,11 +1641,10 @@ func TestConcurrencyConstraint_InProgressLeasesKey(t *testing.T) {
 				Mode:  enums.ConcurrencyModeRun,
 				Scope: enums.ConcurrencyScopeFn,
 			},
-			prefix:      prefix,
 			accountID:   accountID,
 			envID:       envID,
 			functionID:  functionID,
-			expected:    "{test-prefix}:550e8400-e29b-41d4-a716-446655440001:state:concurrency:f:550e8400-e29b-41d4-a716-446655440003",
+			expected:    "{cs}:a:550e8400-e29b-41d4-a716-446655440001:concurrency:f:550e8400-e29b-41d4-a716-446655440003",
 			description: "run mode should generate same key format as other modes",
 		},
 
@@ -2106,11 +1657,10 @@ func TestConcurrencyConstraint_InProgressLeasesKey(t *testing.T) {
 				KeyExpressionHash: "",
 				EvaluatedKeyHash:  "",
 			},
-			prefix:      prefix,
 			accountID:   accountID,
 			envID:       envID,
 			functionID:  functionID,
-			expected:    "{test-prefix}:550e8400-e29b-41d4-a716-446655440001:state:concurrency:f:550e8400-e29b-41d4-a716-446655440003",
+			expected:    "{cs}:a:550e8400-e29b-41d4-a716-446655440001:concurrency:f:550e8400-e29b-41d4-a716-446655440003",
 			description: "empty KeyExpressionHash should not append keyID suffix",
 		},
 		{
@@ -2121,11 +1671,10 @@ func TestConcurrencyConstraint_InProgressLeasesKey(t *testing.T) {
 				KeyExpressionHash: "expr_hash_123",
 				EvaluatedKeyHash:  "eval_hash_456",
 			},
-			prefix:      prefix,
 			accountID:   accountID,
 			envID:       envID,
 			functionID:  functionID,
-			expected:    "{test-prefix}:550e8400-e29b-41d4-a716-446655440001:state:concurrency:f:550e8400-e29b-41d4-a716-446655440003<expr_hash_123:eval_hash_456>",
+			expected:    "{cs}:a:550e8400-e29b-41d4-a716-446655440001:concurrency:f:550e8400-e29b-41d4-a716-446655440003<expr_hash_123:eval_hash_456>",
 			description: "non-empty KeyExpressionHash should append keyID suffix with format <hash:evaluated>",
 		},
 		{
@@ -2136,52 +1685,24 @@ func TestConcurrencyConstraint_InProgressLeasesKey(t *testing.T) {
 				KeyExpressionHash: "expr_hash_789",
 				EvaluatedKeyHash:  "",
 			},
-			prefix:      prefix,
 			accountID:   accountID,
 			envID:       envID,
 			functionID:  functionID,
-			expected:    "{test-prefix}:550e8400-e29b-41d4-a716-446655440001:state:concurrency:f:550e8400-e29b-41d4-a716-446655440003<expr_hash_789:>",
+			expected:    "{cs}:a:550e8400-e29b-41d4-a716-446655440001:concurrency:f:550e8400-e29b-41d4-a716-446655440003<expr_hash_789:>",
 			description: "KeyExpressionHash with empty EvaluatedKeyHash should still include format",
 		},
 
 		// Parameter Validation Testing
-		{
-			name: "empty prefix",
-			constraint: ConcurrencyConstraint{
-				Mode:  enums.ConcurrencyModeStep,
-				Scope: enums.ConcurrencyScopeFn,
-			},
-			prefix:      "",
-			accountID:   accountID,
-			envID:       envID,
-			functionID:  functionID,
-			expected:    "{}:550e8400-e29b-41d4-a716-446655440001:state:concurrency:f:550e8400-e29b-41d4-a716-446655440003",
-			description: "empty prefix should still generate valid key format",
-		},
-		{
-			name: "different prefix",
-			constraint: ConcurrencyConstraint{
-				Mode:  enums.ConcurrencyModeStep,
-				Scope: enums.ConcurrencyScopeFn,
-			},
-			prefix:      "production",
-			accountID:   accountID,
-			envID:       envID,
-			functionID:  functionID,
-			expected:    "{production}:550e8400-e29b-41d4-a716-446655440001:state:concurrency:f:550e8400-e29b-41d4-a716-446655440003",
-			description: "different prefix should be reflected in generated key",
-		},
 		{
 			name: "zero UUIDs",
 			constraint: ConcurrencyConstraint{
 				Mode:  enums.ConcurrencyModeStep,
 				Scope: enums.ConcurrencyScopeFn,
 			},
-			prefix:      prefix,
 			accountID:   uuid.Nil,
 			envID:       uuid.Nil,
 			functionID:  uuid.Nil,
-			expected:    "{test-prefix}:00000000-0000-0000-0000-000000000000:state:concurrency:f:00000000-0000-0000-0000-000000000000",
+			expected:    "{cs}:a:00000000-0000-0000-0000-000000000000:concurrency:f:00000000-0000-0000-0000-000000000000",
 			description: "nil UUIDs should be formatted as zero UUIDs",
 		},
 
@@ -2194,11 +1715,10 @@ func TestConcurrencyConstraint_InProgressLeasesKey(t *testing.T) {
 				KeyExpressionHash: "account_key",
 				EvaluatedKeyHash:  "account_eval",
 			},
-			prefix:      "prod-redis",
 			accountID:   accountID,
 			envID:       envID,
 			functionID:  functionID,
-			expected:    "{prod-redis}:550e8400-e29b-41d4-a716-446655440001:state:concurrency:a:550e8400-e29b-41d4-a716-446655440001<account_key:account_eval>",
+			expected:    "{cs}:a:550e8400-e29b-41d4-a716-446655440001:concurrency:a:550e8400-e29b-41d4-a716-446655440001<account_key:account_eval>",
 			description: "complex combination should work correctly with all parameters",
 		},
 		{
@@ -2209,18 +1729,17 @@ func TestConcurrencyConstraint_InProgressLeasesKey(t *testing.T) {
 				KeyExpressionHash: "env_custom",
 				EvaluatedKeyHash:  "env_value",
 			},
-			prefix:      "staging",
 			accountID:   accountID,
 			envID:       envID,
 			functionID:  functionID,
-			expected:    "{staging}:550e8400-e29b-41d4-a716-446655440001:state:concurrency:e:550e8400-e29b-41d4-a716-446655440002<env_custom:env_value>",
+			expected:    "{cs}:a:550e8400-e29b-41d4-a716-446655440001:concurrency:e:550e8400-e29b-41d4-a716-446655440002<env_custom:env_value>",
 			description: "environment scope with custom keys should generate correct format",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := tt.constraint.InProgressLeasesKey(tt.prefix, tt.accountID, tt.envID, tt.functionID)
+			result := tt.constraint.InProgressLeasesKey(tt.accountID, tt.envID, tt.functionID)
 			assert.Equal(t, tt.expected, result, tt.description)
 		})
 	}
@@ -2238,12 +1757,12 @@ func TestConcurrencyConstraint_InProgressLeasesKey_KeyFormat(t *testing.T) {
 	functionID := uuid.MustParse("ffffffff-1111-2222-3333-444444444444")
 
 	t.Run("key format validation", func(t *testing.T) {
-		key := constraint.InProgressLeasesKey("prefix", accountID, envID, functionID)
+		key := constraint.InProgressLeasesKey(accountID, envID, functionID)
 
-		// Verify the key follows expected pattern: prefix:accountID:state:concurrency:scopeID:entityID[keyID]
-		assert.Contains(t, key, "{prefix}:")
-		assert.Contains(t, key, ":11111111-2222-3333-4444-555555555555:")
-		assert.Contains(t, key, ":state:concurrency:")
+		// Verify the key follows expected pattern: {cs}:a:accountID:concurrency:scopeID:entityID[keyID]
+		assert.Contains(t, key, "{cs}:")
+		assert.Contains(t, key, ":a:11111111-2222-3333-4444-555555555555:")
+		assert.Contains(t, key, ":concurrency:")
 		assert.Contains(t, key, ":f:")
 		assert.Contains(t, key, ":ffffffff-1111-2222-3333-444444444444")
 	})
@@ -2254,9 +1773,9 @@ func TestConcurrencyConstraint_InProgressLeasesKey_KeyFormat(t *testing.T) {
 		constraintEnv := ConcurrencyConstraint{Mode: enums.ConcurrencyModeStep, Scope: enums.ConcurrencyScopeEnv}
 		constraintFn := ConcurrencyConstraint{Mode: enums.ConcurrencyModeStep, Scope: enums.ConcurrencyScopeFn}
 
-		keyAccount := constraintAccount.InProgressLeasesKey("test", accountID, envID, functionID)
-		keyEnv := constraintEnv.InProgressLeasesKey("test", accountID, envID, functionID)
-		keyFn := constraintFn.InProgressLeasesKey("test", accountID, envID, functionID)
+		keyAccount := constraintAccount.InProgressLeasesKey(accountID, envID, functionID)
+		keyEnv := constraintEnv.InProgressLeasesKey(accountID, envID, functionID)
+		keyFn := constraintFn.InProgressLeasesKey(accountID, envID, functionID)
 
 		assert.NotEqual(t, keyAccount, keyEnv, "account and environment scoped keys should be different")
 		assert.NotEqual(t, keyEnv, keyFn, "environment and function scoped keys should be different")
@@ -2477,7 +1996,7 @@ func TestConstraintItem_IsFunctionLevelConstraint(t *testing.T) {
 func TestRateLimitConstraint_StateKey(t *testing.T) {
 	accountID := uuid.MustParse("11111111-2222-3333-4444-555555555555")
 	envID := uuid.MustParse("66666666-7777-8888-9999-aaaaaaaaaaaa")
-	keyPrefix := "test"
+	fnID := uuid.MustParse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
 	evaluatedKeyHash := "abcd1234hash"
 
 	tests := []struct {
@@ -2492,7 +2011,7 @@ func TestRateLimitConstraint_StateKey(t *testing.T) {
 				Scope:            enums.RateLimitScopeAccount,
 				EvaluatedKeyHash: evaluatedKeyHash,
 			},
-			expectedKey: "{test}:rl:a:11111111-2222-3333-4444-555555555555:abcd1234hash",
+			expectedKey: "{cs}:a:11111111-2222-3333-4444-555555555555:rl:a:abcd1234hash",
 			description: "account scope should generate account-specific key",
 		},
 		{
@@ -2501,7 +2020,7 @@ func TestRateLimitConstraint_StateKey(t *testing.T) {
 				Scope:            enums.RateLimitScopeEnv,
 				EvaluatedKeyHash: evaluatedKeyHash,
 			},
-			expectedKey: "{test}:rl:e:66666666-7777-8888-9999-aaaaaaaaaaaa:abcd1234hash",
+			expectedKey: "{cs}:a:11111111-2222-3333-4444-555555555555:rl:e:66666666-7777-8888-9999-aaaaaaaaaaaa:abcd1234hash",
 			description: "environment scope should generate environment-specific key",
 		},
 		{
@@ -2510,8 +2029,8 @@ func TestRateLimitConstraint_StateKey(t *testing.T) {
 				Scope:            enums.RateLimitScopeFn,
 				EvaluatedKeyHash: evaluatedKeyHash,
 			},
-			expectedKey: "{test}:abcd1234hash",
-			description: "function scope should generate compatibility key with rate limit prefix",
+			expectedKey: "{cs}:a:11111111-2222-3333-4444-555555555555:rl:f:aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:abcd1234hash",
+			description: "function scope should generate function-specific key",
 		},
 		{
 			name: "function scope with different key hash",
@@ -2519,7 +2038,7 @@ func TestRateLimitConstraint_StateKey(t *testing.T) {
 				Scope:            enums.RateLimitScopeFn,
 				EvaluatedKeyHash: "xyz789different",
 			},
-			expectedKey: "{test}:xyz789different",
+			expectedKey: "{cs}:a:11111111-2222-3333-4444-555555555555:rl:f:aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:xyz789different",
 			description: "function scope key should vary with different evaluated key hash",
 		},
 		{
@@ -2528,7 +2047,7 @@ func TestRateLimitConstraint_StateKey(t *testing.T) {
 				Scope:            enums.RateLimitScopeAccount,
 				EvaluatedKeyHash: "",
 			},
-			expectedKey: "{test}:rl:a:11111111-2222-3333-4444-555555555555:",
+			expectedKey: "{cs}:a:11111111-2222-3333-4444-555555555555:rl:a:",
 			description: "empty key hash should still generate valid key structure",
 		},
 		{
@@ -2537,7 +2056,7 @@ func TestRateLimitConstraint_StateKey(t *testing.T) {
 				Scope:            enums.RateLimitScopeEnv,
 				EvaluatedKeyHash: "",
 			},
-			expectedKey: "{test}:rl:e:66666666-7777-8888-9999-aaaaaaaaaaaa:",
+			expectedKey: "{cs}:a:11111111-2222-3333-4444-555555555555:rl:e:66666666-7777-8888-9999-aaaaaaaaaaaa:",
 			description: "empty key hash should still generate valid key structure",
 		},
 		{
@@ -2546,8 +2065,8 @@ func TestRateLimitConstraint_StateKey(t *testing.T) {
 				Scope:            enums.RateLimitScopeFn,
 				EvaluatedKeyHash: "",
 			},
-			expectedKey: "{test}:",
-			description: "function scope with empty hash should generate minimal key",
+			expectedKey: "{cs}:a:11111111-2222-3333-4444-555555555555:rl:f:aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:",
+			description: "function scope with empty hash should generate key with function ID",
 		},
 		{
 			name: "account scope with key expression hash",
@@ -2556,23 +2075,23 @@ func TestRateLimitConstraint_StateKey(t *testing.T) {
 				KeyExpressionHash: "expr123",
 				EvaluatedKeyHash:  evaluatedKeyHash,
 			},
-			expectedKey: "{test}:rl:a:11111111-2222-3333-4444-555555555555:abcd1234hash",
+			expectedKey: "{cs}:a:11111111-2222-3333-4444-555555555555:rl:a:abcd1234hash",
 			description: "key expression hash should not affect state key generation",
 		},
 		{
-			name: "invalid scope should default to function behavior",
+			name: "invalid scope should return empty string",
 			constraint: &RateLimitConstraint{
 				Scope:            enums.RateLimitScope(999), // invalid scope value
 				EvaluatedKeyHash: evaluatedKeyHash,
 			},
-			expectedKey: "{test}:abcd1234hash",
-			description: "invalid scope should default to function scope behavior",
+			expectedKey: "",
+			description: "invalid scope should return empty string",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			actualKey := tt.constraint.StateKey(keyPrefix, accountID, envID)
+			actualKey := tt.constraint.StateKey(accountID, envID, fnID)
 			assert.Equal(t, tt.expectedKey, actualKey, tt.description)
 		})
 	}
@@ -2584,7 +2103,8 @@ func TestRateLimitConstraint_StateKey_Uniqueness(t *testing.T) {
 	accountID2 := uuid.MustParse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
 	envID1 := uuid.MustParse("66666666-7777-8888-9999-aaaaaaaaaaaa")
 	envID2 := uuid.MustParse("ffffffff-0000-1111-2222-333333333333")
-	keyPrefix := "test"
+	fnID1 := uuid.MustParse("11112222-3333-4444-5555-666666666666")
+	fnID2 := uuid.MustParse("77778888-9999-aaaa-bbbb-cccccccccccc")
 	evaluatedKeyHash := "samehash"
 
 	constraint := &RateLimitConstraint{
@@ -2593,8 +2113,8 @@ func TestRateLimitConstraint_StateKey_Uniqueness(t *testing.T) {
 	}
 
 	// Test that different account IDs produce different keys
-	key1 := constraint.StateKey(keyPrefix, accountID1, envID1)
-	key2 := constraint.StateKey(keyPrefix, accountID2, envID1)
+	key1 := constraint.StateKey(accountID1, envID1, fnID1)
+	key2 := constraint.StateKey(accountID2, envID1, fnID1)
 	assert.NotEqual(t, key1, key2, "Different account IDs should produce different keys")
 
 	// Test that different environment IDs produce different keys for env scope
@@ -2602,29 +2122,33 @@ func TestRateLimitConstraint_StateKey_Uniqueness(t *testing.T) {
 		Scope:            enums.RateLimitScopeEnv,
 		EvaluatedKeyHash: evaluatedKeyHash,
 	}
-	key3 := envConstraint.StateKey(keyPrefix, accountID1, envID1)
-	key4 := envConstraint.StateKey(keyPrefix, accountID1, envID2)
+	key3 := envConstraint.StateKey(accountID1, envID1, fnID1)
+	key4 := envConstraint.StateKey(accountID1, envID2, fnID1)
 	assert.NotEqual(t, key3, key4, "Different environment IDs should produce different keys for env scope")
 
-	// Test that different key prefixes produce different keys
-	key5 := constraint.StateKey(keyPrefix, accountID1, envID1)
-	key6 := constraint.StateKey("prefix2", accountID1, envID1)
-	assert.NotEqual(t, key5, key6, "Different key prefixes should produce different keys")
+	// Test that different function IDs produce different keys for function scope
+	fnConstraint := &RateLimitConstraint{
+		Scope:            enums.RateLimitScopeFn,
+		EvaluatedKeyHash: evaluatedKeyHash,
+	}
+	key5 := fnConstraint.StateKey(accountID1, envID1, fnID1)
+	key6 := fnConstraint.StateKey(accountID1, envID1, fnID2)
+	assert.NotEqual(t, key5, key6, "Different function IDs should produce different keys")
 
 	// Test that different evaluated key hashes produce different keys
 	constraint2 := &RateLimitConstraint{
 		Scope:            enums.RateLimitScopeAccount,
 		EvaluatedKeyHash: "differenthash",
 	}
-	key7 := constraint.StateKey(keyPrefix, accountID1, envID1)
-	key8 := constraint2.StateKey(keyPrefix, accountID1, envID1)
+	key7 := constraint.StateKey(accountID1, envID1, fnID1)
+	key8 := constraint2.StateKey(accountID1, envID1, fnID1)
 	assert.NotEqual(t, key7, key8, "Different evaluated key hashes should produce different keys")
 }
 
 func TestThrottleConstraint_StateKey(t *testing.T) {
 	accountID := uuid.MustParse("11111111-2222-3333-4444-555555555555")
 	envID := uuid.MustParse("66666666-7777-8888-9999-aaaaaaaaaaaa")
-	keyPrefix := "test"
+	fnID := uuid.MustParse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
 	evaluatedKeyHash := "xyz456hash"
 
 	tests := []struct {
@@ -2639,7 +2163,7 @@ func TestThrottleConstraint_StateKey(t *testing.T) {
 				Scope:            enums.ThrottleScopeAccount,
 				EvaluatedKeyHash: evaluatedKeyHash,
 			},
-			expectedKey: "{test}:throttle:a:11111111-2222-3333-4444-555555555555:xyz456hash",
+			expectedKey: "{cs}:a:11111111-2222-3333-4444-555555555555:throttle:a:xyz456hash",
 			description: "account scope should generate account-specific throttle key",
 		},
 		{
@@ -2648,7 +2172,7 @@ func TestThrottleConstraint_StateKey(t *testing.T) {
 				Scope:            enums.ThrottleScopeEnv,
 				EvaluatedKeyHash: evaluatedKeyHash,
 			},
-			expectedKey: "{test}:throttle:e:66666666-7777-8888-9999-aaaaaaaaaaaa:xyz456hash",
+			expectedKey: "{cs}:a:11111111-2222-3333-4444-555555555555:throttle:e:66666666-7777-8888-9999-aaaaaaaaaaaa:xyz456hash",
 			description: "environment scope should generate environment-specific throttle key",
 		},
 		{
@@ -2657,8 +2181,8 @@ func TestThrottleConstraint_StateKey(t *testing.T) {
 				Scope:            enums.ThrottleScopeFn,
 				EvaluatedKeyHash: evaluatedKeyHash,
 			},
-			expectedKey: "{test}:throttle:xyz456hash",
-			description: "function scope should generate compatibility throttle key",
+			expectedKey: "{cs}:a:11111111-2222-3333-4444-555555555555:throttle:f:aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:xyz456hash",
+			description: "function scope should generate function-specific throttle key",
 		},
 		{
 			name: "function scope with different key hash",
@@ -2666,7 +2190,7 @@ func TestThrottleConstraint_StateKey(t *testing.T) {
 				Scope:            enums.ThrottleScopeFn,
 				EvaluatedKeyHash: "different123",
 			},
-			expectedKey: "{test}:throttle:different123",
+			expectedKey: "{cs}:a:11111111-2222-3333-4444-555555555555:throttle:f:aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:different123",
 			description: "function scope key should vary with different evaluated key hash",
 		},
 		{
@@ -2675,7 +2199,7 @@ func TestThrottleConstraint_StateKey(t *testing.T) {
 				Scope:            enums.ThrottleScopeAccount,
 				EvaluatedKeyHash: "",
 			},
-			expectedKey: "{test}:throttle:a:11111111-2222-3333-4444-555555555555:",
+			expectedKey: "{cs}:a:11111111-2222-3333-4444-555555555555:throttle:a:",
 			description: "empty key hash should still generate valid throttle key structure",
 		},
 		{
@@ -2684,7 +2208,7 @@ func TestThrottleConstraint_StateKey(t *testing.T) {
 				Scope:            enums.ThrottleScopeEnv,
 				EvaluatedKeyHash: "",
 			},
-			expectedKey: "{test}:throttle:e:66666666-7777-8888-9999-aaaaaaaaaaaa:",
+			expectedKey: "{cs}:a:11111111-2222-3333-4444-555555555555:throttle:e:66666666-7777-8888-9999-aaaaaaaaaaaa:",
 			description: "empty key hash should still generate valid throttle key structure",
 		},
 		{
@@ -2693,8 +2217,8 @@ func TestThrottleConstraint_StateKey(t *testing.T) {
 				Scope:            enums.ThrottleScopeFn,
 				EvaluatedKeyHash: "",
 			},
-			expectedKey: "{test}:throttle:",
-			description: "function scope with empty hash should generate minimal throttle key",
+			expectedKey: "{cs}:a:11111111-2222-3333-4444-555555555555:throttle:f:aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:",
+			description: "function scope with empty hash should generate key with function ID",
 		},
 		{
 			name: "account scope with key expression hash",
@@ -2703,23 +2227,23 @@ func TestThrottleConstraint_StateKey(t *testing.T) {
 				KeyExpressionHash: "expr456",
 				EvaluatedKeyHash:  evaluatedKeyHash,
 			},
-			expectedKey: "{test}:throttle:a:11111111-2222-3333-4444-555555555555:xyz456hash",
+			expectedKey: "{cs}:a:11111111-2222-3333-4444-555555555555:throttle:a:xyz456hash",
 			description: "key expression hash should not affect throttle state key generation",
 		},
 		{
-			name: "invalid scope should default to function behavior",
+			name: "invalid scope should return empty string",
 			constraint: &ThrottleConstraint{
 				Scope:            enums.ThrottleScope(999), // invalid scope value
 				EvaluatedKeyHash: evaluatedKeyHash,
 			},
-			expectedKey: "{test}:throttle:xyz456hash",
-			description: "invalid scope should default to function scope throttle behavior",
+			expectedKey: "",
+			description: "invalid scope should return empty string",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			actualKey := tt.constraint.StateKey(keyPrefix, accountID, envID)
+			actualKey := tt.constraint.StateKey(accountID, envID, fnID)
 			assert.Equal(t, tt.expectedKey, actualKey, tt.description)
 		})
 	}
@@ -2731,7 +2255,8 @@ func TestThrottleConstraint_StateKey_Uniqueness(t *testing.T) {
 	accountID2 := uuid.MustParse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
 	envID1 := uuid.MustParse("66666666-7777-8888-9999-aaaaaaaaaaaa")
 	envID2 := uuid.MustParse("ffffffff-0000-1111-2222-333333333333")
-	keyPrefix := "test"
+	fnID1 := uuid.MustParse("11112222-3333-4444-5555-666666666666")
+	fnID2 := uuid.MustParse("77778888-9999-aaaa-bbbb-cccccccccccc")
 	evaluatedKeyHash := "samehash"
 
 	constraint := &ThrottleConstraint{
@@ -2740,8 +2265,8 @@ func TestThrottleConstraint_StateKey_Uniqueness(t *testing.T) {
 	}
 
 	// Test that different account IDs produce different keys
-	key1 := constraint.StateKey(keyPrefix, accountID1, envID1)
-	key2 := constraint.StateKey(keyPrefix, accountID2, envID1)
+	key1 := constraint.StateKey(accountID1, envID1, fnID1)
+	key2 := constraint.StateKey(accountID2, envID1, fnID1)
 	assert.NotEqual(t, key1, key2, "Different account IDs should produce different throttle keys")
 
 	// Test that different environment IDs produce different keys for env scope
@@ -2749,22 +2274,26 @@ func TestThrottleConstraint_StateKey_Uniqueness(t *testing.T) {
 		Scope:            enums.ThrottleScopeEnv,
 		EvaluatedKeyHash: evaluatedKeyHash,
 	}
-	key3 := envConstraint.StateKey(keyPrefix, accountID1, envID1)
-	key4 := envConstraint.StateKey(keyPrefix, accountID1, envID2)
+	key3 := envConstraint.StateKey(accountID1, envID1, fnID1)
+	key4 := envConstraint.StateKey(accountID1, envID2, fnID1)
 	assert.NotEqual(t, key3, key4, "Different environment IDs should produce different throttle keys for env scope")
 
-	// Test that different key prefixes produce different keys
-	key5 := constraint.StateKey(keyPrefix, accountID1, envID1)
-	key6 := constraint.StateKey("otherprefix", accountID1, envID1)
-	assert.NotEqual(t, key5, key6, "Different key prefixes should produce different throttle keys")
+	// Test that different function IDs produce different keys for function scope
+	fnConstraint := &ThrottleConstraint{
+		Scope:            enums.ThrottleScopeFn,
+		EvaluatedKeyHash: evaluatedKeyHash,
+	}
+	key5 := fnConstraint.StateKey(accountID1, envID1, fnID1)
+	key6 := fnConstraint.StateKey(accountID1, envID1, fnID2)
+	assert.NotEqual(t, key5, key6, "Different function IDs should produce different throttle keys")
 
 	// Test that different evaluated key hashes produce different keys
 	constraint2 := &ThrottleConstraint{
 		Scope:            enums.ThrottleScopeAccount,
 		EvaluatedKeyHash: "anotherhash",
 	}
-	key7 := constraint.StateKey(keyPrefix, accountID1, envID1)
-	key8 := constraint2.StateKey(keyPrefix, accountID1, envID1)
+	key7 := constraint.StateKey(accountID1, envID1, fnID1)
+	key8 := constraint2.StateKey(accountID1, envID1, fnID1)
 	assert.NotEqual(t, key7, key8, "Different evaluated key hashes should produce different throttle keys")
 
 	// Test that throttle and rate limit keys are different for same parameters
@@ -2772,8 +2301,8 @@ func TestThrottleConstraint_StateKey_Uniqueness(t *testing.T) {
 		Scope:            enums.RateLimitScopeAccount,
 		EvaluatedKeyHash: evaluatedKeyHash,
 	}
-	throttleKey := constraint.StateKey(keyPrefix, accountID1, envID1)
-	rateLimitKey := rateLimitConstraint.StateKey(keyPrefix, accountID1, envID1)
+	throttleKey := constraint.StateKey(accountID1, envID1, fnID1)
+	rateLimitKey := rateLimitConstraint.StateKey(accountID1, envID1, fnID1)
 	assert.NotEqual(t, throttleKey, rateLimitKey, "Throttle and rate limit keys should be different for same parameters")
 }
 
@@ -2918,7 +2447,6 @@ func TestConcurrencyConstraint_IsCustomKey(t *testing.T) {
 				Scope:             enums.ConcurrencyScopeFn,
 				KeyExpressionHash: "expr_hash",
 				EvaluatedKeyHash:  "eval_hash",
-				InProgressItemKey: "progress_key",
 			},
 			expected:    true,
 			description: "constraints with all fields set including KeyExpressionHash should be custom keys",
@@ -2926,10 +2454,9 @@ func TestConcurrencyConstraint_IsCustomKey(t *testing.T) {
 		{
 			name: "constraint without key expression hash but with other fields is not custom key",
 			constraint: ConcurrencyConstraint{
-				Mode:              enums.ConcurrencyModeStep,
-				Scope:             enums.ConcurrencyScopeEnv,
-				EvaluatedKeyHash:  "eval_hash",
-				InProgressItemKey: "progress_key",
+				Mode:             enums.ConcurrencyModeStep,
+				Scope:            enums.ConcurrencyScopeEnv,
+				EvaluatedKeyHash: "eval_hash",
 			},
 			expected:    false,
 			description: "constraints with other fields but no KeyExpressionHash should not be custom keys",
@@ -2965,13 +2492,11 @@ func TestConcurrencyConstraint_IsCustomKey_KeyGeneration(t *testing.T) {
 	accountID := uuid.MustParse("11111111-2222-3333-4444-555555555555")
 	envID := uuid.MustParse("66666666-7777-8888-9999-aaaaaaaaaaaa")
 	functionID := uuid.MustParse("77777777-8888-9999-aaaa-bbbbbbbbbbbb")
-	prefix := "test"
 
 	// Test that custom key affects InProgressLeasesKey generation
 	standardConstraint := ConcurrencyConstraint{
-		Scope:             enums.ConcurrencyScopeFn,
-		Mode:              enums.ConcurrencyModeStep,
-		InProgressItemKey: "progress_key",
+		Scope: enums.ConcurrencyScopeFn,
+		Mode:  enums.ConcurrencyModeStep,
 	}
 
 	customConstraint := ConcurrencyConstraint{
@@ -2979,7 +2504,6 @@ func TestConcurrencyConstraint_IsCustomKey_KeyGeneration(t *testing.T) {
 		Mode:              enums.ConcurrencyModeStep,
 		KeyExpressionHash: "custom_expr",
 		EvaluatedKeyHash:  "custom_eval",
-		InProgressItemKey: "progress_key",
 	}
 
 	// Verify IsCustomKey returns correct values
@@ -2987,8 +2511,8 @@ func TestConcurrencyConstraint_IsCustomKey_KeyGeneration(t *testing.T) {
 	assert.True(t, customConstraint.IsCustomKey(), "Custom constraint should be custom key")
 
 	// Verify that custom key affects the generated keys
-	standardKey := standardConstraint.InProgressLeasesKey(prefix, accountID, envID, functionID)
-	customKey := customConstraint.InProgressLeasesKey(prefix, accountID, envID, functionID)
+	standardKey := standardConstraint.InProgressLeasesKey(accountID, envID, functionID)
+	customKey := customConstraint.InProgressLeasesKey(accountID, envID, functionID)
 
 	assert.NotEqual(t, standardKey, customKey, "Standard and custom constraints should generate different keys")
 

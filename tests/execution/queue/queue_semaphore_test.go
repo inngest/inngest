@@ -45,14 +45,10 @@ func TestQueueSemaphoreWithConstraintAPI(t *testing.T) {
 
 	cmLifecycles := constraintapi.NewConstraintAPIDebugLifecycles()
 	cm, err := constraintapi.NewRedisCapacityManager(
+		constraintapi.WithClient(rc),
+		constraintapi.WithShardName("test"),
 		constraintapi.WithClock(clock),
 		constraintapi.WithEnableDebugLogs(true),
-		constraintapi.WithQueueShards(map[string]rueidis.Client{
-			"test": queueClient.Client(),
-		}),
-		constraintapi.WithQueueStateKeyPrefix(redis_state.QueueDefaultKey),
-		constraintapi.WithRateLimitClient(rc),
-		constraintapi.WithRateLimitKeyPrefix("rl"),
 		constraintapi.WithLifecycles(cmLifecycles),
 	)
 	require.NoError(t, err)
@@ -601,27 +597,20 @@ func TestQueueSemaphore(t *testing.T) {
 
 			cmLifecycles := constraintapi.NewConstraintAPIDebugLifecycles()
 
-			var cm constraintapi.RolloutManager
-			cm, err = constraintapi.NewRedisCapacityManager(
-				constraintapi.WithClock(clock),
-				constraintapi.WithEnableDebugLogs(true),
-				constraintapi.WithQueueShards(map[string]rueidis.Client{
-					"test": queueClient.Client(),
-				}),
-				constraintapi.WithQueueStateKeyPrefix(redis_state.QueueDefaultKey),
-				constraintapi.WithRateLimitClient(rc),
-				constraintapi.WithRateLimitKeyPrefix("rl"),
-				constraintapi.WithLifecycles(cmLifecycles),
-			)
-			require.NoError(t, err)
-
+			var cm constraintapi.CapacityManager
 			var failingAcquireCallCounter int64
 
 			if tc.useFailingCapacityManager {
-				cm = constraintapi.NewRolloutManager(
-					newFailingCapacityManager(&failingAcquireCallCounter),
-					redis_state.QueueDefaultKey, "rl",
+				cm = newFailingCapacityManager(&failingAcquireCallCounter)
+			} else {
+				cm, err = constraintapi.NewRedisCapacityManager(
+					constraintapi.WithClient(rc),
+					constraintapi.WithShardName("test"),
+					constraintapi.WithClock(clock),
+					constraintapi.WithEnableDebugLogs(true),
+					constraintapi.WithLifecycles(cmLifecycles),
 				)
+				require.NoError(t, err)
 			}
 
 			if tc.numWorkers == 0 {

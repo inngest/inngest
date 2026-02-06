@@ -748,7 +748,6 @@ func TestConstraintItemConversion(t *testing.T) {
 					Scope:             enums.ConcurrencyScopeEnv,
 					KeyExpressionHash: "concurrency_hash",
 					EvaluatedKeyHash:  "eval_concurrency",
-					InProgressItemKey: "redis:concurrency:in_progress:key123",
 				},
 			},
 			expected: &pb.ConstraintItem{
@@ -758,7 +757,6 @@ func TestConstraintItemConversion(t *testing.T) {
 					Scope:             pb.ConstraintApiConcurrencyScope_CONSTRAINT_API_CONCURRENCY_SCOPE_ENV,
 					KeyExpressionHash: "concurrency_hash",
 					EvaluatedKeyHash:  "eval_concurrency",
-					InProgressItemKey: "redis:concurrency:in_progress:key123",
 				},
 			},
 		},
@@ -829,7 +827,6 @@ func TestConstraintUsageConversion(t *testing.T) {
 						Scope:             enums.ConcurrencyScopeFn,
 						KeyExpressionHash: "hash123",
 						EvaluatedKeyHash:  "eval456",
-						InProgressItemKey: "redis:concurrency:test:key456",
 					},
 				},
 				Used:  5,
@@ -843,7 +840,6 @@ func TestConstraintUsageConversion(t *testing.T) {
 						Scope:             pb.ConstraintApiConcurrencyScope_CONSTRAINT_API_CONCURRENCY_SCOPE_FUNCTION,
 						KeyExpressionHash: "hash123",
 						EvaluatedKeyHash:  "eval456",
-						InProgressItemKey: "redis:concurrency:test:key456",
 					},
 				},
 				Used:  5,
@@ -950,54 +946,6 @@ func TestCapacityLeaseConversion(t *testing.T) {
 	})
 }
 
-func TestMigrationIdentifierConversion(t *testing.T) {
-	tests := []struct {
-		name     string
-		input    MigrationIdentifier
-		expected *pb.MigrationIdentifier
-	}{
-		{
-			name: "complete migration",
-			input: MigrationIdentifier{
-				IsRateLimit: true,
-				QueueShard:  "shard-123",
-			},
-			expected: &pb.MigrationIdentifier{
-				IsRateLimit: true,
-				QueueShard:  "shard-123",
-			},
-		},
-		{
-			name: "minimal migration",
-			input: MigrationIdentifier{
-				IsRateLimit: false,
-				QueueShard:  "",
-			},
-			expected: &pb.MigrationIdentifier{
-				IsRateLimit: false,
-				QueueShard:  "",
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := MigrationIdentifierToProto(tt.input)
-			assert.Equal(t, tt.expected, result)
-
-			// Test round trip
-			backConverted := MigrationIdentifierFromProto(result)
-			assert.Equal(t, tt.input, backConverted)
-		})
-	}
-
-	// Test nil handling
-	t.Run("nil protobuf", func(t *testing.T) {
-		result := MigrationIdentifierFromProto(nil)
-		assert.Equal(t, MigrationIdentifier{}, result)
-	})
-}
-
 func TestLeaseSourceConversion(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -1095,13 +1043,8 @@ func TestCapacityCheckRequestConversion(t *testing.T) {
 							Scope:             enums.ConcurrencyScopeFn,
 							KeyExpressionHash: "hash123",
 							EvaluatedKeyHash:  "eval456",
-							InProgressItemKey: "redis:concurrency:check:key123",
 						},
 					},
-				},
-				Migration: MigrationIdentifier{
-					IsRateLimit: false,
-					QueueShard:  "test",
 				},
 			},
 			expected: &pb.CapacityCheckRequest{
@@ -1124,13 +1067,8 @@ func TestCapacityCheckRequestConversion(t *testing.T) {
 							Scope:             pb.ConstraintApiConcurrencyScope_CONSTRAINT_API_CONCURRENCY_SCOPE_FUNCTION,
 							KeyExpressionHash: "hash123",
 							EvaluatedKeyHash:  "eval456",
-							InProgressItemKey: "redis:concurrency:check:key123",
 						},
 					},
-				},
-				Migration: &pb.MigrationIdentifier{
-					IsRateLimit: false,
-					QueueShard:  "test",
 				},
 			},
 		},
@@ -1148,10 +1086,6 @@ func TestCapacityCheckRequestConversion(t *testing.T) {
 					Throttle: []ThrottleConfig{},
 				},
 				Constraints: []ConstraintItem{},
-				Migration: MigrationIdentifier{
-					IsRateLimit: false,
-					QueueShard:  "test",
-				},
 			},
 			expected: &pb.CapacityCheckRequest{
 				AccountId:  accountID.String(),
@@ -1166,10 +1100,6 @@ func TestCapacityCheckRequestConversion(t *testing.T) {
 					Throttle: []*pb.ThrottleConfig{},
 				},
 				Constraints: []*pb.ConstraintItem{},
-				Migration: &pb.MigrationIdentifier{
-					IsRateLimit: false,
-					QueueShard:  "test",
-				},
 			},
 		},
 		{
@@ -1253,7 +1183,6 @@ func TestCapacityCheckResponseConversion(t *testing.T) {
 							Scope:             enums.ConcurrencyScopeFn,
 							KeyExpressionHash: "limiting_hash",
 							EvaluatedKeyHash:  "limiting_eval",
-							InProgressItemKey: "redis:concurrency:check_resp:key999",
 						},
 					},
 				},
@@ -1283,7 +1212,6 @@ func TestCapacityCheckResponseConversion(t *testing.T) {
 							Scope:             pb.ConstraintApiConcurrencyScope_CONSTRAINT_API_CONCURRENCY_SCOPE_FUNCTION,
 							KeyExpressionHash: "limiting_hash",
 							EvaluatedKeyHash:  "limiting_eval",
-							InProgressItemKey: "redis:concurrency:check_resp:key999",
 						},
 					},
 				},
@@ -1391,10 +1319,6 @@ func TestCapacityAcquireRequestConversion(t *testing.T) {
 					Location:          CallerLocationItemLease,
 					RunProcessingMode: RunProcessingModeBackground,
 				},
-				Migration: MigrationIdentifier{
-					IsRateLimit: false,
-					QueueShard:  "test",
-				},
 			},
 			expected: &pb.CapacityAcquireRequest{
 				IdempotencyKey: "test-key-123",
@@ -1433,10 +1357,6 @@ func TestCapacityAcquireRequestConversion(t *testing.T) {
 					Location:          pb.ConstraintApiCallerLocation_CONSTRAINT_API_CALLER_LOCATION_ITEM_LEASE,
 					RunProcessingMode: pb.ConstraintApiRunProcessingMode_CONSTRAINT_API_RUN_PROCESSING_MODE_BACKGROUND,
 				},
-				Migration: &pb.MigrationIdentifier{
-					IsRateLimit: false,
-					QueueShard:  "test",
-				},
 			},
 		},
 		{
@@ -1456,10 +1376,6 @@ func TestCapacityAcquireRequestConversion(t *testing.T) {
 				Constraints: []ConstraintItem{},
 				Amount:      0,
 				LeaseRunIDs: map[string]ulid.ULID{},
-				Migration: MigrationIdentifier{
-					IsRateLimit: false,
-					QueueShard:  "test",
-				},
 			},
 			expected: &pb.CapacityAcquireRequest{
 				IdempotencyKey: "minimal",
@@ -1485,10 +1401,6 @@ func TestCapacityAcquireRequestConversion(t *testing.T) {
 					Service:           pb.ConstraintApiLeaseService_CONSTRAINT_API_LEASE_SERVICE_UNSPECIFIED,
 					Location:          pb.ConstraintApiCallerLocation_CONSTRAINT_API_CALLER_LOCATION_UNSPECIFIED,
 					RunProcessingMode: pb.ConstraintApiRunProcessingMode_CONSTRAINT_API_RUN_PROCESSING_MODE_BACKGROUND,
-				},
-				Migration: &pb.MigrationIdentifier{
-					IsRateLimit: false,
-					QueueShard:  "test",
 				},
 			},
 		},
@@ -1586,7 +1498,6 @@ func TestCapacityAcquireResponseConversion(t *testing.T) {
 							Scope:             enums.ConcurrencyScopeFn,
 							KeyExpressionHash: "limiting_hash",
 							EvaluatedKeyHash:  "limiting_eval",
-							InProgressItemKey: "redis:concurrency:acquire_resp:key888",
 						},
 					},
 				},
@@ -1621,7 +1532,6 @@ func TestCapacityAcquireResponseConversion(t *testing.T) {
 							Scope:             pb.ConstraintApiConcurrencyScope_CONSTRAINT_API_CONCURRENCY_SCOPE_FUNCTION,
 							KeyExpressionHash: "limiting_hash",
 							EvaluatedKeyHash:  "limiting_eval",
-							InProgressItemKey: "redis:concurrency:acquire_resp:key888",
 						},
 					},
 				},
@@ -1713,10 +1623,6 @@ func TestCapacityExtendLeaseRequestConversion(t *testing.T) {
 				AccountID:      accountID,
 				LeaseID:        leaseID,
 				Duration:       15 * time.Minute,
-				Migration: MigrationIdentifier{
-					IsRateLimit: true,
-					QueueShard:  "test-shard",
-				},
 				Source: LeaseSource{
 					Service:           ServiceAPI,
 					Location:          CallerLocationItemLease,
@@ -1728,10 +1634,6 @@ func TestCapacityExtendLeaseRequestConversion(t *testing.T) {
 				AccountId:      accountID.String(),
 				LeaseId:        leaseID.String(),
 				Duration:       durationpb.New(15 * time.Minute),
-				Migration: &pb.MigrationIdentifier{
-					IsRateLimit: true,
-					QueueShard:  "test-shard",
-				},
 				Source: &pb.LeaseSource{
 					Service:           pb.ConstraintApiLeaseService_CONSTRAINT_API_LEASE_SERVICE_API,
 					Location:          pb.ConstraintApiCallerLocation_CONSTRAINT_API_CALLER_LOCATION_ITEM_LEASE,
@@ -1845,10 +1747,6 @@ func TestCapacityReleaseRequestConversion(t *testing.T) {
 				IdempotencyKey: "commit-key",
 				AccountID:      accountID,
 				LeaseID:        leaseID,
-				Migration: MigrationIdentifier{
-					IsRateLimit: false,
-					QueueShard:  "release-shard",
-				},
 				Source: LeaseSource{
 					Service:           ServiceAPI,
 					Location:          CallerLocationItemLease,
@@ -1859,10 +1757,6 @@ func TestCapacityReleaseRequestConversion(t *testing.T) {
 				IdempotencyKey: "commit-key",
 				AccountId:      accountID.String(),
 				LeaseId:        leaseID.String(),
-				Migration: &pb.MigrationIdentifier{
-					IsRateLimit: false,
-					QueueShard:  "release-shard",
-				},
 				Source: &pb.LeaseSource{
 					Service:           pb.ConstraintApiLeaseService_CONSTRAINT_API_LEASE_SERVICE_API,
 					Location:          pb.ConstraintApiCallerLocation_CONSTRAINT_API_CALLER_LOCATION_ITEM_LEASE,
