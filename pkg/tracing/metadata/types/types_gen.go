@@ -23,6 +23,10 @@ type AIMetadata struct {
 	Model		string	`json:"model"`
 	System		string	`json:"system"`
 	OperationName	string	`json:"operation_name"`
+
+	LatencyMs	*int64		`json:"latency_ms,omitempty"`
+	TotalTokens	*int64		`json:"total_tokens,omitempty"`
+	EstimatedCost	*float64	`json:"estimated_cost,omitempty"`
 }
 
 // From http.go

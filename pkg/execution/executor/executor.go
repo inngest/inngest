@@ -3283,6 +3283,31 @@ func (e *executor) handleGeneratorStep(ctx context.Context, runCtx execution.Run
 		return err
 	}
 
+	// extract ai metadata for step.ai.wrap
+	if e.allowStepMetadata.Enabled(ctx, runCtx.Metadata().ID.Tenant.AccountID) {
+		if gen.RunType() == "step.ai.wrap" {
+			// calculate step duration in milliseconds
+			stepDurationMs := gen.Timing.B / 1_000_000
+
+			md := metadata.WithWarnings(extractors.ExtractAIWrapMetadata(
+				[]byte(output),
+				stepDurationMs,
+			))
+			for _, m := range md {
+				_, err := e.createMetadataSpan(
+					ctx,
+					runCtx,
+					"executor.handleGeneratorStep.aiWrap",
+					m,
+					enums.MetadataScopeStepAttempt,
+				)
+				if err != nil {
+					e.log.Warn("error creating AI wrap metadata span", "error", err)
+				}
+			}
+		}
+	}
+
 	// Steps can be batched with checkpointing!  Imagine an SDK that opts into checkpointing,
 	// then returned as an async response because the checkpooint batch time was greater than
 	// the run execution.  In this case, all opcodes are returned to the executor via the async
