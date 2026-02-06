@@ -291,4 +291,140 @@ describe('TimeBrush', () => {
       expect(() => render(<TimeBrush minSelectionWidth={5} />)).not.toThrow();
     });
   });
+
+  describe('re-selection behavior (Task 005)', () => {
+    const mockRect = {
+      left: 0,
+      top: 0,
+      right: 200,
+      bottom: 16,
+      width: 200,
+      height: 16,
+      x: 0,
+      y: 0,
+      toJSON: () => {},
+    };
+
+    function renderWithMock(props: Partial<Parameters<typeof TimeBrush>[0]> = {}) {
+      const onSelectionChange = vi.fn();
+      const result = render(<TimeBrush onSelectionChange={onSelectionChange} {...props} />);
+      const outerContainer = result.container.firstChild as HTMLElement;
+      outerContainer.getBoundingClientRect = vi.fn(() => ({ ...mockRect }));
+      return { ...result, onSelectionChange, outerContainer };
+    }
+
+    /** Create a 25%-75% selection to enter non-default state */
+    function makeNonDefaultSelection(outerContainer: HTMLElement) {
+      const selectionOverlay = outerContainer.querySelector(
+        '.absolute.top-0.h-full:not(.cursor-ew-resize)'
+      ) as HTMLElement;
+      fireEvent.mouseDown(selectionOverlay, { clientX: 50 }); // 25%
+      fireEvent.mouseMove(document, { clientX: 150 }); // 75%
+      fireEvent.mouseUp(document);
+    }
+
+    describe('click-and-drag re-selection', () => {
+      it('clicking outside current selection creates a new selection', () => {
+        const { outerContainer, onSelectionChange } = renderWithMock();
+        makeNonDefaultSelection(outerContainer);
+        onSelectionChange.mockClear();
+
+        // Click on the background track outside selection (5% of 200px = 10px)
+        const track = outerContainer.querySelector('.bg-canvasMuted') as HTMLElement;
+        fireEvent.mouseDown(track, { clientX: 10 });
+        fireEvent.mouseMove(document, { clientX: 40 }); // drag to 20%
+        fireEvent.mouseUp(document);
+
+        expect(onSelectionChange).toHaveBeenCalledWith(5, 20);
+      });
+
+      it('clicking inside current selection preserves move behavior', () => {
+        const { outerContainer, onSelectionChange } = renderWithMock();
+        makeNonDefaultSelection(outerContainer);
+        onSelectionChange.mockClear();
+
+        // Click inside the selection overlay (50%, inside 25-75)
+        const selectionOverlay = outerContainer.querySelector(
+          '.absolute.top-0.h-full:not(.cursor-ew-resize)'
+        ) as HTMLElement;
+        fireEvent.mouseDown(selectionOverlay, { clientX: 100 });
+        fireEvent.mouseMove(document, { clientX: 120 }); // drag right 10%
+        fireEvent.mouseUp(document);
+
+        expect(onSelectionChange).toHaveBeenCalledWith(35, 85);
+      });
+    });
+
+    describe('hover line visibility', () => {
+      it('shows hover line outside selection in non-default state', () => {
+        const { outerContainer } = renderWithMock();
+        makeNonDefaultSelection(outerContainer);
+
+        // Hover on the track outside the selection (5%)
+        const track = outerContainer.querySelector('.bg-canvasMuted') as HTMLElement;
+        fireEvent.mouseMove(track, { clientX: 10 });
+
+        const cursorLine = outerContainer.querySelector('.pointer-events-none.w-px');
+        expect(cursorLine).toBeTruthy();
+      });
+
+      it('does not show hover line inside selection in non-default state', () => {
+        const { outerContainer } = renderWithMock();
+        makeNonDefaultSelection(outerContainer);
+
+        // Hover inside the selection overlay (50%, inside 25-75)
+        const selectionOverlay = outerContainer.querySelector(
+          '.absolute.top-0.h-full:not(.cursor-ew-resize)'
+        ) as HTMLElement;
+        fireEvent.mouseMove(selectionOverlay, { clientX: 100 });
+
+        const cursorLine = outerContainer.querySelector('.pointer-events-none.w-px');
+        expect(cursorLine).toBeNull();
+      });
+
+      it('shows hover line in default state (unchanged behavior)', () => {
+        const { outerContainer } = renderWithMock();
+
+        // Hover on the selection overlay in default state
+        const selectionOverlay = outerContainer.querySelector(
+          '.absolute.top-0.h-full:not(.cursor-ew-resize)'
+        ) as HTMLElement;
+        fireEvent.mouseMove(selectionOverlay, { clientX: 100 });
+
+        const cursorLine = outerContainer.querySelector('.pointer-events-none.w-px');
+        expect(cursorLine).toBeTruthy();
+      });
+    });
+
+    describe('preserved interactions', () => {
+      it('handle drag is preserved in non-default state', () => {
+        const { outerContainer, onSelectionChange } = renderWithMock();
+        makeNonDefaultSelection(outerContainer);
+        onSelectionChange.mockClear();
+
+        // Click on left handle and drag left
+        const handles = outerContainer.querySelectorAll('.cursor-ew-resize');
+        const leftHandle = handles[0] as HTMLElement;
+        fireEvent.mouseDown(leftHandle, { clientX: 50 }); // at 25%
+        fireEvent.mouseMove(document, { clientX: 30 }); // drag left 10%
+        fireEvent.mouseUp(document);
+
+        expect(onSelectionChange).toHaveBeenCalledWith(15, 75);
+      });
+
+      it('initial selection creation in default state still works', () => {
+        const { outerContainer, onSelectionChange } = renderWithMock();
+        onSelectionChange.mockClear();
+
+        const selectionOverlay = outerContainer.querySelector(
+          '.absolute.top-0.h-full:not(.cursor-ew-resize)'
+        ) as HTMLElement;
+        fireEvent.mouseDown(selectionOverlay, { clientX: 60 }); // 30%
+        fireEvent.mouseMove(document, { clientX: 120 }); // 60%
+        fireEvent.mouseUp(document);
+
+        expect(onSelectionChange).toHaveBeenCalledWith(30, 60);
+      });
+    });
+  });
 });

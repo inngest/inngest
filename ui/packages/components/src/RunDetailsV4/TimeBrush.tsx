@@ -5,8 +5,8 @@
  * Features:
  * - Draggable left/right handles to resize selection
  * - Drag selection area to move the window
- * - Click and drag on track to create new selection
- * - Hover cursor line in default state
+ * - Click and drag on track to create new selection (or re-select outside current)
+ * - Hover cursor line in default state and outside selection
  * - Reset button when selection differs from default
  */
 
@@ -109,53 +109,54 @@ export function TimeBrush({
     [selectionStart, selectionEnd, isDefaultSelection]
   );
 
-  // Handle mouse down on track to create a new selection (only for default state)
+  // Handle mouse down on track to create a new selection
   const handleTrackMouseDown = useCallback(
     (e: React.MouseEvent) => {
       const container = containerRef.current;
       if (!container) return;
 
-      // Only allow creating selection when in default state
-      if (!isDefaultSelection) return;
-
-      e.preventDefault();
-      e.stopPropagation();
-
       const rect = container.getBoundingClientRect();
       const clickPercent = ((e.clientX - rect.left) / rect.width) * 100;
 
-      // Set both start and end to the click position initially
-      dragModeRef.current = 'create-selection';
-      dragStartXRef.current = e.clientX;
-      dragStartSelectionRef.current = { start: clickPercent, end: clickPercent };
+      // Allow creating selection in default state OR outside current selection
+      if (isDefaultSelection || clickPercent < selectionStart || clickPercent > selectionEnd) {
+        e.preventDefault();
+        e.stopPropagation();
 
-      // Hide cursor line when dragging starts
-      setHoverPosition(null);
+        dragModeRef.current = 'create-selection';
+        dragStartXRef.current = e.clientX;
+        dragStartSelectionRef.current = { start: clickPercent, end: clickPercent };
 
-      // Set initial selection at click point
-      setSelectionStart(clickPercent);
-      setSelectionEnd(clickPercent);
+        setHoverPosition(null);
+        setSelectionStart(clickPercent);
+        setSelectionEnd(clickPercent);
+      }
     },
-    [isDefaultSelection]
+    [isDefaultSelection, selectionStart, selectionEnd]
   );
 
-  // Handle mouse move on track to show cursor line (only for default state)
+  // Handle mouse move on track to show cursor line
   const handleTrackMouseMove = useCallback(
     (e: React.MouseEvent) => {
       const container = containerRef.current;
       if (!container) return;
 
-      // Only show cursor line in default state
-      if (!isDefaultSelection) {
-        setHoverPosition(null);
-        return;
-      }
-
       const rect = container.getBoundingClientRect();
       const hoverPercent = ((e.clientX - rect.left) / rect.width) * 100;
-      setHoverPosition(Math.max(0, Math.min(100, hoverPercent)));
+      const clampedPercent = Math.max(0, Math.min(100, hoverPercent));
+
+      if (isDefaultSelection) {
+        // Default state: show hover line everywhere
+        setHoverPosition(clampedPercent);
+      } else if (clampedPercent < selectionStart || clampedPercent > selectionEnd) {
+        // Non-default: show hover line only outside selection
+        setHoverPosition(clampedPercent);
+      } else {
+        // Non-default, inside selection: hide hover line
+        setHoverPosition(null);
+      }
     },
-    [isDefaultSelection]
+    [isDefaultSelection, selectionStart, selectionEnd]
   );
 
   // Handle mouse leave on track to hide cursor line
@@ -268,13 +269,12 @@ export function TimeBrush({
 
       {/* Track container */}
       <div className="relative h-4">
-        {/* Background track (clickable area for creating selection in default state) */}
+        {/* Background track (clickable area for creating/re-creating selection) */}
         <div
-          className={cn(
-            'bg-canvasMuted absolute inset-0 top-1/2 h-1 -translate-y-1/2 rounded-full',
-            isDefaultSelection ? 'cursor-default' : ''
-          )}
-          onMouseDown={isDefaultSelection ? handleTrackMouseDown : undefined}
+          className="bg-canvasMuted absolute inset-0 top-1/2 h-1 -translate-y-1/2 rounded-full"
+          onMouseDown={handleTrackMouseDown}
+          onMouseMove={handleTrackMouseMove}
+          onMouseLeave={handleTrackMouseLeave}
         />
 
         {/* Selection highlight area (full height) */}
@@ -296,8 +296,8 @@ export function TimeBrush({
         {/* Children (e.g., the main bar) */}
         {children}
 
-        {/* Cursor line - shown when hovering in default (create selection) mode */}
-        {isDefaultSelection && hoverPosition !== null && (
+        {/* Cursor line - shown when hovering in default state or outside selection */}
+        {hoverPosition !== null && (
           <div
             className={cn('pointer-events-none absolute top-0 h-full w-px', cursorLineClassName)}
             style={{
