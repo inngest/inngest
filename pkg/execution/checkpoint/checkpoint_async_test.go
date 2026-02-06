@@ -246,6 +246,11 @@ func (m *mockRunService) SaveStep(ctx context.Context, id state.ID, stepID strin
 	return false, args.Error(1)
 }
 
+func (m *mockRunService) UpdateMetadata(ctx context.Context, id state.ID, config state.MutableConfig) error {
+	args := m.Called(ctx, id, config)
+	return args.Error(0)
+}
+
 // mockTracerProvider mocks the tracing.TracerProvider interface
 type mockTracerProvider struct {
 	tracing.TracerProvider

@@ -45,6 +45,11 @@ func TestCheckpointSyncSteps_ThreeStepRuns(t *testing.T) {
 	// Create mock assertions prior to checkpointing.
 	//
 
+	// Expect UpdateMetadata to be called with ForceStepPlan=true since we have >1 steps (parallel mode)
+	mocks.state.On("UpdateMetadata", ctx, testData.metadata.ID, mock.MatchedBy(func(config state.MutableConfig) bool {
+		return config.ForceStepPlan == true
+	})).Return(nil)
+
 	// Expect SaveStep to be called for each step when checkpointing.
 	for _, op := range ops {
 		switch op.Op {
@@ -138,6 +143,11 @@ func TestCheckpointSyncSteps_WithStepAndSleep(t *testing.T) {
 	//
 	// Create mock assertions prior to checkpointing.
 	//
+
+	// Expect UpdateMetadata to be called with ForceStepPlan=true since we have >1 steps (parallel mode)
+	mocks.state.On("UpdateMetadata", ctx, testData.metadata.ID, mock.MatchedBy(func(config state.MutableConfig) bool {
+		return config.ForceStepPlan == true
+	})).Return(nil)
 
 	// Expect SaveStep to be called for the step run
 	expectedData := map[string]any{

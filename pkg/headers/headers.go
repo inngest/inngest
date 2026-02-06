@@ -41,6 +41,10 @@ const (
 	// base64-encoded 10-byte value that's sufficiently random for ULID
 	// generation. For example: "1743130137367,eii2YKXRVTJPuA==".
 	HeaderEventIDSeed = "x-inngest-event-id-seed"
+
+	// HeaderKeyForceStepPlan tells the SDK to use step planning instead of
+	// immediate execution. This is used when parallel steps are detected.
+	HeaderKeyForceStepPlan = "X-Inngest-Force-Step-Plan"
 )
 
 const (

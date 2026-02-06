@@ -9,7 +9,6 @@ import (
 	"net/http"
 	neturl "net/url"
 
-	inngestgo "github.com/inngest/inngestgo"
 	apiv1 "github.com/inngest/inngest/pkg/api/apiv1"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
@@ -20,6 +19,7 @@ import (
 	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/util/errs"
+	inngestgo "github.com/inngest/inngestgo"
 )
 
 func NewDriver(client exechttp.RequestExecutor) driver.DriverV2 {
@@ -142,6 +142,10 @@ func (d httpv2) sync(ctx context.Context, sl sv2.StateLoader, opts driver.V2Requ
 	req.Header.Add("X-Inngest-Signature", sig)
 	req.Header.Add("X-Run-ID", opts.Metadata.ID.RunID.String())
 	req.Header.Add(headers.HeaderKeyRequestVersion, fmt.Sprintf("%d", opts.Metadata.Config.RequestVersion))
+
+	if opts.Metadata.Config.ForceStepPlan {
+		req.Header.Add(headers.HeaderKeyForceStepPlan, "true")
+	}
 
 	if opts.StepID != nil && *opts.StepID != "" && *opts.StepID != "step" {
 		req.Header.Add(headers.HeaderInngestStepID, *opts.StepID)

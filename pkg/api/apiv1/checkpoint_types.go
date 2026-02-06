@@ -9,6 +9,7 @@ import (
 
 	"github.com/fatih/structs"
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/inngest"
@@ -83,7 +84,9 @@ type CheckpointNewRunRequest struct {
 	RequestVersion *int `json:"request_version,omitempty"`
 
 	// Retries indicates how many retry attempts should be made for steps in
-	// this run.
+	// this run. For example, retries=3 means 4 total attempts (1 initial + 3
+	// retries). If not provided or <= 0, defaults to consts.DefaultRetryCount
+	// (4 retries = 5 attempts).
 	Retries int `json:"retries,omitempty"`
 
 	// XXX: SDK Version and language??
@@ -128,6 +131,15 @@ func (r CheckpointNewRunRequest) Fn(appID uuid.UUID) inngest.Function {
 	// must store the URL in the run metadata.
 	uri := r.Event.Data.Domain
 
+	// Use the SDK-provided retry count, or fall back to the default. The SDK
+	// should send `retries` in the CheckpointNewRunRequest to specify how many
+	// retry attempts should be made for steps (e.g., 3 means 4 total
+	// attempts).
+	retries := r.Retries
+	if retries < 0 {
+		retries = consts.DefaultRetryCount
+	}
+
 	return inngest.Function{
 		ID:              r.FnID(appID),
 		ConfigVersion:   1,
@@ -146,7 +158,7 @@ func (r CheckpointNewRunRequest) Fn(appID uuid.UUID) inngest.Function {
 				ID:      "step",
 				Name:    r.FnSlug(),
 				URI:     uri,
-				Retries: inngestgo.Ptr(r.Retries),
+				Retries: inngestgo.Ptr(retries),
 			},
 		},
 	}

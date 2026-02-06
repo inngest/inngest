@@ -151,6 +151,56 @@ func TestSyncHeaders(t *testing.T) {
 	require.Contains(t, receivedHeaders.Get("X-Inngest-Signature"), "t=")
 	require.Contains(t, receivedHeaders.Get("X-Inngest-Signature"), "s=")
 	require.Equal(t, runID.String(), receivedHeaders.Get("X-Run-ID"))
+	// ForceStepPlan not set, so header should be absent
+	require.Empty(t, receivedHeaders.Get(headers.HeaderKeyForceStepPlan))
+}
+
+func TestSyncHeadersWithForceStepPlan(t *testing.T) {
+	var receivedHeaders http.Header
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		receivedHeaders = r.Header
+		w.Header().Set(headers.HeaderKeySDK, "test-sdk")
+		opcodes := []*sv1.GeneratorOpcode{{Op: enums.OpcodeNone}}
+		w.WriteHeader(200)
+		_ = json.NewEncoder(w).Encode(opcodes)
+	}))
+	defer ts.Close()
+
+	client := exechttp.Client(exechttp.SecureDialerOpts{AllowPrivate: true})
+	d := &httpv2{Client: client}
+
+	u, _ := url.Parse(ts.URL)
+	runID := ulid.MustNew(ulid.Now(), rand.Reader)
+	fn := inngest.Function{
+		Driver: inngest.FunctionDriver{
+			URI: u.String(),
+			Metadata: map[string]any{
+				"type": "sync",
+			},
+		},
+	}
+
+	opts := driver.V2RequestOpts{
+		Fn:         fn,
+		SigningKey: []byte("test-signing-key"),
+		Metadata: sv2.Metadata{
+			ID: sv2.ID{
+				RunID: runID,
+			},
+			Config: sv2.Config{
+				ForceStepPlan: true,
+			},
+		},
+		URL: u.String(),
+	}
+
+	resp, userErr, internalErr := d.Do(context.Background(), nil, opts)
+	require.NoError(t, userErr)
+	require.NoError(t, internalErr)
+	require.NotNil(t, resp)
+
+	// ForceStepPlan is set, so header should be present
+	require.Equal(t, "true", receivedHeaders.Get(headers.HeaderKeyForceStepPlan))
 }
 
 func TestSyncNonSDKResponse(t *testing.T) {
