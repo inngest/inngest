@@ -78,7 +78,7 @@ func (q *queueProcessor) removeContinue(ctx context.Context, p *QueuePartition, 
 		// Note that this isn't shared across replicas;  cooldowns
 		// only exist in the current replica.
 		q.continueCooldown[p.Queue()] = time.Now().Add(
-			consts.QueueContinuationCooldownPeriod,
+			q.continuationCooldown,
 		)
 	}
 }
@@ -90,7 +90,7 @@ func (q *queueProcessor) scanContinuations(ctx context.Context) error {
 	}
 
 	// Have some chance of skipping continuations in this iteration.
-	if rand.Float64() <= consts.QueueContinuationSkipProbability {
+	if q.continuationSkipProbability > 0 && rand.Float64() <= q.continuationSkipProbability {
 		return nil
 	}
 
