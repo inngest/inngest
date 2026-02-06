@@ -7,13 +7,11 @@ import (
 	"fmt"
 	"io/fs"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/inngest/inngest/pkg/telemetry/metrics"
-	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/config/registration"
@@ -21,9 +19,10 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
+	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
-	"slices"
 )
 
 //go:embed lua/*
@@ -283,11 +282,16 @@ func (m shardedMgr) New(ctx context.Context, input state.Input) (state.State, er
 		}
 	}
 
+	rv := consts.RequestVersionUnknown
+	if input.RequestVersion != nil {
+		rv = *input.RequestVersion
+	}
+
 	metadata := runMetadata{
 		Identifier:     input.Identifier,
 		Debugger:       input.Debugger,
 		Version:        currentVersion,
-		RequestVersion: consts.RequestVersionUnknown, // Always use -1 to indicate unset hash version until first request.
+		RequestVersion: rv,
 		Context:        input.Context,
 		Status:         enums.RunStatusScheduled,
 		SpanID:         input.SpanID,
@@ -1211,6 +1215,9 @@ func newRunMetadata(data map[string]string) (*runMetadata, error) {
 		m.Version = v
 	}
 
+	// Default to unknown RequestVersion (-1) if not present, to distinguish
+	// from version 0 which is a valid version.
+	m.RequestVersion = consts.RequestVersionUnknown
 	if val, ok := data["rv"]; ok && val != "" {
 		v, err := strconv.Atoi(strings.TrimSuffix(val, ".0"))
 		if err != nil {
