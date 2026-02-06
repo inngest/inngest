@@ -272,7 +272,7 @@ export function TimeBrush({
         {/* Background track (extended click target — overflows below the bar for easier interaction) */}
         <div
           data-testid="time-brush-track"
-          className="absolute inset-0 -bottom-2"
+          className="absolute inset-0 -bottom-2 -top-6"
           onMouseDown={handleTrackMouseDown}
           onMouseMove={handleTrackMouseMove}
           onMouseLeave={handleTrackMouseLeave}
@@ -300,7 +300,7 @@ export function TimeBrush({
         {/* Cursor line - shown when hovering in default state or outside selection */}
         {hoverPosition !== null && (
           <div
-            className={cn('pointer-events-none absolute top-0 h-full w-px', cursorLineClassName)}
+            className={cn('pointer-events-none absolute -top-6 bottom-0 w-px', cursorLineClassName)}
             style={{
               left: `${hoverPosition}%`,
               transform: 'translateX(-50%)',
