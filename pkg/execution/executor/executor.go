@@ -3283,27 +3283,27 @@ func (e *executor) handleGeneratorStep(ctx context.Context, runCtx execution.Run
 		return err
 	}
 
-	// extract ai metadata for step.ai.wrap
+	// Extract AI metadata from step output.
+	// This attempts to detect and parse AI SDK responses (e.g. Vercel AI SDK)
+	// from any step output, using a cheap byte-level pre-check to skip non-AI outputs.
 	if e.allowStepMetadata.Enabled(ctx, runCtx.Metadata().ID.Tenant.AccountID) {
-		if gen.RunType() == "step.ai.wrap" {
-			// calculate step duration in milliseconds
-			stepDurationMs := gen.Timing.B / 1_000_000
+		// Calculate step duration in milliseconds
+		stepDurationMs := gen.Timing.B / 1_000_000
 
-			md := metadata.WithWarnings(extractors.ExtractAIWrapMetadata(
-				[]byte(output),
-				stepDurationMs,
-			))
-			for _, m := range md {
-				_, err := e.createMetadataSpan(
-					ctx,
-					runCtx,
-					"executor.handleGeneratorStep.aiWrap",
-					m,
-					enums.MetadataScopeStepAttempt,
-				)
-				if err != nil {
-					e.log.Warn("error creating AI wrap metadata span", "error", err)
-				}
+		md := metadata.WithWarnings(extractors.ExtractAIOutputMetadata(
+			[]byte(output),
+			stepDurationMs,
+		))
+		for _, m := range md {
+			_, err := e.createMetadataSpan(
+				ctx,
+				runCtx,
+				"executor.handleGeneratorStep.aiOutput",
+				m,
+				enums.MetadataScopeStepAttempt,
+			)
+			if err != nil {
+				e.log.Warn("error creating AI output metadata span", "error", err)
 			}
 		}
 	}

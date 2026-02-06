@@ -1,6 +1,7 @@
 package extractors
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"math"
@@ -209,10 +210,16 @@ type vercelAIResponse struct {
 	Data *vercelAIResponseData `json:"data"`
 }
 
-// ExtractAIWrapMetadata extracts ai metadata from step.ai.wrap output
+// ExtractAIOutputMetadata extracts ai metadata from step output
 // which contains vercel ai sdk response format.
-// stepDurationMs is the step execution duration in milliseconds, used as fallback for latency
-func ExtractAIWrapMetadata(output []byte, stepDurationMs int64) ([]metadata.Structured, error) {
+// stepDurationMs is the step execution duration in milliseconds, used as fallback for latency.
+func ExtractAIOutputMetadata(output []byte, stepDurationMs int64) ([]metadata.Structured, error) {
+	// skip unmarshal if output doesn't contain ai-specific fields
+	if !bytes.Contains(output, []byte("totalUsage")) &&
+		!bytes.Contains(output, []byte("inputTokens")) {
+		return nil, nil
+	}
+
 	var resp vercelAIResponse
 	if err := json.Unmarshal(output, &resp); err != nil {
 		return nil, nil

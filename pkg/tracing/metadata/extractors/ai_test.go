@@ -135,7 +135,7 @@ func TestAIMetadataExtractor_NonAISpan(t *testing.T) {
 	assert.Nil(t, metadata, "Non-AI span should not produce metadata")
 }
 
-func TestExtractAIWrapMetadata_VercelAISDK(t *testing.T) {
+func TestExtractAIOutputMetadata_VercelAISDK(t *testing.T) {
 	t.Parallel()
 
 	// Simulated Vercel AI SDK response from step.ai.wrap
@@ -174,7 +174,7 @@ func TestExtractAIWrapMetadata_VercelAISDK(t *testing.T) {
 
 	stepDurationMs := int64(25000) // 25 seconds
 
-	md, err := ExtractAIWrapMetadata(output, stepDurationMs)
+	md, err := ExtractAIOutputMetadata(output, stepDurationMs)
 	require.NoError(t, err)
 	require.NotNil(t, md, "Expected metadata for Vercel AI SDK response")
 	require.Len(t, md, 1, "Expected exactly one metadata item")
@@ -212,7 +212,7 @@ func TestExtractAIWrapMetadata_VercelAISDK(t *testing.T) {
 	assert.NotNil(t, data["estimated_cost"], "Should estimate cost")
 }
 
-func TestExtractAIWrapMetadata_FallbackLatency(t *testing.T) {
+func TestExtractAIOutputMetadata_FallbackLatency(t *testing.T) {
 	t.Parallel()
 
 	// Response without provider headers, should fall back to step duration
@@ -239,7 +239,7 @@ func TestExtractAIWrapMetadata_FallbackLatency(t *testing.T) {
 
 	stepDurationMs := int64(5000)
 
-	md, err := ExtractAIWrapMetadata(output, stepDurationMs)
+	md, err := ExtractAIOutputMetadata(output, stepDurationMs)
 	require.NoError(t, err)
 	require.NotNil(t, md)
 
@@ -258,7 +258,7 @@ func TestExtractAIWrapMetadata_FallbackLatency(t *testing.T) {
 	assert.Equal(t, 5000.0, data["latency_ms"], "Should fall back to step duration for latency")
 }
 
-func TestExtractAIWrapMetadata_NonVercelFormat(t *testing.T) {
+func TestExtractAIOutputMetadata_NonVercelFormat(t *testing.T) {
 	t.Parallel()
 
 	// Non-Vercel format should silently skip
@@ -272,15 +272,36 @@ func TestExtractAIWrapMetadata_NonVercelFormat(t *testing.T) {
 	output, err := json.Marshal(nonVercelResponse)
 	require.NoError(t, err)
 
-	md, err := ExtractAIWrapMetadata(output, 1000)
+	md, err := ExtractAIOutputMetadata(output, 1000)
 	require.NoError(t, err)
 	assert.Nil(t, md, "Non-Vercel format should return nil")
 }
 
-func TestExtractAIWrapMetadata_InvalidJSON(t *testing.T) {
+func TestExtractAIOutputMetadata_InvalidJSON(t *testing.T) {
 	t.Parallel()
 
-	md, err := ExtractAIWrapMetadata([]byte("not valid json"), 1000)
+	md, err := ExtractAIOutputMetadata([]byte("not valid json"), 1000)
 	require.NoError(t, err)
 	assert.Nil(t, md, "Invalid JSON should return nil")
+}
+
+func TestExtractAIOutputMetadata_TypicalStepOutput(t *testing.T) {
+	t.Parallel()
+
+	// Typical non-AI step.run output - should be skipped by bytes.Contains pre-check
+	// without ever reaching json.Unmarshal
+	typicalOutputs := [][]byte{
+		[]byte(`{"data":"hello world"}`),
+		[]byte(`{"data":{"user":"john","email":"john@example.com"}}`),
+		[]byte(`{"data":42}`),
+		[]byte(`{"data":null}`),
+		[]byte(`{"data":["item1","item2","item3"]}`),
+		[]byte(`{"data":{"results":[1,2,3],"count":3}}`),
+	}
+
+	for _, output := range typicalOutputs {
+		md, err := ExtractAIOutputMetadata(output, 1000)
+		require.NoError(t, err)
+		assert.Nil(t, md, "Non-AI step output should return nil: %s", string(output))
+	}
 }
