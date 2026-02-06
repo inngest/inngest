@@ -30,12 +30,9 @@ func TestRedisCapacityManager_RateLimit(t *testing.T) {
 	clock := clockwork.NewFakeClock()
 
 	cm, err := NewRedisCapacityManager(
-		WithRateLimitClient(rc),
-		WithQueueShards(map[string]rueidis.Client{}),
+		WithClient(rc),
+		WithShardName("test"),
 		WithClock(clock),
-		WithNumScavengerShards(1),
-		WithQueueStateKeyPrefix("q:v1"),
-		WithRateLimitKeyPrefix("rl"),
 	)
 	require.NoError(t, err)
 	require.NotNil(t, cm)
@@ -86,12 +83,9 @@ func TestRedisCapacityManager_RateLimit(t *testing.T) {
 		Constraints:     constraints,
 		CurrentTime:     clock.Now(),
 		MaximumLifetime: time.Minute,
-		Migration: MigrationIdentifier{
-			IsRateLimit: true,
-		},
 	}
 
-	_, _, _, fingerprint, err := buildRequestState(acquireReq, "rl")
+	_, _, _, fingerprint, err := buildRequestState(acquireReq)
 	require.NoError(t, err)
 
 	acquireIdempotencyKey := fmt.Sprintf("event1-%s", fingerprint)
@@ -123,12 +117,12 @@ func TestRedisCapacityManager_RateLimit(t *testing.T) {
 
 		// TODO: Verify all keys have been created as expected + TTLs set
 		require.Len(t, r.Keys(), 7)
-		require.True(t, r.Exists("{rl}:test-value")) // rate limit state exists
-		require.True(t, r.Exists(cm.keyScavengerShard(cm.rateLimitKeyPrefix, 0)))
-		require.True(t, r.Exists(cm.keyAccountLeases(cm.rateLimitKeyPrefix, accountID)))
-		require.True(t, r.Exists(cm.keyLeaseDetails(cm.rateLimitKeyPrefix, accountID, leaseID)))
-		require.True(t, r.Exists(cm.keyConstraintCheckIdempotency(cm.rateLimitKeyPrefix, accountID, leaseIdempotencyKey)))
-		require.True(t, r.Exists(cm.keyOperationIdempotency(cm.rateLimitKeyPrefix, accountID, "acq", acquireIdempotencyKey)))
+		require.True(t, r.Exists(constraints[0].RateLimit.StateKey(accountID, envID, fnID))) // rate limit state exists
+		require.True(t, r.Exists(cm.keyScavengerShard()))
+		require.True(t, r.Exists(cm.keyAccountLeases(accountID)))
+		require.True(t, r.Exists(cm.keyLeaseDetails(accountID, leaseID)))
+		require.True(t, r.Exists(cm.keyConstraintCheckIdempotency(accountID, leaseIdempotencyKey)))
+		require.True(t, r.Exists(cm.keyOperationIdempotency(accountID, "acq", acquireIdempotencyKey)))
 	})
 
 	var checkHash string
@@ -139,12 +133,9 @@ func TestRedisCapacityManager_RateLimit(t *testing.T) {
 			FunctionID:    fnID,
 			Configuration: config,
 			Constraints:   constraints,
-			Migration: MigrationIdentifier{
-				IsRateLimit: true,
-			},
 		}
 
-		_, _, hash, err := buildCheckRequestData(req, cm.rateLimitKeyPrefix)
+		_, _, hash, err := buildCheckRequestData(req)
 		require.NoError(t, err)
 		require.NotZero(t, hash)
 		checkHash = hash
@@ -179,9 +170,6 @@ func TestRedisCapacityManager_RateLimit(t *testing.T) {
 			Duration:       5 * time.Second,
 			AccountID:      accountID,
 			LeaseID:        leaseID,
-			Migration: MigrationIdentifier{
-				IsRateLimit: true,
-			},
 		})
 		require.NoError(t, err)
 		require.NotNil(t, resp)
@@ -213,9 +201,6 @@ func TestRedisCapacityManager_RateLimit(t *testing.T) {
 			IdempotencyKey: opIdempotencyKey,
 			AccountID:      accountID,
 			LeaseID:        leaseID,
-			Migration: MigrationIdentifier{
-				IsRateLimit: true,
-			},
 			Source: LeaseSource{
 				Service:           ServiceExecutor,
 				Location:          CallerLocationSchedule,
@@ -241,11 +226,11 @@ func TestRedisCapacityManager_RateLimit(t *testing.T) {
 		// TODO: Expect 4 idempotency keys (1 constraint check + 3 operations)
 		keys := r.Keys()
 		require.Len(t, keys, 5, r.Dump())
-		require.Contains(t, keys, cm.keyConstraintCheckIdempotency(cm.rateLimitKeyPrefix, accountID, "event1"))
-		require.Contains(t, keys, cm.keyOperationIdempotency(cm.rateLimitKeyPrefix, accountID, "acq", acquireIdempotencyKey))
-		require.Contains(t, keys, cm.keyOperationIdempotency(cm.rateLimitKeyPrefix, accountID, "ext", "extend-test"))
-		require.Contains(t, keys, cm.keyOperationIdempotency(cm.rateLimitKeyPrefix, accountID, "rel", "release-test"))
-		require.Contains(t, keys, cm.keyOperationIdempotency(cm.rateLimitKeyPrefix, accountID, "chk", checkHash))
+		require.Contains(t, keys, cm.keyConstraintCheckIdempotency(accountID, "event1"))
+		require.Contains(t, keys, cm.keyOperationIdempotency(accountID, "acq", acquireIdempotencyKey))
+		require.Contains(t, keys, cm.keyOperationIdempotency(accountID, "ext", "extend-test"))
+		require.Contains(t, keys, cm.keyOperationIdempotency(accountID, "rel", "release-test"))
+		require.Contains(t, keys, cm.keyOperationIdempotency(accountID, "chk", checkHash))
 	})
 }
 
@@ -263,14 +248,9 @@ func TestRedisCapacityManager_Concurrency(t *testing.T) {
 	clock := clockwork.NewFakeClock()
 
 	cm, err := NewRedisCapacityManager(
-		WithRateLimitClient(rc),
-		WithQueueShards(map[string]rueidis.Client{
-			"test": rc,
-		}),
+		WithClient(rc),
+		WithShardName("test"),
 		WithClock(clock),
-		WithNumScavengerShards(1),
-		WithQueueStateKeyPrefix("q:v1"),
-		WithRateLimitKeyPrefix("rl"),
 	)
 	require.NoError(t, err)
 	require.NotNil(t, cm)
@@ -290,8 +270,8 @@ func TestRedisCapacityManager_Concurrency(t *testing.T) {
 		},
 	}
 
-	acctConcurrency := fmt.Sprintf("{%s}:concurrency:account:%s", cm.queueStateKeyPrefix, accountID)
-	fnConcurrency := fmt.Sprintf("{%s}:concurrency:p:%s", cm.queueStateKeyPrefix, fnID)
+	acctConcurrency := fmt.Sprintf("{q}:concurrency:account:%s", accountID)
+	fnConcurrency := fmt.Sprintf("{q}:concurrency:p:%s", fnID)
 
 	constraints := []ConstraintItem{
 		{
@@ -299,7 +279,6 @@ func TestRedisCapacityManager_Concurrency(t *testing.T) {
 			Concurrency: &ConcurrencyConstraint{
 				Mode:              enums.ConcurrencyModeStep,
 				Scope:             enums.ConcurrencyScopeAccount,
-				InProgressItemKey: acctConcurrency,
 			},
 		},
 		{
@@ -307,7 +286,6 @@ func TestRedisCapacityManager_Concurrency(t *testing.T) {
 			Concurrency: &ConcurrencyConstraint{
 				Mode:              enums.ConcurrencyModeStep,
 				Scope:             enums.ConcurrencyScopeFn,
-				InProgressItemKey: fnConcurrency,
 			},
 		},
 	}
@@ -330,12 +308,9 @@ func TestRedisCapacityManager_Concurrency(t *testing.T) {
 		Constraints:     constraints,
 		CurrentTime:     clock.Now(),
 		MaximumLifetime: time.Minute,
-		Migration: MigrationIdentifier{
-			QueueShard: "test",
-		},
 	}
 
-	_, _, _, fingerprint, err := buildRequestState(acquireReq, "q:v1")
+	_, _, _, fingerprint, err := buildRequestState(acquireReq)
 	require.NoError(t, err)
 
 	acquireIdempotencyKey := fmt.Sprintf("event1-%s", fingerprint)
@@ -368,17 +343,17 @@ func TestRedisCapacityManager_Concurrency(t *testing.T) {
 		// TODO: Verify all keys have been created as expected + TTLs set
 		require.Len(t, r.Keys(), 8)
 		require.False(t, r.Exists(acctConcurrency)) // we do not modify the in progress items directly
-		require.True(t, r.Exists(constraints[0].Concurrency.InProgressLeasesKey(cm.queueStateKeyPrefix, accountID, envID, fnID)), r.Dump())
+		require.True(t, r.Exists(constraints[0].Concurrency.InProgressLeasesKey(accountID, envID, fnID)), r.Dump())
 		require.False(t, r.Exists(fnConcurrency)) // we do not modify the in progress items directly
-		require.True(t, r.Exists(constraints[1].Concurrency.InProgressLeasesKey(cm.queueStateKeyPrefix, accountID, envID, fnID)), r.Dump())
+		require.True(t, r.Exists(constraints[1].Concurrency.InProgressLeasesKey(accountID, envID, fnID)), r.Dump())
 
-		require.True(t, r.Exists(cm.keyScavengerShard(cm.queueStateKeyPrefix, 0)))
-		require.True(t, r.Exists(cm.keyAccountLeases(cm.queueStateKeyPrefix, accountID)))
-		require.True(t, r.Exists(cm.keyLeaseDetails(cm.queueStateKeyPrefix, accountID, leaseID)))
-		require.True(t, r.Exists(cm.keyConstraintCheckIdempotency(cm.queueStateKeyPrefix, accountID, leaseIdempotencyKey)))
-		require.True(t, r.Exists(cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "acq", acquireIdempotencyKey)))
+		require.True(t, r.Exists(cm.keyScavengerShard()))
+		require.True(t, r.Exists(cm.keyAccountLeases(accountID)))
+		require.True(t, r.Exists(cm.keyLeaseDetails(accountID, leaseID)))
+		require.True(t, r.Exists(cm.keyConstraintCheckIdempotency(accountID, leaseIdempotencyKey)))
+		require.True(t, r.Exists(cm.keyOperationIdempotency(accountID, "acq", acquireIdempotencyKey)))
 
-		keyRequestState := cm.keyRequestState(cm.queueStateKeyPrefix, accountID, resp.RequestID)
+		keyRequestState := cm.keyRequestState(accountID, resp.RequestID)
 		require.True(t, r.Exists(keyRequestState))
 
 		requestState, err := r.Get(keyRequestState)
@@ -403,12 +378,9 @@ func TestRedisCapacityManager_Concurrency(t *testing.T) {
 			FunctionID:    fnID,
 			Configuration: config,
 			Constraints:   constraints,
-			Migration: MigrationIdentifier{
-				QueueShard: "test",
-			},
 		}
 
-		_, _, hash, err := buildCheckRequestData(req, cm.queueStateKeyPrefix)
+		_, _, hash, err := buildCheckRequestData(req)
 		require.NoError(t, err)
 		require.NotZero(t, hash)
 		checkHash = hash
@@ -420,10 +392,10 @@ func TestRedisCapacityManager_Concurrency(t *testing.T) {
 
 		t.Log(resp.internalDebugState.Debug)
 
-		mem, err := r.ZMembers(constraints[0].Concurrency.InProgressLeasesKey(cm.queueStateKeyPrefix, accountID, envID, fnID))
+		mem, err := r.ZMembers(constraints[0].Concurrency.InProgressLeasesKey(accountID, envID, fnID))
 		require.NoError(t, err)
 		require.Len(t, mem, 1)
-		mem, err = r.ZMembers(constraints[1].Concurrency.InProgressLeasesKey(cm.queueStateKeyPrefix, accountID, envID, fnID))
+		mem, err = r.ZMembers(constraints[1].Concurrency.InProgressLeasesKey(accountID, envID, fnID))
 		require.NoError(t, err)
 		require.Len(t, mem, 1)
 
@@ -456,9 +428,6 @@ func TestRedisCapacityManager_Concurrency(t *testing.T) {
 			Duration:       5 * time.Second,
 			AccountID:      accountID,
 			LeaseID:        leaseID,
-			Migration: MigrationIdentifier{
-				QueueShard: "test",
-			},
 		})
 		require.NoError(t, err)
 		require.NotNil(t, resp)
@@ -490,9 +459,6 @@ func TestRedisCapacityManager_Concurrency(t *testing.T) {
 			IdempotencyKey: opIdempotencyKey,
 			AccountID:      accountID,
 			LeaseID:        leaseID,
-			Migration: MigrationIdentifier{
-				QueueShard: "test",
-			},
 			Source: LeaseSource{
 				Service:           ServiceExecutor,
 				Location:          CallerLocationSchedule,
@@ -518,10 +484,10 @@ func TestRedisCapacityManager_Concurrency(t *testing.T) {
 		// TODO: Expect 4 idempotency keys (1 constraint check + 3 operations)
 		keys := r.Keys()
 		require.Len(t, keys, 5, r.Dump())
-		require.Contains(t, keys, cm.keyConstraintCheckIdempotency(cm.queueStateKeyPrefix, accountID, "event1"))
-		require.Contains(t, keys, cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "acq", acquireIdempotencyKey))
-		require.Contains(t, keys, cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "ext", "extend-test"))
-		require.Contains(t, keys, cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "rel", "release-test"))
-		require.Contains(t, keys, cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "chk", checkHash))
+		require.Contains(t, keys, cm.keyConstraintCheckIdempotency(accountID, "event1"))
+		require.Contains(t, keys, cm.keyOperationIdempotency(accountID, "acq", acquireIdempotencyKey))
+		require.Contains(t, keys, cm.keyOperationIdempotency(accountID, "ext", "extend-test"))
+		require.Contains(t, keys, cm.keyOperationIdempotency(accountID, "rel", "release-test"))
+		require.Contains(t, keys, cm.keyOperationIdempotency(accountID, "chk", checkHash))
 	})
 }

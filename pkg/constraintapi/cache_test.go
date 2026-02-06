@@ -2,7 +2,6 @@ package constraintapi
 
 import (
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
@@ -38,8 +37,7 @@ func TestCache(t *testing.T) {
 					Kind: ConstraintKindConcurrency,
 					Concurrency: &ConcurrencyConstraint{
 						Scope:             enums.ConcurrencyScopeAccount,
-						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:account:%s", accountID),
-					},
+						},
 				}
 
 				// First request should pass
@@ -51,9 +49,6 @@ func TestCache(t *testing.T) {
 						Service:           ServiceAPI,
 						Location:          CallerLocationItemLease,
 						RunProcessingMode: RunProcessingModeBackground,
-					},
-					Migration: MigrationIdentifier{
-						QueueShard: "test",
 					},
 					IdempotencyKey: "acq",
 					Configuration: ConstraintConfig{
@@ -91,9 +86,6 @@ func TestCache(t *testing.T) {
 						Location:          CallerLocationItemLease,
 						RunProcessingMode: RunProcessingModeBackground,
 					},
-					Migration: MigrationIdentifier{
-						QueueShard: "test",
-					},
 					IdempotencyKey: "acq2",
 					Configuration: ConstraintConfig{
 						FunctionVersion: 1,
@@ -130,9 +122,6 @@ func TestCache(t *testing.T) {
 						Location:          CallerLocationItemLease,
 						RunProcessingMode: RunProcessingModeBackground,
 					},
-					Migration: MigrationIdentifier{
-						QueueShard: "test",
-					},
 					IdempotencyKey: "acq3",
 					Configuration: ConstraintConfig{
 						FunctionVersion: 1,
@@ -168,9 +157,6 @@ func TestCache(t *testing.T) {
 						Location:          CallerLocationItemLease,
 						RunProcessingMode: RunProcessingModeBackground,
 					},
-					Migration: MigrationIdentifier{
-						QueueShard: "test",
-					},
 					IdempotencyKey: "acq4",
 					Configuration: ConstraintConfig{
 						FunctionVersion: 1,
@@ -202,16 +188,14 @@ func TestCache(t *testing.T) {
 					Kind: ConstraintKindConcurrency,
 					Concurrency: &ConcurrencyConstraint{
 						Scope:             enums.ConcurrencyScopeAccount,
-						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:account:%s", accountID),
-					},
+						},
 				}
 
 				fnConcurrency := ConstraintItem{
 					Kind: ConstraintKindConcurrency,
 					Concurrency: &ConcurrencyConstraint{
 						Scope:             enums.ConcurrencyScopeFn,
-						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:p:%s", fnID),
-					},
+						},
 				}
 
 				customConcurrency := ConstraintItem{
@@ -220,8 +204,7 @@ func TestCache(t *testing.T) {
 						Scope:             enums.ConcurrencyScopeAccount,
 						KeyExpressionHash: "expr-hash",
 						EvaluatedKeyHash:  "hash",
-						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:custom:a:%s:hash", accountID),
-					},
+						},
 				}
 
 				// First request should pass
@@ -233,9 +216,6 @@ func TestCache(t *testing.T) {
 						Service:           ServiceAPI,
 						Location:          CallerLocationItemLease,
 						RunProcessingMode: RunProcessingModeBackground,
-					},
-					Migration: MigrationIdentifier{
-						QueueShard: "test",
 					},
 					IdempotencyKey: "acq",
 					Configuration: ConstraintConfig{
@@ -283,8 +263,7 @@ func TestCache(t *testing.T) {
 					Kind: ConstraintKindConcurrency,
 					Concurrency: &ConcurrencyConstraint{
 						Scope:             enums.ConcurrencyScopeAccount,
-						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:account:%s", accountID),
-					},
+						},
 				}
 
 				// First request should pass
@@ -296,9 +275,6 @@ func TestCache(t *testing.T) {
 						Service:           ServiceAPI,
 						Location:          CallerLocationItemLease,
 						RunProcessingMode: RunProcessingModeBackground,
-					},
-					Migration: MigrationIdentifier{
-						QueueShard: "test",
 					},
 					IdempotencyKey: "acq",
 					Configuration: ConstraintConfig{
@@ -346,9 +322,6 @@ func TestCache(t *testing.T) {
 						Location:          CallerLocationItemLease,
 						RunProcessingMode: RunProcessingModeBackground,
 					},
-					Migration: MigrationIdentifier{
-						QueueShard: "test",
-					},
 					IdempotencyKey: "acq1",
 					Configuration: ConstraintConfig{
 						FunctionVersion: 1,
@@ -386,9 +359,6 @@ func TestCache(t *testing.T) {
 						Location:          CallerLocationItemLease,
 						RunProcessingMode: RunProcessingModeBackground,
 					},
-					Migration: MigrationIdentifier{
-						QueueShard: "test",
-					},
 					IdempotencyKey: "acq2",
 					Configuration: ConstraintConfig{
 						FunctionVersion: 1,
@@ -423,9 +393,6 @@ func TestCache(t *testing.T) {
 						Service:           ServiceAPI,
 						Location:          CallerLocationItemLease,
 						RunProcessingMode: RunProcessingModeBackground,
-					},
-					Migration: MigrationIdentifier{
-						QueueShard: "test",
 					},
 					IdempotencyKey: "acq3",
 					Configuration: ConstraintConfig{
@@ -476,9 +443,6 @@ func TestCache(t *testing.T) {
 						Location:          CallerLocationItemLease,
 						RunProcessingMode: RunProcessingModeBackground,
 					},
-					Migration: MigrationIdentifier{
-						IsRateLimit: true,
-					},
 					IdempotencyKey: "acq1",
 					Configuration: ConstraintConfig{
 						FunctionVersion: 1,
@@ -516,9 +480,6 @@ func TestCache(t *testing.T) {
 						Location:          CallerLocationItemLease,
 						RunProcessingMode: RunProcessingModeBackground,
 					},
-					Migration: MigrationIdentifier{
-						IsRateLimit: true,
-					},
 					IdempotencyKey: "acq2",
 					Configuration: ConstraintConfig{
 						FunctionVersion: 1,
@@ -554,9 +515,6 @@ func TestCache(t *testing.T) {
 						Location:          CallerLocationItemLease,
 						RunProcessingMode: RunProcessingModeBackground,
 					},
-					Migration: MigrationIdentifier{
-						IsRateLimit: true,
-					},
 					IdempotencyKey: "acq3",
 					Configuration: ConstraintConfig{
 						FunctionVersion: 1,
@@ -591,8 +549,7 @@ func TestCache(t *testing.T) {
 					Kind: ConstraintKindConcurrency,
 					Concurrency: &ConcurrencyConstraint{
 						Scope:             enums.ConcurrencyScopeAccount,
-						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:account:%s", accountID),
-					},
+						},
 				}
 
 				// Check should passthrough to manager
@@ -600,9 +557,6 @@ func TestCache(t *testing.T) {
 					AccountID:  accountID,
 					EnvID:      envID,
 					FunctionID: fnID,
-					Migration: MigrationIdentifier{
-						QueueShard: "test",
-					},
 					Configuration: ConstraintConfig{
 						FunctionVersion: 1,
 						Concurrency: ConcurrencyConfig{
@@ -627,8 +581,7 @@ func TestCache(t *testing.T) {
 					Kind: ConstraintKindConcurrency,
 					Concurrency: &ConcurrencyConstraint{
 						Scope:             enums.ConcurrencyScopeAccount,
-						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:account:%s", accountID),
-					},
+						},
 				}
 
 				// First acquire a lease
@@ -640,9 +593,6 @@ func TestCache(t *testing.T) {
 						Service:           ServiceAPI,
 						Location:          CallerLocationItemLease,
 						RunProcessingMode: RunProcessingModeBackground,
-					},
-					Migration: MigrationIdentifier{
-						QueueShard: "test",
 					},
 					IdempotencyKey: "acq1",
 					Configuration: ConstraintConfig{
@@ -667,9 +617,6 @@ func TestCache(t *testing.T) {
 					IdempotencyKey: "extend1",
 					LeaseID:        acquireResp.Leases[0].LeaseID,
 					Duration:       5 * time.Second,
-					Migration: MigrationIdentifier{
-						QueueShard: "test",
-					},
 				})
 				require.NoError(t, err)
 				require.NotNil(t, extendResp)
@@ -683,8 +630,7 @@ func TestCache(t *testing.T) {
 					Kind: ConstraintKindConcurrency,
 					Concurrency: &ConcurrencyConstraint{
 						Scope:             enums.ConcurrencyScopeAccount,
-						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:account:%s", accountID),
-					},
+						},
 				}
 
 				// First acquire a lease
@@ -696,9 +642,6 @@ func TestCache(t *testing.T) {
 						Service:           ServiceAPI,
 						Location:          CallerLocationItemLease,
 						RunProcessingMode: RunProcessingModeBackground,
-					},
-					Migration: MigrationIdentifier{
-						QueueShard: "test",
 					},
 					IdempotencyKey: "acq1",
 					Configuration: ConstraintConfig{
@@ -722,9 +665,6 @@ func TestCache(t *testing.T) {
 					AccountID:      accountID,
 					IdempotencyKey: "release1",
 					LeaseID:        acquireResp.Leases[0].LeaseID,
-					Migration: MigrationIdentifier{
-						QueueShard: "test",
-					},
 				})
 				require.NoError(t, err)
 				require.NotNil(t, releaseResp)
@@ -740,8 +680,7 @@ func TestCache(t *testing.T) {
 					Kind: ConstraintKindConcurrency,
 					Concurrency: &ConcurrencyConstraint{
 						Scope:             enums.ConcurrencyScopeAccount,
-						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:account:%s", accountID1),
-					},
+						},
 				}
 
 				// Account 1: Acquire until limited
@@ -753,9 +692,6 @@ func TestCache(t *testing.T) {
 						Service:           ServiceAPI,
 						Location:          CallerLocationItemLease,
 						RunProcessingMode: RunProcessingModeBackground,
-					},
-					Migration: MigrationIdentifier{
-						QueueShard: "test",
 					},
 					IdempotencyKey: "acq1",
 					Configuration: ConstraintConfig{
@@ -783,9 +719,6 @@ func TestCache(t *testing.T) {
 						Location:          CallerLocationItemLease,
 						RunProcessingMode: RunProcessingModeBackground,
 					},
-					Migration: MigrationIdentifier{
-						QueueShard: "test",
-					},
 					IdempotencyKey: "acq2",
 					Configuration: ConstraintConfig{
 						FunctionVersion: 1,
@@ -809,8 +742,7 @@ func TestCache(t *testing.T) {
 					Kind: ConstraintKindConcurrency,
 					Concurrency: &ConcurrencyConstraint{
 						Scope:             enums.ConcurrencyScopeAccount,
-						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:account:%s", accountID2),
-					},
+						},
 				}
 
 				res2, err := deps.cache.Acquire(ctx, &CapacityAcquireRequest{
@@ -821,9 +753,6 @@ func TestCache(t *testing.T) {
 						Service:           ServiceAPI,
 						Location:          CallerLocationItemLease,
 						RunProcessingMode: RunProcessingModeBackground,
-					},
-					Migration: MigrationIdentifier{
-						QueueShard: "test",
 					},
 					IdempotencyKey: "acq3",
 					Configuration: ConstraintConfig{
@@ -855,8 +784,7 @@ func TestCache(t *testing.T) {
 					Kind: ConstraintKindConcurrency,
 					Concurrency: &ConcurrencyConstraint{
 						Scope:             enums.ConcurrencyScopeAccount,
-						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:account:%s", accountID),
-					},
+						},
 				}
 
 				// First request - acquire
@@ -868,9 +796,6 @@ func TestCache(t *testing.T) {
 						Service:           ServiceAPI,
 						Location:          CallerLocationItemLease,
 						RunProcessingMode: RunProcessingModeBackground,
-					},
-					Migration: MigrationIdentifier{
-						QueueShard: "test",
 					},
 					IdempotencyKey: "acq1",
 					Configuration: ConstraintConfig{
@@ -897,9 +822,6 @@ func TestCache(t *testing.T) {
 						Service:           ServiceAPI,
 						Location:          CallerLocationItemLease,
 						RunProcessingMode: RunProcessingModeBackground,
-					},
-					Migration: MigrationIdentifier{
-						QueueShard: "test",
 					},
 					IdempotencyKey: "acq2",
 					Configuration: ConstraintConfig{
@@ -935,9 +857,6 @@ func TestCache(t *testing.T) {
 						Location:          CallerLocationItemLease,
 						RunProcessingMode: RunProcessingModeBackground,
 					},
-					Migration: MigrationIdentifier{
-						QueueShard: "test",
-					},
 					IdempotencyKey: "acq3",
 					Configuration: ConstraintConfig{
 						FunctionVersion: 1,
@@ -966,16 +885,14 @@ func TestCache(t *testing.T) {
 					Kind: ConstraintKindConcurrency,
 					Concurrency: &ConcurrencyConstraint{
 						Scope:             enums.ConcurrencyScopeAccount,
-						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:account:%s", accountID),
-					},
+						},
 				}
 
 				fnConcurrency := ConstraintItem{
 					Kind: ConstraintKindConcurrency,
 					Concurrency: &ConcurrencyConstraint{
 						Scope:             enums.ConcurrencyScopeFn,
-						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:p:%s", fnID),
-					},
+						},
 				}
 
 				customConcurrency := ConstraintItem{
@@ -984,8 +901,7 @@ func TestCache(t *testing.T) {
 						Scope:             enums.ConcurrencyScopeAccount,
 						KeyExpressionHash: "expr-hash",
 						EvaluatedKeyHash:  "key-hash",
-						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:custom:a:%s:key-hash", accountID),
-					},
+						},
 				}
 
 				throttle := ConstraintItem{
@@ -1024,9 +940,6 @@ func TestCache(t *testing.T) {
 						Service:           ServiceAPI,
 						Location:          CallerLocationItemLease,
 						RunProcessingMode: RunProcessingModeBackground,
-					},
-					Migration: MigrationIdentifier{
-						QueueShard: "test",
 					},
 					IdempotencyKey: "acq1",
 					Configuration: ConstraintConfig{
@@ -1088,9 +1001,6 @@ func TestCache(t *testing.T) {
 						Location:          CallerLocationItemLease,
 						RunProcessingMode: RunProcessingModeBackground,
 					},
-					Migration: MigrationIdentifier{
-						QueueShard: "test",
-					},
 					IdempotencyKey: "acq2",
 					Configuration: ConstraintConfig{
 						FunctionVersion: 1,
@@ -1146,9 +1056,6 @@ func TestCache(t *testing.T) {
 						Service:           ServiceAPI,
 						Location:          CallerLocationItemLease,
 						RunProcessingMode: RunProcessingModeBackground,
-					},
-					Migration: MigrationIdentifier{
-						QueueShard: "test",
 					},
 					IdempotencyKey: "acq3",
 					Configuration: ConstraintConfig{
@@ -1216,14 +1123,9 @@ func TestCache(t *testing.T) {
 			lifecycles := NewConstraintAPIDebugLifecycles()
 
 			cm, err := NewRedisCapacityManager(
-				WithRateLimitClient(rc),
-				WithQueueShards(map[string]rueidis.Client{
-					"test": rc,
-				}),
+				WithClient(rc),
+				WithShardName("default"),
 				WithClock(clock),
-				WithNumScavengerShards(1),
-				WithQueueStateKeyPrefix("q:v1"),
-				WithRateLimitKeyPrefix("rl"),
 				WithEnableDebugLogs(true),
 				// Do not cache check requests
 				WithCheckIdempotencyTTL(0),

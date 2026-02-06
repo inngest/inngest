@@ -31,9 +31,8 @@ func TestLeaseLifecycle_CompleteWorkflows(t *testing.T) {
 			{
 				Kind: ConstraintKindConcurrency,
 				Concurrency: &ConcurrencyConstraint{
-					Mode:              enums.ConcurrencyModeStep,
-					Scope:             enums.ConcurrencyScopeFn,
-					InProgressItemKey: fmt.Sprintf("{%s}:concurrency:lifecycle:%s", te.KeyPrefix, te.FunctionID),
+					Mode:  enums.ConcurrencyModeStep,
+					Scope: enums.ConcurrencyScopeFn,
 				},
 			},
 		}
@@ -45,7 +44,6 @@ func TestLeaseLifecycle_CompleteWorkflows(t *testing.T) {
 			FunctionID:    te.FunctionID,
 			Configuration: config,
 			Constraints:   constraints,
-			Migration:     MigrationIdentifier{QueueShard: "test"},
 		})
 
 		require.NoError(t, err)
@@ -69,7 +67,6 @@ func TestLeaseLifecycle_CompleteWorkflows(t *testing.T) {
 				Service:  ServiceExecutor,
 				Location: CallerLocationItemLease,
 			},
-			Migration: MigrationIdentifier{QueueShard: "test"},
 		})
 
 		require.NoError(t, err)
@@ -82,7 +79,6 @@ func TestLeaseLifecycle_CompleteWorkflows(t *testing.T) {
 			FunctionID:    te.FunctionID,
 			Configuration: config,
 			Constraints:   constraints,
-			Migration:     MigrationIdentifier{QueueShard: "test"},
 		})
 
 		require.NoError(t, err)
@@ -95,7 +91,6 @@ func TestLeaseLifecycle_CompleteWorkflows(t *testing.T) {
 			AccountID:      te.AccountID,
 			LeaseID:        firstLease.LeaseID,
 			Duration:       60 * time.Second,
-			Migration:      MigrationIdentifier{QueueShard: "test"},
 		})
 
 		require.NoError(t, err)
@@ -108,7 +103,6 @@ func TestLeaseLifecycle_CompleteWorkflows(t *testing.T) {
 			FunctionID:    te.FunctionID,
 			Configuration: config,
 			Constraints:   constraints,
-			Migration:     MigrationIdentifier{QueueShard: "test"},
 		})
 
 		require.NoError(t, err)
@@ -119,7 +113,6 @@ func TestLeaseLifecycle_CompleteWorkflows(t *testing.T) {
 			IdempotencyKey: "lifecycle-release-1",
 			AccountID:      te.AccountID,
 			LeaseID:        *extendResp.LeaseID, // Use the extended lease ID
-			Migration:      MigrationIdentifier{QueueShard: "test"},
 		})
 
 		require.NoError(t, err)
@@ -131,7 +124,6 @@ func TestLeaseLifecycle_CompleteWorkflows(t *testing.T) {
 			FunctionID:    te.FunctionID,
 			Configuration: config,
 			Constraints:   constraints,
-			Migration:     MigrationIdentifier{QueueShard: "test"},
 		})
 
 		require.NoError(t, err)
@@ -142,7 +134,6 @@ func TestLeaseLifecycle_CompleteWorkflows(t *testing.T) {
 			IdempotencyKey: "lifecycle-release-2",
 			AccountID:      te.AccountID,
 			LeaseID:        acquireResp.Leases[1].LeaseID,
-			Migration:      MigrationIdentifier{QueueShard: "test"},
 		})
 
 		require.NoError(t, err)
@@ -154,7 +145,6 @@ func TestLeaseLifecycle_CompleteWorkflows(t *testing.T) {
 			FunctionID:    te.FunctionID,
 			Configuration: config,
 			Constraints:   constraints,
-			Migration:     MigrationIdentifier{QueueShard: "test"},
 		})
 
 		require.NoError(t, err)
@@ -195,7 +185,6 @@ func TestLeaseLifecycle_CompleteWorkflows(t *testing.T) {
 			FunctionID:    te.FunctionID,
 			Configuration: config,
 			Constraints:   constraints,
-			Migration:     MigrationIdentifier{IsRateLimit: true},
 		})
 
 		require.NoError(t, err)
@@ -220,7 +209,6 @@ func TestLeaseLifecycle_CompleteWorkflows(t *testing.T) {
 				Service:  ServiceExecutor,
 				Location: CallerLocationItemLease,
 			},
-			Migration: MigrationIdentifier{IsRateLimit: true},
 		})
 
 		require.NoError(t, err)
@@ -244,7 +232,6 @@ func TestLeaseLifecycle_CompleteWorkflows(t *testing.T) {
 				Service:  ServiceExecutor,
 				Location: CallerLocationItemLease,
 			},
-			Migration: MigrationIdentifier{IsRateLimit: true},
 		})
 
 		require.NoError(t, err)
@@ -274,7 +261,6 @@ func TestLeaseLifecycle_CompleteWorkflows(t *testing.T) {
 				Service:  ServiceExecutor,
 				Location: CallerLocationItemLease,
 			},
-			Migration: MigrationIdentifier{IsRateLimit: true},
 		})
 
 		require.NoError(t, err)
@@ -286,7 +272,6 @@ func TestLeaseLifecycle_CompleteWorkflows(t *testing.T) {
 				IdempotencyKey: fmt.Sprintf("rate-release-%s", lease.IdempotencyKey),
 				AccountID:      te.AccountID,
 				LeaseID:        lease.LeaseID,
-				Migration:      MigrationIdentifier{IsRateLimit: true},
 			})
 			require.NoError(t, err)
 		}
@@ -296,7 +281,6 @@ func TestLeaseLifecycle_CompleteWorkflows(t *testing.T) {
 				IdempotencyKey: fmt.Sprintf("rate-release-%s", lease.IdempotencyKey),
 				AccountID:      te.AccountID,
 				LeaseID:        lease.LeaseID,
-				Migration:      MigrationIdentifier{IsRateLimit: true},
 			})
 			require.NoError(t, err)
 		}
@@ -320,9 +304,8 @@ func TestLeaseLifecycle_CompleteWorkflows(t *testing.T) {
 			{
 				Kind: ConstraintKindConcurrency,
 				Concurrency: &ConcurrencyConstraint{
-					Mode:              enums.ConcurrencyModeStep,
-					Scope:             enums.ConcurrencyScopeFn,
-					InProgressItemKey: fmt.Sprintf("{%s}:concurrency:mixed:%s", te.KeyPrefix, te.FunctionID),
+					Mode:  enums.ConcurrencyModeStep,
+					Scope: enums.ConcurrencyScopeFn,
 				},
 			},
 		}
@@ -344,7 +327,6 @@ func TestLeaseLifecycle_CompleteWorkflows(t *testing.T) {
 				Service:  ServiceExecutor,
 				Location: CallerLocationItemLease,
 			},
-			Migration: MigrationIdentifier{QueueShard: "test"},
 		})
 
 		require.NoError(t, err)
@@ -356,7 +338,6 @@ func TestLeaseLifecycle_CompleteWorkflows(t *testing.T) {
 			IdempotencyKey: "mixed-concurrency-release",
 			AccountID:      te.AccountID,
 			LeaseID:        concurrencyResp.Leases[0].LeaseID,
-			Migration:      MigrationIdentifier{QueueShard: "test"},
 		})
 
 		require.NoError(t, err)
@@ -402,7 +383,6 @@ func TestLeaseLifecycle_CompleteWorkflows(t *testing.T) {
 				Service:  ServiceExecutor,
 				Location: CallerLocationItemLease,
 			},
-			Migration: MigrationIdentifier{IsRateLimit: true},
 		})
 
 		require.NoError(t, err)
@@ -413,7 +393,6 @@ func TestLeaseLifecycle_CompleteWorkflows(t *testing.T) {
 			IdempotencyKey: "mixed-ratelimit-release",
 			AccountID:      te.AccountID,
 			LeaseID:        rateLimitResp.Leases[0].LeaseID,
-			Migration:      MigrationIdentifier{IsRateLimit: true},
 		})
 
 		require.NoError(t, err)
@@ -431,9 +410,8 @@ func TestLeaseLifecycle_CompleteWorkflows(t *testing.T) {
 			{
 				Kind: ConstraintKindConcurrency,
 				Concurrency: &ConcurrencyConstraint{
-					Mode:              enums.ConcurrencyModeStep,
-					Scope:             enums.ConcurrencyScopeFn,
-					InProgressItemKey: fmt.Sprintf("{%s}:concurrency:idempotent:%s", te.KeyPrefix, te.FunctionID),
+					Mode:  enums.ConcurrencyModeStep,
+					Scope: enums.ConcurrencyScopeFn,
 				},
 			},
 		}
@@ -454,7 +432,6 @@ func TestLeaseLifecycle_CompleteWorkflows(t *testing.T) {
 				Service:  ServiceExecutor,
 				Location: CallerLocationItemLease,
 			},
-			Migration: MigrationIdentifier{QueueShard: "test"},
 		}
 
 		// Step 1: First acquire with idempotency key
@@ -483,7 +460,6 @@ func TestLeaseLifecycle_CompleteWorkflows(t *testing.T) {
 			IdempotencyKey: "idempotent-release",
 			AccountID:      te.AccountID,
 			LeaseID:        resp1.Leases[0].LeaseID,
-			Migration:      MigrationIdentifier{QueueShard: "test"},
 		})
 
 		require.NoError(t, err)
@@ -493,7 +469,6 @@ func TestLeaseLifecycle_CompleteWorkflows(t *testing.T) {
 			IdempotencyKey: "idempotent-release", // Same key
 			AccountID:      te.AccountID,
 			LeaseID:        resp1.Leases[0].LeaseID,
-			Migration:      MigrationIdentifier{QueueShard: "test"},
 		})
 
 		require.NoError(t, err)
@@ -505,7 +480,6 @@ func TestLeaseLifecycle_CompleteWorkflows(t *testing.T) {
 			AccountID:      te.AccountID,
 			LeaseID:        resp1.Leases[1].LeaseID,
 			Duration:       45 * time.Second,
-			Migration:      MigrationIdentifier{QueueShard: "test"},
 		})
 
 		require.NoError(t, err)
@@ -517,7 +491,6 @@ func TestLeaseLifecycle_CompleteWorkflows(t *testing.T) {
 			AccountID:      te.AccountID,
 			LeaseID:        resp1.Leases[1].LeaseID,
 			Duration:       90 * time.Second, // Different duration - should be ignored
-			Migration:      MigrationIdentifier{QueueShard: "test"},
 		})
 
 		require.NoError(t, err)
@@ -528,7 +501,6 @@ func TestLeaseLifecycle_CompleteWorkflows(t *testing.T) {
 			IdempotencyKey: "cleanup-release",
 			AccountID:      te.AccountID,
 			LeaseID:        *extendResp1.LeaseID,
-			Migration:      MigrationIdentifier{QueueShard: "test"},
 		})
 		require.NoError(t, err)
 	})
@@ -553,9 +525,8 @@ func TestLeaseLifecycle_FailureScenarios(t *testing.T) {
 			{
 				Kind: ConstraintKindConcurrency,
 				Concurrency: &ConcurrencyConstraint{
-					Mode:              enums.ConcurrencyModeStep,
-					Scope:             enums.ConcurrencyScopeFn,
-					InProgressItemKey: fmt.Sprintf("{%s}:concurrency:expired:%s", te.KeyPrefix, te.FunctionID),
+					Mode:  enums.ConcurrencyModeStep,
+					Scope: enums.ConcurrencyScopeFn,
 				},
 			},
 		}
@@ -577,7 +548,6 @@ func TestLeaseLifecycle_FailureScenarios(t *testing.T) {
 				Service:  ServiceExecutor,
 				Location: CallerLocationItemLease,
 			},
-			Migration: MigrationIdentifier{QueueShard: "test"},
 		})
 
 		require.NoError(t, err)
@@ -593,7 +563,6 @@ func TestLeaseLifecycle_FailureScenarios(t *testing.T) {
 			AccountID:      te.AccountID,
 			LeaseID:        acquireResp.Leases[0].LeaseID,
 			Duration:       30 * time.Second,
-			Migration:      MigrationIdentifier{QueueShard: "test"},
 		})
 
 		require.NoError(t, err)
@@ -612,9 +581,8 @@ func TestLeaseLifecycle_FailureScenarios(t *testing.T) {
 			{
 				Kind: ConstraintKindConcurrency,
 				Concurrency: &ConcurrencyConstraint{
-					Mode:              enums.ConcurrencyModeStep,
-					Scope:             enums.ConcurrencyScopeFn,
-					InProgressItemKey: fmt.Sprintf("{%s}:concurrency:release-expired:%s", te.KeyPrefix, te.FunctionID),
+					Mode:  enums.ConcurrencyModeStep,
+					Scope: enums.ConcurrencyScopeFn,
 				},
 			},
 		}
@@ -636,7 +604,6 @@ func TestLeaseLifecycle_FailureScenarios(t *testing.T) {
 				Service:  ServiceExecutor,
 				Location: CallerLocationItemLease,
 			},
-			Migration: MigrationIdentifier{QueueShard: "test"},
 		})
 
 		require.NoError(t, err)
@@ -651,7 +618,6 @@ func TestLeaseLifecycle_FailureScenarios(t *testing.T) {
 			IdempotencyKey: "release-expired",
 			AccountID:      te.AccountID,
 			LeaseID:        acquireResp.Leases[0].LeaseID,
-			Migration:      MigrationIdentifier{QueueShard: "test"},
 		})
 
 		require.NoError(t, err)
@@ -677,9 +643,8 @@ func TestLeaseLifecycle_FailureScenarios(t *testing.T) {
 			{
 				Kind: ConstraintKindConcurrency,
 				Concurrency: &ConcurrencyConstraint{
-					Mode:              enums.ConcurrencyModeStep,
-					Scope:             enums.ConcurrencyScopeFn,
-					InProgressItemKey: fmt.Sprintf("{%s}:concurrency:version:%s", te.KeyPrefix, te.FunctionID),
+					Mode:  enums.ConcurrencyModeStep,
+					Scope: enums.ConcurrencyScopeFn,
 				},
 			},
 		}
@@ -701,7 +666,6 @@ func TestLeaseLifecycle_FailureScenarios(t *testing.T) {
 				Service:  ServiceExecutor,
 				Location: CallerLocationItemLease,
 			},
-			Migration: MigrationIdentifier{QueueShard: "test"},
 		})
 
 		require.NoError(t, err)
@@ -714,7 +678,6 @@ func TestLeaseLifecycle_FailureScenarios(t *testing.T) {
 			FunctionID:    te.FunctionID,
 			Configuration: config2, // New version
 			Constraints:   constraints,
-			Migration:     MigrationIdentifier{QueueShard: "test"},
 		})
 
 		require.NoError(t, err)
@@ -727,7 +690,6 @@ func TestLeaseLifecycle_FailureScenarios(t *testing.T) {
 				IdempotencyKey: fmt.Sprintf("version-release-%s", lease.IdempotencyKey),
 				AccountID:      te.AccountID,
 				LeaseID:        lease.LeaseID,
-				Migration:      MigrationIdentifier{QueueShard: "test"},
 			})
 			require.NoError(t, err)
 		}
@@ -738,9 +700,8 @@ func TestLeaseLifecycle_FailureScenarios(t *testing.T) {
 			{
 				Kind: ConstraintKindConcurrency,
 				Concurrency: &ConcurrencyConstraint{
-					Mode:              enums.ConcurrencyModeStep,
-					Scope:             enums.ConcurrencyScopeFn,
-					InProgressItemKey: fmt.Sprintf("{%s}:concurrency:config-change:%s", te.KeyPrefix, te.FunctionID),
+					Mode:  enums.ConcurrencyModeStep,
+					Scope: enums.ConcurrencyScopeFn,
 				},
 			},
 		}
@@ -749,9 +710,8 @@ func TestLeaseLifecycle_FailureScenarios(t *testing.T) {
 			{
 				Kind: ConstraintKindConcurrency,
 				Concurrency: &ConcurrencyConstraint{
-					Mode:              enums.ConcurrencyModeStep,
-					Scope:             enums.ConcurrencyScopeEnv,                                                // Changed scope
-					InProgressItemKey: fmt.Sprintf("{%s}:concurrency:config-change:%s", te.KeyPrefix, te.EnvID), // Different key
+					Mode:  enums.ConcurrencyModeStep,
+					Scope: enums.ConcurrencyScopeEnv, // Changed scope
 				},
 			},
 		}
@@ -780,7 +740,6 @@ func TestLeaseLifecycle_FailureScenarios(t *testing.T) {
 				Service:  ServiceExecutor,
 				Location: CallerLocationItemLease,
 			},
-			Migration: MigrationIdentifier{QueueShard: "test"},
 		})
 
 		require.NoError(t, err)
@@ -793,7 +752,6 @@ func TestLeaseLifecycle_FailureScenarios(t *testing.T) {
 			FunctionID:    te.FunctionID,
 			Configuration: config,
 			Constraints:   modifiedConstraints, // Different constraints
-			Migration:     MigrationIdentifier{QueueShard: "test"},
 		})
 
 		require.NoError(t, err)
@@ -805,7 +763,6 @@ func TestLeaseLifecycle_FailureScenarios(t *testing.T) {
 			IdempotencyKey: "config-change-release",
 			AccountID:      te.AccountID,
 			LeaseID:        acquireResp.Leases[0].LeaseID,
-			Migration:      MigrationIdentifier{QueueShard: "test"},
 		})
 
 		require.NoError(t, err)
