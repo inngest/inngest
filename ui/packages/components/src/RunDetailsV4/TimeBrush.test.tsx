@@ -123,11 +123,11 @@ describe('TimeBrush', () => {
   });
 
   describe('default styling (FR-002, FR-003, FR-005)', () => {
-    it('renders handles with black color class (bg-basis)', () => {
+    it('renders handles with visible gray color class (bg-surfaceMuted)', () => {
       const { container } = render(<TimeBrush />);
 
-      // Handle inner divs should have bg-basis class
-      const handles = container.querySelectorAll('.bg-basis');
+      // Handle inner divs should have bg-surfaceMuted class
+      const handles = container.querySelectorAll('.bg-surfaceMuted');
       expect(handles).toHaveLength(2);
     });
 
@@ -330,7 +330,9 @@ describe('TimeBrush', () => {
         onSelectionChange.mockClear();
 
         // Click on the background track outside selection (5% of 200px = 10px)
-        const track = outerContainer.querySelector('.bg-canvasMuted') as HTMLElement;
+        const track = outerContainer.querySelector(
+          '[data-testid="time-brush-track"]'
+        ) as HTMLElement;
         fireEvent.mouseDown(track, { clientX: 10 });
         fireEvent.mouseMove(document, { clientX: 40 }); // drag to 20%
         fireEvent.mouseUp(document);
@@ -361,7 +363,9 @@ describe('TimeBrush', () => {
         makeNonDefaultSelection(outerContainer);
 
         // Hover on the track outside the selection (5%)
-        const track = outerContainer.querySelector('.bg-canvasMuted') as HTMLElement;
+        const track = outerContainer.querySelector(
+          '[data-testid="time-brush-track"]'
+        ) as HTMLElement;
         fireEvent.mouseMove(track, { clientX: 10 });
 
         const cursorLine = outerContainer.querySelector('.pointer-events-none.w-px');
