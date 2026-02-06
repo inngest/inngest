@@ -420,14 +420,24 @@ export function TimelineBar({
   );
 
   return (
-    <div data-testid="timeline-bar-container">
+    <div data-testid="timeline-bar-container" className="relative">
       {/* Main row */}
       <div
         data-testid="timeline-bar-row"
-        className={cn('flex h-7 cursor-pointer items-center', selected && 'bg-canvasSubtle')}
+        className="relative isolate flex h-7 cursor-pointer items-center"
         onClick={onClick}
         style={{ height: `${TIMELINE_CONSTANTS.ROW_HEIGHT_PX}px` }}
       >
+        {/* Selection highlight - inset to clear the vertical guide line */}
+        {selected && (
+          <div
+            className="bg-canvasSubtle pointer-events-none absolute inset-y-0 -z-10 rounded-sm"
+            style={{
+              left: `${indentPx - 4}px`,
+              width: `calc(${leftWidth}% - ${indentPx - 4}px)`,
+            }}
+          />
+        )}
         {/* Left panel - name, icon, controls */}
         <div
           data-testid="timeline-bar-left"
@@ -493,6 +503,18 @@ export function TimelineBar({
           </div>
         </div>
       </div>
+
+      {/* Vertical guide line from arrow to bottom of expanded area */}
+      {expandable && expanded && (
+        <div
+          className="bg-canvasMuted absolute w-px"
+          style={{
+            left: `${indentPx + 8}px`,
+            top: `${TIMELINE_CONSTANTS.ROW_HEIGHT_PX}px`,
+            bottom: 0,
+          }}
+        />
+      )}
 
       {/* Children (expanded content) */}
       {expandable && expanded && children}
