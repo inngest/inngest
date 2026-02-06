@@ -99,6 +99,8 @@ func ToFunctionRunStatus(s enums.RunStatus) (FunctionRunStatus, error) {
 		return FunctionRunStatusFailed, nil
 	case enums.RunStatusCancelled:
 		return FunctionRunStatusCancelled, nil
+	case enums.RunStatusSkipped:
+		return FunctionRunStatusSkipped, nil
 	default:
 		return FunctionRunStatusRunning, fmt.Errorf("unknown run status: %d", s)
 	}

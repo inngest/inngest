@@ -629,6 +629,12 @@ export const GET_EVENT_RUNS = gql`
           name
           slug
         }
+        trace(preview: true) {
+          metadata {
+            kind
+            values
+          }
+        }
       }
     }
   }

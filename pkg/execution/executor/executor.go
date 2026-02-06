@@ -1068,6 +1068,10 @@ func (e *executor) schedule(
 	//
 	throttle := queue.GetThrottleConfig(ctx, req.Function.ID, req.Function.Throttle, evtMap)
 
+	// Track skip reason and context for metadata
+	var skipReason enums.SkipReason
+	var singletonSkipRunID *ulid.ULID
+
 	//
 	// Create singleton information and try to handle it prior to creating state.
 	//
@@ -1111,8 +1115,9 @@ func (e *executor) schedule(
 						l.ReportError(err, "error canceling singleton run")
 					}
 				default:
-					// Immediately end before creating state
-					return nil, ErrFunctionSkipped
+					// Mark as singleton skip - will be handled after span creation
+					skipReason = enums.SkipReasonSingleton
+					singletonSkipRunID = singletonRunID
 				}
 			}
 			singletonConfig = &queue.Singleton{Key: singletonKey}
@@ -1144,8 +1149,11 @@ func (e *executor) schedule(
 
 	stv1ID := sv2.V1FromMetadata(metadata)
 
-	// Check if the function should be skipped (paused, draining)
-	skipReason := e.skipped(ctx, req)
+	// Check if the function should be skipped (paused, draining, backlog limit)
+	// Only check if not already marked as skipped (e.g., by singleton)
+	if skipReason == enums.SkipReasonNone {
+		skipReason = e.skipped(ctx, req)
+	}
 
 	// Create run state if not skipped
 	if skipReason == enums.SkipReasonNone {
@@ -1223,8 +1231,21 @@ func (e *executor) schedule(
 		l.Debug("error creating run span", "error", err)
 	}
 
-	// If this is paused, immediately end just before creating state.
+	// If the function is being skipped, create skip metadata and end.
 	if skipReason != enums.SkipReasonNone {
+		if _, err := tracing.CreateMetadataSpan(
+			ctx,
+			e.tracerProvider,
+			runSpanRef.Ref,
+			"executor.Schedule.Skip",
+			pkgName,
+			&metadata,
+			extractors.NewSkipMetadata(skipReason, singletonSkipRunID),
+			enums.MetadataScopeRun,
+		); err != nil {
+			l.Warn("error creating skip metadata span", "error", err)
+		}
+
 		sendSpans()
 		return e.handleFunctionSkipped(ctx, req, metadata, evts, skipReason)
 	}

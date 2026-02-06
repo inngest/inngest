@@ -5,6 +5,7 @@ export const statusTitles: Record<string, string> = {
   FAILED: 'Failed',
   RUNNING: 'Running',
   QUEUED: 'Queued',
+  SKIPPED: 'Skipped',
   SKIPPED_PAUSED: 'Skipped',
   PAUSED: 'Paused',
   INACTIVE: 'Inactive',
