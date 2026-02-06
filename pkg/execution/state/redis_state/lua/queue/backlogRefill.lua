@@ -60,8 +60,6 @@ local keyBacklogActiveCheckCooldown  = KEYS[23]
 
 local keyPartitionNormalizeSet       = KEYS[24]
 
-local keyConstraintCheckIdempotency = KEYS[25]
-
 local backlogID     = ARGV[1]
 local partitionID   = ARGV[2]
 local accountID     = ARGV[3]
@@ -164,10 +162,6 @@ end
 
 -- Check throttle capacity if configured
 local checkThrottle = checkConstraints == 1 and throttlePeriod > 0 and throttleLimit > 0
--- Skip throttle GCRA checks if constraint check idempotency is set by Constraint API
-if checkConstraints and exists_without_ending(keyConstraintCheckIdempotency, ":-") and redis.call("EXISTS", keyConstraintCheckIdempotency) == 1 then
-  checkThrottle = false
-end
 
 if checkConstraints == 1 then
   if (constraintCapacity == nil or constraintCapacity > 0) and checkThrottle then
