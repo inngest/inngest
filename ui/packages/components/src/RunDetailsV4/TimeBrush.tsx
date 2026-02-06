@@ -49,7 +49,7 @@ export function TimeBrush({
   minSelectionWidth = 2,
   showResetButton = true,
   selectionClassName = '',
-  handleClassName = 'bg-basis hover:bg-basis',
+  handleClassName = 'bg-surfaceMuted hover:bg-muted',
   cursorLineClassName = 'bg-slate-500',
   children,
   className,
@@ -269,9 +269,10 @@ export function TimeBrush({
 
       {/* Track container */}
       <div className="relative h-4">
-        {/* Background track (clickable area for creating/re-creating selection) */}
+        {/* Background track (extended click target — overflows below the bar for easier interaction) */}
         <div
-          className="bg-canvasMuted absolute inset-0 top-1/2 h-1 -translate-y-1/2 rounded-full"
+          data-testid="time-brush-track"
+          className="absolute inset-0 -bottom-2"
           onMouseDown={handleTrackMouseDown}
           onMouseMove={handleTrackMouseMove}
           onMouseLeave={handleTrackMouseLeave}
@@ -320,7 +321,7 @@ export function TimeBrush({
         >
           <div
             className={cn(
-              'absolute left-1/2 top-0 h-full w-1 -translate-x-1/2 rounded-full transition-colors',
+              'absolute left-1/2 top-0 h-full w-0.5 -translate-x-1/2 rounded-full transition-colors',
               handleClassName
             )}
           />
@@ -338,7 +339,7 @@ export function TimeBrush({
         >
           <div
             className={cn(
-              'absolute left-1/2 top-0 h-full w-1 -translate-x-1/2 rounded-full transition-colors',
+              'absolute left-1/2 top-0 h-full w-0.5 -translate-x-1/2 rounded-full transition-colors',
               handleClassName
             )}
           />

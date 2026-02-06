@@ -105,7 +105,7 @@ export function TimelineHeader({
           <>
             <div
               data-testid="timestamp-label-left"
-              className="text-basis pointer-events-none absolute z-20 text-xs tabular-nums"
+              className="bg-canvasBase border-subtle text-basis pointer-events-none absolute z-20 rounded border px-1 py-0.5 text-xs tabular-nums"
               style={{
                 left: `${selStart}%`,
                 transform:
@@ -114,14 +114,14 @@ export function TimelineHeader({
                     : selStart > 95
                     ? 'translateX(-100%)'
                     : 'translateX(-50%)',
-                top: '-4px',
+                top: '-18px',
               }}
             >
               {formatDuration(Math.floor((totalMs * selStart) / 100))}
             </div>
             <div
               data-testid="timestamp-label-right"
-              className="text-basis pointer-events-none absolute z-20 text-xs tabular-nums"
+              className="bg-canvasBase border-subtle text-basis pointer-events-none absolute z-20 rounded border px-1 py-0.5 text-xs tabular-nums"
               style={{
                 left: `${selEnd}%`,
                 transform:
@@ -130,7 +130,7 @@ export function TimelineHeader({
                     : selEnd > 95
                     ? 'translateX(-100%)'
                     : 'translateX(-50%)',
-                top: '-4px',
+                top: '-18px',
               }}
             >
               {formatDuration(Math.floor((totalMs * selEnd) / 100))}
