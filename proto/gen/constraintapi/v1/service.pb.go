@@ -1409,7 +1409,7 @@ type CapacityAcquireRequest struct {
 	MaximumLifetime      *durationpb.Duration   `protobuf:"bytes,12,opt,name=maximum_lifetime,json=maximumLifetime,proto3" json:"maximum_lifetime,omitempty"`
 	BlockingThreshold    *durationpb.Duration   `protobuf:"bytes,13,opt,name=blocking_threshold,json=blockingThreshold,proto3" json:"blocking_threshold,omitempty"`
 	Source               *LeaseSource           `protobuf:"bytes,14,opt,name=source,proto3" json:"source,omitempty"`
-	RequestAttempt       uint32                 `protobuf:"varint,16,opt,name=request_attempt,json=requestAttempt,proto3" json:"request_attempt,omitempty"`
+	RequestAttempt       uint32                 `protobuf:"varint,15,opt,name=request_attempt,json=requestAttempt,proto3" json:"request_attempt,omitempty"`
 	unknownFields        protoimpl.UnknownFields
 	sizeCache            protoimpl.SizeCache
 }
@@ -1631,8 +1631,8 @@ type CapacityExtendLeaseRequest struct {
 	AccountId      string                 `protobuf:"bytes,2,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
 	LeaseId        string                 `protobuf:"bytes,3,opt,name=lease_id,json=leaseId,proto3" json:"lease_id,omitempty"`
 	Duration       *durationpb.Duration   `protobuf:"bytes,4,opt,name=duration,proto3" json:"duration,omitempty"`
-	Source         *LeaseSource           `protobuf:"bytes,6,opt,name=source,proto3" json:"source,omitempty"`
-	RequestAttempt uint32                 `protobuf:"varint,7,opt,name=request_attempt,json=requestAttempt,proto3" json:"request_attempt,omitempty"`
+	Source         *LeaseSource           `protobuf:"bytes,5,opt,name=source,proto3" json:"source,omitempty"`
+	RequestAttempt uint32                 `protobuf:"varint,6,opt,name=request_attempt,json=requestAttempt,proto3" json:"request_attempt,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -1758,8 +1758,8 @@ type CapacityReleaseRequest struct {
 	IdempotencyKey string                 `protobuf:"bytes,1,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
 	AccountId      string                 `protobuf:"bytes,2,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
 	LeaseId        string                 `protobuf:"bytes,3,opt,name=lease_id,json=leaseId,proto3" json:"lease_id,omitempty"`
-	Source         *LeaseSource           `protobuf:"bytes,5,opt,name=source,proto3" json:"source,omitempty"`
-	RequestAttempt uint32                 `protobuf:"varint,6,opt,name=request_attempt,json=requestAttempt,proto3" json:"request_attempt,omitempty"`
+	Source         *LeaseSource           `protobuf:"bytes,4,opt,name=source,proto3" json:"source,omitempty"`
+	RequestAttempt uint32                 `protobuf:"varint,5,opt,name=request_attempt,json=requestAttempt,proto3" json:"request_attempt,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -1967,7 +1967,7 @@ const file_constraintapi_v1_service_proto_rawDesc = "" +
 	"\x10maximum_lifetime\x18\f \x01(\v2\x19.google.protobuf.DurationR\x0fmaximumLifetime\x12H\n" +
 	"\x12blocking_threshold\x18\r \x01(\v2\x19.google.protobuf.DurationR\x11blockingThreshold\x125\n" +
 	"\x06source\x18\x0e \x01(\v2\x1d.constraintapi.v1.LeaseSourceR\x06source\x12'\n" +
-	"\x0frequest_attempt\x18\x10 \x01(\rR\x0erequestAttempt\x1a>\n" +
+	"\x0frequest_attempt\x18\x0f \x01(\rR\x0erequestAttempt\x1a>\n" +
 	"\x10LeaseRunIdsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xea\x02\n" +
@@ -1984,8 +1984,8 @@ const file_constraintapi_v1_service_proto_rawDesc = "" +
 	"account_id\x18\x02 \x01(\tR\taccountId\x12\x19\n" +
 	"\blease_id\x18\x03 \x01(\tR\aleaseId\x125\n" +
 	"\bduration\x18\x04 \x01(\v2\x19.google.protobuf.DurationR\bduration\x125\n" +
-	"\x06source\x18\x06 \x01(\v2\x1d.constraintapi.v1.LeaseSourceR\x06source\x12'\n" +
-	"\x0frequest_attempt\x18\a \x01(\rR\x0erequestAttempt\"J\n" +
+	"\x06source\x18\x05 \x01(\v2\x1d.constraintapi.v1.LeaseSourceR\x06source\x12'\n" +
+	"\x0frequest_attempt\x18\x06 \x01(\rR\x0erequestAttempt\"J\n" +
 	"\x1bCapacityExtendLeaseResponse\x12\x1e\n" +
 	"\blease_id\x18\x01 \x01(\tH\x00R\aleaseId\x88\x01\x01B\v\n" +
 	"\t_lease_id\"\xdb\x01\n" +
@@ -1994,8 +1994,8 @@ const file_constraintapi_v1_service_proto_rawDesc = "" +
 	"\n" +
 	"account_id\x18\x02 \x01(\tR\taccountId\x12\x19\n" +
 	"\blease_id\x18\x03 \x01(\tR\aleaseId\x125\n" +
-	"\x06source\x18\x05 \x01(\v2\x1d.constraintapi.v1.LeaseSourceR\x06source\x12'\n" +
-	"\x0frequest_attempt\x18\x06 \x01(\rR\x0erequestAttempt\"\x19\n" +
+	"\x06source\x18\x04 \x01(\v2\x1d.constraintapi.v1.LeaseSourceR\x06source\x12'\n" +
+	"\x0frequest_attempt\x18\x05 \x01(\rR\x0erequestAttempt\"\x19\n" +
 	"\x17CapacityReleaseResponse*\xd2\x01\n" +
 	"\x1bConstraintApiRateLimitScope\x12/\n" +
 	"+CONSTRAINT_API_RATE_LIMIT_SCOPE_UNSPECIFIED\x10\x00\x12,\n" +
