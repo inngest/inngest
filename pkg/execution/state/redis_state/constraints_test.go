@@ -11,7 +11,6 @@ import (
 	"github.com/alicebob/miniredis/v2"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/constraintapi"
-	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
@@ -41,16 +40,11 @@ func TestItemLeaseConstraintCheck(t *testing.T) {
 
 	cmLifecycles := constraintapi.NewConstraintAPIDebugLifecycles()
 	cm, err := constraintapi.NewRedisCapacityManager(
+		constraintapi.WithClient(rc),
+		constraintapi.WithShardName("default"),
 		constraintapi.WithClock(clock),
 		constraintapi.WithEnableDebugLogs(true),
 		constraintapi.WithLifecycles(cmLifecycles),
-		constraintapi.WithNumScavengerShards(1),
-		constraintapi.WithQueueShards(map[string]rueidis.Client{
-			consts.DefaultQueueShardName: rc,
-		}),
-		constraintapi.WithQueueStateKeyPrefix("q:v1"),
-		constraintapi.WithRateLimitClient(rc),
-		constraintapi.WithRateLimitKeyPrefix("rl"),
 	)
 	require.NoError(t, err)
 
@@ -692,11 +686,14 @@ func TestItemLeaseConstraintCheck(t *testing.T) {
 				return constraints
 			}),
 		)
-		kg := shard.Client().kg
 
+		// Simulate in progress leases
+		keyInProgressLeases := constraintapi.ConcurrencyConstraint{
+			Scope: enums.ConcurrencyScopeAccount,
+		}.InProgressLeasesKey(accountID, envID, fnID)
 		for i := range 10 {
 			_, err := r.ZAdd(
-				kg.Concurrency("account", accountID.String()),
+				keyInProgressLeases,
 				float64(clock.Now().Add(5*time.Second).UnixMilli()),
 				fmt.Sprintf("i%d", i),
 			)
@@ -755,16 +752,11 @@ func TestBacklogRefillConstraintCheck(t *testing.T) {
 
 	cmLifecycles := constraintapi.NewConstraintAPIDebugLifecycles()
 	cm, err := constraintapi.NewRedisCapacityManager(
+		constraintapi.WithClient(rc),
+		constraintapi.WithShardName("default"),
 		constraintapi.WithClock(clock),
 		constraintapi.WithEnableDebugLogs(true),
 		constraintapi.WithLifecycles(cmLifecycles),
-		constraintapi.WithNumScavengerShards(1),
-		constraintapi.WithQueueShards(map[string]rueidis.Client{
-			consts.DefaultQueueShardName: rc,
-		}),
-		constraintapi.WithQueueStateKeyPrefix("q:v1"),
-		constraintapi.WithRateLimitClient(rc),
-		constraintapi.WithRateLimitKeyPrefix("rl"),
 	)
 	require.NoError(t, err)
 
@@ -1001,11 +993,14 @@ func TestBacklogRefillConstraintCheck(t *testing.T) {
 				return constraints
 			}),
 		)
-		kg := shard.Client().kg
 
+		// Simulate in progress leases
+		keyInProgressLeases := constraintapi.ConcurrencyConstraint{
+			Scope: enums.ConcurrencyScopeAccount,
+		}.InProgressLeasesKey(accountID, envID, fnID)
 		for i := range 10 {
 			_, err := r.ZAdd(
-				kg.Concurrency("account", accountID.String()),
+				keyInProgressLeases,
 				float64(clock.Now().Add(5*time.Second).UnixMilli()),
 				fmt.Sprintf("i%d", i),
 			)
@@ -1237,17 +1232,15 @@ func TestConstraintItemsFromBacklog(t *testing.T) {
 				{
 					Kind: constraintapi.ConstraintKindConcurrency,
 					Concurrency: &constraintapi.ConcurrencyConstraint{
-						Mode:              enums.ConcurrencyModeStep,
-						Scope:             enums.ConcurrencyScopeAccount,
-						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:account:%s", accountID),
+						Mode:  enums.ConcurrencyModeStep,
+						Scope: enums.ConcurrencyScopeAccount,
 					},
 				},
 				{
 					Kind: constraintapi.ConstraintKindConcurrency,
 					Concurrency: &constraintapi.ConcurrencyConstraint{
-						Mode:              enums.ConcurrencyModeStep,
-						Scope:             enums.ConcurrencyScopeFn,
-						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:p:%s", fnID),
+						Mode:  enums.ConcurrencyModeStep,
+						Scope: enums.ConcurrencyScopeFn,
 					},
 				},
 			},
@@ -1269,17 +1262,15 @@ func TestConstraintItemsFromBacklog(t *testing.T) {
 				{
 					Kind: constraintapi.ConstraintKindConcurrency,
 					Concurrency: &constraintapi.ConcurrencyConstraint{
-						Mode:              enums.ConcurrencyModeStep,
-						Scope:             enums.ConcurrencyScopeAccount,
-						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:account:%s", accountID),
+						Mode:  enums.ConcurrencyModeStep,
+						Scope: enums.ConcurrencyScopeAccount,
 					},
 				},
 				{
 					Kind: constraintapi.ConstraintKindConcurrency,
 					Concurrency: &constraintapi.ConcurrencyConstraint{
-						Mode:              enums.ConcurrencyModeStep,
-						Scope:             enums.ConcurrencyScopeFn,
-						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:p:%s", fnID),
+						Mode:  enums.ConcurrencyModeStep,
+						Scope: enums.ConcurrencyScopeFn,
 					},
 				},
 				{
@@ -1322,17 +1313,15 @@ func TestConstraintItemsFromBacklog(t *testing.T) {
 				{
 					Kind: constraintapi.ConstraintKindConcurrency,
 					Concurrency: &constraintapi.ConcurrencyConstraint{
-						Mode:              enums.ConcurrencyModeStep,
-						Scope:             enums.ConcurrencyScopeAccount,
-						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:account:%s", accountID),
+						Mode:  enums.ConcurrencyModeStep,
+						Scope: enums.ConcurrencyScopeAccount,
 					},
 				},
 				{
 					Kind: constraintapi.ConstraintKindConcurrency,
 					Concurrency: &constraintapi.ConcurrencyConstraint{
-						Mode:              enums.ConcurrencyModeStep,
-						Scope:             enums.ConcurrencyScopeFn,
-						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:p:%s", fnID),
+						Mode:  enums.ConcurrencyModeStep,
+						Scope: enums.ConcurrencyScopeFn,
 					},
 				},
 				{
@@ -1342,7 +1331,6 @@ func TestConstraintItemsFromBacklog(t *testing.T) {
 						Scope:             enums.ConcurrencyScopeAccount,
 						KeyExpressionHash: "custom-key-1-hash",
 						EvaluatedKeyHash:  "custom-key-1-value",
-						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:custom:a:%s:%s", accountID, "custom-key-1-value"),
 					},
 				},
 				{
@@ -1352,7 +1340,6 @@ func TestConstraintItemsFromBacklog(t *testing.T) {
 						Scope:             enums.ConcurrencyScopeFn,
 						KeyExpressionHash: "custom-key-2-hash",
 						EvaluatedKeyHash:  "custom-key-2-value",
-						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:custom:f:%s:%s", fnID, "custom-key-2-value"),
 					},
 				},
 			},
@@ -1384,17 +1371,15 @@ func TestConstraintItemsFromBacklog(t *testing.T) {
 				{
 					Kind: constraintapi.ConstraintKindConcurrency,
 					Concurrency: &constraintapi.ConcurrencyConstraint{
-						Mode:              enums.ConcurrencyModeStep,
-						Scope:             enums.ConcurrencyScopeAccount,
-						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:account:%s", accountID),
+						Mode:  enums.ConcurrencyModeStep,
+						Scope: enums.ConcurrencyScopeAccount,
 					},
 				},
 				{
 					Kind: constraintapi.ConstraintKindConcurrency,
 					Concurrency: &constraintapi.ConcurrencyConstraint{
-						Mode:              enums.ConcurrencyModeStep,
-						Scope:             enums.ConcurrencyScopeFn,
-						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:p:%s", fnID),
+						Mode:  enums.ConcurrencyModeStep,
+						Scope: enums.ConcurrencyScopeFn,
 					},
 				},
 				{
@@ -1411,7 +1396,6 @@ func TestConstraintItemsFromBacklog(t *testing.T) {
 						Scope:             enums.ConcurrencyScopeEnv,
 						KeyExpressionHash: "complete-key-hash",
 						EvaluatedKeyHash:  "complete-key-value",
-						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:custom:e:%s:%s", fnID, "complete-key-value"),
 					},
 				},
 			},

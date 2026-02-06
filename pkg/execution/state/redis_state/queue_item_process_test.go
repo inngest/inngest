@@ -39,16 +39,11 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 
 	cmLifecycles := constraintapi.NewConstraintAPIDebugLifecycles()
 	cm, err := constraintapi.NewRedisCapacityManager(
+		constraintapi.WithClient(rc),
+		constraintapi.WithShardName(consts.DefaultQueueShardName),
 		constraintapi.WithClock(clock),
 		constraintapi.WithEnableDebugLogs(true),
 		constraintapi.WithLifecycles(cmLifecycles),
-		constraintapi.WithNumScavengerShards(1),
-		constraintapi.WithQueueShards(map[string]rueidis.Client{
-			consts.DefaultQueueShardName: rc,
-		}),
-		constraintapi.WithQueueStateKeyPrefix("queue"),
-		constraintapi.WithRateLimitClient(rc),
-		constraintapi.WithRateLimitKeyPrefix("rl"),
 	)
 	require.NoError(t, err)
 
@@ -167,7 +162,6 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 			osqueue.WithCapacityLeaseExtendInterval(time.Second),
 			osqueue.WithLogger(l),
 		)
-		kg := shard.Client().kg
 
 		qi, err := shard.EnqueueItem(ctx, item, start, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
@@ -194,14 +188,12 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 					Kind: constraintapi.ConstraintKindConcurrency,
 					Concurrency: &constraintapi.ConcurrencyConstraint{
 						Scope:             enums.ConcurrencyScopeAccount,
-						InProgressItemKey: kg.Concurrency("account", accountID.String()),
 					},
 				},
 				{
 					Kind: constraintapi.ConstraintKindConcurrency,
 					Concurrency: &constraintapi.ConcurrencyConstraint{
 						Scope:             enums.ConcurrencyScopeFn,
-						InProgressItemKey: kg.Concurrency("p", fnID.String()),
 					},
 				},
 			},
@@ -212,9 +204,6 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 				Service:           constraintapi.ServiceExecutor,
 				Location:          constraintapi.CallerLocationItemLease,
 				RunProcessingMode: constraintapi.RunProcessingModeBackground,
-			},
-			Migration: constraintapi.MigrationIdentifier{
-				QueueShard: shard.Name(),
 			},
 		})
 		require.NoError(t, err)
@@ -282,7 +271,6 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 			osqueue.WithCapacityLeaseExtendInterval(leaseExtendInterval),
 			osqueue.WithLogger(l),
 		)
-		kg := shard.Client().kg
 
 		qi, err := shard.EnqueueItem(ctx, item, start, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
@@ -309,14 +297,12 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 					Kind: constraintapi.ConstraintKindConcurrency,
 					Concurrency: &constraintapi.ConcurrencyConstraint{
 						Scope:             enums.ConcurrencyScopeAccount,
-						InProgressItemKey: kg.Concurrency("account", accountID.String()),
 					},
 				},
 				{
 					Kind: constraintapi.ConstraintKindConcurrency,
 					Concurrency: &constraintapi.ConcurrencyConstraint{
 						Scope:             enums.ConcurrencyScopeFn,
-						InProgressItemKey: kg.Concurrency("p", fnID.String()),
 					},
 				},
 			},
@@ -327,9 +313,6 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 				Service:           constraintapi.ServiceExecutor,
 				Location:          constraintapi.CallerLocationItemLease,
 				RunProcessingMode: constraintapi.RunProcessingModeBackground,
-			},
-			Migration: constraintapi.MigrationIdentifier{
-				QueueShard: shard.Name(),
 			},
 		})
 		require.NoError(t, err)
@@ -406,16 +389,11 @@ func TestQueueProcessorPreLeaseWithConstraintAPI(t *testing.T) {
 
 	cmLifecycles := constraintapi.NewConstraintAPIDebugLifecycles()
 	cm, err := constraintapi.NewRedisCapacityManager(
+		constraintapi.WithClient(rc),
+		constraintapi.WithShardName(consts.DefaultQueueShardName),
 		constraintapi.WithClock(clock),
 		constraintapi.WithEnableDebugLogs(true),
 		constraintapi.WithLifecycles(cmLifecycles),
-		constraintapi.WithNumScavengerShards(1),
-		constraintapi.WithQueueShards(map[string]rueidis.Client{
-			consts.DefaultQueueShardName: rc,
-		}),
-		constraintapi.WithQueueStateKeyPrefix("queue"),
-		constraintapi.WithRateLimitClient(rc),
-		constraintapi.WithRateLimitKeyPrefix("rl"),
 	)
 	require.NoError(t, err)
 
@@ -552,7 +530,6 @@ func TestQueueProcessorPreLeaseWithConstraintAPI(t *testing.T) {
 			osqueue.WithCapacityLeaseExtendInterval(time.Second),
 			osqueue.WithLogger(l),
 		)
-		kg := shard.Client().kg
 
 		qi, err := shard.EnqueueItem(ctx, item, start, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
@@ -577,14 +554,12 @@ func TestQueueProcessorPreLeaseWithConstraintAPI(t *testing.T) {
 					Kind: constraintapi.ConstraintKindConcurrency,
 					Concurrency: &constraintapi.ConcurrencyConstraint{
 						Scope:             enums.ConcurrencyScopeAccount,
-						InProgressItemKey: kg.Concurrency("account", accountID.String()),
 					},
 				},
 				{
 					Kind: constraintapi.ConstraintKindConcurrency,
 					Concurrency: &constraintapi.ConcurrencyConstraint{
 						Scope:             enums.ConcurrencyScopeFn,
-						InProgressItemKey: kg.Concurrency("p", fnID.String()),
 					},
 				},
 			},
@@ -595,9 +570,6 @@ func TestQueueProcessorPreLeaseWithConstraintAPI(t *testing.T) {
 				Service:           constraintapi.ServiceExecutor,
 				Location:          constraintapi.CallerLocationItemLease,
 				RunProcessingMode: constraintapi.RunProcessingModeBackground,
-			},
-			Migration: constraintapi.MigrationIdentifier{
-				QueueShard: shard.Name(),
 			},
 		})
 		require.NoError(t, err)
@@ -657,16 +629,11 @@ func TestPartitionProcessRequeueAfterLimitedWithConstraintAPI(t *testing.T) {
 
 	cmLifecycles := constraintapi.NewConstraintAPIDebugLifecycles()
 	cm, err := constraintapi.NewRedisCapacityManager(
+		constraintapi.WithClient(rc),
+		constraintapi.WithShardName(consts.DefaultQueueShardName),
 		constraintapi.WithClock(clock),
 		constraintapi.WithEnableDebugLogs(true),
 		constraintapi.WithLifecycles(cmLifecycles),
-		constraintapi.WithNumScavengerShards(1),
-		constraintapi.WithQueueShards(map[string]rueidis.Client{
-			consts.DefaultQueueShardName: rc,
-		}),
-		constraintapi.WithQueueStateKeyPrefix("queue"),
-		constraintapi.WithRateLimitClient(rc),
-		constraintapi.WithRateLimitKeyPrefix("rl"),
 	)
 	require.NoError(t, err)
 
@@ -1041,14 +1008,12 @@ func TestPartitionProcessRequeueAfterLimitedWithConstraintAPI(t *testing.T) {
 						Kind: constraintapi.ConstraintKindConcurrency,
 						Concurrency: &constraintapi.ConcurrencyConstraint{
 							Scope:             enums.ConcurrencyScopeAccount,
-							InProgressItemKey: kg.Concurrency("account", accountID.String()),
 						},
 					},
 					{
 						Kind: constraintapi.ConstraintKindConcurrency,
 						Concurrency: &constraintapi.ConcurrencyConstraint{
 							Scope:             enums.ConcurrencyScopeFn,
-							InProgressItemKey: kg.Concurrency("p", fnID.String()),
 						},
 					},
 				},
@@ -1059,9 +1024,6 @@ func TestPartitionProcessRequeueAfterLimitedWithConstraintAPI(t *testing.T) {
 					Service:           constraintapi.ServiceExecutor,
 					Location:          constraintapi.CallerLocationItemLease,
 					RunProcessingMode: constraintapi.RunProcessingModeBackground,
-				},
-				Migration: constraintapi.MigrationIdentifier{
-					QueueShard: shard.Name(),
 				},
 			})
 			require.NoError(t, err)

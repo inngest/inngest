@@ -35,7 +35,6 @@ func TestInputValidation_ResourceLimits(t *testing.T) {
 				Concurrency: &ConcurrencyConstraint{
 					Mode:              enums.ConcurrencyModeStep,
 					Scope:             enums.ConcurrencyScopeFn,
-					InProgressItemKey: fmt.Sprintf("{%s}:concurrency:maxcount:%s", te.KeyPrefix, te.FunctionID),
 				},
 			},
 		}
@@ -64,7 +63,6 @@ func TestInputValidation_ResourceLimits(t *testing.T) {
 				Service:  ServiceExecutor,
 				Location: CallerLocationItemLease,
 			},
-			Migration: MigrationIdentifier{QueueShard: "test"},
 		})
 
 		require.Error(t, err)
@@ -85,7 +83,6 @@ func TestInputValidation_ResourceLimits(t *testing.T) {
 				Concurrency: &ConcurrencyConstraint{
 					Mode:              enums.ConcurrencyModeStep,
 					Scope:             enums.ConcurrencyScopeFn,
-					InProgressItemKey: fmt.Sprintf("{%s}:concurrency:duration:%s", te.KeyPrefix, te.FunctionID),
 				},
 			},
 		}
@@ -107,7 +104,6 @@ func TestInputValidation_ResourceLimits(t *testing.T) {
 				Service:  ServiceExecutor,
 				Location: CallerLocationItemLease,
 			},
-			Migration: MigrationIdentifier{QueueShard: "test"},
 		})
 
 		require.Error(t, err)
@@ -130,7 +126,6 @@ func TestInputValidation_ResourceLimits(t *testing.T) {
 				Service:  ServiceExecutor,
 				Location: CallerLocationItemLease,
 			},
-			Migration: MigrationIdentifier{QueueShard: "test"},
 		})
 
 		require.Error(t, err)
@@ -170,9 +165,8 @@ func TestInputValidation_ResourceLimits(t *testing.T) {
 			{
 				Kind: ConstraintKindConcurrency,
 				Concurrency: &ConcurrencyConstraint{
-					Mode:              enums.ConcurrencyModeStep,
-					Scope:             enums.ConcurrencyScopeFn,
-					InProgressItemKey: fmt.Sprintf("{%s}:concurrency:complex:%s", te.KeyPrefix, te.FunctionID),
+					Mode:  enums.ConcurrencyModeStep,
+					Scope: enums.ConcurrencyScopeFn,
 				},
 			},
 		}
@@ -194,7 +188,6 @@ func TestInputValidation_ResourceLimits(t *testing.T) {
 				Service:  ServiceExecutor,
 				Location: CallerLocationItemLease,
 			},
-			Migration: MigrationIdentifier{QueueShard: "test"},
 		})
 		require.Error(t, err)
 		require.ErrorContains(t, err, "exceeded maximum of 1 rate limits")
@@ -205,7 +198,6 @@ func TestInputValidation_ResourceLimits(t *testing.T) {
 		// Create very long strings
 		longIdempotencyKey := strings.Repeat("a", 1000)
 		longLeaseKey := strings.Repeat("b", 1000)
-		longInProgressKey := fmt.Sprintf("{%s}:concurrency:%s:%s", te.KeyPrefix, strings.Repeat("d", 500), te.FunctionID)
 
 		config := ConstraintConfig{
 			FunctionVersion: 1,
@@ -218,9 +210,8 @@ func TestInputValidation_ResourceLimits(t *testing.T) {
 			{
 				Kind: ConstraintKindConcurrency,
 				Concurrency: &ConcurrencyConstraint{
-					Mode:              enums.ConcurrencyModeStep,
-					Scope:             enums.ConcurrencyScopeFn,
-					InProgressItemKey: longInProgressKey,
+					Mode:  enums.ConcurrencyModeStep,
+					Scope: enums.ConcurrencyScopeFn,
 				},
 			},
 		}
@@ -241,7 +232,6 @@ func TestInputValidation_ResourceLimits(t *testing.T) {
 				Service:  ServiceExecutor,
 				Location: CallerLocationItemLease,
 			},
-			Migration: MigrationIdentifier{QueueShard: "test"},
 		})
 		require.Error(t, err)
 		require.ErrorContains(t, err, "idempotency key longer than 128 chars")
@@ -268,9 +258,8 @@ func TestInputValidation_MalformedData(t *testing.T) {
 			{
 				Kind: ConstraintKindConcurrency,
 				Concurrency: &ConcurrencyConstraint{
-					Mode:              enums.ConcurrencyModeStep,
-					Scope:             enums.ConcurrencyScopeFn,
-					InProgressItemKey: fmt.Sprintf("{%s}:concurrency:invalid-uuid:%s", te.KeyPrefix, te.FunctionID),
+					Mode:  enums.ConcurrencyModeStep,
+					Scope: enums.ConcurrencyScopeFn,
 				},
 			},
 		}
@@ -292,7 +281,6 @@ func TestInputValidation_MalformedData(t *testing.T) {
 				Service:  ServiceExecutor,
 				Location: CallerLocationItemLease,
 			},
-			Migration: MigrationIdentifier{QueueShard: "test"},
 		})
 
 		require.Error(t, err, "Should reject nil UUID")
@@ -315,7 +303,6 @@ func TestInputValidation_MalformedData(t *testing.T) {
 				Service:  ServiceExecutor,
 				Location: CallerLocationItemLease,
 			},
-			Migration: MigrationIdentifier{QueueShard: "test"},
 		})
 
 		require.Error(t, err, "Should reject nil EnvID")
@@ -329,7 +316,6 @@ func TestInputValidation_MalformedData(t *testing.T) {
 			AccountID:      te.AccountID,
 			LeaseID:        ulid.ULID{}, // Zero ULID
 			Duration:       30 * time.Second,
-			Migration:      MigrationIdentifier{QueueShard: "test"},
 		})
 
 		require.Error(t, err, "Should reject zero ULID")
@@ -339,7 +325,6 @@ func TestInputValidation_MalformedData(t *testing.T) {
 			IdempotencyKey: "invalid-ulid-release",
 			AccountID:      te.AccountID,
 			LeaseID:        ulid.ULID{}, // Zero ULID
-			Migration:      MigrationIdentifier{QueueShard: "test"},
 		})
 
 		require.Error(t, err, "Should reject zero ULID")
@@ -358,9 +343,8 @@ func TestInputValidation_MalformedData(t *testing.T) {
 			{
 				Kind: ConstraintKindConcurrency,
 				Concurrency: &ConcurrencyConstraint{
-					Mode:              999, // Invalid mode
-					Scope:             enums.ConcurrencyScopeFn,
-					InProgressItemKey: fmt.Sprintf("{%s}:concurrency:invalid-enum:%s", te.KeyPrefix, te.FunctionID),
+					Mode:  999, // Invalid mode
+					Scope: enums.ConcurrencyScopeFn,
 				},
 			},
 		}
@@ -382,7 +366,6 @@ func TestInputValidation_MalformedData(t *testing.T) {
 				Service:  ServiceExecutor,
 				Location: CallerLocationItemLease,
 			},
-			Migration: MigrationIdentifier{QueueShard: "test"},
 		})
 
 		// Implementation may handle this gracefully or return error
@@ -394,7 +377,6 @@ func TestInputValidation_MalformedData(t *testing.T) {
 					IdempotencyKey: "cleanup-enum",
 					AccountID:      te.AccountID,
 					LeaseID:        lease.LeaseID,
-					Migration:      MigrationIdentifier{QueueShard: "test"},
 				})
 			}
 		}
@@ -412,9 +394,8 @@ func TestInputValidation_MalformedData(t *testing.T) {
 			{
 				Kind: ConstraintKindConcurrency,
 				Concurrency: &ConcurrencyConstraint{
-					Mode:              enums.ConcurrencyModeStep,
-					Scope:             enums.ConcurrencyScopeFn,
-					InProgressItemKey: fmt.Sprintf("{%s}:concurrency:missing:%s", te.KeyPrefix, te.FunctionID),
+					Mode:  enums.ConcurrencyModeStep,
+					Scope: enums.ConcurrencyScopeFn,
 				},
 			},
 		}
@@ -436,7 +417,6 @@ func TestInputValidation_MalformedData(t *testing.T) {
 				Service:  ServiceExecutor,
 				Location: CallerLocationItemLease,
 			},
-			Migration: MigrationIdentifier{QueueShard: "test"},
 		})
 
 		require.Error(t, err, "Should reject empty idempotency key")
@@ -458,7 +438,6 @@ func TestInputValidation_MalformedData(t *testing.T) {
 				Service:  ServiceExecutor,
 				Location: CallerLocationItemLease,
 			},
-			Migration: MigrationIdentifier{QueueShard: "test"},
 		})
 
 		require.Error(t, err, "Should reject empty lease idempotency keys")
@@ -480,7 +459,6 @@ func TestInputValidation_MalformedData(t *testing.T) {
 				Service:  ServiceExecutor,
 				Location: CallerLocationItemLease,
 			},
-			Migration: MigrationIdentifier{QueueShard: "test"},
 		})
 
 		require.Error(t, err, "Should reject empty constraints")
@@ -498,9 +476,8 @@ func TestInputValidation_MalformedData(t *testing.T) {
 			{
 				Kind: ConstraintKindConcurrency,
 				Concurrency: &ConcurrencyConstraint{
-					Mode:              enums.ConcurrencyModeStep,
-					Scope:             enums.ConcurrencyScopeFn,
-					InProgressItemKey: fmt.Sprintf("{%s}:concurrency:zero-values:%s", te.KeyPrefix, te.FunctionID),
+					Mode:  enums.ConcurrencyModeStep,
+					Scope: enums.ConcurrencyScopeFn,
 				},
 			},
 		}
@@ -522,7 +499,6 @@ func TestInputValidation_MalformedData(t *testing.T) {
 				Service:  ServiceExecutor,
 				Location: CallerLocationItemLease,
 			},
-			Migration: MigrationIdentifier{QueueShard: "test"},
 		})
 
 		require.Error(t, err, "Should reject zero function version")
@@ -544,7 +520,6 @@ func TestInputValidation_MalformedData(t *testing.T) {
 				Service:  ServiceExecutor,
 				Location: CallerLocationItemLease,
 			},
-			Migration: MigrationIdentifier{QueueShard: "test"},
 		})
 
 		require.Error(t, err, "Should reject negative duration")
@@ -566,7 +541,6 @@ func TestInputValidation_MalformedData(t *testing.T) {
 				Service:  ServiceExecutor,
 				Location: CallerLocationItemLease,
 			},
-			Migration: MigrationIdentifier{QueueShard: "test"},
 		})
 		require.Error(t, err, "Should reject zero amount")
 	})
@@ -599,9 +573,8 @@ func TestInputValidation_BoundaryConditions(t *testing.T) {
 			{
 				Kind: ConstraintKindConcurrency,
 				Concurrency: &ConcurrencyConstraint{
-					Mode:              enums.ConcurrencyModeStep,
-					Scope:             enums.ConcurrencyScopeFn,
-					InProgressItemKey: fmt.Sprintf("{%s}:concurrency:maxint:%s", te.KeyPrefix, te.FunctionID),
+					Mode:  enums.ConcurrencyModeStep,
+					Scope: enums.ConcurrencyScopeFn,
 				},
 			},
 		}
@@ -622,7 +595,6 @@ func TestInputValidation_BoundaryConditions(t *testing.T) {
 				Service:  ServiceExecutor,
 				Location: CallerLocationItemLease,
 			},
-			Migration: MigrationIdentifier{QueueShard: "test"},
 		})
 
 		// Should handle large values gracefully (may cap or reject)
@@ -634,7 +606,6 @@ func TestInputValidation_BoundaryConditions(t *testing.T) {
 					IdempotencyKey: "cleanup-maxint",
 					AccountID:      te.AccountID,
 					LeaseID:        lease.LeaseID,
-					Migration:      MigrationIdentifier{QueueShard: "test"},
 				})
 			}
 		}
@@ -654,9 +625,8 @@ func TestInputValidation_BoundaryConditions(t *testing.T) {
 			{
 				Kind: ConstraintKindConcurrency,
 				Concurrency: &ConcurrencyConstraint{
-					Mode:              enums.ConcurrencyModeStep,
-					Scope:             enums.ConcurrencyScopeFn,
-					InProgressItemKey: fmt.Sprintf("{%s}:concurrency:empty:%s", te.KeyPrefix, te.FunctionID),
+					Mode:  enums.ConcurrencyModeStep,
+					Scope: enums.ConcurrencyScopeFn,
 				},
 			},
 		}
@@ -677,7 +647,6 @@ func TestInputValidation_BoundaryConditions(t *testing.T) {
 				Service:  ServiceExecutor,
 				Location: CallerLocationItemLease,
 			},
-			Migration: MigrationIdentifier{QueueShard: "test"},
 		})
 
 		require.NoError(t, err)
@@ -688,7 +657,6 @@ func TestInputValidation_BoundaryConditions(t *testing.T) {
 			IdempotencyKey: "cleanup-empty",
 			AccountID:      te.AccountID,
 			LeaseID:        resp.Leases[0].LeaseID,
-			Migration:      MigrationIdentifier{QueueShard: "test"},
 		})
 		require.NoError(t, err)
 	})
@@ -703,15 +671,13 @@ func TestInputValidation_BoundaryConditions(t *testing.T) {
 
 		// Use unicode characters in keys
 		unicodeKey := "🔥测试-key-αβγ-🚀"
-		unicodeInProgressKey := fmt.Sprintf("{%s}:concurrency:unicode:%s:🌟", te.KeyPrefix, te.FunctionID)
 
 		constraints := []ConstraintItem{
 			{
 				Kind: ConstraintKindConcurrency,
 				Concurrency: &ConcurrencyConstraint{
-					Mode:              enums.ConcurrencyModeStep,
-					Scope:             enums.ConcurrencyScopeFn,
-					InProgressItemKey: unicodeInProgressKey,
+					Mode:  enums.ConcurrencyModeStep,
+					Scope: enums.ConcurrencyScopeFn,
 				},
 			},
 		}
@@ -732,7 +698,6 @@ func TestInputValidation_BoundaryConditions(t *testing.T) {
 				Service:  ServiceExecutor,
 				Location: CallerLocationItemLease,
 			},
-			Migration: MigrationIdentifier{QueueShard: "test"},
 		})
 
 		require.NoError(t, err)
@@ -743,7 +708,6 @@ func TestInputValidation_BoundaryConditions(t *testing.T) {
 			IdempotencyKey: "cleanup-unicode",
 			AccountID:      te.AccountID,
 			LeaseID:        resp.Leases[0].LeaseID,
-			Migration:      MigrationIdentifier{QueueShard: "test"},
 		})
 		require.NoError(t, err)
 	})
@@ -760,9 +724,8 @@ func TestInputValidation_BoundaryConditions(t *testing.T) {
 			{
 				Kind: ConstraintKindConcurrency,
 				Concurrency: &ConcurrencyConstraint{
-					Mode:              enums.ConcurrencyModeStep,
-					Scope:             enums.ConcurrencyScopeFn,
-					InProgressItemKey: fmt.Sprintf("{%s}:concurrency:time:%s", te.KeyPrefix, te.FunctionID),
+					Mode:  enums.ConcurrencyModeStep,
+					Scope: enums.ConcurrencyScopeFn,
 				},
 			},
 		}
@@ -784,7 +747,6 @@ func TestInputValidation_BoundaryConditions(t *testing.T) {
 				Service:  ServiceExecutor,
 				Location: CallerLocationItemLease,
 			},
-			Migration: MigrationIdentifier{QueueShard: "test"},
 		})
 
 		require.Error(t, err, "Should reject zero current time")
@@ -806,7 +768,6 @@ func TestInputValidation_BoundaryConditions(t *testing.T) {
 				Service:  ServiceExecutor,
 				Location: CallerLocationItemLease,
 			},
-			Migration: MigrationIdentifier{QueueShard: "test"},
 		})
 
 		// May be rejected or handled gracefully depending on implementation
@@ -818,7 +779,6 @@ func TestInputValidation_BoundaryConditions(t *testing.T) {
 					IdempotencyKey: "cleanup-past",
 					AccountID:      te.AccountID,
 					LeaseID:        lease.LeaseID,
-					Migration:      MigrationIdentifier{QueueShard: "test"},
 				})
 			}
 		}
@@ -840,7 +800,6 @@ func TestInputValidation_BoundaryConditions(t *testing.T) {
 				Service:  ServiceExecutor,
 				Location: CallerLocationItemLease,
 			},
-			Migration: MigrationIdentifier{QueueShard: "test"},
 		})
 
 		// May be rejected due to clock skew validation
@@ -852,7 +811,6 @@ func TestInputValidation_BoundaryConditions(t *testing.T) {
 					IdempotencyKey: "cleanup-future",
 					AccountID:      te.AccountID,
 					LeaseID:        lease.LeaseID,
-					Migration:      MigrationIdentifier{QueueShard: "test"},
 				})
 			}
 		}

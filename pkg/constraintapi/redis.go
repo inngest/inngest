@@ -135,7 +135,7 @@ func accountScope(accountID uuid.UUID) string {
 
 // keyScavengerShard represents the top-level sharded sorted set containing individual accounts
 func (r *redisCapacityManager) keyScavengerShard() string {
-	return fmt.Sprintf("{cs}:css")
+	return "{cs}:css"
 }
 
 // keyAccountLeases represents active leases for the account

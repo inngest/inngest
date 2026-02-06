@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
-	"strconv"
 	"testing"
 	"time"
 
@@ -1627,7 +1626,6 @@ func TestQueueLeaseConstraintIdempotency(t *testing.T) {
 		clock := clockwork.NewFakeClock()
 
 		var cm constraintapi.CapacityManager = &testRolloutManager{}
-		rolloutManager := constraintapi.NewRolloutManager(cm, QueueDefaultKey, "rl")
 
 		_, shard := newQueue(
 			t, rc,
@@ -1649,7 +1647,7 @@ func TestQueueLeaseConstraintIdempotency(t *testing.T) {
 			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
 				return true, true
 			}),
-			osqueue.WithCapacityManager(rolloutManager),
+			osqueue.WithCapacityManager(cm),
 		)
 
 		kg := shard.Client().kg
@@ -1720,7 +1718,6 @@ func TestQueueLeaseConstraintIdempotency(t *testing.T) {
 		clock := clockwork.NewFakeClock()
 
 		var cm constraintapi.CapacityManager = &testRolloutManager{}
-		rolloutManager := constraintapi.NewRolloutManager(cm, QueueDefaultKey, "rl")
 
 		_, shard := newQueue(
 			t, rc,
@@ -1742,7 +1739,7 @@ func TestQueueLeaseConstraintIdempotency(t *testing.T) {
 			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
 				return true, true
 			}),
-			osqueue.WithCapacityManager(rolloutManager),
+			osqueue.WithCapacityManager(cm),
 		)
 		ctx := context.Background()
 
@@ -1788,19 +1785,6 @@ func TestQueueLeaseConstraintIdempotency(t *testing.T) {
 		require.Error(t, err)
 		require.ErrorIs(t, err, osqueue.ErrQueueItemThrottled)
 		require.Nil(t, leaseID)
-
-		// Set idempotency key
-		keyConstraintCheckIdempotency := rolloutManager.KeyConstraintCheckIdempotency(constraintapi.MigrationIdentifier{
-			QueueShard: shard.Name(),
-		}, accountID, item2.ID)
-
-		err = r.Set(keyConstraintCheckIdempotency, strconv.Itoa(int(clock.Now().UnixMilli())))
-		require.NoError(t, err)
-
-		// Do not skip lease checks but handle idempotency
-		leaseID, err = shard.Lease(ctx, item2, 5*time.Second, clock.Now(), nil, osqueue.LeaseOptionDisableConstraintChecks(false))
-		require.NoError(t, err)
-		require.NotNil(t, leaseID)
 
 		// Skip all checks
 		item3, err := shard.EnqueueItem(ctx, qi, start, osqueue.EnqueueOpts{})

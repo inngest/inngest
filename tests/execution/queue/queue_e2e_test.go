@@ -214,14 +214,10 @@ func TestQueueE2E(t *testing.T) {
 			shard := redis_state.NewQueueShard("test", queueClient, options...)
 
 			cm, err := constraintapi.NewRedisCapacityManager(
+				constraintapi.WithClient(rc),
+				constraintapi.WithShardName("test"),
 				constraintapi.WithClock(clock),
 				constraintapi.WithEnableDebugLogs(true),
-				constraintapi.WithQueueShards(map[string]rueidis.Client{
-					shard.Name(): shard.Client().Client(),
-				}),
-				constraintapi.WithQueueStateKeyPrefix(redis_state.QueueDefaultKey),
-				constraintapi.WithRateLimitClient(rc),
-				constraintapi.WithRateLimitKeyPrefix("rl"),
 			)
 			require.NoError(t, err)
 

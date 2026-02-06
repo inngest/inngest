@@ -64,7 +64,7 @@ type ScavengeResult struct {
 
 func (res ScavengeResult) Report(ctx context.Context, source string) {
 	tags := map[string]any{
-		"source": source,
+		"shard": source,
 	}
 
 	metrics.IncrConstraintAPIScavengerTotalAccountsCounter(ctx, int64(res.TotalAccountsCount), metrics.CounterOpt{
