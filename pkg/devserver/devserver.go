@@ -309,6 +309,13 @@ func start(ctx context.Context, opts StartOpts) error {
 		queue.WithShadowPollTick(2 * opts.Tick),
 		queue.WithBacklogNormalizePollTick(5 * opts.Tick),
 
+		// Dev server continuation tuning: the production defaults (limit=5, cooldown=10s,
+		// skip probability=20%) are designed for multi-worker environments to prevent greedy
+		// resource acquisition. In a single-instance dev server, they cause unnecessary
+		// inter-step latency pauses.
+		queue.WithQueueContinuationLimit(0), // 0 = unlimited; cooldown never triggers
+		queue.WithContinuationSkipProbability(0),
+
 		queue.WithLogger(l),
 
 		// Key queues
