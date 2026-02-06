@@ -449,6 +449,13 @@ export function TimelineBar({
               'text-basis min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-sm font-normal leading-tight',
               !expandable && !effectiveIcon && 'pl-1.5'
             )}
+            onClick={
+              expandable && !expanded
+                ? () => {
+                    onToggle?.();
+                  }
+                : undefined
+            }
           >
             {displayName}
           </span>
