@@ -313,8 +313,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		// skip probability=20%) are designed for multi-worker environments to prevent greedy
 		// resource acquisition. In a single-instance dev server, they cause unnecessary
 		// inter-step latency pauses.
-		queue.WithQueueContinuationLimit(50),
-		queue.WithContinuationCooldown(time.Second),
+		queue.WithQueueContinuationLimit(0), // 0 = unlimited; cooldown never triggers
 		queue.WithContinuationSkipProbability(0),
 
 		queue.WithLogger(l),

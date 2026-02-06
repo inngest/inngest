@@ -22,7 +22,7 @@ func (q *queueProcessor) addContinue(ctx context.Context, p *QueuePartition, ctr
 		return
 	}
 
-	if ctr >= q.continuationLimit {
+	if q.continuationLimit > 0 && ctr >= q.continuationLimit {
 		q.removeContinue(ctx, p, true)
 		return
 	}
@@ -78,7 +78,7 @@ func (q *queueProcessor) removeContinue(ctx context.Context, p *QueuePartition, 
 		// Note that this isn't shared across replicas;  cooldowns
 		// only exist in the current replica.
 		q.continueCooldown[p.Queue()] = time.Now().Add(
-			q.continuationCooldown,
+			consts.QueueContinuationCooldownPeriod,
 		)
 	}
 }
