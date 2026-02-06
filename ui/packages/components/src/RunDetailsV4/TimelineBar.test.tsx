@@ -210,7 +210,8 @@ describe('TimelineBar', () => {
     it('applies selected styling when selected is true', () => {
       render(<TimelineBar {...defaultProps} selected />);
       const row = screen.getByTestId('timeline-bar-row');
-      expect(row.className).toContain('bg-canvasSubtle');
+      const highlight = row.querySelector('.bg-canvasSubtle');
+      expect(highlight).toBeTruthy();
     });
 
     it('calls onClick when row is clicked', () => {
