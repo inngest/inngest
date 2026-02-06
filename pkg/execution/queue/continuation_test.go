@@ -35,6 +35,161 @@ func newContinuationTestProcessor(opts ...QueueOpt) *queueProcessor {
 	}
 }
 
+// TestContinuationDefaultOptions verifies that NewQueueOptions sets the expected
+// production defaults for continuation-related fields.
+func TestContinuationDefaultOptions(t *testing.T) {
+	o := NewQueueOptions()
+
+	require.Equal(t, uint(consts.DefaultQueueContinueLimit), o.continuationLimit,
+		"default continuation limit should match consts.DefaultQueueContinueLimit")
+	require.Equal(t, consts.QueueContinuationCooldownPeriod, o.continuationCooldown,
+		"default continuation cooldown should match consts.QueueContinuationCooldownPeriod")
+	require.Equal(t, consts.QueueContinuationSkipProbability, o.continuationSkipProbability,
+		"default skip probability should match consts.QueueContinuationSkipProbability")
+}
+
+// simulateMultiStepFunction simulates a function with stepCount steps running
+// through the continuation system. Each step completes and calls addContinue,
+// mimicking the real executor flow. When cooldown triggers or the limit is hit,
+// the partition is processed via the regular peek path which resets the counter
+// to 1 on the next attempt.
+//
+// Returns the number of steps that were accepted as continuations (i.e. present
+// in the continues map after addContinue).
+func simulateMultiStepFunction(qp *queueProcessor, partition *QueuePartition, stepCount int) int {
+	ctx := context.Background()
+	accepted := 0
+	ctr := uint(1)
+
+	for step := 0; step < stepCount; step++ {
+		qp.addContinue(ctx, partition, ctr)
+
+		if _, ok := qp.continues[partition.Queue()]; ok {
+			accepted++
+			ctr++
+		} else {
+			// Continuation was rejected (cooldown or limit). In production the
+			// partition falls back to the regular peek path, which resets the
+			// continuation counter to 1 for the next attempt.
+			ctr = 1
+		}
+	}
+	return accepted
+}
+
+// TestContinuationRuntimeProductionDefaults simulates a 20-step function under
+// production defaults (limit=5, cooldown=10s, skip=0.2). It proves that:
+//   - Only the first 4 steps use continuations (step 5 hits the limit).
+//   - The remaining 15 steps are all rejected because the 10s cooldown is active.
+//   - ~20% of scan ticks would be skipped by the skip probability.
+func TestContinuationRuntimeProductionDefaults(t *testing.T) {
+	t.Run("20-step function loses continuations after step 4", func(t *testing.T) {
+		qp := newContinuationTestProcessor() // production defaults
+		partition := newTestPartition("fn-20-steps")
+
+		accepted := simulateMultiStepFunction(qp, partition, 20)
+
+		// With limit=5: steps 1-4 accepted (ctr 1..4), step 5 (ctr=5) triggers
+		// cooldown. Steps 6-20 all attempt ctr=1 but are rejected by the 10s cooldown.
+		require.Equal(t, 4, accepted,
+			"production defaults: only 4 of 20 steps should use continuations")
+
+		// Cooldown is active for the partition.
+		require.Contains(t, qp.continueCooldown, partition.Queue(),
+			"production defaults: cooldown should be active")
+
+		// The cooldown won't expire for ~10 seconds.
+		cooldownExpiry := qp.continueCooldown[partition.Queue()]
+		require.True(t, cooldownExpiry.After(time.Now().Add(9*time.Second)),
+			"production defaults: cooldown should not expire for ~10s")
+	})
+
+	t.Run("skip probability causes scan-tick skips", func(t *testing.T) {
+		qp := newContinuationTestProcessor() // production defaults
+
+		// Simulate 1000 scan ticks using the same check as scanContinuations.
+		skipped := 0
+		rng := rand.New(rand.NewSource(99))
+		for i := 0; i < 1000; i++ {
+			if qp.continuationSkipProbability > 0 && rng.Float64() <= qp.continuationSkipProbability {
+				skipped++
+			}
+		}
+
+		// With 0.2 probability, expect ~200 skips. Each skip in the dev server
+		// (150ms tick) adds a full tick of latency to a step transition.
+		require.InDelta(t, 200, skipped, 50,
+			"production defaults: ~20%% of scan ticks should be skipped")
+	})
+}
+
+// TestContinuationRuntimeDevServerOptions simulates the same 20-step function
+// under dev server options (limit=50, cooldown=0, skip=0). It proves that:
+//   - All 20 steps use continuations without interruption.
+//   - No cooldown is triggered.
+//   - Zero scan ticks are skipped.
+func TestContinuationRuntimeDevServerOptions(t *testing.T) {
+	t.Run("20-step function uses continuations for every step", func(t *testing.T) {
+		qp := newContinuationTestProcessor(
+			WithQueueContinuationLimit(50),
+			WithContinuationCooldown(0),
+			WithContinuationSkipProbability(0),
+		)
+		partition := newTestPartition("fn-20-steps")
+
+		accepted := simulateMultiStepFunction(qp, partition, 20)
+
+		require.Equal(t, 20, accepted,
+			"dev server: all 20 steps should use continuations")
+		require.NotContains(t, qp.continueCooldown, partition.Queue(),
+			"dev server: no cooldown should be triggered")
+	})
+
+	t.Run("zero skip probability means zero scan-tick skips", func(t *testing.T) {
+		qp := newContinuationTestProcessor(
+			WithContinuationSkipProbability(0),
+		)
+
+		skipped := 0
+		rng := rand.New(rand.NewSource(99))
+		for i := 0; i < 1000; i++ {
+			if qp.continuationSkipProbability > 0 && rng.Float64() <= qp.continuationSkipProbability {
+				skipped++
+			}
+		}
+
+		require.Equal(t, 0, skipped,
+			"dev server: no scan ticks should be skipped")
+	})
+
+	t.Run("immediate cooldown recovery when limit is exceeded", func(t *testing.T) {
+		ctx := context.Background()
+		// Use a low limit to force a cooldown trigger, proving that even when
+		// the limit is hit, cooldown=0 means instant recovery.
+		qp := newContinuationTestProcessor(
+			WithQueueContinuationLimit(3),
+			WithContinuationCooldown(0),
+			WithContinuationSkipProbability(0),
+		)
+		partition := newTestPartition("fn-exceeds-limit")
+
+		// Steps 1-2 accepted, step 3 triggers cooldown.
+		for i := uint(1); i <= 2; i++ {
+			qp.addContinue(ctx, partition, i)
+			require.Contains(t, qp.continues, partition.Queue())
+		}
+		qp.addContinue(ctx, partition, 3)
+		require.NotContains(t, qp.continues, partition.Queue(),
+			"continuation removed after hitting limit")
+
+		// With cooldown=0, the very next addContinue at ctr=1 is accepted
+		// immediately — no pause between the cooldown trigger and resumption.
+		qp.addContinue(ctx, partition, 1)
+		require.Contains(t, qp.continues, partition.Queue(),
+			"dev server: continuation resumes immediately after cooldown with duration=0")
+	})
+}
+
 // TestContinuationCooldownPreventsResumption proves that after a partition
 // exhausts its continuation limit, the cooldown duration controls how long
 // the partition must wait before continuations can resume.
@@ -74,12 +229,12 @@ func TestContinuationCooldownPreventsResumption(t *testing.T) {
 			"cooldown should default to consts.QueueContinuationCooldownPeriod (10s)")
 	})
 
-	t.Run("configurable 1s cooldown allows fast resumption", func(t *testing.T) {
+	t.Run("zero cooldown allows immediate resumption", func(t *testing.T) {
 		ctx := context.Background()
 
 		qp := newContinuationTestProcessor(
 			WithQueueContinuationLimit(5),
-			WithContinuationCooldown(time.Second),
+			WithContinuationCooldown(0),
 		)
 		partition := newTestPartition("fn-with-many-steps")
 
@@ -90,13 +245,11 @@ func TestContinuationCooldownPreventsResumption(t *testing.T) {
 		qp.addContinue(ctx, partition, 5)
 		require.NotContains(t, qp.continues, partition.Queue())
 
-		// Wait just over 1 second — the configured cooldown.
-		time.Sleep(1100 * time.Millisecond)
-
-		// Continuation should now be accepted.
+		// With cooldown=0, the cooldown expires immediately.
+		// The next addContinue with ctr=1 should be accepted without any wait.
 		qp.addContinue(ctx, partition, 1)
 		require.Contains(t, qp.continues, partition.Queue(),
-			"continuation should be accepted after the 1s configured cooldown expires")
+			"continuation should be accepted immediately with zero cooldown")
 	})
 }
 
