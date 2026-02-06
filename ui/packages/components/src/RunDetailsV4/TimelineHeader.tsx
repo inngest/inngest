@@ -34,8 +34,7 @@ const TIME_MARKERS = [0, 25, 50, 75, 100];
 /**
  * Calculate duration labels for the time markers.
  */
-function getMarkerDurations(minTime: Date, maxTime: Date): string[] {
-  const totalMs = maxTime.getTime() - minTime.getTime();
+function getMarkerDurations(totalMs: number): string[] {
   return TIME_MARKERS.map((percent) => formatDuration(Math.floor((totalMs * percent) / 100)));
 }
 
@@ -49,7 +48,8 @@ export function TimelineHeader({
   onSelectionChange,
   status,
 }: Props): JSX.Element {
-  const durations = getMarkerDurations(minTime, maxTime);
+  const totalMs = maxTime.getTime() - minTime.getTime();
+  const durations = getMarkerDurations(totalMs);
   const barColorClass = status ? getStatusBackgroundClass(status) : 'bg-primary-moderate';
 
   const [selStart, setSelStart] = useState(0);
@@ -99,6 +99,44 @@ export function TimelineHeader({
             </div>
           ))}
         </div>
+
+        {/* Timestamp labels above drag handles */}
+        {!isDefault && (
+          <>
+            <div
+              data-testid="timestamp-label-left"
+              className="text-basis pointer-events-none absolute z-20 text-xs tabular-nums"
+              style={{
+                left: `${selStart}%`,
+                transform:
+                  selStart < 5
+                    ? 'translateX(0)'
+                    : selStart > 95
+                    ? 'translateX(-100%)'
+                    : 'translateX(-50%)',
+                top: '-4px',
+              }}
+            >
+              {formatDuration(Math.floor((totalMs * selStart) / 100))}
+            </div>
+            <div
+              data-testid="timestamp-label-right"
+              className="text-basis pointer-events-none absolute z-20 text-xs tabular-nums"
+              style={{
+                left: `${selEnd}%`,
+                transform:
+                  selEnd < 5
+                    ? 'translateX(0)'
+                    : selEnd > 95
+                    ? 'translateX(-100%)'
+                    : 'translateX(-50%)',
+                top: '-4px',
+              }}
+            >
+              {formatDuration(Math.floor((totalMs * selEnd) / 100))}
+            </div>
+          </>
+        )}
 
         {/* Time brush */}
         <TimeBrush onSelectionChange={handleSelectionChange} className="mt-1">
