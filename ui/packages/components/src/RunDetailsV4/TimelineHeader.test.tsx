@@ -245,6 +245,85 @@ describe('TimelineHeader', () => {
     });
   });
 
+  describe('timestamp labels', () => {
+    it('renders timestamp labels above handles when selection is non-default', () => {
+      const { container } = render(<TimelineHeader {...defaultProps} />);
+
+      act(() => {
+        capturedOnSelectionChange?.(25, 75);
+      });
+
+      const leftLabel = container.querySelector('[data-testid="timestamp-label-left"]');
+      const rightLabel = container.querySelector('[data-testid="timestamp-label-right"]');
+
+      expect(leftLabel).toBeTruthy();
+      expect(rightLabel).toBeTruthy();
+    });
+
+    it('hides timestamp labels when selection is at default position', () => {
+      const { container } = render(<TimelineHeader {...defaultProps} />);
+
+      // Default state (0, 100) — no labels
+      expect(container.querySelector('[data-testid="timestamp-label-left"]')).toBeFalsy();
+      expect(container.querySelector('[data-testid="timestamp-label-right"]')).toBeFalsy();
+    });
+
+    it('displays correct duration offsets', () => {
+      const { container } = render(<TimelineHeader {...defaultProps} />);
+
+      // defaultProps: 10s total. Selection at 50%–100% → 5s and 10s
+      act(() => {
+        capturedOnSelectionChange?.(50, 100);
+      });
+
+      const leftLabel = container.querySelector('[data-testid="timestamp-label-left"]');
+      const rightLabel = container.querySelector('[data-testid="timestamp-label-right"]');
+
+      expect(leftLabel?.textContent).toBe('5s');
+      expect(rightLabel?.textContent).toBe('10s');
+    });
+
+    it('has z-20 class on timestamp labels', () => {
+      const { container } = render(<TimelineHeader {...defaultProps} />);
+
+      act(() => {
+        capturedOnSelectionChange?.(25, 75);
+      });
+
+      const leftLabel = container.querySelector('[data-testid="timestamp-label-left"]');
+      const rightLabel = container.querySelector('[data-testid="timestamp-label-right"]');
+
+      expect((leftLabel as HTMLElement).className).toContain('z-20');
+      expect((rightLabel as HTMLElement).className).toContain('z-20');
+    });
+
+    it('applies edge clamping near 0% (translateX(0))', () => {
+      const { container } = render(<TimelineHeader {...defaultProps} />);
+
+      act(() => {
+        capturedOnSelectionChange?.(2, 50);
+      });
+
+      const leftLabel = container.querySelector(
+        '[data-testid="timestamp-label-left"]'
+      ) as HTMLElement;
+      expect(leftLabel.style.transform).toBe('translateX(0)');
+    });
+
+    it('applies edge clamping near 100% (translateX(-100%))', () => {
+      const { container } = render(<TimelineHeader {...defaultProps} />);
+
+      act(() => {
+        capturedOnSelectionChange?.(50, 98);
+      });
+
+      const rightLabel = container.querySelector(
+        '[data-testid="timestamp-label-right"]'
+      ) as HTMLElement;
+      expect(rightLabel.style.transform).toBe('translateX(-100%)');
+    });
+  });
+
   describe('edge cases', () => {
     it('handles zero-duration timeline', () => {
       const sameTime = new Date('2024-01-01T00:00:00Z');
