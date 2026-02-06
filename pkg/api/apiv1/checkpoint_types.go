@@ -136,7 +136,7 @@ func (r CheckpointNewRunRequest) Fn(appID uuid.UUID) inngest.Function {
 	// retry attempts should be made for steps (e.g., 3 means 4 total
 	// attempts).
 	retries := r.Retries
-	if retries <= 0 {
+	if retries < 0 {
 		retries = consts.DefaultRetryCount
 	}
 
