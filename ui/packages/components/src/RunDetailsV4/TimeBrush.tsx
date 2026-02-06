@@ -48,8 +48,8 @@ export function TimeBrush({
   initialEnd = 100,
   minSelectionWidth = 2,
   showResetButton = true,
-  selectionClassName = 'bg-primary-moderate/25',
-  handleClassName = 'bg-primary-intense hover:bg-primary-xIntense',
+  selectionClassName = '',
+  handleClassName = 'bg-basis hover:bg-basis',
   cursorLineClassName = 'bg-slate-500',
   children,
   className,
@@ -259,7 +259,7 @@ export function TimeBrush({
       {showResetButton && !isDefaultSelection && (
         <button
           onClick={handleReset}
-          className="bg-canvasSubtle hover:bg-canvasMuted text-muted hover:text-basis absolute bottom-1 right-full mr-2 rounded px-2 py-0.5 text-xs transition-colors"
+          className="border-muted bg-canvasBase hover:bg-canvasSubtle text-basis absolute bottom-1 right-full mr-2 rounded border px-2 py-0.5 text-xs transition-colors"
           title="Reset selection"
         >
           Reset
