@@ -17,6 +17,7 @@ export const MenuItem = ({
   beta = false,
   error = false,
   className,
+  dataTestId,
 }: {
   text: string;
   icon: ReactNode;
@@ -28,6 +29,7 @@ export const MenuItem = ({
   beta?: boolean;
   error?: boolean;
   className?: string;
+  dataTestId?: string;
 }) => {
   const location = useLocation();
   const active = (href || to) && location.href.startsWith(href || to || '');
@@ -36,6 +38,7 @@ export const MenuItem = ({
     <OptionalLink href={comingSoon ? '' : href} to={comingSoon ? undefined : to} preload={prefetch}>
       <OptionalTooltip tooltip={comingSoon ? 'Coming soon...' : collapsed ? text : ''}>
         <div
+          data-testid={dataTestId}
           className={cn(
             `my-0.5 flex h-8 w-full flex-row items-center rounded px-1.5  ${
               comingSoon

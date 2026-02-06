@@ -19,3 +19,10 @@ yarn.lock
 /test-results/
 /blob-report/
 .env*.local
+.env.test.local
+
+# Playwright
+test-results/
+playwright-report/
+playwright/.cache/
+playwright/.auth/

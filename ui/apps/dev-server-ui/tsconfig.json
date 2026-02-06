@@ -6,6 +6,7 @@
     "prettier.config.js",
     "vite.config.js"
   ],
+  "exclude": ["tests", "playwright.config.ts"],
 
   "compilerOptions": {
     "target": "ES2022",
