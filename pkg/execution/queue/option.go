@@ -307,6 +307,26 @@ func WithQueueContinuationLimit(limit uint) QueueOpt {
 	}
 }
 
+// WithContinuationCooldown sets how long a partition must wait after exhausting
+// its continuation limit before new continuations can be added. The default is
+// consts.QueueContinuationCooldownPeriod (10s), which is appropriate for production
+// multi-worker environments but too long for single-instance dev servers.
+func WithContinuationCooldown(d time.Duration) QueueOpt {
+	return func(q *QueueOptions) {
+		q.continuationCooldown = d
+	}
+}
+
+// WithContinuationSkipProbability sets the probability (0.0–1.0) that
+// scanContinuations skips processing on any given scan tick. The default is
+// consts.QueueContinuationSkipProbability (0.2), which spreads load across
+// production replicas but adds unnecessary latency in single-instance dev servers.
+func WithContinuationSkipProbability(p float64) QueueOpt {
+	return func(q *QueueOptions) {
+		q.continuationSkipProbability = p
+	}
+}
+
 // WithQueueShadowContinuationLimit sets the shadow continuation limit in the queue, eg. how many
 // sequential steps cause hints in the queue to continue executing the same shadow partition.
 func WithQueueShadowContinuationLimit(limit uint) QueueOpt {
@@ -440,7 +460,9 @@ type QueueOptions struct {
 	// runMode defines the processing scopes or capabilities of the queue instances
 	runMode QueueRunMode
 
-	continuationLimit uint
+	continuationLimit           uint
+	continuationCooldown        time.Duration
+	continuationSkipProbability float64
 
 	shadowContinuationLimit uint
 
@@ -761,7 +783,9 @@ func NewQueueOptions(
 		},
 		backoffFunc:       backoff.DefaultBackoff,
 		Clock:             clockwork.NewRealClock(),
-		continuationLimit: consts.DefaultQueueContinueLimit,
+		continuationLimit:           consts.DefaultQueueContinueLimit,
+		continuationCooldown:        consts.QueueContinuationCooldownPeriod,
+		continuationSkipProbability: consts.QueueContinuationSkipProbability,
 		NormalizeRefreshItemCustomConcurrencyKeys: func(ctx context.Context, item *QueueItem, existingKeys []state.CustomConcurrency, shadowPartition *QueueShadowPartition) ([]state.CustomConcurrency, error) {
 			return existingKeys, nil
 		},
