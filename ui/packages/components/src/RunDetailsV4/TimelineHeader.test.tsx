@@ -3,10 +3,41 @@
  * Feature: 001-composable-timeline-bar
  */
 
-import { cleanup, render, screen } from '@testing-library/react';
+import { useEffect } from 'react';
+import { act, cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { TimelineHeader } from './TimelineHeader';
+
+// Capture the onSelectionChange callback passed to TimeBrush so tests can trigger selection changes
+let capturedOnSelectionChange: ((start: number, end: number) => void) | undefined;
+
+vi.mock('./TimeBrush', () => ({
+  TimeBrush: ({
+    onSelectionChange,
+    children,
+    className,
+  }: {
+    onSelectionChange?: (start: number, end: number) => void;
+    children?: React.ReactNode;
+    className?: string;
+  }) => {
+    capturedOnSelectionChange = onSelectionChange;
+
+    // Simulate TimeBrush calling onSelectionChange on mount with defaults
+    useEffect(() => {
+      onSelectionChange?.(0, 100);
+    }, [onSelectionChange]);
+
+    return (
+      <div className={className} data-testid="time-brush">
+        <div className="cursor-ew-resize" />
+        <div className="cursor-ew-resize" />
+        {children}
+      </div>
+    );
+  },
+}));
 
 afterEach(() => {
   cleanup();
@@ -121,6 +152,96 @@ describe('TimelineHeader', () => {
 
     it('does not crash without onSelectionChange', () => {
       expect(() => render(<TimelineHeader {...defaultProps} />)).not.toThrow();
+    });
+  });
+
+  describe('split-color bar', () => {
+    it('renders single full-width bar in default state', () => {
+      const { container } = render(<TimelineHeader {...defaultProps} status="COMPLETED" />);
+
+      // Default state: single bar element, no segments
+      const defaultBar = container.querySelector('[data-testid="timeline-bar-default"]');
+      expect(defaultBar).toBeTruthy();
+
+      // No split segments should be present
+      expect(container.querySelector('[data-testid="bar-segment-left"]')).toBeFalsy();
+      expect(container.querySelector('[data-testid="bar-segment-middle"]')).toBeFalsy();
+      expect(container.querySelector('[data-testid="bar-segment-right"]')).toBeFalsy();
+    });
+
+    it('renders 3 segments when selection is non-default', () => {
+      const { container } = render(<TimelineHeader {...defaultProps} status="COMPLETED" />);
+
+      // Trigger non-default selection
+      act(() => {
+        capturedOnSelectionChange?.(25, 75);
+      });
+
+      // Default bar should be gone
+      expect(container.querySelector('[data-testid="timeline-bar-default"]')).toBeFalsy();
+
+      // 3 segments should be present
+      expect(container.querySelector('[data-testid="bar-segment-left"]')).toBeTruthy();
+      expect(container.querySelector('[data-testid="bar-segment-middle"]')).toBeTruthy();
+      expect(container.querySelector('[data-testid="bar-segment-right"]')).toBeTruthy();
+    });
+
+    it('outside segments use bg-canvasMuted', () => {
+      const { container } = render(<TimelineHeader {...defaultProps} status="COMPLETED" />);
+
+      act(() => {
+        capturedOnSelectionChange?.(25, 75);
+      });
+
+      const left = container.querySelector('[data-testid="bar-segment-left"]') as HTMLElement;
+      const right = container.querySelector('[data-testid="bar-segment-right"]') as HTMLElement;
+
+      expect(left.className).toContain('bg-canvasMuted');
+      expect(right.className).toContain('bg-canvasMuted');
+    });
+
+    it('middle segment uses status color class', () => {
+      const { container } = render(<TimelineHeader {...defaultProps} status="COMPLETED" />);
+
+      act(() => {
+        capturedOnSelectionChange?.(25, 75);
+      });
+
+      const middle = container.querySelector('[data-testid="bar-segment-middle"]') as HTMLElement;
+      expect(middle.className).toContain('bg-status-completed');
+    });
+
+    it('segments have correct widths based on selection', () => {
+      const { container } = render(<TimelineHeader {...defaultProps} status="COMPLETED" />);
+
+      act(() => {
+        capturedOnSelectionChange?.(25, 75);
+      });
+
+      const left = container.querySelector('[data-testid="bar-segment-left"]') as HTMLElement;
+      const middle = container.querySelector('[data-testid="bar-segment-middle"]') as HTMLElement;
+      const right = container.querySelector('[data-testid="bar-segment-right"]') as HTMLElement;
+
+      expect(left.style.width).toBe('25%');
+      expect(middle.style.left).toBe('25%');
+      expect(middle.style.width).toBe('50%');
+      expect(right.style.left).toBe('75%');
+      expect(right.style.width).toBe('25%');
+    });
+
+    it('forwards selection change to parent callback', () => {
+      const onSelectionChange = vi.fn();
+      render(<TimelineHeader {...defaultProps} onSelectionChange={onSelectionChange} />);
+
+      // Initial call with defaults
+      expect(onSelectionChange).toHaveBeenCalledWith(0, 100);
+
+      act(() => {
+        capturedOnSelectionChange?.(30, 60);
+      });
+
+      // Forwarded call with new values
+      expect(onSelectionChange).toHaveBeenCalledWith(30, 60);
     });
   });
 

@@ -8,6 +8,8 @@
  * - Timing markers at 0%, 25%, 50%, 75%, 100% with duration labels
  */
 
+import { useCallback, useState } from 'react';
+
 import { getStatusBackgroundClass } from '../Status/statusClasses';
 import { cn } from '../utils/classNames';
 import { TimeBrush } from './TimeBrush';
@@ -50,6 +52,19 @@ export function TimelineHeader({
   const durations = getMarkerDurations(minTime, maxTime);
   const barColorClass = status ? getStatusBackgroundClass(status) : 'bg-primary-moderate';
 
+  const [selStart, setSelStart] = useState(0);
+  const [selEnd, setSelEnd] = useState(100);
+  const isDefault = selStart === 0 && selEnd === 100;
+
+  const handleSelectionChange = useCallback(
+    (start: number, end: number) => {
+      setSelStart(start);
+      setSelEnd(end);
+      onSelectionChange?.(start, end);
+    },
+    [onSelectionChange]
+  );
+
   return (
     <div className="mb-1 mt-5 flex w-full items-end">
       {/* Left panel spacer (no label - label is now in the Run bar) */}
@@ -86,14 +101,37 @@ export function TimelineHeader({
         </div>
 
         {/* Time brush */}
-        <TimeBrush onSelectionChange={onSelectionChange} className="mt-1">
-          {/* Main timeline bar (always full width) */}
-          <div
-            className={cn(
-              'pointer-events-none absolute left-0 top-1/2 h-1 w-full -translate-y-1/2',
-              barColorClass
-            )}
-          />
+        <TimeBrush onSelectionChange={handleSelectionChange} className="mt-1">
+          {isDefault ? (
+            <div
+              data-testid="timeline-bar-default"
+              className={cn(
+                'pointer-events-none absolute left-0 top-1/2 h-1 w-full -translate-y-1/2',
+                barColorClass
+              )}
+            />
+          ) : (
+            <>
+              <div
+                data-testid="bar-segment-left"
+                className="bg-canvasMuted pointer-events-none absolute top-1/2 h-1 -translate-y-1/2"
+                style={{ left: 0, width: `${selStart}%` }}
+              />
+              <div
+                data-testid="bar-segment-middle"
+                className={cn(
+                  'pointer-events-none absolute top-1/2 h-1 -translate-y-1/2',
+                  barColorClass
+                )}
+                style={{ left: `${selStart}%`, width: `${selEnd - selStart}%` }}
+              />
+              <div
+                data-testid="bar-segment-right"
+                className="bg-canvasMuted pointer-events-none absolute top-1/2 h-1 -translate-y-1/2"
+                style={{ left: `${selEnd}%`, width: `${100 - selEnd}%` }}
+              />
+            </>
+          )}
         </TimeBrush>
 
         {/* Vertical guide lines (subtle) */}
