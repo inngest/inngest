@@ -109,11 +109,115 @@ describe('TimeBrush', () => {
     it('positions selection area between start and end', () => {
       const { container } = render(<TimeBrush initialStart={20} initialEnd={80} />);
 
-      // Find the selection highlight div (has the selection class)
-      const selectionArea = container.querySelector('.bg-primary-moderate\\/25') as HTMLElement;
+      // Find the selection highlight div by its positioning style
+      const selectionDivs = container.querySelectorAll('.absolute.top-0.h-full');
+      // The selection div is the one with left/width styles (not handles)
+      const selectionArea = Array.from(selectionDivs).find(
+        (el) => (el as HTMLElement).style.left === '20%'
+      ) as HTMLElement;
 
+      expect(selectionArea).toBeTruthy();
       expect(selectionArea.style.left).toBe('20%');
       expect(selectionArea.style.width).toBe('60%'); // 80 - 20
+    });
+  });
+
+  describe('default styling (FR-002, FR-003, FR-005)', () => {
+    it('renders handles with black color class (bg-basis)', () => {
+      const { container } = render(<TimeBrush />);
+
+      // Handle inner divs should have bg-basis class
+      const handles = container.querySelectorAll('.bg-basis');
+      expect(handles).toHaveLength(2);
+    });
+
+    it('selection overlay has no visible styling by default', () => {
+      const { container } = render(<TimeBrush />);
+
+      // The old class should NOT be present
+      expect(container.querySelector('.bg-primary-moderate\\/25')).toBeNull();
+    });
+
+    it('selection overlay div is still in the DOM for interaction', () => {
+      const { container } = render(<TimeBrush initialStart={20} initialEnd={80} />);
+
+      // Find the selection div by its positioning style
+      const selectionDivs = container.querySelectorAll('.absolute.top-0.h-full');
+      const selectionArea = Array.from(selectionDivs).find(
+        (el) => (el as HTMLElement).style.left === '20%'
+      ) as HTMLElement;
+
+      expect(selectionArea).toBeTruthy();
+      expect(selectionArea.style.width).toBe('60%');
+    });
+
+    it('reset button has system border styling', () => {
+      const { container } = render(<TimeBrush />);
+
+      // Mock getBoundingClientRect for the container
+      const trackContainer = container.querySelector('.relative.h-4') as HTMLElement;
+      trackContainer.getBoundingClientRect = vi.fn(() => ({
+        left: 0,
+        top: 0,
+        right: 200,
+        bottom: 16,
+        width: 200,
+        height: 16,
+        x: 0,
+        y: 0,
+        toJSON: () => {},
+      }));
+
+      // Also mock on the outer container ref (used by the component)
+      const outerContainer = container.firstChild as HTMLElement;
+      outerContainer.getBoundingClientRect = vi.fn(() => ({
+        left: 0,
+        top: 0,
+        right: 200,
+        bottom: 16,
+        width: 200,
+        height: 16,
+        x: 0,
+        y: 0,
+        toJSON: () => {},
+      }));
+
+      // Find the selection overlay (click target in default state) and click to create a selection
+      const selectionOverlay = container.querySelector('.absolute.top-0.h-full') as HTMLElement;
+      fireEvent.mouseDown(selectionOverlay, { clientX: 50 });
+      fireEvent.mouseUp(document);
+
+      const resetButton = container.querySelector('button[title="Reset selection"]') as HTMLElement;
+      expect(resetButton).toBeTruthy();
+      expect(resetButton.classList.contains('border')).toBe(true);
+      expect(resetButton.classList.contains('border-muted')).toBe(true);
+      expect(resetButton.classList.contains('bg-canvasBase')).toBe(true);
+    });
+
+    it('reset button does not have old background styling', () => {
+      const { container } = render(<TimeBrush />);
+
+      const outerContainer = container.firstChild as HTMLElement;
+      outerContainer.getBoundingClientRect = vi.fn(() => ({
+        left: 0,
+        top: 0,
+        right: 200,
+        bottom: 16,
+        width: 200,
+        height: 16,
+        x: 0,
+        y: 0,
+        toJSON: () => {},
+      }));
+
+      // Click to create a selection and trigger reset button to appear
+      const selectionOverlay = container.querySelector('.absolute.top-0.h-full') as HTMLElement;
+      fireEvent.mouseDown(selectionOverlay, { clientX: 50 });
+      fireEvent.mouseUp(document);
+
+      const resetButton = container.querySelector('button[title="Reset selection"]') as HTMLElement;
+      expect(resetButton).toBeTruthy();
+      expect(resetButton.classList.contains('bg-canvasSubtle')).toBe(false);
     });
   });
 
