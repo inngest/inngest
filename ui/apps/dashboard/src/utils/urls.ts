@@ -273,7 +273,9 @@ export const pathCreator = {
     return `/env/${envSlug}/manage/signing-key` as FileRouteTypes['to'];
   },
   support({ ref }: { ref?: string } = {}): FileRouteTypes['to'] {
-    return `/support${ref ? `?ref=${ref}` : ''}` as FileRouteTypes['to'];
+    return `https://support.inngest.com/${
+      ref ? `?ref=${ref}` : ''
+    }` as FileRouteTypes['to'];
   },
   unattachedSyncs({ envSlug }: { envSlug: string }): FileRouteTypes['to'] {
     return `/env/${envSlug}/unattached-syncs` as FileRouteTypes['to'];

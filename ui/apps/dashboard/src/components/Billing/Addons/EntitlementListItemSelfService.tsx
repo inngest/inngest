@@ -146,7 +146,7 @@ export default function EntitlementListItemSelfService({
             <p className="text-error text-xs">
               <RiAlertFill className="-mt-0.5 inline h-4" /> Failed to update
               addon.{' '}
-              <a href="/support" className="underline">
+              <a href="https://support.inngest.com" className="underline">
                 Contact support
               </a>{' '}
               if this problem persists.

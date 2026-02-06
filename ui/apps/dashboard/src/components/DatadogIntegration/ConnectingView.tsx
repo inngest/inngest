@@ -32,7 +32,11 @@ export default function SetupPage({ errorMessage }: Props) {
     return (
       <Alert severity="error">
         Connection failed.
-        <Alert.Link severity="error" target="_blank" href="/support">
+        <Alert.Link
+          severity="error"
+          target="_blank"
+          href="https://support.inngest.com"
+        >
           Please contact Inngest support if this error persists.
         </Alert.Link>{' '}
         <br />
