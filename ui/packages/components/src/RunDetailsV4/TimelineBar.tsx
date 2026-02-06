@@ -271,7 +271,7 @@ function VisualBar({
   const barStyle = getBarStyle(style);
   const pattern = getBarPattern(barStyle.pattern);
   const heightClass = BAR_HEIGHT_CLASSES[barStyle.barHeight ?? 'tall'];
-  const opacityStyle = expanded ? { opacity: 0.5 } : {};
+  const opacityStyle = expanded ? { opacity: 0 } : {};
   const barColor = getBarColor(style, status);
 
   // Memoize segment transformation to avoid recalculating on every render
