@@ -59,6 +59,8 @@ const (
 	V2ListWebhooksProcedure = "/api.v2.V2/ListWebhooks"
 	// V2PatchEnvProcedure is the fully-qualified name of the V2's PatchEnv RPC.
 	V2PatchEnvProcedure = "/api.v2.V2/PatchEnv"
+	// V2StreamRunProcedure is the fully-qualified name of the V2's StreamRun RPC.
+	V2StreamRunProcedure = "/api.v2.V2/StreamRun"
 )
 
 // V2Client is a client for the api.v2.V2 service.
@@ -76,6 +78,9 @@ type V2Client interface {
 	CreateWebhook(context.Context, *connect.Request[v2.CreateWebhookRequest]) (*connect.Response[v2.CreateWebhookResponse], error)
 	ListWebhooks(context.Context, *connect.Request[v2.ListWebhooksRequest]) (*connect.Response[v2.ListWebhooksResponse], error)
 	PatchEnv(context.Context, *connect.Request[v2.PatchEnvRequest]) (*connect.Response[v2.PatchEnvsResponse], error)
+	// StreamRun is a server-streaming RPC that streams run trace updates.
+	// This allows clients to receive real-time updates for long-running functions.
+	StreamRun(context.Context, *connect.Request[v2.StreamRunRequest]) (*connect.ServerStreamForClient[v2.RunStreamItem], error)
 }
 
 // NewV2Client constructs a client for the api.v2.V2 service. By default, it uses the Connect
@@ -161,6 +166,12 @@ func NewV2Client(httpClient connect.HTTPClient, baseURL string, opts ...connect.
 			connect.WithSchema(v2Methods.ByName("PatchEnv")),
 			connect.WithClientOptions(opts...),
 		),
+		streamRun: connect.NewClient[v2.StreamRunRequest, v2.RunStreamItem](
+			httpClient,
+			baseURL+V2StreamRunProcedure,
+			connect.WithSchema(v2Methods.ByName("StreamRun")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -178,6 +189,7 @@ type v2Client struct {
 	createWebhook           *connect.Client[v2.CreateWebhookRequest, v2.CreateWebhookResponse]
 	listWebhooks            *connect.Client[v2.ListWebhooksRequest, v2.ListWebhooksResponse]
 	patchEnv                *connect.Client[v2.PatchEnvRequest, v2.PatchEnvsResponse]
+	streamRun               *connect.Client[v2.StreamRunRequest, v2.RunStreamItem]
 }
 
 // Health calls api.v2.V2.Health.
@@ -240,6 +252,11 @@ func (c *v2Client) PatchEnv(ctx context.Context, req *connect.Request[v2.PatchEn
 	return c.patchEnv.CallUnary(ctx, req)
 }
 
+// StreamRun calls api.v2.V2.StreamRun.
+func (c *v2Client) StreamRun(ctx context.Context, req *connect.Request[v2.StreamRunRequest]) (*connect.ServerStreamForClient[v2.RunStreamItem], error) {
+	return c.streamRun.CallServerStream(ctx, req)
+}
+
 // V2Handler is an implementation of the api.v2.V2 service.
 type V2Handler interface {
 	Health(context.Context, *connect.Request[v2.HealthRequest]) (*connect.Response[v2.HealthResponse], error)
@@ -255,6 +272,9 @@ type V2Handler interface {
 	CreateWebhook(context.Context, *connect.Request[v2.CreateWebhookRequest]) (*connect.Response[v2.CreateWebhookResponse], error)
 	ListWebhooks(context.Context, *connect.Request[v2.ListWebhooksRequest]) (*connect.Response[v2.ListWebhooksResponse], error)
 	PatchEnv(context.Context, *connect.Request[v2.PatchEnvRequest]) (*connect.Response[v2.PatchEnvsResponse], error)
+	// StreamRun is a server-streaming RPC that streams run trace updates.
+	// This allows clients to receive real-time updates for long-running functions.
+	StreamRun(context.Context, *connect.Request[v2.StreamRunRequest], *connect.ServerStream[v2.RunStreamItem]) error
 }
 
 // NewV2Handler builds an HTTP handler from the service implementation. It returns the path on which
@@ -336,6 +356,12 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 		connect.WithSchema(v2Methods.ByName("PatchEnv")),
 		connect.WithHandlerOptions(opts...),
 	)
+	v2StreamRunHandler := connect.NewServerStreamHandler(
+		V2StreamRunProcedure,
+		svc.StreamRun,
+		connect.WithSchema(v2Methods.ByName("StreamRun")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/api.v2.V2/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case V2HealthProcedure:
@@ -362,6 +388,8 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 			v2ListWebhooksHandler.ServeHTTP(w, r)
 		case V2PatchEnvProcedure:
 			v2PatchEnvHandler.ServeHTTP(w, r)
+		case V2StreamRunProcedure:
+			v2StreamRunHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -417,4 +445,8 @@ func (UnimplementedV2Handler) ListWebhooks(context.Context, *connect.Request[v2.
 
 func (UnimplementedV2Handler) PatchEnv(context.Context, *connect.Request[v2.PatchEnvRequest]) (*connect.Response[v2.PatchEnvsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.PatchEnv is not implemented"))
+}
+
+func (UnimplementedV2Handler) StreamRun(context.Context, *connect.Request[v2.StreamRunRequest], *connect.ServerStream[v2.RunStreamItem]) error {
+	return connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.StreamRun is not implemented"))
 }

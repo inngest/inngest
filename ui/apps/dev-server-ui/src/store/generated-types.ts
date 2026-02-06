@@ -886,6 +886,7 @@ export type SpanMetadata = {
   __typename?: 'SpanMetadata';
   kind: Scalars['SpanMetadataKind'];
   scope: Scalars['SpanMetadataScope'];
+  updatedAt: Scalars['Time'];
   values: Scalars['SpanMetadataValues'];
 };
 
@@ -1348,6 +1349,13 @@ export type TraceDetailsFragment = {
     spanAttrs: any | null;
     resourceAttrs: any | null;
   } | null;
+  metadata: Array<{
+    __typename?: 'SpanMetadata';
+    scope: any;
+    kind: any;
+    values: any;
+    updatedAt: any;
+  }>;
   stepInfo:
     | {
         __typename: 'InvokeStepInfo';
@@ -1490,6 +1498,13 @@ export type GetRunQuery = {
                 spanAttrs: any | null;
                 resourceAttrs: any | null;
               } | null;
+              metadata: Array<{
+                __typename?: 'SpanMetadata';
+                scope: any;
+                kind: any;
+                values: any;
+                updatedAt: any;
+              }>;
               stepInfo:
                 | {
                     __typename: 'InvokeStepInfo';
@@ -1528,6 +1543,13 @@ export type GetRunQuery = {
               spanAttrs: any | null;
               resourceAttrs: any | null;
             } | null;
+            metadata: Array<{
+              __typename?: 'SpanMetadata';
+              scope: any;
+              kind: any;
+              values: any;
+              updatedAt: any;
+            }>;
             stepInfo:
               | {
                   __typename: 'InvokeStepInfo';
@@ -1566,6 +1588,13 @@ export type GetRunQuery = {
             spanAttrs: any | null;
             resourceAttrs: any | null;
           } | null;
+          metadata: Array<{
+            __typename?: 'SpanMetadata';
+            scope: any;
+            kind: any;
+            values: any;
+            updatedAt: any;
+          }>;
           stepInfo:
             | {
                 __typename: 'InvokeStepInfo';
@@ -1604,6 +1633,13 @@ export type GetRunQuery = {
           spanAttrs: any | null;
           resourceAttrs: any | null;
         } | null;
+        metadata: Array<{
+          __typename?: 'SpanMetadata';
+          scope: any;
+          kind: any;
+          values: any;
+          updatedAt: any;
+        }>;
         stepInfo:
           | {
               __typename: 'InvokeStepInfo';
@@ -1642,6 +1678,13 @@ export type GetRunQuery = {
         spanAttrs: any | null;
         resourceAttrs: any | null;
       } | null;
+      metadata: Array<{
+        __typename?: 'SpanMetadata';
+        scope: any;
+        kind: any;
+        values: any;
+        updatedAt: any;
+      }>;
       stepInfo:
         | {
             __typename: 'InvokeStepInfo';
@@ -1774,6 +1817,13 @@ export type GetRunTraceQuery = {
               spanAttrs: any | null;
               resourceAttrs: any | null;
             } | null;
+            metadata: Array<{
+              __typename?: 'SpanMetadata';
+              scope: any;
+              kind: any;
+              values: any;
+              updatedAt: any;
+            }>;
             stepInfo:
               | {
                   __typename: 'InvokeStepInfo';
@@ -1812,6 +1862,13 @@ export type GetRunTraceQuery = {
             spanAttrs: any | null;
             resourceAttrs: any | null;
           } | null;
+          metadata: Array<{
+            __typename?: 'SpanMetadata';
+            scope: any;
+            kind: any;
+            values: any;
+            updatedAt: any;
+          }>;
           stepInfo:
             | {
                 __typename: 'InvokeStepInfo';
@@ -1850,6 +1907,13 @@ export type GetRunTraceQuery = {
           spanAttrs: any | null;
           resourceAttrs: any | null;
         } | null;
+        metadata: Array<{
+          __typename?: 'SpanMetadata';
+          scope: any;
+          kind: any;
+          values: any;
+          updatedAt: any;
+        }>;
         stepInfo:
           | {
               __typename: 'InvokeStepInfo';
@@ -1888,6 +1952,13 @@ export type GetRunTraceQuery = {
         spanAttrs: any | null;
         resourceAttrs: any | null;
       } | null;
+      metadata: Array<{
+        __typename?: 'SpanMetadata';
+        scope: any;
+        kind: any;
+        values: any;
+        updatedAt: any;
+      }>;
       stepInfo:
         | {
             __typename: 'InvokeStepInfo';
@@ -1926,6 +1997,13 @@ export type GetRunTraceQuery = {
       spanAttrs: any | null;
       resourceAttrs: any | null;
     } | null;
+    metadata: Array<{
+      __typename?: 'SpanMetadata';
+      scope: any;
+      kind: any;
+      values: any;
+      updatedAt: any;
+    }>;
     stepInfo:
       | {
           __typename: 'InvokeStepInfo';
@@ -2253,6 +2331,13 @@ export type GetDebugRunQuery = {
               spanAttrs: any | null;
               resourceAttrs: any | null;
             } | null;
+            metadata: Array<{
+              __typename?: 'SpanMetadata';
+              scope: any;
+              kind: any;
+              values: any;
+              updatedAt: any;
+            }>;
             stepInfo:
               | {
                   __typename: 'InvokeStepInfo';
@@ -2291,6 +2376,13 @@ export type GetDebugRunQuery = {
             spanAttrs: any | null;
             resourceAttrs: any | null;
           } | null;
+          metadata: Array<{
+            __typename?: 'SpanMetadata';
+            scope: any;
+            kind: any;
+            values: any;
+            updatedAt: any;
+          }>;
           stepInfo:
             | {
                 __typename: 'InvokeStepInfo';
@@ -2329,6 +2421,13 @@ export type GetDebugRunQuery = {
           spanAttrs: any | null;
           resourceAttrs: any | null;
         } | null;
+        metadata: Array<{
+          __typename?: 'SpanMetadata';
+          scope: any;
+          kind: any;
+          values: any;
+          updatedAt: any;
+        }>;
         stepInfo:
           | {
               __typename: 'InvokeStepInfo';
@@ -2367,6 +2466,13 @@ export type GetDebugRunQuery = {
         spanAttrs: any | null;
         resourceAttrs: any | null;
       } | null;
+      metadata: Array<{
+        __typename?: 'SpanMetadata';
+        scope: any;
+        kind: any;
+        values: any;
+        updatedAt: any;
+      }>;
       stepInfo:
         | {
             __typename: 'InvokeStepInfo';

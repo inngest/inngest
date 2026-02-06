@@ -13,6 +13,7 @@ import {
 
 import globalsCss from '@inngest/components/AppRoot/globals.css?url';
 import fontsCss from '@inngest/components/AppRoot/fonts.css?url';
+import { ConnectRpcProvider } from '@/components/ConnectRpcProvider';
 import StoreProvider from '@/components/StoreProvider';
 
 export const Route = createRootRoute({
@@ -56,22 +57,24 @@ export const Route = createRootRoute({
 function RootComponent() {
   return (
     <RootDocument>
-      <StoreProvider>
-        <ThemeProvider attribute="class" defaultTheme="system">
-          <Outlet />
-          <Toaster
-            toastOptions={{
-              className: 'drop-shadow-lg',
-              style: {
-                background: `rgb(var(--color-background-canvas-base))`,
-                borderRadius: 0,
-                borderWidth: '0px 0px 2px',
-                color: `rgb(var(--color-foreground-base))`,
-              },
-            }}
-          />
-        </ThemeProvider>
-      </StoreProvider>
+      <ConnectRpcProvider>
+        <StoreProvider>
+          <ThemeProvider attribute="class" defaultTheme="system">
+            <Outlet />
+            <Toaster
+              toastOptions={{
+                className: 'drop-shadow-lg',
+                style: {
+                  background: `rgb(var(--color-background-canvas-base))`,
+                  borderRadius: 0,
+                  borderWidth: '0px 0px 2px',
+                  color: `rgb(var(--color-foreground-base))`,
+                },
+              }}
+            />
+          </ThemeProvider>
+        </StoreProvider>
+      </ConnectRpcProvider>
     </RootDocument>
   );
 }

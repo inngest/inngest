@@ -13,6 +13,7 @@ import type { InvokeRunPayload, InvokeRunResult } from './useInvokeRun';
 import type { PathCreator } from './usePathCreator';
 import type { RerunPayload, RerunResult } from './useRerun';
 import type { RerunFromStepPayload, RerunFromStepResult } from './useRerunFromStep';
+import type { StreamRunHandler } from './useStreamRun';
 
 //
 // These can be either different implementations per app (invokeRun, rerunFromStep) or
@@ -32,6 +33,7 @@ export type SharedDefinitions = {
   inngestStatus: InngestStatus | null;
   pathCreator: PathCreator;
   cloud: boolean;
+  streamRun?: StreamRunHandler;
 };
 
 export type SharedHandlers = SharedDefinitions;

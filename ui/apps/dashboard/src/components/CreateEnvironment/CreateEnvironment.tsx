@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from '@tanstack/react-router';
+import { useQueryClient } from '@tanstack/react-query';
+import { createConnectQueryKey, useTransport } from '@connectrpc/connect-query';
 import { Button } from '@inngest/components/Button';
 import { Input } from '@inngest/components/Forms/Input';
 import { Link } from '@inngest/components/Link';
@@ -7,6 +9,7 @@ import { toast } from 'sonner';
 import { useMutation } from 'urql';
 
 import { graphql } from '@/gql';
+import { fetchAccountEnvs } from '@inngest/components/proto/api/v2/service-V2_connectquery';
 
 const CreateEnvironmentDocument = graphql(`
   mutation CreateEnvironment($name: String!) {
@@ -18,6 +21,8 @@ const CreateEnvironmentDocument = graphql(`
 
 export const CreateEnvironment = () => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const transport = useTransport();
   const [, createEnvironment] = useMutation(CreateEnvironmentDocument);
   const [isDisabled, setDisabled] = useState(false);
   const [error, setError] = useState('');
@@ -40,6 +45,13 @@ export const CreateEnvironment = () => {
       return;
     }
     toast.success(`Created new environment`);
+    await queryClient.invalidateQueries({
+      queryKey: createConnectQueryKey({
+        schema: fetchAccountEnvs,
+        transport,
+        cardinality: 'finite',
+      }),
+    });
     navigate({ to: '/env' });
   };
 

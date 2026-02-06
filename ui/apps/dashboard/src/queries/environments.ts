@@ -79,10 +79,13 @@ const GetDefaultEnvironmentDocument = graphql(`
   }
 `);
 
-export const useEnvironments = (): UseQueryResponse<Environment[]> => {
+export const useEnvironments = (options?: {
+  pause?: boolean;
+}): UseQueryResponse<Environment[]> => {
   const [{ fetching, data, error, stale }, refetch] = useQuery({
     query: GetEnvironmentsDocument,
     requestPolicy: 'cache-first',
+    pause: options?.pause,
   });
 
   const environments = useMemo(() => {

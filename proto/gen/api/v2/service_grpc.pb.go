@@ -31,6 +31,7 @@ const (
 	V2_CreateWebhook_FullMethodName           = "/api.v2.V2/CreateWebhook"
 	V2_ListWebhooks_FullMethodName            = "/api.v2.V2/ListWebhooks"
 	V2_PatchEnv_FullMethodName                = "/api.v2.V2/PatchEnv"
+	V2_StreamRun_FullMethodName               = "/api.v2.V2/StreamRun"
 )
 
 // V2Client is the client API for V2 service.
@@ -50,6 +51,9 @@ type V2Client interface {
 	CreateWebhook(ctx context.Context, in *CreateWebhookRequest, opts ...grpc.CallOption) (*CreateWebhookResponse, error)
 	ListWebhooks(ctx context.Context, in *ListWebhooksRequest, opts ...grpc.CallOption) (*ListWebhooksResponse, error)
 	PatchEnv(ctx context.Context, in *PatchEnvRequest, opts ...grpc.CallOption) (*PatchEnvsResponse, error)
+	// StreamRun is a server-streaming RPC that streams run trace updates.
+	// This allows clients to receive real-time updates for long-running functions.
+	StreamRun(ctx context.Context, in *StreamRunRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[RunStreamItem], error)
 }
 
 type v2Client struct {
@@ -180,6 +184,25 @@ func (c *v2Client) PatchEnv(ctx context.Context, in *PatchEnvRequest, opts ...gr
 	return out, nil
 }
 
+func (c *v2Client) StreamRun(ctx context.Context, in *StreamRunRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[RunStreamItem], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &V2_ServiceDesc.Streams[0], V2_StreamRun_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[StreamRunRequest, RunStreamItem]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type V2_StreamRunClient = grpc.ServerStreamingClient[RunStreamItem]
+
 // V2Server is the server API for V2 service.
 // All implementations must embed UnimplementedV2Server
 // for forward compatibility.
@@ -197,6 +220,9 @@ type V2Server interface {
 	CreateWebhook(context.Context, *CreateWebhookRequest) (*CreateWebhookResponse, error)
 	ListWebhooks(context.Context, *ListWebhooksRequest) (*ListWebhooksResponse, error)
 	PatchEnv(context.Context, *PatchEnvRequest) (*PatchEnvsResponse, error)
+	// StreamRun is a server-streaming RPC that streams run trace updates.
+	// This allows clients to receive real-time updates for long-running functions.
+	StreamRun(*StreamRunRequest, grpc.ServerStreamingServer[RunStreamItem]) error
 	mustEmbedUnimplementedV2Server()
 }
 
@@ -242,6 +268,9 @@ func (UnimplementedV2Server) ListWebhooks(context.Context, *ListWebhooksRequest)
 }
 func (UnimplementedV2Server) PatchEnv(context.Context, *PatchEnvRequest) (*PatchEnvsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method PatchEnv not implemented")
+}
+func (UnimplementedV2Server) StreamRun(*StreamRunRequest, grpc.ServerStreamingServer[RunStreamItem]) error {
+	return status.Errorf(codes.Unimplemented, "method StreamRun not implemented")
 }
 func (UnimplementedV2Server) mustEmbedUnimplementedV2Server() {}
 func (UnimplementedV2Server) testEmbeddedByValue()            {}
@@ -480,6 +509,17 @@ func _V2_PatchEnv_Handler(srv interface{}, ctx context.Context, dec func(interfa
 	return interceptor(ctx, in, info, handler)
 }
 
+func _V2_StreamRun_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(StreamRunRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(V2Server).StreamRun(m, &grpc.GenericServerStream[StreamRunRequest, RunStreamItem]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type V2_StreamRunServer = grpc.ServerStreamingServer[RunStreamItem]
+
 // V2_ServiceDesc is the grpc.ServiceDesc for V2 service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -536,6 +576,12 @@ var V2_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _V2_PatchEnv_Handler,
 		},
 	},
-	Streams:  []grpc.StreamDesc{},
+	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "StreamRun",
+			Handler:       _V2_StreamRun_Handler,
+			ServerStreams: true,
+		},
+	},
 	Metadata: "api/v2/service.proto",
 }
