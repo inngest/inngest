@@ -95,7 +95,7 @@ func (c *Client) FunctionRuns(ctx context.Context, opts FunctionRunOpt) ([]FnRun
 			after: %s,
 			filter: { from: $startTime, until: $endTime, status: $status, timeField: $timeField, query: $query, functionIDs: $ids },
 			orderBy: %s,
-			preview: false
+			preview: true
 		) {
 			edges {
 				cursor
@@ -113,7 +113,7 @@ func (c *Client) FunctionRuns(ctx context.Context, opts FunctionRunOpt) ([]FnRun
 				endCursor
 				hasNextPage
 			}
-			totalCount(preview: false)
+			totalCount(preview: true)
 		}
 	}`,
 		cursor,
