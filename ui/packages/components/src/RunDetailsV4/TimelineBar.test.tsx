@@ -190,6 +190,21 @@ describe('TimelineBar', () => {
     });
   });
 
+  // Expanded row opacity (EXE-1217, Task 001)
+  describe('expanded row opacity', () => {
+    it('renders expanded parent row with opacity 0', () => {
+      render(<TimelineBar {...defaultProps} expandable expanded={true} />);
+      const bar = screen.getByTestId('timeline-bar-visual');
+      expect(bar.style.opacity).toBe('0');
+    });
+
+    it('renders collapsed row with no opacity override', () => {
+      render(<TimelineBar {...defaultProps} expandable expanded={false} />);
+      const bar = screen.getByTestId('timeline-bar-visual');
+      expect(bar.style.opacity).toBe('');
+    });
+  });
+
   // Selection tests
   describe('selection', () => {
     it('applies selected styling when selected is true', () => {
