@@ -97,8 +97,8 @@ func TestConstraintEnforcement(t *testing.T) {
 			queueOpts := []queue.QueueOpt{
 				queue.WithClock(clock),
 				queue.WithCapacityManager(cm),
-				queue.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (bool, bool) {
-					return true, true
+				queue.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (bool) {
+					return true
 				}),
 				queue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p queue.PartitionIdentifier) queue.PartitionConstraintConfig {
 					return test.queueConstraints
@@ -147,12 +147,12 @@ func TestConstraintEnforcement(t *testing.T) {
 				executor.WithPauseManager(pauseMgr),
 				executor.WithCapacityManager(cm),
 				executor.WithLogger(logger.StdlibLogger(ctx)),
-				executor.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
+				executor.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool) {
 					if test.executorUseConstraintAPI != nil {
 						return test.executorUseConstraintAPI(ctx, accountID, envID, functionID)
 					}
 
-					return true, true
+					return true
 				}),
 				executor.WithClock(clock),
 			)
