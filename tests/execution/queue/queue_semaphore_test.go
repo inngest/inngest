@@ -58,8 +58,8 @@ func TestQueueSemaphoreWithConstraintAPI(t *testing.T) {
 
 		// Use Constraint API
 		queue.WithCapacityManager(cm),
-		queue.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
-			return true, true
+		queue.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool) {
+			return true
 		}),
 
 		// Simulate a limit of 1
@@ -325,11 +325,9 @@ func TestQueueSemaphore(t *testing.T) {
 
 		{
 			name: "when Constraint API call fails, should release semaphore",
-			enableConstraintAPI: func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
-				// NOTE: Disable fallback to surface Acquire error to Process()
-				// If we returned true, true, we would simply move on to Lease
-				// for graceful fallbacking
-				return true, false
+			enableConstraintAPI: func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool) {
+				// Constraint API enabled with fail-hard behavior
+				return true
 			},
 			useFailingCapacityManager: true,
 			config: queue.PartitionConstraintConfig{
@@ -379,8 +377,8 @@ func TestQueueSemaphore(t *testing.T) {
 		},
 		{
 			name: "when limited by Constraint API, should release semaphore",
-			enableConstraintAPI: func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
-				return true, true
+			enableConstraintAPI: func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool) {
+				return true
 			},
 			config: queue.PartitionConstraintConfig{
 				FunctionVersion: 1,
@@ -502,8 +500,8 @@ func TestQueueSemaphore(t *testing.T) {
 		},
 		{
 			name: "when lease encounters concurrency limits, should free semaphore",
-			enableConstraintAPI: func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
-				return false, false
+			enableConstraintAPI: func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool) {
+				return false
 			},
 			config: queue.PartitionConstraintConfig{
 				FunctionVersion: 1,
