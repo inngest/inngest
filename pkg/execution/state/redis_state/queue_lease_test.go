@@ -1644,8 +1644,8 @@ func TestQueueLeaseConstraintIdempotency(t *testing.T) {
 				}
 			}),
 
-			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
-				return true, true
+			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool) {
+				return true
 			}),
 			osqueue.WithCapacityManager(cm),
 		)
@@ -1736,8 +1736,8 @@ func TestQueueLeaseConstraintIdempotency(t *testing.T) {
 				}
 			}),
 
-			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
-				return true, true
+			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool) {
+				return true
 			}),
 			osqueue.WithCapacityManager(cm),
 		)

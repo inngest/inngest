@@ -51,7 +51,7 @@ func (q *queue) BacklogRefillConstraintCheck(
 		}, nil
 	}
 
-	useAPI, fallback := q.UseConstraintAPI(ctx, *shadowPart.AccountID, *shadowPart.EnvID, *shadowPart.FunctionID)
+	useAPI := q.UseConstraintAPI(ctx, *shadowPart.AccountID, *shadowPart.EnvID, *shadowPart.FunctionID)
 	if !useAPI {
 		metrics.IncrBacklogRefillConstraintCheckFallbackCounter(ctx, enums.BacklogRefillConstraintCheckFallbackReasonFeatureFlagDisabled.String(), metrics.CounterOpt{
 			PkgName: pkgName,
@@ -82,18 +82,10 @@ func (q *queue) BacklogRefillConstraintCheck(
 	})
 	if err != nil {
 		logger.StdlibLogger(ctx).Error("acquiring capacity lease failed", "err", err, "method", "backlogRefillConstraintCheck", "functionID", *shadowPart.FunctionID)
-
-		if !fallback {
-			return nil, fmt.Errorf("could not enforce constraints and acquire lease: %w", err)
-		}
-
-		// Attempt to fall back to BacklogRefill -- ignore GCRA with constraint check idempotency
 		metrics.IncrBacklogRefillConstraintCheckFallbackCounter(ctx, enums.BacklogRefillConstraintCheckFallbackReasonConstraintAPIError.String(), metrics.CounterOpt{
 			PkgName: pkgName,
 		})
-		return &osqueue.BacklogRefillConstraintCheckResult{
-			ItemsToRefill: itemIDs,
-		}, nil
+		return nil, fmt.Errorf("could not enforce constraints and acquire lease: %w", err)
 	}
 
 	constraint := enums.QueueConstraintNotLimited
@@ -175,7 +167,7 @@ func (q *queue) ItemLeaseConstraintCheck(
 		return osqueue.ItemLeaseConstraintCheckResult{}, nil
 	}
 
-	useAPI, fallback := q.UseConstraintAPI(ctx, *shadowPart.AccountID, *shadowPart.EnvID, *shadowPart.FunctionID)
+	useAPI := q.UseConstraintAPI(ctx, *shadowPart.AccountID, *shadowPart.EnvID, *shadowPart.FunctionID)
 	if !useAPI {
 		metrics.IncrQueueItemConstraintCheckFallbackCounter(ctx, enums.QueueItemConstraintFallbackReasonFeatureFlagDisabled.String(), metrics.CounterOpt{
 			PkgName: pkgName,
@@ -260,16 +252,10 @@ func (q *queue) ItemLeaseConstraintCheck(
 	})
 	if err != nil {
 		l.Error("acquiring capacity lease failed", "err", err, "method", "itemLeaseConstraintCheck", "constraints", constraints, "item", item, "function_id", *shadowPart.FunctionID)
-
-		if !fallback {
-			return osqueue.ItemLeaseConstraintCheckResult{}, fmt.Errorf("could not enforce constraints and acquire lease: %w", err)
-		}
-
-		// Fallback to Lease (with idempotency)
 		metrics.IncrQueueItemConstraintCheckFallbackCounter(ctx, enums.QueueItemConstraintFallbackReasonConstraintAPIError.String(), metrics.CounterOpt{
 			PkgName: pkgName,
 		})
-		return osqueue.ItemLeaseConstraintCheckResult{}, nil
+		return osqueue.ItemLeaseConstraintCheckResult{}, fmt.Errorf("could not enforce constraints and acquire lease: %w", err)
 	}
 
 	constraint := enums.QueueConstraintNotLimited
