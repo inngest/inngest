@@ -117,8 +117,8 @@ func TestQueueE2E(t *testing.T) {
 				}),
 				queue.WithPollTick(150 * time.Millisecond),
 			},
-			useConstraintAPI: func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
-				return true, true
+			useConstraintAPI: func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool) {
+				return true
 			},
 		},
 		{
@@ -148,8 +148,8 @@ func TestQueueE2E(t *testing.T) {
 				}),
 				queue.WithPollTick(150 * time.Millisecond),
 			},
-			useConstraintAPI: func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
-				return true, true
+			useConstraintAPI: func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool) {
+				return true
 			},
 		},
 	}
