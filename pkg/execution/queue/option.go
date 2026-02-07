@@ -454,7 +454,7 @@ type QueueOptions struct {
 
 	enableJobPromotion bool
 
-	CapacityManager                    constraintapi.RolloutManager
+	CapacityManager                    constraintapi.CapacityManager
 	UseConstraintAPI                   constraintapi.UseConstraintAPIFn
 	EnableCapacityLeaseInstrumentation constraintapi.EnableHighCardinalityInstrumentation
 	CapacityLeaseExtendInterval        time.Duration
@@ -561,7 +561,7 @@ func WithEnableJobPromotion(enable bool) QueueOpt {
 	}
 }
 
-func WithCapacityManager(capacityManager constraintapi.RolloutManager) QueueOpt {
+func WithCapacityManager(capacityManager constraintapi.CapacityManager) QueueOpt {
 	return func(q *QueueOptions) {
 		q.CapacityManager = capacityManager
 	}

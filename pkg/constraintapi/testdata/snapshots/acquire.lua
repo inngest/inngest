@@ -209,10 +209,8 @@ for index, value in ipairs(constraints) do
 		constraintCapacity = rlRes["remaining"]
 		constraintRetryAt = toInteger(rlRes["retry_at"] / 1000000) 
 	elseif value.k == 2 then
-		local inProgressItems = getConcurrencyCount(value.c.iik)
 		local inProgressLeases = getConcurrencyCount(value.c.ilk)
-		local inProgressTotal = inProgressItems + inProgressLeases
-		constraintCapacity = value.c.l - inProgressTotal
+		constraintCapacity = value.c.l - inProgressLeases
 		constraintRetryAt = toInteger(nowMS + value.c.ra)
 		concurrencyCapacityCache[index] = constraintCapacity
 	elseif value.k == 3 then

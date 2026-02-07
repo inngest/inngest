@@ -65,7 +65,7 @@ type redisRequestState struct {
 	Metadata stateMetadata `json:"m,omitzero"`
 }
 
-func buildRequestState(req *CapacityAcquireRequest, keyPrefix string) (
+func buildRequestState(req *CapacityAcquireRequest) (
 	[]byte,
 	[]ConstraintItem,
 	map[string]string,
@@ -127,7 +127,6 @@ func buildRequestState(req *CapacityAcquireRequest, keyPrefix string) (
 			req.AccountID,
 			req.EnvID,
 			req.FunctionID,
-			keyPrefix,
 		)
 	}
 
@@ -187,7 +186,7 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 		"fn_id", req.FunctionID,
 		"req_id", requestID,
 		"source", req.Source,
-		"migration", req.Migration,
+		"shard", r.shardName,
 	)
 
 	now := r.clock.Now()
@@ -200,8 +199,8 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 		PkgName: pkgName,
 		Tags: map[string]any{
 			"operation": "acquire",
-			"source":    req.Migration.String(),
 			"attempt":   req.RequestAttempt,
+			"shard":     r.shardName,
 		},
 	})
 
@@ -216,13 +215,6 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 
 	enableHighCardinalityInstrumentation := r.enableHighCardinalityInstrumentation != nil && r.enableHighCardinalityInstrumentation(ctx, req.AccountID, req.EnvID, req.FunctionID)
 
-	// Retrieve client and key prefix for current constraints
-	// NOTE: We will no longer need this once we move to a dedicated store for constraint state
-	keyPrefix, client, err := r.clientAndPrefix(req.Migration)
-	if err != nil {
-		return nil, errs.Wrap(0, false, "failed to get client: %w", err)
-	}
-
 	// TODO: Should we get the current time again/cancel if too much time passed up until here?
 	leaseExpiry := now.Add(req.Duration)
 
@@ -236,13 +228,10 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 		initialLeaseIDs[i] = leaseID
 	}
 
-	requestState, sortedConstraints, hashedLeaseIdempotencyKeysMap, fingerprint, err := buildRequestState(req, keyPrefix)
+	requestState, sortedConstraints, hashedLeaseIdempotencyKeysMap, fingerprint, err := buildRequestState(req)
 	if err != nil {
 		return nil, errs.Wrap(0, false, "could not build request state: %w", err)
 	}
-
-	// Deterministically compute this based on numScavengerShards and accountID
-	scavengerShard := r.scavengerShard(ctx, req.AccountID)
 
 	// Build Lua request
 
@@ -258,17 +247,18 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 
 	keys := []string{
 		// The request state is persisted for consistent cleanup during Scavenge/Release operations
-		r.keyRequestState(keyPrefix, req.AccountID, requestID),
+		r.keyRequestState(req.AccountID, requestID),
 
 		// Operation idempotency is used for retries while the generated leases are still valid
-		r.keyOperationIdempotency(keyPrefix, req.AccountID, "acq", operationIdempotencyKey),
+		r.keyOperationIdempotency(req.AccountID, "acq", operationIdempotencyKey),
 
 		// Enable idempotency for the entire Acquire call. This is used by batch operations like BacklogRefill which
 		// may need to skip GCRA checks without knowing individual leases/items
-		r.keyConstraintCheckIdempotency(keyPrefix, req.AccountID, req.IdempotencyKey),
+		r.keyConstraintCheckIdempotency(req.AccountID, req.IdempotencyKey),
 
-		r.keyScavengerShard(keyPrefix, scavengerShard),
-		r.keyAccountLeases(keyPrefix, req.AccountID),
+		r.keyScavengerShard(),
+
+		r.keyAccountLeases(req.AccountID),
 	}
 
 	enableDebugLogsVal := "0"
@@ -276,7 +266,7 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 		enableDebugLogsVal = "1"
 	}
 
-	scopedKeyPrefix := fmt.Sprintf("{%s}:%s", keyPrefix, accountScope(req.AccountID))
+	scopedKeyPrefix := fmt.Sprintf("{cs}:%s", accountScope(req.AccountID))
 
 	args, err := strSlice([]any{
 		// This will be marshaled
@@ -307,9 +297,9 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 	rawRes, internalErr := executeLuaScript(
 		ctx,
 		"acquire",
-		req.Migration,
+		r.shardName,
 		req.Source,
-		client,
+		r.client,
 		r.clock,
 		keys,
 		args,
@@ -368,7 +358,7 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 			"location":            req.Source.Location.String(),
 			"service":             req.Source.Service.String(),
 			"run_processing_mode": req.Source.RunProcessingMode.String(),
-			"migration":           req.Migration.String(),
+			"shard":               r.shardName,
 		},
 	})
 
@@ -399,7 +389,9 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 		"status", parsedResponse.Status,
 	)
 
-	tags := make(map[string]any)
+	tags := map[string]any{
+		"shard": r.shardName,
+	}
 	if enableHighCardinalityInstrumentation {
 		tags["function_id"] = req.FunctionID
 	}
@@ -450,7 +442,7 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 				"location":            req.Source.Location.String(),
 				"service":             req.Source.Service.String(),
 				"run_processing_mode": req.Source.RunProcessingMode.String(),
-				"migration":           req.Migration.String(),
+				"shard":               r.shardName,
 			},
 		})
 
@@ -460,7 +452,7 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 				"location":            req.Source.Location.String(),
 				"service":             req.Source.Service.String(),
 				"run_processing_mode": req.Source.RunProcessingMode.String(),
-				"migration":           req.Migration.String(),
+				"shard":               r.shardName,
 			},
 		})
 

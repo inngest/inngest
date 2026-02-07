@@ -24,7 +24,6 @@ func TestSerializedConstraintItem(t *testing.T) {
 	accountID := uuid.MustParse("12345678-1234-1234-1234-123456789abc")
 	envID := uuid.MustParse("87654321-4321-4321-4321-cba987654321")
 	functionID := uuid.MustParse("11111111-2222-3333-4444-555555555555")
-	keyPrefix := "test-prefix"
 
 	testConfig := ConstraintConfig{
 		FunctionVersion: 1,
@@ -76,7 +75,7 @@ func TestSerializedConstraintItem(t *testing.T) {
 					EvaluatedKeyHash:  "eval-hash",
 				},
 			},
-			expected: `{"k":1,"r":{"b":10,"s":2,"h":"test-key-hash","eh":"eval-hash","k":"{test-prefix}:rl:a:12345678-1234-1234-1234-123456789abc:eval-hash","l":100,"p":60000000000}}`,
+			expected: `{"k":1,"r":{"b":10,"s":2,"h":"test-key-hash","eh":"eval-hash","k":"{cs}:a:12345678-1234-1234-1234-123456789abc:rl:a:eval-hash","l":100,"p":60000000000}}`,
 		},
 		{
 			name: "Concurrency constraint with custom key",
@@ -87,10 +86,9 @@ func TestSerializedConstraintItem(t *testing.T) {
 					Scope:             enums.ConcurrencyScopeEnv,
 					KeyExpressionHash: "custom-key",
 					EvaluatedKeyHash:  "concurrency-eval",
-					InProgressItemKey: "redis:item:key123",
-				},
+					},
 			},
-			expected: `{"k":2,"c":{"m":1,"s":1,"h":"custom-key","eh":"concurrency-eval","l":15,"ilk":"{test-prefix}:12345678-1234-1234-1234-123456789abc:state:concurrency:e:87654321-4321-4321-4321-cba987654321<custom-key:concurrency-eval>","iik":"redis:item:key123","ra":2000}}`,
+			expected: `{"k":2,"c":{"m":1,"s":1,"h":"custom-key","eh":"concurrency-eval","l":15,"ilk":"{cs}:a:12345678-1234-1234-1234-123456789abc:concurrency:e:87654321-4321-4321-4321-cba987654321<custom-key:concurrency-eval>","ra":2000}}`,
 		},
 		{
 			name: "Throttle constraint with embedded config",
@@ -102,7 +100,7 @@ func TestSerializedConstraintItem(t *testing.T) {
 					EvaluatedKeyHash:  "throttle-key",
 				},
 			},
-			expected: `{"k":3,"t":{"h":"throttle-expr","eh":"throttle-key","l":200,"b":300,"p":60000,"k":"{test-prefix}:throttle:throttle-key"}}`,
+			expected: `{"k":3,"t":{"h":"throttle-expr","eh":"throttle-key","l":200,"b":300,"p":60000,"k":"{cs}:a:12345678-1234-1234-1234-123456789abc:throttle:f:11111111-2222-3333-4444-555555555555:throttle-key"}}`,
 		},
 		{
 			name: "Concurrency constraint with standard function step limit",
@@ -111,17 +109,16 @@ func TestSerializedConstraintItem(t *testing.T) {
 				Concurrency: &ConcurrencyConstraint{
 					Mode:              enums.ConcurrencyModeStep,
 					Scope:             enums.ConcurrencyScopeFn,
-					InProgressItemKey: "redis:function:item456",
-					// KeyExpressionHash and EvaluatedKeyHash left empty for standard limit
+						// KeyExpressionHash and EvaluatedKeyHash left empty for standard limit
 				},
 			},
-			expected: `{"k":2,"c":{"l":25,"ra":2000,"ilk":"{test-prefix}:12345678-1234-1234-1234-123456789abc:state:concurrency:f:11111111-2222-3333-4444-555555555555","iik":"redis:function:item456"}}`, // Function concurrency limit embedded
+			expected: `{"k":2,"c":{"l":25,"ra":2000,"ilk":"{cs}:a:12345678-1234-1234-1234-123456789abc:concurrency:f:11111111-2222-3333-4444-555555555555"}}`, // Function concurrency limit embedded
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			serialized := tt.input.ToSerializedConstraintItem(testConfig, accountID, envID, functionID, keyPrefix)
+			serialized := tt.input.ToSerializedConstraintItem(testConfig, accountID, envID, functionID)
 			jsonBytes, err := json.Marshal(serialized)
 			require.NoError(t, err)
 
@@ -145,7 +142,7 @@ func TestSerializedConstraintItem_EmptyLimit(t *testing.T) {
 	}
 
 	accountID, envID, fnID := uuid.New(), uuid.New(), uuid.New()
-	serialized := constraint.ToSerializedConstraintItem(config, accountID, envID, fnID, "test-prefix")
+	serialized := constraint.ToSerializedConstraintItem(config, accountID, envID, fnID)
 	jsonBytes, err := json.Marshal(serialized)
 	require.NoError(t, err)
 
@@ -153,8 +150,7 @@ func TestSerializedConstraintItem_EmptyLimit(t *testing.T) {
 		"k": 2,
 		"c": map[string]any{
 			"l":   0, // Should always be included
-			"ilk": fmt.Sprintf("{test-prefix}:%s:state:concurrency:f:%s", accountID, fnID),
-			"iik": "",
+			"ilk": fmt.Sprintf("{cs}:a:%s:concurrency:f:%s", accountID, fnID),
 			"ra":  ConcurrencyLimitRetryAfter.Milliseconds(),
 		},
 	})
@@ -167,7 +163,6 @@ func TestSerializedConstraintItem_SizeReduction(t *testing.T) {
 	accountID := uuid.MustParse("12345678-1234-1234-1234-123456789abc")
 	envID := uuid.MustParse("87654321-4321-4321-4321-cba987654321")
 	functionID := uuid.MustParse("11111111-2222-3333-4444-555555555555")
-	keyPrefix := "test-prefix"
 
 	testConfig := ConstraintConfig{
 		FunctionVersion: 1,
@@ -183,7 +178,6 @@ func TestSerializedConstraintItem_SizeReduction(t *testing.T) {
 			Scope:             enums.ConcurrencyScopeAccount,
 			KeyExpressionHash: "some-very-long-key-expression-hash-value",
 			EvaluatedKeyHash:  "some-very-long-evaluated-key-hash-value",
-			InProgressItemKey: "redis:some-very-long-in-progress-item-key-value",
 		},
 	}
 
@@ -192,7 +186,7 @@ func TestSerializedConstraintItem_SizeReduction(t *testing.T) {
 	require.NoError(t, err)
 
 	// Serialize optimized version with embedded config
-	serialized := original.ToSerializedConstraintItem(testConfig, accountID, envID, functionID, keyPrefix)
+	serialized := original.ToSerializedConstraintItem(testConfig, accountID, envID, functionID)
 	optimizedJson, err := json.Marshal(serialized)
 	require.NoError(t, err)
 
@@ -205,7 +199,6 @@ func TestSerializedConstraintItem_SizeReduction(t *testing.T) {
 	assert.NotEmpty(t, optimizedJson)
 	assert.Contains(t, string(optimizedJson), `"k":2`)  // Kind as integer
 	assert.Contains(t, string(optimizedJson), `"ilk":`) // InProgressLeaseKey
-	assert.Contains(t, string(optimizedJson), `"iik":`) // InProgressItemKey
 }
 
 func TestLuaScriptSnapshots(t *testing.T) {

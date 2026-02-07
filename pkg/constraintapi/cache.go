@@ -116,9 +116,10 @@ func (l *constraintCache) Acquire(ctx context.Context, req *CapacityAcquireReque
 		}
 
 		tags := map[string]any{
-			"op":         "hit",
-			"source":     req.Migration.String(),
-			"constraint": ci.MetricsIdentifier(),
+			"op":              "hit",
+			"source_location": req.Source.Location.String(),
+			"source_service":  req.Source.Service.String(),
+			"constraint":      ci.MetricsIdentifier(),
 		}
 		if l.enableHighCardinalityInstrumentation != nil && l.enableHighCardinalityInstrumentation(ctx, req.AccountID, req.EnvID, req.FunctionID) {
 			tags["function_id"] = req.FunctionID
@@ -152,8 +153,9 @@ func (l *constraintCache) Acquire(ctx context.Context, req *CapacityAcquireReque
 
 	// Cache miss - record metric
 	tags := map[string]any{
-		"op":     "miss",
-		"source": req.Migration.String(),
+		"op":              "miss",
+		"source_location": req.Source.Location.String(),
+		"source_service":  req.Source.Service.String(),
 	}
 	if l.enableHighCardinalityInstrumentation != nil && l.enableHighCardinalityInstrumentation(ctx, req.AccountID, req.EnvID, req.FunctionID) {
 		tags["function_id"] = req.FunctionID
@@ -203,9 +205,10 @@ func (l *constraintCache) Acquire(ctx context.Context, req *CapacityAcquireReque
 			cacheTTL,
 		)
 		tags := map[string]any{
-			"op":         "set",
-			"source":     req.Migration.String(),
-			"constraint": ci.MetricsIdentifier(),
+			"op":              "set",
+			"source_location": req.Source.Location.String(),
+			"source_service":  req.Source.Service.String(),
+			"constraint":      ci.MetricsIdentifier(),
 		}
 		if l.enableHighCardinalityInstrumentation != nil && l.enableHighCardinalityInstrumentation(ctx, req.AccountID, req.EnvID, req.FunctionID) {
 			tags["function_id"] = req.FunctionID

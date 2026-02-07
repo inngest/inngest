@@ -114,7 +114,6 @@ message ConcurrencyConstraint {
   ConstraintApiConcurrencyScope scope = 2;
   string key_expression_hash = 3;
   string evaluated_key_hash = 4;
-  string in_progress_item_key = 5; 
 }
 
 message ThrottleConstraint {
@@ -144,12 +143,6 @@ message CapacityLease {
   string idempotency_key = 2;
 }
 
-// Migration identifier for constraint API migration hints
-message MigrationIdentifier {
-  bool is_rate_limit = 1;
-  string queue_shard = 2;
-}
-
 message LeaseSource {
   ConstraintApiLeaseService service = 1;
   ConstraintApiCallerLocation location = 2;
@@ -163,7 +156,6 @@ message CapacityCheckRequest {
   string function_id = 3;
   ConstraintConfig configuration = 4;
   repeated ConstraintItem constraints = 5;
-  MigrationIdentifier migration = 6;
 }
 
 message CapacityCheckResponse {
@@ -190,8 +182,7 @@ message CapacityAcquireRequest {
   google.protobuf.Duration maximum_lifetime = 12;
   google.protobuf.Duration blocking_threshold = 13;
   LeaseSource source = 14;
-  MigrationIdentifier migration = 15;
-  uint32 request_attempt = 16;
+  uint32 request_attempt = 15;
 }
 
 message CapacityAcquireResponse {
@@ -207,9 +198,8 @@ message CapacityExtendLeaseRequest {
   string account_id = 2;
   string lease_id = 3;
   google.protobuf.Duration duration = 4;
-  MigrationIdentifier migration = 5;
-  LeaseSource source = 6;
-  uint32 request_attempt = 7;
+  LeaseSource source = 5;
+  uint32 request_attempt = 6;
 }
 
 message CapacityExtendLeaseResponse {
@@ -220,9 +210,8 @@ message CapacityReleaseRequest {
   string idempotency_key = 1;
   string account_id = 2;
   string lease_id = 3;
-  MigrationIdentifier migration = 4;
-  LeaseSource source = 5;
-  uint32 request_attempt = 6;
+  LeaseSource source = 4;
+  uint32 request_attempt = 5;
 }
 
 message CapacityReleaseResponse {

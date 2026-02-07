@@ -59,7 +59,7 @@ end
 ---@type integer
 local configVersion = requestDetails.cv
 
----@type { k: integer, c: { m: integer?, s: integer?, h: string?, eh: string?, l: integer?, ilk: string?, iik: string? }?, t: { s: integer?, h: string?, k: string, eh: string?, l: integer?, b: integer?, p: integer? }?, r: { s: integer?, h: string, eh: string, l: integer, p: integer, k: string, b: integer }? }[]
+---@type { k: integer, c: { m: integer?, s: integer?, h: string?, eh: string?, l: integer?, ilk: string? }?, t: { s: integer?, h: string?, k: string, eh: string?, l: integer?, b: integer?, p: integer? }?, r: { s: integer?, h: string, eh: string, l: integer, p: integer, k: string, b: integer }? }[]
 local constraints = requestDetails.s
 if not constraints then
 	return redis.error_reply("ERR constraints array is nil")
@@ -103,27 +103,14 @@ for index, value in ipairs(constraints) do
 	elseif value.k == 2 then
 		-- concurrency
 		debug("evaluating concurrency")
-		local inProgressItems = getConcurrencyCount(value.c.iik)
 		local inProgressLeases = getConcurrencyCount(value.c.ilk)
-		local inProgressTotal = inProgressItems + inProgressLeases
-		constraintCapacity = value.c.l - inProgressTotal
+		constraintCapacity = value.c.l - inProgressLeases
 		constraintRetryAfter = toInteger(nowMS + value.c.ra)
 
 		local usage = {}
 		usage["l"] = value.c.l
 		usage["u"] = math.max(math.min(value.c.l - constraintCapacity, value.c.l or 0), 0)
-		debug(
-			"i",
-			index,
-			"ipi",
-			inProgressItems,
-			"ipl",
-			inProgressLeases,
-			"ipt",
-			inProgressTotal,
-			"cc",
-			constraintCapacity
-		)
+		debug("i", index, "ipl", inProgressLeases, "cc", constraintCapacity)
 		table.insert(constraintUsage, usage)
 	elseif value.k == 3 then
 		-- throttle

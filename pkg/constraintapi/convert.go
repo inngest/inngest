@@ -400,7 +400,6 @@ func ConcurrencyConstraintToProto(constraint ConcurrencyConstraint) *pb.Concurre
 		Scope:             ConcurrencyScopeToProto(constraint.Scope),
 		KeyExpressionHash: constraint.KeyExpressionHash,
 		EvaluatedKeyHash:  constraint.EvaluatedKeyHash,
-		InProgressItemKey: constraint.InProgressItemKey,
 	}
 }
 
@@ -413,7 +412,6 @@ func ConcurrencyConstraintFromProto(pbConstraint *pb.ConcurrencyConstraint) Conc
 		Scope:             ConcurrencyScopeFromProto(pbConstraint.Scope),
 		KeyExpressionHash: pbConstraint.KeyExpressionHash,
 		EvaluatedKeyHash:  pbConstraint.EvaluatedKeyHash,
-		InProgressItemKey: pbConstraint.InProgressItemKey,
 	}
 }
 
@@ -546,23 +544,6 @@ func LeaseSourceFromProto(pbSource *pb.LeaseSource) LeaseSource {
 	}
 }
 
-func MigrationIdentifierToProto(migration MigrationIdentifier) *pb.MigrationIdentifier {
-	return &pb.MigrationIdentifier{
-		IsRateLimit: migration.IsRateLimit,
-		QueueShard:  migration.QueueShard,
-	}
-}
-
-func MigrationIdentifierFromProto(pbMigration *pb.MigrationIdentifier) MigrationIdentifier {
-	if pbMigration == nil {
-		return MigrationIdentifier{}
-	}
-	return MigrationIdentifier{
-		IsRateLimit: pbMigration.IsRateLimit,
-		QueueShard:  pbMigration.QueueShard,
-	}
-}
-
 func CapacityCheckRequestToProto(req *CapacityCheckRequest) *pb.CapacityCheckRequest {
 	if req == nil {
 		return nil
@@ -579,7 +560,6 @@ func CapacityCheckRequestToProto(req *CapacityCheckRequest) *pb.CapacityCheckReq
 		FunctionId:    req.FunctionID.String(),
 		Configuration: ConstraintConfigToProto(req.Configuration),
 		Constraints:   constraints,
-		Migration:     MigrationIdentifierToProto(req.Migration),
 	}
 }
 
@@ -617,7 +597,6 @@ func CapacityCheckRequestFromProto(pbReq *pb.CapacityCheckRequest) (*CapacityChe
 		FunctionID:    functionID,
 		Configuration: ConstraintConfigFromProto(pbReq.Configuration),
 		Constraints:   constraints,
-		Migration:     MigrationIdentifierFromProto(pbReq.Migration),
 	}, nil
 }
 
@@ -721,7 +700,6 @@ func CapacityAcquireRequestToProto(req *CapacityAcquireRequest) *pb.CapacityAcqu
 		MaximumLifetime:      durationpb.New(req.MaximumLifetime),
 		BlockingThreshold:    durationpb.New(req.BlockingThreshold),
 		Source:               LeaseSourceToProto(req.Source),
-		Migration:            MigrationIdentifierToProto(req.Migration),
 		RequestAttempt:       uint32(req.RequestAttempt),
 	}
 }
@@ -795,7 +773,6 @@ func CapacityAcquireRequestFromProto(pbReq *pb.CapacityAcquireRequest) (*Capacit
 		MaximumLifetime:      maximumLifetime,
 		BlockingThreshold:    blockingThreshold,
 		Source:               LeaseSourceFromProto(pbReq.Source),
-		Migration:            MigrationIdentifierFromProto(pbReq.Migration),
 		RequestAttempt:       int(pbReq.RequestAttempt),
 	}, nil
 }
@@ -876,7 +853,6 @@ func CapacityExtendLeaseRequestToProto(req *CapacityExtendLeaseRequest) *pb.Capa
 		AccountId:      req.AccountID.String(),
 		LeaseId:        req.LeaseID.String(),
 		Duration:       durationpb.New(req.Duration),
-		Migration:      MigrationIdentifierToProto(req.Migration),
 		Source:         LeaseSourceToProto(req.Source),
 		RequestAttempt: uint32(req.RequestAttempt),
 	}
@@ -907,7 +883,6 @@ func CapacityExtendLeaseRequestFromProto(pbReq *pb.CapacityExtendLeaseRequest) (
 		AccountID:      accountID,
 		LeaseID:        leaseID,
 		Duration:       duration,
-		Migration:      MigrationIdentifierFromProto(pbReq.Migration),
 		Source:         LeaseSourceFromProto(pbReq.Source),
 		RequestAttempt: int(pbReq.RequestAttempt),
 	}, nil
@@ -956,7 +931,6 @@ func CapacityReleaseRequestToProto(req *CapacityReleaseRequest) *pb.CapacityRele
 		IdempotencyKey: req.IdempotencyKey,
 		AccountId:      req.AccountID.String(),
 		LeaseId:        req.LeaseID.String(),
-		Migration:      MigrationIdentifierToProto(req.Migration),
 		Source:         LeaseSourceToProto(req.Source),
 		RequestAttempt: uint32(req.RequestAttempt),
 	}
@@ -981,7 +955,6 @@ func CapacityReleaseRequestFromProto(pbReq *pb.CapacityReleaseRequest) (*Capacit
 		IdempotencyKey: pbReq.IdempotencyKey,
 		AccountID:      accountID,
 		LeaseID:        leaseID,
-		Migration:      MigrationIdentifierFromProto(pbReq.Migration),
 		Source:         LeaseSourceFromProto(pbReq.Source),
 		RequestAttempt: int(pbReq.RequestAttempt),
 	}, nil

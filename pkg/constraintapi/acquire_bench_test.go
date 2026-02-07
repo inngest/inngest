@@ -28,14 +28,9 @@ func BenchmarkAcquire(b *testing.B) {
 	clock := clockwork.NewFakeClock()
 
 	cm, err := NewRedisCapacityManager(
-		WithRateLimitClient(rc),
-		WithQueueShards(map[string]rueidis.Client{
-			"test": rc,
-		}),
+		WithClient(rc),
+		WithShardName("default"),
 		WithClock(clock),
-		WithNumScavengerShards(1),
-		WithQueueStateKeyPrefix("q:v1"),
-		WithRateLimitKeyPrefix("rl"),
 	)
 	require.NoError(b, err)
 	require.NotNil(b, cm)
@@ -53,24 +48,19 @@ func BenchmarkAcquire(b *testing.B) {
 		},
 	}
 
-	acctConcurrency := fmt.Sprintf("{%s}:concurrency:account:%s", cm.queueStateKeyPrefix, accountID)
-	fnConcurrency := fmt.Sprintf("{%s}:concurrency:p:%s", cm.queueStateKeyPrefix, fnID)
-
 	constraints := []ConstraintItem{
 		{
 			Kind: ConstraintKindConcurrency,
 			Concurrency: &ConcurrencyConstraint{
-				Mode:              enums.ConcurrencyModeStep,
-				Scope:             enums.ConcurrencyScopeAccount,
-				InProgressItemKey: acctConcurrency,
+				Mode:  enums.ConcurrencyModeStep,
+				Scope: enums.ConcurrencyScopeAccount,
 			},
 		},
 		{
 			Kind: ConstraintKindConcurrency,
 			Concurrency: &ConcurrencyConstraint{
-				Mode:              enums.ConcurrencyModeStep,
-				Scope:             enums.ConcurrencyScopeFn,
-				InProgressItemKey: fnConcurrency,
+				Mode:  enums.ConcurrencyModeStep,
+				Scope: enums.ConcurrencyScopeFn,
 			},
 		},
 	}
@@ -105,9 +95,6 @@ func BenchmarkAcquire(b *testing.B) {
 			Constraints:     constraints,
 			CurrentTime:     clock.Now(),
 			MaximumLifetime: time.Minute,
-			Migration: MigrationIdentifier{
-				QueueShard: "test",
-			},
 		}
 
 		resp, err := cm.Acquire(ctx, acquireReq)

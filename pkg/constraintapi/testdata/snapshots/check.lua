@@ -189,26 +189,13 @@ for index, value in ipairs(constraints) do
 		table.insert(constraintUsage, usage)
 	elseif value.k == 2 then
 		debug("evaluating concurrency")
-		local inProgressItems = getConcurrencyCount(value.c.iik)
 		local inProgressLeases = getConcurrencyCount(value.c.ilk)
-		local inProgressTotal = inProgressItems + inProgressLeases
-		constraintCapacity = value.c.l - inProgressTotal
+		constraintCapacity = value.c.l - inProgressLeases
 		constraintRetryAfter = toInteger(nowMS + value.c.ra)
 		local usage = {}
 		usage["l"] = value.c.l
 		usage["u"] = math.max(math.min(value.c.l - constraintCapacity, value.c.l or 0), 0)
-		debug(
-			"i",
-			index,
-			"ipi",
-			inProgressItems,
-			"ipl",
-			inProgressLeases,
-			"ipt",
-			inProgressTotal,
-			"cc",
-			constraintCapacity
-		)
+		debug("i", index, "ipl", inProgressLeases, "cc", constraintCapacity)
 		table.insert(constraintUsage, usage)
 	elseif value.k == 3 then
 		debug("evaluating throttle")

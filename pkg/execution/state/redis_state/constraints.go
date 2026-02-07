@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
@@ -52,7 +51,7 @@ func (q *queue) BacklogRefillConstraintCheck(
 		}, nil
 	}
 
-	useAPI, fallback := q.UseConstraintAPI(ctx, *shadowPart.AccountID, *shadowPart.EnvID, *shadowPart.FunctionID)
+	useAPI := q.UseConstraintAPI(ctx, *shadowPart.AccountID, *shadowPart.EnvID, *shadowPart.FunctionID)
 	if !useAPI {
 		metrics.IncrBacklogRefillConstraintCheckFallbackCounter(ctx, enums.BacklogRefillConstraintCheckFallbackReasonFeatureFlagDisabled.String(), metrics.CounterOpt{
 			PkgName: pkgName,
@@ -80,25 +79,13 @@ func (q *queue) BacklogRefillConstraintCheck(
 			Location:          constraintapi.CallerLocationBacklogRefill,
 			RunProcessingMode: constraintapi.RunProcessingModeBackground,
 		},
-		Migration: constraintapi.MigrationIdentifier{
-			IsRateLimit: false,
-			QueueShard:  q.name,
-		},
 	})
 	if err != nil {
 		logger.StdlibLogger(ctx).Error("acquiring capacity lease failed", "err", err, "method", "backlogRefillConstraintCheck", "functionID", *shadowPart.FunctionID)
-
-		if !fallback {
-			return nil, fmt.Errorf("could not enforce constraints and acquire lease: %w", err)
-		}
-
-		// Attempt to fall back to BacklogRefill -- ignore GCRA with constraint check idempotency
 		metrics.IncrBacklogRefillConstraintCheckFallbackCounter(ctx, enums.BacklogRefillConstraintCheckFallbackReasonConstraintAPIError.String(), metrics.CounterOpt{
 			PkgName: pkgName,
 		})
-		return &osqueue.BacklogRefillConstraintCheckResult{
-			ItemsToRefill: itemIDs,
-		}, nil
+		return nil, fmt.Errorf("could not enforce constraints and acquire lease: %w", err)
 	}
 
 	constraint := enums.QueueConstraintNotLimited
@@ -180,7 +167,7 @@ func (q *queue) ItemLeaseConstraintCheck(
 		return osqueue.ItemLeaseConstraintCheckResult{}, nil
 	}
 
-	useAPI, fallback := q.UseConstraintAPI(ctx, *shadowPart.AccountID, *shadowPart.EnvID, *shadowPart.FunctionID)
+	useAPI := q.UseConstraintAPI(ctx, *shadowPart.AccountID, *shadowPart.EnvID, *shadowPart.FunctionID)
 	if !useAPI {
 		metrics.IncrQueueItemConstraintCheckFallbackCounter(ctx, enums.QueueItemConstraintFallbackReasonFeatureFlagDisabled.String(), metrics.CounterOpt{
 			PkgName: pkgName,
@@ -223,10 +210,6 @@ func (q *queue) ItemLeaseConstraintCheck(
 				AccountID:      *shadowPart.AccountID,
 				IdempotencyKey: idempotencyKey,
 				LeaseID:        item.CapacityLease.LeaseID,
-				Migration: constraintapi.MigrationIdentifier{
-					IsRateLimit: false,
-					QueueShard:  q.Name(),
-				},
 				Source: constraintapi.LeaseSource{
 					Location:          constraintapi.CallerLocationItemLease,
 					Service:           constraintapi.ServiceExecutor,
@@ -266,23 +249,13 @@ func (q *queue) ItemLeaseConstraintCheck(
 			Location:          constraintapi.CallerLocationItemLease,
 			RunProcessingMode: constraintapi.RunProcessingModeBackground,
 		},
-		Migration: constraintapi.MigrationIdentifier{
-			IsRateLimit: false,
-			QueueShard:  q.name,
-		},
 	})
 	if err != nil {
 		l.Error("acquiring capacity lease failed", "err", err, "method", "itemLeaseConstraintCheck", "constraints", constraints, "item", item, "function_id", *shadowPart.FunctionID)
-
-		if !fallback {
-			return osqueue.ItemLeaseConstraintCheckResult{}, fmt.Errorf("could not enforce constraints and acquire lease: %w", err)
-		}
-
-		// Fallback to Lease (with idempotency)
 		metrics.IncrQueueItemConstraintCheckFallbackCounter(ctx, enums.QueueItemConstraintFallbackReasonConstraintAPIError.String(), metrics.CounterOpt{
 			PkgName: pkgName,
 		})
-		return osqueue.ItemLeaseConstraintCheckResult{}, nil
+		return osqueue.ItemLeaseConstraintCheckResult{}, fmt.Errorf("could not enforce constraints and acquire lease: %w", err)
 	}
 
 	constraint := enums.QueueConstraintNotLimited
@@ -315,18 +288,16 @@ func constraintItemsFromBacklog(sp *osqueue.QueueShadowPartition, backlog *osque
 		{
 			Kind: constraintapi.ConstraintKindConcurrency,
 			Concurrency: &constraintapi.ConcurrencyConstraint{
-				Mode:              enums.ConcurrencyModeStep,
-				Scope:             enums.ConcurrencyScopeAccount,
-				InProgressItemKey: shadowPartitionAccountInProgressKey(*sp, kg),
+				Mode:  enums.ConcurrencyModeStep,
+				Scope: enums.ConcurrencyScopeAccount,
 			},
 		},
 		// Function concurrency (always set - falls back to account concurrency)
 		{
 			Kind: constraintapi.ConstraintKindConcurrency,
 			Concurrency: &constraintapi.ConcurrencyConstraint{
-				Mode:              enums.ConcurrencyModeStep,
-				Scope:             enums.ConcurrencyScopeFn,
-				InProgressItemKey: shadowPartitionInProgressKey(*sp, kg),
+				Mode:  enums.ConcurrencyModeStep,
+				Scope: enums.ConcurrencyScopeFn,
 			},
 		},
 	}
@@ -350,32 +321,10 @@ func constraintItemsFromBacklog(sp *osqueue.QueueShadowPartition, backlog *osque
 					Scope:             bck.Scope,
 					KeyExpressionHash: bck.HashedKeyExpression,
 					EvaluatedKeyHash:  bck.HashedValue,
-					InProgressItemKey: backlogConcurrencyKey(bck, kg),
 				},
 			})
 		}
 	}
 
 	return constraints
-}
-
-func (q *queue) keyConstraintCheckIdempotency(accountID *uuid.UUID, itemID string) string {
-	kg := q.RedisClient.kg
-
-	if accountID == nil || *accountID == uuid.Nil {
-		return fmt.Sprintf("%s:-", kg.QueuePrefix())
-	}
-
-	if q.CapacityManager == nil {
-		return fmt.Sprintf("%s:-", kg.QueuePrefix())
-	}
-
-	if itemID == "" {
-		return fmt.Sprintf("%s:-", kg.QueuePrefix())
-	}
-
-	return q.CapacityManager.KeyConstraintCheckIdempotency(constraintapi.MigrationIdentifier{
-		IsRateLimit: false,
-		QueueShard:  q.name,
-	}, *accountID, itemID)
 }
