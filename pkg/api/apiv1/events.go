@@ -182,6 +182,9 @@ func (a router) getEventRuns(w http.ResponseWriter, r *http.Request) {
 				_ = publicerr.WriteHTTP(w, err) // return with error since user can leave out trace_preview flag
 				return
 			}
+			if rootSpan == nil {
+				continue
+			}
 			run.Status = enums.StepStatusToRunStatus(rootSpan.Status)
 		}
 	}
