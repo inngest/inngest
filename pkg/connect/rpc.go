@@ -10,10 +10,10 @@ import (
 
 func (c *connectGatewaySvc) Forward(ctx context.Context, req *pb.ForwardRequest) (*pb.ForwardResponse, error) {
 	l := logger.StdlibLogger(ctx)
-	l.Debug("received grpc message from executor")
+	l.Trace("received grpc message from executor")
 
 	if ch, ok := c.wsConnections.Load(req.ConnectionID); ok {
-		l.Debug("found ws connection by connectionID")
+		l.Trace("found ws connection by connectionID")
 		msgChan := ch.(chan *pb.GatewayExecutorRequestData)
 
 		select {

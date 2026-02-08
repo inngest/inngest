@@ -159,8 +159,7 @@ func TestSingleSvcError(t *testing.T) {
 	m := mockserver{
 		pre: func(ctx context.Context) error { return nil },
 		run: func(ctx context.Context) error {
-			atomic.AddInt32(&invocations, 1)
-			if atomic.LoadInt32(&invocations) == 1 {
+			if atomic.AddInt32(&invocations, 1) == 1 {
 				// The first service should error.
 				<-time.After(500 * time.Millisecond)
 				return fmt.Errorf("boo")

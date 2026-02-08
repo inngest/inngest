@@ -235,7 +235,6 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 					"transport": "grpc",
 				},
 			})
-
 		}()
 	}
 
@@ -450,7 +449,7 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 			return nil, fmt.Errorf("failed to route request to gateway: %w", err)
 		}
 
-		l.Debug("forwarded executor request to gateway", "gateway_id", route.GatewayID, "conn_id", route.ConnectionID)
+		l.Trace("forwarded executor request to gateway", "gateway_id", route.GatewayID, "conn_id", route.ConnectionID)
 
 		metrics.IncrConnectRouterGRPCMessageSentCounter(ctx, 1, metrics.CounterOpt{
 			PkgName: pkgName,
@@ -507,7 +506,7 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 			l.ReportError(err, "could not delete response")
 		}
 
-		l.Debug("returning reply", "status", reply.Status)
+		l.Trace("returning reply", "status", reply.Status)
 		return reply, nil
 	// If the worker terminates or otherwise fails to continue extending the lease,
 	// we must retry the step as soon as possible.
