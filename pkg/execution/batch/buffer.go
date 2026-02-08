@@ -22,7 +22,7 @@ const (
 	DefaultMaxBufferDuration = 500 * time.Millisecond
 
 	// DefaultMaxBufferSize is the default max events per buffer key before flush
-	DefaultMaxBufferSize = 100
+	DefaultMaxBufferSize = 50
 )
 
 // appendBuffer manages in-memory buffering for batch appends across varying
@@ -281,7 +281,6 @@ func (ab *appendBuffer) flush(buf *batchBuffer, mgr BatchManager, trigger string
 	bulkResult, err := mgr.BulkAppend(ctx, items, fn)
 	redisDurationMs := time.Since(redisStart).Milliseconds()
 
-	// Record Redis flush duration (#8)
 	metrics.HistogramBatchBufferRedisFlushDuration(ctx, redisDurationMs, metrics.HistogramOpt{PkgName: pkgName})
 
 	if err != nil {
@@ -292,34 +291,30 @@ func (ab *appendBuffer) flush(buf *batchBuffer, mgr BatchManager, trigger string
 	}
 
 	if err == nil && bulkResult != nil {
-		// Record flush counter (#3)
-		metrics.IncrBatchBufferFlushCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: triggerTags})
-		// Record items flushed (#4)
-		metrics.IncrBatchBufferItemsFlushedCounter(ctx, flushCount, metrics.CounterOpt{PkgName: pkgName, Tags: triggerTags})
-		// Record flush size histogram (#7)
-		metrics.HistogramBatchBufferFlushSize(ctx, flushCount, metrics.HistogramOpt{PkgName: pkgName})
-		// Record wait duration histogram (#6)
-		if waitDurationMs > 0 {
-			metrics.HistogramBatchBufferWaitDuration(ctx, waitDurationMs, metrics.HistogramOpt{PkgName: pkgName})
-		}
-		// Record bulk append status (#9)
-		metrics.IncrBatchBufferBulkAppendCounter(ctx, metrics.CounterOpt{
-			PkgName: pkgName,
-			Tags:    map[string]any{"status": bulkResult.Status},
-		})
-		// Record items committed (#10)
-		if bulkResult.Committed > 0 {
-			metrics.IncrBatchBufferItemsCommittedCounter(ctx, int64(bulkResult.Committed), metrics.CounterOpt{PkgName: pkgName})
-		}
-		// Record items duplicated (#11)
-		if bulkResult.Duplicates > 0 {
-			metrics.IncrBatchBufferItemsDuplicatedCounter(ctx, int64(bulkResult.Duplicates), metrics.CounterOpt{PkgName: pkgName})
-		}
-
 		ab.handleScheduling(bulkResult, fn, items[0], mgr)
+
+		go func() {
+			metrics.IncrBatchBufferFlushCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: triggerTags})
+			metrics.IncrBatchBufferItemsFlushedCounter(ctx, flushCount, metrics.CounterOpt{PkgName: pkgName, Tags: triggerTags})
+			metrics.HistogramBatchBufferFlushSize(ctx, flushCount, metrics.HistogramOpt{PkgName: pkgName})
+			if waitDurationMs > 0 {
+				metrics.HistogramBatchBufferWaitDuration(ctx, waitDurationMs, metrics.HistogramOpt{PkgName: pkgName})
+			}
+			metrics.IncrBatchBufferBulkAppendCounter(ctx, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags:    map[string]any{"status": bulkResult.Status},
+			})
+			if bulkResult.Committed > 0 {
+				metrics.IncrBatchBufferItemsCommittedCounter(ctx, int64(bulkResult.Committed), metrics.CounterOpt{PkgName: pkgName})
+			}
+			if bulkResult.Duplicates > 0 {
+				metrics.IncrBatchBufferItemsDuplicatedCounter(ctx, int64(bulkResult.Duplicates), metrics.CounterOpt{PkgName: pkgName})
+			}
+		}()
+
 	}
 
-	ab.log.Debug("flushed in-memory buffer", "len_pending", len(pending), "len_items", len(items), "result", bulkResult)
+	ab.log.Trace("flushed in-memory buffer", "len_pending", len(pending), "len_items", len(items), "result", bulkResult)
 
 	// Send results to all waiters
 	for i, p := range pending {
@@ -346,7 +341,6 @@ func (ab *appendBuffer) flush(buf *batchBuffer, mgr BatchManager, trigger string
 	buf.mu.Unlock()
 	ab.mu.Unlock()
 
-	// Record active keys gauge after cleanup (#2)
 	metrics.GaugeBatchBufferKeysActive(ctx, activeKeys, metrics.GaugeOpt{PkgName: pkgName})
 }
 
