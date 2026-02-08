@@ -236,7 +236,7 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 						EndTime:   op.Timing.End(),
 						Attributes: meta.NewAttrSet(
 							meta.Attr(meta.Attrs.DynamicStatus, &execStatus),
-						),
+						).Merge(tracing.GeneratorAttrs(&op)),
 					},
 				)
 			}
