@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { Link, useNavigate } from '@tanstack/react-router';
 import { Select, type Option } from '@inngest/components/Select/Select';
 import ToggleGroup from '@inngest/components/ToggleGroup/ToggleGroup';
 import { useQuery } from 'urql';
@@ -12,7 +11,7 @@ import {
 } from '@/components/Billing/Usage/types';
 import useGetUsageChartData from '@/components/Billing/Usage/useGetUsageChartData';
 import { graphql } from '@/gql';
-import { pathCreator } from '@/utils/urls';
+import { Route as BillingUsageRoute } from '@/routes/_authed/billing/usage/index';
 
 const GetBillingInfoDocument = graphql(`
   query GetBillingInfo {
@@ -57,7 +56,7 @@ export const UsagePage = ({
   previous,
   dimension = 'execution',
 }: UsagePageProps) => {
-  const navigate = useNavigate({ from: pathCreator.billingUsage() });
+  const navigate = BillingUsageRoute.useNavigate();
   const [{ data, fetching }] = useQuery({
     query: GetBillingInfoDocument,
   });
@@ -109,7 +108,10 @@ export const UsagePage = ({
               return;
             }
             navigate({
-              to: pathCreator.billingUsage({ dimension: value, previous }),
+              search: {
+                dimension: value,
+                ...(previous && { previous }),
+              },
             });
           }}
         >
@@ -134,21 +136,16 @@ export const UsagePage = ({
             </div>
           </Select.Button>
           <Select.Options>
-            <Link to={pathCreator.billingUsage({ dimension })}>
+            <BillingUsageRoute.Link search={{ dimension }}>
               <Select.Option option={options[0]}>
                 {options[0].name}
               </Select.Option>
-            </Link>
-            <Link
-              to={pathCreator.billingUsage({
-                dimension,
-                previous: true,
-              })}
-            >
+            </BillingUsageRoute.Link>
+            <BillingUsageRoute.Link search={{ dimension, previous: true }}>
               <Select.Option option={options[1]}>
                 {options[1].name}
               </Select.Option>
-            </Link>
+            </BillingUsageRoute.Link>
           </Select.Options>
         </Select>
       </div>
