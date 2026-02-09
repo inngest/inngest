@@ -132,6 +132,7 @@ function transformInsightsResponse(
           return {
             severity: diag.severity,
             message: diag.message,
+            code: diag.code,
           };
         }
 

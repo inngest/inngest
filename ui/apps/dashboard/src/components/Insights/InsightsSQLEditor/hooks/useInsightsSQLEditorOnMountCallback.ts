@@ -11,14 +11,13 @@ import { bindEditorShortcuts } from '../actions/handleShortcuts';
 import { markTemplateVars } from '../actions/markTemplateVars';
 import { getCanRunQuery } from '../utils';
 import { useLatest, useLatestCallback } from './useLatestCallback';
-import { segmentio } from '@segment/analytics-next';
 
 type UseInsightsSQLEditorOnMountCallbackReturn = {
   onMount: SQLEditorMountCallback;
 };
 
 export function useInsightsSQLEditorOnMountCallback(): UseInsightsSQLEditorOnMountCallbackReturn {
-  const { query, runQuery, status, data } = useInsightsStateMachineContext();
+  const { query, runQuery, status } = useInsightsStateMachineContext();
   const { saveTab } = useSaveTabActions();
   const { tabManagerActions } = useTabManagerActions();
   const { activeTab } = useActiveTab();

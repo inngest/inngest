@@ -49,7 +49,6 @@ export function DiagnosticsBanner() {
         </div>
       }
       severity={severityToBannerSeverity(maxSeverity)}
-      bodySeverity="none"
     >
       <div className="flex flex-col gap-1 pb-1">
         {diagnostics.map((diag, index) => (

@@ -1,6 +1,6 @@
 /* eslint-disable */
-import type { InsightsDiagnosticCode } from '@inngest/components/Insights/InsightsStateMachineContext/types';
-import type { InsightsDiagnosticSeverity } from '@inngest/components/Insights/InsightsStateMachineContext/types';
+import type { InsightsDiagnosticCode } from '../components/Insights/InsightsStateMachineContext/types';
+import type { InsightsDiagnosticSeverity } from '../components/Insights/InsightsStateMachineContext/types';
 import type { SpanMetadataKind } from '@inngest/components/RunDetailsV3/types';
 import type { SpanMetadataScope } from '@inngest/components/RunDetailsV3/types';
 import type { TypedDocumentNode as DocumentNode } from '@graphql-typed-document-node/core';
