@@ -187,13 +187,13 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 				{
 					Kind: constraintapi.ConstraintKindConcurrency,
 					Concurrency: &constraintapi.ConcurrencyConstraint{
-						Scope:             enums.ConcurrencyScopeAccount,
+						Scope: enums.ConcurrencyScopeAccount,
 					},
 				},
 				{
 					Kind: constraintapi.ConstraintKindConcurrency,
 					Concurrency: &constraintapi.ConcurrencyConstraint{
-						Scope:             enums.ConcurrencyScopeFn,
+						Scope: enums.ConcurrencyScopeFn,
 					},
 				},
 			},
@@ -296,13 +296,13 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 				{
 					Kind: constraintapi.ConstraintKindConcurrency,
 					Concurrency: &constraintapi.ConcurrencyConstraint{
-						Scope:             enums.ConcurrencyScopeAccount,
+						Scope: enums.ConcurrencyScopeAccount,
 					},
 				},
 				{
 					Kind: constraintapi.ConstraintKindConcurrency,
 					Concurrency: &constraintapi.ConcurrencyConstraint{
-						Scope:             enums.ConcurrencyScopeFn,
+						Scope: enums.ConcurrencyScopeFn,
 					},
 				},
 			},
@@ -553,13 +553,13 @@ func TestQueueProcessorPreLeaseWithConstraintAPI(t *testing.T) {
 				{
 					Kind: constraintapi.ConstraintKindConcurrency,
 					Concurrency: &constraintapi.ConcurrencyConstraint{
-						Scope:             enums.ConcurrencyScopeAccount,
+						Scope: enums.ConcurrencyScopeAccount,
 					},
 				},
 				{
 					Kind: constraintapi.ConstraintKindConcurrency,
 					Concurrency: &constraintapi.ConcurrencyConstraint{
-						Scope:             enums.ConcurrencyScopeFn,
+						Scope: enums.ConcurrencyScopeFn,
 					},
 				},
 			},
@@ -808,8 +808,8 @@ func TestPartitionProcessRequeueAfterLimitedWithConstraintAPI(t *testing.T) {
 			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 				return false
 			}),
-			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
-				return true, true // acquire leases
+			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool) {
+				return true // acquire leases
 			}),
 			osqueue.WithCapacityManager(cm),
 			osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
@@ -1007,13 +1007,13 @@ func TestPartitionProcessRequeueAfterLimitedWithConstraintAPI(t *testing.T) {
 					{
 						Kind: constraintapi.ConstraintKindConcurrency,
 						Concurrency: &constraintapi.ConcurrencyConstraint{
-							Scope:             enums.ConcurrencyScopeAccount,
+							Scope: enums.ConcurrencyScopeAccount,
 						},
 					},
 					{
 						Kind: constraintapi.ConstraintKindConcurrency,
 						Concurrency: &constraintapi.ConcurrencyConstraint{
-							Scope:             enums.ConcurrencyScopeFn,
+							Scope: enums.ConcurrencyScopeFn,
 						},
 					},
 				},
