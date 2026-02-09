@@ -333,6 +333,8 @@ func start(ctx context.Context, opts StartOpts) error {
 	}
 
 	const rateLimitPrefix = "ratelimit"
+
+	// Instantiate Constraint API
 	var capacityManager constraintapi.CapacityManager
 	enableConstraintAPI := os.Getenv("ENABLE_CONSTRAINT_API") == "true"
 	if enableConstraintAPI {
@@ -349,6 +351,8 @@ func start(ctx context.Context, opts StartOpts) error {
 		}
 
 		queueOpts = append(queueOpts, queue.WithCapacityManager(cm))
+
+		// Always use Constraint API
 		queueOpts = append(queueOpts, queue.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool) {
 			return true
 		}))
