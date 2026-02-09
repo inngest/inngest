@@ -11,8 +11,8 @@ import type { SQLCompletionConfig } from './types';
 export type SQLEditorMountCallback = (editor: editor.IStandaloneCodeEditor, monaco: Monaco) => void;
 
 export type SQLEditorInstance = editor.IStandaloneCodeEditor;
-
 export type SQLEditorMarkerData = editor.IMarkerData;
+export type SQLEditorModel = editor.ITextModel;
 export const SQLEditorURI = Uri;
 
 export type SQLEditorProps = {
