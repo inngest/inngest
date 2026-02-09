@@ -3,7 +3,7 @@
  */
 
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { TimeBrush } from './TimeBrush';
 
@@ -29,12 +29,6 @@ describe('TimeBrush', () => {
       expect(screen.getByTestId('child-content')).toBeTruthy();
     });
 
-    it('does not show reset button when at default selection', () => {
-      render(<TimeBrush />);
-
-      expect(screen.queryByTitle('Reset selection')).toBeNull();
-    });
-
     it('applies custom className to container', () => {
       const { container } = render(<TimeBrush className="custom-class" />);
 
@@ -43,18 +37,11 @@ describe('TimeBrush', () => {
   });
 
   describe('selection callback', () => {
-    it('calls onSelectionChange with initial values on mount', () => {
+    it('does not call onSelectionChange on mount', () => {
       const onSelectionChange = vi.fn();
       render(<TimeBrush onSelectionChange={onSelectionChange} />);
 
-      expect(onSelectionChange).toHaveBeenCalledWith(0, 100);
-    });
-
-    it('calls onSelectionChange with custom initial values', () => {
-      const onSelectionChange = vi.fn();
-      render(<TimeBrush onSelectionChange={onSelectionChange} initialStart={25} initialEnd={75} />);
-
-      expect(onSelectionChange).toHaveBeenCalledWith(25, 75);
+      expect(onSelectionChange).not.toHaveBeenCalled();
     });
   });
 
@@ -182,9 +169,10 @@ describe('TimeBrush', () => {
         toJSON: () => {},
       }));
 
-      // Find the selection overlay (click target in default state) and click to create a selection
+      // Click and drag on the selection overlay to create a non-default selection
       const selectionOverlay = container.querySelector('.absolute.top-0.h-full') as HTMLElement;
-      fireEvent.mouseDown(selectionOverlay, { clientX: 50 });
+      fireEvent.mouseDown(selectionOverlay, { clientX: 50 }); // 25%
+      fireEvent.mouseMove(document, { clientX: 150 }); // 75%
       fireEvent.mouseUp(document);
 
       const resetButton = container.querySelector('button[title="Reset selection"]') as HTMLElement;
@@ -210,9 +198,10 @@ describe('TimeBrush', () => {
         toJSON: () => {},
       }));
 
-      // Click to create a selection and trigger reset button to appear
+      // Click and drag to create a non-default selection
       const selectionOverlay = container.querySelector('.absolute.top-0.h-full') as HTMLElement;
-      fireEvent.mouseDown(selectionOverlay, { clientX: 50 });
+      fireEvent.mouseDown(selectionOverlay, { clientX: 50 }); // 25%
+      fireEvent.mouseMove(document, { clientX: 150 }); // 75%
       fireEvent.mouseUp(document);
 
       const resetButton = container.querySelector('button[title="Reset selection"]') as HTMLElement;
@@ -286,9 +275,95 @@ describe('TimeBrush', () => {
 
   describe('minSelectionWidth', () => {
     it('accepts minSelectionWidth prop', () => {
-      // This prop affects drag behavior, which is hard to test without full drag simulation
-      // Just verify it renders without error
       expect(() => render(<TimeBrush minSelectionWidth={5} />)).not.toThrow();
+    });
+
+    it('does not create selection below minSelectionWidth during create-selection drag', () => {
+      const onSelectionChange = vi.fn();
+      const { container } = render(
+        <TimeBrush onSelectionChange={onSelectionChange} minSelectionWidth={10} />
+      );
+      const outerContainer = container.firstChild as HTMLElement;
+      outerContainer.getBoundingClientRect = vi.fn(() => ({
+        left: 0,
+        top: 0,
+        right: 200,
+        bottom: 16,
+        width: 200,
+        height: 16,
+        x: 0,
+        y: 0,
+        toJSON: () => {},
+      }));
+
+      // Click on the selection overlay (default state routes to create-selection)
+      const selectionOverlay = outerContainer.querySelector(
+        '.absolute.top-0.h-full:not(.cursor-ew-resize)'
+      ) as HTMLElement;
+      fireEvent.mouseDown(selectionOverlay, { clientX: 60 }); // 30%
+      // Drag only 4% (8px on 200px container) — below minSelectionWidth of 10
+      fireEvent.mouseMove(document, { clientX: 68 });
+      fireEvent.mouseUp(document);
+
+      expect(onSelectionChange).not.toHaveBeenCalled();
+    });
+
+    it('creates selection once drag exceeds minSelectionWidth', () => {
+      const onSelectionChange = vi.fn();
+      const { container } = render(
+        <TimeBrush onSelectionChange={onSelectionChange} minSelectionWidth={10} />
+      );
+      const outerContainer = container.firstChild as HTMLElement;
+      outerContainer.getBoundingClientRect = vi.fn(() => ({
+        left: 0,
+        top: 0,
+        right: 200,
+        bottom: 16,
+        width: 200,
+        height: 16,
+        x: 0,
+        y: 0,
+        toJSON: () => {},
+      }));
+
+      const selectionOverlay = outerContainer.querySelector(
+        '.absolute.top-0.h-full:not(.cursor-ew-resize)'
+      ) as HTMLElement;
+      fireEvent.mouseDown(selectionOverlay, { clientX: 60 }); // 30%
+      // Drag 15% (30px on 200px container) — exceeds minSelectionWidth of 10
+      fireEvent.mouseMove(document, { clientX: 90 });
+      fireEvent.mouseUp(document);
+
+      expect(onSelectionChange).toHaveBeenCalledWith(30, 45);
+    });
+  });
+
+  describe('click without drag', () => {
+    it('does not produce a zero-width selection on click without drag', () => {
+      const onSelectionChange = vi.fn();
+      const { container } = render(<TimeBrush onSelectionChange={onSelectionChange} />);
+      const outerContainer = container.firstChild as HTMLElement;
+      outerContainer.getBoundingClientRect = vi.fn(() => ({
+        left: 0,
+        top: 0,
+        right: 200,
+        bottom: 16,
+        width: 200,
+        height: 16,
+        x: 0,
+        y: 0,
+        toJSON: () => {},
+      }));
+
+      // Click on the selection overlay without dragging
+      const selectionOverlay = outerContainer.querySelector(
+        '.absolute.top-0.h-full:not(.cursor-ew-resize)'
+      ) as HTMLElement;
+      fireEvent.mouseDown(selectionOverlay, { clientX: 70 }); // 35%
+      fireEvent.mouseUp(document);
+
+      // Selection should not have changed — no onSelectionChange call
+      expect(onSelectionChange).not.toHaveBeenCalled();
     });
   });
 
@@ -358,6 +433,20 @@ describe('TimeBrush', () => {
     });
 
     describe('hover line visibility', () => {
+      let rafSpy: ReturnType<typeof vi.spyOn>;
+
+      beforeEach(() => {
+        // Make rAF synchronous so cursor line DOM updates happen immediately in tests
+        rafSpy = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => {
+          cb(0);
+          return 0;
+        });
+      });
+
+      afterEach(() => {
+        rafSpy.mockRestore();
+      });
+
       it('shows hover line outside selection in non-default state', () => {
         const { outerContainer } = renderWithMock();
         makeNonDefaultSelection(outerContainer);
@@ -368,8 +457,10 @@ describe('TimeBrush', () => {
         ) as HTMLElement;
         fireEvent.mouseMove(track, { clientX: 10 });
 
-        const cursorLine = outerContainer.querySelector('.pointer-events-none.w-px');
-        expect(cursorLine).toBeTruthy();
+        const cursorLine = outerContainer.querySelector(
+          '[data-testid="cursor-line"]'
+        ) as HTMLElement;
+        expect(cursorLine.style.display).not.toBe('none');
       });
 
       it('does not show hover line inside selection in non-default state', () => {
@@ -382,8 +473,10 @@ describe('TimeBrush', () => {
         ) as HTMLElement;
         fireEvent.mouseMove(selectionOverlay, { clientX: 100 });
 
-        const cursorLine = outerContainer.querySelector('.pointer-events-none.w-px');
-        expect(cursorLine).toBeNull();
+        const cursorLine = outerContainer.querySelector(
+          '[data-testid="cursor-line"]'
+        ) as HTMLElement;
+        expect(cursorLine.style.display).toBe('none');
       });
 
       it('shows hover line in default state (unchanged behavior)', () => {
@@ -395,8 +488,10 @@ describe('TimeBrush', () => {
         ) as HTMLElement;
         fireEvent.mouseMove(selectionOverlay, { clientX: 100 });
 
-        const cursorLine = outerContainer.querySelector('.pointer-events-none.w-px');
-        expect(cursorLine).toBeTruthy();
+        const cursorLine = outerContainer.querySelector(
+          '[data-testid="cursor-line"]'
+        ) as HTMLElement;
+        expect(cursorLine.style.display).not.toBe('none');
       });
     });
 
