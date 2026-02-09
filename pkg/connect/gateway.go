@@ -1312,8 +1312,7 @@ func (c *connectionHandler) handleSdkReply(ctx context.Context, msg *connectpb.C
 
 		switch {
 		case err == nil:
-			result, err := grpcClient.Reply(ctx, &connectpb.ReplyRequest{Data: data})
-			if err != nil {
+			if _, err := grpcClient.Reply(ctx, &connectpb.ReplyRequest{Data: data}); err != nil {
 				return fmt.Errorf("could not send response through grpc: %w", err)
 			}
 		case errors.Is(err, state.ErrExecutorNotFound):
