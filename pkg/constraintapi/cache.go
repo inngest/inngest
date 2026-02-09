@@ -18,50 +18,63 @@ const (
 	MaxCacheTTL = time.Minute
 )
 
-type EnableLimitingConstraintCacheFn func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, minTTL, maxTTL time.Duration)
+type EnableConstraintCacheFn func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, minTTL, maxTTL time.Duration)
 
-type limitingConstraintCache struct {
+// ShouldCacheConstraintFn is a predicate function that determines whether a constraint should be cached.
+// If nil, all constraints are cached (default behavior).
+// If provided, only constraints for which this function returns true will be cached.
+// The function is called for each constraint during both cache check and cache set operations.
+type ShouldCacheConstraintFn func(ci ConstraintItem) bool
+
+type constraintCache struct {
 	manager CapacityManager
 	clock   clockwork.Clock
 
-	limitingConstraintCache              *ccache.Cache[*limitingConstraintCacheItem]
+	cache                                *ccache.Cache[*constraintCacheItem]
 	enableHighCardinalityInstrumentation EnableHighCardinalityInstrumentation
-	enableCache                          EnableLimitingConstraintCacheFn
+	enableCache                          EnableConstraintCacheFn
+	shouldCache                          ShouldCacheConstraintFn
 }
 
-type limitingConstraintCacheItem struct {
+type constraintCacheItem struct {
 	constraint ConstraintItem
 	retryAfter time.Time
 }
 
-type LimitingConstraintCacheOption func(c *limitingConstraintCache)
+type ConstraintCacheOption func(c *constraintCache)
 
-func WithLimitingCacheClock(clock clockwork.Clock) LimitingConstraintCacheOption {
-	return func(c *limitingConstraintCache) {
+func WithConstraintCacheClock(clock clockwork.Clock) ConstraintCacheOption {
+	return func(c *constraintCache) {
 		c.clock = clock
 	}
 }
 
-func WithLimitingCacheManager(manager CapacityManager) LimitingConstraintCacheOption {
-	return func(c *limitingConstraintCache) {
+func WithConstraintCacheManager(manager CapacityManager) ConstraintCacheOption {
+	return func(c *constraintCache) {
 		c.manager = manager
 	}
 }
 
-func WithLimitingCacheEnableHighCardinalityInstrumentation(ehci EnableHighCardinalityInstrumentation) LimitingConstraintCacheOption {
-	return func(c *limitingConstraintCache) {
+func WithConstraintCacheEnableHighCardinalityInstrumentation(ehci EnableHighCardinalityInstrumentation) ConstraintCacheOption {
+	return func(c *constraintCache) {
 		c.enableHighCardinalityInstrumentation = ehci
 	}
 }
 
-func WithLimitingCacheEnable(enable EnableLimitingConstraintCacheFn) LimitingConstraintCacheOption {
-	return func(c *limitingConstraintCache) {
+func WithConstraintCacheEnable(enable EnableConstraintCacheFn) ConstraintCacheOption {
+	return func(c *constraintCache) {
 		c.enableCache = enable
 	}
 }
 
+func WithConstraintCacheShouldCache(fn ShouldCacheConstraintFn) ConstraintCacheOption {
+	return func(c *constraintCache) {
+		c.shouldCache = fn
+	}
+}
+
 // Acquire implements CapacityManager.
-func (l *limitingConstraintCache) Acquire(ctx context.Context, req *CapacityAcquireRequest) (*CapacityAcquireResponse, errs.InternalError) {
+func (l *constraintCache) Acquire(ctx context.Context, req *CapacityAcquireRequest) (*CapacityAcquireResponse, errs.InternalError) {
 	if l.enableCache == nil {
 		return l.manager.Acquire(ctx, req)
 	}
@@ -71,23 +84,30 @@ func (l *limitingConstraintCache) Acquire(ctx context.Context, req *CapacityAcqu
 		return l.manager.Acquire(ctx, req)
 	}
 
-	// Check if we previously got limited
+	// Check if any constraint is cached as exhausted
 	recentlyLimited := make([]ConstraintItem, 0)
 	var retryAfter time.Time
+
+	// Return immediately on first cache hit since any exhausted constraint blocks the request
 	for _, ci := range req.Constraints {
+		// Skip constraints that don't pass the filter
+		if l.shouldCache != nil && !l.shouldCache(ci) {
+			continue
+		}
+
 		// Construct cache key for constraint scoped to account
 		cacheKey := ci.CacheKey(req.AccountID, req.EnvID, req.FunctionID)
 		if cacheKey == "" {
 			continue
 		}
 
-		item := l.limitingConstraintCache.Get(cacheKey)
+		item := l.cache.Get(cacheKey)
 		if item == nil || item.Expired() {
-			// Not limited previously
+			// Not cached or expired
 			continue
 		}
 
-		// This constraint was recently limited
+		// Cache hit - this constraint is exhausted
 		val := item.Value()
 
 		recentlyLimited = append(recentlyLimited, ci)
@@ -96,9 +116,9 @@ func (l *limitingConstraintCache) Acquire(ctx context.Context, req *CapacityAcqu
 		}
 
 		tags := map[string]any{
-			"op":                  "hit",
-			"source":              req.Migration.String(),
-			"limiting_constraint": ci.LimitingConstraintIdentifier(),
+			"op":         "hit",
+			"source":     req.Migration.String(),
+			"constraint": ci.MetricsIdentifier(),
 		}
 		if l.enableHighCardinalityInstrumentation != nil && l.enableHighCardinalityInstrumentation(ctx, req.AccountID, req.EnvID, req.FunctionID) {
 			tags["function_id"] = req.FunctionID
@@ -108,46 +128,57 @@ func (l *limitingConstraintCache) Acquire(ctx context.Context, req *CapacityAcqu
 			PkgName: pkgName,
 			Tags:    tags,
 		})
+
 	}
 
 	// If one or more requested constraints were recently limited,
 	// return a synthetic response including all affected constraints.
 	if len(recentlyLimited) > 0 {
+		// Return immediately with synthetic response
 		requestID, err := ulid.New(ulid.Timestamp(l.clock.Now()), rand.Reader)
 		if err != nil {
 			return nil, errs.Wrap(0, false, "could not generate request ID: %w", err)
 		}
 
 		return &CapacityAcquireResponse{
-			RequestID:           requestID,
-			Leases:              nil,
+			RequestID:            requestID,
+			Leases:               nil,
+			ExhaustedConstraints: recentlyLimited,
+			// Exhausted constraints are also limiting constraints (they reduce capacity to 0)
 			LimitingConstraints: recentlyLimited,
 			RetryAfter:          retryAfter,
 		}, nil
-	} else {
-		tags := map[string]any{
-			"op":     "miss",
-			"source": req.Migration.String(),
-		}
-		if l.enableHighCardinalityInstrumentation != nil && l.enableHighCardinalityInstrumentation(ctx, req.AccountID, req.EnvID, req.FunctionID) {
-			tags["function_id"] = req.FunctionID
-		}
-
-		metrics.HistogramConstraintAPILimitingConstraintCacheTTL(ctx, 0, metrics.HistogramOpt{
-			PkgName: pkgName,
-			Tags:    tags,
-		})
 	}
+
+	// Cache miss - record metric
+	tags := map[string]any{
+		"op":     "miss",
+		"source": req.Migration.String(),
+	}
+	if l.enableHighCardinalityInstrumentation != nil && l.enableHighCardinalityInstrumentation(ctx, req.AccountID, req.EnvID, req.FunctionID) {
+		tags["function_id"] = req.FunctionID
+	}
+
+	metrics.HistogramConstraintAPILimitingConstraintCacheTTL(ctx, 0, metrics.HistogramOpt{
+		PkgName: pkgName,
+		Tags:    tags,
+	})
 
 	res, err := l.manager.Acquire(ctx, req)
 	if err != nil {
 		return nil, err
 	}
 
-	// If we are limited by constraints,
+	// If we have exhausted constraints (constraints with zero remaining capacity),
 	// cache each individual constraint for subsequent requests
-	// for a short duration to avoid unnecessary load on Redis
-	for _, ci := range res.LimitingConstraints {
+	// for a short duration to avoid unnecessary load on Redis.
+	// Exhausted constraints mean no further requests can succeed until capacity is freed.
+	for _, ci := range res.ExhaustedConstraints {
+		// Skip constraints that don't pass the filter
+		if l.shouldCache != nil && !l.shouldCache(ci) {
+			continue
+		}
+
 		cacheKey := ci.CacheKey(req.AccountID, req.EnvID, req.FunctionID)
 		if cacheKey == "" {
 			continue
@@ -163,18 +194,18 @@ func (l *limitingConstraintCache) Acquire(ctx context.Context, req *CapacityAcqu
 			cacheTTL = maxTTL
 		}
 
-		l.limitingConstraintCache.Set(
+		l.cache.Set(
 			cacheKey,
-			&limitingConstraintCacheItem{
+			&constraintCacheItem{
 				retryAfter: res.RetryAfter,
 				constraint: ci,
 			},
 			cacheTTL,
 		)
 		tags := map[string]any{
-			"op":                  "set",
-			"source":              req.Migration.String(),
-			"limiting_constraint": ci.LimitingConstraintIdentifier(),
+			"op":         "set",
+			"source":     req.Migration.String(),
+			"constraint": ci.MetricsIdentifier(),
 		}
 		if l.enableHighCardinalityInstrumentation != nil && l.enableHighCardinalityInstrumentation(ctx, req.AccountID, req.EnvID, req.FunctionID) {
 			tags["function_id"] = req.FunctionID
@@ -189,24 +220,24 @@ func (l *limitingConstraintCache) Acquire(ctx context.Context, req *CapacityAcqu
 	return res, nil
 }
 
-func (l *limitingConstraintCache) Check(ctx context.Context, req *CapacityCheckRequest) (*CapacityCheckResponse, errs.UserError, errs.InternalError) {
+func (l *constraintCache) Check(ctx context.Context, req *CapacityCheckRequest) (*CapacityCheckResponse, errs.UserError, errs.InternalError) {
 	return l.manager.Check(ctx, req)
 }
 
-func (l *limitingConstraintCache) ExtendLease(ctx context.Context, req *CapacityExtendLeaseRequest) (*CapacityExtendLeaseResponse, errs.InternalError) {
+func (l *constraintCache) ExtendLease(ctx context.Context, req *CapacityExtendLeaseRequest) (*CapacityExtendLeaseResponse, errs.InternalError) {
 	return l.manager.ExtendLease(ctx, req)
 }
 
-func (l *limitingConstraintCache) Release(ctx context.Context, req *CapacityReleaseRequest) (*CapacityReleaseResponse, errs.InternalError) {
+func (l *constraintCache) Release(ctx context.Context, req *CapacityReleaseRequest) (*CapacityReleaseResponse, errs.InternalError) {
 	return l.manager.Release(ctx, req)
 }
 
-func NewLimitingConstraintCache(
-	options ...LimitingConstraintCacheOption,
-) *limitingConstraintCache {
-	cache := &limitingConstraintCache{
-		limitingConstraintCache: ccache.New(
-			ccache.Configure[*limitingConstraintCacheItem]().
+func NewConstraintCache(
+	options ...ConstraintCacheOption,
+) *constraintCache {
+	cache := &constraintCache{
+		cache: ccache.New(
+			ccache.Configure[*constraintCacheItem]().
 				MaxSize(10_000).
 				ItemsToPrune(500),
 		),

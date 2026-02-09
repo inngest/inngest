@@ -64,7 +64,11 @@ function SetupAWSMarketplacePage() {
         setError(
           <>
             {cleanError}.{' '}
-            <Link size="medium" className="inline-flex" href="/support">
+            <Link
+              size="medium"
+              className="inline-flex"
+              href="https://support.inngest.com"
+            >
               Contact support
             </Link>{' '}
             or{' '}

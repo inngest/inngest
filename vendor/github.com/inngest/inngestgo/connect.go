@@ -28,6 +28,12 @@ type ConnectOpts struct {
 	// If this value is not set we use the environment variable "INNGEST_CONNECT_MAX_WORKER_CONCURRENCY".
 	// Defaults to 0. There is no limit if this is 0.
 	MaxWorkerConcurrency *int64
+
+	// MessageReadLimit sets the max number of bytes to read for a single WebSocket message.
+	// By default (nil or 0), the connection has a message read limit of 32768 bytes (32KB).
+	// Set to -1 to disable the limit.
+	// Set to any positive value to use a custom limit.
+	MessageReadLimit *int64
 }
 
 func Connect(ctx context.Context, opts ConnectOpts) (connect.WorkerConnection, error) {
@@ -35,10 +41,6 @@ func Connect(ctx context.Context, opts ConnectOpts) (connect.WorkerConnection, e
 	connectPlaceholder := url.URL{
 		Scheme: "ws",
 		Host:   "connect",
-	}
-
-	if opts.InstanceID == nil {
-		return nil, fmt.Errorf("missing required Instance ID")
 	}
 
 	apps := make([]connect.ConnectApp, len(opts.Apps))
@@ -103,6 +105,7 @@ func Connect(ctx context.Context, opts ConnectOpts) (connect.WorkerConnection, e
 		HashedSigningKey:         hashedKey,
 		HashedSigningKeyFallback: hashedFallbackKey,
 		MaxWorkerConcurrency:     opts.MaxWorkerConcurrency,
+		MessageReadLimit:         opts.MessageReadLimit,
 		APIBaseUrl:               defaultClient.h.GetAPIBaseURL(),
 		IsDev:                    defaultClient.h.isDev(),
 		DevServerUrl:             env.DevServerURL(),

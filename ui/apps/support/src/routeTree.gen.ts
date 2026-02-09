@@ -8,196 +8,190 @@
 // You should NOT make any changes in this file as it will be overwritten.
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
-import { Route as rootRouteImport } from "./routes/__root";
-import { Route as SignOutRouteImport } from "./routes/sign-out";
-import { Route as AuthedRouteImport } from "./routes/_authed";
-import { Route as IndexRouteImport } from "./routes/index";
-import { Route as SignInSplatRouteImport } from "./routes/sign-in.$";
-import { Route as AuthedNewRouteImport } from "./routes/_authed/new";
-import { Route as AuthedSupportIndexRouteImport } from "./routes/_authed/support/index";
-import { Route as AuthedCaseTicketIdRouteImport } from "./routes/_authed/case.$ticketId";
+import { Route as rootRouteImport } from './routes/__root'
+import { Route as SignOutRouteImport } from './routes/sign-out'
+import { Route as AuthedRouteImport } from './routes/_authed'
+import { Route as IndexRouteImport } from './routes/index'
+import { Route as SignInSplatRouteImport } from './routes/sign-in.$'
+import { Route as AuthedNewRouteImport } from './routes/_authed/new'
+import { Route as AuthedSupportIndexRouteImport } from './routes/_authed/support/index'
+import { Route as AuthedCaseTicketIdRouteImport } from './routes/_authed/case.$ticketId'
 
 const SignOutRoute = SignOutRouteImport.update({
-  id: "/sign-out",
-  path: "/sign-out",
+  id: '/sign-out',
+  path: '/sign-out',
   getParentRoute: () => rootRouteImport,
-} as any);
+} as any)
 const AuthedRoute = AuthedRouteImport.update({
-  id: "/_authed",
+  id: '/_authed',
   getParentRoute: () => rootRouteImport,
-} as any);
+} as any)
 const IndexRoute = IndexRouteImport.update({
-  id: "/",
-  path: "/",
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
-} as any);
+} as any)
 const SignInSplatRoute = SignInSplatRouteImport.update({
-  id: "/sign-in/$",
-  path: "/sign-in/$",
+  id: '/sign-in/$',
+  path: '/sign-in/$',
   getParentRoute: () => rootRouteImport,
-} as any);
+} as any)
 const AuthedNewRoute = AuthedNewRouteImport.update({
-  id: "/new",
-  path: "/new",
+  id: '/new',
+  path: '/new',
   getParentRoute: () => AuthedRoute,
-} as any);
+} as any)
 const AuthedSupportIndexRoute = AuthedSupportIndexRouteImport.update({
-  id: "/support/",
-  path: "/support/",
+  id: '/support/',
+  path: '/support/',
   getParentRoute: () => AuthedRoute,
-} as any);
+} as any)
 const AuthedCaseTicketIdRoute = AuthedCaseTicketIdRouteImport.update({
-  id: "/case/$ticketId",
-  path: "/case/$ticketId",
+  id: '/case/$ticketId',
+  path: '/case/$ticketId',
   getParentRoute: () => AuthedRoute,
-} as any);
+} as any)
 
 export interface FileRoutesByFullPath {
-  "/": typeof IndexRoute;
-  "/sign-out": typeof SignOutRoute;
-  "/new": typeof AuthedNewRoute;
-  "/sign-in/$": typeof SignInSplatRoute;
-  "/case/$ticketId": typeof AuthedCaseTicketIdRoute;
-  "/support": typeof AuthedSupportIndexRoute;
+  '/': typeof IndexRoute
+  '/sign-out': typeof SignOutRoute
+  '/new': typeof AuthedNewRoute
+  '/sign-in/$': typeof SignInSplatRoute
+  '/case/$ticketId': typeof AuthedCaseTicketIdRoute
+  '/support': typeof AuthedSupportIndexRoute
 }
 export interface FileRoutesByTo {
-  "/": typeof IndexRoute;
-  "/sign-out": typeof SignOutRoute;
-  "/new": typeof AuthedNewRoute;
-  "/sign-in/$": typeof SignInSplatRoute;
-  "/case/$ticketId": typeof AuthedCaseTicketIdRoute;
-  "/support": typeof AuthedSupportIndexRoute;
+  '/': typeof IndexRoute
+  '/sign-out': typeof SignOutRoute
+  '/new': typeof AuthedNewRoute
+  '/sign-in/$': typeof SignInSplatRoute
+  '/case/$ticketId': typeof AuthedCaseTicketIdRoute
+  '/support': typeof AuthedSupportIndexRoute
 }
 export interface FileRoutesById {
-  __root__: typeof rootRouteImport;
-  "/": typeof IndexRoute;
-  "/_authed": typeof AuthedRouteWithChildren;
-  "/sign-out": typeof SignOutRoute;
-  "/_authed/new": typeof AuthedNewRoute;
-  "/sign-in/$": typeof SignInSplatRoute;
-  "/_authed/case/$ticketId": typeof AuthedCaseTicketIdRoute;
-  "/_authed/support/": typeof AuthedSupportIndexRoute;
+  __root__: typeof rootRouteImport
+  '/': typeof IndexRoute
+  '/_authed': typeof AuthedRouteWithChildren
+  '/sign-out': typeof SignOutRoute
+  '/_authed/new': typeof AuthedNewRoute
+  '/sign-in/$': typeof SignInSplatRoute
+  '/_authed/case/$ticketId': typeof AuthedCaseTicketIdRoute
+  '/_authed/support/': typeof AuthedSupportIndexRoute
 }
 export interface FileRouteTypes {
-  fileRoutesByFullPath: FileRoutesByFullPath;
+  fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    | "/"
-    | "/sign-out"
-    | "/new"
-    | "/sign-in/$"
-    | "/case/$ticketId"
-    | "/support";
-  fileRoutesByTo: FileRoutesByTo;
-  to:
-    | "/"
-    | "/sign-out"
-    | "/new"
-    | "/sign-in/$"
-    | "/case/$ticketId"
-    | "/support";
+    | '/'
+    | '/sign-out'
+    | '/new'
+    | '/sign-in/$'
+    | '/case/$ticketId'
+    | '/support'
+  fileRoutesByTo: FileRoutesByTo
+  to: '/' | '/sign-out' | '/new' | '/sign-in/$' | '/case/$ticketId' | '/support'
   id:
-    | "__root__"
-    | "/"
-    | "/_authed"
-    | "/sign-out"
-    | "/_authed/new"
-    | "/sign-in/$"
-    | "/_authed/case/$ticketId"
-    | "/_authed/support/";
-  fileRoutesById: FileRoutesById;
+    | '__root__'
+    | '/'
+    | '/_authed'
+    | '/sign-out'
+    | '/_authed/new'
+    | '/sign-in/$'
+    | '/_authed/case/$ticketId'
+    | '/_authed/support/'
+  fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute;
-  AuthedRoute: typeof AuthedRouteWithChildren;
-  SignOutRoute: typeof SignOutRoute;
-  SignInSplatRoute: typeof SignInSplatRoute;
+  IndexRoute: typeof IndexRoute
+  AuthedRoute: typeof AuthedRouteWithChildren
+  SignOutRoute: typeof SignOutRoute
+  SignInSplatRoute: typeof SignInSplatRoute
 }
 
-declare module "@tanstack/react-router" {
+declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    "/sign-out": {
-      id: "/sign-out";
-      path: "/sign-out";
-      fullPath: "/sign-out";
-      preLoaderRoute: typeof SignOutRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    "/_authed": {
-      id: "/_authed";
-      path: "";
-      fullPath: "";
-      preLoaderRoute: typeof AuthedRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    "/": {
-      id: "/";
-      path: "/";
-      fullPath: "/";
-      preLoaderRoute: typeof IndexRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    "/sign-in/$": {
-      id: "/sign-in/$";
-      path: "/sign-in/$";
-      fullPath: "/sign-in/$";
-      preLoaderRoute: typeof SignInSplatRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    "/_authed/new": {
-      id: "/_authed/new";
-      path: "/new";
-      fullPath: "/new";
-      preLoaderRoute: typeof AuthedNewRouteImport;
-      parentRoute: typeof AuthedRoute;
-    };
-    "/_authed/support/": {
-      id: "/_authed/support/";
-      path: "/support";
-      fullPath: "/support";
-      preLoaderRoute: typeof AuthedSupportIndexRouteImport;
-      parentRoute: typeof AuthedRoute;
-    };
-    "/_authed/case/$ticketId": {
-      id: "/_authed/case/$ticketId";
-      path: "/case/$ticketId";
-      fullPath: "/case/$ticketId";
-      preLoaderRoute: typeof AuthedCaseTicketIdRouteImport;
-      parentRoute: typeof AuthedRoute;
-    };
+    '/sign-out': {
+      id: '/sign-out'
+      path: '/sign-out'
+      fullPath: '/sign-out'
+      preLoaderRoute: typeof SignOutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authed': {
+      id: '/_authed'
+      path: ''
+      fullPath: ''
+      preLoaderRoute: typeof AuthedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sign-in/$': {
+      id: '/sign-in/$'
+      path: '/sign-in/$'
+      fullPath: '/sign-in/$'
+      preLoaderRoute: typeof SignInSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authed/new': {
+      id: '/_authed/new'
+      path: '/new'
+      fullPath: '/new'
+      preLoaderRoute: typeof AuthedNewRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/support/': {
+      id: '/_authed/support/'
+      path: '/support'
+      fullPath: '/support'
+      preLoaderRoute: typeof AuthedSupportIndexRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/case/$ticketId': {
+      id: '/_authed/case/$ticketId'
+      path: '/case/$ticketId'
+      fullPath: '/case/$ticketId'
+      preLoaderRoute: typeof AuthedCaseTicketIdRouteImport
+      parentRoute: typeof AuthedRoute
+    }
   }
 }
 
 interface AuthedRouteChildren {
-  AuthedNewRoute: typeof AuthedNewRoute;
-  AuthedCaseTicketIdRoute: typeof AuthedCaseTicketIdRoute;
-  AuthedSupportIndexRoute: typeof AuthedSupportIndexRoute;
+  AuthedNewRoute: typeof AuthedNewRoute
+  AuthedCaseTicketIdRoute: typeof AuthedCaseTicketIdRoute
+  AuthedSupportIndexRoute: typeof AuthedSupportIndexRoute
 }
 
 const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedNewRoute: AuthedNewRoute,
   AuthedCaseTicketIdRoute: AuthedCaseTicketIdRoute,
   AuthedSupportIndexRoute: AuthedSupportIndexRoute,
-};
+}
 
 const AuthedRouteWithChildren =
-  AuthedRoute._addFileChildren(AuthedRouteChildren);
+  AuthedRoute._addFileChildren(AuthedRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthedRoute: AuthedRouteWithChildren,
   SignOutRoute: SignOutRoute,
   SignInSplatRoute: SignInSplatRoute,
-};
+}
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
-  ._addFileTypes<FileRouteTypes>();
+  ._addFileTypes<FileRouteTypes>()
 
-import type { getRouter } from "./router.tsx";
-import type { startInstance } from "./start.ts";
-declare module "@tanstack/react-start" {
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
   interface Register {
-    ssr: true;
-    router: Awaited<ReturnType<typeof getRouter>>;
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>;
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
   }
 }

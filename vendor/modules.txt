@@ -751,7 +751,7 @@ github.com/inngest/expr
 # github.com/inngest/go-httpstat v0.0.0-20250328150054-dfda91359d48
 ## explicit; go 1.23.2
 github.com/inngest/go-httpstat
-# github.com/inngest/inngestgo v0.15.0
+# github.com/inngest/inngestgo v0.15.1-0.20260204010937-b4832022aecc
 ## explicit; go 1.24.0
 github.com/inngest/inngestgo
 github.com/inngest/inngestgo/connect
@@ -1374,6 +1374,10 @@ go.opentelemetry.io/proto/otlp/trace/v1
 # go.uber.org/atomic v1.10.0
 ## explicit; go 1.18
 go.uber.org/atomic
+# go.uber.org/goleak v1.3.0
+## explicit; go 1.20
+go.uber.org/goleak
+go.uber.org/goleak/internal/stack
 # go.uber.org/multierr v1.11.0
 ## explicit; go 1.19
 go.uber.org/multierr

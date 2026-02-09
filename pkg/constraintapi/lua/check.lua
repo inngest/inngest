@@ -71,6 +71,10 @@ local availableCapacity = nil
 
 ---@type integer[]
 local limitingConstraints = {}
+---@type integer[]
+local exhaustedConstraints = {}
+---@type table<integer, boolean>
+local exhaustedSet = {}
 local retryAt = 0
 
 local constraintUsage = {}
@@ -103,6 +107,7 @@ for index, value in ipairs(constraints) do
 		local inProgressLeases = getConcurrencyCount(value.c.ilk)
 		local inProgressTotal = inProgressItems + inProgressLeases
 		constraintCapacity = value.c.l - inProgressTotal
+		constraintRetryAfter = toInteger(nowMS + value.c.ra)
 
 		local usage = {}
 		usage["l"] = value.c.l
@@ -135,6 +140,19 @@ for index, value in ipairs(constraints) do
 		table.insert(constraintUsage, usage)
 	end
 
+	-- Track if constraint is exhausted
+	if constraintCapacity <= 0 then
+		if not exhaustedSet[index] then
+			table.insert(exhaustedConstraints, index)
+			exhaustedSet[index] = true
+		end
+
+		-- ONLY set retryAt for exhausted constraints
+		if constraintRetryAfter > retryAt then
+			retryAt = constraintRetryAfter
+		end
+	end
+
 	-- If index ends up limiting capacity, reduce available capacity and remember current constraint
 	if availableCapacity == nil or constraintCapacity < availableCapacity then
 		debug(
@@ -149,11 +167,6 @@ for index, value in ipairs(constraints) do
 
 		availableCapacity = constraintCapacity
 		table.insert(limitingConstraints, index)
-
-		-- if the constraint must be retried later than the initial/last constraint, update retryAfter
-		if constraintRetryAfter > retryAt then
-			retryAt = constraintRetryAfter
-		end
 	end
 end
 
@@ -162,11 +175,12 @@ local fairnessReduction = 0
 -- TODO: How can we track and gracefully handle end to end that we ran out of capacity because for fairness?
 availableCapacity = availableCapacity - fairnessReduction
 
----@type { s: integer, d: string[], lc: integer[], ra: integer, fr: integer, a: integer, constraintUsage: {}[] }
+---@type { s: integer, d: string[], lc: integer[], ec: integer[], ra: integer, fr: integer, a: integer, cu: {}[] }
 local res = {}
 res["s"] = 1
 res["d"] = debugLogs
 res["lc"] = limitingConstraints
+res["ec"] = exhaustedConstraints
 res["ra"] = retryAt
 res["fr"] = fairnessReduction
 res["a"] = availableCapacity

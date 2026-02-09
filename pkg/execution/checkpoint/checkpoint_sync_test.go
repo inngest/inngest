@@ -45,6 +45,11 @@ func TestCheckpointSyncSteps_ThreeStepRuns(t *testing.T) {
 	// Create mock assertions prior to checkpointing.
 	//
 
+	// Expect UpdateMetadata to be called with ForceStepPlan=true since we have >1 steps (parallel mode)
+	mocks.state.On("UpdateMetadata", ctx, testData.metadata.ID, mock.MatchedBy(func(config state.MutableConfig) bool {
+		return config.ForceStepPlan == true
+	})).Return(nil)
+
 	// Expect SaveStep to be called for each step when checkpointing.
 	for _, op := range ops {
 		switch op.Op {
@@ -139,6 +144,11 @@ func TestCheckpointSyncSteps_WithStepAndSleep(t *testing.T) {
 	// Create mock assertions prior to checkpointing.
 	//
 
+	// Expect UpdateMetadata to be called with ForceStepPlan=true since we have >1 steps (parallel mode)
+	mocks.state.On("UpdateMetadata", ctx, testData.metadata.ID, mock.MatchedBy(func(config state.MutableConfig) bool {
+		return config.ForceStepPlan == true
+	})).Return(nil)
+
 	// Expect SaveStep to be called for the step run
 	expectedData := map[string]any{
 		"data": json.RawMessage(`{"result": "step 1 output"}`),
@@ -165,6 +175,17 @@ func TestCheckpointSyncSteps_WithStepAndSleep(t *testing.T) {
 			mock.AnythingOfType("checkpoint.MetricCardinality"),
 			enums.StepStatusCompleted,
 		).
+		Once()
+
+	// Expect UpdateSpan to be called when the async opcode (sleep) is encountered,
+	// which triggers the mode change tracking for Durable Endpoint runs
+	mocks.tracer.
+		On(
+			"UpdateSpan",
+			ctx,
+			mock.AnythingOfType("*tracing.UpdateSpanOptions"),
+		).
+		Return(nil).
 		Once()
 
 	// Expect HandleGenerator to be called for the sleep opcode, which should enqueue a job
@@ -199,6 +220,13 @@ func TestCheckpointSyncSteps_WithStepAndSleep(t *testing.T) {
 	mocks.executor.AssertCalled(t, "HandleGenerator", ctx, mock.AnythingOfType("*checkpoint.checkpointRunContext"), mock.MatchedBy(func(op state.GeneratorOpcode) bool {
 		return op.ID == "sleep-1" && op.Op == enums.OpcodeSleep
 	}))
+
+	// Verify UpdateSpan was called with DurableEndpointModeChangedAt attribute for mode change tracking
+	require.Len(mocks.tracer.updatedSpans, 1, "Expected exactly 1 span update for mode change tracking")
+	updateCapture := mocks.tracer.updatedSpans[0]
+	require.NotNil(updateCapture.attributes, "Updated span should have attributes")
+	modeChangedAt := updateCapture.attributes.Get(meta.Attrs.DurableEndpointModeChangedAt.Key())
+	require.NotNil(modeChangedAt, "DurableEndpointModeChangedAt attribute should be set")
 
 	// Verify all mocks were satisfied
 	mocks.state.AssertExpectations(t)

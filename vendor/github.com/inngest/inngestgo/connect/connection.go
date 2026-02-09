@@ -17,6 +17,10 @@ import (
 	"time"
 )
 
+var (
+	defaultWSReadLimit int64 = 10 * 1024 * 1024 // 10MB
+)
+
 type connectReport struct {
 	reconnect bool
 	err       error
@@ -142,6 +146,13 @@ func (h *connectHandler) prepareConnection(ctx context.Context, data connectionE
 	if err != nil {
 		return nil, newReconnectErr(fmt.Errorf("could not connect to gateway: %w", err))
 	}
+
+	// Set message read limit if configured (skip if nil or 0 to use default)
+	readLimit := defaultWSReadLimit
+	if h.opts.MessageReadLimit != nil && *h.opts.MessageReadLimit != 0 {
+		readLimit = *h.opts.MessageReadLimit
+	}
+	ws.SetReadLimit(readLimit)
 
 	connectionId, err := ulid.Parse(startRes.GetConnectionId())
 	if err != nil {

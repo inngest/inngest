@@ -3026,7 +3026,7 @@ func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*c
 			// Get the latest non-empty status
 			if span.Status != nil && *span.Status != "" {
 				// Convert StepStatus string to RunStatus enum
-				if stepStatus, err := enums.StepStatusString(*span.Status); err == nil {
+				if stepStatus, err := enums.StepStatusString(*span.Status); err == nil && stepStatus != enums.StepStatusUnknown {
 					status = enums.StepStatusToRunStatus(stepStatus)
 				}
 			}
@@ -3202,15 +3202,17 @@ func newSpanRunsQueryBuilder(ctx context.Context, opt cqrs.GetTraceRunOpt) *runs
 
 			if cursor := reqCursor.Find(field); cursor != nil {
 				// Build cursor condition for this field
+				// Convert int64 ms to time.Time for TIMESTAMPTZ column comparison
+				cursorTime := time.UnixMilli(cursor.Value)
 				var baseCondition sq.Expression
 				if o.Direction == enums.TraceRunOrderAsc {
-					baseCondition = sq.C(field).Gt(cursor.Value)
+					baseCondition = sq.C(field).Gt(cursorTime)
 				} else {
-					baseCondition = sq.C(field).Lt(cursor.Value)
+					baseCondition = sq.C(field).Lt(cursorTime)
 				}
 
 				// Build compound condition for tie-breaking
-				equalityConditions := []sq.Expression{sq.C(field).Eq(cursor.Value)}
+				equalityConditions := []sq.Expression{sq.C(field).Eq(cursorTime)}
 
 				// Add conditions for all subsequent fields in sort order
 				for j := i + 1; j < len(opt.Order); j++ {
@@ -3225,17 +3227,18 @@ func newSpanRunsQueryBuilder(ctx context.Context, opt cqrs.GetTraceRunOpt) *runs
 					}
 
 					if nextCursor := reqCursor.Find(nextField); nextCursor != nil {
+						nextCursorTime := time.UnixMilli(nextCursor.Value)
 						if opt.Order[j].Direction == enums.TraceRunOrderAsc {
-							equalityConditions = append(equalityConditions, sq.C(nextField).Gt(nextCursor.Value))
+							equalityConditions = append(equalityConditions, sq.C(nextField).Gt(nextCursorTime))
 						} else {
-							equalityConditions = append(equalityConditions, sq.C(nextField).Lt(nextCursor.Value))
+							equalityConditions = append(equalityConditions, sq.C(nextField).Lt(nextCursorTime))
 						}
 					}
 				}
 
 				// Add run_id tie-breaker
-				if runIDCursor := reqCursor.Find("run_id"); runIDCursor != nil {
-					equalityConditions = append(equalityConditions, sq.C("run_id").Gt(runIDCursor.Value))
+				if reqCursor.ID != "" {
+					equalityConditions = append(equalityConditions, sq.C("run_id").Gt(reqCursor.ID))
 				}
 
 				// Combine: (field > cursor_value) OR (field = cursor_value AND next_conditions)

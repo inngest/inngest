@@ -51,7 +51,7 @@ export const Help = ({
               </div>
             </Listbox.Option>
           </a>
-          <a href="/support" target="_blank">
+          <a href="https://support.inngest.com" target="_blank">
             <Listbox.Option
               className="text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
               value="support"

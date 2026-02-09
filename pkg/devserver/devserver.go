@@ -367,10 +367,10 @@ func start(ctx context.Context, opts StartOpts) error {
 		l.Warn("EXPERIMENTAL: Enabling Constraint API")
 	}
 
+	var retryBackoff backoff.BackoffFunc
 	if opts.RetryInterval > 0 {
-		queueOpts = append(queueOpts, queue.WithBackoffFunc(
-			backoff.GetLinearBackoffFunc(time.Duration(opts.RetryInterval)*time.Second),
-		))
+		retryBackoff = backoff.GetLinearBackoffFunc(time.Duration(opts.RetryInterval) * time.Second)
+		queueOpts = append(queueOpts, queue.WithBackoffFunc(retryBackoff))
 	}
 
 	queueShard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), queueOpts...)
@@ -657,6 +657,7 @@ func start(ctx context.Context, opts StartOpts) error {
 			CheckpointOpts: apiv1.CheckpointAPIOpts{
 				RunOutputReader: devutil.NewLocalOutputReader(core.Resolver(), ds.Data, ds.Data),
 				RunJWTSecret:    consts.DevServerRunJWTSecret,
+				BackoffFunc:     retryBackoff,
 			},
 
 			MetadataOpts: apiv1.MetadataOpts{

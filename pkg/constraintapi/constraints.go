@@ -239,10 +239,10 @@ func (ci ConstraintItem) PrettyStringConfig(config ConstraintConfig) string {
 	}
 }
 
-// LimitingConstraintIdentifier returns an identifier for the limiting constraint.
+// MetricsIdentifier returns an identifier for the constraint item.
 // For throttle and rate limit, it returns the kind.
 // For concurrency, it returns the scope.
-func (ci ConstraintItem) LimitingConstraintIdentifier() string {
+func (ci ConstraintItem) MetricsIdentifier() string {
 	switch ci.Kind {
 	case ConstraintKindConcurrency:
 		if ci.Concurrency != nil {

@@ -1,6 +1,10 @@
 package fn
 
-import "net/url"
+import (
+	"net/url"
+
+	"github.com/inngest/inngestgo/pkg/checkpoint"
+)
 
 func GetFnSyncConfig(fn ServableFunction) *SyncConfig {
 	config := fn.Config()
@@ -16,6 +20,7 @@ func GetFnSyncConfig(fn ServableFunction) *SyncConfig {
 		RateLimit:   config.RateLimit,
 		Throttle:    config.Throttle,
 		Debounce:    config.Debounce,
+		Checkpoint:  config.Checkpoint,
 		Timeouts:    config.Timeouts,
 		Cancel:      config.Cancel,
 		Retries:     config.Retries,
@@ -68,6 +73,8 @@ type SyncConfig struct {
 	Retries *int `json:"retries,omitempty"`
 
 	Debounce *Debounce `json:"debounce,omitempty"`
+
+	Checkpoint *checkpoint.Config `json:"checkpoint,omitempty"`
 
 	Timeouts *Timeouts `json:"timeouts,omitempty"`
 

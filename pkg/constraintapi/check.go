@@ -78,10 +78,11 @@ func buildCheckRequestData(req *CapacityCheckRequest, keyPrefix string) (
 }
 
 type checkScriptResponse struct {
-	Status              int              `json:"s"`
-	AvailableCapacity   int              `json:"a"`
-	LimitingConstraints flexibleIntArray `json:"lc"`
-	ConstraintUsage     []struct {
+	Status               int              `json:"s"`
+	AvailableCapacity    int              `json:"a"`
+	LimitingConstraints  flexibleIntArray `json:"lc"`
+	ExhaustedConstraints flexibleIntArray `json:"ec"`
+	ConstraintUsage      []struct {
 		Usage int `json:"u"`
 		Limit int `json:"l"`
 	} `json:"cu"`
@@ -176,7 +177,15 @@ func (r *redisCapacityManager) Check(ctx context.Context, req *CapacityCheckRequ
 	if len(parsedResponse.LimitingConstraints) > 0 {
 		limitingConstraints = make([]ConstraintItem, len(parsedResponse.LimitingConstraints))
 		for i, limitingConstraintIndex := range []int(parsedResponse.LimitingConstraints) {
-			limitingConstraints[i] = req.Constraints[limitingConstraintIndex-1]
+			limitingConstraints[i] = sortedConstraints[limitingConstraintIndex-1]
+		}
+	}
+
+	var exhaustedConstraints []ConstraintItem
+	if len(parsedResponse.ExhaustedConstraints) > 0 {
+		exhaustedConstraints = make([]ConstraintItem, len(parsedResponse.ExhaustedConstraints))
+		for i, exhaustedConstraintIndex := range []int(parsedResponse.ExhaustedConstraints) {
+			exhaustedConstraints[i] = sortedConstraints[exhaustedConstraintIndex-1]
 		}
 	}
 
@@ -201,12 +210,13 @@ func (r *redisCapacityManager) Check(ctx context.Context, req *CapacityCheckRequ
 		}
 
 		return &CapacityCheckResponse{
-			LimitingConstraints: limitingConstraints,
-			FairnessReduction:   parsedResponse.FairnessReduction,
-			RetryAfter:          retryAfter,
-			AvailableCapacity:   parsedResponse.AvailableCapacity,
-			Usage:               constraintUsage,
-			internalDebugState:  parsedResponse,
+			LimitingConstraints:  limitingConstraints,
+			ExhaustedConstraints: exhaustedConstraints,
+			FairnessReduction:    parsedResponse.FairnessReduction,
+			RetryAfter:           retryAfter,
+			AvailableCapacity:    parsedResponse.AvailableCapacity,
+			Usage:                constraintUsage,
+			internalDebugState:   parsedResponse,
 		}, nil, nil
 	default:
 		return nil, nil, errs.Wrap(0, false, "unexpected status code %v", parsedResponse.Status)

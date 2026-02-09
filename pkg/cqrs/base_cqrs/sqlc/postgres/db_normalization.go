@@ -345,7 +345,11 @@ func (q NormalizedQueries) DeleteFunctionsByAppID(ctx context.Context, appID uui
 }
 
 func (q NormalizedQueries) DeleteFunctionsByIDs(ctx context.Context, ids []uuid.UUID) error {
-	return q.db.DeleteFunctionsByIDs(ctx, ids)
+	strIDs := make([]string, len(ids))
+	for i, id := range ids {
+		strIDs[i] = id.String()
+	}
+	return q.db.DeleteFunctionsByIDs(ctx, strIDs)
 }
 
 func (q NormalizedQueries) UpdateFunctionConfig(ctx context.Context, arg sqlc_sqlite.UpdateFunctionConfigParams) (*sqlc_sqlite.Function, error) {

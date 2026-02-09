@@ -37,21 +37,11 @@ func (q *Queries) DeleteFunctionsByAppID(ctx context.Context, appID uuid.UUID) e
 }
 
 const deleteFunctionsByIDs = `-- name: DeleteFunctionsByIDs :exec
-UPDATE functions SET archived_at = NOW() WHERE id IN ($1)
+UPDATE functions SET archived_at = NOW() WHERE id = ANY($1::text[])
 `
 
-func (q *Queries) DeleteFunctionsByIDs(ctx context.Context, ids []uuid.UUID) error {
-	query := deleteFunctionsByIDs
-	var queryParams []interface{}
-	if len(ids) > 0 {
-		for _, v := range ids {
-			queryParams = append(queryParams, v)
-		}
-		query = strings.Replace(query, "/*SLICE:ids*/?", strings.Repeat(",?", len(ids))[1:], 1)
-	} else {
-		query = strings.Replace(query, "/*SLICE:ids*/?", "NULL", 1)
-	}
-	_, err := q.db.ExecContext(ctx, query, queryParams...)
+func (q *Queries) DeleteFunctionsByIDs(ctx context.Context, ids []string) error {
+	_, err := q.db.ExecContext(ctx, deleteFunctionsByIDs, pq.Array(ids))
 	return err
 }
 
@@ -1304,7 +1294,7 @@ SELECT
   )) AS span_fragments
 FROM spans
 WHERE debug_run_id = CAST($1 AS CHAR(26))
-GROUP BY trace_id, run_id, debug_session_id, parent_span_id
+GROUP BY trace_id, run_id, debug_session_id, dynamic_span_id, parent_span_id
 ORDER BY start_time
 `
 
@@ -1598,7 +1588,7 @@ func (q *Queries) GetTraceRun(ctx context.Context, runID string) (*TraceRun, err
 }
 
 const getTraceRunsByTriggerId = `-- name: GetTraceRunsByTriggerId :many
-SELECT run_id, account_id, workspace_id, app_id, function_id, trace_id, queued_at, started_at, ended_at, status, source_id, trigger_ids, output, is_debounce, batch_id, cron_schedule, has_ai FROM trace_runs WHERE POSITION($1 IN trigger_ids::text) > 0
+SELECT run_id, account_id, workspace_id, app_id, function_id, trace_id, queued_at, started_at, ended_at, status, source_id, trigger_ids, output, is_debounce, batch_id, cron_schedule, has_ai FROM trace_runs WHERE POSITION($1 IN convert_from(trigger_ids, 'UTF8')) > 0
 `
 
 func (q *Queries) GetTraceRunsByTriggerId(ctx context.Context, eventID interface{}) ([]*TraceRun, error) {

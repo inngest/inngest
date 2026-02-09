@@ -7,6 +7,7 @@ import { Button } from "@inngest/components/Button";
 import type { TicketSummary } from "@/data/plain";
 import { getTicketsByEmail } from "@/data/plain";
 import { TicketCard } from "@/components/Support/TicketCard";
+import { CommunityChannels } from "@/components/Support/CommunityChannels";
 
 const getAuthStatusAndTickets = createServerFn({ method: "GET" }).handler(
   async () => {
@@ -58,7 +59,7 @@ function Home() {
 
   if (!isAuthenticated || !userEmail) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-canvasBase">
+      <div className="flex flex-col min-h-screen items-center justify-center bg-canvasBase">
         <div className="text-center">
           <h1 className="text-basis mb-2 text-2xl font-bold">
             Please sign in to view your tickets
@@ -70,11 +71,12 @@ function Home() {
             <Button
               kind="primary"
               appearance="outlined"
-              label="Sign In"
+              label="Sign in"
               href="/sign-in"
             />
           </div>
         </div>
+        <CommunityChannels />
       </div>
     );
   }

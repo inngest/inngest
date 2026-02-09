@@ -94,7 +94,8 @@ func (c *Client) FunctionRuns(ctx context.Context, opts FunctionRunOpt) ([]FnRun
 			first: $first,
 			after: %s,
 			filter: { from: $startTime, until: $endTime, status: $status, timeField: $timeField, query: $query, functionIDs: $ids },
-			orderBy: %s
+			orderBy: %s,
+			preview: false
 		) {
 			edges {
 				cursor
@@ -112,7 +113,7 @@ func (c *Client) FunctionRuns(ctx context.Context, opts FunctionRunOpt) ([]FnRun
 				endCursor
 				hasNextPage
 			}
-			totalCount
+			totalCount(preview: false)
 		}
 	}`,
 		cursor,
@@ -214,7 +215,7 @@ func (c *Client) WaitForRunStatus(
 		o = opts[0]
 	}
 
-	timeout := 5 * time.Second
+	timeout := 10 * time.Second
 	if o.Timeout > 0 {
 		timeout = o.Timeout
 	}

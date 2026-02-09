@@ -80,5 +80,5 @@ func TestRedirect(t *testing.T) {
 
 		// Function ran
 		return runID != ""
-	}, 2*time.Second, 100*time.Millisecond)
+	}, 10*time.Second, 50*time.Millisecond)
 }

@@ -161,14 +161,11 @@ type acquireScriptResponse struct {
 		LeaseID             ulid.ULID `json:"lid"`
 		LeaseIdempotencyKey string    `json:"lik"`
 	} `json:"l"`
-	LimitingConstraints flexibleIntArray    `json:"lc"`
-	FairnessReduction   int                 `json:"fr"`
-	RetryAt             int                 `json:"ra"`
-	Debug               flexibleStringArray `json:"d"`
-
-	ActiveAccountLeases  int `json:"aal"`
-	ExpiredAccountLeases int `json:"eal"`
-	EarliestLeaseExpiry  int `json:"ele"`
+	LimitingConstraints  flexibleIntArray    `json:"lc"`
+	ExhaustedConstraints flexibleIntArray    `json:"ec"`
+	FairnessReduction    int                 `json:"fr"`
+	RetryAt              int                 `json:"ra"`
+	Debug                flexibleStringArray `json:"d"`
 }
 
 func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquireRequest) (*CapacityAcquireResponse, errs.InternalError) {
@@ -351,6 +348,14 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 		}
 	}
 
+	var exhaustedConstraints []ConstraintItem
+	if len(parsedResponse.ExhaustedConstraints) > 0 {
+		exhaustedConstraints = make([]ConstraintItem, len(parsedResponse.ExhaustedConstraints))
+		for i, exhaustedConstraintIndex := range []int(parsedResponse.ExhaustedConstraints) {
+			exhaustedConstraints[i] = sortedConstraints[exhaustedConstraintIndex-1]
+		}
+	}
+
 	retryAfter := time.UnixMilli(int64(parsedResponse.RetryAt))
 	if retryAfter.Before(now) {
 		retryAfter = time.Time{}
@@ -370,18 +375,19 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 	if len(r.lifecycles) > 0 {
 		for _, hook := range r.lifecycles {
 			err := hook.OnCapacityLeaseAcquired(ctx, OnCapacityLeaseAcquiredData{
-				AccountID:           req.AccountID,
-				EnvID:               req.EnvID,
-				FunctionID:          req.FunctionID,
-				Configuration:       req.Configuration,
-				Constraints:         req.Constraints,
-				LimitingConstraints: limitingConstraints,
-				FairnessReduction:   parsedResponse.FairnessReduction,
-				RetryAfter:          retryAfter,
-				RequestedAmount:     req.Amount,
-				Duration:            req.Duration,
-				Source:              req.Source,
-				GrantedLeases:       leases,
+				AccountID:            req.AccountID,
+				EnvID:                req.EnvID,
+				FunctionID:           req.FunctionID,
+				Configuration:        req.Configuration,
+				Constraints:          req.Constraints,
+				LimitingConstraints:  limitingConstraints,
+				ExhaustedConstraints: exhaustedConstraints,
+				FairnessReduction:    parsedResponse.FairnessReduction,
+				RetryAfter:           retryAfter,
+				RequestedAmount:      req.Amount,
+				Duration:             req.Duration,
+				Source:               req.Source,
+				GrantedLeases:        leases,
 			})
 			if err != nil {
 				return nil, errs.Wrap(0, false, "acquire lifecycle failed: %w", err)
@@ -391,9 +397,6 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 
 	l = l.With(
 		"status", parsedResponse.Status,
-		"active", parsedResponse.ActiveAccountLeases,
-		"expired", parsedResponse.ExpiredAccountLeases,
-		"earliest_expiry", time.UnixMilli(int64(parsedResponse.EarliestLeaseExpiry)),
 	)
 
 	tags := make(map[string]any)
@@ -414,12 +417,23 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 
 	// Export counter for limitingConstraints
 	for _, constraint := range limitingConstraints {
-		tags["limiting_constraint"] = constraint.LimitingConstraintIdentifier()
+		tags["limiting_constraint"] = constraint.MetricsIdentifier()
 		metrics.IncrConstraintAPILimitingConstraintsCounter(ctx, metrics.CounterOpt{
 			PkgName: "constraintapi",
 			Tags:    tags,
 		})
 	}
+	delete(tags, "limiting_constraint")
+
+	// Export counter for exhaustedConstraints
+	for _, constraint := range exhaustedConstraints {
+		tags["constraint"] = constraint.MetricsIdentifier()
+		metrics.IncrConstraintAPIExhaustedConstraintsCounter(ctx, metrics.CounterOpt{
+			PkgName: "constraintapi",
+			Tags:    tags,
+		})
+	}
+	delete(tags, "constraint")
 
 	switch parsedResponse.Status {
 	case 1, 3:
@@ -452,28 +466,31 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 
 		// success or idempotency
 		return &CapacityAcquireResponse{
-			RequestID:           requestID,
-			Leases:              leases,
-			LimitingConstraints: limitingConstraints,
-			FairnessReduction:   parsedResponse.FairnessReduction,
-			RetryAfter:          retryAfter,
-			internalDebugState:  parsedResponse,
+			RequestID:            requestID,
+			Leases:               leases,
+			LimitingConstraints:  limitingConstraints,
+			ExhaustedConstraints: exhaustedConstraints,
+			FairnessReduction:    parsedResponse.FairnessReduction,
+			RetryAfter:           retryAfter,
+			internalDebugState:   parsedResponse,
 		}, nil
 
 	case 2:
 		l.Trace(
 			"acquire call lacking capacity",
 			"limiting", limitingConstraints,
+			"exhausted", exhaustedConstraints,
 		)
 
 		// lacking capacity
 		return &CapacityAcquireResponse{
-			RequestID:           requestID,
-			Leases:              leases,
-			LimitingConstraints: limitingConstraints,
-			RetryAfter:          retryAfter,
-			FairnessReduction:   parsedResponse.FairnessReduction,
-			internalDebugState:  parsedResponse,
+			RequestID:            requestID,
+			Leases:               leases,
+			LimitingConstraints:  limitingConstraints,
+			ExhaustedConstraints: exhaustedConstraints,
+			RetryAfter:           retryAfter,
+			FairnessReduction:    parsedResponse.FairnessReduction,
+			internalDebugState:   parsedResponse,
 		}, nil
 
 	case 4:
