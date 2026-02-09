@@ -211,7 +211,7 @@ func TestQueueE2E(t *testing.T) {
 			}, tc.queueOptions...)
 
 			queueClient := redis_state.NewQueueClient(rc, redis_state.QueueDefaultKey)
-			shard := redis_state.NewQueueShard("test", queueClient, options...)
+			shard := redis_state.NewQueueShard("test", queueClient, queue.ExecutorAssignmentConfig{}, options...)
 
 			cm, err := constraintapi.NewRedisCapacityManager(
 				constraintapi.WithClock(clock),

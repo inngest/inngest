@@ -66,6 +66,10 @@ func (m *mockShardForIterator) Kind() enums.QueueShardKind {
 	return enums.QueueShardKindRedis
 }
 
+func (m *mockShardForIterator) ExecutorAssignmentConfig() ExecutorAssignmentConfig {
+	return ExecutorAssignmentConfig{}
+}
+
 func (m *mockShardForIterator) ItemLeaseConstraintCheck(
 	ctx context.Context,
 	shadowPart *QueueShadowPartition,

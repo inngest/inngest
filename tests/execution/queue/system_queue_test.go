@@ -49,7 +49,7 @@ func TestSystemQueueConfigs(t *testing.T) {
 		queue.WithKindToQueueMapping(mapping),
 	}
 
-	shard := redis_state.NewQueueShard(consts.DefaultQueueShardName, redis_state.NewQueueClient(rc, redis_state.QueueDefaultKey), opts...)
+	shard := redis_state.NewQueueShard(consts.DefaultQueueShardName, redis_state.NewQueueClient(rc, redis_state.QueueDefaultKey), queue.ExecutorAssignmentConfig{}, opts...)
 
 	kg := shard.Client().KeyGenerator()
 

@@ -287,6 +287,7 @@ func TestNextHealthCheckTime(t *testing.T) {
 	shard := redis_state.NewQueueShard(
 		consts.DefaultQueueShardName,
 		redis_state.NewQueueClient(rc, consts.DefaultQueueShardName),
+		queue.ExecutorAssignmentConfig{},
 		opts...,
 	)
 
@@ -535,6 +536,7 @@ func TestCronHealthCheckJobID(t *testing.T) {
 	shard := redis_state.NewQueueShard(
 		consts.DefaultQueueShardName,
 		redis_state.NewQueueClient(rc, consts.DefaultQueueShardName),
+		queue.ExecutorAssignmentConfig{},
 		opts...,
 	)
 
@@ -665,6 +667,7 @@ func TestRedisCronManager(t *testing.T) {
 	shard := redis_state.NewQueueShard(
 		consts.DefaultQueueShardName,
 		redis_state.NewQueueClient(rc, redis_state.QueueDefaultKey),
+		queue.ExecutorAssignmentConfig{},
 		opts...,
 	)
 

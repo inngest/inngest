@@ -41,7 +41,7 @@ func TestDebounce(t *testing.T) {
 		}),
 	}
 
-	shard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), opts...)
+	shard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), queue.ExecutorAssignmentConfig{}, opts...)
 
 	q, err := queue.New(
 		context.Background(),
@@ -300,7 +300,7 @@ func TestJITDebounceMigration(t *testing.T) {
 		queue.WithClock(fakeClock),
 	}
 
-	defaultQueueShard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), opts...)
+	defaultQueueShard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), queue.ExecutorAssignmentConfig{}, opts...)
 
 	// Create new single-shard (but multi-replica) Valkey cluster for system queues + colocated debounce state
 	newSystemCluster := miniredis.RunT(t)
@@ -310,7 +310,7 @@ func TestJITDebounceMigration(t *testing.T) {
 	})
 	newSystemClusterClient := redis_state.NewUnshardedClient(newSystemClusterRc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
 	require.NoError(t, err)
-	newSystemShard := redis_state.NewQueueShard("new-system", newSystemClusterClient.Queue(), opts...)
+	newSystemShard := redis_state.NewQueueShard("new-system", newSystemClusterClient.Queue(), queue.ExecutorAssignmentConfig{}, opts...)
 	newSystemDebounceClient := newSystemClusterClient.Debounce()
 
 	// TODO What happens if both old and new services are running? Does this break debounces?
@@ -580,7 +580,7 @@ func TestDebounceMigrationWithoutTimeout(t *testing.T) {
 		queue.WithClock(fakeClock),
 	}
 
-	defaultQueueShard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), opts...)
+	defaultQueueShard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), queue.ExecutorAssignmentConfig{}, opts...)
 
 	// Create new single-shard (but multi-replica) Valkey cluster for system queues + colocated debounce state
 	newSystemCluster := miniredis.RunT(t)
@@ -590,7 +590,7 @@ func TestDebounceMigrationWithoutTimeout(t *testing.T) {
 	})
 	newSystemClusterClient := redis_state.NewUnshardedClient(newSystemClusterRc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
 	require.NoError(t, err)
-	newSystemShard := redis_state.NewQueueShard("new-system", newSystemClusterClient.Queue(), opts...)
+	newSystemShard := redis_state.NewQueueShard("new-system", newSystemClusterClient.Queue(), queue.ExecutorAssignmentConfig{}, opts...)
 	newSystemDebounceClient := newSystemClusterClient.Debounce()
 
 	// TODO What happens if both old and new services are running? Does this break debounces?
@@ -843,7 +843,7 @@ func TestDebounceTimeoutIsPreserved(t *testing.T) {
 		queue.WithClock(fakeClock),
 	}
 
-	defaultQueueShard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), opts...)
+	defaultQueueShard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), queue.ExecutorAssignmentConfig{}, opts...)
 
 	// Create new single-shard (but multi-replica) Valkey cluster for system queues + colocated debounce state
 	newSystemCluster := miniredis.RunT(t)
@@ -853,7 +853,7 @@ func TestDebounceTimeoutIsPreserved(t *testing.T) {
 	})
 	newSystemClusterClient := redis_state.NewUnshardedClient(newSystemClusterRc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
 	require.NoError(t, err)
-	newSystemShard := redis_state.NewQueueShard("new-system", newSystemClusterClient.Queue(), opts...)
+	newSystemShard := redis_state.NewQueueShard("new-system", newSystemClusterClient.Queue(), queue.ExecutorAssignmentConfig{}, opts...)
 	newSystemDebounceClient := newSystemClusterClient.Debounce()
 
 	// TODO What happens if both old and new services are running? Does this break debounces?
@@ -1071,7 +1071,7 @@ func TestDebounceExplicitMigration(t *testing.T) {
 		queue.WithClock(fakeClock),
 	}
 
-	defaultQueueShard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), opts...)
+	defaultQueueShard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), queue.ExecutorAssignmentConfig{}, opts...)
 
 	// Create new single-shard (but multi-replica) Valkey cluster for system queues + colocated debounce state
 	newSystemCluster := miniredis.RunT(t)
@@ -1081,7 +1081,7 @@ func TestDebounceExplicitMigration(t *testing.T) {
 	})
 	newSystemClusterClient := redis_state.NewUnshardedClient(newSystemClusterRc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
 	require.NoError(t, err)
-	newSystemShard := redis_state.NewQueueShard("new-system", newSystemClusterClient.Queue(), opts...)
+	newSystemShard := redis_state.NewQueueShard("new-system", newSystemClusterClient.Queue(), queue.ExecutorAssignmentConfig{}, opts...)
 	newSystemDebounceClient := newSystemClusterClient.Debounce()
 
 	// TODO What happens if both old and new services are running? Does this break debounces?
@@ -1269,7 +1269,7 @@ func TestDebouncePrimaryChooser(t *testing.T) {
 		queue.WithClock(fakeClock),
 	}
 
-	defaultQueueShard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), opts...)
+	defaultQueueShard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), queue.ExecutorAssignmentConfig{}, opts...)
 
 	// Create new single-shard (but multi-replica) Valkey cluster for system queues + colocated debounce state
 	newSystemCluster := miniredis.RunT(t)
@@ -1279,7 +1279,7 @@ func TestDebouncePrimaryChooser(t *testing.T) {
 	})
 	newSystemClusterClient := redis_state.NewUnshardedClient(newSystemClusterRc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
 	require.NoError(t, err)
-	newSystemShard := redis_state.NewQueueShard("new-system", newSystemClusterClient.Queue(), opts...)
+	newSystemShard := redis_state.NewQueueShard("new-system", newSystemClusterClient.Queue(), queue.ExecutorAssignmentConfig{}, opts...)
 	newSystemDebounceClient := newSystemClusterClient.Debounce()
 
 	// TODO What happens if both old and new services are running? Does this break debounces?
@@ -1442,7 +1442,7 @@ func TestDebounceExecutionDuringMigrationWorks(t *testing.T) {
 		queue.WithClock(fakeClock),
 	}
 
-	defaultQueueShard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), opts...)
+	defaultQueueShard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), queue.ExecutorAssignmentConfig{}, opts...)
 
 	// Create new single-shard (but multi-replica) Valkey cluster for system queues + colocated debounce state
 	newSystemCluster := miniredis.RunT(t)
@@ -1452,7 +1452,7 @@ func TestDebounceExecutionDuringMigrationWorks(t *testing.T) {
 	})
 	newSystemClusterClient := redis_state.NewUnshardedClient(newSystemClusterRc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
 	require.NoError(t, err)
-	newSystemShard := redis_state.NewQueueShard("new-system", newSystemClusterClient.Queue(), opts...)
+	newSystemShard := redis_state.NewQueueShard("new-system", newSystemClusterClient.Queue(), queue.ExecutorAssignmentConfig{}, opts...)
 	newSystemDebounceClient := newSystemClusterClient.Debounce()
 
 	// TODO What happens if both old and new services are running? Does this break debounces?
@@ -1662,7 +1662,7 @@ func TestDebounceExecutionShouldNotRaceMigration(t *testing.T) {
 		queue.WithClock(fakeClock),
 	}
 
-	defaultQueueShard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), opts...)
+	defaultQueueShard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), queue.ExecutorAssignmentConfig{}, opts...)
 
 	// Create new single-shard (but multi-replica) Valkey cluster for system queues + colocated debounce state
 	newSystemCluster := miniredis.RunT(t)
@@ -1672,7 +1672,7 @@ func TestDebounceExecutionShouldNotRaceMigration(t *testing.T) {
 	})
 	newSystemClusterClient := redis_state.NewUnshardedClient(newSystemClusterRc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
 	require.NoError(t, err)
-	newSystemShard := redis_state.NewQueueShard("new-system", newSystemClusterClient.Queue(), opts...)
+	newSystemShard := redis_state.NewQueueShard("new-system", newSystemClusterClient.Queue(), queue.ExecutorAssignmentConfig{}, opts...)
 	newSystemDebounceClient := newSystemClusterClient.Debounce()
 
 	// TODO What happens if both old and new services are running? Does this break debounces?
@@ -1889,7 +1889,7 @@ func TestGetDebounceInfo(t *testing.T) {
 		}),
 	}
 
-	shard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), opts...)
+	shard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), queue.ExecutorAssignmentConfig{}, opts...)
 
 	q, err := queue.New(
 		context.Background(),
@@ -2088,7 +2088,7 @@ func TestDeleteDebounce(t *testing.T) {
 		}),
 	}
 
-	shard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), opts...)
+	shard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), queue.ExecutorAssignmentConfig{}, opts...)
 
 	q, err := queue.New(
 		context.Background(),
@@ -2188,7 +2188,7 @@ func TestRunDebounce(t *testing.T) {
 		}),
 	}
 
-	shard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), opts...)
+	shard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), queue.ExecutorAssignmentConfig{}, opts...)
 
 	q, err := queue.New(
 		context.Background(),
