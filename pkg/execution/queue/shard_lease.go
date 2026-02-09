@@ -104,7 +104,7 @@ func (q *queueProcessor) tryClaimShardLease(ctx context.Context, shards []QueueS
 
 // renewShardLease continuously renews the shard lease until the context is cancelled
 func (q *queueProcessor) renewShardLease(ctx context.Context) {
-	tick := q.Clock().NewTicker(ConfigLeaseDuration / 3)
+	tick := q.Clock().NewTicker(ShardLeaseDuration / 3)
 	defer tick.Stop()
 
 	for {
@@ -144,7 +144,7 @@ func (q *queueProcessor) renewShardLease(ctx context.Context) {
 			}
 
 			// Update the lease ID
-			if newLeaseID != leaseID {
+			if *newLeaseID != *leaseID {
 				q.shardLeaseLock.Lock()
 				q.shardLeaseID = newLeaseID
 				q.shardLeaseLock.Unlock()

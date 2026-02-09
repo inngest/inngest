@@ -327,7 +327,7 @@ func (u queueKeyGenerator) ConfigLeaseKey(scope string) string {
 }
 
 func (u queueKeyGenerator) ShardLeaseKey(scope string) string {
-	return fmt.Sprintf("{%s}:queue:%s", u.queueDefaultKey, scope)
+	return fmt.Sprintf("{%s}:queue:shard-lease:%s", u.queueDefaultKey, scope)
 }
 
 func (u queueKeyGenerator) ActiveChecker() string {
