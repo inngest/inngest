@@ -3984,10 +3984,16 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 	runCtx.SetStatusCode(resp.StatusCode)
 
 	if e.allowStepMetadata.Enabled(ctx, runMetadata.ID.Tenant.AccountID) {
+		var serverProcessingMs int64
+		if resp.StatResult != nil {
+			serverProcessingMs = resp.StatResult.ServerProcessing.Milliseconds()
+		}
+
 		md := metadata.WithWarnings(extractors.ExtractAIGatewayMetadata(
 			input,
 			resp.StatusCode,
 			resp.Body,
+			serverProcessingMs,
 		))
 		for _, m := range md {
 			_, err := e.createMetadataSpan(

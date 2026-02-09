@@ -120,7 +120,7 @@ func (e *AIMetadataExtractor) extractAIMetadata(span *tracev1.Span) AIMetadata {
 	return md
 }
 
-func ExtractAIGatewayMetadata(req aigateway.Request, respStatus int, resp []byte) ([]metadata.Structured, error) {
+func ExtractAIGatewayMetadata(req aigateway.Request, respStatus int, resp []byte, serverProcessingMs int64) ([]metadata.Structured, error) {
 	parsedInput, err := aigateway.ParseInput(req)
 	if err != nil {
 		return nil, &metadata.WarningError{
@@ -149,6 +149,11 @@ func ExtractAIGatewayMetadata(req aigateway.Request, respStatus int, resp []byte
 	outputTokens := int64(parsedOutput.TokensOut)
 	totalTokens := inputTokens + outputTokens
 
+	var latencyMs *int64
+	if serverProcessingMs > 0 {
+		latencyMs = &serverProcessingMs
+	}
+
 	aiMd := &AIMetadata{
 		Model:         parsedInput.Model,
 		System:        req.Format,
@@ -158,6 +163,7 @@ func ExtractAIGatewayMetadata(req aigateway.Request, respStatus int, resp []byte
 		OutputTokens:  outputTokens,
 		TotalTokens:   &totalTokens,
 		EstimatedCost: EstimateCost(parsedInput.Model, inputTokens, outputTokens),
+		LatencyMs:     latencyMs,
 	}
 
 	return []metadata.Structured{
