@@ -56,11 +56,17 @@ type Opts struct {
 	Queue queue.Queue
 	// MetricsProvider reports usage metrics.
 	MetricsProvider MetricsProvider
+	// BackoffFunc computes the retry time for a given attempt number.
+	// If nil, defaults to backoff.DefaultBackoff.
+	BackoffFunc backoff.BackoffFunc
 }
 
 func New(o Opts) Checkpointer {
 	if o.MetricsProvider == nil {
 		o.MetricsProvider = nilCheckpointMetrics{}
+	}
+	if o.BackoffFunc == nil {
+		o.BackoffFunc = backoff.GetLinearBackoffFunc(5 * time.Second)
 	}
 
 	return checkpointer{o}
