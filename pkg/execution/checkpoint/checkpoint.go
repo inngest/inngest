@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/backoff"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution"
@@ -251,7 +252,7 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 			if errors.Is(err, executor.ErrHandledStepError) {
 				// In the executor, returning an error bubbles up to the queue to requeue.
 				jobID := fmt.Sprintf("%s-%s-sync-retry", runCtx.Metadata().IdempotencyKey(), op.ID)
-				now := time.Now()
+				retryAt := c.BackoffFunc(1)
 
 				// Inject the step span reference into the retry queue item metadata
 				// so that execution spans created during retries are properly parented
@@ -278,7 +279,7 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 				}
 
 				// Continue checking this particular error.
-				if err = c.Queue.Enqueue(ctx, nextItem, now, queue.EnqueueOpts{}); err != nil {
+				if err = c.Queue.Enqueue(ctx, nextItem, retryAt, queue.EnqueueOpts{}); err != nil {
 					l.Error("error enqueueing step error in checkpoint", "error", err, "opcode", op.Op)
 				}
 			}
