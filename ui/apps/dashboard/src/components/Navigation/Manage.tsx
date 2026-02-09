@@ -28,24 +28,28 @@ export default function Manage({
         collapsed={collapsed}
         text="Apps"
         icon={<AppsIcon className="h-[18px] w-[18px]" />}
+        dataTestId="pws-nav-apps"
       />
       <MenuItem
         to={getNavRoute(activeEnv, 'functions')}
         collapsed={collapsed}
         text="Functions"
         icon={<FunctionsIcon className="h-[18px] w-[18px]" />}
+        dataTestId="pws-nav-functions"
       />
       <MenuItem
         to={getNavRoute(activeEnv, 'event-types')}
         collapsed={collapsed}
         text="Event Types"
         icon={<EventsIcon className="h-[18px] w-[18px]" />}
+        dataTestId="pws-nav-event-types"
       />
       <MenuItem
         to={getNavRoute(activeEnv, 'manage/webhooks')}
         collapsed={collapsed}
         text="Webhooks"
         icon={<WebhooksIcon className="h-[18px] w-[18px]" />}
+        dataTestId="pws-nav-webhooks"
       />
     </div>
   );
