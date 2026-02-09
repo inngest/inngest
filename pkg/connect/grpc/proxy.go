@@ -288,9 +288,8 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 			close(replySubscribed)
 
 			reply = <-replyReceived
-			span.AddEvent("ReplyReceivedGRPC")
-			l.Debug("received response via gRPC")
 
+			span.AddEvent("ReplyReceivedGRPC")
 			metrics.IncrConnectGatewayGRPCReplyCounter(ctx, 1, metrics.CounterOpt{})
 
 			cancelWaitForResponseCtx()
@@ -366,7 +365,6 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 				return
 			}
 
-			l.Debug("request is still leased by worker")
 			span.AddEvent("RequestLeaseOk")
 		}
 	}()

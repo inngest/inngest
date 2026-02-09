@@ -1316,8 +1316,6 @@ func (c *connectionHandler) handleSdkReply(ctx context.Context, msg *connectpb.C
 			if err != nil {
 				return fmt.Errorf("could not send response through grpc: %w", err)
 			}
-
-			l.Debug("sent response through gRPC", "result", result)
 		case errors.Is(err, state.ErrExecutorNotFound):
 			l.Debug("executor not found in lease, reply was likely picked up by polling")
 		default:
