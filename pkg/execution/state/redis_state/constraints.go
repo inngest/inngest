@@ -34,7 +34,7 @@ func (q *queue) BacklogRefillConstraintCheck(
 	}
 
 	if q.CapacityManager == nil || q.UseConstraintAPI == nil {
-		metrics.IncrBacklogRefillConstraintCheckFallbackCounter(ctx, enums.BacklogRefillConstraintCheckFallbackReasonConstraintAPIUninitialized.String(), metrics.CounterOpt{
+		metrics.IncrBacklogRefillConstraintCheckCounter(ctx, enums.BacklogRefillConstraintCheckReasonConstraintAPIUninitialized.String(), metrics.CounterOpt{
 			PkgName: pkgName,
 		})
 		return &osqueue.BacklogRefillConstraintCheckResult{
@@ -43,7 +43,7 @@ func (q *queue) BacklogRefillConstraintCheck(
 	}
 
 	if shadowPart.AccountID == nil || shadowPart.EnvID == nil || shadowPart.FunctionID == nil {
-		metrics.IncrBacklogRefillConstraintCheckFallbackCounter(ctx, enums.BacklogRefillConstraintCheckFallbackReasonIDNil.String(), metrics.CounterOpt{
+		metrics.IncrBacklogRefillConstraintCheckCounter(ctx, enums.BacklogRefillConstraintCheckReasonIDNil.String(), metrics.CounterOpt{
 			PkgName: pkgName,
 		})
 		return &osqueue.BacklogRefillConstraintCheckResult{
@@ -53,7 +53,7 @@ func (q *queue) BacklogRefillConstraintCheck(
 
 	useAPI := q.UseConstraintAPI(ctx, *shadowPart.AccountID, *shadowPart.EnvID, *shadowPart.FunctionID)
 	if !useAPI {
-		metrics.IncrBacklogRefillConstraintCheckFallbackCounter(ctx, enums.BacklogRefillConstraintCheckFallbackReasonFeatureFlagDisabled.String(), metrics.CounterOpt{
+		metrics.IncrBacklogRefillConstraintCheckCounter(ctx, enums.BacklogRefillConstraintCheckReasonFeatureFlagDisabled.String(), metrics.CounterOpt{
 			PkgName: pkgName,
 		})
 		return &osqueue.BacklogRefillConstraintCheckResult{
@@ -82,7 +82,7 @@ func (q *queue) BacklogRefillConstraintCheck(
 	})
 	if err != nil {
 		logger.StdlibLogger(ctx).Error("acquiring capacity lease failed", "err", err, "method", "backlogRefillConstraintCheck", "functionID", *shadowPart.FunctionID)
-		metrics.IncrBacklogRefillConstraintCheckFallbackCounter(ctx, enums.BacklogRefillConstraintCheckFallbackReasonConstraintAPIError.String(), metrics.CounterOpt{
+		metrics.IncrBacklogRefillConstraintCheckCounter(ctx, enums.BacklogRefillConstraintCheckReasonConstraintAPIError.String(), metrics.CounterOpt{
 			PkgName: pkgName,
 		})
 		return nil, fmt.Errorf("could not enforce constraints and acquire lease: %w", err)
@@ -153,7 +153,7 @@ func (q *queue) ItemLeaseConstraintCheck(
 	if shadowPart.AccountID == nil ||
 		shadowPart.EnvID == nil ||
 		shadowPart.FunctionID == nil {
-		metrics.IncrQueueItemConstraintCheckFallbackCounter(ctx, enums.QueueItemConstraintFallbackReasonIdNil.String(), metrics.CounterOpt{
+		metrics.IncrQueueItemConstraintCheckCounter(ctx, enums.QueueItemConstraintReasonIdNil.String(), metrics.CounterOpt{
 			PkgName: pkgName,
 		})
 		return osqueue.ItemLeaseConstraintCheckResult{}, nil
@@ -161,7 +161,7 @@ func (q *queue) ItemLeaseConstraintCheck(
 
 	if q.CapacityManager == nil ||
 		q.UseConstraintAPI == nil {
-		metrics.IncrQueueItemConstraintCheckFallbackCounter(ctx, enums.QueueItemConstraintFallbackReasonConstraintAPIUninitialized.String(), metrics.CounterOpt{
+		metrics.IncrQueueItemConstraintCheckCounter(ctx, enums.QueueItemConstraintReasonConstraintAPIUninitialized.String(), metrics.CounterOpt{
 			PkgName: pkgName,
 		})
 		return osqueue.ItemLeaseConstraintCheckResult{}, nil
@@ -169,7 +169,7 @@ func (q *queue) ItemLeaseConstraintCheck(
 
 	useAPI := q.UseConstraintAPI(ctx, *shadowPart.AccountID, *shadowPart.EnvID, *shadowPart.FunctionID)
 	if !useAPI {
-		metrics.IncrQueueItemConstraintCheckFallbackCounter(ctx, enums.QueueItemConstraintFallbackReasonFeatureFlagDisabled.String(), metrics.CounterOpt{
+		metrics.IncrQueueItemConstraintCheckCounter(ctx, enums.QueueItemConstraintReasonFeatureFlagDisabled.String(), metrics.CounterOpt{
 			PkgName: pkgName,
 		})
 		return osqueue.ItemLeaseConstraintCheckResult{}, nil
@@ -252,7 +252,7 @@ func (q *queue) ItemLeaseConstraintCheck(
 	})
 	if err != nil {
 		l.Error("acquiring capacity lease failed", "err", err, "method", "itemLeaseConstraintCheck", "constraints", constraints, "item", item, "function_id", *shadowPart.FunctionID)
-		metrics.IncrQueueItemConstraintCheckFallbackCounter(ctx, enums.QueueItemConstraintFallbackReasonConstraintAPIError.String(), metrics.CounterOpt{
+		metrics.IncrQueueItemConstraintCheckCounter(ctx, enums.QueueItemConstraintReasonConstraintAPIError.String(), metrics.CounterOpt{
 			PkgName: pkgName,
 		})
 		return osqueue.ItemLeaseConstraintCheckResult{}, fmt.Errorf("could not enforce constraints and acquire lease: %w", err)
