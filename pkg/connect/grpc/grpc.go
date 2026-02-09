@@ -271,7 +271,7 @@ func (i *gatewayGRPCManager) Forward(ctx context.Context, gatewayID ulid.ULID, c
 		Data:         data,
 	})
 
-	logger.StdlibLogger(ctx).Debug("grpc message forwarded to connect gateway", "reply", reply, "err", err)
+	logger.StdlibLogger(ctx).Trace("grpc message forwarded to connect gateway", "reply", reply, "err", err)
 
 	success := err == nil
 	metrics.IncrConnectGatewayGRPCForwardCounter(ctx, 1, metrics.CounterOpt{

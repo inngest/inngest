@@ -27,8 +27,10 @@ const (
 	pkgNameRouter = "connect.router"
 )
 
-var ErrNoHealthyConnection = fmt.Errorf("no healthy connection")
-var ErrAllWorkersAtCapacity = fmt.Errorf("all connect workers at capacity")
+var (
+	ErrNoHealthyConnection  = fmt.Errorf("no healthy connection")
+	ErrAllWorkersAtCapacity = fmt.Errorf("all connect workers at capacity")
+)
 
 type RouteResult struct {
 	GatewayID    ulid.ULID
@@ -81,7 +83,6 @@ func GetRoute(ctx context.Context, stateMgr state.StateManager, rnd *util.FrandR
 		}
 		// all workers at capacity
 		if errors.Is(err, ErrAllWorkersAtCapacity) {
-			log.Warn("no worker capacity available")
 			metrics.IncrConnectRouterAllWorkersAtCapacityCounter(ctx, 1, metrics.CounterOpt{
 				PkgName: pkgNameRouter,
 			})
@@ -299,7 +300,7 @@ type isHealthyRes struct {
 }
 
 func isHealthy(ctx context.Context, stateManager state.StateManager, envID uuid.UUID, appID uuid.UUID, fnSlug string, conn *connectpb.ConnMetadata, log logger.Logger) isHealthyRes {
-	log.Debug("evaluating connection", "conn_id", conn.Id, "status", conn.Status, "last_heartbeat_at", conn.LastHeartbeatAt.AsTime())
+	log.Trace("evaluating connection", "conn_id", conn.Id, "status", conn.Status, "last_heartbeat_at", conn.LastHeartbeatAt.AsTime())
 
 	gatewayId, err := ulid.Parse(conn.GatewayId)
 	if err != nil {
@@ -377,7 +378,7 @@ func isHealthy(ctx context.Context, stateManager state.StateManager, envID uuid.
 
 	gwLastHeartbeat := time.UnixMilli(gw.LastHeartbeatAtMS)
 
-	log.Debug("retrieved gateway for connection", "conn_id", conn.Id, "gateway_id", gatewayId.String(), "status", gw.Status, "last_heartbeat_at", gwLastHeartbeat)
+	log.Trace("retrieved gateway for connection", "conn_id", conn.Id, "gateway_id", gatewayId.String(), "status", gw.Status, "last_heartbeat_at", gwLastHeartbeat)
 
 	gatewayIsActive := gw.Status == state.GatewayStatusActive
 	gatewayHeartbeatTimedOut := gwLastHeartbeat.Before(time.Now().Add(-2 * consts.ConnectGatewayHeartbeatInterval))
@@ -423,7 +424,6 @@ func (a activeLeasesLogger) LogValue() slog.Value {
 }
 
 func checkCapacity(ctx context.Context, stateManager state.StateManager, envID uuid.UUID, conn *connectpb.ConnMetadata, log logger.Logger) *checkCapacityRes {
-
 	// Check worker capacity
 	if conn.InstanceId == "" {
 		// This should never happen

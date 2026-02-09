@@ -179,8 +179,11 @@ func (a router) getEventRuns(w http.ResponseWriter, r *http.Request) {
 		for _, run := range runs {
 			rootSpan, err := a.opts.TraceReader.GetSpansByRunID(ctx, run.RunID)
 			if err != nil {
-				_ = publicerr.WriteHTTP(w, err) // return with error since user can leave out trace_preview flag
+				_ = publicerr.WriteHTTP(w, err)
 				return
+			}
+			if rootSpan == nil {
+				continue
 			}
 			run.Status = enums.StepStatusToRunStatus(rootSpan.Status)
 		}
