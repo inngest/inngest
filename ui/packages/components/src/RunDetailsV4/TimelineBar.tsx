@@ -8,7 +8,7 @@
  * - Optional expansion to show nested children
  */
 
-import { useMemo, type CSSProperties } from 'react';
+import { memo, useMemo, type CSSProperties } from 'react';
 import {
   RiArrowRightLine,
   RiArrowRightSFill,
@@ -240,7 +240,7 @@ const BAR_HEIGHT_CLASSES: Record<BarHeight, string> = { short: 'h-2', tall: 'h-5
  * For compound bars with segments, each segment is independently transformed
  * based on view offsets to only show the visible portion.
  */
-function VisualBar({
+const VisualBar = memo(function VisualBar({
   startPercent,
   widthPercent,
   style,
@@ -357,7 +357,7 @@ function VisualBar({
       }}
     />
   );
-}
+});
 
 // ============================================================================
 // Main Component
@@ -461,7 +461,8 @@ export function TimelineBar({
             )}
             onClick={
               expandable && !expanded
-                ? () => {
+                ? (e) => {
+                    e.stopPropagation();
                     onToggle?.();
                   }
                 : undefined
@@ -492,7 +493,7 @@ export function TimelineBar({
                 widthPercent={transformed.widthPercent}
                 style={style}
                 segments={segments}
-                expanded={expandable && expanded}
+                expanded={!!(expandable && expanded)}
                 originalBarStart={startPercent}
                 originalBarWidth={widthPercent}
                 viewStartOffset={viewStartOffset}

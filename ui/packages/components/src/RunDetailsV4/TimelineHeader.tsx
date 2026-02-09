@@ -8,7 +8,7 @@
  * - Timing markers at 0%, 25%, 50%, 75%, 100% with duration labels
  */
 
-import { useCallback, useState } from 'react';
+import { useCallback } from 'react';
 
 import { getStatusBackgroundClass } from '../Status/statusClasses';
 import { cn } from '../utils/classNames';
@@ -27,6 +27,10 @@ type Props = {
   onSelectionChange?: (start: number, end: number) => void;
   /** Run status for status-based coloring (e.g., COMPLETED, FAILED, CANCELLED) */
   status?: string;
+  /** Current selection start as percentage (0-100), controlled by parent */
+  selectionStart?: number;
+  /** Current selection end as percentage (0-100), controlled by parent */
+  selectionEnd?: number;
 };
 
 const TIME_MARKERS = [0, 25, 50, 75, 100];
@@ -47,19 +51,17 @@ export function TimelineHeader({
   leftWidth,
   onSelectionChange,
   status,
+  selectionStart: selStart = 0,
+  selectionEnd: selEnd = 100,
 }: Props): JSX.Element {
   const totalMs = maxTime.getTime() - minTime.getTime();
   const durations = getMarkerDurations(totalMs);
   const barColorClass = status ? getStatusBackgroundClass(status) : 'bg-primary-moderate';
 
-  const [selStart, setSelStart] = useState(0);
-  const [selEnd, setSelEnd] = useState(100);
   const isDefault = selStart === 0 && selEnd === 100;
 
   const handleSelectionChange = useCallback(
     (start: number, end: number) => {
-      setSelStart(start);
-      setSelEnd(end);
       onSelectionChange?.(start, end);
     },
     [onSelectionChange]

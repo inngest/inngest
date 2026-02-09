@@ -345,6 +345,8 @@ export function Timeline({ data, onSelectStep }: Props): JSX.Element {
         leftWidth={leftWidth}
         onSelectionChange={handleSelectionChange}
         status={rootStatus}
+        selectionStart={viewStartOffset}
+        selectionEnd={viewEndOffset}
       />
 
       {/* Step bars */}

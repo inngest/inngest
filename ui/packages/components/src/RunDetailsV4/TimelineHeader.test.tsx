@@ -3,13 +3,12 @@
  * Feature: 001-composable-timeline-bar
  */
 
-import { useEffect } from 'react';
 import { act, cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { TimelineHeader } from './TimelineHeader';
 
-// Capture the onSelectionChange callback passed to TimeBrush so tests can trigger selection changes
+// Capture the onSelectionChange callback passed to TimeBrush so tests can verify forwarding
 let capturedOnSelectionChange: ((start: number, end: number) => void) | undefined;
 
 vi.mock('./TimeBrush', () => ({
@@ -23,11 +22,6 @@ vi.mock('./TimeBrush', () => ({
     className?: string;
   }) => {
     capturedOnSelectionChange = onSelectionChange;
-
-    // Simulate TimeBrush calling onSelectionChange on mount with defaults
-    useEffect(() => {
-      onSelectionChange?.(0, 100);
-    }, [onSelectionChange]);
 
     return (
       <div className={className} data-testid="time-brush">
@@ -142,12 +136,15 @@ describe('TimelineHeader', () => {
   });
 
   describe('selection callback', () => {
-    it('passes onSelectionChange to TimeBrush', () => {
+    it('forwards onSelectionChange from TimeBrush to parent', () => {
       const onSelectionChange = vi.fn();
       render(<TimelineHeader {...defaultProps} onSelectionChange={onSelectionChange} />);
 
-      // TimeBrush calls onSelectionChange on mount with default values
-      expect(onSelectionChange).toHaveBeenCalledWith(0, 100);
+      act(() => {
+        capturedOnSelectionChange?.(30, 60);
+      });
+
+      expect(onSelectionChange).toHaveBeenCalledWith(30, 60);
     });
 
     it('does not crash without onSelectionChange', () => {
@@ -170,12 +167,14 @@ describe('TimelineHeader', () => {
     });
 
     it('renders 3 segments when selection is non-default', () => {
-      const { container } = render(<TimelineHeader {...defaultProps} status="COMPLETED" />);
-
-      // Trigger non-default selection
-      act(() => {
-        capturedOnSelectionChange?.(25, 75);
-      });
+      const { container } = render(
+        <TimelineHeader
+          {...defaultProps}
+          status="COMPLETED"
+          selectionStart={25}
+          selectionEnd={75}
+        />
+      );
 
       // Default bar should be gone
       expect(container.querySelector('[data-testid="timeline-bar-default"]')).toBeFalsy();
@@ -187,11 +186,14 @@ describe('TimelineHeader', () => {
     });
 
     it('outside segments use bg-canvasMuted', () => {
-      const { container } = render(<TimelineHeader {...defaultProps} status="COMPLETED" />);
-
-      act(() => {
-        capturedOnSelectionChange?.(25, 75);
-      });
+      const { container } = render(
+        <TimelineHeader
+          {...defaultProps}
+          status="COMPLETED"
+          selectionStart={25}
+          selectionEnd={75}
+        />
+      );
 
       const left = container.querySelector('[data-testid="bar-segment-left"]') as HTMLElement;
       const right = container.querySelector('[data-testid="bar-segment-right"]') as HTMLElement;
@@ -201,22 +203,28 @@ describe('TimelineHeader', () => {
     });
 
     it('middle segment uses status color class', () => {
-      const { container } = render(<TimelineHeader {...defaultProps} status="COMPLETED" />);
-
-      act(() => {
-        capturedOnSelectionChange?.(25, 75);
-      });
+      const { container } = render(
+        <TimelineHeader
+          {...defaultProps}
+          status="COMPLETED"
+          selectionStart={25}
+          selectionEnd={75}
+        />
+      );
 
       const middle = container.querySelector('[data-testid="bar-segment-middle"]') as HTMLElement;
       expect(middle.className).toContain('bg-status-completed');
     });
 
     it('segments have correct widths based on selection', () => {
-      const { container } = render(<TimelineHeader {...defaultProps} status="COMPLETED" />);
-
-      act(() => {
-        capturedOnSelectionChange?.(25, 75);
-      });
+      const { container } = render(
+        <TimelineHeader
+          {...defaultProps}
+          status="COMPLETED"
+          selectionStart={25}
+          selectionEnd={75}
+        />
+      );
 
       const left = container.querySelector('[data-testid="bar-segment-left"]') as HTMLElement;
       const middle = container.querySelector('[data-testid="bar-segment-middle"]') as HTMLElement;
@@ -233,25 +241,19 @@ describe('TimelineHeader', () => {
       const onSelectionChange = vi.fn();
       render(<TimelineHeader {...defaultProps} onSelectionChange={onSelectionChange} />);
 
-      // Initial call with defaults
-      expect(onSelectionChange).toHaveBeenCalledWith(0, 100);
-
       act(() => {
         capturedOnSelectionChange?.(30, 60);
       });
 
-      // Forwarded call with new values
       expect(onSelectionChange).toHaveBeenCalledWith(30, 60);
     });
   });
 
   describe('timestamp labels', () => {
     it('renders timestamp labels above handles when selection is non-default', () => {
-      const { container } = render(<TimelineHeader {...defaultProps} />);
-
-      act(() => {
-        capturedOnSelectionChange?.(25, 75);
-      });
+      const { container } = render(
+        <TimelineHeader {...defaultProps} selectionStart={25} selectionEnd={75} />
+      );
 
       const leftLabel = container.querySelector('[data-testid="timestamp-label-left"]');
       const rightLabel = container.querySelector('[data-testid="timestamp-label-right"]');
@@ -269,12 +271,10 @@ describe('TimelineHeader', () => {
     });
 
     it('displays correct duration offsets', () => {
-      const { container } = render(<TimelineHeader {...defaultProps} />);
-
       // defaultProps: 10s total. Selection at 50%–100% → 5s and 10s
-      act(() => {
-        capturedOnSelectionChange?.(50, 100);
-      });
+      const { container } = render(
+        <TimelineHeader {...defaultProps} selectionStart={50} selectionEnd={100} />
+      );
 
       const leftLabel = container.querySelector('[data-testid="timestamp-label-left"]');
       const rightLabel = container.querySelector('[data-testid="timestamp-label-right"]');
@@ -284,11 +284,9 @@ describe('TimelineHeader', () => {
     });
 
     it('has z-20 class on timestamp labels', () => {
-      const { container } = render(<TimelineHeader {...defaultProps} />);
-
-      act(() => {
-        capturedOnSelectionChange?.(25, 75);
-      });
+      const { container } = render(
+        <TimelineHeader {...defaultProps} selectionStart={25} selectionEnd={75} />
+      );
 
       const leftLabel = container.querySelector('[data-testid="timestamp-label-left"]');
       const rightLabel = container.querySelector('[data-testid="timestamp-label-right"]');
@@ -298,11 +296,9 @@ describe('TimelineHeader', () => {
     });
 
     it('applies edge clamping near 0% (translateX(0))', () => {
-      const { container } = render(<TimelineHeader {...defaultProps} />);
-
-      act(() => {
-        capturedOnSelectionChange?.(2, 50);
-      });
+      const { container } = render(
+        <TimelineHeader {...defaultProps} selectionStart={2} selectionEnd={50} />
+      );
 
       const leftLabel = container.querySelector(
         '[data-testid="timestamp-label-left"]'
@@ -311,11 +307,9 @@ describe('TimelineHeader', () => {
     });
 
     it('applies edge clamping near 100% (translateX(-100%))', () => {
-      const { container } = render(<TimelineHeader {...defaultProps} />);
-
-      act(() => {
-        capturedOnSelectionChange?.(50, 98);
-      });
+      const { container } = render(
+        <TimelineHeader {...defaultProps} selectionStart={50} selectionEnd={98} />
+      );
 
       const rightLabel = container.querySelector(
         '[data-testid="timestamp-label-right"]'

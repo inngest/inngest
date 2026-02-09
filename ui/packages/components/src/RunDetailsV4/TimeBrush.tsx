@@ -54,18 +54,36 @@ export function TimeBrush({
   children,
   className,
 }: TimeBrushProps): JSX.Element {
-  // Selection state (0-100 percentages)
-  const [selectionStart, setSelectionStart] = useState(initialStart);
-  const [selectionEnd, setSelectionEnd] = useState(initialEnd);
+  // Selection state (0-100 percentages) — single object for atomic updates from raw DOM listeners
+  const [selection, setSelection] = useState({ start: initialStart, end: initialEnd });
+  const { start: selectionStart, end: selectionEnd } = selection;
 
-  // Hover position for cursor line (null when not hovering)
-  const [hoverPosition, setHoverPosition] = useState<number | null>(null);
+  // Cursor line — manipulated via ref + rAF to avoid re-renders on every mouse move
+  const cursorLineRef = useRef<HTMLDivElement>(null);
+  const rafIdRef = useRef<number>(0);
 
   // Drag state
   const dragModeRef = useRef<DragMode>('none');
   const dragStartXRef = useRef(0);
   const dragStartSelectionRef = useRef({ start: 0, end: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
+  const onSelectionChangeRef = useRef(onSelectionChange);
+  onSelectionChangeRef.current = onSelectionChange;
+
+  // Update cursor line position via rAF (bypasses React render cycle)
+  const updateCursorLine = useCallback((position: number | null) => {
+    cancelAnimationFrame(rafIdRef.current);
+    rafIdRef.current = requestAnimationFrame(() => {
+      const el = cursorLineRef.current;
+      if (!el) return;
+      if (position === null) {
+        el.style.display = 'none';
+      } else {
+        el.style.display = '';
+        el.style.left = `${position}%`;
+      }
+    });
+  }, []);
 
   // Check if selection is at default (matches initial values)
   const isDefaultSelection = selectionStart === initialStart && selectionEnd === initialEnd;
@@ -127,12 +145,10 @@ export function TimeBrush({
         dragStartXRef.current = e.clientX;
         dragStartSelectionRef.current = { start: clickPercent, end: clickPercent };
 
-        setHoverPosition(null);
-        setSelectionStart(clickPercent);
-        setSelectionEnd(clickPercent);
+        updateCursorLine(null);
       }
     },
-    [isDefaultSelection, selectionStart, selectionEnd]
+    [isDefaultSelection, selectionStart, selectionEnd, updateCursorLine]
   );
 
   // Handle mouse move on track to show cursor line
@@ -147,22 +163,22 @@ export function TimeBrush({
 
       if (isDefaultSelection) {
         // Default state: show hover line everywhere
-        setHoverPosition(clampedPercent);
-      } else if (clampedPercent < selectionStart || clampedPercent > selectionEnd) {
+        updateCursorLine(clampedPercent);
+      } else if (clampedPercent <= selectionStart || clampedPercent >= selectionEnd) {
         // Non-default: show hover line only outside selection
-        setHoverPosition(clampedPercent);
+        updateCursorLine(clampedPercent);
       } else {
         // Non-default, inside selection: hide hover line
-        setHoverPosition(null);
+        updateCursorLine(null);
       }
     },
-    [isDefaultSelection, selectionStart, selectionEnd]
+    [isDefaultSelection, selectionStart, selectionEnd, updateCursorLine]
   );
 
   // Handle mouse leave on track to hide cursor line
   const handleTrackMouseLeave = useCallback(() => {
-    setHoverPosition(null);
-  }, []);
+    updateCursorLine(null);
+  }, [updateCursorLine]);
 
   // Handle mouse move (global)
   useEffect(() => {
@@ -184,14 +200,16 @@ export function TimeBrush({
           0,
           Math.min(origEnd - minSelectionWidth, origStart + deltaPercent)
         );
-        setSelectionStart(newStart);
+        setSelection({ start: newStart, end: origEnd });
+        onSelectionChangeRef.current?.(newStart, origEnd);
       } else if (dragModeRef.current === 'right-handle') {
         // Move right handle, constrained by left handle
         const newEnd = Math.max(
           origStart + minSelectionWidth,
           Math.min(100, origEnd + deltaPercent)
         );
-        setSelectionEnd(newEnd);
+        setSelection({ start: origStart, end: newEnd });
+        onSelectionChangeRef.current?.(origStart, newEnd);
       } else if (dragModeRef.current === 'selection') {
         // Move entire selection, constrained by edges
         const width = origEnd - origStart;
@@ -208,8 +226,8 @@ export function TimeBrush({
           newStart = 100 - width;
         }
 
-        setSelectionStart(newStart);
-        setSelectionEnd(newEnd);
+        setSelection({ start: newStart, end: newEnd });
+        onSelectionChangeRef.current?.(newStart, newEnd);
       } else if (dragModeRef.current === 'create-selection') {
         // Create selection by dragging from initial click point
         const currentPercent = ((e.clientX - rect.left) / rect.width) * 100;
@@ -218,14 +236,15 @@ export function TimeBrush({
         // origStart is the initial click position
         const clickPosition = origStart;
 
-        if (clampedPercent < clickPosition) {
-          // Dragging left from click point
-          setSelectionStart(Math.max(0, clampedPercent));
-          setSelectionEnd(clickPosition);
-        } else {
-          // Dragging right from click point
-          setSelectionStart(clickPosition);
-          setSelectionEnd(Math.min(100, clampedPercent));
+        const newStart =
+          clampedPercent < clickPosition ? Math.max(0, clampedPercent) : clickPosition;
+        const newEnd =
+          clampedPercent < clickPosition ? clickPosition : Math.min(100, clampedPercent);
+
+        // Only update when selection meets minimum width
+        if (newEnd - newStart >= minSelectionWidth) {
+          setSelection({ start: newStart, end: newEnd });
+          onSelectionChangeRef.current?.(newStart, newEnd);
         }
       }
     };
@@ -243,15 +262,10 @@ export function TimeBrush({
     };
   }, [minSelectionWidth]);
 
-  // Notify parent of selection changes
-  useEffect(() => {
-    onSelectionChange?.(selectionStart, selectionEnd);
-  }, [selectionStart, selectionEnd, onSelectionChange]);
-
   // Reset selection to default
   const handleReset = useCallback(() => {
-    setSelectionStart(initialStart);
-    setSelectionEnd(initialEnd);
+    setSelection({ start: initialStart, end: initialEnd });
+    onSelectionChangeRef.current?.(initialStart, initialEnd);
   }, [initialStart, initialEnd]);
 
   return (
@@ -297,17 +311,17 @@ export function TimeBrush({
         {/* Children (e.g., the main bar) */}
         {children}
 
-        {/* Cursor line - shown when hovering in default state or outside selection */}
-        {hoverPosition !== null && (
-          <div
-            className={cn('pointer-events-none absolute -top-6 bottom-0 w-px', cursorLineClassName)}
-            style={{
-              left: `${hoverPosition}%`,
-              transform: 'translateX(-50%)',
-              zIndex: 10,
-            }}
-          />
-        )}
+        {/* Cursor line - positioned via ref + rAF to avoid re-renders on mouse move */}
+        <div
+          ref={cursorLineRef}
+          data-testid="cursor-line"
+          className={cn('pointer-events-none absolute -top-6 bottom-0 w-px', cursorLineClassName)}
+          style={{
+            display: 'none',
+            transform: 'translateX(-50%)',
+            zIndex: 10,
+          }}
+        />
 
         {/* Left handle */}
         <div
