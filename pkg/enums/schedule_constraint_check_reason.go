@@ -1,0 +1,14 @@
+//go:generate go run github.com/dmarkham/enumer -trimprefix=ScheduleConstraintCheckReason -type=ScheduleConstraintCheckReason -transform=snake -json -text
+
+package enums
+
+type ScheduleConstraintCheckReason int
+
+const (
+	ScheduleConstraintCheckReasonConstraintAPIUninitialized ScheduleConstraintCheckReason = iota
+	ScheduleConstraintCheckReasonFeatureFlagDisabled
+	ScheduleConstraintCheckReasonGetConstraintsError
+	ScheduleConstraintCheckReasonNoRateLimitConfigured
+	ScheduleConstraintCheckReasonConstraintAPIError
+	ScheduleConstraintCheckReasonMissingLease
+)
