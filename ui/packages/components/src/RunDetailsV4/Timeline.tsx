@@ -160,8 +160,8 @@ function TimelineBarRenderer({
   const duration = calculateDuration(bar.startTime, bar.endTime);
   const hasTimingBreakdown = !!bar.timingBreakdown;
   const hasChildren = bar.children && bar.children.length > 0;
-  const isExpandable = hasTimingBreakdown || hasChildren;
-  const isExpanded = expandedBars.has(bar.id);
+  const isExpandable = !bar.isRoot && (hasTimingBreakdown || hasChildren);
+  const isExpanded = bar.isRoot ? true : expandedBars.has(bar.id);
 
   // Generate segments for compound bar visualization
   const segments = generateBarSegments(bar);
@@ -188,6 +188,9 @@ function TimelineBarRenderer({
       status={bar.status}
       viewStartOffset={viewStartOffset}
       viewEndOffset={viewEndOffset}
+      startTime={bar.startTime}
+      endTime={bar.endTime}
+      minTime={minTime}
     >
       {/* Timing breakdown bars */}
       {isExpanded &&
@@ -222,6 +225,9 @@ function TimelineBarRenderer({
               onToggle={isTimingBarExpandable ? () => onToggleExpand(timingBar.id) : undefined}
               viewStartOffset={viewStartOffset}
               viewEndOffset={viewEndOffset}
+              startTime={timingBar.startTime}
+              endTime={timingBar.endTime}
+              minTime={minTime}
             >
               {/* Child bars nested under YOUR SERVER */}
               {isTimingBarExpanded &&

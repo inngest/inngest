@@ -8,7 +8,7 @@
  * - Timing markers at 0%, 25%, 50%, 75%, 100% with duration labels
  */
 
-import { useCallback } from 'react';
+import { useCallback, useLayoutEffect, useRef } from 'react';
 
 import { getStatusBackgroundClass } from '../Status/statusClasses';
 import { cn } from '../utils/classNames';
@@ -43,6 +43,16 @@ function getMarkerDurations(totalMs: number): string[] {
 }
 
 /**
+ * Get the base CSS transform for a timestamp label at a given percentage.
+ * Labels pin to edges when near 0% or 100%, otherwise center on the handle.
+ */
+function getLabelTransform(percent: number): string {
+  if (percent < 5) return 'translateX(0)';
+  if (percent > 95) return 'translateX(-100%)';
+  return 'translateX(-50%)';
+}
+
+/**
  * TimelineHeader displays a time brush for selecting a portion of the timeline.
  */
 export function TimelineHeader({
@@ -59,6 +69,57 @@ export function TimelineHeader({
   const barColorClass = status ? getStatusBackgroundClass(status) : 'bg-primary-moderate';
 
   const isDefault = selStart === 0 && selEnd === 100;
+
+  const leftLabelRef = useRef<HTMLDivElement>(null);
+  const rightLabelRef = useRef<HTMLDivElement>(null);
+  const rightPanelRef = useRef<HTMLDivElement>(null);
+
+  // Prevent timestamp labels from overlapping by measuring after render
+  // and pushing them apart before paint.
+  useLayoutEffect(() => {
+    if (isDefault) return;
+    const leftEl = leftLabelRef.current;
+    const rightEl = rightLabelRef.current;
+    const containerEl = rightPanelRef.current;
+    if (!leftEl || !rightEl || !containerEl) return;
+
+    // Reset to base transforms so we can measure natural positions
+    const baseLeft = getLabelTransform(selStart);
+    const baseRight = getLabelTransform(selEnd);
+    leftEl.style.transform = baseLeft;
+    rightEl.style.transform = baseRight;
+
+    const containerRect = containerEl.getBoundingClientRect();
+    if (containerRect.width === 0) return; // no layout (e.g., jsdom)
+
+    const leftRect = leftEl.getBoundingClientRect();
+    const rightRect = rightEl.getBoundingClientRect();
+    const gap = 4; // minimum pixel gap between labels
+
+    const overlap = leftRect.right + gap - rightRect.left;
+    if (overlap <= 0) return; // no overlap, base transforms are fine
+
+    // Split the push evenly, but respect container edges
+    let leftPush = overlap / 2;
+    let rightPush = overlap / 2;
+
+    // Left label can't extend past container left edge
+    const leftAvail = leftRect.left - containerRect.left;
+    if (leftPush > leftAvail) {
+      leftPush = Math.max(0, leftAvail);
+      rightPush = overlap - leftPush;
+    }
+
+    // Right label can't extend past container right edge
+    const rightAvail = containerRect.right - rightRect.right;
+    if (rightPush > rightAvail) {
+      rightPush = Math.max(0, rightAvail);
+      leftPush = overlap - rightPush;
+    }
+
+    leftEl.style.transform = `${baseLeft} translateX(-${Math.round(leftPush)}px)`;
+    rightEl.style.transform = `${baseRight} translateX(${Math.round(rightPush)}px)`;
+  }, [selStart, selEnd, isDefault, totalMs]);
 
   const handleSelectionChange = useCallback(
     (start: number, end: number) => {
@@ -79,7 +140,7 @@ export function TimelineHeader({
       />
 
       {/* Right panel with brush and markers */}
-      <div className="relative flex-1">
+      <div ref={rightPanelRef} className="relative flex-1">
         {/* Time markers - positioned above the bar */}
         <div className="relative w-full">
           {TIME_MARKERS.map((percent, i) => (
@@ -106,32 +167,24 @@ export function TimelineHeader({
         {!isDefault && (
           <>
             <div
+              ref={leftLabelRef}
               data-testid="timestamp-label-left"
               className="bg-canvasBase border-subtle text-basis pointer-events-none absolute z-20 rounded border px-1 py-0.5 text-xs tabular-nums"
               style={{
                 left: `${selStart}%`,
-                transform:
-                  selStart < 5
-                    ? 'translateX(0)'
-                    : selStart > 95
-                    ? 'translateX(-100%)'
-                    : 'translateX(-50%)',
+                transform: getLabelTransform(selStart),
                 top: '-18px',
               }}
             >
               {formatDuration(Math.floor((totalMs * selStart) / 100))}
             </div>
             <div
+              ref={rightLabelRef}
               data-testid="timestamp-label-right"
               className="bg-canvasBase border-subtle text-basis pointer-events-none absolute z-20 rounded border px-1 py-0.5 text-xs tabular-nums"
               style={{
                 left: `${selEnd}%`,
-                transform:
-                  selEnd < 5
-                    ? 'translateX(0)'
-                    : selEnd > 95
-                    ? 'translateX(-100%)'
-                    : 'translateX(-50%)',
+                transform: getLabelTransform(selEnd),
                 top: '-18px',
               }}
             >

@@ -3,11 +3,17 @@
  * Feature: 001-composable-timeline-bar
  */
 
+import type { ReactNode } from 'react';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { TooltipProvider } from '../Tooltip/Tooltip';
 import { Timeline } from './Timeline';
 import type { TimelineData } from './TimelineBar.types';
+
+function Wrapper({ children }: { children: ReactNode }) {
+  return <TooltipProvider>{children}</TooltipProvider>;
+}
 
 afterEach(() => {
   cleanup();
@@ -45,13 +51,13 @@ describe('Timeline', () => {
   // T035: renders all steps as TimelineBar components
   describe('renders all steps as TimelineBar components', () => {
     it('renders all bar names', () => {
-      render(<Timeline data={mockData} />);
+      render(<Timeline data={mockData} />, { wrapper: Wrapper });
       expect(screen.getByText('Process payment')).toBeTruthy();
       expect(screen.getByText('Send notification')).toBeTruthy();
     });
 
     it('renders correct number of timeline bars', () => {
-      render(<Timeline data={mockData} />);
+      render(<Timeline data={mockData} />, { wrapper: Wrapper });
       const bars = screen.getAllByTestId('timeline-bar-row');
       expect(bars).toHaveLength(2);
     });
@@ -60,23 +66,23 @@ describe('Timeline', () => {
   // T036: renders timing breakdown rows using TimelineBar when expanded
   describe('renders timing breakdown rows when expanded', () => {
     it('shows timing breakdown when step is expanded', async () => {
-      render(<Timeline data={mockData} />);
+      render(<Timeline data={mockData} />, { wrapper: Wrapper });
 
-      // Find and click expand button for the first step (has timingBreakdown)
-      const expandButtons = screen.getAllByRole('button', { name: /expand/i });
-      fireEvent.click(expandButtons[0]);
+      // Click the first row to expand (has timingBreakdown)
+      const rows = screen.getAllByTestId('timeline-bar-row');
+      fireEvent.click(rows[0]!);
 
       // Should show INNGEST and SERVER timing rows
       expect(screen.getByText('INNGEST')).toBeTruthy();
-      expect(screen.getByText('ACME CORP')).toBeTruthy();
+      expect(screen.getByText('ACME CORP SERVER')).toBeTruthy();
     });
 
     it('uses TimelineBar for timing breakdown rows', async () => {
-      render(<Timeline data={mockData} />);
+      render(<Timeline data={mockData} />, { wrapper: Wrapper });
 
-      // Expand first step
-      const expandButtons = screen.getAllByRole('button', { name: /expand/i });
-      fireEvent.click(expandButtons[0]);
+      // Click first row to expand
+      const rows = screen.getAllByTestId('timeline-bar-row');
+      fireEvent.click(rows[0]!);
 
       // Timing rows should be rendered as TimelineBar components
       const bars = screen.getAllByTestId('timeline-bar-row');
@@ -88,12 +94,12 @@ describe('Timeline', () => {
   // T037: manages expansion state for multiple bars
   describe('manages expansion state for multiple bars', () => {
     it('can expand multiple bars independently', () => {
-      render(<Timeline data={mockData} />);
+      render(<Timeline data={mockData} />, { wrapper: Wrapper });
 
-      const expandButtons = screen.getAllByRole('button', { name: /expand/i });
+      const rows = screen.getAllByTestId('timeline-bar-row');
 
       // Expand first bar
-      fireEvent.click(expandButtons[0]);
+      fireEvent.click(rows[0]!);
       expect(screen.getAllByText('INNGEST').length).toBeGreaterThan(0);
 
       // Second bar (if expandable) should still be collapsed
@@ -101,15 +107,14 @@ describe('Timeline', () => {
     });
 
     it('can collapse an expanded bar', () => {
-      render(<Timeline data={mockData} />);
+      render(<Timeline data={mockData} />, { wrapper: Wrapper });
 
-      const expandButton = screen.getAllByRole('button', { name: /expand/i })[0];
-
-      // Expand
-      fireEvent.click(expandButton);
+      // Expand first bar
+      const rows = screen.getAllByTestId('timeline-bar-row');
+      fireEvent.click(rows[0]!);
       expect(screen.getAllByText('INNGEST').length).toBeGreaterThan(0);
 
-      // Collapse
+      // Collapse by clicking the arrow (only the arrow collapses)
       const collapseButton = screen.getByRole('button', { name: /collapse/i });
       fireEvent.click(collapseButton);
       expect(screen.queryByText('INNGEST')).toBeNull();
@@ -119,7 +124,7 @@ describe('Timeline', () => {
   // Additional tests
   describe('column resize handling', () => {
     it('renders with default left width', () => {
-      render(<Timeline data={mockData} />);
+      render(<Timeline data={mockData} />, { wrapper: Wrapper });
       const leftPanels = screen.getAllByTestId('timeline-bar-left');
       expect(leftPanels[0]?.style.width).toBe('40%');
     });
@@ -149,11 +154,11 @@ describe('Timeline', () => {
         ],
       };
 
-      render(<Timeline data={dataWithChildren} />);
+      render(<Timeline data={dataWithChildren} />, { wrapper: Wrapper });
       expect(screen.getByText('Parent step')).toBeTruthy();
-      // Child is only visible when expanded - check parent exists first
-      const expandButton = screen.getByRole('button', { name: /expand/i });
-      fireEvent.click(expandButton);
+      // Child is only visible when expanded - click the row to expand
+      const rows = screen.getAllByTestId('timeline-bar-row');
+      fireEvent.click(rows[0]!);
       expect(screen.getByText('Child step')).toBeTruthy();
     });
   });
