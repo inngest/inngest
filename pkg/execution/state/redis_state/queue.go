@@ -41,8 +41,8 @@ func (q *queue) Kind() enums.QueueShardKind {
 	return enums.QueueShardKindRedis
 }
 
-func (q *queue) ExecutorAssignmentConfig() osqueue.ExecutorAssignmentConfig {
-	return q.executorAssignmentConfig
+func (q *queue) ShardAssignmentConfig() osqueue.ShardAssignmentConfig {
+	return q.shardAssignmentConfig
 }
 
 type RedisQueueShard interface {
@@ -56,14 +56,14 @@ func (q *queue) Client() *QueueClient {
 	return q.RedisClient
 }
 
-func NewQueueShard(name string, queueClient *QueueClient, executorAssignmentConfig osqueue.ExecutorAssignmentConfig, opts ...osqueue.QueueOpt) RedisQueueShard {
+func NewQueueShard(name string, queueClient *QueueClient, shardAssignmentConfig osqueue.ShardAssignmentConfig, opts ...osqueue.QueueOpt) RedisQueueShard {
 	options := osqueue.NewQueueOptions(opts...)
 	q := &queue{
-		name:                     name,
-		itemIndexer:              QueueItemIndexerFunc,
-		QueueOptions:             *options,
-		RedisClient:              queueClient,
-		executorAssignmentConfig: executorAssignmentConfig,
+		name:                  name,
+		itemIndexer:           QueueItemIndexerFunc,
+		QueueOptions:          *options,
+		RedisClient:           queueClient,
+		shardAssignmentConfig: shardAssignmentConfig,
 	}
 
 	return q
@@ -79,7 +79,7 @@ type queue struct {
 	// itemIndexer returns indexes for a given queue item.
 	itemIndexer QueueItemIndexer
 
-	executorAssignmentConfig osqueue.ExecutorAssignmentConfig
+	shardAssignmentConfig osqueue.ShardAssignmentConfig
 }
 
 // zsetKey represents the key used to store the zset for this partition's items.

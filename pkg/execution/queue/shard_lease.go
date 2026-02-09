@@ -77,7 +77,7 @@ func (q *queueProcessor) tryClaimShardLease(ctx context.Context, shards []QueueS
 
 	// Try to get a lease on one of them
 	for _, shard := range shards {
-		leaseID, err := shard.ShardLease(ctx, "shard-group-"+q.runMode.ShardGroup, ShardLeaseDuration, shard.NumExecutors(), nil)
+		leaseID, err := shard.ShardLease(ctx, "shard-group-"+q.runMode.ShardGroup, ShardLeaseDuration, shard.ShardAssignmentConfig().NumExecutors, nil)
 
 		if err == ErrAllShardsAlreadyLeased {
 			q.log.Warn("Could not get a shard lease", "shard", shard.Name())
@@ -130,7 +130,7 @@ func (q *queueProcessor) renewShardLease(ctx context.Context) {
 			}
 
 			// Renew the lease
-			newLeaseID, err := shard.ShardLease(ctx, "shard-group-"+q.runMode.ShardGroup, ShardLeaseDuration, shard.NumExecutors(), leaseID)
+			newLeaseID, err := shard.ShardLease(ctx, "shard-group-"+q.runMode.ShardGroup, ShardLeaseDuration, shard.ShardAssignmentConfig().NumExecutors, leaseID)
 			if err == ErrShardLeaseExpired || err == ErrShardLeaseNotFound {
 				// Another process took the lease
 				q.log.Error("shard lease taken by another process", "shard", shard.Name(), "group", q.runMode.ShardGroup)

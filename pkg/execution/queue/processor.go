@@ -245,7 +245,7 @@ func (q *queueProcessor) shardByName(name string) (QueueShard, error) {
 func (q *queueProcessor) shardsByGroupName(groupName string) []QueueShard {
 	var shards []QueueShard
 	for _, shard := range q.queueShardClients {
-		if shard.ShardGroup() == groupName {
+		if shard.ShardAssignmentConfig().ShardGroup == groupName {
 			shards = append(shards, shard)
 		}
 	}
