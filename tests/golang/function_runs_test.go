@@ -324,7 +324,7 @@ func TestFunctionRunList(t *testing.T) {
 		}, 10*time.Second, 2*time.Second)
 	})
 
-	t.Run("filter with output CEL expression", func(t *testing.T) {
+	t.Run("filter with output CEL expression searching output.data", func(t *testing.T) {
 		c := client.New(t)
 
 		// test setup created 10 runs numbered 0-9. The runs output double their run number
@@ -346,8 +346,135 @@ func TestFunctionRunList(t *testing.T) {
 			assert.False(ct, pageInfo.HasNextPage)
 		}, 10*time.Second, 2*time.Second)
 	})
+
+	t.Run("filter with error CEL expression searching output.error", func(t *testing.T) {
+		c := client.New(t)
+
+		// Failed runs return fmt.Errorf("fail") which creates output like {"error": {"message": "fail", ...}}
+		// This test verifies that error.message matches can search output.error
+		cel := celBlob([]string{
+			`error.message == "fail"`,
+		})
+
+		require.EventuallyWithT(t, func(ct *assert.CollectT) {
+			edges, pageInfo, total := c.FunctionRuns(ctx, client.FunctionRunOpt{
+				Start: start,
+				End:   end,
+				Query: &cel,
+			})
+
+			assert.Equal(ct, failureTotal, len(edges))
+			assert.Equal(ct, failureTotal, total)
+			assert.False(ct, pageInfo.HasNextPage)
+		}, 10*time.Second, 2*time.Second)
+	})
 }
 
 func celBlob(cel []string) string {
 	return strings.Join(cel, "\n")
+}
+
+// TestFunctionRunListBatchEvents verifies that batch runs (with multiple events) are
+// correctly grouped when filtering with CEL expressions that JOIN on the events table.
+// Without proper GROUP BY, multiple runs would collapse into one row due to aggregate functions.
+func TestFunctionRunListBatchEvents(t *testing.T) {
+	ctx := context.Background()
+
+	appName := fmt.Sprintf("fnrun-batch-%d", time.Now().UnixNano())
+	batchEventName := fmt.Sprintf("%s/batch", appName)
+
+	inngestClient, server, registerFuncs := NewSDKHandler(t, appName)
+	defer server.Close()
+
+	var (
+		runCount    int32
+		totalEvents int32
+		fnID        uuid.UUID
+	)
+
+	// Create a batch function that collects up to 3 events with short timeout
+	_, err := inngestgo.CreateFunction(
+		inngestClient,
+		inngestgo.FunctionOpts{
+			ID:          fmt.Sprintf("fn-run-batch-%s", batchEventName),
+			BatchEvents: &inngestgo.ConfigBatchEvents{MaxSize: 3, Timeout: 2 * time.Second},
+		},
+		inngestgo.EventTrigger(batchEventName, nil),
+		func(ctx context.Context, input inngestgo.Input[FnRunTestEvtData]) (any, error) {
+			atomic.AddInt32(&runCount, 1)
+			atomic.AddInt32(&totalEvents, int32(len(input.Events)))
+			fnID = uuid.MustParse(input.InputCtx.FunctionID)
+			return map[string]any{"eventCount": len(input.Events)}, nil
+		},
+	)
+	require.NoError(t, err)
+	registerFuncs()
+
+	start := time.Now()
+
+	// Send 6 events - they should be batched into 2 runs (3 events each)
+	for i := 0; i < 6; i++ {
+		_, err := inngestClient.Send(ctx, inngestgo.Event{
+			Name: batchEventName,
+			Data: map[string]any{"success": true, "idx": i},
+		})
+		require.NoError(t, err)
+	}
+
+	// Wait for both batches to be processed
+	require.EventuallyWithT(t, func(ct *assert.CollectT) {
+		assert.EqualValues(ct, 2, atomic.LoadInt32(&runCount))
+		assert.EqualValues(ct, 6, atomic.LoadInt32(&totalEvents))
+	}, 10*time.Second, 100*time.Millisecond)
+
+	end := time.Now().Add(10 * time.Second)
+
+	t.Run("multiple batch runs not collapsed with event CEL filter", func(t *testing.T) {
+		c := client.New(t)
+
+		// Filter by event name - this triggers the JOIN path
+		// Without GROUP BY, the 2 runs would collapse into 1 row due to aggregate functions
+		cel := celBlob([]string{
+			fmt.Sprintf("event.name == '%s'", batchEventName),
+		})
+
+		require.EventuallyWithT(t, func(ct *assert.CollectT) {
+			edges, pageInfo, total := c.FunctionRuns(ctx, client.FunctionRunOpt{
+				Start:       start,
+				End:         end,
+				FunctionIDs: []uuid.UUID{fnID},
+				Query:       &cel,
+			})
+
+			// Should be exactly 2 runs, not 1 (collapsed) or 6 (one per event)
+			assert.Equal(ct, 2, len(edges), "expected 2 batch runs, got %d (GROUP BY may be missing)", len(edges))
+			assert.Equal(ct, 2, total)
+			assert.False(ct, pageInfo.HasNextPage)
+		}, 10*time.Second, 2*time.Second)
+	})
+
+	t.Run("multiple batch runs not collapsed with event.data CEL filter", func(t *testing.T) {
+		c := client.New(t)
+
+		// Filter by event.data.idx - all 6 events match (idx 0-5)
+		// This should return 2 runs, one for each batch
+		cel := celBlob([]string{
+			fmt.Sprintf("event.name == '%s'", batchEventName),
+			"event.data.idx >= 0",
+		})
+
+		require.EventuallyWithT(t, func(ct *assert.CollectT) {
+			edges, pageInfo, total := c.FunctionRuns(ctx, client.FunctionRunOpt{
+				Start:       start,
+				End:         end,
+				FunctionIDs: []uuid.UUID{fnID},
+				Query:       &cel,
+			})
+
+			// Should be exactly 2 runs
+			assert.Equal(ct, 2, len(edges), "expected 2 batch runs, got %d", len(edges))
+			assert.Equal(ct, 2, total)
+			assert.False(ct, pageInfo.HasNextPage)
+		}, 10*time.Second, 2*time.Second)
+	})
 }
