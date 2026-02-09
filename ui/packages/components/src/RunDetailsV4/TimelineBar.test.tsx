@@ -8,6 +8,7 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { TooltipProvider } from '../Tooltip/Tooltip';
 import { TimelineBar } from './TimelineBar';
 
 afterEach(() => {
@@ -94,19 +95,19 @@ describe('TimelineBar', () => {
   describe('expandable behavior', () => {
     it('renders expand toggle when expandable is true', () => {
       render(<TimelineBar {...defaultProps} expandable expanded={false} />);
-      expect(screen.getByRole('button', { name: /expand/i })).toBeTruthy();
+      expect(screen.getByLabelText(/expand/i)).toBeTruthy();
     });
 
     it('does not render expand toggle when expandable is false', () => {
       render(<TimelineBar {...defaultProps} expandable={false} />);
-      expect(screen.queryByRole('button', { name: /expand/i })).toBeNull();
+      expect(screen.queryByLabelText(/expand/i)).toBeNull();
     });
 
-    // T021: calls onToggle when expand button clicked
-    it('calls onToggle when expand button is clicked', () => {
+    // T021: calls onToggle when row is clicked
+    it('calls onToggle when row is clicked', () => {
       const onToggle = vi.fn();
       render(<TimelineBar {...defaultProps} expandable expanded={false} onToggle={onToggle} />);
-      fireEvent.click(screen.getByRole('button', { name: /expand/i }));
+      fireEvent.click(screen.getByTestId('timeline-bar-row'));
       expect(onToggle).toHaveBeenCalledTimes(1);
     });
 
@@ -162,7 +163,7 @@ describe('TimelineBar', () => {
     // T045: displays organization name in SERVER label when provided
     it('displays organization name in SERVER label', () => {
       render(<TimelineBar {...defaultProps} style="timing.server" orgName="Acme Corp" />);
-      expect(screen.getByText('ACME CORP')).toBeTruthy();
+      expect(screen.getByText('ACME CORP SERVER')).toBeTruthy();
     });
 
     // T046: displays "YOUR SERVER" when organization name not provided
@@ -205,12 +206,45 @@ describe('TimelineBar', () => {
     });
   });
 
+  // Hover tooltip tests
+  describe('hover tooltip', () => {
+    const tooltipProps = {
+      ...defaultProps,
+      startTime: new Date('2024-01-15T10:00:00.500Z'),
+      endTime: new Date('2024-01-15T10:00:01.200Z'),
+      minTime: new Date('2024-01-15T10:00:00.000Z'),
+    };
+
+    it('renders tooltip trigger on right panel when time props provided', () => {
+      render(
+        <TooltipProvider>
+          <TimelineBar {...tooltipProps} />
+        </TooltipProvider>
+      );
+      expect(screen.getByTestId('timeline-bar-right')).toBeTruthy();
+    });
+
+    it('renders right panel without tooltip when time props are missing', () => {
+      render(<TimelineBar {...defaultProps} />);
+      expect(screen.getByTestId('timeline-bar-right')).toBeTruthy();
+    });
+
+    it('does not crash when endTime is null', () => {
+      render(
+        <TooltipProvider>
+          <TimelineBar {...tooltipProps} endTime={null} />
+        </TooltipProvider>
+      );
+      expect(screen.getByTestId('timeline-bar-right')).toBeTruthy();
+    });
+  });
+
   // Selection tests
   describe('selection', () => {
     it('applies selected styling when selected is true', () => {
       render(<TimelineBar {...defaultProps} selected />);
       const row = screen.getByTestId('timeline-bar-row');
-      const highlight = row.querySelector('.bg-canvasSubtle');
+      const highlight = row.querySelector('.bg-secondary-3xSubtle');
       expect(highlight).toBeTruthy();
     });
 

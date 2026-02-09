@@ -25,7 +25,9 @@ export type BarIcon =
   | 'clock' // step.sleep
   | 'mail' // step.waitForEvent
   | 'arrow' // step.invoke
-  | 'checkbox' // root run
+  | 'checkbox' // root run (completed)
+  | 'close-circle' // root run (failed)
+  | 'stop-circle' // root run (cancelled)
   | 'none';
 
 /**
@@ -171,6 +173,15 @@ export interface TimelineBarProps {
    * @default 100
    */
   viewEndOffset?: number;
+
+  /** Start time of this bar (for hover tooltip) */
+  startTime?: Date;
+
+  /** End time of this bar, null if in progress (for hover tooltip) */
+  endTime?: Date | null;
+
+  /** Timeline start time, used to compute offsets in hover tooltip */
+  minTime?: Date;
 }
 
 // ============================================================================

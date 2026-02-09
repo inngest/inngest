@@ -8,20 +8,24 @@
  * - Optional expansion to show nested children
  */
 
-import { memo, useMemo, type CSSProperties } from 'react';
+import { memo, useMemo, useState, type CSSProperties } from 'react';
 import {
   RiArrowRightLine,
   RiArrowRightSFill,
   RiBuilding2Line,
   RiCheckboxCircleFill,
+  RiCloseCircleFill,
   RiFlashlightLine,
   RiFunctionLine,
   RiMailLine,
   RiSettings3Line,
+  RiStopCircleFill,
   RiTimeLine,
 } from '@remixicon/react';
+import { format } from 'date-fns';
 
-import { getStatusBackgroundClass } from '../Status/statusClasses';
+import { getStatusBackgroundClass, getStatusTextClass } from '../Status/statusClasses';
+import { Tooltip, TooltipArrow, TooltipContent, TooltipTrigger } from '../Tooltip/Tooltip';
 import { cn } from '../utils/classNames';
 import type {
   BarHeight,
@@ -47,7 +51,6 @@ import { TIMELINE_CONSTANTS } from './utils/timing';
 const BAR_STYLES: Record<BarStyleKey, BarStyle> = {
   root: {
     barColor: 'bg-status-completed',
-    icon: 'checkbox',
     statusBased: true,
   },
   'step.run': {
@@ -130,6 +133,21 @@ function getBarColor(styleKey: BarStyleKey, status?: string): string {
 }
 
 /**
+ * Get the icon for a root bar based on run status.
+ */
+function getRootIcon(styleKey: BarStyleKey, status?: string): BarIcon | undefined {
+  if (styleKey !== 'root') return undefined;
+  switch (status) {
+    case 'FAILED':
+      return 'close-circle';
+    case 'CANCELLED':
+      return 'stop-circle';
+    default:
+      return 'checkbox';
+  }
+}
+
+/**
  * Get the CSS pattern for a bar pattern type.
  */
 function getBarPattern(pattern?: BarPattern): CSSProperties {
@@ -191,8 +209,13 @@ const ICON_MAP: Record<BarIcon, React.ComponentType<{ className?: string }>> = {
   mail: RiMailLine,
   arrow: RiArrowRightLine,
   checkbox: RiCheckboxCircleFill,
+  'close-circle': RiCloseCircleFill,
+  'stop-circle': RiStopCircleFill,
   none: () => null,
 };
+
+/** Icons that should derive their color from run status */
+const STATUS_ICONS = new Set<BarIcon>(['checkbox', 'close-circle', 'stop-circle']);
 
 // ============================================================================
 // Sub-components
@@ -201,35 +224,107 @@ const ICON_MAP: Record<BarIcon, React.ComponentType<{ className?: string }>> = {
 /**
  * Renders the icon for a bar based on style or explicit prop.
  */
-function BarIconComponent({ icon, className }: { icon?: BarIcon; className?: string }) {
+function BarIconComponent({
+  icon,
+  className,
+  status,
+}: {
+  icon?: BarIcon;
+  className?: string;
+  status?: string;
+}) {
   if (!icon || icon === 'none') return null;
   const IconComponent = ICON_MAP[icon];
-  // Checkbox icon is green to match the root run bar
-  const iconColor = icon === 'checkbox' ? 'text-primary-moderate' : className;
+  // Status icons (checkbox, close-circle, stop-circle) derive color from run status
+  const statusColor = STATUS_ICONS.has(icon) && status ? getStatusTextClass(status) : undefined;
   return IconComponent ? (
-    <IconComponent className={cn('h-3.5 w-3.5 shrink-0', iconColor)} data-testid="bar-icon" />
+    <IconComponent
+      className={cn('h-3.5 w-3.5 shrink-0', className, statusColor)}
+      data-testid="bar-icon"
+    />
   ) : null;
 }
 
 /**
  * Renders the expand/collapse toggle button as a solid triangle.
  */
-function ExpandToggle({ expanded, onToggle }: { expanded: boolean; onToggle?: () => void }) {
+function ExpandToggle({ expanded, onCollapse }: { expanded: boolean; onCollapse?: () => void }) {
   return (
-    <button
-      type="button"
+    <div
+      role={expanded ? 'button' : undefined}
       aria-label={expanded ? 'Collapse' : 'Expand'}
-      className="flex cursor-pointer items-center justify-center border-none bg-transparent p-0"
-      onClick={(e) => {
-        e.stopPropagation();
-        onToggle?.();
-      }}
+      className={cn('flex items-center justify-center p-0', expanded && 'cursor-pointer')}
+      onClick={
+        expanded
+          ? (e) => {
+              e.stopPropagation();
+              onCollapse?.();
+            }
+          : undefined
+      }
     >
       <RiArrowRightSFill
         className={cn('h-4 w-4 transition-transform', expanded && 'rotate-90')}
         style={{ transitionDuration: `${TIMELINE_CONSTANTS.TRANSITION_MS}ms` }}
       />
-    </button>
+    </div>
+  );
+}
+
+/**
+ * Tooltip content for a timeline bar, showing duration/delay and start/end timestamps.
+ */
+function BarTooltipContent({
+  name,
+  startTime,
+  endTime,
+  minTime,
+}: {
+  name: string;
+  startTime: Date;
+  endTime: Date | null;
+  minTime: Date;
+}) {
+  const startTimestamp = format(startTime, 'yyyy-MM-dd HH:mm:ss.SSS');
+  const endTimestamp = endTime ? format(endTime, 'yyyy-MM-dd HH:mm:ss.SSS') : null;
+
+  const durationMs = endTime ? endTime.getTime() - startTime.getTime() : 0;
+  const delayMs = startTime.getTime() - minTime.getTime();
+
+  return (
+    <div className="whitespace-nowrap px-1 py-0.5 text-xs">
+      <p className="text-basis mb-1.5 font-medium">{name}</p>
+      {/* Duration and delay */}
+      <div className="border-subtle mb-1.5 flex justify-between gap-6 border-b pb-1.5">
+        <div className="flex flex-col items-start">
+          <span className="text-light font-medium">Duration</span>
+          <span className="text-basis tabular-nums">
+            {durationMs > 0 ? `${durationMs.toLocaleString()}ms` : '-'}
+          </span>
+        </div>
+        <div className="flex flex-col items-end">
+          <span className="text-light font-medium">Delay</span>
+          <span className="text-basis tabular-nums">
+            {delayMs > 0 ? `${delayMs.toLocaleString()}ms` : '-'}
+          </span>
+        </div>
+      </div>
+      {/* Start and end timestamps */}
+      <div className="flex justify-between gap-6">
+        <div className="flex flex-col items-start">
+          <span className="text-light font-medium">Start</span>
+          <span className="text-basis tabular-nums">{startTimestamp}</span>
+        </div>
+        <div className="flex flex-col items-end">
+          <span className="text-light font-medium">End</span>
+          {endTimestamp !== null ? (
+            <span className="text-basis tabular-nums">{endTimestamp}</span>
+          ) : (
+            <span className="text-light italic">In progress</span>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -394,9 +489,12 @@ export function TimelineBar({
   status,
   viewStartOffset = 0,
   viewEndOffset = 100,
+  startTime,
+  endTime,
+  minTime,
 }: TimelineBarProps): JSX.Element {
   const barStyle = getBarStyle(style);
-  const effectiveIcon = icon ?? barStyle.icon;
+  const effectiveIcon = icon ?? barStyle.icon ?? getRootIcon(style, status);
 
   // Format the display name based on style
   let displayName = name;
@@ -406,7 +504,7 @@ export function TimelineBar({
 
   // For SERVER timing, show org name or fallback
   if (style === 'timing.server') {
-    displayName = orgName ? orgName.toUpperCase() : 'YOUR SERVER';
+    displayName = orgName ? `${orgName.toUpperCase()} SERVER` : 'YOUR SERVER';
   }
 
   // Calculate indentation (base padding + depth-based indent)
@@ -419,22 +517,33 @@ export function TimelineBar({
     [startPercent, widthPercent, viewStartOffset, viewEndOffset]
   );
 
+  // Tooltip state — controlled so hover target (full right panel) is separate from anchor (bar position)
+  const showTooltip = !!(startTime && minTime);
+  const [tooltipOpen, setTooltipOpen] = useState(false);
+
   return (
     <div data-testid="timeline-bar-container" className="relative">
       {/* Main row */}
       <div
         data-testid="timeline-bar-row"
         className="relative isolate flex h-7 cursor-pointer items-center"
-        onClick={onClick}
+        onClick={() => {
+          onClick?.();
+          if (expandable && !expanded) {
+            onToggle?.();
+          }
+        }}
         style={{ height: `${TIMELINE_CONSTANTS.ROW_HEIGHT_PX}px` }}
       >
-        {/* Selection highlight - inset to clear the vertical guide line */}
-        {selected && (
+        {/* Selection / hover highlight - extends from indent to full width */}
+        {(selected || tooltipOpen) && (
           <div
-            className="bg-canvasSubtle pointer-events-none absolute inset-y-0 -z-10 rounded-sm"
+            className={cn(
+              'pointer-events-none absolute inset-y-0 right-0 -z-10',
+              selected ? 'bg-secondary-3xSubtle' : 'bg-canvasSubtle'
+            )}
             style={{
               left: `${indentPx - 4}px`,
-              width: `calc(${leftWidth}% - ${indentPx - 4}px)`,
             }}
           />
         )}
@@ -448,10 +557,10 @@ export function TimelineBar({
           }}
         >
           {/* Expand toggle */}
-          {expandable && <ExpandToggle expanded={expanded ?? false} onToggle={onToggle} />}
+          {expandable && <ExpandToggle expanded={expanded ?? false} onCollapse={onToggle} />}
 
           {/* Icon */}
-          <BarIconComponent icon={effectiveIcon} className="text-subtle" />
+          <BarIconComponent icon={effectiveIcon} className="text-subtle ml-px" status={status} />
 
           {/* Name */}
           <span
@@ -459,54 +568,77 @@ export function TimelineBar({
               'text-basis min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-sm font-normal leading-tight',
               !expandable && !effectiveIcon && 'pl-1.5'
             )}
-            onClick={
-              expandable && !expanded
-                ? (e) => {
-                    e.stopPropagation();
-                    onToggle?.();
-                  }
-                : undefined
-            }
           >
             {displayName}
           </span>
 
           {/* Duration */}
-          <span className="text-muted shrink-0 text-xs tabular-nums">
+          <span className="text-basis shrink-0 text-xs font-medium tabular-nums">
             {formatDuration(duration)}
           </span>
         </div>
 
-        {/* Right panel - visual bar */}
+        {/* Right panel - visual bar with optional hover tooltip */}
         <div
           data-testid="timeline-bar-right"
           className="relative h-full flex-1"
           style={{ width: `${100 - leftWidth}%` }}
+          onMouseEnter={showTooltip ? () => setTooltipOpen(true) : undefined}
+          onMouseLeave={showTooltip ? () => setTooltipOpen(false) : undefined}
         >
           {/* Center line */}
           <div className="bg-canvasMuted absolute left-0 right-0 top-1/2 h-px -translate-y-1/2" />
           {/* Bar container - centered vertically */}
           <div className="absolute inset-y-0 flex w-full items-center">
             {transformed && (
-              <VisualBar
-                startPercent={transformed.startPercent}
-                widthPercent={transformed.widthPercent}
-                style={style}
-                segments={segments}
-                expanded={!!(expandable && expanded)}
-                originalBarStart={startPercent}
-                originalBarWidth={widthPercent}
-                viewStartOffset={viewStartOffset}
-                viewEndOffset={viewEndOffset}
-                status={status}
-              />
+              <>
+                <VisualBar
+                  startPercent={transformed.startPercent}
+                  widthPercent={transformed.widthPercent}
+                  style={style}
+                  segments={segments}
+                  expanded={!!(expandable && expanded)}
+                  originalBarStart={startPercent}
+                  originalBarWidth={widthPercent}
+                  viewStartOffset={viewStartOffset}
+                  viewEndOffset={viewEndOffset}
+                  status={status}
+                />
+                {showTooltip && (
+                  <Tooltip open={tooltipOpen}>
+                    <TooltipTrigger asChild>
+                      <div
+                        className="pointer-events-none absolute inset-y-0"
+                        style={{
+                          left: `${transformed.startPercent}%`,
+                          width: `${transformed.widthPercent}%`,
+                          minWidth: '4px',
+                        }}
+                      />
+                    </TooltipTrigger>
+                    <TooltipContent
+                      side="top"
+                      hasArrow={false}
+                      className="bg-canvasBase text-basis border-muted max-w-none border shadow-lg"
+                    >
+                      <BarTooltipContent
+                        name={displayName}
+                        startTime={startTime!}
+                        endTime={endTime ?? null}
+                        minTime={minTime!}
+                      />
+                      <TooltipArrow className="fill-canvasBase" />
+                    </TooltipContent>
+                  </Tooltip>
+                )}
+              </>
             )}
           </div>
         </div>
       </div>
 
       {/* Vertical guide line from arrow to bottom of expanded area */}
-      {expandable && expanded && (
+      {expanded && (
         <div
           className="bg-canvasMuted absolute w-px"
           style={{
@@ -518,7 +650,7 @@ export function TimelineBar({
       )}
 
       {/* Children (expanded content) */}
-      {expandable && expanded && children}
+      {expanded && children}
     </div>
   );
 }
