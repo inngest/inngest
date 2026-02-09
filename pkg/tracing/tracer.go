@@ -299,8 +299,10 @@ func (tp *otelTracerProvider) UpdateSpan(
 
 	attrs := meta.NewAttrSet(
 		meta.Attr(meta.Attrs.DynamicSpanID, &opts.TargetSpan.DynamicSpanID),
-		meta.Attr(meta.Attrs.DynamicStatus, &opts.Status),
 	)
+	if opts.Status != enums.StepStatusUnknown {
+		meta.AddAttr(attrs, meta.Attrs.DynamicStatus, &opts.Status)
+	}
 
 	if opts.TargetSpan.DynamicSpanTraceParent != "" {
 		splitTp := strings.Split(opts.TargetSpan.DynamicSpanTraceParent, "-")
