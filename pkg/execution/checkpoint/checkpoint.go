@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/backoff"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution"
@@ -56,11 +57,17 @@ type Opts struct {
 	Queue queue.Queue
 	// MetricsProvider reports usage metrics.
 	MetricsProvider MetricsProvider
+	// BackoffFunc computes the retry time for a given attempt number.
+	// If nil, defaults to backoff.DefaultBackoff.
+	BackoffFunc backoff.BackoffFunc
 }
 
 func New(o Opts) Checkpointer {
 	if o.MetricsProvider == nil {
 		o.MetricsProvider = nilCheckpointMetrics{}
+	}
+	if o.BackoffFunc == nil {
+		o.BackoffFunc = backoff.GetLinearBackoffFunc(5 * time.Second)
 	}
 
 	return checkpointer{o}
@@ -110,6 +117,22 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 	complete := slices.ContainsFunc(input.Steps, func(s state.GeneratorOpcode) bool {
 		return s.Op == enums.OpcodeRunComplete
 	})
+
+	// When we have >1 steps (parallel mode), we need to set ForceStepPlan to disable
+	// immediate execution in the SDK. This ensures that parallel steps are properly
+	// planned rather than executed immediately.
+	if len(input.Steps) > 1 && !input.Metadata.Config.ForceStepPlan {
+		if err := c.State.UpdateMetadata(ctx, input.Metadata.ID, state.MutableConfig{
+			ForceStepPlan:  true,
+			RequestVersion: input.Metadata.Config.RequestVersion,
+			StartedAt:      input.Metadata.Config.StartedAt,
+			HasAI:          input.Metadata.Config.HasAI,
+		}); err != nil {
+			return fmt.Errorf("updating metadata to force step plan: %w", err)
+		}
+		// Update the local metadata so subsequent operations see the change
+		input.Metadata.Config.ForceStepPlan = true
+	}
 
 	// Depending on the type of steps, we may end up switching the run from sync to async.  For example,
 	// if the opcodes are sleeps, waitForEvents, inferences, etc. we will be resuming the API endpoint
@@ -181,7 +204,7 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 			// step errors and continues
 			status := enums.StepStatusErrored
 			max := fn.MaxAttempts()
-			_, err = c.TracerProvider.CreateSpan(
+			stepSpanRef, err := c.TracerProvider.CreateSpan(
 				tracing.WithExecutionContext(ctx, tracing.ExecutionContext{
 					Identifier:  input.Metadata.ID,
 					Attempt:     runCtx.AttemptCount(),
@@ -201,11 +224,46 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 				l.Error("error saving span for checkpoint step error op", "error", err)
 			}
 
-			err := c.Executor.HandleGenerator(ctx, runCtx, op)
+			// Create an execution span for the initial sync attempt (attempt 0) as a child
+			// of the step span. In async execution, the executor creates this in ExecutePre,
+			// but for the initial sync attempt we need to create it here.
+			if stepSpanRef != nil {
+				execStatus := enums.StepStatusFailed
+				_, _ = c.TracerProvider.CreateSpan(
+					tracing.WithExecutionContext(ctx, tracing.ExecutionContext{
+						Identifier:  input.Metadata.ID,
+						Attempt:     runCtx.AttemptCount(),
+						MaxAttempts: &max,
+					}),
+					meta.SpanNameExecution,
+					&tracing.CreateSpanOptions{
+						Debug:     &tracing.SpanDebugData{Location: "checkpoint.SyncExecErr"},
+						Parent:    stepSpanRef,
+						StartTime: op.Timing.Start(),
+						EndTime:   op.Timing.End(),
+						Attributes: meta.NewAttrSet(
+							meta.Attr(meta.Attrs.DynamicStatus, &execStatus),
+						).Merge(tracing.GeneratorAttrs(&op)),
+					},
+				)
+			}
+
+			err = c.Executor.HandleGenerator(ctx, runCtx, op)
 			if errors.Is(err, executor.ErrHandledStepError) {
 				// In the executor, returning an error bubbles up to the queue to requeue.
 				jobID := fmt.Sprintf("%s-%s-sync-retry", runCtx.Metadata().IdempotencyKey(), op.ID)
-				now := time.Now()
+				retryAt := c.BackoffFunc(1)
+
+				// Inject the step span reference into the retry queue item metadata
+				// so that execution spans created during retries are properly parented
+				// under the step span (instead of being orphaned with parent=0000).
+				retryMetadata := make(map[string]any)
+				if stepSpanRef != nil {
+					if byt, merr := json.Marshal(stepSpanRef); merr == nil {
+						retryMetadata[meta.PropagationKey] = string(byt)
+					}
+				}
+
 				nextItem := queue.Item{
 					JobID:                 &jobID,
 					WorkspaceID:           runCtx.Metadata().ID.Tenant.EnvID,
@@ -216,12 +274,12 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 					Attempt:               1, // This is now the next attempt.
 					MaxAttempts:           runCtx.MaxAttempts(),
 					Payload:               queue.PayloadEdge{Edge: inngest.SourceEdge}, // doesn't matter for sync functions.
-					Metadata:              make(map[string]any),
+					Metadata:              retryMetadata,
 					ParallelMode:          enums.ParallelModeWait,
 				}
 
 				// Continue checking this particular error.
-				if err = c.Queue.Enqueue(ctx, nextItem, now, queue.EnqueueOpts{}); err != nil {
+				if err = c.Queue.Enqueue(ctx, nextItem, retryAt, queue.EnqueueOpts{}); err != nil {
 					l.Error("error enqueueing step error in checkpoint", "error", err, "opcode", op.Op)
 				}
 			}

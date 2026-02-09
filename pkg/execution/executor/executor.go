@@ -941,7 +941,7 @@ func (e *executor) schedule(
 	// function run spanID
 	spanID := run.NewSpanID(ctx)
 
-	config := *sv2.InitConfig(&sv2.Config{
+	cfg := sv2.Config{
 		FunctionVersion: req.Function.FunctionVersion,
 		SpanID:          spanID.String(),
 		EventIDs:        eventIDs,
@@ -951,7 +951,13 @@ func (e *executor) schedule(
 		PriorityFactor:  &factor,
 		BatchID:         req.BatchID,
 		Context:         req.Context,
-	})
+		RequestVersion:  consts.RequestVersionUnknown,
+	}
+	if req.RequestVersion != nil {
+		cfg.RequestVersion = *req.RequestVersion
+	}
+
+	config := *sv2.InitConfig(&cfg)
 
 	// If we have a specifc URL to hit for this run, add it to context.
 	if req.URL != "" {
@@ -1197,6 +1203,10 @@ func (e *executor) schedule(
 	status := enums.StepStatusQueued
 	if skipReason != enums.SkipReasonNone {
 		status = enums.StepStatusSkipped
+	} else if req.RunMode == enums.RunModeSync {
+		// Sync runs are already executing by the time Schedule is called, so
+		// mark as Running instead of Queued.
+		status = enums.StepStatusRunning
 	}
 
 	// Always add either queued or skipped as a status.
@@ -2040,13 +2050,19 @@ func (e *executor) executeDriverV2(ctx context.Context, run *runInstance, d driv
 		}
 	}
 
+	// Use IncomingGeneratorStep if set, otherwise fall back to Incoming
+	stepID := run.edge.IncomingGeneratorStep
+	if stepID == "" {
+		stepID = run.edge.Incoming
+	}
+
 	resp, uerr, ierr := d.Do(ctx, e.smv2, driver.V2RequestOpts{
 		Metadata:   *run.Metadata(),
 		Fn:         run.f,
 		SigningKey: sk,
 		Attempt:    run.AttemptCount(),
 		Index:      run.stackIndex,
-		StepID:     &run.edge.Outgoing,
+		StepID:     &stepID,
 		QueueRef:   queueref.StringFromCtx(ctx),
 		URL:        url,
 	})

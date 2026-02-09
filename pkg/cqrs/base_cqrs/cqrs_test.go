@@ -2,6 +2,7 @@ package base_cqrs
 
 import (
 	"context"
+	"crypto/rand"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -12,6 +13,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/cqrs"
 	sqlc_psql "github.com/inngest/inngest/pkg/cqrs/base_cqrs/sqlc/postgres"
+	sqlc_sqlite "github.com/inngest/inngest/pkg/cqrs/base_cqrs/sqlc/sqlite"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/tests/testutil"
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/assert"
@@ -1530,9 +1533,213 @@ func TestCQRSGetTraceRunsByTriggerID(t *testing.T) {
 	})
 }
 
+func TestCQRSGetTraceRunsPagination(t *testing.T) {
+	// This test verifies that cursor-based pagination works correctly for the GetSpanRuns
+	ctx := context.Background()
+	appID := uuid.New()
+
+	cm, cleanup := initCQRS(t, withInitCQRSOptApp(appID))
+	defer cleanup()
+
+	accountID := uuid.New()
+	workspaceID := uuid.New()
+	functionID := uuid.New()
+
+	// Create 3 spans with "executor.run" name (required for GetSpanRuns) with distinct start_time
+	baseTime := time.Now().Truncate(time.Second)
+	runIDs := make([]string, 3)
+	for i := 0; i < 3; i++ {
+		runID := ulid.MustNew(ulid.Now(), rand.Reader).String()
+		runIDs[i] = runID
+
+		insertTestSpan(t, cm, testSpanFields{
+			RunID:         runID,
+			DynamicSpanID: fmt.Sprintf("dyn-%d", i),
+			Name:          "executor.run",
+			StartTime:     baseTime.Add(time.Duration(i) * time.Second),
+			AccountID:     accountID.String(),
+			AppID:         appID.String(),
+			FunctionID:    functionID.String(),
+			EnvID:         workspaceID.String(),
+		})
+	}
+
+	t.Run("preview path paginate with cursor", func(t *testing.T) {
+		// Fetch a page of 1 item at a time. We'll use cursor to get 3 pages
+		getPage := func(cursor string) ([]*cqrs.TraceRun, error) {
+			return cm.GetTraceRuns(ctx, cqrs.GetTraceRunOpt{
+				Filter: cqrs.GetTraceRunFilter{
+					AccountID:   accountID,
+					WorkspaceID: workspaceID,
+					FunctionID:  []uuid.UUID{functionID},
+					TimeField:   enums.TraceRunTimeStartedAt,
+					From:        baseTime.Add(-time.Hour),
+					Until:       baseTime.Add(time.Hour),
+				},
+				Order: []cqrs.GetTraceRunOrder{
+					{Field: enums.TraceRunTimeStartedAt, Direction: enums.TraceRunOrderDesc},
+				},
+				Cursor:  cursor,
+				Items:   1,
+				Preview: true,
+			})
+		}
+
+		// Fetch first page (no cursor, 1 item, ordered by started_at desc)
+		firstPage, err := getPage("")
+		require.NoError(t, err)
+		require.Len(t, firstPage, 1, "First page should have 1 item")
+		require.NotEmpty(t, firstPage[0].Cursor, "First page result should have a cursor")
+		firstRunID := firstPage[0].RunID
+
+		// Fetch second page using the cursor from first page
+		secondPage, err := getPage(firstPage[0].Cursor)
+		require.NoError(t, err)
+		require.Len(t, secondPage, 1, "Second page should have 1 item")
+		secondRunID := secondPage[0].RunID
+		assert.NotEqual(t, firstRunID, secondRunID, "Second page should return a different run than first page")
+
+		// Fetch third page
+		thirdPage, err := getPage(secondPage[0].Cursor)
+		require.NoError(t, err)
+		require.Len(t, thirdPage, 1, "Third page should have 1 item")
+		thirdRunID := thirdPage[0].RunID
+		assert.NotEqual(t, firstRunID, thirdRunID, "Third page should return a different run than first page")
+		assert.NotEqual(t, secondRunID, thirdRunID, "Third page should return a different run than second page")
+
+		// Verify we got all 3 runs
+		returnedRunIDs := []string{firstRunID, secondRunID, thirdRunID}
+		for _, id := range runIDs {
+			assert.Contains(t, returnedRunIDs, id, "All created runs should be returned through pagination")
+		}
+	})
+}
+
+//
+// Span Tests
+//
+
+func TestCQRSGetSpan(t *testing.T) {
+	// These tests insert a root and child span with different dynamic_span_ids.
+	// Each test tests a different query that GROUPs BY dynamic_span_id
+
+	t.Run("by run ID", func(t *testing.T) {
+		cm, cleanup := initCQRS(t)
+		defer cleanup()
+
+		runID := ulid.MustNew(ulid.Now(), rand.Reader).String()
+
+		insertTestSpan(t, cm, testSpanFields{RunID: runID, DynamicSpanID: "dyn-root"})
+		insertTestSpan(t, cm, testSpanFields{RunID: runID, DynamicSpanID: "dyn-child", ParentSpanID: "dyn-root"})
+
+		result, err := cm.GetSpansByRunID(t.Context(), ulid.MustParse(runID))
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.Equal(t, "dyn-root", result.SpanID)
+		assert.Len(t, result.Children, 1, "Root should have 1 child")
+	})
+
+	t.Run("by debug run ID", func(t *testing.T) {
+		cm, cleanup := initCQRS(t)
+		defer cleanup()
+
+		runID := ulid.MustNew(ulid.Now(), rand.Reader).String()
+		debugRunID := ulid.MustNew(ulid.Now(), rand.Reader)
+
+		insertTestSpan(t, cm, testSpanFields{RunID: runID, DynamicSpanID: "dyn-root", DebugRunID: debugRunID.String()})
+		insertTestSpan(t, cm, testSpanFields{RunID: runID, DynamicSpanID: "dyn-child", ParentSpanID: "dyn-root", DebugRunID: debugRunID.String()})
+
+		result, err := cm.GetSpansByDebugRunID(t.Context(), debugRunID)
+		require.NoError(t, err)
+		require.Len(t, result, 1, "Should return 1 root span for the single run")
+		assert.Len(t, result[0].Children, 1, "Root should have 1 child")
+	})
+
+	t.Run("by debug session ID", func(t *testing.T) {
+		cm, cleanup := initCQRS(t)
+		defer cleanup()
+
+		runID := ulid.MustNew(ulid.Now(), rand.Reader).String()
+		debugRunID := ulid.MustNew(ulid.Now(), rand.Reader).String()
+		debugSessionID := ulid.MustNew(ulid.Now(), rand.Reader)
+
+		insertTestSpan(t, cm, testSpanFields{RunID: runID, DynamicSpanID: "dyn-root", DebugRunID: debugRunID, DebugSessionID: debugSessionID.String()})
+		insertTestSpan(t, cm, testSpanFields{RunID: runID, DynamicSpanID: "dyn-child", ParentSpanID: "dyn-root", DebugRunID: debugRunID, DebugSessionID: debugSessionID.String()})
+
+		result, err := cm.GetSpansByDebugSessionID(t.Context(), debugSessionID)
+		require.NoError(t, err)
+		require.Len(t, result, 1, "Should return 1 debug run group")
+		require.Len(t, result[0], 1, "Debug run group should have 1 root span")
+		assert.Len(t, result[0][0].Children, 1, "Root should have 1 child")
+	})
+}
+
 //
 // Helpers
 //
+
+type testSpanFields struct {
+	RunID          string    // required
+	DynamicSpanID  string    // required for GROUP BY tests
+	ParentSpanID   string    // for child spans (references parent's DynamicSpanID)
+	DebugRunID     string    // for debug run tests
+	DebugSessionID string    // for debug session tests
+	Name           string    // default: "test-span"
+	StartTime      time.Time // default: time.Now()
+	AccountID      string    // default: "acct"
+	AppID          string    // default: "app"
+	FunctionID     string    // default: "fn"
+	EnvID          string    // default: "env"
+}
+
+// There aren't any functions exposed on cqrs.Manager that write to the new spans table
+// so use this test helper for now.
+func insertTestSpan(t *testing.T, cm cqrs.Manager, spanFields testSpanFields) {
+	t.Helper()
+
+	spanID := ulid.MustNew(ulid.Now(), rand.Reader).String()
+	traceID := ulid.MustNew(ulid.Now(), rand.Reader).String()
+
+	// Apply defaults
+	if spanFields.Name == "" {
+		spanFields.Name = "test-span"
+	}
+	if spanFields.StartTime.IsZero() {
+		spanFields.StartTime = time.Now()
+	}
+	if spanFields.AccountID == "" {
+		spanFields.AccountID = "acct"
+	}
+	if spanFields.AppID == "" {
+		spanFields.AppID = "app"
+	}
+	if spanFields.FunctionID == "" {
+		spanFields.FunctionID = "fn"
+	}
+	if spanFields.EnvID == "" {
+		spanFields.EnvID = "env"
+	}
+
+	// TODO: ideally we should not have to do this type assertion to wrapper to write a span
+	q := cm.(wrapper).q
+	err := q.InsertSpan(t.Context(), sqlc_sqlite.InsertSpanParams{
+		SpanID:         spanID,
+		TraceID:        traceID,
+		ParentSpanID:   sql.NullString{String: spanFields.ParentSpanID, Valid: spanFields.ParentSpanID != ""},
+		Name:           spanFields.Name,
+		StartTime:      spanFields.StartTime,
+		EndTime:        spanFields.StartTime.Add(100 * time.Millisecond),
+		RunID:          spanFields.RunID,
+		AccountID:      spanFields.AccountID,
+		AppID:          spanFields.AppID,
+		FunctionID:     spanFields.FunctionID,
+		EnvID:          spanFields.EnvID,
+		DynamicSpanID:  sql.NullString{String: spanFields.DynamicSpanID, Valid: spanFields.DynamicSpanID != ""},
+		DebugRunID:     sql.NullString{String: spanFields.DebugRunID, Valid: spanFields.DebugRunID != ""},
+		DebugSessionID: sql.NullString{String: spanFields.DebugSessionID, Valid: spanFields.DebugSessionID != ""},
+	})
+	require.NoError(t, err)
+}
 
 type withInitCQRSOpt func(*initCQRSOpt)
 

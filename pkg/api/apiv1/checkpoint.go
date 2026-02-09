@@ -11,6 +11,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/api/apiv1/apiv1auth"
+	"github.com/inngest/inngest/pkg/backoff"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/enums"
@@ -72,6 +73,8 @@ type CheckpointAPIOpts struct {
 	// RunJWTSecret is the secret for signing run claim JWTs, allowing sync APIs
 	// to redirect to an API endpoint that fetches outputs for a specific run.
 	RunJWTSecret []byte
+	// BackoffFunc computes retry timing. If nil, uses the default backoff table.
+	BackoffFunc backoff.BackoffFunc
 }
 
 // checkpointAPI is the base implementation.
@@ -99,6 +102,7 @@ func NewCheckpointAPI(o Opts) CheckpointAPI {
 		TracerProvider:  o.TracerProvider,
 		Queue:           o.Queue,
 		MetricsProvider: o.CheckpointOpts.CheckpointMetrics,
+		BackoffFunc:     o.CheckpointOpts.BackoffFunc,
 	})
 
 	api := checkpointAPI{
@@ -177,9 +181,10 @@ func (a checkpointAPI) CheckpointNewRun(w http.ResponseWriter, r *http.Request) 
 		AccountID:   auth.AccountID(),
 		WorkspaceID: auth.WorkspaceID(),
 		AppID:       input.AppID(auth.WorkspaceID()),
-		RunMode:     enums.RunModeSync,
-		Events:      []event.TrackedEvent{evt},
-		URL:         input.URL(),
+		RunMode:        enums.RunModeSync,
+		Events:         []event.TrackedEvent{evt},
+		URL:            input.URL(),
+		RequestVersion: input.RequestVersion,
 	})
 
 	metrics.IncrExecutorScheduleCount(ctx, metrics.CounterOpt{

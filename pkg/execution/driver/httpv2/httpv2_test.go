@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -12,6 +13,8 @@ import (
 	"testing"
 	"time"
 
+	apiv1 "github.com/inngest/inngest/pkg/api/apiv1"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/exechttp"
@@ -19,6 +22,7 @@ import (
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/inngest"
+	inngestgo "github.com/inngest/inngestgo"
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/require"
 )
@@ -147,6 +151,56 @@ func TestSyncHeaders(t *testing.T) {
 	require.Contains(t, receivedHeaders.Get("X-Inngest-Signature"), "t=")
 	require.Contains(t, receivedHeaders.Get("X-Inngest-Signature"), "s=")
 	require.Equal(t, runID.String(), receivedHeaders.Get("X-Run-ID"))
+	// ForceStepPlan not set, so header should be absent
+	require.Empty(t, receivedHeaders.Get(headers.HeaderKeyForceStepPlan))
+}
+
+func TestSyncHeadersWithForceStepPlan(t *testing.T) {
+	var receivedHeaders http.Header
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		receivedHeaders = r.Header
+		w.Header().Set(headers.HeaderKeySDK, "test-sdk")
+		opcodes := []*sv1.GeneratorOpcode{{Op: enums.OpcodeNone}}
+		w.WriteHeader(200)
+		_ = json.NewEncoder(w).Encode(opcodes)
+	}))
+	defer ts.Close()
+
+	client := exechttp.Client(exechttp.SecureDialerOpts{AllowPrivate: true})
+	d := &httpv2{Client: client}
+
+	u, _ := url.Parse(ts.URL)
+	runID := ulid.MustNew(ulid.Now(), rand.Reader)
+	fn := inngest.Function{
+		Driver: inngest.FunctionDriver{
+			URI: u.String(),
+			Metadata: map[string]any{
+				"type": "sync",
+			},
+		},
+	}
+
+	opts := driver.V2RequestOpts{
+		Fn:         fn,
+		SigningKey: []byte("test-signing-key"),
+		Metadata: sv2.Metadata{
+			ID: sv2.ID{
+				RunID: runID,
+			},
+			Config: sv2.Config{
+				ForceStepPlan: true,
+			},
+		},
+		URL: u.String(),
+	}
+
+	resp, userErr, internalErr := d.Do(context.Background(), nil, opts)
+	require.NoError(t, userErr)
+	require.NoError(t, internalErr)
+	require.NotNil(t, resp)
+
+	// ForceStepPlan is set, so header should be present
+	require.Equal(t, "true", receivedHeaders.Get(headers.HeaderKeyForceStepPlan))
 }
 
 func TestSyncNonSDKResponse(t *testing.T) {
@@ -506,4 +560,226 @@ func TestSyncDriverTypeDetection(t *testing.T) {
 			}
 		})
 	}
+}
+
+// mockStateLoader implements sv2.StateLoader for testing.
+type mockStateLoader struct {
+	events []json.RawMessage
+	err    error
+}
+
+func (m *mockStateLoader) LoadMetadata(ctx context.Context, id sv2.ID) (sv2.Metadata, error) {
+	return sv2.Metadata{}, nil
+}
+func (m *mockStateLoader) LoadEvents(ctx context.Context, id sv2.ID) ([]json.RawMessage, error) {
+	return m.events, m.err
+}
+func (m *mockStateLoader) LoadSteps(ctx context.Context, id sv2.ID) (map[string]json.RawMessage, error) {
+	return nil, nil
+}
+func (m *mockStateLoader) LoadStepInputs(ctx context.Context, id sv2.ID) (map[string]json.RawMessage, error) {
+	return nil, nil
+}
+func (m *mockStateLoader) LoadStepsWithIDs(ctx context.Context, id sv2.ID, stepIDs []string) (map[string]json.RawMessage, error) {
+	return nil, nil
+}
+func (m *mockStateLoader) LoadStack(ctx context.Context, id sv2.ID) ([]string, error) {
+	return nil, nil
+}
+func (m *mockStateLoader) LoadState(ctx context.Context, id sv2.ID) (sv2.State, error) {
+	return sv2.State{}, nil
+}
+
+func newHTTPRequestEvent(body []byte, contentType, queryParams string) json.RawMessage {
+	evt := inngestgo.GenericEvent[apiv1.NewAPIRunData]{
+		Name: consts.HttpRequestName,
+		Data: apiv1.NewAPIRunData{
+			Body:        body,
+			ContentType: contentType,
+			QueryParams: queryParams,
+		},
+	}
+	byt, _ := json.Marshal(evt)
+	return byt
+}
+
+func TestSyncHTTPRequestEvent(t *testing.T) {
+	tests := []struct {
+		name                string
+		stateLoader         sv2.StateLoader
+		urlSuffix           string
+		expectedBody        string
+		expectedContentType string
+		expectedQuery       string
+	}{
+		{
+			name:                "nil state loader uses defaults",
+			stateLoader:         nil,
+			expectedBody:        "",
+			expectedContentType: "application/json",
+			expectedQuery:       "",
+		},
+		{
+			name: "non-http event uses defaults",
+			stateLoader: &mockStateLoader{
+				events: []json.RawMessage{
+					json.RawMessage(`{"name":"user/signup","data":{}}`),
+				},
+			},
+			expectedBody:        "",
+			expectedContentType: "application/json",
+			expectedQuery:       "",
+		},
+		{
+			name: "http event with body and content type",
+			stateLoader: &mockStateLoader{
+				events: []json.RawMessage{
+					newHTTPRequestEvent([]byte(`{"key":"value"}`), "application/json", ""),
+				},
+			},
+			expectedBody:        `{"key":"value"}`,
+			expectedContentType: "application/json",
+			expectedQuery:       "",
+		},
+		{
+			name: "http event with custom content type",
+			stateLoader: &mockStateLoader{
+				events: []json.RawMessage{
+					newHTTPRequestEvent([]byte(`name=test`), "application/x-www-form-urlencoded", ""),
+				},
+			},
+			expectedBody:        `name=test`,
+			expectedContentType: "application/x-www-form-urlencoded",
+			expectedQuery:       "",
+		},
+		{
+			name: "http event with query params",
+			stateLoader: &mockStateLoader{
+				events: []json.RawMessage{
+					newHTTPRequestEvent(nil, "", "foo=bar&baz=1"),
+				},
+			},
+			expectedBody:        "",
+			expectedContentType: "application/json",
+			expectedQuery:       "foo=bar&baz=1",
+		},
+		{
+			name: "http event with query params appended to existing",
+			stateLoader: &mockStateLoader{
+				events: []json.RawMessage{
+					newHTTPRequestEvent(nil, "", "extra=yes"),
+				},
+			},
+			urlSuffix:           "?existing=1",
+			expectedBody:        "",
+			expectedContentType: "application/json",
+			expectedQuery:       "existing=1&extra=yes",
+		},
+		{
+			name: "state loader error uses defaults",
+			stateLoader: &mockStateLoader{
+				err: fmt.Errorf("state load error"),
+			},
+			expectedBody:        "",
+			expectedContentType: "application/json",
+			expectedQuery:       "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var (
+				receivedBody        string
+				receivedContentType string
+				receivedQuery       string
+			)
+			ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				bodyBytes, _ := io.ReadAll(r.Body)
+				receivedBody = string(bodyBytes)
+				receivedContentType = r.Header.Get("Content-Type")
+				receivedQuery = r.URL.RawQuery
+				w.Header().Set(headers.HeaderKeySDK, "test-sdk")
+				opcodes := []*sv1.GeneratorOpcode{{Op: enums.OpcodeNone}}
+				w.WriteHeader(200)
+				_ = json.NewEncoder(w).Encode(opcodes)
+			}))
+			defer ts.Close()
+
+			client := exechttp.Client(exechttp.SecureDialerOpts{AllowPrivate: true})
+			d := &httpv2{Client: client}
+
+			testURL := ts.URL + tt.urlSuffix
+			fn := inngest.Function{
+				Driver: inngest.FunctionDriver{
+					URI: ts.URL,
+					Metadata: map[string]any{
+						"type": "sync",
+					},
+				},
+			}
+
+			opts := driver.V2RequestOpts{
+				Fn:         fn,
+				SigningKey: []byte("test-key"),
+				Metadata: sv2.Metadata{
+					ID: sv2.ID{
+						RunID: ulid.MustNew(ulid.Now(), rand.Reader),
+					},
+				},
+				URL: testURL,
+			}
+
+			resp, userErr, internalErr := d.Do(context.Background(), tt.stateLoader, opts)
+			require.NoError(t, userErr)
+			require.NoError(t, internalErr)
+			require.NotNil(t, resp)
+
+			require.Equal(t, tt.expectedContentType, receivedContentType)
+			require.Equal(t, tt.expectedBody, receivedBody)
+			require.Equal(t, tt.expectedQuery, receivedQuery)
+		})
+	}
+}
+
+func TestLoadHTTPRequestEvent(t *testing.T) {
+	id := sv2.ID{RunID: ulid.MustNew(ulid.Now(), rand.Reader)}
+
+	t.Run("nil state loader", func(t *testing.T) {
+		result := loadHTTPRequestEvent(context.Background(), nil, id)
+		require.Nil(t, result)
+	})
+
+	t.Run("empty events", func(t *testing.T) {
+		sl := &mockStateLoader{events: []json.RawMessage{}}
+		result := loadHTTPRequestEvent(context.Background(), sl, id)
+		require.Nil(t, result)
+	})
+
+	t.Run("invalid json", func(t *testing.T) {
+		sl := &mockStateLoader{events: []json.RawMessage{json.RawMessage(`not json`)}}
+		result := loadHTTPRequestEvent(context.Background(), sl, id)
+		require.Nil(t, result)
+	})
+
+	t.Run("wrong event name", func(t *testing.T) {
+		sl := &mockStateLoader{
+			events: []json.RawMessage{json.RawMessage(`{"name":"other/event","data":{}}`)},
+		}
+		result := loadHTTPRequestEvent(context.Background(), sl, id)
+		require.Nil(t, result)
+	})
+
+	t.Run("valid http request event", func(t *testing.T) {
+		sl := &mockStateLoader{
+			events: []json.RawMessage{
+				newHTTPRequestEvent([]byte(`hello`), "text/plain", "a=1"),
+			},
+		}
+		result := loadHTTPRequestEvent(context.Background(), sl, id)
+		require.NotNil(t, result)
+		require.Equal(t, consts.HttpRequestName, result.Name)
+		require.Equal(t, "text/plain", result.Data.ContentType)
+		require.Equal(t, "a=1", result.Data.QueryParams)
+		require.Equal(t, []byte(`hello`), result.Data.Body)
+	})
 }

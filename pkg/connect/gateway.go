@@ -633,7 +633,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 }
 
 func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, msg *connectpb.ConnectMessage) *connecterrors.SocketError {
-	c.log.Debug("received WebSocket message", "kind", msg.Kind.String())
+	c.log.Trace("received WebSocket message", "kind", msg.Kind.String())
 
 	switch msg.Kind {
 	case connectpb.GatewayMessageType_WORKER_READY:
@@ -795,7 +795,7 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 			if !reply.Success {
 				c.log.Warn("failed to ack, executor was likely done with the request")
 			}
-			c.log.Debug("worker acked message",
+			c.log.Trace("worker acked message",
 				"req_id", data.RequestId,
 				"run_id", data.RunId,
 				"transport", "grpc",
@@ -1013,7 +1013,7 @@ func (c *connectionHandler) receiveRouterMessagesFromGRPC(ctx context.Context, o
 				"transport", "grpc",
 			)
 
-			log.Debug("gateway received grpc message")
+			log.Trace("gateway received grpc message")
 			grpcTags := map[string]any{
 				"transport": "grpc",
 			}
@@ -1040,7 +1040,7 @@ func (c *connectionHandler) receiveRouterMessagesFromGRPC(ctx context.Context, o
 				continue
 			}
 
-			log.Debug("forwarded message to worker")
+			log.Trace("forwarded message to worker")
 		}
 	}
 }
@@ -1297,7 +1297,7 @@ func (c *connectionHandler) handleSdkReply(ctx context.Context, msg *connectpb.C
 		"run_id", data.RunId,
 	)
 
-	l.Debug("saving response and notifying executor")
+	l.Trace("saving response and notifying executor")
 
 	// Persist response in buffer, which is polled by executor.
 	err := c.svc.stateManager.SaveResponse(ctx, c.conn.EnvID, data.RequestId, data)
@@ -1312,12 +1312,9 @@ func (c *connectionHandler) handleSdkReply(ctx context.Context, msg *connectpb.C
 
 		switch {
 		case err == nil:
-			result, err := grpcClient.Reply(ctx, &connectpb.ReplyRequest{Data: data})
-			if err != nil {
+			if _, err := grpcClient.Reply(ctx, &connectpb.ReplyRequest{Data: data}); err != nil {
 				return fmt.Errorf("could not send response through grpc: %w", err)
 			}
-
-			l.Debug("sent response through gRPC", "result", result)
 		case errors.Is(err, state.ErrExecutorNotFound):
 			l.Debug("executor not found in lease, reply was likely picked up by polling")
 		default:
