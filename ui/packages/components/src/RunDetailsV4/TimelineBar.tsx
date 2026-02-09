@@ -588,7 +588,7 @@ export function TimelineBar({
         >
           {/* Center line */}
           <div className="bg-canvasMuted absolute left-0 right-0 top-1/2 h-px -translate-y-1/2" />
-          {/* Bar container - centered vertically */}
+          {/* Bar container, centered vertically */}
           <div className="absolute inset-y-0 flex w-full items-center">
             {transformed && (
               <>
