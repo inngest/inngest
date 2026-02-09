@@ -83,7 +83,6 @@ func GetRoute(ctx context.Context, stateMgr state.StateManager, rnd *util.FrandR
 		}
 		// all workers at capacity
 		if errors.Is(err, ErrAllWorkersAtCapacity) {
-			log.Warn("no worker capacity available")
 			metrics.IncrConnectRouterAllWorkersAtCapacityCounter(ctx, 1, metrics.CounterOpt{
 				PkgName: pkgNameRouter,
 			})
