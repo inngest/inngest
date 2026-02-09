@@ -1203,6 +1203,10 @@ func (e *executor) schedule(
 	status := enums.StepStatusQueued
 	if skipReason != enums.SkipReasonNone {
 		status = enums.StepStatusSkipped
+	} else if req.RunMode == enums.RunModeSync {
+		// Sync runs are already executing by the time Schedule is called, so
+		// mark as Running instead of Queued.
+		status = enums.StepStatusRunning
 	}
 
 	// Always add either queued or skipped as a status.

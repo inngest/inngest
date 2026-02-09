@@ -184,7 +184,29 @@ func (d httpv2) sync(ctx context.Context, sl sv2.StateLoader, opts driver.V2Requ
 	// result in well-formed ops.
 	ops, userErr := parseOpcodes(resp.Body, resp.StatusCode)
 	if userErr != nil {
-		return nil, userErr, nil
+		// Return a DriverResponse with the HTTP response data so the executor
+		// can detect the error. Without this, a nil response gets converted to
+		// an empty DriverResponse{} with StatusCode: 0 and Err: nil, causing
+		// the executor to treat error responses (like function-rejected 400)
+		// as successful completions.
+		r := &state.DriverResponse{
+			StatusCode:     resp.StatusCode,
+			SDK:            resp.Header.Get(headers.HeaderKeySDK),
+			Header:         resp.Header,
+			Duration:       resp.StatResult.Total,
+			RetryAt:        headers.RetryAfter(resp.Header),
+			NoRetry:        headers.NoRetry(resp.Header),
+			RequestVersion: headers.RequestVersion(resp.Header),
+		}
+		if resp.StatusCode < 200 || resp.StatusCode > 299 {
+			str := fmt.Sprintf("invalid status code: %d", resp.StatusCode)
+			r.Err = &str
+		}
+		if r.NoRetry {
+			str := "NonRetriableError"
+			r.Err = &str
+		}
+		return r, userErr, nil
 	}
 
 	r := &state.DriverResponse{

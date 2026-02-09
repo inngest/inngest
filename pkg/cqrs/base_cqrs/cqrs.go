@@ -3026,7 +3026,7 @@ func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*c
 			// Get the latest non-empty status
 			if span.Status != nil && *span.Status != "" {
 				// Convert StepStatus string to RunStatus enum
-				if stepStatus, err := enums.StepStatusString(*span.Status); err == nil {
+				if stepStatus, err := enums.StepStatusString(*span.Status); err == nil && stepStatus != enums.StepStatusUnknown {
 					status = enums.StepStatusToRunStatus(stepStatus)
 				}
 			}

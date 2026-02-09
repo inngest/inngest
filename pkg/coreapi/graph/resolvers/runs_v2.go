@@ -518,6 +518,6 @@ func toRunsQueryOpt(
 		Order:   orderBy,
 		Cursor:  cursor,
 		Items:   uint(items),
-		Preview: preview != nil && *preview,
+		Preview: preview == nil || *preview,
 	}
 }
