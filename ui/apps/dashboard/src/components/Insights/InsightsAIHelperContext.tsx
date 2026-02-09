@@ -1,6 +1,6 @@
 import { createContext, useContext, type ReactNode } from 'react';
 
-interface InsightsAIHelperContextValue {
+export interface InsightsAIHelperContextValue {
   openAIHelperWithPrompt: (prompt: string) => Promise<void>;
 }
 

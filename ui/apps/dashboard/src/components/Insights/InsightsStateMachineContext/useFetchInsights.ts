@@ -24,6 +24,16 @@ const insightResultsQuery = graphql(`
       rows {
         values
       }
+      diagnostics {
+        position {
+          start
+          end
+          context
+        }
+        severity
+        code
+        message
+      }
     }
   }
 `);
@@ -106,6 +116,7 @@ function transformValuesByColumns(
 function transformInsightsResponse(
   insights: InsightsResultsQuery['insights'],
 ): InsightsFetchResult {
+  console.log(insights);
   return {
     columns: insights.columns.map((col) => ({
       name: col.name,
@@ -115,5 +126,26 @@ function transformInsightsResponse(
       id: `row-${index}`,
       values: transformValuesByColumns(row.values, insights.columns),
     })),
+    diagnostics:
+      insights.diagnostics?.map((diag) => {
+        if (!diag.position) {
+          return {
+            severity: diag.severity,
+            message: diag.message,
+            code: diag.code,
+          };
+        }
+
+        return {
+          position: {
+            start: diag.position.start,
+            end: diag.position.end,
+            context: diag.position.context,
+          },
+          severity: diag.severity,
+          code: diag.code,
+          message: diag.message,
+        };
+      }) ?? [],
   };
 }
