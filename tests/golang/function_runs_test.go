@@ -374,6 +374,161 @@ func celBlob(cel []string) string {
 	return strings.Join(cel, "\n")
 }
 
+// TestFunctionRunListCELBooleanAndNull tests CEL filtering with boolean and null values in event.data.
+// This verifies that expressions like `event.data.b == true`, `event.data.b2 == false`,
+// and `event.data.n == null` work correctly.
+func TestFunctionRunListCELBooleanAndNull(t *testing.T) {
+	ctx := context.Background()
+
+	appName := fmt.Sprintf("fnrun-bool-null-%d", time.Now().UnixNano())
+	eventName := fmt.Sprintf("%s/test", appName)
+
+	inngestClient, server, registerFuncs := NewSDKHandler(t, appName)
+	defer server.Close()
+
+	var (
+		runCount int32
+		fnID     uuid.UUID
+	)
+
+	// Create a function that triggers on the test event
+	_, err := inngestgo.CreateFunction(
+		inngestClient,
+		inngestgo.FunctionOpts{
+			ID: fmt.Sprintf("fn-run-bool-null-%s", eventName),
+		},
+		inngestgo.EventTrigger(eventName, nil),
+		func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
+			atomic.AddInt32(&runCount, 1)
+			fnID = uuid.MustParse(input.InputCtx.FunctionID)
+			return map[string]any{"ok": true}, nil
+		},
+	)
+	require.NoError(t, err)
+	registerFuncs()
+
+	start := time.Now()
+
+	// Send an event with boolean and null literals
+	_, err = inngestClient.Send(ctx, inngestgo.Event{
+		Name: eventName,
+		Data: map[string]any{
+			"b":  true,
+			"b2": false,
+			"n":  nil,
+		},
+	})
+	require.NoError(t, err)
+
+	// Wait for the run to complete
+	require.EventuallyWithT(t, func(ct *assert.CollectT) {
+		assert.EqualValues(ct, 1, atomic.LoadInt32(&runCount))
+	}, 10*time.Second, 100*time.Millisecond)
+
+	end := time.Now().Add(10 * time.Second)
+
+	t.Run("filter with boolean literal true", func(t *testing.T) {
+		c := client.New(t)
+
+		cel := celBlob([]string{
+			fmt.Sprintf("event.name == '%s'", eventName),
+			"event.data.b == true",
+		})
+
+		require.EventuallyWithT(t, func(ct *assert.CollectT) {
+			edges, pageInfo, total := c.FunctionRuns(ctx, client.FunctionRunOpt{
+				Start:       start,
+				End:         end,
+				FunctionIDs: []uuid.UUID{fnID},
+				Query:       &cel,
+			})
+
+			assert.Equal(ct, 1, len(edges), "expected 1 run with event.data.b == true")
+			assert.Equal(ct, 1, total)
+			assert.False(ct, pageInfo.HasNextPage)
+		}, 10*time.Second, 2*time.Second)
+	})
+
+	t.Run("filter with boolean literal false", func(t *testing.T) {
+		c := client.New(t)
+
+		cel := celBlob([]string{
+			fmt.Sprintf("event.name == '%s'", eventName),
+			"event.data.b2 == false",
+		})
+
+		require.EventuallyWithT(t, func(ct *assert.CollectT) {
+			edges, pageInfo, total := c.FunctionRuns(ctx, client.FunctionRunOpt{
+				Start:       start,
+				End:         end,
+				FunctionIDs: []uuid.UUID{fnID},
+				Query:       &cel,
+			})
+
+			assert.Equal(ct, 1, len(edges), "expected 1 run with event.data.b2 == false")
+			assert.Equal(ct, 1, total)
+			assert.False(ct, pageInfo.HasNextPage)
+		}, 10*time.Second, 2*time.Second)
+	})
+
+	t.Run("filter with literal null", func(t *testing.T) {
+		c := client.New(t)
+
+		// event.data.n is null, so == null should return 1
+		celNullEq := celBlob([]string{
+			fmt.Sprintf("event.name == '%s'", eventName),
+			"event.data.n == null",
+		})
+		require.EventuallyWithT(t, func(ct *assert.CollectT) {
+			edges, pageInfo, total := c.FunctionRuns(ctx, client.FunctionRunOpt{
+				Start:       start,
+				End:         end,
+				FunctionIDs: []uuid.UUID{fnID},
+				Query:       &celNullEq,
+			})
+
+			assert.Equal(ct, 1, len(edges), "expected 1 run with event.data.n == null")
+			assert.Equal(ct, 1, total)
+			assert.False(ct, pageInfo.HasNextPage)
+		}, 10*time.Second, 2*time.Second)
+
+		// event.data.b is true (not null), so == null should return 0
+		celBoolEqNull := celBlob([]string{
+			fmt.Sprintf("event.name == '%s'", eventName),
+			"event.data.b == null",
+		})
+		require.EventuallyWithT(t, func(ct *assert.CollectT) {
+			edges, _, total := c.FunctionRuns(ctx, client.FunctionRunOpt{
+				Start:       start,
+				End:         end,
+				FunctionIDs: []uuid.UUID{fnID},
+				Query:       &celBoolEqNull,
+			})
+
+			assert.Equal(ct, 0, len(edges), "expected 0 runs with event.data.b == null")
+			assert.Equal(ct, 0, total)
+		}, 10*time.Second, 2*time.Second)
+
+		// event.data.b is true (not null), so != null should return 1
+		celBoolNeqNull := celBlob([]string{
+			fmt.Sprintf("event.name == '%s'", eventName),
+			"event.data.b != null",
+		})
+		require.EventuallyWithT(t, func(ct *assert.CollectT) {
+			edges, pageInfo, total := c.FunctionRuns(ctx, client.FunctionRunOpt{
+				Start:       start,
+				End:         end,
+				FunctionIDs: []uuid.UUID{fnID},
+				Query:       &celBoolNeqNull,
+			})
+
+			assert.Equal(ct, 1, len(edges), "expected 1 run with event.data.b != null")
+			assert.Equal(ct, 1, total)
+			assert.False(ct, pageInfo.HasNextPage)
+		}, 10*time.Second, 2*time.Second)
+	})
+}
+
 // TestFunctionRunListBatchEvents verifies that batch runs (with multiple events) are
 // correctly grouped when filtering with CEL expressions that JOIN on the events table.
 // Without proper GROUP BY, multiple runs would collapse into one row due to aggregate functions.

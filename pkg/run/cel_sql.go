@@ -173,6 +173,17 @@ func handleSQLiteJSONFilter(expr, fieldPath string, literal interface{}, op stri
 	case int64, float64:
 		numExpr := fmt.Sprintf("CAST(%s AS NUMERIC)", jsonExpr)
 		return handleNumericOp(numExpr, v, op)
+	case bool:
+		// SQLite json_extract returns 1 for true and 0 for false
+		boolInt := 0
+		if v {
+			boolInt = 1
+		}
+		return handleNumericOp(jsonExpr, boolInt, op)
+	case nil:
+		// For null comparison, check if json_type returns 'null' (JSON null, not SQL NULL)
+		jsonTypeExpr := fmt.Sprintf("json_type(%s, '%s')", expr, jsonPath)
+		return handleNullOp(jsonTypeExpr, op)
 	default:
 		return nil, fmt.Errorf("unsupported literal type: %T", literal)
 	}
@@ -199,6 +210,12 @@ func handlePostgresJSONFilter(expr, fieldPath string, literal interface{}, op st
 			boolStr = "true"
 		}
 		return handleStringOp(jsonExpr, boolStr, op)
+	case nil:
+		// For null comparison, use jsonb_typeof to check if the value is 'null' (JSON null)
+		// We use #> (returns jsonb) instead of #>> (returns text) to preserve JSON type info
+		jsonbExpr := fmt.Sprintf("%s#>'%s'", expr, pgPath)
+		jsonTypeExpr := fmt.Sprintf("jsonb_typeof(%s)", jsonbExpr)
+		return handleNullOp(jsonTypeExpr, op)
 	default:
 		return nil, fmt.Errorf("unsupported literal type: %T", literal)
 	}
@@ -230,4 +247,19 @@ func handleNumericOp(expr string, value interface{}, op string) ([]sq.Expression
 		return []sq.Expression{sq.L(expr).Lte(value)}, nil
 	}
 	return nil, fmt.Errorf("unsupported numeric operator: %s", op)
+}
+
+// handleNullOp creates SQL filters for JSON null comparison.
+// The jsonTypeExpr should be a json_type (SQLite) or jsonb_typeof (PostgreSQL) expression
+// that returns 'null' when the JSON value is null.
+func handleNullOp(jsonTypeExpr string, op string) ([]sq.Expression, error) {
+	switch op {
+	case operators.Equals:
+		// Check if json type equals 'null' (the JSON null type string)
+		return []sq.Expression{sq.L(jsonTypeExpr).Eq("null")}, nil
+	case operators.NotEquals:
+		// Check if json type is not 'null'
+		return []sq.Expression{sq.L(jsonTypeExpr).Neq("null")}, nil
+	}
+	return nil, fmt.Errorf("unsupported null operator: %s (only == and != are supported for null)", op)
 }
