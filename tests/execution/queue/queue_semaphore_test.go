@@ -58,7 +58,7 @@ func TestQueueSemaphoreWithConstraintAPI(t *testing.T) {
 
 		// Use Constraint API
 		queue.WithCapacityManager(cm),
-		queue.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool) {
+		queue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
 			return true
 		}),
 
@@ -325,7 +325,7 @@ func TestQueueSemaphore(t *testing.T) {
 
 		{
 			name: "when Constraint API call fails, should release semaphore",
-			enableConstraintAPI: func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool) {
+			enableConstraintAPI: func(ctx context.Context, accountID uuid.UUID) (enable bool) {
 				// Constraint API enabled with fail-hard behavior
 				return true
 			},
@@ -377,7 +377,7 @@ func TestQueueSemaphore(t *testing.T) {
 		},
 		{
 			name: "when limited by Constraint API, should release semaphore",
-			enableConstraintAPI: func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool) {
+			enableConstraintAPI: func(ctx context.Context, accountID uuid.UUID) (enable bool) {
 				return true
 			},
 			config: queue.PartitionConstraintConfig{
@@ -500,7 +500,7 @@ func TestQueueSemaphore(t *testing.T) {
 		},
 		{
 			name: "when lease encounters concurrency limits, should free semaphore",
-			enableConstraintAPI: func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool) {
+			enableConstraintAPI: func(ctx context.Context, accountID uuid.UUID) (enable bool) {
 				return false
 			},
 			config: queue.PartitionConstraintConfig{
