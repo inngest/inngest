@@ -111,10 +111,11 @@ const (
 )
 
 const (
-	defaultNumWorkers                  = 100
-	defaultNumShadowWorkers            = 100
-	defaultBacklogNormalizationWorkers = 10
-	defaultBacklogNormalizeConcurrency = int64(20)
+	defaultNumWorkers                        = 100
+	defaultNumShadowWorkers                  = 100
+	defaultBacklogNormalizationWorkers       = 10
+	defaultBacklogNormalizeConcurrency       = int64(20)
+	defaultQueueProcessorIteratorConcurrency = 20
 )
 
 const (

@@ -180,6 +180,10 @@ func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition
 	_, parallelAccount := q.disableFifoForAccounts[p.AccountID.String()]
 
 	parallel := parallelFn || parallelAccount || isSystemFn
+	concurrency := 1
+	if parallel {
+		concurrency = q.queueProcessorIteratorConcurrency
+	}
 
 	iter := ProcessorIterator{
 		Partition:            p,
@@ -187,8 +191,7 @@ func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition
 		PartitionContinueCtr: continuationCount,
 		Queue:                q,
 		Denies:               NewLeaseDenyList(),
-		StaticTime:           q.Clock().Now(),
-		Parallel:             parallel,
+		Concurrency:          concurrency,
 	}
 
 	if processErr := iter.Iterate(ctx); processErr != nil {

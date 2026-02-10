@@ -12,8 +12,8 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/oklog/ulid/v2"
+	"github.com/sourcegraph/conc/pool"
 	"go.opentelemetry.io/otel/attribute"
-	"golang.org/x/sync/errgroup"
 )
 
 type ProcessorIterator struct {
@@ -35,9 +35,10 @@ type ProcessorIterator struct {
 	// error returned when processing
 	Err error
 
-	// Parallel indicates whether the partition's jobs can be processed in Parallel.
+	// Concurrency defines the number of items that can be processed at once.
+	// This determines whether the partition's jobs can be processed in parallel.
 	// Parallel processing breaks best effort fifo but increases throughput.
-	Parallel bool
+	Concurrency int
 
 	// These flags are used to handle partition requeueing.
 	// These counters must be accessed atomically as they may be incremented
@@ -54,6 +55,11 @@ type ProcessorIterator struct {
 }
 
 func (p *ProcessorIterator) Iterate(ctx context.Context) error {
+	// Ensure concurrency is at least 1 (sequential)
+	if p.Concurrency <= 0 {
+		p.Concurrency = 1
+	}
+
 	var err error
 
 	// Instrument duration for iteration
@@ -62,7 +68,7 @@ func (p *ProcessorIterator) Iterate(ctx context.Context) error {
 		metrics.HistogramQueueProcessorIterateDuration(ctx, time.Since(start), metrics.HistogramOpt{
 			PkgName: pkgName,
 			Tags: map[string]any{
-				"parallel": p.Parallel,
+				"parallel": p.Concurrency > 1,
 			},
 		})
 	}()
@@ -70,7 +76,8 @@ func (p *ProcessorIterator) Iterate(ctx context.Context) error {
 	// set flag to true to begin with
 	p.IsCustomKeyLimitOnly.Store(true)
 
-	eg := errgroup.Group{}
+	// Always run with (limited) concurrency
+	sem := pool.New().WithErrors().WithMaxGoroutines(p.Concurrency)
 	for _, i := range p.Items {
 		if i == nil {
 			// THIS SHOULD NEVER HAPPEN. Skip gracefully and log error
@@ -78,9 +85,9 @@ func (p *ProcessorIterator) Iterate(ctx context.Context) error {
 			continue
 		}
 
-		if p.Parallel {
+		if p.Concurrency > 1 {
 			item := *i
-			eg.Go(func() error {
+			sem.Go(func() error {
 				err := p.Process(ctx, &item)
 				if err != nil {
 					// NOTE: ignore if the queue item is not found
@@ -110,9 +117,9 @@ func (p *ProcessorIterator) Iterate(ctx context.Context) error {
 		}
 	}
 
-	if p.Parallel {
+	if p.Concurrency > 1 {
 		// normalize errors from parallel
-		err = eg.Wait()
+		err = sem.Wait()
 	}
 
 	if errors.Is(err, ErrProcessStopIterator) {

@@ -409,6 +409,9 @@ type QueueOptions struct {
 	peekCurrMultiplier int64
 	// PeekEWMALen is the size of the list to hold the most recent values
 	PeekEWMALen int
+	// queueProcessorIteratorConcurrency determines the number of goroutines used for pre-processing queue items in the queue processor.
+	// NOTE: This is not the number of workers used for processing queue items. Use numWorkers to configure the number of worker goroutines.
+	queueProcessorIteratorConcurrency int
 	// queueKindMapping stores a map of job kind => queue names
 	queueKindMapping        map[string]string
 	disableFifoForFunctions map[string]struct{}
@@ -599,6 +602,12 @@ func WithConditionalTracer(tracer trace.ConditionalTracer) QueueOpt {
 	}
 }
 
+func WithQueueProcessorIteratorConcurrency(concurrency int) QueueOpt {
+	return func(q *QueueOptions) {
+		q.queueProcessorIteratorConcurrency = concurrency
+	}
+}
+
 // continuation represents a partition continuation, forcung the queue to continue working
 // on a partition once a job from a partition has been processed.
 type continuation struct {
@@ -729,17 +738,18 @@ func NewQueueOptions(
 			NormalizePartition:                true,
 			ShadowContinuationSkipProbability: consts.QueueContinuationSkipProbability,
 		},
-		numWorkers:                     defaultNumWorkers,
-		numShadowWorkers:               defaultNumShadowWorkers,
-		numBacklogNormalizationWorkers: defaultBacklogNormalizationWorkers,
-		pollTick:                       defaultPollTick,
-		shadowPollTick:                 defaultShadowPollTick,
-		backlogNormalizePollTick:       defaultBacklogNormalizePollTick,
-		ActiveCheckTick:                defaultActiveCheckTick,
-		IdempotencyTTL:                 defaultIdempotencyTTL,
-		queueKindMapping:               make(map[string]string),
-		peekSizeForFunctions:           make(map[string]int64),
-		instrumentInterval:             DefaultInstrumentInterval,
+		numWorkers:                        defaultNumWorkers,
+		queueProcessorIteratorConcurrency: defaultQueueProcessorIteratorConcurrency,
+		numShadowWorkers:                  defaultNumShadowWorkers,
+		numBacklogNormalizationWorkers:    defaultBacklogNormalizationWorkers,
+		pollTick:                          defaultPollTick,
+		shadowPollTick:                    defaultShadowPollTick,
+		backlogNormalizePollTick:          defaultBacklogNormalizePollTick,
+		ActiveCheckTick:                   defaultActiveCheckTick,
+		IdempotencyTTL:                    defaultIdempotencyTTL,
+		queueKindMapping:                  make(map[string]string),
+		peekSizeForFunctions:              make(map[string]int64),
+		instrumentInterval:                DefaultInstrumentInterval,
 		PartitionConstraintConfigGetter: func(ctx context.Context, pi PartitionIdentifier) PartitionConstraintConfig {
 			def := DefaultConcurrency
 

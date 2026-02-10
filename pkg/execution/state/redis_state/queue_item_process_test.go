@@ -451,8 +451,7 @@ func TestQueueProcessorPreLeaseWithConstraintAPI(t *testing.T) {
 			PartitionContinueCtr: 0,
 			Queue:                q,
 			Denies:               osqueue.NewLeaseDenyList(),
-			StaticTime:           clock.Now(),
-			Parallel:             false,
+			Concurrency:          1,
 		}
 
 		err = iter.Process(ctx, &qi)
@@ -501,8 +500,7 @@ func TestQueueProcessorPreLeaseWithConstraintAPI(t *testing.T) {
 			PartitionContinueCtr: 0,
 			Queue:                q,
 			Denies:               osqueue.NewLeaseDenyList(),
-			StaticTime:           clock.Now(),
-			Parallel:             false,
+			Concurrency:          1,
 		}
 
 		err = iter.Process(ctx, &qi)
@@ -592,8 +590,7 @@ func TestQueueProcessorPreLeaseWithConstraintAPI(t *testing.T) {
 			PartitionContinueCtr: 0,
 			Queue:                q,
 			Denies:               osqueue.NewLeaseDenyList(),
-			StaticTime:           clock.Now(),
-			Parallel:             false,
+			Concurrency:          1,
 		}
 
 		err = iter.Process(ctx, &qi)
@@ -712,8 +709,7 @@ func TestPartitionProcessRequeueAfterLimitedWithConstraintAPI(t *testing.T) {
 			PartitionContinueCtr: 0,
 			Queue:                q,
 			Denies:               osqueue.NewLeaseDenyList(),
-			StaticTime:           clock.Now(),
-			Parallel:             false,
+			Concurrency:          1,
 		}
 
 		require.False(t, iter.IsRequeuable())
@@ -849,8 +845,7 @@ func TestPartitionProcessRequeueAfterLimitedWithConstraintAPI(t *testing.T) {
 			PartitionContinueCtr: 0,
 			Queue:                q,
 			Denies:               osqueue.NewLeaseDenyList(),
-			StaticTime:           clock.Now(),
-			Parallel:             false,
+			Concurrency:          1,
 		}
 
 		require.False(t, iter.IsRequeuable())

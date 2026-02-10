@@ -112,11 +112,10 @@ func TestQueueSemaphoreWithConstraintAPI(t *testing.T) {
 	partition := queue.ItemPartition(ctx, qi1)
 
 	iter := queue.ProcessorIterator{
-		Partition:  &partition,
-		Items:      []*queue.QueueItem{&qi1, &qi2},
-		Queue:      q,
-		Denies:     queue.NewLeaseDenyList(),
-		StaticTime: clock.Now(),
+		Partition: &partition,
+		Items:     []*queue.QueueItem{&qi1, &qi2},
+		Queue:     q,
+		Denies:    queue.NewLeaseDenyList(),
 	}
 
 	// Initially, the semaphore must be at 0
@@ -203,11 +202,10 @@ func TestQueueSemaphore(t *testing.T) {
 				partition := queue.ItemPartition(ctx, qi)
 
 				iter := queue.ProcessorIterator{
-					Partition:  &partition,
-					Items:      []*queue.QueueItem{&qi},
-					Queue:      deps.qp,
-					Denies:     queue.NewLeaseDenyList(),
-					StaticTime: clock.Now(),
+					Partition: &partition,
+					Items:     []*queue.QueueItem{&qi},
+					Queue:     deps.qp,
+					Denies:    queue.NewLeaseDenyList(),
 				}
 
 				// Initially, the semaphore must be at 0
@@ -258,11 +256,10 @@ func TestQueueSemaphore(t *testing.T) {
 				partition := queue.ItemPartition(ctx, qi)
 
 				iter := queue.ProcessorIterator{
-					Partition:  &partition,
-					Items:      []*queue.QueueItem{&qi},
-					Queue:      deps.qp,
-					Denies:     queue.NewLeaseDenyList(),
-					StaticTime: clock.Now(),
+					Partition: &partition,
+					Items:     []*queue.QueueItem{&qi},
+					Queue:     deps.qp,
+					Denies:    queue.NewLeaseDenyList(),
 				}
 
 				// Initially, the semaphore must be at 0
@@ -300,11 +297,10 @@ func TestQueueSemaphore(t *testing.T) {
 				partition := queue.ItemPartition(ctx, qi)
 
 				iter := queue.ProcessorIterator{
-					Partition:  &partition,
-					Items:      []*queue.QueueItem{&qi},
-					Queue:      deps.qp,
-					Denies:     queue.NewLeaseDenyList(),
-					StaticTime: clock.Now(),
+					Partition: &partition,
+					Items:     []*queue.QueueItem{&qi},
+					Queue:     deps.qp,
+					Denies:    queue.NewLeaseDenyList(),
 				}
 
 				// Initially, the semaphore must be at 0
@@ -358,11 +354,10 @@ func TestQueueSemaphore(t *testing.T) {
 				partition := queue.ItemPartition(ctx, qi)
 
 				iter := queue.ProcessorIterator{
-					Partition:  &partition,
-					Items:      []*queue.QueueItem{&qi},
-					Queue:      deps.qp,
-					Denies:     queue.NewLeaseDenyList(),
-					StaticTime: clock.Now(),
+					Partition: &partition,
+					Items:     []*queue.QueueItem{&qi},
+					Queue:     deps.qp,
+					Denies:    queue.NewLeaseDenyList(),
 				}
 
 				require.Equal(t, int64(0), deps.qp.Semaphore().Count())
@@ -424,11 +419,10 @@ func TestQueueSemaphore(t *testing.T) {
 				partition := queue.ItemPartition(ctx, qi)
 
 				iter := queue.ProcessorIterator{
-					Partition:  &partition,
-					Items:      []*queue.QueueItem{&qi, &qi2},
-					Queue:      deps.qp,
-					Denies:     queue.NewLeaseDenyList(),
-					StaticTime: clock.Now(),
+					Partition: &partition,
+					Items:     []*queue.QueueItem{&qi, &qi2},
+					Queue:     deps.qp,
+					Denies:    queue.NewLeaseDenyList(),
 				}
 
 				require.Equal(t, int64(0), deps.qp.Semaphore().Count())
@@ -482,11 +476,10 @@ func TestQueueSemaphore(t *testing.T) {
 				partition := queue.ItemPartition(ctx, qi)
 
 				iter := queue.ProcessorIterator{
-					Partition:  &partition,
-					Items:      []*queue.QueueItem{&qi},
-					Queue:      deps.qp,
-					Denies:     queue.NewLeaseDenyList(),
-					StaticTime: clock.Now(),
+					Partition: &partition,
+					Items:     []*queue.QueueItem{&qi},
+					Queue:     deps.qp,
+					Denies:    queue.NewLeaseDenyList(),
 				}
 
 				require.Equal(t, int64(0), deps.qp.Semaphore().Count())
@@ -547,11 +540,10 @@ func TestQueueSemaphore(t *testing.T) {
 				partition := queue.ItemPartition(ctx, qi)
 
 				iter := queue.ProcessorIterator{
-					Partition:  &partition,
-					Items:      []*queue.QueueItem{&qi, &qi2},
-					Queue:      deps.qp,
-					Denies:     queue.NewLeaseDenyList(),
-					StaticTime: clock.Now(),
+					Partition: &partition,
+					Items:     []*queue.QueueItem{&qi, &qi2},
+					Queue:     deps.qp,
+					Denies:    queue.NewLeaseDenyList(),
 				}
 
 				require.Equal(t, int64(0), deps.qp.Semaphore().Count())
