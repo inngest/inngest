@@ -4,6 +4,7 @@ import (
 	"context"
 	"math/rand"
 
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -23,14 +24,14 @@ func (q *queueProcessor) shardLease() *ulid.ULID {
 // attempting to claim a lease on a shard from the pool. This is a blocking call that
 // only returns when a successful shard lease has been assigned or on error.
 func (q *queueProcessor) claimShardLease(ctx context.Context) {
-
+	l := logger.StdlibLogger(ctx)
 	shardGroup := q.runMode.ShardGroup
 	if len(shardGroup) == 0 {
 		return
 	}
 	shards := q.shardsByGroupName(shardGroup)
 	if len(shards) == 0 {
-		q.log.Error("no shards found for group", "group", shardGroup)
+		l.Error("no shards found for group", "group", shardGroup)
 		q.quit <- ErrQueueShardNotFound
 		return
 	}
@@ -63,10 +64,11 @@ func (q *queueProcessor) claimShardLease(ctx context.Context) {
 
 // tryClaimShardLease attempts to claim a lease on one of the shards in the pool.
 func (q *queueProcessor) tryClaimShardLease(ctx context.Context, shards []QueueShard) error {
+	l := logger.StdlibLogger(ctx)
 
 	// if a shard was already leased, early exit.
 	if q.shardLease() != nil {
-		q.log.Warn("Calling tryClaimShardLease when already leased")
+		l.Warn("Calling tryClaimShardLease when already leased")
 		return nil
 	}
 
@@ -80,7 +82,7 @@ func (q *queueProcessor) tryClaimShardLease(ctx context.Context, shards []QueueS
 		leaseID, err := shard.ShardLease(ctx, "shard-group-"+q.runMode.ShardGroup, ShardLeaseDuration, shard.ShardAssignmentConfig().NumExecutors, nil)
 
 		if err == ErrAllShardsAlreadyLeased {
-			q.log.Warn("Could not get a shard lease", "shard", shard.Name())
+			l.Warn("Could not get a shard lease", "shard", shard.Name())
 			continue
 		}
 		if err != nil {
@@ -93,7 +95,7 @@ func (q *queueProcessor) tryClaimShardLease(ctx context.Context, shards []QueueS
 			q.shardLeaseID = leaseID
 			q.primaryQueueShard = shard
 			q.shardLeaseLock.Unlock()
-			q.log.Info("claimed shard lease", "shard", shard.Name(), "group", q.runMode.ShardGroup, "leaseID", leaseID)
+			l.Info("claimed shard lease", "shard", shard.Name(), "group", q.runMode.ShardGroup, "leaseID", leaseID)
 			return nil
 		}
 	}
@@ -104,6 +106,8 @@ func (q *queueProcessor) tryClaimShardLease(ctx context.Context, shards []QueueS
 
 // renewShardLease continuously renews the shard lease until the context is cancelled
 func (q *queueProcessor) renewShardLease(ctx context.Context) {
+	l := logger.StdlibLogger(ctx)
+
 	tick := q.Clock().NewTicker(ShardLeaseDuration / 3)
 	defer tick.Stop()
 
@@ -112,19 +116,19 @@ func (q *queueProcessor) renewShardLease(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-tick.Chan():
-			q.log.Trace("Renewing Shard Lease")
+			l.Trace("Renewing Shard Lease")
 
 			leaseID := q.shardLease()
 			if leaseID == nil {
 				// Lease was lost somehow, stop renewing
-				q.log.Error("shard lease lost during renewal")
+				l.Error("shard lease lost during renewal")
 				q.quit <- ErrShardLeaseNotFound
 				return
 			}
 
 			shard := q.primaryQueueShard
 			if shard == nil {
-				q.log.Error("primary shard not set during lease renewal")
+				l.Error("primary shard not set during lease renewal")
 				q.quit <- ErrShardLeaseNotFound
 				return
 			}
@@ -133,12 +137,12 @@ func (q *queueProcessor) renewShardLease(ctx context.Context) {
 			newLeaseID, err := shard.ShardLease(ctx, "shard-group-"+q.runMode.ShardGroup, ShardLeaseDuration, shard.ShardAssignmentConfig().NumExecutors, leaseID)
 			if err == ErrShardLeaseExpired || err == ErrShardLeaseNotFound {
 				// Another process took the lease
-				q.log.Error("shard lease taken by another process", "shard", shard.Name(), "group", q.runMode.ShardGroup)
+				l.Error("shard lease taken by another process", "shard", shard.Name(), "group", q.runMode.ShardGroup)
 				q.quit <- err
 				return
 			}
 			if err != nil {
-				q.log.Error("failed to renew shard lease", "error", err, "shard", shard.Name(), "group", q.runMode.ShardGroup, "leaseID", leaseID)
+				l.Error("failed to renew shard lease", "error", err, "shard", shard.Name(), "group", q.runMode.ShardGroup, "leaseID", leaseID)
 				q.quit <- err
 				return
 			}
@@ -148,7 +152,7 @@ func (q *queueProcessor) renewShardLease(ctx context.Context) {
 				q.shardLeaseLock.Lock()
 				q.shardLeaseID = newLeaseID
 				q.shardLeaseLock.Unlock()
-				q.log.Info("Successfully renewed lease", "old_lease", leaseID, "new_lease", newLeaseID)
+				l.Info("Successfully renewed lease", "old_lease", leaseID, "new_lease", newLeaseID)
 
 			}
 		}
