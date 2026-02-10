@@ -549,3 +549,14 @@ func HistogramConstraintAPIQueueItemLeaseTTL(ctx context.Context, ttl time.Durat
 		Boundaries:  ConstraintAPIDurationBoundaries,
 	})
 }
+
+func HistogramQueueProcessorIterateDuration(ctx context.Context, dur time.Duration, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, dur.Milliseconds(), HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "queue_processor_iterate_duration",
+		Description: "Distribution of queue processor iterator duration",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  QueueItemLatencyBoundaries,
+	})
+}

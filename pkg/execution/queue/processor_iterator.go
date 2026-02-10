@@ -35,15 +35,6 @@ type ProcessorIterator struct {
 	// error returned when processing
 	Err error
 
-	// StaticTime is used as the processing time for all items in the queue.
-	// We process queue items sequentially, and time progresses linearly as each
-	// queue item is processed.  We want to use a static time to prevent out-of-order
-	// processing with regards to things like rate limiting;  if we use time.Now(),
-	// queue items later in the array may be processed before queue items earlier in
-	// the array depending on eg. a rate limit becoming available half way through
-	// iteration.
-	StaticTime time.Time
-
 	// Parallel indicates whether the partition's jobs can be processed in Parallel.
 	// Parallel processing breaks best effort fifo but increases throughput.
 	Parallel bool
@@ -64,6 +55,17 @@ type ProcessorIterator struct {
 
 func (p *ProcessorIterator) Iterate(ctx context.Context) error {
 	var err error
+
+	// Instrument duration for iteration
+	start := time.Now()
+	defer func() {
+		metrics.HistogramQueueProcessorIterateDuration(ctx, time.Since(start), metrics.HistogramOpt{
+			PkgName: pkgName,
+			Tags: map[string]any{
+				"parallel": p.Parallel,
+			},
+		})
+	}()
 
 	// set flag to true to begin with
 	p.IsCustomKeyLimitOnly.Store(true)
@@ -129,6 +131,8 @@ func (p *ProcessorIterator) Iterate(ctx context.Context) error {
 func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error {
 	l := logger.StdlibLogger(ctx).With("partition", p.Partition, "item", item)
 
+	now := p.Queue.Clock().Now()
+
 	ctx, span := p.Queue.Options().ConditionalTracer.NewSpan(ctx, "queue.Process", p.Partition.AccountID, p.Partition.Identifier().EnvID)
 	defer span.End()
 	span.SetAttributes(attribute.String("partition_id", p.Partition.ID))
@@ -189,7 +193,7 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 		&backlog,
 		constraints,
 		item,
-		p.StaticTime,
+		now,
 	)
 	if err != nil {
 		return fmt.Errorf("could not check constraints to lease item: %w", err)
@@ -224,7 +228,7 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 				ctx,
 				*item,
 				QueueLeaseDuration,
-				p.StaticTime,
+				now,
 				p.Denies,
 				leaseOptions...,
 			)
