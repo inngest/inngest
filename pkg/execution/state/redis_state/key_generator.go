@@ -199,11 +199,10 @@ type QueueKeyGenerator interface {
 	// Queue metadata keys
 	//
 
-	// Sequential returns the key which allows a worker to claim sequential processing
-	// of the partitions.
+	// Sequential returns the key which allows a worker to claim a config lease for specific roles
 	ConfigLeaseKey(scope string) string
-	// ShardLeaseKey returns the key which allows a worker to claim sequential processing
-	// of the partitions.
+	// ShardLeaseKey returns the key which allows a worker to claim one of n available leases per shard to begin processing
+	// partitions in that shard
 	ShardLeaseKey(scope string) string
 	// Sequential returns the key which allows a worker to claim sequential processing
 	// of the partitions.
