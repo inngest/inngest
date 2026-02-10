@@ -461,7 +461,7 @@ func (q *queueProcessor) ProcessShadowPartitionBacklog(
 	now := q.Clock().Now()
 	operationIdempotencyKey := fmt.Sprintf("%s-%d", backlog.BacklogID, now.UnixMilli())
 
-	constraintCheckRes, err := q.primaryQueueShard.BacklogRefillConstraintCheck(ctx, shadowPart, backlog, constraints, items, operationIdempotencyKey, now)
+	constraintCheckRes, err := q.BacklogRefillConstraintCheck(ctx, shadowPart, backlog, constraints, items, operationIdempotencyKey, now)
 	if err != nil {
 		return nil, false, fmt.Errorf("could not check constraints for backlogRefill: %w", err)
 	}

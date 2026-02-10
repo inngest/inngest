@@ -336,6 +336,14 @@ func (m *mockShardForIterator) RunJobs(ctx context.Context, workspaceID, workflo
 	return nil, nil
 }
 
+func (m *mockQueueProcessor) BacklogRefillConstraintCheck(ctx context.Context, shadowPart *QueueShadowPartition, backlog *QueueBacklog, constraints PartitionConstraintConfig, items []*QueueItem, operationIdempotencyKey string, now time.Time) (*BacklogRefillConstraintCheckResult, error) {
+	return nil, nil
+}
+
+func (m *mockQueueProcessor) ItemLeaseConstraintCheck(ctx context.Context, shadowPart *QueueShadowPartition, backlog *QueueBacklog, constraints PartitionConstraintConfig, item *QueueItem, now time.Time) (ItemLeaseConstraintCheckResult, error) {
+	return ItemLeaseConstraintCheckResult{}, nil
+}
+
 // TestProcessorIteratorCounterRaceCondition tests for race conditions when
 // ProcessorIterator processes items in parallel mode.
 //
