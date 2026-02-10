@@ -576,10 +576,28 @@ func (s *svc) pauses(ctx context.Context, evt event.TrackedEvent) error {
 
 	l.Debug("handling found pauses for event")
 
-	_, err := s.executor.HandlePauses(ctx, evt)
+	res, err := s.executor.HandlePauses(ctx, evt)
 	if err != nil {
 		l.Error("error handling pauses", "error", err)
 	}
+
+	if res.Handled() > 0 {
+		l.Info("event matched pauses",
+			"pauses_processed", res.Processed(),
+			"pauses_matched", res.Handled(),
+		)
+	} else if res.Processed() > 0 {
+		l.Warn("event did not match any pauses despite pauses existing for event name",
+			"pauses_processed", res.Processed(),
+			"pauses_matched", res.Handled(),
+		)
+	} else {
+		l.Info("no pauses processed for event",
+			"pauses_processed", res.Processed(),
+			"pauses_matched", res.Handled(),
+		)
+	}
+
 	return err
 }
 
