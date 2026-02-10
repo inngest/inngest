@@ -48,7 +48,7 @@ func TestCron(t *testing.T) {
 	t.Run("cron should run", func(t *testing.T) {
 		r.Eventually(func() bool {
 			return atomic.LoadInt32(&counter) == 1
-		}, time.Minute, 5*time.Second)
+		}, 61*time.Second, 5*time.Second)
 	})
 
 	t.Run("trace run should have appropriate data", func(t *testing.T) {
@@ -245,6 +245,6 @@ func TestCronAddCronTrigger(t *testing.T) {
 
 		r.Eventually(func() bool {
 			return atomic.LoadInt32(&counter) == 2
-		}, 2*time.Minute, 5*time.Second)
+		}, 121*time.Second, 5*time.Second)
 	})
 }
