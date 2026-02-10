@@ -183,7 +183,7 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 		LeaseConstraints(constraints),
 	}
 
-	constraintRes, err := p.Queue.Shard().ItemLeaseConstraintCheck(
+	constraintRes, err := p.Queue.ItemLeaseConstraintCheck(
 		ctx,
 		&partition,
 		&backlog,
