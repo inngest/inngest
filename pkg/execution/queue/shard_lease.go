@@ -2,9 +2,12 @@ package queue
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"math/rand"
 
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -95,7 +98,10 @@ func (q *queueProcessor) tryClaimShardLease(ctx context.Context, shards []QueueS
 			q.shardLeaseID = leaseID
 			q.primaryQueueShard = shard
 			q.shardLeaseLock.Unlock()
+
+			metrics.GaugeActiveShardLease(ctx, 1, metrics.GaugeOpt{PkgName: pkgName, Tags: map[string]any{"shard_group": q.runMode.ShardGroup, "queue_shard": shard.Name()}})
 			l.Info("claimed shard lease", "shard", shard.Name(), "group", q.runMode.ShardGroup, "leaseID", leaseID)
+
 			return nil
 		}
 	}
@@ -119,16 +125,18 @@ func (q *queueProcessor) renewShardLease(ctx context.Context) {
 			l.Trace("Renewing Shard Lease")
 
 			leaseID := q.shardLease()
-			if leaseID == nil {
-				// Lease was lost somehow, stop renewing
-				l.Error("shard lease lost during renewal")
+
+			shard := q.primaryQueueShard
+			if shard == nil {
+				q.log.ReportError(errors.New("missing primary shard during lease renewal"), fmt.Sprintf("missing primary shard during lease renewal for shard group: %s", q.runMode.ShardGroup))
 				q.quit <- ErrShardLeaseNotFound
 				return
 			}
 
-			shard := q.primaryQueueShard
-			if shard == nil {
-				l.Error("primary shard not set during lease renewal")
+			if leaseID == nil {
+				// Lease was lost somehow, stop renewing
+				metrics.GaugeActiveShardLease(ctx, 0, metrics.GaugeOpt{PkgName: pkgName, Tags: map[string]any{"shard_group": q.runMode.ShardGroup, "queue_shard": q.primaryQueueShard.Name()}})
+				l.Error("shard lease lost during renewal")
 				q.quit <- ErrShardLeaseNotFound
 				return
 			}
@@ -137,11 +145,13 @@ func (q *queueProcessor) renewShardLease(ctx context.Context) {
 			newLeaseID, err := shard.ShardLease(ctx, "shard-group-"+q.runMode.ShardGroup, ShardLeaseDuration, shard.ShardAssignmentConfig().NumExecutors, leaseID)
 			if err == ErrShardLeaseExpired || err == ErrShardLeaseNotFound {
 				// Another process took the lease
+				metrics.GaugeActiveShardLease(ctx, 0, metrics.GaugeOpt{PkgName: pkgName, Tags: map[string]any{"shard_group": q.runMode.ShardGroup, "queue_shard": q.primaryQueueShard.Name()}})
 				l.Error("shard lease taken by another process", "shard", shard.Name(), "group", q.runMode.ShardGroup)
 				q.quit <- err
 				return
 			}
 			if err != nil {
+				metrics.GaugeActiveShardLease(ctx, 0, metrics.GaugeOpt{PkgName: pkgName, Tags: map[string]any{"shard_group": q.runMode.ShardGroup, "queue_shard": q.primaryQueueShard.Name()}})
 				l.Error("failed to renew shard lease", "error", err, "shard", shard.Name(), "group", q.runMode.ShardGroup, "leaseID", leaseID)
 				q.quit <- err
 				return
@@ -153,7 +163,6 @@ func (q *queueProcessor) renewShardLease(ctx context.Context) {
 				q.shardLeaseID = newLeaseID
 				q.shardLeaseLock.Unlock()
 				l.Info("Successfully renewed lease", "old_lease", leaseID, "new_lease", newLeaseID)
-
 			}
 		}
 	}
