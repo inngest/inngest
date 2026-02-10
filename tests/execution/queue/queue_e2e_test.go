@@ -210,9 +210,6 @@ func TestQueueE2E(t *testing.T) {
 				queue.WithConditionalTracer(tracer),
 			}, tc.queueOptions...)
 
-			queueClient := redis_state.NewQueueClient(rc, redis_state.QueueDefaultKey)
-			shard := redis_state.NewQueueShard("test", queueClient, options...)
-
 			cm, err := constraintapi.NewRedisCapacityManager(
 				constraintapi.WithClient(rc),
 				constraintapi.WithShardName("test"),
@@ -227,6 +224,9 @@ func TestQueueE2E(t *testing.T) {
 					queue.WithUseConstraintAPI(tc.useConstraintAPI),
 				)
 			}
+
+			queueClient := redis_state.NewQueueClient(rc, redis_state.QueueDefaultKey)
+			shard := redis_state.NewQueueShard("test", queueClient, options...)
 
 			q, err := queue.New(ctx, "test", shard, nil, nil, options...)
 			require.NoError(t, err)
