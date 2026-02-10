@@ -31,7 +31,7 @@ func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition
 	// constraints like concurrency were consumed.
 	var disableLeaseChecks bool
 	if p.AccountID != uuid.Nil && p.EnvID != nil && p.FunctionID != nil && q.CapacityManager != nil && q.UseConstraintAPI != nil {
-		enableConstraintAPI := q.UseConstraintAPI(ctx, p.AccountID, *p.EnvID, *p.FunctionID)
+		enableConstraintAPI := q.UseConstraintAPI(ctx, p.AccountID)
 		disableLeaseChecks = enableConstraintAPI
 	}
 

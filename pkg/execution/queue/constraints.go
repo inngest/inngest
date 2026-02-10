@@ -216,7 +216,7 @@ func (q *queueProcessor) BacklogRefillConstraintCheck(
 		}, nil
 	}
 
-	useAPI := q.UseConstraintAPI(ctx, *shadowPart.AccountID, *shadowPart.EnvID, *shadowPart.FunctionID)
+	useAPI := q.UseConstraintAPI(ctx, *shadowPart.AccountID)
 	if !useAPI {
 		metrics.IncrBacklogRefillConstraintCheckCounter(ctx, enums.BacklogRefillConstraintCheckReasonFeatureFlagDisabled.String(), metrics.CounterOpt{
 			PkgName: pkgName,
@@ -330,7 +330,7 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 		return ItemLeaseConstraintCheckResult{}, nil
 	}
 
-	useAPI := q.UseConstraintAPI(ctx, *shadowPart.AccountID, *shadowPart.EnvID, *shadowPart.FunctionID)
+	useAPI := q.UseConstraintAPI(ctx, *shadowPart.AccountID)
 	if !useAPI {
 		metrics.IncrQueueItemConstraintCheckCounter(ctx, enums.QueueItemConstraintReasonFeatureFlagDisabled.String(), metrics.CounterOpt{
 			PkgName: pkgName,
