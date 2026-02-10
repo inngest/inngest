@@ -28,6 +28,10 @@ type mockQueueProcessor struct {
 	shadowCh  chan ShadowPartitionChanMsg
 	shadowMu  sync.Mutex
 	shadowMap map[string]ShadowContinuation
+
+	// constraintResultFunc controls what ItemLeaseConstraintCheck returns
+	constraintResultFunc func() enums.QueueConstraint
+	leaseCount           int32
 }
 
 func (m *mockQueueProcessor) Shard() QueueShard                                   { return m.shard }
@@ -55,9 +59,6 @@ func (m *mockQueueProcessor) ClearShadowContinuations() {
 // mockShardForIterator implements the minimal QueueShard interface methods used by ProcessorIterator
 type mockShardForIterator struct {
 	name string
-	// constraintResult controls what ItemLeaseConstraintCheck returns
-	constraintResultFunc func() enums.QueueConstraint
-	leaseCount           int32
 }
 
 func (m *mockShardForIterator) Name() string {
@@ -66,32 +67,6 @@ func (m *mockShardForIterator) Name() string {
 
 func (m *mockShardForIterator) Kind() enums.QueueShardKind {
 	return enums.QueueShardKindRedis
-}
-
-func (m *mockShardForIterator) ItemLeaseConstraintCheck(
-	ctx context.Context,
-	shadowPart *QueueShadowPartition,
-	backlog *QueueBacklog,
-	constraints PartitionConstraintConfig,
-	item *QueueItem,
-	now time.Time,
-) (ItemLeaseConstraintCheckResult, error) {
-	atomic.AddInt32(&m.leaseCount, 1)
-
-	// Add some delay to increase chance of race
-	time.Sleep(time.Microsecond * 50)
-
-	var constraint enums.QueueConstraint
-	if m.constraintResultFunc != nil {
-		constraint = m.constraintResultFunc()
-	} else {
-		constraint = enums.QueueConstraintNotLimited
-	}
-
-	return ItemLeaseConstraintCheckResult{
-		LimitingConstraint:   constraint,
-		SkipConstraintChecks: true,
-	}, nil
 }
 
 func (m *mockShardForIterator) Lease(ctx context.Context, item QueueItem, duration time.Duration, now time.Time, denies *LeaseDenies, options ...LeaseOptionFn) (*ulid.ULID, error) {
@@ -333,7 +308,22 @@ func (m *mockQueueProcessor) BacklogRefillConstraintCheck(ctx context.Context, s
 }
 
 func (m *mockQueueProcessor) ItemLeaseConstraintCheck(ctx context.Context, shadowPart *QueueShadowPartition, backlog *QueueBacklog, constraints PartitionConstraintConfig, item *QueueItem, now time.Time) (ItemLeaseConstraintCheckResult, error) {
-	return ItemLeaseConstraintCheckResult{}, nil
+	atomic.AddInt32(&m.leaseCount, 1)
+
+	// Add some delay to increase chance of race
+	time.Sleep(time.Microsecond * 50)
+
+	var constraint enums.QueueConstraint
+	if m.constraintResultFunc != nil {
+		constraint = m.constraintResultFunc()
+	} else {
+		constraint = enums.QueueConstraintNotLimited
+	}
+
+	return ItemLeaseConstraintCheckResult{
+		LimitingConstraint:   constraint,
+		SkipConstraintChecks: true,
+	}, nil
 }
 
 // TestProcessorIteratorCounterRaceCondition tests for race conditions when
@@ -364,9 +354,6 @@ func TestProcessorIteratorCounterRaceCondition(t *testing.T) {
 	// Create mock shard
 	shard := &mockShardForIterator{
 		name: "test-shard",
-		constraintResultFunc: func() enums.QueueConstraint {
-			return enums.QueueConstraintNotLimited
-		},
 	}
 
 	// Create a buffered workers channel to receive processed items
@@ -375,7 +362,8 @@ func TestProcessorIteratorCounterRaceCondition(t *testing.T) {
 	// Create QueueOptions with defaults
 	opts := NewQueueOptions()
 
-	// Create mock processor
+	// Create mock processor with constraintResultFunc set on the processor,
+	// which now owns ItemLeaseConstraintCheck
 	mockProc := &mockQueueProcessor{
 		shard:     shard,
 		clock:     clockwork.NewRealClock(),
@@ -383,6 +371,9 @@ func TestProcessorIteratorCounterRaceCondition(t *testing.T) {
 		workers:   workers,
 		shadowMap: make(map[string]ShadowContinuation),
 		opts:      opts,
+		constraintResultFunc: func() enums.QueueConstraint {
+			return enums.QueueConstraintNotLimited
+		},
 	}
 
 	// Create test partition
@@ -468,9 +459,21 @@ func TestProcessorIteratorCounterRaceConditionMixed(t *testing.T) {
 	// Track which constraint each item will hit
 	var callCount int32
 
-	// Create mock shard that alternates between different results
 	shard := &mockShardForIterator{
 		name: "test-shard",
+	}
+
+	workers := make(chan ProcessItem, numItems)
+	opts := NewQueueOptions()
+
+	// Set constraintResultFunc on the processor mock, which now owns ItemLeaseConstraintCheck
+	mockProc := &mockQueueProcessor{
+		shard:     shard,
+		clock:     clockwork.NewRealClock(),
+		sem:       util.NewTrackingSemaphore(int(numWorkers)),
+		workers:   workers,
+		shadowMap: make(map[string]ShadowContinuation),
+		opts:      opts,
 		constraintResultFunc: func() enums.QueueConstraint {
 			count := atomic.AddInt32(&callCount, 1)
 			// Add some delay to increase chance of race
@@ -485,18 +488,6 @@ func TestProcessorIteratorCounterRaceConditionMixed(t *testing.T) {
 				return enums.QueueConstraintCustomConcurrencyKey1
 			}
 		},
-	}
-
-	workers := make(chan ProcessItem, numItems)
-	opts := NewQueueOptions()
-
-	mockProc := &mockQueueProcessor{
-		shard:     shard,
-		clock:     clockwork.NewRealClock(),
-		sem:       util.NewTrackingSemaphore(int(numWorkers)),
-		workers:   workers,
-		shadowMap: make(map[string]ShadowContinuation),
-		opts:      opts,
 	}
 
 	partition := &QueuePartition{
@@ -575,9 +566,21 @@ func TestProcessorIteratorIsCustomKeyLimitOnlyRace(t *testing.T) {
 
 	var callCount int32
 
-	// Create shard that alternates between custom key limit and function concurrency limit
 	shard := &mockShardForIterator{
 		name: "test-shard",
+	}
+
+	workers := make(chan ProcessItem, numItems)
+	opts := NewQueueOptions()
+
+	// Set constraintResultFunc on the processor mock, which now owns ItemLeaseConstraintCheck
+	mockProc := &mockQueueProcessor{
+		shard:     shard,
+		clock:     clockwork.NewRealClock(),
+		sem:       util.NewTrackingSemaphore(int(numWorkers)),
+		workers:   workers,
+		shadowMap: make(map[string]ShadowContinuation),
+		opts:      opts,
 		constraintResultFunc: func() enums.QueueConstraint {
 			count := atomic.AddInt32(&callCount, 1)
 			time.Sleep(time.Microsecond * 10)
@@ -588,18 +591,6 @@ func TestProcessorIteratorIsCustomKeyLimitOnlyRace(t *testing.T) {
 			}
 			return enums.QueueConstraintFunctionConcurrency
 		},
-	}
-
-	workers := make(chan ProcessItem, numItems)
-	opts := NewQueueOptions()
-
-	mockProc := &mockQueueProcessor{
-		shard:     shard,
-		clock:     clockwork.NewRealClock(),
-		sem:       util.NewTrackingSemaphore(int(numWorkers)),
-		workers:   workers,
-		shadowMap: make(map[string]ShadowContinuation),
-		opts:      opts,
 	}
 
 	partition := &QueuePartition{
