@@ -93,7 +93,7 @@ func (q *queueProcessor) tryClaimShardLease(ctx context.Context, shards []QueueS
 			q.shardLeaseID = leaseID
 			q.primaryQueueShard = shard
 			q.shardLeaseLock.Unlock()
-			q.log.Info("claimed shard lease", "shard", shard.Name(), "group", q.runMode.ShardGroup)
+			q.log.Info("claimed shard lease", "shard", shard.Name(), "group", q.runMode.ShardGroup, "leaseID", leaseID)
 			return nil
 		}
 	}
@@ -138,7 +138,7 @@ func (q *queueProcessor) renewShardLease(ctx context.Context) {
 				return
 			}
 			if err != nil {
-				q.log.Error("failed to renew shard lease", "error", err, "shard", shard.Name(), "group", q.runMode.ShardGroup)
+				q.log.Error("failed to renew shard lease", "error", err, "shard", shard.Name(), "group", q.runMode.ShardGroup, "leaseID", leaseID)
 				q.quit <- err
 				return
 			}
@@ -148,6 +148,8 @@ func (q *queueProcessor) renewShardLease(ctx context.Context) {
 				q.shardLeaseLock.Lock()
 				q.shardLeaseID = newLeaseID
 				q.shardLeaseLock.Unlock()
+				q.log.Info("Successfully renewed lease", "old_lease", leaseID, "new_lease", newLeaseID)
+
 			}
 		}
 	}

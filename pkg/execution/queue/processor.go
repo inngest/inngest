@@ -410,7 +410,10 @@ func (q *queueProcessor) ResetAttemptsByJobID(ctx context.Context, shardName str
 func (q *queueProcessor) Run(ctx context.Context, f RunFunc) error {
 	// claimShardLease will block until a shard lease is obtained to process the primaryQueueShard.
 	if len(q.runMode.ShardGroup) != 0 {
+		q.log.Info("Executor started in ShardGroup mode, attempting to claim a shard lease", "shard_group", q.runMode.ShardGroup)
 		q.claimShardLease(ctx)
+	} else {
+		q.log.Info("Executor started in assignedQueueShard Mode", "queue_shard", q.primaryQueueShard.Name())
 	}
 	q.initializeShardAssignment(q.primaryQueueShard)
 
