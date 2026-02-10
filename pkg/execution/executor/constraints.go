@@ -60,7 +60,7 @@ func WithConstraints[T any](
 	}
 
 	// Read feature flag
-	enable := useConstraintAPI(ctx, req.AccountID, req.WorkspaceID, req.Function.ID)
+	enable := useConstraintAPI(ctx, req.AccountID)
 
 	defer func() {
 		metrics.HistogramScheduleDuration(ctx, time.Since(start).Milliseconds(), metrics.HistogramOpt{
