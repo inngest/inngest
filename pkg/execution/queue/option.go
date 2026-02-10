@@ -785,6 +785,9 @@ func NewQueueOptions(
 		EnableCapacityLeaseInstrumentation: func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool) {
 			return false
 		},
+		UseConstraintAPI: func(ctx context.Context, accountID uuid.UUID) (enable bool) {
+			return false
+		},
 	}
 
 	for _, qopt := range options {
