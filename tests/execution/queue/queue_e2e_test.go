@@ -208,6 +208,16 @@ func TestQueueE2E(t *testing.T) {
 			options := append([]queue.QueueOpt{
 				queue.WithClock(clock),
 				queue.WithConditionalTracer(tracer),
+				queue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p queue.PartitionIdentifier) queue.PartitionConstraintConfig {
+					return queue.PartitionConstraintConfig{
+						FunctionVersion: 1,
+						Concurrency: queue.PartitionConcurrency{
+							SystemConcurrency:   consts.DefaultConcurrencyLimit,
+							AccountConcurrency:  consts.DefaultConcurrencyLimit,
+							FunctionConcurrency: consts.DefaultConcurrencyLimit,
+						},
+					}
+				}),
 			}, tc.queueOptions...)
 
 			cm, err := constraintapi.NewRedisCapacityManager(
