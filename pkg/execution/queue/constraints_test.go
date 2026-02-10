@@ -1,0 +1,888 @@
+package queue
+
+import (
+	"fmt"
+	"testing"
+
+	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/constraintapi"
+	"github.com/inngest/inngest/pkg/enums"
+	"github.com/stretchr/testify/assert"
+)
+
+func TestConstraintConfigFromConstraints(t *testing.T) {
+	tests := []struct {
+		name        string
+		constraints PartitionConstraintConfig
+		expected    constraintapi.ConstraintConfig
+	}{
+		{
+			name:        "empty constraints",
+			constraints: PartitionConstraintConfig{},
+			expected: constraintapi.ConstraintConfig{
+				FunctionVersion: 0,
+				Concurrency: constraintapi.ConcurrencyConfig{
+					AccountConcurrency:     0,
+					FunctionConcurrency:    0,
+					AccountRunConcurrency:  0,
+					FunctionRunConcurrency: 0,
+				},
+			},
+		},
+		{
+			name: "basic concurrency limits",
+			constraints: PartitionConstraintConfig{
+				FunctionVersion: 1,
+				Concurrency: PartitionConcurrency{
+					AccountConcurrency:     100,
+					FunctionConcurrency:    10,
+					AccountRunConcurrency:  50,
+					FunctionRunConcurrency: 5,
+				},
+			},
+			expected: constraintapi.ConstraintConfig{
+				FunctionVersion: 1,
+				Concurrency: constraintapi.ConcurrencyConfig{
+					AccountConcurrency:     100,
+					FunctionConcurrency:    10,
+					AccountRunConcurrency:  50,
+					FunctionRunConcurrency: 5,
+				},
+			},
+		},
+		{
+			name: "with custom concurrency keys",
+			constraints: PartitionConstraintConfig{
+				FunctionVersion: 2,
+				Concurrency: PartitionConcurrency{
+					AccountConcurrency:  100,
+					FunctionConcurrency: 10,
+					CustomConcurrencyKeys: []CustomConcurrencyLimit{
+						{
+							Mode:                enums.ConcurrencyModeStep,
+							Scope:               enums.ConcurrencyScopeAccount,
+							Limit:               5,
+							HashedKeyExpression: "key1-hash",
+						},
+						{
+							Mode:                enums.ConcurrencyModeStep,
+							Scope:               enums.ConcurrencyScopeFn,
+							Limit:               3,
+							HashedKeyExpression: "key2-hash",
+						},
+					},
+				},
+			},
+			expected: constraintapi.ConstraintConfig{
+				FunctionVersion: 2,
+				Concurrency: constraintapi.ConcurrencyConfig{
+					AccountConcurrency:  100,
+					FunctionConcurrency: 10,
+					CustomConcurrencyKeys: []constraintapi.CustomConcurrencyLimit{
+						{
+							Mode:              enums.ConcurrencyModeStep,
+							Scope:             enums.ConcurrencyScopeAccount,
+							Limit:             5,
+							KeyExpressionHash: "key1-hash",
+						},
+						{
+							Mode:              enums.ConcurrencyModeStep,
+							Scope:             enums.ConcurrencyScopeFn,
+							Limit:             3,
+							KeyExpressionHash: "key2-hash",
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "with throttle",
+			constraints: PartitionConstraintConfig{
+				FunctionVersion: 1,
+				Throttle: &PartitionThrottle{
+					Limit:                     10,
+					Burst:                     5,
+					Period:                    60,
+					ThrottleKeyExpressionHash: "throttle-hash",
+				},
+			},
+			expected: constraintapi.ConstraintConfig{
+				FunctionVersion: 1,
+				Concurrency: constraintapi.ConcurrencyConfig{
+					AccountConcurrency:     0,
+					FunctionConcurrency:    0,
+					AccountRunConcurrency:  0,
+					FunctionRunConcurrency: 0,
+				},
+				Throttle: []constraintapi.ThrottleConfig{
+					{
+						Limit:             10,
+						Burst:             5,
+						Period:            60,
+						KeyExpressionHash: "throttle-hash",
+					},
+				},
+			},
+		},
+		{
+			name: "complete configuration",
+			constraints: PartitionConstraintConfig{
+				FunctionVersion: 3,
+				Concurrency: PartitionConcurrency{
+					AccountConcurrency:     200,
+					FunctionConcurrency:    20,
+					AccountRunConcurrency:  100,
+					FunctionRunConcurrency: 10,
+					CustomConcurrencyKeys: []CustomConcurrencyLimit{
+						{
+							Mode:                enums.ConcurrencyModeStep,
+							Scope:               enums.ConcurrencyScopeAccount,
+							Limit:               15,
+							HashedKeyExpression: "custom-key-hash",
+						},
+					},
+				},
+				Throttle: &PartitionThrottle{
+					Limit:                     20,
+					Burst:                     10,
+					Period:                    30,
+					ThrottleKeyExpressionHash: "complete-throttle-hash",
+				},
+			},
+			expected: constraintapi.ConstraintConfig{
+				FunctionVersion: 3,
+				Concurrency: constraintapi.ConcurrencyConfig{
+					AccountConcurrency:     200,
+					FunctionConcurrency:    20,
+					AccountRunConcurrency:  100,
+					FunctionRunConcurrency: 10,
+					CustomConcurrencyKeys: []constraintapi.CustomConcurrencyLimit{
+						{
+							Mode:              enums.ConcurrencyModeStep,
+							Scope:             enums.ConcurrencyScopeAccount,
+							Limit:             15,
+							KeyExpressionHash: "custom-key-hash",
+						},
+					},
+				},
+				Throttle: []constraintapi.ThrottleConfig{
+					{
+						Limit:             20,
+						Burst:             10,
+						Period:            30,
+						KeyExpressionHash: "complete-throttle-hash",
+					},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := ConstraintConfigFromConstraints(tt.constraints)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestConstraintItemsFromBacklog(t *testing.T) {
+	accountID, fnID := uuid.New(), uuid.New()
+	tests := []struct {
+		name     string
+		backlog  *QueueBacklog
+		sp       *QueueShadowPartition
+		expected []constraintapi.ConstraintItem
+	}{
+		{
+			name: "minimal backlog",
+			backlog: &QueueBacklog{
+				ShadowPartitionID: fnID.String(),
+			},
+			sp: &QueueShadowPartition{
+				PartitionID: fnID.String(),
+				AccountID:   &accountID,
+				FunctionID:  &fnID,
+			},
+			expected: []constraintapi.ConstraintItem{
+				{
+					Kind: constraintapi.ConstraintKindConcurrency,
+					Concurrency: &constraintapi.ConcurrencyConstraint{
+						Mode:  enums.ConcurrencyModeStep,
+						Scope: enums.ConcurrencyScopeAccount,
+					},
+				},
+				{
+					Kind: constraintapi.ConstraintKindConcurrency,
+					Concurrency: &constraintapi.ConcurrencyConstraint{
+						Mode:  enums.ConcurrencyModeStep,
+						Scope: enums.ConcurrencyScopeFn,
+					},
+				},
+			},
+		},
+		{
+			name: "with throttle",
+			backlog: &QueueBacklog{
+				Throttle: &BacklogThrottle{
+					ThrottleKeyExpressionHash: "throttle-expr-hash",
+					ThrottleKey:               "throttle-key-value",
+				},
+			},
+			sp: &QueueShadowPartition{
+				PartitionID: fnID.String(),
+				AccountID:   &accountID,
+				FunctionID:  &fnID,
+			},
+			expected: []constraintapi.ConstraintItem{
+				{
+					Kind: constraintapi.ConstraintKindConcurrency,
+					Concurrency: &constraintapi.ConcurrencyConstraint{
+						Mode:  enums.ConcurrencyModeStep,
+						Scope: enums.ConcurrencyScopeAccount,
+					},
+				},
+				{
+					Kind: constraintapi.ConstraintKindConcurrency,
+					Concurrency: &constraintapi.ConcurrencyConstraint{
+						Mode:  enums.ConcurrencyModeStep,
+						Scope: enums.ConcurrencyScopeFn,
+					},
+				},
+				{
+					Kind: constraintapi.ConstraintKindThrottle,
+					Throttle: &constraintapi.ThrottleConstraint{
+						KeyExpressionHash: "throttle-expr-hash",
+						EvaluatedKeyHash:  "throttle-key-value",
+					},
+				},
+			},
+		},
+		{
+			name: "with custom concurrency keys",
+			backlog: &QueueBacklog{
+				ConcurrencyKeys: []BacklogConcurrencyKey{
+					{
+						CanonicalKeyID:      fmt.Sprintf("a:%s:%s", accountID, "custom-key-1-value"),
+						ConcurrencyMode:     enums.ConcurrencyModeStep,
+						Scope:               enums.ConcurrencyScopeAccount,
+						EntityID:            accountID,
+						HashedKeyExpression: "custom-key-1-hash",
+						HashedValue:         "custom-key-1-value",
+					},
+					{
+						CanonicalKeyID:      fmt.Sprintf("f:%s:%s", fnID, "custom-key-2-value"),
+						ConcurrencyMode:     enums.ConcurrencyModeStep,
+						Scope:               enums.ConcurrencyScopeFn,
+						EntityID:            fnID,
+						HashedKeyExpression: "custom-key-2-hash",
+						HashedValue:         "custom-key-2-value",
+					},
+				},
+			},
+			sp: &QueueShadowPartition{
+				PartitionID: fnID.String(),
+				AccountID:   &accountID,
+				FunctionID:  &fnID,
+			},
+			expected: []constraintapi.ConstraintItem{
+				{
+					Kind: constraintapi.ConstraintKindConcurrency,
+					Concurrency: &constraintapi.ConcurrencyConstraint{
+						Mode:  enums.ConcurrencyModeStep,
+						Scope: enums.ConcurrencyScopeAccount,
+					},
+				},
+				{
+					Kind: constraintapi.ConstraintKindConcurrency,
+					Concurrency: &constraintapi.ConcurrencyConstraint{
+						Mode:  enums.ConcurrencyModeStep,
+						Scope: enums.ConcurrencyScopeFn,
+					},
+				},
+				{
+					Kind: constraintapi.ConstraintKindConcurrency,
+					Concurrency: &constraintapi.ConcurrencyConstraint{
+						Mode:              enums.ConcurrencyModeStep,
+						Scope:             enums.ConcurrencyScopeAccount,
+						KeyExpressionHash: "custom-key-1-hash",
+						EvaluatedKeyHash:  "custom-key-1-value",
+					},
+				},
+				{
+					Kind: constraintapi.ConstraintKindConcurrency,
+					Concurrency: &constraintapi.ConcurrencyConstraint{
+						Mode:              enums.ConcurrencyModeStep,
+						Scope:             enums.ConcurrencyScopeFn,
+						KeyExpressionHash: "custom-key-2-hash",
+						EvaluatedKeyHash:  "custom-key-2-value",
+					},
+				},
+			},
+		},
+		{
+			name: "complete backlog with throttle and concurrency keys",
+			backlog: &QueueBacklog{
+				Throttle: &BacklogThrottle{
+					ThrottleKeyExpressionHash: "complete-throttle-hash",
+					ThrottleKey:               "complete-throttle-value",
+				},
+				ConcurrencyKeys: []BacklogConcurrencyKey{
+					{
+						CanonicalKeyID:      fmt.Sprintf("e:%s:%s", fnID, "complete-key-value"),
+						ConcurrencyMode:     enums.ConcurrencyModeStep,
+						Scope:               enums.ConcurrencyScopeEnv,
+						EntityID:            fnID,
+						HashedKeyExpression: "complete-key-hash",
+						HashedValue:         "complete-key-value",
+					},
+				},
+			},
+			sp: &QueueShadowPartition{
+				PartitionID: fnID.String(),
+				AccountID:   &accountID,
+				FunctionID:  &fnID,
+			},
+			expected: []constraintapi.ConstraintItem{
+				{
+					Kind: constraintapi.ConstraintKindConcurrency,
+					Concurrency: &constraintapi.ConcurrencyConstraint{
+						Mode:  enums.ConcurrencyModeStep,
+						Scope: enums.ConcurrencyScopeAccount,
+					},
+				},
+				{
+					Kind: constraintapi.ConstraintKindConcurrency,
+					Concurrency: &constraintapi.ConcurrencyConstraint{
+						Mode:  enums.ConcurrencyModeStep,
+						Scope: enums.ConcurrencyScopeFn,
+					},
+				},
+				{
+					Kind: constraintapi.ConstraintKindThrottle,
+					Throttle: &constraintapi.ThrottleConstraint{
+						KeyExpressionHash: "complete-throttle-hash",
+						EvaluatedKeyHash:  "complete-throttle-value",
+					},
+				},
+				{
+					Kind: constraintapi.ConstraintKindConcurrency,
+					Concurrency: &constraintapi.ConcurrencyConstraint{
+						Mode:              enums.ConcurrencyModeStep,
+						Scope:             enums.ConcurrencyScopeEnv,
+						KeyExpressionHash: "complete-key-hash",
+						EvaluatedKeyHash:  "complete-key-value",
+					},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := constraintItemsFromBacklog(tt.sp, tt.backlog)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestConvertLimitingConstraint(t *testing.T) {
+	tests := []struct {
+		name                string
+		constraints         PartitionConstraintConfig
+		limitingConstraints []constraintapi.ConstraintItem
+		expected            enums.QueueConstraint
+	}{
+		{
+			name:                "no limiting constraints",
+			constraints:         PartitionConstraintConfig{},
+			limitingConstraints: []constraintapi.ConstraintItem{},
+			expected:            enums.QueueConstraintNotLimited,
+		},
+		{
+			name:        "account concurrency constraint",
+			constraints: PartitionConstraintConfig{},
+			limitingConstraints: []constraintapi.ConstraintItem{
+				{
+					Kind: constraintapi.ConstraintKindConcurrency,
+					Concurrency: &constraintapi.ConcurrencyConstraint{
+						Scope:             enums.ConcurrencyScopeAccount,
+						KeyExpressionHash: "",
+					},
+				},
+			},
+			expected: enums.QueueConstraintAccountConcurrency,
+		},
+		{
+			name:        "function concurrency constraint",
+			constraints: PartitionConstraintConfig{},
+			limitingConstraints: []constraintapi.ConstraintItem{
+				{
+					Kind: constraintapi.ConstraintKindConcurrency,
+					Concurrency: &constraintapi.ConcurrencyConstraint{
+						Scope:             enums.ConcurrencyScopeFn,
+						KeyExpressionHash: "",
+					},
+				},
+			},
+			expected: enums.QueueConstraintFunctionConcurrency,
+		},
+		{
+			name: "custom concurrency key 1",
+			constraints: PartitionConstraintConfig{
+				Concurrency: PartitionConcurrency{
+					CustomConcurrencyKeys: []CustomConcurrencyLimit{
+						{
+							Mode:                enums.ConcurrencyModeStep,
+							Scope:               enums.ConcurrencyScopeAccount,
+							HashedKeyExpression: "custom-key-1",
+						},
+					},
+				},
+			},
+			limitingConstraints: []constraintapi.ConstraintItem{
+				{
+					Kind: constraintapi.ConstraintKindConcurrency,
+					Concurrency: &constraintapi.ConcurrencyConstraint{
+						Mode:              enums.ConcurrencyModeStep,
+						Scope:             enums.ConcurrencyScopeAccount,
+						KeyExpressionHash: "custom-key-1",
+					},
+				},
+			},
+			expected: enums.QueueConstraintCustomConcurrencyKey1,
+		},
+		{
+			name: "custom concurrency key 2",
+			constraints: PartitionConstraintConfig{
+				Concurrency: PartitionConcurrency{
+					CustomConcurrencyKeys: []CustomConcurrencyLimit{
+						{
+							Mode:                enums.ConcurrencyModeStep,
+							Scope:               enums.ConcurrencyScopeAccount,
+							HashedKeyExpression: "custom-key-1",
+						},
+						{
+							Mode:                enums.ConcurrencyModeStep,
+							Scope:               enums.ConcurrencyScopeFn,
+							HashedKeyExpression: "custom-key-2",
+						},
+					},
+				},
+			},
+			limitingConstraints: []constraintapi.ConstraintItem{
+				{
+					Kind: constraintapi.ConstraintKindConcurrency,
+					Concurrency: &constraintapi.ConcurrencyConstraint{
+						Mode:              enums.ConcurrencyModeStep,
+						Scope:             enums.ConcurrencyScopeFn,
+						KeyExpressionHash: "custom-key-2",
+					},
+				},
+			},
+			expected: enums.QueueConstraintCustomConcurrencyKey2,
+		},
+		{
+			name:        "throttle constraint",
+			constraints: PartitionConstraintConfig{},
+			limitingConstraints: []constraintapi.ConstraintItem{
+				{
+					Kind: constraintapi.ConstraintKindThrottle,
+				},
+			},
+			expected: enums.QueueConstraintThrottle,
+		},
+		{
+			name:        "multiple constraints - last one wins",
+			constraints: PartitionConstraintConfig{},
+			limitingConstraints: []constraintapi.ConstraintItem{
+				{
+					Kind: constraintapi.ConstraintKindConcurrency,
+					Concurrency: &constraintapi.ConcurrencyConstraint{
+						Scope:             enums.ConcurrencyScopeAccount,
+						KeyExpressionHash: "",
+					},
+				},
+				{
+					Kind: constraintapi.ConstraintKindThrottle,
+				},
+			},
+			expected: enums.QueueConstraintThrottle,
+		},
+		{
+			name:        "unknown constraint kind",
+			constraints: PartitionConstraintConfig{},
+			limitingConstraints: []constraintapi.ConstraintItem{
+				{
+					Kind: "unknown-kind",
+				},
+			},
+			expected: enums.QueueConstraintNotLimited,
+		},
+		{
+			name: "custom concurrency key without matching configuration",
+			constraints: PartitionConstraintConfig{
+				Concurrency: PartitionConcurrency{
+					CustomConcurrencyKeys: []CustomConcurrencyLimit{
+						{
+							Mode:                enums.ConcurrencyModeStep,
+							Scope:               enums.ConcurrencyScopeAccount,
+							HashedKeyExpression: "different-key",
+						},
+					},
+				},
+			},
+			limitingConstraints: []constraintapi.ConstraintItem{
+				{
+					Kind: constraintapi.ConstraintKindConcurrency,
+					Concurrency: &constraintapi.ConcurrencyConstraint{
+						Mode:              enums.ConcurrencyModeStep,
+						Scope:             enums.ConcurrencyScopeAccount,
+						KeyExpressionHash: "non-matching-key",
+					},
+				},
+			},
+			expected: enums.QueueConstraintNotLimited,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := ConvertLimitingConstraint(tt.constraints, tt.limitingConstraints)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestConstraintItemsBacklogToLimitingConstraintRoundTrip(t *testing.T) {
+	accountID, fnID := uuid.New(), uuid.New()
+	tests := []struct {
+		name                    string
+		backlog                 *QueueBacklog
+		sp                      *QueueShadowPartition
+		constraints             PartitionConstraintConfig
+		expectedQueueConstraint enums.QueueConstraint
+		description             string
+	}{
+		{
+			name:    "account concurrency constraint round trip",
+			backlog: &QueueBacklog{},
+			sp: &QueueShadowPartition{
+				PartitionID: fnID.String(),
+				AccountID:   &accountID,
+				FunctionID:  &fnID,
+			},
+			constraints: PartitionConstraintConfig{
+				Concurrency: PartitionConcurrency{
+					AccountConcurrency: 10,
+				},
+			},
+			expectedQueueConstraint: enums.QueueConstraintAccountConcurrency,
+			description:             "Account concurrency constraint items should map back to account concurrency queue constraint",
+		},
+		{
+			name:    "function concurrency constraint round trip",
+			backlog: &QueueBacklog{},
+			sp: &QueueShadowPartition{
+				PartitionID: fnID.String(),
+				AccountID:   &accountID,
+				FunctionID:  &fnID,
+			},
+			constraints: PartitionConstraintConfig{
+				Concurrency: PartitionConcurrency{
+					FunctionConcurrency: 5,
+				},
+			},
+			expectedQueueConstraint: enums.QueueConstraintFunctionConcurrency,
+			description:             "Function concurrency constraint items should map back to function concurrency queue constraint",
+		},
+		{
+			name: "throttle constraint round trip",
+			backlog: &QueueBacklog{
+				Throttle: &BacklogThrottle{
+					ThrottleKeyExpressionHash: "throttle-hash",
+					ThrottleKey:               "throttle-value",
+				},
+			},
+			sp: &QueueShadowPartition{
+				PartitionID: fnID.String(),
+				AccountID:   &accountID,
+				FunctionID:  &fnID,
+			},
+			constraints: PartitionConstraintConfig{
+				Throttle: &PartitionThrottle{
+					Limit:                     10,
+					Burst:                     5,
+					Period:                    60,
+					ThrottleKeyExpressionHash: "throttle-hash",
+				},
+			},
+			expectedQueueConstraint: enums.QueueConstraintThrottle,
+			description:             "Throttle constraint items should map back to throttle queue constraint",
+		},
+		{
+			name: "custom concurrency key 1 round trip",
+			backlog: &QueueBacklog{
+				ConcurrencyKeys: []BacklogConcurrencyKey{
+					{
+						CanonicalKeyID:      fmt.Sprintf("a:%s:%s", accountID, "custom-key-1-value"),
+						ConcurrencyMode:     enums.ConcurrencyModeStep,
+						Scope:               enums.ConcurrencyScopeAccount,
+						EntityID:            accountID,
+						HashedKeyExpression: "custom-key-1-hash",
+						HashedValue:         "custom-key-1-value",
+					},
+				},
+			},
+			sp: &QueueShadowPartition{
+				PartitionID: fnID.String(),
+				AccountID:   &accountID,
+				FunctionID:  &fnID,
+			},
+			constraints: PartitionConstraintConfig{
+				Concurrency: PartitionConcurrency{
+					CustomConcurrencyKeys: []CustomConcurrencyLimit{
+						{
+							Mode:                enums.ConcurrencyModeStep,
+							Scope:               enums.ConcurrencyScopeAccount,
+							Limit:               3,
+							HashedKeyExpression: "custom-key-1-hash",
+						},
+					},
+				},
+			},
+			expectedQueueConstraint: enums.QueueConstraintCustomConcurrencyKey1,
+			description:             "First custom concurrency key constraint items should map back to custom key 1 queue constraint",
+		},
+		{
+			name: "custom concurrency key 2 round trip",
+			backlog: &QueueBacklog{
+				ConcurrencyKeys: []BacklogConcurrencyKey{
+					{
+						CanonicalKeyID:      fmt.Sprintf("a:%s:%s", accountID, "key-1-value"),
+						ConcurrencyMode:     enums.ConcurrencyModeStep,
+						Scope:               enums.ConcurrencyScopeAccount,
+						EntityID:            accountID,
+						HashedKeyExpression: "key-1-hash",
+						HashedValue:         "key-1-value",
+					},
+					{
+						CanonicalKeyID:      fmt.Sprintf("f:%s:%s", fnID, "custom-key-2-value"),
+						ConcurrencyMode:     enums.ConcurrencyModeStep,
+						Scope:               enums.ConcurrencyScopeFn,
+						EntityID:            fnID,
+						HashedKeyExpression: "custom-key-2-hash",
+						HashedValue:         "custom-key-2-value",
+					},
+				},
+			},
+			sp: &QueueShadowPartition{
+				PartitionID: fnID.String(),
+				AccountID:   &accountID,
+				FunctionID:  &fnID,
+			},
+			constraints: PartitionConstraintConfig{
+				Concurrency: PartitionConcurrency{
+					CustomConcurrencyKeys: []CustomConcurrencyLimit{
+						{
+							Mode:                enums.ConcurrencyModeStep,
+							Scope:               enums.ConcurrencyScopeAccount,
+							Limit:               5,
+							HashedKeyExpression: "key-1-hash",
+						},
+						{
+							Mode:                enums.ConcurrencyModeStep,
+							Scope:               enums.ConcurrencyScopeFn,
+							Limit:               2,
+							HashedKeyExpression: "custom-key-2-hash",
+						},
+					},
+				},
+			},
+			expectedQueueConstraint: enums.QueueConstraintCustomConcurrencyKey2,
+			description:             "Second custom concurrency key constraint items should map back to custom key 2 queue constraint",
+		},
+		{
+			name: "multiple constraints with throttle taking precedence",
+			backlog: &QueueBacklog{
+				Throttle: &BacklogThrottle{
+					ThrottleKeyExpressionHash: "throttle-hash",
+					ThrottleKey:               "throttle-value",
+				},
+				ConcurrencyKeys: []BacklogConcurrencyKey{
+					{
+						CanonicalKeyID:      fmt.Sprintf("a:%s:%s", accountID, "custom-key-value"),
+						ConcurrencyMode:     enums.ConcurrencyModeStep,
+						Scope:               enums.ConcurrencyScopeAccount,
+						EntityID:            accountID,
+						HashedKeyExpression: "custom-key-hash",
+						HashedValue:         "custom-key-value",
+					},
+				},
+			},
+			sp: &QueueShadowPartition{
+				PartitionID: fnID.String(),
+				AccountID:   &accountID,
+				FunctionID:  &fnID,
+			},
+			constraints: PartitionConstraintConfig{
+				Concurrency: PartitionConcurrency{
+					AccountConcurrency: 100,
+					CustomConcurrencyKeys: []CustomConcurrencyLimit{
+						{
+							Mode:                enums.ConcurrencyModeStep,
+							Scope:               enums.ConcurrencyScopeAccount,
+							Limit:               3,
+							HashedKeyExpression: "custom-key-hash",
+						},
+					},
+				},
+				Throttle: &PartitionThrottle{
+					Limit:                     15,
+					Burst:                     3,
+					Period:                    30,
+					ThrottleKeyExpressionHash: "throttle-hash",
+				},
+			},
+			expectedQueueConstraint: enums.QueueConstraintThrottle,
+			description:             "When multiple constraints exist, throttle should take precedence (last one wins)",
+		},
+		{
+			name: "non-matching custom concurrency key should not limit",
+			backlog: &QueueBacklog{
+				ConcurrencyKeys: []BacklogConcurrencyKey{
+					{
+						CanonicalKeyID:      fmt.Sprintf("a:%s:%s", accountID, "different-value"),
+						ConcurrencyMode:     enums.ConcurrencyModeStep,
+						Scope:               enums.ConcurrencyScopeAccount,
+						EntityID:            accountID,
+						HashedKeyExpression: "different-hash",
+						HashedValue:         "different-value",
+					},
+				},
+			},
+			sp: &QueueShadowPartition{
+				PartitionID: fnID.String(),
+				AccountID:   &accountID,
+				FunctionID:  &fnID,
+			},
+			constraints: PartitionConstraintConfig{
+				Concurrency: PartitionConcurrency{
+					CustomConcurrencyKeys: []CustomConcurrencyLimit{
+						{
+							Mode:                enums.ConcurrencyModeStep,
+							Scope:               enums.ConcurrencyScopeAccount,
+							Limit:               3,
+							HashedKeyExpression: "non-matching-hash",
+						},
+					},
+				},
+			},
+			expectedQueueConstraint: enums.QueueConstraintNotLimited,
+			description:             "Custom concurrency keys that don't match configuration should not create limiting constraints",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Step 1: Generate constraint items from the backlog
+			constraintItems := constraintItemsFromBacklog(tt.sp, tt.backlog)
+
+			// Step 2: Filter the constraint items to find the ones that would be limiting
+			// We simulate what the constraint API would return as limiting constraints
+			var simulatedLimitingConstraints []constraintapi.ConstraintItem
+
+			// Determine which constraint type we expect to be limiting based on the test case
+			switch tt.expectedQueueConstraint {
+			case enums.QueueConstraintAccountConcurrency:
+				// Only account concurrency would be limiting
+				for _, item := range constraintItems {
+					if item.Kind == constraintapi.ConstraintKindConcurrency && item.Concurrency != nil &&
+						item.Concurrency.Scope == enums.ConcurrencyScopeAccount && item.Concurrency.KeyExpressionHash == "" {
+						simulatedLimitingConstraints = append(simulatedLimitingConstraints, item)
+						break
+					}
+				}
+			case enums.QueueConstraintFunctionConcurrency:
+				// Only function concurrency would be limiting
+				for _, item := range constraintItems {
+					if item.Kind == constraintapi.ConstraintKindConcurrency && item.Concurrency != nil &&
+						item.Concurrency.Scope == enums.ConcurrencyScopeFn && item.Concurrency.KeyExpressionHash == "" {
+						simulatedLimitingConstraints = append(simulatedLimitingConstraints, item)
+						break
+					}
+				}
+			case enums.QueueConstraintThrottle:
+				// Only throttle would be limiting
+				for _, item := range constraintItems {
+					if item.Kind == constraintapi.ConstraintKindThrottle && item.Throttle != nil {
+						simulatedLimitingConstraints = append(simulatedLimitingConstraints, item)
+						break
+					}
+				}
+			case enums.QueueConstraintCustomConcurrencyKey1:
+				// Only the first custom concurrency key would be limiting
+				for _, item := range constraintItems {
+					if item.Kind == constraintapi.ConstraintKindConcurrency && item.Concurrency != nil &&
+						item.Concurrency.KeyExpressionHash != "" && item.Concurrency.EvaluatedKeyHash != "" {
+						// Check if this matches the first custom concurrency key in the configuration
+						if len(tt.constraints.Concurrency.CustomConcurrencyKeys) > 0 {
+							expectedKey := tt.constraints.Concurrency.CustomConcurrencyKeys[0]
+							if item.Concurrency.Mode == expectedKey.Mode &&
+								item.Concurrency.Scope == expectedKey.Scope &&
+								item.Concurrency.KeyExpressionHash == expectedKey.HashedKeyExpression {
+								simulatedLimitingConstraints = append(simulatedLimitingConstraints, item)
+								break
+							}
+						}
+					}
+				}
+			case enums.QueueConstraintCustomConcurrencyKey2:
+				// Only the second custom concurrency key would be limiting
+				for _, item := range constraintItems {
+					if item.Kind == constraintapi.ConstraintKindConcurrency && item.Concurrency != nil &&
+						item.Concurrency.KeyExpressionHash != "" && item.Concurrency.EvaluatedKeyHash != "" {
+						// Check if this matches the second custom concurrency key in the configuration
+						if len(tt.constraints.Concurrency.CustomConcurrencyKeys) > 1 {
+							expectedKey := tt.constraints.Concurrency.CustomConcurrencyKeys[1]
+							if item.Concurrency.Mode == expectedKey.Mode &&
+								item.Concurrency.Scope == expectedKey.Scope &&
+								item.Concurrency.KeyExpressionHash == expectedKey.HashedKeyExpression {
+								simulatedLimitingConstraints = append(simulatedLimitingConstraints, item)
+								break
+							}
+						}
+					}
+				}
+			case enums.QueueConstraintNotLimited:
+				// No constraints would be limiting - leave the slice empty
+			}
+
+			// Step 3: Convert the limiting constraints back to a queue constraint
+			queueConstraint := ConvertLimitingConstraint(tt.constraints, simulatedLimitingConstraints)
+
+			// Step 4: Verify the round trip matches expectations
+			assert.Equal(t, tt.expectedQueueConstraint, queueConstraint, tt.description)
+
+			// Additional verification: ensure the constraint items contain the expected types
+			if tt.expectedQueueConstraint != enums.QueueConstraintNotLimited {
+				assert.NotEmpty(t, simulatedLimitingConstraints, "Should have found limiting constraints for non-NotLimited queue constraint")
+			}
+
+			// Verify that basic account and function concurrency constraints are always present
+			hasAccountConcurrency := false
+			hasFunctionConcurrency := false
+			for _, item := range constraintItems {
+				if item.Kind == constraintapi.ConstraintKindConcurrency && item.Concurrency != nil {
+					if item.Concurrency.Scope == enums.ConcurrencyScopeAccount && item.Concurrency.KeyExpressionHash == "" {
+						hasAccountConcurrency = true
+					}
+					if item.Concurrency.Scope == enums.ConcurrencyScopeFn && item.Concurrency.KeyExpressionHash == "" {
+						hasFunctionConcurrency = true
+					}
+				}
+			}
+			assert.True(t, hasAccountConcurrency, "Should always include account concurrency constraint")
+			assert.True(t, hasFunctionConcurrency, "Should always include function concurrency constraint")
+		})
+	}
+}
