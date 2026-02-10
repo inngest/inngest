@@ -95,8 +95,6 @@ func loadHTTPRequestEvent(ctx context.Context, sl sv2.StateLoader, id sv2.ID) *i
 }
 
 func (d httpv2) sync(ctx context.Context, sl sv2.StateLoader, opts driver.V2RequestOpts) (*state.DriverResponse, errs.UserError, errs.InternalError) {
-	sig := Sign(ctx, opts.SigningKey, opts.Metadata.ID.RunID[:])
-
 	method := http.MethodPost
 	if m, _ := opts.Fn.Driver.Metadata["method"].(string); m != "" {
 		method = m
@@ -129,6 +127,8 @@ func (d httpv2) sync(ctx context.Context, sl sv2.StateLoader, opts driver.V2Requ
 			}
 		}
 	}
+
+	sig := Sign(ctx, opts.SigningKey, body)
 
 	req, err := exechttp.NewRequest(
 		method,
