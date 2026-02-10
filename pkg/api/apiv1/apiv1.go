@@ -127,6 +127,15 @@ func (a *router) setup() {
 			})
 		}
 
+		// Checkpoint output API does its own auth (using query params), so
+		// should not be wrapped with the general auth middleware.
+		{
+			api := NewCheckpointAPI(a.opts)
+			for _, prefix := range CheckpointRoutePrefixes {
+				r.Get(prefix+"/{runID}/output", api.Output)
+			}
+		}
+
 		r.Group(func(r chi.Router) {
 			if a.opts.AuthMiddleware != nil {
 				r.Use(a.opts.AuthMiddleware)
