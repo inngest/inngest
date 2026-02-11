@@ -14,6 +14,7 @@ import { useGetTraceResult } from '@/hooks/useGetTraceResult';
 import { useInvokeRun } from '@/hooks/useInvokeRun';
 import { useRerun } from '@/hooks/useRerun';
 import { useRerunFromStep } from '@/hooks/useRerunFromStep';
+import { useStreamRun } from '@/hooks/useStreamRun';
 import { pathCreator } from '@/utils/pathCreator';
 
 export const SharedContextProvider = ({
@@ -31,6 +32,7 @@ export const SharedContextProvider = ({
   const createDebugSession = useCreateDebugSession();
   const getDebugRun = useGetDebugRun();
   const getDebugSession = useGetDebugSession();
+  const streamRun = useStreamRun();
 
   const handlers: Partial<SharedHandlers> = {
     invokeRun,
@@ -47,6 +49,7 @@ export const SharedContextProvider = ({
     getDebugRun,
     getDebugSession,
     createDebugSession,
+    streamRun,
   };
 
   return <SharedProvider handlers={handlers}>{children}</SharedProvider>;

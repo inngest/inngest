@@ -696,6 +696,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	serviceOpts := apiv2.ServiceOptions{
 		SigningKeysProvider: apiv2.NewSigningKeysProvider(opts.SigningKey),
 		EventKeysProvider:   apiv2.NewEventKeysProvider(opts.EventKeys),
+		ConnectRPCProvider:  NewConnectRPCProvider(dbcqrs),
 	}
 
 	apiv2Base := apiv2base.NewBase()
@@ -705,6 +706,12 @@ func start(ctx context.Context, opts StartOpts) error {
 	if err != nil {
 		return fmt.Errorf("failed to create v2 handler: %w", err)
 	}
+
+	//
+	// Create rpc handler for connect rpc based endpoints
+	connectService := apiv2.NewService(serviceOpts)
+	connectHandler := apiv2.NewConnectRpcHandler(connectService)
+	connectPath, connectHTTPHandler := apiv2.NewConnectRPCHTTPHandler(connectHandler)
 
 	// Create a new data API directly in the devserver.  This allows us to inject
 	// the data API into the dev server port, providing a single router for the dev
@@ -717,6 +724,9 @@ func start(ctx context.Context, opts StartOpts) error {
 		{At: "/", Router: devAPI},
 		{At: "/v0", Router: core.Router},
 		{At: "/api/v2", Handler: apiv2Handler},
+		//
+		// /rpc, see: pkg/api/v2/service.go
+		{At: connectPath, Handler: connectHTTPHandler},
 		{At: "/debug", Handler: middleware.Profiler()},
 		{At: "/metrics", Router: metricsAPI.Router},
 	}

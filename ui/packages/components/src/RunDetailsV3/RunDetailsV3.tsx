@@ -5,6 +5,7 @@ import type { Run as InitialRunData } from '../RunsPage/types';
 import { useBooleanFlag } from '../SharedContext/useBooleanFlag';
 import { useGetRun } from '../SharedContext/useGetRun';
 import { useGetTraceResult } from '../SharedContext/useGetTraceResult';
+import { useStreamRun } from '../SharedContext/useStreamRun';
 import { StatusCell } from '../Table/Cell';
 import { TriggerDetails } from '../TriggerDetails';
 import { DragDivider } from '../icons/DragDivider';
@@ -61,6 +62,7 @@ export const RunDetailsV3 = ({
     false
   );
   const { value: tracesPreviewEnabled } = booleanFlag('traces-preview', true, true);
+  const { value: rpcEnabled, isReady: rpcFlagReady } = booleanFlag('connect-rpc', false);
   const { updateDynamicRunData } = useDynamicRunData({ runID });
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -144,17 +146,22 @@ export const RunDetailsV3 = ({
     };
   }, [isDragging, handleMouseMove, handleMouseUp]);
 
-  const {
-    data: runData,
-    error: runError,
-    refetch: refetchRun,
-  } = useGetRun({
+  const useRpc = rpcFlagReady && rpcEnabled;
+
+  const { data: streamRunData, error: streamRunError } = useStreamRun({
+    runID,
+    enabled: Boolean(runID) && useRpc,
+  });
+
+  const { data: getRunData, error: getRunError } = useGetRun({
     runID,
     preview: tracesPreviewEnabled,
-    //
-    // TODO: enable this for cloud once we're sure we can handle the load
     refetchInterval: pollInterval,
+    enabled: Boolean(runID) && !useRpc,
   });
+
+  const runData = useRpc ? streamRunData : getRunData;
+  const runError = useRpc ? streamRunError : getRunError;
 
   const outputID = runData?.trace?.outputID;
   const {
@@ -238,10 +245,7 @@ export const RunDetailsV3 = ({
               />
             )}
             {showError && (
-              <ErrorCard
-                error={runError || resultError}
-                reset={runError ? () => refetchRun() : () => refetchResult()}
-              />
+              <ErrorCard error={runError || resultError} reset={() => refetchResult()} />
             )}
           </div>
           <Tabs

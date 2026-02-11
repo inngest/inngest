@@ -33,7 +33,11 @@
     "env:rm": "npx vercel env rm"
   },
   "dependencies": {
+    "@bufbuild/protobuf": "^2.11.0",
     "@clerk/tanstack-react-start": "^0.27.9",
+    "@connectrpc/connect": "^2.0.1",
+    "@connectrpc/connect-query": "^2.2.0",
+    "@connectrpc/connect-web": "^2.0.1",
     "@graphql-typed-document-node/core": "^3.2.0",
     "@headlessui/react": "^1.7.18",
     "@headlessui/tailwindcss": "^0.1.2",
