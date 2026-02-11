@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/util/errs"
 )
@@ -16,6 +17,19 @@ type releaseScriptResponse struct {
 	// Remaining specifies the number of remaining leases
 	// generated in the same Acquire operation
 	Remaining int `json:"r"`
+
+	// EnvID from the request state
+	EnvID string `json:"e,omitempty"`
+
+	// FunctionID from the request state
+	FunctionID string `json:"f,omitempty"`
+
+	// Metadata from the request state
+	Metadata *struct {
+		SourceService           int `json:"ss,omitempty"`
+		SourceLocation          int `json:"sl,omitempty"`
+		SourceRunProcessingMode int `json:"sm,omitempty"`
+	} `json:"m,omitempty"`
 }
 
 // Release implements CapacityManager.
@@ -30,6 +44,8 @@ func (r *redisCapacityManager) Release(ctx context.Context, req *CapacityRelease
 	l = l.With(
 		"account_id", req.AccountID,
 		"lease_id", req.LeaseID,
+		"source", req.Source,
+		"migration", req.Migration,
 	)
 
 	// Retrieve client and key prefix for current constraints
@@ -74,9 +90,18 @@ func (r *redisCapacityManager) Release(ctx context.Context, req *CapacityRelease
 		"args", args,
 	)
 
-	rawRes, err := scripts["release"].Exec(ctx, client, keys, args).AsBytes()
-	if err != nil {
-		return nil, errs.Wrap(0, false, "release script failed: %w", err)
+	rawRes, internalErr := executeLuaScript(
+		ctx,
+		"release",
+		req.Migration,
+		req.Source,
+		client,
+		r.clock,
+		keys,
+		args,
+	)
+	if internalErr != nil {
+		return nil, internalErr
 	}
 
 	parsedResponse := releaseScriptResponse{}
@@ -86,7 +111,35 @@ func (r *redisCapacityManager) Release(ctx context.Context, req *CapacityRelease
 	}
 
 	res := &CapacityReleaseResponse{
+		AccountID:          req.AccountID,
 		internalDebugState: parsedResponse,
+	}
+
+	// Parse EnvID if present
+	if parsedResponse.EnvID != "" {
+		envID, err := uuid.Parse(parsedResponse.EnvID)
+		if err != nil {
+			return nil, errs.Wrap(0, false, "invalid env_id in response: %w", err)
+		}
+		res.EnvID = envID
+	}
+
+	// Parse FunctionID if present
+	if parsedResponse.FunctionID != "" {
+		functionID, err := uuid.Parse(parsedResponse.FunctionID)
+		if err != nil {
+			return nil, errs.Wrap(0, false, "invalid function_id in response: %w", err)
+		}
+		res.FunctionID = functionID
+	}
+
+	// Parse metadata if present
+	if parsedResponse.Metadata != nil {
+		res.CreationSource = LeaseSource{
+			Service:           LeaseService(parsedResponse.Metadata.SourceService),
+			Location:          CallerLocation(parsedResponse.Metadata.SourceLocation),
+			RunProcessingMode: RunProcessingMode(parsedResponse.Metadata.SourceRunProcessingMode),
+		}
 	}
 
 	switch parsedResponse.Status {
@@ -96,7 +149,9 @@ func (r *redisCapacityManager) Release(ctx context.Context, req *CapacityRelease
 		// TODO: Track status (1: cleaned up, 2: cleaned up)
 		return res, nil
 	case 3:
-		l.Trace("capacity released")
+		if r.enableHighCardinalityInstrumentation != nil && r.enableHighCardinalityInstrumentation(ctx, req.AccountID, uuid.Nil, uuid.Nil) {
+			l.Debug("capacity released")
+		}
 
 		if len(r.lifecycles) > 0 {
 			for _, hook := range r.lifecycles {

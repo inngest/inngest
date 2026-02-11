@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { inngest } from '../client';
 import { createChannel } from '../realtime';
 import { createInsightsNetwork } from './agents/network';
+import { setObservability } from './agents/observability';
 import type { InsightsAgentState } from './agents/types';
 
 export const runAgentNetwork = inngest.createFunction(
@@ -51,6 +52,7 @@ export const runAgentNetwork = inngest.createFunction(
         createState<InsightsAgentState>(
           {
             userId,
+            query: userMessage.content,
             ...clientState,
           },
           {
@@ -61,12 +63,39 @@ export const runAgentNetwork = inngest.createFunction(
       );
 
       // Run the network with streaming enabled
-      await network.run(userMessage, {
+      // network.run() returns a NetworkRun instance with the mutated state
+      const networkRun = await network.run(userMessage, {
         streaming: {
           publish: async (chunk: AgentMessageChunk) => {
             await publish(createChannel(targetChannel).agent_stream(chunk));
           },
         },
+      });
+
+      // Capture summarizer output (doesn't use a tool, just returns text)
+      const summarizerResult = networkRun.state.results.find(
+        (r) => r.agentName === 'Insights Summarizer',
+      );
+      const summaryOutput = summarizerResult?.output.find(
+        (msg) => msg.type === 'text' && msg.role === 'assistant',
+      );
+      if (
+        summaryOutput &&
+        'content' in summaryOutput &&
+        typeof summaryOutput.content === 'string'
+      ) {
+        setObservability(networkRun, 'summarizer', {
+          output: summaryOutput.content,
+        });
+      }
+
+      // Capture observability data in a separate step
+      await step.run('capture-observability-data', async () => {
+        return {
+          userPrompt: userMessage.content,
+          timestamp: new Date().toISOString(),
+          agents: networkRun.state.data.observability || {},
+        };
       });
 
       return {

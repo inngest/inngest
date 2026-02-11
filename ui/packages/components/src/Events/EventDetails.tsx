@@ -6,12 +6,12 @@ import { Time } from '@inngest/components/Time';
 import { usePrettyJson } from '@inngest/components/hooks/usePrettyJson';
 import { type Event } from '@inngest/components/types/event';
 import { cn } from '@inngest/components/utils/classNames';
+import { LINE_HEIGHT } from '@inngest/components/utils/monaco';
 import { devServerURL, useDevServer } from '@inngest/components/utils/useDevServer';
 import { RiArrowRightSLine, RiExternalLinkLine } from '@remixicon/react';
 import { useQuery } from '@tanstack/react-query';
 import { Link as TanstackLink } from '@tanstack/react-router';
 
-import { CodeBlock } from '../CodeBlock';
 import {
   IDElement,
   LazyElementWrapper,
@@ -20,6 +20,7 @@ import {
   TimeElement,
 } from '../DetailsCard/Element';
 import { Link } from '../Link';
+import { NewCodeBlock as CodeBlock } from '../NewCodeBlock/NewCodeBlock';
 import { useShared } from '../SharedContext/SharedContext';
 import { StatusDot } from '../Status/StatusDot';
 import { DragDivider } from '../icons/DragDivider';
@@ -152,7 +153,24 @@ export function EventDetails({
   const eventName = initialData?.name || eventDetailsData?.name;
   const eventRuns = initialData?.runs || eventRunsData?.runs;
 
-  return (
+  //
+  // Calculate CodeBlock height based on content for non-standalone mode.
+  const getCodeBlockHeight = () => {
+    if (standalone) {
+      return undefined;
+    }
+    const lineCount = prettyPayload ? (prettyPayload.match(/\n/g) || []).length + 1 : 1;
+    //
+    // give or take
+    const headerHeight = 52;
+    const paddingHeight = 24;
+    const minHeight = 150;
+    const maxHeight = typeof window !== 'undefined' ? window.innerHeight * 0.7 : 500;
+    const contentHeight = lineCount * LINE_HEIGHT + headerHeight + paddingHeight;
+    return Math.min(Math.max(contentHeight, minHeight), maxHeight);
+  };
+
+  const content = (
     <>
       {standalone && (
         <div className="flex flex-row items-start justify-between px-4 pb-4 pt-8">
@@ -169,10 +187,14 @@ export function EventDetails({
 
       <div
         ref={containerRef}
-        className={cn('flex flex-row', standalone ? 'border-subtle border-t' : '')}
+        className={cn('flex flex-row', standalone && 'border-subtle min-h-0 flex-1 border-t')}
       >
-        <div ref={leftColumnRef} className="flex flex-col gap-2" style={{ width: `${leftWidth}%` }}>
-          <div ref={eventInfoRef} className="flex flex-col">
+        <div
+          ref={leftColumnRef}
+          className={cn('flex flex-col gap-2', standalone && 'min-h-0 flex-1')}
+          style={{ width: `${leftWidth}%` }}
+        >
+          <div ref={eventInfoRef} className={cn('flex flex-col', standalone && 'min-h-0 flex-1')}>
             <div className="mb-3 flex h-8 items-center justify-between gap-1 px-4">
               <div className="flex items-center gap-2">
                 <p className="text-basis text-base">{eventName}</p>
@@ -227,7 +249,10 @@ export function EventDetails({
               </LazyElementWrapper>
             </div>
             {!payloadError && (
-              <div className="border-subtle border-t pl-px">
+              <div
+                className={cn('border-subtle border-t pl-px', standalone && 'min-h-0 flex-1')}
+                style={standalone ? undefined : { height: getCodeBlockHeight() }}
+              >
                 <CodeBlock
                   loading={isPendingPayload}
                   header={{ title: 'Payload' }}
@@ -317,4 +342,10 @@ export function EventDetails({
       </div>
     </>
   );
+
+  if (standalone) {
+    return <div className="flex h-full flex-col">{content}</div>;
+  }
+
+  return content;
 }

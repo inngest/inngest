@@ -24,30 +24,20 @@ type PauseMutater interface {
 	// This returns the number of pauses in the current pause.Index.
 	SavePause(ctx context.Context, p Pause) (int64, error)
 
-	// LeasePause allows us to lease the pause until the next step is enqueued, at which point
-	// we can 'consume' the pause to remove it.
-	//
-	// This prevents a failure mode in which we consume the pause but enqueueing the next
-	// action fails (eg. due to power loss).
-	//
-	// If the given pause has been leased within LeasePauseDuration, this should return an
-	// ErrPauseLeased error.
-	//
-	// See https://github.com/inngest/inngest/issues/123 for more info
-	LeasePause(ctx context.Context, id uuid.UUID) error
-
-	// ConsumePause consumes a pause by its ID such that it can't be used again and
-	// will not be returned from any query.
-	//
-	// Any data passed when consuming a pause will be stored within function run state
-	// for future reference using the pause's DataKey.
-	ConsumePause(ctx context.Context, p Pause, opts ConsumePauseOpts) (ConsumePauseResult, func() error, error)
-
 	// DeletePause permanently deletes a pause.
 	DeletePause(ctx context.Context, p Pause, opts ...DeletePauseOpt) error
 
 	// DeletePauseByID removes a pause by its ID.
 	DeletePauseByID(ctx context.Context, pauseID uuid.UUID, workspaceID uuid.UUID) error
+
+	// PauseIDsForRun returns all pause IDs associated with a run.
+	PauseIDsForRun(ctx context.Context, runID ulid.ULID) ([]uuid.UUID, error)
+
+	// DeleteRunPausesIndex deletes the index tracking pauses for a run.
+	DeleteRunPausesIndex(ctx context.Context, runID ulid.ULID) error
+
+	// DeletePausesForRun deletes all pauses associated with a run.
+	DeletePausesForRun(ctx context.Context, runID ulid.ULID, workspaceID uuid.UUID) error
 }
 
 // PauseGetter allows a runner to return all existing pauses by event or by outgoing ID.  This

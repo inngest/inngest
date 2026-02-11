@@ -101,6 +101,8 @@ export function getInsightsStatus({
 }: GetInsightsStatusParams): InsightsStatus {
   if (isLoading) return 'loading';
   if (isError) return 'error';
+  if (data?.diagnostics.find((x) => x.severity === 'error') !== undefined)
+    return 'error';
   if (data !== undefined) return 'success';
   return 'initial';
 }

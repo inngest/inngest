@@ -1,11 +1,4 @@
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ReactNode,
-} from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { Resizable } from '@inngest/components/Resizable/Resizable';
 import {
@@ -17,15 +10,16 @@ import { v4 as uuidv4 } from 'uuid';
 
 import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { InsightsStateMachineContextProvider } from '@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext';
+import { SQLEditorProvider } from '@/components/Insights/InsightsSQLEditor/SQLEditorContext';
 import type {
   QuerySnapshot,
   QueryTemplate,
   Tab,
 } from '@/components/Insights/types';
 import type { InsightsQueryStatement } from '@/gql/graphql';
-import { pathCreator } from '@/utils/urls';
 import { isQuerySnapshot, isQueryTemplate } from '../queries';
 import { SHOW_DOCS_CONTROL_PANEL_BUTTON } from '../temp-flags';
+import { InsightsAIHelperProvider } from '../InsightsAIHelperContext';
 import { InsightsHelperPanel } from './InsightsHelperPanel/InsightsHelperPanel';
 import {
   InsightsHelperPanelControl,
@@ -36,7 +30,6 @@ import {
   DOCUMENTATION,
   INSIGHTS_AI,
   SCHEMA_EXPLORER,
-  SUPPORT,
   type HelperTitle,
 } from './InsightsHelperPanel/constants';
 import {
@@ -101,33 +94,54 @@ export interface UseInsightsTabManagerProps {
   historyWindow?: number;
   isQueryHelperPanelVisible: boolean;
   onToggleQueryHelperPanelVisibility: () => void;
+  isSavedQueriesFetching: boolean;
+  deepLinkQueryId?: string;
 }
 
 export function useInsightsTabManager(
   props: UseInsightsTabManagerProps,
 ): UseInsightsTabManagerReturn {
-  const [isMounted, setIsMounted] = useState(false);
+  // Always initialize with default state to ensure SSR and hydration match
   const [tabs, setTabs] = useState<Tab[]>([HOME_TAB]);
   const [activeTabId, setActiveTabId] = useState<string>(HOME_TAB.id);
+  const hasHydratedRef = useRef(false);
   const isInsightsAgentEnabled = useBooleanFlag('insights-agent');
   const isSchemaWidgetEnabled = useBooleanFlag('insights-schema-widget');
 
-  // Load from localStorage after mount (avoids hydration mismatch)
+  // Wait for saved queries to load before restoring tabs (prevents race condition)
   useEffect(() => {
+    if (hasHydratedRef.current || props.isSavedQueriesFetching) return;
+
     const stored = getStoredTabs();
     if (stored) {
       setTabs(stored.tabs);
-      setActiveTabId(stored.activeTabId);
-    }
-    setIsMounted(true);
-  }, []);
 
-  // Save tabs to local storage whenever they change (only after initial mount)
-  useEffect(() => {
-    if (isMounted) {
-      saveTabsToStorage(tabs, activeTabId);
+      // Handle activeTabId based on deep link
+      if (props.deepLinkQueryId) {
+        // If there's a deep link, check if the query is already in restored tabs
+        const existingTab = stored.tabs.find(
+          (tab) => tab.savedQueryId === props.deepLinkQueryId,
+        );
+        if (existingTab) {
+          // Focus the existing tab
+          setActiveTabId(existingTab.id);
+        }
+        // If not found, useDeepLinkHandler will create it and focus it
+        // See: ui/apps/dashboard/src/components/Insights/useDeepLinkHandler.ts
+      } else {
+        // No deep link, restore the previous activeTabId
+        setActiveTabId(stored.activeTabId);
+      }
     }
-  }, [tabs, activeTabId, isMounted]);
+
+    hasHydratedRef.current = true;
+  }, [props.isSavedQueriesFetching, props.deepLinkQueryId]);
+
+  // Save tabs to local storage whenever they change (skip first render)
+  useEffect(() => {
+    if (!hasHydratedRef.current) return;
+    saveTabsToStorage(tabs, activeTabId);
+  }, [tabs, activeTabId]);
 
   // Map each UI tab to a stable agent thread id
   const agentThreadIdByTabRef = useRef<Record<string, string>>({});
@@ -270,6 +284,235 @@ export function useInsightsTabManager(
   return { actions, activeTabId, tabManager, tabs };
 }
 
+interface SingleTabRendererProps {
+  tab: Tab;
+  activeTabId: string;
+  actions: TabManagerActions;
+  activeHelper: HelperTitle | null;
+  setActiveHelper: (helper: HelperTitle | null) => void;
+  isHelperPanelOpen: boolean;
+  getAgentThreadIdForTab: (tabId: string) => string;
+  helperItems: HelperItem[];
+  historyWindow?: number;
+}
+
+// Renders a single tab with all its content
+function SingleTabRenderer({
+  tab,
+  activeTabId,
+  actions,
+  activeHelper,
+  setActiveHelper,
+  isHelperPanelOpen,
+  getAgentThreadIdForTab,
+  helperItems,
+  historyWindow,
+}: SingleTabRendererProps) {
+  const isActive = tab.id === activeTabId;
+
+  return (
+    <InsightsStateMachineContextProvider
+      key={tab.id}
+      onQueryChange={(query) => actions.updateTab(tab.id, { query })}
+      onQueryNameChange={(name) => actions.updateTab(tab.id, { name })}
+      query={tab.query}
+      queryName={tab.name}
+      renderChildren={isActive}
+      tabId={tab.id}
+    >
+      {isQueryTab(tab.id) ? (
+        <SQLEditorProvider>
+          <div
+            className={
+              isActive ? 'h-full w-full' : 'h-0 w-full overflow-hidden'
+            }
+          >
+            <div className="flex h-full w-full">
+              <div className="h-full min-w-0 flex-1 overflow-hidden">
+                {isHelperPanelOpen && activeHelper ? (
+                  <Resizable
+                    defaultSplitPercentage={75}
+                    minSplitPercentage={20}
+                    maxSplitPercentage={85}
+                    orientation="horizontal"
+                    splitKey="insights-helper-split"
+                    first={
+                      <div className="h-full min-w-0 overflow-hidden">
+                        <InsightsTabPanel
+                          isHomeTab={tab.id === HOME_TAB.id}
+                          isTemplatesTab={tab.id === TEMPLATES_TAB.id}
+                          tab={tab}
+                          historyWindow={historyWindow}
+                        />
+                      </div>
+                    }
+                    second={
+                      <InsightsHelperPanel
+                        active={activeHelper}
+                        agentThreadId={getAgentThreadIdForTab(tab.id)}
+                        onClose={() => {
+                          setActiveHelper(null);
+                        }}
+                      />
+                    }
+                  />
+                ) : (
+                  <InsightsTabPanel
+                    isHomeTab={tab.id === HOME_TAB.id}
+                    isTemplatesTab={tab.id === TEMPLATES_TAB.id}
+                    tab={tab}
+                    historyWindow={historyWindow}
+                  />
+                )}
+              </div>
+              {isQueryTab(tab.id) && helperItems.length > 0 ? (
+                <InsightsHelperPanelControl
+                  items={helperItems}
+                  activeTitle={activeHelper}
+                />
+              ) : null}
+            </div>
+          </div>
+        </SQLEditorProvider>
+      ) : (
+        <div
+          className={isActive ? 'h-full w-full' : 'h-0 w-full overflow-hidden'}
+        >
+          <InsightsTabPanel
+            isHomeTab={tab.id === HOME_TAB.id}
+            isTemplatesTab={tab.id === TEMPLATES_TAB.id}
+            tab={tab}
+            historyWindow={historyWindow}
+          />
+        </div>
+      )}
+    </InsightsStateMachineContextProvider>
+  );
+}
+
+interface TabsRendererProps {
+  tabs: Tab[];
+  activeTabId: string;
+  actions: TabManagerActions;
+  activeHelper: HelperTitle | null;
+  setActiveHelper: (helper: HelperTitle | null) => void;
+  isHelperPanelOpen: boolean;
+  getAgentThreadIdForTab: (tabId: string) => string;
+  helperItems: HelperItem[];
+  historyWindow?: number;
+}
+
+// Component for rendering tabs WITHOUT AI helper integration (no chat provider)
+function TabsRenderer({
+  tabs,
+  activeTabId,
+  actions,
+  activeHelper,
+  setActiveHelper,
+  isHelperPanelOpen,
+  getAgentThreadIdForTab,
+  helperItems,
+  historyWindow,
+}: TabsRendererProps) {
+  return (
+    <InsightsAIHelperProvider openAIHelperWithPrompt={() => Promise.resolve()}>
+      <div className="h-full w-full">
+        {tabs.map((tab) => (
+          <SingleTabRenderer
+            key={tab.id}
+            tab={tab}
+            activeTabId={activeTabId}
+            actions={actions}
+            activeHelper={activeHelper}
+            setActiveHelper={setActiveHelper}
+            isHelperPanelOpen={isHelperPanelOpen}
+            getAgentThreadIdForTab={getAgentThreadIdForTab}
+            helperItems={helperItems}
+            historyWindow={historyWindow}
+          />
+        ))}
+      </div>
+    </InsightsAIHelperProvider>
+  );
+}
+
+interface TabsWithAIHelperProps {
+  tabs: Tab[];
+  activeTabId: string;
+  actions: TabManagerActions;
+  activeHelper: HelperTitle | null;
+  setActiveHelper: (helper: HelperTitle | null) => void;
+  isHelperPanelOpen: boolean;
+  getAgentThreadIdForTab: (tabId: string) => string;
+  helperItems: HelperItem[];
+  historyWindow?: number;
+}
+
+function TabsWithAIHelper({
+  tabs,
+  activeTabId,
+  actions,
+  activeHelper,
+  setActiveHelper,
+  isHelperPanelOpen,
+  getAgentThreadIdForTab,
+  helperItems,
+  historyWindow,
+}: TabsWithAIHelperProps) {
+  // Access the chat provider context to send messages to AI helper
+  const chatProvider = useInsightsChatProvider();
+
+  // Open AI helper by default on mount (now that provider is ready)
+  useEffect(() => {
+    if (activeHelper === null) {
+      setActiveHelper(INSIGHTS_AI);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run on mount - setActiveHelper is stable
+
+  const openAIHelperWithPrompt = useCallback(
+    async (prompt: string) => {
+      // Get the thread ID for the active tab
+      const threadId = getAgentThreadIdForTab(activeTabId);
+
+      // Set the current thread ID FIRST, before opening the panel
+      // This ensures the InsightsChat component has the correct thread ID when it mounts
+      chatProvider.setCurrentThreadId(threadId);
+
+      // Open the AI helper panel (even if already open, this ensures it's visible)
+      setActiveHelper(INSIGHTS_AI);
+
+      // Wait a tick to ensure the panel is rendered and state is synced
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      // Send the prompt message to the thread
+      await chatProvider.sendMessageToThread(threadId, prompt);
+    },
+    [activeTabId, getAgentThreadIdForTab, chatProvider, setActiveHelper],
+  );
+
+  return (
+    <InsightsAIHelperProvider openAIHelperWithPrompt={openAIHelperWithPrompt}>
+      <div className="h-full w-full">
+        {tabs.map((tab) => (
+          <SingleTabRenderer
+            key={tab.id}
+            tab={tab}
+            activeTabId={activeTabId}
+            actions={actions}
+            activeHelper={activeHelper}
+            setActiveHelper={setActiveHelper}
+            isHelperPanelOpen={isHelperPanelOpen}
+            getAgentThreadIdForTab={getAgentThreadIdForTab}
+            helperItems={helperItems}
+            historyWindow={historyWindow}
+          />
+        ))}
+      </div>
+    </InsightsAIHelperProvider>
+  );
+}
+
 interface InsightsTabManagerInternalProps {
   actions: TabManagerActions;
   activeTabId: string;
@@ -337,13 +580,6 @@ function InsightsTabManagerInternal({
       });
     }
 
-    items.push({
-      title: SUPPORT,
-      icon: <InsightsHelperPanelIcon title={SUPPORT} />,
-      action: noOp,
-      href: pathCreator.support({ ref: 'app-insights' }),
-    });
-
     return items;
   }, [handleSelectHelper, isInsightsAgentEnabled, isSchemaWidgetEnabled]);
   // Provide shared transport/connection for all descendant useAgents hooks
@@ -354,76 +590,17 @@ function InsightsTabManagerInternal({
     [isInsightsAgentEnabled],
   );
 
-  const providerChildren: ReactNode = (
-    <div className="h-full w-full">
-      {tabs.map((tab) => (
-        <InsightsStateMachineContextProvider
-          key={tab.id}
-          onQueryChange={(query) => actions.updateTab(tab.id, { query })}
-          onQueryNameChange={(name) => actions.updateTab(tab.id, { name })}
-          query={tab.query}
-          queryName={tab.name}
-          renderChildren={tab.id === activeTabId}
-          tabId={tab.id}
-        >
-          <div
-            className={
-              tab.id === activeTabId
-                ? 'h-full w-full'
-                : 'h-0 w-full overflow-hidden'
-            }
-          >
-            <div className="flex h-full w-full">
-              <div className="h-full min-w-0 flex-1 overflow-hidden">
-                {isQueryTab(tab.id) && isHelperPanelOpen ? (
-                  <Resizable
-                    defaultSplitPercentage={75}
-                    minSplitPercentage={20}
-                    maxSplitPercentage={85}
-                    orientation="horizontal"
-                    splitKey="insights-helper-split"
-                    first={
-                      <div className="h-full min-w-0 overflow-hidden">
-                        <InsightsTabPanel
-                          isHomeTab={tab.id === HOME_TAB.id}
-                          isTemplatesTab={tab.id === TEMPLATES_TAB.id}
-                          tab={tab}
-                          historyWindow={historyWindow}
-                        />
-                      </div>
-                    }
-                    second={
-                      <InsightsHelperPanel
-                        active={activeHelper}
-                        agentThreadId={getAgentThreadIdForTab(tab.id)}
-                        onClose={() => {
-                          setActiveHelper(null);
-                        }}
-                      />
-                    }
-                  />
-                ) : (
-                  <InsightsTabPanel
-                    isHomeTab={tab.id === HOME_TAB.id}
-                    isTemplatesTab={tab.id === TEMPLATES_TAB.id}
-                    tab={tab}
-                    historyWindow={historyWindow}
-                  />
-                )}
-              </div>
-              {isQueryTab(tab.id) &&
-              hasMoreThanOneHelperPanelFeatureEnabled(helperItems) ? (
-                <InsightsHelperPanelControl
-                  items={helperItems}
-                  activeTitle={activeHelper}
-                />
-              ) : null}
-            </div>
-          </div>
-        </InsightsStateMachineContextProvider>
-      ))}
-    </div>
-  );
+  const tabsProps = {
+    tabs,
+    activeTabId,
+    actions,
+    activeHelper,
+    setActiveHelper,
+    isHelperPanelOpen,
+    getAgentThreadIdForTab,
+    helperItems,
+    historyWindow,
+  };
   return (
     <div className="flex h-full w-full flex-1 flex-col overflow-hidden">
       <InsightsTabsList
@@ -445,23 +622,15 @@ function InsightsTabManagerInternal({
                 activeTabId={activeTabId}
                 getAgentThreadIdForTab={getAgentThreadIdForTab}
               />
-              {providerChildren}
+              <TabsWithAIHelper {...tabsProps} />
             </InsightsChatProvider>
           </AgentProvider>
         ) : (
-          providerChildren
+          <TabsRenderer {...tabsProps} />
         )}
       </div>
     </div>
   );
-}
-
-// This ensures the user has support + at least one of AI, Documentation, or Schema Explorer enabled.
-// Otherwise, we just hide the helper panel because only showing support is not useful.
-function hasMoreThanOneHelperPanelFeatureEnabled(
-  features: HelperItem[],
-): boolean {
-  return features.length > 1;
 }
 
 function getNewActiveTabAfterClose(
@@ -556,8 +725,4 @@ function ActiveThreadBridge({
 
 function isQueryTab(tabId: string): boolean {
   return tabId !== HOME_TAB.id && tabId !== TEMPLATES_TAB.id;
-}
-
-function noOp() {
-  return;
 }

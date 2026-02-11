@@ -24,17 +24,18 @@ import (
 //
 
 // NewRedisClient initializes a new redis client
-func NewRedisClient(addr, username, password string) (rueidis.Client, error) {
+func NewRedisClient(addr, username, password string, cluster bool) (rueidis.Client, error) {
 	return rueidis.NewClient(rueidis.ClientOption{
-		InitAddress:  []string{addr},
-		Username:     username,
-		Password:     password,
-		SelectDB:     0,
-		DisableCache: true, // garnet doesn't support client side caching
+		InitAddress:       []string{addr},
+		Username:          username,
+		Password:          password,
+		SelectDB:          0,
+		DisableCache:      true,
+		ForceSingleClient: !cluster, // Force single client mode only when NOT in cluster mode
 		Dialer: net.Dialer{
-			Timeout: 30 * time.Second, // Increased connection timeout
+			Timeout: 30 * time.Second,
 		},
-		ConnWriteTimeout: 30 * time.Second, // Increased write timeout for large keys
+		ConnWriteTimeout: 30 * time.Second,
 	})
 }
 
@@ -620,7 +621,7 @@ func StartGarnet(t *testing.T, opts ...GarnetOption) (*GarnetContainer, error) {
 
 	for range 5 {
 		// Create client with the mapped port
-		rc, err := NewRedisClient(connectAddr, "", passwd)
+		rc, err := NewRedisClient(connectAddr, "", passwd, false)
 		if err != nil {
 			fmt.Printf("ERROR: %v\n", err)
 			<-time.After(time.Second)

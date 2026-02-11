@@ -83,7 +83,7 @@ UPDATE functions SET config = $1, archived_at = NULL WHERE id = $2 RETURNING *;
 UPDATE functions SET archived_at = CURRENT_TIMESTAMP WHERE app_id = $1;
 
 -- name: DeleteFunctionsByIDs :exec
-UPDATE functions SET archived_at = NOW() WHERE id IN (sqlc.slice('ids'));
+UPDATE functions SET archived_at = NOW() WHERE id = ANY(@ids::text[]);
 
 
 --
@@ -240,7 +240,7 @@ SELECT * FROM traces WHERE trace_id = sqlc.arg('trace_id') AND run_id = sqlc.arg
 SELECT * FROM traces WHERE trace_id = sqlc.arg('trace_id') AND span_id = sqlc.arg('span_id') ORDER BY timestamp_unix_ms DESC, duration DESC;
 
 -- name: GetTraceRunsByTriggerId :many
-SELECT * FROM trace_runs WHERE POSITION(sqlc.arg('event_id') IN trigger_ids::text) > 0;
+SELECT * FROM trace_runs WHERE POSITION(sqlc.arg('event_id') IN convert_from(trigger_ids, 'UTF8')) > 0;
 
 --
 -- Queue snapshots
@@ -416,7 +416,7 @@ SELECT
   )) AS span_fragments
 FROM spans
 WHERE debug_run_id = CAST($1 AS CHAR(26))
-GROUP BY trace_id, run_id, debug_session_id, parent_span_id
+GROUP BY trace_id, run_id, debug_session_id, dynamic_span_id, parent_span_id
 ORDER BY start_time;
 
 -- name: GetSpansByDebugSessionID :many

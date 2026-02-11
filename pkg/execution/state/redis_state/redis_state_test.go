@@ -41,9 +41,27 @@ func TestNewRunMetadata(t *testing.T) {
 				"id":       string(byt),
 			},
 			expectedVal: &runMetadata{
-				Status:   enums.RunStatusCompleted,
-				Version:  1,
-				Debugger: false,
+				Status:         enums.RunStatusCompleted,
+				Version:        1,
+				Debugger:       false,
+				RequestVersion: -1,
+			},
+			expectedError: nil,
+		},
+		{
+			name: "should return fixed request version",
+			data: map[string]string{
+				"status":   "1",
+				"version":  "1",
+				"debugger": "false",
+				"id":       string(byt),
+				"rv":       "0",
+			},
+			expectedVal: &runMetadata{
+				Status:         enums.RunStatusCompleted,
+				Version:        1,
+				Debugger:       false,
+				RequestVersion: 0,
 			},
 			expectedError: nil,
 		},
@@ -204,11 +222,12 @@ func TestStateHarness(t *testing.T) {
 		QueueDefaultKey:        QueueDefaultKey,
 		FnRunIsSharded:         AlwaysShardOnRun,
 	})
+	pauseStore := NewPauseStore(unshardedClient)
 
 	sm, err := New(
 		context.Background(),
-		WithUnshardedClient(unshardedClient),
 		WithShardedClient(shardedClient),
+		WithPauseDeleter(pauseStore),
 	)
 	require.NoError(t, err)
 
@@ -314,10 +333,12 @@ func TestLoadStackStepInputsStepsWithIDs(t *testing.T) {
 		FnRunIsSharded:         AlwaysShardOnRun,
 	})
 
+	pauseStore := NewPauseStore(unshardedClient)
+
 	sm, err := New(
 		ctx,
-		WithUnshardedClient(unshardedClient),
 		WithShardedClient(shardedClient),
+		WithPauseDeleter(pauseStore),
 	)
 	require.NoError(t, err)
 
@@ -458,21 +479,7 @@ func TestPauseCreatedAt(t *testing.T) {
 	defer rc.Close()
 
 	unshardedClient := NewUnshardedClient(rc, StateDefaultKey, QueueDefaultKey)
-	shardedClient := NewShardedClient(ShardedClientOpts{
-		UnshardedClient:        unshardedClient,
-		FunctionRunStateClient: rc,
-		BatchClient:            rc,
-		StateDefaultKey:        StateDefaultKey,
-		QueueDefaultKey:        QueueDefaultKey,
-		FnRunIsSharded:         AlwaysShardOnRun,
-	})
-
-	mgr, err := New(
-		context.Background(),
-		WithUnshardedClient(unshardedClient),
-		WithShardedClient(shardedClient),
-	)
-	require.NoError(t, err)
+	pauseStore := NewPauseStore(unshardedClient)
 
 	ctx := context.Background()
 
@@ -493,10 +500,10 @@ func TestPauseCreatedAt(t *testing.T) {
 		Expires: state.Time(time.Now().Add(time.Hour)),
 	}
 
-	_, err = mgr.SavePause(ctx, pause)
+	_, err := pauseStore.SavePause(ctx, pause)
 	require.NoError(t, err)
 
-	createdAt, err := mgr.PauseCreatedAt(ctx, workspaceID, eventName, pauseID)
+	createdAt, err := pauseStore.PauseCreatedAt(ctx, workspaceID, eventName, pauseID)
 	require.NoError(t, err)
 	require.False(t, createdAt.IsZero(), "created at timestamp should not be zero")
 
@@ -505,7 +512,7 @@ func TestPauseCreatedAt(t *testing.T) {
 
 	// Test with non-existent pause
 	nonExistentPauseID := uuid.New()
-	_, err = mgr.PauseCreatedAt(ctx, workspaceID, eventName, nonExistentPauseID)
+	_, err = pauseStore.PauseCreatedAt(ctx, workspaceID, eventName, nonExistentPauseID)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "pause not found")
 
@@ -518,21 +525,7 @@ func TestPausesByEventSinceWithCreatedAt(t *testing.T) {
 	defer rc.Close()
 
 	unshardedClient := NewUnshardedClient(rc, StateDefaultKey, QueueDefaultKey)
-	shardedClient := NewShardedClient(ShardedClientOpts{
-		UnshardedClient:        unshardedClient,
-		FunctionRunStateClient: rc,
-		BatchClient:            rc,
-		StateDefaultKey:        StateDefaultKey,
-		QueueDefaultKey:        QueueDefaultKey,
-		FnRunIsSharded:         AlwaysShardOnRun,
-	})
-
-	mgr, err := New(
-		context.Background(),
-		WithUnshardedClient(unshardedClient),
-		WithShardedClient(shardedClient),
-	)
-	require.NoError(t, err)
+	pauseStore := NewPauseStore(unshardedClient)
 
 	ctx := context.Background()
 	workspaceID := uuid.New()
@@ -554,12 +547,12 @@ func TestPausesByEventSinceWithCreatedAt(t *testing.T) {
 		}
 
 		time.Sleep(10 * time.Millisecond)
-		_, err = mgr.SavePause(ctx, pause)
+		_, err := pauseStore.SavePause(ctx, pause)
 		require.NoError(t, err)
 	}
 
 	t.Run("returns pause iterator", func(t *testing.T) {
-		iter, err := mgr.PausesByEventSinceWithCreatedAt(ctx, workspaceID, eventName, baseTime, 1000)
+		iter, err := pauseStore.PausesByEventSinceWithCreatedAt(ctx, workspaceID, eventName, baseTime, 1000)
 		require.NoError(t, err)
 		require.NotNil(t, iter)
 
@@ -573,7 +566,7 @@ func TestPausesByEventSinceWithCreatedAt(t *testing.T) {
 	})
 
 	t.Run("pauses have CreatedAt populated", func(t *testing.T) {
-		iter, err := mgr.PausesByEventSinceWithCreatedAt(ctx, workspaceID, eventName, baseTime, 1000)
+		iter, err := pauseStore.PausesByEventSinceWithCreatedAt(ctx, workspaceID, eventName, baseTime, 1000)
 		require.NoError(t, err)
 
 		for iter.Next(ctx) {
@@ -585,7 +578,7 @@ func TestPausesByEventSinceWithCreatedAt(t *testing.T) {
 	})
 
 	t.Run("respects limit parameter", func(t *testing.T) {
-		iter, err := mgr.PausesByEventSinceWithCreatedAt(ctx, workspaceID, eventName, baseTime, 5)
+		iter, err := pauseStore.PausesByEventSinceWithCreatedAt(ctx, workspaceID, eventName, baseTime, 5)
 		require.NoError(t, err)
 
 		count := 0
@@ -600,7 +593,7 @@ func TestPausesByEventSinceWithCreatedAt(t *testing.T) {
 	t.Run("since time is inclusive", func(t *testing.T) {
 		midTime := time.Now().Add(-30 * time.Minute)
 
-		iter, err := mgr.PausesByEventSinceWithCreatedAt(ctx, workspaceID, eventName, midTime, 1000)
+		iter, err := pauseStore.PausesByEventSinceWithCreatedAt(ctx, workspaceID, eventName, midTime, 1000)
 		require.NoError(t, err)
 
 		count := 0
@@ -622,17 +615,7 @@ func TestDeletePause(t *testing.T) {
 	defer rc.Close()
 
 	unshardedClient := NewUnshardedClient(rc, StateDefaultKey, QueueDefaultKey)
-	shardedClient := NewShardedClient(ShardedClientOpts{
-		UnshardedClient:        unshardedClient,
-		FunctionRunStateClient: rc,
-		BatchClient:            rc,
-		StateDefaultKey:        StateDefaultKey,
-		QueueDefaultKey:        QueueDefaultKey,
-		FnRunIsSharded:         AlwaysShardOnRun,
-	})
-
-	mgr, err := New(ctx, WithUnshardedClient(unshardedClient), WithShardedClient(shardedClient))
-	require.NoError(t, err)
+	pauseStore := NewPauseStore(unshardedClient)
 
 	workspaceID := uuid.New()
 	eventName := "test.event"
@@ -650,19 +633,19 @@ func TestDeletePause(t *testing.T) {
 		Expires: state.Time(time.Now().Add(time.Hour)),
 	}
 
-	_, err = mgr.SavePause(ctx, pause)
+	_, err := pauseStore.SavePause(ctx, pause)
 	require.NoError(t, err)
 
-	foundPause, err := mgr.PauseByID(ctx, pauseID)
+	foundPause, err := pauseStore.PauseByID(ctx, pauseID)
 	require.NoError(t, err)
 	require.Equal(t, pauseID, foundPause.ID)
 
 	keysBefore, _ := rc.Do(ctx, rc.B().Keys().Pattern("*").Build()).AsStrSlice()
 
-	err = mgr.DeletePause(ctx, pause)
+	err = pauseStore.DeletePause(ctx, pause)
 	require.NoError(t, err)
 
-	_, err = mgr.PauseByID(ctx, pauseID)
+	_, err = pauseStore.PauseByID(ctx, pauseID)
 	require.Error(t, err)
 	require.ErrorIs(t, err, state.ErrPauseNotFound)
 
@@ -677,17 +660,7 @@ func TestDeletePauseWithBlockIndex(t *testing.T) {
 	defer rc.Close()
 
 	unshardedClient := NewUnshardedClient(rc, StateDefaultKey, QueueDefaultKey)
-	shardedClient := NewShardedClient(ShardedClientOpts{
-		UnshardedClient:        unshardedClient,
-		FunctionRunStateClient: rc,
-		BatchClient:            rc,
-		StateDefaultKey:        StateDefaultKey,
-		QueueDefaultKey:        QueueDefaultKey,
-		FnRunIsSharded:         AlwaysShardOnRun,
-	})
-
-	mgr, err := New(ctx, WithUnshardedClient(unshardedClient), WithShardedClient(shardedClient))
-	require.NoError(t, err)
+	pauseStore := NewPauseStore(unshardedClient)
 
 	workspaceID := uuid.New()
 	eventName := "test.event"
@@ -707,11 +680,11 @@ func TestDeletePauseWithBlockIndex(t *testing.T) {
 		CreatedAt: createdAt,
 	}
 
-	_, err = mgr.SavePause(ctx, pause)
+	_, err := pauseStore.SavePause(ctx, pause)
 	require.NoError(t, err)
 
 	blockID := ulid.Make().String()
-	err = mgr.DeletePause(ctx, pause, state.WithWriteBlockIndex(blockID, eventName))
+	err = pauseStore.DeletePause(ctx, pause, state.WithWriteBlockIndex(blockID, eventName))
 	require.NoError(t, err)
 
 	keysAfter, _ := rc.Do(ctx, rc.B().Keys().Pattern("*").Build()).AsStrSlice()
@@ -741,7 +714,7 @@ func TestDeletePauseWithBlockIndex(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, string(expectedJSON), val)
 
-	err = mgr.DeletePause(ctx, pause)
+	err = pauseStore.DeletePause(ctx, pause)
 	require.NoError(t, err)
 
 	finalKeys, _ := rc.Do(ctx, rc.B().Keys().Pattern("*").Build()).AsStrSlice()
@@ -763,8 +736,9 @@ func TestDeleteCleansUpAllKeys(t *testing.T) {
 		QueueDefaultKey:        QueueDefaultKey,
 		FnRunIsSharded:         AlwaysShardOnRun,
 	})
+	pauseStore := NewPauseStore(unshardedClient)
 
-	sm, err := New(ctx, WithUnshardedClient(unshardedClient), WithShardedClient(shardedClient))
+	sm, err := New(ctx, WithShardedClient(shardedClient), WithPauseDeleter(pauseStore))
 	require.NoError(t, err)
 	mgr := sm.(*mgr)
 
@@ -801,9 +775,9 @@ func TestDeleteCleansUpAllKeys(t *testing.T) {
 		Expires: state.Time(time.Now().Add(time.Hour)),
 	}
 
-	_, err = mgr.SavePause(ctx, pause1)
+	_, err = pauseStore.SavePause(ctx, pause1)
 	require.NoError(t, err)
-	_, err = mgr.SavePause(ctx, pause2)
+	_, err = pauseStore.SavePause(ctx, pause2)
 	require.NoError(t, err)
 
 	fnRunState := mgr.shardedMgr.s.FunctionRunState()
@@ -841,17 +815,12 @@ func TestDeleteCleansUpAllKeysWithPauseManager(t *testing.T) {
 		FnRunIsSharded:         AlwaysShardOnRun,
 	})
 
-	sm, err := New(ctx, WithUnshardedClient(unshardedClient), WithShardedClient(shardedClient))
+	// Create pause store for deleting pauses
+	pauseStore := NewPauseStore(unshardedClient)
+
+	sm, err := New(ctx, WithShardedClient(shardedClient), WithPauseDeleter(pauseStore))
 	require.NoError(t, err)
 	mgr := sm.(*mgr)
-
-	// Set up a pause manager
-	pauseManagerClient := NewUnshardedClient(rc, StateDefaultKey, QueueDefaultKey)
-	pauseMgr, err := New(ctx, WithUnshardedClient(pauseManagerClient))
-	require.NoError(t, err)
-
-	// Set the pause deleter
-	mgr.SetPauseDeleter(pauseMgr)
 
 	acctID, wsID, appID, fnID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
 	runID := ulid.MustNew(ulid.Now(), rand.Reader)
@@ -886,9 +855,9 @@ func TestDeleteCleansUpAllKeysWithPauseManager(t *testing.T) {
 		Expires: state.Time(time.Now().Add(time.Hour)),
 	}
 
-	_, err = mgr.SavePause(ctx, pause1)
+	_, err = pauseStore.SavePause(ctx, pause1)
 	require.NoError(t, err)
-	_, err = mgr.SavePause(ctx, pause2)
+	_, err = pauseStore.SavePause(ctx, pause2)
 	require.NoError(t, err)
 
 	fnRunState := mgr.shardedMgr.s.FunctionRunState()
@@ -934,8 +903,9 @@ func TestDeleteStoresRunIDInIdempotencyTombstone(t *testing.T) {
 		QueueDefaultKey:        QueueDefaultKey,
 		FnRunIsSharded:         AlwaysShardOnRun,
 	})
+	pauseStore := NewPauseStore(unshardedClient)
 
-	sm, err := New(ctx, WithUnshardedClient(unshardedClient), WithShardedClient(shardedClient))
+	sm, err := New(ctx, WithShardedClient(shardedClient), WithPauseDeleter(pauseStore))
 	require.NoError(t, err)
 	mgr := sm.(*mgr)
 
@@ -986,11 +956,12 @@ func BenchmarkNew(b *testing.B) {
 		QueueDefaultKey:        QueueDefaultKey,
 		FnRunIsSharded:         AlwaysShardOnRun,
 	})
+	pauseStore := NewPauseStore(unshardedClient)
 
 	sm, err := New(
 		context.Background(),
-		WithUnshardedClient(unshardedClient),
 		WithShardedClient(shardedClient),
+		WithPauseDeleter(pauseStore),
 	)
 	require.NoError(b, err)
 

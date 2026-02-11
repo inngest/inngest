@@ -3,4 +3,8 @@
  * development.
  *
  * This file should be overwritten before publishing via `npm run build`.
+ *
+ * See:
+ *  - .github/workflows/npm_test.yml
+ *  - .github/workflows/release.yml
  */

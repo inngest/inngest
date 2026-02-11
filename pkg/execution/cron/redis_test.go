@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/jonboulle/clockwork"
@@ -277,16 +278,34 @@ func TestNextHealthCheckTime(t *testing.T) {
 	r, rc := initRedis(t)
 	defer rc.Close()
 
-	defaultShard := redis_state.QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: redis_state.NewQueueClient(rc, redis_state.QueueDefaultKey), Name: consts.DefaultQueueShardName}
 	clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Second))
 
-	q := redis_state.NewQueue(
-		defaultShard,
-		redis_state.WithClock(clock),
+	opts := []queue.QueueOpt{
+		queue.WithClock(clock),
+	}
+
+	shard := redis_state.NewQueueShard(
+		consts.DefaultQueueShardName,
+		redis_state.NewQueueClient(rc, consts.DefaultQueueShardName),
+		opts...,
 	)
 
+	q, err := queue.New(
+		ctx,
+		"test-queue",
+		shard,
+		map[string]queue.QueueShard{
+			shard.Name(): shard,
+		},
+		func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
+			return shard, nil
+		},
+		opts...,
+	)
+	require.NoError(t, err)
+
 	t.Run("with default interval (1 minute) and default lead time (20 seconds)", func(t *testing.T) {
-		cm := NewRedisCronManager(q, logger.StdlibLogger(ctx))
+		cm := NewRedisCronManager(shard, q, logger.StdlibLogger(ctx))
 		cmTyped := cm.(*redisCronManager)
 
 		testCases := []struct {
@@ -351,7 +370,7 @@ func TestNextHealthCheckTime(t *testing.T) {
 
 	t.Run("with 5 minute interval and 30 second lead time", func(t *testing.T) {
 		cm := NewRedisCronManager(
-			q,
+			shard, q,
 			logger.StdlibLogger(ctx),
 			WithHealthCheckInterval(5*time.Minute),
 			WithHealthCheckLeadTimeSeconds(30),
@@ -414,7 +433,7 @@ func TestNextHealthCheckTime(t *testing.T) {
 
 	t.Run("with 1 hour interval and 5 minute lead time", func(t *testing.T) {
 		cm := NewRedisCronManager(
-			q,
+			shard, q,
 			logger.StdlibLogger(ctx),
 			WithHealthCheckInterval(1*time.Hour),
 			WithHealthCheckLeadTimeSeconds(300),
@@ -462,7 +481,7 @@ func TestNextHealthCheckTime(t *testing.T) {
 	})
 
 	t.Run("consistency checks", func(t *testing.T) {
-		cm := NewRedisCronManager(q, logger.StdlibLogger(ctx))
+		cm := NewRedisCronManager(shard, q, logger.StdlibLogger(ctx))
 		cmTyped := cm.(*redisCronManager)
 
 		t.Run("calling twice with same time should return same result", func(t *testing.T) {
@@ -507,15 +526,33 @@ func TestCronHealthCheckJobID(t *testing.T) {
 	r, rc := initRedis(t)
 	defer rc.Close()
 
-	defaultShard := redis_state.QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: redis_state.NewQueueClient(rc, redis_state.QueueDefaultKey), Name: consts.DefaultQueueShardName}
 	clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Second))
 
-	q := redis_state.NewQueue(
-		defaultShard,
-		redis_state.WithClock(clock),
+	opts := []queue.QueueOpt{
+		queue.WithClock(clock),
+	}
+
+	shard := redis_state.NewQueueShard(
+		consts.DefaultQueueShardName,
+		redis_state.NewQueueClient(rc, consts.DefaultQueueShardName),
+		opts...,
 	)
 
-	cm := NewRedisCronManager(q, logger.StdlibLogger(ctx))
+	q, err := queue.New(
+		ctx,
+		"test-queue",
+		shard,
+		map[string]queue.QueueShard{
+			shard.Name(): shard,
+		},
+		func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
+			return shard, nil
+		},
+		opts...,
+	)
+	require.NoError(t, err)
+
+	cm := NewRedisCronManager(shard, q, logger.StdlibLogger(ctx))
 	cmTyped := cm.(*redisCronManager)
 
 	t.Run("should generate consistent JobID for same time", func(t *testing.T) {
@@ -611,22 +648,42 @@ func TestRedisCronManager(t *testing.T) {
 
 	ctx := context.Background()
 
-	defaultShard := redis_state.QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: redis_state.NewQueueClient(rc, redis_state.QueueDefaultKey), Name: consts.DefaultQueueShardName}
 	clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Second))
 
-	q := redis_state.NewQueue(
-		defaultShard,
-		redis_state.WithClock(clock),
-		redis_state.WithRunMode(redis_state.QueueRunMode{
+	opts := []queue.QueueOpt{
+		queue.WithClock(clock),
+
+		queue.WithRunMode(queue.QueueRunMode{
 			Sequential:    true,
 			Scavenger:     true,
 			Partition:     true,
 			Account:       true,
 			AccountWeight: 85,
 		}),
+	}
+
+	shard := redis_state.NewQueueShard(
+		consts.DefaultQueueShardName,
+		redis_state.NewQueueClient(rc, redis_state.QueueDefaultKey),
+		opts...,
 	)
 
+	q, err := queue.New(
+		ctx,
+		"test-queue",
+		shard,
+		map[string]queue.QueueShard{
+			shard.Name(): shard,
+		},
+		func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
+			return shard, nil
+		},
+		opts...,
+	)
+	require.NoError(t, err)
+
 	cm := NewRedisCronManager(
+		shard,
 		q,
 		logger.StdlibLogger(ctx),
 	)
@@ -849,7 +906,6 @@ func TestRedisCronManager(t *testing.T) {
 					assert.True(t, nextTime.Equal(time.Date(2025, 12, 25, 1, 0, 0, 0, time.UTC)))
 				})
 			}
-
 		})
 
 		t.Run("should create valid ULID with timestamp", func(t *testing.T) {
@@ -1009,7 +1065,6 @@ func TestRedisCronManager(t *testing.T) {
 			err := cm.Sync(cancelledCtx, cronItem)
 			assert.Error(t, err)
 		})
-
 	})
 
 	t.Run("HealthCheck", func(t *testing.T) {
@@ -1316,11 +1371,13 @@ func TestRedisCronManager(t *testing.T) {
 			// The number of keys should be the same (no duplicates created)
 			assert.Equal(t, queueItemCount1, queueItemCount2, "queue item count should not increase")
 		})
-
 	})
 
 	t.Run("EnqueueHealthCheck", func(t *testing.T) {
 		t.Run("not idempotent", func(t *testing.T) {
+			l := logger.StdlibLogger(ctx, logger.WithLoggerLevel(logger.LevelTrace))
+			ctx := logger.WithStdlib(ctx, l)
+
 			r.FlushAll()
 			cronItem := createCronItem(enums.CronHealthCheck)
 
@@ -1332,6 +1389,8 @@ func TestRedisCronManager(t *testing.T) {
 			cmd := rc.B().Zcard().Key("{queue}:queue:sorted:cron-health-check").Build()
 			queueItemCount1, _ := rc.Do(ctx, cmd).AsInt64()
 
+			require.Equal(t, 1, int(queueItemCount1))
+
 			// Call enqueue should succeed: second time - should enqueue another item
 			err = cm.EnqueueHealthCheck(ctx, cronItem)
 			assert.NoError(t, err)
@@ -1342,9 +1401,7 @@ func TestRedisCronManager(t *testing.T) {
 
 			assert.Equal(t, queueItemCount1+1, queueItemCount2, "queue item count should increase by 1")
 		})
-
 	})
-
 }
 
 func initRedis(t *testing.T) (*miniredis.Miniredis, rueidis.Client) {

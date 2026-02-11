@@ -5,7 +5,7 @@ import {
   useActiveTab,
   useTabManagerActions,
 } from '../../InsightsTabManager/TabManagerContext';
-import { useSQLEditorInstance } from '../SQLEditorInstanceContext';
+import { useSQLEditorInstance } from '../SQLEditorContext';
 import { useSaveTabActions } from '../SaveTabContext';
 import { bindEditorShortcuts } from '../actions/handleShortcuts';
 import { markTemplateVars } from '../actions/markTemplateVars';
@@ -21,7 +21,13 @@ export function useInsightsSQLEditorOnMountCallback(): UseInsightsSQLEditorOnMou
   const { saveTab } = useSaveTabActions();
   const { tabManagerActions } = useTabManagerActions();
   const { activeTab } = useActiveTab();
-  const { editorRef } = useSQLEditorInstance();
+  const editorInstance = useSQLEditorInstance();
+  if (!editorInstance) {
+    throw new Error(
+      'useInsightsSQLEditorOnMountCallback must be used within SQLEditorProvider',
+    );
+  }
+  const { editorRef } = editorInstance;
 
   const latestQueryRef = useLatest(query);
   const isRunningRef = useLatest(status === 'loading');

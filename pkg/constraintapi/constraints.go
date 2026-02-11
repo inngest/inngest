@@ -90,6 +90,12 @@ type ConcurrencyConstraint struct {
 	InProgressItemKey string
 }
 
+const ConcurrencyLimitRetryAfter = 2 * time.Second
+
+func (c ConcurrencyConstraint) RetryAfter() time.Duration {
+	return ConcurrencyLimitRetryAfter
+}
+
 func (c ConcurrencyConstraint) InProgressLeasesKey(prefix string, accountID, envID, functionID uuid.UUID) string {
 	switch c.Mode {
 	case enums.ConcurrencyModeStep:
@@ -230,6 +236,124 @@ func (ci ConstraintItem) PrettyStringConfig(config ConstraintConfig) string {
 		return ci.Throttle.PrettyStringConfig(config)
 	default:
 		return "unknown"
+	}
+}
+
+// MetricsIdentifier returns an identifier for the constraint item.
+// For throttle and rate limit, it returns the kind.
+// For concurrency, it returns the scope.
+func (ci ConstraintItem) MetricsIdentifier() string {
+	switch ci.Kind {
+	case ConstraintKindConcurrency:
+		if ci.Concurrency != nil {
+			return ci.Concurrency.Scope.String()
+		}
+		return ci.Kind.PrettyString()
+	default:
+		return ci.Kind.PrettyString()
+	}
+}
+
+func (ci ConstraintItem) CacheKey(accountID, envID, functionID uuid.UUID) string {
+	switch ci.Kind {
+	case ConstraintKindConcurrency:
+		if ci.Concurrency == nil {
+			return ""
+		}
+		c := ci.Concurrency
+
+		var scopeLetter string
+		var entityID uuid.UUID
+		switch c.Scope {
+		case enums.ConcurrencyScopeAccount:
+			scopeLetter = "a"
+		case enums.ConcurrencyScopeEnv:
+			scopeLetter = "e"
+			entityID = envID
+		case enums.ConcurrencyScopeFn:
+			scopeLetter = "f"
+			entityID = functionID
+		}
+
+		// Custom key uses expression and evaluated hashes
+		if c.KeyExpressionHash != "" {
+			return fmt.Sprintf("%s:c:%s:%s:%s", accountID, scopeLetter, c.KeyExpressionHash, c.EvaluatedKeyHash)
+		}
+
+		// Non-custom function/env scoped constraints include entity ID
+		if entityID != uuid.Nil {
+			return fmt.Sprintf("%s:c:%s:%s", accountID, scopeLetter, entityID)
+		}
+
+		// Account scope with no custom key
+		return fmt.Sprintf("%s:c:%s", accountID, scopeLetter)
+
+	case ConstraintKindThrottle:
+		if ci.Throttle == nil {
+			return ""
+		}
+		t := ci.Throttle
+
+		var scopeLetter string
+		var entityID uuid.UUID
+		switch t.Scope {
+		case enums.ThrottleScopeAccount:
+			scopeLetter = "a"
+		case enums.ThrottleScopeEnv:
+			scopeLetter = "e"
+			entityID = envID
+		case enums.ThrottleScopeFn:
+			scopeLetter = "f"
+			entityID = functionID
+		}
+
+		// Custom key uses expression and evaluated hashes
+		if t.KeyExpressionHash != "" {
+			return fmt.Sprintf("%s:t:%s:%s:%s", accountID, scopeLetter, t.KeyExpressionHash, t.EvaluatedKeyHash)
+		}
+
+		// Non-custom function/env scoped constraints include entity ID
+		if entityID != uuid.Nil {
+			return fmt.Sprintf("%s:t:%s:%s", accountID, scopeLetter, entityID)
+		}
+
+		// Account scope with no custom key
+		return fmt.Sprintf("%s:t:%s", accountID, scopeLetter)
+
+	case ConstraintKindRateLimit:
+		if ci.RateLimit == nil {
+			return ""
+		}
+		r := ci.RateLimit
+
+		var scopeLetter string
+		var entityID uuid.UUID
+		switch r.Scope {
+		case enums.RateLimitScopeAccount:
+			scopeLetter = "a"
+		case enums.RateLimitScopeEnv:
+			scopeLetter = "e"
+			entityID = envID
+		case enums.RateLimitScopeFn:
+			scopeLetter = "f"
+			entityID = functionID
+		}
+
+		// Custom key uses expression and evaluated hashes
+		if r.KeyExpressionHash != "" {
+			return fmt.Sprintf("%s:r:%s:%s:%s", accountID, scopeLetter, r.KeyExpressionHash, r.EvaluatedKeyHash)
+		}
+
+		// Non-custom function/env scoped constraints include entity ID
+		if entityID != uuid.Nil {
+			return fmt.Sprintf("%s:r:%s:%s", accountID, scopeLetter, entityID)
+		}
+
+		// Account scope with no custom key
+		return fmt.Sprintf("%s:r:%s", accountID, scopeLetter)
+
+	default:
+		return ""
 	}
 }
 

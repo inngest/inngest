@@ -3,7 +3,7 @@ import AdmZip from "adm-zip";
 import Debug from "debug";
 import fetch, { Response } from "node-fetch";
 import path from "path";
-import tar from "tar";
+import * as tar from "tar";
 import { URL } from "url";
 import packageJson from "./package.json";
 

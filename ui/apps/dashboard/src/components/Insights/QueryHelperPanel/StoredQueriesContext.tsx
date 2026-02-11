@@ -39,12 +39,12 @@ const StoredQueriesContext = createContext<
 
 interface StoredQueriesProviderProps {
   children: ReactNode;
-  tabManagerActions: TabManagerActions;
+  tabManagerActionsRef: React.MutableRefObject<TabManagerActions>;
 }
 
 export function StoredQueriesProvider({
   children,
-  tabManagerActions,
+  tabManagerActionsRef,
 }: StoredQueriesProviderProps) {
   const [querySnapshots, setQuerySnapshots] = useState<QuerySnapshot[]>([]);
 
@@ -83,7 +83,9 @@ export function StoredQueriesProvider({
       } else {
         const result = await beSaveQuery({ name: tab.name, query: tab.query });
         if (result.ok) {
-          tabManagerActions.updateTab(tab.id, { savedQueryId: result.data.id });
+          tabManagerActionsRef.current.updateTab(tab.id, {
+            savedQueryId: result.data.id,
+          });
           // TODO: This often leads to double-fetching, but it's currently needed because the "InsightsQueryStatement"
           // __typename does not exist and does not auto-refetch if the list was previously empty. We need to make sure
           // that we have a consistent type name to match on regardless of existing saved queries.
@@ -98,14 +100,14 @@ export function StoredQueriesProvider({
         }
       }
     },
-    [beSaveQuery, beUpdateQuery, refetchSavedQueries, tabManagerActions],
+    [beSaveQuery, beUpdateQuery, refetchSavedQueries, tabManagerActionsRef],
   );
 
   const deleteQuery = useCallback(
     async (queryId: string) => {
       const result = await beDeleteQuery({ id: queryId });
       if (result.ok) {
-        tabManagerActions.breakQueryAssociation(queryId);
+        tabManagerActionsRef.current.breakQueryAssociation(queryId);
         // This is necessary because the query never returns anything that matches the list by __typename.
         // It returns only a list of deleted IDs.
         refetchSavedQueries();
@@ -114,7 +116,7 @@ export function StoredQueriesProvider({
         toast.error('Failed to delete query');
       }
     },
-    [beDeleteQuery, refetchSavedQueries, tabManagerActions],
+    [beDeleteQuery, refetchSavedQueries, tabManagerActionsRef],
   );
 
   const shareQuery = useCallback(

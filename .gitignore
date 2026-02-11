@@ -35,3 +35,6 @@ go.work
 go.work.sum
 
 pkg/execution/state/redis_state/testdata
+.specify/
+specs/
+CLAUDE.md

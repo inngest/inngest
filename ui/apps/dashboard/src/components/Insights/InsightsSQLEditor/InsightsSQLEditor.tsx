@@ -1,20 +1,28 @@
-import { SQLEditor } from '@inngest/components/SQLEditor/SQLEditor';
-
+import {
+  SQLEditor,
+  type SQLEditorMarkerData,
+  SQLEditorURI,
+} from '@inngest/components/SQLEditor/SQLEditor';
 import { useInsightsStateMachineContext } from '../InsightsStateMachineContext/InsightsStateMachineContext';
 import { hasUnsavedChanges } from '../InsightsTabManager/InsightsTabManager';
 import { useActiveTab } from '../InsightsTabManager/TabManagerContext';
 import { useStoredQueries } from '../QueryHelperPanel/StoredQueriesContext';
 import { SQLEditorContextMenu } from './SQLEditorContextMenu';
-import { useSQLEditorInstance } from './SQLEditorInstanceContext';
+import { useSQLEditorInstance } from './SQLEditorContext';
 import { useSaveTabActions } from './SaveTabContext';
 import { useInsightsSQLEditorOnMountCallback } from './hooks/useInsightsSQLEditorOnMountCallback';
 import { useSQLCompletionConfig } from './hooks/useSQLCompletionConfig';
+import { useEffect, useState } from 'react';
 
 export function InsightsSQLEditor() {
-  const { onChange, query, runQuery } = useInsightsStateMachineContext();
+  const { onChange, query, runQuery, data } = useInsightsStateMachineContext();
   const { onMount } = useInsightsSQLEditorOnMountCallback();
   const completionConfig = useSQLCompletionConfig();
-  const { editorRef } = useSQLEditorInstance();
+  const editorInstance = useSQLEditorInstance();
+  if (!editorInstance) {
+    throw new Error('InsightsSQLEditor must be used within SQLEditorProvider');
+  }
+  const { editorRef } = editorInstance;
   const { activeTab } = useActiveTab();
   const { saveTab } = useSaveTabActions();
   const { queries } = useStoredQueries();
@@ -106,13 +114,51 @@ export function InsightsSQLEditor() {
     }
   };
 
+  const [monaco, setMonaco] = useState<any>(null);
+
+  useEffect(() => {
+    const editor = editorRef.current;
+    if (!editor) return;
+
+    const model = editor.getModel();
+    if (!model) return;
+
+    if (!monaco) return;
+
+    const decorations = data?.diagnostics
+      ?.filter((diag) => diag.position)
+      ?.map((diag) => {
+        const startPos = model.getPositionAt(diag.position!.start);
+        const endPos = model.getPositionAt(diag.position!.end);
+
+        return {
+          startColumn: startPos.column,
+          startLineNumber: startPos.lineNumber,
+          endColumn: endPos.column,
+          endLineNumber: endPos.lineNumber,
+          severity: diag.severity === 'error' ? 8 : 4,
+          code: {
+            // TODO: add docs links based on diagnostic code
+            target: SQLEditorURI.parse('http://example.com'),
+            value: diag.code,
+          },
+          message: diag.message, // TODO: pretty message by code
+        } as SQLEditorMarkerData;
+      });
+
+    monaco.editor.setModelMarkers(model, 'insights', decorations ?? []);
+  }, [editorRef, query, data]);
+
   return (
     <div className="h-full min-h-0 overflow-hidden">
       <SQLEditor
         completionConfig={completionConfig}
         content={query}
         onChange={onChange}
-        onMount={onMount}
+        onMount={(editor, monacoInstance) => {
+          onMount(editor, monacoInstance);
+          setMonaco(monacoInstance);
+        }}
       />
       <SQLEditorContextMenu
         onCopy={handleCopy}

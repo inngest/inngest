@@ -173,6 +173,8 @@ func CallerLocationToProto(location CallerLocation) pb.ConstraintApiCallerLocati
 		return pb.ConstraintApiCallerLocation_CONSTRAINT_API_CALLER_LOCATION_ITEM_LEASE
 	case CallerLocationCheckpoint:
 		return pb.ConstraintApiCallerLocation_CONSTRAINT_API_CALLER_LOCATION_CHECKPOINT
+	case CallerLocationLeaseScavenge:
+		return pb.ConstraintApiCallerLocation_CONSTRAINT_API_CALLER_LOCATION_LEASE_SCAVENGE
 	default:
 		return pb.ConstraintApiCallerLocation_CONSTRAINT_API_CALLER_LOCATION_UNSPECIFIED
 	}
@@ -190,6 +192,8 @@ func LeaseLocationFromProto(location pb.ConstraintApiCallerLocation) CallerLocat
 		return CallerLocationItemLease
 	case pb.ConstraintApiCallerLocation_CONSTRAINT_API_CALLER_LOCATION_CHECKPOINT:
 		return CallerLocationCheckpoint
+	case pb.ConstraintApiCallerLocation_CONSTRAINT_API_CALLER_LOCATION_LEASE_SCAVENGE:
+		return CallerLocationLeaseScavenge
 	default:
 		return CallerLocationUnknown
 	}
@@ -205,6 +209,8 @@ func LeaseServiceToProto(service LeaseService) pb.ConstraintApiLeaseService {
 		return pb.ConstraintApiLeaseService_CONSTRAINT_API_LEASE_SERVICE_EXECUTOR
 	case ServiceAPI:
 		return pb.ConstraintApiLeaseService_CONSTRAINT_API_LEASE_SERVICE_API
+	case ServiceConstraintScavenger:
+		return pb.ConstraintApiLeaseService_CONSTRAINT_API_LEASE_CONSTRAINT_SCAVENGER
 	default:
 		return pb.ConstraintApiLeaseService_CONSTRAINT_API_LEASE_SERVICE_UNSPECIFIED
 	}
@@ -220,6 +226,8 @@ func LeaseServiceFromProto(service pb.ConstraintApiLeaseService) LeaseService {
 		return ServiceExecutor
 	case pb.ConstraintApiLeaseService_CONSTRAINT_API_LEASE_SERVICE_API:
 		return ServiceAPI
+	case pb.ConstraintApiLeaseService_CONSTRAINT_API_LEASE_CONSTRAINT_SCAVENGER:
+		return ServiceConstraintScavenger
 	default:
 		return ServiceUnknown
 	}
@@ -623,6 +631,11 @@ func CapacityCheckResponseToProto(resp *CapacityCheckResponse) *pb.CapacityCheck
 		limitingConstraints[i] = ConstraintItemToProto(constraint)
 	}
 
+	exhaustedConstraints := make([]*pb.ConstraintItem, len(resp.ExhaustedConstraints))
+	for i, constraint := range resp.ExhaustedConstraints {
+		exhaustedConstraints[i] = ConstraintItemToProto(constraint)
+	}
+
 	usage := make([]*pb.ConstraintUsage, len(resp.Usage))
 	for i, u := range resp.Usage {
 		usage[i] = ConstraintUsageToProto(u)
@@ -634,11 +647,12 @@ func CapacityCheckResponseToProto(resp *CapacityCheckResponse) *pb.CapacityCheck
 	}
 
 	return &pb.CapacityCheckResponse{
-		AvailableCapacity:   int32(resp.AvailableCapacity),
-		LimitingConstraints: limitingConstraints,
-		Usage:               usage,
-		FairnessReduction:   int32(resp.FairnessReduction),
-		RetryAfter:          retryAfter,
+		AvailableCapacity:    int32(resp.AvailableCapacity),
+		LimitingConstraints:  limitingConstraints,
+		ExhaustedConstraints: exhaustedConstraints,
+		Usage:                usage,
+		FairnessReduction:    int32(resp.FairnessReduction),
+		RetryAfter:           retryAfter,
 	}
 }
 
@@ -652,6 +666,11 @@ func CapacityCheckResponseFromProto(pbResp *pb.CapacityCheckResponse) *CapacityC
 		limitingConstraints[i] = ConstraintItemFromProto(constraint)
 	}
 
+	exhaustedConstraints := make([]ConstraintItem, len(pbResp.ExhaustedConstraints))
+	for i, constraint := range pbResp.ExhaustedConstraints {
+		exhaustedConstraints[i] = ConstraintItemFromProto(constraint)
+	}
+
 	usage := make([]ConstraintUsage, len(pbResp.Usage))
 	for i, u := range pbResp.Usage {
 		usage[i] = ConstraintUsageFromProto(u)
@@ -663,11 +682,12 @@ func CapacityCheckResponseFromProto(pbResp *pb.CapacityCheckResponse) *CapacityC
 	}
 
 	return &CapacityCheckResponse{
-		AvailableCapacity:   int(pbResp.AvailableCapacity),
-		LimitingConstraints: limitingConstraints,
-		Usage:               usage,
-		FairnessReduction:   int(pbResp.FairnessReduction),
-		RetryAfter:          retryAfter,
+		AvailableCapacity:    int(pbResp.AvailableCapacity),
+		LimitingConstraints:  limitingConstraints,
+		ExhaustedConstraints: exhaustedConstraints,
+		Usage:                usage,
+		FairnessReduction:    int(pbResp.FairnessReduction),
+		RetryAfter:           retryAfter,
 	}
 }
 
@@ -702,6 +722,7 @@ func CapacityAcquireRequestToProto(req *CapacityAcquireRequest) *pb.CapacityAcqu
 		BlockingThreshold:    durationpb.New(req.BlockingThreshold),
 		Source:               LeaseSourceToProto(req.Source),
 		Migration:            MigrationIdentifierToProto(req.Migration),
+		RequestAttempt:       uint32(req.RequestAttempt),
 	}
 }
 
@@ -775,6 +796,7 @@ func CapacityAcquireRequestFromProto(pbReq *pb.CapacityAcquireRequest) (*Capacit
 		BlockingThreshold:    blockingThreshold,
 		Source:               LeaseSourceFromProto(pbReq.Source),
 		Migration:            MigrationIdentifierFromProto(pbReq.Migration),
+		RequestAttempt:       int(pbReq.RequestAttempt),
 	}, nil
 }
 
@@ -793,11 +815,17 @@ func CapacityAcquireResponseToProto(resp *CapacityAcquireResponse) *pb.CapacityA
 		limitingConstraints[i] = ConstraintItemToProto(constraint)
 	}
 
+	exhaustedConstraints := make([]*pb.ConstraintItem, len(resp.ExhaustedConstraints))
+	for i, constraint := range resp.ExhaustedConstraints {
+		exhaustedConstraints[i] = ConstraintItemToProto(constraint)
+	}
+
 	return &pb.CapacityAcquireResponse{
-		Leases:              leases,
-		LimitingConstraints: limitingConstraints,
-		RetryAfter:          timestamppb.New(resp.RetryAfter),
-		FairnessReduction:   int32(resp.FairnessReduction),
+		Leases:               leases,
+		LimitingConstraints:  limitingConstraints,
+		ExhaustedConstraints: exhaustedConstraints,
+		RetryAfter:           timestamppb.New(resp.RetryAfter),
+		FairnessReduction:    int32(resp.FairnessReduction),
 	}
 }
 
@@ -820,16 +848,22 @@ func CapacityAcquireResponseFromProto(pbResp *pb.CapacityAcquireResponse) (*Capa
 		limitingConstraints[i] = ConstraintItemFromProto(constraint)
 	}
 
+	exhaustedConstraints := make([]ConstraintItem, len(pbResp.ExhaustedConstraints))
+	for i, constraint := range pbResp.ExhaustedConstraints {
+		exhaustedConstraints[i] = ConstraintItemFromProto(constraint)
+	}
+
 	var retryAfter time.Time
 	if pbResp.RetryAfter != nil {
 		retryAfter = pbResp.RetryAfter.AsTime()
 	}
 
 	return &CapacityAcquireResponse{
-		Leases:              leases,
-		LimitingConstraints: limitingConstraints,
-		RetryAfter:          retryAfter,
-		FairnessReduction:   int(pbResp.FairnessReduction),
+		Leases:               leases,
+		LimitingConstraints:  limitingConstraints,
+		ExhaustedConstraints: exhaustedConstraints,
+		RetryAfter:           retryAfter,
+		FairnessReduction:    int(pbResp.FairnessReduction),
 	}, nil
 }
 
@@ -843,6 +877,8 @@ func CapacityExtendLeaseRequestToProto(req *CapacityExtendLeaseRequest) *pb.Capa
 		LeaseId:        req.LeaseID.String(),
 		Duration:       durationpb.New(req.Duration),
 		Migration:      MigrationIdentifierToProto(req.Migration),
+		Source:         LeaseSourceToProto(req.Source),
+		RequestAttempt: uint32(req.RequestAttempt),
 	}
 }
 
@@ -872,6 +908,8 @@ func CapacityExtendLeaseRequestFromProto(pbReq *pb.CapacityExtendLeaseRequest) (
 		LeaseID:        leaseID,
 		Duration:       duration,
 		Migration:      MigrationIdentifierFromProto(pbReq.Migration),
+		Source:         LeaseSourceFromProto(pbReq.Source),
+		RequestAttempt: int(pbReq.RequestAttempt),
 	}, nil
 }
 
@@ -919,6 +957,8 @@ func CapacityReleaseRequestToProto(req *CapacityReleaseRequest) *pb.CapacityRele
 		AccountId:      req.AccountID.String(),
 		LeaseId:        req.LeaseID.String(),
 		Migration:      MigrationIdentifierToProto(req.Migration),
+		Source:         LeaseSourceToProto(req.Source),
+		RequestAttempt: uint32(req.RequestAttempt),
 	}
 }
 
@@ -942,6 +982,8 @@ func CapacityReleaseRequestFromProto(pbReq *pb.CapacityReleaseRequest) (*Capacit
 		AccountID:      accountID,
 		LeaseID:        leaseID,
 		Migration:      MigrationIdentifierFromProto(pbReq.Migration),
+		Source:         LeaseSourceFromProto(pbReq.Source),
+		RequestAttempt: int(pbReq.RequestAttempt),
 	}, nil
 }
 

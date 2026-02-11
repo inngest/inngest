@@ -9,7 +9,6 @@ import {
   createRootRouteWithContext,
 } from '@tanstack/react-router';
 
-import PageViewTracker from '@/components/Analytics/PageViewTracker';
 import SegmentAnalytics from '@/components/Analytics/SegmentAnalytics';
 import SentryUserIdentification from '@/components/Analytics/SentryUserIdentification';
 import { InngestClerkProvider } from '@/components/Clerk/Provider';
@@ -22,6 +21,14 @@ import globalsCss from '@inngest/components/AppRoot/globals.css?url';
 import { TooltipProvider } from '@inngest/components/Tooltip';
 import { QueryClient } from '@tanstack/react-query';
 import { ThemeProvider } from 'next-themes';
+
+//
+// don't load locally, causes issues with adblockers
+const PageViewTracker = React.lazy(() =>
+  import.meta.env.PROD
+    ? import('@/components/Analytics/PageViewTracker')
+    : Promise.resolve({ default: () => null }),
+);
 
 export const Route = createRootRouteWithContext<{
   queryClient: QueryClient;
@@ -52,13 +59,19 @@ export const Route = createRootRouteWithContext<{
       },
       {
         rel: 'icon',
-        href: import.meta.env.VITE_FAVICON ?? '/favicon-june-2025-light.svg',
-        media: '(prefers-color-scheme: light)',
+        type: 'image/svg+xml',
+        href: import.meta.env.VITE_FAVICON ?? '/favicon.svg',
       },
       {
         rel: 'icon',
-        href: import.meta.env.VITE_FAVICON ?? '/favicon-june-2025-dark.svg',
-        media: '(prefers-color-scheme: dark)',
+        type: 'image/png',
+        sizes: '32x32',
+        href: '/favicon-32x32.png',
+      },
+      {
+        rel: 'apple-touch-icon',
+        sizes: '180x180',
+        href: '/apple-touch-icon.png',
       },
     ],
   }),
@@ -85,7 +98,9 @@ function RootComponent() {
 
               <Toaster />
               <SegmentAnalytics />
-              <PageViewTracker />
+              <React.Suspense>
+                <PageViewTracker />
+              </React.Suspense>
             </ClientFeatureFlagProvider>
           </URQLProviderWrapper>
         </InngestClerkProvider>

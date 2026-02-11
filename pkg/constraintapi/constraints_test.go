@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -162,6 +163,106 @@ func TestConstraintEnforcement(t *testing.T) {
 		},
 
 		{
+			name: "missing account concurrency",
+			config: ConstraintConfig{
+				FunctionVersion: 1,
+				Concurrency: ConcurrencyConfig{
+					AccountConcurrency: 1,
+				},
+			},
+			constraints: []ConstraintItem{
+				{
+					Kind: ConstraintKindConcurrency,
+					Concurrency: &ConcurrencyConstraint{
+						Scope:             enums.ConcurrencyScopeAccount,
+						Mode:              enums.ConcurrencyModeStep,
+						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:account:%s", accountID),
+					},
+				},
+			},
+			amount:              1,
+			expectedLeaseAmount: 1,
+			mi: MigrationIdentifier{
+				QueueShard: "test",
+			},
+			afterAcquire: func(t *testing.T, deps *deps, resp *CapacityAcquireResponse) {
+				cm := deps.cm
+
+				res, err := cm.Acquire(context.Background(), &CapacityAcquireRequest{
+					IdempotencyKey: "before-acquire-acquire-call",
+					AccountID:      accountID,
+					EnvID:          envID,
+					FunctionID:     fnID,
+
+					Duration: 5 * time.Second,
+
+					Configuration:        deps.config,
+					Constraints:          deps.constraints,
+					Amount:               1,
+					LeaseIdempotencyKeys: []string{"test1"},
+
+					CurrentTime:     deps.clock.Now(),
+					MaximumLifetime: time.Minute,
+
+					Source: LeaseSource{
+						Service:           ServiceAPI,
+						Location:          CallerLocationBacklogRefill,
+						RunProcessingMode: RunProcessingModeBackground,
+					},
+
+					Migration: MigrationIdentifier{
+						QueueShard: "test",
+					},
+				})
+				require.NoError(t, err)
+				require.Len(t, res.Leases, 0)
+				require.Len(t, res.LimitingConstraints, 1)
+				require.Len(t, res.ExhaustedConstraints, 1)
+				require.Equal(t, ConstraintKindConcurrency, res.ExhaustedConstraints[0].Kind)
+				require.Equal(t, deps.clock.Now().Add(ConcurrencyLimitRetryAfter), res.RetryAfter)
+			},
+		},
+
+		{
+			name: "account concurrency exhausted at limit with retryAfter",
+			config: ConstraintConfig{
+				FunctionVersion: 1,
+				Concurrency: ConcurrencyConfig{
+					AccountConcurrency: 1,
+				},
+			},
+			constraints: []ConstraintItem{
+				{
+					Kind: ConstraintKindConcurrency,
+					Concurrency: &ConcurrencyConstraint{
+						Scope:             enums.ConcurrencyScopeAccount,
+						Mode:              enums.ConcurrencyModeStep,
+						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:account:%s", accountID),
+					},
+				},
+			},
+			amount:              1,
+			expectedLeaseAmount: 1,
+			mi: MigrationIdentifier{
+				QueueShard: "test",
+			},
+			afterAcquire: func(t *testing.T, deps *deps, resp *CapacityAcquireResponse) {
+				// Verify lease was granted
+				require.Len(t, resp.Leases, 1)
+
+				// Verify constraint is now exhausted
+				require.Len(t, resp.ExhaustedConstraints, 1)
+				require.Equal(t, ConstraintKindConcurrency, resp.ExhaustedConstraints[0].Kind)
+
+				// Verify RetryAfter is properly set
+				require.False(t, resp.RetryAfter.IsZero(), "RetryAfter should not be zero")
+				require.True(t, resp.RetryAfter.After(deps.clock.Now()), "RetryAfter should be in the future")
+				require.Equal(t, deps.clock.Now().Add(ConcurrencyLimitRetryAfter), resp.RetryAfter,
+					"RetryAfter should be set to ConcurrencyLimitRetryAfter (2s) from now")
+			},
+		},
+
+		{
 			name: "account concurrency limited due to legacy concurrency",
 			config: ConstraintConfig{
 				FunctionVersion: 1,
@@ -199,6 +300,10 @@ func TestConstraintEnforcement(t *testing.T) {
 			expectedLeaseAmount: 0,
 			afterAcquire: func(t *testing.T, deps *deps, resp *CapacityAcquireResponse) {
 				require.Equal(t, 0, len(resp.Leases))
+				require.Equal(t, deps.clock.Now().Add(ConcurrencyLimitRetryAfter), resp.RetryAfter)
+
+				require.Len(t, resp.ExhaustedConstraints, 1)
+				require.Equal(t, ConstraintKindConcurrency, resp.ExhaustedConstraints[0].Kind)
 			},
 		},
 
@@ -351,6 +456,147 @@ func TestConstraintEnforcement(t *testing.T) {
 			},
 			amount:              10,
 			expectedLeaseAmount: 5,
+		},
+
+		{
+			name: "account and function concurrency with none exhausted after",
+			config: ConstraintConfig{
+				FunctionVersion: 1,
+				Concurrency: ConcurrencyConfig{
+					AccountConcurrency:  4,
+					FunctionConcurrency: 4,
+				},
+			},
+			constraints: []ConstraintItem{
+				{
+					Kind: ConstraintKindConcurrency,
+					Concurrency: &ConcurrencyConstraint{
+						Scope:             enums.ConcurrencyScopeAccount,
+						Mode:              enums.ConcurrencyModeStep,
+						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:account:%s", accountID),
+					},
+				},
+				{
+					Kind: ConstraintKindConcurrency,
+					Concurrency: &ConcurrencyConstraint{
+						Scope:             enums.ConcurrencyScopeFn,
+						Mode:              enums.ConcurrencyModeStep,
+						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:p:%s", fnID),
+					},
+				},
+			},
+			amount:              2,
+			expectedLeaseAmount: 2,
+			mi: MigrationIdentifier{
+				QueueShard: "test",
+			},
+			afterAcquire: func(t *testing.T, deps *deps, resp *CapacityAcquireResponse) {
+				// no limiting constraints
+				require.Len(t, resp.LimitingConstraints, 0)
+
+				// no exhausted constraints
+				require.Len(t, resp.ExhaustedConstraints, 0)
+
+				// no retry after since we still have capacity
+				require.True(t, resp.RetryAfter.IsZero())
+			},
+		},
+
+		{
+			name: "account and function concurrency with one exhausted after",
+			config: ConstraintConfig{
+				FunctionVersion: 1,
+				Concurrency: ConcurrencyConfig{
+					AccountConcurrency:  4,
+					FunctionConcurrency: 2,
+				},
+			},
+			constraints: []ConstraintItem{
+				{
+					Kind: ConstraintKindConcurrency,
+					Concurrency: &ConcurrencyConstraint{
+						Scope:             enums.ConcurrencyScopeAccount,
+						Mode:              enums.ConcurrencyModeStep,
+						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:account:%s", accountID),
+					},
+				},
+				{
+					Kind: ConstraintKindConcurrency,
+					Concurrency: &ConcurrencyConstraint{
+						Scope:             enums.ConcurrencyScopeFn,
+						Mode:              enums.ConcurrencyModeStep,
+						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:p:%s", fnID),
+					},
+				},
+			},
+			amount:              2,
+			expectedLeaseAmount: 2,
+			mi: MigrationIdentifier{
+				QueueShard: "test",
+			},
+			afterAcquire: func(t *testing.T, deps *deps, resp *CapacityAcquireResponse) {
+				clock := deps.clock
+
+				// no limited at since capacity was at least 2
+				require.Len(t, resp.LimitingConstraints, 0)
+
+				// fn concurrency was exhausted
+				require.Len(t, resp.ExhaustedConstraints, 1)
+				require.Equal(t, ConstraintKindConcurrency, resp.ExhaustedConstraints[0].Kind)
+				require.Equal(t, enums.ConcurrencyScopeFn, resp.ExhaustedConstraints[0].Concurrency.Scope)
+
+				// expect retryAt
+				require.WithinDuration(t, clock.Now().Add(ConcurrencyLimitRetryAfter), resp.RetryAfter, time.Millisecond)
+			},
+		},
+
+		{
+			name: "account and function concurrency with both exhausted after",
+			config: ConstraintConfig{
+				FunctionVersion: 1,
+				Concurrency: ConcurrencyConfig{
+					AccountConcurrency:  2,
+					FunctionConcurrency: 2,
+				},
+			},
+			constraints: []ConstraintItem{
+				{
+					Kind: ConstraintKindConcurrency,
+					Concurrency: &ConcurrencyConstraint{
+						Scope:             enums.ConcurrencyScopeAccount,
+						Mode:              enums.ConcurrencyModeStep,
+						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:account:%s", accountID),
+					},
+				},
+				{
+					Kind: ConstraintKindConcurrency,
+					Concurrency: &ConcurrencyConstraint{
+						Scope:             enums.ConcurrencyScopeFn,
+						Mode:              enums.ConcurrencyModeStep,
+						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:p:%s", fnID),
+					},
+				},
+			},
+			amount:              2,
+			expectedLeaseAmount: 2,
+			mi: MigrationIdentifier{
+				QueueShard: "test",
+			},
+			afterAcquire: func(t *testing.T, deps *deps, resp *CapacityAcquireResponse) {
+				clock := deps.clock
+
+				// still no limiting constraint
+				require.Len(t, resp.LimitingConstraints, 0)
+
+				// expect 2 exhausted constraints
+				require.Len(t, resp.ExhaustedConstraints, 2)
+				require.Equal(t, ConstraintKindConcurrency, resp.ExhaustedConstraints[0].Kind)
+				require.Equal(t, enums.ConcurrencyScopeAccount, resp.ExhaustedConstraints[0].Concurrency.Scope)
+				require.Equal(t, enums.ConcurrencyScopeFn, resp.ExhaustedConstraints[1].Concurrency.Scope)
+
+				// retryAt should be set
+				require.WithinDuration(t, clock.Now().Add(ConcurrencyLimitRetryAfter), resp.RetryAfter, time.Millisecond)
+			},
 		},
 
 		{
@@ -647,6 +893,8 @@ func TestConstraintEnforcement(t *testing.T) {
 
 				require.Len(t, resp.LimitingConstraints, 1)
 				require.Equal(t, ConstraintKindThrottle, resp.LimitingConstraints[0].Kind)
+				require.Len(t, resp.ExhaustedConstraints, 1)
+				require.Equal(t, ConstraintKindThrottle, resp.ExhaustedConstraints[0].Kind)
 				require.False(t, resp.RetryAfter.IsZero())
 				// Next unit will be available in 1h
 				require.WithinDuration(t, deps.clock.Now().Add(time.Hour), resp.RetryAfter, time.Second)
@@ -843,6 +1091,8 @@ func TestConstraintEnforcement(t *testing.T) {
 
 				require.Len(t, resp.LimitingConstraints, 1)
 				require.Equal(t, ConstraintKindRateLimit, resp.LimitingConstraints[0].Kind)
+				require.Len(t, resp.ExhaustedConstraints, 1)
+				require.Equal(t, ConstraintKindRateLimit, resp.ExhaustedConstraints[0].Kind)
 				require.False(t, resp.RetryAfter.IsZero())
 				// Next unit will be available in 1m
 				require.WithinDuration(t, deps.clock.Now().Add(time.Minute), resp.RetryAfter, time.Second)
@@ -899,7 +1149,15 @@ func TestConstraintEnforcement(t *testing.T) {
 			afterAcquire: func(t *testing.T, deps *deps, resp *CapacityAcquireResponse) {
 				t.Log(resp.Debug())
 
-				require.True(t, resp.RetryAfter.Before(deps.clock.Now()))
+				// Rate limit allows 1 request every 6s. The burst is limit / 10 = 1, so we can
+				// admit two requests at once. The first request was legacy, the second request
+				// was just acquired, so we have 0 more requests and used up capacity.
+
+				// Since we used up capacity, expected rate limit constraint to be part of exhausted constraints
+				require.Len(t, resp.ExhaustedConstraints, 1)
+
+				// Also expect retry after to be now + 6s
+				require.WithinDuration(t, deps.clock.Now().Add(6*time.Second), resp.RetryAfter, time.Millisecond)
 
 				raw, err := deps.r.Get("{rl}:key-hash")
 				require.NoError(t, err)
@@ -972,6 +1230,623 @@ func TestConstraintEnforcement(t *testing.T) {
 			afterPostAcquireCheck: func(t *testing.T, deps *deps, resp *CapacityCheckResponse) {
 				// We are now accounting for 2 requests
 				require.Equal(t, 2, resp.Usage[0].Used)
+			},
+		},
+
+		{
+			name: "concurrency with limiting constraints",
+			config: ConstraintConfig{
+				FunctionVersion: 1,
+				Concurrency: ConcurrencyConfig{
+					AccountConcurrency:  5,
+					FunctionConcurrency: 4,
+				},
+			},
+			constraints: []ConstraintItem{
+				{
+					Kind: ConstraintKindConcurrency,
+					Concurrency: &ConcurrencyConstraint{
+						Scope:             enums.ConcurrencyScopeAccount,
+						Mode:              enums.ConcurrencyModeStep,
+						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:account:%s", accountID),
+					},
+				},
+				{
+					Kind: ConstraintKindConcurrency,
+					Concurrency: &ConcurrencyConstraint{
+						Scope:             enums.ConcurrencyScopeFn,
+						Mode:              enums.ConcurrencyModeStep,
+						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:p:%s", fnID),
+					},
+				},
+			},
+			amount:              10,
+			expectedLeaseAmount: 4,
+			mi: MigrationIdentifier{
+				QueueShard: "test",
+			},
+			afterAcquire: func(t *testing.T, deps *deps, resp *CapacityAcquireResponse) {
+				clock := deps.clock
+
+				// both constraints are limiting
+				require.Len(t, resp.LimitingConstraints, 2)
+
+				// only function concurrency is exhausted
+				require.Len(t, resp.ExhaustedConstraints, 1)
+				require.Equal(t, ConstraintKindConcurrency, resp.ExhaustedConstraints[0].Kind)
+				require.Equal(t, enums.ConcurrencyScopeFn, resp.ExhaustedConstraints[0].Concurrency.Scope)
+
+				// expect retryAt
+				require.WithinDuration(t, clock.Now().Add(ConcurrencyLimitRetryAfter), resp.RetryAfter, time.Millisecond)
+			},
+		},
+
+		{
+			name: "pick highest retryAt value",
+
+			amount:              10,
+			expectedLeaseAmount: 2,
+
+			config: ConstraintConfig{
+				FunctionVersion: 1,
+				Concurrency: ConcurrencyConfig{
+					AccountConcurrency:  5,
+					FunctionConcurrency: 2,
+				},
+				Throttle: []ThrottleConfig{
+					{
+						Limit:             2,
+						Period:            60,
+						KeyExpressionHash: "expr-hash",
+					},
+				},
+			},
+
+			constraints: []ConstraintItem{
+				{
+					Kind: ConstraintKindThrottle,
+					Throttle: &ThrottleConstraint{
+						KeyExpressionHash: "expr-hash",
+						EvaluatedKeyHash:  "key-hash",
+					},
+				},
+
+				{
+					Kind: ConstraintKindConcurrency,
+					Concurrency: &ConcurrencyConstraint{
+						Scope:             enums.ConcurrencyScopeAccount,
+						Mode:              enums.ConcurrencyModeStep,
+						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:account:%s", accountID),
+					},
+				},
+
+				{
+					Kind: ConstraintKindConcurrency,
+					Concurrency: &ConcurrencyConstraint{
+						Scope:             enums.ConcurrencyScopeFn,
+						Mode:              enums.ConcurrencyModeStep,
+						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:p:%s", fnID),
+					},
+				},
+			},
+			mi: MigrationIdentifier{
+				QueueShard: "test",
+			},
+			afterAcquire: func(t *testing.T, deps *deps, resp *CapacityAcquireResponse) {
+				clock := deps.clock
+
+				// only throttle is limiting since it runs first
+				require.Len(t, resp.LimitingConstraints, 1)
+				require.Equal(t, ConstraintKindThrottle, resp.LimitingConstraints[0].Kind)
+
+				// throttle and fn concurrency are exhausted
+				require.Len(t, resp.ExhaustedConstraints, 2)
+				require.Equal(t, ConstraintKindThrottle, resp.ExhaustedConstraints[0].Kind)
+				require.Equal(t, ConstraintKindConcurrency, resp.ExhaustedConstraints[1].Kind)
+				require.Equal(t, enums.ConcurrencyScopeFn, resp.ExhaustedConstraints[1].Concurrency.Scope)
+
+				// expect retryAt
+				throttleRetry := (60 * time.Second) / 2
+				require.WithinDuration(t, clock.Now().Add(throttleRetry), resp.RetryAfter, time.Millisecond)
+			},
+		},
+
+		{
+			name: "only pick retryAt value from exhausted",
+
+			amount:              10,
+			expectedLeaseAmount: 2,
+
+			config: ConstraintConfig{
+				FunctionVersion: 1,
+				Concurrency: ConcurrencyConfig{
+					AccountConcurrency:  5,
+					FunctionConcurrency: 2,
+				},
+				Throttle: []ThrottleConfig{
+					{
+						Limit:             3,
+						Period:            60,
+						KeyExpressionHash: "expr-hash",
+					},
+				},
+			},
+
+			constraints: []ConstraintItem{
+				{
+					Kind: ConstraintKindThrottle,
+					Throttle: &ThrottleConstraint{
+						KeyExpressionHash: "expr-hash",
+						EvaluatedKeyHash:  "key-hash",
+					},
+				},
+
+				{
+					Kind: ConstraintKindConcurrency,
+					Concurrency: &ConcurrencyConstraint{
+						Scope:             enums.ConcurrencyScopeAccount,
+						Mode:              enums.ConcurrencyModeStep,
+						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:account:%s", accountID),
+					},
+				},
+
+				{
+					Kind: ConstraintKindConcurrency,
+					Concurrency: &ConcurrencyConstraint{
+						Scope:             enums.ConcurrencyScopeFn,
+						Mode:              enums.ConcurrencyModeStep,
+						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:p:%s", fnID),
+					},
+				},
+			},
+			mi: MigrationIdentifier{
+				QueueShard: "test",
+			},
+			afterAcquire: func(t *testing.T, deps *deps, resp *CapacityAcquireResponse) {
+				clock := deps.clock
+
+				// both throttle and function concurrency are limiting
+				require.Len(t, resp.LimitingConstraints, 2)
+				require.Equal(t, ConstraintKindThrottle, resp.LimitingConstraints[0].Kind)
+				require.Equal(t, ConstraintKindConcurrency, resp.LimitingConstraints[1].Kind)
+				require.Equal(t, enums.ConcurrencyScopeFn, resp.LimitingConstraints[1].Concurrency.Scope)
+
+				// only fn concurrency is exhausted
+				require.Len(t, resp.ExhaustedConstraints, 1)
+				require.Equal(t, ConstraintKindConcurrency, resp.ExhaustedConstraints[0].Kind)
+				require.Equal(t, enums.ConcurrencyScopeFn, resp.ExhaustedConstraints[0].Concurrency.Scope)
+
+				// expect retryAt to match concurrency
+				require.WithinDuration(t, clock.Now().Add(ConcurrencyLimitRetryAfter), resp.RetryAfter, time.Millisecond)
+			},
+		},
+
+		{
+			name: "concurrency constraints exhausted initially should be returned",
+
+			amount:              10,
+			expectedLeaseAmount: 0,
+
+			config: ConstraintConfig{
+				FunctionVersion: 1,
+				Concurrency: ConcurrencyConfig{
+					AccountConcurrency:  5,
+					FunctionConcurrency: 2,
+				},
+				Throttle: []ThrottleConfig{
+					{
+						Limit:             3,
+						Period:            60,
+						KeyExpressionHash: "expr-hash",
+					},
+				},
+			},
+
+			constraints: []ConstraintItem{
+				{
+					Kind: ConstraintKindThrottle,
+					Throttle: &ThrottleConstraint{
+						KeyExpressionHash: "expr-hash",
+						EvaluatedKeyHash:  "key-hash",
+					},
+				},
+
+				{
+					Kind: ConstraintKindConcurrency,
+					Concurrency: &ConcurrencyConstraint{
+						Scope:             enums.ConcurrencyScopeAccount,
+						Mode:              enums.ConcurrencyModeStep,
+						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:account:%s", accountID),
+					},
+				},
+
+				{
+					Kind: ConstraintKindConcurrency,
+					Concurrency: &ConcurrencyConstraint{
+						Scope:             enums.ConcurrencyScopeFn,
+						Mode:              enums.ConcurrencyModeStep,
+						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:p:%s", fnID),
+					},
+				},
+			},
+			mi: MigrationIdentifier{
+				QueueShard: "test",
+			},
+			beforeAcquire: func(t *testing.T, deps *deps) {
+				// Pretend function concurrency capacity is already consumed
+				key := deps.constraints[2].Concurrency.InProgressLeasesKey(
+					deps.cm.queueStateKeyPrefix,
+					accountID,
+					envID,
+					fnID,
+				)
+				for i := range 2 {
+					inProgress := deps.clock.Now().Add(5 * time.Second).UnixMilli()
+					_, err := deps.r.ZAdd(key, float64(inProgress), fmt.Sprintf("%d", i))
+					require.NoError(t, err)
+				}
+			},
+			afterAcquire: func(t *testing.T, deps *deps, resp *CapacityAcquireResponse) {
+				clock := deps.clock
+
+				// both throttle and function concurrency are limiting
+				require.Len(t, resp.LimitingConstraints, 2)
+				require.Equal(t, ConstraintKindThrottle, resp.LimitingConstraints[0].Kind)
+				require.Equal(t, ConstraintKindConcurrency, resp.LimitingConstraints[1].Kind)
+				require.Equal(t, enums.ConcurrencyScopeFn, resp.LimitingConstraints[1].Concurrency.Scope)
+
+				// only fn concurrency is exhausted
+				require.Len(t, resp.ExhaustedConstraints, 1)
+				require.Equal(t, ConstraintKindConcurrency, resp.ExhaustedConstraints[0].Kind)
+				require.Equal(t, enums.ConcurrencyScopeFn, resp.ExhaustedConstraints[0].Concurrency.Scope)
+
+				// expect retryAt to match concurrency
+				require.WithinDuration(t, clock.Now().Add(ConcurrencyLimitRetryAfter), resp.RetryAfter, time.Millisecond)
+			},
+		},
+
+		{
+			name: "throttle constraints exhausted initially should be returned",
+
+			// expect no returned leases due to using up throttle capacity
+			amount:              10,
+			expectedLeaseAmount: 0,
+
+			config: ConstraintConfig{
+				FunctionVersion: 1,
+				Throttle: []ThrottleConfig{
+					{
+						Limit:             2,
+						Period:            60,
+						KeyExpressionHash: "expr-hash",
+					},
+				},
+			},
+
+			constraints: []ConstraintItem{
+				{
+					Kind: ConstraintKindThrottle,
+					Throttle: &ThrottleConstraint{
+						KeyExpressionHash: "expr-hash",
+						EvaluatedKeyHash:  "key-hash",
+					},
+				},
+			},
+			mi: MigrationIdentifier{
+				QueueShard: "test",
+			},
+			beforeAcquire: func(t *testing.T, deps *deps) {
+				// Set existing legacy state, simulate 2 admitted requests
+				tat := deps.clock.Now().Add(60 * time.Second).UnixMilli()
+				err := deps.r.Set("{q:v1}:throttle:key-hash", strconv.Itoa(int(tat)))
+				require.NoError(t, err)
+			},
+			afterAcquire: func(t *testing.T, deps *deps, resp *CapacityAcquireResponse) {
+				clock := deps.clock
+
+				// only throttle is limiting
+				require.Len(t, resp.LimitingConstraints, 1)
+				require.Equal(t, ConstraintKindThrottle, resp.LimitingConstraints[0].Kind)
+
+				// only throttle is exhausted
+				require.Len(t, resp.ExhaustedConstraints, 1)
+				require.Equal(t, ConstraintKindThrottle, resp.ExhaustedConstraints[0].Kind)
+
+				// expect retryAt to match throttle
+				throttleRetry := 30 * time.Second
+
+				require.WithinDuration(t, clock.Now().Add(throttleRetry), resp.RetryAfter, time.Millisecond)
+			},
+		},
+
+		{
+			name: "rateLimit constraints exhausted initially should be returned",
+
+			// expect no returned leases due to using up rateLimit capacity
+			amount:              10,
+			expectedLeaseAmount: 0,
+
+			config: ConstraintConfig{
+				FunctionVersion: 1,
+				RateLimit: []RateLimitConfig{
+					{
+						Limit:             1,
+						Period:            60,
+						KeyExpressionHash: "expr-hash",
+					},
+				},
+			},
+
+			constraints: []ConstraintItem{
+				{
+					Kind: ConstraintKindRateLimit,
+					RateLimit: &RateLimitConstraint{
+						KeyExpressionHash: "expr-hash",
+						EvaluatedKeyHash:  "key-hash",
+					},
+				},
+			},
+			mi: MigrationIdentifier{
+				IsRateLimit: true,
+			},
+			beforeAcquire: func(t *testing.T, deps *deps) {
+				// Set existing legacy state, simulate 1 admitted request
+				tat := deps.clock.Now().Add(60 * time.Second).UnixNano()
+				err := deps.r.Set("{rl}:key-hash", strconv.Itoa(int(tat)))
+				require.NoError(t, err)
+			},
+			afterAcquire: func(t *testing.T, deps *deps, resp *CapacityAcquireResponse) {
+				clock := deps.clock
+
+				// only rateLimit is limiting
+				require.Len(t, resp.LimitingConstraints, 1)
+				require.Equal(t, ConstraintKindRateLimit, resp.LimitingConstraints[0].Kind)
+
+				// only rateLimit is exhausted
+				require.Len(t, resp.ExhaustedConstraints, 1)
+				require.Equal(t, ConstraintKindRateLimit, resp.ExhaustedConstraints[0].Kind)
+
+				// expect retryAt to match rateLimit
+				retryAt := 60 * time.Second
+
+				require.WithinDuration(t, clock.Now().Add(retryAt), resp.RetryAfter, time.Millisecond)
+			},
+		},
+
+		{
+			name: "rateLimit constraints exhausted after updating should be returned",
+
+			// expect only one returned lease
+			amount:              10,
+			expectedLeaseAmount: 1,
+
+			config: ConstraintConfig{
+				FunctionVersion: 1,
+				RateLimit: []RateLimitConfig{
+					{
+						Limit:             1,
+						Period:            60,
+						KeyExpressionHash: "expr-hash",
+					},
+				},
+			},
+
+			constraints: []ConstraintItem{
+				{
+					Kind: ConstraintKindRateLimit,
+					RateLimit: &RateLimitConstraint{
+						KeyExpressionHash: "expr-hash",
+						EvaluatedKeyHash:  "key-hash",
+					},
+				},
+			},
+			mi: MigrationIdentifier{
+				IsRateLimit: true,
+			},
+			afterAcquire: func(t *testing.T, deps *deps, resp *CapacityAcquireResponse) {
+				clock := deps.clock
+
+				// only rateLimit is limiting
+				require.Len(t, resp.LimitingConstraints, 1)
+				require.Equal(t, ConstraintKindRateLimit, resp.LimitingConstraints[0].Kind)
+
+				// only rateLimit is exhausted
+				require.Len(t, resp.ExhaustedConstraints, 1)
+				require.Equal(t, ConstraintKindRateLimit, resp.ExhaustedConstraints[0].Kind)
+
+				// expect retryAt to match rateLimit
+				retryAt := 60 * time.Second
+
+				require.WithinDuration(t, clock.Now().Add(retryAt), resp.RetryAfter, time.Millisecond)
+			},
+		},
+
+		{
+			name: "Check with exhausted concurrency constraint",
+
+			amount:              1,
+			expectedLeaseAmount: 0,
+
+			config: ConstraintConfig{
+				FunctionVersion: 1,
+				Concurrency: ConcurrencyConfig{
+					FunctionConcurrency: 2,
+				},
+			},
+
+			constraints: []ConstraintItem{
+				{
+					Kind: ConstraintKindConcurrency,
+					Concurrency: &ConcurrencyConstraint{
+						Scope:             enums.ConcurrencyScopeFn,
+						Mode:              enums.ConcurrencyModeStep,
+						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:p:%s", fnID),
+					},
+				},
+			},
+			mi: MigrationIdentifier{
+				QueueShard: "test",
+			},
+			beforeAcquire: func(t *testing.T, deps *deps) {
+				// Exhaust function concurrency capacity by adding leases
+				key := deps.constraints[0].Concurrency.InProgressLeasesKey(
+					deps.cm.queueStateKeyPrefix,
+					accountID,
+					envID,
+					fnID,
+				)
+				for i := range 2 {
+					inProgress := deps.clock.Now().Add(5 * time.Second).UnixMilli()
+					_, err := deps.r.ZAdd(key, float64(inProgress), fmt.Sprintf("%d", i))
+					require.NoError(t, err)
+				}
+			},
+			afterPreAcquireCheck: func(t *testing.T, deps *deps, resp *CapacityCheckResponse) {
+				// Check should detect exhausted constraint
+				require.Len(t, resp.ExhaustedConstraints, 1)
+				require.Equal(t, ConstraintKindConcurrency, resp.ExhaustedConstraints[0].Kind)
+
+				// Constraint should be limiting
+				require.Len(t, resp.LimitingConstraints, 1)
+				require.Equal(t, ConstraintKindConcurrency, resp.LimitingConstraints[0].Kind)
+
+				// RetryAfter should be set for exhausted constraint
+				require.False(t, resp.RetryAfter.IsZero())
+				require.WithinDuration(t, deps.clock.Now().Add(ConcurrencyLimitRetryAfter), resp.RetryAfter, time.Millisecond)
+
+				// Available capacity should be 0
+				require.Equal(t, 0, resp.AvailableCapacity)
+			},
+		},
+
+		{
+			name: "Check with limiting but not exhausted constraint",
+
+			amount:              10,
+			expectedLeaseAmount: 5,
+
+			config: ConstraintConfig{
+				FunctionVersion: 1,
+				Concurrency: ConcurrencyConfig{
+					FunctionConcurrency: 5,
+				},
+			},
+
+			constraints: []ConstraintItem{
+				{
+					Kind: ConstraintKindConcurrency,
+					Concurrency: &ConcurrencyConstraint{
+						Scope:             enums.ConcurrencyScopeFn,
+						Mode:              enums.ConcurrencyModeStep,
+						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:p:%s", fnID),
+					},
+				},
+			},
+			mi: MigrationIdentifier{
+				QueueShard: "test",
+			},
+			afterPreAcquireCheck: func(t *testing.T, deps *deps, resp *CapacityCheckResponse) {
+				// Requesting 10 but limit is 5, so constraint IS limiting (reduces capacity)
+				// but NOT exhausted (still has capacity > 0)
+				require.Len(t, resp.LimitingConstraints, 1)
+				require.Len(t, resp.ExhaustedConstraints, 0)
+
+				// RetryAfter should NOT be set for non-exhausted constraint
+				require.True(t, resp.RetryAfter.IsZero())
+
+				// Available capacity should be 5
+				require.Equal(t, 5, resp.AvailableCapacity)
+			},
+			afterAcquire: func(t *testing.T, deps *deps, resp *CapacityAcquireResponse) {
+				// After acquiring 5 leases, constraint should now be exhausted
+				require.Len(t, resp.LimitingConstraints, 1)
+				require.Len(t, resp.ExhaustedConstraints, 1)
+			},
+			afterPostAcquireCheck: func(t *testing.T, deps *deps, resp *CapacityCheckResponse) {
+				// After acquiring 5 leases, constraint should now be exhausted
+				require.Len(t, resp.ExhaustedConstraints, 1)
+				require.Equal(t, ConstraintKindConcurrency, resp.ExhaustedConstraints[0].Kind)
+
+				// Constraint should be limiting
+				require.Len(t, resp.LimitingConstraints, 1)
+				require.Equal(t, ConstraintKindConcurrency, resp.LimitingConstraints[0].Kind)
+
+				// RetryAfter should now be set
+				require.False(t, resp.RetryAfter.IsZero())
+
+				// Available capacity should be 0
+				require.Equal(t, 0, resp.AvailableCapacity)
+			},
+		},
+
+		{
+			name: "Check with multiple constraints - one exhausted, one limiting",
+
+			amount:              10,
+			expectedLeaseAmount: 0,
+
+			config: ConstraintConfig{
+				FunctionVersion: 1,
+				Concurrency: ConcurrencyConfig{
+					AccountConcurrency:  10,
+					FunctionConcurrency: 2,
+				},
+			},
+
+			constraints: []ConstraintItem{
+				{
+					Kind: ConstraintKindConcurrency,
+					Concurrency: &ConcurrencyConstraint{
+						Scope:             enums.ConcurrencyScopeAccount,
+						Mode:              enums.ConcurrencyModeStep,
+						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:account:%s", accountID),
+					},
+				},
+				{
+					Kind: ConstraintKindConcurrency,
+					Concurrency: &ConcurrencyConstraint{
+						Scope:             enums.ConcurrencyScopeFn,
+						Mode:              enums.ConcurrencyModeStep,
+						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:p:%s", fnID),
+					},
+				},
+			},
+			mi: MigrationIdentifier{
+				QueueShard: "test",
+			},
+			beforeAcquire: func(t *testing.T, deps *deps) {
+				// Exhaust function concurrency
+				key := deps.constraints[1].Concurrency.InProgressLeasesKey(
+					deps.cm.queueStateKeyPrefix,
+					accountID,
+					envID,
+					fnID,
+				)
+				for i := range 2 {
+					inProgress := deps.clock.Now().Add(5 * time.Second).UnixMilli()
+					_, err := deps.r.ZAdd(key, float64(inProgress), fmt.Sprintf("%d", i))
+					require.NoError(t, err)
+				}
+			},
+			afterPreAcquireCheck: func(t *testing.T, deps *deps, resp *CapacityCheckResponse) {
+				// Function concurrency is exhausted
+				require.Len(t, resp.ExhaustedConstraints, 1)
+				require.Equal(t, ConstraintKindConcurrency, resp.ExhaustedConstraints[0].Kind)
+				require.Equal(t, enums.ConcurrencyScopeFn, resp.ExhaustedConstraints[0].Concurrency.Scope)
+
+				// Both constraints are in limiting array (account was checked first and reduced capacity,
+				// then function reduced it further to 0)
+				require.Len(t, resp.LimitingConstraints, 2)
+				require.Equal(t, ConstraintKindConcurrency, resp.LimitingConstraints[0].Kind)
+				require.Equal(t, enums.ConcurrencyScopeAccount, resp.LimitingConstraints[0].Concurrency.Scope)
+				require.Equal(t, ConstraintKindConcurrency, resp.LimitingConstraints[1].Kind)
+				require.Equal(t, enums.ConcurrencyScopeFn, resp.LimitingConstraints[1].Concurrency.Scope)
+
+				// RetryAfter should be set
+				require.False(t, resp.RetryAfter.IsZero())
+
+				// Available capacity should be 0
+				require.Equal(t, 0, resp.AvailableCapacity)
 			},
 		},
 	}
@@ -2124,4 +2999,620 @@ func TestConcurrencyConstraint_IsCustomKey_KeyGeneration(t *testing.T) {
 	// Standard key should not contain custom key patterns
 	assert.NotContains(t, standardKey, "<", "Standard key should not contain custom key markers")
 	assert.NotContains(t, standardKey, ">", "Standard key should not contain custom key markers")
+}
+
+func TestConstraintItem_CacheKey(t *testing.T) {
+	// Test UUIDs
+	accountID := uuid.MustParse("550e8400-e29b-41d4-a716-446655440001")
+	envID := uuid.MustParse("550e8400-e29b-41d4-a716-446655440002")
+	functionID := uuid.MustParse("550e8400-e29b-41d4-a716-446655440003")
+
+	tests := []struct {
+		name        string
+		constraint  ConstraintItem
+		expected    string
+		description string
+	}{
+		// Concurrency Constraints - No Custom Key
+		{
+			name: "concurrency account scope no custom key",
+			constraint: ConstraintItem{
+				Kind: ConstraintKindConcurrency,
+				Concurrency: &ConcurrencyConstraint{
+					Scope: enums.ConcurrencyScopeAccount,
+				},
+			},
+			expected:    "550e8400-e29b-41d4-a716-446655440001:c:a",
+			description: "account concurrency without custom key should use account ID",
+		},
+		{
+			name: "concurrency env scope no custom key",
+			constraint: ConstraintItem{
+				Kind: ConstraintKindConcurrency,
+				Concurrency: &ConcurrencyConstraint{
+					Scope: enums.ConcurrencyScopeEnv,
+				},
+			},
+			expected:    "550e8400-e29b-41d4-a716-446655440001:c:e:550e8400-e29b-41d4-a716-446655440002",
+			description: "env concurrency without custom key should include env ID",
+		},
+		{
+			name: "concurrency function scope no custom key",
+			constraint: ConstraintItem{
+				Kind: ConstraintKindConcurrency,
+				Concurrency: &ConcurrencyConstraint{
+					Scope: enums.ConcurrencyScopeFn,
+				},
+			},
+			expected:    "550e8400-e29b-41d4-a716-446655440001:c:f:550e8400-e29b-41d4-a716-446655440003",
+			description: "function concurrency without custom key should include function ID",
+		},
+
+		// Concurrency Constraints - With Custom Key
+		{
+			name: "concurrency account scope with custom key",
+			constraint: ConstraintItem{
+				Kind: ConstraintKindConcurrency,
+				Concurrency: &ConcurrencyConstraint{
+					Scope:             enums.ConcurrencyScopeAccount,
+					KeyExpressionHash: "expr_hash_123",
+					EvaluatedKeyHash:  "eval_hash_456",
+				},
+			},
+			expected:    "550e8400-e29b-41d4-a716-446655440001:c:a:expr_hash_123:eval_hash_456",
+			description: "account concurrency with custom key should include both hashes",
+		},
+		{
+			name: "concurrency env scope with custom key",
+			constraint: ConstraintItem{
+				Kind: ConstraintKindConcurrency,
+				Concurrency: &ConcurrencyConstraint{
+					Scope:             enums.ConcurrencyScopeEnv,
+					KeyExpressionHash: "expr_env",
+					EvaluatedKeyHash:  "eval_env",
+				},
+			},
+			expected:    "550e8400-e29b-41d4-a716-446655440001:c:e:expr_env:eval_env",
+			description: "env concurrency with custom key should include both hashes",
+		},
+		{
+			name: "concurrency function scope with custom key",
+			constraint: ConstraintItem{
+				Kind: ConstraintKindConcurrency,
+				Concurrency: &ConcurrencyConstraint{
+					Scope:             enums.ConcurrencyScopeFn,
+					KeyExpressionHash: "expr_fn",
+					EvaluatedKeyHash:  "eval_fn",
+				},
+			},
+			expected:    "550e8400-e29b-41d4-a716-446655440001:c:f:expr_fn:eval_fn",
+			description: "function concurrency with custom key should include both hashes",
+		},
+
+		// Throttle Constraints - No Custom Key
+		{
+			name: "throttle account scope no custom key",
+			constraint: ConstraintItem{
+				Kind: ConstraintKindThrottle,
+				Throttle: &ThrottleConstraint{
+					Scope: enums.ThrottleScopeAccount,
+				},
+			},
+			expected:    "550e8400-e29b-41d4-a716-446655440001:t:a",
+			description: "account throttle without custom key should use account ID",
+		},
+		{
+			name: "throttle env scope no custom key",
+			constraint: ConstraintItem{
+				Kind: ConstraintKindThrottle,
+				Throttle: &ThrottleConstraint{
+					Scope: enums.ThrottleScopeEnv,
+				},
+			},
+			expected:    "550e8400-e29b-41d4-a716-446655440001:t:e:550e8400-e29b-41d4-a716-446655440002",
+			description: "env throttle without custom key should include env ID",
+		},
+		{
+			name: "throttle function scope no custom key",
+			constraint: ConstraintItem{
+				Kind: ConstraintKindThrottle,
+				Throttle: &ThrottleConstraint{
+					Scope: enums.ThrottleScopeFn,
+				},
+			},
+			expected:    "550e8400-e29b-41d4-a716-446655440001:t:f:550e8400-e29b-41d4-a716-446655440003",
+			description: "function throttle without custom key should include function ID",
+		},
+
+		// Throttle Constraints - With Custom Key
+		{
+			name: "throttle account scope with custom key",
+			constraint: ConstraintItem{
+				Kind: ConstraintKindThrottle,
+				Throttle: &ThrottleConstraint{
+					Scope:             enums.ThrottleScopeAccount,
+					KeyExpressionHash: "throttle_expr",
+					EvaluatedKeyHash:  "throttle_eval",
+				},
+			},
+			expected:    "550e8400-e29b-41d4-a716-446655440001:t:a:throttle_expr:throttle_eval",
+			description: "account throttle with custom key should include both hashes",
+		},
+		{
+			name: "throttle env scope with custom key",
+			constraint: ConstraintItem{
+				Kind: ConstraintKindThrottle,
+				Throttle: &ThrottleConstraint{
+					Scope:             enums.ThrottleScopeEnv,
+					KeyExpressionHash: "throttle_env_expr",
+					EvaluatedKeyHash:  "throttle_env_eval",
+				},
+			},
+			expected:    "550e8400-e29b-41d4-a716-446655440001:t:e:throttle_env_expr:throttle_env_eval",
+			description: "env throttle with custom key should include both hashes",
+		},
+		{
+			name: "throttle function scope with custom key",
+			constraint: ConstraintItem{
+				Kind: ConstraintKindThrottle,
+				Throttle: &ThrottleConstraint{
+					Scope:             enums.ThrottleScopeFn,
+					KeyExpressionHash: "throttle_fn_expr",
+					EvaluatedKeyHash:  "throttle_fn_eval",
+				},
+			},
+			expected:    "550e8400-e29b-41d4-a716-446655440001:t:f:throttle_fn_expr:throttle_fn_eval",
+			description: "function throttle with custom key should include both hashes",
+		},
+
+		// Rate Limit Constraints - No Custom Key
+		{
+			name: "rate limit account scope no custom key",
+			constraint: ConstraintItem{
+				Kind: ConstraintKindRateLimit,
+				RateLimit: &RateLimitConstraint{
+					Scope: enums.RateLimitScopeAccount,
+				},
+			},
+			expected:    "550e8400-e29b-41d4-a716-446655440001:r:a",
+			description: "account rate limit without custom key should use account ID",
+		},
+		{
+			name: "rate limit env scope no custom key",
+			constraint: ConstraintItem{
+				Kind: ConstraintKindRateLimit,
+				RateLimit: &RateLimitConstraint{
+					Scope: enums.RateLimitScopeEnv,
+				},
+			},
+			expected:    "550e8400-e29b-41d4-a716-446655440001:r:e:550e8400-e29b-41d4-a716-446655440002",
+			description: "env rate limit without custom key should include env ID",
+		},
+		{
+			name: "rate limit function scope no custom key",
+			constraint: ConstraintItem{
+				Kind: ConstraintKindRateLimit,
+				RateLimit: &RateLimitConstraint{
+					Scope: enums.RateLimitScopeFn,
+				},
+			},
+			expected:    "550e8400-e29b-41d4-a716-446655440001:r:f:550e8400-e29b-41d4-a716-446655440003",
+			description: "function rate limit without custom key should include function ID",
+		},
+
+		// Rate Limit Constraints - With Custom Key
+		{
+			name: "rate limit account scope with custom key",
+			constraint: ConstraintItem{
+				Kind: ConstraintKindRateLimit,
+				RateLimit: &RateLimitConstraint{
+					Scope:             enums.RateLimitScopeAccount,
+					KeyExpressionHash: "rl_expr",
+					EvaluatedKeyHash:  "rl_eval",
+				},
+			},
+			expected:    "550e8400-e29b-41d4-a716-446655440001:r:a:rl_expr:rl_eval",
+			description: "account rate limit with custom key should include both hashes",
+		},
+		{
+			name: "rate limit env scope with custom key",
+			constraint: ConstraintItem{
+				Kind: ConstraintKindRateLimit,
+				RateLimit: &RateLimitConstraint{
+					Scope:             enums.RateLimitScopeEnv,
+					KeyExpressionHash: "rl_env_expr",
+					EvaluatedKeyHash:  "rl_env_eval",
+				},
+			},
+			expected:    "550e8400-e29b-41d4-a716-446655440001:r:e:rl_env_expr:rl_env_eval",
+			description: "env rate limit with custom key should include both hashes",
+		},
+		{
+			name: "rate limit function scope with custom key",
+			constraint: ConstraintItem{
+				Kind: ConstraintKindRateLimit,
+				RateLimit: &RateLimitConstraint{
+					Scope:             enums.RateLimitScopeFn,
+					KeyExpressionHash: "rl_fn_expr",
+					EvaluatedKeyHash:  "rl_fn_eval",
+				},
+			},
+			expected:    "550e8400-e29b-41d4-a716-446655440001:r:f:rl_fn_expr:rl_fn_eval",
+			description: "function rate limit with custom key should include both hashes",
+		},
+
+		// Edge Cases
+		{
+			name: "concurrency with nil constraint pointer",
+			constraint: ConstraintItem{
+				Kind:        ConstraintKindConcurrency,
+				Concurrency: nil,
+			},
+			expected:    "",
+			description: "nil concurrency pointer should return empty string",
+		},
+		{
+			name: "throttle with nil constraint pointer",
+			constraint: ConstraintItem{
+				Kind:     ConstraintKindThrottle,
+				Throttle: nil,
+			},
+			expected:    "",
+			description: "nil throttle pointer should return empty string",
+		},
+		{
+			name: "rate limit with nil constraint pointer",
+			constraint: ConstraintItem{
+				Kind:      ConstraintKindRateLimit,
+				RateLimit: nil,
+			},
+			expected:    "",
+			description: "nil rate limit pointer should return empty string",
+		},
+		{
+			name: "unknown constraint kind",
+			constraint: ConstraintItem{
+				Kind: ConstraintKind("unknown"),
+			},
+			expected:    "",
+			description: "unknown constraint kind should return empty string",
+		},
+		{
+			name:        "zero value constraint item",
+			constraint:  ConstraintItem{},
+			expected:    "",
+			description: "zero-value constraint item should return empty string",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.constraint.CacheKey(accountID, envID, functionID)
+			assert.Equal(t, tt.expected, result, tt.description)
+		})
+	}
+}
+
+func TestConstraintItem_CacheKey_AlwaysIncludesAccountID(t *testing.T) {
+	accountID := uuid.MustParse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
+	envID := uuid.MustParse("11111111-2222-3333-4444-555555555555")
+	functionID := uuid.MustParse("66666666-7777-8888-9999-000000000000")
+
+	tests := []struct {
+		name       string
+		constraint ConstraintItem
+	}{
+		{
+			name: "concurrency account scope",
+			constraint: ConstraintItem{
+				Kind:        ConstraintKindConcurrency,
+				Concurrency: &ConcurrencyConstraint{Scope: enums.ConcurrencyScopeAccount},
+			},
+		},
+		{
+			name: "concurrency env scope",
+			constraint: ConstraintItem{
+				Kind:        ConstraintKindConcurrency,
+				Concurrency: &ConcurrencyConstraint{Scope: enums.ConcurrencyScopeEnv},
+			},
+		},
+		{
+			name: "concurrency function scope",
+			constraint: ConstraintItem{
+				Kind:        ConstraintKindConcurrency,
+				Concurrency: &ConcurrencyConstraint{Scope: enums.ConcurrencyScopeFn},
+			},
+		},
+		{
+			name: "throttle account scope",
+			constraint: ConstraintItem{
+				Kind:     ConstraintKindThrottle,
+				Throttle: &ThrottleConstraint{Scope: enums.ThrottleScopeAccount},
+			},
+		},
+		{
+			name: "throttle env scope",
+			constraint: ConstraintItem{
+				Kind:     ConstraintKindThrottle,
+				Throttle: &ThrottleConstraint{Scope: enums.ThrottleScopeEnv},
+			},
+		},
+		{
+			name: "throttle function scope",
+			constraint: ConstraintItem{
+				Kind:     ConstraintKindThrottle,
+				Throttle: &ThrottleConstraint{Scope: enums.ThrottleScopeFn},
+			},
+		},
+		{
+			name: "rate limit account scope",
+			constraint: ConstraintItem{
+				Kind:      ConstraintKindRateLimit,
+				RateLimit: &RateLimitConstraint{Scope: enums.RateLimitScopeAccount},
+			},
+		},
+		{
+			name: "rate limit env scope",
+			constraint: ConstraintItem{
+				Kind:      ConstraintKindRateLimit,
+				RateLimit: &RateLimitConstraint{Scope: enums.RateLimitScopeEnv},
+			},
+		},
+		{
+			name: "rate limit function scope",
+			constraint: ConstraintItem{
+				Kind:      ConstraintKindRateLimit,
+				RateLimit: &RateLimitConstraint{Scope: enums.RateLimitScopeFn},
+			},
+		},
+		{
+			name: "concurrency with custom key",
+			constraint: ConstraintItem{
+				Kind: ConstraintKindConcurrency,
+				Concurrency: &ConcurrencyConstraint{
+					Scope:             enums.ConcurrencyScopeAccount,
+					KeyExpressionHash: "expr",
+					EvaluatedKeyHash:  "eval",
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			key := tt.constraint.CacheKey(accountID, envID, functionID)
+			assert.NotEmpty(t, key, "cache key should not be empty")
+			assert.Contains(t, key, accountID.String(), "cache key must always start with account ID")
+
+			// Verify account ID is at the beginning
+			assert.True(t, len(key) > 0 && key[:36] == accountID.String(),
+				"cache key should start with account ID")
+		})
+	}
+}
+
+func TestConstraintItem_CacheKey_Uniqueness(t *testing.T) {
+	accountID1 := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	accountID2 := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+	envID1 := uuid.MustParse("33333333-3333-3333-3333-333333333333")
+	envID2 := uuid.MustParse("44444444-4444-4444-4444-444444444444")
+	functionID1 := uuid.MustParse("55555555-5555-5555-5555-555555555555")
+	functionID2 := uuid.MustParse("66666666-6666-6666-6666-666666666666")
+
+	t.Run("different accounts produce different keys", func(t *testing.T) {
+		constraint := ConstraintItem{
+			Kind:        ConstraintKindConcurrency,
+			Concurrency: &ConcurrencyConstraint{Scope: enums.ConcurrencyScopeAccount},
+		}
+
+		key1 := constraint.CacheKey(accountID1, envID1, functionID1)
+		key2 := constraint.CacheKey(accountID2, envID1, functionID1)
+
+		assert.NotEqual(t, key1, key2, "different account IDs should produce different cache keys")
+	})
+
+	t.Run("different envs produce different keys for env scope", func(t *testing.T) {
+		constraint := ConstraintItem{
+			Kind:        ConstraintKindConcurrency,
+			Concurrency: &ConcurrencyConstraint{Scope: enums.ConcurrencyScopeEnv},
+		}
+
+		key1 := constraint.CacheKey(accountID1, envID1, functionID1)
+		key2 := constraint.CacheKey(accountID1, envID2, functionID1)
+
+		assert.NotEqual(t, key1, key2, "different env IDs should produce different cache keys for env scope")
+	})
+
+	t.Run("different functions produce different keys for function scope", func(t *testing.T) {
+		constraint := ConstraintItem{
+			Kind:        ConstraintKindConcurrency,
+			Concurrency: &ConcurrencyConstraint{Scope: enums.ConcurrencyScopeFn},
+		}
+
+		key1 := constraint.CacheKey(accountID1, envID1, functionID1)
+		key2 := constraint.CacheKey(accountID1, envID1, functionID2)
+
+		assert.NotEqual(t, key1, key2, "different function IDs should produce different cache keys for function scope")
+	})
+
+	t.Run("different constraint kinds produce different keys", func(t *testing.T) {
+		concurrency := ConstraintItem{
+			Kind:        ConstraintKindConcurrency,
+			Concurrency: &ConcurrencyConstraint{Scope: enums.ConcurrencyScopeAccount},
+		}
+		throttle := ConstraintItem{
+			Kind:     ConstraintKindThrottle,
+			Throttle: &ThrottleConstraint{Scope: enums.ThrottleScopeAccount},
+		}
+		rateLimit := ConstraintItem{
+			Kind:      ConstraintKindRateLimit,
+			RateLimit: &RateLimitConstraint{Scope: enums.RateLimitScopeAccount},
+		}
+
+		key1 := concurrency.CacheKey(accountID1, envID1, functionID1)
+		key2 := throttle.CacheKey(accountID1, envID1, functionID1)
+		key3 := rateLimit.CacheKey(accountID1, envID1, functionID1)
+
+		assert.NotEqual(t, key1, key2, "concurrency and throttle should produce different keys")
+		assert.NotEqual(t, key2, key3, "throttle and rate limit should produce different keys")
+		assert.NotEqual(t, key1, key3, "concurrency and rate limit should produce different keys")
+	})
+
+	t.Run("different scopes produce different keys", func(t *testing.T) {
+		accountScope := ConstraintItem{
+			Kind:        ConstraintKindConcurrency,
+			Concurrency: &ConcurrencyConstraint{Scope: enums.ConcurrencyScopeAccount},
+		}
+		envScope := ConstraintItem{
+			Kind:        ConstraintKindConcurrency,
+			Concurrency: &ConcurrencyConstraint{Scope: enums.ConcurrencyScopeEnv},
+		}
+		functionScope := ConstraintItem{
+			Kind:        ConstraintKindConcurrency,
+			Concurrency: &ConcurrencyConstraint{Scope: enums.ConcurrencyScopeFn},
+		}
+
+		key1 := accountScope.CacheKey(accountID1, envID1, functionID1)
+		key2 := envScope.CacheKey(accountID1, envID1, functionID1)
+		key3 := functionScope.CacheKey(accountID1, envID1, functionID1)
+
+		assert.NotEqual(t, key1, key2, "account and env scope should produce different keys")
+		assert.NotEqual(t, key2, key3, "env and function scope should produce different keys")
+		assert.NotEqual(t, key1, key3, "account and function scope should produce different keys")
+	})
+
+	t.Run("custom keys produce different keys from non-custom", func(t *testing.T) {
+		standard := ConstraintItem{
+			Kind:        ConstraintKindConcurrency,
+			Concurrency: &ConcurrencyConstraint{Scope: enums.ConcurrencyScopeAccount},
+		}
+		custom := ConstraintItem{
+			Kind: ConstraintKindConcurrency,
+			Concurrency: &ConcurrencyConstraint{
+				Scope:             enums.ConcurrencyScopeAccount,
+				KeyExpressionHash: "expr",
+				EvaluatedKeyHash:  "eval",
+			},
+		}
+
+		key1 := standard.CacheKey(accountID1, envID1, functionID1)
+		key2 := custom.CacheKey(accountID1, envID1, functionID1)
+
+		assert.NotEqual(t, key1, key2, "custom key constraints should produce different keys than standard")
+	})
+
+	t.Run("different custom keys produce different keys", func(t *testing.T) {
+		custom1 := ConstraintItem{
+			Kind: ConstraintKindConcurrency,
+			Concurrency: &ConcurrencyConstraint{
+				Scope:             enums.ConcurrencyScopeAccount,
+				KeyExpressionHash: "expr1",
+				EvaluatedKeyHash:  "eval1",
+			},
+		}
+		custom2 := ConstraintItem{
+			Kind: ConstraintKindConcurrency,
+			Concurrency: &ConcurrencyConstraint{
+				Scope:             enums.ConcurrencyScopeAccount,
+				KeyExpressionHash: "expr2",
+				EvaluatedKeyHash:  "eval2",
+			},
+		}
+
+		key1 := custom1.CacheKey(accountID1, envID1, functionID1)
+		key2 := custom2.CacheKey(accountID1, envID1, functionID1)
+
+		assert.NotEqual(t, key1, key2, "different custom keys should produce different cache keys")
+	})
+}
+
+func TestConstraintItem_CacheKey_Format(t *testing.T) {
+	accountID := uuid.MustParse("12345678-1234-1234-1234-123456789012")
+	envID := uuid.MustParse("abcdef00-abcd-abcd-abcd-abcdefabcdef")
+	functionID := uuid.MustParse("fedcba00-fedc-fedc-fedc-fedcbafedcba")
+
+	t.Run("concurrency keys have correct format", func(t *testing.T) {
+		constraint := ConstraintItem{
+			Kind:        ConstraintKindConcurrency,
+			Concurrency: &ConcurrencyConstraint{Scope: enums.ConcurrencyScopeAccount},
+		}
+
+		key := constraint.CacheKey(accountID, envID, functionID)
+		assert.Contains(t, key, ":c:", "concurrency key should contain :c: marker")
+		assert.True(t, len(key) > 0, "key should not be empty")
+	})
+
+	t.Run("throttle keys have correct format", func(t *testing.T) {
+		constraint := ConstraintItem{
+			Kind:     ConstraintKindThrottle,
+			Throttle: &ThrottleConstraint{Scope: enums.ThrottleScopeAccount},
+		}
+
+		key := constraint.CacheKey(accountID, envID, functionID)
+		assert.Contains(t, key, ":t:", "throttle key should contain :t: marker")
+		assert.True(t, len(key) > 0, "key should not be empty")
+	})
+
+	t.Run("rate limit keys have correct format", func(t *testing.T) {
+		constraint := ConstraintItem{
+			Kind:      ConstraintKindRateLimit,
+			RateLimit: &RateLimitConstraint{Scope: enums.RateLimitScopeAccount},
+		}
+
+		key := constraint.CacheKey(accountID, envID, functionID)
+		assert.Contains(t, key, ":r:", "rate limit key should contain :r: marker")
+		assert.True(t, len(key) > 0, "key should not be empty")
+	})
+
+	t.Run("account scope keys have correct format", func(t *testing.T) {
+		constraint := ConstraintItem{
+			Kind:        ConstraintKindConcurrency,
+			Concurrency: &ConcurrencyConstraint{Scope: enums.ConcurrencyScopeAccount},
+		}
+
+		key := constraint.CacheKey(accountID, envID, functionID)
+		assert.Contains(t, key, ":a", "account scope key should contain :a marker")
+	})
+
+	t.Run("env scope keys have correct format", func(t *testing.T) {
+		constraint := ConstraintItem{
+			Kind:        ConstraintKindConcurrency,
+			Concurrency: &ConcurrencyConstraint{Scope: enums.ConcurrencyScopeEnv},
+		}
+
+		key := constraint.CacheKey(accountID, envID, functionID)
+		assert.Contains(t, key, ":e:", "env scope key should contain :e: marker")
+		assert.Contains(t, key, envID.String(), "env scope key should contain env ID")
+	})
+
+	t.Run("function scope keys have correct format", func(t *testing.T) {
+		constraint := ConstraintItem{
+			Kind:        ConstraintKindConcurrency,
+			Concurrency: &ConcurrencyConstraint{Scope: enums.ConcurrencyScopeFn},
+		}
+
+		key := constraint.CacheKey(accountID, envID, functionID)
+		assert.Contains(t, key, ":f:", "function scope key should contain :f: marker")
+		assert.Contains(t, key, functionID.String(), "function scope key should contain function ID")
+	})
+
+	t.Run("custom key format includes both hashes", func(t *testing.T) {
+		constraint := ConstraintItem{
+			Kind: ConstraintKindConcurrency,
+			Concurrency: &ConcurrencyConstraint{
+				Scope:             enums.ConcurrencyScopeAccount,
+				KeyExpressionHash: "my_expr",
+				EvaluatedKeyHash:  "my_eval",
+			},
+		}
+
+		key := constraint.CacheKey(accountID, envID, functionID)
+		assert.Contains(t, key, "my_expr", "custom key should contain expression hash")
+		assert.Contains(t, key, "my_eval", "custom key should contain evaluated hash")
+
+		// Check that expr comes before eval
+		exprIdx := strings.Index(key, "my_expr")
+		evalIdx := strings.Index(key, "my_eval")
+		assert.True(t, exprIdx < evalIdx, "expression hash should come before evaluated hash")
+	})
 }

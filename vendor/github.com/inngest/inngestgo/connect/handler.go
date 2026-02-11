@@ -114,6 +114,12 @@ type Opts struct {
 
 	MaxWorkerConcurrency *int64
 
+	// MessageReadLimit sets the max number of bytes to read for a single WebSocket message.
+	// By default (nil or 0), the connection has a message read limit of 10MB.
+	// Set to -1 to disable the limit.
+	// Set to any positive value to use a custom limit.
+	MessageReadLimit *int64
+
 	APIBaseUrl   string
 	IsDev        bool
 	DevServerUrl string

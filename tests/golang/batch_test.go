@@ -57,10 +57,10 @@ func TestBatchEvents(t *testing.T) {
 	registerFuncs()
 
 	t.Run("trigger batch", func(t *testing.T) {
-		for i := 0; i < 8; i++ {
+		for i := range 8 {
 			_, err := inngestClient.Send(ctx, BatchEvent{
 				Name: "test/batch",
-				Data: BatchEventData{Time: time.Now()},
+				Data: BatchEventData{Time: time.Now(), Num: i},
 			})
 			require.NoError(t, err)
 		}
@@ -206,7 +206,6 @@ func TestBatchWithConditionalTrigger(t *testing.T) {
 		<-time.After(6 * time.Second)
 		assert.EqualValues(t, 1, atomic.LoadInt32(&counter))
 		assert.EqualValues(t, 5, atomic.LoadInt32(&totalEvents))
-
 	})
 }
 
@@ -253,7 +252,6 @@ func TestConditionalBatching(t *testing.T) {
 		<-time.After(6 * time.Second)
 		assert.EqualValues(t, 6, atomic.LoadInt32(&counter))
 		assert.EqualValues(t, 10, atomic.LoadInt32(&totalEvents))
-
 	})
 }
 
@@ -302,7 +300,6 @@ func TestConditionalBatchingWithEventTriggerCondition(t *testing.T) {
 		<-time.After(6 * time.Second)
 		assert.EqualValues(t, 6, atomic.LoadInt32(&counter))
 		assert.EqualValues(t, 10, atomic.LoadInt32(&totalEvents))
-
 	})
 }
 
@@ -317,6 +314,7 @@ func TestBatchInvoke(t *testing.T) {
 		invokeCounter int32
 	)
 
+	// this will be invoked.  we expect invokes to respect batches.
 	_, err := inngestgo.CreateFunction(
 		inngestClient,
 		inngestgo.FunctionOpts{
@@ -324,7 +322,7 @@ func TestBatchInvoke(t *testing.T) {
 			Name: "test batching",
 			BatchEvents: &inngestgo.ConfigBatchEvents{
 				MaxSize: 3,
-				Timeout: 5 * time.Second,
+				Timeout: 2 * time.Second,
 			},
 		},
 		inngestgo.EventTrigger("batchinvoke/batch", nil),
@@ -332,11 +330,13 @@ func TestBatchInvoke(t *testing.T) {
 			evts := input.Events
 			atomic.AddInt32(&counter, 1)
 			atomic.AddInt32(&totalEvents, int32(len(evts)))
+			fmt.Println("hi from invoked func", len(evts))
 			return fmt.Sprintf("batched %d events", len(evts)), nil
 		},
 	)
 	require.NoError(t, err)
 
+	// this will run N times, as its not batched.
 	_, err = inngestgo.CreateFunction(
 		inngestClient,
 		inngestgo.FunctionOpts{
@@ -353,6 +353,7 @@ func TestBatchInvoke(t *testing.T) {
 				FunctionId: "batchinvoke-batcher",
 				Data: map[string]any{
 					"name": "invoke",
+					"n":    input.Event.Data.Data.Num,
 				},
 			})
 			fmt.Println("Invoked batch fn:", val)
@@ -367,29 +368,34 @@ func TestBatchInvoke(t *testing.T) {
 
 	t.Run("trigger a batch", func(t *testing.T) {
 		// Call invoke twice
-		for i := 0; i < 5; i++ {
+		for i := range 5 {
 			_, err := inngestClient.Send(ctx, BatchEvent{
 				Name: "batchinvoke/caller",
-				Data: BatchEventData{Time: time.Now()},
+				Data: BatchEventData{Time: time.Now(), Num: i},
 			})
 			require.NoError(t, err)
 		}
 
 		// First trigger should be because of batch is full
-		<-time.After(2 * time.Second)
-		require.EqualValues(t, 1, atomic.LoadInt32(&counter))
-		require.EqualValues(t, 3, atomic.LoadInt32(&totalEvents))
-		require.EqualValues(t, 3, atomic.LoadInt32(&invokeCounter))
+		<-time.After(1 * time.Second)
+		require.EventuallyWithT(t, func(t *assert.CollectT) {
+			assert.EqualValues(t, 1, atomic.LoadInt32(&counter))
+			assert.EqualValues(t, 3, atomic.LoadInt32(&totalEvents))
+			assert.EqualValues(t, 3, atomic.LoadInt32(&invokeCounter))
+		}, time.Second*3, time.Millisecond)
 
 		// Second trigger should be because of the batch timeout
-		<-time.After(5 * time.Second)
-		require.EqualValues(t, 2, atomic.LoadInt32(&counter))
-		require.EqualValues(t, 5, atomic.LoadInt32(&totalEvents))
-		require.EqualValues(t, 5, atomic.LoadInt32(&invokeCounter))
+		<-time.After(2 * time.Second)
+
+		require.EventuallyWithT(t, func(t *assert.CollectT) {
+			assert.EqualValues(t, 2, atomic.LoadInt32(&counter))
+			assert.EqualValues(t, 5, atomic.LoadInt32(&totalEvents))
+			assert.EqualValues(t, 5, atomic.LoadInt32(&invokeCounter))
+		}, time.Second*15, time.Millisecond)
 	})
 }
 
-func TestBatchEventsWithKeys(t *testing.T) {
+func TestBatchKeyEvents(t *testing.T) {
 	type BatchEventDataWithUserId struct {
 		Time   time.Time `json:"time"`
 		UserId string    `json:"userId"`
@@ -400,9 +406,7 @@ func TestBatchEventsWithKeys(t *testing.T) {
 	inngestClient, server, registerFuncs := NewSDKHandler(t, "user-notifications")
 	defer server.Close()
 
-	var (
-		totalEvents int32
-	)
+	var totalEvents int32
 
 	batchInvokedCounter := make(map[string]int32)
 	batchEventsCounter := make(map[string]int)

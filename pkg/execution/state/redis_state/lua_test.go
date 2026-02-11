@@ -10,8 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/inngest/inngest/pkg/consts"
-	"github.com/inngest/inngest/pkg/enums"
 	"github.com/jonboulle/clockwork"
 	"github.com/redis/rueidis"
 	"github.com/stretchr/testify/require"
@@ -1123,8 +1121,8 @@ func TestLuaEndsWith(t *testing.T) {
 	_, rc := initRedis(t)
 	defer rc.Close()
 
-	defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
-	kg := defaultShard.RedisClient.kg
+	defaultShard := shardFromClient("default", rc)
+	kg := defaultShard.Client().kg
 
 	t.Run("with empty string", func(t *testing.T) {
 		key := kg.BacklogSet("")

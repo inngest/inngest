@@ -8,8 +8,6 @@ import (
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/google/uuid"
-	"github.com/inngest/inngest/pkg/consts"
-	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/jonboulle/clockwork"
@@ -30,19 +28,17 @@ func TestQueueScavenge(t *testing.T) {
 
 	clock := clockwork.NewFakeClock()
 
-	shard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
-	kg := shard.RedisClient.KeyGenerator()
-
 	t.Run("in-progress items must be added to scavenger index", func(t *testing.T) {
 		r.FlushAll()
 
-		q := NewQueue(
-			shard,
-			WithClock(clock),
-			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+		q, shard := newQueue(
+			t, rc,
+			osqueue.WithClock(clock),
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 				return true
 			}),
 		)
+		kg := shard.Client().kg
 		ctx := context.Background()
 
 		accountID := uuid.New()
@@ -61,13 +57,13 @@ func TestQueueScavenge(t *testing.T) {
 
 		start := time.Now().Truncate(time.Second)
 
-		item, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi, start, osqueue.EnqueueOpts{})
+		item, err := shard.EnqueueItem(ctx, qi, start, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
 		leaseExpiry := clock.Now().Add(5 * time.Second)
 
 		// Lease item in legacy/fallback mode (do not disable lease checks)
-		leaseID, err := q.Lease(ctx, item, 5*time.Second, clock.Now(), nil, LeaseOptionDisableConstraintChecks(false))
+		leaseID, err := shard.Lease(ctx, item, 5*time.Second, clock.Now(), nil, osqueue.LeaseOptionDisableConstraintChecks(false))
 		require.NoError(t, err)
 		require.NotNil(t, leaseID)
 
@@ -87,7 +83,7 @@ func TestQueueScavenge(t *testing.T) {
 
 		// Expire lease and expect scores to represent new expiry
 		leaseExpiry = clock.Now().Add(5 * time.Second)
-		leaseID, err = q.ExtendLease(ctx, item, *leaseID, 5*time.Second)
+		leaseID, err = shard.ExtendLease(ctx, item, *leaseID, 5*time.Second)
 		require.NoError(t, err)
 		require.NotNil(t, leaseID)
 
@@ -101,7 +97,7 @@ func TestQueueScavenge(t *testing.T) {
 		require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, kg.Concurrency("p", fnID.String()), item.ID)))
 
 		// Dequeue item and check scavenger index was cleaned up
-		err = q.Dequeue(ctx, shard, item, DequeueOptionDisableConstraintUpdates(false))
+		err = q.Dequeue(ctx, shard, item, osqueue.DequeueOptionDisableConstraintUpdates(false))
 		require.NoError(t, err)
 
 		require.False(t, r.Exists(kg.PartitionScavengerIndex(fnID.String())))
@@ -113,13 +109,14 @@ func TestQueueScavenge(t *testing.T) {
 	t.Run("in-progress items must be added to scavenger index - requeue", func(t *testing.T) {
 		r.FlushAll()
 
-		q := NewQueue(
-			shard,
-			WithClock(clock),
-			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+		_, shard := newQueue(
+			t, rc,
+			osqueue.WithClock(clock),
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 				return true
 			}),
 		)
+		kg := shard.Client().kg
 		ctx := context.Background()
 
 		accountID := uuid.New()
@@ -138,11 +135,11 @@ func TestQueueScavenge(t *testing.T) {
 
 		start := time.Now().Truncate(time.Second)
 
-		item, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi, start, osqueue.EnqueueOpts{})
+		item, err := shard.EnqueueItem(ctx, qi, start, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
 		// Lease item in legacy/fallback mode (do not disable lease checks)
-		leaseID, err := q.Lease(ctx, item, 5*time.Second, clock.Now(), nil, LeaseOptionDisableConstraintChecks(false))
+		leaseID, err := shard.Lease(ctx, item, 5*time.Second, clock.Now(), nil, osqueue.LeaseOptionDisableConstraintChecks(false))
 		require.NoError(t, err)
 		require.NotNil(t, leaseID)
 
@@ -154,7 +151,7 @@ func TestQueueScavenge(t *testing.T) {
 		require.True(t, r.Exists(kg.ConcurrencyIndex()))
 
 		// Requeue item and check scavenger index was cleaned up
-		err = q.Requeue(ctx, shard, item, clock.Now().Add(5*time.Second), RequeueOptionDisableConstraintUpdates(false))
+		err = shard.Requeue(ctx, item, clock.Now().Add(5*time.Second), osqueue.RequeueOptionDisableConstraintUpdates(false))
 		require.NoError(t, err)
 
 		require.False(t, r.Exists(kg.PartitionScavengerIndex(fnID.String())))
@@ -166,13 +163,14 @@ func TestQueueScavenge(t *testing.T) {
 	t.Run("enqueueing multiple items should lead to earliest lease to expire to be pointer score", func(t *testing.T) {
 		r.FlushAll()
 
-		q := NewQueue(
-			shard,
-			WithClock(clock),
-			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+		_, shard := newQueue(
+			t, rc,
+			osqueue.WithClock(clock),
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 				return true
 			}),
 		)
+		kg := shard.Client().kg
 		ctx := context.Background()
 
 		accountID := uuid.New()
@@ -191,10 +189,10 @@ func TestQueueScavenge(t *testing.T) {
 
 		start := time.Now().Truncate(time.Second)
 
-		item1, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi, start, osqueue.EnqueueOpts{})
+		item1, err := shard.EnqueueItem(ctx, qi, start, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
-		item2, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi, start, osqueue.EnqueueOpts{})
+		item2, err := shard.EnqueueItem(ctx, qi, start, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
 		leaseExpiry := clock.Now().Add(5 * time.Second)
@@ -202,11 +200,11 @@ func TestQueueScavenge(t *testing.T) {
 		require.NotEqual(t, leaseExpiry, leaseExpiry2)
 
 		// Lease item in legacy/fallback mode (do not disable lease checks)
-		leaseID1, err := q.Lease(ctx, item1, 5*time.Second, clock.Now(), nil, LeaseOptionDisableConstraintChecks(false))
+		leaseID1, err := shard.Lease(ctx, item1, 5*time.Second, clock.Now(), nil, osqueue.LeaseOptionDisableConstraintChecks(false))
 		require.NoError(t, err)
 		require.NotNil(t, leaseID1)
 
-		leaseID2, err := q.Lease(ctx, item2, 3*time.Second, clock.Now(), nil, LeaseOptionDisableConstraintChecks(false))
+		leaseID2, err := shard.Lease(ctx, item2, 3*time.Second, clock.Now(), nil, osqueue.LeaseOptionDisableConstraintChecks(false))
 		require.NoError(t, err)
 		require.NotNil(t, leaseID2)
 
@@ -218,70 +216,6 @@ func TestQueueScavenge(t *testing.T) {
 		// The earliest expiring lease should become the pointer score
 		require.True(t, r.Exists(kg.ConcurrencyIndex()))
 		require.Equal(t, leaseExpiry2.UnixMilli(), int64(score(t, r, kg.ConcurrencyIndex(), fnID.String())))
-	})
-
-	// NOTE: This test covers backward compatibility with in-progress items tracked by the queue
-	// this is no longer valid since we removed the partition scavenger index
-	t.Run("existing items in in-progress sets are no longer covered by scavenger", func(t *testing.T) {
-		r.FlushAll()
-
-		q := NewQueue(
-			shard,
-			WithClock(clock),
-			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
-				return true
-			}),
-		)
-		ctx := context.Background()
-
-		accountID := uuid.New()
-		fnID := uuid.New()
-
-		qi := osqueue.QueueItem{
-			FunctionID: fnID,
-			Data: osqueue.Item{
-				Payload: json.RawMessage("{\"test\":\"payload\"}"),
-				Identifier: state.Identifier{
-					AccountID:  accountID,
-					WorkflowID: fnID,
-				},
-			},
-		}
-
-		start := time.Now().Truncate(time.Second)
-
-		item1, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi, start, osqueue.EnqueueOpts{})
-		require.NoError(t, err)
-
-		// Simulate existing lease valid for another second
-		leaseExpiry := clock.Now().Add(time.Second)
-		_, err = r.ZAdd(kg.Concurrency("p", fnID.String()), float64(leaseExpiry.UnixMilli()), item1.ID)
-		require.NoError(t, err)
-
-		_, err = r.ZAdd(kg.ConcurrencyIndex(), float64(leaseExpiry.UnixMilli()), fnID.String())
-		require.NoError(t, err)
-
-		// First run should not find any items since lease is still valid
-
-		scavenged, err := q.Scavenge(ctx, 100)
-		require.NoError(t, err)
-		require.Equal(t, 0, scavenged)
-
-		require.True(t, r.Exists(kg.ConcurrencyIndex()))
-		require.True(t, r.Exists(kg.Concurrency("p", fnID.String())))
-
-		clock.Advance(2 * time.Second)
-		r.FastForward(2 * time.Second)
-		r.SetTime(clock.Now())
-
-		require.True(t, clock.Now().After(leaseExpiry))
-
-		scavenged, err = q.Scavenge(ctx, 100)
-		require.NoError(t, err)
-		require.Equal(t, 0, scavenged, "we no longer scavenge from in progress set")
-
-		require.True(t, r.Exists(kg.ConcurrencyIndex()))
-		require.True(t, r.Exists(kg.Concurrency("p", fnID.String())))
 	})
 
 	// NOTE: This test validates scavenging logic continues to work when we progressively switch to the Constraint API.
@@ -307,13 +241,14 @@ func TestQueueScavenge(t *testing.T) {
 
 			r.FlushAll()
 
-			q := NewQueue(
-				shard,
-				WithClock(clock),
-				WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+			q, shard := newQueue(
+				t, rc,
+				osqueue.WithClock(clock),
+				osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 					return true
 				}),
 			)
+			kg := shard.Client().kg
 			ctx := context.Background()
 
 			accountID := uuid.New()
@@ -332,11 +267,11 @@ func TestQueueScavenge(t *testing.T) {
 
 			start := time.Now().Truncate(time.Second)
 
-			item, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi, start, osqueue.EnqueueOpts{})
+			item, err := shard.EnqueueItem(ctx, qi, start, osqueue.EnqueueOpts{})
 			require.NoError(t, err)
 
 			// Perform initial lease without writing to the new index
-			leaseID, err := q.Lease(ctx, item, 5*time.Second, clock.Now(), nil, LeaseOptionDisableConstraintChecks(false))
+			leaseID, err := shard.Lease(ctx, item, 5*time.Second, clock.Now(), nil, osqueue.LeaseOptionDisableConstraintChecks(false))
 			require.NoError(t, err)
 			require.NotNil(t, leaseID)
 
@@ -356,7 +291,7 @@ func TestQueueScavenge(t *testing.T) {
 			r.FastForward(time.Second)
 			r.SetTime(clock.Now())
 
-			leaseID, err = q.ExtendLease(ctx, item, *leaseID, 5*time.Second, ExtendLeaseOptionDisableConstraintUpdates(false))
+			leaseID, err = shard.ExtendLease(ctx, item, *leaseID, 5*time.Second, osqueue.ExtendLeaseOptionDisableConstraintUpdates(false))
 			require.NoError(t, err)
 			require.NotNil(t, leaseID)
 			leaseExpiry = clock.Now().Add(5 * time.Second)
@@ -371,7 +306,7 @@ func TestQueueScavenge(t *testing.T) {
 			require.True(t, r.Exists(kg.PartitionScavengerIndex(fnID.String())))
 			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, kg.PartitionScavengerIndex(fnID.String()), item.ID)))
 
-			err = q.Requeue(ctx, shard, item, clock.Now(), RequeueOptionDisableConstraintUpdates(false))
+			err = q.Requeue(ctx, shard, item, clock.Now(), osqueue.RequeueOptionDisableConstraintUpdates(false))
 			require.NoError(t, err)
 
 			require.False(t, r.Exists(kg.ConcurrencyIndex()))
@@ -383,13 +318,14 @@ func TestQueueScavenge(t *testing.T) {
 			t.Run("earlier in progress item exists", func(t *testing.T) {
 				r.FlushAll()
 
-				q := NewQueue(
-					shard,
-					WithClock(clock),
-					WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+				_, shard := newQueue(
+					t, rc,
+					osqueue.WithClock(clock),
+					osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 						return true
 					}),
 				)
+				kg := shard.Client().kg
 				ctx := context.Background()
 
 				accountID := uuid.New()
@@ -408,10 +344,10 @@ func TestQueueScavenge(t *testing.T) {
 
 				start := time.Now().Truncate(time.Second)
 
-				item1, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi, start, osqueue.EnqueueOpts{})
+				item1, err := shard.EnqueueItem(ctx, qi, start, osqueue.EnqueueOpts{})
 				require.NoError(t, err)
 
-				item2, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi, start, osqueue.EnqueueOpts{})
+				item2, err := shard.EnqueueItem(ctx, qi, start, osqueue.EnqueueOpts{})
 				require.NoError(t, err)
 
 				// Simulate existing lease valid for another second
@@ -424,7 +360,7 @@ func TestQueueScavenge(t *testing.T) {
 
 				// Perform initial lease without writing to the new index
 				leaseExpiry2 := clock.Now().Add(5 * time.Second)
-				leaseID, err := q.Lease(ctx, item2, 5*time.Second, clock.Now(), nil, LeaseOptionDisableConstraintChecks(false))
+				leaseID, err := shard.Lease(ctx, item2, 5*time.Second, clock.Now(), nil, osqueue.LeaseOptionDisableConstraintChecks(false))
 				require.NoError(t, err)
 				require.NotNil(t, leaseID)
 
@@ -445,13 +381,14 @@ func TestQueueScavenge(t *testing.T) {
 			t.Run("earlier item in scavenger index", func(t *testing.T) {
 				r.FlushAll()
 
-				q := NewQueue(
-					shard,
-					WithClock(clock),
-					WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+				_, shard := newQueue(
+					t, rc,
+					osqueue.WithClock(clock),
+					osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 						return true
 					}),
 				)
+				kg := shard.Client().kg
 				ctx := context.Background()
 
 				accountID := uuid.New()
@@ -470,18 +407,18 @@ func TestQueueScavenge(t *testing.T) {
 
 				start := time.Now().Truncate(time.Second)
 
-				item1, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi, start, osqueue.EnqueueOpts{})
+				item1, err := shard.EnqueueItem(ctx, qi, start, osqueue.EnqueueOpts{})
 				require.NoError(t, err)
 
-				item2, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi, start, osqueue.EnqueueOpts{})
+				item2, err := shard.EnqueueItem(ctx, qi, start, osqueue.EnqueueOpts{})
 				require.NoError(t, err)
 
 				// Perform initial lease only to the new index
-				leaseID, err := q.Lease(ctx, item1, 3*time.Second, clock.Now(), nil, LeaseOptionDisableConstraintChecks(true)) // NOTE: Do not update concurrency index!
+				leaseID, err := shard.Lease(ctx, item1, 3*time.Second, clock.Now(), nil, osqueue.LeaseOptionDisableConstraintChecks(true)) // NOTE: Do not update concurrency index!
 				require.NoError(t, err)
 				require.NotNil(t, leaseID)
 
-				leaseID2, err := q.Lease(ctx, item2, 5*time.Second, clock.Now(), nil, LeaseOptionDisableConstraintChecks(false))
+				leaseID2, err := shard.Lease(ctx, item2, 5*time.Second, clock.Now(), nil, osqueue.LeaseOptionDisableConstraintChecks(false))
 				require.NoError(t, err)
 				require.NotNil(t, leaseID2)
 
@@ -508,13 +445,14 @@ func TestQueueScavenge(t *testing.T) {
 			t.Run("earlier in progress item exists", func(t *testing.T) {
 				r.FlushAll()
 
-				q := NewQueue(
-					shard,
-					WithClock(clock),
-					WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+				_, shard := newQueue(
+					t, rc,
+					osqueue.WithClock(clock),
+					osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 						return true
 					}),
 				)
+				kg := shard.Client().kg
 				ctx := context.Background()
 
 				accountID := uuid.New()
@@ -533,10 +471,10 @@ func TestQueueScavenge(t *testing.T) {
 
 				start := time.Now().Truncate(time.Second)
 
-				item1, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi, start, osqueue.EnqueueOpts{})
+				item1, err := shard.EnqueueItem(ctx, qi, start, osqueue.EnqueueOpts{})
 				require.NoError(t, err)
 
-				item2, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi, start, osqueue.EnqueueOpts{})
+				item2, err := shard.EnqueueItem(ctx, qi, start, osqueue.EnqueueOpts{})
 				require.NoError(t, err)
 
 				// Simulate existing lease valid for another second
@@ -548,13 +486,13 @@ func TestQueueScavenge(t *testing.T) {
 				require.NoError(t, err)
 
 				// Lease item first
-				leaseID, err := q.Lease(ctx, item2, 5*time.Second, clock.Now(), nil, LeaseOptionDisableConstraintChecks(false))
+				leaseID, err := shard.Lease(ctx, item2, 5*time.Second, clock.Now(), nil, osqueue.LeaseOptionDisableConstraintChecks(false))
 				require.NoError(t, err)
 				require.NotNil(t, leaseID)
 
 				// Then push back lease with expiry which is still later than earliest leased item
 				leaseExpiry2 := clock.Now().Add(3 * time.Second)
-				leaseID, err = q.ExtendLease(ctx, item2, *leaseID, 3*time.Second, ExtendLeaseOptionDisableConstraintUpdates(false))
+				leaseID, err = shard.ExtendLease(ctx, item2, *leaseID, 3*time.Second, osqueue.ExtendLeaseOptionDisableConstraintUpdates(false))
 				require.NoError(t, err)
 				require.NotNil(t, leaseID)
 
@@ -575,13 +513,14 @@ func TestQueueScavenge(t *testing.T) {
 			t.Run("earlier item in scavenger index", func(t *testing.T) {
 				r.FlushAll()
 
-				q := NewQueue(
-					shard,
-					WithClock(clock),
-					WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+				_, shard := newQueue(
+					t, rc,
+					osqueue.WithClock(clock),
+					osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 						return true
 					}),
 				)
+				kg := shard.Client().kg
 				ctx := context.Background()
 
 				accountID := uuid.New()
@@ -600,22 +539,22 @@ func TestQueueScavenge(t *testing.T) {
 
 				start := time.Now().Truncate(time.Second)
 
-				item1, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi, start, osqueue.EnqueueOpts{})
+				item1, err := shard.EnqueueItem(ctx, qi, start, osqueue.EnqueueOpts{})
 				require.NoError(t, err)
 
-				item2, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi, start, osqueue.EnqueueOpts{})
+				item2, err := shard.EnqueueItem(ctx, qi, start, osqueue.EnqueueOpts{})
 				require.NoError(t, err)
 
 				// Perform initial lease only to the new index
-				leaseID, err := q.Lease(ctx, item1, 3*time.Second, clock.Now(), nil, LeaseOptionDisableConstraintChecks(true)) // NOTE: Do not update concurrency index!
+				leaseID, err := shard.Lease(ctx, item1, 3*time.Second, clock.Now(), nil, osqueue.LeaseOptionDisableConstraintChecks(true)) // NOTE: Do not update concurrency index!
 				require.NoError(t, err)
 				require.NotNil(t, leaseID)
 
-				leaseID2, err := q.Lease(ctx, item2, 2*time.Second, clock.Now(), nil, LeaseOptionDisableConstraintChecks(false))
+				leaseID2, err := shard.Lease(ctx, item2, 2*time.Second, clock.Now(), nil, osqueue.LeaseOptionDisableConstraintChecks(false))
 				require.NoError(t, err)
 				require.NotNil(t, leaseID2)
 
-				leaseID2, err = q.ExtendLease(ctx, item2, *leaseID2, 5*time.Second, ExtendLeaseOptionDisableConstraintUpdates(false))
+				leaseID2, err = shard.ExtendLease(ctx, item2, *leaseID2, 5*time.Second, osqueue.ExtendLeaseOptionDisableConstraintUpdates(false))
 				require.NoError(t, err)
 				require.NotNil(t, leaseID2)
 
@@ -642,13 +581,14 @@ func TestQueueScavenge(t *testing.T) {
 			t.Run("no more leases in either should drop pointer to function", func(t *testing.T) {
 				r.FlushAll()
 
-				q := NewQueue(
-					shard,
-					WithClock(clock),
-					WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+				q, shard := newQueue(
+					t, rc,
+					osqueue.WithClock(clock),
+					osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 						return true
 					}),
 				)
+				kg := shard.Client().kg
 				ctx := context.Background()
 
 				accountID := uuid.New()
@@ -667,10 +607,10 @@ func TestQueueScavenge(t *testing.T) {
 
 				start := time.Now().Truncate(time.Second)
 
-				item1, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi, start, osqueue.EnqueueOpts{})
+				item1, err := shard.EnqueueItem(ctx, qi, start, osqueue.EnqueueOpts{})
 				require.NoError(t, err)
 
-				item2, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi, start, osqueue.EnqueueOpts{})
+				item2, err := shard.EnqueueItem(ctx, qi, start, osqueue.EnqueueOpts{})
 				require.NoError(t, err)
 
 				// Simulate existing item in the future
@@ -682,7 +622,7 @@ func TestQueueScavenge(t *testing.T) {
 				require.NoError(t, err)
 
 				// Lease item closer to now
-				leaseID, err := q.Lease(ctx, item2, 3*time.Second, clock.Now(), nil, LeaseOptionDisableConstraintChecks(false))
+				leaseID, err := shard.Lease(ctx, item2, 3*time.Second, clock.Now(), nil, osqueue.LeaseOptionDisableConstraintChecks(false))
 				require.NoError(t, err)
 				require.NotNil(t, leaseID)
 
@@ -717,13 +657,14 @@ func TestQueueScavenge(t *testing.T) {
 			t.Run("does not update to next earliest old lease", func(t *testing.T) {
 				r.FlushAll()
 
-				q := NewQueue(
-					shard,
-					WithClock(clock),
-					WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+				q, shard := newQueue(
+					t, rc,
+					osqueue.WithClock(clock),
+					osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 						return true
 					}),
 				)
+				kg := shard.Client().kg
 				ctx := context.Background()
 
 				accountID := uuid.New()
@@ -742,10 +683,10 @@ func TestQueueScavenge(t *testing.T) {
 
 				start := time.Now().Truncate(time.Second)
 
-				item1, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi, start, osqueue.EnqueueOpts{})
+				item1, err := shard.EnqueueItem(ctx, qi, start, osqueue.EnqueueOpts{})
 				require.NoError(t, err)
 
-				item2, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi, start, osqueue.EnqueueOpts{})
+				item2, err := shard.EnqueueItem(ctx, qi, start, osqueue.EnqueueOpts{})
 				require.NoError(t, err)
 
 				// Simulate existing item in the future
@@ -757,7 +698,7 @@ func TestQueueScavenge(t *testing.T) {
 				require.NoError(t, err)
 
 				// Lease item closer to now
-				leaseID, err := q.Lease(ctx, item2, 3*time.Second, clock.Now(), nil, LeaseOptionDisableConstraintChecks(false))
+				leaseID, err := shard.Lease(ctx, item2, 3*time.Second, clock.Now(), nil, osqueue.LeaseOptionDisableConstraintChecks(false))
 				require.NoError(t, err)
 				require.NotNil(t, leaseID)
 
@@ -795,13 +736,14 @@ func TestQueueScavenge(t *testing.T) {
 			t.Run("update to next earliest item in scavenger index", func(t *testing.T) {
 				r.FlushAll()
 
-				q := NewQueue(
-					shard,
-					WithClock(clock),
-					WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+				q, shard := newQueue(
+					t, rc,
+					osqueue.WithClock(clock),
+					osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 						return true
 					}),
 				)
+				kg := shard.Client().kg
 				ctx := context.Background()
 
 				accountID := uuid.New()
@@ -820,18 +762,18 @@ func TestQueueScavenge(t *testing.T) {
 
 				start := time.Now().Truncate(time.Second)
 
-				item1, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi, start, osqueue.EnqueueOpts{})
+				item1, err := shard.EnqueueItem(ctx, qi, start, osqueue.EnqueueOpts{})
 				require.NoError(t, err)
 
-				item2, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi, start, osqueue.EnqueueOpts{})
+				item2, err := shard.EnqueueItem(ctx, qi, start, osqueue.EnqueueOpts{})
 				require.NoError(t, err)
 
 				// Perform initial lease only to the new index
-				leaseID, err := q.Lease(ctx, item1, 2*time.Second, clock.Now(), nil, LeaseOptionDisableConstraintChecks(true)) // NOTE: Do not update concurrency index!
+				leaseID, err := shard.Lease(ctx, item1, 2*time.Second, clock.Now(), nil, osqueue.LeaseOptionDisableConstraintChecks(true)) // NOTE: Do not update concurrency index!
 				require.NoError(t, err)
 				require.NotNil(t, leaseID)
 
-				leaseID2, err := q.Lease(ctx, item2, 5*time.Second, clock.Now(), nil, LeaseOptionDisableConstraintChecks(false))
+				leaseID2, err := shard.Lease(ctx, item2, 5*time.Second, clock.Now(), nil, osqueue.LeaseOptionDisableConstraintChecks(false))
 				require.NoError(t, err)
 				require.NotNil(t, leaseID2)
 
@@ -876,13 +818,14 @@ func TestQueueScavenge(t *testing.T) {
 			t.Run("no more leases in either should drop pointer to function", func(t *testing.T) {
 				r.FlushAll()
 
-				q := NewQueue(
-					shard,
-					WithClock(clock),
-					WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+				q, shard := newQueue(
+					t, rc,
+					osqueue.WithClock(clock),
+					osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 						return true
 					}),
 				)
+				kg := shard.Client().kg
 				ctx := context.Background()
 
 				accountID := uuid.New()
@@ -901,10 +844,10 @@ func TestQueueScavenge(t *testing.T) {
 
 				start := time.Now().Truncate(time.Second)
 
-				item1, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi, start, osqueue.EnqueueOpts{})
+				item1, err := shard.EnqueueItem(ctx, qi, start, osqueue.EnqueueOpts{})
 				require.NoError(t, err)
 
-				item2, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi, start, osqueue.EnqueueOpts{})
+				item2, err := shard.EnqueueItem(ctx, qi, start, osqueue.EnqueueOpts{})
 				require.NoError(t, err)
 
 				// Simulate existing item in the future
@@ -916,7 +859,7 @@ func TestQueueScavenge(t *testing.T) {
 				require.NoError(t, err)
 
 				// Lease item closer to now
-				leaseID, err := q.Lease(ctx, item2, 3*time.Second, clock.Now(), nil, LeaseOptionDisableConstraintChecks(false))
+				leaseID, err := shard.Lease(ctx, item2, 3*time.Second, clock.Now(), nil, osqueue.LeaseOptionDisableConstraintChecks(false))
 				require.NoError(t, err)
 				require.NotNil(t, leaseID)
 
@@ -951,13 +894,14 @@ func TestQueueScavenge(t *testing.T) {
 			t.Run("does not update to next earliest old lease", func(t *testing.T) {
 				r.FlushAll()
 
-				q := NewQueue(
-					shard,
-					WithClock(clock),
-					WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+				q, shard := newQueue(
+					t, rc,
+					osqueue.WithClock(clock),
+					osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 						return true
 					}),
 				)
+				kg := shard.Client().kg
 				ctx := context.Background()
 
 				accountID := uuid.New()
@@ -976,10 +920,10 @@ func TestQueueScavenge(t *testing.T) {
 
 				start := time.Now().Truncate(time.Second)
 
-				item1, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi, start, osqueue.EnqueueOpts{})
+				item1, err := shard.EnqueueItem(ctx, qi, start, osqueue.EnqueueOpts{})
 				require.NoError(t, err)
 
-				item2, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi, start, osqueue.EnqueueOpts{})
+				item2, err := shard.EnqueueItem(ctx, qi, start, osqueue.EnqueueOpts{})
 				require.NoError(t, err)
 
 				// Simulate existing item in the future
@@ -991,7 +935,7 @@ func TestQueueScavenge(t *testing.T) {
 				require.NoError(t, err)
 
 				// Lease item closer to now
-				leaseID, err := q.Lease(ctx, item2, 3*time.Second, clock.Now(), nil, LeaseOptionDisableConstraintChecks(false))
+				leaseID, err := shard.Lease(ctx, item2, 3*time.Second, clock.Now(), nil, osqueue.LeaseOptionDisableConstraintChecks(false))
 				require.NoError(t, err)
 				require.NotNil(t, leaseID)
 
@@ -1029,13 +973,14 @@ func TestQueueScavenge(t *testing.T) {
 			t.Run("update to next earliest item in scavenger index", func(t *testing.T) {
 				r.FlushAll()
 
-				q := NewQueue(
-					shard,
-					WithClock(clock),
-					WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+				q, shard := newQueue(
+					t, rc,
+					osqueue.WithClock(clock),
+					osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 						return true
 					}),
 				)
+				kg := shard.Client().kg
 				ctx := context.Background()
 
 				accountID := uuid.New()
@@ -1054,18 +999,18 @@ func TestQueueScavenge(t *testing.T) {
 
 				start := time.Now().Truncate(time.Second)
 
-				item1, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi, start, osqueue.EnqueueOpts{})
+				item1, err := shard.EnqueueItem(ctx, qi, start, osqueue.EnqueueOpts{})
 				require.NoError(t, err)
 
-				item2, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi, start, osqueue.EnqueueOpts{})
+				item2, err := shard.EnqueueItem(ctx, qi, start, osqueue.EnqueueOpts{})
 				require.NoError(t, err)
 
 				// Perform initial lease only to the new index
-				leaseID, err := q.Lease(ctx, item1, 2*time.Second, clock.Now(), nil, LeaseOptionDisableConstraintChecks(true)) // NOTE: Do not update concurrency index!
+				leaseID, err := shard.Lease(ctx, item1, 2*time.Second, clock.Now(), nil, osqueue.LeaseOptionDisableConstraintChecks(true)) // NOTE: Do not update concurrency index!
 				require.NoError(t, err)
 				require.NotNil(t, leaseID)
 
-				leaseID2, err := q.Lease(ctx, item2, 5*time.Second, clock.Now(), nil, LeaseOptionDisableConstraintChecks(false))
+				leaseID2, err := shard.Lease(ctx, item2, 5*time.Second, clock.Now(), nil, osqueue.LeaseOptionDisableConstraintChecks(false))
 				require.NoError(t, err)
 				require.NotNil(t, leaseID2)
 
@@ -1110,13 +1055,14 @@ func TestQueueScavenge(t *testing.T) {
 	t.Run("scavenger must clean up expired leases", func(t *testing.T) {
 		r.FlushAll()
 
-		q := NewQueue(
-			shard,
-			WithClock(clock),
-			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+		_, shard := newQueue(
+			t, rc,
+			osqueue.WithClock(clock),
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
 				return true
 			}),
 		)
+		kg := shard.Client().kg
 		ctx := context.Background()
 
 		accountID := uuid.New()
@@ -1135,18 +1081,18 @@ func TestQueueScavenge(t *testing.T) {
 
 		start := time.Now().Truncate(time.Second)
 
-		item1, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi, start, osqueue.EnqueueOpts{})
+		item1, err := shard.EnqueueItem(ctx, qi, start, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
 		// Simulate existing lease valid for another second
 		leaseExpiry := clock.Now().Add(5 * time.Second)
-		leaseID, err := q.Lease(ctx, item1, 5*time.Second, clock.Now(), nil, LeaseOptionDisableConstraintChecks(false))
+		leaseID, err := shard.Lease(ctx, item1, 5*time.Second, clock.Now(), nil, osqueue.LeaseOptionDisableConstraintChecks(false))
 		require.NoError(t, err)
 		require.NotNil(t, leaseID)
 
 		// First run should not find any items since lease is still valid
 
-		scavenged, err := q.Scavenge(ctx, 100)
+		scavenged, err := shard.Scavenge(ctx, 100)
 		require.NoError(t, err)
 		require.Equal(t, 0, scavenged)
 
@@ -1161,7 +1107,7 @@ func TestQueueScavenge(t *testing.T) {
 
 		require.True(t, clock.Now().After(leaseExpiry))
 
-		scavenged, err = q.Scavenge(ctx, 100)
+		scavenged, err = shard.Scavenge(ctx, 100)
 		require.NoError(t, err)
 		require.Equal(t, 1, scavenged)
 
@@ -1173,10 +1119,11 @@ func TestQueueScavenge(t *testing.T) {
 	t.Run("scavenging removes leftover traces of key queues", func(t *testing.T) {
 		r.FlushAll()
 
-		q := NewQueue(
-			shard,
-			WithClock(clock),
+		_, shard := newQueue(
+			t, rc,
+			osqueue.WithClock(clock),
 		)
+		kg := shard.Client().kg
 		ctx := context.Background()
 
 		id := uuid.New()
@@ -1190,7 +1137,7 @@ func TestQueueScavenge(t *testing.T) {
 
 		start := clock.Now().Truncate(time.Second)
 
-		item, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi, start, osqueue.EnqueueOpts{})
+		item, err := shard.EnqueueItem(ctx, qi, start, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 		require.NotEqual(t, item.ID, ulid.Zero)
 		require.Equal(t, time.UnixMilli(item.WallTimeMS).Truncate(time.Second), start)
@@ -1198,10 +1145,10 @@ func TestQueueScavenge(t *testing.T) {
 		qp := getDefaultPartition(t, r, id)
 
 		leaseStart := clock.Now()
-		leaseExpires := q.clock.Now().Add(time.Second)
+		leaseExpires := clock.Now().Add(time.Second)
 
 		itemCountMatches := func(num int) {
-			zsetKey := qp.zsetKey(q.primaryQueueShard.RedisClient.kg)
+			zsetKey := partitionZsetKey(qp, kg)
 			items, err := rc.Do(ctx, rc.B().
 				Zrangebyscore().
 				Key(zsetKey).
@@ -1215,7 +1162,7 @@ func TestQueueScavenge(t *testing.T) {
 		concurrencyItemCountMatches := func(num int) {
 			items, err := rc.Do(ctx, rc.B().
 				Zrangebyscore().
-				Key(qp.concurrencyKey(q.primaryQueueShard.RedisClient.kg)).
+				Key(partitionConcurrencyKey(qp, kg)).
 				Min("-inf").
 				Max("+inf").
 				Build()).AsStrSlice()
@@ -1226,7 +1173,7 @@ func TestQueueScavenge(t *testing.T) {
 		itemCountMatches(1)
 		concurrencyItemCountMatches(0)
 
-		leaseId, err := q.Lease(ctx, item, time.Second, leaseStart, nil)
+		leaseId, err := shard.Lease(ctx, item, time.Second, leaseStart, nil)
 		require.NoError(t, err)
 		require.NotNil(t, leaseId)
 
@@ -1239,39 +1186,39 @@ func TestQueueScavenge(t *testing.T) {
 		r.SetTime(clock.Now())
 		require.True(t, clock.Now().After(leaseExpires))
 
-		incompatibleConcurrencyIndexItem := q.primaryQueueShard.RedisClient.kg.Concurrency("p", id.String())
+		incompatibleConcurrencyIndexItem := kg.Concurrency("p", id.String())
 		compatibleConcurrencyIndexItem := id.String()
 
-		indexMembers, err := r.ZMembers(q.primaryQueueShard.RedisClient.kg.ConcurrencyIndex())
+		indexMembers, err := r.ZMembers(kg.ConcurrencyIndex())
 		require.NoError(t, err)
 		require.Equal(t, 1, len(indexMembers))
 		require.Contains(t, indexMembers, compatibleConcurrencyIndexItem)
 
 		leftoverData := []string{
-			q.primaryQueueShard.RedisClient.kg.Concurrency("p", id.String()),
+			kg.Concurrency("p", id.String()),
 			"{queue}:concurrency:p:0ffd4629-317c-4f65-8b8f-b30fccfde46f",
 			"{queue}:concurrency:custom:f:0ffd4629-317c-4f65-8b8f-b30fccfde46f:1nt4mu0skse4a",
 		}
 		score := float64(leaseStart.Add(time.Second).UnixMilli())
 		for _, leftover := range leftoverData {
-			_, err = r.ZAdd(q.primaryQueueShard.RedisClient.kg.ConcurrencyIndex(), score, leftover)
+			_, err = r.ZAdd(kg.ConcurrencyIndex(), score, leftover)
 			require.NoError(t, err)
 		}
-		indexMembers, err = r.ZMembers(q.primaryQueueShard.RedisClient.kg.ConcurrencyIndex())
+		indexMembers, err = r.ZMembers(kg.ConcurrencyIndex())
 		require.NoError(t, err)
 		require.Equal(t, 4, len(indexMembers))
 		for _, datum := range leftoverData {
 			require.Contains(t, indexMembers, datum)
 		}
 
-		requeued, err := q.Scavenge(ctx, ScavengePeekSize)
+		requeued, err := shard.Scavenge(ctx, osqueue.ScavengePeekSize)
 		require.NoError(t, err)
 		assert.Equal(t, 1, requeued, "expected one item with expired leases to be requeued by scavenge", r.Dump())
 
 		itemCountMatches(1)
 		concurrencyItemCountMatches(0)
 
-		_, err = r.ZMembers(q.primaryQueueShard.RedisClient.kg.ConcurrencyIndex())
+		_, err = r.ZMembers(kg.ConcurrencyIndex())
 		require.Error(t, err, r.Dump())
 		require.ErrorIs(t, err, miniredis.ErrKeyNotFound)
 

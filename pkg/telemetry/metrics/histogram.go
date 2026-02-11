@@ -40,6 +40,39 @@ var (
 		600_000, 1_800_000, // < 1h
 		3_600_000, // 1h
 	}
+
+	constraintAPIRequestStateSizeBoundaries = []float64{
+		512,             // 512 bytes
+		1024,            // 1 KiB
+		4 * 1024,        // 4 KiB
+		8 * 1024,        // 8 KiB
+		16 * 1024,       // 16 KiB
+		32 * 1024,       // 32 KiB
+		64 * 1024,       // 64 KiB
+		128 * 1024,      // 128 KiB
+		256 * 1024,      // 256 KiB
+		512 * 1024,      // 512 KiB
+		1024 * 1024,     // 1 MiB
+		2 * 1024 * 1024, // 2 MiB
+		4 * 1024 * 1024, // 4 MiB
+	}
+
+	ConstraintAPIDurationBoundaries = []float64{
+		5,
+		10,
+		15,
+		25,
+		50,
+		100,
+		200,
+		500,
+		1000,
+		2000,
+		5000,
+		10000,
+		30000,
+		60000,
+	}
 )
 
 func HistogramQueueItemLatency(ctx context.Context, value int64, opts HistogramOpt) {
@@ -448,5 +481,71 @@ func HistogramScheduleDuration(ctx context.Context, dur int64, opts HistogramOpt
 		Tags:        opts.Tags,
 		Unit:        "ms",
 		Boundaries:  DefaultBoundaries,
+	})
+}
+
+func HistogramConstraintAPIRequestStateSize(ctx context.Context, size int64, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, size, HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "constraintapi_request_state_size",
+		Description: "Distribution of request state size",
+		Tags:        opts.Tags,
+		Unit:        "bytes",
+		Boundaries:  constraintAPIRequestStateSizeBoundaries,
+	})
+}
+
+func HistogramConstraintAPILuaScriptDuration(ctx context.Context, duration time.Duration, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, duration.Milliseconds(), HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "constraintapi_lua_duration",
+		Description: "Distribution of Lua script duration",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  ConstraintAPIDurationBoundaries,
+	})
+}
+
+func HistogramConstraintAPIRequestLatency(ctx context.Context, latency time.Duration, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, latency.Milliseconds(), HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "constraintapi_request_latency",
+		Description: "Distribution of request latency",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  ConstraintAPIDurationBoundaries,
+	})
+}
+
+func HistogramConstraintAPIRetryAfterDuration(ctx context.Context, dur time.Duration, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, dur.Milliseconds(), HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "constraintapi_retry_after_duration",
+		Description: "Distribution of retry after values",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  ConstraintAPIDurationBoundaries,
+	})
+}
+
+func HistogramConstraintAPILimitingConstraintCacheTTL(ctx context.Context, ttl time.Duration, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, ttl.Milliseconds(), HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "constraintapi_limiting_constraint_cache_ttl",
+		Description: "Distribution of cache TTL values",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  ConstraintAPIDurationBoundaries,
+	})
+}
+
+func HistogramConstraintAPIQueueItemLeaseTTL(ctx context.Context, ttl time.Duration, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, ttl.Milliseconds(), HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "constraintapi_queue_item_lease_ttl",
+		Description: "Distribution of item lease age",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  ConstraintAPIDurationBoundaries,
 	})
 }

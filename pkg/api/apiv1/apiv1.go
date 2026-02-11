@@ -8,13 +8,13 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/inngest/inngest/pkg/api"
 	"github.com/inngest/inngest/pkg/api/apiv1/apiv1auth"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/realtime"
-	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/tracing"
@@ -45,13 +45,13 @@ type Opts struct {
 	// CancellationReadWriter reads and writes cancellations to/from a backing store.
 	CancellationReadWriter cqrs.CancellationReadWriter
 	// QueueShardSelector determines the queue shard to use
-	QueueShardSelector redis_state.ShardSelector
+	QueueShardSelector queue.ShardSelector
 	// Broadcaster is used to handle realtime via APIv1
 	Broadcaster realtime.Broadcaster
 	// TraceReader reads traces from a backing store.
 	TraceReader cqrs.TraceReader
 	// MetricsMiddleware is used to instrument the APIv1 endpoints.
-	MetricsMiddleware MetricsMiddleware
+	MetricsMiddleware api.MetricsMiddleware
 
 	// AppCreator is used with HTTP/API-based functions to create apps on the fly via checkpointing.
 	AppCreator cqrs.AppCreator
@@ -125,6 +125,15 @@ func (a *router) setup() {
 				})
 				r.Mount("/", rt)
 			})
+		}
+
+		// Checkpoint output API does its own auth (using query params), so
+		// should not be wrapped with the general auth middleware.
+		{
+			api := NewCheckpointAPI(a.opts)
+			for _, prefix := range CheckpointRoutePrefixes {
+				r.Get(prefix+"/{runID}/output", api.Output)
+			}
 		}
 
 		r.Group(func(r chi.Router) {

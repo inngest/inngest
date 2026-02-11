@@ -13,6 +13,10 @@ import (
 )
 
 const (
+	pkgName = "constraintapi.redis"
+)
+
+const (
 	MaximumAllowedRequestDelay = time.Second
 	// OperationIdempotencyTTL represents the time the same response will be returned after a successful request.
 	// Depending on the operation, this should be low (Otherwise, Acquire may return an already expired lease)
@@ -45,7 +49,8 @@ type redisCapacityManager struct {
 
 	numScavengerShards int
 
-	enableDebugLogs bool
+	enableDebugLogs                      bool
+	enableHighCardinalityInstrumentation EnableHighCardinalityInstrumentation
 
 	lifecycles []ConstraintAPILifecycleHooks
 
@@ -77,6 +82,12 @@ func WithRateLimitClient(client rueidis.Client) RedisCapacityManagerOption {
 func WithRateLimitKeyPrefix(prefix string) RedisCapacityManagerOption {
 	return func(m *redisCapacityManager) {
 		m.rateLimitKeyPrefix = prefix
+	}
+}
+
+func WithEnableHighCardinalityInstrumentation(ehci EnableHighCardinalityInstrumentation) RedisCapacityManagerOption {
+	return func(m *redisCapacityManager) {
+		m.enableHighCardinalityInstrumentation = ehci
 	}
 }
 

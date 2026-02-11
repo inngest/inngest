@@ -2,13 +2,16 @@ import { GetAccountEntitlementsDocument } from '@/gql/graphql';
 import { useQuery } from 'urql';
 
 import { createFileRoute } from '@tanstack/react-router';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   useInsightsTabManager,
   type TabManagerActions,
 } from '@/components/Insights/InsightsTabManager/InsightsTabManager';
 import { useDocumentShortcuts } from '@/components/Insights/InsightsSQLEditor/actions/handleShortcuts';
-import { StoredQueriesProvider } from '@/components/Insights/QueryHelperPanel/StoredQueriesContext';
+import {
+  StoredQueriesProvider,
+  useStoredQueries,
+} from '@/components/Insights/QueryHelperPanel/StoredQueriesContext';
 import { SaveTabProvider } from '@/components/Insights/InsightsSQLEditor/SaveTabContext';
 import { TabManagerProvider } from '@/components/Insights/InsightsTabManager/TabManagerContext';
 import { SchemasProvider } from '@/components/Insights/InsightsTabManager/InsightsHelperPanel/features/SchemaExplorer/SchemasContext/SchemasContext';
@@ -28,6 +31,18 @@ export const Route = createFileRoute('/_authed/env/$envSlug/insights/')({
   },
 });
 
+// Initial placeholder actions used before real actions are available from useInsightsTabManager
+// Defined outside component to avoid recreation on every render
+const INITIAL_TAB_ACTIONS: TabManagerActions = {
+  breakQueryAssociation: () => {},
+  closeTab: () => {},
+  createNewTab: () => {},
+  createTabFromQuery: () => {},
+  focusTab: () => {},
+  openTemplatesTab: () => {},
+  updateTab: () => {},
+};
+
 function InsightsComponent() {
   const [isQueryHelperPanelVisible, setIsQueryHelperPanelVisible] =
     useState(true);
@@ -37,12 +52,58 @@ function InsightsComponent() {
   });
   const historyWindow = entitlementsData?.account.entitlements.history.limit;
 
+  const search = Route.useSearch();
+  const deepLinkQueryId =
+    typeof search.query_id === 'string' && search.query_id.length > 0
+      ? search.query_id
+      : undefined;
+
+  // Create a ref for actions that will be populated inside InsightsWithTabManager
+  // This allows StoredQueriesProvider to use the latest actions without recreating the provider
+  const actionsRef = useRef<TabManagerActions>(INITIAL_TAB_ACTIONS);
+
+  return (
+    <StoredQueriesProvider tabManagerActionsRef={actionsRef}>
+      <InsightsWithTabManager
+        historyWindow={historyWindow}
+        isQueryHelperPanelVisible={isQueryHelperPanelVisible}
+        onToggleQueryHelperPanelVisibility={() =>
+          setIsQueryHelperPanelVisible((visible) => !visible)
+        }
+        deepLinkQueryId={deepLinkQueryId}
+        actionsRef={actionsRef}
+      />
+    </StoredQueriesProvider>
+  );
+}
+
+interface InsightsWithTabManagerProps {
+  historyWindow?: number;
+  isQueryHelperPanelVisible: boolean;
+  onToggleQueryHelperPanelVisibility: () => void;
+  deepLinkQueryId?: string;
+  actionsRef: React.MutableRefObject<TabManagerActions>;
+}
+
+function InsightsWithTabManager({
+  historyWindow,
+  isQueryHelperPanelVisible,
+  onToggleQueryHelperPanelVisibility,
+  deepLinkQueryId,
+  actionsRef,
+}: InsightsWithTabManagerProps) {
+  const { isSavedQueriesFetching } = useStoredQueries();
+
   const { actions, activeTabId, tabManager, tabs } = useInsightsTabManager({
     historyWindow,
     isQueryHelperPanelVisible,
-    onToggleQueryHelperPanelVisibility: () =>
-      setIsQueryHelperPanelVisible((visible) => !visible),
+    onToggleQueryHelperPanelVisibility,
+    isSavedQueriesFetching,
+    deepLinkQueryId,
   });
+
+  // Update the ref with real actions so StoredQueriesProvider can use them
+  actionsRef.current = actions;
 
   useDocumentShortcuts([
     {
@@ -55,20 +116,18 @@ function InsightsComponent() {
   const activeSavedQueryId = activeTab?.savedQueryId;
 
   return (
-    <StoredQueriesProvider tabManagerActions={actions}>
-      <SaveTabProvider>
-        <TabManagerProvider actions={actions} activeTab={activeTab}>
-          <SchemasProvider>
-            <InsightsContentWithDeepLink
-              isQueryHelperPanelVisible={isQueryHelperPanelVisible}
-              activeSavedQueryId={activeSavedQueryId}
-              tabManager={tabManager}
-              actions={actions}
-            />
-          </SchemasProvider>
-        </TabManagerProvider>
-      </SaveTabProvider>
-    </StoredQueriesProvider>
+    <SaveTabProvider>
+      <TabManagerProvider actions={actions} activeTab={activeTab}>
+        <SchemasProvider>
+          <InsightsContentWithDeepLink
+            isQueryHelperPanelVisible={isQueryHelperPanelVisible}
+            activeSavedQueryId={activeSavedQueryId}
+            tabManager={tabManager}
+            actions={actions}
+          />
+        </SchemasProvider>
+      </TabManagerProvider>
+    </SaveTabProvider>
   );
 }
 

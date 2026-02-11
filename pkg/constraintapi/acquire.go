@@ -11,11 +11,18 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/inngest/inngest/pkg/util/errs"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 )
+
+type stateMetadata struct {
+	SourceService           LeaseService      `json:"ss,omitempty"`
+	SourceLocation          CallerLocation    `json:"sl,omitempty"`
+	SourceRunProcessingMode RunProcessingMode `json:"sm,omitempty"`
+}
 
 // redisRequestState represents the data structure stored for every request
 // This is used by subsequent calls to Extend, Release to properly handle the lease lifecycle
@@ -53,6 +60,9 @@ type redisRequestState struct {
 
 	// LeaseRunIDs stores the run IDs associated with hashed lease idempotency keys
 	LeaseRunIDs map[string]ulid.ULID `json:"lri,omitempty"`
+
+	// Annotate metadata
+	Metadata stateMetadata `json:"m,omitzero"`
 }
 
 func buildRequestState(req *CapacityAcquireRequest, keyPrefix string) (
@@ -73,6 +83,12 @@ func buildRequestState(req *CapacityAcquireRequest, keyPrefix string) (
 		// These keys are set during Acquire and Release respectively
 		GrantedAmount: 0,
 		ActiveAmount:  0,
+
+		Metadata: stateMetadata{
+			SourceService:           req.Source.Service,
+			SourceLocation:          req.Source.Location,
+			SourceRunProcessingMode: req.Source.RunProcessingMode,
+		},
 	}
 
 	// We hash all idempotency keys provided by users internally.
@@ -145,14 +161,11 @@ type acquireScriptResponse struct {
 		LeaseID             ulid.ULID `json:"lid"`
 		LeaseIdempotencyKey string    `json:"lik"`
 	} `json:"l"`
-	LimitingConstraints flexibleIntArray    `json:"lc"`
-	FairnessReduction   int                 `json:"fr"`
-	RetryAt             int                 `json:"ra"`
-	Debug               flexibleStringArray `json:"d"`
-
-	ActiveAccountLeases  int `json:"aal"`
-	ExpiredAccountLeases int `json:"eal"`
-	EarliestLeaseExpiry  int `json:"ele"`
+	LimitingConstraints  flexibleIntArray    `json:"lc"`
+	ExhaustedConstraints flexibleIntArray    `json:"ec"`
+	FairnessReduction    int                 `json:"fr"`
+	RetryAt              int                 `json:"ra"`
+	Debug                flexibleStringArray `json:"d"`
 }
 
 func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquireRequest) (*CapacityAcquireResponse, errs.InternalError) {
@@ -173,19 +186,35 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 		"env_id", req.EnvID,
 		"fn_id", req.FunctionID,
 		"req_id", requestID,
+		"source", req.Source,
+		"migration", req.Migration,
 	)
 
 	now := r.clock.Now()
 
-	// TODO: Add metric for this
 	// NOTE: This will include request latency (marshaling, network delays),
 	// and it might not work for retries, as those retain the same CurrentTime value.
-	// TODO: Ensure retries have the updated CurrentTime
 	requestLatency := now.Sub(req.CurrentTime)
+
+	metrics.HistogramConstraintAPIRequestLatency(ctx, requestLatency, metrics.HistogramOpt{
+		PkgName: pkgName,
+		Tags: map[string]any{
+			"operation": "acquire",
+			"source":    req.Migration.String(),
+			"attempt":   req.RequestAttempt,
+		},
+	})
+
 	if requestLatency > MaximumAllowedRequestDelay {
 		// TODO : Set proper error code
-		return nil, errs.Wrap(0, false, "exceeded maximum allowed request delay")
+		return nil, errs.Wrap(
+			0,
+			false,
+			"exceeded maximum allowed request delay, latency: %s, attempt: %d", requestLatency, req.RequestAttempt,
+		)
 	}
+
+	enableHighCardinalityInstrumentation := r.enableHighCardinalityInstrumentation != nil && r.enableHighCardinalityInstrumentation(ctx, req.AccountID, req.EnvID, req.FunctionID)
 
 	// Retrieve client and key prefix for current constraints
 	// NOTE: We will no longer need this once we move to a dedicated store for constraint state
@@ -275,9 +304,18 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 		"prepared acquire call",
 	)
 
-	rawRes, err := scripts["acquire"].Exec(ctx, client, keys, args).AsBytes()
-	if err != nil {
-		return nil, errs.Wrap(0, false, "acquire script failed: %w", err)
+	rawRes, internalErr := executeLuaScript(
+		ctx,
+		"acquire",
+		req.Migration,
+		req.Source,
+		client,
+		r.clock,
+		keys,
+		args,
+	)
+	if internalErr != nil {
+		return nil, internalErr
 	}
 
 	parsedResponse := acquireScriptResponse{}
@@ -310,26 +348,46 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 		}
 	}
 
+	var exhaustedConstraints []ConstraintItem
+	if len(parsedResponse.ExhaustedConstraints) > 0 {
+		exhaustedConstraints = make([]ConstraintItem, len(parsedResponse.ExhaustedConstraints))
+		for i, exhaustedConstraintIndex := range []int(parsedResponse.ExhaustedConstraints) {
+			exhaustedConstraints[i] = sortedConstraints[exhaustedConstraintIndex-1]
+		}
+	}
+
 	retryAfter := time.UnixMilli(int64(parsedResponse.RetryAt))
 	if retryAfter.Before(now) {
 		retryAfter = time.Time{}
 	}
 
+	untilRetryAfter := max(retryAfter.Sub(now), 0)
+	metrics.HistogramConstraintAPIRetryAfterDuration(ctx, untilRetryAfter, metrics.HistogramOpt{
+		PkgName: pkgName,
+		Tags: map[string]any{
+			"location":            req.Source.Location.String(),
+			"service":             req.Source.Service.String(),
+			"run_processing_mode": req.Source.RunProcessingMode.String(),
+			"migration":           req.Migration.String(),
+		},
+	})
+
 	if len(r.lifecycles) > 0 {
 		for _, hook := range r.lifecycles {
 			err := hook.OnCapacityLeaseAcquired(ctx, OnCapacityLeaseAcquiredData{
-				AccountID:           req.AccountID,
-				EnvID:               req.EnvID,
-				FunctionID:          req.FunctionID,
-				Configuration:       req.Configuration,
-				Constraints:         req.Constraints,
-				LimitingConstraints: limitingConstraints,
-				FairnessReduction:   parsedResponse.FairnessReduction,
-				RetryAfter:          retryAfter,
-				RequestedAmount:     req.Amount,
-				Duration:            req.Duration,
-				Source:              req.Source,
-				GrantedLeases:       leases,
+				AccountID:            req.AccountID,
+				EnvID:                req.EnvID,
+				FunctionID:           req.FunctionID,
+				Configuration:        req.Configuration,
+				Constraints:          req.Constraints,
+				LimitingConstraints:  limitingConstraints,
+				ExhaustedConstraints: exhaustedConstraints,
+				FairnessReduction:    parsedResponse.FairnessReduction,
+				RetryAfter:           retryAfter,
+				RequestedAmount:      req.Amount,
+				Duration:             req.Duration,
+				Source:               req.Source,
+				GrantedLeases:        leases,
 			})
 			if err != nil {
 				return nil, errs.Wrap(0, false, "acquire lifecycle failed: %w", err)
@@ -339,42 +397,100 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 
 	l = l.With(
 		"status", parsedResponse.Status,
-		"active", parsedResponse.ActiveAccountLeases,
-		"expired", parsedResponse.ExpiredAccountLeases,
-		"earliest_expiry", time.UnixMilli(int64(parsedResponse.EarliestLeaseExpiry)),
 	)
+
+	tags := make(map[string]any)
+	if enableHighCardinalityInstrumentation {
+		tags["function_id"] = req.FunctionID
+	}
+
+	// Export metrics for leases requested and granted
+	metrics.IncrConstraintAPILeasesRequestedCounter(ctx, int64(parsedResponse.Requested), metrics.CounterOpt{
+		PkgName: "constraintapi",
+		Tags:    tags,
+	})
+
+	metrics.IncrConstraintAPILeasesGrantedCounter(ctx, int64(parsedResponse.Granted), metrics.CounterOpt{
+		PkgName: "constraintapi",
+		Tags:    tags,
+	})
+
+	// Export counter for limitingConstraints
+	for _, constraint := range limitingConstraints {
+		tags["limiting_constraint"] = constraint.MetricsIdentifier()
+		metrics.IncrConstraintAPILimitingConstraintsCounter(ctx, metrics.CounterOpt{
+			PkgName: "constraintapi",
+			Tags:    tags,
+		})
+	}
+	delete(tags, "limiting_constraint")
+
+	// Export counter for exhaustedConstraints
+	for _, constraint := range exhaustedConstraints {
+		tags["constraint"] = constraint.MetricsIdentifier()
+		metrics.IncrConstraintAPIExhaustedConstraintsCounter(ctx, metrics.CounterOpt{
+			PkgName: "constraintapi",
+			Tags:    tags,
+		})
+	}
+	delete(tags, "constraint")
 
 	switch parsedResponse.Status {
 	case 1, 3:
-		l.Trace(
-			"successful acquire call",
-			"leases", leases,
-		)
+		if enableHighCardinalityInstrumentation {
+			l.Debug(
+				"successful acquire call",
+				"leases", leases,
+			)
+		}
+
+		metrics.HistogramConstraintAPIRequestStateSize(ctx, int64(len(requestState)), metrics.HistogramOpt{
+			PkgName: pkgName,
+			Tags: map[string]any{
+				"location":            req.Source.Location.String(),
+				"service":             req.Source.Service.String(),
+				"run_processing_mode": req.Source.RunProcessingMode.String(),
+				"migration":           req.Migration.String(),
+			},
+		})
+
+		metrics.IncrConstraintAPIIssuedLeaseCounter(ctx, int64(len(leases)), metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags: map[string]any{
+				"location":            req.Source.Location.String(),
+				"service":             req.Source.Service.String(),
+				"run_processing_mode": req.Source.RunProcessingMode.String(),
+				"migration":           req.Migration.String(),
+			},
+		})
 
 		// success or idempotency
 		return &CapacityAcquireResponse{
-			RequestID:           requestID,
-			Leases:              leases,
-			LimitingConstraints: limitingConstraints,
-			FairnessReduction:   parsedResponse.FairnessReduction,
-			RetryAfter:          retryAfter,
-			internalDebugState:  parsedResponse,
+			RequestID:            requestID,
+			Leases:               leases,
+			LimitingConstraints:  limitingConstraints,
+			ExhaustedConstraints: exhaustedConstraints,
+			FairnessReduction:    parsedResponse.FairnessReduction,
+			RetryAfter:           retryAfter,
+			internalDebugState:   parsedResponse,
 		}, nil
 
 	case 2:
 		l.Trace(
 			"acquire call lacking capacity",
 			"limiting", limitingConstraints,
+			"exhausted", exhaustedConstraints,
 		)
 
 		// lacking capacity
 		return &CapacityAcquireResponse{
-			RequestID:           requestID,
-			Leases:              leases,
-			LimitingConstraints: limitingConstraints,
-			RetryAfter:          retryAfter,
-			FairnessReduction:   parsedResponse.FairnessReduction,
-			internalDebugState:  parsedResponse,
+			RequestID:            requestID,
+			Leases:               leases,
+			LimitingConstraints:  limitingConstraints,
+			ExhaustedConstraints: exhaustedConstraints,
+			RetryAfter:           retryAfter,
+			FairnessReduction:    parsedResponse.FairnessReduction,
+			internalDebugState:   parsedResponse,
 		}, nil
 
 	case 4:

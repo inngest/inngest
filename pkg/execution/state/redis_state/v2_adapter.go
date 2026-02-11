@@ -90,6 +90,7 @@ func (v v2) Create(ctx context.Context, s state.CreateState) (state.State, error
 		SpanID:         s.Metadata.Config.SpanID,
 		Steps:          s.Steps,
 		StepInputs:     s.StepInputs,
+		RequestVersion: &s.Metadata.Config.RequestVersion,
 	})
 	switch err {
 	case nil:
@@ -181,9 +182,9 @@ func (v v2) Create(ctx context.Context, s state.CreateState) (state.State, error
 // store after.
 func (v v2) Delete(ctx context.Context, id state.ID) error {
 	return v.mgr.Delete(ctx, statev1.Identifier{
-		RunID:      id.RunID,
-		WorkflowID: id.FunctionID,
-		AccountID:  id.Tenant.AccountID,
+		RunID:       id.RunID,
+		WorkflowID:  id.FunctionID,
+		AccountID:   id.Tenant.AccountID,
 		WorkspaceID: id.Tenant.EnvID,
 	})
 }
@@ -407,6 +408,21 @@ func (v v2) SavePending(ctx context.Context, id state.ID, pending []string) erro
 	)
 
 	return err
+}
+
+// ConsumePause consumes a pause by its ID such that it can't be used again.
+func (v v2) ConsumePause(ctx context.Context, p statev1.Pause, opts statev1.ConsumePauseOpts) (statev1.ConsumePauseResult, error) {
+	r, err := util.WithRetry(
+		ctx,
+		"state.ConsumePause",
+		func(ctx context.Context) (statev1.ConsumePauseResult, error) {
+			res,  err := v.mgr.ConsumePause(ctx, p, opts)
+			return res, err
+		},
+		v.retryPolicy(),
+	)
+
+	return r, err
 }
 
 func (v v2) retryPolicy(opts ...util.RetryConfSetting) util.RetryConf {

@@ -271,6 +271,16 @@ type ScheduleRequest struct {
 	DebugSessionID *ulid.ULID
 	// DebugRunID is the ID of the debugger run that this function is being scheduled from.
 	DebugRunID *ulid.ULID
+	// RequestVersion represents the executor request versioning/hashing style
+	// used to manage state.
+	//
+	// This lets us send the hashing style to SDKs so that we can execute in
+	// the correct format with backcompat guarantees built in.
+	//
+	// We usually wait for the SDK to decide this, but allow passing it in here
+	// if we're queuing a function as a result of a sync run going async, as
+	// the SDK has already been run at that point.
+	RequestVersion *int
 }
 
 // NewScheduleRequest creates an initial ScheduleRequest given a deployed
