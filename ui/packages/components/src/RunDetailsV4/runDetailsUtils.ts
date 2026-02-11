@@ -143,7 +143,7 @@ export const useStepSelection = ({ runID }: { runID?: string }) => {
 
 export const formatDuration = (ms: number): string => {
   if (ms <= 0) return '0ms';
-  if (ms < 1000) return `${Math.round(ms).toLocaleString()}ms`;
+  if (ms < 1000) return `${Math.round(ms)}ms`;
   if (ms < 60000) return `${(ms / 1000).toFixed(3)}s`;
   if (ms < 3600000) {
     const minutes = Math.floor(ms / 60000);

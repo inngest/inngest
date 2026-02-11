@@ -48,11 +48,11 @@ describe('TimelineHeader', () => {
     it('renders 5 time markers (0%, 25%, 50%, 75%, 100%)', () => {
       render(<TimelineHeader {...defaultProps} />);
 
-      // Look for duration labels: 0ms (0%), 2,500ms (25%), 5,000ms (50%), 7,500ms (75%), 10.000s (100%)
+      // Look for duration labels: 0ms (0%), 2.500s (25%), 5.000s (50%), 7.500s (75%), 10.000s (100%)
       expect(screen.getByText('0ms')).toBeTruthy(); // 0%
-      expect(screen.getByText('2,500ms')).toBeTruthy(); // 25%
-      expect(screen.getByText('5,000ms')).toBeTruthy(); // 50%
-      expect(screen.getByText('7,500ms')).toBeTruthy(); // 75%
+      expect(screen.getByText('2.500s')).toBeTruthy(); // 25%
+      expect(screen.getByText('5.000s')).toBeTruthy(); // 50%
+      expect(screen.getByText('7.500s')).toBeTruthy(); // 75%
       expect(screen.getByText('10.000s')).toBeTruthy(); // 100%
     });
 
@@ -279,7 +279,7 @@ describe('TimelineHeader', () => {
       const leftLabel = container.querySelector('[data-testid="timestamp-label-left"]');
       const rightLabel = container.querySelector('[data-testid="timestamp-label-right"]');
 
-      expect(leftLabel?.textContent).toBe('5,000ms');
+      expect(leftLabel?.textContent).toBe('5.000s');
       expect(rightLabel?.textContent).toBe('10.000s');
     });
 
