@@ -68,15 +68,19 @@ const BAR_STYLES: Record<BarStyleKey, BarStyle> = {
   },
   'timing.inngest': {
     barColor: 'bg-slate-300',
-    labelFormat: 'uppercase',
-    barHeight: 'short',
+    barHeight: 'tall',
+    durationColor: 'text-basis',
+    labelFormat: 'default',
+    textColor: 'text-light',
   },
   'timing.server': {
     barColor: 'bg-status-completed',
-    pattern: 'barber-pole',
-    labelFormat: 'uppercase',
     barHeight: 'tall',
+    durationColor: 'text-basis',
+    labelFormat: 'default',
+    pattern: 'barber-pole',
     statusBased: true,
+    textColor: 'text-light',
   },
   'timing.connecting': {
     barColor: 'bg-transparent',
@@ -294,28 +298,24 @@ function BarTooltipContent({
   return (
     <div className="whitespace-nowrap px-1 py-0.5 text-xs">
       <p className="text-basis mb-1.5 font-medium">{name}</p>
-      {/* Duration and delay */}
-      <div className="border-subtle mb-1.5 flex justify-between gap-6 border-b pb-1.5">
-        <div className="flex flex-col items-start">
+      <div className="flex flex-col gap-1">
+        <div className="flex justify-between gap-6">
           <span className="text-light font-medium">Duration</span>
           <span className="text-basis tabular-nums">
             {durationMs > 0 ? formatDuration(durationMs) : '-'}
           </span>
         </div>
-        <div className="flex flex-col items-end">
+        <div className="border-subtle flex justify-between gap-6 border-b pb-1.5">
           <span className="text-light font-medium">Delay</span>
           <span className="text-basis tabular-nums">
             {delayMs > 0 ? formatDuration(delayMs) : '-'}
           </span>
         </div>
-      </div>
-      {/* Start and end timestamps */}
-      <div className="flex justify-between gap-6">
-        <div className="flex flex-col items-start">
+        <div className="mt-0.5 flex justify-between gap-6">
           <span className="text-light font-medium">Start</span>
           <span className="text-basis tabular-nums">{startTimestamp}</span>
         </div>
-        <div className="flex flex-col items-end">
+        <div className="flex justify-between gap-6">
           <span className="text-light font-medium">End</span>
           {endTimestamp !== null ? (
             <span className="text-basis tabular-nums">{endTimestamp}</span>
@@ -504,7 +504,7 @@ export function TimelineBar({
 
   // For SERVER timing, show org name or fallback
   if (style === 'timing.server') {
-    displayName = orgName ? `${orgName.toUpperCase()} SERVER` : 'YOUR SERVER';
+    displayName = orgName ? `${orgName} server` : 'Your server';
   }
 
   // Calculate indentation (base padding + depth-based indent)
@@ -565,7 +565,8 @@ export function TimelineBar({
           {/* Name */}
           <span
             className={cn(
-              'text-basis min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-sm font-normal leading-tight',
+              'min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap font-mono text-xs font-normal leading-tight',
+              barStyle.textColor ?? 'text-basis',
               !expandable && !effectiveIcon && 'pl-1.5'
             )}
           >
@@ -573,7 +574,12 @@ export function TimelineBar({
           </span>
 
           {/* Duration */}
-          <span className="text-basis shrink-0 text-xs font-medium tabular-nums">
+          <span
+            className={cn(
+              'shrink-0 text-xs font-medium tabular-nums',
+              barStyle.durationColor ?? barStyle.textColor ?? 'text-basis'
+            )}
+          >
             {formatDuration(duration)}
           </span>
         </div>
