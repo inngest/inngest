@@ -1244,7 +1244,8 @@ SELECT
   output
 FROM spans
 WHERE span_id IN (SELECT UNNEST($1::TEXT[]))
-LIMIT 2
+   OR (dynamic_span_id IN (SELECT UNNEST($1::TEXT[])) AND output IS NOT NULL)
+LIMIT 4
 `
 
 type GetSpanOutputRow struct {

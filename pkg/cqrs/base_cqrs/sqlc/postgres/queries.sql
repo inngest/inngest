@@ -448,7 +448,8 @@ SELECT
   output
 FROM spans
 WHERE span_id IN (SELECT UNNEST(sqlc.slice('ids')::TEXT[]))
-LIMIT 2;
+   OR (dynamic_span_id IN (SELECT UNNEST(sqlc.slice('ids')::TEXT[])) AND output IS NOT NULL)
+LIMIT 4;
 
 -- name: GetRunSpanByRunID :one
 SELECT

@@ -1822,7 +1822,15 @@ func (w wrapper) GetSpanOutput(ctx context.Context, opts cqrs.SpanIdentifier) (*
 		return nil, fmt.Errorf("span ID or input span ID is required to retrieve output")
 	}
 
-	rows, err := w.q.GetSpanOutput(ctx, ids)
+	dynIds := make([]sql.NullString, len(ids))
+	for i, id := range ids {
+		dynIds[i] = sql.NullString{String: id, Valid: true}
+	}
+
+	rows, err := w.q.GetSpanOutput(ctx, sqlc.GetSpanOutputParams{
+		Ids:    ids,
+		DynIds: dynIds,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving span output: %w", err)
 	}
