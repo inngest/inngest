@@ -65,6 +65,9 @@ export interface BarStyle {
   /** Tailwind text color class (optional, defaults to standard) */
   textColor?: string;
 
+  /** Tailwind text color class for the duration label (optional, defaults to textColor) */
+  durationColor?: string;
+
   /** Icon to display for this style */
   icon?: BarIcon;
 

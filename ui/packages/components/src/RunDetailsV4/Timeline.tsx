@@ -50,7 +50,7 @@ function generateTimingBreakdownBars(bar: TimelineBarData, orgName?: string): Ti
   if (queueMs > 0) {
     timingBars.push({
       id: `${bar.id}-timing-inngest`,
-      name: 'INNGEST',
+      name: 'Inngest',
       startTime: barStartTime,
       endTime: queueEndTime,
       style: 'timing.inngest',
@@ -61,7 +61,7 @@ function generateTimingBreakdownBars(bar: TimelineBarData, orgName?: string): Ti
   if (executionMs > 0) {
     timingBars.push({
       id: `${bar.id}-timing-server`,
-      name: orgName ?? 'YOUR SERVER',
+      name: orgName ?? 'Your Server',
       startTime: queueEndTime,
       endTime: executionEndTime,
       style: 'timing.server',

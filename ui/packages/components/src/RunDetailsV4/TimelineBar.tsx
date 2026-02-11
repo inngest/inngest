@@ -68,15 +68,19 @@ const BAR_STYLES: Record<BarStyleKey, BarStyle> = {
   },
   'timing.inngest': {
     barColor: 'bg-slate-300',
-    labelFormat: 'uppercase',
     barHeight: 'short',
+    durationColor: 'text-basis',
+    labelFormat: 'default',
+    textColor: 'text-muted',
   },
   'timing.server': {
     barColor: 'bg-status-completed',
-    pattern: 'barber-pole',
-    labelFormat: 'uppercase',
     barHeight: 'tall',
+    durationColor: 'text-basis',
+    labelFormat: 'default',
+    pattern: 'barber-pole',
     statusBased: true,
+    textColor: 'text-muted',
   },
   'timing.connecting': {
     barColor: 'bg-transparent',
@@ -504,7 +508,7 @@ export function TimelineBar({
 
   // For SERVER timing, show org name or fallback
   if (style === 'timing.server') {
-    displayName = orgName ? `${orgName.toUpperCase()} SERVER` : 'YOUR SERVER';
+    displayName = orgName ? `${orgName.toUpperCase()} SERVER` : 'Your Server';
   }
 
   // Calculate indentation (base padding + depth-based indent)
@@ -565,7 +569,8 @@ export function TimelineBar({
           {/* Name */}
           <span
             className={cn(
-              'text-basis min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-sm font-normal leading-tight',
+              'min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-sm font-normal leading-tight',
+              barStyle.textColor ?? 'text-basis',
               !expandable && !effectiveIcon && 'pl-1.5'
             )}
           >
@@ -573,7 +578,12 @@ export function TimelineBar({
           </span>
 
           {/* Duration */}
-          <span className="text-basis shrink-0 text-xs font-medium tabular-nums">
+          <span
+            className={cn(
+              'shrink-0 text-xs font-medium tabular-nums',
+              barStyle.durationColor ?? barStyle.textColor ?? 'text-basis'
+            )}
+          >
             {formatDuration(duration)}
           </span>
         </div>
