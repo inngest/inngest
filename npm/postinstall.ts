@@ -2,6 +2,7 @@
 import AdmZip from "adm-zip";
 import Debug from "debug";
 import fetch, { Response } from "node-fetch";
+import fs from "fs";
 import path from "path";
 import * as tar from "tar";
 import { URL } from "url";
@@ -238,6 +239,24 @@ function pipeBinaryToInstallLocation(
       const req = await downloadBinary(binaryUrl);
       await pipeBinaryToInstallLocation(req, binaryUrl);
       rootDebug("postinstall complete (via github)");
+    }
+
+    // Ensure the extracted binary has executable permissions.
+    // AdmZip (used for Windows .zip archives) does not preserve Unix
+    // permission bits, which causes "Permission denied" errors when
+    // running the CLI via Git Bash, WSL, or MSYS2 on Windows.
+    // tar.extract preserves permissions on Unix, but an explicit chmod
+    // is harmless and acts as a safety net for all platforms.
+    const binaryName = process.platform === "win32" ? "inngest.exe" : "inngest";
+    const binaryPath = path.resolve("./bin", binaryName);
+    try {
+      fs.chmodSync(binaryPath, 0o755);
+      rootDebug("set executable permission on", binaryPath);
+    } catch (chmodErr) {
+      // chmod may fail on some Windows filesystems (e.g. FAT32) where
+      // permission bits are not supported. This is non-fatal since the
+      // binary can still be executed natively on those systems.
+      rootDebug("chmod failed (non-fatal):", chmodErr);
     }
   } catch (err) {
     console.error(err);
