@@ -255,7 +255,13 @@ func getScheduleConstraints(ctx context.Context, req execution.ScheduleRequest) 
 	// Throttle + concurrency constraints are checked in the queue.
 	if req.Function.RateLimit != nil {
 		rateLimitKey, err := ratelimit.RateLimitKey(ctx, req.Function.ID, *req.Function.RateLimit, req.Events[0].GetEvent().Map())
-		if err != nil {
+		switch err {
+		case ratelimit.ErrNotRateLimited:
+			// no rate limit configured, do not return constraints
+			return nil, nil
+		case nil:
+			// enforce rate limit
+		default:
 			return nil, fmt.Errorf("could not get rate limit key: %w", err)
 		}
 
