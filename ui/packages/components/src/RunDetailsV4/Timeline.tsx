@@ -61,7 +61,7 @@ function generateTimingBreakdownBars(bar: TimelineBarData, orgName?: string): Ti
   if (executionMs > 0) {
     timingBars.push({
       id: `${bar.id}-timing-server`,
-      name: orgName ?? 'Your Server',
+      name: orgName ?? 'Your server',
       startTime: queueEndTime,
       endTime: executionEndTime,
       style: 'timing.server',

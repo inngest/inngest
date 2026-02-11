@@ -163,13 +163,13 @@ describe('TimelineBar', () => {
     // T045: displays organization name in SERVER label when provided
     it('displays organization name in SERVER label', () => {
       render(<TimelineBar {...defaultProps} style="timing.server" orgName="Acme Corp" />);
-      expect(screen.getByText('Acme Corp Server')).toBeTruthy();
+      expect(screen.getByText('Acme Corp server')).toBeTruthy();
     });
 
-    // T046: displays "Your Server" when organization name not provided
-    it('displays Your Server when orgName not provided', () => {
+    // T046: displays "Your server" when organization name not provided
+    it('displays Your server when orgName not provided', () => {
       render(<TimelineBar {...defaultProps} style="timing.server" />);
-      expect(screen.getByText('Your Server')).toBeTruthy();
+      expect(screen.getByText('Your server')).toBeTruthy();
     });
   });
 

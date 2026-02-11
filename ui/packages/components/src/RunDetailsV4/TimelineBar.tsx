@@ -504,7 +504,7 @@ export function TimelineBar({
 
   // For SERVER timing, show org name or fallback
   if (style === 'timing.server') {
-    displayName = orgName ? `${orgName} Server` : 'Your Server';
+    displayName = orgName ? `${orgName} server` : 'Your server';
   }
 
   // Calculate indentation (base padding + depth-based indent)
@@ -565,7 +565,7 @@ export function TimelineBar({
           {/* Name */}
           <span
             className={cn(
-              'min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-sm font-normal leading-tight',
+              'min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap font-mono text-xs font-normal leading-tight',
               barStyle.textColor ?? 'text-basis',
               !expandable && !effectiveIcon && 'pl-1.5'
             )}
