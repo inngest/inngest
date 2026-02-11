@@ -28,6 +28,7 @@
   "dependencies": {
     "adm-zip": "^0.5.10",
     "debug": "^4.3.4",
+    "https-proxy-agent": "^7.0.6",
     "node-fetch": "^2.6.7",
     "tar": "^7.5.3"
   },
