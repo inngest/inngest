@@ -3032,14 +3032,14 @@ func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*c
 			}
 
 			if span.EventIDs != nil && *span.EventIDs != "" {
-				// Event IDs are a stringified JSON array of strings. Unpack
-				// them here.
+				// Event IDs may be stored as a JSON array (e.g. '["id1","id2"]')
+				// or as a plain comma-separated string (e.g. 'id1,id2').
 				var eids []string
-				if err := json.Unmarshal([]byte(*span.EventIDs), &eids); err == nil {
-					triggerIDs = append(triggerIDs, eids...)
-				} else {
-					l.Debug("invalid event IDs in span", "run_id", span.RunID, "dynamic_span_id", span.DynamicSpanID, "error", err)
+				if err := json.Unmarshal([]byte(*span.EventIDs), &eids); err != nil {
+					// Fallback: treat the value as a comma-separated string.
+					eids = strings.Split(*span.EventIDs, ",")
 				}
+				triggerIDs = append(triggerIDs, eids...)
 			}
 		}
 
