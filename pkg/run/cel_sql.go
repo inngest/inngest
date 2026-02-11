@@ -15,6 +15,10 @@ import (
 // Supports: event.id, event.name, event.ts, event.v
 //
 // This applies to searching the events table, either by itself or when joined to runs for CEL search.
+//
+// N.B. we intentionally do not worry too much about SQL injection because this code should only be used
+// - dev server, which is not secure by design
+// - self hosted OSS, so a single tenant deployment and the self hosted dashboard ui should not be exposed externally
 func EventFieldConverter(ctx context.Context, n *expr.Node) ([]sq.Expression, error) {
 	if !n.HasPredicate() {
 		return []sq.Expression{}, nil
