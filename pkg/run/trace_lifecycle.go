@@ -41,6 +41,52 @@ type traceLifecycle struct {
 	log logger.Logger
 }
 
+func (l traceLifecycle) OnStepScheduled(
+	ctx context.Context,
+	md statev2.Metadata,
+	item queue.Item,
+	stepName *string,
+) {
+	ctx = l.extractTraceCtx(ctx, md, false)
+
+	runID := md.ID.RunID
+
+	name := consts.OtelExecPlaceholder
+	if stepName != nil && *stepName != "" {
+		name = *stepName
+	}
+
+	_, span := NewSpan(ctx,
+		WithScope(consts.OtelScopeExecution),
+		WithName(name),
+		WithTimestamp(time.Now()),
+		WithSpanAttributes(
+			attribute.String(consts.OtelSysLifecycleID, "OnStepScheduled"),
+			attribute.String(consts.OtelSysAccountID, md.ID.Tenant.AccountID.String()),
+			attribute.String(consts.OtelSysWorkspaceID, md.ID.Tenant.EnvID.String()),
+			attribute.String(consts.OtelSysAppID, md.ID.Tenant.AppID.String()),
+			attribute.String(consts.OtelSysFunctionID, md.ID.FunctionID.String()),
+			attribute.String(consts.OtelSysFunctionSlug, md.Config.FunctionSlug()),
+			attribute.Int(consts.OtelSysFunctionVersion, md.Config.FunctionVersion),
+			attribute.String(consts.OtelAttrSDKRunID, runID.String()),
+			attribute.Int(consts.OtelSysStepAttempt, item.Attempt),
+			attribute.Int(consts.OtelSysStepMaxAttempt, item.GetMaxAttempts()),
+			attribute.String(consts.OtelSysStepGroupID, item.GroupID),
+			attribute.String(consts.OtelSysStepOpcode, enums.OpcodeStepPlanned.String()),
+			// Set QUEUED dynamic status — flows through ClickHouse → GraphQL → UI QUEUED styling
+			attribute.String("_inngest.dynamic.status", enums.StepStatusQueued.String()),
+		),
+	)
+	defer span.End()
+
+	if stepName != nil && *stepName != "" {
+		span.SetAttributes(attribute.String(consts.OtelSysStepDisplayName, *stepName))
+	}
+	if item.Attempt > 0 {
+		span.SetAttributes(attribute.Bool(consts.OtelSysStepRetry, true))
+	}
+}
+
 func (l traceLifecycle) OnFunctionScheduled(ctx context.Context, md statev2.Metadata, item queue.Item, evts []event.TrackedEvent) {
 	runID := md.ID.RunID
 	evtIDs := []string{}
