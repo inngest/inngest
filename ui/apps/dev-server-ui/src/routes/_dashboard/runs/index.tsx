@@ -43,8 +43,11 @@ function RunsComponent() {
     'polling-disabled',
     false,
   );
-  const { value: tracesPreviewEnabled, isReady: tracesPreviewFlagReady } =
-    booleanFlag('traces-preview', true, true);
+  const { value: v4Enabled, isReady: v4FlagReady } = booleanFlag(
+    'run-details-v4',
+    true,
+    true,
+  );
 
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [preview, setPreview] = useState(false);
@@ -73,8 +76,8 @@ function RunsComponent() {
   }, [pollingDisabled, pollingFlagReady]);
 
   useEffect(() => {
-    setPreview(tracesPreviewEnabled);
-  }, [tracesPreviewEnabled, tracesPreviewFlagReady]);
+    setPreview(v4Enabled);
+  }, [v4Enabled, v4FlagReady]);
 
   const queryFn = useCallback(
     async ({ pageParam }: { pageParam: string | null }) => {
@@ -132,7 +135,7 @@ function RunsComponent() {
         },
       ],
       queryFn,
-      enabled: tracesPreviewFlagReady,
+      enabled: v4FlagReady,
       refetchInterval: autoRefresh ? pollInterval : false,
       initialPageParam: null,
       getNextPageParam: (lastPage) => {
@@ -226,7 +229,7 @@ function RunsComponent() {
         ]}
         features={{
           history: Number.MAX_SAFE_INTEGER,
-          tracesPreview: tracesPreviewEnabled,
+          tracesPreview: v4Enabled,
         }}
         hasMore={hasNextPage ?? false}
         isLoadingInitial={isFetching && runs === undefined}
