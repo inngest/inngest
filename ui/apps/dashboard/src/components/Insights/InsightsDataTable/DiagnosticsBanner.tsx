@@ -52,7 +52,9 @@ export function DiagnosticsBanner() {
               label="Fix with AI"
               onClick={handleFixWithAI(
                 aiHelper,
-                diagnostics.map((d) => d.message).join('\n'),
+                diagnostics
+                  .map((diag) => formatDiagnosticMessage(model, diag))
+                  .join('\n'),
                 query,
               )}
             />
