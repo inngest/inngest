@@ -189,7 +189,7 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 		&backlog,
 		constraints,
 		item,
-		p.StaticTime,
+		p.Queue.Clock().Now(),
 	)
 	if err != nil {
 		return fmt.Errorf("could not check constraints to lease item: %w", err)
