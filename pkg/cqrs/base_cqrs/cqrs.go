@@ -349,31 +349,36 @@ fragmentLoop:
 			}
 		}
 
-		if attrs, ok := fragment["attributes"].(string); ok {
+		// Handle span attributes from both storage formats:
+		// - string: legacy double-encoded JSONB (stored as JSON string type)
+		// - map[string]any: properly encoded JSONB object (new format)
+		switch attrs := fragment["attributes"].(type) {
+		case string:
 			fragmentAttr := map[string]any{}
 			if err := json.Unmarshal([]byte(attrs), &fragmentAttr); err != nil {
 				logger.StdlibLogger(ctx).Error("error unmarshalling span attributes", "error", err)
 				return nil, err
 			}
-
 			maps.Copy(newSpan.RawOtelSpan.Attributes, fragmentAttr)
+		case map[string]any:
+			maps.Copy(newSpan.RawOtelSpan.Attributes, attrs)
+		}
 
-			if outputRef, ok := fragment["output_span_id"].(string); ok && info != nil {
-				outputSpanID = &outputRef
-				if io, ok := info.dynamicRefs[dynamicSpanID.String]; ok && io != nil {
-					io.OutputRef = outputRef
-				} else {
-					info.dynamicRefs[dynamicSpanID.String] = &IODynamicRef{OutputRef: outputRef}
-				}
+		if outputRef, ok := fragment["output_span_id"].(string); ok && info != nil {
+			outputSpanID = &outputRef
+			if io, ok := info.dynamicRefs[dynamicSpanID.String]; ok && io != nil {
+				io.OutputRef = outputRef
+			} else {
+				info.dynamicRefs[dynamicSpanID.String] = &IODynamicRef{OutputRef: outputRef}
 			}
+		}
 
-			if inputRef, ok := fragment["input_span_id"].(string); ok && info != nil {
-				inputSpanID = &inputRef
-				if io, ok := info.dynamicRefs[dynamicSpanID.String]; ok && io != nil {
-					io.InputRef = inputRef
-				} else {
-					info.dynamicRefs[dynamicSpanID.String] = &IODynamicRef{InputRef: inputRef}
-				}
+		if inputRef, ok := fragment["input_span_id"].(string); ok && info != nil {
+			inputSpanID = &inputRef
+			if io, ok := info.dynamicRefs[dynamicSpanID.String]; ok && io != nil {
+				io.InputRef = inputRef
+			} else {
+				info.dynamicRefs[dynamicSpanID.String] = &IODynamicRef{InputRef: inputRef}
 			}
 		}
 	}
@@ -2151,12 +2156,10 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 	reqcursor := builder.cursor
 	resCursorLayout := builder.cursorLayout
 
-	// read from database
-	// TODO:
-	// change this to a continuous loop with limits instead of just attempting to grab everything.
-	// might not matter though since this is primarily meant for local
-	// development
-	sql, args, err := sq.Dialect(w.dialect()).
+	// Build the query with a SQL-level LIMIT to prevent unbounded result sets
+	// on large PostgreSQL databases. A buffer multiplier accounts for rows that
+	// may be discarded by post-query filters (event IDs, output expressions).
+	qb := sq.Dialect(w.dialect()).
 		From("trace_runs").
 		Select(
 			"app_id",
@@ -2176,8 +2179,20 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 			"has_ai",
 		).
 		Where(filter...).
-		Order(order...).
-		ToSQL()
+		Order(order...)
+
+	if opt.Items > 0 {
+		// Use a buffer to account for post-query filtering. When no filters
+		// are active, the buffer is minimal. With active expression filters,
+		// fetch more rows to compensate for filtered-out results.
+		sqlLimit := opt.Items + 1
+		if expHandler.HasEventFilters() || expHandler.HasOutputFilters() {
+			sqlLimit = opt.Items*5 + 1
+		}
+		qb = qb.Limit(sqlLimit)
+	}
+
+	sql, args, err := qb.ToSQL()
 	if err != nil {
 		return nil, err
 	}
@@ -2848,8 +2863,8 @@ func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*c
 	resCursorLayout := builder.cursorLayout
 
 	// Query spans table directly, similar to how GetTraceRuns queries
-	// trace_runs
-	sql, args, err := sq.Dialect(w.dialect()).
+	// trace_runs. Add a SQL-level LIMIT to prevent unbounded queries.
+	spanQb := sq.Dialect(w.dialect()).
 		From("spans").
 		Select(
 			"run_id",
@@ -2873,8 +2888,13 @@ func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*c
 			sq.Dialect(w.dialect()).Select("dynamic_span_id").Distinct().From("spans").Where(sq.C("name").Eq(meta.SpanNameRun)),
 		)).
 		Where(filter...).
-		Order(order...).
-		ToSQL()
+		Order(order...)
+
+	if opt.Items > 0 {
+		spanQb = spanQb.Limit(opt.Items*5 + 1)
+	}
+
+	sql, args, err := spanQb.ToSQL()
 	if err != nil {
 		return nil, err
 	}
