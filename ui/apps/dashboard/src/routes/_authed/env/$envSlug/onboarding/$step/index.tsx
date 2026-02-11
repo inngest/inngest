@@ -6,9 +6,18 @@ import SyncApp from '@/components/Onboarding/SyncApp';
 import { OnboardingSteps } from '@/components/Onboarding/types';
 import InvokeFn from '@/components/Onboarding/InvokeFn';
 
+type OnboardingStepSearchParams = {
+  nonVercel?: string;
+};
+
 export const Route = createFileRoute('/_authed/env/$envSlug/onboarding/$step/')(
   {
     component: OnboardingStepPage,
+    validateSearch: (
+      search: Record<string, unknown>,
+    ): OnboardingStepSearchParams => ({
+      nonVercel: search.nonVercel as string | undefined,
+    }),
   },
 );
 

@@ -34,6 +34,7 @@ export default defineConfig({
   },
   optimizeDeps: {
     exclude: ['@inngest/agent-kit'],
+    include: ['@clerk/tanstack-react-start'],
   },
   ssr: {
     noExternal: ['@headlessui/tailwindcss', 'react-use'],
