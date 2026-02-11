@@ -17,8 +17,7 @@ CREATE TABLE apps (
 
 -- XXX: - this is very basic right now.  it does not conform to the cloud.
 CREATE TABLE functions (
-	-- id CHAR(36) PRIMARY KEY, -- ADD this when https://github.com/duckdb/duckdb/issues/1631 is fixed.
-	id CHAR(36),
+	id CHAR(36) PRIMARY KEY,
 	app_id CHAR(36),
 	name VARCHAR NOT NULL,
 	slug VARCHAR NOT NULL,
