@@ -71,18 +71,22 @@ func (q *queueProcessor) ProcessShadowPartition(ctx context.Context, shadowPart 
 		if info.Paused {
 			q.removeShadowContinue(ctx, shadowPart, false)
 
-			if !info.Stale {
-				forceRequeueAt := q.Clock().Now().Add(ShadowPartitionRefillPausedRequeueExtension)
-				_, err := DurationWithTags(ctx, shard.Name(), durOpShadowPartitionRequeue, q.Clock().Now(), func(ctx context.Context) (any, error) {
-					err := q.primaryQueueShard.ShadowPartitionRequeue(ctx, shadowPart, &forceRequeueAt)
-					return nil, err
-				}, map[string]any{"reason": "paused"})
-				switch err {
-				case nil, ErrShadowPartitionNotFound:
-					return nil
-				default:
-					return fmt.Errorf("could not requeue shadow partition: %w", err)
-				}
+			// Paused status was returned from cache, we don't know if it's safe to requeue for an extended time
+			if info.Stale {
+				return nil
+			}
+
+			// We freshly read from the database and know the function is currently paused, requeue 5m into the future
+			forceRequeueAt := q.Clock().Now().Add(ShadowPartitionRefillPausedRequeueExtension)
+			_, err := DurationWithTags(ctx, shard.Name(), durOpShadowPartitionRequeue, q.Clock().Now(), func(ctx context.Context) (any, error) {
+				err := q.primaryQueueShard.ShadowPartitionRequeue(ctx, shadowPart, &forceRequeueAt)
+				return nil, err
+			}, map[string]any{"reason": "paused"})
+			switch err {
+			case nil, ErrShadowPartitionNotFound:
+				return nil
+			default:
+				return fmt.Errorf("could not requeue shadow partition: %w", err)
 			}
 		}
 	}
