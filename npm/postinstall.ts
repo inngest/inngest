@@ -2,6 +2,7 @@
 import AdmZip from "adm-zip";
 import Debug from "debug";
 import fetch, { Response } from "node-fetch";
+import { HttpsProxyAgent } from "https-proxy-agent";
 import path from "path";
 import * as tar from "tar";
 import { URL } from "url";
@@ -102,6 +103,25 @@ function getArchPlatform() {
 }
 
 /**
+ * Returns an HTTPS proxy agent if the standard proxy environment variables
+ * are set, or undefined otherwise.
+ */
+function getProxyAgent(): HttpsProxyAgent<string> | undefined {
+  const proxyUrl =
+    process.env.HTTPS_PROXY ||
+    process.env.https_proxy ||
+    process.env.HTTP_PROXY ||
+    process.env.http_proxy;
+
+  if (proxyUrl) {
+    rootDebug("using proxy:", proxyUrl);
+    return new HttpsProxyAgent(proxyUrl);
+  }
+
+  return undefined;
+}
+
+/**
  * Attempts to fetch a binary given a `url` and returns the response so long as
  * it is a successful `200 OK`.
  *
@@ -124,6 +144,7 @@ function downloadBinary(
 
     fetch(url.href, {
       redirect: "follow",
+      agent: getProxyAgent(),
     })
       .then((res) => {
         if (res.status !== 200) {
