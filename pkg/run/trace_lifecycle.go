@@ -57,7 +57,11 @@ func (l traceLifecycle) OnStepScheduled(
 	}
 
 	_, span := NewSpan(ctx,
-		WithScope(consts.OtelScopeExecution),
+		// Use OtelScopeStep (not OtelScopeExecution) to avoid being grouped with
+		// execution spans in the trace tree builder. OtelScopeExecution spans share
+		// a GroupID and are treated as retry "attempts" by processExecGroup — adding
+		// a QUEUED marker there inflates the attempt count and breaks OutputId resolution.
+		WithScope(consts.OtelScopeStep),
 		WithName(name),
 		WithTimestamp(time.Now()),
 		WithSpanAttributes(
@@ -71,7 +75,6 @@ func (l traceLifecycle) OnStepScheduled(
 			attribute.String(consts.OtelAttrSDKRunID, runID.String()),
 			attribute.Int(consts.OtelSysStepAttempt, item.Attempt),
 			attribute.Int(consts.OtelSysStepMaxAttempt, item.GetMaxAttempts()),
-			attribute.String(consts.OtelSysStepGroupID, item.GroupID),
 			attribute.String(consts.OtelSysStepOpcode, enums.OpcodeStepPlanned.String()),
 			// Set QUEUED dynamic status — flows through ClickHouse → GraphQL → UI QUEUED styling
 			attribute.String("_inngest.dynamic.status", enums.StepStatusQueued.String()),
