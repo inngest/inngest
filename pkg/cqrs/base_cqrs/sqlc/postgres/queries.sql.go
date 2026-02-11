@@ -546,7 +546,7 @@ SELECT
     'links', links,
     'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
     'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
-  )) AS span_fragments
+  ) ORDER BY start_time ASC) AS span_fragments
 FROM spans
 WHERE run_id = CAST($1 AS CHAR(26)) AND account_id = $2
 GROUP BY dynamic_span_id, run_id, trace_id, parent_span_id
@@ -1014,7 +1014,7 @@ SELECT
     'links', links,
     'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
     'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
-  )) AS span_fragments
+  ) ORDER BY start_time ASC) AS span_fragments
 FROM spans b
 WHERE b.run_id = CAST($1 AS CHAR(26)) AND b.account_id = $2
 GROUP BY dynamic_span_id, run_id, trace_id, parent_span_id
@@ -1146,7 +1146,7 @@ SELECT
     'links', links,
     'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
     'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
-  )) AS span_fragments
+  ) ORDER BY start_time ASC) AS span_fragments
 FROM spans
 WHERE run_id = CAST($1 AS CHAR(26)) AND account_id = $2 AND (parent_span_id IS NULL OR parent_span_id = '0000000000000000')
 GROUP BY dynamic_span_id, run_id, trace_id, parent_span_id
@@ -1199,7 +1199,7 @@ SELECT
     'links', links,
     'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
     'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
-  )) AS span_fragments
+  ) ORDER BY start_time ASC) AS span_fragments
 FROM spans
 WHERE run_id = CAST($1 AS CHAR(26)) AND span_id = $2 AND account_id = $3
 GROUP BY dynamic_span_id, run_id, trace_id, parent_span_id
@@ -1291,7 +1291,7 @@ SELECT
     'links', links,
     'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
     'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
-  )) AS span_fragments
+  ) ORDER BY start_time ASC) AS span_fragments
 FROM spans
 WHERE debug_run_id = CAST($1 AS CHAR(26))
 GROUP BY trace_id, run_id, debug_session_id, dynamic_span_id, parent_span_id
@@ -1357,7 +1357,7 @@ SELECT
     'links', links,
     'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
     'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
-  )) AS span_fragments
+  ) ORDER BY start_time ASC) AS span_fragments
 FROM spans
 WHERE debug_session_id = CAST($1 AS CHAR(26))
 GROUP BY trace_id, run_id, debug_run_id, dynamic_span_id, parent_span_id
@@ -1422,7 +1422,7 @@ SELECT
     'links', links,
     'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
     'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
-  )) AS span_fragments
+  ) ORDER BY start_time ASC) AS span_fragments
 FROM spans
 WHERE run_id = CAST($1 AS CHAR(26))
 GROUP BY run_id, trace_id, dynamic_span_id, parent_span_id
@@ -1484,7 +1484,7 @@ SELECT
     'links', links,
     'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
     'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
-  )) AS span_fragments
+  ) ORDER BY start_time ASC) AS span_fragments
 FROM spans
 WHERE span_id IN (
   SELECT
@@ -1515,7 +1515,7 @@ SELECT
     'links', links,
     'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
     'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
-  )) AS span_fragments
+  ) ORDER BY start_time ASC) AS span_fragments
 FROM spans
 WHERE run_id = CAST($1 AS CHAR(26)) AND account_id = $2
 GROUP BY dynamic_span_id, run_id, trace_id, parent_span_id
