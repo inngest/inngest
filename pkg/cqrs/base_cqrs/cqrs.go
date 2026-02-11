@@ -349,31 +349,36 @@ fragmentLoop:
 			}
 		}
 
-		if attrs, ok := fragment["attributes"].(string); ok {
+		// Handle span attributes from both storage formats:
+		// - string: legacy double-encoded JSONB (stored as JSON string type)
+		// - map[string]any: properly encoded JSONB object (new format)
+		switch attrs := fragment["attributes"].(type) {
+		case string:
 			fragmentAttr := map[string]any{}
 			if err := json.Unmarshal([]byte(attrs), &fragmentAttr); err != nil {
 				logger.StdlibLogger(ctx).Error("error unmarshalling span attributes", "error", err)
 				return nil, err
 			}
-
 			maps.Copy(newSpan.RawOtelSpan.Attributes, fragmentAttr)
+		case map[string]any:
+			maps.Copy(newSpan.RawOtelSpan.Attributes, attrs)
+		}
 
-			if outputRef, ok := fragment["output_span_id"].(string); ok && info != nil {
-				outputSpanID = &outputRef
-				if io, ok := info.dynamicRefs[dynamicSpanID.String]; ok && io != nil {
-					io.OutputRef = outputRef
-				} else {
-					info.dynamicRefs[dynamicSpanID.String] = &IODynamicRef{OutputRef: outputRef}
-				}
+		if outputRef, ok := fragment["output_span_id"].(string); ok && info != nil {
+			outputSpanID = &outputRef
+			if io, ok := info.dynamicRefs[dynamicSpanID.String]; ok && io != nil {
+				io.OutputRef = outputRef
+			} else {
+				info.dynamicRefs[dynamicSpanID.String] = &IODynamicRef{OutputRef: outputRef}
 			}
+		}
 
-			if inputRef, ok := fragment["input_span_id"].(string); ok && info != nil {
-				inputSpanID = &inputRef
-				if io, ok := info.dynamicRefs[dynamicSpanID.String]; ok && io != nil {
-					io.InputRef = inputRef
-				} else {
-					info.dynamicRefs[dynamicSpanID.String] = &IODynamicRef{InputRef: inputRef}
-				}
+		if inputRef, ok := fragment["input_span_id"].(string); ok && info != nil {
+			inputSpanID = &inputRef
+			if io, ok := info.dynamicRefs[dynamicSpanID.String]; ok && io != nil {
+				io.InputRef = inputRef
+			} else {
+				info.dynamicRefs[dynamicSpanID.String] = &IODynamicRef{InputRef: inputRef}
 			}
 		}
 	}
