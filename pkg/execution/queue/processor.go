@@ -80,6 +80,8 @@ func New(
 		qp.SetPrimaryShard(ctx, primaryQueueShard)
 	} else if o.runMode.ShardGroup == "" {
 		return nil, fmt.Errorf("must pass either primary queue shard or a valid ShardGroup in runMode")
+	} else if len(qp.shardsByGroupName(o.runMode.ShardGroup)) == 0 {
+		return nil, fmt.Errorf("No shards found for configured shard group: %s", o.runMode.ShardGroup)
 	}
 
 	return qp, nil

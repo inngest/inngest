@@ -44,6 +44,41 @@ func TestNewQueueCreationWithPrimaryShard(t *testing.T) {
 	require.Equal(t, shard, q.Shard())
 }
 
+func TestNewQueueWithNoValidShardsInGroup(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	r := miniredis.RunT(t)
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	// One shard belonging to group "A"
+	queueClient := redis_state.NewQueueClient(rc, redis_state.QueueDefaultKey)
+	shard := redis_state.NewQueueShard("shard-a", queueClient,
+		queue.WithShardAssignmentConfig(queue.ShardAssignmentConfig{
+			ShardGroup:   "A",
+			NumExecutors: 1,
+		}),
+	)
+
+	queueShards := map[string]queue.QueueShard{
+		"shard-a": shard,
+	}
+
+	// Runtime expects group "B", but no shards belong to that group
+	_, err = queue.New(ctx, "test", nil, queueShards, nil,
+		queue.WithRunMode(queue.QueueRunMode{
+			ShardGroup: "B",
+		}),
+	)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "No shards found for configured shard group: B")
+}
+
 func TestNewQueueWithShardAssignment(t *testing.T) {
 	t.Parallel()
 	ctx, cancel := context.WithCancel(context.Background())
