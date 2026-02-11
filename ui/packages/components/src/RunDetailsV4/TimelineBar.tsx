@@ -299,13 +299,13 @@ function BarTooltipContent({
         <div className="flex flex-col items-start">
           <span className="text-light font-medium">Duration</span>
           <span className="text-basis tabular-nums">
-            {durationMs > 0 ? `${durationMs.toLocaleString()}ms` : '-'}
+            {durationMs > 0 ? formatDuration(durationMs) : '-'}
           </span>
         </div>
         <div className="flex flex-col items-end">
           <span className="text-light font-medium">Delay</span>
           <span className="text-basis tabular-nums">
-            {delayMs > 0 ? `${delayMs.toLocaleString()}ms` : '-'}
+            {delayMs > 0 ? formatDuration(delayMs) : '-'}
           </span>
         </div>
       </div>

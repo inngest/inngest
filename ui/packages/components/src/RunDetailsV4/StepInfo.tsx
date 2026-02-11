@@ -18,13 +18,13 @@ import { useGetTraceResult } from '../SharedContext/useGetTraceResult';
 import { usePathCreator } from '../SharedContext/usePathCreator';
 import { Time } from '../Time';
 import { usePrettyErrorBody, usePrettyJson, usePrettyShortError } from '../hooks/usePrettyJson';
-import { formatMilliseconds, toMaybeDate } from '../utils/date';
+import { toMaybeDate } from '../utils/date';
 import { ErrorInfo } from './ErrorInfo';
 import { IO } from './IO';
 import { MetadataAttrs } from './MetadataAttrs';
 import { Tabs } from './Tabs';
 import { UserlandAttrs } from './UserlandAttrs';
-import { maybeBooleanToString, type StepInfoType } from './runDetailsUtils';
+import { formatDuration, maybeBooleanToString, type StepInfoType } from './runDetailsUtils';
 import {
   isStepInfoInvoke,
   isStepInfoSignal,
@@ -154,7 +154,7 @@ export const StepInfo = ({
     result && setPollInterval(undefined);
   }, [result]);
 
-  const delayText = formatMilliseconds(
+  const delayText = formatDuration(
     (toMaybeDate(trace.startedAt) ?? new Date()).getTime() - new Date(trace.queuedAt).getTime()
   );
 
@@ -162,7 +162,7 @@ export const StepInfo = ({
   const endedAt = toMaybeDate(trace.endedAt);
   const duration = startedAt ? (endedAt ?? new Date()).getTime() - startedAt.getTime() : 0;
 
-  const durationText = duration > 0 ? formatMilliseconds(duration) : '-';
+  const durationText = duration > 0 ? formatDuration(duration) : '-';
 
   const stepKindInfo = getStepKindInfo({
     stepInfo: trace.stepInfo,

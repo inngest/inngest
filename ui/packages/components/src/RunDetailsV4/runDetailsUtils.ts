@@ -142,24 +142,17 @@ export const useStepSelection = ({ runID }: { runID?: string }) => {
 };
 
 export const formatDuration = (ms: number): string => {
-  const units = [
-    { label: 'd', value: 86400000 }, // 24 * 60 * 60 * 1000
-    { label: 'h', value: 3600000 }, // 60 * 60 * 1000
-    { label: 'm', value: 60000 }, // 60 * 1000
-    { label: 's', value: 1000 }, // 1000
-    { label: 'ms', value: 1 },
-  ];
-
-  for (const { label, value } of units) {
-    if (ms >= value) {
-      const amount = ms / value;
-      const rounded = Math.round(amount * 10) / 10;
-      const display = rounded % 1 === 0 ? rounded.toFixed(0) : rounded.toFixed(1);
-      return `${display}${label}`;
-    }
+  if (ms <= 0) return '0ms';
+  if (ms < 1000) return `${Math.round(ms).toLocaleString()}ms`;
+  if (ms < 60000) return `${(ms / 1000).toFixed(3)}s`;
+  if (ms < 3600000) {
+    const minutes = Math.floor(ms / 60000);
+    const seconds = Math.floor((ms % 60000) / 1000);
+    return `${minutes}m ${seconds}s`;
   }
-
-  return '0ms';
+  const hours = Math.floor(ms / 3600000);
+  const minutes = Math.floor((ms % 3600000) / 60000);
+  return `${hours}h ${minutes}m`;
 };
 
 export const getSpanName = (name: string) => {

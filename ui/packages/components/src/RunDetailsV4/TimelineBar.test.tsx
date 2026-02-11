@@ -35,8 +35,8 @@ describe('TimelineBar', () => {
 
     it('displays formatted duration', () => {
       render(<TimelineBar {...defaultProps} />);
-      // 1234ms should format to "1.2s"
-      expect(screen.getByText('1.2s')).toBeTruthy();
+      // 1234ms is < 10s, so displayed in ms with delimiter
+      expect(screen.getByText('1,234ms')).toBeTruthy();
     });
 
     it('displays duration in milliseconds for short durations', () => {

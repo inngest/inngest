@@ -158,7 +158,9 @@ export function TimelineHeader({
               }}
             >
               {/* Duration label */}
-              <span className="text-muted text-xs tabular-nums">{durations[i]}</span>
+              <span className="text-muted whitespace-nowrap text-xs tabular-nums">
+                {durations[i]}
+              </span>
             </div>
           ))}
         </div>
@@ -169,7 +171,7 @@ export function TimelineHeader({
             <div
               ref={leftLabelRef}
               data-testid="timestamp-label-left"
-              className="bg-canvasBase border-subtle text-basis pointer-events-none absolute z-20 rounded border px-1 py-0.5 text-xs tabular-nums"
+              className="bg-canvasBase border-subtle text-basis pointer-events-none absolute z-20 whitespace-nowrap rounded border px-1 py-0.5 text-xs tabular-nums"
               style={{
                 left: `${selStart}%`,
                 transform: getLabelTransform(selStart),
@@ -181,7 +183,7 @@ export function TimelineHeader({
             <div
               ref={rightLabelRef}
               data-testid="timestamp-label-right"
-              className="bg-canvasBase border-subtle text-basis pointer-events-none absolute z-20 rounded border px-1 py-0.5 text-xs tabular-nums"
+              className="bg-canvasBase border-subtle text-basis pointer-events-none absolute z-20 whitespace-nowrap rounded border px-1 py-0.5 text-xs tabular-nums"
               style={{
                 left: `${selEnd}%`,
                 transform: getLabelTransform(selEnd),

@@ -48,12 +48,12 @@ describe('TimelineHeader', () => {
     it('renders 5 time markers (0%, 25%, 50%, 75%, 100%)', () => {
       render(<TimelineHeader {...defaultProps} />);
 
-      // Look for duration labels: 0ms (0%), 2.5s (25%), 5s (50%), 7.5s (75%), 10s (100%)
+      // Look for duration labels: 0ms (0%), 2,500ms (25%), 5,000ms (50%), 7,500ms (75%), 10.000s (100%)
       expect(screen.getByText('0ms')).toBeTruthy(); // 0%
-      expect(screen.getByText('2.5s')).toBeTruthy(); // 25%
-      expect(screen.getByText('5s')).toBeTruthy(); // 50%
-      expect(screen.getByText('7.5s')).toBeTruthy(); // 75%
-      expect(screen.getByText('10s')).toBeTruthy(); // 100%
+      expect(screen.getByText('2,500ms')).toBeTruthy(); // 25%
+      expect(screen.getByText('5,000ms')).toBeTruthy(); // 50%
+      expect(screen.getByText('7,500ms')).toBeTruthy(); // 75%
+      expect(screen.getByText('10.000s')).toBeTruthy(); // 100%
     });
 
     it('calculates correct durations for 1 minute timeline', () => {
@@ -66,10 +66,10 @@ describe('TimelineHeader', () => {
       );
 
       expect(screen.getByText('0ms')).toBeTruthy(); // 0%
-      expect(screen.getByText('15s')).toBeTruthy(); // 25% of 60s
-      expect(screen.getByText('30s')).toBeTruthy(); // 50% of 60s
-      expect(screen.getByText('45s')).toBeTruthy(); // 75% of 60s
-      expect(screen.getByText('1m')).toBeTruthy(); // 100% of 60s
+      expect(screen.getByText('15.000s')).toBeTruthy(); // 25% of 60s
+      expect(screen.getByText('30.000s')).toBeTruthy(); // 50% of 60s
+      expect(screen.getByText('45.000s')).toBeTruthy(); // 75% of 60s
+      expect(screen.getByText('1m 0s')).toBeTruthy(); // 100% of 60s
     });
 
     it('handles millisecond-level timelines', () => {
@@ -279,8 +279,8 @@ describe('TimelineHeader', () => {
       const leftLabel = container.querySelector('[data-testid="timestamp-label-left"]');
       const rightLabel = container.querySelector('[data-testid="timestamp-label-right"]');
 
-      expect(leftLabel?.textContent).toBe('5s');
-      expect(rightLabel?.textContent).toBe('10s');
+      expect(leftLabel?.textContent).toBe('5,000ms');
+      expect(rightLabel?.textContent).toBe('10.000s');
     });
 
     it('has z-20 class on timestamp labels', () => {
@@ -338,8 +338,8 @@ describe('TimelineHeader', () => {
       );
 
       // 2 hours = 7200000ms
-      expect(screen.getByText('1h')).toBeTruthy(); // 50% of 2 hours = 1 hour
-      expect(screen.getByText('2h')).toBeTruthy(); // 100% of 2 hours
+      expect(screen.getByText('1h 0m')).toBeTruthy(); // 50% of 2 hours = 1 hour
+      expect(screen.getByText('2h 0m')).toBeTruthy(); // 100% of 2 hours
     });
   });
 });
