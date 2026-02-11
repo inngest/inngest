@@ -636,15 +636,22 @@ func (q *Queries) GetFunctionBySlug(ctx context.Context, slug string) (*Function
 }
 
 const getFunctionRun = `-- name: GetFunctionRun :one
-SELECT function_runs.run_id, function_runs.run_started_at, function_runs.function_id, function_runs.function_version, function_runs.trigger_type, function_runs.event_id, function_runs.batch_id, function_runs.original_run_id, function_runs.cron, function_finishes.run_id, function_finishes.status, function_finishes.output, function_finishes.completed_step_count, function_finishes.created_at
+SELECT function_runs.run_id, function_runs.run_started_at, function_runs.function_id, function_runs.function_version, function_runs.trigger_type, function_runs.event_id, function_runs.batch_id, function_runs.original_run_id, function_runs.cron,
+    COALESCE(function_finishes.status, '') AS finish_status,
+    COALESCE(function_finishes.output, '') AS finish_output,
+    COALESCE(function_finishes.completed_step_count, 0) AS finish_completed_step_count,
+    COALESCE(function_finishes.created_at, function_runs.run_started_at) AS finish_created_at
   FROM function_runs
   LEFT JOIN function_finishes ON function_finishes.run_id = function_runs.run_id
   WHERE function_runs.run_id = $1
 `
 
 type GetFunctionRunRow struct {
-	FunctionRun    FunctionRun
-	FunctionFinish FunctionFinish
+	FunctionRun              FunctionRun
+	FinishStatus             string
+	FinishOutput             string
+	FinishCompletedStepCount int32
+	FinishCreatedAt          time.Time
 }
 
 func (q *Queries) GetFunctionRun(ctx context.Context, runID ulid.ULID) (*GetFunctionRunRow, error) {
@@ -660,11 +667,10 @@ func (q *Queries) GetFunctionRun(ctx context.Context, runID ulid.ULID) (*GetFunc
 		&i.FunctionRun.BatchID,
 		&i.FunctionRun.OriginalRunID,
 		&i.FunctionRun.Cron,
-		&i.FunctionFinish.RunID,
-		&i.FunctionFinish.Status,
-		&i.FunctionFinish.Output,
-		&i.FunctionFinish.CompletedStepCount,
-		&i.FunctionFinish.CreatedAt,
+		&i.FinishStatus,
+		&i.FinishOutput,
+		&i.FinishCompletedStepCount,
+		&i.FinishCreatedAt,
 	)
 	return &i, err
 }
@@ -765,13 +771,21 @@ func (q *Queries) GetFunctionRunHistory(ctx context.Context, runID ulid.ULID) ([
 }
 
 const getFunctionRuns = `-- name: GetFunctionRuns :many
-SELECT function_runs.run_id, function_runs.run_started_at, function_runs.function_id, function_runs.function_version, function_runs.trigger_type, function_runs.event_id, function_runs.batch_id, function_runs.original_run_id, function_runs.cron, function_finishes.run_id, function_finishes.status, function_finishes.output, function_finishes.completed_step_count, function_finishes.created_at FROM function_runs
+SELECT function_runs.run_id, function_runs.run_started_at, function_runs.function_id, function_runs.function_version, function_runs.trigger_type, function_runs.event_id, function_runs.batch_id, function_runs.original_run_id, function_runs.cron,
+    COALESCE(function_finishes.status, '') AS finish_status,
+    COALESCE(function_finishes.output, '') AS finish_output,
+    COALESCE(function_finishes.completed_step_count, 0) AS finish_completed_step_count,
+    COALESCE(function_finishes.created_at, function_runs.run_started_at) AS finish_created_at
+FROM function_runs
 LEFT JOIN function_finishes ON function_finishes.run_id = function_runs.run_id
 `
 
 type GetFunctionRunsRow struct {
-	FunctionRun    FunctionRun
-	FunctionFinish FunctionFinish
+	FunctionRun              FunctionRun
+	FinishStatus             string
+	FinishOutput             string
+	FinishCompletedStepCount int32
+	FinishCreatedAt          time.Time
 }
 
 func (q *Queries) GetFunctionRuns(ctx context.Context) ([]*GetFunctionRunsRow, error) {
@@ -793,11 +807,10 @@ func (q *Queries) GetFunctionRuns(ctx context.Context) ([]*GetFunctionRunsRow, e
 			&i.FunctionRun.BatchID,
 			&i.FunctionRun.OriginalRunID,
 			&i.FunctionRun.Cron,
-			&i.FunctionFinish.RunID,
-			&i.FunctionFinish.Status,
-			&i.FunctionFinish.Output,
-			&i.FunctionFinish.CompletedStepCount,
-			&i.FunctionFinish.CreatedAt,
+			&i.FinishStatus,
+			&i.FinishOutput,
+			&i.FinishCompletedStepCount,
+			&i.FinishCreatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -869,7 +882,12 @@ func (q *Queries) GetFunctionRunsFromEvents(ctx context.Context, eventIds [][]by
 }
 
 const getFunctionRunsTimebound = `-- name: GetFunctionRunsTimebound :many
-SELECT function_runs.run_id, function_runs.run_started_at, function_runs.function_id, function_runs.function_version, function_runs.trigger_type, function_runs.event_id, function_runs.batch_id, function_runs.original_run_id, function_runs.cron, function_finishes.run_id, function_finishes.status, function_finishes.output, function_finishes.completed_step_count, function_finishes.created_at FROM function_runs
+SELECT function_runs.run_id, function_runs.run_started_at, function_runs.function_id, function_runs.function_version, function_runs.trigger_type, function_runs.event_id, function_runs.batch_id, function_runs.original_run_id, function_runs.cron,
+    COALESCE(function_finishes.status, '') AS finish_status,
+    COALESCE(function_finishes.output, '') AS finish_output,
+    COALESCE(function_finishes.completed_step_count, 0) AS finish_completed_step_count,
+    COALESCE(function_finishes.created_at, function_runs.run_started_at) AS finish_created_at
+FROM function_runs
 LEFT JOIN function_finishes ON function_finishes.run_id = function_runs.run_id
 WHERE function_runs.run_started_at > $1 AND function_runs.run_started_at <= $2
 ORDER BY function_runs.run_started_at DESC
@@ -883,8 +901,11 @@ type GetFunctionRunsTimeboundParams struct {
 }
 
 type GetFunctionRunsTimeboundRow struct {
-	FunctionRun    FunctionRun
-	FunctionFinish FunctionFinish
+	FunctionRun              FunctionRun
+	FinishStatus             string
+	FinishOutput             string
+	FinishCompletedStepCount int32
+	FinishCreatedAt          time.Time
 }
 
 func (q *Queries) GetFunctionRunsTimebound(ctx context.Context, arg GetFunctionRunsTimeboundParams) ([]*GetFunctionRunsTimeboundRow, error) {
@@ -906,11 +927,10 @@ func (q *Queries) GetFunctionRunsTimebound(ctx context.Context, arg GetFunctionR
 			&i.FunctionRun.BatchID,
 			&i.FunctionRun.OriginalRunID,
 			&i.FunctionRun.Cron,
-			&i.FunctionFinish.RunID,
-			&i.FunctionFinish.Status,
-			&i.FunctionFinish.Output,
-			&i.FunctionFinish.CompletedStepCount,
-			&i.FunctionFinish.CreatedAt,
+			&i.FinishStatus,
+			&i.FinishOutput,
+			&i.FinishCompletedStepCount,
+			&i.FinishCreatedAt,
 		); err != nil {
 			return nil, err
 		}
