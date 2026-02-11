@@ -78,7 +78,7 @@ func TestQueueSemaphoreWithConstraintAPI(t *testing.T) {
 		}),
 	}
 
-	shard := redis_state.NewQueueShard("test", queueClient, queue.ShardAssignmentConfig{}, options...)
+	shard := redis_state.NewQueueShard("test", queueClient, options...)
 
 	q, err := queue.New(ctx, "test", shard, nil, nil, options...)
 	require.NoError(t, err)
@@ -643,7 +643,7 @@ func TestQueueSemaphore(t *testing.T) {
 				queue.WithNumWorkers(tc.numWorkers),
 			}
 
-			shard := redis_state.NewQueueShard("test", queueClient, queue.ShardAssignmentConfig{}, options...)
+			shard := redis_state.NewQueueShard("test", queueClient, options...)
 
 			q, err := queue.New(ctx, "test", shard, nil, nil, options...)
 			require.NoError(t, err)

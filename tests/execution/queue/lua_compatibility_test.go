@@ -118,7 +118,6 @@ func TestLuaCompatibility(t *testing.T) {
 				shard := redis_state.NewQueueShard(
 					consts.DefaultQueueShardName,
 					redis_state.NewQueueClient(client, redis_state.QueueDefaultKey),
-					queue.ShardAssignmentConfig{},
 					opts...,
 				)
 
