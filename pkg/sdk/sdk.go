@@ -117,7 +117,30 @@ func (f *RegisterRequest) Checksum() (string, error) {
 	if f.checksum != "" {
 		return f.checksum, nil
 	}
-	byt, err := json.Marshal(f)
+
+	// Hash only the fields that represent the application's function
+	// definitions. Transient fields like Headers (set from HTTP request
+	// metadata), IdempotencyKey, and Capabilities change between syncs
+	// even when the app code is unchanged. Including them causes the
+	// checksum to differ on every sync, making the dev server always
+	// report modified: true.
+	stable := struct {
+		AppName    string        `json:"appName"`
+		AppVersion string        `json:"appVersion,omitempty"`
+		Functions  []SDKFunction `json:"functions"`
+		URL        string        `json:"url"`
+		SDK        string        `json:"sdk"`
+		Framework  string        `json:"framework"`
+	}{
+		AppName:    f.AppName,
+		AppVersion: f.AppVersion,
+		Functions:  f.Functions,
+		URL:        f.URL,
+		SDK:        f.SDK,
+		Framework:  f.Framework,
+	}
+
+	byt, err := json.Marshal(stable)
 	if err != nil {
 		return "", err
 	}
