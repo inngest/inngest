@@ -9,7 +9,7 @@ import {
   type RemixiconComponentType,
 } from '@remixicon/react';
 
-export type Severity = 'error' | 'info' | 'success' | 'warning';
+export type Severity = 'error' | 'info' | 'success' | 'warning' | 'none';
 
 type SeveritySpecific = {
   icon: RemixiconComponentType;
@@ -51,6 +51,13 @@ const severityStyles = {
     linkClassName:
       'text-warning decoration-warning hover:text-accent-2xIntense hover:decoration-accent-2xIntense',
     borderStyles: 'border-accent-2xSubtle',
+  },
+  none: {
+    icon: RiCloseLine,
+    iconClassName: '',
+    wrapperClassName: '',
+    linkClassName: '',
+    borderStyles: 'border-subtle',
   },
 } as const satisfies { [key in Severity]: SeveritySpecific };
 
@@ -147,18 +154,19 @@ export function ContextualBanner({
   className,
   onDismiss,
   severity = 'info',
+  bodySeverity = severity,
   cta,
 }: Omit<Props, 'showIcon'> & {
   title: React.ReactNode | string;
+  bodySeverity?: Severity;
 }) {
   return (
-    <div
-      className={cn(className, severityStyles[severity].wrapperClassName, 'flex w-full flex-col ')}
-    >
+    <div className={cn(className, 'flex w-full flex-col ')}>
       <div
         className={cn(
           'flex grow items-center justify-between gap-1 border-b px-4 py-2',
-          severityStyles[severity].borderStyles
+          severityStyles[severity].borderStyles,
+          severityStyles[severity].wrapperClassName
         )}
       >
         <span className="grow text-sm leading-6">{title}</span>
@@ -173,7 +181,13 @@ export function ContextualBanner({
         )}
       </div>
 
-      <div className="flex grow items-start gap-1 text-sm">
+      <div
+        className={cn(
+          severityStyles[bodySeverity].wrapperClassName,
+          severityStyles[bodySeverity].borderStyles,
+          'flex grow items-start gap-1 border-b text-sm'
+        )}
+      >
         <span className="grow leading-6">{children}</span>
       </div>
     </div>
