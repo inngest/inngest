@@ -169,7 +169,7 @@ describe('TimelineBar', () => {
     // T046: displays "YOUR SERVER" when organization name not provided
     it('displays YOUR SERVER when orgName not provided', () => {
       render(<TimelineBar {...defaultProps} style="timing.server" />);
-      expect(screen.getByText('Your Server')).toBeTruthy();
+      expect(screen.getByText('YOUR SERVER')).toBeTruthy();
     });
   });
 

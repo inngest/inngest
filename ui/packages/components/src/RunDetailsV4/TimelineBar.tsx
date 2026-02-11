@@ -68,19 +68,19 @@ const BAR_STYLES: Record<BarStyleKey, BarStyle> = {
   },
   'timing.inngest': {
     barColor: 'bg-slate-300',
-    barHeight: 'short',
+    barHeight: 'tall',
     durationColor: 'text-basis',
-    labelFormat: 'default',
-    textColor: 'text-muted',
+    labelFormat: 'uppercase',
+    textColor: 'text-light',
   },
   'timing.server': {
     barColor: 'bg-status-completed',
     barHeight: 'tall',
     durationColor: 'text-basis',
-    labelFormat: 'default',
+    labelFormat: 'uppercase',
     pattern: 'barber-pole',
     statusBased: true,
-    textColor: 'text-muted',
+    textColor: 'text-light',
   },
   'timing.connecting': {
     barColor: 'bg-transparent',
@@ -504,7 +504,7 @@ export function TimelineBar({
 
   // For SERVER timing, show org name or fallback
   if (style === 'timing.server') {
-    displayName = orgName ? `${orgName.toUpperCase()} SERVER` : 'Your Server';
+    displayName = orgName ? `${orgName.toUpperCase()} SERVER` : 'YOUR SERVER';
   }
 
   // Calculate indentation (base padding + depth-based indent)
