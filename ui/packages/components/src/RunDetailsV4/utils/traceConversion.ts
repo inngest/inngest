@@ -83,8 +83,9 @@ function calculateTimingBreakdown(
 function traceToBarData(trace: Trace, orgName?: string, rootStatus?: string): TimelineBarData {
   const isStepRun = isStepRunSpan(trace) && !trace.isUserland;
   const timingBreakdown = isStepRun ? calculateTimingBreakdown(trace) : undefined;
-  // Use root status if available (for consistent coloring), otherwise use trace's own status
-  const status = rootStatus ?? trace.status;
+  // Each bar uses its own status for coloring. rootStatus is only used as a
+  // fallback for bars that don't have a meaningful status of their own.
+  const status = trace.status || rootStatus;
 
   return {
     id: trace.spanID,
@@ -92,7 +93,7 @@ function traceToBarData(trace: Trace, orgName?: string, rootStatus?: string): Ti
     startTime: new Date(trace.queuedAt),
     endTime: trace.endedAt ? new Date(trace.endedAt) : null,
     style: getStyleForTrace(trace),
-    children: trace.childrenSpans?.map((child) => traceToBarData(child, orgName, status)),
+    children: trace.childrenSpans?.map((child) => traceToBarData(child, orgName, rootStatus)),
     timingBreakdown,
     isRoot: trace.isRoot,
     status,
