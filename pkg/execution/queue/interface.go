@@ -93,7 +93,12 @@ func PartitionLeaseOptionDisableLeaseChecks(disableLeaseChecks bool) PartitionLe
 	}
 }
 
+type ShardAssingmentManager interface {
+	SetPrimaryShard(ctx context.Context, queueShard QueueShard)
+}
+
 type QueueManager interface {
+	ShardAssingmentManager
 	JobQueueReader
 	Queue
 

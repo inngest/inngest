@@ -96,7 +96,7 @@ func (q *queueProcessor) tryClaimShardLease(ctx context.Context, shards []QueueS
 		if leaseID != nil {
 			q.shardLeaseLock.Lock()
 			q.shardLeaseID = leaseID
-			q.primaryQueueShard = shard
+			q.SetPrimaryShard(ctx, shard)
 			q.shardLeaseLock.Unlock()
 
 			metrics.GaugeActiveShardLease(ctx, 1, metrics.GaugeOpt{PkgName: pkgName, Tags: map[string]any{"shard_group": q.runMode.ShardGroup, "queue_shard": shard.Name()}})

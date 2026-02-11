@@ -45,10 +45,6 @@ func New(
 ) (*queueProcessor, error) {
 	o := NewQueueOptions(options...)
 
-	if primaryQueueShard == nil {
-		return nil, fmt.Errorf("must pass primary queue shard")
-	}
-
 	qp := &queueProcessor{
 		name: name,
 
@@ -78,6 +74,12 @@ func New(
 		shadowContinuesLock:    &sync.Mutex{},
 		shadowContinues:        map[string]ShadowContinuation{},
 		shadowContinueCooldown: map[string]time.Time{},
+	}
+
+	if primaryQueueShard != nil {
+		qp.SetPrimaryShard(ctx, primaryQueueShard)
+	} else if o.runMode.ShardGroup == "" {
+		return nil, fmt.Errorf("must pass either primary queue shard or a valid ShardGroup in runMode")
 	}
 
 	return qp, nil
@@ -180,6 +182,24 @@ func (q *queueProcessor) Clock() clockwork.Clock {
 
 func (q *queueProcessor) Shard() QueueShard {
 	return q.primaryQueueShard
+}
+
+// Implements SetPrimaryShard() in ShardAssingmentManager interface
+func (q *queueProcessor) SetPrimaryShard(ctx context.Context, queueShard QueueShard) {
+
+	q.primaryQueueShard = queueShard
+
+	if q.queueShardClients == nil {
+		q.queueShardClients = map[string]QueueShard{
+			queueShard.Name(): queueShard,
+		}
+	}
+
+	if q.shardSelector == nil {
+		q.shardSelector = func(ctx context.Context, accountId uuid.UUID, queueName *string) (QueueShard, error) {
+			return queueShard, nil
+		}
+	}
 }
 
 func (q *queueProcessor) Semaphore() util.TrackingSemaphore {
@@ -416,7 +436,6 @@ func (q *queueProcessor) Run(ctx context.Context, f RunFunc) error {
 	} else {
 		l.Info("Executor started in assignedQueueShard Mode", "queue_shard", q.primaryQueueShard.Name())
 	}
-	q.initializeShardAssignment(q.primaryQueueShard)
 
 	if q.runMode.Sequential {
 		go q.claimSequentialLease(ctx)
@@ -452,20 +471,6 @@ func (q *queueProcessor) Run(ctx context.Context, f RunFunc) error {
 	}
 
 	return eg.Wait()
-}
-
-func (q *queueProcessor) initializeShardAssignment(shard QueueShard) {
-	if q.queueShardClients == nil {
-		q.queueShardClients = map[string]QueueShard{
-			shard.Name(): shard,
-		}
-	}
-
-	if q.shardSelector == nil {
-		q.shardSelector = func(ctx context.Context, accountId uuid.UUID, queueName *string) (QueueShard, error) {
-			return shard, nil
-		}
-	}
 }
 
 // SetFunctionMigrate implements Queue.
