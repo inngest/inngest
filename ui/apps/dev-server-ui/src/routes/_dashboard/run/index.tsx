@@ -19,7 +19,7 @@ function RunComponent() {
     'polling-disabled',
     false,
   );
-  const { value: v4Enabled } = booleanFlag('run-details-v4', true, true);
+  const { value: v4Enabled } = booleanFlag('run-details-v4', false, true);
   const [showV4, setShowV4] = useState(true);
   const [runID] = useSearchParam('runID');
   const getTrigger = useGetTrigger();
