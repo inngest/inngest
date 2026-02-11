@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
@@ -431,6 +432,12 @@ func (q *queueProcessor) ProcessShadowPartitionBacklog(
 	}
 	if refillLimit <= 0 {
 		refillLimit = BacklogRefillHardLimit
+	}
+
+	// Limit backlog peek to maximum lease generation
+	// TODO: Run multiple requests, etc. to balance peek size and throughput
+	if shadowPart.AccountID != nil && q.UseConstraintAPI != nil && q.UseConstraintAPI(ctx, *shadowPart.AccountID) {
+		refillLimit = constraintapi.MaximumAmount
 	}
 
 	// Peek items (scheduled to run within the next 2s) to be refilled.
