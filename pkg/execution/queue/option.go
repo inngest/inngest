@@ -358,6 +358,9 @@ type QueueRunMode struct {
 	// ExclusiveAccounts defines a list of account IDs to peek exclusively.
 	// This can be used to configure executors processing only a static subset of accounts.
 	ExclusiveAccounts []uuid.UUID
+
+	// ShardGroup enables the executor to determine which shard to process items from during run time.
+	ShardGroup string
 }
 
 type QueueOptions struct {
@@ -462,11 +465,19 @@ type QueueOptions struct {
 	EnableThrottleInstrumentation EnableThrottleInstrumentationFn
 
 	ConditionalTracer trace.ConditionalTracer
+
+	ShardAssignmentConfig ShardAssignmentConfig
 }
 
 // ShardSelector returns a shard reference for the given queue item.
 // This allows applying a policy to enqueue items to different queue shards.
 type ShardSelector func(ctx context.Context, accountId uuid.UUID, queueName *string) (QueueShard, error)
+
+func WithShardAssignmentConfig(cfg ShardAssignmentConfig) QueueOpt {
+	return func(q *QueueOptions) {
+		q.ShardAssignmentConfig = cfg
+	}
+}
 
 func WithPeekEWMA(on bool) QueueOpt {
 	return func(q *QueueOptions) {

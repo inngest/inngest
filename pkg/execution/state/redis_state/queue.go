@@ -41,6 +41,10 @@ func (q *queue) Kind() enums.QueueShardKind {
 	return enums.QueueShardKindRedis
 }
 
+func (q *queue) ShardAssignmentConfig() osqueue.ShardAssignmentConfig {
+	return q.QueueOptions.ShardAssignmentConfig
+}
+
 type RedisQueueShard interface {
 	osqueue.QueueShard
 	Client() *QueueClient

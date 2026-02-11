@@ -8,11 +8,17 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 )
 
+type ShardAssignmentConfig struct {
+	ShardGroup   string
+	NumExecutors int
+}
+
 type QueueShard interface {
 	ShardOperations
 
 	Name() string
 	Kind() enums.QueueShardKind
+	ShardAssignmentConfig() ShardAssignmentConfig
 }
 
 func (q *queueProcessor) selectShard(ctx context.Context, shardName string, qi QueueItem) (QueueShard, error) {

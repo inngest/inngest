@@ -93,7 +93,12 @@ func PartitionLeaseOptionDisableLeaseChecks(disableLeaseChecks bool) PartitionLe
 	}
 }
 
+type ShardAssingmentManager interface {
+	SetPrimaryShard(ctx context.Context, queueShard QueueShard)
+}
+
 type QueueManager interface {
+	ShardAssingmentManager
 	JobQueueReader
 	Queue
 
@@ -204,6 +209,7 @@ type ShardOperations interface {
 	PartitionSize(ctx context.Context, partitionID string, until time.Time) (int64, error)
 
 	ConfigLease(ctx context.Context, key string, duration time.Duration, existingLeaseID ...*ulid.ULID) (*ulid.ULID, error)
+	ShardLease(ctx context.Context, key string, duration time.Duration, maxLeases int, existingLeaseID ...*ulid.ULID) (*ulid.ULID, error)
 
 	AccountPeek(ctx context.Context, sequential bool, until time.Time, limit int64) ([]uuid.UUID, error)
 

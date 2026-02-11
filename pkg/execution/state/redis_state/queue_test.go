@@ -2138,7 +2138,7 @@ func TestQueueLeaseSequential(t *testing.T) {
 		require.WithinDuration(t, now.Add(dur), ulid.Time(leaseID.Time()), 5*time.Millisecond)
 	})
 
-	t.Run("It doesn't allow leasing without an existing lease ID", func(t *testing.T) {
+	t.Run("It doesn't allow renewing leasing without an existing lease ID", func(t *testing.T) {
 		id, err := shard.ConfigLease(ctx, "sequential", time.Second)
 		require.Equal(t, osqueue.ErrConfigAlreadyLeased, err)
 		require.Nil(t, id)

@@ -50,6 +50,11 @@ var (
 	ErrConfigAlreadyLeased           = fmt.Errorf("config scanner already leased")
 	ErrConfigLeaseExceedsLimits      = fmt.Errorf("config lease duration exceeds the maximum of %d seconds", int(ConfigLeaseMax.Seconds()))
 
+	ErrAllShardsAlreadyLeased  = fmt.Errorf("all shards in the group are fully allocated")
+	ErrShardLeaseNotFound      = fmt.Errorf("shard lease not found")
+	ErrShardLeaseExpired       = fmt.Errorf("cannot renew expired shard lease")
+	ErrShardLeaseExceedsLimits = fmt.Errorf("shard lease duration exceeds the maximum of %d seconds", int(ShardLeaseMax.Seconds()))
+
 	ErrPartitionConcurrencyLimit = fmt.Errorf("at partition concurrency limit")
 	ErrAccountConcurrencyLimit   = fmt.Errorf("at account concurrency limit")
 
