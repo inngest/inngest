@@ -176,6 +176,15 @@ func (a devapi) Info(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Expose the first event key so the UI can send test events via /e/{key}.
+	// Without this, the dashboard's "Send Event" feature returns 401 in
+	// self-hosted mode because it doesn't know the configured key.
+	// This is safe: the /dev endpoint is already behind AuthMiddleware.
+	var eventKey string
+	if len(a.devserver.Opts.EventKeys) > 0 {
+		eventKey = a.devserver.Opts.EventKeys[0]
+	}
+
 	ir := InfoResponse{
 		Version:             version.Print(),
 		StartOpts:           a.devserver.Opts,
@@ -185,6 +194,7 @@ func (a devapi) Info(w http.ResponseWriter, r *http.Request) {
 		IsMissingSigningKey: a.devserver.Opts.RequireKeys && !a.devserver.HasSigningKey(),
 		IsMissingEventKeys:  a.devserver.Opts.RequireKeys && !a.devserver.HasEventKeys(),
 		Features:            features,
+		EventKey:            eventKey,
 	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	byt, _ := json.MarshalIndent(ir, "", "  ")
@@ -717,4 +727,10 @@ type InfoResponse struct {
 
 	// Features acts as an in-memory feature flag for the UI
 	Features map[string]bool `json:"features"`
+
+	// EventKey is exposed so that the dashboard UI can send test events
+	// via the /e/{key} endpoint. Only the first configured key is exposed.
+	// This field is only served on the /dev endpoint which is already
+	// protected by AuthMiddleware.
+	EventKey string `json:"eventKey,omitempty"`
 }
