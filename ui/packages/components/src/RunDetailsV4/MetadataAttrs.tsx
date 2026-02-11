@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useRef } from 'react';
 
 import { ElementWrapper, TextElement, TimeElement } from '../DetailsCard/Element';
 import type { SpanMetadata, SpanMetadataKind } from './types';
@@ -75,32 +75,28 @@ const MetadataAttrRow = ({
 
 export const MetadataAttrs = ({ metadata }: { metadata: SpanMetadata[] }) => {
   const ref = useRef<HTMLDivElement>(null);
-  const [height, setHeight] = useState<number | null>(null);
   useLayoutEffect(() => {
-    if (ref.current) {
+    if (ref.current && ref.current.clientHeight > 0) {
       ref.current.style.height = `${ref.current.clientHeight}px`;
-      setHeight(ref.current.offsetHeight);
     }
   }, [metadata]);
 
   return (
     <div className="relative h-full overflow-y-auto" ref={ref}>
-      {height
-        ? metadata.map((md, idx) => {
-            const isLast = idx === metadata.length - 1;
+      {metadata.map((md, idx) => {
+        const isLast = idx === metadata.length - 1;
 
-            return (
-              <MetadataAttrRow
-                key={`metadata-attr-${md.scope}-${md.kind}`}
-                kind={md.kind}
-                scope={md.scope}
-                values={md.values}
-                updatedAt={md.updatedAt}
-                isLast={isLast}
-              />
-            );
-          })
-        : null}
+        return (
+          <MetadataAttrRow
+            key={`metadata-attr-${md.scope}-${md.kind}`}
+            kind={md.kind}
+            scope={md.scope}
+            values={md.values}
+            updatedAt={md.updatedAt}
+            isLast={isLast}
+          />
+        );
+      })}
     </div>
   );
 };
