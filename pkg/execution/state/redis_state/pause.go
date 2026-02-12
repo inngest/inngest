@@ -10,13 +10,14 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 )
 
-func (q *queue) UnpauseFunction(ctx context.Context, acctID, fnID uuid.UUID) error {
+func (q *queue) UnpauseFunction(ctx context.Context, acctID, envID, fnID uuid.UUID) error {
 	l := logger.StdlibLogger(ctx)
 
 	part := &osqueue.QueuePartition{
 		ID:         fnID.String(),
 		FunctionID: &fnID,
 		AccountID:  acctID,
+		EnvID:      &envID,
 	}
 
 	err := q.PartitionRequeue(ctx, part, q.Clock.Now(), false)
@@ -26,7 +27,7 @@ func (q *queue) UnpauseFunction(ctx context.Context, acctID, fnID uuid.UUID) err
 	}
 
 	// Also unpause shadow partition if key queues enabled
-	if q.AllowKeyQueues(ctx, acctID, fnID) {
+	if q.AllowKeyQueues(ctx, acctID, envID, fnID) {
 		shadowPart := &osqueue.QueueShadowPartition{
 			PartitionID: fnID.String(),
 			FunctionID:  &fnID,

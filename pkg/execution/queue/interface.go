@@ -292,7 +292,7 @@ type ShardOperations interface {
 	PartitionBacklogSize(ctx context.Context, partitionID string) (int64, error)
 	PartitionByID(ctx context.Context, partitionID string) (*PartitionInspectionResult, error)
 
-	UnpauseFunction(ctx context.Context, acctID, fnID uuid.UUID) error
+	UnpauseFunction(ctx context.Context, acctID, envID, fnID uuid.UUID) error
 
 	OutstandingJobCount(ctx context.Context, workspaceID, workflowID uuid.UUID, runID ulid.ULID) (int, error)
 	RunningCount(ctx context.Context, functionID uuid.UUID) (int64, error)

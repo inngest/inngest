@@ -91,7 +91,7 @@ type Migrator interface {
 }
 
 type Unpauser interface {
-	UnpauseFunction(ctx context.Context, shard string, acctID, fnID uuid.UUID) error
+	UnpauseFunction(ctx context.Context, shard string, acctID, envID, fnID uuid.UUID) error
 }
 
 // AttemptResetter resets queue item attempts after a successful checkpoint.

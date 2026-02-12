@@ -316,7 +316,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		queue.WithRefreshItemThrottle(NormalizeThrottle(smv2, dbcqrs)),
 		queue.WithPartitionConstraintConfigGetter(PartitionConstraintConfigGetter(dbcqrs)),
 
-		queue.WithAllowKeyQueues(func(ctx context.Context, acctID, functionID uuid.UUID) bool {
+		queue.WithAllowKeyQueues(func(ctx context.Context, acctID, envID, functionID uuid.UUID) bool {
 			return enableKeyQueues
 		}),
 		queue.WithBacklogRefillLimit(10),

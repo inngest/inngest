@@ -188,7 +188,6 @@ func (q *queueProcessor) Shard() QueueShard {
 
 // Implements SetPrimaryShard() in ShardAssingmentManager interface
 func (q *queueProcessor) SetPrimaryShard(ctx context.Context, queueShard QueueShard) {
-
 	q.primaryQueueShard = queueShard
 
 	if q.queueShardClients == nil {
@@ -486,12 +485,12 @@ func (q *queueProcessor) SetFunctionMigrate(ctx context.Context, sourceShard str
 }
 
 // UnpauseFunction implements Queue.
-func (q *queueProcessor) UnpauseFunction(ctx context.Context, shardName string, acctID uuid.UUID, fnID uuid.UUID) error {
+func (q *queueProcessor) UnpauseFunction(ctx context.Context, shardName string, acctID uuid.UUID, envID, fnID uuid.UUID) error {
 	shard, err := q.shardByName(shardName)
 	if err != nil {
 		return err
 	}
-	return shard.UnpauseFunction(ctx, acctID, fnID)
+	return shard.UnpauseFunction(ctx, acctID, envID, fnID)
 }
 
 func (q *queueProcessor) capacity() int64 {

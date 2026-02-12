@@ -496,7 +496,7 @@ func WithPartitionConstraintConfigGetter(f PartitionConstraintConfigGetter) Queu
 }
 
 // AllowKeyQueues determines if key queues should be enabled for the account
-type AllowKeyQueues func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool
+type AllowKeyQueues func(ctx context.Context, acctID, envID, fnID uuid.UUID) bool
 
 func WithAllowKeyQueues(kq AllowKeyQueues) QueueOpt {
 	return func(q *QueueOptions) {
@@ -761,7 +761,7 @@ func NewQueueOptions(
 				},
 			}
 		},
-		AllowKeyQueues: func(ctx context.Context, acctID, fnID uuid.UUID) bool {
+		AllowKeyQueues: func(ctx context.Context, acctID, envID, fnID uuid.UUID) bool {
 			return false
 		},
 		shadowPartitionProcessCount: func(ctx context.Context, acctID uuid.UUID) int {

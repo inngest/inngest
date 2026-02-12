@@ -373,8 +373,8 @@ func (q *queueProcessor) ProcessShadowPartitionBacklog(
 	)
 
 	var enableKeyQueues bool
-	if shadowPart.AccountID != nil && shadowPart.FunctionID != nil {
-		enableKeyQueues = q.AllowKeyQueues(ctx, *shadowPart.AccountID, *shadowPart.FunctionID)
+	if shadowPart.AccountID != nil && shadowPart.EnvID != nil && shadowPart.FunctionID != nil {
+		enableKeyQueues = q.AllowKeyQueues(ctx, *shadowPart.AccountID, *shadowPart.EnvID, *shadowPart.FunctionID)
 	}
 
 	// May need to normalize - this will not happen for default backlogs
