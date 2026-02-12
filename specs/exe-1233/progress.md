@@ -8,8 +8,8 @@
 
 - [x] 001-retry-attempt-badge
 - [x] 002-invoke-info-fields
-- [ ] 003-wait-info-matched-event ← Current
-- [ ] 004-userland-span-metadata
+- [x] 003-wait-info-matched-event
+- [ ] 004-userland-span-metadata ← Current
 - [ ] 005-step-op-and-debug-fields
 - [ ] 006-metadata-flag-and-verification
 
@@ -17,9 +17,10 @@
 
 - 001-retry-attempt-badge
 - 002-invoke-info-fields
+- 003-wait-info-matched-event
 
 ## Summary
 
 **Total Tasks**: 6
-**Completed**: 2
-**Progress**: 33%
+**Completed**: 3
+**Progress**: 50%

@@ -93,6 +93,7 @@ const SleepInfo = ({ stepInfo }: { stepInfo: StepInfoSleep }) => {
 };
 
 const WaitInfo = ({ stepInfo }: { stepInfo: StepInfoWait }) => {
+  const { pathCreator } = usePathCreator();
   const timeout = toMaybeDate(stepInfo.timeout);
   return (
     <>
@@ -105,6 +106,13 @@ const WaitInfo = ({ stepInfo }: { stepInfo: StepInfoWait }) => {
       <ElementWrapper label="Timed out">
         <TextElement>{maybeBooleanToString(stepInfo.timedOut)}</TextElement>
       </ElementWrapper>
+      {stepInfo.foundEventID && (
+        <ElementWrapper label="Matched Event ID">
+          <LinkElement href={pathCreator.eventPopout({ eventID: stepInfo.foundEventID })}>
+            {stepInfo.foundEventID}
+          </LinkElement>
+        </ElementWrapper>
+      )}
       <ElementWrapper className="w-full" label="Match expression">
         {stepInfo.expression ? (
           <CodeElement value={stepInfo.expression} />

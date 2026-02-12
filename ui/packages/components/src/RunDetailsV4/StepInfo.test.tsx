@@ -10,7 +10,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { TooltipProvider } from '../Tooltip/Tooltip';
 import { StepInfo } from './StepInfo';
-import type { Trace } from './types';
+import type { StepInfoWait, Trace } from './types';
 
 // jsdom doesn't provide ResizeObserver
 beforeAll(() => {
@@ -242,6 +242,45 @@ describe('InvokeInfo fields', () => {
       'Timed out',
       'Return Event ID',
     ];
+    for (const label of labels) {
+      expect(document.querySelector(`[data-label="${label}"]`)).toBeTruthy();
+    }
+  });
+});
+
+describe('WaitInfo fields', () => {
+  const waitStepInfo: StepInfoWait = {
+    eventName: 'test/event',
+    expression: 'event.data.id == async.data.id',
+    timeout: '2026-01-01T00:00:00Z',
+    foundEventID: '01MATCHED123',
+    timedOut: false,
+  };
+
+  it('renders Matched Event ID as link when foundEventID is non-null', () => {
+    const trace = makeTrace({ stepInfo: waitStepInfo });
+    renderStepInfo(trace);
+    const wrapper = document.querySelector('[data-label="Matched Event ID"]');
+    expect(wrapper).toBeTruthy();
+    const link = wrapper!.querySelector('a');
+    expect(link).toBeTruthy();
+    expect(link!.textContent).toContain('01MATCHED123');
+    expect(link!.getAttribute('href')).toBe('/events/01MATCHED123');
+  });
+
+  it('hides Matched Event ID when foundEventID is null', () => {
+    const trace = makeTrace({
+      stepInfo: { ...waitStepInfo, foundEventID: null },
+    });
+    renderStepInfo(trace);
+    const wrapper = document.querySelector('[data-label="Matched Event ID"]');
+    expect(wrapper).toBeNull();
+  });
+
+  it('renders existing WaitInfo fields', () => {
+    const trace = makeTrace({ stepInfo: waitStepInfo });
+    renderStepInfo(trace);
+    const labels = ['Event name', 'Timeout', 'Timed out', 'Match expression'];
     for (const label of labels) {
       expect(document.querySelector(`[data-label="${label}"]`)).toBeTruthy();
     }
