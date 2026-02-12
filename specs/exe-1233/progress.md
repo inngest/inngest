@@ -10,8 +10,8 @@
 - [x] 002-invoke-info-fields
 - [x] 003-wait-info-matched-event
 - [x] 004-userland-span-metadata
-- [ ] 005-step-op-and-debug-fields ← Current
-- [ ] 006-metadata-flag-and-verification
+- [x] 005-step-op-and-debug-fields
+- [ ] 006-metadata-flag-and-verification ← Current
 
 ## Completed
 
@@ -19,9 +19,10 @@
 - 002-invoke-info-fields
 - 003-wait-info-matched-event
 - 004-userland-span-metadata
+- 005-step-op-and-debug-fields
 
 ## Summary
 
 **Total Tasks**: 6
-**Completed**: 4
-**Progress**: 66%
+**Completed**: 5
+**Progress**: 83%

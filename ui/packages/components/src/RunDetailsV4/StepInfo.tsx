@@ -7,6 +7,7 @@ import { Button } from '../Button/Button';
 import {
   CodeElement,
   ElementWrapper,
+  IDElement,
   LinkElement,
   TextElement,
   TimeElement,
@@ -37,6 +38,15 @@ import {
   type StepInfoSleep,
   type StepInfoWait,
 } from './types';
+
+const STEP_OP_LABELS: Record<string, string> = {
+  RUN: 'step.run',
+  INVOKE: 'step.invoke',
+  SLEEP: 'step.sleep',
+  WAIT_FOR_EVENT: 'step.waitForEvent',
+  AI_GATEWAY: 'step.ai',
+  WAIT_FOR_SIGNAL: 'step.waitForSignal',
+};
 
 type StepKindInfoProps = {
   stepInfo: StepInfoType['trace']['stepInfo'];
@@ -290,7 +300,19 @@ export const StepInfo = ({
             <TextElement>{durationText}</TextElement>
           </ElementWrapper>
 
+          {trace.stepOp && (
+            <ElementWrapper label="Step Type">
+              <CodeElement value={STEP_OP_LABELS[trace.stepOp] ?? trace.stepOp} />
+            </ElementWrapper>
+          )}
+
           {stepKindInfo}
+
+          {debug && trace.debugRunID && (
+            <ElementWrapper label="Debug Run ID">
+              <IDElement>{trace.debugRunID}</IDElement>
+            </ElementWrapper>
+          )}
 
           {aiOutput && <AITrace aiOutput={aiOutput} />}
         </div>

@@ -4,8 +4,8 @@
 
 ## Continue ⏩
 
-### Well-Scoped Task Files with Embedded Code (x3)
-**What**: Tasks 002, 003, and 004 included exact current code, updated code, type definitions, and mock patterns — implementation was straightforward with no ambiguity
+### Well-Scoped Task Files with Embedded Code (x4)
+**What**: Tasks 002, 003, 004, and 005 included exact current code, updated code, type definitions, and mock patterns — implementation was straightforward with no ambiguity
 **Why**: No need to explore the codebase or read spec/plan files; task file was fully self-contained
 
 ### Using data-testid for Badge Assertions
@@ -20,8 +20,8 @@
 **What**: Updated `usePathCreator` mock from static values to parameterized functions and `LinkElement` mock to include `href` — backward-compatible with existing tests
 **Why**: Makes mocks realistic and testable without breaking prior tests; a pattern to follow for future mock updates
 
-### Reusing Existing Mock Infrastructure Across Tasks
-**What**: Task 003 required no new mocks — `usePathCreator` (with `eventPopout`), `LinkElement`, and all providers were already set up from tasks 001/002
+### Reusing Existing Mock Infrastructure Across Tasks (x2)
+**What**: Tasks 003 and 005 required minimal new mocks — only adding `IDElement` to the existing Element mock; all providers, hooks, and component mocks were already set up
 **Why**: Investing in parameterized, realistic mocks upfront pays off as subsequent tasks become trivially testable
 
 ### Avoiding External Imports Eliminates Mock Complexity

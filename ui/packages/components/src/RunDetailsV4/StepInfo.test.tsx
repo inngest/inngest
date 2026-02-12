@@ -45,6 +45,9 @@ vi.mock('../DetailsCard/Element', () => ({
   LinkElement: ({ children, href }: { children: React.ReactNode; href?: string }) => (
     <a href={href}>{children}</a>
   ),
+  IDElement: ({ children }: { children: React.ReactNode }) => (
+    <span data-testid="mock-id">{children}</span>
+  ),
   TextElement: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
   TimeElement: ({ date }: { date: Date }) => <time>{date.toISOString()}</time>,
 }));
@@ -128,10 +131,10 @@ function makeTrace(overrides: Partial<Trace> = {}): Trace {
   };
 }
 
-function renderStepInfo(trace: Trace) {
+function renderStepInfo(trace: Trace, { debug = false }: { debug?: boolean } = {}) {
   return render(
     <TooltipProvider>
-      <StepInfo selectedStep={{ trace, runID: 'run-1' }} />
+      <StepInfo selectedStep={{ trace, runID: 'run-1' }} debug={debug} />
     </TooltipProvider>
   );
 }
@@ -284,5 +287,67 @@ describe('WaitInfo fields', () => {
     for (const label of labels) {
       expect(document.querySelector(`[data-label="${label}"]`)).toBeTruthy();
     }
+  });
+});
+
+describe('Step operation type', () => {
+  it('renders SDK-style label for known stepOp', () => {
+    const trace = makeTrace({ stepOp: 'INVOKE' });
+    renderStepInfo(trace);
+    const wrapper = document.querySelector('[data-label="Step Type"]');
+    expect(wrapper).toBeTruthy();
+    expect(wrapper!.textContent).toBe('step.invoke');
+  });
+
+  it.each([
+    ['RUN', 'step.run'],
+    ['INVOKE', 'step.invoke'],
+    ['SLEEP', 'step.sleep'],
+    ['WAIT_FOR_EVENT', 'step.waitForEvent'],
+    ['AI_GATEWAY', 'step.ai'],
+    ['WAIT_FOR_SIGNAL', 'step.waitForSignal'],
+  ])('maps stepOp "%s" to label "%s"', (stepOp, expectedLabel) => {
+    const trace = makeTrace({ stepOp });
+    const { unmount } = renderStepInfo(trace);
+    const wrapper = document.querySelector('[data-label="Step Type"]');
+    expect(wrapper).toBeTruthy();
+    expect(wrapper!.textContent).toBe(expectedLabel);
+    unmount();
+  });
+
+  it('renders raw value for unknown stepOp', () => {
+    const trace = makeTrace({ stepOp: 'FUTURE_OP' });
+    renderStepInfo(trace);
+    const wrapper = document.querySelector('[data-label="Step Type"]');
+    expect(wrapper).toBeTruthy();
+    expect(wrapper!.textContent).toBe('FUTURE_OP');
+  });
+
+  it('hides Step Type when stepOp is null', () => {
+    const trace = makeTrace({ stepOp: null });
+    renderStepInfo(trace);
+    expect(document.querySelector('[data-label="Step Type"]')).toBeNull();
+  });
+});
+
+describe('Debug Run ID', () => {
+  it('renders when debug=true and debugRunID is non-null', () => {
+    const trace = makeTrace({ debugRunID: '01DEBUGRUNID123' });
+    renderStepInfo(trace, { debug: true });
+    const wrapper = document.querySelector('[data-label="Debug Run ID"]');
+    expect(wrapper).toBeTruthy();
+    expect(wrapper!.textContent).toBe('01DEBUGRUNID123');
+  });
+
+  it('hidden when debug=false', () => {
+    const trace = makeTrace({ debugRunID: '01DEBUGRUNID123' });
+    renderStepInfo(trace, { debug: false });
+    expect(document.querySelector('[data-label="Debug Run ID"]')).toBeNull();
+  });
+
+  it('hidden when debugRunID is null', () => {
+    const trace = makeTrace({ debugRunID: null });
+    renderStepInfo(trace, { debug: true });
+    expect(document.querySelector('[data-label="Debug Run ID"]')).toBeNull();
   });
 });
