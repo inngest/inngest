@@ -47,7 +47,17 @@ const InvokeInfo = ({ stepInfo }: { stepInfo: StepInfoInvoke }) => {
   const timeout = toMaybeDate(stepInfo.timeout);
   return (
     <>
-      <ElementWrapper label="Run">
+      <ElementWrapper label="Function">
+        <LinkElement href={pathCreator.function({ functionSlug: stepInfo.functionID })}>
+          {stepInfo.functionID}
+        </LinkElement>
+      </ElementWrapper>
+      <ElementWrapper label="Triggering Event ID">
+        <LinkElement href={pathCreator.eventPopout({ eventID: stepInfo.triggeringEventID })}>
+          {stepInfo.triggeringEventID}
+        </LinkElement>
+      </ElementWrapper>
+      <ElementWrapper label="Triggered Run ID">
         {stepInfo.runID ? (
           <LinkElement href={pathCreator.runPopout({ runID: stepInfo.runID })}>
             {stepInfo.runID}
@@ -62,6 +72,13 @@ const InvokeInfo = ({ stepInfo }: { stepInfo: StepInfoInvoke }) => {
       <ElementWrapper label="Timed out">
         <TextElement>{maybeBooleanToString(stepInfo.timedOut)}</TextElement>
       </ElementWrapper>
+      {stepInfo.returnEventID && (
+        <ElementWrapper label="Return Event ID">
+          <LinkElement href={pathCreator.eventPopout({ eventID: stepInfo.returnEventID })}>
+            {stepInfo.returnEventID}
+          </LinkElement>
+        </ElementWrapper>
+      )}
     </>
   );
 };

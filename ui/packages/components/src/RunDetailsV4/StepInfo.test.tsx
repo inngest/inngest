@@ -42,7 +42,9 @@ vi.mock('../DetailsCard/Element', () => ({
   ElementWrapper: ({ label, children }: { label: string; children: React.ReactNode }) => (
     <div data-label={label}>{children}</div>
   ),
-  LinkElement: ({ children }: { children: React.ReactNode }) => <a>{children}</a>,
+  LinkElement: ({ children, href }: { children: React.ReactNode; href?: string }) => (
+    <a href={href}>{children}</a>
+  ),
   TextElement: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
   TimeElement: ({ date }: { date: Date }) => <time>{date.toISOString()}</time>,
 }));
@@ -97,9 +99,9 @@ vi.mock('../SharedContext/useGetTraceResult', () => ({
 vi.mock('../SharedContext/usePathCreator', () => ({
   usePathCreator: () => ({
     pathCreator: {
-      runPopout: () => '/run/123',
-      function: () => '/fn/test',
-      eventPopout: () => '/event/123',
+      runPopout: ({ runID }: { runID: string }) => `/runs/${runID}`,
+      function: ({ functionSlug }: { functionSlug: string }) => `/functions/${functionSlug}`,
+      eventPopout: ({ eventID }: { eventID: string }) => `/events/${eventID}`,
     },
   }),
 }));
@@ -174,5 +176,74 @@ describe('StepInfo retry attempt badge', () => {
     const trace5 = makeTrace({ attempts: 5 });
     renderStepInfo(trace5);
     expect(screen.getByTestId('retry-attempt-badge').textContent).toContain('Attempt 6');
+  });
+});
+
+describe('InvokeInfo fields', () => {
+  const invokeStepInfo = {
+    triggeringEventID: '01ABC123TRIGGER',
+    functionID: 'my-app-send-email',
+    returnEventID: '01XYZ789RETURN',
+    runID: 'run-invoked-1',
+    timeout: '2026-06-01T00:00:00Z',
+    timedOut: false,
+  };
+
+  it('renders Function field as link with correct href', () => {
+    const trace = makeTrace({ stepInfo: invokeStepInfo });
+    renderStepInfo(trace);
+    const wrapper = document.querySelector('[data-label="Function"]');
+    expect(wrapper).toBeTruthy();
+    const link = wrapper!.querySelector('a');
+    expect(link).toBeTruthy();
+    expect(link!.textContent).toContain('my-app-send-email');
+    expect(link!.getAttribute('href')).toBe('/functions/my-app-send-email');
+  });
+
+  it('renders Triggering Event ID field as link with correct href', () => {
+    const trace = makeTrace({ stepInfo: invokeStepInfo });
+    renderStepInfo(trace);
+    const wrapper = document.querySelector('[data-label="Triggering Event ID"]');
+    expect(wrapper).toBeTruthy();
+    const link = wrapper!.querySelector('a');
+    expect(link).toBeTruthy();
+    expect(link!.textContent).toContain('01ABC123TRIGGER');
+    expect(link!.getAttribute('href')).toBe('/events/01ABC123TRIGGER');
+  });
+
+  it('renders Return Event ID field as link when non-null', () => {
+    const trace = makeTrace({ stepInfo: invokeStepInfo });
+    renderStepInfo(trace);
+    const wrapper = document.querySelector('[data-label="Return Event ID"]');
+    expect(wrapper).toBeTruthy();
+    const link = wrapper!.querySelector('a');
+    expect(link).toBeTruthy();
+    expect(link!.textContent).toContain('01XYZ789RETURN');
+    expect(link!.getAttribute('href')).toBe('/events/01XYZ789RETURN');
+  });
+
+  it('hides Return Event ID field when returnEventID is null', () => {
+    const trace = makeTrace({
+      stepInfo: { ...invokeStepInfo, returnEventID: null },
+    });
+    renderStepInfo(trace);
+    const wrapper = document.querySelector('[data-label="Return Event ID"]');
+    expect(wrapper).toBeNull();
+  });
+
+  it('renders all expected field labels in correct order', () => {
+    const trace = makeTrace({ stepInfo: invokeStepInfo });
+    renderStepInfo(trace);
+    const labels = [
+      'Function',
+      'Triggering Event ID',
+      'Triggered Run ID',
+      'Timeout',
+      'Timed out',
+      'Return Event ID',
+    ];
+    for (const label of labels) {
+      expect(document.querySelector(`[data-label="${label}"]`)).toBeTruthy();
+    }
   });
 });
