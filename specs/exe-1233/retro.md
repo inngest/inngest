@@ -4,8 +4,8 @@
 
 ## Continue ⏩
 
-### Well-Scoped Task Files with Embedded Code (x2)
-**What**: Tasks 002 and 003 included exact current code, updated code, type definitions, and mock patterns — implementation was straightforward with no ambiguity
+### Well-Scoped Task Files with Embedded Code (x3)
+**What**: Tasks 002, 003, and 004 included exact current code, updated code, type definitions, and mock patterns — implementation was straightforward with no ambiguity
 **Why**: No need to explore the codebase or read spec/plan files; task file was fully self-contained
 
 ### Using data-testid for Badge Assertions
@@ -23,6 +23,10 @@
 ### Reusing Existing Mock Infrastructure Across Tasks
 **What**: Task 003 required no new mocks — `usePathCreator` (with `eventPopout`), `LinkElement`, and all providers were already set up from tasks 001/002
 **Why**: Investing in parameterized, realistic mocks upfront pays off as subsequent tasks become trivially testable
+
+### Avoiding External Imports Eliminates Mock Complexity
+**What**: UserlandAttrs uses zero `@inngest/components/*` imports — an inline Tailwind badge for `spanKind` instead of `PillElement`, keeping the test file mock-free
+**Why**: No `vi.mock()` blocks needed at all, making tests trivially simple compared to StepInfo tests (12 mock blocks); test file is ~100 lines vs ~300+
 
 ## Start 🟢
 
