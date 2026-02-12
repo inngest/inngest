@@ -368,29 +368,33 @@ func (ab *appendBuffer) handleScheduling(result *BulkAppendResult, fn inngest.Fu
 
 	ctx := context.Background()
 
-	if result.Status == "new" || result.Status == "overflow" || result.Duplicates > 0 {
-		batchID := result.BatchID
-		status := "new"
-		if result.Status == "overflow" {
-			batchID = result.NextBatchID
-			status = "overflow_next"
-		}
-		if err := ab.scheduleBatchExecution(ctx, mgr, batchID, result, firstItem, fn, time.Now().Add(timeout), status); err != nil {
+	if result.Status == "new" || result.Duplicates > 0 {
+		// Schedule an execution after the batch timeout
+		if err := ab.scheduleBatchExecution(ctx, mgr, result.BatchID, result, firstItem, fn, time.Now().Add(timeout), "new"); err != nil {
 			return
 		}
 	}
 
-	if result.Status == "full" || result.Status == "maxsize" || result.Status == "overflow" {
-		status := result.Status
-		if result.Status == "overflow" {
-			status = "overflow_full"
-		}
+	if result.Status == "full" || result.Status == "maxsize" {
 		// Schedule immediate execution for the full batch
-		if err := ab.scheduleBatchExecution(ctx, mgr, result.BatchID, result, firstItem, fn, time.Now(), status); err != nil {
+		if err := ab.scheduleBatchExecution(ctx, mgr, result.BatchID, result, firstItem, fn, time.Now(), result.Status); err != nil {
 			return
 		}
 	}
-	// For "append", "itemexists" - no scheduling needed
+
+	if result.Status == "overflow" {
+		// Schedule immediate execution for the current full batch
+		if err := ab.scheduleBatchExecution(ctx, mgr, result.BatchID, result, firstItem, fn, time.Now(), "overflow_full"); err != nil {
+			return
+		}
+
+		// Schedule execution after timeout for the overflow batch
+		if err := ab.scheduleBatchExecution(ctx, mgr, result.NextBatchID, result, firstItem, fn, time.Now().Add(timeout), "overflow_next"); err != nil {
+			return
+		}
+	}
+
+	// For "append" where no duplicates are present, no action is needed
 	// The batch is already scheduled from when it was created
 }
 
