@@ -312,7 +312,7 @@ func TestLuaCompatibility(t *testing.T) {
 					queue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p queue.PartitionIdentifier) queue.PartitionConstraintConfig {
 						return constraints
 					}),
-					queue.WithAllowKeyQueues(func(ctx context.Context, acctID, fnID uuid.UUID) bool {
+					queue.WithAllowKeyQueues(func(ctx context.Context, acctID, envID, fnID uuid.UUID) bool {
 						return true
 					}),
 				}

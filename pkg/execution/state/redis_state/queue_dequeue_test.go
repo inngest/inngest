@@ -36,7 +36,7 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 		enqueueToBacklog := false
 		_, shard := newQueue(
 			t, rc,
-			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 				return enqueueToBacklog
 			}),
 			osqueue.WithClock(clock),
@@ -164,7 +164,7 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 			clock := clockwork.NewFakeClock()
 			_, shard := newQueue(
 				t, rc,
-				osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+				osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 					return enqueueToBacklog
 				}),
 				osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
@@ -312,7 +312,7 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 			clock := clockwork.NewFakeClock()
 			_, shard := newQueue(
 				t, rc,
-				osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+				osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 					return enqueueToBacklog
 				}),
 				osqueue.WithClock(clock),
@@ -438,7 +438,7 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 		clock := clockwork.NewFakeClock()
 		_, shard := newQueue(
 			t, rc,
-			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 				return enqueueToBacklog
 			}),
 			osqueue.WithClock(clock),
@@ -915,7 +915,7 @@ func TestQueueDequeueWithDisabledConstraintUpdates(t *testing.T) {
 	q, shard := newQueue(
 		t, rc,
 		osqueue.WithClock(clock),
-		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 			return true
 		}),
 	)

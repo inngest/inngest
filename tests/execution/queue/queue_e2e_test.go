@@ -56,7 +56,7 @@ func TestQueueE2E(t *testing.T) {
 						ShadowContinuations:               true,
 					},
 				),
-				queue.WithAllowKeyQueues(func(ctx context.Context, acctID, fnID uuid.UUID) bool {
+				queue.WithAllowKeyQueues(func(ctx context.Context, acctID, envID, fnID uuid.UUID) bool {
 					return false
 				}),
 				queue.WithPollTick(150 * time.Millisecond),
@@ -84,7 +84,7 @@ func TestQueueE2E(t *testing.T) {
 						ShadowContinuations:               true,
 					},
 				),
-				queue.WithAllowKeyQueues(func(ctx context.Context, acctID, fnID uuid.UUID) bool {
+				queue.WithAllowKeyQueues(func(ctx context.Context, acctID, envID, fnID uuid.UUID) bool {
 					return true
 				}),
 				queue.WithPollTick(150 * time.Millisecond),
@@ -112,7 +112,7 @@ func TestQueueE2E(t *testing.T) {
 						ShadowContinuations:               true,
 					},
 				),
-				queue.WithAllowKeyQueues(func(ctx context.Context, acctID, fnID uuid.UUID) bool {
+				queue.WithAllowKeyQueues(func(ctx context.Context, acctID, envID, fnID uuid.UUID) bool {
 					return true
 				}),
 				queue.WithPollTick(150 * time.Millisecond),
@@ -143,7 +143,7 @@ func TestQueueE2E(t *testing.T) {
 						ShadowContinuations:               true,
 					},
 				),
-				queue.WithAllowKeyQueues(func(ctx context.Context, acctID, fnID uuid.UUID) bool {
+				queue.WithAllowKeyQueues(func(ctx context.Context, acctID, envID, fnID uuid.UUID) bool {
 					return false
 				}),
 				queue.WithPollTick(150 * time.Millisecond),

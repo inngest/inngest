@@ -38,7 +38,7 @@ func (o QueueOptions) ItemEnableKeyQueues(ctx context.Context, item QueueItem) b
 	}
 
 	if item.Data.Identifier.AccountID != uuid.Nil && o.AllowKeyQueues != nil {
-		return o.AllowKeyQueues(ctx, item.Data.Identifier.AccountID, item.FunctionID)
+		return o.AllowKeyQueues(ctx, item.Data.Identifier.AccountID, item.Data.Identifier.WorkspaceID, item.FunctionID)
 	}
 
 	return false

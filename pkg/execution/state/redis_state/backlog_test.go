@@ -1159,7 +1159,7 @@ func TestBacklogsByPartition(t *testing.T) {
 
 			q, shard := newQueue(
 				t, rc,
-				osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+				osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 					return true
 				}),
 				osqueue.WithClock(clock),
@@ -1229,7 +1229,7 @@ func TestBacklogSize(t *testing.T) {
 				},
 			}
 		}),
-		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 			return true
 		}),
 	)
@@ -1290,7 +1290,7 @@ func TestPartitionBacklogSize(t *testing.T) {
 	clock := clockwork.NewFakeClock()
 
 	opts := []osqueue.QueueOpt{
-		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 			return true
 		}),
 		osqueue.WithClock(clock),
