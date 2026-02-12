@@ -74,7 +74,7 @@ describe('Timeline', () => {
 
       // Should show Inngest and SERVER timing rows
       expect(screen.getByText('Inngest')).toBeTruthy();
-      expect(screen.getByText('ACME CORP SERVER')).toBeTruthy();
+      expect(screen.getByText('Acme Corp server')).toBeTruthy();
     });
 
     it('uses TimelineBar for timing breakdown rows', async () => {
