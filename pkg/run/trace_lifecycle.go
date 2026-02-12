@@ -57,10 +57,9 @@ func (l traceLifecycle) OnStepScheduled(
 	}
 
 	_, span := NewSpan(ctx,
-		// Use OtelScopeStep (not OtelScopeExecution) to avoid being grouped with
-		// execution spans in the trace tree builder. OtelScopeExecution spans share
-		// a GroupID and are treated as retry "attempts" by processExecGroup — adding
-		// a QUEUED marker there inflates the attempt count and breaks OutputId resolution.
+		// Use OtelScopeStep so the tree builder filters this span out
+		// (it skips OtelScopeStep + OpcodeStepPlanned). Using OtelScopeExecution
+		// would bypass that filter and cause grouping issues in processExecGroup.
 		WithScope(consts.OtelScopeStep),
 		WithName(name),
 		WithTimestamp(time.Now()),
