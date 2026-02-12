@@ -17,7 +17,7 @@ export function useColumns(data?: InsightsFetchResult): { columns: Column[] } {
 
     return cols.map(
       (col): ColumnDef<InsightsEntry, InsightsColumnValue> => ({
-        accessorKey: `values.${col.name}`,
+        accessorFn: (row) => row.values[col.name],
         cell: ({ getValue }) => {
           const value = getValue();
 
