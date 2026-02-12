@@ -716,6 +716,28 @@ func TestExtractTypedValues(t *testing.T) {
 		assert.Equal(t, "StepRun", ev.StepOp.String())
 	})
 
+	// Test skip reason attribute
+	t.Run("skip reason attribute", func(t *testing.T) {
+		attrs := map[string]any{
+			"_inngest.run.skip_reason": "Singleton",
+		}
+		ev, err := ExtractTypedValues(context.Background(), attrs)
+		require.NoError(t, err)
+		assert.NotNil(t, ev.SkipReason)
+		assert.Equal(t, enums.SkipReasonSingleton, *ev.SkipReason)
+	})
+
+	// Test skip existing run ID attribute
+	t.Run("skip existing run id attribute", func(t *testing.T) {
+		attrs := map[string]any{
+			"_inngest.run.skip_existing_run_id": "01JXXXXXXXXXXXXXXXXXXXXXXXXX",
+		}
+		ev, err := ExtractTypedValues(context.Background(), attrs)
+		require.NoError(t, err)
+		assert.NotNil(t, ev.SkipExistingRunID)
+		assert.Equal(t, "01JXXXXXXXXXXXXXXXXXXXXXXXXX", *ev.SkipExistingRunID)
+	})
+
 	// Test JSON attributes (ResponseHeaders)
 	t.Run("JSON attributes", func(t *testing.T) {
 		headers := map[string][]string{

@@ -392,7 +392,8 @@ export enum FunctionRunStatus {
   Completed = 'COMPLETED',
   Failed = 'FAILED',
   Queued = 'QUEUED',
-  Running = 'RUNNING'
+  Running = 'RUNNING',
+  Skipped = 'SKIPPED',
 }
 
 export type FunctionRunV2 = {
@@ -813,6 +814,8 @@ export type RunTraceSpan = {
   queuedAt: Scalars['Time'];
   run: FunctionRun;
   runID: Scalars['ULID'];
+  skipExistingRunID: Maybe<Scalars['String']>;
+  skipReason: Maybe<Scalars['String']>;
   spanID: Scalars['String'];
   startedAt: Maybe<Scalars['Time']>;
   status: RunTraceSpanStatus;
@@ -837,7 +840,8 @@ export enum RunTraceSpanStatus {
   Failed = 'FAILED',
   Queued = 'QUEUED',
   Running = 'RUNNING',
-  Waiting = 'WAITING'
+  Skipped = 'SKIPPED',
+  Waiting = 'WAITING',
 }
 
 export type RunTraceTrigger = {
@@ -1222,8 +1226,26 @@ export type GetEventV2RunsQueryVariables = Exact<{
   eventID: Scalars['ULID'];
 }>;
 
-
-export type GetEventV2RunsQuery = { __typename?: 'Query', eventV2: { __typename?: 'EventV2', name: string, runs: Array<{ __typename?: 'FunctionRunV2', status: FunctionRunStatus, id: any, startedAt: any | null, endedAt: any | null, function: { __typename?: 'Function', name: string, slug: string } }> } };
+export type GetEventV2RunsQuery = {
+  __typename?: 'Query';
+  eventV2: {
+    __typename?: 'EventV2';
+    name: string;
+    runs: Array<{
+      __typename?: 'FunctionRunV2';
+      status: FunctionRunStatus;
+      id: any;
+      startedAt: any | null;
+      endedAt: any | null;
+      function: { __typename?: 'Function'; name: string; slug: string };
+      trace: {
+        __typename?: 'RunTraceSpan';
+        skipReason: string | null;
+        skipExistingRunID: string | null;
+      } | null;
+    }>;
+  };
+};
 
 export type CreateDebugSessionMutationVariables = Exact<{
   input: CreateDebugSessionInput;

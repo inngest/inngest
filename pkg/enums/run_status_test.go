@@ -66,9 +66,9 @@ func TestStepStatusToRunStatus(t *testing.T) {
 			want:       RunStatusCancelled,
 		},
 		{
-			name:       "StepStatusSkipped should map to RunStatusUnknown",
+			name:       "StepStatusSkipped should map to RunStatusSkipped",
 			stepStatus: StepStatusSkipped,
-			want:       RunStatusUnknown,
+			want:       RunStatusSkipped,
 		},
 		{
 			name:       "StepStatusUnknown should map to RunStatusUnknown",
