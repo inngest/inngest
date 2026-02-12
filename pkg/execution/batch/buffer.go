@@ -399,8 +399,10 @@ func (ab *appendBuffer) handleScheduling(result *BulkAppendResult, fn inngest.Fu
 		}
 
 		// Schedule execution after timeout for the overflow batch
-		if err := ab.scheduleBatchExecution(ctx, mgr, result.NextBatchID, result, firstItem, fn, time.Now().Add(timeout), "overflow_next"); err != nil {
-			return
+		if result.NextBatchID != "" {
+			if err := ab.scheduleBatchExecution(ctx, mgr, result.NextBatchID, result, firstItem, fn, time.Now().Add(timeout), "overflow_next"); err != nil {
+				return
+			}
 		}
 	}
 
