@@ -368,15 +368,25 @@ func (ab *appendBuffer) handleScheduling(result *BulkAppendResult, fn inngest.Fu
 
 	ctx := context.Background()
 
+	// For new batches, schedule an execution after the batch timeout.
+	//
+	// If there were duplicate events in the buffered batch, also schedule an execution after the batch timeout.
+	// This is necessary for cases where the first event in a new batch fails due to transient issues like i/o timeouts writing to redis,
+	// we might still write the event to a redis batch and return an error, which leads to not scheduling the batch for execution ever.
+	// This results in stuck batches.
+	//
+	// To avoid that, we always schedule the batch for execution when any of the events are duplicates.
+	// While this scheduling attempt is only required if the retried event was the first event in a new batch, it is hard to distinguish
+	// that case because we bulk append. So we just schedule a job every time there are _any_ duplicate elements in a batch.
+	// This is safe because batcher.ScheduleExecution is idempotent for a given batchID, so if a job already exists, the schedule call is a no-op.
 	if result.Status == "new" || result.Duplicates > 0 {
-		// Schedule an execution after the batch timeout
 		if err := ab.scheduleBatchExecution(ctx, mgr, result.BatchID, result, firstItem, fn, time.Now().Add(timeout), "new"); err != nil {
 			return
 		}
 	}
 
+	// Schedule immediate execution for the full batch
 	if result.Status == "full" || result.Status == "maxsize" {
-		// Schedule immediate execution for the full batch
 		if err := ab.scheduleBatchExecution(ctx, mgr, result.BatchID, result, firstItem, fn, time.Now(), result.Status); err != nil {
 			return
 		}
@@ -394,8 +404,7 @@ func (ab *appendBuffer) handleScheduling(result *BulkAppendResult, fn inngest.Fu
 		}
 	}
 
-	// For "append" where no duplicates are present, no action is needed
-	// The batch is already scheduled from when it was created
+	// For "append" where no duplicates are present, no action is needed. The batch was already scheduled from when it was created
 }
 
 // scheduleBatchExecution parses a batch ID, schedules execution, and emits metrics.
