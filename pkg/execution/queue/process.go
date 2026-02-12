@@ -11,6 +11,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/service"
+	"github.com/inngest/inngest/pkg/telemetry/conditional"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"go.opentelemetry.io/otel/attribute"
 )
@@ -22,6 +23,14 @@ func (q *queueProcessor) ProcessItem(
 ) error {
 	accountID, envID, fnID, runID := i.I.Data.Identifier.AccountID, i.I.Data.Identifier.WorkspaceID, i.I.Data.Identifier.WorkflowID, i.I.Data.Identifier.RunID
 
+	// Set up conditional observability context for feature flag evaluation
+	ctx = conditional.WithContext(ctx,
+		conditional.WithAccountID(accountID),
+		conditional.WithEnvID(envID),
+		conditional.WithFunctionID(fnID),
+		conditional.WithRunID(runID),
+	)
+
 	l := logger.StdlibLogger(ctx).With(
 		"item_id", i.I.ID,
 		"account_id", accountID,
@@ -29,6 +38,8 @@ func (q *queueProcessor) ProcessItem(
 		"fn_id", fnID,
 		"partition_id", i.P.ID,
 	)
+	// Store configured logger in context so scoped loggers can reuse its fields
+	ctx = logger.WithStdlib(ctx, l)
 
 	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.ProcessItem", accountID, envID)
 	defer span.End()
@@ -55,7 +66,6 @@ func (q *queueProcessor) ProcessItem(
 	defer extendLeaseTick.Stop()
 
 	capacityLeaseID := newCapacityLease(i.CapacityLease)
-	instrumentCapacityLease := i.CapacityLease != nil && q.EnableCapacityLeaseInstrumentation != nil && q.EnableCapacityLeaseInstrumentation(ctx, accountID, envID, fnID)
 
 	disableConstraintUpdates := i.DisableConstraintUpdates
 	extendCapacityLeaseTick := q.Clock().NewTicker(q.CapacityLeaseExtendInterval)
@@ -200,14 +210,12 @@ func (q *queueProcessor) ProcessItem(
 				}
 
 				// Record current + next lease if high-cardinality instrumentation is enabled
-				if instrumentCapacityLease {
-					l.Debug(
-						"extended capacity lease",
-						"last_extension", time.Since(lastCapacityLeaseExtension),
-						"lease_id", currentCapacityLease.String(),
-						"next_lease", res.LeaseID.String(),
-					)
-				}
+				conditional.Logger(ctx, "queue.CapacityLease").Debug(
+					"extended capacity lease",
+					"last_extension", time.Since(lastCapacityLeaseExtension),
+					"lease_id", currentCapacityLease.String(),
+					"next_lease", res.LeaseID.String(),
+				)
 
 				// Update capacity lease
 				capacityLeaseID.set(res.LeaseID)
@@ -311,8 +319,10 @@ func (q *queueProcessor) ProcessItem(
 			extendLeaseTick.Stop()
 			extendCapacityLeaseTick.Stop()
 
-			if leaseID := capacityLeaseID.get(); leaseID != nil && instrumentCapacityLease {
-				l.Debug("stopping lease extension", "lease_id", leaseID.String())
+			if leaseID := capacityLeaseID.get(); leaseID != nil {
+				conditional.Logger(ctx, "queue.CapacityLease").Debug(
+					"stopping lease extension", "lease_id", leaseID.String(),
+				)
 			}
 		}
 
@@ -374,13 +384,11 @@ func (q *queueProcessor) ProcessItem(
 				return
 			}
 
-			if instrumentCapacityLease {
-				l.Debug(
-					"released capacity lease",
-					"res", res,
-					"lease_id", currentLeaseID.String(),
-				)
-			}
+			conditional.Logger(ctx, "queue.CapacityLease").Debug(
+				"released capacity lease",
+				"res", res,
+				"lease_id", currentLeaseID.String(),
+			)
 		})
 	}
 

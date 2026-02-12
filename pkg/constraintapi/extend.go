@@ -6,8 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/telemetry/conditional"
 	"github.com/inngest/inngest/pkg/util/errs"
 	"github.com/oklog/ulid/v2"
 )
@@ -20,6 +20,11 @@ type extendLeaseScriptResponse struct {
 
 // ExtendLease implements CapacityManager.
 func (r *redisCapacityManager) ExtendLease(ctx context.Context, req *CapacityExtendLeaseRequest) (*CapacityExtendLeaseResponse, errs.InternalError) {
+	// Set up conditional observability context for feature flag evaluation
+	ctx = conditional.WithContext(ctx,
+		conditional.WithAccountID(req.AccountID),
+	)
+
 	l := logger.StdlibLogger(ctx)
 
 	// Validate request
@@ -33,6 +38,8 @@ func (r *redisCapacityManager) ExtendLease(ctx context.Context, req *CapacityExt
 		"source", req.Source,
 		"migration", req.Migration,
 	)
+	// Store configured logger in context so scoped loggers can reuse its fields
+	ctx = logger.WithStdlib(ctx, l)
 
 	now := r.clock.Now()
 
@@ -122,9 +129,7 @@ func (r *redisCapacityManager) ExtendLease(ctx context.Context, req *CapacityExt
 		// TODO: Track status (1: cleaned up, 2: cleaned up or lease superseded, 3: lease expired)
 		return res, nil
 	case 4:
-		if r.enableHighCardinalityInstrumentation != nil && r.enableHighCardinalityInstrumentation(ctx, req.AccountID, uuid.Nil, uuid.Nil) {
-			l.Debug("lease extended")
-		}
+		conditional.Logger(ctx, "constraintapi.ExtendLease").Debug("lease extended")
 
 		if len(r.lifecycles) > 0 {
 			for _, hook := range r.lifecycles {

@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/telemetry/conditional"
 	"github.com/inngest/inngest/pkg/util/errs"
 )
 
@@ -34,6 +34,11 @@ type releaseScriptResponse struct {
 
 // Release implements CapacityManager.
 func (r *redisCapacityManager) Release(ctx context.Context, req *CapacityReleaseRequest) (*CapacityReleaseResponse, errs.InternalError) {
+	// Set up conditional observability context for feature flag evaluation
+	ctx = conditional.WithContext(ctx,
+		conditional.WithAccountID(req.AccountID),
+	)
+
 	l := logger.StdlibLogger(ctx)
 
 	// Validate request
@@ -47,6 +52,8 @@ func (r *redisCapacityManager) Release(ctx context.Context, req *CapacityRelease
 		"source", req.Source,
 		"migration", req.Migration,
 	)
+	// Store configured logger in context so scoped loggers can reuse its fields
+	ctx = logger.WithStdlib(ctx, l)
 
 	// Retrieve client and key prefix for current constraints
 	// NOTE: We will no longer need this once we move to a dedicated store for constraint state
@@ -149,9 +156,7 @@ func (r *redisCapacityManager) Release(ctx context.Context, req *CapacityRelease
 		// TODO: Track status (1: cleaned up, 2: cleaned up)
 		return res, nil
 	case 3:
-		if r.enableHighCardinalityInstrumentation != nil && r.enableHighCardinalityInstrumentation(ctx, req.AccountID, uuid.Nil, uuid.Nil) {
-			l.Debug("capacity released")
-		}
+		conditional.Logger(ctx, "constraintapi.Release").Debug("capacity released")
 
 		if len(r.lifecycles) > 0 {
 			for _, hook := range r.lifecycles {

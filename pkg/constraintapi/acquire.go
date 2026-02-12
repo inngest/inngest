@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/telemetry/conditional"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/inngest/inngest/pkg/util/errs"
@@ -169,6 +170,13 @@ type acquireScriptResponse struct {
 }
 
 func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquireRequest) (*CapacityAcquireResponse, errs.InternalError) {
+	// Set up conditional observability context for feature flag evaluation
+	ctx = conditional.WithContext(ctx,
+		conditional.WithAccountID(req.AccountID),
+		conditional.WithEnvID(req.EnvID),
+		conditional.WithFunctionID(req.FunctionID),
+	)
+
 	l := logger.StdlibLogger(ctx)
 
 	requestID, err := ulid.New(ulid.Timestamp(r.clock.Now()), rand.Reader)
@@ -189,6 +197,8 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 		"source", req.Source,
 		"migration", req.Migration,
 	)
+	// Store configured logger in context so scoped loggers can reuse its fields
+	ctx = logger.WithStdlib(ctx, l)
 
 	now := r.clock.Now()
 
@@ -213,8 +223,6 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 			"exceeded maximum allowed request delay, latency: %s, attempt: %d", requestLatency, req.RequestAttempt,
 		)
 	}
-
-	enableHighCardinalityInstrumentation := r.enableHighCardinalityInstrumentation != nil && r.enableHighCardinalityInstrumentation(ctx, req.AccountID, req.EnvID, req.FunctionID)
 
 	// Retrieve client and key prefix for current constraints
 	// NOTE: We will no longer need this once we move to a dedicated store for constraint state
@@ -400,7 +408,7 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 	)
 
 	tags := make(map[string]any)
-	if enableHighCardinalityInstrumentation {
+	if conditional.IsMetricsEnabled(ctx, "constraintapi.Acquire") {
 		tags["function_id"] = req.FunctionID
 	}
 
@@ -437,12 +445,10 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 
 	switch parsedResponse.Status {
 	case 1, 3:
-		if enableHighCardinalityInstrumentation {
-			l.Debug(
-				"successful acquire call",
-				"leases", leases,
-			)
-		}
+		conditional.Logger(ctx, "constraintapi.Acquire").Debug(
+			"successful acquire call",
+			"leases", leases,
+		)
 
 		metrics.HistogramConstraintAPIRequestStateSize(ctx, int64(len(requestState)), metrics.HistogramOpt{
 			PkgName: pkgName,

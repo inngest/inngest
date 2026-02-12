@@ -20,6 +20,32 @@ var (
 	registry = newRegistry()
 )
 
+// ConditionalCheckFn is a function that checks if metrics recording should be enabled.
+// It receives the context and returns false if metrics should be skipped.
+// This is set by the conditional package to enable context-based conditional metrics.
+type ConditionalCheckFn func(ctx context.Context) bool
+
+var (
+	conditionalCheckFn ConditionalCheckFn
+	conditionalCheckMu sync.RWMutex
+)
+
+// RegisterConditionalCheck registers a function that will be called by all Record metric functions
+// to determine if metrics should be recorded. This is used by the conditional
+// package to integrate scope-based metrics.
+func RegisterConditionalCheck(fn ConditionalCheckFn) {
+	conditionalCheckMu.Lock()
+	defer conditionalCheckMu.Unlock()
+	conditionalCheckFn = fn
+}
+
+// getConditionalCheck returns the registered conditional check function.
+func getConditionalCheck() ConditionalCheckFn {
+	conditionalCheckMu.RLock()
+	defer conditionalCheckMu.RUnlock()
+	return conditionalCheckFn
+}
+
 //
 // NOTE:
 // Most of these maps probably can be done with generics.
@@ -79,8 +105,19 @@ type CounterOpt struct {
 }
 
 // RecordCounterMetric increments the counter by the provided value.
-// The meter used can either be passed in or is the global meter
+// The meter used can either be passed in or is the global meter.
+//
+// If a conditional check function has been registered (via RegisterConditionalCheck)
+// and the context has a conditional scope set, the metric will be skipped if
+// disabled for that scope.
 func RecordCounterMetric(ctx context.Context, incr int64, opts CounterOpt) {
+	// Check for conditional scope in context
+	if fn := getConditionalCheck(); fn != nil {
+		if !fn(ctx) {
+			return
+		}
+	}
+
 	attrs := []attribute.KeyValue{}
 	if opts.Tags != nil {
 		attrs = append(attrs, parseAttributes(ctx, opts.Tags)...)
@@ -97,6 +134,13 @@ func RecordCounterMetric(ctx context.Context, incr int64, opts CounterOpt) {
 }
 
 func RecordUpDownCounterMetric(ctx context.Context, val int64, opts CounterOpt) {
+	// Check for conditional scope in context
+	if fn := getConditionalCheck(); fn != nil {
+		if !fn(ctx) {
+			return
+		}
+	}
+
 	attrs := []attribute.KeyValue{}
 	if opts.Tags != nil {
 		attrs = append(attrs, parseAttributes(ctx, opts.Tags)...)
@@ -176,6 +220,13 @@ func RegisterAsyncGauge(ctx context.Context, opts GaugeOpt) {
 }
 
 func RecordGaugeMetric(ctx context.Context, val int64, opts GaugeOpt) {
+	// Check for conditional scope in context
+	if fn := getConditionalCheck(); fn != nil {
+		if !fn(ctx) {
+			return
+		}
+	}
+
 	attrs := []attribute.KeyValue{}
 	if opts.Tags != nil {
 		attrs = append(attrs, parseAttributes(ctx, opts.Tags)...)
@@ -226,8 +277,19 @@ type HistogramOpt struct {
 }
 
 // RecordIntHistogramMetric records the observed value for distributions.
-// Bucket can be provided
+// Bucket can be provided.
+//
+// If a conditional check function has been registered (via RegisterConditionalCheck)
+// and the context has a conditional scope set, the metric will be skipped if
+// disabled for that scope.
 func RecordIntHistogramMetric(ctx context.Context, value int64, opts HistogramOpt) {
+	// Check for conditional scope in context
+	if fn := getConditionalCheck(); fn != nil {
+		if !fn(ctx) {
+			return
+		}
+	}
+
 	metricName := fmt.Sprintf("%s_%s", prefix, opts.MetricName)
 	h, err := registry.getHistogram(ctx, opts)
 	if err != nil {
