@@ -899,6 +899,15 @@ func IncrConstraintAPIExhaustedConstraintsCounter(ctx context.Context, opts Coun
 	})
 }
 
+func IncrShardLeaseContentionCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "shard_lease_contention_total",
+		Description: "The total number of times contention occurred for shard leasing",
+		Tags:        opts.Tags,
+	})
+}
+
 func IncrConstraintAPIIssuedLeaseCounter(ctx context.Context, count int64, opts CounterOpt) {
 	if opts.Tags == nil {
 		opts.Tags = map[string]any{}
