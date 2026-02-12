@@ -82,10 +82,16 @@ func (q *queueProcessor) tryClaimShardLease(ctx context.Context, shards []QueueS
 
 	// Try to get a lease on one of them
 	for _, shard := range shards {
-		leaseID, err := shard.ShardLease(ctx, "shard-group-"+q.runMode.ShardGroup, ShardLeaseDuration, shard.ShardAssignmentConfig().NumExecutors, nil)
+		maxExecutors := shard.ShardAssignmentConfig().NumExecutors
+		if maxExecutors <= 0 {
+			l.Debug("no executor capacity requested, skipping shard lease", "shard", shard.Name())
+			continue
+		}
+		leaseID, err := shard.ShardLease(ctx, "shard-group-"+q.runMode.ShardGroup, ShardLeaseDuration, maxExecutors, nil)
 
 		if err == ErrAllShardsAlreadyLeased {
 			l.Warn("Could not get a shard lease", "shard", shard.Name())
+			metrics.IncrShardLeaseContentionCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"shard_group": q.runMode.ShardGroup, "queue_shard": shard.Name()}})
 			continue
 		}
 		if err != nil {
