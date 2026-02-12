@@ -117,8 +117,8 @@ func TestQueueE2E(t *testing.T) {
 				}),
 				queue.WithPollTick(150 * time.Millisecond),
 			},
-			useConstraintAPI: func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
-				return true, true
+			useConstraintAPI: func(ctx context.Context, accountID uuid.UUID) (enable bool) {
+				return true
 			},
 		},
 		{
@@ -148,8 +148,8 @@ func TestQueueE2E(t *testing.T) {
 				}),
 				queue.WithPollTick(150 * time.Millisecond),
 			},
-			useConstraintAPI: func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
-				return true, true
+			useConstraintAPI: func(ctx context.Context, accountID uuid.UUID) (enable bool) {
+				return true
 			},
 		},
 	}
@@ -208,20 +208,23 @@ func TestQueueE2E(t *testing.T) {
 			options := append([]queue.QueueOpt{
 				queue.WithClock(clock),
 				queue.WithConditionalTracer(tracer),
+				queue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p queue.PartitionIdentifier) queue.PartitionConstraintConfig {
+					return queue.PartitionConstraintConfig{
+						FunctionVersion: 1,
+						Concurrency: queue.PartitionConcurrency{
+							SystemConcurrency:   consts.DefaultConcurrencyLimit,
+							AccountConcurrency:  consts.DefaultConcurrencyLimit,
+							FunctionConcurrency: consts.DefaultConcurrencyLimit,
+						},
+					}
+				}),
 			}, tc.queueOptions...)
 
-			queueClient := redis_state.NewQueueClient(rc, redis_state.QueueDefaultKey)
-			shard := redis_state.NewQueueShard("test", queueClient, options...)
-
 			cm, err := constraintapi.NewRedisCapacityManager(
+				constraintapi.WithClient(rc),
+				constraintapi.WithShardName("test"),
 				constraintapi.WithClock(clock),
 				constraintapi.WithEnableDebugLogs(true),
-				constraintapi.WithQueueShards(map[string]rueidis.Client{
-					shard.Name(): shard.Client().Client(),
-				}),
-				constraintapi.WithQueueStateKeyPrefix(redis_state.QueueDefaultKey),
-				constraintapi.WithRateLimitClient(rc),
-				constraintapi.WithRateLimitKeyPrefix("rl"),
 			)
 			require.NoError(t, err)
 
@@ -231,6 +234,9 @@ func TestQueueE2E(t *testing.T) {
 					queue.WithUseConstraintAPI(tc.useConstraintAPI),
 				)
 			}
+
+			queueClient := redis_state.NewQueueClient(rc, redis_state.QueueDefaultKey)
+			shard := redis_state.NewQueueShard("test", queueClient, options...)
 
 			q, err := queue.New(ctx, "test", shard, nil, nil, options...)
 			require.NoError(t, err)

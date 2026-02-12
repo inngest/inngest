@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
@@ -70,18 +71,22 @@ func (q *queueProcessor) ProcessShadowPartition(ctx context.Context, shadowPart 
 		if info.Paused {
 			q.removeShadowContinue(ctx, shadowPart, false)
 
-			if !info.Stale {
-				forceRequeueAt := q.Clock().Now().Add(ShadowPartitionRefillPausedRequeueExtension)
-				_, err := DurationWithTags(ctx, shard.Name(), durOpShadowPartitionRequeue, q.Clock().Now(), func(ctx context.Context) (any, error) {
-					err := q.primaryQueueShard.ShadowPartitionRequeue(ctx, shadowPart, &forceRequeueAt)
-					return nil, err
-				}, map[string]any{"reason": "paused"})
-				switch err {
-				case nil, ErrShadowPartitionNotFound:
-					return nil
-				default:
-					return fmt.Errorf("could not requeue shadow partition: %w", err)
-				}
+			// Paused status was returned from cache, we don't know if it's safe to requeue for an extended time
+			if info.Stale {
+				return nil
+			}
+
+			// We freshly read from the database and know the function is currently paused, requeue 5m into the future
+			forceRequeueAt := q.Clock().Now().Add(ShadowPartitionRefillPausedRequeueExtension)
+			_, err := DurationWithTags(ctx, shard.Name(), durOpShadowPartitionRequeue, q.Clock().Now(), func(ctx context.Context) (any, error) {
+				err := q.primaryQueueShard.ShadowPartitionRequeue(ctx, shadowPart, &forceRequeueAt)
+				return nil, err
+			}, map[string]any{"reason": "paused"})
+			switch err {
+			case nil, ErrShadowPartitionNotFound:
+				return nil
+			default:
+				return fmt.Errorf("could not requeue shadow partition: %w", err)
 			}
 		}
 	}
@@ -433,6 +438,12 @@ func (q *queueProcessor) ProcessShadowPartitionBacklog(
 		refillLimit = BacklogRefillHardLimit
 	}
 
+	// Limit backlog peek to maximum lease generation
+	// TODO: Run multiple requests, etc. to balance peek size and throughput
+	if shadowPart.AccountID != nil && q.UseConstraintAPI != nil && q.UseConstraintAPI(ctx, *shadowPart.AccountID) {
+		refillLimit = constraintapi.MaximumAmount
+	}
+
 	// Peek items (scheduled to run within the next 2s) to be refilled.
 	//
 	// Peek will delete missing items at the time of peeking.
@@ -461,9 +472,11 @@ func (q *queueProcessor) ProcessShadowPartitionBacklog(
 	now := q.Clock().Now()
 	operationIdempotencyKey := fmt.Sprintf("%s-%d", backlog.BacklogID, now.UnixMilli())
 
-	constraintCheckRes, err := q.primaryQueueShard.BacklogRefillConstraintCheck(ctx, shadowPart, backlog, constraints, items, operationIdempotencyKey, now)
+	constraintCheckRes, err := q.BacklogRefillConstraintCheck(ctx, shadowPart, backlog, constraints, items, operationIdempotencyKey, now)
 	if err != nil {
-		return nil, false, fmt.Errorf("could not check constraints for backlogRefill: %w", err)
+		// Do not pass on error further, we want to prevent quitting the queue
+		l.ReportError(err, "could not check constraints for backlogRefill")
+		return nil, false, nil
 	}
 
 	// In case the Constraint API determines no work can happen right now, we will report the limit

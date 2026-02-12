@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/util/errs"
 	"github.com/oklog/ulid/v2"
 )
@@ -15,54 +14,6 @@ type CapacityManager interface {
 	Acquire(ctx context.Context, req *CapacityAcquireRequest) (*CapacityAcquireResponse, errs.InternalError)
 	ExtendLease(ctx context.Context, req *CapacityExtendLeaseRequest) (*CapacityExtendLeaseResponse, errs.InternalError)
 	Release(ctx context.Context, req *CapacityReleaseRequest) (*CapacityReleaseResponse, errs.InternalError)
-}
-
-type RolloutKeyGenerator interface {
-	KeyInProgressLeasesAccount(accountID uuid.UUID) string
-	KeyInProgressLeasesFunction(accountID uuid.UUID, fnID uuid.UUID) string
-	KeyInProgressLeasesCustom(accountID uuid.UUID, scope enums.ConcurrencyScope, entityID uuid.UUID, keyExpressionHash, evaluatedKeyHash string) string
-	KeyConstraintCheckIdempotency(mi MigrationIdentifier, accountID uuid.UUID, leaseIdempotencyKey string) string
-}
-
-type RolloutManager interface {
-	CapacityManager
-	RolloutKeyGenerator
-}
-
-type wrappedManager struct {
-	CapacityManager
-	keyGenerator
-}
-
-func NewRolloutManager(cm CapacityManager, queueStatePrefix string, rateLimitPrefix string) RolloutManager {
-	return &wrappedManager{
-		keyGenerator: keyGenerator{
-			rateLimitKeyPrefix:  rateLimitPrefix,
-			queueStateKeyPrefix: queueStatePrefix,
-		},
-		CapacityManager: cm,
-	}
-}
-
-// MigrationIdentifier includes hints for the Constraint API which will be removed
-// once all constraint state is moved to a dedicated data store
-//
-// While we can infer the target data store from the contraint, we only send constraints
-// during the Acquire call. Sharing the same migration identifier simplifies this.
-type MigrationIdentifier struct {
-	// IsRateLimit specifies whether the request is linked to a rate limit constraint vs.
-	// queue constraints.
-	//
-	// This is only necessary until constraint state is migrated to a dedicated data store in a later milestone.
-	IsRateLimit bool
-	QueueShard  string
-}
-
-func (m MigrationIdentifier) String() string {
-	if m.QueueShard != "" {
-		return m.QueueShard
-	}
-	return "rate_limit"
 }
 
 type CapacityCheckRequest struct {
@@ -92,8 +43,6 @@ type CapacityCheckRequest struct {
 	//
 	// This design assumes that the other side _knows_ the current constraint.
 	Constraints []ConstraintItem
-
-	Migration MigrationIdentifier
 }
 
 type CapacityCheckResponse struct {
@@ -195,8 +144,6 @@ type CapacityAcquireRequest struct {
 	// Source includes information on the calling service and processing mode for instrumentation purposes and to enforce fairness/avoid starvation.
 	Source LeaseSource
 
-	Migration MigrationIdentifier
-
 	// RequestAttempt is the current request attempt. For retries, this should be > 0.
 	// This is mainly used for instrumentation.
 	RequestAttempt int
@@ -256,8 +203,6 @@ type CapacityExtendLeaseRequest struct {
 
 	Duration time.Duration
 
-	Migration MigrationIdentifier
-
 	// Source includes information on the calling service and processing mode for instrumentation purposes.
 	Source LeaseSource
 
@@ -281,8 +226,6 @@ type CapacityReleaseRequest struct {
 
 	// LeaseID is the current lease ID
 	LeaseID ulid.ULID
-
-	Migration MigrationIdentifier
 
 	// Source includes information on the calling service and processing mode for instrumentation purposes.
 	Source LeaseSource
@@ -392,6 +335,6 @@ type LeaseSource struct {
 	RunProcessingMode RunProcessingMode
 }
 
-type UseConstraintAPIFn func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool)
+type UseConstraintAPIFn func(ctx context.Context, accountID uuid.UUID) (enable bool)
 
 type EnableHighCardinalityInstrumentation func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool)

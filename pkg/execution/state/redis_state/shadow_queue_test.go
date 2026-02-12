@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
-	"strconv"
 	"testing"
 	"time"
 
@@ -2339,7 +2338,6 @@ func TestBacklogRefillWithDisabledConstraintChecks(t *testing.T) {
 	}
 
 	var cm constraintapi.CapacityManager = &testRolloutManager{}
-	rolloutManager := constraintapi.NewRolloutManager(cm, QueueDefaultKey, "rl")
 
 	_, shard := newQueue(
 		t, rc,
@@ -2347,10 +2345,10 @@ func TestBacklogRefillWithDisabledConstraintChecks(t *testing.T) {
 		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 			return true
 		}),
-		osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
-			return true, true
+		osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
+			return true
 		}),
-		osqueue.WithCapacityManager(rolloutManager),
+		osqueue.WithCapacityManager(cm),
 		osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
 			return constraints
 		}),
@@ -2409,32 +2407,6 @@ func TestBacklogRefillWithDisabledConstraintChecks(t *testing.T) {
 	require.Equal(t, 0, res.Capacity)
 	require.Equal(t, 0, res.Refilled)
 	require.Equal(t, enums.QueueConstraintThrottle, res.Constraint)
-
-	// Set idempotency key
-	idempotencyKey := "random string for backlog operation"
-	keyConstraintCheckIdempotency := rolloutManager.KeyConstraintCheckIdempotency(constraintapi.MigrationIdentifier{
-		QueueShard: shard.Name(),
-	}, accountID, idempotencyKey)
-
-	err = r.Set(keyConstraintCheckIdempotency, strconv.Itoa(int(clock.Now().UnixMilli())))
-	require.NoError(t, err)
-
-	// Refill with idempotency should work
-	res, err = shard.BacklogRefill(
-		ctx,
-		&backlog,
-		&shadowPart,
-		clock.Now().Add(time.Minute),
-		[]string{item2.ID},
-		constraints,
-		osqueue.WithBacklogRefillDisableConstraintChecks(false),
-		osqueue.WithBacklogRefillConstraintCheckIdempotencyKey(idempotencyKey),
-	)
-	require.NoError(t, err)
-	require.Equal(t, 1, res.Refill)
-	require.Equal(t, 4, res.Capacity) // function concurrency is limiting constraint
-	require.Equal(t, 1, res.Refilled)
-	require.Equal(t, []string{item2.ID}, res.RefilledItems)
 
 	// Refill with ignoring checks should work
 	res, err = shard.BacklogRefill(

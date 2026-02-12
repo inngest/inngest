@@ -45,14 +45,10 @@ func TestQueueSemaphoreWithConstraintAPI(t *testing.T) {
 
 	cmLifecycles := constraintapi.NewConstraintAPIDebugLifecycles()
 	cm, err := constraintapi.NewRedisCapacityManager(
+		constraintapi.WithClient(rc),
+		constraintapi.WithShardName("test"),
 		constraintapi.WithClock(clock),
 		constraintapi.WithEnableDebugLogs(true),
-		constraintapi.WithQueueShards(map[string]rueidis.Client{
-			"test": queueClient.Client(),
-		}),
-		constraintapi.WithQueueStateKeyPrefix(redis_state.QueueDefaultKey),
-		constraintapi.WithRateLimitClient(rc),
-		constraintapi.WithRateLimitKeyPrefix("rl"),
 		constraintapi.WithLifecycles(cmLifecycles),
 	)
 	require.NoError(t, err)
@@ -62,8 +58,8 @@ func TestQueueSemaphoreWithConstraintAPI(t *testing.T) {
 
 		// Use Constraint API
 		queue.WithCapacityManager(cm),
-		queue.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
-			return true, true
+		queue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
+			return true
 		}),
 
 		// Simulate a limit of 1
@@ -329,11 +325,9 @@ func TestQueueSemaphore(t *testing.T) {
 
 		{
 			name: "when Constraint API call fails, should release semaphore",
-			enableConstraintAPI: func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
-				// NOTE: Disable fallback to surface Acquire error to Process()
-				// If we returned true, true, we would simply move on to Lease
-				// for graceful fallbacking
-				return true, false
+			enableConstraintAPI: func(ctx context.Context, accountID uuid.UUID) (enable bool) {
+				// Constraint API enabled with fail-hard behavior
+				return true
 			},
 			useFailingCapacityManager: true,
 			config: queue.PartitionConstraintConfig{
@@ -383,8 +377,8 @@ func TestQueueSemaphore(t *testing.T) {
 		},
 		{
 			name: "when limited by Constraint API, should release semaphore",
-			enableConstraintAPI: func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
-				return true, true
+			enableConstraintAPI: func(ctx context.Context, accountID uuid.UUID) (enable bool) {
+				return true
 			},
 			config: queue.PartitionConstraintConfig{
 				FunctionVersion: 1,
@@ -506,8 +500,8 @@ func TestQueueSemaphore(t *testing.T) {
 		},
 		{
 			name: "when lease encounters concurrency limits, should free semaphore",
-			enableConstraintAPI: func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
-				return false, false
+			enableConstraintAPI: func(ctx context.Context, accountID uuid.UUID) (enable bool) {
+				return false
 			},
 			config: queue.PartitionConstraintConfig{
 				FunctionVersion: 1,
@@ -601,27 +595,20 @@ func TestQueueSemaphore(t *testing.T) {
 
 			cmLifecycles := constraintapi.NewConstraintAPIDebugLifecycles()
 
-			var cm constraintapi.RolloutManager
-			cm, err = constraintapi.NewRedisCapacityManager(
-				constraintapi.WithClock(clock),
-				constraintapi.WithEnableDebugLogs(true),
-				constraintapi.WithQueueShards(map[string]rueidis.Client{
-					"test": queueClient.Client(),
-				}),
-				constraintapi.WithQueueStateKeyPrefix(redis_state.QueueDefaultKey),
-				constraintapi.WithRateLimitClient(rc),
-				constraintapi.WithRateLimitKeyPrefix("rl"),
-				constraintapi.WithLifecycles(cmLifecycles),
-			)
-			require.NoError(t, err)
-
+			var cm constraintapi.CapacityManager
 			var failingAcquireCallCounter int64
 
 			if tc.useFailingCapacityManager {
-				cm = constraintapi.NewRolloutManager(
-					newFailingCapacityManager(&failingAcquireCallCounter),
-					redis_state.QueueDefaultKey, "rl",
+				cm = newFailingCapacityManager(&failingAcquireCallCounter)
+			} else {
+				cm, err = constraintapi.NewRedisCapacityManager(
+					constraintapi.WithClient(rc),
+					constraintapi.WithShardName("test"),
+					constraintapi.WithClock(clock),
+					constraintapi.WithEnableDebugLogs(true),
+					constraintapi.WithLifecycles(cmLifecycles),
 				)
+				require.NoError(t, err)
 			}
 
 			if tc.numWorkers == 0 {
