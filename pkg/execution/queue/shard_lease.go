@@ -168,7 +168,7 @@ func (q *queueProcessor) renewShardLease(ctx context.Context) {
 				q.shardLeaseLock.Lock()
 				q.shardLeaseID = newLeaseID
 				q.shardLeaseLock.Unlock()
-				l.Info("Successfully renewed lease", "old_lease", leaseID, "new_lease", newLeaseID)
+				l.Trace("Successfully renewed lease", "old_lease", leaseID, "new_lease", newLeaseID)
 			}
 		}
 	}
