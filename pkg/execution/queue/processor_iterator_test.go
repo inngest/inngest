@@ -269,6 +269,10 @@ func (m *mockShardForIterator) BacklogSize(ctx context.Context, backlogID string
 	return 0, nil
 }
 
+func (m *mockShardForIterator) BacklogByID(ctx context.Context, backlogID string) (*QueueBacklog, error) {
+	return nil, nil
+}
+
 func (m *mockShardForIterator) PeekShadowPartitions(ctx context.Context, accountID *uuid.UUID, sequential bool, peekLimit int64, until time.Time) ([]*QueueShadowPartition, error) {
 	return nil, nil
 }

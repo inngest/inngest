@@ -220,6 +220,11 @@ func (q *queueProcessor) BacklogSize(ctx context.Context, shard QueueShard, back
 	return shard.BacklogSize(ctx, backlogID)
 }
 
+// BacklogByID implements QueueManager.
+func (q *queueProcessor) BacklogByID(ctx context.Context, shard QueueShard, backlogID string) (*QueueBacklog, error) {
+	return shard.BacklogByID(ctx, backlogID)
+}
+
 // BacklogsByPartition implements QueueManager.
 func (q *queueProcessor) BacklogsByPartition(ctx context.Context, shard QueueShard, partitionID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueBacklog], error) {
 	return shard.BacklogsByPartition(ctx, partitionID, from, until, opts...)

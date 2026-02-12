@@ -62,3 +62,63 @@ message QueueItemRequest {
 }
 
 message QueueItemResponse { bytes data = 1; }
+
+//
+// Shadow Partition / Backlog (Key Queues)
+//
+message ShadowPartitionRequest { string partition_id = 1; }
+
+message ShadowPartitionResponse {
+  string partition_id = 1;
+  int32 function_version = 2;
+  string lease_id = 3;
+  string function_id = 4;
+  string env_id = 5;
+  string account_id = 6;
+  string system_queue_name = 7;
+  int64 backlog_count = 8;
+}
+
+message BacklogsRequest {
+  string partition_id = 1;
+  int64 limit = 2;
+}
+
+message BacklogsResponse {
+  repeated BacklogInfo backlogs = 1;
+  int64 total_count = 2;
+}
+
+message BacklogSizeRequest { string backlog_id = 1; }
+
+message BacklogSizeResponse {
+  string backlog_id = 1;
+  int64 item_count = 2;
+  BacklogInfo backlog = 3;
+}
+
+message BacklogInfo {
+  string backlog_id = 1;
+  string shadow_partition_id = 2;
+  int32 earliest_function_version = 3;
+  bool start = 4;
+  repeated BacklogConcurrencyKeyInfo concurrency_keys = 5;
+  BacklogThrottleInfo throttle = 6;
+  int64 item_count = 7;
+}
+
+message BacklogConcurrencyKeyInfo {
+  string canonical_key_id = 1;
+  string scope = 2;
+  string entity_id = 3;
+  string hashed_key_expression = 4;
+  string hashed_value = 5;
+  string unhashed_value = 6;
+  string concurrency_mode = 7;
+}
+
+message BacklogThrottleInfo {
+  string throttle_key = 1;
+  string throttle_key_raw_value = 2;
+  string throttle_key_expression_hash = 3;
+}

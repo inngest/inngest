@@ -2,6 +2,7 @@ package redis_state
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"iter"
@@ -687,6 +688,26 @@ func (q *queue) PartitionBacklogSize(ctx context.Context, partitionID string) (i
 	bwg.Wait()
 
 	return count, nil
+}
+
+func (q *queue) BacklogByID(ctx context.Context, backlogID string) (*osqueue.QueueBacklog, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "backlogByID"), redis_telemetry.ScopeQueue)
+
+	rc := q.RedisClient.Client()
+	cmd := rc.B().Hget().Key(q.RedisClient.kg.BacklogMeta()).Field(backlogID).Build()
+	byt, err := rc.Do(ctx, cmd).AsBytes()
+	if err != nil {
+		if rueidis.IsRedisNil(err) {
+			return nil, osqueue.ErrBacklogNotFound
+		}
+		return nil, fmt.Errorf("error retrieving backlog: %w", err)
+	}
+
+	var backlog osqueue.QueueBacklog
+	if err := json.Unmarshal(byt, &backlog); err != nil {
+		return nil, fmt.Errorf("error unmarshalling backlog: %w", err)
+	}
+	return &backlog, nil
 }
 
 func (q *queue) BacklogSize(ctx context.Context, backlogID string) (int64, error) {
