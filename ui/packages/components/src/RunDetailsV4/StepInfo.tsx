@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Button } from '@inngest/components/Button';
 import { RiArrowRightSLine } from '@remixicon/react';
 
 import { AITrace } from '../AI/AITrace';
 import { parseAIOutput } from '../AI/utils';
+import { Button } from '../Button/Button';
 import {
   CodeElement,
   ElementWrapper,
@@ -11,11 +11,13 @@ import {
   TextElement,
   TimeElement,
 } from '../DetailsCard/Element';
+import { Pill } from '../Pill/Pill';
 import { RerunModal } from '../Rerun/RerunModal';
 import { useShared } from '../SharedContext/SharedContext';
 import { useBooleanFlag } from '../SharedContext/useBooleanFlag';
 import { useGetTraceResult } from '../SharedContext/useGetTraceResult';
 import { usePathCreator } from '../SharedContext/usePathCreator';
+import { getStatusBackgroundClass, getStatusTextClass } from '../Status/statusClasses';
 import { Time } from '../Time';
 import { usePrettyErrorBody, usePrettyJson, usePrettyShortError } from '../hooks/usePrettyJson';
 import { toMaybeDate } from '../utils/date';
@@ -197,6 +199,17 @@ export const StepInfo = ({
           />
 
           <span className="text-basis text-sm font-normal">{trace.name}</span>
+          {trace.attempts !== null && (trace.attempts > 0 || trace.status === 'FAILED') && (
+            <span data-testid="retry-attempt-badge">
+              <Pill
+                className={`${getStatusBackgroundClass(trace.status)} ${getStatusTextClass(
+                  trace.status
+                )}`}
+              >
+                Attempt {trace.attempts + 1}
+              </Pill>
+            </span>
+          )}
         </div>
         {!debug && runID && trace.stepID && (!cloud || prettyInput) && (
           <>
