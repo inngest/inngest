@@ -368,176 +368,74 @@ func (ab *appendBuffer) handleScheduling(result *BulkAppendResult, fn inngest.Fu
 
 	ctx := context.Background()
 
-	switch result.Status {
-	case "new":
-		// Schedule batch timeout for the new batch
-		batchID, err := ulid.Parse(result.BatchID)
-		if err != nil {
-			ab.log.Error("failed to parse batch ID", "error", err, "batchID", result.BatchID)
-			metrics.IncrBatchBufferErrorsCounter(ctx, metrics.CounterOpt{
-				PkgName: pkgName,
-				Tags:    map[string]any{"error_type": "parse_batch_id"},
-			})
+	if result.Status == "new" || result.Status == "overflow" || result.Duplicates > 0 {
+		batchID := result.BatchID
+		status := "new"
+		if result.Status == "overflow" {
+			batchID = result.NextBatchID
+			status = "overflow_next"
+		}
+		if err := ab.scheduleBatchExecution(ctx, mgr, batchID, result, firstItem, fn, time.Now().Add(timeout), status); err != nil {
 			return
 		}
+	}
 
-		scheduleErr := mgr.ScheduleExecution(ctx, ScheduleBatchOpts{
-			ScheduleBatchPayload: ScheduleBatchPayload{
-				BatchID:         batchID,
-				BatchPointer:    result.BatchPointer,
-				AccountID:       firstItem.AccountID,
-				WorkspaceID:     firstItem.WorkspaceID,
-				AppID:           firstItem.AppID,
-				FunctionID:      fn.ID,
-				FunctionVersion: firstItem.FunctionVersion,
-			},
-			At: time.Now().Add(timeout),
-		})
-		if scheduleErr != nil {
-			ab.log.Error("failed to schedule batch execution", "error", scheduleErr)
-			metrics.IncrBatchBufferScheduleCounter(ctx, metrics.CounterOpt{
-				PkgName: pkgName,
-				Tags:    map[string]any{"schedule_type": "new", "status": "error"},
-			})
-			metrics.IncrBatchBufferErrorsCounter(ctx, metrics.CounterOpt{
-				PkgName: pkgName,
-				Tags:    map[string]any{"error_type": "schedule"},
-			})
-		} else {
-			metrics.IncrBatchBufferScheduleCounter(ctx, metrics.CounterOpt{
-				PkgName: pkgName,
-				Tags:    map[string]any{"schedule_type": "new", "status": "success"},
-			})
+	if result.Status == "full" || result.Status == "maxsize" || result.Status == "overflow" {
+		status := result.Status
+		if result.Status == "overflow" {
+			status = "overflow_full"
 		}
-
-	case "full", "maxsize":
-		// Batch is full - schedule immediate execution
-		batchID, err := ulid.Parse(result.BatchID)
-		if err != nil {
-			ab.log.Error("failed to parse batch ID", "error", err, "batchID", result.BatchID)
-			metrics.IncrBatchBufferErrorsCounter(ctx, metrics.CounterOpt{
-				PkgName: pkgName,
-				Tags:    map[string]any{"error_type": "parse_batch_id"},
-			})
-			return
-		}
-
-		scheduleErr := mgr.ScheduleExecution(ctx, ScheduleBatchOpts{
-			ScheduleBatchPayload: ScheduleBatchPayload{
-				BatchID:         batchID,
-				BatchPointer:    result.BatchPointer,
-				AccountID:       firstItem.AccountID,
-				WorkspaceID:     firstItem.WorkspaceID,
-				AppID:           firstItem.AppID,
-				FunctionID:      fn.ID,
-				FunctionVersion: firstItem.FunctionVersion,
-			},
-			At: time.Now(), // Immediate execution
-		})
-		if scheduleErr != nil {
-			ab.log.Error("failed to schedule full batch execution", "error", scheduleErr)
-			metrics.IncrBatchBufferScheduleCounter(ctx, metrics.CounterOpt{
-				PkgName: pkgName,
-				Tags:    map[string]any{"schedule_type": result.Status, "status": "error"},
-			})
-			metrics.IncrBatchBufferErrorsCounter(ctx, metrics.CounterOpt{
-				PkgName: pkgName,
-				Tags:    map[string]any{"error_type": "schedule"},
-			})
-		} else {
-			metrics.IncrBatchBufferScheduleCounter(ctx, metrics.CounterOpt{
-				PkgName: pkgName,
-				Tags:    map[string]any{"schedule_type": result.Status, "status": "success"},
-			})
-		}
-
-	case "overflow":
-		// Batch overflowed - schedule immediate execution for the full batch,
-		// and schedule timeout for the overflow batch
-		batchID, err := ulid.Parse(result.BatchID)
-		if err != nil {
-			ab.log.Error("failed to parse batch ID", "error", err, "batchID", result.BatchID)
-			metrics.IncrBatchBufferErrorsCounter(ctx, metrics.CounterOpt{
-				PkgName: pkgName,
-				Tags:    map[string]any{"error_type": "parse_batch_id"},
-			})
-			return
-		}
-
 		// Schedule immediate execution for the full batch
-		scheduleErr := mgr.ScheduleExecution(ctx, ScheduleBatchOpts{
-			ScheduleBatchPayload: ScheduleBatchPayload{
-				BatchID:         batchID,
-				BatchPointer:    result.BatchPointer,
-				AccountID:       firstItem.AccountID,
-				WorkspaceID:     firstItem.WorkspaceID,
-				AppID:           firstItem.AppID,
-				FunctionID:      fn.ID,
-				FunctionVersion: firstItem.FunctionVersion,
-			},
-			At: time.Now(), // Immediate execution
-		})
-		if scheduleErr != nil {
-			ab.log.Error("failed to schedule full batch execution", "error", scheduleErr)
-			metrics.IncrBatchBufferScheduleCounter(ctx, metrics.CounterOpt{
-				PkgName: pkgName,
-				Tags:    map[string]any{"schedule_type": "overflow_full", "status": "error"},
-			})
-			metrics.IncrBatchBufferErrorsCounter(ctx, metrics.CounterOpt{
-				PkgName: pkgName,
-				Tags:    map[string]any{"error_type": "schedule"},
-			})
-		} else {
-			metrics.IncrBatchBufferScheduleCounter(ctx, metrics.CounterOpt{
-				PkgName: pkgName,
-				Tags:    map[string]any{"schedule_type": "overflow_full", "status": "success"},
-			})
-		}
-
-		// Schedule timeout for the overflow batch
-		if result.NextBatchID != "" {
-			nextBatchID, err := ulid.Parse(result.NextBatchID)
-			if err != nil {
-				ab.log.Error("failed to parse next batch ID", "error", err, "batchID", result.NextBatchID)
-				metrics.IncrBatchBufferErrorsCounter(ctx, metrics.CounterOpt{
-					PkgName: pkgName,
-					Tags:    map[string]any{"error_type": "parse_batch_id"},
-				})
-				return
-			}
-
-			scheduleErr := mgr.ScheduleExecution(ctx, ScheduleBatchOpts{
-				ScheduleBatchPayload: ScheduleBatchPayload{
-					BatchID:         nextBatchID,
-					BatchPointer:    result.BatchPointer,
-					AccountID:       firstItem.AccountID,
-					WorkspaceID:     firstItem.WorkspaceID,
-					AppID:           firstItem.AppID,
-					FunctionID:      fn.ID,
-					FunctionVersion: firstItem.FunctionVersion,
-				},
-				At: time.Now().Add(timeout),
-			})
-			if scheduleErr != nil {
-				ab.log.Error("failed to schedule overflow batch execution", "error", scheduleErr)
-				metrics.IncrBatchBufferScheduleCounter(ctx, metrics.CounterOpt{
-					PkgName: pkgName,
-					Tags:    map[string]any{"schedule_type": "overflow_next", "status": "error"},
-				})
-				metrics.IncrBatchBufferErrorsCounter(ctx, metrics.CounterOpt{
-					PkgName: pkgName,
-					Tags:    map[string]any{"error_type": "schedule"},
-				})
-			} else {
-				metrics.IncrBatchBufferScheduleCounter(ctx, metrics.CounterOpt{
-					PkgName: pkgName,
-					Tags:    map[string]any{"schedule_type": "overflow_next", "status": "success"},
-				})
-			}
+		if err := ab.scheduleBatchExecution(ctx, mgr, result.BatchID, result, firstItem, fn, time.Now(), status); err != nil {
+			return
 		}
 	}
 	// For "append", "itemexists" - no scheduling needed
 	// The batch is already scheduled from when it was created
+}
+
+// scheduleBatchExecution parses a batch ID, schedules execution, and emits metrics.
+// Returns a non-nil error only if parsing the batch ID fails.
+func (ab *appendBuffer) scheduleBatchExecution(ctx context.Context, mgr BatchManager, rawBatchID string, result *BulkAppendResult, firstItem BatchItem, fn inngest.Function, at time.Time, scheduleType string) error {
+	batchID, err := ulid.Parse(rawBatchID)
+	if err != nil {
+		ab.log.Error("failed to parse batch ID", "error", err, "batchID", rawBatchID)
+		metrics.IncrBatchBufferErrorsCounter(ctx, metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags:    map[string]any{"error_type": "parse_batch_id"},
+		})
+		return err
+	}
+
+	scheduleErr := mgr.ScheduleExecution(ctx, ScheduleBatchOpts{
+		ScheduleBatchPayload: ScheduleBatchPayload{
+			BatchID:         batchID,
+			BatchPointer:    result.BatchPointer,
+			AccountID:       firstItem.AccountID,
+			WorkspaceID:     firstItem.WorkspaceID,
+			AppID:           firstItem.AppID,
+			FunctionID:      fn.ID,
+			FunctionVersion: firstItem.FunctionVersion,
+		},
+		At: at,
+	})
+	if scheduleErr != nil {
+		ab.log.Error("failed to schedule batch execution", "error", scheduleErr)
+		metrics.IncrBatchBufferScheduleCounter(ctx, metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags:    map[string]any{"schedule_type": scheduleType, "status": "error"},
+		})
+		metrics.IncrBatchBufferErrorsCounter(ctx, metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags:    map[string]any{"error_type": "schedule"},
+		})
+	} else {
+		metrics.IncrBatchBufferScheduleCounter(ctx, metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags:    map[string]any{"schedule_type": scheduleType, "status": "success"},
+		})
+	}
+	return nil
 }
 
 // close shuts down the appendBuffer, flushing all pending buffers.
