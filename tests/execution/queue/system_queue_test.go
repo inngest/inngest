@@ -43,7 +43,7 @@ func TestSystemQueueConfigs(t *testing.T) {
 	clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Second))
 	opts := []queue.QueueOpt{
 		queue.WithClock(clock),
-		queue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+		queue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 			return false
 		}),
 		queue.WithKindToQueueMapping(mapping),

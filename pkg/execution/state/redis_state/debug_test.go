@@ -70,7 +70,7 @@ func TestPartitionByID(t *testing.T) {
 
 			q, shard := newQueue(
 				t, rc,
-				osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+				osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 					return tc.keyQueues
 				}),
 				osqueue.WithClock(clock),

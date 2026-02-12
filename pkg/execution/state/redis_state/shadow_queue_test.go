@@ -58,7 +58,7 @@ func TestQueueRefillBacklog(t *testing.T) {
 
 	_, shard := newQueue(
 		t, rc,
-		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 			return true
 		}),
 		osqueue.WithClock(clock),
@@ -261,7 +261,7 @@ func TestQueueRefillBacklog(t *testing.T) {
 		_, shard := newQueue(
 			t, rc,
 			osqueue.WithClock(clock),
-			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 				return enqueueToBacklog
 			}),
 			osqueue.WithRunMode(osqueue.QueueRunMode{
@@ -376,7 +376,7 @@ func TestQueueRefillBacklog(t *testing.T) {
 		_, shard := newQueue(
 			t, rc,
 			osqueue.WithClock(clock),
-			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 				return enqueueToBacklog
 			}),
 			osqueue.WithRunMode(osqueue.QueueRunMode{
@@ -523,7 +523,7 @@ func TestQueueRefillBacklog(t *testing.T) {
 		_, shard := newQueue(
 			t, rc,
 			osqueue.WithClock(clock),
-			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 				return enqueueToBacklog
 			}),
 			osqueue.WithRunMode(osqueue.QueueRunMode{
@@ -672,7 +672,7 @@ func TestQueueShadowPartitionLease(t *testing.T) {
 	_, shard := newQueue(
 		t, rc,
 		osqueue.WithClock(clock),
-		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 			return enqueueToBacklog
 		}),
 	)
@@ -898,7 +898,7 @@ func TestQueueShadowScanner(t *testing.T) {
 	q, shard := newQueue(
 		t, rc,
 		osqueue.WithClock(clock),
-		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 			return enqueueToBacklog
 		}),
 	)
@@ -955,7 +955,7 @@ func TestQueueShadowScannerContinuations(t *testing.T) {
 	clock := clockwork.NewFakeClock()
 	queueOpts := []osqueue.QueueOpt{
 		osqueue.WithClock(clock),
-		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 			return true
 		}),
 		osqueue.WithBacklogRefillLimit(1),
@@ -1662,7 +1662,7 @@ func TestRefillConstraints(t *testing.T) {
 			q, shard := newQueue(
 				t, rc,
 				osqueue.WithClock(clock),
-				osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+				osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 					return enqueueToBacklog
 				}),
 				osqueue.WithRunMode(osqueue.QueueRunMode{
@@ -1953,7 +1953,7 @@ func TestShadowPartitionPointerTimings(t *testing.T) {
 		_, shard := newQueue(
 			t, rc,
 			osqueue.WithClock(clock),
-			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 				return enqueueToBacklog
 			}),
 			osqueue.WithRunMode(osqueue.QueueRunMode{
@@ -2091,7 +2091,7 @@ func TestShadowPartitionPointerTimings(t *testing.T) {
 		_, shard := newQueue(
 			t, rc,
 			osqueue.WithClock(clock),
-			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 				return enqueueToBacklog
 			}),
 			osqueue.WithRunMode(osqueue.QueueRunMode{
@@ -2187,7 +2187,7 @@ func TestConstraintLifecycleReporting(t *testing.T) {
 	q, shard := newQueue(
 		t, rc,
 		osqueue.WithClock(clock),
-		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 			return enqueueToBacklog
 		}),
 		osqueue.WithRunMode(osqueue.QueueRunMode{
@@ -2344,7 +2344,7 @@ func TestBacklogRefillWithDisabledConstraintChecks(t *testing.T) {
 	_, shard := newQueue(
 		t, rc,
 		osqueue.WithClock(clock),
-		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 			return true
 		}),
 		osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, fallback bool) {
@@ -2475,7 +2475,7 @@ func TestBacklogRefillSetCapacityLease(t *testing.T) {
 	q, shard := newQueue(
 		t, rc,
 		osqueue.WithClock(clock),
-		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 			return true
 		}),
 		osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
@@ -2594,7 +2594,7 @@ func TestPreventThrottleBacklogUnfairness(t *testing.T) {
 		q, shard := newQueue(
 			t, rc,
 			osqueue.WithClock(clock),
-			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 				return true
 			}),
 			osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
@@ -2721,7 +2721,7 @@ func TestPreventThrottleBacklogUnfairness(t *testing.T) {
 		q, shard := newQueue(
 			t, rc,
 			osqueue.WithClock(clock),
-			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 				return true
 			}),
 			osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {

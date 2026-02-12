@@ -33,7 +33,7 @@ func BenchmarkKeyQueues(b *testing.B) {
 
 	q, _ := newQueue(
 		b, rc,
-		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 			return true
 		}),
 		osqueue.WithKindToQueueMapping(map[string]string{

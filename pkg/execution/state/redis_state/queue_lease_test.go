@@ -1172,7 +1172,7 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 		_, shard := newQueue(
 			t, rc,
 			osqueue.WithClock(clock),
-			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 				return enqueueToBacklog
 			}),
 		)
@@ -1285,7 +1285,7 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 			_, shard := newQueue(
 				t, rc,
 				osqueue.WithClock(clock),
-				osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+				osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 					return enqueueToBacklog
 				}),
 				osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
@@ -1416,7 +1416,7 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 			_, shard := newQueue(
 				t, rc,
 				osqueue.WithClock(clock),
-				osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+				osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 					return enqueueToBacklog
 				}),
 				osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
@@ -1526,7 +1526,7 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 		_, shard := newQueue(
 			t, rc,
 			osqueue.WithClock(clock),
-			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 				return enqueueToBacklog
 			}),
 		)
@@ -1632,7 +1632,7 @@ func TestQueueLeaseConstraintIdempotency(t *testing.T) {
 		_, shard := newQueue(
 			t, rc,
 			osqueue.WithClock(clock),
-			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 				return false
 			}),
 			osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
@@ -1725,7 +1725,7 @@ func TestQueueLeaseConstraintIdempotency(t *testing.T) {
 		_, shard := newQueue(
 			t, rc,
 			osqueue.WithClock(clock),
-			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 				return false
 			}),
 			osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
