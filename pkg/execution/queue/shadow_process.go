@@ -474,7 +474,9 @@ func (q *queueProcessor) ProcessShadowPartitionBacklog(
 
 	constraintCheckRes, err := q.BacklogRefillConstraintCheck(ctx, shadowPart, backlog, constraints, items, operationIdempotencyKey, now)
 	if err != nil {
-		return nil, false, fmt.Errorf("could not check constraints for backlogRefill: %w", err)
+		// Do not pass on error further, we want to prevent quitting the queue
+		l.ReportError(err, "could not check constraints for backlogRefill")
+		return nil, false, nil
 	}
 
 	// In case the Constraint API determines no work can happen right now, we will report the limit
