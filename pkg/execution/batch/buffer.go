@@ -368,176 +368,87 @@ func (ab *appendBuffer) handleScheduling(result *BulkAppendResult, fn inngest.Fu
 
 	ctx := context.Background()
 
-	switch result.Status {
-	case "new":
-		// Schedule batch timeout for the new batch
-		batchID, err := ulid.Parse(result.BatchID)
-		if err != nil {
-			ab.log.Error("failed to parse batch ID", "error", err, "batchID", result.BatchID)
-			metrics.IncrBatchBufferErrorsCounter(ctx, metrics.CounterOpt{
-				PkgName: pkgName,
-				Tags:    map[string]any{"error_type": "parse_batch_id"},
-			})
+	// For new batches, schedule an execution after the batch timeout.
+	//
+	// If there were duplicate events in the buffered batch, also schedule an execution after the batch timeout.
+	// This is necessary for cases where the first event in a new batch fails due to transient issues like i/o timeouts writing to redis,
+	// we might still write the event to a redis batch and return an error, which leads to not scheduling the batch for execution ever.
+	// This results in stuck batches.
+	//
+	// To avoid that, we always schedule the batch for execution when any of the events are duplicates.
+	// While this scheduling attempt is only required if the retried event was the first event in a new batch, it is hard to distinguish
+	// that case because we bulk append. So we just schedule a job every time there are _any_ duplicate elements in a batch.
+	// This is safe because batcher.ScheduleExecution is idempotent for a given batchID, so if a job already exists, the schedule call is a no-op.
+	if result.Status == "new" || result.Duplicates > 0 {
+		if err := ab.scheduleBatchExecution(ctx, mgr, result.BatchID, result, firstItem, fn, time.Now().Add(timeout), "new"); err != nil {
 			return
-		}
-
-		scheduleErr := mgr.ScheduleExecution(ctx, ScheduleBatchOpts{
-			ScheduleBatchPayload: ScheduleBatchPayload{
-				BatchID:         batchID,
-				BatchPointer:    result.BatchPointer,
-				AccountID:       firstItem.AccountID,
-				WorkspaceID:     firstItem.WorkspaceID,
-				AppID:           firstItem.AppID,
-				FunctionID:      fn.ID,
-				FunctionVersion: firstItem.FunctionVersion,
-			},
-			At: time.Now().Add(timeout),
-		})
-		if scheduleErr != nil {
-			ab.log.Error("failed to schedule batch execution", "error", scheduleErr)
-			metrics.IncrBatchBufferScheduleCounter(ctx, metrics.CounterOpt{
-				PkgName: pkgName,
-				Tags:    map[string]any{"schedule_type": "new", "status": "error"},
-			})
-			metrics.IncrBatchBufferErrorsCounter(ctx, metrics.CounterOpt{
-				PkgName: pkgName,
-				Tags:    map[string]any{"error_type": "schedule"},
-			})
-		} else {
-			metrics.IncrBatchBufferScheduleCounter(ctx, metrics.CounterOpt{
-				PkgName: pkgName,
-				Tags:    map[string]any{"schedule_type": "new", "status": "success"},
-			})
-		}
-
-	case "full", "maxsize":
-		// Batch is full - schedule immediate execution
-		batchID, err := ulid.Parse(result.BatchID)
-		if err != nil {
-			ab.log.Error("failed to parse batch ID", "error", err, "batchID", result.BatchID)
-			metrics.IncrBatchBufferErrorsCounter(ctx, metrics.CounterOpt{
-				PkgName: pkgName,
-				Tags:    map[string]any{"error_type": "parse_batch_id"},
-			})
-			return
-		}
-
-		scheduleErr := mgr.ScheduleExecution(ctx, ScheduleBatchOpts{
-			ScheduleBatchPayload: ScheduleBatchPayload{
-				BatchID:         batchID,
-				BatchPointer:    result.BatchPointer,
-				AccountID:       firstItem.AccountID,
-				WorkspaceID:     firstItem.WorkspaceID,
-				AppID:           firstItem.AppID,
-				FunctionID:      fn.ID,
-				FunctionVersion: firstItem.FunctionVersion,
-			},
-			At: time.Now(), // Immediate execution
-		})
-		if scheduleErr != nil {
-			ab.log.Error("failed to schedule full batch execution", "error", scheduleErr)
-			metrics.IncrBatchBufferScheduleCounter(ctx, metrics.CounterOpt{
-				PkgName: pkgName,
-				Tags:    map[string]any{"schedule_type": result.Status, "status": "error"},
-			})
-			metrics.IncrBatchBufferErrorsCounter(ctx, metrics.CounterOpt{
-				PkgName: pkgName,
-				Tags:    map[string]any{"error_type": "schedule"},
-			})
-		} else {
-			metrics.IncrBatchBufferScheduleCounter(ctx, metrics.CounterOpt{
-				PkgName: pkgName,
-				Tags:    map[string]any{"schedule_type": result.Status, "status": "success"},
-			})
-		}
-
-	case "overflow":
-		// Batch overflowed - schedule immediate execution for the full batch,
-		// and schedule timeout for the overflow batch
-		batchID, err := ulid.Parse(result.BatchID)
-		if err != nil {
-			ab.log.Error("failed to parse batch ID", "error", err, "batchID", result.BatchID)
-			metrics.IncrBatchBufferErrorsCounter(ctx, metrics.CounterOpt{
-				PkgName: pkgName,
-				Tags:    map[string]any{"error_type": "parse_batch_id"},
-			})
-			return
-		}
-
-		// Schedule immediate execution for the full batch
-		scheduleErr := mgr.ScheduleExecution(ctx, ScheduleBatchOpts{
-			ScheduleBatchPayload: ScheduleBatchPayload{
-				BatchID:         batchID,
-				BatchPointer:    result.BatchPointer,
-				AccountID:       firstItem.AccountID,
-				WorkspaceID:     firstItem.WorkspaceID,
-				AppID:           firstItem.AppID,
-				FunctionID:      fn.ID,
-				FunctionVersion: firstItem.FunctionVersion,
-			},
-			At: time.Now(), // Immediate execution
-		})
-		if scheduleErr != nil {
-			ab.log.Error("failed to schedule full batch execution", "error", scheduleErr)
-			metrics.IncrBatchBufferScheduleCounter(ctx, metrics.CounterOpt{
-				PkgName: pkgName,
-				Tags:    map[string]any{"schedule_type": "overflow_full", "status": "error"},
-			})
-			metrics.IncrBatchBufferErrorsCounter(ctx, metrics.CounterOpt{
-				PkgName: pkgName,
-				Tags:    map[string]any{"error_type": "schedule"},
-			})
-		} else {
-			metrics.IncrBatchBufferScheduleCounter(ctx, metrics.CounterOpt{
-				PkgName: pkgName,
-				Tags:    map[string]any{"schedule_type": "overflow_full", "status": "success"},
-			})
-		}
-
-		// Schedule timeout for the overflow batch
-		if result.NextBatchID != "" {
-			nextBatchID, err := ulid.Parse(result.NextBatchID)
-			if err != nil {
-				ab.log.Error("failed to parse next batch ID", "error", err, "batchID", result.NextBatchID)
-				metrics.IncrBatchBufferErrorsCounter(ctx, metrics.CounterOpt{
-					PkgName: pkgName,
-					Tags:    map[string]any{"error_type": "parse_batch_id"},
-				})
-				return
-			}
-
-			scheduleErr := mgr.ScheduleExecution(ctx, ScheduleBatchOpts{
-				ScheduleBatchPayload: ScheduleBatchPayload{
-					BatchID:         nextBatchID,
-					BatchPointer:    result.BatchPointer,
-					AccountID:       firstItem.AccountID,
-					WorkspaceID:     firstItem.WorkspaceID,
-					AppID:           firstItem.AppID,
-					FunctionID:      fn.ID,
-					FunctionVersion: firstItem.FunctionVersion,
-				},
-				At: time.Now().Add(timeout),
-			})
-			if scheduleErr != nil {
-				ab.log.Error("failed to schedule overflow batch execution", "error", scheduleErr)
-				metrics.IncrBatchBufferScheduleCounter(ctx, metrics.CounterOpt{
-					PkgName: pkgName,
-					Tags:    map[string]any{"schedule_type": "overflow_next", "status": "error"},
-				})
-				metrics.IncrBatchBufferErrorsCounter(ctx, metrics.CounterOpt{
-					PkgName: pkgName,
-					Tags:    map[string]any{"error_type": "schedule"},
-				})
-			} else {
-				metrics.IncrBatchBufferScheduleCounter(ctx, metrics.CounterOpt{
-					PkgName: pkgName,
-					Tags:    map[string]any{"schedule_type": "overflow_next", "status": "success"},
-				})
-			}
 		}
 	}
-	// For "append", "itemexists" - no scheduling needed
-	// The batch is already scheduled from when it was created
+
+	// Schedule immediate execution for the full batch
+	if result.Status == "full" || result.Status == "maxsize" {
+		if err := ab.scheduleBatchExecution(ctx, mgr, result.BatchID, result, firstItem, fn, time.Now(), result.Status); err != nil {
+			return
+		}
+	}
+
+	if result.Status == "overflow" {
+		// Schedule immediate execution for the current full batch
+		if err := ab.scheduleBatchExecution(ctx, mgr, result.BatchID, result, firstItem, fn, time.Now(), "overflow_full"); err != nil {
+			return
+		}
+
+		// Schedule execution after timeout for the overflow batch
+		if err := ab.scheduleBatchExecution(ctx, mgr, result.NextBatchID, result, firstItem, fn, time.Now().Add(timeout), "overflow_next"); err != nil {
+			return
+		}
+	}
+
+	// For "append" where no duplicates are present, no action is needed. The batch was already scheduled from when it was created
+}
+
+// scheduleBatchExecution parses a batch ID, schedules execution, and emits metrics.
+// Returns a non-nil error only if parsing the batch ID fails.
+func (ab *appendBuffer) scheduleBatchExecution(ctx context.Context, mgr BatchManager, rawBatchID string, result *BulkAppendResult, firstItem BatchItem, fn inngest.Function, at time.Time, scheduleType string) error {
+	batchID, err := ulid.Parse(rawBatchID)
+	if err != nil {
+		ab.log.Error("failed to parse batch ID", "error", err, "batchID", rawBatchID)
+		metrics.IncrBatchBufferErrorsCounter(ctx, metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags:    map[string]any{"error_type": "parse_batch_id"},
+		})
+		return err
+	}
+
+	scheduleErr := mgr.ScheduleExecution(ctx, ScheduleBatchOpts{
+		ScheduleBatchPayload: ScheduleBatchPayload{
+			BatchID:         batchID,
+			BatchPointer:    result.BatchPointer,
+			AccountID:       firstItem.AccountID,
+			WorkspaceID:     firstItem.WorkspaceID,
+			AppID:           firstItem.AppID,
+			FunctionID:      fn.ID,
+			FunctionVersion: firstItem.FunctionVersion,
+		},
+		At: at,
+	})
+	if scheduleErr != nil {
+		ab.log.Error("failed to schedule batch execution", "error", scheduleErr)
+		metrics.IncrBatchBufferScheduleCounter(ctx, metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags:    map[string]any{"schedule_type": scheduleType, "status": "error"},
+		})
+		metrics.IncrBatchBufferErrorsCounter(ctx, metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags:    map[string]any{"error_type": "schedule"},
+		})
+	} else {
+		metrics.IncrBatchBufferScheduleCounter(ctx, metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags:    map[string]any{"schedule_type": scheduleType, "status": "success"},
+		})
+	}
+	return nil
 }
 
 // close shuts down the appendBuffer, flushing all pending buffers.
