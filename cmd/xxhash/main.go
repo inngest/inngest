@@ -7,7 +7,7 @@ import (
 )
 
 func main() {
-	input := "72a2aaf4-808b-4b24-b1b6-bf3883c9d559"
+	input := "1edd0832-b21a-4e76-a604-41a2041832b3"
 	fmt.Printf("Input:  %s\n", input)
 	fmt.Printf("XXHash: %s\n", util.XXHash(input))
 }
