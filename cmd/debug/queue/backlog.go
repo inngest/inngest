@@ -168,8 +168,6 @@ func resolveBacklogID(cmd *cli.Command) (string, error) {
 		return "", fmt.Errorf("invalid function ID: %w", err)
 	}
 
-	start := cmd.Bool("start")
-
 	var throttle *osqueue.ThrottleKeyInput
 	if cmd.IsSet("throttle-expr") || cmd.IsSet("throttle-value") {
 		throttle = &osqueue.ThrottleKeyInput{
@@ -177,6 +175,9 @@ func resolveBacklogID(cmd *cli.Command) (string, error) {
 			EvaluatedValue: cmd.String("throttle-value"),
 		}
 	}
+
+	// Throttle only applies to start backlogs, so imply start when throttle is provided
+	start := cmd.Bool("start") || throttle != nil
 
 	var concurrencyKeys []osqueue.ConcurrencyKeyInput
 	if cmd.IsSet("ck1-value") || cmd.IsSet("ck1-expr") {
