@@ -13,6 +13,15 @@ import type {
 } from '../InsightsStateMachineContext/types';
 import { type SQLEditorModel } from '@inngest/components/SQLEditor/SQLEditor';
 import { handleFixWithAI } from './ai';
+import {
+  RiCircleFill,
+  RiCloseCircleLine,
+  RiErrorWarningLine,
+  RiInformationLine,
+  RiSparkling2Line,
+  type RemixiconComponentType,
+} from '@remixicon/react';
+import { cn } from '@inngest/components/utils/classNames';
 
 export function DiagnosticsBanner() {
   const { query, data } = useInsightsStateMachineContext();
@@ -31,24 +40,28 @@ export function DiagnosticsBanner() {
 
   return (
     <ContextualBanner
-      title={`${formatDiagnosticSeverity(maxSeverity)} executing query`}
+      title={bannerTitleForSeverity(maxSeverity)}
       cta={
         <div className="flex items-center gap-2">
           {aiHelper && (
             <Button
-              appearance="solid"
+              appearance="outlined"
               kind="secondary"
+              icon={<RiSparkling2Line />}
+              iconSide="left"
               label="Fix with AI"
               onClick={handleFixWithAI(
                 aiHelper,
-                diagnostics.map((d) => d.message).join('\n'),
+                diagnostics
+                  .map((diag) => formatDiagnosticMessage(model, diag))
+                  .join('\n'),
                 query,
               )}
             />
           )}
         </div>
       }
-      severity={severityToBannerSeverity(maxSeverity)}
+      severity="none"
     >
       <div className="flex flex-col gap-1 pb-1">
         {diagnostics.map((diag, index) => (
@@ -66,9 +79,16 @@ function DiagnosticBannerEntry({
   model: SQLEditorModel | null;
   diag: InsightsDiagnostic;
 }) {
+  const Icon = diagnosticIconForSeverity(diag.severity);
   return (
-    <div className="px-4 pt-1">
-      <span>{formatDiagnosticMessage(model, diag)}</span>
+    <div
+      className={cn(
+        colorForSeverity(diag.severity),
+        'px-4 pt-1 flex flex-row gap-1 pb-1 items-center',
+      )}
+    >
+      <Icon className="h-4" />
+      <span className="font-mono">{formatDiagnosticMessage(model, diag)}</span>
     </div>
   );
 }
@@ -83,7 +103,11 @@ function formatDiagnosticMessage(
 
   const startPos = model.getPositionAt(diag.position.start);
 
-  return `${diag.severity} ${startPos.lineNumber}:${startPos.column} ${diag.message} (${diag.position.context})`;
+  return `[${startPos.lineNumber}:${
+    startPos.column
+  }] ${formatDiagnosticSeverity(diag.severity)}: ${diag.message} (${
+    diag.position.context
+  })`;
 }
 
 function maxDiagnosticsSeverity(
@@ -107,25 +131,59 @@ function formatDiagnosticSeverity(
 ): string {
   switch (severity) {
     case 'error':
-      return 'Error';
+      return 'ERROR';
     case 'warning':
-      return 'Warning';
+      return 'WARNING';
     case 'info':
     default:
-      return 'Info';
+      return 'INFO';
   }
 }
 
-function severityToBannerSeverity(
+function bannerTitleForSeverity(
   severity: InsightsDiagnosticSeverity,
-): Severity {
+): React.ReactNode {
+  return (
+    <div className="flex items-center gap-1">
+      <RiCircleFill className={cn(colorForSeverity(severity), 'h-4')} />
+      <span className="font-mono">{bannerLabelForSeverity(severity)}</span>
+    </div>
+  );
+}
+
+function bannerLabelForSeverity(severity: InsightsDiagnosticSeverity): string {
   switch (severity) {
     case 'error':
-      return 'error';
+      return 'QUERY FAILED TO RUN';
     case 'warning':
-      return 'warning';
+      return 'QUERY RAN WITH WARNINGS';
+    default:
+      return 'QUERY RAN WITH INFO';
+  }
+}
+
+function colorForSeverity(severity: InsightsDiagnosticSeverity): string {
+  switch (severity) {
+    case 'error':
+      return 'text-red-400 dark:text-red-500';
+    case 'warning':
+      return 'text-amber-600 dark:text-amber-500';
     case 'info':
     default:
-      return 'info';
+      return 'text-blue-400 dark:text-blue-500';
+  }
+}
+
+function diagnosticIconForSeverity(
+  severity: InsightsDiagnosticSeverity,
+): RemixiconComponentType {
+  switch (severity) {
+    case 'error':
+      return RiCloseCircleLine;
+    case 'warning':
+      return RiErrorWarningLine;
+    case 'info':
+    default:
+      return RiInformationLine;
   }
 }
