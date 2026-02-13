@@ -1,21 +1,24 @@
 import { useEffect, useState } from 'react';
-import { Button } from '@inngest/components/Button';
 import { RiArrowRightSLine } from '@remixicon/react';
 
 import { AITrace } from '../AI/AITrace';
 import { parseAIOutput } from '../AI/utils';
+import { Button } from '../Button/Button';
 import {
   CodeElement,
   ElementWrapper,
+  IDElement,
   LinkElement,
   TextElement,
   TimeElement,
 } from '../DetailsCard/Element';
+import { Pill } from '../Pill/Pill';
 import { RerunModal } from '../Rerun/RerunModal';
 import { useShared } from '../SharedContext/SharedContext';
 import { useBooleanFlag } from '../SharedContext/useBooleanFlag';
 import { useGetTraceResult } from '../SharedContext/useGetTraceResult';
 import { usePathCreator } from '../SharedContext/usePathCreator';
+import { getStatusBackgroundClass, getStatusTextClass } from '../Status/statusClasses';
 import { Time } from '../Time';
 import { usePrettyErrorBody, usePrettyJson, usePrettyShortError } from '../hooks/usePrettyJson';
 import { toMaybeDate } from '../utils/date';
@@ -36,6 +39,15 @@ import {
   type StepInfoWait,
 } from './types';
 
+const STEP_OP_LABELS: Record<string, string> = {
+  RUN: 'step.run',
+  INVOKE: 'step.invoke',
+  SLEEP: 'step.sleep',
+  WAIT_FOR_EVENT: 'step.waitForEvent',
+  AI_GATEWAY: 'step.ai',
+  WAIT_FOR_SIGNAL: 'step.waitForSignal',
+};
+
 type StepKindInfoProps = {
   stepInfo: StepInfoType['trace']['stepInfo'];
 };
@@ -45,7 +57,17 @@ const InvokeInfo = ({ stepInfo }: { stepInfo: StepInfoInvoke }) => {
   const timeout = toMaybeDate(stepInfo.timeout);
   return (
     <>
-      <ElementWrapper label="Run">
+      <ElementWrapper label="Function">
+        <LinkElement href={pathCreator.function({ functionSlug: stepInfo.functionID })}>
+          {stepInfo.functionID}
+        </LinkElement>
+      </ElementWrapper>
+      <ElementWrapper label="Triggering Event ID">
+        <LinkElement href={pathCreator.eventPopout({ eventID: stepInfo.triggeringEventID })}>
+          {stepInfo.triggeringEventID}
+        </LinkElement>
+      </ElementWrapper>
+      <ElementWrapper label="Triggered Run ID">
         {stepInfo.runID ? (
           <LinkElement href={pathCreator.runPopout({ runID: stepInfo.runID })}>
             {stepInfo.runID}
@@ -60,6 +82,13 @@ const InvokeInfo = ({ stepInfo }: { stepInfo: StepInfoInvoke }) => {
       <ElementWrapper label="Timed out">
         <TextElement>{maybeBooleanToString(stepInfo.timedOut)}</TextElement>
       </ElementWrapper>
+      {stepInfo.returnEventID && (
+        <ElementWrapper label="Return Event ID">
+          <LinkElement href={pathCreator.eventPopout({ eventID: stepInfo.returnEventID })}>
+            {stepInfo.returnEventID}
+          </LinkElement>
+        </ElementWrapper>
+      )}
     </>
   );
 };
@@ -74,6 +103,7 @@ const SleepInfo = ({ stepInfo }: { stepInfo: StepInfoSleep }) => {
 };
 
 const WaitInfo = ({ stepInfo }: { stepInfo: StepInfoWait }) => {
+  const { pathCreator } = usePathCreator();
   const timeout = toMaybeDate(stepInfo.timeout);
   return (
     <>
@@ -86,6 +116,13 @@ const WaitInfo = ({ stepInfo }: { stepInfo: StepInfoWait }) => {
       <ElementWrapper label="Timed out">
         <TextElement>{maybeBooleanToString(stepInfo.timedOut)}</TextElement>
       </ElementWrapper>
+      {stepInfo.foundEventID && (
+        <ElementWrapper label="Matched Event ID">
+          <LinkElement href={pathCreator.eventPopout({ eventID: stepInfo.foundEventID })}>
+            {stepInfo.foundEventID}
+          </LinkElement>
+        </ElementWrapper>
+      )}
       <ElementWrapper className="w-full" label="Match expression">
         {stepInfo.expression ? (
           <CodeElement value={stepInfo.expression} />
@@ -197,6 +234,17 @@ export const StepInfo = ({
           />
 
           <span className="text-basis text-sm font-normal">{trace.name}</span>
+          {trace.attempts !== null && (trace.attempts > 0 || trace.status === 'FAILED') && (
+            <span data-testid="retry-attempt-badge">
+              <Pill
+                className={`${getStatusBackgroundClass(trace.status)} ${getStatusTextClass(
+                  trace.status
+                )}`}
+              >
+                Attempt {trace.attempts + 1}
+              </Pill>
+            </span>
+          )}
         </div>
         {!debug && runID && trace.stepID && (!cloud || prettyInput) && (
           <>
@@ -252,7 +300,19 @@ export const StepInfo = ({
             <TextElement>{durationText}</TextElement>
           </ElementWrapper>
 
+          {trace.stepOp && (
+            <ElementWrapper label="Step Type">
+              <CodeElement value={STEP_OP_LABELS[trace.stepOp] ?? trace.stepOp} />
+            </ElementWrapper>
+          )}
+
           {stepKindInfo}
+
+          {debug && trace.debugRunID && (
+            <ElementWrapper label="Debug Run ID">
+              <IDElement>{trace.debugRunID}</IDElement>
+            </ElementWrapper>
+          )}
 
           {aiOutput && <AITrace aiOutput={aiOutput} />}
         </div>
