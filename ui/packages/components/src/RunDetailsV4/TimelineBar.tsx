@@ -313,34 +313,37 @@ function BarTooltipContent({
   name,
   startTime,
   endTime,
-  minTime,
+  delayMs,
 }: {
   name: string;
   startTime: Date;
   endTime: Date | null;
-  minTime: Date;
+  delayMs?: number;
 }) {
   const startTimestamp = format(startTime, 'yyyy-MM-dd HH:mm:ss.SSS');
   const endTimestamp = endTime ? format(endTime, 'yyyy-MM-dd HH:mm:ss.SSS') : null;
 
   const durationMs = endTime ? endTime.getTime() - startTime.getTime() : 0;
-  const delayMs = startTime.getTime() - minTime.getTime();
 
   return (
     <div className="whitespace-nowrap px-1 py-0.5 text-xs">
       <p className="text-basis mb-1.5 font-medium">{name}</p>
       <div className="flex flex-col gap-1">
-        <div className="flex justify-between gap-6">
-          <span className="text-light font-medium">Duration</span>
-          <span className="text-basis tabular-nums">
-            {durationMs > 0 ? formatDuration(durationMs) : '-'}
-          </span>
-        </div>
-        <div className="border-subtle flex justify-between gap-6 border-b pb-1.5">
-          <span className="text-light font-medium">Delay</span>
-          <span className="text-basis tabular-nums">
-            {delayMs > 0 ? formatDuration(delayMs) : '-'}
-          </span>
+        <div className="border-subtle flex flex-col gap-1 border-b pb-1.5">
+          <div className="flex justify-between gap-6">
+            <span className="text-light font-medium">Duration</span>
+            <span className="text-basis tabular-nums">
+              {durationMs > 0 ? formatDuration(durationMs) : '-'}
+            </span>
+          </div>
+          {delayMs != null && (
+            <div className="flex justify-between gap-6">
+              <span className="text-light font-medium">Delay</span>
+              <span className="text-basis tabular-nums">
+                {delayMs > 0 ? formatDuration(delayMs) : '-'}
+              </span>
+            </div>
+          )}
         </div>
         <div className="mt-0.5 flex justify-between gap-6">
           <span className="text-light font-medium">Start</span>
@@ -522,7 +525,7 @@ export function TimelineBar({
   viewEndOffset = 100,
   startTime,
   endTime,
-  minTime,
+  delayMs,
 }: TimelineBarProps): JSX.Element {
   const barStyle = getBarStyle(style);
   const effectiveIcon = icon ?? barStyle.icon ?? getRootIcon(style, status);
@@ -549,7 +552,7 @@ export function TimelineBar({
   );
 
   // Tooltip state — controlled so hover target (full right panel) is separate from anchor (bar position)
-  const showTooltip = !!(startTime && minTime);
+  const showTooltip = !!startTime;
   const [tooltipOpen, setTooltipOpen] = useState(false);
 
   return (
@@ -662,7 +665,7 @@ export function TimelineBar({
                         name={displayName}
                         startTime={startTime!}
                         endTime={endTime ?? null}
-                        minTime={minTime!}
+                        delayMs={delayMs}
                       />
                       <TooltipArrow className="fill-canvasBase" />
                     </TooltipContent>

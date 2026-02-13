@@ -247,6 +247,7 @@ function TimelineBarRenderer({
       startTime={bar.startTime}
       endTime={bar.endTime}
       minTime={minTime}
+      delayMs={bar.delayMs}
     >
       {/* Timing breakdown bars */}
       {isExpanded &&

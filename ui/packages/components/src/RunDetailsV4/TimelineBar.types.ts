@@ -191,6 +191,9 @@ export interface TimelineBarProps {
 
   /** Timeline start time, used to compute offsets in hover tooltip */
   minTime?: Date;
+
+  /** Queue delay in milliseconds (startedAt - queuedAt) for tooltip display */
+  delayMs?: number;
 }
 
 // ============================================================================
@@ -248,6 +251,9 @@ export interface TimelineBarData {
 
   /** Run status for status-based coloring (e.g., COMPLETED, FAILED, CANCELLED) */
   status?: string;
+
+  /** Queue delay in milliseconds (startedAt - queuedAt) */
+  delayMs?: number;
 }
 
 /**

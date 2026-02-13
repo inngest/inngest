@@ -126,6 +126,11 @@ function traceToBarData(trace: Trace, orgName?: string, rootStatus?: string): Ti
   // fallback for bars that don't have a meaningful status of their own.
   const status = trace.status || rootStatus;
 
+  // Actual queue delay: time from when the step was queued to when execution started
+  const delayMs = trace.startedAt
+    ? Math.max(0, new Date(trace.startedAt).getTime() - new Date(trace.queuedAt).getTime())
+    : undefined;
+
   return {
     id: trace.spanID,
     name: getSpanName(trace.name),
@@ -137,6 +142,7 @@ function traceToBarData(trace: Trace, orgName?: string, rootStatus?: string): Ti
     httpTimingBreakdown,
     isRoot: trace.isRoot,
     status,
+    delayMs,
   };
 }
 
