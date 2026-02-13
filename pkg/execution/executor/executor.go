@@ -1720,6 +1720,23 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 					}
 				}
 			}
+
+			// Extract HTTP timing metadata from httpstat if available.
+			// This captures the detailed connection timing breakdown (DNS, TCP, TLS, TTFB, transfer)
+			// from the HTTP request to the user's SDK function.
+			if resp.HTTPStat != nil {
+				httpTimingMd := extractors.ExtractHTTPTimingMetadata(resp.HTTPStat)
+				_, err := e.createMetadataSpan(
+					ctx,
+					&instance,
+					"executor.httpTiming",
+					httpTimingMd,
+					enums.MetadataScopeStepAttempt,
+				)
+				if err != nil {
+					l.Warn("error creating HTTP timing metadata span", "error", err)
+				}
+			}
 		}
 
 		if handleErr := e.HandleResponse(ctx, &instance); handleErr != nil {

@@ -92,7 +92,7 @@ func (e executor) Execute(ctx context.Context, sl sv2.StateLoader, s sv2.Metadat
 		}
 	}
 
-	dr, _, err := ExecuteDriverRequest(ctx, e.Client, Request{
+	dr, httpstatResult, err := ExecuteDriverRequest(ctx, e.Client, Request{
 		AccountID:      s.ID.Tenant.AccountID,
 		WorkflowID:     s.ID.FunctionID,
 		RunID:          s.ID.RunID,
@@ -104,6 +104,9 @@ func (e executor) Execute(ctx context.Context, sl sv2.StateLoader, s sv2.Metadat
 		Headers:        headers,
 		RequestVersion: &s.Config.RequestVersion,
 	})
+	if dr != nil && httpstatResult != nil {
+		dr.HTTPStat = httpstatResult
+	}
 	return dr, err
 }
 

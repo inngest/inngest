@@ -88,6 +88,37 @@ const BAR_STYLES: Record<BarStyleKey, BarStyle> = {
     labelFormat: 'uppercase',
     barHeight: 'short',
   },
+  // HTTP timing phases (children of SERVER bar)
+  'timing.http.dns': {
+    barColor: 'bg-sky-400',
+    barHeight: 'short',
+    labelFormat: 'uppercase',
+    statusBased: true,
+  },
+  'timing.http.tcp': {
+    barColor: 'bg-cyan-400',
+    barHeight: 'short',
+    labelFormat: 'uppercase',
+    statusBased: true,
+  },
+  'timing.http.tls': {
+    barColor: 'bg-teal-400',
+    barHeight: 'short',
+    labelFormat: 'uppercase',
+    statusBased: true,
+  },
+  'timing.http.server': {
+    barColor: 'bg-emerald-400',
+    barHeight: 'short',
+    labelFormat: 'uppercase',
+    statusBased: true,
+  },
+  'timing.http.transfer': {
+    barColor: 'bg-green-400',
+    barHeight: 'short',
+    labelFormat: 'uppercase',
+    statusBased: true,
+  },
   default: {
     barColor: 'bg-slate-400',
     statusBased: true,

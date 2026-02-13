@@ -7,6 +7,7 @@ export type SpanMetadataKindUserland = `userland.${string}`;
 export type SpanMetadataKind =
   | typeof KindInngestAI
   | typeof KindInngestHTTP
+  | typeof KindInngestHTTPTiming
   | typeof KindInngestWarnings
   | SpanMetadataKindUserland;
 
@@ -51,4 +52,40 @@ export interface HTTPMetadata {
   response_status: number /* int64 */;
   domain?: string;
   path?: string;
+}
+/**
+ * From httptiming.go
+ */
+export const KindInngestHTTPTiming = 'inngest.http.timing';
+/**
+ * From httptiming.go
+ * HTTPTimingMetadata contains detailed HTTP connection timing phases
+ * from httpstat, capturing the duration of each phase in the HTTP
+ * request lifecycle.
+ */
+export interface HTTPTimingMetadata {
+  /**
+   * DNSLookupMs is the time spent resolving the domain name.
+   */
+  dns_lookup_ms: number /* int64 */;
+  /**
+   * TCPConnectionMs is the time spent establishing the TCP connection.
+   */
+  tcp_connection_ms: number /* int64 */;
+  /**
+   * TLSHandshakeMs is the time spent on TLS negotiation.
+   */
+  tls_handshake_ms: number /* int64 */;
+  /**
+   * ServerProcessingMs is the time from request sent to first byte received (TTFB).
+   */
+  server_processing_ms: number /* int64 */;
+  /**
+   * ContentTransferMs is the time spent downloading the response body.
+   */
+  content_transfer_ms: number /* int64 */;
+  /**
+   * TotalMs is the total request duration.
+   */
+  total_ms: number /* int64 */;
 }

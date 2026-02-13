@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/inngest/go-httpstat"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
@@ -108,6 +109,10 @@ type DriverResponse struct {
 	final bool
 
 	Header http.Header `json:"header,omitempty"`
+
+	// HTTPStat contains detailed HTTP timing breakdown from httpstat.
+	// Populated by httpdriver when making requests to user SDK functions.
+	HTTPStat *httpstat.Result `json:"-"`
 }
 
 // SetFinal indicates that this error is final, regardless of the status code
