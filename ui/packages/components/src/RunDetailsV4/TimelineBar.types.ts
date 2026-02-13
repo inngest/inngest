@@ -47,6 +47,12 @@ export type BarStyleKey =
   | 'timing.inngest' // Queue time (short, gray)
   | 'timing.server' // Execution time (tall, barber-pole, status color)
   | 'timing.connecting' // Connection time (short, dotted border, status color)
+  // HTTP timing phases (nested under server execution)
+  | 'timing.http.dns' // DNS lookup (short, sky)
+  | 'timing.http.tcp' // TCP connection (short, cyan)
+  | 'timing.http.tls' // TLS handshake (short, teal)
+  | 'timing.http.server' // Server processing / TTFB (short, emerald)
+  | 'timing.http.transfer' // Content transfer (short, green)
   // Generic fallback
   | 'default';
 
@@ -234,6 +240,9 @@ export interface TimelineBarData {
   /** Timing breakdown data (for expandable bars) */
   timingBreakdown?: TimingBreakdownData;
 
+  /** HTTP timing breakdown (for steps with HTTP timing metadata) */
+  httpTimingBreakdown?: HTTPTimingBreakdownData;
+
   /** Whether this bar represents the root run (clicking shows TopInfo) */
   isRoot?: boolean;
 
@@ -252,5 +261,30 @@ export interface TimingBreakdownData {
   executionMs: number;
 
   /** Total duration */
+  totalMs: number;
+}
+
+/**
+ * HTTP timing breakdown for a step bar.
+ * Represents the sequential phases of an HTTP request lifecycle
+ * (Inngest's HTTP call to the SDK endpoint).
+ */
+export interface HTTPTimingBreakdownData {
+  /** Time spent resolving the domain name */
+  dnsLookupMs: number;
+
+  /** Time spent establishing the TCP connection */
+  tcpConnectionMs: number;
+
+  /** Time spent on TLS negotiation */
+  tlsHandshakeMs: number;
+
+  /** Time from request sent to first byte received (TTFB) */
+  serverProcessingMs: number;
+
+  /** Time spent downloading the response body */
+  contentTransferMs: number;
+
+  /** Total request duration */
   totalMs: number;
 }

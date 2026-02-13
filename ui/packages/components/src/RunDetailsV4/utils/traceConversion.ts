@@ -5,9 +5,19 @@
 
 import { max, min } from 'date-fns';
 
-import type { BarStyleKey, TimelineBarData, TimelineData } from '../TimelineBar.types';
+import type {
+  BarStyleKey,
+  HTTPTimingBreakdownData,
+  TimelineBarData,
+  TimelineData,
+} from '../TimelineBar.types';
 import { traceWalk } from '../runDetailsUtils';
-import { isStepInfoRun, type Trace } from '../types';
+import {
+  isStepInfoRun,
+  type SpanMetadata,
+  type SpanMetadataInngestHTTPTiming,
+  type Trace,
+} from '../types';
 import { TIMELINE_CONSTANTS } from './timing';
 
 /**
@@ -78,11 +88,40 @@ function calculateTimingBreakdown(
 }
 
 /**
+ * Extract HTTP timing breakdown from span metadata.
+ * Returns timing phases for Inngest's HTTP call to the SDK endpoint.
+ */
+function getHTTPTimingFromMetadata(metadata?: SpanMetadata[]): HTTPTimingBreakdownData | null {
+  if (!metadata) return null;
+
+  const httpTiming = metadata.find(
+    (m): m is SpanMetadataInngestHTTPTiming => m.kind === 'inngest.http.timing'
+  );
+
+  if (!httpTiming) return null;
+
+  return {
+    dnsLookupMs: httpTiming.values.dns_lookup_ms,
+    tcpConnectionMs: httpTiming.values.tcp_connection_ms,
+    tlsHandshakeMs: httpTiming.values.tls_handshake_ms,
+    serverProcessingMs: httpTiming.values.server_processing_ms,
+    contentTransferMs: httpTiming.values.content_transfer_ms,
+    totalMs: httpTiming.values.total_ms,
+  };
+}
+
+/**
  * Convert a single Trace to TimelineBarData
  */
 function traceToBarData(trace: Trace, orgName?: string, rootStatus?: string): TimelineBarData {
   const isStepRun = isStepRunSpan(trace) && !trace.isUserland;
   const timingBreakdown = isStepRun ? calculateTimingBreakdown(trace) : undefined;
+
+  // HTTP timing applies to any step that Inngest calls via HTTP, not just step.run
+  const httpTimingBreakdown = !trace.isRoot
+    ? getHTTPTimingFromMetadata(trace.metadata) ?? undefined
+    : undefined;
+
   // Each bar uses its own status for coloring. rootStatus is only used as a
   // fallback for bars that don't have a meaningful status of their own.
   const status = trace.status || rootStatus;
@@ -95,6 +134,7 @@ function traceToBarData(trace: Trace, orgName?: string, rootStatus?: string): Ti
     style: getStyleForTrace(trace),
     children: trace.childrenSpans?.map((child) => traceToBarData(child, orgName, rootStatus)),
     timingBreakdown,
+    httpTimingBreakdown,
     isRoot: trace.isRoot,
     status,
   };

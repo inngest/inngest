@@ -22,6 +22,7 @@ export type Trace = {
 
 export type SpanMetadataKind =
   | `inngest.http`
+  | `inngest.http.timing`
   | `inngest.ai`
   | `inngest.warnings`
   | SpanMetadataKindUserland;
@@ -33,6 +34,7 @@ export type SpanMetadataScope = 'run' | 'step' | 'step_attempt' | 'extended_trac
 export type SpanMetadata =
   | SpanMetadataInngestAI
   | SpanMetadataInngestHTTP
+  | SpanMetadataInngestHTTPTiming
   | SpanMetadataInngestWarnings
   | SpanMetadataUserland
   | SpanMetadataUnknown;
@@ -63,6 +65,20 @@ export type SpanMetadataInngestHTTP = {
     response_size?: number;
     response_status?: number;
     response_content_type?: string;
+  };
+};
+
+export type SpanMetadataInngestHTTPTiming = {
+  scope: 'step_attempt';
+  kind: 'inngest.http.timing';
+  updatedAt: string;
+  values: {
+    dns_lookup_ms: number;
+    tcp_connection_ms: number;
+    tls_handshake_ms: number;
+    server_processing_ms: number;
+    content_transfer_ms: number;
+    total_ms: number;
   };
 };
 
