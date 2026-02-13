@@ -108,6 +108,9 @@ func (q *queueProcessor) tryClaimShardLease(ctx context.Context, shards []QueueS
 			metrics.GaugeActiveShardLease(ctx, 1, metrics.GaugeOpt{PkgName: pkgName, Tags: map[string]any{"shard_group": q.runMode.ShardGroup, "queue_shard": shard.Name()}})
 			l.Info("claimed shard lease", "shard", shard.Name(), "group", q.runMode.ShardGroup, "leaseID", leaseID)
 
+			if q.OnShardLeaseAcquired != nil {
+				go q.OnShardLeaseAcquired(ctx, shard.Name())
+			}
 			return nil
 		}
 	}
