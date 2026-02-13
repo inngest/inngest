@@ -3,8 +3,8 @@ import type { editor } from 'monaco-editor';
 import { FONT, LINE_HEIGHT } from '../utils/monaco';
 
 export const EDITOR_OPTIONS: editor.IEditorOptions = {
-  autoClosingBrackets: 'always',
-  autoClosingQuotes: 'always',
+  autoClosingBrackets: 'beforeWhitespace',
+  autoClosingQuotes: 'beforeWhitespace',
   contextmenu: false,
   fixedOverflowWidgets: true,
   fontFamily: FONT.font,
