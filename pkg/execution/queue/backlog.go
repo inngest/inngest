@@ -250,6 +250,73 @@ func ItemBacklog(ctx context.Context, i QueueItem) QueueBacklog {
 	return b
 }
 
+// ConcurrencyKeyInput represents the inputs needed to construct a concurrency key component
+// of a backlog ID.
+type ConcurrencyKeyInput struct {
+	// Expression is the raw concurrency key expression (e.g. "event.data.customerId").
+	// This will be hashed to produce the expression hash component.
+	Expression string
+
+	// EvaluatedValue is the evaluated value of the expression (e.g. "customer1").
+	// This will be hashed as part of the canonical key.
+	EvaluatedValue string
+
+	// Scope is the concurrency scope (function, env, or account).
+	Scope enums.ConcurrencyScope
+
+	// ScopeID is the UUID of the entity (function, env, or account) that the key applies to.
+	ScopeID uuid.UUID
+}
+
+// ThrottleKeyInput represents the inputs needed to construct a throttle key component
+// of a backlog ID.
+type ThrottleKeyInput struct {
+	// Expression is the raw throttle key expression (e.g. "event.data.customerId").
+	// If empty, only the function ID is used as the throttle key.
+	Expression string
+
+	// EvaluatedValue is the evaluated value of the expression (e.g. "customer1").
+	// Only used when Expression is non-empty.
+	EvaluatedValue string
+}
+
+// BuildBacklogID constructs a backlog ID from its component parts, matching the format
+// produced by ItemBacklog. This is useful for debugging when you know the function ID
+// and key details but don't have the pre-computed backlog ID.
+//
+// The resulting format is:
+//
+//	fn:{functionID}[:start][:t<exprHash:throttleKey>][:c1<exprHash:canonicalKeyHash>][:c2<exprHash:canonicalKeyHash>]
+func BuildBacklogID(functionID uuid.UUID, start bool, throttle *ThrottleKeyInput, concurrencyKeys []ConcurrencyKeyInput) string {
+	id := fmt.Sprintf("fn:%s", functionID)
+	if start {
+		id += ":start"
+	}
+
+	if throttle != nil && start {
+		exprHash := util.XXHash(throttle.Expression)
+
+		// Throttle key: hashID(fnID) or hashID(fnID)-hashID(evaluatedValue)
+		throttleKey := HashID(context.Background(), functionID.String())
+		if throttle.Expression != "" {
+			throttleKey = throttleKey + "-" + HashID(context.Background(), throttle.EvaluatedValue)
+		}
+
+		id += fmt.Sprintf(":t<%s:%s>", exprHash, throttleKey)
+	}
+
+	for i, ck := range concurrencyKeys {
+		if i >= 2 {
+			break
+		}
+		exprHash := util.XXHash(ck.Expression)
+		canonicalKey := util.ConcurrencyKey(ck.Scope, ck.ScopeID, ck.EvaluatedValue)
+		id += fmt.Sprintf(":c%d<%s:%s>", i+1, exprHash, util.XXHash(canonicalKey))
+	}
+
+	return id
+}
+
 func ItemShadowPartition(ctx context.Context, i QueueItem) QueueShadowPartition {
 	l := logger.StdlibLogger(ctx)
 	queueName := i.QueueName
