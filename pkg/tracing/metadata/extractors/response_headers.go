@@ -36,6 +36,26 @@ func (m ResponseHeaderMetadata) Serialize() (metadata.Values, error) {
 	return ret, nil
 }
 
+// sensitiveHeaders contains header names (lowercase) that should be redacted
+// to prevent exposure of credentials, tokens, and session data in traces.
+var sensitiveHeaders = map[string]bool{
+	"authorization":       true,
+	"proxy-authorization": true,
+	"cookie":              true,
+	"set-cookie":          true,
+	"x-api-key":           true,
+	"x-auth-token":        true,
+	"www-authenticate":    true,
+	"proxy-authenticate":  true,
+}
+
+const redactedValue = "[REDACTED]"
+
+// isSensitiveHeader returns true if the header name should be redacted.
+func isSensitiveHeader(name string) bool {
+	return sensitiveHeaders[strings.ToLower(name)]
+}
+
 type ResponseHeaderMetadataExtractor struct{}
 
 func NewResponseHeaderMetadataExtractor() *ResponseHeaderMetadataExtractor {
@@ -68,10 +88,14 @@ func (e *ResponseHeaderMetadataExtractor) ExtractSpanMetadata(ctx context.Contex
 		return nil, nil
 	}
 
-	// Flatten multi-value headers to comma-separated strings
+	// Flatten multi-value headers to comma-separated strings, redacting sensitive ones
 	result := make(ResponseHeaderMetadata, len(rawHeaders))
 	for key, values := range rawHeaders {
-		result[key] = strings.Join(values, ", ")
+		if isSensitiveHeader(key) {
+			result[key] = redactedValue
+		} else {
+			result[key] = strings.Join(values, ", ")
+		}
 	}
 
 	return []metadata.Structured{result}, nil
@@ -89,7 +113,11 @@ func NewResponseHeaderMetadataFromHTTPHeader(header http.Header, statusCode int)
 		result["Status Code"] = strconv.Itoa(statusCode)
 	}
 	for key, values := range header {
-		result[key] = strings.Join(values, ", ")
+		if isSensitiveHeader(key) {
+			result[key] = redactedValue
+		} else {
+			result[key] = strings.Join(values, ", ")
+		}
 	}
 	return result
 }

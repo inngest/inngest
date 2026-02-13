@@ -130,7 +130,7 @@ func TestResponseHeaderMetadataExtractor_MultiValueHeaders(t *testing.T) {
 				Key: "_inngest.response.headers",
 				Value: &commonv1.AnyValue{
 					Value: &commonv1.AnyValue_StringValue{
-						StringValue: `{"Set-Cookie":["a=1","b=2"],"Accept":["text/html","application/json"]}`,
+						StringValue: `{"X-Custom":["val1","val2"],"Accept":["text/html","application/json"]}`,
 					},
 				},
 			},
@@ -155,7 +155,7 @@ func TestResponseHeaderMetadataExtractor_MultiValueHeaders(t *testing.T) {
 		data[k] = s
 	}
 
-	assert.Equal(t, "a=1, b=2", data["Set-Cookie"], "Multi-value headers should be comma-separated")
+	assert.Equal(t, "val1, val2", data["X-Custom"], "Multi-value headers should be comma-separated")
 	assert.Equal(t, "text/html, application/json", data["Accept"], "Multi-value headers should be comma-separated")
 }
 
@@ -190,7 +190,7 @@ func TestNewResponseHeaderMetadataFromHTTPHeader(t *testing.T) {
 	header := http.Header{
 		"Content-Type":  {"application/json"},
 		"Cache-Control": {"no-cache"},
-		"Set-Cookie":    {"a=1", "b=2"},
+		"X-Request-Id":  {"abc-123"},
 	}
 
 	result := NewResponseHeaderMetadataFromHTTPHeader(header, 200)
@@ -200,7 +200,7 @@ func TestNewResponseHeaderMetadataFromHTTPHeader(t *testing.T) {
 	assert.Equal(t, "200", result["Status Code"])
 	assert.Equal(t, "application/json", result["Content-Type"])
 	assert.Equal(t, "no-cache", result["Cache-Control"])
-	assert.Equal(t, "a=1, b=2", result["Set-Cookie"])
+	assert.Equal(t, "abc-123", result["X-Request-Id"])
 }
 
 func TestNewResponseHeaderMetadataFromHTTPHeader_Nil(t *testing.T) {
@@ -215,4 +215,93 @@ func TestNewResponseHeaderMetadataFromHTTPHeader_Empty(t *testing.T) {
 
 	result := NewResponseHeaderMetadataFromHTTPHeader(http.Header{}, 0)
 	assert.Nil(t, result)
+}
+
+func TestNewResponseHeaderMetadataFromHTTPHeader_RedactsSensitiveHeaders(t *testing.T) {
+	t.Parallel()
+
+	header := http.Header{
+		"Content-Type":    {"application/json"},
+		"Set-Cookie":      {"session=abc123"},
+		"Authorization":   {"Bearer secret-token"},
+		"X-Api-Key":       {"my-api-key"},
+		"Cookie":          {"session=abc123"},
+		"Proxy-Authorization": {"Basic creds"},
+		"X-Forwarded-For": {"192.168.1.1"},
+		"Cache-Control":   {"no-cache"},
+	}
+
+	result := NewResponseHeaderMetadataFromHTTPHeader(header, 200)
+
+	require.NotNil(t, result)
+	// Safe headers are passed through
+	assert.Equal(t, "application/json", result["Content-Type"])
+	assert.Equal(t, "no-cache", result["Cache-Control"])
+	assert.Equal(t, "192.168.1.1", result["X-Forwarded-For"])
+	assert.Equal(t, "200", result["Status Code"])
+
+	// Sensitive headers are redacted
+	assert.Equal(t, "[REDACTED]", result["Set-Cookie"])
+	assert.Equal(t, "[REDACTED]", result["Authorization"])
+	assert.Equal(t, "[REDACTED]", result["X-Api-Key"])
+	assert.Equal(t, "[REDACTED]", result["Cookie"])
+	assert.Equal(t, "[REDACTED]", result["Proxy-Authorization"])
+}
+
+func TestNewResponseHeaderMetadataFromHTTPHeader_RedactsCaseInsensitive(t *testing.T) {
+	t.Parallel()
+
+	header := http.Header{
+		"AUTHORIZATION": {"Bearer token"},
+		"set-cookie":    {"session=xyz"},
+		"X-API-KEY":     {"key123"},
+	}
+
+	result := NewResponseHeaderMetadataFromHTTPHeader(header, 0)
+
+	require.NotNil(t, result)
+	assert.Equal(t, "[REDACTED]", result["AUTHORIZATION"])
+	assert.Equal(t, "[REDACTED]", result["set-cookie"])
+	assert.Equal(t, "[REDACTED]", result["X-API-KEY"])
+}
+
+func TestResponseHeaderMetadataExtractor_RedactsSensitiveHeaders(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	span := &tracev1.Span{
+		SpanId: []byte("sensitive-span"),
+		Attributes: []*commonv1.KeyValue{
+			{
+				Key: "_inngest.response.headers",
+				Value: &commonv1.AnyValue{
+					Value: &commonv1.AnyValue_StringValue{
+						StringValue: `{"Content-Type":["application/json"],"Set-Cookie":["session=abc"],"Authorization":["Bearer token"]}`,
+					},
+				},
+			},
+		},
+	}
+
+	extractor := NewResponseHeaderMetadataExtractor()
+	md, err := extractor.ExtractSpanMetadata(ctx, span)
+
+	require.NoError(t, err)
+	require.NotNil(t, md)
+	require.Len(t, md, 1)
+
+	raw, err := md[0].Serialize()
+	require.NoError(t, err)
+
+	data := make(map[string]string)
+	for k, v := range raw {
+		var s string
+		err := json.Unmarshal(v, &s)
+		require.NoError(t, err)
+		data[k] = s
+	}
+
+	assert.Equal(t, "application/json", data["Content-Type"])
+	assert.Equal(t, "[REDACTED]", data["Set-Cookie"])
+	assert.Equal(t, "[REDACTED]", data["Authorization"])
 }
