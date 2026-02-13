@@ -467,6 +467,9 @@ type QueueOptions struct {
 	ConditionalTracer trace.ConditionalTracer
 
 	ShardAssignmentConfig ShardAssignmentConfig
+	// OnShardLeaseAcquired is called immediately after a shard lease is successfully claimed.
+	// The shardName parameter is the name of the specific shard that was leased.
+	OnShardLeaseAcquired func(ctx context.Context, shardName string)
 }
 
 // ShardSelector returns a shard reference for the given queue item.
@@ -476,6 +479,12 @@ type ShardSelector func(ctx context.Context, accountId uuid.UUID, queueName *str
 func WithShardAssignmentConfig(cfg ShardAssignmentConfig) QueueOpt {
 	return func(q *QueueOptions) {
 		q.ShardAssignmentConfig = cfg
+	}
+}
+
+func WithOnShardLeaseAcquired(f func(ctx context.Context, shardName string)) QueueOpt {
+	return func(q *QueueOptions) {
+		q.OnShardLeaseAcquired = f
 	}
 }
 
