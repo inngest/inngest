@@ -38,7 +38,7 @@ describe('traceConversion', () => {
       expect(result.minTime).toEqual(new Date('2024-01-01T00:00:00Z'));
       expect(result.maxTime).toEqual(new Date('2024-01-01T00:00:10Z'));
       expect(result.bars).toHaveLength(1);
-      expect(result.leftWidth).toBe(30); // default
+      expect(result.leftWidth).toBe(35); // default
     });
 
     it('uses provided leftWidth option', () => {

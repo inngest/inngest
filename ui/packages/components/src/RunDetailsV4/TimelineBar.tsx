@@ -105,8 +105,8 @@ const BAR_PATTERNS: Record<BarPattern, CSSProperties> = {
       -45deg,
       transparent,
       transparent 6px,
-      rgba(255, 255, 255, 0.1) 6px,
-      rgba(255, 255, 255, 0.1) 8px
+      rgba(255, 255, 255, 0.15) 6px,
+      rgba(255, 255, 255, 0.15) 8px
     )`,
   },
   dotted: {
@@ -328,7 +328,7 @@ function BarTooltipContent({
   );
 }
 
-const BAR_HEIGHT_CLASSES: Record<BarHeight, string> = { short: 'h-2', tall: 'h-5' };
+const BAR_HEIGHT_CLASSES: Record<BarHeight, string> = { short: 'h-2', tall: 'h-4' };
 
 /**
  * Renders the visual bar in the right panel.
@@ -550,7 +550,7 @@ export function TimelineBar({
         {/* Left panel - name, icon, controls */}
         <div
           data-testid="timeline-bar-left"
-          className="flex h-full shrink-0 items-center gap-1.5 overflow-hidden pr-2"
+          className="flex h-full shrink-0 items-center gap-1.5 overflow-hidden pr-4"
           style={{
             width: `${leftWidth}%`,
             paddingLeft: `${indentPx}px`,
