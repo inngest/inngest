@@ -185,7 +185,7 @@ export const StepInfo = ({
   });
 
   const { booleanFlag } = useBooleanFlag();
-  const { value: metadataIsEnabled } = booleanFlag('enable-step-metadata', true);
+  const { value: metadataIsEnabled } = booleanFlag('enable-step-metadata', false);
 
   useEffect(() => {
     result && setPollInterval(undefined);
