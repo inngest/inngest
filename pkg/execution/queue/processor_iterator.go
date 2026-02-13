@@ -183,16 +183,18 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 		LeaseConstraints(constraints),
 	}
 
-	constraintRes, err := p.Queue.Shard().ItemLeaseConstraintCheck(
+	constraintRes, err := p.Queue.ItemLeaseConstraintCheck(
 		ctx,
 		&partition,
 		&backlog,
 		constraints,
 		item,
-		p.StaticTime,
+		p.Queue.Clock().Now(),
 	)
 	if err != nil {
-		return fmt.Errorf("could not check constraints to lease item: %w", err)
+		l.ReportError(err, "could not check constraints to lease item")
+		// Stop iterator but don't quit the queue
+		return ErrProcessStopIterator
 	}
 
 	constraint_check_source := "lease"

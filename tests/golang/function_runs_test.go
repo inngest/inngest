@@ -33,7 +33,6 @@ func TestFunctionRunList(t *testing.T) {
 	okEventName := fmt.Sprintf("%s/ok", appName)
 	failedEventName := fmt.Sprintf("%s/failed", appName)
 
-	c := client.New(t)
 	inngestClient, server, registerFuncs := NewSDKHandler(t, appName)
 	defer server.Close()
 
@@ -124,7 +123,8 @@ func TestFunctionRunList(t *testing.T) {
 
 	// tests
 	t.Run("retrieve all runs", func(t *testing.T) {
-		require.EventuallyWithT(t, func(t *assert.CollectT) {
+		c := client.New(t)
+		require.EventuallyWithT(t, func(ct *assert.CollectT) {
 			edges, pageInfo, count := c.FunctionRuns(ctx, client.FunctionRunOpt{
 				Start:       start,
 				End:         end,
@@ -132,22 +132,23 @@ func TestFunctionRunList(t *testing.T) {
 			})
 
 			// With parallel event processing, we should have at least the expected runs
-			assert.GreaterOrEqual(t, len(edges), total)
-			assert.False(t, pageInfo.HasNextPage)
-			assert.GreaterOrEqual(t, count, total)
+			assert.GreaterOrEqual(ct, len(edges), total)
+			assert.False(ct, pageInfo.HasNextPage)
+			assert.GreaterOrEqual(ct, count, total)
 
 			// sorted by queued_at desc order by default
 			ts := time.Now()
 			for _, e := range edges {
 				queuedAt := e.Node.QueuedAt
-				assert.True(t, queuedAt.UnixMilli() <= ts.UnixMilli())
+				assert.True(ct, queuedAt.UnixMilli() <= ts.UnixMilli())
 				ts = queuedAt
 			}
 		}, 10*time.Second, 2*time.Second)
 	})
 
 	t.Run("retrieve only successful runs sorted by started_at", func(t *testing.T) {
-		require.EventuallyWithT(t, func(t *assert.CollectT) {
+		c := client.New(t)
+		require.EventuallyWithT(t, func(ct *assert.CollectT) {
 			edges, pageInfo, _ := c.FunctionRuns(ctx, client.FunctionRunOpt{
 				Start:     start,
 				End:       end,
@@ -160,21 +161,22 @@ func TestFunctionRunList(t *testing.T) {
 			})
 
 			// With parallel event processing, we should have at least the expected runs
-			assert.GreaterOrEqual(t, len(edges), successTotal)
-			assert.False(t, pageInfo.HasNextPage)
+			assert.GreaterOrEqual(ct, len(edges), successTotal)
+			assert.False(ct, pageInfo.HasNextPage)
 
 			// should be sorted by started_at desc order
 			ts := time.Now()
 			for _, e := range edges {
 				startedAt := e.Node.StartedAt
-				assert.True(t, startedAt.UnixMilli() <= ts.UnixMilli())
+				assert.True(ct, startedAt.UnixMilli() <= ts.UnixMilli())
 				ts = startedAt
 			}
 		}, 10*time.Second, 2*time.Second)
 	})
 
 	t.Run("retrieve only failed runs sorted by ended_at", func(t *testing.T) {
-		require.EventuallyWithT(t, func(t *assert.CollectT) {
+		c := client.New(t)
+		require.EventuallyWithT(t, func(ct *assert.CollectT) {
 			edges, pageInfo, _ := c.FunctionRuns(ctx, client.FunctionRunOpt{
 				Start:     start,
 				End:       end,
@@ -186,21 +188,22 @@ func TestFunctionRunList(t *testing.T) {
 				FunctionIDs: fnIDs,
 			})
 
-			assert.Equal(t, failureTotal, len(edges))
-			assert.False(t, pageInfo.HasNextPage)
+			assert.Equal(ct, failureTotal, len(edges))
+			assert.False(ct, pageInfo.HasNextPage)
 
 			// should be sorted by ended_at asc order
 			ts := start
 			for _, e := range edges {
 				endedAt := e.Node.EndedAt
-				assert.True(t, endedAt.UnixMilli() >= ts.UnixMilli())
+				assert.True(ct, endedAt.UnixMilli() >= ts.UnixMilli())
 				ts = endedAt
 			}
 		}, 10*time.Second, 2*time.Second)
 	})
 
 	t.Run("retrieve only failed runs", func(t *testing.T) {
-		require.EventuallyWithT(t, func(t *assert.CollectT) {
+		c := client.New(t)
+		require.EventuallyWithT(t, func(ct *assert.CollectT) {
 			edges, pageInfo, _ := c.FunctionRuns(ctx, client.FunctionRunOpt{
 				Start:       start,
 				End:         end,
@@ -208,21 +211,22 @@ func TestFunctionRunList(t *testing.T) {
 				FunctionIDs: fnIDs,
 			})
 
-			assert.Equal(t, failureTotal, len(edges))
-			assert.False(t, pageInfo.HasNextPage)
+			assert.Equal(ct, failureTotal, len(edges))
+			assert.False(ct, pageInfo.HasNextPage)
 
 			// should be sorted by queued_at desc order
 			ts := time.Now()
 			for _, e := range edges {
 				queuedAt := e.Node.QueuedAt
-				assert.True(t, queuedAt.UnixMilli() <= ts.UnixMilli())
+				assert.True(ct, queuedAt.UnixMilli() <= ts.UnixMilli())
 				ts = queuedAt
 			}
 		}, 10*time.Second, 2*time.Second)
 	})
 
 	t.Run("paginate without additional filter", func(t *testing.T) {
-		require.EventuallyWithT(t, func(t *assert.CollectT) {
+		c := client.New(t)
+		require.EventuallyWithT(t, func(ct *assert.CollectT) {
 			items := 10
 			edges, pageInfo, totalCount := c.FunctionRuns(ctx, client.FunctionRunOpt{
 				Start:       start,
@@ -232,9 +236,9 @@ func TestFunctionRunList(t *testing.T) {
 			})
 
 			// With parallel event processing, we should have at least the expected runs
-			assert.GreaterOrEqual(t, totalCount, successTotal+failureTotal)
-			assert.Equal(t, items, len(edges))
-			assert.True(t, pageInfo.HasNextPage)
+			assert.GreaterOrEqual(ct, totalCount, successTotal+failureTotal)
+			assert.Equal(ct, items, len(edges))
+			assert.True(ct, pageInfo.HasNextPage)
 
 			// Second page should have the remaining items
 			edges, pageInfo, _ = c.FunctionRuns(ctx, client.FunctionRunOpt{
@@ -246,13 +250,13 @@ func TestFunctionRunList(t *testing.T) {
 			})
 			// Remaining count depends on total, which may vary with parallel processing
 			remain := totalCount - items
-			assert.GreaterOrEqual(t, len(edges), remain)
+			assert.GreaterOrEqual(ct, len(edges), remain)
 		}, 10*time.Second, 2*time.Second)
 	})
 
 	t.Run("paginate with status filter", func(t *testing.T) {
-		// fnIDs is already built above to isolate from concurrent tests
-		require.EventuallyWithT(t, func(t *assert.CollectT) {
+		c := client.New(t)
+		require.EventuallyWithT(t, func(ct *assert.CollectT) {
 			items := 2
 			edges, pageInfo, total := c.FunctionRuns(ctx, client.FunctionRunOpt{
 				Start: start,
@@ -267,9 +271,9 @@ func TestFunctionRunList(t *testing.T) {
 				Items:       items,
 			})
 
-			assert.Equal(t, 2, len(edges))
-			assert.True(t, pageInfo.HasNextPage)
-			assert.Equal(t, failureTotal, total)
+			assert.Equal(ct, 2, len(edges))
+			assert.True(ct, pageInfo.HasNextPage)
+			assert.Equal(ct, failureTotal, total)
 
 			// there are only 3 failed runs, so there shouldn't be anymore than 1
 			edges, pageInfo, _ = c.FunctionRuns(ctx, client.FunctionRunOpt{
@@ -287,20 +291,25 @@ func TestFunctionRunList(t *testing.T) {
 			})
 
 			remain := failureTotal - items // we should paginate and remove the 2 previous from the total.
-			assert.False(t, pageInfo.HasNextPage, "Failed with IDs: %s (%s)", fnIDs, fmt.Sprintf("fn-run-err-%s", failedEventName))
-			assert.Equal(t, failureTotal, total)
-			assert.Equal(t, remain, len(edges), "Got %#v and page info %#v", edges, pageInfo)
+			assert.False(ct, pageInfo.HasNextPage, "Failed with IDs: %s (%s)", fnIDs, fmt.Sprintf("fn-run-err-%s", failedEventName))
+			assert.Equal(ct, failureTotal, total)
+			assert.Equal(ct, remain, len(edges), "Got %#v and page info %#v", edges, pageInfo)
 		}, 10*time.Second, 2*time.Second)
 	})
 
 	t.Run("filter with event CEL expression", func(t *testing.T) {
+		c := client.New(t)
+
+		// test setup created 10 runs numbered 0-9, with the > min filter, we should get runs 6, 7, 8, 9 eventually
+		// Because there are 4 runs after the filter, if we are requesting a page of 3 runs, we should get a page with
+		// 3 items and with HasNextPage true
 		min := 5
 		cel := celBlob([]string{
 			fmt.Sprintf("event.name == '%s'", okEventName),
 			fmt.Sprintf("event.data.idx > %d", min),
 		})
 
-		require.EventuallyWithT(t, func(t *assert.CollectT) {
+		require.EventuallyWithT(t, func(ct *assert.CollectT) {
 			items := 3
 			edges, pageInfo, total := c.FunctionRuns(ctx, client.FunctionRunOpt{
 				Start: start,
@@ -309,32 +318,318 @@ func TestFunctionRunList(t *testing.T) {
 				Query: &cel,
 			})
 
-			assert.Equal(t, items, len(edges))
-			assert.Equal(t, successTotal-(min+1), total)
-			assert.True(t, pageInfo.HasNextPage)
+			assert.Equal(ct, items, len(edges))
+			assert.Equal(ct, successTotal-(min+1), total)
+			assert.True(ct, pageInfo.HasNextPage)
 		}, 10*time.Second, 2*time.Second)
 	})
 
-	t.Run("filter with output CEL expression", func(t *testing.T) {
+	t.Run("filter with output CEL expression searching output.data", func(t *testing.T) {
+		c := client.New(t)
+
+		// test setup created 10 runs numbered 0-9. The runs output double their run number
+		// so runs 6, 7, 8, 9 should produce output.num greater than 11
 		cel := celBlob([]string{
 			"output.num > 11",
 		})
 		expectedCount := 4
 
-		require.EventuallyWithT(t, func(t *assert.CollectT) {
+		require.EventuallyWithT(t, func(ct *assert.CollectT) {
 			edges, pageInfo, total := c.FunctionRuns(ctx, client.FunctionRunOpt{
 				Start: start,
 				End:   end,
 				Query: &cel,
 			})
 
-			assert.Equal(t, expectedCount, len(edges))
-			assert.Equal(t, expectedCount, total)
-			assert.False(t, pageInfo.HasNextPage)
+			assert.Equal(ct, expectedCount, len(edges))
+			assert.Equal(ct, expectedCount, total)
+			assert.False(ct, pageInfo.HasNextPage)
+		}, 10*time.Second, 2*time.Second)
+	})
+
+	t.Run("filter with error CEL expression searching output.error", func(t *testing.T) {
+		c := client.New(t)
+
+		// Failed runs return fmt.Errorf("fail") which creates output like {"error": {"message": "fail", ...}}
+		// This test verifies that error.message matches can search output.error
+		cel := celBlob([]string{
+			`error.message == "fail"`,
+		})
+
+		require.EventuallyWithT(t, func(ct *assert.CollectT) {
+			edges, pageInfo, total := c.FunctionRuns(ctx, client.FunctionRunOpt{
+				Start: start,
+				End:   end,
+				Query: &cel,
+			})
+
+			assert.Equal(ct, failureTotal, len(edges))
+			assert.Equal(ct, failureTotal, total)
+			assert.False(ct, pageInfo.HasNextPage)
 		}, 10*time.Second, 2*time.Second)
 	})
 }
 
 func celBlob(cel []string) string {
 	return strings.Join(cel, "\n")
+}
+
+// TestFunctionRunListCELBooleanAndNull tests CEL filtering with boolean and null values in event.data.
+// This verifies that expressions like `event.data.b == true`, `event.data.b2 == false`,
+// and `event.data.n == null` work correctly.
+func TestFunctionRunListCELBooleanAndNull(t *testing.T) {
+	ctx := context.Background()
+
+	appName := fmt.Sprintf("fnrun-bool-null-%d", time.Now().UnixNano())
+	eventName := fmt.Sprintf("%s/test", appName)
+
+	inngestClient, server, registerFuncs := NewSDKHandler(t, appName)
+	defer server.Close()
+
+	var (
+		runCount int32
+		fnID     uuid.UUID
+	)
+
+	// Create a function that triggers on the test event
+	_, err := inngestgo.CreateFunction(
+		inngestClient,
+		inngestgo.FunctionOpts{
+			ID: fmt.Sprintf("fn-run-bool-null-%s", eventName),
+		},
+		inngestgo.EventTrigger(eventName, nil),
+		func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
+			atomic.AddInt32(&runCount, 1)
+			fnID = uuid.MustParse(input.InputCtx.FunctionID)
+			return map[string]any{"ok": true}, nil
+		},
+	)
+	require.NoError(t, err)
+	registerFuncs()
+
+	start := time.Now()
+
+	// Send an event with boolean and null literals
+	_, err = inngestClient.Send(ctx, inngestgo.Event{
+		Name: eventName,
+		Data: map[string]any{
+			"b":  true,
+			"b2": false,
+			"n":  nil,
+		},
+	})
+	require.NoError(t, err)
+
+	// Wait for the run to complete
+	require.EventuallyWithT(t, func(ct *assert.CollectT) {
+		assert.EqualValues(ct, 1, atomic.LoadInt32(&runCount))
+	}, 10*time.Second, 100*time.Millisecond)
+
+	end := time.Now().Add(10 * time.Second)
+
+	t.Run("filter with boolean literal true", func(t *testing.T) {
+		c := client.New(t)
+
+		cel := celBlob([]string{
+			fmt.Sprintf("event.name == '%s'", eventName),
+			"event.data.b == true",
+		})
+
+		require.EventuallyWithT(t, func(ct *assert.CollectT) {
+			edges, pageInfo, total := c.FunctionRuns(ctx, client.FunctionRunOpt{
+				Start:       start,
+				End:         end,
+				FunctionIDs: []uuid.UUID{fnID},
+				Query:       &cel,
+			})
+
+			assert.Equal(ct, 1, len(edges), "expected 1 run with event.data.b == true")
+			assert.Equal(ct, 1, total)
+			assert.False(ct, pageInfo.HasNextPage)
+		}, 10*time.Second, 2*time.Second)
+	})
+
+	t.Run("filter with boolean literal false", func(t *testing.T) {
+		c := client.New(t)
+
+		cel := celBlob([]string{
+			fmt.Sprintf("event.name == '%s'", eventName),
+			"event.data.b2 == false",
+		})
+
+		require.EventuallyWithT(t, func(ct *assert.CollectT) {
+			edges, pageInfo, total := c.FunctionRuns(ctx, client.FunctionRunOpt{
+				Start:       start,
+				End:         end,
+				FunctionIDs: []uuid.UUID{fnID},
+				Query:       &cel,
+			})
+
+			assert.Equal(ct, 1, len(edges), "expected 1 run with event.data.b2 == false")
+			assert.Equal(ct, 1, total)
+			assert.False(ct, pageInfo.HasNextPage)
+		}, 10*time.Second, 2*time.Second)
+	})
+
+	t.Run("filter with literal null", func(t *testing.T) {
+		c := client.New(t)
+
+		// event.data.n is null, so == null should return 1
+		celNullEq := celBlob([]string{
+			fmt.Sprintf("event.name == '%s'", eventName),
+			"event.data.n == null",
+		})
+		require.EventuallyWithT(t, func(ct *assert.CollectT) {
+			edges, pageInfo, total := c.FunctionRuns(ctx, client.FunctionRunOpt{
+				Start:       start,
+				End:         end,
+				FunctionIDs: []uuid.UUID{fnID},
+				Query:       &celNullEq,
+			})
+
+			assert.Equal(ct, 1, len(edges), "expected 1 run with event.data.n == null")
+			assert.Equal(ct, 1, total)
+			assert.False(ct, pageInfo.HasNextPage)
+		}, 10*time.Second, 2*time.Second)
+
+		// event.data.b is true (not null), so == null should return 0
+		celBoolEqNull := celBlob([]string{
+			fmt.Sprintf("event.name == '%s'", eventName),
+			"event.data.b == null",
+		})
+		require.EventuallyWithT(t, func(ct *assert.CollectT) {
+			edges, _, total := c.FunctionRuns(ctx, client.FunctionRunOpt{
+				Start:       start,
+				End:         end,
+				FunctionIDs: []uuid.UUID{fnID},
+				Query:       &celBoolEqNull,
+			})
+
+			assert.Equal(ct, 0, len(edges), "expected 0 runs with event.data.b == null")
+			assert.Equal(ct, 0, total)
+		}, 10*time.Second, 2*time.Second)
+
+		// event.data.b is true (not null), so != null should return 1
+		celBoolNeqNull := celBlob([]string{
+			fmt.Sprintf("event.name == '%s'", eventName),
+			"event.data.b != null",
+		})
+		require.EventuallyWithT(t, func(ct *assert.CollectT) {
+			edges, pageInfo, total := c.FunctionRuns(ctx, client.FunctionRunOpt{
+				Start:       start,
+				End:         end,
+				FunctionIDs: []uuid.UUID{fnID},
+				Query:       &celBoolNeqNull,
+			})
+
+			assert.Equal(ct, 1, len(edges), "expected 1 run with event.data.b != null")
+			assert.Equal(ct, 1, total)
+			assert.False(ct, pageInfo.HasNextPage)
+		}, 10*time.Second, 2*time.Second)
+	})
+}
+
+// TestFunctionRunListBatchEvents verifies that batch runs (with multiple events) are
+// correctly grouped when filtering with CEL expressions that JOIN on the events table.
+// Without proper GROUP BY, multiple runs would collapse into one row due to aggregate functions.
+func TestFunctionRunListBatchEvents(t *testing.T) {
+	ctx := context.Background()
+
+	appName := fmt.Sprintf("fnrun-batch-%d", time.Now().UnixNano())
+	batchEventName := fmt.Sprintf("%s/batch", appName)
+
+	inngestClient, server, registerFuncs := NewSDKHandler(t, appName)
+	defer server.Close()
+
+	var (
+		runCount    int32
+		totalEvents int32
+		fnID        uuid.UUID
+	)
+
+	// Create a batch function that collects up to 3 events with short timeout
+	_, err := inngestgo.CreateFunction(
+		inngestClient,
+		inngestgo.FunctionOpts{
+			ID:          fmt.Sprintf("fn-run-batch-%s", batchEventName),
+			BatchEvents: &inngestgo.ConfigBatchEvents{MaxSize: 3, Timeout: 2 * time.Second},
+		},
+		inngestgo.EventTrigger(batchEventName, nil),
+		func(ctx context.Context, input inngestgo.Input[FnRunTestEvtData]) (any, error) {
+			atomic.AddInt32(&runCount, 1)
+			atomic.AddInt32(&totalEvents, int32(len(input.Events)))
+			fnID = uuid.MustParse(input.InputCtx.FunctionID)
+			return map[string]any{"eventCount": len(input.Events)}, nil
+		},
+	)
+	require.NoError(t, err)
+	registerFuncs()
+
+	start := time.Now()
+
+	// Send 6 events - they should be batched into 2 runs (3 events each)
+	for i := 0; i < 6; i++ {
+		_, err := inngestClient.Send(ctx, inngestgo.Event{
+			Name: batchEventName,
+			Data: map[string]any{"success": true, "idx": i},
+		})
+		require.NoError(t, err)
+	}
+
+	// Wait for both batches to be processed
+	require.EventuallyWithT(t, func(ct *assert.CollectT) {
+		assert.EqualValues(ct, 2, atomic.LoadInt32(&runCount))
+		assert.EqualValues(ct, 6, atomic.LoadInt32(&totalEvents))
+	}, 10*time.Second, 100*time.Millisecond)
+
+	end := time.Now().Add(10 * time.Second)
+
+	t.Run("multiple batch runs not collapsed with event CEL filter", func(t *testing.T) {
+		c := client.New(t)
+
+		// Filter by event name - this triggers the JOIN path
+		// Without GROUP BY, the 2 runs would collapse into 1 row due to aggregate functions
+		cel := celBlob([]string{
+			fmt.Sprintf("event.name == '%s'", batchEventName),
+		})
+
+		require.EventuallyWithT(t, func(ct *assert.CollectT) {
+			edges, pageInfo, total := c.FunctionRuns(ctx, client.FunctionRunOpt{
+				Start:       start,
+				End:         end,
+				FunctionIDs: []uuid.UUID{fnID},
+				Query:       &cel,
+			})
+
+			// Should be exactly 2 runs, not 1 (collapsed) or 6 (one per event)
+			assert.Equal(ct, 2, len(edges), "expected 2 batch runs, got %d (GROUP BY may be missing)", len(edges))
+			assert.Equal(ct, 2, total)
+			assert.False(ct, pageInfo.HasNextPage)
+		}, 10*time.Second, 2*time.Second)
+	})
+
+	t.Run("multiple batch runs not collapsed with event.data CEL filter", func(t *testing.T) {
+		c := client.New(t)
+
+		// Filter by event.data.idx - all 6 events match (idx 0-5)
+		// This should return 2 runs, one for each batch
+		cel := celBlob([]string{
+			fmt.Sprintf("event.name == '%s'", batchEventName),
+			"event.data.idx >= 0",
+		})
+
+		require.EventuallyWithT(t, func(ct *assert.CollectT) {
+			edges, pageInfo, total := c.FunctionRuns(ctx, client.FunctionRunOpt{
+				Start:       start,
+				End:         end,
+				FunctionIDs: []uuid.UUID{fnID},
+				Query:       &cel,
+			})
+
+			// Should be exactly 2 runs
+			assert.Equal(ct, 2, len(edges), "expected 2 batch runs, got %d", len(edges))
+			assert.Equal(ct, 2, total)
+			assert.False(ct, pageInfo.HasNextPage)
+		}, 10*time.Second, 2*time.Second)
+	})
 }

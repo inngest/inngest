@@ -448,34 +448,36 @@ type ComplexityRoot struct {
 	}
 
 	RunTraceSpan struct {
-		AppID          func(childComplexity int) int
-		Attempts       func(childComplexity int) int
-		ChildrenSpans  func(childComplexity int) int
-		DebugPaused    func(childComplexity int) int
-		DebugRunID     func(childComplexity int) int
-		DebugSessionID func(childComplexity int) int
-		Duration       func(childComplexity int) int
-		EndedAt        func(childComplexity int) int
-		FunctionID     func(childComplexity int) int
-		IsRoot         func(childComplexity int) int
-		IsUserland     func(childComplexity int) int
-		Metadata       func(childComplexity int) int
-		Name           func(childComplexity int) int
-		OutputID       func(childComplexity int) int
-		ParentSpan     func(childComplexity int) int
-		ParentSpanID   func(childComplexity int) int
-		QueuedAt       func(childComplexity int) int
-		Run            func(childComplexity int) int
-		RunID          func(childComplexity int) int
-		SpanID         func(childComplexity int) int
-		StartedAt      func(childComplexity int) int
-		Status         func(childComplexity int) int
-		StepID         func(childComplexity int) int
-		StepInfo       func(childComplexity int) int
-		StepOp         func(childComplexity int) int
-		StepType       func(childComplexity int) int
-		TraceID        func(childComplexity int) int
-		UserlandSpan   func(childComplexity int) int
+		AppID             func(childComplexity int) int
+		Attempts          func(childComplexity int) int
+		ChildrenSpans     func(childComplexity int) int
+		DebugPaused       func(childComplexity int) int
+		DebugRunID        func(childComplexity int) int
+		DebugSessionID    func(childComplexity int) int
+		Duration          func(childComplexity int) int
+		EndedAt           func(childComplexity int) int
+		FunctionID        func(childComplexity int) int
+		IsRoot            func(childComplexity int) int
+		IsUserland        func(childComplexity int) int
+		Metadata          func(childComplexity int) int
+		Name              func(childComplexity int) int
+		OutputID          func(childComplexity int) int
+		ParentSpan        func(childComplexity int) int
+		ParentSpanID      func(childComplexity int) int
+		QueuedAt          func(childComplexity int) int
+		Run               func(childComplexity int) int
+		RunID             func(childComplexity int) int
+		SkipExistingRunID func(childComplexity int) int
+		SkipReason        func(childComplexity int) int
+		SpanID            func(childComplexity int) int
+		StartedAt         func(childComplexity int) int
+		Status            func(childComplexity int) int
+		StepID            func(childComplexity int) int
+		StepInfo          func(childComplexity int) int
+		StepOp            func(childComplexity int) int
+		StepType          func(childComplexity int) int
+		TraceID           func(childComplexity int) int
+		UserlandSpan      func(childComplexity int) int
 	}
 
 	RunTraceSpanOutput struct {
@@ -2771,6 +2773,20 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.RunTraceSpan.RunID(childComplexity), true
 
+	case "RunTraceSpan.skipExistingRunID":
+		if e.complexity.RunTraceSpan.SkipExistingRunID == nil {
+			break
+		}
+
+		return e.complexity.RunTraceSpan.SkipExistingRunID(childComplexity), true
+
+	case "RunTraceSpan.skipReason":
+		if e.complexity.RunTraceSpan.SkipReason == nil {
+			break
+		}
+
+		return e.complexity.RunTraceSpan.SkipReason(childComplexity), true
+
 	case "RunTraceSpan.spanID":
 		if e.complexity.RunTraceSpan.SpanID == nil {
 			break
@@ -3736,6 +3752,7 @@ enum FunctionRunStatus {
   CANCELLED
   RUNNING
   QUEUED
+  SKIPPED
 }
 
 enum FunctionEventType {
@@ -4045,6 +4062,7 @@ enum RunTraceSpanStatus {
   # TIMED_OUT # wait for event timed out waiting
   WAITING # sleeping, waiting for an event
   CANCELLED # cancelled run
+  SKIPPED # run was skipped (e.g. singleton, paused, backlog limit)
 }
 
 enum StepOp {
@@ -4129,6 +4147,8 @@ type RunTraceSpan {
   debugRunID: ULID
   debugSessionID: ULID
   debugPaused: Boolean!
+  skipReason: String
+  skipExistingRunID: String
   metadata: [SpanMetadata!]!
 }
 
@@ -7554,6 +7574,10 @@ func (ec *executionContext) fieldContext_DebugRun_debugTraces(ctx context.Contex
 				return ec.fieldContext_RunTraceSpan_debugSessionID(ctx, field)
 			case "debugPaused":
 				return ec.fieldContext_RunTraceSpan_debugPaused(ctx, field)
+			case "skipReason":
+				return ec.fieldContext_RunTraceSpan_skipReason(ctx, field)
+			case "skipExistingRunID":
+				return ec.fieldContext_RunTraceSpan_skipExistingRunID(ctx, field)
 			case "metadata":
 				return ec.fieldContext_RunTraceSpan_metadata(ctx, field)
 			}
@@ -12451,6 +12475,10 @@ func (ec *executionContext) fieldContext_FunctionRunV2_trace(ctx context.Context
 				return ec.fieldContext_RunTraceSpan_debugSessionID(ctx, field)
 			case "debugPaused":
 				return ec.fieldContext_RunTraceSpan_debugPaused(ctx, field)
+			case "skipReason":
+				return ec.fieldContext_RunTraceSpan_skipReason(ctx, field)
+			case "skipExistingRunID":
+				return ec.fieldContext_RunTraceSpan_skipExistingRunID(ctx, field)
 			case "metadata":
 				return ec.fieldContext_RunTraceSpan_metadata(ctx, field)
 			}
@@ -15193,6 +15221,10 @@ func (ec *executionContext) fieldContext_Query_runTrace(ctx context.Context, fie
 				return ec.fieldContext_RunTraceSpan_debugSessionID(ctx, field)
 			case "debugPaused":
 				return ec.fieldContext_RunTraceSpan_debugPaused(ctx, field)
+			case "skipReason":
+				return ec.fieldContext_RunTraceSpan_skipReason(ctx, field)
+			case "skipExistingRunID":
+				return ec.fieldContext_RunTraceSpan_skipExistingRunID(ctx, field)
 			case "metadata":
 				return ec.fieldContext_RunTraceSpan_metadata(ctx, field)
 			}
@@ -18448,6 +18480,10 @@ func (ec *executionContext) fieldContext_RunTraceSpan_childrenSpans(ctx context.
 				return ec.fieldContext_RunTraceSpan_debugSessionID(ctx, field)
 			case "debugPaused":
 				return ec.fieldContext_RunTraceSpan_debugPaused(ctx, field)
+			case "skipReason":
+				return ec.fieldContext_RunTraceSpan_skipReason(ctx, field)
+			case "skipExistingRunID":
+				return ec.fieldContext_RunTraceSpan_skipExistingRunID(ctx, field)
 			case "metadata":
 				return ec.fieldContext_RunTraceSpan_metadata(ctx, field)
 			}
@@ -18799,6 +18835,10 @@ func (ec *executionContext) fieldContext_RunTraceSpan_parentSpan(ctx context.Con
 				return ec.fieldContext_RunTraceSpan_debugSessionID(ctx, field)
 			case "debugPaused":
 				return ec.fieldContext_RunTraceSpan_debugPaused(ctx, field)
+			case "skipReason":
+				return ec.fieldContext_RunTraceSpan_skipReason(ctx, field)
+			case "skipExistingRunID":
+				return ec.fieldContext_RunTraceSpan_skipExistingRunID(ctx, field)
 			case "metadata":
 				return ec.fieldContext_RunTraceSpan_metadata(ctx, field)
 			}
@@ -19030,6 +19070,88 @@ func (ec *executionContext) fieldContext_RunTraceSpan_debugPaused(ctx context.Co
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RunTraceSpan_skipReason(ctx context.Context, field graphql.CollectedField, obj *models.RunTraceSpan) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RunTraceSpan_skipReason(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.SkipReason, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RunTraceSpan_skipReason(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RunTraceSpan",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RunTraceSpan_skipExistingRunID(ctx context.Context, field graphql.CollectedField, obj *models.RunTraceSpan) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RunTraceSpan_skipExistingRunID(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.SkipExistingRunID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RunTraceSpan_skipExistingRunID(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RunTraceSpan",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
 		},
 	}
 	return fc, nil
@@ -27754,6 +27876,14 @@ func (ec *executionContext) _RunTraceSpan(ctx context.Context, sel ast.Selection
 			if out.Values[i] == graphql.Null {
 				invalids++
 			}
+		case "skipReason":
+
+			out.Values[i] = ec._RunTraceSpan_skipReason(ctx, field, obj)
+
+		case "skipExistingRunID":
+
+			out.Values[i] = ec._RunTraceSpan_skipExistingRunID(ctx, field, obj)
+
 		case "metadata":
 
 			out.Values[i] = ec._RunTraceSpan_metadata(ctx, field, obj)

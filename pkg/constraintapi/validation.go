@@ -81,36 +81,6 @@ func (r *CapacityCheckRequest) Valid() error {
 		}
 	}
 
-	// NOTE: This validation is only enforced as long as existing constraint state
-	// and the new lease-related data are colocated.
-	//
-	// Once we move all constraint state to a dedicated store, we will be able to
-	// mix constraints of different stages.
-	var hasRateLimit bool
-	var hasQueueConstraint bool
-	for _, ci := range r.Constraints {
-		if ci.Kind.IsQueueConstraint() {
-			hasQueueConstraint = true
-		}
-
-		if ci.Kind == ConstraintKindRateLimit {
-			hasRateLimit = true
-		}
-	}
-
-	if hasRateLimit && hasQueueConstraint {
-		errs = multierror.Append(errs, fmt.Errorf("cannot mix queue and rate limit constraints for first stage"))
-	}
-
-	// Ensure migration identifier is provided
-	if hasRateLimit && !r.Migration.IsRateLimit {
-		errs = multierror.Append(errs, fmt.Errorf("missing rate limit flag in migration identifier"))
-	}
-
-	if hasQueueConstraint && r.Migration.QueueShard == "" {
-		errs = multierror.Append(errs, fmt.Errorf("missing queue shard in migration identifier"))
-	}
-
 	return errs
 }
 
@@ -221,36 +191,6 @@ func (r *CapacityAcquireRequest) Valid() error {
 		}
 	}
 
-	// NOTE: This validation is only enforced as long as existing constraint state
-	// and the new lease-related data are colocated.
-	//
-	// Once we move all constraint state to a dedicated store, we will be able to
-	// mix constraints of different stages.
-	var hasRateLimit bool
-	var hasQueueConstraint bool
-	for _, ci := range r.Constraints {
-		if ci.Kind.IsQueueConstraint() {
-			hasQueueConstraint = true
-		}
-
-		if ci.Kind == ConstraintKindRateLimit {
-			hasRateLimit = true
-		}
-	}
-
-	if hasRateLimit && hasQueueConstraint {
-		errs = multierror.Append(errs, fmt.Errorf("cannot mix queue and rate limit constraints for first stage"))
-	}
-
-	// Ensure migration identifier is provided
-	if hasRateLimit && !r.Migration.IsRateLimit {
-		errs = multierror.Append(errs, fmt.Errorf("missing rate limit flag in migration identifier"))
-	}
-
-	if hasQueueConstraint && r.Migration.QueueShard == "" {
-		errs = multierror.Append(errs, fmt.Errorf("missing queue shard in migration identifier"))
-	}
-
 	return errs
 }
 
@@ -261,9 +201,6 @@ func (ci ConstraintItem) Valid() error {
 		// TODO: Implement run level concurrency and remove this validation
 		if ci.Concurrency != nil && ci.Concurrency.Mode == enums.ConcurrencyModeRun {
 			return fmt.Errorf("run level concurrency is not implemented yet")
-		}
-		if ci.Concurrency != nil && ci.Concurrency.InProgressItemKey == "" {
-			return fmt.Errorf("concurrency constraint must specify InProgressItemKey")
 		}
 	case ConstraintKindThrottle:
 		if ci.Throttle != nil && ci.Throttle.EvaluatedKeyHash == "" {

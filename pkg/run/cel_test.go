@@ -192,3 +192,139 @@ func TestToSQLFilters(t *testing.T) {
 		})
 	}
 }
+
+func TestToSQLFiltersWithSQLiteConverter(t *testing.T) {
+	ctx := context.Background()
+
+	tests := []struct {
+		name     string
+		cel      []string
+		expected []sq.Expression
+	}{
+		{
+			name: "event.data boolean true",
+			cel:  []string{`event.data.b == true`},
+			expected: []sq.Expression{
+				sq.L("json_extract(NULLIF(events.event_data, ''), '$.b')").Eq(1),
+			},
+		},
+		{
+			name: "event.data boolean false",
+			cel:  []string{`event.data.b2 == false`},
+			expected: []sq.Expression{
+				sq.L("json_extract(NULLIF(events.event_data, ''), '$.b2')").Eq(0),
+			},
+		},
+		{
+			name: "event.data null",
+			cel:  []string{`event.data.n == null`},
+			expected: []sq.Expression{
+				sq.L("json_type(NULLIF(events.event_data, ''), '$.n')").Eq("null"),
+			},
+		},
+		{
+			name: "event.data not null",
+			cel:  []string{`event.data.n != null`},
+			expected: []sq.Expression{
+				sq.L("json_type(NULLIF(events.event_data, ''), '$.n')").Neq("null"),
+			},
+		},
+		{
+			name: "output boolean true",
+			cel:  []string{`output.success == true`},
+			expected: []sq.Expression{
+				sq.L("json_extract(json_extract(spans.output, '$.data'), '$.success')").Eq(1),
+			},
+		},
+		{
+			name: "output null",
+			cel:  []string{`output.result == null`},
+			expected: []sq.Expression{
+				sq.L("json_type(json_extract(spans.output, '$.data'), '$.result')").Eq("null"),
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			handler, err := NewExpressionHandler(ctx,
+				WithExpressionHandlerExpressions(test.cel),
+				WithExpressionSQLConverter(SpanEventSQLiteConverter),
+			)
+			require.NoError(t, err)
+
+			filters, err := handler.ToSQLFilters(ctx)
+			require.NoError(t, err)
+
+			assert.ElementsMatch(t, test.expected, filters)
+		})
+	}
+}
+
+func TestToSQLFiltersWithPostgresConverter(t *testing.T) {
+	ctx := context.Background()
+
+	tests := []struct {
+		name     string
+		cel      []string
+		expected []sq.Expression
+	}{
+		{
+			name: "event.data boolean true",
+			cel:  []string{`event.data.b == true`},
+			expected: []sq.Expression{
+				sq.L("(NULLIF(events.event_data, '')::jsonb)#>>'{b}'").Eq("true"),
+			},
+		},
+		{
+			name: "event.data boolean false",
+			cel:  []string{`event.data.b2 == false`},
+			expected: []sq.Expression{
+				sq.L("(NULLIF(events.event_data, '')::jsonb)#>>'{b2}'").Eq("false"),
+			},
+		},
+		{
+			name: "event.data null",
+			cel:  []string{`event.data.n == null`},
+			expected: []sq.Expression{
+				sq.L("jsonb_typeof((NULLIF(events.event_data, '')::jsonb)#>'{n}')").Eq("null"),
+			},
+		},
+		{
+			name: "event.data not null",
+			cel:  []string{`event.data.n != null`},
+			expected: []sq.Expression{
+				sq.L("jsonb_typeof((NULLIF(events.event_data, '')::jsonb)#>'{n}')").Neq("null"),
+			},
+		},
+		{
+			name: "output boolean true",
+			cel:  []string{`output.success == true`},
+			expected: []sq.Expression{
+				sq.L("((spans.output#>>'{}')::jsonb->'data')#>>'{success}'").Eq("true"),
+			},
+		},
+		{
+			name: "output null",
+			cel:  []string{`output.result == null`},
+			expected: []sq.Expression{
+				sq.L("jsonb_typeof(((spans.output#>>'{}')::jsonb->'data')#>'{result}')").Eq("null"),
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			handler, err := NewExpressionHandler(ctx,
+				WithExpressionHandlerExpressions(test.cel),
+				WithExpressionSQLConverter(SpanEventPostgresConverter),
+			)
+			require.NoError(t, err)
+
+			filters, err := handler.ToSQLFilters(ctx)
+			require.NoError(t, err)
+
+			assert.ElementsMatch(t, test.expected, filters)
+		})
+	}
+}

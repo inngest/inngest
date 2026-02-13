@@ -38,6 +38,7 @@ export function EventsTable({
   getEvents,
   getEventDetails,
   getEventPayload,
+  getEventRuns,
   eventNames,
   singleEventTypePage,
   emptyActions,
@@ -74,6 +75,7 @@ export function EventsTable({
   }) => Promise<{ events: Event[]; pageInfo: PageInfo; totalCount: number }>;
   getEventDetails: ({ eventID }: { eventID: string }) => Promise<Event>;
   getEventPayload: ({ eventID }: { eventID: string }) => Promise<Pick<Event, 'payload'>>;
+  getEventRuns?: ({ eventID }: { eventID: string }) => Promise<Pick<Event, 'runs' | 'name'>>;
   getEventTypes?: () => Promise<Required<Pick<EventType, 'name' | 'id'>>[]>;
   eventNames?: string[];
   singleEventTypePage?: boolean;
@@ -342,6 +344,7 @@ export function EventsTable({
                 initialData={initialData}
                 getEventDetails={getEventDetails}
                 getEventPayload={getEventPayload}
+                getEventRuns={getEventRuns}
                 expandedRowActions={expandedRowActions}
                 standalone={standalone}
                 eventID={id}

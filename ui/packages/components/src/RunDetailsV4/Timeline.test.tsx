@@ -72,9 +72,9 @@ describe('Timeline', () => {
       const rows = screen.getAllByTestId('timeline-bar-row');
       fireEvent.click(rows[0]!);
 
-      // Should show INNGEST and SERVER timing rows
-      expect(screen.getByText('INNGEST')).toBeTruthy();
-      expect(screen.getByText('ACME CORP SERVER')).toBeTruthy();
+      // Should show Inngest and SERVER timing rows
+      expect(screen.getByText('Inngest')).toBeTruthy();
+      expect(screen.getByText('Acme Corp server')).toBeTruthy();
     });
 
     it('uses TimelineBar for timing breakdown rows', async () => {
@@ -100,7 +100,7 @@ describe('Timeline', () => {
 
       // Expand first bar
       fireEvent.click(rows[0]!);
-      expect(screen.getAllByText('INNGEST').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('Inngest').length).toBeGreaterThan(0);
 
       // Second bar (if expandable) should still be collapsed
       // The state should be independent
@@ -112,12 +112,12 @@ describe('Timeline', () => {
       // Expand first bar
       const rows = screen.getAllByTestId('timeline-bar-row');
       fireEvent.click(rows[0]!);
-      expect(screen.getAllByText('INNGEST').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('Inngest').length).toBeGreaterThan(0);
 
       // Collapse by clicking the arrow (only the arrow collapses)
       const collapseButton = screen.getByRole('button', { name: /collapse/i });
       fireEvent.click(collapseButton);
-      expect(screen.queryByText('INNGEST')).toBeNull();
+      expect(screen.queryByText('Inngest')).toBeNull();
     });
   });
 

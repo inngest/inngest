@@ -31,6 +31,8 @@ var Attrs = struct {
 	FunctionID          attr[*uuid.UUID]
 	FunctionVersion     attr[*int]
 	RunID               attr[*ulid.ULID]
+	SkipReason          attr[*enums.SkipReason]
+	SkipExistingRunID   attr[*string]
 
 	// Durable endpoint attributes
 	IsDurableEndpointRun         attr[*bool]
@@ -175,6 +177,8 @@ var Attrs = struct {
 	ResponseOutputSize:                 IntAttr("response.output_size"),
 	ResponseStatusCode:                 IntAttr("response.status_code"),
 	RunID:                              ULIDAttr("run.id"),
+	SkipReason:                         TextAttr[enums.SkipReason]("run.skip_reason"),
+	SkipExistingRunID:                  StringAttr("run.skip_existing_run_id"),
 	StartedAt:                          TimeAttr("started_at"),
 	StepAttempt:                        IntAttr("step.attempt"),
 	StepCodeLocation:                   StringAttr("step.code_location"),

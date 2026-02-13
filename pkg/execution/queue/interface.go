@@ -178,6 +178,25 @@ type QueueProcessor interface {
 	AddShadowContinue(ctx context.Context, p *QueueShadowPartition, ctr uint)
 	GetShadowContinuations() map[string]ShadowContinuation
 	ClearShadowContinuations()
+
+	BacklogRefillConstraintCheck(
+		ctx context.Context,
+		shadowPart *QueueShadowPartition,
+		backlog *QueueBacklog,
+		constraints PartitionConstraintConfig,
+		items []*QueueItem,
+		operationIdempotencyKey string,
+		now time.Time,
+	) (*BacklogRefillConstraintCheckResult, error)
+
+	ItemLeaseConstraintCheck(
+		ctx context.Context,
+		shadowPart *QueueShadowPartition,
+		backlog *QueueBacklog,
+		constraints PartitionConstraintConfig,
+		item *QueueItem,
+		now time.Time,
+	) (ItemLeaseConstraintCheckResult, error)
 }
 
 type ShardOperations interface {
@@ -228,25 +247,6 @@ type ShardOperations interface {
 		sequential bool,
 	) ([]*QueuePartition, error)
 
-	BacklogRefillConstraintCheck(
-		ctx context.Context,
-		shadowPart *QueueShadowPartition,
-		backlog *QueueBacklog,
-		constraints PartitionConstraintConfig,
-		items []*QueueItem,
-		operationIdempotencyKey string,
-		now time.Time,
-	) (*BacklogRefillConstraintCheckResult, error)
-
-	ItemLeaseConstraintCheck(
-		ctx context.Context,
-		shadowPart *QueueShadowPartition,
-		backlog *QueueBacklog,
-		constraints PartitionConstraintConfig,
-		item *QueueItem,
-		now time.Time,
-	) (ItemLeaseConstraintCheckResult, error)
-
 	RemoveQueueItem(ctx context.Context, partitionID string, itemID string) error
 	LoadQueueItem(ctx context.Context, itemID string) (*QueueItem, error)
 
@@ -292,7 +292,7 @@ type ShardOperations interface {
 	PartitionBacklogSize(ctx context.Context, partitionID string) (int64, error)
 	PartitionByID(ctx context.Context, partitionID string) (*PartitionInspectionResult, error)
 
-	UnpauseFunction(ctx context.Context, acctID, fnID uuid.UUID) error
+	UnpauseFunction(ctx context.Context, acctID, envID, fnID uuid.UUID) error
 
 	OutstandingJobCount(ctx context.Context, workspaceID, workflowID uuid.UUID, runID ulid.ULID) (int, error)
 	RunningCount(ctx context.Context, functionID uuid.UUID) (int64, error)

@@ -123,6 +123,8 @@ func StepStatusToRunStatus(stepStatus StepStatus) RunStatus {
 		return RunStatusScheduled // Functions in queue due to concurrency limits
 	case StepStatusWaiting, StepStatusSleeping, StepStatusInvoking:
 		return RunStatusRunning // These are all "in progress" states
+	case StepStatusSkipped:
+		return RunStatusSkipped
 	default:
 		return RunStatusUnknown // default to unknown
 	}

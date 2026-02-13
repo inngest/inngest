@@ -457,7 +457,7 @@ type QueueOptions struct {
 
 	enableJobPromotion bool
 
-	CapacityManager                    constraintapi.RolloutManager
+	CapacityManager                    constraintapi.CapacityManager
 	UseConstraintAPI                   constraintapi.UseConstraintAPIFn
 	EnableCapacityLeaseInstrumentation constraintapi.EnableHighCardinalityInstrumentation
 	CapacityLeaseExtendInterval        time.Duration
@@ -467,6 +467,9 @@ type QueueOptions struct {
 	ConditionalTracer trace.ConditionalTracer
 
 	ShardAssignmentConfig ShardAssignmentConfig
+	// OnShardLeaseAcquired is called immediately after a shard lease is successfully claimed.
+	// The shardName parameter is the name of the specific shard that was leased.
+	OnShardLeaseAcquired func(ctx context.Context, shardName string)
 }
 
 // ShardSelector returns a shard reference for the given queue item.
@@ -476,6 +479,12 @@ type ShardSelector func(ctx context.Context, accountId uuid.UUID, queueName *str
 func WithShardAssignmentConfig(cfg ShardAssignmentConfig) QueueOpt {
 	return func(q *QueueOptions) {
 		q.ShardAssignmentConfig = cfg
+	}
+}
+
+func WithOnShardLeaseAcquired(f func(ctx context.Context, shardName string)) QueueOpt {
+	return func(q *QueueOptions) {
+		q.OnShardLeaseAcquired = f
 	}
 }
 
@@ -496,7 +505,7 @@ func WithPartitionConstraintConfigGetter(f PartitionConstraintConfigGetter) Queu
 }
 
 // AllowKeyQueues determines if key queues should be enabled for the account
-type AllowKeyQueues func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool
+type AllowKeyQueues func(ctx context.Context, acctID, envID, fnID uuid.UUID) bool
 
 func WithAllowKeyQueues(kq AllowKeyQueues) QueueOpt {
 	return func(q *QueueOptions) {
@@ -572,7 +581,7 @@ func WithEnableJobPromotion(enable bool) QueueOpt {
 	}
 }
 
-func WithCapacityManager(capacityManager constraintapi.RolloutManager) QueueOpt {
+func WithCapacityManager(capacityManager constraintapi.CapacityManager) QueueOpt {
 	return func(q *QueueOptions) {
 		q.CapacityManager = capacityManager
 	}
@@ -761,7 +770,7 @@ func NewQueueOptions(
 				},
 			}
 		},
-		AllowKeyQueues: func(ctx context.Context, acctID, fnID uuid.UUID) bool {
+		AllowKeyQueues: func(ctx context.Context, acctID, envID, fnID uuid.UUID) bool {
 			return false
 		},
 		shadowPartitionProcessCount: func(ctx context.Context, acctID uuid.UUID) int {
@@ -794,6 +803,9 @@ func NewQueueOptions(
 			return false
 		}),
 		EnableCapacityLeaseInstrumentation: func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool) {
+			return false
+		},
+		UseConstraintAPI: func(ctx context.Context, accountID uuid.UUID) (enable bool) {
 			return false
 		},
 	}

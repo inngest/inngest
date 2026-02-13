@@ -288,7 +288,7 @@ func WithBatcher(b batch.BatchManager) ExecutorOpt {
 	}
 }
 
-func WithCapacityManager(cm constraintapi.RolloutManager) ExecutorOpt {
+func WithCapacityManager(cm constraintapi.CapacityManager) ExecutorOpt {
 	return func(e execution.Executor) error {
 		e.(*executor).capacityManager = cm
 		return nil
@@ -464,7 +464,7 @@ type executor struct {
 	batcher      batch.BatchManager
 	singletonMgr singleton.Singleton
 
-	capacityManager               constraintapi.RolloutManager
+	capacityManager               constraintapi.CapacityManager
 	useConstraintAPI              constraintapi.UseConstraintAPIFn
 	enableBatchingInstrumentation func(ctx context.Context, accountID, envID uuid.UUID) (enable bool)
 
@@ -826,17 +826,12 @@ func (e *executor) schedule(
 			rateLimitKey, err := ratelimit.RateLimitKey(ctx, req.Function.ID, *req.Function.RateLimit, evtMap)
 			switch err {
 			case nil:
-				constraintCheckIdempotencyKey := key
-				if e.capacityManager != nil {
-					constraintCheckIdempotencyKey = e.capacityManager.KeyConstraintCheckIdempotency(constraintapi.MigrationIdentifier{IsRateLimit: true}, req.AccountID, key)
-				}
-
 				res, err := e.rateLimiter.RateLimit(
 					logger.WithStdlib(ctx, l),
 					rateLimitKey,
 					*req.Function.RateLimit,
 					ratelimit.WithNow(e.now()),
-					ratelimit.WithIdempotency(constraintCheckIdempotencyKey, RateLimitIdempotencyTTL),
+					ratelimit.WithIdempotency(key, RateLimitIdempotencyTTL),
 				)
 				if err != nil {
 					metrics.IncrRateLimitUsage(ctx, metrics.CounterOpt{
@@ -1068,6 +1063,10 @@ func (e *executor) schedule(
 	//
 	throttle := queue.GetThrottleConfig(ctx, req.Function.ID, req.Function.Throttle, evtMap)
 
+	// Track skip reason and context for span attributes
+	var skipReason enums.SkipReason
+	var singletonSkipRunID *ulid.ULID
+
 	//
 	// Create singleton information and try to handle it prior to creating state.
 	//
@@ -1111,8 +1110,9 @@ func (e *executor) schedule(
 						l.ReportError(err, "error canceling singleton run")
 					}
 				default:
-					// Immediately end before creating state
-					return nil, ErrFunctionSkipped
+					// Mark as singleton skip - will be handled after span creation
+					skipReason = enums.SkipReasonSingleton
+					singletonSkipRunID = singletonRunID
 				}
 			}
 			singletonConfig = &queue.Singleton{Key: singletonKey}
@@ -1144,8 +1144,11 @@ func (e *executor) schedule(
 
 	stv1ID := sv2.V1FromMetadata(metadata)
 
-	// Check if the function should be skipped (paused, draining)
-	skipReason := e.skipped(ctx, req)
+	// Check if the function should be skipped (paused, draining, backlog limit)
+	// Only check if not already marked as skipped (e.g., by singleton)
+	if skipReason == enums.SkipReasonNone {
+		skipReason = e.skipped(ctx, req)
+	}
 
 	// Create run state if not skipped
 	if skipReason == enums.SkipReasonNone {
@@ -1216,6 +1219,14 @@ func (e *executor) schedule(
 		&status,
 	)
 
+	if skipReason != enums.SkipReasonNone {
+		meta.AddAttr(runSpanOpts.Attributes, meta.Attrs.SkipReason, &skipReason)
+		if singletonSkipRunID != nil {
+			existingRunID := singletonSkipRunID.String()
+			meta.AddAttr(runSpanOpts.Attributes, meta.Attrs.SkipExistingRunID, &existingRunID)
+		}
+	}
+
 	// Always the root span.
 	runSpanRef, err = e.tracerProvider.CreateDroppableSpan(
 		ctx,
@@ -1227,7 +1238,7 @@ func (e *executor) schedule(
 		l.Debug("error creating run span", "error", err)
 	}
 
-	// If this is paused, immediately end just before creating state.
+	// If the function is being skipped, send spans and handle skip.
 	if skipReason != enums.SkipReasonNone {
 		sendSpans()
 		return e.handleFunctionSkipped(ctx, req, metadata, evts, skipReason)
@@ -4682,7 +4693,6 @@ func (e *executor) newExpressionEvaluator(ctx context.Context, expr string) (exp
 // AppendAndScheduleBatch appends a new batch item. If a new batch is created, it will be scheduled to run
 // after the batch timeout. If the item finalizes the batch, a function run is immediately scheduled.
 func (e *executor) AppendAndScheduleBatch(ctx context.Context, fn inngest.Function, bi batch.BatchItem, opts *execution.BatchExecOpts) error {
-
 	enableInstrumentation := e.enableBatchingInstrumentation != nil && e.enableBatchingInstrumentation(ctx, bi.AccountID, bi.WorkspaceID)
 	l := logger.StdlibLogger(ctx).With("eventID", bi.EventID)
 	result, err := e.batcher.Append(ctx, bi, fn)

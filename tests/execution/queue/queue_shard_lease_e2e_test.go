@@ -2,6 +2,7 @@ package queue
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
@@ -117,10 +118,18 @@ func TestNewQueueWithShardAssignment(t *testing.T) {
 		"shard-b": shardB,
 	}
 
+	var mu sync.Mutex
+	var acquiredShardName string
+
 	q, err := queue.New(ctx, "test", nil, queueShards, nil,
 		queue.WithClock(clock),
 		queue.WithRunMode(queue.QueueRunMode{
 			ShardGroup: groupName,
+		}),
+		queue.WithOnShardLeaseAcquired(func(ctx context.Context, shardName string) {
+			mu.Lock()
+			defer mu.Unlock()
+			acquiredShardName = shardName
 		}),
 	)
 	require.NoError(t, err)
@@ -146,4 +155,11 @@ func TestNewQueueWithShardAssignment(t *testing.T) {
 
 	// The primary shard must be shard-a (the one with matching group config)
 	require.Equal(t, "shard-a", q.Shard().Name())
+
+	// The OnShardLeaseAcquired callback is invoked in a goroutine, so wait for it.
+	require.Eventually(t, func() bool {
+		mu.Lock()
+		defer mu.Unlock()
+		return acquiredShardName == "shard-a"
+	}, 5*time.Second, 50*time.Millisecond)
 }

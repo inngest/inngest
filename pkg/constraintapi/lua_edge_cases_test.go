@@ -21,66 +21,13 @@ func TestLuaScriptEdgeCases_Concurrency(t *testing.T) {
 	clock := clockwork.NewFakeClock()
 	te.CapacityManager.clock = clock
 
-	t.Run("In-Progress Items vs Leases Reconciliation", func(t *testing.T) {
-		inProgressItemKey := fmt.Sprintf("{%s}:concurrency:items:%s", te.KeyPrefix, te.FunctionID)
-
-		// Pre-populate in-progress items (simulating existing queue items)
-		_, err := te.Redis.ZAdd(inProgressItemKey, float64(clock.Now().Add(time.Minute).UnixMilli()), "item-1")
-		require.NoError(t, err)
-		_, err = te.Redis.ZAdd(inProgressItemKey, float64(clock.Now().Add(time.Minute).UnixMilli()), "item-2")
-		require.NoError(t, err)
-
-		config := ConstraintConfig{
-			FunctionVersion: 1,
-			Concurrency: ConcurrencyConfig{
-				FunctionConcurrency: 5,
-			},
-		}
-
-		constraints := []ConstraintItem{
-			{
-				Kind: ConstraintKindConcurrency,
-				Concurrency: &ConcurrencyConstraint{
-					Mode:              enums.ConcurrencyModeStep,
-					Scope:             enums.ConcurrencyScopeFn,
-					InProgressItemKey: inProgressItemKey,
-				},
-			},
-		}
-
-		// Should have capacity for 3 more (5 - 2 existing items)
-		resp, err := te.CapacityManager.Acquire(context.Background(), &CapacityAcquireRequest{
-			IdempotencyKey:       "reconcile-test",
-			AccountID:            te.AccountID,
-			EnvID:                te.EnvID,
-			FunctionID:           te.FunctionID,
-			Amount:               4, // Request more than available
-			LeaseIdempotencyKeys: []string{"lease-1", "lease-2", "lease-3", "lease-4"},
-			CurrentTime:          clock.Now(),
-			Duration:             5 * time.Second,
-			MaximumLifetime:      time.Minute,
-			Configuration:        config,
-			Constraints:          constraints,
-			Source: LeaseSource{
-				Service:  ServiceExecutor,
-				Location: CallerLocationItemLease,
-			},
-			Migration: MigrationIdentifier{QueueShard: "test"},
-		})
-
-		require.NoError(t, err)
-		require.Len(t, resp.Leases, 3, "Should grant available capacity accounting for existing items")
-		require.NotEmpty(t, resp.LimitingConstraints, "Should report concurrency as limiting")
-
-		// Verify constraint state
-		cv := te.NewConstraintVerifier()
-		cv.VerifyInProgressCounts(constraints, map[string]int{"constraint_0": 5}) // 2 items + 3 leases
-	})
+	// NOTE: "In-Progress Items vs Leases Reconciliation" test removed
+	// This test was checking backward compatibility with legacy queue-based concurrency state
+	// using the old key format {q}:concurrency:items:{functionID}. Since we're doing a hard
+	// migration to the new constraint API, this legacy compatibility is no longer needed.
 
 	t.Run("Expired Lease Detection", func(t *testing.T) {
 		te.Redis.FlushAll()
-
-		inProgressItemKey := fmt.Sprintf("{%s}:concurrency:items2:%s", te.KeyPrefix, te.FunctionID)
 
 		config := ConstraintConfig{
 			FunctionVersion: 1,
@@ -93,14 +40,13 @@ func TestLuaScriptEdgeCases_Concurrency(t *testing.T) {
 			{
 				Kind: ConstraintKindConcurrency,
 				Concurrency: &ConcurrencyConstraint{
-					Mode:              enums.ConcurrencyModeStep,
-					Scope:             enums.ConcurrencyScopeFn,
-					InProgressItemKey: inProgressItemKey,
+					Mode:  enums.ConcurrencyModeStep,
+					Scope: enums.ConcurrencyScopeFn,
 				},
 			},
 		}
 
-		inProgressLeasesKey := constraints[0].Concurrency.InProgressLeasesKey(te.KeyPrefix, te.AccountID, te.EnvID, te.FunctionID)
+		inProgressLeasesKey := constraints[0].Concurrency.InProgressLeasesKey(te.AccountID, te.EnvID, te.FunctionID)
 
 		// Pre-populate with expired and active leases
 		expiredTime := clock.Now().Add(-time.Minute).UnixMilli()
@@ -131,7 +77,6 @@ func TestLuaScriptEdgeCases_Concurrency(t *testing.T) {
 				Service:  ServiceExecutor,
 				Location: CallerLocationItemLease,
 			},
-			Migration: MigrationIdentifier{QueueShard: "test"},
 		})
 
 		require.NoError(t, err)
@@ -153,9 +98,8 @@ func TestLuaScriptEdgeCases_Concurrency(t *testing.T) {
 			{
 				Kind: ConstraintKindConcurrency,
 				Concurrency: &ConcurrencyConstraint{
-					Mode:              enums.ConcurrencyModeStep,
-					Scope:             enums.ConcurrencyScopeFn,
-					InProgressItemKey: "zero-concurrency-key",
+					Mode:  enums.ConcurrencyModeStep,
+					Scope: enums.ConcurrencyScopeFn,
 				},
 			},
 		}
@@ -176,7 +120,6 @@ func TestLuaScriptEdgeCases_Concurrency(t *testing.T) {
 				Service:  ServiceExecutor,
 				Location: CallerLocationItemLease,
 			},
-			Migration: MigrationIdentifier{QueueShard: "test"},
 		})
 
 		require.NoError(t, err)
@@ -239,7 +182,6 @@ func TestLuaScriptEdgeCases_Throttle(t *testing.T) {
 				Service:  ServiceExecutor,
 				Location: CallerLocationItemLease,
 			},
-			Migration: MigrationIdentifier{QueueShard: "test"},
 		}
 		for i := 0; i < 20; i++ {
 			req.LeaseIdempotencyKeys[i] = fmt.Sprintf("lease-%d", i)
@@ -297,7 +239,6 @@ func TestLuaScriptEdgeCases_Throttle(t *testing.T) {
 				Service:  ServiceExecutor,
 				Location: CallerLocationItemLease,
 			},
-			Migration: MigrationIdentifier{QueueShard: "test"},
 		})
 
 		require.NoError(t, err)
@@ -321,7 +262,6 @@ func TestLuaScriptEdgeCases_Throttle(t *testing.T) {
 				Service:  ServiceExecutor,
 				Location: CallerLocationItemLease,
 			},
-			Migration: MigrationIdentifier{QueueShard: "test"},
 		})
 
 		require.NoError(t, err)
@@ -370,7 +310,6 @@ func TestLuaScriptEdgeCases_Throttle(t *testing.T) {
 				Service:  ServiceExecutor,
 				Location: CallerLocationItemLease,
 			},
-			Migration: MigrationIdentifier{QueueShard: "test"},
 		})
 
 		require.NoError(t, err)
@@ -389,12 +328,12 @@ func TestLuaScriptEdgeCases_ErrorConditions(t *testing.T) {
 	t.Run("Invalid JSON in Request State", func(t *testing.T) {
 		reqID := ulid.MustNew(ulid.Timestamp(te.CapacityManager.clock.Now()), rand.Reader)
 		// Pre-populate invalid request state
-		requestStateKey := te.CapacityManager.keyRequestState(te.KeyPrefix, te.AccountID, reqID)
+		requestStateKey := te.CapacityManager.keyRequestState(te.AccountID, reqID)
 		err := te.Redis.Set(requestStateKey, "invalid-json-data")
 		require.NoError(t, err)
 		leaseID := ulid.Make()
 		te.Redis.HSet(
-			te.CapacityManager.keyLeaseDetails(te.KeyPrefix, te.AccountID, leaseID),
+			te.CapacityManager.keyLeaseDetails(te.AccountID, leaseID),
 			"req", reqID.String(),
 			"lik", util.XXHash("acquire-key"),
 			"rid", "",
@@ -406,7 +345,6 @@ func TestLuaScriptEdgeCases_ErrorConditions(t *testing.T) {
 			AccountID:      te.AccountID,
 			LeaseID:        leaseID,
 			Duration:       5 * time.Second,
-			Migration:      MigrationIdentifier{QueueShard: "test"},
 		})
 		require.ErrorContains(t, err, "requestDetails is nil after JSON decode")
 		require.Error(t, err)
@@ -421,7 +359,6 @@ func TestLuaScriptEdgeCases_ErrorConditions(t *testing.T) {
 			AccountID:      te.AccountID,
 			LeaseID:        leaseID,
 			Duration:       5 * time.Second,
-			Migration:      MigrationIdentifier{QueueShard: "test"},
 		})
 
 		require.NoError(t, err)
@@ -440,7 +377,6 @@ func TestLuaScriptEdgeCases_ErrorConditions(t *testing.T) {
 			AccountID:      te.AccountID,
 			LeaseID:        leaseID,
 			Duration:       5 * time.Second,
-			Migration:      MigrationIdentifier{QueueShard: "test"},
 		})
 
 		require.NoError(t, err)
@@ -457,15 +393,12 @@ func TestLuaScriptEdgeCases_ErrorConditions(t *testing.T) {
 			},
 		}
 
-		inProgressKey := fmt.Sprintf("{%s}:concurrency:test:%s", te.KeyPrefix, te.FunctionID)
-
 		constraints := []ConstraintItem{
 			{
 				Kind: ConstraintKindConcurrency,
 				Concurrency: &ConcurrencyConstraint{
-					Mode:              enums.ConcurrencyModeStep,
-					Scope:             enums.ConcurrencyScopeFn,
-					InProgressItemKey: inProgressKey,
+					Mode:  enums.ConcurrencyModeStep,
+					Scope: enums.ConcurrencyScopeFn,
 				},
 			},
 		}
@@ -488,10 +421,9 @@ func TestLuaScriptEdgeCases_ErrorConditions(t *testing.T) {
 				Service:  ServiceExecutor,
 				Location: CallerLocationItemLease,
 			},
-			Migration: MigrationIdentifier{QueueShard: "test"},
 		}
 
-		_, _, _, fingerprint, err := buildRequestState(req, "q:v1")
+		_, _, _, fingerprint, err := buildRequestState(req)
 		require.NoError(t, err)
 
 		acquireIdempotencyKey := fmt.Sprintf("idempotency-test-%s", fingerprint)
