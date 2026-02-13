@@ -509,6 +509,17 @@ func (s *svc) handleDebounce(ctx context.Context, item queue.Item) error {
 
 			if err != nil {
 				span.SetAttributes(attribute.Bool(consts.OtelSysStepDelete, true))
+
+				// If no run was scheduled, clean up debounce item
+				if errors.Is(err, state.ErrIdentifierExists) ||
+					errors.Is(err, ErrFunctionSkipped) ||
+					errors.Is(err, ErrFunctionSkippedIdempotency) {
+					if err := s.debouncer.DeleteDebounceItem(ctx, d.DebounceID, *di, d.AccountID); err != nil {
+						logger.StdlibLogger(ctx).ReportError(err, "error deleting debounce item")
+					}
+
+					continue
+				}
 				return err
 			}
 
@@ -516,7 +527,9 @@ func (s *svc) handleDebounce(ctx context.Context, item queue.Item) error {
 				span.SetAttributes(attribute.String(consts.OtelAttrSDKRunID, md.ID.RunID.String()))
 			}
 
-			_ = s.debouncer.DeleteDebounceItem(ctx, d.DebounceID, *di, d.AccountID)
+			if err := s.debouncer.DeleteDebounceItem(ctx, d.DebounceID, *di, d.AccountID); err != nil {
+				logger.StdlibLogger(ctx).ReportError(err, "error deleting debounce item")
+			}
 		}
 	}
 
