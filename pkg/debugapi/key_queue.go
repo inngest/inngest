@@ -126,12 +126,12 @@ func mapBacklogToProto(bl *queue.QueueBacklog, itemCount int64) *pb.BacklogInfo 
 	for _, ck := range bl.ConcurrencyKeys {
 		info.ConcurrencyKeys = append(info.ConcurrencyKeys, &pb.BacklogConcurrencyKeyInfo{
 			CanonicalKeyId:      ck.CanonicalKeyID,
-			Scope:               string(ck.Scope),
+			Scope:               ck.Scope.String(),
 			EntityId:            ck.EntityID.String(),
 			HashedKeyExpression: ck.HashedKeyExpression,
 			HashedValue:         ck.HashedValue,
 			UnhashedValue:       ck.UnhashedValue,
-			ConcurrencyMode:     string(ck.ConcurrencyMode),
+			ConcurrencyMode:     ck.ConcurrencyMode.String(),
 		})
 	}
 	if bl.Throttle != nil {
