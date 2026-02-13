@@ -78,7 +78,11 @@ export interface HTTPTimingMetadata {
    */
   tls_handshake_ms: number /* int64 */;
   /**
-   * ServerProcessingMs is the time spent downloading the response body.
+   * ServerProcessingMs is the time from request sent to first byte received (TTFB).
+   */
+  server_processing_ms: number /* int64 */;
+  /**
+   * ContentTransferMs is the time spent downloading the response body.
    */
   content_transfer_ms: number /* int64 */;
   /**
