@@ -1,7 +1,6 @@
 import type {
   SpanMetadataKind as GeneratedSpanMetadataKind,
   SpanMetadataKindUserland as GeneratedSpanMetadataKindUserland,
-  HTTPTimingMetadata,
   Warnings,
 } from '../generated/index';
 
@@ -74,7 +73,14 @@ export type SpanMetadataInngestHTTPTiming = {
   scope: 'step_attempt';
   kind: 'inngest.http.timing';
   updatedAt: string;
-  values: HTTPTimingMetadata;
+  values: {
+    dns_lookup_ms: number;
+    tcp_connection_ms: number;
+    tls_handshake_ms: number;
+    server_processing_ms: number;
+    content_transfer_ms: number;
+    total_ms: number;
+  };
 };
 
 export type SpanMetadataInngestWarnings = {
