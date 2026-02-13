@@ -6,6 +6,7 @@ import type { SpanMetadata, SpanMetadataKind } from './types';
 const inngestKindLabels: Record<string, string> = {
   ai: 'AI Metadata',
   http: 'HTTP Metadata',
+  response_headers: 'Response Headers',
   warnings: 'Warnings',
 };
 
@@ -58,16 +59,24 @@ const MetadataAttrRow = ({
           <div className="w-48">Key</div>
           <div className="">Value</div>
         </div>
-        {Object.entries(values).map(([key, value]) => {
-          return (
-            <div key={`metadata-attr-${key}`} className="flex flex-row items-center px-4 pb-2">
-              <div className="text-muted w-48 text-sm font-normal leading-tight">{key}</div>
-              <div className="text-basis truncate text-sm font-normal leading-tight">
-                {String(value) || '--'}
+        {Object.entries(values)
+          .sort(([a], [b]) => {
+            if (a === 'Status Code') return -1;
+            if (b === 'Status Code') return 1;
+            return a.localeCompare(b);
+          })
+          .map(([key, value]) => {
+            return (
+              <div key={`metadata-attr-${key}`} className="flex flex-row items-start px-4 pb-2">
+                <div className="text-muted w-48 shrink-0 text-sm font-normal leading-tight">
+                  {key}
+                </div>
+                <div className="text-basis min-w-0 break-words text-sm font-normal leading-tight">
+                  {String(value) || '--'}
+                </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
       </div>
     </div>
   );

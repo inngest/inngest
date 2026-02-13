@@ -36,6 +36,7 @@ export type SpanMetadata =
   | SpanMetadataInngestAI
   | SpanMetadataInngestHTTP
   | SpanMetadataInngestHTTPTiming
+  | SpanMetadataInngestResponseHeaders
   | SpanMetadataInngestWarnings
   | SpanMetadataUserland
   | SpanMetadataUnknown;
@@ -81,6 +82,13 @@ export type SpanMetadataInngestHTTPTiming = {
     content_transfer_ms: number;
     total_ms: number;
   };
+};
+
+export type SpanMetadataInngestResponseHeaders = {
+  scope: 'extended_trace' | 'step_attempt';
+  kind: 'inngest.response_headers';
+  updatedAt: string;
+  values: Record<string, string>;
 };
 
 export type SpanMetadataInngestWarnings = {

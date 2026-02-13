@@ -8,6 +8,7 @@ export type SpanMetadataKind =
   | typeof KindInngestAI
   | typeof KindInngestHTTP
   | typeof KindInngestHTTPTiming
+  | typeof KindInngestResponseHeaders
   | typeof KindInngestWarnings
   | SpanMetadataKindUserland;
 
@@ -77,11 +78,7 @@ export interface HTTPTimingMetadata {
    */
   tls_handshake_ms: number /* int64 */;
   /**
-   * ServerProcessingMs is the time from request sent to first byte received (TTFB).
-   */
-  server_processing_ms: number /* int64 */;
-  /**
-   * ContentTransferMs is the time spent downloading the response body.
+   * ServerProcessingMs is the time spent downloading the response body.
    */
   content_transfer_ms: number /* int64 */;
   /**
@@ -89,3 +86,11 @@ export interface HTTPTimingMetadata {
    */
   total_ms: number /* int64 */;
 }
+/**
+ * From response_headers.go
+ */
+export const KindInngestResponseHeaders = 'inngest.response_headers';
+/**
+ * From response_headers.go
+ */
+export type ResponseHeaderMetadata = { [key: string]: string };
