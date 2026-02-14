@@ -67,3 +67,11 @@ type HTTPTimingMetadata struct {
 	TotalMs	int64	`json:"total_ms"`
 }
 
+// From response_headers.go
+const (
+	KindInngestResponseHeaders = "inngest.response_headers"
+)
+
+// From response_headers.go
+type ResponseHeaderMetadata map[string]string
+

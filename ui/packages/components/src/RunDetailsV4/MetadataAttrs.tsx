@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef } from 'react';
+import { useLayoutEffect, useMemo, useRef } from 'react';
 
 import { ElementWrapper, TextElement, TimeElement } from '../DetailsCard/Element';
 import type { SpanMetadata, SpanMetadataKind } from './types';
@@ -6,9 +6,11 @@ import type { SpanMetadata, SpanMetadataKind } from './types';
 const inngestKindLabels: Record<string, string> = {
   ai: 'AI Metadata',
   http: 'HTTP Metadata',
+  response_headers: 'Response Headers',
   warnings: 'Warnings',
 };
 
+/** Returns a human-readable label for a metadata kind. Handles both inngest.* and userland.* kinds. */
 const getKindLabel = (kind: SpanMetadataKind): string => {
   const [namespace, kindName] = kind.split('.');
   if (!kindName) {
@@ -33,6 +35,16 @@ const MetadataAttrRow = ({
   updatedAt,
   isLast,
 }: SpanMetadata & { isLast: boolean }) => {
+  const sortedEntries = useMemo(
+    () =>
+      Object.entries(values).sort(([a], [b]) => {
+        if (a === 'Status Code') return -1;
+        if (b === 'Status Code') return 1;
+        return a.localeCompare(b);
+      }),
+    [values]
+  );
+
   return (
     <div className="flex flex-col justify-start gap-2">
       <div className="flex h-11 w-full flex-row items-center justify-between border-none px-4 pt-2">
@@ -58,11 +70,13 @@ const MetadataAttrRow = ({
           <div className="w-48">Key</div>
           <div className="">Value</div>
         </div>
-        {Object.entries(values).map(([key, value]) => {
+        {sortedEntries.map(([key, value]) => {
           return (
-            <div key={`metadata-attr-${key}`} className="flex flex-row items-center px-4 pb-2">
-              <div className="text-muted w-48 text-sm font-normal leading-tight">{key}</div>
-              <div className="text-basis truncate text-sm font-normal leading-tight">
+            <div key={`metadata-attr-${key}`} className="flex flex-row items-start px-4 pb-2">
+              <div className="text-muted w-48 shrink-0 text-sm font-normal leading-tight">
+                {key}
+              </div>
+              <div className="text-basis min-w-0 break-words text-sm font-normal leading-tight">
                 {String(value) || '--'}
               </div>
             </div>
@@ -73,6 +87,7 @@ const MetadataAttrRow = ({
   );
 };
 
+/** Displays metadata attributes as key-value pairs. Status Code is pinned to the top, remaining entries sorted alphabetically. */
 export const MetadataAttrs = ({ metadata }: { metadata: SpanMetadata[] }) => {
   const ref = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {

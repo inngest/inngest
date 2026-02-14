@@ -8,6 +8,7 @@ export type SpanMetadataKind =
   | typeof KindInngestAI
   | typeof KindInngestHTTP
   | typeof KindInngestHTTPTiming
+  | typeof KindInngestResponseHeaders
   | typeof KindInngestWarnings
   | SpanMetadataKindUserland;
 
@@ -89,3 +90,11 @@ export interface HTTPTimingMetadata {
    */
   total_ms: number /* int64 */;
 }
+/**
+ * From response_headers.go
+ */
+export const KindInngestResponseHeaders = 'inngest.response_headers';
+/**
+ * From response_headers.go
+ */
+export type ResponseHeaderMetadata = { [key: string]: string };

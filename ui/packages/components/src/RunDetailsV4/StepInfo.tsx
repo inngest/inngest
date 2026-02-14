@@ -211,6 +211,13 @@ export const StepInfo = ({
   const prettyErrorBody = usePrettyErrorBody(result?.error);
   const prettyShortError = usePrettyShortError(result?.error);
 
+  const responseHeaderMetadata = trace.metadata?.filter(
+    (md) => md.kind === 'inngest.response_headers'
+  );
+  const nonHeaderMetadata = metadataIsEnabled
+    ? trace.metadata?.filter((md) => md.kind !== 'inngest.response_headers')
+    : undefined;
+
   const hasNoData = !prettyInput && !prettyOutput && !result?.error;
 
   let emptyStateMessage = 'No output available';
@@ -328,12 +335,21 @@ export const StepInfo = ({
                 id: 'attributes',
                 node: <UserlandAttrs userlandSpan={trace.userlandSpan} />,
               },
-              ...(metadataIsEnabled && trace.metadata?.length
+              ...(responseHeaderMetadata?.length
+                ? [
+                    {
+                      label: 'Headers',
+                      id: 'headers',
+                      node: <MetadataAttrs metadata={responseHeaderMetadata} />,
+                    },
+                  ]
+                : []),
+              ...(nonHeaderMetadata?.length
                 ? [
                     {
                       label: 'Metadata',
                       id: 'metadata',
-                      node: <MetadataAttrs metadata={trace.metadata} />,
+                      node: <MetadataAttrs metadata={nonHeaderMetadata} />,
                     },
                   ]
                 : []),
@@ -386,12 +402,21 @@ export const StepInfo = ({
                         },
                       ]
                     : []),
-                  ...(metadataIsEnabled && trace.metadata?.length
+                  ...(responseHeaderMetadata?.length
+                    ? [
+                        {
+                          label: 'Headers',
+                          id: 'headers',
+                          node: <MetadataAttrs metadata={responseHeaderMetadata} />,
+                        },
+                      ]
+                    : []),
+                  ...(nonHeaderMetadata?.length
                     ? [
                         {
                           label: 'Metadata',
                           id: 'metadata',
-                          node: <MetadataAttrs metadata={trace.metadata} />,
+                          node: <MetadataAttrs metadata={nonHeaderMetadata} />,
                         },
                       ]
                     : []),
