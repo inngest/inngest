@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/execution/debounce"
+	"github.com/oklog/ulid/v2"
 	pb "github.com/inngest/inngest/proto/gen/debug/v1"
 )
 
@@ -74,6 +75,39 @@ func (d *debugAPI) DeleteDebounce(ctx context.Context, req *pb.DeleteDebounceReq
 		Deleted:    result.Deleted,
 		DebounceId: result.DebounceID,
 		EventId:    result.EventID,
+	}, nil
+}
+
+// DeleteDebounceByID deletes debounces directly by their IDs.
+func (d *debugAPI) DeleteDebounceByID(ctx context.Context, req *pb.DeleteDebounceByIDRequest) (*pb.DeleteDebounceByIDResponse, error) {
+	if d.debouncer == nil {
+		return nil, fmt.Errorf("debouncer not configured")
+	}
+
+	ids := req.GetDebounceIds()
+	if len(ids) == 0 {
+		return &pb.DeleteDebounceByIDResponse{}, nil
+	}
+	if len(ids) > 20 {
+		return nil, fmt.Errorf("too many debounce IDs: max 20, got %d", len(ids))
+	}
+
+	parsed := make([]ulid.ULID, len(ids))
+	for i, id := range ids {
+		u, err := ulid.Parse(id)
+		if err != nil {
+			return nil, fmt.Errorf("invalid debounce ID %q: %w", id, err)
+		}
+		parsed[i] = u
+	}
+
+	err := d.debouncer.DeleteDebounceByID(ctx, parsed...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to delete debounce by ID: %w", err)
+	}
+
+	return &pb.DeleteDebounceByIDResponse{
+		DeletedIds: ids,
 	}, nil
 }
 

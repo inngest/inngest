@@ -36,6 +36,7 @@ const (
 	Debug_GetDebounceInfo_FullMethodName     = "/debug.v1.Debug/GetDebounceInfo"
 	Debug_DeleteDebounce_FullMethodName      = "/debug.v1.Debug/DeleteDebounce"
 	Debug_RunDebounce_FullMethodName         = "/debug.v1.Debug/RunDebounce"
+	Debug_DeleteDebounceByID_FullMethodName  = "/debug.v1.Debug/DeleteDebounceByID"
 )
 
 // DebugClient is the client API for Debug service.
@@ -75,6 +76,8 @@ type DebugClient interface {
 	DeleteDebounce(ctx context.Context, in *DeleteDebounceRequest, opts ...grpc.CallOption) (*DeleteDebounceResponse, error)
 	// RunDebounce triggers immediate execution of a debounce.
 	RunDebounce(ctx context.Context, in *RunDebounceRequest, opts ...grpc.CallOption) (*RunDebounceResponse, error)
+	// DeleteDebounceByID deletes debounces directly by their IDs, without requiring function_id or debounce_key.
+	DeleteDebounceByID(ctx context.Context, in *DeleteDebounceByIDRequest, opts ...grpc.CallOption) (*DeleteDebounceByIDResponse, error)
 }
 
 type debugClient struct {
@@ -245,6 +248,16 @@ func (c *debugClient) RunDebounce(ctx context.Context, in *RunDebounceRequest, o
 	return out, nil
 }
 
+func (c *debugClient) DeleteDebounceByID(ctx context.Context, in *DeleteDebounceByIDRequest, opts ...grpc.CallOption) (*DeleteDebounceByIDResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeleteDebounceByIDResponse)
+	err := c.cc.Invoke(ctx, Debug_DeleteDebounceByID_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // DebugServer is the server API for Debug service.
 // All implementations must embed UnimplementedDebugServer
 // for forward compatibility.
@@ -282,6 +295,8 @@ type DebugServer interface {
 	DeleteDebounce(context.Context, *DeleteDebounceRequest) (*DeleteDebounceResponse, error)
 	// RunDebounce triggers immediate execution of a debounce.
 	RunDebounce(context.Context, *RunDebounceRequest) (*RunDebounceResponse, error)
+	// DeleteDebounceByID deletes debounces directly by their IDs, without requiring function_id or debounce_key.
+	DeleteDebounceByID(context.Context, *DeleteDebounceByIDRequest) (*DeleteDebounceByIDResponse, error)
 	mustEmbedUnimplementedDebugServer()
 }
 
@@ -339,6 +354,9 @@ func (UnimplementedDebugServer) DeleteDebounce(context.Context, *DeleteDebounceR
 }
 func (UnimplementedDebugServer) RunDebounce(context.Context, *RunDebounceRequest) (*RunDebounceResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RunDebounce not implemented")
+}
+func (UnimplementedDebugServer) DeleteDebounceByID(context.Context, *DeleteDebounceByIDRequest) (*DeleteDebounceByIDResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteDebounceByID not implemented")
 }
 func (UnimplementedDebugServer) mustEmbedUnimplementedDebugServer() {}
 func (UnimplementedDebugServer) testEmbeddedByValue()               {}
@@ -649,6 +667,24 @@ func _Debug_RunDebounce_Handler(srv interface{}, ctx context.Context, dec func(i
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Debug_DeleteDebounceByID_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteDebounceByIDRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DebugServer).DeleteDebounceByID(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Debug_DeleteDebounceByID_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DebugServer).DeleteDebounceByID(ctx, req.(*DeleteDebounceByIDRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Debug_ServiceDesc is the grpc.ServiceDesc for Debug service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -719,6 +755,10 @@ var Debug_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RunDebounce",
 			Handler:    _Debug_RunDebounce_Handler,
+		},
+		{
+			MethodName: "DeleteDebounceByID",
+			Handler:    _Debug_DeleteDebounceByID_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

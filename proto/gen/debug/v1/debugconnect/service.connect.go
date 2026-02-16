@@ -68,6 +68,9 @@ const (
 	DebugDeleteDebounceProcedure = "/debug.v1.Debug/DeleteDebounce"
 	// DebugRunDebounceProcedure is the fully-qualified name of the Debug's RunDebounce RPC.
 	DebugRunDebounceProcedure = "/debug.v1.Debug/RunDebounce"
+	// DebugDeleteDebounceByIDProcedure is the fully-qualified name of the Debug's DeleteDebounceByID
+	// RPC.
+	DebugDeleteDebounceByIDProcedure = "/debug.v1.Debug/DeleteDebounceByID"
 )
 
 // DebugClient is a client for the debug.v1.Debug service.
@@ -105,6 +108,8 @@ type DebugClient interface {
 	DeleteDebounce(context.Context, *connect.Request[v1.DeleteDebounceRequest]) (*connect.Response[v1.DeleteDebounceResponse], error)
 	// RunDebounce triggers immediate execution of a debounce.
 	RunDebounce(context.Context, *connect.Request[v1.RunDebounceRequest]) (*connect.Response[v1.RunDebounceResponse], error)
+	// DeleteDebounceByID deletes debounces directly by their IDs, without requiring function_id or debounce_key.
+	DeleteDebounceByID(context.Context, *connect.Request[v1.DeleteDebounceByIDRequest]) (*connect.Response[v1.DeleteDebounceByIDResponse], error)
 }
 
 // NewDebugClient constructs a client for the debug.v1.Debug service. By default, it uses the
@@ -214,6 +219,12 @@ func NewDebugClient(httpClient connect.HTTPClient, baseURL string, opts ...conne
 			connect.WithSchema(debugMethods.ByName("RunDebounce")),
 			connect.WithClientOptions(opts...),
 		),
+		deleteDebounceByID: connect.NewClient[v1.DeleteDebounceByIDRequest, v1.DeleteDebounceByIDResponse](
+			httpClient,
+			baseURL+DebugDeleteDebounceByIDProcedure,
+			connect.WithSchema(debugMethods.ByName("DeleteDebounceByID")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -235,6 +246,7 @@ type debugClient struct {
 	getDebounceInfo     *connect.Client[v1.DebounceInfoRequest, v1.DebounceInfoResponse]
 	deleteDebounce      *connect.Client[v1.DeleteDebounceRequest, v1.DeleteDebounceResponse]
 	runDebounce         *connect.Client[v1.RunDebounceRequest, v1.RunDebounceResponse]
+	deleteDebounceByID  *connect.Client[v1.DeleteDebounceByIDRequest, v1.DeleteDebounceByIDResponse]
 }
 
 // GetPartition calls debug.v1.Debug.GetPartition.
@@ -317,6 +329,11 @@ func (c *debugClient) RunDebounce(ctx context.Context, req *connect.Request[v1.R
 	return c.runDebounce.CallUnary(ctx, req)
 }
 
+// DeleteDebounceByID calls debug.v1.Debug.DeleteDebounceByID.
+func (c *debugClient) DeleteDebounceByID(ctx context.Context, req *connect.Request[v1.DeleteDebounceByIDRequest]) (*connect.Response[v1.DeleteDebounceByIDResponse], error) {
+	return c.deleteDebounceByID.CallUnary(ctx, req)
+}
+
 // DebugHandler is an implementation of the debug.v1.Debug service.
 type DebugHandler interface {
 	// GetPartition retrieves the partition data from the database
@@ -352,6 +369,8 @@ type DebugHandler interface {
 	DeleteDebounce(context.Context, *connect.Request[v1.DeleteDebounceRequest]) (*connect.Response[v1.DeleteDebounceResponse], error)
 	// RunDebounce triggers immediate execution of a debounce.
 	RunDebounce(context.Context, *connect.Request[v1.RunDebounceRequest]) (*connect.Response[v1.RunDebounceResponse], error)
+	// DeleteDebounceByID deletes debounces directly by their IDs, without requiring function_id or debounce_key.
+	DeleteDebounceByID(context.Context, *connect.Request[v1.DeleteDebounceByIDRequest]) (*connect.Response[v1.DeleteDebounceByIDResponse], error)
 }
 
 // NewDebugHandler builds an HTTP handler from the service implementation. It returns the path on
@@ -457,6 +476,12 @@ func NewDebugHandler(svc DebugHandler, opts ...connect.HandlerOption) (string, h
 		connect.WithSchema(debugMethods.ByName("RunDebounce")),
 		connect.WithHandlerOptions(opts...),
 	)
+	debugDeleteDebounceByIDHandler := connect.NewUnaryHandler(
+		DebugDeleteDebounceByIDProcedure,
+		svc.DeleteDebounceByID,
+		connect.WithSchema(debugMethods.ByName("DeleteDebounceByID")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/debug.v1.Debug/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case DebugGetPartitionProcedure:
@@ -491,6 +516,8 @@ func NewDebugHandler(svc DebugHandler, opts ...connect.HandlerOption) (string, h
 			debugDeleteDebounceHandler.ServeHTTP(w, r)
 		case DebugRunDebounceProcedure:
 			debugRunDebounceHandler.ServeHTTP(w, r)
+		case DebugDeleteDebounceByIDProcedure:
+			debugDeleteDebounceByIDHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -562,4 +589,8 @@ func (UnimplementedDebugHandler) DeleteDebounce(context.Context, *connect.Reques
 
 func (UnimplementedDebugHandler) RunDebounce(context.Context, *connect.Request[v1.RunDebounceRequest]) (*connect.Response[v1.RunDebounceResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("debug.v1.Debug.RunDebounce is not implemented"))
+}
+
+func (UnimplementedDebugHandler) DeleteDebounceByID(context.Context, *connect.Request[v1.DeleteDebounceByIDRequest]) (*connect.Response[v1.DeleteDebounceByIDResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("debug.v1.Debug.DeleteDebounceByID is not implemented"))
 }

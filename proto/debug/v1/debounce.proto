@@ -71,3 +71,15 @@ message RunDebounceResponse {
   // event_id is the ULID of the event that was debounced.
   string event_id = 3;
 }
+
+// DeleteDebounceByIDRequest is used to delete debounces directly by their IDs.
+message DeleteDebounceByIDRequest {
+  // debounce_ids are the ULIDs of the debounces to delete. Max 20.
+  repeated string debounce_ids = 1;
+}
+
+// DeleteDebounceByIDResponse contains information about the deleted debounces.
+message DeleteDebounceByIDResponse {
+  // deleted_ids are the debounce IDs that were processed.
+  repeated string deleted_ids = 1;
+}

@@ -156,6 +156,10 @@ type Debouncer interface {
 	// DeleteDebounce deletes the current debounce for a function and debounce key.
 	// Returns information about the deleted debounce.
 	DeleteDebounce(ctx context.Context, functionID uuid.UUID, debounceKey string) (*DeleteDebounceResult, error)
+	// DeleteDebounceByID deletes debounces directly by their IDs.
+	// Unlike DeleteDebounce, this does not require function_id or debounce_key.
+	// It removes the debounce items from the hash and (best effort) removes the timeout queue items.
+	DeleteDebounceByID(ctx context.Context, debounceIDs ...ulid.ULID) error
 	// RunDebounce schedules immediate execution of a debounce by creating a timeout job that runs in one second.
 	RunDebounce(ctx context.Context, opts RunDebounceOpts) (*RunDebounceResult, error)
 }
@@ -345,7 +349,7 @@ func (d debouncer) DeleteDebounceItem(ctx context.Context, debounceID ulid.ULID,
 		})
 	}()
 
-	err := d.deleteDebounceItem(ctx, debounceID, client)
+	err := d.deleteDebounceItem(ctx, client, debounceID)
 	if err != nil {
 		return fmt.Errorf("could not delete debounce item: %w", err)
 	}
@@ -355,9 +359,16 @@ func (d debouncer) DeleteDebounceItem(ctx context.Context, debounceID ulid.ULID,
 	return nil
 }
 
-func (d debouncer) deleteDebounceItem(ctx context.Context, debounceID ulid.ULID, client *redis_state.DebounceClient) error {
+func (d debouncer) deleteDebounceItem(ctx context.Context, client *redis_state.DebounceClient, debounceIDs ...ulid.ULID) error {
+	if len(debounceIDs) == 0 {
+		return nil
+	}
 	keyDbc := client.KeyGenerator().Debounce(ctx)
-	cmd := client.Client().B().Hdel().Key(keyDbc).Field(debounceID.String()).Build()
+	fields := make([]string, len(debounceIDs))
+	for i, id := range debounceIDs {
+		fields[i] = id.String()
+	}
+	cmd := client.Client().B().Hdel().Key(keyDbc).Field(fields...).Build()
 	err := client.Client().Do(ctx, cmd).Error()
 	if rueidis.IsRedisNil(err) {
 		return nil
@@ -619,7 +630,7 @@ func (d debouncer) debounce(ctx context.Context, di DebounceItem, fn inngest.Fun
 			di.Timeout = debounceTimeout
 
 			// Delete debounce state from old cluster
-			err := d.deleteDebounceItem(ctx, newDebounceID, d.secondaryDebounceClient)
+			err := d.deleteDebounceItem(ctx, d.secondaryDebounceClient, newDebounceID)
 			if err != nil {
 				l.Error("unable to delete old debounce after migration", "err", err)
 				return nil
@@ -1103,7 +1114,7 @@ func (d debouncer) DeleteDebounce(ctx context.Context, functionID uuid.UUID, deb
 	}
 
 	// Delete the debounce item from the hash
-	err = d.deleteDebounceItem(ctx, debounceID, client)
+	err = d.deleteDebounceItem(ctx, client, debounceID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to delete debounce item: %w", err)
 	}
@@ -1126,6 +1137,34 @@ func (d debouncer) DeleteDebounce(ctx context.Context, functionID uuid.UUID, deb
 		DebounceID: info.DebounceID,
 		EventID:    info.Item.EventID.String(),
 	}, nil
+}
+
+// DeleteDebounceByID deletes debounces directly by their IDs.
+func (d debouncer) DeleteDebounceByID(ctx context.Context, debounceIDs ...ulid.ULID) error {
+	if len(debounceIDs) == 0 {
+		return nil
+	}
+
+	client := d.primaryDebounceClient
+	if client == nil {
+		return fmt.Errorf("debounce client not configured")
+	}
+
+	// Delete all items from the hash in a single HDEL
+	err := d.deleteDebounceItem(ctx, client, debounceIDs...)
+	if err != nil {
+		return fmt.Errorf("failed to delete debounce items: %w", err)
+	}
+
+	// Best-effort remove timeout queue items
+	if d.primaryQueueShard != nil && d.primaryQueueShard.Name() != "" {
+		for _, id := range debounceIDs {
+			queueItemId := queue.HashID(ctx, id.String())
+			_ = d.primaryQueueShard.RemoveQueueItem(ctx, queue.KindDebounce, queueItemId)
+		}
+	}
+
+	return nil
 }
 
 // RunDebounce schedules immediate execution of a debounce by creating a timeout job that runs in one second.
