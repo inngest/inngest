@@ -246,8 +246,8 @@ importers:
         specifier: ^1.2.0
         version: 1.2.0(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       sql-formatter:
-        specifier: ^15.6.10
-        version: 15.6.10
+        specifier: ^15.7.1
+        version: 15.7.1
       srvx:
         specifier: 0.8.15
         version: 0.8.15
@@ -823,7 +823,7 @@ importers:
         version: 1.2.0(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       sql-formatter:
         specifier: ^15.6.10
-        version: 15.6.10
+        version: 15.7.1
       tailwind-merge:
         specifier: ^1.10.0
         version: 1.10.0
@@ -12354,8 +12354,8 @@ packages:
   sprintf-js@1.0.3:
     resolution: {integrity: sha512-D9cPgkvLlV3t3IzL0D0YLvGA9Ahk4PcvVwUbN0dSGr1aP0Nrt4AEnTUbuGvquEC0mA64Gqt1fzirlRs5ibXx8g==}
 
-  sql-formatter@15.6.10:
-    resolution: {integrity: sha512-0bJOPQrRO/JkjQhiThVayq0hOKnI1tHI+2OTkmT7TGtc6kqS+V7kveeMzRW+RNQGxofmTmet9ILvztyuxv0cJQ==}
+  sql-formatter@15.7.1:
+    resolution: {integrity: sha512-O8h51MnuQAnsInO7is6VoBGeB9wFvXhiTi4AqY5yGWUdF7fNcEDA6F67AAD4OvV4Seb95bPXaAPmnSii/mModg==}
     hasBin: true
 
   srvx@0.10.1:
@@ -28377,7 +28377,7 @@ snapshots:
 
   sprintf-js@1.0.3: {}
 
-  sql-formatter@15.6.10:
+  sql-formatter@15.7.1:
     dependencies:
       argparse: 2.0.1
       nearley: 2.20.1
