@@ -46,5 +46,7 @@ service Debug {
   rpc DeleteDebounce(DeleteDebounceRequest) returns (DeleteDebounceResponse) {}
   // RunDebounce triggers immediate execution of a debounce.
   rpc RunDebounce(RunDebounceRequest) returns (RunDebounceResponse) {}
+  // DeleteDebounceByID deletes debounces directly by their IDs, without requiring function_id or debounce_key.
+  rpc DeleteDebounceByID(DeleteDebounceByIDRequest) returns (DeleteDebounceByIDResponse) {}
 }
 
