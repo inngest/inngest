@@ -84,7 +84,7 @@
     "recharts": "^2.4.3",
     "remark-gfm": "^4.0.1",
     "sonner": "^1.2.0",
-    "sql-formatter": "^15.6.10",
+    "sql-formatter": "^15.7.1",
     "srvx": "0.8.15",
     "type-fest": "^3.7.2",
     "ulid": "^2.3.0",
