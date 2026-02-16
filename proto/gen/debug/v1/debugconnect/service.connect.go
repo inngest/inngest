@@ -68,8 +68,8 @@ const (
 	DebugDeleteDebounceProcedure = "/debug.v1.Debug/DeleteDebounce"
 	// DebugRunDebounceProcedure is the fully-qualified name of the Debug's RunDebounce RPC.
 	DebugRunDebounceProcedure = "/debug.v1.Debug/RunDebounce"
-	// DebugDeleteDebounceByIDProcedure is the fully-qualified name of the Debug's
-	// DeleteDebounceByID RPC.
+	// DebugDeleteDebounceByIDProcedure is the fully-qualified name of the Debug's DeleteDebounceByID
+	// RPC.
 	DebugDeleteDebounceByIDProcedure = "/debug.v1.Debug/DeleteDebounceByID"
 )
 
