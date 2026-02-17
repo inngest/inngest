@@ -33,7 +33,10 @@ type BaseTableProps<T> = {
   blankState?: React.ReactNode;
   cellClassName?: string;
   enableColumnSizing?: boolean;
+<<<<<<< HEAD
   selectedCell?: { rowIndex: number; columnId: string } | null;
+=======
+>>>>>>> 18e872648 (updated data tabel to fix the table column issue, added cell detail sidebar, removed query history from the sidebar)
   noHeader?: boolean;
 };
 
@@ -55,7 +58,10 @@ export function Table<T>({
   columns,
   expandedIDs = [],
   cellClassName,
+<<<<<<< HEAD
   selectedCell,
+=======
+>>>>>>> 18e872648 (updated data tabel to fix the table column issue, added cell detail sidebar, removed query history from the sidebar)
   enableColumnSizing = false,
   noHeader = false,
 }: TableProps<T>) {
@@ -216,12 +222,16 @@ export function Table<T>({
                             : '',
                           isIconOnlyColumn ? '' : tableColumnStyles,
                           cellClassName ?? '',
+<<<<<<< HEAD
                           onCellClick && !onRowClick ? 'cursor-pointer' : '',
                           selectedCell &&
                             row.index === selectedCell.rowIndex &&
                             cell.column.id === selectedCell.columnId
                             ? 'ring-2 ring-inset ring-[rgb(var(--color-border-active))]'
                             : ''
+=======
+                          onCellClick && !onRowClick ? 'cursor-pointer' : ''
+>>>>>>> 18e872648 (updated data tabel to fix the table column issue, added cell detail sidebar, removed query history from the sidebar)
                         )}
                         style={
                           enableColumnSizing
