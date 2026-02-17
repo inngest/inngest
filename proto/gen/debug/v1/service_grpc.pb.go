@@ -37,6 +37,9 @@ const (
 	Debug_DeleteDebounce_FullMethodName      = "/debug.v1.Debug/DeleteDebounce"
 	Debug_RunDebounce_FullMethodName         = "/debug.v1.Debug/RunDebounce"
 	Debug_DeleteDebounceByID_FullMethodName  = "/debug.v1.Debug/DeleteDebounceByID"
+	Debug_GetShadowPartition_FullMethodName  = "/debug.v1.Debug/GetShadowPartition"
+	Debug_GetBacklogs_FullMethodName         = "/debug.v1.Debug/GetBacklogs"
+	Debug_GetBacklogSize_FullMethodName      = "/debug.v1.Debug/GetBacklogSize"
 )
 
 // DebugClient is the client API for Debug service.
@@ -78,6 +81,12 @@ type DebugClient interface {
 	RunDebounce(ctx context.Context, in *RunDebounceRequest, opts ...grpc.CallOption) (*RunDebounceResponse, error)
 	// DeleteDebounceByID deletes debounces directly by their IDs, without requiring function_id or debounce_key.
 	DeleteDebounceByID(ctx context.Context, in *DeleteDebounceByIDRequest, opts ...grpc.CallOption) (*DeleteDebounceByIDResponse, error)
+	// GetShadowPartition retrieves shadow partition details for a given partition ID
+	GetShadowPartition(ctx context.Context, in *ShadowPartitionRequest, opts ...grpc.CallOption) (*ShadowPartitionResponse, error)
+	// GetBacklogs retrieves the list of backlogs for a partition
+	GetBacklogs(ctx context.Context, in *BacklogsRequest, opts ...grpc.CallOption) (*BacklogsResponse, error)
+	// GetBacklogSize retrieves the number of items in a specific backlog
+	GetBacklogSize(ctx context.Context, in *BacklogSizeRequest, opts ...grpc.CallOption) (*BacklogSizeResponse, error)
 }
 
 type debugClient struct {
@@ -258,6 +267,36 @@ func (c *debugClient) DeleteDebounceByID(ctx context.Context, in *DeleteDebounce
 	return out, nil
 }
 
+func (c *debugClient) GetShadowPartition(ctx context.Context, in *ShadowPartitionRequest, opts ...grpc.CallOption) (*ShadowPartitionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ShadowPartitionResponse)
+	err := c.cc.Invoke(ctx, Debug_GetShadowPartition_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *debugClient) GetBacklogs(ctx context.Context, in *BacklogsRequest, opts ...grpc.CallOption) (*BacklogsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(BacklogsResponse)
+	err := c.cc.Invoke(ctx, Debug_GetBacklogs_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *debugClient) GetBacklogSize(ctx context.Context, in *BacklogSizeRequest, opts ...grpc.CallOption) (*BacklogSizeResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(BacklogSizeResponse)
+	err := c.cc.Invoke(ctx, Debug_GetBacklogSize_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // DebugServer is the server API for Debug service.
 // All implementations must embed UnimplementedDebugServer
 // for forward compatibility.
@@ -297,6 +336,12 @@ type DebugServer interface {
 	RunDebounce(context.Context, *RunDebounceRequest) (*RunDebounceResponse, error)
 	// DeleteDebounceByID deletes debounces directly by their IDs, without requiring function_id or debounce_key.
 	DeleteDebounceByID(context.Context, *DeleteDebounceByIDRequest) (*DeleteDebounceByIDResponse, error)
+	// GetShadowPartition retrieves shadow partition details for a given partition ID
+	GetShadowPartition(context.Context, *ShadowPartitionRequest) (*ShadowPartitionResponse, error)
+	// GetBacklogs retrieves the list of backlogs for a partition
+	GetBacklogs(context.Context, *BacklogsRequest) (*BacklogsResponse, error)
+	// GetBacklogSize retrieves the number of items in a specific backlog
+	GetBacklogSize(context.Context, *BacklogSizeRequest) (*BacklogSizeResponse, error)
 	mustEmbedUnimplementedDebugServer()
 }
 
@@ -357,6 +402,15 @@ func (UnimplementedDebugServer) RunDebounce(context.Context, *RunDebounceRequest
 }
 func (UnimplementedDebugServer) DeleteDebounceByID(context.Context, *DeleteDebounceByIDRequest) (*DeleteDebounceByIDResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeleteDebounceByID not implemented")
+}
+func (UnimplementedDebugServer) GetShadowPartition(context.Context, *ShadowPartitionRequest) (*ShadowPartitionResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetShadowPartition not implemented")
+}
+func (UnimplementedDebugServer) GetBacklogs(context.Context, *BacklogsRequest) (*BacklogsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetBacklogs not implemented")
+}
+func (UnimplementedDebugServer) GetBacklogSize(context.Context, *BacklogSizeRequest) (*BacklogSizeResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetBacklogSize not implemented")
 }
 func (UnimplementedDebugServer) mustEmbedUnimplementedDebugServer() {}
 func (UnimplementedDebugServer) testEmbeddedByValue()               {}
@@ -685,6 +739,60 @@ func _Debug_DeleteDebounceByID_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Debug_GetShadowPartition_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ShadowPartitionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DebugServer).GetShadowPartition(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Debug_GetShadowPartition_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DebugServer).GetShadowPartition(ctx, req.(*ShadowPartitionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Debug_GetBacklogs_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BacklogsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DebugServer).GetBacklogs(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Debug_GetBacklogs_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DebugServer).GetBacklogs(ctx, req.(*BacklogsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Debug_GetBacklogSize_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BacklogSizeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DebugServer).GetBacklogSize(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Debug_GetBacklogSize_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DebugServer).GetBacklogSize(ctx, req.(*BacklogSizeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Debug_ServiceDesc is the grpc.ServiceDesc for Debug service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -759,6 +867,18 @@ var Debug_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DeleteDebounceByID",
 			Handler:    _Debug_DeleteDebounceByID_Handler,
+		},
+		{
+			MethodName: "GetShadowPartition",
+			Handler:    _Debug_GetShadowPartition_Handler,
+		},
+		{
+			MethodName: "GetBacklogs",
+			Handler:    _Debug_GetBacklogs_Handler,
+		},
+		{
+			MethodName: "GetBacklogSize",
+			Handler:    _Debug_GetBacklogSize_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

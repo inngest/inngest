@@ -552,6 +552,603 @@ func (x *QueueItemResponse) GetData() []byte {
 	return nil
 }
 
+// Shadow Partition / Backlog (Key Queues)
+type ShadowPartitionRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	PartitionId   string                 `protobuf:"bytes,1,opt,name=partition_id,json=partitionId,proto3" json:"partition_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ShadowPartitionRequest) Reset() {
+	*x = ShadowPartitionRequest{}
+	mi := &file_debug_v1_queue_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ShadowPartitionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ShadowPartitionRequest) ProtoMessage() {}
+
+func (x *ShadowPartitionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_debug_v1_queue_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ShadowPartitionRequest.ProtoReflect.Descriptor instead.
+func (*ShadowPartitionRequest) Descriptor() ([]byte, []int) {
+	return file_debug_v1_queue_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *ShadowPartitionRequest) GetPartitionId() string {
+	if x != nil {
+		return x.PartitionId
+	}
+	return ""
+}
+
+type ShadowPartitionResponse struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	PartitionId     string                 `protobuf:"bytes,1,opt,name=partition_id,json=partitionId,proto3" json:"partition_id,omitempty"`
+	FunctionVersion int32                  `protobuf:"varint,2,opt,name=function_version,json=functionVersion,proto3" json:"function_version,omitempty"`
+	LeaseId         string                 `protobuf:"bytes,3,opt,name=lease_id,json=leaseId,proto3" json:"lease_id,omitempty"`
+	FunctionId      string                 `protobuf:"bytes,4,opt,name=function_id,json=functionId,proto3" json:"function_id,omitempty"`
+	EnvId           string                 `protobuf:"bytes,5,opt,name=env_id,json=envId,proto3" json:"env_id,omitempty"`
+	AccountId       string                 `protobuf:"bytes,6,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	SystemQueueName string                 `protobuf:"bytes,7,opt,name=system_queue_name,json=systemQueueName,proto3" json:"system_queue_name,omitempty"`
+	BacklogCount    int64                  `protobuf:"varint,8,opt,name=backlog_count,json=backlogCount,proto3" json:"backlog_count,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *ShadowPartitionResponse) Reset() {
+	*x = ShadowPartitionResponse{}
+	mi := &file_debug_v1_queue_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ShadowPartitionResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ShadowPartitionResponse) ProtoMessage() {}
+
+func (x *ShadowPartitionResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_debug_v1_queue_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ShadowPartitionResponse.ProtoReflect.Descriptor instead.
+func (*ShadowPartitionResponse) Descriptor() ([]byte, []int) {
+	return file_debug_v1_queue_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *ShadowPartitionResponse) GetPartitionId() string {
+	if x != nil {
+		return x.PartitionId
+	}
+	return ""
+}
+
+func (x *ShadowPartitionResponse) GetFunctionVersion() int32 {
+	if x != nil {
+		return x.FunctionVersion
+	}
+	return 0
+}
+
+func (x *ShadowPartitionResponse) GetLeaseId() string {
+	if x != nil {
+		return x.LeaseId
+	}
+	return ""
+}
+
+func (x *ShadowPartitionResponse) GetFunctionId() string {
+	if x != nil {
+		return x.FunctionId
+	}
+	return ""
+}
+
+func (x *ShadowPartitionResponse) GetEnvId() string {
+	if x != nil {
+		return x.EnvId
+	}
+	return ""
+}
+
+func (x *ShadowPartitionResponse) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *ShadowPartitionResponse) GetSystemQueueName() string {
+	if x != nil {
+		return x.SystemQueueName
+	}
+	return ""
+}
+
+func (x *ShadowPartitionResponse) GetBacklogCount() int64 {
+	if x != nil {
+		return x.BacklogCount
+	}
+	return 0
+}
+
+type BacklogsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	PartitionId   string                 `protobuf:"bytes,1,opt,name=partition_id,json=partitionId,proto3" json:"partition_id,omitempty"`
+	Limit         int64                  `protobuf:"varint,2,opt,name=limit,proto3" json:"limit,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BacklogsRequest) Reset() {
+	*x = BacklogsRequest{}
+	mi := &file_debug_v1_queue_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BacklogsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BacklogsRequest) ProtoMessage() {}
+
+func (x *BacklogsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_debug_v1_queue_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BacklogsRequest.ProtoReflect.Descriptor instead.
+func (*BacklogsRequest) Descriptor() ([]byte, []int) {
+	return file_debug_v1_queue_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *BacklogsRequest) GetPartitionId() string {
+	if x != nil {
+		return x.PartitionId
+	}
+	return ""
+}
+
+func (x *BacklogsRequest) GetLimit() int64 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+type BacklogsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Backlogs      []*BacklogInfo         `protobuf:"bytes,1,rep,name=backlogs,proto3" json:"backlogs,omitempty"`
+	TotalCount    int64                  `protobuf:"varint,2,opt,name=total_count,json=totalCount,proto3" json:"total_count,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BacklogsResponse) Reset() {
+	*x = BacklogsResponse{}
+	mi := &file_debug_v1_queue_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BacklogsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BacklogsResponse) ProtoMessage() {}
+
+func (x *BacklogsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_debug_v1_queue_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BacklogsResponse.ProtoReflect.Descriptor instead.
+func (*BacklogsResponse) Descriptor() ([]byte, []int) {
+	return file_debug_v1_queue_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *BacklogsResponse) GetBacklogs() []*BacklogInfo {
+	if x != nil {
+		return x.Backlogs
+	}
+	return nil
+}
+
+func (x *BacklogsResponse) GetTotalCount() int64 {
+	if x != nil {
+		return x.TotalCount
+	}
+	return 0
+}
+
+type BacklogSizeRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	BacklogId     string                 `protobuf:"bytes,1,opt,name=backlog_id,json=backlogId,proto3" json:"backlog_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BacklogSizeRequest) Reset() {
+	*x = BacklogSizeRequest{}
+	mi := &file_debug_v1_queue_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BacklogSizeRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BacklogSizeRequest) ProtoMessage() {}
+
+func (x *BacklogSizeRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_debug_v1_queue_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BacklogSizeRequest.ProtoReflect.Descriptor instead.
+func (*BacklogSizeRequest) Descriptor() ([]byte, []int) {
+	return file_debug_v1_queue_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *BacklogSizeRequest) GetBacklogId() string {
+	if x != nil {
+		return x.BacklogId
+	}
+	return ""
+}
+
+type BacklogSizeResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	BacklogId     string                 `protobuf:"bytes,1,opt,name=backlog_id,json=backlogId,proto3" json:"backlog_id,omitempty"`
+	ItemCount     int64                  `protobuf:"varint,2,opt,name=item_count,json=itemCount,proto3" json:"item_count,omitempty"`
+	Backlog       *BacklogInfo           `protobuf:"bytes,3,opt,name=backlog,proto3" json:"backlog,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BacklogSizeResponse) Reset() {
+	*x = BacklogSizeResponse{}
+	mi := &file_debug_v1_queue_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BacklogSizeResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BacklogSizeResponse) ProtoMessage() {}
+
+func (x *BacklogSizeResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_debug_v1_queue_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BacklogSizeResponse.ProtoReflect.Descriptor instead.
+func (*BacklogSizeResponse) Descriptor() ([]byte, []int) {
+	return file_debug_v1_queue_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *BacklogSizeResponse) GetBacklogId() string {
+	if x != nil {
+		return x.BacklogId
+	}
+	return ""
+}
+
+func (x *BacklogSizeResponse) GetItemCount() int64 {
+	if x != nil {
+		return x.ItemCount
+	}
+	return 0
+}
+
+func (x *BacklogSizeResponse) GetBacklog() *BacklogInfo {
+	if x != nil {
+		return x.Backlog
+	}
+	return nil
+}
+
+type BacklogInfo struct {
+	state                   protoimpl.MessageState       `protogen:"open.v1"`
+	BacklogId               string                       `protobuf:"bytes,1,opt,name=backlog_id,json=backlogId,proto3" json:"backlog_id,omitempty"`
+	ShadowPartitionId       string                       `protobuf:"bytes,2,opt,name=shadow_partition_id,json=shadowPartitionId,proto3" json:"shadow_partition_id,omitempty"`
+	EarliestFunctionVersion int32                        `protobuf:"varint,3,opt,name=earliest_function_version,json=earliestFunctionVersion,proto3" json:"earliest_function_version,omitempty"`
+	Start                   bool                         `protobuf:"varint,4,opt,name=start,proto3" json:"start,omitempty"`
+	ConcurrencyKeys         []*BacklogConcurrencyKeyInfo `protobuf:"bytes,5,rep,name=concurrency_keys,json=concurrencyKeys,proto3" json:"concurrency_keys,omitempty"`
+	Throttle                *BacklogThrottleInfo         `protobuf:"bytes,6,opt,name=throttle,proto3" json:"throttle,omitempty"`
+	ItemCount               int64                        `protobuf:"varint,7,opt,name=item_count,json=itemCount,proto3" json:"item_count,omitempty"`
+	unknownFields           protoimpl.UnknownFields
+	sizeCache               protoimpl.SizeCache
+}
+
+func (x *BacklogInfo) Reset() {
+	*x = BacklogInfo{}
+	mi := &file_debug_v1_queue_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BacklogInfo) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BacklogInfo) ProtoMessage() {}
+
+func (x *BacklogInfo) ProtoReflect() protoreflect.Message {
+	mi := &file_debug_v1_queue_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BacklogInfo.ProtoReflect.Descriptor instead.
+func (*BacklogInfo) Descriptor() ([]byte, []int) {
+	return file_debug_v1_queue_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *BacklogInfo) GetBacklogId() string {
+	if x != nil {
+		return x.BacklogId
+	}
+	return ""
+}
+
+func (x *BacklogInfo) GetShadowPartitionId() string {
+	if x != nil {
+		return x.ShadowPartitionId
+	}
+	return ""
+}
+
+func (x *BacklogInfo) GetEarliestFunctionVersion() int32 {
+	if x != nil {
+		return x.EarliestFunctionVersion
+	}
+	return 0
+}
+
+func (x *BacklogInfo) GetStart() bool {
+	if x != nil {
+		return x.Start
+	}
+	return false
+}
+
+func (x *BacklogInfo) GetConcurrencyKeys() []*BacklogConcurrencyKeyInfo {
+	if x != nil {
+		return x.ConcurrencyKeys
+	}
+	return nil
+}
+
+func (x *BacklogInfo) GetThrottle() *BacklogThrottleInfo {
+	if x != nil {
+		return x.Throttle
+	}
+	return nil
+}
+
+func (x *BacklogInfo) GetItemCount() int64 {
+	if x != nil {
+		return x.ItemCount
+	}
+	return 0
+}
+
+type BacklogConcurrencyKeyInfo struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	CanonicalKeyId      string                 `protobuf:"bytes,1,opt,name=canonical_key_id,json=canonicalKeyId,proto3" json:"canonical_key_id,omitempty"`
+	Scope               string                 `protobuf:"bytes,2,opt,name=scope,proto3" json:"scope,omitempty"`
+	EntityId            string                 `protobuf:"bytes,3,opt,name=entity_id,json=entityId,proto3" json:"entity_id,omitempty"`
+	HashedKeyExpression string                 `protobuf:"bytes,4,opt,name=hashed_key_expression,json=hashedKeyExpression,proto3" json:"hashed_key_expression,omitempty"`
+	HashedValue         string                 `protobuf:"bytes,5,opt,name=hashed_value,json=hashedValue,proto3" json:"hashed_value,omitempty"`
+	UnhashedValue       string                 `protobuf:"bytes,6,opt,name=unhashed_value,json=unhashedValue,proto3" json:"unhashed_value,omitempty"`
+	ConcurrencyMode     string                 `protobuf:"bytes,7,opt,name=concurrency_mode,json=concurrencyMode,proto3" json:"concurrency_mode,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+func (x *BacklogConcurrencyKeyInfo) Reset() {
+	*x = BacklogConcurrencyKeyInfo{}
+	mi := &file_debug_v1_queue_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BacklogConcurrencyKeyInfo) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BacklogConcurrencyKeyInfo) ProtoMessage() {}
+
+func (x *BacklogConcurrencyKeyInfo) ProtoReflect() protoreflect.Message {
+	mi := &file_debug_v1_queue_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BacklogConcurrencyKeyInfo.ProtoReflect.Descriptor instead.
+func (*BacklogConcurrencyKeyInfo) Descriptor() ([]byte, []int) {
+	return file_debug_v1_queue_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *BacklogConcurrencyKeyInfo) GetCanonicalKeyId() string {
+	if x != nil {
+		return x.CanonicalKeyId
+	}
+	return ""
+}
+
+func (x *BacklogConcurrencyKeyInfo) GetScope() string {
+	if x != nil {
+		return x.Scope
+	}
+	return ""
+}
+
+func (x *BacklogConcurrencyKeyInfo) GetEntityId() string {
+	if x != nil {
+		return x.EntityId
+	}
+	return ""
+}
+
+func (x *BacklogConcurrencyKeyInfo) GetHashedKeyExpression() string {
+	if x != nil {
+		return x.HashedKeyExpression
+	}
+	return ""
+}
+
+func (x *BacklogConcurrencyKeyInfo) GetHashedValue() string {
+	if x != nil {
+		return x.HashedValue
+	}
+	return ""
+}
+
+func (x *BacklogConcurrencyKeyInfo) GetUnhashedValue() string {
+	if x != nil {
+		return x.UnhashedValue
+	}
+	return ""
+}
+
+func (x *BacklogConcurrencyKeyInfo) GetConcurrencyMode() string {
+	if x != nil {
+		return x.ConcurrencyMode
+	}
+	return ""
+}
+
+type BacklogThrottleInfo struct {
+	state                     protoimpl.MessageState `protogen:"open.v1"`
+	ThrottleKey               string                 `protobuf:"bytes,1,opt,name=throttle_key,json=throttleKey,proto3" json:"throttle_key,omitempty"`
+	ThrottleKeyRawValue       string                 `protobuf:"bytes,2,opt,name=throttle_key_raw_value,json=throttleKeyRawValue,proto3" json:"throttle_key_raw_value,omitempty"`
+	ThrottleKeyExpressionHash string                 `protobuf:"bytes,3,opt,name=throttle_key_expression_hash,json=throttleKeyExpressionHash,proto3" json:"throttle_key_expression_hash,omitempty"`
+	unknownFields             protoimpl.UnknownFields
+	sizeCache                 protoimpl.SizeCache
+}
+
+func (x *BacklogThrottleInfo) Reset() {
+	*x = BacklogThrottleInfo{}
+	mi := &file_debug_v1_queue_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BacklogThrottleInfo) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BacklogThrottleInfo) ProtoMessage() {}
+
+func (x *BacklogThrottleInfo) ProtoReflect() protoreflect.Message {
+	mi := &file_debug_v1_queue_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BacklogThrottleInfo.ProtoReflect.Descriptor instead.
+func (*BacklogThrottleInfo) Descriptor() ([]byte, []int) {
+	return file_debug_v1_queue_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *BacklogThrottleInfo) GetThrottleKey() string {
+	if x != nil {
+		return x.ThrottleKey
+	}
+	return ""
+}
+
+func (x *BacklogThrottleInfo) GetThrottleKeyRawValue() string {
+	if x != nil {
+		return x.ThrottleKeyRawValue
+	}
+	return ""
+}
+
+func (x *BacklogThrottleInfo) GetThrottleKeyExpressionHash() string {
+	if x != nil {
+		return x.ThrottleKeyExpressionHash
+	}
+	return ""
+}
+
 var File_debug_v1_queue_proto protoreflect.FileDescriptor
 
 const file_debug_v1_queue_proto_rawDesc = "" +
@@ -600,7 +1197,58 @@ const file_debug_v1_queue_proto_rawDesc = "" +
 	"\vqueue_shard\x18\x03 \x01(\tR\n" +
 	"queueShard\"'\n" +
 	"\x11QueueItemResponse\x12\x12\n" +
-	"\x04data\x18\x01 \x01(\fR\x04dataB5Z3github.com/inngest/inngest/proto/gen/debug/v1;debugb\x06proto3"
+	"\x04data\x18\x01 \x01(\fR\x04data\";\n" +
+	"\x16ShadowPartitionRequest\x12!\n" +
+	"\fpartition_id\x18\x01 \x01(\tR\vpartitionId\"\xaa\x02\n" +
+	"\x17ShadowPartitionResponse\x12!\n" +
+	"\fpartition_id\x18\x01 \x01(\tR\vpartitionId\x12)\n" +
+	"\x10function_version\x18\x02 \x01(\x05R\x0ffunctionVersion\x12\x19\n" +
+	"\blease_id\x18\x03 \x01(\tR\aleaseId\x12\x1f\n" +
+	"\vfunction_id\x18\x04 \x01(\tR\n" +
+	"functionId\x12\x15\n" +
+	"\x06env_id\x18\x05 \x01(\tR\x05envId\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x06 \x01(\tR\taccountId\x12*\n" +
+	"\x11system_queue_name\x18\a \x01(\tR\x0fsystemQueueName\x12#\n" +
+	"\rbacklog_count\x18\b \x01(\x03R\fbacklogCount\"J\n" +
+	"\x0fBacklogsRequest\x12!\n" +
+	"\fpartition_id\x18\x01 \x01(\tR\vpartitionId\x12\x14\n" +
+	"\x05limit\x18\x02 \x01(\x03R\x05limit\"f\n" +
+	"\x10BacklogsResponse\x121\n" +
+	"\bbacklogs\x18\x01 \x03(\v2\x15.debug.v1.BacklogInfoR\bbacklogs\x12\x1f\n" +
+	"\vtotal_count\x18\x02 \x01(\x03R\n" +
+	"totalCount\"3\n" +
+	"\x12BacklogSizeRequest\x12\x1d\n" +
+	"\n" +
+	"backlog_id\x18\x01 \x01(\tR\tbacklogId\"\x84\x01\n" +
+	"\x13BacklogSizeResponse\x12\x1d\n" +
+	"\n" +
+	"backlog_id\x18\x01 \x01(\tR\tbacklogId\x12\x1d\n" +
+	"\n" +
+	"item_count\x18\x02 \x01(\x03R\titemCount\x12/\n" +
+	"\abacklog\x18\x03 \x01(\v2\x15.debug.v1.BacklogInfoR\abacklog\"\xd8\x02\n" +
+	"\vBacklogInfo\x12\x1d\n" +
+	"\n" +
+	"backlog_id\x18\x01 \x01(\tR\tbacklogId\x12.\n" +
+	"\x13shadow_partition_id\x18\x02 \x01(\tR\x11shadowPartitionId\x12:\n" +
+	"\x19earliest_function_version\x18\x03 \x01(\x05R\x17earliestFunctionVersion\x12\x14\n" +
+	"\x05start\x18\x04 \x01(\bR\x05start\x12N\n" +
+	"\x10concurrency_keys\x18\x05 \x03(\v2#.debug.v1.BacklogConcurrencyKeyInfoR\x0fconcurrencyKeys\x129\n" +
+	"\bthrottle\x18\x06 \x01(\v2\x1d.debug.v1.BacklogThrottleInfoR\bthrottle\x12\x1d\n" +
+	"\n" +
+	"item_count\x18\a \x01(\x03R\titemCount\"\xa1\x02\n" +
+	"\x19BacklogConcurrencyKeyInfo\x12(\n" +
+	"\x10canonical_key_id\x18\x01 \x01(\tR\x0ecanonicalKeyId\x12\x14\n" +
+	"\x05scope\x18\x02 \x01(\tR\x05scope\x12\x1b\n" +
+	"\tentity_id\x18\x03 \x01(\tR\bentityId\x122\n" +
+	"\x15hashed_key_expression\x18\x04 \x01(\tR\x13hashedKeyExpression\x12!\n" +
+	"\fhashed_value\x18\x05 \x01(\tR\vhashedValue\x12%\n" +
+	"\x0eunhashed_value\x18\x06 \x01(\tR\runhashedValue\x12)\n" +
+	"\x10concurrency_mode\x18\a \x01(\tR\x0fconcurrencyMode\"\xae\x01\n" +
+	"\x13BacklogThrottleInfo\x12!\n" +
+	"\fthrottle_key\x18\x01 \x01(\tR\vthrottleKey\x123\n" +
+	"\x16throttle_key_raw_value\x18\x02 \x01(\tR\x13throttleKeyRawValue\x12?\n" +
+	"\x1cthrottle_key_expression_hash\x18\x03 \x01(\tR\x19throttleKeyExpressionHashB5Z3github.com/inngest/inngest/proto/gen/debug/v1;debugb\x06proto3"
 
 var (
 	file_debug_v1_queue_proto_rawDescOnce sync.Once
@@ -614,28 +1262,41 @@ func file_debug_v1_queue_proto_rawDescGZIP() []byte {
 	return file_debug_v1_queue_proto_rawDescData
 }
 
-var file_debug_v1_queue_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_debug_v1_queue_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
 var file_debug_v1_queue_proto_goTypes = []any{
-	(*PartitionRequest)(nil),        // 0: debug.v1.PartitionRequest
-	(*PartitionResponse)(nil),       // 1: debug.v1.PartitionResponse
-	(*PartitionStatusResponse)(nil), // 2: debug.v1.PartitionStatusResponse
-	(*PartitionTenant)(nil),         // 3: debug.v1.PartitionTenant
-	(*QueueShard)(nil),              // 4: debug.v1.QueueShard
-	(*CronSchedule)(nil),            // 5: debug.v1.CronSchedule
-	(*QueueItemRequest)(nil),        // 6: debug.v1.QueueItemRequest
-	(*QueueItemResponse)(nil),       // 7: debug.v1.QueueItemResponse
-	(*timestamppb.Timestamp)(nil),   // 8: google.protobuf.Timestamp
+	(*PartitionRequest)(nil),          // 0: debug.v1.PartitionRequest
+	(*PartitionResponse)(nil),         // 1: debug.v1.PartitionResponse
+	(*PartitionStatusResponse)(nil),   // 2: debug.v1.PartitionStatusResponse
+	(*PartitionTenant)(nil),           // 3: debug.v1.PartitionTenant
+	(*QueueShard)(nil),                // 4: debug.v1.QueueShard
+	(*CronSchedule)(nil),              // 5: debug.v1.CronSchedule
+	(*QueueItemRequest)(nil),          // 6: debug.v1.QueueItemRequest
+	(*QueueItemResponse)(nil),         // 7: debug.v1.QueueItemResponse
+	(*ShadowPartitionRequest)(nil),    // 8: debug.v1.ShadowPartitionRequest
+	(*ShadowPartitionResponse)(nil),   // 9: debug.v1.ShadowPartitionResponse
+	(*BacklogsRequest)(nil),           // 10: debug.v1.BacklogsRequest
+	(*BacklogsResponse)(nil),          // 11: debug.v1.BacklogsResponse
+	(*BacklogSizeRequest)(nil),        // 12: debug.v1.BacklogSizeRequest
+	(*BacklogSizeResponse)(nil),       // 13: debug.v1.BacklogSizeResponse
+	(*BacklogInfo)(nil),               // 14: debug.v1.BacklogInfo
+	(*BacklogConcurrencyKeyInfo)(nil), // 15: debug.v1.BacklogConcurrencyKeyInfo
+	(*BacklogThrottleInfo)(nil),       // 16: debug.v1.BacklogThrottleInfo
+	(*timestamppb.Timestamp)(nil),     // 17: google.protobuf.Timestamp
 }
 var file_debug_v1_queue_proto_depIdxs = []int32{
-	3, // 0: debug.v1.PartitionResponse.tenant:type_name -> debug.v1.PartitionTenant
-	4, // 1: debug.v1.PartitionResponse.queue_shard:type_name -> debug.v1.QueueShard
-	5, // 2: debug.v1.PartitionResponse.crons:type_name -> debug.v1.CronSchedule
-	8, // 3: debug.v1.CronSchedule.next:type_name -> google.protobuf.Timestamp
-	4, // [4:4] is the sub-list for method output_type
-	4, // [4:4] is the sub-list for method input_type
-	4, // [4:4] is the sub-list for extension type_name
-	4, // [4:4] is the sub-list for extension extendee
-	0, // [0:4] is the sub-list for field type_name
+	3,  // 0: debug.v1.PartitionResponse.tenant:type_name -> debug.v1.PartitionTenant
+	4,  // 1: debug.v1.PartitionResponse.queue_shard:type_name -> debug.v1.QueueShard
+	5,  // 2: debug.v1.PartitionResponse.crons:type_name -> debug.v1.CronSchedule
+	17, // 3: debug.v1.CronSchedule.next:type_name -> google.protobuf.Timestamp
+	14, // 4: debug.v1.BacklogsResponse.backlogs:type_name -> debug.v1.BacklogInfo
+	14, // 5: debug.v1.BacklogSizeResponse.backlog:type_name -> debug.v1.BacklogInfo
+	15, // 6: debug.v1.BacklogInfo.concurrency_keys:type_name -> debug.v1.BacklogConcurrencyKeyInfo
+	16, // 7: debug.v1.BacklogInfo.throttle:type_name -> debug.v1.BacklogThrottleInfo
+	8,  // [8:8] is the sub-list for method output_type
+	8,  // [8:8] is the sub-list for method input_type
+	8,  // [8:8] is the sub-list for extension type_name
+	8,  // [8:8] is the sub-list for extension extendee
+	0,  // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_debug_v1_queue_proto_init() }
@@ -649,7 +1310,7 @@ func file_debug_v1_queue_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_debug_v1_queue_proto_rawDesc), len(file_debug_v1_queue_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   8,
+			NumMessages:   17,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

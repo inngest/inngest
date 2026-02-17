@@ -118,6 +118,8 @@ type QueueManager interface {
 	BacklogsByPartition(ctx context.Context, queueShard QueueShard, partitionID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueBacklog], error)
 	// BacklogSize retrieves the number of items in the specified backlog
 	BacklogSize(ctx context.Context, queueShard QueueShard, backlogID string) (int64, error)
+	// BacklogByID retrieves a single backlog by its ID
+	BacklogByID(ctx context.Context, queueShard QueueShard, backlogID string) (*QueueBacklog, error)
 	// PartitionByID retrieves the partition by the partition ID
 	PartitionByID(ctx context.Context, queueShard QueueShard, partitionID string) (*PartitionInspectionResult, error)
 	// ItemByID retrieves the queue item by the jobID
@@ -276,6 +278,7 @@ type ShardOperations interface {
 	BacklogRequeue(ctx context.Context, backlog *QueueBacklog, sp *QueueShadowPartition, requeueAt time.Time) error
 	BacklogsByPartition(ctx context.Context, partitionID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueBacklog], error)
 	BacklogSize(ctx context.Context, backlogID string) (int64, error)
+	BacklogByID(ctx context.Context, backlogID string) (*QueueBacklog, error)
 
 	PeekShadowPartitions(ctx context.Context, accountID *uuid.UUID, sequential bool, peekLimit int64, until time.Time) ([]*QueueShadowPartition, error)
 
