@@ -17,7 +17,6 @@ export function CellDetailView() {
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-<<<<<<< HEAD
       <div className=" flex items-center justify-between px-4 py-4">
         <div className="text-basis text-sm font-medium">
           {selectedCell.columnId}
@@ -27,17 +26,6 @@ export function CellDetailView() {
         </div>
       </div>
       <div className="min-h-0 flex-1 overflow-auto px-4 py-1">
-=======
-      <div className="border-subtle border-b px-4 py-3">
-        <div className="text-muted text-xs font-medium uppercase tracking-wide">
-          {selectedCell.columnName}
-        </div>
-        <div className="text-subtle mt-0.5 text-xs">
-          {selectedCell.columnType}
-        </div>
-      </div>
-      <div className="min-h-0 flex-1">
->>>>>>> 18e872648 (updated data tabel to fix the table column issue, added cell detail sidebar, removed query history from the sidebar)
         <CellValueCodeBlock
           columnType={selectedCell.columnType}
           value={selectedCell.value}
@@ -79,7 +67,6 @@ function CellValueCodeBlock({
   }, [columnType, value]);
 
   return (
-<<<<<<< HEAD
     <CodeBlock.Wrapper>
       <CodeBlock
         tab={{
@@ -89,15 +76,5 @@ function CellValueCodeBlock({
         }}
       />
     </CodeBlock.Wrapper>
-=======
-    <CodeBlock
-      tab={{
-        content,
-        language,
-        readOnly: true,
-      }}
-      alwaysFullHeight
-    />
->>>>>>> 18e872648 (updated data tabel to fix the table column issue, added cell detail sidebar, removed query history from the sidebar)
   );
 }
