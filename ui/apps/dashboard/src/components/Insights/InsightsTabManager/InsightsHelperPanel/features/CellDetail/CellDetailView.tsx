@@ -17,15 +17,15 @@ export function CellDetailView() {
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <div className="border-subtle border-b px-4 py-3">
-        <div className="text-muted text-xs font-medium uppercase tracking-wide">
+      <div className=" flex items-center justify-between px-4 py-4">
+        <div className="text-basis text-sm font-medium">
           {selectedCell.columnName}
         </div>
-        <div className="text-subtle mt-0.5 text-xs">
+        <div className=" text-muted rounded px-1.5 py-0.5 text-xs font-medium uppercase">
           {selectedCell.columnType}
         </div>
       </div>
-      <div className="min-h-0 flex-1">
+      <div className="min-h-0 flex-1 overflow-auto px-4 py-1">
         <CellValueCodeBlock
           columnType={selectedCell.columnType}
           value={selectedCell.value}
@@ -67,13 +67,14 @@ function CellValueCodeBlock({
   }, [columnType, value]);
 
   return (
-    <CodeBlock
-      tab={{
-        content,
-        language,
-        readOnly: true,
-      }}
-      alwaysFullHeight
-    />
+    <CodeBlock.Wrapper>
+      <CodeBlock
+        tab={{
+          content,
+          language,
+          readOnly: true,
+        }}
+      />
+    </CodeBlock.Wrapper>
   );
 }

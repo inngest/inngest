@@ -33,6 +33,7 @@ type BaseTableProps<T> = {
   blankState?: React.ReactNode;
   cellClassName?: string;
   enableColumnSizing?: boolean;
+  selectedCell?: { rowIndex: number; columnId: string } | null;
   noHeader?: boolean;
 };
 
@@ -54,6 +55,7 @@ export function Table<T>({
   columns,
   expandedIDs = [],
   cellClassName,
+  selectedCell,
   enableColumnSizing = false,
   noHeader = false,
 }: TableProps<T>) {
@@ -124,7 +126,8 @@ export function Table<T>({
                       key={header.id}
                       className={cn(
                         isIconOnlyColumn ? '' : tableColumnStyles,
-                        'text-muted text-nowrap text-left text-xs font-medium'
+                        'text-muted text-nowrap text-left text-xs font-medium',
+                        enableColumnSizing ? 'overflow-hidden text-ellipsis' : ''
                       )}
                       style={
                         enableColumnSizing
@@ -143,14 +146,17 @@ export function Table<T>({
                               ? 'flex cursor-pointer select-none items-center gap-1'
                               : header.column.getIsSorted()
                               ? 'flex items-center gap-1'
-                              : ''
+                              : '',
+                            enableColumnSizing ? 'min-w-0 overflow-hidden text-ellipsis' : ''
                           )}
                           onClick={header.column.getToggleSortingHandler()}
                         >
-                          {flexRender(header.column.columnDef.header, header.getContext())}
+                          <span className={enableColumnSizing ? 'min-w-0 truncate' : ''}>
+                            {flexRender(header.column.columnDef.header, header.getContext())}
+                          </span>
                           {{
-                            asc: <RiSortAsc className="text-light h-4 w-4" />,
-                            desc: <RiSortDesc className="text-light h-4 w-4" />,
+                            asc: <RiSortAsc className="text-light h-4 w-4 shrink-0" />,
+                            desc: <RiSortDesc className="text-light h-4 w-4 shrink-0" />,
                           }[header.column.getIsSorted() as string] ?? null}
                         </div>
                       )}
@@ -210,7 +216,12 @@ export function Table<T>({
                             : '',
                           isIconOnlyColumn ? '' : tableColumnStyles,
                           cellClassName ?? '',
-                          onCellClick && !onRowClick ? 'cursor-pointer' : ''
+                          onCellClick && !onRowClick ? 'cursor-pointer' : '',
+                          selectedCell &&
+                            row.index === selectedCell.rowIndex &&
+                            cell.column.id === selectedCell.columnId
+                            ? 'ring-2 ring-inset ring-[rgb(var(--color-border-active))]'
+                            : ''
                         )}
                         style={
                           enableColumnSizing
