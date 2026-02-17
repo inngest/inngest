@@ -210,6 +210,13 @@ export function Table<T>({
                     return (
                       <td
                         key={cell.id}
+                        data-selected={
+                          selectedCell &&
+                          row.index === selectedCell.rowIndex &&
+                          cell.column.id === selectedCell.columnId
+                            ? 'true'
+                            : undefined
+                        }
                         className={cn(
                           i === 0 && hasId(row.original) && expandedIDs.includes(row.original.id)
                             ? expandedRowSideBorder
