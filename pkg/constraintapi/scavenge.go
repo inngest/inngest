@@ -32,6 +32,11 @@ type scavengerOptions struct {
 	accountsPeekSize int
 	leasesPeekSize   int
 	concurrency      int
+
+	// skipAccount is called for each account before scavenging.
+	// If it returns true, the account is skipped.
+	// This is used to skip accounts during shard migration.
+	skipAccount func(accountID uuid.UUID) bool
 }
 
 type scavengerOpt func(o *scavengerOptions)
@@ -51,6 +56,15 @@ func ScavengerAccountsPeekSize(peekSize int) scavengerOpt {
 func ScavengerLeasesPeekSize(peekSize int) scavengerOpt {
 	return func(o *scavengerOptions) {
 		o.leasesPeekSize = peekSize
+	}
+}
+
+// ScavengerSkipMigratingAccounts configures the scavenger to skip accounts that are
+// currently being migrated between shards. The provided function should return true
+// for accounts that should be skipped.
+func ScavengerSkipMigratingAccounts(skipFn func(accountID uuid.UUID) bool) scavengerOpt {
+	return func(o *scavengerOptions) {
+		o.skipAccount = skipFn
 	}
 }
 
@@ -157,6 +171,12 @@ func (r *redisCapacityManager) scavengeShard(ctx context.Context, client rueidis
 	eg.SetLimit(o.concurrency)
 
 	for _, accountID := range res.accountIDs {
+		// Skip accounts that are being migrated between shards.
+		// During migration, the migration coordinator handles lease lifecycle.
+		if o.skipAccount != nil && o.skipAccount(accountID) {
+			continue
+		}
+
 		eg.Go(func() error {
 			res, err := r.scavengeAccount(
 				ctx,

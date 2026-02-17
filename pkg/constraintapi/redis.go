@@ -162,3 +162,42 @@ func (r *redisCapacityManager) keyConstraintCheckIdempotency(accountID uuid.UUID
 func (r *redisCapacityManager) keyLeaseDetails(accountID uuid.UUID, leaseID ulid.ULID) string {
 	return fmt.Sprintf("{cs}:%s:ld:%s", accountScope(accountID), leaseID)
 }
+
+// AccountKeyPrefix returns the Redis key prefix for all keys belonging to an account.
+// This is used during shard migration to enumerate all account keys via SCAN.
+func AccountKeyPrefix(accountID uuid.UUID) string {
+	return fmt.Sprintf("{cs}:%s:", accountScope(accountID))
+}
+
+// AccountKeyScanPattern returns the SCAN MATCH pattern for all keys belonging to an account.
+func AccountKeyScanPattern(accountID uuid.UUID) string {
+	return fmt.Sprintf("{cs}:%s:*", accountScope(accountID))
+}
+
+// AccountGCRAScanPatterns returns SCAN MATCH patterns for rate limit and throttle GCRA state keys.
+// These keys are only modified during Acquire operations.
+func AccountGCRAScanPatterns(accountID uuid.UUID) []string {
+	prefix := accountScope(accountID)
+	return []string{
+		fmt.Sprintf("{cs}:%s:rl:*", prefix),
+		fmt.Sprintf("{cs}:%s:throttle:*", prefix),
+	}
+}
+
+// AccountLeaseStateScanPatterns returns SCAN MATCH patterns for active lease-related keys.
+// These keys are modified during Acquire, Extend, and Release operations.
+func AccountLeaseStateScanPatterns(accountID uuid.UUID) []string {
+	prefix := accountScope(accountID)
+	return []string{
+		fmt.Sprintf("{cs}:%s:leaseq", prefix),
+		fmt.Sprintf("{cs}:%s:ld:*", prefix),
+		fmt.Sprintf("{cs}:%s:rs:*", prefix),
+		fmt.Sprintf("{cs}:%s:concurrency:*", prefix),
+		fmt.Sprintf("{cs}:%s:ik:*", prefix),
+	}
+}
+
+// ScavengerShardKey returns the key for the global scavenger shard sorted set.
+func ScavengerShardKey() string {
+	return "{cs}:css"
+}
