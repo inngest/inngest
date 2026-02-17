@@ -14,8 +14,7 @@ export function QueryHelperPanel({
   activeSavedQueryId,
 }: QueryHelperPanelProps) {
   const { tabManagerActions } = useTabManagerActions();
-  const { deleteQuery, deleteQuerySnapshot, querySnapshots, queries } =
-    useStoredQueries();
+  const { deleteQuery, queries } = useStoredQueries();
 
   const sharedQueries = useMemo(
     () => limitQueriesByType('shared', queries),
@@ -67,14 +66,6 @@ export function QueryHelperPanel({
           queries={savedQueries}
           title="Saved queries"
           sectionType="saved"
-        />
-        <QueryHelperPanelCollapsibleSection
-          activeSavedQueryId={activeSavedQueryId}
-          onQueryDelete={deleteQuerySnapshot}
-          onQuerySelect={tabManagerActions.createTabFromQuery}
-          queries={querySnapshots}
-          title="Query history"
-          sectionType="history"
         />
       </div>
     </div>

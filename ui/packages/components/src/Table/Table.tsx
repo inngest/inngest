@@ -28,9 +28,11 @@ type BaseTableProps<T> = {
   isLoading?: boolean;
   columns: ColumnDef<T, any>[];
   onRowClick?: (row: Row<T>) => void;
+  onCellClick?: (rowIndex: number, columnId: string, value: unknown) => void;
   getRowHref?: (row: Row<T>) => string;
   blankState?: React.ReactNode;
   cellClassName?: string;
+  enableColumnSizing?: boolean;
   noHeader?: boolean;
 };
 
@@ -46,11 +48,13 @@ export function Table<T>({
   setSorting,
   renderSubComponent,
   onRowClick,
+  onCellClick,
   getRowHref,
   blankState,
   columns,
   expandedIDs = [],
   cellClassName,
+  enableColumnSizing = false,
   noHeader = false,
 }: TableProps<T>) {
   // Render empty lines for skeletons when data is loading
@@ -93,7 +97,7 @@ export function Table<T>({
     },
   });
 
-  const tableStyles = 'w-full';
+  const tableStyles = enableColumnSizing ? 'table-fixed' : 'w-full';
   const tableHeadStyles = 'bg-tableHeader sticky top-0 z-[2]';
   const tableColumnStyles = 'px-4';
   const expandedRowSideBorder =
@@ -122,6 +126,15 @@ export function Table<T>({
                         isIconOnlyColumn ? '' : tableColumnStyles,
                         'text-muted text-nowrap text-left text-xs font-medium'
                       )}
+                      style={
+                        enableColumnSizing
+                          ? {
+                              width: header.getSize(),
+                              minWidth: header.getSize(),
+                              maxWidth: header.getSize(),
+                            }
+                          : undefined
+                      }
                     >
                       {header.isPlaceholder ? null : (
                         <div
@@ -196,8 +209,23 @@ export function Table<T>({
                             ? expandedRowSideBorder
                             : '',
                           isIconOnlyColumn ? '' : tableColumnStyles,
-                          cellClassName ?? ''
+                          cellClassName ?? '',
+                          onCellClick && !onRowClick ? 'cursor-pointer' : ''
                         )}
+                        style={
+                          enableColumnSizing
+                            ? {
+                                width: cell.column.getSize(),
+                                minWidth: cell.column.getSize(),
+                                maxWidth: cell.column.getSize(),
+                              }
+                            : undefined
+                        }
+                        onClick={
+                          onCellClick && !onRowClick
+                            ? () => onCellClick(row.index, cell.column.id, cell.getValue())
+                            : undefined
+                        }
                       >
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
                       </td>

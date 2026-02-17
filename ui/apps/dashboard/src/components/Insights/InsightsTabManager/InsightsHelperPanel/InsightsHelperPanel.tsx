@@ -3,12 +3,14 @@ import { RiCloseLine } from '@remixicon/react';
 
 import { InsightsHelperPanelIcon } from './InsightsHelperPanelIcon';
 import {
+  CELL_DETAIL,
   DOCUMENTATION,
   INSIGHTS_AI,
   SCHEMA_EXPLORER,
   SUPPORT,
   type HelperTitle,
 } from './constants';
+import { CellDetailView } from './features/CellDetail/CellDetailView';
 import { InsightsChat } from './features/InsightsChat/InsightsChat';
 import { SchemaExplorer } from './features/SchemaExplorer/SchemaExplorer';
 
@@ -29,6 +31,8 @@ export function InsightsHelperPanel({
         if (!agentThreadId) return null;
         return <InsightsChat agentThreadId={agentThreadId} />;
       }
+      case CELL_DETAIL:
+        return <CellDetailView />;
       case DOCUMENTATION:
         return <div className="text-sm">Docs helper (placeholder)</div>;
       case SCHEMA_EXPLORER:
