@@ -238,6 +238,10 @@ const eventRunsQuery = graphql(`
             name
             slug
           }
+          trace(preview: true) {
+            skipReason
+            skipExistingRunID
+          }
         }
       }
     }
@@ -279,6 +283,8 @@ export function useEventRuns() {
           id: run.id,
           completedAt: run.endedAt ? new Date(run.endedAt) : undefined,
           startedAt: run.startedAt ? new Date(run.startedAt) : undefined,
+          skipReason: run.trace?.skipReason ?? undefined,
+          skipExistingRunID: run.trace?.skipExistingRunID ?? undefined,
         })),
       };
     },
