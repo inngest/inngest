@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useOrganization, useUser } from '@clerk/tanstack-react-start';
 import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
@@ -33,6 +33,7 @@ const SubmitChurnSurveyDocument = graphql(`
   mutation SubmitChurnSurvey(
     $reason: String!
     $feedback: String
+    $renderedOrder: [String!]
     $email: String!
     $accountID: UUID!
     $clerkUserID: String!
@@ -40,6 +41,7 @@ const SubmitChurnSurveyDocument = graphql(`
     submitChurnSurvey(
       reason: $reason
       feedback: $feedback
+      renderedOrder: $renderedOrder
       email: $email
       accountID: $accountID
       clerkUserID: $clerkUserID
@@ -54,12 +56,20 @@ const SubmitChurnSurveyDocument = graphql(`
 const CHURN_REASONS = [
   { id: 'too-expensive', name: 'Too expensive' },
   { id: 'missing-features', name: 'Missing features' },
-  { id: 'too-complex', name: 'Too complex to use' },
-  { id: 'found-alternative', name: 'Found a better alternative' },
-  { id: 'no-longer-needed', name: 'No longer needed' },
-  { id: 'poor-performance', name: 'Poor performance / Issues' },
+  { id: 'unhappy-with-experience', name: 'Unhappy with experience' },
+  { id: 'project-ended', name: 'Project ended' },
+  { id: 'unhappy-with-performance', name: 'Unhappy with performance' },
   { id: 'other', name: 'Other' },
 ];
+
+function shuffleArray<T>(array: T[]): T[] {
+  const shuffled = [...array];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j]!, shuffled[i]!];
+  }
+  return shuffled;
+}
 
 export default function ConfirmPlanChangeModal({
   action,
@@ -74,6 +84,20 @@ export default function ConfirmPlanChangeModal({
     name: string;
   } | null>(null);
   const [churnFeedback, setChurnFeedback] = useState('');
+
+  // Shuffle churn reasons once on mount, keeping "Other" last
+  const { shuffledReasons, renderedOrder } = useMemo(() => {
+    const other = CHURN_REASONS.find((r) => r.id === 'other');
+    const rest = CHURN_REASONS.filter((r) => r.id !== 'other');
+    const shuffled = shuffleArray(rest);
+    if (other) {
+      shuffled.push(other);
+    }
+    return {
+      shuffledReasons: shuffled,
+      renderedOrder: shuffled.map((r) => r.id),
+    };
+  }, []);
   const [{ error: apiError }, updatePlan] = useMutation(UpdatePlanDocument);
   const [{ error: churnError }, submitChurnSurvey] = useMutation(
     SubmitChurnSurveyDocument,
@@ -112,6 +136,7 @@ export default function ConfirmPlanChangeModal({
           await submitChurnSurvey({
             reason: churnReason.id,
             feedback: churnFeedback || null,
+            renderedOrder,
             email,
             accountID: accountId,
             clerkUserID: user.id,
@@ -175,8 +200,8 @@ export default function ConfirmPlanChangeModal({
                 <div className="w-full">
                   <label className="mb-2 block text-sm font-medium">
                     {isCancellation
-                      ? 'Primary reason for canceling'
-                      : 'Primary reason for downgrading'}{' '}
+                      ? 'What’s causing you to downgrade right now?'
+                      : 'What’s causing you to cancel right now?'}{' '}
                     <span className="text-error">*</span>
                   </label>
                   <div className="w-full">
@@ -190,7 +215,7 @@ export default function ConfirmPlanChangeModal({
                         {churnReason ? churnReason.name : 'Select a reason...'}
                       </Select.Button>
                       <Select.Options className="w-full">
-                        {CHURN_REASONS.map((reason) => (
+                        {shuffledReasons.map((reason) => (
                           <Select.Option key={reason.id} option={reason}>
                             {reason.name}
                           </Select.Option>
