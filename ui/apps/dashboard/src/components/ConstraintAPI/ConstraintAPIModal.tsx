@@ -74,7 +74,9 @@ export function ConstraintAPIModal({
               <p className="mb-1 font-medium">Summary</p>
               <p className="text-subtle text-sm">
                 We&apos;re upgrading the infrastructure that powers constraint
-                enforcement across the platform.
+                enforcement across the platform. As part of this rollout, your
+                existing constraint usage will be reset. This only affects
+                function execution, <b>billing will not be affected</b>.
               </p>
             </div>
             <div>
