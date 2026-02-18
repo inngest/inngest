@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"time"
 
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
@@ -39,7 +40,7 @@ func (q *queueProcessor) claimShardLease(ctx context.Context) {
 		return
 	}
 
-	tick := q.Clock().NewTicker(ShardLeaseDuration / 3)
+	tick := q.Clock().NewTicker(500 * time.Millisecond)
 	for {
 		select {
 		case <-ctx.Done():
