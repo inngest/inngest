@@ -12,13 +12,14 @@ const STORAGE_KEY = 'constraintAPIWidgetDismissedUntil';
 export function useConstraintAPI() {
   const [isReady, setIsReady] = useState(false);
   const [shouldShow, setShouldShow] = useState(true);
+  const [hasEnrolled, setHasEnrolled] = useState(false);
 
   // Dual queries for enrollment status
-  const [enrolledResult] = useQuery({
+  const [enrolledResult, reexecuteEnrolled] = useQuery({
     query: ConstraintAPIEnrollmentQuery,
   });
 
-  const [inEffectResult] = useQuery({
+  const [inEffectResult, reexecuteInEffect] = useQuery({
     query: ConstraintAPIInEffectQuery,
   });
 
@@ -44,6 +45,12 @@ export function useConstraintAPI() {
     setIsReady(true);
   }, []);
 
+  const refetch = useCallback(() => {
+    setHasEnrolled(true);
+    reexecuteEnrolled({ requestPolicy: 'network-only' });
+    reexecuteInEffect({ requestPolicy: 'network-only' });
+  }, [reexecuteEnrolled, reexecuteInEffect]);
+
   const dismiss = useCallback(() => {
     if (typeof window === 'undefined') return;
 
@@ -52,18 +59,20 @@ export function useConstraintAPI() {
     setShouldShow(false);
   }, []);
 
-  // Widget visible if: ready, not dismissed, no errors, has data
+  // Widget visible if: ready, not dismissed, no errors, not yet enrolled, and enrollment not just triggered
   const isWidgetVisible =
     isReady &&
     shouldShow &&
+    !hasEnrolled &&
     !enrolledResult.error &&
     !inEffectResult.error &&
-    constraintAPIData !== null;
+    constraintAPIData?.displayState === 'not_enrolled';
 
   return {
     isWidgetVisible,
     constraintAPIData,
     dismiss,
+    refetch,
     isLoading: enrolledResult.fetching || inEffectResult.fetching,
     error: enrolledResult.error || inEffectResult.error,
   };

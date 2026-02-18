@@ -1,24 +1,24 @@
 import { useState } from 'react';
 import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
-import { Modal, AlertModal } from '@inngest/components/Modal';
+import { Modal } from '@inngest/components/Modal';
 import { useMutation } from 'urql';
-import { toast } from 'sonner';
 
 import { EnrollToConstraintAPIMutation, type ConstraintAPIData } from './data';
 
 type ConstraintAPIModalProps = {
   isOpen: boolean;
   onClose: () => void;
+  onEnrolled: () => void;
   constraintAPIData: ConstraintAPIData;
 };
 
 export function ConstraintAPIModal({
   isOpen,
   onClose,
+  onEnrolled,
   constraintAPIData,
 }: ConstraintAPIModalProps) {
-  const [showConfirmation, setShowConfirmation] = useState(false);
   const [error, setError] = useState<string>();
   const [isFetching, setIsFetching] = useState(false);
   const [, enrollMutation] = useMutation(EnrollToConstraintAPIMutation);
@@ -41,9 +41,8 @@ export function ConstraintAPIModal({
         throw result.error;
       }
 
-      toast.success('Successfully enrolled in Constraint API!');
-      setShowConfirmation(false);
       onClose();
+      onEnrolled();
     } catch (err) {
       const message =
         err instanceof Error ? err.message : 'Unknown error occurred';
@@ -53,56 +52,80 @@ export function ConstraintAPIModal({
     }
   }
 
-  // Confirmation modal (shown after clicking "Enroll Now")
-  if (showConfirmation) {
-    return (
-      <AlertModal
-        isOpen={isOpen}
-        onClose={() => {
-          setShowConfirmation(false);
-          setError(undefined);
-        }}
-        onSubmit={handleEnrollment}
-        title="Confirm Enrollment"
-        description="Are you sure you want to enroll in the Constraint API? This will enable the new infrastructure for your account."
-        confirmButtonLabel="Enroll Now"
-        confirmButtonKind="primary"
-        isLoading={isFetching}
-      >
-        {error && (
-          <div className="p-6">
-            <Alert severity="error">{error}</Alert>
-          </div>
-        )}
-      </AlertModal>
-    );
-  }
-
   // Main information modal
   return (
     <Modal className="max-w-2xl" isOpen={isOpen} onClose={onClose}>
-      <Modal.Header>
-        {displayState === 'not_enrolled' && 'Constraint API Upgrade'}
-        {displayState === 'pending' && 'Enrollment Pending'}
-        {displayState === 'active' && 'Constraint API Active'}
-      </Modal.Header>
+      <div className="bg-modalBase border-subtle flex items-center justify-between border-b p-6">
+        <p className="text-basis text-xl">Important Infrastructure Upgrade</p>
+        <a
+          href="https://inngest.com/blog"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-sm text-link hover:underline"
+        >
+          Learn more
+        </a>
+      </div>
 
       <Modal.Body>
         {displayState === 'not_enrolled' && (
-          <>
-            <p className="mb-4">
-              We&apos;re rolling out a new infrastructure upgrade that improves
-              reliability and performance through our Constraint API.
-            </p>
-            <Alert severity="info" className="mb-4">
-              You can enroll now to start using the new infrastructure when it
-              becomes available for your account.
-            </Alert>
-            <p className="text-sm text-subtle">
-              Enrollment is optional but recommended. You can enroll at any time
-              that best fits your schedule.
-            </p>
-          </>
+          <div className="space-y-4">
+            <div>
+              <p className="mb-1 font-medium">Summary</p>
+              <p className="text-subtle text-sm">
+                We&apos;re upgrading the infrastructure that powers constraint
+                enforcement across the platform.
+              </p>
+            </div>
+            <div>
+              <p className="mb-1 font-medium">Impact</p>
+              <ul className="text-subtle list-disc space-y-1 pl-4 text-sm">
+                <li>
+                  Existing function runs will not count toward your account,
+                  function, or custom concurrency limits during the enrollment.
+                  As a result, those limits may temporarily be exceeded.
+                </li>
+                <li>
+                  Throttle and rate limit counters on your functions will reset
+                  to zero at the time of enrollment.
+                </li>
+              </ul>
+            </div>
+            <div>
+              <p className="mb-1 font-medium">Mitigation</p>
+              <p className="text-subtle mb-2 text-sm">
+                If any of your deployed apps may struggle to handle increased
+                traffic — whether from higher concurrency or additional
+                scheduled runs due to throttle or rate limit resets — you have a
+                couple of options:
+              </p>
+              <ul className="text-subtle list-disc space-y-1 pl-4 text-sm">
+                <li>
+                  <a
+                    href="https://www.inngest.com/docs/guides/pause-functions"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-link hover:underline"
+                  >
+                    Pause individual functions
+                  </a>{' '}
+                  before enrolling and re-enable them once the migration is
+                  complete.
+                </li>
+                <li>
+                  Reduce your configured concurrency, throttle, or rate limits
+                  ahead of time to give yourself more headroom.
+                </li>
+              </ul>
+            </div>
+            <div>
+              <p className="mb-1 font-medium">Timeline</p>
+              <p className="text-subtle text-sm">
+                You can enroll at any time before March 23, 2026. After that
+                date, any remaining accounts will be migrated automatically.
+              </p>
+            </div>
+          </div>
         )}
 
         {displayState === 'pending' && (
@@ -126,6 +149,11 @@ export function ConstraintAPIModal({
       </Modal.Body>
 
       <Modal.Footer>
+        {error && (
+          <Alert severity="error" className="mb-4">
+            {error}
+          </Alert>
+        )}
         <div className="flex justify-end gap-2">
           <Button
             label="Close"
@@ -137,7 +165,8 @@ export function ConstraintAPIModal({
             <Button
               label="Enroll Now"
               kind="primary"
-              onClick={() => setShowConfirmation(true)}
+              loading={isFetching}
+              onClick={handleEnrollment}
             />
           )}
         </div>

@@ -5,7 +5,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@inngest/components/Tooltip/Tooltip';
-import { RiCloseLine, RiInformationLine } from '@remixicon/react';
+import { RiCloseLine } from '@remixicon/react';
 
 import { ConstraintAPIModal } from './ConstraintAPIModal';
 import { useConstraintAPI } from './useConstraintAPI';
@@ -25,19 +25,19 @@ function getContentForState(
       return {
         collapsedText: 'Infrastructure upgrade',
         title: 'Infrastructure Upgrade Available',
-        description: 'Learn about the Constraint API',
+        description: 'Enroll before February 25, 2026',
       };
     case 'pending':
       return {
         collapsedText: 'Enrollment pending',
         title: 'Enrollment Pending',
-        description: 'Your enrollment is being processed',
+        description: 'Enroll before February 25, 2026',
       };
     case 'active':
       return {
         collapsedText: 'Constraint API active',
         title: 'Constraint API Active',
-        description: 'Your account is using the new infrastructure',
+        description: 'Enroll before February 25, 2026',
       };
   }
 }
@@ -47,7 +47,8 @@ export default function ConstraintAPIWidget({
 }: {
   collapsed: boolean;
 }) {
-  const { isWidgetVisible, constraintAPIData, dismiss } = useConstraintAPI();
+  const { isWidgetVisible, constraintAPIData, dismiss, refetch } =
+    useConstraintAPI();
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   if (!isWidgetVisible || !constraintAPIData) {
@@ -62,18 +63,16 @@ export default function ConstraintAPIWidget({
       {collapsed && (
         <button
           onClick={() => setIsModalOpen(true)}
-          className="border-muted text-basis hover:border-basis flex w-full items-center justify-center gap-2 rounded border border-blue-200 bg-blue-50 px-2 py-2.5 text-sm transition-colors"
-        >
-          <RiInformationLine className="h-[18px] w-[18px] text-blue-600" />
-        </button>
+          className="flex w-full items-center justify-center rounded border border-amber-200 bg-amber-50 px-2 py-2.5 text-sm transition-colors hover:bg-amber-100"
+        />
       )}
 
       {!collapsed && (
-        <div className="text-basis mb-5 block rounded border border-blue-200 bg-blue-50 p-3 leading-tight">
+        <div className="text-basis mb-5 block rounded border border-amber-200 bg-amber-50 p-3 leading-tight">
           <div className="flex min-h-[110px] flex-col justify-between">
             <div>
-              <div className="flex items-center justify-between">
-                <RiInformationLine className="h-5 w-5 text-blue-600" />
+              <div className="flex items-start justify-between">
+                <p className="font-medium text-amber-800">{content.title}</p>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
@@ -81,7 +80,7 @@ export default function ConstraintAPIWidget({
                       kind="secondary"
                       appearance="ghost"
                       size="small"
-                      className="hover:bg-blue-100"
+                      className="hover:bg-amber-100 -mr-1 -mt-1 shrink-0"
                       onClick={(e) => {
                         e.preventDefault();
                         dismiss();
@@ -93,17 +92,14 @@ export default function ConstraintAPIWidget({
                   </TooltipContent>
                 </Tooltip>
               </div>
-              <p className="flex items-center gap-1.5 font-medium text-blue-800">
-                {content.title}
-              </p>
-              <p className="text-sm text-blue-700">{content.description}</p>
+              <p className="text-sm text-amber-700">{content.description}</p>
             </div>
-            <Button
-              appearance="outlined"
-              className="hover:bg-blue-100 w-full text-sm"
-              label="Learn More"
+            <button
+              className="text-left text-sm text-amber-800 hover:underline"
               onClick={() => setIsModalOpen(true)}
-            />
+            >
+              Learn more
+            </button>
           </div>
         </div>
       )}
@@ -111,6 +107,7 @@ export default function ConstraintAPIWidget({
       <ConstraintAPIModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
+        onEnrolled={refetch}
         constraintAPIData={constraintAPIData}
       />
     </>

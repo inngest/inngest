@@ -1868,6 +1868,8 @@ export type RunTraceSpan = {
   queuedAt: Scalars['Time']['output'];
   run: FunctionRun;
   runID: Scalars['ULID']['output'];
+  skipExistingRunID: Maybe<Scalars['String']['output']>;
+  skipReason: Maybe<Scalars['String']['output']>;
   spanID: Scalars['String']['output'];
   startedAt: Maybe<Scalars['Time']['output']>;
   status: RunTraceSpanStatus;
