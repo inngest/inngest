@@ -654,7 +654,7 @@ type InitOpts struct {
 	exec  execution.Executor
 }
 
-// Initialize creates a new funciton run identifier for the given workflow and
+// Initialize creates a new function run identifier for the given workflow and
 // event, stores this in our state store, then enqueues a new function run
 // within the given queue for execution.
 //
