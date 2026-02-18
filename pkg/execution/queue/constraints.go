@@ -404,7 +404,7 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 		CurrentTime:     now,
 		Duration:        QueueLeaseDuration,
 		Configuration:   ConstraintConfigFromConstraints(constraints),
-		Constraints:     constraintItemsFromBacklog(shadowPart, backlog),
+		Constraints:     constraintItemsFromBacklog(shadowPart, backlog, constraints),
 		Amount:          1,
 		MaximumLifetime: consts.MaxFunctionTimeout + 30*time.Minute,
 		Source: constraintapi.LeaseSource{
@@ -445,7 +445,7 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 	}, nil
 }
 
-func constraintItemsFromBacklog(sp *QueueShadowPartition, backlog *QueueBacklog) []constraintapi.ConstraintItem {
+func constraintItemsFromBacklog(sp *QueueShadowPartition, backlog *QueueBacklog, latestConstraints PartitionConstraintConfig) []constraintapi.ConstraintItem {
 	constraints := []constraintapi.ConstraintItem{
 		// Account concurrency (always set)
 		{
@@ -477,6 +477,20 @@ func constraintItemsFromBacklog(sp *QueueShadowPartition, backlog *QueueBacklog)
 
 	if len(backlog.ConcurrencyKeys) > 0 {
 		for _, bck := range backlog.ConcurrencyKeys {
+			var found bool
+			for _, cc := range latestConstraints.Concurrency.CustomConcurrencyKeys {
+				if cc.Mode == bck.ConcurrencyMode && cc.Scope == bck.Scope && cc.HashedKeyExpression == bck.HashedKeyExpression {
+					found = true
+					break
+				}
+			}
+
+			// If custom concurrency key from backlog is not used in latest constraints,
+			// do not include in constraint check request
+			if !found {
+				continue
+			}
+
 			constraints = append(constraints, constraintapi.ConstraintItem{
 				Kind: constraintapi.ConstraintKindConcurrency,
 				Concurrency: &constraintapi.ConcurrencyConstraint{
