@@ -3,6 +3,7 @@ import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
 import { Modal } from '@inngest/components/Modal';
 import { useMutation } from 'urql';
+import { toast } from 'sonner';
 
 import { EnrollToConstraintAPIMutation, type ConstraintAPIData } from './data';
 
@@ -43,6 +44,11 @@ export function ConstraintAPIModal({
 
       onClose();
       onEnrolled();
+      toast.success('Enabling Constraint API...', {
+        description:
+          'Your account will be migrated to the Constraint API shortly.',
+        position: 'bottom-right',
+      });
     } catch (err) {
       const message =
         err instanceof Error ? err.message : 'Unknown error occurred';
