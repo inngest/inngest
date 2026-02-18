@@ -188,10 +188,11 @@ func TestConstraintConfigFromConstraints(t *testing.T) {
 func TestConstraintItemsFromBacklog(t *testing.T) {
 	accountID, fnID := uuid.New(), uuid.New()
 	tests := []struct {
-		name     string
-		backlog  *QueueBacklog
-		sp       *QueueShadowPartition
-		expected []constraintapi.ConstraintItem
+		name        string
+		backlog     *QueueBacklog
+		sp          *QueueShadowPartition
+		expected    []constraintapi.ConstraintItem
+		constraints PartitionConstraintConfig
 	}{
 		{
 			name: "minimal backlog",
@@ -284,6 +285,22 @@ func TestConstraintItemsFromBacklog(t *testing.T) {
 				AccountID:   &accountID,
 				FunctionID:  &fnID,
 			},
+			constraints: PartitionConstraintConfig{
+				Concurrency: PartitionConcurrency{
+					CustomConcurrencyKeys: []CustomConcurrencyLimit{
+						{
+							Mode:                enums.ConcurrencyModeStep,
+							Scope:               enums.ConcurrencyScopeAccount,
+							HashedKeyExpression: "custom-key-1-hash",
+						},
+						{
+							Mode:                enums.ConcurrencyModeStep,
+							Scope:               enums.ConcurrencyScopeFn,
+							HashedKeyExpression: "custom-key-2-hash",
+						},
+					},
+				},
+			},
 			expected: []constraintapi.ConstraintItem{
 				{
 					Kind: constraintapi.ConstraintKindConcurrency,
@@ -320,6 +337,72 @@ func TestConstraintItemsFromBacklog(t *testing.T) {
 			},
 		},
 		{
+			name: "custom concurrency key missing from config is excluded",
+			backlog: &QueueBacklog{
+				ConcurrencyKeys: []BacklogConcurrencyKey{
+					{
+						CanonicalKeyID:      fmt.Sprintf("a:%s:%s", accountID, "stale-key-value"),
+						ConcurrencyMode:     enums.ConcurrencyModeStep,
+						Scope:               enums.ConcurrencyScopeAccount,
+						EntityID:            accountID,
+						HashedKeyExpression: "stale-key-hash",
+						HashedValue:         "stale-key-value",
+					},
+					{
+						CanonicalKeyID:      fmt.Sprintf("f:%s:%s", fnID, "current-key-value"),
+						ConcurrencyMode:     enums.ConcurrencyModeStep,
+						Scope:               enums.ConcurrencyScopeFn,
+						EntityID:            fnID,
+						HashedKeyExpression: "current-key-hash",
+						HashedValue:         "current-key-value",
+					},
+				},
+			},
+			sp: &QueueShadowPartition{
+				PartitionID: fnID.String(),
+				AccountID:   &accountID,
+				FunctionID:  &fnID,
+			},
+			// Only the second key is present in the latest config; the first (stale) key must be dropped.
+			constraints: PartitionConstraintConfig{
+				Concurrency: PartitionConcurrency{
+					CustomConcurrencyKeys: []CustomConcurrencyLimit{
+						{
+							Mode:                enums.ConcurrencyModeStep,
+							Scope:               enums.ConcurrencyScopeFn,
+							HashedKeyExpression: "current-key-hash",
+						},
+					},
+				},
+			},
+			expected: []constraintapi.ConstraintItem{
+				{
+					Kind: constraintapi.ConstraintKindConcurrency,
+					Concurrency: &constraintapi.ConcurrencyConstraint{
+						Mode:  enums.ConcurrencyModeStep,
+						Scope: enums.ConcurrencyScopeAccount,
+					},
+				},
+				{
+					Kind: constraintapi.ConstraintKindConcurrency,
+					Concurrency: &constraintapi.ConcurrencyConstraint{
+						Mode:  enums.ConcurrencyModeStep,
+						Scope: enums.ConcurrencyScopeFn,
+					},
+				},
+				// stale-key-hash is intentionally absent
+				{
+					Kind: constraintapi.ConstraintKindConcurrency,
+					Concurrency: &constraintapi.ConcurrencyConstraint{
+						Mode:              enums.ConcurrencyModeStep,
+						Scope:             enums.ConcurrencyScopeFn,
+						KeyExpressionHash: "current-key-hash",
+						EvaluatedKeyHash:  "current-key-value",
+					},
+				},
+			},
+		},
+		{
 			name: "complete backlog with throttle and concurrency keys",
 			backlog: &QueueBacklog{
 				Throttle: &BacklogThrottle{
@@ -341,6 +424,17 @@ func TestConstraintItemsFromBacklog(t *testing.T) {
 				PartitionID: fnID.String(),
 				AccountID:   &accountID,
 				FunctionID:  &fnID,
+			},
+			constraints: PartitionConstraintConfig{
+				Concurrency: PartitionConcurrency{
+					CustomConcurrencyKeys: []CustomConcurrencyLimit{
+						{
+							Mode:                enums.ConcurrencyModeStep,
+							Scope:               enums.ConcurrencyScopeEnv,
+							HashedKeyExpression: "complete-key-hash",
+						},
+					},
+				},
 			},
 			expected: []constraintapi.ConstraintItem{
 				{
@@ -379,7 +473,7 @@ func TestConstraintItemsFromBacklog(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := constraintItemsFromBacklog(tt.sp, tt.backlog)
+			result := constraintItemsFromBacklog(tt.sp, tt.backlog, tt.constraints)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -785,7 +879,7 @@ func TestConstraintItemsBacklogToLimitingConstraintRoundTrip(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Step 1: Generate constraint items from the backlog
-			constraintItems := constraintItemsFromBacklog(tt.sp, tt.backlog)
+			constraintItems := constraintItemsFromBacklog(tt.sp, tt.backlog, tt.constraints)
 
 			// Step 2: Filter the constraint items to find the ones that would be limiting
 			// We simulate what the constraint API would return as limiting constraints

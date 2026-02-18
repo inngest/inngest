@@ -234,7 +234,7 @@ func (q *queueProcessor) BacklogRefillConstraintCheck(
 		CurrentTime:          now,
 		Duration:             QueueLeaseDuration,
 		Configuration:        ConstraintConfigFromConstraints(constraints),
-		Constraints:          constraintItemsFromBacklog(shadowPart, backlog),
+		Constraints:          constraintItemsFromBacklog(shadowPart, backlog, constraints),
 		Amount:               len(items),
 		LeaseIdempotencyKeys: itemIDs,
 		LeaseRunIDs:          itemRunIDs,
