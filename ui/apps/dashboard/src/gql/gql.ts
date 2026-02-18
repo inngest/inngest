@@ -38,6 +38,9 @@ type Documents = {
     "\n  query GetBillableRuns($month: Int!, $year: Int!) {\n    usage: runCountTimeSeries(timeOptions: { month: $month, year: $year }) {\n      data {\n        time\n        value\n      }\n    }\n  }\n": typeof types.GetBillableRunsDocument,
     "\n  query GetBillableExecutions($month: Int!, $year: Int!) {\n    usage: executionTimeSeries(timeOptions: { month: $month, year: $year }) {\n      data {\n        time\n        value\n      }\n    }\n  }\n": typeof types.GetBillableExecutionsDocument,
     "\n  query GetBillingInfo {\n    account {\n      entitlements {\n        executions {\n          limit\n        }\n        stepCount {\n          limit\n        }\n        runCount {\n          limit\n        }\n      }\n      plan {\n        slug\n      }\n    }\n  }\n": typeof types.GetBillingInfoDocument,
+    "\n  query ConstraintAPIEnrollment {\n    account {\n      id\n      constraintAPIEnrolled\n    }\n  }\n": typeof types.ConstraintApiEnrollmentDocument,
+    "\n  query ConstraintAPIInEffect {\n    account {\n      id\n      constraintAPIEnrolled(inEffect: true)\n    }\n  }\n": typeof types.ConstraintApiInEffectDocument,
+    "\n  mutation EnrollToConstraintAPI {\n    enrollToConstraintAPI\n  }\n": typeof types.EnrollToConstraintApiDocument,
     "\n  mutation CreateEnvironment($name: String!) {\n    createWorkspace(input: { name: $name }) {\n      id\n    }\n  }\n": typeof types.CreateEnvironmentDocument,
     "\n  mutation EnableDatadogConnection($organizationID: UUID!, $envID: UUID!) {\n    enableDatadogConnection(organizationID: $organizationID, envID: $envID) {\n      id\n    }\n  }\n": typeof types.EnableDatadogConnectionDocument,
     "\n  mutation FinishDatadogIntegrationDocument(\n    $orgName: String!\n    $orgID: String!\n    $authCode: String!\n    $ddSite: String!\n    $ddDomain: String!\n  ) {\n    datadogOAuthCompleted(\n      orgName: $orgName\n      orgID: $orgID\n      authCode: $authCode\n      ddSite: $ddSite\n      ddDomain: $ddDomain\n    ) {\n      id\n    }\n  }\n": typeof types.FinishDatadogIntegrationDocumentDocument,
@@ -179,6 +182,9 @@ const documents: Documents = {
     "\n  query GetBillableRuns($month: Int!, $year: Int!) {\n    usage: runCountTimeSeries(timeOptions: { month: $month, year: $year }) {\n      data {\n        time\n        value\n      }\n    }\n  }\n": types.GetBillableRunsDocument,
     "\n  query GetBillableExecutions($month: Int!, $year: Int!) {\n    usage: executionTimeSeries(timeOptions: { month: $month, year: $year }) {\n      data {\n        time\n        value\n      }\n    }\n  }\n": types.GetBillableExecutionsDocument,
     "\n  query GetBillingInfo {\n    account {\n      entitlements {\n        executions {\n          limit\n        }\n        stepCount {\n          limit\n        }\n        runCount {\n          limit\n        }\n      }\n      plan {\n        slug\n      }\n    }\n  }\n": types.GetBillingInfoDocument,
+    "\n  query ConstraintAPIEnrollment {\n    account {\n      id\n      constraintAPIEnrolled\n    }\n  }\n": types.ConstraintApiEnrollmentDocument,
+    "\n  query ConstraintAPIInEffect {\n    account {\n      id\n      constraintAPIEnrolled(inEffect: true)\n    }\n  }\n": types.ConstraintApiInEffectDocument,
+    "\n  mutation EnrollToConstraintAPI {\n    enrollToConstraintAPI\n  }\n": types.EnrollToConstraintApiDocument,
     "\n  mutation CreateEnvironment($name: String!) {\n    createWorkspace(input: { name: $name }) {\n      id\n    }\n  }\n": types.CreateEnvironmentDocument,
     "\n  mutation EnableDatadogConnection($organizationID: UUID!, $envID: UUID!) {\n    enableDatadogConnection(organizationID: $organizationID, envID: $envID) {\n      id\n    }\n  }\n": types.EnableDatadogConnectionDocument,
     "\n  mutation FinishDatadogIntegrationDocument(\n    $orgName: String!\n    $orgID: String!\n    $authCode: String!\n    $ddSite: String!\n    $ddDomain: String!\n  ) {\n    datadogOAuthCompleted(\n      orgName: $orgName\n      orgID: $orgID\n      authCode: $authCode\n      ddSite: $ddSite\n      ddDomain: $ddDomain\n    ) {\n      id\n    }\n  }\n": types.FinishDatadogIntegrationDocumentDocument,
@@ -406,6 +412,18 @@ export function graphql(source: "\n  query GetBillableExecutions($month: Int!, $
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(source: "\n  query GetBillingInfo {\n    account {\n      entitlements {\n        executions {\n          limit\n        }\n        stepCount {\n          limit\n        }\n        runCount {\n          limit\n        }\n      }\n      plan {\n        slug\n      }\n    }\n  }\n"): (typeof documents)["\n  query GetBillingInfo {\n    account {\n      entitlements {\n        executions {\n          limit\n        }\n        stepCount {\n          limit\n        }\n        runCount {\n          limit\n        }\n      }\n      plan {\n        slug\n      }\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  query ConstraintAPIEnrollment {\n    account {\n      id\n      constraintAPIEnrolled\n    }\n  }\n"): (typeof documents)["\n  query ConstraintAPIEnrollment {\n    account {\n      id\n      constraintAPIEnrolled\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  query ConstraintAPIInEffect {\n    account {\n      id\n      constraintAPIEnrolled(inEffect: true)\n    }\n  }\n"): (typeof documents)["\n  query ConstraintAPIInEffect {\n    account {\n      id\n      constraintAPIEnrolled(inEffect: true)\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation EnrollToConstraintAPI {\n    enrollToConstraintAPI\n  }\n"): (typeof documents)["\n  mutation EnrollToConstraintAPI {\n    enrollToConstraintAPI\n  }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */

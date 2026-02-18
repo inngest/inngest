@@ -10,6 +10,7 @@ import { Help } from '../Navigation/Help';
 import useOnboardingWidget from '../Onboarding/useOnboardingWidget';
 import SeatOverageWidget from '../SeatOverage/SeatOverageWidget';
 import OnboardingWidget from '../Navigation/OnboardingWidget';
+import ConstraintAPIWidget from '../ConstraintAPI/ConstraintAPIWidget';
 
 // Disable SSR in Onboarding Widget, to prevent hydration errors. It requires windows info
 // const OnboardingWidget = dynamic(() => import('../Navigation/OnboardingWidget'), {
@@ -71,6 +72,7 @@ export default function SideBar({
 
         <div className="mx-4">
           <SeatOverageWidget collapsed={collapsed} />
+          <ConstraintAPIWidget collapsed={collapsed} />
           {isWidgetOpen && (
             <OnboardingWidget collapsed={collapsed} closeWidget={closeWidget} />
           )}
