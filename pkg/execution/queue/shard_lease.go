@@ -88,7 +88,7 @@ func (q *queueProcessor) tryClaimShardLease(ctx context.Context, shards []QueueS
 			l.Debug("no executor capacity requested, skipping shard lease", "shard", shard.Name())
 			continue
 		}
-		leaseID, err := shard.ShardLease(ctx, q.ShardLeaseKeySuffix, ShardLeaseDuration, maxExecutors, nil)
+		leaseID, err := shard.ShardLease(ctx, shard.Name()+"-"+q.ShardLeaseKeySuffix, ShardLeaseDuration, maxExecutors, nil)
 
 		if err == ErrAllShardsAlreadyLeased {
 			l.Warn("Could not get a shard lease", "shard", shard.Name())
@@ -152,7 +152,7 @@ func (q *queueProcessor) renewShardLease(ctx context.Context) {
 			}
 
 			// Renew the lease
-			newLeaseID, err := shard.ShardLease(ctx, q.ShardLeaseKeySuffix, ShardLeaseDuration, shard.ShardAssignmentConfig().NumExecutors, leaseID)
+			newLeaseID, err := shard.ShardLease(ctx, shard.Name()+"-"+q.ShardLeaseKeySuffix, ShardLeaseDuration, shard.ShardAssignmentConfig().NumExecutors, leaseID)
 			if err == ErrShardLeaseExpired || err == ErrShardLeaseNotFound {
 				// Another process took the lease
 				metrics.GaugeActiveShardLease(ctx, 0, metrics.GaugeOpt{PkgName: pkgName, Tags: map[string]any{"shard_group": q.runMode.ShardGroup, "queue_shard": q.primaryQueueShard.Name(), "segment": q.ShardLeaseKeySuffix}})
