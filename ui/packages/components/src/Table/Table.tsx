@@ -28,9 +28,12 @@ type BaseTableProps<T> = {
   isLoading?: boolean;
   columns: ColumnDef<T, any>[];
   onRowClick?: (row: Row<T>) => void;
+  onCellClick?: (rowIndex: number, columnId: string, value: unknown) => void;
   getRowHref?: (row: Row<T>) => string;
   blankState?: React.ReactNode;
   cellClassName?: string;
+  enableColumnSizing?: boolean;
+  selectedCell?: { rowIndex: number; columnId: string } | null;
   noHeader?: boolean;
 };
 
@@ -46,11 +49,14 @@ export function Table<T>({
   setSorting,
   renderSubComponent,
   onRowClick,
+  onCellClick,
   getRowHref,
   blankState,
   columns,
   expandedIDs = [],
   cellClassName,
+  selectedCell,
+  enableColumnSizing = false,
   noHeader = false,
 }: TableProps<T>) {
   // Render empty lines for skeletons when data is loading
@@ -93,7 +99,7 @@ export function Table<T>({
     },
   });
 
-  const tableStyles = 'w-full';
+  const tableStyles = enableColumnSizing ? 'table-fixed' : 'w-full';
   const tableHeadStyles = 'bg-tableHeader sticky top-0 z-[2]';
   const tableColumnStyles = 'px-4';
   const expandedRowSideBorder =
@@ -120,8 +126,18 @@ export function Table<T>({
                       key={header.id}
                       className={cn(
                         isIconOnlyColumn ? '' : tableColumnStyles,
-                        'text-muted text-nowrap text-left text-xs font-medium'
+                        'text-muted text-nowrap text-left text-xs font-medium',
+                        enableColumnSizing ? 'overflow-hidden text-ellipsis' : ''
                       )}
+                      style={
+                        enableColumnSizing
+                          ? {
+                              width: header.getSize(),
+                              minWidth: header.getSize(),
+                              maxWidth: header.getSize(),
+                            }
+                          : undefined
+                      }
                     >
                       {header.isPlaceholder ? null : (
                         <div
@@ -130,14 +146,17 @@ export function Table<T>({
                               ? 'flex cursor-pointer select-none items-center gap-1'
                               : header.column.getIsSorted()
                               ? 'flex items-center gap-1'
-                              : ''
+                              : '',
+                            enableColumnSizing ? 'min-w-0 overflow-hidden text-ellipsis' : ''
                           )}
                           onClick={header.column.getToggleSortingHandler()}
                         >
-                          {flexRender(header.column.columnDef.header, header.getContext())}
+                          <span className={enableColumnSizing ? 'min-w-0 truncate' : ''}>
+                            {flexRender(header.column.columnDef.header, header.getContext())}
+                          </span>
                           {{
-                            asc: <RiSortAsc className="text-light h-4 w-4" />,
-                            desc: <RiSortDesc className="text-light h-4 w-4" />,
+                            asc: <RiSortAsc className="text-light h-4 w-4 shrink-0" />,
+                            desc: <RiSortDesc className="text-light h-4 w-4 shrink-0" />,
                           }[header.column.getIsSorted() as string] ?? null}
                         </div>
                       )}
@@ -196,8 +215,28 @@ export function Table<T>({
                             ? expandedRowSideBorder
                             : '',
                           isIconOnlyColumn ? '' : tableColumnStyles,
-                          cellClassName ?? ''
+                          cellClassName ?? '',
+                          onCellClick && !onRowClick ? 'cursor-pointer' : '',
+                          selectedCell &&
+                            row.index === selectedCell.rowIndex &&
+                            cell.column.id === selectedCell.columnId
+                            ? 'ring-2 ring-inset ring-[rgb(var(--color-border-active))]'
+                            : ''
                         )}
+                        style={
+                          enableColumnSizing
+                            ? {
+                                width: cell.column.getSize(),
+                                minWidth: cell.column.getSize(),
+                                maxWidth: cell.column.getSize(),
+                              }
+                            : undefined
+                        }
+                        onClick={
+                          onCellClick && !onRowClick
+                            ? () => onCellClick(row.index, cell.column.id, cell.getValue())
+                            : undefined
+                        }
                       >
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
                       </td>

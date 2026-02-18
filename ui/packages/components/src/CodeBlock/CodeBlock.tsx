@@ -383,7 +383,7 @@ export function CodeBlock({
                 <Editor
                   className={cn('relative', (alwaysFullHeight || fullScreen) && 'h-full')}
                   height={alwaysFullHeight || fullScreen ? '100%' : editorHeight}
-                  defaultLanguage={language}
+                  language={language}
                   value={editEmtpy ? EMPTY_INPUT : content}
                   theme="inngest-theme"
                   loading={<LoadingIndicator />}
