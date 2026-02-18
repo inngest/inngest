@@ -25,19 +25,19 @@ function getContentForState(
       return {
         collapsedText: 'Infrastructure upgrade',
         title: 'Infrastructure Upgrade Available',
-        description: 'Enroll before February 25, 2026',
+        description: 'Enroll before February 23, 2026',
       };
     case 'pending':
       return {
         collapsedText: 'Enrollment pending',
         title: 'Enrollment Pending',
-        description: 'Enroll before February 25, 2026',
+        description: 'Enroll before February 23, 2026',
       };
     case 'active':
       return {
         collapsedText: 'Constraint API active',
         title: 'Constraint API Active',
-        description: 'Enroll before February 25, 2026',
+        description: 'Enroll before February 23, 2026',
       };
   }
 }

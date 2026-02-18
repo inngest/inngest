@@ -123,7 +123,7 @@ export function ConstraintAPIModal({
             <div>
               <p className="mb-1 font-medium">Timeline</p>
               <p className="text-subtle text-sm">
-                You can enroll at any time before March 23, 2026. After that
+                You can enroll at any time before February 23, 2026. After that
                 date, any remaining accounts will be migrated automatically.
               </p>
             </div>
