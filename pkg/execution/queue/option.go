@@ -470,6 +470,7 @@ type QueueOptions struct {
 	// OnShardLeaseAcquired is called immediately after a shard lease is successfully claimed.
 	// The shardName parameter is the name of the specific shard that was leased.
 	OnShardLeaseAcquired func(ctx context.Context, shardName string)
+	ShardLeaseKeySuffix  string
 }
 
 // ShardSelector returns a shard reference for the given queue item.
@@ -485,6 +486,12 @@ func WithShardAssignmentConfig(cfg ShardAssignmentConfig) QueueOpt {
 func WithOnShardLeaseAcquired(f func(ctx context.Context, shardName string)) QueueOpt {
 	return func(q *QueueOptions) {
 		q.OnShardLeaseAcquired = f
+	}
+}
+
+func WithShardLeaseKeySuffix(suffix string) QueueOpt {
+	return func(q *QueueOptions) {
+		q.ShardLeaseKeySuffix = suffix
 	}
 }
 
