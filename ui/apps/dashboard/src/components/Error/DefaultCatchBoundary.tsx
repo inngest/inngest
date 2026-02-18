@@ -5,16 +5,12 @@ import { rootRouteId, useMatch, useRouter } from '@tanstack/react-router';
 
 import * as Sentry from '@sentry/tanstackstart-react';
 
-import { useClerk } from '@clerk/tanstack-react-start';
-
 function DefaultCatchBoundary({ error }: ErrorComponentProps) {
   const router = useRouter();
   const isRoot = useMatch({
     strict: false,
     select: (state) => state.id === rootRouteId,
   });
-
-  const { signOut, session } = useClerk();
 
   console.error(error.message);
 
@@ -48,27 +44,19 @@ function DefaultCatchBoundary({ error }: ErrorComponentProps) {
           />
         )}
 
-        {/* Provide some escape hatches here if 
-          user/org state gets out of sync with clerk */}
+        {/* Provide some escape hatches here if user/org state gets out of sync with clerk */}
         {authError && (
           <>
             <Button
               kind="secondary"
               appearance="outlined"
-              onClick={async () => {
-                await signOut({
-                  sessionId: session?.id,
-                  redirectUrl: '/sign-in/choose',
-                });
-              }}
+              href="/sign-in/choose"
               label="Sign Out"
             />
             <Button
               kind="secondary"
               appearance="outlined"
-              onClick={() => {
-                router.navigate({ to: '/organization-list/$' });
-              }}
+              href="/organization-list"
               label="Switch Org"
             />
           </>
