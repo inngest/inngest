@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"time"
 
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
@@ -39,7 +40,7 @@ func (q *queueProcessor) claimShardLease(ctx context.Context) {
 		return
 	}
 
-	tick := q.Clock().NewTicker(ShardLeaseDuration / 3)
+	tick := q.Clock().NewTicker(500 * time.Millisecond)
 	for {
 		select {
 		case <-ctx.Done():
@@ -87,11 +88,11 @@ func (q *queueProcessor) tryClaimShardLease(ctx context.Context, shards []QueueS
 			l.Debug("no executor capacity requested, skipping shard lease", "shard", shard.Name())
 			continue
 		}
-		leaseID, err := shard.ShardLease(ctx, "shard-group-"+q.runMode.ShardGroup, ShardLeaseDuration, maxExecutors, nil)
+		leaseID, err := shard.ShardLease(ctx, q.ShardLeaseKeySuffix, ShardLeaseDuration, maxExecutors, nil)
 
 		if err == ErrAllShardsAlreadyLeased {
 			l.Warn("Could not get a shard lease", "shard", shard.Name())
-			metrics.IncrShardLeaseContentionCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"shard_group": q.runMode.ShardGroup, "queue_shard": shard.Name()}})
+			metrics.IncrShardLeaseContentionCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"shard_group": q.runMode.ShardGroup, "queue_shard": shard.Name(), "segment": q.ShardLeaseKeySuffix}})
 			continue
 		}
 		if err != nil {
@@ -105,7 +106,7 @@ func (q *queueProcessor) tryClaimShardLease(ctx context.Context, shards []QueueS
 			q.SetPrimaryShard(ctx, shard)
 			q.shardLeaseLock.Unlock()
 
-			metrics.GaugeActiveShardLease(ctx, 1, metrics.GaugeOpt{PkgName: pkgName, Tags: map[string]any{"shard_group": q.runMode.ShardGroup, "queue_shard": shard.Name()}})
+			metrics.GaugeActiveShardLease(ctx, 1, metrics.GaugeOpt{PkgName: pkgName, Tags: map[string]any{"shard_group": q.runMode.ShardGroup, "queue_shard": shard.Name(), "segment": q.ShardLeaseKeySuffix}})
 			l.Info("claimed shard lease", "shard", shard.Name(), "group", q.runMode.ShardGroup, "leaseID", leaseID)
 
 			if q.OnShardLeaseAcquired != nil {
@@ -144,23 +145,23 @@ func (q *queueProcessor) renewShardLease(ctx context.Context) {
 
 			if leaseID == nil {
 				// Lease was lost somehow, stop renewing
-				metrics.GaugeActiveShardLease(ctx, 0, metrics.GaugeOpt{PkgName: pkgName, Tags: map[string]any{"shard_group": q.runMode.ShardGroup, "queue_shard": q.primaryQueueShard.Name()}})
+				metrics.GaugeActiveShardLease(ctx, 0, metrics.GaugeOpt{PkgName: pkgName, Tags: map[string]any{"shard_group": q.runMode.ShardGroup, "queue_shard": q.primaryQueueShard.Name(), "segment": q.ShardLeaseKeySuffix}})
 				l.Error("shard lease lost during renewal")
 				q.quit <- ErrShardLeaseNotFound
 				return
 			}
 
 			// Renew the lease
-			newLeaseID, err := shard.ShardLease(ctx, "shard-group-"+q.runMode.ShardGroup, ShardLeaseDuration, shard.ShardAssignmentConfig().NumExecutors, leaseID)
+			newLeaseID, err := shard.ShardLease(ctx, q.ShardLeaseKeySuffix, ShardLeaseDuration, shard.ShardAssignmentConfig().NumExecutors, leaseID)
 			if err == ErrShardLeaseExpired || err == ErrShardLeaseNotFound {
 				// Another process took the lease
-				metrics.GaugeActiveShardLease(ctx, 0, metrics.GaugeOpt{PkgName: pkgName, Tags: map[string]any{"shard_group": q.runMode.ShardGroup, "queue_shard": q.primaryQueueShard.Name()}})
+				metrics.GaugeActiveShardLease(ctx, 0, metrics.GaugeOpt{PkgName: pkgName, Tags: map[string]any{"shard_group": q.runMode.ShardGroup, "queue_shard": q.primaryQueueShard.Name(), "segment": q.ShardLeaseKeySuffix}})
 				l.Error("shard lease taken by another process", "shard", shard.Name(), "group", q.runMode.ShardGroup)
 				q.quit <- err
 				return
 			}
 			if err != nil {
-				metrics.GaugeActiveShardLease(ctx, 0, metrics.GaugeOpt{PkgName: pkgName, Tags: map[string]any{"shard_group": q.runMode.ShardGroup, "queue_shard": q.primaryQueueShard.Name()}})
+				metrics.GaugeActiveShardLease(ctx, 0, metrics.GaugeOpt{PkgName: pkgName, Tags: map[string]any{"shard_group": q.runMode.ShardGroup, "queue_shard": q.primaryQueueShard.Name(), "segment": q.ShardLeaseKeySuffix}})
 				l.Error("failed to renew shard lease", "error", err, "shard", shard.Name(), "group", q.runMode.ShardGroup, "leaseID", leaseID)
 				q.quit <- err
 				return
