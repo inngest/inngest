@@ -45,6 +45,7 @@ func DeleteByIDCommand() *cli.Command {
 				return nil
 			}
 
+			fmt.Printf("Deleted count:     %d\n", len(resp.DeletedIds))
 			fmt.Printf("Deleted debounces: %s\n", strings.Join(resp.DeletedIds, ", "))
 
 			return nil
