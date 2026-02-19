@@ -3306,6 +3306,31 @@ func (e *executor) handleGeneratorStep(ctx context.Context, runCtx execution.Run
 		return err
 	}
 
+	// Extract AI metadata from step output.
+	// This attempts to detect and parse AI SDK responses (e.g. Vercel AI SDK)
+	// from any step output, using a cheap byte-level pre-check to skip non-AI outputs.
+	if e.allowStepMetadata.Enabled(ctx, runCtx.Metadata().ID.Tenant.AccountID) {
+		// Calculate step duration in milliseconds
+		stepDurationMs := gen.Timing.B / 1_000_000
+
+		md := metadata.WithWarnings(extractors.ExtractAIOutputMetadata(
+			[]byte(output),
+			stepDurationMs,
+		))
+		for _, m := range md {
+			_, err := e.createMetadataSpan(
+				ctx,
+				runCtx,
+				"executor.handleGeneratorStep.aiOutput",
+				m,
+				enums.MetadataScopeStepAttempt,
+			)
+			if err != nil {
+				e.log.Warn("error creating AI output metadata span", "error", err)
+			}
+		}
+	}
+
 	// Steps can be batched with checkpointing!  Imagine an SDK that opts into checkpointing,
 	// then returned as an async response because the checkpooint batch time was greater than
 	// the run execution.  In this case, all opcodes are returned to the executor via the async
@@ -3982,10 +4007,16 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 	runCtx.SetStatusCode(resp.StatusCode)
 
 	if e.allowStepMetadata.Enabled(ctx, runMetadata.ID.Tenant.AccountID) {
+		var serverProcessingMs int64
+		if resp.StatResult != nil {
+			serverProcessingMs = resp.StatResult.ServerProcessing.Milliseconds()
+		}
+
 		md := metadata.WithWarnings(extractors.ExtractAIGatewayMetadata(
 			input,
 			resp.StatusCode,
 			resp.Body,
+			serverProcessingMs,
 		))
 		for _, m := range md {
 			_, err := e.createMetadataSpan(

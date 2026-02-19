@@ -36,6 +36,9 @@ export interface AIMetadata {
   model: string;
   system: string;
   operation_name: string;
+  latency_ms?: number /* int64 */;
+  total_tokens?: number /* int64 */;
+  estimated_cost?: number /* float64 */;
 }
 /**
  * From http.go
