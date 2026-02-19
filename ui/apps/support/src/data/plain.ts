@@ -877,6 +877,113 @@ export const getCustomerTierByEmail = createServerFn({ method: "GET" })
     }
   });
 
+// Close ticket (mark thread as done)
+export type CloseTicketResult = {
+  success: boolean;
+  error?: string;
+};
+
+export const closeTicket = createServerFn({ method: "POST" })
+  .inputValidator((data: { threadId: string }) => data)
+  .handler(async ({ data }): Promise<CloseTicketResult> => {
+    try {
+      const { threadId } = data;
+
+      // First, get the thread to find the customer ID (needed for the note)
+      const threadRes = (await plainClient.rawRequest({
+        query: `
+          query GetThreadCustomer($threadId: ID!) {
+            thread(threadId: $threadId) {
+              customer {
+                id
+              }
+            }
+          }
+        `,
+        variables: { threadId },
+      })) as {
+        data?: { thread: { customer: { id: string } } };
+        error?: PlainSDKError;
+      };
+
+      if (threadRes.error || !threadRes.data) {
+        console.error("Error fetching thread for note:", threadRes.error);
+        return {
+          success: false,
+          error: "Failed to fetch ticket details",
+        };
+      }
+
+      const customerId = threadRes.data.thread.customer.id;
+
+      // Add a note to the thread before closing
+      const noteRes = (await plainClient.rawRequest({
+        query: `
+          mutation CreateNote($input: CreateNoteInput!) {
+            createNote(input: $input) {
+              note {
+                id
+              }
+              error {
+                message
+                type
+                code
+              }
+            }
+          }
+        `,
+        variables: {
+          input: {
+            threadId,
+            customerId,
+            text: "User closed the ticket",
+            markdown: "User closed the ticket",
+          },
+        },
+      })) as {
+        data?: {
+          createNote: {
+            note: { id: string } | null;
+            error: { message: string } | null;
+          };
+        };
+        error?: PlainSDKError;
+      };
+
+      if (noteRes.error) {
+        console.error("Error adding close note:", noteRes.error);
+        // Continue to close even if note fails — closing is the primary action
+      } else if (noteRes.data?.createNote.error) {
+        console.error(
+          "Error adding close note:",
+          noteRes.data.createNote.error,
+        );
+      }
+
+      // Mark the thread as done
+      const res = await plainClient.markThreadAsDone({ threadId });
+
+      if (res.error) {
+        console.error("Error closing ticket:", res.error);
+        return {
+          success: false,
+          error: res.error.message,
+        };
+      }
+
+      return {
+        success: true,
+      };
+    } catch (error) {
+      console.error("Error closing ticket:", error);
+      return {
+        success: false,
+        error:
+          error instanceof Error ? error.message : "Failed to close ticket",
+      };
+    }
+  });
+
 // Reply to thread types
 export type ReplyToThreadInput = {
   threadId: string;

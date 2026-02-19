@@ -17,6 +17,7 @@ import {
   getTicketById,
   getTimelineEntriesForTicket,
   replyToThread,
+  closeTicket,
 } from "@/data/plain";
 import { Markdown } from "@/components/Markdown/Markdown";
 import { PriorityBadge, StatusBadge } from "@/components/Support/TicketBadges";
@@ -43,6 +44,9 @@ function TicketDetailPage() {
   const router = useRouter();
   const { user } = useUser();
   const timelineEndRef = useRef<HTMLDivElement>(null);
+  const [isClosing, setIsClosing] = useState(false);
+  const [closeError, setCloseError] = useState<string | null>(null);
+  const closeTicketFn = useServerFn(closeTicket);
 
   if (!ticket || !timelineEntries) {
     return <div>Error loading ticket</div>;
@@ -51,6 +55,28 @@ function TicketDetailPage() {
   // Check if this is a Slack conversation
   const isSlackChannel = ticket.channel === "SLACK";
   const userEmail = user?.primaryEmailAddress?.emailAddress;
+  const isOpen = ticket.status.toLowerCase() !== "done";
+
+  async function handleCloseTicket() {
+    if (!ticket) return;
+    setIsClosing(true);
+    setCloseError(null);
+    try {
+      const result = await closeTicketFn({
+        data: { threadId: ticket.id },
+      });
+      if (result.success) {
+        await router.invalidate();
+      } else {
+        setCloseError(result.error || "Failed to close ticket");
+      }
+    } catch (err) {
+      console.error("Error closing ticket:", err);
+      setCloseError("Failed to close ticket. Please try again.");
+    } finally {
+      setIsClosing(false);
+    }
+  }
 
   const scrollToBottom = () => {
     // Wait for the DOM to update after invalidation, then scroll
@@ -128,6 +154,23 @@ function TicketDetailPage() {
               {formatTimestamp(ticket.updatedAt)}
             </span>
           </div>
+
+          {/* Close Ticket */}
+          {isOpen && (
+            <div className="flex items-center gap-2 pt-2">
+              <Button
+                kind="danger"
+                appearance="outlined"
+                size="small"
+                label={isClosing ? "Closing..." : "Close ticket"}
+                disabled={isClosing}
+                onClick={handleCloseTicket}
+              />
+              {closeError && (
+                <span className="text-sm text-red-500">{closeError}</span>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
