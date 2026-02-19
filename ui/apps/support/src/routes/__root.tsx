@@ -14,9 +14,9 @@ import globalsCss from "@inngest/components/AppRoot/globals.css?url";
 import { TooltipProvider } from "@inngest/components/Tooltip";
 import { ThemeProvider } from "next-themes";
 import type { QueryClient } from "@tanstack/react-query";
-import type { ExtendedStatus } from "@/data/status";
+import { StatusBanner } from "@inngest/components/Support/StatusBanner";
+import type { ExtendedStatus } from "@inngest/components/Support/Status";
 import { InngestClerkProvider } from "@/components/Clerk/Provider";
-import { StatusBanner } from "@/components/Support/StatusBanner";
 import { Navigation } from "@/components/Support/Navigation";
 import { getStatus } from "@/data/status";
 

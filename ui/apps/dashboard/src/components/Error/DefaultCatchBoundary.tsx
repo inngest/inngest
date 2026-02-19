@@ -1,5 +1,7 @@
 import { Button } from '@inngest/components/Button';
 import { Error } from '@inngest/components/Error/Error';
+import { StatusBanner } from '@inngest/components/Support/StatusBanner';
+import { useSystemStatus } from '@inngest/components/Support/useSystemStatus';
 import type { ErrorComponentProps } from '@tanstack/react-router';
 import { rootRouteId, useMatch, useRouter } from '@tanstack/react-router';
 
@@ -11,6 +13,7 @@ function DefaultCatchBoundary({ error }: ErrorComponentProps) {
     strict: false,
     select: (state) => state.id === rootRouteId,
   });
+  const status = useSystemStatus();
 
   console.error(error.message);
 
@@ -18,6 +21,7 @@ function DefaultCatchBoundary({ error }: ErrorComponentProps) {
 
   return (
     <div className="flex flex-col justify-start items-start gap">
+      <StatusBanner status={status} />
       <Error message={error.message} />
 
       <div className="flex gap-2 justif-start items-center flex-wrap mx-4">
