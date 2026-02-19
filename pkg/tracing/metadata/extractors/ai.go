@@ -387,8 +387,8 @@ func EstimateCost(model string, inputTokens, outputTokens int64) *float64 {
 	outputCost := (float64(outputTokens) / 1_000_000) * pricing.OutputPer1M
 	totalCost := inputCost + outputCost
 
-	// Round to 3 decimal places
-	rounded := math.Round(totalCost*1000) / 1000
+	// Round to 6 decimal places
+	rounded := math.Round(totalCost*1_000_000) / 1_000_000
 
 	return &rounded
 }
