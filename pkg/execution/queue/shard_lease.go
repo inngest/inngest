@@ -130,6 +130,7 @@ func (q *queueProcessor) renewShardLease(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
+			l.Debug("Stopping Shard Lease Renewal")
 			return
 		case <-tick.Chan():
 			l.Trace("Renewing Shard Lease")
@@ -156,7 +157,7 @@ func (q *queueProcessor) renewShardLease(ctx context.Context) {
 			if err == ErrShardLeaseExpired || err == ErrShardLeaseNotFound {
 				// Another process took the lease
 				metrics.GaugeActiveShardLease(ctx, 0, metrics.GaugeOpt{PkgName: pkgName, Tags: map[string]any{"shard_group": q.runMode.ShardGroup, "queue_shard": q.primaryQueueShard.Name(), "segment": q.ShardLeaseKeySuffix}})
-				l.Error("shard lease taken by another process", "shard", shard.Name(), "group", q.runMode.ShardGroup)
+				l.Error("failed to renew shard lease", "shard", shard.Name(), "group", q.runMode.ShardGroup, "error", err)
 				q.quit <- err
 				return
 			}
