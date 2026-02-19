@@ -116,6 +116,11 @@ func (q *queue) Scavenge(ctx context.Context, limit int) (int, error) {
 					resultErr = multierror.Append(resultErr, fmt.Errorf("error requeueing job '%s': %w", item, err))
 					continue
 				}
+				l.Debug("scavenger requeued queue item",
+					"id", qi.ID,
+					"kind", qi.Data.Kind,
+					"run_id", qi.Data.Identifier.RunID,
+				)
 				counter++
 			}
 

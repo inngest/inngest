@@ -28,6 +28,7 @@ func (q *queueProcessor) ProcessItem(
 		"env_id", envID,
 		"fn_id", fnID,
 		"partition_id", i.P.ID,
+		"run_id", i.I.Data.Identifier.RunID,
 	)
 
 	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.ProcessItem", accountID, envID)
@@ -191,6 +192,7 @@ func (q *queueProcessor) ProcessItem(
 
 				if res.LeaseID == nil {
 					// Lease could not be extended
+					l.Error("failed to extend capacity lease, no new lease ID received", "qi", qi, "partition", p)
 					errCh <- fmt.Errorf("failed to extend capacity lease, no new lease ID received")
 					return
 				}
@@ -405,6 +407,7 @@ func (q *queueProcessor) ProcessItem(
 				l.Error("error requeuing job", "error", err, "item", qi)
 				return err
 			}
+			l.Debug("ProcessItem requeued job due to either lease extension error or error running the job", "err", err)
 			if _, ok := err.(QuitError); ok {
 				q.quit <- err
 				return err
