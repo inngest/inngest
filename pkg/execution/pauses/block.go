@@ -533,7 +533,7 @@ func (b blockstore) Delete(ctx context.Context, index Index, pause state.Pause, 
 		if err != nil {
 			return fmt.Errorf("error fetching blocks for timestamp: %w", err)
 		}
-		logger.StdlibLogger(ctx).Debug("deleting pause", "pause", pause.ID, "createdAt", pause.CreatedAt.UnixMilli(), "blks", blockIDs)
+		logger.StdlibLogger(ctx).Trace("deleting pause", "pause", pause.ID, "createdAt", pause.CreatedAt.UnixMilli(), "blks", blockIDs)
 	}
 
 	if len(blockIDs) == 0 {
