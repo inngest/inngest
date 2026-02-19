@@ -28,6 +28,7 @@ func (q *queueProcessor) ProcessItem(
 		"env_id", envID,
 		"fn_id", fnID,
 		"partition_id", i.P.ID,
+		"run_id", i.I.Data.Identifier.RunID,
 	)
 
 	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.ProcessItem", accountID, envID)
