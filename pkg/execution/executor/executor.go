@@ -1464,6 +1464,12 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		return nil, fmt.Errorf("cannot load metadata to execute run: %w", err)
 	}
 
+	if isSleepResume {
+		if err := e.maybeResetForceStepPlan(ctx, &md); err != nil {
+			return nil, fmt.Errorf("error resetting force step plan: %w", err)
+		}
+	}
+
 	ef, err := e.fl.LoadFunction(ctx, md.ID.Tenant.EnvID, md.ID.FunctionID)
 	if err != nil {
 		return nil, fmt.Errorf("error loading function for run: %w", err)
@@ -2726,6 +2732,9 @@ func (e *executor) ResumePauseTimeout(ctx context.Context, pause state.Pause, r 
 	})
 
 	if shouldEnqueueDiscovery(hasPendingSteps, pause.ParallelMode) {
+		if err := e.maybeResetForceStepPlan(ctx, &md); err != nil {
+			return fmt.Errorf("error resetting force step plan: %w", err)
+		}
 		// If there are no parallel steps ongoing, we must enqueue the next SDK ping to continue on with
 		// execution.
 		jobID := fmt.Sprintf("%s-%s-timeout", md.IdempotencyKey(), pause.DataKey)
@@ -2891,6 +2900,9 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 		})
 
 		if shouldEnqueueDiscovery(consumeResult.HasPendingSteps, pause.ParallelMode) {
+			if err := e.maybeResetForceStepPlan(ctx, &md); err != nil {
+				return fmt.Errorf("error resetting force step plan: %w", err)
+			}
 			// Schedule an execution from the pause's entrypoint.  We do this
 			// after consuming the pause to guarantee the event data is
 			// stored via the pause for the next run.  If the ConsumePause
@@ -3215,7 +3227,9 @@ func (e *executor) maybeEnqueueDiscoveryStep(ctx context.Context, runCtx executi
 	}
 
 	if shouldEnqueueDiscovery(hasPendingSteps, gen.ParallelMode()) {
-
+		if err := e.maybeResetForceStepPlan(ctx, runCtx.Metadata()); err != nil {
+			return fmt.Errorf("error resetting force step plan: %w", err)
+		}
 		lifecycleItem := runCtx.LifecycleItem()
 		metadata := runCtx.Metadata()
 		span, err := e.tracerProvider.CreateDroppableSpan(
@@ -3496,6 +3510,9 @@ func (e *executor) handleStepFailed(ctx context.Context, runCtx execution.RunCon
 	}
 
 	if shouldEnqueueDiscovery(hasPendingSteps, runCtx.ParallelMode()) {
+		if err := e.maybeResetForceStepPlan(ctx, runCtx.Metadata()); err != nil {
+			return fmt.Errorf("error resetting force step plan: %w", err)
+		}
 		lifecycleItem := runCtx.LifecycleItem()
 		metadata := runCtx.Metadata()
 		span, err := e.tracerProvider.CreateDroppableSpan(
@@ -3925,6 +3942,9 @@ func (e *executor) handleGeneratorGateway(ctx context.Context, runCtx execution.
 	}
 
 	if shouldEnqueueDiscovery(hasPendingSteps, gen.ParallelMode()) {
+		if err := e.maybeResetForceStepPlan(ctx, runCtx.Metadata()); err != nil {
+			return fmt.Errorf("error resetting force step plan: %w", err)
+		}
 		lifecycleItem := runCtx.LifecycleItem()
 		metadata := runCtx.Metadata()
 		span, err := e.tracerProvider.CreateDroppableSpan(
@@ -4172,6 +4192,9 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 	}
 
 	if shouldEnqueueDiscovery(hasPendingSteps, runCtx.ParallelMode()) {
+		if err := e.maybeResetForceStepPlan(ctx, runCtx.Metadata()); err != nil {
+			return fmt.Errorf("error resetting force step plan: %w", err)
+		}
 		lifecycleItem := runCtx.LifecycleItem()
 		metadata := runCtx.Metadata()
 		span, err := e.tracerProvider.CreateDroppableSpan(
