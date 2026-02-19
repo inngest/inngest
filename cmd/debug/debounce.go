@@ -13,6 +13,7 @@ func debounceCommand() *cli.Command {
 		Commands: []*cli.Command{
 			debounce.InfoCommand(),
 			debounce.DeleteCommand(),
+			debounce.DeleteByIDCommand(),
 			debounce.RunCommand(),
 		},
 	}
