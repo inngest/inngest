@@ -13,14 +13,8 @@ export interface CellDetailData {
   value: string | number | Date | null;
 }
 
-export interface SelectedCellCoords {
-  rowIndex: number;
-  columnId: string;
-}
-
 interface CellDetailContextValue {
   selectedCell: CellDetailData | null;
-  selectedCellCoords: SelectedCellCoords | null;
   openCellDetail: (data: CellDetailData) => void;
   closeCellDetail: () => void;
 }
@@ -38,10 +32,6 @@ export function CellDetailProvider({
 }: CellDetailProviderProps) {
   const [selectedCell, setSelectedCell] = useState<CellDetailData | null>(null);
 
-  const selectedCellCoords: SelectedCellCoords | null = selectedCell
-    ? { rowIndex: selectedCell.rowIndex, columnId: selectedCell.columnId }
-    : null;
-
   const openCellDetail = useCallback(
     (data: CellDetailData) => {
       setSelectedCell(data);
@@ -58,7 +48,6 @@ export function CellDetailProvider({
     <CellDetailContext.Provider
       value={{
         selectedCell,
-        selectedCellCoords,
         openCellDetail,
         closeCellDetail,
       }}

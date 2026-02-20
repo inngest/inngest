@@ -4,7 +4,7 @@ import type { ColumnDef } from '@tanstack/react-table';
 
 import {
   useCellDetailContext,
-  type SelectedCellCoords,
+  type CellDetailData,
 } from '@/components/Insights/CellDetailContext';
 import { useInsightsStateMachineContext } from '@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext';
 import type { InsightsFetchResult } from '@/components/Insights/InsightsStateMachineContext/types';
@@ -18,7 +18,7 @@ type InsightsTableProps = {
   columns: ColumnDef<InsightsEntry, InsightsColumnValue>[];
   data: InsightsEntry[];
   onCellClick?: (rowIndex: number, columnId: string, value: unknown) => void;
-  selectedCell?: SelectedCellCoords | null;
+  selectedCell?: CellDetailData | null;
 };
 
 function InsightsTable({
@@ -45,7 +45,7 @@ const MemoizedInsightsTable = memo(InsightsTable);
 export function ResultsTable() {
   const { data } = useInsightsStateMachineContext();
   const { columns } = useColumns(data);
-  const { openCellDetail, selectedCellCoords } = useCellDetailContext();
+  const { openCellDetail, selectedCell } = useCellDetailContext();
 
   const handleCellClick = useCallback(
     (rowIndex: number, columnId: string, value: unknown) => {
@@ -74,7 +74,7 @@ export function ResultsTable() {
           columns={columns}
           data={data.rows}
           onCellClick={handleCellClick}
-          selectedCell={selectedCellCoords}
+          selectedCell={selectedCell}
         />
       </div>
       <ResultsTableFooter />
