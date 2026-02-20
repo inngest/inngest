@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/rand"
 	"time"
 
 	"github.com/google/uuid"
@@ -172,6 +173,49 @@ func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition
 			"is_continuation": continuationCount > 0,
 		},
 	})
+
+	if rand.Float64() < 0.05 {
+		// Group items by backlogs
+		backlogs := make(map[string][]*QueueItem)
+
+		var (
+			lastBacklogID          string
+			successiveBacklogCount int
+		)
+
+		for _, qi := range queue {
+			b := ItemBacklog(ctx, *qi)
+
+			// Append to grouped items
+			backlogs[b.BacklogID] = append(backlogs[b.BacklogID], qi)
+
+			// If backlog is different than previous item, reset counter
+			if b.BacklogID != lastBacklogID {
+				successiveBacklogCount = 0
+				lastBacklogID = b.BacklogID
+
+				if successiveBacklogCount > 0 {
+					metrics.HistogramQueueSuccessivePeekedItems(ctx, int64(successiveBacklogCount), metrics.HistogramOpt{
+						PkgName: pkgName,
+						Tags: map[string]any{
+							"queue_shard": q.Shard().Name(),
+						},
+					})
+				}
+				continue
+			}
+
+			successiveBacklogCount++
+		}
+
+		ratioBacklogsToPeeked := (float64(len(backlogs)) / float64(len(queue))) * 100
+		metrics.HistogramQueueRatioBacklogsToPeekedItems(ctx, int64(ratioBacklogsToPeeked), metrics.HistogramOpt{
+			PkgName: pkgName,
+			Tags: map[string]any{
+				"queue_shard": q.Shard().Name(),
+			},
+		})
+	}
 
 	// parallel all queue names with internal mappings for now.
 	// XXX: Allow parallel partitions for all functions except for fns opting into FIFO

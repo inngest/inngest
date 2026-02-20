@@ -549,3 +549,39 @@ func HistogramConstraintAPIQueueItemLeaseTTL(ctx context.Context, ttl time.Durat
 		Boundaries:  ConstraintAPIDurationBoundaries,
 	})
 }
+
+func HistogramQueueSuccessivePeekedItems(ctx context.Context, count int64, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, count, HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "queue_successive_peeked_items",
+		Description: "Distribution of number of peeked items with same backlog",
+		Tags:        opts.Tags,
+		Boundaries: []float64{
+			1, 2, 5, 10, 15, 20, 25, 30, 50, 100, 200, 500, 1000,
+		},
+	})
+}
+
+func HistogramQueueRatioBacklogsToPeekedItems(ctx context.Context, count int64, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, count, HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "queue_ratio_backlogs_to_peeked_items",
+		Description: "Distribution of ratio of backlogs to peeked items",
+		Tags:        opts.Tags,
+		Boundaries: []float64{
+			1, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100,
+		},
+	})
+}
+
+func HistogramQueueRatioTopBacklogItemsToPeekedItems(ctx context.Context, count int64, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, count, HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "queue_ratio_top_backlogs_to_peeked_items",
+		Description: "Distribution of ratio of top backlog size to peeked items",
+		Tags:        opts.Tags,
+		Boundaries: []float64{
+			1, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100,
+		},
+	})
+}
