@@ -1,4 +1,10 @@
-import { memo, useCallback, useEffect, useRef } from 'react';
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useRef,
+  type KeyboardEvent,
+} from 'react';
 import { Table } from '@inngest/components/Table';
 import type { ColumnDef } from '@tanstack/react-table';
 
@@ -64,15 +70,10 @@ export function ResultsTable() {
   );
 
   // Keyboard navigation: arrow keys move between cells, Escape deselects
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Only handle keys when a cell is selected
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent) => {
       if (!selectedCell || !data) return;
 
-      // Build an ordered list of column names so we can index into it
       const colNames = data.columns.map((c) => c.name);
       const colIndex = colNames.indexOf(selectedCell.columnId);
       if (colIndex === -1) return;
@@ -97,10 +98,9 @@ export function ResultsTable() {
           closeCellDetail();
           return;
         default:
-          return; // Ignore all other keys
+          return;
       }
 
-      // Prevent the scroll container from scrolling on arrow keys
       e.preventDefault();
 
       const nextColumnId = colNames[nextColIndex];
@@ -115,19 +115,17 @@ export function ResultsTable() {
         columnType: col.type,
         value,
       });
+    },
+    [selectedCell, data, openCellDetail, closeCellDetail],
+  );
 
-      // Wait one frame for React to re-render, then scroll the new cell into view
-      requestAnimationFrame(() => {
-        container.querySelector('td[data-selected="true"]')?.scrollIntoView({
-          block: 'nearest',
-          inline: 'nearest',
-        });
-      });
-    };
-
-    container.addEventListener('keydown', handleKeyDown);
-    return () => container.removeEventListener('keydown', handleKeyDown);
-  }, [selectedCell, data, openCellDetail, closeCellDetail]);
+  // Scroll the selected cell into view after React commits the DOM update
+  useEffect(() => {
+    if (!selectedCell) return;
+    containerRef.current
+      ?.querySelector('td[data-selected="true"]')
+      ?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }, [selectedCell]);
 
   if (!assertData(data)) return null;
 
@@ -136,6 +134,7 @@ export function ResultsTable() {
       <div
         ref={containerRef}
         tabIndex={0}
+        onKeyDown={handleKeyDown}
         className="flex-1 overflow-auto overscroll-none outline-none"
         id="insights-table-container"
       >
