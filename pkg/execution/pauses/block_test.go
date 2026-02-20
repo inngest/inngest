@@ -1952,19 +1952,16 @@ func TestBlockstoreDeleteByID(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	// Run compaction to clean up deleted pauses
-	err = store.(*blockstore).compact(ctx, index)
-	require.NoError(t, err)
-
-	// Check that pause-block keys are gone after block deletion
-	allKeys := r.Keys()
-	var pauseBlockKeys []string
-	for _, key := range allKeys {
-		if strings.Contains(key, "pause-block") {
-			pauseBlockKeys = append(pauseBlockKeys, key)
+	// Check that pause-block keys are gone after compaction
+	require.EventuallyWithT(t, func(t *assert.CollectT) {
+		var pauseBlockKeys []string
+		for _, key := range r.Keys() {
+			if strings.Contains(key, "pause-block") {
+				pauseBlockKeys = append(pauseBlockKeys, key)
+			}
 		}
-	}
-	require.Equal(t, 0, len(pauseBlockKeys), "Expected no pause-block keys remaining after block deletion, but found: %v", pauseBlockKeys)
+		assert.Equal(t, 0, len(pauseBlockKeys), "Expected no pause-block keys remaining after block deletion, but found: %v", pauseBlockKeys)
+	}, 5*time.Second, 20*time.Millisecond)
 
 	// Now delete the runs to clean up run pause keys
 	for _, pause := range pauses {
@@ -1978,8 +1975,7 @@ func TestBlockstoreDeleteByID(t *testing.T) {
 	}
 
 	// Check that all keys are cleaned up after run deletion
-	allKeys = r.Keys()
-	remainingKeys := append([]string(nil), allKeys...)
+	remainingKeys := r.Keys()
 	require.Equal(t, 0, len(remainingKeys), "Expected no keys remaining after run deletion, but found: %v", remainingKeys)
 }
 
