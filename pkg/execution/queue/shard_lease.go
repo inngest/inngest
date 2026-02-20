@@ -40,6 +40,16 @@ func (q *queueProcessor) claimShardLease(ctx context.Context) {
 		return
 	}
 
+	// Attempt to claim the lease immediately before waiting for the ticker.
+	claimed, err := q.tryClaimShardLease(ctx, shards)
+	if err != nil {
+		q.quit <- err
+		return
+	}
+	if claimed {
+		return
+	}
+
 	tick := q.Clock().NewTicker(500 * time.Millisecond)
 	for {
 		select {
@@ -48,17 +58,14 @@ func (q *queueProcessor) claimShardLease(ctx context.Context) {
 			return
 		case <-tick.Chan():
 			// Attempt to claim the lease.
-			err := q.tryClaimShardLease(ctx, shards)
+			claimed, err := q.tryClaimShardLease(ctx, shards)
 			if err != nil {
 				q.quit <- err
 				return
 			}
 
-			if q.shardLease() != nil {
+			if claimed {
 				tick.Stop()
-
-				// After getting the lease, renew it indefinitely in a separate goroutine
-				go q.renewShardLease(ctx)
 				return
 			}
 		}
@@ -67,13 +74,13 @@ func (q *queueProcessor) claimShardLease(ctx context.Context) {
 }
 
 // tryClaimShardLease attempts to claim a lease on one of the shards in the pool.
-func (q *queueProcessor) tryClaimShardLease(ctx context.Context, shards []QueueShard) error {
+func (q *queueProcessor) tryClaimShardLease(ctx context.Context, shards []QueueShard) (bool, error) {
 	l := logger.StdlibLogger(ctx)
 
 	// if a shard was already leased, early exit.
 	if q.shardLease() != nil {
 		l.Warn("Calling tryClaimShardLease when already leased")
-		return nil
+		return false, nil
 	}
 
 	// Randomize shards to minimize contention
@@ -96,7 +103,7 @@ func (q *queueProcessor) tryClaimShardLease(ctx context.Context, shards []QueueS
 			continue
 		}
 		if err != nil {
-			return err
+			return false, err
 		}
 
 		// If lease has been gotten, set the primary shard and return it
@@ -109,15 +116,18 @@ func (q *queueProcessor) tryClaimShardLease(ctx context.Context, shards []QueueS
 			metrics.GaugeActiveShardLease(ctx, 1, metrics.GaugeOpt{PkgName: pkgName, Tags: map[string]any{"shard_group": q.runMode.ShardGroup, "queue_shard": shard.Name(), "segment": q.ShardLeaseKeySuffix}})
 			l.Info("claimed shard lease", "shard", shard.Name(), "group", q.runMode.ShardGroup, "leaseID", leaseID)
 
+			// Renew the lease indefinitely in a separate goroutine
+			go q.renewShardLease(ctx)
+
 			if q.OnShardLeaseAcquired != nil {
 				go q.OnShardLeaseAcquired(ctx, shard.Name())
 			}
-			return nil
+			return true, nil
 		}
 	}
 
-	// If we couldn't get a lease on any shard, return nil
-	return nil
+	// If we couldn't get a lease on any shard, return false
+	return false, nil
 }
 
 // renewShardLease continuously renews the shard lease until the context is cancelled
