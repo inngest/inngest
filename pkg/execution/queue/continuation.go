@@ -22,7 +22,7 @@ func (q *queueProcessor) addContinue(ctx context.Context, p *QueuePartition, ctr
 		return
 	}
 
-	if ctr >= q.continuationLimit {
+	if q.continuationLimit > 0 && ctr >= q.continuationLimit {
 		q.removeContinue(ctx, p, true)
 		return
 	}
@@ -90,7 +90,7 @@ func (q *queueProcessor) scanContinuations(ctx context.Context) error {
 	}
 
 	// Have some chance of skipping continuations in this iteration.
-	if rand.Float64() <= consts.QueueContinuationSkipProbability {
+	if q.continuationSkipProbability > 0 && rand.Float64() <= q.continuationSkipProbability {
 		return nil
 	}
 
