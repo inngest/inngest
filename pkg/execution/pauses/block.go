@@ -565,25 +565,7 @@ func (b blockstore) Delete(ctx context.Context, index Index, pause state.Pause, 
 		compactionSample = b.compactionSample * 0.1 // 10x lower chance for legacy pauses
 	}
 
-	if rand.Float64() < compactionSample {
-		go func() {
-			var maxDeletes int64
-			for _, blockID := range blockIDs {
-				size, err := b.pc.Client().Do(ctx, b.pc.Client().B().Scard().Key(blockDeleteKey(index, blockID)).Build()).AsInt64()
-				if err != nil {
-					logger.StdlibLogger(ctx).Warn("error fetching block delete length", "error", err, "block_id", blockID)
-					continue
-				}
-				maxDeletes = max(maxDeletes, size)
-			}
-
-			// Trigger a new compaction.
-			if maxDeletes >= int64(float64(b.blocksize)*b.compactionGarbageRatio) {
-				logger.StdlibLogger(ctx).Debug("compacting block deletes", "max_deletes", maxDeletes, "index", index)
-				_ = b.Compact(ctx, index)
-			}
-		}()
-	}
+	b.maybeCompact(ctx, index, blockIDs, compactionSample)
 
 	return nil
 }
@@ -591,8 +573,6 @@ func (b blockstore) Delete(ctx context.Context, index Index, pause state.Pause, 
 // DeleteByID deletes a pause from a block by marking it as deleted in the block's delete tracking set.
 // This method must be called before the pause is deleted from the buffer, otherwise the block index
 // lookup will fail and we won't know which block contains the pause.
-// Note: This method does not trigger compaction as it can be called by any service that only has
-// access to the buffer and not necessarily the block store.
 func (b blockstore) DeleteByID(ctx context.Context, pauseID uuid.UUID, workspaceID uuid.UUID) error {
 	blockIndexKey := b.pc.KeyGenerator().PauseBlockIndex(ctx, pauseID)
 
@@ -643,7 +623,13 @@ func (b blockstore) DeleteByID(ctx context.Context, pauseID uuid.UUID, workspace
 
 	index := Index{WorkspaceID: workspaceID, EventName: blockIndex.EventName}
 
-	return b.pc.Client().Do(ctx, b.pc.Client().B().Sadd().Key(blockDeleteKey(index, blockID)).Member(pauseID.String()).Build()).Error()
+	if err := b.pc.Client().Do(ctx, b.pc.Client().B().Sadd().Key(blockDeleteKey(index, blockID)).Member(pauseID.String()).Build()).Error(); err != nil {
+		return err
+	}
+
+	b.maybeCompact(ctx, index, []ulid.ULID{blockID}, b.compactionSample)
+
+	return nil
 }
 
 func (b *blockstore) IndexExists(ctx context.Context, i Index) (bool, error) {
@@ -748,10 +734,34 @@ func (b *blockstore) PauseByID(ctx context.Context, index Index, pauseID uuid.UU
 	return nil, state.ErrPauseNotFound
 }
 
+// maybeCompact probabilistically checks whether any of the given blocks exceed the compaction
+// threshold and, if so, triggers compaction in the background.
+func (b *blockstore) maybeCompact(ctx context.Context, index Index, blockIDs []ulid.ULID, sample float64) {
+	if rand.Float64() >= sample {
+		return
+	}
+	go func() {
+		var maxDeletes int64
+		for _, blockID := range blockIDs {
+			size, err := b.pc.Client().Do(ctx, b.pc.Client().B().Scard().Key(blockDeleteKey(index, blockID)).Build()).AsInt64()
+			if err != nil {
+				logger.StdlibLogger(ctx).Warn("error fetching block delete length", "error", err, "block_id", blockID)
+				continue
+			}
+			maxDeletes = max(maxDeletes, size)
+		}
+		if maxDeletes >= int64(float64(b.blocksize)*b.compactionGarbageRatio) {
+			_ = b.Compact(ctx, index)
+		}
+	}()
+}
+
 // Compact reads all indexed deletes from block for an index, then compacts any blocks over a given threshold
 // by removing pauses and rewriting blocks.
 func (b *blockstore) Compact(ctx context.Context, index Index) error {
 	if b.buf == nil || b.bucket == nil || b.blocksize == 0 {
+		logger.From(ctx).Warn("skipping compaction because of missing dependencies")
+
 		return fmt.Errorf("error bucket is not setup")
 	}
 	return util.Lease(
