@@ -469,6 +469,7 @@ func (a devapi) OTLPTrace(w http.ResponseWriter, r *http.Request) {
 			Err:     err,
 			Message: err.Error(),
 		})
+		return
 	}
 	defer r.Body.Close()
 
