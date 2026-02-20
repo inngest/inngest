@@ -360,19 +360,17 @@ function BillingComponent() {
               onChange={refetch}
             />
           </ClientFeatureFlag>
-          <ClientFeatureFlag flag="connect-workers" defaultValue={false}>
-            <EntitlementListItem
-              planName={currentPlan.name}
-              title="Connect Workers"
-              description="Maximum number of connect workers"
-              entitlement={{
-                currentValue: entitlements.connectWorkerConnections.limit,
-                displayValue: `${entitlements.connectWorkerConnections.limit} connections`,
-              }}
-              addon={addons.connectWorkers}
-              onChange={refetch}
-            />
-          </ClientFeatureFlag>
+          <EntitlementListItem
+            planName={currentPlan.name}
+            title="Connect Workers"
+            description="Maximum number of connect workers"
+            entitlement={{
+              currentValue: entitlements.connectWorkerConnections.limit,
+              displayValue: `${entitlements.connectWorkerConnections.limit} connections`,
+            }}
+            addon={addons.connectWorkers}
+            onChange={refetch}
+          />
           <EntitlementListItem
             increaseInHigherPlan={false}
             planName={currentPlan.name}
