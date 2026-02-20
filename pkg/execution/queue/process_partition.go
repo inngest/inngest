@@ -183,6 +183,7 @@ func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition
 			successiveBacklogCount int
 		)
 
+		start := time.Now()
 		for _, qi := range queue {
 			b := ItemBacklog(ctx, *qi)
 
@@ -207,6 +208,14 @@ func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition
 
 			successiveBacklogCount++
 		}
+
+		// Measure time it took to group by backlog
+		metrics.HistogramQueueBacklogGroupingDuration(ctx, time.Since(start).Milliseconds(), metrics.HistogramOpt{
+			PkgName: pkgName,
+			Tags: map[string]any{
+				"queue_shard": q.Shard().Name(),
+			},
+		})
 
 		ratioBacklogsToPeeked := (float64(len(backlogs)) / float64(len(queue))) * 100
 		metrics.HistogramQueueRatioBacklogsToPeekedItems(ctx, int64(ratioBacklogsToPeeked), metrics.HistogramOpt{

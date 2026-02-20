@@ -585,3 +585,14 @@ func HistogramQueueRatioTopBacklogItemsToPeekedItems(ctx context.Context, count 
 		},
 	})
 }
+
+func HistogramQueueBacklogGroupingDuration(ctx context.Context, dur int64, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, dur, HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "queue_backlog_grouping_duration",
+		Description: "Distribution of time required to group all peeked items by backlog",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  ConstraintAPIDurationBoundaries,
+	})
+}
