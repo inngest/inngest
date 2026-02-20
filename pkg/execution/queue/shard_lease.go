@@ -102,7 +102,7 @@ func (q *queueProcessor) tryClaimShardLease(ctx context.Context, shards []QueueS
 		})
 
 		if err == ErrAllShardsAlreadyLeased {
-			l.Warn("Could not get a shard lease", "shard", shard.Name())
+			l.Warn("could not get a shard lease", "shard", shard.Name())
 			metrics.IncrShardLeaseContentionCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"shard_group": q.runMode.ShardGroup, "queue_shard": shard.Name(), "segment": q.ShardLeaseKeySuffix}})
 			continue
 		}
