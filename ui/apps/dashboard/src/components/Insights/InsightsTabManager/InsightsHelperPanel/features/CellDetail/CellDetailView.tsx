@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { CodeBlock } from '@inngest/components/CodeBlock';
+import { RiArrowDownSLine, RiArrowUpSLine } from '@remixicon/react';
 
 import { useCellDetailContext } from '@/components/Insights/CellDetailContext';
 import { getFormattedJSONObjectOrArrayString } from '@/components/Insights/InsightsDataTable/states/ResultsState/json';
@@ -30,6 +31,19 @@ export function CellDetailView() {
           columnType={selectedCell.columnType}
           value={selectedCell.value}
         />
+      </div>
+      <div className="border-subtle flex items-center gap-1.5 border-t px-4 py-3">
+        <div className="flex items-center gap-0.5">
+          <span className="border-subtle bg-canvasSubtle inline-flex h-5 w-5 items-center justify-center rounded border">
+            <RiArrowDownSLine className="text-muted h-3.5 w-3.5" />
+          </span>
+          <span className="border-subtle bg-canvasSubtle inline-flex h-5 w-5 items-center justify-center rounded border">
+            <RiArrowUpSLine className="text-muted h-3.5 w-3.5" />
+          </span>
+        </div>
+        <span className="text-subtle text-xs">
+          Use arrow keys to navigate the table.
+        </span>
       </div>
     </div>
   );

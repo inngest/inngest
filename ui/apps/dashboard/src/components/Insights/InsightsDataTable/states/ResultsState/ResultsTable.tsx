@@ -1,4 +1,10 @@
-import { memo, useCallback } from 'react';
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useRef,
+  type KeyboardEvent,
+} from 'react';
 import { Table } from '@inngest/components/Table';
 import type { ColumnDef } from '@tanstack/react-table';
 
@@ -43,9 +49,11 @@ function InsightsTable({
 const MemoizedInsightsTable = memo(InsightsTable);
 
 export function ResultsTable() {
+  const containerRef = useRef<HTMLDivElement>(null);
   const { data } = useInsightsStateMachineContext();
   const { columns } = useColumns(data);
-  const { openCellDetail, selectedCell } = useCellDetailContext();
+  const { openCellDetail, closeCellDetail, selectedCell } =
+    useCellDetailContext();
 
   const handleCellClick = useCallback(
     (rowIndex: number, columnId: string, value: unknown) => {
@@ -61,12 +69,73 @@ export function ResultsTable() {
     [data, openCellDetail],
   );
 
+  // Keyboard navigation: arrow keys move between cells, Escape deselects
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent) => {
+      if (!selectedCell || !data) return;
+
+      const colNames = data.columns.map((c) => c.name);
+      const colIndex = colNames.indexOf(selectedCell.columnId);
+      if (colIndex === -1) return;
+
+      let nextRow = selectedCell.rowIndex;
+      let nextColIndex = colIndex;
+
+      switch (e.key) {
+        case 'ArrowUp':
+          nextRow = Math.max(0, nextRow - 1);
+          break;
+        case 'ArrowDown':
+          nextRow = Math.min(data.rows.length - 1, nextRow + 1);
+          break;
+        case 'ArrowLeft':
+          nextColIndex = Math.max(0, nextColIndex - 1);
+          break;
+        case 'ArrowRight':
+          nextColIndex = Math.min(colNames.length - 1, nextColIndex + 1);
+          break;
+        case 'Escape':
+          closeCellDetail();
+          return;
+        default:
+          return;
+      }
+
+      e.preventDefault();
+
+      const nextColumnId = colNames[nextColIndex];
+      const col = data.columns[nextColIndex];
+      if (!nextColumnId || !col) return;
+
+      const value = data.rows[nextRow]?.values[nextColumnId] ?? null;
+
+      openCellDetail({
+        rowIndex: nextRow,
+        columnId: nextColumnId,
+        columnType: col.type,
+        value,
+      });
+    },
+    [selectedCell, data, openCellDetail, closeCellDetail],
+  );
+
+  // Scroll the selected cell into view after React commits the DOM update
+  useEffect(() => {
+    if (!selectedCell) return;
+    containerRef.current
+      ?.querySelector('td[data-selected="true"]')
+      ?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }, [selectedCell]);
+
   if (!assertData(data)) return null;
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
       <div
-        className="flex-1 overflow-auto overscroll-none"
+        ref={containerRef}
+        tabIndex={0}
+        onKeyDown={handleKeyDown}
+        className="flex-1 overflow-auto overscroll-none outline-none"
         id="insights-table-container"
       >
         <MemoizedInsightsTable
