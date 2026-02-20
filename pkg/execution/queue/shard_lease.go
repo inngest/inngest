@@ -142,10 +142,10 @@ func (q *queueProcessor) renewShardLease(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			l.Debug("Stopping Shard Lease Renewal")
+			l.Debug("stopping shard lease renewal")
 			return
 		case <-tick.Chan():
-			l.Trace("Renewing Shard Lease")
+			l.Trace("renewing shard lease")
 
 			leaseID := q.shardLease()
 
