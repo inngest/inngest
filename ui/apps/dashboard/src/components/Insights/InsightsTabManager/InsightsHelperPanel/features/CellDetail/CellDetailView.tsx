@@ -1,8 +1,12 @@
 import { useMemo } from 'react';
-import { CodeBlock } from '@inngest/components/CodeBlock';
-import { RiArrowDownSLine, RiArrowUpSLine, RiFileCopyLine } from '@remixicon/react';
+import {
+  RiArrowDownSLine,
+  RiArrowUpSLine,
+  RiFileCopyLine,
+} from '@remixicon/react';
 import { toast } from 'sonner';
 import { format, formatInTimeZone } from '@inngest/components/utils/date';
+import { NewCodeBlock } from '@inngest/components/NewCodeBlock/NewCodeBlock';
 
 import { useCellDetailContext } from '@/components/Insights/CellDetailContext';
 import { getFormattedJSONObjectOrArrayString } from '@/components/Insights/InsightsDataTable/states/ResultsState/json';
@@ -20,11 +24,11 @@ export function CellDetailView() {
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <div className=" flex items-center justify-between px-4 py-4">
+      <div className="flex items-center justify-between px-4 py-4">
         <div className="text-basis text-sm font-medium">
           {selectedCell.columnId}
         </div>
-        <div className=" text-muted rounded px-1.5 py-0.5 text-xs font-medium uppercase">
+        <div className="text-muted rounded px-1.5 py-0.5 text-xs font-medium uppercase">
           {selectedCell.columnType}
         </div>
       </div>
@@ -59,38 +63,40 @@ function CellValueDisplay({
   value: string | number | Date | null;
 }) {
   const { content, language } = useMemo(() => {
-    if (columnType === 'string' && value != null) {
+    if (value == null) {
+      return { content: 'null', language: 'plaintext' };
+    }
+
+    if (columnType === 'string') {
       const formatted = getFormattedJSONObjectOrArrayString(String(value));
       if (formatted !== null) {
         return { content: formatted, language: 'json' };
       }
       return { content: String(value), language: 'plaintext' };
     }
+
+    // dates are ignored since we use a differnet component
     return { content: String(value ?? 'null'), language: 'plaintext' };
   }, [columnType, value]);
-
-  if (value == null) {
-    return (
-      <CodeBlock.Wrapper>
-        <CodeBlock
-          tab={{ content: 'null', language: 'plaintext', readOnly: true }}
-        />
-      </CodeBlock.Wrapper>
-    );
-  }
 
   if (columnType === 'date') {
     return <DateDisplay value={value} />;
   }
 
   return (
-    <CodeBlock.Wrapper>
-      <CodeBlock tab={{ content, language, readOnly: true }} />
-    </CodeBlock.Wrapper>
+    <div className="bg-codeEditor h-full overflow-hidden rounded-lg">
+      <NewCodeBlock
+        tab={{
+          content,
+          language,
+          readOnly: true,
+        }}
+      />
+    </div>
   );
 }
 
-function DateDisplay({ value }: { value: string | number | Date }) {
+function DateDisplay({ value }: { value: string | number | null | Date }) {
   const date = value instanceof Date ? value : new Date(value);
 
   if (!(date instanceof Date) || isNaN(date.getTime())) {
