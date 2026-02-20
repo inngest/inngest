@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
-import { CodeBlock } from '@inngest/components/CodeBlock';
 import { RiArrowDownSLine, RiArrowUpSLine } from '@remixicon/react';
+import { NewCodeBlock } from '@inngest/components/NewCodeBlock/NewCodeBlock';
 
 import { useCellDetailContext } from '@/components/Insights/CellDetailContext';
 import { getFormattedJSONObjectOrArrayString } from '@/components/Insights/InsightsDataTable/states/ResultsState/json';
@@ -18,11 +18,11 @@ export function CellDetailView() {
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <div className=" flex items-center justify-between px-4 py-4">
+      <div className="flex items-center justify-between px-4 py-4">
         <div className="text-basis text-sm font-medium">
           {selectedCell.columnId}
         </div>
-        <div className=" text-muted rounded px-1.5 py-0.5 text-xs font-medium uppercase">
+        <div className="text-muted rounded px-1.5 py-0.5 text-xs font-medium uppercase">
           {selectedCell.columnType}
         </div>
       </div>
@@ -58,7 +58,7 @@ function CellValueCodeBlock({
 }) {
   const { content, language } = useMemo(() => {
     if (value == null) {
-      return { content: 'null', language: 'plaintext' };
+      return { content: 'null', language: 'plaintext', isJson: false };
     }
 
     if (columnType === 'date') {
@@ -66,29 +66,30 @@ function CellValueCodeBlock({
       return {
         content: `${date.toLocaleString()}\n${date.toISOString()}`,
         language: 'plaintext',
+        isJson: false,
       };
     }
 
     if (columnType === 'string') {
       const formatted = getFormattedJSONObjectOrArrayString(String(value));
       if (formatted !== null) {
-        return { content: formatted, language: 'json' };
+        return { content: formatted, language: 'json', isJson: true };
       }
-      return { content: String(value), language: 'plaintext' };
+      return { content: String(value), language: 'plaintext', isJson: false };
     }
 
-    return { content: String(value), language: 'plaintext' };
+    return { content: String(value), language: 'plaintext', isJson: false };
   }, [columnType, value]);
 
   return (
-    <CodeBlock.Wrapper>
-      <CodeBlock
+    <div className="bg-codeEditor h-full overflow-hidden rounded-lg">
+      <NewCodeBlock
         tab={{
           content,
           language,
           readOnly: true,
         }}
       />
-    </CodeBlock.Wrapper>
+    </div>
   );
 }
