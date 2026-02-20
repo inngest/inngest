@@ -41,12 +41,9 @@ func (q *queueProcessor) claimShardLease(ctx context.Context) {
 	}
 
 	// Attempt to claim the lease immediately before waiting for the ticker.
-	claimed, err := q.tryClaimShardLease(ctx, shards)
-	if err != nil {
-		q.quit <- err
-		return
-	}
-	if claimed {
+	_, _ = q.tryClaimShardLease(ctx, shards)
+
+	if q.shardLease() != nil {
 		return
 	}
 
@@ -58,13 +55,13 @@ func (q *queueProcessor) claimShardLease(ctx context.Context) {
 			return
 		case <-tick.Chan():
 			// Attempt to claim the lease.
-			claimed, err := q.tryClaimShardLease(ctx, shards)
+			_, err := q.tryClaimShardLease(ctx, shards)
 			if err != nil {
 				q.quit <- err
 				return
 			}
 
-			if claimed {
+			if q.shardLease() != nil {
 				tick.Stop()
 				return
 			}
