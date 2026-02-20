@@ -740,7 +740,11 @@ func (b *blockstore) maybeCompact(ctx context.Context, index Index, blockIDs []u
 	if rand.Float64() >= sample {
 		return
 	}
+
+	ctx, cancel := context.WithCancel(context.WithoutCancel(ctx))
 	go func() {
+		defer cancel()
+
 		var maxDeletes int64
 		for _, blockID := range blockIDs {
 			size, err := b.pc.Client().Do(ctx, b.pc.Client().B().Scard().Key(blockDeleteKey(index, blockID)).Build()).AsInt64()
