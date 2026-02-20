@@ -19,7 +19,7 @@ export function CellDetailView() {
     <div className="flex h-full flex-col overflow-hidden">
       <div className=" flex items-center justify-between px-4 py-4">
         <div className="text-basis text-sm font-medium">
-          {selectedCell.columnName}
+          {selectedCell.columnId}
         </div>
         <div className=" text-muted rounded px-1.5 py-0.5 text-xs font-medium uppercase">
           {selectedCell.columnType}
