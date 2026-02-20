@@ -79,6 +79,14 @@ func NewRunTree(opts RunTreeOpts) (*runTree, error) {
 			if _, ok := s.SpanAttributes[consts.OtelSysStepPlan]; ok {
 				continue
 			}
+			// Skip OnStepScheduled QUEUED marker spans — step-scope spans
+			// with OpcodeStepPlanned are point-in-time markers that record
+			// when a step was queued. They flow to ClickHouse for analytics
+			// but don't belong in the trace tree (the synthetic queued span
+			// at the end of the tree handles the "currently queued" display).
+			if s.ScopeName == consts.OtelScopeStep {
+				continue
+			}
 		}
 
 		if s.ScopeName == consts.OtelScopeFunction {
@@ -105,6 +113,10 @@ func NewRunTree(opts RunTreeOpts) (*runTree, error) {
 		// ignore parallelism planning spans
 		if s.StepOpCode() == enums.OpcodeStepPlanned {
 			if _, ok := s.SpanAttributes[consts.OtelSysStepPlan]; ok {
+				continue
+			}
+			// Skip OnStepScheduled QUEUED marker spans (see above)
+			if s.ScopeName == consts.OtelScopeStep {
 				continue
 			}
 		}
@@ -171,8 +183,10 @@ func (tb *runTree) ToRunSpan(ctx context.Context) (*rpbv2.RunSpan, error) {
 		if skipped {
 			continue
 		}
-		// the last output is the run's output
-		if finished {
+		// Use the last child's output as the run's output. The nil guard
+		// prevents marker spans (e.g. QUEUED) from overwriting a valid
+		// OutputId, since they don't produce output.
+		if finished && tspan.OutputId != nil {
 			root.OutputId = tspan.OutputId
 		}
 		root.Children = append(root.Children, tspan)
