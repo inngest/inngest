@@ -119,6 +119,116 @@ func (FilterType) EnumDescriptor() ([]byte, []int) {
 	return file_api_v2_service_proto_rawDescGZIP(), []int{1}
 }
 
+type RunStatus int32
+
+const (
+	RunStatus_RUNNING   RunStatus = 0
+	RunStatus_COMPLETED RunStatus = 1
+	RunStatus_FAILED    RunStatus = 2
+	RunStatus_CANCELLED RunStatus = 3
+	RunStatus_SCHEDULED RunStatus = 4
+	RunStatus_UNKNOWN   RunStatus = 5
+	RunStatus_SKIPPED   RunStatus = 6
+)
+
+// Enum value maps for RunStatus.
+var (
+	RunStatus_name = map[int32]string{
+		0: "RUNNING",
+		1: "COMPLETED",
+		2: "FAILED",
+		3: "CANCELLED",
+		4: "SCHEDULED",
+		5: "UNKNOWN",
+		6: "SKIPPED",
+	}
+	RunStatus_value = map[string]int32{
+		"RUNNING":   0,
+		"COMPLETED": 1,
+		"FAILED":    2,
+		"CANCELLED": 3,
+		"SCHEDULED": 4,
+		"UNKNOWN":   5,
+		"SKIPPED":   6,
+	}
+)
+
+func (x RunStatus) Enum() *RunStatus {
+	p := new(RunStatus)
+	*p = x
+	return p
+}
+
+func (x RunStatus) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (RunStatus) Descriptor() protoreflect.EnumDescriptor {
+	return file_api_v2_service_proto_enumTypes[2].Descriptor()
+}
+
+func (RunStatus) Type() protoreflect.EnumType {
+	return &file_api_v2_service_proto_enumTypes[2]
+}
+
+func (x RunStatus) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use RunStatus.Descriptor instead.
+func (RunStatus) EnumDescriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{2}
+}
+
+type RunTimeField int32
+
+const (
+	RunTimeField_QUEUED_AT  RunTimeField = 0
+	RunTimeField_STARTED_AT RunTimeField = 1
+	RunTimeField_ENDED_AT   RunTimeField = 2
+)
+
+// Enum value maps for RunTimeField.
+var (
+	RunTimeField_name = map[int32]string{
+		0: "QUEUED_AT",
+		1: "STARTED_AT",
+		2: "ENDED_AT",
+	}
+	RunTimeField_value = map[string]int32{
+		"QUEUED_AT":  0,
+		"STARTED_AT": 1,
+		"ENDED_AT":   2,
+	}
+)
+
+func (x RunTimeField) Enum() *RunTimeField {
+	p := new(RunTimeField)
+	*p = x
+	return p
+}
+
+func (x RunTimeField) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (RunTimeField) Descriptor() protoreflect.EnumDescriptor {
+	return file_api_v2_service_proto_enumTypes[3].Descriptor()
+}
+
+func (RunTimeField) Type() protoreflect.EnumType {
+	return &file_api_v2_service_proto_enumTypes[3]
+}
+
+func (x RunTimeField) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use RunTimeField.Descriptor instead.
+func (RunTimeField) EnumDescriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{3}
+}
+
 type HealthRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -2087,6 +2197,242 @@ func (x *PatchEnvsResponse) GetMetadata() *ResponseMetadata {
 	return nil
 }
 
+type ListRunsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Cursor        *string                `protobuf:"bytes,1,opt,name=cursor,proto3,oneof" json:"cursor,omitempty"`
+	Limit         *int32                 `protobuf:"varint,2,opt,name=limit,proto3,oneof" json:"limit,omitempty"`
+	Status        []RunStatus            `protobuf:"varint,3,rep,packed,name=status,proto3,enum=api.v2.RunStatus" json:"status,omitempty"`
+	StartTime     *string                `protobuf:"bytes,4,opt,name=startTime,proto3,oneof" json:"startTime,omitempty"`
+	EndTime       *string                `protobuf:"bytes,5,opt,name=endTime,proto3,oneof" json:"endTime,omitempty"`
+	TimeField     *RunTimeField          `protobuf:"varint,6,opt,name=timeField,proto3,enum=api.v2.RunTimeField,oneof" json:"timeField,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListRunsRequest) Reset() {
+	*x = ListRunsRequest{}
+	mi := &file_api_v2_service_proto_msgTypes[34]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListRunsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListRunsRequest) ProtoMessage() {}
+
+func (x *ListRunsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[34]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListRunsRequest.ProtoReflect.Descriptor instead.
+func (*ListRunsRequest) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{34}
+}
+
+func (x *ListRunsRequest) GetCursor() string {
+	if x != nil && x.Cursor != nil {
+		return *x.Cursor
+	}
+	return ""
+}
+
+func (x *ListRunsRequest) GetLimit() int32 {
+	if x != nil && x.Limit != nil {
+		return *x.Limit
+	}
+	return 0
+}
+
+func (x *ListRunsRequest) GetStatus() []RunStatus {
+	if x != nil {
+		return x.Status
+	}
+	return nil
+}
+
+func (x *ListRunsRequest) GetStartTime() string {
+	if x != nil && x.StartTime != nil {
+		return *x.StartTime
+	}
+	return ""
+}
+
+func (x *ListRunsRequest) GetEndTime() string {
+	if x != nil && x.EndTime != nil {
+		return *x.EndTime
+	}
+	return ""
+}
+
+func (x *ListRunsRequest) GetTimeField() RunTimeField {
+	if x != nil && x.TimeField != nil {
+		return *x.TimeField
+	}
+	return RunTimeField_QUEUED_AT
+}
+
+type ListRunsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Data          []*Run                 `protobuf:"bytes,1,rep,name=data,proto3" json:"data,omitempty"`
+	Metadata      *ResponseMetadata      `protobuf:"bytes,2,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	Page          *Page                  `protobuf:"bytes,3,opt,name=page,proto3" json:"page,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListRunsResponse) Reset() {
+	*x = ListRunsResponse{}
+	mi := &file_api_v2_service_proto_msgTypes[35]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListRunsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListRunsResponse) ProtoMessage() {}
+
+func (x *ListRunsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[35]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListRunsResponse.ProtoReflect.Descriptor instead.
+func (*ListRunsResponse) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{35}
+}
+
+func (x *ListRunsResponse) GetData() []*Run {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+func (x *ListRunsResponse) GetMetadata() *ResponseMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *ListRunsResponse) GetPage() *Page {
+	if x != nil {
+		return x.Page
+	}
+	return nil
+}
+
+type Run struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	AppId         string                 `protobuf:"bytes,2,opt,name=appId,proto3" json:"appId,omitempty"`
+	FunctionId    string                 `protobuf:"bytes,3,opt,name=functionId,proto3" json:"functionId,omitempty"`
+	Status        RunStatus              `protobuf:"varint,4,opt,name=status,proto3,enum=api.v2.RunStatus" json:"status,omitempty"`
+	QueuedAt      *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=queuedAt,proto3" json:"queuedAt,omitempty"`
+	StartedAt     *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=startedAt,proto3,oneof" json:"startedAt,omitempty"`
+	EndedAt       *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=endedAt,proto3,oneof" json:"endedAt,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Run) Reset() {
+	*x = Run{}
+	mi := &file_api_v2_service_proto_msgTypes[36]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Run) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Run) ProtoMessage() {}
+
+func (x *Run) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[36]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Run.ProtoReflect.Descriptor instead.
+func (*Run) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{36}
+}
+
+func (x *Run) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *Run) GetAppId() string {
+	if x != nil {
+		return x.AppId
+	}
+	return ""
+}
+
+func (x *Run) GetFunctionId() string {
+	if x != nil {
+		return x.FunctionId
+	}
+	return ""
+}
+
+func (x *Run) GetStatus() RunStatus {
+	if x != nil {
+		return x.Status
+	}
+	return RunStatus_RUNNING
+}
+
+func (x *Run) GetQueuedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.QueuedAt
+	}
+	return nil
+}
+
+func (x *Run) GetStartedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.StartedAt
+	}
+	return nil
+}
+
+func (x *Run) GetEndedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.EndedAt
+	}
+	return nil
+}
+
 var File_api_v2_service_proto protoreflect.FileDescriptor
 
 const file_api_v2_service_proto_rawDesc = "" +
@@ -2243,7 +2589,40 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\v_isArchived\"j\n" +
 	"\x11PatchEnvsResponse\x12\x1f\n" +
 	"\x04data\x18\x01 \x01(\v2\v.api.v2.EnvR\x04data\x124\n" +
-	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata*/\n" +
+	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"\xf0\x05\n" +
+	"\x0fListRunsRequest\x12J\n" +
+	"\x06cursor\x18\x01 \x01(\tB-\x92A*2(Pagination cursor from previous responseH\x00R\x06cursor\x88\x01\x01\x12X\n" +
+	"\x05limit\x18\x02 \x01(\x05B=\x92A:24Number of runs to return per page (min: 1, max: 250):\x0250H\x01R\x05limit\x88\x01\x01\x12g\n" +
+	"\x06status\x18\x03 \x03(\x0e2\x11.api.v2.RunStatusB<\x92A927Filter by run status (e.g., RUNNING, COMPLETED, FAILED)R\x06status\x12t\n" +
+	"\tstartTime\x18\x04 \x01(\tBQ\x92AN2LStart of time range filter in RFC 3339 format (e.g., '2025-08-01T00:00:00Z')H\x02R\tstartTime\x88\x01\x01\x12n\n" +
+	"\aendTime\x18\x05 \x01(\tBO\x92AL2JEnd of time range filter in RFC 3339 format (e.g., '2025-08-31T23:59:59Z')H\x03R\aendTime\x88\x01\x01\x12\xaa\x01\n" +
+	"\ttimeField\x18\x06 \x01(\x0e2\x14.api.v2.RunTimeFieldBq\x92An2_Which timestamp field to filter on (QUEUED_AT, STARTED_AT, or ENDED_AT). Defaults to QUEUED_AT.:\v\"QUEUED_AT\"H\x04R\ttimeField\x88\x01\x01B\t\n" +
+	"\a_cursorB\b\n" +
+	"\x06_limitB\f\n" +
+	"\n" +
+	"_startTimeB\n" +
+	"\n" +
+	"\b_endTimeB\f\n" +
+	"\n" +
+	"_timeField\"\x8b\x01\n" +
+	"\x10ListRunsResponse\x12\x1f\n" +
+	"\x04data\x18\x01 \x03(\v2\v.api.v2.RunR\x04data\x124\n" +
+	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\x12 \n" +
+	"\x04page\x18\x03 \x01(\v2\f.api.v2.PageR\x04page\"\xc2\x02\n" +
+	"\x03Run\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
+	"\x05appId\x18\x02 \x01(\tR\x05appId\x12\x1e\n" +
+	"\n" +
+	"functionId\x18\x03 \x01(\tR\n" +
+	"functionId\x12)\n" +
+	"\x06status\x18\x04 \x01(\x0e2\x11.api.v2.RunStatusR\x06status\x126\n" +
+	"\bqueuedAt\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\bqueuedAt\x12=\n" +
+	"\tstartedAt\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampH\x00R\tstartedAt\x88\x01\x01\x129\n" +
+	"\aendedAt\x18\a \x01(\v2\x1a.google.protobuf.TimestampH\x01R\aendedAt\x88\x01\x01B\f\n" +
+	"\n" +
+	"_startedAtB\n" +
+	"\n" +
+	"\b_endedAt*/\n" +
 	"\aEnvType\x12\x0e\n" +
 	"\n" +
 	"PRODUCTION\x10\x00\x12\b\n" +
@@ -2253,7 +2632,21 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\n" +
 	"FilterType\x12\t\n" +
 	"\x05ALLOW\x10\x00\x12\b\n" +
-	"\x04DENY\x10\x012\xd8;\n" +
+	"\x04DENY\x10\x01*k\n" +
+	"\tRunStatus\x12\v\n" +
+	"\aRUNNING\x10\x00\x12\r\n" +
+	"\tCOMPLETED\x10\x01\x12\n" +
+	"\n" +
+	"\x06FAILED\x10\x02\x12\r\n" +
+	"\tCANCELLED\x10\x03\x12\r\n" +
+	"\tSCHEDULED\x10\x04\x12\v\n" +
+	"\aUNKNOWN\x10\x05\x12\v\n" +
+	"\aSKIPPED\x10\x06*;\n" +
+	"\fRunTimeField\x12\r\n" +
+	"\tQUEUED_AT\x10\x00\x12\x0e\n" +
+	"\n" +
+	"STARTED_AT\x10\x01\x12\f\n" +
+	"\bENDED_AT\x10\x022\xe0@\n" +
 	"\x02V2\x12\xb2\x02\n" +
 	"\x06Health\x12\x15.api.v2.HealthRequest\x1a\x16.api.v2.HealthResponse\"\xf8\x01\x92A\xe5\x01\x12\fHealth check\x1a,Returns the health status of the API serviceJR\n" +
 	"\x03401\x12K\n" +
@@ -2490,7 +2883,28 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x0e\n" +
 	"\n" +
 	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x0f:\x01*2\n" +
-	"/envs/{id}B\xc8\x02\x92A\x91\x02\x12\x9b\x01\n" +
+	"/envs/{id}\x12\x85\x05\n" +
+	"\bListRuns\x12\x17.api.v2.ListRunsRequest\x1a\x18.api.v2.ListRunsResponse\"\xc5\x04\x92A\xb4\x04\x12\tList runs\x1a;Lists function runs with filtering by status and time rangeJ;\n" +
+	"\x03200\x124\n" +
+	"\fList of runs\x12$\n" +
+	"\"\x1a #/definitions/v2ListRunsResponseJR\n" +
+	"\x03400\x12K\n" +
+	"&Bad Request - invalid query parameters\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJR\n" +
+	"\x03401\x12K\n" +
+	"&Unauthorized - authentication required\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJP\n" +
+	"\x03403\x12I\n" +
+	"$Forbidden - insufficient permissions\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJA\n" +
+	"\x03500\x12:\n" +
+	"\x15Internal Server Error\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseb\x10\n" +
+	"\x0e\n" +
+	"\n" +
+	"BearerAuth\x12\x00r^\n" +
+	"\\\n" +
+	"\rX-Inngest-Env\x12IFilter runs by environment (e.g., 'production', 'staging', 'development')\x18\x01\x82\xd3\xe4\x93\x02\a\x12\x05/runsB\xc8\x02\x92A\x91\x02\x12\x9b\x01\n" +
 	"\x13Inngest REST API v2\x12}The v2 API delivers a significantly improved developer experience with consistent design patterns and enhanced functionality.2\x052.0.0\x1a\x0fapi.inngest.com\"\x03/v2*\x01\x02ZX\n" +
 	"V\n" +
 	"\n" +
@@ -2508,120 +2922,136 @@ func file_api_v2_service_proto_rawDescGZIP() []byte {
 	return file_api_v2_service_proto_rawDescData
 }
 
-var file_api_v2_service_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_api_v2_service_proto_msgTypes = make([]protoimpl.MessageInfo, 34)
+var file_api_v2_service_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
+var file_api_v2_service_proto_msgTypes = make([]protoimpl.MessageInfo, 37)
 var file_api_v2_service_proto_goTypes = []any{
 	(EnvType)(0),                            // 0: api.v2.EnvType
 	(FilterType)(0),                         // 1: api.v2.FilterType
-	(*HealthRequest)(nil),                   // 2: api.v2.HealthRequest
-	(*FetchAccountRequest)(nil),             // 3: api.v2.FetchAccountRequest
-	(*HealthResponse)(nil),                  // 4: api.v2.HealthResponse
-	(*HealthData)(nil),                      // 5: api.v2.HealthData
-	(*Error)(nil),                           // 6: api.v2.Error
-	(*ErrorResponse)(nil),                   // 7: api.v2.ErrorResponse
-	(*ResponseMetadata)(nil),                // 8: api.v2.ResponseMetadata
-	(*CreateAccountRequest)(nil),            // 9: api.v2.CreateAccountRequest
-	(*CreateAccountResponse)(nil),           // 10: api.v2.CreateAccountResponse
-	(*CreateEnvRequest)(nil),                // 11: api.v2.CreateEnvRequest
-	(*CreateEnvResponse)(nil),               // 12: api.v2.CreateEnvResponse
-	(*Env)(nil),                             // 13: api.v2.Env
-	(*CreateAccountData)(nil),               // 14: api.v2.CreateAccountData
-	(*FetchAccountsRequest)(nil),            // 15: api.v2.FetchAccountsRequest
-	(*FetchAccountsResponse)(nil),           // 16: api.v2.FetchAccountsResponse
-	(*FetchAccountResponse)(nil),            // 17: api.v2.FetchAccountResponse
-	(*Account)(nil),                         // 18: api.v2.Account
-	(*Page)(nil),                            // 19: api.v2.Page
-	(*FetchAccountEventKeysRequest)(nil),    // 20: api.v2.FetchAccountEventKeysRequest
-	(*FetchAccountEventKeysResponse)(nil),   // 21: api.v2.FetchAccountEventKeysResponse
-	(*EventKey)(nil),                        // 22: api.v2.EventKey
-	(*FetchAccountEnvsRequest)(nil),         // 23: api.v2.FetchAccountEnvsRequest
-	(*FetchAccountEnvsResponse)(nil),        // 24: api.v2.FetchAccountEnvsResponse
-	(*FetchAccountSigningKeysRequest)(nil),  // 25: api.v2.FetchAccountSigningKeysRequest
-	(*FetchAccountSigningKeysResponse)(nil), // 26: api.v2.FetchAccountSigningKeysResponse
-	(*SigningKey)(nil),                      // 27: api.v2.SigningKey
-	(*CreateWebhookRequest)(nil),            // 28: api.v2.CreateWebhookRequest
-	(*CreateWebhookResponse)(nil),           // 29: api.v2.CreateWebhookResponse
-	(*EventFilter)(nil),                     // 30: api.v2.EventFilter
-	(*ListWebhooksRequest)(nil),             // 31: api.v2.ListWebhooksRequest
-	(*ListWebhooksResponse)(nil),            // 32: api.v2.ListWebhooksResponse
-	(*Webhook)(nil),                         // 33: api.v2.Webhook
-	(*PatchEnvRequest)(nil),                 // 34: api.v2.PatchEnvRequest
-	(*PatchEnvsResponse)(nil),               // 35: api.v2.PatchEnvsResponse
-	(*timestamppb.Timestamp)(nil),           // 36: google.protobuf.Timestamp
+	(RunStatus)(0),                          // 2: api.v2.RunStatus
+	(RunTimeField)(0),                       // 3: api.v2.RunTimeField
+	(*HealthRequest)(nil),                   // 4: api.v2.HealthRequest
+	(*FetchAccountRequest)(nil),             // 5: api.v2.FetchAccountRequest
+	(*HealthResponse)(nil),                  // 6: api.v2.HealthResponse
+	(*HealthData)(nil),                      // 7: api.v2.HealthData
+	(*Error)(nil),                           // 8: api.v2.Error
+	(*ErrorResponse)(nil),                   // 9: api.v2.ErrorResponse
+	(*ResponseMetadata)(nil),                // 10: api.v2.ResponseMetadata
+	(*CreateAccountRequest)(nil),            // 11: api.v2.CreateAccountRequest
+	(*CreateAccountResponse)(nil),           // 12: api.v2.CreateAccountResponse
+	(*CreateEnvRequest)(nil),                // 13: api.v2.CreateEnvRequest
+	(*CreateEnvResponse)(nil),               // 14: api.v2.CreateEnvResponse
+	(*Env)(nil),                             // 15: api.v2.Env
+	(*CreateAccountData)(nil),               // 16: api.v2.CreateAccountData
+	(*FetchAccountsRequest)(nil),            // 17: api.v2.FetchAccountsRequest
+	(*FetchAccountsResponse)(nil),           // 18: api.v2.FetchAccountsResponse
+	(*FetchAccountResponse)(nil),            // 19: api.v2.FetchAccountResponse
+	(*Account)(nil),                         // 20: api.v2.Account
+	(*Page)(nil),                            // 21: api.v2.Page
+	(*FetchAccountEventKeysRequest)(nil),    // 22: api.v2.FetchAccountEventKeysRequest
+	(*FetchAccountEventKeysResponse)(nil),   // 23: api.v2.FetchAccountEventKeysResponse
+	(*EventKey)(nil),                        // 24: api.v2.EventKey
+	(*FetchAccountEnvsRequest)(nil),         // 25: api.v2.FetchAccountEnvsRequest
+	(*FetchAccountEnvsResponse)(nil),        // 26: api.v2.FetchAccountEnvsResponse
+	(*FetchAccountSigningKeysRequest)(nil),  // 27: api.v2.FetchAccountSigningKeysRequest
+	(*FetchAccountSigningKeysResponse)(nil), // 28: api.v2.FetchAccountSigningKeysResponse
+	(*SigningKey)(nil),                      // 29: api.v2.SigningKey
+	(*CreateWebhookRequest)(nil),            // 30: api.v2.CreateWebhookRequest
+	(*CreateWebhookResponse)(nil),           // 31: api.v2.CreateWebhookResponse
+	(*EventFilter)(nil),                     // 32: api.v2.EventFilter
+	(*ListWebhooksRequest)(nil),             // 33: api.v2.ListWebhooksRequest
+	(*ListWebhooksResponse)(nil),            // 34: api.v2.ListWebhooksResponse
+	(*Webhook)(nil),                         // 35: api.v2.Webhook
+	(*PatchEnvRequest)(nil),                 // 36: api.v2.PatchEnvRequest
+	(*PatchEnvsResponse)(nil),               // 37: api.v2.PatchEnvsResponse
+	(*ListRunsRequest)(nil),                 // 38: api.v2.ListRunsRequest
+	(*ListRunsResponse)(nil),                // 39: api.v2.ListRunsResponse
+	(*Run)(nil),                             // 40: api.v2.Run
+	(*timestamppb.Timestamp)(nil),           // 41: google.protobuf.Timestamp
 }
 var file_api_v2_service_proto_depIdxs = []int32{
-	5,  // 0: api.v2.HealthResponse.data:type_name -> api.v2.HealthData
-	8,  // 1: api.v2.HealthResponse.metadata:type_name -> api.v2.ResponseMetadata
-	6,  // 2: api.v2.ErrorResponse.errors:type_name -> api.v2.Error
-	36, // 3: api.v2.ResponseMetadata.fetched_at:type_name -> google.protobuf.Timestamp
-	36, // 4: api.v2.ResponseMetadata.cached_until:type_name -> google.protobuf.Timestamp
-	14, // 5: api.v2.CreateAccountResponse.data:type_name -> api.v2.CreateAccountData
-	8,  // 6: api.v2.CreateAccountResponse.metadata:type_name -> api.v2.ResponseMetadata
-	13, // 7: api.v2.CreateEnvResponse.data:type_name -> api.v2.Env
-	8,  // 8: api.v2.CreateEnvResponse.metadata:type_name -> api.v2.ResponseMetadata
+	7,  // 0: api.v2.HealthResponse.data:type_name -> api.v2.HealthData
+	10, // 1: api.v2.HealthResponse.metadata:type_name -> api.v2.ResponseMetadata
+	8,  // 2: api.v2.ErrorResponse.errors:type_name -> api.v2.Error
+	41, // 3: api.v2.ResponseMetadata.fetched_at:type_name -> google.protobuf.Timestamp
+	41, // 4: api.v2.ResponseMetadata.cached_until:type_name -> google.protobuf.Timestamp
+	16, // 5: api.v2.CreateAccountResponse.data:type_name -> api.v2.CreateAccountData
+	10, // 6: api.v2.CreateAccountResponse.metadata:type_name -> api.v2.ResponseMetadata
+	15, // 7: api.v2.CreateEnvResponse.data:type_name -> api.v2.Env
+	10, // 8: api.v2.CreateEnvResponse.metadata:type_name -> api.v2.ResponseMetadata
 	0,  // 9: api.v2.Env.type:type_name -> api.v2.EnvType
-	36, // 10: api.v2.Env.createdAt:type_name -> google.protobuf.Timestamp
-	36, // 11: api.v2.CreateAccountData.createdAt:type_name -> google.protobuf.Timestamp
-	36, // 12: api.v2.CreateAccountData.updatedAt:type_name -> google.protobuf.Timestamp
-	18, // 13: api.v2.FetchAccountsResponse.data:type_name -> api.v2.Account
-	8,  // 14: api.v2.FetchAccountsResponse.metadata:type_name -> api.v2.ResponseMetadata
-	19, // 15: api.v2.FetchAccountsResponse.page:type_name -> api.v2.Page
-	18, // 16: api.v2.FetchAccountResponse.data:type_name -> api.v2.Account
-	8,  // 17: api.v2.FetchAccountResponse.metadata:type_name -> api.v2.ResponseMetadata
-	36, // 18: api.v2.Account.createdAt:type_name -> google.protobuf.Timestamp
-	36, // 19: api.v2.Account.updatedAt:type_name -> google.protobuf.Timestamp
-	22, // 20: api.v2.FetchAccountEventKeysResponse.data:type_name -> api.v2.EventKey
-	8,  // 21: api.v2.FetchAccountEventKeysResponse.metadata:type_name -> api.v2.ResponseMetadata
-	19, // 22: api.v2.FetchAccountEventKeysResponse.page:type_name -> api.v2.Page
-	36, // 23: api.v2.EventKey.createdAt:type_name -> google.protobuf.Timestamp
-	13, // 24: api.v2.FetchAccountEnvsResponse.data:type_name -> api.v2.Env
-	8,  // 25: api.v2.FetchAccountEnvsResponse.metadata:type_name -> api.v2.ResponseMetadata
-	19, // 26: api.v2.FetchAccountEnvsResponse.page:type_name -> api.v2.Page
-	27, // 27: api.v2.FetchAccountSigningKeysResponse.data:type_name -> api.v2.SigningKey
-	8,  // 28: api.v2.FetchAccountSigningKeysResponse.metadata:type_name -> api.v2.ResponseMetadata
-	19, // 29: api.v2.FetchAccountSigningKeysResponse.page:type_name -> api.v2.Page
-	36, // 30: api.v2.SigningKey.createdAt:type_name -> google.protobuf.Timestamp
-	30, // 31: api.v2.CreateWebhookRequest.event_filter:type_name -> api.v2.EventFilter
-	33, // 32: api.v2.CreateWebhookResponse.data:type_name -> api.v2.Webhook
-	8,  // 33: api.v2.CreateWebhookResponse.metadata:type_name -> api.v2.ResponseMetadata
+	41, // 10: api.v2.Env.createdAt:type_name -> google.protobuf.Timestamp
+	41, // 11: api.v2.CreateAccountData.createdAt:type_name -> google.protobuf.Timestamp
+	41, // 12: api.v2.CreateAccountData.updatedAt:type_name -> google.protobuf.Timestamp
+	20, // 13: api.v2.FetchAccountsResponse.data:type_name -> api.v2.Account
+	10, // 14: api.v2.FetchAccountsResponse.metadata:type_name -> api.v2.ResponseMetadata
+	21, // 15: api.v2.FetchAccountsResponse.page:type_name -> api.v2.Page
+	20, // 16: api.v2.FetchAccountResponse.data:type_name -> api.v2.Account
+	10, // 17: api.v2.FetchAccountResponse.metadata:type_name -> api.v2.ResponseMetadata
+	41, // 18: api.v2.Account.createdAt:type_name -> google.protobuf.Timestamp
+	41, // 19: api.v2.Account.updatedAt:type_name -> google.protobuf.Timestamp
+	24, // 20: api.v2.FetchAccountEventKeysResponse.data:type_name -> api.v2.EventKey
+	10, // 21: api.v2.FetchAccountEventKeysResponse.metadata:type_name -> api.v2.ResponseMetadata
+	21, // 22: api.v2.FetchAccountEventKeysResponse.page:type_name -> api.v2.Page
+	41, // 23: api.v2.EventKey.createdAt:type_name -> google.protobuf.Timestamp
+	15, // 24: api.v2.FetchAccountEnvsResponse.data:type_name -> api.v2.Env
+	10, // 25: api.v2.FetchAccountEnvsResponse.metadata:type_name -> api.v2.ResponseMetadata
+	21, // 26: api.v2.FetchAccountEnvsResponse.page:type_name -> api.v2.Page
+	29, // 27: api.v2.FetchAccountSigningKeysResponse.data:type_name -> api.v2.SigningKey
+	10, // 28: api.v2.FetchAccountSigningKeysResponse.metadata:type_name -> api.v2.ResponseMetadata
+	21, // 29: api.v2.FetchAccountSigningKeysResponse.page:type_name -> api.v2.Page
+	41, // 30: api.v2.SigningKey.createdAt:type_name -> google.protobuf.Timestamp
+	32, // 31: api.v2.CreateWebhookRequest.event_filter:type_name -> api.v2.EventFilter
+	35, // 32: api.v2.CreateWebhookResponse.data:type_name -> api.v2.Webhook
+	10, // 33: api.v2.CreateWebhookResponse.metadata:type_name -> api.v2.ResponseMetadata
 	1,  // 34: api.v2.EventFilter.filter:type_name -> api.v2.FilterType
-	33, // 35: api.v2.ListWebhooksResponse.data:type_name -> api.v2.Webhook
-	8,  // 36: api.v2.ListWebhooksResponse.metadata:type_name -> api.v2.ResponseMetadata
-	19, // 37: api.v2.ListWebhooksResponse.page:type_name -> api.v2.Page
-	30, // 38: api.v2.Webhook.event_filter:type_name -> api.v2.EventFilter
-	36, // 39: api.v2.Webhook.createdAt:type_name -> google.protobuf.Timestamp
-	36, // 40: api.v2.Webhook.updatedAt:type_name -> google.protobuf.Timestamp
-	13, // 41: api.v2.PatchEnvsResponse.data:type_name -> api.v2.Env
-	8,  // 42: api.v2.PatchEnvsResponse.metadata:type_name -> api.v2.ResponseMetadata
-	2,  // 43: api.v2.V2.Health:input_type -> api.v2.HealthRequest
-	2,  // 44: api.v2.V2._SchemaOnly:input_type -> api.v2.HealthRequest
-	9,  // 45: api.v2.V2.CreatePartnerAccount:input_type -> api.v2.CreateAccountRequest
-	11, // 46: api.v2.V2.CreateEnv:input_type -> api.v2.CreateEnvRequest
-	15, // 47: api.v2.V2.FetchPartnerAccounts:input_type -> api.v2.FetchAccountsRequest
-	3,  // 48: api.v2.V2.FetchAccount:input_type -> api.v2.FetchAccountRequest
-	23, // 49: api.v2.V2.FetchAccountEnvs:input_type -> api.v2.FetchAccountEnvsRequest
-	20, // 50: api.v2.V2.FetchAccountEventKeys:input_type -> api.v2.FetchAccountEventKeysRequest
-	25, // 51: api.v2.V2.FetchAccountSigningKeys:input_type -> api.v2.FetchAccountSigningKeysRequest
-	28, // 52: api.v2.V2.CreateWebhook:input_type -> api.v2.CreateWebhookRequest
-	31, // 53: api.v2.V2.ListWebhooks:input_type -> api.v2.ListWebhooksRequest
-	34, // 54: api.v2.V2.PatchEnv:input_type -> api.v2.PatchEnvRequest
-	4,  // 55: api.v2.V2.Health:output_type -> api.v2.HealthResponse
-	7,  // 56: api.v2.V2._SchemaOnly:output_type -> api.v2.ErrorResponse
-	10, // 57: api.v2.V2.CreatePartnerAccount:output_type -> api.v2.CreateAccountResponse
-	12, // 58: api.v2.V2.CreateEnv:output_type -> api.v2.CreateEnvResponse
-	16, // 59: api.v2.V2.FetchPartnerAccounts:output_type -> api.v2.FetchAccountsResponse
-	17, // 60: api.v2.V2.FetchAccount:output_type -> api.v2.FetchAccountResponse
-	24, // 61: api.v2.V2.FetchAccountEnvs:output_type -> api.v2.FetchAccountEnvsResponse
-	21, // 62: api.v2.V2.FetchAccountEventKeys:output_type -> api.v2.FetchAccountEventKeysResponse
-	26, // 63: api.v2.V2.FetchAccountSigningKeys:output_type -> api.v2.FetchAccountSigningKeysResponse
-	29, // 64: api.v2.V2.CreateWebhook:output_type -> api.v2.CreateWebhookResponse
-	32, // 65: api.v2.V2.ListWebhooks:output_type -> api.v2.ListWebhooksResponse
-	35, // 66: api.v2.V2.PatchEnv:output_type -> api.v2.PatchEnvsResponse
-	55, // [55:67] is the sub-list for method output_type
-	43, // [43:55] is the sub-list for method input_type
-	43, // [43:43] is the sub-list for extension type_name
-	43, // [43:43] is the sub-list for extension extendee
-	0,  // [0:43] is the sub-list for field type_name
+	35, // 35: api.v2.ListWebhooksResponse.data:type_name -> api.v2.Webhook
+	10, // 36: api.v2.ListWebhooksResponse.metadata:type_name -> api.v2.ResponseMetadata
+	21, // 37: api.v2.ListWebhooksResponse.page:type_name -> api.v2.Page
+	32, // 38: api.v2.Webhook.event_filter:type_name -> api.v2.EventFilter
+	41, // 39: api.v2.Webhook.createdAt:type_name -> google.protobuf.Timestamp
+	41, // 40: api.v2.Webhook.updatedAt:type_name -> google.protobuf.Timestamp
+	15, // 41: api.v2.PatchEnvsResponse.data:type_name -> api.v2.Env
+	10, // 42: api.v2.PatchEnvsResponse.metadata:type_name -> api.v2.ResponseMetadata
+	2,  // 43: api.v2.ListRunsRequest.status:type_name -> api.v2.RunStatus
+	3,  // 44: api.v2.ListRunsRequest.timeField:type_name -> api.v2.RunTimeField
+	40, // 45: api.v2.ListRunsResponse.data:type_name -> api.v2.Run
+	10, // 46: api.v2.ListRunsResponse.metadata:type_name -> api.v2.ResponseMetadata
+	21, // 47: api.v2.ListRunsResponse.page:type_name -> api.v2.Page
+	2,  // 48: api.v2.Run.status:type_name -> api.v2.RunStatus
+	41, // 49: api.v2.Run.queuedAt:type_name -> google.protobuf.Timestamp
+	41, // 50: api.v2.Run.startedAt:type_name -> google.protobuf.Timestamp
+	41, // 51: api.v2.Run.endedAt:type_name -> google.protobuf.Timestamp
+	4,  // 52: api.v2.V2.Health:input_type -> api.v2.HealthRequest
+	4,  // 53: api.v2.V2._SchemaOnly:input_type -> api.v2.HealthRequest
+	11, // 54: api.v2.V2.CreatePartnerAccount:input_type -> api.v2.CreateAccountRequest
+	13, // 55: api.v2.V2.CreateEnv:input_type -> api.v2.CreateEnvRequest
+	17, // 56: api.v2.V2.FetchPartnerAccounts:input_type -> api.v2.FetchAccountsRequest
+	5,  // 57: api.v2.V2.FetchAccount:input_type -> api.v2.FetchAccountRequest
+	25, // 58: api.v2.V2.FetchAccountEnvs:input_type -> api.v2.FetchAccountEnvsRequest
+	22, // 59: api.v2.V2.FetchAccountEventKeys:input_type -> api.v2.FetchAccountEventKeysRequest
+	27, // 60: api.v2.V2.FetchAccountSigningKeys:input_type -> api.v2.FetchAccountSigningKeysRequest
+	30, // 61: api.v2.V2.CreateWebhook:input_type -> api.v2.CreateWebhookRequest
+	33, // 62: api.v2.V2.ListWebhooks:input_type -> api.v2.ListWebhooksRequest
+	36, // 63: api.v2.V2.PatchEnv:input_type -> api.v2.PatchEnvRequest
+	38, // 64: api.v2.V2.ListRuns:input_type -> api.v2.ListRunsRequest
+	6,  // 65: api.v2.V2.Health:output_type -> api.v2.HealthResponse
+	9,  // 66: api.v2.V2._SchemaOnly:output_type -> api.v2.ErrorResponse
+	12, // 67: api.v2.V2.CreatePartnerAccount:output_type -> api.v2.CreateAccountResponse
+	14, // 68: api.v2.V2.CreateEnv:output_type -> api.v2.CreateEnvResponse
+	18, // 69: api.v2.V2.FetchPartnerAccounts:output_type -> api.v2.FetchAccountsResponse
+	19, // 70: api.v2.V2.FetchAccount:output_type -> api.v2.FetchAccountResponse
+	26, // 71: api.v2.V2.FetchAccountEnvs:output_type -> api.v2.FetchAccountEnvsResponse
+	23, // 72: api.v2.V2.FetchAccountEventKeys:output_type -> api.v2.FetchAccountEventKeysResponse
+	28, // 73: api.v2.V2.FetchAccountSigningKeys:output_type -> api.v2.FetchAccountSigningKeysResponse
+	31, // 74: api.v2.V2.CreateWebhook:output_type -> api.v2.CreateWebhookResponse
+	34, // 75: api.v2.V2.ListWebhooks:output_type -> api.v2.ListWebhooksResponse
+	37, // 76: api.v2.V2.PatchEnv:output_type -> api.v2.PatchEnvsResponse
+	39, // 77: api.v2.V2.ListRuns:output_type -> api.v2.ListRunsResponse
+	65, // [65:78] is the sub-list for method output_type
+	52, // [52:65] is the sub-list for method input_type
+	52, // [52:52] is the sub-list for extension type_name
+	52, // [52:52] is the sub-list for extension extendee
+	0,  // [0:52] is the sub-list for field type_name
 }
 
 func init() { file_api_v2_service_proto_init() }
@@ -2641,13 +3071,15 @@ func file_api_v2_service_proto_init() {
 	file_api_v2_service_proto_msgTypes[29].OneofWrappers = []any{}
 	file_api_v2_service_proto_msgTypes[31].OneofWrappers = []any{}
 	file_api_v2_service_proto_msgTypes[32].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[34].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[36].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_api_v2_service_proto_rawDesc), len(file_api_v2_service_proto_rawDesc)),
-			NumEnums:      2,
-			NumMessages:   34,
+			NumEnums:      4,
+			NumMessages:   37,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
