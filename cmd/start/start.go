@@ -97,9 +97,14 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		os.Exit(1)
 	}
 
-	// Validate PostgreSQL connection pool settings
-	postgresMaxIdleConns := cmd.Int("postgres-max-idle-conns")
-	postgresMaxOpenConns := cmd.Int("postgres-max-open-conns")
+	// Validate PostgreSQL connection pool settings.
+	// Use localconfig.GetIntValue to respect the config priority chain:
+	// CLI flag > environment variable (INNGEST_*) > config file > default.
+	// Previously, cmd.Int() was used directly, which ignored env vars and
+	// config file values — a problem for Docker/Kubernetes deployments where
+	// configuration is typically passed via environment variables.
+	postgresMaxIdleConns := localconfig.GetIntValue(cmd, "postgres-max-idle-conns", 10)
+	postgresMaxOpenConns := localconfig.GetIntValue(cmd, "postgres-max-open-conns", 100)
 	if postgresMaxOpenConns <= 1 {
 		fmt.Printf("Error: postgres-max-open-conns (%d) must be greater than 1\n", postgresMaxOpenConns)
 		os.Exit(1)
@@ -130,8 +135,8 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		NoUI:                    localconfig.GetBoolValue(cmd, "no-ui", false),
 		Persist:                 true,
 		PollInterval:            localconfig.GetIntValue(cmd, "poll-interval", devserver.DefaultPollInterval),
-		PostgresConnMaxIdleTime: cmd.Int("postgres-conn-max-idle-time"),
-		PostgresConnMaxLifetime: cmd.Int("postgres-conn-max-lifetime"),
+		PostgresConnMaxIdleTime: localconfig.GetIntValue(cmd, "postgres-conn-max-idle-time", 5),
+		PostgresConnMaxLifetime: localconfig.GetIntValue(cmd, "postgres-conn-max-lifetime", 30),
 		PostgresMaxIdleConns:    postgresMaxIdleConns,
 		PostgresMaxOpenConns:    postgresMaxOpenConns,
 		PostgresURI:             postgresURI,
