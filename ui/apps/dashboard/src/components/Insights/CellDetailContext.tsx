@@ -9,7 +9,6 @@ import {
 export interface CellDetailData {
   rowIndex: number;
   columnId: string;
-  columnName: string;
   columnType: string;
   value: string | number | Date | null;
 }

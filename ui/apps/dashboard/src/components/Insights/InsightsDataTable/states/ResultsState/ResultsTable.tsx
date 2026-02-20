@@ -54,7 +54,6 @@ export function ResultsTable() {
       openCellDetail({
         rowIndex,
         columnId,
-        columnName: columnId,
         columnType: col?.type ?? 'string',
         value: value as string | number | Date | null,
       });
