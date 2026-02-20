@@ -95,7 +95,9 @@ func (q *queueProcessor) tryClaimShardLease(ctx context.Context, shards []QueueS
 			l.Debug("no executor capacity requested, skipping shard lease", "shard", shard.Name())
 			continue
 		}
-		leaseID, err := shard.ShardLease(ctx, shard.Name()+"-"+q.ShardLeaseKeySuffix, ShardLeaseDuration, maxExecutors, nil)
+		leaseID, err := Duration(ctx, shard.Name(), "shard_lease", q.Clock().Now(), func(ctx context.Context) (*ulid.ULID, error) {
+			return shard.ShardLease(ctx, shard.Name()+"-"+q.ShardLeaseKeySuffix, ShardLeaseDuration, maxExecutors, nil)
+		})
 
 		if err == ErrAllShardsAlreadyLeased {
 			l.Warn("Could not get a shard lease", "shard", shard.Name())
