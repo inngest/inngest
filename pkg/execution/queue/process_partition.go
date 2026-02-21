@@ -174,7 +174,7 @@ func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition
 		},
 	})
 
-	if rand.Float64() < 0.05 {
+	if len(queue) > 0 && rand.Float64() < 0.05 {
 		// Group items by backlogs
 		backlogs := make(map[string][]*QueueItem)
 
@@ -183,37 +183,46 @@ func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition
 			successiveBacklogCount int
 		)
 
-		start := time.Now()
+		start := q.Clock().Now()
 		for _, qi := range queue {
 			b := ItemBacklog(ctx, *qi)
 
 			// Append to grouped items
 			backlogs[b.BacklogID] = append(backlogs[b.BacklogID], qi)
 
-			// If backlog is different than previous item, reset counter
+			// If backlog is different than previous item, emit and reset counter
 			if b.BacklogID != lastBacklogID {
-				successiveBacklogCount = 0
-				lastBacklogID = b.BacklogID
-
 				if successiveBacklogCount > 0 {
 					metrics.HistogramQueueSuccessivePeekedItems(ctx, int64(successiveBacklogCount), metrics.HistogramOpt{
 						PkgName: pkgName,
 						Tags: map[string]any{
-							"queue_shard": q.Shard().Name(),
+							"queue_shard": q.primaryQueueShard.Name(),
 						},
 					})
 				}
+				successiveBacklogCount = 0
+				lastBacklogID = b.BacklogID
 				continue
 			}
 
 			successiveBacklogCount++
 		}
 
+		// Emit the final successive run
+		if successiveBacklogCount > 0 {
+			metrics.HistogramQueueSuccessivePeekedItems(ctx, int64(successiveBacklogCount), metrics.HistogramOpt{
+				PkgName: pkgName,
+				Tags: map[string]any{
+					"queue_shard": q.primaryQueueShard.Name(),
+				},
+			})
+		}
+
 		// Measure time it took to group by backlog
-		metrics.HistogramQueueBacklogGroupingDuration(ctx, time.Since(start).Milliseconds(), metrics.HistogramOpt{
+		metrics.HistogramQueueBacklogGroupingDuration(ctx, q.Clock().Since(start).Milliseconds(), metrics.HistogramOpt{
 			PkgName: pkgName,
 			Tags: map[string]any{
-				"queue_shard": q.Shard().Name(),
+				"queue_shard": q.primaryQueueShard.Name(),
 			},
 		})
 
@@ -221,7 +230,7 @@ func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition
 		metrics.HistogramQueueRatioBacklogsToPeekedItems(ctx, int64(ratioBacklogsToPeeked), metrics.HistogramOpt{
 			PkgName: pkgName,
 			Tags: map[string]any{
-				"queue_shard": q.Shard().Name(),
+				"queue_shard": q.primaryQueueShard.Name(),
 			},
 		})
 	}

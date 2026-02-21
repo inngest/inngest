@@ -574,18 +574,6 @@ func HistogramQueueRatioBacklogsToPeekedItems(ctx context.Context, count int64, 
 	})
 }
 
-func HistogramQueueRatioTopBacklogItemsToPeekedItems(ctx context.Context, count int64, opts HistogramOpt) {
-	RecordIntHistogramMetric(ctx, count, HistogramOpt{
-		PkgName:     opts.PkgName,
-		MetricName:  "queue_ratio_top_backlogs_to_peeked_items",
-		Description: "Distribution of ratio of top backlog size to peeked items",
-		Tags:        opts.Tags,
-		Boundaries: []float64{
-			1, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100,
-		},
-	})
-}
-
 func HistogramQueueBacklogGroupingDuration(ctx context.Context, dur int64, opts HistogramOpt) {
 	RecordIntHistogramMetric(ctx, dur, HistogramOpt{
 		PkgName:     opts.PkgName,
