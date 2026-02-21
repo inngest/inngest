@@ -447,6 +447,41 @@ func (r *GetSpanOutputRow) ToSQLite() (*sqlc.GetSpanOutputRow, error) {
 	}, nil
 }
 
+// rawJSONToNullRawMessage converts a value that is already a JSON-encoded
+// string into a pqtype.NullRawMessage without re-marshalling. This prevents
+// double-encoding when storing pre-serialized JSON in PostgreSQL JSONB columns.
+//
+// Use this for fields like span attributes, links, and event_ids that are
+// already marshalled to JSON strings before reaching the normalization layer.
+// Using toNullRawMessage on these would call json.Marshal on the string,
+// producing a JSONB string type (jsonb_typeof = 'string') instead of the
+// intended JSONB object/array.
+func rawJSONToNullRawMessage(v interface{}) pqtype.NullRawMessage {
+	switch val := v.(type) {
+	case string:
+		if val == "" {
+			return pqtype.NullRawMessage{Valid: false}
+		}
+		return pqtype.NullRawMessage{
+			RawMessage: json.RawMessage(val),
+			Valid:      true,
+		}
+	case json.RawMessage:
+		if len(val) == 0 {
+			return pqtype.NullRawMessage{Valid: false}
+		}
+		return pqtype.NullRawMessage{
+			RawMessage: val,
+			Valid:      true,
+		}
+	case nil:
+		return pqtype.NullRawMessage{Valid: false}
+	default:
+		// Unexpected type; fall back to marshalling.
+		return toNullRawMessage(v)
+	}
+}
+
 func toNullRawMessage(v interface{}) pqtype.NullRawMessage {
 	data, err := json.Marshal(v)
 	if err != nil {

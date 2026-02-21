@@ -856,14 +856,17 @@ func (q NormalizedQueries) GetSpanOutput(ctx context.Context, spanIds []string) 
 
 func (q NormalizedQueries) InsertSpan(ctx context.Context, arg sqlc_sqlite.InsertSpanParams) error {
 	pgArg := InsertSpanParams{
-		AccountID:      arg.AccountID,
-		AppID:          arg.AppID,
-		Attributes:     toNullRawMessage(arg.Attributes),
+		AccountID:  arg.AccountID,
+		AppID:      arg.AppID,
+		// Attributes and Links are already JSON-encoded strings from
+		// tracer_sqlc.go. Use rawJSONToNullRawMessage to avoid
+		// double-encoding them into JSONB string types.
+		Attributes:     rawJSONToNullRawMessage(arg.Attributes),
 		DynamicSpanID:  arg.DynamicSpanID,
 		EndTime:        arg.EndTime,
 		EnvID:          arg.EnvID,
 		FunctionID:     arg.FunctionID,
-		Links:          toNullRawMessage(arg.Links),
+		Links:          rawJSONToNullRawMessage(arg.Links),
 		Name:           arg.Name,
 		Output:         toNullRawMessage(arg.Output),
 		ParentSpanID:   arg.ParentSpanID,
@@ -875,7 +878,7 @@ func (q NormalizedQueries) InsertSpan(ctx context.Context, arg sqlc_sqlite.Inser
 		DebugRunID:     arg.DebugRunID,
 		DebugSessionID: arg.DebugSessionID,
 		Status:         arg.Status,
-		EventIds:       toNullRawMessage(arg.EventIds),
+		EventIds:       rawJSONToNullRawMessage(arg.EventIds),
 	}
 
 	return q.db.InsertSpan(ctx, pgArg)
