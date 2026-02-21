@@ -20,7 +20,7 @@ import (
 var globalFlags = []cli.Flag{
 	&cli.BoolFlag{
 		Name:  "json",
-		Usage: "Output logs as JSON.  Set to true if stdout is not a TTY.",
+		Usage: "Output logs as JSON. Auto-enabled when stdout is not a TTY. Use --json=false to force human-readable output in non-TTY environments.",
 	},
 	&cli.BoolFlag{
 		Name:  "verbose",
@@ -45,9 +45,18 @@ func execute() {
 		)),
 		Version: inngestversion.Print(),
 		Before: func(ctx context.Context, cmd *cli.Command) (context.Context, error) {
-			// Set LOG_HANDLER environment variable based on --json flag
-			// This ensures the logger respects the JSON output setting
-			if cmd.Bool("json") {
+			// Determine JSON output mode.
+			// If --json is explicitly set, respect the user's choice unconditionally.
+			// This allows --json=false to force human-readable output even when
+			// stdout is not a TTY (e.g. when running under turbo, Docker, or piped).
+			if cmd.IsSet("json") {
+				if cmd.Bool("json") {
+					os.Setenv("LOG_HANDLER", "json")
+				}
+				// --json=false: explicitly requested human-readable output;
+				// do not override with auto-detection below.
+			} else if !isatty.IsTerminal(os.Stdout.Fd()) {
+				// Auto-detect: default to JSON when stdout is not a TTY.
 				os.Setenv("LOG_HANDLER", "json")
 			}
 
@@ -80,11 +89,6 @@ func execute() {
 			start.Command(),
 			debug.Command(),
 		},
-	}
-
-	if !isatty.IsTerminal(os.Stdout.Fd()) {
-		// Always use JSON when not in a terminal
-		os.Setenv("LOG_HANDLER", "json")
 	}
 
 	if err := app.Run(context.Background(), os.Args); err != nil {
