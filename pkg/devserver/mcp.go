@@ -251,18 +251,18 @@ func (h *MCPHandler) createMCPServer() *mcp.Server {
 
 // SendEventArgs represents the arguments for sending an event
 type SendEventArgs struct {
-	Name        string `json:"name"`
-	Data        any    `json:"data,omitempty" jsonschema:"true"`
-	User        any    `json:"user,omitempty" jsonschema:"true"`
-	EventIDSeed string `json:"eventIdSeed,omitempty"`
+	Name        string         `json:"name"`
+	Data        map[string]any `json:"data,omitempty"`
+	User        map[string]any `json:"user,omitempty"`
+	EventIDSeed string         `json:"eventIdSeed,omitempty"`
 }
 
 // InvokeFunctionArgs represents the arguments for invoking a function
 type InvokeFunctionArgs struct {
-	FunctionID string `json:"functionId"`
-	Data       any    `json:"data,omitempty" jsonschema:"true"`
-	User       any    `json:"user,omitempty" jsonschema:"true"`
-	Timeout    int    `json:"timeout,omitempty"`
+	FunctionID string         `json:"functionId"`
+	Data       map[string]any `json:"data,omitempty"`
+	User       map[string]any `json:"user,omitempty"`
+	Timeout    int            `json:"timeout,omitempty"`
 }
 
 // SendEventResult represents the result of sending an event
