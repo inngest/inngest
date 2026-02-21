@@ -223,3 +223,5 @@ CREATE TABLE spans (
 
 CREATE INDEX idx_spans_run_id ON spans(run_id); -- mainly for debugging
 CREATE INDEX idx_spans_run_id_dynamic_start_time ON spans(run_id, dynamic_span_id, start_time);
+CREATE INDEX idx_spans_name_dynamic_span_id ON spans(name, dynamic_span_id);
+CREATE INDEX idx_spans_debug_run_id_start_time ON spans(debug_run_id, start_time);
