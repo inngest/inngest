@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import AdmZip from "adm-zip";
 import Debug from "debug";
+import { HttpsProxyAgent } from "https-proxy-agent";
 import fetch, { Response } from "node-fetch";
 import path from "path";
 import * as tar from "tar";
@@ -122,8 +123,23 @@ function downloadBinary(
   return new Promise(async (resolve, reject) => {
     debug("downloading binary from:", url.href);
 
+    // Respect standard proxy environment variables so that the binary can be
+    // downloaded in corporate networks, CI systems, and sandboxed environments
+    // (e.g. OpenAI Codex) that require outbound traffic to go through a proxy.
+    const proxyUrl =
+      process.env.HTTPS_PROXY ||
+      process.env.https_proxy ||
+      process.env.HTTP_PROXY ||
+      process.env.http_proxy;
+
+    const agent = proxyUrl ? new HttpsProxyAgent(proxyUrl) : undefined;
+    if (proxyUrl) {
+      debug("using proxy:", proxyUrl);
+    }
+
     fetch(url.href, {
       redirect: "follow",
+      agent,
     })
       .then((res) => {
         if (res.status !== 200) {
