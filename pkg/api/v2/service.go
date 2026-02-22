@@ -30,14 +30,20 @@ type Service struct {
 // ServiceOptions contains configuration for the V2 service
 type ServiceOptions struct {
 	SigningKeysProvider SigningKeysProvider
-	EventKeysProvider   EventKeysProvider
+	EventKeysProvider  EventKeysProvider
+	Functions          FunctionProvider
+	Executor           FunctionScheduler
+	EventPublisher     EventPublisher
 }
 
 func NewService(opts ServiceOptions) *Service {
 	return &Service{
-		signingKeys: opts.SigningKeysProvider,
-		eventKeys:   opts.EventKeysProvider,
-		base:        apiv2base.NewBase(),
+		signingKeys:    opts.SigningKeysProvider,
+		eventKeys:      opts.EventKeysProvider,
+		functions:      opts.Functions,
+		executor:       opts.Executor,
+		eventPublisher: opts.EventPublisher,
+		base:           apiv2base.NewBase(),
 	}
 }
 
