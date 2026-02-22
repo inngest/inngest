@@ -828,6 +828,7 @@ const (
 	FunctionRunStatusCancelled FunctionRunStatus = "CANCELLED"
 	FunctionRunStatusRunning   FunctionRunStatus = "RUNNING"
 	FunctionRunStatusQueued    FunctionRunStatus = "QUEUED"
+	FunctionRunStatusSkipped   FunctionRunStatus = "SKIPPED"
 )
 
 var AllFunctionRunStatus = []FunctionRunStatus{
@@ -836,11 +837,12 @@ var AllFunctionRunStatus = []FunctionRunStatus{
 	FunctionRunStatusCancelled,
 	FunctionRunStatusRunning,
 	FunctionRunStatusQueued,
+	FunctionRunStatusSkipped,
 }
 
 func (e FunctionRunStatus) IsValid() bool {
 	switch e {
-	case FunctionRunStatusCompleted, FunctionRunStatusFailed, FunctionRunStatusCancelled, FunctionRunStatusRunning, FunctionRunStatusQueued:
+	case FunctionRunStatusCompleted, FunctionRunStatusFailed, FunctionRunStatusCancelled, FunctionRunStatusRunning, FunctionRunStatusQueued, FunctionRunStatusSkipped:
 		return true
 	}
 	return false
@@ -962,6 +964,7 @@ const (
 	RunTraceSpanStatusCompleted RunTraceSpanStatus = "COMPLETED"
 	RunTraceSpanStatusWaiting   RunTraceSpanStatus = "WAITING"
 	RunTraceSpanStatusCancelled RunTraceSpanStatus = "CANCELLED"
+	RunTraceSpanStatusSkipped   RunTraceSpanStatus = "SKIPPED"
 )
 
 var AllRunTraceSpanStatus = []RunTraceSpanStatus{
@@ -971,11 +974,12 @@ var AllRunTraceSpanStatus = []RunTraceSpanStatus{
 	RunTraceSpanStatusCompleted,
 	RunTraceSpanStatusWaiting,
 	RunTraceSpanStatusCancelled,
+	RunTraceSpanStatusSkipped,
 }
 
 func (e RunTraceSpanStatus) IsValid() bool {
 	switch e {
-	case RunTraceSpanStatusFailed, RunTraceSpanStatusQueued, RunTraceSpanStatusRunning, RunTraceSpanStatusCompleted, RunTraceSpanStatusWaiting, RunTraceSpanStatusCancelled:
+	case RunTraceSpanStatusFailed, RunTraceSpanStatusQueued, RunTraceSpanStatusRunning, RunTraceSpanStatusCompleted, RunTraceSpanStatusWaiting, RunTraceSpanStatusCancelled, RunTraceSpanStatusSkipped:
 		return true
 	}
 	return false

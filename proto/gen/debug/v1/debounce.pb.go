@@ -427,6 +427,98 @@ func (x *RunDebounceResponse) GetEventId() string {
 	return ""
 }
 
+// DeleteDebounceByIDRequest is used to delete debounces directly by their IDs.
+type DeleteDebounceByIDRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// debounce_ids are the ULIDs of the debounces to delete. Max 20.
+	DebounceIds   []string `protobuf:"bytes,1,rep,name=debounce_ids,json=debounceIds,proto3" json:"debounce_ids,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteDebounceByIDRequest) Reset() {
+	*x = DeleteDebounceByIDRequest{}
+	mi := &file_debug_v1_debounce_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteDebounceByIDRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteDebounceByIDRequest) ProtoMessage() {}
+
+func (x *DeleteDebounceByIDRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_debug_v1_debounce_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteDebounceByIDRequest.ProtoReflect.Descriptor instead.
+func (*DeleteDebounceByIDRequest) Descriptor() ([]byte, []int) {
+	return file_debug_v1_debounce_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *DeleteDebounceByIDRequest) GetDebounceIds() []string {
+	if x != nil {
+		return x.DebounceIds
+	}
+	return nil
+}
+
+// DeleteDebounceByIDResponse contains information about the deleted debounces.
+type DeleteDebounceByIDResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// deleted_ids are the debounce IDs that were processed.
+	DeletedIds    []string `protobuf:"bytes,1,rep,name=deleted_ids,json=deletedIds,proto3" json:"deleted_ids,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteDebounceByIDResponse) Reset() {
+	*x = DeleteDebounceByIDResponse{}
+	mi := &file_debug_v1_debounce_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteDebounceByIDResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteDebounceByIDResponse) ProtoMessage() {}
+
+func (x *DeleteDebounceByIDResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_debug_v1_debounce_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteDebounceByIDResponse.ProtoReflect.Descriptor instead.
+func (*DeleteDebounceByIDResponse) Descriptor() ([]byte, []int) {
+	return file_debug_v1_debounce_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *DeleteDebounceByIDResponse) GetDeletedIds() []string {
+	if x != nil {
+		return x.DeletedIds
+	}
+	return nil
+}
+
 var File_debug_v1_debounce_proto protoreflect.FileDescriptor
 
 const file_debug_v1_debounce_proto_rawDesc = "" +
@@ -466,7 +558,12 @@ const file_debug_v1_debounce_proto_rawDesc = "" +
 	"\tscheduled\x18\x01 \x01(\bR\tscheduled\x12\x1f\n" +
 	"\vdebounce_id\x18\x02 \x01(\tR\n" +
 	"debounceId\x12\x19\n" +
-	"\bevent_id\x18\x03 \x01(\tR\aeventIdB5Z3github.com/inngest/inngest/proto/gen/debug/v1;debugb\x06proto3"
+	"\bevent_id\x18\x03 \x01(\tR\aeventId\">\n" +
+	"\x19DeleteDebounceByIDRequest\x12!\n" +
+	"\fdebounce_ids\x18\x01 \x03(\tR\vdebounceIds\"=\n" +
+	"\x1aDeleteDebounceByIDResponse\x12\x1f\n" +
+	"\vdeleted_ids\x18\x01 \x03(\tR\n" +
+	"deletedIdsB5Z3github.com/inngest/inngest/proto/gen/debug/v1;debugb\x06proto3"
 
 var (
 	file_debug_v1_debounce_proto_rawDescOnce sync.Once
@@ -480,14 +577,16 @@ func file_debug_v1_debounce_proto_rawDescGZIP() []byte {
 	return file_debug_v1_debounce_proto_rawDescData
 }
 
-var file_debug_v1_debounce_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_debug_v1_debounce_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_debug_v1_debounce_proto_goTypes = []any{
-	(*DebounceInfoRequest)(nil),    // 0: debug.v1.DebounceInfoRequest
-	(*DebounceInfoResponse)(nil),   // 1: debug.v1.DebounceInfoResponse
-	(*DeleteDebounceRequest)(nil),  // 2: debug.v1.DeleteDebounceRequest
-	(*DeleteDebounceResponse)(nil), // 3: debug.v1.DeleteDebounceResponse
-	(*RunDebounceRequest)(nil),     // 4: debug.v1.RunDebounceRequest
-	(*RunDebounceResponse)(nil),    // 5: debug.v1.RunDebounceResponse
+	(*DebounceInfoRequest)(nil),        // 0: debug.v1.DebounceInfoRequest
+	(*DebounceInfoResponse)(nil),       // 1: debug.v1.DebounceInfoResponse
+	(*DeleteDebounceRequest)(nil),      // 2: debug.v1.DeleteDebounceRequest
+	(*DeleteDebounceResponse)(nil),     // 3: debug.v1.DeleteDebounceResponse
+	(*RunDebounceRequest)(nil),         // 4: debug.v1.RunDebounceRequest
+	(*RunDebounceResponse)(nil),        // 5: debug.v1.RunDebounceResponse
+	(*DeleteDebounceByIDRequest)(nil),  // 6: debug.v1.DeleteDebounceByIDRequest
+	(*DeleteDebounceByIDResponse)(nil), // 7: debug.v1.DeleteDebounceByIDResponse
 }
 var file_debug_v1_debounce_proto_depIdxs = []int32{
 	0, // [0:0] is the sub-list for method output_type
@@ -508,7 +607,7 @@ func file_debug_v1_debounce_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_debug_v1_debounce_proto_rawDesc), len(file_debug_v1_debounce_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   6,
+			NumMessages:   8,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

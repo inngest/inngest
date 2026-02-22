@@ -789,7 +789,7 @@ func IncrAsyncCancellationCheckCounter(ctx context.Context, count int64, opts Co
 	})
 }
 
-func IncrScheduleConstraintsCheckFallbackCounter(ctx context.Context, reason string, opts CounterOpt) {
+func IncrScheduleConstraintsCheckCounter(ctx context.Context, reason string, opts CounterOpt) {
 	if opts.Tags == nil {
 		opts.Tags = map[string]any{}
 	}
@@ -797,8 +797,8 @@ func IncrScheduleConstraintsCheckFallbackCounter(ctx context.Context, reason str
 
 	RecordCounterMetric(ctx, 1, CounterOpt{
 		PkgName:     opts.PkgName,
-		MetricName:  "schedule_constraints_check_fallback_total",
-		Description: "Total number of schedule constraint check fallbacks with reason",
+		MetricName:  "schedule_constraints_check_total",
+		Description: "Total number of schedule constraint check attempts with reason",
 		Tags:        opts.Tags,
 	})
 }
@@ -817,7 +817,7 @@ func IncrScheduleConstraintsHitCounter(ctx context.Context, reason string, opts 
 	})
 }
 
-func IncrQueueItemConstraintCheckFallbackCounter(ctx context.Context, reason string, opts CounterOpt) {
+func IncrQueueItemConstraintCheckCounter(ctx context.Context, reason string, opts CounterOpt) {
 	if opts.Tags == nil {
 		opts.Tags = map[string]any{}
 	}
@@ -849,7 +849,7 @@ func IncrPausesOrphanedIndexCleanupCounter(ctx context.Context, opts CounterOpt)
 	})
 }
 
-func IncrBacklogRefillConstraintCheckFallbackCounter(ctx context.Context, reason string, opts CounterOpt) {
+func IncrBacklogRefillConstraintCheckCounter(ctx context.Context, reason string, opts CounterOpt) {
 	if opts.Tags == nil {
 		opts.Tags = map[string]any{}
 	}
@@ -857,8 +857,8 @@ func IncrBacklogRefillConstraintCheckFallbackCounter(ctx context.Context, reason
 
 	RecordCounterMetric(ctx, 1, CounterOpt{
 		PkgName:     opts.PkgName,
-		MetricName:  "backlog_refill_constraint_check_fallback_total",
-		Description: "Total number of backlog refill constraint check fallbacks with reason",
+		MetricName:  "backlog_refill_constraint_check_total",
+		Description: "Total number of backlog refill constraint checks with reason",
 		Tags:        opts.Tags,
 	})
 }
@@ -895,6 +895,15 @@ func IncrConstraintAPIExhaustedConstraintsCounter(ctx context.Context, opts Coun
 		PkgName:     opts.PkgName,
 		MetricName:  "constraintapi_exhausted_constraints_total",
 		Description: "Total number of times constraints exhausted capacity acquisition",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrShardLeaseContentionCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "shard_lease_contention_total",
+		Description: "The total number of times contention occurred for shard leasing",
 		Tags:        opts.Tags,
 	})
 }

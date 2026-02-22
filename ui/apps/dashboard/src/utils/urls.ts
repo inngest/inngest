@@ -1,5 +1,3 @@
-import type { FileRouteTypes } from '@/routeTree.gen';
-
 export const WEBSITE_PRICING_URL = 'https://www.inngest.com/pricing';
 export const WEBSITE_CONTACT_URL = 'https://www.inngest.com/contact';
 export const DISCORD_URL = 'https://www.inngest.com/discord';
@@ -37,19 +35,11 @@ export function getManageKey(pathname: string) {
 }
 
 export const pathCreator = {
-  apps({ envSlug }: { envSlug: string }): FileRouteTypes['to'] {
-    return `/env/${envSlug}/apps` as FileRouteTypes['to'];
+  apps({ envSlug }: { envSlug: string }) {
+    return `/env/${envSlug}/apps`;
   },
-  app({
-    envSlug,
-    externalAppID,
-  }: {
-    envSlug: string;
-    externalAppID: string;
-  }): FileRouteTypes['to'] {
-    return `/env/${envSlug}/apps/${encodeURIComponent(
-      externalAppID,
-    )}` as FileRouteTypes['to'];
+  app({ envSlug, externalAppID }: { envSlug: string; externalAppID: string }) {
+    return `/env/${envSlug}/apps/${encodeURIComponent(externalAppID)}`;
   },
   appSyncs({
     envSlug,
@@ -57,10 +47,8 @@ export const pathCreator = {
   }: {
     envSlug: string;
     externalAppID: string;
-  }): FileRouteTypes['to'] {
-    return `/env/${envSlug}/apps/${encodeURIComponent(
-      externalAppID,
-    )}/syncs` as FileRouteTypes['to'];
+  }) {
+    return `/env/${envSlug}/apps/${encodeURIComponent(externalAppID)}/syncs`;
   },
   billing({
     ref,
@@ -70,7 +58,7 @@ export const pathCreator = {
     ref?: string;
     tab?: string;
     highlight?: string;
-  } = {}): FileRouteTypes['to'] {
+  } = {}) {
     let path = '/billing';
     if (tab) {
       path += `/${tab}`;
@@ -87,7 +75,7 @@ export const pathCreator = {
       path += `?${query.toString()}`;
     }
 
-    return path as FileRouteTypes['to'];
+    return path;
   },
   billingUsage({
     dimension,
@@ -95,7 +83,7 @@ export const pathCreator = {
   }: {
     dimension?: string;
     previous?: boolean;
-  } = {}): FileRouteTypes['to'] {
+  } = {}) {
     let path = '/billing/usage';
     const query = new URLSearchParams();
     if (dimension) {
@@ -107,33 +95,19 @@ export const pathCreator = {
     if (query.toString()) {
       path += `?${query.toString()}`;
     }
-    return path as FileRouteTypes['to'];
+    return path;
   },
-  createApp({ envSlug }: { envSlug: string }): FileRouteTypes['to'] {
-    return `/env/${envSlug}/apps/sync-new` as FileRouteTypes['to'];
+  createApp({ envSlug }: { envSlug: string }) {
+    return `/env/${envSlug}/apps/sync-new`;
   },
-  eventPopout({
-    envSlug,
-    eventID,
-  }: {
-    envSlug: string;
-    eventID: string;
-  }): FileRouteTypes['to'] {
-    return `/env/${envSlug}/events/${eventID}` as FileRouteTypes['to'];
+  eventPopout({ envSlug, eventID }: { envSlug: string; eventID: string }) {
+    return `/env/${envSlug}/events/${eventID}`;
   },
-  eventType({
-    envSlug,
-    eventName,
-  }: {
-    envSlug: string;
-    eventName: string;
-  }): FileRouteTypes['to'] {
-    return `/env/${envSlug}/event-types/${encodeURIComponent(
-      eventName,
-    )}` as FileRouteTypes['to'];
+  eventType({ envSlug, eventName }: { envSlug: string; eventName: string }) {
+    return `/env/${envSlug}/event-types/${encodeURIComponent(eventName)}`;
   },
-  eventTypes({ envSlug }: { envSlug: string }): FileRouteTypes['to'] {
-    return `/env/${envSlug}/event-types` as FileRouteTypes['to'];
+  eventTypes({ envSlug }: { envSlug: string }) {
+    return `/env/${envSlug}/event-types`;
   },
   eventTypeEvents({
     envSlug,
@@ -141,16 +115,16 @@ export const pathCreator = {
   }: {
     envSlug: string;
     eventName: string;
-  }): FileRouteTypes['to'] {
+  }) {
     return `/env/${envSlug}/event-types/${encodeURIComponent(
       eventName,
-    )}/events` as FileRouteTypes['to'];
+    )}/events`;
   },
-  envs(): FileRouteTypes['to'] {
-    return '/env' as FileRouteTypes['to'];
+  envs() {
+    return '/env';
   },
-  functions({ envSlug }: { envSlug: string }): FileRouteTypes['to'] {
-    return `/env/${envSlug}/functions` as FileRouteTypes['to'];
+  functions({ envSlug }: { envSlug: string }) {
+    return `/env/${envSlug}/functions`;
   },
   function({
     envSlug,
@@ -158,10 +132,8 @@ export const pathCreator = {
   }: {
     envSlug: string;
     functionSlug: string;
-  }): FileRouteTypes['to'] {
-    return `/env/${envSlug}/functions/${encodeURIComponent(
-      functionSlug,
-    )}` as FileRouteTypes['to'];
+  }) {
+    return `/env/${envSlug}/functions/${encodeURIComponent(functionSlug)}`;
   },
   functionReplays({
     envSlug,
@@ -169,10 +141,10 @@ export const pathCreator = {
   }: {
     envSlug: string;
     functionSlug: string;
-  }): FileRouteTypes['to'] {
+  }) {
     return `/env/${envSlug}/functions/${encodeURIComponent(
       functionSlug,
-    )}/replays` as FileRouteTypes['to'];
+    )}/replays`;
   },
   functionReplay({
     envSlug,
@@ -182,10 +154,10 @@ export const pathCreator = {
     envSlug: string;
     functionSlug: string;
     replayID: string;
-  }): FileRouteTypes['to'] {
+  }) {
     return `/env/${envSlug}/functions/${encodeURIComponent(
       functionSlug,
-    )}/replays/${replayID}` as FileRouteTypes['to'];
+    )}/replays/${replayID}`;
   },
   functionCancellations({
     envSlug,
@@ -193,27 +165,19 @@ export const pathCreator = {
   }: {
     envSlug: string;
     functionSlug: string;
-  }): FileRouteTypes['to'] {
+  }) {
     return `/env/${envSlug}/functions/${encodeURIComponent(
       functionSlug,
-    )}/cancellations` as FileRouteTypes['to'];
+    )}/cancellations`;
   },
-  insights({
-    envSlug,
-    ref,
-  }: {
-    envSlug: string;
-    ref?: string;
-  }): FileRouteTypes['to'] {
-    return `/env/${envSlug}/insights${
-      ref ? `?ref=${ref}` : ''
-    }` as FileRouteTypes['to'];
+  insights({ envSlug, ref }: { envSlug: string; ref?: string }) {
+    return `/env/${envSlug}/insights${ref ? `?ref=${ref}` : ''}`;
   },
-  integrations(): FileRouteTypes['to'] {
-    return `/settings/integrations` as FileRouteTypes['to'];
+  integrations() {
+    return `/settings/integrations`;
   },
-  keys({ envSlug }: { envSlug: string }): FileRouteTypes['to'] {
-    return `/env/${envSlug}/manage/keys` as FileRouteTypes['to'];
+  keys({ envSlug }: { envSlug: string }) {
+    return `/env/${envSlug}/manage/keys`;
   },
   pgIntegrationStep({
     integration,
@@ -221,15 +185,11 @@ export const pathCreator = {
   }: {
     integration: string;
     step?: string;
-  }): FileRouteTypes['to'] {
-    return `/settings/integrations/${integration}${
-      step ? `/${step}` : ''
-    }` as FileRouteTypes['to'];
+  }) {
+    return `/settings/integrations/${integration}${step ? `/${step}` : ''}`;
   },
-  onboarding({
-    envSlug = 'production',
-  }: { envSlug?: string } = {}): FileRouteTypes['to'] {
-    return `/env/${envSlug}/onboarding` as FileRouteTypes['to'];
+  onboarding({ envSlug = 'production' }: { envSlug?: string } = {}) {
+    return `/env/${envSlug}/onboarding`;
   },
   onboardingSteps({
     envSlug = 'production',
@@ -239,19 +199,13 @@ export const pathCreator = {
     envSlug?: string;
     step?: string;
     ref?: string;
-  }): FileRouteTypes['to'] {
+  }) {
     return `/env/${envSlug}/onboarding${step ? `/${step}` : ''}${
       ref ? `?ref=${ref}` : ''
-    }` as FileRouteTypes['to'];
+    }`;
   },
-  runPopout({
-    envSlug,
-    runID,
-  }: {
-    envSlug: string;
-    runID: string;
-  }): FileRouteTypes['to'] {
-    return `/env/${envSlug}/runs/${runID}` as FileRouteTypes['to'];
+  runPopout({ envSlug, runID }: { envSlug: string; runID: string }) {
+    return `/env/${envSlug}/runs/${runID}`;
   },
   debugger({
     envSlug,
@@ -261,32 +215,30 @@ export const pathCreator = {
     envSlug: string;
     functionSlug: string;
     runID?: string;
-  }): FileRouteTypes['to'] {
+  }) {
     return `/env/${envSlug}/debugger/${functionSlug}${
       runID ? `?runID=${runID}` : ''
-    }` as FileRouteTypes['to'];
+    }`;
   },
-  runs({ envSlug }: { envSlug: string }): FileRouteTypes['to'] {
-    return `/env/${envSlug}/runs` as FileRouteTypes['to'];
+  runs({ envSlug }: { envSlug: string }) {
+    return `/env/${envSlug}/runs`;
   },
-  signingKeys({ envSlug }: { envSlug: string }): FileRouteTypes['to'] {
-    return `/env/${envSlug}/manage/signing-key` as FileRouteTypes['to'];
+  signingKeys({ envSlug }: { envSlug: string }) {
+    return `/env/${envSlug}/manage/signing-key`;
   },
-  support({ ref }: { ref?: string } = {}): FileRouteTypes['to'] {
-    return `https://support.inngest.com/${
-      ref ? `?ref=${ref}` : ''
-    }` as FileRouteTypes['to'];
+  support({ ref }: { ref?: string } = {}) {
+    return `https://support.inngest.com/${ref ? `?ref=${ref}` : ''}`;
   },
-  unattachedSyncs({ envSlug }: { envSlug: string }): FileRouteTypes['to'] {
-    return `/env/${envSlug}/unattached-syncs` as FileRouteTypes['to'];
+  unattachedSyncs({ envSlug }: { envSlug: string }) {
+    return `/env/${envSlug}/unattached-syncs`;
   },
-  vercel(): FileRouteTypes['to'] {
-    return `/settings/integrations/vercel` as FileRouteTypes['to'];
+  vercel() {
+    return `/settings/integrations/vercel`;
   },
-  vercelSetup(): FileRouteTypes['to'] {
-    return `/settings/integrations/vercel/connect` as FileRouteTypes['to'];
+  vercelSetup() {
+    return `/settings/integrations/vercel/connect`;
   },
-  neon(): FileRouteTypes['to'] {
-    return `/settings/integrations/neon` as FileRouteTypes['to'];
+  neon() {
+    return `/settings/integrations/neon`;
   },
 };

@@ -23,6 +23,10 @@ type AIMetadata struct {
 	Model		string	`json:"model"`
 	System		string	`json:"system"`
 	OperationName	string	`json:"operation_name"`
+
+	LatencyMs	*int64		`json:"latency_ms,omitempty"`
+	TotalTokens	*int64		`json:"total_tokens,omitempty"`
+	EstimatedCost	*float64	`json:"estimated_cost,omitempty"`
 }
 
 // From http.go
@@ -41,4 +45,37 @@ type HTTPMetadata struct {
 	Domain			*string	`json:"domain,omitempty"`
 	Path			*string	`json:"path,omitempty"`
 }
+
+// From httptiming.go
+const (
+	KindInngestHTTPTiming = "inngest.http.timing"
+)
+
+// From httptiming.go
+// HTTPTimingMetadata contains detailed HTTP connection timing phases
+// from httpstat, capturing the duration of each phase in the HTTP
+// request lifecycle.
+//
+type HTTPTimingMetadata struct {
+	// DNSLookupMs is the time spent resolving the domain name.
+	DNSLookupMs	int64	`json:"dns_lookup_ms"`
+	// TCPConnectionMs is the time spent establishing the TCP connection.
+	TCPConnectionMs	int64	`json:"tcp_connection_ms"`
+	// TLSHandshakeMs is the time spent on TLS negotiation.
+	TLSHandshakeMs	int64	`json:"tls_handshake_ms"`
+	// ServerProcessingMs is the time from request sent to first byte received (TTFB).
+	ServerProcessingMs	int64	`json:"server_processing_ms"`
+	// ContentTransferMs is the time spent downloading the response body.
+	ContentTransferMs	int64	`json:"content_transfer_ms"`
+	// TotalMs is the total request duration.
+	TotalMs	int64	`json:"total_ms"`
+}
+
+// From response_headers.go
+const (
+	KindInngestResponseHeaders = "inngest.response_headers"
+)
+
+// From response_headers.go
+type ResponseHeaderMetadata map[string]string
 

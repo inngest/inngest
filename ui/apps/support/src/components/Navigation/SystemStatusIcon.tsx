@@ -1,6 +1,6 @@
 import { cn } from "@inngest/components/utils/classNames";
 
-import type { Status } from "../Support/Status";
+import type { Status } from "@inngest/components/Support/Status";
 
 type SystemStatusIconProps = {
   className?: string;

@@ -11,6 +11,7 @@ import { bindEditorShortcuts } from '../actions/handleShortcuts';
 import { markTemplateVars } from '../actions/markTemplateVars';
 import { getCanRunQuery } from '../utils';
 import { useLatest, useLatestCallback } from './useLatestCallback';
+import { clickhouse, formatDialect } from 'sql-formatter';
 
 type UseInsightsSQLEditorOnMountCallbackReturn = {
   onMount: SQLEditorMountCallback;
@@ -58,6 +59,17 @@ export function useInsightsSQLEditorOnMountCallback(): UseInsightsSQLEditorOnMou
           handler: tabManagerActions.createNewTab,
         },
       ]);
+
+      monaco.languages.registerDocumentFormattingEditProvider('sql', {
+        provideDocumentFormattingEdits: (model) => {
+          return [
+            {
+              range: model.getFullModelRange(),
+              text: formatDialect(model.getValue(), { dialect: clickhouse }),
+            },
+          ];
+        },
+      });
 
       const markersDisposable = markTemplateVars(editor, monaco);
 

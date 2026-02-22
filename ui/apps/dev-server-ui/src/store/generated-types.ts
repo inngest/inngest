@@ -398,6 +398,7 @@ export enum FunctionRunStatus {
   Failed = 'FAILED',
   Queued = 'QUEUED',
   Running = 'RUNNING',
+  Skipped = 'SKIPPED',
 }
 
 export type FunctionRunV2 = {
@@ -791,6 +792,8 @@ export type RunTraceSpan = {
   queuedAt: Scalars['Time'];
   run: FunctionRun;
   runID: Scalars['ULID'];
+  skipExistingRunID: Maybe<Scalars['String']>;
+  skipReason: Maybe<Scalars['String']>;
   spanID: Scalars['String'];
   startedAt: Maybe<Scalars['Time']>;
   status: RunTraceSpanStatus;
@@ -815,6 +818,7 @@ export enum RunTraceSpanStatus {
   Failed = 'FAILED',
   Queued = 'QUEUED',
   Running = 'RUNNING',
+  Skipped = 'SKIPPED',
   Waiting = 'WAITING',
 }
 
@@ -2228,6 +2232,11 @@ export type GetEventV2RunsQuery = {
       startedAt: any | null;
       endedAt: any | null;
       function: { __typename?: 'Function'; name: string; slug: string };
+      trace: {
+        __typename?: 'RunTraceSpan';
+        skipReason: string | null;
+        skipExistingRunID: string | null;
+      } | null;
     }>;
   };
 };

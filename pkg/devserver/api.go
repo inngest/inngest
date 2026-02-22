@@ -158,6 +158,10 @@ func (a devapi) Info(w http.ResponseWriter, r *http.Request) {
 		enabled, _ := strconv.ParseBool(os.Getenv(flag))
 		features[flag] = enabled
 	}
+	// TODO: Remove once we drop the run-details-v4 feature flag.
+	if os.Getenv("run-details-v4") == "" {
+		features["run-details-v4"] = true
+	}
 
 	//
 	// inngest feature flags are a map of arbitrary key value

@@ -358,6 +358,9 @@ type QueueRunMode struct {
 	// ExclusiveAccounts defines a list of account IDs to peek exclusively.
 	// This can be used to configure executors processing only a static subset of accounts.
 	ExclusiveAccounts []uuid.UUID
+
+	// ShardGroup enables the executor to determine which shard to process items from during run time.
+	ShardGroup string
 }
 
 type QueueOptions struct {
@@ -454,7 +457,7 @@ type QueueOptions struct {
 
 	enableJobPromotion bool
 
-	CapacityManager                    constraintapi.RolloutManager
+	CapacityManager                    constraintapi.CapacityManager
 	UseConstraintAPI                   constraintapi.UseConstraintAPIFn
 	EnableCapacityLeaseInstrumentation constraintapi.EnableHighCardinalityInstrumentation
 	CapacityLeaseExtendInterval        time.Duration
@@ -462,11 +465,35 @@ type QueueOptions struct {
 	EnableThrottleInstrumentation EnableThrottleInstrumentationFn
 
 	ConditionalTracer trace.ConditionalTracer
+
+	ShardAssignmentConfig ShardAssignmentConfig
+	// OnShardLeaseAcquired is called immediately after a shard lease is successfully claimed.
+	// The shardName parameter is the name of the specific shard that was leased.
+	OnShardLeaseAcquired func(ctx context.Context, shardName string)
+	ShardLeaseKeySuffix  string
 }
 
 // ShardSelector returns a shard reference for the given queue item.
 // This allows applying a policy to enqueue items to different queue shards.
 type ShardSelector func(ctx context.Context, accountId uuid.UUID, queueName *string) (QueueShard, error)
+
+func WithShardAssignmentConfig(cfg ShardAssignmentConfig) QueueOpt {
+	return func(q *QueueOptions) {
+		q.ShardAssignmentConfig = cfg
+	}
+}
+
+func WithOnShardLeaseAcquired(f func(ctx context.Context, shardName string)) QueueOpt {
+	return func(q *QueueOptions) {
+		q.OnShardLeaseAcquired = f
+	}
+}
+
+func WithShardLeaseKeySuffix(suffix string) QueueOpt {
+	return func(q *QueueOptions) {
+		q.ShardLeaseKeySuffix = suffix
+	}
+}
 
 func WithPeekEWMA(on bool) QueueOpt {
 	return func(q *QueueOptions) {
@@ -485,7 +512,7 @@ func WithPartitionConstraintConfigGetter(f PartitionConstraintConfigGetter) Queu
 }
 
 // AllowKeyQueues determines if key queues should be enabled for the account
-type AllowKeyQueues func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool
+type AllowKeyQueues func(ctx context.Context, acctID, envID, fnID uuid.UUID) bool
 
 func WithAllowKeyQueues(kq AllowKeyQueues) QueueOpt {
 	return func(q *QueueOptions) {
@@ -561,7 +588,7 @@ func WithEnableJobPromotion(enable bool) QueueOpt {
 	}
 }
 
-func WithCapacityManager(capacityManager constraintapi.RolloutManager) QueueOpt {
+func WithCapacityManager(capacityManager constraintapi.CapacityManager) QueueOpt {
 	return func(q *QueueOptions) {
 		q.CapacityManager = capacityManager
 	}
@@ -750,7 +777,7 @@ func NewQueueOptions(
 				},
 			}
 		},
-		AllowKeyQueues: func(ctx context.Context, acctID, fnID uuid.UUID) bool {
+		AllowKeyQueues: func(ctx context.Context, acctID, envID, fnID uuid.UUID) bool {
 			return false
 		},
 		shadowPartitionProcessCount: func(ctx context.Context, acctID uuid.UUID) int {
@@ -783,6 +810,9 @@ func NewQueueOptions(
 			return false
 		}),
 		EnableCapacityLeaseInstrumentation: func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool) {
+			return false
+		},
+		UseConstraintAPI: func(ctx context.Context, accountID uuid.UUID) (enable bool) {
 			return false
 		},
 	}

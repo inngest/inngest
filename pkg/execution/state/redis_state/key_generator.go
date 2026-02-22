@@ -199,9 +199,11 @@ type QueueKeyGenerator interface {
 	// Queue metadata keys
 	//
 
-	// Sequential returns the key which allows a worker to claim sequential processing
-	// of the partitions.
+	// Sequential returns the key which allows a worker to claim a config lease for specific roles
 	ConfigLeaseKey(scope string) string
+	// ShardLeaseKey returns the key which allows a worker to claim one of n available leases per shard to begin processing
+	// partitions in that shard
+	ShardLeaseKey(scope string) string
 	// Sequential returns the key which allows a worker to claim sequential processing
 	// of the partitions.
 	Sequential() string
@@ -321,6 +323,10 @@ func (u queueKeyGenerator) Instrumentation() string {
 
 func (u queueKeyGenerator) ConfigLeaseKey(scope string) string {
 	return fmt.Sprintf("{%s}:queue:%s", u.queueDefaultKey, scope)
+}
+
+func (u queueKeyGenerator) ShardLeaseKey(scope string) string {
+	return fmt.Sprintf("{%s}:queue:shard-lease:%s", u.queueDefaultKey, scope)
 }
 
 func (u queueKeyGenerator) ActiveChecker() string {

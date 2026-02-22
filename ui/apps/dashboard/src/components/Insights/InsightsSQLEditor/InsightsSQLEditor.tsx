@@ -1,7 +1,6 @@
 import {
   SQLEditor,
   type SQLEditorMarkerData,
-  SQLEditorURI,
 } from '@inngest/components/SQLEditor/SQLEditor';
 import { useInsightsStateMachineContext } from '../InsightsStateMachineContext/InsightsStateMachineContext';
 import { hasUnsavedChanges } from '../InsightsTabManager/InsightsTabManager';
@@ -139,7 +138,7 @@ export function InsightsSQLEditor() {
           severity: diag.severity === 'error' ? 8 : 4,
           code: {
             // TODO: add docs links based on diagnostic code
-            target: SQLEditorURI.parse('http://example.com'),
+            target: monaco.Uri.parse('http://example.com'),
             value: diag.code,
           },
           message: diag.message, // TODO: pretty message by code

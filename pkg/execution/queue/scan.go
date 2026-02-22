@@ -82,8 +82,9 @@ LOOP:
 	}
 
 	// Wait for all in-progress items to complete.
-	l.Info("queue waiting to quit")
+	l.Info("queue waiting to quit", "err", err)
 	q.wg.Wait()
+	l.Info("in-progress jobs finished, exiting executionScan", "err", err)
 
 	return err
 }

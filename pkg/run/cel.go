@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	sq "github.com/doug-martin/goqu/v9"
-	"github.com/google/cel-go/common/operators"
 	"github.com/inngest/expr"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/expressions"
@@ -17,7 +16,8 @@ import (
 
 var (
 	eventRegex  = regexp.MustCompile(`^event\..+`)
-	outputRegex = regexp.MustCompile(`^output`)
+	outputRegex = regexp.MustCompile(`^output\.`)
+	errorRegex  = regexp.MustCompile(`^error\.`)
 
 	exprErrorRegex = regexp.MustCompile(`^ERROR: <input>:\d+:\d+:\s+`)
 )
@@ -67,7 +67,7 @@ func NewExpressionHandler(ctx context.Context, opts ...ExprHandlerOpt) (*Express
 	h := &ExpressionHandler{
 		EventExprList:  []string{},
 		OutputExprList: []string{},
-		SQLConverter:   SQLiteConverter,
+		SQLConverter:   EventFieldConverter,
 	}
 
 	for _, apply := range opts {
@@ -146,7 +146,8 @@ func (h *ExpressionHandler) addToExprList(
 				if _, ok := evtDedup[cel]; !ok {
 					evtDedup[cel] = true
 				}
-			case outputRegex.MatchString(n.Predicate.Ident):
+			case outputRegex.MatchString(n.Predicate.Ident), errorRegex.MatchString(n.Predicate.Ident):
+				// Both output.* and error.* CEL filters look at spans.output in the database
 				if _, ok := outputDedup[cel]; !ok {
 					outputDedup[cel] = true
 				}
@@ -315,7 +316,7 @@ func allMatches(res []bool) bool {
 	return true
 }
 
-// toSQLEventFilter parses the passed in nodes and converts them into SQL filter expressions
+// toSQLFilters parses the passed in nodes and converts them into SQL filter expressions
 func (h *ExpressionHandler) toSQLFilters(ctx context.Context, nodes []*expr.Node) ([]sq.Expression, error) {
 	filters := []sq.Expression{}
 
@@ -354,84 +355,6 @@ func (h *ExpressionHandler) toSQLFilters(ctx context.Context, nodes []*expr.Node
 				filters = append(filters, nested[0])
 			default:
 				filters = append(filters, sq.Or(nested...))
-			}
-		}
-	}
-
-	return filters, nil
-}
-
-// create filters for database queries in sqlite
-// - ULID
-// - event id (idempotency key)
-// - event name
-// - version
-// - timestamp
-//
-// This only applies to events
-func SQLiteConverter(ctx context.Context, n *expr.Node) ([]sq.Expression, error) {
-	filters := []sq.Expression{}
-	if n.HasPredicate() {
-		literal := n.Predicate.Literal
-
-		switch n.Predicate.Ident {
-		case "event.id":
-			id, ok := literal.(string)
-			if !ok {
-				return nil, fmt.Errorf("expects 'event.id' to be a string: %v", literal)
-			}
-			switch n.Predicate.Operator {
-			case operators.Equals:
-				filters = append(filters, sq.C("event_id").Eq(id))
-			case operators.NotEquals:
-				filters = append(filters, sq.C("event_id").Neq(id))
-			}
-		case "event.name":
-			name, ok := literal.(string)
-			if !ok {
-				return nil, fmt.Errorf("expects 'event.name' to be a string: %v", literal)
-			}
-			switch n.Predicate.Operator {
-			case operators.Equals:
-				filters = append(filters, sq.C("event_name").Eq(name))
-			case operators.NotEquals:
-				filters = append(filters, sq.C("event_name").Neq(name))
-			}
-		case "event.ts":
-			ts, ok := literal.(int64)
-			if !ok {
-				return nil, fmt.Errorf("expects 'event.ts' to be an integer: %v", literal)
-			}
-			var f sq.Expression
-			field := "event_ts"
-
-			switch n.Predicate.Operator {
-			case operators.Greater:
-				f = sq.C(field).Gt(ts)
-			case operators.GreaterEquals:
-				f = sq.C(field).Gte(ts)
-			case operators.Equals:
-				f = sq.C(field).Eq(ts)
-			case operators.Less:
-				f = sq.C(field).Lt(ts)
-			case operators.LessEquals:
-				f = sq.C(field).Lte(ts)
-			case operators.NotEquals:
-				f = sq.C(field).Neq(ts)
-			}
-			if f != nil {
-				filters = append(filters, f)
-			}
-		case "event.v":
-			v, ok := literal.(string)
-			if !ok {
-				return nil, fmt.Errorf("expects 'event.v' to be a string: %v", literal)
-			}
-			switch n.Predicate.Operator {
-			case operators.Equals:
-				filters = append(filters, sq.C("event_v").Eq(v))
-			case operators.NotEquals:
-				filters = append(filters, sq.C("event_v").Neq(v))
 			}
 		}
 	}

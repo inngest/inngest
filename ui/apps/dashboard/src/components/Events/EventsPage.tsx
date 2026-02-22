@@ -14,6 +14,7 @@ import { SendEventModal } from '@/components/Events/SendEventModal';
 import {
   useEventDetails,
   useEventPayload,
+  useEventRuns,
   useEvents,
 } from '@/components/Events/useEvents';
 import { useAccountFeatures } from '@/utils/useAccountFeatures';
@@ -37,6 +38,7 @@ export default function EventsPage({
   const getEvents = useEvents();
   const getEventDetails = useEventDetails();
   const getEventPayload = useEventPayload();
+  const getEventRuns = useEventRuns();
   const getEventTypes = useAllEventTypes();
   const features = useAccountFeatures();
 
@@ -59,6 +61,7 @@ export default function EventsPage({
         getEvents={getEvents}
         getEventDetails={getEventDetails}
         getEventPayload={getEventPayload}
+        getEventRuns={getEventRuns}
         getEventTypes={getEventTypes}
         eventNames={eventTypeNames}
         singleEventTypePage={singleEventTypePage}

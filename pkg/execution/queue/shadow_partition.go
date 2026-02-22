@@ -35,11 +35,11 @@ func (sp QueueShadowPartition) KeyQueuesEnabled(ctx context.Context, q *QueueOpt
 		return false
 	}
 
-	if sp.AccountID == nil || sp.FunctionID == nil || q.AllowKeyQueues == nil {
+	if sp.AccountID == nil || sp.EnvID == nil || sp.FunctionID == nil || q.AllowKeyQueues == nil {
 		return false
 	}
 
-	return q.AllowKeyQueues(ctx, *sp.AccountID, *sp.FunctionID)
+	return q.AllowKeyQueues(ctx, *sp.AccountID, *sp.EnvID, *sp.FunctionID)
 }
 
 func (sp QueueShadowPartition) Identifier() PartitionIdentifier {

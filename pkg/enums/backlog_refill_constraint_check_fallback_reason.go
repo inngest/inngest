@@ -1,12 +1,12 @@
-//go:generate go run github.com/dmarkham/enumer -trimprefix=BacklogRefillConstraintCheckFallbackReason -type=BacklogRefillConstraintCheckFallbackReason -transform=snake -json -text
+//go:generate go run github.com/dmarkham/enumer -trimprefix=BacklogRefillConstraintCheckReason -type=BacklogRefillConstraintCheckReason -transform=snake -json -text
 
 package enums
 
-type BacklogRefillConstraintCheckFallbackReason int
+type BacklogRefillConstraintCheckReason int
 
 const (
-	BacklogRefillConstraintCheckFallbackReasonConstraintAPIUninitialized BacklogRefillConstraintCheckFallbackReason = iota
-	BacklogRefillConstraintCheckFallbackReasonIDNil
-	BacklogRefillConstraintCheckFallbackReasonFeatureFlagDisabled
-	BacklogRefillConstraintCheckFallbackReasonConstraintAPIError
+	BacklogRefillConstraintCheckReasonConstraintAPIUninitialized BacklogRefillConstraintCheckReason = iota
+	BacklogRefillConstraintCheckReasonIDNil
+	BacklogRefillConstraintCheckReasonFeatureFlagDisabled
+	BacklogRefillConstraintCheckReasonConstraintAPIError
 )

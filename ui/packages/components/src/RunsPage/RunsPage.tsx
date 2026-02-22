@@ -22,6 +22,7 @@ import CodeSearch from '../CodeSearch/CodeSearch';
 import type { RangeChangeProps } from '../DatePicker/RangePicker';
 import EntityFilter from '../Filter/EntityFilter';
 import { RunDetailsV3 } from '../RunDetailsV3/RunDetailsV3';
+import { RunDetailsV4 } from '../RunDetailsV4';
 import {
   useBatchedSearchParams,
   useSearchParam,
@@ -38,7 +39,7 @@ import type { Run, ViewScope } from './types';
 type Props = {
   data: Run[];
   defaultVisibleColumns?: ColumnID[];
-  features: Pick<Features, 'history' | 'tracesPreview'>;
+  features: Pick<Features, 'history' | 'tracesPreview' | 'runDetailsV4'>;
   getTrigger: React.ComponentProps<typeof RunDetailsV3>['getTrigger'];
   hasMore: boolean;
   isLoadingInitial: boolean;
@@ -221,18 +222,28 @@ export function RunsPage({
     (rowData: Run) => {
       return (
         <div className={`border-subtle `}>
-          <RunDetailsV3
-            initialRunData={rowData}
-            getTrigger={getTrigger}
-            pollInterval={pollInterval}
-            runID={rowData.id}
-            standalone={false}
-            newStack={true}
-          />
+          {features.runDetailsV4 ? (
+            <RunDetailsV4
+              initialRunData={rowData}
+              getTrigger={getTrigger}
+              pollInterval={pollInterval}
+              runID={rowData.id}
+              standalone={false}
+            />
+          ) : (
+            <RunDetailsV3
+              initialRunData={rowData}
+              getTrigger={getTrigger}
+              pollInterval={pollInterval}
+              runID={rowData.id}
+              standalone={false}
+              newStack={true}
+            />
+          )}
         </div>
       );
     },
-    [getTrigger, pollInterval, features.tracesPreview]
+    [getTrigger, pollInterval, features.tracesPreview, features.runDetailsV4]
   );
 
   const options = useMemo(() => {

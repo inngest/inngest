@@ -16,6 +16,8 @@ export type Event = {
     status: string;
     startedAt?: Date;
     completedAt?: Date;
+    skipReason?: string;
+    skipExistingRunID?: string;
   }[];
 };
 

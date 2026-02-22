@@ -1,0 +1,431 @@
+import { useEffect, useState } from 'react';
+import { RiArrowRightSLine } from '@remixicon/react';
+
+import { AITrace } from '../AI/AITrace';
+import { parseAIOutput } from '../AI/utils';
+import { Button } from '../Button/Button';
+import {
+  CodeElement,
+  ElementWrapper,
+  IDElement,
+  LinkElement,
+  TextElement,
+  TimeElement,
+} from '../DetailsCard/Element';
+import { Pill } from '../Pill/Pill';
+import { RerunModal } from '../Rerun/RerunModal';
+import { useShared } from '../SharedContext/SharedContext';
+import { useBooleanFlag } from '../SharedContext/useBooleanFlag';
+import { useGetTraceResult } from '../SharedContext/useGetTraceResult';
+import { usePathCreator } from '../SharedContext/usePathCreator';
+import { getStatusBackgroundClass, getStatusTextClass } from '../Status/statusClasses';
+import { Time } from '../Time';
+import { usePrettyErrorBody, usePrettyJson, usePrettyShortError } from '../hooks/usePrettyJson';
+import { toMaybeDate } from '../utils/date';
+import { ErrorInfo } from './ErrorInfo';
+import { IO } from './IO';
+import { MetadataAttrs } from './MetadataAttrs';
+import { Tabs } from './Tabs';
+import { UserlandAttrs } from './UserlandAttrs';
+import { formatDuration, maybeBooleanToString, type StepInfoType } from './runDetailsUtils';
+import {
+  isStepInfoInvoke,
+  isStepInfoSignal,
+  isStepInfoSleep,
+  isStepInfoWait,
+  type StepInfoInvoke,
+  type StepInfoSignal,
+  type StepInfoSleep,
+  type StepInfoWait,
+} from './types';
+
+const STEP_OP_LABELS: Record<string, string> = {
+  RUN: 'step.run',
+  INVOKE: 'step.invoke',
+  SLEEP: 'step.sleep',
+  WAIT_FOR_EVENT: 'step.waitForEvent',
+  AI_GATEWAY: 'step.ai',
+  WAIT_FOR_SIGNAL: 'step.waitForSignal',
+};
+
+type StepKindInfoProps = {
+  stepInfo: StepInfoType['trace']['stepInfo'];
+};
+
+const InvokeInfo = ({ stepInfo }: { stepInfo: StepInfoInvoke }) => {
+  const { pathCreator } = usePathCreator();
+  const timeout = toMaybeDate(stepInfo.timeout);
+  return (
+    <>
+      <ElementWrapper label="Function">
+        <LinkElement href={pathCreator.function({ functionSlug: stepInfo.functionID })}>
+          {stepInfo.functionID}
+        </LinkElement>
+      </ElementWrapper>
+      <ElementWrapper label="Triggering Event ID">
+        <LinkElement href={pathCreator.eventPopout({ eventID: stepInfo.triggeringEventID })}>
+          {stepInfo.triggeringEventID}
+        </LinkElement>
+      </ElementWrapper>
+      <ElementWrapper label="Triggered Run ID">
+        {stepInfo.runID ? (
+          <LinkElement href={pathCreator.runPopout({ runID: stepInfo.runID })}>
+            {stepInfo.runID}
+          </LinkElement>
+        ) : (
+          '-'
+        )}
+      </ElementWrapper>
+      <ElementWrapper label="Timeout">
+        {timeout ? <TimeElement date={timeout} /> : <TextElement>-</TextElement>}
+      </ElementWrapper>
+      <ElementWrapper label="Timed out">
+        <TextElement>{maybeBooleanToString(stepInfo.timedOut)}</TextElement>
+      </ElementWrapper>
+      {stepInfo.returnEventID && (
+        <ElementWrapper label="Return Event ID">
+          <LinkElement href={pathCreator.eventPopout({ eventID: stepInfo.returnEventID })}>
+            {stepInfo.returnEventID}
+          </LinkElement>
+        </ElementWrapper>
+      )}
+    </>
+  );
+};
+
+const SleepInfo = ({ stepInfo }: { stepInfo: StepInfoSleep }) => {
+  const sleepUntil = toMaybeDate(stepInfo.sleepUntil);
+  return (
+    <ElementWrapper label="Sleep until">
+      {sleepUntil ? <Time value={sleepUntil} /> : <TextElement>-</TextElement>}
+    </ElementWrapper>
+  );
+};
+
+const WaitInfo = ({ stepInfo }: { stepInfo: StepInfoWait }) => {
+  const { pathCreator } = usePathCreator();
+  const timeout = toMaybeDate(stepInfo.timeout);
+  return (
+    <>
+      <ElementWrapper label="Event name">
+        <TextElement>{stepInfo.eventName}</TextElement>
+      </ElementWrapper>
+      <ElementWrapper label="Timeout">
+        {timeout ? <TimeElement date={timeout} /> : <TextElement>-</TextElement>}
+      </ElementWrapper>
+      <ElementWrapper label="Timed out">
+        <TextElement>{maybeBooleanToString(stepInfo.timedOut)}</TextElement>
+      </ElementWrapper>
+      {stepInfo.foundEventID && (
+        <ElementWrapper label="Matched Event ID">
+          <LinkElement href={pathCreator.eventPopout({ eventID: stepInfo.foundEventID })}>
+            {stepInfo.foundEventID}
+          </LinkElement>
+        </ElementWrapper>
+      )}
+      <ElementWrapper className="w-full" label="Match expression">
+        {stepInfo.expression ? (
+          <CodeElement value={stepInfo.expression} />
+        ) : (
+          <TextElement>-</TextElement>
+        )}
+      </ElementWrapper>
+    </>
+  );
+};
+
+const SignalInfo = ({ stepInfo }: { stepInfo: StepInfoSignal }) => {
+  const timeout = toMaybeDate(stepInfo.timeout);
+  return (
+    <>
+      <ElementWrapper label="Signal name">
+        <TextElement>{stepInfo.signal}</TextElement>
+      </ElementWrapper>
+      <ElementWrapper label="Timeout">
+        {timeout ? <TimeElement date={timeout} /> : <TextElement>-</TextElement>}
+      </ElementWrapper>
+      <ElementWrapper label="Timed out">
+        <TextElement>{maybeBooleanToString(stepInfo.timedOut)}</TextElement>
+      </ElementWrapper>
+    </>
+  );
+};
+
+const getStepKindInfo = (props: StepKindInfoProps): JSX.Element | null =>
+  isStepInfoInvoke(props.stepInfo) ? (
+    <InvokeInfo stepInfo={props.stepInfo} />
+  ) : isStepInfoSleep(props.stepInfo) ? (
+    <SleepInfo stepInfo={props.stepInfo} />
+  ) : isStepInfoWait(props.stepInfo) ? (
+    <WaitInfo stepInfo={props.stepInfo} />
+  ) : isStepInfoSignal(props.stepInfo) ? (
+    <SignalInfo stepInfo={props.stepInfo} />
+  ) : null;
+
+export const StepInfo = ({
+  selectedStep,
+  pollInterval: initialPollInterval,
+  tracesPreviewEnabled,
+  debug = false,
+}: {
+  selectedStep: StepInfoType;
+  pollInterval?: number;
+  tracesPreviewEnabled?: boolean;
+  debug?: boolean;
+}) => {
+  const { cloud } = useShared();
+  const [expanded, setExpanded] = useState(true);
+  const [rerunModalOpen, setRerunModalOpen] = useState(false);
+  const { runID, trace } = selectedStep;
+  const [pollInterval, setPollInterval] = useState(initialPollInterval);
+  const { loading, data: result } = useGetTraceResult({
+    traceID: trace.outputID,
+    refetchInterval: pollInterval ? pollInterval : undefined,
+    preview: tracesPreviewEnabled,
+  });
+
+  const { booleanFlag } = useBooleanFlag();
+  const { value: metadataIsEnabled } = booleanFlag('enable-step-metadata', false);
+
+  useEffect(() => {
+    result && setPollInterval(undefined);
+  }, [result]);
+
+  const delayText = formatDuration(
+    (toMaybeDate(trace.startedAt) ?? new Date()).getTime() - new Date(trace.queuedAt).getTime()
+  );
+
+  const startedAt = toMaybeDate(trace.startedAt);
+  const endedAt = toMaybeDate(trace.endedAt);
+  const duration = startedAt ? (endedAt ?? new Date()).getTime() - startedAt.getTime() : 0;
+
+  const durationText = duration > 0 ? formatDuration(duration) : '-';
+
+  const stepKindInfo = getStepKindInfo({
+    stepInfo: trace.stepInfo,
+  });
+
+  const aiOutput = result?.data ? parseAIOutput(result.data) : undefined;
+  const prettyInput = usePrettyJson(result?.input ?? '') || (result?.input ?? '');
+  const prettyOutput = usePrettyJson(result?.data ?? '') || (result?.data ?? '');
+  const prettyErrorBody = usePrettyErrorBody(result?.error);
+  const prettyShortError = usePrettyShortError(result?.error);
+
+  const responseHeaderMetadata = trace.metadata?.filter(
+    (md) => md.kind === 'inngest.response_headers'
+  );
+  const nonHeaderMetadata = metadataIsEnabled
+    ? trace.metadata?.filter((md) => md.kind !== 'inngest.response_headers')
+    : undefined;
+
+  const hasNoData = !prettyInput && !prettyOutput && !result?.error;
+
+  let emptyStateMessage = 'No output available';
+  if (loading) {
+    emptyStateMessage = 'Loading...';
+  } else if (trace.outputID) {
+    emptyStateMessage = 'No trace data available';
+  }
+
+  return (
+    <div className="flex h-full flex-col justify-start gap-2">
+      <div className="flex min-h-11 w-full flex-row items-center justify-between border-none px-4">
+        <div
+          className="text-basis flex cursor-pointer items-center justify-start gap-2"
+          onClick={() => setExpanded(!expanded)}
+        >
+          <RiArrowRightSLine
+            className={`shrink-0 transition-transform duration-[250ms] ${
+              expanded ? 'rotate-90' : ''
+            }`}
+          />
+
+          <span className="text-basis text-sm font-normal">{trace.name}</span>
+          {trace.attempts !== null && (trace.attempts > 0 || trace.status === 'FAILED') && (
+            <span data-testid="retry-attempt-badge">
+              <Pill
+                className={`${getStatusBackgroundClass(trace.status)} ${getStatusTextClass(
+                  trace.status
+                )}`}
+              >
+                Attempt {trace.attempts + 1}
+              </Pill>
+            </span>
+          )}
+        </div>
+        {!debug && runID && trace.stepID && (!cloud || prettyInput) && (
+          <>
+            <Button
+              kind="primary"
+              appearance="outlined"
+              size="medium"
+              label="Rerun from step"
+              onClick={() => setRerunModalOpen(true)}
+            />
+            <RerunModal
+              open={rerunModalOpen}
+              setOpen={setRerunModalOpen}
+              runID={runID}
+              stepID={trace.stepID}
+              input={prettyInput || result?.input || ''}
+            />
+          </>
+        )}
+      </div>
+
+      {expanded && (
+        <div className="flex flex-row flex-wrap items-center justify-start gap-x-10 gap-y-4 px-4">
+          {!trace.isUserland && (
+            <ElementWrapper label="Queued at">
+              <TimeElement date={new Date(trace.queuedAt)} />
+            </ElementWrapper>
+          )}
+
+          <ElementWrapper label="Started at">
+            {trace.startedAt ? (
+              <TimeElement date={new Date(trace.startedAt)} />
+            ) : (
+              <TextElement>-</TextElement>
+            )}
+          </ElementWrapper>
+
+          <ElementWrapper label="Ended at">
+            {trace.endedAt ? (
+              <TimeElement date={new Date(trace.endedAt)} />
+            ) : (
+              <TextElement>-</TextElement>
+            )}
+          </ElementWrapper>
+
+          {!trace.isUserland && (
+            <ElementWrapper label="Delay">
+              <TextElement>{delayText}</TextElement>
+            </ElementWrapper>
+          )}
+
+          <ElementWrapper label="Duration">
+            <TextElement>{durationText}</TextElement>
+          </ElementWrapper>
+
+          {trace.stepOp && (
+            <ElementWrapper label="Step Type">
+              <CodeElement value={STEP_OP_LABELS[trace.stepOp] ?? trace.stepOp} />
+            </ElementWrapper>
+          )}
+
+          {stepKindInfo}
+
+          {debug && trace.debugRunID && (
+            <ElementWrapper label="Debug Run ID">
+              <IDElement>{trace.debugRunID}</IDElement>
+            </ElementWrapper>
+          )}
+
+          {aiOutput && <AITrace aiOutput={aiOutput} />}
+        </div>
+      )}
+
+      {trace.isUserland && trace.userlandSpan ? (
+        <div className="flex-1">
+          <Tabs
+            defaultActive={'attributes'}
+            tabs={[
+              {
+                label: 'Attributes',
+                id: 'attributes',
+                node: <UserlandAttrs userlandSpan={trace.userlandSpan} />,
+              },
+              ...(responseHeaderMetadata?.length
+                ? [
+                    {
+                      label: 'Headers',
+                      id: 'headers',
+                      node: <MetadataAttrs metadata={responseHeaderMetadata} />,
+                    },
+                  ]
+                : []),
+              ...(nonHeaderMetadata?.length
+                ? [
+                    {
+                      label: 'Metadata',
+                      id: 'metadata',
+                      node: <MetadataAttrs metadata={nonHeaderMetadata} />,
+                    },
+                  ]
+                : []),
+            ]}
+          />
+        </div>
+      ) : (
+        <>
+          {result?.error && <ErrorInfo error={prettyShortError} />}
+          <div className="flex-1">
+            {hasNoData ? (
+              <div className="flex h-full items-center justify-center px-4 py-8">
+                <p className="text-muted text-center text-sm">{emptyStateMessage}</p>
+              </div>
+            ) : (
+              <Tabs
+                defaultActive={result?.error ? 'error' : 'output'}
+                tabs={[
+                  ...(prettyInput
+                    ? [
+                        {
+                          label: 'Input',
+                          id: 'input',
+                          node: <IO title="Step Input" raw={prettyInput} loading={loading} />,
+                        },
+                      ]
+                    : []),
+                  ...(prettyOutput
+                    ? [
+                        {
+                          label: 'Output',
+                          id: 'output',
+                          node: <IO title="Step Output" raw={prettyOutput} loading={loading} />,
+                        },
+                      ]
+                    : []),
+                  ...(result?.error
+                    ? [
+                        {
+                          label: 'Error details',
+                          id: 'error',
+                          node: (
+                            <IO
+                              title={prettyShortError}
+                              raw={prettyErrorBody ?? ''}
+                              error={true}
+                              loading={loading}
+                            />
+                          ),
+                        },
+                      ]
+                    : []),
+                  ...(responseHeaderMetadata?.length
+                    ? [
+                        {
+                          label: 'Headers',
+                          id: 'headers',
+                          node: <MetadataAttrs metadata={responseHeaderMetadata} />,
+                        },
+                      ]
+                    : []),
+                  ...(nonHeaderMetadata?.length
+                    ? [
+                        {
+                          label: 'Metadata',
+                          id: 'metadata',
+                          node: <MetadataAttrs metadata={nonHeaderMetadata} />,
+                        },
+                      ]
+                    : []),
+                ]}
+              />
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+};

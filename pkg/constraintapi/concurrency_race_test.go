@@ -32,9 +32,8 @@ func TestConcurrencyAndRaces_ParallelOperations(t *testing.T) {
 			{
 				Kind: ConstraintKindConcurrency,
 				Concurrency: &ConcurrencyConstraint{
-					Mode:              enums.ConcurrencyModeStep,
-					Scope:             enums.ConcurrencyScopeFn,
-					InProgressItemKey: fmt.Sprintf("{%s}:concurrency:parallel:%s", te.KeyPrefix, te.FunctionID),
+					Mode:  enums.ConcurrencyModeStep,
+					Scope: enums.ConcurrencyScopeFn,
 				},
 			},
 		}
@@ -69,8 +68,7 @@ func TestConcurrencyAndRaces_ParallelOperations(t *testing.T) {
 							Service:  ServiceExecutor,
 							Location: CallerLocationItemLease,
 						},
-						Migration: MigrationIdentifier{QueueShard: "test"},
-					})
+								})
 
 					mu.Lock()
 					if err != nil {
@@ -104,7 +102,6 @@ func TestConcurrencyAndRaces_ParallelOperations(t *testing.T) {
 				IdempotencyKey: fmt.Sprintf("cleanup-%s", lease.IdempotencyKey),
 				AccountID:      te.AccountID,
 				LeaseID:        lease.LeaseID,
-				Migration:      MigrationIdentifier{QueueShard: "test"},
 			})
 			require.NoError(t, err)
 		}
@@ -126,9 +123,8 @@ func TestConcurrencyAndRaces_ParallelOperations(t *testing.T) {
 			{
 				Kind: ConstraintKindConcurrency,
 				Concurrency: &ConcurrencyConstraint{
-					Mode:              enums.ConcurrencyModeStep,
-					Scope:             enums.ConcurrencyScopeFn,
-					InProgressItemKey: fmt.Sprintf("{%s}:concurrency:acquire-release:%s", te.KeyPrefix, te.FunctionID),
+					Mode:  enums.ConcurrencyModeStep,
+					Scope: enums.ConcurrencyScopeFn,
 				},
 			},
 		}
@@ -152,8 +148,7 @@ func TestConcurrencyAndRaces_ParallelOperations(t *testing.T) {
 					Service:  ServiceExecutor,
 					Location: CallerLocationItemLease,
 				},
-				Migration: MigrationIdentifier{QueueShard: "test"},
-			})
+				})
 			require.NoError(t, err)
 			require.Len(t, resp.Leases, 1)
 			initialLeases[i] = resp.Leases[0]
@@ -174,8 +169,7 @@ func TestConcurrencyAndRaces_ParallelOperations(t *testing.T) {
 					IdempotencyKey: fmt.Sprintf("concurrent-release-%d", index),
 					AccountID:      te.AccountID,
 					LeaseID:        lease.LeaseID,
-					Migration:      MigrationIdentifier{QueueShard: "test"},
-				})
+					})
 
 				mu.Lock()
 				if err != nil {
@@ -207,8 +201,7 @@ func TestConcurrencyAndRaces_ParallelOperations(t *testing.T) {
 						Service:  ServiceExecutor,
 						Location: CallerLocationItemLease,
 					},
-					Migration: MigrationIdentifier{QueueShard: "test"},
-				})
+						})
 
 				mu.Lock()
 				if err != nil {
@@ -234,7 +227,6 @@ func TestConcurrencyAndRaces_ParallelOperations(t *testing.T) {
 				IdempotencyKey: fmt.Sprintf("final-cleanup-%s", lease.IdempotencyKey),
 				AccountID:      te.AccountID,
 				LeaseID:        lease.LeaseID,
-				Migration:      MigrationIdentifier{QueueShard: "test"},
 			})
 			require.NoError(t, err)
 		}
@@ -256,9 +248,8 @@ func TestConcurrencyAndRaces_ParallelOperations(t *testing.T) {
 			{
 				Kind: ConstraintKindConcurrency,
 				Concurrency: &ConcurrencyConstraint{
-					Mode:              enums.ConcurrencyModeStep,
-					Scope:             enums.ConcurrencyScopeFn,
-					InProgressItemKey: fmt.Sprintf("{%s}:concurrency:extend:%s", te.KeyPrefix, te.FunctionID),
+					Mode:  enums.ConcurrencyModeStep,
+					Scope: enums.ConcurrencyScopeFn,
 				},
 			},
 		}
@@ -280,7 +271,6 @@ func TestConcurrencyAndRaces_ParallelOperations(t *testing.T) {
 				Service:  ServiceExecutor,
 				Location: CallerLocationItemLease,
 			},
-			Migration: MigrationIdentifier{QueueShard: "test"},
 		})
 
 		require.NoError(t, err)
@@ -303,8 +293,7 @@ func TestConcurrencyAndRaces_ParallelOperations(t *testing.T) {
 					AccountID:      te.AccountID,
 					LeaseID:        originalLease.LeaseID,
 					Duration:       time.Duration(60+extendID) * time.Second, // Different durations
-					Migration:      MigrationIdentifier{QueueShard: "test"},
-				})
+					})
 
 				mu.Lock()
 				if err != nil {
@@ -334,8 +323,7 @@ func TestConcurrencyAndRaces_ParallelOperations(t *testing.T) {
 							IdempotencyKey: "cleanup-extended",
 							AccountID:      te.AccountID,
 							LeaseID:        leaseID,
-							Migration:      MigrationIdentifier{QueueShard: "test"},
-						})
+									})
 						break // Only need to clean up once
 					}
 				}
@@ -359,9 +347,8 @@ func TestConcurrencyAndRaces_ParallelOperations(t *testing.T) {
 			{
 				Kind: ConstraintKindConcurrency,
 				Concurrency: &ConcurrencyConstraint{
-					Mode:              enums.ConcurrencyModeStep,
-					Scope:             enums.ConcurrencyScopeFn,
-					InProgressItemKey: fmt.Sprintf("{%s}:concurrency:scavenge-concurrent:%s", te.KeyPrefix, te.FunctionID),
+					Mode:  enums.ConcurrencyModeStep,
+					Scope: enums.ConcurrencyScopeFn,
 				},
 			},
 		}
@@ -384,8 +371,7 @@ func TestConcurrencyAndRaces_ParallelOperations(t *testing.T) {
 					Service:  ServiceExecutor,
 					Location: CallerLocationItemLease,
 				},
-				Migration: MigrationIdentifier{QueueShard: "test"},
-			})
+				})
 			require.NoError(t, err)
 			require.Len(t, resp.Leases, 1)
 		}
@@ -438,8 +424,7 @@ func TestConcurrencyAndRaces_ParallelOperations(t *testing.T) {
 						Service:  ServiceExecutor,
 						Location: CallerLocationItemLease,
 					},
-					Migration: MigrationIdentifier{QueueShard: "test"},
-				})
+						})
 
 				mu.Lock()
 				if err != nil {
@@ -464,7 +449,6 @@ func TestConcurrencyAndRaces_ParallelOperations(t *testing.T) {
 				IdempotencyKey: fmt.Sprintf("cleanup-concurrent-%s", lease.IdempotencyKey),
 				AccountID:      te.AccountID,
 				LeaseID:        lease.LeaseID,
-				Migration:      MigrationIdentifier{QueueShard: "test"},
 			})
 			require.NoError(t, err)
 		}
@@ -490,9 +474,8 @@ func TestConcurrencyAndRaces_IdempotencyRaces(t *testing.T) {
 			{
 				Kind: ConstraintKindConcurrency,
 				Concurrency: &ConcurrencyConstraint{
-					Mode:              enums.ConcurrencyModeStep,
-					Scope:             enums.ConcurrencyScopeFn,
-					InProgressItemKey: fmt.Sprintf("{%s}:concurrency:idempotent:%s", te.KeyPrefix, te.FunctionID),
+					Mode:  enums.ConcurrencyModeStep,
+					Scope: enums.ConcurrencyScopeFn,
 				},
 			},
 		}
@@ -527,8 +510,7 @@ func TestConcurrencyAndRaces_IdempotencyRaces(t *testing.T) {
 						Service:  ServiceExecutor,
 						Location: CallerLocationItemLease,
 					},
-					Migration: MigrationIdentifier{QueueShard: "test"},
-				})
+						})
 
 				mu.Lock()
 				if err != nil {
@@ -564,7 +546,6 @@ func TestConcurrencyAndRaces_IdempotencyRaces(t *testing.T) {
 				IdempotencyKey: fmt.Sprintf("cleanup-idempotent-%s", lease.IdempotencyKey),
 				AccountID:      te.AccountID,
 				LeaseID:        lease.LeaseID,
-				Migration:      MigrationIdentifier{QueueShard: "test"},
 			})
 			require.NoError(t, err)
 		}
@@ -582,9 +563,8 @@ func TestConcurrencyAndRaces_IdempotencyRaces(t *testing.T) {
 			{
 				Kind: ConstraintKindConcurrency,
 				Concurrency: &ConcurrencyConstraint{
-					Mode:              enums.ConcurrencyModeStep,
-					Scope:             enums.ConcurrencyScopeFn,
-					InProgressItemKey: fmt.Sprintf("{%s}:concurrency:race-idempotent:%s", te.KeyPrefix, te.FunctionID),
+					Mode:  enums.ConcurrencyModeStep,
+					Scope: enums.ConcurrencyScopeFn,
 				},
 			},
 		}
@@ -606,7 +586,6 @@ func TestConcurrencyAndRaces_IdempotencyRaces(t *testing.T) {
 				Service:  ServiceExecutor,
 				Location: CallerLocationItemLease,
 			},
-			Migration: MigrationIdentifier{QueueShard: "test"},
 		})
 
 		require.NoError(t, err)
@@ -633,8 +612,7 @@ func TestConcurrencyAndRaces_IdempotencyRaces(t *testing.T) {
 					AccountID:      te.AccountID,
 					LeaseID:        originalLease.LeaseID,
 					Duration:       60 * time.Second,
-					Migration:      MigrationIdentifier{QueueShard: "test"},
-				})
+					})
 
 				mu.Lock()
 				if err != nil {
@@ -659,8 +637,7 @@ func TestConcurrencyAndRaces_IdempotencyRaces(t *testing.T) {
 					IdempotencyKey: idempotentReleaseKey, // Same key
 					AccountID:      te.AccountID,
 					LeaseID:        originalLease.LeaseID,
-					Migration:      MigrationIdentifier{QueueShard: "test"},
-				})
+					})
 
 				mu.Lock()
 				if err != nil {
@@ -707,9 +684,8 @@ func TestConcurrencyAndRaces_ClockSkew(t *testing.T) {
 			{
 				Kind: ConstraintKindConcurrency,
 				Concurrency: &ConcurrencyConstraint{
-					Mode:              enums.ConcurrencyModeStep,
-					Scope:             enums.ConcurrencyScopeFn,
-					InProgressItemKey: fmt.Sprintf("{%s}:concurrency:clock-skew:%s", te.KeyPrefix, te.FunctionID),
+					Mode:  enums.ConcurrencyModeStep,
+					Scope: enums.ConcurrencyScopeFn,
 				},
 			},
 		}
@@ -747,8 +723,7 @@ func TestConcurrencyAndRaces_ClockSkew(t *testing.T) {
 						Service:  ServiceExecutor,
 						Location: CallerLocationItemLease,
 					},
-					Migration: MigrationIdentifier{QueueShard: "test"},
-				})
+						})
 
 				mu.Lock()
 				if err != nil {
@@ -772,7 +747,6 @@ func TestConcurrencyAndRaces_ClockSkew(t *testing.T) {
 				IdempotencyKey: fmt.Sprintf("cleanup-skew-%s", lease.IdempotencyKey),
 				AccountID:      te.AccountID,
 				LeaseID:        lease.LeaseID,
-				Migration:      MigrationIdentifier{QueueShard: "test"},
 			})
 			require.NoError(t, err)
 		}
@@ -798,9 +772,8 @@ func TestConcurrencyAndRaces_NetworkPartitions(t *testing.T) {
 			{
 				Kind: ConstraintKindConcurrency,
 				Concurrency: &ConcurrencyConstraint{
-					Mode:              enums.ConcurrencyModeStep,
-					Scope:             enums.ConcurrencyScopeFn,
-					InProgressItemKey: fmt.Sprintf("{%s}:concurrency:network:%s", te.KeyPrefix, te.FunctionID),
+					Mode:  enums.ConcurrencyModeStep,
+					Scope: enums.ConcurrencyScopeFn,
 				},
 			},
 		}
@@ -836,8 +809,7 @@ func TestConcurrencyAndRaces_NetworkPartitions(t *testing.T) {
 						Service:  ServiceExecutor,
 						Location: CallerLocationItemLease,
 					},
-					Migration: MigrationIdentifier{QueueShard: "test"},
-				})
+						})
 
 				mu.Lock()
 				if err != nil {
@@ -862,7 +834,6 @@ func TestConcurrencyAndRaces_NetworkPartitions(t *testing.T) {
 				IdempotencyKey: fmt.Sprintf("cleanup-network-%s", lease.IdempotencyKey),
 				AccountID:      te.AccountID,
 				LeaseID:        lease.LeaseID,
-				Migration:      MigrationIdentifier{QueueShard: "test"},
 			})
 			require.NoError(t, err)
 		}

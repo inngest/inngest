@@ -25,6 +25,7 @@ import { useShared } from '../SharedContext/SharedContext';
 import { StatusDot } from '../Status/StatusDot';
 import { DragDivider } from '../icons/DragDivider';
 import { loadingSentinel, type Lazy } from '../utils/lazyLoad';
+import { formatSkipReason } from '../utils/skipReasons';
 import type { EventsTable } from './EventsTable';
 
 function toLazy<T>(data: T | undefined, isPending: boolean): Lazy<T | undefined> {
@@ -151,7 +152,7 @@ export function EventDetails({
     usePrettyJson(eventPayloadData?.payload ?? '') || (eventPayloadData?.payload ?? '');
 
   const eventName = initialData?.name || eventDetailsData?.name;
-  const eventRuns = initialData?.runs || eventRunsData?.runs;
+  const eventRuns = eventRunsData?.runs || initialData?.runs;
 
   //
   // Calculate CodeBlock height based on content for non-standalone mode.
@@ -316,16 +317,38 @@ export function EventDetails({
                           <StatusDot status={run.status} />
                           <p className="text-basis text-sm font-medium">{run.fnName}</p>
                         </div>
-                        <div className="ml-[1.375rem] flex items-center gap-1">
-                          <p className="text-subtle text-xs lowercase first-letter:capitalize">
-                            {run.status}
-                          </p>
-                          {(run.completedAt || run.startedAt) && (
-                            <Time
-                              className="text-subtle text-xs"
-                              format="relative"
-                              value={run.completedAt ?? run.startedAt!}
-                            />
+                        <div className="ml-[1.375rem] flex flex-col gap-0.5">
+                          <div className="flex items-center gap-1">
+                            <p className="text-subtle text-xs lowercase first-letter:capitalize">
+                              {run.status}
+                            </p>
+                            {(run.completedAt || run.startedAt) && (
+                              <Time
+                                className="text-subtle text-xs"
+                                format="relative"
+                                value={run.completedAt ?? run.startedAt!}
+                              />
+                            )}
+                          </div>
+                          {run.status === 'SKIPPED' && (
+                            <p className="text-subtle text-xs">
+                              {run.skipExistingRunID ? (
+                                <>
+                                  <TanstackLink
+                                    to={pathCreator.runPopout({
+                                      runID: run.skipExistingRunID,
+                                    })}
+                                    className="text-link hover:underline"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    Another run
+                                  </TanstackLink>
+                                  {' already in progress'}
+                                </>
+                              ) : (
+                                formatSkipReason(run.skipReason)
+                              )}
+                            </p>
                           )}
                         </div>
                       </div>

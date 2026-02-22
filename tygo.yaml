@@ -12,6 +12,8 @@ packages:
       export type SpanMetadataKind =
         | typeof KindInngestAI
         | typeof KindInngestHTTP
+        | typeof KindInngestHTTPTiming
+        | typeof KindInngestResponseHeaders
         | typeof KindInngestWarnings
         | SpanMetadataKindUserland;
     type_mappings:

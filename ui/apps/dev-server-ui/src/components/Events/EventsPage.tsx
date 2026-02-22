@@ -14,6 +14,7 @@ import { ExpandedRowActions } from '@/components/Events/ExpandedRowActions';
 import {
   useEventDetails,
   useEventPayload,
+  useEventRuns,
   useEvents,
 } from '@/components/Events/useEvents';
 import { useNavigate } from '@tanstack/react-router';
@@ -46,6 +47,7 @@ export default function EventsPage({
   const getEvents = useEvents();
   const getEventDetails = useEventDetails();
   const getEventPayload = useEventPayload();
+  const getEventRuns = useEventRuns();
 
   return (
     <>
@@ -76,6 +78,7 @@ export default function EventsPage({
         getEvents={getEvents}
         getEventDetails={getEventDetails}
         getEventPayload={getEventPayload}
+        getEventRuns={getEventRuns}
         eventNames={eventTypeNames}
         singleEventTypePage={false}
         features={{

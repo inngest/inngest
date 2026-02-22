@@ -93,7 +93,12 @@ func PartitionLeaseOptionDisableLeaseChecks(disableLeaseChecks bool) PartitionLe
 	}
 }
 
+type ShardAssingmentManager interface {
+	SetPrimaryShard(ctx context.Context, queueShard QueueShard)
+}
+
 type QueueManager interface {
+	ShardAssingmentManager
 	JobQueueReader
 	Queue
 
@@ -113,6 +118,8 @@ type QueueManager interface {
 	BacklogsByPartition(ctx context.Context, queueShard QueueShard, partitionID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueBacklog], error)
 	// BacklogSize retrieves the number of items in the specified backlog
 	BacklogSize(ctx context.Context, queueShard QueueShard, backlogID string) (int64, error)
+	// BacklogByID retrieves a single backlog by its ID
+	BacklogByID(ctx context.Context, queueShard QueueShard, backlogID string) (*QueueBacklog, error)
 	// PartitionByID retrieves the partition by the partition ID
 	PartitionByID(ctx context.Context, queueShard QueueShard, partitionID string) (*PartitionInspectionResult, error)
 	// ItemByID retrieves the queue item by the jobID
@@ -173,6 +180,25 @@ type QueueProcessor interface {
 	AddShadowContinue(ctx context.Context, p *QueueShadowPartition, ctr uint)
 	GetShadowContinuations() map[string]ShadowContinuation
 	ClearShadowContinuations()
+
+	BacklogRefillConstraintCheck(
+		ctx context.Context,
+		shadowPart *QueueShadowPartition,
+		backlog *QueueBacklog,
+		constraints PartitionConstraintConfig,
+		items []*QueueItem,
+		operationIdempotencyKey string,
+		now time.Time,
+	) (*BacklogRefillConstraintCheckResult, error)
+
+	ItemLeaseConstraintCheck(
+		ctx context.Context,
+		shadowPart *QueueShadowPartition,
+		backlog *QueueBacklog,
+		constraints PartitionConstraintConfig,
+		item *QueueItem,
+		now time.Time,
+	) (ItemLeaseConstraintCheckResult, error)
 }
 
 type ShardOperations interface {
@@ -204,6 +230,7 @@ type ShardOperations interface {
 	PartitionSize(ctx context.Context, partitionID string, until time.Time) (int64, error)
 
 	ConfigLease(ctx context.Context, key string, duration time.Duration, existingLeaseID ...*ulid.ULID) (*ulid.ULID, error)
+	ShardLease(ctx context.Context, key string, duration time.Duration, maxLeases int, existingLeaseID ...*ulid.ULID) (*ulid.ULID, error)
 
 	AccountPeek(ctx context.Context, sequential bool, until time.Time, limit int64) ([]uuid.UUID, error)
 
@@ -221,25 +248,6 @@ type ShardOperations interface {
 		peekUntil time.Time,
 		sequential bool,
 	) ([]*QueuePartition, error)
-
-	BacklogRefillConstraintCheck(
-		ctx context.Context,
-		shadowPart *QueueShadowPartition,
-		backlog *QueueBacklog,
-		constraints PartitionConstraintConfig,
-		items []*QueueItem,
-		operationIdempotencyKey string,
-		now time.Time,
-	) (*BacklogRefillConstraintCheckResult, error)
-
-	ItemLeaseConstraintCheck(
-		ctx context.Context,
-		shadowPart *QueueShadowPartition,
-		backlog *QueueBacklog,
-		constraints PartitionConstraintConfig,
-		item *QueueItem,
-		now time.Time,
-	) (ItemLeaseConstraintCheckResult, error)
 
 	RemoveQueueItem(ctx context.Context, partitionID string, itemID string) error
 	LoadQueueItem(ctx context.Context, itemID string) (*QueueItem, error)
@@ -270,6 +278,7 @@ type ShardOperations interface {
 	BacklogRequeue(ctx context.Context, backlog *QueueBacklog, sp *QueueShadowPartition, requeueAt time.Time) error
 	BacklogsByPartition(ctx context.Context, partitionID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueBacklog], error)
 	BacklogSize(ctx context.Context, backlogID string) (int64, error)
+	BacklogByID(ctx context.Context, backlogID string) (*QueueBacklog, error)
 
 	PeekShadowPartitions(ctx context.Context, accountID *uuid.UUID, sequential bool, peekLimit int64, until time.Time) ([]*QueueShadowPartition, error)
 
@@ -286,7 +295,7 @@ type ShardOperations interface {
 	PartitionBacklogSize(ctx context.Context, partitionID string) (int64, error)
 	PartitionByID(ctx context.Context, partitionID string) (*PartitionInspectionResult, error)
 
-	UnpauseFunction(ctx context.Context, acctID, fnID uuid.UUID) error
+	UnpauseFunction(ctx context.Context, acctID, envID, fnID uuid.UUID) error
 
 	OutstandingJobCount(ctx context.Context, workspaceID, workflowID uuid.UUID, runID ulid.ULID) (int, error)
 	RunningCount(ctx context.Context, functionID uuid.UUID) (int64, error)

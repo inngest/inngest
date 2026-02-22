@@ -46,5 +46,13 @@ service Debug {
   rpc DeleteDebounce(DeleteDebounceRequest) returns (DeleteDebounceResponse) {}
   // RunDebounce triggers immediate execution of a debounce.
   rpc RunDebounce(RunDebounceRequest) returns (RunDebounceResponse) {}
+  // DeleteDebounceByID deletes debounces directly by their IDs, without requiring function_id or debounce_key.
+  rpc DeleteDebounceByID(DeleteDebounceByIDRequest) returns (DeleteDebounceByIDResponse) {}
+  // GetShadowPartition retrieves shadow partition details for a given partition ID
+  rpc GetShadowPartition(ShadowPartitionRequest) returns (ShadowPartitionResponse) {}
+  // GetBacklogs retrieves the list of backlogs for a partition
+  rpc GetBacklogs(BacklogsRequest) returns (BacklogsResponse) {}
+  // GetBacklogSize retrieves the number of items in a specific backlog
+  rpc GetBacklogSize(BacklogSizeRequest) returns (BacklogSizeResponse) {}
 }
 

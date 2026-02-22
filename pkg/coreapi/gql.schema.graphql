@@ -207,6 +207,7 @@ enum FunctionRunStatus {
   CANCELLED
   RUNNING
   QUEUED
+  SKIPPED
 }
 
 enum FunctionEventType {
@@ -516,6 +517,7 @@ enum RunTraceSpanStatus {
   # TIMED_OUT # wait for event timed out waiting
   WAITING # sleeping, waiting for an event
   CANCELLED # cancelled run
+  SKIPPED # run was skipped (e.g. singleton, paused, backlog limit)
 }
 
 enum StepOp {
@@ -600,6 +602,8 @@ type RunTraceSpan {
   debugRunID: ULID
   debugSessionID: ULID
   debugPaused: Boolean!
+  skipReason: String
+  skipExistingRunID: String
   metadata: [SpanMetadata!]!
 }
 

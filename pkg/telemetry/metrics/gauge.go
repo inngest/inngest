@@ -111,6 +111,24 @@ func GaugeShadowPartitionSize(ctx context.Context, value int64, opts GaugeOpt) {
 	})
 }
 
+func GaugeShardLeaseCapacity(ctx context.Context, val int64, opts GaugeOpt) {
+	RecordGaugeMetric(ctx, val, GaugeOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "shard_lease_capacity",
+		Description: "The lease capacity of a queue shard",
+		Tags:        opts.Tags,
+	})
+}
+
+func GaugeActiveShardLease(ctx context.Context, val int64, opts GaugeOpt) {
+	RecordGaugeMetric(ctx, val, GaugeOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "active_shard_lease",
+		Description: "Whether this worker holds an active shard lease",
+		Tags:        opts.Tags,
+	})
+}
+
 func GaugeAggregatorPendingDeletes(ctx context.Context, value int64, opts GaugeOpt) {
 	RecordGaugeMetric(ctx, value, GaugeOpt{
 		PkgName:     opts.PkgName,

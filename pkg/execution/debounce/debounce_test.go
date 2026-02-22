@@ -2270,3 +2270,232 @@ func TestRunDebounce(t *testing.T) {
 		require.Equal(t, eventId.String(), result.EventID)
 	})
 }
+
+func TestDeleteDebounceByID(t *testing.T) {
+	unshardedCluster := miniredis.RunT(t)
+
+	unshardedRc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{unshardedCluster.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+
+	unshardedClient := redis_state.NewUnshardedClient(unshardedRc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
+	debounceClient := unshardedClient.Debounce()
+
+	opts := []queue.QueueOpt{
+		queue.WithKindToQueueMapping(map[string]string{
+			queue.KindDebounce: queue.KindDebounce,
+		}),
+	}
+
+	shard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), opts...)
+
+	q, err := queue.New(
+		context.Background(),
+		"debounce-test",
+		shard,
+		map[string]queue.QueueShard{
+			consts.DefaultQueueShardName: shard,
+		},
+		func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
+			return shard, nil
+		},
+		opts...,
+	)
+	require.NoError(t, err)
+
+	redisDebouncer := NewRedisDebouncer(debounceClient, shard, q)
+
+	ctx := context.Background()
+	accountId, workspaceId, appId := uuid.New(), uuid.New(), uuid.New()
+
+	// helper to create a debounce and return its ULID
+	createDebounce := func(t *testing.T) (uuid.UUID, ulid.ULID) {
+		t.Helper()
+		functionId := uuid.New()
+		fn := inngest.Function{
+			ID: functionId,
+			Debounce: &inngest.Debounce{
+				Key:     nil,
+				Period:  "10s",
+				Timeout: util.StrPtr("60s"),
+			},
+		}
+
+		eventId := ulid.MustNew(ulid.Now(), rand.Reader)
+		di := DebounceItem{
+			AccountID:       accountId,
+			WorkspaceID:     workspaceId,
+			AppID:           appId,
+			FunctionID:      functionId,
+			FunctionVersion: 1,
+			EventID:         eventId,
+			Event: event.Event{
+				Name:      "test/debounce-event",
+				ID:        eventId.String(),
+				Timestamp: time.Now().UnixMilli(),
+				Data:      map[string]any{"key": "value"},
+			},
+		}
+
+		err := redisDebouncer.Debounce(ctx, di, fn)
+		require.NoError(t, err)
+
+		info, err := redisDebouncer.GetDebounceInfo(ctx, functionId, functionId.String())
+		require.NoError(t, err)
+		require.NotEmpty(t, info.DebounceID)
+
+		debounceID := ulid.MustParse(info.DebounceID)
+		return functionId, debounceID
+	}
+
+	// hashFieldExists checks if a field exists in a Redis hash using miniredis.
+	hashFieldExists := func(key, field string) bool {
+		val := unshardedCluster.HGet(key, field)
+		return val != ""
+	}
+
+	t.Run("no debounce exists should succeed", func(t *testing.T) {
+		fakeID := ulid.MustNew(ulid.Now(), rand.Reader)
+		err := redisDebouncer.DeleteDebounceByID(ctx, fakeID)
+		require.NoError(t, err)
+	})
+
+	t.Run("delete current debounce by ID", func(t *testing.T) {
+		functionId, debounceID := createDebounce(t)
+
+		// Verify the debounce item exists in the hash
+		debounceKey := debounceClient.KeyGenerator().Debounce(ctx)
+		require.True(t, hashFieldExists(debounceKey, debounceID.String()), "debounce item should exist in hash")
+
+		// Verify the timeout queue item exists
+		queueItemId := queue.HashID(ctx, debounceID.String())
+		_, err := shard.LoadQueueItem(ctx, queueItemId)
+		require.NoError(t, err, "timeout queue item should exist")
+
+		// Delete by ID
+		err = redisDebouncer.DeleteDebounceByID(ctx, debounceID)
+		require.NoError(t, err)
+
+		// Verify the debounce item is gone from the hash
+		require.False(t, hashFieldExists(debounceKey, debounceID.String()), "debounce item should be deleted from hash")
+
+		// Verify the timeout queue item is gone
+		_, err = shard.LoadQueueItem(ctx, queueItemId)
+		require.ErrorIs(t, err, queue.ErrQueueItemNotFound, "timeout queue item should be deleted")
+
+		// The pointer key may still exist (DeleteDebounceByID does not clean it up),
+		// but GetDebounceInfo should handle this gracefully.
+		info, err := redisDebouncer.GetDebounceInfo(ctx, functionId, functionId.String())
+		require.NoError(t, err)
+		require.Nil(t, info.Item, "debounce item should not be found via pointer")
+	})
+
+	t.Run("delete debounce after pointer is dropped", func(t *testing.T) {
+		_, debounceID := createDebounce(t)
+
+		debounceKey := debounceClient.KeyGenerator().Debounce(ctx)
+		require.True(t, hashFieldExists(debounceKey, debounceID.String()), "debounce item should exist in hash before deletion")
+
+		// Verify the timeout queue item exists
+		queueItemId := queue.HashID(ctx, debounceID.String())
+		_, err := shard.LoadQueueItem(ctx, queueItemId)
+		require.NoError(t, err, "timeout queue item should exist")
+
+		// Delete by ID (pointer is gone, but item + timeout still exist)
+		err = redisDebouncer.DeleteDebounceByID(ctx, debounceID)
+		require.NoError(t, err)
+
+		// Verify item is gone from hash
+		require.False(t, hashFieldExists(debounceKey, debounceID.String()), "debounce item should be deleted from hash")
+
+		// Verify timeout queue item is gone
+		_, err = shard.LoadQueueItem(ctx, queueItemId)
+		require.ErrorIs(t, err, queue.ErrQueueItemNotFound, "timeout queue item should be deleted")
+	})
+
+	t.Run("delete debounce when timeout already removed", func(t *testing.T) {
+		_, debounceID := createDebounce(t)
+
+		debounceKey := debounceClient.KeyGenerator().Debounce(ctx)
+		require.True(t, hashFieldExists(debounceKey, debounceID.String()), "debounce item should exist in hash")
+
+		// Manually remove the timeout queue item first
+		queueItemId := queue.HashID(ctx, debounceID.String())
+		err := shard.RemoveQueueItem(ctx, queue.KindDebounce, queueItemId)
+		require.NoError(t, err)
+
+		// Verify timeout is gone
+		_, err = shard.LoadQueueItem(ctx, queueItemId)
+		require.ErrorIs(t, err, queue.ErrQueueItemNotFound, "timeout should already be gone")
+
+		// Delete by ID should still succeed (timeout removal is best-effort)
+		err = redisDebouncer.DeleteDebounceByID(ctx, debounceID)
+		require.NoError(t, err)
+
+		// Verify item is gone from hash
+		require.False(t, hashFieldExists(debounceKey, debounceID.String()), "debounce item should be deleted from hash")
+	})
+
+	t.Run("missing item but existing timeout job should clean up timeout", func(t *testing.T) {
+		_, debounceID := createDebounce(t)
+
+		debounceKey := debounceClient.KeyGenerator().Debounce(ctx)
+
+		// Manually remove the debounce item from the hash, leaving only the timeout
+		unshardedCluster.HDel(debounceKey, debounceID.String())
+		require.False(t, hashFieldExists(debounceKey, debounceID.String()), "debounce item should be gone from hash")
+
+		// Verify the timeout queue item still exists
+		queueItemId := queue.HashID(ctx, debounceID.String())
+		_, err := shard.LoadQueueItem(ctx, queueItemId)
+		require.NoError(t, err, "timeout queue item should still exist")
+
+		// Delete by ID — HDEL on missing item is a no-op, but timeout should be cleaned up
+		err = redisDebouncer.DeleteDebounceByID(ctx, debounceID)
+		require.NoError(t, err)
+
+		// Verify timeout queue item is now gone
+		_, err = shard.LoadQueueItem(ctx, queueItemId)
+		require.ErrorIs(t, err, queue.ErrQueueItemNotFound, "timeout queue item should be deleted")
+	})
+
+	t.Run("batch delete multiple debounce IDs", func(t *testing.T) {
+		_, debounceID1 := createDebounce(t)
+		_, debounceID2 := createDebounce(t)
+
+		debounceKey := debounceClient.KeyGenerator().Debounce(ctx)
+
+		// Both items should exist
+		require.True(t, hashFieldExists(debounceKey, debounceID1.String()))
+		require.True(t, hashFieldExists(debounceKey, debounceID2.String()))
+
+		queueItemId1 := queue.HashID(ctx, debounceID1.String())
+		queueItemId2 := queue.HashID(ctx, debounceID2.String())
+
+		_, err := shard.LoadQueueItem(ctx, queueItemId1)
+		require.NoError(t, err)
+		_, err = shard.LoadQueueItem(ctx, queueItemId2)
+		require.NoError(t, err)
+
+		// Batch delete both
+		err = redisDebouncer.DeleteDebounceByID(ctx, debounceID1, debounceID2)
+		require.NoError(t, err)
+
+		// Both items should be gone from hash
+		require.False(t, hashFieldExists(debounceKey, debounceID1.String()))
+		require.False(t, hashFieldExists(debounceKey, debounceID2.String()))
+
+		// Both timeout queue items should be gone
+		_, err = shard.LoadQueueItem(ctx, queueItemId1)
+		require.ErrorIs(t, err, queue.ErrQueueItemNotFound)
+		_, err = shard.LoadQueueItem(ctx, queueItemId2)
+		require.ErrorIs(t, err, queue.ErrQueueItemNotFound)
+	})
+
+	t.Run("empty ID list is a no-op", func(t *testing.T) {
+		err := redisDebouncer.DeleteDebounceByID(ctx)
+		require.NoError(t, err)
+	})
+}

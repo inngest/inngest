@@ -45,22 +45,6 @@ func New(
 ) (*queueProcessor, error) {
 	o := NewQueueOptions(options...)
 
-	if primaryQueueShard == nil {
-		return nil, fmt.Errorf("must pass primary queue shard")
-	}
-
-	if queueShardClients == nil {
-		queueShardClients = map[string]QueueShard{
-			primaryQueueShard.Name(): primaryQueueShard,
-		}
-	}
-
-	if shardSelector == nil {
-		shardSelector = func(ctx context.Context, accountId uuid.UUID, queueName *string) (QueueShard, error) {
-			return primaryQueueShard, nil
-		}
-	}
-
 	qp := &queueProcessor{
 		name: name,
 
@@ -71,6 +55,7 @@ func New(
 		scavengerLeaseLock:       &sync.RWMutex{},
 		activeCheckerLeaseLock:   &sync.RWMutex{},
 		instrumentationLeaseLock: &sync.RWMutex{},
+		shardLeaseLock:           &sync.RWMutex{},
 
 		continuesLock:    &sync.Mutex{},
 		continues:        map[string]continuation{},
@@ -91,6 +76,14 @@ func New(
 		shadowContinueCooldown: map[string]time.Time{},
 	}
 
+	if primaryQueueShard != nil {
+		qp.SetPrimaryShard(ctx, primaryQueueShard)
+	} else if o.runMode.ShardGroup == "" {
+		return nil, fmt.Errorf("must pass either primary queue shard or a valid ShardGroup in runMode")
+	} else if len(qp.shardsByGroupName(o.runMode.ShardGroup)) == 0 {
+		return nil, fmt.Errorf("No shards found for configured shard group: %s", o.runMode.ShardGroup)
+	}
+
 	return qp, nil
 }
 
@@ -100,7 +93,6 @@ type queueProcessor struct {
 	// name is the identifiable name for this worker, for logging.
 	name string
 
-	primaryQueueShard QueueShard
 	queueShardClients map[string]QueueShard
 	shardSelector     ShardSelector
 
@@ -135,6 +127,14 @@ type queueProcessor struct {
 	// seqLeaseLock ensures that there are no data races writing to
 	// or reading from seqLeaseID in parallel.
 	seqLeaseLock *sync.RWMutex
+
+	primaryQueueShard QueueShard
+	// shardLeaseID stores the lease ID for the primaryQueueShard this queue is processing from.
+	// all runners attempt to claim this lease on start up.
+	shardLeaseID *ulid.ULID
+	// shardLeaseLock ensures that there are no data races writing to
+	// or reading from shardLeaseID in parallel.
+	shardLeaseLock *sync.RWMutex
 
 	// instrumentationLeaseID stores the lease ID if executor is running queue
 	// instrumentations
@@ -186,6 +186,23 @@ func (q *queueProcessor) Shard() QueueShard {
 	return q.primaryQueueShard
 }
 
+// Implements SetPrimaryShard() in ShardAssingmentManager interface
+func (q *queueProcessor) SetPrimaryShard(ctx context.Context, queueShard QueueShard) {
+	q.primaryQueueShard = queueShard
+
+	if q.queueShardClients == nil {
+		q.queueShardClients = map[string]QueueShard{
+			queueShard.Name(): queueShard,
+		}
+	}
+
+	if q.shardSelector == nil {
+		q.shardSelector = func(ctx context.Context, accountId uuid.UUID, queueName *string) (QueueShard, error) {
+			return queueShard, nil
+		}
+	}
+}
+
 func (q *queueProcessor) Semaphore() util.TrackingSemaphore {
 	return q.sem
 }
@@ -201,6 +218,11 @@ func (q *queueProcessor) Workers() chan ProcessItem {
 // BacklogSize implements QueueManager.
 func (q *queueProcessor) BacklogSize(ctx context.Context, shard QueueShard, backlogID string) (int64, error) {
 	return shard.BacklogSize(ctx, backlogID)
+}
+
+// BacklogByID implements QueueManager.
+func (q *queueProcessor) BacklogByID(ctx context.Context, shard QueueShard, backlogID string) (*QueueBacklog, error) {
+	return shard.BacklogByID(ctx, backlogID)
 }
 
 // BacklogsByPartition implements QueueManager.
@@ -244,6 +266,16 @@ func (q *queueProcessor) shardByName(name string) (QueueShard, error) {
 		return nil, ErrQueueShardNotFound
 	}
 	return shard, nil
+}
+
+func (q *queueProcessor) shardsByGroupName(groupName string) []QueueShard {
+	var shards []QueueShard
+	for _, shard := range q.queueShardClients {
+		if shard.ShardAssignmentConfig().ShardGroup == groupName {
+			shards = append(shards, shard)
+		}
+	}
+	return shards
 }
 
 // LoadQueueItem implements QueueManager.
@@ -402,6 +434,15 @@ func (q *queueProcessor) ResetAttemptsByJobID(ctx context.Context, shardName str
 }
 
 func (q *queueProcessor) Run(ctx context.Context, f RunFunc) error {
+	// claimShardLease will block until a shard lease is obtained to process the primaryQueueShard.
+	l := logger.StdlibLogger(ctx)
+	if len(q.runMode.ShardGroup) != 0 {
+		l.Info("Executor started in ShardGroup mode, attempting to claim a shard lease", "shard_group", q.runMode.ShardGroup)
+		q.claimShardLease(ctx)
+	} else {
+		l.Info("Executor started in assignedQueueShard Mode", "queue_shard", q.primaryQueueShard.Name())
+	}
+
 	if q.runMode.Sequential {
 		go q.claimSequentialLease(ctx)
 	}
@@ -449,12 +490,12 @@ func (q *queueProcessor) SetFunctionMigrate(ctx context.Context, sourceShard str
 }
 
 // UnpauseFunction implements Queue.
-func (q *queueProcessor) UnpauseFunction(ctx context.Context, shardName string, acctID uuid.UUID, fnID uuid.UUID) error {
+func (q *queueProcessor) UnpauseFunction(ctx context.Context, shardName string, acctID uuid.UUID, envID, fnID uuid.UUID) error {
 	shard, err := q.shardByName(shardName)
 	if err != nil {
 		return err
 	}
-	return shard.UnpauseFunction(ctx, acctID, fnID)
+	return shard.UnpauseFunction(ctx, acctID, envID, fnID)
 }
 
 func (q *queueProcessor) capacity() int64 {

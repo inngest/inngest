@@ -45,24 +45,14 @@ func (r *redisCapacityManager) Release(ctx context.Context, req *CapacityRelease
 		"account_id", req.AccountID,
 		"lease_id", req.LeaseID,
 		"source", req.Source,
-		"migration", req.Migration,
+		"shard", r.shardName,
 	)
 
-	// Retrieve client and key prefix for current constraints
-	// NOTE: We will no longer need this once we move to a dedicated store for constraint state
-	keyPrefix, client, err := r.clientAndPrefix(req.Migration)
-	if err != nil {
-		return nil, errs.Wrap(0, false, "could not get client: %w", err)
-	}
-
-	// Deterministically compute this based on numScavengerShards and accountID
-	scavengerShard := r.scavengerShard(ctx, req.AccountID)
-
 	keys := []string{
-		r.keyOperationIdempotency(keyPrefix, req.AccountID, "rel", req.IdempotencyKey),
-		r.keyScavengerShard(keyPrefix, scavengerShard),
-		r.keyAccountLeases(keyPrefix, req.AccountID),
-		r.keyLeaseDetails(keyPrefix, req.AccountID, req.LeaseID),
+		r.keyOperationIdempotency(req.AccountID, "rel", req.IdempotencyKey),
+		r.keyScavengerShard(),
+		r.keyAccountLeases(req.AccountID),
+		r.keyLeaseDetails(req.AccountID, req.LeaseID),
 	}
 
 	enableDebugLogsVal := "0"
@@ -70,7 +60,7 @@ func (r *redisCapacityManager) Release(ctx context.Context, req *CapacityRelease
 		enableDebugLogsVal = "1"
 	}
 
-	scopedKeyPrefix := fmt.Sprintf("{%s}:%s", keyPrefix, accountScope(req.AccountID))
+	scopedKeyPrefix := fmt.Sprintf("{cs}:%s", accountScope(req.AccountID))
 
 	args, err := strSlice([]any{
 		scopedKeyPrefix,
@@ -93,9 +83,9 @@ func (r *redisCapacityManager) Release(ctx context.Context, req *CapacityRelease
 	rawRes, internalErr := executeLuaScript(
 		ctx,
 		"release",
-		req.Migration,
+		r.shardName,
 		req.Source,
-		client,
+		r.client,
 		r.clock,
 		keys,
 		args,

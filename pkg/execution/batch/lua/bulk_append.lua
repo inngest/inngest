@@ -78,11 +78,6 @@ redis.call("EXPIRE", batchIdempotenceKey, idempotenceSetTTL)
 
 -- If all events were duplicates, return early
 if #eventsToAdd == 0 then
-  local currentLen = redis.call("LLEN", batchKey)
-  local status = "append"
-  if currentLen == 0 or isNewBatch then
-    status = "new"
-  end
   return cjson.encode({
     status = "itemexists",
     batchID = batchID,

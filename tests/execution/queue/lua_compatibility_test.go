@@ -3,7 +3,6 @@ package queue
 import (
 	"context"
 	"crypto/rand"
-	"fmt"
 	"strconv"
 	"testing"
 	"time"
@@ -312,7 +311,7 @@ func TestLuaCompatibility(t *testing.T) {
 					queue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p queue.PartitionIdentifier) queue.PartitionConstraintConfig {
 						return constraints
 					}),
-					queue.WithAllowKeyQueues(func(ctx context.Context, acctID, fnID uuid.UUID) bool {
+					queue.WithAllowKeyQueues(func(ctx context.Context, acctID, envID, fnID uuid.UUID) bool {
 						return true
 					}),
 				}
@@ -449,16 +448,13 @@ func TestLuaCompatibility(t *testing.T) {
 			t.Run("acquiring capacity works", func(t *testing.T) {
 				shard := setup(t)
 
+				rc := shard.Client().Client()
+
 				cm, err := constraintapi.NewRedisCapacityManager(
 					constraintapi.WithClock(clockwork.NewRealClock()),
 					constraintapi.WithEnableDebugLogs(false),
-					constraintapi.WithNumScavengerShards(4),
-					constraintapi.WithQueueShards(map[string]rueidis.Client{
-						shard.Name(): shard.Client().Client(),
-					}),
-					constraintapi.WithQueueStateKeyPrefix("q:v1"),
-					constraintapi.WithRateLimitClient(shard.Client().Client()),
-					constraintapi.WithRateLimitKeyPrefix("rl"),
+					constraintapi.WithClient(rc),
+					constraintapi.WithShardName("test"),
 				)
 				require.NoError(t, err)
 
@@ -478,26 +474,20 @@ func TestLuaCompatibility(t *testing.T) {
 					{
 						Kind: constraintapi.ConstraintKindConcurrency,
 						Concurrency: &constraintapi.ConcurrencyConstraint{
-							Scope:             enums.ConcurrencyScopeAccount,
-							Mode:              enums.ConcurrencyModeStep,
-							InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:account:%s", accountID),
+							Scope: enums.ConcurrencyScopeAccount,
+							Mode:  enums.ConcurrencyModeStep,
 						},
 					},
 					{
 						Kind: constraintapi.ConstraintKindConcurrency,
 						Concurrency: &constraintapi.ConcurrencyConstraint{
-							Scope:             enums.ConcurrencyScopeFn,
-							Mode:              enums.ConcurrencyModeStep,
-							InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:p:%s", functionID),
+							Scope: enums.ConcurrencyScopeFn,
+							Mode:  enums.ConcurrencyModeStep,
 						},
 					},
 				}
 
 				checkResp, userErr, internalErr := cm.Check(ctx, &constraintapi.CapacityCheckRequest{
-					Migration: constraintapi.MigrationIdentifier{
-						IsRateLimit: false,
-						QueueShard:  shard.Name(),
-					},
 					AccountID:     accountID,
 					EnvID:         envID,
 					FunctionID:    functionID,
@@ -515,10 +505,6 @@ func TestLuaCompatibility(t *testing.T) {
 				require.Equal(t, 0, checkResp.Usage[1].Used)
 
 				acquireResp, err := cm.Acquire(ctx, &constraintapi.CapacityAcquireRequest{
-					Migration: constraintapi.MigrationIdentifier{
-						IsRateLimit: false,
-						QueueShard:  shard.Name(),
-					},
 					IdempotencyKey:       "acquire-test",
 					AccountID:            accountID,
 					EnvID:                envID,
@@ -546,10 +532,6 @@ func TestLuaCompatibility(t *testing.T) {
 				require.Empty(t, acquireResp.ExhaustedConstraints, "ExhaustedConstraints should be empty when leases are granted")
 
 				extendResp, err := cm.ExtendLease(ctx, &constraintapi.CapacityExtendLeaseRequest{
-					Migration: constraintapi.MigrationIdentifier{
-						IsRateLimit: false,
-						QueueShard:  shard.Name(),
-					},
 					IdempotencyKey: "extend-test",
 					AccountID:      accountID,
 					Duration:       5 * time.Second,
@@ -561,10 +543,6 @@ func TestLuaCompatibility(t *testing.T) {
 				require.NotNil(t, extendResp.LeaseID)
 
 				releaseResp, err := cm.Release(ctx, &constraintapi.CapacityReleaseRequest{
-					Migration: constraintapi.MigrationIdentifier{
-						IsRateLimit: false,
-						QueueShard:  shard.Name(),
-					},
 					IdempotencyKey: "release-test",
 					AccountID:      accountID,
 					LeaseID:        *extendResp.LeaseID,
@@ -590,16 +568,13 @@ func TestLuaCompatibility(t *testing.T) {
 			t.Run("acquiring capacity when exhausted", func(t *testing.T) {
 				shard := setup(t)
 
+				rc := shard.Client().Client()
+
 				cm, err := constraintapi.NewRedisCapacityManager(
 					constraintapi.WithClock(clockwork.NewRealClock()),
 					constraintapi.WithEnableDebugLogs(false),
-					constraintapi.WithNumScavengerShards(4),
-					constraintapi.WithQueueShards(map[string]rueidis.Client{
-						shard.Name(): shard.Client().Client(),
-					}),
-					constraintapi.WithQueueStateKeyPrefix("q:v1"),
-					constraintapi.WithRateLimitClient(shard.Client().Client()),
-					constraintapi.WithRateLimitKeyPrefix("rl"),
+					constraintapi.WithClient(rc),
+					constraintapi.WithShardName("test"),
 				)
 				require.NoError(t, err)
 
@@ -620,27 +595,21 @@ func TestLuaCompatibility(t *testing.T) {
 					{
 						Kind: constraintapi.ConstraintKindConcurrency,
 						Concurrency: &constraintapi.ConcurrencyConstraint{
-							Scope:             enums.ConcurrencyScopeAccount,
-							Mode:              enums.ConcurrencyModeStep,
-							InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:account:%s", accountID),
+							Scope: enums.ConcurrencyScopeAccount,
+							Mode:  enums.ConcurrencyModeStep,
 						},
 					},
 					{
 						Kind: constraintapi.ConstraintKindConcurrency,
 						Concurrency: &constraintapi.ConcurrencyConstraint{
-							Scope:             enums.ConcurrencyScopeFn,
-							Mode:              enums.ConcurrencyModeStep,
-							InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:p:%s", functionID),
+							Scope: enums.ConcurrencyScopeFn,
+							Mode:  enums.ConcurrencyModeStep,
 						},
 					},
 				}
 
 				// Acquire first lease (should succeed)
 				acquire1Resp, err := cm.Acquire(ctx, &constraintapi.CapacityAcquireRequest{
-					Migration: constraintapi.MigrationIdentifier{
-						IsRateLimit: false,
-						QueueShard:  shard.Name(),
-					},
 					IdempotencyKey:       "acquire-1",
 					AccountID:            accountID,
 					EnvID:                envID,
@@ -665,10 +634,6 @@ func TestLuaCompatibility(t *testing.T) {
 
 				// Acquire second lease (should succeed, reaching the limit)
 				acquire2Resp, err := cm.Acquire(ctx, &constraintapi.CapacityAcquireRequest{
-					Migration: constraintapi.MigrationIdentifier{
-						IsRateLimit: false,
-						QueueShard:  shard.Name(),
-					},
 					IdempotencyKey:       "acquire-2",
 					AccountID:            accountID,
 					EnvID:                envID,
@@ -698,10 +663,6 @@ func TestLuaCompatibility(t *testing.T) {
 
 				// Acquire third lease (should fail due to exhaustion)
 				acquire3Resp, err := cm.Acquire(ctx, &constraintapi.CapacityAcquireRequest{
-					Migration: constraintapi.MigrationIdentifier{
-						IsRateLimit: false,
-						QueueShard:  shard.Name(),
-					},
 					IdempotencyKey:       "acquire-3",
 					AccountID:            accountID,
 					EnvID:                envID,

@@ -222,8 +222,8 @@ func (e *dbExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlyS
 			TraceID:      traceID,
 			ParentSpanID: sql.NullString{String: parentID, Valid: parentID != ""},
 			Name:         span.Name(),
-			StartTime:    span.StartTime(),
-			EndTime:      span.EndTime(),
+			StartTime:    span.StartTime().Round(0), // strip monotonic clock reading when inserting into database
+			EndTime:      span.EndTime().Round(0),
 			RunID:        runID,
 			AppID:        appID,
 			FunctionID:   functionID,

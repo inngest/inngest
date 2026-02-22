@@ -89,6 +89,86 @@ func (w wrapper) dialect() string {
 	return "sqlite3"
 }
 
+// spanRunsAdapter encapsulates all database-specific logic for GetSpanRuns.
+// This only makes sense because spans and events have very similar structure in SQLite and postgres
+// if we ever diverge more significantly, we should fork the query paths at a higher point and share less code
+type spanRunsAdapter struct {
+	dialect        string
+	celConverter   run.ExprSQLConverter
+	eventIdsExpr   sqexp.Expression
+	buildEventJoin func(q *sq.SelectDataset) *sq.SelectDataset
+	parseEventIDs  func(raw *string) []string
+	parseTime      func(s string) (time.Time, error)
+}
+
+var sqliteSpanRunsAdapter = spanRunsAdapter{
+	dialect:      "sqlite3",
+	celConverter: run.SpanEventSQLiteConverter,
+	eventIdsExpr: sq.L("MAX(spans.event_ids)").As("event_ids"),
+	buildEventJoin: func(q *sq.SelectDataset) *sq.SelectDataset {
+		// SQLite: json_each for unnesting
+		// json_each('') errors with "malformed JSON", so we use NULLIF to convert empty strings
+		// to NULL. json_each(NULL) safely returns no rows.
+		return q.InnerJoin(sq.L("json_each(NULLIF(spans.event_ids, '')) AS je"), sq.On(sq.L("1=1"))).
+			InnerJoin(sq.L("events"), sq.On(sq.L("je.value = events.event_id")))
+	},
+	parseEventIDs: func(raw *string) []string {
+		// SQLite: plain JSON array
+		var ids []string
+		if raw != nil && *raw != "" {
+			// Ignore error: return empty slice on parse failure
+		_ = json.Unmarshal([]byte(*raw), &ids)
+		}
+		return ids
+	},
+	parseTime: func(s string) (time.Time, error) {
+		// SQLite: we currently store the literal go time.Time string
+		// strip monotonic clock suffix if present
+		if idx := strings.Index(s, " m="); idx != -1 {
+			s = s[:idx]
+		}
+		return time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", s)
+	},
+}
+
+var postgresSpanRunsAdapter = spanRunsAdapter{
+	dialect:      "postgres",
+	celConverter: run.SpanEventPostgresConverter,
+	// PostgreSQL: cast JSONB to text first (no MAX for JSONB)
+	eventIdsExpr: sq.L("MAX(spans.event_ids::text)").As("event_ids"),
+	buildEventJoin: func(q *sq.SelectDataset) *sq.SelectDataset {
+		// PostgreSQL: jsonb_array_elements_text for unnesting
+		// event_ids is JSONB containing a JSON string (double-encoded), e.g. "[\"uuid\"]" or ""
+		// Extract string with #>>'{}', use NULLIF to handle empty strings, then parse as JSON
+		return q.InnerJoin(
+			sq.L("jsonb_array_elements_text(NULLIF(spans.event_ids#>>'{}', '')::jsonb) AS eid(event_id)"),
+			sq.On(sq.L("true")),
+		).InnerJoin(sq.T("events"), sq.On(sq.L("eid.event_id = events.event_id")))
+	},
+	parseEventIDs: func(raw *string) []string {
+		// PostgreSQL: double-encoded JSON (a JSON string containing a JSON array)
+		var ids []string
+		if raw != nil && *raw != "" {
+			var innerStr string
+			if err := json.Unmarshal([]byte(*raw), &innerStr); err == nil {
+				// Ignore error: return empty slice on parse failure
+			_ = json.Unmarshal([]byte(innerStr), &ids)
+			}
+		}
+		return ids
+	},
+	parseTime: func(s string) (time.Time, error) {
+		return time.Parse(time.RFC3339Nano, s)
+	},
+}
+
+func (w wrapper) spanRunsAdapter() spanRunsAdapter {
+	if w.isPostgres() {
+		return postgresSpanRunsAdapter
+	}
+	return sqliteSpanRunsAdapter
+}
+
 type normalizedSpan interface {
 	GetTraceID() string
 	GetRunID() string
@@ -1997,6 +2077,8 @@ func newRunsQueryBuilder(ctx context.Context, opt cqrs.GetTraceRunOpt) *runsQuer
 		}
 		filter = append(filter, sq.C("status").In(status))
 	}
+	// Skipped runs should only be visible in event-scoped queries, not the runs list
+	filter = append(filter, sq.C("status").Neq(enums.RunStatusSkipped.ToCode()))
 	tsfield := strings.ToLower(opt.Filter.TimeField.String())
 	filter = append(filter, sq.C(tsfield).Gte(opt.Filter.From.UnixMilli()))
 
@@ -2823,225 +2905,201 @@ func (w wrapper) GetWorkerConnections(ctx context.Context, opt cqrs.GetWorkerCon
 // EXTEND span grouping
 func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*cqrs.TraceRun, error) {
 	l := logger.StdlibLogger(ctx)
-
-	// use evtIDs as post query filter
-	// evtIDs := []string{}
-	// expHandler, err := run.NewExpressionHandler(ctx,
-	// 	run.WithExpressionHandlerBlob(opt.Filter.CEL, "\n"),
-	// )
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// if expHandler.HasEventFilters() {
-	// 	evts, err := w.GetEventsByExpressions(ctx, expHandler.EventExprList)
-	// 	if err != nil {
-	// 		return nil, err
-	// 	}
-	// 	for _, e := range evts {
-	// 		evtIDs = append(evtIDs, e.ID.String())
-	// 	}
-	// }
+	adapter := w.spanRunsAdapter()
 
 	builder := newSpanRunsQueryBuilder(ctx, opt)
-	filter := builder.filter
-	order := builder.order
-	resCursorLayout := builder.cursorLayout
 
-	// Query spans table directly, similar to how GetTraceRuns queries
-	// trace_runs
-	sql, args, err := sq.Dialect(w.dialect()).
-		From("spans").
-		Select(
-			"run_id",
-			"account_id",
-			"app_id",
-			"function_id",
-			"trace_id",
-			"dynamic_span_id",
-			"start_time",
-			"end_time",
-			"status",
-			"span_id",
-			"name",
-			"attributes",
-			"links",
-			"output",
-			"event_ids",
-			"input",
-		).
-		Where(sq.C("dynamic_span_id").In(
-			sq.Dialect(w.dialect()).Select("dynamic_span_id").Distinct().From("spans").Where(sq.C("name").Eq(meta.SpanNameRun)),
+	// Parse CEL expressions using adapter's converter
+	var celFilters []sq.Expression
+	var useJoin bool
+	if opt.Filter.CEL != "" {
+		expHandler, err := run.NewExpressionHandler(ctx,
+			run.WithExpressionHandlerBlob(opt.Filter.CEL, "\n"),
+			run.WithExpressionSQLConverter(adapter.celConverter),
+		)
+		if err != nil {
+			return nil, err
+		}
+		if expHandler.HasFilters() {
+			celFilters, err = expHandler.ToSQLFilters(ctx)
+			if err != nil {
+				return nil, err
+			}
+			useJoin = needsEventJoin(opt.Filter.CEL)
+		}
+	}
+
+	selectCols := []interface{}{
+		"spans.run_id",
+		"spans.dynamic_span_id",
+		"spans.account_id",
+		"spans.app_id",
+		"spans.function_id",
+		"spans.trace_id",
+		sq.L("MIN(spans.start_time)").As("start_time"),
+		sq.L("MAX(spans.end_time)").As("end_time"),
+		// subselect for argmax(status, end_time)
+		// not the most efficient but it'll do for now
+		sq.L(`(SELECT s2.status FROM spans s2
+			WHERE s2.run_id = spans.run_id AND s2.dynamic_span_id = spans.dynamic_span_id
+			ORDER BY s2.end_time DESC LIMIT 1)`).As("status"),
+		adapter.eventIdsExpr, // DB-specific due to storage differences
+	}
+
+	groupByCols := []interface{}{
+		"spans.run_id",
+		"spans.dynamic_span_id",
+		"spans.account_id",
+		"spans.app_id",
+		"spans.function_id",
+		"spans.trace_id",
+	}
+
+	// Build ORDER BY for aggregated columns
+	var orderExprs []sqexp.OrderedExpression
+	for _, o := range opt.Order {
+		var aggExpr sqexp.LiteralExpression
+		switch o.Field {
+		case enums.TraceRunTimeQueuedAt, enums.TraceRunTimeStartedAt:
+			aggExpr = sq.L("MIN(spans.start_time)")
+		case enums.TraceRunTimeEndedAt:
+			aggExpr = sq.L("MAX(spans.end_time)")
+		default:
+			aggExpr = sq.L("MIN(spans.start_time)")
+		}
+		if o.Direction == enums.TraceRunOrderAsc {
+			orderExprs = append(orderExprs, aggExpr.Asc())
+		} else {
+			orderExprs = append(orderExprs, aggExpr.Desc())
+		}
+	}
+	if len(orderExprs) == 0 {
+		orderExprs = append(orderExprs, sq.L("MIN(spans.start_time)").Desc())
+	}
+	// always add run_id at the end for stable sorting
+	orderExprs = append(orderExprs, sq.C("run_id").Asc())
+
+	q := sq.Dialect(adapter.dialect).From("spans")
+	if useJoin {
+		// database specific join syntax needed because event_ids is an array of ids to the events table,
+		// so we need to unpack that and perform the join before the spans are grouped back together by run_id
+		q = adapter.buildEventJoin(q)
+	}
+
+	allFilters := append(builder.filter, celFilters...)
+	q = q.Select(selectCols...).
+		Where(sq.L("spans.dynamic_span_id").In(
+			sq.Dialect(adapter.dialect).Select("dynamic_span_id").Distinct().From("spans").Where(sq.C("name").Eq(meta.SpanNameRun)),
 		)).
-		Where(filter...).
-		Order(order...).
-		ToSQL()
+		Where(allFilters...).
+		GroupBy(groupByCols...).
+		Order(orderExprs...)
+
+	if opt.Items > 0 {
+		q = q.Limit(opt.Items + 1) // fetch one more item than requested to determine hasNextPage
+	}
+
+	sqlQuery, args, err := q.ToSQL()
 	if err != nil {
 		return nil, err
 	}
 
-	rows, err := w.db.QueryContext(ctx, sql, args...)
+	l.Debug("GetSpanRuns query", "sql", sqlQuery, "args", args)
+
+	rows, err := w.db.QueryContext(ctx, sqlQuery, args...)
 	if err != nil {
+		l.Debug("GetSpanRuns query error", "error", err)
 		return nil, err
 	}
+	defer rows.Close()
 
-	// Define span row structure for scanning
-	type spanRow struct {
+	return w.convertSpanRunRows(ctx, rows, builder.cursorLayout, adapter, opt.Items)
+}
+
+// convertSpanRunRows converts database rows to TraceRun structs
+func (w wrapper) convertSpanRunRows(
+	ctx context.Context,
+	rows *sql.Rows,
+	cursorLayout *cqrs.TracePageCursor,
+	adapter spanRunsAdapter,
+	itemLimit uint,
+) ([]*cqrs.TraceRun, error) {
+	l := logger.StdlibLogger(ctx)
+
+	type runRow struct {
 		RunID         string
+		DynamicSpanID string
 		AccountID     string
 		AppID         string
 		FunctionID    string
 		TraceID       string
-		DynamicSpanID string
-		StartTime     time.Time
-		EndTime       *time.Time
+		StartTime     string
+		EndTime       *string
 		Status        *string
-		SpanID        string
-		Name          string
-		Attributes    *string
-		Links         *string
-		Output        *string
 		EventIDs      *string
-		Input         *string
 	}
 
-	// Group spans by run_id and dynamic_span_id
-	runSpanMap := make(map[string]map[string][]*spanRow)
+	res := []*cqrs.TraceRun{}
+	var count uint
+
 	for rows.Next() {
-		var span spanRow
+		var row runRow
 		err := rows.Scan(
-			&span.RunID,
-			&span.AccountID,
-			&span.AppID,
-			&span.FunctionID,
-			&span.TraceID,
-			&span.DynamicSpanID,
-			&span.StartTime,
-			&span.EndTime,
-			&span.Status,
-			&span.SpanID,
-			&span.Name,
-			&span.Attributes,
-			&span.Links,
-			&span.Output,
-			&span.EventIDs,
-			&span.Input,
+			&row.RunID,
+			&row.DynamicSpanID,
+			&row.AccountID,
+			&row.AppID,
+			&row.FunctionID,
+			&row.TraceID,
+			&row.StartTime,
+			&row.EndTime,
+			&row.Status,
+			&row.EventIDs,
 		)
 		if err != nil {
 			return nil, err
 		}
 
-		// TODO Event ID filtering based on CEL filtering
-
-		if runSpanMap[span.RunID] == nil {
-			runSpanMap[span.RunID] = make(map[string][]*spanRow)
+		// Parse times using adapter, times are stored differently across SQLite and Postgres
+		startTime, err := adapter.parseTime(row.StartTime)
+		if err != nil {
+			l.Debug("invalid start_time", "start_time", row.StartTime, "error", err)
+			continue
 		}
-		runSpanMap[span.RunID][span.DynamicSpanID] = append(runSpanMap[span.RunID][span.DynamicSpanID], &span)
-	}
-
-	// Convert grouped spans to TraceRuns
-	type runGroup struct {
-		runID         string
-		dynamicSpanID string
-		spans         []*spanRow
-		startTime     time.Time
-	}
-
-	// Collect all run groups first
-	var runGroups []runGroup
-	for runID, spanGroups := range runSpanMap {
-		for dynamicSpanID, spans := range spanGroups {
-			if len(spans) == 0 {
-				continue
+		var endTime *time.Time
+		if row.EndTime != nil && *row.EndTime != "" {
+			if t, err := adapter.parseTime(*row.EndTime); err == nil {
+				endTime = &t
 			}
-			// Find earliest start time for sorting
-			startTime := spans[0].StartTime
-			for _, span := range spans {
-				if span.StartTime.Before(startTime) {
-					startTime = span.StartTime
-				}
-			}
-
-			// order the spans by start time too so that we process each
-			// update step-by-step as they happened
-			sort.Slice(spans, func(i, j int) bool {
-				return spans[i].StartTime.Before(spans[j].StartTime)
-			})
-
-			runGroups = append(runGroups, runGroup{
-				runID:         runID,
-				dynamicSpanID: dynamicSpanID,
-				spans:         spans,
-				startTime:     startTime,
-			})
 		}
-	}
-
-	// Sort by start_time DESC (newest first), then by run_id for stable ordering
-	sort.Slice(runGroups, func(i, j int) bool {
-		if runGroups[i].startTime.Equal(runGroups[j].startTime) {
-			return runGroups[i].runID < runGroups[j].runID
-		}
-		return runGroups[i].startTime.After(runGroups[j].startTime)
-	})
-
-	res := []*cqrs.TraceRun{}
-	var count uint
-
-	for _, group := range runGroups {
-		spans := group.spans
-
-		// Use first span for metadata (they should all have the same metadata)
-		firstSpan := spans[0]
 
 		// Parse UUIDs
-		accountUUID, err := uuid.Parse(firstSpan.AccountID)
+		accountUUID, err := uuid.Parse(row.AccountID)
 		if err != nil {
-			l.Debug("invalid account ID", "account_id", firstSpan.AccountID, "error", err)
+			l.Debug("invalid account ID", "account_id", row.AccountID, "error", err)
 			continue
 		}
-		appUUID, err := uuid.Parse(firstSpan.AppID)
+		appUUID, err := uuid.Parse(row.AppID)
 		if err != nil {
-			l.Debug("invalid app ID", "app_id", firstSpan.AppID, "error", err)
+			l.Debug("invalid app ID", "app_id", row.AppID, "error", err)
 			continue
 		}
-		functionUUID, err := uuid.Parse(firstSpan.FunctionID)
+		functionUUID, err := uuid.Parse(row.FunctionID)
 		if err != nil {
-			l.Debug("invalid function ID", "function_id", firstSpan.FunctionID, "error", err)
+			l.Debug("invalid function ID", "function_id", row.FunctionID, "error", err)
 			continue
 		}
 
-		// Find min start_time and max end_time across all spans in this group
-		startTime := spans[0].StartTime
-		var endTime *time.Time
+		// Parse status
 		status := enums.RunStatusRunning
-		var triggerIDs []string
-
-		for _, span := range spans {
-			if span.StartTime.Before(startTime) {
-				startTime = span.StartTime
-			}
-			if span.EndTime != nil && (endTime == nil || span.EndTime.After(*endTime)) {
-				endTime = span.EndTime
-			}
-			// Get the latest non-empty status
-			if span.Status != nil && *span.Status != "" {
-				// Convert StepStatus string to RunStatus enum
-				if stepStatus, err := enums.StepStatusString(*span.Status); err == nil && stepStatus != enums.StepStatusUnknown {
-					status = enums.StepStatusToRunStatus(stepStatus)
-				}
-			}
-
-			if span.EventIDs != nil && *span.EventIDs != "" {
-				// Event IDs are a stringified JSON array of strings. Unpack
-				// them here.
-				var eids []string
-				if err := json.Unmarshal([]byte(*span.EventIDs), &eids); err == nil {
-					triggerIDs = append(triggerIDs, eids...)
-				} else {
-					l.Debug("invalid event IDs in span", "run_id", span.RunID, "dynamic_span_id", span.DynamicSpanID, "error", err)
-				}
+		if row.Status != nil && *row.Status != "" {
+			if stepStatus, err := enums.StepStatusString(*row.Status); err == nil && stepStatus != enums.StepStatusUnknown {
+				status = enums.StepStatusToRunStatus(stepStatus)
 			}
 		}
+
+		// Parse event IDs using adapter due to differences in column type and serialization
+		triggerIDs := adapter.parseEventIDs(row.EventIDs)
 
 		// Calculate duration
 		var duration time.Duration
@@ -3051,18 +3109,18 @@ func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*c
 
 		// Build cursor for pagination
 		var cursor string
-		if resCursorLayout != nil {
+		if cursorLayout != nil {
 			c := &cqrs.TracePageCursor{
-				ID:      group.runID,
+				ID:      row.RunID,
 				Cursors: map[string]cqrs.TraceCursor{},
 			}
-			for field := range resCursorLayout.Cursors {
+			for field := range cursorLayout.Cursors {
 				switch field {
 				case "start_time":
-					c.Cursors[field] = cqrs.TraceCursor{Field: field, Value: startTime.UnixMilli()}
+					c.Cursors[field] = cqrs.TraceCursor{Field: field, Value: startTime.UnixMicro()}
 				case "end_time":
 					if endTime != nil {
-						c.Cursors[field] = cqrs.TraceCursor{Field: field, Value: endTime.UnixMilli()}
+						c.Cursors[field] = cqrs.TraceCursor{Field: field, Value: endTime.UnixMicro()}
 					}
 				}
 			}
@@ -3073,11 +3131,11 @@ func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*c
 
 		traceRun := &cqrs.TraceRun{
 			AccountID:   accountUUID,
-			WorkspaceID: accountUUID, // Using account ID as workspace ID for now
+			WorkspaceID: accountUUID,
 			AppID:       appUUID,
 			FunctionID:  functionUUID,
-			TraceID:     firstSpan.TraceID,
-			RunID:       group.runID,
+			TraceID:     row.TraceID,
+			RunID:       row.RunID,
 			QueuedAt:    startTime,
 			StartedAt:   startTime,
 			Duration:    duration,
@@ -3093,8 +3151,8 @@ func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*c
 		res = append(res, traceRun)
 		count++
 
-		// enough items, don't need to proceed anymore
-		if opt.Items > 0 && count >= opt.Items {
+		// We have filled a page's worth of requests, so break
+		if itemLimit > 0 && count >= itemLimit {
 			break
 		}
 	}
@@ -3125,6 +3183,12 @@ func newSpanRunsQueryBuilder(ctx context.Context, opt cqrs.GetTraceRunOpt) *runs
 		}
 		filter = append(filter, sq.C("status").In(statusStrings))
 	}
+	// Skipped runs should only be visible in event-scoped queries, not the runs list.
+	// status is nullable in spans, so we must also accept NULL.
+	filter = append(filter, sq.Or(
+		sq.C("status").IsNull(),
+		sq.C("status").Neq(enums.RunStatusSkipped.String()),
+	))
 
 	// Map time fields - spans use start_time/end_time instead of
 	// queued_at/started_at/ended_at
@@ -3138,9 +3202,14 @@ func newSpanRunsQueryBuilder(ctx context.Context, opt cqrs.GetTraceRunOpt) *runs
 		tsfield = "start_time"
 	}
 
-	// Convert time to Unix milliseconds to match spans storage format
-	filter = append(filter, sq.C(tsfield).Gte(opt.Filter.From))
-	filter = append(filter, sq.C(tsfield).Lt(opt.Filter.Until))
+	// Convert times to UTC to match spans storage format in SQLite
+	// We currently store SQLite timestamps as Go's time.Time string: "2025-07-13 19:32:24.939517 +0000 UTC m=+..."
+	// SQLite compares these as strings, so filter times must also serialize with "+0000 UTC" suffix to correctly use
+	// lexicographic comparisons.
+	// The UTC conversion was not strictly necessary for Postgres because the timestamp columns are timestamptz, so
+	// type and timezone conversion were handled for us
+	filter = append(filter, sq.C(tsfield).Gte(opt.Filter.From.UTC()))
+	filter = append(filter, sq.C(tsfield).Lt(opt.Filter.Until.UTC()))
 
 	// cursor
 	resCursorLayout := &cqrs.TracePageCursor{
@@ -3202,8 +3271,8 @@ func newSpanRunsQueryBuilder(ctx context.Context, opt cqrs.GetTraceRunOpt) *runs
 
 			if cursor := reqCursor.Find(field); cursor != nil {
 				// Build cursor condition for this field
-				// Convert int64 ms to time.Time for TIMESTAMPTZ column comparison
-				cursorTime := time.UnixMilli(cursor.Value)
+				// Convert int64 microseconds to time.Time in UTC for spans table comparison
+				cursorTime := time.UnixMicro(cursor.Value).UTC()
 				var baseCondition sq.Expression
 				if o.Direction == enums.TraceRunOrderAsc {
 					baseCondition = sq.C(field).Gt(cursorTime)
@@ -3227,7 +3296,7 @@ func newSpanRunsQueryBuilder(ctx context.Context, opt cqrs.GetTraceRunOpt) *runs
 					}
 
 					if nextCursor := reqCursor.Find(nextField); nextCursor != nil {
-						nextCursorTime := time.UnixMilli(nextCursor.Value)
+						nextCursorTime := time.UnixMicro(nextCursor.Value).UTC()
 						if opt.Order[j].Direction == enums.TraceRunOrderAsc {
 							equalityConditions = append(equalityConditions, sq.C(nextField).Gt(nextCursorTime))
 						} else {
@@ -3258,6 +3327,11 @@ func newSpanRunsQueryBuilder(ctx context.Context, opt cqrs.GetTraceRunOpt) *runs
 		cursor:       reqCursor,
 		cursorLayout: resCursorLayout,
 	}
+}
+
+// needsEventJoin checks if CEL expression references event.* fields
+func needsEventJoin(cel string) bool {
+	return strings.Contains(cel, "event.")
 }
 
 func isWaitForEventOutput(o map[string]any) bool {

@@ -34,7 +34,7 @@ func TestQueueScavenge(t *testing.T) {
 		q, shard := newQueue(
 			t, rc,
 			osqueue.WithClock(clock),
-			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 				return true
 			}),
 		)
@@ -112,7 +112,7 @@ func TestQueueScavenge(t *testing.T) {
 		_, shard := newQueue(
 			t, rc,
 			osqueue.WithClock(clock),
-			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 				return true
 			}),
 		)
@@ -166,7 +166,7 @@ func TestQueueScavenge(t *testing.T) {
 		_, shard := newQueue(
 			t, rc,
 			osqueue.WithClock(clock),
-			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 				return true
 			}),
 		)
@@ -244,7 +244,7 @@ func TestQueueScavenge(t *testing.T) {
 			q, shard := newQueue(
 				t, rc,
 				osqueue.WithClock(clock),
-				osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+				osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 					return true
 				}),
 			)
@@ -321,7 +321,7 @@ func TestQueueScavenge(t *testing.T) {
 				_, shard := newQueue(
 					t, rc,
 					osqueue.WithClock(clock),
-					osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+					osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 						return true
 					}),
 				)
@@ -384,7 +384,7 @@ func TestQueueScavenge(t *testing.T) {
 				_, shard := newQueue(
 					t, rc,
 					osqueue.WithClock(clock),
-					osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+					osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 						return true
 					}),
 				)
@@ -448,7 +448,7 @@ func TestQueueScavenge(t *testing.T) {
 				_, shard := newQueue(
 					t, rc,
 					osqueue.WithClock(clock),
-					osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+					osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 						return true
 					}),
 				)
@@ -516,7 +516,7 @@ func TestQueueScavenge(t *testing.T) {
 				_, shard := newQueue(
 					t, rc,
 					osqueue.WithClock(clock),
-					osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+					osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 						return true
 					}),
 				)
@@ -584,7 +584,7 @@ func TestQueueScavenge(t *testing.T) {
 				q, shard := newQueue(
 					t, rc,
 					osqueue.WithClock(clock),
-					osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+					osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 						return true
 					}),
 				)
@@ -660,7 +660,7 @@ func TestQueueScavenge(t *testing.T) {
 				q, shard := newQueue(
 					t, rc,
 					osqueue.WithClock(clock),
-					osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+					osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 						return true
 					}),
 				)
@@ -739,7 +739,7 @@ func TestQueueScavenge(t *testing.T) {
 				q, shard := newQueue(
 					t, rc,
 					osqueue.WithClock(clock),
-					osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+					osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 						return true
 					}),
 				)
@@ -821,7 +821,7 @@ func TestQueueScavenge(t *testing.T) {
 				q, shard := newQueue(
 					t, rc,
 					osqueue.WithClock(clock),
-					osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+					osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 						return true
 					}),
 				)
@@ -897,7 +897,7 @@ func TestQueueScavenge(t *testing.T) {
 				q, shard := newQueue(
 					t, rc,
 					osqueue.WithClock(clock),
-					osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+					osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 						return true
 					}),
 				)
@@ -976,7 +976,7 @@ func TestQueueScavenge(t *testing.T) {
 				q, shard := newQueue(
 					t, rc,
 					osqueue.WithClock(clock),
-					osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+					osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 						return true
 					}),
 				)
@@ -1058,7 +1058,7 @@ func TestQueueScavenge(t *testing.T) {
 		_, shard := newQueue(
 			t, rc,
 			osqueue.WithClock(clock),
-			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 				return true
 			}),
 		)

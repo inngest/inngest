@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/rand"
 	"time"
 
 	"github.com/google/uuid"
@@ -31,7 +32,7 @@ func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition
 	// constraints like concurrency were consumed.
 	var disableLeaseChecks bool
 	if p.AccountID != uuid.Nil && p.EnvID != nil && p.FunctionID != nil && q.CapacityManager != nil && q.UseConstraintAPI != nil {
-		enableConstraintAPI, _ := q.UseConstraintAPI(ctx, p.AccountID, *p.EnvID, *p.FunctionID)
+		enableConstraintAPI := q.UseConstraintAPI(ctx, p.AccountID)
 		disableLeaseChecks = enableConstraintAPI
 	}
 
@@ -172,6 +173,67 @@ func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition
 			"is_continuation": continuationCount > 0,
 		},
 	})
+
+	if len(queue) > 0 && rand.Float64() < 0.05 {
+		// Group items by backlogs
+		backlogs := make(map[string][]*QueueItem)
+
+		var (
+			lastBacklogID          string
+			successiveBacklogCount int
+		)
+
+		start := q.Clock().Now()
+		for _, qi := range queue {
+			b := ItemBacklog(ctx, *qi)
+
+			// Append to grouped items
+			backlogs[b.BacklogID] = append(backlogs[b.BacklogID], qi)
+
+			// If backlog is different than previous item, emit and reset counter
+			if b.BacklogID != lastBacklogID {
+				if successiveBacklogCount > 0 {
+					metrics.HistogramQueueSuccessivePeekedItems(ctx, int64(successiveBacklogCount), metrics.HistogramOpt{
+						PkgName: pkgName,
+						Tags: map[string]any{
+							"queue_shard": q.primaryQueueShard.Name(),
+						},
+					})
+				}
+				successiveBacklogCount = 0
+				lastBacklogID = b.BacklogID
+				continue
+			}
+
+			successiveBacklogCount++
+		}
+
+		// Emit the final successive run
+		if successiveBacklogCount > 0 {
+			metrics.HistogramQueueSuccessivePeekedItems(ctx, int64(successiveBacklogCount), metrics.HistogramOpt{
+				PkgName: pkgName,
+				Tags: map[string]any{
+					"queue_shard": q.primaryQueueShard.Name(),
+				},
+			})
+		}
+
+		// Measure time it took to group by backlog
+		metrics.HistogramQueueBacklogGroupingDuration(ctx, q.Clock().Since(start).Milliseconds(), metrics.HistogramOpt{
+			PkgName: pkgName,
+			Tags: map[string]any{
+				"queue_shard": q.primaryQueueShard.Name(),
+			},
+		})
+
+		ratioBacklogsToPeeked := (float64(len(backlogs)) / float64(len(queue))) * 100
+		metrics.HistogramQueueRatioBacklogsToPeekedItems(ctx, int64(ratioBacklogsToPeeked), metrics.HistogramOpt{
+			PkgName: pkgName,
+			Tags: map[string]any{
+				"queue_shard": q.primaryQueueShard.Name(),
+			},
+		})
+	}
 
 	// parallel all queue names with internal mappings for now.
 	// XXX: Allow parallel partitions for all functions except for fns opting into FIFO

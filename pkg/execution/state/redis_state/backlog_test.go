@@ -1159,7 +1159,7 @@ func TestBacklogsByPartition(t *testing.T) {
 
 			q, shard := newQueue(
 				t, rc,
-				osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+				osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 					return true
 				}),
 				osqueue.WithClock(clock),
@@ -1229,7 +1229,7 @@ func TestBacklogSize(t *testing.T) {
 				},
 			}
 		}),
-		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 			return true
 		}),
 	)
@@ -1290,7 +1290,7 @@ func TestPartitionBacklogSize(t *testing.T) {
 	clock := clockwork.NewFakeClock()
 
 	opts := []osqueue.QueueOpt{
-		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 			return true
 		}),
 		osqueue.WithClock(clock),
@@ -1552,5 +1552,226 @@ func TestShadowPartitionFunctionBacklog(t *testing.T) {
 			SuccessiveThrottleConstrained:          0,
 			SuccessiveCustomConcurrencyConstrained: 0,
 		}, b)
+	})
+}
+
+func TestBacklogByID(t *testing.T) {
+	r := miniredis.RunT(t)
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Second))
+
+	_, shard := newQueue(
+		t, rc,
+		osqueue.WithClock(clock),
+		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
+			return true
+		}),
+	)
+	ctx := context.Background()
+
+	accountID, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
+	at := clock.Now().Add(10 * time.Minute)
+
+	t.Run("not found", func(t *testing.T) {
+		_, err := shard.BacklogByID(ctx, "nonexistent-backlog-id")
+		require.ErrorIs(t, err, osqueue.ErrBacklogNotFound)
+	})
+
+	t.Run("default backlog", func(t *testing.T) {
+		item := osqueue.QueueItem{
+			ID:          "default-bl-item",
+			FunctionID:  fnID,
+			WorkspaceID: wsID,
+			Data: osqueue.Item{
+				WorkspaceID: wsID,
+				Kind:        osqueue.KindEdge,
+				Identifier: state.Identifier{
+					WorkflowID:  fnID,
+					AccountID:   accountID,
+					WorkspaceID: wsID,
+				},
+			},
+		}
+
+		_, err := shard.EnqueueItem(ctx, item, at, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+
+		expected := osqueue.ItemBacklog(ctx, item)
+
+		got, err := shard.BacklogByID(ctx, expected.BacklogID)
+		require.NoError(t, err)
+		require.Equal(t, expected.BacklogID, got.BacklogID)
+		require.Equal(t, expected.ShadowPartitionID, got.ShadowPartitionID)
+		require.Equal(t, expected.Start, got.Start)
+		require.Nil(t, got.Throttle)
+		require.Nil(t, got.ConcurrencyKeys)
+	})
+
+	t.Run("start backlog", func(t *testing.T) {
+		startFnID := uuid.New()
+
+		item := osqueue.QueueItem{
+			ID:          "start-bl-item",
+			FunctionID:  startFnID,
+			WorkspaceID: wsID,
+			Data: osqueue.Item{
+				WorkspaceID: wsID,
+				Kind:        osqueue.KindStart,
+				Identifier: state.Identifier{
+					WorkflowID:  startFnID,
+					AccountID:   accountID,
+					WorkspaceID: wsID,
+				},
+			},
+		}
+
+		_, err := shard.EnqueueItem(ctx, item, at, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+
+		expected := osqueue.ItemBacklog(ctx, item)
+		require.True(t, expected.Start)
+
+		got, err := shard.BacklogByID(ctx, expected.BacklogID)
+		require.NoError(t, err)
+		require.Equal(t, expected.BacklogID, got.BacklogID)
+		require.True(t, got.Start)
+	})
+
+	t.Run("backlog with concurrency key", func(t *testing.T) {
+		ckFnID := uuid.New()
+		canonicalKey := util.ConcurrencyKey(enums.ConcurrencyScopeFn, ckFnID, "customer-42")
+
+		item := osqueue.QueueItem{
+			ID:          "ck-bl-item",
+			FunctionID:  ckFnID,
+			WorkspaceID: wsID,
+			Data: osqueue.Item{
+				WorkspaceID: wsID,
+				Kind:        osqueue.KindEdge,
+				Identifier: state.Identifier{
+					WorkflowID:  ckFnID,
+					AccountID:   accountID,
+					WorkspaceID: wsID,
+				},
+				CustomConcurrencyKeys: []state.CustomConcurrency{
+					{
+						Key:  canonicalKey,
+						Hash: util.XXHash("event.data.customerId"),
+					},
+				},
+			},
+		}
+
+		_, err := shard.EnqueueItem(ctx, item, at, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+
+		expected := osqueue.ItemBacklog(ctx, item)
+		require.Len(t, expected.ConcurrencyKeys, 1)
+
+		got, err := shard.BacklogByID(ctx, expected.BacklogID)
+		require.NoError(t, err)
+		require.Equal(t, expected.BacklogID, got.BacklogID)
+		require.Len(t, got.ConcurrencyKeys, 1)
+		require.Equal(t, expected.ConcurrencyKeys[0].CanonicalKeyID, got.ConcurrencyKeys[0].CanonicalKeyID)
+		require.Equal(t, expected.ConcurrencyKeys[0].HashedKeyExpression, got.ConcurrencyKeys[0].HashedKeyExpression)
+		require.Equal(t, expected.ConcurrencyKeys[0].Scope, got.ConcurrencyKeys[0].Scope)
+	})
+
+	t.Run("backlog with throttle", func(t *testing.T) {
+		tFnID := uuid.New()
+		throttleKeyExprHash := util.XXHash("event.data.org")
+		throttleKey := osqueue.HashID(ctx, tFnID.String()) + "-" + osqueue.HashID(ctx, "org-99")
+
+		item := osqueue.QueueItem{
+			ID:          "throttle-bl-item",
+			FunctionID:  tFnID,
+			WorkspaceID: wsID,
+			Data: osqueue.Item{
+				WorkspaceID: wsID,
+				Kind:        osqueue.KindStart,
+				Identifier: state.Identifier{
+					WorkflowID:  tFnID,
+					AccountID:   accountID,
+					WorkspaceID: wsID,
+				},
+				Throttle: &osqueue.Throttle{
+					Key:                 throttleKey,
+					Limit:               100,
+					Burst:               10,
+					Period:              60,
+					UnhashedThrottleKey: "org-99",
+					KeyExpressionHash:   throttleKeyExprHash,
+				},
+			},
+		}
+
+		_, err := shard.EnqueueItem(ctx, item, at, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+
+		expected := osqueue.ItemBacklog(ctx, item)
+		require.NotNil(t, expected.Throttle)
+		require.True(t, expected.Start)
+
+		got, err := shard.BacklogByID(ctx, expected.BacklogID)
+		require.NoError(t, err)
+		require.Equal(t, expected.BacklogID, got.BacklogID)
+		require.True(t, got.Start)
+		require.NotNil(t, got.Throttle)
+		require.Equal(t, expected.Throttle.ThrottleKey, got.Throttle.ThrottleKey)
+		require.Equal(t, expected.Throttle.ThrottleKeyExpressionHash, got.Throttle.ThrottleKeyExpressionHash)
+	})
+
+	t.Run("BuildBacklogID matches enqueued backlog", func(t *testing.T) {
+		bFnID := uuid.New()
+		canonicalKey := util.ConcurrencyKey(enums.ConcurrencyScopeFn, bFnID, "val-abc")
+
+		item := osqueue.QueueItem{
+			ID:          "build-bl-item",
+			FunctionID:  bFnID,
+			WorkspaceID: wsID,
+			Data: osqueue.Item{
+				WorkspaceID: wsID,
+				Kind:        osqueue.KindEdge,
+				Identifier: state.Identifier{
+					WorkflowID:  bFnID,
+					AccountID:   accountID,
+					WorkspaceID: wsID,
+				},
+				CustomConcurrencyKeys: []state.CustomConcurrency{
+					{
+						Key:  canonicalKey,
+						Hash: util.XXHash("event.data.key"),
+					},
+				},
+			},
+		}
+
+		_, err := shard.EnqueueItem(ctx, item, at, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+
+		// Construct the backlog ID using BuildBacklogID
+		builtID := osqueue.BuildBacklogID(bFnID, false, nil, []osqueue.ConcurrencyKeyInput{
+			{
+				Expression:     "event.data.key",
+				EvaluatedValue: "val-abc",
+				Scope:          enums.ConcurrencyScopeFn,
+				ScopeID:        bFnID,
+			},
+		})
+
+		// It should match what ItemBacklog produced
+		expected := osqueue.ItemBacklog(ctx, item)
+		require.Equal(t, expected.BacklogID, builtID)
+
+		// And we should be able to look it up via BacklogByID
+		got, err := shard.BacklogByID(ctx, builtID)
+		require.NoError(t, err)
+		require.Equal(t, expected.BacklogID, got.BacklogID)
 	})
 }

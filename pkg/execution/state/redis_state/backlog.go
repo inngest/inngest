@@ -2,6 +2,7 @@ package redis_state
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"iter"
@@ -11,7 +12,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/logger"
@@ -121,23 +121,6 @@ func backlogCustomKeyActiveRuns(b osqueue.QueueBacklog, kg QueueKeyGenerator, n 
 	return backlogConcurrencyKeyActiveRunsKey(key, kg)
 }
 
-func backlogInProgressLeasesCustomKey(b osqueue.QueueBacklog, cm constraintapi.RolloutKeyGenerator, kg QueueKeyGenerator, accountID *uuid.UUID, n int) string {
-	if cm == nil {
-		return kg.Concurrency("", "")
-	}
-
-	if accountID == nil {
-		return kg.Concurrency("", "")
-	}
-
-	if n < 0 || n > len(b.ConcurrencyKeys) {
-		return kg.Concurrency("", "")
-	}
-
-	key := b.ConcurrencyKeys[n-1]
-	return backlogConcurrencyKeyInProgressLeasesKey(key, cm, *accountID)
-}
-
 func backlogConcurrencyKeyActiveKey(bck osqueue.BacklogConcurrencyKey, kg QueueKeyGenerator) string {
 	// Concurrency accounting keys are made up of three parts:
 	// - The scope (account, environment, function) to apply the concurrency limit on
@@ -148,10 +131,6 @@ func backlogConcurrencyKeyActiveKey(bck osqueue.BacklogConcurrencyKey, kg QueueK
 
 func backlogConcurrencyKeyActiveRunsKey(bck osqueue.BacklogConcurrencyKey, kg QueueKeyGenerator) string {
 	return kg.ActiveRunsSet("custom", bck.CanonicalKeyID)
-}
-
-func backlogConcurrencyKeyInProgressLeasesKey(bck osqueue.BacklogConcurrencyKey, cm constraintapi.RolloutKeyGenerator, accountID uuid.UUID) string {
-	return cm.KeyInProgressLeasesCustom(accountID, bck.Scope, bck.EntityID, bck.HashedKeyExpression, bck.HashedValue)
 }
 
 // activeKey returns backlog compound active key
@@ -237,9 +216,6 @@ func (q *queue) BacklogRefill(
 		kg.BacklogActiveCheckCooldown(b.BacklogID),
 
 		kg.PartitionNormalizeSet(sp.PartitionID),
-
-		// Constraint API rollout
-		q.keyConstraintCheckIdempotency(sp.AccountID, o.ConstraintCheckIdempotencyKey),
 	}
 
 	// Don't check constraints if
@@ -712,6 +688,26 @@ func (q *queue) PartitionBacklogSize(ctx context.Context, partitionID string) (i
 	bwg.Wait()
 
 	return count, nil
+}
+
+func (q *queue) BacklogByID(ctx context.Context, backlogID string) (*osqueue.QueueBacklog, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "backlogByID"), redis_telemetry.ScopeQueue)
+
+	rc := q.RedisClient.Client()
+	cmd := rc.B().Hget().Key(q.RedisClient.kg.BacklogMeta()).Field(backlogID).Build()
+	byt, err := rc.Do(ctx, cmd).AsBytes()
+	if err != nil {
+		if rueidis.IsRedisNil(err) {
+			return nil, osqueue.ErrBacklogNotFound
+		}
+		return nil, fmt.Errorf("error retrieving backlog: %w", err)
+	}
+
+	var backlog osqueue.QueueBacklog
+	if err := json.Unmarshal(byt, &backlog); err != nil {
+		return nil, fmt.Errorf("error unmarshalling backlog: %w", err)
+	}
+	return &backlog, nil
 }
 
 func (q *queue) BacklogSize(ctx context.Context, backlogID string) (int64, error) {

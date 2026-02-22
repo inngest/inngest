@@ -1,9 +1,15 @@
-import { RiBookOpenLine, RiFeedbackLine, RiNodeTree } from '@remixicon/react';
+import {
+  RiBookOpenLine,
+  RiFeedbackLine,
+  RiNodeTree,
+  RiTableLine,
+} from '@remixicon/react';
 
 import InsightsAI from '@/components/Icons/insights-ai-icon.svg?react';
 import InsightsAIDark from '@/components/Icons/insights-ai-icon-dark.svg?react';
 
 import {
+  CELL_DETAIL,
   DOCUMENTATION,
   INSIGHTS_AI,
   SCHEMA_EXPLORER,
@@ -38,6 +44,8 @@ export function InsightsHelperPanelIcon({
           />
         </>
       );
+    case CELL_DETAIL:
+      return <RiTableLine className={className} size={size} />;
     case DOCUMENTATION:
       return <RiBookOpenLine className={className} size={size} />;
     case SCHEMA_EXPLORER:

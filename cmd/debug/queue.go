@@ -13,6 +13,7 @@ func queueCommand() *cli.Command {
 		Commands: []*cli.Command{
 			queue.PartitionCommand(),
 			queue.ItemCommand(),
+			queue.BacklogCommand(),
 		},
 	}
 }

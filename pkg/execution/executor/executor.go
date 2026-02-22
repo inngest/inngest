@@ -288,7 +288,7 @@ func WithBatcher(b batch.BatchManager) ExecutorOpt {
 	}
 }
 
-func WithCapacityManager(cm constraintapi.RolloutManager) ExecutorOpt {
+func WithCapacityManager(cm constraintapi.CapacityManager) ExecutorOpt {
 	return func(e execution.Executor) error {
 		e.(*executor).capacityManager = cm
 		return nil
@@ -464,7 +464,7 @@ type executor struct {
 	batcher      batch.BatchManager
 	singletonMgr singleton.Singleton
 
-	capacityManager               constraintapi.RolloutManager
+	capacityManager               constraintapi.CapacityManager
 	useConstraintAPI              constraintapi.UseConstraintAPIFn
 	enableBatchingInstrumentation func(ctx context.Context, accountID, envID uuid.UUID) (enable bool)
 
@@ -842,17 +842,12 @@ func (e *executor) schedule(
 			rateLimitKey, err := ratelimit.RateLimitKey(ctx, req.Function.ID, *req.Function.RateLimit, evtMap)
 			switch err {
 			case nil:
-				constraintCheckIdempotencyKey := key
-				if e.capacityManager != nil {
-					constraintCheckIdempotencyKey = e.capacityManager.KeyConstraintCheckIdempotency(constraintapi.MigrationIdentifier{IsRateLimit: true}, req.AccountID, key)
-				}
-
 				res, err := e.rateLimiter.RateLimit(
 					logger.WithStdlib(ctx, l),
 					rateLimitKey,
 					*req.Function.RateLimit,
 					ratelimit.WithNow(e.now()),
-					ratelimit.WithIdempotency(constraintCheckIdempotencyKey, RateLimitIdempotencyTTL),
+					ratelimit.WithIdempotency(key, RateLimitIdempotencyTTL),
 				)
 				if err != nil {
 					metrics.IncrRateLimitUsage(ctx, metrics.CounterOpt{
@@ -1084,6 +1079,10 @@ func (e *executor) schedule(
 	//
 	throttle := queue.GetThrottleConfig(ctx, req.Function.ID, req.Function.Throttle, evtMap)
 
+	// Track skip reason and context for span attributes
+	var skipReason enums.SkipReason
+	var singletonSkipRunID *ulid.ULID
+
 	//
 	// Create singleton information and try to handle it prior to creating state.
 	//
@@ -1127,8 +1126,9 @@ func (e *executor) schedule(
 						l.ReportError(err, "error canceling singleton run")
 					}
 				default:
-					// Immediately end before creating state
-					return nil, nil, ErrFunctionSkipped
+					// Mark as singleton skip - will be handled after span creation
+					skipReason = enums.SkipReasonSingleton
+					singletonSkipRunID = singletonRunID
 				}
 			}
 			singletonConfig = &queue.Singleton{Key: singletonKey}
@@ -1160,8 +1160,11 @@ func (e *executor) schedule(
 
 	stv1ID := sv2.V1FromMetadata(metadata)
 
-	// Check if the function should be skipped (paused, draining)
-	skipReason := e.skipped(ctx, req)
+	// Check if the function should be skipped (paused, draining, backlog limit)
+	// Only check if not already marked as skipped (e.g., by singleton)
+	if skipReason == enums.SkipReasonNone {
+		skipReason = e.skipped(ctx, req)
+	}
 
 	// Create run state if not skipped
 	if skipReason == enums.SkipReasonNone {
@@ -1233,6 +1236,14 @@ func (e *executor) schedule(
 		&status,
 	)
 
+	if skipReason != enums.SkipReasonNone {
+		meta.AddAttr(runSpanOpts.Attributes, meta.Attrs.SkipReason, &skipReason)
+		if singletonSkipRunID != nil {
+			existingRunID := singletonSkipRunID.String()
+			meta.AddAttr(runSpanOpts.Attributes, meta.Attrs.SkipExistingRunID, &existingRunID)
+		}
+	}
+
 	// Always the root span.
 	runSpanRef, err = e.tracerProvider.CreateDroppableSpan(
 		ctx,
@@ -1244,7 +1255,7 @@ func (e *executor) schedule(
 		l.Debug("error creating run span", "error", err)
 	}
 
-	// If this is paused, immediately end just before creating state.
+	// If the function is being skipped, send spans and handle skip.
 	if skipReason != enums.SkipReasonNone {
 		sendSpans()
 		return e.handleFunctionSkipped(ctx, req, metadata, evts, skipReason)
@@ -1468,6 +1479,12 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	// XXX: MetadataNotFound -> assume fn is deleted.
 	if err != nil {
 		return nil, fmt.Errorf("cannot load metadata to execute run: %w", err)
+	}
+
+	if isSleepResume {
+		if err := e.maybeResetForceStepPlan(ctx, &md); err != nil {
+			return nil, fmt.Errorf("error resetting force step plan: %w", err)
+		}
 	}
 
 	ef, err := e.fl.LoadFunction(ctx, md.ID.Tenant.EnvID, md.ID.FunctionID)
@@ -1724,6 +1741,46 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 					if err != nil {
 						l.Warn("error creating metadata span", "error", err)
 					}
+				}
+			}
+
+			// Extract HTTP timing metadata from httpstat if available.
+			// This captures the detailed connection timing breakdown (DNS, TCP, TLS, TTFB, transfer)
+			// from the HTTP request to the user's SDK function.
+			if resp.HTTPStat != nil {
+				httpTimingMd := extractors.ExtractHTTPTimingMetadata(resp.HTTPStat)
+				_, err := e.createMetadataSpan(
+					ctx,
+					&instance,
+					"executor.httpTiming",
+					httpTimingMd,
+					enums.MetadataScopeStepAttempt,
+				)
+				if err != nil {
+					l.Warn("error creating HTTP timing metadata span", "error", err)
+				}
+			}
+		}
+
+		// Extract response header metadata from the HTTP response.
+		// Response headers live on internal server execution spans, not OTLP spans,
+		// so we must explicitly create the metadata span here.
+		// Not gated by allowStepMetadata — response headers are first-party server data.
+		if len(resp.Header) > 0 || resp.StatusCode != 0 {
+			headerMd := extractors.NewResponseHeaderMetadataFromHTTPHeader(resp.Header, resp.StatusCode)
+			if len(headerMd) > 0 {
+				_, err := tracing.CreateMetadataSpan(
+					ctx,
+					e.tracerProvider,
+					instance.execSpan,
+					"executor.ExecutePostResponseHeaders",
+					pkgName,
+					instance.Metadata(),
+					headerMd,
+					enums.MetadataScopeExtendedTrace,
+				)
+				if err != nil {
+					l.Warn("error creating response header metadata span", "error", err)
 				}
 			}
 		}
@@ -2692,6 +2749,9 @@ func (e *executor) ResumePauseTimeout(ctx context.Context, pause state.Pause, r 
 	})
 
 	if shouldEnqueueDiscovery(hasPendingSteps, pause.ParallelMode) {
+		if err := e.maybeResetForceStepPlan(ctx, &md); err != nil {
+			return fmt.Errorf("error resetting force step plan: %w", err)
+		}
 		// If there are no parallel steps ongoing, we must enqueue the next SDK ping to continue on with
 		// execution.
 		jobID := fmt.Sprintf("%s-%s-timeout", md.IdempotencyKey(), pause.DataKey)
@@ -2857,6 +2917,9 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 		})
 
 		if shouldEnqueueDiscovery(consumeResult.HasPendingSteps, pause.ParallelMode) {
+			if err := e.maybeResetForceStepPlan(ctx, &md); err != nil {
+				return fmt.Errorf("error resetting force step plan: %w", err)
+			}
 			// Schedule an execution from the pause's entrypoint.  We do this
 			// after consuming the pause to guarantee the event data is
 			// stored via the pause for the next run.  If the ConsumePause
@@ -3181,7 +3244,9 @@ func (e *executor) maybeEnqueueDiscoveryStep(ctx context.Context, runCtx executi
 	}
 
 	if shouldEnqueueDiscovery(hasPendingSteps, gen.ParallelMode()) {
-
+		if err := e.maybeResetForceStepPlan(ctx, runCtx.Metadata()); err != nil {
+			return fmt.Errorf("error resetting force step plan: %w", err)
+		}
 		lifecycleItem := runCtx.LifecycleItem()
 		metadata := runCtx.Metadata()
 		span, err := e.tracerProvider.CreateDroppableSpan(
@@ -3270,6 +3335,31 @@ func (e *executor) handleGeneratorStep(ctx context.Context, runCtx execution.Run
 
 	if err != nil {
 		return err
+	}
+
+	// Extract AI metadata from step output.
+	// This attempts to detect and parse AI SDK responses (e.g. Vercel AI SDK)
+	// from any step output, using a cheap byte-level pre-check to skip non-AI outputs.
+	if e.allowStepMetadata.Enabled(ctx, runCtx.Metadata().ID.Tenant.AccountID) {
+		// Calculate step duration in milliseconds
+		stepDurationMs := gen.Timing.B / 1_000_000
+
+		md := metadata.WithWarnings(extractors.ExtractAIOutputMetadata(
+			[]byte(output),
+			stepDurationMs,
+		))
+		for _, m := range md {
+			_, err := e.createMetadataSpan(
+				ctx,
+				runCtx,
+				"executor.handleGeneratorStep.aiOutput",
+				m,
+				enums.MetadataScopeStepAttempt,
+			)
+			if err != nil {
+				e.log.Warn("error creating AI output metadata span", "error", err)
+			}
+		}
 	}
 
 	// Steps can be batched with checkpointing!  Imagine an SDK that opts into checkpointing,
@@ -3437,6 +3527,9 @@ func (e *executor) handleStepFailed(ctx context.Context, runCtx execution.RunCon
 	}
 
 	if shouldEnqueueDiscovery(hasPendingSteps, runCtx.ParallelMode()) {
+		if err := e.maybeResetForceStepPlan(ctx, runCtx.Metadata()); err != nil {
+			return fmt.Errorf("error resetting force step plan: %w", err)
+		}
 		lifecycleItem := runCtx.LifecycleItem()
 		metadata := runCtx.Metadata()
 		span, err := e.tracerProvider.CreateDroppableSpan(
@@ -3866,6 +3959,9 @@ func (e *executor) handleGeneratorGateway(ctx context.Context, runCtx execution.
 	}
 
 	if shouldEnqueueDiscovery(hasPendingSteps, gen.ParallelMode()) {
+		if err := e.maybeResetForceStepPlan(ctx, runCtx.Metadata()); err != nil {
+			return fmt.Errorf("error resetting force step plan: %w", err)
+		}
 		lifecycleItem := runCtx.LifecycleItem()
 		metadata := runCtx.Metadata()
 		span, err := e.tracerProvider.CreateDroppableSpan(
@@ -3948,10 +4044,16 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 	runCtx.SetStatusCode(resp.StatusCode)
 
 	if e.allowStepMetadata.Enabled(ctx, runMetadata.ID.Tenant.AccountID) {
+		var serverProcessingMs int64
+		if resp.StatResult != nil {
+			serverProcessingMs = resp.StatResult.ServerProcessing.Milliseconds()
+		}
+
 		md := metadata.WithWarnings(extractors.ExtractAIGatewayMetadata(
 			input,
 			resp.StatusCode,
 			resp.Body,
+			serverProcessingMs,
 		))
 		for _, m := range md {
 			_, err := e.createMetadataSpan(
@@ -4107,6 +4209,9 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 	}
 
 	if shouldEnqueueDiscovery(hasPendingSteps, runCtx.ParallelMode()) {
+		if err := e.maybeResetForceStepPlan(ctx, runCtx.Metadata()); err != nil {
+			return fmt.Errorf("error resetting force step plan: %w", err)
+		}
 		lifecycleItem := runCtx.LifecycleItem()
 		metadata := runCtx.Metadata()
 		span, err := e.tracerProvider.CreateDroppableSpan(

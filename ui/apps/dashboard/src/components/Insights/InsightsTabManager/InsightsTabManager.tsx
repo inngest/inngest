@@ -9,6 +9,7 @@ import { ulid } from 'ulid';
 import { v4 as uuidv4 } from 'uuid';
 
 import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
+import { CellDetailProvider } from '@/components/Insights/CellDetailContext';
 import { InsightsStateMachineContextProvider } from '@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext';
 import { SQLEditorProvider } from '@/components/Insights/InsightsSQLEditor/SQLEditorContext';
 import type {
@@ -27,6 +28,7 @@ import {
 } from './InsightsHelperPanel/InsightsHelperPanelControl';
 import { InsightsHelperPanelIcon } from './InsightsHelperPanel/InsightsHelperPanelIcon';
 import {
+  CELL_DETAIL,
   DOCUMENTATION,
   INSIGHTS_AI,
   SCHEMA_EXPLORER,
@@ -310,6 +312,10 @@ function SingleTabRenderer({
 }: SingleTabRendererProps) {
   const isActive = tab.id === activeTabId;
 
+  const handleOpenCellDetailPanel = useCallback(() => {
+    setActiveHelper(CELL_DETAIL);
+  }, [setActiveHelper]);
+
   return (
     <InsightsStateMachineContextProvider
       key={tab.id}
@@ -320,72 +326,76 @@ function SingleTabRenderer({
       renderChildren={isActive}
       tabId={tab.id}
     >
-      {isQueryTab(tab.id) ? (
-        <SQLEditorProvider>
+      <CellDetailProvider onOpenPanel={handleOpenCellDetailPanel}>
+        {isQueryTab(tab.id) ? (
+          <SQLEditorProvider>
+            <div
+              className={
+                isActive ? 'h-full w-full' : 'h-0 w-full overflow-hidden'
+              }
+            >
+              <div className="flex h-full w-full">
+                <div className="h-full min-w-0 flex-1 overflow-hidden">
+                  {isHelperPanelOpen && activeHelper ? (
+                    <Resizable
+                      defaultSplitPercentage={75}
+                      minSplitPercentage={20}
+                      maxSplitPercentage={85}
+                      orientation="horizontal"
+                      splitKey="insights-helper-split"
+                      first={
+                        <div className="h-full min-w-0 overflow-hidden">
+                          <InsightsTabPanel
+                            isHomeTab={tab.id === HOME_TAB.id}
+                            isTemplatesTab={tab.id === TEMPLATES_TAB.id}
+                            tab={tab}
+                            historyWindow={historyWindow}
+                          />
+                        </div>
+                      }
+                      second={
+                        <InsightsHelperPanel
+                          active={activeHelper}
+                          agentThreadId={getAgentThreadIdForTab(tab.id)}
+                          onClose={() => {
+                            setActiveHelper(null);
+                          }}
+                        />
+                      }
+                    />
+                  ) : (
+                    <InsightsTabPanel
+                      isHomeTab={tab.id === HOME_TAB.id}
+                      isTemplatesTab={tab.id === TEMPLATES_TAB.id}
+                      tab={tab}
+                      historyWindow={historyWindow}
+                    />
+                  )}
+                </div>
+                {isQueryTab(tab.id) && helperItems.length > 0 ? (
+                  <InsightsHelperPanelControl
+                    items={helperItems}
+                    activeTitle={activeHelper}
+                  />
+                ) : null}
+              </div>
+            </div>
+          </SQLEditorProvider>
+        ) : (
           <div
             className={
               isActive ? 'h-full w-full' : 'h-0 w-full overflow-hidden'
             }
           >
-            <div className="flex h-full w-full">
-              <div className="h-full min-w-0 flex-1 overflow-hidden">
-                {isHelperPanelOpen && activeHelper ? (
-                  <Resizable
-                    defaultSplitPercentage={75}
-                    minSplitPercentage={20}
-                    maxSplitPercentage={85}
-                    orientation="horizontal"
-                    splitKey="insights-helper-split"
-                    first={
-                      <div className="h-full min-w-0 overflow-hidden">
-                        <InsightsTabPanel
-                          isHomeTab={tab.id === HOME_TAB.id}
-                          isTemplatesTab={tab.id === TEMPLATES_TAB.id}
-                          tab={tab}
-                          historyWindow={historyWindow}
-                        />
-                      </div>
-                    }
-                    second={
-                      <InsightsHelperPanel
-                        active={activeHelper}
-                        agentThreadId={getAgentThreadIdForTab(tab.id)}
-                        onClose={() => {
-                          setActiveHelper(null);
-                        }}
-                      />
-                    }
-                  />
-                ) : (
-                  <InsightsTabPanel
-                    isHomeTab={tab.id === HOME_TAB.id}
-                    isTemplatesTab={tab.id === TEMPLATES_TAB.id}
-                    tab={tab}
-                    historyWindow={historyWindow}
-                  />
-                )}
-              </div>
-              {isQueryTab(tab.id) && helperItems.length > 0 ? (
-                <InsightsHelperPanelControl
-                  items={helperItems}
-                  activeTitle={activeHelper}
-                />
-              ) : null}
-            </div>
+            <InsightsTabPanel
+              isHomeTab={tab.id === HOME_TAB.id}
+              isTemplatesTab={tab.id === TEMPLATES_TAB.id}
+              tab={tab}
+              historyWindow={historyWindow}
+            />
           </div>
-        </SQLEditorProvider>
-      ) : (
-        <div
-          className={isActive ? 'h-full w-full' : 'h-0 w-full overflow-hidden'}
-        >
-          <InsightsTabPanel
-            isHomeTab={tab.id === HOME_TAB.id}
-            isTemplatesTab={tab.id === TEMPLATES_TAB.id}
-            tab={tab}
-            historyWindow={historyWindow}
-          />
-        </div>
-      )}
+        )}
+      </CellDetailProvider>
     </InsightsStateMachineContextProvider>
   );
 }
@@ -467,7 +477,6 @@ function TabsWithAIHelper({
     if (activeHelper === null) {
       setActiveHelper(INSIGHTS_AI);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Only run on mount - setActiveHelper is stable
 
   const openAIHelperWithPrompt = useCallback(

@@ -1291,7 +1291,7 @@ func TestQueuePartitionPeek(t *testing.T) {
 
 		// After unpausing A, it should be included in the peek:
 		paused[idA] = false
-		require.NoError(t, q.UnpauseFunction(ctx, shard.Name(), accountId, idA))
+		require.NoError(t, q.UnpauseFunction(ctx, shard.Name(), accountId, uuid.Nil, idA))
 
 		require.NoError(t, err)
 		items, err = shard.PartitionPeek(ctx, true, now.Add(time.Hour), osqueue.PartitionPeekMax)
@@ -1360,7 +1360,7 @@ func TestQueuePartitionRequeue(t *testing.T) {
 	clock := clockwork.NewFakeClock()
 	_, shard := newQueue(
 		t, rc,
-		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 			return enableKeyQueues
 		}),
 		osqueue.WithClock(clock),
@@ -1690,7 +1690,7 @@ func TestQueueFunctionPause(t *testing.T) {
 
 	paused = false
 
-	err = q.UnpauseFunction(ctx, shard.Name(), uuid.Nil, idA)
+	err = q.UnpauseFunction(ctx, shard.Name(), uuid.Nil, uuid.Nil, idA)
 	require.NoError(t, err)
 
 	peeked, err = shard.PeekGlobalPartitions(ctx, 100, now.Add(5*time.Minute), true)
@@ -1747,7 +1747,7 @@ func TestQueueSetFunctionMigrate(t *testing.T) {
 			osqueue.WithPartitionPriorityFinder(func(ctx context.Context, part osqueue.QueuePartition) uint {
 				return osqueue.PriorityDefault
 			}),
-			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 				return true
 			}),
 		)
@@ -2138,7 +2138,7 @@ func TestQueueLeaseSequential(t *testing.T) {
 		require.WithinDuration(t, now.Add(dur), ulid.Time(leaseID.Time()), 5*time.Millisecond)
 	})
 
-	t.Run("It doesn't allow leasing without an existing lease ID", func(t *testing.T) {
+	t.Run("It doesn't allow renewing leasing without an existing lease ID", func(t *testing.T) {
 		id, err := shard.ConfigLease(ctx, "sequential", time.Second)
 		require.Equal(t, osqueue.ErrConfigAlreadyLeased, err)
 		require.Nil(t, id)
@@ -2432,7 +2432,7 @@ func TestMigrate(t *testing.T) {
 
 			idempotencyTTL := 5 * time.Second
 			opts := []osqueue.QueueOpt{
-				osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+				osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 					return tc.keyQueue
 				}),
 				osqueue.WithIdempotencyTTL(idempotencyTTL),
@@ -2812,7 +2812,7 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 		_, shard := newQueue(
 			t, rc,
 			osqueue.WithClock(clock),
-			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 				return true
 			}),
 		)
@@ -3005,7 +3005,7 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 			_, shard := newQueue(
 				t, rc,
 				osqueue.WithClock(clock),
-				osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+				osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 					return true
 				}),
 				osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
@@ -3091,7 +3091,7 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 		_, shard := newQueue(
 			t, rc,
 			osqueue.WithClock(clock),
-			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 				return true
 			}),
 			osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
@@ -3141,7 +3141,7 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 			_, shard := newQueue(
 				t, rc,
 				osqueue.WithClock(clock),
-				osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+				osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 					return true
 				}),
 				osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
@@ -3234,7 +3234,7 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 		_, shard := newQueue(
 			t, rc,
 			osqueue.WithClock(clock),
-			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 				return true
 			}),
 			osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
@@ -3313,7 +3313,7 @@ func TestQueueEnqueueItemSingleton(t *testing.T) {
 	_, shard := newQueue(
 		t, rc,
 		osqueue.WithClock(clock),
-		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 			return true
 		}),
 		osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
@@ -3483,7 +3483,7 @@ func TestQueueActiveCounters(t *testing.T) {
 	_, shard := newQueue(
 		t, rc,
 		osqueue.WithClock(clock),
-		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 			return enqueueToBacklog
 		}),
 	)
@@ -4046,7 +4046,7 @@ func TestInvalidScoreOnRefill(t *testing.T) {
 	_, shard := newQueue(
 		t, rc,
 		osqueue.WithClock(clock),
-		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 			return true
 		}),
 		osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {

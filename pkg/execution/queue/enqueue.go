@@ -55,7 +55,6 @@ func (q *queueProcessor) Enqueue(ctx context.Context, item Item, at time.Time, o
 		"env_id", item.WorkspaceID,
 		"app_id", item.Identifier.AppID,
 		"fn_id", item.Identifier.WorkflowID,
-		"queue_shard", q.primaryQueueShard.Name(),
 	)
 
 	if item.QueueName == nil && qi.FunctionID == uuid.Nil {

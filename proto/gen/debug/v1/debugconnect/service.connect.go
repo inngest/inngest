@@ -68,6 +68,16 @@ const (
 	DebugDeleteDebounceProcedure = "/debug.v1.Debug/DeleteDebounce"
 	// DebugRunDebounceProcedure is the fully-qualified name of the Debug's RunDebounce RPC.
 	DebugRunDebounceProcedure = "/debug.v1.Debug/RunDebounce"
+	// DebugDeleteDebounceByIDProcedure is the fully-qualified name of the Debug's DeleteDebounceByID
+	// RPC.
+	DebugDeleteDebounceByIDProcedure = "/debug.v1.Debug/DeleteDebounceByID"
+	// DebugGetShadowPartitionProcedure is the fully-qualified name of the Debug's GetShadowPartition
+	// RPC.
+	DebugGetShadowPartitionProcedure = "/debug.v1.Debug/GetShadowPartition"
+	// DebugGetBacklogsProcedure is the fully-qualified name of the Debug's GetBacklogs RPC.
+	DebugGetBacklogsProcedure = "/debug.v1.Debug/GetBacklogs"
+	// DebugGetBacklogSizeProcedure is the fully-qualified name of the Debug's GetBacklogSize RPC.
+	DebugGetBacklogSizeProcedure = "/debug.v1.Debug/GetBacklogSize"
 )
 
 // DebugClient is a client for the debug.v1.Debug service.
@@ -105,6 +115,14 @@ type DebugClient interface {
 	DeleteDebounce(context.Context, *connect.Request[v1.DeleteDebounceRequest]) (*connect.Response[v1.DeleteDebounceResponse], error)
 	// RunDebounce triggers immediate execution of a debounce.
 	RunDebounce(context.Context, *connect.Request[v1.RunDebounceRequest]) (*connect.Response[v1.RunDebounceResponse], error)
+	// DeleteDebounceByID deletes debounces directly by their IDs, without requiring function_id or debounce_key.
+	DeleteDebounceByID(context.Context, *connect.Request[v1.DeleteDebounceByIDRequest]) (*connect.Response[v1.DeleteDebounceByIDResponse], error)
+	// GetShadowPartition retrieves shadow partition details for a given partition ID
+	GetShadowPartition(context.Context, *connect.Request[v1.ShadowPartitionRequest]) (*connect.Response[v1.ShadowPartitionResponse], error)
+	// GetBacklogs retrieves the list of backlogs for a partition
+	GetBacklogs(context.Context, *connect.Request[v1.BacklogsRequest]) (*connect.Response[v1.BacklogsResponse], error)
+	// GetBacklogSize retrieves the number of items in a specific backlog
+	GetBacklogSize(context.Context, *connect.Request[v1.BacklogSizeRequest]) (*connect.Response[v1.BacklogSizeResponse], error)
 }
 
 // NewDebugClient constructs a client for the debug.v1.Debug service. By default, it uses the
@@ -214,6 +232,30 @@ func NewDebugClient(httpClient connect.HTTPClient, baseURL string, opts ...conne
 			connect.WithSchema(debugMethods.ByName("RunDebounce")),
 			connect.WithClientOptions(opts...),
 		),
+		deleteDebounceByID: connect.NewClient[v1.DeleteDebounceByIDRequest, v1.DeleteDebounceByIDResponse](
+			httpClient,
+			baseURL+DebugDeleteDebounceByIDProcedure,
+			connect.WithSchema(debugMethods.ByName("DeleteDebounceByID")),
+			connect.WithClientOptions(opts...),
+		),
+		getShadowPartition: connect.NewClient[v1.ShadowPartitionRequest, v1.ShadowPartitionResponse](
+			httpClient,
+			baseURL+DebugGetShadowPartitionProcedure,
+			connect.WithSchema(debugMethods.ByName("GetShadowPartition")),
+			connect.WithClientOptions(opts...),
+		),
+		getBacklogs: connect.NewClient[v1.BacklogsRequest, v1.BacklogsResponse](
+			httpClient,
+			baseURL+DebugGetBacklogsProcedure,
+			connect.WithSchema(debugMethods.ByName("GetBacklogs")),
+			connect.WithClientOptions(opts...),
+		),
+		getBacklogSize: connect.NewClient[v1.BacklogSizeRequest, v1.BacklogSizeResponse](
+			httpClient,
+			baseURL+DebugGetBacklogSizeProcedure,
+			connect.WithSchema(debugMethods.ByName("GetBacklogSize")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -235,6 +277,10 @@ type debugClient struct {
 	getDebounceInfo     *connect.Client[v1.DebounceInfoRequest, v1.DebounceInfoResponse]
 	deleteDebounce      *connect.Client[v1.DeleteDebounceRequest, v1.DeleteDebounceResponse]
 	runDebounce         *connect.Client[v1.RunDebounceRequest, v1.RunDebounceResponse]
+	deleteDebounceByID  *connect.Client[v1.DeleteDebounceByIDRequest, v1.DeleteDebounceByIDResponse]
+	getShadowPartition  *connect.Client[v1.ShadowPartitionRequest, v1.ShadowPartitionResponse]
+	getBacklogs         *connect.Client[v1.BacklogsRequest, v1.BacklogsResponse]
+	getBacklogSize      *connect.Client[v1.BacklogSizeRequest, v1.BacklogSizeResponse]
 }
 
 // GetPartition calls debug.v1.Debug.GetPartition.
@@ -317,6 +363,26 @@ func (c *debugClient) RunDebounce(ctx context.Context, req *connect.Request[v1.R
 	return c.runDebounce.CallUnary(ctx, req)
 }
 
+// DeleteDebounceByID calls debug.v1.Debug.DeleteDebounceByID.
+func (c *debugClient) DeleteDebounceByID(ctx context.Context, req *connect.Request[v1.DeleteDebounceByIDRequest]) (*connect.Response[v1.DeleteDebounceByIDResponse], error) {
+	return c.deleteDebounceByID.CallUnary(ctx, req)
+}
+
+// GetShadowPartition calls debug.v1.Debug.GetShadowPartition.
+func (c *debugClient) GetShadowPartition(ctx context.Context, req *connect.Request[v1.ShadowPartitionRequest]) (*connect.Response[v1.ShadowPartitionResponse], error) {
+	return c.getShadowPartition.CallUnary(ctx, req)
+}
+
+// GetBacklogs calls debug.v1.Debug.GetBacklogs.
+func (c *debugClient) GetBacklogs(ctx context.Context, req *connect.Request[v1.BacklogsRequest]) (*connect.Response[v1.BacklogsResponse], error) {
+	return c.getBacklogs.CallUnary(ctx, req)
+}
+
+// GetBacklogSize calls debug.v1.Debug.GetBacklogSize.
+func (c *debugClient) GetBacklogSize(ctx context.Context, req *connect.Request[v1.BacklogSizeRequest]) (*connect.Response[v1.BacklogSizeResponse], error) {
+	return c.getBacklogSize.CallUnary(ctx, req)
+}
+
 // DebugHandler is an implementation of the debug.v1.Debug service.
 type DebugHandler interface {
 	// GetPartition retrieves the partition data from the database
@@ -352,6 +418,14 @@ type DebugHandler interface {
 	DeleteDebounce(context.Context, *connect.Request[v1.DeleteDebounceRequest]) (*connect.Response[v1.DeleteDebounceResponse], error)
 	// RunDebounce triggers immediate execution of a debounce.
 	RunDebounce(context.Context, *connect.Request[v1.RunDebounceRequest]) (*connect.Response[v1.RunDebounceResponse], error)
+	// DeleteDebounceByID deletes debounces directly by their IDs, without requiring function_id or debounce_key.
+	DeleteDebounceByID(context.Context, *connect.Request[v1.DeleteDebounceByIDRequest]) (*connect.Response[v1.DeleteDebounceByIDResponse], error)
+	// GetShadowPartition retrieves shadow partition details for a given partition ID
+	GetShadowPartition(context.Context, *connect.Request[v1.ShadowPartitionRequest]) (*connect.Response[v1.ShadowPartitionResponse], error)
+	// GetBacklogs retrieves the list of backlogs for a partition
+	GetBacklogs(context.Context, *connect.Request[v1.BacklogsRequest]) (*connect.Response[v1.BacklogsResponse], error)
+	// GetBacklogSize retrieves the number of items in a specific backlog
+	GetBacklogSize(context.Context, *connect.Request[v1.BacklogSizeRequest]) (*connect.Response[v1.BacklogSizeResponse], error)
 }
 
 // NewDebugHandler builds an HTTP handler from the service implementation. It returns the path on
@@ -457,6 +531,30 @@ func NewDebugHandler(svc DebugHandler, opts ...connect.HandlerOption) (string, h
 		connect.WithSchema(debugMethods.ByName("RunDebounce")),
 		connect.WithHandlerOptions(opts...),
 	)
+	debugDeleteDebounceByIDHandler := connect.NewUnaryHandler(
+		DebugDeleteDebounceByIDProcedure,
+		svc.DeleteDebounceByID,
+		connect.WithSchema(debugMethods.ByName("DeleteDebounceByID")),
+		connect.WithHandlerOptions(opts...),
+	)
+	debugGetShadowPartitionHandler := connect.NewUnaryHandler(
+		DebugGetShadowPartitionProcedure,
+		svc.GetShadowPartition,
+		connect.WithSchema(debugMethods.ByName("GetShadowPartition")),
+		connect.WithHandlerOptions(opts...),
+	)
+	debugGetBacklogsHandler := connect.NewUnaryHandler(
+		DebugGetBacklogsProcedure,
+		svc.GetBacklogs,
+		connect.WithSchema(debugMethods.ByName("GetBacklogs")),
+		connect.WithHandlerOptions(opts...),
+	)
+	debugGetBacklogSizeHandler := connect.NewUnaryHandler(
+		DebugGetBacklogSizeProcedure,
+		svc.GetBacklogSize,
+		connect.WithSchema(debugMethods.ByName("GetBacklogSize")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/debug.v1.Debug/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case DebugGetPartitionProcedure:
@@ -491,6 +589,14 @@ func NewDebugHandler(svc DebugHandler, opts ...connect.HandlerOption) (string, h
 			debugDeleteDebounceHandler.ServeHTTP(w, r)
 		case DebugRunDebounceProcedure:
 			debugRunDebounceHandler.ServeHTTP(w, r)
+		case DebugDeleteDebounceByIDProcedure:
+			debugDeleteDebounceByIDHandler.ServeHTTP(w, r)
+		case DebugGetShadowPartitionProcedure:
+			debugGetShadowPartitionHandler.ServeHTTP(w, r)
+		case DebugGetBacklogsProcedure:
+			debugGetBacklogsHandler.ServeHTTP(w, r)
+		case DebugGetBacklogSizeProcedure:
+			debugGetBacklogSizeHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -562,4 +668,20 @@ func (UnimplementedDebugHandler) DeleteDebounce(context.Context, *connect.Reques
 
 func (UnimplementedDebugHandler) RunDebounce(context.Context, *connect.Request[v1.RunDebounceRequest]) (*connect.Response[v1.RunDebounceResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("debug.v1.Debug.RunDebounce is not implemented"))
+}
+
+func (UnimplementedDebugHandler) DeleteDebounceByID(context.Context, *connect.Request[v1.DeleteDebounceByIDRequest]) (*connect.Response[v1.DeleteDebounceByIDResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("debug.v1.Debug.DeleteDebounceByID is not implemented"))
+}
+
+func (UnimplementedDebugHandler) GetShadowPartition(context.Context, *connect.Request[v1.ShadowPartitionRequest]) (*connect.Response[v1.ShadowPartitionResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("debug.v1.Debug.GetShadowPartition is not implemented"))
+}
+
+func (UnimplementedDebugHandler) GetBacklogs(context.Context, *connect.Request[v1.BacklogsRequest]) (*connect.Response[v1.BacklogsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("debug.v1.Debug.GetBacklogs is not implemented"))
+}
+
+func (UnimplementedDebugHandler) GetBacklogSize(context.Context, *connect.Request[v1.BacklogSizeRequest]) (*connect.Response[v1.BacklogSizeResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("debug.v1.Debug.GetBacklogSize is not implemented"))
 }

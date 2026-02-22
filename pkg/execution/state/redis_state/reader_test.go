@@ -29,7 +29,7 @@ func TestItemsByPartitionOnEmptyPartition(t *testing.T) {
 
 		q, shard := newQueue(
 			t, rc,
-			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 				return true
 			}),
 			osqueue.WithClock(clock),
@@ -139,7 +139,7 @@ func TestItemsByPartition(t *testing.T) {
 
 			q, shard := newQueue(
 				t, rc,
-				osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+				osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 					return tc.keyQueuesEnabled
 				}),
 				osqueue.WithClock(clock),
@@ -198,7 +198,7 @@ func TestItemsByPartitionWithSystemQueue(t *testing.T) {
 
 	q, shard := newQueue(
 		t, rc,
-		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 			return false
 		}),
 		osqueue.WithClock(clock),
@@ -256,7 +256,7 @@ func TestItemsByBacklog(t *testing.T) {
 
 	q, shard := newQueue(
 		t, rc,
-		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 			return true
 		}),
 		osqueue.WithClock(clock),
@@ -366,7 +366,7 @@ func TestQueueIterator(t *testing.T) {
 
 	_, shard := newQueue(
 		t, rc,
-		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 			return false // TODO need to add support for key queues
 		}),
 		osqueue.WithClock(clock),
@@ -444,7 +444,7 @@ func TestItemByID(t *testing.T) {
 
 	q1, shard := newQueue(
 		t, rc,
-		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 			return false
 		}),
 		osqueue.WithClock(clock),
@@ -499,7 +499,7 @@ func TestItemExists(t *testing.T) {
 
 	q, shard := newQueue(
 		t, rc,
-		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, fnID uuid.UUID) bool {
+		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 			return false
 		}),
 		osqueue.WithClock(clock),

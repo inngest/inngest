@@ -1,11 +1,11 @@
 import { Button } from '@inngest/components/Button';
 import { Error } from '@inngest/components/Error/Error';
+import { StatusBanner } from '@inngest/components/Support/StatusBanner';
+import { useSystemStatus } from '@inngest/components/Support/useSystemStatus';
 import type { ErrorComponentProps } from '@tanstack/react-router';
 import { rootRouteId, useMatch, useRouter } from '@tanstack/react-router';
 
 import * as Sentry from '@sentry/tanstackstart-react';
-
-import { useClerk } from '@clerk/tanstack-react-start';
 
 function DefaultCatchBoundary({ error }: ErrorComponentProps) {
   const router = useRouter();
@@ -13,8 +13,7 @@ function DefaultCatchBoundary({ error }: ErrorComponentProps) {
     strict: false,
     select: (state) => state.id === rootRouteId,
   });
-
-  const { signOut, session } = useClerk();
+  const status = useSystemStatus();
 
   console.error(error.message);
 
@@ -22,6 +21,7 @@ function DefaultCatchBoundary({ error }: ErrorComponentProps) {
 
   return (
     <div className="flex flex-col justify-start items-start gap">
+      <StatusBanner status={status} />
       <Error message={error.message} />
 
       <div className="flex gap-2 justif-start items-center flex-wrap mx-4">
@@ -48,27 +48,19 @@ function DefaultCatchBoundary({ error }: ErrorComponentProps) {
           />
         )}
 
-        {/* Provide some escape hatches here if 
-          user/org state gets out of sync with clerk */}
+        {/* Provide some escape hatches here if user/org state gets out of sync with clerk */}
         {authError && (
           <>
             <Button
               kind="secondary"
               appearance="outlined"
-              onClick={async () => {
-                await signOut({
-                  sessionId: session?.id,
-                  redirectUrl: '/sign-in/choose',
-                });
-              }}
+              href="/sign-in/choose"
               label="Sign Out"
             />
             <Button
               kind="secondary"
               appearance="outlined"
-              onClick={() => {
-                router.navigate({ to: '/organization-list/$' });
-              }}
+              href="/organization-list"
               label="Switch Org"
             />
           </>
