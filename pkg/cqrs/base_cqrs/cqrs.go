@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"log"
 	"maps"
 	"slices"
 	"sort"
@@ -186,7 +187,7 @@ func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.Ot
 		return nil, err
 	}
 
-	return mapRootSpansFromRows(ctx, spans)
+	return mapRootSpansFromRows(ctx, spans, false)
 }
 
 func (w wrapper) GetSpansByDebugRunID(ctx context.Context, debugRunID ulid.ULID) ([]*cqrs.OtelSpan, error) {
@@ -236,7 +237,7 @@ func (w wrapper) GetSpansByDebugSessionID(ctx context.Context, debugSessionID ul
 
 var _ normalizedSpan = (*sqlc.GetRunSpanByRunIDRow)(nil)
 
-func (w wrapper) GetRunSpanByRunID(ctx context.Context, runID ulid.ULID, accountID, workspaceID uuid.UUID) (*cqrs.OtelSpan, error) {
+func (w wrapper) GetRunSpanByRunID(ctx context.Context, runID ulid.ULID, accountID, workspaceID uuid.UUID, opt cqrs.GetTraceSpanOpt) (*cqrs.OtelSpan, error) {
 	// Ignore the workspace ID for now.
 	span, err := w.q.GetRunSpanByRunID(ctx, sqlc.GetRunSpanByRunIDParams{
 		RunID:     runID.String(),
@@ -247,10 +248,10 @@ func (w wrapper) GetRunSpanByRunID(ctx context.Context, runID ulid.ULID, account
 		return nil, err
 	}
 
-	return mapSpanFromRow(ctx, span, nil)
+	return w.mapSpanWithOpts(ctx, span, runID, accountID, workspaceID, opt)
 }
 
-func (w wrapper) GetStepSpanByStepID(ctx context.Context, runID ulid.ULID, stepID string, accountID, workspaceID uuid.UUID) (*cqrs.OtelSpan, error) {
+func (w wrapper) GetStepSpanByStepID(ctx context.Context, runID ulid.ULID, stepID string, accountID, workspaceID uuid.UUID, opt cqrs.GetTraceSpanOpt) (*cqrs.OtelSpan, error) {
 	// Ignore the workspace ID for now.
 	span, err := w.q.GetStepSpanByStepID(ctx, sqlc.GetStepSpanByStepIDParams{
 		RunID:     runID.String(),
@@ -262,10 +263,10 @@ func (w wrapper) GetStepSpanByStepID(ctx context.Context, runID ulid.ULID, stepI
 		return nil, err
 	}
 
-	return mapSpanFromRow(ctx, span, nil)
+	return w.mapSpanWithOpts(ctx, span, runID, accountID, workspaceID, opt)
 }
 
-func (w wrapper) GetExecutionSpanByStepIDAndAttempt(ctx context.Context, runID ulid.ULID, stepID string, attempt int, accountID, workspaceID uuid.UUID) (*cqrs.OtelSpan, error) {
+func (w wrapper) GetExecutionSpanByStepIDAndAttempt(ctx context.Context, runID ulid.ULID, stepID string, attempt int, accountID, workspaceID uuid.UUID, opt cqrs.GetTraceSpanOpt) (*cqrs.OtelSpan, error) {
 	// Ignore the workspace ID for now.
 	span, err := w.q.GetExecutionSpanByStepIDAndAttempt(ctx, sqlc.GetExecutionSpanByStepIDAndAttemptParams{
 		RunID:       runID.String(),
@@ -278,10 +279,10 @@ func (w wrapper) GetExecutionSpanByStepIDAndAttempt(ctx context.Context, runID u
 		return nil, err
 	}
 
-	return mapSpanFromRow(ctx, span, nil)
+	return w.mapSpanWithOpts(ctx, span, runID, accountID, workspaceID, opt)
 }
 
-func (w wrapper) GetLatestExecutionSpanByStepID(ctx context.Context, runID ulid.ULID, stepID string, accountID, workspaceID uuid.UUID) (*cqrs.OtelSpan, error) {
+func (w wrapper) GetLatestExecutionSpanByStepID(ctx context.Context, runID ulid.ULID, stepID string, accountID, workspaceID uuid.UUID, opt cqrs.GetTraceSpanOpt) (*cqrs.OtelSpan, error) {
 	// Ignore the workspace ID for now.
 	span, err := w.q.GetLatestExecutionSpanByStepID(ctx, sqlc.GetLatestExecutionSpanByStepIDParams{
 		RunID:     runID.String(),
@@ -293,10 +294,10 @@ func (w wrapper) GetLatestExecutionSpanByStepID(ctx context.Context, runID ulid.
 		return nil, err
 	}
 
-	return mapSpanFromRow(ctx, span, nil)
+	return w.mapSpanWithOpts(ctx, span, runID, accountID, workspaceID, opt)
 }
 
-func (w wrapper) GetSpanBySpanID(ctx context.Context, runID ulid.ULID, spanID string, accountID, workspaceID uuid.UUID) (*cqrs.OtelSpan, error) {
+func (w wrapper) GetSpanBySpanID(ctx context.Context, runID ulid.ULID, spanID string, accountID, workspaceID uuid.UUID, opt cqrs.GetTraceSpanOpt) (*cqrs.OtelSpan, error) {
 	// Ignore the workspace ID for now.
 	span, err := w.q.GetSpanBySpanID(ctx, sqlc.GetSpanBySpanIDParams{
 		RunID:     runID.String(),
@@ -308,7 +309,30 @@ func (w wrapper) GetSpanBySpanID(ctx context.Context, runID ulid.ULID, spanID st
 		return nil, err
 	}
 
-	return mapSpanFromRow(ctx, span, nil)
+	return w.mapSpanWithOpts(ctx, span, runID, accountID, workspaceID, opt)
+}
+
+func (w wrapper) mapSpanWithOpts(ctx context.Context, span normalizedSpan, runID ulid.ULID, accountID, workspaceID uuid.UUID, opt cqrs.GetTraceSpanOpt) (*cqrs.OtelSpan, error) {
+	spans := []normalizedSpan{span}
+	if opt.IncludeMetadata {
+		metadataSpans, err := w.q.GetMetadataSpansByParentSpanID(ctx, sqlc.GetMetadataSpansByParentSpanIDParams{
+			RunID:        runID.String(),
+			ParentSpanID: span.GetDynamicSpanID(),
+			AccountID:    accountID.String(),
+		})
+		if err != nil {
+			logger.StdlibLogger(ctx).Error("error getting metadata spans by parent span ID", "error", err)
+			return nil, err
+		}
+
+		log.Println(len(metadataSpans))
+
+		for _, mspan := range metadataSpans {
+			spans = append(spans, mspan)
+		}
+	}
+
+	return mapRootSpansFromRows(ctx, spans, true)
 }
 
 type IODynamicRef struct {
@@ -521,7 +545,8 @@ fragmentLoop:
 }
 
 // Uses generics to accept slices of any type that implements normalizedSpan interface
-func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cqrs.OtelSpan, error) {
+// implicitRoot causes the first span to be used as the root if no explicit root is found
+func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T, implicitRoot bool) (*cqrs.OtelSpan, error) {
 	// ordered map is required by subsequent gql mapping
 	spanMap := orderedmap.NewOrderedMap[string, *cqrs.OtelSpan]()
 
@@ -578,7 +603,7 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 			span.Metadata = metadata
 		}
 
-		if (span.Attributes.IsUserland == nil || !*span.Attributes.IsUserland) && (span.ParentSpanID == nil || *span.ParentSpanID == "" || *span.ParentSpanID == "0000000000000000") {
+		if (span.Attributes.IsUserland == nil || !*span.Attributes.IsUserland) && (span.ParentSpanID == nil || *span.ParentSpanID == "" || *span.ParentSpanID == "0000000000000000") || (implicitRoot && root == nil) {
 			root, _ = spanMap.Get(span.SpanID)
 			continue
 		}
@@ -722,7 +747,7 @@ func buildDebugRunSpan[T normalizedSpan](ctx context.Context, spans []T) ([]*cqr
 
 	runSpans := make([]*cqrs.OtelSpan, 0, len(spansByRunID))
 	for _, runSpansGroup := range spansByRunID {
-		runSpan, err := mapRootSpansFromRows(ctx, runSpansGroup)
+		runSpan, err := mapRootSpansFromRows(ctx, runSpansGroup, false)
 		if err != nil {
 			return nil, err
 		}

@@ -1094,6 +1094,74 @@ func (q *Queries) GetLatestQueueSnapshotChunks(ctx context.Context) ([]*GetLates
 	return items, nil
 }
 
+const getMetadataSpansByParentSpanID = `-- name: GetMetadataSpansByParentSpanID :many
+SELECT
+  run_id,
+  trace_id,
+  dynamic_span_id,
+  MIN(start_time) as start_time,
+  MAX(end_time) AS end_time,
+  parent_span_id,
+  json_agg(json_build_object(
+    'name', name,
+    'attributes', attributes,
+    'links', links,
+    'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
+    'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
+  )) AS span_fragments
+FROM spans
+WHERE run_id = CAST($1 AS CHAR(26)) AND parent_span_id = $2 AND account_id = $3 AND name = 'metadata'
+GROUP BY dynamic_span_id, run_id, trace_id, parent_span_id
+ORDER BY start_time ASC
+`
+
+type GetMetadataSpansByParentSpanIDParams struct {
+	RunID        string
+	ParentSpanID sql.NullString
+	AccountID    string
+}
+
+type GetMetadataSpansByParentSpanIDRow struct {
+	RunID         string
+	TraceID       string
+	DynamicSpanID sql.NullString
+	StartTime     interface{}
+	EndTime       interface{}
+	ParentSpanID  sql.NullString
+	SpanFragments json.RawMessage
+}
+
+func (q *Queries) GetMetadataSpansByParentSpanID(ctx context.Context, arg GetMetadataSpansByParentSpanIDParams) ([]*GetMetadataSpansByParentSpanIDRow, error) {
+	rows, err := q.db.QueryContext(ctx, getMetadataSpansByParentSpanID, arg.RunID, arg.ParentSpanID, arg.AccountID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*GetMetadataSpansByParentSpanIDRow
+	for rows.Next() {
+		var i GetMetadataSpansByParentSpanIDRow
+		if err := rows.Scan(
+			&i.RunID,
+			&i.TraceID,
+			&i.DynamicSpanID,
+			&i.StartTime,
+			&i.EndTime,
+			&i.ParentSpanID,
+			&i.SpanFragments,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getQueueSnapshotChunks = `-- name: GetQueueSnapshotChunks :many
 
 
