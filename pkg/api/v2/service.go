@@ -10,6 +10,8 @@ import (
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"github.com/inngest/inngest/pkg/api"
 	"github.com/inngest/inngest/pkg/api/v2/apiv2base"
+	"github.com/inngest/inngest/pkg/cqrs"
+	"github.com/inngest/inngest/pkg/execution"
 	apiv2 "github.com/inngest/inngest/proto/gen/api/v2"
 	"google.golang.org/grpc"
 )
@@ -20,12 +22,16 @@ type Service struct {
 	signingKeys SigningKeysProvider
 	eventKeys   EventKeysProvider
 	base        *apiv2base.Base
+	data        cqrs.Manager
+	executor    execution.Executor
 }
 
 // ServiceOptions contains configuration for the V2 service
 type ServiceOptions struct {
 	SigningKeysProvider SigningKeysProvider
 	EventKeysProvider   EventKeysProvider
+	CQRSManager         cqrs.Manager
+	Executor            execution.Executor
 }
 
 func NewService(opts ServiceOptions) *Service {
@@ -33,6 +39,8 @@ func NewService(opts ServiceOptions) *Service {
 		signingKeys: opts.SigningKeysProvider,
 		eventKeys:   opts.EventKeysProvider,
 		base:        apiv2base.NewBase(),
+		data:        opts.CQRSManager,
+		executor:    opts.Executor,
 	}
 }
 
