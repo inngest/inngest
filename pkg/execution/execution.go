@@ -60,7 +60,7 @@ type Executor interface {
 	// Note that the executor does *not* handle rate limiting, debouncing, batching,
 	// expressions, etc.  Any Schedule request will immediately be scheduled for the
 	// given time. Filtering of events in any way must be handled prior scheduling.
-	Schedule(ctx context.Context, r ScheduleRequest) (*sv2.Metadata, error)
+	Schedule(ctx context.Context, r ScheduleRequest) (*ulid.ULID, *sv2.Metadata, error)
 
 	// Execute runs the given function via the execution drivers.  If the
 	// from ID is "$trigger" this is treated as a new workflow invocation from the

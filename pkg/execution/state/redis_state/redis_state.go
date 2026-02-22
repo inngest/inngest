@@ -249,6 +249,15 @@ func (m shardedMgr) New(ctx context.Context, input state.Input) (state.State, er
 		// So if this error is returned, we should just continue with creating a new state, since
 		// it could mean that the state is not actually created.
 		case state.ErrInvalidIdentifier: // no-op
+		case state.ErrIdentifierTombstone:
+			if runID != nil {
+				input.Identifier.RunID = *runID
+			}
+			return state.NewStateInstance(
+				input.Identifier,
+				state.Metadata{Identifier: input.Identifier},
+				nil, nil, nil,
+			), state.ErrIdentifierTombstone
 		default:
 			return nil, err
 		}
@@ -385,7 +394,11 @@ func (m shardedMgr) idempotencyCheck(ctx context.Context, rc RetriableClient, ke
 	// Realisitcally, the chances of this are low, as the entire run has to finish while
 	// the scheduling op retries.
 	if len(prev) > 0 && prev[0] == consts.FunctionIdempotencyTombstone {
-		return nil, state.ErrIdentifierTombstone
+		runID, err := ulid.Parse(prev[1:])
+		if err != nil {
+			return nil, state.ErrIdentifierTombstone
+		}
+		return &runID, state.ErrIdentifierTombstone
 	}
 
 	// if there are existing values, the state might have already been created

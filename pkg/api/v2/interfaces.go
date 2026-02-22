@@ -24,7 +24,7 @@ type FunctionScheduler interface {
 	// If the run was impacted by flow control (idempotency, rate limiting, debounce, etc.),
 	// metadata will be nil.  This will return the original run ID if runs were skipped due
 	// to idemptoency.
-	Schedule(ctx context.Context, req execution.ScheduleRequest) (ulid.ULID, *sv2.Metadata, error)
+	Schedule(ctx context.Context, req execution.ScheduleRequest) (*ulid.ULID, *sv2.Metadata, error)
 }
 
 type EventPublisher interface {

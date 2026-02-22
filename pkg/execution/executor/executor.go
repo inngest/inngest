@@ -767,18 +767,19 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	// Run IDs are created embedding the timestamp now, when the function is being scheduled.
 	// When running a cancellation, functions are cancelled at scheduling time based off of
 	// this run ID.
-	var runID ulid.ULID
+	var runID *ulid.ULID
 
 	if req.RunID == nil {
-		runID = ulid.MustNew(ulid.Now(), rand.Reader)
+		id := ulid.MustNew(ulid.Now(), rand.Reader)
+		runID = &id
 	} else {
-		runID = *req.RunID
+		runID = req.RunID
 	}
 
-	key := idempotencyKey(req, runID)
+	key := idempotencyKey(req, *runID)
 
 	// Check constraints and acquire lease
-	WithConstraints(
+	md, err := WithConstraints(
 		ctx,
 		e.now(),
 		e.capacityManager,
@@ -787,7 +788,12 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		key,
 		func(ctx context.Context, performChecks bool) (*sv2.Metadata, error) {
 			return util.CritT(ctx, "schedule", func(ctx context.Context) (*sv2.Metadata, error) {
-				runID, md, err = e.schedule(ctx, req, runID, key, performChecks)
+				var (
+					md  *sv2.Metadata
+					err error
+				)
+				runID, md, err = e.schedule(ctx, req, *runID, key, performChecks)
+				return md, err
 			}, util.WithBoundaries(2*time.Second))
 		})
 
@@ -817,7 +823,7 @@ func (e *executor) schedule(
 	performChecks bool,
 ) (*ulid.ULID, *sv2.Metadata, error) {
 	if req.AppID == uuid.Nil {
-		return nil, fmt.Errorf("app ID is required to schedule a run")
+		return nil, nil, fmt.Errorf("app ID is required to schedule a run")
 	}
 
 	l := e.log.With(
@@ -856,7 +862,7 @@ func (e *executor) schedule(
 							"status": "error",
 						},
 					})
-					return nil, fmt.Errorf("could not check rate limit: %w", err)
+					return nil, nil, fmt.Errorf("could not check rate limit: %w", err)
 				}
 
 				if res.Limited {
@@ -874,7 +880,7 @@ func (e *executor) schedule(
 							"constraint_api": false,
 						},
 					})
-					return nil, ErrFunctionRateLimited
+					return nil, nil, ErrFunctionRateLimited
 				}
 
 				status := "allowed"
@@ -892,7 +898,7 @@ func (e *executor) schedule(
 			case ratelimit.ErrNotRateLimited:
 				// no-op: proceed with function run as usual
 			default:
-				return nil, fmt.Errorf("could not evaluate rate limit: %w", err)
+				return nil, nil, fmt.Errorf("could not evaluate rate limit: %w", err)
 			}
 		}
 	}
@@ -911,9 +917,9 @@ func (e *executor) schedule(
 			FunctionPausedAt: req.FunctionPausedAt,
 		}, req.Function)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
-		return nil, ErrFunctionDebounced
+		return nil, nil, ErrFunctionDebounced
 	}
 
 	if req.Context == nil {
@@ -940,7 +946,7 @@ func (e *executor) schedule(
 		// serialize this data to the span at the same time
 		byt, err := json.Marshal(evt)
 		if err != nil {
-			return nil, fmt.Errorf("error marshalling event: %w", err)
+			return nil, nil, fmt.Errorf("error marshalling event: %w", err)
 		}
 		evts[n] = byt
 	}
@@ -1013,7 +1019,7 @@ func (e *executor) schedule(
 
 	bytEvts, err := json.Marshal(evts)
 	if err != nil {
-		return nil, fmt.Errorf("error marshalling events: %w", err)
+		return nil, nil, fmt.Errorf("error marshalling events: %w", err)
 	}
 
 	strEvts := string(bytEvts)
@@ -1098,7 +1104,7 @@ func (e *executor) schedule(
 			// behaving as if the singleton mode were set to skip.
 			singletonRunID, err := e.singletonMgr.HandleSingleton(ctx, singletonKey, *req.Function.Singleton, req.AccountID)
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 
 			eventID := req.Events[0].GetInternalID()
@@ -1122,7 +1128,7 @@ func (e *executor) schedule(
 					}
 				default:
 					// Immediately end before creating state
-					return nil, ErrFunctionSkipped
+					return nil, nil, ErrFunctionSkipped
 				}
 			}
 			singletonConfig = &queue.Singleton{Key: singletonKey}
@@ -1132,7 +1138,7 @@ func (e *executor) schedule(
 		case errors.Is(err, singleton.ErrNotASingleton):
 			// We no-op, and we run the function normally not as a singleton
 		default:
-			return nil, err
+			return nil, nil, err
 		}
 	}
 
@@ -1148,7 +1154,7 @@ func (e *executor) schedule(
 
 	if req.OriginalRunID != nil && req.FromStep != nil && req.FromStep.StepID != "" {
 		if err := reconstruct(ctx, e.traceReader, req, &newState); err != nil {
-			return nil, fmt.Errorf("error reconstructing input state: %w", err)
+			return nil, nil, fmt.Errorf("error reconstructing input state: %w", err)
 		}
 	}
 
@@ -1164,9 +1170,10 @@ func (e *executor) schedule(
 		case err == nil: // no-op
 		case errors.Is(err, state.ErrIdentifierExists): // no-op
 		case errors.Is(err, state.ErrIdentifierTombstone):
-			return nil, ErrFunctionSkippedIdempotency
+			tombstoneRunID := st.Metadata.ID.RunID
+			return &tombstoneRunID, nil, ErrFunctionSkippedIdempotency
 		default:
-			return nil, fmt.Errorf("error creating run state: %w", err)
+			return nil, nil, fmt.Errorf("error creating run state: %w", err)
 		}
 
 		// Override existing identifier in case we changed the run ID due to idempotency
@@ -1179,7 +1186,7 @@ func (e *executor) schedule(
 			id := sv2.IDFromV1(stv1ID)
 			metadata, err = e.smv2.LoadMetadata(ctx, id)
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 		}
 	}
@@ -1248,7 +1255,7 @@ func (e *executor) schedule(
 		// Create cancellation pauses immediately, only if this is a non-batch event.
 		if len(req.Function.Cancel) > 0 {
 			if err := e.createCancellationPauses(ctx, l, key, evtMap, metadata.ID, req); err != nil {
-				return &metadata, err
+				return &metadata.ID.RunID, &metadata, err
 			}
 		}
 
@@ -1256,7 +1263,7 @@ func (e *executor) schedule(
 		if req.Function.Timeouts != nil && req.Function.Timeouts.Start != nil {
 			enqueuedAt := ulid.Time(runID.Time())
 			if err := e.createEagerCancellationForTimeout(ctx, enqueuedAt, req.Function.Timeouts.StartDuration(), enums.CancellationKindStartTimeout, stv1ID); err != nil {
-				return &metadata, err
+				return &metadata.ID.RunID, &metadata, err
 			}
 		}
 	}
@@ -1336,7 +1343,7 @@ func (e *executor) schedule(
 		for _, e := range e.lifecycles {
 			go e.OnFunctionScheduled(context.WithoutCancel(ctx), metadata, item, req.Events)
 		}
-		return &metadata, nil
+		return &metadata.ID.RunID, &metadata, nil
 	}
 
 	// Schedule for async functons (the default)
@@ -1349,17 +1356,17 @@ func (e *executor) schedule(
 		// If the item already exists in the queue, we can safely ignore this
 		// entire schedule request; it's basically a retry and we should not
 		// persist this for the user.
-		return nil, state.ErrIdentifierExists
+		return &metadata.ID.RunID, nil, state.ErrIdentifierExists
 
 	case queue.ErrQueueItemSingletonExists:
 		err := e.smv2.Delete(ctx, sv2.IDFromV1(stv1ID))
 		if err != nil {
 			l.ReportError(err, "error deleting function state")
 		}
-		return nil, ErrFunctionSkipped
+		return nil, nil, ErrFunctionSkipped
 
 	default:
-		return nil, fmt.Errorf("error enqueueing source edge '%v': %w", queueKey, err)
+		return nil, nil, fmt.Errorf("error enqueueing source edge '%v': %w", queueKey, err)
 	}
 
 	sendSpans()
@@ -1367,10 +1374,10 @@ func (e *executor) schedule(
 		go e.OnFunctionScheduled(context.WithoutCancel(ctx), metadata, item, req.Events)
 	}
 
-	return &metadata, nil
+	return &metadata.ID.RunID, &metadata, nil
 }
 
-func (e *executor) handleFunctionSkipped(ctx context.Context, req execution.ScheduleRequest, metadata sv2.Metadata, evts []json.RawMessage, reason enums.SkipReason) (*sv2.Metadata, error) {
+func (e *executor) handleFunctionSkipped(ctx context.Context, req execution.ScheduleRequest, metadata sv2.Metadata, evts []json.RawMessage, reason enums.SkipReason) (*ulid.ULID, *sv2.Metadata, error) {
 	for _, e := range e.lifecycles {
 		service.Go(
 			func() {
@@ -1381,7 +1388,7 @@ func (e *executor) handleFunctionSkipped(ctx context.Context, req execution.Sche
 				})
 			})
 	}
-	return nil, ErrFunctionSkipped
+	return nil, nil, ErrFunctionSkipped
 }
 
 // Execute loads a workflow and the current run state, then executes the
@@ -4692,7 +4699,6 @@ func (e *executor) newExpressionEvaluator(ctx context.Context, expr string) (exp
 // AppendAndScheduleBatch appends a new batch item. If a new batch is created, it will be scheduled to run
 // after the batch timeout. If the item finalizes the batch, a function run is immediately scheduled.
 func (e *executor) AppendAndScheduleBatch(ctx context.Context, fn inngest.Function, bi batch.BatchItem, opts *execution.BatchExecOpts) error {
-
 	enableInstrumentation := e.enableBatchingInstrumentation != nil && e.enableBatchingInstrumentation(ctx, bi.AccountID, bi.WorkspaceID)
 	l := logger.StdlibLogger(ctx).With("eventID", bi.EventID)
 	result, err := e.batcher.Append(ctx, bi, fn)
@@ -4812,7 +4818,7 @@ func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Func
 	}
 
 	key := fmt.Sprintf("%s-%s", fn.ID, payload.BatchID)
-	md, err := e.Schedule(ctx, execution.ScheduleRequest{
+	_, md, err := e.Schedule(ctx, execution.ScheduleRequest{
 		AccountID:        payload.AccountID,
 		WorkspaceID:      payload.WorkspaceID,
 		AppID:            payload.AppID,

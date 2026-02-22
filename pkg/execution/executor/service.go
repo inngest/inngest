@@ -488,7 +488,7 @@ func (s *svc) handleDebounce(ctx context.Context, item queue.Item) error {
 			)
 			defer span.End()
 
-			md, err := s.exec.Schedule(ctx, execution.ScheduleRequest{
+			_, md, err := s.exec.Schedule(ctx, execution.ScheduleRequest{
 				Function:         f,
 				AccountID:        di.AccountID,
 				WorkspaceID:      di.WorkspaceID,
@@ -1089,7 +1089,7 @@ func (s *svc) handleCron(ctx context.Context, item queue.Item) error {
 	// NOTE
 	// should this also handle batching and rate limit like runner.initialize?
 	// seems kinda weird to have those settisngs with cron tbh
-	_, err = s.Executor().Schedule(ctx, execution.ScheduleRequest{
+	_, _, err = s.Executor().Schedule(ctx, execution.ScheduleRequest{
 		AccountID:      ci.AccountID,
 		WorkspaceID:    ci.WorkspaceID,
 		AppID:          ci.AppID,

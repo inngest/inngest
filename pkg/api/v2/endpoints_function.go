@@ -3,7 +3,6 @@ package apiv2
 import (
 	"context"
 	"crypto/rand"
-	"fmt"
 	"net/http"
 	"time"
 
@@ -69,7 +68,7 @@ func (s *Service) InvokeFunction(ctx context.Context, req *apiv2.InvokeFunctionR
 	sr := execution.NewScheduleRequest(f)
 	sr.IdempotencyKey = &idempotencyHash
 	sr.Events = append(sr.Events, event)
-	md, err := s.executor.Schedule(ctx, sr)
+	runID, _, err := s.executor.Schedule(ctx, sr)
 	scheduleStatus := executor.ScheduleStatus(err)
 
 	go func() {
@@ -97,9 +96,7 @@ func (s *Service) InvokeFunction(ctx context.Context, req *apiv2.InvokeFunctionR
 		// running.
 		return &apiv2.InvokeFunctionResponse{
 			Data: &apiv2.InvokeFunctionData{
-				RunId:    md.ID.RunID.String(),
-				Status:   apiv2.RunStatus_RUN_STATUS_QUEUED,
-				QueuedAt: timestamppb.Now(),
+				RunId: runID.String(),
 			},
 			Metadata: &apiv2.ResponseMetadata{
 				FetchedAt: timestamppb.Now(),
@@ -124,13 +121,14 @@ func (s *Service) InvokeFunction(ctx context.Context, req *apiv2.InvokeFunctionR
 			"Function invocation was skipped because the function is paused or draining.",
 		)
 	case "idempotency":
-		// TODO: Return the run ID here!!  Without this, people won't be able to find the
-		// original run ID.
-		return nil, s.base.NewError(
-			http.StatusConflict,
-			apiv2base.ErrorIdempotencyConflict,
-			fmt.Sprintf("A function execution with this idempotency key already exists. Idempotency key: %s", *req.IdempotencyKey),
-		)
+		return &apiv2.InvokeFunctionResponse{
+			Data: &apiv2.InvokeFunctionData{
+				RunId: runID.String(),
+			},
+			Metadata: &apiv2.ResponseMetadata{
+				FetchedAt: timestamppb.Now(),
+			},
+		}, nil
 	}
 
 	logger.From(ctx).Error("error invoking function via api", "error", err)

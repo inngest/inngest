@@ -692,7 +692,7 @@ func Initialize(ctx context.Context, opts InitOpts) (*sv2.Metadata, error) {
 	}
 
 	// If this is a debounced function, run this through a debouncer.
-	md, err := opts.exec.Schedule(ctx, execution.ScheduleRequest{
+	_, md, err := opts.exec.Schedule(ctx, execution.ScheduleRequest{
 		WorkspaceID:    wsID,
 		AppID:          opts.appID,
 		Function:       fn,

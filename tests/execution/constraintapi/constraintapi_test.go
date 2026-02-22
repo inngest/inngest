@@ -353,7 +353,7 @@ func TestConstraintEnforcement(t *testing.T) {
 					},
 				}
 
-				md, err := deps.exec.Schedule(ctx, execution.ScheduleRequest{
+				_, md, err := deps.exec.Schedule(ctx, execution.ScheduleRequest{
 					Function:       fnConfig,
 					AccountID:      accountID,
 					WorkspaceID:    envID,
@@ -445,7 +445,7 @@ func TestConstraintEnforcement(t *testing.T) {
 					},
 				}
 
-				md, err := deps.exec.Schedule(ctx, execution.ScheduleRequest{
+				_, md, err := deps.exec.Schedule(ctx, execution.ScheduleRequest{
 					Function:       fnConfig,
 					AccountID:      accountID,
 					WorkspaceID:    envID,
@@ -1584,7 +1584,7 @@ func TestScheduleConstraintAPICompatibility(t *testing.T) {
 		require.False(t, rlRes.Limited)
 
 		// Try as part of schedule
-		md, err := exec.Schedule(ctx, execution.ScheduleRequest{
+		_, md, err := exec.Schedule(ctx, execution.ScheduleRequest{
 			AccountID:      accountID,
 			WorkspaceID:    envID,
 			AppID:          appID,
@@ -1797,7 +1797,7 @@ func TestScheduleConstraintAPICompatibility(t *testing.T) {
 		// Schedule should be allowed for second event with same key
 		eventID2 := ulid.MustNew(ulid.Timestamp(clock.Now()), rand.Reader)
 		scheduleIdempotencyKey := eventID2.String()
-		md, err := exec.Schedule(ctx, execution.ScheduleRequest{
+		_, md, err := exec.Schedule(ctx, execution.ScheduleRequest{
 			AccountID:      accountID,
 			WorkspaceID:    envID,
 			AppID:          appID,
