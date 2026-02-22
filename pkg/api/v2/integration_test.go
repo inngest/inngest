@@ -201,12 +201,11 @@ func TestGRPCIntegration_InvokeFunction(t *testing.T) {
 		require.NoError(t, err)
 
 		req := &apiv2.InvokeFunctionRequest{
-			FunctionId: "my-app-hello-world",
-			Data:       data,
-			Mode:       stringPtr("async"),
+			FunctionId:     "my-app-hello-world",
+			Data:           data,
 			IdempotencyKey: stringPtr("test-key-123"),
 		}
-		
+
 		resp, err := client.InvokeFunction(ctx, req)
 
 		require.Error(t, err)
@@ -227,7 +226,7 @@ func TestGRPCIntegration_InvokeFunction(t *testing.T) {
 			FunctionId: "",
 			Data:       data,
 		}
-		
+
 		resp, err := client.InvokeFunction(ctx, req)
 
 		require.Error(t, err)
@@ -243,58 +242,12 @@ func TestGRPCIntegration_InvokeFunction(t *testing.T) {
 			FunctionId: "my-app-hello-world",
 			Data:       nil, // Missing data
 		}
-		
+
 		resp, err := client.InvokeFunction(ctx, req)
 
 		require.Error(t, err)
 		require.Nil(t, resp)
 		require.Contains(t, err.Error(), "Input data is required")
-	})
-
-	t.Run("invoke function with invalid mode", func(t *testing.T) {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-
-		data, err := structpb.NewStruct(map[string]interface{}{
-			"message": "Hello, World!",
-		})
-		require.NoError(t, err)
-
-		req := &apiv2.InvokeFunctionRequest{
-			FunctionId: "my-app-hello-world",
-			Data:       data,
-			Mode:       stringPtr("invalid"),
-		}
-		
-		resp, err := client.InvokeFunction(ctx, req)
-
-		require.Error(t, err)
-		require.Nil(t, resp)
-		require.Contains(t, err.Error(), "Mode must be either 'sync' or 'async'")
-	})
-
-	t.Run("invoke function with sync mode via gRPC", func(t *testing.T) {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-
-		data, err := structpb.NewStruct(map[string]interface{}{
-			"message": "Hello, World!",
-		})
-		require.NoError(t, err)
-
-		req := &apiv2.InvokeFunctionRequest{
-			FunctionId: "my-app-hello-world",
-			Data:       data,
-			Mode:       stringPtr("sync"),
-		}
-		
-		resp, err := client.InvokeFunction(ctx, req)
-
-		require.Error(t, err)
-		require.Nil(t, resp)
-		require.Contains(t, err.Error(), "not implemented")
-		// Verify mode was parsed correctly in gRPC
-		require.Contains(t, err.Error(), "mode: sync")
 	})
 
 	t.Run("invoke function with async mode via gRPC", func(t *testing.T) {
@@ -309,9 +262,8 @@ func TestGRPCIntegration_InvokeFunction(t *testing.T) {
 		req := &apiv2.InvokeFunctionRequest{
 			FunctionId: "my-app-hello-world",
 			Data:       data,
-			Mode:       stringPtr("async"),
 		}
-		
+
 		resp, err := client.InvokeFunction(ctx, req)
 
 		require.Error(t, err)
@@ -333,9 +285,8 @@ func TestGRPCIntegration_InvokeFunction(t *testing.T) {
 		req := &apiv2.InvokeFunctionRequest{
 			FunctionId: "my-app-hello-world",
 			Data:       data,
-			Mode:       nil, // No mode specified
 		}
-		
+
 		resp, err := client.InvokeFunction(ctx, req)
 
 		require.Error(t, err)
