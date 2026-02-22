@@ -56,6 +56,7 @@ jobs:
           args: ${{ needs.check-release-type.outputs.prerelease != '' && 'release --clean --verbose --skip=docker' || 'release --clean --verbose' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAP_GITHUB_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}
   npm:
     runs-on: ubuntu-latest
     needs: [goreleaser, check-release-type]
