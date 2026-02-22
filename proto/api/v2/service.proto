@@ -1357,7 +1357,7 @@ message InvokeFunctionRequest {
   ];
   optional string idempotency_key = 3 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-      description: "Optional idempotency key to ensure the function is only invoked once within 24h using the same key"
+      description: "Optional idempotency key to handle duplicate requests within a given idempotency period."
       example: "\"user-action-123\""
     }
   ];
@@ -1371,15 +1371,6 @@ message InvokeFunctionRequest {
 }
 
 
-enum RunStatus {
-  RUN_STATUS_QUEUED = 0;
-  RUN_STATUS_RUNNING = 1;
-  RUN_STATUS_COMPLETED = 2;
-  RUN_STATUS_FAILED = 3;
-  RUN_STATUS_CANCELLED = 4;
-  RUN_STATUS_SKIPPED = 5;
-}
-
 message InvokeFunctionResponse {
   InvokeFunctionData data = 1;
   ResponseMetadata metadata = 2;
@@ -1392,34 +1383,28 @@ message InvokeFunctionData {
       example: "\"01hp1zx8m3ng9vp6qn0xk7j4cy\""
     }
   ];
-  RunStatus status = 2 [
-    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-      description: "Current status of the function execution"
-      example: "\"RUN_STATUS_RUNNING\""
-    }
-  ];
-  google.protobuf.Timestamp queued_at = 3 [
+  google.protobuf.Timestamp queued_at = 2 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
       description: "Timestamp when the function execution was enqueued"
     }
   ];
-  optional google.protobuf.Timestamp started_at = 4 [
+  optional google.protobuf.Timestamp started_at = 3 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
       description: "Timestamp when the function execution started (if started)"
     }
   ];
-  optional google.protobuf.Timestamp completed_at = 5 [
+  optional google.protobuf.Timestamp completed_at = 4 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
       description: "Timestamp when the function execution completed (if finished)"
     }
   ];
-  optional string result = 6 [
+  optional string result = 5 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
       description: "JSON string containing the function result (only available for completed synchronous invocations)"
       example: "\"{\\\"success\\\": true, \\\"data\\\": \\\"Hello, World!\\\"}\""
     }
   ];
-  optional string error = 7 [
+  optional string error = 6 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
       description: "Error message if the function execution failed"
     }

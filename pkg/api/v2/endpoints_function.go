@@ -16,6 +16,8 @@ import (
 	"github.com/inngest/inngest/pkg/util"
 	apiv2 "github.com/inngest/inngest/proto/gen/api/v2"
 	"github.com/oklog/ulid/v2"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -121,6 +123,7 @@ func (s *Service) InvokeFunction(ctx context.Context, req *apiv2.InvokeFunctionR
 			"Function invocation was skipped because the function is paused or draining.",
 		)
 	case "idempotency":
+		_ = grpc.SetHeader(ctx, metadata.Pairs("x-http-code", "409"))
 		return &apiv2.InvokeFunctionResponse{
 			Data: &apiv2.InvokeFunctionData{
 				RunId: runID.String(),

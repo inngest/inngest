@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
@@ -12,6 +13,7 @@ import (
 	"github.com/inngest/inngest/pkg/api/v2/apiv2base"
 	apiv2 "github.com/inngest/inngest/proto/gen/api/v2"
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/proto"
 )
 
 // Service implements the V2 API service for gRPC with grpc-gateway
@@ -91,6 +93,24 @@ func NewHTTPHandler(ctx context.Context, serviceOpts ServiceOptions, httpOpts HT
 				return strings.ToLower(key), true
 			}
 			return "", false
+		}),
+		// Allow handlers to override the HTTP status code by setting a
+		// "x-http-code" gRPC header via grpc.SetHeader.  This runs before
+		// the response body is written, so WriteHeader takes effect.
+		runtime.WithForwardResponseOption(func(ctx context.Context, w http.ResponseWriter, _ proto.Message) error {
+			md, ok := runtime.ServerMetadataFromContext(ctx)
+			if !ok {
+				return nil
+			}
+			if vals := md.HeaderMD.Get("x-http-code"); len(vals) > 0 {
+				if code, err := strconv.Atoi(vals[0]); err == nil {
+					// Remove the metadata key so it doesn't leak as an HTTP header.
+					delete(md.HeaderMD, "x-http-code")
+					w.Header().Del("Grpc-Metadata-X-Http-Code")
+					w.WriteHeader(code)
+				}
+			}
+			return nil
 		}),
 	)
 	if err := apiv2.RegisterV2HandlerServer(ctx, gwmux, service); err != nil {

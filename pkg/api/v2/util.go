@@ -18,10 +18,11 @@ func validateInvokeRequest(ctx context.Context, req *apiv2.InvokeFunctionRequest
 	}
 
 	// Validate mode parameter if provided
-	if req.Mode != nil {
-		if *req.Mode != "sync" && *req.Mode != "async" {
-			return apiv2base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidFieldFormat, "Mode must be either 'sync' or 'async'")
-		}
-	}
+	// if req.Mode != nil {
+	// 	if *req.Mode != "sync" && *req.Mode != "async" {
+	// 		return apiv2base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidFieldFormat, "Mode must be either 'sync' or 'async'")
+	// 	}
+	// }
+
 	return nil
 }
