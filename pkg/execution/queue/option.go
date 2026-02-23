@@ -457,10 +457,11 @@ type QueueOptions struct {
 
 	enableJobPromotion bool
 
-	CapacityManager                    constraintapi.CapacityManager
-	UseConstraintAPI                   constraintapi.UseConstraintAPIFn
-	EnableCapacityLeaseInstrumentation constraintapi.EnableHighCardinalityInstrumentation
-	CapacityLeaseExtendInterval        time.Duration
+	CapacityManager                     constraintapi.CapacityManager
+	UseConstraintAPI                    constraintapi.UseConstraintAPIFn
+	EnableCapacityLeaseInstrumentation  constraintapi.EnableHighCardinalityInstrumentation
+	CapacityLeaseExtendInterval         time.Duration
+	AcquireCapacityLeaseOnBacklogRefill bool
 
 	EnableThrottleInstrumentation EnableThrottleInstrumentationFn
 
@@ -609,6 +610,12 @@ func WithCapacityLeaseExtendInterval(interval time.Duration) QueueOpt {
 func WithCapacityLeaseInstrumentation(enable constraintapi.EnableHighCardinalityInstrumentation) QueueOpt {
 	return func(q *QueueOptions) {
 		q.EnableCapacityLeaseInstrumentation = enable
+	}
+}
+
+func WithAcquireCapacityLeaseOnBacklogRefill(acquire bool) QueueOpt {
+	return func(q *QueueOptions) {
+		q.AcquireCapacityLeaseOnBacklogRefill = acquire
 	}
 }
 

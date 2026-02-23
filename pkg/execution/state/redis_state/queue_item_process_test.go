@@ -116,6 +116,7 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
 				return true
 			}),
+			osqueue.WithAcquireCapacityLeaseOnBacklogRefill(true),
 			osqueue.WithCapacityManager(cm),
 			// make lease extensions more frequent
 			osqueue.WithCapacityLeaseExtendInterval(time.Second),
@@ -157,6 +158,7 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
 				return true
 			}),
+			osqueue.WithAcquireCapacityLeaseOnBacklogRefill(true),
 			osqueue.WithCapacityManager(cm),
 			// make lease extensions more frequent
 			osqueue.WithCapacityLeaseExtendInterval(time.Second),
@@ -266,6 +268,7 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
 				return true
 			}),
+			osqueue.WithAcquireCapacityLeaseOnBacklogRefill(true),
 			osqueue.WithCapacityManager(cm),
 			// Use matching interval (same as queue item lease ticker)
 			osqueue.WithCapacityLeaseExtendInterval(leaseExtendInterval),
@@ -475,6 +478,7 @@ func TestQueueProcessorPreLeaseWithConstraintAPI(t *testing.T) {
 			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
 				return true
 			}),
+			osqueue.WithAcquireCapacityLeaseOnBacklogRefill(true),
 			osqueue.WithCapacityManager(cm),
 			// make lease extensions more frequent
 			osqueue.WithCapacityLeaseExtendInterval(time.Second),
@@ -525,6 +529,7 @@ func TestQueueProcessorPreLeaseWithConstraintAPI(t *testing.T) {
 			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
 				return true
 			}),
+			osqueue.WithAcquireCapacityLeaseOnBacklogRefill(true),
 			osqueue.WithCapacityManager(cm),
 			// make lease extensions more frequent
 			osqueue.WithCapacityLeaseExtendInterval(time.Second),
@@ -811,6 +816,7 @@ func TestPartitionProcessRequeueAfterLimitedWithConstraintAPI(t *testing.T) {
 			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
 				return true // acquire leases
 			}),
+			osqueue.WithAcquireCapacityLeaseOnBacklogRefill(true),
 			osqueue.WithCapacityManager(cm),
 			osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
 				return osqueue.PartitionConstraintConfig{
