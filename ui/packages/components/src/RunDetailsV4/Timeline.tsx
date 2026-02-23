@@ -168,6 +168,41 @@ function generateHTTPTimingBars(
 }
 
 // ============================================================================
+// Expand All / Collapse All Utilities
+// ============================================================================
+
+/**
+ * Recursively collect all expandable bar IDs from the timeline data.
+ * This includes:
+ * - Step bars with timingBreakdown or children (non-root)
+ * - Server timing bars that can expand to show HTTP timing or children
+ */
+function collectExpandableIds(bars: TimelineBarData[]): string[] {
+  const ids: string[] = [];
+  for (const bar of bars) {
+    const hasTimingBreakdown = !!bar.timingBreakdown;
+    const hasChildren = bar.children && bar.children.length > 0;
+    const hasHTTPTiming = !!bar.httpTimingBreakdown;
+
+    // Step-level bars are expandable when they have timing or children
+    if (!bar.isRoot && (hasTimingBreakdown || hasChildren)) {
+      ids.push(bar.id);
+
+      // The server timing bar is expandable when there are children or HTTP timing
+      if (hasTimingBreakdown && (hasHTTPTiming || hasChildren)) {
+        ids.push(`${bar.id}-timing-server`);
+      }
+    }
+
+    // Recurse into children
+    if (bar.children) {
+      ids.push(...collectExpandableIds(bar.children));
+    }
+  }
+  return ids;
+}
+
+// ============================================================================
 // Timeline Bar Renderer
 // ============================================================================
 
@@ -420,6 +455,17 @@ export function Timeline({ data, onSelectStep }: Props): JSX.Element {
     [onSelectStep]
   );
 
+  const handleExpandAll = useCallback(() => {
+    const rootBarIds = bars.filter((bar) => bar.isRoot).map((bar) => bar.id);
+    const allExpandableIds = collectExpandableIds(bars);
+    setExpandedBars(new Set([...rootBarIds, ...allExpandableIds]));
+  }, [bars]);
+
+  const handleCollapseAll = useCallback(() => {
+    const rootBarIds = bars.filter((bar) => bar.isRoot).map((bar) => bar.id);
+    setExpandedBars(new Set(rootBarIds));
+  }, [bars]);
+
   // Handle timeline brush selection change
   const handleSelectionChange = useCallback((start: number, end: number) => {
     setViewStartOffset(start);
@@ -440,6 +486,8 @@ export function Timeline({ data, onSelectStep }: Props): JSX.Element {
         status={rootStatus}
         selectionStart={viewStartOffset}
         selectionEnd={viewEndOffset}
+        onExpandAll={handleExpandAll}
+        onCollapseAll={handleCollapseAll}
       />
 
       {/* Step bars */}
