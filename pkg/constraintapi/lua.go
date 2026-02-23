@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"net"
 	"os"
@@ -352,6 +353,11 @@ func isNetworkError(err error) bool {
 	}
 	var dnsErr *net.DNSError
 	if errors.As(err, &dnsErr) {
+		return true
+	}
+	// rueidis returns io.EOF and io.ErrUnexpectedEOF directly from its bufio
+	// read loop without wrapping them in *net.OpError, so check explicitly.
+	if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
 		return true
 	}
 	return false

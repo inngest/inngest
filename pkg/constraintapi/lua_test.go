@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"net"
 	"os"
@@ -331,6 +332,30 @@ func TestLuaError(t *testing.T) {
 		{
 			name:       "wrapped net.DNSError returns network_error",
 			err:        fmt.Errorf("redis: %w", dnsErr),
+			wantStatus: "network_error",
+			wantRetry:  true,
+		},
+		{
+			name:       "io.EOF returns network_error",
+			err:        io.EOF,
+			wantStatus: "network_error",
+			wantRetry:  true,
+		},
+		{
+			name:       "wrapped io.EOF returns network_error",
+			err:        fmt.Errorf("redis: %w", io.EOF),
+			wantStatus: "network_error",
+			wantRetry:  true,
+		},
+		{
+			name:       "io.ErrUnexpectedEOF returns network_error",
+			err:        io.ErrUnexpectedEOF,
+			wantStatus: "network_error",
+			wantRetry:  true,
+		},
+		{
+			name:       "wrapped io.ErrUnexpectedEOF returns network_error",
+			err:        fmt.Errorf("redis: %w", io.ErrUnexpectedEOF),
 			wantStatus: "network_error",
 			wantRetry:  true,
 		},
