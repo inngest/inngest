@@ -204,15 +204,6 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 		},
 	})
 
-	if requestLatency > MaximumAllowedRequestDelay {
-		// TODO : Set proper error code
-		return nil, errs.Wrap(
-			0,
-			false,
-			"exceeded maximum allowed request delay, latency: %s, attempt: %d", requestLatency, req.RequestAttempt,
-		)
-	}
-
 	enableHighCardinalityInstrumentation := r.enableHighCardinalityInstrumentation != nil && r.enableHighCardinalityInstrumentation(ctx, req.AccountID, req.EnvID, req.FunctionID)
 
 	// TODO: Should we get the current time again/cancel if too much time passed up until here?
