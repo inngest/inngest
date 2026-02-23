@@ -82,7 +82,7 @@ if decode_ulid_time(currentLeaseID) < nowMS then
 	return cjson.encode(res)
 end
 local leaseDetails = call("HMGET", keyOldLeaseDetails, "lik", "req", "rid")
-if leaseDetails == false or leaseDetails == nil or leaseDetails[1] == nil or leaseDetails[2] == nil then
+if leaseDetails == false or leaseDetails == nil or not leaseDetails[1] or not leaseDetails[2] then
 	local res = {}
 	res["s"] = 2
 	res["d"] = debugLogs
