@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"net"
 	"os"
 	"regexp"
 	"strconv"
@@ -344,6 +345,18 @@ func isTimeout(err error) bool {
 	return false
 }
 
+func isNetworkError(err error) bool {
+	var opErr *net.OpError
+	if errors.As(err, &opErr) {
+		return true
+	}
+	var dnsErr *net.DNSError
+	if errors.As(err, &dnsErr) {
+		return true
+	}
+	return false
+}
+
 func executeLuaScript(
 	ctx context.Context,
 	name string,
@@ -384,6 +397,9 @@ func executeLuaScript(
 func luaError(err error) (status string, retry bool) {
 	if isTimeout(err) {
 		return "timeout", true
+	}
+	if isNetworkError(err) {
+		return "network_error", true
 	}
 	if err != nil {
 		return "error", false

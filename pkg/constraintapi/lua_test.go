@@ -1,10 +1,13 @@
 package constraintapi
 
 import (
+	"context"
 	"embed"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/fs"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -264,5 +267,92 @@ func collectLuaScripts(t *testing.T, path string, entries []fs.DirEntry, scripts
 		name = strings.TrimSuffix(name, ".lua")
 
 		scripts[name] = string(byt)
+	}
+}
+
+func TestLuaError(t *testing.T) {
+	dialErr := &net.OpError{Op: "dial", Net: "tcp", Err: errors.New("connection refused")}
+	dnsErr := &net.DNSError{Err: "no such host", Name: "redis.example.com"}
+
+	tests := []struct {
+		name        string
+		err         error
+		wantStatus  string
+		wantRetry   bool
+	}{
+		{
+			name:       "nil error returns success",
+			err:        nil,
+			wantStatus: "success",
+			wantRetry:  false,
+		},
+		{
+			name:       "context deadline exceeded returns timeout",
+			err:        context.DeadlineExceeded,
+			wantStatus: "timeout",
+			wantRetry:  true,
+		},
+		{
+			name:       "context canceled returns timeout",
+			err:        context.Canceled,
+			wantStatus: "timeout",
+			wantRetry:  true,
+		},
+		{
+			name:       "os deadline exceeded returns timeout",
+			err:        os.ErrDeadlineExceeded,
+			wantStatus: "timeout",
+			wantRetry:  true,
+		},
+		{
+			name:       "wrapped context deadline exceeded returns timeout",
+			err:        fmt.Errorf("redis: %w", context.DeadlineExceeded),
+			wantStatus: "timeout",
+			wantRetry:  true,
+		},
+		{
+			name:       "net.OpError returns network_error",
+			err:        dialErr,
+			wantStatus: "network_error",
+			wantRetry:  true,
+		},
+		{
+			name:       "wrapped net.OpError returns network_error",
+			err:        fmt.Errorf("redis: %w", dialErr),
+			wantStatus: "network_error",
+			wantRetry:  true,
+		},
+		{
+			name:       "net.DNSError returns network_error",
+			err:        dnsErr,
+			wantStatus: "network_error",
+			wantRetry:  true,
+		},
+		{
+			name:       "wrapped net.DNSError returns network_error",
+			err:        fmt.Errorf("redis: %w", dnsErr),
+			wantStatus: "network_error",
+			wantRetry:  true,
+		},
+		{
+			name:       "generic error returns error without retry",
+			err:        errors.New("WRONGTYPE Operation against a key holding the wrong kind of value"),
+			wantStatus: "error",
+			wantRetry:  false,
+		},
+		{
+			name:       "wrapped generic error returns error without retry",
+			err:        fmt.Errorf("script failed: %w", errors.New("ERR unknown command")),
+			wantStatus: "error",
+			wantRetry:  false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			status, retry := luaError(tt.err)
+			assert.Equal(t, tt.wantStatus, status)
+			assert.Equal(t, tt.wantRetry, retry)
+		})
 	}
 }
