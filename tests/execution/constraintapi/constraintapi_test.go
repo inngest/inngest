@@ -100,6 +100,7 @@ func TestConstraintEnforcement(t *testing.T) {
 				queue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (bool) {
 					return true
 				}),
+				queue.WithAcquireCapacityLeaseOnBacklogRefill(true),
 				queue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p queue.PartitionIdentifier) queue.PartitionConstraintConfig {
 					return test.queueConstraints
 				}),

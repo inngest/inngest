@@ -232,6 +232,7 @@ func TestQueueE2E(t *testing.T) {
 				options = append(options, queue.WithCapacityManager(cm))
 				options = append(options,
 					queue.WithUseConstraintAPI(tc.useConstraintAPI),
+					queue.WithAcquireCapacityLeaseOnBacklogRefill(true),
 				)
 			}
 
