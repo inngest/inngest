@@ -465,7 +465,7 @@ func constraintItemsFromBacklog(sp *QueueShadowPartition, backlog *QueueBacklog,
 		},
 	}
 
-	if backlog.Throttle != nil {
+	if backlog.Throttle != nil && latestConstraints.Throttle != nil && backlog.Throttle.ThrottleKeyExpressionHash == latestConstraints.Throttle.ThrottleKeyExpressionHash {
 		constraints = append(constraints, constraintapi.ConstraintItem{
 			Kind: constraintapi.ConstraintKindThrottle,
 			Throttle: &constraintapi.ThrottleConstraint{
