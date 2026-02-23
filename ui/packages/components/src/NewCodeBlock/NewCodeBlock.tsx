@@ -256,7 +256,7 @@ export const NewCodeBlock = ({
             <Editor
               className={cn('h-full', className)}
               theme="inngest-theme"
-              defaultLanguage={language}
+              language={language}
               value={editEmtpy ? EMPTY_INPUT : content}
               options={{
                 wordWrap: wordWrap ? 'on' : 'off',
