@@ -7,10 +7,9 @@ export type IOProps = {
   raw?: string;
   error?: boolean;
   loading?: boolean;
-  parsed?: boolean;
 };
 
-export const IO = ({ title, actions, raw, error, loading, parsed = false }: IOProps) => {
+export const IO = ({ title, actions, raw, error, loading }: IOProps) => {
   return (
     <div className="text-muted bg-codeEditor h-full">
       <NewCodeBlock
