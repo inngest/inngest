@@ -396,6 +396,10 @@ func (f Function) Validate(ctx context.Context) error {
 			err = multierror.Append(err, fmt.Errorf("All steps must have a name"))
 		}
 
+		if _, rerr := step.GetRetryDelay(); rerr != nil {
+			err = multierror.Append(err, rerr)
+		}
+
 		uri, serr := url.Parse(step.URI)
 		if serr != nil {
 			err = multierror.Append(err, fmt.Errorf("Steps must have a valid URI"))

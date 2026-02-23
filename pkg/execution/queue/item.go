@@ -335,6 +335,11 @@ type Item struct {
 	// ParallelMode controls discovery step scheduling after a parallel step
 	// ends
 	ParallelMode enums.ParallelMode `json:"pm,omitempty"`
+
+	// CustomRetryDelay stores a fixed delay between retry attempts, overriding the default
+	// backoff table. When set, each retry will be scheduled at least this far in the future.
+	// This is set from the step's RetryDelay configuration.
+	CustomRetryDelay *time.Duration `json:"crd,omitempty"`
 }
 
 func (i Item) GetMaxAttempts() int {
