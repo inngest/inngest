@@ -4333,7 +4333,11 @@ func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, runCtx exec
 		e.log.Debug("error creating span for next step after WaitForSignal", "error", err)
 	}
 
-	_, err = e.pm.Write(ctx, pauses.PauseIndex(pause), &pause)
+	// We really don't want this to fail, this can be retried in an idempotent way but
+	// workflows with 0 retries setup will just hang forever if pause creation fails.
+	_, err = util.WithRetry(ctx, "pause.handleGeneratorWaitForSignal", func(ctx context.Context) (int, error) {
+		return e.pm.Write(ctx, pauses.PauseIndex(pause), &pause)
+	}, util.NewRetryConf(util.WithRetryConfRetryableErrors(pauses.WritePauseRetryableError)))
 	if err == state.ErrSignalConflict {
 		stdErr := state.WrapInStandardError(
 			err,
