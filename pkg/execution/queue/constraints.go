@@ -217,7 +217,7 @@ func (q *queueProcessor) BacklogRefillConstraintCheck(
 	}
 
 	useAPI := q.UseConstraintAPI(ctx, *shadowPart.AccountID)
-	if !useAPI {
+	if !q.AcquireCapacityLeaseOnBacklogRefill || !useAPI {
 		metrics.IncrBacklogRefillConstraintCheckCounter(ctx, enums.BacklogRefillConstraintCheckReasonFeatureFlagDisabled.String(), metrics.CounterOpt{
 			PkgName: pkgName,
 		})
