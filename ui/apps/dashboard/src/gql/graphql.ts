@@ -1479,6 +1479,7 @@ export type MutationSubmitChurnSurveyArgs = {
   email: Scalars['String']['input'];
   feedback: InputMaybe<Scalars['String']['input']>;
   reason: Scalars['String']['input'];
+  renderedOrder: InputMaybe<Array<Scalars['String']['input']>>;
 };
 
 

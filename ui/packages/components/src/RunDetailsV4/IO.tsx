@@ -20,7 +20,6 @@ export const IO = ({ title, actions, raw, error, loading, parsed = false }: IOPr
           content: raw ?? 'Unknown',
         }}
         allowFullScreen={true}
-        parsed={parsed}
         loading={loading}
       />
     </div>

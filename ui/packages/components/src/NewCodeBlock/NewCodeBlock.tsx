@@ -15,7 +15,7 @@ import {
   RiExpandDiagonalLine,
 } from '@remixicon/react';
 import { JSONTree } from 'react-json-tree';
-import useLocalStorage from 'react-use/lib/useLocalStorage';
+import useLocalStorage from 'react-use/esm/useLocalStorage';
 
 import { Alert } from '../Alert';
 import { Fullscreen } from '../Fullscreen/Fullscreen';
@@ -50,35 +50,51 @@ interface CodeBlockProps {
   };
   actions?: CodeBlockAction[];
   allowFullScreen?: boolean;
-  parsed?: boolean;
+  enableTreeView?: boolean;
   loading?: boolean;
 }
+
+const jsonParse = (content: string) => {
+  try {
+    return JSON.parse(content);
+  } catch (e) {
+    console.error('Error parsing content CodeBlock, returning raw content', e);
+    return content;
+  }
+};
+
+const downloadJson = ({ content }: { content?: string }) => {
+  if (content) {
+    const blob = new Blob([content], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const element = document.createElement('a');
+    element.href = url;
+    element.download = 'data.json';
+    document.body.appendChild(element);
+    element.click();
+    document.body.removeChild(element);
+    URL.revokeObjectURL(url);
+  }
+};
 
 export const NewCodeBlock = ({
   header,
   tab,
   actions = [],
   allowFullScreen = false,
-  parsed = false,
+  enableTreeView = false,
   loading = false,
   className,
 }: CodeBlockProps) => {
   const [dark, _] = useState(isDark());
   const [fullScreen, setFullScreen] = useState(false);
-  const [mode, setMode] = useState<'rich' | 'raw'>('rich');
+  const [mode, setMode] = useState<'tree' | 'raw'>('raw');
   const [wordWrap, setWordWrap] = useLocalStorage('wordWrap', false);
   const { handleCopyClick, isCopying } = useCopyToClipboard();
   const [editEmtpy, setEditEmtpy] = useState(false);
 
   const monaco = useMonaco();
   const { content, readOnly = true, language = 'json' } = tab;
-
-  let parsedContent = null;
-  try {
-    parsed && (parsedContent = JSON.parse(content));
-  } catch (e) {
-    console.error('Error parsing content', e);
-  }
 
   useEffect(() => {
     if (!monaco) {
@@ -94,20 +110,6 @@ export const NewCodeBlock = ({
   }, [monaco, dark]);
 
   const isOutputTooLarge = (content?.length ?? 0) > maxRenderedOutputSizeBytes;
-
-  const downloadJson = ({ content }: { content?: string }) => {
-    if (content) {
-      const blob = new Blob([content], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const element = document.createElement('a');
-      element.href = url;
-      element.download = 'data.json';
-      document.body.appendChild(element);
-      element.click();
-      document.body.removeChild(element);
-      URL.revokeObjectURL(url);
-    }
-  };
 
   if (!monaco) {
     console.info('monaco not loaded, abandoning ship');
@@ -129,35 +131,35 @@ export const NewCodeBlock = ({
               'inline-flex max-h-24 w-0 grow overflow-hidden text-ellipsis whitespace-nowrap text-sm '
             )}
           >
-            {parsed ? (
+            {enableTreeView ? (
               <SegmentedControl defaultValue={mode}>
-                <SegmentedControl.Button value="rich" onClick={() => setMode('rich')}>
+                <SegmentedControl.Button value="tree" onClick={() => setMode('tree')}>
                   <div className="overflow-x-hidden overflow-y-hidden text-ellipsis whitespace-nowrap">
-                    {header?.title}
+                    {'Tree View'}
                   </div>
                 </SegmentedControl.Button>
                 <SegmentedControl.Button value="raw" onClick={() => setMode('raw')}>
-                  <div className="w-0 overflow-x-hidden overflow-y-hidden text-ellipsis whitespace-nowrap">
-                    {header?.title}
+                  <div className="overflow-x-hidden overflow-y-hidden text-ellipsis whitespace-nowrap">
+                    {'Raw View'}
                   </div>
                 </SegmentedControl.Button>
               </SegmentedControl>
-            ) : (
+            ) : header?.title ? (
               <Pill
                 kind={header?.status === 'error' ? 'error' : 'default'}
                 appearance="outlined"
                 className="my-2 overflow-x-auto rounded-full p-3"
               >
                 <OptionalTooltip
-                  tooltip={header?.title?.length && header?.title?.length > 55 ? header?.title : ''}
+                  tooltip={header.title.length && header.title.length > 55 ? header.title : ''}
                   side="left"
                 >
                   <div className="overflow-x-hidden overflow-y-hidden text-ellipsis whitespace-nowrap">
-                    {header?.title}
+                    {header.title}
                   </div>
                 </OptionalTooltip>
               </Pill>
-            )}
+            ) : null}
           </div>
 
           {!isOutputTooLarge && (
@@ -183,16 +185,18 @@ export const NewCodeBlock = ({
                 handleCopyClick={handleCopyClick}
                 appearance="outlined"
               />
-              <Button
-                icon={wordWrap ? <IconOverflowText /> : <IconWrapText />}
-                onClick={() => setWordWrap(!wordWrap)}
-                size="small"
-                aria-label={wordWrap ? 'Do not wrap text' : 'Wrap text'}
-                title={wordWrap ? 'Do not wrap text' : 'Wrap text'}
-                tooltip={wordWrap ? 'Do not wrap text' : 'Wrap text'}
-                appearance="outlined"
-                kind="secondary"
-              />
+              {(!enableTreeView || mode === 'raw') && (
+                <Button
+                  icon={wordWrap ? <IconOverflowText /> : <IconWrapText />}
+                  onClick={() => setWordWrap(!wordWrap)}
+                  size="small"
+                  aria-label={wordWrap ? 'Do not wrap text' : 'Wrap text'}
+                  title={wordWrap ? 'Do not wrap text' : 'Wrap text'}
+                  tooltip={wordWrap ? 'Do not wrap text' : 'Wrap text'}
+                  appearance="outlined"
+                  kind="secondary"
+                />
+              )}
               {allowFullScreen && (
                 <Button
                   onClick={() => setFullScreen(!fullScreen)}
@@ -233,10 +237,10 @@ export const NewCodeBlock = ({
             </>
           ) : loading ? (
             <Skeleton className="h-24 w-full" />
-          ) : parsed && mode === 'rich' ? (
+          ) : enableTreeView && mode === 'raw' ? (
             <JSONTree
               hideRoot={true}
-              data={parsedContent ?? {}}
+              data={jsonParse(content) ?? {}}
               shouldExpandNodeInitially={() => true}
               theme={jsonTreeTheme(dark)}
               labelRenderer={([key]) => (
