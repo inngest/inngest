@@ -143,6 +143,15 @@ func MarshalV1(
 		UseAPI:  true,
 	}
 
+	// Propagate defer context from metadata config.
+	if deferGroupID := md.Config.GetDeferGroupID(); deferGroupID != "" {
+		req.Context.DeferGroupID = deferGroupID
+		req.Context.DeferResult = md.Config.GetDeferResult()
+		req.Context.DeferError = md.Config.GetDeferError()
+		deferRunEnded := md.Config.GetDeferRunEnded()
+		req.Context.DeferRunEnded = &deferRunEnded
+	}
+
 	// Ensure that we're not sending data that's too large to the SDK.
 	if md.Metrics.StateSize <= (consts.MaxSDKRequestBodySize - 1024) {
 		// Load the actual function state here.

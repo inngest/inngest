@@ -972,6 +972,17 @@ func (e *executor) schedule(
 	config.SetDebounceFlag(req.PreventDebounce)
 	config.SetEventIDMapping(req.Events)
 
+	if req.DeferGroupID != nil {
+		config.SetDeferGroupID(*req.DeferGroupID)
+		config.SetDeferRunEnded(req.DeferRunEnded)
+	}
+	if req.DeferResult != nil {
+		config.SetDeferResult(req.DeferResult)
+	}
+	if req.DeferError != nil {
+		config.SetDeferError(req.DeferError)
+	}
+
 	if req.DebugSessionID != nil {
 		config.SetDebugSessionID(*req.DebugSessionID)
 	}
@@ -980,7 +991,13 @@ func (e *executor) schedule(
 	}
 
 	carrier := itrace.NewTraceCarrier(itrace.WithTraceCarrierSpanID(&spanID))
-	itrace.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
+	if req.DeferGroupID != nil {
+		// Deferred runs must NOT inherit the parent run's trace context.
+		// Use a clean context so the carrier only contains this run's trace.
+		itrace.UserTracer().Propagator().Inject(context.Background(), propagation.MapCarrier(carrier.Context))
+	} else {
+		itrace.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
+	}
 	config.SetFunctionTrace(carrier)
 
 	metadata := sv2.Metadata{
@@ -1136,9 +1153,16 @@ func (e *executor) schedule(
 		Steps:    []state.MemoizedStep{},
 	}
 
-	if req.OriginalRunID != nil && req.FromStep != nil && req.FromStep.StepID != "" {
-		if err := reconstruct(ctx, e.traceReader, req, &newState); err != nil {
-			return nil, fmt.Errorf("error reconstructing input state: %w", err)
+	if req.OriginalRunID != nil {
+		if req.DeferGroupID != nil && req.DeferSteps != nil {
+			// Deferred run: copy ALL state from the original run using pre-loaded steps
+			if err := reconstructForDefer(req.DeferSteps, &newState); err != nil {
+				return nil, fmt.Errorf("error reconstructing state for defer: %w", err)
+			}
+		} else if req.FromStep != nil && req.FromStep.StepID != "" {
+			if err := reconstruct(ctx, e.traceReader, req, &newState); err != nil {
+				return nil, fmt.Errorf("error reconstructing input state: %w", err)
+			}
 		}
 	}
 
@@ -3097,10 +3121,38 @@ func (e *executor) HandleGeneratorResponse(ctx context.Context, i *runInstance, 
 		}
 	}
 
+	// Pre-scan for RunComplete + DeferGroup ops and load parent steps BEFORE
+	// processing opcode groups, because handleGeneratorFunctionFinished calls
+	// Finalize which deletes state (including steps).
+	var runCompleteOp *state.GeneratorOpcode
+	var deferOps []*state.GeneratorOpcode
+	for _, op := range resp.Generator {
+		if op.Op == enums.OpcodeRunComplete || op.Op == enums.OpcodeSyncRunComplete {
+			runCompleteOp = op
+		}
+		if op.Op == enums.OpcodeDeferGroup {
+			deferOps = append(deferOps, op)
+		}
+	}
+
+	// Pre-load parent steps for deferred runs before finalization deletes them.
+	var parentSteps map[string]json.RawMessage
+	if runCompleteOp != nil && len(deferOps) > 0 && i.md.Config.GetDeferGroupID() == "" {
+		var err error
+		parentSteps, err = e.smv2.LoadSteps(ctx, i.md.ID)
+		if err != nil {
+			e.log.Error("error loading parent steps for deferred runs", "error", err)
+		}
+	}
+
 	for _, group := range groups.All() {
 		if err := e.handleGeneratorGroup(ctx, i, group, resp); err != nil {
 			return err
 		}
+	}
+
+	if runCompleteOp != nil && len(deferOps) > 0 {
+		e.scheduleDeferredRuns(ctx, i, parentSteps, deferOps, runCompleteOp)
 	}
 
 	return nil
@@ -3150,6 +3202,110 @@ func (e *executor) handleGeneratorGroup(ctx context.Context, i *runInstance, gro
 	return nil
 }
 
+// handleGeneratorDeferGroup records a DeferGroup opcode. The actual scheduling
+// of deferred runs happens in scheduleDeferredRuns when RunComplete is processed
+// (reading DeferGroup ops from the response).
+//
+// We no longer save defer groups as step data (via SaveStep) because that
+// pollutes the memoized step data sent to deferred runs. Instead, defer groups
+// are tracked in run metadata for persistence across requests.
+func (e *executor) handleGeneratorDeferGroup(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode) error {
+	opts, err := gen.DeferGroupOpts()
+	if err != nil {
+		return fmt.Errorf("error parsing defer group opts: %w", err)
+	}
+
+	deferGroupID := opts.Name
+	if deferGroupID == "" {
+		deferGroupID = gen.Name
+	}
+	if deferGroupID == "" {
+		return nil
+	}
+
+	// Record the defer group in the run's metadata config (in-memory).
+	// This is idempotent and survives across opcodes within the same request.
+	// The authoritative source for scheduling remains the response opcodes.
+	runCtx.Metadata().Config.AddDeferGroup(deferGroupID)
+
+	return nil
+}
+
+// scheduleDeferredRuns schedules new linked runs for each deferred group after
+// the parent run completes. Each deferred run copies ALL step state from the parent
+// and receives the parent's result/error via the defer context.
+// parentSteps must be pre-loaded before finalization deletes the state.
+func (e *executor) scheduleDeferredRuns(ctx context.Context, i *runInstance, parentSteps map[string]json.RawMessage, deferOps []*state.GeneratorOpcode, runCompleteOp *state.GeneratorOpcode) {
+	md := i.md
+
+	// Don't schedule deferred runs from a run that is itself a deferred run.
+	// This prevents infinite chains of deferred executions.
+	if md.Config.GetDeferGroupID() != "" {
+		return
+	}
+
+	for _, deferOp := range deferOps {
+		opts, err := deferOp.DeferGroupOpts()
+		if err != nil {
+			e.log.Error("error parsing defer group opts", "error", err)
+			continue
+		}
+
+		deferGroupID := opts.Name
+		if deferGroupID == "" {
+			deferGroupID = deferOp.Name
+		}
+		if deferGroupID == "" {
+			e.log.Error("defer group has no name, skipping")
+			continue
+		}
+
+		// Determine result/error from RunComplete
+		var deferResult, deferError json.RawMessage
+		if runCompleteOp.Error != nil {
+			deferError = runCompleteOp.Data
+		} else {
+			deferResult = runCompleteOp.Data
+		}
+
+		// Use the events already loaded in the run instance.
+		// We cannot load from state here because the run may have already
+		// been finalized (state deleted) by the time we schedule deferred runs.
+		trackedEvts := make([]event.TrackedEvent, len(i.events))
+		for j, raw := range i.events {
+			evt := event.Event{}
+			if err := json.Unmarshal(raw, &evt); err != nil {
+				e.log.Error("error unmarshalling event for deferred run", "error", err)
+				continue
+			}
+			trackedEvts[j] = event.NewBaseTrackedEvent(evt, nil)
+		}
+
+		originalRunID := md.ID.RunID
+		// Use a clean context so the deferred run's spans don't inherit
+		// the parent run's trace context (which would cause lost lineage).
+		_, err = e.Schedule(context.Background(), execution.ScheduleRequest{
+			Function:         i.f,
+			AccountID:        md.ID.Tenant.AccountID,
+			WorkspaceID:      md.ID.Tenant.EnvID,
+			AppID:            md.ID.Tenant.AppID,
+			Events:           trackedEvts,
+			OriginalRunID:    &originalRunID,
+			DeferGroupID:     &deferGroupID,
+			DeferRunEnded:    true, // Parent reached RunComplete
+			DeferResult:      deferResult,
+			DeferError:       deferError,
+			DeferSteps:       parentSteps,
+			PreventRateLimit: true,
+			PreventDebounce:  true,
+		})
+		if err != nil {
+			e.log.Error("error scheduling deferred run", "error", err, "defer_group", deferGroupID)
+			continue
+		}
+	}
+}
+
 func (e *executor) HandleGenerator(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode) error {
 	// Grab the edge that triggered this step execution.
 	lifecycleItem := runCtx.LifecycleItem()
@@ -3196,6 +3352,8 @@ func (e *executor) HandleGenerator(ctx context.Context, runCtx execution.RunCont
 		return e.handleStepFailed(ctx, runCtx, gen, edge)
 	case enums.OpcodeDiscoveryRequest:
 		return e.handleGeneratorDiscoveryRequest(ctx, runCtx, gen, edge)
+	case enums.OpcodeDeferGroup:
+		return e.handleGeneratorDeferGroup(ctx, runCtx, gen)
 	}
 
 	return fmt.Errorf("unknown opcode: %s", gen.Op)
@@ -4977,6 +5135,15 @@ func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Func
 
 func (e *executor) GetEvent(ctx context.Context, id ulid.ULID, accountID uuid.UUID, workspaceID uuid.UUID) (any, error) {
 	return e.traceReader.GetEvent(ctx, id, accountID, workspaceID)
+}
+
+func (e *executor) LoadRunMetadata(ctx context.Context, runID ulid.ULID) (*sv2.Metadata, error) {
+	id := sv2.ID{RunID: runID}
+	md, err := e.smv2.LoadMetadata(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return &md, nil
 }
 
 func (e *executor) fnDriver(ctx context.Context, fn inngest.Function) any {

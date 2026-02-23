@@ -93,6 +93,12 @@ models:
         resolver: true
       trace:
         resolver: true
+      deferredRuns:
+        resolver: true
+      deferGroupName:
+        resolver: true
+      parentRunID:
+        resolver: true
   ConnectV1WorkerConnection:
     fields:
       app:

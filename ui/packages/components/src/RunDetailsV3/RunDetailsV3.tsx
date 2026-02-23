@@ -295,6 +295,9 @@ export const RunDetailsV3 = ({
               runID={runID}
               result={resultData}
               trace={runData?.trace}
+              deferredRuns={runData?.deferredRuns}
+              deferGroupName={runData?.deferGroupName}
+              parentRunID={runData?.parentRunID}
             />
           )}
         </div>

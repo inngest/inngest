@@ -136,6 +136,10 @@ type Executor interface {
 
 	// NOTE: Temporary for manually resuming pauses, you likely shouldn't use this
 	GetEvent(ctx context.Context, id ulid.ULID, accountID uuid.UUID, workspaceID uuid.UUID) (any, error)
+
+	// LoadRunMetadata loads the metadata for a run from state. Returns an error
+	// if the state has been deleted (e.g. after finalization).
+	LoadRunMetadata(ctx context.Context, runID ulid.ULID) (*sv2.Metadata, error)
 }
 
 // RunContext provides the context needed for HandleGenerator execution without
@@ -240,6 +244,20 @@ type ScheduleRequest struct {
 	ReplayID *uuid.UUID
 	// FromStep is the step that this function is being scheduled from.
 	FromStep *ScheduleRequestFromStep
+	// DeferGroupID is the ID of the deferred group to execute in this run.
+	DeferGroupID *string
+	// DeferResult is the result of the parent function (for deferred runs).
+	DeferResult json.RawMessage
+	// DeferError is the error from the parent function (for deferred runs).
+	DeferError json.RawMessage
+	// DeferRunEnded indicates whether the parent function ran to completion
+	// (resolved or rejected). When false, the parent failed before finishing
+	// and some steps may not have memoized data.
+	DeferRunEnded bool
+	// DeferSteps carries the parent run's step data for deferred runs.
+	// This is loaded before the parent run is finalized (state deleted)
+	// and passed directly to avoid timing issues with trace reconstruction.
+	DeferSteps map[string]json.RawMessage
 
 	// Events represent one or more events that the function is being triggered with.
 	Events []event.TrackedEvent

@@ -135,3 +135,27 @@ func reconstruct(ctx context.Context, tr cqrs.TraceReader, req execution.Schedul
 
 	return nil
 }
+
+// reconstructForDefer copies ALL step state from the original run to the new deferred run.
+// Unlike reconstruct(), this does not stop at any step - it copies the entire stack.
+// It uses pre-loaded step data directly rather than loading from traces (which may not
+// be available immediately after run finalization).
+func reconstructForDefer(steps map[string]json.RawMessage, newState *sv2.CreateState) error {
+	if len(steps) == 0 {
+		// No steps to copy - this can happen if the parent function had no steps.
+		return nil
+	}
+
+	memoized := make([]state.MemoizedStep, 0, len(steps))
+	for stepID, data := range steps {
+		var parsed any
+		_ = json.Unmarshal(data, &parsed)
+		memoized = append(memoized, state.MemoizedStep{
+			ID:   stepID,
+			Data: parsed,
+		})
+	}
+
+	newState.Steps = memoized
+	return nil
+}

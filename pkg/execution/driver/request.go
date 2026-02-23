@@ -61,6 +61,17 @@ type SDKRequestContext struct {
 	// size limits.
 	UseAPI bool `json:"use_api"`
 
+	// DeferGroupID tells the SDK which deferred group to execute.
+	DeferGroupID string `json:"defer_group_id,omitempty"`
+	// DeferResult is the parent function's successful result.
+	DeferResult json.RawMessage `json:"defer_result,omitempty"`
+	// DeferError is the parent function's error.
+	DeferError json.RawMessage `json:"defer_error,omitempty"`
+	// DeferRunEnded indicates whether the parent function ran to completion
+	// (resolved or rejected). When false, the SDK knows the parent failed
+	// before finishing and should reject unmemoized steps during replay.
+	DeferRunEnded *bool `json:"defer_run_ended,omitempty"`
+
 	// XXX: Pass in opentracing context within ctx.
 }
 

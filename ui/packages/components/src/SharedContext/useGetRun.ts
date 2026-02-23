@@ -13,6 +13,14 @@ export type GetRunPayload = {
   preview?: boolean;
 };
 
+export type DeferredRunInfo = {
+  id: string;
+  status: string;
+  queuedAt?: string;
+  startedAt?: string;
+  endedAt?: string;
+};
+
 export type GetRunData = {
   app: {
     externalID: string;
@@ -27,6 +35,9 @@ export type GetRunData = {
   trace: Trace;
   hasAI: boolean;
   status: string;
+  deferredRuns?: DeferredRunInfo[];
+  deferGroupName?: string | null;
+  parentRunID?: string | null;
 };
 
 export type GetRunResult = {

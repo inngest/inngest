@@ -299,12 +299,49 @@ func (s SignalOpts) Expires() (time.Time, error) {
 	return time.Now().Add(dur), nil
 }
 
+func (g GeneratorOpcode) DeferGroupOpts() (*DeferGroupOpts, error) {
+	opts := &DeferGroupOpts{}
+	if err := opts.UnmarshalAny(g.Opts); err != nil {
+		// Fallback: use the Name field from the opcode itself
+		opts.Name = g.Name
+		return opts, nil
+	}
+	if opts.Name == "" {
+		opts.Name = g.Name
+	}
+	return opts, nil
+}
+
 func (g GeneratorOpcode) InvokeFunctionOpts() (*InvokeFunctionOpts, error) {
 	opts := &InvokeFunctionOpts{}
 	if err := opts.UnmarshalAny(g.Opts); err != nil {
 		return nil, err
 	}
 	return opts, nil
+}
+
+type DeferGroupOpts struct {
+	Name string `json:"name"`
+}
+
+func (d *DeferGroupOpts) UnmarshalAny(a any) error {
+	opts := DeferGroupOpts{}
+	var mappedByt []byte
+	switch typ := a.(type) {
+	case []byte:
+		mappedByt = typ
+	default:
+		byt, err := json.Marshal(a)
+		if err != nil {
+			return err
+		}
+		mappedByt = byt
+	}
+	if err := json.Unmarshal(mappedByt, &opts); err != nil {
+		return err
+	}
+	*d = opts
+	return nil
 }
 
 type InvokeFunctionOpts struct {

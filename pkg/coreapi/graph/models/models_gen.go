@@ -306,6 +306,9 @@ type FunctionRunV2 struct {
 	Output         *string           `json:"output,omitempty"`
 	Trace          *RunTraceSpan     `json:"trace,omitempty"`
 	HasAi          bool              `json:"hasAI"`
+	DeferredRuns   []*FunctionRunV2  `json:"deferredRuns,omitempty"`
+	DeferGroupName *string           `json:"deferGroupName,omitempty"`
+	ParentRunID    *string           `json:"parentRunID,omitempty"`
 }
 
 type FunctionRunV2Edge struct {

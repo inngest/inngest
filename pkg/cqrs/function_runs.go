@@ -54,6 +54,9 @@ type FunctionRunReader interface {
 	APIV1FunctionRunReader
 
 	GetFunctionRunsTimebound(ctx context.Context, t Timebound, limit int) ([]*FunctionRun, error)
+	// GetFunctionRunsByOriginalRunID returns all function runs created from the given original run ID.
+	// This is used to find deferred runs linked to a parent run.
+	GetFunctionRunsByOriginalRunID(ctx context.Context, originalRunID ulid.ULID) ([]*FunctionRun, error)
 }
 
 type APIV1FunctionRunReader interface {

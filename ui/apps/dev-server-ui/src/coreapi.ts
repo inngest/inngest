@@ -413,6 +413,15 @@ export const GET_RUN = gql`
         }
       }
       hasAI
+      deferredRuns {
+        id
+        status
+        queuedAt
+        startedAt
+        endedAt
+      }
+      deferGroupName
+      parentRunID
     }
   }
 `;

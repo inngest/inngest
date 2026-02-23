@@ -25,6 +25,8 @@ const (
 	// OpcodeDiscoveryRequest indicates that an SDK wants another discovery
 	// request to be sent to resume execution.
 	OpcodeDiscoveryRequest
+	// OpcodeDeferGroup indicates a deferred group to execute after function completion.
+	OpcodeDeferGroup
 )
 
 // opcodeSyncMap explicitly represents the sync opcodes that can be checkpointed.

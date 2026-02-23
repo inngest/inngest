@@ -1553,6 +1553,42 @@ func (w wrapper) GetFunctionRunsTimebound(ctx context.Context, t cqrs.Timebound,
 	return result, nil
 }
 
+func (w wrapper) GetFunctionRunsByOriginalRunID(ctx context.Context, originalRunID ulid.ULID) ([]*cqrs.FunctionRun, error) {
+	rows, err := w.db.QueryContext(ctx,
+		`SELECT
+			function_runs.run_id, function_runs.run_started_at, function_runs.function_id,
+			function_runs.function_version, function_runs.trigger_type, function_runs.event_id,
+			function_runs.batch_id, function_runs.original_run_id, function_runs.cron,
+			function_runs.workspace_id,
+			function_finishes.run_id, function_finishes.status, function_finishes.output,
+			function_finishes.created_at, function_finishes.completed_step_count
+		 FROM function_runs
+		 LEFT JOIN function_finishes ON function_finishes.run_id = function_runs.run_id
+		 WHERE function_runs.original_run_id = ?`,
+		originalRunID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	result := []*cqrs.FunctionRun{}
+	for rows.Next() {
+		var run sqlc.FunctionRun
+		var finish sqlc.FunctionFinish
+		if err := rows.Scan(
+			&run.RunID, &run.RunStartedAt, &run.FunctionID, &run.FunctionVersion,
+			&run.TriggerType, &run.EventID, &run.BatchID, &run.OriginalRunID,
+			&run.Cron, &run.WorkspaceID,
+			&finish.RunID, &finish.Status, &finish.Output, &finish.CreatedAt, &finish.CompletedStepCount,
+		); err != nil {
+			return nil, err
+		}
+		result = append(result, toCQRSRun(run, finish))
+	}
+	return result, nil
+}
+
 func (w wrapper) GetFunctionRunFinishesByRunIDs(
 	ctx context.Context,
 	accountID uuid.UUID,
@@ -2944,6 +2980,8 @@ func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*c
 			WHERE s2.run_id = spans.run_id AND s2.dynamic_span_id = spans.dynamic_span_id
 			ORDER BY s2.end_time DESC LIMIT 1)`).As("status"),
 		adapter.eventIdsExpr, // DB-specific due to storage differences
+		// Fetch output from trace_runs table
+		sq.L(`(SELECT tr.output FROM trace_runs tr WHERE tr.run_id = spans.run_id LIMIT 1)`).As("output"),
 	}
 
 	groupByCols := []interface{}{
@@ -3004,7 +3042,7 @@ func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*c
 		return nil, err
 	}
 
-	l.Debug("GetSpanRuns query", "sql", sqlQuery, "args", args)
+	l.Info("GetSpanRuns query", "sql", sqlQuery, "args", args)
 
 	rows, err := w.db.QueryContext(ctx, sqlQuery, args...)
 	if err != nil {
@@ -3037,6 +3075,7 @@ func (w wrapper) convertSpanRunRows(
 		EndTime       *string
 		Status        *string
 		EventIDs      *string
+		Output        []byte
 	}
 
 	res := []*cqrs.TraceRun{}
@@ -3055,6 +3094,7 @@ func (w wrapper) convertSpanRunRows(
 			&row.EndTime,
 			&row.Status,
 			&row.EventIDs,
+			&row.Output,
 		)
 		if err != nil {
 			return nil, err
@@ -3142,6 +3182,7 @@ func (w wrapper) convertSpanRunRows(
 			Status:      status,
 			Cursor:      cursor,
 			TriggerIDs:  triggerIDs,
+			Output:      row.Output,
 		}
 
 		if endTime != nil {

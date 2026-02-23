@@ -496,6 +496,11 @@ type FunctionRunV2 {
 
   trace(preview: Boolean): RunTraceSpan
   hasAI: Boolean!
+
+  # Deferred run support
+  deferredRuns: [FunctionRunV2!]
+  deferGroupName: String
+  parentRunID: String
 }
 
 type RunsV2Connection {

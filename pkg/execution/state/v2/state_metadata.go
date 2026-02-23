@@ -24,6 +24,11 @@ const (
 	evtmapKey         = "__evtmap"
 	debugSessionIDKey = "__debug_session_id"
 	debugRunIDKey     = "__debug_run_id"
+	deferGroupIDKey   = "__defer_group_id"
+	deferResultKey    = "__defer_result"
+	deferErrorKey     = "__defer_error"
+	deferRunEndedKey  = "__defer_run_ended"
+	deferGroupsKey    = "__defer_groups"
 )
 
 type ID struct {
@@ -480,6 +485,147 @@ func (c *Config) DebugRunID() *ulid.ULID {
 		}
 	}
 
+	return nil
+}
+
+func (c *Config) SetDeferGroupID(id string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.initContext()
+	c.Context[deferGroupIDKey] = id
+}
+
+func (c *Config) GetDeferGroupID() string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	if c.Context == nil {
+		return ""
+	}
+	if v, ok := c.Context[deferGroupIDKey]; ok {
+		if s, ok := v.(string); ok {
+			return s
+		}
+	}
+	return ""
+}
+
+func (c *Config) SetDeferResult(data json.RawMessage) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.initContext()
+	c.Context[deferResultKey] = string(data)
+}
+
+func (c *Config) GetDeferResult() json.RawMessage {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	if c.Context == nil {
+		return nil
+	}
+	if v, ok := c.Context[deferResultKey]; ok {
+		if s, ok := v.(string); ok {
+			return json.RawMessage(s)
+		}
+	}
+	return nil
+}
+
+func (c *Config) SetDeferError(data json.RawMessage) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.initContext()
+	c.Context[deferErrorKey] = string(data)
+}
+
+func (c *Config) GetDeferError() json.RawMessage {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	if c.Context == nil {
+		return nil
+	}
+	if v, ok := c.Context[deferErrorKey]; ok {
+		if s, ok := v.(string); ok {
+			return json.RawMessage(s)
+		}
+	}
+	return nil
+}
+
+func (c *Config) SetDeferRunEnded(ended bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.initContext()
+	c.Context[deferRunEndedKey] = ended
+}
+
+func (c *Config) GetDeferRunEnded() bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	if c.Context == nil {
+		return false
+	}
+	if v, ok := c.Context[deferRunEndedKey]; ok {
+		if b, ok := v.(bool); ok {
+			return b
+		}
+	}
+	return false
+}
+
+// AddDeferGroup records a defer group name in the run's metadata context.
+// This is idempotent: duplicate names are not added.
+func (c *Config) AddDeferGroup(name string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.initContext()
+	groups := c.getDeferGroupsLocked()
+	for _, g := range groups {
+		if g == name {
+			return
+		}
+	}
+	c.Context[deferGroupsKey] = append(groups, name)
+}
+
+// GetDeferGroups returns the list of defer group names stored in metadata.
+func (c *Config) GetDeferGroups() []string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	return c.getDeferGroupsLocked()
+}
+
+func (c *Config) getDeferGroupsLocked() []string {
+	if c.Context == nil {
+		return nil
+	}
+	v, ok := c.Context[deferGroupsKey]
+	if !ok {
+		return nil
+	}
+
+	// After JSON round-trip, the value may be []interface{} instead of []string.
+	switch val := v.(type) {
+	case []string:
+		return val
+	case []any:
+		result := make([]string, 0, len(val))
+		for _, item := range val {
+			if s, ok := item.(string); ok {
+				result = append(result, s)
+			}
+		}
+		return result
+	}
 	return nil
 }
 

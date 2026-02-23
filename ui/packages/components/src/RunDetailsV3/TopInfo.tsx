@@ -9,16 +9,20 @@ import {
   CodeElement,
   ElementWrapper,
   IDElement,
+  LinkElement,
   SkeletonElement,
   TextElement,
   TimeElement,
 } from '../DetailsCard/Element';
 import { ErrorCard } from '../Error/ErrorCard';
 import { InvokeModal } from '../InvokeButton';
+import type { DeferredRunInfo } from '../SharedContext/useGetRun';
 import { useBooleanFlag } from '../SharedContext/useBooleanFlag';
 import type { TraceResult } from '../SharedContext/useGetTraceResult';
 import { useInvokeRun } from '../SharedContext/useInvokeRun';
+import { usePathCreator } from '../SharedContext/usePathCreator';
 import { usePrettyErrorBody, usePrettyJson } from '../hooks/usePrettyJson';
+import { StatusCell } from '../Table/Cell';
 import { IconCloudArrowDown } from '../icons/CloudArrowDown';
 import { devServerURL, useDevServer } from '../utils/useDevServer';
 import { ErrorInfo } from './ErrorInfo';
@@ -34,6 +38,9 @@ type TopInfoProps = {
   runID: string;
   resultLoading?: boolean;
   trace?: Trace;
+  deferredRuns?: DeferredRunInfo[];
+  deferGroupName?: string | null;
+  parentRunID?: string | null;
 };
 
 export type Trigger = {
@@ -91,10 +98,14 @@ export const TopInfo = ({
   result,
   resultLoading,
   trace,
+  deferredRuns,
+  deferGroupName,
+  parentRunID,
 }: TopInfoProps) => {
   const [expanded, setExpanded] = useState(true);
   const { isRunning, send } = useDevServer();
   const { invoke, loading: invokeLoading, error: invokeError } = useInvokeRun();
+  const { pathCreator } = usePathCreator();
   const [invokeOpen, setInvokeOpen] = useState(false);
 
   const {
@@ -253,6 +264,40 @@ export const TopInfo = ({
               </ElementWrapper>
             </>
           )}
+        </div>
+      )}
+      {parentRunID && (
+        <div className="border-muted mx-4 rounded border p-3">
+          <div className="text-subtle mb-1 text-xs font-medium uppercase">Deferred Run</div>
+          <div className="flex flex-row items-center gap-4">
+            {deferGroupName && (
+              <ElementWrapper label="Group">
+                <TextElement>{deferGroupName}</TextElement>
+              </ElementWrapper>
+            )}
+            <ElementWrapper label="Parent Run">
+              <LinkElement href={pathCreator.runPopout({ runID: parentRunID })}>
+                {parentRunID.substring(0, 12)}...
+              </LinkElement>
+            </ElementWrapper>
+          </div>
+        </div>
+      )}
+      {deferredRuns && deferredRuns.length > 0 && (
+        <div className="border-muted mx-4 rounded border p-3">
+          <div className="text-subtle mb-2 text-xs font-medium uppercase">Deferred Runs</div>
+          <div className="flex flex-col gap-2">
+            {deferredRuns.map((dr) => (
+              <div key={dr.id} className="flex flex-row items-center justify-between gap-4">
+                <div className="flex items-center gap-2">
+                  <StatusCell status={dr.status} />
+                  <LinkElement href={pathCreator.runPopout({ runID: dr.id })}>
+                    {dr.id.substring(0, 12)}...
+                  </LinkElement>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
       {result?.error && <ErrorInfo error={result.error.message || 'Unknown error'} />}
