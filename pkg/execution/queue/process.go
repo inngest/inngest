@@ -7,6 +7,7 @@ import (
 	"runtime/debug"
 	"time"
 
+	"github.com/inngest/inngest/pkg/backoff"
 	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/logger"
@@ -386,6 +387,12 @@ func (q *queueProcessor) ProcessItem(
 
 		if ShouldRetry(err, qi.Data.Attempt, qi.Data.GetMaxAttempts()) {
 			at := q.backoffFunc(qi.Data.Attempt)
+
+			// If a custom per-step retry delay is configured, use that instead of
+			// the global backoff function.
+			if qi.Data.CustomRetryDelay != nil {
+				at = backoff.GetLinearBackoffFunc(*qi.Data.CustomRetryDelay)(qi.Data.Attempt)
+			}
 
 			// Attempt to find any RetryAtSpecifier in the error tree.
 			if specifier := AsRetryAtError(err); specifier != nil {

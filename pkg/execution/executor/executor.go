@@ -1572,6 +1572,11 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		retries := ef.Function.Steps[0].RetryCount() + 1
 		item.MaxAttempts = &retries
 
+		// Set the custom retry delay from the step configuration, if specified.
+		if delay, err := ef.Function.Steps[0].GetRetryDelay(); err == nil && delay != nil {
+			item.CustomRetryDelay = delay
+		}
+
 		if md.Config.RequestVersion == 0 {
 			// The intent of this is to ensure that the 1st request received by
 			// the SDK does not have a request version of 0. This fixes an issue
