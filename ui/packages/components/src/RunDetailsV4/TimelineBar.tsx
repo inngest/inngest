@@ -563,7 +563,7 @@ export function TimelineBar({
         className="relative isolate flex h-7 cursor-pointer items-center"
         onClick={() => {
           onClick?.();
-          if (expandable && !expanded) {
+          if (expandable) {
             onToggle?.();
           }
         }}
