@@ -407,9 +407,6 @@ func (q *queueProcessor) ProcessItem(
 				l.Error("error requeuing job", "error", err, "item", qi)
 				return err
 			}
-			if err != state.ErrConnectWorkerCapacity {
-				l.Debug("ProcessItem requeued job due to either lease extension error or error running the job", "err", err)
-			}
 			if _, ok := err.(QuitError); ok {
 				q.quit <- err
 				return err
