@@ -6,7 +6,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
+	"net"
 	"os"
 	"regexp"
 	"strconv"
@@ -344,6 +346,23 @@ func isTimeout(err error) bool {
 	return false
 }
 
+func isNetworkError(err error) bool {
+	var opErr *net.OpError
+	if errors.As(err, &opErr) {
+		return true
+	}
+	var dnsErr *net.DNSError
+	if errors.As(err, &dnsErr) {
+		return true
+	}
+	// rueidis returns io.EOF and io.ErrUnexpectedEOF directly from its bufio
+	// read loop without wrapping them in *net.OpError, so check explicitly.
+	if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+		return true
+	}
+	return false
+}
+
 func executeLuaScript(
 	ctx context.Context,
 	name string,
@@ -384,6 +403,9 @@ func executeLuaScript(
 func luaError(err error) (status string, retry bool) {
 	if isTimeout(err) {
 		return "timeout", true
+	}
+	if isNetworkError(err) {
+		return "network_error", true
 	}
 	if err != nil {
 		return "error", false
