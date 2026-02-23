@@ -38,7 +38,7 @@ func (s *Service) InvokeFunction(ctx context.Context, req *apiv2.InvokeFunctionR
 
 	var idempotencyHash string
 	if req.IdempotencyKey != nil {
-		idempotencyHash = util.XXHash(req.IdempotencyKey)
+		idempotencyHash = util.XXHash(*req.IdempotencyKey)
 	}
 
 	// Create an invoke event using the data from the above request.

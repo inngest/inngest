@@ -1,9 +1,11 @@
-package apiv2
+package devserver
 
 import (
 	"context"
 	"fmt"
 
+	apiv2 "github.com/inngest/inngest/pkg/api/v2"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/inngest"
 )
@@ -14,7 +16,7 @@ type cqrsFunctionProvider struct {
 
 // NewFunctionProvider returns a FunctionProvider that looks up functions by
 // slug or UUID using the given DevFunctionReader.
-func NewFunctionProvider(reader cqrs.DevFunctionReader) FunctionProvider {
+func NewFunctionProvider(reader cqrs.DevFunctionReader) apiv2.FunctionProvider {
 	return &cqrsFunctionProvider{reader: reader}
 }
 
@@ -30,10 +32,12 @@ func (p *cqrsFunctionProvider) GetFunction(ctx context.Context, identifier strin
 				return inngest.DeployedFunction{}, err
 			}
 			return inngest.DeployedFunction{
-				ID:       fn.ID,
-				Slug:     fn.Slug,
-				AppID:    fn.AppID,
-				Function: *inngestFn,
+				ID:            fn.ID,
+				Slug:          fn.Slug,
+				AppID:         fn.AppID,
+				AccountID:     consts.DevServerAccountID,
+				EnvironmentID: consts.DevServerEnvID,
+				Function:      *inngestFn,
 			}, nil
 		}
 	}

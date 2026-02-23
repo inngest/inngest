@@ -693,7 +693,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	serviceOpts := apiv2.ServiceOptions{
 		SigningKeysProvider: apiv2.NewSigningKeysProvider(opts.SigningKey),
 		EventKeysProvider:   apiv2.NewEventKeysProvider(opts.EventKeys),
-		Functions:           apiv2.NewFunctionProvider(dbcqrs),
+		Functions:           NewFunctionProvider(dbcqrs),
 		Executor:            exec,
 		EventPublisher:      runner,
 	}

@@ -268,6 +268,8 @@ func (c *Client) WaitForRunTraces(ctx context.Context, t *testing.T, runID *stri
 			return
 		}
 
+		fmt.Println("FINDING RUN ID", *runID)
+
 		run, err := c.RunTraces(ctx, *runID)
 		if !a.NoError(err) {
 			return
@@ -316,7 +318,7 @@ func (c *Client) RunTraces(ctx context.Context, runID string) (*RunV2, error) {
 				cronSchedule
         endedAt
 
-				trace {
+				trace(preview: true) {
 					...TraceDetails
 					childrenSpans {
 						...TraceDetails
