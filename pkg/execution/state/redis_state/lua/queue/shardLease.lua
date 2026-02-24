@@ -26,12 +26,12 @@ if existingLeaseID ~= "" then
 		return 1
 	end
 	-- Check if the lease is expired
-    local existingLeaseTime = decode_ulid_time(existingLeaseID)
-    if existingLeaseTime < currentTime then
-        -- Lease expired, remove it and deny renewal
-        redis.call("SREM", leaseKey, existingLeaseID)
-        return 2
-    end
+    -- local existingLeaseTime = decode_ulid_time(existingLeaseID)
+    -- if existingLeaseTime < currentTime then
+    --     -- Lease expired, remove it and deny renewal
+    --     redis.call("SREM", leaseKey, existingLeaseID)
+    --     return 2
+    -- end
 	-- Remove the old lease ID
 	redis.call("SREM", leaseKey, existingLeaseID)
 

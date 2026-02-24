@@ -61,17 +61,18 @@ func TestQueueShardLease(t *testing.T) {
 		require.Nil(t, id)
 	})
 
-	t.Run("cannot renew an expired lease", func(t *testing.T) {
+	t.Run("can renew an expired lease", func(t *testing.T) {
 		<-time.After(100 * time.Millisecond)
 
-		id, err := shard.ShardLease(ctx, "shard", time.Second, 1, leaseID)
-		require.Equal(t, osqueue.ErrShardLeaseExpired, err)
-		require.Nil(t, id)
+		now := time.Now()
+		dur := time.Second
+		leaseID, err = shard.ShardLease(ctx, "shard", dur, 1, leaseID)
+		require.NoError(t, err)
+		require.NotNil(t, leaseID)
+		require.WithinDuration(t, now.Add(dur), ulid.Time(leaseID.Time()), 5*time.Millisecond)
 	})
 
 	t.Run("extend an unexpired lease", func(t *testing.T) {
-		leaseID, err = shard.ShardLease(ctx, "shard", time.Second, 1)
-		require.NotNil(t, leaseID)
 
 		now := time.Now()
 		dur := 50 * time.Millisecond
