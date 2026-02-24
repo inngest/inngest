@@ -23,6 +23,10 @@ const (
 
 	// DefaultMaxBufferSize is the default max events per buffer key before flush
 	DefaultMaxBufferSize = 50
+
+	// DefaultMaxBufferByteSize is the default max cumulative byte size of buffered
+	// events before flushing (8 MiB).
+	DefaultMaxBufferByteSize = 8 * 1024 * 1024
 )
 
 // appendBuffer manages in-memory buffering for batch appends across varying
@@ -30,6 +34,7 @@ const (
 type appendBuffer struct {
 	maxDuration       time.Duration
 	maxSize           int
+	maxByteSize       int
 	buffers           map[bufferKey]*batchBuffer
 	mu                sync.Mutex
 	closed            chan struct{} // signals shutdown to unblock waiting appends
@@ -66,6 +71,7 @@ type batchBuffer struct {
 	mu             sync.Mutex
 	key            bufferKey
 	items          []pendingItem
+	byteSize       int                       // cumulative byte size of buffered events
 	pendingResults map[string]*pendingResult // Local dedup + result sharing
 	timer          *time.Timer
 	fn             inngest.Function // Function config for batch settings
@@ -73,7 +79,8 @@ type batchBuffer struct {
 }
 
 // newAppendBuffer creates a new appendBuffer with the given configuration.
-func newAppendBuffer(maxDuration time.Duration, maxSize int, log logger.Logger) *appendBuffer {
+// maxByteSize of 0 uses DefaultMaxBufferByteSize.
+func newAppendBuffer(maxDuration time.Duration, maxSize int, maxByteSize int, log logger.Logger) *appendBuffer {
 	// Clamp maxDuration to 5s max due to pub/sub ACK deadline
 	if maxDuration > 5*time.Second {
 		maxDuration = 5 * time.Second
@@ -84,10 +91,14 @@ func newAppendBuffer(maxDuration time.Duration, maxSize int, log logger.Logger) 
 	if maxSize <= 0 {
 		maxSize = DefaultMaxBufferSize
 	}
+	if maxByteSize <= 0 {
+		maxByteSize = DefaultMaxBufferByteSize
+	}
 
 	return &appendBuffer{
 		maxDuration: maxDuration,
 		maxSize:     maxSize,
+		maxByteSize: maxByteSize,
 		buffers:     make(map[bufferKey]*batchBuffer),
 		closed:      make(chan struct{}),
 		log:         log,
@@ -140,6 +151,7 @@ func (ab *appendBuffer) append(ctx context.Context, bi BatchItem, fn inngest.Fun
 		pending: pr,
 	})
 	buf.pendingResults[eventIDStr] = pr
+	buf.byteSize += bi.Event.Size()
 
 	// Set createdAt on first item
 	if buf.createdAt.IsZero() {
@@ -155,7 +167,11 @@ func (ab *appendBuffer) append(ctx context.Context, bi BatchItem, fn inngest.Fun
 	if fn.EventBatch != nil && fn.EventBatch.MaxSize > 0 {
 		batchMaxSize = fn.EventBatch.MaxSize
 	}
-	shouldFlush := len(buf.items) >= batchMaxSize
+	shouldFlush := len(buf.items) >= batchMaxSize || buf.byteSize >= ab.maxByteSize
+	flushTrigger := "size"
+	if buf.byteSize >= ab.maxByteSize {
+		flushTrigger = "bytesize"
+	}
 
 	// If we're about to flush manually, stop the timer to prevent a concurrent
 	// timer-triggered flush racing with our manual flush.
@@ -176,7 +192,7 @@ func (ab *appendBuffer) append(ctx context.Context, bi BatchItem, fn inngest.Fun
 
 	// Trigger immediate flush if buffer is full
 	if shouldFlush {
-		ab.flush(buf, mgr, "size")
+		ab.flush(buf, mgr, flushTrigger)
 	}
 
 	// Block until result is available
@@ -477,6 +493,7 @@ func (ab *appendBuffer) close(mgr *redisBatchManager) error {
 // reset resets a batch buffer
 func (buf *batchBuffer) reset() {
 	buf.items = make([]pendingItem, 0)
+	buf.byteSize = 0
 	buf.pendingResults = make(map[string]*pendingResult)
 	buf.createdAt = time.Time{}
 	if buf.timer != nil {

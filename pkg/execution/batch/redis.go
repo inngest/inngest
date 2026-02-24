@@ -58,7 +58,20 @@ func WithLogger(l logger.Logger) RedisBatchManagerOpt {
 // Append() blocks until the batch is committed to Redis.
 func WithBufferSettings(maxDuration time.Duration, maxSize int) RedisBatchManagerOpt {
 	return func(m *redisBatchManager) {
-		m.buffer = newAppendBuffer(maxDuration, maxSize, m.log)
+		m.buffer = newAppendBuffer(maxDuration, maxSize, 0, m.log)
+	}
+}
+
+// WithBufferMaxByteSize sets the maximum cumulative byte size of buffered events
+// before a flush is triggered. 0 uses DefaultMaxBufferByteSize.
+func WithBufferMaxByteSize(maxByteSize int) RedisBatchManagerOpt {
+	return func(m *redisBatchManager) {
+		if m.buffer != nil {
+			m.buffer.maxByteSize = maxByteSize
+			if maxByteSize <= 0 {
+				m.buffer.maxByteSize = DefaultMaxBufferByteSize
+			}
+		}
 	}
 }
 
@@ -85,7 +98,7 @@ func NewRedisBatchManager(b *redis_state.BatchClient, q queue.QueueManager, opts
 	}
 
 	// add default buffer
-	manager.buffer = newAppendBuffer(DefaultMaxBufferDuration, DefaultMaxBufferSize, manager.log)
+	manager.buffer = newAppendBuffer(DefaultMaxBufferDuration, DefaultMaxBufferSize, 0, manager.log)
 
 	for _, apply := range opts {
 		apply(manager)

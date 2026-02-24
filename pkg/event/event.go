@@ -65,6 +65,32 @@ type Event struct {
 	//
 	// Deprecated:  this will be removed in favour of storing everything within data.
 	User map[string]any `json:"user,omitempty"`
+
+	// size represents the size of the event in bytes, set during
+	// the UnmarshalJSON call.
+	size int
+}
+
+func (e *Event) UnmarshalJSON(data []byte) error {
+	type raw Event
+	if err := json.Unmarshal(data, (*raw)(e)); err != nil {
+		return err
+	}
+	e.size = len(data)
+	return nil
+}
+
+// Size returns the size of the event in bytes, as a JSON-encoded string.
+//
+// If UnmarshalJSON is called to create the event, this returns the size
+// of the unmarshalled JSON payload in bytes.  Oherwise, this calls
+// MarshalJSON to get the size.
+func (e Event) Size() int {
+	if e.size > 0 {
+		return e.size
+	}
+	byt, _ := json.Marshal(e)
+	return len(byt)
 }
 
 func (e Event) Time() time.Time {
