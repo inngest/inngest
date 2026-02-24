@@ -140,7 +140,7 @@ func (q *queueProcessor) releaseShardLease() {
 
 	shard := q.primaryQueueShard
 	if shard == nil {
-		l.Warn("could not release shard lease, no primary shard set", "shard", shard.Name())
+		l.Warn("could not release shard lease, no primary shard set")
 		return
 	}
 
