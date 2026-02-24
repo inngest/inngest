@@ -117,7 +117,7 @@ var sqliteSpanRunsAdapter = spanRunsAdapter{
 		var ids []string
 		if raw != nil && *raw != "" {
 			// Ignore error: return empty slice on parse failure
-		_ = json.Unmarshal([]byte(*raw), &ids)
+			_ = json.Unmarshal([]byte(*raw), &ids)
 		}
 		return ids
 	},
@@ -152,7 +152,7 @@ var postgresSpanRunsAdapter = spanRunsAdapter{
 			var innerStr string
 			if err := json.Unmarshal([]byte(*raw), &innerStr); err == nil {
 				// Ignore error: return empty slice on parse failure
-			_ = json.Unmarshal([]byte(innerStr), &ids)
+				_ = json.Unmarshal([]byte(innerStr), &ids)
 			}
 		}
 		return ids
@@ -2184,22 +2184,58 @@ func newRunsQueryBuilder(ctx context.Context, opt cqrs.GetTraceRunOpt) *runsQuer
 }
 
 func (w wrapper) GetTraceRunsCount(ctx context.Context, opt cqrs.GetTraceRunOpt) (int, error) {
-	// explicitly set it to zero so it would not attempt to paginate
-	opt.Items = 0
-	var (
-		res []*cqrs.TraceRun
-		err error
-	)
 	if opt.Preview {
-		res, err = w.GetSpanRuns(ctx, opt)
-	} else {
-		res, err = w.GetTraceRuns(ctx, opt)
+		return w.getSpanRunsCount(ctx, opt)
 	}
+	return w.getTraceRunsCount(ctx, opt)
+}
+
+// getTraceRunsCount returns the count of trace runs matching the given filters
+// using a SQL COUNT(*) query instead of fetching all rows.
+func (w wrapper) getTraceRunsCount(ctx context.Context, opt cqrs.GetTraceRunOpt) (int, error) {
+	builder := newRunsQueryBuilder(ctx, opt)
+
+	sqlQuery, args, err := sq.Dialect(w.dialect()).
+		From("trace_runs").
+		Select(sq.L("COUNT(*)")).
+		Where(builder.filter...).
+		ToSQL()
 	if err != nil {
 		return 0, err
 	}
 
-	return len(res), nil
+	var count int
+	err = w.db.QueryRowContext(ctx, sqlQuery, args...).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("error counting trace runs: %w", err)
+	}
+	return count, nil
+}
+
+// getSpanRunsCount returns the count of span-based runs matching the given filters
+// using a SQL COUNT(DISTINCT run_id) query instead of fetching all rows.
+func (w wrapper) getSpanRunsCount(ctx context.Context, opt cqrs.GetTraceRunOpt) (int, error) {
+	adapter := w.spanRunsAdapter()
+	builder := newSpanRunsQueryBuilder(ctx, opt)
+
+	sqlQuery, args, err := sq.Dialect(adapter.dialect).
+		From("spans").
+		Select(sq.L("COUNT(DISTINCT run_id)")).
+		Where(sq.L("spans.dynamic_span_id").In(
+			sq.Dialect(adapter.dialect).Select("dynamic_span_id").Distinct().From("spans").Where(sq.C("name").Eq(meta.SpanNameRun)),
+		)).
+		Where(builder.filter...).
+		ToSQL()
+	if err != nil {
+		return 0, err
+	}
+
+	var count int
+	err = w.db.QueryRowContext(ctx, sqlQuery, args...).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("error counting span runs: %w", err)
+	}
+	return count, nil
 }
 
 func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*cqrs.TraceRun, error) {
@@ -2234,11 +2270,7 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 	resCursorLayout := builder.cursorLayout
 
 	// read from database
-	// TODO:
-	// change this to a continuous loop with limits instead of just attempting to grab everything.
-	// might not matter though since this is primarily meant for local
-	// development
-	sql, args, err := sq.Dialect(w.dialect()).
+	q := sq.Dialect(w.dialect()).
 		From("trace_runs").
 		Select(
 			"app_id",
@@ -2258,8 +2290,13 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 			"has_ai",
 		).
 		Where(filter...).
-		Order(order...).
-		ToSQL()
+		Order(order...)
+
+	if opt.Items > 0 {
+		q = q.Limit(opt.Items + 1) // fetch one more item than requested to determine hasNextPage
+	}
+
+	sql, args, err := q.ToSQL()
 	if err != nil {
 		return nil, err
 	}
@@ -2268,6 +2305,7 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 
 	res := []*cqrs.TraceRun{}
 	var count uint
