@@ -25,8 +25,8 @@ const (
 	DefaultMaxBufferSize = 50
 
 	// DefaultMaxBufferByteSize is the default max cumulative byte size of buffered
-	// events before flushing (8 MiB).
-	DefaultMaxBufferByteSize = 8 * 1024 * 1024
+	// events before flushing
+	DefaultMaxBufferByteSize = 4 * 1024 * 1024
 )
 
 // appendBuffer manages in-memory buffering for batch appends across varying
