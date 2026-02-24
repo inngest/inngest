@@ -769,6 +769,19 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 
 	key := idempotencyKey(req, runID)
 
+	l := e.log.With(
+		"account_id", req.AccountID,
+		"env_id", req.WorkspaceID,
+		"app_id", req.AppID,
+		"fn_id", req.Function.ID,
+		"fn_v", req.Function.FunctionVersion,
+		"evt_id", req.Events[0].GetInternalID(),
+		"run_id", runID,
+		"schedule_req", req,
+	)
+
+	l.Optional(req.AccountID, "schedule").Debug("hitting constraint API")
+
 	// Check constraints and acquire lease
 	return WithConstraints(
 		ctx,
@@ -824,6 +837,9 @@ func (e *executor) schedule(
 		if e.rateLimiter != nil && req.Function.RateLimit != nil && !req.PreventRateLimit {
 			evtMap := req.Events[0].GetEvent().Map()
 			rateLimitKey, err := ratelimit.RateLimitKey(ctx, req.Function.ID, *req.Function.RateLimit, evtMap)
+
+			l.Optional(req.AccountID, "schedule-ratelimit").Debug("ratelimiting schedule", "key", rateLimitKey, "error", err)
+
 			switch err {
 			case nil:
 				res, err := e.rateLimiter.RateLimit(
@@ -833,6 +849,9 @@ func (e *executor) schedule(
 					ratelimit.WithNow(e.now()),
 					ratelimit.WithIdempotency(key, RateLimitIdempotencyTTL),
 				)
+
+				l.Optional(req.AccountID, "schedule-ratelimit").Debug("ratelimiting schedule", "result", res)
+
 				if err != nil {
 					metrics.IncrRateLimitUsage(ctx, metrics.CounterOpt{
 						PkgName: pkgName,
