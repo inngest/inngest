@@ -2,6 +2,7 @@ package constraintapi
 
 import (
 	"encoding/json"
+	"strconv"
 	"testing"
 	"time"
 
@@ -838,6 +839,46 @@ func TestThrottleGCRA(t *testing.T) {
 		// RetryAtMS will be set to now + emission
 		require.WithinDuration(t, clock.Now().Add(6*time.Second), time.UnixMilli(res.RetryAtMS), time.Millisecond)
 	})
+
+	// Regression test for: "attempt to compare nil with number" panic in acquire.lua / check.lua.
+	//
+	// The throttle function only sets result["remaining"] when next > -emission
+	// (where next = dvt - ttl). When the stored TAT is far enough in the future
+	// that ttl >= dvt+emission, the conditional is never entered and remaining
+	// stays nil. The nil then reaches `if constraintCapacity <= 0` in the callers
+	// and crashes Lua.
+	//
+	// With limit=10/min (emission=6s, dvt=6s, burst=0): the boundary is ttl >= 12s.
+	// We inject a TAT 13s ahead to land just past it.
+	t.Run("quantity=0 with TAT beyond dvt+emission returns 0 remaining, not nil", func(t *testing.T) {
+		t.Parallel()
+
+		clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Minute))
+
+		r, rc := initRedis(t)
+		defer rc.Close()
+
+		key := "test"
+
+		period := 1 * time.Minute
+		limit := 10
+		burst := 0
+		// emission=6s, dvt=6s, dvt+emission=12s — inject TAT 13s ahead to exceed boundary
+		tat := clock.Now().Add(13 * time.Second).UnixMilli()
+		require.NoError(t, r.Set(key, strconv.FormatInt(tat, 10)))
+
+		res := runScript(t, rc, gcraScriptOptions{
+			key:      key,
+			now:      clock.Now(),
+			period:   period,
+			limit:    limit,
+			burst:    burst,
+			quantity: 0,
+		})
+
+		// remaining must be 0 (not nil); nil caused a Lua panic before the fix
+		require.Equal(t, 0, res.Remaining)
+	})
 }
 
 func TestRateLimitGCRA(t *testing.T) {
@@ -1605,5 +1646,45 @@ func TestRateLimitGCRA(t *testing.T) {
 		require.Equal(t, clock.Now().UnixNano(), res.AllowAt)
 		require.Equal(t, 0*time.Second, time.Duration(res.Diff)*time.Nanosecond)
 		require.WithinDuration(t, clock.Now().Add(6*time.Second), time.Unix(0, res.RetryAtMS), time.Second)
+	})
+
+	// Regression test for: "attempt to compare nil with number" panic in acquire.lua / check.lua.
+	//
+	// The rateLimit function only sets result["remaining"] when next > -emission
+	// (where next = dvt - ttl). When the stored TAT is far enough in the future
+	// that ttl >= dvt+emission, the conditional is never entered and remaining
+	// stays nil. The nil then reaches `if constraintCapacity <= 0` in the callers
+	// and crashes Lua.
+	//
+	// With limit=10/min (emission=6s, dvt=6s, burst=0): the boundary is ttl >= 12s.
+	// We inject a TAT 13s ahead to land just past it.
+	t.Run("quantity=0 with TAT beyond dvt+emission returns 0 remaining, not nil", func(t *testing.T) {
+		t.Parallel()
+
+		clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Minute))
+
+		r, rc := initRedis(t)
+		defer rc.Close()
+
+		key := "test"
+
+		period := 1 * time.Minute
+		limit := 10
+		burst := 0
+		// emission=6s, dvt=6s, dvt+emission=12s — inject TAT 13s ahead to exceed boundary
+		tat := clock.Now().Add(13 * time.Second).UnixNano()
+		require.NoError(t, r.Set(key, strconv.FormatInt(tat, 10)))
+
+		res := runScript(t, rc, gcraScriptOptions{
+			key:      key,
+			now:      clock.Now(),
+			period:   period,
+			limit:    limit,
+			burst:    burst,
+			quantity: 0,
+		})
+
+		// remaining must be 0 (not nil); nil caused a Lua panic before the fix
+		require.Equal(t, 0, res.Remaining)
 	})
 }

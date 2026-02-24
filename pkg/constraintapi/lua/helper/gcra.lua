@@ -11,6 +11,9 @@ local function rateLimit(key, now_ns, period_ns, limit, burst, quantity)
 	---@type { limit: integer, ei: number, retry_at: number, dvt: number, tat: number, inc: number, ntat: number, aat: number, diff: number, retry_after: integer?, u: number, next: number?, remaining: integer?, reset_after: integer?, limited: boolean? }
 	local result = {}
 
+	-- Default remaining to 0; updated below if capacity is available
+	result["remaining"] = 0
+
 	-- limit defines the maximum number of requests that can be admitted at once (irrespective of current usage)
 	result["limit"] = burst + 1
 
@@ -123,6 +126,9 @@ local function throttle(key, now_ms, period_ms, limit, burst, quantity)
 
 	---@type { limit: integer, ei: number, retry_at: number, dvt: number, tat: number, inc: number, ntat: number, aat: number, diff: number, retry_after: integer?, u: number, next: number?, remaining: integer?, reset_after: integer?, limited: boolean? }
 	local result = {}
+
+	-- Default remaining to 0; updated below if capacity is available
+	result["remaining"] = 0
 
 	-- limit defines the maximum number of requests that can be admitted at once (irrespective of current usage)
 	result["limit"] = burst + 1
