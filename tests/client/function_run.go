@@ -268,9 +268,7 @@ func (c *Client) WaitForRunTraces(ctx context.Context, t *testing.T, runID *stri
 			return
 		}
 
-		fmt.Println("FINDING RUN ID", *runID)
-
-		run, err := c.RunTraces(ctx, *runID)
+		run, err := c.RunTraces(ctx, *runID, opts.NewTraces)
 		if !a.NoError(err) {
 			return
 		}
@@ -294,14 +292,15 @@ func (c *Client) WaitForRunTraces(ctx context.Context, t *testing.T, runID *stri
 }
 
 type WaitForRunTracesOptions struct {
-	Status   models.FunctionStatus
-	Timeout  time.Duration
-	Interval time.Duration
+	Status    models.FunctionStatus
+	Timeout   time.Duration
+	Interval  time.Duration
+	NewTraces bool
 
 	ChildSpanCount int
 }
 
-func (c *Client) RunTraces(ctx context.Context, runID string) (*RunV2, error) {
+func (c *Client) RunTraces(ctx context.Context, runID string, newTraces bool) (*RunV2, error) {
 	c.Helper()
 
 	if runID == "" {
@@ -309,7 +308,7 @@ func (c *Client) RunTraces(ctx context.Context, runID string) (*RunV2, error) {
 	}
 
 	query := `
-		query GetTraceRun($runID: String!) {
+	  query GetTraceRun($runID: String!, $preview: Boolean) {
 	  	run(runID: $runID) {
 				status
 				traceID
@@ -318,7 +317,7 @@ func (c *Client) RunTraces(ctx context.Context, runID string) (*RunV2, error) {
 				cronSchedule
         endedAt
 
-				trace(preview: true) {
+				trace(preview: $preview) {
 					...TraceDetails
 					childrenSpans {
 						...TraceDetails
@@ -372,7 +371,8 @@ func (c *Client) RunTraces(ctx context.Context, runID string) (*RunV2, error) {
 	resp, err := c.DoGQL(ctx, graphql.RawParams{
 		Query: query,
 		Variables: map[string]any{
-			"runID": runID,
+			"runID":   runID,
+			"preview": newTraces,
 		},
 	})
 	if err != nil {

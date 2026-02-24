@@ -96,7 +96,8 @@ func TestV2InvokeFunction(t *testing.T) {
 	// Verify the function actually ran to completion
 	runID := result.Data.RunID
 	c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{
-		Status: models.FunctionStatusCompleted,
+		Status:    models.FunctionStatusCompleted,
+		NewTraces: true,
 	})
 }
 
