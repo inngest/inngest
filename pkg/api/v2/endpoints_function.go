@@ -23,12 +23,12 @@ import (
 
 // InvokeFunction invokes a function either synchronously or asynchronously.
 func (s *Service) InvokeFunction(ctx context.Context, req *apiv2.InvokeFunctionRequest) (*apiv2.InvokeFunctionResponse, error) {
-	if s.functions == nil || s.executor == nil || s.eventPublisher == nil {
-		return nil, s.base.NewError(http.StatusInternalServerError, apiv2base.ErrorInternalError, "Unable to invoke functions")
-	}
-
 	if err := validateInvokeRequest(ctx, req); err != nil {
 		return nil, err
+	}
+
+	if s.functions == nil || s.executor == nil || s.eventPublisher == nil {
+		return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Invoke is not yet implemented")
 	}
 
 	f, err := s.functions.GetFunction(ctx, req.FunctionId)

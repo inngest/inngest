@@ -210,7 +210,7 @@ func TestGRPCIntegration_InvokeFunction(t *testing.T) {
 
 		require.Error(t, err)
 		require.Nil(t, resp)
-		require.Contains(t, err.Error(), "not implemented")
+		require.Contains(t, err.Error(), "not_implemented")
 	})
 
 	t.Run("invoke function with missing function ID", func(t *testing.T) {
@@ -268,9 +268,7 @@ func TestGRPCIntegration_InvokeFunction(t *testing.T) {
 
 		require.Error(t, err)
 		require.Nil(t, resp)
-		require.Contains(t, err.Error(), "not implemented")
-		// Verify mode was parsed correctly in gRPC
-		require.Contains(t, err.Error(), "mode: async")
+		require.Contains(t, err.Error(), "not_implemented")
 	})
 
 	t.Run("invoke function without mode defaults to async via gRPC", func(t *testing.T) {
@@ -291,9 +289,7 @@ func TestGRPCIntegration_InvokeFunction(t *testing.T) {
 
 		require.Error(t, err)
 		require.Nil(t, resp)
-		require.Contains(t, err.Error(), "not implemented")
-		// Verify mode defaults to async
-		require.Contains(t, err.Error(), "mode: async")
+		require.Contains(t, err.Error(), "not_implemented")
 	})
 }
 

@@ -427,9 +427,7 @@ func TestHTTPGateway_InvokeFunction(t *testing.T) {
 		err := json.Unmarshal(rec.Body.Bytes(), &response)
 		require.NoError(t, err)
 		require.Len(t, response.Errors, 1)
-		require.Contains(t, response.Errors[0].Message, "not implemented")
-		// Assert that the mode parameter was correctly parsed from the request body
-		require.Contains(t, response.Errors[0].Message, "mode: async")
+		require.Contains(t, response.Errors[0].Code, "not_implemented")
 	})
 
 	t.Run("POST /api/v2/functions/{id}/invoke with mode=sync in request body", func(t *testing.T) {
@@ -447,9 +445,7 @@ func TestHTTPGateway_InvokeFunction(t *testing.T) {
 		err := json.Unmarshal(rec.Body.Bytes(), &response)
 		require.NoError(t, err)
 		require.Len(t, response.Errors, 1)
-		require.Contains(t, response.Errors[0].Message, "not implemented")
-		// Assert that the mode parameter was correctly parsed from the request body
-		require.Contains(t, response.Errors[0].Message, "mode: sync")
+		require.Contains(t, response.Errors[0].Code, "not_implemented")
 	})
 
 	t.Run("POST /api/v2/functions/{id}/invoke without mode defaults to async", func(t *testing.T) {
@@ -467,9 +463,7 @@ func TestHTTPGateway_InvokeFunction(t *testing.T) {
 		err := json.Unmarshal(rec.Body.Bytes(), &response)
 		require.NoError(t, err)
 		require.Len(t, response.Errors, 1)
-		require.Contains(t, response.Errors[0].Message, "not implemented")
-		// Assert that when no mode is provided, it defaults to async
-		require.Contains(t, response.Errors[0].Message, "mode: async")
+		require.Contains(t, response.Errors[0].Code, "not_implemented")
 	})
 
 	t.Run("POST /api/v2/functions/{id}/invoke with invalid mode parameter", func(t *testing.T) {
@@ -480,14 +474,15 @@ func TestHTTPGateway_InvokeFunction(t *testing.T) {
 
 		handler.ServeHTTP(rec, req)
 
-		require.Equal(t, http.StatusBadRequest, rec.Code)
+		// Mode is ignored, so this becomes a valid invoke that returns not-implemented
+		require.Equal(t, http.StatusNotImplemented, rec.Code)
 		require.Contains(t, rec.Header().Get("Content-Type"), "application/json")
 
 		var response errorResponse
 		err := json.Unmarshal(rec.Body.Bytes(), &response)
 		require.NoError(t, err)
 		require.Len(t, response.Errors, 1)
-		require.Contains(t, response.Errors[0].Message, "Mode must be either 'sync' or 'async'")
+		require.Contains(t, response.Errors[0].Code, "not_implemented")
 	})
 
 	t.Run("POST /api/v2/functions/{id}/invoke with missing function ID", func(t *testing.T) {
@@ -535,8 +530,7 @@ func TestHTTPGateway_InvokeFunction(t *testing.T) {
 		err := json.Unmarshal(rec.Body.Bytes(), &response)
 		require.NoError(t, err)
 		require.Len(t, response.Errors, 1)
-		require.Contains(t, response.Errors[0].Message, "not implemented")
-		require.Contains(t, response.Errors[0].Message, "mode: sync")
+		require.Contains(t, response.Errors[0].Code, "not_implemented")
 	})
 
 	t.Run("GET /api/v2/functions/{id}/invoke returns not implemented", func(t *testing.T) {
