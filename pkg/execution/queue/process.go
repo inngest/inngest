@@ -169,21 +169,17 @@ func (q *queueProcessor) ProcessItem(
 					},
 				})
 				if err != nil {
-					// log error if unexpected; the queue item may be removed by a Dequeue() operation
-					// invoked by finalize() (Cancellations, Parallelism)
-					if !errors.Is(ErrQueueItemNotFound, err) {
-						l.ReportError(
-							err,
-							"error extending capacity lease",
-							logger.WithErrorReportLog(true),
-							logger.WithErrorReportTags(map[string]string{
-								"partitionID": p.ID,
-								"accountID":   accountID.String(),
-								"item":        qi.ID,
-								"leaseID":     currentCapacityLease.String(),
-							}),
-						)
-					}
+					l.ReportError(
+						err,
+						"error extending capacity lease",
+						logger.WithErrorReportLog(true),
+						logger.WithErrorReportTags(map[string]string{
+							"partitionID": p.ID,
+							"accountID":   accountID.String(),
+							"item":        qi.ID,
+							"leaseID":     currentCapacityLease.String(),
+						}),
+					)
 
 					// always stop processing the queue item if lease cannot be extended
 					errCh <- fmt.Errorf("error extending lease while processing: %w", err)
