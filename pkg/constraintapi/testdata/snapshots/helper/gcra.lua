@@ -1,6 +1,7 @@
 local function rateLimit(key, now_ns, period_ns, limit, burst, quantity)
 	limit = math.max(limit, 1)
 	local result = {}
+	result["remaining"] = 0
 	result["limit"] = burst + 1
 	local emission = period_ns / limit
 	result["ei"] = emission
@@ -65,6 +66,7 @@ end
 local function throttle(key, now_ms, period_ms, limit, burst, quantity)
 	limit = math.max(limit, 1)
 	local result = {}
+	result["remaining"] = 0
 	result["limit"] = burst + 1
 	local emission = period_ms / limit
 	result["ei"] = emission
