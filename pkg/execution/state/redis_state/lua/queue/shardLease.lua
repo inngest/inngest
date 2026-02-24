@@ -25,7 +25,8 @@ if existingLeaseID ~= "" then
 		-- Lease doesn't exist (was removed/expired), cannot renew
 		return 1
 	end
-	-- Check if the lease is expired
+	-- Ignore lease expiration checks.
+	-- If an expired lease is still in the set, it indicates that there has been no membership change since and therefore it is safe to renew the lease.
     -- local existingLeaseTime = decode_ulid_time(existingLeaseID)
     -- if existingLeaseTime < currentTime then
     --     -- Lease expired, remove it and deny renewal
