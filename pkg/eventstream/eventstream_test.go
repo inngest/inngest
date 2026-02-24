@@ -51,6 +51,7 @@ func TestParseStream_JSON(t *testing.T) {
 			evt := event.Event{}
 			err := json.Unmarshal(item.Item, &evt)
 			require.NoError(t, err)
+			evt.ClearSize()
 			require.EqualValues(t, actual, evt)
 			n++
 		}
@@ -97,6 +98,7 @@ func TestParseStream_JSON(t *testing.T) {
 			evt := event.Event{}
 			err := json.Unmarshal(item.Item, &evt)
 			require.NoError(t, err)
+			evt.ClearSize()
 			require.EqualValues(t, evts[n], evt)
 			n++
 		}
@@ -520,16 +522,19 @@ func TestParseStream_FormUrlencoded(t *testing.T) {
 			return ParseStream(ctx, body, stream, 512*1024, contentType)
 		})
 
+		expected := event.Event{
+			Name: "my-event",
+			Data: map[string]any{
+				"name": "Alice",
+			},
+		}
+
 		n := 0
 		for item := range stream {
 			var result event.Event
 			r.NoError(json.Unmarshal(item.Item, &result))
-			r.Equal(event.Event{
-				Name: "my-event",
-				Data: map[string]any{
-					"name": "Alice",
-				},
-			}, result)
+			result.ClearSize()
+			r.Equal(expected, result)
 			n++
 		}
 		r.NoError(eg.Wait())

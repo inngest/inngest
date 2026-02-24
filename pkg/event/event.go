@@ -93,6 +93,11 @@ func (e Event) Size() int {
 	return len(byt)
 }
 
+// ClearSize clears the internal memoized size field.
+func (e *Event) ClearSize() {
+	e.size = 0
+}
+
 func (e Event) Time() time.Time {
 	return time.UnixMilli(e.Timestamp)
 }
