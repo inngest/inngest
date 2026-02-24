@@ -133,17 +133,46 @@ func (q *queueProcessor) tryClaimShardLease(ctx context.Context, shards []QueueS
 	return false, nil
 }
 
+// releaseShardLease attempts to release the current shard lease. This is called
+// whenever we stop renewing the lease to free the slot for other workers.
+func (q *queueProcessor) releaseShardLease() {
+	l := logger.StdlibLogger(context.Background())
+
+	shard := q.primaryQueueShard
+	if shard == nil {
+		l.Warn("could not release shard lease, no primary shard set")
+		return
+	}
+
+	leaseID := q.shardLease()
+	if leaseID == nil {
+		l.Error("could not release shard lease, no leaseID set", "shard", shard.Name())
+		return
+	}
+
+	if err := shard.ReleaseShardLease(context.Background(), shard.Name()+"-"+q.ShardLeaseKeySuffix, *leaseID); err != nil {
+		l.Error("failed to release shard lease", "shard", shard.Name(), "error", err)
+	} else {
+		l.Debug("released shard lease", "shard", shard.Name())
+	}
+}
+
 // renewShardLease continuously renews the shard lease until the context is cancelled
 func (q *queueProcessor) renewShardLease(ctx context.Context) {
 	l := logger.StdlibLogger(ctx)
 
 	tick := q.Clock().NewTicker(ShardLeaseDuration / 3)
 	defer tick.Stop()
+	defer q.releaseShardLease()
 
 	for {
 		select {
 		case <-ctx.Done():
-			l.Debug("stopping shard lease renewal")
+			shardName := ""
+			if shard := q.primaryQueueShard; shard != nil {
+				shardName = shard.Name()
+			}
+			l.Debug("stopping shard lease renewal", "shard", shardName)
 			return
 		case <-tick.Chan():
 

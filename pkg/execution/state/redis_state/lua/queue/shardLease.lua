@@ -1,8 +1,8 @@
 --[[
 
 Output:
-  0: Successfully obtained or renewed lease for key (new or renewed)
-// Renewal Failures:
+  0: Successfully obtained, renewed, or released lease for key
+// Renewal, Release Failures:
   1: existingLease does not exist
   2: existingLease already expired, cannot renew
 // New Lease Failures:
@@ -25,17 +25,21 @@ if existingLeaseID ~= "" then
 		-- Lease doesn't exist (was removed/expired), cannot renew
 		return 1
 	end
-     -- Check if the lease is expired
-    local existingLeaseTime = decode_ulid_time(existingLeaseID)
-    if existingLeaseTime < currentTime then
-        -- Lease expired, remove it and deny renewal
-        redis.call("SREM", leaseKey, existingLeaseID)
-        return 2
-    end
+	-- Ignore lease expiration checks.
+	-- If an expired lease is still in the set, it indicates that there has been no membership change since and therefore it is safe to renew the lease.
+    -- local existingLeaseTime = decode_ulid_time(existingLeaseID)
+    -- if existingLeaseTime < currentTime then
+    --     -- Lease expired, remove it and deny renewal
+    --     redis.call("SREM", leaseKey, existingLeaseID)
+    --     return 2
+    -- end
 	-- Remove the old lease ID
 	redis.call("SREM", leaseKey, existingLeaseID)
-	-- Add the new lease ID (extends the lease)
-	redis.call("SADD", leaseKey, newLeaseID)
+
+	-- Add the new lease ID if provided (extends the lease), otherwise just release
+	if newLeaseID ~= "" then
+		redis.call("SADD", leaseKey, newLeaseID)
+	end
 	return 0
 end
 

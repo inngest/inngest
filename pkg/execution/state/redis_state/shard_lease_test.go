@@ -61,17 +61,18 @@ func TestQueueShardLease(t *testing.T) {
 		require.Nil(t, id)
 	})
 
-	t.Run("cannot renew an expired lease", func(t *testing.T) {
+	t.Run("can renew an expired lease", func(t *testing.T) {
 		<-time.After(100 * time.Millisecond)
 
-		id, err := shard.ShardLease(ctx, "shard", time.Second, 1, leaseID)
-		require.Equal(t, osqueue.ErrShardLeaseExpired, err)
-		require.Nil(t, id)
+		now := time.Now()
+		dur := time.Second
+		leaseID, err = shard.ShardLease(ctx, "shard", dur, 1, leaseID)
+		require.NoError(t, err)
+		require.NotNil(t, leaseID)
+		require.WithinDuration(t, now.Add(dur), ulid.Time(leaseID.Time()), 5*time.Millisecond)
 	})
 
 	t.Run("extend an unexpired lease", func(t *testing.T) {
-		leaseID, err = shard.ShardLease(ctx, "shard", time.Second, 1)
-		require.NotNil(t, leaseID)
 
 		now := time.Now()
 		dur := 50 * time.Millisecond
@@ -90,5 +91,127 @@ func TestQueueShardLease(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, leaseID)
 		require.WithinDuration(t, now.Add(dur), ulid.Time(leaseID.Time()), 5*time.Millisecond)
+	})
+}
+
+func TestReleaseShardLease(t *testing.T) {
+	ctx := context.Background()
+	r := miniredis.RunT(t)
+
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	_, shard := newQueue(t, rc)
+
+	t.Run("releasing a non-existent lease is a no-op", func(t *testing.T) {
+		nonExistent := ulid.MustNew(ulid.Now(), rnd)
+		err := shard.ReleaseShardLease(ctx, "shard", nonExistent)
+		require.NoError(t, err)
+	})
+
+	t.Run("release a valid lease frees the slot", func(t *testing.T) {
+		// Claim a lease with maxLeases=1
+		leaseID, err := shard.ShardLease(ctx, "shard", 5*time.Second, 1)
+		require.NoError(t, err)
+		require.NotNil(t, leaseID)
+
+		// Slot is full, cannot claim another
+		_, err = shard.ShardLease(ctx, "shard", 5*time.Second, 1)
+		require.Equal(t, osqueue.ErrAllShardsAlreadyLeased, err)
+
+		// Release the lease
+		err = shard.ReleaseShardLease(ctx, "shard", *leaseID)
+		require.NoError(t, err)
+
+		// Now a new lease can be claimed
+		newLeaseID, err := shard.ShardLease(ctx, "shard", 5*time.Second, 1)
+		require.NoError(t, err)
+		require.NotNil(t, newLeaseID)
+
+		// Clean up
+		err = shard.ReleaseShardLease(ctx, "shard", *newLeaseID)
+		require.NoError(t, err)
+	})
+
+	t.Run("releasing an already released lease is a no-op", func(t *testing.T) {
+		leaseID, err := shard.ShardLease(ctx, "shard", 5*time.Second, 1)
+		require.NoError(t, err)
+		require.NotNil(t, leaseID)
+
+		// Release once
+		err = shard.ReleaseShardLease(ctx, "shard", *leaseID)
+		require.NoError(t, err)
+
+		// Release again is a no-op
+		err = shard.ReleaseShardLease(ctx, "shard", *leaseID)
+		require.NoError(t, err)
+	})
+
+	t.Run("releasing an expired lease is a no-op", func(t *testing.T) {
+		dur := 50 * time.Millisecond
+		leaseID, err := shard.ShardLease(ctx, "shard", dur, 1)
+		require.NoError(t, err)
+		require.NotNil(t, leaseID)
+
+		// Wait for it to expire
+		<-time.After(100 * time.Millisecond)
+
+		err = shard.ReleaseShardLease(ctx, "shard", *leaseID)
+		require.NoError(t, err)
+	})
+
+	t.Run("release one of multiple leases", func(t *testing.T) {
+		// Claim two leases (maxLeases=2)
+		leaseA, err := shard.ShardLease(ctx, "shard-multi", 5*time.Second, 2)
+		require.NoError(t, err)
+		require.NotNil(t, leaseA)
+
+		leaseB, err := shard.ShardLease(ctx, "shard-multi", 5*time.Second, 2)
+		require.NoError(t, err)
+		require.NotNil(t, leaseB)
+
+		// All slots full
+		_, err = shard.ShardLease(ctx, "shard-multi", 5*time.Second, 2)
+		require.Equal(t, osqueue.ErrAllShardsAlreadyLeased, err)
+
+		// Release one lease
+		err = shard.ReleaseShardLease(ctx, "shard-multi", *leaseA)
+		require.NoError(t, err)
+
+		// Can claim one more again
+		leaseC, err := shard.ShardLease(ctx, "shard-multi", 5*time.Second, 2)
+		require.NoError(t, err)
+		require.NotNil(t, leaseC)
+
+		// Still full
+		_, err = shard.ShardLease(ctx, "shard-multi", 5*time.Second, 2)
+		require.Equal(t, osqueue.ErrAllShardsAlreadyLeased, err)
+	})
+
+	t.Run("release does not affect other keys", func(t *testing.T) {
+		leaseA, err := shard.ShardLease(ctx, "shard-a", 5*time.Second, 1)
+		require.NoError(t, err)
+		require.NotNil(t, leaseA)
+
+		leaseB, err := shard.ShardLease(ctx, "shard-b", 5*time.Second, 1)
+		require.NoError(t, err)
+		require.NotNil(t, leaseB)
+
+		// Release lease on shard-a
+		err = shard.ReleaseShardLease(ctx, "shard-a", *leaseA)
+		require.NoError(t, err)
+
+		// shard-b should still be leased (cannot claim another)
+		_, err = shard.ShardLease(ctx, "shard-b", 5*time.Second, 1)
+		require.Equal(t, osqueue.ErrAllShardsAlreadyLeased, err)
+
+		// shard-a should be free
+		newLeaseA, err := shard.ShardLease(ctx, "shard-a", 5*time.Second, 1)
+		require.NoError(t, err)
+		require.NotNil(t, newLeaseA)
 	})
 }
