@@ -166,11 +166,11 @@ func (q *queueProcessor) renewShardLease(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
+			shardName := ""
 			if shard := q.primaryQueueShard; shard != nil {
-				l.Debug("stopping shard lease renewal", "shard", shard.Name())
-			} else {
-				l.Debug("stopping shard lease renewal")
+				shardName = shard.Name()
 			}
+			l.Debug("stopping shard lease renewal", "shard", shardName)
 			return
 		case <-tick.Chan():
 
