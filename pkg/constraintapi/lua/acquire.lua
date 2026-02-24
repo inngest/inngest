@@ -161,7 +161,7 @@ for index, value in ipairs(constraints) do
 	elseif value.k == 1 then
 		-- rate limit
 		local rlRes = rateLimit(value.r.k, nowNS, value.r.p, value.r.l, value.r.b, 0)
-		constraintCapacity = rlRes["remaining"]
+		constraintCapacity = rlRes["remaining"] or 0
 		constraintRetryAt = toInteger(rlRes["retry_at"] / 1000000) -- convert from ns to ms
 	elseif value.k == 2 then
 		-- concurrency
@@ -176,7 +176,7 @@ for index, value in ipairs(constraints) do
 		-- allow consuming all capacity in one request (for generating multiple leases)
 		local maxBurst = (value.t.l or 0) + (value.t.b or 0) - 1
 		local throttleRes = throttle(value.t.k, nowMS, value.t.p, value.t.l, maxBurst, 0)
-		constraintCapacity = throttleRes["remaining"]
+		constraintCapacity = throttleRes["remaining"] or 0
 		constraintRetryAt = toInteger(throttleRes["retry_at"]) -- already in ms
 	end
 
@@ -249,7 +249,7 @@ for i, value in ipairs(constraints) do
 		-- rate limit
 		local rlRes = rateLimit(value.r.k, nowNS, value.r.p, value.r.l, value.r.b, granted)
 		constraintRetryAt = toInteger(rlRes["retry_at"] / 1000000)
-		constraintCapacity = rlRes["remaining"]
+		constraintCapacity = rlRes["remaining"] or 0
 	elseif value.k == 2 then
 		-- concurrency
 		local updates = {}
@@ -272,7 +272,7 @@ for i, value in ipairs(constraints) do
 		local maxBurst = (value.t.l or 0) + (value.t.b or 0) - 1
 		local throttleRes = throttle(value.t.k, nowMS, value.t.p, value.t.l, maxBurst, granted)
 		constraintRetryAt = toInteger(throttleRes["retry_at"])
-		constraintCapacity = throttleRes["remaining"]
+		constraintCapacity = throttleRes["remaining"] or 0
 	end
 
 	-- If we used up capacity after the update,

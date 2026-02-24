@@ -183,7 +183,7 @@ for index, value in ipairs(constraints) do
 	local constraintRetryAfter = 0
 	if value.k == 1 then
 		local rlRes = rateLimit(value.r.k, nowNS, value.r.p, value.r.l, value.r.b, 0)
-		constraintCapacity = rlRes["remaining"]
+		constraintCapacity = rlRes["remaining"] or 0
 		constraintRetryAfter = toInteger(rlRes["retry_at"] / 1000000) 
 		local usage = {}
 		usage["l"] = value.r.l
@@ -203,7 +203,7 @@ for index, value in ipairs(constraints) do
 		debug("evaluating throttle")
 		local maxBurst = (value.t.l or 0) + (value.t.b or 0) - 1
 		local throttleRes = throttle(value.t.k, nowMS, value.t.p, value.t.l, maxBurst, 0)
-		constraintCapacity = throttleRes["remaining"]
+		constraintCapacity = throttleRes["remaining"] or 0
 		constraintRetryAfter = toInteger(throttleRes["retry_at"]) 
 		local usage = {}
 		usage["l"] = value.t.l
