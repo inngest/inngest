@@ -2191,10 +2191,7 @@ func (w wrapper) GetTraceRunsCount(ctx context.Context, opt cqrs.GetTraceRunOpt)
 }
 
 // getTraceRunsCount returns the count of trace runs matching the given filters.
-// This uses the original len(GetTraceRuns) approach because GetTraceRuns applies
-// CEL event filtering in Go (post-query), which can't be easily replicated in a
-// SQL COUNT. The trace_runs path is used for non-preview (local dev) queries where
-// data volumes are small.
+// Uses len(GetTraceRuns) because CEL event filtering is applied in Go post-query.
 func (w wrapper) getTraceRunsCount(ctx context.Context, opt cqrs.GetTraceRunOpt) (int, error) {
 	opt.Items = 0
 	res, err := w.GetTraceRuns(ctx, opt)
