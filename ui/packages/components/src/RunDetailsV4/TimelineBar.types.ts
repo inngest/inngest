@@ -44,7 +44,7 @@ export type BarStyleKey =
   | 'step.waitForEvent'
   | 'step.invoke'
   // Timing categories
-  | 'timing.inngest' // Queue time (short, gray)
+  | 'timing.inngest' // Queue/delay time (short, gray)
   | 'timing.server' // Execution time (tall, barber-pole, status color)
   | 'timing.connecting' // Connection time (short, dotted border, status color)
   // HTTP timing phases (nested under server execution)

@@ -68,7 +68,7 @@ const BAR_STYLES: Record<BarStyleKey, BarStyle> = {
   },
   'timing.inngest': {
     barColor: 'bg-slate-300',
-    barHeight: 'tall',
+    barHeight: 'short',
     durationColor: 'text-basis',
     labelFormat: 'default',
     textColor: 'text-light',
