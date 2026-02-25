@@ -115,6 +115,7 @@ func TestDebounce(t *testing.T) {
 		require.NoError(t, err)
 
 		require.NotEmpty(t, debounceIds[0])
+		di.Event.ClearSize()
 		require.Equal(t, expectedDi, di)
 
 		// Queue state should match
@@ -195,6 +196,7 @@ func TestDebounce(t *testing.T) {
 		require.NoError(t, err)
 
 		require.NotEmpty(t, debounceIds[0])
+		di.Event.ClearSize()
 		require.Equal(t, expectedDi, di)
 
 		// Queue state should match
@@ -423,6 +425,7 @@ func TestJITDebounceMigration(t *testing.T) {
 		require.NoError(t, err)
 
 		require.NotEmpty(t, debounceIds[0])
+		di.Event.ClearSize()
 		require.Equal(t, expectedDi, di)
 
 		// Queue state should match
@@ -503,6 +506,7 @@ func TestJITDebounceMigration(t *testing.T) {
 		require.NoError(t, err)
 
 		require.NotEmpty(t, debounceIds[0])
+		di.Event.ClearSize()
 		require.Equal(t, expectedDi, di)
 
 		// Queue state should match
@@ -698,6 +702,7 @@ func TestDebounceMigrationWithoutTimeout(t *testing.T) {
 		require.NoError(t, err)
 
 		require.NotEmpty(t, debounceIds[0])
+		di.Event.ClearSize()
 		require.Equal(t, expectedDi, di)
 
 		// Queue state should match
@@ -776,6 +781,7 @@ func TestDebounceMigrationWithoutTimeout(t *testing.T) {
 		require.NoError(t, err)
 
 		require.NotEmpty(t, debounceIds[0])
+		di.Event.ClearSize()
 		require.Equal(t, expectedDi, di)
 
 		// Queue state should match
@@ -1009,6 +1015,7 @@ func TestDebounceTimeoutIsPreserved(t *testing.T) {
 		expectedDi.Timeout = evt0Time.Add(6 * time.Second).UnixMilli()
 
 		require.NotEmpty(t, debounceIds[0])
+		di.Event.ClearSize()
 		require.Equal(t, expectedDi, di)
 
 		// Queue state should match
@@ -1565,6 +1572,7 @@ func TestDebounceExecutionDuringMigrationWorks(t *testing.T) {
 		require.NoError(t, err)
 
 		require.NotEmpty(t, debounceIds[0])
+		di.Event.ClearSize()
 		require.Equal(t, expectedDi, di)
 
 		// Queue state should match
@@ -1785,6 +1793,7 @@ func TestDebounceExecutionShouldNotRaceMigration(t *testing.T) {
 		require.NoError(t, err)
 
 		require.NotEmpty(t, debounceIds[0])
+		di.Event.ClearSize()
 		require.Equal(t, expectedDi, di)
 
 		// Queue state should match

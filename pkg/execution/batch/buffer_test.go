@@ -960,3 +960,140 @@ func TestBufferedBatchManagerMultipleBufferKeys(t *testing.T) {
 		require.Len(t, info.Items, 1, "tenant %s should have 1 item", tenant)
 	}
 }
+
+func TestBufferedByteSize(t *testing.T) {
+	r := miniredis.RunT(t)
+
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	bc := redis_state.NewBatchClient(rc, redis_state.QueueDefaultKey)
+
+	t.Run("byte size flush triggers before count limit", func(t *testing.T) {
+		// Low byte-size limit (500B), high count limit (1000), long timer (5s).
+		// Events with large Data should trigger a byte-size flush well before count or timer.
+		buffered := NewRedisBatchManager(bc, nil,
+			WithBufferSettings(5*time.Second, 1000),
+			WithBufferMaxByteSize(500),
+		)
+		defer buffered.Close()
+
+		fnId := uuid.New()
+		fn := inngest.Function{
+			ID: fnId,
+			EventBatch: &inngest.EventBatchConfig{
+				MaxSize: 1000,
+				Timeout: "60s",
+			},
+		}
+
+		// Each event is ~200+ bytes of JSON, so 3 should exceed 500B.
+		var wg sync.WaitGroup
+		results := make([]*BatchAppendResult, 3)
+		errs := make([]error, 3)
+
+		start := time.Now()
+		for i := 0; i < 3; i++ {
+			wg.Add(1)
+			go func(idx int) {
+				defer wg.Done()
+				bi := BatchItem{
+					AccountID:   uuid.New(),
+					WorkspaceID: uuid.New(),
+					AppID:       uuid.New(),
+					FunctionID:  fnId,
+					EventID:     ulid.MustNew(ulid.Now(), rand.Reader),
+					Event: event.Event{
+						Name: "test/bytesize",
+						Data: map[string]any{
+							"payload": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +
+								"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+							"idx": idx,
+						},
+					},
+				}
+				results[idx], errs[idx] = buffered.Append(context.Background(), bi, fn)
+			}(i)
+		}
+
+		wg.Wait()
+		elapsed := time.Since(start)
+
+		for i := 0; i < 3; i++ {
+			require.NoError(t, errs[i], "append %d failed", i)
+			require.NotNil(t, results[i], "result %d is nil", i)
+		}
+
+		// Should have flushed quickly via byte-size, not waited 5s for timer
+		require.Less(t, elapsed, 500*time.Millisecond, "should flush on byte size, not wait for timer")
+	})
+
+	t.Run("byte size resets after flush", func(t *testing.T) {
+		// Verify that two consecutive batches each flush at the byte-size threshold independently.
+		// Appends are concurrent within each batch since Append blocks until flush.
+		buffered := NewRedisBatchManager(bc, nil,
+			WithBufferSettings(5*time.Second, 1000),
+			WithBufferMaxByteSize(500),
+		)
+		defer buffered.Close()
+
+		fnId := uuid.New()
+		fn := inngest.Function{
+			ID: fnId,
+			EventBatch: &inngest.EventBatchConfig{
+				MaxSize: 1000,
+				Timeout: "60s",
+			},
+		}
+
+		makeLargeItem := func() BatchItem {
+			return BatchItem{
+				AccountID:   uuid.New(),
+				WorkspaceID: uuid.New(),
+				AppID:       uuid.New(),
+				FunctionID:  fnId,
+				EventID:     ulid.MustNew(ulid.Now(), rand.Reader),
+				Event: event.Event{
+					Name: "test/bytesize-reset",
+					Data: map[string]any{
+						"payload": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" +
+							"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+					},
+				},
+			}
+		}
+
+		// First batch: 3 concurrent items should exceed 500B and flush
+		var wg1 sync.WaitGroup
+		for i := 0; i < 3; i++ {
+			wg1.Add(1)
+			go func() {
+				defer wg1.Done()
+				_, appendErr := buffered.Append(context.Background(), makeLargeItem(), fn)
+				require.NoError(t, appendErr)
+			}()
+		}
+		wg1.Wait()
+
+		// Second batch: another 3 concurrent items should also flush (byte size was reset)
+		var wg2 sync.WaitGroup
+		start := time.Now()
+		for i := 0; i < 3; i++ {
+			wg2.Add(1)
+			go func() {
+				defer wg2.Done()
+				_, appendErr := buffered.Append(context.Background(), makeLargeItem(), fn)
+				require.NoError(t, appendErr)
+			}()
+		}
+		wg2.Wait()
+		elapsed := time.Since(start)
+
+		// If byte size wasn't reset, second batch would wait for the 5s timer
+		require.Less(t, elapsed, 500*time.Millisecond, "second batch should flush on byte size too")
+	})
+}
