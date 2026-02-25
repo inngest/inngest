@@ -61,12 +61,16 @@ export const getLabelForStatus = (status: string) => {
   }
 };
 
+export type TicketStatusFilter = "open" | "closed";
+
 export const getTicketsByEmail = createServerFn({ method: "GET" })
-  .inputValidator((data: { email: string }) => data)
+  .inputValidator(
+    (data: { email: string; status?: TicketStatusFilter }) => data,
+  )
   .handler(async ({ data }): Promise<Array<TicketSummary>> => {
     // TODO - Use Clerk auth here to get the customer email, and the metadata with their external id
     try {
-      const { email } = data;
+      const { email, status } = data;
 
       // First, get or create the customer by email
       const customer = await plainClient.getCustomerByEmail({
@@ -126,6 +130,11 @@ export const getTicketsByEmail = createServerFn({ method: "GET" })
         variables: {
           filters: {
             customerIds: [customer.data.id],
+            ...(status === "open"
+              ? { statuses: ["TODO", "SNOOZED"] }
+              : status === "closed"
+              ? { statuses: ["DONE"] }
+              : {}),
           },
           first: 10,
           // after: null,
