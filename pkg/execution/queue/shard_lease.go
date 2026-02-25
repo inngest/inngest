@@ -9,6 +9,7 @@ import (
 
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
+	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -195,19 +196,13 @@ func (q *queueProcessor) renewShardLease(ctx context.Context) {
 			l.Trace("renewing shard lease", "shard", shard.Name())
 			start := time.Now()
 			// Renew the lease
-			newLeaseID, err := DurationWithTags(ctx, shard.Name(), "shard_lease", q.Clock().Now(), func(ctx context.Context) (*ulid.ULID, error) {
-				return shard.ShardLease(ctx, shard.Name()+"-"+q.ShardLeaseKeySuffix, ShardLeaseDuration, shard.ShardAssignmentConfig().NumExecutors, leaseID)
-			}, map[string]any{
-				"action": "renew",
-			})
-
-			if err == ErrShardLeaseExpired || err == ErrShardLeaseNotFound {
-				// Another process took the lease
-				metrics.GaugeActiveShardLease(ctx, 0, metrics.GaugeOpt{PkgName: pkgName, Tags: map[string]any{"shard_group": q.runMode.ShardGroup, "queue_shard": q.primaryQueueShard.Name(), "segment": q.ShardLeaseKeySuffix}})
-				l.Error("stopping shard lease renewal, failed to renew shard lease", "shard", shard.Name(), "group", q.runMode.ShardGroup, "error", err, "duration", time.Since(start), "leaseID", *leaseID)
-				q.quit <- err
-				return
-			}
+			newLeaseID, err := util.WithRetry(ctx, "queue.ShardLeaseRenewal", func(ctx context.Context) (*ulid.ULID, error) {
+				return DurationWithTags(ctx, shard.Name(), "shard_lease", q.Clock().Now(), func(ctx context.Context) (*ulid.ULID, error) {
+					return shard.ShardLease(ctx, shard.Name()+"-"+q.ShardLeaseKeySuffix, ShardLeaseDuration, shard.ShardAssignmentConfig().NumExecutors, leaseID)
+				}, map[string]any{
+					"action": "renew",
+				})
+			}, util.NewRetryConf(util.WithRetryConfRetryableErrors(ShardLeaseRenewalRetryableError)))
 			if err != nil {
 				metrics.GaugeActiveShardLease(ctx, 0, metrics.GaugeOpt{PkgName: pkgName, Tags: map[string]any{"shard_group": q.runMode.ShardGroup, "queue_shard": q.primaryQueueShard.Name(), "segment": q.ShardLeaseKeySuffix}})
 				l.Error("stopping shard lease renewal, failed to renew shard lease", "shard", shard.Name(), "group", q.runMode.ShardGroup, "error", err, "duration", time.Since(start), "leaseID", *leaseID)

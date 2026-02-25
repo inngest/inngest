@@ -1,6 +1,9 @@
 package queue
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+)
 
 var ErrQueueItemThrottled = fmt.Errorf("queue item throttled")
 
@@ -87,3 +90,13 @@ var (
 )
 
 var ErrQueueShardNotFound = fmt.Errorf("could not find queue shard for the specified name")
+
+func ShardLeaseRenewalRetryableError(err error) bool {
+	switch {
+	case errors.Is(err, ErrShardLeaseNotFound):
+		return false
+	case errors.Is(err, ErrShardLeaseExpired):
+		return false
+	}
+	return true
+}
