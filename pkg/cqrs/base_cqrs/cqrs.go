@@ -2212,6 +2212,7 @@ func (w wrapper) getSpanRunsCount(ctx context.Context, opt cqrs.GetTraceRunOpt) 
 
 	// Parse CEL expressions using adapter's converter (same as GetSpanRuns)
 	var celFilters []sq.Expression
+	var useJoin bool
 	if opt.Filter.CEL != "" {
 		expHandler, err := run.NewExpressionHandler(ctx,
 			run.WithExpressionHandlerBlob(opt.Filter.CEL, "\n"),
@@ -2225,13 +2226,18 @@ func (w wrapper) getSpanRunsCount(ctx context.Context, opt cqrs.GetTraceRunOpt) 
 			if err != nil {
 				return 0, err
 			}
+			useJoin = needsEventJoin(opt.Filter.CEL)
 		}
 	}
 
 	allFilters := append(builder.filter, celFilters...)
 
-	sqlQuery, args, err := sq.Dialect(adapter.dialect).
-		From("spans").
+	q := sq.Dialect(adapter.dialect).From("spans")
+	if useJoin {
+		q = adapter.buildEventJoin(q)
+	}
+
+	sqlQuery, args, err := q.
 		Select(sq.L("COUNT(DISTINCT run_id)")).
 		Where(sq.L("spans.dynamic_span_id").In(
 			sq.Dialect(adapter.dialect).Select("dynamic_span_id").Distinct().From("spans").Where(sq.C("name").Eq(meta.SpanNameRun)),
