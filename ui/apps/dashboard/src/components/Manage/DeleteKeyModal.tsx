@@ -6,6 +6,7 @@ import { useEnvironment } from '@/components/Environments/environment-context';
 import { graphql } from '@/gql';
 import useManagePageTerminology from './useManagePageTerminology';
 import { useNavigate } from '@tanstack/react-router';
+import { skipCacheSearchParam } from '@/utils/urls';
 
 const DeleteEventKey = graphql(`
   mutation DeleteEventKey($input: DeleteIngestKey!) {
@@ -50,6 +51,10 @@ export default function DeleteKeyModal({
             envSlug: env.slug,
             ingestKeys: currentContent?.param,
           },
+          search: (prev) => ({
+            ...prev,
+            [skipCacheSearchParam.name]: skipCacheSearchParam.value,
+          }),
         });
       }
     });
