@@ -79,6 +79,7 @@ function generateTimingBreakdownBars(bar: TimelineBarData, orgName?: string): Ti
 
 /**
  * Generate segments for a compound bar based on timing breakdown.
+ * Uses gray delay bar for the queue portion (matching V3's visual distinction).
  */
 function generateBarSegments(bar: TimelineBarData): BarSegment[] | undefined {
   if (!bar.timingBreakdown) return undefined;
@@ -90,15 +91,14 @@ function generateBarSegments(bar: TimelineBarData): BarSegment[] | undefined {
   const segments: BarSegment[] = [];
   let currentPercent = 0;
 
-  // Queue segment (INNGEST)
+  // Queue segment — short gray delay bar
   if (queueMs > 0) {
     const queuePercent = (queueMs / totalMs) * 100;
     segments.push({
-      id: `${bar.id}-seg-inngest`,
+      id: `${bar.id}-seg-delay`,
       startPercent: currentPercent,
       widthPercent: queuePercent,
       style: 'timing.inngest',
-      status: bar.status,
     });
     currentPercent += queuePercent;
   }
@@ -111,6 +111,47 @@ function generateBarSegments(bar: TimelineBarData): BarSegment[] | undefined {
       startPercent: currentPercent,
       widthPercent: execPercent,
       style: 'timing.server',
+      status: bar.status,
+    });
+  }
+
+  return segments.length > 0 ? segments : undefined;
+}
+
+/**
+ * Generate delay + execution segments for any bar with delay data.
+ * Fallback for bars without timingBreakdown (e.g. root bar, Finalization span).
+ * Shows checkpoint/queue delay as a gray bar followed by the execution portion.
+ */
+function generateDelaySegments(bar: TimelineBarData): BarSegment[] | undefined {
+  if (bar.delayMs == null || bar.delayMs <= 0) return undefined;
+
+  const totalMs = bar.endTime
+    ? bar.endTime.getTime() - bar.startTime.getTime()
+    : Date.now() - bar.startTime.getTime();
+
+  if (totalMs <= 0) return undefined;
+
+  const delayPercent = Math.min((bar.delayMs / totalMs) * 100, 100);
+  const execPercent = Math.max(100 - delayPercent, 0);
+
+  const segments: BarSegment[] = [];
+
+  if (delayPercent > 0) {
+    segments.push({
+      id: `${bar.id}-seg-delay`,
+      startPercent: 0,
+      widthPercent: delayPercent,
+      style: 'timing.inngest',
+    });
+  }
+
+  if (execPercent > 0) {
+    segments.push({
+      id: `${bar.id}-seg-exec`,
+      startPercent: delayPercent,
+      widthPercent: execPercent,
+      style: bar.style,
       status: bar.status,
     });
   }
@@ -220,7 +261,8 @@ function TimelineBarRenderer({
   const isExpanded = bar.isRoot ? true : expandedBars.has(bar.id);
 
   // Generate segments for compound bar visualization
-  const segments = generateBarSegments(bar);
+  // Bars with timingBreakdown use queue+execution segments; others fall back to delay+execution
+  const segments = generateBarSegments(bar) ?? generateDelaySegments(bar);
 
   // Generate timing breakdown bars for expanded view
   const timingBars = hasTimingBreakdown ? generateTimingBreakdownBars(bar, orgName) : [];
