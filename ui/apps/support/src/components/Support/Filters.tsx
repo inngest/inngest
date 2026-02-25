@@ -1,37 +1,44 @@
-import type { TicketStatusFilter } from "@/data/plain";
+import SegmentedControl from "@inngest/components/SegmentedControl/SegmentedControl";
+import {
+  TICKET_STATUS_ALL,
+  TICKET_STATUS_OPEN,
+  TICKET_STATUS_CLOSED,
+  type TicketStatusFilter,
+} from "@/data/plain";
 
 type FiltersProps = {
   status: TicketStatusFilter | undefined;
   onStatusChange: (status: TicketStatusFilter | undefined) => void;
+  defaultStatus: TicketStatusFilter | undefined;
 };
 
-const options: Array<{ label: string; value: TicketStatusFilter | undefined }> =
-  [
-    { label: "All", value: undefined },
-    { label: "Open", value: "open" },
-    { label: "Closed", value: "closed" },
-  ];
-
-export function Filters({ status, onStatusChange }: FiltersProps) {
+export function Filters({
+  status,
+  onStatusChange,
+  defaultStatus = TICKET_STATUS_OPEN,
+}: FiltersProps) {
   return (
-    <div className="flex w-full items-center gap-1 text-sm">
-      {options.map((option) => {
-        const isActive = status === option.value;
-        return (
-          <button
-            key={option.label}
-            type="button"
-            onClick={() => onStatusChange(option.value)}
-            className={`rounded px-2.5 py-1 text-sm font-medium transition-colors ${
-              isActive
-                ? "bg-contrast text-onContrast"
-                : "text-muted hover:text-basis hover:bg-canvasSubtle"
-            }`}
-          >
-            {option.label}
-          </button>
-        );
-      })}
+    <div className="flex flex-row">
+      <SegmentedControl defaultValue={status ?? defaultStatus}>
+        <SegmentedControl.Button
+          value={TICKET_STATUS_ALL}
+          onClick={() => onStatusChange(TICKET_STATUS_ALL)}
+        >
+          All
+        </SegmentedControl.Button>
+        <SegmentedControl.Button
+          value={TICKET_STATUS_OPEN}
+          onClick={() => onStatusChange(TICKET_STATUS_OPEN)}
+        >
+          Open
+        </SegmentedControl.Button>
+        <SegmentedControl.Button
+          value={TICKET_STATUS_CLOSED}
+          onClick={() => onStatusChange(TICKET_STATUS_CLOSED)}
+        >
+          Closed
+        </SegmentedControl.Button>
+      </SegmentedControl>
     </div>
   );
 }

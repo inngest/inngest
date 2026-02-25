@@ -4,7 +4,13 @@ import { createServerFn } from "@tanstack/react-start";
 import { usePaginationUI } from "@inngest/components/Pagination";
 import { Filters } from "@/components/Support/Filters";
 import { Button } from "@inngest/components/Button";
-import type { TicketSummary, TicketStatusFilter } from "@/data/plain";
+import {
+  TICKET_STATUS_OPEN,
+  TICKET_STATUS_CLOSED,
+  type TicketSummary,
+  type TicketStatusFilter,
+  TICKET_STATUS_ALL,
+} from "@/data/plain";
 import { getTicketsByEmail } from "@/data/plain";
 import { TicketCard } from "@/components/Support/TicketCard";
 import { CommunityChannels } from "@/components/Support/CommunityChannels";
@@ -46,12 +52,19 @@ const getAuthStatusAndTickets = createServerFn({ method: "GET" })
     };
   });
 
+const TICKET_STATUS_DEFAULT = TICKET_STATUS_OPEN;
+
 export const Route = createFileRoute("/")({
   component: Home,
   validateSearch: (search: Record<string, unknown>): TicketSearchParams => {
     const status = search.status as string | undefined;
     return {
-      status: status === "open" || status === "closed" ? status : undefined,
+      status:
+        status === TICKET_STATUS_OPEN ||
+        status === TICKET_STATUS_CLOSED ||
+        status === TICKET_STATUS_ALL
+          ? status
+          : TICKET_STATUS_DEFAULT,
     };
   },
   loaderDeps: ({ search: { status } }) => ({ status }),
@@ -107,6 +120,7 @@ function Home() {
             search: newStatus ? { status: newStatus } : {},
           });
         }}
+        defaultStatus={TICKET_STATUS_DEFAULT}
       />
 
       {/* Ticket List */}

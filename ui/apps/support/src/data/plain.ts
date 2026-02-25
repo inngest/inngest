@@ -61,7 +61,14 @@ export const getLabelForStatus = (status: string) => {
   }
 };
 
-export type TicketStatusFilter = "open" | "closed";
+export const TICKET_STATUS_ALL = "all" as const;
+export const TICKET_STATUS_OPEN = "open" as const;
+export const TICKET_STATUS_CLOSED = "closed" as const;
+
+export type TicketStatusFilter =
+  | typeof TICKET_STATUS_OPEN
+  | typeof TICKET_STATUS_CLOSED
+  | typeof TICKET_STATUS_ALL;
 
 export const getTicketsByEmail = createServerFn({ method: "GET" })
   .inputValidator(
