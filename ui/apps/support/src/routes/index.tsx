@@ -1,16 +1,27 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { auth, clerkClient } from "@clerk/tanstack-react-start/server";
 import { createServerFn } from "@tanstack/react-start";
 import { usePaginationUI } from "@inngest/components/Pagination";
-// import { Filters } from "@/components/Support/Filters";
+import { Filters } from "@/components/Support/Filters";
 import { Button } from "@inngest/components/Button";
-import type { TicketSummary } from "@/data/plain";
+import {
+  TICKET_STATUS_OPEN,
+  TICKET_STATUS_CLOSED,
+  type TicketSummary,
+  type TicketStatusFilter,
+  TICKET_STATUS_ALL,
+} from "@/data/plain";
 import { getTicketsByEmail } from "@/data/plain";
 import { TicketCard } from "@/components/Support/TicketCard";
 import { CommunityChannels } from "@/components/Support/CommunityChannels";
 
-const getAuthStatusAndTickets = createServerFn({ method: "GET" }).handler(
-  async () => {
+type TicketSearchParams = {
+  status?: TicketStatusFilter;
+};
+
+const getAuthStatusAndTickets = createServerFn({ method: "GET" })
+  .inputValidator((data: { status?: TicketStatusFilter }) => data)
+  .handler(async ({ data }) => {
     const { isAuthenticated, userId } = await auth();
 
     // Only fetch user email and tickets if authenticated
@@ -24,7 +35,9 @@ const getAuthStatusAndTickets = createServerFn({ method: "GET" }).handler(
 
         // Fetch tickets using the user's email
         if (userEmail) {
-          tickets = await getTicketsByEmail({ data: { email: userEmail } });
+          tickets = await getTicketsByEmail({
+            data: { email: userEmail, status: data.status },
+          });
         }
       } catch (error) {
         // If user fetch fails, user will see sign-in
@@ -37,18 +50,33 @@ const getAuthStatusAndTickets = createServerFn({ method: "GET" }).handler(
       userEmail,
       tickets,
     };
-  },
-);
+  });
+
+const TICKET_STATUS_DEFAULT = TICKET_STATUS_OPEN;
 
 export const Route = createFileRoute("/")({
   component: Home,
-  loader: async () => {
-    return await getAuthStatusAndTickets();
+  validateSearch: (search: Record<string, unknown>): TicketSearchParams => {
+    const status = search.status as string | undefined;
+    return {
+      status:
+        status === TICKET_STATUS_OPEN ||
+        status === TICKET_STATUS_CLOSED ||
+        status === TICKET_STATUS_ALL
+          ? status
+          : TICKET_STATUS_DEFAULT,
+    };
+  },
+  loaderDeps: ({ search: { status } }) => ({ status }),
+  loader: async ({ deps: { status } }) => {
+    return await getAuthStatusAndTickets({ data: { status } });
   },
 });
 
 function Home() {
   const { isAuthenticated, userEmail, tickets } = Route.useLoaderData();
+  const { status } = Route.useSearch();
+  const navigate = useNavigate();
 
   // Paginate tickets with 8 per page
   const { currentPageData, BoundPagination } = usePaginationUI({
@@ -84,7 +112,16 @@ function Home() {
   return (
     <div className="mx-auto w-full max-w-5xl py-6">
       {/* Filters */}
-      {/* <Filters /> */}
+      <Filters
+        status={status}
+        onStatusChange={(newStatus) => {
+          void navigate({
+            to: "/",
+            search: newStatus ? { status: newStatus } : {},
+          });
+        }}
+        defaultStatus={TICKET_STATUS_DEFAULT}
+      />
 
       {/* Ticket List */}
       <div className="flex w-full flex-col gap-4 py-4">
