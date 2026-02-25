@@ -1,0 +1,1 @@
+export { TruncateMiddle } from './TruncateMiddle';
