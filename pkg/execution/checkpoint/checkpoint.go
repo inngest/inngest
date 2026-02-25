@@ -165,6 +165,7 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 				}
 				if err != nil {
 					l.Error("error saving checkpointed step state", "error", err)
+					return fmt.Errorf("failed to save step %s: %w", op.ID, err)
 				}
 			}
 
@@ -412,6 +413,7 @@ func (c checkpointer) checkpointAsyncSteps(ctx context.Context, input AsyncCheck
 			}
 			if err != nil {
 				l.Error("error saving checkpointed step state", "error", err)
+				return fmt.Errorf("failed to save step %s: %w", op.ID, err)
 			}
 
 			_, err = c.TracerProvider.CreateSpan(
