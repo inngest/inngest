@@ -2190,26 +2190,18 @@ func (w wrapper) GetTraceRunsCount(ctx context.Context, opt cqrs.GetTraceRunOpt)
 	return w.getTraceRunsCount(ctx, opt)
 }
 
-// getTraceRunsCount returns the count of trace runs matching the given filters
-// using a SQL COUNT(*) query instead of fetching all rows.
+// getTraceRunsCount returns the count of trace runs matching the given filters.
+// This uses the original len(GetTraceRuns) approach because GetTraceRuns applies
+// CEL event filtering in Go (post-query), which can't be easily replicated in a
+// SQL COUNT. The trace_runs path is used for non-preview (local dev) queries where
+// data volumes are small.
 func (w wrapper) getTraceRunsCount(ctx context.Context, opt cqrs.GetTraceRunOpt) (int, error) {
-	builder := newRunsQueryBuilder(ctx, opt)
-
-	sqlQuery, args, err := sq.Dialect(w.dialect()).
-		From("trace_runs").
-		Select(sq.L("COUNT(*)")).
-		Where(builder.filter...).
-		ToSQL()
+	opt.Items = 0
+	res, err := w.GetTraceRuns(ctx, opt)
 	if err != nil {
 		return 0, err
 	}
-
-	var count int
-	err = w.db.QueryRowContext(ctx, sqlQuery, args...).Scan(&count)
-	if err != nil {
-		return 0, fmt.Errorf("error counting trace runs: %w", err)
-	}
-	return count, nil
+	return len(res), nil
 }
 
 // getSpanRunsCount returns the count of span-based runs matching the given filters
@@ -2218,13 +2210,33 @@ func (w wrapper) getSpanRunsCount(ctx context.Context, opt cqrs.GetTraceRunOpt) 
 	adapter := w.spanRunsAdapter()
 	builder := newSpanRunsQueryBuilder(ctx, opt)
 
+	// Parse CEL expressions using adapter's converter (same as GetSpanRuns)
+	var celFilters []sq.Expression
+	if opt.Filter.CEL != "" {
+		expHandler, err := run.NewExpressionHandler(ctx,
+			run.WithExpressionHandlerBlob(opt.Filter.CEL, "\n"),
+			run.WithExpressionSQLConverter(adapter.celConverter),
+		)
+		if err != nil {
+			return 0, err
+		}
+		if expHandler.HasFilters() {
+			celFilters, err = expHandler.ToSQLFilters(ctx)
+			if err != nil {
+				return 0, err
+			}
+		}
+	}
+
+	allFilters := append(builder.filter, celFilters...)
+
 	sqlQuery, args, err := sq.Dialect(adapter.dialect).
 		From("spans").
 		Select(sq.L("COUNT(DISTINCT run_id)")).
 		Where(sq.L("spans.dynamic_span_id").In(
 			sq.Dialect(adapter.dialect).Select("dynamic_span_id").Distinct().From("spans").Where(sq.C("name").Eq(meta.SpanNameRun)),
 		)).
-		Where(builder.filter...).
+		Where(allFilters...).
 		ToSQL()
 	if err != nil {
 		return 0, err
