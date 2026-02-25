@@ -37,6 +37,7 @@ service V2 {
       get: "/health"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "Health"
       summary: "Health check"
       description: "Returns the health status of the API service"
       security: {
@@ -69,10 +70,7 @@ service V2 {
       }
     };
   }
-  
-  // Internal method to ensure ErrorResponse schema generation (not exposed via HTTP)
-  rpc _SchemaOnly(HealthRequest) returns (ErrorResponse);
-  
+
   rpc CreatePartnerAccount(CreateAccountRequest) returns (CreateAccountResponse) {
     option (google.api.http) = {
       post: "/partner/accounts",
@@ -82,6 +80,7 @@ service V2 {
       require_authz: true
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "Partner Accounts"
       summary: "Create partner account"
       description: "Creates a sub-account (if you have partner access)"
       security: {
@@ -165,6 +164,7 @@ service V2 {
       body : "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "Environments"
       summary: "Create environment"
       description: "Create custom environment"
       security: {
@@ -250,6 +250,7 @@ service V2 {
       require_authz: true
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "Partner Accounts"
       summary: "List partner accounts"
       description: "Lists sub-accounts (if you have partner access)"
       security: {
@@ -321,6 +322,7 @@ service V2 {
       get: "/account"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "Accounts"
       summary: "Get account"
       description: "Returns the account for the authenticated user"
       security: {
@@ -381,6 +383,7 @@ service V2 {
       get: "/envs"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "Environments"
       summary: "List environments"
       description: "List of all custom environments."
       security: {
@@ -463,6 +466,7 @@ service V2 {
       get: "/keys/events"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "Event Keys"
       summary: "List account event keys"
       description: "Lists event keys for a specific account, optionally filtered by environment. If the environment header isn't specified, this returns the default production environment's keys."
       parameters: {
@@ -553,6 +557,7 @@ service V2 {
       get: "/keys/signing"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "Signing Keys"
       summary: "List account signing keys"
       description: "Lists signing keys for a specific account, optionally filtered by environment.  If the environment header isn't specified, this returns the default production environment's keys."
       parameters: {
@@ -644,6 +649,7 @@ service V2 {
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "Webhooks"
       summary: "Create webhook"
       description: "Creates a new webhook for receiving events"
       parameters: {
@@ -745,6 +751,7 @@ service V2 {
       get: "/env/webhooks"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "Webhooks"
       summary: "List webhooks"
       description: "Lists all webhooks in the specified environment"
       parameters: {
@@ -825,6 +832,7 @@ service V2 {
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      tags: "Environments"
       summary: "Update environment"
       description: "Partially updates an environment. Only the provided fields will be modified."
       security: {
