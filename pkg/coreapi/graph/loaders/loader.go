@@ -27,6 +27,7 @@ func Middleware(params LoaderParams) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			loaders := NewLoaders(params)
 			ctx := ToCtx(r.Context(), loaders)
+			ctx = WithLookupCache(ctx)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
