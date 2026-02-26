@@ -158,48 +158,6 @@ func WithBacklogNormalizePollTick(t time.Duration) QueueOpt {
 	}
 }
 
-// WithActiveCheckPollTick specifies the interval at which the queue will poll the backing store
-// for available backlogs to normalize.
-func WithActiveCheckPollTick(t time.Duration) QueueOpt {
-	return func(q *QueueOptions) {
-		q.ActiveCheckTick = t
-	}
-}
-
-// WithActiveCheckAccountProbability specifies the probability of processing accounts vs. backlogs during an active check run.
-func WithActiveCheckAccountProbability(p int) QueueOpt {
-	return func(q *QueueOptions) {
-		q.ActiveCheckAccountProbability = p
-	}
-}
-
-// WithActiveCheckAccountConcurrency specifies the number of accounts to be peeked and processed by the active checker in parallel
-func WithActiveCheckAccountConcurrency(p int) QueueOpt {
-	return func(q *QueueOptions) {
-		if p > 0 {
-			q.ActiveCheckAccountConcurrency = int64(p)
-		}
-	}
-}
-
-// WithActiveCheckBacklogConcurrency specifies the number of backlogs to be peeked and processed by the active checker in parallel
-func WithActiveCheckBacklogConcurrency(p int) QueueOpt {
-	return func(q *QueueOptions) {
-		if p > 0 {
-			q.ActiveCheckBacklogConcurrency = int64(p)
-		}
-	}
-}
-
-// WithActiveCheckScanBatchSize specifies the batch size for iterating over active sets
-func WithActiveCheckScanBatchSize(p int) QueueOpt {
-	return func(q *QueueOptions) {
-		if p > 0 {
-			q.ActiveCheckScanBatchSize = int64(p)
-		}
-	}
-}
-
 // WithDenyQueueNames specifies that the worker cannot select jobs from queue partitions
 // within the given list of names.  This means that the worker will never work on jobs
 // in the specified queues.
@@ -352,9 +310,6 @@ type QueueRunMode struct {
 	// NormalizePartition enables the processing of partitions for normalization
 	NormalizePartition bool
 
-	// ActiveChecker enables background checking of active sets.
-	ActiveChecker bool
-
 	// ExclusiveAccounts defines a list of account IDs to peek exclusively.
 	// This can be used to configure executors processing only a static subset of accounts.
 	ExclusiveAccounts []uuid.UUID
@@ -372,15 +327,6 @@ type QueueOptions struct {
 
 	AllowKeyQueues                  AllowKeyQueues
 	PartitionConstraintConfigGetter PartitionConstraintConfigGetter
-
-	ActiveCheckTick               time.Duration
-	ActiveCheckAccountConcurrency int64
-	ActiveCheckBacklogConcurrency int64
-	ActiveCheckScanBatchSize      int64
-
-	ActiveCheckAccountProbability int
-	ActiveSpotCheckProbability    ActiveSpotChecksProbability
-	ReadOnlySpotChecks            ReadOnlySpotChecks
 
 	shadowPartitionProcessCount QueueShadowPartitionProcessCount
 
@@ -547,23 +493,6 @@ func WithNormalizeRefreshItemCustomConcurrencyKeys(fn NormalizeRefreshItemCustom
 func WithRefreshItemThrottle(fn RefreshItemThrottleFn) QueueOpt {
 	return func(q *QueueOptions) {
 		q.RefreshItemThrottle = fn
-	}
-}
-
-type (
-	ActiveSpotChecksProbability func(ctx context.Context, acctID uuid.UUID) (backlogRefillCheckProbability int, accountSpotCheckProbability int)
-	ReadOnlySpotChecks          func(ctx context.Context, acctID uuid.UUID) bool
-)
-
-func WithActiveSpotCheckProbability(fn ActiveSpotChecksProbability) QueueOpt {
-	return func(q *QueueOptions) {
-		q.ActiveSpotCheckProbability = fn
-	}
-}
-
-func WithReadOnlySpotChecks(fn ReadOnlySpotChecks) QueueOpt {
-	return func(q *QueueOptions) {
-		q.ReadOnlySpotChecks = fn
 	}
 }
 
@@ -769,7 +698,6 @@ func NewQueueOptions(
 		pollTick:                       defaultPollTick,
 		shadowPollTick:                 defaultShadowPollTick,
 		backlogNormalizePollTick:       defaultBacklogNormalizePollTick,
-		ActiveCheckTick:                defaultActiveCheckTick,
 		IdempotencyTTL:                 defaultIdempotencyTTL,
 		queueKindMapping:               make(map[string]string),
 		peekSizeForFunctions:           make(map[string]int64),
@@ -802,17 +730,7 @@ func NewQueueOptions(
 		RefreshItemThrottle: func(ctx context.Context, item *QueueItem) (*Throttle, error) {
 			return nil, nil
 		},
-		ReadOnlySpotChecks: func(ctx context.Context, acctID uuid.UUID) bool {
-			return true
-		},
-		ActiveSpotCheckProbability: func(ctx context.Context, acctID uuid.UUID) (backlogRefillCheckProbability int, accountSpotCheckProbability int) {
-			return 100, 100
-		},
-		ActiveCheckAccountProbability: 10,
-		ActiveCheckAccountConcurrency: ActiveCheckAccountConcurrency,
-		ActiveCheckBacklogConcurrency: ActiveCheckBacklogConcurrency,
-		ActiveCheckScanBatchSize:      ActiveCheckScanBatchSize,
-		CapacityLeaseExtendInterval:   QueueLeaseDuration / 2,
+		CapacityLeaseExtendInterval: QueueLeaseDuration / 2,
 		ConditionalTracer: trace.NewConditionalTracer(noop.Tracer{}, func(ctx context.Context, accountID, envID uuid.UUID) bool {
 			return false
 		}),
