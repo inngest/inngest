@@ -280,7 +280,7 @@ func TestInvokeTimeout(t *testing.T) {
 	)
 	r.NoError(err)
 	// This function will invoke the other function
-	runID := ""
+	rid := NewRunID()
 	evtName := "my-event"
 	_, err = inngestgo.CreateFunction(
 		inngestClient,
@@ -289,7 +289,7 @@ func TestInvokeTimeout(t *testing.T) {
 		},
 		inngestgo.EventTrigger(evtName, nil),
 		func(ctx context.Context, input inngestgo.Input[DebounceEvent]) (any, error) {
-			runID = input.InputCtx.RunID
+			rid.Send(input.InputCtx.RunID)
 
 			_, err := step.Invoke[any](
 				ctx,
@@ -310,7 +310,8 @@ func TestInvokeTimeout(t *testing.T) {
 	r.NoError(err)
 
 	// The invoke target times out and should fail the main run
-	c.WaitForRunStatus(ctx, t, "FAILED", &runID)
+	runID := rid.Wait(t)
+	c.WaitForRunStatus(ctx, t, "FAILED", runID)
 
 	t.Run("trace run should have appropriate data", func(t *testing.T) {
 		errMsg := "Timed out waiting for invoked function to complete"
@@ -385,7 +386,6 @@ func TestInvokeRateLimit(t *testing.T) {
 	)
 	r.NoError(err)
 	// This function will invoke the other function
-	runID := ""
 	evtName := "my-event"
 	_, err = inngestgo.CreateFunction(
 		inngestClient,
@@ -394,8 +394,6 @@ func TestInvokeRateLimit(t *testing.T) {
 		},
 		inngestgo.EventTrigger(evtName, nil),
 		func(ctx context.Context, input inngestgo.Input[DebounceEvent]) (any, error) {
-			runID = input.InputCtx.RunID
-
 			_, err := step.Invoke[any](
 				ctx,
 				"invoke",
@@ -410,18 +408,35 @@ func TestInvokeRateLimit(t *testing.T) {
 	registerFuncs()
 
 	// Trigger the main function and successfully invoke the other function
-	_, err = inngestClient.Send(ctx, &event.Event{Name: evtName})
+	eventID, err := inngestClient.Send(ctx, &event.Event{Name: evtName})
 	r.NoError(err)
 
-	// Wait a moment for runID to be populated
-	<-time.After(2 * time.Second)
+	var firstRunID string
+	r.Eventually(func() bool {
+		runs, err := c.RunsByEventID(ctx, eventID)
+		if err != nil || len(runs) == 0 {
+			return false
+		}
+		firstRunID = runs[0].ID
+		return true
+	}, 10*time.Second, 200*time.Millisecond)
 
-	c.WaitForRunStatus(ctx, t, "COMPLETED", &runID)
+	c.WaitForRunStatus(ctx, t, "COMPLETED", firstRunID)
 
 	// Trigger the main function. It'll fail because the invoked function is
 	// rate limited
-	runID = ""
-	_, err = inngestClient.Send(ctx, &event.Event{Name: evtName})
+	eventID, err = inngestClient.Send(ctx, &event.Event{Name: evtName})
 	r.NoError(err)
-	c.WaitForRunStatus(ctx, t, "FAILED", &runID)
+
+	var secondRunID string
+	r.Eventually(func() bool {
+		runs, err := c.RunsByEventID(ctx, eventID)
+		if err != nil || len(runs) == 0 {
+			return false
+		}
+		secondRunID = runs[0].ID
+		return true
+	}, 10*time.Second, 200*time.Millisecond)
+
+	c.WaitForRunStatus(ctx, t, "FAILED", secondRunID)
 }

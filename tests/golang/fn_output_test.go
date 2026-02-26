@@ -47,7 +47,7 @@ func TestFnOutputTooLarge(t *testing.T) {
 
 	// Wait a moment for runID to be populated
 	<-time.After(2 * time.Second)
-	run := c.WaitForRunStatus(ctx, t, "FAILED", &runID)
+	run := c.WaitForRunStatus(ctx, t, "FAILED", runID)
 	var output string
 	err = json.Unmarshal([]byte(run.Output), &output)
 	r.NoError(err)

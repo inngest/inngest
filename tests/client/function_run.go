@@ -202,14 +202,9 @@ func (c *Client) WaitForRunStatus(
 	ctx context.Context,
 	t require.TestingT,
 	expectedStatus string,
-	runID *string,
+	runID string,
 	opts ...WaitForRunStatusOpts,
 ) Run {
-	// Wait for non-nil run ID. This is a weird fn...
-	require.EventuallyWithT(t, func(t *assert.CollectT) {
-		require.NotNil(t, runID)
-	}, 15*time.Second, 500*time.Millisecond)
-
 	var o WaitForRunStatusOpts
 	if len(opts) > 0 {
 		o = opts[0]
@@ -223,18 +218,7 @@ func (c *Client) WaitForRunStatus(
 	start := time.Now()
 	var run Run
 	for {
-
-		// It looks as though this original code may mutate the run ID
-		// passed in as a pointer while this loop runs?  This feels like
-		// a strange pattern and a bit of a code smell
-		if runID == nil {
-			c.Fatalf("runID pointer is nil")
-		}
-		if *runID == "" {
-			continue
-		}
-
-		run = c.Run(ctx, *runID)
+		run = c.Run(ctx, runID)
 		if run.Status == expectedStatus {
 			return run
 		}
@@ -245,8 +229,7 @@ func (c *Client) WaitForRunStatus(
 		time.Sleep(100 * time.Millisecond)
 	}
 
-	require.NotEmpty(t, runID, "Expected non-nil run id: %s", runID)
-	require.Failf(t, "status didn't match", "didn't get expected status: %s, got %s", expectedStatus, run.Status)
+	require.Failf(t, "status didn't match", "didn't get expected status: %s, got %s (runID: %s)", expectedStatus, run.Status, runID)
 	return run
 }
 
