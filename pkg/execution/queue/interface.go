@@ -13,40 +13,16 @@ import (
 
 type DequeueOptionFn func(o *DequeueOptions)
 
-type DequeueOptions struct {
-	DisableConstraintUpdates bool
-}
+type DequeueOptions struct{}
 
-func DequeueOptionDisableConstraintUpdates(disableUpdates bool) DequeueOptionFn {
-	return func(o *DequeueOptions) {
-		o.DisableConstraintUpdates = disableUpdates
-	}
-}
-
-type RequeueOptions struct {
-	DisableConstraintUpdates bool
-}
-
-func RequeueOptionDisableConstraintUpdates(disableUpdates bool) RequeueOptionFn {
-	return func(o *RequeueOptions) {
-		o.DisableConstraintUpdates = disableUpdates
-	}
-}
+type RequeueOptions struct{}
 
 type RequeueOptionFn func(o *RequeueOptions)
 
 type LeaseOptions struct {
-	DisableConstraintChecks bool
-
 	Backlog         QueueBacklog
 	ShadowPartition QueueShadowPartition
 	Constraints     PartitionConstraintConfig
-}
-
-func LeaseOptionDisableConstraintChecks(disableChecks bool) LeaseOptionFn {
-	return func(o *LeaseOptions) {
-		o.DisableConstraintChecks = disableChecks
-	}
 }
 
 func LeaseBacklog(b QueueBacklog) LeaseOptionFn {
@@ -69,29 +45,13 @@ func LeaseConstraints(constraints PartitionConstraintConfig) LeaseOptionFn {
 
 type LeaseOptionFn func(o *LeaseOptions)
 
-type ExtendLeaseOptions struct {
-	DisableConstraintUpdates bool
-}
-
-func ExtendLeaseOptionDisableConstraintUpdates(disableUpdates bool) ExtendLeaseOptionFn {
-	return func(o *ExtendLeaseOptions) {
-		o.DisableConstraintUpdates = disableUpdates
-	}
-}
+type ExtendLeaseOptions struct{}
 
 type ExtendLeaseOptionFn func(o *ExtendLeaseOptions)
 
-type PartitionLeaseOptions struct {
-	DisableLeaseChecks bool
-}
+type PartitionLeaseOptions struct{}
 
 type PartitionLeaseOpt func(o *PartitionLeaseOptions)
-
-func PartitionLeaseOptionDisableLeaseChecks(disableLeaseChecks bool) PartitionLeaseOpt {
-	return func(o *PartitionLeaseOptions) {
-		o.DisableLeaseChecks = disableLeaseChecks
-	}
-}
 
 type ShardAssingmentManager interface {
 	SetPrimaryShard(ctx context.Context, queueShard QueueShard)
@@ -205,7 +165,7 @@ type ShardOperations interface {
 	EnqueueItem(ctx context.Context, i QueueItem, at time.Time, opts EnqueueOpts) (QueueItem, error)
 	Peek(ctx context.Context, partition *QueuePartition, until time.Time, limit int64) ([]*QueueItem, error)
 	PeekRandom(ctx context.Context, partition *QueuePartition, until time.Time, limit int64) ([]*QueueItem, error)
-	Lease(ctx context.Context, item QueueItem, leaseDuration time.Duration, now time.Time, denies *LeaseDenies, options ...LeaseOptionFn) (*ulid.ULID, error)
+	Lease(ctx context.Context, item QueueItem, leaseDuration time.Duration, now time.Time, options ...LeaseOptionFn) (*ulid.ULID, error)
 	ExtendLease(ctx context.Context, i QueueItem, leaseID ulid.ULID, duration time.Duration, opts ...ExtendLeaseOptionFn) (*ulid.ULID, error)
 	Requeue(ctx context.Context, i QueueItem, at time.Time, opts ...RequeueOptionFn) error
 	RequeueByJobID(ctx context.Context, jobID string, at time.Time) error

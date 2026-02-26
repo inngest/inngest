@@ -915,7 +915,6 @@ func (q *queue) ExtendLease(ctx context.Context, i osqueue.QueueItem, leaseID ul
 		return nil, fmt.Errorf("error generating id: %w", err)
 	}
 
-	backlog := osqueue.ItemBacklog(ctx, i)
 	partition := osqueue.ItemShadowPartition(ctx, i)
 
 	partitionID := partition.Identifier()
@@ -930,18 +929,8 @@ func (q *queue) ExtendLease(ctx context.Context, i osqueue.QueueItem, leaseID ul
 
 	keys := []string{
 		q.RedisClient.kg.QueueItem(),
-		// And pass in the key queue's concurrency keys.
-		shadowPartitionInProgressKey(partition, kg),
-		backlogCustomKeyInProgress(backlog, kg, 1),
-		backlogCustomKeyInProgress(backlog, kg, 2),
-		shadowPartitionAccountInProgressKey(partition, kg),
 		q.RedisClient.kg.ConcurrencyIndex(),
 		kg.PartitionScavengerIndex(partition.PartitionID),
-	}
-
-	updateConstraintStateVal := "1"
-	if o.DisableConstraintUpdates {
-		updateConstraintStateVal = "0"
 	}
 
 	args, err := StrSlice([]any{
@@ -949,7 +938,6 @@ func (q *queue) ExtendLease(ctx context.Context, i osqueue.QueueItem, leaseID ul
 		leaseID.String(),
 		newLeaseID.String(),
 		partition.PartitionID,
-		updateConstraintStateVal,
 	})
 	if err != nil {
 		return nil, err
@@ -1001,7 +989,7 @@ func (q *queue) PartitionLease(
 	p *osqueue.QueuePartition,
 	duration time.Duration,
 	options ...osqueue.PartitionLeaseOpt,
-) (*ulid.ULID, int, error) {
+) (*ulid.ULID, error) {
 	l := logger.StdlibLogger(ctx)
 
 	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.partitionLease", p.AccountID, p.Identifier().EnvID)
@@ -1017,30 +1005,6 @@ func (q *queue) PartitionLease(
 
 	kg := q.RedisClient.kg
 
-	// Fetch partition constraints with a timeout
-	dbCtx, dbCtxCancel := context.WithTimeout(ctx, osqueue.DatabaseReadTimeout)
-	constraints := q.PartitionConstraintConfigGetter(dbCtx, p.Identifier())
-
-	if dbCtx.Err() == context.DeadlineExceeded {
-		metrics.IncrQueueDatabaseContextTimeoutCounter(ctx, metrics.CounterOpt{
-			PkgName: pkgName,
-			Tags: map[string]any{
-				"operation": "partition_constraint_config_getter",
-			},
-		})
-	}
-
-	dbCtxCancel()
-
-	var accountLimit, functionLimit int
-	if p.IsSystem() {
-		accountLimit = constraints.Concurrency.SystemConcurrency
-		functionLimit = constraints.Concurrency.SystemConcurrency
-	} else {
-		accountLimit = constraints.Concurrency.AccountConcurrency
-		functionLimit = constraints.Concurrency.FunctionConcurrency
-	}
-
 	// XXX: Check for function throttling prior to leasing;  if it's throttled we can requeue
 	// the pointer and back off.  A question here is enqueuing new items onto the partition
 	// will reset the pointer update, leading to thrash.
@@ -1048,17 +1012,7 @@ func (q *queue) PartitionLease(
 	leaseExpires := now.Add(duration).UTC().Truncate(time.Millisecond)
 	leaseID, err := ulid.New(ulid.Timestamp(leaseExpires), rnd)
 	if err != nil {
-		return nil, 0, fmt.Errorf("error generating id: %w", err)
-	}
-
-	disableLeaseChecks := p.IsSystem()
-	if o.DisableLeaseChecks {
-		disableLeaseChecks = o.DisableLeaseChecks
-	}
-
-	disableLeaseChecksVal := "0"
-	if disableLeaseChecks {
-		disableLeaseChecksVal = "1"
+		return nil, fmt.Errorf("error generating id: %w", err)
 	}
 
 	keys := []string{
@@ -1069,11 +1023,6 @@ func (q *queue) PartitionLease(
 		// Until this, we may not use account queues at all, as we cannot properly clean up
 		// here without knowing the Account ID
 		kg.AccountPartitionIndex(p.AccountID),
-
-		// These concurrency keys are for fast checking of partition
-		// concurrency limits prior to leasing, as an optimization.
-		acctConcurrencyKey(*p, kg),
-		fnConcurrencyKey(*p, kg),
 	}
 
 	args, err := StrSlice([]any{
@@ -1081,14 +1030,10 @@ func (q *queue) PartitionLease(
 		leaseID.String(),
 		now.UnixMilli(),
 		leaseExpires.Unix(),
-		accountLimit,
-		functionLimit,
-		now.Add(osqueue.PartitionConcurrencyLimitRequeueExtension).Unix(),
 		p.AccountID.String(),
-		disableLeaseChecksVal,
 	})
 	if err != nil {
-		return nil, 0, err
+		return nil, err
 	}
 
 	result, err := scripts["queue/partitionLease"].Exec(
@@ -1098,10 +1043,10 @@ func (q *queue) PartitionLease(
 		args,
 	).AsIntSlice()
 	if err != nil {
-		return nil, 0, fmt.Errorf("error leasing partition: %w", err)
+		return nil, fmt.Errorf("error leasing partition: %w", err)
 	}
 	if len(result) == 0 {
-		return nil, 0, fmt.Errorf("unknown partition lease result: %v", result)
+		return nil, fmt.Errorf("unknown partition lease result: %v", result)
 	}
 
 	l.Trace("leased partition",
@@ -1113,26 +1058,20 @@ func (q *queue) PartitionLease(
 
 	switch result[0] {
 	case -1:
-		return nil, 0, osqueue.ErrAccountConcurrencyLimit
+		return nil, osqueue.ErrAccountConcurrencyLimit
 	case -2:
-		return nil, 0, osqueue.ErrPartitionConcurrencyLimit
+		return nil, osqueue.ErrPartitionConcurrencyLimit
 	case -3:
-		return nil, 0, osqueue.ErrPartitionNotFound
+		return nil, osqueue.ErrPartitionNotFound
 	case -4:
-		return nil, 0, osqueue.ErrPartitionAlreadyLeased
+		return nil, osqueue.ErrPartitionAlreadyLeased
 	default:
-		limit := functionLimit
-		if len(result) == 2 {
-			limit = int(result[1])
-		}
-
 		// Update the partition's last indicator.
 		if result[0] > p.Last {
 			p.Last = result[0]
 		}
 
-		// result is the available concurrency within this partition
-		return &leaseID, limit, nil
+		return &leaseID, nil
 	}
 }
 
