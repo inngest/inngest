@@ -18,53 +18,33 @@ local keyAccountPartitions    = KEYS[6] -- accounts:$accountID:partition:sorted
 
 local keyReadyQueue           = KEYS[7] -- queue:sorted:$workflowID - zset
 
-local keyInProgressAccount                  = KEYS[8]
-local keyInProgressPartition                = KEYS[9]
-local keyInProgressCustomConcurrencyKey1    = KEYS[10]
-local keyInProgressCustomConcurrencyKey2    = KEYS[11]
+local keyBacklogSet                      = KEYS[8]          -- backlog:sorted:<backlogID> - zset
+local keyBacklogMeta                     = KEYS[9]          -- backlogs - hash
+local keyGlobalShadowPartitionSet        = KEYS[10]          -- shadow:sorted
+local keyShadowPartitionSet              = KEYS[11]          -- shadow:sorted:<fnID|queueName> - zset
+local keyShadowPartitionMeta             = KEYS[12]          -- shadows
+local keyGlobalAccountShadowPartitionSet = KEYS[13]
+local keyAccountShadowPartitionSet       = KEYS[14]
 
-local keyActiveAccount             = KEYS[12]
-local keyActivePartition           = KEYS[13]
-local keyActiveConcurrencyKey1     = KEYS[14]
-local keyActiveConcurrencyKey2     = KEYS[15]
-local keyActiveCompound            = KEYS[16]
+local keyPartitionScavengerIndex  = KEYS[15]
 
-local keyActiveRun                        = KEYS[17]
-local keyActiveRunsAccount                = KEYS[18]
-local keyActiveRunsPartition              = KEYS[19]
-local keyActiveRunsCustomConcurrencyKey1  = KEYS[20]
-local keyActiveRunsCustomConcurrencyKey2  = KEYS[21]
-
-local keyBacklogSet                      = KEYS[22]          -- backlog:sorted:<backlogID> - zset
-local keyBacklogMeta                     = KEYS[23]          -- backlogs - hash
-local keyGlobalShadowPartitionSet        = KEYS[24]          -- shadow:sorted
-local keyShadowPartitionSet              = KEYS[25]          -- shadow:sorted:<fnID|queueName> - zset
-local keyShadowPartitionMeta             = KEYS[26]          -- shadows
-local keyGlobalAccountShadowPartitionSet = KEYS[27]
-local keyAccountShadowPartitionSet       = KEYS[28]
-
-local keyPartitionScavengerIndex  = KEYS[29]
-
-local keyItemIndexA           = KEYS[30]          -- custom item index 1
-local keyItemIndexB           = KEYS[31]          -- custom item index 2
+local keyItemIndexA           = KEYS[16]          -- custom item index 1
+local keyItemIndexB           = KEYS[17]          -- custom item index 2
 
 local queueID             = ARGV[1]           -- id
 local queueItem           = ARGV[2]
 local queueScore          = tonumber(ARGV[3]) -- vesting time, in ms
 local accountID           = ARGV[4]
-local runID               = ARGV[5]
-local partitionID         = ARGV[6]
-local partitionItem       = ARGV[7]
+local partitionID         = ARGV[5]
+local partitionItem       = ARGV[6]
 
-local nowMS               = tonumber(ARGV[8]) -- now in ms
+local nowMS               = tonumber(ARGV[7]) -- now in ms
 
 -- Key queues v2
-local requeueToBacklog				= tonumber(ARGV[9])
-local shadowPartitionItem     = ARGV[10]
-local backlogID               = ARGV[11]
-local backlogItem             = ARGV[12]
-
-local updateConstraintState = tonumber(ARGV[13])
+local requeueToBacklog				= tonumber(ARGV[8])
+local shadowPartitionItem     = ARGV[9]
+local backlogID               = ARGV[10]
+local backlogItem             = ARGV[11]
 
 -- $include(get_queue_item.lua)
 -- $include(get_partition_item.lua)
@@ -84,41 +64,6 @@ redis.call("HSET", queueKey, queueID, queueItem)
 
 -- Remove item from ready queue
 redis.call("ZREM", keyReadyQueue, item.id)
-
-if updateConstraintState == 1 then
-  -- This removes the queue item from the concurrency/in-progress queue and ensures that the concurrency
-  -- index/scavenger queue is updated to the next earliest item.
-  -- This is the first half of requeueing: Removing the in-progress item, which must be followed up
-  -- by enqueueing back to the partition queues
-  local function handleRequeueConcurrency(keyConcurrency)
-    redis.call("ZREM", keyConcurrency, item.id) -- Remove from in-progress queue
-  end
-
-  --
-  -- Concurrency
-  --
-
-  handleRequeueConcurrency(keyInProgressPartition)
-
-  if exists_without_ending(keyInProgressCustomConcurrencyKey1, ":-") then
-    handleRequeueConcurrency(keyInProgressCustomConcurrencyKey1)
-  end
-
-  if exists_without_ending(keyInProgressCustomConcurrencyKey2, ":-") then
-    handleRequeueConcurrency(keyInProgressCustomConcurrencyKey2)
-  end
-
-  if exists_without_ending(keyInProgressAccount, ":-") then
-      -- Remove item from the account concurrency queue
-      -- This does not have a scavenger queue, as it's purely an entitlement limitation. See extendLease
-      -- and Lease for respective ZADD calls.
-      redis.call("ZREM", keyInProgressAccount, item.id)
-  end
-
-  -- Remove item from active sets
-  removeFromActiveSets(keyActivePartition, keyActiveAccount, keyActiveCompound, keyActiveConcurrencyKey1, keyActiveConcurrencyKey2, queueID)
-  removeFromActiveRunSets(keyActiveRun, keyActiveRunsPartition, keyActiveRunsAccount, keyActiveRunsCustomConcurrencyKey1, keyActiveRunsCustomConcurrencyKey2, runID, queueID)
-end
 
 -- Remove item from scavenger index
 redis.call("ZREM", keyPartitionScavengerIndex, item.id)

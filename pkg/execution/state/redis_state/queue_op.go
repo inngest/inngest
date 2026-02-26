@@ -255,26 +255,6 @@ func (q *queue) Requeue(ctx context.Context, i osqueue.QueueItem, at time.Time, 
 
 		shadowPartitionReadyQueueKey(shadowPartition, kg),
 
-		// In progress (concurrency) keys
-		shadowPartitionAccountInProgressKey(shadowPartition, kg),
-		shadowPartitionInProgressKey(shadowPartition, kg),
-		backlogCustomKeyInProgress(backlog, kg, 1),
-		backlogCustomKeyInProgress(backlog, kg, 2),
-
-		// Active set keys
-		shadowPartitionAccountActiveKey(shadowPartition, kg),
-		shadowPartitionActiveKey(shadowPartition, kg),
-		backlogCustomKeyActive(backlog, kg, 1),
-		backlogCustomKeyActive(backlog, kg, 2),
-		backlogActiveKey(backlog, kg),
-
-		// Active run sets
-		kg.RunActiveSet(i.Data.Identifier.RunID),                // Set for active items in run
-		shadowPartitionAccountActiveRunKey(shadowPartition, kg), // Set for active runs in account
-		shadowPartitionActiveRunKey(shadowPartition, kg),        // Set for active runs in partition
-		backlogCustomKeyActiveRuns(backlog, kg, 1),              // Set for active runs with custom concurrency key 1
-		backlogCustomKeyActiveRuns(backlog, kg, 2),              // Set for active runs with custom concurrency key 2
-
 		// key queues v2
 		kg.BacklogSet(backlog.BacklogID),
 		kg.BacklogMeta(),
@@ -293,21 +273,12 @@ func (q *queue) Requeue(ctx context.Context, i osqueue.QueueItem, at time.Time, 
 		}
 	}
 
-	// Enable concurrency state updates by default, disable under some circumstances
-	// - processing system queue items
-	// - holding a valid capacity lease
-	updateConstraintStateVal := "1"
-	if o.DisableConstraintUpdates {
-		updateConstraintStateVal = "0"
-	}
-
 	args, err := StrSlice([]any{
 		i.ID,
 		i,
 		at.UnixMilli(),
 
 		i.Data.Identifier.AccountID.String(),
-		i.Data.Identifier.RunID.String(),
 		fnPartition.ID,
 		fnPartition,
 
@@ -317,8 +288,6 @@ func (q *queue) Requeue(ctx context.Context, i osqueue.QueueItem, at time.Time, 
 		shadowPartition,
 		backlog.BacklogID,
 		backlog,
-
-		updateConstraintStateVal,
 	})
 	if err != nil {
 		return err
