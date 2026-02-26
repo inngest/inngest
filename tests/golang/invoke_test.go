@@ -280,7 +280,7 @@ func TestInvokeTimeout(t *testing.T) {
 	)
 	r.NoError(err)
 	// This function will invoke the other function
-	runIDCh := make(chan string, 1)
+	rid := NewRunID()
 	evtName := "my-event"
 	_, err = inngestgo.CreateFunction(
 		inngestClient,
@@ -289,10 +289,7 @@ func TestInvokeTimeout(t *testing.T) {
 		},
 		inngestgo.EventTrigger(evtName, nil),
 		func(ctx context.Context, input inngestgo.Input[DebounceEvent]) (any, error) {
-			select {
-			case runIDCh <- input.InputCtx.RunID:
-			default:
-			}
+			rid.Send(input.InputCtx.RunID)
 
 			_, err := step.Invoke[any](
 				ctx,
@@ -313,7 +310,7 @@ func TestInvokeTimeout(t *testing.T) {
 	r.NoError(err)
 
 	// The invoke target times out and should fail the main run
-	runID := <-runIDCh
+	runID := rid.Wait(t)
 	c.WaitForRunStatus(ctx, t, "FAILED", runID)
 
 	t.Run("trace run should have appropriate data", func(t *testing.T) {

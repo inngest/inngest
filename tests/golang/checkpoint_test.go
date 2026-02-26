@@ -86,7 +86,7 @@ func TestFnCheckpoint(t *testing.T) {
 
 			<-time.After(4 * time.Second)
 
-			run := c.WaitForRunStatus(ctx, t, "COMPLETED", &runID)
+			run := c.WaitForRunStatus(ctx, t, "COMPLETED", runID)
 			var output string
 			err = json.Unmarshal([]byte(run.Output), &output)
 			require.NotEmpty(t, runID)

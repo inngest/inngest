@@ -25,7 +25,7 @@ func TestStepRetry(t *testing.T) {
 		inngestClient, server, registerFuncs := NewSDKHandler(t, randomSuffix("my-app"))
 		defer server.Close()
 
-		runIDCh := make(chan string, 1)
+		rid := NewRunID()
 		var stepError error
 		var stepExecutions atomic.Int32
 
@@ -38,10 +38,7 @@ func TestStepRetry(t *testing.T) {
 			},
 			inngestgo.EventTrigger(eventName, nil),
 			func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
-				select {
-				case runIDCh <- input.InputCtx.RunID:
-				default:
-				}
+				rid.Send(input.InputCtx.RunID)
 
 				_, stepError = step.Run(ctx,
 					"a",
@@ -60,7 +57,7 @@ func TestStepRetry(t *testing.T) {
 		_, err = inngestClient.Send(ctx, inngestgo.Event{Name: eventName})
 		r.NoError(err)
 
-		c.WaitForRunStatus(ctx, t, models.FunctionStatusFailed.String(), <-runIDCh, client.WaitForRunStatusOpts{
+		c.WaitForRunStatus(ctx, t, models.FunctionStatusFailed.String(), rid.Wait(t), client.WaitForRunStatusOpts{
 			Timeout: 15 * time.Second,
 		})
 
@@ -78,7 +75,7 @@ func TestStepRetry(t *testing.T) {
 		inngestClient, server, registerFuncs := NewSDKHandler(t, randomSuffix("my-app"))
 		defer server.Close()
 
-		runIDCh := make(chan string, 1)
+		rid := NewRunID()
 		var stepError error
 		var stepExecutions atomic.Int32
 
@@ -91,10 +88,7 @@ func TestStepRetry(t *testing.T) {
 			},
 			inngestgo.EventTrigger(eventName, nil),
 			func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
-				select {
-				case runIDCh <- input.InputCtx.RunID:
-				default:
-				}
+				rid.Send(input.InputCtx.RunID)
 
 				_, stepError = step.Run(ctx,
 					"a",
@@ -116,7 +110,7 @@ func TestStepRetry(t *testing.T) {
 		_, err = inngestClient.Send(ctx, inngestgo.Event{Name: eventName})
 		r.NoError(err)
 
-		c.WaitForRunStatus(ctx, t, models.FunctionStatusFailed.String(), <-runIDCh, client.WaitForRunStatusOpts{
+		c.WaitForRunStatus(ctx, t, models.FunctionStatusFailed.String(), rid.Wait(t), client.WaitForRunStatusOpts{
 			Timeout: 15 * time.Second,
 		})
 
@@ -134,7 +128,7 @@ func TestStepRetry(t *testing.T) {
 		inngestClient, server, registerFuncs := NewSDKHandler(t, randomSuffix("my-app"))
 		defer server.Close()
 
-		runIDCh := make(chan string, 1)
+		rid := NewRunID()
 		var stepError error
 		var stepExecutions atomic.Int32
 
@@ -147,10 +141,7 @@ func TestStepRetry(t *testing.T) {
 			},
 			inngestgo.EventTrigger(eventName, nil),
 			func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
-				select {
-				case runIDCh <- input.InputCtx.RunID:
-				default:
-				}
+				rid.Send(input.InputCtx.RunID)
 
 				_, stepError = step.Run(ctx,
 					"a",
@@ -169,7 +160,7 @@ func TestStepRetry(t *testing.T) {
 		_, err = inngestClient.Send(ctx, inngestgo.Event{Name: eventName})
 		r.NoError(err)
 
-		c.WaitForRunStatus(ctx, t, models.FunctionStatusFailed.String(), <-runIDCh, client.WaitForRunStatusOpts{
+		c.WaitForRunStatus(ctx, t, models.FunctionStatusFailed.String(), rid.Wait(t), client.WaitForRunStatusOpts{
 			Timeout: 15 * time.Second,
 		})
 
@@ -187,7 +178,7 @@ func TestStepRetry(t *testing.T) {
 		inngestClient, server, registerFuncs := NewSDKHandler(t, randomSuffix("my-app"))
 		defer server.Close()
 
-		runIDCh := make(chan string, 1)
+		rid := NewRunID()
 		var functionExecutions atomic.Int32
 
 		eventName := randomSuffix("my-event")
@@ -199,10 +190,7 @@ func TestStepRetry(t *testing.T) {
 			},
 			inngestgo.EventTrigger(eventName, nil),
 			func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
-				select {
-				case runIDCh <- input.InputCtx.RunID:
-				default:
-				}
+				rid.Send(input.InputCtx.RunID)
 				functionExecutions.Add(1)
 
 				// Return a function-level error (not from a step)
@@ -215,7 +203,7 @@ func TestStepRetry(t *testing.T) {
 		_, err = inngestClient.Send(ctx, inngestgo.Event{Name: eventName})
 		r.NoError(err)
 
-		c.WaitForRunStatus(ctx, t, models.FunctionStatusFailed.String(), <-runIDCh, client.WaitForRunStatusOpts{
+		c.WaitForRunStatus(ctx, t, models.FunctionStatusFailed.String(), rid.Wait(t), client.WaitForRunStatusOpts{
 			Timeout: 15 * time.Second,
 		})
 
@@ -230,7 +218,7 @@ func TestStepRetry(t *testing.T) {
 		inngestClient, server, registerFuncs := NewSDKHandler(t, randomSuffix("my-app"))
 		defer server.Close()
 
-		runIDCh := make(chan string, 1)
+		rid := NewRunID()
 		var functionExecutions atomic.Int32
 
 		eventName := randomSuffix("my-event")
@@ -242,10 +230,7 @@ func TestStepRetry(t *testing.T) {
 			},
 			inngestgo.EventTrigger(eventName, nil),
 			func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
-				select {
-				case runIDCh <- input.InputCtx.RunID:
-				default:
-				}
+				rid.Send(input.InputCtx.RunID)
 				functionExecutions.Add(1)
 
 				// Return a function-level NoRetryError (not from a step)
@@ -258,7 +243,7 @@ func TestStepRetry(t *testing.T) {
 		_, err = inngestClient.Send(ctx, inngestgo.Event{Name: eventName})
 		r.NoError(err)
 
-		c.WaitForRunStatus(ctx, t, models.FunctionStatusFailed.String(), <-runIDCh, client.WaitForRunStatusOpts{
+		c.WaitForRunStatus(ctx, t, models.FunctionStatusFailed.String(), rid.Wait(t), client.WaitForRunStatusOpts{
 			Timeout: 15 * time.Second,
 		})
 
@@ -273,7 +258,7 @@ func TestStepRetry(t *testing.T) {
 		inngestClient, server, registerFuncs := NewSDKHandler(t, randomSuffix("my-app"))
 		defer server.Close()
 
-		runIDCh := make(chan string, 1)
+		rid := NewRunID()
 		var stepError error
 		var stepExecutions atomic.Int32
 		var functionExecutions atomic.Int32
@@ -287,10 +272,7 @@ func TestStepRetry(t *testing.T) {
 			},
 			inngestgo.EventTrigger(eventName, nil),
 			func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
-				select {
-				case runIDCh <- input.InputCtx.RunID:
-				default:
-				}
+				rid.Send(input.InputCtx.RunID)
 				functionExecutions.Add(1)
 
 				_, stepError = step.Run(ctx,
@@ -311,7 +293,7 @@ func TestStepRetry(t *testing.T) {
 		_, err = inngestClient.Send(ctx, inngestgo.Event{Name: eventName})
 		r.NoError(err)
 
-		c.WaitForRunStatus(ctx, t, models.FunctionStatusCompleted.String(), <-runIDCh, client.WaitForRunStatusOpts{
+		c.WaitForRunStatus(ctx, t, models.FunctionStatusCompleted.String(), rid.Wait(t), client.WaitForRunStatusOpts{
 			Timeout: 15 * time.Second,
 		})
 

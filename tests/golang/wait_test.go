@@ -319,7 +319,7 @@ func TestWaitInvalidExpression(t *testing.T) {
 	defer server.Close()
 
 	// This function will invoke the other function
-	runIDCh := make(chan string, 1)
+	rid := NewRunID()
 	evtName := "my-event"
 	_, err := inngestgo.CreateFunction(
 		inngestClient,
@@ -328,10 +328,7 @@ func TestWaitInvalidExpression(t *testing.T) {
 		},
 		inngestgo.EventTrigger(evtName, nil),
 		func(ctx context.Context, input inngestgo.Input[DebounceEvent]) (any, error) {
-			select {
-			case runIDCh <- input.InputCtx.RunID:
-			default:
-			}
+			rid.Send(input.InputCtx.RunID)
 
 			_, _ = step.WaitForEvent[any](
 				ctx,
@@ -353,7 +350,7 @@ func TestWaitInvalidExpression(t *testing.T) {
 	_, err = inngestClient.Send(ctx, &event.Event{Name: evtName})
 	r.NoError(err)
 
-	c.WaitForRunStatus(ctx, t, "FAILED", <-runIDCh)
+	c.WaitForRunStatus(ctx, t, "FAILED", rid.Wait(t))
 }
 
 func TestWaitInvalidExpressionSyntaxError(t *testing.T) {
@@ -366,7 +363,7 @@ func TestWaitInvalidExpressionSyntaxError(t *testing.T) {
 	defer server.Close()
 
 	// This function will invoke the other function
-	runIDCh := make(chan string, 1)
+	rid := NewRunID()
 	evtName := "my-event"
 	_, err := inngestgo.CreateFunction(
 		inngestClient,
@@ -375,10 +372,7 @@ func TestWaitInvalidExpressionSyntaxError(t *testing.T) {
 		},
 		inngestgo.EventTrigger(evtName, nil),
 		func(ctx context.Context, input inngestgo.Input[DebounceEvent]) (any, error) {
-			select {
-			case runIDCh <- input.InputCtx.RunID:
-			default:
-			}
+			rid.Send(input.InputCtx.RunID)
 
 			_, _ = step.WaitForEvent[any](
 				ctx,
@@ -400,7 +394,7 @@ func TestWaitInvalidExpressionSyntaxError(t *testing.T) {
 	_, err = inngestClient.Send(ctx, &event.Event{Name: evtName})
 	r.NoError(err)
 
-	run := c.WaitForRunStatus(ctx, t, "FAILED", <-runIDCh)
+	run := c.WaitForRunStatus(ctx, t, "FAILED", rid.Wait(t))
 	assert.Equal(t,
 		`{"error":{"error":"InvalidExpression: Wait for event If expression failed to compile","name":"InvalidExpression","message":"Wait for event If expression failed to compile","stack":"error compiling expression: ERROR: \u003cinput\u003e:1:21: Syntax error: token recognition error at: '= '\n | event.data.userId === async.data.userId\n | ....................^"}}`,
 		run.Output,
