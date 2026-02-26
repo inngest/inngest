@@ -60,6 +60,8 @@ type ProcessorIterator struct {
 	// to attempt to find other possible functions outside of the key(s) with issues.
 	// This field must be accessed atomically as it may be modified concurrently when Parallel=true.
 	IsCustomKeyLimitOnly atomic.Bool
+
+	Constraints PartitionConstraintConfig
 }
 
 func (p *ProcessorIterator) Iterate(ctx context.Context) error {
@@ -175,19 +177,18 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 
 	backlog := ItemBacklog(ctx, *item)
 	partition := ItemShadowPartition(ctx, *item)
-	constraints := p.Queue.Options().PartitionConstraintConfigGetter(ctx, partition.Identifier())
 
 	leaseOptions := []LeaseOptionFn{
 		LeaseBacklog(backlog),
 		LeaseShadowPartition(partition),
-		LeaseConstraints(constraints),
+		LeaseConstraints(p.Constraints),
 	}
 
 	constraintRes, err := p.Queue.ItemLeaseConstraintCheck(
 		ctx,
 		&partition,
 		&backlog,
-		constraints,
+		p.Constraints,
 		item,
 		p.Queue.Clock().Now(),
 	)

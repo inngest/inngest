@@ -445,8 +445,8 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 	}, nil
 }
 
-func constraintItemsFromBacklog(sp *QueueShadowPartition, backlog *QueueBacklog, latestConstraints PartitionConstraintConfig) []constraintapi.ConstraintItem {
-	constraints := []constraintapi.ConstraintItem{
+func defaultQueueConstraints() []constraintapi.ConstraintItem {
+	return []constraintapi.ConstraintItem{
 		// Account concurrency (always set)
 		{
 			Kind: constraintapi.ConstraintKindConcurrency,
@@ -464,6 +464,10 @@ func constraintItemsFromBacklog(sp *QueueShadowPartition, backlog *QueueBacklog,
 			},
 		},
 	}
+}
+
+func constraintItemsFromBacklog(sp *QueueShadowPartition, backlog *QueueBacklog, latestConstraints PartitionConstraintConfig) []constraintapi.ConstraintItem {
+	constraints := defaultQueueConstraints()
 
 	if backlog.Throttle != nil && latestConstraints.Throttle != nil && backlog.Throttle.ThrottleKeyExpressionHash == latestConstraints.Throttle.ThrottleKeyExpressionHash {
 		constraints = append(constraints, constraintapi.ConstraintItem{
@@ -504,4 +508,46 @@ func constraintItemsFromBacklog(sp *QueueShadowPartition, backlog *QueueBacklog,
 	}
 
 	return constraints
+}
+
+type PartitionLeaseConstraintCheckResult struct {
+	DisableChecks      bool
+	Capacity           int
+	LimitingConstraint enums.QueueConstraint
+}
+
+func (q *queueProcessor) PartitionLeaseConstraintCheck(
+	ctx context.Context,
+	p *QueuePartition,
+	constraints PartitionConstraintConfig,
+) (*PartitionLeaseConstraintCheckResult, error) {
+	res, userErr, err := q.CapacityManager.Check(ctx, &constraintapi.CapacityCheckRequest{
+		AccountID:     p.AccountID,
+		EnvID:         *p.EnvID,
+		FunctionID:    *p.FunctionID,
+		Configuration: ConstraintConfigFromConstraints(constraints),
+		Constraints:   defaultQueueConstraints(),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("could not run Check for capacity: %w", err)
+	}
+
+	if userErr != nil {
+		return nil, fmt.Errorf("user error from constraint api: %w", err)
+	}
+
+	if res == nil {
+		return nil, fmt.Errorf("missing check response")
+	}
+
+	constraint := enums.QueueConstraintNotLimited
+	if len(res.ExhaustedConstraints) > 0 {
+		constraint = ConvertLimitingConstraint(constraints, res.ExhaustedConstraints)
+	}
+
+	return &PartitionLeaseConstraintCheckResult{
+		LimitingConstraint: constraint,
+		DisableChecks:      true,
+		Capacity:           res.AvailableCapacity,
+	}, nil
 }
