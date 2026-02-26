@@ -2258,6 +2258,8 @@ func (w wrapper) buildSpanRunsBaseQuery(ctx context.Context, opt cqrs.GetTraceRu
 
 	q := sq.Dialect(adapter.dialect).From("spans")
 	if useJoin {
+		// database specific join syntax needed because event_ids is an array of ids to the events table,
+		// so we need to unpack that and perform the join before the spans are grouped back together by run_id
 		q = adapter.buildEventJoin(q)
 	}
 
