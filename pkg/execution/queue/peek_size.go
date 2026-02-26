@@ -10,14 +10,14 @@ import (
 // 1. EWMA of concurrency limit hits
 // 2. configured min, max of peek size range
 // 3. worker capacity
-func (q *queueProcessor) peekSize(ctx context.Context, p *QueuePartition) int64 {
+func (q *queueProcessor) peekSize(ctx context.Context, p *QueuePartition, maxCapacity int64) int64 {
 	if peekSize, ok := q.peekSizeForFunctions[p.ID]; ok {
 		return peekSize
 	}
 	if q.usePeekEWMA {
-		return q.ewmaPeekSize(ctx, p)
+		return max(q.ewmaPeekSize(ctx, p), maxCapacity)
 	}
-	return q.peekSizeRandom(ctx, p)
+	return max(q.peekSizeRandom(ctx, p), maxCapacity)
 }
 
 func (q *queueProcessor) peekSizeRandom(_ context.Context, _ *QueuePartition) int64 {

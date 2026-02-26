@@ -27,13 +27,9 @@ func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition
 	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.processPartition", p.AccountID, p.Identifier().EnvID)
 	defer span.End()
 
-	// When Constraint API is enabled, disable capacity checks on PartitionLease.
-	// This is necessary as capacity was already granted to individual items, and
-	// constraints like concurrency were consumed.
-	var disableLeaseChecks bool
-	if p.AccountID != uuid.Nil && p.EnvID != nil && p.FunctionID != nil && q.CapacityManager != nil && q.UseConstraintAPI != nil {
-		enableConstraintAPI := q.UseConstraintAPI(ctx, p.AccountID)
-		disableLeaseChecks = enableConstraintAPI
+	var enableConstraintAPI bool
+	if p.AccountID != uuid.Nil && p.EnvID != nil && p.FunctionID != nil && q.CapacityManager != nil && q.UseConstraintAPI != nil && q.UseConstraintAPI(ctx, p.AccountID) {
+		enableConstraintAPI = true
 	}
 
 	// Attempt to lease items.  This checks partition-level concurrency limits
@@ -49,7 +45,7 @@ func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition
 	// processing the partition by N seconds, meaning the latency is increased by
 	// up to this period for scheduled items behind the concurrency limits.
 	_, err := Duration(ctx, q.primaryQueueShard.Name(), "partition_lease", q.Clock().Now(), func(ctx context.Context) (int, error) {
-		l, capacity, err := q.primaryQueueShard.PartitionLease(ctx, p, PartitionLeaseDuration, PartitionLeaseOptionDisableLeaseChecks(disableLeaseChecks))
+		l, capacity, err := q.primaryQueueShard.PartitionLease(ctx, p, PartitionLeaseDuration, PartitionLeaseOptionDisableLeaseChecks(enableConstraintAPI))
 		p.LeaseID = l
 		return capacity, err
 	})
@@ -116,6 +112,22 @@ func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition
 		return fmt.Errorf("error leasing partition: %w", err)
 	}
 
+	// Fetch latest constraints for partition
+	constraints := q.PartitionConstraintConfigGetter(ctx, p.Identifier())
+
+	// When Constraint API is enabled, disable capacity checks on PartitionLease.
+	// This is necessary as capacity was already granted to individual items, and
+	// constraints like concurrency were consumed.
+	checkRes, err := q.PartitionLeaseConstraintCheck(ctx, p, constraints)
+	if err != nil {
+		l.ReportError(err, "failed to run partition lease constraint check")
+	}
+
+	var maxCapacity int64
+	if checkRes != nil && checkRes.Capacity > 0 {
+		maxCapacity = int64(checkRes.Capacity)
+	}
+
 	begin := q.Clock().Now()
 	defer func() {
 		metrics.HistogramProcessPartitionDuration(ctx, q.Clock().Since(begin).Milliseconds(), metrics.HistogramOpt{
@@ -142,7 +154,7 @@ func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition
 	fetch := q.Clock().Now().Truncate(time.Second).Add(PartitionLookahead)
 
 	peek, _ := Duration(peekCtx, q.primaryQueueShard.Name(), "peek-size", q.Clock().Now(), func(ctx context.Context) (int64, error) {
-		peek := q.peekSize(ctx, p)
+		peek := q.peekSize(ctx, p, maxCapacity)
 		return peek, nil
 	})
 
@@ -269,6 +281,7 @@ func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition
 		Denies:               NewLeaseDenyList(),
 		StaticTime:           q.Clock().Now(),
 		Parallel:             parallel,
+		Constraints:          constraints,
 	}
 
 	if processErr := iter.Iterate(ctx); processErr != nil {
