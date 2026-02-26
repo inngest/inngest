@@ -87,7 +87,7 @@ func (m *mockShardForIterator) ItemLeaseConstraintCheck(
 	}, nil
 }
 
-func (m *mockShardForIterator) Lease(ctx context.Context, item QueueItem, duration time.Duration, now time.Time, denies *LeaseDenies, options ...LeaseOptionFn) (*ulid.ULID, error) {
+func (m *mockShardForIterator) Lease(ctx context.Context, item QueueItem, duration time.Duration, now time.Time, options ...LeaseOptionFn) (*ulid.ULID, error) {
 	id := ulid.Make()
 	return &id, nil
 }
@@ -125,8 +125,8 @@ func (m *mockShardForIterator) PartitionPeek(ctx context.Context, sequential boo
 	return nil, nil
 }
 
-func (m *mockShardForIterator) PartitionLease(ctx context.Context, p *QueuePartition, duration time.Duration, opts ...PartitionLeaseOpt) (*ulid.ULID, int, error) {
-	return nil, 0, nil
+func (m *mockShardForIterator) PartitionLease(ctx context.Context, p *QueuePartition, duration time.Duration, opts ...PartitionLeaseOpt) (*ulid.ULID, error) {
+	return nil, nil
 }
 
 func (m *mockShardForIterator) PartitionRequeue(ctx context.Context, p *QueuePartition, at time.Time, forceAt bool) error {
