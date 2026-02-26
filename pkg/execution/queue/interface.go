@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/jonboulle/clockwork"
 	"github.com/oklog/ulid/v2"
@@ -125,7 +126,7 @@ type QueueManager interface {
 		backlog *QueueBacklog,
 		refillUntil time.Time,
 		constraints PartitionConstraintConfig,
-	) (*BacklogRefillResult, bool, error)
+	) (*BacklogRefillResult, enums.QueueConstraint, error)
 }
 
 type QueueProcessor interface {
@@ -233,7 +234,6 @@ type ShardOperations interface {
 		sp *QueueShadowPartition,
 		refillUntil time.Time,
 		refillItems []string,
-		latestConstraints PartitionConstraintConfig,
 		options ...BacklogRefillOptionFn,
 	) (*BacklogRefillResult, error)
 	BacklogRequeue(ctx context.Context, backlog *QueueBacklog, sp *QueueShadowPartition, requeueAt time.Time) error
@@ -265,24 +265,10 @@ type ShardOperations interface {
 }
 
 type BacklogRefillOptions struct {
-	ConstraintCheckIdempotencyKey string
-	DisableConstraintChecks       bool
-	CapacityLeases                []CapacityLease
+	CapacityLeases []CapacityLease
 }
 
 type BacklogRefillOptionFn func(o *BacklogRefillOptions)
-
-func WithBacklogRefillConstraintCheckIdempotencyKey(idempotencyKey string) BacklogRefillOptionFn {
-	return func(o *BacklogRefillOptions) {
-		o.ConstraintCheckIdempotencyKey = idempotencyKey
-	}
-}
-
-func WithBacklogRefillDisableConstraintChecks(disableConstraintChecks bool) BacklogRefillOptionFn {
-	return func(o *BacklogRefillOptions) {
-		o.DisableConstraintChecks = disableConstraintChecks
-	}
-}
 
 func WithBacklogRefillItemCapacityLeases(itemCapacityLeases []CapacityLease) BacklogRefillOptionFn {
 	return func(o *BacklogRefillOptions) {

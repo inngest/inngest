@@ -1,20 +1,13 @@
 --[[
 
-  Checks available capacity by validating concurrency and other queue capacity constraints.
-  Moves as many queue items from backlog into ready queue as capacity.
+  BacklogRefill moves the specified items from backlogs into the ready queue.
 
-  backlogRefill will always attempt to move queue items from backlogs into ready queues up to
-  hitting concurrency.
+  If items do not exist, 
 
   Returns a tuple of {
-    status,               -- See status section below
-    items_refilled,       -- Number of items refilled to ready queue
-    items_until,          -- Number of items within provided time range in backlog before refilling
     items_total,          -- Total number of items in backlog before refilling
-    constraintCapacity,   -- Most limiting constraint capacity
-    refill,               -- Number of items to refill (may include missing items)
+    items_until,          -- Number of items within provided time range in backlog before refilling
     refilled_item_ids,    -- Set of refilled item IDs
-    retry_after           -- Unix timestamp after which retrying has a lower chance of running into constraints
   }
 
   Status values:
@@ -43,22 +36,7 @@ local keyAccountPartitions    	         = KEYS[11] -- accounts:$accountID:partit
 
 local keyQueueItemHash                   = KEYS[12]
 
--- Constraint-related accounting keys
-local keyActiveAccount           = KEYS[13]
-local keyActivePartition         = KEYS[14]
-local keyActiveConcurrencyKey1   = KEYS[15]
-local keyActiveConcurrencyKey2   = KEYS[16]
-local keyActiveCompound          = KEYS[17]
-
-local keyActiveRunsAccount                = KEYS[18]
-local keyActiveRunsPartition              = KEYS[19]
-local keyActiveRunsCustomConcurrencyKey1  = KEYS[20]
-local keyActiveRunsCustomConcurrencyKey2  = KEYS[21]
-
-local keyBacklogActiveCheckSet       = KEYS[22]
-local keyBacklogActiveCheckCooldown  = KEYS[23]
-
-local keyPartitionNormalizeSet       = KEYS[24]
+local keyPartitionNormalizeSet       = KEYS[13]
 
 local backlogID     = ARGV[1]
 local partitionID   = ARGV[2]
@@ -66,24 +44,6 @@ local accountID     = ARGV[3]
 local refillUntilMS = tonumber(ARGV[4])
 local refillItems   = cjson.decode(ARGV[5])
 local nowMS         = tonumber(ARGV[6])
-
--- We check concurrency limits before refilling
-local concurrencyAcct 				= tonumber(ARGV[7])
-local concurrencyFn    				= tonumber(ARGV[8])
-local customConcurrencyKey1   = tonumber(ARGV[9])
-local customConcurrencyKey2   = tonumber(ARGV[10])
-
--- We check throttle before refilling
-local throttleKey    = ARGV[11]
-local throttleLimit  = tonumber(ARGV[12])
-local throttleBurst  = tonumber(ARGV[13])
-local throttlePeriod = tonumber(ARGV[14])
-
-local keyPrefix = ARGV[15]
-
-local checkConstraints = tonumber(ARGV[16])
-
-local shouldSpotCheckActiveSet = tonumber(ARGV[17])
 
 -- Constraint API rollout
 local itemCapacityLeases = {}
@@ -118,7 +78,7 @@ if backlogCountTotal == 0 then
   -- update backlog pointers
   updateBacklogPointer(keyShadowPartitionMeta, keyBacklogMeta, keyGlobalShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, keyShadowPartitionSet, keyBacklogSet, keyPartitionNormalizeSet, accountID, partitionID, backlogID)
 
-  return { 0, 0, 0, backlogCountTotal, 0, 0, {}, 0 }
+  return { 0, 0, {} }
 end
 
 local backlogCountUntil = redis.call("ZCOUNT", keyBacklogSet, "-inf", refillUntilMS)
@@ -130,7 +90,7 @@ if backlogCountUntil == 0 then
   -- update backlog pointers
   updateBacklogPointer(keyShadowPartitionMeta, keyBacklogMeta, keyGlobalShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, keyShadowPartitionSet, keyBacklogSet, keyPartitionNormalizeSet, accountID, partitionID, backlogID)
 
-  return { 0, 0, backlogCountUntil, backlogCountTotal, 0, 0, {}, 0 }
+  return { backlogCountTotal, 0, {} }
 end
 
 --
@@ -141,190 +101,77 @@ end
 local refill = #refillItems
 
 --
--- Check constraints and adjust capacity
---
-
--- Initialize capacity as nil, which represents no constraint limits
-local constraintCapacity = nil
-
--- Set initial status to success, progressively add more specific capacity constraints
-local status = 0
-local retryAt = 0
-
-local function check_active_capacity(now_ms, keyActiveSet, limit)
-	local count = redis.call("SCARD", keyActiveSet)
-	if count ~= false and count ~= nil then
-    return tonumber(limit) - tonumber(count)
-  end
-
-	return tonumber(limit)
-end
-
--- Check throttle capacity if configured
-local checkThrottle = checkConstraints == 1 and throttlePeriod > 0 and throttleLimit > 0
-
-if checkConstraints == 1 then
-  if (constraintCapacity == nil or constraintCapacity > 0) and checkThrottle then
-    local gcraRes = gcraCapacity(throttleKey, nowMS, throttlePeriod * 1000, throttleLimit, throttleBurst)
-    local remainingThrottleCapacity = gcraRes[1]
-    local throttleRetryAt = gcraRes[2]
-    if constraintCapacity == nil or remainingThrottleCapacity < constraintCapacity then
-      constraintCapacity = remainingThrottleCapacity
-      status = 5
-      retryAt = throttleRetryAt
-    end
-  end
-
-  -- Check custom concurrency key 2 capacity
-  if (constraintCapacity == nil or constraintCapacity > 0) and exists_without_ending(keyActiveConcurrencyKey2, ":-") == true and customConcurrencyKey2 > 0 then
-    local remainingCustomConcurrencyCapacityKey2 = check_active_capacity(nowMS, keyActiveConcurrencyKey2, customConcurrencyKey2)
-    if constraintCapacity == nil or remainingCustomConcurrencyCapacityKey2 < constraintCapacity then
-      -- Custom concurrency key 2 imposes limits
-      constraintCapacity = remainingCustomConcurrencyCapacityKey2
-      status = 4
-    end
-  end
-
-  -- Check custom concurrency key 1 capacity
-  if (constraintCapacity == nil or constraintCapacity > 0) and exists_without_ending(keyActiveConcurrencyKey1, ":-") == true and customConcurrencyKey1 > 0 then
-    local remainingCustomConcurrencyCapacityKey1 = check_active_capacity(nowMS, keyActiveConcurrencyKey1, customConcurrencyKey1)
-    if constraintCapacity == nil or remainingCustomConcurrencyCapacityKey1 < constraintCapacity then
-      -- Custom concurrency key 1 imposes limits
-      constraintCapacity = remainingCustomConcurrencyCapacityKey1
-      status = 3
-    end
-  end
-
-  -- Check function concurrency capacity
-  if (constraintCapacity == nil or constraintCapacity > 0) and exists_without_ending(keyActivePartition, ":-") == true and concurrencyFn > 0 then
-    local remainingFunctionCapacity = check_active_capacity(nowMS, keyActivePartition, concurrencyFn)
-    if constraintCapacity == nil or remainingFunctionCapacity < constraintCapacity then
-      -- Function concurrency imposes limits
-      constraintCapacity = remainingFunctionCapacity
-      status = 2
-    end
-  end
-
-  -- Check account concurrency capacity
-  if (constraintCapacity == nil or constraintCapacity > 0) and exists_without_ending(keyActiveAccount, ":-") == true and concurrencyAcct > 0 then
-    local remainingAccountCapacity = check_active_capacity(nowMS, keyActiveAccount, concurrencyAcct)
-
-    if constraintCapacity == nil or remainingAccountCapacity < constraintCapacity then
-      -- Account concurrency imposes limits
-      constraintCapacity = remainingAccountCapacity
-      status = 1
-    end
-  end
-
-  -- prevent negative constraint capacity
-  if constraintCapacity ~= nil and constraintCapacity < 0 then
-    constraintCapacity = 0
-  end
-else
-  -- Refill as many items as possible
-  constraintCapacity = refill
-end
-
-if constraintCapacity == nil or constraintCapacity > 0 then
-  -- Reset status as we're not limited
-  status = 0
-end
-
--- If we are constrained, reduce refill to max allowed capacity
-if constraintCapacity ~= nil and constraintCapacity < refill then
-  -- Most limiting status will be kept
-  refill = constraintCapacity
-end
-
---
 -- Refill to match capacity
 --
 
-local refilled = 0
-
--- Only attempt to refill if we have capacity
 local refilledItemIDs = {}
-if refill > 0 then
-  -- Move item(s) out of backlog and into partition
 
-  -- Use provided item IDs, limited by final refill count
-  local itemIDs = {}
-  for i = 1, math.min(refill, #refillItems) do
-    table.insert(itemIDs, refillItems[i])
-  end
-  local itemScores = redis.call("ZMSCORE", keyBacklogSet, unpack(itemIDs))
+-- Move item(s) out of backlog and into partition
 
-  -- Attempt to load item data
-  local potentiallyMissingQueueItems = redis.call("HMGET", keyQueueItemHash, unpack(itemIDs))
+-- Use provided item IDs, limited by final refill count
+local itemIDs = {}
+for i = 1, math.min(refill, #refillItems) do
+  table.insert(itemIDs, refillItems[i])
+end
 
-  -- Reverse the items to be added to the ready set
-  local readyArgs = {}
+local itemScores = redis.call("ZMSCORE", keyBacklogSet, unpack(itemIDs))
 
-  local backlogRemArgs = {}
-  local hasRemove = false
+-- Attempt to load item data
+local potentiallyMissingQueueItems = redis.call("HMGET", keyQueueItemHash, unpack(itemIDs))
 
-  local itemUpdateArgs = {}
+-- Reverse the items to be added to the ready set
+local readyArgs = {}
 
-  for i = 1, #itemIDs do
-    local itemID = itemIDs[i]
-    local itemScore = tonumber(itemScores[i])
-    local itemData = potentiallyMissingQueueItems[i]
+local backlogRemArgs = {}
+local hasRemove = false
 
-    -- If queue item does not exist in backlog, skip
-    local missingInBacklog = itemScore == nil
+local itemUpdateArgs = {}
 
-    -- If queue item does not exist in hash, delete from backlog
-    local missingInHash = itemData == false or itemData == nil or itemData == ""
+for i = 1, #itemIDs do
+  local itemID = itemIDs[i]
+  local itemScore = tonumber(itemScores[i])
+  local itemData = potentiallyMissingQueueItems[i]
 
-    if missingInBacklog then
-      -- no-op
-    elseif missingInHash then
-      table.insert(backlogRemArgs, itemID)  -- remove from backlog
-      hasRemove = true
-    else
-      -- Insert new members into ready set
-      table.insert(readyArgs, itemScore)
-      table.insert(readyArgs, itemID)
+  -- If queue item does not exist in backlog, skip
+  local missingInBacklog = itemScore == nil
 
-      -- Remove item from backlog
-      table.insert(backlogRemArgs, itemID)
-      hasRemove = true
+  -- If queue item does not exist in hash, delete from backlog
+  local missingInHash = itemData == false or itemData == nil or itemData == ""
 
-      -- Update queue item with refill data
-      local updatedData = cjson.decode(itemData)
-      updatedData.rf = backlogID
-      updatedData.rat = nowMS
+  if missingInBacklog then
+    -- no-op
+  elseif missingInHash then
+    table.insert(backlogRemArgs, itemID)  -- remove from backlog
+    hasRemove = true
+  else
+    -- Insert new members into ready set
+    table.insert(readyArgs, itemScore)
+    table.insert(readyArgs, itemID)
 
-      -- Update item with Capacity Lease if lease acquired
-      if itemCapacityLeases ~= nil and #itemCapacityLeases > 0 then
-        updatedData.cl = itemCapacityLeases[i]
-      end
+    -- Remove item from backlog
+    table.insert(backlogRemArgs, itemID)
+    hasRemove = true
 
-      if checkConstraints == 1 and updatedData.data ~= nil and updatedData.data.identifier ~= nil and updatedData.data.identifier.runID ~= nil then
-        -- add item to active in run
-        local runID = updatedData.data.identifier.runID
-        local keyActiveRun = string.format("%s:v2:active:run:%s", keyPrefix, runID)
+    -- Update queue item with refill data
+    local updatedData = cjson.decode(itemData)
+    updatedData.rf = backlogID
+    updatedData.rat = nowMS
 
-        addToActiveRunSets(keyActiveRun, keyActiveRunsPartition, keyActiveRunsAccount, keyActiveRunsCustomConcurrencyKey1, keyActiveRunsCustomConcurrencyKey2, runID, itemID)
-      end
-
-      table.insert(itemUpdateArgs, itemID)
-      table.insert(itemUpdateArgs, cjson.encode(updatedData))
-
-      table.insert(refilledItemIDs, itemID)
-
-      -- Increment number of refilled items
-      refilled = refilled + 1
+    -- Update item with Capacity Lease if lease acquired
+    if itemCapacityLeases ~= nil and #itemCapacityLeases > 0 then
+      updatedData.cl = itemCapacityLeases[i]
     end
-  end
 
-  if refilled > 0 then
+    table.insert(itemUpdateArgs, itemID)
+    table.insert(itemUpdateArgs, cjson.encode(updatedData))
+
+    table.insert(refilledItemIDs, itemID)
+  end
+end
+
+  if #refilledItemIDs > 0 then
     -- "Refill" items to ready set
     redis.call("ZADD", keyReadySet, unpack(readyArgs))
-
-    if checkConstraints == 1 then
-      addToActiveSets(keyActivePartition, keyActiveAccount, keyActiveCompound, keyActiveConcurrencyKey1, keyActiveConcurrencyKey2, refilledItemIDs)
-    end
 
     -- Update queue items with refill data
     redis.call("HSET", keyQueueItemHash, unpack(itemUpdateArgs))
@@ -334,12 +181,6 @@ if refill > 0 then
     -- Remove refilled or missing items from backlog
     redis.call("ZREM", keyBacklogSet, unpack(backlogRemArgs))
   end
-end
-
--- update gcra theoretical arrival time
-if checkThrottle then
-  gcraUpdate(throttleKey, nowMS, throttlePeriod * 1000, throttleLimit, throttleBurst, refilled)
-end
 
 --
 -- Adjust ready queue pointers
@@ -363,59 +204,12 @@ end
 -- Adjust pointer scores for shadow scanning, potentially clean up
 --
 
-local function update_backlog_successive_constrained_counters(keyBacklogMeta, backlogID, status)
-  --
-  -- Update successive constrained metrics in backlog meta
-  --
-
-  local existing = cjson.decode(redis.call("HGET", keyBacklogMeta, backlogID))
-
-  -- If not constrained, reset counters
-  if status == 0 then
-    existing.stc = 0
-    existing.sccc = 0
-  end
-
-  -- If custom concurrency limits hit, increase counter
-  if status == 3 or status == 4 then
-    local previousSuccessiveCustomConcurrencyConstrained = existing.sccc
-    if previousSuccessiveCustomConcurrencyConstrained == false or previousSuccessiveCustomConcurrencyConstrained == nil then
-      previousSuccessiveCustomConcurrencyConstrained = 0
-    end
-
-    existing.sccc = previousSuccessiveCustomConcurrencyConstrained + 1
-  end
-
-  -- If throttled, increase counter
-  if status == 5 then
-    local previousSuccessiveThrottleConstrained = existing.stc
-    if previousSuccessiveThrottleConstrained == false or previousSuccessiveThrottleConstrained == nil then
-      previousSuccessiveThrottleConstrained = 0
-    end
-
-    existing.stc = previousSuccessiveThrottleConstrained + 1
-  end
-
-  redis.call("HSET", keyBacklogMeta, backlogID, cjson.encode(existing))
-end
-
 -- Clean up backlog meta if we refilled the last item (or dropped all dangling item pointers)
 if tonumber(redis.call("ZCARD", keyBacklogSet)) == 0 then
   redis.call("HDEL", keyBacklogMeta, backlogID)
-else
-  update_backlog_successive_constrained_counters(keyBacklogMeta, backlogID, status)
 end
 
 -- Always update pointers
 updateBacklogPointer(keyShadowPartitionMeta, keyBacklogMeta, keyGlobalShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, keyShadowPartitionSet, keyBacklogSet, keyPartitionNormalizeSet, accountID, partitionID, backlogID)
 
---
--- Optional: Add backlog to active checker set. This will verify that all items marked as active
--- are either in the ready queue or in progress.
---
-local concurrencyConstrained = status >= 1 and status <= 4
-if concurrencyConstrained and shouldSpotCheckActiveSet == 1 then
-    add_to_active_check(keyBacklogActiveCheckSet, keyBacklogActiveCheckCooldown, backlogID, nowMS)
-end
-
-return { status, refilled, backlogCountUntil, backlogCountTotal, constraintCapacity, refill, refilledItemIDs, retryAt }
+return { backlogCountTotal, backlogCountUntil, refilledItemIDs }
