@@ -211,7 +211,7 @@ func BenchmarkWriteNonLua(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		c.wroteAt.Store(0) // reset between iterations
-		c.Write(payload)
+		_, _ = c.Write(payload)
 	}
 }
 
@@ -224,7 +224,7 @@ func BenchmarkWriteLua(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		c.wroteAt.Store(0) // reset between iterations
-		c.Write(payload)
+		_, _ = c.Write(payload)
 	}
 }
 
@@ -237,7 +237,7 @@ func BenchmarkReadNoEvent(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		c.wroteAt.Store(-1) // non-Lua write pending
-		c.Read(buf)
+		_, _ = c.Read(buf)
 	}
 }
 
@@ -252,7 +252,7 @@ func BenchmarkReadWithEvent(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		c.wroteAt.Store(time.Now().UnixNano()) // Lua write pending
-		c.Read(buf)
+		_, _ = c.Read(buf)
 	}
 }
 
