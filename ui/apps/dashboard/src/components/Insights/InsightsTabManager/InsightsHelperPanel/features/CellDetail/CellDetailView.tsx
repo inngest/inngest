@@ -79,24 +79,21 @@ function CellValueDisplay({
     return { content: String(value ?? 'null'), language: 'plaintext' };
   }, [columnType, value]);
 
-  if (columnType === 'date') {
+  if (columnType === 'date' && value != null) {
     return <DateDisplay value={value} />;
   }
 
   return (
-    <div className="bg-codeEditor h-full overflow-hidden rounded-lg">
+    <div className="bg-codeEditor h-full overflow-hidden rounded-lg border border-subtle">
       <NewCodeBlock
-        tab={{
-          content,
-          language,
-          readOnly: true,
-        }}
+        tab={{ content, language, readOnly: true }}
+        scrollbarOptions={{ vertical: 'auto', horizontal: 'auto' }}
       />
     </div>
   );
 }
 
-function DateDisplay({ value }: { value: string | number | null | Date }) {
+function DateDisplay({ value }: { value: string | number | Date }) {
   const date = value instanceof Date ? value : new Date(value);
 
   if (!(date instanceof Date) || isNaN(date.getTime())) {
