@@ -243,7 +243,14 @@ func (r *GetFunctionRunRow) ToSQLite() (*sqlc.GetFunctionRunRow, error) {
 		return nil, err
 	}
 
-	finish, err := r.FunctionFinish.ToSQLite()
+	pgFinish := FunctionFinish{
+		RunID:              r.FunctionRun.RunID,
+		Status:             r.FinishStatus,
+		Output:             r.FinishOutput,
+		CompletedStepCount: r.FinishCompletedStepCount,
+		CreatedAt:          r.FinishCreatedAt,
+	}
+	finish, err := pgFinish.ToSQLite()
 	if err != nil {
 		return nil, err
 	}
@@ -260,7 +267,14 @@ func (r *GetFunctionRunsTimeboundRow) ToSQLite() (*sqlc.GetFunctionRunsTimebound
 		return nil, err
 	}
 
-	finish, err := r.FunctionFinish.ToSQLite()
+	pgFinish := FunctionFinish{
+		RunID:              r.FunctionRun.RunID,
+		Status:             r.FinishStatus,
+		Output:             r.FinishOutput,
+		CompletedStepCount: r.FinishCompletedStepCount,
+		CreatedAt:          r.FinishCreatedAt,
+	}
+	finish, err := pgFinish.ToSQLite()
 	if err != nil {
 		return nil, err
 	}
@@ -277,7 +291,14 @@ func (r *GetFunctionRunsRow) ToSQLite() (*sqlc.GetFunctionRunsRow, error) {
 		return nil, err
 	}
 
-	finish, err := r.FunctionFinish.ToSQLite()
+	pgFinish := FunctionFinish{
+		RunID:              r.FunctionRun.RunID,
+		Status:             r.FinishStatus,
+		Output:             r.FinishOutput,
+		CompletedStepCount: r.FinishCompletedStepCount,
+		CreatedAt:          r.FinishCreatedAt,
+	}
+	finish, err := pgFinish.ToSQLite()
 	if err != nil {
 		return nil, err
 	}
