@@ -3,6 +3,7 @@ package exechttp
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
@@ -17,6 +18,7 @@ import (
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/execution/realtime"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 )
 
 const (
@@ -206,14 +208,41 @@ func Transport(opts SecureDialerOpts) *http.Transport {
 		IdleConnTimeout:       2 * time.Second,
 		TLSHandshakeTimeout:   15 * time.Second,
 		ExpectContinueTimeout: 1 * time.Second,
-		DisableKeepAlives:     true,
+		DisableKeepAlives:     true, // one conn per request, only, ever.
 		// New, ensuring that services can take their time before
 		// responding with headers as they process long running
 		// jobs.
 		ResponseHeaderTimeout: consts.MaxFunctionTimeout,
+		TLSClientConfig: &tls.Config{
+			ClientSessionCache: &instrumentedSessionCache{
+				cache: tls.NewLRUClientSessionCache(8_192),
+			},
+		},
 	}
 
 	return t
+}
+
+// instrumentedSessionCache wraps a tls.ClientSessionCache to record hit/miss metrics.
+type instrumentedSessionCache struct {
+	cache tls.ClientSessionCache
+}
+
+func (c *instrumentedSessionCache) Get(sessionKey string) (*tls.ClientSessionState, bool) {
+	cs, ok := c.cache.Get(sessionKey)
+	status := "miss"
+	if ok {
+		status = "hit"
+	}
+	go metrics.IncrTLSSessionCacheLookup(context.Background(), metrics.CounterOpt{
+		PkgName: "exechttp",
+		Tags:    map[string]any{"status": status},
+	})
+	return cs, ok
+}
+
+func (c *instrumentedSessionCache) Put(sessionKey string, cs *tls.ClientSessionState) {
+	c.cache.Put(sessionKey, cs)
 }
 
 // CheckRedirect is an http client utility to follow redirects in outgoing requests.
