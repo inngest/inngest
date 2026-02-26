@@ -141,21 +141,39 @@ func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition
 	// to the worker, how long Redis takes to lease the item, etc.
 	fetch := q.Clock().Now().Truncate(time.Second).Add(PartitionLookahead)
 
-	queue, err := Duration(peekCtx, q.primaryQueueShard.Name(), "peek", q.Clock().Now(), func(ctx context.Context) ([]*QueueItem, error) {
+	peek, _ := Duration(peekCtx, q.primaryQueueShard.Name(), "peek-size", q.Clock().Now(), func(ctx context.Context) (int64, error) {
 		peek := q.peekSize(ctx, p)
+		return peek, nil
+	})
+
+	queue, err := Duration(peekCtx, q.primaryQueueShard.Name(), "peek", q.Clock().Now(), func(ctx context.Context) ([]*QueueItem, error) {
 		// NOTE: would love to instrument this value to see it over time per function but
 		// it's likely too high of a cardinality
 		go metrics.HistogramQueuePeekEWMA(ctx, peek, metrics.HistogramOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name()}})
 
+		l.Optional(p.AccountID, "queue").Debug(
+			"peeking",
+			"limit", peek,
+			"randomize", randomOffset,
+			"until", fetch,
+		)
+
 		if randomOffset {
 			return q.primaryQueueShard.PeekRandom(peekCtx, p, fetch, peek)
 		}
-
 		return q.primaryQueueShard.Peek(peekCtx, p, fetch, peek)
 	})
 	if err != nil {
 		return err
 	}
+
+	l.Optional(p.AccountID, "queue").Debug(
+		"peeked",
+		"limit", peek,
+		"randomize", randomOffset,
+		"until", fetch,
+		"results", len(queue),
+	)
 
 	metrics.HistogramQueuePeekSize(ctx, int64(len(queue)), metrics.HistogramOpt{
 		PkgName: pkgName,
