@@ -17,6 +17,13 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+// partitionMsg carries a partition and metadata needed for processing by partition worker goroutines.
+type partitionMsg struct {
+	partition         *QueuePartition
+	continuationCount uint
+	metricShardName   string
+}
+
 var (
 	latencyAvg ewma.MovingAverage
 	latencySem *sync.Mutex
@@ -61,9 +68,11 @@ func New(
 		continues:        map[string]continuation{},
 		continueCooldown: map[string]time.Time{},
 
-		sem:     util.NewTrackingSemaphore(int(o.numWorkers)),
-		workers: make(chan ProcessItem, o.numWorkers),
-		quit:    make(chan error, o.numWorkers),
+		sem:          util.NewTrackingSemaphore(int(o.numWorkers)),
+		workers:      make(chan ProcessItem, o.numWorkers),
+		partitions:   make(chan partitionMsg, o.numPartitionWorkers),
+		partitionSem: util.NewTrackingSemaphore(int(o.numPartitionWorkers)),
+		quit:         make(chan error, o.numWorkers),
 
 		primaryQueueShard: primaryQueueShard,
 		queueShardClients: queueShardClients,
@@ -113,6 +122,13 @@ type queueProcessor struct {
 	// workers is a buffered channel which allows scanners to send queue items
 	// to workers to be processed
 	workers chan ProcessItem
+
+	// partitions is a bounded channel that feeds partitions to partition processor goroutines.
+	// This decouples PartitionPeek from partition processing, preventing the convoy effect
+	// where the scan loop is gated by the slowest partition per cycle.
+	partitions chan partitionMsg
+	// partitionSem tracks how many partitions are currently being processed.
+	partitionSem util.TrackingSemaphore
 
 	qspc chan ShadowPartitionChanMsg
 
@@ -500,4 +516,8 @@ func (q *queueProcessor) UnpauseFunction(ctx context.Context, shardName string, 
 
 func (q *queueProcessor) capacity() int64 {
 	return int64(q.numWorkers) - q.Semaphore().Count()
+}
+
+func (q *queueProcessor) partitionCapacity() int64 {
+	return int64(q.numPartitionWorkers) - q.partitionSem.Count()
 }

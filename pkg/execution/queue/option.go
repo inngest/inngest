@@ -90,6 +90,12 @@ func WithShadowNumWorkers(n int32) QueueOpt {
 	}
 }
 
+func WithNumPartitionWorkers(n int32) QueueOpt {
+	return func(q *QueueOptions) {
+		q.numPartitionWorkers = n
+	}
+}
+
 func WithPeekSizeRange(min int64, max int64) QueueOpt {
 	return func(q *QueueOptions) {
 		if max > AbsoluteQueuePeekMax {
@@ -400,6 +406,8 @@ type QueueOptions struct {
 	numWorkers int32
 	// numShadowWorkers stores the number of workers available to concurrently scan partitions
 	numShadowWorkers int32
+	// numPartitionWorkers stores the number of goroutines available to concurrently process partitions.
+	numPartitionWorkers int32
 	// numBacklogNormalizationWorkers stores the maximum number of workers available to concurrenctly scan normalization partitions
 	numBacklogNormalizationWorkers int32
 	// peek min & max sets the range for partitions to peek for items
@@ -765,6 +773,7 @@ func NewQueueOptions(
 		},
 		numWorkers:                     defaultNumWorkers,
 		numShadowWorkers:               defaultNumShadowWorkers,
+		numPartitionWorkers:            defaultNumPartitionWorkers,
 		numBacklogNormalizationWorkers: defaultBacklogNormalizationWorkers,
 		pollTick:                       defaultPollTick,
 		shadowPollTick:                 defaultShadowPollTick,

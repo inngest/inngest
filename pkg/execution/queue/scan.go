@@ -13,7 +13,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
-	"golang.org/x/sync/errgroup"
 )
 
 func (q *queueProcessor) executionScan(ctx context.Context, f RunFunc) error {
@@ -23,6 +22,10 @@ func (q *queueProcessor) executionScan(ctx context.Context, f RunFunc) error {
 
 	for i := int32(0); i < q.numWorkers; i++ {
 		go q.worker(ctx, f)
+	}
+
+	for i := int32(0); i < q.numPartitionWorkers; i++ {
+		go q.partitionWorker(ctx)
 	}
 
 	if !q.runMode.Partition && !q.runMode.Account {
@@ -50,13 +53,13 @@ LOOP:
 			break LOOP
 
 		case <-tick.Chan():
-			if q.capacity() < minWorkersFree {
+			if q.capacity() < minWorkersFree || q.partitionCapacity() == 0 {
 				// Wait until we have more workers free.  This stops us from
 				// claiming a partition to work on a single job, ensuring we
 				// have capacity to run at least MinWorkersFree concurrent
 				// QueueItems.  This reduces latency of enqueued items when
 				// there are lots of enqueued and available jobs.
-				l.Trace("all workers busy, early exiting scan", "worker_capacity", q.capacity())
+				l.Trace("all workers busy, early exiting scan", "worker_capacity", q.capacity(), "partition_capacity", q.partitionCapacity())
 				continue
 			}
 
@@ -92,11 +95,13 @@ LOOP:
 func (q *queueProcessor) scan(ctx context.Context) error {
 	l := logger.StdlibLogger(ctx)
 
-	if q.capacity() == 0 {
+	if q.capacity() == 0 || q.partitionCapacity() == 0 {
 		return nil
 	}
 
 	// If there are continuations, process those immediately.
+	//
+	// TODO: METRICS ON CONTINUATION DURATIONS.
 	if err := q.scanContinuations(ctx); err != nil {
 		return fmt.Errorf("error scanning continuations: %w", err)
 	}
@@ -238,50 +243,65 @@ func (q *queueProcessor) processScannedPartitions(
 	metricShardName string,
 	reportPeekedPartitions *int64,
 ) error {
-	l := logger.StdlibLogger(ctx)
-
 	if reportPeekedPartitions != nil {
 		atomic.AddInt64(reportPeekedPartitions, int64(len(partitions)))
 	}
 
-	l.Trace("processing partitions",
-		"peek_until", peekUntil.Format(time.StampMilli),
-		"partition", len(partitions),
-	)
-
-	eg := errgroup.Group{}
-
 	for _, ptr := range partitions {
-		p := *ptr
-		eg.Go(func() error {
-			if q.capacity() == 0 {
-				// no longer any available workers for partition, so we can skip
-				// work
-				metrics.IncrQueueScanNoCapacityCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"shard": metricShardName, "queue_shard": q.primaryQueueShard.Name()}})
-				return nil
-			}
-			if err := q.ProcessPartition(ctx, &p, 0, false); err != nil {
-				if err == ErrPartitionNotFound || err == ErrPartitionGarbageCollected {
-					// Another worker grabbed the partition, or the partition was deleted
-					// during the scan by an another worker.
-					// TODO: Increase internal metrics
-					return nil
-				}
-				if !errors.Is(err, context.Canceled) {
-					l.Error("error processing partition", "error", err)
-				}
-				return err
-			}
-
-			metrics.IncrQueuePartitionProcessedCounter(ctx, metrics.CounterOpt{
-				PkgName: pkgName,
-				Tags:    map[string]any{"shard": metricShardName, "queue_shard": q.primaryQueueShard.Name()},
-			})
+		if q.capacity() == 0 || q.partitionCapacity() == 0 {
+			metrics.IncrQueueScanNoCapacityCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"shard": metricShardName, "queue_shard": q.primaryQueueShard.Name()}})
 			return nil
-		})
+		}
+
+		if !q.partitionSem.TryAcquire(1) {
+			metrics.IncrQueueScanNoCapacityCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"shard": metricShardName, "queue_shard": q.primaryQueueShard.Name()}})
+			return nil
+		}
+
+		select {
+		case q.partitions <- partitionMsg{
+			partition:       ptr,
+			metricShardName: metricShardName,
+		}:
+			// Sent successfully
+		default:
+			// Channel full — release semaphore and stop
+			q.partitionSem.Release(1)
+			return nil
+		}
 	}
 
-	return eg.Wait()
+	return nil
+}
+
+func (q *queueProcessor) partitionWorker(ctx context.Context) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case msg := <-q.partitions:
+			q.processOnePartition(ctx, msg)
+			q.partitionSem.Release(1)
+		}
+	}
+}
+
+func (q *queueProcessor) processOnePartition(ctx context.Context, msg partitionMsg) {
+	p := msg.partition
+	err := q.ProcessPartition(ctx, p, msg.continuationCount, false)
+	if err != nil {
+		if err == ErrPartitionNotFound || err == ErrPartitionGarbageCollected {
+			return
+		}
+		if !errors.Is(err, context.Canceled) {
+			logger.StdlibLogger(ctx).Error("error processing partition", "error", err)
+		}
+		return
+	}
+	metrics.IncrQueuePartitionProcessedCounter(ctx, metrics.CounterOpt{
+		PkgName: pkgName,
+		Tags:    map[string]any{"shard": msg.metricShardName, "queue_shard": q.primaryQueueShard.Name()},
+	})
 }
 
 // shadowScan iterates through the shadow partitions and attempt to add queue items
