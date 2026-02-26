@@ -172,7 +172,7 @@ type ShardOperations interface {
 	Dequeue(ctx context.Context, i QueueItem, opts ...DequeueOptionFn) error
 
 	PartitionPeek(ctx context.Context, sequential bool, until time.Time, limit int64) ([]*QueuePartition, error)
-	PartitionLease(ctx context.Context, p *QueuePartition, duration time.Duration, opts ...PartitionLeaseOpt) (*ulid.ULID, int, error)
+	PartitionLease(ctx context.Context, p *QueuePartition, duration time.Duration, opts ...PartitionLeaseOpt) (*ulid.ULID, error)
 	PartitionRequeue(ctx context.Context, p *QueuePartition, at time.Time, forceAt bool) error
 
 	Scavenge(ctx context.Context, limit int) (int, error)

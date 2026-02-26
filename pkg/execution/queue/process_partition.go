@@ -38,10 +38,10 @@ func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition
 	// items are dynamic generators).  This means that we have to delay
 	// processing the partition by N seconds, meaning the latency is increased by
 	// up to this period for scheduled items behind the concurrency limits.
-	_, err := Duration(ctx, q.primaryQueueShard.Name(), "partition_lease", q.Clock().Now(), func(ctx context.Context) (int, error) {
-		l, capacity, err := q.primaryQueueShard.PartitionLease(ctx, p, PartitionLeaseDuration)
+	_, err := Duration(ctx, q.primaryQueueShard.Name(), "partition_lease", q.Clock().Now(), func(ctx context.Context) (any, error) {
+		l, err := q.primaryQueueShard.PartitionLease(ctx, p, PartitionLeaseDuration)
 		p.LeaseID = l
-		return capacity, err
+		return nil, err
 	})
 	if errors.Is(err, ErrPartitionAlreadyLeased) {
 		metrics.IncrQueuePartitionLeaseContentionCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name()}})
@@ -226,7 +226,6 @@ func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition
 		Items:                queue,
 		PartitionContinueCtr: continuationCount,
 		Queue:                q,
-		Denies:               NewLeaseDenyList(),
 		StaticTime:           q.Clock().Now(),
 		Parallel:             parallel,
 	}
