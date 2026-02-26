@@ -139,6 +139,8 @@ func (q *queueProcessor) tryClaimShardLease(ctx context.Context, shards []QueueS
 func (q *queueProcessor) releaseShardLease() {
 	l := logger.StdlibLogger(context.Background())
 
+	defer metrics.GaugeActiveShardLease(context.Background(), 0, metrics.GaugeOpt{PkgName: pkgName, Tags: map[string]any{"shard_group": q.runMode.ShardGroup, "queue_shard": q.primaryQueueShard.Name(), "segment": q.ShardLeaseKeySuffix}})
+
 	shard := q.primaryQueueShard
 	if shard == nil {
 		l.Warn("could not release shard lease, no primary shard set")
@@ -188,7 +190,6 @@ func (q *queueProcessor) renewShardLease(ctx context.Context) {
 
 			if leaseID == nil {
 				// Lease was lost somehow, stop renewing
-				metrics.GaugeActiveShardLease(ctx, 0, metrics.GaugeOpt{PkgName: pkgName, Tags: map[string]any{"shard_group": q.runMode.ShardGroup, "queue_shard": q.primaryQueueShard.Name(), "segment": q.ShardLeaseKeySuffix}})
 				l.Error("stopping shard lease renewal, shard lease lost during renewal")
 				q.quit <- ErrShardLeaseNotFound
 				return
@@ -204,7 +205,6 @@ func (q *queueProcessor) renewShardLease(ctx context.Context) {
 				})
 			}, util.NewRetryConf(util.WithRetryConfRetryableErrors(ShardLeaseRenewalRetryableError)))
 			if err != nil {
-				metrics.GaugeActiveShardLease(ctx, 0, metrics.GaugeOpt{PkgName: pkgName, Tags: map[string]any{"shard_group": q.runMode.ShardGroup, "queue_shard": q.primaryQueueShard.Name(), "segment": q.ShardLeaseKeySuffix}})
 				l.Error("stopping shard lease renewal, failed to renew shard lease", "shard", shard.Name(), "group", q.runMode.ShardGroup, "error", err, "duration", time.Since(start), "leaseID", *leaseID)
 				q.quit <- err
 				return
