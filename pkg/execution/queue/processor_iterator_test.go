@@ -137,10 +137,6 @@ func (m *mockShardForIterator) Scavenge(ctx context.Context, limit int) (int, er
 	return 0, nil
 }
 
-func (m *mockShardForIterator) ActiveCheck(ctx context.Context) (int, error) {
-	return 0, nil
-}
-
 func (m *mockShardForIterator) Instrument(ctx context.Context) error {
 	return nil
 }
@@ -257,7 +253,7 @@ func (m *mockShardForIterator) BacklogPeek(ctx context.Context, b *QueueBacklog,
 	return nil, 0, nil
 }
 
-func (m *mockShardForIterator) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueShadowPartition, refillUntil time.Time, refillItems []string, latestConstraints PartitionConstraintConfig, options ...BacklogRefillOptionFn) (*BacklogRefillResult, error) {
+func (m *mockShardForIterator) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueShadowPartition, refillUntil time.Time, refillItems []string, options ...BacklogRefillOptionFn) (*BacklogRefillResult, error) {
 	return nil, nil
 }
 
