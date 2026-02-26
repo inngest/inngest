@@ -82,13 +82,10 @@ function CellValueCodeBlock({
   }, [columnType, value]);
 
   return (
-    <div className="bg-codeEditor h-full overflow-hidden rounded-lg">
+    <div className="bg-codeEditor h-full overflow-hidden rounded-lg border border-subtle">
       <NewCodeBlock
-        tab={{
-          content,
-          language,
-          readOnly: true,
-        }}
+        tab={{ content, language, readOnly: true }}
+        scrollbarOptions={{ vertical: 'auto', horizontal: 'auto' }}
       />
     </div>
   );
