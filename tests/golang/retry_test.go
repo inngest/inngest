@@ -194,7 +194,7 @@ func TestMaxRetries(t *testing.T) {
 	defer server.Close()
 
 	var attempt int
-	var runID string
+	runIDCh := make(chan string, 1)
 	evtName := "event"
 	_, err := inngestgo.CreateFunction(
 		ic,
@@ -204,7 +204,10 @@ func TestMaxRetries(t *testing.T) {
 		},
 		inngestgo.EventTrigger(evtName, nil),
 		func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
-			runID = input.InputCtx.RunID
+			select {
+			case runIDCh <- input.InputCtx.RunID:
+			default:
+			}
 			return step.Run(ctx, "a", func(ctx context.Context) (any, error) {
 				attempt = input.InputCtx.Attempt
 				return nil, inngestgo.RetryAtError(errors.New("oh no"), time.Now())
@@ -219,7 +222,7 @@ func TestMaxRetries(t *testing.T) {
 
 	c.WaitForRunStatus(ctx, t,
 		models.FunctionStatusFailed.String(),
-		&runID,
+		<-runIDCh,
 		client.WaitForRunStatusOpts{
 			Timeout: 30 * time.Second,
 		},

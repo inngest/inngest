@@ -25,7 +25,7 @@ func TestStepRetry(t *testing.T) {
 		inngestClient, server, registerFuncs := NewSDKHandler(t, randomSuffix("my-app"))
 		defer server.Close()
 
-		var runID string
+		runIDCh := make(chan string, 1)
 		var stepError error
 		var stepExecutions atomic.Int32
 
@@ -38,7 +38,10 @@ func TestStepRetry(t *testing.T) {
 			},
 			inngestgo.EventTrigger(eventName, nil),
 			func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
-				runID = input.InputCtx.RunID
+				select {
+				case runIDCh <- input.InputCtx.RunID:
+				default:
+				}
 
 				_, stepError = step.Run(ctx,
 					"a",
@@ -57,9 +60,7 @@ func TestStepRetry(t *testing.T) {
 		_, err = inngestClient.Send(ctx, inngestgo.Event{Name: eventName})
 		r.NoError(err)
 
-		// Wait a moment for runID to be populated
-		<-time.After(2 * time.Second)
-		c.WaitForRunStatus(ctx, t, models.FunctionStatusFailed.String(), &runID, client.WaitForRunStatusOpts{
+		c.WaitForRunStatus(ctx, t, models.FunctionStatusFailed.String(), <-runIDCh, client.WaitForRunStatusOpts{
 			Timeout: 15 * time.Second,
 		})
 
@@ -77,7 +78,7 @@ func TestStepRetry(t *testing.T) {
 		inngestClient, server, registerFuncs := NewSDKHandler(t, randomSuffix("my-app"))
 		defer server.Close()
 
-		var runID string
+		runIDCh := make(chan string, 1)
 		var stepError error
 		var stepExecutions atomic.Int32
 
@@ -90,7 +91,10 @@ func TestStepRetry(t *testing.T) {
 			},
 			inngestgo.EventTrigger(eventName, nil),
 			func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
-				runID = input.InputCtx.RunID
+				select {
+				case runIDCh <- input.InputCtx.RunID:
+				default:
+				}
 
 				_, stepError = step.Run(ctx,
 					"a",
@@ -112,10 +116,7 @@ func TestStepRetry(t *testing.T) {
 		_, err = inngestClient.Send(ctx, inngestgo.Event{Name: eventName})
 		r.NoError(err)
 
-		// Wait a moment for runID to be populated
-		<-time.After(2 * time.Second)
-
-		c.WaitForRunStatus(ctx, t, models.FunctionStatusFailed.String(), &runID, client.WaitForRunStatusOpts{
+		c.WaitForRunStatus(ctx, t, models.FunctionStatusFailed.String(), <-runIDCh, client.WaitForRunStatusOpts{
 			Timeout: 15 * time.Second,
 		})
 
@@ -133,7 +134,7 @@ func TestStepRetry(t *testing.T) {
 		inngestClient, server, registerFuncs := NewSDKHandler(t, randomSuffix("my-app"))
 		defer server.Close()
 
-		var runID string
+		runIDCh := make(chan string, 1)
 		var stepError error
 		var stepExecutions atomic.Int32
 
@@ -146,7 +147,10 @@ func TestStepRetry(t *testing.T) {
 			},
 			inngestgo.EventTrigger(eventName, nil),
 			func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
-				runID = input.InputCtx.RunID
+				select {
+				case runIDCh <- input.InputCtx.RunID:
+				default:
+				}
 
 				_, stepError = step.Run(ctx,
 					"a",
@@ -165,10 +169,7 @@ func TestStepRetry(t *testing.T) {
 		_, err = inngestClient.Send(ctx, inngestgo.Event{Name: eventName})
 		r.NoError(err)
 
-		// Wait a moment for runID to be populated
-		<-time.After(2 * time.Second)
-
-		c.WaitForRunStatus(ctx, t, models.FunctionStatusFailed.String(), &runID, client.WaitForRunStatusOpts{
+		c.WaitForRunStatus(ctx, t, models.FunctionStatusFailed.String(), <-runIDCh, client.WaitForRunStatusOpts{
 			Timeout: 15 * time.Second,
 		})
 
@@ -186,7 +187,7 @@ func TestStepRetry(t *testing.T) {
 		inngestClient, server, registerFuncs := NewSDKHandler(t, randomSuffix("my-app"))
 		defer server.Close()
 
-		var runID string
+		runIDCh := make(chan string, 1)
 		var functionExecutions atomic.Int32
 
 		eventName := randomSuffix("my-event")
@@ -198,7 +199,10 @@ func TestStepRetry(t *testing.T) {
 			},
 			inngestgo.EventTrigger(eventName, nil),
 			func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
-				runID = input.InputCtx.RunID
+				select {
+				case runIDCh <- input.InputCtx.RunID:
+				default:
+				}
 				functionExecutions.Add(1)
 
 				// Return a function-level error (not from a step)
@@ -211,10 +215,7 @@ func TestStepRetry(t *testing.T) {
 		_, err = inngestClient.Send(ctx, inngestgo.Event{Name: eventName})
 		r.NoError(err)
 
-		// Wait a moment for runID to be populated
-		<-time.After(2 * time.Second)
-
-		c.WaitForRunStatus(ctx, t, models.FunctionStatusFailed.String(), &runID, client.WaitForRunStatusOpts{
+		c.WaitForRunStatus(ctx, t, models.FunctionStatusFailed.String(), <-runIDCh, client.WaitForRunStatusOpts{
 			Timeout: 15 * time.Second,
 		})
 
@@ -229,7 +230,7 @@ func TestStepRetry(t *testing.T) {
 		inngestClient, server, registerFuncs := NewSDKHandler(t, randomSuffix("my-app"))
 		defer server.Close()
 
-		var runID string
+		runIDCh := make(chan string, 1)
 		var functionExecutions atomic.Int32
 
 		eventName := randomSuffix("my-event")
@@ -241,7 +242,10 @@ func TestStepRetry(t *testing.T) {
 			},
 			inngestgo.EventTrigger(eventName, nil),
 			func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
-				runID = input.InputCtx.RunID
+				select {
+				case runIDCh <- input.InputCtx.RunID:
+				default:
+				}
 				functionExecutions.Add(1)
 
 				// Return a function-level NoRetryError (not from a step)
@@ -254,7 +258,7 @@ func TestStepRetry(t *testing.T) {
 		_, err = inngestClient.Send(ctx, inngestgo.Event{Name: eventName})
 		r.NoError(err)
 
-		c.WaitForRunStatus(ctx, t, models.FunctionStatusFailed.String(), &runID, client.WaitForRunStatusOpts{
+		c.WaitForRunStatus(ctx, t, models.FunctionStatusFailed.String(), <-runIDCh, client.WaitForRunStatusOpts{
 			Timeout: 15 * time.Second,
 		})
 
@@ -269,7 +273,7 @@ func TestStepRetry(t *testing.T) {
 		inngestClient, server, registerFuncs := NewSDKHandler(t, randomSuffix("my-app"))
 		defer server.Close()
 
-		var runID string
+		runIDCh := make(chan string, 1)
 		var stepError error
 		var stepExecutions atomic.Int32
 		var functionExecutions atomic.Int32
@@ -283,7 +287,10 @@ func TestStepRetry(t *testing.T) {
 			},
 			inngestgo.EventTrigger(eventName, nil),
 			func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
-				runID = input.InputCtx.RunID
+				select {
+				case runIDCh <- input.InputCtx.RunID:
+				default:
+				}
 				functionExecutions.Add(1)
 
 				_, stepError = step.Run(ctx,
@@ -304,10 +311,7 @@ func TestStepRetry(t *testing.T) {
 		_, err = inngestClient.Send(ctx, inngestgo.Event{Name: eventName})
 		r.NoError(err)
 
-		// Wait a moment for runID to be populated
-		<-time.After(2 * time.Second)
-
-		c.WaitForRunStatus(ctx, t, models.FunctionStatusCompleted.String(), &runID, client.WaitForRunStatusOpts{
+		c.WaitForRunStatus(ctx, t, models.FunctionStatusCompleted.String(), <-runIDCh, client.WaitForRunStatusOpts{
 			Timeout: 15 * time.Second,
 		})
 
