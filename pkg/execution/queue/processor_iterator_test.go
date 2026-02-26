@@ -439,7 +439,6 @@ func TestProcessorIteratorCounterRaceCondition(t *testing.T) {
 		Items:                items,
 		PartitionContinueCtr: 0,
 		Queue:                mockProc,
-		Denies:               NewLeaseDenyList(),
 		StaticTime:           time.Now(),
 		Parallel:             true, // Enable parallel processing
 	}
@@ -550,7 +549,6 @@ func TestProcessorIteratorCounterRaceConditionMixed(t *testing.T) {
 		Items:                items,
 		PartitionContinueCtr: 0,
 		Queue:                mockProc,
-		Denies:               NewLeaseDenyList(),
 		StaticTime:           time.Now(),
 		Parallel:             true,
 	}
@@ -653,7 +651,6 @@ func TestProcessorIteratorIsCustomKeyLimitOnlyRace(t *testing.T) {
 		Items:                items,
 		PartitionContinueCtr: 0,
 		Queue:                mockProc,
-		Denies:               NewLeaseDenyList(),
 		StaticTime:           time.Now(),
 		Parallel:             true,
 	}
