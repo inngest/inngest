@@ -260,6 +260,7 @@ func (q *queueProcessor) processScannedPartitions(
 
 		p := *ptr
 		eg.Go(func() error {
+			defer q.partitionSem.Release(1)
 			if q.capacity() == 0 {
 				// no longer any available workers for partition, so we can skip
 				// work
