@@ -93,12 +93,11 @@ func (q *queueProcessor) scan(ctx context.Context) error {
 	l := logger.StdlibLogger(ctx)
 
 	if q.capacity() == 0 || q.partitionCapacity() == 0 {
+		metrics.IncrQueueScanNoCapacityCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name()}})
 		return nil
 	}
 
 	// If there are continuations, process those immediately.
-	//
-	// TODO: METRICS ON CONTINUATION DURATIONS.
 	if err := q.scanContinuations(ctx); err != nil {
 		return fmt.Errorf("error scanning continuations: %w", err)
 	}
@@ -224,6 +223,7 @@ func (q *queueProcessor) ScanAccountPartitions(ctx context.Context, accountID uu
 	return q.processScannedPartitions(ctx, partitions, peekUntil, metricShardName, reportPeekedPartitions)
 }
 
+// ScanGlobalPartitions scans the partiton of partitions across all fns.
 func (q *queueProcessor) ScanGlobalPartitions(ctx context.Context, peekLimit int64, peekUntil time.Time, metricShardName string, reportPeekedPartitions *int64) error {
 	partitions, err := q.primaryQueueShard.PeekGlobalPartitions(ctx, peekLimit, peekUntil, q.isSequential())
 	if err != nil {
@@ -254,7 +254,7 @@ func (q *queueProcessor) processScannedPartitions(
 
 	for _, ptr := range partitions {
 		if q.capacity() == 0 || !q.partitionSem.TryAcquire(1) {
-			metrics.IncrQueueScanNoCapacityCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"shard": metricShardName, "queue_shard": q.primaryQueueShard.Name()}})
+			metrics.IncrQueueScanNoCapacityCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name()}})
 			return nil
 		}
 
@@ -265,7 +265,7 @@ func (q *queueProcessor) processScannedPartitions(
 			if q.capacity() == 0 {
 				// no longer any available workers for partition, so we can skip
 				// work
-				metrics.IncrQueueScanNoCapacityCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"shard": metricShardName, "queue_shard": q.primaryQueueShard.Name()}})
+				metrics.IncrQueueScanNoCapacityCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name()}})
 				return nil
 			}
 			err := q.ProcessPartition(ctx, &p, 0, false)
