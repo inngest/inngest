@@ -429,7 +429,6 @@ func (s *PauseStore) PausesByEventSince(ctx context.Context, workspaceID uuid.UU
 
 	// Load all items in the set.
 	addIndexKey := pauses.kg.PauseIndex(ctx, "add", workspaceID, event)
-	expIndexKey := pauses.kg.PauseIndex(ctx, "exp", workspaceID, event)
 	cmd := pauses.Client().B().
 		Zrangebyscore().
 		Key(addIndexKey).
@@ -442,10 +441,9 @@ func (s *PauseStore) PausesByEventSince(ctx context.Context, workspaceID uuid.UU
 	}
 
 	iter := &keyIter{
-		r:         pauses.Client(),
-		kf:        pauses.kg,
-		start:     start,
-		indexKeys: []string{addIndexKey, expIndexKey},
+		r:     pauses.Client(),
+		kf:    pauses.kg,
+		start: start,
 	}
 	err = iter.init(ctx, ids, []float64{}, 100)
 	return iter, err
@@ -461,7 +459,6 @@ func (s *PauseStore) PausesByEventSinceWithCreatedAt(ctx context.Context, worksp
 	pauses := s.unsharded.Pauses()
 
 	addIndexKey := pauses.kg.PauseIndex(ctx, "add", workspaceID, event)
-	expIndexKey := pauses.kg.PauseIndex(ctx, "exp", workspaceID, event)
 	cmd := pauses.Client().B().
 		Zrange().
 		Key(addIndexKey).
@@ -485,10 +482,9 @@ func (s *PauseStore) PausesByEventSinceWithCreatedAt(ctx context.Context, worksp
 	}
 
 	iter := &keyIter{
-		r:         pauses.Client(),
-		kf:        pauses.kg,
-		start:     start,
-		indexKeys: []string{addIndexKey, expIndexKey},
+		r:     pauses.Client(),
+		kf:    pauses.kg,
+		start: start,
 	}
 	err = iter.init(ctx, ids, scores, 100)
 	return iter, err

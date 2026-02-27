@@ -4,8 +4,8 @@ import (
 	"os"
 	"sync/atomic"
 
-	"github.com/cockroachdb/pebble"
-	"github.com/cockroachdb/pebble/vfs"
+	"github.com/cockroachdb/pebble/v2"
+	"github.com/cockroachdb/pebble/v2/vfs"
 	"github.com/google/uuid"
 )
 
@@ -38,7 +38,15 @@ func NewKV[T Evaluable](o KVOpts[T]) (KV[T], error) {
 		o.FS = vfs.Default
 	}
 
-	db, err := pebble.Open(o.Dir, &pebble.Options{FS: o.FS})
+	db, err := pebble.Open(o.Dir, &pebble.Options{
+		FS: o.FS,
+		// cockroachdb defaults that should slightly help with faster writes
+		// https://github.com/cockroachdb/cockroach/blob/5a1f5da5bb3b2d962d8737848a4fca69f915dacb/pkg/storage/pebble.go#L668-L673
+		L0CompactionThreshold:       2,
+		L0StopWritesThreshold:       1000,
+		MemTableSize:                64 << 20, // 64 MB
+		MemTableStopWritesThreshold: 4,
+	})
 	if err != nil {
 		return nil, err
 	}
