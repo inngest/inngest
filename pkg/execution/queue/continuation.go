@@ -131,7 +131,7 @@ func (q *queueProcessor) scanContinuations(ctx context.Context) error {
 					q.removeContinue(ctx, p, false)
 					return nil
 				}
-				if errors.Unwrap(err) != context.Canceled {
+				if !errors.Is(err, context.Canceled) {
 					logger.StdlibLogger(ctx).Error("error processing partition", "error", err)
 				}
 				return err
