@@ -26,6 +26,11 @@ export default [
     },
   },
   {
-    ignores: ['src/gql/gql.ts', 'src/gql/graphql.ts', 'src/routeTree.gen.ts'],
+    ignores: [
+      'src/gql/gql.ts',
+      'src/gql/graphql.ts',
+      'src/gql/fragment-masking.ts',
+      'src/routeTree.gen.ts',
+    ],
   },
 ];

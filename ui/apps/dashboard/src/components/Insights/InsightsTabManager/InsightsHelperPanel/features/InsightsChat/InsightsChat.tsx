@@ -124,7 +124,6 @@ export function InsightsChat({ agentThreadId, className }: InsightsChatProps) {
 
     // Use the SQL editor service to set query and run it
     editorActions.setQueryAndRun(latest);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     currentThreadId,
     agentThreadId,
