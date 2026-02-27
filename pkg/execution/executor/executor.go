@@ -2158,6 +2158,15 @@ func (e *executor) executeDriverV2(ctx context.Context, run *runInstance, d driv
 	if ierr != nil {
 		str := ierr.Error()
 		resp.Err = &str
+
+		// Produce structured error output so that downstream trace storage and the
+		// frontend can parse the error correctly
+		gracefulErr := state.StandardError{
+			Error:   ierr.Error(),
+			Name:    state.DefaultErrorName,
+			Message: ierr.Error(),
+		}
+		resp.Output = gracefulErr.Serialize(execution.StateErrorKey)
 	}
 
 	return resp, ierr
@@ -2211,12 +2220,17 @@ func (e *executor) executeDriverV1(ctx context.Context, i *runInstance) (*state.
 		} else {
 			// Set the response error if it wasn't set, or if Execute had an internal error.
 			// This ensures that we only ever need to check resp.Err to handle errors.
-			byt, e := json.Marshal(err.Error())
-			if e != nil {
-				response.Output = err
-			} else {
-				response.Output = string(byt)
+			//
+			// We serialize as a StandardError so that the output is always in a structured
+			// JSON format that downstream consumers (trace storage, GraphQL, frontend) can
+			// parse correctly. Without this, raw error strings end up as malformed StepError
+			// objects in the trace UI (empty message, text buried in stack field)
+			gracefulErr := state.StandardError{
+				Error:   err.Error(),
+				Name:    state.DefaultErrorName,
+				Message: err.Error(),
 			}
+			response.Output = gracefulErr.Serialize(execution.StateErrorKey)
 
 			errstr := err.Error()
 			response.Err = &errstr
