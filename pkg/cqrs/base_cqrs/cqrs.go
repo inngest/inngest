@@ -117,7 +117,7 @@ var sqliteSpanRunsAdapter = spanRunsAdapter{
 		var ids []string
 		if raw != nil && *raw != "" {
 			// Ignore error: return empty slice on parse failure
-		_ = json.Unmarshal([]byte(*raw), &ids)
+			_ = json.Unmarshal([]byte(*raw), &ids)
 		}
 		return ids
 	},
@@ -152,7 +152,7 @@ var postgresSpanRunsAdapter = spanRunsAdapter{
 			var innerStr string
 			if err := json.Unmarshal([]byte(*raw), &innerStr); err == nil {
 				// Ignore error: return empty slice on parse failure
-			_ = json.Unmarshal([]byte(innerStr), &ids)
+				_ = json.Unmarshal([]byte(innerStr), &ids)
 			}
 		}
 		return ids
@@ -2184,22 +2184,91 @@ func newRunsQueryBuilder(ctx context.Context, opt cqrs.GetTraceRunOpt) *runsQuer
 }
 
 func (w wrapper) GetTraceRunsCount(ctx context.Context, opt cqrs.GetTraceRunOpt) (int, error) {
-	// explicitly set it to zero so it would not attempt to paginate
-	opt.Items = 0
-	var (
-		res []*cqrs.TraceRun
-		err error
-	)
 	if opt.Preview {
-		res, err = w.GetSpanRuns(ctx, opt)
-	} else {
-		res, err = w.GetTraceRuns(ctx, opt)
+		return w.getSpanRunsCount(ctx, opt)
 	}
+	return w.getTraceRunsCount(ctx, opt)
+}
+
+// getTraceRunsCount returns the count of trace runs matching the given filters.
+// Uses len(GetTraceRuns) because CEL event filtering is applied in Go post-query.
+func (w wrapper) getTraceRunsCount(ctx context.Context, opt cqrs.GetTraceRunOpt) (int, error) {
+	opt.Items = 0
+	res, err := w.GetTraceRuns(ctx, opt)
+	if err != nil {
+		return 0, err
+	}
+	return len(res), nil
+}
+
+// getSpanRunsCount returns the count of span-based runs matching the given filters
+// using a SQL COUNT(DISTINCT run_id) query instead of fetching all rows.
+func (w wrapper) getSpanRunsCount(ctx context.Context, opt cqrs.GetTraceRunOpt) (int, error) {
+	baseQuery, _, _, err := w.buildSpanRunsBaseQuery(ctx, opt)
 	if err != nil {
 		return 0, err
 	}
 
-	return len(res), nil
+	sqlQuery, args, err := baseQuery.
+		Select(sq.L("COUNT(DISTINCT run_id)")).
+		ToSQL()
+	if err != nil {
+		return 0, err
+	}
+
+	l := logger.StdlibLogger(ctx)
+	l.Debug("getSpanRunsCount query", "sql", sqlQuery, "args", args)
+
+	var count int
+	err = w.db.QueryRowContext(ctx, sqlQuery, args...).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("error counting span runs: %w", err)
+	}
+	return count, nil
+}
+
+// buildSpanRunsBaseQuery builds the shared base query for span-based run queries.
+// Returns the base SelectDataset with filters (including CEL) and event JOIN applied,
+// plus the cursor layout and adapter for callers that need them.
+func (w wrapper) buildSpanRunsBaseQuery(ctx context.Context, opt cqrs.GetTraceRunOpt) (*sq.SelectDataset, *cqrs.TracePageCursor, spanRunsAdapter, error) {
+	adapter := w.spanRunsAdapter()
+	builder := newSpanRunsQueryBuilder(ctx, opt)
+
+	// Parse CEL expressions using adapter's converter
+	var celFilters []sq.Expression
+	var useJoin bool
+	if opt.Filter.CEL != "" {
+		expHandler, err := run.NewExpressionHandler(ctx,
+			run.WithExpressionHandlerBlob(opt.Filter.CEL, "\n"),
+			run.WithExpressionSQLConverter(adapter.celConverter),
+		)
+		if err != nil {
+			return nil, nil, adapter, err
+		}
+		if expHandler.HasFilters() {
+			celFilters, err = expHandler.ToSQLFilters(ctx)
+			if err != nil {
+				return nil, nil, adapter, err
+			}
+			useJoin = needsEventJoin(opt.Filter.CEL)
+		}
+	}
+
+	allFilters := append(builder.filter, celFilters...)
+
+	q := sq.Dialect(adapter.dialect).From("spans")
+	if useJoin {
+		// database specific join syntax needed because event_ids is an array of ids to the events table,
+		// so we need to unpack that and perform the join before the spans are grouped back together by run_id
+		q = adapter.buildEventJoin(q)
+	}
+
+	q = q.Where(sq.L("spans.dynamic_span_id").In(
+		sq.Dialect(adapter.dialect).Select("dynamic_span_id").Distinct().From("spans").Where(sq.C("name").Eq(meta.SpanNameRun)),
+	)).
+		Where(allFilters...)
+
+	return q, builder.cursorLayout, adapter, nil
 }
 
 func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*cqrs.TraceRun, error) {
@@ -2234,11 +2303,7 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 	resCursorLayout := builder.cursorLayout
 
 	// read from database
-	// TODO:
-	// change this to a continuous loop with limits instead of just attempting to grab everything.
-	// might not matter though since this is primarily meant for local
-	// development
-	sql, args, err := sq.Dialect(w.dialect()).
+	q := sq.Dialect(w.dialect()).
 		From("trace_runs").
 		Select(
 			"app_id",
@@ -2258,8 +2323,13 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 			"has_ai",
 		).
 		Where(filter...).
-		Order(order...).
-		ToSQL()
+		Order(order...)
+
+	if opt.Items > 0 {
+		q = q.Limit(opt.Items + 1) // fetch one more item than requested to determine hasNextPage
+	}
+
+	sql, args, err := q.ToSQL()
 	if err != nil {
 		return nil, err
 	}
@@ -2268,6 +2338,7 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 
 	res := []*cqrs.TraceRun{}
 	var count uint
@@ -2905,28 +2976,10 @@ func (w wrapper) GetWorkerConnections(ctx context.Context, opt cqrs.GetWorkerCon
 // EXTEND span grouping
 func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*cqrs.TraceRun, error) {
 	l := logger.StdlibLogger(ctx)
-	adapter := w.spanRunsAdapter()
 
-	builder := newSpanRunsQueryBuilder(ctx, opt)
-
-	// Parse CEL expressions using adapter's converter
-	var celFilters []sq.Expression
-	var useJoin bool
-	if opt.Filter.CEL != "" {
-		expHandler, err := run.NewExpressionHandler(ctx,
-			run.WithExpressionHandlerBlob(opt.Filter.CEL, "\n"),
-			run.WithExpressionSQLConverter(adapter.celConverter),
-		)
-		if err != nil {
-			return nil, err
-		}
-		if expHandler.HasFilters() {
-			celFilters, err = expHandler.ToSQLFilters(ctx)
-			if err != nil {
-				return nil, err
-			}
-			useJoin = needsEventJoin(opt.Filter.CEL)
-		}
+	baseQuery, cursorLayout, adapter, err := w.buildSpanRunsBaseQuery(ctx, opt)
+	if err != nil {
+		return nil, err
 	}
 
 	selectCols := []interface{}{
@@ -2979,19 +3032,7 @@ func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*c
 	// always add run_id at the end for stable sorting
 	orderExprs = append(orderExprs, sq.C("run_id").Asc())
 
-	q := sq.Dialect(adapter.dialect).From("spans")
-	if useJoin {
-		// database specific join syntax needed because event_ids is an array of ids to the events table,
-		// so we need to unpack that and perform the join before the spans are grouped back together by run_id
-		q = adapter.buildEventJoin(q)
-	}
-
-	allFilters := append(builder.filter, celFilters...)
-	q = q.Select(selectCols...).
-		Where(sq.L("spans.dynamic_span_id").In(
-			sq.Dialect(adapter.dialect).Select("dynamic_span_id").Distinct().From("spans").Where(sq.C("name").Eq(meta.SpanNameRun)),
-		)).
-		Where(allFilters...).
+	q := baseQuery.Select(selectCols...).
 		GroupBy(groupByCols...).
 		Order(orderExprs...)
 
@@ -3013,7 +3054,7 @@ func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*c
 	}
 	defer rows.Close()
 
-	return w.convertSpanRunRows(ctx, rows, builder.cursorLayout, adapter, opt.Items)
+	return w.convertSpanRunRows(ctx, rows, cursorLayout, adapter, opt.Items)
 }
 
 // convertSpanRunRows converts database rows to TraceRun structs
