@@ -17,13 +17,6 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// partitionMsg carries a partition and metadata needed for processing by partition worker goroutines.
-type partitionMsg struct {
-	partition         *QueuePartition
-	continuationCount uint
-	metricShardName   string
-}
-
 var (
 	latencyAvg ewma.MovingAverage
 	latencySem *sync.Mutex
@@ -70,7 +63,6 @@ func New(
 
 		sem:          util.NewTrackingSemaphore(int(o.numWorkers)),
 		workers:      make(chan ProcessItem, o.numWorkers),
-		partitions:   make(chan partitionMsg, o.numPartitionWorkers),
 		partitionSem: util.NewTrackingSemaphore(int(o.numPartitionWorkers)),
 		quit:         make(chan error, o.numWorkers),
 
@@ -123,10 +115,6 @@ type queueProcessor struct {
 	// to workers to be processed
 	workers chan ProcessItem
 
-	// partitions is a bounded channel that feeds partitions to partition processor goroutines.
-	// This decouples PartitionPeek from partition processing, preventing the convoy effect
-	// where the scan loop is gated by the slowest partition per cycle.
-	partitions chan partitionMsg
 	// partitionSem tracks how many partitions are currently being processed.
 	partitionSem util.TrackingSemaphore
 

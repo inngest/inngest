@@ -95,25 +95,54 @@ func (q *queueProcessor) scanContinuations(ctx context.Context) error {
 		return nil
 	}
 
+	eg := errgroup.Group{}
 	for _, c := range q.continues {
-		if q.capacity() == 0 || q.partitionCapacity() == 0 {
+		if q.capacity() == 0 || !q.partitionSem.TryAcquire(1) {
 			break
 		}
-		if !q.partitionSem.TryAcquire(1) {
-			break
-		}
-		select {
-		case q.partitions <- partitionMsg{
-			partition:         c.partition,
-			continuationCount: c.count,
-		}:
-			// Sent successfully
-		default:
-			q.partitionSem.Release(1)
-		}
+
+		cont := c
+		eg.Go(func() error {
+			defer q.partitionSem.Release(1)
+
+			p := cont.partition
+			if q.capacity() == 0 {
+				// no longer any available workers for partition, so we can skip
+				// work
+				metrics.IncrQueueScanNoCapacityCounter(ctx, metrics.CounterOpt{PkgName: pkgName})
+				return nil
+			}
+
+			logger.StdlibLogger(ctx).Trace("continue partition processing", "partition_id", p.ID, "count", cont.count)
+
+			err := q.ProcessPartition(ctx, p, cont.count, false)
+
+			metrics.IncrQueuePartitionProcessedCounter(ctx, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags: map[string]any{
+					"queue_shard": q.primaryQueueShard.Name(),
+					"type":        "continuation",
+					"has_error":   err != nil,
+				},
+			})
+
+			if err != nil {
+				if err == ErrPartitionNotFound || err == ErrPartitionGarbageCollected {
+					q.removeContinue(ctx, p, false)
+					return nil
+				}
+				if !errors.Is(err, context.Canceled) {
+					logger.StdlibLogger(ctx).Error("error processing partition", "error", err)
+				}
+				return err
+			}
+
+			return nil
+		})
 	}
+
 	q.continuesLock.Unlock()
-	return nil
+	return eg.Wait()
 }
 
 // AddShadowContinue is the equivalent of addContinue for shadow partitions
