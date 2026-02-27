@@ -769,6 +769,10 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 
 	key := idempotencyKey(req, runID)
 
+	if len(req.Events) == 0 {
+		return nil, fmt.Errorf("no events provided in schedule request")
+	}
+
 	l := e.log.With(
 		"account_id", req.AccountID,
 		"env_id", req.WorkspaceID,
@@ -4891,6 +4895,11 @@ func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Func
 	}
 	if err != nil {
 		return err
+	}
+
+	if len(evtList) == 0 {
+		l.Warn("batch has no events, skipping schedule", "function_id", payload.FunctionID, "batch_id", payload.BatchID)
+		return nil
 	}
 
 	if opts == nil {
