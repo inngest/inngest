@@ -113,7 +113,7 @@ func (q *queueProcessor) scanContinuations(ctx context.Context) error {
 				return nil
 			}
 
-			logger.StdlibLogger(ctx).Trace("continue partition processing", "partition_id", p.ID, "count", c.count)
+			logger.StdlibLogger(ctx).Trace("continue partition processing", "partition_id", p.ID, "count", cont.count)
 
 			err := q.ProcessPartition(ctx, p, cont.count, false)
 
