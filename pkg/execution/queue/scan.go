@@ -261,13 +261,25 @@ func (q *queueProcessor) processScannedPartitions(
 		p := *ptr
 		eg.Go(func() error {
 			defer q.partitionSem.Release(1)
+
 			if q.capacity() == 0 {
 				// no longer any available workers for partition, so we can skip
 				// work
 				metrics.IncrQueueScanNoCapacityCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"shard": metricShardName, "queue_shard": q.primaryQueueShard.Name()}})
 				return nil
 			}
-			if err := q.ProcessPartition(ctx, &p, 0, false); err != nil {
+			err := q.ProcessPartition(ctx, &p, 0, false)
+
+			metrics.IncrQueuePartitionProcessedCounter(ctx, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags: map[string]any{
+					"queue_shard": q.primaryQueueShard.Name(),
+					"type":        "continuation",
+					"has_error":   err != nil,
+				},
+			})
+
+			if err != nil {
 				if err == ErrPartitionNotFound || err == ErrPartitionGarbageCollected {
 					// Another worker grabbed the partition, or the partition was deleted
 					// during the scan by an another worker.
@@ -280,10 +292,6 @@ func (q *queueProcessor) processScannedPartitions(
 				return err
 			}
 
-			metrics.IncrQueuePartitionProcessedCounter(ctx, metrics.CounterOpt{
-				PkgName: pkgName,
-				Tags:    map[string]any{"shard": metricShardName, "queue_shard": q.primaryQueueShard.Name()},
-			})
 			return nil
 		})
 	}

@@ -115,7 +115,18 @@ func (q *queueProcessor) scanContinuations(ctx context.Context) error {
 
 			logger.StdlibLogger(ctx).Trace("continue partition processing", "partition_id", p.ID, "count", c.count)
 
-			if err := q.ProcessPartition(ctx, p, cont.count, false); err != nil {
+			err := q.ProcessPartition(ctx, p, cont.count, false)
+
+			metrics.IncrQueuePartitionProcessedCounter(ctx, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags: map[string]any{
+					"queue_shard": q.primaryQueueShard.Name(),
+					"type":        "continuation",
+					"has_error":   err != nil,
+				},
+			})
+
+			if err != nil {
 				if err == ErrPartitionNotFound || err == ErrPartitionGarbageCollected {
 					q.removeContinue(ctx, p, false)
 					return nil
@@ -126,9 +137,6 @@ func (q *queueProcessor) scanContinuations(ctx context.Context) error {
 				return err
 			}
 
-			metrics.IncrQueuePartitionProcessedCounter(ctx, metrics.CounterOpt{
-				PkgName: pkgName,
-			})
 			return nil
 		})
 	}
