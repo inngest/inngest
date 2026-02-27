@@ -9,6 +9,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/telemetry/trace"
+	"github.com/inngest/inngest/pkg/util/rueidisconn"
 )
 
 var (
@@ -87,5 +88,5 @@ type QueueConfig interface {
 
 type StateConfig interface {
 	StateName() string
-	SingleClusterManager(context.Context) (state.Manager, error)
+	SingleClusterManager(context.Context, rueidisconn.TTFBHandler) (state.Manager, error)
 }
