@@ -144,12 +144,12 @@ export function EventDetails({
     };
   }, [isDragging, handleMouseMove, handleMouseUp]);
 
+  const prettyPayload =
+    usePrettyJson(eventPayloadData?.payload ?? '') || (eventPayloadData?.payload ?? '');
+
   if (error) {
     return <ErrorCard error={error} reset={() => refetchEventDetails()} />;
   }
-
-  const prettyPayload =
-    usePrettyJson(eventPayloadData?.payload ?? '') || (eventPayloadData?.payload ?? '');
 
   const eventName = initialData?.name || eventDetailsData?.name;
   const eventRuns = eventRunsData?.runs || initialData?.runs;

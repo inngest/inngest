@@ -130,7 +130,7 @@ CommandBlock.Header = ({
   return <div className={cn('border-subtle border-b', className)}>{children}</div>;
 };
 
-CommandBlock.CopyButton = ({ content }: { content?: string }) => {
+function CommandBlockCopyButton({ content }: { content?: string }) {
   const { handleCopyClick, isCopying } = useCopyToClipboard();
   return (
     <CopyButton
@@ -141,7 +141,8 @@ CommandBlock.CopyButton = ({ content }: { content?: string }) => {
       appearance="outlined"
     />
   );
-};
+}
+CommandBlock.CopyButton = CommandBlockCopyButton;
 
 CommandBlock.Tabs = ({
   tabs,
