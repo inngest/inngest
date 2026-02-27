@@ -15,7 +15,11 @@ func (q *queueProcessor) peekSize(ctx context.Context, p *QueuePartition) int64 
 		return peekSize
 	}
 	if q.usePeekEWMA {
-		return q.ewmaPeekSize(ctx, p)
+		size, _ := q.peekSizeCache.Fetch(p.Queue(), time.Minute, func() (int64, error) {
+			size := q.ewmaPeekSize(ctx, p)
+			return size, nil
+		})
+		return size.Value()
 	}
 	return q.peekSizeRandom(ctx, p)
 }

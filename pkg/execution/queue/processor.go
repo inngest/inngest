@@ -13,6 +13,7 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/jonboulle/clockwork"
+	"github.com/karlseguin/ccache/v3"
 	"github.com/oklog/ulid/v2"
 	"golang.org/x/sync/errgroup"
 )
@@ -69,6 +70,8 @@ func New(
 		primaryQueueShard: primaryQueueShard,
 		queueShardClients: queueShardClients,
 		shardSelector:     shardSelector,
+
+		peekSizeCache: ccache.New(ccache.Configure[int64]().MaxSize(50_000)),
 
 		qspc: make(chan ShadowPartitionChanMsg),
 
@@ -151,6 +154,9 @@ type queueProcessor struct {
 	// this lets us optimize running consecutive steps for a function, as a continuation, to a specific limit.
 	continues        map[string]continuation
 	continueCooldown map[string]time.Time
+
+	// peekSizeCache stores ewma peek sizes for partitions.
+	peekSizeCache *ccache.Cache[int64]
 
 	// continuesLock protects the continues map.
 	continuesLock *sync.Mutex
