@@ -91,40 +91,42 @@ const columns = [
   columnHelper.display({
     id: 'triggerCTA',
     size: 55,
-    cell: (props) => {
-      const navigate = useNavigate();
-      const doesFunctionAcceptPayload = useMemo(() => {
-        return Boolean(
-          props.row?.original?.triggers?.some(
-            (trigger) => trigger.type === FunctionTriggerTypes.Event,
-          ),
-        );
-      }, [props.row.original.triggers]);
-
-      const [invokeFunction] = useInvokeFunctionMutation();
-
-      return (
-        <InvokeButton
-          kind="secondary"
-          appearance="outlined"
-          disabled={false}
-          doesFunctionAcceptPayload={doesFunctionAcceptPayload}
-          btnAction={async ({ data, user }) => {
-            await invokeFunction({
-              data,
-              functionSlug: props.row.original.slug,
-              user,
-            });
-            toast.success('Function invoked');
-            navigate({ to: '/runs' });
-          }}
-        />
-      );
-    },
+    cell: (props) => <TriggerCell row={props.row} />,
     enableSorting: false,
     enableGlobalFilter: false,
   }),
 ];
+
+function TriggerCell({ row }: { row: Row<Function> }) {
+  const navigate = useNavigate();
+  const doesFunctionAcceptPayload = useMemo(() => {
+    return Boolean(
+      row.original?.triggers?.some(
+        (trigger) => trigger.type === FunctionTriggerTypes.Event,
+      ),
+    );
+  }, [row.original.triggers]);
+
+  const [invokeFunction] = useInvokeFunctionMutation();
+
+  return (
+    <InvokeButton
+      kind="secondary"
+      appearance="outlined"
+      disabled={false}
+      doesFunctionAcceptPayload={doesFunctionAcceptPayload}
+      btnAction={async ({ data, user }) => {
+        await invokeFunction({
+          data,
+          functionSlug: row.original.slug,
+          user,
+        });
+        toast.success('Function invoked');
+        navigate({ to: '/runs' });
+      }}
+    />
+  );
+}
 
 function FunctionListComponent() {
   const tableContainerRef = useRef<HTMLDivElement>(null);
