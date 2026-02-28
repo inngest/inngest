@@ -2,7 +2,6 @@ package golang
 
 import (
 	"context"
-	"encoding/json"
 	"strings"
 	"testing"
 	"time"
@@ -48,8 +47,8 @@ func TestFnOutputTooLarge(t *testing.T) {
 	// Wait a moment for runID to be populated
 	<-time.After(2 * time.Second)
 	run := c.WaitForRunStatus(ctx, t, "FAILED", runID)
-	var output string
-	err = json.Unmarshal([]byte(run.Output), &output)
-	r.NoError(err)
-	r.Equal(syscode.CodeOutputTooLarge, output)
+
+	// The output should be a structured StandardError serialized under the "error" key.
+	expectedOutput := `{"error":{"error":"` + syscode.CodeOutputTooLarge + `: Your function's response body exceeds the maximum size limit","name":"` + syscode.CodeOutputTooLarge + `","message":"Your function's response body exceeds the maximum size limit"}}`
+	r.Equal(expectedOutput, run.Output)
 }

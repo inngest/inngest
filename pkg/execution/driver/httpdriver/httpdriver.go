@@ -34,7 +34,7 @@ var (
 
 	ErrEmptyResponse = fmt.Errorf("no response data")
 	ErrNoRetryAfter  = fmt.Errorf("no retry after present")
-	ErrNotSDK        = syscode.Error{Code: syscode.CodeNotSDK}
+	ErrNotSDK        = syscode.Error{Code: syscode.CodeNotSDK, Message: "The response did not come from an Inngest SDK"}
 
 	defaultClient = exechttp.Client(exechttp.SecureDialerOpts{})
 )
@@ -339,7 +339,7 @@ func do(ctx context.Context, c exechttp.RequestExecutor, r Request) (*Response, 
 
 	var sysErr *syscode.Error
 	if errors.Is(err, exechttp.ErrBodyTooLarge) {
-		sysErr = &syscode.Error{Code: syscode.CodeOutputTooLarge}
+		sysErr = &syscode.Error{Code: syscode.CodeOutputTooLarge, Message: "Your function's response body exceeds the maximum size limit"}
 		//
 		// downstream executor code expects system error codes here for traces
 		// and history to work properly
