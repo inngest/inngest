@@ -8,6 +8,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+
+	internaljson "github.com/modelcontextprotocol/go-sdk/internal/json"
 )
 
 // ID is a Request identifier, which is defined by the spec to be a string, integer, or null.
@@ -167,7 +169,7 @@ func EncodeIndent(msg Message, prefix, indent string) ([]byte, error) {
 
 func DecodeMessage(data []byte) (Message, error) {
 	msg := wireCombined{}
-	if err := json.Unmarshal(data, &msg); err != nil {
+	if err := internaljson.Unmarshal(data, &msg); err != nil {
 		return nil, fmt.Errorf("unmarshaling jsonrpc message: %w", err)
 	}
 	if msg.VersionTag != wireVersion {

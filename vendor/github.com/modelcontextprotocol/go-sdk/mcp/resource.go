@@ -15,8 +15,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/modelcontextprotocol/go-sdk/internal/jsonrpc2"
 	"github.com/modelcontextprotocol/go-sdk/internal/util"
+	"github.com/modelcontextprotocol/go-sdk/jsonrpc"
 	"github.com/yosida95/uritemplate/v3"
 )
 
@@ -40,8 +40,8 @@ type ResourceHandler func(context.Context, *ReadResourceRequest) (*ReadResourceR
 // ResourceNotFoundError returns an error indicating that a resource being read could
 // not be found.
 func ResourceNotFoundError(uri string) error {
-	return &jsonrpc2.WireError{
-		Code:    codeResourceNotFound,
+	return &jsonrpc.Error{
+		Code:    CodeResourceNotFound,
 		Message: "Resource not found",
 		Data:    json.RawMessage(fmt.Sprintf(`{"uri":%q}`, uri)),
 	}

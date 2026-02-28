@@ -6,8 +6,8 @@
 Package jsonschema is an implementation of the [JSON Schema specification],
 a JSON-based format for describing the structure of JSON data.
 The package can be used to read schemas for code generation, and to validate
-data using the draft 2020-12 specification. Validation with other drafts
-or custom meta-schemas is not supported.
+data using the draft 2020-12 and draft-07 specifications. Validation with
+other drafts or custom meta-schemas is not supported.
 
 Construct a [Schema] as you would any Go struct (for example, by writing
 a struct literal), or unmarshal a JSON schema into a [Schema] in the usual
@@ -90,6 +90,20 @@ implementations. See [learnjsonschema.com] for more recommendations about "forma
 
 The content keywords described in [section 8 of the validation spec]
 are recorded in the schema, but ignored during validation.
+
+# Controlling behavior changes
+
+Minor and patch releases of this package may introduce behavior changes as part
+of bug fixes or correctness improvements. To help manage the impact of such
+changes, the package allows you to access previous behaviors using the
+`JSONSCHEMAGODEBUG` environment variable. The available settings are listed
+below; additional options may be introduced in future releases.
+
+- **typeschemasnull**: When set to `"1"`, the inferred schema for slices will
+*not* include the `null` type alongside the array type. It will also avoid
+adding `null` to non-native pointer types (such as `time.Time`). This restores
+the behavior from versions prior to v0.3.0. The default behavior is to include
+`null` in these cases.
 
 [JSON Schema specification]: https://json-schema.org
 [section 7 of the validation spec]: https://json-schema.org/draft/2020-12/draft-bhutton-json-schema-validation-00#rfc.section.7
