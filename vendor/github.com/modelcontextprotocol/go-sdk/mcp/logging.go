@@ -10,6 +10,7 @@ import (
 	"context"
 	"encoding/json"
 	"log/slog"
+	"slices"
 	"sync"
 	"time"
 )
@@ -88,6 +89,23 @@ type LoggingHandler struct {
 	handler         slog.Handler
 }
 
+// discardHandler is a slog.Handler that drops all logs.
+// TODO: use slog.DiscardHandler when we require Go 1.24+.
+type discardHandler struct{}
+
+func (discardHandler) Enabled(context.Context, slog.Level) bool  { return false }
+func (discardHandler) Handle(context.Context, slog.Record) error { return nil }
+func (discardHandler) WithAttrs([]slog.Attr) slog.Handler        { return discardHandler{} }
+func (discardHandler) WithGroup(string) slog.Handler             { return discardHandler{} }
+
+// ensureLogger returns l if non-nil, otherwise a discard logger.
+func ensureLogger(l *slog.Logger) *slog.Logger {
+	if l != nil {
+		return l
+	}
+	return slog.New(discardHandler{})
+}
+
 // NewLoggingHandler creates a [LoggingHandler] that logs to the given [ServerSession] using a
 // [slog.JSONHandler].
 func NewLoggingHandler(ss *ServerSession, opts *LoggingHandlerOptions) *LoggingHandler {
@@ -148,8 +166,7 @@ func (h *LoggingHandler) Handle(ctx context.Context, r slog.Record) error {
 
 func (h *LoggingHandler) handle(ctx context.Context, r slog.Record) error {
 	// Observe the rate limit.
-	// TODO(jba): use golang.org/x/time/rate. (We can't here because it would require adding
-	// golang.org/x/time to the go.mod file.)
+	// TODO(jba): use golang.org/x/time/rate.
 	h.mu.Lock()
 	skip := time.Since(h.lastMessageSent) < h.opts.MinInterval
 	h.mu.Unlock()
@@ -158,6 +175,7 @@ func (h *LoggingHandler) handle(ctx context.Context, r slog.Record) error {
 	}
 
 	var err error
+	var data json.RawMessage
 	// Make the buffer reset atomic with the record write.
 	// We are careful here in the unlikely event that the handler panics.
 	// We don't want to hold the lock for the entire function, because Notify is
@@ -168,6 +186,8 @@ func (h *LoggingHandler) handle(ctx context.Context, r slog.Record) error {
 		defer h.mu.Unlock()
 		h.buf.Reset()
 		err = h.handler.Handle(ctx, r)
+		// Clone the buffer as Bytes() references the internal buffer.
+		data = json.RawMessage(slices.Clone(h.buf.Bytes()))
 	}()
 	if err != nil {
 		return err
@@ -180,7 +200,7 @@ func (h *LoggingHandler) handle(ctx context.Context, r slog.Record) error {
 	params := &LoggingMessageParams{
 		Logger: h.opts.LoggerName,
 		Level:  slogLevelToMCP(r.Level),
-		Data:   json.RawMessage(h.buf.Bytes()),
+		Data:   data,
 	}
 	// We pass the argument context to Notify, even though slog.Handler.Handle's
 	// documentation says not to.

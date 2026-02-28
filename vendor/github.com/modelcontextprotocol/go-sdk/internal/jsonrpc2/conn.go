@@ -6,13 +6,14 @@ package jsonrpc2
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/modelcontextprotocol/go-sdk/internal/json"
 )
 
 // Binder builds a connection configuration.
@@ -55,9 +56,16 @@ type ConnectionOptions struct {
 }
 
 // Connection manages the jsonrpc2 protocol, connecting responses back to their
-// calls.
-// Connection is bidirectional; it does not have a designated server or client
-// end.
+// calls. Connection is bidirectional; it does not have a designated server or
+// client end.
+//
+// Note that the word 'Connection' is overloaded: the mcp.Connection represents
+// the bidirectional stream of messages between client an server. The
+// jsonrpc2.Connection layers RPC logic on top of that stream, dispatching RPC
+// handlers, and correlating requests with responses from the peer.
+//
+// Some of the complexity of the Connection type is grown out of its usage in
+// gopls: it could probably be simplified based on our usage in MCP.
 type Connection struct {
 	seq int64 // must only be accessed using atomic operations
 
@@ -361,17 +369,24 @@ func (c *Connection) Call(ctx context.Context, method string, params any) *Async
 	if err := c.write(ctx, call); err != nil {
 		// Sending failed. We will never get a response, so deliver a fake one if it
 		// wasn't already retired by the connection breaking.
-		c.updateInFlight(func(s *inFlightState) {
-			if s.outgoingCalls[ac.id] == ac {
-				delete(s.outgoingCalls, ac.id)
-				ac.retire(&Response{ID: id, Error: err})
-			} else {
-				// ac was already retired by the readIncoming goroutine:
-				// perhaps our write raced with the Read side of the connection breaking.
-			}
-		})
+		c.Retire(ac, err)
 	}
 	return ac
+}
+
+// Retire stops tracking the call, and reports err as its terminal error.
+//
+// Retire is safe to call multiple times: if the call is already no longer
+// tracked, Retire is a no op.
+func (c *Connection) Retire(ac *AsyncCall, err error) {
+	c.updateInFlight(func(s *inFlightState) {
+		if s.outgoingCalls[ac.id] == ac {
+			delete(s.outgoingCalls, ac.id)
+			ac.retire(&Response{ID: ac.id, Error: err})
+		} else {
+			// ac was already retired elsewhere.
+		}
+	})
 }
 
 // Async, signals that the current jsonrpc2 request may be handled
@@ -437,6 +452,9 @@ func (ac *AsyncCall) IsReady() bool {
 }
 
 // retire processes the response to the call.
+//
+// It is an error to call retire more than once: retire is guarded by the
+// connection's outgoingCalls map.
 func (ac *AsyncCall) retire(response *Response) {
 	select {
 	case <-ac.ready:
@@ -450,6 +468,9 @@ func (ac *AsyncCall) retire(response *Response) {
 
 // Await waits for (and decodes) the results of a Call.
 // The response will be unmarshaled from JSON into the result.
+//
+// If the call is cancelled due to context cancellation, the result is
+// ctx.Err().
 func (ac *AsyncCall) Await(ctx context.Context, result any) error {
 	select {
 	case <-ctx.Done():
@@ -772,13 +793,9 @@ func (c *Connection) write(ctx context.Context, msg Message) error {
 		err = c.writer.Write(ctx, msg)
 	}
 
-	// For rejected requests, we don't set the writeErr (which would break the
-	// connection). They can just be returned to the caller.
-	if errors.Is(err, ErrRejected) {
-		return err
-	}
-
-	if err != nil && ctx.Err() == nil {
+	// For cancelled or rejected requests, we don't set the writeErr (which would
+	// break the connection). They can just be returned to the caller.
+	if err != nil && ctx.Err() == nil && !errors.Is(err, ErrRejected) {
 		// The call to Write failed, and since ctx.Err() is nil we can't attribute
 		// the failure (even indirectly) to Context cancellation. The writer appears
 		// to be broken, and future writes are likely to also fail.
