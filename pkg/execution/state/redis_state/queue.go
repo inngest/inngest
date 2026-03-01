@@ -764,7 +764,6 @@ func (q *queue) Lease(
 	item osqueue.QueueItem,
 	leaseDuration time.Duration,
 	now time.Time,
-	denies *osqueue.LeaseDenies,
 	options ...osqueue.LeaseOptionFn,
 ) (*ulid.ULID, error) {
 	l := logger.StdlibLogger(ctx)
@@ -804,138 +803,23 @@ func (q *queue) Lease(
 
 	refilledFromBacklog := enableKeyQueues && item.RefilledFrom != ""
 
-	// Disable constraint checks and updates under certain circumstances
-	// - For system queues
-	// - When a valid capacity lease is held
-	checkConstraints := !o.DisableConstraintChecks
-
-	if checkConstraints {
-		if item.Data.Throttle != nil && denies != nil && denies.DenyThrottle(item.Data.Throttle.Key) {
-			return nil, osqueue.ErrQueueItemThrottled
-		}
-
-		// Check to see if this key has already been denied in the lease iteration.
-		// If partition concurrency limits were encountered previously, fail early.
-		if denies != nil && denies.DenyConcurrency(item.FunctionID.String()) {
-			// Note that we do not need to wrap the key as the key is already present.
-			return nil, osqueue.ErrPartitionConcurrencyLimit
-		}
-
-		// Same for account concurrency limits
-		if denies != nil && denies.DenyConcurrency(item.Data.Identifier.AccountID.String()) {
-			return nil, osqueue.ErrAccountConcurrencyLimit
-		}
-	}
-
-	if checkConstraints {
-		// Check to see if this key has already been denied in the lease iteration.
-		// If so, fail early.
-		if denies != nil && len(o.Backlog.ConcurrencyKeys) > 0 && denies.DenyConcurrency(o.Backlog.CustomConcurrencyKeyID(1)) {
-			return nil, osqueue.ErrConcurrencyLimitCustomKey
-		}
-
-		// Check to see if this key has already been denied in the lease iteration.
-		// If so, fail early.
-		if denies != nil && len(o.Backlog.ConcurrencyKeys) > 1 && denies.DenyConcurrency(o.Backlog.CustomConcurrencyKeyID(2)) {
-			return nil, osqueue.ErrConcurrencyLimitCustomKey
-		}
-	}
-
 	leaseID, err := ulid.New(ulid.Timestamp(now.Add(leaseDuration).UTC()), rnd)
 	if err != nil {
 		return nil, fmt.Errorf("error generating id: %w", err)
 	}
 
-	refilledFromBacklogVal := "0"
-	if refilledFromBacklog {
-		refilledFromBacklogVal = "1"
-	}
-
-	checkConstraintsVal := "0"
-	if checkConstraints {
-		checkConstraintsVal = "1"
-	}
-
-	checkThrottle := checkConstraints && o.Constraints.Throttle != nil && item.Data.Throttle != nil
-
-	enableThrottleInstrumentation := checkThrottle &&
-		o.ShadowPartition.AccountID != nil &&
-		o.ShadowPartition.FunctionID != nil &&
-		q.EnableThrottleInstrumentation != nil &&
-		q.EnableThrottleInstrumentation(ctx, *o.ShadowPartition.AccountID, *o.ShadowPartition.FunctionID)
-
-	// Check if throttle is outdated
-	if outdatedThrottleReason := o.Constraints.HasOutdatedThrottle(item); outdatedThrottleReason != enums.OutdatedThrottleReasonNone {
-		// TODO: Re-evaluate throttle with event data
-		metrics.IncrQueueThrottleKeyExpressionMismatchCounter(ctx, metrics.CounterOpt{
-			PkgName: pkgName,
-			Tags: map[string]any{
-				"reason": outdatedThrottleReason.String(),
-			},
-		})
-	}
-
 	keys := []string{
 		kg.QueueItem(),
 		kg.ConcurrencyIndex(),
-
 		shadowPartitionReadyQueueKey(o.ShadowPartition, kg),
-
-		// In progress (concurrency) ZSETs
-		shadowPartitionAccountInProgressKey(o.ShadowPartition, kg),
-		shadowPartitionInProgressKey(o.ShadowPartition, kg),
-		backlogCustomKeyInProgress(o.Backlog, kg, 1),
-		backlogCustomKeyInProgress(o.Backlog, kg, 2),
-
-		// Active set keys (ready + in progress)
-		shadowPartitionAccountActiveKey(o.ShadowPartition, kg),
-		shadowPartitionActiveKey(o.ShadowPartition, kg),
-		backlogCustomKeyActive(o.Backlog, kg, 1),
-		backlogCustomKeyActive(o.Backlog, kg, 2),
-		backlogActiveKey(o.Backlog, kg),
-
-		// Active run sets
-		kg.RunActiveSet(item.Data.Identifier.RunID),               // Set for active items in run
-		shadowPartitionAccountActiveRunKey(o.ShadowPartition, kg), // Set for active runs in account
-		shadowPartitionActiveRunKey(o.ShadowPartition, kg),        // Set for active runs in partition
-		backlogCustomKeyActiveRuns(o.Backlog, kg, 1),              // Set for active runs with custom concurrency key 1
-		backlogCustomKeyActiveRuns(o.Backlog, kg, 2),              // Set for active runs with custom concurrency key 2
-
-		kg.ThrottleKey(item.Data.Throttle),
-
 		kg.PartitionScavengerIndex(o.ShadowPartition.PartitionID),
-	}
-
-	partConcurrency := o.Constraints.Concurrency.FunctionConcurrency
-	if o.ShadowPartition.SystemQueueName != nil {
-		partConcurrency = o.Constraints.Concurrency.SystemConcurrency
-	}
-
-	marshaledConstraints, err := json.Marshal(o.Constraints)
-	if err != nil {
-		return nil, fmt.Errorf("could not marshal constraints: %w", err)
 	}
 
 	args, err := StrSlice([]any{
 		item.ID,
 		o.ShadowPartition.PartitionID,
-		item.Data.Identifier.AccountID,
-		item.Data.Identifier.RunID.String(),
-
 		leaseID.String(),
 		now.UnixMilli(),
-
-		// Concurrency limits
-		o.Constraints.Concurrency.AccountConcurrency,
-		partConcurrency,
-		o.Constraints.CustomConcurrencyLimit(1),
-		o.Constraints.CustomConcurrencyLimit(2),
-		string(marshaledConstraints),
-
-		// Key queues v2
-		refilledFromBacklogVal,
-
-		checkConstraintsVal,
 	})
 	if err != nil {
 		return nil, err
@@ -993,66 +877,16 @@ func (q *queue) Lease(
 		"partition_id", o.ShadowPartition.PartitionID,
 		"item_delay", itemDelay.String(),
 		"refilled", refilledFromBacklog,
-		"check", checkConstraints,
 		"status", status,
 	)
 
 	switch status {
-	case 0, 1:
-		if enableThrottleInstrumentation {
-			statusStr := "allowed"
-			if status == 1 {
-				statusStr = "burst"
-			}
-			metrics.IncrQueueThrottleStatus(ctx, 1, metrics.CounterOpt{
-				PkgName: pkgName,
-				Tags: map[string]any{
-					"account_id":  *o.ShadowPartition.AccountID,
-					"function_id": *o.ShadowPartition.FunctionID,
-					"status":      statusStr,
-				},
-			})
-		}
-
+	case 0:
 		return &leaseID, nil
 	case -1:
 		return nil, osqueue.ErrQueueItemNotFound
 	case -2:
 		return nil, osqueue.ErrQueueItemAlreadyLeased
-	case -3:
-		// This partition is reused for function partitions without keys, system partions,
-		// and potentially concurrency key partitions. Errors should be returned based on
-		// the partition type
-
-		if o.ShadowPartition.SystemQueueName != nil {
-			return nil, osqueue.NewKeyError(osqueue.ErrSystemConcurrencyLimit, o.ShadowPartition.PartitionID)
-		}
-
-		return nil, osqueue.NewKeyError(osqueue.ErrPartitionConcurrencyLimit, item.FunctionID.String())
-	case -4:
-		return nil, osqueue.NewKeyError(osqueue.ErrConcurrencyLimitCustomKey, o.Backlog.CustomConcurrencyKeyID(1))
-	case -5:
-		return nil, osqueue.NewKeyError(osqueue.ErrConcurrencyLimitCustomKey, o.Backlog.CustomConcurrencyKeyID(2))
-	case -6:
-		return nil, osqueue.NewKeyError(osqueue.ErrAccountConcurrencyLimit, item.Data.Identifier.AccountID.String())
-	case -7:
-		if enableThrottleInstrumentation {
-			status := "throttled"
-			metrics.IncrQueueThrottleStatus(ctx, 1, metrics.CounterOpt{
-				PkgName: pkgName,
-				Tags: map[string]any{
-					"account_id":  *o.ShadowPartition.AccountID,
-					"function_id": *o.ShadowPartition.FunctionID,
-					"status":      status,
-				},
-			})
-		}
-
-		if o.Constraints.Throttle == nil {
-			// This should never happen, as the throttle key is nil.
-			return nil, fmt.Errorf("lease attempted throttle with nil throttle config: %#v", item)
-		}
-		return nil, osqueue.NewKeyError(osqueue.ErrQueueItemThrottled, item.Data.Throttle.Key)
 	default:
 		return nil, fmt.Errorf("unknown response leasing item: %d", status)
 	}
@@ -1081,7 +915,6 @@ func (q *queue) ExtendLease(ctx context.Context, i osqueue.QueueItem, leaseID ul
 		return nil, fmt.Errorf("error generating id: %w", err)
 	}
 
-	backlog := osqueue.ItemBacklog(ctx, i)
 	partition := osqueue.ItemShadowPartition(ctx, i)
 
 	partitionID := partition.Identifier()
@@ -1096,18 +929,8 @@ func (q *queue) ExtendLease(ctx context.Context, i osqueue.QueueItem, leaseID ul
 
 	keys := []string{
 		q.RedisClient.kg.QueueItem(),
-		// And pass in the key queue's concurrency keys.
-		shadowPartitionInProgressKey(partition, kg),
-		backlogCustomKeyInProgress(backlog, kg, 1),
-		backlogCustomKeyInProgress(backlog, kg, 2),
-		shadowPartitionAccountInProgressKey(partition, kg),
 		q.RedisClient.kg.ConcurrencyIndex(),
 		kg.PartitionScavengerIndex(partition.PartitionID),
-	}
-
-	updateConstraintStateVal := "1"
-	if o.DisableConstraintUpdates {
-		updateConstraintStateVal = "0"
 	}
 
 	args, err := StrSlice([]any{
@@ -1115,7 +938,6 @@ func (q *queue) ExtendLease(ctx context.Context, i osqueue.QueueItem, leaseID ul
 		leaseID.String(),
 		newLeaseID.String(),
 		partition.PartitionID,
-		updateConstraintStateVal,
 	})
 	if err != nil {
 		return nil, err
@@ -1167,7 +989,7 @@ func (q *queue) PartitionLease(
 	p *osqueue.QueuePartition,
 	duration time.Duration,
 	options ...osqueue.PartitionLeaseOpt,
-) (*ulid.ULID, int, error) {
+) (*ulid.ULID, error) {
 	l := logger.StdlibLogger(ctx)
 
 	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.partitionLease", p.AccountID, p.Identifier().EnvID)
@@ -1183,30 +1005,6 @@ func (q *queue) PartitionLease(
 
 	kg := q.RedisClient.kg
 
-	// Fetch partition constraints with a timeout
-	dbCtx, dbCtxCancel := context.WithTimeout(ctx, osqueue.DatabaseReadTimeout)
-	constraints := q.PartitionConstraintConfigGetter(dbCtx, p.Identifier())
-
-	if dbCtx.Err() == context.DeadlineExceeded {
-		metrics.IncrQueueDatabaseContextTimeoutCounter(ctx, metrics.CounterOpt{
-			PkgName: pkgName,
-			Tags: map[string]any{
-				"operation": "partition_constraint_config_getter",
-			},
-		})
-	}
-
-	dbCtxCancel()
-
-	var accountLimit, functionLimit int
-	if p.IsSystem() {
-		accountLimit = constraints.Concurrency.SystemConcurrency
-		functionLimit = constraints.Concurrency.SystemConcurrency
-	} else {
-		accountLimit = constraints.Concurrency.AccountConcurrency
-		functionLimit = constraints.Concurrency.FunctionConcurrency
-	}
-
 	// XXX: Check for function throttling prior to leasing;  if it's throttled we can requeue
 	// the pointer and back off.  A question here is enqueuing new items onto the partition
 	// will reset the pointer update, leading to thrash.
@@ -1214,17 +1012,7 @@ func (q *queue) PartitionLease(
 	leaseExpires := now.Add(duration).UTC().Truncate(time.Millisecond)
 	leaseID, err := ulid.New(ulid.Timestamp(leaseExpires), rnd)
 	if err != nil {
-		return nil, 0, fmt.Errorf("error generating id: %w", err)
-	}
-
-	disableLeaseChecks := p.IsSystem()
-	if o.DisableLeaseChecks {
-		disableLeaseChecks = o.DisableLeaseChecks
-	}
-
-	disableLeaseChecksVal := "0"
-	if disableLeaseChecks {
-		disableLeaseChecksVal = "1"
+		return nil, fmt.Errorf("error generating id: %w", err)
 	}
 
 	keys := []string{
@@ -1235,11 +1023,6 @@ func (q *queue) PartitionLease(
 		// Until this, we may not use account queues at all, as we cannot properly clean up
 		// here without knowing the Account ID
 		kg.AccountPartitionIndex(p.AccountID),
-
-		// These concurrency keys are for fast checking of partition
-		// concurrency limits prior to leasing, as an optimization.
-		acctConcurrencyKey(*p, kg),
-		fnConcurrencyKey(*p, kg),
 	}
 
 	args, err := StrSlice([]any{
@@ -1247,14 +1030,10 @@ func (q *queue) PartitionLease(
 		leaseID.String(),
 		now.UnixMilli(),
 		leaseExpires.Unix(),
-		accountLimit,
-		functionLimit,
-		now.Add(osqueue.PartitionConcurrencyLimitRequeueExtension).Unix(),
 		p.AccountID.String(),
-		disableLeaseChecksVal,
 	})
 	if err != nil {
-		return nil, 0, err
+		return nil, err
 	}
 
 	result, err := scripts["queue/partitionLease"].Exec(
@@ -1264,10 +1043,10 @@ func (q *queue) PartitionLease(
 		args,
 	).AsIntSlice()
 	if err != nil {
-		return nil, 0, fmt.Errorf("error leasing partition: %w", err)
+		return nil, fmt.Errorf("error leasing partition: %w", err)
 	}
 	if len(result) == 0 {
-		return nil, 0, fmt.Errorf("unknown partition lease result: %v", result)
+		return nil, fmt.Errorf("unknown partition lease result: %v", result)
 	}
 
 	l.Trace("leased partition",
@@ -1279,26 +1058,20 @@ func (q *queue) PartitionLease(
 
 	switch result[0] {
 	case -1:
-		return nil, 0, osqueue.ErrAccountConcurrencyLimit
+		return nil, osqueue.ErrAccountConcurrencyLimit
 	case -2:
-		return nil, 0, osqueue.ErrPartitionConcurrencyLimit
+		return nil, osqueue.ErrPartitionConcurrencyLimit
 	case -3:
-		return nil, 0, osqueue.ErrPartitionNotFound
+		return nil, osqueue.ErrPartitionNotFound
 	case -4:
-		return nil, 0, osqueue.ErrPartitionAlreadyLeased
+		return nil, osqueue.ErrPartitionAlreadyLeased
 	default:
-		limit := functionLimit
-		if len(result) == 2 {
-			limit = int(result[1])
-		}
-
 		// Update the partition's last indicator.
 		if result[0] > p.Last {
 			p.Last = result[0]
 		}
 
-		// result is the available concurrency within this partition
-		return &leaseID, limit, nil
+		return &leaseID, nil
 	}
 }
 

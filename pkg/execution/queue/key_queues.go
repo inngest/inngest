@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/inngest/inngest/pkg/enums"
 )
 
 // NOTE: there's no logic behind this number, it's just a random pick for now
@@ -21,14 +20,9 @@ var (
 )
 
 type BacklogRefillResult struct {
-	Constraint        enums.QueueConstraint
-	Refilled          int
 	TotalBacklogCount int
 	BacklogCountUntil int
-	Capacity          int
-	Refill            int
 	RefilledItems     []string
-	RetryAt           time.Time
 }
 
 func (o QueueOptions) ItemEnableKeyQueues(ctx context.Context, item QueueItem) bool {

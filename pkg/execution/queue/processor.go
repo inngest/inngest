@@ -461,10 +461,6 @@ func (q *queueProcessor) Run(ctx context.Context, f RunFunc) error {
 		go q.runScavenger(ctx)
 	}
 
-	if q.runMode.ActiveChecker {
-		go q.runActiveChecker(ctx)
-	}
-
 	go q.runInstrumentation(ctx)
 
 	// start execution and shadow scan concurrently
