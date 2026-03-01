@@ -31,6 +31,7 @@ const (
 	V2_CreateWebhook_FullMethodName           = "/api.v2.V2/CreateWebhook"
 	V2_ListWebhooks_FullMethodName            = "/api.v2.V2/ListWebhooks"
 	V2_PatchEnv_FullMethodName                = "/api.v2.V2/PatchEnv"
+	V2_InvokeFunction_FullMethodName          = "/api.v2.V2/InvokeFunction"
 )
 
 // V2Client is the client API for V2 service.
@@ -50,6 +51,7 @@ type V2Client interface {
 	CreateWebhook(ctx context.Context, in *CreateWebhookRequest, opts ...grpc.CallOption) (*CreateWebhookResponse, error)
 	ListWebhooks(ctx context.Context, in *ListWebhooksRequest, opts ...grpc.CallOption) (*ListWebhooksResponse, error)
 	PatchEnv(ctx context.Context, in *PatchEnvRequest, opts ...grpc.CallOption) (*PatchEnvsResponse, error)
+	InvokeFunction(ctx context.Context, in *InvokeFunctionRequest, opts ...grpc.CallOption) (*InvokeFunctionResponse, error)
 }
 
 type v2Client struct {
@@ -180,6 +182,16 @@ func (c *v2Client) PatchEnv(ctx context.Context, in *PatchEnvRequest, opts ...gr
 	return out, nil
 }
 
+func (c *v2Client) InvokeFunction(ctx context.Context, in *InvokeFunctionRequest, opts ...grpc.CallOption) (*InvokeFunctionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(InvokeFunctionResponse)
+	err := c.cc.Invoke(ctx, V2_InvokeFunction_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // V2Server is the server API for V2 service.
 // All implementations must embed UnimplementedV2Server
 // for forward compatibility.
@@ -197,6 +209,7 @@ type V2Server interface {
 	CreateWebhook(context.Context, *CreateWebhookRequest) (*CreateWebhookResponse, error)
 	ListWebhooks(context.Context, *ListWebhooksRequest) (*ListWebhooksResponse, error)
 	PatchEnv(context.Context, *PatchEnvRequest) (*PatchEnvsResponse, error)
+	InvokeFunction(context.Context, *InvokeFunctionRequest) (*InvokeFunctionResponse, error)
 	mustEmbedUnimplementedV2Server()
 }
 
@@ -242,6 +255,9 @@ func (UnimplementedV2Server) ListWebhooks(context.Context, *ListWebhooksRequest)
 }
 func (UnimplementedV2Server) PatchEnv(context.Context, *PatchEnvRequest) (*PatchEnvsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method PatchEnv not implemented")
+}
+func (UnimplementedV2Server) InvokeFunction(context.Context, *InvokeFunctionRequest) (*InvokeFunctionResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method InvokeFunction not implemented")
 }
 func (UnimplementedV2Server) mustEmbedUnimplementedV2Server() {}
 func (UnimplementedV2Server) testEmbeddedByValue()            {}
@@ -480,6 +496,24 @@ func _V2_PatchEnv_Handler(srv interface{}, ctx context.Context, dec func(interfa
 	return interceptor(ctx, in, info, handler)
 }
 
+func _V2_InvokeFunction_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(InvokeFunctionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).InvokeFunction(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_InvokeFunction_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).InvokeFunction(ctx, req.(*InvokeFunctionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // V2_ServiceDesc is the grpc.ServiceDesc for V2 service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -534,6 +568,10 @@ var V2_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "PatchEnv",
 			Handler:    _V2_PatchEnv_Handler,
+		},
+		{
+			MethodName: "InvokeFunction",
+			Handler:    _V2_InvokeFunction_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

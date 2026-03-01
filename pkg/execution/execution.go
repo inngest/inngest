@@ -60,7 +60,7 @@ type Executor interface {
 	// Note that the executor does *not* handle rate limiting, debouncing, batching,
 	// expressions, etc.  Any Schedule request will immediately be scheduled for the
 	// given time. Filtering of events in any way must be handled prior scheduling.
-	Schedule(ctx context.Context, r ScheduleRequest) (*sv2.Metadata, error)
+	Schedule(ctx context.Context, r ScheduleRequest) (*ulid.ULID, *sv2.Metadata, error)
 
 	// Execute runs the given function via the execution drivers.  If the
 	// from ID is "$trigger" this is treated as a new workflow invocation from the
@@ -224,11 +224,9 @@ type ScheduleRequest struct {
 	// RunID allows specifying a run ID for the scheduled run.  This is entirely
 	// optional, and allows clients to choose a run ID when scheduling.  We need this
 	// for run IDs with API-based checkpointing.
-	//
-	// Note that this should never be provided by the user, as that could welcome
-	// conflicts.
 	RunID *ulid.ULID
-	// URL is the URL that is being hit for REST-based sync functions.
+	// URL is the URL that is being hit for durable endpoints, and without this
+	// we cannot reenter and resume these durable endpoint runs.
 	//
 	// This is required because some URLs may contain IDs (/v1/users/:id).
 	// These URLs are *run specific* vs function specific;  we must always include
@@ -283,6 +281,27 @@ type ScheduleRequest struct {
 	// if we're queuing a function as a result of a sync run going async, as
 	// the SDK has already been run at that point.
 	RequestVersion *int
+}
+
+// NewScheduleRequest creates an initial ScheduleRequest given a deployed
+// function, ensuring common fields are filled out.
+//
+// XXX: We should replace Function in ScheduleRequest with a DeployedFunction
+// to remove this method.
+func NewScheduleRequest(f inngest.DeployedFunction) ScheduleRequest {
+	req := ScheduleRequest{
+		Function:    f.Function,
+		AccountID:   f.AccountID,
+		WorkspaceID: f.EnvironmentID,
+		AppID:       f.AppID,
+	}
+	if !f.PausedAt.IsZero() {
+		req.FunctionPausedAt = &f.PausedAt
+	}
+	if !f.DrainedAt.IsZero() {
+		req.DrainedAt = &f.DrainedAt
+	}
+	return req
 }
 
 func (r ScheduleRequest) SkipReason() enums.SkipReason {

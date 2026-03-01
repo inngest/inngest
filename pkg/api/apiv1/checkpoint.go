@@ -175,7 +175,7 @@ func (a checkpointAPI) CheckpointNewRun(w http.ResponseWriter, r *http.Request) 
 	// We do this by inserting into the state store and adding a trace.  Note that API functions
 	// SHOULD automatically have a timeout after 60 minutes;  we should auomatically ensure
 	// that functions are marked as FAILED if we do not get a call to finalize them.
-	md, err := a.Executor.Schedule(ctx, execution.ScheduleRequest{
+	_, md, err := a.Executor.Schedule(ctx, execution.ScheduleRequest{
 		RunID:       &input.RunID,
 		Function:    fn,
 		AccountID:   auth.AccountID(),

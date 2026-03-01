@@ -246,7 +246,7 @@ func TestScheduleRaceCondition(t *testing.T) {
 					Name: "cron-resumed",
 					ID:   evtID.String(),
 				}, event.SeededIDFromString("", 0))
-				md, err := exec.Schedule(ctx, execution.ScheduleRequest{
+				_, md, err := exec.Schedule(ctx, execution.ScheduleRequest{
 					Function:       fn,
 					At:             &at,
 					AccountID:      accountID,
@@ -427,7 +427,7 @@ func TestScheduleRaceConditionWithExistingIdempotencyKey(t *testing.T) {
 					ID:   evtID.String(),
 				}, event.SeededIDFromString("", 0))
 
-				md, err := exec.Schedule(ctx, execution.ScheduleRequest{
+				_, md, err := exec.Schedule(ctx, execution.ScheduleRequest{
 					Function:       fn,
 					At:             &at,
 					AccountID:      accountID,
@@ -592,7 +592,7 @@ func TestFinalize(t *testing.T) {
 	// Schedule two runs
 	//
 
-	run1, err := exec.Schedule(ctx, execution.ScheduleRequest{
+	_, run1, err := exec.Schedule(ctx, execution.ScheduleRequest{
 		Function:    fn,
 		At:          &now,
 		AccountID:   accountID,
@@ -631,7 +631,7 @@ func TestFinalize(t *testing.T) {
 	require.Len(t, jobs1, 1)
 	require.Equal(t, queue.KindStart, jobs1[0].Kind)
 
-	run2, err := exec.Schedule(ctx, execution.ScheduleRequest{
+	_, run2, err := exec.Schedule(ctx, execution.ScheduleRequest{
 		Function:    fn,
 		At:          &now,
 		AccountID:   accountID,
@@ -897,7 +897,7 @@ func TestInvokeRetrySucceedsIfPauseAlreadyCreated(t *testing.T) {
 	now := time.Now()
 	evtID := ulid.MustNew(ulid.Timestamp(now), rand.Reader)
 
-	run, err := exec.Schedule(ctx, execution.ScheduleRequest{
+	_, run, err := exec.Schedule(ctx, execution.ScheduleRequest{
 		Function:    fn,
 		At:          &now,
 		AccountID:   aID,
@@ -1075,7 +1075,7 @@ func TestExecutorReturnsResponseWhenNonRetriableError(t *testing.T) {
 	now := time.Now()
 	evtID := ulid.MustNew(ulid.Timestamp(now), rand.Reader)
 
-	run, err := exec.Schedule(ctx, execution.ScheduleRequest{
+	_, run, err := exec.Schedule(ctx, execution.ScheduleRequest{
 		Function:    fn,
 		At:          &now,
 		AccountID:   aID,
@@ -1271,7 +1271,7 @@ func TestExecutorScheduleRateLimit(t *testing.T) {
 		},
 	}, evtID)
 
-	run, err := exec.Schedule(ctx, execution.ScheduleRequest{
+	_, run, err := exec.Schedule(ctx, execution.ScheduleRequest{
 		Function:    fn,
 		At:          &now,
 		AccountID:   aID,
@@ -1314,7 +1314,7 @@ func TestExecutorScheduleRateLimit(t *testing.T) {
 		},
 	}, evtID)
 
-	_, err = exec.Schedule(ctx, execution.ScheduleRequest{
+	_, _, err = exec.Schedule(ctx, execution.ScheduleRequest{
 		Function:    fn,
 		At:          &now,
 		AccountID:   aID,
@@ -1479,7 +1479,7 @@ func TestExecutorScheduleBacklogSizeLimit(t *testing.T) {
 		},
 	}, evtID)
 
-	run, err := exec.Schedule(ctx, execution.ScheduleRequest{
+	_, run, err := exec.Schedule(ctx, execution.ScheduleRequest{
 		Function:    fn,
 		At:          &now,
 		AccountID:   aID,
@@ -1525,7 +1525,7 @@ func TestExecutorScheduleBacklogSizeLimit(t *testing.T) {
 		},
 	}, evtID)
 
-	_, err = exec.Schedule(ctx, execution.ScheduleRequest{
+	_, _, err = exec.Schedule(ctx, execution.ScheduleRequest{
 		Function:    fn,
 		At:          &now,
 		AccountID:   aID,

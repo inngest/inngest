@@ -116,6 +116,9 @@ func (v v2) Create(ctx context.Context, s state.CreateState) (state.State, error
 			return state.State{}, err
 		}
 		return st, statev1.ErrIdentifierExists
+	case statev1.ErrIdentifierTombstone:
+		s.Metadata.ID.RunID = st.RunID()
+		return state.State{Metadata: s.Metadata}, statev1.ErrIdentifierTombstone
 	default:
 		return state.State{}, err
 	}

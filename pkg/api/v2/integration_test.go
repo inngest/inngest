@@ -11,6 +11,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/test/bufconn"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 const bufSize = 1024 * 1024
@@ -184,6 +185,117 @@ func TestGRPCIntegration_ErrorHandling(t *testing.T) {
 		require.Error(t, err)
 		require.Nil(t, resp)
 	})
+}
+
+func TestGRPCIntegration_InvokeFunction(t *testing.T) {
+	client, cleanup := setupGRPCTestServer(t)
+	defer cleanup()
+
+	t.Run("invoke function with valid request returns not implemented", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		data, err := structpb.NewStruct(map[string]interface{}{
+			"message": "Hello, World!",
+		})
+		require.NoError(t, err)
+
+		req := &apiv2.InvokeFunctionRequest{
+			FunctionId:     "my-app-hello-world",
+			Data:           data,
+			IdempotencyKey: stringPtr("test-key-123"),
+		}
+
+		resp, err := client.InvokeFunction(ctx, req)
+
+		require.Error(t, err)
+		require.Nil(t, resp)
+		require.Contains(t, err.Error(), "not_implemented")
+	})
+
+	t.Run("invoke function with missing function ID", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		data, err := structpb.NewStruct(map[string]interface{}{
+			"message": "Hello, World!",
+		})
+		require.NoError(t, err)
+
+		req := &apiv2.InvokeFunctionRequest{
+			FunctionId: "",
+			Data:       data,
+		}
+
+		resp, err := client.InvokeFunction(ctx, req)
+
+		require.Error(t, err)
+		require.Nil(t, resp)
+		require.Contains(t, err.Error(), "Function ID is required")
+	})
+
+	t.Run("invoke function with missing data", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		req := &apiv2.InvokeFunctionRequest{
+			FunctionId: "my-app-hello-world",
+			Data:       nil, // Missing data
+		}
+
+		resp, err := client.InvokeFunction(ctx, req)
+
+		require.Error(t, err)
+		require.Nil(t, resp)
+		require.Contains(t, err.Error(), "Input data is required")
+	})
+
+	t.Run("invoke function with async mode via gRPC", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		data, err := structpb.NewStruct(map[string]interface{}{
+			"message": "Hello, World!",
+		})
+		require.NoError(t, err)
+
+		req := &apiv2.InvokeFunctionRequest{
+			FunctionId: "my-app-hello-world",
+			Data:       data,
+		}
+
+		resp, err := client.InvokeFunction(ctx, req)
+
+		require.Error(t, err)
+		require.Nil(t, resp)
+		require.Contains(t, err.Error(), "not_implemented")
+	})
+
+	t.Run("invoke function without mode defaults to async via gRPC", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		data, err := structpb.NewStruct(map[string]interface{}{
+			"message": "Hello, World!",
+		})
+		require.NoError(t, err)
+
+		req := &apiv2.InvokeFunctionRequest{
+			FunctionId: "my-app-hello-world",
+			Data:       data,
+		}
+
+		resp, err := client.InvokeFunction(ctx, req)
+
+		require.Error(t, err)
+		require.Nil(t, resp)
+		require.Contains(t, err.Error(), "not_implemented")
+	})
+}
+
+// Helper function to create string pointer for optional fields
+func stringPtr(s string) *string {
+	return &s
 }
 
 func BenchmarkGRPCIntegration_Health(b *testing.B) {
