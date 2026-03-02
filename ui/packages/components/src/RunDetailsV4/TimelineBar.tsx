@@ -17,6 +17,7 @@ import {
   RiCloseCircleFill,
   RiFlashlightLine,
   RiFunctionLine,
+  RiInformationLine,
   RiMailLine,
   RiSettings3Line,
   RiStopCircleFill,
@@ -595,6 +596,21 @@ export function TimelineBar({
 
           {/* Icon */}
           <BarIconComponent icon={effectiveIcon} className="text-subtle ml-px" status={status} />
+
+          {/* Info tooltip for Inngest timing bar */}
+          {style === 'timing.inngest' && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <RiInformationLine
+                  className="text-light h-3.5 w-3.5 shrink-0 cursor-help"
+                  onClick={(e) => e.stopPropagation()}
+                />
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                This contains flow control delay (concurrency, etc.)
+              </TooltipContent>
+            </Tooltip>
+          )}
 
           {/* Name */}
           <span
