@@ -126,16 +126,10 @@ func TestQueueRefillBacklog(t *testing.T) {
 		itemIDs, err := getItemIDsFromBacklog(ctx, shard, &expectedBacklog, clock.Now(), 1000)
 		require.NoError(t, err)
 
-		res, err := shard.BacklogRefill(ctx, &expectedBacklog, &shadowPartition, clock.Now(), itemIDs, osqueue.PartitionConstraintConfig{
-			Concurrency: osqueue.PartitionConcurrency{
-				AccountConcurrency:  osqueue.DefaultConcurrency,
-				FunctionConcurrency: osqueue.DefaultConcurrency,
-			},
-		})
+		res, err := shard.BacklogRefill(ctx, &expectedBacklog, &shadowPartition, clock.Now(), itemIDs)
 		require.NoError(t, err)
 
-		require.Equal(t, 1, res.Refilled)
-		require.Equal(t, enums.QueueConstraintNotLimited, res.Constraint)
+		require.Equal(t, 1, len(res.RefilledItems))
 
 		require.False(t, hasMember(t, r, kg.BacklogSet(expectedBacklog.BacklogID), qi.ID))
 
@@ -219,16 +213,10 @@ func TestQueueRefillBacklog(t *testing.T) {
 		// Simulate peek returned missing items
 		itemIDs = append(itemIDs, "missing-1", "missing-2", "missing-3")
 
-		res, err := shard.BacklogRefill(ctx, &expectedBacklog, &shadowPartition, clock.Now(), itemIDs, osqueue.PartitionConstraintConfig{
-			Concurrency: osqueue.PartitionConcurrency{
-				AccountConcurrency:  osqueue.DefaultConcurrency,
-				FunctionConcurrency: osqueue.DefaultConcurrency,
-			},
-		})
+		res, err := shard.BacklogRefill(ctx, &expectedBacklog, &shadowPartition, clock.Now(), itemIDs)
 		require.NoError(t, err)
 
-		require.Equal(t, 1, res.Refilled)
-		require.Equal(t, enums.QueueConstraintNotLimited, res.Constraint)
+		require.Equal(t, 1, len(res.RefilledItems))
 
 		require.False(t, hasMember(t, r, kg.BacklogSet(expectedBacklog.BacklogID), qi.ID))
 		require.False(t, r.Exists(kg.BacklogMeta()))
@@ -342,20 +330,12 @@ func TestQueueRefillBacklog(t *testing.T) {
 		// Only include first 2 items
 		itemIDs = itemIDs[:2]
 
-		res, err := shard.BacklogRefill(ctx, &backlog, &shadowPart, refillUntil, itemIDs, osqueue.PartitionConstraintConfig{
-			Concurrency: osqueue.PartitionConcurrency{
-				AccountConcurrency:  123,
-				FunctionConcurrency: 45,
-			},
-		})
+		res, err := shard.BacklogRefill(ctx, &backlog, &shadowPart, refillUntil, itemIDs)
 		require.NoError(t, err)
 
 		require.Equal(t, 3, res.TotalBacklogCount)
 		require.Equal(t, 3, res.BacklogCountUntil)
-		require.Equal(t, 45, res.Capacity) // limit by function concurrency
-		require.Equal(t, 2, res.Refill)    // limited by max refill limit of 1
-		require.Equal(t, 2, res.Refilled)
-		require.Equal(t, enums.QueueConstraintNotLimited, res.Constraint)
+		require.Equal(t, 2, len(res.RefilledItems))
 	})
 
 	t.Run("should not move future items but adjust pointers", func(t *testing.T) {
