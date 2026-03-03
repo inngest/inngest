@@ -399,12 +399,16 @@ func TestInvokeRateLimit(t *testing.T) {
 		},
 		inngestgo.EventTrigger(evtName, nil),
 		func(ctx context.Context, input inngestgo.Input[DebounceEvent]) (any, error) {
-			n := calls.Add(1)
-			if n == 1 {
-				firstRID.Send(input.InputCtx.RunID)
-			} else {
-				secondRID.Send(input.InputCtx.RunID)
-			}
+			// Only send run ID once
+			_, _ = step.Run(ctx, "send", func(ctx context.Context) (any, error) {
+				switch calls.Add(1) {
+				case 1:
+					firstRID.Send(input.InputCtx.RunID)
+				case 2:
+					secondRID.Send(input.InputCtx.RunID)
+				}
+				return nil, nil
+			})
 
 			_, err := step.Invoke[any](
 				ctx,
