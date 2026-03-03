@@ -367,8 +367,12 @@ func TestInvokeRateLimit(t *testing.T) {
 	inngestClient, server, registerFuncs := NewSDKHandler(t, appID)
 	defer server.Close()
 
+	firstRID := NewRunID()
+	secondRID := NewRunID()
+	var calls atomic.Int32
+
 	// This function will be invoked by the main function
-	invokedFnName := "invoked-fn"
+	invokedFnName := "invoked-fn-foo"
 	_, err := inngestgo.CreateFunction(
 		inngestClient,
 		inngestgo.FunctionOpts{
@@ -390,10 +394,22 @@ func TestInvokeRateLimit(t *testing.T) {
 	_, err = inngestgo.CreateFunction(
 		inngestClient,
 		inngestgo.FunctionOpts{
-			ID: "main-fn",
+			ID:      "main-fn",
+			Retries: inngestgo.IntPtr(0),
 		},
 		inngestgo.EventTrigger(evtName, nil),
 		func(ctx context.Context, input inngestgo.Input[DebounceEvent]) (any, error) {
+			// Only send run ID once
+			_, _ = step.Run(ctx, "send", func(ctx context.Context) (any, error) {
+				switch calls.Add(1) {
+				case 1:
+					firstRID.Send(input.InputCtx.RunID)
+				case 2:
+					secondRID.Send(input.InputCtx.RunID)
+				}
+				return nil, nil
+			})
+
 			_, err := step.Invoke[any](
 				ctx,
 				"invoke",
@@ -408,35 +424,17 @@ func TestInvokeRateLimit(t *testing.T) {
 	registerFuncs()
 
 	// Trigger the main function and successfully invoke the other function
-	eventID, err := inngestClient.Send(ctx, &event.Event{Name: evtName})
+	_, err = inngestClient.Send(ctx, &event.Event{Name: evtName})
 	r.NoError(err)
 
-	var firstRunID string
-	r.Eventually(func() bool {
-		runs, err := c.RunsByEventID(ctx, eventID)
-		if err != nil || len(runs) == 0 {
-			return false
-		}
-		firstRunID = runs[0].ID
-		return true
-	}, 10*time.Second, 200*time.Millisecond)
-
+	firstRunID := firstRID.Wait(t)
 	c.WaitForRunStatus(ctx, t, "COMPLETED", firstRunID)
 
 	// Trigger the main function. It'll fail because the invoked function is
 	// rate limited
-	eventID, err = inngestClient.Send(ctx, &event.Event{Name: evtName})
+	_, err = inngestClient.Send(ctx, &event.Event{Name: evtName})
 	r.NoError(err)
 
-	var secondRunID string
-	r.Eventually(func() bool {
-		runs, err := c.RunsByEventID(ctx, eventID)
-		if err != nil || len(runs) == 0 {
-			return false
-		}
-		secondRunID = runs[0].ID
-		return true
-	}, 10*time.Second, 200*time.Millisecond)
-
+	secondRunID := secondRID.Wait(t)
 	c.WaitForRunStatus(ctx, t, "FAILED", secondRunID)
 }

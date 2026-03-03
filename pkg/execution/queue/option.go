@@ -413,6 +413,8 @@ type QueueOptions struct {
 	// peek min & max sets the range for partitions to peek for items
 	PeekMin int64
 	PeekMax int64
+	// PeekSizeExponent is the exp. on the random skewed distribution
+	PeekSizeExponent float64
 	// usePeekEWMA specifies whether we should use EWMA for peeking.
 	usePeekEWMA bool
 	// peekCurrMultiplier is a multiplier used for calculating the dynamic peek size
@@ -641,6 +643,12 @@ func WithConditionalTracer(tracer trace.ConditionalTracer) QueueOpt {
 	}
 }
 
+func WithPeekSizeExponent(n float64) QueueOpt {
+	return func(q *QueueOptions) {
+		q.PeekSizeExponent = n
+	}
+}
+
 // continuation represents a partition continuation, forcung the queue to continue working
 // on a partition once a job from a partition has been processed.
 type continuation struct {
@@ -755,6 +763,7 @@ func NewQueueOptions(
 		},
 		PeekMin:                     DefaultQueuePeekMin,
 		PeekMax:                     DefaultQueuePeekMax,
+		PeekSizeExponent:            7,
 		shadowPeekMin:               ShadowPartitionPeekMinBacklogs,
 		shadowPeekMax:               ShadowPartitionPeekMaxBacklogs,
 		backlogRefillLimit:          BacklogRefillHardLimit,
