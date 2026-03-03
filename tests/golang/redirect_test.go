@@ -74,5 +74,5 @@ func TestRedirect(t *testing.T) {
 	require.NoError(t, err)
 
 	c.WaitForRunStatus(ctx, t, "COMPLETED", rid.Wait(t))
-	r.GreaterOrEqual(2, redirectCounter)
+	r.GreaterOrEqual(redirectCounter, 2)
 }
