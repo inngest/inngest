@@ -2193,8 +2193,19 @@ func (e *executor) executeDriverV1(ctx context.Context, i *runInstance) (*state.
 	}
 
 	if err != nil && response.Err == nil {
-		var serr syscode.Error
-		if errors.As(err, &serr) {
+		// NOTE: syscode.Error is returned as a pointer (*syscode.Error) from
+		// httpdriver (e.g. output_too_large) and as a value (syscode.Error) from
+		// the connect driver and httpdriver's ErrNotSDK. We need to check both
+		// because errors.As only matches *T to **T (pointer) or T to *T (value),
+		// not both with a single target type.
+		var serr *syscode.Error
+		if !errors.As(err, &serr) {
+			var serrVal syscode.Error
+			if errors.As(err, &serrVal) {
+				serr = &serrVal
+			}
+		}
+		if serr != nil {
 			gracefulErr := state.StandardError{
 				Error:   fmt.Sprintf("%s: %s", serr.Code, serr.Message),
 				Name:    serr.Code,
