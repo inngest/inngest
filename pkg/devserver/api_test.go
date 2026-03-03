@@ -476,6 +476,53 @@ func TestRegister_DuplicateAppCleanup(t *testing.T) {
 		require.Equal(t, "my-app", apps[0].Name)
 	})
 
+	t.Run("port mismatch between UI URL and SDK URL does not create duplicate", func(t *testing.T) {
+		// This tests the scenario where a user adds a URL without an explicit
+		// port (e.g. "http://myhost/api/inngest") via the UI, but the SDK
+		// reports its URL with the default port (e.g. "http://myhost:80/api/inngest").
+		//
+		// Because NormalizeAppURL does not strip default ports, these are
+		// treated as different URLs, so the GetAppByURL cleanup can't find
+		// the placeholder even on the first registration.
+
+		ds := newTestDevServer(t)
+		api := &devapi{
+			devserver: ds,
+		}
+
+		// Step 1: User adds "http://myhost/api/inngest" via UI (no port).
+		// This creates a placeholder with ID based on the URL without port.
+		uiURL := "http://myhost/api/inngest"
+		placeholderID := inngest.DeterministicAppUUID(uiURL)
+		_, err := ds.Data.UpsertApp(ctx, cqrs.UpsertAppParams{
+			ID:  placeholderID,
+			Url: uiURL,
+			Error: sql.NullString{
+				Valid:  true,
+				String: deploy.DeployErrUnreachable.Error(),
+			},
+		})
+		require.NoError(t, err)
+
+		// Step 2: SDK registers with the explicit default port in its URL.
+		// The SDK self-reports "http://myhost:80/api/inngest".
+		sdkReq := sdk.RegisterRequest{
+			URL:       "http://myhost:80/api/inngest",
+			AppName:   "my-app",
+			V:         "1",
+			Functions: []sdk.SDKFunction{sdkFunction},
+		}
+		_, err = api.register(ctx, sdkReq)
+		require.NoError(t, err)
+
+		// There should be exactly one app. The placeholder should have been
+		// cleaned up since both URLs refer to the same host.
+		apps, err := ds.Data.GetAllApps(ctx, consts.DevServerEnvID)
+		require.NoError(t, err)
+		require.Len(t, apps, 1, "port mismatch (no port vs :80) should not create duplicate apps")
+		require.Equal(t, "my-app", apps[0].Name)
+	})
+
 	t.Run("two URLs serving same app ID results in one app", func(t *testing.T) {
 		// When two different URLs serve the same app name, registering both
 		// should result in only one app (the last one wins).
