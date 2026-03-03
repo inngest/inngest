@@ -5,11 +5,16 @@
  * Tests are written FIRST per TDD approach.
  */
 
+import type { ReactNode } from 'react';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { TooltipProvider } from '../Tooltip/Tooltip';
 import { TimelineBar } from './TimelineBar';
+
+function Wrapper({ children }: { children: ReactNode }) {
+  return <TooltipProvider>{children}</TooltipProvider>;
+}
 
 afterEach(() => {
   cleanup();
@@ -29,18 +34,18 @@ describe('TimelineBar', () => {
   // T009: renders bar with name and duration
   describe('renders bar with name and duration', () => {
     it('displays the step name', () => {
-      render(<TimelineBar {...defaultProps} />);
+      render(<TimelineBar {...defaultProps} />, { wrapper: Wrapper });
       expect(screen.getByText('Test Step')).toBeTruthy();
     });
 
     it('displays formatted duration', () => {
-      render(<TimelineBar {...defaultProps} />);
+      render(<TimelineBar {...defaultProps} />, { wrapper: Wrapper });
       // 1234ms is >= 1s, so displayed in seconds with 3 decimal places
       expect(screen.getByText('1.234s')).toBeTruthy();
     });
 
     it('displays duration in milliseconds for short durations', () => {
-      render(<TimelineBar {...defaultProps} duration={456} />);
+      render(<TimelineBar {...defaultProps} duration={456} />, { wrapper: Wrapper });
       expect(screen.getByText('456ms')).toBeTruthy();
     });
   });
@@ -48,13 +53,13 @@ describe('TimelineBar', () => {
   // T010: positions bar using startPercent and widthPercent
   describe('positions bar using startPercent and widthPercent', () => {
     it('positions bar at correct left offset', () => {
-      render(<TimelineBar {...defaultProps} startPercent={20} />);
+      render(<TimelineBar {...defaultProps} startPercent={20} />, { wrapper: Wrapper });
       const bar = screen.getByTestId('timeline-bar-visual');
       expect(bar.style.left).toBe('20%');
     });
 
     it('sets bar width correctly', () => {
-      render(<TimelineBar {...defaultProps} widthPercent={50} />);
+      render(<TimelineBar {...defaultProps} widthPercent={50} />, { wrapper: Wrapper });
       const bar = screen.getByTestId('timeline-bar-visual');
       expect(bar.style.width).toBe('50%');
     });
@@ -63,19 +68,19 @@ describe('TimelineBar', () => {
   // T011: applies correct style based on style prop
   describe('applies correct style based on style prop', () => {
     it('applies step.run style colors (status-completed)', () => {
-      render(<TimelineBar {...defaultProps} style="step.run" />);
+      render(<TimelineBar {...defaultProps} style="step.run" />, { wrapper: Wrapper });
       const bar = screen.getByTestId('timeline-bar-visual');
       expect(bar.className).toContain('bg-status-completed');
     });
 
     it('applies timing.inngest style colors', () => {
-      render(<TimelineBar {...defaultProps} style="timing.inngest" />);
+      render(<TimelineBar {...defaultProps} style="timing.inngest" />, { wrapper: Wrapper });
       const bar = screen.getByTestId('timeline-bar-visual');
       expect(bar.className).toContain('bg-slate-300');
     });
 
     it('applies timing.server style colors (status-completed)', () => {
-      render(<TimelineBar {...defaultProps} style="timing.server" />);
+      render(<TimelineBar {...defaultProps} style="timing.server" />, { wrapper: Wrapper });
       const bar = screen.getByTestId('timeline-bar-visual');
       expect(bar.className).toContain('bg-status-completed');
     });
@@ -84,7 +89,7 @@ describe('TimelineBar', () => {
   // T012: renders with minimum 2px width for short durations (FR-009)
   describe('renders with minimum width for short durations', () => {
     it('applies minimum width for very small widthPercent', () => {
-      render(<TimelineBar {...defaultProps} widthPercent={0.001} />);
+      render(<TimelineBar {...defaultProps} widthPercent={0.001} />, { wrapper: Wrapper });
       const bar = screen.getByTestId('timeline-bar-visual');
       // Should have min-width style applied
       expect(bar.style.minWidth).toBe('2px');
@@ -94,19 +99,21 @@ describe('TimelineBar', () => {
   // T020: renders expand toggle when expandable prop is true
   describe('expandable behavior', () => {
     it('renders expand toggle when expandable is true', () => {
-      render(<TimelineBar {...defaultProps} expandable expanded={false} />);
+      render(<TimelineBar {...defaultProps} expandable expanded={false} />, { wrapper: Wrapper });
       expect(screen.getByLabelText(/expand/i)).toBeTruthy();
     });
 
     it('does not render expand toggle when expandable is false', () => {
-      render(<TimelineBar {...defaultProps} expandable={false} />);
+      render(<TimelineBar {...defaultProps} expandable={false} />, { wrapper: Wrapper });
       expect(screen.queryByLabelText(/expand/i)).toBeNull();
     });
 
     // T021: calls onToggle when row is clicked
     it('calls onToggle when row is clicked', () => {
       const onToggle = vi.fn();
-      render(<TimelineBar {...defaultProps} expandable expanded={false} onToggle={onToggle} />);
+      render(<TimelineBar {...defaultProps} expandable expanded={false} onToggle={onToggle} />, {
+        wrapper: Wrapper,
+      });
       fireEvent.click(screen.getByTestId('timeline-bar-row'));
       expect(onToggle).toHaveBeenCalledTimes(1);
     });
@@ -116,7 +123,8 @@ describe('TimelineBar', () => {
       render(
         <TimelineBar {...defaultProps} expandable expanded={true}>
           <div data-testid="child-content">Child content</div>
-        </TimelineBar>
+        </TimelineBar>,
+        { wrapper: Wrapper }
       );
       expect(screen.getByTestId('child-content')).toBeTruthy();
     });
@@ -126,7 +134,8 @@ describe('TimelineBar', () => {
       render(
         <TimelineBar {...defaultProps} expandable expanded={false}>
           <div data-testid="child-content">Child content</div>
-        </TimelineBar>
+        </TimelineBar>,
+        { wrapper: Wrapper }
       );
       expect(screen.queryByTestId('child-content')).toBeNull();
     });
@@ -136,14 +145,14 @@ describe('TimelineBar', () => {
   describe('visual styling', () => {
     // T028: renders INNGEST timing with gray color
     it('renders INNGEST timing with correct styling', () => {
-      render(<TimelineBar {...defaultProps} style="timing.inngest" />);
+      render(<TimelineBar {...defaultProps} style="timing.inngest" />, { wrapper: Wrapper });
       const bar = screen.getByTestId('timeline-bar-visual');
       expect(bar.className).toContain('bg-slate-300');
     });
 
     // T029: renders SERVER timing with barber pole pattern (status-completed color)
     it('renders SERVER timing with barber pole pattern', () => {
-      render(<TimelineBar {...defaultProps} style="timing.server" />);
+      render(<TimelineBar {...defaultProps} style="timing.server" />, { wrapper: Wrapper });
       const bar = screen.getByTestId('timeline-bar-visual');
       expect(bar.className).toContain('bg-status-completed');
       // Should have background-image style for barber-pole
@@ -152,9 +161,30 @@ describe('TimelineBar', () => {
 
     // T030: applies barber pole stripe pattern when configured
     it('applies barber pole pattern based on style configuration', () => {
-      render(<TimelineBar {...defaultProps} style="timing.server" />);
+      render(<TimelineBar {...defaultProps} style="timing.server" />, { wrapper: Wrapper });
       const bar = screen.getByTestId('timeline-bar-visual');
       expect(bar.style.backgroundImage).toBeTruthy();
+    });
+  });
+
+  // Info icon with tooltip for Inngest and Your Server labels
+  describe('info icon with tooltip', () => {
+    it('renders info icon for Inngest timing bar', () => {
+      render(<TimelineBar {...defaultProps} style="timing.inngest" />, { wrapper: Wrapper });
+      const infoIcons = document.querySelectorAll('.cursor-help');
+      expect(infoIcons.length).toBeGreaterThan(0);
+    });
+
+    it('renders info icon for Your Server timing bar', () => {
+      render(<TimelineBar {...defaultProps} style="timing.server" />, { wrapper: Wrapper });
+      const infoIcons = document.querySelectorAll('.cursor-help');
+      expect(infoIcons.length).toBeGreaterThan(0);
+    });
+
+    it('does not render info icon for step.run style', () => {
+      render(<TimelineBar {...defaultProps} style="step.run" />, { wrapper: Wrapper });
+      const infoIcons = document.querySelectorAll('.cursor-help');
+      expect(infoIcons.length).toBe(0);
     });
   });
 
@@ -162,13 +192,15 @@ describe('TimelineBar', () => {
   describe('organization name in labels', () => {
     // T045: displays organization name in SERVER label when provided
     it('displays organization name in SERVER label', () => {
-      render(<TimelineBar {...defaultProps} style="timing.server" orgName="Acme Corp" />);
+      render(<TimelineBar {...defaultProps} style="timing.server" orgName="Acme Corp" />, {
+        wrapper: Wrapper,
+      });
       expect(screen.getByText('Acme Corp server')).toBeTruthy();
     });
 
     // T046: displays "Your server" when organization name not provided
     it('displays Your server when orgName not provided', () => {
-      render(<TimelineBar {...defaultProps} style="timing.server" />);
+      render(<TimelineBar {...defaultProps} style="timing.server" />, { wrapper: Wrapper });
       expect(screen.getByText('Your server')).toBeTruthy();
     });
   });
@@ -176,7 +208,7 @@ describe('TimelineBar', () => {
   // Depth/indentation tests
   describe('depth-based indentation', () => {
     it('applies indentation based on depth', () => {
-      render(<TimelineBar {...defaultProps} depth={2} />);
+      render(<TimelineBar {...defaultProps} depth={2} />, { wrapper: Wrapper });
       const leftPanel = screen.getByTestId('timeline-bar-left');
       // Should have padding-left based on BASE_LEFT_PADDING_PX + depth * INDENT_WIDTH_PX
       // 4px base + 2 * 20px = 44px
@@ -184,7 +216,7 @@ describe('TimelineBar', () => {
     });
 
     it('has base indentation at depth 0', () => {
-      render(<TimelineBar {...defaultProps} depth={0} />);
+      render(<TimelineBar {...defaultProps} depth={0} />, { wrapper: Wrapper });
       const leftPanel = screen.getByTestId('timeline-bar-left');
       // BASE_LEFT_PADDING_PX = 4px
       expect(leftPanel.style.paddingLeft).toBe('4px');
@@ -194,13 +226,13 @@ describe('TimelineBar', () => {
   // Expanded row opacity (EXE-1217, Task 001)
   describe('expanded row opacity', () => {
     it('renders expanded parent row with opacity 0', () => {
-      render(<TimelineBar {...defaultProps} expandable expanded={true} />);
+      render(<TimelineBar {...defaultProps} expandable expanded={true} />, { wrapper: Wrapper });
       const bar = screen.getByTestId('timeline-bar-visual');
       expect(bar.style.opacity).toBe('0');
     });
 
     it('renders collapsed row with no opacity override', () => {
-      render(<TimelineBar {...defaultProps} expandable expanded={false} />);
+      render(<TimelineBar {...defaultProps} expandable expanded={false} />, { wrapper: Wrapper });
       const bar = screen.getByTestId('timeline-bar-visual');
       expect(bar.style.opacity).toBe('');
     });
@@ -216,25 +248,17 @@ describe('TimelineBar', () => {
     };
 
     it('renders tooltip trigger on right panel when time props provided', () => {
-      render(
-        <TooltipProvider>
-          <TimelineBar {...tooltipProps} />
-        </TooltipProvider>
-      );
+      render(<TimelineBar {...tooltipProps} />, { wrapper: Wrapper });
       expect(screen.getByTestId('timeline-bar-right')).toBeTruthy();
     });
 
     it('renders right panel without tooltip when time props are missing', () => {
-      render(<TimelineBar {...defaultProps} />);
+      render(<TimelineBar {...defaultProps} />, { wrapper: Wrapper });
       expect(screen.getByTestId('timeline-bar-right')).toBeTruthy();
     });
 
     it('does not crash when endTime is null', () => {
-      render(
-        <TooltipProvider>
-          <TimelineBar {...tooltipProps} endTime={null} />
-        </TooltipProvider>
-      );
+      render(<TimelineBar {...tooltipProps} endTime={null} />, { wrapper: Wrapper });
       expect(screen.getByTestId('timeline-bar-right')).toBeTruthy();
     });
   });
@@ -242,7 +266,7 @@ describe('TimelineBar', () => {
   // Selection tests
   describe('selection', () => {
     it('applies selected styling when selected is true', () => {
-      render(<TimelineBar {...defaultProps} selected />);
+      render(<TimelineBar {...defaultProps} selected />, { wrapper: Wrapper });
       const row = screen.getByTestId('timeline-bar-row');
       const highlight = row.querySelector('.bg-secondary-3xSubtle');
       expect(highlight).toBeTruthy();
@@ -250,7 +274,7 @@ describe('TimelineBar', () => {
 
     it('calls onClick when row is clicked', () => {
       const onClick = vi.fn();
-      render(<TimelineBar {...defaultProps} onClick={onClick} />);
+      render(<TimelineBar {...defaultProps} onClick={onClick} />, { wrapper: Wrapper });
       fireEvent.click(screen.getByTestId('timeline-bar-row'));
       expect(onClick).toHaveBeenCalledTimes(1);
     });
