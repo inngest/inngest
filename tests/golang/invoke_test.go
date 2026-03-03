@@ -372,7 +372,7 @@ func TestInvokeRateLimit(t *testing.T) {
 	var calls atomic.Int32
 
 	// This function will be invoked by the main function
-	invokedFnName := "invoked-fn"
+	invokedFnName := "invoked-fn-foo"
 	_, err := inngestgo.CreateFunction(
 		inngestClient,
 		inngestgo.FunctionOpts{
