@@ -819,6 +819,97 @@ service V2 {
     };
   }
 
+  rpc UpdateWebhook(UpdateWebhookRequest) returns (UpdateWebhookResponse) {
+    option (google.api.http) = {
+      put: "/env/webhooks/{id}"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update webhook"
+      description: "Updates an existing webhook configuration"
+      parameters: {
+        headers: {
+          name: "X-Inngest-Env"
+          description: "Target environment for the webhook (e.g., 'production', 'staging', 'development')"
+          type: STRING
+          required: true
+        }
+      }
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+      responses: {
+        key: "200"
+        value: {
+          description: "Updated webhook"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2UpdateWebhookResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "400"
+        value: {
+          description: "Bad Request - invalid request body"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "401"
+        value: {
+          description: "Unauthorized - authentication required"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "403"
+        value: {
+          description: "Forbidden - insufficient permissions"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "404"
+        value: {
+          description: "Not Found - webhook does not exist"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "500"
+        value: {
+          description: "Internal Server Error"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+    };
+  }
+
   rpc PatchEnv(PatchEnvRequest) returns (PatchEnvsResponse) {
     option (google.api.http) = {
       patch: "/envs/{id}",
@@ -1171,6 +1262,41 @@ message ListWebhooksResponse {
   repeated Webhook data = 1;
   ResponseMetadata metadata = 2;
   Page page = 3;
+}
+
+message UpdateWebhookRequest {
+  string id = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Webhook ID"
+      example: "\"wh_01HFBK7X8Q2Y3Z4A5B6C7D8E9F\""
+    }
+  ];
+  optional string name = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Updated descriptive name for the webhook"
+      example: "\"Payment Processing Webhook - Updated\""
+    }
+  ];
+  optional string transform = 3 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Updated JavaScript transformation code"
+    }
+  ];
+  optional string response = 4 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Updated custom response configuration"
+    }
+  ];
+  optional EventFilter event_filter = 5 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Updated event filtering configuration"
+    }
+  ];
+}
+
+message UpdateWebhookResponse {
+  Webhook data = 1;
+  ResponseMetadata metadata = 2;
 }
 
 message Webhook {
