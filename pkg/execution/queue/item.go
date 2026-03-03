@@ -536,6 +536,8 @@ func (i *Item) UnmarshalJSON(b []byte) error {
 			return err
 		}
 		i.Payload = *p
+	case KindLatencyTrack:
+		// No payload for latency tracking items.
 	}
 	return nil
 }

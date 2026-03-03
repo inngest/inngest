@@ -466,12 +466,15 @@ func (q *queueProcessor) Run(ctx context.Context, f RunFunc) error {
 	}
 
 	go q.runInstrumentation(ctx)
+	go q.runLatencyTracker(ctx)
+
+	wrappedF := q.wrapRunFuncWithLatency(f)
 
 	// start execution and shadow scan concurrently
 	eg, ctx := errgroup.WithContext(ctx)
 
 	eg.Go(func() error {
-		return q.executionScan(ctx, f)
+		return q.executionScan(ctx, wrappedF)
 	})
 
 	if q.runMode.ShadowPartition {
