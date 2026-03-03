@@ -22,7 +22,7 @@ func (q *queueProcessor) peekSize(ctx context.Context, p *QueuePartition) int64 
 		})
 		return size.Value()
 	}
-	return q.peekSizeWeightedDistribution(ctx, p, 7)
+	return q.peekSizeWeightedDistribution(ctx, p, q.PeekSizeExponent)
 }
 
 // SkewedRand returns a random number in [min, max] following
