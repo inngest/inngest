@@ -1752,8 +1752,11 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 						continue
 					}
 
-					// TODO: validate that specific kinds are allowed to be set by the user and check account-level metadata
-					// limits.
+					if err := md.Kind().ValidateAllowed(); err != nil {
+						l.Warn("disallowed metadata kind in driver response", "error", err, "kind", md.Kind())
+						continue
+					}
+
 					_, err := e.createMetadataSpan(
 						ctx,
 						&instance,
