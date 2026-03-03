@@ -467,6 +467,8 @@ type QueueOptions struct {
 
 	enableJobPromotion bool
 
+	latencyPartition *LatencyPartitionOptions
+
 	CapacityManager                     constraintapi.CapacityManager
 	UseConstraintAPI                    constraintapi.UseConstraintAPIFn
 	EnableCapacityLeaseInstrumentation  constraintapi.EnableHighCardinalityInstrumentation
@@ -647,6 +649,32 @@ func WithPeekSizeExponent(n float64) QueueOpt {
 	return func(q *QueueOptions) {
 		q.PeekSizeExponent = n
 	}
+}
+
+// WithLatencyPartition adds latency partition tracking jobs which enter the queue
+// without flow control, and when peeked and executed run the provided callback
+// to report enqueue-to-process delay E2E.
+func WithLatencyPartition(o LatencyPartitionOptions) QueueOpt {
+	return func(q *QueueOptions) {
+		// Only a single partition supported for now.
+		if o.Partitions != 1 {
+			o.Partitions = 1
+		}
+		if o.Interval <= 0 {
+			o.Interval = 5 * time.Second
+		}
+		q.latencyPartition = &o
+	}
+}
+
+// LatencyPartitionOptions sets latency tracking jobs in the queue.
+type LatencyPartitionOptions struct {
+	// Partitions is the number of unique partition IDs to create for job tracking.
+	Partitions int // will create eg. uuid.New("ffffffff-ffff-ffff-ffff-fffffffffff1"),
+	// Interval is the duration between tracking jobs
+	Interval time.Duration // time.Second*5
+	// Callback is called when the job executes, with latency recorded.
+	Callback func(ctx context.Context, latency time.Duration)
 }
 
 // continuation represents a partition continuation, forcung the queue to continue working
