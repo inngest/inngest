@@ -29,6 +29,20 @@ type AIMetadata struct {
 	EstimatedCost	*float64	`json:"estimated_cost,omitempty"`
 }
 
+// From experiment.go
+const (
+	KindInngestExperiment = "inngest.experiment"
+)
+
+// From experiment.go
+type ExperimentMetadata struct {
+	ExperimentName		string		`json:"experiment_name"`
+	VariantSelected		string		`json:"variant_selected"`
+	SelectionStrategy	string		`json:"selection_strategy"`
+	AvailableVariants	[]string	`json:"available_variants"`
+	VariantWeights		map[string]int	`json:"variant_weights,omitempty"`
+}
+
 // From http.go
 const (
 	KindInngestHTTP = "inngest.http"
