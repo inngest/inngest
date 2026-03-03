@@ -26,6 +26,7 @@ import { format } from 'date-fns';
 
 import { getStatusBackgroundClass, getStatusTextClass } from '../Status/statusClasses';
 import { Tooltip, TooltipArrow, TooltipContent, TooltipTrigger } from '../Tooltip/Tooltip';
+import { TruncateMiddle } from '../TruncateMiddle';
 import { cn } from '../utils/classNames';
 import type {
   BarHeight,
@@ -597,15 +598,14 @@ export function TimelineBar({
           <BarIconComponent icon={effectiveIcon} className="text-subtle ml-px" status={status} />
 
           {/* Name */}
-          <span
+          <TruncateMiddle
+            text={displayName}
             className={cn(
-              'min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap font-mono text-xs font-normal leading-tight',
+              'min-w-0 flex-1 font-mono text-xs font-normal leading-tight',
               barStyle.textColor ?? 'text-basis',
               !expandable && !effectiveIcon && 'pl-1.5'
             )}
-          >
-            {displayName}
-          </span>
+          />
 
           {/* Duration */}
           <span
