@@ -311,6 +311,55 @@ func TestToSQLFiltersWithPostgresConverter(t *testing.T) {
 				sq.L("jsonb_typeof(((spans.output#>>'{}')::jsonb->'data')#>'{result}')").Eq("null"),
 			},
 		},
+		{
+			name: "output string equality",
+			cel:  []string{`output.status == "ok"`},
+			expected: []sq.Expression{
+				sq.L("((spans.output#>>'{}')::jsonb->'data')#>>'{status}'").Eq("ok"),
+			},
+		},
+		{
+			name: "output numeric greater than",
+			cel:  []string{`output.count > 10`},
+			expected: []sq.Expression{
+				sq.L("(((spans.output#>>'{}')::jsonb->'data')#>>'{count}')::numeric").Gt(int64(10)),
+			},
+		},
+		{
+			name: "error string equality",
+			cel:  []string{`error.message == "something went wrong"`},
+			expected: []sq.Expression{
+				sq.L("((spans.output#>>'{}')::jsonb->'error')#>>'{message}'").Eq("something went wrong"),
+			},
+		},
+		{
+			name: "error not null",
+			cel:  []string{`error.code != null`},
+			expected: []sq.Expression{
+				sq.L("jsonb_typeof(((spans.output#>>'{}')::jsonb->'error')#>'{code}')").Neq("null"),
+			},
+		},
+		{
+			name: "event.data string equality",
+			cel:  []string{`event.data.status == "active"`},
+			expected: []sq.Expression{
+				sq.L("(NULLIF(events.event_data, '')::jsonb)#>>'{status}'").Eq("active"),
+			},
+		},
+		{
+			name: "event.data numeric comparison",
+			cel:  []string{`event.data.count > 5`},
+			expected: []sq.Expression{
+				sq.L("((NULLIF(events.event_data, '')::jsonb)#>>'{count}')::numeric").Gt(int64(5)),
+			},
+		},
+		{
+			name: "event.data nested field",
+			cel:  []string{`event.data.nested.field == "value"`},
+			expected: []sq.Expression{
+				sq.L("(NULLIF(events.event_data, '')::jsonb)#>>'{nested,field}'").Eq("value"),
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -325,6 +374,243 @@ func TestToSQLFiltersWithPostgresConverter(t *testing.T) {
 			require.NoError(t, err)
 
 			assert.ElementsMatch(t, test.expected, filters)
+		})
+	}
+}
+
+func TestToSQLFiltersWithSQLiteConverterAdditional(t *testing.T) {
+	ctx := context.Background()
+
+	tests := []struct {
+		name     string
+		cel      []string
+		expected []sq.Expression
+	}{
+		{
+			name: "output string equality",
+			cel:  []string{`output.status == "ok"`},
+			expected: []sq.Expression{
+				sq.L("json_extract(json_extract(spans.output, '$.data'), '$.status')").Eq("ok"),
+			},
+		},
+		{
+			name: "output numeric greater than",
+			cel:  []string{`output.count > 10`},
+			expected: []sq.Expression{
+				sq.L("CAST(json_extract(json_extract(spans.output, '$.data'), '$.count') AS NUMERIC)").Gt(int64(10)),
+			},
+		},
+		{
+			name: "error string equality",
+			cel:  []string{`error.message == "something went wrong"`},
+			expected: []sq.Expression{
+				sq.L("json_extract(json_extract(spans.output, '$.error'), '$.message')").Eq("something went wrong"),
+			},
+		},
+		{
+			name: "error not null",
+			cel:  []string{`error.code != null`},
+			expected: []sq.Expression{
+				sq.L("json_type(json_extract(spans.output, '$.error'), '$.code')").Neq("null"),
+			},
+		},
+		{
+			name: "event.data string equality",
+			cel:  []string{`event.data.status == "active"`},
+			expected: []sq.Expression{
+				sq.L("json_extract(NULLIF(events.event_data, ''), '$.status')").Eq("active"),
+			},
+		},
+		{
+			name: "event.data numeric comparison",
+			cel:  []string{`event.data.count > 5`},
+			expected: []sq.Expression{
+				sq.L("CAST(json_extract(NULLIF(events.event_data, ''), '$.count') AS NUMERIC)").Gt(int64(5)),
+			},
+		},
+		{
+			name: "event.data nested field",
+			cel:  []string{`event.data.nested.field == "value"`},
+			expected: []sq.Expression{
+				sq.L("json_extract(NULLIF(events.event_data, ''), '$.nested.field')").Eq("value"),
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			handler, err := NewExpressionHandler(ctx,
+				WithExpressionHandlerExpressions(test.cel),
+				WithExpressionSQLConverter(SpanEventSQLiteConverter),
+			)
+			require.NoError(t, err)
+
+			filters, err := handler.ToSQLFilters(ctx)
+			require.NoError(t, err)
+
+			assert.ElementsMatch(t, test.expected, filters)
+		})
+	}
+}
+
+func TestHasFilters(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("no expressions - no filters", func(t *testing.T) {
+		h, err := NewExpressionHandler(ctx)
+		require.NoError(t, err)
+		assert.False(t, h.HasFilters())
+		assert.False(t, h.HasEventFilters())
+		assert.False(t, h.HasOutputFilters())
+	})
+
+	t.Run("event expression - has event filter only", func(t *testing.T) {
+		h, err := NewExpressionHandler(ctx,
+			WithExpressionHandlerExpressions([]string{`event.name == "test/hello"`}),
+		)
+		require.NoError(t, err)
+		assert.True(t, h.HasFilters())
+		assert.True(t, h.HasEventFilters())
+		assert.False(t, h.HasOutputFilters())
+	})
+
+	t.Run("output expression - has output filter only", func(t *testing.T) {
+		h, err := NewExpressionHandler(ctx,
+			WithExpressionHandlerExpressions([]string{`output.success == true`}),
+		)
+		require.NoError(t, err)
+		assert.True(t, h.HasFilters())
+		assert.False(t, h.HasEventFilters())
+		assert.True(t, h.HasOutputFilters())
+	})
+
+	t.Run("error expression - has output filter only", func(t *testing.T) {
+		h, err := NewExpressionHandler(ctx,
+			WithExpressionHandlerExpressions([]string{`error.message == "fail"`}),
+		)
+		require.NoError(t, err)
+		assert.True(t, h.HasFilters())
+		assert.False(t, h.HasEventFilters())
+		assert.True(t, h.HasOutputFilters())
+	})
+
+	t.Run("mixed event and output - has both", func(t *testing.T) {
+		h, err := NewExpressionHandler(ctx,
+			WithExpressionHandlerExpressions([]string{
+				`event.name == "test/hello"`,
+				`output.success == true`,
+			}),
+		)
+		require.NoError(t, err)
+		assert.True(t, h.HasFilters())
+		assert.True(t, h.HasEventFilters())
+		assert.True(t, h.HasOutputFilters())
+	})
+}
+
+func TestWithExpressionHandlerBlob(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("newline-delimited blob", func(t *testing.T) {
+		blob := "event.name == \"test/hello\"\nevent.ts > 1727291508963"
+		h, err := NewExpressionHandler(ctx, WithExpressionHandlerBlob(blob, ""))
+		require.NoError(t, err)
+		assert.True(t, h.HasEventFilters())
+		assert.Len(t, h.EventExprList, 2)
+	})
+
+	t.Run("custom delimiter blob", func(t *testing.T) {
+		blob := `event.name == "test/hello"|output.success == true`
+		h, err := NewExpressionHandler(ctx, WithExpressionHandlerBlob(blob, "|"))
+		require.NoError(t, err)
+		assert.True(t, h.HasEventFilters())
+		assert.True(t, h.HasOutputFilters())
+	})
+
+	t.Run("empty blob", func(t *testing.T) {
+		h, err := NewExpressionHandler(ctx, WithExpressionHandlerBlob("", ""))
+		require.NoError(t, err)
+		assert.False(t, h.HasFilters())
+	})
+
+	t.Run("single expression blob", func(t *testing.T) {
+		blob := `event.name == "test/hello"`
+		h, err := NewExpressionHandler(ctx, WithExpressionHandlerBlob(blob, "\n"))
+		require.NoError(t, err)
+		assert.True(t, h.HasEventFilters())
+		assert.Len(t, h.EventExprList, 1)
+	})
+}
+
+func TestMatchOutputExpressions(t *testing.T) {
+	ctx := context.Background()
+
+	tests := []struct {
+		name     string
+		expr     string
+		output   []byte
+		expected bool
+	}{
+		{
+			name:     "should match boolean true",
+			expr:     `output.success == true`,
+			output:   []byte(`{"success": true}`),
+			expected: true,
+		},
+		{
+			name:     "should not match boolean false vs true",
+			expr:     `output.success == true`,
+			output:   []byte(`{"success": false}`),
+			expected: false,
+		},
+		{
+			name:     "should match string equality",
+			expr:     `output.status == "ok"`,
+			output:   []byte(`{"status": "ok"}`),
+			expected: true,
+		},
+		{
+			name:     "should not match different string",
+			expr:     `output.status == "ok"`,
+			output:   []byte(`{"status": "fail"}`),
+			expected: false,
+		},
+		{
+			name:     "should match numeric comparison",
+			expr:     `output.count > 5`,
+			output:   []byte(`{"count": 10}`),
+			expected: true,
+		},
+		{
+			name:     "should not match numeric comparison",
+			expr:     `output.count > 5`,
+			output:   []byte(`{"count": 3}`),
+			expected: false,
+		},
+		{
+			name:     "should not match when output is empty",
+			expr:     `output.success == true`,
+			output:   []byte(``),
+			expected: false,
+		},
+		{
+			name:     "should match nested field",
+			expr:     `output.data.value == "hello"`,
+			output:   []byte(`{"data": {"value": "hello"}}`),
+			expected: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			handler, err := NewExpressionHandler(ctx,
+				WithExpressionHandlerExpressions([]string{test.expr}),
+			)
+			require.NoError(t, err)
+
+			ok, err := handler.MatchOutputExpressions(ctx, test.output)
+			require.NoError(t, err)
+			assert.Equal(t, test.expected, ok)
 		})
 	}
 }
