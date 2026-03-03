@@ -12,36 +12,18 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestLatencyQueueName(t *testing.T) {
-	tests := []struct {
-		n        int
-		expected string
-	}{
-		{1, "ffffffff-ffff-ffff-ffff-fffffffffff1"},
-		{2, "ffffffff-ffff-ffff-ffff-fffffffffff2"},
-		{10, "ffffffff-ffff-ffff-ffff-fffffffffffa"},
-		{15, "ffffffff-ffff-ffff-ffff-ffffffffffff"},
-	}
-	for _, tt := range tests {
-		require.Equal(t, tt.expected, latencyQueueName(tt.n))
-	}
-}
-
 func TestIsLatencyPartition(t *testing.T) {
 	tests := []struct {
 		id       string
 		expected bool
 	}{
-		{latencyQueueName(1), true},
-		{latencyQueueName(2), true},
-		{latencyQueueName(15), true},
-		{"ffffffff-ffff-ffff-ffff-fffffffffff0", true},
-		{"ffffffff-ffff-ffff-ffff-ffffffffffff", true},
+		{LatencyFunctionID.String(), true},
 		// Real UUIDs should never match.
 		{"00000000-0000-0000-0000-000000000000", false},
 		{"a1b2c3d4-e5f6-7890-abcd-ef1234567890", false},
-		// Differs before the final suffix — not a latency partition.
-		{"ffffffff-ffff-ffff-ffff-ffffffffffe1", false},
+		// Other well-known latency UUIDs are not the function ID.
+		{LatencyAccountID.String(), false},
+		{LatencyEnvID.String(), false},
 		// Empty and short strings.
 		{"", false},
 		{"ffffffff", false},
@@ -291,14 +273,18 @@ func TestEnqueueLatencyJob(t *testing.T) {
 		require.Equal(t, int32(1), enqueueCalled.Load())
 
 		require.Equal(t, KindLatencyTrack, enqueuedItem.Kind)
-		require.NotNil(t, enqueuedItem.QueueName)
-		require.Equal(t, latencyQueueName(1), *enqueuedItem.QueueName)
+		require.Nil(t, enqueuedItem.QueueName)
+		require.Equal(t, LatencyAccountID, enqueuedItem.Identifier.AccountID)
+		require.Equal(t, LatencyEnvID, enqueuedItem.Identifier.WorkspaceID)
+		require.Equal(t, LatencyFunctionID, enqueuedItem.Identifier.WorkflowID)
+		require.Equal(t, LatencyEnvID, enqueuedItem.WorkspaceID)
 		require.NotNil(t, enqueuedItem.JobID)
 		require.Contains(t, *enqueuedItem.JobID, "ltrack-1-")
 		// Enqueue truncates times to millisecond precision internally.
 		require.Equal(t, fakeClock.Now().UnixMilli(), enqueuedAt.UnixMilli())
 		require.NotNil(t, enqueuedOpts.IdempotencyPeriod)
 		require.Equal(t, time.Second, *enqueuedOpts.IdempotencyPeriod)
+		require.Equal(t, "test", enqueuedOpts.ForceQueueShardName)
 	})
 }
 
