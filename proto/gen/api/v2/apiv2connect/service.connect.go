@@ -59,6 +59,8 @@ const (
 	V2ListWebhooksProcedure = "/api.v2.V2/ListWebhooks"
 	// V2PatchEnvProcedure is the fully-qualified name of the V2's PatchEnv RPC.
 	V2PatchEnvProcedure = "/api.v2.V2/PatchEnv"
+	// V2BulkRerunProcedure is the fully-qualified name of the V2's BulkRerun RPC.
+	V2BulkRerunProcedure = "/api.v2.V2/BulkRerun"
 )
 
 // V2Client is a client for the api.v2.V2 service.
@@ -76,6 +78,7 @@ type V2Client interface {
 	CreateWebhook(context.Context, *connect.Request[v2.CreateWebhookRequest]) (*connect.Response[v2.CreateWebhookResponse], error)
 	ListWebhooks(context.Context, *connect.Request[v2.ListWebhooksRequest]) (*connect.Response[v2.ListWebhooksResponse], error)
 	PatchEnv(context.Context, *connect.Request[v2.PatchEnvRequest]) (*connect.Response[v2.PatchEnvsResponse], error)
+	BulkRerun(context.Context, *connect.Request[v2.BulkRerunRequest]) (*connect.Response[v2.BulkRerunResponse], error)
 }
 
 // NewV2Client constructs a client for the api.v2.V2 service. By default, it uses the Connect
@@ -161,6 +164,12 @@ func NewV2Client(httpClient connect.HTTPClient, baseURL string, opts ...connect.
 			connect.WithSchema(v2Methods.ByName("PatchEnv")),
 			connect.WithClientOptions(opts...),
 		),
+		bulkRerun: connect.NewClient[v2.BulkRerunRequest, v2.BulkRerunResponse](
+			httpClient,
+			baseURL+V2BulkRerunProcedure,
+			connect.WithSchema(v2Methods.ByName("BulkRerun")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -178,6 +187,7 @@ type v2Client struct {
 	createWebhook           *connect.Client[v2.CreateWebhookRequest, v2.CreateWebhookResponse]
 	listWebhooks            *connect.Client[v2.ListWebhooksRequest, v2.ListWebhooksResponse]
 	patchEnv                *connect.Client[v2.PatchEnvRequest, v2.PatchEnvsResponse]
+	bulkRerun               *connect.Client[v2.BulkRerunRequest, v2.BulkRerunResponse]
 }
 
 // Health calls api.v2.V2.Health.
@@ -240,6 +250,11 @@ func (c *v2Client) PatchEnv(ctx context.Context, req *connect.Request[v2.PatchEn
 	return c.patchEnv.CallUnary(ctx, req)
 }
 
+// BulkRerun calls api.v2.V2.BulkRerun.
+func (c *v2Client) BulkRerun(ctx context.Context, req *connect.Request[v2.BulkRerunRequest]) (*connect.Response[v2.BulkRerunResponse], error) {
+	return c.bulkRerun.CallUnary(ctx, req)
+}
+
 // V2Handler is an implementation of the api.v2.V2 service.
 type V2Handler interface {
 	Health(context.Context, *connect.Request[v2.HealthRequest]) (*connect.Response[v2.HealthResponse], error)
@@ -255,6 +270,7 @@ type V2Handler interface {
 	CreateWebhook(context.Context, *connect.Request[v2.CreateWebhookRequest]) (*connect.Response[v2.CreateWebhookResponse], error)
 	ListWebhooks(context.Context, *connect.Request[v2.ListWebhooksRequest]) (*connect.Response[v2.ListWebhooksResponse], error)
 	PatchEnv(context.Context, *connect.Request[v2.PatchEnvRequest]) (*connect.Response[v2.PatchEnvsResponse], error)
+	BulkRerun(context.Context, *connect.Request[v2.BulkRerunRequest]) (*connect.Response[v2.BulkRerunResponse], error)
 }
 
 // NewV2Handler builds an HTTP handler from the service implementation. It returns the path on which
@@ -336,6 +352,12 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 		connect.WithSchema(v2Methods.ByName("PatchEnv")),
 		connect.WithHandlerOptions(opts...),
 	)
+	v2BulkRerunHandler := connect.NewUnaryHandler(
+		V2BulkRerunProcedure,
+		svc.BulkRerun,
+		connect.WithSchema(v2Methods.ByName("BulkRerun")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/api.v2.V2/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case V2HealthProcedure:
@@ -362,6 +384,8 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 			v2ListWebhooksHandler.ServeHTTP(w, r)
 		case V2PatchEnvProcedure:
 			v2PatchEnvHandler.ServeHTTP(w, r)
+		case V2BulkRerunProcedure:
+			v2BulkRerunHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -417,4 +441,8 @@ func (UnimplementedV2Handler) ListWebhooks(context.Context, *connect.Request[v2.
 
 func (UnimplementedV2Handler) PatchEnv(context.Context, *connect.Request[v2.PatchEnvRequest]) (*connect.Response[v2.PatchEnvsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.PatchEnv is not implemented"))
+}
+
+func (UnimplementedV2Handler) BulkRerun(context.Context, *connect.Request[v2.BulkRerunRequest]) (*connect.Response[v2.BulkRerunResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.BulkRerun is not implemented"))
 }

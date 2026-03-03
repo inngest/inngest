@@ -2087,6 +2087,170 @@ func (x *PatchEnvsResponse) GetMetadata() *ResponseMetadata {
 	return nil
 }
 
+type BulkRerunRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RunIds        []string               `protobuf:"bytes,1,rep,name=runIds,proto3" json:"runIds,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BulkRerunRequest) Reset() {
+	*x = BulkRerunRequest{}
+	mi := &file_api_v2_service_proto_msgTypes[34]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BulkRerunRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BulkRerunRequest) ProtoMessage() {}
+
+func (x *BulkRerunRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[34]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BulkRerunRequest.ProtoReflect.Descriptor instead.
+func (*BulkRerunRequest) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{34}
+}
+
+func (x *BulkRerunRequest) GetRunIds() []string {
+	if x != nil {
+		return x.RunIds
+	}
+	return nil
+}
+
+type BulkRerunResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Data          []*RerunResult         `protobuf:"bytes,1,rep,name=data,proto3" json:"data,omitempty"`
+	Metadata      *ResponseMetadata      `protobuf:"bytes,2,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BulkRerunResponse) Reset() {
+	*x = BulkRerunResponse{}
+	mi := &file_api_v2_service_proto_msgTypes[35]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BulkRerunResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BulkRerunResponse) ProtoMessage() {}
+
+func (x *BulkRerunResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[35]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BulkRerunResponse.ProtoReflect.Descriptor instead.
+func (*BulkRerunResponse) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{35}
+}
+
+func (x *BulkRerunResponse) GetData() []*RerunResult {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+func (x *BulkRerunResponse) GetMetadata() *ResponseMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+type RerunResult struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	OriginalRunId string                 `protobuf:"bytes,1,opt,name=originalRunId,proto3" json:"originalRunId,omitempty"`
+	NewRunId      *string                `protobuf:"bytes,2,opt,name=newRunId,proto3,oneof" json:"newRunId,omitempty"`
+	Success       bool                   `protobuf:"varint,3,opt,name=success,proto3" json:"success,omitempty"`
+	Error         *string                `protobuf:"bytes,4,opt,name=error,proto3,oneof" json:"error,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RerunResult) Reset() {
+	*x = RerunResult{}
+	mi := &file_api_v2_service_proto_msgTypes[36]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RerunResult) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RerunResult) ProtoMessage() {}
+
+func (x *RerunResult) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[36]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RerunResult.ProtoReflect.Descriptor instead.
+func (*RerunResult) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{36}
+}
+
+func (x *RerunResult) GetOriginalRunId() string {
+	if x != nil {
+		return x.OriginalRunId
+	}
+	return ""
+}
+
+func (x *RerunResult) GetNewRunId() string {
+	if x != nil && x.NewRunId != nil {
+		return *x.NewRunId
+	}
+	return ""
+}
+
+func (x *RerunResult) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *RerunResult) GetError() string {
+	if x != nil && x.Error != nil {
+		return *x.Error
+	}
+	return ""
+}
+
 var File_api_v2_service_proto protoreflect.FileDescriptor
 
 const file_api_v2_service_proto_rawDesc = "" +
@@ -2243,7 +2407,19 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\v_isArchived\"j\n" +
 	"\x11PatchEnvsResponse\x12\x1f\n" +
 	"\x04data\x18\x01 \x01(\v2\v.api.v2.EnvR\x04data\x124\n" +
-	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata*/\n" +
+	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"\x91\x01\n" +
+	"\x10BulkRerunRequest\x12}\n" +
+	"\x06runIds\x18\x01 \x03(\tBe\x92Ab2\"List of run IDs to rerun (max: 50)J<[\"01HP1ZX8M3NG9VP6QN0XK7J4CY\", \"01HP1ZY9N4OH0WQ7RO1YL8K5DZ\"]R\x06runIds\"r\n" +
+	"\x11BulkRerunResponse\x12'\n" +
+	"\x04data\x18\x01 \x03(\v2\x13.api.v2.RerunResultR\x04data\x124\n" +
+	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"\xa0\x01\n" +
+	"\vRerunResult\x12$\n" +
+	"\roriginalRunId\x18\x01 \x01(\tR\roriginalRunId\x12\x1f\n" +
+	"\bnewRunId\x18\x02 \x01(\tH\x00R\bnewRunId\x88\x01\x01\x12\x18\n" +
+	"\asuccess\x18\x03 \x01(\bR\asuccess\x12\x19\n" +
+	"\x05error\x18\x04 \x01(\tH\x01R\x05error\x88\x01\x01B\v\n" +
+	"\t_newRunIdB\b\n" +
+	"\x06_error*/\n" +
 	"\aEnvType\x12\x0e\n" +
 	"\n" +
 	"PRODUCTION\x10\x00\x12\b\n" +
@@ -2253,7 +2429,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\n" +
 	"FilterType\x12\t\n" +
 	"\x05ALLOW\x10\x00\x12\b\n" +
-	"\x04DENY\x10\x012\xd8;\n" +
+	"\x04DENY\x10\x012\xb4@\n" +
 	"\x02V2\x12\xb2\x02\n" +
 	"\x06Health\x12\x15.api.v2.HealthRequest\x1a\x16.api.v2.HealthResponse\"\xf8\x01\x92A\xe5\x01\x12\fHealth check\x1a,Returns the health status of the API serviceJR\n" +
 	"\x03401\x12K\n" +
@@ -2490,7 +2666,27 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x0e\n" +
 	"\n" +
 	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x0f:\x01*2\n" +
-	"/envs/{id}B\xc8\x02\x92A\x91\x02\x12\x9b\x01\n" +
+	"/envs/{id}\x12\xd9\x04\n" +
+	"\tBulkRerun\x12\x18.api.v2.BulkRerunRequest\x1a\x19.api.v2.BulkRerunResponse\"\x96\x04\x92A\xfc\x03\x12\n" +
+	"Bulk rerun\x1aaTriggers up to 50 runs to be re-executed. Each run will be replayed with its original event data.JB\n" +
+	"\x03200\x12;\n" +
+	"\x12Bulk rerun results\x12%\n" +
+	"#\x1a!#/definitions/v2BulkRerunResponseJL\n" +
+	"\x03400\x12E\n" +
+	" Bad Request - invalid input data\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJR\n" +
+	"\x03401\x12K\n" +
+	"&Unauthorized - authentication required\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJP\n" +
+	"\x03403\x12I\n" +
+	"$Forbidden - insufficient permissions\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJA\n" +
+	"\x03500\x12:\n" +
+	"\x15Internal Server Error\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseb\x10\n" +
+	"\x0e\n" +
+	"\n" +
+	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x10:\x01*\"\v/bulk/rerunB\xc8\x02\x92A\x91\x02\x12\x9b\x01\n" +
 	"\x13Inngest REST API v2\x12}The v2 API delivers a significantly improved developer experience with consistent design patterns and enhanced functionality.2\x052.0.0\x1a\x0fapi.inngest.com\"\x03/v2*\x01\x02ZX\n" +
 	"V\n" +
 	"\n" +
@@ -2509,7 +2705,7 @@ func file_api_v2_service_proto_rawDescGZIP() []byte {
 }
 
 var file_api_v2_service_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_api_v2_service_proto_msgTypes = make([]protoimpl.MessageInfo, 34)
+var file_api_v2_service_proto_msgTypes = make([]protoimpl.MessageInfo, 37)
 var file_api_v2_service_proto_goTypes = []any{
 	(EnvType)(0),                            // 0: api.v2.EnvType
 	(FilterType)(0),                         // 1: api.v2.FilterType
@@ -2547,40 +2743,43 @@ var file_api_v2_service_proto_goTypes = []any{
 	(*Webhook)(nil),                         // 33: api.v2.Webhook
 	(*PatchEnvRequest)(nil),                 // 34: api.v2.PatchEnvRequest
 	(*PatchEnvsResponse)(nil),               // 35: api.v2.PatchEnvsResponse
-	(*timestamppb.Timestamp)(nil),           // 36: google.protobuf.Timestamp
+	(*BulkRerunRequest)(nil),                // 36: api.v2.BulkRerunRequest
+	(*BulkRerunResponse)(nil),               // 37: api.v2.BulkRerunResponse
+	(*RerunResult)(nil),                     // 38: api.v2.RerunResult
+	(*timestamppb.Timestamp)(nil),           // 39: google.protobuf.Timestamp
 }
 var file_api_v2_service_proto_depIdxs = []int32{
 	5,  // 0: api.v2.HealthResponse.data:type_name -> api.v2.HealthData
 	8,  // 1: api.v2.HealthResponse.metadata:type_name -> api.v2.ResponseMetadata
 	6,  // 2: api.v2.ErrorResponse.errors:type_name -> api.v2.Error
-	36, // 3: api.v2.ResponseMetadata.fetched_at:type_name -> google.protobuf.Timestamp
-	36, // 4: api.v2.ResponseMetadata.cached_until:type_name -> google.protobuf.Timestamp
+	39, // 3: api.v2.ResponseMetadata.fetched_at:type_name -> google.protobuf.Timestamp
+	39, // 4: api.v2.ResponseMetadata.cached_until:type_name -> google.protobuf.Timestamp
 	14, // 5: api.v2.CreateAccountResponse.data:type_name -> api.v2.CreateAccountData
 	8,  // 6: api.v2.CreateAccountResponse.metadata:type_name -> api.v2.ResponseMetadata
 	13, // 7: api.v2.CreateEnvResponse.data:type_name -> api.v2.Env
 	8,  // 8: api.v2.CreateEnvResponse.metadata:type_name -> api.v2.ResponseMetadata
 	0,  // 9: api.v2.Env.type:type_name -> api.v2.EnvType
-	36, // 10: api.v2.Env.createdAt:type_name -> google.protobuf.Timestamp
-	36, // 11: api.v2.CreateAccountData.createdAt:type_name -> google.protobuf.Timestamp
-	36, // 12: api.v2.CreateAccountData.updatedAt:type_name -> google.protobuf.Timestamp
+	39, // 10: api.v2.Env.createdAt:type_name -> google.protobuf.Timestamp
+	39, // 11: api.v2.CreateAccountData.createdAt:type_name -> google.protobuf.Timestamp
+	39, // 12: api.v2.CreateAccountData.updatedAt:type_name -> google.protobuf.Timestamp
 	18, // 13: api.v2.FetchAccountsResponse.data:type_name -> api.v2.Account
 	8,  // 14: api.v2.FetchAccountsResponse.metadata:type_name -> api.v2.ResponseMetadata
 	19, // 15: api.v2.FetchAccountsResponse.page:type_name -> api.v2.Page
 	18, // 16: api.v2.FetchAccountResponse.data:type_name -> api.v2.Account
 	8,  // 17: api.v2.FetchAccountResponse.metadata:type_name -> api.v2.ResponseMetadata
-	36, // 18: api.v2.Account.createdAt:type_name -> google.protobuf.Timestamp
-	36, // 19: api.v2.Account.updatedAt:type_name -> google.protobuf.Timestamp
+	39, // 18: api.v2.Account.createdAt:type_name -> google.protobuf.Timestamp
+	39, // 19: api.v2.Account.updatedAt:type_name -> google.protobuf.Timestamp
 	22, // 20: api.v2.FetchAccountEventKeysResponse.data:type_name -> api.v2.EventKey
 	8,  // 21: api.v2.FetchAccountEventKeysResponse.metadata:type_name -> api.v2.ResponseMetadata
 	19, // 22: api.v2.FetchAccountEventKeysResponse.page:type_name -> api.v2.Page
-	36, // 23: api.v2.EventKey.createdAt:type_name -> google.protobuf.Timestamp
+	39, // 23: api.v2.EventKey.createdAt:type_name -> google.protobuf.Timestamp
 	13, // 24: api.v2.FetchAccountEnvsResponse.data:type_name -> api.v2.Env
 	8,  // 25: api.v2.FetchAccountEnvsResponse.metadata:type_name -> api.v2.ResponseMetadata
 	19, // 26: api.v2.FetchAccountEnvsResponse.page:type_name -> api.v2.Page
 	27, // 27: api.v2.FetchAccountSigningKeysResponse.data:type_name -> api.v2.SigningKey
 	8,  // 28: api.v2.FetchAccountSigningKeysResponse.metadata:type_name -> api.v2.ResponseMetadata
 	19, // 29: api.v2.FetchAccountSigningKeysResponse.page:type_name -> api.v2.Page
-	36, // 30: api.v2.SigningKey.createdAt:type_name -> google.protobuf.Timestamp
+	39, // 30: api.v2.SigningKey.createdAt:type_name -> google.protobuf.Timestamp
 	30, // 31: api.v2.CreateWebhookRequest.event_filter:type_name -> api.v2.EventFilter
 	33, // 32: api.v2.CreateWebhookResponse.data:type_name -> api.v2.Webhook
 	8,  // 33: api.v2.CreateWebhookResponse.metadata:type_name -> api.v2.ResponseMetadata
@@ -2589,39 +2788,43 @@ var file_api_v2_service_proto_depIdxs = []int32{
 	8,  // 36: api.v2.ListWebhooksResponse.metadata:type_name -> api.v2.ResponseMetadata
 	19, // 37: api.v2.ListWebhooksResponse.page:type_name -> api.v2.Page
 	30, // 38: api.v2.Webhook.event_filter:type_name -> api.v2.EventFilter
-	36, // 39: api.v2.Webhook.createdAt:type_name -> google.protobuf.Timestamp
-	36, // 40: api.v2.Webhook.updatedAt:type_name -> google.protobuf.Timestamp
+	39, // 39: api.v2.Webhook.createdAt:type_name -> google.protobuf.Timestamp
+	39, // 40: api.v2.Webhook.updatedAt:type_name -> google.protobuf.Timestamp
 	13, // 41: api.v2.PatchEnvsResponse.data:type_name -> api.v2.Env
 	8,  // 42: api.v2.PatchEnvsResponse.metadata:type_name -> api.v2.ResponseMetadata
-	2,  // 43: api.v2.V2.Health:input_type -> api.v2.HealthRequest
-	2,  // 44: api.v2.V2._SchemaOnly:input_type -> api.v2.HealthRequest
-	9,  // 45: api.v2.V2.CreatePartnerAccount:input_type -> api.v2.CreateAccountRequest
-	11, // 46: api.v2.V2.CreateEnv:input_type -> api.v2.CreateEnvRequest
-	15, // 47: api.v2.V2.FetchPartnerAccounts:input_type -> api.v2.FetchAccountsRequest
-	3,  // 48: api.v2.V2.FetchAccount:input_type -> api.v2.FetchAccountRequest
-	23, // 49: api.v2.V2.FetchAccountEnvs:input_type -> api.v2.FetchAccountEnvsRequest
-	20, // 50: api.v2.V2.FetchAccountEventKeys:input_type -> api.v2.FetchAccountEventKeysRequest
-	25, // 51: api.v2.V2.FetchAccountSigningKeys:input_type -> api.v2.FetchAccountSigningKeysRequest
-	28, // 52: api.v2.V2.CreateWebhook:input_type -> api.v2.CreateWebhookRequest
-	31, // 53: api.v2.V2.ListWebhooks:input_type -> api.v2.ListWebhooksRequest
-	34, // 54: api.v2.V2.PatchEnv:input_type -> api.v2.PatchEnvRequest
-	4,  // 55: api.v2.V2.Health:output_type -> api.v2.HealthResponse
-	7,  // 56: api.v2.V2._SchemaOnly:output_type -> api.v2.ErrorResponse
-	10, // 57: api.v2.V2.CreatePartnerAccount:output_type -> api.v2.CreateAccountResponse
-	12, // 58: api.v2.V2.CreateEnv:output_type -> api.v2.CreateEnvResponse
-	16, // 59: api.v2.V2.FetchPartnerAccounts:output_type -> api.v2.FetchAccountsResponse
-	17, // 60: api.v2.V2.FetchAccount:output_type -> api.v2.FetchAccountResponse
-	24, // 61: api.v2.V2.FetchAccountEnvs:output_type -> api.v2.FetchAccountEnvsResponse
-	21, // 62: api.v2.V2.FetchAccountEventKeys:output_type -> api.v2.FetchAccountEventKeysResponse
-	26, // 63: api.v2.V2.FetchAccountSigningKeys:output_type -> api.v2.FetchAccountSigningKeysResponse
-	29, // 64: api.v2.V2.CreateWebhook:output_type -> api.v2.CreateWebhookResponse
-	32, // 65: api.v2.V2.ListWebhooks:output_type -> api.v2.ListWebhooksResponse
-	35, // 66: api.v2.V2.PatchEnv:output_type -> api.v2.PatchEnvsResponse
-	55, // [55:67] is the sub-list for method output_type
-	43, // [43:55] is the sub-list for method input_type
-	43, // [43:43] is the sub-list for extension type_name
-	43, // [43:43] is the sub-list for extension extendee
-	0,  // [0:43] is the sub-list for field type_name
+	38, // 43: api.v2.BulkRerunResponse.data:type_name -> api.v2.RerunResult
+	8,  // 44: api.v2.BulkRerunResponse.metadata:type_name -> api.v2.ResponseMetadata
+	2,  // 45: api.v2.V2.Health:input_type -> api.v2.HealthRequest
+	2,  // 46: api.v2.V2._SchemaOnly:input_type -> api.v2.HealthRequest
+	9,  // 47: api.v2.V2.CreatePartnerAccount:input_type -> api.v2.CreateAccountRequest
+	11, // 48: api.v2.V2.CreateEnv:input_type -> api.v2.CreateEnvRequest
+	15, // 49: api.v2.V2.FetchPartnerAccounts:input_type -> api.v2.FetchAccountsRequest
+	3,  // 50: api.v2.V2.FetchAccount:input_type -> api.v2.FetchAccountRequest
+	23, // 51: api.v2.V2.FetchAccountEnvs:input_type -> api.v2.FetchAccountEnvsRequest
+	20, // 52: api.v2.V2.FetchAccountEventKeys:input_type -> api.v2.FetchAccountEventKeysRequest
+	25, // 53: api.v2.V2.FetchAccountSigningKeys:input_type -> api.v2.FetchAccountSigningKeysRequest
+	28, // 54: api.v2.V2.CreateWebhook:input_type -> api.v2.CreateWebhookRequest
+	31, // 55: api.v2.V2.ListWebhooks:input_type -> api.v2.ListWebhooksRequest
+	34, // 56: api.v2.V2.PatchEnv:input_type -> api.v2.PatchEnvRequest
+	36, // 57: api.v2.V2.BulkRerun:input_type -> api.v2.BulkRerunRequest
+	4,  // 58: api.v2.V2.Health:output_type -> api.v2.HealthResponse
+	7,  // 59: api.v2.V2._SchemaOnly:output_type -> api.v2.ErrorResponse
+	10, // 60: api.v2.V2.CreatePartnerAccount:output_type -> api.v2.CreateAccountResponse
+	12, // 61: api.v2.V2.CreateEnv:output_type -> api.v2.CreateEnvResponse
+	16, // 62: api.v2.V2.FetchPartnerAccounts:output_type -> api.v2.FetchAccountsResponse
+	17, // 63: api.v2.V2.FetchAccount:output_type -> api.v2.FetchAccountResponse
+	24, // 64: api.v2.V2.FetchAccountEnvs:output_type -> api.v2.FetchAccountEnvsResponse
+	21, // 65: api.v2.V2.FetchAccountEventKeys:output_type -> api.v2.FetchAccountEventKeysResponse
+	26, // 66: api.v2.V2.FetchAccountSigningKeys:output_type -> api.v2.FetchAccountSigningKeysResponse
+	29, // 67: api.v2.V2.CreateWebhook:output_type -> api.v2.CreateWebhookResponse
+	32, // 68: api.v2.V2.ListWebhooks:output_type -> api.v2.ListWebhooksResponse
+	35, // 69: api.v2.V2.PatchEnv:output_type -> api.v2.PatchEnvsResponse
+	37, // 70: api.v2.V2.BulkRerun:output_type -> api.v2.BulkRerunResponse
+	58, // [58:71] is the sub-list for method output_type
+	45, // [45:58] is the sub-list for method input_type
+	45, // [45:45] is the sub-list for extension type_name
+	45, // [45:45] is the sub-list for extension extendee
+	0,  // [0:45] is the sub-list for field type_name
 }
 
 func init() { file_api_v2_service_proto_init() }
@@ -2641,13 +2844,14 @@ func file_api_v2_service_proto_init() {
 	file_api_v2_service_proto_msgTypes[29].OneofWrappers = []any{}
 	file_api_v2_service_proto_msgTypes[31].OneofWrappers = []any{}
 	file_api_v2_service_proto_msgTypes[32].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[36].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_api_v2_service_proto_rawDesc), len(file_api_v2_service_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   34,
+			NumMessages:   37,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
