@@ -40,8 +40,8 @@ func TestIsLatencyPartition(t *testing.T) {
 		// Real UUIDs should never match.
 		{"00000000-0000-0000-0000-000000000000", false},
 		{"a1b2c3d4-e5f6-7890-abcd-ef1234567890", false},
-		// Partial prefix match is not enough.
-		{"ffffffff-ffff-ffff-ffff-fffffffffffe", false},
+		// Differs before the final suffix — not a latency partition.
+		{"ffffffff-ffff-ffff-ffff-ffffffffffe1", false},
 		// Empty and short strings.
 		{"", false},
 		{"ffffffff", false},
