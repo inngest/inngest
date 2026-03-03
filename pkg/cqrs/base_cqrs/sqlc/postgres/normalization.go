@@ -448,10 +448,31 @@ func (r *GetSpanOutputRow) ToSQLite() (*sqlc.GetSpanOutputRow, error) {
 }
 
 func toNullRawMessage(v interface{}) pqtype.NullRawMessage {
-	data, err := json.Marshal(v)
-	if err != nil {
-		return pqtype.NullRawMessage{Valid: false}
+	var data []byte
+
+	switch val := v.(type) {
+	case string:
+		// The input from SQLite-typed params is a Go string that already
+		// contains valid JSON (e.g. '{"key":"value"}'). Using it directly
+		// avoids double-encoding: json.Marshal on a string wraps it in
+		// quotes, turning a JSON object into a JSON string value.
+		if len(val) == 0 {
+			return pqtype.NullRawMessage{Valid: false}
+		}
+		data = []byte(val)
+	case []byte:
+		if len(val) == 0 {
+			return pqtype.NullRawMessage{Valid: false}
+		}
+		data = val
+	default:
+		var err error
+		data, err = json.Marshal(v)
+		if err != nil {
+			return pqtype.NullRawMessage{Valid: false}
+		}
 	}
+
 	return pqtype.NullRawMessage{
 		RawMessage: json.RawMessage(data),
 		Valid:      true,
