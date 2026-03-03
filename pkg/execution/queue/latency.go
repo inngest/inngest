@@ -66,7 +66,7 @@ func (q *queueProcessor) wrapRunFuncWithLatency(f RunFunc) RunFunc {
 	}
 	return func(ctx context.Context, info RunInfo, item Item) (RunResult, error) {
 		if item.Kind == KindLatencyTrack {
-			q.latencyPartition.Callback(ctx, info.Latency)
+			q.latencyPartition.Callback(ctx, info)
 			return RunResult{}, nil
 		}
 		return f(ctx, info, item)

@@ -673,8 +673,9 @@ type LatencyPartitionOptions struct {
 	Partitions int // will create eg. uuid.New("ffffffff-ffff-ffff-ffff-fffffffffff1"),
 	// Interval is the duration between tracking jobs
 	Interval time.Duration // time.Second*5
-	// Callback is called when the job executes, with latency recorded.
-	Callback func(ctx context.Context, latency time.Duration)
+	// Callback is called when the job executes, with the full RunInfo
+	// containing latency, sojourn delay, and other processing metadata.
+	Callback func(ctx context.Context, info RunInfo)
 }
 
 // continuation represents a partition continuation, forcung the queue to continue working

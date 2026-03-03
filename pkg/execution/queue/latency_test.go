@@ -55,7 +55,7 @@ func TestWithLatencyPartition(t *testing.T) {
 	t.Run("sets defaults", func(t *testing.T) {
 		called := false
 		opts := NewQueueOptions(WithLatencyPartition(LatencyPartitionOptions{
-			Callback: func(ctx context.Context, latency time.Duration) {
+			Callback: func(ctx context.Context, info RunInfo) {
 				called = true
 			},
 		}))
@@ -65,7 +65,7 @@ func TestWithLatencyPartition(t *testing.T) {
 		require.NotNil(t, opts.latencyPartition.Callback)
 
 		// Verify callback is the one we passed
-		opts.latencyPartition.Callback(context.Background(), 0)
+		opts.latencyPartition.Callback(context.Background(), RunInfo{})
 		require.True(t, called)
 	})
 
@@ -127,12 +127,12 @@ func TestWrapRunFuncWithLatency(t *testing.T) {
 	})
 
 	t.Run("intercepts latency tracking items", func(t *testing.T) {
-		var capturedLatency time.Duration
+		var capturedInfo RunInfo
 		qp := &queueProcessor{
 			QueueOptions: NewQueueOptions(WithLatencyPartition(LatencyPartitionOptions{
 				Interval: time.Second,
-				Callback: func(ctx context.Context, latency time.Duration) {
-					capturedLatency = latency
+				Callback: func(ctx context.Context, info RunInfo) {
+					capturedInfo = info
 				},
 			})),
 		}
@@ -144,14 +144,15 @@ func TestWrapRunFuncWithLatency(t *testing.T) {
 		}
 		wrapped := qp.wrapRunFuncWithLatency(original)
 
-		expectedLatency := 42 * time.Millisecond
-		res, err := wrapped(context.Background(), RunInfo{
-			Latency: expectedLatency,
-		}, Item{Kind: KindLatencyTrack})
+		expectedInfo := RunInfo{
+			Latency:      42 * time.Millisecond,
+			SojournDelay: 10 * time.Millisecond,
+		}
+		res, err := wrapped(context.Background(), expectedInfo, Item{Kind: KindLatencyTrack})
 
 		require.NoError(t, err)
 		require.Equal(t, RunResult{}, res)
-		require.Equal(t, expectedLatency, capturedLatency)
+		require.Equal(t, expectedInfo, capturedInfo)
 		require.False(t, originalCalled, "original RunFunc should not be called for latency items")
 	})
 
@@ -159,7 +160,7 @@ func TestWrapRunFuncWithLatency(t *testing.T) {
 		qp := &queueProcessor{
 			QueueOptions: NewQueueOptions(WithLatencyPartition(LatencyPartitionOptions{
 				Interval: time.Second,
-				Callback: func(ctx context.Context, latency time.Duration) {
+				Callback: func(ctx context.Context, info RunInfo) {
 					t.Fatal("callback should not be called for non-latency items")
 				},
 			})),
@@ -211,7 +212,7 @@ func TestRunLatencyTracker(t *testing.T) {
 			QueueOptions: NewQueueOptions(
 				WithLatencyPartition(LatencyPartitionOptions{
 					Interval: 5 * time.Second,
-					Callback: func(ctx context.Context, latency time.Duration) {},
+					Callback: func(ctx context.Context, info RunInfo) {},
 				}),
 				WithClock(fakeClock),
 			),
@@ -252,7 +253,7 @@ func TestEnqueueLatencyJob(t *testing.T) {
 				WithLatencyPartition(LatencyPartitionOptions{
 					Partitions: 1,
 					Interval:   time.Second,
-					Callback:   func(ctx context.Context, latency time.Duration) {},
+					Callback:   func(ctx context.Context, info RunInfo) {},
 				}),
 				WithClock(fakeClock),
 			),
@@ -304,14 +305,14 @@ func TestEnqueueLatencyJob(t *testing.T) {
 func TestWrapRunFuncWithLatencyConcurrency(t *testing.T) {
 	// Verify the wrapper is safe for concurrent access.
 	var mu sync.Mutex
-	var latencies []time.Duration
+	var infos []RunInfo
 
 	qp := &queueProcessor{
 		QueueOptions: NewQueueOptions(WithLatencyPartition(LatencyPartitionOptions{
 			Interval: time.Second,
-			Callback: func(ctx context.Context, latency time.Duration) {
+			Callback: func(ctx context.Context, info RunInfo) {
 				mu.Lock()
-				latencies = append(latencies, latency)
+				infos = append(infos, info)
 				mu.Unlock()
 			},
 		})),
@@ -344,7 +345,7 @@ func TestWrapRunFuncWithLatencyConcurrency(t *testing.T) {
 	wg.Wait()
 
 	mu.Lock()
-	require.Len(t, latencies, n/2)
+	require.Len(t, infos, n/2)
 	mu.Unlock()
 	require.Equal(t, int32(n/2), originalCalls.Load())
 }
