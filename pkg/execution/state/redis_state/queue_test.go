@@ -775,10 +775,9 @@ func TestQueueSystemPartitions(t *testing.T) {
 	t.Run("leases correct partition", func(t *testing.T) {
 		qp := getSystemPartition(t, r, customQueueName)
 
-		leaseId, availableCapacity, err := shard.PartitionLease(ctx, &qp, time.Second)
+		leaseId, err := shard.PartitionLease(ctx, &qp, time.Second)
 		require.NoError(t, err)
 		require.NotNil(t, leaseId)
-		require.Equal(t, 1, availableCapacity)
 	})
 
 	t.Run("peeks partition successfully", func(t *testing.T) {
@@ -1390,7 +1389,7 @@ func TestQueuePartitionRequeue(t *testing.T) {
 
 		next := now.Add(5 * time.Second)
 		t.Run("It removes any lease when requeueing", func(t *testing.T) {
-			_, _, err := shard.PartitionLease(ctx, &osqueue.QueuePartition{FunctionID: &idA}, time.Minute)
+			_, err := shard.PartitionLease(ctx, &osqueue.QueuePartition{FunctionID: &idA}, time.Minute)
 			require.NoError(t, err)
 
 			err = shard.PartitionRequeue(ctx, &p, next, true)
@@ -1638,9 +1637,9 @@ func TestQueuePartitionRequeue(t *testing.T) {
 		itemIDs, err := getItemIDsFromBacklog(ctx, shard, &backlog, time.Now().Add(time.Minute), 1000)
 		require.NoError(t, err)
 
-		res, err := shard.BacklogRefill(ctx, &backlog, &shadowPart, time.Now().Add(time.Minute), itemIDs, osqueue.PartitionConstraintConfig{})
+		res, err := shard.BacklogRefill(ctx, &backlog, &shadowPart, time.Now().Add(time.Minute), itemIDs)
 		require.NoError(t, err)
-		require.Equal(t, 1, res.Refilled)
+		require.Equal(t, 1, len(res.RefilledItems))
 
 		err = shard.Dequeue(ctx, qi2)
 		require.NoError(t, err)
@@ -3555,16 +3554,10 @@ func TestQueueActiveCounters(t *testing.T) {
 			itemIDs, err := getItemIDsFromBacklog(ctx, shard, &backlog, refillUntil, 1000)
 			require.NoError(t, err)
 
-			res, err := shard.BacklogRefill(ctx, &backlog, &shadowPart, refillUntil, itemIDs, osqueue.PartitionConstraintConfig{
-				Concurrency: osqueue.PartitionConcurrency{
-					SystemConcurrency:   consts.DefaultConcurrencyLimit,
-					AccountConcurrency:  consts.DefaultConcurrencyLimit,
-					FunctionConcurrency: consts.DefaultConcurrencyLimit,
-				},
-			})
+			res, err := shard.BacklogRefill(ctx, &backlog, &shadowPart, refillUntil, itemIDs)
 			require.NoError(t, err)
 
-			require.Equal(t, 1, res.Refilled)
+			require.Equal(t, 1, len(res.RefilledItems))
 
 			require.Equal(t, 1, scard(kg.ActiveRunsSet("p", shadowPart.PartitionID)))
 			require.Equal(t, 1, scard(kg.ActiveRunsSet("account", accountID.String())))
@@ -3627,16 +3620,10 @@ func TestQueueActiveCounters(t *testing.T) {
 			itemIDs, err := getItemIDsFromBacklog(ctx, shard, &backlog, refillUntil, 1000)
 			require.NoError(t, err)
 
-			res, err := shard.BacklogRefill(ctx, &backlog, &shadowPart, refillUntil, itemIDs, osqueue.PartitionConstraintConfig{
-				Concurrency: osqueue.PartitionConcurrency{
-					SystemConcurrency:   consts.DefaultConcurrencyLimit,
-					AccountConcurrency:  consts.DefaultConcurrencyLimit,
-					FunctionConcurrency: consts.DefaultConcurrencyLimit,
-				},
-			})
+			res, err := shard.BacklogRefill(ctx, &backlog, &shadowPart, refillUntil, itemIDs)
 			require.NoError(t, err)
 
-			require.Equal(t, 1, res.Refilled)
+			require.Equal(t, 1, len(res.RefilledItems))
 
 			require.Equal(t, 1, scard(kg.ActiveRunsSet("p", shadowPart.PartitionID)))
 			require.Equal(t, 1, scard(kg.ActiveRunsSet("account", accountID.String())))
@@ -3872,16 +3859,10 @@ func TestQueueActiveCounters(t *testing.T) {
 			itemIDs, err := getItemIDsFromBacklog(ctx, shard, &backlog, refillUntil, 1000)
 			require.NoError(t, err)
 
-			res, err := shard.BacklogRefill(ctx, &backlog, &shadowPart, refillUntil, itemIDs, osqueue.PartitionConstraintConfig{
-				Concurrency: osqueue.PartitionConcurrency{
-					SystemConcurrency:   consts.DefaultConcurrencyLimit,
-					AccountConcurrency:  consts.DefaultConcurrencyLimit,
-					FunctionConcurrency: consts.DefaultConcurrencyLimit,
-				},
-			})
+			res, err := shard.BacklogRefill(ctx, &backlog, &shadowPart, refillUntil, itemIDs)
 			require.NoError(t, err)
 
-			require.Equal(t, 4, res.Refilled)
+			require.Equal(t, 4, len(res.RefilledItems))
 
 			require.Equal(t, 2, scard(kg.ActiveRunsSet("p", shadowPart.PartitionID)))
 			require.Equal(t, 2, scard(kg.ActiveRunsSet("account", accountID.String())))
@@ -4125,10 +4106,9 @@ func TestInvalidScoreOnRefill(t *testing.T) {
 			qi.ID,
 			qi2.ID,
 		},
-		constraints,
 	)
 	require.NoError(t, err)
 
-	require.Equal(t, 1, res.Refilled)
+	require.Equal(t, 1, len(res.RefilledItems))
 	require.Equal(t, qi2.ID, res.RefilledItems[0])
 }

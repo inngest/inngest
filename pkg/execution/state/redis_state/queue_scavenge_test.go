@@ -62,20 +62,17 @@ func TestQueueScavenge(t *testing.T) {
 
 		leaseExpiry := clock.Now().Add(5 * time.Second)
 
-		// Lease item in legacy/fallback mode (do not disable lease checks)
-		leaseID, err := shard.Lease(ctx, item, 5*time.Second, clock.Now(), nil, osqueue.LeaseOptionDisableConstraintChecks(false))
+		leaseID, err := shard.Lease(ctx, item, 5*time.Second, clock.Now())
 		require.NoError(t, err)
 		require.NotNil(t, leaseID)
 
-		// Check that partition scavenger index + concurrency index are populated
+		// Check that partition scavenger index + concurrency index are not populated
 		require.True(t, r.Exists(kg.PartitionScavengerIndex(fnID.String())))
 		require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, kg.PartitionScavengerIndex(fnID.String()), item.ID)))
 		require.True(t, r.Exists(kg.ConcurrencyIndex()))
 		require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, kg.ConcurrencyIndex(), fnID.String())))
 
-		// Legacy: Since we did not disable lease checks,
-		require.True(t, r.Exists(kg.Concurrency("p", fnID.String())))
-		require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, kg.Concurrency("p", fnID.String()), item.ID)))
+		require.False(t, r.Exists(kg.Concurrency("p", fnID.String())))
 
 		clock.Advance(2 * time.Second)
 		r.FastForward(2 * time.Second)
@@ -92,17 +89,14 @@ func TestQueueScavenge(t *testing.T) {
 		require.True(t, r.Exists(kg.ConcurrencyIndex()))
 		require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, kg.ConcurrencyIndex(), fnID.String())))
 
-		// Legacy: Since we did not disable lease checks,
-		require.True(t, r.Exists(kg.Concurrency("p", fnID.String())))
-		require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, kg.Concurrency("p", fnID.String()), item.ID)))
+		require.False(t, r.Exists(kg.Concurrency("p", fnID.String())))
 
 		// Dequeue item and check scavenger index was cleaned up
-		err = q.Dequeue(ctx, shard, item, osqueue.DequeueOptionDisableConstraintUpdates(false))
+		err = q.Dequeue(ctx, shard, item)
 		require.NoError(t, err)
 
 		require.False(t, r.Exists(kg.PartitionScavengerIndex(fnID.String())))
 		require.False(t, r.Exists(kg.ConcurrencyIndex()))
-		// Legacy: Since we did not disable lease checks,
 		require.False(t, r.Exists(kg.Concurrency("p", fnID.String())))
 	})
 
@@ -139,7 +133,7 @@ func TestQueueScavenge(t *testing.T) {
 		require.NoError(t, err)
 
 		// Lease item in legacy/fallback mode (do not disable lease checks)
-		leaseID, err := shard.Lease(ctx, item, 5*time.Second, clock.Now(), nil, osqueue.LeaseOptionDisableConstraintChecks(false))
+		leaseID, err := shard.Lease(ctx, item, 5*time.Second, clock.Now())
 		require.NoError(t, err)
 		require.NotNil(t, leaseID)
 
@@ -151,7 +145,7 @@ func TestQueueScavenge(t *testing.T) {
 		require.True(t, r.Exists(kg.ConcurrencyIndex()))
 
 		// Requeue item and check scavenger index was cleaned up
-		err = shard.Requeue(ctx, item, clock.Now().Add(5*time.Second), osqueue.RequeueOptionDisableConstraintUpdates(false))
+		err = shard.Requeue(ctx, item, clock.Now().Add(5*time.Second))
 		require.NoError(t, err)
 
 		require.False(t, r.Exists(kg.PartitionScavengerIndex(fnID.String())))
@@ -199,12 +193,11 @@ func TestQueueScavenge(t *testing.T) {
 		leaseExpiry2 := clock.Now().Add(3 * time.Second)
 		require.NotEqual(t, leaseExpiry, leaseExpiry2)
 
-		// Lease item in legacy/fallback mode (do not disable lease checks)
-		leaseID1, err := shard.Lease(ctx, item1, 5*time.Second, clock.Now(), nil, osqueue.LeaseOptionDisableConstraintChecks(false))
+		leaseID1, err := shard.Lease(ctx, item1, 5*time.Second, clock.Now())
 		require.NoError(t, err)
 		require.NotNil(t, leaseID1)
 
-		leaseID2, err := shard.Lease(ctx, item2, 3*time.Second, clock.Now(), nil, osqueue.LeaseOptionDisableConstraintChecks(false))
+		leaseID2, err := shard.Lease(ctx, item2, 3*time.Second, clock.Now())
 		require.NoError(t, err)
 		require.NotNil(t, leaseID2)
 
@@ -271,7 +264,7 @@ func TestQueueScavenge(t *testing.T) {
 			require.NoError(t, err)
 
 			// Perform initial lease without writing to the new index
-			leaseID, err := shard.Lease(ctx, item, 5*time.Second, clock.Now(), nil, osqueue.LeaseOptionDisableConstraintChecks(false))
+			leaseID, err := shard.Lease(ctx, item, 5*time.Second, clock.Now())
 			require.NoError(t, err)
 			require.NotNil(t, leaseID)
 
@@ -279,9 +272,7 @@ func TestQueueScavenge(t *testing.T) {
 			require.True(t, r.Exists(kg.ConcurrencyIndex()))
 			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, kg.ConcurrencyIndex(), fnID.String())))
 
-			// It's critical that we write to the existing concurrency set which is checked by old Lease, Extend, Requeue, Dequeue scripts
-			require.True(t, r.Exists(kg.Concurrency("p", fnID.String())))
-			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, kg.Concurrency("p", fnID.String()), item.ID)))
+			require.False(t, r.Exists(kg.Concurrency("p", fnID.String())))
 
 			// This will not be read by the old executors!
 			require.True(t, r.Exists(kg.PartitionScavengerIndex(fnID.String())))
@@ -291,7 +282,7 @@ func TestQueueScavenge(t *testing.T) {
 			r.FastForward(time.Second)
 			r.SetTime(clock.Now())
 
-			leaseID, err = shard.ExtendLease(ctx, item, *leaseID, 5*time.Second, osqueue.ExtendLeaseOptionDisableConstraintUpdates(false))
+			leaseID, err = shard.ExtendLease(ctx, item, *leaseID, 5*time.Second)
 			require.NoError(t, err)
 			require.NotNil(t, leaseID)
 			leaseExpiry = clock.Now().Add(5 * time.Second)
@@ -299,14 +290,13 @@ func TestQueueScavenge(t *testing.T) {
 			require.True(t, r.Exists(kg.ConcurrencyIndex()))
 			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, kg.ConcurrencyIndex(), fnID.String())))
 
-			// It's critical that we extend the item in the existing concurrency set which is checked by old Lease, Extend, Requeue, Dequeue scripts
-			require.True(t, r.Exists(kg.Concurrency("p", fnID.String())))
+			require.False(t, r.Exists(kg.Concurrency("p", fnID.String())))
 			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, kg.Concurrency("p", fnID.String()), item.ID)))
 
 			require.True(t, r.Exists(kg.PartitionScavengerIndex(fnID.String())))
 			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, kg.PartitionScavengerIndex(fnID.String()), item.ID)))
 
-			err = q.Requeue(ctx, shard, item, clock.Now(), osqueue.RequeueOptionDisableConstraintUpdates(false))
+			err = q.Requeue(ctx, shard, item, clock.Now())
 			require.NoError(t, err)
 
 			require.False(t, r.Exists(kg.ConcurrencyIndex()))
@@ -360,7 +350,7 @@ func TestQueueScavenge(t *testing.T) {
 
 				// Perform initial lease without writing to the new index
 				leaseExpiry2 := clock.Now().Add(5 * time.Second)
-				leaseID, err := shard.Lease(ctx, item2, 5*time.Second, clock.Now(), nil, osqueue.LeaseOptionDisableConstraintChecks(false))
+				leaseID, err := shard.Lease(ctx, item2, 5*time.Second, clock.Now())
 				require.NoError(t, err)
 				require.NotNil(t, leaseID)
 
@@ -372,10 +362,7 @@ func TestQueueScavenge(t *testing.T) {
 				require.True(t, r.Exists(kg.ConcurrencyIndex()))
 				require.Equal(t, leaseExpiry2.UnixMilli(), int64(score(t, r, kg.ConcurrencyIndex(), fnID.String())))
 
-				// Concurrency index must have both items
-				require.True(t, r.Exists(kg.Concurrency("p", fnID.String())))
-				require.Equal(t, leaseExpiry1.UnixMilli(), int64(score(t, r, kg.Concurrency("p", fnID.String()), item1.ID)))
-				require.Equal(t, leaseExpiry2.UnixMilli(), int64(score(t, r, kg.Concurrency("p", fnID.String()), item2.ID)))
+				require.False(t, r.Exists(kg.Concurrency("p", fnID.String())))
 			})
 
 			t.Run("earlier item in scavenger index", func(t *testing.T) {
@@ -414,11 +401,11 @@ func TestQueueScavenge(t *testing.T) {
 				require.NoError(t, err)
 
 				// Perform initial lease only to the new index
-				leaseID, err := shard.Lease(ctx, item1, 3*time.Second, clock.Now(), nil, osqueue.LeaseOptionDisableConstraintChecks(true)) // NOTE: Do not update concurrency index!
+				leaseID, err := shard.Lease(ctx, item1, 3*time.Second, clock.Now())
 				require.NoError(t, err)
 				require.NotNil(t, leaseID)
 
-				leaseID2, err := shard.Lease(ctx, item2, 5*time.Second, clock.Now(), nil, osqueue.LeaseOptionDisableConstraintChecks(false))
+				leaseID2, err := shard.Lease(ctx, item2, 5*time.Second, clock.Now())
 				require.NoError(t, err)
 				require.NotNil(t, leaseID2)
 
@@ -435,9 +422,7 @@ func TestQueueScavenge(t *testing.T) {
 				require.Equal(t, leaseExpiry1.UnixMilli(), int64(score(t, r, kg.ConcurrencyIndex(), fnID.String())))
 
 				// Concurrency index must only have second item
-				require.True(t, r.Exists(kg.Concurrency("p", fnID.String())))
-				require.False(t, hasMember(t, r, kg.Concurrency("p", fnID.String()), item1.ID))
-				require.Equal(t, leaseExpiry2.UnixMilli(), int64(score(t, r, kg.Concurrency("p", fnID.String()), item2.ID)))
+				require.False(t, r.Exists(kg.Concurrency("p", fnID.String())))
 			})
 		})
 
@@ -486,13 +471,13 @@ func TestQueueScavenge(t *testing.T) {
 				require.NoError(t, err)
 
 				// Lease item first
-				leaseID, err := shard.Lease(ctx, item2, 5*time.Second, clock.Now(), nil, osqueue.LeaseOptionDisableConstraintChecks(false))
+				leaseID, err := shard.Lease(ctx, item2, 5*time.Second, clock.Now())
 				require.NoError(t, err)
 				require.NotNil(t, leaseID)
 
 				// Then push back lease with expiry which is still later than earliest leased item
 				leaseExpiry2 := clock.Now().Add(3 * time.Second)
-				leaseID, err = shard.ExtendLease(ctx, item2, *leaseID, 3*time.Second, osqueue.ExtendLeaseOptionDisableConstraintUpdates(false))
+				leaseID, err = shard.ExtendLease(ctx, item2, *leaseID, 3*time.Second)
 				require.NoError(t, err)
 				require.NotNil(t, leaseID)
 
@@ -504,10 +489,7 @@ func TestQueueScavenge(t *testing.T) {
 				require.True(t, r.Exists(kg.ConcurrencyIndex()))
 				require.Equal(t, leaseExpiry2.UnixMilli(), int64(score(t, r, kg.ConcurrencyIndex(), fnID.String())))
 
-				// Concurrency index must have both items
-				require.True(t, r.Exists(kg.Concurrency("p", fnID.String())))
-				require.Equal(t, leaseExpiry1.UnixMilli(), int64(score(t, r, kg.Concurrency("p", fnID.String()), item1.ID)))
-				require.Equal(t, leaseExpiry2.UnixMilli(), int64(score(t, r, kg.Concurrency("p", fnID.String()), item2.ID)))
+				require.False(t, r.Exists(kg.Concurrency("p", fnID.String())))
 			})
 
 			t.Run("earlier item in scavenger index", func(t *testing.T) {
@@ -546,15 +528,15 @@ func TestQueueScavenge(t *testing.T) {
 				require.NoError(t, err)
 
 				// Perform initial lease only to the new index
-				leaseID, err := shard.Lease(ctx, item1, 3*time.Second, clock.Now(), nil, osqueue.LeaseOptionDisableConstraintChecks(true)) // NOTE: Do not update concurrency index!
+				leaseID, err := shard.Lease(ctx, item1, 3*time.Second, clock.Now())
 				require.NoError(t, err)
 				require.NotNil(t, leaseID)
 
-				leaseID2, err := shard.Lease(ctx, item2, 2*time.Second, clock.Now(), nil, osqueue.LeaseOptionDisableConstraintChecks(false))
+				leaseID2, err := shard.Lease(ctx, item2, 2*time.Second, clock.Now())
 				require.NoError(t, err)
 				require.NotNil(t, leaseID2)
 
-				leaseID2, err = shard.ExtendLease(ctx, item2, *leaseID2, 5*time.Second, osqueue.ExtendLeaseOptionDisableConstraintUpdates(false))
+				leaseID2, err = shard.ExtendLease(ctx, item2, *leaseID2, 5*time.Second)
 				require.NoError(t, err)
 				require.NotNil(t, leaseID2)
 
@@ -570,10 +552,7 @@ func TestQueueScavenge(t *testing.T) {
 				require.True(t, r.Exists(kg.ConcurrencyIndex()))
 				require.Equal(t, leaseExpiry1.UnixMilli(), int64(score(t, r, kg.ConcurrencyIndex(), fnID.String())))
 
-				// Concurrency index must only have second item
-				require.True(t, r.Exists(kg.Concurrency("p", fnID.String())))
-				require.False(t, hasMember(t, r, kg.Concurrency("p", fnID.String()), item1.ID))
-				require.Equal(t, leaseExpiry2.UnixMilli(), int64(score(t, r, kg.Concurrency("p", fnID.String()), item2.ID)))
+				require.False(t, r.Exists(kg.Concurrency("p", fnID.String())))
 			})
 		})
 
@@ -622,7 +601,7 @@ func TestQueueScavenge(t *testing.T) {
 				require.NoError(t, err)
 
 				// Lease item closer to now
-				leaseID, err := shard.Lease(ctx, item2, 3*time.Second, clock.Now(), nil, osqueue.LeaseOptionDisableConstraintChecks(false))
+				leaseID, err := shard.Lease(ctx, item2, 3*time.Second, clock.Now())
 				require.NoError(t, err)
 				require.NotNil(t, leaseID)
 
@@ -637,10 +616,7 @@ func TestQueueScavenge(t *testing.T) {
 				require.True(t, r.Exists(kg.ConcurrencyIndex()))
 				require.Equal(t, leaseExpiry2.UnixMilli(), int64(score(t, r, kg.ConcurrencyIndex(), fnID.String())))
 
-				// Concurrency index must have both items
-				require.True(t, r.Exists(kg.Concurrency("p", fnID.String())))
-				require.Equal(t, leaseExpiry1.UnixMilli(), int64(score(t, r, kg.Concurrency("p", fnID.String()), item1.ID)))
-				require.Equal(t, leaseExpiry2.UnixMilli(), int64(score(t, r, kg.Concurrency("p", fnID.String()), item2.ID)))
+				require.False(t, r.Exists(kg.Concurrency("p", fnID.String())))
 
 				err = q.Requeue(ctx, shard, item1, clock.Now().Add(time.Minute))
 				require.NoError(t, err)
@@ -698,7 +674,7 @@ func TestQueueScavenge(t *testing.T) {
 				require.NoError(t, err)
 
 				// Lease item closer to now
-				leaseID, err := shard.Lease(ctx, item2, 3*time.Second, clock.Now(), nil, osqueue.LeaseOptionDisableConstraintChecks(false))
+				leaseID, err := shard.Lease(ctx, item2, 3*time.Second, clock.Now())
 				require.NoError(t, err)
 				require.NotNil(t, leaseID)
 
@@ -713,10 +689,7 @@ func TestQueueScavenge(t *testing.T) {
 				require.True(t, r.Exists(kg.ConcurrencyIndex()))
 				require.Equal(t, leaseExpiry2.UnixMilli(), int64(score(t, r, kg.ConcurrencyIndex(), fnID.String())))
 
-				// Concurrency index must have both items
-				require.True(t, r.Exists(kg.Concurrency("p", fnID.String())))
-				require.Equal(t, leaseExpiry1.UnixMilli(), int64(score(t, r, kg.Concurrency("p", fnID.String()), item1.ID)))
-				require.Equal(t, leaseExpiry2.UnixMilli(), int64(score(t, r, kg.Concurrency("p", fnID.String()), item2.ID)))
+				require.False(t, r.Exists(kg.Concurrency("p", fnID.String())))
 
 				err = q.Requeue(ctx, shard, item2, clock.Now().Add(time.Minute))
 				require.NoError(t, err)
@@ -769,11 +742,11 @@ func TestQueueScavenge(t *testing.T) {
 				require.NoError(t, err)
 
 				// Perform initial lease only to the new index
-				leaseID, err := shard.Lease(ctx, item1, 2*time.Second, clock.Now(), nil, osqueue.LeaseOptionDisableConstraintChecks(true)) // NOTE: Do not update concurrency index!
+				leaseID, err := shard.Lease(ctx, item1, 2*time.Second, clock.Now())
 				require.NoError(t, err)
 				require.NotNil(t, leaseID)
 
-				leaseID2, err := shard.Lease(ctx, item2, 5*time.Second, clock.Now(), nil, osqueue.LeaseOptionDisableConstraintChecks(false))
+				leaseID2, err := shard.Lease(ctx, item2, 5*time.Second, clock.Now())
 				require.NoError(t, err)
 				require.NotNil(t, leaseID2)
 
@@ -789,10 +762,7 @@ func TestQueueScavenge(t *testing.T) {
 				require.True(t, r.Exists(kg.ConcurrencyIndex()))
 				require.Equal(t, leaseExpiry1.UnixMilli(), int64(score(t, r, kg.ConcurrencyIndex(), fnID.String())))
 
-				// Concurrency index must only have second item
-				require.True(t, r.Exists(kg.Concurrency("p", fnID.String())))
-				require.False(t, hasMember(t, r, kg.Concurrency("p", fnID.String()), item1.ID))
-				require.Equal(t, leaseExpiry2.UnixMilli(), int64(score(t, r, kg.Concurrency("p", fnID.String()), item2.ID)))
+				require.False(t, r.Exists(kg.Concurrency("p", fnID.String())))
 
 				err = q.Requeue(ctx, shard, item1, clock.Now().Add(time.Minute))
 				require.NoError(t, err)
@@ -807,10 +777,7 @@ func TestQueueScavenge(t *testing.T) {
 				require.True(t, r.Exists(kg.ConcurrencyIndex()))
 				require.Equal(t, leaseExpiry2.UnixMilli(), int64(score(t, r, kg.ConcurrencyIndex(), fnID.String())))
 
-				// Concurrency index must only have second item
-				require.True(t, r.Exists(kg.Concurrency("p", fnID.String())))
-				require.False(t, hasMember(t, r, kg.Concurrency("p", fnID.String()), item1.ID))
-				require.Equal(t, leaseExpiry2.UnixMilli(), int64(score(t, r, kg.Concurrency("p", fnID.String()), item2.ID)))
+				require.False(t, r.Exists(kg.Concurrency("p", fnID.String())))
 			})
 		})
 
@@ -859,7 +826,7 @@ func TestQueueScavenge(t *testing.T) {
 				require.NoError(t, err)
 
 				// Lease item closer to now
-				leaseID, err := shard.Lease(ctx, item2, 3*time.Second, clock.Now(), nil, osqueue.LeaseOptionDisableConstraintChecks(false))
+				leaseID, err := shard.Lease(ctx, item2, 3*time.Second, clock.Now())
 				require.NoError(t, err)
 				require.NotNil(t, leaseID)
 
@@ -874,10 +841,7 @@ func TestQueueScavenge(t *testing.T) {
 				require.True(t, r.Exists(kg.ConcurrencyIndex()))
 				require.Equal(t, leaseExpiry2.UnixMilli(), int64(score(t, r, kg.ConcurrencyIndex(), fnID.String())))
 
-				// Concurrency index must have both items
-				require.True(t, r.Exists(kg.Concurrency("p", fnID.String())))
-				require.Equal(t, leaseExpiry1.UnixMilli(), int64(score(t, r, kg.Concurrency("p", fnID.String()), item1.ID)))
-				require.Equal(t, leaseExpiry2.UnixMilli(), int64(score(t, r, kg.Concurrency("p", fnID.String()), item2.ID)))
+				require.False(t, r.Exists(kg.Concurrency("p", fnID.String())))
 
 				err = q.Dequeue(ctx, shard, item1)
 				require.NoError(t, err)
@@ -935,7 +899,7 @@ func TestQueueScavenge(t *testing.T) {
 				require.NoError(t, err)
 
 				// Lease item closer to now
-				leaseID, err := shard.Lease(ctx, item2, 3*time.Second, clock.Now(), nil, osqueue.LeaseOptionDisableConstraintChecks(false))
+				leaseID, err := shard.Lease(ctx, item2, 3*time.Second, clock.Now())
 				require.NoError(t, err)
 				require.NotNil(t, leaseID)
 
@@ -950,10 +914,7 @@ func TestQueueScavenge(t *testing.T) {
 				require.True(t, r.Exists(kg.ConcurrencyIndex()))
 				require.Equal(t, leaseExpiry2.UnixMilli(), int64(score(t, r, kg.ConcurrencyIndex(), fnID.String())))
 
-				// Concurrency index must have both items
-				require.True(t, r.Exists(kg.Concurrency("p", fnID.String())))
-				require.Equal(t, leaseExpiry1.UnixMilli(), int64(score(t, r, kg.Concurrency("p", fnID.String()), item1.ID)))
-				require.Equal(t, leaseExpiry2.UnixMilli(), int64(score(t, r, kg.Concurrency("p", fnID.String()), item2.ID)))
+				require.False(t, r.Exists(kg.Concurrency("p", fnID.String())))
 
 				err = q.Dequeue(ctx, shard, item2)
 				require.NoError(t, err)
@@ -964,10 +925,7 @@ func TestQueueScavenge(t *testing.T) {
 				// Global index must be empty since no more items in index
 				require.False(t, r.Exists(kg.ConcurrencyIndex()))
 
-				// Concurrency index must have only one item
-				require.True(t, r.Exists(kg.Concurrency("p", fnID.String())))
-				require.Equal(t, leaseExpiry1.UnixMilli(), int64(score(t, r, kg.Concurrency("p", fnID.String()), item1.ID)))
-				require.False(t, hasMember(t, r, kg.Concurrency("p", fnID.String()), item2.ID))
+				require.False(t, r.Exists(kg.Concurrency("p", fnID.String())))
 			})
 
 			t.Run("update to next earliest item in scavenger index", func(t *testing.T) {
@@ -1006,11 +964,11 @@ func TestQueueScavenge(t *testing.T) {
 				require.NoError(t, err)
 
 				// Perform initial lease only to the new index
-				leaseID, err := shard.Lease(ctx, item1, 2*time.Second, clock.Now(), nil, osqueue.LeaseOptionDisableConstraintChecks(true)) // NOTE: Do not update concurrency index!
+				leaseID, err := shard.Lease(ctx, item1, 2*time.Second, clock.Now())
 				require.NoError(t, err)
 				require.NotNil(t, leaseID)
 
-				leaseID2, err := shard.Lease(ctx, item2, 5*time.Second, clock.Now(), nil, osqueue.LeaseOptionDisableConstraintChecks(false))
+				leaseID2, err := shard.Lease(ctx, item2, 5*time.Second, clock.Now())
 				require.NoError(t, err)
 				require.NotNil(t, leaseID2)
 
@@ -1026,10 +984,7 @@ func TestQueueScavenge(t *testing.T) {
 				require.True(t, r.Exists(kg.ConcurrencyIndex()))
 				require.Equal(t, leaseExpiry1.UnixMilli(), int64(score(t, r, kg.ConcurrencyIndex(), fnID.String())))
 
-				// Concurrency index must only have second item
-				require.True(t, r.Exists(kg.Concurrency("p", fnID.String())))
-				require.False(t, hasMember(t, r, kg.Concurrency("p", fnID.String()), item1.ID))
-				require.Equal(t, leaseExpiry2.UnixMilli(), int64(score(t, r, kg.Concurrency("p", fnID.String()), item2.ID)))
+				require.False(t, r.Exists(kg.Concurrency("p", fnID.String())))
 
 				err = q.Dequeue(ctx, shard, item1)
 				require.NoError(t, err)
@@ -1044,10 +999,7 @@ func TestQueueScavenge(t *testing.T) {
 				require.True(t, r.Exists(kg.ConcurrencyIndex()))
 				require.Equal(t, leaseExpiry2.UnixMilli(), int64(score(t, r, kg.ConcurrencyIndex(), fnID.String())))
 
-				// Concurrency index must only have second item
-				require.True(t, r.Exists(kg.Concurrency("p", fnID.String())))
-				require.False(t, hasMember(t, r, kg.Concurrency("p", fnID.String()), item1.ID))
-				require.Equal(t, leaseExpiry2.UnixMilli(), int64(score(t, r, kg.Concurrency("p", fnID.String()), item2.ID)))
+				require.False(t, r.Exists(kg.Concurrency("p", fnID.String())))
 			})
 		})
 	})
@@ -1086,7 +1038,7 @@ func TestQueueScavenge(t *testing.T) {
 
 		// Simulate existing lease valid for another second
 		leaseExpiry := clock.Now().Add(5 * time.Second)
-		leaseID, err := shard.Lease(ctx, item1, 5*time.Second, clock.Now(), nil, osqueue.LeaseOptionDisableConstraintChecks(false))
+		leaseID, err := shard.Lease(ctx, item1, 5*time.Second, clock.Now())
 		require.NoError(t, err)
 		require.NotNil(t, leaseID)
 
