@@ -23,15 +23,16 @@ type (
 )
 
 type (
-	CreateMessageRequest               = ClientRequest[*CreateMessageParams]
-	ElicitRequest                      = ClientRequest[*ElicitParams]
-	initializedClientRequest           = ClientRequest[*InitializedParams]
-	InitializeRequest                  = ClientRequest[*InitializeParams]
-	ListRootsRequest                   = ClientRequest[*ListRootsParams]
-	LoggingMessageRequest              = ClientRequest[*LoggingMessageParams]
-	ProgressNotificationClientRequest  = ClientRequest[*ProgressNotificationParams]
-	PromptListChangedRequest           = ClientRequest[*PromptListChangedParams]
-	ResourceListChangedRequest         = ClientRequest[*ResourceListChangedParams]
-	ResourceUpdatedNotificationRequest = ClientRequest[*ResourceUpdatedNotificationParams]
-	ToolListChangedRequest             = ClientRequest[*ToolListChangedParams]
+	CreateMessageRequest                   = ClientRequest[*CreateMessageParams]
+	ElicitRequest                          = ClientRequest[*ElicitParams]
+	initializedClientRequest               = ClientRequest[*InitializedParams]
+	InitializeRequest                      = ClientRequest[*InitializeParams]
+	ListRootsRequest                       = ClientRequest[*ListRootsParams]
+	LoggingMessageRequest                  = ClientRequest[*LoggingMessageParams]
+	ProgressNotificationClientRequest      = ClientRequest[*ProgressNotificationParams]
+	PromptListChangedRequest               = ClientRequest[*PromptListChangedParams]
+	ResourceListChangedRequest             = ClientRequest[*ResourceListChangedParams]
+	ResourceUpdatedNotificationRequest     = ClientRequest[*ResourceUpdatedNotificationParams]
+	ToolListChangedRequest                 = ClientRequest[*ToolListChangedParams]
+	ElicitationCompleteNotificationRequest = ClientRequest[*ElicitationCompleteParams]
 )

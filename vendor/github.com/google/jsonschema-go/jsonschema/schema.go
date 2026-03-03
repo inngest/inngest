@@ -18,10 +18,11 @@ import (
 )
 
 // A Schema is a JSON schema object.
-// It corresponds to the 2020-12 draft, as described in https://json-schema.org/draft/2020-12,
-// specifically:
-//   - https://json-schema.org/draft/2020-12/draft-bhutton-json-schema-01
-//   - https://json-schema.org/draft/2020-12/draft-bhutton-json-schema-validation-01
+// It supports both draft-07 and the 2020-12 draft specifications:
+//   - Draft-07: https://json-schema.org/draft-07/draft-handrews-json-schema-01
+//     and https://json-schema.org/draft-07/draft-handrews-json-schema-validation-01
+//   - Draft 2020-12: https://json-schema.org/draft/2020-12/draft-bhutton-json-schema-01
+//     and https://json-schema.org/draft/2020-12/draft-bhutton-json-schema-validation-01
 //
 // A Schema value may have non-zero values for more than one field:
 // all relevant non-zero fields are used for validation.
@@ -41,13 +42,16 @@ import (
 // requires equality to some slice element, so it vacuously rejects every instance.
 type Schema struct {
 	// core
-	ID      string             `json:"$id,omitempty"`
-	Schema  string             `json:"$schema,omitempty"`
-	Ref     string             `json:"$ref,omitempty"`
-	Comment string             `json:"$comment,omitempty"`
-	Defs    map[string]*Schema `json:"$defs,omitempty"`
-	// definitions is deprecated but still allowed. It is a synonym for $defs.
+	ID          string             `json:"$id,omitempty"`
+	Schema      string             `json:"$schema,omitempty"`
+	Ref         string             `json:"$ref,omitempty"`
+	Comment     string             `json:"$comment,omitempty"`
+	Defs        map[string]*Schema `json:"$defs,omitempty"`
 	Definitions map[string]*Schema `json:"definitions,omitempty"`
+
+	// split draft 7 Dependencies into DependencySchemas and DependencyStrings
+	DependencySchemas map[string]*Schema  `json:"-"`
+	DependencyStrings map[string][]string `json:"-"`
 
 	Anchor        string          `json:"$anchor,omitempty"`
 	DynamicAnchor string          `json:"$dynamicAnchor,omitempty"`
@@ -81,7 +85,8 @@ type Schema struct {
 
 	// arrays
 	PrefixItems      []*Schema `json:"prefixItems,omitempty"`
-	Items            *Schema   `json:"items,omitempty"`
+	Items            *Schema   `json:"-"`
+	ItemsArray       []*Schema `json:"-"`
 	MinItems         *int      `json:"minItems,omitempty"`
 	MaxItems         *int      `json:"maxItems,omitempty"`
 	AdditionalItems  *Schema   `json:"additionalItems,omitempty"`
@@ -125,6 +130,17 @@ type Schema struct {
 
 	// Extra allows for additional keywords beyond those specified.
 	Extra map[string]any `json:"-"`
+
+	// PropertyOrder records the ordering of properties for JSON rendering.
+	//
+	// During [For], PropertyOrder is set to the field order,
+	// if the type used for inference is a struct.
+	//
+	// If PropertyOrder is set, it controls the relative ordering of properties in [Schema.MarshalJSON].
+	// The rendered JSON first lists any properties that appear in the PropertyOrder slice in the order
+	// they appear, followed by all other properties that do not appear in the PropertyOrder slice in an
+	// undefined but deterministic order.
+	PropertyOrder []string `json:"-"`
 }
 
 // falseSchema returns a new Schema tree that fails to validate any value.
@@ -181,6 +197,7 @@ func (s *Schema) CloneSchemas() *Schema {
 				m[k] = ss.CloneSchemas()
 			}
 			fv.Set(reflect.ValueOf(m))
+
 		}
 	}
 	return &s2
@@ -193,16 +210,40 @@ func (s *Schema) basicChecks() error {
 	if s.Defs != nil && s.Definitions != nil {
 		return errors.New("both Defs and Definitions are set; at most one should be")
 	}
+	if s.Items != nil && s.ItemsArray != nil {
+		return errors.New("both Items and ItemsArray are set; at most one should be")
+	}
+	propertyOrderSeen := make(map[string]bool)
+	for _, val := range s.PropertyOrder {
+		if _, ok := propertyOrderSeen[val]; ok {
+			// Duplicate found
+			return fmt.Errorf("property order slice cannot contain duplicate entries, found duplicate %q", val)
+		}
+		propertyOrderSeen[val] = true
+	}
+
+	for key := range s.DependencySchemas {
+		// Check if the key exists in the dependency strings map
+		if _, exists := s.DependencyStrings[key]; exists {
+			return fmt.Errorf("dependency key %q cannot be defined as both a schema and a string array", key)
+		}
+	}
 	return nil
 }
 
 type schemaWithoutMethods Schema // doesn't implement json.{Unm,M}arshaler
 
-func (s *Schema) MarshalJSON() ([]byte, error) {
+func (s Schema) MarshalJSON() ([]byte, error) {
+	// NOTE: Use a value receiver here to avoid the encoding/json bugs
+	// described in golang/go#22967, golang/go#33993, and golang/go#55890.
+	// With a pointer receiver, MarshalJSON is only called for Schema in
+	// some cases (for example when the field value is addressable, or not
+	// stored as a map value), which leads to inconsistent JSON encoding.
+	// A value receiver makes Schema itself implement json.Marshaler and
+	// ensures that encoding/json always calls this method.
 	if err := s.basicChecks(); err != nil {
 		return nil, err
 	}
-
 	// Marshal either Type or Types as "type".
 	var typ any
 	switch {
@@ -211,13 +252,47 @@ func (s *Schema) MarshalJSON() ([]byte, error) {
 	case s.Types != nil:
 		typ = s.Types
 	}
+
+	var items any
+	switch {
+	case s.Items != nil:
+		items = s.Items
+	case s.ItemsArray != nil:
+		items = s.ItemsArray
+	}
+
+	var dep map[string]any
+	size := len(s.DependencySchemas) + len(s.DependencyStrings)
+	if size > 0 {
+		dep = make(map[string]any, size)
+		for k, v := range s.DependencySchemas {
+			dep[k] = v
+		}
+		for k, v := range s.DependencyStrings {
+			dep[k] = v
+		}
+	}
+
 	ms := struct {
-		Type any `json:"type,omitempty"`
+		Type         any            `json:"type,omitempty"`
+		Properties   json.Marshaler `json:"properties,omitempty"`
+		Dependencies map[string]any `json:"dependencies,omitempty"`
+		Items        any            `json:"items,omitempty"`
 		*schemaWithoutMethods
 	}{
 		Type:                 typ,
-		schemaWithoutMethods: (*schemaWithoutMethods)(s),
+		Dependencies:         dep,
+		Items:                items,
+		schemaWithoutMethods: (*schemaWithoutMethods)(&s),
 	}
+	// Marshal properties, even if the empty map (but not nil).
+	if s.Properties != nil {
+		ms.Properties = orderedProperties{
+			props: s.Properties,
+			order: s.PropertyOrder,
+		}
+	}
+
 	bs, err := marshalStructWithMap(&ms, "Extra")
 	if err != nil {
 		return nil, err
@@ -231,6 +306,75 @@ func (s *Schema) MarshalJSON() ([]byte, error) {
 		bs = []byte("false")
 	}
 	return bs, nil
+}
+
+// orderedProperties is a helper to marshal the properties map in a specific order.
+type orderedProperties struct {
+	props map[string]*Schema
+	order []string
+}
+
+func (op orderedProperties) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	buf.WriteByte('{')
+
+	first := true
+	processed := make(map[string]bool, len(op.props))
+
+	// Helper closure to write "key": value
+	writeEntry := func(key string, val *Schema) error {
+		if !first {
+			buf.WriteByte(',')
+		}
+		first = false
+
+		// Marshal the Key
+		keyBytes, err := json.Marshal(key)
+		if err != nil {
+			return err
+		}
+		buf.Write(keyBytes)
+
+		buf.WriteByte(':')
+
+		// Marshal the Value
+		valBytes, err := json.Marshal(val)
+		if err != nil {
+			return err
+		}
+		buf.Write(valBytes)
+		return nil
+	}
+
+	// Write keys explicitly listed in PropertyOrder
+	for _, name := range op.order {
+		if prop, ok := op.props[name]; ok {
+			if err := writeEntry(name, prop); err != nil {
+				return nil, err
+			}
+			processed[name] = true
+		}
+	}
+
+	// Write any remaining keys
+	var remaining []string
+	for name := range op.props {
+		if !processed[name] {
+			remaining = append(remaining, name)
+		}
+	}
+
+	// Sort the slice alphabetically
+	slices.Sort(remaining)
+
+	for _, name := range remaining {
+		if err := writeEntry(name, op.props[name]); err != nil {
+			return nil, err
+		}
+	}
+
+	buf.WriteByte('}')
+	return buf.Bytes(), nil
 }
 
 func (s *Schema) UnmarshalJSON(data []byte) error {
@@ -248,16 +392,18 @@ func (s *Schema) UnmarshalJSON(data []byte) error {
 	}
 
 	ms := struct {
-		Type          json.RawMessage `json:"type,omitempty"`
-		Const         json.RawMessage `json:"const,omitempty"`
-		MinLength     *integer        `json:"minLength,omitempty"`
-		MaxLength     *integer        `json:"maxLength,omitempty"`
-		MinItems      *integer        `json:"minItems,omitempty"`
-		MaxItems      *integer        `json:"maxItems,omitempty"`
-		MinProperties *integer        `json:"minProperties,omitempty"`
-		MaxProperties *integer        `json:"maxProperties,omitempty"`
-		MinContains   *integer        `json:"minContains,omitempty"`
-		MaxContains   *integer        `json:"maxContains,omitempty"`
+		Type          json.RawMessage            `json:"type,omitempty"`
+		Dependencies  map[string]json.RawMessage `json:"dependencies,omitempty"`
+		Items         json.RawMessage            `json:"items,omitempty"`
+		Const         json.RawMessage            `json:"const,omitempty"`
+		MinLength     *integer                   `json:"minLength,omitempty"`
+		MaxLength     *integer                   `json:"maxLength,omitempty"`
+		MinItems      *integer                   `json:"minItems,omitempty"`
+		MaxItems      *integer                   `json:"maxItems,omitempty"`
+		MinProperties *integer                   `json:"minProperties,omitempty"`
+		MaxProperties *integer                   `json:"maxProperties,omitempty"`
+		MinContains   *integer                   `json:"minContains,omitempty"`
+		MaxContains   *integer                   `json:"maxContains,omitempty"`
 
 		*schemaWithoutMethods
 	}{
@@ -280,6 +426,49 @@ func (s *Schema) UnmarshalJSON(data []byte) error {
 	}
 	if err != nil {
 		return err
+	}
+
+	// Unmarshal "items" as either Items or ItemsArray.
+	if len(ms.Items) > 0 {
+		switch ms.Items[0] {
+		case '[':
+			var schemas []*Schema
+			err = json.Unmarshal(ms.Items, &schemas)
+			s.ItemsArray = schemas
+		default:
+			var schema Schema
+			err = json.Unmarshal(ms.Items, &schema)
+			s.Items = &schema
+		}
+	}
+	if err != nil {
+		return err
+	}
+
+	// Unmarshal "Dependencies" values as either string arrays or schemas
+	// and assign them to specific map DependencySchemas or DependencyStrings.
+	for k, v := range ms.Dependencies {
+		if len(v) > 0 {
+			switch v[0] {
+			case '[':
+				var dstrings []string
+				err = json.Unmarshal(v, &dstrings)
+				if s.DependencyStrings == nil {
+					s.DependencyStrings = make(map[string][]string)
+				}
+				s.DependencyStrings[k] = dstrings
+			default:
+				var dschema Schema
+				err = json.Unmarshal(v, &dschema)
+				if s.DependencySchemas == nil {
+					s.DependencySchemas = make(map[string]*Schema)
+				}
+				s.DependencySchemas[k] = &dschema
+			}
+		}
+		if err != nil {
+			return err
+		}
 	}
 
 	unmarshalAnyPtr := func(p **any, raw json.RawMessage) error {
@@ -389,6 +578,7 @@ func (s *Schema) everyChild(f func(*Schema) bool) bool {
 			}
 		}
 	}
+
 	return true
 }
 
@@ -421,12 +611,28 @@ var (
 )
 
 func init() {
-	for _, sf := range reflect.VisibleFields(reflect.TypeFor[Schema]()) {
+	t := reflect.VisibleFields(reflect.TypeFor[Schema]())
+	for _, sf := range t {
 		info := fieldJSONInfo(sf)
 		if !info.omit {
 			schemaFieldInfos = append(schemaFieldInfos, structFieldInfo{sf, info.name})
+		} else {
+			// jsoninfo.name is used to build the info paths. The items and dependencies are ommited,
+			// since the original fields are separated to handle the union types supported in json and
+			// these fields have custom marshalling and unmarshalling logic.
+			// we still need these fields in schemaFieldInfos for creating schema trees and calculating paths and refs.
+			// so we manually create them and assign the jsonName to the original field json name.
+			switch sf.Name {
+			case "Items", "ItemsArray":
+				schemaFieldInfos = append(schemaFieldInfos, structFieldInfo{sf, "items"})
+			case "DependencySchemas", "DependencyStrings":
+				schemaFieldInfos = append(schemaFieldInfos, structFieldInfo{sf, "dependencies"})
+			}
 		}
 	}
+	// The value of "dependencies" this sort of schemaFieldInfos.
+	// This sort is unstable and is comparing the json.names of DependencyStrings and DependencySchemas which are both "dependencies".
+	// Since the sort is unstable it cannot be guarantied that "dependencies" has the DependencySchemas value.
 	slices.SortFunc(schemaFieldInfos, func(i1, i2 structFieldInfo) int {
 		return cmp.Compare(i1.jsonName, i2.jsonName)
 	})

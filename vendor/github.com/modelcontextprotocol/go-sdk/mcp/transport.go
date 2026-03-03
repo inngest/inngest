@@ -15,6 +15,7 @@ import (
 	"os"
 	"sync"
 
+	internaljson "github.com/modelcontextprotocol/go-sdk/internal/json"
 	"github.com/modelcontextprotocol/go-sdk/internal/jsonrpc2"
 	"github.com/modelcontextprotocol/go-sdk/internal/xcontext"
 	"github.com/modelcontextprotocol/go-sdk/jsonrpc"
@@ -46,7 +47,7 @@ type Connection interface {
 
 	// Write writes a new message to the connection.
 	//
-	// Write may be called concurrently, as calls or reponses may occur
+	// Write may be called concurrently, as calls or responses may occur
 	// concurrently in user code.
 	Write(context.Context, jsonrpc.Message) error
 
@@ -69,7 +70,7 @@ type Connection interface {
 type clientConnection interface {
 	Connection
 
-	// SessionUpdated is called whenever the client session state changes.
+	// sessionUpdated is called whenever the client session state changes.
 	sessionUpdated(clientSessionState)
 }
 
@@ -90,11 +91,33 @@ type StdioTransport struct{}
 
 // Connect implements the [Transport] interface.
 func (*StdioTransport) Connect(context.Context) (Connection, error) {
-	return newIOConn(rwc{os.Stdin, os.Stdout}), nil
+	return newIOConn(rwc{os.Stdin, nopCloserWriter{os.Stdout}}), nil
+}
+
+// nopCloserWriter is an io.WriteCloser with a trivial Close method.
+type nopCloserWriter struct {
+	io.Writer
+}
+
+func (nopCloserWriter) Close() error { return nil }
+
+// An IOTransport is a [Transport] that communicates over separate
+// io.ReadCloser and io.WriteCloser using newline-delimited JSON.
+type IOTransport struct {
+	Reader io.ReadCloser
+	Writer io.WriteCloser
+}
+
+// Connect implements the [Transport] interface.
+func (t *IOTransport) Connect(context.Context) (Connection, error) {
+	return newIOConn(rwc{t.Reader, t.Writer}), nil
 }
 
 // An InMemoryTransport is a [Transport] that communicates over an in-memory
 // network connection, using newline-delimited JSON.
+//
+// InMemoryTransports should be constructed using [NewInMemoryTransports],
+// which returns two transports connected to each other.
 type InMemoryTransport struct {
 	rwc io.ReadWriteCloser
 }
@@ -167,7 +190,7 @@ type canceller struct {
 func (c *canceller) Preempt(ctx context.Context, req *jsonrpc.Request) (result any, err error) {
 	if req.Method == notificationCancelled {
 		var params CancelledParams
-		if err := json.Unmarshal(req.Params, &params); err != nil {
+		if err := internaljson.Unmarshal(req.Params, &params); err != nil {
 			return nil, err
 		}
 		id, err := jsonrpc2.MakeID(params.RequestID)
@@ -182,8 +205,7 @@ func (c *canceller) Preempt(ctx context.Context, req *jsonrpc.Request) (result a
 // call executes and awaits a jsonrpc2 call on the given connection,
 // translating errors into the mcp domain.
 func call(ctx context.Context, conn *jsonrpc2.Connection, method string, params Params, result Result) error {
-	// TODO: the "%w"s in this function effectively make jsonrpc2.WireError part of the API.
-	// Consider alternatives.
+	// The "%w"s in this function expose jsonrpc.Error as part of the API.
 	call := conn.Call(ctx, method, params)
 	err := call.Await(ctx, result)
 	switch {
@@ -195,6 +217,18 @@ func call(ctx context.Context, conn *jsonrpc2.Connection, method string, params 
 			Reason:    ctx.Err().Error(),
 			RequestID: call.ID().Raw(),
 		})
+		// By default, the jsonrpc2 library waits for graceful shutdown when the
+		// connection is closed, meaning it expects all outgoing and incoming
+		// requests to complete. However, for MCP this expectation is unrealistic,
+		// and can lead to hanging shutdown. For example, if a streamable client is
+		// killed, the server will not be able to detect this event, except via
+		// keepalive pings (if they are configured), and so outgoing calls may hang
+		// indefinitely.
+		//
+		// Therefore, we choose to eagerly retire calls, removing them from the
+		// outgoingCalls map, when the caller context is cancelled: if the caller
+		// will never receive the response, there's no need to track it.
+		conn.Retire(call, ctx.Err())
 		return errors.Join(ctx.Err(), err)
 	case err != nil:
 		return fmt.Errorf("calling %q: %w", method, err)
@@ -288,7 +322,14 @@ func (r rwc) Write(p []byte) (n int, err error) {
 }
 
 func (r rwc) Close() error {
-	return errors.Join(r.rc.Close(), r.wc.Close())
+	rcErr := r.rc.Close()
+
+	var wcErr error
+	if r.wc != nil { // we only allow a nil writer in unit tests
+		wcErr = r.wc.Close()
+	}
+
+	return errors.Join(rcErr, wcErr)
 }
 
 // An ioConn is a transport that delimits messages with newlines across
@@ -352,7 +393,8 @@ func newIOConn(rwc io.ReadWriteCloser) *ioConn {
 				var tr [1]byte
 				if n, readErr := dec.Buffered().Read(tr[:]); n > 0 {
 					// If read byte is not a newline, it is an error.
-					if tr[0] != '\n' {
+					// Support both Unix (\n) and Windows (\r\n) line endings.
+					if tr[0] != '\n' && tr[0] != '\r' {
 						err = fmt.Errorf("invalid trailing data at the end of stream")
 					}
 				} else if readErr != nil && readErr != io.EOF {
@@ -524,7 +566,7 @@ func (t *ioConn) Read(ctx context.Context) (jsonrpc.Message, error) {
 func readBatch(data []byte) (msgs []jsonrpc.Message, isBatch bool, _ error) {
 	// Try to read an array of messages first.
 	var rawBatch []json.RawMessage
-	if err := json.Unmarshal(data, &rawBatch); err == nil {
+	if err := internaljson.Unmarshal(data, &rawBatch); err == nil {
 		if len(rawBatch) == 0 {
 			return nil, true, fmt.Errorf("empty batch")
 		}

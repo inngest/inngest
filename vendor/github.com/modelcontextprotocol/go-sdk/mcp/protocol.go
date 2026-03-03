@@ -13,6 +13,8 @@ package mcp
 import (
 	"encoding/json"
 	"fmt"
+
+	internaljson "github.com/modelcontextprotocol/go-sdk/internal/json"
 )
 
 // Optional annotations for the client. The client can use annotations to inform
@@ -116,17 +118,17 @@ type CallToolResult struct {
 	err error
 }
 
-// TODO(#64): consider exposing setError (and getError), by adding an error
-// field on CallToolResult.
-func (r *CallToolResult) setError(err error) {
+// SetError sets the error for the tool result and populates the Content field
+// with the error text. It also sets IsError to true.
+func (r *CallToolResult) SetError(err error) {
 	r.Content = []Content{&TextContent{Text: err.Error()}}
 	r.IsError = true
 	r.err = err
 }
 
-// getError returns the error set with setError, or nil if none.
+// GetError returns the error set with SetError, or nil if none.
 // This function always returns nil on clients.
-func (r *CallToolResult) getError() error {
+func (r *CallToolResult) GetError() error {
 	return r.err
 }
 
@@ -140,7 +142,7 @@ func (x *CallToolResult) UnmarshalJSON(data []byte) error {
 		res
 		Content []*wireContent `json:"content"`
 	}
-	if err := json.Unmarshal(data, &wire); err != nil {
+	if err := internaljson.Unmarshal(data, &wire); err != nil {
 		return err
 	}
 	var err error
@@ -177,21 +179,87 @@ func (x *CancelledParams) isParams()              {}
 func (x *CancelledParams) GetProgressToken() any  { return getProgressToken(x) }
 func (x *CancelledParams) SetProgressToken(t any) { setProgressToken(x, t) }
 
+// RootCapabilities describes a client's support for roots.
+type RootCapabilities struct {
+	// ListChanged reports whether the client supports notifications for
+	// changes to the roots list.
+	ListChanged bool `json:"listChanged,omitempty"`
+}
+
 // Capabilities a client may support. Known capabilities are defined here, in
 // this schema, but this is not a closed set: any client can define its own,
 // additional capabilities.
 type ClientCapabilities struct {
-	// Experimental, non-standard capabilities that the client supports.
+
+	// NOTE: any addition to ClientCapabilities must also be reflected in
+	// [ClientCapabilities.clone].
+
+	// Experimental reports non-standard capabilities that the client supports.
 	Experimental map[string]any `json:"experimental,omitempty"`
-	// Present if the client supports listing roots.
+	// Roots describes the client's support for roots.
+	//
+	// Deprecated: use RootsV2. As described in #607, Roots should have been a
+	// pointer to a RootCapabilities value. Roots will be continue to be
+	// populated, but any new fields will only be added in the RootsV2 field.
 	Roots struct {
-		// Whether the client supports notifications for changes to the roots list.
+		// ListChanged reports whether the client supports notifications for
+		// changes to the roots list.
 		ListChanged bool `json:"listChanged,omitempty"`
 	} `json:"roots,omitempty"`
-	// Present if the client supports sampling from an LLM.
+	// RootsV2 is present if the client supports roots. When capabilities are explicitly configured via [ClientOptions.Capabilities]
+	RootsV2 *RootCapabilities `json:"-"`
+	// Sampling is present if the client supports sampling from an LLM.
 	Sampling *SamplingCapabilities `json:"sampling,omitempty"`
-	// Present if the client supports elicitation from the server.
+	// Elicitation is present if the client supports elicitation from the server.
 	Elicitation *ElicitationCapabilities `json:"elicitation,omitempty"`
+}
+
+// clone returns a deep copy of the ClientCapabilities.
+func (c *ClientCapabilities) clone() *ClientCapabilities {
+	cp := *c
+	cp.RootsV2 = shallowClone(c.RootsV2)
+	cp.Sampling = shallowClone(c.Sampling)
+	if c.Elicitation != nil {
+		x := *c.Elicitation
+		x.Form = shallowClone(c.Elicitation.Form)
+		x.URL = shallowClone(c.Elicitation.URL)
+		cp.Elicitation = &x
+	}
+	return &cp
+}
+
+// shallowClone returns a shallow clone of *p, or nil if p is nil.
+func shallowClone[T any](p *T) *T {
+	if p == nil {
+		return nil
+	}
+	x := *p
+	return &x
+}
+
+func (c *ClientCapabilities) toV2() *clientCapabilitiesV2 {
+	return &clientCapabilitiesV2{
+		ClientCapabilities: *c,
+		Roots:              c.RootsV2,
+	}
+}
+
+// clientCapabilitiesV2 is a version of ClientCapabilities that fixes the bug
+// described in #607: Roots should have been a pointer to value type
+// RootCapabilities.
+type clientCapabilitiesV2 struct {
+	ClientCapabilities
+	Roots *RootCapabilities `json:"roots,omitempty"`
+}
+
+func (c *clientCapabilitiesV2) toV1() *ClientCapabilities {
+	caps := c.ClientCapabilities
+	caps.RootsV2 = c.Roots
+	// Sync Roots from RootsV2 for backward compatibility (#607).
+	if caps.RootsV2 != nil {
+		caps.Roots = *caps.RootsV2
+	}
+	return &caps
 }
 
 type CompleteParamsArgument struct {
@@ -220,7 +288,7 @@ type CompleteReference struct {
 func (r *CompleteReference) UnmarshalJSON(data []byte) error {
 	type wireCompleteReference CompleteReference // for naive unmarshaling
 	var r2 wireCompleteReference
-	if err := json.Unmarshal(data, &r2); err != nil {
+	if err := internaljson.Unmarshal(data, &r2); err != nil {
 		return err
 	}
 	switch r2.Type {
@@ -336,7 +404,7 @@ func (r *CreateMessageResult) UnmarshalJSON(data []byte) error {
 		result
 		Content *wireContent `json:"content"`
 	}
-	if err := json.Unmarshal(data, &wire); err != nil {
+	if err := internaljson.Unmarshal(data, &wire); err != nil {
 		return err
 	}
 	var err error
@@ -373,27 +441,53 @@ type GetPromptResult struct {
 
 func (*GetPromptResult) isResult() {}
 
+// InitializeParams is sent by the client to initialize the session.
 type InitializeParams struct {
 	// This property is reserved by the protocol to allow clients and servers to
 	// attach additional metadata to their responses.
-	Meta         `json:"_meta,omitempty"`
+	Meta `json:"_meta,omitempty"`
+	// Capabilities describes the client's capabilities.
 	Capabilities *ClientCapabilities `json:"capabilities"`
-	ClientInfo   *Implementation     `json:"clientInfo"`
-	// The latest version of the Model Context Protocol that the client supports.
-	// The client may decide to support older versions as well.
+	// ClientInfo provides information about the client.
+	ClientInfo *Implementation `json:"clientInfo"`
+	// ProtocolVersion is the latest version of the Model Context Protocol that
+	// the client supports.
 	ProtocolVersion string `json:"protocolVersion"`
+}
+
+func (p *InitializeParams) toV2() *initializeParamsV2 {
+	return &initializeParamsV2{
+		InitializeParams: *p,
+		Capabilities:     p.Capabilities.toV2(),
+	}
+}
+
+// initializeParamsV2 works around the mistake in #607: Capabilities.Roots
+// should have been a pointer.
+type initializeParamsV2 struct {
+	InitializeParams
+	Capabilities *clientCapabilitiesV2 `json:"capabilities"`
+}
+
+func (p *initializeParamsV2) toV1() *InitializeParams {
+	p1 := p.InitializeParams
+	if p.Capabilities != nil {
+		p1.Capabilities = p.Capabilities.toV1()
+	}
+	return &p1
 }
 
 func (x *InitializeParams) isParams()              {}
 func (x *InitializeParams) GetProgressToken() any  { return getProgressToken(x) }
 func (x *InitializeParams) SetProgressToken(t any) { setProgressToken(x, t) }
 
-// After receiving an initialize request from the client, the server sends this
-// response.
+// InitializeResult is sent by the server in response to an initialize request
+// from the client.
 type InitializeResult struct {
 	// This property is reserved by the protocol to allow clients and servers to
 	// attach additional metadata to their responses.
-	Meta         `json:"_meta,omitempty"`
+	Meta `json:"_meta,omitempty"`
+	// Capabilities describes the server's capabilities.
 	Capabilities *ServerCapabilities `json:"capabilities"`
 	// Instructions describing how to use the server and its features.
 	//
@@ -411,8 +505,8 @@ type InitializeResult struct {
 func (*InitializeResult) isResult() {}
 
 type InitializedParams struct {
-	// This property is reserved by the protocol to allow clients and servers to
-	// attach additional metadata to their responses.
+	// Meta is reserved by the protocol to allow clients and servers to attach
+	// additional metadata to their responses.
 	Meta `json:"_meta,omitempty"`
 }
 
@@ -658,6 +752,34 @@ type ProgressNotificationParams struct {
 
 func (*ProgressNotificationParams) isParams() {}
 
+// IconTheme specifies the theme an icon is designed for.
+type IconTheme string
+
+const (
+	// IconThemeLight indicates the icon is designed for a light background.
+	IconThemeLight IconTheme = "light"
+	// IconThemeDark indicates the icon is designed for a dark background.
+	IconThemeDark IconTheme = "dark"
+)
+
+// Icon provides visual identifiers for their resources, tools, prompts, and implementations
+// See [/specification/draft/basic/index#icons] for notes on icons
+//
+// TODO(iamsurajbobade): update specification url from draft.
+type Icon struct {
+	// Source is A URI pointing to the icon resource (required). This can be:
+	// - An HTTP/HTTPS URL pointing to an image file
+	// - A data URI with base64-encoded image data
+	Source string `json:"src"`
+	// Optional MIME type if the server's type is missing or generic
+	MIMEType string `json:"mimeType,omitempty"`
+	// Optional size specification (e.g., ["48x48"], ["any"] for scalable formats like SVG, or ["48x48", "96x96"] for multiple sizes)
+	Sizes []string `json:"sizes,omitempty"`
+	// Optional theme specifier. "light" indicates the icon is designed for a light
+	// background, "dark" indicates the icon is designed for a dark background.
+	Theme IconTheme `json:"theme,omitempty"`
+}
+
 // A prompt or prompt template that the server offers.
 type Prompt struct {
 	// See [specification/2025-06-18/basic/index#general-fields] for notes on _meta
@@ -673,6 +795,8 @@ type Prompt struct {
 	// Intended for UI and end-user contexts — optimized to be human-readable and
 	// easily understood, even by those unfamiliar with domain-specific terminology.
 	Title string `json:"title,omitempty"`
+	// Icons for the prompt, if any.
+	Icons []Icon `json:"icons,omitempty"`
 }
 
 // Describes an argument that a prompt can accept.
@@ -716,7 +840,7 @@ func (m *PromptMessage) UnmarshalJSON(data []byte) error {
 		msg
 		Content *wireContent `json:"content"`
 	}
-	if err := json.Unmarshal(data, &wire); err != nil {
+	if err := internaljson.Unmarshal(data, &wire); err != nil {
 		return err
 	}
 	var err error
@@ -782,6 +906,8 @@ type Resource struct {
 	Title string `json:"title,omitempty"`
 	// The URI of this resource.
 	URI string `json:"uri"`
+	// Icons for the resource, if any.
+	Icons []Icon `json:"icons,omitempty"`
 }
 
 type ResourceListChangedParams struct {
@@ -822,6 +948,8 @@ type ResourceTemplate struct {
 	// A URI template (according to RFC 6570) that can be used to construct resource
 	// URIs.
 	URITemplate string `json:"uriTemplate"`
+	// Icons for the resource template, if any.
+	Icons []Icon `json:"icons,omitempty"`
 }
 
 // The sender or recipient of messages and data in a conversation.
@@ -852,11 +980,27 @@ func (x *RootsListChangedParams) isParams()              {}
 func (x *RootsListChangedParams) GetProgressToken() any  { return getProgressToken(x) }
 func (x *RootsListChangedParams) SetProgressToken(t any) { setProgressToken(x, t) }
 
-// SamplingCapabilities describes the capabilities for sampling.
+// TODO: to be consistent with ServerCapabilities, move the capability types
+// below directly above ClientCapabilities.
+
+// SamplingCapabilities describes the client's support for sampling.
 type SamplingCapabilities struct{}
 
 // ElicitationCapabilities describes the capabilities for elicitation.
-type ElicitationCapabilities struct{}
+//
+// If neither Form nor URL is set, the 'Form' capabilitiy is assumed.
+type ElicitationCapabilities struct {
+	Form *FormElicitationCapabilities
+	URL  *URLElicitationCapabilities
+}
+
+// FormElicitationCapabilities describes capabilities for form elicitation.
+type FormElicitationCapabilities struct {
+}
+
+// URLElicitationCapabilities describes capabilities for url elicitation.
+type URLElicitationCapabilities struct {
+}
 
 // Describes a message issued to or received from an LLM API.
 type SamplingMessage struct {
@@ -872,7 +1016,7 @@ func (m *SamplingMessage) UnmarshalJSON(data []byte) error {
 		msg
 		Content *wireContent `json:"content"`
 	}
-	if err := json.Unmarshal(data, &wire); err != nil {
+	if err := internaljson.Unmarshal(data, &wire); err != nil {
 		return err
 	}
 	var err error
@@ -948,6 +1092,8 @@ type Tool struct {
 	// If not provided, Annotations.Title should be used for display if present,
 	// otherwise Name.
 	Title string `json:"title,omitempty"`
+	// Icons for the tool, if any.
+	Icons []Icon `json:"icons,omitempty"`
 }
 
 // Additional properties describing a Tool to clients.
@@ -1042,6 +1188,10 @@ type ElicitParams struct {
 	// This property is reserved by the protocol to allow clients and servers to
 	// attach additional metadata to their responses.
 	Meta `json:"_meta,omitempty"`
+	// The mode of elicitation to use.
+	//
+	// If unset, will be inferred from the other fields.
+	Mode string `json:"mode"`
 	// The message to present to the user.
 	Message string `json:"message"`
 	// A JSON schema object defining the requested elicitation schema.
@@ -1055,7 +1205,17 @@ type ElicitParams struct {
 	// map[string]any).
 	//
 	// Only top-level properties are allowed, without nesting.
-	RequestedSchema any `json:"requestedSchema"`
+	//
+	// This is only used for "form" elicitation.
+	RequestedSchema any `json:"requestedSchema,omitempty"`
+	// The URL to present to the user.
+	//
+	// This is only used for "url" elicitation.
+	URL string `json:"url,omitempty"`
+	// The ID of the elicitation.
+	//
+	// This is only used for "url" elicitation.
+	ElicitationID string `json:"elicitationId,omitempty"`
 }
 
 func (x *ElicitParams) isParams() {}
@@ -1080,6 +1240,18 @@ type ElicitResult struct {
 
 func (*ElicitResult) isResult() {}
 
+// ElicitationCompleteParams is sent from the server to the client, informing it that an out-of-band elicitation interaction has completed.
+type ElicitationCompleteParams struct {
+	// This property is reserved by the protocol to allow clients and servers to
+	// attach additional metadata to their responses.
+	Meta `json:"_meta,omitempty"`
+	// The ID of the elicitation that has completed. This must correspond to the
+	// elicitationId from the original elicitation/create request.
+	ElicitationID string `json:"elicitationId"`
+}
+
+func (*ElicitationCompleteParams) isParams() {}
+
 // An Implementation describes the name and version of an MCP implementation, with an optional
 // title for UI representation.
 type Implementation struct {
@@ -1090,50 +1262,71 @@ type Implementation struct {
 	// easily understood, even by those unfamiliar with domain-specific terminology.
 	Title   string `json:"title,omitempty"`
 	Version string `json:"version"`
+	// WebsiteURL for the server, if any.
+	WebsiteURL string `json:"websiteUrl,omitempty"`
+	// Icons for the Server, if any.
+	Icons []Icon `json:"icons,omitempty"`
 }
 
-// Present if the server supports argument autocompletion suggestions.
+// CompletionCapabilities describes the server's support for argument autocompletion.
 type CompletionCapabilities struct{}
 
-// Present if the server supports sending log messages to the client.
+// LoggingCapabilities describes the server's support for sending log messages to the client.
 type LoggingCapabilities struct{}
 
-// Present if the server offers any prompt templates.
+// PromptCapabilities describes the server's support for prompts.
 type PromptCapabilities struct {
 	// Whether this server supports notifications for changes to the prompt list.
 	ListChanged bool `json:"listChanged,omitempty"`
 }
 
-// Present if the server offers any resources to read.
+// ResourceCapabilities describes the server's support for resources.
 type ResourceCapabilities struct {
-	// Whether this server supports notifications for changes to the resource list.
+	// ListChanged reports whether the client supports notifications for
+	// changes to the resource list.
 	ListChanged bool `json:"listChanged,omitempty"`
-	// Whether this server supports subscribing to resource updates.
+	// Subscribe reports whether this server supports subscribing to resource
+	// updates.
 	Subscribe bool `json:"subscribe,omitempty"`
 }
 
-// Capabilities that a server may support. Known capabilities are defined here,
-// in this schema, but this is not a closed set: any server can define its own,
-// additional capabilities.
+// ToolCapabilities describes the server's support for tools.
+type ToolCapabilities struct {
+	// ListChanged reports whether the client supports notifications for
+	// changes to the tool list.
+	ListChanged bool `json:"listChanged,omitempty"`
+}
+
+// ServerCapabilities describes capabilities that a server supports.
 type ServerCapabilities struct {
-	// Present if the server supports argument autocompletion suggestions.
-	Completions *CompletionCapabilities `json:"completions,omitempty"`
-	// Experimental, non-standard capabilities that the server supports.
+
+	// NOTE: any addition to ServerCapabilities must also be reflected in
+	// [ServerCapabilities.clone].
+
+	// Experimental reports non-standard capabilities that the server supports.
 	Experimental map[string]any `json:"experimental,omitempty"`
-	// Present if the server supports sending log messages to the client.
+	// Completions is present if the server supports argument autocompletion
+	// suggestions.
+	Completions *CompletionCapabilities `json:"completions,omitempty"`
+	// Logging is present if the server supports log messages.
 	Logging *LoggingCapabilities `json:"logging,omitempty"`
-	// Present if the server offers any prompt templates.
+	// Prompts is present if the server supports prompts.
 	Prompts *PromptCapabilities `json:"prompts,omitempty"`
-	// Present if the server offers any resources to read.
+	// Resources is present if the server supports resourcs.
 	Resources *ResourceCapabilities `json:"resources,omitempty"`
-	// Present if the server offers any tools to call.
+	// Tools is present if the supports tools.
 	Tools *ToolCapabilities `json:"tools,omitempty"`
 }
 
-// Present if the server offers any tools to call.
-type ToolCapabilities struct {
-	// Whether this server supports notifications for changes to the tool list.
-	ListChanged bool `json:"listChanged,omitempty"`
+// clone returns a deep copy of the ServerCapabilities.
+func (c *ServerCapabilities) clone() *ServerCapabilities {
+	cp := *c
+	cp.Completions = shallowClone(c.Completions)
+	cp.Logging = shallowClone(c.Logging)
+	cp.Prompts = shallowClone(c.Prompts)
+	cp.Resources = shallowClone(c.Resources)
+	cp.Tools = shallowClone(c.Tools)
+	return &cp
 }
 
 const (
@@ -1142,6 +1335,7 @@ const (
 	methodComplete                  = "completion/complete"
 	methodCreateMessage             = "sampling/createMessage"
 	methodElicit                    = "elicitation/create"
+	notificationElicitationComplete = "notifications/elicitation/complete"
 	methodGetPrompt                 = "prompts/get"
 	methodInitialize                = "initialize"
 	notificationInitialized         = "notifications/initialized"
