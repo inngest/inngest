@@ -3109,7 +3109,8 @@ func (e *executor) HandleGeneratorResponse(ctx context.Context, i *runInstance, 
 
 	groups := opGroups(resp.Generator)
 
-	if stepCount > 1 && i.md.ShouldCoalesceParallelism(resp) {
+	// We only save pending steps if there's >= 1 step planned op.
+	if hasPlanOp(resp.Generator) && i.md.ShouldCoalesceParallelism(resp) {
 		if err := e.smv2.SavePending(ctx, i.md.ID, groups.IDs()); err != nil {
 			return fmt.Errorf("error saving pending steps: %w", err)
 		}
@@ -5280,4 +5281,13 @@ func (e *executor) createMetadataSpan(ctx context.Context, runCtx execution.RunC
 		md,
 		scope,
 	)
+}
+
+func hasPlanOp(ops []*state.GeneratorOpcode) bool {
+	for _, op := range ops {
+		if op.Op == enums.OpcodeStepPlanned {
+			return true
+		}
+	}
+	return false
 }
