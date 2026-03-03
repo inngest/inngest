@@ -88,3 +88,55 @@ func TestFnCheckpoint(t *testing.T) {
 		}
 	}
 }
+
+func TestCheckpointMaxDuration(t *testing.T) {
+	ctx := context.Background()
+	r := require.New(t)
+	c := client.New(t)
+
+	inngestClient, server, registerFuncs := NewSDKHandler(t, "checkpoint")
+	defer server.Close()
+
+	rid := NewRunID()
+	evtName := "invoke-checkpoint-timeout"
+	fmt.Println(evtName)
+
+	_, err := inngestgo.CreateFunction(
+		inngestClient,
+		inngestgo.FunctionOpts{
+			ID: evtName,
+			Checkpoint: &checkpoint.Config{
+				BatchSteps:    3,
+				BatchInterval: time.Second,
+				MaxRuntime:    time.Second * 2,
+			},
+		},
+		inngestgo.EventTrigger(evtName, nil),
+		func(ctx context.Context, input inngestgo.Input[DebounceEvent]) (any, error) {
+			rid.Send(input.InputCtx.RunID)
+
+			for i := range 8 {
+				_, _ = step.Run(ctx, fmt.Sprintf("%d", i), func(ctx context.Context) (string, error) {
+					<-time.After(1 * time.Second)
+					return "a", nil
+				})
+				fmt.Println(i)
+			}
+			fmt.Println("c (done), ", input.InputCtx.RunID)
+			return nil, nil
+		},
+	)
+	r.NoError(err)
+	registerFuncs()
+
+	// Trigger the main function and successfully invoke the other function
+	_, err = inngestClient.Send(ctx, &event.Event{Name: evtName})
+	r.NoError(err)
+
+	runID := rid.Wait(t)
+	run := c.WaitForRunStatus(ctx, t, "COMPLETED", runID)
+	var output string
+	err = json.Unmarshal([]byte(run.Output), &output)
+	require.NotEmpty(t, runID)
+	r.NoError(err)
+}
