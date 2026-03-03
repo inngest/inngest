@@ -390,7 +390,8 @@ func TestInvokeRateLimit(t *testing.T) {
 	_, err = inngestgo.CreateFunction(
 		inngestClient,
 		inngestgo.FunctionOpts{
-			ID: "main-fn",
+			ID:      "main-fn",
+			Retries: inngestgo.IntPtr(0),
 		},
 		inngestgo.EventTrigger(evtName, nil),
 		func(ctx context.Context, input inngestgo.Input[DebounceEvent]) (any, error) {
@@ -431,7 +432,7 @@ func TestInvokeRateLimit(t *testing.T) {
 	var secondRunID string
 	r.Eventually(func() bool {
 		runs, err := c.RunsByEventID(ctx, eventID)
-		if err != nil || len(runs) == 0 {
+		if err != nil || len(runs) < 2 {
 			return false
 		}
 		secondRunID = runs[0].ID
