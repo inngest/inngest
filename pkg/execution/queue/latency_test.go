@@ -27,6 +27,30 @@ func TestLatencyQueueName(t *testing.T) {
 	}
 }
 
+func TestIsLatencyPartition(t *testing.T) {
+	tests := []struct {
+		id       string
+		expected bool
+	}{
+		{latencyQueueName(1), true},
+		{latencyQueueName(2), true},
+		{latencyQueueName(15), true},
+		{"ffffffff-ffff-ffff-ffff-fffffffffff0", true},
+		{"ffffffff-ffff-ffff-ffff-ffffffffffff", true},
+		// Real UUIDs should never match.
+		{"00000000-0000-0000-0000-000000000000", false},
+		{"a1b2c3d4-e5f6-7890-abcd-ef1234567890", false},
+		// Partial prefix match is not enough.
+		{"ffffffff-ffff-ffff-ffff-fffffffffffe", false},
+		// Empty and short strings.
+		{"", false},
+		{"ffffffff", false},
+	}
+	for _, tt := range tests {
+		require.Equal(t, tt.expected, IsLatencyPartition(tt.id), "IsLatencyPartition(%q)", tt.id)
+	}
+}
+
 func TestWithLatencyPartition(t *testing.T) {
 	t.Run("sets defaults", func(t *testing.T) {
 		called := false
