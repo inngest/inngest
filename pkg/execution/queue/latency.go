@@ -3,22 +3,7 @@ package queue
 import (
 	"context"
 	"fmt"
-
-	"github.com/google/uuid"
-	"github.com/inngest/inngest/pkg/execution/state"
 )
-
-var (
-	LatencyAccountID  = uuid.MustParse("ffffffff-ffff-ffff-ffff-ffffffffffff")
-	LatencyEnvID      = uuid.MustParse("ffffffff-ffff-ffff-ffff-fffffffffffe")
-	LatencyFunctionID = uuid.MustParse("ffffffff-ffff-ffff-ffff-fffffffffffd")
-)
-
-// IsLatencyPartition reports whether the given partition ID belongs to
-// the latency tracking function.
-func IsLatencyPartition(id string) bool {
-	return id == LatencyFunctionID.String()
-}
 
 // runLatencyTracker is a background goroutine that periodically enqueues
 // latency tracking canary jobs into the queue.
@@ -47,16 +32,12 @@ func (q *queueProcessor) runLatencyTracker(ctx context.Context) {
 func (q *queueProcessor) enqueueLatencyJob(ctx context.Context, partition int) error {
 	jobID := fmt.Sprintf("ltrack-%d-%d", partition, q.Clock().Now().UnixMilli())
 	idempotency := q.latencyPartition.Interval
+	queueName := "ltc"
 
 	return q.Enqueue(ctx, Item{
-		JobID:       &jobID,
-		Kind:        KindLatencyTrack,
-		WorkspaceID: LatencyEnvID,
-		Identifier: state.Identifier{
-			AccountID:   LatencyAccountID,
-			WorkspaceID: LatencyEnvID,
-			WorkflowID:  LatencyFunctionID,
-		},
+		JobID:     &jobID,
+		Kind:      KindLatencyTrack,
+		QueueName: &queueName,
 	}, q.Clock().Now(), EnqueueOpts{
 		IdempotencyPeriod:   &idempotency,
 		ForceQueueShardName: q.primaryQueueShard.Name(),
