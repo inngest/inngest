@@ -31,6 +31,7 @@ type RunInfo struct {
 	ContinueCount       uint
 	RefilledFromBacklog string
 	CapacityLease       *CapacityLease
+	ScavengeCount       int
 }
 
 // RunFunc represents a function called to process each item in the queue.  This may be
