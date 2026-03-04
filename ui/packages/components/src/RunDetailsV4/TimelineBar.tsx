@@ -17,6 +17,7 @@ import {
   RiCloseCircleFill,
   RiFlashlightLine,
   RiFunctionLine,
+  RiInformationLine,
   RiMailLine,
   RiSettings3Line,
   RiStopCircleFill,
@@ -596,7 +597,7 @@ export function TimelineBar({
           {/* Icon */}
           <BarIconComponent icon={effectiveIcon} className="text-subtle ml-px" status={status} />
 
-          {/* Name */}
+          {/* Name (with optional info icon tooltip for Inngest and Your Server labels) */}
           <span
             className={cn(
               'min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap font-mono text-xs font-normal leading-tight',
@@ -605,6 +606,24 @@ export function TimelineBar({
             )}
           >
             {displayName}
+            {(style === 'timing.inngest' || style === 'timing.server') && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span
+                    className=" ml-1 inline-flex shrink-0 cursor-help align-middle"
+                    onClick={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => e.stopPropagation()}
+                  >
+                    <RiInformationLine className="text-light h-3.5 w-3.5" />
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="top" className=" max-w-xs text-xs shadow-lg">
+                  {style === 'timing.inngest'
+                    ? 'Time spent on queue delays, concurrency limits, processing delays, and related overhead'
+                    : 'Time spent on your server executing the function'}
+                </TooltipContent>
+              </Tooltip>
+            )}
           </span>
 
           {/* Duration */}
