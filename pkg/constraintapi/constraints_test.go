@@ -1547,6 +1547,7 @@ func TestConstraintEnforcement(t *testing.T) {
 					LeaseID:        lease.LeaseID,
 					AccountID:      accountID,
 					Duration:       5 * time.Second,
+					LeaseIssuedAt:  clock.Now(),
 				})
 				require.NoError(t, err)
 
@@ -1558,6 +1559,7 @@ func TestConstraintEnforcement(t *testing.T) {
 					AccountID:      accountID,
 					IdempotencyKey: "release",
 					LeaseID:        *extendResp.LeaseID,
+					LeaseIssuedAt:  clock.Now(),
 				})
 				require.NoError(t, err)
 

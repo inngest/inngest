@@ -1623,6 +1623,7 @@ func TestCapacityExtendLeaseRequestConversion(t *testing.T) {
 				AccountID:      accountID,
 				LeaseID:        leaseID,
 				Duration:       15 * time.Minute,
+				LeaseIssuedAt:  time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
 				Source: LeaseSource{
 					Service:           ServiceAPI,
 					Location:          CallerLocationItemLease,
@@ -1634,6 +1635,7 @@ func TestCapacityExtendLeaseRequestConversion(t *testing.T) {
 				AccountId:      accountID.String(),
 				LeaseId:        leaseID.String(),
 				Duration:       durationpb.New(15 * time.Minute),
+				LeaseIssuedAt:  timestamppb.New(time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)),
 				Source: &pb.LeaseSource{
 					Service:           pb.ConstraintApiLeaseService_CONSTRAINT_API_LEASE_SERVICE_API,
 					Location:          pb.ConstraintApiCallerLocation_CONSTRAINT_API_CALLER_LOCATION_ITEM_LEASE,
@@ -1747,6 +1749,7 @@ func TestCapacityReleaseRequestConversion(t *testing.T) {
 				IdempotencyKey: "commit-key",
 				AccountID:      accountID,
 				LeaseID:        leaseID,
+				LeaseIssuedAt:  time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
 				Source: LeaseSource{
 					Service:           ServiceAPI,
 					Location:          CallerLocationItemLease,
@@ -1757,6 +1760,7 @@ func TestCapacityReleaseRequestConversion(t *testing.T) {
 				IdempotencyKey: "commit-key",
 				AccountId:      accountID.String(),
 				LeaseId:        leaseID.String(),
+				LeaseIssuedAt:  timestamppb.New(time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)),
 				Source: &pb.LeaseSource{
 					Service:           pb.ConstraintApiLeaseService_CONSTRAINT_API_LEASE_SERVICE_API,
 					Location:          pb.ConstraintApiCallerLocation_CONSTRAINT_API_CALLER_LOCATION_ITEM_LEASE,

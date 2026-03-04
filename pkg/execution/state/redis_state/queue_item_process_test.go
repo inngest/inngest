@@ -220,7 +220,8 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 			P:                        p,
 			DisableConstraintUpdates: true,
 			CapacityLease: &osqueue.CapacityLease{
-				LeaseID: resp.Leases[0].LeaseID,
+				LeaseID:    resp.Leases[0].LeaseID,
+				IssuedAtMS: clock.Now().UnixMilli(),
 			},
 		}, func(ctx context.Context, ri osqueue.RunInfo, i osqueue.Item) (osqueue.RunResult, error) {
 			go func() {
@@ -335,7 +336,8 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 			P:                        p,
 			DisableConstraintUpdates: true,
 			CapacityLease: &osqueue.CapacityLease{
-				LeaseID: resp.Leases[0].LeaseID,
+				LeaseID:    resp.Leases[0].LeaseID,
+				IssuedAtMS: clock.Now().UnixMilli(),
 			},
 		}, func(ctx context.Context, ri osqueue.RunInfo, i osqueue.Item) (osqueue.RunResult, error) {
 			go func() {
@@ -586,7 +588,8 @@ func TestQueueProcessorPreLeaseWithConstraintAPI(t *testing.T) {
 
 		// Set capacity lease ID
 		qi.CapacityLease = &osqueue.CapacityLease{
-			LeaseID: resp.Leases[0].LeaseID,
+			LeaseID:    resp.Leases[0].LeaseID,
+			IssuedAtMS: clock.Now().UnixMilli(),
 		}
 
 		p := osqueue.ItemPartition(ctx, qi)
@@ -1041,7 +1044,8 @@ func TestPartitionProcessRequeueAfterLimitedWithConstraintAPI(t *testing.T) {
 
 			// Set capacity lease ID on first item
 			item.CapacityLease = &osqueue.CapacityLease{
-				LeaseID: resp.Leases[0].LeaseID,
+				LeaseID:    resp.Leases[0].LeaseID,
+				IssuedAtMS: clock.Now().UnixMilli(),
 			}
 			// Manually set ID for first item
 			item.ID = util.XXHash("item0")
