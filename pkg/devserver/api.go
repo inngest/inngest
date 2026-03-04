@@ -29,6 +29,7 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/publicerr"
 	"github.com/inngest/inngest/pkg/sdk"
+	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
 	ptrace "go.opentelemetry.io/collector/pdata/ptrace"
 )
@@ -246,6 +247,31 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 	// TODO Retrieve same syncID for connect, if r.IdempotencyKey is the same
 	syncID := uuid.New()
 
+	// Clean up URL-based placeholder apps before the checksum check to ensure
+	// zombie placeholders are always removed, even if the checksum matches and
+	// we return early below.
+	//
+	// We iterate all apps rather than using GetAppByURL because that query
+	// returns LIMIT 1 and may find the real (named) app instead of the
+	// placeholder when both share the same URL.
+	if allApps, err := a.devserver.Data.GetAllApps(ctx, consts.DevServerEnvID); err == nil {
+		normalizedURL := util.NormalizeAppURL(r.URL, false)
+		for _, app := range allApps {
+			if app.Name == "" && util.NormalizeAppURL(app.Url, false) == normalizedURL {
+				// Since there's an app with the same URL but no name, we can
+				// assume it was a failed sync. We should delete it since we're
+				// in the process of syncing a replacement app.
+				//
+				// This situation happens when a user enters an unreachable URL
+				// in the UI. It'll still create an app, but in a placeholder
+				// state.
+				if err := a.devserver.Data.DeleteApp(ctx, app.ID); err != nil {
+					l.Error("error deleting app", "error", err)
+				}
+			}
+		}
+	}
+
 	if app, err := a.devserver.Data.GetAppByChecksum(ctx, consts.DevServerEnvID, sum); err == nil {
 		if !app.Error.Valid {
 			// Skip registration since the app was already successfully
@@ -267,21 +293,6 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 		)
 		if err != nil {
 			return nil, publicerr.Wrap(err, 500, "Error updating app error")
-		}
-	}
-
-	app, err := a.devserver.Data.GetAppByURL(ctx, consts.DevServerEnvID, r.URL)
-	if err == nil && app.Name == "" {
-		// Since there's an app with the same URL but no name, we can assume it
-		// was a failed sync. We should delete it since we're in the process of
-		// syncing a replacement app.
-		//
-		// This situation happens when a user enters an unreachable URL in the
-		// UI. It'll still create an app, but in a placeholder state
-
-		err = a.devserver.Data.DeleteApp(ctx, app.ID)
-		if err != nil {
-			l.Error("error deleting app", "error", err)
 		}
 	}
 
