@@ -929,3 +929,14 @@ func IncrConstraintAPIIssuedLeaseCounter(ctx context.Context, count int64, opts 
 		Tags:        opts.Tags,
 	})
 }
+
+// IncrResponseCacheLookupCounter tracks cache hit/miss for the executor response cache.
+// Tags should include "status" with value "hit" or "miss".
+func IncrResponseCacheLookupCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "executor_response_cache_lookup_total",
+		Description: "Total number of executor response cache lookups",
+		Tags:        opts.Tags,
+	})
+}
