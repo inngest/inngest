@@ -295,6 +295,7 @@ func (q *queueProcessor) ProcessItem(
 			ContinueCount:       continuationCtr,
 			RefilledFromBacklog: qi.RefilledFrom,
 			CapacityLease:       i.CapacityLease,
+			ScavengeCount:       qi.ScavengeCount,
 		}
 
 		// Call the run func.
