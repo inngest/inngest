@@ -2,7 +2,9 @@ package meta
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"strconv"
 	"testing"
 	"time"
@@ -827,6 +829,44 @@ func TestExtractTypedValues(t *testing.T) {
 		assert.Equal(t, op, *ev.MetadataOp)
 		assert.Equal(t, values, *ev.Metadata)
 		assert.Equal(t, kind, *ev.MetadataKind)
+	})
+
+	t.Run("Compact HTTP Headers Attributes", func(t *testing.T) {
+
+		value := http.Header{
+			"Content-Type":   {"application/json"},
+			"Content-Length": {"256"},
+			"X-Custom":       {"value1", "value2"},
+		}
+
+		expected := map[string]any{
+
+			"Content-Type":   "application/json",
+			"Content-Length": "256",
+			"X-Custom":       []any{"value1", "value2"},
+		}
+
+		attrs := NewAttrSet()
+		key := "header-test"
+		jsonAttr := CompactHTTPHeadersAttr(key)
+
+		AddAttr(attrs, jsonAttr, &value)
+		require.Len(t, attrs.Attrs, 1)
+		require.Equal(t, &value, attrs.Attrs[0].value)
+
+		serialized, ok := attrs.Attrs[0].serialize(&value)
+		require.True(t, ok, "should serialize successfully")
+
+		var rawDeserialized map[string]any
+		err := json.Unmarshal([]byte(serialized.Value.AsString()), &rawDeserialized)
+		require.NoError(t, err, "should deserialize JSON successfully")
+		require.Equal(t, expected, rawDeserialized, "deserialized value should match expected structure")
+
+		// Update with new value
+		newValue := http.Header{}
+		AddAttr(attrs, jsonAttr, &newValue)
+		require.Len(t, attrs.Attrs, 1, "should still have only one attribute")
+		require.Equal(t, &newValue, attrs.Attrs[0].value, "JSON value should be updated")
 	})
 }
 

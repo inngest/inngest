@@ -7,6 +7,7 @@ import (
 	"encoding"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"reflect"
 	"strconv"
 	"time"
@@ -561,6 +562,57 @@ func JsonAttr[T any](key string) attr[*T] {
 				var req T
 				if err := json.Unmarshal([]byte(str), &req); err == nil {
 					return &req, true
+				}
+			}
+
+			return nil, false
+		},
+	}
+}
+
+// CompactHTTPHeadersAttr is a specialized attribute serializer for http.Header types. It serializes the
+// headers into a compact JSON format where single-value headers are represented as strings and multi-value
+// headers are represented as arrays. This makes the serialized form more concise and easier to read in
+// traces, while still allowing for accurate deserialization back into http.Header.
+func CompactHTTPHeadersAttr(key string) attr[*http.Header] {
+	return attr[*http.Header]{
+		key: withPrefix(key),
+		serialize: func(v *http.Header) attribute.KeyValue {
+			if v == nil {
+				return BlankAttr
+			}
+
+			compactHeaders := make(map[string]any)
+			for k, values := range *v {
+				if len(values) == 1 {
+					compactHeaders[k] = values[0]
+				} else {
+					compactHeaders[k] = values
+				}
+			}
+
+			byt, _ := json.Marshal(compactHeaders)
+
+			return attribute.String(withPrefix(key), string(byt))
+		},
+		deserialize: func(v any) (*http.Header, bool) {
+			if str, ok := v.(string); ok {
+				var req map[string]any
+				if err := json.Unmarshal([]byte(str), &req); err == nil {
+					header := http.Header{}
+					for k, v := range req {
+						switch val := v.(type) {
+						case string:
+							header.Add(k, val)
+						case []any:
+							for _, value := range val {
+								if strValue, ok := value.(string); ok {
+									header.Add(k, strValue)
+								}
+							}
+						}
+					}
+					return &header, true
 				}
 			}
 

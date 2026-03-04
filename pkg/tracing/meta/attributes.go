@@ -173,7 +173,7 @@ var Attrs = struct {
 	IsFunctionOutput:                   BoolAttr("is.function.output"),
 	QueuedAt:                           TimeAttr("queued_at"),
 	RequestURL:                         StringAttr("request.url"),
-	ResponseHeaders:                    JsonAttr[http.Header]("response.headers"),
+	ResponseHeaders:                    CompactHTTPHeadersAttr("response.headers"),
 	ResponseOutputSize:                 IntAttr("response.output_size"),
 	ResponseStatusCode:                 IntAttr("response.status_code"),
 	RunID:                              ULIDAttr("run.id"),
