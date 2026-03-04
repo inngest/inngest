@@ -46,10 +46,12 @@ func (q *queueProcessor) runLatencyTracker(ctx context.Context) {
 func (q *queueProcessor) enqueueLatencyJob(ctx context.Context, partition int) error {
 	jobID := fmt.Sprintf("ltrack-%d-%d", partition, q.Clock().Now().UnixMilli())
 	idempotency := q.latencyPartition.Interval
+	queueName := "ltc"
 
 	return q.Enqueue(ctx, Item{
-		JobID: &jobID,
-		Kind:  KindLatencyTrack,
+		JobID:     &jobID,
+		Kind:      KindLatencyTrack,
+		QueueName: &queueName,
 	}, q.Clock().Now(), EnqueueOpts{
 		IdempotencyPeriod:   &idempotency,
 		ForceQueueShardName: q.primaryQueueShard.Name(),
