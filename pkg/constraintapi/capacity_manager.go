@@ -239,7 +239,7 @@ type CapacityReleaseRequest struct {
 	RequestAttempt int
 
 	// LeaseIssuedAt represents the time the initial lease was issued.
-	// This can be used for routing lease extension request to the same shard.
+	// This can be used for routing the lease release request to the same shard.
 	LeaseIssuedAt time.Time
 }
 
