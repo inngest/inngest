@@ -2,7 +2,9 @@ package redis_state
 
 import (
 	"context"
+	"crypto/sha1"
 	"embed"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io/fs"
@@ -21,6 +23,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
+	"github.com/inngest/inngest/pkg/util/rueidisconn"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 )
@@ -32,6 +35,7 @@ var (
 	// scripts stores all embedded lua scripts on initialization
 	scripts          = map[string]*rueidis.Lua{}
 	retriableScripts = map[string]*RetriableLua{}
+	shasums          = map[string]string{}
 	include          = regexp.MustCompile(`-- \$include\(([\w.]+)\)`)
 
 	// A number to version backend logic in order to prevent non-backward compatible
@@ -89,6 +93,10 @@ func readRedisScripts(path string, entries []fs.DirEntry) {
 
 		scripts[name] = rueidis.NewLuaScript(val)
 		retriableScripts[name] = NewClusterLuaScript(val)
+
+		sum := sha1.Sum([]byte(val))
+		sha1 := hex.EncodeToString(sum[:])
+		shasums[sha1] = name
 	}
 }
 
@@ -96,6 +104,11 @@ func readRedisScripts(path string, entries []fs.DirEntry) {
 // This is primarily used for Lua compatibility testing across different Redis implementations.
 func GetScript(name string) *rueidis.Lua {
 	return scripts[name]
+}
+
+// GetScriptBySHA returns a Lua script name given the checksum
+func GetScriptBySHA(sha1 string) string {
+	return shasums[sha1]
 }
 
 type queueConfig struct{}
@@ -131,15 +144,26 @@ func (c Config) StateName() string { return "redis" }
 
 // SingleClusterManager returns a state manager connecting to just one Redis instance. Do not use this when separate instances
 // should be used for sharded/unsharded data
-func (c Config) SingleClusterManager(ctx context.Context) (state.Manager, error) {
+func (c Config) SingleClusterManager(ctx context.Context, h rueidisconn.TTFBHandler) (state.Manager, error) {
 	opts, err := c.ConnectOpts()
 	if err != nil {
 		return nil, err
 	}
 
-	r, err := rueidis.NewClient(opts)
-	if err != nil {
-		return nil, err
+	var r rueidis.Client
+
+	switch h {
+	case nil:
+		// DOnt bother to use the rueidisconn with TTFB, as we won't want to parse the write bytes,  etc.
+		r, err = rueidis.NewClient(opts)
+		if err != nil {
+			return nil, err
+		}
+	default:
+		r, err = rueidisconn.NewClient(opts, h)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	u := NewUnshardedClient(r, StateDefaultKey, QueueDefaultKey)

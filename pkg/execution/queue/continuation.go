@@ -89,17 +89,22 @@ func (q *queueProcessor) scanContinuations(ctx context.Context) error {
 		return nil
 	}
 
-	// Have some chance of skipping continuations in this iteration.
-	if rand.Float64() <= consts.QueueContinuationSkipProbability {
+	// Have some chance of skipping continuations in this iteration.  And, if someone
+	// else has continuations locked, don't bother.
+	if rand.Float64() <= consts.QueueContinuationSkipProbability || !q.continuesLock.TryLock() {
 		return nil
 	}
 
 	eg := errgroup.Group{}
-	// If we have continued partitions, process those immediately.
-	q.continuesLock.Lock()
 	for _, c := range q.continues {
+		if q.capacity() == 0 || !q.partitionSem.TryAcquire(1) {
+			break
+		}
+
 		cont := c
 		eg.Go(func() error {
+			defer q.partitionSem.Release(1)
+
 			p := cont.partition
 			if q.capacity() == 0 {
 				// no longer any available workers for partition, so we can skip
@@ -108,25 +113,34 @@ func (q *queueProcessor) scanContinuations(ctx context.Context) error {
 				return nil
 			}
 
-			logger.StdlibLogger(ctx).Trace("continue partition processing", "partition_id", p.ID, "count", c.count)
+			logger.StdlibLogger(ctx).Trace("continue partition processing", "partition_id", p.ID, "count", cont.count)
 
-			if err := q.ProcessPartition(ctx, p, cont.count, false); err != nil {
+			err := q.ProcessPartition(ctx, p, cont.count, false)
+
+			metrics.IncrQueuePartitionProcessedCounter(ctx, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags: map[string]any{
+					"queue_shard": q.primaryQueueShard.Name(),
+					"type":        "continuation",
+					"has_error":   err != nil,
+				},
+			})
+
+			if err != nil {
 				if err == ErrPartitionNotFound || err == ErrPartitionGarbageCollected {
 					q.removeContinue(ctx, p, false)
 					return nil
 				}
-				if errors.Unwrap(err) != context.Canceled {
+				if !errors.Is(err, context.Canceled) {
 					logger.StdlibLogger(ctx).Error("error processing partition", "error", err)
 				}
 				return err
 			}
 
-			metrics.IncrQueuePartitionProcessedCounter(ctx, metrics.CounterOpt{
-				PkgName: pkgName,
-			})
 			return nil
 		})
 	}
+
 	q.continuesLock.Unlock()
 	return eg.Wait()
 }

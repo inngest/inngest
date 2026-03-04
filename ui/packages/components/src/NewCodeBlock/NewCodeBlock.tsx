@@ -14,6 +14,7 @@ import {
   RiEdit2Line,
   RiExpandDiagonalLine,
 } from '@remixicon/react';
+import type { editor } from 'monaco-editor';
 import { JSONTree } from 'react-json-tree';
 import useLocalStorage from 'react-use/esm/useLocalStorage';
 
@@ -52,6 +53,7 @@ interface CodeBlockProps {
   allowFullScreen?: boolean;
   enableTreeView?: boolean;
   loading?: boolean;
+  scrollbarOptions?: editor.IEditorScrollbarOptions;
 }
 
 const jsonParse = (content: string) => {
@@ -85,6 +87,7 @@ export const NewCodeBlock = ({
   enableTreeView = false,
   loading = false,
   className,
+  scrollbarOptions,
 }: CodeBlockProps) => {
   const [dark, _] = useState(isDark());
   const [fullScreen, setFullScreen] = useState(false);
@@ -258,6 +261,7 @@ export const NewCodeBlock = ({
               theme="inngest-theme"
               language={language}
               value={editEmtpy ? EMPTY_INPUT : content}
+              height="100%"
               options={{
                 wordWrap: wordWrap ? 'on' : 'off',
                 contextmenu: false,
@@ -271,7 +275,7 @@ export const NewCodeBlock = ({
                 renderWhitespace: 'none',
                 automaticLayout: true,
                 scrollBeyondLastLine: false,
-                scrollbar: {
+                scrollbar: scrollbarOptions ?? {
                   alwaysConsumeMouseWheel: false,
                   horizontalScrollbarSize: 0,
                   verticalScrollbarSize: 0,

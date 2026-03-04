@@ -1,9 +1,11 @@
 //  @ts-check
 
 import { tanstackConfig } from '@tanstack/eslint-config';
+import reactHooks from 'eslint-plugin-react-hooks';
 
 export default [
   ...tanstackConfig,
+  reactHooks.configs['recommended-latest'],
   {
     //
     // TODO: Remove these overrides once migration is done
@@ -23,9 +25,16 @@ export default [
       'import/newline-after-import': 'off',
       '@typescript-eslint/naming-convention': 'off',
       'node/prefer-node-protocol': 'off',
+      // TODO: Enable exhaustive-deps and fix violations
+      'react-hooks/exhaustive-deps': 'off',
     },
   },
   {
-    ignores: ['src/gql/gql.ts', 'src/gql/graphql.ts', 'src/routeTree.gen.ts'],
+    ignores: [
+      'src/gql/gql.ts',
+      'src/gql/graphql.ts',
+      'src/gql/fragment-masking.ts',
+      'src/routeTree.gen.ts',
+    ],
   },
 ];

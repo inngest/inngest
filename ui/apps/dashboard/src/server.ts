@@ -1,4 +1,5 @@
 import * as Sentry from '@sentry/tanstackstart-react';
+import handler from '@tanstack/react-start/server-entry';
 
 const dsn = process.env.VITE_SENTRY_DSN;
 
@@ -13,7 +14,5 @@ if (dsn) {
     tracesSampleRate: 0.2,
   });
 }
-
-import handler from '@tanstack/react-start/server-entry';
 
 export default handler;

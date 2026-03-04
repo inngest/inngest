@@ -16,14 +16,14 @@ type StatusBannerProps = {
 };
 
 export function StatusBanner({ status }: StatusBannerProps) {
+  const isOperational = status?.impact === 'none';
+  const [isOpen, setIsOpen] = useState(!isOperational);
+
   if (!status) return null;
 
-  const isOperational = status.impact === 'none';
   const isOutage = impactSchema.options.includes(status.impact as Impact);
   const isMaintenance = status.impact === 'maintenance';
   const isMaintenanceScheduled = status.scheduled_maintenances.length > 0;
-
-  const [isOpen, setIsOpen] = useState(!isOperational);
 
   return (
     <div
