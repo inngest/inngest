@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/inngest/inngest/pkg/enums"
@@ -128,7 +130,9 @@ func DriverResponseAttrs(
 		size = len(fnOutput)
 	}
 
-	meta.AddAttr(rawAttrs, meta.Attrs.ResponseHeaders, &resp.Header)
+	redactedHeaders := RedactHeaders(resp.Header)
+
+	meta.AddAttr(rawAttrs, meta.Attrs.ResponseHeaders, &redactedHeaders)
 	meta.AddAttr(rawAttrs, meta.Attrs.ResponseStatusCode, &resp.StatusCode)
 	meta.AddAttr(rawAttrs, meta.Attrs.ResponseOutputSize, &size)
 
@@ -139,6 +143,35 @@ func DriverResponseAttrs(
 	}
 
 	return rawAttrs
+}
+
+// sensitiveHeaders contains header names (lowercase) that should be redacted
+// to prevent exposure of credentials, tokens, and session data in traces.
+var sensitiveHeaders = map[string]bool{
+	"authorization":       true,
+	"proxy-authorization": true,
+	"cookie":              true,
+	"set-cookie":          true,
+	"x-api-key":           true,
+	"x-auth-token":        true,
+	"www-authenticate":    true,
+	"proxy-authenticate":  true,
+}
+
+// RedactHeaders returns a copy of the given headers with sensitive headers redacted.
+func RedactHeaders(headers http.Header) http.Header {
+	redacted := http.Header{}
+	const redactedValue = "[REDACTED]"
+
+	for key, values := range headers {
+		if _, isSensitiveHeader := sensitiveHeaders[strings.ToLower(key)]; isSensitiveHeader {
+			redacted[key] = []string{redactedValue}
+		} else {
+			redacted[key] = values
+		}
+	}
+
+	return redacted
 }
 
 func GeneratorAttrs(op *state.GeneratorOpcode) *meta.SerializableAttrs {

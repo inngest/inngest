@@ -289,6 +289,8 @@ func apiAttributes(res apiresult.APIResult) *meta.SerializableAttrs {
 		h.Set(k, v)
 	}
 
+	h = tracing.RedactHeaders(h)
+
 	rawAttrs := meta.NewAttrSet()
 	meta.AddAttr(rawAttrs, meta.Attrs.IsFunctionOutput, inngestgo.Ptr(true))
 	meta.AddAttr(rawAttrs, meta.Attrs.ResponseHeaders, &h)
