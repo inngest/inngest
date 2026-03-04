@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/99designs/gqlgen/graphql/handler"
+	"github.com/99designs/gqlgen/graphql/handler/extension"
 	"github.com/99designs/gqlgen/graphql/playground"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/cors"
@@ -107,6 +108,7 @@ func NewCoreApi(o Options) (*CoreAPI, error) {
 			RequireKeys:     o.RequireKeys,
 		}
 		srv := handler.NewDefaultServer(generated.NewExecutableSchema(generated.Config{Resolvers: a.resolver}))
+		srv.Use(extension.FixedComplexityLimit(300))
 
 		// TODO - Add option for enabling GraphQL Playground
 		a.Handle("/", playground.Handler("GraphQL playground", "/v0/gql"))

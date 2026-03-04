@@ -382,6 +382,10 @@ export const TRACE_DETAILS_FRAGMENT = gql`
         timedOut
       }
     }
+    response {
+      statusCode
+      headers
+    }
   }
 `;
 

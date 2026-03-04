@@ -252,6 +252,13 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 		gqlSpan.SkipExistingRunID = span.Attributes.SkipExistingRunID
 	}
 
+	if span.Attributes.ResponseStatusCode != nil && span.Attributes.ResponseHeaders != nil {
+		gqlSpan.Response = &models.RunTraceSpanResponseInfo{
+			StatusCode: *span.Attributes.ResponseStatusCode,
+			Headers:    *span.Attributes.ResponseHeaders,
+		}
+	}
+
 	// If this was a discovery span, we may not want to show it.
 	showSpan := span.Name != meta.SpanNameStepDiscovery
 

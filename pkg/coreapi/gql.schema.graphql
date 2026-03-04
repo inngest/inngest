@@ -14,6 +14,7 @@ scalar Int64
 scalar SpanMetadataKind
 scalar SpanMetadataScope
 scalar SpanMetadataValues
+scalar HTTPHeaders
 
 "The pagination information in a connection."
 type PageInfo {
@@ -605,6 +606,12 @@ type RunTraceSpan {
   skipReason: String
   skipExistingRunID: String
   metadata: [SpanMetadata!]!
+  response: RunTraceSpanResponseInfo # Response status and headers
+}
+
+type RunTraceSpanResponseInfo {
+  statusCode: Int!
+  headers: HTTPHeaders!
 }
 
 type SpanMetadata {

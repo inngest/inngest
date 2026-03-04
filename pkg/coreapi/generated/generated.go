@@ -20,6 +20,7 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/function"
 	types "github.com/inngest/inngest/pkg/gql_scalars"
+	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/history_reader"
 	"github.com/inngest/inngest/pkg/tracing/metadata"
 	ulid "github.com/oklog/ulid/v2"
@@ -465,6 +466,7 @@ type ComplexityRoot struct {
 		ParentSpan        func(childComplexity int) int
 		ParentSpanID      func(childComplexity int) int
 		QueuedAt          func(childComplexity int) int
+		Response          func(childComplexity int) int
 		Run               func(childComplexity int) int
 		RunID             func(childComplexity int) int
 		SkipExistingRunID func(childComplexity int) int
@@ -484,6 +486,11 @@ type ComplexityRoot struct {
 		Data  func(childComplexity int) int
 		Error func(childComplexity int) int
 		Input func(childComplexity int) int
+	}
+
+	RunTraceSpanResponseInfo struct {
+		Headers    func(childComplexity int) int
+		StatusCode func(childComplexity int) int
 	}
 
 	RunTraceTrigger struct {
@@ -2759,6 +2766,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.RunTraceSpan.QueuedAt(childComplexity), true
 
+	case "RunTraceSpan.response":
+		if e.complexity.RunTraceSpan.Response == nil {
+			break
+		}
+
+		return e.complexity.RunTraceSpan.Response(childComplexity), true
+
 	case "RunTraceSpan.run":
 		if e.complexity.RunTraceSpan.Run == nil {
 			break
@@ -2870,6 +2884,20 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.RunTraceSpanOutput.Input(childComplexity), true
+
+	case "RunTraceSpanResponseInfo.headers":
+		if e.complexity.RunTraceSpanResponseInfo.Headers == nil {
+			break
+		}
+
+		return e.complexity.RunTraceSpanResponseInfo.Headers(childComplexity), true
+
+	case "RunTraceSpanResponseInfo.statusCode":
+		if e.complexity.RunTraceSpanResponseInfo.StatusCode == nil {
+			break
+		}
+
+		return e.complexity.RunTraceSpanResponseInfo.StatusCode(childComplexity), true
 
 	case "RunTraceTrigger.batchID":
 		if e.complexity.RunTraceTrigger.BatchID == nil {
@@ -3559,6 +3587,7 @@ scalar Int64
 scalar SpanMetadataKind
 scalar SpanMetadataScope
 scalar SpanMetadataValues
+scalar HTTPHeaders
 
 "The pagination information in a connection."
 type PageInfo {
@@ -4150,6 +4179,12 @@ type RunTraceSpan {
   skipReason: String
   skipExistingRunID: String
   metadata: [SpanMetadata!]!
+  response: RunTraceSpanResponseInfo # Response status and headers
+}
+
+type RunTraceSpanResponseInfo {
+  statusCode: Int!
+  headers: HTTPHeaders!
 }
 
 type SpanMetadata {
@@ -7580,6 +7615,8 @@ func (ec *executionContext) fieldContext_DebugRun_debugTraces(ctx context.Contex
 				return ec.fieldContext_RunTraceSpan_skipExistingRunID(ctx, field)
 			case "metadata":
 				return ec.fieldContext_RunTraceSpan_metadata(ctx, field)
+			case "response":
+				return ec.fieldContext_RunTraceSpan_response(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type RunTraceSpan", field.Name)
 		},
@@ -12481,6 +12518,8 @@ func (ec *executionContext) fieldContext_FunctionRunV2_trace(ctx context.Context
 				return ec.fieldContext_RunTraceSpan_skipExistingRunID(ctx, field)
 			case "metadata":
 				return ec.fieldContext_RunTraceSpan_metadata(ctx, field)
+			case "response":
+				return ec.fieldContext_RunTraceSpan_response(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type RunTraceSpan", field.Name)
 		},
@@ -15227,6 +15266,8 @@ func (ec *executionContext) fieldContext_Query_runTrace(ctx context.Context, fie
 				return ec.fieldContext_RunTraceSpan_skipExistingRunID(ctx, field)
 			case "metadata":
 				return ec.fieldContext_RunTraceSpan_metadata(ctx, field)
+			case "response":
+				return ec.fieldContext_RunTraceSpan_response(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type RunTraceSpan", field.Name)
 		},
@@ -18486,6 +18527,8 @@ func (ec *executionContext) fieldContext_RunTraceSpan_childrenSpans(ctx context.
 				return ec.fieldContext_RunTraceSpan_skipExistingRunID(ctx, field)
 			case "metadata":
 				return ec.fieldContext_RunTraceSpan_metadata(ctx, field)
+			case "response":
+				return ec.fieldContext_RunTraceSpan_response(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type RunTraceSpan", field.Name)
 		},
@@ -18841,6 +18884,8 @@ func (ec *executionContext) fieldContext_RunTraceSpan_parentSpan(ctx context.Con
 				return ec.fieldContext_RunTraceSpan_skipExistingRunID(ctx, field)
 			case "metadata":
 				return ec.fieldContext_RunTraceSpan_metadata(ctx, field)
+			case "response":
+				return ec.fieldContext_RunTraceSpan_response(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type RunTraceSpan", field.Name)
 		},
@@ -19211,6 +19256,53 @@ func (ec *executionContext) fieldContext_RunTraceSpan_metadata(ctx context.Conte
 	return fc, nil
 }
 
+func (ec *executionContext) _RunTraceSpan_response(ctx context.Context, field graphql.CollectedField, obj *models.RunTraceSpan) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RunTraceSpan_response(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Response, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*models.RunTraceSpanResponseInfo)
+	fc.Result = res
+	return ec.marshalORunTraceSpanResponseInfo2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐRunTraceSpanResponseInfo(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RunTraceSpan_response(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RunTraceSpan",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "statusCode":
+				return ec.fieldContext_RunTraceSpanResponseInfo_statusCode(ctx, field)
+			case "headers":
+				return ec.fieldContext_RunTraceSpanResponseInfo_headers(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type RunTraceSpanResponseInfo", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _RunTraceSpanOutput_input(ctx context.Context, field graphql.CollectedField, obj *models.RunTraceSpanOutput) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_RunTraceSpanOutput_input(ctx, field)
 	if err != nil {
@@ -19339,6 +19431,94 @@ func (ec *executionContext) fieldContext_RunTraceSpanOutput_error(ctx context.Co
 				return ec.fieldContext_StepError_cause(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type StepError", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RunTraceSpanResponseInfo_statusCode(ctx context.Context, field graphql.CollectedField, obj *models.RunTraceSpanResponseInfo) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RunTraceSpanResponseInfo_statusCode(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.StatusCode, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RunTraceSpanResponseInfo_statusCode(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RunTraceSpanResponseInfo",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RunTraceSpanResponseInfo_headers(ctx context.Context, field graphql.CollectedField, obj *models.RunTraceSpanResponseInfo) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RunTraceSpanResponseInfo_headers(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Headers, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(headers.Compact)
+	fc.Result = res
+	return ec.marshalNHTTPHeaders2githubᚗcomᚋinngestᚋinngestᚋpkgᚋheadersᚐCompact(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RunTraceSpanResponseInfo_headers(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RunTraceSpanResponseInfo",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type HTTPHeaders does not have child fields")
 		},
 	}
 	return fc, nil
@@ -27891,6 +28071,10 @@ func (ec *executionContext) _RunTraceSpan(ctx context.Context, sel ast.Selection
 			if out.Values[i] == graphql.Null {
 				invalids++
 			}
+		case "response":
+
+			out.Values[i] = ec._RunTraceSpan_response(ctx, field, obj)
+
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -27924,6 +28108,41 @@ func (ec *executionContext) _RunTraceSpanOutput(ctx context.Context, sel ast.Sel
 
 			out.Values[i] = ec._RunTraceSpanOutput_error(ctx, field, obj)
 
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var runTraceSpanResponseInfoImplementors = []string{"RunTraceSpanResponseInfo"}
+
+func (ec *executionContext) _RunTraceSpanResponseInfo(ctx context.Context, sel ast.SelectionSet, obj *models.RunTraceSpanResponseInfo) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, runTraceSpanResponseInfoImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("RunTraceSpanResponseInfo")
+		case "statusCode":
+
+			out.Values[i] = ec._RunTraceSpanResponseInfo_statusCode(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "headers":
+
+			out.Values[i] = ec._RunTraceSpanResponseInfo_headers(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -29707,6 +29926,22 @@ func (ec *executionContext) marshalNFunctionTriggerTypes2githubᚗcomᚋinngest�
 	return v
 }
 
+func (ec *executionContext) unmarshalNHTTPHeaders2githubᚗcomᚋinngestᚋinngestᚋpkgᚋheadersᚐCompact(ctx context.Context, v interface{}) (headers.Compact, error) {
+	var res headers.Compact
+	err := res.UnmarshalGQLContext(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNHTTPHeaders2githubᚗcomᚋinngestᚋinngestᚋpkgᚋheadersᚐCompact(ctx context.Context, sel ast.SelectionSet, v headers.Compact) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return graphql.WrapContextMarshaler(ctx, v)
+}
+
 func (ec *executionContext) unmarshalNHistoryType2githubᚗcomᚋinngestᚋinngestᚋpkgᚋenumsᚐHistoryType(ctx context.Context, v interface{}) (enums.HistoryType, error) {
 	var res enums.HistoryType
 	err := res.UnmarshalGQL(v)
@@ -31345,6 +31580,13 @@ func (ec *executionContext) marshalORunTraceSpan2ᚖgithubᚗcomᚋinngestᚋinn
 		return graphql.Null
 	}
 	return ec._RunTraceSpan(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalORunTraceSpanResponseInfo2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐRunTraceSpanResponseInfo(ctx context.Context, sel ast.SelectionSet, v *models.RunTraceSpanResponseInfo) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._RunTraceSpanResponseInfo(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalORunsV2OrderByField2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐRunsV2OrderByField(ctx context.Context, v interface{}) (*models.RunsV2OrderByField, error) {

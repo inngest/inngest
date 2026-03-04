@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/history_reader"
 	"github.com/inngest/inngest/pkg/tracing/metadata"
 	ulid "github.com/oklog/ulid/v2"
@@ -378,6 +379,11 @@ type RunTraceSpanOutput struct {
 	Input *string    `json:"input,omitempty"`
 	Data  *string    `json:"data,omitempty"`
 	Error *StepError `json:"error,omitempty"`
+}
+
+type RunTraceSpanResponseInfo struct {
+	StatusCode int             `json:"statusCode"`
+	Headers    headers.Compact `json:"headers"`
 }
 
 type RunTraceTrigger struct {

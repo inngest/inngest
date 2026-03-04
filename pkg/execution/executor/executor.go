@@ -1768,6 +1768,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			}
 		}
 
+		// TODO: remove this once the response header attribute is fully plumbed.
 		// Extract response header metadata from the HTTP response.
 		// Response headers live on internal server execution spans, not OTLP spans,
 		// so we must explicitly create the metadata span here.

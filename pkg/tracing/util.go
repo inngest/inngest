@@ -4,9 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/inngest/inngest/pkg/enums"
@@ -15,6 +13,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
+	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/inngest/inngest/pkg/util/aigateway"
@@ -76,7 +75,7 @@ func ResumeAttrs(p *state.Pause, r *execution.ResumeRequest) *meta.SerializableA
 
 // DriverResponseAttrs applies details from the given `DriverResponse` to the
 // given span. This is used for adding additional details to the span after the
-// exectution has completed.
+// execution has completed.
 func DriverResponseAttrs(
 	resp *state.DriverResponse,
 
@@ -130,7 +129,7 @@ func DriverResponseAttrs(
 		size = len(fnOutput)
 	}
 
-	redactedHeaders := RedactHeaders(resp.Header)
+	redactedHeaders := headers.Compact(headers.Redact(resp.Header))
 
 	meta.AddAttr(rawAttrs, meta.Attrs.ResponseHeaders, &redactedHeaders)
 	meta.AddAttr(rawAttrs, meta.Attrs.ResponseStatusCode, &resp.StatusCode)
@@ -143,35 +142,6 @@ func DriverResponseAttrs(
 	}
 
 	return rawAttrs
-}
-
-// sensitiveHeaders contains header names (lowercase) that should be redacted
-// to prevent exposure of credentials, tokens, and session data in traces.
-var sensitiveHeaders = map[string]bool{
-	"authorization":       true,
-	"proxy-authorization": true,
-	"cookie":              true,
-	"set-cookie":          true,
-	"x-api-key":           true,
-	"x-auth-token":        true,
-	"www-authenticate":    true,
-	"proxy-authenticate":  true,
-}
-
-// RedactHeaders returns a copy of the given headers with sensitive headers redacted.
-func RedactHeaders(headers http.Header) http.Header {
-	redacted := http.Header{}
-	const redactedValue = "[REDACTED]"
-
-	for key, values := range headers {
-		if _, isSensitiveHeader := sensitiveHeaders[strings.ToLower(key)]; isSensitiveHeader {
-			redacted[key] = []string{redactedValue}
-		} else {
-			redacted[key] = values
-		}
-	}
-
-	return redacted
 }
 
 func GeneratorAttrs(op *state.GeneratorOpcode) *meta.SerializableAttrs {

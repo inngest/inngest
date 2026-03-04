@@ -135,6 +135,8 @@ models:
     model: github.com/inngest/inngest/pkg/enums.MetadataScope
   SpanMetadataValues:
     model: github.com/inngest/inngest/pkg/tracing/metadata.Values
+  HTTPHeaders:
+    model: github.com/inngest/inngest/pkg/headers.Compact
   StreamItem:
     fields:
       inBatch:

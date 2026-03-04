@@ -24,6 +24,12 @@ export type Trace = {
   debugRunID?: string | null;
   debugSessionID?: string | null;
   metadata?: SpanMetadata[];
+  response?: ResponseInfo;
+};
+
+export type ResponseInfo = {
+  statusCode: number;
+  headers: Record<string, string | string[]>;
 };
 
 export type SpanMetadataKind = GeneratedSpanMetadataKind;

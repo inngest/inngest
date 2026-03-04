@@ -13,6 +13,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/apiresult"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/service"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
@@ -289,11 +290,11 @@ func apiAttributes(res apiresult.APIResult) *meta.SerializableAttrs {
 		h.Set(k, v)
 	}
 
-	h = tracing.RedactHeaders(h)
+	compactHeaders := headers.Compact(headers.Redact(h))
 
 	rawAttrs := meta.NewAttrSet()
 	meta.AddAttr(rawAttrs, meta.Attrs.IsFunctionOutput, inngestgo.Ptr(true))
-	meta.AddAttr(rawAttrs, meta.Attrs.ResponseHeaders, &h)
+	meta.AddAttr(rawAttrs, meta.Attrs.ResponseHeaders, &compactHeaders)
 	meta.AddAttr(rawAttrs, meta.Attrs.ResponseStatusCode, &res.StatusCode)
 	meta.AddAttr(rawAttrs, meta.Attrs.ResponseOutputSize, inngestgo.Ptr(len(res.Body)))
 	// XXX: We always wrap trace output with {"data":T} or {"error":T} for consistency with steps.
