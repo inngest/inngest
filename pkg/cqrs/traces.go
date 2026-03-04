@@ -422,11 +422,11 @@ type TraceReader interface {
 	// GetSpansByDebugSessionID retrieves all spans related to the specified debug session
 	GetSpansByDebugSessionID(ctx context.Context, debugSessionID ulid.ULID) ([][]*OtelSpan, error)
 	GetSpanOutput(ctx context.Context, id SpanIdentifier) (*SpanOutput, error)
-	GetRunSpanByRunID(ctx context.Context, runID ulid.ULID, accountID, workspaceID uuid.UUID) (*OtelSpan, error)
-	GetStepSpanByStepID(ctx context.Context, runID ulid.ULID, stepID string, accountID, workspaceID uuid.UUID) (*OtelSpan, error)
-	GetExecutionSpanByStepIDAndAttempt(ctx context.Context, runID ulid.ULID, stepID string, attempt int, accountID, workspaceID uuid.UUID) (*OtelSpan, error)
-	GetLatestExecutionSpanByStepID(ctx context.Context, runID ulid.ULID, stepID string, accountID, workspaceID uuid.UUID) (*OtelSpan, error)
-	GetSpanBySpanID(ctx context.Context, runID ulid.ULID, spanID string, accountID, workspaceID uuid.UUID) (*OtelSpan, error)
+	GetRunSpanByRunID(ctx context.Context, runID ulid.ULID, accountID, workspaceID uuid.UUID, opt GetTraceSpanOpt) (*OtelSpan, error)
+	GetStepSpanByStepID(ctx context.Context, runID ulid.ULID, stepID string, accountID, workspaceID uuid.UUID, opt GetTraceSpanOpt) (*OtelSpan, error)
+	GetExecutionSpanByStepIDAndAttempt(ctx context.Context, runID ulid.ULID, stepID string, attempt int, accountID, workspaceID uuid.UUID, opt GetTraceSpanOpt) (*OtelSpan, error)
+	GetLatestExecutionSpanByStepID(ctx context.Context, runID ulid.ULID, stepID string, accountID, workspaceID uuid.UUID, opt GetTraceSpanOpt) (*OtelSpan, error)
+	GetSpanBySpanID(ctx context.Context, runID ulid.ULID, spanID string, accountID, workspaceID uuid.UUID, opt GetTraceSpanOpt) (*OtelSpan, error)
 	// TODO move to dedicated entitlement interface once that is implemented properly
 	// for both oss & cloud
 	OtelTracesEnabled(ctx context.Context, accountID uuid.UUID) (bool, error)
@@ -447,6 +447,10 @@ type GetTraceRunOpt struct {
 	Items  uint
 	// Whether the run list should use the tracing preview stores
 	Preview bool
+}
+
+type GetTraceSpanOpt struct {
+	IncludeMetadata bool
 }
 
 type FindOrCreateTraceRunOpt struct {
