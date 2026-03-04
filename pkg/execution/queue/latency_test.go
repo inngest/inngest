@@ -12,27 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestIsLatencyPartition(t *testing.T) {
-	tests := []struct {
-		id       string
-		expected bool
-	}{
-		{LatencyFunctionID.String(), true},
-		// Real UUIDs should never match.
-		{"00000000-0000-0000-0000-000000000000", false},
-		{"a1b2c3d4-e5f6-7890-abcd-ef1234567890", false},
-		// Other well-known latency UUIDs are not the function ID.
-		{LatencyAccountID.String(), false},
-		{LatencyEnvID.String(), false},
-		// Empty and short strings.
-		{"", false},
-		{"ffffffff", false},
-	}
-	for _, tt := range tests {
-		require.Equal(t, tt.expected, IsLatencyPartition(tt.id), "IsLatencyPartition(%q)", tt.id)
-	}
-}
-
 func TestWithLatencyPartition(t *testing.T) {
 	t.Run("sets defaults", func(t *testing.T) {
 		called := false
@@ -273,11 +252,8 @@ func TestEnqueueLatencyJob(t *testing.T) {
 		require.Equal(t, int32(1), enqueueCalled.Load())
 
 		require.Equal(t, KindLatencyTrack, enqueuedItem.Kind)
-		require.Nil(t, enqueuedItem.QueueName)
-		require.Equal(t, LatencyAccountID, enqueuedItem.Identifier.AccountID)
-		require.Equal(t, LatencyEnvID, enqueuedItem.Identifier.WorkspaceID)
-		require.Equal(t, LatencyFunctionID, enqueuedItem.Identifier.WorkflowID)
-		require.Equal(t, LatencyEnvID, enqueuedItem.WorkspaceID)
+		require.NotNil(t, enqueuedItem.QueueName)
+		require.Equal(t, "ltc", *enqueuedItem.QueueName)
 		require.NotNil(t, enqueuedItem.JobID)
 		require.Contains(t, *enqueuedItem.JobID, "ltrack-1-")
 		// Enqueue truncates times to millisecond precision internally.

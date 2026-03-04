@@ -3,21 +3,7 @@ package queue
 import (
 	"context"
 	"fmt"
-
-	"github.com/google/uuid"
 )
-
-var (
-	LatencyAccountID  = uuid.MustParse("ffffffff-ffff-ffff-ffff-ffffffffffff")
-	LatencyEnvID      = uuid.MustParse("ffffffff-ffff-ffff-ffff-fffffffffffe")
-	LatencyFunctionID = uuid.MustParse("ffffffff-ffff-ffff-ffff-fffffffffffd")
-)
-
-// IsLatencyPartition reports whether the given partition ID belongs to
-// the latency tracking function.
-func IsLatencyPartition(id string) bool {
-	return id == LatencyFunctionID.String()
-}
 
 // runLatencyTracker is a background goroutine that periodically enqueues
 // latency tracking canary jobs into the queue.
