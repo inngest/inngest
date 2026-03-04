@@ -848,6 +848,12 @@ func CapacityExtendLeaseRequestToProto(req *CapacityExtendLeaseRequest) *pb.Capa
 	if req == nil {
 		return nil
 	}
+
+	var leaseIssuedAt *timestamppb.Timestamp
+	if !req.LeaseIssuedAt.IsZero() {
+		leaseIssuedAt = timestamppb.New(req.LeaseIssuedAt)
+	}
+
 	return &pb.CapacityExtendLeaseRequest{
 		IdempotencyKey: req.IdempotencyKey,
 		AccountId:      req.AccountID.String(),
@@ -855,7 +861,7 @@ func CapacityExtendLeaseRequestToProto(req *CapacityExtendLeaseRequest) *pb.Capa
 		Duration:       durationpb.New(req.Duration),
 		Source:         LeaseSourceToProto(req.Source),
 		RequestAttempt: uint32(req.RequestAttempt),
-		LeaseIssuedAt:  timestamppb.New(req.LeaseIssuedAt),
+		LeaseIssuedAt:  leaseIssuedAt,
 	}
 }
 
@@ -935,13 +941,18 @@ func CapacityReleaseRequestToProto(req *CapacityReleaseRequest) *pb.CapacityRele
 		return nil
 	}
 
+	var leaseIssuedAt *timestamppb.Timestamp
+	if !req.LeaseIssuedAt.IsZero() {
+		leaseIssuedAt = timestamppb.New(req.LeaseIssuedAt)
+	}
+
 	return &pb.CapacityReleaseRequest{
 		IdempotencyKey: req.IdempotencyKey,
 		AccountId:      req.AccountID.String(),
 		LeaseId:        req.LeaseID.String(),
 		Source:         LeaseSourceToProto(req.Source),
 		RequestAttempt: uint32(req.RequestAttempt),
-		LeaseIssuedAt:  timestamppb.New(req.LeaseIssuedAt),
+		LeaseIssuedAt:  leaseIssuedAt,
 	}
 }
 

@@ -1644,6 +1644,27 @@ func TestCapacityExtendLeaseRequestConversion(t *testing.T) {
 			},
 		},
 		{
+			name: "zero lease issued at",
+			input: &CapacityExtendLeaseRequest{
+				IdempotencyKey: "extend-key-zero",
+				AccountID:      accountID,
+				LeaseID:        leaseID,
+				Duration:       5 * time.Minute,
+			},
+			expected: &pb.CapacityExtendLeaseRequest{
+				IdempotencyKey: "extend-key-zero",
+				AccountId:      accountID.String(),
+				LeaseId:        leaseID.String(),
+				Duration:       durationpb.New(5 * time.Minute),
+				LeaseIssuedAt:  nil,
+				Source: &pb.LeaseSource{
+					Service:           pb.ConstraintApiLeaseService_CONSTRAINT_API_LEASE_SERVICE_UNSPECIFIED,
+					Location:          pb.ConstraintApiCallerLocation_CONSTRAINT_API_CALLER_LOCATION_UNSPECIFIED,
+					RunProcessingMode: pb.ConstraintApiRunProcessingMode_CONSTRAINT_API_RUN_PROCESSING_MODE_BACKGROUND,
+				},
+			},
+		},
+		{
 			name:     "nil request",
 			input:    nil,
 			expected: nil,
@@ -1764,6 +1785,25 @@ func TestCapacityReleaseRequestConversion(t *testing.T) {
 				Source: &pb.LeaseSource{
 					Service:           pb.ConstraintApiLeaseService_CONSTRAINT_API_LEASE_SERVICE_API,
 					Location:          pb.ConstraintApiCallerLocation_CONSTRAINT_API_CALLER_LOCATION_ITEM_LEASE,
+					RunProcessingMode: pb.ConstraintApiRunProcessingMode_CONSTRAINT_API_RUN_PROCESSING_MODE_BACKGROUND,
+				},
+			},
+		},
+		{
+			name: "zero lease issued at",
+			input: &CapacityReleaseRequest{
+				IdempotencyKey: "commit-key-zero",
+				AccountID:      accountID,
+				LeaseID:        leaseID,
+			},
+			expected: &pb.CapacityReleaseRequest{
+				IdempotencyKey: "commit-key-zero",
+				AccountId:      accountID.String(),
+				LeaseId:        leaseID.String(),
+				LeaseIssuedAt:  nil,
+				Source: &pb.LeaseSource{
+					Service:           pb.ConstraintApiLeaseService_CONSTRAINT_API_LEASE_SERVICE_UNSPECIFIED,
+					Location:          pb.ConstraintApiCallerLocation_CONSTRAINT_API_CALLER_LOCATION_UNSPECIFIED,
 					RunProcessingMode: pb.ConstraintApiRunProcessingMode_CONSTRAINT_API_RUN_PROCESSING_MODE_BACKGROUND,
 				},
 			},
