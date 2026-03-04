@@ -132,9 +132,10 @@ func TestQueueItemScore(t *testing.T) {
 	for _, kind := range kinds {
 		t.Run(fmt.Sprintf("%s: within promotion timerange", kind), func(t *testing.T) {
 			// Enqueue a job now, and ensure that it is fudged and promoted.
-			atMS := time.Now().UnixMilli()
+			now := time.Now()
+			atMS := now.UnixMilli()
 			item := osqueue.QueueItem{
-				AtMS: time.Now().UnixMilli(),
+				AtMS: atMS,
 				Data: osqueue.Item{
 					Kind: kind,
 					Identifier: state.Identifier{
@@ -143,7 +144,7 @@ func TestQueueItemScore(t *testing.T) {
 				},
 			}
 
-			actual := item.Score(time.Now())
+			actual := item.Score(now)
 			require.Equal(t, atMS, actual, kind)
 		})
 
