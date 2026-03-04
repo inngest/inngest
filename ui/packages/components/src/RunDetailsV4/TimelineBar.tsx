@@ -610,17 +610,14 @@ export function TimelineBar({
               <Tooltip>
                 <TooltipTrigger asChild>
                   <span
-                    className="ml-1 inline-flex shrink-0 cursor-help align-middle"
+                    className=" ml-1 inline-flex shrink-0 cursor-help align-middle"
                     onClick={(e) => e.stopPropagation()}
                     onMouseDown={(e) => e.stopPropagation()}
                   >
                     <RiInformationLine className="text-light h-3.5 w-3.5" />
                   </span>
                 </TooltipTrigger>
-                <TooltipContent
-                  side="top"
-                  className="bg-canvasBase text-basis border-muted max-w-xs border shadow-lg"
-                >
+                <TooltipContent side="top" className=" max-w-xs text-xs shadow-lg">
                   {style === 'timing.inngest'
                     ? 'Time spent on queue delays, concurrency limits, processing delays, and related overhead'
                     : 'Time spent on your server executing the function'}
