@@ -92,6 +92,8 @@ type checkpointAPI struct {
 	runClaimsSecret []byte
 	// outputReader allows us to read run output for a given env / run ID
 	outputReader RunOutputReader
+	// streams manages per-run stream buffers for durable endpoint streaming.
+	streams *streamRegistry
 }
 
 func NewCheckpointAPI(o Opts) CheckpointAPI {
@@ -112,12 +114,15 @@ func NewCheckpointAPI(o Opts) CheckpointAPI {
 		runClaimsSecret: o.CheckpointOpts.RunJWTSecret,
 		outputReader:    o.CheckpointOpts.RunOutputReader,
 		checkpointer:    c,
+		streams:         newStreamRegistry(),
 	}
 
 	api.Post("/", api.CheckpointNewRun)             // sync, API-based fns
 	api.Post("/{runID}/steps", api.CheckpointSteps) // sync, API-based fns
 	api.Post("/{runID}/async", api.CheckpointAsyncSteps)
 	api.HandleFunc("/{runID}/output", api.Output)
+	api.Post("/{runID}/stream", api.StreamIngest)
+	api.Get("/{runID}/stream", api.StreamOutput)
 
 	return api
 }
