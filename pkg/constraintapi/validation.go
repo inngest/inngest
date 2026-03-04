@@ -17,7 +17,7 @@ const (
 	MaximumAmount        = 20
 	MaxConstraints       = 10
 
-	MaxIdempotencyKeyLength = 128
+	MaxIdempotencyKeyLength = 256
 
 	// Max constraints per kind
 	MaxRateLimits            = 1
