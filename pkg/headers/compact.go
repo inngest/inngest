@@ -63,7 +63,7 @@ func (h *Compact) UnmarshalGQLContext(ctx context.Context, v any) error {
 	if !ok {
 		return fmt.Errorf("cannot unmarshal %T as RawMetadata", v)
 	}
-
+*h = make(Compact)
 	for key, value := range vm {
 		switch v := value.(type) {
 		case string:
