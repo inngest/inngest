@@ -1688,6 +1688,15 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			})
 		}()
 
+		atties := tracing.DriverResponseAttrs(resp, nil)
+		if err != nil {
+			// this always adds any error as an internal error attribute to our spans.
+			errstr := err.Error()
+			atties = atties.Merge(
+				meta.NewAttrSet(meta.Attr(meta.StringAttr("internal.error"), &errstr)),
+			)
+		}
+
 		// XX: This is going to drop any sleep requests, because DriverResponseAttrs
 		// forces the drop field if resp.IsDiscoveryResponse() is true.
 		updateOpts := &tracing.UpdateSpanOptions{
@@ -1695,7 +1704,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			Metadata:   &md,
 			QueueItem:  &item,
 			TargetSpan: instance.execSpan,
-			Attributes: tracing.DriverResponseAttrs(resp, nil),
+			Attributes: atties,
 		}
 
 		// For most executions, we now set the status of the execution span.
