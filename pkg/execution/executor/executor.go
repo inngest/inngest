@@ -1671,7 +1671,6 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		},
 	)
 	if err != nil {
-		// return nil, fmt.Errorf("error creating execution span: %w", err)
 		l.Debug("error creating execution span", "error", err)
 	}
 
@@ -3486,7 +3485,8 @@ func (e *executor) handleStepError(ctx context.Context, runCtx execution.RunCont
 	// - Steps throwing/returning NonRetriableErrors are still OpcodeStepError
 	// - We are now in charge of rescheduling the entire function
 	span := trace.SpanFromContext(ctx)
-	span.SetStatus(codes.Error, gen.Error.Name)
+	span.SetStatus(codes.Error, gen.Error.GetNameOrMessage())
+	meta.AttachInternalError(span, gen.Error.GetNameOrMessage())
 
 	if gen.Error == nil {
 		// This should never happen.
@@ -5023,6 +5023,7 @@ func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Func
 	if err != nil {
 		span.SetStatus(codes.Error, err.Error())
 		span.SetAttributes(attribute.Bool(consts.OtelSysStepDelete, true))
+		meta.AttachInternalError(span, err.Error())
 		return err
 	}
 
