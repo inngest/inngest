@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
-	"github.com/inngest/inngest/pkg/execution/state"
 )
 
 var (
@@ -49,14 +48,8 @@ func (q *queueProcessor) enqueueLatencyJob(ctx context.Context, partition int) e
 	idempotency := q.latencyPartition.Interval
 
 	return q.Enqueue(ctx, Item{
-		JobID:       &jobID,
-		Kind:        KindLatencyTrack,
-		WorkspaceID: LatencyEnvID,
-		Identifier: state.Identifier{
-			AccountID:   LatencyAccountID,
-			WorkspaceID: LatencyEnvID,
-			WorkflowID:  LatencyFunctionID,
-		},
+		JobID: &jobID,
+		Kind:  KindLatencyTrack,
 	}, q.Clock().Now(), EnqueueOpts{
 		IdempotencyPeriod:   &idempotency,
 		ForceQueueShardName: q.primaryQueueShard.Name(),
