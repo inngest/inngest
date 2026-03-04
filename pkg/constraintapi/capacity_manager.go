@@ -209,6 +209,10 @@ type CapacityExtendLeaseRequest struct {
 	// RequestAttempt is the current request attempt. For retries, this should be > 0.
 	// This is mainly used for instrumentation.
 	RequestAttempt int
+
+	// LeaseIssuedAt represents the time the initial lease was issued.
+	// This can be used for routing lease extension request to the same shard.
+	LeaseIssuedAt time.Time
 }
 
 type CapacityExtendLeaseResponse struct {
@@ -233,6 +237,10 @@ type CapacityReleaseRequest struct {
 	// RequestAttempt is the current request attempt. For retries, this should be > 0.
 	// This is mainly used for instrumentation.
 	RequestAttempt int
+
+	// LeaseIssuedAt represents the time the initial lease was issued.
+	// This can be used for routing the lease release request to the same shard.
+	LeaseIssuedAt time.Time
 }
 
 type CapacityReleaseResponse struct {

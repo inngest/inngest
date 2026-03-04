@@ -195,6 +195,7 @@ func WithConstraints[T any](
 				LeaseID:        lID,
 				Duration:       ScheduleLeaseDuration,
 				Source:         source,
+				LeaseIssuedAt:  now,
 			})
 			if err != nil {
 				l.Error("could not extend schedule capacity lease", "err", err, "leaseID", lID, "req", req)
@@ -235,6 +236,7 @@ func WithConstraints[T any](
 					LeaseID:        lID,
 					IdempotencyKey: operationIdempotencyKey,
 					Source:         source,
+					LeaseIssuedAt:  now,
 				})
 				if internalErr != nil {
 					l.ReportError(internalErr, "failed to release capacity after schedule", logger.WithErrorReportTags(map[string]string{

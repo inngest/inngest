@@ -121,7 +121,8 @@ type QueueItem struct {
 }
 
 type CapacityLease struct {
-	LeaseID ulid.ULID `json:"l,omitempty"`
+	LeaseID    ulid.ULID `json:"l,omitempty"`
+	IssuedAtMS int64     `json:"i,omitempty"`
 }
 
 func (q *QueueItem) SetID(ctx context.Context, str string) {

@@ -167,6 +167,7 @@ func (q *queueProcessor) ProcessItem(
 						RunProcessingMode: constraintapi.RunProcessingModeBackground,
 						Service:           constraintapi.ServiceExecutor,
 					},
+					LeaseIssuedAt: capacityLeaseID.issuedAt(),
 				})
 				if err != nil {
 					l.ReportError(
@@ -355,6 +356,7 @@ func (q *queueProcessor) ProcessItem(
 					Service:           constraintapi.ServiceExecutor,
 					RunProcessingMode: constraintapi.RunProcessingModeBackground,
 				},
+				LeaseIssuedAt: capacityLeaseID.issuedAt(),
 			})
 			if err != nil {
 				l.ReportError(err, "failed to release capacity", logger.WithErrorReportTags(map[string]string{
