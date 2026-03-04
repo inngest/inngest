@@ -1066,6 +1066,7 @@ func TestQueuePeek(t *testing.T) {
 			ia.AtMS = items[0].AtMS
 			ia.WallTimeMS = items[0].WallTimeMS
 			ia.EnqueuedAt = items[0].EnqueuedAt
+			ia.ScavengeCount = items[0].ScavengeCount
 			require.EqualValues(t, []*osqueue.QueueItem{&ia, &ib, &ic, &id}, items)
 		})
 
