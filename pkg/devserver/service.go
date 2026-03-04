@@ -33,6 +33,7 @@ import (
 	"github.com/inngest/inngest/pkg/pubsub"
 	"github.com/inngest/inngest/pkg/sdk"
 	"github.com/inngest/inngest/pkg/service"
+	"github.com/inngest/inngest/pkg/util"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/mattn/go-isatty"
 	"github.com/redis/rueidis"
@@ -301,6 +302,11 @@ func (d *devserver) pollSDKs(ctx context.Context) {
 		if !strings.Contains(url, "://") {
 			url = "http://" + url
 		}
+
+		// Normalize the URL so that default ports (e.g. :80, :443) are
+		// stripped and localhost variants are unified before deriving the
+		// placeholder app ID.
+		url = util.NormalizeAppURL(url, false)
 
 		// Create a new app which holds the error message.
 		params := cqrs.UpsertAppParams{
@@ -748,7 +754,7 @@ func upsertErroredApp(
 				String: pingError.Error(),
 				Valid:  true,
 			},
-			ID:  inngest.DeterministicAppUUID(appURL),
+			ID:  inngest.DeterministicAppUUID(util.NormalizeAppURL(appURL, false)),
 			Url: appURL,
 		})
 		if err != nil {
