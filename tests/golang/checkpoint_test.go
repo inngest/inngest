@@ -13,7 +13,6 @@ import (
 	"github.com/inngest/inngestgo"
 	"github.com/inngest/inngestgo/pkg/checkpoint"
 	"github.com/inngest/inngestgo/step"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -44,7 +43,7 @@ func TestFnCheckpoint(t *testing.T) {
 		// For each config, add a delay after the second and third step.  This is because a config
 		// will always checkpoint after a second, and we want to assert that this happens.
 		for _, delay := range delays {
-			runID := ""
+			rid := NewRunID()
 			evtName := fmt.Sprintf("invoke-checkpoint-delay-%v-cfg-%v", delay.String(), util.XXHash(cfg))
 			fmt.Println(evtName)
 
@@ -56,6 +55,8 @@ func TestFnCheckpoint(t *testing.T) {
 				},
 				inngestgo.EventTrigger(evtName, nil),
 				func(ctx context.Context, input inngestgo.Input[DebounceEvent]) (any, error) {
+					rid.Send(input.InputCtx.RunID)
+
 					_, _ = step.Run(ctx, "a", func(ctx context.Context) (string, error) { return "a", nil })
 					fmt.Println("a")
 					_, _ = step.Run(ctx, "b", func(ctx context.Context) (string, error) {
@@ -67,8 +68,7 @@ func TestFnCheckpoint(t *testing.T) {
 						<-time.After(delay)
 						return "c", nil
 					})
-					runID = input.InputCtx.RunID
-					fmt.Println("c (done), ", runID)
+					fmt.Println("c (done), ", input.InputCtx.RunID)
 					return nil, nil
 				},
 			)
@@ -79,18 +79,64 @@ func TestFnCheckpoint(t *testing.T) {
 			_, err = inngestClient.Send(ctx, &event.Event{Name: evtName})
 			r.NoError(err)
 
-			// Wait a moment for runID to be populated
-			require.EventuallyWithT(t, func(t *assert.CollectT) {
-				assert.NotEmpty(t, runID)
-			}, 5*time.Second, time.Millisecond)
-
-			<-time.After(4 * time.Second)
-
-			run := c.WaitForRunStatus(ctx, t, "COMPLETED", &runID)
+			runID := rid.Wait(t)
+			run := c.WaitForRunStatus(ctx, t, "COMPLETED", runID)
 			var output string
 			err = json.Unmarshal([]byte(run.Output), &output)
 			require.NotEmpty(t, runID)
 			r.NoError(err)
 		}
 	}
+}
+
+func TestCheckpointMaxDuration(t *testing.T) {
+	ctx := context.Background()
+	r := require.New(t)
+	c := client.New(t)
+
+	inngestClient, server, registerFuncs := NewSDKHandler(t, "checkpoint")
+	defer server.Close()
+
+	rid := NewRunID()
+	evtName := "invoke-checkpoint-timeout"
+	fmt.Println(evtName)
+
+	_, err := inngestgo.CreateFunction(
+		inngestClient,
+		inngestgo.FunctionOpts{
+			ID: evtName,
+			Checkpoint: &checkpoint.Config{
+				BatchSteps:    3,
+				BatchInterval: time.Second,
+				MaxRuntime:    time.Second * 2,
+			},
+		},
+		inngestgo.EventTrigger(evtName, nil),
+		func(ctx context.Context, input inngestgo.Input[DebounceEvent]) (any, error) {
+			rid.Send(input.InputCtx.RunID)
+
+			for i := range 8 {
+				_, _ = step.Run(ctx, fmt.Sprintf("%d", i), func(ctx context.Context) (string, error) {
+					<-time.After(1 * time.Second)
+					return "a", nil
+				})
+				fmt.Println(i)
+			}
+			fmt.Println("c (done), ", input.InputCtx.RunID)
+			return nil, nil
+		},
+	)
+	r.NoError(err)
+	registerFuncs()
+
+	// Trigger the main function and successfully invoke the other function
+	_, err = inngestClient.Send(ctx, &event.Event{Name: evtName})
+	r.NoError(err)
+
+	runID := rid.Wait(t)
+	run := c.WaitForRunStatus(ctx, t, "COMPLETED", runID)
+	var output string
+	err = json.Unmarshal([]byte(run.Output), &output)
+	require.NotEmpty(t, runID)
+	r.NoError(err)
 }

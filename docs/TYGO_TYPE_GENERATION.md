@@ -59,7 +59,6 @@ go generate ./pkg/tracing/metadata/types && tygo generate
 | `error` | `string` |
 | `map[string]error` | `{ [key: string]: string }` |
 
-## TODO
+## References
 
-- [ ] Integrate type generation into the Makefile
-- [ ] Add a step to run prettier on the generated TypeScript file (`ui/packages/components/src/generated/index.ts`) to ensure it conforms to project formatting standards
+- [Tygo Workflow (Notion)](https://www.notion.so/inngest/Tygo-Workflow-2f8b64753bbd80f8852cf4ff2ee91d39)

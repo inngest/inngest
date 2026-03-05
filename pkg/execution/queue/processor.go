@@ -13,6 +13,7 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/jonboulle/clockwork"
+	"github.com/karlseguin/ccache/v3"
 	"github.com/oklog/ulid/v2"
 	"golang.org/x/sync/errgroup"
 )
@@ -61,13 +62,16 @@ func New(
 		continues:        map[string]continuation{},
 		continueCooldown: map[string]time.Time{},
 
-		sem:     util.NewTrackingSemaphore(int(o.numWorkers)),
-		workers: make(chan ProcessItem, o.numWorkers),
-		quit:    make(chan error, o.numWorkers),
+		sem:          util.NewTrackingSemaphore(int(o.numWorkers)),
+		workers:      make(chan ProcessItem, o.numWorkers),
+		partitionSem: util.NewTrackingSemaphore(int(o.numPartitionWorkers)),
+		quit:         make(chan error, o.numWorkers),
 
 		primaryQueueShard: primaryQueueShard,
 		queueShardClients: queueShardClients,
 		shardSelector:     shardSelector,
+
+		peekSizeCache: ccache.New(ccache.Configure[int64]().MaxSize(50_000)),
 
 		qspc: make(chan ShadowPartitionChanMsg),
 
@@ -114,6 +118,9 @@ type queueProcessor struct {
 	// to workers to be processed
 	workers chan ProcessItem
 
+	// partitionSem tracks how many partitions are currently being processed.
+	partitionSem util.TrackingSemaphore
+
 	qspc chan ShadowPartitionChanMsg
 
 	// sem stores a semaphore controlling the number of jobs currently
@@ -147,6 +154,9 @@ type queueProcessor struct {
 	// this lets us optimize running consecutive steps for a function, as a continuation, to a specific limit.
 	continues        map[string]continuation
 	continueCooldown map[string]time.Time
+
+	// peekSizeCache stores ewma peek sizes for partitions.
+	peekSizeCache *ccache.Cache[int64]
 
 	// continuesLock protects the continues map.
 	continuesLock *sync.Mutex
@@ -456,12 +466,15 @@ func (q *queueProcessor) Run(ctx context.Context, f RunFunc) error {
 	}
 
 	go q.runInstrumentation(ctx)
+	go q.runLatencyTracker(ctx)
+
+	wrappedF := q.wrapRunFuncWithLatency(f)
 
 	// start execution and shadow scan concurrently
 	eg, ctx := errgroup.WithContext(ctx)
 
 	eg.Go(func() error {
-		return q.executionScan(ctx, f)
+		return q.executionScan(ctx, wrappedF)
 	})
 
 	if q.runMode.ShadowPartition {
@@ -500,4 +513,8 @@ func (q *queueProcessor) UnpauseFunction(ctx context.Context, shardName string, 
 
 func (q *queueProcessor) capacity() int64 {
 	return int64(q.numWorkers) - q.Semaphore().Count()
+}
+
+func (q *queueProcessor) partitionCapacity() int64 {
+	return int64(q.numPartitionWorkers) - q.partitionSem.Count()
 }

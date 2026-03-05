@@ -80,6 +80,35 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 			errMsgs: []string{"missing idempotency key"},
 		},
 		{
+			name: "long idempotency key should be allowed",
+			request: CapacityAcquireRequest{
+				// BacklogRefill will concatenate the backlog ID and current timestamp
+				IdempotencyKey: "fn:f2a4f87b-56be-426e-b65c-19bc3f540aaf:start:t<1r7o8k6m1hzyu:1nmk345ipx7is-3cwrgvm5kh837>:c1<1d2q6od45blt2:2vitkz2abm02f>:c2<1r7o8k6m1hzyu:1rf3m3mqp3jnh>-1772637885948",
+				AccountID:      accountID,
+				EnvID:          envID,
+				FunctionID:     functionID,
+				Configuration: ConstraintConfig{
+					FunctionVersion: 1,
+				},
+				Constraints: []ConstraintItem{
+					{
+						Kind:        kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{},
+					},
+				},
+				Amount:               1,
+				LeaseIdempotencyKeys: []string{"item1"},
+				CurrentTime:          baseTime,
+				Duration:             1 * time.Minute,
+				MaximumLifetime:      30 * time.Minute,
+				Source: LeaseSource{
+					Service:  ServiceExecutor,
+					Location: CallerLocationItemLease,
+				},
+			},
+			wantErr: false,
+		},
+		{
 			name: "missing account ID",
 			request: CapacityAcquireRequest{
 				IdempotencyKey: "test-key",

@@ -50,13 +50,13 @@ LOOP:
 			break LOOP
 
 		case <-tick.Chan():
-			if q.capacity() < minWorkersFree {
+			if q.capacity() < minWorkersFree || q.partitionCapacity() == 0 {
 				// Wait until we have more workers free.  This stops us from
 				// claiming a partition to work on a single job, ensuring we
 				// have capacity to run at least MinWorkersFree concurrent
 				// QueueItems.  This reduces latency of enqueued items when
 				// there are lots of enqueued and available jobs.
-				l.Trace("all workers busy, early exiting scan", "worker_capacity", q.capacity())
+				l.Trace("all workers busy, early exiting scan", "worker_capacity", q.capacity(), "partition_capacity", q.partitionCapacity())
 				continue
 			}
 
@@ -92,7 +92,8 @@ LOOP:
 func (q *queueProcessor) scan(ctx context.Context) error {
 	l := logger.StdlibLogger(ctx)
 
-	if q.capacity() == 0 {
+	if q.capacity() == 0 || q.partitionCapacity() == 0 {
+		metrics.IncrQueueScanNoCapacityCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name()}})
 		return nil
 	}
 
@@ -222,6 +223,7 @@ func (q *queueProcessor) ScanAccountPartitions(ctx context.Context, accountID uu
 	return q.processScannedPartitions(ctx, partitions, peekUntil, metricShardName, reportPeekedPartitions)
 }
 
+// ScanGlobalPartitions scans the partiton of partitions across all fns.
 func (q *queueProcessor) ScanGlobalPartitions(ctx context.Context, peekLimit int64, peekUntil time.Time, metricShardName string, reportPeekedPartitions *int64) error {
 	partitions, err := q.primaryQueueShard.PeekGlobalPartitions(ctx, peekLimit, peekUntil, q.isSequential())
 	if err != nil {
@@ -238,12 +240,11 @@ func (q *queueProcessor) processScannedPartitions(
 	metricShardName string,
 	reportPeekedPartitions *int64,
 ) error {
-	l := logger.StdlibLogger(ctx)
-
 	if reportPeekedPartitions != nil {
 		atomic.AddInt64(reportPeekedPartitions, int64(len(partitions)))
 	}
 
+	l := logger.StdlibLogger(ctx)
 	l.Trace("processing partitions",
 		"peek_until", peekUntil.Format(time.StampMilli),
 		"partition", len(partitions),
@@ -252,15 +253,33 @@ func (q *queueProcessor) processScannedPartitions(
 	eg := errgroup.Group{}
 
 	for _, ptr := range partitions {
+		if q.capacity() == 0 || !q.partitionSem.TryAcquire(1) {
+			metrics.IncrQueueScanNoCapacityCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name()}})
+			return nil
+		}
+
 		p := *ptr
 		eg.Go(func() error {
+			defer q.partitionSem.Release(1)
+
 			if q.capacity() == 0 {
 				// no longer any available workers for partition, so we can skip
 				// work
-				metrics.IncrQueueScanNoCapacityCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"shard": metricShardName, "queue_shard": q.primaryQueueShard.Name()}})
+				metrics.IncrQueueScanNoCapacityCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name()}})
 				return nil
 			}
-			if err := q.ProcessPartition(ctx, &p, 0, false); err != nil {
+			err := q.ProcessPartition(ctx, &p, 0, false)
+
+			metrics.IncrQueuePartitionProcessedCounter(ctx, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags: map[string]any{
+					"queue_shard": q.primaryQueueShard.Name(),
+					"type":        "continuation",
+					"has_error":   err != nil,
+				},
+			})
+
+			if err != nil {
 				if err == ErrPartitionNotFound || err == ErrPartitionGarbageCollected {
 					// Another worker grabbed the partition, or the partition was deleted
 					// during the scan by an another worker.
@@ -273,10 +292,6 @@ func (q *queueProcessor) processScannedPartitions(
 				return err
 			}
 
-			metrics.IncrQueuePartitionProcessedCounter(ctx, metrics.CounterOpt{
-				PkgName: pkgName,
-				Tags:    map[string]any{"shard": metricShardName, "queue_shard": q.primaryQueueShard.Name()},
-			})
 			return nil
 		})
 	}

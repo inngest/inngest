@@ -132,9 +132,10 @@ func TestQueueItemScore(t *testing.T) {
 	for _, kind := range kinds {
 		t.Run(fmt.Sprintf("%s: within promotion timerange", kind), func(t *testing.T) {
 			// Enqueue a job now, and ensure that it is fudged and promoted.
-			atMS := time.Now().UnixMilli()
+			now := time.Now()
+			atMS := now.UnixMilli()
 			item := osqueue.QueueItem{
-				AtMS: time.Now().UnixMilli(),
+				AtMS: atMS,
 				Data: osqueue.Item{
 					Kind: kind,
 					Identifier: state.Identifier{
@@ -143,7 +144,7 @@ func TestQueueItemScore(t *testing.T) {
 				},
 			}
 
-			actual := item.Score(time.Now())
+			actual := item.Score(now)
 			require.Equal(t, atMS, actual, kind)
 		})
 
@@ -1066,6 +1067,8 @@ func TestQueuePeek(t *testing.T) {
 			ia.AtMS = items[0].AtMS
 			ia.WallTimeMS = items[0].WallTimeMS
 			ia.EnqueuedAt = items[0].EnqueuedAt
+			require.EqualValues(t, int64(1), items[0].ScavengeCount, "ScavengeCount should be 1 after first scavenge/requeue")
+			ia.ScavengeCount = 1
 			require.EqualValues(t, []*osqueue.QueueItem{&ia, &ib, &ic, &id}, items)
 		})
 

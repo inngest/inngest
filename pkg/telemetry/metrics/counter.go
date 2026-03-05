@@ -636,6 +636,15 @@ func IncrAPICacheMiss(ctx context.Context, opts CounterOpt) {
 	})
 }
 
+func IncrTLSSessionCacheLookup(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "tls_session_cache_lookup_total",
+		Description: "The number of TLS session cache lookups",
+		Tags:        opts.Tags,
+	})
+}
+
 func IncrQueueThrottleKeyExpressionMismatchCounter(ctx context.Context, opts CounterOpt) {
 	RecordCounterMetric(ctx, 1, CounterOpt{
 		PkgName:     opts.PkgName,

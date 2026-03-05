@@ -16,7 +16,6 @@ const (
 )
 
 const (
-	MaximumAllowedRequestDelay = time.Second
 	// OperationIdempotencyTTL represents the time the same response will be returned after a successful request.
 	// Depending on the operation, this should be low (Otherwise, Acquire may return an already expired lease)
 	// TODO: Figure out a reasonable operation idempotency TTL (maybe per-operation)

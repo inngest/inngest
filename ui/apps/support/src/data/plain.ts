@@ -4,6 +4,7 @@ import type {
   PlainSDKError,
   ThreadPartsFragment,
 } from "@team-plain/typescript-sdk/dist/index";
+import { getAuthenticatedUserEmail } from "@/data/clerk";
 
 // Initialize Plain client
 // The API key should be set in the environment variable PLAIN_API_KEY
@@ -61,12 +62,23 @@ export const getLabelForStatus = (status: string) => {
   }
 };
 
+export const TICKET_STATUS_ALL = "all" as const;
+export const TICKET_STATUS_OPEN = "open" as const;
+export const TICKET_STATUS_CLOSED = "closed" as const;
+
+export type TicketStatusFilter =
+  | typeof TICKET_STATUS_OPEN
+  | typeof TICKET_STATUS_CLOSED
+  | typeof TICKET_STATUS_ALL;
+
 export const getTicketsByEmail = createServerFn({ method: "GET" })
-  .inputValidator((data: { email: string }) => data)
+  .inputValidator(
+    (data: { email: string; status?: TicketStatusFilter }) => data,
+  )
   .handler(async ({ data }): Promise<Array<TicketSummary>> => {
     // TODO - Use Clerk auth here to get the customer email, and the metadata with their external id
     try {
-      const { email } = data;
+      const { email, status } = data;
 
       // First, get or create the customer by email
       const customer = await plainClient.getCustomerByEmail({
@@ -126,6 +138,11 @@ export const getTicketsByEmail = createServerFn({ method: "GET" })
         variables: {
           filters: {
             customerIds: [customer.data.id],
+            ...(status === "open"
+              ? { statuses: ["TODO", "SNOOZED"] }
+              : status === "closed"
+              ? { statuses: ["DONE"] }
+              : {}),
           },
           first: 10,
           // after: null,
@@ -190,6 +207,11 @@ export const getTicketById = createServerFn({ method: "GET" })
     try {
       const { ticketId } = data;
 
+      const userEmail = await getAuthenticatedUserEmail();
+      if (!userEmail) {
+        return null;
+      }
+
       const res = (await plainClient.rawRequest({
         query: `
           query GetThread($threadId: ID!) {
@@ -227,6 +249,13 @@ export const getTicketById = createServerFn({ method: "GET" })
       }
 
       const thread = res.data.thread;
+
+      // Verify the authenticated user owns this ticket
+      if (
+        thread.customer.email.email.toLowerCase() !== userEmail.toLowerCase()
+      ) {
+        return null;
+      }
 
       return {
         id: thread.id,
@@ -298,6 +327,9 @@ type TimelineEntriesResponse = {
   thread: {
     customer: {
       fullName: string;
+      email: {
+        email: string;
+      };
     };
     timelineEntries: { edges: Array<TimeLineEntryEdge> };
   };
@@ -400,6 +432,11 @@ export const getTimelineEntriesForTicket = createServerFn({ method: "GET" })
     try {
       const { ticketId } = data;
 
+      const userEmail = await getAuthenticatedUserEmail();
+      if (!userEmail) {
+        return null;
+      }
+
       const res = (await plainClient.rawRequest({
         query: `
           query GetTimelineEntries($threadId: ID!, $first: Int, $after: String, $last: Int, $before: String) {
@@ -407,6 +444,9 @@ export const getTimelineEntriesForTicket = createServerFn({ method: "GET" })
               id
               customer {
                 fullName
+                email {
+                  email
+                }
               }
               timelineEntries(first: $first, after: $after, last: $last, before: $before) {
                 edges {
@@ -512,6 +552,12 @@ export const getTimelineEntriesForTicket = createServerFn({ method: "GET" })
       if (res.error) {
         console.error("Failed to fetch timeline entries:", res.error);
         return [];
+      }
+
+      // Verify the authenticated user owns this ticket
+      const customerEmail = res.data.thread.customer.email.email;
+      if (customerEmail.toLowerCase() !== userEmail.toLowerCase()) {
+        return null;
       }
 
       const customerName = res.data.thread.customer.fullName;
@@ -881,8 +927,8 @@ export const getCustomerTierByEmail = createServerFn({ method: "GET" })
 export type ReplyToThreadInput = {
   threadId: string;
   message: string;
-  /** The user's email address - used to impersonate the customer in Plain */
-  userEmail: string;
+  /** @deprecated No longer used - email is derived from authenticated session */
+  userEmail?: string;
 };
 
 export type ReplyToThreadResult = {
@@ -894,14 +940,56 @@ export const replyToThread = createServerFn({ method: "POST" })
   .inputValidator((data: ReplyToThreadInput) => data)
   .handler(async ({ data }): Promise<ReplyToThreadResult> => {
     try {
-      const { threadId, message, userEmail } = data;
+      const { threadId, message } = data;
+
+      // Get the authenticated user's email instead of trusting client input
+      const userEmail = await getAuthenticatedUserEmail();
+      if (!userEmail) {
+        return {
+          success: false,
+          error: "Not authenticated",
+        };
+      }
+
+      // Verify the user owns this thread before allowing a reply
+      const threadRes = (await plainClient.rawRequest({
+        query: `
+          query GetThreadCustomer($threadId: ID!) {
+            thread(threadId: $threadId) {
+              customer {
+                email {
+                  email
+                }
+              }
+            }
+          }
+        `,
+        variables: { threadId },
+      })) as unknown as Result<
+        { thread: { customer: { email: { email: string } } } },
+        PlainSDKError
+      >;
+
+      if (threadRes.error) {
+        return { success: false, error: "Failed to verify thread ownership" };
+      }
+
+      if (
+        threadRes.data.thread.customer.email.email.toLowerCase() !==
+        userEmail.toLowerCase()
+      ) {
+        return {
+          success: false,
+          error: "Not authorized to reply to this thread",
+        };
+      }
 
       // Build input with customer impersonation so the reply appears from the customer
       const input: {
         threadId: string;
         textContent: string;
         markdownContent: string;
-        impersonation?: {
+        impersonation: {
           asCustomer: {
             customerIdentifier: {
               emailAddress: string;
@@ -912,18 +1000,14 @@ export const replyToThread = createServerFn({ method: "POST" })
         threadId,
         textContent: message,
         markdownContent: message,
-      };
-
-      // Use impersonation to make the reply appear as from the customer
-      if (userEmail) {
-        input.impersonation = {
+        impersonation: {
           asCustomer: {
             customerIdentifier: {
               emailAddress: userEmail,
             },
           },
-        };
-      }
+        },
+      };
 
       const res = (await plainClient.rawRequest({
         query: `

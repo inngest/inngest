@@ -112,6 +112,7 @@ func (q *queue) Scavenge(ctx context.Context, limit int) (int, error) {
 					resultErr = multierror.Append(resultErr, fmt.Errorf("error unmarshalling job '%s': %w", item, err))
 					continue
 				}
+				qi.ScavengeCount++
 				if err := q.Requeue(ctx, qi, q.Clock.Now()); err != nil {
 					resultErr = multierror.Append(resultErr, fmt.Errorf("error requeueing job '%s': %w", item, err))
 					continue

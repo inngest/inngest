@@ -167,23 +167,20 @@ func (q *queueProcessor) ProcessItem(
 						RunProcessingMode: constraintapi.RunProcessingModeBackground,
 						Service:           constraintapi.ServiceExecutor,
 					},
+					LeaseIssuedAt: capacityLeaseID.issuedAt(),
 				})
 				if err != nil {
-					// log error if unexpected; the queue item may be removed by a Dequeue() operation
-					// invoked by finalize() (Cancellations, Parallelism)
-					if !errors.Is(ErrQueueItemNotFound, err) {
-						l.ReportError(
-							err,
-							"error extending capacity lease",
-							logger.WithErrorReportLog(true),
-							logger.WithErrorReportTags(map[string]string{
-								"partitionID": p.ID,
-								"accountID":   accountID.String(),
-								"item":        qi.ID,
-								"leaseID":     currentCapacityLease.String(),
-							}),
-						)
-					}
+					l.ReportError(
+						err,
+						"error extending capacity lease",
+						logger.WithErrorReportLog(true),
+						logger.WithErrorReportTags(map[string]string{
+							"partitionID": p.ID,
+							"accountID":   accountID.String(),
+							"item":        qi.ID,
+							"leaseID":     currentCapacityLease.String(),
+						}),
+					)
 
 					// always stop processing the queue item if lease cannot be extended
 					errCh <- fmt.Errorf("error extending lease while processing: %w", err)
@@ -299,6 +296,7 @@ func (q *queueProcessor) ProcessItem(
 			ContinueCount:       continuationCtr,
 			RefilledFromBacklog: qi.RefilledFrom,
 			CapacityLease:       i.CapacityLease,
+			ScavengeCount:       qi.ScavengeCount,
 		}
 
 		// Call the run func.
@@ -358,6 +356,7 @@ func (q *queueProcessor) ProcessItem(
 					Service:           constraintapi.ServiceExecutor,
 					RunProcessingMode: constraintapi.RunProcessingModeBackground,
 				},
+				LeaseIssuedAt: capacityLeaseID.issuedAt(),
 			})
 			if err != nil {
 				l.ReportError(err, "failed to release capacity", logger.WithErrorReportTags(map[string]string{
@@ -407,7 +406,6 @@ func (q *queueProcessor) ProcessItem(
 				l.Error("error requeuing job", "error", err, "item", qi)
 				return err
 			}
-			l.Debug("ProcessItem requeued job due to either lease extension error or error running the job", "err", err)
 			if _, ok := err.(QuitError); ok {
 				q.quit <- err
 				return err

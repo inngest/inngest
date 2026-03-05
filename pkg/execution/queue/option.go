@@ -90,6 +90,12 @@ func WithShadowNumWorkers(n int32) QueueOpt {
 	}
 }
 
+func WithNumPartitionWorkers(n int32) QueueOpt {
+	return func(q *QueueOptions) {
+		q.numPartitionWorkers = n
+	}
+}
+
 func WithPeekSizeRange(min int64, max int64) QueueOpt {
 	return func(q *QueueOptions) {
 		if max > AbsoluteQueuePeekMax {
@@ -400,11 +406,15 @@ type QueueOptions struct {
 	numWorkers int32
 	// numShadowWorkers stores the number of workers available to concurrently scan partitions
 	numShadowWorkers int32
+	// numPartitionWorkers stores the number of goroutines available to concurrently process partitions.
+	numPartitionWorkers int32
 	// numBacklogNormalizationWorkers stores the maximum number of workers available to concurrenctly scan normalization partitions
 	numBacklogNormalizationWorkers int32
 	// peek min & max sets the range for partitions to peek for items
 	PeekMin int64
 	PeekMax int64
+	// PeekSizeExponent is the exp. on the random skewed distribution
+	PeekSizeExponent float64
 	// usePeekEWMA specifies whether we should use EWMA for peeking.
 	usePeekEWMA bool
 	// peekCurrMultiplier is a multiplier used for calculating the dynamic peek size
@@ -457,10 +467,13 @@ type QueueOptions struct {
 
 	enableJobPromotion bool
 
-	CapacityManager                    constraintapi.CapacityManager
-	UseConstraintAPI                   constraintapi.UseConstraintAPIFn
-	EnableCapacityLeaseInstrumentation constraintapi.EnableHighCardinalityInstrumentation
-	CapacityLeaseExtendInterval        time.Duration
+	latencyPartition *LatencyPartitionOptions
+
+	CapacityManager                     constraintapi.CapacityManager
+	UseConstraintAPI                    constraintapi.UseConstraintAPIFn
+	EnableCapacityLeaseInstrumentation  constraintapi.EnableHighCardinalityInstrumentation
+	CapacityLeaseExtendInterval         time.Duration
+	AcquireCapacityLeaseOnBacklogRefill bool
 
 	EnableThrottleInstrumentation EnableThrottleInstrumentationFn
 
@@ -612,6 +625,12 @@ func WithCapacityLeaseInstrumentation(enable constraintapi.EnableHighCardinality
 	}
 }
 
+func WithAcquireCapacityLeaseOnBacklogRefill(acquire bool) QueueOpt {
+	return func(q *QueueOptions) {
+		q.AcquireCapacityLeaseOnBacklogRefill = acquire
+	}
+}
+
 type EnableThrottleInstrumentationFn func(ctx context.Context, accountID, fnID uuid.UUID) bool
 
 func WithEnableThrottleInstrumentation(fn EnableThrottleInstrumentationFn) QueueOpt {
@@ -624,6 +643,39 @@ func WithConditionalTracer(tracer trace.ConditionalTracer) QueueOpt {
 	return func(q *QueueOptions) {
 		q.ConditionalTracer = tracer
 	}
+}
+
+func WithPeekSizeExponent(n float64) QueueOpt {
+	return func(q *QueueOptions) {
+		q.PeekSizeExponent = n
+	}
+}
+
+// WithLatencyPartition adds latency partition tracking jobs which enter the queue
+// without flow control, and when peeked and executed run the provided callback
+// to report enqueue-to-process delay E2E.
+func WithLatencyPartition(o LatencyPartitionOptions) QueueOpt {
+	return func(q *QueueOptions) {
+		// Only a single partition supported for now.
+		if o.Partitions != 1 {
+			o.Partitions = 1
+		}
+		if o.Interval <= 0 {
+			o.Interval = 5 * time.Second
+		}
+		q.latencyPartition = &o
+	}
+}
+
+// LatencyPartitionOptions sets latency tracking jobs in the queue.
+type LatencyPartitionOptions struct {
+	// Partitions is the number of unique partition IDs to create for job tracking.
+	Partitions int // will create eg. uuid.New("ffffffff-ffff-ffff-ffff-fffffffffff1"),
+	// Interval is the duration between tracking jobs
+	Interval time.Duration // time.Second*5
+	// Callback is called when the job executes, with the full RunInfo
+	// containing latency, sojourn delay, and other processing metadata.
+	Callback func(ctx context.Context, info RunInfo)
 }
 
 // continuation represents a partition continuation, forcung the queue to continue working
@@ -672,6 +724,8 @@ type ProcessItem struct {
 type capacityLease struct {
 	currentCapacityLeaseID *ulid.ULID
 	capacityLeaseLock      sync.Mutex
+
+	initialLeaseIssuedAt time.Time
 }
 
 func newCapacityLease(initialLease *CapacityLease) *capacityLease {
@@ -680,6 +734,7 @@ func newCapacityLease(initialLease *CapacityLease) *capacityLease {
 	}
 	if initialLease != nil {
 		cl.currentCapacityLeaseID = &initialLease.LeaseID
+		cl.initialLeaseIssuedAt = time.UnixMilli(initialLease.IssuedAtMS)
 	}
 
 	return cl
@@ -695,6 +750,10 @@ func (p *capacityLease) get() *ulid.ULID {
 	p.capacityLeaseLock.Lock()
 	defer p.capacityLeaseLock.Unlock()
 	return p.currentCapacityLeaseID
+}
+
+func (p *capacityLease) issuedAt() time.Time {
+	return p.initialLeaseIssuedAt
 }
 
 func (p *capacityLease) has() bool {
@@ -740,6 +799,7 @@ func NewQueueOptions(
 		},
 		PeekMin:                     DefaultQueuePeekMin,
 		PeekMax:                     DefaultQueuePeekMax,
+		PeekSizeExponent:            7,
 		shadowPeekMin:               ShadowPartitionPeekMinBacklogs,
 		shadowPeekMax:               ShadowPartitionPeekMaxBacklogs,
 		backlogRefillLimit:          BacklogRefillHardLimit,
@@ -758,6 +818,7 @@ func NewQueueOptions(
 		},
 		numWorkers:                     defaultNumWorkers,
 		numShadowWorkers:               defaultNumShadowWorkers,
+		numPartitionWorkers:            defaultNumPartitionWorkers,
 		numBacklogNormalizationWorkers: defaultBacklogNormalizationWorkers,
 		pollTick:                       defaultPollTick,
 		shadowPollTick:                 defaultShadowPollTick,

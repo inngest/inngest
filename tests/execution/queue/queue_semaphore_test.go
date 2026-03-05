@@ -61,6 +61,7 @@ func TestQueueSemaphoreWithConstraintAPI(t *testing.T) {
 		queue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
 			return true
 		}),
+		queue.WithAcquireCapacityLeaseOnBacklogRefill(true),
 
 		// Simulate a limit of 1
 		queue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p queue.PartitionIdentifier) queue.PartitionConstraintConfig {
@@ -621,6 +622,7 @@ func TestQueueSemaphore(t *testing.T) {
 				// Use Constraint API
 				queue.WithCapacityManager(cm),
 				queue.WithUseConstraintAPI(tc.enableConstraintAPI),
+				queue.WithAcquireCapacityLeaseOnBacklogRefill(true),
 
 				// Simulate a limit of 1
 				queue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p queue.PartitionIdentifier) queue.PartitionConstraintConfig {

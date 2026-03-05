@@ -350,12 +350,15 @@ func start(ctx context.Context, opts StartOpts) error {
 			return fmt.Errorf("could not create contraint API: %w", err)
 		}
 
-		queueOpts = append(queueOpts, queue.WithCapacityManager(cm))
-
-		// Always use Constraint API
-		queueOpts = append(queueOpts, queue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
-			return true
-		}))
+		queueOpts = append(
+			queueOpts,
+			queue.WithCapacityManager(cm),
+			// Always use Constraint API
+			queue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
+				return true
+			}),
+			queue.WithAcquireCapacityLeaseOnBacklogRefill(true),
+		)
 
 		services = append(services, constraintapi.NewLeaseScavengerService(cm, consts.ConstraintAPIScavengerTick))
 

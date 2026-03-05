@@ -181,6 +181,10 @@ func (m *mockShardForIterator) ShardLease(ctx context.Context, key string, durat
 	return nil, nil
 }
 
+func (m *mockShardForIterator) ReleaseShardLease(ctx context.Context, key string, existingLeaseID ulid.ULID) error {
+	return nil
+}
+
 func (m *mockShardForIterator) AccountPeek(ctx context.Context, sequential bool, until time.Time, limit int64) ([]uuid.UUID, error) {
 	return nil, nil
 }

@@ -111,13 +111,18 @@ type QueueItem struct {
 	// the partition). This is not the same as AtMS for items scheduled in the future or past.
 	EnqueuedAt int64 `json:"eat"`
 
+	// ScavengeCount tracks how many times this item has been requeued by the scavenger
+	// due to an expired or lost lease.
+	ScavengeCount int `json:"sc,omitempty"`
+
 	// CapacityLease is the optional capacity lease for this queue item.
 	// This is set when the Constraint API feature flag is enabled and the item was refilled.
 	CapacityLease *CapacityLease `json:"cl,omitempty"`
 }
 
 type CapacityLease struct {
-	LeaseID ulid.ULID `json:"l,omitempty"`
+	LeaseID    ulid.ULID `json:"l,omitempty"`
+	IssuedAtMS int64     `json:"i,omitempty"`
 }
 
 func (q *QueueItem) SetID(ctx context.Context, str string) {
@@ -536,6 +541,8 @@ func (i *Item) UnmarshalJSON(b []byte) error {
 			return err
 		}
 		i.Payload = *p
+	case KindLatencyTrack:
+		// No payload for latency tracking items.
 	}
 	return nil
 }

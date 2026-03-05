@@ -234,6 +234,14 @@ func TestConstraintItemsFromBacklog(t *testing.T) {
 				AccountID:   &accountID,
 				FunctionID:  &fnID,
 			},
+			constraints: PartitionConstraintConfig{
+				Throttle: &PartitionThrottle{
+					Limit:                     10,
+					Burst:                     5,
+					Period:                    60,
+					ThrottleKeyExpressionHash: "throttle-expr-hash",
+				},
+			},
 			expected: []constraintapi.ConstraintItem{
 				{
 					Kind: constraintapi.ConstraintKindConcurrency,
@@ -254,6 +262,77 @@ func TestConstraintItemsFromBacklog(t *testing.T) {
 					Throttle: &constraintapi.ThrottleConstraint{
 						KeyExpressionHash: "throttle-expr-hash",
 						EvaluatedKeyHash:  "throttle-key-value",
+					},
+				},
+			},
+		},
+		{
+			name: "throttle in backlog ignored when config has no throttle",
+			backlog: &QueueBacklog{
+				Throttle: &BacklogThrottle{
+					ThrottleKeyExpressionHash: "throttle-expr-hash",
+					ThrottleKey:               "throttle-key-value",
+				},
+			},
+			sp: &QueueShadowPartition{
+				PartitionID: fnID.String(),
+				AccountID:   &accountID,
+				FunctionID:  &fnID,
+			},
+			// No throttle in latest config
+			constraints: PartitionConstraintConfig{},
+			expected: []constraintapi.ConstraintItem{
+				{
+					Kind: constraintapi.ConstraintKindConcurrency,
+					Concurrency: &constraintapi.ConcurrencyConstraint{
+						Mode:  enums.ConcurrencyModeStep,
+						Scope: enums.ConcurrencyScopeAccount,
+					},
+				},
+				{
+					Kind: constraintapi.ConstraintKindConcurrency,
+					Concurrency: &constraintapi.ConcurrencyConstraint{
+						Mode:  enums.ConcurrencyModeStep,
+						Scope: enums.ConcurrencyScopeFn,
+					},
+				},
+			},
+		},
+		{
+			name: "throttle in backlog ignored when config has different expression hash",
+			backlog: &QueueBacklog{
+				Throttle: &BacklogThrottle{
+					ThrottleKeyExpressionHash: "old-throttle-expr-hash",
+					ThrottleKey:               "throttle-key-value",
+				},
+			},
+			sp: &QueueShadowPartition{
+				PartitionID: fnID.String(),
+				AccountID:   &accountID,
+				FunctionID:  &fnID,
+			},
+			// Config has a throttle but with a different expression hash (e.g. function was updated)
+			constraints: PartitionConstraintConfig{
+				Throttle: &PartitionThrottle{
+					Limit:                     10,
+					Burst:                     5,
+					Period:                    60,
+					ThrottleKeyExpressionHash: "new-throttle-expr-hash",
+				},
+			},
+			expected: []constraintapi.ConstraintItem{
+				{
+					Kind: constraintapi.ConstraintKindConcurrency,
+					Concurrency: &constraintapi.ConcurrencyConstraint{
+						Mode:  enums.ConcurrencyModeStep,
+						Scope: enums.ConcurrencyScopeAccount,
+					},
+				},
+				{
+					Kind: constraintapi.ConstraintKindConcurrency,
+					Concurrency: &constraintapi.ConcurrencyConstraint{
+						Mode:  enums.ConcurrencyModeStep,
+						Scope: enums.ConcurrencyScopeFn,
 					},
 				},
 			},
@@ -426,6 +505,12 @@ func TestConstraintItemsFromBacklog(t *testing.T) {
 				FunctionID:  &fnID,
 			},
 			constraints: PartitionConstraintConfig{
+				Throttle: &PartitionThrottle{
+					Limit:                     20,
+					Burst:                     5,
+					Period:                    60,
+					ThrottleKeyExpressionHash: "complete-throttle-hash",
+				},
 				Concurrency: PartitionConcurrency{
 					CustomConcurrencyKeys: []CustomConcurrencyLimit{
 						{

@@ -778,6 +778,23 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 
 	key := idempotencyKey(req, *runID)
 
+	if len(req.Events) == 0 {
+		return nil, fmt.Errorf("no events provided in schedule request")
+	}
+
+	l := e.log.With(
+		"account_id", req.AccountID,
+		"env_id", req.WorkspaceID,
+		"app_id", req.AppID,
+		"fn_id", req.Function.ID,
+		"fn_v", req.Function.FunctionVersion,
+		"evt_id", req.Events[0].GetInternalID(),
+		"run_id", runID,
+		"schedule_req", req,
+	)
+
+	l.Optional(req.AccountID, "schedule").Debug("hitting constraint API")
+
 	// Check constraints and acquire lease
 	md, err := WithConstraints(
 		ctx,
@@ -840,6 +857,9 @@ func (e *executor) schedule(
 		if e.rateLimiter != nil && req.Function.RateLimit != nil && !req.PreventRateLimit {
 			evtMap := req.Events[0].GetEvent().Map()
 			rateLimitKey, err := ratelimit.RateLimitKey(ctx, req.Function.ID, *req.Function.RateLimit, evtMap)
+
+			l.Optional(req.AccountID, "schedule-ratelimit").Debug("ratelimiting schedule", "key", rateLimitKey, "error", err)
+
 			switch err {
 			case nil:
 				res, err := e.rateLimiter.RateLimit(
@@ -849,6 +869,9 @@ func (e *executor) schedule(
 					ratelimit.WithNow(e.now()),
 					ratelimit.WithIdempotency(key, RateLimitIdempotencyTTL),
 				)
+
+				l.Optional(req.AccountID, "schedule-ratelimit").Debug("ratelimiting schedule", "result", res)
+
 				if err != nil {
 					metrics.IncrRateLimitUsage(ctx, metrics.CounterOpt{
 						PkgName: pkgName,
@@ -1762,6 +1785,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			}
 		}
 
+		// TODO: remove this once the response header attribute is fully plumbed.
 		// Extract response header metadata from the HTTP response.
 		// Response headers live on internal server execution spans, not OTLP spans,
 		// so we must explicitly create the metadata span here.
@@ -2156,6 +2180,15 @@ func (e *executor) executeDriverV2(ctx context.Context, run *runInstance, d driv
 	if ierr != nil {
 		str := ierr.Error()
 		resp.Err = &str
+
+		// Produce structured error output so that downstream trace storage and the
+		// frontend can parse the error correctly
+		gracefulErr := state.StandardError{
+			Error:   ierr.Error(),
+			Name:    state.DefaultErrorName,
+			Message: ierr.Error(),
+		}
+		resp.Output = gracefulErr.Serialize(execution.StateErrorKey)
 	}
 
 	return resp, ierr
@@ -2187,8 +2220,19 @@ func (e *executor) executeDriverV1(ctx context.Context, i *runInstance) (*state.
 	}
 
 	if err != nil && response.Err == nil {
-		var serr syscode.Error
-		if errors.As(err, &serr) {
+		// NOTE: syscode.Error is returned as a pointer (*syscode.Error) from
+		// httpdriver (e.g. output_too_large) and as a value (syscode.Error) from
+		// the connect driver and httpdriver's ErrNotSDK. We need to check both
+		// because errors.As only matches *T to **T (pointer) or T to *T (value),
+		// not both with a single target type.
+		var serr *syscode.Error
+		if !errors.As(err, &serr) {
+			var serrVal syscode.Error
+			if errors.As(err, &serrVal) {
+				serr = &serrVal
+			}
+		}
+		if serr != nil {
 			gracefulErr := state.StandardError{
 				Error:   fmt.Sprintf("%s: %s", serr.Code, serr.Message),
 				Name:    serr.Code,
@@ -2209,12 +2253,17 @@ func (e *executor) executeDriverV1(ctx context.Context, i *runInstance) (*state.
 		} else {
 			// Set the response error if it wasn't set, or if Execute had an internal error.
 			// This ensures that we only ever need to check resp.Err to handle errors.
-			byt, e := json.Marshal(err.Error())
-			if e != nil {
-				response.Output = err
-			} else {
-				response.Output = string(byt)
+			//
+			// We serialize as a StandardError so that the output is always in a structured
+			// JSON format that downstream consumers (trace storage, GraphQL, frontend) can
+			// parse correctly. Without this, raw error strings end up as malformed StepError
+			// objects in the trace UI (empty message, text buried in stack field)
+			gracefulErr := state.StandardError{
+				Error:   err.Error(),
+				Name:    state.DefaultErrorName,
+				Message: err.Error(),
 			}
+			response.Output = gracefulErr.Serialize(execution.StateErrorKey)
 
 			errstr := err.Error()
 			response.Err = &errstr
@@ -3092,7 +3141,8 @@ func (e *executor) HandleGeneratorResponse(ctx context.Context, i *runInstance, 
 
 	groups := opGroups(resp.Generator)
 
-	if stepCount > 1 && i.md.ShouldCoalesceParallelism(resp) {
+	// We only save pending steps if there's >= 1 step planned op.
+	if hasPlanOp(resp.Generator) && i.md.ShouldCoalesceParallelism(resp) {
 		if err := e.smv2.SavePending(ctx, i.md.ID, groups.IDs()); err != nil {
 			return fmt.Errorf("error saving pending steps: %w", err)
 		}
@@ -4350,7 +4400,11 @@ func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, runCtx exec
 		e.log.Debug("error creating span for next step after WaitForSignal", "error", err)
 	}
 
-	_, err = e.pm.Write(ctx, pauses.PauseIndex(pause), &pause)
+	// We really don't want this to fail, this can be retried in an idempotent way but
+	// workflows with 0 retries setup will just hang forever if pause creation fails.
+	_, err = util.WithRetry(ctx, "pause.handleGeneratorWaitForSignal", func(ctx context.Context) (int, error) {
+		return e.pm.Write(ctx, pauses.PauseIndex(pause), &pause)
+	}, util.NewRetryConf(util.WithRetryConfRetryableErrors(pauses.WritePauseRetryableError)))
 	if err == state.ErrSignalConflict {
 		stdErr := state.WrapInStandardError(
 			err,
@@ -4887,6 +4941,11 @@ func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Func
 		return err
 	}
 
+	if len(evtList) == 0 {
+		l.Warn("batch has no events, skipping schedule", "function_id", payload.FunctionID, "batch_id", payload.BatchID)
+		return nil
+	}
+
 	if opts == nil {
 		opts = &execution.BatchExecOpts{}
 	}
@@ -5254,4 +5313,13 @@ func (e *executor) createMetadataSpan(ctx context.Context, runCtx execution.RunC
 		md,
 		scope,
 	)
+}
+
+func hasPlanOp(ops []*state.GeneratorOpcode) bool {
+	for _, op := range ops {
+		if op.Op == enums.OpcodeStepPlanned {
+			return true
+		}
+	}
+	return false
 }

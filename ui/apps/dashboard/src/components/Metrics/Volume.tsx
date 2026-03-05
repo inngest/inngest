@@ -270,6 +270,7 @@ export const MetricsVolume = ({
   isMarketplace = false,
 }: MetricsFilters) => {
   const [volumeOpen, setVolumeOpen] = useState(true);
+  const [connectOpen, setConnectOpen] = useState(true);
 
   const env = useEnvironment();
 
@@ -327,28 +328,43 @@ export const MetricsVolume = ({
               limit={concurrencyLimit}
               isMarketplace={isMarketplace}
             />
-            {/* Only show Connect worker metrics if there's data */}
-            {connectMetricsEnabled &&
-              connectMetricsReady &&
-              data &&
-              data.workspace.workerPercentageUsed.metrics.length > 0 && (
-                <ConnectWorkerPercentage
-                  workspace={data.workspace}
-                  entities={entities}
-                />
-              )}
-            {connectMetricsEnabled &&
-              connectMetricsReady &&
-              data &&
-              data.workspace.workerTotalCapacity.metrics.length > 0 && (
-                <ConnectWorkerTotalCapacity
-                  workspace={data.workspace}
-                  entities={entities}
-                />
-              )}
           </div>
         </>
       )}
+
+      {/* Connect Section */}
+      {connectMetricsEnabled &&
+        connectMetricsReady &&
+        data &&
+        (data.workspace.workerPercentageUsed.metrics.length > 0 ||
+          data.workspace.workerTotalCapacity.metrics.length > 0) && (
+          <>
+            <div
+              className="text-subtle my-4 flex w-full cursor-pointer flex-row items-center justify-start gap-x-2 text-xs uppercase"
+              onClick={() => setConnectOpen(!connectOpen)}
+            >
+              {connectOpen ? <RiArrowDownSFill /> : <RiArrowRightSFill />}
+              <div>Connect</div>
+              <hr className="border-subtle w-full" />
+            </div>
+            {connectOpen && (
+              <div className="relative grid w-full auto-cols-max grid-cols-1 gap-2 overflow-hidden md:grid-cols-2">
+                {data.workspace.workerPercentageUsed.metrics.length > 0 && (
+                  <ConnectWorkerPercentage
+                    workspace={data.workspace}
+                    entities={entities}
+                  />
+                )}
+                {data.workspace.workerTotalCapacity.metrics.length > 0 && (
+                  <ConnectWorkerTotalCapacity
+                    workspace={data.workspace}
+                    entities={entities}
+                  />
+                )}
+              </div>
+            )}
+          </>
+        )}
     </div>
   );
 };

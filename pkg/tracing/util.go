@@ -13,6 +13,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
+	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/inngest/inngest/pkg/util/aigateway"
@@ -74,7 +75,7 @@ func ResumeAttrs(p *state.Pause, r *execution.ResumeRequest) *meta.SerializableA
 
 // DriverResponseAttrs applies details from the given `DriverResponse` to the
 // given span. This is used for adding additional details to the span after the
-// exectution has completed.
+// execution has completed.
 func DriverResponseAttrs(
 	resp *state.DriverResponse,
 
@@ -128,7 +129,9 @@ func DriverResponseAttrs(
 		size = len(fnOutput)
 	}
 
-	meta.AddAttr(rawAttrs, meta.Attrs.ResponseHeaders, &resp.Header)
+	redactedHeaders := headers.Compact(headers.Redact(resp.Header))
+
+	meta.AddAttr(rawAttrs, meta.Attrs.ResponseHeaders, &redactedHeaders)
 	meta.AddAttr(rawAttrs, meta.Attrs.ResponseStatusCode, &resp.StatusCode)
 	meta.AddAttr(rawAttrs, meta.Attrs.ResponseOutputSize, &size)
 

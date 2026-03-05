@@ -116,6 +116,7 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
 				return true
 			}),
+			osqueue.WithAcquireCapacityLeaseOnBacklogRefill(true),
 			osqueue.WithCapacityManager(cm),
 			// make lease extensions more frequent
 			osqueue.WithCapacityLeaseExtendInterval(time.Second),
@@ -157,6 +158,7 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
 				return true
 			}),
+			osqueue.WithAcquireCapacityLeaseOnBacklogRefill(true),
 			osqueue.WithCapacityManager(cm),
 			// make lease extensions more frequent
 			osqueue.WithCapacityLeaseExtendInterval(time.Second),
@@ -218,7 +220,8 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 			P:                        p,
 			DisableConstraintUpdates: true,
 			CapacityLease: &osqueue.CapacityLease{
-				LeaseID: resp.Leases[0].LeaseID,
+				LeaseID:    resp.Leases[0].LeaseID,
+				IssuedAtMS: clock.Now().UnixMilli(),
 			},
 		}, func(ctx context.Context, ri osqueue.RunInfo, i osqueue.Item) (osqueue.RunResult, error) {
 			go func() {
@@ -266,6 +269,7 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
 				return true
 			}),
+			osqueue.WithAcquireCapacityLeaseOnBacklogRefill(true),
 			osqueue.WithCapacityManager(cm),
 			// Use matching interval (same as queue item lease ticker)
 			osqueue.WithCapacityLeaseExtendInterval(leaseExtendInterval),
@@ -332,7 +336,8 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 			P:                        p,
 			DisableConstraintUpdates: true,
 			CapacityLease: &osqueue.CapacityLease{
-				LeaseID: resp.Leases[0].LeaseID,
+				LeaseID:    resp.Leases[0].LeaseID,
+				IssuedAtMS: clock.Now().UnixMilli(),
 			},
 		}, func(ctx context.Context, ri osqueue.RunInfo, i osqueue.Item) (osqueue.RunResult, error) {
 			go func() {
@@ -475,6 +480,7 @@ func TestQueueProcessorPreLeaseWithConstraintAPI(t *testing.T) {
 			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
 				return true
 			}),
+			osqueue.WithAcquireCapacityLeaseOnBacklogRefill(true),
 			osqueue.WithCapacityManager(cm),
 			// make lease extensions more frequent
 			osqueue.WithCapacityLeaseExtendInterval(time.Second),
@@ -525,6 +531,7 @@ func TestQueueProcessorPreLeaseWithConstraintAPI(t *testing.T) {
 			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
 				return true
 			}),
+			osqueue.WithAcquireCapacityLeaseOnBacklogRefill(true),
 			osqueue.WithCapacityManager(cm),
 			// make lease extensions more frequent
 			osqueue.WithCapacityLeaseExtendInterval(time.Second),
@@ -581,7 +588,8 @@ func TestQueueProcessorPreLeaseWithConstraintAPI(t *testing.T) {
 
 		// Set capacity lease ID
 		qi.CapacityLease = &osqueue.CapacityLease{
-			LeaseID: resp.Leases[0].LeaseID,
+			LeaseID:    resp.Leases[0].LeaseID,
+			IssuedAtMS: clock.Now().UnixMilli(),
 		}
 
 		p := osqueue.ItemPartition(ctx, qi)
@@ -811,6 +819,7 @@ func TestPartitionProcessRequeueAfterLimitedWithConstraintAPI(t *testing.T) {
 			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
 				return true // acquire leases
 			}),
+			osqueue.WithAcquireCapacityLeaseOnBacklogRefill(true),
 			osqueue.WithCapacityManager(cm),
 			osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
 				return osqueue.PartitionConstraintConfig{
@@ -1035,7 +1044,8 @@ func TestPartitionProcessRequeueAfterLimitedWithConstraintAPI(t *testing.T) {
 
 			// Set capacity lease ID on first item
 			item.CapacityLease = &osqueue.CapacityLease{
-				LeaseID: resp.Leases[0].LeaseID,
+				LeaseID:    resp.Leases[0].LeaseID,
+				IssuedAtMS: clock.Now().UnixMilli(),
 			}
 			// Manually set ID for first item
 			item.ID = util.XXHash("item0")

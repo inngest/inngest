@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/getsentry/sentry-go"
+	"github.com/google/uuid"
 	"github.com/lmittmann/tint"
 )
 
@@ -20,6 +21,12 @@ var stdlibCtxKey = stdlibKey{}
 type stdlibKey struct{}
 
 type handler int
+
+// noop doesn't log.
+var noop = &logger{
+	Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
+	level:  LevelEmergency,
+}
 
 const (
 	JSONHandler handler = iota
@@ -61,6 +68,9 @@ type Logger interface {
 	Handler() slog.Handler
 	Level() slog.Level
 	With(args ...any) Logger
+
+	// Optional uses the [DefaultLogEnabler] function to only log on truthy results
+	Optional(accountID uuid.UUID, logname string) Logger
 
 	//
 	// Methods added in wrapper
@@ -289,6 +299,13 @@ func (l *logger) With(args ...any) Logger {
 		Logger: log,
 		attrs:  append(l.attrs, args...),
 	}
+}
+
+func (l *logger) Optional(accountID uuid.UUID, logname string) Logger {
+	if DefaultLogEnabler(accountID, logname) {
+		return l.With("logname", logname)
+	}
+	return noop
 }
 
 func (l *logger) Trace(msg string, args ...any) {

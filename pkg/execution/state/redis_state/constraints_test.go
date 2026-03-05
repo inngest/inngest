@@ -823,6 +823,7 @@ func TestBacklogRefillConstraintCheck(t *testing.T) {
 			osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
 				return constraints
 			}),
+			osqueue.WithAcquireCapacityLeaseOnBacklogRefill(true),
 		)
 
 		qi, err := shard.EnqueueItem(ctx, item, start, osqueue.EnqueueOpts{})
@@ -864,6 +865,7 @@ func TestBacklogRefillConstraintCheck(t *testing.T) {
 			osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
 				return constraints
 			}),
+			osqueue.WithAcquireCapacityLeaseOnBacklogRefill(true),
 		)
 
 		qi, err := shard.EnqueueItem(ctx, item, start, osqueue.EnqueueOpts{})
@@ -905,6 +907,7 @@ func TestBacklogRefillConstraintCheck(t *testing.T) {
 			osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
 				return constraints
 			}),
+			osqueue.WithAcquireCapacityLeaseOnBacklogRefill(true),
 		)
 
 		qi, err := shard.EnqueueItem(ctx, item, start, osqueue.EnqueueOpts{})
@@ -946,6 +949,7 @@ func TestBacklogRefillConstraintCheck(t *testing.T) {
 			osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
 				return constraints
 			}),
+			osqueue.WithAcquireCapacityLeaseOnBacklogRefill(true),
 		)
 
 		qi, err := shard.EnqueueItem(ctx, item, start, osqueue.EnqueueOpts{})
@@ -994,6 +998,7 @@ func TestBacklogRefillConstraintCheck(t *testing.T) {
 			osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
 				return constraints
 			}),
+			osqueue.WithAcquireCapacityLeaseOnBacklogRefill(true),
 		)
 
 		// Simulate in progress leases

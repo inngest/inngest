@@ -72,3 +72,39 @@ func (q *queue) ShardLease(ctx context.Context, key string, duration time.Durati
 		return nil, fmt.Errorf("unknown response claiming shard lease: %d", status)
 	}
 }
+
+// ReleaseShardLease releases an existing shard lease without renewing it.
+// This removes the lease from the set, freeing a slot for other workers.
+func (q *queue) ReleaseShardLease(ctx context.Context, key string, existingLeaseID ulid.ULID) error {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "ReleaseShardLease"), redis_telemetry.ScopeQueue)
+
+	now := q.Clock.Now()
+
+	args, err := StrSlice([]any{
+		now.UnixMilli(),
+		"", // empty newLeaseID signals release
+		existingLeaseID.String(),
+		0, // maxLeases is unused for release
+	})
+	if err != nil {
+		return err
+	}
+
+	status, err := scripts["queue/shardLease"].Exec(
+		redis_telemetry.WithScriptName(ctx, "shardLease"),
+		q.RedisClient.unshardedRc,
+		[]string{
+			q.RedisClient.kg.ShardLeaseKey(key),
+		},
+		args,
+	).AsInt64()
+	if err != nil {
+		return fmt.Errorf("error releasing shard lease: %w", err)
+	}
+	switch status {
+	case 0, 1, 2:
+		return nil
+	default:
+		return fmt.Errorf("unknown response releasing shard lease: %d", status)
+	}
+}

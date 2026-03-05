@@ -15,6 +15,7 @@ import (
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/run"
+	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
 	"go.opentelemetry.io/otel/attribute"
 )
@@ -25,6 +26,10 @@ func (r *mutationResolver) CreateApp(ctx context.Context, input models.CreateApp
 	if !strings.Contains(input.URL, "://") {
 		input.URL = "http://" + input.URL
 	}
+
+	// Normalize the URL so that default ports and localhost variants are
+	// unified before deriving the placeholder app ID.
+	input.URL = util.NormalizeAppURL(input.URL, false)
 
 	// This ID will not match the app ID after the sync process succeeds. That's
 	// because the eventual app ID will use the app name, rather than the URL.
