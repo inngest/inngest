@@ -20,7 +20,7 @@ type ExperimentMetadata struct {
 	ExperimentName    string         `json:"experiment_name"`
 	Variant           string         `json:"variant"`
 	SelectionStrategy string         `json:"selection_strategy"`
-	AvailableVariants []string       `json:"available_variants"`
+	AvailableVariants []string       `json:"available_variants,omitempty"`
 	VariantWeights    map[string]int `json:"variant_weights,omitempty"`
 }
 
