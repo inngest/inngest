@@ -53,7 +53,7 @@ export interface ExperimentMetadata {
   experiment_name: string;
   variant: string;
   selection_strategy: string;
-  available_variants: string[];
+  available_variants?: string[];
   variant_weights?: { [key: string]: number /* int */ };
 }
 /**
