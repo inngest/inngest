@@ -2093,6 +2093,7 @@ type InvokeFunctionRequest struct {
 	FunctionId     string                 `protobuf:"bytes,1,opt,name=function_id,json=functionId,proto3" json:"function_id,omitempty"`
 	Data           *structpb.Struct       `protobuf:"bytes,2,opt,name=data,proto3" json:"data,omitempty"`
 	IdempotencyKey *string                `protobuf:"bytes,3,opt,name=idempotency_key,json=idempotencyKey,proto3,oneof" json:"idempotency_key,omitempty"`
+	AppId          string                 `protobuf:"bytes,4,opt,name=app_id,json=appId,proto3" json:"app_id,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -2144,6 +2145,13 @@ func (x *InvokeFunctionRequest) GetData() *structpb.Struct {
 func (x *InvokeFunctionRequest) GetIdempotencyKey() string {
 	if x != nil && x.IdempotencyKey != nil {
 		return *x.IdempotencyKey
+	}
+	return ""
+}
+
+func (x *InvokeFunctionRequest) GetAppId() string {
+	if x != nil {
+		return x.AppId
 	}
 	return ""
 }
@@ -2440,12 +2448,13 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\v_isArchived\"j\n" +
 	"\x11PatchEnvsResponse\x12\x1f\n" +
 	"\x04data\x18\x01 \x01(\v2\v.api.v2.EnvR\x04data\x124\n" +
-	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"\xb3\x03\n" +
+	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"\x84\x04\n" +
 	"\x15InvokeFunctionRequest\x12\\\n" +
 	"\vfunction_id\x18\x01 \x01(\tB;\x92A82 The ID of the function to invokeJ\x14\"my-app-hello-world\"R\n" +
 	"functionId\x12\x86\x01\n" +
 	"\x04data\x18\x02 \x01(\v2\x17.google.protobuf.StructBY\x92AV26JSON object containing the input data for the functionJ\x1c{\"message\": \"Hello, World!\"}R\x04data\x12\x9e\x01\n" +
-	"\x0fidempotency_key\x18\x03 \x01(\tBp\x92Am2XOptional idempotency key to handle duplicate requests within a given idempotency period.J\x11\"user-action-123\"H\x00R\x0eidempotencyKey\x88\x01\x01B\x12\n" +
+	"\x0fidempotency_key\x18\x03 \x01(\tBp\x92Am2XOptional idempotency key to handle duplicate requests within a given idempotency period.J\x11\"user-action-123\"H\x00R\x0eidempotencyKey\x88\x01\x01\x12O\n" +
+	"\x06app_id\x18\x04 \x01(\tB8\x92A52)The ID of the app containing the functionJ\b\"my-app\"R\x05appIdB\x12\n" +
 	"\x10_idempotency_key\"~\n" +
 	"\x16InvokeFunctionResponse\x12.\n" +
 	"\x04data\x18\x01 \x01(\v2\x1a.api.v2.InvokeFunctionDataR\x04data\x124\n" +
@@ -2471,7 +2480,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\n" +
 	"FilterType\x12\t\n" +
 	"\x05ALLOW\x10\x00\x12\b\n" +
-	"\x04DENY\x10\x012\xbeG\n" +
+	"\x04DENY\x10\x012\xccG\n" +
 	"\x02V2\x12\xb2\x02\n" +
 	"\x06Health\x12\x15.api.v2.HealthRequest\x1a\x16.api.v2.HealthResponse\"\xf8\x01\x92A\xe5\x01\x12\fHealth check\x1a,Returns the health status of the API serviceJR\n" +
 	"\x03401\x12K\n" +
@@ -2708,8 +2717,8 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x0e\n" +
 	"\n" +
 	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x0f:\x01*2\n" +
-	"/envs/{id}\x12\xe3\v\n" +
-	"\x0eInvokeFunction\x12\x1d.api.v2.InvokeFunctionRequest\x1a\x1e.api.v2.InvokeFunctionResponse\"\x91\v\x92A\xe3\n" +
+	"/envs/{id}\x12\xf1\v\n" +
+	"\x0eInvokeFunction\x12\x1d.api.v2.InvokeFunctionRequest\x1a\x1e.api.v2.InvokeFunctionResponse\"\x9f\v\x92A\xe3\n" +
 	"\x12\x0fInvoke function\x1a\x81\x01Invokes a function, executing the function either asynchronously or synchronously based on the mode parameter in the request bodyJn\n" +
 	"\x03200\x12g\n" +
 	"9Function invoked synchronously and has finished executing\x12*\n" +
@@ -2746,7 +2755,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x1f\x1a\x1d#/definitions/v2ErrorResponseb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02$:\x01*\"\x1f/functions/{function_id}/invokeB\xc8\x02\x92A\x91\x02\x12\x9b\x01\n" +
+	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x022:\x01*\"-/apps/{app_id}/functions/{function_id}/invokeB\xc8\x02\x92A\x91\x02\x12\x9b\x01\n" +
 	"\x13Inngest REST API v2\x12}The v2 API delivers a significantly improved developer experience with consistent design patterns and enhanced functionality.2\x052.0.0\x1a\x0fapi.inngest.com\"\x03/v2*\x01\x02ZX\n" +
 	"V\n" +
 	"\n" +

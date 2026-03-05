@@ -779,7 +779,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	key := idempotencyKey(req, *runID)
 
 	if len(req.Events) == 0 {
-		return nil, fmt.Errorf("no events provided in schedule request")
+		return nil, nil, fmt.Errorf("no events provided in schedule request")
 	}
 
 	l := e.log.With(

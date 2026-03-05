@@ -9,6 +9,10 @@ import (
 )
 
 func validateInvokeRequest(ctx context.Context, req *apiv2.InvokeFunctionRequest) error {
+	if req.AppId == "" {
+		return apiv2base.NewError(http.StatusBadRequest, apiv2base.ErrorMissingField, "App ID is required")
+	}
+
 	if req.FunctionId == "" {
 		return apiv2base.NewError(http.StatusBadRequest, apiv2base.ErrorMissingField, "Function ID is required")
 	}
@@ -16,13 +20,6 @@ func validateInvokeRequest(ctx context.Context, req *apiv2.InvokeFunctionRequest
 	if req.Data == nil {
 		return apiv2base.NewError(http.StatusBadRequest, apiv2base.ErrorMissingField, "Input data is required")
 	}
-
-	// Validate mode parameter if provided
-	// if req.Mode != nil {
-	// 	if *req.Mode != "sync" && *req.Mode != "async" {
-	// 		return apiv2base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidFieldFormat, "Mode must be either 'sync' or 'async'")
-	// 	}
-	// }
 
 	return nil
 }

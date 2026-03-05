@@ -916,7 +916,7 @@ service V2 {
 
   rpc InvokeFunction(InvokeFunctionRequest) returns (InvokeFunctionResponse) {
     option (google.api.http) = {
-      post: "/functions/{function_id}/invoke",
+      post: "/apps/{app_id}/functions/{function_id}/invoke",
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
@@ -1361,13 +1361,12 @@ message InvokeFunctionRequest {
       example: "\"user-action-123\""
     }
   ];
-  // optional string mode = 4 [
-  //   (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-  //     description: "Execution mode: 'sync' for synchronous execution, 'async' for asynchronous execution"
-  //     default: "async"
-  //     enum: ["sync", "async"]
-  //   }
-  // ];
+  string app_id = 4 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "The ID of the app containing the function"
+      example: "\"my-app\""
+    }
+  ];
 }
 
 

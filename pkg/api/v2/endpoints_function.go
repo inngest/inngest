@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/inngest/inngest/pkg/api/v2/apiv2base"
@@ -31,7 +32,14 @@ func (s *Service) InvokeFunction(ctx context.Context, req *apiv2.InvokeFunctionR
 		return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Invoke is not yet implemented")
 	}
 
-	f, err := s.functions.GetFunction(ctx, req.FunctionId)
+	// Build the composite function slug from app_id and function_id.
+	// If the function_id already has the app_id prefix, use it as-is.
+	functionSlug := req.FunctionId
+	if len(req.AppId) > 0 && !strings.HasPrefix(req.FunctionId, req.AppId+"-") {
+		functionSlug = req.AppId + "-" + req.FunctionId
+	}
+
+	f, err := s.functions.GetFunction(ctx, functionSlug)
 	if err != nil {
 		return nil, s.base.NewError(404, apiv2base.ErrorNotFound, "function not found")
 	}

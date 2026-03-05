@@ -31,13 +31,13 @@ type invokeResponse struct {
 	} `json:"metadata"`
 }
 
-func postInvoke(ctx context.Context, functionSlug string, body map[string]any) (*http.Response, error) {
+func postInvoke(ctx context.Context, appID, functionSlug string, body map[string]any) (*http.Response, error) {
 	byt, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
-		fmt.Sprintf("%s/api/v2/functions/%s/invoke", devURL, functionSlug),
+		fmt.Sprintf("%s/api/v2/apps/%s/functions/%s/invoke", devURL, appID, functionSlug),
 		bytes.NewReader(byt),
 	)
 	if err != nil {
@@ -74,8 +74,7 @@ func TestV2InvokeFunction(t *testing.T) {
 	// Allow registration to propagate
 	<-time.After(2 * time.Second)
 
-	slug := fmt.Sprintf("%s-%s", appID, fnID)
-	resp, err := postInvoke(ctx, slug, map[string]any{
+	resp, err := postInvoke(ctx, appID, fnID, map[string]any{
 		"data": map[string]any{"test": true},
 	})
 	r.NoError(err)
@@ -126,10 +125,8 @@ func TestV2InvokeFunctionIdempotency(t *testing.T) {
 
 	<-time.After(2 * time.Second)
 
-	slug := fmt.Sprintf("%s-%s", appID, fnID)
-
 	// First invoke with idempotency key
-	resp1, err := postInvoke(ctx, slug, map[string]any{
+	resp1, err := postInvoke(ctx, appID, fnID, map[string]any{
 		"data":            map[string]any{"key": "value"},
 		"idempotency_key": "test-key-1",
 	})
@@ -144,7 +141,7 @@ func TestV2InvokeFunctionIdempotency(t *testing.T) {
 	r.NotEmpty(result1.Data.RunID)
 
 	// Second invoke with same idempotency key → 409
-	resp2, err := postInvoke(ctx, slug, map[string]any{
+	resp2, err := postInvoke(ctx, appID, fnID, map[string]any{
 		"data":            map[string]any{"key": "value"},
 		"idempotency_key": "test-key-1",
 	})
@@ -159,7 +156,7 @@ func TestV2InvokeFunctionIdempotency(t *testing.T) {
 	r.Equal(result1.Data.RunID, result2.Data.RunID, "idempotent request should return same run ID")
 
 	// Third invoke with different idempotency key → 200
-	resp3, err := postInvoke(ctx, slug, map[string]any{
+	resp3, err := postInvoke(ctx, appID, fnID, map[string]any{
 		"data":            map[string]any{"key": "value"},
 		"idempotency_key": "test-key-2",
 	})
@@ -179,7 +176,7 @@ func TestV2InvokeFunctionNotFound(t *testing.T) {
 	ctx := context.Background()
 	r := require.New(t)
 
-	resp, err := postInvoke(ctx, "nonexistent-fn", map[string]any{
+	resp, err := postInvoke(ctx, "nonexistent-app", "nonexistent-fn", map[string]any{
 		"data": map[string]any{"test": true},
 	})
 	r.NoError(err)
@@ -194,7 +191,7 @@ func TestV2InvokeFunctionValidation(t *testing.T) {
 	t.Run("missing data returns 400", func(t *testing.T) {
 		r := require.New(t)
 		// POST with no data field
-		resp, err := postInvoke(ctx, "some-fn", map[string]any{})
+		resp, err := postInvoke(ctx, "some-app", "some-fn", map[string]any{})
 		r.NoError(err)
 		defer resp.Body.Close()
 		r.Equal(http.StatusBadRequest, resp.StatusCode)
@@ -202,7 +199,7 @@ func TestV2InvokeFunctionValidation(t *testing.T) {
 
 	t.Run("null data returns 400", func(t *testing.T) {
 		r := require.New(t)
-		resp, err := postInvoke(ctx, "some-fn", map[string]any{
+		resp, err := postInvoke(ctx, "some-app", "some-fn", map[string]any{
 			"data": nil,
 		})
 		r.NoError(err)
