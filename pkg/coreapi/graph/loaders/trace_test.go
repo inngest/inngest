@@ -2,6 +2,7 @@ package loader
 
 import (
 	"testing"
+	"time"
 
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/enums"
@@ -65,4 +66,58 @@ func TestRunTraceEnded(t *testing.T) {
 	for _, s := range nonTerminal {
 		assert.False(t, models.RunTraceEnded(s), "%s should not be terminal", s)
 	}
+}
+
+func TestFilterSleepSchedulingAttempts(t *testing.T) {
+	sleepOp := models.StepOpSleep
+	now := time.Now().UTC()
+
+	t.Run("filters transient 206 scheduling attempt when follow-up sleep attempt exists", func(t *testing.T) {
+		step := &models.RunTraceSpan{
+			StepOp: &sleepOp,
+			ChildrenSpans: []*models.RunTraceSpan{
+				{
+					StepOp:    &sleepOp,
+					StartedAt: &now,
+					EndedAt:   &now,
+					Response: &models.RunTraceSpanResponseInfo{
+						StatusCode: 206,
+					},
+				},
+				{
+					StepOp:    &sleepOp,
+					StartedAt: &now,
+					EndedAt:   ptrTime(now.Add(time.Second)),
+				},
+			},
+		}
+
+		filterSleepSchedulingAttempts(step)
+		require.Len(t, step.ChildrenSpans, 1)
+		assert.Nil(t, step.ChildrenSpans[0].Response)
+	})
+
+	t.Run("keeps single sleep attempt with 206 response", func(t *testing.T) {
+		step := &models.RunTraceSpan{
+			StepOp: &sleepOp,
+			ChildrenSpans: []*models.RunTraceSpan{
+				{
+					StepOp:    &sleepOp,
+					StartedAt: &now,
+					EndedAt:   &now,
+					Response: &models.RunTraceSpanResponseInfo{
+						StatusCode: 206,
+					},
+				},
+			},
+		}
+
+		filterSleepSchedulingAttempts(step)
+		require.Len(t, step.ChildrenSpans, 1)
+		assert.Equal(t, 206, step.ChildrenSpans[0].Response.StatusCode)
+	})
+}
+
+func ptrTime(t time.Time) *time.Time {
+	return &t
 }
