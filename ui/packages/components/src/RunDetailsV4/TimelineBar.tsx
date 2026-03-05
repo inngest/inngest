@@ -309,9 +309,9 @@ function ExpandToggle({ expanded, onCollapse }: { expanded: boolean; onCollapse?
 }
 
 /**
- * Tooltip content for a timeline bar, showing duration/delay and start/end timestamps.
+ * Hover card content for a timeline bar, showing duration/delay and start/end timestamps.
  */
-function BarTooltipContent({
+function BarHoverCardContent({
   name,
   startTime,
   endTime,
@@ -553,9 +553,9 @@ export function TimelineBar({
     [startPercent, widthPercent, viewStartOffset, viewEndOffset]
   );
 
-  // Tooltip state — controlled so hover target (full right panel) is separate from anchor (bar position)
-  const showTooltip = !!startTime;
-  const [tooltipOpen, setTooltipOpen] = useState(false);
+  // Hover card state — controlled so hover target (full right panel) is separate from anchor (bar position)
+  const showHoverCard = !!startTime;
+  const [hoverCardOpen, setHoverCardOpen] = useState(false);
 
   return (
     <div data-testid="timeline-bar-container" className="relative">
@@ -572,7 +572,7 @@ export function TimelineBar({
         style={{ height: `${TIMELINE_CONSTANTS.ROW_HEIGHT_PX}px` }}
       >
         {/* Selection / hover highlight - extends from indent to full width */}
-        {(selected || tooltipOpen) && (
+        {(selected || hoverCardOpen) && (
           <div
             className={cn(
               'pointer-events-none absolute inset-y-0 right-0 -z-10',
@@ -638,13 +638,13 @@ export function TimelineBar({
           </span>
         </div>
 
-        {/* Right panel - visual bar with optional hover tooltip */}
+        {/* Right panel - visual bar with optional hover card */}
         <div
           data-testid="timeline-bar-right"
           className="relative h-full flex-1"
           style={{ width: `${100 - leftWidth}%` }}
-          onMouseEnter={showTooltip ? () => setTooltipOpen(true) : undefined}
-          onMouseLeave={showTooltip ? () => setTooltipOpen(false) : undefined}
+          onMouseEnter={showHoverCard ? () => setHoverCardOpen(true) : undefined}
+          onMouseLeave={showHoverCard ? () => setHoverCardOpen(false) : undefined}
         >
           {/* Center line */}
           <div className="bg-canvasMuted absolute left-0 right-0 top-1/2 h-px -translate-y-1/2" />
@@ -664,8 +664,8 @@ export function TimelineBar({
                   viewEndOffset={viewEndOffset}
                   status={status}
                 />
-                {showTooltip && (
-                  <HoverCardRoot open={tooltipOpen} closeDelay={0}>
+                {showHoverCard && (
+                  <HoverCardRoot open={hoverCardOpen} closeDelay={0}>
                     <HoverCardTrigger asChild>
                       <div
                         className="pointer-events-none absolute inset-y-0"
@@ -677,7 +677,7 @@ export function TimelineBar({
                       />
                     </HoverCardTrigger>
                     <HoverCardContent side="top" className="border-muted max-w-none border">
-                      <BarTooltipContent
+                      <BarHoverCardContent
                         name={displayName}
                         startTime={startTime!}
                         endTime={endTime ?? null}
