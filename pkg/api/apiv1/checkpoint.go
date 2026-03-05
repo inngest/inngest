@@ -56,6 +56,10 @@ type CheckpointAPI interface {
 	CheckpointAsyncSteps(w http.ResponseWriter, r *http.Request)
 	// Output returns run output given a JWT which has access to the given {env, runID} claimset.
 	Output(w http.ResponseWriter, r *http.Request)
+	// StreamIngest accepts a streamed response body from the SDK.
+	StreamIngest(w http.ResponseWriter, r *http.Request)
+	// StreamOutput streams the response to the client, supporting late joiners.
+	StreamOutput(w http.ResponseWriter, r *http.Request)
 }
 
 // RunOutputReader represents any implementation that fetches run outputs.
@@ -122,7 +126,8 @@ func NewCheckpointAPI(o Opts) CheckpointAPI {
 	api.Post("/{runID}/async", api.CheckpointAsyncSteps)
 	api.HandleFunc("/{runID}/output", api.Output)
 	api.Post("/{runID}/stream", api.StreamIngest)
-	api.Get("/{runID}/stream", api.StreamOutput)
+	// NOTE: StreamOutput (GET) is registered in apiv1.go outside the
+	// auth/caching middleware group to avoid response buffering.
 
 	return api
 }
@@ -181,11 +186,11 @@ func (a checkpointAPI) CheckpointNewRun(w http.ResponseWriter, r *http.Request) 
 	// SHOULD automatically have a timeout after 60 minutes;  we should auomatically ensure
 	// that functions are marked as FAILED if we do not get a call to finalize them.
 	md, err := a.Executor.Schedule(ctx, execution.ScheduleRequest{
-		RunID:       &input.RunID,
-		Function:    fn,
-		AccountID:   auth.AccountID(),
-		WorkspaceID: auth.WorkspaceID(),
-		AppID:       input.AppID(auth.WorkspaceID()),
+		RunID:          &input.RunID,
+		Function:       fn,
+		AccountID:      auth.AccountID(),
+		WorkspaceID:    auth.WorkspaceID(),
+		AppID:          input.AppID(auth.WorkspaceID()),
 		RunMode:        enums.RunModeSync,
 		Events:         []event.TrackedEvent{evt},
 		URL:            input.URL(),

@@ -261,11 +261,9 @@ func (a checkpointAPI) StreamOutput(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	flusher, ok := w.(http.Flusher)
-	if !ok {
-		_ = publicerr.WriteHTTP(w, publicerr.Errorf(500, "Streaming not supported"))
-		return
-	}
+	// Use ResponseController to flush through wrapped ResponseWriters
+	// (e.g. chi middleware wrappers that don't delegate http.Flusher).
+	rc := http.NewResponseController(w)
 
 	headersSent := false
 	offset := 0
@@ -281,8 +279,11 @@ func (a checkpointAPI) StreamOutput(w http.ResponseWriter, r *http.Request) {
 					for k, v := range hdr.Headers {
 						w.Header().Set(k, v)
 					}
+					w.Header().Del("Content-Length")
+					w.Header().Set("Transfer-Encoding", "chunked")
+					w.Header().Set("X-Accel-Buffering", "no")
 					w.WriteHeader(hdr.StatusCode)
-					flusher.Flush()
+					_ = rc.Flush()
 					headersSent = true
 					offset++
 					continue
@@ -296,7 +297,7 @@ func (a checkpointAPI) StreamOutput(w http.ResponseWriter, r *http.Request) {
 			if _, writeErr := w.Write(chunk); writeErr != nil {
 				return
 			}
-			flusher.Flush()
+			_ = rc.Flush()
 			offset++
 		}
 
