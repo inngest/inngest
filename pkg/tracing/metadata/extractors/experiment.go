@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/tracing/metadata"
 	tracev1 "go.opentelemetry.io/proto/otlp/trace/v1"
 )
@@ -52,7 +53,7 @@ func (e *ExperimentMetadataExtractor) ExtractSpanMetadata(ctx context.Context, s
 		return nil, nil
 	}
 
-	md := e.extractExperimentMetadata(span)
+	md := e.extractExperimentMetadata(ctx, span)
 	return []metadata.Structured{md}, nil
 }
 
@@ -73,7 +74,7 @@ func (e *ExperimentMetadataExtractor) isExperimentSpan(span *tracev1.Span) bool 
 	return false
 }
 
-func (e *ExperimentMetadataExtractor) extractExperimentMetadata(span *tracev1.Span) ExperimentMetadata {
+func (e *ExperimentMetadataExtractor) extractExperimentMetadata(ctx context.Context, span *tracev1.Span) ExperimentMetadata {
 	var md ExperimentMetadata
 
 	for _, attr := range span.Attributes {
@@ -96,7 +97,9 @@ func (e *ExperimentMetadataExtractor) extractExperimentMetadata(span *tracev1.Sp
 			// Variant weights are stored as a JSON-encoded string attribute
 			if s := attr.Value.GetStringValue(); s != "" {
 				var weights map[string]int
-				if err := json.Unmarshal([]byte(s), &weights); err == nil {
+				if err := json.Unmarshal([]byte(s), &weights); err != nil {
+					logger.From(ctx).Warn("failed to parse experiment variant_weights", "error", err, "value", s)
+				} else {
 					md.VariantWeights = weights
 				}
 			}
