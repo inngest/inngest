@@ -23,6 +23,7 @@ export type Scalars = {
   DSN: { input: unknown; output: unknown; }
   EdgeType: { input: unknown; output: unknown; }
   FilterType: { input: string; output: string; }
+  HTTPHeaders: { input: Record<string, string|string[]>; output: Record<string, string|string[]>; }
   IP: { input: string; output: string; }
   IngestSource: { input: string; output: string; }
   InsightsDiagnosticCode: { input: InsightsDiagnosticCode; output: InsightsDiagnosticCode; }
@@ -1867,6 +1868,7 @@ export type RunTraceSpan = {
   parentSpan: Maybe<RunTraceSpan>;
   parentSpanID: Maybe<Scalars['String']['output']>;
   queuedAt: Scalars['Time']['output'];
+  response: Maybe<RunTraceSpanResponseInfo>;
   run: FunctionRun;
   runID: Scalars['ULID']['output'];
   skipExistingRunID: Maybe<Scalars['String']['output']>;
@@ -1889,6 +1891,12 @@ export type RunTraceSpanOutput = {
   data: Maybe<Scalars['Bytes']['output']>;
   error: Maybe<StepError>;
   input: Maybe<Scalars['Bytes']['output']>;
+};
+
+export type RunTraceSpanResponseInfo = {
+  __typename?: 'RunTraceSpanResponseInfo';
+  headers: Scalars['HTTPHeaders']['output'];
+  statusCode: Scalars['Int']['output'];
 };
 
 export enum RunTraceSpanStatus {
