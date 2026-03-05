@@ -15,7 +15,6 @@ export const HoverCardContent = forwardRef<
       <HoverCardPrimitive.Content
         {...props}
         ref={forwardedRef}
-        align="start"
         sideOffset={5}
         className={cn(
           className,
