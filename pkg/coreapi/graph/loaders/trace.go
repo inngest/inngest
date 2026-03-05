@@ -25,6 +25,10 @@ const (
 	DiscoveryStepSpanName    = "Discovery step"
 	GenericExecutionSpanName = "Execution"
 	FinalizationSpanName     = "Finalization"
+
+	// SDKExecutionSpanName is an alias for meta.SDKExecutionSpanName
+	// used locally for readability.
+	SDKExecutionSpanName = meta.SDKExecutionSpanName
 )
 
 var ErrSkipSuccess = fmt.Errorf("skip success span")
@@ -448,7 +452,8 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 		}
 
 		// If we only have a single child, this span isn't a userland span,
-		// but the single child is, return its children (if any).
+		// but the single child is the SDK's `"inngest.execution"` wrapper,
+		// collapse it by returning its children (if any).
 		//
 		// We do this because userland spans are always underneath an
 		// `"inngest.execution"` span created by an SDK, which houses useful
@@ -457,9 +462,13 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 		// Critically, this means we also ignore the `"inngest.execution"`
 		// span itself, as we never want to display it to the user.
 		//
-		// If the userland span has no children (i.e., it is a leaf node),
-		// we skip the collapse to avoid silently dropping it from the tree.
-		if !gqlSpan.IsUserland && len(gqlSpan.ChildrenSpans) == 1 && gqlSpan.ChildrenSpans[0].IsUserland {
+		// We only collapse when the child is specifically the SDK execution
+		// wrapper span. Other userland spans with children (e.g., spans
+		// within checkpointed steps) must be preserved in the tree.
+		//
+		// If the execution wrapper has no children (i.e., it is a leaf
+		// node), we skip the collapse to avoid silently dropping it.
+		if !gqlSpan.IsUserland && len(gqlSpan.ChildrenSpans) == 1 && gqlSpan.ChildrenSpans[0].IsUserland && gqlSpan.ChildrenSpans[0].Name == SDKExecutionSpanName {
 			if len(gqlSpan.ChildrenSpans[0].ChildrenSpans) > 0 {
 				gqlSpan.ChildrenSpans = gqlSpan.ChildrenSpans[0].ChildrenSpans
 			}

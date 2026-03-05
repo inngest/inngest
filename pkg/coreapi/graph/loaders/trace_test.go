@@ -99,16 +99,16 @@ func TestConvertRunSpanToGQL_UserlandCollapse(t *testing.T) {
 		assert.Equal(t, "GET", result.ChildrenSpans[0].Name)
 	})
 
-	t.Run("userland span with children is collapsed", func(t *testing.T) {
+	t.Run("SDK execution wrapper with children is collapsed", func(t *testing.T) {
 		span := &cqrs.OtelSpan{
 			RawOtelSpan: cqrs.RawOtelSpan{Name: meta.SpanNameExecution},
 			Attributes:  &meta.ExtractedValues{},
 			Children: []*cqrs.OtelSpan{
 				{
-					RawOtelSpan: cqrs.RawOtelSpan{Name: "inngest.execution"},
+					RawOtelSpan: cqrs.RawOtelSpan{Name: SDKExecutionSpanName},
 					Attributes: &meta.ExtractedValues{
 						IsUserland:   boolPtr(true),
-						UserlandName: strPtr("inngest.execution"),
+						UserlandName: strPtr(SDKExecutionSpanName),
 					},
 					Children: []*cqrs.OtelSpan{
 						{
@@ -127,5 +127,38 @@ func TestConvertRunSpanToGQL_UserlandCollapse(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, result.ChildrenSpans, 1, "should collapse to grandchild")
 		assert.Equal(t, "GET", result.ChildrenSpans[0].Name)
+	})
+
+	t.Run("non-wrapper userland span with children is preserved", func(t *testing.T) {
+		span := &cqrs.OtelSpan{
+			RawOtelSpan: cqrs.RawOtelSpan{Name: meta.SpanNameExecution},
+			Attributes:  &meta.ExtractedValues{},
+			Children: []*cqrs.OtelSpan{
+				{
+					RawOtelSpan: cqrs.RawOtelSpan{Name: "my-span"},
+					Attributes: &meta.ExtractedValues{
+						IsUserland:   boolPtr(true),
+						UserlandName: strPtr("my-span"),
+					},
+					Children: []*cqrs.OtelSpan{
+						{
+							RawOtelSpan: cqrs.RawOtelSpan{Name: "child-span"},
+							Attributes: &meta.ExtractedValues{
+								IsUserland:   boolPtr(true),
+								UserlandName: strPtr("child-span"),
+							},
+						},
+					},
+				},
+			},
+		}
+
+		result, err := tr.convertRunSpanToGQL(ctx, span)
+		require.NoError(t, err)
+		require.Len(t, result.ChildrenSpans, 1, "should keep the userland span")
+		assert.Equal(t, "my-span", result.ChildrenSpans[0].Name)
+		assert.True(t, result.ChildrenSpans[0].IsUserland)
+		require.Len(t, result.ChildrenSpans[0].ChildrenSpans, 1, "should preserve children")
+		assert.Equal(t, "child-span", result.ChildrenSpans[0].ChildrenSpans[0].Name)
 	})
 }
