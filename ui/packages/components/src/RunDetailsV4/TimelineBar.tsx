@@ -25,8 +25,9 @@ import {
 } from '@remixicon/react';
 import { format } from 'date-fns';
 
+import { HoverCardContent, HoverCardRoot, HoverCardTrigger } from '../HoverCard';
 import { getStatusBackgroundClass, getStatusTextClass } from '../Status/statusClasses';
-import { Tooltip, TooltipArrow, TooltipContent, TooltipTrigger } from '../Tooltip/Tooltip';
+import { Tooltip, TooltipContent, TooltipTrigger } from '../Tooltip/Tooltip';
 import { cn } from '../utils/classNames';
 import type {
   BarHeight,
@@ -332,14 +333,14 @@ function BarTooltipContent({
       <div className="flex flex-col gap-1">
         <div className="border-subtle flex flex-col gap-1 border-b pb-1.5">
           <div className="flex justify-between gap-6">
-            <span className="text-light font-medium">Duration</span>
+            <span className="text-light font-mono uppercase">Duration</span>
             <span className="text-basis tabular-nums">
               {durationMs > 0 ? formatDuration(durationMs) : '-'}
             </span>
           </div>
           {delayMs != null && (
             <div className="flex justify-between gap-6">
-              <span className="text-light font-medium">Delay</span>
+              <span className="text-light font-mono uppercase">Delay</span>
               <span className="text-basis tabular-nums">
                 {delayMs > 0 ? formatDuration(delayMs) : '-'}
               </span>
@@ -347,11 +348,11 @@ function BarTooltipContent({
           )}
         </div>
         <div className="mt-0.5 flex justify-between gap-6">
-          <span className="text-light font-medium">Start</span>
+          <span className="text-light font-mono uppercase">Start</span>
           <span className="text-basis tabular-nums">{startTimestamp}</span>
         </div>
         <div className="flex justify-between gap-6">
-          <span className="text-light font-medium">End</span>
+          <span className="text-light font-mono uppercase">End</span>
           {endTimestamp !== null ? (
             <span className="text-basis tabular-nums">{endTimestamp}</span>
           ) : (
@@ -664,8 +665,8 @@ export function TimelineBar({
                   status={status}
                 />
                 {showTooltip && (
-                  <Tooltip open={tooltipOpen}>
-                    <TooltipTrigger asChild>
+                  <HoverCardRoot open={tooltipOpen} closeDelay={0}>
+                    <HoverCardTrigger asChild>
                       <div
                         className="pointer-events-none absolute inset-y-0"
                         style={{
@@ -674,21 +675,16 @@ export function TimelineBar({
                           minWidth: '4px',
                         }}
                       />
-                    </TooltipTrigger>
-                    <TooltipContent
-                      side="top"
-                      hasArrow={false}
-                      className="bg-canvasBase text-basis border-muted max-w-none border shadow-lg"
-                    >
+                    </HoverCardTrigger>
+                    <HoverCardContent side="top" className="border-muted max-w-none border">
                       <BarTooltipContent
                         name={displayName}
                         startTime={startTime!}
                         endTime={endTime ?? null}
                         delayMs={delayMs}
                       />
-                      <TooltipArrow className="fill-canvasBase" />
-                    </TooltipContent>
-                  </Tooltip>
+                    </HoverCardContent>
+                  </HoverCardRoot>
                 )}
               </>
             )}

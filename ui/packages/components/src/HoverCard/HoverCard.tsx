@@ -17,7 +17,10 @@ export const HoverCardContent = forwardRef<
         ref={forwardedRef}
         align="start"
         sideOffset={5}
-        className={cn(className, 'shadow-primary bg-canvasBase rounded-md p-2')}
+        className={cn(
+          className,
+          'shadow-primary bg-canvasBase border-subtle z-[52] rounded border p-2'
+        )}
       >
         <HoverCardPrimitive.Arrow className="tooltipArrow" />
         {children}
