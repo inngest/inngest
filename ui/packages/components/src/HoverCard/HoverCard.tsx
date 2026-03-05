@@ -22,7 +22,6 @@ export const HoverCardContent = forwardRef<
           'shadow-primary bg-canvasBase border-subtle z-[52] rounded border p-2'
         )}
       >
-        <HoverCardPrimitive.Arrow className="tooltipArrow" />
         {children}
       </HoverCardPrimitive.Content>
     </HoverCardPrimitive.Portal>
