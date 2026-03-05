@@ -50,7 +50,7 @@ export const KindInngestExperiment = 'inngest.experiment';
  */
 export interface ExperimentMetadata {
   experiment_name: string;
-  variant_selected: string;
+  variant: string;
   selection_strategy: string;
   available_variants: string[];
   variant_weights?: { [key: string]: number /* int */ };

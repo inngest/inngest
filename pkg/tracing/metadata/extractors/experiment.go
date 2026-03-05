@@ -17,7 +17,7 @@ const (
 //tygo:generate
 type ExperimentMetadata struct {
 	ExperimentName    string         `json:"experiment_name"`
-	VariantSelected   string         `json:"variant_selected"`
+	Variant           string         `json:"variant"`
 	SelectionStrategy string         `json:"selection_strategy"`
 	AvailableVariants []string       `json:"available_variants"`
 	VariantWeights    map[string]int `json:"variant_weights,omitempty"`
@@ -58,7 +58,7 @@ func (e *ExperimentMetadataExtractor) ExtractSpanMetadata(ctx context.Context, s
 
 var experimentAttributeKeys = map[string]bool{
 	"inngest.experiment.name":               true,
-	"inngest.experiment.variant_selected":    true,
+	"inngest.experiment.variant":             true,
 	"inngest.experiment.selection_strategy":  true,
 	"inngest.experiment.available_variants":  true,
 	"inngest.experiment.variant_weights":     true,
@@ -80,8 +80,8 @@ func (e *ExperimentMetadataExtractor) extractExperimentMetadata(span *tracev1.Sp
 		switch attr.Key {
 		case "inngest.experiment.name":
 			md.ExperimentName = attr.Value.GetStringValue()
-		case "inngest.experiment.variant_selected":
-			md.VariantSelected = attr.Value.GetStringValue()
+		case "inngest.experiment.variant":
+			md.Variant = attr.Value.GetStringValue()
 		case "inngest.experiment.selection_strategy":
 			md.SelectionStrategy = attr.Value.GetStringValue()
 		case "inngest.experiment.available_variants":

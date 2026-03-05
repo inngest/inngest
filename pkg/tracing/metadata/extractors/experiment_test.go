@@ -27,7 +27,7 @@ func TestExperimentMetadataExtractor_FullSpan(t *testing.T) {
 				},
 			},
 			{
-				Key: "inngest.experiment.variant_selected",
+				Key: "inngest.experiment.variant",
 				Value: &commonv1.AnyValue{
 					Value: &commonv1.AnyValue_StringValue{StringValue: "variant-b"},
 				},
@@ -84,7 +84,7 @@ func TestExperimentMetadataExtractor_FullSpan(t *testing.T) {
 	}
 
 	assert.Equal(t, "checkout-flow", data["experiment_name"])
-	assert.Equal(t, "variant-b", data["variant_selected"])
+	assert.Equal(t, "variant-b", data["variant"])
 	assert.Equal(t, "weighted", data["selection_strategy"])
 
 	variants, ok := data["available_variants"].([]any)
@@ -168,7 +168,7 @@ func TestExperimentMetadataExtractor_PartialAttributes(t *testing.T) {
 	}
 
 	assert.Equal(t, "ab-test", data["experiment_name"])
-	assert.Equal(t, "", data["variant_selected"])
+	assert.Equal(t, "", data["variant"])
 	assert.Equal(t, "", data["selection_strategy"])
 }
 
@@ -186,7 +186,7 @@ func TestExperimentMetadataExtractor_NoWeights(t *testing.T) {
 				},
 			},
 			{
-				Key: "inngest.experiment.variant_selected",
+				Key: "inngest.experiment.variant",
 				Value: &commonv1.AnyValue{
 					Value: &commonv1.AnyValue_StringValue{StringValue: "enabled"},
 				},
@@ -214,7 +214,7 @@ func TestExperimentMetadata_Serialize(t *testing.T) {
 
 	md := ExperimentMetadata{
 		ExperimentName:    "pricing-test",
-		VariantSelected:   "high-price",
+		Variant:   "high-price",
 		SelectionStrategy: "random",
 		AvailableVariants: []string{"low-price", "high-price"},
 		VariantWeights:    map[string]int{"low-price": 50, "high-price": 50},
@@ -233,7 +233,7 @@ func TestExperimentMetadata_Serialize(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, md.ExperimentName, roundTripped.ExperimentName)
-	assert.Equal(t, md.VariantSelected, roundTripped.VariantSelected)
+	assert.Equal(t, md.Variant, roundTripped.Variant)
 	assert.Equal(t, md.SelectionStrategy, roundTripped.SelectionStrategy)
 	assert.Equal(t, md.AvailableVariants, roundTripped.AvailableVariants)
 	assert.Equal(t, md.VariantWeights, roundTripped.VariantWeights)
