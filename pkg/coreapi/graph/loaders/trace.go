@@ -448,16 +448,21 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 		}
 
 		// If we only have a single child, this span isn't a userland span,
-		// but the single child is, return its children.
+		// but the single child is, return its children (if any).
 		//
 		// We do this because userland spans are always underneath an
 		// `"inngest.execution"` span created by an SDK, which houses useful
 		// information about the environment, versions, scope, etc.
 		//
-		// Critically, this means we also ignore the `"inggest.execution"`
+		// Critically, this means we also ignore the `"inngest.execution"`
 		// span itself, as we never want to display it to the user.
+		//
+		// If the userland span has no children (i.e., it is a leaf node),
+		// we skip the collapse to avoid silently dropping it from the tree.
 		if !gqlSpan.IsUserland && len(gqlSpan.ChildrenSpans) == 1 && gqlSpan.ChildrenSpans[0].IsUserland {
-			gqlSpan.ChildrenSpans = gqlSpan.ChildrenSpans[0].ChildrenSpans
+			if len(gqlSpan.ChildrenSpans[0].ChildrenSpans) > 0 {
+				gqlSpan.ChildrenSpans = gqlSpan.ChildrenSpans[0].ChildrenSpans
+			}
 		}
 
 		// For the run span, the start is the first child span's start

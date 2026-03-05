@@ -1,10 +1,13 @@
 package loader
 
 import (
+	"context"
 	"testing"
 
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
+	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -65,4 +68,64 @@ func TestRunTraceEnded(t *testing.T) {
 	for _, s := range nonTerminal {
 		assert.False(t, models.RunTraceEnded(s), "%s should not be terminal", s)
 	}
+}
+
+func boolPtr(b bool) *bool     { return &b }
+func strPtr(s string) *string  { return &s }
+
+func TestConvertRunSpanToGQL_UserlandCollapse(t *testing.T) {
+	tr := &traceReader{}
+	ctx := context.Background()
+
+	t.Run("leaf userland span is preserved", func(t *testing.T) {
+		span := &cqrs.OtelSpan{
+			RawOtelSpan: cqrs.RawOtelSpan{Name: meta.SpanNameExecution},
+			Attributes:  &meta.ExtractedValues{},
+			Children: []*cqrs.OtelSpan{
+				{
+					RawOtelSpan: cqrs.RawOtelSpan{Name: "GET"},
+					Attributes: &meta.ExtractedValues{
+						IsUserland:   boolPtr(true),
+						UserlandName: strPtr("GET"),
+					},
+				},
+			},
+		}
+
+		result, err := tr.convertRunSpanToGQL(ctx, span)
+		require.NoError(t, err)
+		require.Len(t, result.ChildrenSpans, 1, "leaf userland span should not be dropped")
+		assert.True(t, result.ChildrenSpans[0].IsUserland)
+		assert.Equal(t, "GET", result.ChildrenSpans[0].Name)
+	})
+
+	t.Run("userland span with children is collapsed", func(t *testing.T) {
+		span := &cqrs.OtelSpan{
+			RawOtelSpan: cqrs.RawOtelSpan{Name: meta.SpanNameExecution},
+			Attributes:  &meta.ExtractedValues{},
+			Children: []*cqrs.OtelSpan{
+				{
+					RawOtelSpan: cqrs.RawOtelSpan{Name: "inngest.execution"},
+					Attributes: &meta.ExtractedValues{
+						IsUserland:   boolPtr(true),
+						UserlandName: strPtr("inngest.execution"),
+					},
+					Children: []*cqrs.OtelSpan{
+						{
+							RawOtelSpan: cqrs.RawOtelSpan{Name: "GET"},
+							Attributes: &meta.ExtractedValues{
+								IsUserland:   boolPtr(true),
+								UserlandName: strPtr("GET"),
+							},
+						},
+					},
+				},
+			},
+		}
+
+		result, err := tr.convertRunSpanToGQL(ctx, span)
+		require.NoError(t, err)
+		require.Len(t, result.ChildrenSpans, 1, "should collapse to grandchild")
+		assert.Equal(t, "GET", result.ChildrenSpans[0].Name)
+	})
 }
