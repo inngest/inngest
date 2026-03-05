@@ -217,6 +217,8 @@ export const StepInfo = ({
     (md) => md.kind === 'inngest.response_headers'
   );
 
+  // TODO: remove metadata handling once all response header
+  // data in history uses the response field. (After 2026-06-03)
   const responseHeaderData = responseHeaderMetadata?.length
     ? responseHeaderMetadata
     : trace.response
