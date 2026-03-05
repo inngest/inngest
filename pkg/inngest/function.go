@@ -29,6 +29,29 @@ const (
 	DefaultStepName = "step-1"
 )
 
+// DeployedFunction reresents a synced function deployed to an Inngest environment.
+//
+// This contains the function definition, alongside tenant identifiers and whether the
+// function is paused, draining, etc.
+type DeployedFunction struct {
+	// ID is an internal surrogate key representing this function.
+	ID uuid.UUID
+	// Slug is the function slug.
+	Slug string
+	// Function represents the deployed function
+	Function Function
+	// AccountID represents the account that the function is owned by
+	AccountID uuid.UUID
+	// EnvironmentID represents the environment that the function is deployed to
+	EnvironmentID uuid.UUID
+	// AppID represents the app that the function belongs to
+	AppID uuid.UUID
+	// PausedAt, if non-zero, indicates that the function is paused as of the given time.
+	PausedAt time.Time
+	// DrainedAt, if non-zero, indicates that the function is draining as of the given time.
+	DrainedAt time.Time
+}
+
 // Function represents a step function which is triggered whenever an event
 // is received or on a schedule.  In essence, it contains:
 //
@@ -50,6 +73,8 @@ type Function struct {
 	// FunctionVersion represents the version of this specific function.  The same
 	// function ID may be updated many times over the lifetime of a function; this
 	// represents the specific version for the functon ID.
+	//
+	// deprecated:  this should be removed.
 	FunctionVersion int `json:"fv"`
 
 	// Name is the descriptive name for the function

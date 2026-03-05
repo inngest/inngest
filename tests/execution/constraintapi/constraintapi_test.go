@@ -97,7 +97,7 @@ func TestConstraintEnforcement(t *testing.T) {
 			queueOpts := []queue.QueueOpt{
 				queue.WithClock(clock),
 				queue.WithCapacityManager(cm),
-				queue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (bool) {
+				queue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) bool {
 					return true
 				}),
 				queue.WithAcquireCapacityLeaseOnBacklogRefill(true),
@@ -271,4 +271,3 @@ func TestConstraintEnforcement(t *testing.T) {
 		})
 	}
 }
-
