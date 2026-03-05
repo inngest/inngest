@@ -117,7 +117,7 @@ var sqliteSpanRunsAdapter = spanRunsAdapter{
 		var ids []string
 		if raw != nil && *raw != "" {
 			// Ignore error: return empty slice on parse failure
-		_ = json.Unmarshal([]byte(*raw), &ids)
+			_ = json.Unmarshal([]byte(*raw), &ids)
 		}
 		return ids
 	},
@@ -152,7 +152,7 @@ var postgresSpanRunsAdapter = spanRunsAdapter{
 			var innerStr string
 			if err := json.Unmarshal([]byte(*raw), &innerStr); err == nil {
 				// Ignore error: return empty slice on parse failure
-			_ = json.Unmarshal([]byte(innerStr), &ids)
+				_ = json.Unmarshal([]byte(innerStr), &ids)
 			}
 		}
 		return ids
