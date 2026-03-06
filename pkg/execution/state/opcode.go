@@ -372,6 +372,10 @@ func (s *SleepOpts) UnmarshalAny(a any) error {
 type RunOpts struct {
 	Type  string          `json:"type,omitempty"`
 	Input json.RawMessage `json:"input"`
+
+	ExperimentStepID string `json:"experimentStepID,omitempty"`
+	ExperimentName   string `json:"experimentName,omitempty"`
+	Variant          string `json:"variant,omitempty"`
 }
 
 func (r *RunOpts) UnmarshalAny(a any) error {
