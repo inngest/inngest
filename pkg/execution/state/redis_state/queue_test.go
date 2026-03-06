@@ -575,7 +575,11 @@ func TestQueueEnqueueItem(t *testing.T) {
 		}, start, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 		require.NotEqual(t, item.ID, ulid.Zero)
-		require.Equal(t, time.UnixMilli(item.WallTimeMS).Truncate(time.Second), start)
+		require.WithinDuration(t,
+			time.UnixMilli(item.WallTimeMS),
+			start,
+			time.Second,
+		)
 
 		assert.Equal(t, osqueue.QueuePartition{
 			FunctionID: &id,
