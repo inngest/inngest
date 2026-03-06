@@ -113,7 +113,10 @@ func (v v2) Create(ctx context.Context, s state.CreateState) (state.State, error
 			},
 		)
 		if err != nil {
-			return state.State{}, err
+			// If the run already completed and was GC'd, we still know the
+			// identifier exists.  Return ErrIdentifierExists with whatever
+			// metadata we have (the run ID was already extracted above).
+			return state.State{Metadata: s.Metadata}, statev1.ErrIdentifierExists
 		}
 		return st, statev1.ErrIdentifierExists
 	case statev1.ErrIdentifierTombstone:
