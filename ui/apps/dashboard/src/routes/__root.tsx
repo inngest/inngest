@@ -9,6 +9,7 @@ import {
   createRootRouteWithContext,
 } from '@tanstack/react-router';
 
+import CustomerIOAnalytics from '@/components/Analytics/CustomerIOAnalytics';
 import SegmentAnalytics from '@/components/Analytics/SegmentAnalytics';
 import SentryUserIdentification from '@/components/Analytics/SentryUserIdentification';
 import { InngestClerkProvider } from '@/components/Clerk/Provider';
@@ -98,6 +99,7 @@ function RootComponent() {
 
               <Toaster />
               <SegmentAnalytics />
+              <CustomerIOAnalytics />
               <React.Suspense>
                 <PageViewTracker />
               </React.Suspense>
