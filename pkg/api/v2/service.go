@@ -24,25 +24,32 @@ type Service struct {
 	functions      FunctionProvider
 	executor       FunctionScheduler
 	eventPublisher EventPublisher
+	rateLimiter    RateLimitProvider
 	base           *apiv2base.Base
 }
 
 // ServiceOptions contains configuration for the V2 service
 type ServiceOptions struct {
 	SigningKeysProvider SigningKeysProvider
-	EventKeysProvider  EventKeysProvider
-	Functions          FunctionProvider
-	Executor           FunctionScheduler
-	EventPublisher     EventPublisher
+	EventKeysProvider   EventKeysProvider
+	Functions           FunctionProvider
+	Executor            FunctionScheduler
+	EventPublisher      EventPublisher
+	RateLimitProvider   RateLimitProvider
 }
 
 func NewService(opts ServiceOptions) *Service {
+	rateLimiter := opts.RateLimitProvider
+	if rateLimiter == nil {
+		rateLimiter = noopRateLimitProvider{}
+	}
 	return &Service{
 		signingKeys:    opts.SigningKeysProvider,
 		eventKeys:      opts.EventKeysProvider,
 		functions:      opts.Functions,
 		executor:       opts.Executor,
 		eventPublisher: opts.EventPublisher,
+		rateLimiter:    rateLimiter,
 		base:           apiv2base.NewBase(),
 	}
 }
