@@ -371,7 +371,7 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 				continue
 			}
 
-			if child.Omit {
+			if child.Omit || cs.MarkedAsDropped {
 				// We're skipping this child, but we may still want to use
 				// its data for timings.
 				if child.SpanTypeName == meta.SpanNameStepDiscovery && !haveSetRunStartTime {
@@ -384,9 +384,7 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 				continue
 			}
 
-			if !cs.MarkedAsDropped {
-				showSpan = true
-			}
+			showSpan = true
 
 			// Decide on changes to this parent span based on the children.
 			switch span.Name {
