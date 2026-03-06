@@ -264,6 +264,22 @@ func (a router) commitSpan(ctx context.Context, l logger.Logger, auth apiv1auth.
 		}
 	}
 
+	// If the SDK has set a deterministic step parent span ID (used during
+	// checkpointing to match the executor.step span), use it to override
+	// the parent so userland spans are correctly parented under their step.
+	for _, kv := range s.Attributes {
+		if kv.Key == "inngest.step.parentSpanId" {
+			sid, sidErr := trace.SpanIDFromHex(kv.GetValue().GetStringValue())
+			if sidErr == nil {
+				parent, err = tr.SetParentSpanID(sid)
+				if err != nil {
+					return fmt.Errorf("failed to set step parent span ID: %w", err)
+				}
+			}
+			break
+		}
+	}
+
 	span, err := a.opts.TracerProvider.CreateSpan(ctx, meta.SpanNameUserland, &tracing.CreateSpanOptions{
 		Debug:              &tracing.SpanDebugData{Location: "apiv1.traces.commitSpan"},
 		StartTime:          time.Unix(0, int64(s.StartTimeUnixNano)),

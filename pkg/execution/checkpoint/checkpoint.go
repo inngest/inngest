@@ -169,8 +169,10 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 				}
 			}
 
+			// Create a deterministic executor.step span whose ID matches what the SDK
+			// generates, so userland spans are correctly parented underneath it.
 			max := fn.MaxAttempts()
-			_, err = c.TracerProvider.CreateSpan(
+			stepSpanRef, err := c.TracerProvider.CreateSpan(
 				tracing.WithExecutionContext(ctx, tracing.ExecutionContext{
 					Identifier:  input.Metadata.ID,
 					Attempt:     runCtx.AttemptCount(),
@@ -179,6 +181,7 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 				meta.SpanNameStep,
 				&tracing.CreateSpanOptions{
 					Debug:      &tracing.SpanDebugData{Location: "checkpoint.SyncStep"},
+					Seed:       []byte(fmt.Sprintf("%s:%d", op.ID, runCtx.AttemptCount())),
 					Parent:     tracing.RunSpanRefFromMetadata(input.Metadata),
 					StartTime:  op.Timing.Start(),
 					EndTime:    op.Timing.End(),
@@ -188,6 +191,31 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 			if err != nil {
 				// We should never hit a blocker creating a span.  If so, warn loudly.
 				l.Error("error saving span for checkpoint op", "error", err)
+			}
+
+			// Create an executor.execution child span so the UI renders "Inngest" /
+			// "Your server" sections, matching the non-checkpointed structure.
+			// Uses a deterministic seed so the SDK can parent userland spans here.
+			if stepSpanRef != nil {
+				execStatus := enums.StepStatusCompleted
+				_, _ = c.TracerProvider.CreateSpan(
+					tracing.WithExecutionContext(ctx, tracing.ExecutionContext{
+						Identifier:  input.Metadata.ID,
+						Attempt:     runCtx.AttemptCount(),
+						MaxAttempts: &max,
+					}),
+					meta.SpanNameExecution,
+					&tracing.CreateSpanOptions{
+						Debug:     &tracing.SpanDebugData{Location: "checkpoint.SyncExec"},
+						Seed:      []byte(fmt.Sprintf("%s:%d:exec", op.ID, runCtx.AttemptCount())),
+						Parent:    stepSpanRef,
+						StartTime: op.Timing.Start(),
+						EndTime:   op.Timing.End(),
+						Attributes: meta.NewAttrSet(
+							meta.Attr(meta.Attrs.DynamicStatus, &execStatus),
+						).Merge(tracing.GeneratorAttrs(&op)),
+					},
+				)
 			}
 
 			go c.MetricsProvider.OnStepFinished(ctx, MetricCardinality{
@@ -214,6 +242,7 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 				meta.SpanNameStep,
 				&tracing.CreateSpanOptions{
 					Debug:      &tracing.SpanDebugData{Location: "checkpoint.SyncErr"},
+					Seed:       []byte(fmt.Sprintf("%s:%d", op.ID, runCtx.AttemptCount())),
 					Parent:     tracing.RunSpanRefFromMetadata(input.Metadata),
 					StartTime:  op.Timing.Start(),
 					EndTime:    op.Timing.End(),
@@ -239,6 +268,7 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 					meta.SpanNameExecution,
 					&tracing.CreateSpanOptions{
 						Debug:     &tracing.SpanDebugData{Location: "checkpoint.SyncExecErr"},
+						Seed:      []byte(fmt.Sprintf("%s:%d:exec", op.ID, runCtx.AttemptCount())),
 						Parent:    stepSpanRef,
 						StartTime: op.Timing.Start(),
 						EndTime:   op.Timing.End(),
@@ -416,7 +446,7 @@ func (c checkpointer) checkpointAsyncSteps(ctx context.Context, input AsyncCheck
 				return fmt.Errorf("failed to save step %s: %w", op.ID, err)
 			}
 
-			_, err = c.TracerProvider.CreateSpan(
+			stepSpanRef, err := c.TracerProvider.CreateSpan(
 				tracing.WithExecutionContext(ctx, tracing.ExecutionContext{
 					Identifier: md.ID,
 					Attempt:    0,
@@ -425,7 +455,7 @@ func (c checkpointer) checkpointAsyncSteps(ctx context.Context, input AsyncCheck
 				meta.SpanNameStep,
 				&tracing.CreateSpanOptions{
 					Debug:      &tracing.SpanDebugData{Location: "checkpoint.AsyncStep"},
-					Seed:       []byte(op.ID + op.Timing.String()),
+					Seed:       []byte(fmt.Sprintf("%s:%d", op.ID, 0)),
 					Parent:     tracing.RunSpanRefFromMetadata(&md),
 					StartTime:  op.Timing.Start(),
 					EndTime:    op.Timing.End(),
@@ -435,6 +465,29 @@ func (c checkpointer) checkpointAsyncSteps(ctx context.Context, input AsyncCheck
 			if err != nil {
 				// We should never hit a blocker creating a span.  If so, warn loudly.
 				l.Error("error saving span for checkpoint op", "error", err)
+			}
+
+			// Create an executor.execution child span so the UI renders
+			// correctly, matching the non-checkpointed structure.
+			if stepSpanRef != nil {
+				execStatus := enums.StepStatusCompleted
+				_, _ = c.TracerProvider.CreateSpan(
+					tracing.WithExecutionContext(ctx, tracing.ExecutionContext{
+						Identifier: md.ID,
+						Attempt:    0,
+					}),
+					meta.SpanNameExecution,
+					&tracing.CreateSpanOptions{
+						Debug:     &tracing.SpanDebugData{Location: "checkpoint.AsyncExec"},
+						Seed:      []byte(fmt.Sprintf("%s:%d:exec", op.ID, 0)),
+						Parent:    stepSpanRef,
+						StartTime: op.Timing.Start(),
+						EndTime:   op.Timing.End(),
+						Attributes: meta.NewAttrSet(
+							meta.Attr(meta.Attrs.DynamicStatus, &execStatus),
+						).Merge(tracing.GeneratorAttrs(&op)),
+					},
+				)
 			}
 		default:
 			// Return an error
