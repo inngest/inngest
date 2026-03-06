@@ -3,6 +3,7 @@ package apiv2
 import (
 	"context"
 	"crypto/rand"
+	"errors"
 	"net/http"
 	"strings"
 	"time"
@@ -12,6 +13,8 @@ import (
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/executor"
+	"github.com/inngest/inngest/pkg/execution/queue"
+	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/util"
@@ -147,6 +150,42 @@ func (s *Service) InvokeFunction(ctx context.Context, req *apiv2.InvokeFunctionR
 		}, nil
 	}
 
+	// Check for idempotency errors that ScheduleStatus didn't classify.
+	// This can happen when sentinel errors lose their identity crossing
+	// gRPC boundaries (e.g. the cloud state proxy).
+	if isIdempotencyError(err) {
+		_ = grpc.SetHeader(ctx, metadata.Pairs("x-http-code", "409"))
+		return &apiv2.InvokeFunctionResponse{
+			Data: &apiv2.InvokeFunctionData{
+				RunId: runID.String(),
+			},
+			Metadata: &apiv2.ResponseMetadata{
+				FetchedAt: timestamppb.Now(),
+			},
+		}, nil
+	}
+
 	logger.From(ctx).Error("error invoking function via api", "error", err)
 	return nil, s.base.NewError(http.StatusInternalServerError, apiv2base.ErrorInternalError, "There was an error invoking your function")
+}
+
+// isIdempotencyError checks whether the given error represents an idempotency
+// conflict. It first checks via errors.Is for the standard sentinel errors,
+// then falls back to string matching for cases where the sentinel identity is
+// lost crossing gRPC boundaries (e.g. the cloud state proxy).
+func isIdempotencyError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, queue.ErrQueueItemExists) ||
+		errors.Is(err, executor.ErrFunctionSkippedIdempotency) ||
+		errors.Is(err, state.ErrIdentifierExists) {
+		return true
+	}
+	// Fallback: check the error string for known idempotency error messages
+	// that may have been serialized across gRPC boundaries.
+	msg := err.Error()
+	return strings.Contains(msg, state.ErrIdentifierExists.Error()) ||
+		strings.Contains(msg, queue.ErrQueueItemExists.Error()) ||
+		strings.Contains(msg, executor.ErrFunctionSkippedIdempotency.Error())
 }
