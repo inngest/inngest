@@ -48,7 +48,7 @@ export type IntegrationPageContent = {
 };
 
 export function parseConnectionString(connectionString: string) {
-  const regex = /postgresq?l?:\/\/(\w+):([^@]+)@([^/]+)/;
+  const regex = /postgresq?l?:\/\/([\w.\-]+):([^@]+)@([^/]+)/;
   const match = connectionString.match(regex);
 
   if (match) {
@@ -68,5 +68,6 @@ export type Publication = {
   name: string;
   slug: string;
   projects: never[];
+  status?: string;
   enabled: boolean;
 };
