@@ -942,7 +942,7 @@ func TestQueueDequeueWithDisabledConstraintUpdates(t *testing.T) {
 	require.NoError(t, err)
 
 	// Lease item in new mode (skip checks)
-	leaseID, err := shard.Lease(ctx, item, 5*time.Second, clock.Now(), nil, osqueue.LeaseOptionDisableConstraintChecks(true))
+	leaseID, err := shard.Lease(ctx, item, 5*time.Second, clock.Now(), nil)
 	require.NoError(t, err)
 	require.NotNil(t, leaseID)
 
@@ -950,7 +950,7 @@ func TestQueueDequeueWithDisabledConstraintUpdates(t *testing.T) {
 	require.False(t, r.Exists(kg.Concurrency("p", fnID.String())))
 	require.False(t, r.Exists(kg.Concurrency("account", accountID.String())))
 
-	err = q.Dequeue(ctx, shard, item, osqueue.DequeueOptionDisableConstraintUpdates(true))
+	err = q.Dequeue(ctx, shard, item)
 	require.NoError(t, err)
 
 	require.False(t, r.Exists(kg.Concurrency("p", fnID.String())))

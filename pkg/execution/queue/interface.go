@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/jonboulle/clockwork"
 	"github.com/oklog/ulid/v2"
@@ -13,40 +14,16 @@ import (
 
 type DequeueOptionFn func(o *DequeueOptions)
 
-type DequeueOptions struct {
-	DisableConstraintUpdates bool
-}
+type DequeueOptions struct{}
 
-func DequeueOptionDisableConstraintUpdates(disableUpdates bool) DequeueOptionFn {
-	return func(o *DequeueOptions) {
-		o.DisableConstraintUpdates = disableUpdates
-	}
-}
-
-type RequeueOptions struct {
-	DisableConstraintUpdates bool
-}
-
-func RequeueOptionDisableConstraintUpdates(disableUpdates bool) RequeueOptionFn {
-	return func(o *RequeueOptions) {
-		o.DisableConstraintUpdates = disableUpdates
-	}
-}
+type RequeueOptions struct{}
 
 type RequeueOptionFn func(o *RequeueOptions)
 
 type LeaseOptions struct {
-	DisableConstraintChecks bool
-
 	Backlog         QueueBacklog
 	ShadowPartition QueueShadowPartition
 	Constraints     PartitionConstraintConfig
-}
-
-func LeaseOptionDisableConstraintChecks(disableChecks bool) LeaseOptionFn {
-	return func(o *LeaseOptions) {
-		o.DisableConstraintChecks = disableChecks
-	}
 }
 
 func LeaseBacklog(b QueueBacklog) LeaseOptionFn {
@@ -69,29 +46,13 @@ func LeaseConstraints(constraints PartitionConstraintConfig) LeaseOptionFn {
 
 type LeaseOptionFn func(o *LeaseOptions)
 
-type ExtendLeaseOptions struct {
-	DisableConstraintUpdates bool
-}
-
-func ExtendLeaseOptionDisableConstraintUpdates(disableUpdates bool) ExtendLeaseOptionFn {
-	return func(o *ExtendLeaseOptions) {
-		o.DisableConstraintUpdates = disableUpdates
-	}
-}
+type ExtendLeaseOptions struct{}
 
 type ExtendLeaseOptionFn func(o *ExtendLeaseOptions)
 
-type PartitionLeaseOptions struct {
-	DisableLeaseChecks bool
-}
+type PartitionLeaseOptions struct{}
 
 type PartitionLeaseOpt func(o *PartitionLeaseOptions)
-
-func PartitionLeaseOptionDisableLeaseChecks(disableLeaseChecks bool) PartitionLeaseOpt {
-	return func(o *PartitionLeaseOptions) {
-		o.DisableLeaseChecks = disableLeaseChecks
-	}
-}
 
 type ShardAssingmentManager interface {
 	SetPrimaryShard(ctx context.Context, queueShard QueueShard)
@@ -165,7 +126,7 @@ type QueueManager interface {
 		backlog *QueueBacklog,
 		refillUntil time.Time,
 		constraints PartitionConstraintConfig,
-	) (*BacklogRefillResult, bool, error)
+	) (*BacklogRefillResult, enums.QueueConstraint, error)
 }
 
 type QueueProcessor interface {
@@ -205,18 +166,17 @@ type ShardOperations interface {
 	EnqueueItem(ctx context.Context, i QueueItem, at time.Time, opts EnqueueOpts) (QueueItem, error)
 	Peek(ctx context.Context, partition *QueuePartition, until time.Time, limit int64) ([]*QueueItem, error)
 	PeekRandom(ctx context.Context, partition *QueuePartition, until time.Time, limit int64) ([]*QueueItem, error)
-	Lease(ctx context.Context, item QueueItem, leaseDuration time.Duration, now time.Time, denies *LeaseDenies, options ...LeaseOptionFn) (*ulid.ULID, error)
+	Lease(ctx context.Context, item QueueItem, leaseDuration time.Duration, now time.Time, options ...LeaseOptionFn) (*ulid.ULID, error)
 	ExtendLease(ctx context.Context, i QueueItem, leaseID ulid.ULID, duration time.Duration, opts ...ExtendLeaseOptionFn) (*ulid.ULID, error)
 	Requeue(ctx context.Context, i QueueItem, at time.Time, opts ...RequeueOptionFn) error
 	RequeueByJobID(ctx context.Context, jobID string, at time.Time) error
 	Dequeue(ctx context.Context, i QueueItem, opts ...DequeueOptionFn) error
 
 	PartitionPeek(ctx context.Context, sequential bool, until time.Time, limit int64) ([]*QueuePartition, error)
-	PartitionLease(ctx context.Context, p *QueuePartition, duration time.Duration, opts ...PartitionLeaseOpt) (*ulid.ULID, int, error)
+	PartitionLease(ctx context.Context, p *QueuePartition, duration time.Duration, opts ...PartitionLeaseOpt) (*ulid.ULID, error)
 	PartitionRequeue(ctx context.Context, p *QueuePartition, at time.Time, forceAt bool) error
 
 	Scavenge(ctx context.Context, limit int) (int, error)
-	ActiveCheck(ctx context.Context) (int, error)
 	Instrument(ctx context.Context) error
 
 	ItemsByPartition(ctx context.Context, partitionID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueItem], error)
@@ -273,7 +233,6 @@ type ShardOperations interface {
 		sp *QueueShadowPartition,
 		refillUntil time.Time,
 		refillItems []string,
-		latestConstraints PartitionConstraintConfig,
 		options ...BacklogRefillOptionFn,
 	) (*BacklogRefillResult, error)
 	BacklogRequeue(ctx context.Context, backlog *QueueBacklog, sp *QueueShadowPartition, requeueAt time.Time) error
@@ -305,24 +264,10 @@ type ShardOperations interface {
 }
 
 type BacklogRefillOptions struct {
-	ConstraintCheckIdempotencyKey string
-	DisableConstraintChecks       bool
-	CapacityLeases                []CapacityLease
+	CapacityLeases []CapacityLease
 }
 
 type BacklogRefillOptionFn func(o *BacklogRefillOptions)
-
-func WithBacklogRefillConstraintCheckIdempotencyKey(idempotencyKey string) BacklogRefillOptionFn {
-	return func(o *BacklogRefillOptions) {
-		o.ConstraintCheckIdempotencyKey = idempotencyKey
-	}
-}
-
-func WithBacklogRefillDisableConstraintChecks(disableConstraintChecks bool) BacklogRefillOptionFn {
-	return func(o *BacklogRefillOptions) {
-		o.DisableConstraintChecks = disableConstraintChecks
-	}
-}
 
 func WithBacklogRefillItemCapacityLeases(itemCapacityLeases []CapacityLease) BacklogRefillOptionFn {
 	return func(o *BacklogRefillOptions) {

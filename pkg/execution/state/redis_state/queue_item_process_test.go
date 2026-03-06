@@ -325,7 +325,7 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 		require.Len(t, cmLifecycles.AcquireCalls, 1)
 
 		// Lease the queue item (required when queue item lease ticker fires)
-		leaseID, err := shard.Lease(ctx, qi, osqueue.QueueLeaseDuration, clock.Now(), nil, osqueue.LeaseOptionDisableConstraintChecks(true))
+		leaseID, err := shard.Lease(ctx, qi, osqueue.QueueLeaseDuration, clock.Now(), nil)
 		require.NoError(t, err)
 		qi.LeaseID = leaseID
 
@@ -455,7 +455,6 @@ func TestQueueProcessorPreLeaseWithConstraintAPI(t *testing.T) {
 			Items:                []*osqueue.QueueItem{&qi},
 			PartitionContinueCtr: 0,
 			Queue:                q,
-			Denies:               osqueue.NewLeaseDenyList(),
 			StaticTime:           clock.Now(),
 			Parallel:             false,
 		}
@@ -506,7 +505,6 @@ func TestQueueProcessorPreLeaseWithConstraintAPI(t *testing.T) {
 			Items:                []*osqueue.QueueItem{&qi},
 			PartitionContinueCtr: 0,
 			Queue:                q,
-			Denies:               osqueue.NewLeaseDenyList(),
 			StaticTime:           clock.Now(),
 			Parallel:             false,
 		}
@@ -599,7 +597,6 @@ func TestQueueProcessorPreLeaseWithConstraintAPI(t *testing.T) {
 			Items:                []*osqueue.QueueItem{&qi},
 			PartitionContinueCtr: 0,
 			Queue:                q,
-			Denies:               osqueue.NewLeaseDenyList(),
 			StaticTime:           clock.Now(),
 			Parallel:             false,
 		}
@@ -719,7 +716,6 @@ func TestPartitionProcessRequeueAfterLimitedWithConstraintAPI(t *testing.T) {
 			Items:                items,
 			PartitionContinueCtr: 0,
 			Queue:                q,
-			Denies:               osqueue.NewLeaseDenyList(),
 			StaticTime:           clock.Now(),
 			Parallel:             false,
 		}
@@ -857,7 +853,6 @@ func TestPartitionProcessRequeueAfterLimitedWithConstraintAPI(t *testing.T) {
 			Items:                items,
 			PartitionContinueCtr: 0,
 			Queue:                q,
-			Denies:               osqueue.NewLeaseDenyList(),
 			StaticTime:           clock.Now(),
 			Parallel:             false,
 		}
