@@ -2184,7 +2184,11 @@ func newRunsQueryBuilder(ctx context.Context, opt cqrs.GetTraceRunOpt) *runsQuer
 }
 
 func (w wrapper) GetTraceRunsCount(ctx context.Context, opt cqrs.GetTraceRunOpt) (int, error) {
-	// explicitly set it to zero so it would not attempt to paginate
+	if w.isPostgres() && opt.Preview {
+		return w.getSpanRunsCountPostgres(ctx, opt)
+	}
+
+	// Fallback for SQLite or non-preview: fetch all and count.
 	opt.Items = 0
 	var (
 		res []*cqrs.TraceRun
@@ -2200,6 +2204,54 @@ func (w wrapper) GetTraceRunsCount(ctx context.Context, opt cqrs.GetTraceRunOpt)
 	}
 
 	return len(res), nil
+}
+
+// getSpanRunsCountPostgres returns the count of matching root spans using
+// SELECT COUNT(DISTINCT run_id) instead of fetching and deserializing every row.
+func (w wrapper) getSpanRunsCountPostgres(ctx context.Context, opt cqrs.GetTraceRunOpt) (int, error) {
+	l := logger.StdlibLogger(ctx)
+	adapter := w.spanRunsAdapter()
+
+	builder := newSpanRunsQueryBuilder(ctx, opt)
+
+	var celFilters []sq.Expression
+	if opt.Filter.CEL != "" {
+		expHandler, err := run.NewExpressionHandler(ctx,
+			run.WithExpressionHandlerBlob(opt.Filter.CEL, "\n"),
+			run.WithExpressionSQLConverter(adapter.celConverter),
+		)
+		if err != nil {
+			return 0, err
+		}
+		if expHandler.HasFilters() {
+			celFilters, err = expHandler.ToSQLFilters(ctx)
+			if err != nil {
+				return 0, err
+			}
+		}
+	}
+
+	allFilters := append(builder.filter, celFilters...)
+
+	q := sq.Dialect(adapter.dialect).From("spans").
+		Select(sq.L("COUNT(DISTINCT run_id)")).
+		Where(sq.C("name").Eq(meta.SpanNameRun)).
+		Where(allFilters...)
+
+	sqlQuery, args, err := q.ToSQL()
+	if err != nil {
+		return 0, err
+	}
+
+	l.Debug("getSpanRunsCountPostgres query", "sql", sqlQuery, "args", args)
+
+	var count int
+	err = w.db.QueryRowContext(ctx, sqlQuery, args...).Scan(&count)
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
 }
 
 func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*cqrs.TraceRun, error) {
@@ -2929,79 +2981,28 @@ func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*c
 		}
 	}
 
-	selectCols := []interface{}{
-		"spans.run_id",
-		"spans.dynamic_span_id",
-		"spans.account_id",
-		"spans.app_id",
-		"spans.function_id",
-		"spans.trace_id",
-		sq.L("MIN(spans.start_time)").As("start_time"),
-		sq.L("MAX(spans.end_time)").As("end_time"),
-		// subselect for argmax(status, end_time)
-		// not the most efficient but it'll do for now
-		sq.L(`(SELECT s2.status FROM spans s2
-			WHERE s2.run_id = spans.run_id AND s2.dynamic_span_id = spans.dynamic_span_id
-			ORDER BY s2.end_time DESC LIMIT 1)`).As("status"),
-		adapter.eventIdsExpr, // DB-specific due to storage differences
-	}
-
-	groupByCols := []interface{}{
-		"spans.run_id",
-		"spans.dynamic_span_id",
-		"spans.account_id",
-		"spans.app_id",
-		"spans.function_id",
-		"spans.trace_id",
-	}
-
-	// Build ORDER BY for aggregated columns
-	var orderExprs []sqexp.OrderedExpression
-	for _, o := range opt.Order {
-		var aggExpr sqexp.LiteralExpression
-		switch o.Field {
-		case enums.TraceRunTimeQueuedAt, enums.TraceRunTimeStartedAt:
-			aggExpr = sq.L("MIN(spans.start_time)")
-		case enums.TraceRunTimeEndedAt:
-			aggExpr = sq.L("MAX(spans.end_time)")
-		default:
-			aggExpr = sq.L("MIN(spans.start_time)")
-		}
-		if o.Direction == enums.TraceRunOrderAsc {
-			orderExprs = append(orderExprs, aggExpr.Asc())
-		} else {
-			orderExprs = append(orderExprs, aggExpr.Desc())
-		}
-	}
-	if len(orderExprs) == 0 {
-		orderExprs = append(orderExprs, sq.L("MIN(spans.start_time)").Desc())
-	}
-	// always add run_id at the end for stable sorting
-	orderExprs = append(orderExprs, sq.C("run_id").Asc())
-
-	q := sq.Dialect(adapter.dialect).From("spans")
-	if useJoin {
-		// database specific join syntax needed because event_ids is an array of ids to the events table,
-		// so we need to unpack that and perform the join before the spans are grouped back together by run_id
-		q = adapter.buildEventJoin(q)
-	}
-
 	allFilters := append(builder.filter, celFilters...)
-	q = q.Select(selectCols...).
-		Where(sq.L("spans.dynamic_span_id").In(
-			sq.Dialect(adapter.dialect).Select("dynamic_span_id").Distinct().From("spans").Where(sq.C("name").Eq(meta.SpanNameRun)),
-		)).
-		Where(allFilters...).
-		GroupBy(groupByCols...).
-		Order(orderExprs...)
 
-	if opt.Items > 0 {
-		q = q.Limit(opt.Items + 1) // fetch one more item than requested to determine hasNextPage
-	}
+	var sqlQuery string
+	var args []interface{}
 
-	sqlQuery, args, err := q.ToSQL()
-	if err != nil {
-		return nil, err
+	if w.isPostgres() {
+		// PostgreSQL: query root spans directly with LIMIT, then use correlated
+		// subqueries only on the small result set for end_time and status.
+		// This avoids the expensive GROUP BY over the full table.
+		var err error
+		sqlQuery, args, err = w.buildPostgresSpanRunsQuery(adapter, allFilters, useJoin, opt)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		// SQLite: keep the correlated subquery approach. Data volumes in SQLite
+		// deployments are small enough that this performs acceptably.
+		var err error
+		sqlQuery, args, err = w.buildSQLiteSpanRunsQuery(adapter, allFilters, useJoin, opt)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	l.Debug("GetSpanRuns query", "sql", sqlQuery, "args", args)
@@ -3014,6 +3015,165 @@ func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*c
 	defer rows.Close()
 
 	return w.convertSpanRunRows(ctx, rows, builder.cursorLayout, adapter, opt.Items)
+}
+
+// buildSQLiteSpanRunsQuery builds the span runs query for SQLite using the original
+// correlated subquery approach for status lookup.
+func (w wrapper) buildSQLiteSpanRunsQuery(
+	adapter spanRunsAdapter,
+	allFilters []sq.Expression,
+	useJoin bool,
+	opt cqrs.GetTraceRunOpt,
+) (string, []interface{}, error) {
+	selectCols := []interface{}{
+		"spans.run_id",
+		"spans.dynamic_span_id",
+		"spans.account_id",
+		"spans.app_id",
+		"spans.function_id",
+		"spans.trace_id",
+		sq.L("MIN(spans.start_time)").As("start_time"),
+		sq.L("MAX(spans.end_time)").As("end_time"),
+		sq.L(`(SELECT s2.status FROM spans s2
+			WHERE s2.run_id = spans.run_id AND s2.dynamic_span_id = spans.dynamic_span_id
+			ORDER BY s2.end_time DESC LIMIT 1)`).As("status"),
+		adapter.eventIdsExpr,
+	}
+
+	groupByCols := []interface{}{
+		"spans.run_id",
+		"spans.dynamic_span_id",
+		"spans.account_id",
+		"spans.app_id",
+		"spans.function_id",
+		"spans.trace_id",
+	}
+
+	orderExprs := buildSpanRunsOrderExprs(opt, "spans", true)
+
+	q := sq.Dialect(adapter.dialect).From("spans")
+	if useJoin {
+		q = adapter.buildEventJoin(q)
+	}
+
+	q = q.Select(selectCols...).
+		Where(sq.L("spans.dynamic_span_id").In(
+			sq.Dialect(adapter.dialect).Select("dynamic_span_id").Distinct().From("spans").Where(sq.C("name").Eq(meta.SpanNameRun)),
+		)).
+		Where(allFilters...).
+		GroupBy(groupByCols...).
+		Order(orderExprs...)
+
+	if opt.Items > 0 {
+		q = q.Limit(opt.Items + 1)
+	}
+
+	return q.ToSQL()
+}
+
+// buildPostgresSpanRunsQuery builds an optimized span runs query for PostgreSQL.
+//
+// Strategy: Query root spans (name='executor.run') directly with all filters,
+// order and limit early, then use correlated subqueries only for the small
+// result set (typically 40 rows).
+//
+// Performance relies on these indexes:
+//   - idx_spans_executor_run_start: partial index on (start_time DESC, run_id)
+//     WHERE name='executor.run' AND debug_run_id IS NULL AND status conditions
+//     → enables index scan for root span lookup with LIMIT pushdown
+//   - idx_spans_run_dynamic_endtime_status: on (run_id, dynamic_span_id, end_time DESC)
+//     INCLUDE (status) → enables index-only scan for status and end_time lookups
+//
+// Benchmark: 1.2M spans, 88K runs → 0.45ms (warm) vs 84s with original GROUP BY approach.
+func (w wrapper) buildPostgresSpanRunsQuery(
+	adapter spanRunsAdapter,
+	allFilters []sq.Expression,
+	useJoin bool,
+	opt cqrs.GetTraceRunOpt,
+) (string, []interface{}, error) {
+	selectCols := []interface{}{
+		"spans.run_id",
+		"spans.dynamic_span_id",
+		"spans.account_id",
+		"spans.app_id",
+		"spans.function_id",
+		"spans.trace_id",
+		"spans.start_time",
+		sq.L(`COALESCE(
+			(SELECT MAX(s.end_time) FROM spans s
+			 WHERE s.run_id = spans.run_id AND s.dynamic_span_id = spans.dynamic_span_id),
+			spans.end_time
+		)`).As("end_time"),
+		sq.L(`(SELECT s2.status FROM spans s2
+			WHERE s2.run_id = spans.run_id AND s2.dynamic_span_id = spans.dynamic_span_id
+			ORDER BY s2.end_time DESC LIMIT 1)`).As("status"),
+		// No GROUP BY in this query, so adapter.eventIdsExpr (which wraps with MAX()) is
+		// not appropriate. The ::text cast matches the Postgres adapter's cast for JSONB.
+		sq.L("spans.event_ids::text").As("event_ids"),
+	}
+
+	orderExprs := buildSpanRunsOrderExprs(opt, "spans", false)
+
+	q := sq.Dialect(adapter.dialect).From("spans")
+	if useJoin {
+		q = adapter.buildEventJoin(q)
+	}
+
+	q = q.Select(selectCols...).
+		Where(sq.C("name").Eq(meta.SpanNameRun)).
+		Where(allFilters...).
+		Order(orderExprs...)
+
+	if opt.Items > 0 {
+		q = q.Limit(opt.Items + 1)
+	}
+
+	return q.ToSQL()
+}
+
+// buildSpanRunsOrderExprs builds ORDER BY expressions for span runs queries.
+// The tablePrefix is used to qualify column references (e.g. "spans" or "a").
+// If aggregate is true, wraps time columns with MIN/MAX (for GROUP BY queries).
+func buildSpanRunsOrderExprs(opt cqrs.GetTraceRunOpt, tablePrefix string, aggregate bool) []sqexp.OrderedExpression {
+	var orderExprs []sqexp.OrderedExpression
+	for _, o := range opt.Order {
+		var aggExpr sqexp.LiteralExpression
+		switch o.Field {
+		case enums.TraceRunTimeQueuedAt, enums.TraceRunTimeStartedAt:
+			if aggregate {
+				aggExpr = sq.L("MIN(" + tablePrefix + ".start_time)")
+			} else {
+				aggExpr = sq.L(tablePrefix + ".start_time")
+			}
+		case enums.TraceRunTimeEndedAt:
+			if aggregate {
+				aggExpr = sq.L("MAX(" + tablePrefix + ".end_time)")
+			} else {
+				aggExpr = sq.L(tablePrefix + ".end_time")
+			}
+		default:
+			if aggregate {
+				aggExpr = sq.L("MIN(" + tablePrefix + ".start_time)")
+			} else {
+				aggExpr = sq.L(tablePrefix + ".start_time")
+			}
+		}
+		if o.Direction == enums.TraceRunOrderAsc {
+			orderExprs = append(orderExprs, aggExpr.Asc())
+		} else {
+			orderExprs = append(orderExprs, aggExpr.Desc())
+		}
+	}
+	if len(orderExprs) == 0 {
+		if aggregate {
+			orderExprs = append(orderExprs, sq.L("MIN("+tablePrefix+".start_time)").Desc())
+		} else {
+			orderExprs = append(orderExprs, sq.L(tablePrefix+".start_time").Desc())
+		}
+	}
+	// always add run_id at the end for stable sorting
+	orderExprs = append(orderExprs, sq.C("run_id").Asc())
+	return orderExprs
 }
 
 // convertSpanRunRows converts database rows to TraceRun structs
