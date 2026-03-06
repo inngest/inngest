@@ -3469,6 +3469,364 @@ func TestQueueEnqueueItemSingleton(t *testing.T) {
 		}))
 		require.False(t, locked)
 	})
+
+	t.Run("Singleton lock persists for the lifetime of a run", func(t *testing.T) {
+		// This test reproduces the real-world production flow for a singleton
+		// function with mode: "cancel". The sequence mirrors what happens when
+		// a function starts, executes steps, sleeps, and then a second run
+		// arrives with the same singleton key.
+		//
+		// In production, only the KindStart queue item carries the Singleton
+		// config. Subsequent items (KindEdge, KindSleep) do not. The singleton
+		// lock must persist across the entire run lifetime regardless.
+
+		key := "singleton-lifetime"
+		singletonKey := kg.SingletonKey(&osqueue.Singleton{Key: key})
+		runA := ulid.MustNew(ulid.Now(), rand.Reader)
+
+		// Step 1: Run A is scheduled. The KindStart item holds the singleton lock.
+		kindStart := osqueue.QueueItem{
+			Data: osqueue.Item{
+				Kind:       osqueue.KindStart,
+				Identifier: state.Identifier{RunID: runA},
+				Singleton:  &osqueue.Singleton{Key: key},
+			},
+		}
+		startItem, err := shard.EnqueueItem(ctx, kindStart, start, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+		require.True(t, r.Exists(singletonKey), "singleton key should exist after enqueuing KindStart")
+
+		// Step 2: The executor dequeues KindStart to begin execution. At this
+		// moment the run index is empty — no next step has been enqueued yet.
+		// The singleton lock must still be held.
+		err = shard.Dequeue(ctx, startItem)
+		require.NoError(t, err)
+		require.True(t, r.Exists(singletonKey),
+			"singleton key must persist after KindStart dequeue — the run is still active")
+
+		// Step 3: The executor discovers steps and enqueues a KindEdge for the
+		// first step. Note: KindEdge items do NOT carry Singleton config, which
+		// matches production behavior.
+		kindEdge := osqueue.QueueItem{
+			Data: osqueue.Item{
+				Kind:       osqueue.KindEdge,
+				Identifier: state.Identifier{RunID: runA},
+			},
+		}
+		edgeItem, err := shard.EnqueueItem(ctx, kindEdge, start, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+		require.True(t, r.Exists(singletonKey),
+			"singleton key must persist while KindEdge is queued")
+
+		// Step 4: The first step completes. The executor dequeues KindEdge and
+		// enqueues a KindSleep (e.g. step.sleep for a scheduled post).
+		err = shard.Dequeue(ctx, edgeItem)
+		require.NoError(t, err)
+		require.True(t, r.Exists(singletonKey),
+			"singleton key must persist after KindEdge dequeue — sleep hasn't been enqueued yet")
+
+		sleepUntil := start.Add(24 * time.Hour)
+		kindSleep := osqueue.QueueItem{
+			Data: osqueue.Item{
+				Kind:       osqueue.KindSleep,
+				Identifier: state.Identifier{RunID: runA},
+			},
+		}
+		_, err = shard.EnqueueItem(ctx, kindSleep, sleepUntil, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+		require.True(t, r.Exists(singletonKey),
+			"singleton key must persist while the run is sleeping")
+
+		// Step 5: Hours later, a second event with the same singleton key arrives.
+		// Run B should NOT be able to acquire the lock — Run A is still active.
+		runB := ulid.MustNew(ulid.Now(), rand.Reader)
+		kindStartB := osqueue.QueueItem{
+			Data: osqueue.Item{
+				Kind:       osqueue.KindStart,
+				Identifier: state.Identifier{RunID: runB},
+				Singleton:  &osqueue.Singleton{Key: key},
+			},
+		}
+		_, err = shard.EnqueueItem(ctx, kindStartB, start, osqueue.EnqueueOpts{})
+		require.ErrorIs(t, err, osqueue.ErrQueueItemSingletonExists,
+			"a second run must not acquire the singleton lock while the first run is still active")
+
+		// Step 6: Verify the lock still belongs to Run A.
+		lockHolder, err := r.Get(singletonKey)
+		require.NoError(t, err)
+		require.Equal(t, runA.String(), lockHolder,
+			"the singleton lock must still be held by Run A")
+	})
+
+	t.Run("Multiple parallel steps do not release lock when one is dequeued", func(t *testing.T) {
+		// A function run can have multiple KindEdge items in flight at the same
+		// time (parallel steps). Dequeuing one must not release the singleton lock.
+
+		key := "parallel-steps"
+		singletonKey := kg.SingletonKey(&osqueue.Singleton{Key: key})
+		runID := ulid.MustNew(ulid.Now(), rand.Reader)
+
+		// Enqueue start with singleton
+		kindStart := osqueue.QueueItem{
+			Data: osqueue.Item{
+				Kind:       osqueue.KindStart,
+				Identifier: state.Identifier{RunID: runID},
+				Singleton:  &osqueue.Singleton{Key: key},
+			},
+		}
+		startItem, err := shard.EnqueueItem(ctx, kindStart, start, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+
+		// Dequeue start (executor begins)
+		err = shard.Dequeue(ctx, startItem)
+		require.NoError(t, err)
+
+		// Enqueue three parallel KindEdge items
+		edges := make([]osqueue.QueueItem, 3)
+		for i := range edges {
+			qi := osqueue.QueueItem{
+				Data: osqueue.Item{
+					Kind:       osqueue.KindEdge,
+					Identifier: state.Identifier{RunID: runID},
+				},
+			}
+			edges[i], err = shard.EnqueueItem(ctx, qi, start, osqueue.EnqueueOpts{})
+			require.NoError(t, err)
+		}
+
+		require.True(t, r.Exists(singletonKey), "lock must exist with 3 edges queued")
+
+		// Dequeue first two edges — lock must persist
+		err = shard.Dequeue(ctx, edges[0])
+		require.NoError(t, err)
+		require.True(t, r.Exists(singletonKey),
+			"lock must persist after dequeuing 1 of 3 parallel edges")
+
+		err = shard.Dequeue(ctx, edges[1])
+		require.NoError(t, err)
+		require.True(t, r.Exists(singletonKey),
+			"lock must persist after dequeuing 2 of 3 parallel edges")
+
+		// Dequeue last edge — this is the true end of the run
+		err = shard.Dequeue(ctx, edges[2])
+		require.NoError(t, err)
+
+		// Lock should be released now because no more items remain
+		require.False(t, r.Exists(singletonKey),
+			"lock should be released after all items are dequeued")
+	})
+
+	t.Run("Cancel flow: Run B lock survives Run A dequeue after ReleaseSingleton", func(t *testing.T) {
+		// Simulates: Run A is active with multiple items. Cancellation releases
+		// the singleton lock (via ReleaseSingleton / Del). Run B acquires the
+		// lock. Then Run A's remaining items are dequeued — Run B's lock must
+		// survive.
+
+		key := "cancel-flow-multi"
+		singletonKey := kg.SingletonKey(&osqueue.Singleton{Key: key})
+		runA := ulid.MustNew(ulid.Now(), rand.Reader)
+
+		// Run A: enqueue start + edge
+		kindStartA := osqueue.QueueItem{
+			Data: osqueue.Item{
+				Kind:       osqueue.KindStart,
+				Identifier: state.Identifier{RunID: runA},
+				Singleton:  &osqueue.Singleton{Key: key},
+			},
+		}
+		startItemA, err := shard.EnqueueItem(ctx, kindStartA, start, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+
+		edgeA := osqueue.QueueItem{
+			Data: osqueue.Item{
+				Kind:       osqueue.KindEdge,
+				Identifier: state.Identifier{RunID: runA},
+			},
+		}
+		edgeItemA, err := shard.EnqueueItem(ctx, edgeA, start, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+
+		// Simulate cancellation: release Run A's singleton lock
+		deleted := r.Del(singletonKey)
+		require.True(t, deleted)
+
+		// Run B acquires the lock
+		runB := ulid.MustNew(ulid.Now(), rand.Reader)
+		kindStartB := osqueue.QueueItem{
+			Data: osqueue.Item{
+				Kind:       osqueue.KindStart,
+				Identifier: state.Identifier{RunID: runB},
+				Singleton:  &osqueue.Singleton{Key: key},
+			},
+		}
+		_, err = shard.EnqueueItem(ctx, kindStartB, start, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+
+		lockHolder, err := r.Get(singletonKey)
+		require.NoError(t, err)
+		require.Equal(t, runB.String(), lockHolder)
+
+		// Dequeue Run A's items — must NOT affect Run B's lock
+		err = shard.Dequeue(ctx, startItemA)
+		require.NoError(t, err)
+		require.True(t, r.Exists(singletonKey), "Run B lock must survive Run A start dequeue")
+
+		err = shard.Dequeue(ctx, edgeItemA)
+		require.NoError(t, err)
+		require.True(t, r.Exists(singletonKey), "Run B lock must survive Run A edge dequeue")
+
+		lockHolder, err = r.Get(singletonKey)
+		require.NoError(t, err)
+		require.Equal(t, runB.String(), lockHolder,
+			"lock must still belong to Run B after all Run A items are dequeued")
+	})
+
+	t.Run("KindEdgeError does not release singleton lock", func(t *testing.T) {
+		// When a step errors, a KindEdgeError item is enqueued for retry.
+		// Dequeuing it must not prematurely release the singleton lock.
+
+		key := "edge-error-lock"
+		singletonKey := kg.SingletonKey(&osqueue.Singleton{Key: key})
+		runID := ulid.MustNew(ulid.Now(), rand.Reader)
+
+		kindStart := osqueue.QueueItem{
+			Data: osqueue.Item{
+				Kind:       osqueue.KindStart,
+				Identifier: state.Identifier{RunID: runID},
+				Singleton:  &osqueue.Singleton{Key: key},
+			},
+		}
+		startItem, err := shard.EnqueueItem(ctx, kindStart, start, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+
+		err = shard.Dequeue(ctx, startItem)
+		require.NoError(t, err)
+		require.True(t, r.Exists(singletonKey), "lock must exist after start dequeue")
+
+		// Step fails — enqueue KindEdgeError for retry
+		edgeErr := osqueue.QueueItem{
+			Data: osqueue.Item{
+				Kind:       osqueue.KindEdgeError,
+				Identifier: state.Identifier{RunID: runID},
+			},
+		}
+		errItem, err := shard.EnqueueItem(ctx, edgeErr, start, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+
+		// Dequeue the error item (executor picks it up for retry)
+		err = shard.Dequeue(ctx, errItem)
+		require.NoError(t, err)
+		require.True(t, r.Exists(singletonKey),
+			"lock must persist after KindEdgeError dequeue — the run is retrying, not finished")
+
+		// Retry succeeds — enqueue and dequeue a final KindEdge
+		finalEdge := osqueue.QueueItem{
+			Data: osqueue.Item{
+				Kind:       osqueue.KindEdge,
+				Identifier: state.Identifier{RunID: runID},
+			},
+		}
+		finalItem, err := shard.EnqueueItem(ctx, finalEdge, start, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+
+		err = shard.Dequeue(ctx, finalItem)
+		require.NoError(t, err)
+
+		// Now the run is truly done
+		require.False(t, r.Exists(singletonKey),
+			"lock should be released after the run finishes with no remaining items")
+	})
+
+	t.Run("KindPause does not release singleton lock", func(t *testing.T) {
+		// KindPause items represent waitForEvent or similar pauses. The run is
+		// still active while paused — the singleton lock must persist.
+
+		key := "pause-lock"
+		singletonKey := kg.SingletonKey(&osqueue.Singleton{Key: key})
+		runID := ulid.MustNew(ulid.Now(), rand.Reader)
+
+		kindStart := osqueue.QueueItem{
+			Data: osqueue.Item{
+				Kind:       osqueue.KindStart,
+				Identifier: state.Identifier{RunID: runID},
+				Singleton:  &osqueue.Singleton{Key: key},
+			},
+		}
+		startItem, err := shard.EnqueueItem(ctx, kindStart, start, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+
+		err = shard.Dequeue(ctx, startItem)
+		require.NoError(t, err)
+		require.True(t, r.Exists(singletonKey))
+
+		// Enqueue a pause item (e.g. waitForEvent)
+		pauseItem := osqueue.QueueItem{
+			Data: osqueue.Item{
+				Kind:       osqueue.KindPause,
+				Identifier: state.Identifier{RunID: runID},
+			},
+		}
+		pauseQueued, err := shard.EnqueueItem(ctx, pauseItem, start.Add(1*time.Hour), osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+
+		require.True(t, r.Exists(singletonKey), "lock must persist while pause is queued")
+
+		// Dequeue the pause — run resumes
+		err = shard.Dequeue(ctx, pauseQueued)
+		require.NoError(t, err)
+
+		// At this point the run has no items in queue, which is the gap between
+		// pause completion and the next step being enqueued. The lock must persist.
+		require.True(t, r.Exists(singletonKey),
+			"lock must persist after KindPause dequeue — the run is still active")
+	})
+
+	t.Run("Rapid enqueue-dequeue cycles do not corrupt lock ownership", func(t *testing.T) {
+		// Simulates a function that goes through many rapid step cycles:
+		// enqueue edge -> dequeue edge -> enqueue next edge -> dequeue -> ...
+		// Each cycle has a moment where the item count hits 0. The lock must
+		// persist throughout and remain owned by the original run.
+
+		key := "rapid-cycles"
+		singletonKey := kg.SingletonKey(&osqueue.Singleton{Key: key})
+		runID := ulid.MustNew(ulid.Now(), rand.Reader)
+
+		kindStart := osqueue.QueueItem{
+			Data: osqueue.Item{
+				Kind:       osqueue.KindStart,
+				Identifier: state.Identifier{RunID: runID},
+				Singleton:  &osqueue.Singleton{Key: key},
+			},
+		}
+		startItem, err := shard.EnqueueItem(ctx, kindStart, start, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+
+		err = shard.Dequeue(ctx, startItem)
+		require.NoError(t, err)
+
+		// 5 rapid cycles of enqueue -> dequeue
+		for i := 0; i < 5; i++ {
+			edge := osqueue.QueueItem{
+				Data: osqueue.Item{
+					Kind:       osqueue.KindEdge,
+					Identifier: state.Identifier{RunID: runID},
+				},
+			}
+			edgeItem, err := shard.EnqueueItem(ctx, edge, start, osqueue.EnqueueOpts{})
+			require.NoError(t, err)
+
+			err = shard.Dequeue(ctx, edgeItem)
+			require.NoError(t, err)
+
+			require.True(t, r.Exists(singletonKey),
+				"lock must persist after cycle %d — the run is not finished", i+1)
+
+			lockHolder, err := r.Get(singletonKey)
+			require.NoError(t, err)
+			require.Equal(t, runID.String(), lockHolder,
+				"lock owner must remain the same run after cycle %d", i+1)
+		}
+	})
 }
 
 func TestQueueActiveCounters(t *testing.T) {
