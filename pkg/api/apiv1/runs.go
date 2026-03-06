@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state/v2"
@@ -32,7 +33,12 @@ func (a router) GetFunctionRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fr, err := a.opts.TraceReader.GetRun(ctx, runID, auth.AccountID(), auth.WorkspaceID())
+	fr, err := a.opts.TraceReader.GetRun(
+		cqrs.WithGetRunOpt(ctx, cqrs.GetRunOpt{IncludeOutput: true}),
+		runID,
+		auth.AccountID(),
+		auth.WorkspaceID(),
+	)
 	if err != nil {
 		_ = publicerr.WriteHTTP(w, publicerr.Wrapf(err, 500, "Unable to load function run: %s", chi.URLParam(r, "runID")))
 		return
