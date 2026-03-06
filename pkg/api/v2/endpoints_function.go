@@ -28,6 +28,11 @@ func (s *Service) InvokeFunction(ctx context.Context, req *apiv2.InvokeFunctionR
 		return nil, err
 	}
 
+	if result := s.rateLimiter.CheckRateLimit(ctx, apiv2.V2_InvokeFunction_FullMethodName); result.Limited {
+		return nil, s.base.NewError(http.StatusTooManyRequests, apiv2base.ErrorRateLimited,
+			"API rate limit exceeded. The request was rejected and no function was invoked.")
+	}
+
 	if s.functions == nil || s.executor == nil || s.eventPublisher == nil {
 		return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Invoke is not yet implemented")
 	}
