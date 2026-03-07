@@ -737,6 +737,12 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 			return &ErrDraining
 		}
 
+		// Immediately delete from in-memory map to prevent routing any more
+		// messages to this connection. If we don't do this, we may still send
+		// messages to the draining worker (since `Forward()` uses the in-memory
+		// map)
+		c.svc.wsConnections.Delete(c.conn.ConnectionId.String())
+
 		err := c.updateConnStatus(connectpb.ConnectionStatus_DRAINING)
 		if err != nil {
 			// TODO Should we actually close the connection here?
