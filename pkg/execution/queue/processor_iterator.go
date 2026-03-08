@@ -27,11 +27,6 @@ type ProcessorIterator struct {
 	// Queue is the Queue that owns this processor.
 	Queue QueueProcessor
 
-	// Denies records a denylist as keys hit concurrency and throttling limits.
-	// this lets us prevent lease attempts for consecutive keys, as soon as the first
-	// key is denied.
-	Denies *LeaseDenies
-
 	// error returned when processing
 	Err error
 
@@ -197,15 +192,6 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 		return ErrProcessStopIterator
 	}
 
-	constraintCheckSource := "lease"
-	if constraintRes.SkipConstraintChecks || constraintRes.LimitingConstraint != enums.QueueConstraintNotLimited {
-		constraintCheckSource = "constraint-api"
-	}
-
-	if constraintRes.SkipConstraintChecks {
-		leaseOptions = append(leaseOptions, LeaseOptionDisableConstraintChecks(true))
-	}
-
 	// If we're limited by constraints, release semaphore early since we won't be leasing or processing
 	if constraintRes.LimitingConstraint != enums.QueueConstraintNotLimited {
 		release()
@@ -230,7 +216,6 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 				*item,
 				QueueLeaseDuration,
 				p.StaticTime,
-				p.Denies,
 				leaseOptions...,
 			)
 		})
@@ -315,15 +300,11 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 	switch cause {
 	case ErrQueueItemThrottled:
 		p.IsCustomKeyLimitOnly.Store(false)
-		// Here we denylist each throttled key that's been limited here, then ignore
-		// any other jobs from being leased as we continue to iterate through the loop.
-		// This maintains FIFO ordering amongst all custom concurrency keys.
-		p.Denies.AddThrottled(err)
 
 		p.CtrRateLimit.Add(1)
 		metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{
 			PkgName: pkgName,
-			Tags:    map[string]any{"status": "throttled", "queue_shard": p.Queue.Shard().Name(), "constraint_source": constraintCheckSource},
+			Tags:    map[string]any{"status": "throttled", "queue_shard": p.Queue.Shard().Name(), "constraint_source": "constraintapi"},
 		})
 
 		if p.Queue.Options().ItemEnableKeyQueues(ctx, *item) {
@@ -382,7 +363,7 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 
 		metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{
 			PkgName: pkgName,
-			Tags:    map[string]any{"status": status, "queue_shard": p.Queue.Shard().Name(), "constraint_source": constraintCheckSource},
+			Tags:    map[string]any{"status": status, "queue_shard": p.Queue.Shard().Name(), "constraint_source": "constraintapi"},
 		})
 
 		if p.Queue.Options().ItemEnableKeyQueues(ctx, *item) {
@@ -408,14 +389,6 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 	case ErrConcurrencyLimitCustomKey:
 		p.CtrConcurrency.Add(1)
 
-		// Custom concurrency keys are different.  Each job may have a different key,
-		// so we cannot break the loop in case the next job has a different key and
-		// has capacity.
-		//
-		// Here we denylist each concurrency key that's been limited here, then ignore
-		// any other jobs from being leased as we continue to iterate through the loop.
-		p.Denies.AddConcurrency(err)
-
 		// For backwards compatibility, we report on the function level as well
 		if p.Partition.FunctionID != nil {
 			p.Queue.Options().lifecycles.OnFnConcurrencyLimitReached(context.WithoutCancel(ctx), *p.Partition.FunctionID)
@@ -426,7 +399,7 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 
 		metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{
 			PkgName: pkgName,
-			Tags:    map[string]any{"status": "custom_key_concurrency_limit", "queue_shard": p.Queue.Shard().Name(), "constraint_source": constraintCheckSource},
+			Tags:    map[string]any{"status": "custom_key_concurrency_limit", "queue_shard": p.Queue.Shard().Name(), "constraint_source": "constraintapi"},
 		})
 
 		if p.Queue.Options().ItemEnableKeyQueues(ctx, *item) {
@@ -453,7 +426,7 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 		p.CtrSuccess.Add(1) // count as a success for stats purposes.
 		metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{
 			PkgName: pkgName,
-			Tags:    map[string]any{"status": "success", "queue_shard": p.Queue.Shard().Name(), "constraint_source": constraintCheckSource},
+			Tags:    map[string]any{"status": "success", "queue_shard": p.Queue.Shard().Name(), "constraint_source": "constraintapi"},
 		})
 		return nil
 	case ErrQueueItemAlreadyLeased:
@@ -461,7 +434,7 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 		p.CtrSuccess.Add(1) // count as a success for stats purposes.
 		metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{
 			PkgName: pkgName,
-			Tags:    map[string]any{"status": "success", "queue_shard": p.Queue.Shard().Name(), "constraint_source": constraintCheckSource},
+			Tags:    map[string]any{"status": "success", "queue_shard": p.Queue.Shard().Name(), "constraint_source": "constraintapi"},
 		})
 		return nil
 	}
@@ -471,7 +444,7 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 		p.Err = fmt.Errorf("error leasing in process: %w", err)
 		metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{
 			PkgName: pkgName,
-			Tags:    map[string]any{"status": "error", "queue_shard": p.Queue.Shard().Name(), "constraint_source": constraintCheckSource},
+			Tags:    map[string]any{"status": "error", "queue_shard": p.Queue.Shard().Name(), "constraint_source": "constraintapi"},
 		})
 		return p.Err
 	}
@@ -485,7 +458,7 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 	p.CtrSuccess.Add(1)
 	metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{
 		PkgName: pkgName,
-		Tags:    map[string]any{"status": "success", "queue_shard": p.Queue.Shard().Name(), "constraint_source": constraintCheckSource},
+		Tags:    map[string]any{"status": "success", "queue_shard": p.Queue.Shard().Name(), "constraint_source": "constraintapi"},
 	})
 	p.Queue.Workers() <- ProcessItem{
 		P:    *p.Partition,

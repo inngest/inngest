@@ -7,7 +7,6 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 )
@@ -27,16 +26,7 @@ func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition
 	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.processPartition", p.AccountID, p.Identifier().EnvID)
 	defer span.End()
 
-	// When Constraint API is enabled, disable capacity checks on PartitionLease.
-	// This is necessary as capacity was already granted to individual items, and
-	// constraints like concurrency were consumed.
-	var disableLeaseChecks bool
-	if p.AccountID != uuid.Nil && p.EnvID != nil && p.FunctionID != nil && q.CapacityManager != nil && q.UseConstraintAPI != nil {
-		enableConstraintAPI := q.UseConstraintAPI(ctx, p.AccountID)
-		disableLeaseChecks = enableConstraintAPI
-	}
-
-	// Attempt to lease items.  This checks partition-level concurrency limits
+	// Attempt to lease items
 	//
 	// For optimization, because this is the only thread that can be leasing
 	// jobs for this partition, we store the partition limit and current count
@@ -48,41 +38,11 @@ func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition
 	// items are dynamic generators).  This means that we have to delay
 	// processing the partition by N seconds, meaning the latency is increased by
 	// up to this period for scheduled items behind the concurrency limits.
-	_, err := Duration(ctx, q.primaryQueueShard.Name(), "partition_lease", q.Clock().Now(), func(ctx context.Context) (int, error) {
-		l, capacity, err := q.primaryQueueShard.PartitionLease(ctx, p, PartitionLeaseDuration, PartitionLeaseOptionDisableLeaseChecks(disableLeaseChecks))
+	_, err := Duration(ctx, q.primaryQueueShard.Name(), "partition_lease", q.Clock().Now(), func(ctx context.Context) (any, error) {
+		l, err := q.primaryQueueShard.PartitionLease(ctx, p, PartitionLeaseDuration)
 		p.LeaseID = l
-		return capacity, err
+		return nil, err
 	})
-	if errors.Is(err, ErrPartitionConcurrencyLimit) {
-		if p.FunctionID != nil {
-			q.lifecycles.OnFnConcurrencyLimitReached(context.WithoutCancel(ctx), *p.FunctionID)
-		}
-		metrics.IncrQueuePartitionConcurrencyLimitCounter(ctx,
-			metrics.CounterOpt{
-				PkgName: pkgName,
-				Tags:    map[string]any{"kind": "function", "queue_shard": q.primaryQueueShard.Name()},
-			},
-		)
-		return q.primaryQueueShard.PartitionRequeue(ctx, p, q.Clock().Now().Truncate(time.Second).Add(PartitionConcurrencyLimitRequeueExtension), true)
-	}
-	if errors.Is(err, ErrAccountConcurrencyLimit) {
-		// For backwards compatibility, we report on the function level as well
-		if p.FunctionID != nil {
-			q.lifecycles.OnFnConcurrencyLimitReached(context.WithoutCancel(ctx), *p.FunctionID)
-		}
-		q.lifecycles.OnAccountConcurrencyLimitReached(
-			context.WithoutCancel(ctx),
-			p.AccountID,
-			p.EnvID,
-		)
-		metrics.IncrQueuePartitionConcurrencyLimitCounter(ctx,
-			metrics.CounterOpt{
-				PkgName: pkgName,
-				Tags:    map[string]any{"kind": "account", "queue_shard": q.primaryQueueShard.Name()},
-			},
-		)
-		return q.primaryQueueShard.PartitionRequeue(ctx, p, q.Clock().Now().Truncate(time.Second).Add(PartitionConcurrencyLimitRequeueExtension), true)
-	}
 	if errors.Is(err, ErrPartitionAlreadyLeased) {
 		metrics.IncrQueuePartitionLeaseContentionCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name()}})
 		// If this is a continuation, remove it from the continuation counter.
@@ -266,7 +226,6 @@ func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition
 		Items:                queue,
 		PartitionContinueCtr: continuationCount,
 		Queue:                q,
-		Denies:               NewLeaseDenyList(),
 		StaticTime:           q.Clock().Now(),
 		Parallel:             parallel,
 	}

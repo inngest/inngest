@@ -256,7 +256,7 @@ func TestQueueExtendLeaseWithDisabledConstraintUpdates(t *testing.T) {
 	require.NoError(t, err)
 
 	// Lease item in new mode (skip checks)
-	leaseID, err := shard.Lease(ctx, item, 5*time.Second, clock.Now(), nil, osqueue.LeaseOptionDisableConstraintChecks(true))
+	leaseID, err := shard.Lease(ctx, item, 5*time.Second, clock.Now(), nil)
 	require.NoError(t, err)
 	require.NotNil(t, leaseID)
 
@@ -264,7 +264,7 @@ func TestQueueExtendLeaseWithDisabledConstraintUpdates(t *testing.T) {
 	require.False(t, r.Exists(kg.Concurrency("p", fnID.String())))
 	require.False(t, r.Exists(kg.Concurrency("account", accountID.String())))
 
-	newLeaseID, err := shard.ExtendLease(ctx, item, *leaseID, 10*time.Second, osqueue.ExtendLeaseOptionDisableConstraintUpdates(true))
+	newLeaseID, err := shard.ExtendLease(ctx, item, *leaseID, 10*time.Second)
 	require.NoError(t, err)
 	require.NotNil(t, newLeaseID)
 	require.NotEqual(t, *leaseID, *newLeaseID)
