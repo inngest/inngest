@@ -45,11 +45,11 @@ type RateLimitConstraint struct {
 func (r *RateLimitConstraint) StateKey(accountID uuid.UUID, envID uuid.UUID, fnID uuid.UUID) string {
 	switch r.Scope {
 	case enums.RateLimitScopeAccount:
-		return fmt.Sprintf("{cs}:%s:rl:a:%s", accountScope(accountID), r.EvaluatedKeyHash)
+		return fmt.Sprintf("{cs}:%s:rl:a:%s:%s", accountScope(accountID), r.KeyExpressionHash, r.EvaluatedKeyHash)
 	case enums.RateLimitScopeEnv:
-		return fmt.Sprintf("{cs}:%s:rl:e:%s:%s", accountScope(accountID), envID, r.EvaluatedKeyHash)
+		return fmt.Sprintf("{cs}:%s:rl:e:%s:%s:%s", accountScope(accountID), envID, r.KeyExpressionHash, r.EvaluatedKeyHash)
 	case enums.RateLimitScopeFn:
-		return fmt.Sprintf("{cs}:%s:rl:f:%s:%s", accountScope(accountID), fnID, r.EvaluatedKeyHash)
+		return fmt.Sprintf("{cs}:%s:rl:f:%s:%s:%s", accountScope(accountID), fnID, r.KeyExpressionHash, r.EvaluatedKeyHash)
 	default:
 		return ""
 	}
@@ -158,11 +158,11 @@ type ThrottleConstraint struct {
 func (t *ThrottleConstraint) StateKey(accountID uuid.UUID, envID uuid.UUID, fnID uuid.UUID) string {
 	switch t.Scope {
 	case enums.ThrottleScopeAccount:
-		return fmt.Sprintf("{cs}:%s:throttle:a:%s", accountScope(accountID), t.EvaluatedKeyHash)
+		return fmt.Sprintf("{cs}:%s:throttle:a:%s:%s", accountScope(accountID), t.KeyExpressionHash, t.EvaluatedKeyHash)
 	case enums.ThrottleScopeEnv:
-		return fmt.Sprintf("{cs}:%s:throttle:e:%s:%s", accountScope(accountID), envID, t.EvaluatedKeyHash)
+		return fmt.Sprintf("{cs}:%s:throttle:e:%s:%s:%s", accountScope(accountID), envID, t.KeyExpressionHash, t.EvaluatedKeyHash)
 	case enums.ThrottleScopeFn:
-		return fmt.Sprintf("{cs}:%s:throttle:f:%s:%s", accountScope(accountID), fnID, t.EvaluatedKeyHash)
+		return fmt.Sprintf("{cs}:%s:throttle:f:%s:%s:%s", accountScope(accountID), fnID, t.KeyExpressionHash, t.EvaluatedKeyHash)
 	default:
 		return ""
 	}
