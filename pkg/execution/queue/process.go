@@ -147,7 +147,7 @@ func (q *queueProcessor) ProcessItem(
 					if currentCapacityLease == nil {
 						l.Error("cannot extend capacity lease since capacity lease ID is nil", "qi", qi, "partition", p)
 						// Don't extend lease since one doesn't exist
-						errCh <- fmt.Errorf("cannot extend capacity lease since lease ID is nil")
+						errCh <- AlwaysRetryError(fmt.Errorf("cannot extend capacity lease since lease ID is nil"))
 						return
 					}
 
@@ -180,14 +180,14 @@ func (q *queueProcessor) ProcessItem(
 						)
 
 						// always stop processing the queue item if lease cannot be extended
-						errCh <- fmt.Errorf("error extending lease while processing: %w", err)
+						errCh <- AlwaysRetryError(fmt.Errorf("error extending capacity lease while processing: %w", err))
 						return
 					}
 
 					if res.LeaseID == nil {
 						// Lease could not be extended
 						l.Error("failed to extend capacity lease, no new lease ID received", "qi", qi, "partition", p)
-						errCh <- fmt.Errorf("failed to extend capacity lease, no new lease ID received")
+						errCh <- AlwaysRetryError(fmt.Errorf("failed to extend capacity lease, no new lease ID received"))
 						return
 					}
 
@@ -208,6 +208,44 @@ func (q *queueProcessor) ProcessItem(
 				}
 			}
 		}()
+
+		// When capacity is leased, release it after the job function has completed.
+		// This is optional and best-effort to free up concurrency capacity as quickly as possible
+		// for the next worker to lease a queue item.
+		defer service.Go(func() {
+			currentLeaseID := capacityLeaseID.get()
+			if currentLeaseID == nil {
+				return
+			}
+
+			res, err := q.CapacityManager.Release(context.Background(), &constraintapi.CapacityReleaseRequest{
+				AccountID:      p.AccountID,
+				IdempotencyKey: qi.ID,
+				LeaseID:        *currentLeaseID,
+				Source: constraintapi.LeaseSource{
+					Location:          constraintapi.CallerLocationItemLease,
+					Service:           constraintapi.ServiceExecutor,
+					RunProcessingMode: constraintapi.RunProcessingModeBackground,
+				},
+				LeaseIssuedAt: capacityLeaseID.issuedAt(),
+			})
+			if err != nil {
+				l.ReportError(err, "failed to release capacity", logger.WithErrorReportTags(map[string]string{
+					"account_id":  p.AccountID.String(),
+					"lease_id":    currentLeaseID.String(),
+					"function_id": p.FunctionID.String(),
+				}))
+				return
+			}
+
+			if instrumentCapacityLease {
+				l.Debug(
+					"released capacity lease",
+					"res", res,
+					"lease_id", currentLeaseID.String(),
+				)
+			}
+		})
 	}
 
 	startedAt := q.Clock().Now()
@@ -308,44 +346,6 @@ func (q *queueProcessor) ProcessItem(
 				extendCapacityLeaseTick.Stop()
 			}
 
-			// When capacity is leased, release it after the job function has completed.
-			// This is optional and best-effort to free up concurrency capacity as quickly as possible
-			// for the next worker to lease a queue item.
-			if currentLeaseID := capacityLeaseID.get(); currentLeaseID != nil {
-				if instrumentCapacityLease {
-					l.Debug("stopping lease extension", "lease_id", currentLeaseID.String())
-				}
-
-				service.Go(func() {
-					res, err := q.CapacityManager.Release(context.Background(), &constraintapi.CapacityReleaseRequest{
-						AccountID:      p.AccountID,
-						IdempotencyKey: qi.ID,
-						LeaseID:        *currentLeaseID,
-						Source: constraintapi.LeaseSource{
-							Location:          constraintapi.CallerLocationItemLease,
-							Service:           constraintapi.ServiceExecutor,
-							RunProcessingMode: constraintapi.RunProcessingModeBackground,
-						},
-						LeaseIssuedAt: capacityLeaseID.issuedAt(),
-					})
-					if err != nil {
-						l.ReportError(err, "failed to release capacity", logger.WithErrorReportTags(map[string]string{
-							"account_id":  p.AccountID.String(),
-							"lease_id":    currentLeaseID.String(),
-							"function_id": p.FunctionID.String(),
-						}))
-						return
-					}
-
-					if instrumentCapacityLease {
-						l.Debug(
-							"released capacity lease",
-							"res", res,
-							"lease_id", currentLeaseID.String(),
-						)
-					}
-				})
-			}
 		}
 
 		if res.ScheduledImmediateJob {
