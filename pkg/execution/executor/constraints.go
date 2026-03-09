@@ -189,7 +189,7 @@ func WithConstraints[T any](
 			// is generated. This means idempotency can be used for graceful retries.
 			operationIempotencyKey := lID.String()
 
-			res, err := capacityManager.ExtendLease(ctx, &constraintapi.CapacityExtendLeaseRequest{
+			res, err := capacityManager.ExtendLease(context.Background(), &constraintapi.CapacityExtendLeaseRequest{
 				IdempotencyKey: operationIempotencyKey,
 				AccountID:      req.AccountID,
 				LeaseID:        lID,
