@@ -281,14 +281,14 @@ func getScheduleConstraints(ctx context.Context, req execution.ScheduleRequest) 
 
 		var rateLimitKeyExpr string
 		if req.Function.RateLimit.Key != nil {
-			rateLimitKeyExpr = *req.Function.RateLimit.Key
+			rateLimitKeyExpr = util.XXHash(*req.Function.RateLimit.Key)
 		}
 
 		requests = append(requests, constraintapi.ConstraintItem{
 			Kind: constraintapi.ConstraintKindRateLimit,
 			RateLimit: &constraintapi.RateLimitConstraint{
 				Scope:             enums.RateLimitScopeFn,
-				KeyExpressionHash: util.XXHash(rateLimitKeyExpr),
+				KeyExpressionHash: rateLimitKeyExpr,
 				EvaluatedKeyHash:  rateLimitKey,
 			},
 		})
