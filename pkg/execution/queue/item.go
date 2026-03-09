@@ -689,7 +689,7 @@ func ConvertToConstraintConfiguration(accountConcurrency int, fn inngest.Functio
 	if fn.RateLimit != nil {
 		var rateLimitKey string
 		if fn.RateLimit.Key != nil {
-			rateLimitKey = *fn.RateLimit.Key
+			rateLimitKey = util.XXHash(*fn.RateLimit.Key)
 		}
 
 		dur, err := str2duration.ParseDuration(fn.RateLimit.Period)
@@ -701,7 +701,7 @@ func ConvertToConstraintConfiguration(accountConcurrency int, fn inngest.Functio
 			Scope:             enums.RateLimitScopeFn,
 			Limit:             int(fn.RateLimit.Limit),
 			Period:            int(dur.Seconds()),
-			KeyExpressionHash: util.XXHash(rateLimitKey),
+			KeyExpressionHash: rateLimitKey,
 		})
 	}
 
