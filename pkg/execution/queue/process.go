@@ -127,7 +127,6 @@ func (q *queueProcessor) ProcessItem(
 	// We will not expect a lease when
 	// - the item is enqueued to a system queue
 	// - the Constraint API is disabled or the current account is not enrolled
-	// - the Constraint API provided a lease which expired at the time of leasing the queue item
 	if capacityLeaseID.has() {
 		extendCapacityLeaseTick = q.Clock().NewTicker(q.CapacityLeaseExtendInterval)
 		defer extendCapacityLeaseTick.Stop()
