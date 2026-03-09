@@ -129,7 +129,7 @@ for index, value in ipairs(constraints) do
 		-- semaphore
 		debug("evaluating semaphore")
 		local currentCount = tonumber(call("GET", value.sem.k)) or 0
-		local remaining = value.sem.cap - currentCount
+		local remaining = math.max(0, value.sem.cap - currentCount)
 		constraintCapacity = math.floor(remaining / value.sem.amt)
 		constraintRetryAfter = toInteger(nowMS + (value.sem.ra or 2000))
 

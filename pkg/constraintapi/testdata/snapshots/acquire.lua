@@ -222,7 +222,7 @@ for index, value in ipairs(constraints) do
 		constraintRetryAt = toInteger(throttleRes["retry_at"]) 
 	elseif value.k == 4 then
 		local currentCount = tonumber(call("GET", value.sem.k)) or 0
-		local remaining = value.sem.cap - currentCount
+		local remaining = math.max(0, value.sem.cap - currentCount)
 		constraintCapacity = math.floor(remaining / value.sem.amt)
 		constraintRetryAt = toInteger(nowMS + (value.sem.ra or 2000))
 	end
@@ -286,7 +286,7 @@ for i, value in ipairs(constraints) do
 		local increment = granted * value.sem.amt
 		local newCount = call("INCRBY", value.sem.k, increment)
 		call("EXPIRE", value.sem.k, 604800)
-		local remaining = value.sem.cap - newCount
+		local remaining = math.max(0, value.sem.cap - newCount)
 		constraintCapacity = math.floor(remaining / value.sem.amt)
 		constraintRetryAt = toInteger(nowMS + (value.sem.ra or 2000))
 	end

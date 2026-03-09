@@ -181,7 +181,7 @@ for index, value in ipairs(constraints) do
 	elseif value.k == 4 then
 		-- semaphore
 		local currentCount = tonumber(call("GET", value.sem.k)) or 0
-		local remaining = value.sem.cap - currentCount
+		local remaining = math.max(0, value.sem.cap - currentCount)
 		-- Capacity in terms of leases (each lease consumes 'amount' units)
 		constraintCapacity = math.floor(remaining / value.sem.amt)
 		constraintRetryAt = toInteger(nowMS + (value.sem.ra or 2000))
@@ -287,7 +287,7 @@ for i, value in ipairs(constraints) do
 		-- Set 7-day TTL on semaphore key
 		call("EXPIRE", value.sem.k, 604800)
 		-- Recalculate remaining capacity after increment
-		local remaining = value.sem.cap - newCount
+		local remaining = math.max(0, value.sem.cap - newCount)
 		constraintCapacity = math.floor(remaining / value.sem.amt)
 		constraintRetryAt = toInteger(nowMS + (value.sem.ra or 2000))
 	end

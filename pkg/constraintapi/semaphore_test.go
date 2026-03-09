@@ -1025,3 +1025,84 @@ func TestSemaphore_RedisCounterValue(t *testing.T) {
 
 	require.False(t, te.Redis.Exists(semKey), "Key should be deleted when counter reaches 0")
 }
+
+// TestSemaphore_CapacityReduction verifies that when the semaphore capacity is reduced
+// between acquires, the second acquire correctly refuses to grant a lease even though
+// the counter is below the new capacity. This guards against negative remaining values
+// when cap - currentCount < 0.
+func TestSemaphore_CapacityReduction(t *testing.T) {
+	te := NewTestEnvironment(t)
+	defer te.Cleanup()
+
+	clock := clockwork.NewFakeClock()
+	te.CapacityManager.clock = clock
+
+	// First acquire: capacity=20, amount=1, acquire 10 leases
+	config1 := semaphoreConfig("test-sem", enums.SemaphoreScopeFn, 20)
+	constraints1 := []ConstraintItem{
+		semaphoreConstraint("test-sem", enums.SemaphoreScopeFn, 1),
+	}
+
+	leaseKeys := make([]string, 10)
+	for i := range leaseKeys {
+		leaseKeys[i] = fmt.Sprintf("lease-%d", i+1)
+	}
+
+	resp1, err := te.CapacityManager.Acquire(context.Background(), &CapacityAcquireRequest{
+		IdempotencyKey:       "sem-cap-reduce-1",
+		AccountID:            te.AccountID,
+		EnvID:                te.EnvID,
+		FunctionID:           te.FunctionID,
+		Amount:               10,
+		LeaseIdempotencyKeys: leaseKeys,
+		CurrentTime:          clock.Now(),
+		Duration:             30 * time.Second,
+		MaximumLifetime:      time.Minute,
+		Configuration:        config1,
+		Constraints:          constraints1,
+		Source:               LeaseSource{Service: ServiceExecutor, Location: CallerLocationItemLease},
+	})
+
+	require.NoError(t, err)
+	require.Len(t, resp1.Leases, 10, "Should grant 10 leases with capacity=20")
+
+	// Second acquire: capacity reduced to 10 (same as current count), amount=1
+	// The counter is at 10, so remaining = max(0, 10-10) = 0 → no lease granted
+	config2 := semaphoreConfig("test-sem", enums.SemaphoreScopeFn, 10)
+	constraints2 := []ConstraintItem{
+		semaphoreConstraint("test-sem", enums.SemaphoreScopeFn, 1),
+	}
+
+	resp2, err := te.CapacityManager.Acquire(context.Background(), &CapacityAcquireRequest{
+		IdempotencyKey:       "sem-cap-reduce-2",
+		AccountID:            te.AccountID,
+		EnvID:                te.EnvID,
+		FunctionID:           te.FunctionID,
+		Amount:               1,
+		LeaseIdempotencyKeys: []string{"lease-11"},
+		CurrentTime:          clock.Now(),
+		Duration:             30 * time.Second,
+		MaximumLifetime:      time.Minute,
+		Configuration:        config2,
+		Constraints:          constraints2,
+		Source:               LeaseSource{Service: ServiceExecutor, Location: CallerLocationItemLease},
+	})
+
+	require.NoError(t, err)
+	require.Len(t, resp2.Leases, 0, "Should not grant any leases when capacity reduced to current count")
+	require.NotEmpty(t, resp2.ExhaustedConstraints, "Semaphore constraint should be exhausted")
+
+	// Also verify check reports no capacity
+	checkResp, userErr, internalErr := te.CapacityManager.Check(context.Background(), &CapacityCheckRequest{
+		AccountID:     te.AccountID,
+		EnvID:         te.EnvID,
+		FunctionID:    te.FunctionID,
+		Configuration: config2,
+		Constraints:   constraints2,
+	})
+
+	require.Nil(t, userErr)
+	require.Nil(t, internalErr)
+	require.Equal(t, 0, checkResp.AvailableCapacity, "Check should report 0 available capacity")
+	require.NotEmpty(t, checkResp.ExhaustedConstraints, "Check should report exhausted constraint")
+}
