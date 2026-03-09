@@ -308,7 +308,7 @@ func (q *queueProcessor) ProcessItem(
 				extendCapacityLeaseTick.Stop()
 			}
 
-			// When capacity is leased, release it after requeueing/dequeueing the item.
+			// When capacity is leased, release it after the job function has completed.
 			// This is optional and best-effort to free up concurrency capacity as quickly as possible
 			// for the next worker to lease a queue item.
 			if currentLeaseID := capacityLeaseID.get(); currentLeaseID != nil {
