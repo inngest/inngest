@@ -210,6 +210,10 @@ func (ci ConstraintItem) Valid() error {
 		if ci.RateLimit != nil && ci.RateLimit.EvaluatedKeyHash == "" {
 			return fmt.Errorf("rate limit constraint must include EvaluatedKeyHash")
 		}
+	case ConstraintKindSemaphore:
+		if ci.Semaphore != nil && ci.Semaphore.Amount <= 0 {
+			return fmt.Errorf("semaphore constraint amount must be greater than 0")
+		}
 	}
 	return nil
 }
