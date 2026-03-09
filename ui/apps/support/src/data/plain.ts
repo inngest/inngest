@@ -1,4 +1,7 @@
-import { PlainClient } from "@team-plain/typescript-sdk/dist/index";
+import {
+  PlainClient,
+  AttachmentType,
+} from "@team-plain/typescript-sdk/dist/index";
 import { createServerFn } from "@tanstack/react-start";
 import type {
   PlainSDKError,
@@ -20,6 +23,25 @@ type Err<TError> = {
   error: TError;
 };
 type Result<T, TError> = NonNullable<Data<T> | Err<TError>>;
+
+function hasMissingLabelTypeError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+
+  const maybeErrorDetails = (
+    error as {
+      errorDetails?: {
+        fields?: Array<{ field?: string; type?: string }>;
+      };
+    }
+  ).errorDetails;
+
+  const fields = maybeErrorDetails?.fields;
+  if (!Array.isArray(fields)) return false;
+
+  return fields.some(
+    (field) => field.field === "labelTypeIds" && field.type === "NOT_FOUND",
+  );
+}
 
 export type TicketChannel = "EMAIL" | "SLACK" | "API" | "DISCORD";
 
@@ -319,7 +341,12 @@ export type TimeLineEntryEdge = {
           __typename: "MachineUserActor";
           machineUser: { fullName: string };
         };
-    entry: EmailEntry | CustomEntry | SlackMessageEntry | SlackReplyEntry;
+    entry:
+      | EmailEntry
+      | CustomEntry
+      | SlackMessageEntry
+      | SlackReplyEntry
+      | ChatEntry;
   };
 };
 
@@ -425,6 +452,14 @@ type SlackReplyEntry = {
   customerId: string;
   attachments: Array<Attachment>;
   lastEditedOnSlackAt: DateTime;
+};
+
+type ChatEntry = {
+  __typename: "ChatEntry";
+  chatId: string;
+  /** Aliased as `chatText` in the query to avoid GraphQL type conflict with Slack entries */
+  chatText: string;
+  attachments: Array<Attachment>;
 };
 export const getTimelineEntriesForTicket = createServerFn({ method: "GET" })
   .inputValidator((data: { ticketId: string }) => data)
@@ -533,6 +568,14 @@ export const getTimelineEntriesForTicket = createServerFn({ method: "GET" })
                           unixTimestamp
                         }
                       }
+                      ... on ChatEntry {
+                        chatId
+                        chatText: text
+                        attachments {
+                          id
+                          fileName
+                        }
+                      }
                     }
                   }
                 }
@@ -571,7 +614,8 @@ export const getTimelineEntriesForTicket = createServerFn({ method: "GET" })
             typename === "EmailEntry" ||
             typename === "SlackMessageEntry" ||
             // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-            typename === "SlackReplyEntry"
+            typename === "SlackReplyEntry" ||
+            typename === "ChatEntry"
           );
         })
         .sort(
@@ -677,6 +721,7 @@ export type CreateTicketInput = {
     type: string;
     body: string;
     severity?: string;
+    attachmentIds?: string[];
   };
 };
 
@@ -757,6 +802,7 @@ export const createTicket = createServerFn({ method: "POST" })
         customerIdentifier: { customerId: string };
         labelTypeIds?: Array<string>;
         priority?: number;
+        attachmentIds?: Array<string>;
       } = {
         title: ticketTypeTitles[ticket.type] || "Support request",
         components: [
@@ -784,8 +830,22 @@ export const createTicket = createServerFn({ method: "POST" })
           threadInput.priority = severity;
         }
       }
+      if (ticket.attachmentIds && ticket.attachmentIds.length > 0) {
+        threadInput.attachmentIds = ticket.attachmentIds;
+      }
 
-      const threadRes = await plainClient.createThread(threadInput);
+      let threadRes = await plainClient.createThread(threadInput);
+
+      // Some environments can have stale/invalid label IDs. Retry once without
+      // labels so ticket creation still succeeds.
+      if (
+        threadRes.error &&
+        threadInput.labelTypeIds &&
+        hasMissingLabelTypeError(threadRes.error)
+      ) {
+        delete threadInput.labelTypeIds;
+        threadRes = await plainClient.createThread(threadInput);
+      }
 
       if (threadRes.error) {
         console.error(
@@ -1030,12 +1090,239 @@ export const closeTicket = createServerFn({ method: "POST" })
     }
   });
 
+// --- Attachment upload ---
+
+// Allowed MIME types for attachment uploads
+const ALLOWED_MIME_TYPES = new Set([
+  // Images
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+  "image/svg+xml",
+  "image/bmp",
+  "image/tiff",
+  // Documents
+  "application/pdf",
+  "text/plain",
+  "text/csv",
+  "text/markdown",
+  "application/rtf",
+  // Microsoft Office
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-powerpoint",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  // Archives
+  "application/zip",
+  "application/x-zip-compressed",
+  "application/gzip",
+  // Video
+  "video/quicktime",
+]);
+
+// Blocked file extensions (double-check even if MIME looks safe)
+const BLOCKED_EXTENSIONS = new Set([
+  ".exe",
+  ".bat",
+  ".cmd",
+  ".com",
+  ".msi",
+  ".scr",
+  ".pif",
+  ".ps1",
+  ".vbs",
+  ".vbe",
+  ".js",
+  ".jse",
+  ".ws",
+  ".wsf",
+  ".wsc",
+  ".wsh",
+  ".sh",
+  ".bash",
+  ".csh",
+  ".ksh",
+  ".dll",
+  ".sys",
+  ".drv",
+  ".app",
+  ".dmg",
+  ".pkg",
+  ".deb",
+  ".rpm",
+  ".iso",
+  ".jar",
+  ".class",
+  ".php",
+  ".py",
+  ".rb",
+  ".pl",
+  ".cgi",
+  ".asp",
+  ".aspx",
+  ".reg",
+  ".inf",
+  ".lnk",
+  ".hta",
+  ".htm",
+  ".html",
+  ".svg", // allow svg via MIME but block raw .svg extension spoofing
+]);
+
+export const MAX_ATTACHMENT_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
+export const MAX_ATTACHMENTS = 5;
+
+/**
+ * Validates a file name and MIME type against the allow/block lists.
+ * Returns an error message if invalid, or null if valid.
+ */
+export function validateAttachment(
+  fileName: string,
+  mimeType: string,
+  fileSizeBytes: number,
+): string | null {
+  // Check file size
+  if (fileSizeBytes > MAX_ATTACHMENT_SIZE_BYTES) {
+    return `File "${fileName}" exceeds the maximum size of 10 MB.`;
+  }
+
+  // Allow empty MIME (some browsers don't report it) and rely on extension check
+  if (mimeType && !ALLOWED_MIME_TYPES.has(mimeType)) {
+    return `File type "${mimeType}" is not allowed. Please upload a common document or image file.`;
+  }
+
+  // Check extension against blocklist
+  const ext =
+    fileName.lastIndexOf(".") !== -1
+      ? fileName.slice(fileName.lastIndexOf(".")).toLowerCase()
+      : "";
+  if (ext && BLOCKED_EXTENSIONS.has(ext)) {
+    return `File extension "${ext}" is not allowed for security reasons.`;
+  }
+
+  return null;
+}
+
+// Accept string for the file input element
+export const ACCEPTED_FILE_TYPES = [
+  ".pdf",
+  ".txt",
+  ".csv",
+  ".md",
+  ".rtf",
+  ".doc",
+  ".docx",
+  ".xls",
+  ".xlsx",
+  ".ppt",
+  ".pptx",
+  ".zip",
+  ".gz",
+  ".mov",
+  ".jpg",
+  ".jpeg",
+  ".png",
+  ".gif",
+  ".webp",
+  ".bmp",
+  ".tiff",
+].join(",");
+
+export type AttachmentUploadUrlResult = {
+  success: boolean;
+  uploadFormUrl?: string;
+  uploadFormData?: Array<{ key: string; value: string }>;
+  attachmentId?: string;
+  error?: string;
+};
+
+export type AttachmentUploadContext = "chat" | "customEntry";
+
+export const getUploadUrl = createServerFn({ method: "POST" })
+  .inputValidator(
+    (data: {
+      userEmail: string;
+      fileName: string;
+      fileSizeBytes: number;
+      context?: AttachmentUploadContext;
+    }) => data,
+  )
+  .handler(async ({ data }): Promise<AttachmentUploadUrlResult> => {
+    try {
+      const { userEmail, fileName, fileSizeBytes } = data;
+      const context = data.context || "chat";
+
+      // Server-side validation
+      // We use a generic MIME check based on extension since we don't have the real MIME here
+      const ext =
+        fileName.lastIndexOf(".") !== -1
+          ? fileName.slice(fileName.lastIndexOf(".")).toLowerCase()
+          : "";
+      if (ext && BLOCKED_EXTENSIONS.has(ext)) {
+        return {
+          success: false,
+          error: `File extension "${ext}" is not allowed for security reasons.`,
+        };
+      }
+      if (fileSizeBytes > MAX_ATTACHMENT_SIZE_BYTES) {
+        return {
+          success: false,
+          error: `File exceeds the maximum size of 10 MB.`,
+        };
+      }
+
+      // Get customer ID
+      const customer = await plainClient.getCustomerByEmail({
+        email: userEmail,
+      });
+      if (customer.error || !customer.data) {
+        return { success: false, error: "Could not find customer account." };
+      }
+
+      const attachmentType =
+        context === "customEntry"
+          ? AttachmentType.CustomTimelineEntry
+          : AttachmentType.Chat;
+
+      const res = await plainClient.createAttachmentUploadUrl({
+        customerId: customer.data.id,
+        fileName,
+        fileSizeBytes,
+        attachmentType,
+      });
+
+      if (res.error) {
+        console.error("Error creating attachment upload URL:", res.error);
+        return { success: false, error: res.error.message };
+      }
+
+      return {
+        success: true,
+        uploadFormUrl: res.data.uploadFormUrl,
+        uploadFormData: res.data.uploadFormData,
+        attachmentId: res.data.attachment.id,
+      };
+    } catch (error) {
+      console.error("Error getting attachment upload URL:", error);
+      return {
+        success: false,
+        error:
+          error instanceof Error ? error.message : "Failed to get upload URL",
+      };
+    }
+  });
+
 // Reply to thread types
 export type ReplyToThreadInput = {
   threadId: string;
   message: string;
   /** @deprecated No longer used - email is derived from authenticated session */
   userEmail?: string;
+  /** Optional attachment IDs to include with the reply */
+  attachmentIds?: string[];
 };
 
 export type ReplyToThreadResult = {
@@ -1047,7 +1334,7 @@ export const replyToThread = createServerFn({ method: "POST" })
   .inputValidator((data: ReplyToThreadInput) => data)
   .handler(async ({ data }): Promise<ReplyToThreadResult> => {
     try {
-      const { threadId, message } = data;
+      const { threadId, message, attachmentIds } = data;
 
       // Get the authenticated user's email instead of trusting client input
       const userEmail = await getAuthenticatedUserEmail();
@@ -1091,11 +1378,11 @@ export const replyToThread = createServerFn({ method: "POST" })
         };
       }
 
-      // Build input with customer impersonation so the reply appears from the customer
       const input: {
         threadId: string;
         textContent: string;
         markdownContent: string;
+        attachmentIds?: string[];
         impersonation: {
           asCustomer: {
             customerIdentifier: {
@@ -1115,6 +1402,9 @@ export const replyToThread = createServerFn({ method: "POST" })
           },
         },
       };
+      if (attachmentIds && attachmentIds.length > 0) {
+        input.attachmentIds = attachmentIds;
+      }
 
       const res = (await plainClient.rawRequest({
         query: `

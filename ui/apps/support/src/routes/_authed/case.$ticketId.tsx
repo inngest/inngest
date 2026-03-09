@@ -24,6 +24,10 @@ import { PriorityBadge, StatusBadge } from "@/components/Support/TicketBadges";
 import { ChannelBadge } from "@/components/Support/ChannelBadge";
 import { formatTimestamp } from "@/utils/ticket";
 import { Attachment } from "@/components/Support/Attachment";
+import {
+  AttachmentUploadField,
+  useAttachmentUpload,
+} from "@/components/Support/AttachmentUploadField";
 
 export const Route = createFileRoute("/_authed/case/$ticketId")({
   component: TicketDetailPage,
@@ -278,13 +282,25 @@ function ReplyForm({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const replyToThreadFn = useServerFn(replyToThread);
+  const {
+    attachments,
+    isUploading,
+    uploadedAttachmentIds,
+    fileInputRef,
+    handleFileSelect,
+    removeAttachment,
+    openFilePicker,
+    clearAttachments,
+  } = useAttachmentUpload({
+    userEmail,
+    onError: setError,
+  });
+  const hasContent =
+    message.trim().length > 0 || uploadedAttachmentIds.length > 0;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-
-    if (!message.trim()) {
-      return;
-    }
+    if (!hasContent) return;
 
     setIsSubmitting(true);
     setError(null);
@@ -295,11 +311,16 @@ function ReplyForm({
           threadId: ticketId,
           message: message.trim(),
           userEmail,
+          attachmentIds:
+            uploadedAttachmentIds.length > 0
+              ? uploadedAttachmentIds
+              : undefined,
         },
       });
 
       if (result.success) {
         setMessage("");
+        clearAttachments();
         onSuccess();
       } else {
         setError(result.error || "Failed to send message");
@@ -324,31 +345,40 @@ function ReplyForm({
             className="text-basis placeholder:text-disabled min-h-[21px] w-full resize-none border-0 bg-transparent p-0 text-sm leading-5 outline-none focus:ring-0"
             disabled={isSubmitting}
           />
+
           <div className="flex items-center justify-between">
-            <div>{/* TODO - Add attachment support */}</div>
-            {/* <button
-              type="button"
-              className="text-muted hover:text-basis flex h-6 w-5 items-center justify-center"
-              disabled
-              title="Attachments coming soon"
-            >
-              <RiAttachmentLine className="h-4 w-4" />
-            </button> */}
+            <div>
+              <AttachmentUploadField
+                attachments={attachments}
+                isUploading={isUploading}
+                isSubmitting={isSubmitting}
+                fileInputRef={fileInputRef}
+                onFileSelect={handleFileSelect}
+                onRemoveAttachment={removeAttachment}
+                onAddClick={openFilePicker}
+                variant="compact"
+                showHelpText={false}
+              />
+            </div>
             <div>
               <Button
                 type="submit"
                 kind="primary"
                 appearance="solid"
                 size="small"
-                label="Submit"
+                label={isSubmitting ? "Sending..." : "Submit"}
                 icon={<RiArrowRightUpLine className="h-4 w-4" />}
-                disabled={isSubmitting || !message.trim()}
+                disabled={isSubmitting || isUploading || !hasContent}
                 className="h-6 px-2 text-xs"
               />
             </div>
           </div>
         </div>
         {error && <p className="mt-2 text-sm text-red-500">{error}</p>}
+        <p className="text-muted mt-1 text-xs">
+          Max 5 files, 10 MB each. PDF, images, and common document types
+          accepted.
+        </p>
       </form>
     </div>
   );
@@ -366,11 +396,17 @@ function TimelineEntry({
   const actorTypename = entry.node.actor.__typename;
   const isStaff =
     actorTypename === "UserActor" || actorTypename === "MachineUserActor";
+  const staffName =
+    actorTypename === "UserActor"
+      ? entry.node.actor.user.fullName
+      : actorTypename === "MachineUserActor"
+      ? entry.node.actor.machineUser.fullName
+      : "";
   const actorName =
     actorTypename === "CustomerActor"
       ? entry.node.actor.customer.fullName || "Customer"
       : isStaff
-      ? "Inngest Support Team"
+      ? staffName || "Inngest Support Team"
       : "Unknown";
 
   const timeAgo = formatDistanceToNow(new Date(entry.node.timestamp.iso8601), {
@@ -384,6 +420,8 @@ function TimelineEntry({
       ? entry.node.entry.components
           .map((component) => component.text)
           .join("\n")
+      : entry.node.entry.__typename === "ChatEntry"
+      ? entry.node.entry.chatText || ""
       : entry.node.entry.text || "";
 
   return (
@@ -458,11 +496,12 @@ function TimelineEntry({
 
         {(entry.node.entry.__typename === "EmailEntry" ||
           entry.node.entry.__typename === "SlackMessageEntry" ||
-          entry.node.entry.__typename === "SlackReplyEntry") &&
+          entry.node.entry.__typename === "SlackReplyEntry" ||
+          entry.node.entry.__typename === "ChatEntry") &&
           entry.node.entry.attachments.length > 0 && (
             <div className="flex flex-row flex-wrap gap-1">
               {entry.node.entry.attachments.map((attachment) => (
-                <Attachment attachmentId={attachment.id} />
+                <Attachment key={attachment.id} attachmentId={attachment.id} />
               ))}
             </div>
           )}
