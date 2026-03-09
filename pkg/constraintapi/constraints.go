@@ -14,10 +14,11 @@ const (
 	ConstraintKindRateLimit   ConstraintKind = "rate_limit"
 	ConstraintKindConcurrency ConstraintKind = "concurrency"
 	ConstraintKindThrottle    ConstraintKind = "throttle"
+	ConstraintKindSemaphore   ConstraintKind = "semaphore"
 )
 
 func (k ConstraintKind) IsQueueConstraint() bool {
-	return k == ConstraintKindConcurrency || k == ConstraintKindThrottle
+	return k == ConstraintKindConcurrency || k == ConstraintKindThrottle || k == ConstraintKindSemaphore
 }
 
 func (k ConstraintKind) PrettyString() string {
@@ -28,6 +29,8 @@ func (k ConstraintKind) PrettyString() string {
 		return "concurrency"
 	case ConstraintKindThrottle:
 		return "throttle"
+	case ConstraintKindSemaphore:
+		return "semaphore"
 	default:
 		return "unknown"
 	}
@@ -184,12 +187,73 @@ func (t *ThrottleConstraint) PrettyStringConfig(config ConstraintConfig) string 
 	return "unknown"
 }
 
+const SemaphoreLimitRetryAfter = 2 * time.Second
+
+type SemaphoreConstraint struct {
+	// Name uniquely identifies the semaphore on the scope
+	Name string
+
+	// Scope specifies the semaphore scope
+	Scope enums.SemaphoreScope
+
+	// KeyExpressionHash is the hashed key expression, if set
+	KeyExpressionHash string
+
+	// EvaluatedKeyHash is the evaluated key hash
+	EvaluatedKeyHash string
+
+	// Amount is how much capacity to acquire per item
+	Amount int
+}
+
+// StateKey returns the fully-qualified Redis key for the semaphore counter.
+// Pattern: {cs}:a:<accountID>:sem:<scope>:<entityID>[:<exprHash>:<evalKeyHash>]
+func (s *SemaphoreConstraint) StateKey(accountID uuid.UUID, envID uuid.UUID, fnID uuid.UUID) string {
+	var scopeID string
+	var entityID uuid.UUID
+	switch s.Scope {
+	case enums.SemaphoreScopeAccount:
+		scopeID = "a"
+		entityID = accountID
+	case enums.SemaphoreScopeEnv:
+		scopeID = "e"
+		entityID = envID
+	case enums.SemaphoreScopeFn:
+		scopeID = "f"
+		entityID = fnID
+	}
+
+	key := fmt.Sprintf("{cs}:%s:sem:%s:%s", accountScope(accountID), scopeID, entityID)
+	if s.KeyExpressionHash != "" {
+		key = fmt.Sprintf("%s:%s:%s", key, s.KeyExpressionHash, s.EvaluatedKeyHash)
+	}
+	return key
+}
+
+func (s *SemaphoreConstraint) RetryAfter() time.Duration {
+	return SemaphoreLimitRetryAfter
+}
+
+func (s *SemaphoreConstraint) PrettyString() string {
+	return fmt.Sprintf("name %s, scope %s, expression hash %s, key hash %s, amount %d", s.Name, s.Scope, s.KeyExpressionHash, s.EvaluatedKeyHash, s.Amount)
+}
+
+func (s *SemaphoreConstraint) PrettyStringConfig(config ConstraintConfig) string {
+	for _, sc := range config.Semaphore {
+		if sc.Name == s.Name && sc.Scope == s.Scope && sc.KeyExpressionHash == s.KeyExpressionHash {
+			return fmt.Sprintf("capacity %d", sc.Capacity)
+		}
+	}
+	return "unknown"
+}
+
 type ConstraintItem struct {
 	Kind ConstraintKind
 
 	Concurrency *ConcurrencyConstraint
 	Throttle    *ThrottleConstraint
 	RateLimit   *RateLimitConstraint
+	Semaphore   *SemaphoreConstraint
 }
 
 // IsFunctionLevelConstraint returns whether the constraint is on the function level
@@ -201,6 +265,8 @@ func (ci ConstraintItem) IsFunctionLevelConstraint() bool {
 		return ci.Throttle != nil && ci.Throttle.Scope == enums.ThrottleScopeFn
 	case ConstraintKindConcurrency:
 		return ci.Concurrency != nil && ci.Concurrency.Scope == enums.ConcurrencyScopeFn
+	case ConstraintKindSemaphore:
+		return ci.Semaphore != nil && ci.Semaphore.Scope == enums.SemaphoreScopeFn
 	default:
 		return false
 	}
@@ -214,6 +280,8 @@ func (ci ConstraintItem) PrettyString() string {
 		return ci.RateLimit.PrettyString()
 	case ConstraintKindThrottle:
 		return ci.Throttle.PrettyString()
+	case ConstraintKindSemaphore:
+		return ci.Semaphore.PrettyString()
 	default:
 		return "unknown"
 	}
@@ -227,6 +295,8 @@ func (ci ConstraintItem) PrettyStringConfig(config ConstraintConfig) string {
 		return ci.RateLimit.PrettyStringConfig(config)
 	case ConstraintKindThrottle:
 		return ci.Throttle.PrettyStringConfig(config)
+	case ConstraintKindSemaphore:
+		return ci.Semaphore.PrettyStringConfig(config)
 	default:
 		return "unknown"
 	}
@@ -344,6 +414,38 @@ func (ci ConstraintItem) CacheKey(accountID, envID, functionID uuid.UUID) string
 
 		// Account scope with no custom key
 		return fmt.Sprintf("%s:r:%s", accountID, scopeLetter)
+
+	case ConstraintKindSemaphore:
+		if ci.Semaphore == nil {
+			return ""
+		}
+		s := ci.Semaphore
+
+		var scopeLetter string
+		var entityID uuid.UUID
+		switch s.Scope {
+		case enums.SemaphoreScopeAccount:
+			scopeLetter = "a"
+		case enums.SemaphoreScopeEnv:
+			scopeLetter = "e"
+			entityID = envID
+		case enums.SemaphoreScopeFn:
+			scopeLetter = "f"
+			entityID = functionID
+		}
+
+		// Custom key uses expression and evaluated hashes
+		if s.KeyExpressionHash != "" {
+			return fmt.Sprintf("%s:sem:%s:%s:%s:%s", accountID, scopeLetter, s.Name, s.KeyExpressionHash, s.EvaluatedKeyHash)
+		}
+
+		// Non-custom function/env scoped constraints include entity ID
+		if entityID != uuid.Nil {
+			return fmt.Sprintf("%s:sem:%s:%s:%s", accountID, scopeLetter, s.Name, entityID)
+		}
+
+		// Account scope with no custom key
+		return fmt.Sprintf("%s:sem:%s:%s", accountID, scopeLetter, s.Name)
 
 	default:
 		return ""

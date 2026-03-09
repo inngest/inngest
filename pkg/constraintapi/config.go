@@ -15,6 +15,9 @@ type ConstraintConfig struct {
 
 	// Throttle represents 0-n throttle constraints
 	Throttle []ThrottleConfig
+
+	// Semaphore represents 0-n semaphore constraints
+	Semaphore []SemaphoreConfig
 }
 
 type RateLimitConfig struct {
@@ -53,6 +56,20 @@ type ThrottleConfig struct {
 	Burst int `json:"b"`
 	// Period is the rate limit period, in seconds
 	Period int `json:"p"`
+}
+
+type SemaphoreConfig struct {
+	// Name uniquely identifies the semaphore on the scope
+	Name string
+
+	// Scope specifies the semaphore scope
+	Scope enums.SemaphoreScope
+
+	// KeyExpressionHash is the hashed key expression, if set
+	KeyExpressionHash string
+
+	// Capacity is the maximum number of units the semaphore can hold
+	Capacity int
 }
 
 type ConcurrencyConfig struct {

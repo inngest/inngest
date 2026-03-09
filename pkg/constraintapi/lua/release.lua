@@ -84,6 +84,13 @@ for _, c in ipairs(constraints) do
 	if c.k == 2 then
 		debug("removing in progress lease", c.c.ilk)
 		call("ZREM", c.c.ilk, currentLeaseID)
+	elseif c.k == 4 then
+		-- semaphore: decrement counter by the per-item amount (release is per lease)
+		debug("releasing semaphore", c.sem.k, "amount", c.sem.amt)
+		local newVal = call("DECRBY", c.sem.k, c.sem.amt)
+		if newVal <= 0 then
+			call("DEL", c.sem.k)
+		end
 	end
 end
 

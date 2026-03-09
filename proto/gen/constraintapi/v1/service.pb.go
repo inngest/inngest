@@ -236,6 +236,7 @@ const (
 	ConstraintApiConstraintKind_CONSTRAINT_API_CONSTRAINT_KIND_RATE_LIMIT  ConstraintApiConstraintKind = 1
 	ConstraintApiConstraintKind_CONSTRAINT_API_CONSTRAINT_KIND_CONCURRENCY ConstraintApiConstraintKind = 2
 	ConstraintApiConstraintKind_CONSTRAINT_API_CONSTRAINT_KIND_THROTTLE    ConstraintApiConstraintKind = 3
+	ConstraintApiConstraintKind_CONSTRAINT_API_CONSTRAINT_KIND_SEMAPHORE   ConstraintApiConstraintKind = 4
 )
 
 // Enum value maps for ConstraintApiConstraintKind.
@@ -245,12 +246,14 @@ var (
 		1: "CONSTRAINT_API_CONSTRAINT_KIND_RATE_LIMIT",
 		2: "CONSTRAINT_API_CONSTRAINT_KIND_CONCURRENCY",
 		3: "CONSTRAINT_API_CONSTRAINT_KIND_THROTTLE",
+		4: "CONSTRAINT_API_CONSTRAINT_KIND_SEMAPHORE",
 	}
 	ConstraintApiConstraintKind_value = map[string]int32{
 		"CONSTRAINT_API_CONSTRAINT_KIND_UNSPECIFIED": 0,
 		"CONSTRAINT_API_CONSTRAINT_KIND_RATE_LIMIT":  1,
 		"CONSTRAINT_API_CONSTRAINT_KIND_CONCURRENCY": 2,
 		"CONSTRAINT_API_CONSTRAINT_KIND_THROTTLE":    3,
+		"CONSTRAINT_API_CONSTRAINT_KIND_SEMAPHORE":   4,
 	}
 )
 
@@ -738,6 +741,7 @@ type ConstraintConfig struct {
 	RateLimit       []*RateLimitConfig     `protobuf:"bytes,2,rep,name=rate_limit,json=rateLimit,proto3" json:"rate_limit,omitempty"`
 	Concurrency     *ConcurrencyConfig     `protobuf:"bytes,3,opt,name=concurrency,proto3" json:"concurrency,omitempty"`
 	Throttle        []*ThrottleConfig      `protobuf:"bytes,4,rep,name=throttle,proto3" json:"throttle,omitempty"`
+	Semaphore       []*SemaphoreConfig     `protobuf:"bytes,5,rep,name=semaphore,proto3" json:"semaphore,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -796,6 +800,13 @@ func (x *ConstraintConfig) GetConcurrency() *ConcurrencyConfig {
 func (x *ConstraintConfig) GetThrottle() []*ThrottleConfig {
 	if x != nil {
 		return x.Throttle
+	}
+	return nil
+}
+
+func (x *ConstraintConfig) GetSemaphore() []*SemaphoreConfig {
+	if x != nil {
+		return x.Semaphore
 	}
 	return nil
 }
@@ -996,6 +1007,7 @@ type ConstraintItem struct {
 	Concurrency   *ConcurrencyConstraint      `protobuf:"bytes,2,opt,name=concurrency,proto3,oneof" json:"concurrency,omitempty"`
 	Throttle      *ThrottleConstraint         `protobuf:"bytes,3,opt,name=throttle,proto3,oneof" json:"throttle,omitempty"`
 	RateLimit     *RateLimitConstraint        `protobuf:"bytes,4,opt,name=rate_limit,json=rateLimit,proto3,oneof" json:"rate_limit,omitempty"`
+	Semaphore     *SemaphoreConstraint        `protobuf:"bytes,5,opt,name=semaphore,proto3,oneof" json:"semaphore,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1054,6 +1066,13 @@ func (x *ConstraintItem) GetThrottle() *ThrottleConstraint {
 func (x *ConstraintItem) GetRateLimit() *RateLimitConstraint {
 	if x != nil {
 		return x.RateLimit
+	}
+	return nil
+}
+
+func (x *ConstraintItem) GetSemaphore() *SemaphoreConstraint {
+	if x != nil {
+		return x.Semaphore
 	}
 	return nil
 }
