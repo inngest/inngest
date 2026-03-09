@@ -81,6 +81,10 @@ type connectionHandler struct {
 
 	remoteAddr string
 
+	// draining is set to true when a WORKER_PAUSE message is received.
+	// Once set, heartbeats must not reset the connection status to READY.
+	draining atomic.Bool
+
 	lastHeartbeatLock       sync.Mutex
 	lastHeartbeatReceivedAt time.Time
 }
@@ -641,6 +645,11 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 			return &ErrDraining
 		}
 
+		if c.draining.Load() {
+			// Connection is draining, so don't reset status to READY.
+			return nil
+		}
+
 		err := c.updateConnStatus(connectpb.ConnectionStatus_READY)
 		if err != nil {
 			// TODO Should we actually close the connection here?
@@ -682,6 +691,11 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 	case connectpb.GatewayMessageType_WORKER_HEARTBEAT:
 		if c.svc.isDraining.Load() {
 			return &ErrDraining
+		}
+
+		if c.draining.Load() {
+			// Connection is draining, so don't reset status to READY.
+			return nil
 		}
 
 		err := c.updateConnStatus(connectpb.ConnectionStatus_READY)
@@ -737,21 +751,25 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 			return &ErrDraining
 		}
 
-		// Immediately delete from in-memory map to prevent routing any more
-		// messages to this connection. If we don't do this, we may still send
-		// messages to the draining worker (since `Forward()` uses the in-memory
-		// map)
-		c.svc.wsConnections.Delete(c.conn.ConnectionId.String())
+		// Mark as draining before updating Redis so that concurrent heartbeat
+		// messages do not reset the status back to READY.
+		c.draining.Store(true)
 
+		// Update the Redis status to DRAINING so the router stops selecting
+		// this connection for new requests.
 		err := c.updateConnStatus(connectpb.ConnectionStatus_DRAINING)
 		if err != nil {
-			// TODO Should we actually close the connection here?
 			return &connecterrors.SocketError{
 				SysCode:    syscode.CodeConnectInternal,
 				StatusCode: websocket.StatusInternalError,
 				Msg:        "could not update connection status",
 			}
 		}
+
+		// Then delete from in-memory map to prevent forwarding. This must
+		// happen after the Redis status update to avoid a race where the
+		// router still sees status=READY but the gateway can no longer forward.
+		c.svc.wsConnections.Delete(c.conn.ConnectionId.String())
 
 		// For pauses, worker capacity is not tracked and it will expire
 

@@ -837,13 +837,18 @@ type testingParameters struct {
 	shouldUseGRPC                bool
 
 	noConnect bool
+	silent    bool
 }
 
 func createTestingGateway(t *testing.T, params ...testingParameters) testingResources {
+	logLevel := logger.LevelDebug
+	if len(params) > 0 && params[0].silent {
+		logLevel = logger.LevelEmergency
+	}
 	l := logger.StdlibLogger(context.Background(),
 		logger.WithHandler(logger.TextHandler),
 		logger.WithLoggerWriter(os.Stdout),
-		logger.WithLoggerLevel(logger.LevelDebug),
+		logger.WithLoggerLevel(logLevel),
 	)
 
 	envID, accountID := uuid.New(), uuid.New()
@@ -1206,6 +1211,15 @@ func sendWorkerHeartbeatMessage(t *testing.T, ws *websocket.Conn) {
 
 	err := wsproto.Write(ctx, ws, &connect.ConnectMessage{
 		Kind: connect.GatewayMessageType_WORKER_HEARTBEAT,
+	})
+	require.NoError(t, err)
+}
+
+func sendWorkerPauseMessage(t *testing.T, ws *websocket.Conn) {
+	ctx := context.Background()
+
+	err := wsproto.Write(ctx, ws, &connect.ConnectMessage{
+		Kind: connect.GatewayMessageType_WORKER_PAUSE,
 	})
 	require.NoError(t, err)
 }
@@ -1618,4 +1632,34 @@ func TestCloseWithConnectError(t *testing.T) {
 	status, reason := awaitClosure(t, ws2, 2*time.Second)
 	require.Equal(t, websocket.StatusPolicyViolation, status)
 	require.Equal(t, syscode.CodeConnectAuthFailed, reason)
+}
+
+// TestHeartbeatDoesNotResetDrainingStatus verifies that heartbeats from a
+// draining worker do not reset the connection status back to READY in Redis.
+func TestHeartbeatDoesNotResetDrainingStatus(t *testing.T) {
+	r := require.New(t)
+	ctx := context.Background()
+	res := createTestingGateway(t, testingParameters{silent: true})
+	handshake(t, res)
+
+	// Worker sends WORKER_PAUSE to start draining
+	sendWorkerPauseMessage(t, res.ws)
+
+	r.EventuallyWithT(func(t *assert.CollectT) {
+		a := assert.New(t)
+		conn, err := res.stateManager.GetConnection(ctx, res.envID, res.connID)
+		a.NoError(err)
+		a.Equal(connect.ConnectionStatus_DRAINING, conn.Status)
+	}, 2*time.Second, 100*time.Millisecond)
+
+	// Simulate heartbeats while worker finishes in-progress work
+	for range 3 {
+		sendWorkerHeartbeatMessage(t, res.ws)
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	// Status must still be DRAINING
+	conn, err := res.stateManager.GetConnection(ctx, res.envID, res.connID)
+	r.NoError(err)
+	r.Equal(connect.ConnectionStatus_DRAINING, conn.Status)
 }
