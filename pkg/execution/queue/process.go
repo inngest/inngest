@@ -305,10 +305,51 @@ func (q *queueProcessor) ProcessItem(
 		{
 			// Clean up leases and such
 			extendLeaseTick.Stop()
-			extendCapacityLeaseTick.Stop()
 
-			if leaseID := capacityLeaseID.get(); leaseID != nil && instrumentCapacityLease {
-				l.Debug("stopping lease extension", "lease_id", leaseID.String())
+			// When capacity is leased, release it after requeueing/dequeueing the item.
+			// This is optional and best-effort to free up concurrency capacity as quickly as possible
+			// for the next worker to lease a queue item.
+			if capacityLeaseID.has() {
+				extendCapacityLeaseTick.Stop()
+
+				if instrumentCapacityLease {
+					l.Debug("stopping lease extension", "lease_id", leaseID.String())
+				}
+
+				service.Go(func() {
+					currentLeaseID := capacityLeaseID.get()
+					if currentLeaseID == nil {
+						return
+					}
+
+					res, err := q.CapacityManager.Release(context.Background(), &constraintapi.CapacityReleaseRequest{
+						AccountID:      p.AccountID,
+						IdempotencyKey: qi.ID,
+						LeaseID:        *currentLeaseID,
+						Source: constraintapi.LeaseSource{
+							Location:          constraintapi.CallerLocationItemLease,
+							Service:           constraintapi.ServiceExecutor,
+							RunProcessingMode: constraintapi.RunProcessingModeBackground,
+						},
+						LeaseIssuedAt: capacityLeaseID.issuedAt(),
+					})
+					if err != nil {
+						l.ReportError(err, "failed to release capacity", logger.WithErrorReportTags(map[string]string{
+							"account_id":  p.AccountID.String(),
+							"lease_id":    currentLeaseID.String(),
+							"function_id": p.FunctionID.String(),
+						}))
+						return
+					}
+
+					if instrumentCapacityLease {
+						l.Debug(
+							"released capacity lease",
+							"res", res,
+							"lease_id", currentLeaseID.String(),
+						)
+					}
+				})
 			}
 		}
 
@@ -336,46 +377,6 @@ func (q *queueProcessor) ProcessItem(
 			jobDone()
 		}
 	}()
-
-	// When capacity is leased, release it after requeueing/dequeueing the item.
-	// This is optional and best-effort to free up concurrency capacity as quickly as possible
-	// for the next worker to lease a queue item.
-	if capacityLeaseID.has() {
-		defer service.Go(func() {
-			currentLeaseID := capacityLeaseID.get()
-			if currentLeaseID == nil {
-				return
-			}
-
-			res, err := q.CapacityManager.Release(context.Background(), &constraintapi.CapacityReleaseRequest{
-				AccountID:      p.AccountID,
-				IdempotencyKey: qi.ID,
-				LeaseID:        *currentLeaseID,
-				Source: constraintapi.LeaseSource{
-					Location:          constraintapi.CallerLocationItemLease,
-					Service:           constraintapi.ServiceExecutor,
-					RunProcessingMode: constraintapi.RunProcessingModeBackground,
-				},
-				LeaseIssuedAt: capacityLeaseID.issuedAt(),
-			})
-			if err != nil {
-				l.ReportError(err, "failed to release capacity", logger.WithErrorReportTags(map[string]string{
-					"account_id":  p.AccountID.String(),
-					"lease_id":    currentLeaseID.String(),
-					"function_id": p.FunctionID.String(),
-				}))
-				return
-			}
-
-			if instrumentCapacityLease {
-				l.Debug(
-					"released capacity lease",
-					"res", res,
-					"lease_id", currentLeaseID.String(),
-				)
-			}
-		})
-	}
 
 	select {
 	case err := <-errCh:
