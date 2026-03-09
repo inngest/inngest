@@ -147,7 +147,7 @@ func (q *queueProcessor) ProcessItem(
 					if currentCapacityLease == nil {
 						l.Error("cannot extend capacity lease since capacity lease ID is nil", "qi", qi, "partition", p)
 						// Don't extend lease since one doesn't exist
-						errCh <- fmt.Errorf("cannot extend lease since lease ID is nil")
+						errCh <- fmt.Errorf("cannot extend capacity lease since lease ID is nil")
 						return
 					}
 
