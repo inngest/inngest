@@ -311,17 +311,12 @@ func (q *queueProcessor) ProcessItem(
 			// When capacity is leased, release it after requeueing/dequeueing the item.
 			// This is optional and best-effort to free up concurrency capacity as quickly as possible
 			// for the next worker to lease a queue item.
-			if capacityLeaseID.has() {
+			if currentLeaseID := capacityLeaseID.get(); currentLeaseID != nil {
 				if instrumentCapacityLease {
-					l.Debug("stopping lease extension", "lease_id", leaseID.String())
+					l.Debug("stopping lease extension", "lease_id", currentLeaseID.String())
 				}
 
 				service.Go(func() {
-					currentLeaseID := capacityLeaseID.get()
-					if currentLeaseID == nil {
-						return
-					}
-
 					res, err := q.CapacityManager.Release(context.Background(), &constraintapi.CapacityReleaseRequest{
 						AccountID:      p.AccountID,
 						IdempotencyKey: qi.ID,
