@@ -43,13 +43,18 @@ type RateLimitConstraint struct {
 
 // StateKey returns the fully-qualified Redis key pointing to the rate limit GCRA state
 func (r *RateLimitConstraint) StateKey(accountID uuid.UUID, envID uuid.UUID, fnID uuid.UUID) string {
+	var keyID string
+	if r.KeyExpressionHash != "" {
+		keyID = fmt.Sprintf("<%s:%s>", r.KeyExpressionHash, r.EvaluatedKeyHash)
+	}
+
 	switch r.Scope {
 	case enums.RateLimitScopeAccount:
-		return fmt.Sprintf("{cs}:%s:rl:a:%s:%s", accountScope(accountID), r.KeyExpressionHash, r.EvaluatedKeyHash)
+		return fmt.Sprintf("{cs}:%s:rl:a:%s%s", accountScope(accountID), accountID, keyID)
 	case enums.RateLimitScopeEnv:
-		return fmt.Sprintf("{cs}:%s:rl:e:%s:%s:%s", accountScope(accountID), envID, r.KeyExpressionHash, r.EvaluatedKeyHash)
+		return fmt.Sprintf("{cs}:%s:rl:e:%s%s", accountScope(accountID), envID, keyID)
 	case enums.RateLimitScopeFn:
-		return fmt.Sprintf("{cs}:%s:rl:f:%s:%s:%s", accountScope(accountID), fnID, r.KeyExpressionHash, r.EvaluatedKeyHash)
+		return fmt.Sprintf("{cs}:%s:rl:f:%s%s", accountScope(accountID), fnID, keyID)
 	default:
 		return ""
 	}
@@ -156,13 +161,18 @@ type ThrottleConstraint struct {
 
 // StateKey returns the fully-qualified Redis key pointing to the throttle GCRA state
 func (t *ThrottleConstraint) StateKey(accountID uuid.UUID, envID uuid.UUID, fnID uuid.UUID) string {
+	var keyID string
+	if t.KeyExpressionHash != "" {
+		keyID = fmt.Sprintf("<%s:%s>", t.KeyExpressionHash, t.EvaluatedKeyHash)
+	}
+
 	switch t.Scope {
 	case enums.ThrottleScopeAccount:
-		return fmt.Sprintf("{cs}:%s:throttle:a:%s:%s", accountScope(accountID), t.KeyExpressionHash, t.EvaluatedKeyHash)
+		return fmt.Sprintf("{cs}:%s:throttle:a:%s%s", accountScope(accountID), accountID, keyID)
 	case enums.ThrottleScopeEnv:
-		return fmt.Sprintf("{cs}:%s:throttle:e:%s:%s:%s", accountScope(accountID), envID, t.KeyExpressionHash, t.EvaluatedKeyHash)
+		return fmt.Sprintf("{cs}:%s:throttle:e:%s%s", accountScope(accountID), envID, keyID)
 	case enums.ThrottleScopeFn:
-		return fmt.Sprintf("{cs}:%s:throttle:f:%s:%s:%s", accountScope(accountID), fnID, t.KeyExpressionHash, t.EvaluatedKeyHash)
+		return fmt.Sprintf("{cs}:%s:throttle:f:%s%s", accountScope(accountID), fnID, keyID)
 	default:
 		return ""
 	}
