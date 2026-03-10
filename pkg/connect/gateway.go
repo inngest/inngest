@@ -693,18 +693,16 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 			return &ErrDraining
 		}
 
-		if c.draining.Load() {
-			// Connection is draining, so don't reset status to READY.
-			return nil
-		}
-
-		err := c.updateConnStatus(connectpb.ConnectionStatus_READY)
-		if err != nil {
-			// TODO Should we actually close the connection here?
-			return &connecterrors.SocketError{
-				SysCode:    syscode.CodeConnectInternal,
-				StatusCode: websocket.StatusInternalError,
-				Msg:        "could not update connection status",
+		// Don't reset status to READY if the connection is draining.
+		if !c.draining.Load() {
+			err := c.updateConnStatus(connectpb.ConnectionStatus_READY)
+			if err != nil {
+				// TODO Should we actually close the connection here?
+				return &connecterrors.SocketError{
+					SysCode:    syscode.CodeConnectInternal,
+					StatusCode: websocket.StatusInternalError,
+					Msg:        "could not update connection status",
+				}
 			}
 		}
 

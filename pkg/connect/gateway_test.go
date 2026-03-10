@@ -1663,3 +1663,55 @@ func TestHeartbeatDoesNotResetDrainingStatus(t *testing.T) {
 	r.NoError(err)
 	r.Equal(connect.ConnectionStatus_DRAINING, conn.Status)
 }
+
+func TestDrainingConnectionNotKilledByHeartbeatDetector(t *testing.T) {
+	// Verify that a draining connection is not killed by the consecutive
+	// heartbeat miss detector, as long as the worker keeps sending heartbeats
+	// (e.g. while finishing in-flight work).
+	//
+	// This test was created when we noticed the following error during
+	// long-running steps:
+	// connect_worker_stopped_responding: The worker stopped responding to the request.
+	//
+	// The steps would continue running to completion, but we'd mark the attempt
+	// as failed on our end.
+
+	// Use aggressive heartbeat settings so the miss detector would fire quickly
+	// if heartbeats weren't being tracked during drain.
+	params := testingParameters{
+		consecutiveMissesBeforeClose: 3,
+		heartbeatInterval:            200 * time.Millisecond,
+		silent:                       true,
+	}
+	res := createTestingGateway(t, params)
+	handshake(t, res)
+
+	// Worker sends WORKER_PAUSE to start draining
+	sendWorkerPauseMessage(t, res.ws)
+
+	require.EventuallyWithT(t, func(ct *assert.CollectT) {
+		conn, err := res.stateManager.GetConnection(context.Background(), res.envID, res.connID)
+		assert.NoError(ct, err)
+		assert.Equal(ct, connect.ConnectionStatus_DRAINING, conn.Status)
+	}, 2*time.Second, 50*time.Millisecond)
+
+	// Keep sending heartbeats well past the miss threshold (3 * 200ms = 600ms).
+	// Use exchangeHeartbeat to verify the gateway responds with GATEWAY_HEARTBEAT
+	// even while draining. Without a response, the SDK would consider the
+	// connection dead and stop extending leases for in-flight work.
+	for range 10 {
+		exchangeHeartbeat(t, res.ws, 2*time.Second)
+		time.Sleep(params.heartbeatInterval)
+	}
+
+	// Connection should still be alive: heartbeats processed, no disconnect
+	r := require.New(t)
+	res.lifecycles.lock.Lock()
+	disconnectingCount := len(res.lifecycles.onStartDisconnecting)
+	disconnectedCount := len(res.lifecycles.onDisconnected)
+	heartbeatCount := len(res.lifecycles.onHeartbeat)
+	res.lifecycles.lock.Unlock()
+	r.Zero(disconnectingCount, "connection should not have started disconnecting")
+	r.Zero(disconnectedCount, "connection should not have disconnected")
+	r.GreaterOrEqual(heartbeatCount, 10, "heartbeats should have been processed")
+}
