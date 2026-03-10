@@ -1706,7 +1706,12 @@ func TestDrainingConnectionNotKilledByHeartbeatDetector(t *testing.T) {
 
 	// Connection should still be alive: heartbeats processed, no disconnect
 	r := require.New(t)
-	r.Zero(len(res.lifecycles.onStartDisconnecting), "connection should not have started disconnecting")
-	r.Zero(len(res.lifecycles.onDisconnected), "connection should not have disconnected")
-	r.GreaterOrEqual(len(res.lifecycles.onHeartbeat), 10, "heartbeats should have been processed")
+	res.lifecycles.lock.Lock()
+	disconnectingCount := len(res.lifecycles.onStartDisconnecting)
+	disconnectedCount := len(res.lifecycles.onDisconnected)
+	heartbeatCount := len(res.lifecycles.onHeartbeat)
+	res.lifecycles.lock.Unlock()
+	r.Zero(disconnectingCount, "connection should not have started disconnecting")
+	r.Zero(disconnectedCount, "connection should not have disconnected")
+	r.GreaterOrEqual(heartbeatCount, 10, "heartbeats should have been processed")
 }
