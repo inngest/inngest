@@ -500,33 +500,6 @@ func (m shardedMgr) metadata(ctx context.Context, accountId uuid.UUID, runID uli
 	return newRunMetadata(val)
 }
 
-func (m shardedMgr) Cancel(ctx context.Context, id state.Identifier) error {
-	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Cancel"), redis_telemetry.ScopeFnRunState)
-
-	fnRunState := m.s.FunctionRunState()
-	r, isSharded := fnRunState.Client(ctx, id.AccountID, id.RunID)
-	status, err := retriableScripts["cancel"].Exec(
-		redis_telemetry.WithScriptName(ctx, "cancel"),
-		r,
-		[]string{fnRunState.kg.RunMetadata(ctx, isSharded, id.RunID)},
-		[]string{},
-	).AsInt64()
-	if err != nil && !rueidis.IsRedisNil(err) {
-		return fmt.Errorf("error cancelling: %w", err)
-	}
-	switch status {
-	case 0:
-		return nil
-	case 1:
-		return state.ErrFunctionComplete
-	case 2:
-		return state.ErrFunctionFailed
-	case 3:
-		return state.ErrFunctionCancelled
-	}
-	return fmt.Errorf("unknown return value cancelling function: %d", status)
-}
-
 func (m shardedMgr) SetStatus(ctx context.Context, id state.Identifier, status enums.RunStatus) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "SetStatus"), redis_telemetry.ScopeFnRunState)
 
