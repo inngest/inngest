@@ -481,6 +481,8 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 
 		isStep := span.Name == meta.SpanNameStep || span.Name == meta.SpanNameStepDiscovery
 		if isStep {
+			filterSleepSchedulingAttempts(gqlSpan)
+
 			// Step spans should not show attempts if they only have one and
 			// have resolved
 			if len(gqlSpan.ChildrenSpans) == 1 && gqlSpan.ChildrenSpans[0].Status == models.RunTraceSpanStatusCompleted {
@@ -554,6 +556,55 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 	}
 
 	return gqlSpan, nil
+}
+
+func filterSleepSchedulingAttempts(step *models.RunTraceSpan) {
+	if step == nil || step.StepOp == nil || *step.StepOp != models.StepOpSleep || len(step.ChildrenSpans) < 2 {
+		return
+	}
+
+	keepFollowupAttempt := false
+	for _, child := range step.ChildrenSpans {
+		if child == nil || child.StepOp == nil || *child.StepOp != models.StepOpSleep {
+			continue
+		}
+
+		if child.Response == nil {
+			keepFollowupAttempt = true
+			break
+		}
+	}
+
+	if !keepFollowupAttempt {
+		return
+	}
+
+	filtered := make([]*models.RunTraceSpan, 0, len(step.ChildrenSpans))
+	for _, child := range step.ChildrenSpans {
+		if isSleepSchedulingAttempt(child) {
+			continue
+		}
+
+		filtered = append(filtered, child)
+	}
+
+	step.ChildrenSpans = filtered
+}
+
+func isSleepSchedulingAttempt(span *models.RunTraceSpan) bool {
+	if span == nil || span.StepOp == nil || *span.StepOp != models.StepOpSleep || span.Response == nil {
+		return false
+	}
+
+	if span.Response.StatusCode != 206 {
+		return false
+	}
+
+	if span.StartedAt == nil || span.EndedAt == nil {
+		return false
+	}
+
+	return span.StartedAt.Equal(*span.EndedAt)
 }
 
 func (tr *traceReader) GetLegacyRunTrace(ctx context.Context, keys dataloader.Keys) []*dataloader.Result {
