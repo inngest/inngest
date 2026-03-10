@@ -288,7 +288,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		Continuations: true,
 	}
 	enableKeyQueues := os.Getenv("EXPERIMENTAL_KEY_QUEUES_ENABLE") == "true"
-	enableStepMetadata := os.Getenv("EXPERIMENTAL_STEP_METADATA") == "true"
+	enableStepMetadata := os.Getenv("EXPERIMENTAL_STEP_METADATA") != "false"
 
 	if enableKeyQueues {
 		runMode.ShadowPartition = true
