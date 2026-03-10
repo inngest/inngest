@@ -213,7 +213,7 @@ func TestConvertToConstraintConfiguration(t *testing.T) {
 					{
 						Scope:             enums.RateLimitScopeFn,
 						Limit:             10,
-						KeyExpressionHash: util.XXHash(""),
+						KeyExpressionHash: "",
 						Period:            60,
 					},
 				},

@@ -379,6 +379,7 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 					Service:           constraintapi.ServiceExecutor,
 					RunProcessingMode: constraintapi.RunProcessingModeBackground,
 				},
+				LeaseIssuedAt: time.UnixMilli(item.CapacityLease.IssuedAtMS),
 			})
 			if err != nil {
 				l.ReportError(err, "failed to release expired capacity", logger.WithErrorReportTags(map[string]string{
