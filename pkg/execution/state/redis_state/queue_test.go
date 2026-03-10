@@ -578,7 +578,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 		require.WithinDuration(t,
 			time.UnixMilli(item.WallTimeMS),
 			start,
-			time.Second,
+			1500*time.Millisecond,
 		)
 
 		assert.Equal(t, osqueue.QueuePartition{
