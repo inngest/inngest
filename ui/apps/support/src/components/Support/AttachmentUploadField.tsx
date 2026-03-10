@@ -296,7 +296,7 @@ export function AttachmentUploadField({
 
       <div>
         <input
-          ref={fileInputRef}
+          ref={fileInputRef as React.RefObject<HTMLInputElement>}
           type="file"
           multiple
           accept={ACCEPTED_FILE_TYPES}
