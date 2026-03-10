@@ -38,6 +38,7 @@ type RunTraceSpan struct {
 	Duration          *int                      `json:"duration,omitempty"`
 	OutputID          *string                   `json:"outputID,omitempty"`
 	QueuedAt          time.Time                 `json:"queuedAt"`
+	ScheduledAt       *time.Time                `json:"scheduledAt,omitempty"`
 	StartedAt         *time.Time                `json:"startedAt,omitempty"`
 	EndedAt           *time.Time                `json:"endedAt,omitempty"`
 	ChildrenSpans     []*RunTraceSpan           `json:"childrenSpans"`

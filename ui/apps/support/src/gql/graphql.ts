@@ -1955,6 +1955,7 @@ export type RunTraceSpan = {
   queuedAt: Scalars['Time'];
   run: FunctionRun;
   runID: Scalars['ULID'];
+  scheduledAt: Maybe<Scalars['Time']>;
   spanID: Scalars['String'];
   startedAt: Maybe<Scalars['Time']>;
   status: RunTraceSpanStatus;

@@ -73,16 +73,21 @@ function calculateTimingBreakdown(
 ): { queueMs: number; executionMs: number; totalMs: number } | undefined {
   if (!trace.queuedAt) return undefined;
 
-  const queuedAt = new Date(trace.queuedAt).getTime();
+  // Use scheduledAt as the baseline when present, to avoid counting intentional
+  // future-scheduling delay as queue time. scheduledAt is typically only set on
+  // root spans, but we handle it here defensively.
+  const baseline = trace.scheduledAt
+    ? new Date(trace.scheduledAt).getTime()
+    : new Date(trace.queuedAt).getTime();
   const startedAt = trace.startedAt ? new Date(trace.startedAt).getTime() : null;
   const endedAt = trace.endedAt ? new Date(trace.endedAt).getTime() : Date.now();
 
   // Calculate durations
   const queueMs = startedAt
-    ? Math.max(0, startedAt - queuedAt)
-    : Math.max(0, Date.now() - queuedAt);
+    ? Math.max(0, startedAt - baseline)
+    : Math.max(0, Date.now() - baseline);
   const executionMs = startedAt ? Math.max(0, endedAt - startedAt) : 0;
-  const totalMs = startedAt ? queueMs + executionMs : Date.now() - queuedAt;
+  const totalMs = startedAt ? queueMs + executionMs : Date.now() - baseline;
 
   return { queueMs, executionMs, totalMs };
 }
@@ -126,15 +131,20 @@ function traceToBarData(trace: Trace, orgName?: string, rootStatus?: string): Ti
   // fallback for bars that don't have a meaningful status of their own.
   const status = trace.status || rootStatus;
 
-  // Actual queue delay: time from when the step was queued to when execution started
+  // Actual queue delay: time from when the run was expected to start to when execution started.
+  // For future-scheduled runs, use scheduledAt as the baseline to avoid counting intentional
+  // scheduling as queue delay.
+  const delayBaseline = trace.scheduledAt
+    ? new Date(trace.scheduledAt).getTime()
+    : new Date(trace.queuedAt).getTime();
   const delayMs = trace.startedAt
-    ? Math.max(0, new Date(trace.startedAt).getTime() - new Date(trace.queuedAt).getTime())
+    ? Math.max(0, new Date(trace.startedAt).getTime() - delayBaseline)
     : undefined;
 
   return {
     id: trace.spanID,
     name: getSpanName(trace.name),
-    startTime: new Date(trace.queuedAt),
+    startTime: new Date(trace.scheduledAt ?? trace.queuedAt),
     endTime: trace.endedAt ? new Date(trace.endedAt) : null,
     style: getStyleForTrace(trace),
     children: trace.childrenSpans?.map((child) => traceToBarData(child, orgName, rootStatus)),
@@ -159,12 +169,15 @@ export function traceToTimelineData(
 ): TimelineData {
   const { orgName, leftWidth = TIMELINE_CONSTANTS.DEFAULT_LEFT_WIDTH } = options;
 
-  // Calculate min/max time from the entire trace tree
-  let minTime = new Date(trace.queuedAt);
+  // Calculate min/max time from the entire trace tree.
+  // For future-scheduled runs, use scheduledAt so the timeline doesn't include
+  // the intentional pre-schedule wait period.
+  let minTime = new Date(trace.scheduledAt ?? trace.queuedAt);
   let maxTime = trace.endedAt ? new Date(trace.endedAt) : new Date();
 
+  // scheduledAt is only set on root spans; child spans will always fall back to queuedAt.
   traceWalk(trace, (t) => {
-    minTime = min([minTime, new Date(t.queuedAt)]);
+    minTime = min([minTime, new Date(t.scheduledAt ?? t.queuedAt)]);
     const endedAt = t.endedAt ? new Date(t.endedAt) : null;
     if (endedAt) {
       maxTime = max([endedAt, maxTime]);

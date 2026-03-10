@@ -1218,6 +1218,21 @@ func (e *executor) schedule(
 	}
 
 	runTimestamp := runID.Timestamp()
+
+	// Calculate the scheduled execution time.
+	at := e.now()
+	if req.BatchID == nil {
+		evtTs := time.UnixMilli(req.Events[0].GetEvent().Timestamp)
+		if evtTs.After(at) {
+			// Schedule functions in the future if there's a future
+			// event `ts` field.
+			at = evtTs
+		}
+	}
+	if req.At != nil {
+		at = *req.At
+	}
+
 	runSpanOpts := &tracing.CreateSpanOptions{
 		Debug:    &tracing.SpanDebugData{Location: "executor.Schedule"},
 		Metadata: &metadata,
@@ -1229,6 +1244,9 @@ func (e *executor) schedule(
 			meta.Attr(meta.Attrs.QueuedAt, &runTimestamp),
 		),
 		Seed: []byte(metadata.ID.RunID[:]),
+	}
+	if at.After(runTimestamp) {
+		meta.AddAttr(runSpanOpts.Attributes, meta.Attrs.ScheduledAt, &at)
 	}
 	if req.RunMode == enums.RunModeSync {
 		// XXX: If this is a sync run, always add the start time to the span. We do this
@@ -1300,19 +1318,6 @@ func (e *executor) schedule(
 				return &metadata.ID.RunID, &metadata, err
 			}
 		}
-	}
-
-	at := e.now()
-	if req.BatchID == nil {
-		evtTs := time.UnixMilli(req.Events[0].GetEvent().Timestamp)
-		if evtTs.After(at) {
-			// Schedule functions in the future if there's a future
-			// event `ts` field.
-			at = evtTs
-		}
-	}
-	if req.At != nil {
-		at = *req.At
 	}
 
 	// Prefix the workflow to the job ID so that no invocation can accidentally

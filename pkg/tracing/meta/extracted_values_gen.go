@@ -19,6 +19,7 @@ type ExtractedValues struct {
 	StartedAt *time.Time
 	QueuedAt *time.Time
 	EndedAt *time.Time
+	ScheduledAt *time.Time
 	AccountID *uuid.UUID
 	AppID *uuid.UUID
 	BatchID *ulid.ULID

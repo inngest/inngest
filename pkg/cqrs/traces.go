@@ -148,6 +148,16 @@ func (s *OtelSpan) GetQueuedAtTime() time.Time {
 	return s.StartTime
 }
 
+// GetScheduledAtTime returns the time the run was scheduled to execute, if it
+// was intentionally delayed (e.g. via a future event ts or req.At). Returns nil
+// if the run was not intentionally scheduled for the future.
+func (s *OtelSpan) GetScheduledAtTime() *time.Time {
+	if s.Attributes != nil && s.Attributes.ScheduledAt != nil {
+		return s.Attributes.ScheduledAt
+	}
+	return nil
+}
+
 // GetStartedAtTime gets the time that the span started. Note that this is not necessarily
 // when the span created, as it may be dynamic.
 func (s *OtelSpan) GetStartedAtTime() *time.Time {

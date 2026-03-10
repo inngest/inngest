@@ -14,6 +14,7 @@ const traceDetailsFragment = graphql(`
     status
     attempts
     queuedAt
+    scheduledAt
     startedAt
     endedAt
     isRoot
