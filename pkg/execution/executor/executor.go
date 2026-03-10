@@ -29,6 +29,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/exechttp"
 	"github.com/inngest/inngest/pkg/execution/executor/queueref"
+	"github.com/inngest/inngest/pkg/execution/executor/responsecache"
 	"github.com/inngest/inngest/pkg/execution/pauses"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/ratelimit"
@@ -263,6 +264,13 @@ func WithStateSizeLimits(limit func(id sv2.ID) int) ExecutorOpt {
 func WithRateLimiter(rl ratelimit.RateLimiter) ExecutorOpt {
 	return func(e execution.Executor) error {
 		e.(*executor).rateLimiter = rl
+		return nil
+	}
+}
+
+func WithResponseCache(rc responsecache.ResponseCache) ExecutorOpt {
+	return func(e execution.Executor) error {
+		e.(*executor).responseCache = rc
 		return nil
 	}
 }
@@ -505,6 +513,10 @@ type executor struct {
 
 	allowStepMetadata AllowStepMetadata
 	clock             clockwork.Clock
+
+	// responseCache optionally caches SDK responses to disk for crash
+	// recovery.  If nil, caching is disabled.
+	responseCache responsecache.ResponseCache
 }
 
 func (e *executor) SetFinalizer(f execution.FinalizePublisher) {
@@ -2091,27 +2103,73 @@ func (e *executor) run(ctx context.Context, i *runInstance) (*state.DriverRespon
 		}
 	}
 
+	// Attempt to load a cached response before sending the request.  This
+	// handles the case where the executor previously sent the request,
+	// received the response, and cached it but crashed before fully
+	// processing the result.  The cache key includes the attempt number
+	// so that genuine retries still reach the SDK.
+	cacheKey := e.responseCacheKey(ctx, i)
+	if cacheKey != "" {
+		if cached, err := e.responseCache.Get(ctx, cacheKey); err != nil {
+			e.log.Warn("response cache get error", "error", err, "cache_key", cacheKey)
+		} else if cached != nil {
+			metrics.IncrResponseCacheLookupCounter(ctx, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags:    map[string]any{"status": "hit"},
+			})
+			return cached, nil
+		} else {
+			metrics.IncrResponseCacheLookupCounter(ctx, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags:    map[string]any{"status": "miss"},
+			})
+		}
+	}
+
 	for _, e := range e.lifecycles {
 		go e.OnStepStarted(context.WithoutCancel(ctx), i.md, i.item, i.edge, endpoint.String())
 	}
 
+	var resp *state.DriverResponse
+	var err error
+
 	switch d := e.fnDriver(ctx, i.f).(type) {
 	case driver.DriverV2:
-		return e.executeDriverV2(ctx, i, d, endpoint.String())
+		resp, err = e.executeDriverV2(ctx, i, d, endpoint.String())
 	case driver.DriverV1:
-		{
-			// Execute the actual step using V1 drivers.  The V1 driver embeds errors in driver
-			// response and has generally difficult error management.
-			response, err := e.executeDriverV1(ctx, i)
-			if response.Err != nil && err == nil {
-				// This step errored, so always return an error.
-				return response, fmt.Errorf("%s", *response.Err)
-			}
-			return response, err
+		resp, err = e.executeDriverV1(ctx, i)
+		if resp != nil && resp.Err != nil && err == nil {
+			err = fmt.Errorf("%s", *resp.Err)
 		}
 	default:
 		return nil, fmt.Errorf("%w: '%s'", ErrNoRuntimeDriver, inngest.Driver(i.f))
 	}
+
+	// Cache the response so that a crash before we finish processing
+	// doesn't force a duplicate request to the SDK.  We cache all
+	// non-nil responses, including user errors—only nil responses
+	// (internal failures where the request never reached the SDK) are
+	// skipped.
+	if cacheKey != "" && resp != nil {
+		if cacheErr := e.responseCache.Set(ctx, cacheKey, resp); cacheErr != nil {
+			e.log.Warn("response cache set error", "error", cacheErr, "cache_key", cacheKey)
+		}
+	}
+
+	return resp, err
+}
+
+// responseCacheKey returns a cache key for the current execution attempt,
+// or an empty string if caching is disabled or the job ID is unavailable.
+func (e *executor) responseCacheKey(ctx context.Context, i *runInstance) string {
+	if e.responseCache == nil {
+		return ""
+	}
+	jobID := queue.JobIDFromContext(ctx)
+	if jobID == "" {
+		return ""
+	}
+	return fmt.Sprintf("%s:%d", jobID, i.item.Attempt)
 }
 
 func (e *executor) executeDriverV2(ctx context.Context, run *runInstance, d driver.DriverV2, url string) (*state.DriverResponse, error) {
