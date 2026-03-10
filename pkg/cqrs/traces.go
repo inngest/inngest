@@ -463,6 +463,25 @@ type FindOrCreateTraceRunOpt struct {
 	TraceID     string
 }
 
+type getRunContextKey struct{}
+
+type GetRunOpt struct {
+	IncludeOutput bool
+}
+
+func WithGetRunOpt(ctx context.Context, opt GetRunOpt) context.Context {
+	return context.WithValue(ctx, getRunContextKey{}, opt)
+}
+
+func GetRunOptFromContext(ctx context.Context) GetRunOpt {
+	opt, ok := ctx.Value(getRunContextKey{}).(GetRunOpt)
+	if !ok {
+		return GetRunOpt{}
+	}
+
+	return opt
+}
+
 type GetTraceRunFilter struct {
 	AccountID   uuid.UUID
 	WorkspaceID uuid.UUID
