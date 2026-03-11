@@ -210,8 +210,6 @@ export const StepInfo = ({
     stepInfo: trace.stepInfo,
   });
 
-  const experimentMetadata = trace.metadata?.find(isExperimentMetadata);
-
   const aiOutput = result?.data ? parseAIOutput(result.data) : undefined;
   const prettyInput = usePrettyJson(result?.input ?? '') || (result?.input ?? '');
   const prettyOutput = usePrettyJson(result?.data ?? '') || (result?.data ?? '');
@@ -248,8 +246,16 @@ export const StepInfo = ({
     : [];
 
   const nonHeaderMetadata = metadataIsEnabled
-    ? trace.metadata?.filter((md) => md.kind !== 'inngest.response_headers')
+    ? trace.metadata?.filter(
+        (md) => md.kind !== 'inngest.response_headers' && !isExperimentMetadata(md)
+      )
     : undefined;
+
+  const experimentMetadataList = metadataIsEnabled
+    ? trace.metadata?.filter(isExperimentMetadata)
+    : undefined;
+
+  const experimentMetadata = experimentMetadataList?.[0];
 
   const hasNoData = !prettyInput && !prettyOutput && !result?.error;
 
@@ -388,6 +394,15 @@ export const StepInfo = ({
                     },
                   ]
                 : []),
+              ...(experimentMetadataList?.length
+                ? [
+                    {
+                      label: 'Experiment',
+                      id: 'experiment',
+                      node: <MetadataAttrs metadata={experimentMetadataList} />,
+                    },
+                  ]
+                : []),
               ...(nonHeaderMetadata?.length
                 ? [
                     {
@@ -452,6 +467,15 @@ export const StepInfo = ({
                           label: 'Headers',
                           id: 'headers',
                           node: <MetadataAttrs metadata={responseHeaderData} />,
+                        },
+                      ]
+                    : []),
+                  ...(experimentMetadataList?.length
+                    ? [
+                        {
+                          label: 'Experiment',
+                          id: 'experiment',
+                          node: <MetadataAttrs metadata={experimentMetadataList} />,
                         },
                       ]
                     : []),
