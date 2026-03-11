@@ -215,7 +215,6 @@ const GetVolumeMetrics = graphql(`
           scope: FN
           from: $from
           functionIDs: $functionIDs
-          appIDs: $appIDs
           until: $until
         }
       ) {
