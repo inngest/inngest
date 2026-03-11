@@ -3,7 +3,7 @@ package constraintapi
 import (
 	"context"
 	"crypto/rand"
-	"sync/atomic"
+	mrand "math/rand"
 	"time"
 
 	"github.com/google/uuid"
@@ -37,9 +37,6 @@ type constraintCache struct {
 	enableHighCardinalityInstrumentation EnableHighCardinalityInstrumentation
 	enableCache                          EnableConstraintCacheFn
 	shouldCache                          ShouldCacheConstraintFn
-
-	// acquireCount is used to sample cache size gauge reporting (~every 100 calls).
-	acquireCount atomic.Int64
 }
 
 type constraintCacheItem struct {
@@ -102,8 +99,8 @@ func (l *constraintCache) Acquire(ctx context.Context, req *CapacityAcquireReque
 		return l.manager.Acquire(ctx, req)
 	}
 
-	// Report cache size gauge every ~100 Acquire calls to avoid lock overhead at high volume.
-	if l.acquireCount.Add(1)%100 == 0 {
+	// Report cache size gauge on ~1% of Acquire calls to avoid ItemCount() lock overhead at high volume.
+	if mrand.Float64() < 0.01 {
 		metrics.GaugeConstraintAPICacheSize(ctx, int64(l.cache.ItemCount()), metrics.GaugeOpt{
 			PkgName: pkgName,
 		})
@@ -281,15 +278,19 @@ func NewConstraintCache(
 				// OnDelete fires on the ccache worker goroutine for both LRU evictions
 				// and explicit deletions. We use context.Background() since there's no
 				// request context available here; OTEL SDK buffers these internally.
-				if item.Expired() {
-					metrics.IncrConstraintAPICacheEvictedExpiredCounter(context.Background(), metrics.CounterOpt{
-						PkgName: pkgName,
-					})
-				} else {
-					metrics.IncrConstraintAPICacheEvictedUnexpiredCounter(context.Background(), metrics.CounterOpt{
-						PkgName: pkgName,
-					})
-					metrics.HistogramConstraintAPICacheEvictedRemainingTTL(context.Background(), item.TTL(), metrics.HistogramOpt{
+				expired := item.Expired()
+				metrics.IncrConstraintAPICacheEvictedCounter(context.Background(), metrics.CounterOpt{
+					PkgName: pkgName,
+					Tags: map[string]any{
+						"expired": expired,
+					},
+				})
+				if !expired {
+					remainingTTL := item.TTL()
+					if remainingTTL < 0 {
+						remainingTTL = 0
+					}
+					metrics.HistogramConstraintAPICacheEvictedRemainingTTL(context.Background(), remainingTTL, metrics.HistogramOpt{
 						PkgName: pkgName,
 					})
 				}

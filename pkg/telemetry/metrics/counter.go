@@ -921,20 +921,11 @@ func IncrConstraintAPIIssuedLeaseCounter(ctx context.Context, count int64, opts 
 	})
 }
 
-func IncrConstraintAPICacheEvictedUnexpiredCounter(ctx context.Context, opts CounterOpt) {
+func IncrConstraintAPICacheEvictedCounter(ctx context.Context, opts CounterOpt) {
 	RecordCounterMetric(ctx, 1, CounterOpt{
 		PkgName:     opts.PkgName,
-		MetricName:  "constraintapi_cache_evicted_unexpired_total",
-		Description: "Total number of constraint cache items evicted before TTL expired (cache thrashing indicator)",
-		Tags:        opts.Tags,
-	})
-}
-
-func IncrConstraintAPICacheEvictedExpiredCounter(ctx context.Context, opts CounterOpt) {
-	RecordCounterMetric(ctx, 1, CounterOpt{
-		PkgName:     opts.PkgName,
-		MetricName:  "constraintapi_cache_evicted_expired_total",
-		Description: "Total number of constraint cache items evicted after TTL expired (normal cleanup)",
+		MetricName:  "constraintapi_cache_evicted_total",
+		Description: "Total number of constraint cache items evicted, tagged by whether the item was expired",
 		Tags:        opts.Tags,
 	})
 }
