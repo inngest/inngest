@@ -306,9 +306,12 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 		cacheMinTTL, // ARGV[12]: cache min TTL in seconds
 		cacheMaxTTL, // ARGV[13]: cache max TTL in seconds
 	}
-	// ARGV[14..13+N]: one cache key per sorted constraint (empty string if disabled)
-	for _, ck := range cacheKeys {
-		argsList = append(argsList, ck)
+	// ARGV[14..13+N]: one cache key per sorted constraint (empty string if disabled).
+	// Only appended when caching is enabled to avoid overhead in the Lua script.
+	if cacheEnabled {
+		for _, ck := range cacheKeys {
+			argsList = append(argsList, ck)
+		}
 	}
 
 	args, err := strSlice(argsList)
