@@ -14,6 +14,7 @@ import {
 import { getTicketsByEmail } from "@/data/plain";
 import { TicketCard } from "@/components/Support/TicketCard";
 import { CommunityChannels } from "@/components/Support/CommunityChannels";
+import { Main } from "@/components/Main";
 
 type TicketSearchParams = {
   status?: TicketStatusFilter;
@@ -110,7 +111,7 @@ function Home() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-5xl py-6">
+    <Main className="mx-auto w-full max-w-5xl py-6">
       <header className="flex flex-row justify-between items-center pb-6">
         {/* Filters */}
         <Filters
@@ -163,6 +164,6 @@ function Home() {
           </>
         )}
       </div>
-    </div>
+    </Main>
   );
 }
