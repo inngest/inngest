@@ -41,7 +41,7 @@ type HTTPMetadata struct {
 	Method			string	`json:"method"`
 	RequestSize		*int64	`json:"request_size,omitempty"`
 	ResponseSize		*int64	`json:"response_size,omitempty"`
-	ResponseStatus		int64	`json:"response_status"`
+	ResponseStatus		*int64	`json:"response_status,omitempty"`
 	Domain			*string	`json:"domain,omitempty"`
 	Path			*string	`json:"path,omitempty"`
 }

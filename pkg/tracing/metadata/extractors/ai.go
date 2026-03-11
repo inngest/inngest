@@ -177,7 +177,7 @@ func ExtractAIGatewayMetadata(req aigateway.Request, respStatus int, resp []byte
 
 			ResponseContentType: util.ToPtr("application/json"),
 			ResponseSize:        util.ToPtr(int64(len(resp))),
-			ResponseStatus:      int64(respStatus),
+			ResponseStatus:      util.ToPtr(int64(respStatus)),
 		},
 	}, nil
 }
