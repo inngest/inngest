@@ -580,7 +580,9 @@ func TestLuaCompatibility(t *testing.T) {
 					constraintapi.WithClient(rc),
 					constraintapi.WithShardName("test"),
 					constraintapi.WithEnableAcquireCache(enableCache),
-					constraintapi.WithAcquireCacheTTL(constraintapi.MinCacheTTL, constraintapi.MaxCacheTTL),
+					constraintapi.WithAcquireCacheTTL(func(_ context.Context, _, _, _ uuid.UUID) (time.Duration, time.Duration) {
+						return constraintapi.MinCacheTTL, constraintapi.MaxCacheTTL
+					}),
 				)
 				require.NoError(t, err)
 

@@ -42,7 +42,9 @@ func newTestSetup(t *testing.T, enableCache EnableAcquireCacheFn) (*redisCapacit
 		WithCheckIdempotencyTTL(0),
 	}
 	if enableCache != nil {
-		opts = append(opts, WithEnableAcquireCache(enableCache), WithAcquireCacheTTL(MinCacheTTL, MaxCacheTTL))
+		opts = append(opts, WithEnableAcquireCache(enableCache), WithAcquireCacheTTL(func(_ context.Context, _, _, _ uuid.UUID) (time.Duration, time.Duration) {
+			return MinCacheTTL, MaxCacheTTL
+		}))
 	}
 
 	cm, err := NewRedisCapacityManager(opts...)
@@ -294,8 +296,9 @@ func TestAcquireCacheTTLClamping(t *testing.T) {
 	customMaxTTL := 15 * time.Second
 
 	cm, r, clock, ctx := newTestSetup(t, enableAllCache())
-	cm.acquireCacheMinTTL = customMinTTL
-	cm.acquireCacheMaxTTL = customMaxTTL
+	cm.acquireCacheTTL = func(_ context.Context, _, _, _ uuid.UUID) (time.Duration, time.Duration) {
+		return customMinTTL, customMaxTTL
+	}
 
 	config := ConstraintConfig{
 		FunctionVersion: 1,

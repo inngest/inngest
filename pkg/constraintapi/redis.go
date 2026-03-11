@@ -32,6 +32,10 @@ var enableDebugLogs = false
 // allowing granular control over which constraints (or entire accounts/envs/functions) are cached.
 type EnableAcquireCacheFn func(ctx context.Context, accountID, envID, functionID uuid.UUID, ci ConstraintItem) (enable bool)
 
+// AcquireCacheTTLFn returns the min and max cache TTL for a given account/env/function.
+// This allows dynamic TTL configuration per user.
+type AcquireCacheTTLFn func(ctx context.Context, accountID, envID, functionID uuid.UUID) (minTTL, maxTTL time.Duration)
+
 type redisCapacityManager struct {
 	// Constraint state is stored in Redis-compatible scavengerShards for the time being.
 	// In the future, we will move to another data store like FoundationDB.
@@ -43,8 +47,7 @@ type redisCapacityManager struct {
 	enableDebugLogs                      bool
 	enableHighCardinalityInstrumentation EnableHighCardinalityInstrumentation
 	enableAcquireCache                   EnableAcquireCacheFn
-	acquireCacheMinTTL                   time.Duration
-	acquireCacheMaxTTL                   time.Duration
+	acquireCacheTTL                      AcquireCacheTTLFn
 
 	lifecycles []ConstraintAPILifecycleHooks
 
@@ -115,10 +118,9 @@ func WithEnableAcquireCache(fn EnableAcquireCacheFn) RedisCapacityManagerOption 
 	}
 }
 
-func WithAcquireCacheTTL(minTTL, maxTTL time.Duration) RedisCapacityManagerOption {
+func WithAcquireCacheTTL(fn AcquireCacheTTLFn) RedisCapacityManagerOption {
 	return func(m *redisCapacityManager) {
-		m.acquireCacheMinTTL = minTTL
-		m.acquireCacheMaxTTL = maxTTL
+		m.acquireCacheTTL = fn
 	}
 }
 
@@ -129,8 +131,6 @@ func NewRedisCapacityManager(
 		operationIdempotencyTTL:       OperationIdempotencyTTL,
 		constraintCheckIdempotencyTTL: ConstraintCheckIdempotencyTTL,
 		checkIdempotencyTTL:           CheckIdempotencyTTL,
-		acquireCacheMinTTL:            MinCacheTTL,
-		acquireCacheMaxTTL:            MaxCacheTTL,
 	}
 
 	for _, rcmo := range options {
