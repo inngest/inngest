@@ -565,6 +565,86 @@ func TestLuaCompatibility(t *testing.T) {
 				require.Equal(t, constraintapi.RunProcessingModeDurableEndpoint, releaseResp.CreationSource.RunProcessingMode)
 			})
 
+			t.Run("acquire cache hit on exhausted constraint", func(t *testing.T) {
+				shard := setup(t)
+
+				rc := shard.Client().Client()
+
+				enableCache := func(_ context.Context, _, _, _ uuid.UUID, _ constraintapi.ConstraintItem) (bool, time.Duration, time.Duration) {
+					return true, constraintapi.MinCacheTTL, constraintapi.MaxCacheTTL
+				}
+
+				cm, err := constraintapi.NewRedisCapacityManager(
+					constraintapi.WithClock(clockwork.NewRealClock()),
+					constraintapi.WithEnableDebugLogs(true),
+					constraintapi.WithClient(rc),
+					constraintapi.WithShardName("test"),
+					constraintapi.WithEnableAcquireCache(enableCache),
+				)
+				require.NoError(t, err)
+
+				config := constraintapi.ConstraintConfig{
+					FunctionVersion: 1,
+					Concurrency: constraintapi.ConcurrencyConfig{
+						FunctionConcurrency: 1, // Single slot so we can exhaust easily
+					},
+				}
+
+				accountID := uuid.New()
+				envID := uuid.New()
+				functionID := uuid.New()
+
+				constraints := []constraintapi.ConstraintItem{
+					{
+						Kind: constraintapi.ConstraintKindConcurrency,
+						Concurrency: &constraintapi.ConcurrencyConstraint{
+							Scope: enums.ConcurrencyScopeFn,
+							Mode:  enums.ConcurrencyModeStep,
+						},
+					},
+				}
+
+				makeReq := func(idempotencyKey string) *constraintapi.CapacityAcquireRequest {
+					return &constraintapi.CapacityAcquireRequest{
+						IdempotencyKey:       idempotencyKey,
+						AccountID:            accountID,
+						EnvID:                envID,
+						FunctionID:           functionID,
+						Configuration:        config,
+						Constraints:          constraints,
+						Amount:               1,
+						LeaseIdempotencyKeys: []string{"item-" + idempotencyKey},
+						CurrentTime:          time.Now(),
+						Duration:             30 * time.Second,
+						MaximumLifetime:      time.Hour,
+						Source: constraintapi.LeaseSource{
+							Service:           constraintapi.ServiceAPI,
+							Location:          constraintapi.CallerLocationItemLease,
+							RunProcessingMode: constraintapi.RunProcessingModeDurableEndpoint,
+						},
+					}
+				}
+
+				// First acquire: fills the single concurrency slot, no cache exists yet
+				resp1, err := cm.Acquire(ctx, makeReq("fill-slot"))
+				require.NoError(t, err)
+				require.Len(t, resp1.Leases, 1, "first acquire should grant one lease")
+				require.False(t, resp1.CacheHit, "first acquire must not be a cache hit")
+
+				// Second acquire: constraint is exhausted, Lua writes cache entry
+				resp2, err := cm.Acquire(ctx, makeReq("exhaust"))
+				require.NoError(t, err)
+				require.Empty(t, resp2.Leases, "second acquire should be denied — capacity exhausted")
+				require.NotEmpty(t, resp2.ExhaustedConstraints, "should report exhausted constraint")
+
+				// Third acquire: cache entry now exists, should short-circuit via cache
+				resp3, err := cm.Acquire(ctx, makeReq("cached"))
+				require.NoError(t, err)
+				require.Empty(t, resp3.Leases, "third acquire should be denied from cache")
+				require.NotEmpty(t, resp3.ExhaustedConstraints, "cached response should report exhausted constraint")
+				require.True(t, resp3.CacheHit, "third acquire must be a cache hit")
+			})
+
 			t.Run("acquiring capacity when exhausted", func(t *testing.T) {
 				shard := setup(t)
 
