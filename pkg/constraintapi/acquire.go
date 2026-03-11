@@ -165,6 +165,14 @@ type acquireScriptResponse struct {
 	FairnessReduction    int                 `json:"fr"`
 	RetryAt              int                 `json:"ra"`
 	Debug                flexibleStringArray `json:"d"`
+	CacheHit             int                 `json:"ch"`
+}
+
+// acquireCacheEntry represents the per-constraint cache configuration passed to the Lua script.
+type acquireCacheEntry struct {
+	CacheKey string `json:"ck"`
+	MinTTL   int    `json:"min"` // seconds
+	MaxTTL   int    `json:"max"` // seconds
 }
 
 func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquireRequest) (*CapacityAcquireResponse, errs.InternalError) {
@@ -224,6 +232,30 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 		return nil, errs.Wrap(0, false, "could not build request state: %w", err)
 	}
 
+	// Build per-constraint cache config for the Lua script
+	cacheEntries := make([]acquireCacheEntry, len(sortedConstraints))
+	if r.enableAcquireCache != nil {
+		for i, ci := range sortedConstraints {
+			enabled, minTTL, maxTTL := r.enableAcquireCache(ctx, req.AccountID, req.EnvID, req.FunctionID, ci)
+			if !enabled {
+				continue
+			}
+			key := r.keyConstraintCache(req.AccountID, req.EnvID, req.FunctionID, ci)
+			if key == "" {
+				continue
+			}
+			cacheEntries[i] = acquireCacheEntry{
+				CacheKey: key,
+				MinTTL:   int(max(minTTL.Seconds(), 1)),
+				MaxTTL:   int(max(maxTTL.Seconds(), 1)),
+			}
+		}
+	}
+	cacheConfigJSON, err := json.Marshal(cacheEntries)
+	if err != nil {
+		return nil, errs.Wrap(0, false, "could not marshal cache config: %w", err)
+	}
+
 	// Build Lua request
 
 	// When the same Acquire request is received again after a successful first request, we will
@@ -276,6 +308,8 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 		int(r.constraintCheckIdempotencyTTL.Seconds()),
 
 		enableDebugLogsVal,
+
+		rueidis.BinaryString(cacheConfigJSON),
 	})
 	if err != nil {
 		return nil, errs.Wrap(0, false, "invalid args: %w", err)
@@ -335,6 +369,23 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 		for i, exhaustedConstraintIndex := range []int(parsedResponse.ExhaustedConstraints) {
 			exhaustedConstraints[i] = sortedConstraints[exhaustedConstraintIndex-1]
 		}
+	}
+
+	cacheHit := parsedResponse.CacheHit != 0
+
+	// Record centralized cache hit/miss metric
+	if r.enableAcquireCache != nil {
+		cacheOp := "miss"
+		if cacheHit {
+			cacheOp = "hit"
+		}
+		metrics.IncrConstraintAPIAcquireCacheCounter(ctx, metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags: map[string]any{
+				"op":    cacheOp,
+				"shard": r.shardName,
+			},
+		})
 	}
 
 	retryAfter := time.UnixMilli(int64(parsedResponse.RetryAt))
@@ -455,6 +506,7 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 			ExhaustedConstraints: exhaustedConstraints,
 			FairnessReduction:    parsedResponse.FairnessReduction,
 			RetryAfter:           retryAfter,
+			CacheHit:             cacheHit,
 			internalDebugState:   parsedResponse,
 		}, nil
 
@@ -473,6 +525,7 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 			ExhaustedConstraints: exhaustedConstraints,
 			RetryAfter:           retryAfter,
 			FairnessReduction:    parsedResponse.FairnessReduction,
+			CacheHit:             cacheHit,
 			internalDebugState:   parsedResponse,
 		}, nil
 
