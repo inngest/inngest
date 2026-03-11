@@ -465,7 +465,7 @@ func TestAcquireCacheIsolationAcrossAccounts(t *testing.T) {
 	// Cache a constraint as exhausted for account A
 	cacheKeyA := cm.keyConstraintCache(accountA, envA, fnA, constraints[0])
 	retryAtMS := clock.Now().Add(10 * time.Second).UnixMilli()
-	r.Set(cacheKeyA, fmt.Sprintf("%d", retryAtMS))
+	require.NoError(t, r.Set(cacheKeyA, fmt.Sprintf("%d", retryAtMS)))
 	r.SetTTL(cacheKeyA, 30*time.Second)
 
 	// Account A should see cache hit
@@ -504,7 +504,7 @@ func TestAcquireCacheDebugResponse(t *testing.T) {
 	// Pre-cache constraint
 	cacheKey := cm.keyConstraintCache(accountID, envID, fnID, constraints[0])
 	retryAtMS := clock.Now().Add(10 * time.Second).UnixMilli()
-	r.Set(cacheKey, fmt.Sprintf("%d", retryAtMS))
+	require.NoError(t, r.Set(cacheKey, fmt.Sprintf("%d", retryAtMS)))
 	r.SetTTL(cacheKey, 30*time.Second)
 
 	resp, err := cm.Acquire(ctx, makeAcquireRequest(accountID, envID, fnID, clock, config, constraints, "debug-test"))
