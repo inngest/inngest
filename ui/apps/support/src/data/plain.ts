@@ -7,7 +7,7 @@ import type {
   PlainSDKError,
   ThreadPartsFragment,
 } from "@team-plain/typescript-sdk/dist/index";
-import { getAuthenticatedUserEmail } from "@/data/clerk";
+import { requireAuthEmail } from "@/data/clerk";
 
 // Initialize Plain client
 // The API key should be set in the environment variable PLAIN_API_KEY
@@ -94,13 +94,11 @@ export type TicketStatusFilter =
   | typeof TICKET_STATUS_ALL;
 
 export const getTicketsByEmail = createServerFn({ method: "GET" })
-  .inputValidator(
-    (data: { email: string; status?: TicketStatusFilter }) => data,
-  )
+  .inputValidator((data: { status?: TicketStatusFilter }) => data)
   .handler(async ({ data }): Promise<Array<TicketSummary>> => {
-    // TODO - Use Clerk auth here to get the customer email, and the metadata with their external id
     try {
-      const { email, status } = data;
+      const email = await requireAuthEmail();
+      const { status } = data;
 
       // First, get or create the customer by email
       const customer = await plainClient.getCustomerByEmail({
@@ -229,10 +227,7 @@ export const getTicketById = createServerFn({ method: "GET" })
     try {
       const { ticketId } = data;
 
-      const userEmail = await getAuthenticatedUserEmail();
-      if (!userEmail) {
-        return null;
-      }
+      const userEmail = await requireAuthEmail();
 
       const res = (await plainClient.rawRequest({
         query: `
@@ -467,10 +462,7 @@ export const getTimelineEntriesForTicket = createServerFn({ method: "GET" })
     try {
       const { ticketId } = data;
 
-      const userEmail = await getAuthenticatedUserEmail();
-      if (!userEmail) {
-        return null;
-      }
+      const userEmail = await requireAuthEmail();
 
       const res = (await plainClient.rawRequest({
         query: `
@@ -654,6 +646,7 @@ export const getAttachmentDownloadUrl = createServerFn({ method: "GET" })
   .inputValidator((data: { attachmentId: string }) => data)
   .handler(async ({ data }): Promise<AttachmentDownloadUrl | null> => {
     try {
+      await requireAuthEmail();
       const { attachmentId } = data;
 
       const res = (await plainClient.rawRequest({
@@ -714,7 +707,8 @@ type AttachmentDownloadUrl = {
 export type CreateTicketInput = {
   user: {
     id: string;
-    email: string;
+    /** @deprecated No longer used - email is derived from authenticated session */
+    email?: string;
     name?: string;
   };
   ticket: {
@@ -735,6 +729,7 @@ export const createTicket = createServerFn({ method: "POST" })
   .inputValidator((data: CreateTicketInput) => data)
   .handler(async ({ data }): Promise<CreateTicketResult> => {
     try {
+      const authEmail = await requireAuthEmail();
       const { user, ticket } = data;
 
       // Import label type IDs dynamically to avoid issues with env vars
@@ -756,9 +751,9 @@ export const createTicket = createServerFn({ method: "POST" })
         question: "General question",
       };
 
-      // Get or create customer
+      // Get or create customer using the authenticated email
       const existingCustomer = await plainClient.getCustomerByEmail({
-        email: user.email,
+        email: authEmail,
       });
 
       let customerId = existingCustomer.data?.id;
@@ -766,13 +761,13 @@ export const createTicket = createServerFn({ method: "POST" })
       if (!customerId) {
         const upsertedCustomer = await plainClient.upsertCustomer({
           identifier: {
-            emailAddress: user.email,
+            emailAddress: authEmail,
           },
           onCreate: {
             externalId: user.id,
-            fullName: user.name || user.email,
+            fullName: user.name || authEmail,
             email: {
-              email: user.email,
+              email: authEmail,
               isVerified: true,
             },
           },
@@ -780,7 +775,7 @@ export const createTicket = createServerFn({ method: "POST" })
             externalId: { value: user.id },
             fullName: user.name ? { value: user.name } : undefined,
             email: {
-              email: user.email,
+              email: authEmail,
               isVerified: true,
             },
           },
@@ -901,10 +896,10 @@ type CustomerWithCompanyResponse = {
 };
 
 export const getCustomerTierByEmail = createServerFn({ method: "GET" })
-  .inputValidator((data: { email: string }) => data)
-  .handler(async ({ data }): Promise<CustomerTierInfo> => {
+  .inputValidator((data: undefined) => data)
+  .handler(async (): Promise<CustomerTierInfo> => {
     try {
-      const { email } = data;
+      const email = await requireAuthEmail();
 
       const res = (await plainClient.rawRequest({
         query: `
@@ -993,22 +988,28 @@ export const closeTicket = createServerFn({ method: "POST" })
   .inputValidator((data: { threadId: string }) => data)
   .handler(async ({ data }): Promise<CloseTicketResult> => {
     try {
+      const authEmail = await requireAuthEmail();
       const { threadId } = data;
 
-      // First, get the thread to find the customer ID (needed for the note)
+      // Get the thread to verify ownership and find customer ID for the note
       const threadRes = (await plainClient.rawRequest({
         query: `
           query GetThreadCustomer($threadId: ID!) {
             thread(threadId: $threadId) {
               customer {
                 id
+                email {
+                  email
+                }
               }
             }
           }
         `,
         variables: { threadId },
       })) as {
-        data?: { thread: { customer: { id: string } } };
+        data?: {
+          thread: { customer: { id: string; email: { email: string } } };
+        };
         error?: PlainSDKError;
       };
 
@@ -1017,6 +1018,17 @@ export const closeTicket = createServerFn({ method: "POST" })
         return {
           success: false,
           error: "Failed to fetch ticket details",
+        };
+      }
+
+      // Verify the authenticated user owns this thread
+      if (
+        threadRes.data.thread.customer.email.email.toLowerCase() !==
+        authEmail.toLowerCase()
+      ) {
+        return {
+          success: false,
+          error: "Not authorized to close this ticket",
         };
       }
 
@@ -1244,7 +1256,6 @@ export type AttachmentUploadContext = "chat" | "customEntry";
 export const getUploadUrl = createServerFn({ method: "POST" })
   .inputValidator(
     (data: {
-      userEmail: string;
       fileName: string;
       fileSizeBytes: number;
       context?: AttachmentUploadContext;
@@ -1252,7 +1263,8 @@ export const getUploadUrl = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }): Promise<AttachmentUploadUrlResult> => {
     try {
-      const { userEmail, fileName, fileSizeBytes } = data;
+      const userEmail = await requireAuthEmail();
+      const { fileName, fileSizeBytes } = data;
       const context = data.context || "chat";
 
       // Server-side validation
@@ -1336,14 +1348,7 @@ export const replyToThread = createServerFn({ method: "POST" })
     try {
       const { threadId, message, attachmentIds } = data;
 
-      // Get the authenticated user's email instead of trusting client input
-      const userEmail = await getAuthenticatedUserEmail();
-      if (!userEmail) {
-        return {
-          success: false,
-          error: "Not authenticated",
-        };
-      }
+      const userEmail = await requireAuthEmail();
 
       // Verify the user owns this thread before allowing a reply
       const threadRes = (await plainClient.rawRequest({

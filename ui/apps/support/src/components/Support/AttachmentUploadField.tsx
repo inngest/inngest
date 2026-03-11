@@ -26,13 +26,13 @@ export type PendingAttachment = {
 };
 
 type UseAttachmentUploadOptions = {
+  /** @deprecated No longer used - email is derived from authenticated session */
   userEmail?: string;
   context?: AttachmentUploadContext;
   onError?: (message: string | null) => void;
 };
 
 export function useAttachmentUpload({
-  userEmail,
   context = "chat",
   onError,
 }: UseAttachmentUploadOptions) {
@@ -55,7 +55,6 @@ export function useAttachmentUpload({
     try {
       const urlResult = await getUploadUrlFn({
         data: {
-          userEmail: userEmail || "",
           fileName: file.name,
           fileSizeBytes: file.size,
           context,

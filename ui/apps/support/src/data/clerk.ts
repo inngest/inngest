@@ -13,6 +13,18 @@ export async function getAuthenticatedUserEmail(): Promise<string | null> {
   return user.emailAddresses[0]?.emailAddress ?? null;
 }
 
+/**
+ * Require an authenticated user email. Throws if not authenticated.
+ * Use this in server functions that must be gated behind auth.
+ */
+export async function requireAuthEmail(): Promise<string> {
+  const email = await getAuthenticatedUserEmail();
+  if (!email) {
+    throw new Error("Not authenticated");
+  }
+  return email;
+}
+
 export const fetchClerkAuth = createServerFn({ method: "GET" }).handler(
   async () => {
     const { isAuthenticated, userId, getToken } = await auth();

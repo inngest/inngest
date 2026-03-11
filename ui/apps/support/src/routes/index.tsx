@@ -33,10 +33,10 @@ const getAuthStatusAndTickets = createServerFn({ method: "GET" })
         const user = await clerkClient().users.getUser(userId);
         userEmail = user.emailAddresses[0]?.emailAddress;
 
-        // Fetch tickets using the user's email
+        // Fetch tickets using the authenticated user's email (derived server-side)
         if (userEmail) {
           tickets = await getTicketsByEmail({
-            data: { email: userEmail, status: data.status },
+            data: { status: data.status },
           });
         }
       } catch (error) {

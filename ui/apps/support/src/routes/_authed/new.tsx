@@ -44,11 +44,11 @@ function NewTicketPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [result, setResult] = useState<{ ok?: boolean; message?: string }>({});
 
-  // Fetch customer tier information from Plain API
+  // Fetch customer tier information from Plain API (email derived server-side from auth)
   const userEmail = user?.primaryEmailAddress?.emailAddress;
   const { data: plainTierInfo } = useQuery({
     queryKey: ["customerTier", userEmail],
-    queryFn: () => getCustomerTierFn({ data: { email: userEmail! } }),
+    queryFn: () => getCustomerTierFn({ data: undefined }),
     enabled: !!userEmail,
   });
 
