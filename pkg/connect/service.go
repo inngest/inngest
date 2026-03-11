@@ -264,6 +264,11 @@ func NewConnectGatewayService(opts ...gatewayOpt) *connectGatewaySvc {
 	gateway.maintenanceApi = newMaintenanceApi(gateway)
 	gateway.maintenanceApi.Get("/ready", readinessHandler)
 
+	// Optionally mount maintenance API on the gateway public routes
+	if os.Getenv("INTERNAL_CONNECT_MAINTENANCE") == "1" {
+		gateway.gatewayRoutes.Mount("/maintenance", gateway.maintenanceApi)
+	}
+
 	return gateway
 }
 
