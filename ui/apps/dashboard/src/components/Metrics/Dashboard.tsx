@@ -218,6 +218,7 @@ export const Dashboard = ({ envSlug }: { envSlug: string }) => {
           selectedFns={selectedFns}
           autoRefresh={autoRefresh}
           entities={mappedEntities}
+          functions={mappedFunctions}
           scope={envLookup ? MetricsScope.App : MetricsScope.Fn}
           concurrencyLimit={concurrencyLimit}
           isMarketplace={isMarketplace}
