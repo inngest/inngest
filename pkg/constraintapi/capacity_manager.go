@@ -182,10 +182,6 @@ type CapacityAcquireResponse struct {
 
 	RetryAfter time.Time
 
-	// CacheHit indicates whether the response was served from the centralized Redis constraint cache.
-	// When true, a previously cached exhausted constraint was found and the acquire short-circuited.
-	CacheHit bool
-
 	internalDebugState acquireScriptResponse
 
 	RequestID ulid.ULID

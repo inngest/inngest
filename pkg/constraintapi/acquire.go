@@ -246,8 +246,13 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 	var cacheMinTTL, cacheMaxTTL int
 	if cacheEnabled && r.acquireCacheTTL != nil {
 		minTTL, maxTTL := r.acquireCacheTTL(ctx, req.AccountID, req.EnvID, req.FunctionID)
-		cacheMinTTL = int(max(minTTL.Seconds(), 1))
-		cacheMaxTTL = int(max(maxTTL.Seconds(), 1))
+		if minTTL <= 0 && maxTTL <= 0 {
+			// Callback returned non-positive TTLs; disable caching for this request.
+			cacheEnabled = false
+		} else {
+			cacheMinTTL = int(max(minTTL.Seconds(), 1))
+			cacheMaxTTL = int(max(maxTTL.Seconds(), 1))
+		}
 	}
 
 	// Build Lua request
@@ -375,12 +380,10 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 		}
 	}
 
-	cacheHit := parsedResponse.CacheHit != 0
-
 	// Record centralized cache hit/miss metric only when caching is enabled
 	if cacheEnabled {
 		cacheOp := "miss"
-		if cacheHit {
+		if parsedResponse.CacheHit != 0 {
 			cacheOp = "hit"
 		}
 		metrics.IncrConstraintAPIAcquireCacheCounter(ctx, metrics.CounterOpt{
@@ -510,7 +513,6 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 			ExhaustedConstraints: exhaustedConstraints,
 			FairnessReduction:    parsedResponse.FairnessReduction,
 			RetryAfter:           retryAfter,
-			CacheHit:             cacheHit,
 			internalDebugState:   parsedResponse,
 		}, nil
 
@@ -529,7 +531,6 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 			ExhaustedConstraints: exhaustedConstraints,
 			RetryAfter:           retryAfter,
 			FairnessReduction:    parsedResponse.FairnessReduction,
-			CacheHit:             cacheHit,
 			internalDebugState:   parsedResponse,
 		}, nil
 

@@ -113,10 +113,9 @@ func TestAcquireCachePreExistingKey(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, resp)
 
-	assert.True(t, resp.CacheHit, "expected cache hit")
 	assert.Empty(t, resp.Leases, "expected no leases on cache hit")
 	assert.Len(t, resp.ExhaustedConstraints, 1, "expected one exhausted constraint")
-	assert.Equal(t, resp.internalDebugState.CacheHit, 1)
+	assert.Equal(t, 1, resp.internalDebugState.CacheHit)
 }
 
 func TestAcquireCacheKeysHaveTTL(t *testing.T) {
@@ -212,7 +211,7 @@ func TestAcquireCacheAnyConstraintShortCircuits(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, resp)
 
-	assert.True(t, resp.CacheHit, "expected cache hit when any constraint is cached")
+	assert.Equal(t, 1, resp.internalDebugState.CacheHit, "expected cache hit when any constraint is cached")
 	assert.Empty(t, resp.Leases)
 	assert.NotEmpty(t, resp.ExhaustedConstraints)
 }
@@ -242,7 +241,7 @@ func TestAcquireCacheMissFallsThrough(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, resp)
 
-	assert.False(t, resp.CacheHit, "expected cache miss")
+	assert.Equal(t, 0, resp.internalDebugState.CacheHit, "expected cache miss")
 	assert.Len(t, resp.Leases, 1, "should have granted a lease on cache miss")
 }
 
@@ -275,7 +274,7 @@ func TestAcquireCacheTTLExpiry(t *testing.T) {
 	// Should be cache hit now
 	resp1, err := cm.Acquire(ctx, makeAcquireRequest(accountID, envID, fnID, clock, config, constraints, "before-expiry"))
 	require.NoError(t, err)
-	assert.True(t, resp1.CacheHit)
+	assert.Equal(t, 1, resp1.internalDebugState.CacheHit)
 
 	// Advance past TTL
 	r.FastForward(3 * time.Second)
@@ -284,7 +283,7 @@ func TestAcquireCacheTTLExpiry(t *testing.T) {
 	// Should be cache miss now - normal acquire succeeds
 	resp2, err := cm.Acquire(ctx, makeAcquireRequest(accountID, envID, fnID, clock, config, constraints, "after-expiry"))
 	require.NoError(t, err)
-	assert.False(t, resp2.CacheHit, "expected cache miss after TTL expiry")
+	assert.Equal(t, 0, resp2.internalDebugState.CacheHit, "expected cache miss after TTL expiry")
 	assert.Len(t, resp2.Leases, 1, "should grant lease after cache expires")
 }
 
@@ -363,7 +362,7 @@ func TestAcquireCacheFeatureFlagDisabled(t *testing.T) {
 	resp, err := cm.Acquire(ctx, makeAcquireRequest(accountID, envID, fnID, clock, config, constraints, "exhaust"))
 	require.NoError(t, err)
 	assert.Empty(t, resp.Leases)
-	assert.False(t, resp.CacheHit)
+	assert.Equal(t, 0, resp.internalDebugState.CacheHit)
 
 	// Verify NO cache key was set
 	cacheKey := cm.keyConstraintCache(accountID, envID, fnID, constraints[0])
@@ -471,13 +470,13 @@ func TestAcquireCacheIsolationAcrossAccounts(t *testing.T) {
 	// Account A should see cache hit
 	respA, err := cm.Acquire(ctx, makeAcquireRequest(accountA, envA, fnA, clock, config, constraints, "account-a"))
 	require.NoError(t, err)
-	assert.True(t, respA.CacheHit, "account A should see cache hit")
+	assert.Equal(t, 1, respA.internalDebugState.CacheHit, "account A should see cache hit")
 	assert.Empty(t, respA.Leases)
 
 	// Account B should be unaffected
 	respB, err := cm.Acquire(ctx, makeAcquireRequest(accountB, envB, fnB, clock, config, constraints, "account-b"))
 	require.NoError(t, err)
-	assert.False(t, respB.CacheHit, "account B should not see cache hit")
+	assert.Equal(t, 0, respB.internalDebugState.CacheHit, "account B should not see cache hit")
 	assert.Len(t, respB.Leases, 1, "account B should get a lease")
 }
 
@@ -510,14 +509,13 @@ func TestAcquireCacheDebugResponse(t *testing.T) {
 	resp, err := cm.Acquire(ctx, makeAcquireRequest(accountID, envID, fnID, clock, config, constraints, "debug-test"))
 	require.NoError(t, err)
 
-	// Verify CacheHit in response struct
-	assert.True(t, resp.CacheHit)
+	assert.Equal(t, 1, resp.internalDebugState.CacheHit)
 	assert.Equal(t, 1, resp.internalDebugState.CacheHit)
 
 	// Cache miss case
 	resp2, err := cm.Acquire(ctx, makeAcquireRequest(uuid.New(), uuid.New(), uuid.New(), clock, config, constraints, "debug-miss"))
 	require.NoError(t, err)
-	assert.False(t, resp2.CacheHit)
+	assert.Equal(t, 0, resp2.internalDebugState.CacheHit)
 	assert.Equal(t, 0, resp2.internalDebugState.CacheHit)
 }
 
@@ -596,7 +594,7 @@ func TestAcquireCacheFeatureFlagReturnsFalse(t *testing.T) {
 	resp, err := cm.Acquire(ctx, makeAcquireRequest(accountID, envID, fnID, clock, config, constraints, "exhaust"))
 	require.NoError(t, err)
 	assert.Empty(t, resp.Leases)
-	assert.False(t, resp.CacheHit)
+	assert.Equal(t, 0, resp.internalDebugState.CacheHit)
 
 	// No cache key should be set
 	cacheKey := cm.keyConstraintCache(accountID, envID, fnID, constraints[0])
