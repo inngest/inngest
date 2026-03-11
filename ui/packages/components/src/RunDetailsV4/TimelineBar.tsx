@@ -16,6 +16,7 @@ import {
   RiCheckboxCircleFill,
   RiCloseCircleFill,
   RiFlashlightLine,
+  RiFlaskLine,
   RiFunctionLine,
   RiInformationLine,
   RiMailLine,
@@ -316,6 +317,7 @@ const ICON_MAP: Record<BarIcon, React.ComponentType<{ className?: string }>> = {
   checkbox: RiCheckboxCircleFill,
   'close-circle': RiCloseCircleFill,
   'stop-circle': RiStopCircleFill,
+  experiment: RiFlaskLine,
   none: () => null,
 };
 
@@ -640,7 +642,10 @@ export function TimelineBar({
   actions,
   timingDetails,
   styleLabel,
+  hasExperiment,
+  insideExperiment,
 }: TimelineBarProps): JSX.Element {
+  const showExperimentBackground = hasExperiment || insideExperiment;
   const barStyle = getBarStyle(style);
   const effectiveIcon = icon ?? barStyle.icon ?? getRootIcon(style, status);
 
@@ -698,7 +703,7 @@ export function TimelineBar({
         {/* Left panel - name, icon, controls */}
         <div
           data-testid="timeline-bar-left"
-          className="flex h-full shrink-0 items-center gap-1.5 overflow-hidden pr-4"
+          className="flex h-full shrink-0 items-center gap-1.5 overflow-hidden pr-2"
           style={{
             width: `${leftWidth}%`,
             paddingLeft: `${indentPx}px`,
@@ -756,6 +761,25 @@ export function TimelineBar({
           </span>
         </div>
 
+        {/* Experiment badge - centered between left panel and bars */}
+        <span className="inline-flex w-7 shrink-0 items-center justify-center">
+          {hasExperiment && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span
+                  className="inline-flex items-center justify-center rounded border p-0.5"
+                  style={{ borderColor: 'rgb(var(--color-foreground-subtle))' }}
+                >
+                  <RiFlaskLine className="text-subtle h-3 w-3" />
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="text-xs">
+                This step uses an experiment
+              </TooltipContent>
+            </Tooltip>
+          )}
+        </span>
+
         {/* Right panel - visual bar with optional hover card */}
         <div
           data-testid="timeline-bar-right"
@@ -766,6 +790,20 @@ export function TimelineBar({
         >
           {/* Center line */}
           <div className="bg-canvasMuted absolute left-0 right-0 top-1/2 h-px -translate-y-1/2" />
+
+          {/* Dotted background pattern for experiment steps and their children */}
+          {showExperimentBackground && (
+            <div
+              className="pointer-events-none absolute inset-0"
+              style={{
+                backgroundImage:
+                  'radial-gradient(circle, rgb(var(--color-foreground-subtle)) 1px, transparent 1px)',
+                backgroundSize: '7px 7px',
+                opacity: 0.5,
+              }}
+            />
+          )}
+
           {/* Bar container, centered vertically */}
           <div className="absolute inset-y-0 flex w-full items-center">
             {transformed && (

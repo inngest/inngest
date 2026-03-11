@@ -467,6 +467,8 @@ type TimelineBarRendererProps = {
   viewEndOffset?: number;
   /** Optional actions to render in the bar's left panel (e.g. expand/collapse all) */
   actions?: ReactNode;
+  /** Whether this bar is inside an experiment (inherited from parent) */
+  insideExperiment?: boolean;
 };
 
 /**
@@ -486,6 +488,7 @@ function TimelineBarRenderer({
   viewStartOffset = 0,
   viewEndOffset = 100,
   actions,
+  insideExperiment,
 }: TimelineBarRendererProps): JSX.Element {
   const { startPercent, widthPercent } = calculateBarPosition(
     bar.startTime,
@@ -503,6 +506,9 @@ function TimelineBarRenderer({
   const isExpandable =
     hasTimingBreakdown || hasInngestBreakdown || hasChildren || hasRunInngestBreakdown;
   const isExpanded = bar.isRoot ? true : expandedBars.has(bar.id);
+
+  // Children of experiment bars inherit the dotted background
+  const childInsideExperiment = insideExperiment || bar.hasExperiment;
 
   // Generate segments for compound bar visualization
   // Bars with timingBreakdown use queue+execution segments; others fall back to delay+execution
@@ -598,6 +604,8 @@ function TimelineBarRenderer({
       delayMs={bar.delayMs}
       actions={actions}
       timingDetails={buildTimingDetails(bar)}
+      hasExperiment={bar.hasExperiment}
+      insideExperiment={insideExperiment}
     >
       {/* Inngest timing bar — positioned to match the queue segment of the parent.
           Only for non-root bars; the root uses timingBreakdown only for compound segments. */}
@@ -668,6 +676,7 @@ function TimelineBarRenderer({
           startTime={bar.startTime}
           endTime={bar.endTime}
           minTime={minTime}
+          insideExperiment={childInsideExperiment}
         >
           {/* HTTP timing bars — each positioned within the server bar's range */}
           {isServerExpanded && hasHTTPTiming && (
@@ -705,6 +714,7 @@ function TimelineBarRenderer({
                 selectedStepId={selectedStepId}
                 viewStartOffset={viewStartOffset}
                 viewEndOffset={viewEndOffset}
+                insideExperiment={childInsideExperiment}
               />
             ))}
         </TimelineBar>
@@ -820,6 +830,7 @@ function TimelineBarRenderer({
             selectedStepId={selectedStepId}
             viewStartOffset={viewStartOffset}
             viewEndOffset={viewEndOffset}
+            insideExperiment={childInsideExperiment}
           />
         ))}
     </TimelineBar>

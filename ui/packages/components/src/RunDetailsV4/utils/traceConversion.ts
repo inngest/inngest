@@ -5,6 +5,7 @@
 
 import { max, min } from 'date-fns';
 
+import { KindInngestExperiment } from '../../generated';
 import type {
   BarStyleKey,
   HTTPTimingBreakdownData,
@@ -205,6 +206,9 @@ function traceToBarData(
     ? getInngestBreakdown(trace, runStartedAtMs ?? null) ?? undefined
     : undefined;
 
+  // Check if this step has experiment metadata
+  const hasExperiment = trace.metadata?.some((m) => m.kind === KindInngestExperiment) ?? false;
+
   return {
     id: trace.spanID,
     name: getSpanName(trace.name),
@@ -220,6 +224,7 @@ function traceToBarData(
     isRoot: trace.isRoot,
     status,
     delayMs,
+    hasExperiment,
   };
 }
 

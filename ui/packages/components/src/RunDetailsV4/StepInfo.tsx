@@ -30,6 +30,7 @@ import { Tabs } from './Tabs';
 import { UserlandAttrs } from './UserlandAttrs';
 import { formatDuration, maybeBooleanToString, type StepInfoType } from './runDetailsUtils';
 import {
+  isExperimentMetadata,
   isStepInfoInvoke,
   isStepInfoSignal,
   isStepInfoSleep,
@@ -189,7 +190,7 @@ export const StepInfo = ({
   });
 
   const { booleanFlag } = useBooleanFlag();
-  const { value: metadataIsEnabled } = booleanFlag('enable-step-metadata', false);
+  const { value: metadataIsEnabled } = booleanFlag('enable-step-metadata', true);
 
   useEffect(() => {
     result && setPollInterval(undefined);
@@ -208,6 +209,8 @@ export const StepInfo = ({
   const stepKindInfo = getStepKindInfo({
     stepInfo: trace.stepInfo,
   });
+
+  const experimentMetadata = trace.metadata?.find(isExperimentMetadata);
 
   const aiOutput = result?.data ? parseAIOutput(result.data) : undefined;
   const prettyInput = usePrettyJson(result?.input ?? '') || (result?.input ?? '');
@@ -344,6 +347,17 @@ export const StepInfo = ({
           )}
 
           {stepKindInfo}
+
+          {experimentMetadata && (
+            <>
+              <ElementWrapper label="Experiment name">
+                <TextElement>{experimentMetadata.values.experiment_name}</TextElement>
+              </ElementWrapper>
+              <ElementWrapper label="Variant">
+                <TextElement>{experimentMetadata.values.variant_selected}</TextElement>
+              </ElementWrapper>
+            </>
+          )}
 
           {debug && trace.debugRunID && (
             <ElementWrapper label="Debug Run ID">

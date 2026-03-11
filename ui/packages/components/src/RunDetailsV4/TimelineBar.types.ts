@@ -28,6 +28,7 @@ export type BarIcon =
   | 'checkbox' // root run (completed)
   | 'close-circle' // root run (failed)
   | 'stop-circle' // root run (cancelled)
+  | 'experiment' // experiment badge for steps with experiment metadata
   | 'none';
 
 /**
@@ -210,6 +211,12 @@ export interface TimelineBarProps {
 
   /** Human-readable type label shown in the hover tooltip subtitle (e.g., "step.sleep") */
   styleLabel?: string;
+
+  /** Whether this step has experiment metadata (shows badge + dotted background) */
+  hasExperiment?: boolean;
+
+  /** Whether this step is inside an experiment (shows dotted background but no badge) */
+  insideExperiment?: boolean;
 }
 
 /**
@@ -284,6 +291,9 @@ export interface TimelineBarData {
 
   /** Queue delay in milliseconds (startedAt - queuedAt) */
   delayMs?: number;
+
+  /** Whether this bar has experiment metadata attached */
+  hasExperiment?: boolean;
 }
 
 /**
