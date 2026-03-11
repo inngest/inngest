@@ -168,13 +168,6 @@ type acquireScriptResponse struct {
 	CacheHit             int                 `json:"ch"`
 }
 
-// acquireCacheEntry represents the per-constraint cache configuration passed to the Lua script.
-type acquireCacheEntry struct {
-	CacheKey string `json:"ck"`
-	MinTTL   int    `json:"min"` // seconds
-	MaxTTL   int    `json:"max"` // seconds
-}
-
 func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquireRequest) (*CapacityAcquireResponse, errs.InternalError) {
 	l := logger.StdlibLogger(ctx)
 
@@ -232,8 +225,11 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 		return nil, errs.Wrap(0, false, "could not build request state: %w", err)
 	}
 
-	// Build per-constraint cache config for the Lua script
-	cacheEntries := make([]acquireCacheEntry, len(sortedConstraints))
+	// Build per-constraint cache keys for the Lua script.
+	// Each constraint gets a cache key (empty string if caching is disabled for that constraint).
+	// A single min/max TTL pair is used across all cached constraints.
+	cacheKeys := make([]string, len(sortedConstraints))
+	var cacheMinTTL, cacheMaxTTL int
 	if r.enableAcquireCache != nil {
 		for i, ci := range sortedConstraints {
 			enabled, minTTL, maxTTL := r.enableAcquireCache(ctx, req.AccountID, req.EnvID, req.FunctionID, ci)
@@ -244,16 +240,10 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 			if key == "" {
 				continue
 			}
-			cacheEntries[i] = acquireCacheEntry{
-				CacheKey: key,
-				MinTTL:   int(max(minTTL.Seconds(), 1)),
-				MaxTTL:   int(max(maxTTL.Seconds(), 1)),
-			}
+			cacheKeys[i] = key
+			cacheMinTTL = int(max(minTTL.Seconds(), 1))
+			cacheMaxTTL = int(max(maxTTL.Seconds(), 1))
 		}
-	}
-	cacheConfigJSON, err := json.Marshal(cacheEntries)
-	if err != nil {
-		return nil, errs.Wrap(0, false, "could not marshal cache config: %w", err)
 	}
 
 	// Build Lua request
@@ -291,7 +281,7 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 
 	scopedKeyPrefix := fmt.Sprintf("{cs}:%s", accountScope(req.AccountID))
 
-	args, err := strSlice([]any{
+	argsList := []any{
 		// This will be marshaled
 		rueidis.BinaryString(requestState),
 		requestID.String(),
@@ -309,8 +299,15 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 
 		enableDebugLogsVal,
 
-		rueidis.BinaryString(cacheConfigJSON),
-	})
+		cacheMinTTL, // ARGV[12]: cache min TTL in seconds
+		cacheMaxTTL, // ARGV[13]: cache max TTL in seconds
+	}
+	// ARGV[14..13+N]: one cache key per sorted constraint (empty string if disabled)
+	for _, ck := range cacheKeys {
+		argsList = append(argsList, ck)
+	}
+
+	args, err := strSlice(argsList)
 	if err != nil {
 		return nil, errs.Wrap(0, false, "invalid args: %w", err)
 	}

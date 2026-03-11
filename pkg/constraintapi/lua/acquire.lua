@@ -46,7 +46,9 @@ end
 local operationIdempotencyTTL = tonumber(ARGV[9])--[[@as integer]]
 local constraintCheckIdempotencyTTL = tonumber(ARGV[10])--[[@as integer]]
 local enableDebugLogs = tonumber(ARGV[11]) == 1
-local cacheConfig = cjson.decode(ARGV[12])
+local cacheMinTTL = tonumber(ARGV[12]) or 0
+local cacheMaxTTL = tonumber(ARGV[13]) or 0
+local cacheKeyOffset = 14
 
 if not requestDetails.lik then
 	return redis.error_reply("ERR requestDetails.lik is nil during update")
@@ -152,25 +154,27 @@ local concurrencyCapacityCache = {}
 -- Skip GCRA if constraint check idempotency key is present
 local skipGCRA = call("EXISTS", keyConstraintCheckIdempotency) == 1
 
--- Check centralized constraint cache
-local cacheKeys = {}
-local cacheKeyIndices = {}
-if cacheConfig then
-	for i, cc in ipairs(cacheConfig) do
-		if cc.ck ~= nil and cc.ck ~= "" then
-			table.insert(cacheKeys, cc.ck)
-			table.insert(cacheKeyIndices, i)
-		end
+-- Check centralized constraint cache using individual ARGV entries
+-- Cache keys are at ARGV[cacheKeyOffset .. cacheKeyOffset + #constraints - 1]
+local constraintCacheKeys = {}
+local mgetKeys = {}
+local mgetIndices = {}
+for i = 1, #constraints do
+	local ck = ARGV[cacheKeyOffset + i - 1] or ""
+	constraintCacheKeys[i] = ck
+	if ck ~= "" then
+		table.insert(mgetKeys, ck)
+		table.insert(mgetIndices, i)
 	end
 end
 
 local cacheHit = false
-if #cacheKeys > 0 then
-	local cacheValues = call("MGET", unpack(cacheKeys))
+if #mgetKeys > 0 then
+	local cacheValues = call("MGET", unpack(mgetKeys))
 	for j, val in ipairs(cacheValues) do
 		if val ~= nil and val ~= false then
 			cacheHit = true
-			local idx = cacheKeyIndices[j]
+			local idx = mgetIndices[j]
 			local cachedRetryAt = tonumber(val) or 0
 
 			if not exhaustedSet[idx] then
@@ -259,17 +263,15 @@ availableCapacity = availableCapacity - fairnessReduction
 -- TODO: If missing capacity, exit early (return limiting constraint and details)
 if availableCapacity <= 0 then
 	-- Store cache keys for exhausted constraints
-	if cacheConfig then
-		for _, exhaustedIdx in ipairs(exhaustedConstraints) do
-			local cc = cacheConfig[exhaustedIdx]
-			if cc ~= nil and cc.ck ~= nil and cc.ck ~= "" then
-				local cacheTTLSec = math.max(
-					math.min(math.ceil((retryAt - nowMS) / 1000), cc.max),
-					cc.min
-				)
-				if cacheTTLSec > 0 then
-					call("SET", cc.ck, tostring(retryAt), "EX", tostring(cacheTTLSec))
-				end
+	for _, exhaustedIdx in ipairs(exhaustedConstraints) do
+		local ck = constraintCacheKeys[exhaustedIdx]
+		if ck ~= nil and ck ~= "" then
+			local cacheTTLSec = math.max(
+				math.min(math.ceil((retryAt - nowMS) / 1000), cacheMaxTTL),
+				cacheMinTTL
+			)
+			if cacheTTLSec > 0 then
+				call("SET", ck, tostring(retryAt), "EX", tostring(cacheTTLSec))
 			end
 		end
 	end
@@ -358,18 +360,15 @@ for i, value in ipairs(constraints) do
 end
 
 -- Store cache keys for constraints exhausted after granting
-if cacheConfig then
-	for _, exhaustedIdx in ipairs(exhaustedConstraints) do
-		local cc = cacheConfig[exhaustedIdx]
-		if cc ~= nil and cc.ck ~= nil and cc.ck ~= "" then
-			local cacheTTLSec = math.max(
-				math.min(math.ceil((retryAt - nowMS) / 1000), cc.max),
-				cc.min
-			)
-			if cacheTTLSec > 0 then
-				call("SET", cc.ck, tostring(retryAt), "EX", tostring(cacheTTLSec))
-				debug("cache set for constraint", tostring(exhaustedIdx), "ttl", tostring(cacheTTLSec))
-			end
+for _, exhaustedIdx in ipairs(exhaustedConstraints) do
+	local ck = constraintCacheKeys[exhaustedIdx]
+	if ck ~= nil and ck ~= "" then
+		local cacheTTLSec = math.max(
+			math.min(math.ceil((retryAt - nowMS) / 1000), cacheMaxTTL),
+			cacheMinTTL
+		)
+		if cacheTTLSec > 0 then
+			call("SET", ck, tostring(retryAt), "EX", tostring(cacheTTLSec))
 		end
 	end
 end
