@@ -395,10 +395,6 @@ type Mutater interface {
 	// Delete removes state from the state store.
 	Delete(ctx context.Context, i Identifier) error
 
-	// Cancel sets a function run metadata status to RunStatusCancelled, which prevents
-	// future execution of steps.
-	Cancel(ctx context.Context, i Identifier) error
-
 	// SetStatus sets a status specifically.
 	SetStatus(ctx context.Context, i Identifier, status enums.RunStatus) error
 

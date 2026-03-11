@@ -17,6 +17,7 @@ import {
   RiCloseCircleFill,
   RiFlashlightLine,
   RiFunctionLine,
+  RiInformationLine,
   RiMailLine,
   RiSettings3Line,
   RiStopCircleFill,
@@ -24,8 +25,9 @@ import {
 } from '@remixicon/react';
 import { format } from 'date-fns';
 
+import { HoverCardContent, HoverCardRoot, HoverCardTrigger } from '../HoverCard';
 import { getStatusBackgroundClass, getStatusTextClass } from '../Status/statusClasses';
-import { Tooltip, TooltipArrow, TooltipContent, TooltipTrigger } from '../Tooltip/Tooltip';
+import { Tooltip, TooltipContent, TooltipTrigger } from '../Tooltip/Tooltip';
 import { cn } from '../utils/classNames';
 import type {
   BarHeight,
@@ -307,9 +309,9 @@ function ExpandToggle({ expanded, onCollapse }: { expanded: boolean; onCollapse?
 }
 
 /**
- * Tooltip content for a timeline bar, showing duration/delay and start/end timestamps.
+ * Hover card content for a timeline bar, showing duration/delay and start/end timestamps.
  */
-function BarTooltipContent({
+function BarHoverCardContent({
   name,
   startTime,
   endTime,
@@ -331,14 +333,14 @@ function BarTooltipContent({
       <div className="flex flex-col gap-1">
         <div className="border-subtle flex flex-col gap-1 border-b pb-1.5">
           <div className="flex justify-between gap-6">
-            <span className="text-light font-medium">Duration</span>
+            <span className="text-light font-mono uppercase">Duration</span>
             <span className="text-basis tabular-nums">
               {durationMs > 0 ? formatDuration(durationMs) : '-'}
             </span>
           </div>
           {delayMs != null && (
             <div className="flex justify-between gap-6">
-              <span className="text-light font-medium">Delay</span>
+              <span className="text-light font-mono uppercase">Delay</span>
               <span className="text-basis tabular-nums">
                 {delayMs > 0 ? formatDuration(delayMs) : '-'}
               </span>
@@ -346,11 +348,11 @@ function BarTooltipContent({
           )}
         </div>
         <div className="mt-0.5 flex justify-between gap-6">
-          <span className="text-light font-medium">Start</span>
+          <span className="text-light font-mono uppercase">Start</span>
           <span className="text-basis tabular-nums">{startTimestamp}</span>
         </div>
         <div className="flex justify-between gap-6">
-          <span className="text-light font-medium">End</span>
+          <span className="text-light font-mono uppercase">End</span>
           {endTimestamp !== null ? (
             <span className="text-basis tabular-nums">{endTimestamp}</span>
           ) : (
@@ -551,9 +553,9 @@ export function TimelineBar({
     [startPercent, widthPercent, viewStartOffset, viewEndOffset]
   );
 
-  // Tooltip state — controlled so hover target (full right panel) is separate from anchor (bar position)
-  const showTooltip = !!startTime;
-  const [tooltipOpen, setTooltipOpen] = useState(false);
+  // Hover card state — controlled so hover target (full right panel) is separate from anchor (bar position)
+  const showHoverCard = !!startTime;
+  const [hoverCardOpen, setHoverCardOpen] = useState(false);
 
   return (
     <div data-testid="timeline-bar-container" className="relative">
@@ -570,7 +572,7 @@ export function TimelineBar({
         style={{ height: `${TIMELINE_CONSTANTS.ROW_HEIGHT_PX}px` }}
       >
         {/* Selection / hover highlight - extends from indent to full width */}
-        {(selected || tooltipOpen) && (
+        {(selected || hoverCardOpen) && (
           <div
             className={cn(
               'pointer-events-none absolute inset-y-0 right-0 -z-10',
@@ -596,7 +598,7 @@ export function TimelineBar({
           {/* Icon */}
           <BarIconComponent icon={effectiveIcon} className="text-subtle ml-px" status={status} />
 
-          {/* Name */}
+          {/* Name (with optional info icon tooltip for Inngest and Your Server labels) */}
           <span
             className={cn(
               'min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap font-mono text-xs font-normal leading-tight',
@@ -605,6 +607,24 @@ export function TimelineBar({
             )}
           >
             {displayName}
+            {(style === 'timing.inngest' || style === 'timing.server') && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span
+                    className=" ml-1 inline-flex shrink-0 cursor-help align-middle"
+                    onClick={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => e.stopPropagation()}
+                  >
+                    <RiInformationLine className="text-light h-3.5 w-3.5" />
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="top" className=" max-w-xs text-xs shadow-lg">
+                  {style === 'timing.inngest'
+                    ? 'Time spent on queue delays, concurrency limits, processing delays, and related overhead'
+                    : 'Time spent on your server executing the function'}
+                </TooltipContent>
+              </Tooltip>
+            )}
           </span>
 
           {/* Duration */}
@@ -618,13 +638,13 @@ export function TimelineBar({
           </span>
         </div>
 
-        {/* Right panel - visual bar with optional hover tooltip */}
+        {/* Right panel - visual bar with optional hover card */}
         <div
           data-testid="timeline-bar-right"
           className="relative h-full flex-1"
           style={{ width: `${100 - leftWidth}%` }}
-          onMouseEnter={showTooltip ? () => setTooltipOpen(true) : undefined}
-          onMouseLeave={showTooltip ? () => setTooltipOpen(false) : undefined}
+          onMouseEnter={showHoverCard ? () => setHoverCardOpen(true) : undefined}
+          onMouseLeave={showHoverCard ? () => setHoverCardOpen(false) : undefined}
         >
           {/* Center line */}
           <div className="bg-canvasMuted absolute left-0 right-0 top-1/2 h-px -translate-y-1/2" />
@@ -644,9 +664,9 @@ export function TimelineBar({
                   viewEndOffset={viewEndOffset}
                   status={status}
                 />
-                {showTooltip && (
-                  <Tooltip open={tooltipOpen}>
-                    <TooltipTrigger asChild>
+                {showHoverCard && (
+                  <HoverCardRoot open={hoverCardOpen} closeDelay={0}>
+                    <HoverCardTrigger asChild>
                       <div
                         className="pointer-events-none absolute inset-y-0"
                         style={{
@@ -655,21 +675,16 @@ export function TimelineBar({
                           minWidth: '4px',
                         }}
                       />
-                    </TooltipTrigger>
-                    <TooltipContent
-                      side="top"
-                      hasArrow={false}
-                      className="bg-canvasBase text-basis border-muted max-w-none border shadow-lg"
-                    >
-                      <BarTooltipContent
+                    </HoverCardTrigger>
+                    <HoverCardContent side="top" className="border-muted max-w-none border">
+                      <BarHoverCardContent
                         name={displayName}
                         startTime={startTime!}
                         endTime={endTime ?? null}
                         delayMs={delayMs}
                       />
-                      <TooltipArrow className="fill-canvasBase" />
-                    </TooltipContent>
-                  </Tooltip>
+                    </HoverCardContent>
+                  </HoverCardRoot>
                 )}
               </>
             )}

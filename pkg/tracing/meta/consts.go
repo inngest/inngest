@@ -20,6 +20,12 @@ const (
 	SpanNameUserland         = "userland"
 	SpanNameMetadata         = "metadata"
 
+	// SDKExecutionSpanName is the name of the execution wrapper span
+	// created by SDKs (e.g., "inngest.execution"). This span houses
+	// metadata about the environment, versions, and scope, but should
+	// not be displayed to the user directly.
+	SDKExecutionSpanName = "inngest.execution"
+
 	// Link attributes
 	LinkAttributeType            = "_inngest.link.type"
 	LinkAttributeTypeFollowsFrom = "follows_from"

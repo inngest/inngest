@@ -338,7 +338,7 @@ func (r *mutationResolver) Rerun(
 		originalRunID = fnrun.OriginalRunID
 	}
 
-	identifier, err := r.Executor.Schedule(ctx, execution.ScheduleRequest{
+	newRunID, _, err := r.Executor.Schedule(ctx, execution.ScheduleRequest{
 		Function: *fn,
 		AppID:    fnCQRS.AppID,
 		Events: []event.TrackedEvent{
@@ -369,5 +369,5 @@ func (r *mutationResolver) Rerun(
 		return ulid.Zero, err
 	}
 
-	return identifier.ID.RunID, nil
+	return *newRunID, nil
 }

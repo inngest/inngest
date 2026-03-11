@@ -20,6 +20,7 @@ import { useGetTraceResult } from '../SharedContext/useGetTraceResult';
 import { usePathCreator } from '../SharedContext/usePathCreator';
 import { getStatusBackgroundClass, getStatusTextClass } from '../Status/statusClasses';
 import { Time } from '../Time';
+import type { SpanMetadataKind } from '../generated';
 import { usePrettyErrorBody, usePrettyJson, usePrettyShortError } from '../hooks/usePrettyJson';
 import { toMaybeDate } from '../utils/date';
 import { ErrorInfo } from './ErrorInfo';
@@ -33,6 +34,7 @@ import {
   isStepInfoSignal,
   isStepInfoSleep,
   isStepInfoWait,
+  type SpanMetadataScope,
   type StepInfoInvoke,
   type StepInfoSignal,
   type StepInfoSleep,
@@ -214,6 +216,30 @@ export const StepInfo = ({
   const responseHeaderMetadata = trace.metadata?.filter(
     (md) => md.kind === 'inngest.response_headers'
   );
+
+  // TODO: remove metadata handling once all response header
+  // data in history uses the response field. (After 2026-06-03)
+  const responseHeaderData = responseHeaderMetadata?.length
+    ? responseHeaderMetadata
+    : trace.response
+    ? [
+        {
+          kind: 'inngest.response_headers' as SpanMetadataKind,
+          values: {
+            ...Object.fromEntries(
+              Object.entries(trace.response?.headers ?? {}).map(([k, v]) => [
+                k,
+                Array.isArray(v) ? v.join(', ') : v,
+              ])
+            ),
+            'Status Code': trace.response.statusCode.toString(),
+          },
+          updatedAt: trace.endedAt ?? trace.startedAt ?? trace.queuedAt,
+          scope: 'step_attempt' as SpanMetadataScope,
+        },
+      ]
+    : [];
+
   const nonHeaderMetadata = metadataIsEnabled
     ? trace.metadata?.filter((md) => md.kind !== 'inngest.response_headers')
     : undefined;
@@ -229,7 +255,7 @@ export const StepInfo = ({
 
   return (
     <div className="flex h-full flex-col justify-start gap-2">
-      <div className="flex min-h-11 w-full flex-row items-center justify-between border-none px-4">
+      <div className="min-h-11 flex w-full flex-row items-center justify-between border-none px-4">
         <div
           className="text-basis flex cursor-pointer items-center justify-start gap-2"
           onClick={() => setExpanded(!expanded)}
@@ -335,12 +361,12 @@ export const StepInfo = ({
                 id: 'attributes',
                 node: <UserlandAttrs userlandSpan={trace.userlandSpan} />,
               },
-              ...(responseHeaderMetadata?.length
+              ...(responseHeaderData?.length
                 ? [
                     {
                       label: 'Headers',
                       id: 'headers',
-                      node: <MetadataAttrs metadata={responseHeaderMetadata} />,
+                      node: <MetadataAttrs metadata={responseHeaderData} />,
                     },
                   ]
                 : []),
@@ -402,12 +428,12 @@ export const StepInfo = ({
                         },
                       ]
                     : []),
-                  ...(responseHeaderMetadata?.length
+                  ...(responseHeaderData?.length
                     ? [
                         {
                           label: 'Headers',
                           id: 'headers',
-                          node: <MetadataAttrs metadata={responseHeaderMetadata} />,
+                          node: <MetadataAttrs metadata={responseHeaderData} />,
                         },
                       ]
                     : []),

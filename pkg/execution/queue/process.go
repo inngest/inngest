@@ -12,6 +12,7 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/service"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
+	"github.com/jonboulle/clockwork"
 	"go.opentelemetry.io/otel/attribute"
 )
 
@@ -51,16 +52,7 @@ func (q *queueProcessor) ProcessItem(
 	q.wg.Add(1)
 	defer q.wg.Done()
 
-	// Continually the lease while this job is being processed.
-	extendLeaseTick := q.Clock().NewTicker(QueueLeaseDuration / 2)
-	defer extendLeaseTick.Stop()
-
-	capacityLeaseID := newCapacityLease(i.CapacityLease)
-	instrumentCapacityLease := i.CapacityLease != nil && q.EnableCapacityLeaseInstrumentation != nil && q.EnableCapacityLeaseInstrumentation(ctx, accountID, envID, fnID)
-
 	disableConstraintUpdates := i.DisableConstraintUpdates
-	extendCapacityLeaseTick := q.Clock().NewTicker(q.CapacityLeaseExtendInterval)
-	defer extendCapacityLeaseTick.Stop()
 
 	errCh := make(chan error, 1)
 
@@ -82,6 +74,8 @@ func (q *queueProcessor) ProcessItem(
 	}
 
 	// Continually extend lease in the background while we're working on this job
+	extendLeaseTick := q.Clock().NewTicker(QueueLeaseDuration / 2)
+	defer extendLeaseTick.Stop()
 	go func() {
 		for {
 			select {
@@ -124,92 +118,135 @@ func (q *queueProcessor) ProcessItem(
 		}
 	}()
 
-	go func() {
-		lastCapacityLeaseExtension := time.Now()
-		for {
-			select {
-			case <-jobCtx.Done():
-				return
-			case <-extendCapacityLeaseTick.Chan():
-				if ctx.Err() != nil {
-					// Don't extend lease when the ctx is done.
+	// If a capacity lease is set on the item, continue extending it and cancel execution if lease expires
+	capacityLeaseID := newCapacityLease(i.CapacityLease)
+	instrumentCapacityLease := i.CapacityLease != nil && q.EnableCapacityLeaseInstrumentation != nil && q.EnableCapacityLeaseInstrumentation(ctx, accountID, envID, fnID)
+	var extendCapacityLeaseTick clockwork.Ticker
+
+	// Only extend if initial capacity lease was provided for this queue item
+	// We will not expect a lease when
+	// - the item is enqueued to a system queue
+	// - the Constraint API is disabled or the current account is not enrolled
+	if capacityLeaseID.has() {
+		extendCapacityLeaseTick = q.Clock().NewTicker(q.CapacityLeaseExtendInterval)
+		defer extendCapacityLeaseTick.Stop()
+
+		go func() {
+			lastCapacityLeaseExtension := time.Now()
+			for {
+				select {
+				case <-jobCtx.Done():
 					return
+				case <-extendCapacityLeaseTick.Chan():
+					if ctx.Err() != nil {
+						// Don't extend lease when the ctx is done.
+						return
+					}
+
+					currentCapacityLease := capacityLeaseID.get()
+					if currentCapacityLease == nil {
+						l.Error("cannot extend capacity lease since capacity lease ID is nil", "qi", qi, "partition", p)
+						// Don't extend lease since one doesn't exist
+						errCh <- AlwaysRetryError(fmt.Errorf("cannot extend capacity lease since lease ID is nil"))
+						return
+					}
+
+					// This idempotency key will change with every refreshed lease, which makes sense.
+					operationIdempotencyKey := currentCapacityLease.String()
+
+					res, err := q.CapacityManager.ExtendLease(context.Background(), &constraintapi.CapacityExtendLeaseRequest{
+						AccountID:      accountID,
+						IdempotencyKey: operationIdempotencyKey,
+						LeaseID:        *currentCapacityLease,
+						Duration:       QueueLeaseDuration,
+						Source: constraintapi.LeaseSource{
+							Location:          constraintapi.CallerLocationItemLease,
+							RunProcessingMode: constraintapi.RunProcessingModeBackground,
+							Service:           constraintapi.ServiceExecutor,
+						},
+						LeaseIssuedAt: capacityLeaseID.issuedAt(),
+					})
+					if err != nil {
+						l.ReportError(
+							err,
+							"error extending capacity lease",
+							logger.WithErrorReportLog(true),
+							logger.WithErrorReportTags(map[string]string{
+								"partitionID": p.ID,
+								"accountID":   accountID.String(),
+								"item":        qi.ID,
+								"leaseID":     currentCapacityLease.String(),
+							}),
+						)
+
+						// always stop processing the queue item if lease cannot be extended
+						errCh <- AlwaysRetryError(fmt.Errorf("error extending capacity lease while processing: %w", err))
+						return
+					}
+
+					if res.LeaseID == nil {
+						// Lease could not be extended
+						l.Error("failed to extend capacity lease, no new lease ID received", "qi", qi, "partition", p)
+						errCh <- AlwaysRetryError(fmt.Errorf("failed to extend capacity lease, no new lease ID received"))
+						return
+					}
+
+					// Record current + next lease if high-cardinality instrumentation is enabled
+					if instrumentCapacityLease {
+						l.Debug(
+							"extended capacity lease",
+							"last_extension", time.Since(lastCapacityLeaseExtension),
+							"lease_id", currentCapacityLease.String(),
+							"next_lease", res.LeaseID.String(),
+						)
+					}
+
+					// Update capacity lease
+					capacityLeaseID.set(res.LeaseID)
+
+					lastCapacityLeaseExtension = time.Now()
 				}
-
-				// If no initial capacity lease was provided for this queue item, no-op
-				// This specifically happens when
-				// - the item is enqueued to a system queue
-				// - the Constraint API is disabled or the current account is not enrolled
-				// - the Constraint API provided a lease which expired at the time of leasing the queue item
-				if i.CapacityLease == nil {
-					l.Trace("item has no capacity lease, skipping lease extension")
-					continue
-				}
-
-				currentCapacityLease := capacityLeaseID.get()
-				if currentCapacityLease == nil {
-					l.Error("cannot extend capacity lease since capacity lease ID is nil", "qi", qi, "partition", p)
-					// Don't extend lease since one doesn't exist
-					errCh <- fmt.Errorf("cannot extend lease since lease ID is nil")
-					return
-				}
-
-				// This idempotency key will change with every refreshed lease, which makes sense.
-				operationIdempotencyKey := currentCapacityLease.String()
-
-				res, err := q.CapacityManager.ExtendLease(context.Background(), &constraintapi.CapacityExtendLeaseRequest{
-					AccountID:      accountID,
-					IdempotencyKey: operationIdempotencyKey,
-					LeaseID:        *currentCapacityLease,
-					Duration:       QueueLeaseDuration,
-					Source: constraintapi.LeaseSource{
-						Location:          constraintapi.CallerLocationItemLease,
-						RunProcessingMode: constraintapi.RunProcessingModeBackground,
-						Service:           constraintapi.ServiceExecutor,
-					},
-				})
-				if err != nil {
-					l.ReportError(
-						err,
-						"error extending capacity lease",
-						logger.WithErrorReportLog(true),
-						logger.WithErrorReportTags(map[string]string{
-							"partitionID": p.ID,
-							"accountID":   accountID.String(),
-							"item":        qi.ID,
-							"leaseID":     currentCapacityLease.String(),
-						}),
-					)
-
-					// always stop processing the queue item if lease cannot be extended
-					errCh <- fmt.Errorf("error extending lease while processing: %w", err)
-					return
-				}
-
-				if res.LeaseID == nil {
-					// Lease could not be extended
-					l.Error("failed to extend capacity lease, no new lease ID received", "qi", qi, "partition", p)
-					errCh <- fmt.Errorf("failed to extend capacity lease, no new lease ID received")
-					return
-				}
-
-				// Record current + next lease if high-cardinality instrumentation is enabled
-				if instrumentCapacityLease {
-					l.Debug(
-						"extended capacity lease",
-						"last_extension", time.Since(lastCapacityLeaseExtension),
-						"lease_id", currentCapacityLease.String(),
-						"next_lease", res.LeaseID.String(),
-					)
-				}
-
-				// Update capacity lease
-				capacityLeaseID.set(res.LeaseID)
-
-				lastCapacityLeaseExtension = time.Now()
 			}
-		}
-	}()
+		}()
+
+		// When capacity is leased, release it after the job function has completed.
+		// This is optional and best-effort to free up concurrency capacity as quickly as possible
+		// for the next worker to lease a queue item.
+		defer service.Go(func() {
+			currentLeaseID := capacityLeaseID.get()
+			if currentLeaseID == nil {
+				return
+			}
+
+			res, err := q.CapacityManager.Release(context.Background(), &constraintapi.CapacityReleaseRequest{
+				AccountID:      p.AccountID,
+				IdempotencyKey: qi.ID,
+				LeaseID:        *currentLeaseID,
+				Source: constraintapi.LeaseSource{
+					Location:          constraintapi.CallerLocationItemLease,
+					Service:           constraintapi.ServiceExecutor,
+					RunProcessingMode: constraintapi.RunProcessingModeBackground,
+				},
+				LeaseIssuedAt: capacityLeaseID.issuedAt(),
+			})
+			if err != nil {
+				l.ReportError(err, "failed to release capacity", logger.WithErrorReportTags(map[string]string{
+					"account_id":  p.AccountID.String(),
+					"lease_id":    currentLeaseID.String(),
+					"function_id": p.FunctionID.String(),
+				}))
+				return
+			}
+
+			if instrumentCapacityLease {
+				l.Debug(
+					"released capacity lease",
+					"res", res,
+					"lease_id", currentLeaseID.String(),
+				)
+			}
+		})
+	}
 
 	startedAt := q.Clock().Now()
 	go func() {
@@ -295,6 +332,7 @@ func (q *queueProcessor) ProcessItem(
 			ContinueCount:       continuationCtr,
 			RefilledFromBacklog: qi.RefilledFrom,
 			CapacityLease:       i.CapacityLease,
+			ScavengeCount:       qi.ScavengeCount,
 		}
 
 		// Call the run func.
@@ -303,11 +341,11 @@ func (q *queueProcessor) ProcessItem(
 		{
 			// Clean up leases and such
 			extendLeaseTick.Stop()
-			extendCapacityLeaseTick.Stop()
 
-			if leaseID := capacityLeaseID.get(); leaseID != nil && instrumentCapacityLease {
-				l.Debug("stopping lease extension", "lease_id", leaseID.String())
+			if extendCapacityLeaseTick != nil {
+				extendCapacityLeaseTick.Stop()
 			}
+
 		}
 
 		if res.ScheduledImmediateJob {
@@ -334,45 +372,6 @@ func (q *queueProcessor) ProcessItem(
 			jobDone()
 		}
 	}()
-
-	// When capacity is leased, release it after requeueing/dequeueing the item.
-	// This is optional and best-effort to free up concurrency capacity as quickly as possible
-	// for the next worker to lease a queue item.
-	if capacityLeaseID.has() {
-		defer service.Go(func() {
-			currentLeaseID := capacityLeaseID.get()
-			if currentLeaseID == nil {
-				return
-			}
-
-			res, err := q.CapacityManager.Release(context.Background(), &constraintapi.CapacityReleaseRequest{
-				AccountID:      p.AccountID,
-				IdempotencyKey: qi.ID,
-				LeaseID:        *currentLeaseID,
-				Source: constraintapi.LeaseSource{
-					Location:          constraintapi.CallerLocationItemLease,
-					Service:           constraintapi.ServiceExecutor,
-					RunProcessingMode: constraintapi.RunProcessingModeBackground,
-				},
-			})
-			if err != nil {
-				l.ReportError(err, "failed to release capacity", logger.WithErrorReportTags(map[string]string{
-					"account_id":  p.AccountID.String(),
-					"lease_id":    currentLeaseID.String(),
-					"function_id": p.FunctionID.String(),
-				}))
-				return
-			}
-
-			if instrumentCapacityLease {
-				l.Debug(
-					"released capacity lease",
-					"res", res,
-					"lease_id", currentLeaseID.String(),
-				)
-			}
-		})
-	}
 
 	select {
 	case err := <-errCh:

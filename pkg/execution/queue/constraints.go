@@ -272,7 +272,8 @@ func (q *queueProcessor) BacklogRefillConstraintCheck(
 		// NOTE: This works because idempotency key == queue item ID
 		itemsToRefill[i] = l.IdempotencyKey
 		itemCapacityLeases[i] = CapacityLease{
-			LeaseID: l.LeaseID,
+			LeaseID:    l.LeaseID,
+			IssuedAtMS: now.UnixMilli(),
 		}
 	}
 
@@ -378,6 +379,7 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 					Service:           constraintapi.ServiceExecutor,
 					RunProcessingMode: constraintapi.RunProcessingModeBackground,
 				},
+				LeaseIssuedAt: time.UnixMilli(item.CapacityLease.IssuedAtMS),
 			})
 			if err != nil {
 				l.ReportError(err, "failed to release expired capacity", logger.WithErrorReportTags(map[string]string{
@@ -437,7 +439,8 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 
 	return ItemLeaseConstraintCheckResult{
 		CapacityLease: &CapacityLease{
-			LeaseID: capacityLeaseID,
+			LeaseID:    capacityLeaseID,
+			IssuedAtMS: now.UnixMilli(),
 		},
 		// Skip any constraint checks and subsequent updates,
 		// as constraint state is maintained in the Constraint API.

@@ -210,18 +210,21 @@ func (s *Span) UserlandChildren() []*Span {
 		return s.Children
 	}
 
-	// If we're not a userland span, but our first child is, return its
-	// children.
+	// If we're not a userland span, but our first child is the SDK's
+	// `"inngest.execution"` wrapper, return its children.
 	//
 	// We do this because userland spans are always underneath an
 	// `"inngest.execution"` span created by an SDK. So in this case, we're
-	// checking that we have `Executor span -> inngest.exection span ->
+	// checking that we have `Executor span -> inngest.execution span ->
 	// userland`.
 	//
 	// Critically, this means we're also completely ignoring the
 	// `"inngest.execution"` span itself, since we never want to display it to
 	// the user.
-	if len(s.Children) > 0 && s.Children[0].IsUserland() && len(s.Children[0].Children) > 0 {
+	//
+	// We only collapse the SDK execution wrapper; other userland spans
+	// with children (e.g., from checkpointed steps) must be preserved.
+	if len(s.Children) > 0 && s.Children[0].IsUserland() && s.Children[0].SpanName == meta.SDKExecutionSpanName {
 		return s.Children[0].Children
 	}
 
@@ -458,6 +461,25 @@ type FindOrCreateTraceRunOpt struct {
 	AppID       uuid.UUID
 	FunctionID  uuid.UUID
 	TraceID     string
+}
+
+type getRunContextKey struct{}
+
+type GetRunOpt struct {
+	IncludeOutput bool
+}
+
+func WithGetRunOpt(ctx context.Context, opt GetRunOpt) context.Context {
+	return context.WithValue(ctx, getRunContextKey{}, opt)
+}
+
+func GetRunOptFromContext(ctx context.Context) GetRunOpt {
+	opt, ok := ctx.Value(getRunContextKey{}).(GetRunOpt)
+	if !ok {
+		return GetRunOpt{}
+	}
+
+	return opt
 }
 
 type GetTraceRunFilter struct {

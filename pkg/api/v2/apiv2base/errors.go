@@ -27,8 +27,18 @@ const (
 
 	// 409 Conflict errors
 	ErrorResourceAlreadyExists = "resource_already_exists"
+	ErrorIdempotencyConflict   = "idempotency_conflict"
+
+	// 429 Too Many Requests errors
+	ErrorRateLimited = "rate_limited"
+
+	// 422 Unprocessable Entity errors
+	ErrorFunctionDebounced = "function_debounced"
+	ErrorFunctionSkipped   = "function_skipped"
 
 	// 404 Not Found errors
+	// ErrorNotFound is the generic not found error code used across multiple APIs.
+	ErrorNotFound        = "not_found"
 	ErrorAccountNotFound = "account_not_found"
 	ErrorEnvNotFound     = "env_not_found"
 

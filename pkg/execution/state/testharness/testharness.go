@@ -82,17 +82,14 @@ func CheckState(t *testing.T, gen Generator) {
 	t.Helper()
 
 	funcs := map[string]func(t *testing.T, m state.Manager){
-		"New":                     checkNew,
-		"Exists":                  checkExists,
-		"New/StepData":            checkNew_stepdata,
-		"UpdateMetadata":          checkUpdateMetadata,
-		"SaveResponse/Output":     checkSaveResponse_output,
-		"SaveResponse/Stack":      checkSaveResponse_stack,
-		"Idempotency":             checkIdempotency,
-		"SetStatus":               checkSetStatus,
-		"Cancel":                  checkCancel,
-		"Cancel/AlreadyCompleted": checkCancel_completed,
-		"Cancel/AlreadyCancelled": checkCancel_cancelled,
+		"New":                 checkNew,
+		"Exists":              checkExists,
+		"New/StepData":        checkNew_stepdata,
+		"UpdateMetadata":      checkUpdateMetadata,
+		"SaveResponse/Output": checkSaveResponse_output,
+		"SaveResponse/Stack":  checkSaveResponse_stack,
+		"Idempotency":         checkIdempotency,
+		"SetStatus":           checkSetStatus,
 	}
 	for name, f := range funcs {
 		t.Run(name, func(t *testing.T) {
@@ -1417,103 +1414,6 @@ func checkSetStatus(t *testing.T, m state.Manager) {
 	reloaded, err := m.Load(ctx, s.Identifier().AccountID, s.RunID())
 	require.NoError(t, err)
 	require.EqualValues(t, enums.RunStatusOverflowed, reloaded.Metadata().Status, "Status is not Overflowed")
-}
-
-func checkCancel(t *testing.T, m state.Manager) {
-	ctx := context.Background()
-	runID := ulid.MustNew(ulid.Now(), rand.Reader)
-	id := state.Identifier{
-		WorkflowID: w.ID,
-		RunID:      runID,
-		Key:        runID.String(),
-	}
-
-	init := state.Input{
-		Identifier:     id,
-		EventBatchData: []map[string]any{input.Map()},
-	}
-
-	s, err := m.New(ctx, init)
-	require.NoError(t, err)
-	require.EqualValues(t, enums.RunStatusScheduled, s.Metadata().Status, "Status is not Scheduled")
-
-	// Add time so that the history ticks a millisecond
-	<-time.After(time.Millisecond)
-
-	err = m.Cancel(ctx, s.Identifier())
-	require.NoError(t, err)
-
-	reloaded, err := m.Load(ctx, s.Identifier().AccountID, s.RunID())
-	require.NoError(t, err)
-	require.EqualValues(t, enums.RunStatusCancelled, reloaded.Metadata().Status, "Status is not Cancelled")
-}
-
-func checkCancel_cancelled(t *testing.T, m state.Manager) {
-	ctx := context.Background()
-	runID := ulid.MustNew(ulid.Now(), rand.Reader)
-	id := state.Identifier{
-		WorkflowID: w.ID,
-		RunID:      runID,
-		Key:        runID.String(),
-	}
-	init := state.Input{
-		Identifier:     id,
-		EventBatchData: []map[string]any{input.Map()},
-	}
-
-	s, err := m.New(ctx, init)
-	require.NoError(t, err)
-	require.EqualValues(t, enums.RunStatusScheduled, s.Metadata().Status, "Status is not Scheduled")
-
-	// Add time so that the history ticks a millisecond
-	<-time.After(time.Millisecond)
-
-	err = m.Cancel(ctx, s.Identifier())
-	require.NoError(t, err)
-	reloaded, err := m.Load(ctx, s.Identifier().AccountID, s.RunID())
-	require.NoError(t, err)
-	require.EqualValues(t, enums.RunStatusCancelled, reloaded.Metadata().Status, "Status is not Cancelled")
-
-	err = m.Cancel(ctx, s.Identifier())
-	require.Equal(t, err, state.ErrFunctionCancelled)
-}
-
-func checkCancel_completed(t *testing.T, m state.Manager) {
-	ctx := context.Background()
-	runID := ulid.MustNew(ulid.Now(), rand.Reader)
-	id := state.Identifier{
-		WorkflowID: w.ID,
-		RunID:      runID,
-		Key:        runID.String(),
-	}
-	init := state.Input{
-		Identifier:     id,
-		EventBatchData: []map[string]any{input.Map()},
-	}
-
-	s, err := m.New(ctx, init)
-	require.NoError(t, err)
-	require.EqualValues(t, enums.RunStatusScheduled, s.Metadata().Status, "Status is not Scheduled")
-
-	// Add time so that the history ticks a millisecond
-	<-time.After(time.Millisecond)
-
-	err = m.SetStatus(ctx, s.Identifier(), enums.RunStatusCompleted)
-	require.NoError(t, err)
-
-	s, err = m.Load(ctx, s.Identifier().AccountID, s.RunID())
-	require.NoError(t, err)
-	require.EqualValues(t, enums.RunStatusCompleted, s.Metadata().Status, "Status is not Complete after finalizing")
-
-	// Add time so that the history ticks a millisecond
-	<-time.After(time.Millisecond)
-
-	err = m.Cancel(ctx, s.Identifier())
-	require.Equal(t, err, state.ErrFunctionComplete)
-
-	s, err = m.Load(ctx, s.Identifier().AccountID, s.RunID())
-	require.NoError(t, err)
-	require.EqualValues(t, enums.RunStatusCompleted, s.Metadata().Status, "Status is not Complete after finalizing")
 }
 
 func setup(t *testing.T, m state.Manager) state.State {

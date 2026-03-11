@@ -102,7 +102,7 @@ func TestStateConsistency_LeaseOperations(t *testing.T) {
 		cv.VerifyScavengerShard(float64(ulid.Time(acquireResp.Leases[0].LeaseID.Time()).UnixMilli()), true)
 
 		// Get throttle key using explicit values (test-value is the EvaluatedKeyHash, function scope)
-		throttleKey := fmt.Sprintf("{cs}:a:%s:throttle:f:%s:test-value", te.AccountID, te.FunctionID)
+		throttleKey := fmt.Sprintf("{cs}:a:%s:throttle:f:%s<consistency-test:test-value>", te.AccountID, te.FunctionID)
 
 		// Release all leases
 		for i, lease := range acquireResp.Leases {
@@ -493,7 +493,7 @@ func TestStateConsistency_LeaseOperations(t *testing.T) {
 		cv.VerifyInProgressCounts(constraints, map[string]int{"constraint_0": 2}) // 2 leases in concurrency
 
 		// Get throttle key using explicit values (multi-value is the EvaluatedKeyHash, function scope)
-		throttleKey := fmt.Sprintf("{cs}:a:%s:throttle:f:%s:multi-value", te.AccountID, te.FunctionID)
+		throttleKey := fmt.Sprintf("{cs}:a:%s:throttle:f:%s<throttle-expr:multi-value>", te.AccountID, te.FunctionID)
 
 		// Release leases and verify both constraints are properly cleaned up
 		for i, lease := range acquireResp.Leases {

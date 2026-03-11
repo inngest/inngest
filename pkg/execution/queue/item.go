@@ -111,13 +111,18 @@ type QueueItem struct {
 	// the partition). This is not the same as AtMS for items scheduled in the future or past.
 	EnqueuedAt int64 `json:"eat"`
 
+	// ScavengeCount tracks how many times this item has been requeued by the scavenger
+	// due to an expired or lost lease.
+	ScavengeCount int `json:"sc,omitempty"`
+
 	// CapacityLease is the optional capacity lease for this queue item.
 	// This is set when the Constraint API feature flag is enabled and the item was refilled.
 	CapacityLease *CapacityLease `json:"cl,omitempty"`
 }
 
 type CapacityLease struct {
-	LeaseID ulid.ULID `json:"l,omitempty"`
+	LeaseID    ulid.ULID `json:"l,omitempty"`
+	IssuedAtMS int64     `json:"i,omitempty"`
 }
 
 func (q *QueueItem) SetID(ctx context.Context, str string) {
@@ -684,7 +689,7 @@ func ConvertToConstraintConfiguration(accountConcurrency int, fn inngest.Functio
 	if fn.RateLimit != nil {
 		var rateLimitKey string
 		if fn.RateLimit.Key != nil {
-			rateLimitKey = *fn.RateLimit.Key
+			rateLimitKey = util.XXHash(*fn.RateLimit.Key)
 		}
 
 		dur, err := str2duration.ParseDuration(fn.RateLimit.Period)
@@ -696,7 +701,7 @@ func ConvertToConstraintConfiguration(accountConcurrency int, fn inngest.Functio
 			Scope:             enums.RateLimitScopeFn,
 			Limit:             int(fn.RateLimit.Limit),
 			Period:            int(dur.Seconds()),
-			KeyExpressionHash: util.XXHash(rateLimitKey),
+			KeyExpressionHash: rateLimitKey,
 		})
 	}
 

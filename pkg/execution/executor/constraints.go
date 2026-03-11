@@ -189,12 +189,13 @@ func WithConstraints[T any](
 			// is generated. This means idempotency can be used for graceful retries.
 			operationIempotencyKey := lID.String()
 
-			res, err := capacityManager.ExtendLease(ctx, &constraintapi.CapacityExtendLeaseRequest{
+			res, err := capacityManager.ExtendLease(context.Background(), &constraintapi.CapacityExtendLeaseRequest{
 				IdempotencyKey: operationIempotencyKey,
 				AccountID:      req.AccountID,
 				LeaseID:        lID,
 				Duration:       ScheduleLeaseDuration,
 				Source:         source,
+				LeaseIssuedAt:  now,
 			})
 			if err != nil {
 				l.Error("could not extend schedule capacity lease", "err", err, "leaseID", lID, "req", req)
@@ -235,6 +236,7 @@ func WithConstraints[T any](
 					LeaseID:        lID,
 					IdempotencyKey: operationIdempotencyKey,
 					Source:         source,
+					LeaseIssuedAt:  now,
 				})
 				if internalErr != nil {
 					l.ReportError(internalErr, "failed to release capacity after schedule", logger.WithErrorReportTags(map[string]string{
@@ -279,14 +281,14 @@ func getScheduleConstraints(ctx context.Context, req execution.ScheduleRequest) 
 
 		var rateLimitKeyExpr string
 		if req.Function.RateLimit.Key != nil {
-			rateLimitKeyExpr = *req.Function.RateLimit.Key
+			rateLimitKeyExpr = util.XXHash(*req.Function.RateLimit.Key)
 		}
 
 		requests = append(requests, constraintapi.ConstraintItem{
 			Kind: constraintapi.ConstraintKindRateLimit,
 			RateLimit: &constraintapi.RateLimitConstraint{
 				Scope:             enums.RateLimitScopeFn,
-				KeyExpressionHash: util.XXHash(rateLimitKeyExpr),
+				KeyExpressionHash: rateLimitKeyExpr,
 				EvaluatedKeyHash:  rateLimitKey,
 			},
 		})

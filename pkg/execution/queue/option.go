@@ -724,6 +724,8 @@ type ProcessItem struct {
 type capacityLease struct {
 	currentCapacityLeaseID *ulid.ULID
 	capacityLeaseLock      sync.Mutex
+
+	initialLeaseIssuedAt time.Time
 }
 
 func newCapacityLease(initialLease *CapacityLease) *capacityLease {
@@ -732,6 +734,7 @@ func newCapacityLease(initialLease *CapacityLease) *capacityLease {
 	}
 	if initialLease != nil {
 		cl.currentCapacityLeaseID = &initialLease.LeaseID
+		cl.initialLeaseIssuedAt = time.UnixMilli(initialLease.IssuedAtMS)
 	}
 
 	return cl
@@ -747,6 +750,10 @@ func (p *capacityLease) get() *ulid.ULID {
 	p.capacityLeaseLock.Lock()
 	defer p.capacityLeaseLock.Unlock()
 	return p.currentCapacityLeaseID
+}
+
+func (p *capacityLease) issuedAt() time.Time {
+	return p.initialLeaseIssuedAt
 }
 
 func (p *capacityLease) has() bool {

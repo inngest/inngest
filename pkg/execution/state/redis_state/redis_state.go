@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"io/fs"
 	"regexp"
-	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -273,6 +272,15 @@ func (m shardedMgr) New(ctx context.Context, input state.Input) (state.State, er
 		// So if this error is returned, we should just continue with creating a new state, since
 		// it could mean that the state is not actually created.
 		case state.ErrInvalidIdentifier: // no-op
+		case state.ErrIdentifierTombstone:
+			if runID != nil {
+				input.Identifier.RunID = *runID
+			}
+			return state.NewStateInstance(
+				input.Identifier,
+				state.Metadata{Identifier: input.Identifier},
+				nil, nil, nil,
+			), state.ErrIdentifierTombstone
 		default:
 			return nil, err
 		}
@@ -409,7 +417,11 @@ func (m shardedMgr) idempotencyCheck(ctx context.Context, rc RetriableClient, ke
 	// Realisitcally, the chances of this are low, as the entire run has to finish while
 	// the scheduling op retries.
 	if len(prev) > 0 && prev[0] == consts.FunctionIdempotencyTombstone {
-		return nil, state.ErrIdentifierTombstone
+		runID, err := ulid.Parse(prev[1:])
+		if err != nil {
+			return nil, state.ErrIdentifierTombstone
+		}
+		return &runID, state.ErrIdentifierTombstone
 	}
 
 	// if there are existing values, the state might have already been created
@@ -486,33 +498,6 @@ func (m shardedMgr) metadata(ctx context.Context, accountId uuid.UUID, runID uli
 		return nil, err
 	}
 	return newRunMetadata(val)
-}
-
-func (m shardedMgr) Cancel(ctx context.Context, id state.Identifier) error {
-	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Cancel"), redis_telemetry.ScopeFnRunState)
-
-	fnRunState := m.s.FunctionRunState()
-	r, isSharded := fnRunState.Client(ctx, id.AccountID, id.RunID)
-	status, err := retriableScripts["cancel"].Exec(
-		redis_telemetry.WithScriptName(ctx, "cancel"),
-		r,
-		[]string{fnRunState.kg.RunMetadata(ctx, isSharded, id.RunID)},
-		[]string{},
-	).AsInt64()
-	if err != nil && !rueidis.IsRedisNil(err) {
-		return fmt.Errorf("error cancelling: %w", err)
-	}
-	switch status {
-	case 0:
-		return nil
-	case 1:
-		return state.ErrFunctionComplete
-	case 2:
-		return state.ErrFunctionFailed
-	case 3:
-		return state.ErrFunctionCancelled
-	}
-	return fmt.Errorf("unknown return value cancelling function: %d", status)
 }
 
 func (m shardedMgr) SetStatus(ctx context.Context, id state.Identifier, status enums.RunStatus) error {
@@ -1310,18 +1295,12 @@ type keyIter struct {
 	keys []string
 	// vals stores pauses as strings from MGET
 	vals []string
-	// currentIDs stores the original pause IDs for the current batch
-	currentIDs []string
-
 	// scores stores pause creation times or index scores
 	// they are conditionally used so the iterator works
 	// just fine if it's empty
 	scores []float64
 
 	hasScores bool
-
-	// indexKeys are the sorted set index keys to clean up orphaned entries from
-	indexKeys []string
 
 	idx   int64
 	err   error
@@ -1376,9 +1355,6 @@ func (i *keyIter) fetch(ctx context.Context) error {
 		i.keys = []string{}
 	}
 
-	// Preserve original pause IDs before transforming to full keys
-	i.currentIDs = slices.Clone(load)
-
 	pauseKeys := make([]string, len(load))
 	for n, id := range load {
 		pauseKeys[n] = i.kf.Pause(ctx, uuid.MustParse(id))
@@ -1415,27 +1391,11 @@ func (i *keyIter) Val(ctx context.Context) *state.Pause {
 	val := i.vals[0]
 	i.vals = i.vals[1:]
 
-	// Get the current pause ID and shift
-	var currentID string
-	if len(i.currentIDs) > 0 {
-		currentID = i.currentIDs[0]
-		i.currentIDs = i.currentIDs[1:]
-	}
-
 	if i.hasScores {
 		score = i.scores[0]
 		i.scores = i.scores[1:]
 	}
 	if val == "" {
-		// Pause data is gone but ID remains in index - clean it up
-		if len(i.indexKeys) > 0 && currentID != "" {
-			for _, indexKey := range i.indexKeys {
-				_ = i.r.Do(ctx, i.r.B().Zrem().Key(indexKey).Member(currentID).Build())
-			}
-			metrics.IncrPausesOrphanedIndexCleanupCounter(ctx, metrics.CounterOpt{
-				PkgName: pkgName,
-			})
-		}
 		return nil
 	}
 

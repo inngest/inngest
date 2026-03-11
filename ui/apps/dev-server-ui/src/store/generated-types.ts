@@ -19,6 +19,7 @@ export type Scalars = {
   Bytes: any;
   /** The environment for the function to be run: `"prod"` or `"test"` */
   Environment: any;
+  HTTPHeaders: any;
   Int64: number;
   Map: any;
   SpanMetadataKind: any;
@@ -790,6 +791,7 @@ export type RunTraceSpan = {
   parentSpan: Maybe<RunTraceSpan>;
   parentSpanID: Maybe<Scalars['String']>;
   queuedAt: Scalars['Time'];
+  response: Maybe<RunTraceSpanResponseInfo>;
   run: FunctionRun;
   runID: Scalars['ULID'];
   skipExistingRunID: Maybe<Scalars['String']>;
@@ -810,6 +812,12 @@ export type RunTraceSpanOutput = {
   data: Maybe<Scalars['Bytes']>;
   error: Maybe<StepError>;
   input: Maybe<Scalars['Bytes']>;
+};
+
+export type RunTraceSpanResponseInfo = {
+  __typename?: 'RunTraceSpanResponseInfo';
+  headers: Scalars['HTTPHeaders'];
+  statusCode: Scalars['Int'];
 };
 
 export enum RunTraceSpanStatus {
@@ -1387,6 +1395,11 @@ export type TraceDetailsFragment = {
         timedOut: boolean | null;
       }
     | null;
+  response: {
+    __typename?: 'RunTraceSpanResponseInfo';
+    statusCode: number;
+    headers: any;
+  } | null;
 };
 
 export type GetRunQueryVariables = Exact<{
@@ -1536,6 +1549,11 @@ export type GetRunQuery = {
                     timedOut: boolean | null;
                   }
                 | null;
+              response: {
+                __typename?: 'RunTraceSpanResponseInfo';
+                statusCode: number;
+                headers: any;
+              } | null;
             }>;
             userlandSpan: {
               __typename?: 'UserlandSpan';
@@ -1581,6 +1599,11 @@ export type GetRunQuery = {
                   timedOut: boolean | null;
                 }
               | null;
+            response: {
+              __typename?: 'RunTraceSpanResponseInfo';
+              statusCode: number;
+              headers: any;
+            } | null;
           }>;
           userlandSpan: {
             __typename?: 'UserlandSpan';
@@ -1626,6 +1649,11 @@ export type GetRunQuery = {
                 timedOut: boolean | null;
               }
             | null;
+          response: {
+            __typename?: 'RunTraceSpanResponseInfo';
+            statusCode: number;
+            headers: any;
+          } | null;
         }>;
         userlandSpan: {
           __typename?: 'UserlandSpan';
@@ -1671,6 +1699,11 @@ export type GetRunQuery = {
               timedOut: boolean | null;
             }
           | null;
+        response: {
+          __typename?: 'RunTraceSpanResponseInfo';
+          statusCode: number;
+          headers: any;
+        } | null;
       }>;
       userlandSpan: {
         __typename?: 'UserlandSpan';
@@ -1716,6 +1749,11 @@ export type GetRunQuery = {
             timedOut: boolean | null;
           }
         | null;
+      response: {
+        __typename?: 'RunTraceSpanResponseInfo';
+        statusCode: number;
+        headers: any;
+      } | null;
     } | null;
   } | null;
 };
@@ -1855,6 +1893,11 @@ export type GetRunTraceQuery = {
                   timedOut: boolean | null;
                 }
               | null;
+            response: {
+              __typename?: 'RunTraceSpanResponseInfo';
+              statusCode: number;
+              headers: any;
+            } | null;
           }>;
           userlandSpan: {
             __typename?: 'UserlandSpan';
@@ -1900,6 +1943,11 @@ export type GetRunTraceQuery = {
                 timedOut: boolean | null;
               }
             | null;
+          response: {
+            __typename?: 'RunTraceSpanResponseInfo';
+            statusCode: number;
+            headers: any;
+          } | null;
         }>;
         userlandSpan: {
           __typename?: 'UserlandSpan';
@@ -1945,6 +1993,11 @@ export type GetRunTraceQuery = {
               timedOut: boolean | null;
             }
           | null;
+        response: {
+          __typename?: 'RunTraceSpanResponseInfo';
+          statusCode: number;
+          headers: any;
+        } | null;
       }>;
       userlandSpan: {
         __typename?: 'UserlandSpan';
@@ -1990,6 +2043,11 @@ export type GetRunTraceQuery = {
             timedOut: boolean | null;
           }
         | null;
+      response: {
+        __typename?: 'RunTraceSpanResponseInfo';
+        statusCode: number;
+        headers: any;
+      } | null;
     }>;
     userlandSpan: {
       __typename?: 'UserlandSpan';
@@ -2035,6 +2093,11 @@ export type GetRunTraceQuery = {
           timedOut: boolean | null;
         }
       | null;
+    response: {
+      __typename?: 'RunTraceSpanResponseInfo';
+      statusCode: number;
+      headers: any;
+    } | null;
   };
 };
 
@@ -2374,6 +2437,11 @@ export type GetDebugRunQuery = {
                   timedOut: boolean | null;
                 }
               | null;
+            response: {
+              __typename?: 'RunTraceSpanResponseInfo';
+              statusCode: number;
+              headers: any;
+            } | null;
           }>;
           userlandSpan: {
             __typename?: 'UserlandSpan';
@@ -2419,6 +2487,11 @@ export type GetDebugRunQuery = {
                 timedOut: boolean | null;
               }
             | null;
+          response: {
+            __typename?: 'RunTraceSpanResponseInfo';
+            statusCode: number;
+            headers: any;
+          } | null;
         }>;
         userlandSpan: {
           __typename?: 'UserlandSpan';
@@ -2464,6 +2537,11 @@ export type GetDebugRunQuery = {
               timedOut: boolean | null;
             }
           | null;
+        response: {
+          __typename?: 'RunTraceSpanResponseInfo';
+          statusCode: number;
+          headers: any;
+        } | null;
       }>;
       userlandSpan: {
         __typename?: 'UserlandSpan';
@@ -2509,6 +2587,11 @@ export type GetDebugRunQuery = {
             timedOut: boolean | null;
           }
         | null;
+      response: {
+        __typename?: 'RunTraceSpanResponseInfo';
+        statusCode: number;
+        headers: any;
+      } | null;
     }> | null;
   } | null;
 };

@@ -1230,4 +1230,70 @@ func TestQueueScavenge(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, 0, int(oldConcurrencyQueueItems), "expected no items in the old concurrency queue", r.Dump())
 	})
+
+	t.Run("scavenger increments ScavengeCount on requeue", func(t *testing.T) {
+		r.FlushAll()
+
+		_, shard := newQueue(
+			t, rc,
+			osqueue.WithClock(clock),
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
+				return true
+			}),
+		)
+		ctx := context.Background()
+
+		accountID := uuid.New()
+		fnID := uuid.New()
+
+		qi := osqueue.QueueItem{
+			FunctionID: fnID,
+			Data: osqueue.Item{
+				Payload: json.RawMessage("{\"test\":\"payload\"}"),
+				Identifier: state.Identifier{
+					AccountID:  accountID,
+					WorkflowID: fnID,
+				},
+			},
+		}
+
+		start := time.Now().Truncate(time.Second)
+
+		item, err := shard.EnqueueItem(ctx, qi, start, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+		require.Equal(t, 0, item.ScavengeCount)
+
+		// Lease the item and let it expire
+		_, err = shard.Lease(ctx, item, 5*time.Second, clock.Now(), nil, osqueue.LeaseOptionDisableConstraintChecks(false))
+		require.NoError(t, err)
+
+		clock.Advance(6 * time.Second)
+		r.FastForward(6 * time.Second)
+		r.SetTime(clock.Now())
+
+		// First scavenge should increment ScavengeCount to 1
+		scavenged, err := shard.Scavenge(ctx, 100)
+		require.NoError(t, err)
+		require.Equal(t, 1, scavenged)
+
+		requeued, err := shard.LoadQueueItem(ctx, item.ID)
+		require.NoError(t, err)
+		require.Equal(t, 1, requeued.ScavengeCount)
+
+		// Lease and expire again to verify accumulation
+		_, err = shard.Lease(ctx, *requeued, 5*time.Second, clock.Now(), nil, osqueue.LeaseOptionDisableConstraintChecks(false))
+		require.NoError(t, err)
+
+		clock.Advance(6 * time.Second)
+		r.FastForward(6 * time.Second)
+		r.SetTime(clock.Now())
+
+		scavenged, err = shard.Scavenge(ctx, 100)
+		require.NoError(t, err)
+		require.Equal(t, 1, scavenged)
+
+		requeued2, err := shard.LoadQueueItem(ctx, item.ID)
+		require.NoError(t, err)
+		require.Equal(t, 2, requeued2.ScavengeCount)
+	})
 }

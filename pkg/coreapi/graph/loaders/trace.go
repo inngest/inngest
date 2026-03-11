@@ -25,6 +25,10 @@ const (
 	DiscoveryStepSpanName    = "Discovery step"
 	GenericExecutionSpanName = "Execution"
 	FinalizationSpanName     = "Finalization"
+
+	// SDKExecutionSpanName is an alias for meta.SDKExecutionSpanName
+	// used locally for readability.
+	SDKExecutionSpanName = meta.SDKExecutionSpanName
 )
 
 var ErrSkipSuccess = fmt.Errorf("skip success span")
@@ -252,6 +256,13 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 		gqlSpan.SkipExistingRunID = span.Attributes.SkipExistingRunID
 	}
 
+	if span.Attributes.ResponseStatusCode != nil && span.Attributes.ResponseHeaders != nil {
+		gqlSpan.Response = &models.RunTraceSpanResponseInfo{
+			StatusCode: *span.Attributes.ResponseStatusCode,
+			Headers:    *span.Attributes.ResponseHeaders,
+		}
+	}
+
 	// If this was a discovery span, we may not want to show it.
 	showSpan := span.Name != meta.SpanNameStepDiscovery
 
@@ -396,11 +407,14 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 				}
 			case meta.SpanNameStepDiscovery, meta.SpanNameStep:
 				{
-					// Don't copy status from userland spans to preserve step status
-					if !child.IsUserland {
-						gqlSpan.EndedAt = child.EndedAt
-						gqlSpan.Status = child.Status
+					// Userland spans don't carry step execution metadata;
+					// so skip all parent-property propagation for them.
+					if child.IsUserland {
+						break
 					}
+
+					gqlSpan.EndedAt = child.EndedAt
+					gqlSpan.Status = child.Status
 
 					if isFirstChild {
 						isFirstChild = false
@@ -448,15 +462,20 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 		}
 
 		// If we only have a single child, this span isn't a userland span,
-		// but the single child is, return its children.
+		// but the single child is the SDK's `"inngest.execution"` wrapper,
+		// collapse it by returning its children (if any).
 		//
 		// We do this because userland spans are always underneath an
 		// `"inngest.execution"` span created by an SDK, which houses useful
 		// information about the environment, versions, scope, etc.
 		//
-		// Critically, this means we also ignore the `"inggest.execution"`
+		// Critically, this means we also ignore the `"inngest.execution"`
 		// span itself, as we never want to display it to the user.
-		if !gqlSpan.IsUserland && len(gqlSpan.ChildrenSpans) == 1 && gqlSpan.ChildrenSpans[0].IsUserland {
+		//
+		// We only collapse when the child is specifically the SDK execution
+		// wrapper span. Other userland spans with children (e.g., spans
+		// within checkpointed steps) must be preserved in the tree.
+		if !gqlSpan.IsUserland && len(gqlSpan.ChildrenSpans) == 1 && gqlSpan.ChildrenSpans[0].IsUserland && gqlSpan.ChildrenSpans[0].Name == SDKExecutionSpanName {
 			gqlSpan.ChildrenSpans = gqlSpan.ChildrenSpans[0].ChildrenSpans
 		}
 
@@ -476,7 +495,8 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 		if isStep {
 			// Step spans should not show attempts if they only have one and
 			// have resolved
-			if len(gqlSpan.ChildrenSpans) == 1 && gqlSpan.ChildrenSpans[0].Status == models.RunTraceSpanStatusCompleted {
+			if len(gqlSpan.ChildrenSpans) == 1 && !gqlSpan.ChildrenSpans[0].IsUserland && gqlSpan.ChildrenSpans[0].Status == models.RunTraceSpanStatusCompleted {
+				gqlSpan.Response = gqlSpan.ChildrenSpans[0].Response
 				gqlSpan.Metadata = append(gqlSpan.Metadata, gqlSpan.ChildrenSpans[0].Metadata...)
 				// However, we preserve any userland spans from the
 				// successful execution if we have any.

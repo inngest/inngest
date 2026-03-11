@@ -132,6 +132,7 @@ func Start(ctx context.Context, s Service) (err error) {
 		l.Error("service cleanup errored", "error", stopErr)
 		err = errors.Join(err, stopErr)
 	}
+	l.Info("service run finished", "err", err)
 
 	return err
 }
@@ -181,7 +182,15 @@ func run(ctx context.Context, stop func(), s Service) error {
 		// We received a cancellation signal.  Allow Run to continue for up
 		// to RunTimoeut period before quitting and cleaning up.
 
-		// Ensure that we prevent the paretn context from capturing signals again.
+		// Wait for Run to finish draining in-progress work (e.g. queue
+		// jobs) before proceeding to Stop. This ensures graceful
+		// shutdown completes before the stop timeout begins.
+		l.Info("waiting for service run to finish")
+		if err := <-runErr; err != nil && err != context.Canceled {
+			return err
+		}
+		l.Info("service run finished")
+
 		stop()
 	}
 	return nil

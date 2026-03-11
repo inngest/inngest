@@ -406,6 +406,10 @@ func FindInvokedFunction(ctx context.Context, tracked event.TrackedEvent, fl cqr
 	}
 
 	for _, fn := range fns {
+		// allow ID lookups.
+		if fn.ID.String() == fnID {
+			return &fn, nil
+		}
 		if fn.GetSlug() == fnID {
 			return &fn, nil
 		}
@@ -688,7 +692,7 @@ func Initialize(ctx context.Context, opts InitOpts) (*sv2.Metadata, error) {
 	}
 
 	// If this is a debounced function, run this through a debouncer.
-	md, err := opts.exec.Schedule(ctx, execution.ScheduleRequest{
+	_, md, err := opts.exec.Schedule(ctx, execution.ScheduleRequest{
 		WorkspaceID:    wsID,
 		AppID:          opts.appID,
 		Function:       fn,

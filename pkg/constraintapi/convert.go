@@ -848,6 +848,12 @@ func CapacityExtendLeaseRequestToProto(req *CapacityExtendLeaseRequest) *pb.Capa
 	if req == nil {
 		return nil
 	}
+
+	var leaseIssuedAt *timestamppb.Timestamp
+	if !req.LeaseIssuedAt.IsZero() {
+		leaseIssuedAt = timestamppb.New(req.LeaseIssuedAt)
+	}
+
 	return &pb.CapacityExtendLeaseRequest{
 		IdempotencyKey: req.IdempotencyKey,
 		AccountId:      req.AccountID.String(),
@@ -855,6 +861,7 @@ func CapacityExtendLeaseRequestToProto(req *CapacityExtendLeaseRequest) *pb.Capa
 		Duration:       durationpb.New(req.Duration),
 		Source:         LeaseSourceToProto(req.Source),
 		RequestAttempt: uint32(req.RequestAttempt),
+		LeaseIssuedAt:  leaseIssuedAt,
 	}
 }
 
@@ -878,6 +885,11 @@ func CapacityExtendLeaseRequestFromProto(pbReq *pb.CapacityExtendLeaseRequest) (
 		duration = pbReq.Duration.AsDuration()
 	}
 
+	var leaseIssuedAt time.Time
+	if pbReq.LeaseIssuedAt != nil {
+		leaseIssuedAt = pbReq.LeaseIssuedAt.AsTime()
+	}
+
 	return &CapacityExtendLeaseRequest{
 		IdempotencyKey: pbReq.IdempotencyKey,
 		AccountID:      accountID,
@@ -885,6 +897,7 @@ func CapacityExtendLeaseRequestFromProto(pbReq *pb.CapacityExtendLeaseRequest) (
 		Duration:       duration,
 		Source:         LeaseSourceFromProto(pbReq.Source),
 		RequestAttempt: int(pbReq.RequestAttempt),
+		LeaseIssuedAt:  leaseIssuedAt,
 	}, nil
 }
 
@@ -927,12 +940,19 @@ func CapacityReleaseRequestToProto(req *CapacityReleaseRequest) *pb.CapacityRele
 	if req == nil {
 		return nil
 	}
+
+	var leaseIssuedAt *timestamppb.Timestamp
+	if !req.LeaseIssuedAt.IsZero() {
+		leaseIssuedAt = timestamppb.New(req.LeaseIssuedAt)
+	}
+
 	return &pb.CapacityReleaseRequest{
 		IdempotencyKey: req.IdempotencyKey,
 		AccountId:      req.AccountID.String(),
 		LeaseId:        req.LeaseID.String(),
 		Source:         LeaseSourceToProto(req.Source),
 		RequestAttempt: uint32(req.RequestAttempt),
+		LeaseIssuedAt:  leaseIssuedAt,
 	}
 }
 
@@ -951,12 +971,18 @@ func CapacityReleaseRequestFromProto(pbReq *pb.CapacityReleaseRequest) (*Capacit
 		return nil, fmt.Errorf("invalid lease ID: %w", err)
 	}
 
+	var leaseIssuedAt time.Time
+	if pbReq.LeaseIssuedAt != nil {
+		leaseIssuedAt = pbReq.LeaseIssuedAt.AsTime()
+	}
+
 	return &CapacityReleaseRequest{
 		IdempotencyKey: pbReq.IdempotencyKey,
 		AccountID:      accountID,
 		LeaseID:        leaseID,
 		Source:         LeaseSourceFromProto(pbReq.Source),
 		RequestAttempt: int(pbReq.RequestAttempt),
+		LeaseIssuedAt:  leaseIssuedAt,
 	}, nil
 }
 

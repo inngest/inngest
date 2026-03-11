@@ -8,7 +8,8 @@
     "build": "vite build && tsc --noEmit",
     "start": "vite start",
     "format": "prettier --write .",
-    "lint": "eslint . --report-unused-disable-directives --max-warnings 0"
+    "lint": "eslint . --report-unused-disable-directives --max-warnings 0",
+    "type-check": "tsc --noEmit"
   },
   "dependencies": {
     "@clerk/tanstack-react-start": "^0.26.5",

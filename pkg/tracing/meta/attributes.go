@@ -1,11 +1,11 @@
 package meta
 
 import (
-	"net/http"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/tracing/metadata"
 	"github.com/inngest/inngest/pkg/util/aigateway"
 	"github.com/oklog/ulid/v2"
@@ -118,7 +118,7 @@ var Attrs = struct {
 
 	// HTTP (serve) attributes
 	RequestURL         attr[*string]
-	ResponseHeaders    attr[*http.Header]
+	ResponseHeaders    attr[*headers.Compact]
 	ResponseStatusCode attr[*int]
 	ResponseOutputSize attr[*int]
 
@@ -173,7 +173,7 @@ var Attrs = struct {
 	IsFunctionOutput:                   BoolAttr("is.function.output"),
 	QueuedAt:                           TimeAttr("queued_at"),
 	RequestURL:                         StringAttr("request.url"),
-	ResponseHeaders:                    JsonAttr[http.Header]("response.headers"),
+	ResponseHeaders:                    JsonAttr[headers.Compact]("response.headers"),
 	ResponseOutputSize:                 IntAttr("response.output_size"),
 	ResponseStatusCode:                 IntAttr("response.status_code"),
 	RunID:                              ULIDAttr("run.id"),
