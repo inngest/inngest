@@ -56,10 +56,6 @@ type CheckpointAPI interface {
 	CheckpointAsyncSteps(w http.ResponseWriter, r *http.Request)
 	// Output returns run output given a JWT which has access to the given {env, runID} claimset.
 	Output(w http.ResponseWriter, r *http.Request)
-	// StreamIngest accepts a streamed response body from the SDK.
-	StreamIngest(w http.ResponseWriter, r *http.Request)
-	// StreamOutput streams the response to the client, supporting late joiners.
-	StreamOutput(w http.ResponseWriter, r *http.Request)
 }
 
 // RunOutputReader represents any implementation that fetches run outputs.

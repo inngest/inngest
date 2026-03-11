@@ -136,7 +136,6 @@ func (a *router) setup() {
 		// group to avoid the caching middleware buffering streamed responses.
 		for _, prefix := range CheckpointRoutePrefixes {
 			r.Get(prefix+"/{runID}/output", checkpointAPI.Output)
-			// r.Get(prefix+"/{runID}/stream", checkpointAPI.StreamOutput)
 		}
 
 		r.Group(func(r chi.Router) {
