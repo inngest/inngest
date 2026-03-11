@@ -230,6 +230,7 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 	// A single min/max TTL pair is used across all cached constraints.
 	cacheKeys := make([]string, len(sortedConstraints))
 	var cacheMinTTL, cacheMaxTTL int
+	cacheEnabled := false
 	if r.enableAcquireCache != nil {
 		for i, ci := range sortedConstraints {
 			enabled, minTTL, maxTTL := r.enableAcquireCache(ctx, req.AccountID, req.EnvID, req.FunctionID, ci)
@@ -241,6 +242,7 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 				continue
 			}
 			cacheKeys[i] = key
+			cacheEnabled = true
 			cacheMinTTL = int(max(minTTL.Seconds(), 1))
 			cacheMaxTTL = int(max(maxTTL.Seconds(), 1))
 		}
@@ -370,8 +372,8 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 
 	cacheHit := parsedResponse.CacheHit != 0
 
-	// Record centralized cache hit/miss metric
-	if r.enableAcquireCache != nil {
+	// Record centralized cache hit/miss metric only when caching is enabled
+	if cacheEnabled {
 		cacheOp := "miss"
 		if cacheHit {
 			cacheOp = "hit"
