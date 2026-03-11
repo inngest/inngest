@@ -111,17 +111,20 @@ function Home() {
 
   return (
     <div className="mx-auto w-full max-w-5xl py-6">
-      {/* Filters */}
-      <Filters
-        status={status}
-        onStatusChange={(newStatus) => {
-          void navigate({
-            to: "/",
-            search: newStatus ? { status: newStatus } : {},
-          });
-        }}
-        defaultStatus={TICKET_STATUS_DEFAULT}
-      />
+      <header className="flex flex-row justify-between items-center pb-6">
+        {/* Filters */}
+        <Filters
+          status={status}
+          onStatusChange={(newStatus) => {
+            void navigate({
+              to: "/",
+              search: newStatus ? { status: newStatus } : {},
+            });
+          }}
+          defaultStatus={TICKET_STATUS_DEFAULT}
+        />
+        <Button kind="primary" label="Create a new ticket" href="new" />
+      </header>
 
       {/* Ticket List */}
       <div className="flex w-full flex-col gap-4 py-4">
