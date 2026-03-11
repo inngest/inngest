@@ -227,6 +227,8 @@ type TimelineBarRendererProps = {
   viewStartOffset?: number;
   /** View offset - end position as percentage (0-100) for zooming */
   viewEndOffset?: number;
+  /** Whether this bar is inside an experiment (inherited from parent) */
+  insideExperiment?: boolean;
 };
 
 /**
@@ -245,6 +247,7 @@ function TimelineBarRenderer({
   selectedStepId,
   viewStartOffset = 0,
   viewEndOffset = 100,
+  insideExperiment,
 }: TimelineBarRendererProps): JSX.Element {
   const { startPercent, widthPercent } = calculateBarPosition(
     bar.startTime,
@@ -259,6 +262,9 @@ function TimelineBarRenderer({
   const hasChildren = bar.children && bar.children.length > 0;
   const isExpandable = !bar.isRoot && (hasTimingBreakdown || hasChildren);
   const isExpanded = bar.isRoot ? true : expandedBars.has(bar.id);
+
+  // Children of experiment bars inherit the dotted background
+  const childInsideExperiment = insideExperiment || bar.hasExperiment;
 
   // Generate segments for compound bar visualization
   // Bars with timingBreakdown use queue+execution segments; others fall back to delay+execution
@@ -290,6 +296,8 @@ function TimelineBarRenderer({
       endTime={bar.endTime}
       minTime={minTime}
       delayMs={bar.delayMs}
+      hasExperiment={bar.hasExperiment}
+      insideExperiment={insideExperiment}
     >
       {/* Timing breakdown bars */}
       {isExpanded &&
@@ -333,6 +341,7 @@ function TimelineBarRenderer({
               startTime={timingBar.startTime}
               endTime={timingBar.endTime}
               minTime={minTime}
+              insideExperiment={childInsideExperiment}
             >
               {/* HTTP timing bars nested under YOUR SERVER */}
               {isTimingBarExpanded &&
@@ -362,6 +371,7 @@ function TimelineBarRenderer({
                       startTime={httpBar.startTime}
                       endTime={httpBar.endTime}
                       minTime={minTime}
+                      insideExperiment={childInsideExperiment}
                     />
                   );
                 })}
@@ -385,6 +395,7 @@ function TimelineBarRenderer({
                     selectedStepId={selectedStepId}
                     viewStartOffset={viewStartOffset}
                     viewEndOffset={viewEndOffset}
+                    insideExperiment={childInsideExperiment}
                   />
                 ))}
             </TimelineBar>
@@ -409,6 +420,7 @@ function TimelineBarRenderer({
             selectedStepId={selectedStepId}
             viewStartOffset={viewStartOffset}
             viewEndOffset={viewEndOffset}
+            insideExperiment={childInsideExperiment}
           />
         ))}
     </TimelineBar>
