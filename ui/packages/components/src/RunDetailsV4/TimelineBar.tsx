@@ -584,21 +584,28 @@ export function TimelineBar({
               selected ? 'bg-secondary-3xSubtle' : 'bg-canvasSubtle'
             )}
             style={{
-              left: `${indentPx - 4}px`,
+              left: `${indentPx - 24}px`,
             }}
           />
         )}
         {/* Left panel - name, icon, controls */}
         <div
           data-testid="timeline-bar-left"
-          className="flex h-full shrink-0 items-center gap-1.5 overflow-hidden pr-2"
+          className="relative flex h-full shrink-0 items-center gap-1.5 overflow-hidden pr-2"
           style={{
             width: `${leftWidth}%`,
             paddingLeft: `${indentPx}px`,
           }}
         >
-          {/* Expand toggle */}
-          {expandable && <ExpandToggle expanded={expanded ?? false} onCollapse={onToggle} />}
+          {/* Expand toggle - absolutely positioned to sit on the parent's vertical line */}
+          {expandable && (
+            <div
+              className="absolute flex items-center justify-center"
+              style={{ left: `${indentPx - 20}px` }}
+            >
+              <ExpandToggle expanded={expanded ?? false} onCollapse={onToggle} />
+            </div>
+          )}
 
           {/* Icon */}
           <BarIconComponent icon={effectiveIcon} className="text-subtle ml-px" status={status} />
@@ -608,7 +615,7 @@ export function TimelineBar({
             className={cn(
               'min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap font-mono text-xs font-normal leading-tight',
               barStyle.textColor ?? 'text-basis',
-              !expandable && !effectiveIcon && 'pl-1.5'
+              !effectiveIcon && 'pl-1.5'
             )}
           >
             {displayName}
