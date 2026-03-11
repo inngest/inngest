@@ -3,6 +3,7 @@ package constraintapi
 import (
 	"context"
 	"crypto/rand"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -36,6 +37,9 @@ type constraintCache struct {
 	enableHighCardinalityInstrumentation EnableHighCardinalityInstrumentation
 	enableCache                          EnableConstraintCacheFn
 	shouldCache                          ShouldCacheConstraintFn
+
+	// acquireCount is used to sample cache size gauge reporting (~every 100 calls).
+	acquireCount atomic.Int64
 }
 
 type constraintCacheItem struct {
@@ -96,6 +100,13 @@ func (l *constraintCache) Acquire(ctx context.Context, req *CapacityAcquireReque
 	enableCache, minTTL, maxTTL := l.enableCache(ctx, req.AccountID, req.EnvID, req.FunctionID)
 	if !enableCache {
 		return l.manager.Acquire(ctx, req)
+	}
+
+	// Report cache size gauge every ~100 Acquire calls to avoid lock overhead at high volume.
+	if l.acquireCount.Add(1)%100 == 0 {
+		metrics.GaugeConstraintAPICacheSize(ctx, int64(l.cache.ItemCount()), metrics.GaugeOpt{
+			PkgName: pkgName,
+		})
 	}
 
 	// Check if any constraint is cached as exhausted
@@ -264,7 +275,25 @@ func NewConstraintCache(
 	cache.cache = ccache.New(
 		ccache.Configure[*constraintCacheItem]().
 			MaxSize(cache.maxSize).
-			ItemsToPrune(cache.itemsToPrune),
+			ItemsToPrune(cache.itemsToPrune).
+			OnDelete(func(item *ccache.Item[*constraintCacheItem]) {
+				// Track cache evictions to detect thrashing (cache size too small).
+				// OnDelete fires on the ccache worker goroutine for both LRU evictions
+				// and explicit deletions. We use context.Background() since there's no
+				// request context available here; OTEL SDK buffers these internally.
+				if item.Expired() {
+					metrics.IncrConstraintAPICacheEvictedExpiredCounter(context.Background(), metrics.CounterOpt{
+						PkgName: pkgName,
+					})
+				} else {
+					metrics.IncrConstraintAPICacheEvictedUnexpiredCounter(context.Background(), metrics.CounterOpt{
+						PkgName: pkgName,
+					})
+					metrics.HistogramConstraintAPICacheEvictedRemainingTTL(context.Background(), item.TTL(), metrics.HistogramOpt{
+						PkgName: pkgName,
+					})
+				}
+			}),
 	)
 
 	if cache.clock == nil {
