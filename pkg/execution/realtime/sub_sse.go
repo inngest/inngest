@@ -16,8 +16,14 @@ func NewSSESubscription(
 	ctx context.Context,
 	w http.ResponseWriter,
 ) *subSSE {
-	// Ensure SSE headers are sent.
+	// Ensure SSE headers are sent and flushed immediately so that
+	// clients (e.g. browser fetch) receive the response headers
+	// without waiting for the first data write or keepalive.
 	sseHeaders(w)
+	w.WriteHeader(http.StatusOK)
+	if f, ok := w.(http.Flusher); ok {
+		f.Flush()
+	}
 
 	return &subSSE{
 		id: uuid.New(),
