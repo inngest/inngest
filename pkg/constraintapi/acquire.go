@@ -165,6 +165,7 @@ type acquireScriptResponse struct {
 	FairnessReduction    int                 `json:"fr"`
 	RetryAt              int                 `json:"ra"`
 	Debug                flexibleStringArray `json:"d"`
+	CacheHit             int                 `json:"ch"`
 }
 
 func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquireRequest) (*CapacityAcquireResponse, errs.InternalError) {
@@ -224,6 +225,36 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 		return nil, errs.Wrap(0, false, "could not build request state: %w", err)
 	}
 
+	// Build per-constraint cache keys for the Lua script.
+	// Each constraint gets a cache key (empty string if caching is disabled for that constraint).
+	// Min/max TTL is resolved per account/env/function via the AcquireCacheTTLFn callback.
+	cacheKeys := make([]string, len(sortedConstraints))
+	cacheEnabled := false
+	if r.enableAcquireCache != nil {
+		for i, ci := range sortedConstraints {
+			if !r.enableAcquireCache(ctx, req.AccountID, req.EnvID, req.FunctionID, ci) {
+				continue
+			}
+			key := r.keyConstraintCache(req.AccountID, req.EnvID, req.FunctionID, ci)
+			if key == "" {
+				continue
+			}
+			cacheKeys[i] = key
+			cacheEnabled = true
+		}
+	}
+	var cacheMinTTL, cacheMaxTTL int
+	if cacheEnabled && r.acquireCacheTTL != nil {
+		minTTL, maxTTL := r.acquireCacheTTL(ctx, req.AccountID, req.EnvID, req.FunctionID)
+		if minTTL <= 0 && maxTTL <= 0 {
+			// Callback returned non-positive TTLs; disable caching for this request.
+			cacheEnabled = false
+		} else {
+			cacheMinTTL = int(max(minTTL.Seconds(), 1))
+			cacheMaxTTL = int(max(maxTTL.Seconds(), 1))
+		}
+	}
+
 	// Build Lua request
 
 	// When the same Acquire request is received again after a successful first request, we will
@@ -259,7 +290,7 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 
 	scopedKeyPrefix := fmt.Sprintf("{cs}:%s", accountScope(req.AccountID))
 
-	args, err := strSlice([]any{
+	argsList := []any{
 		// This will be marshaled
 		rueidis.BinaryString(requestState),
 		requestID.String(),
@@ -276,7 +307,19 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 		int(r.constraintCheckIdempotencyTTL.Seconds()),
 
 		enableDebugLogsVal,
-	})
+
+		cacheMinTTL, // ARGV[12]: cache min TTL in seconds
+		cacheMaxTTL, // ARGV[13]: cache max TTL in seconds
+	}
+	// ARGV[14..13+N]: one cache key per sorted constraint (empty string if disabled).
+	// Only appended when caching is enabled to avoid overhead in the Lua script.
+	if cacheEnabled {
+		for _, ck := range cacheKeys {
+			argsList = append(argsList, ck)
+		}
+	}
+
+	args, err := strSlice(argsList)
 	if err != nil {
 		return nil, errs.Wrap(0, false, "invalid args: %w", err)
 	}
@@ -335,6 +378,21 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 		for i, exhaustedConstraintIndex := range []int(parsedResponse.ExhaustedConstraints) {
 			exhaustedConstraints[i] = sortedConstraints[exhaustedConstraintIndex-1]
 		}
+	}
+
+	// Record centralized cache hit/miss metric only when caching is enabled
+	if cacheEnabled {
+		cacheOp := "miss"
+		if parsedResponse.CacheHit != 0 {
+			cacheOp = "hit"
+		}
+		metrics.IncrConstraintAPIAcquireCacheCounter(ctx, metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags: map[string]any{
+				"op":    cacheOp,
+				"shard": r.shardName,
+			},
+		})
 	}
 
 	retryAfter := time.UnixMilli(int64(parsedResponse.RetryAt))

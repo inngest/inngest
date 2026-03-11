@@ -929,3 +929,12 @@ func IncrConstraintAPICacheEvictedCounter(ctx context.Context, opts CounterOpt) 
 		Tags:        opts.Tags,
 	})
 }
+
+func IncrConstraintAPIAcquireCacheCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "constraintapi_acquire_cache_total",
+		Description: "Total number of centralized Redis acquire cache hits and misses",
+		Tags:        opts.Tags,
+	})
+}

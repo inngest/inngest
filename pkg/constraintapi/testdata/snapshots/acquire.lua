@@ -23,6 +23,9 @@ end
 local operationIdempotencyTTL = tonumber(ARGV[9])
 local constraintCheckIdempotencyTTL = tonumber(ARGV[10])
 local enableDebugLogs = tonumber(ARGV[11]) == 1
+local cacheMinTTL = tonumber(ARGV[12]) or 0
+local cacheMaxTTL = tonumber(ARGV[13]) or 0
+local cacheKeyOffset = 14
 if not requestDetails.lik then
 	return redis.error_reply("ERR requestDetails.lik is nil during update")
 end
@@ -201,6 +204,51 @@ local exhaustedSet = {}
 local retryAt = 0
 local concurrencyCapacityCache = {}
 local skipGCRA = call("EXISTS", keyConstraintCheckIdempotency) == 1
+local cacheEnabled = cacheMaxTTL > 0
+local constraintCacheKeys = {}
+local cacheHit = false
+if cacheEnabled then
+	local mgetKeys = {}
+	local mgetIndices = {}
+	for i = 1, #constraints do
+		local ck = ARGV[cacheKeyOffset + i - 1] or ""
+		constraintCacheKeys[i] = ck
+		if ck ~= "" then
+			table.insert(mgetKeys, ck)
+			table.insert(mgetIndices, i)
+		end
+	end
+	if #mgetKeys > 0 then
+		local cacheValues = call("MGET", unpack(mgetKeys))
+		for j, val in ipairs(cacheValues) do
+			if val ~= nil and val ~= false then
+				cacheHit = true
+				local idx = mgetIndices[j]
+				local cachedRetryAt = tonumber(val) or 0
+				if not exhaustedSet[idx] then
+					table.insert(exhaustedConstraints, idx)
+					exhaustedSet[idx] = true
+				end
+				table.insert(limitingConstraints, idx)
+				if cachedRetryAt > retryAt then
+					retryAt = cachedRetryAt
+				end
+				availableCapacity = 0
+			end
+		end
+	end
+	if cacheHit then
+		local res = {}
+		res["s"] = 2
+		res["lc"] = limitingConstraints
+		res["ec"] = exhaustedConstraints
+		res["ra"] = retryAt
+		res["d"] = debugLogs
+		res["fr"] = 0
+		res["ch"] = 1
+		return cjson.encode(res)
+	end
+end
 for index, value in ipairs(constraints) do
 	local constraintCapacity = 0
 	local constraintRetryAt = 0
@@ -229,6 +277,18 @@ for index, value in ipairs(constraints) do
 		if constraintRetryAt > retryAt then
 			retryAt = constraintRetryAt
 		end
+		if cacheEnabled then
+			local ck = constraintCacheKeys[index]
+			if ck ~= nil and ck ~= "" and constraintRetryAt > nowMS then
+				local cacheTTLSec = math.max(
+					math.min(math.ceil((constraintRetryAt - nowMS) / 1000), cacheMaxTTL),
+					cacheMinTTL
+				)
+				if cacheTTLSec > 0 then
+					call("SET", ck, tostring(constraintRetryAt), "EX", tostring(cacheTTLSec))
+				end
+			end
+		end
 	end
 	if constraintCapacity < availableCapacity then
 		availableCapacity = constraintCapacity
@@ -245,6 +305,7 @@ if availableCapacity <= 0 then
 	res["ra"] = retryAt
 	res["d"] = debugLogs
 	res["fr"] = fairnessReduction
+	res["ch"] = 0
 	return cjson.encode(res)
 end
 local granted = availableCapacity
@@ -286,6 +347,18 @@ for i, value in ipairs(constraints) do
 		if constraintRetryAt > retryAt then
 			retryAt = constraintRetryAt
 		end
+		if cacheEnabled then
+			local ck = constraintCacheKeys[i]
+			if ck ~= nil and ck ~= "" and constraintRetryAt > nowMS then
+				local cacheTTLSec = math.max(
+					math.min(math.ceil((constraintRetryAt - nowMS) / 1000), cacheMaxTTL),
+					cacheMinTTL
+				)
+				if cacheTTLSec > 0 then
+					call("SET", ck, tostring(constraintRetryAt), "EX", tostring(cacheTTLSec))
+				end
+			end
+		end
 	end
 end
 for i = 1, granted, 1 do
@@ -324,6 +397,7 @@ result["ec"] = exhaustedConstraints
 result["ra"] = retryAt 
 result["d"] = debugLogs
 result["fr"] = fairnessReduction
+result["ch"] = 0
 local encoded = cjson.encode(result)
 call("SET", keyOperationIdempotency, encoded, "EX", tostring(operationIdempotencyTTL))
 return encoded
