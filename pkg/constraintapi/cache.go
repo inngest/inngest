@@ -31,6 +31,8 @@ type constraintCache struct {
 	clock   clockwork.Clock
 
 	cache                                *ccache.Cache[*constraintCacheItem]
+	maxSize                              int64
+	itemsToPrune                         uint32
 	enableHighCardinalityInstrumentation EnableHighCardinalityInstrumentation
 	enableCache                          EnableConstraintCacheFn
 	shouldCache                          ShouldCacheConstraintFn
@@ -70,6 +72,18 @@ func WithConstraintCacheEnable(enable EnableConstraintCacheFn) ConstraintCacheOp
 func WithConstraintCacheShouldCache(fn ShouldCacheConstraintFn) ConstraintCacheOption {
 	return func(c *constraintCache) {
 		c.shouldCache = fn
+	}
+}
+
+func WithConstraintCacheMaxSize(maxSize int64) ConstraintCacheOption {
+	return func(c *constraintCache) {
+		c.maxSize = maxSize
+	}
+}
+
+func WithConstraintCacheItemsToPrune(itemsToPrune uint32) ConstraintCacheOption {
+	return func(c *constraintCache) {
+		c.itemsToPrune = itemsToPrune
 	}
 }
 
@@ -239,16 +253,19 @@ func NewConstraintCache(
 	options ...ConstraintCacheOption,
 ) *constraintCache {
 	cache := &constraintCache{
-		cache: ccache.New(
-			ccache.Configure[*constraintCacheItem]().
-				MaxSize(10_000).
-				ItemsToPrune(500),
-		),
+		maxSize:      10_000,
+		itemsToPrune: 500,
 	}
 
 	for _, opt := range options {
 		opt(cache)
 	}
+
+	cache.cache = ccache.New(
+		ccache.Configure[*constraintCacheItem]().
+			MaxSize(cache.maxSize).
+			ItemsToPrune(cache.itemsToPrune),
+	)
 
 	if cache.clock == nil {
 		cache.clock = clockwork.NewRealClock()
