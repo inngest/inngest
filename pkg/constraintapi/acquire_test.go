@@ -103,7 +103,7 @@ func TestAcquireCachePreExistingKey(t *testing.T) {
 	require.NotEmpty(t, cacheKey)
 
 	retryAtMS := clock.Now().Add(10 * time.Second).UnixMilli()
-	r.Set(cacheKey, fmt.Sprintf("%d", retryAtMS))
+	require.NoError(t, r.Set(cacheKey, fmt.Sprintf("%d", retryAtMS)))
 	r.SetTTL(cacheKey, 30*time.Second)
 
 	// Acquire should short-circuit due to cache hit
@@ -202,7 +202,7 @@ func TestAcquireCacheAnyConstraintShortCircuits(t *testing.T) {
 	require.NotEmpty(t, cacheKey)
 
 	retryAtMS := clock.Now().Add(5 * time.Second).UnixMilli()
-	r.Set(cacheKey, fmt.Sprintf("%d", retryAtMS))
+	require.NoError(t, r.Set(cacheKey, fmt.Sprintf("%d", retryAtMS)))
 	r.SetTTL(cacheKey, 30*time.Second)
 
 	// Acquire should short-circuit without evaluating other constraints
@@ -267,7 +267,7 @@ func TestAcquireCacheTTLExpiry(t *testing.T) {
 	// Set cache key with 2s TTL
 	cacheKey := cm.keyConstraintCache(accountID, envID, fnID, constraints[0])
 	retryAtMS := clock.Now().Add(2 * time.Second).UnixMilli()
-	r.Set(cacheKey, fmt.Sprintf("%d", retryAtMS))
+	require.NoError(t, r.Set(cacheKey, fmt.Sprintf("%d", retryAtMS)))
 	r.SetTTL(cacheKey, 2*time.Second)
 
 	// Should be cache hit now
