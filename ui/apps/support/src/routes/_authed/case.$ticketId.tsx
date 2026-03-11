@@ -12,13 +12,14 @@ import { Button } from "@inngest/components/Button";
 import { formatDistanceToNow } from "date-fns";
 import { InngestLogoSmall } from "@inngest/components/icons/logos/InngestLogoSmall";
 import { Image } from "@unpic/react";
-import type { TimeLineEntryEdge } from "@/data/plain";
+import type { TicketDetail, TimeLineEntryEdge } from "@/data/plain";
 import {
   getTicketById,
   getTimelineEntriesForTicket,
   replyToThread,
   closeTicket,
 } from "@/data/plain";
+import { Main } from "@/components/Main";
 import { Markdown } from "@/components/Markdown/Markdown";
 import { PriorityBadge, StatusBadge } from "@/components/Support/TicketBadges";
 import { ChannelBadge } from "@/components/Support/ChannelBadge";
@@ -48,9 +49,6 @@ function TicketDetailPage() {
   const router = useRouter();
   const { user } = useUser();
   const timelineEndRef = useRef<HTMLDivElement>(null);
-  const [isClosing, setIsClosing] = useState(false);
-  const [closeError, setCloseError] = useState<string | null>(null);
-  const closeTicketFn = useServerFn(closeTicket);
 
   if (!ticket || !timelineEntries) {
     return <div>Error loading ticket</div>;
@@ -59,28 +57,6 @@ function TicketDetailPage() {
   // Check if this is a Slack conversation
   const isSlackChannel = ticket.channel === "SLACK";
   const userEmail = user?.primaryEmailAddress?.emailAddress;
-  const isOpen = ticket.status.toLowerCase() !== "done";
-
-  async function handleCloseTicket() {
-    if (!ticket) return;
-    setIsClosing(true);
-    setCloseError(null);
-    try {
-      const result = await closeTicketFn({
-        data: { threadId: ticket.id },
-      });
-      if (result.success) {
-        await router.invalidate();
-      } else {
-        setCloseError(result.error || "Failed to close ticket");
-      }
-    } catch (err) {
-      console.error("Error closing ticket:", err);
-      setCloseError("Failed to close ticket. Please try again.");
-    } finally {
-      setIsClosing(false);
-    }
-  }
 
   const scrollToBottom = () => {
     // Wait for the DOM to update after invalidation, then scroll
@@ -103,169 +79,214 @@ function TicketDetailPage() {
       : undefined;
 
   return (
-    <div className="flex min-h-screen flex-col">
-      {/* Back button */}
-      <Link
-        to="/"
-        className="text-muted hover:text-basis mb-6 inline-flex items-center gap-2 text-sm font-medium transition-colors"
-      >
-        <RiArrowLeftLine className="h-4 w-4" />
-        Back to tickets
-      </Link>
+    <Main className="min-h-screen lg:max-w-6xl">
+      <div className="mb-4 lg:`mb-8 max-w-4xl">
+        {/* Back button */}
+        <Link
+          to="/"
+          className="text-muted hover:text-basis mb-6 inline-flex items-center gap-2 text-sm font-medium transition-colors"
+        >
+          <RiArrowLeftLine className="h-4 w-4" />
+          Back to tickets
+        </Link>
 
-      {/* Ticket header */}
-      <div className="mb-8 flex flex-col gap-2 pb-2 pt-2 text-sm md:text-base">
         {/* Title and Status */}
-        <div className="flex items-center justify-between">
-          <h1 className="text-basis font-medium leading-4">{ticket.title}</h1>
-          <StatusBadge status={ticket.status} />
-        </div>
+        <header className="flex items-center justify-between">
+          <h1 className="text-basis font-medium text-lg leading-4">
+            {ticket.title}
+          </h1>
+          <StatusBadge status={ticket.status} size="md" />
+        </header>
+      </div>
 
-        {/* Metadata */}
-        <div className="flex flex-col gap-2">
-          {/* Ticket number */}
-          <div className="flex items-start gap-1 leading-4">
-            <span className="text-muted">Ticket number:</span>
-            <span className="text-basis font-mono">{ticket.ref}</span>
+      <div className="flex flex-col flex-grow h-full lg:flex-row gap-10">
+        <div className="flex flex-col flex-grow max-w-4xl">
+          {/* Ticket header */}
+          <div className="mb-8 flex flex-col gap-2 pb-2 pt-2 text-sm md:text-base lg:hidden">
+            <Metadata ticket={ticket} />
           </div>
 
-          {/* Priority */}
-          <div className="flex items-center gap-2 leading-4">
-            <span className="text-muted">Priority:</span>
-            <PriorityBadge priority={ticket.priority} />
+          {/* Conversation timeline */}
+          <div className="flex-1 space-y-8">
+            {timelineEntries.length === 0 ? (
+              <div className="bg-canvasSubtle border-subtle rounded-xl border p-12 text-center">
+                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-canvasMuted">
+                  <svg
+                    className="text-muted h-8 w-8"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+                    />
+                  </svg>
+                </div>
+                <p className="text-basis mb-1 text-lg font-medium">
+                  No messages yet
+                </p>
+                <p className="text-muted text-sm">
+                  The conversation will appear here once messages are exchanged.
+                </p>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-0">
+                {" "}
+                {/* To support threading, we handle spacing in the element */}
+                {timelineEntries.map((entry, idx, arr) => {
+                  // If multiple messages are send from Slack within 2 minutes of each, thread them together
+                  const entryTypename = entry.node.entry.__typename;
+                  const isSlackMessage =
+                    entryTypename === "SlackMessageEntry" ||
+                    entryTypename === "SlackReplyEntry";
+                  const previousEntry = arr[idx - 1] as
+                    | typeof entry
+                    | undefined;
+                  const prevTypename = previousEntry?.node.entry.__typename;
+                  const isPreviousSlackMessage = prevTypename
+                    ? prevTypename === "SlackMessageEntry" ||
+                      prevTypename === "SlackReplyEntry"
+                    : false;
+                  const shouldThread =
+                    isSlackMessage &&
+                    isPreviousSlackMessage &&
+                    previousEntry !== undefined &&
+                    new Date(entry.node.timestamp.iso8601).getTime() -
+                      new Date(previousEntry.node.timestamp.iso8601).getTime() <
+                      2 * 60 * 1000;
+                  return (
+                    <TimelineEntry
+                      key={entry.node.id}
+                      entry={entry}
+                      idx={idx}
+                      shouldThread={shouldThread}
+                    />
+                  );
+                })}
+                {/* Scroll target for after sending a message */}
+                <div ref={timelineEndRef} />
+              </div>
+            )}
           </div>
 
-          {/* Source */}
-          {ticket.channel && (
-            <div className="flex items-center gap-2 leading-4">
-              <span className="text-muted">Source:</span>
-              <ChannelBadge channel={ticket.channel} showLabel={true} />
-            </div>
-          )}
-
-          {/* Created */}
-          <div className="flex items-center gap-2 leading-4">
-            <span className="text-muted">Created:</span>
-            <span className="text-muted leading-4">
-              {formatTimestamp(ticket.createdAt)}
-            </span>
-          </div>
-
-          {/* Updated */}
-          <div className="flex items-center gap-2 leading-4">
-            <span className="text-muted">Updated:</span>
-            <span className="text-muted leading-4">
-              {formatTimestamp(ticket.updatedAt)}
-            </span>
-          </div>
-
-          {/* Close Ticket */}
-          {isOpen && (
-            <div className="flex items-center gap-2 pt-2">
+          {/* Reply form or Slack button */}
+          {isSlackChannel && slackMessageLink ? (
+            <div className="sticky bottom-0 border-t border-muted bg-canvasBase py-2">
               <Button
-                kind="danger"
+                kind="primary"
                 appearance="outlined"
-                size="small"
-                label={isClosing ? "Closing..." : "Close ticket"}
-                disabled={isClosing}
-                onClick={handleCloseTicket}
+                href={slackMessageLink}
+                target="_blank"
+                label="Reply in Slack"
+                icon={<RiSlackLine className="h-4 w-4" />}
+                iconSide="left"
               />
-              {closeError && (
-                <span className="text-sm text-red-500">{closeError}</span>
-              )}
             </div>
+          ) : userEmail ? (
+            <ReplyForm
+              ticketId={ticket.id}
+              userEmail={userEmail}
+              onSuccess={async () => {
+                await router.invalidate();
+                scrollToBottom();
+              }}
+            />
+          ) : null}
+        </div>
+        <div className="hidden lg:block">
+          <Metadata ticket={ticket} />
+        </div>
+      </div>
+    </Main>
+  );
+}
+
+function Metadata({ ticket }: { ticket: TicketDetail }) {
+  const router = useRouter();
+  const [isClosing, setIsClosing] = useState(false);
+  const [closeError, setCloseError] = useState<string | null>(null);
+  const closeTicketFn = useServerFn(closeTicket);
+
+  async function handleCloseTicket() {
+    if (!ticket) return;
+    setIsClosing(true);
+    setCloseError(null);
+    try {
+      const result = await closeTicketFn({
+        data: { threadId: ticket.id },
+      });
+      if (result.success) {
+        await router.invalidate();
+      } else {
+        setCloseError(result.error || "Failed to close ticket");
+      }
+    } catch (err) {
+      console.error("Error closing ticket:", err);
+      setCloseError("Failed to close ticket. Please try again.");
+    } finally {
+      setIsClosing(false);
+    }
+  }
+
+  const isOpen = ticket.status.toLowerCase() !== "done";
+  return (
+    <aside className="flex flex-col gap-2 lg:gap-4">
+      {/* Ticket number */}
+      <div className="flex md:flex-col items-center md:items-start gap-2 leading-4">
+        <span className="text-muted text-sm">Ticket number:</span>
+        <span className="text-basis font-mono">{ticket.ref}</span>
+      </div>
+
+      {/* Priority */}
+      <div className="flex md:flex-col items-center md:items-start gap-2 leading-4">
+        <span className="text-muted text-sm">Priority:</span>
+        <PriorityBadge priority={ticket.priority} />
+      </div>
+
+      {/* Source */}
+      {ticket.channel && (
+        <div className="flex md:flex-col items-center md:items-start gap-2 leading-4">
+          <span className="text-muted text-sm">Source:</span>
+          <ChannelBadge channel={ticket.channel} showLabel={true} />
+        </div>
+      )}
+
+      {/* Created */}
+      <div className="flex md:flex-col items-center md:items-start gap-2 leading-4">
+        <span className="text-muted text-sm">Created:</span>
+        <span className="text-basis leading-4">
+          {formatTimestamp(ticket.createdAt)}
+        </span>
+      </div>
+
+      {/* Updated */}
+      <div className="flex md:flex-col items-center md:items-start gap-2 leading-4">
+        <span className="text-muted text-sm">Updated:</span>
+        <span className="text-basis leading-4">
+          {formatTimestamp(ticket.updatedAt)}
+        </span>
+      </div>
+
+      {/* Close Ticket */}
+      {isOpen && (
+        <div className="flex items-center gap-2 pt-2">
+          <Button
+            kind="danger"
+            appearance="outlined"
+            size="small"
+            label={isClosing ? "Closing..." : "Close ticket"}
+            disabled={isClosing}
+            onClick={handleCloseTicket}
+          />
+          {closeError && (
+            <span className="text-sm text-red-500">{closeError}</span>
           )}
         </div>
-      </div>
-
-      {/* Conversation timeline */}
-      <div className="flex-1 space-y-8">
-        {timelineEntries.length === 0 ? (
-          <div className="bg-canvasSubtle border-subtle rounded-xl border p-12 text-center">
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-canvasMuted">
-              <svg
-                className="text-muted h-8 w-8"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
-                />
-              </svg>
-            </div>
-            <p className="text-basis mb-1 text-lg font-medium">
-              No messages yet
-            </p>
-            <p className="text-muted text-sm">
-              The conversation will appear here once messages are exchanged.
-            </p>
-          </div>
-        ) : (
-          <div className="flex flex-col gap-0">
-            {" "}
-            {/* To support threading, we handle spacing in the element */}
-            {timelineEntries.map((entry, idx, arr) => {
-              // If multiple messages are send from Slack within 2 minutes of each, thread them together
-              const entryTypename = entry.node.entry.__typename;
-              const isSlackMessage =
-                entryTypename === "SlackMessageEntry" ||
-                entryTypename === "SlackReplyEntry";
-              const previousEntry = arr[idx - 1] as typeof entry | undefined;
-              const prevTypename = previousEntry?.node.entry.__typename;
-              const isPreviousSlackMessage = prevTypename
-                ? prevTypename === "SlackMessageEntry" ||
-                  prevTypename === "SlackReplyEntry"
-                : false;
-              const shouldThread =
-                isSlackMessage &&
-                isPreviousSlackMessage &&
-                previousEntry !== undefined &&
-                new Date(entry.node.timestamp.iso8601).getTime() -
-                  new Date(previousEntry.node.timestamp.iso8601).getTime() <
-                  2 * 60 * 1000;
-              return (
-                <TimelineEntry
-                  key={entry.node.id}
-                  entry={entry}
-                  idx={idx}
-                  shouldThread={shouldThread}
-                />
-              );
-            })}
-            {/* Scroll target for after sending a message */}
-            <div ref={timelineEndRef} />
-          </div>
-        )}
-      </div>
-
-      {/* Reply form or Slack button */}
-      {isSlackChannel && slackMessageLink ? (
-        <div className="sticky bottom-0 border-t border-muted bg-canvasBase py-2">
-          <Button
-            kind="primary"
-            appearance="outlined"
-            href={slackMessageLink}
-            target="_blank"
-            label="Reply in Slack"
-            icon={<RiSlackLine className="h-4 w-4" />}
-            iconSide="left"
-          />
-        </div>
-      ) : userEmail ? (
-        <ReplyForm
-          ticketId={ticket.id}
-          userEmail={userEmail}
-          onSuccess={async () => {
-            await router.invalidate();
-            scrollToBottom();
-          }}
-        />
-      ) : null}
-    </div>
+      )}
+    </aside>
   );
 }
 
