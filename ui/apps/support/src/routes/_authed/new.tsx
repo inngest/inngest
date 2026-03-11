@@ -48,7 +48,7 @@ function NewTicketPage() {
   const userEmail = user?.primaryEmailAddress?.emailAddress;
   const { data: plainTierInfo } = useQuery({
     queryKey: ["customerTier", userEmail],
-    queryFn: () => getCustomerTierFn({ data: undefined }),
+    queryFn: () => getCustomerTierFn(),
     enabled: !!userEmail,
   });
 

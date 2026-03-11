@@ -7,7 +7,7 @@ import type {
   PlainSDKError,
   ThreadPartsFragment,
 } from "@team-plain/typescript-sdk/dist/index";
-import { requireAuthEmail } from "@/data/clerk";
+import { authMiddleware } from "@/data/clerk";
 
 // Initialize Plain client
 // The API key should be set in the environment variable PLAIN_API_KEY
@@ -94,10 +94,11 @@ export type TicketStatusFilter =
   | typeof TICKET_STATUS_ALL;
 
 export const getTicketsByEmail = createServerFn({ method: "GET" })
+  .middleware([authMiddleware])
   .inputValidator((data: { status?: TicketStatusFilter }) => data)
-  .handler(async ({ data }): Promise<Array<TicketSummary>> => {
+  .handler(async ({ data, context }): Promise<Array<TicketSummary>> => {
     try {
-      const email = await requireAuthEmail();
+      const email = context.userEmail;
       const { status } = data;
 
       // First, get or create the customer by email
@@ -222,12 +223,12 @@ type ThreadsQueryResult = {
 };
 
 export const getTicketById = createServerFn({ method: "GET" })
+  .middleware([authMiddleware])
   .inputValidator((data: { ticketId: string }) => data)
-  .handler(async ({ data }): Promise<TicketDetail | null> => {
+  .handler(async ({ data, context }): Promise<TicketDetail | null> => {
     try {
       const { ticketId } = data;
-
-      const userEmail = await requireAuthEmail();
+      const userEmail = context.userEmail;
 
       const res = (await plainClient.rawRequest({
         query: `
@@ -457,15 +458,16 @@ type ChatEntry = {
   attachments: Array<Attachment>;
 };
 export const getTimelineEntriesForTicket = createServerFn({ method: "GET" })
+  .middleware([authMiddleware])
   .inputValidator((data: { ticketId: string }) => data)
-  .handler(async ({ data }): Promise<Array<TimeLineEntryEdge> | null> => {
-    try {
-      const { ticketId } = data;
+  .handler(
+    async ({ data, context }): Promise<Array<TimeLineEntryEdge> | null> => {
+      try {
+        const { ticketId } = data;
+        const userEmail = context.userEmail;
 
-      const userEmail = await requireAuthEmail();
-
-      const res = (await plainClient.rawRequest({
-        query: `
+        const res = (await plainClient.rawRequest({
+          query: `
           query GetTimelineEntries($threadId: ID!, $first: Int, $after: String, $last: Int, $before: String) {
             thread(threadId: $threadId) {
               id
@@ -575,78 +577,79 @@ export const getTimelineEntriesForTicket = createServerFn({ method: "GET" })
             }
           }
         `,
-        variables: {
-          threadId: ticketId,
-          first: 20,
-          after: null,
-          last: null,
-          before: null,
-        },
-      })) as unknown as Result<TimelineEntriesResponse, PlainSDKError>;
+          variables: {
+            threadId: ticketId,
+            first: 20,
+            after: null,
+            last: null,
+            before: null,
+          },
+        })) as unknown as Result<TimelineEntriesResponse, PlainSDKError>;
 
-      if (res.error) {
-        console.error("Failed to fetch timeline entries:", res.error);
-        return [];
-      }
+        if (res.error) {
+          console.error("Failed to fetch timeline entries:", res.error);
+          return [];
+        }
 
-      // Verify the authenticated user owns this ticket
-      const customerEmail = res.data.thread.customer.email.email;
-      if (customerEmail.toLowerCase() !== userEmail.toLowerCase()) {
-        return null;
-      }
+        // Verify the authenticated user owns this ticket
+        const customerEmail = res.data.thread.customer.email.email;
+        if (customerEmail.toLowerCase() !== userEmail.toLowerCase()) {
+          return null;
+        }
 
-      const customerName = res.data.thread.customer.fullName;
-      const entries = res.data.thread.timelineEntries.edges;
-      return entries
-        .filter((entry) => {
-          // Custom entries are created via the API
-          const typename = entry.node.entry.__typename;
-          return (
-            typename === "CustomEntry" ||
-            typename === "EmailEntry" ||
-            typename === "SlackMessageEntry" ||
-            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-            typename === "SlackReplyEntry" ||
-            typename === "ChatEntry"
-          );
-        })
-        .sort(
-          (a, b) =>
-            new Date(a.node.timestamp.iso8601).getTime() -
-            new Date(b.node.timestamp.iso8601).getTime(),
-        )
-        .map((entry, idx) => {
-          // Map the first custom entry to the customer's name
-          // We create a ticket via the API so it's a "machine user"
-          if (idx === 0 && entry.node.entry.__typename === "CustomEntry") {
-            return {
-              ...entry,
-              node: {
-                ...entry.node,
-                actor: {
-                  __typename: "CustomerActor",
-                  customer: {
-                    fullName: customerName,
-                    avatarUrl: "",
-                    email: { email: "" },
+        const customerName = res.data.thread.customer.fullName;
+        const entries = res.data.thread.timelineEntries.edges;
+        return entries
+          .filter((entry) => {
+            // Custom entries are created via the API
+            const typename = entry.node.entry.__typename;
+            return (
+              typename === "CustomEntry" ||
+              typename === "EmailEntry" ||
+              typename === "SlackMessageEntry" ||
+              // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+              typename === "SlackReplyEntry" ||
+              typename === "ChatEntry"
+            );
+          })
+          .sort(
+            (a, b) =>
+              new Date(a.node.timestamp.iso8601).getTime() -
+              new Date(b.node.timestamp.iso8601).getTime(),
+          )
+          .map((entry, idx) => {
+            // Map the first custom entry to the customer's name
+            // We create a ticket via the API so it's a "machine user"
+            if (idx === 0 && entry.node.entry.__typename === "CustomEntry") {
+              return {
+                ...entry,
+                node: {
+                  ...entry.node,
+                  actor: {
+                    __typename: "CustomerActor",
+                    customer: {
+                      fullName: customerName,
+                      avatarUrl: "",
+                      email: { email: "" },
+                    },
                   },
                 },
-              },
-            };
-          }
-          return entry;
-        });
-    } catch (error) {
-      console.error("Error fetching timeline entries:", error);
-      return [];
-    }
-  });
+              };
+            }
+            return entry;
+          });
+      } catch (error) {
+        console.error("Error fetching timeline entries:", error);
+        return [];
+      }
+    },
+  );
 
 export const getAttachmentDownloadUrl = createServerFn({ method: "GET" })
+  .middleware([authMiddleware])
   .inputValidator((data: { attachmentId: string }) => data)
   .handler(async ({ data }): Promise<AttachmentDownloadUrl | null> => {
     try {
-      await requireAuthEmail();
       const { attachmentId } = data;
 
       const res = (await plainClient.rawRequest({
@@ -726,10 +729,11 @@ export type CreateTicketResult = {
 };
 
 export const createTicket = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
   .inputValidator((data: CreateTicketInput) => data)
-  .handler(async ({ data }): Promise<CreateTicketResult> => {
+  .handler(async ({ data, context }): Promise<CreateTicketResult> => {
     try {
-      const authEmail = await requireAuthEmail();
+      const authEmail = context.userEmail;
       const { user, ticket } = data;
 
       // Import label type IDs dynamically to avoid issues with env vars
@@ -896,10 +900,10 @@ type CustomerWithCompanyResponse = {
 };
 
 export const getCustomerTierByEmail = createServerFn({ method: "GET" })
-  .inputValidator((data: undefined) => data)
-  .handler(async (): Promise<CustomerTierInfo> => {
+  .middleware([authMiddleware])
+  .handler(async ({ context }): Promise<CustomerTierInfo> => {
     try {
-      const email = await requireAuthEmail();
+      const email = context.userEmail;
 
       const res = (await plainClient.rawRequest({
         query: `
@@ -985,10 +989,11 @@ export type CloseTicketResult = {
 };
 
 export const closeTicket = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
   .inputValidator((data: { threadId: string }) => data)
-  .handler(async ({ data }): Promise<CloseTicketResult> => {
+  .handler(async ({ data, context }): Promise<CloseTicketResult> => {
     try {
-      const authEmail = await requireAuthEmail();
+      const authEmail = context.userEmail;
       const { threadId } = data;
 
       // Get the thread to verify ownership and find customer ID for the note
@@ -1254,6 +1259,7 @@ export type AttachmentUploadUrlResult = {
 export type AttachmentUploadContext = "chat" | "customEntry";
 
 export const getUploadUrl = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
   .inputValidator(
     (data: {
       fileName: string;
@@ -1261,11 +1267,11 @@ export const getUploadUrl = createServerFn({ method: "POST" })
       context?: AttachmentUploadContext;
     }) => data,
   )
-  .handler(async ({ data }): Promise<AttachmentUploadUrlResult> => {
+  .handler(async ({ data, context }): Promise<AttachmentUploadUrlResult> => {
     try {
-      const userEmail = await requireAuthEmail();
+      const userEmail = context.userEmail;
       const { fileName, fileSizeBytes } = data;
-      const context = data.context || "chat";
+      const uploadContext = data.context || "chat";
 
       // Server-side validation
       // We use a generic MIME check based on extension since we don't have the real MIME here
@@ -1295,7 +1301,7 @@ export const getUploadUrl = createServerFn({ method: "POST" })
       }
 
       const attachmentType =
-        context === "customEntry"
+        uploadContext === "customEntry"
           ? AttachmentType.CustomTimelineEntry
           : AttachmentType.Chat;
 
@@ -1343,12 +1349,12 @@ export type ReplyToThreadResult = {
 };
 
 export const replyToThread = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
   .inputValidator((data: ReplyToThreadInput) => data)
-  .handler(async ({ data }): Promise<ReplyToThreadResult> => {
+  .handler(async ({ data, context }): Promise<ReplyToThreadResult> => {
     try {
       const { threadId, message, attachmentIds } = data;
-
-      const userEmail = await requireAuthEmail();
+      const userEmail = context.userEmail;
 
       // Verify the user owns this thread before allowing a reply
       const threadRes = (await plainClient.rawRequest({

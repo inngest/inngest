@@ -1,6 +1,6 @@
 import { auth, clerkClient } from "@clerk/tanstack-react-start/server";
 import { redirect } from "@tanstack/react-router";
-import { createServerFn } from "@tanstack/react-start";
+import { createMiddleware, createServerFn } from "@tanstack/react-start";
 
 /**
  * Get the authenticated user's email address from Clerk.
@@ -14,16 +14,16 @@ export async function getAuthenticatedUserEmail(): Promise<string | null> {
 }
 
 /**
- * Require an authenticated user email. Throws if not authenticated.
- * Use this in server functions that must be gated behind auth.
+ * Middleware that requires an authenticated user and provides their email
+ * via context. Use with `.middleware([authMiddleware])` on server functions.
  */
-export async function requireAuthEmail(): Promise<string> {
+export const authMiddleware = createMiddleware().server(async ({ next }) => {
   const email = await getAuthenticatedUserEmail();
   if (!email) {
     throw new Error("Not authenticated");
   }
-  return email;
-}
+  return next({ context: { userEmail: email } });
+});
 
 export const fetchClerkAuth = createServerFn({ method: "GET" }).handler(
   async () => {
