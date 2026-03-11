@@ -86,7 +86,7 @@ function createChartOption({
   entities: EntityLookup;
 }): React.ComponentProps<typeof Chart>['option'] {
   const dark = isDark();
-  const runningMetrics = workspace.stepRunning.metrics;
+  const runningMetrics = workspace.accountStepRunning.metrics;
 
   const series: LineSeriesOption[] = runningMetrics
     .filter(({ id }) => id !== zeroID)
