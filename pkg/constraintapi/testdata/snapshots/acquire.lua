@@ -274,6 +274,16 @@ for index, value in ipairs(constraints) do
 		if constraintRetryAt > retryAt then
 			retryAt = constraintRetryAt
 		end
+		local ck = constraintCacheKeys[index]
+		if ck ~= nil and ck ~= "" then
+			local cacheTTLSec = math.max(
+				math.min(math.ceil((constraintRetryAt - nowMS) / 1000), cacheMaxTTL),
+				cacheMinTTL
+			)
+			if cacheTTLSec > 0 then
+				call("SET", ck, tostring(constraintRetryAt), "EX", tostring(cacheTTLSec))
+			end
+		end
 	end
 	if constraintCapacity < availableCapacity then
 		availableCapacity = constraintCapacity
@@ -283,18 +293,6 @@ end
 local fairnessReduction = 0
 availableCapacity = availableCapacity - fairnessReduction
 if availableCapacity <= 0 then
-	for _, exhaustedIdx in ipairs(exhaustedConstraints) do
-		local ck = constraintCacheKeys[exhaustedIdx]
-		if ck ~= nil and ck ~= "" then
-			local cacheTTLSec = math.max(
-				math.min(math.ceil((retryAt - nowMS) / 1000), cacheMaxTTL),
-				cacheMinTTL
-			)
-			if cacheTTLSec > 0 then
-				call("SET", ck, tostring(retryAt), "EX", tostring(cacheTTLSec))
-			end
-		end
-	end
 	local res = {}
 	res["s"] = 2
 	res["lc"] = limitingConstraints
@@ -344,17 +342,15 @@ for i, value in ipairs(constraints) do
 		if constraintRetryAt > retryAt then
 			retryAt = constraintRetryAt
 		end
-	end
-end
-for _, exhaustedIdx in ipairs(exhaustedConstraints) do
-	local ck = constraintCacheKeys[exhaustedIdx]
-	if ck ~= nil and ck ~= "" then
-		local cacheTTLSec = math.max(
-			math.min(math.ceil((retryAt - nowMS) / 1000), cacheMaxTTL),
-			cacheMinTTL
-		)
-		if cacheTTLSec > 0 then
-			call("SET", ck, tostring(retryAt), "EX", tostring(cacheTTLSec))
+		local ck = constraintCacheKeys[i]
+		if ck ~= nil and ck ~= "" then
+			local cacheTTLSec = math.max(
+				math.min(math.ceil((constraintRetryAt - nowMS) / 1000), cacheMaxTTL),
+				cacheMinTTL
+			)
+			if cacheTTLSec > 0 then
+				call("SET", ck, tostring(constraintRetryAt), "EX", tostring(cacheTTLSec))
+			end
 		end
 	end
 end

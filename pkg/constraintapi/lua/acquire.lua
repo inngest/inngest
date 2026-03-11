@@ -244,6 +244,18 @@ for index, value in ipairs(constraints) do
 		if constraintRetryAt > retryAt then
 			retryAt = constraintRetryAt
 		end
+
+		-- Write cache entry for exhausted constraint
+		local ck = constraintCacheKeys[index]
+		if ck ~= nil and ck ~= "" then
+			local cacheTTLSec = math.max(
+				math.min(math.ceil((constraintRetryAt - nowMS) / 1000), cacheMaxTTL),
+				cacheMinTTL
+			)
+			if cacheTTLSec > 0 then
+				call("SET", ck, tostring(constraintRetryAt), "EX", tostring(cacheTTLSec))
+			end
+		end
 	end
 
 	-- If index ends up limiting capacity, reduce available capacity and remember current constraint
@@ -262,20 +274,6 @@ availableCapacity = availableCapacity - fairnessReduction
 
 -- TODO: If missing capacity, exit early (return limiting constraint and details)
 if availableCapacity <= 0 then
-	-- Store cache keys for exhausted constraints
-	for _, exhaustedIdx in ipairs(exhaustedConstraints) do
-		local ck = constraintCacheKeys[exhaustedIdx]
-		if ck ~= nil and ck ~= "" then
-			local cacheTTLSec = math.max(
-				math.min(math.ceil((retryAt - nowMS) / 1000), cacheMaxTTL),
-				cacheMinTTL
-			)
-			if cacheTTLSec > 0 then
-				call("SET", ck, tostring(retryAt), "EX", tostring(cacheTTLSec))
-			end
-		end
-	end
-
 	local res = {}
 	res["s"] = 2
 	res["lc"] = limitingConstraints
@@ -356,19 +354,17 @@ for i, value in ipairs(constraints) do
 		if constraintRetryAt > retryAt then
 			retryAt = constraintRetryAt
 		end
-	end
-end
 
--- Store cache keys for constraints exhausted after granting
-for _, exhaustedIdx in ipairs(exhaustedConstraints) do
-	local ck = constraintCacheKeys[exhaustedIdx]
-	if ck ~= nil and ck ~= "" then
-		local cacheTTLSec = math.max(
-			math.min(math.ceil((retryAt - nowMS) / 1000), cacheMaxTTL),
-			cacheMinTTL
-		)
-		if cacheTTLSec > 0 then
-			call("SET", ck, tostring(retryAt), "EX", tostring(cacheTTLSec))
+		-- Write cache entry for constraint exhausted after granting
+		local ck = constraintCacheKeys[i]
+		if ck ~= nil and ck ~= "" then
+			local cacheTTLSec = math.max(
+				math.min(math.ceil((constraintRetryAt - nowMS) / 1000), cacheMaxTTL),
+				cacheMinTTL
+			)
+			if cacheTTLSec > 0 then
+				call("SET", ck, tostring(constraintRetryAt), "EX", tostring(cacheTTLSec))
+			end
 		end
 	end
 end
