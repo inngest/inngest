@@ -122,7 +122,7 @@ func NewCheckpointAPI(o Opts) CheckpointAPI {
 	api.Post("/{runID}/steps", api.CheckpointSteps) // sync, API-based fns
 	api.Post("/{runID}/async", api.CheckpointAsyncSteps)
 	api.HandleFunc("/{runID}/output", api.Output)
-	api.Post("/{runID}/stream", api.StreamIngest)
+	// api.Post("/{runID}/stream", api.StreamIngest)
 	// NOTE: StreamOutput (GET) is registered in apiv1.go outside the
 	// auth/caching middleware group to avoid response buffering.
 
