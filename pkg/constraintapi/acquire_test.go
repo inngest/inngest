@@ -42,7 +42,7 @@ func newTestSetup(t *testing.T, enableCache EnableAcquireCacheFn) (*redisCapacit
 		WithCheckIdempotencyTTL(0),
 	}
 	if enableCache != nil {
-		opts = append(opts, WithEnableAcquireCache(enableCache))
+		opts = append(opts, WithEnableAcquireCache(enableCache), WithAcquireCacheTTL(MinCacheTTL, MaxCacheTTL))
 	}
 
 	cm, err := NewRedisCapacityManager(opts...)
@@ -53,8 +53,8 @@ func newTestSetup(t *testing.T, enableCache EnableAcquireCacheFn) (*redisCapacit
 
 // enableAllCache returns an EnableAcquireCacheFn that enables caching for all constraints.
 func enableAllCache() EnableAcquireCacheFn {
-	return func(_ context.Context, _, _, _ uuid.UUID, _ ConstraintItem) (bool, time.Duration, time.Duration) {
-		return true, MinCacheTTL, MaxCacheTTL
+	return func(_ context.Context, _, _, _ uuid.UUID, _ ConstraintItem) bool {
+		return true
 	}
 }
 
@@ -292,11 +292,10 @@ func TestAcquireCacheTTLClamping(t *testing.T) {
 	// Custom min/max TTL for this test
 	customMinTTL := 5 * time.Second
 	customMaxTTL := 15 * time.Second
-	enableCache := func(_ context.Context, _, _, _ uuid.UUID, _ ConstraintItem) (bool, time.Duration, time.Duration) {
-		return true, customMinTTL, customMaxTTL
-	}
 
-	cm, r, clock, ctx := newTestSetup(t, enableCache)
+	cm, r, clock, ctx := newTestSetup(t, enableAllCache())
+	cm.acquireCacheMinTTL = customMinTTL
+	cm.acquireCacheMaxTTL = customMaxTTL
 
 	config := ConstraintConfig{
 		FunctionVersion: 1,
@@ -372,11 +371,8 @@ func TestAcquireCachePerConstraintGranularity(t *testing.T) {
 	accountID, envID, fnID := uuid.New(), uuid.New(), uuid.New()
 
 	// Only enable caching for concurrency, not throttle
-	enableCache := func(_ context.Context, _, _, _ uuid.UUID, ci ConstraintItem) (bool, time.Duration, time.Duration) {
-		if ci.Kind == ConstraintKindConcurrency {
-			return true, MinCacheTTL, MaxCacheTTL
-		}
-		return false, 0, 0
+	enableCache := func(_ context.Context, _, _, _ uuid.UUID, ci ConstraintItem) bool {
+		return ci.Kind == ConstraintKindConcurrency
 	}
 
 	cm, r, clock, ctx := newTestSetup(t, enableCache)
@@ -568,8 +564,8 @@ func TestAcquireCacheFeatureFlagReturnsFalse(t *testing.T) {
 	accountID, envID, fnID := uuid.New(), uuid.New(), uuid.New()
 
 	// Feature flag function exists but always returns false
-	enableCache := func(_ context.Context, _, _, _ uuid.UUID, _ ConstraintItem) (bool, time.Duration, time.Duration) {
-		return false, 0, 0
+	enableCache := func(_ context.Context, _, _, _ uuid.UUID, _ ConstraintItem) bool {
+		return false
 	}
 
 	cm, r, clock, ctx := newTestSetup(t, enableCache)
@@ -610,11 +606,8 @@ func TestAcquireCacheAccountScopedFlag(t *testing.T) {
 	envID, fnID := uuid.New(), uuid.New()
 
 	// Only enable for a specific account
-	enableCache := func(_ context.Context, accountID, _, _ uuid.UUID, _ ConstraintItem) (bool, time.Duration, time.Duration) {
-		if accountID == targetAccountID {
-			return true, MinCacheTTL, MaxCacheTTL
-		}
-		return false, 0, 0
+	enableCache := func(_ context.Context, accountID, _, _ uuid.UUID, _ ConstraintItem) bool {
+		return accountID == targetAccountID
 	}
 
 	cm, r, clock, ctx := newTestSetup(t, enableCache)

@@ -30,8 +30,7 @@ var enableDebugLogs = false
 // EnableAcquireCacheFn controls centralized Redis caching per constraint.
 // It receives the account, env, function IDs and the specific constraint item,
 // allowing granular control over which constraints (or entire accounts/envs/functions) are cached.
-// Returns whether caching is enabled, and the min/max TTL for cache entries.
-type EnableAcquireCacheFn func(ctx context.Context, accountID, envID, functionID uuid.UUID, ci ConstraintItem) (enable bool, minTTL, maxTTL time.Duration)
+type EnableAcquireCacheFn func(ctx context.Context, accountID, envID, functionID uuid.UUID, ci ConstraintItem) (enable bool)
 
 type redisCapacityManager struct {
 	// Constraint state is stored in Redis-compatible scavengerShards for the time being.
@@ -44,6 +43,8 @@ type redisCapacityManager struct {
 	enableDebugLogs                      bool
 	enableHighCardinalityInstrumentation EnableHighCardinalityInstrumentation
 	enableAcquireCache                   EnableAcquireCacheFn
+	acquireCacheMinTTL                   time.Duration
+	acquireCacheMaxTTL                   time.Duration
 
 	lifecycles []ConstraintAPILifecycleHooks
 
@@ -114,6 +115,13 @@ func WithEnableAcquireCache(fn EnableAcquireCacheFn) RedisCapacityManagerOption 
 	}
 }
 
+func WithAcquireCacheTTL(minTTL, maxTTL time.Duration) RedisCapacityManagerOption {
+	return func(m *redisCapacityManager) {
+		m.acquireCacheMinTTL = minTTL
+		m.acquireCacheMaxTTL = maxTTL
+	}
+}
+
 func NewRedisCapacityManager(
 	options ...RedisCapacityManagerOption,
 ) (*redisCapacityManager, error) {
@@ -121,6 +129,8 @@ func NewRedisCapacityManager(
 		operationIdempotencyTTL:       OperationIdempotencyTTL,
 		constraintCheckIdempotencyTTL: ConstraintCheckIdempotencyTTL,
 		checkIdempotencyTTL:           CheckIdempotencyTTL,
+		acquireCacheMinTTL:            MinCacheTTL,
+		acquireCacheMaxTTL:            MaxCacheTTL,
 	}
 
 	for _, rcmo := range options {

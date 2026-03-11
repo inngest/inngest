@@ -227,14 +227,12 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 
 	// Build per-constraint cache keys for the Lua script.
 	// Each constraint gets a cache key (empty string if caching is disabled for that constraint).
-	// A single min/max TTL pair is used across all cached constraints.
+	// Min/max TTL are global settings from the manager, shared across all cached constraints.
 	cacheKeys := make([]string, len(sortedConstraints))
-	var cacheMinTTL, cacheMaxTTL int
 	cacheEnabled := false
 	if r.enableAcquireCache != nil {
 		for i, ci := range sortedConstraints {
-			enabled, minTTL, maxTTL := r.enableAcquireCache(ctx, req.AccountID, req.EnvID, req.FunctionID, ci)
-			if !enabled {
+			if !r.enableAcquireCache(ctx, req.AccountID, req.EnvID, req.FunctionID, ci) {
 				continue
 			}
 			key := r.keyConstraintCache(req.AccountID, req.EnvID, req.FunctionID, ci)
@@ -243,10 +241,10 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 			}
 			cacheKeys[i] = key
 			cacheEnabled = true
-			cacheMinTTL = int(max(minTTL.Seconds(), 1))
-			cacheMaxTTL = int(max(maxTTL.Seconds(), 1))
 		}
 	}
+	cacheMinTTL := int(max(r.acquireCacheMinTTL.Seconds(), 1))
+	cacheMaxTTL := int(max(r.acquireCacheMaxTTL.Seconds(), 1))
 
 	// Build Lua request
 

@@ -570,8 +570,8 @@ func TestLuaCompatibility(t *testing.T) {
 
 				rc := shard.Client().Client()
 
-				enableCache := func(_ context.Context, _, _, _ uuid.UUID, _ constraintapi.ConstraintItem) (bool, time.Duration, time.Duration) {
-					return true, constraintapi.MinCacheTTL, constraintapi.MaxCacheTTL
+				enableCache := func(_ context.Context, _, _, _ uuid.UUID, _ constraintapi.ConstraintItem) bool {
+					return true
 				}
 
 				cm, err := constraintapi.NewRedisCapacityManager(
@@ -580,6 +580,7 @@ func TestLuaCompatibility(t *testing.T) {
 					constraintapi.WithClient(rc),
 					constraintapi.WithShardName("test"),
 					constraintapi.WithEnableAcquireCache(enableCache),
+					constraintapi.WithAcquireCacheTTL(constraintapi.MinCacheTTL, constraintapi.MaxCacheTTL),
 				)
 				require.NoError(t, err)
 

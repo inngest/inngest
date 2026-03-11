@@ -245,9 +245,9 @@ for index, value in ipairs(constraints) do
 			retryAt = constraintRetryAt
 		end
 
-		-- Write cache entry for exhausted constraint
+		-- Write cache entry for exhausted constraint (skip if retryAt is not in the future)
 		local ck = constraintCacheKeys[index]
-		if ck ~= nil and ck ~= "" then
+		if ck ~= nil and ck ~= "" and constraintRetryAt > nowMS then
 			local cacheTTLSec = math.max(
 				math.min(math.ceil((constraintRetryAt - nowMS) / 1000), cacheMaxTTL),
 				cacheMinTTL
@@ -355,9 +355,9 @@ for i, value in ipairs(constraints) do
 			retryAt = constraintRetryAt
 		end
 
-		-- Write cache entry for constraint exhausted after granting
+		-- Write cache entry for constraint exhausted after granting (skip if retryAt is not in the future)
 		local ck = constraintCacheKeys[i]
-		if ck ~= nil and ck ~= "" then
+		if ck ~= nil and ck ~= "" and constraintRetryAt > nowMS then
 			local cacheTTLSec = math.max(
 				math.min(math.ceil((constraintRetryAt - nowMS) / 1000), cacheMaxTTL),
 				cacheMinTTL
