@@ -32,6 +32,8 @@ export type MetricsFilters = {
   isMarketplace: boolean;
 };
 
+// TODO: The `accountConcurrency` field in this query is no longer used by AccountConcurrency
+// (which now uses workspace.stepRunning). Remove it once confirmed no other consumers depend on it.
 const GetVolumeMetrics = graphql(`
   query VolumeMetrics(
     $workspaceId: ID!
@@ -324,7 +326,8 @@ export const MetricsVolume = ({
               isMarketplace={isMarketplace}
             />
             <AccountConcurrency
-              data={data?.accountConcurrency}
+              workspace={data?.workspace}
+              entities={entities}
               limit={concurrencyLimit}
               isMarketplace={isMarketplace}
             />
