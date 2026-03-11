@@ -515,17 +515,6 @@ func TestAcquireCacheDebugResponse(t *testing.T) {
 	assert.True(t, resp.CacheHit)
 	assert.Equal(t, 1, resp.internalDebugState.CacheHit)
 
-	// Verify debug logs contain cache-related messages
-	debugLogs := resp.Debug()
-	foundCacheMsg := false
-	for _, msg := range debugLogs {
-		if len(msg) > 0 {
-			foundCacheMsg = true
-			break
-		}
-	}
-	assert.True(t, foundCacheMsg, "debug logs should contain cache hit info")
-
 	// Cache miss case
 	resp2, err := cm.Acquire(ctx, makeAcquireRequest(uuid.New(), uuid.New(), uuid.New(), clock, config, constraints, "debug-miss"))
 	require.NoError(t, err)

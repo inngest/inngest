@@ -220,7 +220,6 @@ if #cacheKeys > 0 then
 			cacheHit = true
 			local idx = cacheKeyIndices[j]
 			local cachedRetryAt = tonumber(val) or 0
-			debug("cache hit for constraint", tostring(idx), "retryAt", tostring(cachedRetryAt))
 			if not exhaustedSet[idx] then
 				table.insert(exhaustedConstraints, idx)
 				exhaustedSet[idx] = true
@@ -234,7 +233,6 @@ if #cacheKeys > 0 then
 	end
 end
 if cacheHit then
-	debug("short-circuiting due to cache hit")
 	local res = {}
 	res["s"] = 2
 	res["lc"] = limitingConstraints
@@ -292,7 +290,6 @@ if availableCapacity <= 0 then
 				)
 				if cacheTTLSec > 0 then
 					call("SET", cc.ck, tostring(retryAt), "EX", tostring(cacheTTLSec))
-					debug("cache set for constraint", tostring(exhaustedIdx), "ttl", tostring(cacheTTLSec))
 				end
 			end
 		end
