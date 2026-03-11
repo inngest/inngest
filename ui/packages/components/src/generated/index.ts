@@ -53,7 +53,7 @@ export interface HTTPMetadata {
   method: string;
   request_size?: number /* int64 */;
   response_size?: number /* int64 */;
-  response_status: number /* int64 */;
+  response_status?: number /* int64 */;
   domain?: string;
   path?: string;
 }
