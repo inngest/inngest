@@ -1102,6 +1102,45 @@ func TestCache(t *testing.T) {
 				require.Equal(t, 1, cache.cache.ItemCount(), "Should still only have 1 cached constraint")
 			},
 		},
+		{
+			name: "should track cache thrashing when items evicted before TTL",
+			run: func(ctx context.Context, t *testing.T, deps deps) {
+				// Create a very small cache to force LRU eviction (thrashing).
+				smallCache := NewConstraintCache(
+					WithConstraintCacheClock(deps.clock),
+					WithConstraintCacheManager(deps.cm),
+					WithConstraintCacheMaxSize(3),
+					WithConstraintCacheItemsToPrune(1),
+					WithConstraintCacheEnable(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, minTTL, maxTTL time.Duration) {
+						return true, MinCacheTTL, MaxCacheTTL
+					}),
+				)
+
+				// Fill the cache with items that have long TTLs by inserting directly.
+				// This simulates many distinct constraints being cached.
+				for i := 0; i < 10; i++ {
+					smallCache.cache.Set(
+						uuid.New().String(),
+						&constraintCacheItem{
+							retryAfter: deps.clock.Now().Add(time.Minute),
+							constraint: ConstraintItem{Kind: ConstraintKindConcurrency},
+						},
+						time.Minute,
+					)
+				}
+
+				// SyncUpdates ensures the async worker has processed all promotions and evictions.
+				smallCache.cache.SyncUpdates()
+
+				// With maxSize=3 and 10 items inserted, at least 7 should have been dropped.
+				// GetDropped returns items evicted due to memory pressure since last call.
+				dropped := smallCache.cache.GetDropped()
+				require.GreaterOrEqual(t, dropped, 7, "expected at least 7 items dropped due to LRU eviction, got %d", dropped)
+
+				// Verify cache is at or under max size.
+				require.LessOrEqual(t, smallCache.cache.ItemCount(), 3, "cache should not exceed max size")
+			},
+		},
 	}
 
 	for _, tc := range cases {
