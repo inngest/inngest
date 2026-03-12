@@ -3,12 +3,18 @@ package metadata
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"maps"
 
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/inngest/inngest/pkg/enums"
+)
+
+var (
+	ErrMetadataSpanTooLarge    = errors.New("metadata span exceeds maximum size")
+	ErrRunMetadataSizeExceeded = errors.New("run cumulative metadata size exceeded")
 )
 
 type Opcode = enums.MetadataOpcode
@@ -92,6 +98,14 @@ func (m Values) Combine(o Values, op enums.MetadataOpcode) error {
 	default:
 		return fmt.Errorf("unrecognized op %q", op)
 	}
+}
+
+func (v Values) Size() int {
+	total := 0
+	for k, val := range v {
+		total += len(k) + len(val)
+	}
+	return total
 }
 
 type RawUpdate struct {
