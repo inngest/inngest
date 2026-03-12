@@ -10,6 +10,7 @@
 
 import { memo, useMemo, useState, type CSSProperties } from 'react';
 import {
+  RiArrowRightFill,
   RiArrowRightLine,
   RiArrowRightSFill,
   RiBuilding2Line,
@@ -366,6 +367,73 @@ function BarHoverCardContent({
   );
 }
 
+/**
+ * Hover card content for the experiment badge, showing experiment name and variant weights.
+ * The selected variant is shown bold above the divider; other variants are shown lighter below.
+ */
+function ExperimentHoverCardContent({
+  metadata,
+}: {
+  metadata?: TimelineBarProps['experimentMetadata'];
+}) {
+  if (!metadata) {
+    return (
+      <div className="whitespace-nowrap px-1 py-0.5 text-xs">
+        <p className="text-light">No experiment data</p>
+      </div>
+    );
+  }
+
+  const { experimentName, variantSelected, variantWeights } = metadata;
+  const availableVariants = metadata.availableVariants ?? [];
+
+  // Separate selected variant from the rest
+  const otherVariants = availableVariants.filter((v) => v !== variantSelected);
+
+  return (
+    <div className="whitespace-nowrap px-1 py-0.5 text-xs">
+      <p className="text-light mb-0.5">Experiment name</p>
+      <p className="text-basis mb-2 font-medium">{experimentName}</p>
+
+      {(availableVariants.length > 0 || variantSelected) && (
+        <div>
+          {/* Header row */}
+          <div className="border-subtle flex justify-between gap-6 border-b pb-1">
+            <span className="text-light">Variant</span>
+            {variantWeights && <span className="text-light">Weight</span>}
+          </div>
+
+          {/* Selected variant — bold, above the darker divider */}
+          <div className="border-muted flex items-center justify-between gap-6 border-b py-1">
+            <span className="text-basis flex items-center gap-1 font-medium">
+              <RiArrowRightFill className="text-basis h-3 w-3 shrink-0" />
+              {variantSelected}
+            </span>
+            {variantWeights && variantWeights[variantSelected] != null && (
+              <span className="text-basis font-medium tabular-nums">
+                {variantWeights[variantSelected]}
+              </span>
+            )}
+          </div>
+
+          {/* Other variants — lighter */}
+          {otherVariants.map((variant) => (
+            <div
+              key={variant}
+              className="border-subtle flex items-center justify-between gap-6 border-b py-1 last:border-b-0"
+            >
+              <span className="text-light ml-4">{variant}</span>
+              {variantWeights && variantWeights[variant] != null && (
+                <span className="text-light tabular-nums">{variantWeights[variant]}</span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 const BAR_HEIGHT_CLASSES: Record<BarHeight, string> = { short: 'h-2', tall: 'h-4' };
 
 /**
@@ -532,6 +600,7 @@ export function TimelineBar({
   delayMs,
   hasExperiment,
   insideExperiment,
+  experimentMetadata,
 }: TimelineBarProps): JSX.Element {
   const showExperimentBackground = hasExperiment || insideExperiment;
   const barStyle = getBarStyle(style);
@@ -653,19 +722,24 @@ export function TimelineBar({
         {/* Experiment badge - centered between left panel and bars */}
         <span className="inline-flex w-7 shrink-0 items-center justify-center">
           {hasExperiment && (
-            <Tooltip>
-              <TooltipTrigger asChild>
+            <HoverCardRoot openDelay={200} closeDelay={0}>
+              <HoverCardTrigger asChild>
                 <span
-                  className="inline-flex items-center justify-center rounded border p-0.5"
-                  style={{ borderColor: 'rgb(var(--color-foreground-subtle))' }}
+                  className="hover:bg-canvasMuted inline-flex items-center justify-center rounded border p-0.5 transition-colors"
+                  style={{
+                    borderColor: 'rgb(var(--color-foreground-subtle))',
+                    color: 'rgb(var(--color-foreground-subtle))',
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                  onMouseDown={(e) => e.stopPropagation()}
                 >
-                  <RiFlaskLine className="text-subtle h-3 w-3" />
+                  <RiFlaskLine className="h-3 w-3" />
                 </span>
-              </TooltipTrigger>
-              <TooltipContent side="top" className="text-xs">
-                This step uses an experiment
-              </TooltipContent>
-            </Tooltip>
+              </HoverCardTrigger>
+              <HoverCardContent side="top" align="start" className="border-muted max-w-none border">
+                <ExperimentHoverCardContent metadata={experimentMetadata} />
+              </HoverCardContent>
+            </HoverCardRoot>
           )}
         </span>
 
@@ -683,12 +757,11 @@ export function TimelineBar({
           {/* Dotted background pattern for experiment steps and their children */}
           {showExperimentBackground && (
             <div
-              className="pointer-events-none absolute inset-0"
+              className="bg-canvasSubtle pointer-events-none absolute inset-0"
               style={{
                 backgroundImage:
-                  'radial-gradient(circle, rgb(var(--color-foreground-subtle)) 1px, transparent 1px)',
+                  'radial-gradient(circle, rgb(var(--color-border-muted)) 1px, transparent 1px)',
                 backgroundSize: '7px 7px',
-                opacity: 0.5,
               }}
             />
           )}

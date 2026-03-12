@@ -298,6 +298,7 @@ function TimelineBarRenderer({
       delayMs={bar.delayMs}
       hasExperiment={bar.hasExperiment}
       insideExperiment={insideExperiment}
+      experimentMetadata={bar.experimentMetadata}
     >
       {/* Timing breakdown bars */}
       {isExpanded &&
