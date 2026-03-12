@@ -39,6 +39,7 @@ func NewDebugAPI(o Opts) service.Service {
 		findShard:      o.ShardSelector,
 		pm:             o.PauseManager,
 		cm:             o.CapacityManager,
+		cdb:            o.ConstraintDebugger,
 		batchManager:   o.BatchManager,
 		singletonStore: o.SingletonStore,
 		debouncer:      o.Debouncer,
@@ -52,7 +53,8 @@ type Opts struct {
 	State           state.Manager
 	Cron            cron.CronManager
 	PauseManager    pauses.Manager
-	CapacityManager constraintapi.CapacityManager
+	CapacityManager    constraintapi.CapacityManager
+	ConstraintDebugger constraintapi.ConstraintDebugger
 
 	ShardSelector queue.ShardSelector
 
@@ -79,7 +81,8 @@ type debugAPI struct {
 	state  state.Manager
 	croner cron.CronManager
 	pm     pauses.Manager
-	cm     constraintapi.CapacityManager
+	cm  constraintapi.CapacityManager
+	cdb constraintapi.ConstraintDebugger
 
 	// Dependencies for batching, singleton, and debounce insights
 	batchManager   batch.BatchManager
