@@ -188,9 +188,7 @@ func TestCreateMetadataSpan_SequentialAccumulation(t *testing.T) {
 	e := newTestExecutor()
 	rc := newTestRunContext()
 
-	spanSize := 100_000 // 100 KB per span, under 64 KB per-span limit? No, 100KB > 64KB.
-	// Use a span size under the per-span limit (64 KB)
-	spanSize = 50_000 // 50 KB per span
+	spanSize := 50_000 // 50 KB per span, under per-span limit (64 KB)
 
 	// We can fit floor(1MB / 50KB) = 20 spans, and the 21st should be rejected
 	md := &mockStructured{
@@ -200,7 +198,7 @@ func TestCreateMetadataSpan_SequentialAccumulation(t *testing.T) {
 
 	expectedFits := consts.MaxRunMetadataSize / spanSize // 1048576 / 50000 = 20
 
-	for i := 0; i < expectedFits; i++ {
+	for i := range expectedFits {
 		ref, err := e.createMetadataSpan(context.Background(), rc, "test.location", md, enums.MetadataScopeStep)
 		require.NoError(t, err, "span %d should succeed", i)
 		require.NotNil(t, ref)
