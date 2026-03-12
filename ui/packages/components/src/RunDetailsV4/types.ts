@@ -40,6 +40,7 @@ export type SpanMetadataScope = 'run' | 'step' | 'step_attempt' | 'extended_trac
 
 export type SpanMetadata =
   | SpanMetadataInngestAI
+  | SpanMetadataInngestExperiment
   | SpanMetadataInngestHTTP
   | SpanMetadataInngestHTTPTiming
   | SpanMetadataInngestResponseHeaders
@@ -57,6 +58,19 @@ export type SpanMetadataInngestAI = {
     model: string;
     system: string;
     operation_name: string;
+  };
+};
+
+export type SpanMetadataInngestExperiment = {
+  scope: SpanMetadataScope;
+  kind: 'inngest.experiment';
+  updatedAt: string;
+  values: {
+    experiment_name: string;
+    variant_selected: string;
+    selection_strategy: string;
+    available_variants?: string[];
+    variant_weights?: Record<string, number>;
   };
 };
 
@@ -197,4 +211,8 @@ export function isStepInfoSignal(stepInfo: Trace['stepInfo']): stepInfo is StepI
   }
 
   return 'signal' in stepInfo;
+}
+
+export function isExperimentMetadata(md: SpanMetadata): md is SpanMetadataInngestExperiment {
+  return md.kind === 'inngest.experiment';
 }
