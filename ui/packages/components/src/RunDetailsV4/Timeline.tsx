@@ -606,6 +606,7 @@ function TimelineBarRenderer({
       timingDetails={buildTimingDetails(bar)}
       hasExperiment={bar.hasExperiment}
       insideExperiment={insideExperiment}
+      experimentMetadata={bar.experimentMetadata}
     >
       {/* Inngest timing bar — positioned to match the queue segment of the parent.
           Only for non-root bars; the root uses timingBreakdown only for compound segments. */}

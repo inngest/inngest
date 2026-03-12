@@ -217,6 +217,14 @@ export interface TimelineBarProps {
 
   /** Whether this step is inside an experiment (shows dotted background but no badge) */
   insideExperiment?: boolean;
+
+  /** Experiment metadata for hover card display on experiment badge */
+  experimentMetadata?: {
+    experimentName: string;
+    variantSelected: string;
+    availableVariants?: string[];
+    variantWeights?: Record<string, number>;
+  };
 }
 
 /**
@@ -294,6 +302,14 @@ export interface TimelineBarData {
 
   /** Whether this bar has experiment metadata attached */
   hasExperiment?: boolean;
+
+  /** Experiment metadata for hover card display */
+  experimentMetadata?: {
+    experimentName: string;
+    variantSelected: string;
+    availableVariants?: string[];
+    variantWeights?: Record<string, number>;
+  };
 }
 
 /**

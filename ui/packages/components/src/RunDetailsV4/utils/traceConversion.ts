@@ -15,6 +15,7 @@ import type {
 } from '../TimelineBar.types';
 import { traceWalk } from '../runDetailsUtils';
 import {
+  isExperimentMetadata,
   isStepInfoRun,
   type SpanMetadata,
   type SpanMetadataInngestHTTPTiming,
@@ -209,6 +210,17 @@ function traceToBarData(
   // Check if this step has experiment metadata
   const hasExperiment = trace.metadata?.some((m) => m.kind === KindInngestExperiment) ?? false;
 
+  // Extract experiment metadata for hover card display
+  const experimentMd = trace.metadata?.find(isExperimentMetadata);
+  const experimentMetadata = experimentMd
+    ? {
+        experimentName: experimentMd.values.experiment_name,
+        variantSelected: experimentMd.values.variant_selected,
+        availableVariants: experimentMd.values.available_variants,
+        variantWeights: experimentMd.values.variant_weights,
+      }
+    : undefined;
+
   return {
     id: trace.spanID,
     name: getSpanName(trace.name),
@@ -225,6 +237,7 @@ function traceToBarData(
     status,
     delayMs,
     hasExperiment,
+    experimentMetadata,
   };
 }
 
