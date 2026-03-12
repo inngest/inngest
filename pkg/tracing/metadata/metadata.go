@@ -100,6 +100,8 @@ func (m Values) Combine(o Values, op enums.MetadataOpcode) error {
 	}
 }
 
+// Size returns the sum of key lengths and raw JSON value byte lengths.
+// Map overhead is excluded; this is intended as an approximate cost metric.
 func (v Values) Size() int {
 	total := 0
 	for k, val := range v {

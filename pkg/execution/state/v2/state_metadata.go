@@ -495,9 +495,9 @@ type RunMetrics struct {
 	// StepCount represents the total number of steps already completed.
 	StepCount int
 
-	// MetadataSize tracks the cumulative metadata size in bytes for this run.
-	// This is in-memory only (not persisted to Redis), starting at zero value
-	// each step execution.
+	// MetadataSize tracks the cumulative metadata size in bytes for the
+	// current step execution. This is in-memory only (not persisted to
+	// Redis) and resets to zero at the start of each step execution.
 	MetadataSize int
 
 	// TODO

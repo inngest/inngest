@@ -5293,7 +5293,7 @@ func (e *executor) createMetadataSpan(ctx context.Context, runCtx execution.RunC
 		return nil, metadata.ErrMetadataSpanTooLarge
 	}
 
-	// Per-run cumulative size limit (in-memory, resets per step execution)
+	// Per-step-execution cumulative size limit (in-memory, resets each step)
 	currentSize := runCtx.Metadata().Metrics.MetadataSize
 	if currentSize+spanSize > consts.MaxRunMetadataSize {
 		l.Warn("run cumulative metadata size exceeded",
@@ -5320,14 +5320,16 @@ func (e *executor) createMetadataSpan(ctx context.Context, runCtx execution.RunC
 		return nil, fmt.Errorf("unknown metadata scope: %s", scope)
 	}
 
-	ref, err := tracing.CreateMetadataSpan(
+	ref, err := tracing.CreateMetadataSpanFromValues(
 		ctx,
 		e.tracerProvider,
 		parent,
 		location,
 		pkgName,
 		runCtx.Metadata(),
-		md,
+		md.Kind(),
+		md.Op(),
+		values,
 		scope,
 	)
 	if err != nil {
