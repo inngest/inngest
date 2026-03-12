@@ -5272,6 +5272,41 @@ func emitCheckpointTraces(ctx context.Context) bool {
 }
 
 func (e *executor) createMetadataSpan(ctx context.Context, runCtx execution.RunContext, location string, md metadata.Structured, scope metadata.Scope) (*meta.SpanReference, error) {
+	// Serialize to compute size
+	values, err := md.Serialize()
+	if err != nil {
+		return nil, fmt.Errorf("failed to serialize metadata: %w", err)
+	}
+
+	l := e.log
+
+	// Per-span size limit
+	spanSize := values.Size()
+	if spanSize > consts.MaxMetadataSpanSize {
+		l.Warn("metadata span exceeds maximum size",
+			"span_size", spanSize,
+			"limit", consts.MaxMetadataSpanSize,
+			"run_id", runCtx.Metadata().ID.RunID,
+			"metadata_kind", md.Kind().String(),
+			"location", location,
+		)
+		return nil, metadata.ErrMetadataSpanTooLarge
+	}
+
+	// Per-run cumulative size limit (in-memory, resets per step execution)
+	currentSize := runCtx.Metadata().Metrics.MetadataSize
+	if currentSize+spanSize > consts.MaxRunMetadataSize {
+		l.Warn("run cumulative metadata size exceeded",
+			"current_size", currentSize,
+			"span_size", spanSize,
+			"limit", consts.MaxRunMetadataSize,
+			"run_id", runCtx.Metadata().ID.RunID,
+			"metadata_kind", md.Kind().String(),
+			"location", location,
+		)
+		return nil, metadata.ErrRunMetadataSizeExceeded
+	}
+
 	var parent *meta.SpanReference
 
 	switch scope {
@@ -5285,7 +5320,7 @@ func (e *executor) createMetadataSpan(ctx context.Context, runCtx execution.RunC
 		return nil, fmt.Errorf("unknown metadata scope: %s", scope)
 	}
 
-	return tracing.CreateMetadataSpan(
+	ref, err := tracing.CreateMetadataSpan(
 		ctx,
 		e.tracerProvider,
 		parent,
@@ -5295,6 +5330,15 @@ func (e *executor) createMetadataSpan(ctx context.Context, runCtx execution.RunC
 		md,
 		scope,
 	)
+	if err != nil {
+		return nil, err
+	}
+
+	// Increment in-memory counter so subsequent spans in the same
+	// step execution see the updated total.
+	runCtx.Metadata().Metrics.MetadataSize += spanSize
+
+	return ref, nil
 }
 
 func hasPlanOp(ops []*state.GeneratorOpcode) bool {
