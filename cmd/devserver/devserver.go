@@ -116,7 +116,12 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		return err
 	}
 	for _, change := range changes {
-		fmt.Fprintf(os.Stderr, "%s port %d is already in use, using %d instead\n", change.Name, change.From, change.To)
+		l.Info(
+			"Port conflict, using new port",
+			"name", change.Name,
+			"from", change.From,
+			"to", change.To,
+		)
 	}
 
 	traceEndpoint := fmt.Sprintf("localhost:%d", opts.Config.EventAPI.Port)
