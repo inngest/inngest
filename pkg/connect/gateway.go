@@ -863,7 +863,6 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 
 			// get worker capacity to check if we have worker limits to enforce
 			workerCap, err := c.svc.stateManager.GetWorkerCapacities(ctx, c.conn.EnvID, c.conn.Data.InstanceId)
-			c.log.Trace("worker capacity info before extending lease", "account_id", c.conn.AccountID, "env_id", c.conn.EnvID, "instance_id", c.conn.Data.InstanceId, "worker_total_capacity", workerCap.Total, "worker_available_capacity", workerCap.Available)
 			if err != nil {
 				c.log.ReportError(err, "failed to get worker available capacity",
 					logger.WithErrorReportTags(map[string]string{
@@ -876,6 +875,8 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 					Msg:        "failed to get total worker capacity",
 				}
 			}
+			c.log.Trace("worker capacity info before extending lease", "account_id", c.conn.AccountID, "env_id", c.conn.EnvID, "instance_id", c.conn.Data.InstanceId, "worker_total_capacity", workerCap.Total, "worker_available_capacity", workerCap.Available)
+
 			// extend lease with worker capacity limit if set
 			newLeaseID, err := c.svc.stateManager.ExtendRequestLease(ctx, c.conn.EnvID, c.conn.Data.InstanceId,
 				data.RequestId, leaseID, consts.ConnectWorkerRequestLeaseDuration, workerCap.IsUnlimited())
