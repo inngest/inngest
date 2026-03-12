@@ -12,6 +12,7 @@ const inngestKindLabels: Record<string, string> = {
 
 /** Returns a human-readable label for a metadata kind. Handles both inngest.* and userland.* kinds. */
 const getKindLabel = (kind: SpanMetadataKind): string => {
+  if (!kind) return 'Unknown Metadata';
   const [namespace, kindName] = kind.split('.');
   if (!kindName) {
     return `Unknown Metadata (kind: ${kind})`;
@@ -37,7 +38,7 @@ const MetadataAttrRow = ({
 }: SpanMetadata & { isLast: boolean }) => {
   const sortedEntries = useMemo(
     () =>
-      Object.entries(values).sort(([a], [b]) => {
+      Object.entries(values ?? {}).sort(([a], [b]) => {
         if (a === 'Status Code') return -1;
         if (b === 'Status Code') return 1;
         return a.localeCompare(b);
@@ -76,7 +77,7 @@ const MetadataAttrRow = ({
               <div className="text-muted w-48 shrink-0 text-sm font-normal leading-tight">
                 {key}
               </div>
-              <div className="text-basis min-w-0 break-words text-sm font-normal leading-tight">
+              <div className="text-basis min-w-0 break-all text-sm font-normal leading-tight">
                 {String(value) || '--'}
               </div>
             </div>
@@ -96,10 +97,12 @@ export const MetadataAttrs = ({ metadata }: { metadata: SpanMetadata[] }) => {
     }
   }, [metadata]);
 
+  const safeMetadata = metadata.filter((md) => md && typeof md === 'object' && md.kind);
+
   return (
-    <div className="relative h-full overflow-y-auto" ref={ref}>
-      {metadata.map((md, idx) => {
-        const isLast = idx === metadata.length - 1;
+    <div className="relative h-full overflow-y-auto overflow-x-hidden" ref={ref}>
+      {safeMetadata.map((md, idx) => {
+        const isLast = idx === safeMetadata.length - 1;
 
         return (
           <MetadataAttrRow
