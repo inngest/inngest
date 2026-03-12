@@ -3576,6 +3576,11 @@ func (e *executor) handleStepFailed(ctx context.Context, runCtx execution.RunCon
 		return err
 	}
 
+	// Persist the cumulative metadata size delta alongside the step output.
+	if delta := runCtx.Metadata().Metrics.MetadataSize - runCtx.Metadata().Metrics.MetadataSizeLoaded; delta > 0 {
+		ctx = state.WithMetadataSizeDelta(ctx, delta)
+	}
+
 	hasPendingSteps, err := e.smv2.SaveStep(ctx, runCtx.Metadata().ID, gen.ID, []byte(output))
 	if err != nil {
 		return err
@@ -4016,6 +4021,11 @@ func (e *executor) handleGeneratorGateway(ctx context.Context, runCtx execution.
 		}
 	}
 
+	// Persist the cumulative metadata size delta alongside the step output.
+	if delta := runCtx.Metadata().Metrics.MetadataSize - runCtx.Metadata().Metrics.MetadataSizeLoaded; delta > 0 {
+		ctx = state.WithMetadataSizeDelta(ctx, delta)
+	}
+
 	// Save the output as the step result.
 	hasPendingSteps, err := e.smv2.SaveStep(ctx, runCtx.Metadata().ID, gen.ID, output)
 	if err != nil {
@@ -4259,6 +4269,11 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 			// step statuses when a step finishes.
 			go e.OnStepGatewayRequestFinished(context.WithoutCancel(ctx), *runCtx.Metadata(), lifecycleItem, edge.Edge, gen, nil, nil)
 		}
+	}
+
+	// Persist the cumulative metadata size delta alongside the step output.
+	if delta := runCtx.Metadata().Metrics.MetadataSize - runCtx.Metadata().Metrics.MetadataSizeLoaded; delta > 0 {
+		ctx = state.WithMetadataSizeDelta(ctx, delta)
 	}
 
 	// Save the output as the step result.
@@ -5357,7 +5372,7 @@ func (e *executor) createMetadataSpan(ctx context.Context, runCtx execution.RunC
 		return nil, metadata.ErrMetadataSpanTooLarge
 	}
 
-	// Per-step-execution cumulative size limit (in-memory, resets each step)
+	// Per-run cumulative metadata size limit
 	currentSize := runCtx.Metadata().Metrics.MetadataSize
 	if currentSize+spanSize > consts.MaxRunMetadataSize {
 		l.Warn("run cumulative metadata size exceeded",

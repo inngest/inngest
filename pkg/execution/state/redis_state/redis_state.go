@@ -773,7 +773,8 @@ func (m shardedMgr) SaveResponse(ctx context.Context, i state.Identifier, stepID
 		fnRunState.kg.ActionInputs(ctx, isSharded, i),
 		fnRunState.kg.Pending(ctx, isSharded, i),
 	}
-	args := []string{stepID, marshalledOuptut}
+	metadataSizeDelta := state.MetadataSizeDeltaFromContext(ctx)
+	args := []string{stepID, marshalledOuptut, strconv.Itoa(metadataSizeDelta)}
 
 	indexes, err := retriableScripts["saveResponse"].Exec(
 		redis_telemetry.WithScriptName(ctx, "saveResponse"),
@@ -1214,6 +1215,7 @@ func newRunMetadata(data map[string]string) (*runMetadata, error) {
 	m.StateSize, _ = parseInt("state_size")
 	m.EventSize, _ = parseInt("event_size")
 	m.StepCount, _ = parseInt("step_count")
+	m.MetadataSize, _ = parseInt("metadata_size")
 
 	if val, ok := data["version"]; ok && val != "" {
 		v, err := strconv.Atoi(strings.TrimSuffix(val, ".0"))
@@ -1424,6 +1426,7 @@ type runMetadata struct {
 	StateSize                 int            `json:"state_size"`
 	EventSize                 int            `json:"event_size"`
 	StepCount                 int            `json:"step_count"`
+	MetadataSize              int            `json:"metadata_size"`
 	Debugger                  bool           `json:"debugger"`
 	RunType                   string         `json:"runType,omitempty"`
 	ReplayID                  string         `json:"rID,omitempty"`

@@ -295,9 +295,11 @@ func (v v2) LoadMetadata(ctx context.Context, id state.ID) (state.Metadata, erro
 		}),
 		Stack: stack,
 		Metrics: state.RunMetrics{
-			EventSize: md.EventSize,
-			StateSize: md.StateSize,
-			StepCount: md.StepCount,
+			EventSize:          md.EventSize,
+			StateSize:          md.StateSize,
+			StepCount:          md.StepCount,
+			MetadataSize:       md.MetadataSize,
+			MetadataSizeLoaded: md.MetadataSize,
 		},
 	}
 

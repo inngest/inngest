@@ -45,6 +45,7 @@ func (m *mockRunContext) SetStatusCode(code int)             {}
 func (m *mockRunContext) UpdateOpcodeError(op *state.GeneratorOpcode, err state.UserError) {}
 func (m *mockRunContext) UpdateOpcodeOutput(op *state.GeneratorOpcode, output json.RawMessage) {}
 func (m *mockRunContext) SetError(err error)                 {}
+func (m *mockRunContext) ReleaseCapacityLease() error        { return nil }
 
 // Compile-time check that mockRunContext implements RunContext.
 var _ execution.RunContext = (*mockRunContext)(nil)
@@ -245,4 +246,41 @@ func TestCreateMetadataSpan_EmptyValues(t *testing.T) {
 	require.NotNil(t, ref)
 	// MetadataSize should still be 0 since span size was 0
 	require.Equal(t, 0, rc.md.Metrics.MetadataSize)
+}
+
+// TestCreateMetadataSpan_CrossStepAccumulation verifies that MetadataSize
+// loaded from a previous step (via MetadataSizeLoaded) is used as the
+// starting point for the cumulative limit, simulating cross-step persistence.
+func TestCreateMetadataSpan_CrossStepAccumulation(t *testing.T) {
+	e := newTestExecutor()
+	rc := newTestRunContext()
+
+	// Simulate that previous steps accumulated metadata just under the limit.
+	previouslyPersisted := consts.MaxRunMetadataSize - 50000
+	rc.md.Metrics.MetadataSize = previouslyPersisted
+	rc.md.Metrics.MetadataSizeLoaded = previouslyPersisted
+
+	// A 40000-byte span should fit (remaining = 50000, 40000 < 50000)
+	spanSize := 40000
+	md := &mockStructured{
+		kind:   "test.kind",
+		values: makeValues(spanSize),
+	}
+	ref, err := e.createMetadataSpan(context.Background(), rc, "test.location", md, enums.MetadataScopeStep)
+	require.NoError(t, err)
+	require.NotNil(t, ref)
+	require.Equal(t, previouslyPersisted+spanSize, rc.md.Metrics.MetadataSize)
+
+	// A 20000-byte span should exceed the limit (remaining = 10000, 20000 > 10000)
+	md2 := &mockStructured{
+		kind:   "test.kind",
+		values: makeValues(20000),
+	}
+	ref, err = e.createMetadataSpan(context.Background(), rc, "test.location", md2, enums.MetadataScopeStep)
+	require.ErrorIs(t, err, metadata.ErrRunMetadataSizeExceeded)
+	require.Nil(t, ref)
+
+	// The delta for persistence should only include the span that succeeded
+	delta := rc.md.Metrics.MetadataSize - rc.md.Metrics.MetadataSizeLoaded
+	require.Equal(t, spanSize, delta)
 }
