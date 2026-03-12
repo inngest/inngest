@@ -1,6 +1,7 @@
 package devserver
 
 import (
+	"fmt"
 	"net"
 	"testing"
 
@@ -95,4 +96,46 @@ func TestResolvePortConflictsLeavesAvailablePortsUnchanged(t *testing.T) {
 
 	require.Equal(t, opts, resolved)
 	require.Empty(t, changes)
+}
+
+func TestResolvePortConflictsChecksWildcardPortsForConnectServices(t *testing.T) {
+	opts := StartOpts{
+		Config: config.Config{
+			EventAPI: config.EventAPI{
+				Addr: "127.0.0.1",
+				Port: 8288,
+			},
+			CoreAPI: config.CoreAPI{
+				Addr: "127.0.0.1",
+				Port: 8288,
+			},
+		},
+		ConnectGatewayPort: 8289,
+		ConnectGatewayHost: "127.0.0.1",
+		ConnectGRPCConfig: connectConfig.ConnectGRPCConfig{
+			Gateway: connectConfig.GRPCConfig{
+				IP:   net.ParseIP("127.0.0.1"),
+				Port: 50052,
+			},
+			Executor: connectConfig.GRPCConfig{
+				IP:   net.ParseIP("127.0.0.1"),
+				Port: 50053,
+			},
+		},
+	}
+
+	seen := map[string]bool{}
+
+	resolved, changes, err := resolvePortConflicts(opts, func(addr string, port int) bool {
+		seen[fmt.Sprintf("%s:%d", addr, port)] = true
+		return true
+	})
+	require.NoError(t, err)
+
+	require.Equal(t, opts, resolved)
+	require.Empty(t, changes)
+	require.True(t, seen["127.0.0.1:8288"])
+	require.True(t, seen[":8289"])
+	require.True(t, seen[":50052"])
+	require.True(t, seen[":50053"])
 }

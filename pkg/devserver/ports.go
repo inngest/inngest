@@ -41,7 +41,6 @@ func resolvePortConflicts(opts StartOpts, isAvailable func(string, int) bool) (S
 		},
 		{
 			name: "connect gateway",
-			addr: resolved.ConnectGatewayHost,
 			port: resolved.ConnectGatewayPort,
 			set: func(opts *StartOpts, port int) {
 				opts.ConnectGatewayPort = port
@@ -49,7 +48,6 @@ func resolvePortConflicts(opts StartOpts, isAvailable func(string, int) bool) (S
 		},
 		{
 			name: "connect gateway grpc",
-			addr: resolved.ConnectGRPCConfig.Gateway.IP.String(),
 			port: resolved.ConnectGRPCConfig.Gateway.Port,
 			set: func(opts *StartOpts, port int) {
 				opts.ConnectGRPCConfig.Gateway.Port = port
@@ -57,7 +55,6 @@ func resolvePortConflicts(opts StartOpts, isAvailable func(string, int) bool) (S
 		},
 		{
 			name: "connect executor grpc",
-			addr: resolved.ConnectGRPCConfig.Executor.IP.String(),
 			port: resolved.ConnectGRPCConfig.Executor.Port,
 			set: func(opts *StartOpts, port int) {
 				opts.ConnectGRPCConfig.Executor.Port = port
