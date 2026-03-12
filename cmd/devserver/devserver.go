@@ -83,7 +83,43 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	postgresConnMaxIdleTime := localconfig.GetIntValue(cmd, "postgres-conn-max-idle-time", 5)
 	postgresConnMaxLifetime := localconfig.GetIntValue(cmd, "postgres-conn-max-lifetime", 30)
 
-	traceEndpoint := fmt.Sprintf("localhost:%d", port)
+	conf.ServerKind = headers.ServerKindDev
+
+	opts := devserver.StartOpts{
+		Autodiscover:       !noDiscovery,
+		Config:             *conf,
+		Poll:               !noPoll,
+		PollInterval:       pollInterval,
+		RetryInterval:      retryInterval,
+		QueueWorkers:       queueWorkers,
+		Tick:               time.Duration(tick) * time.Millisecond,
+		URLs:               urls,
+		ConnectGatewayPort: connectGatewayPort,
+		ConnectGatewayHost: conf.CoreAPI.Addr,
+		ConnectGRPCConfig: connectConfig.NewGRPCConfig(
+			ctx,
+			connectgrpc.DefaultConnectGRPCIP, connectGatewayGRPCPort,
+			connectgrpc.DefaultConnectGRPCIP, connectExecutorGRPCPort,
+		),
+		Persist:                 persist,
+		SQLiteDir:               sqliteDir,
+		PostgresURI:             postgresURI,
+		PostgresMaxIdleConns:    postgresMaxIdleConns,
+		PostgresMaxOpenConns:    postgresMaxOpenConns,
+		PostgresConnMaxIdleTime: postgresConnMaxIdleTime,
+		PostgresConnMaxLifetime: postgresConnMaxLifetime,
+		DebugAPIPort:            debugAPIPort,
+	}
+
+	opts, changes, err := devserver.ResolvePortConflicts(opts)
+	if err != nil {
+		return err
+	}
+	for _, change := range changes {
+		fmt.Fprintf(os.Stderr, "%s port %d is already in use, using %d instead\n", change.Name, change.From, change.To)
+	}
+
+	traceEndpoint := fmt.Sprintf("localhost:%d", opts.Config.EventAPI.Port)
 	if err := itrace.NewUserTracer(ctx, itrace.TracerOpts{
 		ServiceName:   "tracing",
 		TraceEndpoint: traceEndpoint,
@@ -112,34 +148,6 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	defer func() {
 		_ = itrace.CloseSystemTracer(ctx)
 	}()
-
-	conf.ServerKind = headers.ServerKindDev
-
-	opts := devserver.StartOpts{
-		Autodiscover:       !noDiscovery,
-		Config:             *conf,
-		Poll:               !noPoll,
-		PollInterval:       pollInterval,
-		RetryInterval:      retryInterval,
-		QueueWorkers:       queueWorkers,
-		Tick:               time.Duration(tick) * time.Millisecond,
-		URLs:               urls,
-		ConnectGatewayPort: connectGatewayPort,
-		ConnectGatewayHost: conf.CoreAPI.Addr,
-		ConnectGRPCConfig: connectConfig.NewGRPCConfig(
-			ctx,
-			connectgrpc.DefaultConnectGRPCIP, connectGatewayGRPCPort,
-			connectgrpc.DefaultConnectGRPCIP, connectExecutorGRPCPort,
-		),
-		Persist:                 persist,
-		SQLiteDir:               sqliteDir,
-		PostgresURI:             postgresURI,
-		PostgresMaxIdleConns:    postgresMaxIdleConns,
-		PostgresMaxOpenConns:    postgresMaxOpenConns,
-		PostgresConnMaxIdleTime: postgresConnMaxIdleTime,
-		PostgresConnMaxLifetime: postgresConnMaxLifetime,
-		DebugAPIPort:            debugAPIPort,
-	}
 
 	err = devserver.New(ctx, opts)
 	if err != nil {
