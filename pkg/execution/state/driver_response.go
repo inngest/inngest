@@ -42,6 +42,14 @@ type UserError struct {
 	Cause json.RawMessage `json:"cause,omitempty"`
 }
 
+// GetNameOrMessage returns the name or message for the user error.
+func (u UserError) GetNameOrMessage() string {
+	if u.Name != "" {
+		return u.Name
+	}
+	return u.Message
+}
+
 // DriverResponse is returned after a driver executes an action.  This represents any
 // output from running the step, including the output (as a JSON map), the error, and
 // whether the driver's response is "scheduled", eg. the driver is running the job

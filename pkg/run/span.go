@@ -16,6 +16,7 @@ import (
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/logger"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
+	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/oklog/ulid/v2"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -458,14 +459,15 @@ func (s *Span) IsRecording() bool {
 	return true
 }
 
-// official one doesn't actually set the status, but we'll just do it here
-// for convinence's sake.
 func (s *Span) RecordError(err error, opts ...trace.EventOption) {
 	s.Lock()
 	defer s.Unlock()
 
 	s.AddEvent(err.Error(), opts...)
+	// official one doesn't actually set the status, but we'll just do it here
+	// for convinence's sake.
 	s.SetStatus(codes.Error, err.Error())
+	meta.AttachInternalError(s, err.Error())
 }
 
 func (s *Span) SetStatus(code codes.Code, desc string) {
