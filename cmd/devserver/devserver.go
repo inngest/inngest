@@ -15,6 +15,7 @@ import (
 	connectgrpc "github.com/inngest/inngest/pkg/connect/grpc"
 	"github.com/inngest/inngest/pkg/devserver"
 	"github.com/inngest/inngest/pkg/headers"
+	"github.com/inngest/inngest/pkg/logger"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/urfave/cli/v3"
 )
@@ -110,6 +111,8 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		PostgresConnMaxLifetime: postgresConnMaxLifetime,
 		DebugAPIPort:            debugAPIPort,
 	}
+
+	l := logger.StdlibLogger(ctx)
 
 	opts, changes, err := devserver.ResolvePortConflicts(opts)
 	if err != nil {
