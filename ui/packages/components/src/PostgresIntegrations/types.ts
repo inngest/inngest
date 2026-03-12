@@ -47,22 +47,6 @@ export type IntegrationPageContent = {
   url: string;
 };
 
-export function parseConnectionString(connectionString: string) {
-  const regex = /postgresq?l?:\/\/([\w.\-]+):([^@]+)@([^/]+)/;
-  const match = connectionString.match(regex);
-
-  if (match) {
-    const [, _username, _password, host] = match;
-    return {
-      name: `Neon-${host}`,
-      engine: 'postgresql',
-      adminConn: connectionString,
-    };
-  }
-
-  return null;
-}
-
 export type Publication = {
   id: string;
   name: string;
