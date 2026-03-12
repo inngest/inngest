@@ -203,7 +203,6 @@ export const verifyAutoSetup = createServerFn({ method: 'POST' })
     }): Promise<
       | { success: false; error: string; steps: AutoSetupSteps }
       | { success: true; error: null; steps: AutoSetupSteps }
-      | { success: false; error: null; steps: AutoSetupSteps }
     > => {
       try {
         //

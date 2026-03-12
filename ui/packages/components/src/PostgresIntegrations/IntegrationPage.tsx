@@ -87,7 +87,7 @@ export default function IntegrationPage({
             className="my-9"
             accentPosition="left"
             accentColor={
-              status == 'error'
+              status === 'error'
                 ? 'bg-tertiary-moderate'
                 : p.enabled
                 ? 'bg-primary-intense'
