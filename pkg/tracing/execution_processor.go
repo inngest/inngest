@@ -136,20 +136,8 @@ func (p *executionProcessor) OnStart(parent context.Context, s sdktrace.ReadWrit
 				meta.AddAttr(rawAttrs, meta.Attrs.StepMaxAttempts, ec.MaxAttempts)
 				meta.AddAttr(rawAttrs, meta.Attrs.StepAttempt, &ec.Attempt)
 
-				// Some steps "start" as soon as they are queued
-				startWhenQueued := ec.QueueKind == queue.KindSleep
-				if !startWhenQueued {
-					for _, attr := range s.Attributes() {
-						if string(attr.Key) == meta.Attrs.StepOp.Key() {
-							if attr.Value.Type() == attribute.STRING && attr.Value.AsString() == enums.OpcodeWaitForEvent.String() {
-								startWhenQueued = true
-								break
-							}
-						}
-					}
-				}
-
-				if startWhenQueued {
+				// Sleeps "start" as soon as they are queued
+				if ec.QueueKind == queue.KindSleep {
 					meta.AddAttr(rawAttrs, meta.Attrs.StartedAt, &now)
 				}
 			}
