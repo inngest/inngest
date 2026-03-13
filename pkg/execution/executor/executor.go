@@ -3352,20 +3352,8 @@ func (e *executor) handleGeneratorStep(ctx context.Context, runCtx execution.Run
 		return err
 	}
 
-	hasPendingSteps, err := e.smv2.SaveStep(ctx, runCtx.Metadata().ID, gen.ID, []byte(output))
-	if errors.Is(err, state.ErrDuplicateResponse) || errors.Is(err, state.ErrIdempotentResponse) {
-		// This is fine.
-		// XXX: we should totally attach a warning to the function run here.
-		return nil
-	}
-
-	if err != nil {
-		return err
-	}
-
-	// Extract AI metadata from step output.
-	// This attempts to detect and parse AI SDK responses (e.g. Vercel AI SDK)
-	// from any step output, using a cheap byte-level pre-check to skip non-AI outputs.
+	// Extract AI metadata from step output before saving so the cumulative
+	// metadata size delta is accurate when persisted alongside the step.
 	if e.allowStepMetadata.Enabled(ctx, runCtx.Metadata().ID.Tenant.AccountID) {
 		// Calculate step duration in milliseconds
 		stepDurationMs := gen.Timing.B / 1_000_000
@@ -3386,6 +3374,22 @@ func (e *executor) handleGeneratorStep(ctx context.Context, runCtx execution.Run
 				e.log.Warn("error creating AI output metadata span", "error", err)
 			}
 		}
+	}
+
+	// Persist the cumulative metadata size delta alongside the step output.
+	if delta := runCtx.Metadata().Metrics.MetadataSize - runCtx.Metadata().Metrics.MetadataSizeLoaded; delta > 0 {
+		ctx = state.WithMetadataSizeDelta(ctx, delta)
+	}
+
+	hasPendingSteps, err := e.smv2.SaveStep(ctx, runCtx.Metadata().ID, gen.ID, []byte(output))
+	if errors.Is(err, state.ErrDuplicateResponse) || errors.Is(err, state.ErrIdempotentResponse) {
+		// This is fine.
+		// XXX: we should totally attach a warning to the function run here.
+		return nil
+	}
+
+	if err != nil {
+		return err
 	}
 
 	// Steps can be batched with checkpointing!  Imagine an SDK that opts into checkpointing,
@@ -3518,6 +3522,11 @@ func (e *executor) handleStepFailed(ctx context.Context, runCtx execution.RunCon
 	output, err := gen.Output()
 	if err != nil {
 		return err
+	}
+
+	// Persist the cumulative metadata size delta alongside the step output.
+	if delta := runCtx.Metadata().Metrics.MetadataSize - runCtx.Metadata().Metrics.MetadataSizeLoaded; delta > 0 {
+		ctx = state.WithMetadataSizeDelta(ctx, delta)
 	}
 
 	hasPendingSteps, err := e.smv2.SaveStep(ctx, runCtx.Metadata().ID, gen.ID, []byte(output))
@@ -3953,6 +3962,11 @@ func (e *executor) handleGeneratorGateway(ctx context.Context, runCtx execution.
 		}
 	}
 
+	// Persist the cumulative metadata size delta alongside the step output.
+	if delta := runCtx.Metadata().Metrics.MetadataSize - runCtx.Metadata().Metrics.MetadataSizeLoaded; delta > 0 {
+		ctx = state.WithMetadataSizeDelta(ctx, delta)
+	}
+
 	// Save the output as the step result.
 	hasPendingSteps, err := e.smv2.SaveStep(ctx, runCtx.Metadata().ID, gen.ID, output)
 	if err != nil {
@@ -4196,6 +4210,11 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 			// step statuses when a step finishes.
 			go e.OnStepGatewayRequestFinished(context.WithoutCancel(ctx), *runCtx.Metadata(), lifecycleItem, edge.Edge, gen, nil, nil)
 		}
+	}
+
+	// Persist the cumulative metadata size delta alongside the step output.
+	if delta := runCtx.Metadata().Metrics.MetadataSize - runCtx.Metadata().Metrics.MetadataSizeLoaded; delta > 0 {
+		ctx = state.WithMetadataSizeDelta(ctx, delta)
 	}
 
 	// Save the output as the step result.
@@ -5266,6 +5285,41 @@ func emitCheckpointTraces(ctx context.Context) bool {
 }
 
 func (e *executor) createMetadataSpan(ctx context.Context, runCtx execution.RunContext, location string, md metadata.Structured, scope metadata.Scope) (*meta.SpanReference, error) {
+	// Serialize to compute size
+	values, err := md.Serialize()
+	if err != nil {
+		return nil, fmt.Errorf("failed to serialize metadata: %w", err)
+	}
+
+	l := e.log
+
+	// Per-span size limit
+	spanSize := values.Size()
+	if spanSize > consts.MaxMetadataSpanSize {
+		l.Warn("metadata span exceeds maximum size",
+			"span_size", spanSize,
+			"limit", consts.MaxMetadataSpanSize,
+			"run_id", runCtx.Metadata().ID.RunID,
+			"metadata_kind", md.Kind().String(),
+			"location", location,
+		)
+		return nil, metadata.ErrMetadataSpanTooLarge
+	}
+
+	// Per-run cumulative metadata size limit
+	currentSize := runCtx.Metadata().Metrics.MetadataSize
+	if currentSize+spanSize > consts.MaxRunMetadataSize {
+		l.Warn("run cumulative metadata size exceeded",
+			"current_size", currentSize,
+			"span_size", spanSize,
+			"limit", consts.MaxRunMetadataSize,
+			"run_id", runCtx.Metadata().ID.RunID,
+			"metadata_kind", md.Kind().String(),
+			"location", location,
+		)
+		return nil, metadata.ErrRunMetadataSizeExceeded
+	}
+
 	var parent *meta.SpanReference
 
 	switch scope {
@@ -5279,16 +5333,27 @@ func (e *executor) createMetadataSpan(ctx context.Context, runCtx execution.RunC
 		return nil, fmt.Errorf("unknown metadata scope: %s", scope)
 	}
 
-	return tracing.CreateMetadataSpan(
+	ref, err := tracing.CreateMetadataSpanFromValues(
 		ctx,
 		e.tracerProvider,
 		parent,
 		location,
 		pkgName,
 		runCtx.Metadata(),
-		md,
+		md.Kind(),
+		md.Op(),
+		values,
 		scope,
 	)
+	if err != nil {
+		return nil, err
+	}
+
+	// Increment in-memory counter so subsequent spans in the same
+	// step execution see the updated total.
+	runCtx.Metadata().Metrics.MetadataSize += spanSize
+
+	return ref, nil
 }
 
 func hasPlanOp(ops []*state.GeneratorOpcode) bool {

@@ -17,11 +17,18 @@ type MetadataSpanConfig struct {
 }
 
 func CreateMetadataSpan(ctx context.Context, tracerProvider TracerProvider, parent *meta.SpanReference, location, pkgName string, stateMetadata *statev2.Metadata, spanMetadata metadata.Structured, scope metadata.Scope, opts ...MetadataSpanAttrOpts) (*meta.SpanReference, error) {
-	attrs, err := MetadataAttrs(spanMetadata)
+	values, err := spanMetadata.Serialize()
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal metadata: %w", err)
+		return nil, fmt.Errorf("failed to serialize metadata: %w", err)
 	}
 
+	return CreateMetadataSpanFromValues(ctx, tracerProvider, parent, location, pkgName, stateMetadata, spanMetadata.Kind(), spanMetadata.Op(), values, scope, opts...)
+}
+
+// CreateMetadataSpanFromValues creates a metadata span from pre-serialized values,
+// avoiding redundant serialization when the caller has already called Serialize.
+func CreateMetadataSpanFromValues(ctx context.Context, tracerProvider TracerProvider, parent *meta.SpanReference, location, pkgName string, stateMetadata *statev2.Metadata, kind metadata.Kind, op metadata.Opcode, values metadata.Values, scope metadata.Scope, opts ...MetadataSpanAttrOpts) (*meta.SpanReference, error) {
+	attrs := RawMetadataAttrs(kind, values, op)
 	meta.AddAttr(attrs, meta.Attrs.MetadataScope, &scope)
 
 	cfg := MetadataSpanConfig{
@@ -31,8 +38,8 @@ func CreateMetadataSpan(ctx context.Context, tracerProvider TracerProvider, pare
 		opt(&cfg)
 	}
 
-	kindTag := spanMetadata.Kind().String()
-	if spanMetadata.Kind().IsUser() {
+	kindTag := kind.String()
+	if kind.IsUser() {
 		kindTag = fmt.Sprintf("%s*", metadata.KindPrefixUserland)
 	}
 
@@ -51,7 +58,7 @@ func CreateMetadataSpan(ctx context.Context, tracerProvider TracerProvider, pare
 			Metadata:   stateMetadata,
 			Attributes: cfg.Attrs,
 
-			DynamicSeed: MetadataSpanIDSeed(parent.DynamicSpanID, spanMetadata.Kind()),
+			DynamicSeed: MetadataSpanIDSeed(parent.DynamicSpanID, kind),
 		},
 	)
 }

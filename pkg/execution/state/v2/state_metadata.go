@@ -495,6 +495,18 @@ type RunMetrics struct {
 	// StepCount represents the total number of steps already completed.
 	StepCount int
 
+	// MetadataSize tracks the cumulative metadata size in bytes across all
+	// steps in a run. This value is persisted to Redis via the saveResponse
+	// Lua script and loaded at the start of each step execution. During a
+	// step, it grows in-memory as metadata spans are created.
+	MetadataSize int
+
+	// MetadataSizeLoaded stores the MetadataSize value as loaded from Redis
+	// at the start of a step execution. This is used to compute the delta
+	// (MetadataSize - MetadataSizeLoaded) that gets persisted back to Redis
+	// when the step output is saved.
+	MetadataSizeLoaded int
+
 	// TODO
 
 	// Waits stores the current number of in-progress waits for the run.
