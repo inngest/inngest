@@ -184,6 +184,10 @@ type CheckpointNewRunResponse struct {
 	RunID string `json:"run_id"`
 	// Token is the token that can be used to view the run output for redirects.
 	Token string `json:"token,omitempty"`
+
+	// RealtimeToken is a short-lived JWT that the DurableEndpoint's client can
+	// use to subscribe to the stream after the run goes async.
+	RealtimeToken string `json:"realtime_token,omitempty"`
 }
 
 // runEvent creates a new event.Event from the CheckpointNewRunRequest.  This allows us to

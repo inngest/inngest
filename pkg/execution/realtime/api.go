@@ -408,10 +408,25 @@ func (a *api) PostPublish(w http.ResponseWriter, r *http.Request) {
 func (a *api) PostPublishTee(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	auth, err := realtimeAuth(ctx)
-	if err != nil || auth == nil || !auth.Publish {
+	// Accept realtime JWT with publish claim, or fall back to signing key auth.
+	claims, err := realtimeAuth(ctx)
+	if err == nil && !claims.Publish {
 		http.Error(w, "Not authenticated for publishing", http.StatusUnauthorized)
 		return
+	}
+	if claims == nil {
+		auth, err := a.opts.AuthFinder(ctx)
+		if err != nil {
+			http.Error(w, "Not authenticated", http.StatusUnauthorized)
+			return
+		}
+		claims = &JWTClaims{
+			RegisteredClaims: jwt.RegisteredClaims{
+				Subject: auth.AccountID().String(),
+			},
+			Env:     auth.WorkspaceID(),
+			Publish: true,
+		}
 	}
 
 	channel := r.URL.Query().Get("channel")
@@ -427,7 +442,7 @@ func (a *api) PostPublishTee(w http.ResponseWriter, r *http.Request) {
 		broadcaster: a.opts.Broadcaster,
 		ctx:         ctx,
 		channel:     channel,
-		envID:       auth.Env, // req'd for auth
+		envID:       claims.Env,
 	}, r.Body)
 
 	metrics.HistogramRealtimeRawDataSizeBytes(ctx, n, metrics.HistogramOpt{

@@ -5201,6 +5201,8 @@ func (e *executor) addRequestPublishOpts(ctx context.Context, item queue.Item, s
 
 	sr.Publish.Token = token
 	sr.Publish.PublishURL = e.rtconfig.PublishURL
+	sr.Publish.Channel = item.Identifier.RunID.String()
+	sr.Publish.Topic = "$stream"
 }
 
 // shouldEnqueueDiscovery returns true if the ended step should have a discovery

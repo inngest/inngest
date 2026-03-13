@@ -34,9 +34,13 @@ type checkpointStreamHarness struct {
 	done chan struct{}
 }
 
-// newCheckpointStreamHarness opens a POST (ingest) and GET (output)
+// newCheckpointStreamHarness opens a GET (output) and POST (ingest)
 // connection to the dev server's stream endpoint, sends the initial
 // header frame, and returns a ready-to-use harness.
+//
+// The client (GET) connects BEFORE the ingest (POST) starts, since
+// there is no buffering — the broadcaster forwards data only to
+// subscribers that are already connected.
 func newCheckpointStreamHarness(t *testing.T) *checkpointStreamHarness {
 	t.Helper()
 	r := require.New(t)
@@ -54,7 +58,27 @@ func newCheckpointStreamHarness(t *testing.T) *checkpointStreamHarness {
 
 	streamURL := DEV_URL + "/v1/checkpoint/" + runID.String() + "/stream"
 
-	// `io.Pipe`` gives the test precise control over when each chunk is
+	// Open the output (GET) connection FIRST. The client must be subscribed
+	// before the app starts streaming, since there is no buffering.
+	ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
+	t.Cleanup(cancel)
+
+	outReq, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodGet,
+		streamURL+"?token="+token,
+		nil,
+	)
+	r.NoError(err)
+
+	outResp, err := http.DefaultClient.Do(outReq)
+	r.NoError(err)
+	t.Cleanup(func() { outResp.Body.Close() })
+
+	// Give the subscription time to register with the broadcaster
+	time.Sleep(100 * time.Millisecond)
+
+	// `io.Pipe` gives the test precise control over when each chunk is
 	// delivered to the ingest endpoint. Writes block until `Read` is called
 	ingestReader, ingestWriter := io.Pipe()
 
@@ -83,8 +107,9 @@ func newCheckpointStreamHarness(t *testing.T) *checkpointStreamHarness {
 		}
 	}()
 
-	// The first line must be a JSON header frame containing the HTTP status and
-	// headers that the client-facing endpoint will use
+	// The first line must be a JSON header frame (consumed by StreamIngest
+	// but NOT forwarded to the broadcaster). We still send it because the
+	// SDK protocol requires it.
 	headerFrame := apiv1.StreamHeaderFrame{
 		StatusCode: 200,
 		Headers:    map[string]string{"Content-Type": "text/plain"},
@@ -94,7 +119,7 @@ func newCheckpointStreamHarness(t *testing.T) *checkpointStreamHarness {
 	_, err = ingestWriter.Write(append(byt, '\n'))
 	r.NoError(err)
 
-	// Wait for the ingest handler to read and buffer the header frame
+	// Wait for the ingest handler to read and forward the header frame
 	time.Sleep(100 * time.Millisecond)
 
 	select {
@@ -103,26 +128,10 @@ func newCheckpointStreamHarness(t *testing.T) *checkpointStreamHarness {
 	default:
 	}
 
-	// Open the output (GET) connection. This is the client's perspective. It
-	// should receive the status/headers from the header frame, then stream body
-	// chunks as they arrive
-	ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
-	t.Cleanup(cancel)
-
-	outReq, err := http.NewRequestWithContext(
-		ctx,
-		http.MethodGet,
-		streamURL+"?token="+token,
-		nil,
-	)
-	r.NoError(err)
-
-	outResp, err := http.DefaultClient.Do(outReq)
-	r.NoError(err)
-	t.Cleanup(func() { outResp.Body.Close() })
-
+	// The client should have received SSE headers (the StreamHeaderFrame is
+	// consumed by StreamIngest and NOT forwarded to the subscriber).
 	r.Equal(200, outResp.StatusCode)
-	r.Equal("text/plain", outResp.Header.Get("Content-Type"))
+	r.Equal("text/event-stream", outResp.Header.Get("Content-Type"))
 
 	return &checkpointStreamHarness{
 		t:      t,

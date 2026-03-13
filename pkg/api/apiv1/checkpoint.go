@@ -20,6 +20,8 @@ import (
 	"github.com/inngest/inngest/pkg/execution/apiresult"
 	"github.com/inngest/inngest/pkg/execution/checkpoint"
 	"github.com/inngest/inngest/pkg/execution/executor"
+	"github.com/inngest/inngest/pkg/execution/realtime"
+	"github.com/inngest/inngest/pkg/execution/realtime/streamingtypes"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/publicerr"
@@ -56,10 +58,6 @@ type CheckpointAPI interface {
 	CheckpointAsyncSteps(w http.ResponseWriter, r *http.Request)
 	// Output returns run output given a JWT which has access to the given {env, runID} claimset.
 	Output(w http.ResponseWriter, r *http.Request)
-	// StreamIngest accepts a streamed response body from the SDK.
-	StreamIngest(w http.ResponseWriter, r *http.Request)
-	// StreamOutput streams the response to the client, supporting late joiners.
-	StreamOutput(w http.ResponseWriter, r *http.Request)
 }
 
 // RunOutputReader represents any implementation that fetches run outputs.
@@ -96,8 +94,6 @@ type checkpointAPI struct {
 	runClaimsSecret []byte
 	// outputReader allows us to read run output for a given env / run ID
 	outputReader RunOutputReader
-	// streams manages per-run stream buffers for durable endpoint streaming.
-	streams *streamRegistry
 }
 
 func NewCheckpointAPI(o Opts) CheckpointAPI {
@@ -118,14 +114,13 @@ func NewCheckpointAPI(o Opts) CheckpointAPI {
 		runClaimsSecret: o.CheckpointOpts.RunJWTSecret,
 		outputReader:    o.CheckpointOpts.RunOutputReader,
 		checkpointer:    c,
-		streams:         newStreamRegistry(),
 	}
 
 	api.Post("/", api.CheckpointNewRun)             // sync, API-based fns
 	api.Post("/{runID}/steps", api.CheckpointSteps) // sync, API-based fns
 	api.Post("/{runID}/async", api.CheckpointAsyncSteps)
 	api.HandleFunc("/{runID}/output", api.Output)
-	api.Post("/{runID}/stream", api.StreamIngest)
+	// api.Post("/{runID}/stream", api.StreamIngest)
 	// NOTE: StreamOutput (GET) is registered in apiv1.go outside the
 	// auth/caching middleware group to avoid response buffering.
 
@@ -253,11 +248,36 @@ func (a checkpointAPI) CheckpointNewRun(w http.ResponseWriter, r *http.Request) 
 
 	}
 
+	// This is for DurableEndpoint streaming. It gives the DurableEndpoint a
+	// realtime JWT that it can pass back to its client (e.g. the browser). The
+	// client needs a realtime JWT to redirect to the Inngest Server so it can
+	// subscribe to the new stream after the run goes async.
+	var realtimeToken string
+	if len(a.Opts.RealtimeJWTSecret) > 0 {
+		rt, err := realtime.NewJWT(
+			ctx,
+			a.Opts.RealtimeJWTSecret,
+			auth.AccountID(),
+			auth.WorkspaceID(),
+			[]realtime.Topic{{
+				Channel: md.ID.RunID.String(),
+				Name:    streamTopicName,
+				Kind:    streamingtypes.TopicKindRun,
+				EnvID:   auth.WorkspaceID(),
+			}},
+		)
+		if err != nil {
+			logger.StdlibLogger(ctx).Warn("error creating realtime subscribe JWT", "error", err)
+		}
+		realtimeToken = rt
+	}
+
 	_ = WriteResponse(w, CheckpointNewRunResponse{
-		RunID: md.ID.RunID.String(),
-		FnID:  fn.ID,
-		AppID: appID,
-		Token: jwt,
+		RunID:         md.ID.RunID.String(),
+		FnID:          fn.ID,
+		AppID:         appID,
+		Token:         jwt,
+		RealtimeToken: realtimeToken,
 	})
 }
 
