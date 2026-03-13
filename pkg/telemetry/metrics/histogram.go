@@ -539,6 +539,17 @@ func HistogramConstraintAPILimitingConstraintCacheTTL(ctx context.Context, ttl t
 	})
 }
 
+func HistogramConstraintAPICacheEvictedRemainingTTL(ctx context.Context, ttl time.Duration, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, ttl.Milliseconds(), HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "constraintapi_cache_evicted_remaining_ttl",
+		Description: "Distribution of remaining TTL for items evicted due to cache size pressure",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  ConstraintAPIDurationBoundaries,
+	})
+}
+
 func HistogramConstraintAPIQueueItemLeaseTTL(ctx context.Context, ttl time.Duration, opts HistogramOpt) {
 	RecordIntHistogramMetric(ctx, ttl.Milliseconds(), HistogramOpt{
 		PkgName:     opts.PkgName,

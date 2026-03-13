@@ -3,6 +3,7 @@ package constraintapi
 import (
 	"context"
 	"crypto/rand"
+	mrand "math/rand"
 	"time"
 
 	"github.com/google/uuid"
@@ -96,6 +97,13 @@ func (l *constraintCache) Acquire(ctx context.Context, req *CapacityAcquireReque
 	enableCache, minTTL, maxTTL := l.enableCache(ctx, req.AccountID, req.EnvID, req.FunctionID)
 	if !enableCache {
 		return l.manager.Acquire(ctx, req)
+	}
+
+	// Report cache size gauge on ~1% of Acquire calls to avoid ItemCount() lock overhead at high volume.
+	if mrand.Float64() < 0.01 {
+		metrics.GaugeConstraintAPICacheSize(ctx, int64(l.cache.ItemCount()), metrics.GaugeOpt{
+			PkgName: pkgName,
+		})
 	}
 
 	// Check if any constraint is cached as exhausted
@@ -264,7 +272,29 @@ func NewConstraintCache(
 	cache.cache = ccache.New(
 		ccache.Configure[*constraintCacheItem]().
 			MaxSize(cache.maxSize).
-			ItemsToPrune(cache.itemsToPrune),
+			ItemsToPrune(cache.itemsToPrune).
+			OnDelete(func(item *ccache.Item[*constraintCacheItem]) {
+				// Track cache evictions to detect thrashing (cache size too small).
+				// OnDelete fires on the ccache worker goroutine for both LRU evictions
+				// and explicit deletions. We use context.Background() since there's no
+				// request context available here; OTEL SDK buffers these internally.
+				expired := item.Expired()
+				metrics.IncrConstraintAPICacheEvictedCounter(context.Background(), metrics.CounterOpt{
+					PkgName: pkgName,
+					Tags: map[string]any{
+						"expired": expired,
+					},
+				})
+				if !expired {
+					remainingTTL := item.TTL()
+					if remainingTTL < 0 {
+						remainingTTL = 0
+					}
+					metrics.HistogramConstraintAPICacheEvictedRemainingTTL(context.Background(), remainingTTL, metrics.HistogramOpt{
+						PkgName: pkgName,
+					})
+				}
+			}),
 	)
 
 	if cache.clock == nil {

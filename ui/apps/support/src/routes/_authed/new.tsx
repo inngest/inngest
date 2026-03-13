@@ -24,6 +24,7 @@ import {
   AttachmentUploadField,
   useAttachmentUpload,
 } from "@/components/Support/AttachmentUploadField";
+import { Main } from "@/components/Main";
 
 export const Route = createFileRoute("/_authed/new")({
   component: NewTicketPage,
@@ -44,11 +45,11 @@ function NewTicketPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [result, setResult] = useState<{ ok?: boolean; message?: string }>({});
 
-  // Fetch customer tier information from Plain API
+  // Fetch customer tier information from Plain API (email derived server-side from auth)
   const userEmail = user?.primaryEmailAddress?.emailAddress;
   const { data: plainTierInfo } = useQuery({
     queryKey: ["customerTier", userEmail],
-    queryFn: () => getCustomerTierFn({ data: { email: userEmail! } }),
+    queryFn: () => getCustomerTierFn(),
     enabled: !!userEmail,
   });
 
@@ -191,7 +192,7 @@ function NewTicketPage() {
   }
 
   return (
-    <div className="min-h-screen">
+    <Main className="min-h-screen max-w-2xl">
       {/* Back button */}
       <Link
         to="/"
@@ -201,7 +202,7 @@ function NewTicketPage() {
         Back to tickets
       </Link>
 
-      <div className="mx-auto max-w-2xl mb-8">
+      <div className="mb-8">
         <div className="mb-8">
           <h1 className="text-basis mb-2 text-2xl font-bold">
             Create Support Ticket
@@ -332,6 +333,6 @@ function NewTicketPage() {
           <CommunityChannels />
         </div>
       </div>
-    </div>
+    </Main>
   );
 }

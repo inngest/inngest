@@ -27,11 +27,14 @@ export type MetricsFilters = {
   selectedFns?: string[];
   autoRefresh?: boolean;
   entities: EntityLookup;
+  functions: EntityLookup;
   scope: MetricsScope;
   concurrencyLimit?: number;
   isMarketplace: boolean;
 };
 
+// TODO: The `accountConcurrency` field in this query is no longer used by AccountConcurrency
+// (which now uses workspace.stepRunning). Remove it once confirmed no other consumers depend on it.
 const GetVolumeMetrics = graphql(`
   query VolumeMetrics(
     $workspaceId: ID!
@@ -206,6 +209,27 @@ const GetVolumeMetrics = graphql(`
       }
     }
     workspace(id: $workspaceId) {
+      accountStepRunning: scopedMetrics(
+        filter: {
+          name: "steps_running"
+          scope: FN
+          from: $from
+          functionIDs: $functionIDs
+          until: $until
+        }
+      ) {
+        metrics {
+          id
+          tagName
+          tagValue
+          data {
+            value
+            bucket
+          }
+        }
+      }
+    }
+    workspace(id: $workspaceId) {
       concurrency: scopedMetrics(
         filter: {
           name: "concurrency_limit_reached_total"
@@ -265,6 +289,7 @@ export const MetricsVolume = ({
   selectedFns = [],
   autoRefresh = false,
   entities,
+  functions,
   scope,
   concurrencyLimit,
   isMarketplace = false,
@@ -324,7 +349,8 @@ export const MetricsVolume = ({
               isMarketplace={isMarketplace}
             />
             <AccountConcurrency
-              data={data?.accountConcurrency}
+              workspace={data?.workspace}
+              entities={functions}
               limit={concurrencyLimit}
               isMarketplace={isMarketplace}
             />

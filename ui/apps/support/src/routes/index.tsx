@@ -14,6 +14,7 @@ import {
 import { getTicketsByEmail } from "@/data/plain";
 import { TicketCard } from "@/components/Support/TicketCard";
 import { CommunityChannels } from "@/components/Support/CommunityChannels";
+import { Main } from "@/components/Main";
 
 type TicketSearchParams = {
   status?: TicketStatusFilter;
@@ -33,10 +34,10 @@ const getAuthStatusAndTickets = createServerFn({ method: "GET" })
         const user = await clerkClient().users.getUser(userId);
         userEmail = user.emailAddresses[0]?.emailAddress;
 
-        // Fetch tickets using the user's email
+        // Fetch tickets using the authenticated user's email (derived server-side)
         if (userEmail) {
           tickets = await getTicketsByEmail({
-            data: { email: userEmail, status: data.status },
+            data: { status: data.status },
           });
         }
       } catch (error) {
@@ -110,18 +111,21 @@ function Home() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-5xl py-6">
-      {/* Filters */}
-      <Filters
-        status={status}
-        onStatusChange={(newStatus) => {
-          void navigate({
-            to: "/",
-            search: newStatus ? { status: newStatus } : {},
-          });
-        }}
-        defaultStatus={TICKET_STATUS_DEFAULT}
-      />
+    <Main className="mx-auto w-full max-w-5xl py-6">
+      <header className="flex flex-row justify-between items-center pb-6">
+        {/* Filters */}
+        <Filters
+          status={status}
+          onStatusChange={(newStatus) => {
+            void navigate({
+              to: "/",
+              search: newStatus ? { status: newStatus } : {},
+            });
+          }}
+          defaultStatus={TICKET_STATUS_DEFAULT}
+        />
+        <Button kind="primary" label="Create a new ticket" href="new" />
+      </header>
 
       {/* Ticket List */}
       <div className="flex w-full flex-col gap-4 py-4">
@@ -160,6 +164,6 @@ function Home() {
           </>
         )}
       </div>
-    </div>
+    </Main>
   );
 }

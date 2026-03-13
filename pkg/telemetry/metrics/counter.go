@@ -920,3 +920,21 @@ func IncrConstraintAPIIssuedLeaseCounter(ctx context.Context, count int64, opts 
 		Tags:        opts.Tags,
 	})
 }
+
+func IncrConstraintAPICacheEvictedCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "constraintapi_cache_evicted_total",
+		Description: "Total number of constraint cache items evicted, tagged by whether the item was expired",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrConstraintAPIAcquireCacheCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "constraintapi_acquire_cache_total",
+		Description: "Total number of centralized Redis acquire cache hits and misses",
+		Tags:        opts.Tags,
+	})
+}

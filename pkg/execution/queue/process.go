@@ -218,6 +218,8 @@ func (q *queueProcessor) ProcessItem(
 				return
 			}
 
+			leaseIssuedAt := capacityLeaseID.issuedAt()
+
 			res, err := q.CapacityManager.Release(context.Background(), &constraintapi.CapacityReleaseRequest{
 				AccountID:      p.AccountID,
 				IdempotencyKey: qi.ID,
@@ -227,13 +229,14 @@ func (q *queueProcessor) ProcessItem(
 					Service:           constraintapi.ServiceExecutor,
 					RunProcessingMode: constraintapi.RunProcessingModeBackground,
 				},
-				LeaseIssuedAt: capacityLeaseID.issuedAt(),
+				LeaseIssuedAt: leaseIssuedAt,
 			})
 			if err != nil {
 				l.ReportError(err, "failed to release capacity", logger.WithErrorReportTags(map[string]string{
-					"account_id":  p.AccountID.String(),
-					"lease_id":    currentLeaseID.String(),
-					"function_id": p.FunctionID.String(),
+					"account_id":      p.AccountID.String(),
+					"lease_id":        currentLeaseID.String(),
+					"function_id":     p.FunctionID.String(),
+					"lease_issued_at": leaseIssuedAt.String(),
 				}))
 				return
 			}

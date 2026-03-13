@@ -91,7 +91,7 @@ function RootComponent() {
                 {/* Status Banner */}
                 <StatusBanner status={status} />
 
-                <div className="mx-auto w-full max-w-5xl py-6 px-4">
+                <div className="mx-auto w-full py-6 px-4">
                   <Outlet />
                 </div>
               </div>
@@ -109,7 +109,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       <head>
         <HeadContent />
       </head>
-      <body className=" bg-canvasBase text-basis h-full overflow-auto overscroll-none">
+      <body className="bg-canvasBase text-basis h-full overflow-auto overscroll-none">
         {children}
         <TanStackRouterDevtools position="bottom-right" />
         <Scripts />

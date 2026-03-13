@@ -15,6 +15,7 @@ import (
 	connectgrpc "github.com/inngest/inngest/pkg/connect/grpc"
 	"github.com/inngest/inngest/pkg/devserver"
 	"github.com/inngest/inngest/pkg/headers"
+	"github.com/inngest/inngest/pkg/logger"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/urfave/cli/v3"
 )
@@ -83,7 +84,50 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	postgresConnMaxIdleTime := localconfig.GetIntValue(cmd, "postgres-conn-max-idle-time", 5)
 	postgresConnMaxLifetime := localconfig.GetIntValue(cmd, "postgres-conn-max-lifetime", 30)
 
-	traceEndpoint := fmt.Sprintf("localhost:%d", port)
+	conf.ServerKind = headers.ServerKindDev
+
+	opts := devserver.StartOpts{
+		Autodiscover:       !noDiscovery,
+		Config:             *conf,
+		Poll:               !noPoll,
+		PollInterval:       pollInterval,
+		RetryInterval:      retryInterval,
+		QueueWorkers:       queueWorkers,
+		Tick:               time.Duration(tick) * time.Millisecond,
+		URLs:               urls,
+		ConnectGatewayPort: connectGatewayPort,
+		ConnectGatewayHost: conf.CoreAPI.Addr,
+		ConnectGRPCConfig: connectConfig.NewGRPCConfig(
+			ctx,
+			connectgrpc.DefaultConnectGRPCIP, connectGatewayGRPCPort,
+			connectgrpc.DefaultConnectGRPCIP, connectExecutorGRPCPort,
+		),
+		Persist:                 persist,
+		SQLiteDir:               sqliteDir,
+		PostgresURI:             postgresURI,
+		PostgresMaxIdleConns:    postgresMaxIdleConns,
+		PostgresMaxOpenConns:    postgresMaxOpenConns,
+		PostgresConnMaxIdleTime: postgresConnMaxIdleTime,
+		PostgresConnMaxLifetime: postgresConnMaxLifetime,
+		DebugAPIPort:            debugAPIPort,
+	}
+
+	l := logger.StdlibLogger(ctx)
+
+	opts, changes, err := devserver.ResolvePortConflicts(opts)
+	if err != nil {
+		return err
+	}
+	for _, change := range changes {
+		l.Info(
+			"Port conflict, using new port",
+			"name", change.Name,
+			"from", change.From,
+			"to", change.To,
+		)
+	}
+
+	traceEndpoint := fmt.Sprintf("localhost:%d", opts.Config.EventAPI.Port)
 	if err := itrace.NewUserTracer(ctx, itrace.TracerOpts{
 		ServiceName:   "tracing",
 		TraceEndpoint: traceEndpoint,
@@ -112,34 +156,6 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	defer func() {
 		_ = itrace.CloseSystemTracer(ctx)
 	}()
-
-	conf.ServerKind = headers.ServerKindDev
-
-	opts := devserver.StartOpts{
-		Autodiscover:       !noDiscovery,
-		Config:             *conf,
-		Poll:               !noPoll,
-		PollInterval:       pollInterval,
-		RetryInterval:      retryInterval,
-		QueueWorkers:       queueWorkers,
-		Tick:               time.Duration(tick) * time.Millisecond,
-		URLs:               urls,
-		ConnectGatewayPort: connectGatewayPort,
-		ConnectGatewayHost: conf.CoreAPI.Addr,
-		ConnectGRPCConfig: connectConfig.NewGRPCConfig(
-			ctx,
-			connectgrpc.DefaultConnectGRPCIP, connectGatewayGRPCPort,
-			connectgrpc.DefaultConnectGRPCIP, connectExecutorGRPCPort,
-		),
-		Persist:                 persist,
-		SQLiteDir:               sqliteDir,
-		PostgresURI:             postgresURI,
-		PostgresMaxIdleConns:    postgresMaxIdleConns,
-		PostgresMaxOpenConns:    postgresMaxOpenConns,
-		PostgresConnMaxIdleTime: postgresConnMaxIdleTime,
-		PostgresConnMaxLifetime: postgresConnMaxLifetime,
-		DebugAPIPort:            debugAPIPort,
-	}
 
 	err = devserver.New(ctx, opts)
 	if err != nil {

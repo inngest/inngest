@@ -165,6 +165,7 @@ The app uses TanStack Start's `createServerFn()` for server-side data fetching:
 - All functions in `src/data/` are server functions
 - They run on the server and are called from client components
 - Auth tokens are handled server-side for security
+- ALWAYS USE `authMiddleware` in every server function
 
 ### SSR Query Integration
 
