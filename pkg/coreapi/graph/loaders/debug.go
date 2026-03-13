@@ -35,7 +35,7 @@ func (tr *traceReader) GetDebugRunTrace(ctx context.Context, keys dataloader.Key
 
 			gqlRoots := make([]*models.RunTraceSpan, 0, len(debugRuns))
 			for _, rootSpan := range debugRuns {
-				gqlRoot, err := tr.convertRunSpanToGQL(ctx, rootSpan)
+				gqlRoot, err := ConvertOtelSpanToModel(ctx, rootSpan)
 				if err != nil {
 					res.Error = fmt.Errorf("error converting debug run span to GQL, skipping: %w", err)
 					continue
@@ -89,7 +89,7 @@ func (tr *traceReader) GetDebugSessionTrace(ctx context.Context, keys dataloader
 			for _, runSpans := range debugRuns {
 				converted := make([]*models.RunTraceSpan, 0, len(runSpans))
 				for _, span := range runSpans {
-					gqlSpan, err := tr.convertRunSpanToGQL(ctx, span)
+					gqlSpan, err := ConvertOtelSpanToModel(ctx, span)
 					if err != nil {
 						res.Error = fmt.Errorf("error converting debug run span to GQL for debug session, skipping: %w", err)
 						continue

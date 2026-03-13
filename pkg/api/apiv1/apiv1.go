@@ -72,6 +72,9 @@ type Opts struct {
 
 	// MetadataOpts represents the required opts for the metadadata API
 	MetadataOpts MetadataOpts
+
+	// AppReader optionally reads apps from a backing store.
+	AppReader cqrs.AppReader
 }
 
 func noopRateChecker(r *http.Request, w http.ResponseWriter, route string) bool {
@@ -167,12 +170,19 @@ func (a *router) setup() {
 			r.Get("/events", a.getEvents)
 			r.Get("/events/{eventID}", a.getEvent)
 			r.Get("/events/{eventID}/runs", a.getEventRuns)
+			r.Get("/runs", a.listRuns)
+			r.Get("/runs/counts", a.getRunsCounts) // Must come before /runs/{runID}
 			r.Get("/runs/{runID}", a.GetFunctionRun)
+			r.Get("/runs/{runID}/trace", a.getRunTrace)
+			r.Get("/runs/{runID}/trigger", a.getRunTrigger)
 			r.Delete("/runs/{runID}", a.cancelFunctionRun)
 			r.Get("/runs/{runID}/jobs", a.GetFunctionRunJobs)
 			r.Post("/runs/{runID}/metadata", a.addRunMetadata)
 
+			r.Get("/functions", a.listFunctions)
 			r.Get("/apps/{appName}/functions", a.GetAppFunctions) // Returns an app and all of its functions.
+
+			r.Get("/traces/span-output/{outputID}", a.getSpanOutput)
 
 			r.Post("/cancellations", a.createCancellation)
 			r.Get("/cancellations", a.getCancellations)

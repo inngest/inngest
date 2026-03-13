@@ -29,7 +29,7 @@ type RunTraceSpan struct {
 	AppID             uuid.UUID                 `json:"appID"`
 	FunctionID        uuid.UUID                 `json:"functionID"`
 	RunID             ulid.ULID                 `json:"runID"`
-	Run               *FunctionRun              `json:"run"`
+	Run               *FunctionRun              `json:"-"`
 	SpanID            string                    `json:"spanID"`
 	TraceID           string                    `json:"traceID"`
 	Name              string                    `json:"name"`
@@ -47,7 +47,7 @@ type RunTraceSpan struct {
 	StepType          string                    `json:"stepType"`
 	IsRoot            bool                      `json:"isRoot"`
 	ParentSpanID      *string                   `json:"parentSpanID,omitempty"`
-	ParentSpan        *RunTraceSpan             `json:"parentSpan,omitempty"`
+	ParentSpan        *RunTraceSpan             `json:"-"`
 	IsUserland        bool                      `json:"isUserland"`
 	UserlandSpan      *UserlandSpan             `json:"userlandSpan,omitempty"`
 	DebugRunID        *ulid.ULID                `json:"debugRunID,omitempty"`
@@ -58,9 +58,9 @@ type RunTraceSpan struct {
 	Metadata          []*SpanMetadata           `json:"metadata,omitempty"`
 	Response          *RunTraceSpanResponseInfo `json:"response,omitempty"`
 
-	// Internal fields not exposed over GraphQL.
-	SpanTypeName string
-	Omit         bool
+	// Internal fields not exposed over GraphQL or REST.
+	SpanTypeName string            `json:"-"`
+	Omit         bool              `json:"-"`
 }
 
 func RunTraceEnded(s RunTraceSpanStatus) bool {

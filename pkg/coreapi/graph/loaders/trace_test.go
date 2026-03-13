@@ -13,8 +13,6 @@ import (
 )
 
 func TestStepStatusToGQL(t *testing.T) {
-	tr := &traceReader{}
-
 	tests := []struct {
 		name     string
 		input    enums.StepStatus
@@ -37,14 +35,14 @@ func TestStepStatusToGQL(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			status := tt.input
-			result := tr.stepStatusToGQL(&status)
+			result := StepStatusToGQL(&status)
 			require.NotNil(t, result, "stepStatusToGQL should not return nil for %s", tt.name)
 			assert.Equal(t, tt.expected, *result)
 		})
 	}
 
 	t.Run("nil input", func(t *testing.T) {
-		result := tr.stepStatusToGQL(nil)
+		result := StepStatusToGQL(nil)
 		assert.Nil(t, result)
 	})
 }
@@ -74,7 +72,6 @@ func boolPtr(b bool) *bool     { return &b }
 func strPtr(s string) *string  { return &s }
 
 func TestConvertRunSpanToGQL_UserlandCollapse(t *testing.T) {
-	tr := &traceReader{}
 	ctx := context.Background()
 
 	t.Run("leaf userland span is preserved", func(t *testing.T) {
@@ -92,7 +89,7 @@ func TestConvertRunSpanToGQL_UserlandCollapse(t *testing.T) {
 			},
 		}
 
-		result, err := tr.convertRunSpanToGQL(ctx, span)
+		result, err := ConvertOtelSpanToModel(ctx, span)
 		require.NoError(t, err)
 		require.Len(t, result.ChildrenSpans, 1, "leaf userland span should not be dropped")
 		assert.True(t, result.ChildrenSpans[0].IsUserland)
@@ -123,7 +120,7 @@ func TestConvertRunSpanToGQL_UserlandCollapse(t *testing.T) {
 			},
 		}
 
-		result, err := tr.convertRunSpanToGQL(ctx, span)
+		result, err := ConvertOtelSpanToModel(ctx, span)
 		require.NoError(t, err)
 		require.Len(t, result.ChildrenSpans, 1, "should collapse to grandchild")
 		assert.Equal(t, "GET", result.ChildrenSpans[0].Name)
@@ -153,7 +150,7 @@ func TestConvertRunSpanToGQL_UserlandCollapse(t *testing.T) {
 			},
 		}
 
-		result, err := tr.convertRunSpanToGQL(ctx, span)
+		result, err := ConvertOtelSpanToModel(ctx, span)
 		require.NoError(t, err)
 		require.Len(t, result.ChildrenSpans, 1, "should keep the userland span")
 		assert.Equal(t, "my-span", result.ChildrenSpans[0].Name)

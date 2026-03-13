@@ -98,7 +98,7 @@ func (tr *traceReader) GetRunTrace(ctx context.Context, keys dataloader.Keys) []
 				return
 			}
 
-			gqlRoot, err := tr.convertRunSpanToGQL(ctx, rootSpan)
+			gqlRoot, err := ConvertOtelSpanToModel(ctx, rootSpan)
 			if err != nil {
 				res.Error = fmt.Errorf("error converting run root to GQL: %w", err)
 				return
@@ -114,7 +114,9 @@ func (tr *traceReader) GetRunTrace(ctx context.Context, keys dataloader.Keys) []
 	return results
 }
 
-func (tr *traceReader) opcodeToGQL(op *enums.Opcode) *models.StepOp {
+// OpcodeToGQL converts an internal Opcode enum to the GQL StepOp model.
+// Exported for use by REST API handlers.
+func OpcodeToGQL(op *enums.Opcode) *models.StepOp {
 	if op == nil {
 		return nil
 	}
@@ -143,7 +145,9 @@ func (tr *traceReader) opcodeToGQL(op *enums.Opcode) *models.StepOp {
 	return nil
 }
 
-func (tr *traceReader) stepStatusToGQL(status *enums.StepStatus) *models.RunTraceSpanStatus {
+// StepStatusToGQL converts an internal StepStatus enum to the GQL RunTraceSpanStatus model.
+// Exported for use by REST API handlers.
+func StepStatusToGQL(status *enums.StepStatus) *models.RunTraceSpanStatus {
 	if status == nil {
 		return nil
 	}
@@ -175,12 +179,14 @@ func (tr *traceReader) stepStatusToGQL(status *enums.StepStatus) *models.RunTrac
 	return nil
 }
 
-func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelSpan) (*models.RunTraceSpan, error) {
+// ConvertOtelSpanToModel converts a cqrs.OtelSpan tree to a models.RunTraceSpan tree.
+// This is the canonical converter used by both GQL resolvers and REST API handlers.
+func ConvertOtelSpanToModel(ctx context.Context, span *cqrs.OtelSpan) (*models.RunTraceSpan, error) {
 	status := models.RunTraceSpanStatusRunning
 
 	// Make sure we parse dynamic statuses from updates
 	if span.Attributes.DynamicStatus != nil {
-		if gqlStatus := tr.stepStatusToGQL(span.Attributes.DynamicStatus); gqlStatus != nil {
+		if gqlStatus := StepStatusToGQL(span.Attributes.DynamicStatus); gqlStatus != nil {
 			status = *gqlStatus
 		}
 	}
@@ -267,7 +273,7 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 	showSpan := span.Name != meta.SpanNameStepDiscovery
 
 	if span.Attributes.StepOp != nil {
-		gqlSpan.StepOp = tr.opcodeToGQL(span.Attributes.StepOp)
+		gqlSpan.StepOp = OpcodeToGQL(span.Attributes.StepOp)
 	}
 
 	if span.Attributes.StepID != nil {
@@ -364,7 +370,7 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 		}
 
 		for i, cs := range span.Children {
-			child, err := tr.convertRunSpanToGQL(ctx, cs)
+			child, err := ConvertOtelSpanToModel(ctx, cs)
 			if err != nil {
 				return nil, fmt.Errorf("error converting child span: %w", err)
 			}
