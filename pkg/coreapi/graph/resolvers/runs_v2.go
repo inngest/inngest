@@ -285,6 +285,34 @@ func (qr *queryResolver) RunTraceSpanOutputByID(ctx context.Context, outputID st
 		if err != nil {
 			logger.StdlibLogger(ctx).Error("error deserializing step error", "error", err)
 
+			// If we can't unmarshal into StepError, the data might be a simple string
+			// or have a different format. Try to handle it gracefully.
+			var rawData interface{}
+			if unmarshalErr := json.Unmarshal(spanData.Data, &rawData); unmarshalErr == nil {
+				switch v := rawData.(type) {
+				case string:
+					// If it's a simple string, use it as the message
+					stepErr.Message = v
+				case map[string]interface{}:
+					// Try to extract fields manually
+					if msg, ok := v["message"].(string); ok {
+						stepErr.Message = msg
+					}
+					if name, ok := v["name"].(string); ok {
+						stepErr.Name = &name
+					}
+					if stack, ok := v["stack"].(string); ok {
+						stepErr.Stack = &stack
+					}
+					if cause, ok := v["cause"]; ok {
+						if causeStr, isString := cause.(string); isString {
+							stepErr.Cause = &causeStr
+						} else {
+							// Convert non-string cause to JSON string
+							if byt, err := json.Marshal(cause); err == nil {
+								s := string(byt)
+								stepErr.Cause = &s
+							}
 			// This may have been the `cause`, as that's any JSON value, but
 			// needs to be a string when parsed here. Let's try to save it.
 			if stepErr.Cause == nil {
@@ -297,13 +325,18 @@ func (qr *queryResolver) RunTraceSpanOutputByID(ctx context.Context, outputID st
 							causeStr = &s
 						}
 					}
-
-					stepErr.Cause = causeStr
+				default:
+					// Fallback: use the raw data as a string message
+					stepErr.Message = string(spanData.Data)
 				}
+			} else {
+				// Complete fallback: use raw data as message
+				stepErr.Message = string(spanData.Data)
 			}
 		}
 
-		if stepErr.Message == "" {
+		// Ensure we have at least a message or stack
+		if stepErr.Message == "" && (stepErr.Stack == nil || *stepErr.Stack == "") {
 			stack := string(spanData.Data)
 			stepErr.Stack = &stack
 		}
