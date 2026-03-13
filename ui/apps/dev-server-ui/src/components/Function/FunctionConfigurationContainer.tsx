@@ -44,7 +44,8 @@ export function FunctionConfigurationContainer({
 
   // TypeScript flow analysis helper - function is guaranteed to exist after the null check above
   const inngestFunction = data.functionBySlug;
-  const isDurableEndpoint = inngestFunction.app?.method === AppMethod.Api;
+  const isDurableEndpoint =
+    !isFetching && inngestFunction.app?.method === AppMethod.Api;
 
   const header = (
     <Header
