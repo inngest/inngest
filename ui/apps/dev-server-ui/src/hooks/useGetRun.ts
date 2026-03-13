@@ -40,7 +40,7 @@ export function useGetRun() {
         id: runID,
         fn,
         trace,
-        isDurableEndpoint: fn.app.method === AppMethod.Api,
+        isDurableEndpoint: fn.app?.method === AppMethod.Api,
       },
       loading,
       error,

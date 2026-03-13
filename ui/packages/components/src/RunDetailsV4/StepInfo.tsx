@@ -214,6 +214,8 @@ export const StepInfo = ({
   const prettyOutput = usePrettyJson(result?.data ?? '') || (result?.data ?? '');
   const prettyErrorBody = usePrettyErrorBody(result?.error);
   const prettyShortError = usePrettyShortError(result?.error);
+  const showRerunFromStep =
+    !isDurableEndpoint && !debug && runID && trace.stepID && (!cloud || prettyInput);
 
   const responseHeaderMetadata = trace.metadata?.filter(
     (md) => md.kind === 'inngest.response_headers'
@@ -281,7 +283,7 @@ export const StepInfo = ({
             </span>
           )}
         </div>
-        {!isDurableEndpoint && !debug && runID && trace.stepID && (!cloud || prettyInput) && (
+        {showRerunFromStep && (
           <>
             <Button
               kind="primary"
