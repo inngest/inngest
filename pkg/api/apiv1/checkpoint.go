@@ -20,6 +20,8 @@ import (
 	"github.com/inngest/inngest/pkg/execution/apiresult"
 	"github.com/inngest/inngest/pkg/execution/checkpoint"
 	"github.com/inngest/inngest/pkg/execution/executor"
+	"github.com/inngest/inngest/pkg/execution/realtime"
+	"github.com/inngest/inngest/pkg/execution/realtime/streamingtypes"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/publicerr"
@@ -246,11 +248,36 @@ func (a checkpointAPI) CheckpointNewRun(w http.ResponseWriter, r *http.Request) 
 
 	}
 
+	// This is for DurableEndpoint streaming. It gives the DurableEndpoint a
+	// realtime JWT that it can pass back to its client (e.g. the browser). The
+	// client needs a realtime JWT to redirect to the Inngest Server so it can
+	// subscribe to the new stream after the run goes async.
+	var realtimeToken string
+	if len(a.Opts.RealtimeJWTSecret) > 0 {
+		rt, err := realtime.NewJWT(
+			ctx,
+			a.Opts.RealtimeJWTSecret,
+			auth.AccountID(),
+			auth.WorkspaceID(),
+			[]realtime.Topic{{
+				Channel: md.ID.RunID.String(),
+				Name:    streamTopicName,
+				Kind:    streamingtypes.TopicKindRun,
+				EnvID:   auth.WorkspaceID(),
+			}},
+		)
+		if err != nil {
+			logger.StdlibLogger(ctx).Warn("error creating realtime subscribe JWT", "error", err)
+		}
+		realtimeToken = rt
+	}
+
 	_ = WriteResponse(w, CheckpointNewRunResponse{
-		RunID: md.ID.RunID.String(),
-		FnID:  fn.ID,
-		AppID: appID,
-		Token: jwt,
+		RunID:         md.ID.RunID.String(),
+		FnID:          fn.ID,
+		AppID:         appID,
+		Token:         jwt,
+		RealtimeToken: realtimeToken,
 	})
 }
 
