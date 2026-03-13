@@ -296,7 +296,7 @@ export const StepInfo = ({
               open={rerunModalOpen}
               setOpen={setRerunModalOpen}
               runID={runID}
-              stepID={trace.stepID}
+              stepID={trace.stepID!}
               input={prettyInput || result?.input || ''}
             />
           </>
