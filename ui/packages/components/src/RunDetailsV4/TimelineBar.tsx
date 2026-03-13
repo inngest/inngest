@@ -60,16 +60,16 @@ const BAR_STYLES: Record<BarStyleKey, BarStyle> = {
     statusBased: true,
   },
   'step.sleep': {
-    barColor: 'bg-slate-400',
+    barColor: 'bg-surfaceMuted',
   },
   'step.waitForEvent': {
-    barColor: 'bg-slate-400',
+    barColor: 'bg-surfaceMuted',
   },
   'step.invoke': {
-    barColor: 'bg-slate-400',
+    barColor: 'bg-surfaceMuted',
   },
   'timing.inngest': {
-    barColor: 'bg-slate-300',
+    barColor: 'bg-surfaceMuted',
     barHeight: 'short',
     durationColor: 'text-basis',
     labelFormat: 'default',
@@ -92,37 +92,37 @@ const BAR_STYLES: Record<BarStyleKey, BarStyle> = {
   },
   // HTTP timing phases (children of SERVER bar)
   'timing.http.dns': {
-    barColor: 'bg-sky-400',
+    barColor: 'bg-secondary-moderate',
     barHeight: 'short',
     labelFormat: 'uppercase',
     statusBased: true,
   },
   'timing.http.tcp': {
-    barColor: 'bg-cyan-400',
+    barColor: 'bg-secondary-moderate',
     barHeight: 'short',
     labelFormat: 'uppercase',
     statusBased: true,
   },
   'timing.http.tls': {
-    barColor: 'bg-teal-400',
+    barColor: 'bg-secondary-moderate',
     barHeight: 'short',
     labelFormat: 'uppercase',
     statusBased: true,
   },
   'timing.http.server': {
-    barColor: 'bg-emerald-400',
+    barColor: 'bg-primary-moderate',
     barHeight: 'short',
     labelFormat: 'uppercase',
     statusBased: true,
   },
   'timing.http.transfer': {
-    barColor: 'bg-green-400',
+    barColor: 'bg-primary-moderate',
     barHeight: 'short',
     labelFormat: 'uppercase',
     statusBased: true,
   },
   default: {
-    barColor: 'bg-slate-400',
+    barColor: 'bg-surfaceMuted',
     statusBased: true,
   },
 };
