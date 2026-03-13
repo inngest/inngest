@@ -130,14 +130,22 @@ func (p *executionProcessor) OnStart(parent context.Context, s sdktrace.ReadWrit
 
 	case meta.SpanNameStep:
 		{
-			meta.AddAttrIfUnset(rawAttrs, meta.Attrs.QueuedAt, &now)
+			var hasQueuedAt bool
+			for _, attr := range s.Attributes() {
+				hasQueuedAt = hasQueuedAt || string(attr.Key) == meta.Attrs.QueuedAt.Key()
+			}
+
+			if !hasQueuedAt {
+				meta.AddAttrIfUnset(rawAttrs, meta.Attrs.QueuedAt, &now)
+			}
 
 			if ec != nil {
 				meta.AddAttr(rawAttrs, meta.Attrs.StepMaxAttempts, ec.MaxAttempts)
 				meta.AddAttr(rawAttrs, meta.Attrs.StepAttempt, &ec.Attempt)
 
-				// Sleeps "start" as soon as they are queued
-				if ec.QueueKind == queue.KindSleep {
+				// Some steps "start" as soon as they are queued
+				startWhenQueued := ec.QueueKind == queue.KindSleep
+				if startWhenQueued {
 					meta.AddAttr(rawAttrs, meta.Attrs.StartedAt, &now)
 				}
 			}
