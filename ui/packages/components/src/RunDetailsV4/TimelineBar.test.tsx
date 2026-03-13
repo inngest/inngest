@@ -76,7 +76,7 @@ describe('TimelineBar', () => {
     it('applies timing.inngest style colors', () => {
       render(<TimelineBar {...defaultProps} style="timing.inngest" />, { wrapper: Wrapper });
       const bar = screen.getByTestId('timeline-bar-visual');
-      expect(bar.className).toContain('bg-slate-300');
+      expect(bar.className).toContain('bg-surfaceMuted');
     });
 
     it('applies timing.server style colors (status-completed)', () => {
@@ -147,7 +147,7 @@ describe('TimelineBar', () => {
     it('renders INNGEST timing with correct styling', () => {
       render(<TimelineBar {...defaultProps} style="timing.inngest" />, { wrapper: Wrapper });
       const bar = screen.getByTestId('timeline-bar-visual');
-      expect(bar.className).toContain('bg-slate-300');
+      expect(bar.className).toContain('bg-surfaceMuted');
     });
 
     // T029: renders SERVER timing with barber pole pattern (status-completed color)
