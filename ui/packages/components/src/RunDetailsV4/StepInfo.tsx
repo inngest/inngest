@@ -169,11 +169,13 @@ export const StepInfo = ({
   pollInterval: initialPollInterval,
   tracesPreviewEnabled,
   debug = false,
+  isDurableEndpoint,
 }: {
   selectedStep: StepInfoType;
   pollInterval?: number;
   tracesPreviewEnabled?: boolean;
   debug?: boolean;
+  isDurableEndpoint?: boolean;
 }) => {
   const { cloud } = useShared();
   const [expanded, setExpanded] = useState(true);
@@ -279,7 +281,7 @@ export const StepInfo = ({
             </span>
           )}
         </div>
-        {!debug && runID && trace.stepID && (!cloud || prettyInput) && (
+        {!isDurableEndpoint && !debug && runID && trace.stepID && (!cloud || prettyInput) && (
           <>
             <Button
               kind="primary"

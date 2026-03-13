@@ -6,6 +6,7 @@ import { RiCloseLine } from '@remixicon/react';
 import { toast } from 'sonner';
 
 import {
+  AppMethod,
   FunctionTriggerTypes,
   useGetFunctionQuery,
   useInvokeFunctionMutation,
@@ -43,27 +44,30 @@ export function FunctionConfigurationContainer({
 
   // TypeScript flow analysis helper - function is guaranteed to exist after the null check above
   const inngestFunction = data.functionBySlug;
+  const isDurableEndpoint = inngestFunction.app?.method === AppMethod.Api;
 
   const header = (
     <Header
       breadcrumb={[{ text: inngestFunction.name }]}
       action={
         <div className="flex flex-row items-center justify-end gap-2">
-          <InvokeButton
-            kind="primary"
-            appearance="solid"
-            disabled={false}
-            doesFunctionAcceptPayload={doesFunctionAcceptPayload}
-            btnAction={async ({ data, user }) => {
-              await invokeFunction({
-                data,
-                functionSlug: inngestFunction.slug,
-                user,
-              });
-              toast.success('Function invoked');
-              navigate({ to: '/runs' });
-            }}
-          />
+          {!isDurableEndpoint && (
+            <InvokeButton
+              kind="primary"
+              appearance="solid"
+              disabled={false}
+              doesFunctionAcceptPayload={doesFunctionAcceptPayload}
+              btnAction={async ({ data, user }) => {
+                await invokeFunction({
+                  data,
+                  functionSlug: inngestFunction.slug,
+                  user,
+                });
+                toast.success('Function invoked');
+                navigate({ to: '/runs' });
+              }}
+            />
+          )}
           <Button
             icon={<RiCloseLine className="text-muted h-5 w-5" />}
             kind="secondary"

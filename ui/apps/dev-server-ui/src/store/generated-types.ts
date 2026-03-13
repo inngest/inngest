@@ -1068,7 +1068,7 @@ export type GetFunctionsQuery = {
       type: FunctionTriggerTypes;
       value: string;
     }> | null;
-    app: { __typename?: 'App'; name: string };
+    app: { __typename?: 'App'; name: string; method: AppMethod };
   }> | null;
 };
 
@@ -1147,7 +1147,7 @@ export type GetFunctionQuery = {
       value: string;
       condition: string | null;
     }> | null;
-    app: { __typename?: 'App'; name: string };
+    app: { __typename?: 'App'; name: string; method: AppMethod };
   } | null;
 };
 
@@ -1418,7 +1418,7 @@ export type GetRunQuery = {
       id: string;
       name: string;
       slug: string;
-      app: { __typename?: 'App'; name: string };
+      app: { __typename?: 'App'; name: string; method: AppMethod };
     };
     trace: {
       __typename?: 'RunTraceSpan';
