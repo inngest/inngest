@@ -46,6 +46,7 @@ export const PostgresIntegrations = createServerFn({
         name: integration.name,
         slug,
         projects: [],
+        status: integration.status,
         enabled:
           integration.status === 'RUNNING' ||
           integration.status === 'SETUP_COMPLETE',
@@ -152,7 +153,9 @@ export const verifyCredentials = createServerFn({ method: 'POST' })
       return { success: true, error: null };
     } catch (error) {
       console.error('Error verifying credentials:', error);
-      return { success: false, error: null };
+      const message =
+        error instanceof Error ? error.message : 'Failed to verify credentials';
+      return { success: false, error: message };
     }
   });
 
@@ -168,7 +171,11 @@ export const verifyLogicalReplication = createServerFn({ method: 'POST' })
       return { success: true, error: null };
     } catch (error) {
       console.error('Error verifying logical replication:', error);
-      return { success: false, error: null };
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Failed to verify logical replication';
+      return { success: false, error: message };
     }
   });
 
@@ -196,7 +203,6 @@ export const verifyAutoSetup = createServerFn({ method: 'POST' })
     }): Promise<
       | { success: false; error: string; steps: AutoSetupSteps }
       | { success: true; error: null; steps: AutoSetupSteps }
-      | { success: false; error: null; steps: AutoSetupSteps }
     > => {
       try {
         //
@@ -220,9 +226,13 @@ export const verifyAutoSetup = createServerFn({ method: 'POST' })
         };
       } catch (error) {
         console.error('Error connecting:', error);
+        const message =
+          error instanceof Error
+            ? error.message
+            : 'An unexpected error occurred';
         return {
           success: false,
-          error: null,
+          error: message,
           steps: defaultSteps,
         };
       }

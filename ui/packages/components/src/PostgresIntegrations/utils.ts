@@ -1,4 +1,4 @@
-const regex = /postgresq?l?:\/\/([\w-]+):([^@]+)@([^/]+)/;
+const regex = /postgresq?l?:\/\/([\w.\-]+):([^@]+)@([^/]+)/;
 
 export function parseConnectionString(integration: string, connectionString: string) {
   const match = connectionString.match(regex);

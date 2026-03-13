@@ -7,7 +7,7 @@ import type {
   PlainSDKError,
   ThreadPartsFragment,
 } from "@team-plain/typescript-sdk/dist/index";
-import { getAuthenticatedUserEmail } from "@/data/clerk";
+import { authMiddleware } from "@/data/clerk";
 
 // Initialize Plain client
 // The API key should be set in the environment variable PLAIN_API_KEY
@@ -94,13 +94,12 @@ export type TicketStatusFilter =
   | typeof TICKET_STATUS_ALL;
 
 export const getTicketsByEmail = createServerFn({ method: "GET" })
-  .inputValidator(
-    (data: { email: string; status?: TicketStatusFilter }) => data,
-  )
-  .handler(async ({ data }): Promise<Array<TicketSummary>> => {
-    // TODO - Use Clerk auth here to get the customer email, and the metadata with their external id
+  .middleware([authMiddleware])
+  .inputValidator((data: { status?: TicketStatusFilter }) => data)
+  .handler(async ({ data, context }): Promise<Array<TicketSummary>> => {
     try {
-      const { email, status } = data;
+      const email = context.userEmail;
+      const { status } = data;
 
       // First, get or create the customer by email
       const customer = await plainClient.getCustomerByEmail({
@@ -224,15 +223,12 @@ type ThreadsQueryResult = {
 };
 
 export const getTicketById = createServerFn({ method: "GET" })
+  .middleware([authMiddleware])
   .inputValidator((data: { ticketId: string }) => data)
-  .handler(async ({ data }): Promise<TicketDetail | null> => {
+  .handler(async ({ data, context }): Promise<TicketDetail | null> => {
     try {
       const { ticketId } = data;
-
-      const userEmail = await getAuthenticatedUserEmail();
-      if (!userEmail) {
-        return null;
-      }
+      const userEmail = context.userEmail;
 
       const res = (await plainClient.rawRequest({
         query: `
@@ -462,18 +458,16 @@ type ChatEntry = {
   attachments: Array<Attachment>;
 };
 export const getTimelineEntriesForTicket = createServerFn({ method: "GET" })
+  .middleware([authMiddleware])
   .inputValidator((data: { ticketId: string }) => data)
-  .handler(async ({ data }): Promise<Array<TimeLineEntryEdge> | null> => {
-    try {
-      const { ticketId } = data;
+  .handler(
+    async ({ data, context }): Promise<Array<TimeLineEntryEdge> | null> => {
+      try {
+        const { ticketId } = data;
+        const userEmail = context.userEmail;
 
-      const userEmail = await getAuthenticatedUserEmail();
-      if (!userEmail) {
-        return null;
-      }
-
-      const res = (await plainClient.rawRequest({
-        query: `
+        const res = (await plainClient.rawRequest({
+          query: `
           query GetTimelineEntries($threadId: ID!, $first: Int, $after: String, $last: Int, $before: String) {
             thread(threadId: $threadId) {
               id
@@ -583,74 +577,76 @@ export const getTimelineEntriesForTicket = createServerFn({ method: "GET" })
             }
           }
         `,
-        variables: {
-          threadId: ticketId,
-          first: 20,
-          after: null,
-          last: null,
-          before: null,
-        },
-      })) as unknown as Result<TimelineEntriesResponse, PlainSDKError>;
+          variables: {
+            threadId: ticketId,
+            first: 20,
+            after: null,
+            last: null,
+            before: null,
+          },
+        })) as unknown as Result<TimelineEntriesResponse, PlainSDKError>;
 
-      if (res.error) {
-        console.error("Failed to fetch timeline entries:", res.error);
-        return [];
-      }
+        if (res.error) {
+          console.error("Failed to fetch timeline entries:", res.error);
+          return [];
+        }
 
-      // Verify the authenticated user owns this ticket
-      const customerEmail = res.data.thread.customer.email.email;
-      if (customerEmail.toLowerCase() !== userEmail.toLowerCase()) {
-        return null;
-      }
+        // Verify the authenticated user owns this ticket
+        const customerEmail = res.data.thread.customer.email.email;
+        if (customerEmail.toLowerCase() !== userEmail.toLowerCase()) {
+          return null;
+        }
 
-      const customerName = res.data.thread.customer.fullName;
-      const entries = res.data.thread.timelineEntries.edges;
-      return entries
-        .filter((entry) => {
-          // Custom entries are created via the API
-          const typename = entry.node.entry.__typename;
-          return (
-            typename === "CustomEntry" ||
-            typename === "EmailEntry" ||
-            typename === "SlackMessageEntry" ||
-            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-            typename === "SlackReplyEntry" ||
-            typename === "ChatEntry"
-          );
-        })
-        .sort(
-          (a, b) =>
-            new Date(a.node.timestamp.iso8601).getTime() -
-            new Date(b.node.timestamp.iso8601).getTime(),
-        )
-        .map((entry, idx) => {
-          // Map the first custom entry to the customer's name
-          // We create a ticket via the API so it's a "machine user"
-          if (idx === 0 && entry.node.entry.__typename === "CustomEntry") {
-            return {
-              ...entry,
-              node: {
-                ...entry.node,
-                actor: {
-                  __typename: "CustomerActor",
-                  customer: {
-                    fullName: customerName,
-                    avatarUrl: "",
-                    email: { email: "" },
+        const customerName = res.data.thread.customer.fullName;
+        const entries = res.data.thread.timelineEntries.edges;
+        return entries
+          .filter((entry) => {
+            // Custom entries are created via the API
+            const typename = entry.node.entry.__typename;
+            return (
+              typename === "CustomEntry" ||
+              typename === "EmailEntry" ||
+              typename === "SlackMessageEntry" ||
+              // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+              typename === "SlackReplyEntry" ||
+              typename === "ChatEntry"
+            );
+          })
+          .sort(
+            (a, b) =>
+              new Date(a.node.timestamp.iso8601).getTime() -
+              new Date(b.node.timestamp.iso8601).getTime(),
+          )
+          .map((entry, idx) => {
+            // Map the first custom entry to the customer's name
+            // We create a ticket via the API so it's a "machine user"
+            if (idx === 0 && entry.node.entry.__typename === "CustomEntry") {
+              return {
+                ...entry,
+                node: {
+                  ...entry.node,
+                  actor: {
+                    __typename: "CustomerActor",
+                    customer: {
+                      fullName: customerName,
+                      avatarUrl: "",
+                      email: { email: "" },
+                    },
                   },
                 },
-              },
-            };
-          }
-          return entry;
-        });
-    } catch (error) {
-      console.error("Error fetching timeline entries:", error);
-      return [];
-    }
-  });
+              };
+            }
+            return entry;
+          });
+      } catch (error) {
+        console.error("Error fetching timeline entries:", error);
+        return [];
+      }
+    },
+  );
 
 export const getAttachmentDownloadUrl = createServerFn({ method: "GET" })
+  .middleware([authMiddleware])
   .inputValidator((data: { attachmentId: string }) => data)
   .handler(async ({ data }): Promise<AttachmentDownloadUrl | null> => {
     try {
@@ -714,7 +710,8 @@ type AttachmentDownloadUrl = {
 export type CreateTicketInput = {
   user: {
     id: string;
-    email: string;
+    /** @deprecated No longer used - email is derived from authenticated session */
+    email?: string;
     name?: string;
   };
   ticket: {
@@ -732,9 +729,11 @@ export type CreateTicketResult = {
 };
 
 export const createTicket = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
   .inputValidator((data: CreateTicketInput) => data)
-  .handler(async ({ data }): Promise<CreateTicketResult> => {
+  .handler(async ({ data, context }): Promise<CreateTicketResult> => {
     try {
+      const authEmail = context.userEmail;
       const { user, ticket } = data;
 
       // Import label type IDs dynamically to avoid issues with env vars
@@ -756,9 +755,9 @@ export const createTicket = createServerFn({ method: "POST" })
         question: "General question",
       };
 
-      // Get or create customer
+      // Get or create customer using the authenticated email
       const existingCustomer = await plainClient.getCustomerByEmail({
-        email: user.email,
+        email: authEmail,
       });
 
       let customerId = existingCustomer.data?.id;
@@ -766,13 +765,13 @@ export const createTicket = createServerFn({ method: "POST" })
       if (!customerId) {
         const upsertedCustomer = await plainClient.upsertCustomer({
           identifier: {
-            emailAddress: user.email,
+            emailAddress: authEmail,
           },
           onCreate: {
             externalId: user.id,
-            fullName: user.name || user.email,
+            fullName: user.name || authEmail,
             email: {
-              email: user.email,
+              email: authEmail,
               isVerified: true,
             },
           },
@@ -780,7 +779,7 @@ export const createTicket = createServerFn({ method: "POST" })
             externalId: { value: user.id },
             fullName: user.name ? { value: user.name } : undefined,
             email: {
-              email: user.email,
+              email: authEmail,
               isVerified: true,
             },
           },
@@ -901,10 +900,10 @@ type CustomerWithCompanyResponse = {
 };
 
 export const getCustomerTierByEmail = createServerFn({ method: "GET" })
-  .inputValidator((data: { email: string }) => data)
-  .handler(async ({ data }): Promise<CustomerTierInfo> => {
+  .middleware([authMiddleware])
+  .handler(async ({ context }): Promise<CustomerTierInfo> => {
     try {
-      const { email } = data;
+      const email = context.userEmail;
 
       const res = (await plainClient.rawRequest({
         query: `
@@ -990,25 +989,32 @@ export type CloseTicketResult = {
 };
 
 export const closeTicket = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
   .inputValidator((data: { threadId: string }) => data)
-  .handler(async ({ data }): Promise<CloseTicketResult> => {
+  .handler(async ({ data, context }): Promise<CloseTicketResult> => {
     try {
+      const authEmail = context.userEmail;
       const { threadId } = data;
 
-      // First, get the thread to find the customer ID (needed for the note)
+      // Get the thread to verify ownership and find customer ID for the note
       const threadRes = (await plainClient.rawRequest({
         query: `
           query GetThreadCustomer($threadId: ID!) {
             thread(threadId: $threadId) {
               customer {
                 id
+                email {
+                  email
+                }
               }
             }
           }
         `,
         variables: { threadId },
       })) as {
-        data?: { thread: { customer: { id: string } } };
+        data?: {
+          thread: { customer: { id: string; email: { email: string } } };
+        };
         error?: PlainSDKError;
       };
 
@@ -1017,6 +1023,17 @@ export const closeTicket = createServerFn({ method: "POST" })
         return {
           success: false,
           error: "Failed to fetch ticket details",
+        };
+      }
+
+      // Verify the authenticated user owns this thread
+      if (
+        threadRes.data.thread.customer.email.email.toLowerCase() !==
+        authEmail.toLowerCase()
+      ) {
+        return {
+          success: false,
+          error: "Not authorized to close this ticket",
         };
       }
 
@@ -1242,18 +1259,19 @@ export type AttachmentUploadUrlResult = {
 export type AttachmentUploadContext = "chat" | "customEntry";
 
 export const getUploadUrl = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
   .inputValidator(
     (data: {
-      userEmail: string;
       fileName: string;
       fileSizeBytes: number;
       context?: AttachmentUploadContext;
     }) => data,
   )
-  .handler(async ({ data }): Promise<AttachmentUploadUrlResult> => {
+  .handler(async ({ data, context }): Promise<AttachmentUploadUrlResult> => {
     try {
-      const { userEmail, fileName, fileSizeBytes } = data;
-      const context = data.context || "chat";
+      const userEmail = context.userEmail;
+      const { fileName, fileSizeBytes } = data;
+      const uploadContext = data.context || "chat";
 
       // Server-side validation
       // We use a generic MIME check based on extension since we don't have the real MIME here
@@ -1283,7 +1301,7 @@ export const getUploadUrl = createServerFn({ method: "POST" })
       }
 
       const attachmentType =
-        context === "customEntry"
+        uploadContext === "customEntry"
           ? AttachmentType.CustomTimelineEntry
           : AttachmentType.Chat;
 
@@ -1331,19 +1349,12 @@ export type ReplyToThreadResult = {
 };
 
 export const replyToThread = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
   .inputValidator((data: ReplyToThreadInput) => data)
-  .handler(async ({ data }): Promise<ReplyToThreadResult> => {
+  .handler(async ({ data, context }): Promise<ReplyToThreadResult> => {
     try {
       const { threadId, message, attachmentIds } = data;
-
-      // Get the authenticated user's email instead of trusting client input
-      const userEmail = await getAuthenticatedUserEmail();
-      if (!userEmail) {
-        return {
-          success: false,
-          error: "Not authenticated",
-        };
-      }
+      const userEmail = context.userEmail;
 
       // Verify the user owns this thread before allowing a reply
       const threadRes = (await plainClient.rawRequest({

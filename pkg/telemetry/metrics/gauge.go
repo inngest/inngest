@@ -155,3 +155,12 @@ func GaugePartitionProcessorInFlight(ctx context.Context, val int64, opts GaugeO
 		Tags:        opts.Tags,
 	})
 }
+
+func GaugeConstraintAPICacheSize(ctx context.Context, val int64, opts GaugeOpt) {
+	RecordGaugeMetric(ctx, val, GaugeOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "constraintapi_cache_size",
+		Description: "Current number of items in the constraint cache",
+		Tags:        opts.Tags,
+	})
+}
