@@ -794,6 +794,7 @@ export type RunTraceSpan = {
   response: Maybe<RunTraceSpanResponseInfo>;
   run: FunctionRun;
   runID: Scalars['ULID'];
+  scheduledAt: Maybe<Scalars['Time']>;
   skipExistingRunID: Maybe<Scalars['String']>;
   skipReason: Maybe<Scalars['String']>;
   spanID: Scalars['String'];
@@ -1340,6 +1341,7 @@ export type TraceDetailsFragment = {
   status: RunTraceSpanStatus;
   attempts: number | null;
   queuedAt: any;
+  scheduledAt: any | null;
   startedAt: any | null;
   endedAt: any | null;
   isRoot: boolean;
@@ -1426,6 +1428,7 @@ export type GetRunQuery = {
       status: RunTraceSpanStatus;
       attempts: number | null;
       queuedAt: any;
+      scheduledAt: any | null;
       startedAt: any | null;
       endedAt: any | null;
       isRoot: boolean;
@@ -1443,6 +1446,7 @@ export type GetRunQuery = {
         status: RunTraceSpanStatus;
         attempts: number | null;
         queuedAt: any;
+        scheduledAt: any | null;
         startedAt: any | null;
         endedAt: any | null;
         isRoot: boolean;
@@ -1460,6 +1464,7 @@ export type GetRunQuery = {
           status: RunTraceSpanStatus;
           attempts: number | null;
           queuedAt: any;
+          scheduledAt: any | null;
           startedAt: any | null;
           endedAt: any | null;
           isRoot: boolean;
@@ -1477,6 +1482,7 @@ export type GetRunQuery = {
             status: RunTraceSpanStatus;
             attempts: number | null;
             queuedAt: any;
+            scheduledAt: any | null;
             startedAt: any | null;
             endedAt: any | null;
             isRoot: boolean;
@@ -1494,6 +1500,7 @@ export type GetRunQuery = {
               status: RunTraceSpanStatus;
               attempts: number | null;
               queuedAt: any;
+              scheduledAt: any | null;
               startedAt: any | null;
               endedAt: any | null;
               isRoot: boolean;
@@ -1770,6 +1777,7 @@ export type GetRunTraceQuery = {
     status: RunTraceSpanStatus;
     attempts: number | null;
     queuedAt: any;
+    scheduledAt: any | null;
     startedAt: any | null;
     endedAt: any | null;
     isRoot: boolean;
@@ -1787,6 +1795,7 @@ export type GetRunTraceQuery = {
       status: RunTraceSpanStatus;
       attempts: number | null;
       queuedAt: any;
+      scheduledAt: any | null;
       startedAt: any | null;
       endedAt: any | null;
       isRoot: boolean;
@@ -1804,6 +1813,7 @@ export type GetRunTraceQuery = {
         status: RunTraceSpanStatus;
         attempts: number | null;
         queuedAt: any;
+        scheduledAt: any | null;
         startedAt: any | null;
         endedAt: any | null;
         isRoot: boolean;
@@ -1821,6 +1831,7 @@ export type GetRunTraceQuery = {
           status: RunTraceSpanStatus;
           attempts: number | null;
           queuedAt: any;
+          scheduledAt: any | null;
           startedAt: any | null;
           endedAt: any | null;
           isRoot: boolean;
@@ -1838,6 +1849,7 @@ export type GetRunTraceQuery = {
             status: RunTraceSpanStatus;
             attempts: number | null;
             queuedAt: any;
+            scheduledAt: any | null;
             startedAt: any | null;
             endedAt: any | null;
             isRoot: boolean;
@@ -2331,6 +2343,7 @@ export type GetDebugRunQuery = {
       status: RunTraceSpanStatus;
       attempts: number | null;
       queuedAt: any;
+      scheduledAt: any | null;
       startedAt: any | null;
       endedAt: any | null;
       isRoot: boolean;
@@ -2348,6 +2361,7 @@ export type GetDebugRunQuery = {
         status: RunTraceSpanStatus;
         attempts: number | null;
         queuedAt: any;
+        scheduledAt: any | null;
         startedAt: any | null;
         endedAt: any | null;
         isRoot: boolean;
@@ -2365,6 +2379,7 @@ export type GetDebugRunQuery = {
           status: RunTraceSpanStatus;
           attempts: number | null;
           queuedAt: any;
+          scheduledAt: any | null;
           startedAt: any | null;
           endedAt: any | null;
           isRoot: boolean;
@@ -2382,6 +2397,7 @@ export type GetDebugRunQuery = {
             status: RunTraceSpanStatus;
             attempts: number | null;
             queuedAt: any;
+            scheduledAt: any | null;
             startedAt: any | null;
             endedAt: any | null;
             isRoot: boolean;

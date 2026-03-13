@@ -469,6 +469,7 @@ type ComplexityRoot struct {
 		Response          func(childComplexity int) int
 		Run               func(childComplexity int) int
 		RunID             func(childComplexity int) int
+		ScheduledAt       func(childComplexity int) int
 		SkipExistingRunID func(childComplexity int) int
 		SkipReason        func(childComplexity int) int
 		SpanID            func(childComplexity int) int
@@ -2787,6 +2788,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.RunTraceSpan.RunID(childComplexity), true
 
+	case "RunTraceSpan.scheduledAt":
+		if e.complexity.RunTraceSpan.ScheduledAt == nil {
+			break
+		}
+
+		return e.complexity.RunTraceSpan.ScheduledAt(childComplexity), true
+
 	case "RunTraceSpan.skipExistingRunID":
 		if e.complexity.RunTraceSpan.SkipExistingRunID == nil {
 			break
@@ -4160,6 +4168,7 @@ type RunTraceSpan {
   duration: Int # the duration of the span in milliseconds (calculated), if null, it's still running
   outputID: String
   queuedAt: Time!
+  scheduledAt: Time # the time the run was scheduled to execute, if intentionally delayed (e.g. future event ts)
   startedAt: Time # the start time of the span
   endedAt: Time # the end time of the span, only present if it's ended
   childrenSpans: [RunTraceSpan!]! # the children spans of this span - invoke
@@ -7579,6 +7588,8 @@ func (ec *executionContext) fieldContext_DebugRun_debugTraces(ctx context.Contex
 				return ec.fieldContext_RunTraceSpan_outputID(ctx, field)
 			case "queuedAt":
 				return ec.fieldContext_RunTraceSpan_queuedAt(ctx, field)
+			case "scheduledAt":
+				return ec.fieldContext_RunTraceSpan_scheduledAt(ctx, field)
 			case "startedAt":
 				return ec.fieldContext_RunTraceSpan_startedAt(ctx, field)
 			case "endedAt":
@@ -12482,6 +12493,8 @@ func (ec *executionContext) fieldContext_FunctionRunV2_trace(ctx context.Context
 				return ec.fieldContext_RunTraceSpan_outputID(ctx, field)
 			case "queuedAt":
 				return ec.fieldContext_RunTraceSpan_queuedAt(ctx, field)
+			case "scheduledAt":
+				return ec.fieldContext_RunTraceSpan_scheduledAt(ctx, field)
 			case "startedAt":
 				return ec.fieldContext_RunTraceSpan_startedAt(ctx, field)
 			case "endedAt":
@@ -15230,6 +15243,8 @@ func (ec *executionContext) fieldContext_Query_runTrace(ctx context.Context, fie
 				return ec.fieldContext_RunTraceSpan_outputID(ctx, field)
 			case "queuedAt":
 				return ec.fieldContext_RunTraceSpan_queuedAt(ctx, field)
+			case "scheduledAt":
+				return ec.fieldContext_RunTraceSpan_scheduledAt(ctx, field)
 			case "startedAt":
 				return ec.fieldContext_RunTraceSpan_startedAt(ctx, field)
 			case "endedAt":
@@ -18346,6 +18361,47 @@ func (ec *executionContext) fieldContext_RunTraceSpan_queuedAt(ctx context.Conte
 	return fc, nil
 }
 
+func (ec *executionContext) _RunTraceSpan_scheduledAt(ctx context.Context, field graphql.CollectedField, obj *models.RunTraceSpan) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RunTraceSpan_scheduledAt(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ScheduledAt, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*time.Time)
+	fc.Result = res
+	return ec.marshalOTime2ᚖtimeᚐTime(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RunTraceSpan_scheduledAt(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RunTraceSpan",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Time does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _RunTraceSpan_startedAt(ctx context.Context, field graphql.CollectedField, obj *models.RunTraceSpan) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_RunTraceSpan_startedAt(ctx, field)
 	if err != nil {
@@ -18491,6 +18547,8 @@ func (ec *executionContext) fieldContext_RunTraceSpan_childrenSpans(ctx context.
 				return ec.fieldContext_RunTraceSpan_outputID(ctx, field)
 			case "queuedAt":
 				return ec.fieldContext_RunTraceSpan_queuedAt(ctx, field)
+			case "scheduledAt":
+				return ec.fieldContext_RunTraceSpan_scheduledAt(ctx, field)
 			case "startedAt":
 				return ec.fieldContext_RunTraceSpan_startedAt(ctx, field)
 			case "endedAt":
@@ -18848,6 +18906,8 @@ func (ec *executionContext) fieldContext_RunTraceSpan_parentSpan(ctx context.Con
 				return ec.fieldContext_RunTraceSpan_outputID(ctx, field)
 			case "queuedAt":
 				return ec.fieldContext_RunTraceSpan_queuedAt(ctx, field)
+			case "scheduledAt":
+				return ec.fieldContext_RunTraceSpan_scheduledAt(ctx, field)
 			case "startedAt":
 				return ec.fieldContext_RunTraceSpan_startedAt(ctx, field)
 			case "endedAt":
@@ -27981,6 +28041,10 @@ func (ec *executionContext) _RunTraceSpan(ctx context.Context, sel ast.Selection
 			if out.Values[i] == graphql.Null {
 				invalids++
 			}
+		case "scheduledAt":
+
+			out.Values[i] = ec._RunTraceSpan_scheduledAt(ctx, field, obj)
+
 		case "startedAt":
 
 			out.Values[i] = ec._RunTraceSpan_startedAt(ctx, field, obj)

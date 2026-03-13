@@ -18,6 +18,7 @@ describe('traceConversion', () => {
     name: 'test-step',
     outputID: null,
     queuedAt: '2024-01-01T00:00:00Z',
+    scheduledAt: null,
     spanID: 'span-1',
     stepID: 'step-1',
     startedAt: '2024-01-01T00:00:02Z',
@@ -259,6 +260,74 @@ describe('traceConversion', () => {
       const childBar = result.bars[0]?.children?.[0];
       expect(childBar?.timingBreakdown?.queueMs).toBe(0);
       expect(childBar?.timingBreakdown?.executionMs).toBe(5000);
+    });
+  });
+
+  describe('future-scheduled runs (scheduledAt)', () => {
+    it('uses scheduledAt for minTime when present on root trace', () => {
+      const trace = createTrace({
+        isRoot: true,
+        queuedAt: '2024-01-01T00:00:00Z',
+        scheduledAt: '2024-01-01T00:05:00Z',
+        startedAt: '2024-01-01T00:05:01Z',
+        endedAt: '2024-01-01T00:05:10Z',
+      });
+      const result = traceToTimelineData(trace, { runID: 'run-1' });
+
+      // minTime should be scheduledAt, not queuedAt
+      expect(result.minTime).toEqual(new Date('2024-01-01T00:05:00Z'));
+    });
+
+    it('uses scheduledAt for bar startTime when present', () => {
+      const trace = createTrace({
+        isRoot: true,
+        queuedAt: '2024-01-01T00:00:00Z',
+        scheduledAt: '2024-01-01T00:05:00Z',
+        startedAt: '2024-01-01T00:05:01Z',
+        endedAt: '2024-01-01T00:05:10Z',
+      });
+      const result = traceToTimelineData(trace, { runID: 'run-1' });
+
+      // Bar startTime should use scheduledAt
+      expect(result.bars[0]?.startTime).toEqual(new Date('2024-01-01T00:05:00Z'));
+    });
+
+    it('calculates delayMs from scheduledAt instead of queuedAt', () => {
+      const trace = createTrace({
+        isRoot: true,
+        queuedAt: '2024-01-01T00:00:00Z',
+        scheduledAt: '2024-01-01T00:05:00Z',
+        startedAt: '2024-01-01T00:05:01Z', // 1s after scheduledAt
+        endedAt: '2024-01-01T00:05:10Z',
+      });
+      const result = traceToTimelineData(trace, { runID: 'run-1' });
+
+      // delayMs should be 1s (startedAt - scheduledAt), not 301s (startedAt - queuedAt)
+      expect(result.bars[0]?.delayMs).toBe(1000);
+    });
+
+    it('child spans fall back to queuedAt when scheduledAt is null', () => {
+      const trace = createTrace({
+        isRoot: true,
+        queuedAt: '2024-01-01T00:00:00Z',
+        scheduledAt: '2024-01-01T00:05:00Z',
+        startedAt: '2024-01-01T00:05:01Z',
+        endedAt: '2024-01-01T00:05:10Z',
+        childrenSpans: [
+          createTrace({
+            spanID: 'child-1',
+            queuedAt: '2024-01-01T00:05:01Z',
+            scheduledAt: null,
+            startedAt: '2024-01-01T00:05:02Z', // 1s queue delay
+            endedAt: '2024-01-01T00:05:05Z',
+          }),
+        ],
+      });
+      const result = traceToTimelineData(trace, { runID: 'run-1' });
+
+      const childBar = result.bars[0]?.children?.[0];
+      expect(childBar?.startTime).toEqual(new Date('2024-01-01T00:05:01Z'));
+      expect(childBar?.delayMs).toBe(1000);
     });
   });
 

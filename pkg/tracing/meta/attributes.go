@@ -13,9 +13,10 @@ import (
 
 var Attrs = struct {
 	// Timings
-	StartedAt attr[*time.Time]
-	QueuedAt  attr[*time.Time]
-	EndedAt   attr[*time.Time]
+	StartedAt   attr[*time.Time]
+	QueuedAt    attr[*time.Time]
+	EndedAt     attr[*time.Time]
+	ScheduledAt attr[*time.Time]
 
 	// Run attributes
 	AccountID           attr[*uuid.UUID]
@@ -172,6 +173,7 @@ var Attrs = struct {
 	DurableEndpointModeChangedAt:       TimeAttr("run.durable_endpoint.mode_changed_at"),
 	IsFunctionOutput:                   BoolAttr("is.function.output"),
 	QueuedAt:                           TimeAttr("queued_at"),
+	ScheduledAt:                        TimeAttr("scheduled_at"),
 	RequestURL:                         StringAttr("request.url"),
 	ResponseHeaders:                    JsonAttr[headers.Compact]("response.headers"),
 	ResponseOutputSize:                 IntAttr("response.output_size"),

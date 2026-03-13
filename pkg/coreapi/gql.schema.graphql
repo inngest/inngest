@@ -587,6 +587,7 @@ type RunTraceSpan {
   duration: Int # the duration of the span in milliseconds (calculated), if null, it's still running
   outputID: String
   queuedAt: Time!
+  scheduledAt: Time # the time the run was scheduled to execute, if intentionally delayed (e.g. future event ts)
   startedAt: Time # the start time of the span
   endedAt: Time # the end time of the span, only present if it's ended
   childrenSpans: [RunTraceSpan!]! # the children spans of this span - invoke
