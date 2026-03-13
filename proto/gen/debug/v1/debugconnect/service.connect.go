@@ -78,6 +78,17 @@ const (
 	DebugGetBacklogsProcedure = "/debug.v1.Debug/GetBacklogs"
 	// DebugGetBacklogSizeProcedure is the fully-qualified name of the Debug's GetBacklogSize RPC.
 	DebugGetBacklogSizeProcedure = "/debug.v1.Debug/GetBacklogSize"
+	// DebugGetAccountConcurrencyProcedure is the fully-qualified name of the Debug's
+	// GetAccountConcurrency RPC.
+	DebugGetAccountConcurrencyProcedure = "/debug.v1.Debug/GetAccountConcurrency"
+	// DebugGetFunctionConcurrencyProcedure is the fully-qualified name of the Debug's
+	// GetFunctionConcurrency RPC.
+	DebugGetFunctionConcurrencyProcedure = "/debug.v1.Debug/GetFunctionConcurrency"
+	// DebugCountAccountLeasesProcedure is the fully-qualified name of the Debug's CountAccountLeases
+	// RPC.
+	DebugCountAccountLeasesProcedure = "/debug.v1.Debug/CountAccountLeases"
+	// DebugCountAccountsProcedure is the fully-qualified name of the Debug's CountAccounts RPC.
+	DebugCountAccountsProcedure = "/debug.v1.Debug/CountAccounts"
 )
 
 // DebugClient is a client for the debug.v1.Debug service.
@@ -123,6 +134,14 @@ type DebugClient interface {
 	GetBacklogs(context.Context, *connect.Request[v1.BacklogsRequest]) (*connect.Response[v1.BacklogsResponse], error)
 	// GetBacklogSize retrieves the number of items in a specific backlog
 	GetBacklogSize(context.Context, *connect.Request[v1.BacklogSizeRequest]) (*connect.Response[v1.BacklogSizeResponse], error)
+	// GetAccountConcurrency returns in-progress concurrency count for an account
+	GetAccountConcurrency(context.Context, *connect.Request[v1.GetAccountConcurrencyRequest]) (*connect.Response[v1.GetAccountConcurrencyResponse], error)
+	// GetFunctionConcurrency returns in-progress concurrency count for a function
+	GetFunctionConcurrency(context.Context, *connect.Request[v1.GetFunctionConcurrencyRequest]) (*connect.Response[v1.GetFunctionConcurrencyResponse], error)
+	// CountAccountLeases returns the number of items in the account leaseq zset
+	CountAccountLeases(context.Context, *connect.Request[v1.CountAccountLeasesRequest]) (*connect.Response[v1.CountAccountLeasesResponse], error)
+	// CountAccounts returns the number of accounts in the top-level scavenger zset
+	CountAccounts(context.Context, *connect.Request[v1.CountAccountsRequest]) (*connect.Response[v1.CountAccountsResponse], error)
 }
 
 // NewDebugClient constructs a client for the debug.v1.Debug service. By default, it uses the
@@ -256,31 +275,59 @@ func NewDebugClient(httpClient connect.HTTPClient, baseURL string, opts ...conne
 			connect.WithSchema(debugMethods.ByName("GetBacklogSize")),
 			connect.WithClientOptions(opts...),
 		),
+		getAccountConcurrency: connect.NewClient[v1.GetAccountConcurrencyRequest, v1.GetAccountConcurrencyResponse](
+			httpClient,
+			baseURL+DebugGetAccountConcurrencyProcedure,
+			connect.WithSchema(debugMethods.ByName("GetAccountConcurrency")),
+			connect.WithClientOptions(opts...),
+		),
+		getFunctionConcurrency: connect.NewClient[v1.GetFunctionConcurrencyRequest, v1.GetFunctionConcurrencyResponse](
+			httpClient,
+			baseURL+DebugGetFunctionConcurrencyProcedure,
+			connect.WithSchema(debugMethods.ByName("GetFunctionConcurrency")),
+			connect.WithClientOptions(opts...),
+		),
+		countAccountLeases: connect.NewClient[v1.CountAccountLeasesRequest, v1.CountAccountLeasesResponse](
+			httpClient,
+			baseURL+DebugCountAccountLeasesProcedure,
+			connect.WithSchema(debugMethods.ByName("CountAccountLeases")),
+			connect.WithClientOptions(opts...),
+		),
+		countAccounts: connect.NewClient[v1.CountAccountsRequest, v1.CountAccountsResponse](
+			httpClient,
+			baseURL+DebugCountAccountsProcedure,
+			connect.WithSchema(debugMethods.ByName("CountAccounts")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // debugClient implements DebugClient.
 type debugClient struct {
-	getPartition        *connect.Client[v1.PartitionRequest, v1.PartitionResponse]
-	getPartitionStatus  *connect.Client[v1.PartitionRequest, v1.PartitionStatusResponse]
-	getQueueItem        *connect.Client[v1.QueueItemRequest, v1.QueueItemResponse]
-	getPause            *connect.Client[v1.PauseRequest, v1.PauseResponse]
-	getIndex            *connect.Client[v1.IndexRequest, v1.IndexResponse]
-	blockPeek           *connect.Client[v1.BlockPeekRequest, v1.BlockPeekResponse]
-	blockDeleted        *connect.Client[v1.BlockDeletedRequest, v1.BlockDeletedResponse]
-	checkConstraints    *connect.Client[v11.CapacityCheckRequest, v1.CheckConstraintsResponse]
-	getBatchInfo        *connect.Client[v1.BatchInfoRequest, v1.BatchInfoResponse]
-	deleteBatch         *connect.Client[v1.DeleteBatchRequest, v1.DeleteBatchResponse]
-	runBatch            *connect.Client[v1.RunBatchRequest, v1.RunBatchResponse]
-	getSingletonInfo    *connect.Client[v1.SingletonInfoRequest, v1.SingletonInfoResponse]
-	deleteSingletonLock *connect.Client[v1.DeleteSingletonLockRequest, v1.DeleteSingletonLockResponse]
-	getDebounceInfo     *connect.Client[v1.DebounceInfoRequest, v1.DebounceInfoResponse]
-	deleteDebounce      *connect.Client[v1.DeleteDebounceRequest, v1.DeleteDebounceResponse]
-	runDebounce         *connect.Client[v1.RunDebounceRequest, v1.RunDebounceResponse]
-	deleteDebounceByID  *connect.Client[v1.DeleteDebounceByIDRequest, v1.DeleteDebounceByIDResponse]
-	getShadowPartition  *connect.Client[v1.ShadowPartitionRequest, v1.ShadowPartitionResponse]
-	getBacklogs         *connect.Client[v1.BacklogsRequest, v1.BacklogsResponse]
-	getBacklogSize      *connect.Client[v1.BacklogSizeRequest, v1.BacklogSizeResponse]
+	getPartition           *connect.Client[v1.PartitionRequest, v1.PartitionResponse]
+	getPartitionStatus     *connect.Client[v1.PartitionRequest, v1.PartitionStatusResponse]
+	getQueueItem           *connect.Client[v1.QueueItemRequest, v1.QueueItemResponse]
+	getPause               *connect.Client[v1.PauseRequest, v1.PauseResponse]
+	getIndex               *connect.Client[v1.IndexRequest, v1.IndexResponse]
+	blockPeek              *connect.Client[v1.BlockPeekRequest, v1.BlockPeekResponse]
+	blockDeleted           *connect.Client[v1.BlockDeletedRequest, v1.BlockDeletedResponse]
+	checkConstraints       *connect.Client[v11.CapacityCheckRequest, v1.CheckConstraintsResponse]
+	getBatchInfo           *connect.Client[v1.BatchInfoRequest, v1.BatchInfoResponse]
+	deleteBatch            *connect.Client[v1.DeleteBatchRequest, v1.DeleteBatchResponse]
+	runBatch               *connect.Client[v1.RunBatchRequest, v1.RunBatchResponse]
+	getSingletonInfo       *connect.Client[v1.SingletonInfoRequest, v1.SingletonInfoResponse]
+	deleteSingletonLock    *connect.Client[v1.DeleteSingletonLockRequest, v1.DeleteSingletonLockResponse]
+	getDebounceInfo        *connect.Client[v1.DebounceInfoRequest, v1.DebounceInfoResponse]
+	deleteDebounce         *connect.Client[v1.DeleteDebounceRequest, v1.DeleteDebounceResponse]
+	runDebounce            *connect.Client[v1.RunDebounceRequest, v1.RunDebounceResponse]
+	deleteDebounceByID     *connect.Client[v1.DeleteDebounceByIDRequest, v1.DeleteDebounceByIDResponse]
+	getShadowPartition     *connect.Client[v1.ShadowPartitionRequest, v1.ShadowPartitionResponse]
+	getBacklogs            *connect.Client[v1.BacklogsRequest, v1.BacklogsResponse]
+	getBacklogSize         *connect.Client[v1.BacklogSizeRequest, v1.BacklogSizeResponse]
+	getAccountConcurrency  *connect.Client[v1.GetAccountConcurrencyRequest, v1.GetAccountConcurrencyResponse]
+	getFunctionConcurrency *connect.Client[v1.GetFunctionConcurrencyRequest, v1.GetFunctionConcurrencyResponse]
+	countAccountLeases     *connect.Client[v1.CountAccountLeasesRequest, v1.CountAccountLeasesResponse]
+	countAccounts          *connect.Client[v1.CountAccountsRequest, v1.CountAccountsResponse]
 }
 
 // GetPartition calls debug.v1.Debug.GetPartition.
@@ -383,6 +430,26 @@ func (c *debugClient) GetBacklogSize(ctx context.Context, req *connect.Request[v
 	return c.getBacklogSize.CallUnary(ctx, req)
 }
 
+// GetAccountConcurrency calls debug.v1.Debug.GetAccountConcurrency.
+func (c *debugClient) GetAccountConcurrency(ctx context.Context, req *connect.Request[v1.GetAccountConcurrencyRequest]) (*connect.Response[v1.GetAccountConcurrencyResponse], error) {
+	return c.getAccountConcurrency.CallUnary(ctx, req)
+}
+
+// GetFunctionConcurrency calls debug.v1.Debug.GetFunctionConcurrency.
+func (c *debugClient) GetFunctionConcurrency(ctx context.Context, req *connect.Request[v1.GetFunctionConcurrencyRequest]) (*connect.Response[v1.GetFunctionConcurrencyResponse], error) {
+	return c.getFunctionConcurrency.CallUnary(ctx, req)
+}
+
+// CountAccountLeases calls debug.v1.Debug.CountAccountLeases.
+func (c *debugClient) CountAccountLeases(ctx context.Context, req *connect.Request[v1.CountAccountLeasesRequest]) (*connect.Response[v1.CountAccountLeasesResponse], error) {
+	return c.countAccountLeases.CallUnary(ctx, req)
+}
+
+// CountAccounts calls debug.v1.Debug.CountAccounts.
+func (c *debugClient) CountAccounts(ctx context.Context, req *connect.Request[v1.CountAccountsRequest]) (*connect.Response[v1.CountAccountsResponse], error) {
+	return c.countAccounts.CallUnary(ctx, req)
+}
+
 // DebugHandler is an implementation of the debug.v1.Debug service.
 type DebugHandler interface {
 	// GetPartition retrieves the partition data from the database
@@ -426,6 +493,14 @@ type DebugHandler interface {
 	GetBacklogs(context.Context, *connect.Request[v1.BacklogsRequest]) (*connect.Response[v1.BacklogsResponse], error)
 	// GetBacklogSize retrieves the number of items in a specific backlog
 	GetBacklogSize(context.Context, *connect.Request[v1.BacklogSizeRequest]) (*connect.Response[v1.BacklogSizeResponse], error)
+	// GetAccountConcurrency returns in-progress concurrency count for an account
+	GetAccountConcurrency(context.Context, *connect.Request[v1.GetAccountConcurrencyRequest]) (*connect.Response[v1.GetAccountConcurrencyResponse], error)
+	// GetFunctionConcurrency returns in-progress concurrency count for a function
+	GetFunctionConcurrency(context.Context, *connect.Request[v1.GetFunctionConcurrencyRequest]) (*connect.Response[v1.GetFunctionConcurrencyResponse], error)
+	// CountAccountLeases returns the number of items in the account leaseq zset
+	CountAccountLeases(context.Context, *connect.Request[v1.CountAccountLeasesRequest]) (*connect.Response[v1.CountAccountLeasesResponse], error)
+	// CountAccounts returns the number of accounts in the top-level scavenger zset
+	CountAccounts(context.Context, *connect.Request[v1.CountAccountsRequest]) (*connect.Response[v1.CountAccountsResponse], error)
 }
 
 // NewDebugHandler builds an HTTP handler from the service implementation. It returns the path on
@@ -555,6 +630,30 @@ func NewDebugHandler(svc DebugHandler, opts ...connect.HandlerOption) (string, h
 		connect.WithSchema(debugMethods.ByName("GetBacklogSize")),
 		connect.WithHandlerOptions(opts...),
 	)
+	debugGetAccountConcurrencyHandler := connect.NewUnaryHandler(
+		DebugGetAccountConcurrencyProcedure,
+		svc.GetAccountConcurrency,
+		connect.WithSchema(debugMethods.ByName("GetAccountConcurrency")),
+		connect.WithHandlerOptions(opts...),
+	)
+	debugGetFunctionConcurrencyHandler := connect.NewUnaryHandler(
+		DebugGetFunctionConcurrencyProcedure,
+		svc.GetFunctionConcurrency,
+		connect.WithSchema(debugMethods.ByName("GetFunctionConcurrency")),
+		connect.WithHandlerOptions(opts...),
+	)
+	debugCountAccountLeasesHandler := connect.NewUnaryHandler(
+		DebugCountAccountLeasesProcedure,
+		svc.CountAccountLeases,
+		connect.WithSchema(debugMethods.ByName("CountAccountLeases")),
+		connect.WithHandlerOptions(opts...),
+	)
+	debugCountAccountsHandler := connect.NewUnaryHandler(
+		DebugCountAccountsProcedure,
+		svc.CountAccounts,
+		connect.WithSchema(debugMethods.ByName("CountAccounts")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/debug.v1.Debug/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case DebugGetPartitionProcedure:
@@ -597,6 +696,14 @@ func NewDebugHandler(svc DebugHandler, opts ...connect.HandlerOption) (string, h
 			debugGetBacklogsHandler.ServeHTTP(w, r)
 		case DebugGetBacklogSizeProcedure:
 			debugGetBacklogSizeHandler.ServeHTTP(w, r)
+		case DebugGetAccountConcurrencyProcedure:
+			debugGetAccountConcurrencyHandler.ServeHTTP(w, r)
+		case DebugGetFunctionConcurrencyProcedure:
+			debugGetFunctionConcurrencyHandler.ServeHTTP(w, r)
+		case DebugCountAccountLeasesProcedure:
+			debugCountAccountLeasesHandler.ServeHTTP(w, r)
+		case DebugCountAccountsProcedure:
+			debugCountAccountsHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -684,4 +791,20 @@ func (UnimplementedDebugHandler) GetBacklogs(context.Context, *connect.Request[v
 
 func (UnimplementedDebugHandler) GetBacklogSize(context.Context, *connect.Request[v1.BacklogSizeRequest]) (*connect.Response[v1.BacklogSizeResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("debug.v1.Debug.GetBacklogSize is not implemented"))
+}
+
+func (UnimplementedDebugHandler) GetAccountConcurrency(context.Context, *connect.Request[v1.GetAccountConcurrencyRequest]) (*connect.Response[v1.GetAccountConcurrencyResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("debug.v1.Debug.GetAccountConcurrency is not implemented"))
+}
+
+func (UnimplementedDebugHandler) GetFunctionConcurrency(context.Context, *connect.Request[v1.GetFunctionConcurrencyRequest]) (*connect.Response[v1.GetFunctionConcurrencyResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("debug.v1.Debug.GetFunctionConcurrency is not implemented"))
+}
+
+func (UnimplementedDebugHandler) CountAccountLeases(context.Context, *connect.Request[v1.CountAccountLeasesRequest]) (*connect.Response[v1.CountAccountLeasesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("debug.v1.Debug.CountAccountLeases is not implemented"))
+}
+
+func (UnimplementedDebugHandler) CountAccounts(context.Context, *connect.Request[v1.CountAccountsRequest]) (*connect.Response[v1.CountAccountsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("debug.v1.Debug.CountAccounts is not implemented"))
 }

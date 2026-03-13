@@ -54,5 +54,14 @@ service Debug {
   rpc GetBacklogs(BacklogsRequest) returns (BacklogsResponse) {}
   // GetBacklogSize retrieves the number of items in a specific backlog
   rpc GetBacklogSize(BacklogSizeRequest) returns (BacklogSizeResponse) {}
+
+  // GetAccountConcurrency returns in-progress concurrency count for an account
+  rpc GetAccountConcurrency(GetAccountConcurrencyRequest) returns (GetAccountConcurrencyResponse) {}
+  // GetFunctionConcurrency returns in-progress concurrency count for a function
+  rpc GetFunctionConcurrency(GetFunctionConcurrencyRequest) returns (GetFunctionConcurrencyResponse) {}
+  // CountAccountLeases returns the number of items in the account leaseq zset
+  rpc CountAccountLeases(CountAccountLeasesRequest) returns (CountAccountLeasesResponse) {}
+  // CountAccounts returns the number of accounts in the top-level scavenger zset
+  rpc CountAccounts(CountAccountsRequest) returns (CountAccountsResponse) {}
 }
 

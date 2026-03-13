@@ -127,3 +127,59 @@ func (d *debugAPI) CheckConstraints(ctx context.Context, req *cpb.CapacityCheckR
 		Response: serializedResp,
 	}, nil
 }
+
+func (d *debugAPI) GetAccountConcurrency(ctx context.Context, req *pb.GetAccountConcurrencyRequest) (*pb.GetAccountConcurrencyResponse, error) {
+	accountID, err := uuid.Parse(req.AccountId)
+	if err != nil {
+		return nil, fmt.Errorf("invalid account ID: %w", err)
+	}
+
+	count, err := d.cdb.GetAccountConcurrency(ctx, accountID)
+	if err != nil {
+		return nil, fmt.Errorf("could not get account concurrency: %w", err)
+	}
+
+	return &pb.GetAccountConcurrencyResponse{InProgress: int32(count)}, nil
+}
+
+func (d *debugAPI) GetFunctionConcurrency(ctx context.Context, req *pb.GetFunctionConcurrencyRequest) (*pb.GetFunctionConcurrencyResponse, error) {
+	accountID, err := uuid.Parse(req.AccountId)
+	if err != nil {
+		return nil, fmt.Errorf("invalid account ID: %w", err)
+	}
+
+	functionID, err := uuid.Parse(req.FunctionId)
+	if err != nil {
+		return nil, fmt.Errorf("invalid function ID: %w", err)
+	}
+
+	count, err := d.cdb.GetFunctionConcurrency(ctx, accountID, functionID)
+	if err != nil {
+		return nil, fmt.Errorf("could not get function concurrency: %w", err)
+	}
+
+	return &pb.GetFunctionConcurrencyResponse{InProgress: int32(count)}, nil
+}
+
+func (d *debugAPI) CountAccountLeases(ctx context.Context, req *pb.CountAccountLeasesRequest) (*pb.CountAccountLeasesResponse, error) {
+	accountID, err := uuid.Parse(req.AccountId)
+	if err != nil {
+		return nil, fmt.Errorf("invalid account ID: %w", err)
+	}
+
+	count, err := d.cdb.CountAccountLeases(ctx, accountID)
+	if err != nil {
+		return nil, fmt.Errorf("could not count account leases: %w", err)
+	}
+
+	return &pb.CountAccountLeasesResponse{Count: int32(count)}, nil
+}
+
+func (d *debugAPI) CountAccounts(ctx context.Context, req *pb.CountAccountsRequest) (*pb.CountAccountsResponse, error) {
+	count, err := d.cdb.CountAccounts(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("could not count accounts: %w", err)
+	}
+
+	return &pb.CountAccountsResponse{Count: int32(count)}, nil
+}

@@ -20,26 +20,30 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Debug_GetPartition_FullMethodName        = "/debug.v1.Debug/GetPartition"
-	Debug_GetPartitionStatus_FullMethodName  = "/debug.v1.Debug/GetPartitionStatus"
-	Debug_GetQueueItem_FullMethodName        = "/debug.v1.Debug/GetQueueItem"
-	Debug_GetPause_FullMethodName            = "/debug.v1.Debug/GetPause"
-	Debug_GetIndex_FullMethodName            = "/debug.v1.Debug/GetIndex"
-	Debug_BlockPeek_FullMethodName           = "/debug.v1.Debug/BlockPeek"
-	Debug_BlockDeleted_FullMethodName        = "/debug.v1.Debug/BlockDeleted"
-	Debug_CheckConstraints_FullMethodName    = "/debug.v1.Debug/CheckConstraints"
-	Debug_GetBatchInfo_FullMethodName        = "/debug.v1.Debug/GetBatchInfo"
-	Debug_DeleteBatch_FullMethodName         = "/debug.v1.Debug/DeleteBatch"
-	Debug_RunBatch_FullMethodName            = "/debug.v1.Debug/RunBatch"
-	Debug_GetSingletonInfo_FullMethodName    = "/debug.v1.Debug/GetSingletonInfo"
-	Debug_DeleteSingletonLock_FullMethodName = "/debug.v1.Debug/DeleteSingletonLock"
-	Debug_GetDebounceInfo_FullMethodName     = "/debug.v1.Debug/GetDebounceInfo"
-	Debug_DeleteDebounce_FullMethodName      = "/debug.v1.Debug/DeleteDebounce"
-	Debug_RunDebounce_FullMethodName         = "/debug.v1.Debug/RunDebounce"
-	Debug_DeleteDebounceByID_FullMethodName  = "/debug.v1.Debug/DeleteDebounceByID"
-	Debug_GetShadowPartition_FullMethodName  = "/debug.v1.Debug/GetShadowPartition"
-	Debug_GetBacklogs_FullMethodName         = "/debug.v1.Debug/GetBacklogs"
-	Debug_GetBacklogSize_FullMethodName      = "/debug.v1.Debug/GetBacklogSize"
+	Debug_GetPartition_FullMethodName           = "/debug.v1.Debug/GetPartition"
+	Debug_GetPartitionStatus_FullMethodName     = "/debug.v1.Debug/GetPartitionStatus"
+	Debug_GetQueueItem_FullMethodName           = "/debug.v1.Debug/GetQueueItem"
+	Debug_GetPause_FullMethodName               = "/debug.v1.Debug/GetPause"
+	Debug_GetIndex_FullMethodName               = "/debug.v1.Debug/GetIndex"
+	Debug_BlockPeek_FullMethodName              = "/debug.v1.Debug/BlockPeek"
+	Debug_BlockDeleted_FullMethodName           = "/debug.v1.Debug/BlockDeleted"
+	Debug_CheckConstraints_FullMethodName       = "/debug.v1.Debug/CheckConstraints"
+	Debug_GetBatchInfo_FullMethodName           = "/debug.v1.Debug/GetBatchInfo"
+	Debug_DeleteBatch_FullMethodName            = "/debug.v1.Debug/DeleteBatch"
+	Debug_RunBatch_FullMethodName               = "/debug.v1.Debug/RunBatch"
+	Debug_GetSingletonInfo_FullMethodName       = "/debug.v1.Debug/GetSingletonInfo"
+	Debug_DeleteSingletonLock_FullMethodName    = "/debug.v1.Debug/DeleteSingletonLock"
+	Debug_GetDebounceInfo_FullMethodName        = "/debug.v1.Debug/GetDebounceInfo"
+	Debug_DeleteDebounce_FullMethodName         = "/debug.v1.Debug/DeleteDebounce"
+	Debug_RunDebounce_FullMethodName            = "/debug.v1.Debug/RunDebounce"
+	Debug_DeleteDebounceByID_FullMethodName     = "/debug.v1.Debug/DeleteDebounceByID"
+	Debug_GetShadowPartition_FullMethodName     = "/debug.v1.Debug/GetShadowPartition"
+	Debug_GetBacklogs_FullMethodName            = "/debug.v1.Debug/GetBacklogs"
+	Debug_GetBacklogSize_FullMethodName         = "/debug.v1.Debug/GetBacklogSize"
+	Debug_GetAccountConcurrency_FullMethodName  = "/debug.v1.Debug/GetAccountConcurrency"
+	Debug_GetFunctionConcurrency_FullMethodName = "/debug.v1.Debug/GetFunctionConcurrency"
+	Debug_CountAccountLeases_FullMethodName     = "/debug.v1.Debug/CountAccountLeases"
+	Debug_CountAccounts_FullMethodName          = "/debug.v1.Debug/CountAccounts"
 )
 
 // DebugClient is the client API for Debug service.
@@ -87,6 +91,14 @@ type DebugClient interface {
 	GetBacklogs(ctx context.Context, in *BacklogsRequest, opts ...grpc.CallOption) (*BacklogsResponse, error)
 	// GetBacklogSize retrieves the number of items in a specific backlog
 	GetBacklogSize(ctx context.Context, in *BacklogSizeRequest, opts ...grpc.CallOption) (*BacklogSizeResponse, error)
+	// GetAccountConcurrency returns in-progress concurrency count for an account
+	GetAccountConcurrency(ctx context.Context, in *GetAccountConcurrencyRequest, opts ...grpc.CallOption) (*GetAccountConcurrencyResponse, error)
+	// GetFunctionConcurrency returns in-progress concurrency count for a function
+	GetFunctionConcurrency(ctx context.Context, in *GetFunctionConcurrencyRequest, opts ...grpc.CallOption) (*GetFunctionConcurrencyResponse, error)
+	// CountAccountLeases returns the number of items in the account leaseq zset
+	CountAccountLeases(ctx context.Context, in *CountAccountLeasesRequest, opts ...grpc.CallOption) (*CountAccountLeasesResponse, error)
+	// CountAccounts returns the number of accounts in the top-level scavenger zset
+	CountAccounts(ctx context.Context, in *CountAccountsRequest, opts ...grpc.CallOption) (*CountAccountsResponse, error)
 }
 
 type debugClient struct {
@@ -297,6 +309,46 @@ func (c *debugClient) GetBacklogSize(ctx context.Context, in *BacklogSizeRequest
 	return out, nil
 }
 
+func (c *debugClient) GetAccountConcurrency(ctx context.Context, in *GetAccountConcurrencyRequest, opts ...grpc.CallOption) (*GetAccountConcurrencyResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetAccountConcurrencyResponse)
+	err := c.cc.Invoke(ctx, Debug_GetAccountConcurrency_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *debugClient) GetFunctionConcurrency(ctx context.Context, in *GetFunctionConcurrencyRequest, opts ...grpc.CallOption) (*GetFunctionConcurrencyResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetFunctionConcurrencyResponse)
+	err := c.cc.Invoke(ctx, Debug_GetFunctionConcurrency_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *debugClient) CountAccountLeases(ctx context.Context, in *CountAccountLeasesRequest, opts ...grpc.CallOption) (*CountAccountLeasesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CountAccountLeasesResponse)
+	err := c.cc.Invoke(ctx, Debug_CountAccountLeases_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *debugClient) CountAccounts(ctx context.Context, in *CountAccountsRequest, opts ...grpc.CallOption) (*CountAccountsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CountAccountsResponse)
+	err := c.cc.Invoke(ctx, Debug_CountAccounts_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // DebugServer is the server API for Debug service.
 // All implementations must embed UnimplementedDebugServer
 // for forward compatibility.
@@ -342,6 +394,14 @@ type DebugServer interface {
 	GetBacklogs(context.Context, *BacklogsRequest) (*BacklogsResponse, error)
 	// GetBacklogSize retrieves the number of items in a specific backlog
 	GetBacklogSize(context.Context, *BacklogSizeRequest) (*BacklogSizeResponse, error)
+	// GetAccountConcurrency returns in-progress concurrency count for an account
+	GetAccountConcurrency(context.Context, *GetAccountConcurrencyRequest) (*GetAccountConcurrencyResponse, error)
+	// GetFunctionConcurrency returns in-progress concurrency count for a function
+	GetFunctionConcurrency(context.Context, *GetFunctionConcurrencyRequest) (*GetFunctionConcurrencyResponse, error)
+	// CountAccountLeases returns the number of items in the account leaseq zset
+	CountAccountLeases(context.Context, *CountAccountLeasesRequest) (*CountAccountLeasesResponse, error)
+	// CountAccounts returns the number of accounts in the top-level scavenger zset
+	CountAccounts(context.Context, *CountAccountsRequest) (*CountAccountsResponse, error)
 	mustEmbedUnimplementedDebugServer()
 }
 
@@ -411,6 +471,18 @@ func (UnimplementedDebugServer) GetBacklogs(context.Context, *BacklogsRequest) (
 }
 func (UnimplementedDebugServer) GetBacklogSize(context.Context, *BacklogSizeRequest) (*BacklogSizeResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetBacklogSize not implemented")
+}
+func (UnimplementedDebugServer) GetAccountConcurrency(context.Context, *GetAccountConcurrencyRequest) (*GetAccountConcurrencyResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetAccountConcurrency not implemented")
+}
+func (UnimplementedDebugServer) GetFunctionConcurrency(context.Context, *GetFunctionConcurrencyRequest) (*GetFunctionConcurrencyResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetFunctionConcurrency not implemented")
+}
+func (UnimplementedDebugServer) CountAccountLeases(context.Context, *CountAccountLeasesRequest) (*CountAccountLeasesResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CountAccountLeases not implemented")
+}
+func (UnimplementedDebugServer) CountAccounts(context.Context, *CountAccountsRequest) (*CountAccountsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CountAccounts not implemented")
 }
 func (UnimplementedDebugServer) mustEmbedUnimplementedDebugServer() {}
 func (UnimplementedDebugServer) testEmbeddedByValue()               {}
@@ -793,6 +865,78 @@ func _Debug_GetBacklogSize_Handler(srv interface{}, ctx context.Context, dec fun
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Debug_GetAccountConcurrency_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetAccountConcurrencyRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DebugServer).GetAccountConcurrency(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Debug_GetAccountConcurrency_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DebugServer).GetAccountConcurrency(ctx, req.(*GetAccountConcurrencyRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Debug_GetFunctionConcurrency_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetFunctionConcurrencyRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DebugServer).GetFunctionConcurrency(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Debug_GetFunctionConcurrency_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DebugServer).GetFunctionConcurrency(ctx, req.(*GetFunctionConcurrencyRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Debug_CountAccountLeases_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CountAccountLeasesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DebugServer).CountAccountLeases(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Debug_CountAccountLeases_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DebugServer).CountAccountLeases(ctx, req.(*CountAccountLeasesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Debug_CountAccounts_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CountAccountsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DebugServer).CountAccounts(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Debug_CountAccounts_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DebugServer).CountAccounts(ctx, req.(*CountAccountsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Debug_ServiceDesc is the grpc.ServiceDesc for Debug service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -879,6 +1023,22 @@ var Debug_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetBacklogSize",
 			Handler:    _Debug_GetBacklogSize_Handler,
+		},
+		{
+			MethodName: "GetAccountConcurrency",
+			Handler:    _Debug_GetAccountConcurrency_Handler,
+		},
+		{
+			MethodName: "GetFunctionConcurrency",
+			Handler:    _Debug_GetFunctionConcurrency_Handler,
+		},
+		{
+			MethodName: "CountAccountLeases",
+			Handler:    _Debug_CountAccountLeases_Handler,
+		},
+		{
+			MethodName: "CountAccounts",
+			Handler:    _Debug_CountAccounts_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

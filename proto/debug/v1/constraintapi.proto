@@ -9,3 +9,34 @@ message CheckConstraintsResponse {
   constraintapi.v1.CapacityCheckRequest request = 1;
   constraintapi.v1.CapacityCheckResponse response = 2;
 }
+
+message GetAccountConcurrencyRequest {
+  string account_id = 1;
+}
+
+message GetAccountConcurrencyResponse {
+  int32 in_progress = 1;
+}
+
+message GetFunctionConcurrencyRequest {
+  string account_id = 1;
+  string function_id = 2;
+}
+
+message GetFunctionConcurrencyResponse {
+  int32 in_progress = 1;
+}
+
+message CountAccountLeasesRequest {
+  string account_id = 1;
+}
+
+message CountAccountLeasesResponse {
+  int32 count = 1;
+}
+
+message CountAccountsRequest {}
+
+message CountAccountsResponse {
+  int32 count = 1;
+}
