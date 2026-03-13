@@ -179,7 +179,7 @@ func registerFunctions(t *testing.T, sdkServer *http.Server) {
 	if err != nil {
 		t.Fatalf("failed to register functions: %v", err)
 	}
-	io.ReadAll(resp.Body)
+	_, _ = io.ReadAll(resp.Body)
 	resp.Body.Close()
 	if resp.StatusCode != 200 {
 		t.Fatalf("registration returned status %d", resp.StatusCode)

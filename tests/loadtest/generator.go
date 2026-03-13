@@ -36,11 +36,7 @@ func (g *Generator) Run(ctx context.Context) (int, error) {
 		errors []error
 	)
 
-	for {
-		if g.Profile.MaxEvents > 0 && sent >= g.Profile.MaxEvents {
-			break
-		}
-
+	for g.Profile.MaxEvents == 0 || sent < g.Profile.MaxEvents {
 		if err := limiter.Wait(ctx); err != nil {
 			// Context cancelled or timed out — that's normal for duration-based profiles.
 			break
