@@ -209,6 +209,16 @@ for index, value in ipairs(constraints) do
 		usage["l"] = value.t.l
 		usage["u"] = math.max(math.min(value.t.l - constraintCapacity, value.t.l or 0), 0)
 		table.insert(constraintUsage, usage)
+	elseif value.k == 4 then
+		debug("evaluating semaphore")
+		local currentCount = tonumber(call("GET", value.sem.k)) or 0
+		local remaining = math.max(0, value.sem.cap - currentCount)
+		constraintCapacity = math.floor(remaining / value.sem.amt)
+		constraintRetryAfter = toInteger(nowMS + (value.sem.ra or 2000))
+		local usage = {}
+		usage["l"] = value.sem.cap
+		usage["u"] = currentCount
+		table.insert(constraintUsage, usage)
 	end
 	if constraintCapacity <= 0 then
 		if not exhaustedSet[index] then

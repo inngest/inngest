@@ -110,7 +110,7 @@ func readRedisScripts(path string, entries []fs.DirEntry) {
 // SerializedConstraintItem represents a minimal, Lua-friendly version of ConstraintItem
 // with short JSON field names and integer enums to reduce Redis storage size.
 type SerializedConstraintItem struct {
-	// k = Kind as integer: 1=rate_limit, 2=concurrency, 3=throttle
+	// k = Kind as integer: 1=rate_limit, 2=concurrency, 3=throttle, 4=semaphore
 	Kind int `json:"k"`
 
 	// Concurrency constraint (only populated when Kind=2)
@@ -121,6 +121,9 @@ type SerializedConstraintItem struct {
 
 	// RateLimit constraint (only populated when Kind=1)
 	RateLimit *SerializedRateLimitConstraint `json:"r,omitempty"`
+
+	// Semaphore constraint (only populated when Kind=4)
+	Semaphore *SerializedSemaphoreConstraint `json:"sem,omitempty"`
 }
 
 // SerializedConcurrencyConstraint represents a minimal version of ConcurrencyConstraint
@@ -193,6 +196,33 @@ type SerializedRateLimitConstraint struct {
 
 	// k = Key (fully-qualified Redis key: concatenated evaluated key hash with prefix)
 	Key string `json:"k,omitempty"`
+}
+
+// SerializedSemaphoreConstraint represents a minimal version of SemaphoreConstraint
+type SerializedSemaphoreConstraint struct {
+	// s = Scope as integer: 0=Fn, 1=Env, 2=Account
+	Scope int `json:"s,omitempty"`
+
+	// n = Name to uniquely identify the semaphore
+	Name string `json:"n"`
+
+	// h = KeyExpressionHash
+	KeyExpressionHash string `json:"h,omitempty"`
+
+	// eh = EvaluatedKeyHash
+	EvaluatedKeyHash string `json:"eh,omitempty"`
+
+	// cap = Capacity (max units from config)
+	Capacity int `json:"cap"`
+
+	// amt = Amount (units to acquire per item)
+	Amount int `json:"amt"`
+
+	// k = Key (fully-qualified Redis key)
+	Key string `json:"k,omitempty"`
+
+	// ra = RetryAfterMS determines the retry duration in milliseconds
+	RetryAfterMS int `json:"ra,omitempty"`
 }
 
 // ToSerializedConstraintItem converts a ConstraintItem to a SerializedConstraintItem
@@ -295,6 +325,29 @@ func (ci ConstraintItem) ToSerializedConstraintItem(
 			}
 
 			serialized.Throttle = throttleConstraint
+		}
+	case ConstraintKindSemaphore:
+		serialized.Kind = 4
+		if ci.Semaphore != nil {
+			semaphoreConstraint := &SerializedSemaphoreConstraint{
+				Scope:             int(ci.Semaphore.Scope),
+				Name:              ci.Semaphore.Name,
+				KeyExpressionHash: ci.Semaphore.KeyExpressionHash,
+				EvaluatedKeyHash:  ci.Semaphore.EvaluatedKeyHash,
+				Amount:            ci.Semaphore.Amount,
+				Key:               ci.Semaphore.StateKey(accountID, envID, functionID),
+				RetryAfterMS:      int(ci.Semaphore.RetryAfter().Milliseconds()),
+			}
+
+			// Find matching semaphore config
+			for _, sConfig := range config.Semaphore {
+				if sConfig.Name == ci.Semaphore.Name && sConfig.Scope == ci.Semaphore.Scope && sConfig.KeyExpressionHash == ci.Semaphore.KeyExpressionHash {
+					semaphoreConstraint.Capacity = sConfig.Capacity
+					break
+				}
+			}
+
+			serialized.Semaphore = semaphoreConstraint
 		}
 	}
 

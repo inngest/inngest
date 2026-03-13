@@ -121,6 +121,8 @@ func ConstraintKindToProto(kind ConstraintKind) pb.ConstraintApiConstraintKind {
 		return pb.ConstraintApiConstraintKind_CONSTRAINT_API_CONSTRAINT_KIND_CONCURRENCY
 	case ConstraintKindThrottle:
 		return pb.ConstraintApiConstraintKind_CONSTRAINT_API_CONSTRAINT_KIND_THROTTLE
+	case ConstraintKindSemaphore:
+		return pb.ConstraintApiConstraintKind_CONSTRAINT_API_CONSTRAINT_KIND_SEMAPHORE
 	default:
 		return pb.ConstraintApiConstraintKind_CONSTRAINT_API_CONSTRAINT_KIND_UNSPECIFIED
 	}
@@ -134,8 +136,80 @@ func ConstraintKindFromProto(kind pb.ConstraintApiConstraintKind) ConstraintKind
 		return ConstraintKindConcurrency
 	case pb.ConstraintApiConstraintKind_CONSTRAINT_API_CONSTRAINT_KIND_THROTTLE:
 		return ConstraintKindThrottle
+	case pb.ConstraintApiConstraintKind_CONSTRAINT_API_CONSTRAINT_KIND_SEMAPHORE:
+		return ConstraintKindSemaphore
 	default:
 		return ConstraintKind("")
+	}
+}
+
+func SemaphoreScopeToProto(scope enums.SemaphoreScope) pb.ConstraintApiSemaphoreScope {
+	switch scope {
+	case enums.SemaphoreScopeFn:
+		return pb.ConstraintApiSemaphoreScope_CONSTRAINT_API_SEMAPHORE_SCOPE_FUNCTION
+	case enums.SemaphoreScopeEnv:
+		return pb.ConstraintApiSemaphoreScope_CONSTRAINT_API_SEMAPHORE_SCOPE_ENV
+	case enums.SemaphoreScopeAccount:
+		return pb.ConstraintApiSemaphoreScope_CONSTRAINT_API_SEMAPHORE_SCOPE_ACCOUNT
+	default:
+		return pb.ConstraintApiSemaphoreScope_CONSTRAINT_API_SEMAPHORE_SCOPE_UNSPECIFIED
+	}
+}
+
+func SemaphoreScopeFromProto(scope pb.ConstraintApiSemaphoreScope) enums.SemaphoreScope {
+	switch scope {
+	case pb.ConstraintApiSemaphoreScope_CONSTRAINT_API_SEMAPHORE_SCOPE_FUNCTION:
+		return enums.SemaphoreScopeFn
+	case pb.ConstraintApiSemaphoreScope_CONSTRAINT_API_SEMAPHORE_SCOPE_ENV:
+		return enums.SemaphoreScopeEnv
+	case pb.ConstraintApiSemaphoreScope_CONSTRAINT_API_SEMAPHORE_SCOPE_ACCOUNT:
+		return enums.SemaphoreScopeAccount
+	default:
+		return enums.SemaphoreScopeFn
+	}
+}
+
+func SemaphoreConfigToProto(config SemaphoreConfig) *pb.SemaphoreConfig {
+	return &pb.SemaphoreConfig{
+		Name:              config.Name,
+		Scope:             SemaphoreScopeToProto(config.Scope),
+		KeyExpressionHash: config.KeyExpressionHash,
+		Capacity:          int32(config.Capacity),
+	}
+}
+
+func SemaphoreConfigFromProto(pbConfig *pb.SemaphoreConfig) SemaphoreConfig {
+	if pbConfig == nil {
+		return SemaphoreConfig{}
+	}
+	return SemaphoreConfig{
+		Name:              pbConfig.Name,
+		Scope:             SemaphoreScopeFromProto(pbConfig.Scope),
+		KeyExpressionHash: pbConfig.KeyExpressionHash,
+		Capacity:          int(pbConfig.Capacity),
+	}
+}
+
+func SemaphoreConstraintToProto(constraint SemaphoreConstraint) *pb.SemaphoreConstraint {
+	return &pb.SemaphoreConstraint{
+		Name:              constraint.Name,
+		Scope:             SemaphoreScopeToProto(constraint.Scope),
+		KeyExpressionHash: constraint.KeyExpressionHash,
+		EvaluatedKeyHash:  constraint.EvaluatedKeyHash,
+		Amount:            int32(constraint.Amount),
+	}
+}
+
+func SemaphoreConstraintFromProto(pbConstraint *pb.SemaphoreConstraint) SemaphoreConstraint {
+	if pbConstraint == nil {
+		return SemaphoreConstraint{}
+	}
+	return SemaphoreConstraint{
+		Name:              pbConstraint.Name,
+		Scope:             SemaphoreScopeFromProto(pbConstraint.Scope),
+		KeyExpressionHash: pbConstraint.KeyExpressionHash,
+		EvaluatedKeyHash:  pbConstraint.EvaluatedKeyHash,
+		Amount:            int(pbConstraint.Amount),
 	}
 }
 
@@ -343,11 +417,20 @@ func ConstraintConfigToProto(config ConstraintConfig) *pb.ConstraintConfig {
 		throttles[i] = ThrottleConfigToProto(th)
 	}
 
+	var semaphores []*pb.SemaphoreConfig
+	if len(config.Semaphore) > 0 {
+		semaphores = make([]*pb.SemaphoreConfig, len(config.Semaphore))
+		for i, s := range config.Semaphore {
+			semaphores[i] = SemaphoreConfigToProto(s)
+		}
+	}
+
 	return &pb.ConstraintConfig{
 		FunctionVersion: int32(config.FunctionVersion),
 		RateLimit:       rateLimits,
 		Concurrency:     ConcurrencyConfigToProto(config.Concurrency),
 		Throttle:        throttles,
+		Semaphore:       semaphores,
 	}
 }
 
@@ -366,11 +449,20 @@ func ConstraintConfigFromProto(pbConfig *pb.ConstraintConfig) ConstraintConfig {
 		throttles[i] = ThrottleConfigFromProto(th)
 	}
 
+	var semaphores []SemaphoreConfig
+	if len(pbConfig.Semaphore) > 0 {
+		semaphores = make([]SemaphoreConfig, len(pbConfig.Semaphore))
+		for i, s := range pbConfig.Semaphore {
+			semaphores[i] = SemaphoreConfigFromProto(s)
+		}
+	}
+
 	return ConstraintConfig{
 		FunctionVersion: int(pbConfig.FunctionVersion),
 		RateLimit:       rateLimits,
 		Concurrency:     ConcurrencyConfigFromProto(pbConfig.Concurrency),
 		Throttle:        throttles,
+		Semaphore:       semaphores,
 	}
 }
 
@@ -453,6 +545,10 @@ func ConstraintItemToProto(item ConstraintItem) *pb.ConstraintItem {
 		pbItem.RateLimit = RateLimitConstraintToProto(*item.RateLimit)
 	}
 
+	if item.Semaphore != nil {
+		pbItem.Semaphore = SemaphoreConstraintToProto(*item.Semaphore)
+	}
+
 	return pbItem
 }
 
@@ -478,6 +574,11 @@ func ConstraintItemFromProto(pbItem *pb.ConstraintItem) ConstraintItem {
 	if pbItem.RateLimit != nil {
 		rateLimit := RateLimitConstraintFromProto(pbItem.RateLimit)
 		item.RateLimit = &rateLimit
+	}
+
+	if pbItem.Semaphore != nil {
+		semaphore := SemaphoreConstraintFromProto(pbItem.Semaphore)
+		item.Semaphore = &semaphore
 	}
 
 	return item

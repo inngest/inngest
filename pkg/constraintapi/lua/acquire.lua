@@ -236,6 +236,13 @@ for index, value in ipairs(constraints) do
 		local throttleRes = throttle(value.t.k, nowMS, value.t.p, value.t.l, maxBurst, 0)
 		constraintCapacity = throttleRes["remaining"] or 0
 		constraintRetryAt = toInteger(throttleRes["retry_at"]) -- already in ms
+	elseif value.k == 4 then
+		-- semaphore
+		local currentCount = tonumber(call("GET", value.sem.k)) or 0
+		local remaining = math.max(0, value.sem.cap - currentCount)
+		-- Capacity in terms of leases (each lease consumes 'amount' units)
+		constraintCapacity = math.floor(remaining / value.sem.amt)
+		constraintRetryAt = toInteger(nowMS + (value.sem.ra or 2000))
 	end
 
 	-- Track if constraint is exhausted before granting
@@ -346,6 +353,16 @@ for i, value in ipairs(constraints) do
 		local throttleRes = throttle(value.t.k, nowMS, value.t.p, value.t.l, maxBurst, granted)
 		constraintRetryAt = toInteger(throttleRes["retry_at"])
 		constraintCapacity = throttleRes["remaining"] or 0
+	elseif value.k == 4 then
+		-- semaphore: increment counter by granted * amount
+		local increment = granted * value.sem.amt
+		local newCount = call("INCRBY", value.sem.k, increment)
+		-- Set 7-day TTL on semaphore key
+		call("EXPIRE", value.sem.k, 604800)
+		-- Recalculate remaining capacity after increment
+		local remaining = math.max(0, value.sem.cap - newCount)
+		constraintCapacity = math.floor(remaining / value.sem.amt)
+		constraintRetryAt = toInteger(nowMS + (value.sem.ra or 2000))
 	end
 
 	-- If we used up capacity after the update,

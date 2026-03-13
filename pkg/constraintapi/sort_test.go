@@ -440,7 +440,8 @@ func TestGetConstraintKindPriority(t *testing.T) {
 		{ConstraintKindRateLimit, 1},
 		{ConstraintKindThrottle, 2},
 		{ConstraintKindConcurrency, 3},
-		{ConstraintKind("unknown"), 4},
+		{ConstraintKindSemaphore, 4},
+		{ConstraintKind("unknown"), 5},
 	}
 
 	for _, tt := range tests {
