@@ -26,6 +26,7 @@ import {
 import { toast } from 'sonner';
 
 import {
+  AppMethod,
   FunctionTriggerTypes,
   useGetFunctionsQuery,
   useInvokeFunctionMutation,
@@ -108,6 +109,11 @@ function TriggerCell({ row }: { row: Row<Function> }) {
   }, [row.original.triggers]);
 
   const [invokeFunction] = useInvokeFunctionMutation();
+  const isDurableEndpoint = row.original.app?.method === AppMethod.Api;
+
+  if (isDurableEndpoint) {
+    return null;
+  }
 
   return (
     <InvokeButton

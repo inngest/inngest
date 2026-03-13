@@ -29,6 +29,7 @@ type Props = {
   run: Lazy<Run>;
   runID: string;
   result?: TraceResult;
+  isDurableEndpoint?: boolean;
 };
 
 type Run = {
@@ -54,7 +55,14 @@ type Run = {
   hasAI: boolean;
 };
 
-export const RunInfo = ({ initialRunData, run, runID, standalone, result }: Props) => {
+export const RunInfo = ({
+  initialRunData,
+  run,
+  runID,
+  standalone,
+  result,
+  isDurableEndpoint,
+}: Props) => {
   const [expanded, setExpanded] = useState(true);
   const allowCancel = isLazyDone(run) && !Boolean(run.trace.endedAt);
   const aiOutput = result?.data ? parseAIOutput(result.data) : undefined;
@@ -90,6 +98,7 @@ export const RunInfo = ({ initialRunData, run, runID, standalone, result }: Prop
             runID={runID}
             fnID={isLazyDone(run) ? run.fn.id : undefined}
             allowCancel={allowCancel}
+            isDurableEndpoint={isDurableEndpoint}
           />
         </div>
       </div>

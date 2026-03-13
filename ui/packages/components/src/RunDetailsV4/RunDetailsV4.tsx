@@ -289,6 +289,7 @@ export const RunDetailsV4 = ({
               runID={runID}
               standalone={standalone}
               result={resultData}
+              isDurableEndpoint={runData?.isDurableEndpoint}
             />
             {showError && (
               <ErrorCard
@@ -339,6 +340,7 @@ export const RunDetailsV4 = ({
               selectedStep={selectedStep}
               pollInterval={pollInterval}
               tracesPreviewEnabled={tracesPreviewEnabled}
+              isDurableEndpoint={runData?.isDurableEndpoint}
             />
           ) : (
             <TopInfo
@@ -347,6 +349,7 @@ export const RunDetailsV4 = ({
               runID={runID}
               result={resultData}
               trace={runData?.trace}
+              isDurableEndpoint={runData?.isDurableEndpoint}
             />
           )}
         </div>
