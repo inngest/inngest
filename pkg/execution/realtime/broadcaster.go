@@ -564,10 +564,10 @@ func (b *broadcaster) keepalive(ctx context.Context, subID uuid.UUID) {
 		// ensure the subscription ID exists, else it has been closed.
 		b.l.RLock()
 		sub, ok := b.subs[subID]
+		b.l.RUnlock()
 		if !ok {
 			return
 		}
-		b.l.RUnlock()
 
 		err := sub.SendKeepalive(Message{
 			Kind:      streamingtypes.MessageKindPing,
