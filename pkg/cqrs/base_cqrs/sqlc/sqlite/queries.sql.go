@@ -1273,24 +1273,38 @@ SELECT
   output
 FROM spans
 WHERE span_id IN (/*SLICE:ids*/?)
-LIMIT 2
+   OR (dynamic_span_id IN (/*SLICE:dyn_ids*/?) AND output IS NOT NULL)
+LIMIT 4
 `
+
+type GetSpanOutputParams struct {
+	Ids    []string
+	DynIds []sql.NullString
+}
 
 type GetSpanOutputRow struct {
 	Input  interface{}
 	Output interface{}
 }
 
-func (q *Queries) GetSpanOutput(ctx context.Context, ids []string) ([]*GetSpanOutputRow, error) {
+func (q *Queries) GetSpanOutput(ctx context.Context, arg GetSpanOutputParams) ([]*GetSpanOutputRow, error) {
 	query := getSpanOutput
 	var queryParams []interface{}
-	if len(ids) > 0 {
-		for _, v := range ids {
+	if len(arg.Ids) > 0 {
+		for _, v := range arg.Ids {
 			queryParams = append(queryParams, v)
 		}
-		query = strings.Replace(query, "/*SLICE:ids*/?", strings.Repeat(",?", len(ids))[1:], 1)
+		query = strings.Replace(query, "/*SLICE:ids*/?", strings.Repeat(",?", len(arg.Ids))[1:], 1)
 	} else {
 		query = strings.Replace(query, "/*SLICE:ids*/?", "NULL", 1)
+	}
+	if len(arg.DynIds) > 0 {
+		for _, v := range arg.DynIds {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:dyn_ids*/?", strings.Repeat(",?", len(arg.DynIds))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:dyn_ids*/?", "NULL", 1)
 	}
 	rows, err := q.db.QueryContext(ctx, query, queryParams...)
 	if err != nil {
