@@ -1,3 +1,5 @@
+version: 2
+
 before:
   hooks:
     - go mod tidy
@@ -83,6 +85,23 @@ changelog:
     exclude:
       - '^docs:'
       - '^test:'
+
+homebrew_casks:
+  - name: inngest
+
+    # https://github.com/inngest/homebrew-tap
+    repository:
+      owner: inngest
+      name: homebrew-tap
+      branch: main
+      token: "{{ .Env.TAP_GITHUB_TOKEN }}"
+
+    # auto only uploads stable releases to homebrew-tap
+    # set to false temporarily if testing prereleases too
+    skip_upload: auto
+
+    homepage: "https://www.inngest.com/"
+    description: "Inngest CLI and development server"
 
 release:
   # Repo in which the release will be created.
