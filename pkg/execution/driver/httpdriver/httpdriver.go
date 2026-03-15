@@ -245,7 +245,38 @@ func HandleHttpResponse(ctx context.Context, r Request, resp *Response) (*state.
 		// - The SDK isn't invoked (proxy error, etc.)
 		// - The SDK has a catastrophic failure and does not respond gracefully.
 		// - The function fails or errors (these are not *yet* opcodes, but should be).
-		err = fmt.Errorf("invalid status code: %d", resp.StatusCode)
+		
+		// Log the HTTP error for debugging purposes
+		logger.StdlibLogger(ctx).Debug("HTTP request returned non-2xx status", 
+			"status_code", resp.StatusCode,
+			"method", "POST",
+			"response_body_length", len(resp.Body))
+		
+		// Provide more specific error messages based on status code
+		switch resp.StatusCode {
+		case 404:
+			err = fmt.Errorf("endpoint not found (404): the function endpoint may not exist or may not be properly configured")
+		case 401:
+			err = fmt.Errorf("unauthorized (401): authentication failed")
+		case 403:
+			err = fmt.Errorf("forbidden (403): access denied")
+		case 500:
+			err = fmt.Errorf("internal server error (500): the function encountered an error")
+		case 502:
+			err = fmt.Errorf("bad gateway (502): upstream server error")
+		case 503:
+			err = fmt.Errorf("service unavailable (503): the service is temporarily unavailable")
+		case 504:
+			err = fmt.Errorf("gateway timeout (504): the request timed out")
+		default:
+			if resp.StatusCode >= 400 && resp.StatusCode < 500 {
+				err = fmt.Errorf("client error (%d): the request was invalid", resp.StatusCode)
+			} else if resp.StatusCode >= 500 {
+				err = fmt.Errorf("server error (%d): the server encountered an error", resp.StatusCode)
+			} else {
+				err = fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+			}
+		}
 		dr.SetError(err)
 	}
 	if resp.NoRetry {
