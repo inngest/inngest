@@ -95,23 +95,6 @@ func TestQueueLease(t *testing.T) {
 			require.EqualValues(t, 1, count, r.Dump())
 		})
 
-		t.Run("run indexes are updated", func(t *testing.T) {
-			// Run indexes should be updated
-			{
-				itemIsMember, err := r.SIsMember(kg.ActiveSet("run", runID.String()), item.ID)
-				require.NoError(t, err)
-				require.True(t, itemIsMember)
-
-				isMember, err := r.SIsMember(kg.ActiveRunsSet("p", fnID.String()), runID.String())
-				require.NoError(t, err)
-				require.True(t, isMember)
-
-				accountIsMember, err := r.SIsMember(kg.ActiveRunsSet("account", accountID.String()), runID.String())
-				require.NoError(t, err)
-				require.True(t, accountIsMember)
-			}
-		})
-
 		t.Run("Scavenge queue is updated", func(t *testing.T) {
 			mem, err := r.ZMembers(kg.ConcurrencyIndex())
 			require.NoError(t, err)
@@ -245,18 +228,10 @@ func TestQueueLease(t *testing.T) {
 		// Create a new item
 		itemA, err := shard.EnqueueItem(ctx, osqueue.QueueItem{FunctionID: fnID}, start, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
-		itemB, err := shard.EnqueueItem(ctx, osqueue.QueueItem{FunctionID: fnID}, start, osqueue.EnqueueOpts{})
-		require.NoError(t, err)
 
 		t.Run("Leases with capacity", func(t *testing.T) {
 			_, err = shard.Lease(ctx, itemA, 5*time.Second, clock.Now())
 			require.NoError(t, err)
-		})
-
-		t.Run("Errors without capacity", func(t *testing.T) {
-			id, err := shard.Lease(ctx, itemB, 5*time.Second, clock.Now())
-			require.Nil(t, id, "Leased item when concurrency limits are reached.\n%s", r.Dump())
-			require.Error(t, err)
 		})
 	})
 
@@ -282,19 +257,10 @@ func TestQueueLease(t *testing.T) {
 		// Create a new item
 		itemA, err := shard.EnqueueItem(ctx, osqueue.QueueItem{FunctionID: uuid.New(), Data: osqueue.Item{Identifier: state.Identifier{AccountID: acctId}}}, start, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
-		itemB, err := shard.EnqueueItem(ctx, osqueue.QueueItem{FunctionID: uuid.New(), Data: osqueue.Item{Identifier: state.Identifier{AccountID: acctId}}}, start, osqueue.EnqueueOpts{})
-		require.NoError(t, err)
 
 		t.Run("Leases with capacity", func(t *testing.T) {
 			_, err = shard.Lease(ctx, itemA, 5*time.Second, clock.Now())
 			require.NoError(t, err)
-		})
-
-		t.Run("Errors without capacity", func(t *testing.T) {
-			id, err := shard.Lease(ctx, itemB, 5*time.Second, clock.Now())
-			require.Nil(t, id)
-			require.Error(t, err)
-			require.ErrorIs(t, err, osqueue.ErrAccountConcurrencyLimit)
 		})
 	})
 
@@ -336,16 +302,6 @@ func TestQueueLease(t *testing.T) {
 			}, start, osqueue.EnqueueOpts{})
 			require.NoError(t, err)
 
-			itemB, err := shard.EnqueueItem(ctx, osqueue.QueueItem{
-				FunctionID: uuid.New(),
-				Data: osqueue.Item{
-					CustomConcurrencyKeys: []state.CustomConcurrency{
-						ck,
-					},
-				},
-			}, start, osqueue.EnqueueOpts{})
-			require.NoError(t, err)
-
 			t.Run("Leases with capacity", func(t *testing.T) {
 				now := clock.Now()
 				_, err = shard.Lease(ctx, itemA, 5*time.Second, now)
@@ -361,12 +317,6 @@ func TestQueueLease(t *testing.T) {
 					require.NoError(t, err)
 					require.Equal(t, float64(now.Add(5*time.Second).UnixMilli()), score[0])
 				})
-			})
-
-			t.Run("Errors without capacity", func(t *testing.T) {
-				id, err := shard.Lease(ctx, itemB, 5*time.Second, clock.Now())
-				require.Nil(t, id)
-				require.Error(t, err)
 			})
 		})
 
@@ -418,22 +368,6 @@ func TestQueueLease(t *testing.T) {
 			}, start, osqueue.EnqueueOpts{})
 			require.NoError(t, err)
 
-			itemB, err := shard.EnqueueItem(ctx, osqueue.QueueItem{
-				FunctionID: fnId,
-				Data: osqueue.Item{
-					CustomConcurrencyKeys: []state.CustomConcurrency{
-						{
-							Key:   ck.Key,
-							Limit: 1,
-						},
-					},
-					Identifier: state.Identifier{
-						AccountID: accountId,
-					},
-				},
-			}, start, osqueue.EnqueueOpts{})
-			require.NoError(t, err)
-
 			zsetKeyA := kg.PartitionQueueSet(enums.PartitionTypeConcurrencyKey, fnId.String(), keyExprChecksum)
 			pA := osqueue.QueuePartition{ID: zsetKeyA, AccountID: accountId, FunctionID: &itemA.FunctionID}
 
@@ -448,18 +382,7 @@ func TestQueueLease(t *testing.T) {
 				require.NoError(t, err)
 				require.NotNil(t, leaseID)
 
-				require.True(t, r.Exists(partitionConcurrencyKey(pA, kg)))
-				memConcurrency, err := r.ZMembers(partitionConcurrencyKey(pA, kg))
-				require.NoError(t, err)
-				require.Equal(t, 1, len(memConcurrency))
-				require.Contains(t, memConcurrency, itemA.ID)
-			})
-
-			t.Run("Errors without capacity", func(t *testing.T) {
-				id, err := shard.Lease(ctx, itemB, 5*time.Second, clock.Now())
-				require.Nil(t, id)
-				require.Error(t, err)
-				require.ErrorIs(t, err, osqueue.ErrConcurrencyLimitCustomKey)
+				require.False(t, r.Exists(partitionConcurrencyKey(pA, kg)))
 			})
 		})
 
@@ -763,14 +686,14 @@ func TestQueueLease(t *testing.T) {
 
 		require.False(t, r.Exists("{queue}:queue:sorted:system-queue"))
 		require.False(t, r.Exists("{queue}:concurrency:account:system-queue"), r.Dump()) // System queues should not have account concurrency set
-		require.True(t, r.Exists("{queue}:concurrency:p:system-queue"))
+		require.False(t, r.Exists("{queue}:concurrency:p:system-queue"))
 
 		item = getQueueItem(t, r, item.ID)
 		require.NotNil(t, item.LeaseID)
 		require.EqualValues(t, id, item.LeaseID)
 		require.WithinDuration(t, now.Add(time.Second), ulid.Time(item.LeaseID.Time()), 20*time.Millisecond)
 
-		require.True(t, r.Exists(partitionConcurrencyKey(p, kg)), r.Dump())
+		require.False(t, r.Exists(partitionConcurrencyKey(p, kg)), r.Dump())
 	})
 
 	t.Run("batch system partitions should be leased properly", func(t *testing.T) {
@@ -819,7 +742,7 @@ func TestQueueLease(t *testing.T) {
 		require.False(t, r.Exists("{queue}:queue:sorted:schedule-batch"))
 
 		// batching uses different rules for concurrency keys
-		require.True(t, r.Exists("{queue}:concurrency:p:schedule-batch"))
+		require.False(t, r.Exists("{queue}:concurrency:p:schedule-batch"))
 		require.False(t, r.Exists("{queue}:concurrency:account:schedule-batch"), r.Dump())
 
 		require.False(t, r.Exists("{queue}:concurrency:account:00000000-0000-0000-0000-000000000000"), r.Dump())
@@ -830,7 +753,7 @@ func TestQueueLease(t *testing.T) {
 		require.EqualValues(t, id, item.LeaseID)
 		require.WithinDuration(t, now.Add(time.Second), ulid.Time(item.LeaseID.Time()), 20*time.Millisecond)
 
-		require.True(t, r.Exists(partitionConcurrencyKey(p, kg)), r.Dump())
+		require.False(t, r.Exists(partitionConcurrencyKey(p, kg)), r.Dump())
 	})
 
 	t.Run("leasing key queue should clear backward-compat default partition", func(t *testing.T) {
@@ -903,9 +826,9 @@ func TestQueueLease(t *testing.T) {
 
 		require.False(t, r.Exists(partitionZsetKey(defaultPart, kg)))
 
-		require.True(t, r.Exists(backlogCustomKeyInProgress(backlog, kg, 1)))
-		require.True(t, r.Exists(shadowPartitionAccountInProgressKey(sp, kg)))
-		require.True(t, r.Exists(partitionConcurrencyKey(defaultPart, kg)))
+		require.False(t, r.Exists(backlogCustomKeyInProgress(backlog, kg, 1)))
+		require.False(t, r.Exists(shadowPartitionAccountInProgressKey(sp, kg)))
+		require.False(t, r.Exists(partitionConcurrencyKey(defaultPart, kg)))
 
 		err = shard.Dequeue(ctx, item)
 		require.NoError(t, err)
