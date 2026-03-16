@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -1864,4 +1865,56 @@ func TestPreventThrottleBacklogUnfairness(t *testing.T) {
 		require.Len(t, mem, 1)
 		require.Contains(t, mem, item2.ID)
 	})
+}
+
+type testLifecycleListener struct {
+	lock            *sync.Mutex
+	fnConcurrency   map[uuid.UUID]int
+	acctConcurrency map[uuid.UUID]int
+	ckConcurrency   map[string]int
+}
+
+func newTestLifecycleListener() testLifecycleListener {
+	return testLifecycleListener{
+		lock:            &sync.Mutex{},
+		fnConcurrency:   map[uuid.UUID]int{},
+		acctConcurrency: map[uuid.UUID]int{},
+		ckConcurrency:   map[string]int{},
+	}
+}
+
+func (t testLifecycleListener) OnFnConcurrencyLimitReached(_ context.Context, fnID uuid.UUID) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	i := t.fnConcurrency[fnID]
+	t.fnConcurrency[fnID] = i + 1
+}
+
+func (t testLifecycleListener) OnAccountConcurrencyLimitReached(
+	_ context.Context,
+	acctID uuid.UUID,
+	workspaceID *uuid.UUID,
+) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	i := t.acctConcurrency[acctID]
+	t.acctConcurrency[acctID] = i + 1
+}
+
+func (t testLifecycleListener) OnCustomKeyConcurrencyLimitReached(_ context.Context, key string) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	i := t.ckConcurrency[key]
+	t.ckConcurrency[key] = i + 1
+}
+
+func (t testLifecycleListener) OnBacklogRefillConstraintHit(ctx context.Context, p *osqueue.QueueShadowPartition, b *osqueue.QueueBacklog, res *osqueue.BacklogRefillResult) {
+	// no-op
+}
+
+func (t testLifecycleListener) OnBacklogRefilled(ctx context.Context, p *osqueue.QueueShadowPartition, b *osqueue.QueueBacklog, res *osqueue.BacklogRefillResult) {
+	// no-op
 }
