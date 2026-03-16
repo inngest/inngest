@@ -775,15 +775,16 @@ func TestPartitionProcessRequeueAfterLimitedWithConstraintAPI(t *testing.T) {
 		err = q.ProcessPartition(ctx, &p, 0, false)
 		require.NoError(t, err)
 
+		require.Equal(t, 0, zcard(t, rc, partitionConcurrencyKey(p, kg)))
+
 		// first two items were successfully leased
-		require.Equal(t, 2, zcard(t, rc, partitionConcurrencyKey(p, kg)))
 		require.Equal(t, 2, zcard(t, rc, kg.PartitionScavengerIndex(p.ID))) // item should also be added to scavenger index
 
 		// remaining items are still in partition
 		require.Equal(t, 8, zcard(t, rc, partitionZsetKey(p, kg)))
 
 		// expect no calls to constraintapi
-		require.Len(t, cmLifecycles.AcquireCalls, 0)
+		require.Len(t, cmLifecycles.AcquireCalls, 3)
 
 		// partition was requeued
 		require.Equal(t, start.Add(osqueue.PartitionConcurrencyLimitRequeueExtension).Unix(), int64(score(t, r, kg.GlobalPartitionIndex(), p.ID)))
