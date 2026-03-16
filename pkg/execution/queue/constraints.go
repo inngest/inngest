@@ -225,6 +225,13 @@ func (q *queueProcessor) BacklogRefillConstraintCheck(
 		}, nil
 	}
 
+	constraintsToCheck := constraintItemsFromBacklog(shadowPart, backlog, constraints)
+	if len(constraintsToCheck) == 0 {
+		return &BacklogRefillConstraintCheckResult{
+			ItemsToRefill: itemIDs,
+		}, nil
+	}
+
 	res, err := q.CapacityManager.Acquire(ctx, &constraintapi.CapacityAcquireRequest{
 		AccountID:            *shadowPart.AccountID,
 		EnvID:                *shadowPart.EnvID,
@@ -233,7 +240,7 @@ func (q *queueProcessor) BacklogRefillConstraintCheck(
 		CurrentTime:          now,
 		Duration:             QueueLeaseDuration,
 		Configuration:        ConstraintConfigFromConstraints(constraints),
-		Constraints:          constraintItemsFromBacklog(shadowPart, backlog, constraints),
+		Constraints:          constraintsToCheck,
 		Amount:               len(items),
 		LeaseIdempotencyKeys: itemIDs,
 		LeaseRunIDs:          itemRunIDs,
@@ -381,6 +388,13 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 		})
 	}
 
+	constraintsToCheck := constraintItemsFromBacklog(shadowPart, backlog, constraints)
+	if len(constraintsToCheck) == 0 {
+		return ItemLeaseConstraintCheckResult{
+			SkipConstraintChecks: true,
+		}, nil
+	}
+
 	res, err := q.CapacityManager.Acquire(ctx, &constraintapi.CapacityAcquireRequest{
 		AccountID: *shadowPart.AccountID,
 		EnvID:     *shadowPart.EnvID,
@@ -396,7 +410,7 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 		CurrentTime:     now,
 		Duration:        QueueLeaseDuration,
 		Configuration:   ConstraintConfigFromConstraints(constraints),
-		Constraints:     constraintItemsFromBacklog(shadowPart, backlog, constraints),
+		Constraints:     constraintsToCheck,
 		Amount:          1,
 		MaximumLifetime: consts.MaxFunctionTimeout + 30*time.Minute,
 		Source: constraintapi.LeaseSource{
@@ -439,23 +453,32 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 }
 
 func constraintItemsFromBacklog(sp *QueueShadowPartition, backlog *QueueBacklog, latestConstraints PartitionConstraintConfig) []constraintapi.ConstraintItem {
-	constraints := []constraintapi.ConstraintItem{
-		// Account concurrency (always set)
-		{
-			Kind: constraintapi.ConstraintKindConcurrency,
-			Concurrency: &constraintapi.ConcurrencyConstraint{
-				Mode:  enums.ConcurrencyModeStep,
-				Scope: enums.ConcurrencyScopeAccount,
+	constraints := []constraintapi.ConstraintItem{}
+
+	// Account concurrency
+	if latestConstraints.Concurrency.AccountConcurrency != NoConcurrencyLimit {
+		constraints = append(constraints,
+			constraintapi.ConstraintItem{
+				Kind: constraintapi.ConstraintKindConcurrency,
+				Concurrency: &constraintapi.ConcurrencyConstraint{
+					Mode:  enums.ConcurrencyModeStep,
+					Scope: enums.ConcurrencyScopeAccount,
+				},
 			},
-		},
-		// Function concurrency (always set - falls back to account concurrency)
-		{
-			Kind: constraintapi.ConstraintKindConcurrency,
-			Concurrency: &constraintapi.ConcurrencyConstraint{
-				Mode:  enums.ConcurrencyModeStep,
-				Scope: enums.ConcurrencyScopeFn,
+		)
+	}
+
+	// Function concurrency
+	if latestConstraints.Concurrency.FunctionConcurrency != NoConcurrencyLimit {
+		constraints = append(constraints,
+			constraintapi.ConstraintItem{
+				Kind: constraintapi.ConstraintKindConcurrency,
+				Concurrency: &constraintapi.ConcurrencyConstraint{
+					Mode:  enums.ConcurrencyModeStep,
+					Scope: enums.ConcurrencyScopeFn,
+				},
 			},
-		},
+		)
 	}
 
 	if backlog.Throttle != nil && latestConstraints.Throttle != nil && backlog.Throttle.ThrottleKeyExpressionHash == latestConstraints.Throttle.ThrottleKeyExpressionHash {
