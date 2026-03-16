@@ -257,7 +257,9 @@ func TestItemLeaseConstraintCheck(t *testing.T) {
 		backlog := osqueue.ItemBacklog(ctx, qi)
 
 		res, err := q.ItemLeaseConstraintCheck(ctx, &sp, &backlog, constraints, &qi, clock.Now())
-		require.NoError(t, err)
+		require.Error(t, err)
+		require.ErrorContains(t, err, "missing accountID")
+		require.ErrorContains(t, err, "missing envID")
 
 		// No lease acquired
 		require.Nil(t, res.CapacityLease)
@@ -878,12 +880,10 @@ func TestBacklogRefillConstraintCheck(t *testing.T) {
 		res, err := q.BacklogRefillConstraintCheck(ctx, &sp, &backlog, constraints, []*osqueue.QueueItem{&qi}, opIdempotencyKey, clock.Now())
 		require.NoError(t, err)
 
-		// No lease acquired
-		require.Nil(t, res.ItemCapacityLeases)
-		require.False(t, res.SkipConstraintChecks)
+		require.NotNil(t, res.ItemCapacityLeases)
+		require.True(t, res.SkipConstraintChecks)
 
-		// Do not expect a ConstraintAPI call for missing capacity manager
-		require.Equal(t, 0, len(cmLifecycles.AcquireCalls))
+		require.Equal(t, 1, len(cmLifecycles.AcquireCalls))
 		require.Equal(t, 0, len(cmLifecycles.ExtendCalls))
 		require.Equal(t, 0, len(cmLifecycles.ReleaseCalls))
 	})
