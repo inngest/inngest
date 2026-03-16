@@ -32,10 +32,7 @@ local keyAccountPartitions    	         = KEYS[11] -- accounts:$accountID:partit
 
 local keyQueueItemHash                   = KEYS[12]
 
-local keyBacklogActiveCheckSet       = KEYS[13]
-local keyBacklogActiveCheckCooldown  = KEYS[14]
-
-local keyPartitionNormalizeSet       = KEYS[15]
+local keyPartitionNormalizeSet       = KEYS[13]
 
 local backlogID     = ARGV[1]
 local partitionID   = ARGV[2]

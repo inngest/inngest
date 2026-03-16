@@ -8,11 +8,9 @@ import (
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/google/uuid"
-	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/util"
-	"github.com/inngest/inngest/pkg/util/errs"
 	"github.com/jonboulle/clockwork"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
@@ -1590,25 +1588,4 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 	})
 }
 
-type testRolloutManager struct{}
-
-// Acquire implements constraintapi.RolloutManager.
-func (t *testRolloutManager) Acquire(ctx context.Context, req *constraintapi.CapacityAcquireRequest) (*constraintapi.CapacityAcquireResponse, errs.InternalError) {
-	panic("unimplemented")
-}
-
-// Check implements constraintapi.RolloutManager.
-func (t *testRolloutManager) Check(ctx context.Context, req *constraintapi.CapacityCheckRequest) (*constraintapi.CapacityCheckResponse, errs.UserError, errs.InternalError) {
-	panic("unimplemented")
-}
-
-// ExtendLease implements constraintapi.RolloutManager.
-func (t *testRolloutManager) ExtendLease(ctx context.Context, req *constraintapi.CapacityExtendLeaseRequest) (*constraintapi.CapacityExtendLeaseResponse, errs.InternalError) {
-	panic("unimplemented")
-}
-
-// Release implements constraintapi.RolloutManager.
-func (t *testRolloutManager) Release(ctx context.Context, req *constraintapi.CapacityReleaseRequest) (*constraintapi.CapacityReleaseResponse, errs.InternalError) {
-	panic("unimplemented")
-}
 

@@ -534,7 +534,6 @@ func TestQueueRefillBacklog(t *testing.T) {
 				ShadowContinuations:               true,
 				ShadowContinuationSkipProbability: 0,
 				NormalizePartition:                true,
-				ActiveChecker:                     true,
 			}),
 			osqueue.WithBacklogRefillLimit(500),
 			osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
@@ -545,9 +544,6 @@ func TestQueueRefillBacklog(t *testing.T) {
 						SystemConcurrency:   678,
 					},
 				}
-			}),
-			osqueue.WithActiveSpotCheckProbability(func(ctx context.Context, acctID uuid.UUID) (int, int) {
-				return 100, 100
 			}),
 		)
 
@@ -642,12 +638,6 @@ func TestQueueRefillBacklog(t *testing.T) {
 		require.Equal(t, 0, res.Refill)
 		require.Equal(t, 0, res.Refilled)
 		require.Equal(t, enums.QueueConstraintAccountConcurrency, res.Constraint)
-
-		require.True(t, r.Exists(kg.BacklogActiveCheckSet()))
-		members, err := r.ZMembers(kg.BacklogActiveCheckSet())
-		require.NoError(t, err)
-		require.Len(t, members, 1)
-		require.Equal(t, b2.BacklogID, members[0])
 	})
 }
 

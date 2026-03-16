@@ -123,19 +123,6 @@ func fnConcurrencyKey(qp osqueue.QueuePartition, kg QueueKeyGenerator) string {
 	return kg.Concurrency("p", qp.FunctionID.String())
 }
 
-// acctConcurrencyKey returns the concurrency key for the account limit, on the
-// entire account (not custom keys)
-func acctConcurrencyKey(qp osqueue.QueuePartition, kg QueueKeyGenerator) string {
-	// Enable system partitions to use the queueName override instead of the accountId
-	if qp.IsSystem() {
-		return kg.Concurrency("account", qp.Queue())
-	}
-	if qp.AccountID == uuid.Nil {
-		return kg.Concurrency("account", "-")
-	}
-	return kg.Concurrency("account", qp.AccountID.String())
-}
-
 func (q *queue) EnqueueItem(ctx context.Context, i osqueue.QueueItem, at time.Time, opts osqueue.EnqueueOpts) (osqueue.QueueItem, error) {
 	l := logger.StdlibLogger(ctx)
 

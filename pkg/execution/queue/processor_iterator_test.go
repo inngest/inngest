@@ -137,10 +137,6 @@ func (m *mockShardForIterator) Scavenge(ctx context.Context, limit int) (int, er
 	return 0, nil
 }
 
-func (m *mockShardForIterator) ActiveCheck(ctx context.Context) (int, error) {
-	return 0, nil
-}
-
 func (m *mockShardForIterator) Instrument(ctx context.Context) error {
 	return nil
 }

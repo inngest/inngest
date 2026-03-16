@@ -29,11 +29,6 @@ func shadowPartitionInProgressKey(sp osqueue.QueueShadowPartition, kg QueueKeyGe
 	return kg.Concurrency("p", sp.PartitionID)
 }
 
-// activeKey returns the key storing the active set for the shadow partition
-func shadowPartitionActiveKey(sp osqueue.QueueShadowPartition, kg QueueKeyGenerator) string {
-	return kg.ActiveSet("p", sp.PartitionID)
-}
-
 // accountInProgressKey returns the key storing the in progress set for the shadow partition's account
 func shadowPartitionAccountInProgressKey(sp osqueue.QueueShadowPartition, kg QueueKeyGenerator) string {
 	// Do not track account concurrency for system queues
@@ -49,39 +44,6 @@ func shadowPartitionAccountInProgressKey(sp osqueue.QueueShadowPartition, kg Que
 	return kg.Concurrency("account", sp.AccountID.String())
 }
 
-// accountActiveKey returns the key storing the active set for the shadow partition's account
-func shadowPartitionAccountActiveKey(sp osqueue.QueueShadowPartition, kg QueueKeyGenerator) string {
-	// Do not track account concurrency for system queues
-	if sp.SystemQueueName != nil {
-		return kg.ActiveSet("", "")
-	}
-
-	// This should never be unset
-	if sp.AccountID == nil {
-		return kg.ActiveSet("account", "")
-	}
-
-	return kg.ActiveSet("account", sp.AccountID.String())
-}
-
-func shadowPartitionAccountActiveRunKey(sp osqueue.QueueShadowPartition, kg QueueKeyGenerator) string {
-	// Do not track account run concurrency for system queues
-	if sp.SystemQueueName != nil {
-		return kg.ActiveRunsSet("", "")
-	}
-
-	// This should never be unset
-	if sp.AccountID == nil {
-		return kg.ActiveRunsSet("account", "")
-	}
-
-	return kg.ActiveRunsSet("account", sp.AccountID.String())
-}
-
-func shadowPartitionActiveRunKey(sp osqueue.QueueShadowPartition, kg QueueKeyGenerator) string {
-	return kg.ActiveRunsSet("p", sp.PartitionID)
-}
-
 // customKeyInProgress returns the key to the "in progress" ZSET
 func backlogCustomKeyInProgress(b osqueue.QueueBacklog, kg QueueKeyGenerator, n int) string {
 	if n < 0 || n > len(b.ConcurrencyKeys) {
@@ -93,48 +55,7 @@ func backlogCustomKeyInProgress(b osqueue.QueueBacklog, kg QueueKeyGenerator, n 
 }
 
 func backlogConcurrencyKey(bck osqueue.BacklogConcurrencyKey, kg QueueKeyGenerator) string {
-	// Concurrency accounting keys are made up of three parts:
-	// - The scope (account, environment, function) to apply the concurrency limit on
-	// - The entity (account ID, envID, or function ID) based on the scope
-	// - The dynamic key value (hashed evaluated expression)
 	return kg.Concurrency("custom", bck.CanonicalKeyID)
-}
-
-// customKeyActive returns the key to the active set for the given custom concurrency key
-func backlogCustomKeyActive(b osqueue.QueueBacklog, kg QueueKeyGenerator, n int) string {
-	if n < 0 || n > len(b.ConcurrencyKeys) {
-		return kg.ActiveSet("", "")
-	}
-
-	key := b.ConcurrencyKeys[n-1]
-	return backlogConcurrencyKeyActiveKey(key, kg)
-}
-
-// customKeyActiveRuns returns the key to the active runs counter for the given custom concurrency key
-func backlogCustomKeyActiveRuns(b osqueue.QueueBacklog, kg QueueKeyGenerator, n int) string {
-	if n < 0 || n > len(b.ConcurrencyKeys) {
-		return kg.ActiveRunsSet("", "")
-	}
-
-	key := b.ConcurrencyKeys[n-1]
-	return backlogConcurrencyKeyActiveRunsKey(key, kg)
-}
-
-func backlogConcurrencyKeyActiveKey(bck osqueue.BacklogConcurrencyKey, kg QueueKeyGenerator) string {
-	// Concurrency accounting keys are made up of three parts:
-	// - The scope (account, environment, function) to apply the concurrency limit on
-	// - The entity (account ID, envID, or function ID) based on the scope
-	// - The dynamic key value (hashed evaluated expression)
-	return kg.ActiveSet("custom", bck.CanonicalKeyID)
-}
-
-func backlogConcurrencyKeyActiveRunsKey(bck osqueue.BacklogConcurrencyKey, kg QueueKeyGenerator) string {
-	return kg.ActiveRunsSet("custom", bck.CanonicalKeyID)
-}
-
-// activeKey returns backlog compound active key
-func backlogActiveKey(b osqueue.QueueBacklog, kg QueueKeyGenerator) string {
-	return kg.ActiveSet("compound", b.BacklogID)
 }
 
 func (q *queue) BacklogRefill(
@@ -179,9 +100,6 @@ func (q *queue) BacklogRefill(
 		kg.AccountPartitionIndex(accountID),
 
 		kg.QueueItem(),
-
-		kg.BacklogActiveCheckSet(),
-		kg.BacklogActiveCheckCooldown(b.BacklogID),
 
 		kg.PartitionNormalizeSet(sp.PartitionID),
 	}
