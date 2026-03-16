@@ -3,7 +3,6 @@ package redis_state
 import (
 	"context"
 	"crypto/rand"
-	"encoding/json"
 	"testing"
 	"time"
 
@@ -1223,7 +1222,7 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 			denies := osqueue.NewLeaseDenyList()
 			denies.AddConcurrency(osqueue.NewKeyError(osqueue.ErrPartitionConcurrencyLimit, fnPart.Queue()))
 
-			leaseID, err := shard.Lease(ctx, qi, leaseDur, now, denies, osqueue.LeaseOptionDisableConstraintChecks(true))
+			leaseID, err := shard.Lease(ctx, qi, leaseDur, now, denies)
 			require.NoError(t, err)
 			require.NotNil(t, leaseID)
 
@@ -1345,7 +1344,7 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 			denies := osqueue.NewLeaseDenyList()
 			denies.AddConcurrency(osqueue.NewKeyError(osqueue.ErrPartitionConcurrencyLimit, fnPart.Queue()))
 
-			leaseID, err := shard.Lease(ctx, qi, leaseDur, now, denies, osqueue.LeaseOptionDisableConstraintChecks(true))
+			leaseID, err := shard.Lease(ctx, qi, leaseDur, now, denies)
 			require.NoError(t, err)
 			require.NotNil(t, leaseID)
 
@@ -1482,7 +1481,7 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 			denies := osqueue.NewLeaseDenyList()
 			denies.AddConcurrency(osqueue.NewKeyError(osqueue.ErrPartitionConcurrencyLimit, backlog.CustomConcurrencyKeyID(2)))
 
-			leaseID, err := shard.Lease(ctx, qi, leaseDur, now, denies, osqueue.LeaseOptionDisableConstraintChecks(true))
+			leaseID, err := shard.Lease(ctx, qi, leaseDur, now, denies)
 			require.NoError(t, err)
 			require.NotNil(t, leaseID)
 
@@ -1569,7 +1568,7 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 			denies := osqueue.NewLeaseDenyList()
 			denies.AddConcurrency(osqueue.NewKeyError(osqueue.ErrPartitionConcurrencyLimit, fnPart.Queue()))
 
-			leaseID, err := shard.Lease(ctx, qi, leaseDur, now, denies, osqueue.LeaseOptionDisableConstraintChecks(true))
+			leaseID, err := shard.Lease(ctx, qi, leaseDur, now, denies)
 			require.NoError(t, err)
 			require.NotNil(t, leaseID)
 
@@ -1613,187 +1612,3 @@ func (t *testRolloutManager) Release(ctx context.Context, req *constraintapi.Cap
 	panic("unimplemented")
 }
 
-func TestQueueLeaseConstraintIdempotency(t *testing.T) {
-	t.Run("should skip constraint updates when disabled", func(t *testing.T) {
-		r := miniredis.RunT(t)
-		rc, err := rueidis.NewClient(rueidis.ClientOption{
-			InitAddress:  []string{r.Addr()},
-			DisableCache: true,
-		})
-		require.NoError(t, err)
-		defer rc.Close()
-
-		clock := clockwork.NewFakeClock()
-
-		var cm constraintapi.CapacityManager = &testRolloutManager{}
-
-		_, shard := newQueue(
-			t, rc,
-			osqueue.WithClock(clock),
-			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
-				return false
-			}),
-			osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
-				return osqueue.PartitionConstraintConfig{
-					FunctionVersion: 1,
-					Throttle: &osqueue.PartitionThrottle{
-						Limit:                     1,
-						Period:                    5,
-						ThrottleKeyExpressionHash: "throttle-expr-key",
-					},
-				}
-			}),
-
-			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
-				return true
-			}),
-			osqueue.WithAcquireCapacityLeaseOnBacklogRefill(true),
-			osqueue.WithCapacityManager(cm),
-		)
-
-		kg := shard.Client().kg
-		ctx := context.Background()
-
-		accountID := uuid.New()
-		fnID := uuid.New()
-
-		qi := osqueue.QueueItem{
-			FunctionID: fnID,
-			Data: osqueue.Item{
-				Payload: json.RawMessage("{\"test\":\"payload\"}"),
-				Identifier: state.Identifier{
-					AccountID:  accountID,
-					WorkflowID: fnID,
-				},
-				Throttle: &osqueue.Throttle{
-					Period:            5,
-					Limit:             1,
-					Key:               "throttle-key",
-					KeyExpressionHash: "throttle-expr-key",
-				},
-			},
-		}
-
-		start := clock.Now().Truncate(time.Second)
-
-		t.Run("constraint state should be set when not skipping", func(t *testing.T) {
-			r.FlushAll()
-
-			item, err := shard.EnqueueItem(ctx, qi, start, osqueue.EnqueueOpts{})
-			require.NoError(t, err)
-
-			leaseID, err := shard.Lease(ctx, item, 5*time.Second, clock.Now(), nil, osqueue.LeaseOptionDisableConstraintChecks(false))
-			require.NoError(t, err)
-			require.NotNil(t, leaseID)
-
-			require.True(t, r.Exists(kg.ThrottleKey(qi.Data.Throttle)))
-			require.True(t, r.Exists(kg.Concurrency("p", fnID.String())))
-			require.True(t, r.Exists(kg.Concurrency("account", accountID.String())))
-		})
-
-		t.Run("constraint state should not be set when skipped", func(t *testing.T) {
-			r.FlushAll()
-
-			item, err := shard.EnqueueItem(ctx, qi, start, osqueue.EnqueueOpts{})
-			require.NoError(t, err)
-
-			leaseID, err := shard.Lease(ctx, item, 5*time.Second, clock.Now(), nil, osqueue.LeaseOptionDisableConstraintChecks(true))
-			require.NoError(t, err)
-			require.NotNil(t, leaseID)
-
-			require.False(t, r.Exists(kg.ThrottleKey(qi.Data.Throttle)))
-			require.False(t, r.Exists(kg.Concurrency("p", fnID.String())))
-			require.False(t, r.Exists(kg.Concurrency("account", accountID.String())))
-		})
-	})
-
-	t.Run("should skip gcra when constraint check idempotency key is set", func(t *testing.T) {
-		r := miniredis.RunT(t)
-		rc, err := rueidis.NewClient(rueidis.ClientOption{
-			InitAddress:  []string{r.Addr()},
-			DisableCache: true,
-		})
-		require.NoError(t, err)
-		defer rc.Close()
-
-		clock := clockwork.NewFakeClock()
-
-		var cm constraintapi.CapacityManager = &testRolloutManager{}
-
-		_, shard := newQueue(
-			t, rc,
-			osqueue.WithClock(clock),
-			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
-				return false
-			}),
-			osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
-				return osqueue.PartitionConstraintConfig{
-					FunctionVersion: 1,
-					Throttle: &osqueue.PartitionThrottle{
-						Limit:                     1,
-						Period:                    5,
-						ThrottleKeyExpressionHash: "throttle-expr-key",
-					},
-				}
-			}),
-
-			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
-				return true
-			}),
-			osqueue.WithAcquireCapacityLeaseOnBacklogRefill(true),
-			osqueue.WithCapacityManager(cm),
-		)
-		ctx := context.Background()
-
-		accountID := uuid.New()
-		fnID := uuid.New()
-
-		qi := osqueue.QueueItem{
-			FunctionID: fnID,
-			Data: osqueue.Item{
-				Payload: json.RawMessage("{\"test\":\"payload\"}"),
-				Identifier: state.Identifier{
-					AccountID:  accountID,
-					WorkflowID: fnID,
-				},
-				Throttle: &osqueue.Throttle{
-					Period:            5,
-					Limit:             1,
-					Key:               "throttle-key",
-					KeyExpressionHash: "throttle-expr-key",
-				},
-			},
-		}
-
-		start := clock.Now().Truncate(time.Second)
-
-		item, err := shard.EnqueueItem(ctx, qi, start, osqueue.EnqueueOpts{})
-		require.NoError(t, err)
-
-		// First call should succeed - Use up all capacity
-		leaseID, err := shard.Lease(ctx, item, 5*time.Second, clock.Now(), nil, osqueue.LeaseOptionDisableConstraintChecks(false))
-		require.NoError(t, err)
-		require.NotNil(t, leaseID)
-
-		clock.Advance(time.Second)
-		r.FastForward(time.Second)
-		r.SetTime(clock.Now())
-
-		item2, err := shard.EnqueueItem(ctx, qi, start, osqueue.EnqueueOpts{})
-		require.NoError(t, err)
-
-		// Second call should fail - Capacity all used up
-		leaseID, err = shard.Lease(ctx, item2, 5*time.Second, clock.Now(), nil, osqueue.LeaseOptionDisableConstraintChecks(false))
-		require.Error(t, err)
-		require.ErrorIs(t, err, osqueue.ErrQueueItemThrottled)
-		require.Nil(t, leaseID)
-
-		// Skip all checks
-		item3, err := shard.EnqueueItem(ctx, qi, start, osqueue.EnqueueOpts{})
-		require.NoError(t, err)
-
-		leaseID, err = shard.Lease(ctx, item3, 5*time.Second, clock.Now(), nil, osqueue.LeaseOptionDisableConstraintChecks(true))
-		require.NoError(t, err)
-		require.NotNil(t, leaseID)
-	})
-}

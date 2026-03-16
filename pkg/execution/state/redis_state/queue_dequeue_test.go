@@ -3,7 +3,6 @@ package redis_state
 import (
 	"context"
 	"crypto/rand"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
@@ -901,59 +900,3 @@ func TestQueueDequeue(t *testing.T) {
 	})
 }
 
-func TestQueueDequeueWithDisabledConstraintUpdates(t *testing.T) {
-	r := miniredis.RunT(t)
-	rc, err := rueidis.NewClient(rueidis.ClientOption{
-		InitAddress:  []string{r.Addr()},
-		DisableCache: true,
-	})
-	require.NoError(t, err)
-	defer rc.Close()
-
-	clock := clockwork.NewFakeClock()
-
-	q, shard := newQueue(
-		t, rc,
-		osqueue.WithClock(clock),
-		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
-			return true
-		}),
-	)
-	kg := shard.Client().kg
-	ctx := context.Background()
-
-	accountID := uuid.New()
-	fnID := uuid.New()
-
-	qi := osqueue.QueueItem{
-		FunctionID: fnID,
-		Data: osqueue.Item{
-			Payload: json.RawMessage("{\"test\":\"payload\"}"),
-			Identifier: state.Identifier{
-				AccountID:  accountID,
-				WorkflowID: fnID,
-			},
-		},
-	}
-
-	start := time.Now().Truncate(time.Second)
-
-	item, err := shard.EnqueueItem(ctx, qi, start, osqueue.EnqueueOpts{})
-	require.NoError(t, err)
-
-	// Lease item in new mode (skip checks)
-	leaseID, err := shard.Lease(ctx, item, 5*time.Second, clock.Now(), nil, osqueue.LeaseOptionDisableConstraintChecks(true))
-	require.NoError(t, err)
-	require.NotNil(t, leaseID)
-
-	require.Equal(t, clock.Now().Add(5*time.Second).UnixMilli(), int64(score(t, r, kg.PartitionScavengerIndex(fnID.String()), item.ID)))
-	require.False(t, r.Exists(kg.Concurrency("p", fnID.String())))
-	require.False(t, r.Exists(kg.Concurrency("account", accountID.String())))
-
-	err = q.Dequeue(ctx, shard, item, osqueue.DequeueOptionDisableConstraintUpdates(true))
-	require.NoError(t, err)
-
-	require.False(t, r.Exists(kg.Concurrency("p", fnID.String())))
-	require.False(t, r.Exists(kg.Concurrency("account", accountID.String())))
-	require.False(t, r.Exists(kg.PartitionScavengerIndex(fnID.String())))
-}

@@ -469,11 +469,9 @@ type QueueOptions struct {
 
 	latencyPartition *LatencyPartitionOptions
 
-	CapacityManager                     constraintapi.CapacityManager
-	UseConstraintAPI                    constraintapi.UseConstraintAPIFn
-	EnableCapacityLeaseInstrumentation  constraintapi.EnableHighCardinalityInstrumentation
-	CapacityLeaseExtendInterval         time.Duration
-	AcquireCapacityLeaseOnBacklogRefill bool
+	CapacityManager                    constraintapi.CapacityManager
+	EnableCapacityLeaseInstrumentation constraintapi.EnableHighCardinalityInstrumentation
+	CapacityLeaseExtendInterval        time.Duration
 
 	EnableThrottleInstrumentation EnableThrottleInstrumentationFn
 
@@ -607,12 +605,6 @@ func WithCapacityManager(capacityManager constraintapi.CapacityManager) QueueOpt
 	}
 }
 
-func WithUseConstraintAPI(uca constraintapi.UseConstraintAPIFn) QueueOpt {
-	return func(q *QueueOptions) {
-		q.UseConstraintAPI = uca
-	}
-}
-
 func WithCapacityLeaseExtendInterval(interval time.Duration) QueueOpt {
 	return func(q *QueueOptions) {
 		q.CapacityLeaseExtendInterval = interval
@@ -622,12 +614,6 @@ func WithCapacityLeaseExtendInterval(interval time.Duration) QueueOpt {
 func WithCapacityLeaseInstrumentation(enable constraintapi.EnableHighCardinalityInstrumentation) QueueOpt {
 	return func(q *QueueOptions) {
 		q.EnableCapacityLeaseInstrumentation = enable
-	}
-}
-
-func WithAcquireCapacityLeaseOnBacklogRefill(acquire bool) QueueOpt {
-	return func(q *QueueOptions) {
-		q.AcquireCapacityLeaseOnBacklogRefill = acquire
 	}
 }
 
@@ -703,22 +689,6 @@ type ProcessItem struct {
 	PCtr uint
 
 	CapacityLease *CapacityLease
-
-	// DisableConstraintUpdates determines whether ExtendLease, Requeue,
-	// and Dequeue should update constraint state.
-	//
-	// Disable constraint updates in case
-	// - we are processing an item for a system queue
-	// - we are holding an active capacity lease
-	//
-	// For system queues, we skip constraint checks + updates entirely,
-	// for regular functions we manage constraint checks + updates in the Constraint API,
-	// if enabled for the current account.
-	//
-	// If the Constraint API is disabled or the lease expired, we will manage constraint state internally.
-	//
-	// NOTE: This value is set in itemLeaseConstraintCheck.
-	DisableConstraintUpdates bool
 }
 
 type capacityLease struct {
@@ -871,9 +841,6 @@ func NewQueueOptions(
 			return false
 		}),
 		EnableCapacityLeaseInstrumentation: func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool) {
-			return false
-		},
-		UseConstraintAPI: func(ctx context.Context, accountID uuid.UUID) (enable bool) {
 			return false
 		},
 	}

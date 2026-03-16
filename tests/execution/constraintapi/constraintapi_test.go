@@ -64,7 +64,6 @@ func TestConstraintEnforcement(t *testing.T) {
 		afterExtend  func(t *testing.T, deps *deps, resp *constraintapi.CapacityExtendLeaseResponse)
 		afterRelease func(t *testing.T, deps *deps, resp *constraintapi.CapacityReleaseResponse)
 
-		executorUseConstraintAPI constraintapi.UseConstraintAPIFn
 	}
 
 	testCases := []testCase{}
@@ -97,10 +96,6 @@ func TestConstraintEnforcement(t *testing.T) {
 			queueOpts := []queue.QueueOpt{
 				queue.WithClock(clock),
 				queue.WithCapacityManager(cm),
-				queue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) bool {
-					return true
-				}),
-				queue.WithAcquireCapacityLeaseOnBacklogRefill(true),
 				queue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p queue.PartitionIdentifier) queue.PartitionConstraintConfig {
 					return test.queueConstraints
 				}),
@@ -148,13 +143,6 @@ func TestConstraintEnforcement(t *testing.T) {
 				executor.WithPauseManager(pauseMgr),
 				executor.WithCapacityManager(cm),
 				executor.WithLogger(logger.StdlibLogger(ctx)),
-				executor.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
-					if test.executorUseConstraintAPI != nil {
-						return test.executorUseConstraintAPI(ctx, accountID)
-					}
-
-					return true
-				}),
 				executor.WithClock(clock),
 			)
 			require.NoError(t, err)

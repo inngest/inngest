@@ -14,39 +14,17 @@ import (
 type DequeueOptionFn func(o *DequeueOptions)
 
 type DequeueOptions struct {
-	DisableConstraintUpdates bool
-}
-
-func DequeueOptionDisableConstraintUpdates(disableUpdates bool) DequeueOptionFn {
-	return func(o *DequeueOptions) {
-		o.DisableConstraintUpdates = disableUpdates
-	}
 }
 
 type RequeueOptions struct {
-	DisableConstraintUpdates bool
-}
-
-func RequeueOptionDisableConstraintUpdates(disableUpdates bool) RequeueOptionFn {
-	return func(o *RequeueOptions) {
-		o.DisableConstraintUpdates = disableUpdates
-	}
 }
 
 type RequeueOptionFn func(o *RequeueOptions)
 
 type LeaseOptions struct {
-	DisableConstraintChecks bool
-
 	Backlog         QueueBacklog
 	ShadowPartition QueueShadowPartition
 	Constraints     PartitionConstraintConfig
-}
-
-func LeaseOptionDisableConstraintChecks(disableChecks bool) LeaseOptionFn {
-	return func(o *LeaseOptions) {
-		o.DisableConstraintChecks = disableChecks
-	}
 }
 
 func LeaseBacklog(b QueueBacklog) LeaseOptionFn {
@@ -70,28 +48,14 @@ func LeaseConstraints(constraints PartitionConstraintConfig) LeaseOptionFn {
 type LeaseOptionFn func(o *LeaseOptions)
 
 type ExtendLeaseOptions struct {
-	DisableConstraintUpdates bool
-}
-
-func ExtendLeaseOptionDisableConstraintUpdates(disableUpdates bool) ExtendLeaseOptionFn {
-	return func(o *ExtendLeaseOptions) {
-		o.DisableConstraintUpdates = disableUpdates
-	}
 }
 
 type ExtendLeaseOptionFn func(o *ExtendLeaseOptions)
 
 type PartitionLeaseOptions struct {
-	DisableLeaseChecks bool
 }
 
 type PartitionLeaseOpt func(o *PartitionLeaseOptions)
-
-func PartitionLeaseOptionDisableLeaseChecks(disableLeaseChecks bool) PartitionLeaseOpt {
-	return func(o *PartitionLeaseOptions) {
-		o.DisableLeaseChecks = disableLeaseChecks
-	}
-}
 
 type ShardAssingmentManager interface {
 	SetPrimaryShard(ctx context.Context, queueShard QueueShard)
@@ -306,8 +270,6 @@ type ShardOperations interface {
 
 type BacklogRefillOptions struct {
 	ConstraintCheckIdempotencyKey string
-	DisableConstraintChecks       bool
-	CapacityLeases                []CapacityLease
 }
 
 type BacklogRefillOptionFn func(o *BacklogRefillOptions)
@@ -315,17 +277,5 @@ type BacklogRefillOptionFn func(o *BacklogRefillOptions)
 func WithBacklogRefillConstraintCheckIdempotencyKey(idempotencyKey string) BacklogRefillOptionFn {
 	return func(o *BacklogRefillOptions) {
 		o.ConstraintCheckIdempotencyKey = idempotencyKey
-	}
-}
-
-func WithBacklogRefillDisableConstraintChecks(disableConstraintChecks bool) BacklogRefillOptionFn {
-	return func(o *BacklogRefillOptions) {
-		o.DisableConstraintChecks = disableConstraintChecks
-	}
-}
-
-func WithBacklogRefillItemCapacityLeases(itemCapacityLeases []CapacityLease) BacklogRefillOptionFn {
-	return func(o *BacklogRefillOptions) {
-		o.CapacityLeases = itemCapacityLeases
 	}
 }

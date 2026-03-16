@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"iter"
-	"math/rand"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -149,11 +148,6 @@ func (q *queue) BacklogRefill(
 ) (*osqueue.BacklogRefillResult, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "BacklogRefill"), redis_telemetry.ScopeQueue)
 
-	o := &osqueue.BacklogRefillOptions{}
-	for _, opt := range options {
-		opt(o)
-	}
-
 	kg := q.RedisClient.kg
 
 	accountID := uuid.Nil
@@ -168,18 +162,6 @@ func (q *queue) BacklogRefill(
 	span.SetAttributes(attribute.String("backlog_id", b.BacklogID))
 
 	nowMS := q.Clock.Now().UnixMilli()
-
-	var (
-		keyThrottleState                             string
-		throttleLimit, throttleBurst, throttlePeriod int
-	)
-	if latestConstraints.Throttle != nil && b.Throttle != nil {
-		// NOTE: The Throttle state key must be generated to match the Redis key used in the Lease and Constraint API implementation
-		keyThrottleState = kg.ThrottleKey(&osqueue.Throttle{Key: b.Throttle.ThrottleKey})
-		throttleLimit = latestConstraints.Throttle.Limit
-		throttleBurst = latestConstraints.Throttle.Burst
-		throttlePeriod = latestConstraints.Throttle.Period
-	}
 
 	keys := []string{
 		kg.ShadowPartitionMeta(),
@@ -198,47 +180,10 @@ func (q *queue) BacklogRefill(
 
 		kg.QueueItem(),
 
-		// Constraint-related accounting keys
-		shadowPartitionAccountActiveKey(*sp, kg), // account active
-		shadowPartitionActiveKey(*sp, kg),        // partition active
-		backlogCustomKeyActive(*b, kg, 1),        // custom key 1
-		backlogCustomKeyActive(*b, kg, 2),        // custom key 2
-		backlogActiveKey(*b, kg),                 // compound key (active for this backlog)
-
-		// Active run sets
-		// kg.RunActiveSet(i.Data.Identifier.RunID), -> dynamically constructed in script for each item
-		shadowPartitionAccountActiveRunKey(*sp, kg), // Set for active runs in account
-		shadowPartitionActiveRunKey(*sp, kg),        // Set for active runs in partition
-		backlogCustomKeyActiveRuns(*b, kg, 1),       // Set for active runs with custom concurrency key 1
-		backlogCustomKeyActiveRuns(*b, kg, 2),       // Set for active runs with custom concurrency key 2
-
 		kg.BacklogActiveCheckSet(),
 		kg.BacklogActiveCheckCooldown(b.BacklogID),
 
 		kg.PartitionNormalizeSet(sp.PartitionID),
-	}
-
-	// Don't check constraints if
-	// - key queues have been disabled for this function (refill as quickly as possible)
-	// - capacity leases were successfully acquired
-	checkConstraints := sp.KeyQueuesEnabled(ctx, &q.QueueOptions)
-	if o.DisableConstraintChecks {
-		checkConstraints = false
-	}
-
-	checkConstraintsVal := "1"
-	if !checkConstraints {
-		checkConstraintsVal = "0"
-	}
-
-	// Enable conditional spot checking (probability in queue settings + feature flag)
-	refillProbability, _ := q.ActiveSpotCheckProbability(ctx, accountID)
-	shouldSpotCheckActiveSet := checkConstraints && rand.Intn(100) <= refillProbability
-
-	// Ensure capacityLeaseIDs is never nil to avoid JSON marshaling to "null"
-	capacityLeaseIDs := o.CapacityLeases
-	if capacityLeaseIDs == nil {
-		capacityLeaseIDs = []osqueue.CapacityLease{}
 	}
 
 	args, err := StrSlice([]any{
@@ -248,22 +193,7 @@ func (q *queue) BacklogRefill(
 		refillUntil.UnixMilli(),
 		refillItems,
 		nowMS,
-
-		latestConstraints.Concurrency.AccountConcurrency,
-		latestConstraints.Concurrency.FunctionConcurrency,
-		latestConstraints.CustomConcurrencyLimit(1),
-		latestConstraints.CustomConcurrencyLimit(2),
-
-		keyThrottleState,
-		throttleLimit,
-		throttleBurst,
-		throttlePeriod,
-
 		kg.QueuePrefix(),
-		checkConstraintsVal,
-		shouldSpotCheckActiveSet,
-
-		capacityLeaseIDs,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("could not serialize args: %w", err)
@@ -349,21 +279,6 @@ func (q *queue) BacklogRefill(
 
 	switch status {
 	case 0:
-		return refillResult, nil
-	case 1:
-		refillResult.Constraint = enums.QueueConstraintAccountConcurrency
-		return refillResult, nil
-	case 2:
-		refillResult.Constraint = enums.QueueConstraintFunctionConcurrency
-		return refillResult, nil
-	case 3:
-		refillResult.Constraint = enums.QueueConstraintCustomConcurrencyKey1
-		return refillResult, nil
-	case 4:
-		refillResult.Constraint = enums.QueueConstraintCustomConcurrencyKey2
-		return refillResult, nil
-	case 5:
-		refillResult.Constraint = enums.QueueConstraintThrottle
 		return refillResult, nil
 	default:
 		return nil, fmt.Errorf("unknown status refilling backlog: %v (%T)", status, status)

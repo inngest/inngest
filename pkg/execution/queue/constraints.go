@@ -198,27 +198,12 @@ func (q *queueProcessor) BacklogRefillConstraintCheck(
 		itemRunIDs[item.ID] = item.Data.Identifier.RunID
 	}
 
-	if q.CapacityManager == nil || q.UseConstraintAPI == nil {
-		metrics.IncrBacklogRefillConstraintCheckCounter(ctx, enums.BacklogRefillConstraintCheckReasonConstraintAPIUninitialized.String(), metrics.CounterOpt{
-			PkgName: pkgName,
-		})
-		return &BacklogRefillConstraintCheckResult{
-			ItemsToRefill: itemIDs,
-		}, nil
+	if q.CapacityManager == nil {
+		return nil, fmt.Errorf("capacity manager is not initialized")
 	}
 
 	if shadowPart.AccountID == nil || shadowPart.EnvID == nil || shadowPart.FunctionID == nil {
 		metrics.IncrBacklogRefillConstraintCheckCounter(ctx, enums.BacklogRefillConstraintCheckReasonIDNil.String(), metrics.CounterOpt{
-			PkgName: pkgName,
-		})
-		return &BacklogRefillConstraintCheckResult{
-			ItemsToRefill: itemIDs,
-		}, nil
-	}
-
-	useAPI := q.UseConstraintAPI(ctx, *shadowPart.AccountID)
-	if !q.AcquireCapacityLeaseOnBacklogRefill || !useAPI {
-		metrics.IncrBacklogRefillConstraintCheckCounter(ctx, enums.BacklogRefillConstraintCheckReasonFeatureFlagDisabled.String(), metrics.CounterOpt{
 			PkgName: pkgName,
 		})
 		return &BacklogRefillConstraintCheckResult{
@@ -323,20 +308,8 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 		return ItemLeaseConstraintCheckResult{}, nil
 	}
 
-	if q.CapacityManager == nil ||
-		q.UseConstraintAPI == nil {
-		metrics.IncrQueueItemConstraintCheckCounter(ctx, enums.QueueItemConstraintReasonConstraintAPIUninitialized.String(), metrics.CounterOpt{
-			PkgName: pkgName,
-		})
-		return ItemLeaseConstraintCheckResult{}, nil
-	}
-
-	useAPI := q.UseConstraintAPI(ctx, *shadowPart.AccountID)
-	if !useAPI {
-		metrics.IncrQueueItemConstraintCheckCounter(ctx, enums.QueueItemConstraintReasonFeatureFlagDisabled.String(), metrics.CounterOpt{
-			PkgName: pkgName,
-		})
-		return ItemLeaseConstraintCheckResult{}, nil
+	if q.CapacityManager == nil {
+		return ItemLeaseConstraintCheckResult{}, fmt.Errorf("capacity manager is not initialized")
 	}
 
 	idempotencyKey := item.ID

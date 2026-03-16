@@ -295,13 +295,6 @@ func WithCapacityManager(cm constraintapi.CapacityManager) ExecutorOpt {
 	}
 }
 
-func WithUseConstraintAPI(uca constraintapi.UseConstraintAPIFn) ExecutorOpt {
-	return func(e execution.Executor) error {
-		e.(*executor).useConstraintAPI = uca
-		return nil
-	}
-}
-
 func WithEnableBatchingInstrumentation(ebi func(ctx context.Context, accountID, envID uuid.UUID) (enable bool)) ExecutorOpt {
 	return func(e execution.Executor) error {
 		e.(*executor).enableBatchingInstrumentation = ebi
@@ -465,7 +458,6 @@ type executor struct {
 	singletonMgr singleton.Singleton
 
 	capacityManager               constraintapi.CapacityManager
-	useConstraintAPI              constraintapi.UseConstraintAPIFn
 	enableBatchingInstrumentation func(ctx context.Context, accountID, envID uuid.UUID) (enable bool)
 
 	fl                  state.FunctionLoader
@@ -800,7 +792,6 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		ctx,
 		e.now(),
 		e.capacityManager,
-		e.useConstraintAPI,
 		req,
 		key,
 		func(ctx context.Context, performChecks bool) (*sv2.Metadata, error) {

@@ -2,7 +2,6 @@ package redis_state
 
 import (
 	"context"
-	"encoding/json"
 	"testing"
 	"time"
 
@@ -214,62 +213,3 @@ func TestQueueExtendLease(t *testing.T) {
 	})
 }
 
-func TestQueueExtendLeaseWithDisabledConstraintUpdates(t *testing.T) {
-	r := miniredis.RunT(t)
-	rc, err := rueidis.NewClient(rueidis.ClientOption{
-		InitAddress:  []string{r.Addr()},
-		DisableCache: true,
-	})
-	require.NoError(t, err)
-	defer rc.Close()
-
-	clock := clockwork.NewFakeClock()
-
-	_, shard := newQueue(
-		t, rc,
-		osqueue.WithClock(clock),
-		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
-			return true
-		}),
-	)
-	ctx := context.Background()
-
-	kg := shard.Client().kg
-
-	accountID := uuid.New()
-	fnID := uuid.New()
-
-	qi := osqueue.QueueItem{
-		FunctionID: fnID,
-		Data: osqueue.Item{
-			Payload: json.RawMessage("{\"test\":\"payload\"}"),
-			Identifier: state.Identifier{
-				AccountID:  accountID,
-				WorkflowID: fnID,
-			},
-		},
-	}
-
-	start := time.Now().Truncate(time.Second)
-
-	item, err := shard.EnqueueItem(ctx, qi, start, osqueue.EnqueueOpts{})
-	require.NoError(t, err)
-
-	// Lease item in new mode (skip checks)
-	leaseID, err := shard.Lease(ctx, item, 5*time.Second, clock.Now(), nil, osqueue.LeaseOptionDisableConstraintChecks(true))
-	require.NoError(t, err)
-	require.NotNil(t, leaseID)
-
-	require.Equal(t, clock.Now().Add(5*time.Second).UnixMilli(), int64(score(t, r, kg.PartitionScavengerIndex(fnID.String()), item.ID)))
-	require.False(t, r.Exists(kg.Concurrency("p", fnID.String())))
-	require.False(t, r.Exists(kg.Concurrency("account", accountID.String())))
-
-	newLeaseID, err := shard.ExtendLease(ctx, item, *leaseID, 10*time.Second, osqueue.ExtendLeaseOptionDisableConstraintUpdates(true))
-	require.NoError(t, err)
-	require.NotNil(t, newLeaseID)
-	require.NotEqual(t, *leaseID, *newLeaseID)
-
-	require.False(t, r.Exists(kg.Concurrency("p", fnID.String())))
-	require.False(t, r.Exists(kg.Concurrency("account", accountID.String())))
-	require.Equal(t, clock.Now().Add(10*time.Second).UnixMilli(), int64(score(t, r, kg.PartitionScavengerIndex(fnID.String()), item.ID)))
-}
