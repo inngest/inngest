@@ -316,7 +316,7 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 		require.Len(t, cmLifecycles.AcquireCalls, 1)
 
 		// Lease the queue item (required when queue item lease ticker fires)
-		leaseID, err := shard.Lease(ctx, qi, osqueue.QueueLeaseDuration, clock.Now(), nil)
+		leaseID, err := shard.Lease(ctx, qi, osqueue.QueueLeaseDuration, clock.Now())
 		require.NoError(t, err)
 		qi.LeaseID = leaseID
 

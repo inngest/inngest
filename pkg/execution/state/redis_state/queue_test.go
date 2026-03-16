@@ -809,11 +809,11 @@ func TestQueueSystemPartitions(t *testing.T) {
 		found := getQueueItem(t, r, item.ID)
 		require.Equal(t, item, found)
 
-		leaseId, err := shard.Lease(ctx, item, time.Second, clock.Now(), nil)
+		leaseId, err := shard.Lease(ctx, item, time.Second, clock.Now())
 		require.NoError(t, err)
 		require.NotNil(t, leaseId)
 
-		leaseId, err = shard.Lease(ctx, item2, time.Second, clock.Now(), nil)
+		leaseId, err = shard.Lease(ctx, item2, time.Second, clock.Now())
 		require.Error(t, err)
 		require.ErrorIs(t, err, osqueue.ErrSystemConcurrencyLimit)
 		require.Nil(t, leaseId)
@@ -871,7 +871,7 @@ func TestQueueSystemPartitions(t *testing.T) {
 		itemCountMatches(1)
 		concurrencyItemCountMatches(0)
 
-		leaseId, err := shard.Lease(ctx, item, time.Second, leaseStart, nil)
+		leaseId, err := shard.Lease(ctx, item, time.Second, leaseStart)
 		require.NoError(t, err)
 		require.NotNil(t, leaseId)
 
@@ -1027,7 +1027,7 @@ func TestQueuePeek(t *testing.T) {
 
 		t.Run("It should remove any leased items from the list", func(t *testing.T) {
 			// Lease step A, and it should be removed.
-			_, err := shard.Lease(ctx, ia, 50*time.Millisecond, time.Now(), nil)
+			_, err := shard.Lease(ctx, ia, 50*time.Millisecond, time.Now())
 			require.NoError(t, err)
 
 			items, err = shard.Peek(ctx, &osqueue.QueuePartition{FunctionID: &workflowID}, d, osqueue.DefaultQueuePeekMax)
@@ -1455,7 +1455,7 @@ func TestQueuePartitionRequeue(t *testing.T) {
 			requirePartitionScoreEquals(t, r, &idA, now)
 
 			// Simulate processing queue item, add to partition scavenger index
-			_, err = shard.Lease(ctx, qi, 10*time.Second, clock.Now(), nil)
+			_, err = shard.Lease(ctx, qi, 10*time.Second, clock.Now())
 			require.NoError(t, err)
 			kg := shard.Client().kg
 			require.True(t, r.Exists(kg.PartitionScavengerIndex(idA.String())))
@@ -1535,7 +1535,7 @@ func TestQueuePartitionRequeue(t *testing.T) {
 			})
 
 			t.Run("It doesn't dequeue the partition with an in-progress job", func(t *testing.T) {
-				id, err := shard.Lease(ctx, item, 10*time.Second, clock.Now(), nil)
+				id, err := shard.Lease(ctx, item, 10*time.Second, clock.Now())
 				require.NoError(t, err)
 				require.NotNil(t, id)
 
@@ -1958,7 +1958,7 @@ func TestQueueRequeueByJobID(t *testing.T) {
 			require.Equal(t, 1, len(partitions))
 
 			// Lease
-			lid, err := shard.Lease(ctx, item, time.Second*10, time.Now(), nil)
+			lid, err := shard.Lease(ctx, item, time.Second*10, time.Now())
 			require.NoError(t, err)
 			require.NotNil(t, lid)
 
@@ -2248,7 +2248,7 @@ func TestQueueRateLimit(t *testing.T) {
 		// clock.Advance(10 * time.Millisecond)
 
 		t.Run("Leasing a first item succeeds", func(t *testing.T) {
-			leaseA, err := shard.Lease(ctx, aa, 10*time.Second, clock.Now(), nil)
+			leaseA, err := shard.Lease(ctx, aa, 10*time.Second, clock.Now())
 			r.NoError(err, "leasing throttled queue item with capacity failed")
 			r.NotNil(leaseA)
 		})
@@ -2256,7 +2256,7 @@ func TestQueueRateLimit(t *testing.T) {
 		// clock.Advance(10 * time.Millisecond)
 
 		t.Run("Attempting to lease another throttled key immediately fails", func(t *testing.T) {
-			leaseB, err := shard.Lease(ctx, ab, 10*time.Second, clock.Now(), nil)
+			leaseB, err := shard.Lease(ctx, ab, 10*time.Second, clock.Now())
 			r.NotNil(err, "leasing throttled queue item without capacity didn't error")
 			r.Nil(leaseB)
 		})
@@ -2293,7 +2293,7 @@ func TestQueueRateLimit(t *testing.T) {
 				},
 			}, clock.Now().Add(time.Second), osqueue.EnqueueOpts{})
 			r.NoError(err)
-			lease, err := shard.Lease(ctx, ba, 10*time.Second, clock.Now(), nil)
+			lease, err := shard.Lease(ctx, ba, 10*time.Second, clock.Now())
 			r.Nil(err, "leasing throttled queue item without capacity didn't error")
 			r.NotNil(lease)
 		})
@@ -2303,7 +2303,7 @@ func TestQueueRateLimit(t *testing.T) {
 		t.Run("Leasing after the period succeeds", func(t *testing.T) {
 			clock.Advance(time.Duration(throttle.Period)*time.Second + time.Second)
 
-			leaseB, err := shard.Lease(ctx, ab, 10*time.Second, clock.Now(), nil)
+			leaseB, err := shard.Lease(ctx, ab, 10*time.Second, clock.Now())
 			r.Nil(err, "leasing after waiting for throttle should succeed")
 			r.NotNil(leaseB)
 		})
@@ -2361,7 +2361,7 @@ func TestQueueRateLimit(t *testing.T) {
 
 		t.Run("Leasing up to bursts succeeds", func(t *testing.T) {
 			for i := 0; i < 4; i++ {
-				lease, err := shard.Lease(ctx, items[i], 2*time.Second, clock.Now(), nil)
+				lease, err := shard.Lease(ctx, items[i], 2*time.Second, clock.Now())
 				r.NoError(err, "leasing throttled queue item with capacity failed")
 				r.NotNil(lease)
 				idx++
@@ -2369,7 +2369,7 @@ func TestQueueRateLimit(t *testing.T) {
 		})
 
 		t.Run("Leasing the 5th time fails", func(t *testing.T) {
-			lease, err := shard.Lease(ctx, items[idx], 1*time.Second, clock.Now(), nil)
+			lease, err := shard.Lease(ctx, items[idx], 1*time.Second, clock.Now())
 			r.NotNil(err, "leasing throttled queue item without capacity didn't error")
 			r.ErrorContains(err, osqueue.ErrQueueItemThrottled.Error())
 			r.Nil(lease)
@@ -2378,14 +2378,14 @@ func TestQueueRateLimit(t *testing.T) {
 		t.Run("After 10s, we can re-lease once as bursting is done.", func(t *testing.T) {
 			clock.Advance(time.Duration(throttle.Period)*time.Second + time.Second)
 
-			lease, err := shard.Lease(ctx, items[idx], 2*time.Second, clock.Now(), nil)
+			lease, err := shard.Lease(ctx, items[idx], 2*time.Second, clock.Now())
 			r.NoError(err, "leasing throttled queue item with capacity failed")
 			r.NotNil(lease)
 
 			idx++
 
 			// It should fail, as bursting is done.
-			lease, err = shard.Lease(ctx, items[idx], 1*time.Second, clock.Now(), nil)
+			lease, err = shard.Lease(ctx, items[idx], 1*time.Second, clock.Now())
 			r.NotNil(err, "leasing throttled queue item without capacity didn't error")
 			r.ErrorContains(err, osqueue.ErrQueueItemThrottled.Error())
 			r.Nil(lease)
@@ -2395,7 +2395,7 @@ func TestQueueRateLimit(t *testing.T) {
 			clock.Advance(time.Duration(throttle.Period*4) * time.Second)
 
 			for i := 0; i < 3; i++ {
-				lease, err := shard.Lease(ctx, items[i], 2*time.Second, clock.Now(), nil)
+				lease, err := shard.Lease(ctx, items[i], 2*time.Second, clock.Now())
 				r.NoError(err, "leasing throttled queue item with capacity failed")
 				r.NotNil(lease)
 				idx++
@@ -3578,7 +3578,7 @@ func TestQueueActiveCounters(t *testing.T) {
 			require.Equal(t, clock.Now(), time.UnixMilli(i.RefilledAt))
 
 			// lease
-			leaseID, err := shard.Lease(ctx, i, 10*time.Second, clock.Now(), nil)
+			leaseID, err := shard.Lease(ctx, i, 10*time.Second, clock.Now())
 			require.NoError(t, err)
 			require.NotNil(t, leaseID)
 
@@ -3644,7 +3644,7 @@ func TestQueueActiveCounters(t *testing.T) {
 			require.Equal(t, clock.Now(), time.UnixMilli(i.RefilledAt))
 
 			// lease
-			leaseID, err := shard.Lease(ctx, i, 10*time.Second, clock.Now(), nil)
+			leaseID, err := shard.Lease(ctx, i, 10*time.Second, clock.Now())
 			require.NoError(t, err)
 			require.NotNil(t, leaseID)
 
@@ -3681,7 +3681,7 @@ func TestQueueActiveCounters(t *testing.T) {
 			require.Equal(t, 0, scard(kg.ActiveSet("account", accountID.String())))
 
 			// lease
-			leaseID, err := shard.Lease(ctx, i, 10*time.Second, clock.Now(), nil)
+			leaseID, err := shard.Lease(ctx, i, 10*time.Second, clock.Now())
 			require.NoError(t, err)
 			require.NotNil(t, leaseID)
 
@@ -3720,7 +3720,7 @@ func TestQueueActiveCounters(t *testing.T) {
 			require.Equal(t, 0, scard(kg.ActiveSet("account", accountID.String())))
 
 			// lease
-			leaseID, err := shard.Lease(ctx, i, 10*time.Second, clock.Now(), nil)
+			leaseID, err := shard.Lease(ctx, i, 10*time.Second, clock.Now())
 			require.NoError(t, err)
 			require.NotNil(t, leaseID)
 
@@ -3888,7 +3888,7 @@ func TestQueueActiveCounters(t *testing.T) {
 			require.Equal(t, clock.Now(), time.UnixMilli(iA1.RefilledAt))
 
 			// lease
-			leaseID, err := shard.Lease(ctx, iA1, 10*time.Second, clock.Now(), nil)
+			leaseID, err := shard.Lease(ctx, iA1, 10*time.Second, clock.Now())
 			require.NoError(t, err)
 			require.NotNil(t, leaseID)
 
@@ -3919,7 +3919,7 @@ func TestQueueActiveCounters(t *testing.T) {
 			require.NoError(t, json.Unmarshal([]byte(currentItemStr), &iA2))
 
 			// lease
-			leaseID, err = shard.Lease(ctx, iA2, 10*time.Second, clock.Now(), nil)
+			leaseID, err = shard.Lease(ctx, iA2, 10*time.Second, clock.Now())
 			require.NoError(t, err)
 			require.NotNil(t, leaseID)
 
@@ -3948,7 +3948,7 @@ func TestQueueActiveCounters(t *testing.T) {
 
 			currentItemStr = r.HGet(kg.QueueItem(), iB1.ID)
 			require.NoError(t, json.Unmarshal([]byte(currentItemStr), &iB1))
-			_, err = shard.Lease(ctx, iB1, 10*time.Second, clock.Now(), nil)
+			_, err = shard.Lease(ctx, iB1, 10*time.Second, clock.Now())
 			require.NoError(t, err)
 			require.NoError(t, shard.Requeue(ctx, iB1, requeueAt))
 
@@ -3965,7 +3965,7 @@ func TestQueueActiveCounters(t *testing.T) {
 
 			currentItemStr = r.HGet(kg.QueueItem(), iB2.ID)
 			require.NoError(t, json.Unmarshal([]byte(currentItemStr), &iB2))
-			_, err = shard.Lease(ctx, iB2, 10*time.Second, clock.Now(), nil)
+			_, err = shard.Lease(ctx, iB2, 10*time.Second, clock.Now())
 			require.NoError(t, err)
 			require.NoError(t, shard.Requeue(ctx, iB2, requeueAt))
 

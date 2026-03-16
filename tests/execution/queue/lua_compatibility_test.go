@@ -189,7 +189,7 @@ func TestLuaCompatibility(t *testing.T) {
 
 				// - Lease item
 				leaseDuration := 30 * time.Second
-				leaseID, err := shard.Lease(ctx, enqueuedItem, leaseDuration, now, nil)
+				leaseID, err := shard.Lease(ctx, enqueuedItem, leaseDuration, now)
 				require.NoError(t, err, "Failed to lease item on %s", serverType)
 				require.NotNil(t, leaseID, "Lease ID should not be nil on %s", serverType)
 
@@ -281,7 +281,7 @@ func TestLuaCompatibility(t *testing.T) {
 				qi, err := shard.EnqueueItem(ctx, queueItem, now, queue.EnqueueOpts{})
 				require.NoError(t, err)
 
-				leaseID, err := shard.Lease(ctx, qi, 5*time.Second, now, nil)
+				leaseID, err := shard.Lease(ctx, qi, 5*time.Second, now)
 				require.NoError(t, err)
 				require.NotNil(t, leaseID)
 			})
