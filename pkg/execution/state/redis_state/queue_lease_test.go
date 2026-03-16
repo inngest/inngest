@@ -1596,10 +1596,6 @@ func TestQueueLeaseConstraintIdempotency(t *testing.T) {
 					},
 				}
 			}),
-
-			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
-				return true
-			}),
 			osqueue.WithAcquireCapacityLeaseOnBacklogRefill(true),
 			osqueue.WithCapacityManager(cm),
 		)

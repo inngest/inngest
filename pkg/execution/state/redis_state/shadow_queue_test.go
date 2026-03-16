@@ -1419,9 +1419,6 @@ func TestBacklogRefillWithDisabledConstraintChecks(t *testing.T) {
 		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 			return true
 		}),
-		osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
-			return true
-		}),
 		osqueue.WithAcquireCapacityLeaseOnBacklogRefill(true),
 		osqueue.WithCapacityManager(cm),
 		osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {

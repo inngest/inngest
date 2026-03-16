@@ -443,7 +443,7 @@ func (q *queueProcessor) ProcessShadowPartitionBacklog(
 
 	// Limit backlog peek to maximum lease generation
 	// TODO: Run multiple requests, etc. to balance peek size and throughput
-	if shadowPart.AccountID != nil && q.UseConstraintAPI != nil && q.UseConstraintAPI(ctx, *shadowPart.AccountID) {
+	if shadowPart.AccountID != nil {
 		refillLimit = constraintapi.MaximumAmount
 	}
 
