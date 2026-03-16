@@ -122,6 +122,7 @@ type Tenant struct {
 	AppID     uuid.UUID
 	EnvID     uuid.UUID
 	AccountID uuid.UUID
+	Plan      int32
 }
 
 func InitConfig(c *Config) *Config {

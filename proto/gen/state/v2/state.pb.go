@@ -433,6 +433,7 @@ type Tenant struct {
 	AppId         string                 `protobuf:"bytes,1,opt,name=app_id,json=appId,proto3" json:"app_id,omitempty"`
 	EnvId         string                 `protobuf:"bytes,2,opt,name=env_id,json=envId,proto3" json:"env_id,omitempty"`
 	AccountId     string                 `protobuf:"bytes,3,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	Plan          int32                  `protobuf:"varint,4,opt,name=plan,proto3" json:"plan,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -486,6 +487,13 @@ func (x *Tenant) GetAccountId() string {
 		return x.AccountId
 	}
 	return ""
+}
+
+func (x *Tenant) GetPlan() int32 {
+	if x != nil {
+		return x.Plan
+	}
+	return 0
 }
 
 type CreateStateRequest struct {
@@ -1842,12 +1850,13 @@ const file_state_v2_state_proto_rawDesc = "" +
 	"\n" +
 	"event_size\x18\x02 \x01(\x03R\teventSize\x12\x1d\n" +
 	"\n" +
-	"step_count\x18\x03 \x01(\x03R\tstepCount\"U\n" +
+	"step_count\x18\x03 \x01(\x03R\tstepCount\"i\n" +
 	"\x06Tenant\x12\x15\n" +
 	"\x06app_id\x18\x01 \x01(\tR\x05appId\x12\x15\n" +
 	"\x06env_id\x18\x02 \x01(\tR\x05envId\x12\x1d\n" +
 	"\n" +
-	"account_id\x18\x03 \x01(\tR\taccountId\"\x95\x01\n" +
+	"account_id\x18\x03 \x01(\tR\taccountId\x12\x12\n" +
+	"\x04plan\x18\x04 \x01(\x05R\x04plan\"\x95\x01\n" +
 	"\x12CreateStateRequest\x12.\n" +
 	"\bmetadata\x18\x01 \x01(\v2\x12.state.v2.MetadataR\bmetadata\x12\x16\n" +
 	"\x06events\x18\x02 \x03(\fR\x06events\x12\x14\n" +

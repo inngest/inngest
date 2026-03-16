@@ -54,6 +54,7 @@ message Tenant {
   string app_id     = 1;
   string env_id     = 2;
   string account_id = 3;
+  int32  plan       = 4;
 }
 
 message CreateStateRequest {
