@@ -558,7 +558,7 @@ func TestConstraintItemsFromBacklog(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := constraintItemsFromBacklog(tt.sp, tt.backlog, tt.constraints)
+			result := constraintItemsFromBacklog(tt.backlog, tt.constraints)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
