@@ -261,7 +261,6 @@ export function EventDetails({
                     content: prettyPayload,
                   }}
                   allowFullScreen={true}
-                  enableTreeView={true}
                   actions={
                     cloud
                       ? [

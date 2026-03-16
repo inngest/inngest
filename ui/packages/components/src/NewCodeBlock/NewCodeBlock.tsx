@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Button } from '@inngest/components/Button';
 import { CopyButton } from '@inngest/components/CopyButton';
 import { maxRenderedOutputSizeBytes } from '@inngest/components/constants';
@@ -70,6 +70,89 @@ function buildJsonPath(keyPath: readonly (string | number)[]): string {
   return result;
 }
 
+/**
+ * Given pretty-printed JSON text (2-space indent) and a 1-based line number,
+ * returns the dot/bracket-notation path for that line (e.g. "data.users[0].name").
+ */
+function getJsonPathAtLine(text: string, targetLine: number): string | null {
+  const lines = text.split('\n');
+  if (targetLine < 1 || targetLine > lines.length) return null;
+
+  const pathByDepth: (string | undefined)[] = [];
+  const arrayIndices = new Map<number, number>();
+  const isArrayDepth = new Set<number>();
+
+  for (let i = 0; i < targetLine; i++) {
+    const line = lines[i]!;
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+
+    const indent = line.length - line.trimStart().length;
+    const depth = Math.floor(indent / 2);
+    const hasComma = trimmed.endsWith(',');
+
+    // Closing bracket/brace
+    if (/^[}\]]/.test(trimmed)) {
+      pathByDepth.length = depth;
+      if (hasComma && isArrayDepth.has(depth)) {
+        arrayIndices.set(depth, (arrayIndices.get(depth) ?? 0) + 1);
+      }
+      continue;
+    }
+
+    // Truncate path to current depth
+    pathByDepth.length = depth;
+
+    // If inside an array, set the index segment
+    if (isArrayDepth.has(depth)) {
+      pathByDepth[depth] = `[${arrayIndices.get(depth) ?? 0}]`;
+    }
+
+    // Object property: "key": value
+    const keyMatch = trimmed.match(/^"((?:[^"\\]|\\.)*)"\s*:\s*(.*)/);
+    if (keyMatch) {
+      const key = keyMatch[1]!;
+      const rest = keyMatch[2]!.replace(/,?\s*$/, '');
+      pathByDepth[depth] = key;
+      if (rest === '{') {
+        isArrayDepth.delete(depth + 1);
+      } else if (rest === '[') {
+        isArrayDepth.add(depth + 1);
+        arrayIndices.set(depth + 1, 0);
+      }
+      continue;
+    }
+
+    // Standalone { or [
+    if (trimmed.startsWith('{')) {
+      isArrayDepth.delete(depth + 1);
+      continue;
+    }
+    if (trimmed.startsWith('[')) {
+      isArrayDepth.add(depth + 1);
+      arrayIndices.set(depth + 1, 0);
+      continue;
+    }
+
+    // Scalar array element
+    if (hasComma && isArrayDepth.has(depth)) {
+      arrayIndices.set(depth, (arrayIndices.get(depth) ?? 0) + 1);
+    }
+  }
+
+  let result = '';
+  for (let d = 0; d < pathByDepth.length; d++) {
+    const seg = pathByDepth[d];
+    if (seg === undefined) continue;
+    if (seg.startsWith('[')) {
+      result += seg;
+    } else {
+      result += result ? `.${seg}` : seg;
+    }
+  }
+  return result || null;
+}
+
 const jsonParse = (content: string) => {
   try {
     return JSON.parse(content);
@@ -110,6 +193,8 @@ export const NewCodeBlock = ({
   const { handleCopyClick, isCopying } = useCopyToClipboard();
   const [editEmtpy, setEditEmtpy] = useState(false);
   const [hoveredPath, setHoveredPath] = useState<string | null>(null);
+  const [cursorPath, setCursorPath] = useState<string | null>(null);
+  const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
 
   const monaco = useMonaco();
   const { content, readOnly = true, language = 'json' } = tab;
@@ -289,39 +374,57 @@ export const NewCodeBlock = ({
               )}
             </div>
           ) : (
-            <Editor
-              className={cn('h-full', className)}
-              theme="inngest-theme"
-              language={language}
-              value={editEmtpy ? EMPTY_INPUT : content}
-              height="100%"
-              options={{
-                wordWrap: wordWrap ? 'on' : 'off',
-                contextmenu: false,
-                readOnly,
-                minimap: { enabled: false },
-                fontFamily: FONT.font,
-                fontSize: FONT.size,
-                fontWeight: 'light',
-                lineHeight: LINE_HEIGHT,
-                renderLineHighlight: 'none',
-                renderWhitespace: 'none',
-                automaticLayout: true,
-                scrollBeyondLastLine: false,
-                scrollbar: scrollbarOptions ?? {
-                  alwaysConsumeMouseWheel: false,
-                  horizontalScrollbarSize: 0,
-                  verticalScrollbarSize: 0,
-                  vertical: 'hidden',
-                  horizontal: 'hidden',
-                },
-                guides: {
-                  indentation: false,
-                  highlightActiveBracketPair: false,
-                  highlightActiveIndentation: false,
-                },
-              }}
-            />
+            <div className="flex h-full flex-col">
+              <div className="min-h-0 flex-1">
+                <Editor
+                  className={cn('h-full', className)}
+                  theme="inngest-theme"
+                  language={language}
+                  value={editEmtpy ? EMPTY_INPUT : content}
+                  height="100%"
+                  onMount={(ed) => {
+                    editorRef.current = ed;
+                    if (language === 'json') {
+                      ed.onDidChangeCursorPosition((e) => {
+                        const text = ed.getValue();
+                        setCursorPath(getJsonPathAtLine(text, e.position.lineNumber));
+                      });
+                    }
+                  }}
+                  options={{
+                    wordWrap: wordWrap ? 'on' : 'off',
+                    contextmenu: false,
+                    readOnly,
+                    minimap: { enabled: false },
+                    fontFamily: FONT.font,
+                    fontSize: FONT.size,
+                    fontWeight: 'light',
+                    lineHeight: LINE_HEIGHT,
+                    renderLineHighlight: 'none',
+                    renderWhitespace: 'none',
+                    automaticLayout: true,
+                    scrollBeyondLastLine: false,
+                    scrollbar: scrollbarOptions ?? {
+                      alwaysConsumeMouseWheel: false,
+                      horizontalScrollbarSize: 0,
+                      verticalScrollbarSize: 0,
+                      vertical: 'hidden',
+                      horizontal: 'hidden',
+                    },
+                    guides: {
+                      indentation: false,
+                      highlightActiveBracketPair: false,
+                      highlightActiveIndentation: false,
+                    },
+                  }}
+                />
+              </div>
+              {language === 'json' && cursorPath && (
+                <div className="bg-canvasSubtle text-muted border-subtle flex items-center border-t px-3 py-1">
+                  <code className="truncate font-mono text-xs">{cursorPath}</code>
+                </div>
+              )}
+            </div>
           )}
         </div>
       </div>
