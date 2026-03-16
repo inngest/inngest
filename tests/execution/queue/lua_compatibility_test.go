@@ -364,11 +364,10 @@ func TestLuaCompatibility(t *testing.T) {
 				refillItems, err := getItemIDsFromBacklog(ctx, shard, &backlog, refillUntil, 10)
 				require.NoError(t, err)
 
-				res, err := shard.BacklogRefill(ctx, &backlog, &sp, refillUntil, refillItems, constraints)
+				res, err := shard.BacklogRefill(ctx, &backlog, &sp, refillUntil, refillItems)
 				require.NoError(t, err)
 				require.NotNil(t, res)
-				require.Equal(t, 1, res.Refill, *res)
-				require.Equal(t, 1, res.Refilled)
+				require.Equal(t, 1, len(res.RefilledItems))
 
 				// Add second item with capacity lease
 				capacityLeaseID := ulid.MustNew(ulid.Timestamp(refillUntil.Add(5*time.Second)), rand.Reader)
@@ -405,17 +404,13 @@ func TestLuaCompatibility(t *testing.T) {
 					&sp,
 					refillUntil,
 					refillItems,
-					constraints,
-					queue.WithBacklogRefillConstraintCheckIdempotencyKey("acquire-refill"),
-					queue.WithBacklogRefillDisableConstraintChecks(true),
 					queue.WithBacklogRefillItemCapacityLeases([]queue.CapacityLease{{
 						LeaseID: capacityLeaseID,
 					}}),
 				)
 				require.NoError(t, err)
 				require.NotNil(t, res)
-				require.Equal(t, 1, res.Refill)
-				require.Equal(t, 1, res.Refilled)
+				require.Equal(t, 1, len(res.RefilledItems))
 
 				refilled, err := q.ItemByID(ctx, shard, qi2.ID)
 				require.NoError(t, err)

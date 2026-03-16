@@ -54,7 +54,6 @@ func New(
 		wg:                       &sync.WaitGroup{},
 		seqLeaseLock:             &sync.RWMutex{},
 		scavengerLeaseLock:       &sync.RWMutex{},
-		activeCheckerLeaseLock:   &sync.RWMutex{},
 		instrumentationLeaseLock: &sync.RWMutex{},
 		shardLeaseLock:           &sync.RWMutex{},
 
@@ -106,13 +105,6 @@ type queueProcessor struct {
 	quit chan error
 	// wg stores a waitgroup for all in-progress jobs
 	wg *sync.WaitGroup
-
-	// activeCheckerLeaseID stores the lease ID if this queue is the ActiveChecker processor.
-	// all runners attempt to claim this lease automatically.
-	activeCheckerLeaseID *ulid.ULID
-	// activeCheckerLeaseLock ensures that there are no data races writing to
-	// or reading from activeCheckerLeaseID in parallel.
-	activeCheckerLeaseLock *sync.RWMutex
 
 	// workers is a buffered channel which allows scanners to send queue items
 	// to workers to be processed

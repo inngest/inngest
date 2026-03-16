@@ -116,7 +116,6 @@ func TestQueueSemaphoreWithConstraintAPI(t *testing.T) {
 		Partition:  &partition,
 		Items:      []*queue.QueueItem{&qi1, &qi2},
 		Queue:      q,
-		Denies:     queue.NewLeaseDenyList(),
 		StaticTime: clock.Now(),
 	}
 
@@ -207,7 +206,6 @@ func TestQueueSemaphore(t *testing.T) {
 					Partition:  &partition,
 					Items:      []*queue.QueueItem{&qi},
 					Queue:      deps.qp,
-					Denies:     queue.NewLeaseDenyList(),
 					StaticTime: clock.Now(),
 				}
 
@@ -262,7 +260,6 @@ func TestQueueSemaphore(t *testing.T) {
 					Partition:  &partition,
 					Items:      []*queue.QueueItem{&qi},
 					Queue:      deps.qp,
-					Denies:     queue.NewLeaseDenyList(),
 					StaticTime: clock.Now(),
 				}
 
@@ -304,7 +301,6 @@ func TestQueueSemaphore(t *testing.T) {
 					Partition:  &partition,
 					Items:      []*queue.QueueItem{&qi},
 					Queue:      deps.qp,
-					Denies:     queue.NewLeaseDenyList(),
 					StaticTime: clock.Now(),
 				}
 
@@ -362,7 +358,6 @@ func TestQueueSemaphore(t *testing.T) {
 					Partition:  &partition,
 					Items:      []*queue.QueueItem{&qi},
 					Queue:      deps.qp,
-					Denies:     queue.NewLeaseDenyList(),
 					StaticTime: clock.Now(),
 				}
 
@@ -428,7 +423,6 @@ func TestQueueSemaphore(t *testing.T) {
 					Partition:  &partition,
 					Items:      []*queue.QueueItem{&qi, &qi2},
 					Queue:      deps.qp,
-					Denies:     queue.NewLeaseDenyList(),
 					StaticTime: clock.Now(),
 				}
 
@@ -486,7 +480,6 @@ func TestQueueSemaphore(t *testing.T) {
 					Partition:  &partition,
 					Items:      []*queue.QueueItem{&qi},
 					Queue:      deps.qp,
-					Denies:     queue.NewLeaseDenyList(),
 					StaticTime: clock.Now(),
 				}
 
@@ -551,7 +544,6 @@ func TestQueueSemaphore(t *testing.T) {
 					Partition:  &partition,
 					Items:      []*queue.QueueItem{&qi, &qi2},
 					Queue:      deps.qp,
-					Denies:     queue.NewLeaseDenyList(),
 					StaticTime: clock.Now(),
 				}
 
