@@ -56,16 +56,6 @@ func (q *queueProcessor) ProcessItem(
 	q.wg.Add(1)
 	defer q.wg.Done()
 
-	// Continually the lease while this job is being processed.
-	extendLeaseTick := q.Clock().NewTicker(QueueLeaseDuration / 2)
-	defer extendLeaseTick.Stop()
-
-	capacityLeaseID := newCapacityLease(i.CapacityLease)
-	instrumentCapacityLease := i.CapacityLease != nil && q.EnableCapacityLeaseInstrumentation != nil && q.EnableCapacityLeaseInstrumentation(ctx, accountID, envID, fnID)
-
-	extendCapacityLeaseTick := q.Clock().NewTicker(q.CapacityLeaseExtendInterval)
-	defer extendCapacityLeaseTick.Stop()
-
 	errCh := make(chan error, 1)
 
 	// XXX: Add a max job time here, configurable.
