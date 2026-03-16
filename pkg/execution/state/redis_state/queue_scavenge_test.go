@@ -1216,7 +1216,7 @@ func TestQueueScavenge(t *testing.T) {
 		require.Equal(t, 0, item.ScavengeCount)
 
 		// Lease the item and let it expire
-		_, err = shard.Lease(ctx, item, 5*time.Second, clock.Now(), nil, osqueue.LeaseOptionDisableConstraintChecks(false))
+		_, err = shard.Lease(ctx, item, 5*time.Second, clock.Now(), nil)
 		require.NoError(t, err)
 
 		clock.Advance(6 * time.Second)
@@ -1233,7 +1233,7 @@ func TestQueueScavenge(t *testing.T) {
 		require.Equal(t, 1, requeued.ScavengeCount)
 
 		// Lease and expire again to verify accumulation
-		_, err = shard.Lease(ctx, *requeued, 5*time.Second, clock.Now(), nil, osqueue.LeaseOptionDisableConstraintChecks(false))
+		_, err = shard.Lease(ctx, *requeued, 5*time.Second, clock.Now(), nil)
 		require.NoError(t, err)
 
 		clock.Advance(6 * time.Second)
