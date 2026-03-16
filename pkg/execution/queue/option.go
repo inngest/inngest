@@ -415,12 +415,9 @@ type QueueOptions struct {
 	latencyPartition *LatencyPartitionOptions
 
 	CapacityManager                     constraintapi.CapacityManager
-	UseConstraintAPI                    constraintapi.UseConstraintAPIFn
 	EnableCapacityLeaseInstrumentation  constraintapi.EnableHighCardinalityInstrumentation
 	CapacityLeaseExtendInterval         time.Duration
 	AcquireCapacityLeaseOnBacklogRefill bool
-
-	EnableThrottleInstrumentation EnableThrottleInstrumentationFn
 
 	ConditionalTracer trace.ConditionalTracer
 
@@ -535,12 +532,6 @@ func WithCapacityManager(capacityManager constraintapi.CapacityManager) QueueOpt
 	}
 }
 
-func WithUseConstraintAPI(uca constraintapi.UseConstraintAPIFn) QueueOpt {
-	return func(q *QueueOptions) {
-		q.UseConstraintAPI = uca
-	}
-}
-
 func WithCapacityLeaseExtendInterval(interval time.Duration) QueueOpt {
 	return func(q *QueueOptions) {
 		q.CapacityLeaseExtendInterval = interval
@@ -556,14 +547,6 @@ func WithCapacityLeaseInstrumentation(enable constraintapi.EnableHighCardinality
 func WithAcquireCapacityLeaseOnBacklogRefill(acquire bool) QueueOpt {
 	return func(q *QueueOptions) {
 		q.AcquireCapacityLeaseOnBacklogRefill = acquire
-	}
-}
-
-type EnableThrottleInstrumentationFn func(ctx context.Context, accountID, fnID uuid.UUID) bool
-
-func WithEnableThrottleInstrumentation(fn EnableThrottleInstrumentationFn) QueueOpt {
-	return func(q *QueueOptions) {
-		q.EnableThrottleInstrumentation = fn
 	}
 }
 
@@ -788,9 +771,6 @@ func NewQueueOptions(
 		CapacityLeaseExtendInterval: QueueLeaseDuration / 2,
 		ConditionalTracer:           trace.NoopConditionalTracer(),
 		EnableCapacityLeaseInstrumentation: func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool) {
-			return false
-		},
-		UseConstraintAPI: func(ctx context.Context, accountID uuid.UUID) (enable bool) {
 			return false
 		},
 	}
