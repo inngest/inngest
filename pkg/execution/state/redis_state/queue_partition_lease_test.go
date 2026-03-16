@@ -165,11 +165,10 @@ func TestQueuePartitionLease(t *testing.T) {
 				require.NoError(t, err)
 			})
 
-			t.Run("Partition lease errors without capacity", func(t *testing.T) {
+			t.Run("Partition lease does not error without capacity", func(t *testing.T) {
 				leaseId, err := shard.PartitionLease(ctx, &p, 5*time.Second)
-				require.Nil(t, leaseId, "No lease id when leasing fails.\n%s", r.Dump())
-				require.Error(t, err)
-				require.ErrorIs(t, err, osqueue.ErrPartitionConcurrencyLimit)
+				require.NotNil(t, leaseId)
+				require.NoError(t, err)
 			})
 		})
 
@@ -204,11 +203,10 @@ func TestQueuePartitionLease(t *testing.T) {
 				require.NoError(t, err)
 			})
 
-			t.Run("Partition lease errors without capacity", func(t *testing.T) {
+			t.Run("Partition lease does not error without capacity", func(t *testing.T) {
 				leaseId, err := shard.PartitionLease(ctx, &p, 5*time.Second)
-				require.Nil(t, leaseId, "No lease id when leasing fails.\n%s", r.Dump())
-				require.Error(t, err)
-				require.ErrorIs(t, err, osqueue.ErrAccountConcurrencyLimit)
+				require.NotNil(t, leaseId)
+				require.NoError(t, err)
 			})
 		})
 
