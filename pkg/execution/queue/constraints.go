@@ -200,7 +200,7 @@ func (q *queueProcessor) BacklogRefillConstraintCheck(
 		itemRunIDs[item.ID] = item.Data.Identifier.RunID
 	}
 
-	if q.CapacityManager == nil || q.UseConstraintAPI == nil {
+	if q.CapacityManager == nil {
 		metrics.IncrBacklogRefillConstraintCheckCounter(ctx, enums.BacklogRefillConstraintCheckReasonConstraintAPIUninitialized.String(), metrics.CounterOpt{
 			PkgName: pkgName,
 		})
@@ -218,8 +218,7 @@ func (q *queueProcessor) BacklogRefillConstraintCheck(
 		}, nil
 	}
 
-	useAPI := q.UseConstraintAPI(ctx, *shadowPart.AccountID)
-	if !q.AcquireCapacityLeaseOnBacklogRefill || !useAPI {
+	if !q.AcquireCapacityLeaseOnBacklogRefill {
 		metrics.IncrBacklogRefillConstraintCheckCounter(ctx, enums.BacklogRefillConstraintCheckReasonFeatureFlagDisabled.String(), metrics.CounterOpt{
 			PkgName: pkgName,
 		})
@@ -325,8 +324,7 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 		return ItemLeaseConstraintCheckResult{}, nil
 	}
 
-	if q.CapacityManager == nil ||
-		q.UseConstraintAPI == nil {
+	if q.CapacityManager == nil {
 		metrics.IncrQueueItemConstraintCheckCounter(ctx, enums.QueueItemConstraintReasonConstraintAPIUninitialized.String(), metrics.CounterOpt{
 			PkgName: pkgName,
 		})
