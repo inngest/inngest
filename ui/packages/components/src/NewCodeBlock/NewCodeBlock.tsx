@@ -56,6 +56,20 @@ interface CodeBlockProps {
   scrollbarOptions?: editor.IEditorScrollbarOptions;
 }
 
+function buildJsonPath(keyPath: readonly (string | number)[]): string {
+  // keyPath is ordered from leaf to root, so reverse it and skip "root"
+  const parts = [...keyPath].reverse();
+  let result = '';
+  for (const part of parts) {
+    if (typeof part === 'number') {
+      result += `[${part}]`;
+    } else {
+      result += result ? `.${part}` : part;
+    }
+  }
+  return result;
+}
+
 const jsonParse = (content: string) => {
   try {
     return JSON.parse(content);
@@ -95,6 +109,7 @@ export const NewCodeBlock = ({
   const [wordWrap, setWordWrap] = useLocalStorage('wordWrap', false);
   const { handleCopyClick, isCopying } = useCopyToClipboard();
   const [editEmtpy, setEditEmtpy] = useState(false);
+  const [hoveredPath, setHoveredPath] = useState<string | null>(null);
 
   const monaco = useMonaco();
   const { content, readOnly = true, language = 'json' } = tab;
@@ -241,20 +256,38 @@ export const NewCodeBlock = ({
           ) : loading ? (
             <Skeleton className="h-24 w-full" />
           ) : enableTreeView && mode === 'raw' ? (
-            <JSONTree
-              hideRoot={true}
-              data={jsonParse(content) ?? {}}
-              shouldExpandNodeInitially={() => true}
-              theme={jsonTreeTheme(dark)}
-              labelRenderer={([key]) => (
-                <>
-                  <span className="font-mono text-[13px]">{key}</span>
-                  <span className="text-codeDelimiterBracketJson font-mono text-[13px]">:</span>
-                </>
+            <div
+              className="flex h-full flex-col"
+              onMouseLeave={() => setHoveredPath(null)}
+            >
+              <div className="min-h-0 flex-1 overflow-y-auto">
+                <JSONTree
+                  hideRoot={true}
+                  data={jsonParse(content) ?? {}}
+                  shouldExpandNodeInitially={() => true}
+                  theme={jsonTreeTheme(dark)}
+                  labelRenderer={(keyPath) => (
+                    <span
+                      onMouseEnter={() => setHoveredPath(buildJsonPath(keyPath))}
+                    >
+                      <span className="font-mono text-[13px]">{keyPath[0]}</span>
+                      <span className="text-codeDelimiterBracketJson font-mono text-[13px]">
+                        :
+                      </span>
+                    </span>
+                  )}
+                  valueRenderer={(raw: any) => (
+                    <span className="font-mono text-[13px]">{raw}</span>
+                  )}
+                  getItemString={() => null}
+                />
+              </div>
+              {hoveredPath && (
+                <div className="bg-canvasSubtle text-muted border-subtle flex items-center border-t px-3 py-1">
+                  <code className="truncate font-mono text-xs">{hoveredPath}</code>
+                </div>
               )}
-              valueRenderer={(raw: any) => <span className="font-mono text-[13px]">{raw}</span>}
-              getItemString={() => null}
-            />
+            </div>
           ) : (
             <Editor
               className={cn('h-full', className)}
