@@ -92,21 +92,11 @@ func TestQueueLease(t *testing.T) {
 			require.EqualValues(t, 1, count, r.Dump())
 		})
 
-		t.Run("run indexes are updated", func(t *testing.T) {
-			// Run indexes should be updated
-			{
-				itemIsMember, err := r.SIsMember(kg.ActiveSet("run", runID.String()), item.ID)
-				require.NoError(t, err)
-				require.True(t, itemIsMember)
-
-				isMember, err := r.SIsMember(kg.ActiveRunsSet("p", fnID.String()), runID.String())
-				require.NoError(t, err)
-				require.True(t, isMember)
-
-				accountIsMember, err := r.SIsMember(kg.ActiveRunsSet("account", accountID.String()), runID.String())
-				require.NoError(t, err)
-				require.True(t, accountIsMember)
-			}
+		t.Run("run indexes are not updated by lease (handled by Constraint API)", func(t *testing.T) {
+			// Run indexes are no longer written by the lease Lua script
+			require.False(t, r.Exists(kg.ActiveSet("run", runID.String())))
+			require.False(t, r.Exists(kg.ActiveRunsSet("p", fnID.String())))
+			require.False(t, r.Exists(kg.ActiveRunsSet("account", accountID.String())))
 		})
 
 		t.Run("Scavenge queue is updated", func(t *testing.T) {
@@ -247,24 +237,20 @@ func TestQueueLease(t *testing.T) {
 		// Use the new item's workflow ID
 		p := osqueue.QueuePartition{ID: itemA.FunctionID.String(), FunctionID: &itemA.FunctionID}
 
-		t.Run("With denylists it does not lease.", func(t *testing.T) {
+		t.Run("Denylists no longer checked inline during lease", func(t *testing.T) {
+			// Denylist checks are now handled by the Constraint API, not inline during lease
 			list := osqueue.NewLeaseDenyList()
 			list.AddConcurrency(osqueue.NewKeyError(osqueue.ErrPartitionConcurrencyLimit, p.Queue()))
 			id, err := shard.Lease(ctx, itemA, 5*time.Second, clock.Now(), list)
-			require.NotNil(t, err, "Expcted error leasing denylists")
-			require.Nil(t, id, "Expected nil ID with denylists")
-			require.ErrorIs(t, err, osqueue.ErrPartitionConcurrencyLimit)
-		})
-
-		t.Run("Leases with capacity", func(t *testing.T) {
-			_, err = shard.Lease(ctx, itemA, 5*time.Second, clock.Now(), nil)
 			require.NoError(t, err)
+			require.NotNil(t, id)
 		})
 
-		t.Run("Errors without capacity", func(t *testing.T) {
+		t.Run("Concurrency no longer enforced inline - second lease succeeds", func(t *testing.T) {
+			// Concurrency limits are now enforced by the Constraint API, not inline during lease
 			id, err := shard.Lease(ctx, itemB, 5*time.Second, clock.Now(), nil)
-			require.Nil(t, id, "Leased item when concurrency limits are reached.\n%s", r.Dump())
-			require.Error(t, err)
+			require.NotNil(t, id)
+			require.NoError(t, err)
 		})
 	})
 
@@ -298,11 +284,11 @@ func TestQueueLease(t *testing.T) {
 			require.NoError(t, err)
 		})
 
-		t.Run("Errors without capacity", func(t *testing.T) {
+		t.Run("Concurrency no longer enforced inline - second lease succeeds", func(t *testing.T) {
+			// Account concurrency limits are now enforced by the Constraint API, not inline during lease
 			id, err := shard.Lease(ctx, itemB, 5*time.Second, clock.Now(), nil)
-			require.Nil(t, id)
-			require.Error(t, err)
-			require.ErrorIs(t, err, osqueue.ErrAccountConcurrencyLimit)
+			require.NotNil(t, id)
+			require.NoError(t, err)
 		})
 	})
 
@@ -354,35 +340,20 @@ func TestQueueLease(t *testing.T) {
 			}, start, osqueue.EnqueueOpts{})
 			require.NoError(t, err)
 
-			t.Run("With denylists it does not lease.", func(t *testing.T) {
+			t.Run("Denylists no longer checked inline during lease", func(t *testing.T) {
+				// Denylist checks are now handled by the Constraint API, not inline during lease
 				list := osqueue.NewLeaseDenyList()
 				list.AddConcurrency(osqueue.NewKeyError(osqueue.ErrConcurrencyLimitCustomKey, ck.Key))
-				_, err = shard.Lease(ctx, itemA, 5*time.Second, clock.Now(), list)
-				require.NotNil(t, err)
-				require.ErrorIs(t, err, osqueue.ErrConcurrencyLimitCustomKey)
-			})
-
-			t.Run("Leases with capacity", func(t *testing.T) {
-				now := clock.Now()
-				_, err = shard.Lease(ctx, itemA, 5*time.Second, now, nil)
+				id, err := shard.Lease(ctx, itemA, 5*time.Second, clock.Now(), list)
 				require.NoError(t, err)
-
-				t.Run("Scavenge queue is updated", func(t *testing.T) {
-					mem, err := r.ZMembers(kg.ConcurrencyIndex())
-					require.NoError(t, err, r.Dump())
-					require.Equal(t, 1, len(mem), "scavenge queue should have 1 item", mem)
-					require.Contains(t, mem, fnA.String())
-
-					score, err := r.ZMScore(kg.ConcurrencyIndex(), fnA.String())
-					require.NoError(t, err)
-					require.Equal(t, float64(now.Add(5*time.Second).UnixMilli()), score[0])
-				})
+				require.NotNil(t, id)
 			})
 
-			t.Run("Errors without capacity", func(t *testing.T) {
+			t.Run("Leases second item (concurrency no longer enforced inline)", func(t *testing.T) {
+				// Concurrency limits are now enforced by the Constraint API, not inline during lease
 				id, err := shard.Lease(ctx, itemB, 5*time.Second, clock.Now(), nil)
-				require.Nil(t, id)
-				require.Error(t, err)
+				require.NotNil(t, id)
+				require.NoError(t, err)
 			})
 		})
 
@@ -453,37 +424,28 @@ func TestQueueLease(t *testing.T) {
 			zsetKeyA := kg.PartitionQueueSet(enums.PartitionTypeConcurrencyKey, fnId.String(), keyExprChecksum)
 			pA := osqueue.QueuePartition{ID: zsetKeyA, AccountID: accountId, FunctionID: &itemA.FunctionID}
 
-			t.Run("With denylists it does not lease.", func(t *testing.T) {
+			t.Run("Denylists no longer checked inline during lease", func(t *testing.T) {
+				// Denylist checks are now handled by the Constraint API, not inline during lease
 				list := osqueue.NewLeaseDenyList()
 				list.AddConcurrency(osqueue.NewKeyError(osqueue.ErrConcurrencyLimitCustomKey, ck.Key))
-				_, err = shard.Lease(ctx, itemA, 5*time.Second, clock.Now(), list)
-				require.NotNil(t, err)
-				require.ErrorIs(t, err, osqueue.ErrConcurrencyLimitCustomKey)
+				id, err := shard.Lease(ctx, itemA, 5*time.Second, clock.Now(), list)
+				require.NoError(t, err)
+				require.NotNil(t, id)
 			})
 
-			t.Run("Leases with capacity", func(t *testing.T) {
+			t.Run("Concurrency key queue no longer populated by lease", func(t *testing.T) {
 				// partition key queue does not exist
 				require.False(t, r.Exists(zsetKeyA), "partition shouldn't have been added by enqueue or lease")
 
-				// concurrency key queue does not yet exist
+				// concurrency key queue is no longer written by the lease Lua script
 				require.False(t, r.Exists(partitionConcurrencyKey(pA, kg)))
-
-				leaseID, err := shard.Lease(ctx, itemA, 5*time.Second, clock.Now(), nil)
-				require.NoError(t, err)
-				require.NotNil(t, leaseID)
-
-				require.True(t, r.Exists(partitionConcurrencyKey(pA, kg)))
-				memConcurrency, err := r.ZMembers(partitionConcurrencyKey(pA, kg))
-				require.NoError(t, err)
-				require.Equal(t, 1, len(memConcurrency))
-				require.Contains(t, memConcurrency, itemA.ID)
 			})
 
-			t.Run("Errors without capacity", func(t *testing.T) {
+			t.Run("Second lease succeeds (concurrency no longer enforced inline)", func(t *testing.T) {
+				// Concurrency limits are now enforced by the Constraint API, not inline during lease
 				id, err := shard.Lease(ctx, itemB, 5*time.Second, clock.Now(), nil)
-				require.Nil(t, id)
-				require.Error(t, err)
-				require.ErrorIs(t, err, osqueue.ErrConcurrencyLimitCustomKey)
+				require.NotNil(t, id)
+				require.NoError(t, err)
 			})
 		})
 
@@ -558,13 +520,14 @@ func TestQueueLease(t *testing.T) {
 			_, err = shard.Lease(ctx, itemB1, 5*time.Second, clock.Now(), nil)
 			require.NoError(t, err)
 
-			// Lease item A2 - should fail due to custom concurrency limit
+			// Concurrency limits are now enforced by the Constraint API, not inline during lease
+			// Lease item A2 - succeeds (no inline concurrency check)
 			_, err = shard.Lease(ctx, itemA2, 5*time.Second, clock.Now(), nil)
-			require.ErrorIs(t, err, osqueue.ErrConcurrencyLimitCustomKey)
+			require.NoError(t, err)
 
-			// Lease item B1 - should fail due to custom concurrency limit
+			// Lease item B2 - succeeds (no inline concurrency check)
 			_, err = shard.Lease(ctx, itemB2, 5*time.Second, clock.Now(), nil)
-			require.ErrorIs(t, err, osqueue.ErrConcurrencyLimitCustomKey)
+			require.NoError(t, err)
 		})
 	})
 
@@ -787,14 +750,16 @@ func TestQueueLease(t *testing.T) {
 
 		require.False(t, r.Exists("{queue}:queue:sorted:system-queue"))
 		require.False(t, r.Exists("{queue}:concurrency:account:system-queue"), r.Dump()) // System queues should not have account concurrency set
-		require.True(t, r.Exists("{queue}:concurrency:p:system-queue"))
+		// Concurrency key is no longer populated by lease Lua script (handled by Constraint API)
+		require.False(t, r.Exists("{queue}:concurrency:p:system-queue"))
 
 		item = getQueueItem(t, r, item.ID)
 		require.NotNil(t, item.LeaseID)
 		require.EqualValues(t, id, item.LeaseID)
 		require.WithinDuration(t, now.Add(time.Second), ulid.Time(item.LeaseID.Time()), 20*time.Millisecond)
 
-		require.True(t, r.Exists(partitionConcurrencyKey(p, kg)), r.Dump())
+		// Partition concurrency key is no longer populated by lease Lua script
+		require.False(t, r.Exists(partitionConcurrencyKey(p, kg)))
 	})
 
 	t.Run("batch system partitions should be leased properly", func(t *testing.T) {
@@ -842,8 +807,8 @@ func TestQueueLease(t *testing.T) {
 
 		require.False(t, r.Exists("{queue}:queue:sorted:schedule-batch"))
 
-		// batching uses different rules for concurrency keys
-		require.True(t, r.Exists("{queue}:concurrency:p:schedule-batch"))
+		// Concurrency keys are no longer populated by lease Lua script (handled by Constraint API)
+		require.False(t, r.Exists("{queue}:concurrency:p:schedule-batch"))
 		require.False(t, r.Exists("{queue}:concurrency:account:schedule-batch"), r.Dump())
 
 		require.False(t, r.Exists("{queue}:concurrency:account:00000000-0000-0000-0000-000000000000"), r.Dump())
@@ -854,7 +819,8 @@ func TestQueueLease(t *testing.T) {
 		require.EqualValues(t, id, item.LeaseID)
 		require.WithinDuration(t, now.Add(time.Second), ulid.Time(item.LeaseID.Time()), 20*time.Millisecond)
 
-		require.True(t, r.Exists(partitionConcurrencyKey(p, kg)), r.Dump())
+		// Partition concurrency key is no longer populated by lease Lua script
+		require.False(t, r.Exists(partitionConcurrencyKey(p, kg)))
 	})
 
 	t.Run("leasing key queue should clear backward-compat default partition", func(t *testing.T) {
@@ -927,9 +893,10 @@ func TestQueueLease(t *testing.T) {
 
 		require.False(t, r.Exists(partitionZsetKey(defaultPart, kg)))
 
-		require.True(t, r.Exists(backlogCustomKeyInProgress(backlog, kg, 1)))
-		require.True(t, r.Exists(shadowPartitionAccountInProgressKey(sp, kg)))
-		require.True(t, r.Exists(partitionConcurrencyKey(defaultPart, kg)))
+		// In-progress keys are no longer populated by the lease Lua script (handled by Constraint API)
+		require.False(t, r.Exists(backlogCustomKeyInProgress(backlog, kg, 1)))
+		require.False(t, r.Exists(shadowPartitionAccountInProgressKey(sp, kg)))
+		require.False(t, r.Exists(partitionConcurrencyKey(defaultPart, kg)))
 
 		err = shard.Dequeue(ctx, item)
 		require.NoError(t, err)
