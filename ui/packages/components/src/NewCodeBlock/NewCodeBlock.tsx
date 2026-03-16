@@ -27,6 +27,8 @@ import { OptionalTooltip } from '../Tooltip/OptionalTooltip';
 import { jsonTreeTheme } from '../utils/jsonTree';
 import { isDark } from '../utils/theme';
 
+// JSON field path display: shows the full path (e.g. "data.users[0].name") at the bottom
+// of the editor when the cursor is on a line, similar to the fx terminal tool.
 const EMPTY_INPUT = JSON.stringify({ data: {} }, null, 2);
 
 export type CodeBlockAction = {
