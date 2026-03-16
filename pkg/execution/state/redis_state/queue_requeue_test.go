@@ -55,7 +55,7 @@ func TestQueueRequeue(t *testing.T) {
 		}, now, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
-		_, err = shard.Lease(ctx, item, time.Second, time.Now(), nil)
+		_, err = shard.Lease(ctx, item, time.Second, time.Now())
 		require.NoError(t, err)
 
 		// Assert partition index is original
@@ -205,7 +205,7 @@ func TestQueueRequeue(t *testing.T) {
 		require.Equal(t, partScoreDefault, accountPartScore, "expected account partitions to match global partitions")
 		require.Equal(t, accountPartScore[0], accountScore[0], "expected account score to match earliest account partition")
 
-		_, err = shard.Lease(ctx, item, time.Second, clock.Now(), nil)
+		_, err = shard.Lease(ctx, item, time.Second, clock.Now())
 		require.NoError(t, err)
 
 		// Requeue
@@ -295,7 +295,7 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 			now := clock.Now()
 			leaseDur := 5 * time.Second
 			leaseExpires := now.Add(leaseDur)
-			leaseID, err := shard.Lease(ctx, qi, leaseDur, now, nil)
+			leaseID, err := shard.Lease(ctx, qi, leaseDur, now)
 			require.NoError(t, err)
 			require.NotNil(t, leaseID)
 
@@ -468,7 +468,7 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 			now := clock.Now().Truncate(time.Minute)
 			leaseDur := 5 * time.Second
 			leaseExpires := now.Add(leaseDur)
-			leaseID, err := shard.Lease(ctx, qi, leaseDur, now, nil)
+			leaseID, err := shard.Lease(ctx, qi, leaseDur, now)
 			require.NoError(t, err)
 			require.NotNil(t, leaseID)
 			require.Equal(t, leaseExpires, ulid.Time(leaseID.Time()), now)
@@ -647,7 +647,7 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 			now := clock.Now().Truncate(time.Minute)
 			leaseDur := 5 * time.Second
 			leaseExpires := now.Add(leaseDur)
-			leaseID, err := shard.Lease(ctx, qi, leaseDur, now, nil)
+			leaseID, err := shard.Lease(ctx, qi, leaseDur, now)
 			require.NoError(t, err)
 			require.NotNil(t, leaseID)
 			require.Equal(t, leaseExpires, ulid.Time(leaseID.Time()), now)
@@ -779,7 +779,7 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 			now := clock.Now()
 			leaseDur := 5 * time.Second
 			leaseExpires := now.Add(leaseDur)
-			leaseID, err := shard.Lease(ctx, qi, leaseDur, now, nil)
+			leaseID, err := shard.Lease(ctx, qi, leaseDur, now)
 			require.NoError(t, err)
 			require.NotNil(t, leaseID)
 
@@ -905,11 +905,11 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 
 		// put item in progress, this is tested separately
 		leaseDur := 5 * time.Second
-		leaseID, err := shard.Lease(ctx, qi, leaseDur, now, nil)
+		leaseID, err := shard.Lease(ctx, qi, leaseDur, now)
 		require.NoError(t, err)
 		require.NotNil(t, leaseID)
 
-		leaseID, err = shard.Lease(ctx, qi2, leaseDur, now, nil)
+		leaseID, err = shard.Lease(ctx, qi2, leaseDur, now)
 		require.NoError(t, err)
 		require.NotNil(t, leaseID)
 
