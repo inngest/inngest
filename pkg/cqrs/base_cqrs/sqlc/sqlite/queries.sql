@@ -570,3 +570,23 @@ WHERE run_id = ? AND span_id = ? AND account_id = ?
 GROUP BY dynamic_span_id
 ORDER BY start_time ASC
 LIMIT 1;
+
+-- name: GetMetadataSpansByParentSpanID :many
+SELECT
+  run_id,
+  trace_id,
+  dynamic_span_id,
+  MIN(start_time) as start_time,
+  MAX(end_time) AS end_time,
+  parent_span_id,
+  json_group_array(json_object(
+    'name', name,
+    'attributes', attributes,
+    'links', links,
+    'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
+    'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
+  )) AS span_fragments
+FROM spans
+WHERE run_id = ? AND parent_span_id = ? AND account_id = ? AND name = 'metadata'
+GROUP BY dynamic_span_id
+ORDER BY start_time ASC;
