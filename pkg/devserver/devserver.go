@@ -377,7 +377,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		return fmt.Errorf("could not create queue: %w", err)
 	}
 
-	rl := ratelimit.New(ctx, unshardedRc, fmt.Sprintf("{ratelimit}:"))
+	rl := ratelimit.New(ctx, unshardedRc, "{ratelimit}:")
 
 	// Create the batch manager. In production, a second BatchClient can be provided
 	// to enable zero-downtime migration between Redis clusters via
