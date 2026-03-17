@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -363,7 +364,16 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 			haveSetRunStartTime = true
 		}
 
-		for i, cs := range span.Children {
+		// Filter out dropped spans before processing. Execution spans are
+		// exported to the DB before their DropSpan attribute is set via an
+		// EXTEND span, so they end up in the span tree with
+		// MarkedAsDropped=true. Keeping them would cause phantom "Attempt 0"
+		// entries in the UI.
+		children := slices.DeleteFunc(span.Children, func(s *cqrs.OtelSpan) bool {
+			return s == nil || s.MarkedAsDropped
+		})
+
+		for i, cs := range children {
 			child, err := tr.convertRunSpanToGQL(ctx, cs)
 			if err != nil {
 				return nil, fmt.Errorf("error converting child span: %w", err)
@@ -375,7 +385,7 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 				continue
 			}
 
-			if child.Omit || cs.MarkedAsDropped {
+			if child.Omit {
 				// We're skipping this child, but we may still want to use
 				// its data for timings.
 				if child.SpanTypeName == meta.SpanNameStepDiscovery && !haveSetRunStartTime {
