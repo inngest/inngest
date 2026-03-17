@@ -27,7 +27,8 @@ func (e *eventstore) Append(evt Event) {
 func (e *eventstore) Reset() {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	e.Events = []Event{}
+	// Preserve the underlying array capacity for reuse.
+	e.Events = e.Events[:0]
 }
 
 // Event represents a log event for wide logs, used in req end logging
