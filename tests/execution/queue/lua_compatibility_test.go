@@ -414,6 +414,7 @@ func TestLuaCompatibility(t *testing.T) {
 
 				refilled, err := q.ItemByID(ctx, shard, qi2.ID)
 				require.NoError(t, err)
+				require.NotNil(t, refilled.CapacityLease)
 				require.Equal(t, capacityLeaseID.String(), refilled.CapacityLease.LeaseID.String())
 			})
 
