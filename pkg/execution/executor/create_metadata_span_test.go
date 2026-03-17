@@ -26,38 +26,38 @@ type mockRunContext struct {
 	md sv2.Metadata
 }
 
-func (m *mockRunContext) Metadata() *sv2.Metadata          { return &m.md }
-func (m *mockRunContext) DriverResponse() *state.DriverResponse { return nil }
-func (m *mockRunContext) Events() []json.RawMessage         { return nil }
-func (m *mockRunContext) HTTPClient() exechttp.RequestExecutor { return nil }
-func (m *mockRunContext) ExecutionSpan() *meta.SpanReference { return &meta.SpanReference{} }
-func (m *mockRunContext) ParentSpan() *meta.SpanReference   { return &meta.SpanReference{} }
-func (m *mockRunContext) GroupID() string                    { return "" }
-func (m *mockRunContext) AttemptCount() int                  { return 0 }
-func (m *mockRunContext) MaxAttempts() *int                  { return nil }
-func (m *mockRunContext) ShouldRetry() bool                 { return false }
-func (m *mockRunContext) IncrementAttempt()                  {}
-func (m *mockRunContext) PriorityFactor() *int64             { return nil }
-func (m *mockRunContext) ConcurrencyKeys() []state.CustomConcurrency { return nil }
-func (m *mockRunContext) ParallelMode() enums.ParallelMode  { return 0 }
-func (m *mockRunContext) LifecycleItem() queue.Item         { return queue.Item{} }
-func (m *mockRunContext) SetStatusCode(code int)             {}
-func (m *mockRunContext) UpdateOpcodeError(op *state.GeneratorOpcode, err state.UserError) {}
+func (m *mockRunContext) Metadata() *sv2.Metadata                                              { return &m.md }
+func (m *mockRunContext) DriverResponse() *state.DriverResponse                                { return nil }
+func (m *mockRunContext) Events() []json.RawMessage                                            { return nil }
+func (m *mockRunContext) HTTPClient() exechttp.RequestExecutor                                 { return nil }
+func (m *mockRunContext) ExecutionSpan() *meta.SpanReference                                   { return &meta.SpanReference{} }
+func (m *mockRunContext) ParentSpan() *meta.SpanReference                                      { return &meta.SpanReference{} }
+func (m *mockRunContext) GroupID() string                                                      { return "" }
+func (m *mockRunContext) AttemptCount() int                                                    { return 0 }
+func (m *mockRunContext) MaxAttempts() *int                                                    { return nil }
+func (m *mockRunContext) ShouldRetry() bool                                                    { return false }
+func (m *mockRunContext) IncrementAttempt()                                                    {}
+func (m *mockRunContext) PriorityFactor() *int64                                               { return nil }
+func (m *mockRunContext) ConcurrencyKeys() []state.CustomConcurrency                           { return nil }
+func (m *mockRunContext) ParallelMode() enums.ParallelMode                                     { return 0 }
+func (m *mockRunContext) LifecycleItem() queue.Item                                            { return queue.Item{} }
+func (m *mockRunContext) SetStatusCode(code int)                                               {}
+func (m *mockRunContext) UpdateOpcodeError(op *state.GeneratorOpcode, err state.UserError)     {}
 func (m *mockRunContext) UpdateOpcodeOutput(op *state.GeneratorOpcode, output json.RawMessage) {}
-func (m *mockRunContext) SetError(err error)                 {}
+func (m *mockRunContext) SetError(err error)                                                   {}
 
 // Compile-time check that mockRunContext implements RunContext.
 var _ execution.RunContext = (*mockRunContext)(nil)
 
 // mockStructured implements metadata.Structured with configurable behavior.
 type mockStructured struct {
-	kind      metadata.Kind
-	values    metadata.Values
+	kind         metadata.Kind
+	values       metadata.Values
 	serializeErr error
 }
 
-func (m *mockStructured) Kind() metadata.Kind             { return m.kind }
-func (m *mockStructured) Op() enums.MetadataOpcode        { return enums.MetadataOpcodeMerge }
+func (m *mockStructured) Kind() metadata.Kind      { return m.kind }
+func (m *mockStructured) Op() enums.MetadataOpcode { return enums.MetadataOpcodeMerge }
 func (m *mockStructured) Serialize() (metadata.Values, error) {
 	if m.serializeErr != nil {
 		return nil, m.serializeErr

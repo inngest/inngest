@@ -98,11 +98,11 @@ type checkpointAPI struct {
 
 func NewCheckpointAPI(o Opts) CheckpointAPI {
 	c := checkpoint.New(checkpoint.Opts{
-		State:           o.State,
-		FnReader:        o.FunctionReader,
-		Executor:        o.Executor,
-		TracerProvider:  o.TracerProvider,
-		Queue:           o.Queue,
+		State:             o.State,
+		FnReader:          o.FunctionReader,
+		Executor:          o.Executor,
+		TracerProvider:    o.TracerProvider,
+		Queue:             o.Queue,
 		MetricsProvider:   o.CheckpointOpts.CheckpointMetrics,
 		BackoffFunc:       o.CheckpointOpts.BackoffFunc,
 		AllowStepMetadata: o.CheckpointOpts.AllowStepMetadata,
@@ -179,11 +179,11 @@ func (a checkpointAPI) CheckpointNewRun(w http.ResponseWriter, r *http.Request) 
 	// SHOULD automatically have a timeout after 60 minutes;  we should auomatically ensure
 	// that functions are marked as FAILED if we do not get a call to finalize them.
 	_, md, err := a.Executor.Schedule(ctx, execution.ScheduleRequest{
-		RunID:       &input.RunID,
-		Function:    fn,
-		AccountID:   auth.AccountID(),
-		WorkspaceID: auth.WorkspaceID(),
-		AppID:       input.AppID(auth.WorkspaceID()),
+		RunID:          &input.RunID,
+		Function:       fn,
+		AccountID:      auth.AccountID(),
+		WorkspaceID:    auth.WorkspaceID(),
+		AppID:          input.AppID(auth.WorkspaceID()),
 		RunMode:        enums.RunModeSync,
 		Events:         []event.TrackedEvent{evt},
 		URL:            input.URL(),

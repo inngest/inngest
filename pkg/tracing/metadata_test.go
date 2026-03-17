@@ -21,8 +21,8 @@ type mockStructured struct {
 	serializeErr error
 }
 
-func (m *mockStructured) Kind() metadata.Kind                { return m.kind }
-func (m *mockStructured) Op() enums.MetadataOpcode           { return enums.MetadataOpcodeMerge }
+func (m *mockStructured) Kind() metadata.Kind      { return m.kind }
+func (m *mockStructured) Op() enums.MetadataOpcode { return enums.MetadataOpcodeMerge }
 func (m *mockStructured) Serialize() (metadata.Values, error) {
 	if m.serializeErr != nil {
 		return nil, m.serializeErr
