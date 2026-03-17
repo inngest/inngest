@@ -257,7 +257,7 @@ func (q *queueProcessor) ProcessShadowPartition(ctx context.Context, shadowPart 
 			if res != nil {
 				refilled := len(res.RefilledItems)
 				refilledItems += refilled
-				fullyProcessed = (res.TotalBacklogCount - refilled) > 0
+				fullyProcessed = (res.TotalBacklogCount - refilled) <= 0
 			}
 
 			// If we fully refilled, track and continue
@@ -434,9 +434,6 @@ func (q *queueProcessor) ProcessShadowPartitionBacklog(
 	}
 
 	refillLimit := q.backlogRefillLimit
-	if refillLimit > BacklogRefillHardLimit {
-		refillLimit = BacklogRefillHardLimit
-	}
 	if refillLimit <= 0 {
 		refillLimit = BacklogRefillHardLimit
 	}
@@ -445,6 +442,16 @@ func (q *queueProcessor) ProcessShadowPartitionBacklog(
 	// TODO: Run multiple requests, etc. to balance peek size and throughput
 	if shadowPart.AccountID != nil {
 		refillLimit = constraintapi.MaximumAmount
+	}
+
+	// Cap at custom limit
+	if q.backlogRefillLimit > 0 && refillLimit > q.backlogRefillLimit {
+		refillLimit = q.backlogRefillLimit
+	}
+
+	// Cap at hard limit
+	if refillLimit > BacklogRefillHardLimit {
+		refillLimit = BacklogRefillHardLimit
 	}
 
 	// Peek items (scheduled to run within the next 2s) to be refilled.
