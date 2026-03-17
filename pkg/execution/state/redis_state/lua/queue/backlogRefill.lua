@@ -59,8 +59,6 @@ end
 -- $include(update_account_queues.lua)
 -- $include(gcra.lua)
 -- $include(update_backlog_pointer.lua)
--- $include(update_active_sets.lua)
--- $include(active_check.lua)
 
 --
 -- Retrieve current backlog size
