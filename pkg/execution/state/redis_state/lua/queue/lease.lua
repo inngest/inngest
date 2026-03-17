@@ -24,10 +24,8 @@ local currentTime = tonumber(ARGV[4]) -- in ms
 -- $include(get_queue_item.lua)
 -- $include(set_item_peek_time.lua)
 -- $include(update_pointer_score.lua)
--- $include(gcra.lua)
 -- $include(ends_with.lua)
 -- $include(update_account_queues.lua)
--- $include(update_active_sets.lua)
 
 -- first, get the queue item.  we must do this and bail early if the queue item
 -- was not found.

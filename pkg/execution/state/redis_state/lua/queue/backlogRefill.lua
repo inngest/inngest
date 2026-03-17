@@ -57,7 +57,6 @@ end
 -- $include(update_pointer_score.lua)
 -- $include(ends_with.lua)
 -- $include(update_account_queues.lua)
--- $include(gcra.lua)
 -- $include(update_backlog_pointer.lua)
 
 --
