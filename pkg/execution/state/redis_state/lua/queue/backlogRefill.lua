@@ -47,8 +47,8 @@ local nowMS         = tonumber(ARGV[6])
 
 -- Constraint API rollout
 local itemCapacityLeases = {}
-if ARGV[18] ~= nil and ARGV[18] ~= "" and ARGV[18] ~= "null" then
-  local success, result = pcall(cjson.decode, ARGV[18])
+if ARGV[7] ~= nil and ARGV[7] ~= "" and ARGV[7] ~= "null" then
+  local success, result = pcall(cjson.decode, ARGV[7])
   if success and type(result) == "table" then
     itemCapacityLeases = result
   end
