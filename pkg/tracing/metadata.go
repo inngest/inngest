@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/inngest/inngest/pkg/consts"
 	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/tracing/meta"
@@ -28,6 +29,10 @@ func CreateMetadataSpan(ctx context.Context, tracerProvider TracerProvider, pare
 // CreateMetadataSpanFromValues creates a metadata span from pre-serialized values,
 // avoiding redundant serialization when the caller has already called Serialize.
 func CreateMetadataSpanFromValues(ctx context.Context, tracerProvider TracerProvider, parent *meta.SpanReference, location, pkgName string, stateMetadata *statev2.Metadata, kind metadata.Kind, op metadata.Opcode, values metadata.Values, scope metadata.Scope, opts ...MetadataSpanAttrOpts) (*meta.SpanReference, error) {
+	if values.Size() > consts.MaxMetadataSpanSize {
+		return nil, metadata.ErrMetadataSpanTooLarge
+	}
+
 	attrs := RawMetadataAttrs(kind, values, op)
 	meta.AddAttr(attrs, meta.Attrs.MetadataScope, &scope)
 
