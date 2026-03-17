@@ -301,6 +301,19 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	conditionalQueueTracer := itrace.NewConditionalTracer(itrace.QueueTracer(), itrace.AlwaysTrace)
 
+	// Instantiate Constraint API
+	cm, err := constraintapi.NewRedisCapacityManager(
+		constraintapi.WithClock(clockwork.NewRealClock()),
+		constraintapi.WithShardName("default"),
+		constraintapi.WithClient(unshardedRc),
+		constraintapi.WithEnableHighCardinalityInstrumentation(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool) {
+			return false
+		}),
+	)
+	if err != nil {
+		return fmt.Errorf("could not create contraint API: %w", err)
+	}
+
 	queueOpts := []queue.QueueOpt{
 		queue.WithRunMode(runMode),
 		queue.WithIdempotencyTTL(time.Hour),
@@ -330,28 +343,9 @@ func start(ctx context.Context, opts StartOpts) error {
 			return queue.PartitionPausedInfo{}
 		}),
 		queue.WithConditionalTracer(conditionalQueueTracer),
-	}
-
-	const rateLimitPrefix = "ratelimit"
-
-	// Instantiate Constraint API
-	cm, err := constraintapi.NewRedisCapacityManager(
-		constraintapi.WithClock(clockwork.NewRealClock()),
-		constraintapi.WithShardName("default"),
-		constraintapi.WithClient(unshardedRc),
-		constraintapi.WithEnableHighCardinalityInstrumentation(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool) {
-			return false
-		}),
-	)
-	if err != nil {
-		return fmt.Errorf("could not create contraint API: %w", err)
-	}
-
-	queueOpts = append(
-		queueOpts,
 		queue.WithCapacityManager(cm),
 		queue.WithAcquireCapacityLeaseOnBacklogRefill(true),
-	)
+	}
 
 	services = append(services, constraintapi.NewLeaseScavengerService(cm, consts.ConstraintAPIScavengerTick))
 
@@ -383,7 +377,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		return fmt.Errorf("could not create queue: %w", err)
 	}
 
-	rl := ratelimit.New(ctx, unshardedRc, fmt.Sprintf("{%s}:", rateLimitPrefix))
+	rl := ratelimit.New(ctx, unshardedRc, fmt.Sprintf("{ratelimit}:"))
 
 	// Create the batch manager. In production, a second BatchClient can be provided
 	// to enable zero-downtime migration between Redis clusters via
@@ -531,16 +525,15 @@ func start(ctx context.Context, opts StartOpts) error {
 		executor.WithAllowStepMetadata(func(ctx context.Context, acctID uuid.UUID) bool {
 			return enableStepMetadata
 		}),
+
+		executor.WithCapacityManager(cm),
+		executor.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
+			return true
+		}),
+		executor.WithEnableBatchingInstrumentation(func(ctx context.Context, accountID, envID uuid.UUID) (enable bool) {
+			return false
+		}),
 	}
-
-	executorOpts = append(executorOpts, executor.WithCapacityManager(cm))
-	executorOpts = append(executorOpts, executor.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
-		return true
-	}))
-
-	executorOpts = append(executorOpts, executor.WithEnableBatchingInstrumentation(func(ctx context.Context, accountID, envID uuid.UUID) (enable bool) {
-		return false
-	}))
 
 	exec, err := executor.NewExecutor(executorOpts...)
 	if err != nil {
