@@ -105,7 +105,6 @@ func (a *devapi) addRoutes(AuthMiddleware func(http.Handler) http.Handler) {
 		// Everything else loads the UI (SPA fallback)
 		a.NotFound(a.UI)
 	}
-
 }
 
 func (a devapi) UI(w http.ResponseWriter, r *http.Request) {
@@ -383,9 +382,9 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 			fnExists = true
 		}
 
-		if fnExists {
-			fn.FunctionVersion = currentFn.FunctionVersion + 1
-		}
+		// Ensure function version is at least 1 and incremented on re-sync
+		fn.FunctionVersion = max(currentFn.FunctionVersion+1, 1)
+
 		config, err := json.Marshal(fn)
 		if err != nil {
 			return nil, publicerr.Wrap(err, 500, "Error marshalling function")
@@ -442,7 +441,6 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 				Expression:      cronExpr,
 				Op:              enums.CronOpNew,
 			})
-
 		}
 	}
 
