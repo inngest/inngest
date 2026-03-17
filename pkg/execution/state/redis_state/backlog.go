@@ -142,8 +142,8 @@ func (q *queue) BacklogRefill(
 	}
 
 	returnTuple, ok := res.([]any)
-	if !ok || len(returnTuple) != 8 {
-		return nil, fmt.Errorf("expected return tuple to include 8 items")
+	if !ok || len(returnTuple) != 3 {
+		return nil, fmt.Errorf("expected return tuple to include 3 items")
 	}
 
 	backlogCountTotal, ok := returnTuple[0].(int64)
