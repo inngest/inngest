@@ -81,7 +81,7 @@ func TestRegister_FunctionVersionIncrement(t *testing.T) {
 		}
 	})
 
-	t.Run("re-registering same app config increments version", func(t *testing.T) {
+	t.Run("re-registering same app config does not increment version", func(t *testing.T) {
 		// Create a test devserver with in-memory data store
 		ds := newTestDevServer(t)
 		api := &devapi{
@@ -103,12 +103,12 @@ func TestRegister_FunctionVersionIncrement(t *testing.T) {
 		_, err = api.register(ctx, req)
 		require.NoError(t, err)
 
-		// Get the updated version — increments on every sync
+		// Get the updated version — same config means no increment
 		fnVersions2 := getFunctionIDandVersion(t, ds, req.AppName)
 		require.Len(t, fnVersions2, 1)
-		for _, fnVersion := range fnVersions2 {
-			require.Equal(t, 2, fnVersion)
-		}
+
+		// fn versions don't change
+		require.EqualValues(t, fnVersions1, fnVersions2)
 	})
 
 	t.Run("multiple re-registrations increment version correctly", func(t *testing.T) {
