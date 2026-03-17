@@ -13,6 +13,7 @@ import {
   RiDownload2Line,
   RiEdit2Line,
   RiExpandDiagonalLine,
+  RiInformationLine,
 } from '@remixicon/react';
 import type { editor } from 'monaco-editor';
 import { JSONTree } from 'react-json-tree';
@@ -317,7 +318,7 @@ export const NewCodeBlock = ({
             </div>
           )}
         </div>
-        <div className={cn('bg-codeEditor h-full overflow-y-auto py-3')}>
+        <div className={cn('bg-codeEditor flex min-h-0 flex-1 flex-col pt-3')}>
           {isOutputTooLarge && !editEmtpy ? (
             <>
               <Alert severity="warning">Output size is too large to render {`( > 1MB )`}</Alert>
@@ -344,7 +345,7 @@ export const NewCodeBlock = ({
             <Skeleton className="h-24 w-full" />
           ) : enableTreeView && mode === 'raw' ? (
             <div
-              className="flex h-full flex-col"
+              className="flex min-h-0 flex-1 flex-col"
               onMouseLeave={() => setHoveredPath(null)}
             >
               <div className="min-h-0 flex-1 overflow-y-auto">
@@ -369,14 +370,28 @@ export const NewCodeBlock = ({
                   getItemString={() => null}
                 />
               </div>
-              {hoveredPath && (
-                <div className="bg-canvasSubtle text-muted border-subtle flex items-center border-t px-3 py-1">
-                  <code className="truncate font-mono text-xs">{hoveredPath}</code>
-                </div>
-              )}
+              <div className="bg-canvasSubtle text-muted border-subtle flex shrink-0 items-center justify-between border-t px-3 py-1">
+                <code className="truncate font-mono text-xs">
+                  {hoveredPath || (
+                    <span className="text-muted flex items-center gap-1">
+                      <RiInformationLine className="h-3 w-3" />
+                      Hover over a JSON key to see full path
+                    </span>
+                  )}
+                </code>
+                {hoveredPath && (
+                  <CopyButton
+                    size="small"
+                    code={hoveredPath}
+                    isCopying={isCopying}
+                    handleCopyClick={handleCopyClick}
+                    appearance="ghost"
+                  />
+                )}
+              </div>
             </div>
           ) : (
-            <div className="flex h-full flex-col">
+            <div className="flex min-h-0 flex-1 flex-col">
               <div className="min-h-0 flex-1">
                 <Editor
                   className={cn('h-full', className)}
@@ -421,9 +436,25 @@ export const NewCodeBlock = ({
                   }}
                 />
               </div>
-              {language === 'json' && cursorPath && (
-                <div className="bg-canvasSubtle text-muted border-subtle flex items-center border-t px-3 py-1">
-                  <code className="truncate font-mono text-xs">{cursorPath}</code>
+              {language === 'json' && (
+                <div className="bg-canvasSubtle text-muted border-subtle flex shrink-0 items-center justify-between border-t px-3 py-1">
+                  <code className="truncate font-mono text-xs">
+                    {cursorPath || (
+                      <span className="text-muted flex items-center gap-1">
+                        <RiInformationLine className="h-3 w-3" />
+                        Click on a JSON line to see full path
+                      </span>
+                    )}
+                  </code>
+                  {cursorPath && (
+                    <CopyButton
+                      size="small"
+                      code={cursorPath}
+                      isCopying={isCopying}
+                      handleCopyClick={handleCopyClick}
+                      appearance="ghost"
+                    />
+                  )}
                 </div>
               )}
             </div>
