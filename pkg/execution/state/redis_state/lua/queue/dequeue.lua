@@ -47,7 +47,6 @@ local idempotencyTTL = tonumber(ARGV[6])
 -- $include(ends_with.lua)
 -- $include(update_account_queues.lua)
 -- $include(update_backlog_pointer.lua)
--- $include(update_active_sets.lua)
 
 --
 -- Fetch this item to see if it was in progress prior to deleting.
