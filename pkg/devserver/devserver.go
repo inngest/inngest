@@ -377,7 +377,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		return fmt.Errorf("could not create queue: %w", err)
 	}
 
-	rl := ratelimit.New(ctx, unshardedRc, fmt.Sprintf("{ratelimit}:"))
+	rl := ratelimit.New(ctx, unshardedRc, "{ratelimit}:")
 
 	batcher := batch.NewRedisBatchManager(shardedClient.Batch(), rq, batch.WithLogger(l))
 	debouncer := debounce.NewRedisDebouncer(unshardedClient.Debounce(), queueShard, rq)
