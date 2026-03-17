@@ -12,6 +12,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/api/apiv1/apiv1auth"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/publicerr"
@@ -87,7 +88,8 @@ func (a router) addRunMetadata(w http.ResponseWriter, r *http.Request) {
 
 	err = a.AddRunMetadata(ctx, auth, runID, &data)
 	switch {
-	// TODO: better cases for specific errors
+	case errors.Is(err, metadata.ErrMetadataSpanTooLarge):
+		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 413, "Metadata span exceeds maximum size of 64KB"))
 	case err != nil:
 		_ = publicerr.WriteHTTP(w, err)
 		return
@@ -129,14 +131,22 @@ func (a router) AddRunMetadata(ctx context.Context, auth apiv1auth.V1Auth, runID
 		meta.AddAttr(cfg.Attrs, meta.Attrs.AppID, &parentSpan.AppID)
 	}
 
+	var cumulativeSize int
 	for _, md := range req.Metadata {
 		if err := md.Validate(); err != nil {
 			return publicerr.Wrap(err, 400, "Invalid metadata")
 		}
 
-		// TODO: validate that specific kinds are allowed to be set by the user and check account-level metadata
-		// limits.
-		_, err := tracing.CreateMetadataSpan(
+		values, err := md.Serialize()
+		if err != nil {
+			return publicerr.Wrap(err, 400, "Failed to serialize metadata")
+		}
+		cumulativeSize += values.Size()
+		if cumulativeSize > consts.MaxRunMetadataSize {
+			return publicerr.Wrap(metadata.ErrRunMetadataSizeExceeded, 413, "Cumulative metadata size in request exceeds limit")
+		}
+
+		_, err = tracing.CreateMetadataSpan(
 			ctx,
 			a.opts.TracerProvider,
 			parentSpanRef,
