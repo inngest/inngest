@@ -52,7 +52,6 @@ local backlogItem             = ARGV[11]
 -- $include(ends_with.lua)
 -- $include(update_account_queues.lua)
 -- $include(enqueue_to_partition.lua)
--- $include(update_active_sets.lua)
 
 local item = get_queue_item(queueKey, queueID)
 if item == nil then
