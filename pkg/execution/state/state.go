@@ -87,8 +87,6 @@ type Identifier struct {
 	WorkspaceID uuid.UUID `json:"wsID"`
 	// AppID represents the app ID for this run
 	AppID uuid.UUID `json:"appID"`
-	// Plan for this run
-	Plan int32 `json:"plan,omitempty"`
 	// If this is a rerun, the original run ID is stored here.
 	OriginalRunID *ulid.ULID `json:"oRunID,omitempty"`
 	// ReplayID stores the ID of the replay, if this identifier belongs to a replay.
