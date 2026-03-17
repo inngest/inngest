@@ -60,6 +60,8 @@ type Opts struct {
 	// BackoffFunc computes the retry time for a given attempt number.
 	// If nil, defaults to backoff.DefaultBackoff.
 	BackoffFunc backoff.BackoffFunc
+	// AllowStepMetadata controls whether step metadata is allowed for a given account.
+	AllowStepMetadata executor.AllowStepMetadata
 }
 
 func New(o Opts) Checkpointer {

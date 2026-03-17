@@ -75,6 +75,8 @@ type CheckpointAPIOpts struct {
 	RunJWTSecret []byte
 	// BackoffFunc computes retry timing. If nil, uses the default backoff table.
 	BackoffFunc backoff.BackoffFunc
+	// AllowStepMetadata controls whether step metadata is allowed for a given account.
+	AllowStepMetadata executor.AllowStepMetadata
 }
 
 // checkpointAPI is the base implementation.
@@ -101,8 +103,9 @@ func NewCheckpointAPI(o Opts) CheckpointAPI {
 		Executor:        o.Executor,
 		TracerProvider:  o.TracerProvider,
 		Queue:           o.Queue,
-		MetricsProvider: o.CheckpointOpts.CheckpointMetrics,
-		BackoffFunc:     o.CheckpointOpts.BackoffFunc,
+		MetricsProvider:   o.CheckpointOpts.CheckpointMetrics,
+		BackoffFunc:       o.CheckpointOpts.BackoffFunc,
+		AllowStepMetadata: o.CheckpointOpts.AllowStepMetadata,
 	})
 
 	api := checkpointAPI{
