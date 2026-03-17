@@ -5298,19 +5298,7 @@ func (e *executor) createMetadataSpan(ctx context.Context, runCtx execution.RunC
 	}
 
 	l := e.log
-
-	// Per-span size limit
 	spanSize := values.Size()
-	if spanSize > consts.MaxMetadataSpanSize {
-		l.Warn("metadata span exceeds maximum size",
-			"span_size", spanSize,
-			"limit", consts.MaxMetadataSpanSize,
-			"run_id", runCtx.Metadata().ID.RunID,
-			"metadata_kind", md.Kind().String(),
-			"location", location,
-		)
-		return nil, metadata.ErrMetadataSpanTooLarge
-	}
 
 	// Per-run cumulative metadata size limit
 	currentSize := runCtx.Metadata().Metrics.MetadataSize
@@ -5352,6 +5340,15 @@ func (e *executor) createMetadataSpan(ctx context.Context, runCtx execution.RunC
 		scope,
 	)
 	if err != nil {
+		if errors.Is(err, metadata.ErrMetadataSpanTooLarge) {
+			l.Warn("metadata span exceeds maximum size",
+				"span_size", spanSize,
+				"limit", consts.MaxMetadataSpanSize,
+				"run_id", runCtx.Metadata().ID.RunID,
+				"metadata_kind", md.Kind().String(),
+				"location", location,
+			)
+		}
 		return nil, err
 	}
 
