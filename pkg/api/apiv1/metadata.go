@@ -90,6 +90,7 @@ func (a router) addRunMetadata(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case errors.Is(err, metadata.ErrMetadataSpanTooLarge):
 		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 413, "Metadata span exceeds maximum size of 64KB"))
+		return
 	case err != nil:
 		_ = publicerr.WriteHTTP(w, err)
 		return
