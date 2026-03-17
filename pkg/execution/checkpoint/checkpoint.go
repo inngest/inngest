@@ -195,6 +195,8 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 				l.Error("error saving span for checkpoint op", "error", err)
 			}
 
+			c.processMetadata(ctx, l, input.AccountID, input.Metadata, op, "checkpoint.SyncStep.metadata")
+
 			go c.MetricsProvider.OnStepFinished(ctx, MetricCardinality{
 				AccountID: input.AccountID,
 				EnvID:     input.EnvID,
@@ -230,6 +232,8 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 				// We should never hit a blocker creating a span.  If so, warn loudly.
 				l.Error("error saving span for checkpoint step error op", "error", err)
 			}
+
+			c.processMetadata(ctx, l, input.AccountID, input.Metadata, op, "checkpoint.SyncErr.metadata")
 
 			err = c.Executor.HandleGenerator(ctx, runCtx, op)
 			if errors.Is(err, executor.ErrHandledStepError) {
@@ -419,6 +423,8 @@ func (c checkpointer) checkpointAsyncSteps(ctx context.Context, input AsyncCheck
 				l.Error("error saving span for checkpoint op", "error", err)
 			}
 
+			c.processMetadata(ctx, l, input.AccountID, &md, op, "checkpoint.AsyncStep.metadata")
+
 		default:
 			// Return an error
 			l.Error("unimplemented checkpoint op", "op", op.Op)
@@ -490,4 +496,37 @@ func (c checkpointer) fn(ctx context.Context, fnID uuid.UUID) (*inngest.Function
 		return nil, fmt.Errorf("error loading function: %w", err)
 	}
 	return cfn.InngestFunction()
+}
+
+func (c checkpointer) processMetadata(
+	ctx context.Context,
+	l logger.Logger,
+	accountID uuid.UUID,
+	md *state.Metadata,
+	op state.GeneratorOpcode,
+	location string,
+) {
+	if !c.AllowStepMetadata.Enabled(ctx, accountID) {
+		return
+	}
+	for _, spanMd := range op.Metadata {
+		if err := spanMd.Validate(); err != nil {
+			l.Warn("invalid metadata in checkpoint step", "error", err)
+			continue
+		}
+		parent := tracing.RunSpanRefFromMetadata(md)
+		_, err := tracing.CreateMetadataSpan(
+			ctx,
+			c.TracerProvider,
+			parent,
+			location,
+			"checkpoint",
+			md,
+			spanMd,
+			spanMd.Scope,
+		)
+		if err != nil {
+			l.Warn("error creating metadata span in checkpoint", "error", err)
+		}
+	}
 }
