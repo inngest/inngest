@@ -186,7 +186,7 @@ end
 -- Adjust ready queue pointers
 --
 
-if refilled > 0 then
+if #refilledItemIDs > 0 then
   -- Get the minimum score for the queue.
   local earliestScore = get_converted_earliest_pointer_score(keyReadySet)
   if earliestScore > 0 then

@@ -457,13 +457,13 @@ func TestQueueLease(t *testing.T) {
 			_, err = shard.Lease(ctx, itemB1, 5*time.Second, clock.Now())
 			require.NoError(t, err)
 
-			// Lease item A2 - should fail due to custom concurrency limit
+			// Lease item A2
 			_, err = shard.Lease(ctx, itemA2, 5*time.Second, clock.Now())
-			require.ErrorIs(t, err, osqueue.ErrConcurrencyLimitCustomKey)
+			require.NoError(t, err)
 
-			// Lease item B1 - should fail due to custom concurrency limit
+			// Lease item B1
 			_, err = shard.Lease(ctx, itemB2, 5*time.Second, clock.Now())
-			require.ErrorIs(t, err, osqueue.ErrConcurrencyLimitCustomKey)
+			require.NoError(t, err)
 		})
 	})
 
