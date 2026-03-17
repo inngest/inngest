@@ -103,6 +103,7 @@ func NewCheckpointAPI(o Opts) CheckpointAPI {
 		Queue:           o.Queue,
 		MetricsProvider: o.CheckpointOpts.CheckpointMetrics,
 		BackoffFunc:     o.CheckpointOpts.BackoffFunc,
+		PlanSelector:    o.PlanSelector,
 	})
 
 	api := checkpointAPI{

@@ -1,6 +1,7 @@
 package apiv1
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -8,6 +9,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/api"
 	"github.com/inngest/inngest/pkg/api/apiv1/apiv1auth"
 	"github.com/inngest/inngest/pkg/cqrs"
@@ -63,6 +65,8 @@ type Opts struct {
 	TracerProvider tracing.TracerProvider
 	// State allows loading and mutating state from various checkpointing APIs.
 	State state.RunService
+	// PlanSelector returns the plan type for an account.
+	PlanSelector func(context.Context, uuid.UUID) int32
 
 	// RealtimeJWTSecret is the realtime JWT secret for the V1 API
 	RealtimeJWTSecret []byte

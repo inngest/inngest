@@ -50,7 +50,7 @@ func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) er
 
 	// If there are no input events, fetch them.
 	if len(opts.Optional.InputEvents) == 0 {
-		opts.Optional.InputEvents, err = e.smv2.LoadEvents(ctx, opts.Metadata.ID)
+		opts.Optional.InputEvents, err = e.smv2.LoadEvents(ctx, e.enrichID(ctx, opts.Metadata.ID))
 		if err != nil {
 			l.Warn(
 				"error loading run events to finalize",
@@ -61,7 +61,7 @@ func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) er
 	}
 
 	// Delete the function state in every case.
-	err = e.smv2.Delete(ctx, opts.Metadata.ID)
+	err = e.smv2.Delete(ctx, e.enrichID(ctx, opts.Metadata.ID))
 	if err != nil {
 		l.Error(
 			"error deleting state in finalize",

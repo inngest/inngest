@@ -60,6 +60,8 @@ type Opts struct {
 	// BackoffFunc computes the retry time for a given attempt number.
 	// If nil, defaults to backoff.DefaultBackoff.
 	BackoffFunc backoff.BackoffFunc
+	// PlanSelector returns the plan type for an account.
+	PlanSelector func(context.Context, uuid.UUID) int32
 }
 
 func New(o Opts) Checkpointer {
@@ -81,6 +83,14 @@ func (c checkpointer) Metrics() MetricsProvider {
 	return c.MetricsProvider
 }
 
+// enrichID sets the Plan field on the ID using the PlanSelector if available.
+func (c checkpointer) enrichID(ctx context.Context, id state.ID) state.ID {
+	if c.PlanSelector != nil && id.Tenant.AccountID != uuid.Nil {
+		id.Tenant.Plan = c.PlanSelector(ctx, id.Tenant.AccountID)
+	}
+	return id
+}
+
 // CheckpointSyncSteps handles the checkpointing of new steps via sync, HTTP-based functions
 // that are treated as API endpoints.
 //
@@ -88,7 +98,7 @@ func (c checkpointer) Metrics() MetricsProvider {
 // state updates in the state store for resumability.
 func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpoint) error {
 	if input.Metadata == nil {
-		md, err := c.State.LoadMetadata(ctx, input.ID())
+		md, err := c.State.LoadMetadata(ctx, c.enrichID(ctx, input.ID()))
 		if errors.Is(err, state.ErrRunNotFound) || errors.Is(err, state.ErrMetadataNotFound) {
 			// Handle run not found with 404
 			return err
@@ -122,7 +132,7 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 	// immediate execution in the SDK. This ensures that parallel steps are properly
 	// planned rather than executed immediately.
 	if len(input.Steps) > 1 && !input.Metadata.Config.ForceStepPlan {
-		if err := c.State.UpdateMetadata(ctx, input.Metadata.ID, state.MutableConfig{
+		if err := c.State.UpdateMetadata(ctx, c.enrichID(ctx, input.Metadata.ID), state.MutableConfig{
 			ForceStepPlan:  true,
 			RequestVersion: input.Metadata.Config.RequestVersion,
 			StartedAt:      input.Metadata.Config.StartedAt,
@@ -157,7 +167,7 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 				// Checkpointing happens in this API when either the function finishes or we move to
 				// async.  Therefore, we onl want to save state if we don't have a complete opcode,
 				// as all complete functions will never re-enter.
-				_, err := c.State.SaveStep(ctx, input.Metadata.ID, op.ID, []byte(output))
+				_, err := c.State.SaveStep(ctx, c.enrichID(ctx, input.Metadata.ID), op.ID, []byte(output))
 				if errors.Is(err, state.ErrDuplicateResponse) || errors.Is(err, state.ErrIdempotentResponse) {
 					// Ignore.
 					l.Warn("duplicate checkpoint step", "id", input.Metadata.ID)
@@ -350,7 +360,7 @@ func (c checkpointer) CheckpointAsyncSteps(ctx context.Context, input AsyncCheck
 }
 
 func (c checkpointer) checkpointAsyncSteps(ctx context.Context, input AsyncCheckpoint, l logger.Logger) error {
-	md, err := c.State.LoadMetadata(ctx, input.ID())
+	md, err := c.State.LoadMetadata(ctx, c.enrichID(ctx, input.ID()))
 	if errors.Is(err, state.ErrRunNotFound) || errors.Is(err, state.ErrMetadataNotFound) {
 		// Handle run not found with 404
 		return err
@@ -385,7 +395,7 @@ func (c checkpointer) checkpointAsyncSteps(ctx context.Context, input AsyncCheck
 				l.Error("error fetching checkpoint step output", "error", err)
 			}
 
-			_, err = c.State.SaveStep(ctx, md.ID, op.ID, []byte(output))
+			_, err = c.State.SaveStep(ctx, c.enrichID(ctx, md.ID), op.ID, []byte(output))
 			if errors.Is(err, state.ErrDuplicateResponse) || errors.Is(err, state.ErrIdempotentResponse) {
 				// Ignore.
 				l.Warn("duplicate checkpoint step", "id", md.ID)

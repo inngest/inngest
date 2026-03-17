@@ -260,6 +260,13 @@ func WithStateSizeLimits(limit func(id sv2.ID) int) ExecutorOpt {
 	}
 }
 
+func WithPlanSelector(fn func(context.Context, uuid.UUID) int32) ExecutorOpt {
+	return func(e execution.Executor) error {
+		e.(*executor).planSelector = fn
+		return nil
+	}
+}
+
 func WithRateLimiter(rl ratelimit.RateLimiter) ExecutorOpt {
 	return func(e execution.Executor) error {
 		e.(*executor).rateLimiter = rl
@@ -497,6 +504,9 @@ type executor struct {
 
 	functionBacklogSizeLimit BacklogSizeLimitFn
 
+	// planSelector returns the plan type for an account.
+	planSelector func(context.Context, uuid.UUID) int32
+
 	assignedQueueShard queue.QueueShard
 	shardFinder        queue.ShardSelector
 
@@ -513,6 +523,14 @@ func (e *executor) SetFinalizer(f execution.FinalizePublisher) {
 
 func (e *executor) SetInvokeFailHandler(f execution.InvokeFailHandler) {
 	e.invokeFailHandler = f
+}
+
+// enrichID sets the Plan field on the ID using the planSelector if available.
+func (e *executor) enrichID(ctx context.Context, id sv2.ID) sv2.ID {
+	if e.planSelector != nil && id.Tenant.AccountID != uuid.Nil {
+		id.Tenant.Plan = e.planSelector(ctx, id.Tenant.AccountID)
+	}
+	return id
 }
 
 func (e *executor) InvokeFailHandler(ctx context.Context, opts execution.InvokeFailHandlerOpts) error {
@@ -1191,6 +1209,7 @@ func (e *executor) schedule(
 
 	// Create run state if not skipped
 	if skipReason == enums.SkipReasonNone {
+		newState.Metadata.ID = e.enrichID(ctx, newState.Metadata.ID)
 		st, err := e.smv2.Create(ctx, newState)
 		switch {
 		case err == nil: // no-op
@@ -1209,7 +1228,7 @@ func (e *executor) schedule(
 		// and we need to override the one we already have to make sure we're using
 		// the correct metedata values
 		if metadata.ID.RunID != stv1ID.RunID {
-			id := sv2.IDFromV1(stv1ID)
+			id := e.enrichID(ctx, sv2.IDFromV1(stv1ID))
 			metadata, err = e.smv2.LoadMetadata(ctx, id)
 			if err != nil {
 				return nil, nil, err
@@ -1393,7 +1412,7 @@ func (e *executor) schedule(
 		return &metadata.ID.RunID, nil, state.ErrIdentifierExists
 
 	case queue.ErrQueueItemSingletonExists:
-		err := e.smv2.Delete(ctx, sv2.IDFromV1(stv1ID))
+		err := e.smv2.Delete(ctx, e.enrichID(ctx, sv2.IDFromV1(stv1ID)))
 		if err != nil {
 			l.ReportError(err, "error deleting function state")
 		}
@@ -1467,7 +1486,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			l.Debug("error updating sleep resume span", "error", err)
 		}
 
-		hasPendingSteps, err := e.smv2.SaveStep(ctx, sv2.ID{
+		hasPendingSteps, err := e.smv2.SaveStep(ctx, e.enrichID(ctx, sv2.ID{
 			RunID:      id.RunID,
 			FunctionID: id.WorkflowID,
 			Tenant: sv2.Tenant{
@@ -1475,7 +1494,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 				EnvID:     id.WorkspaceID,
 				AccountID: id.AccountID,
 			},
-		}, edge.Outgoing, []byte("null"))
+		}), edge.Outgoing, []byte("null"))
 		if !errors.Is(err, state.ErrDuplicateResponse) && err != nil {
 			return nil, err
 		}
@@ -1490,7 +1509,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		ctx = state.WithGroupID(ctx, uuid.New().String())
 	}
 
-	md, err := e.smv2.LoadMetadata(ctx, sv2.ID{
+	md, err := e.smv2.LoadMetadata(ctx, e.enrichID(ctx, sv2.ID{
 		RunID:      id.RunID,
 		FunctionID: id.WorkflowID,
 		Tenant: sv2.Tenant{
@@ -1498,7 +1517,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			EnvID:     id.WorkspaceID,
 			AccountID: id.AccountID,
 		},
-	})
+	}))
 	// XXX: MetadataNotFound -> assume fn is deleted.
 	if err != nil {
 		return nil, fmt.Errorf("cannot load metadata to execute run: %w", err)
@@ -1531,7 +1550,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		}
 	}
 
-	events, err := e.smv2.LoadEvents(ctx, md.ID)
+	events, err := e.smv2.LoadEvents(ctx, e.enrichID(ctx, md.ID))
 	if err != nil {
 		return nil, fmt.Errorf("cannot load run events: %w", err)
 	}
@@ -1570,7 +1589,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	if cancelled || v.stopWithoutRetry {
 		// Validation prevented execution and doesn't want the executor to retry, so
 		// don't return an error - assume the function finishes and delete state.
-		err := e.smv2.Delete(ctx, md.ID)
+		err := e.smv2.Delete(ctx, e.enrichID(ctx, md.ID))
 		return nil, err
 	}
 
@@ -1631,7 +1650,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			// Set the start time and spanID in metadata for subsequent runs
 			// This should be an one time operation and is never updated after,
 			// which is enforced on the Lua script.
-			if err := e.smv2.UpdateMetadata(ctx, md.ID, sv2.MutableConfig{
+			if err := e.smv2.UpdateMetadata(ctx, e.enrichID(ctx, md.ID), sv2.MutableConfig{
 				StartedAt:      md.Config.StartedAt,
 				ForceStepPlan:  md.Config.ForceStepPlan,
 				RequestVersion: md.Config.RequestVersion,
@@ -2537,7 +2556,7 @@ func (e *executor) handlePause(
 			// NOTE: Bookkeeping must be added to individual function runs and handled on
 			// completion instead of here.  This is a hot path and should only exist whilst
 			// bookkeeping is not implemented.
-			if exists, err := e.smv2.Exists(ctx, sv2.IDFromPause(*pause)); !exists && err == nil {
+			if exists, err := e.smv2.Exists(ctx, e.enrichID(ctx, sv2.IDFromPause(*pause))); !exists && err == nil {
 				// This function has ended.  Delete the pause and continue
 				cleanup(ctx)
 				return nil
@@ -2664,7 +2683,7 @@ func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequ
 		"workflow_id", id.FunctionID.String(),
 	)
 
-	md, err := e.smv2.LoadMetadata(ctx, id)
+	md, err := e.smv2.LoadMetadata(ctx, e.enrichID(ctx, id))
 	if err == sv2.ErrMetadataNotFound || errors.Is(err, state.ErrRunNotFound) {
 		return nil
 	}
@@ -2678,7 +2697,7 @@ func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequ
 	})
 
 	// We need events to finalize the function.
-	evts, err := e.smv2.LoadEvents(ctx, id)
+	evts, err := e.smv2.LoadEvents(ctx, e.enrichID(ctx, id))
 	if errors.Is(err, state.ErrEventNotFound) {
 		// If the event has gone, another thread cancelled the function.
 		return nil
@@ -2730,7 +2749,7 @@ func (e *executor) ResumePauseTimeout(ctx context.Context, pause state.Pause, r 
 	// (tonyhb): this could be refactored to not require a pause, and instead only require the fields
 	// necessary for timeouts.  This will save space in the queue.  This requires a refactor of the
 	// trace lifecycles, whihc also require pauses.
-	id := sv2.IDFromPause(pause)
+	id := e.enrichID(ctx, sv2.IDFromPause(pause))
 	md, err := e.smv2.LoadMetadata(ctx, id)
 	if err == state.ErrRunNotFound {
 		return err
@@ -2861,7 +2880,7 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 		return fmt.Errorf("no queue or state manager specified")
 	}
 
-	sv2id := sv2.ID{
+	sv2id := e.enrichID(ctx, sv2.ID{
 		RunID:      pause.Identifier.RunID,
 		FunctionID: pause.Identifier.FunctionID,
 		Tenant: sv2.Tenant{
@@ -2869,7 +2888,7 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 			AccountID: pause.Identifier.AccountID,
 			// NOTE: Pauses do not store app IDs.
 		},
-	}
+	})
 
 	// Immediately store execution context for tracing.
 	ctx = tracing.WithExecutionContext(ctx, tracing.ExecutionContext{
@@ -3097,7 +3116,7 @@ func (e *executor) HandleGeneratorResponse(ctx context.Context, i *runInstance, 
 			update.HasAI = true
 		}
 		if update != nil {
-			if err := e.smv2.UpdateMetadata(ctx, i.md.ID, *update); err != nil {
+			if err := e.smv2.UpdateMetadata(ctx, e.enrichID(ctx, i.md.ID), *update); err != nil {
 				return fmt.Errorf("error updating function metadata: %w", err)
 			}
 		}
@@ -3119,7 +3138,7 @@ func (e *executor) HandleGeneratorResponse(ctx context.Context, i *runInstance, 
 
 	// We only save pending steps if there's >= 1 step planned op.
 	if hasPlanOp(resp.Generator) && i.md.ShouldCoalesceParallelism(resp) {
-		if err := e.smv2.SavePending(ctx, i.md.ID, groups.IDs()); err != nil {
+		if err := e.smv2.SavePending(ctx, e.enrichID(ctx, i.md.ID), groups.IDs()); err != nil {
 			return fmt.Errorf("error saving pending steps: %w", err)
 		}
 	}
@@ -3352,7 +3371,7 @@ func (e *executor) handleGeneratorStep(ctx context.Context, runCtx execution.Run
 		return err
 	}
 
-	hasPendingSteps, err := e.smv2.SaveStep(ctx, runCtx.Metadata().ID, gen.ID, []byte(output))
+	hasPendingSteps, err := e.smv2.SaveStep(ctx, e.enrichID(ctx, runCtx.Metadata().ID), gen.ID, []byte(output))
 	if errors.Is(err, state.ErrDuplicateResponse) || errors.Is(err, state.ErrIdempotentResponse) {
 		// This is fine.
 		// XXX: we should totally attach a warning to the function run here.
@@ -3520,7 +3539,7 @@ func (e *executor) handleStepFailed(ctx context.Context, runCtx execution.RunCon
 		return err
 	}
 
-	hasPendingSteps, err := e.smv2.SaveStep(ctx, runCtx.Metadata().ID, gen.ID, []byte(output))
+	hasPendingSteps, err := e.smv2.SaveStep(ctx, e.enrichID(ctx, runCtx.Metadata().ID), gen.ID, []byte(output))
 	if err != nil {
 		return err
 	}
@@ -3954,7 +3973,7 @@ func (e *executor) handleGeneratorGateway(ctx context.Context, runCtx execution.
 	}
 
 	// Save the output as the step result.
-	hasPendingSteps, err := e.smv2.SaveStep(ctx, runCtx.Metadata().ID, gen.ID, output)
+	hasPendingSteps, err := e.smv2.SaveStep(ctx, e.enrichID(ctx, runCtx.Metadata().ID), gen.ID, output)
 	if err != nil {
 		return err
 	}
@@ -4199,7 +4218,7 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 	}
 
 	// Save the output as the step result.
-	hasPendingSteps, err := e.smv2.SaveStep(ctx, runCtx.Metadata().ID, gen.ID, resp.Body)
+	hasPendingSteps, err := e.smv2.SaveStep(ctx, e.enrichID(ctx, runCtx.Metadata().ID), gen.ID, resp.Body)
 	if err != nil {
 		return err
 	}
