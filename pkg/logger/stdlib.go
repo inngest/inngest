@@ -72,6 +72,9 @@ type Logger interface {
 	// Optional uses the [DefaultLogEnabler] function to only log on truthy results
 	Optional(accountID uuid.UUID, logname string) Logger
 
+	// LogEvents adds any events stored in the log line for wide logs.
+	LogEvents(ctx context.Context)
+
 	//
 	// Methods added in wrapper
 	//
@@ -299,6 +302,21 @@ func (l *logger) With(args ...any) Logger {
 		Logger: log,
 		attrs:  append(l.attrs, args...),
 	}
+}
+
+func (l *logger) LogEvents(ctx context.Context) {
+	es, ok := ctx.Value(evtCtxKeyVal).(*eventstore)
+	if !ok || es == nil || len(es.Events) == 0 {
+		return
+	}
+
+	// NOTE: we have to modify the logger in place as the interface for LogEvents
+	// doesn't return a new logger.
+	l.Logger = l.Logger.With(
+		slog.String("events_name", es.Name),
+		slog.Any("events", es.Events),
+	)
+	l.attrs = append(l.attrs, slog.String("events_name", es.Name), slog.Any("events", es.Events))
 }
 
 func (l *logger) Optional(accountID uuid.UUID, logname string) Logger {
