@@ -383,7 +383,10 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 		}
 
 		// Ensure function version is at least 1 and incremented on re-sync
-		fn.FunctionVersion = max(currentFn.FunctionVersion+1, 1)
+		if fnExists {
+			fn.FunctionVersion = currentFn.FunctionVersion + 1
+		}
+		fn.FunctionVersion = max(fn.FunctionVersion, 1)
 
 		config, err := json.Marshal(fn)
 		if err != nil {
