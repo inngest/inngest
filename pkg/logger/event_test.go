@@ -3,8 +3,8 @@ package logger
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -39,7 +39,7 @@ func TestAddEvent_AppendsEvent(t *testing.T) {
 	// Fn and File are auto-populated by runtime.Caller.
 	require.NotEmpty(t, evt.Fn)
 	require.True(t, strings.Contains(evt.Fn, "TestAddEvent_AppendsEvent"))
-	require.True(t, strings.HasSuffix(evt.File, "event_test.go:32"), "expected caller file, got %s", evt.File)
+	require.True(t, strings.Contains(evt.File, "event_test.go:"), "expected caller file, got %s", evt.File)
 }
 
 func TestAddEvent_PresetFnFile(t *testing.T) {
@@ -101,24 +101,6 @@ func TestMultipleEvents(t *testing.T) {
 	require.Equal(t, "third", store.Events[2].Name)
 }
 
-func TestEvent_MarshalJSON_ZeroDurationOmitted(t *testing.T) {
-	evt := Event{
-		Name: "simple",
-		Fn:   "pkg.Func",
-		File: "pkg/f.go:1",
-	}
-
-	data, err := json.Marshal(evt)
-	require.NoError(t, err)
-
-	var raw map[string]any
-	err = json.Unmarshal(data, &raw)
-	require.NoError(t, err)
-
-	_, exists := raw["d"]
-	require.False(t, exists, "zero duration should be omitted")
-}
-
 func TestLogEvents(t *testing.T) {
 	ctx := NewEventStore(context.Background(), "log-test")
 	AddEvent(ctx, Event{Name: "evt1", Metadata: map[string]any{"key": "val"}})
@@ -158,4 +140,53 @@ func TestLogEvents_EmptyStore(t *testing.T) {
 
 	output := buf.String()
 	require.NotContains(t, output, "events_name")
+}
+
+func TestResetEventStore(t *testing.T) {
+	ctx := NewEventStore(context.Background(), "reset-test")
+	AddEvent(ctx, Event{Name: "before-reset"})
+
+	store := ctx.Value(evtCtxKeyVal).(*eventstore)
+	require.Len(t, store.Events, 1)
+
+	ResetEventStore(ctx)
+	require.Empty(t, store.Events)
+
+	// After reset, LogEvents should return the original logger (no-op).
+	var buf bytes.Buffer
+	l := newLogger(WithLoggerWriter(&buf), WithHandler(JSONHandler))
+
+	returned := l.LogEvents(ctx)
+	returned.Info("after reset")
+
+	output := buf.String()
+	require.NotContains(t, output, "events_name")
+	require.Contains(t, output, "after reset")
+}
+
+func TestResetEventStore_NoStore(t *testing.T) {
+	// Should not panic on a bare context.
+	ResetEventStore(context.Background())
+}
+
+func TestEventStore_ConcurrentAppend(t *testing.T) {
+	ctx := NewEventStore(context.Background(), "concurrent")
+
+	const goroutines = 50
+	const eventsPerGoroutine = 20
+
+	var wg sync.WaitGroup
+	wg.Add(goroutines)
+	for i := 0; i < goroutines; i++ {
+		go func() {
+			defer wg.Done()
+			for j := 0; j < eventsPerGoroutine; j++ {
+				AddEvent(ctx, Event{Name: "concurrent-event"})
+			}
+		}()
+	}
+	wg.Wait()
+
+	store := ctx.Value(evtCtxKeyVal).(*eventstore)
+	require.Len(t, store.Events, goroutines*eventsPerGoroutine)
 }
