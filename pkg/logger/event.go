@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"runtime"
+	"sync"
 	"time"
 )
 
@@ -14,10 +15,19 @@ type evtCtxKey struct{}
 type eventstore struct {
 	Name   string
 	Events []Event
+	mu     sync.Mutex
 }
 
 func (e *eventstore) Append(evt Event) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
 	e.Events = append(e.Events, evt)
+}
+
+func (e *eventstore) Reset() {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.Events = []Event{}
 }
 
 // Event represents a log event for wide logs, used in req end logging
@@ -33,6 +43,7 @@ type Event struct {
 	// Start is the start time of the event:  the time the event occurred.
 	Start time.Time `json:"start,omitempty,omitzero"`
 	// Duration is the duration for the overall function, or the duration for the event.
+	// Logged in microseconds.
 	Duration time.Duration `json:"d,omitempty,omitzero"`
 	// Metadata includes any info you want in the event.
 	Metadata map[string]any `json:"metadata,omitempty,omitzero"`
@@ -44,6 +55,15 @@ type Event struct {
 // [Logger.LogEvents]
 func NewEventStore(ctx context.Context, name string) context.Context {
 	return context.WithValue(ctx, evtCtxKeyVal, &eventstore{Name: name})
+}
+
+// ResetEventStore clears events in the event store from context.
+func ResetEventStore(ctx context.Context) {
+	es, ok := ctx.Value(evtCtxKeyVal).(*eventstore)
+	if !ok || es == nil {
+		return
+	}
+	es.Reset()
 }
 
 // AddEvent tracks an event for future logging in the current event store.

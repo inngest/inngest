@@ -3,6 +3,7 @@ package logger
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"strings"
 	"testing"
 	"time"
@@ -38,7 +39,7 @@ func TestAddEvent_AppendsEvent(t *testing.T) {
 	// Fn and File are auto-populated by runtime.Caller.
 	require.NotEmpty(t, evt.Fn)
 	require.True(t, strings.Contains(evt.Fn, "TestAddEvent_AppendsEvent"))
-	require.True(t, strings.HasSuffix(evt.File, "event_test.go:31"), "expected caller file, got %s", evt.File)
+	require.True(t, strings.HasSuffix(evt.File, "event_test.go:32"), "expected caller file, got %s", evt.File)
 }
 
 func TestAddEvent_PresetFnFile(t *testing.T) {
@@ -100,6 +101,24 @@ func TestMultipleEvents(t *testing.T) {
 	require.Equal(t, "third", store.Events[2].Name)
 }
 
+func TestEvent_MarshalJSON_ZeroDurationOmitted(t *testing.T) {
+	evt := Event{
+		Name: "simple",
+		Fn:   "pkg.Func",
+		File: "pkg/f.go:1",
+	}
+
+	data, err := json.Marshal(evt)
+	require.NoError(t, err)
+
+	var raw map[string]any
+	err = json.Unmarshal(data, &raw)
+	require.NoError(t, err)
+
+	_, exists := raw["d"]
+	require.False(t, exists, "zero duration should be omitted")
+}
+
 func TestLogEvents(t *testing.T) {
 	ctx := NewEventStore(context.Background(), "log-test")
 	AddEvent(ctx, Event{Name: "evt1", Metadata: map[string]any{"key": "val"}})
@@ -108,8 +127,7 @@ func TestLogEvents(t *testing.T) {
 	var buf bytes.Buffer
 	l := newLogger(WithLoggerWriter(&buf), WithHandler(JSONHandler))
 
-	l.LogEvents(ctx)
-	l.Info("request complete")
+	l.LogEvents(ctx).Info("request complete")
 
 	output := buf.String()
 	require.Contains(t, output, "events_name")
@@ -123,8 +141,7 @@ func TestLogEvents_NoStore(t *testing.T) {
 	l := newLogger(WithLoggerWriter(&buf), WithHandler(JSONHandler))
 
 	// Should not panic and should not add events attrs.
-	l.LogEvents(context.Background())
-	l.Info("no events")
+	l.LogEvents(context.Background()).Info("no events")
 
 	output := buf.String()
 	require.NotContains(t, output, "events_name")
@@ -137,8 +154,7 @@ func TestLogEvents_EmptyStore(t *testing.T) {
 	l := newLogger(WithLoggerWriter(&buf), WithHandler(JSONHandler))
 
 	// Empty store should be a no-op.
-	l.LogEvents(ctx)
-	l.Info("no events")
+	l.LogEvents(ctx).Info("no events")
 
 	output := buf.String()
 	require.NotContains(t, output, "events_name")
