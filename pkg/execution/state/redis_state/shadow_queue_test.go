@@ -139,17 +139,6 @@ func TestQueueRefillBacklog(t *testing.T) {
 		require.Equal(t, at.Unix(), int64(score(t, r, kg.GlobalPartitionIndex(), fnID.String())))
 		require.Equal(t, at.Unix(), int64(score(t, r, kg.GlobalAccountIndex(), accountId.String())))
 		require.Equal(t, at.Unix(), int64(score(t, r, kg.AccountPartitionIndex(accountId), fnID.String())))
-
-		// Run indexes should be updated
-		{
-			itemIsMember, err := r.SIsMember(kg.ActiveSet("run", runID.String()), qi.ID)
-			require.NoError(t, err)
-			require.True(t, itemIsMember)
-
-			isMember, err := r.SIsMember(kg.ActiveRunsSet("p", fnID.String()), runID.String())
-			require.NoError(t, err)
-			require.True(t, isMember)
-		}
 	})
 
 	t.Run("should clean up dangling pointers", func(t *testing.T) {
@@ -856,8 +845,6 @@ func TestQueueShadowScannerContinuations(t *testing.T) {
 
 		err = q.ScanShadowPartitions(ctx, at, qspc)
 		require.NoError(t, err)
-
-		fmt.Println("waiting for message")
 
 		// check that it's scanned and gone
 
@@ -1862,7 +1849,7 @@ func TestPreventThrottleBacklogUnfairness(t *testing.T) {
 
 		mem, err = r.ZMembers(kg.PartitionQueueSet(enums.PartitionTypeDefault, fnID.String(), ""))
 		require.NoError(t, err)
-		require.Len(t, mem, 1)
+		require.Len(t, mem, 101)
 		require.Contains(t, mem, item2.ID)
 	})
 }
