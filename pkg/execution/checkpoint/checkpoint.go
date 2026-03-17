@@ -174,7 +174,7 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 			// Create a deterministic executor.step span whose ID matches what the SDK
 			// generates, so userland spans are correctly parented underneath it.
 			max := fn.MaxAttempts()
-			_, err = c.TracerProvider.CreateSpan(
+			stepSpanRef, err := c.TracerProvider.CreateSpan(
 				tracing.WithExecutionContext(ctx, tracing.ExecutionContext{
 					Identifier:  input.Metadata.ID,
 					Attempt:     runCtx.AttemptCount(),
@@ -195,7 +195,7 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 				l.Error("error saving span for checkpoint op", "error", err)
 			}
 
-			c.processMetadata(ctx, l, input.AccountID, input.Metadata, op, "checkpoint.SyncStep.metadata")
+			c.processMetadata(ctx, l, input.AccountID, input.Metadata, stepSpanRef, op, "checkpoint.SyncStep.metadata")
 
 			go c.MetricsProvider.OnStepFinished(ctx, MetricCardinality{
 				AccountID: input.AccountID,
@@ -233,7 +233,7 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 				l.Error("error saving span for checkpoint step error op", "error", err)
 			}
 
-			c.processMetadata(ctx, l, input.AccountID, input.Metadata, op, "checkpoint.SyncErr.metadata")
+			c.processMetadata(ctx, l, input.AccountID, input.Metadata, stepSpanRef, op, "checkpoint.SyncErr.metadata")
 
 			err = c.Executor.HandleGenerator(ctx, runCtx, op)
 			if errors.Is(err, executor.ErrHandledStepError) {
@@ -402,7 +402,7 @@ func (c checkpointer) checkpointAsyncSteps(ctx context.Context, input AsyncCheck
 				return fmt.Errorf("failed to save step %s: %w", op.ID, err)
 			}
 
-			_, err = c.TracerProvider.CreateSpan(
+			stepSpanRef, err := c.TracerProvider.CreateSpan(
 				tracing.WithExecutionContext(ctx, tracing.ExecutionContext{
 					Identifier: md.ID,
 					Attempt:    0,
@@ -423,7 +423,7 @@ func (c checkpointer) checkpointAsyncSteps(ctx context.Context, input AsyncCheck
 				l.Error("error saving span for checkpoint op", "error", err)
 			}
 
-			c.processMetadata(ctx, l, input.AccountID, &md, op, "checkpoint.AsyncStep.metadata")
+			c.processMetadata(ctx, l, input.AccountID, &md, stepSpanRef, op, "checkpoint.AsyncStep.metadata")
 
 		default:
 			// Return an error
@@ -503,6 +503,7 @@ func (c checkpointer) processMetadata(
 	l logger.Logger,
 	accountID uuid.UUID,
 	md *state.Metadata,
+	stepSpanRef *meta.SpanReference,
 	op state.GeneratorOpcode,
 	location string,
 ) {
@@ -514,7 +515,25 @@ func (c checkpointer) processMetadata(
 			l.Warn("invalid metadata in checkpoint step", "error", err)
 			continue
 		}
-		parent := tracing.RunSpanRefFromMetadata(md)
+
+		// Resolve the parent span based on metadata scope, matching the
+		// executor's behavior in createMetadataSpan.
+		var parent *meta.SpanReference
+		switch spanMd.Scope {
+		case enums.MetadataScopeRun:
+			parent = tracing.RunSpanRefFromMetadata(md)
+		case enums.MetadataScopeStep, enums.MetadataScopeStepAttempt:
+			// Use the step span created just before this call.
+			// Fall back to the run span if the step span was not captured.
+			if stepSpanRef != nil {
+				parent = stepSpanRef
+			} else {
+				parent = tracing.RunSpanRefFromMetadata(md)
+			}
+		default:
+			parent = tracing.RunSpanRefFromMetadata(md)
+		}
+
 		_, err := tracing.CreateMetadataSpan(
 			ctx,
 			c.TracerProvider,
