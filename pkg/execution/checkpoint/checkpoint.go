@@ -532,6 +532,12 @@ func (c checkpointer) processMetadata(
 			continue
 		}
 
+		values, err := spanMd.Serialize()
+		if err != nil {
+			l.Warn("failed to serialize metadata in checkpoint step", "error", err)
+			continue
+		}
+
 		// Resolve the parent span based on metadata scope, matching the
 		// executor's behavior in createMetadataSpan.
 		var parent *meta.SpanReference
@@ -550,14 +556,16 @@ func (c checkpointer) processMetadata(
 			parent = tracing.RunSpanRefFromMetadata(md)
 		}
 
-		_, err := tracing.CreateMetadataSpan(
+		_, err = tracing.CreateMetadataSpanFromValues(
 			ctx,
 			c.TracerProvider,
 			parent,
 			location,
 			"checkpoint",
 			md,
-			spanMd,
+			spanMd.Kind(),
+			spanMd.Op(),
+			values,
 			spanMd.Scope,
 		)
 		if err != nil {
