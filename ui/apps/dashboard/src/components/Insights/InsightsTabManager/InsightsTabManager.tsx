@@ -88,6 +88,7 @@ export interface TabManagerActions {
 export interface UseInsightsTabManagerReturn {
   actions: TabManagerActions;
   activeTabId: string;
+  isHydrated: boolean;
   tabManager: JSX.Element;
   tabs: Tab[];
 }
@@ -107,6 +108,7 @@ export function useInsightsTabManager(
   const [tabs, setTabs] = useState<Tab[]>([HOME_TAB]);
   const [activeTabId, setActiveTabId] = useState<string>(HOME_TAB.id);
   const hasHydratedRef = useRef(false);
+  const [isHydrated, setIsHydrated] = useState(false);
   const isInsightsAgentEnabled = useBooleanFlag('insights-agent');
   const isSchemaWidgetEnabled = useBooleanFlag('insights-schema-widget');
 
@@ -137,6 +139,7 @@ export function useInsightsTabManager(
     }
 
     hasHydratedRef.current = true;
+    setIsHydrated(true);
   }, [props.isSavedQueriesFetching, props.deepLinkQueryId]);
 
   // Save tabs to local storage whenever they change (skip first render)
@@ -283,7 +286,7 @@ export function useInsightsTabManager(
     ],
   );
 
-  return { actions, activeTabId, tabManager, tabs };
+  return { actions, activeTabId, isHydrated, tabManager, tabs };
 }
 
 interface SingleTabRendererProps {

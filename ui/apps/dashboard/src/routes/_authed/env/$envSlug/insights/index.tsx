@@ -94,13 +94,14 @@ function InsightsWithTabManager({
 }: InsightsWithTabManagerProps) {
   const { isSavedQueriesFetching } = useStoredQueries();
 
-  const { actions, activeTabId, tabManager, tabs } = useInsightsTabManager({
-    historyWindow,
-    isQueryHelperPanelVisible,
-    onToggleQueryHelperPanelVisibility,
-    isSavedQueriesFetching,
-    deepLinkQueryId,
-  });
+  const { actions, activeTabId, isHydrated, tabManager, tabs } =
+    useInsightsTabManager({
+      historyWindow,
+      isQueryHelperPanelVisible,
+      onToggleQueryHelperPanelVisibility,
+      isSavedQueriesFetching,
+      deepLinkQueryId,
+    });
 
   // Update the ref with real actions so StoredQueriesProvider can use them
   actionsRef.current = actions;
@@ -122,6 +123,7 @@ function InsightsWithTabManager({
           <InsightsContentWithDeepLink
             isQueryHelperPanelVisible={isQueryHelperPanelVisible}
             activeSavedQueryId={activeSavedQueryId}
+            isHydrated={isHydrated}
             tabManager={tabManager}
             actions={actions}
           />
@@ -134,11 +136,13 @@ function InsightsWithTabManager({
 function InsightsContentWithDeepLink({
   isQueryHelperPanelVisible,
   activeSavedQueryId,
+  isHydrated,
   tabManager,
   actions,
 }: {
   isQueryHelperPanelVisible: boolean;
   activeSavedQueryId: string | undefined;
+  isHydrated: boolean;
   tabManager: JSX.Element;
   actions: TabManagerActions;
 }) {
@@ -149,6 +153,7 @@ function InsightsContentWithDeepLink({
   useDeepLinkHandler({
     actions,
     activeSavedQueryId,
+    isHydrated,
     navigate,
     search,
   });

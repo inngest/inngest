@@ -4771,26 +4771,9 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, runCtx execu
 	}
 
 	lifecycleItem := runCtx.LifecycleItem()
-	span, err := e.tracerProvider.CreateDroppableSpan(
-		ctx,
-		meta.SpanNameStep,
-		&tracing.CreateSpanOptions{
-			Carriers:    []map[string]any{pause.Metadata, nextItem.Metadata},
-			FollowsFrom: tracing.SpanRefFromQueueItem(&lifecycleItem),
-			Debug:       &tracing.SpanDebugData{Location: "executor.handleGeneratorWaitForEvent"},
-			Metadata:    runCtx.Metadata(),
-			QueueItem:   &nextItem,
-			Parent:      tracing.RunSpanRefFromMetadata(runCtx.Metadata()),
-			Attributes:  tracing.GeneratorAttrs(&gen),
-		},
-	)
-	if err != nil {
-		// return fmt.Errorf("error creating span for next step after
-		// WaitForEvent: %w", err)
-		e.log.Debug("error creating span for next step after WaitForEvent", "error", err)
-	}
-
 	idx := pauses.Index{WorkspaceID: runCtx.Metadata().ID.Tenant.EnvID, EventName: opts.Event}
+
+	attrs := tracing.GeneratorAttrs(&gen)
 
 	// We really don't want this to fail, this can be retried in an idempotent way but
 	// workflows with 0 retries setup will just hang forever if pause creation fails.
@@ -4806,7 +4789,30 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, runCtx execu
 			return err
 		}
 		// Allow pause already existing to be idempotent, and continue on with enqueueing.
-		span.Drop()
+	}
+
+	afterPauseTS := e.now()
+
+	span, err := e.tracerProvider.CreateDroppableSpan(
+		ctx,
+		meta.SpanNameStep,
+		&tracing.CreateSpanOptions{
+			Carriers:    []map[string]any{pause.Metadata, nextItem.Metadata},
+			FollowsFrom: tracing.SpanRefFromQueueItem(&lifecycleItem),
+			Debug:       &tracing.SpanDebugData{Location: "executor.handleGeneratorWaitForEvent"},
+			Metadata:    runCtx.Metadata(),
+			QueueItem:   &nextItem,
+			Parent:      tracing.RunSpanRefFromMetadata(runCtx.Metadata()),
+			Attributes: attrs.Merge(meta.NewAttrSet(
+				meta.Attr(meta.Attrs.QueuedAt, &now),
+				meta.Attr(meta.Attrs.StartedAt, &afterPauseTS),
+			)),
+		},
+	)
+	if err != nil {
+		// return fmt.Errorf("error creating span for next step after
+		// WaitForEvent: %w", err)
+		e.log.Debug("error creating span for next step after WaitForEvent", "error", err)
 	}
 
 	// TODO Is this fine to leave? No attempts.

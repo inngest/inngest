@@ -14,9 +14,10 @@ export type RunActions = {
   allowCancel?: boolean;
   runID: string;
   fnID?: string;
+  isDurableEndpoint?: boolean;
 };
 
-export const Actions = ({ allowCancel, runID, fnID }: RunActions) => {
+export const Actions = ({ allowCancel, runID, fnID, isDurableEndpoint }: RunActions) => {
   const [rerunLoading, setRerunLoading] = useState(false);
   const [cancelLoading, setCancelLoading] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
@@ -27,39 +28,41 @@ export const Actions = ({ allowCancel, runID, fnID }: RunActions) => {
   return (
     <div className="flex flex-row items-center justify-end gap-2">
       <CancelModal runID={runID} open={cancelOpen} onClose={() => setCancelOpen(false)} />
-      <Button
-        kind="primary"
-        appearance="outlined"
-        size="medium"
-        label="Rerun"
-        loading={rerunLoading}
-        disabled={rerunLoading}
-        onClick={async () => {
-          setRerunLoading(true);
-          const { data, error, redirect } = await rerun({ runID, fnID });
+      {!isDurableEndpoint && (
+        <Button
+          kind="primary"
+          appearance="outlined"
+          size="medium"
+          label="Rerun"
+          loading={rerunLoading}
+          disabled={rerunLoading}
+          onClick={async () => {
+            setRerunLoading(true);
+            const { data, error, redirect } = await rerun({ runID, fnID });
 
-          if (error) {
-            toast.error('Rerun failed. Please try again.');
-          }
+            if (error) {
+              toast.error('Rerun failed. Please try again.');
+            }
 
-          if (data?.newRunID) {
-            toast.success(
-              <Link
-                size="medium"
-                href={redirect ?? ''}
-                iconBefore={
-                  <RiCheckboxCircleFill className="bg-success dark:bg-success/40 text-success h-4 w-4 shrink-0" />
-                }
-                iconAfter={<RiExternalLinkLine className="h-4 w-4 shrink-0" />}
-                className="z-50 flex flex-row items-center gap-2"
-              >
-                Successfully queued rerun
-              </Link>
-            );
-          }
-          setRerunLoading(false);
-        }}
-      />
+            if (data?.newRunID) {
+              toast.success(
+                <Link
+                  size="medium"
+                  href={redirect ?? ''}
+                  iconBefore={
+                    <RiCheckboxCircleFill className="bg-success dark:bg-success/40 text-success h-4 w-4 shrink-0" />
+                  }
+                  iconAfter={<RiExternalLinkLine className="h-4 w-4 shrink-0" />}
+                  className="z-50 flex flex-row items-center gap-2"
+                >
+                  Successfully queued rerun
+                </Link>
+              );
+            }
+            setRerunLoading(false);
+          }}
+        />
+      )}
       <OptionalTooltip tooltip={!allowCancel && 'Only active runs can be cancelled'}>
         <Button
           kind="danger"

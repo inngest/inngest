@@ -40,6 +40,7 @@ export const FUNCTIONS = gql`
       }
       app {
         name
+        method
       }
       url
     }
@@ -108,6 +109,7 @@ export const FUNCTION = gql`
       }
       app {
         name
+        method
       }
       url
     }
@@ -395,6 +397,7 @@ export const GET_RUN = gql`
       function {
         app {
           name
+          method
         }
         id
         name

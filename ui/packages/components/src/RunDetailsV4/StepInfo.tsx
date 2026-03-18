@@ -169,11 +169,13 @@ export const StepInfo = ({
   pollInterval: initialPollInterval,
   tracesPreviewEnabled,
   debug = false,
+  isDurableEndpoint,
 }: {
   selectedStep: StepInfoType;
   pollInterval?: number;
   tracesPreviewEnabled?: boolean;
   debug?: boolean;
+  isDurableEndpoint?: boolean;
 }) => {
   const { cloud } = useShared();
   const [expanded, setExpanded] = useState(true);
@@ -212,6 +214,8 @@ export const StepInfo = ({
   const prettyOutput = usePrettyJson(result?.data ?? '') || (result?.data ?? '');
   const prettyErrorBody = usePrettyErrorBody(result?.error);
   const prettyShortError = usePrettyShortError(result?.error);
+  const showRerunFromStep =
+    !isDurableEndpoint && !debug && runID && trace.stepID && (!cloud || prettyInput);
 
   const responseHeaderMetadata = trace.metadata?.filter(
     (md) => md.kind === 'inngest.response_headers'
@@ -279,7 +283,7 @@ export const StepInfo = ({
             </span>
           )}
         </div>
-        {!debug && runID && trace.stepID && (!cloud || prettyInput) && (
+        {showRerunFromStep && (
           <>
             <Button
               kind="primary"
@@ -292,7 +296,7 @@ export const StepInfo = ({
               open={rerunModalOpen}
               setOpen={setRerunModalOpen}
               runID={runID}
-              stepID={trace.stepID}
+              stepID={trace.stepID!}
               input={prettyInput || result?.input || ''}
             />
           </>

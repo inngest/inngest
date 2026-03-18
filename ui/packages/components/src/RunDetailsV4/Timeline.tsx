@@ -328,6 +328,7 @@ function TimelineBarRenderer({
               expandable={isTimingBarExpandable}
               expanded={isTimingBarExpanded}
               onToggle={isTimingBarExpandable ? () => onToggleExpand(timingBar.id) : undefined}
+              onClick={() => onSelectStep?.(bar.id)}
               viewStartOffset={viewStartOffset}
               viewEndOffset={viewEndOffset}
               startTime={timingBar.startTime}
@@ -357,6 +358,7 @@ function TimelineBarRenderer({
                       leftWidth={leftWidth}
                       style={httpBar.style}
                       status={bar.status}
+                      onClick={() => onSelectStep?.(bar.id)}
                       viewStartOffset={viewStartOffset}
                       viewEndOffset={viewEndOffset}
                       startTime={httpBar.startTime}

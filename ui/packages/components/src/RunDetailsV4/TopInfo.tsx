@@ -34,6 +34,7 @@ type TopInfoProps = {
   runID: string;
   resultLoading?: boolean;
   trace?: Trace;
+  isDurableEndpoint?: boolean;
 };
 
 export type Trigger = {
@@ -91,6 +92,7 @@ export const TopInfo = ({
   result,
   resultLoading,
   trace,
+  isDurableEndpoint,
 }: TopInfoProps) => {
   const [expanded, setExpanded] = useState(true);
   const { isRunning, send } = useDevServer();
@@ -163,37 +165,41 @@ export const TopInfo = ({
           )}
         </div>
 
-        <Button
-          kind="primary"
-          appearance="outlined"
-          size="medium"
-          iconSide="right"
-          label="Invoke"
-          loading={invokeLoading}
-          disabled={invokeLoading}
-          onClick={() => {
-            setInvokeOpen(true);
-          }}
-        />
+        {!isDurableEndpoint && (
+          <>
+            <Button
+              kind="primary"
+              appearance="outlined"
+              size="medium"
+              iconSide="right"
+              label="Invoke"
+              loading={invokeLoading}
+              disabled={invokeLoading}
+              onClick={() => {
+                setInvokeOpen(true);
+              }}
+            />
 
-        {invokeError && <Alert severity="error">{invokeError.message}</Alert>}
-        <InvokeModal
-          doesFunctionAcceptPayload={true}
-          isOpen={invokeOpen}
-          onCancel={() => setInvokeOpen(false)}
-          onConfirm={async ({ data, user }) => {
-            const res = await invoke({
-              functionSlug: slug || '',
-              data,
-              user,
-            });
+            {invokeError && <Alert severity="error">{invokeError.message}</Alert>}
+            <InvokeModal
+              doesFunctionAcceptPayload={true}
+              isOpen={invokeOpen}
+              onCancel={() => setInvokeOpen(false)}
+              onConfirm={async ({ data, user }) => {
+                const res = await invoke({
+                  functionSlug: slug || '',
+                  data,
+                  user,
+                });
 
-            if (res?.data) {
-              setInvokeOpen(false);
-              toast.success('Function invoked');
-            }
-          }}
-        />
+                if (res?.data) {
+                  setInvokeOpen(false);
+                  toast.success('Function invoked');
+                }
+              }}
+            />
+          </>
+        )}
       </div>
 
       {expanded && (
