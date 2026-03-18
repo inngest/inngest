@@ -1876,6 +1876,95 @@ func initCQRS(t *testing.T, opts ...withInitCQRSOpt) (cqrs.Manager, func()) {
 	return cm, cleanup
 }
 
+// mockSpan implements normalizedSpan for testing mapSpanFromRow.
+type mockSpan struct {
+	traceID       string
+	runID         string
+	dynamicSpanID sql.NullString
+	parentSpanID  sql.NullString
+	startTime     interface{}
+	endTime       interface{}
+	spanFragments any
+}
+
+func (m mockSpan) GetTraceID() string              { return m.traceID }
+func (m mockSpan) GetRunID() string                { return m.runID }
+func (m mockSpan) GetDynamicSpanID() sql.NullString { return m.dynamicSpanID }
+func (m mockSpan) GetParentSpanID() sql.NullString  { return m.parentSpanID }
+func (m mockSpan) GetStartTime() interface{}        { return m.startTime }
+func (m mockSpan) GetEndTime() interface{}          { return m.endTime }
+func (m mockSpan) GetSpanFragments() any            { return m.spanFragments }
+
+func TestMapSpanFromRow_MapAttributes(t *testing.T) {
+	ctx := context.Background()
+	now := time.Now()
+	runID := ulid.MustNew(ulid.Now(), rand.Reader)
+
+	// Span fragments with attributes as a JSON object (not a string).
+	// This is what happens when PostgreSQL returns JSONB objects directly.
+	fragments := []map[string]any{
+		{
+			"name":       "executor.run",
+			"attributes": map[string]any{"test_key": "test_value", "count": float64(42)},
+		},
+	}
+	fragmentsJSON, err := json.Marshal(fragments)
+	require.NoError(t, err)
+
+	span := mockSpan{
+		traceID:       "abc123",
+		runID:         runID.String(),
+		dynamicSpanID: sql.NullString{String: "span-1", Valid: true},
+		parentSpanID:  sql.NullString{Valid: false},
+		startTime:     now,
+		endTime:       now.Add(time.Second),
+		spanFragments: string(fragmentsJSON),
+	}
+
+	result, err := mapSpanFromRow(ctx, span, nil)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+
+	assert.Equal(t, "executor.run", result.RawOtelSpan.Name)
+	assert.Equal(t, "test_value", result.RawOtelSpan.Attributes["test_key"])
+	assert.Equal(t, float64(42), result.RawOtelSpan.Attributes["count"])
+}
+
+func TestMapSpanFromRow_StringAttributes(t *testing.T) {
+	ctx := context.Background()
+	now := time.Now()
+	runID := ulid.MustNew(ulid.Now(), rand.Reader)
+
+	// Span fragments with attributes as a JSON string (SQLite path).
+	attrsStr := `{"test_key":"test_value","count":42}`
+	fragments := []map[string]any{
+		{
+			"name":       "executor.run",
+			"attributes": attrsStr,
+		},
+	}
+	fragmentsJSON, err := json.Marshal(fragments)
+	require.NoError(t, err)
+
+	span := mockSpan{
+		traceID:       "abc123",
+		runID:         runID.String(),
+		dynamicSpanID: sql.NullString{String: "span-1", Valid: true},
+		parentSpanID:  sql.NullString{Valid: false},
+		startTime:     now,
+		endTime:       now.Add(time.Second),
+		spanFragments: string(fragmentsJSON),
+	}
+
+	result, err := mapSpanFromRow(ctx, span, nil)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+
+	assert.Equal(t, "executor.run", result.RawOtelSpan.Name)
+	assert.Equal(t, "test_value", result.RawOtelSpan.Attributes["test_key"])
+	assert.Equal(t, float64(42), result.RawOtelSpan.Attributes["count"])
+}
+
 func TestRollupSpanMetadataFromFragments(t *testing.T) {
 	ctx := context.Background()
 	now := time.Now()
