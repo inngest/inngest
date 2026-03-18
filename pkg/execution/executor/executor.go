@@ -5291,40 +5291,7 @@ func emitCheckpointTraces(ctx context.Context) bool {
 }
 
 func (e *executor) createMetadataSpan(ctx context.Context, runCtx execution.RunContext, location string, md metadata.Structured, scope metadata.Scope) (*meta.SpanReference, error) {
-	// Serialize to compute size
-	values, err := md.Serialize()
-	if err != nil {
-		return nil, fmt.Errorf("failed to serialize metadata: %w", err)
-	}
-
 	l := e.log
-
-	// Per-span size limit
-	spanSize := values.Size()
-	if spanSize > consts.MaxMetadataSpanSize {
-		l.Warn("metadata span exceeds maximum size",
-			"span_size", spanSize,
-			"limit", consts.MaxMetadataSpanSize,
-			"run_id", runCtx.Metadata().ID.RunID,
-			"metadata_kind", md.Kind().String(),
-			"location", location,
-		)
-		return nil, metadata.ErrMetadataSpanTooLarge
-	}
-
-	// Per-run cumulative metadata size limit
-	currentSize := runCtx.Metadata().Metrics.MetadataSize
-	if currentSize+spanSize > consts.MaxRunMetadataSize {
-		l.Warn("run cumulative metadata size exceeded",
-			"current_size", currentSize,
-			"span_size", spanSize,
-			"limit", consts.MaxRunMetadataSize,
-			"run_id", runCtx.Metadata().ID.RunID,
-			"metadata_kind", md.Kind().String(),
-			"location", location,
-		)
-		return nil, metadata.ErrRunMetadataSizeExceeded
-	}
 
 	var parent *meta.SpanReference
 
@@ -5339,25 +5306,35 @@ func (e *executor) createMetadataSpan(ctx context.Context, runCtx execution.RunC
 		return nil, fmt.Errorf("unknown metadata scope: %s", scope)
 	}
 
-	ref, err := tracing.CreateMetadataSpanFromValues(
+	ref, err := tracing.CreateMetadataSpan(
 		ctx,
 		e.tracerProvider,
 		parent,
 		location,
 		pkgName,
 		runCtx.Metadata(),
-		md.Kind(),
-		md.Op(),
-		values,
+		md,
 		scope,
 	)
 	if err != nil {
+		if errors.Is(err, metadata.ErrMetadataSpanTooLarge) {
+			l.Warn("metadata span exceeds maximum size",
+				"run_id", runCtx.Metadata().ID.RunID,
+				"metadata_kind", md.Kind().String(),
+				"location", location,
+			)
+		}
+		if errors.Is(err, metadata.ErrRunMetadataSizeExceeded) {
+			l.Warn("run cumulative metadata size exceeded",
+				"current_size", runCtx.Metadata().Metrics.MetadataSize,
+				"limit", consts.MaxRunMetadataSize,
+				"run_id", runCtx.Metadata().ID.RunID,
+				"metadata_kind", md.Kind().String(),
+				"location", location,
+			)
+		}
 		return nil, err
 	}
-
-	// Increment in-memory counter so subsequent spans in the same
-	// step execution see the updated total.
-	runCtx.Metadata().Metrics.MetadataSize += spanSize
 
 	return ref, nil
 }

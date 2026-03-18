@@ -9,11 +9,13 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/execution/executor"
 	"github.com/inngest/inngest/pkg/execution/executor/queueref"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/tracing"
 	"github.com/inngest/inngest/pkg/tracing/meta"
+	"github.com/inngest/inngest/pkg/tracing/metadata"
 	"github.com/inngest/inngest/pkg/util/interval"
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/mock"
@@ -157,6 +159,79 @@ func TestCheckpointAsyncSteps_WithSleepFails(t *testing.T) {
 	mocks.queue.AssertExpectations(t)
 }
 
+// TestAsyncStepWithMetadataCreatesMetadataSpans asserts that async checkpoint with metadata-bearing
+// opcodes creates both step and metadata spans when AllowStepMetadata returns true.
+func TestAsyncStepWithMetadataCreatesMetadataSpans(t *testing.T) {
+	ctx := context.Background()
+	require := require.New(t)
+
+	now := time.Now()
+	ops := []state.GeneratorOpcode{
+		{
+			ID:     "step-1",
+			Op:     enums.OpcodeStepRun,
+			Data:   json.RawMessage(`{"result": "step 1 output"}`),
+			Name:   "Step 1",
+			Timing: interval.New(now, now.Add(100*time.Millisecond)),
+			Metadata: []metadata.ScopedUpdate{
+				{
+					Scope: enums.MetadataScopeRun,
+					Update: metadata.Update{
+						RawUpdate: metadata.RawUpdate{
+							Kind:   "userland.test",
+							Op:     enums.MetadataOpcodeMerge,
+							Values: metadata.Values{"key": json.RawMessage(`"value"`)},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	mocks, testData := setupAsyncCheckpointTest(t, ops...)
+
+	// Replace checkpointer with AllowStepMetadata enabled
+	testData.checkpointer = New(Opts{
+		State:           mocks.state,
+		TracerProvider:  mocks.tracer,
+		Queue:           mocks.queue,
+		MetricsProvider: mocks.metrics,
+		AllowStepMetadata: executor.AllowStepMetadata(func(ctx context.Context, acctID uuid.UUID) bool {
+			return true
+		}),
+	})
+
+	// Expect SaveStep
+	expectedData := map[string]any{"data": json.RawMessage(`{"result": "step 1 output"}`)}
+	expectedOutputBytes, _ := json.Marshal(expectedData)
+	mocks.state.On("SaveStep", ctx, testData.metadata.ID, "step-1", expectedOutputBytes).Return(false, nil)
+
+	// Expect CreateSpan for both step and metadata spans
+	mocks.tracer.
+		On("CreateSpan", mock.Anything, mock.Anything, mock.AnythingOfType("*tracing.CreateSpanOptions")).
+		Return(&meta.SpanReference{}, nil)
+
+	// Expect queue reset
+	mocks.queue.On("ResetAttemptsByJobID", ctx, "shard-1", "job-123").Return(nil)
+
+	err := testData.checkpointer.CheckpointAsyncSteps(ctx, testData.asyncCheckpoint)
+	require.NoError(err)
+
+	// Assert that both step and metadata spans were created
+	require.Len(mocks.tracer.createdSpans, 2, "Expected 1 step span + 1 metadata span")
+	var hasStep, hasMetadata bool
+	for _, s := range mocks.tracer.createdSpans {
+		if s.name == meta.SpanNameStep {
+			hasStep = true
+		}
+		if s.name == meta.SpanNameMetadata {
+			hasMetadata = true
+		}
+	}
+	require.True(hasStep, "Expected a step span")
+	require.True(hasMetadata, "Expected a metadata span")
+}
+
 //
 //
 // Testing utils.
@@ -249,6 +324,10 @@ func (m *mockRunService) SaveStep(ctx context.Context, id state.ID, stepID strin
 func (m *mockRunService) UpdateMetadata(ctx context.Context, id state.ID, config state.MutableConfig) error {
 	args := m.Called(ctx, id, config)
 	return args.Error(0)
+}
+
+func (m *mockRunService) IncrementMetadataSize(ctx context.Context, id state.ID, delta int) error {
+	return nil
 }
 
 // mockTracerProvider mocks the tracing.TracerProvider interface

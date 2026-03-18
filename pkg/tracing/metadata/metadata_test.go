@@ -48,11 +48,11 @@ func TestValuesSize(t *testing.T) {
 		{
 			name: "realistic metadata payload",
 			values: Values{
-				"model":        json.RawMessage(`"gpt-4"`),
-				"prompt":       json.RawMessage(`"Tell me about Go programming"`),
-				"completion":   json.RawMessage(`"Go is a statically typed language designed at Google."`),
-				"tokens_used":  json.RawMessage(`150`),
-				"latency_ms":   json.RawMessage(`432`),
+				"model":       json.RawMessage(`"gpt-4"`),
+				"prompt":      json.RawMessage(`"Tell me about Go programming"`),
+				"completion":  json.RawMessage(`"Go is a statically typed language designed at Google."`),
+				"tokens_used": json.RawMessage(`150`),
+				"latency_ms":  json.RawMessage(`432`),
 			},
 			expected: len("model") + len(`"gpt-4"`) +
 				len("prompt") + len(`"Tell me about Go programming"`) +

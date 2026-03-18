@@ -486,6 +486,17 @@ func (m shardedMgr) Exists(ctx context.Context, accountId uuid.UUID, runID ulid.
 	}).AsBool()
 }
 
+func (m shardedMgr) IncrementMetadataSize(ctx context.Context, accountID uuid.UUID, runID ulid.ULID, delta int) error {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "IncrementMetadataSize"), redis_telemetry.ScopeFnRunState)
+
+	fnRunState := m.s.FunctionRunState()
+	r, isSharded := fnRunState.Client(ctx, accountID, runID)
+	_, err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
+		return client.B().Hincrby().Key(fnRunState.kg.RunMetadata(ctx, isSharded, runID)).Field("metadata_size").Increment(int64(delta)).Build()
+	}).AsInt64()
+	return err
+}
+
 func (m shardedMgr) metadata(ctx context.Context, accountId uuid.UUID, runID ulid.ULID) (*runMetadata, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "metadata"), redis_telemetry.ScopeFnRunState)
 
