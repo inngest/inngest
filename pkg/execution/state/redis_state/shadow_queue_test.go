@@ -1247,6 +1247,23 @@ func TestConstraintLifecycleReporting(t *testing.T) {
 
 	testLifecycles := newTestLifecycleListener()
 
+	cmLifecycles := constraintapi.NewConstraintAPIDebugLifecycles()
+	cm, err := constraintapi.NewRedisCapacityManager(
+		constraintapi.WithClock(clock),
+		constraintapi.WithClient(rc),
+		constraintapi.WithShardName("test"),
+		constraintapi.WithLifecycles(cmLifecycles),
+	)
+	require.NoError(t, err)
+
+	constraints := osqueue.PartitionConstraintConfig{
+		FunctionVersion: 1,
+		Concurrency: osqueue.PartitionConcurrency{
+			AccountConcurrency:  1,
+			FunctionConcurrency: 1,
+		},
+	}
+
 	enqueueToBacklog := true
 	q, shard := newQueue(
 		t, rc,
@@ -1269,15 +1286,11 @@ func TestConstraintLifecycleReporting(t *testing.T) {
 		}),
 		osqueue.WithBacklogRefillLimit(100),
 		osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
-			return osqueue.PartitionConstraintConfig{
-				Concurrency: osqueue.PartitionConcurrency{
-					AccountConcurrency:  123,
-					FunctionConcurrency: 45,
-					SystemConcurrency:   678,
-				},
-			}
+			return constraints
 		}),
 		osqueue.WithQueueLifecycles(testLifecycles),
+		osqueue.WithCapacityManager(cm),
+		osqueue.WithAcquireCapacityLeaseOnBacklogRefill(true),
 	)
 
 	fnID1, accountID1, envID1 := uuid.New(), uuid.New(), uuid.New()
@@ -1306,13 +1319,6 @@ func TestConstraintLifecycleReporting(t *testing.T) {
 	}
 	at := clock.Now()
 
-	constraints := osqueue.PartitionConstraintConfig{
-		Concurrency: osqueue.PartitionConcurrency{
-			AccountConcurrency:  1,
-			FunctionConcurrency: 1,
-		},
-	}
-
 	itemA1 := addItem("test1", state.Identifier{
 		AccountID:   accountID1,
 		WorkspaceID: envID1,
@@ -1325,15 +1331,19 @@ func TestConstraintLifecycleReporting(t *testing.T) {
 	require.Equal(t, 1, constraints.Concurrency.FunctionConcurrency)
 	require.Equal(t, 1, constraints.Concurrency.AccountConcurrency)
 
-	res, _, err := q.ProcessShadowPartitionBacklog(ctx, &sp1, &b1, at.Add(time.Minute), constraints)
+	res, limitingConstraint, err := q.ProcessShadowPartitionBacklog(ctx, &sp1, &b1, at.Add(time.Minute), constraints)
 	require.NoError(t, err)
 	require.NotNil(t, res)
 
+	require.Equal(t, enums.QueueConstraintNotLimited, limitingConstraint)
 	testLifecycles.lock.Lock()
 	require.Equal(t, 0, testLifecycles.acctConcurrency[accountID1])
-	assert.Equal(t, 0, testLifecycles.fnConcurrency[fnID1])
-	assert.Equal(t, 0, testLifecycles.fnConcurrency[fnID2])
+	require.Equal(t, 0, testLifecycles.fnConcurrency[fnID1])
+	require.Equal(t, 0, testLifecycles.fnConcurrency[fnID2])
 	testLifecycles.lock.Unlock()
+
+	require.Equal(t, 1, len(cmLifecycles.AcquireCalls))
+	cmLifecycles.Reset()
 
 	_ = addItem("test2", state.Identifier{
 		AccountID:   accountID1,
@@ -1341,14 +1351,16 @@ func TestConstraintLifecycleReporting(t *testing.T) {
 		WorkflowID:  fnID1,
 	}, at)
 
-	res, _, err = q.ProcessShadowPartitionBacklog(ctx, &sp1, &b1, at.Add(time.Minute), constraints)
+	res, limitingConstraint, err = q.ProcessShadowPartitionBacklog(ctx, &sp1, &b1, at.Add(time.Minute), constraints)
 	require.NoError(t, err)
 	require.NotNil(t, res)
+	require.Equal(t, enums.QueueConstraintFunctionConcurrency, limitingConstraint)
 	require.EventuallyWithT(t, func(t *assert.CollectT) {
 		testLifecycles.lock.Lock()
-		assert.Equal(t, 0, testLifecycles.acctConcurrency[accountID1])
-		assert.Equal(t, 1, testLifecycles.fnConcurrency[fnID1])
-		assert.Equal(t, 0, testLifecycles.fnConcurrency[fnID2])
+		assert.Equal(t, 1, len(cmLifecycles.AcquireCalls))
+		assert.Equal(t, 0, testLifecycles.acctConcurrency[accountID1], "expected account not to be hit")
+		assert.Equal(t, 1, testLifecycles.fnConcurrency[fnID1], "expected fn1 to be hit once")
+		assert.Equal(t, 0, testLifecycles.fnConcurrency[fnID2], "expected fn2 not to be hit")
 		testLifecycles.lock.Unlock()
 	}, 1*time.Second, 100*time.Millisecond)
 

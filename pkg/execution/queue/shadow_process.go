@@ -550,7 +550,7 @@ func (q *queueProcessor) ProcessShadowPartitionBacklog(
 			PkgName: pkgName,
 			Tags: map[string]any{
 				"queue_shard":    q.primaryQueueShard.Name(),
-				"constraint_api": constraintCheckRes.SkipConstraintChecks,
+				"constraint_api": "true",
 				// "partition_id": shadowPart.PartitionID,
 			},
 		}
