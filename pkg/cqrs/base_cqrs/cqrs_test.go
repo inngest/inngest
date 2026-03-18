@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strconv"
 	"testing"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 	sqlc_psql "github.com/inngest/inngest/pkg/cqrs/base_cqrs/sqlc/postgres"
 	sqlc_sqlite "github.com/inngest/inngest/pkg/cqrs/base_cqrs/sqlc/sqlite"
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/tracing/metadata"
 	"github.com/inngest/inngest/tests/testutil"
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/assert"
@@ -1872,4 +1874,84 @@ func initCQRS(t *testing.T, opts ...withInitCQRSOpt) (cqrs.Manager, func()) {
 	}
 
 	return cm, cleanup
+}
+
+func TestRollupSpanMetadataFromFragments(t *testing.T) {
+	ctx := context.Background()
+	now := time.Now()
+
+	// Build a valid metadata attributes JSON string
+	metadataValues := `{"counter":42}`
+	attrsJSON := fmt.Sprintf(
+		`{"_inngest.metadata.scope":"run","_inngest.metadata.kind":"inngest.test","_inngest.metadata.op":"merge","_inngest.metadata.values":%s}`,
+		strconv.Quote(metadataValues),
+	)
+
+	t.Run("attributes as string", func(t *testing.T) {
+		fragments := []map[string]any{
+			{"attributes": attrsJSON},
+		}
+
+		result, err := rollupSpanMetadataFromFragments(ctx, fragments, now)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.Equal(t, enums.MetadataScopeRun, result.Scope)
+		assert.Equal(t, metadata.Kind("inngest.test"), result.Kind)
+		assert.NotEmpty(t, result.Values)
+	})
+
+	t.Run("attributes as map[string]any", func(t *testing.T) {
+		// Simulate what PostgreSQL JSONB returns: a parsed map instead of a string
+		var attrsMap map[string]any
+		require.NoError(t, json.Unmarshal([]byte(attrsJSON), &attrsMap))
+
+		fragments := []map[string]any{
+			{"attributes": attrsMap},
+		}
+
+		result, err := rollupSpanMetadataFromFragments(ctx, fragments, now)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.Equal(t, enums.MetadataScopeRun, result.Scope)
+		assert.Equal(t, metadata.Kind("inngest.test"), result.Kind)
+		assert.NotEmpty(t, result.Values)
+	})
+
+	t.Run("both types produce same result", func(t *testing.T) {
+		// String attributes
+		stringFragments := []map[string]any{
+			{"attributes": attrsJSON},
+		}
+		stringResult, err := rollupSpanMetadataFromFragments(ctx, stringFragments, now)
+		require.NoError(t, err)
+
+		// Map attributes (from JSONB)
+		var attrsMap map[string]any
+		require.NoError(t, json.Unmarshal([]byte(attrsJSON), &attrsMap))
+		mapFragments := []map[string]any{
+			{"attributes": attrsMap},
+		}
+		mapResult, err := rollupSpanMetadataFromFragments(ctx, mapFragments, now)
+		require.NoError(t, err)
+
+		assert.Equal(t, stringResult.Scope, mapResult.Scope)
+		assert.Equal(t, stringResult.Kind, mapResult.Kind)
+
+		// Compare serialized values
+		stringValBytes, _ := json.Marshal(stringResult.Values)
+		mapValBytes, _ := json.Marshal(mapResult.Values)
+		assert.JSONEq(t, string(stringValBytes), string(mapValBytes))
+	})
+
+	t.Run("skips fragment with no attributes", func(t *testing.T) {
+		fragments := []map[string]any{
+			{"other_field": "value"},
+		}
+
+		result, err := rollupSpanMetadataFromFragments(ctx, fragments, now)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		// No metadata extracted since no valid attributes
+		assert.Equal(t, enums.MetadataScopeUnknown, result.Scope)
+	})
 }
