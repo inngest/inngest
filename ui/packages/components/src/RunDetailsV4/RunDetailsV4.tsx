@@ -241,25 +241,21 @@ export const RunDetailsV4 = ({
     return () => clearTimeout(timeoutId);
   }, [runData?.trace.endedAt, pollInterval]);
 
+  const traceStatus = runData?.trace?.status;
+
   useEffect(() => {
-    if (!runData?.status || runData?.status === initialRunData?.status) {
+    if (!traceStatus || traceStatus === initialRunData?.status) {
       return;
     }
 
     updateDynamicRunData({
       runID,
-      status: runData.status,
-      endedAt: runData.trace.endedAt ?? undefined,
+      status: traceStatus,
+      endedAt: runData?.trace.endedAt ?? undefined,
     });
-  }, [
-    runData?.trace.endedAt,
-    runData?.status,
-    initialRunData?.status,
-    updateDynamicRunData,
-    runID,
-  ]);
+  }, [runData?.trace.endedAt, traceStatus, initialRunData?.status, updateDynamicRunData, runID]);
 
-  const waiting = isWaiting(initialRunData?.status || runData?.status, runError, resultError);
+  const waiting = isWaiting(initialRunData?.status || traceStatus, runError, resultError);
   const showError = waiting ? false : runError || resultError;
 
   // Works around a variety of layout and scroll issues with two column layout
