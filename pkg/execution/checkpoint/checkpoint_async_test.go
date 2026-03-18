@@ -326,10 +326,6 @@ func (m *mockRunService) UpdateMetadata(ctx context.Context, id state.ID, config
 	return args.Error(0)
 }
 
-func (m *mockRunService) IncrementMetadataSize(ctx context.Context, id state.ID, delta int) error {
-	return nil
-}
-
 // mockTracerProvider mocks the tracing.TracerProvider interface
 type mockTracerProvider struct {
 	tracing.TracerProvider

@@ -309,7 +309,7 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 	// Persist cumulative metadata size delta to Redis so subsequent checkpoint
 	// requests (potentially on different instances) see the updated total.
 	if delta := input.Metadata.Metrics.MetadataSizeDelta(); delta > 0 {
-		if err := c.State.IncrementMetadataSize(ctx, input.Metadata.ID, delta); err != nil {
+		if err := state.TryIncrementMetadataSize(ctx, c.State, input.Metadata.ID, delta); err != nil {
 			l.Warn("error persisting metadata size delta", "error", err, "delta", delta)
 		}
 	}
@@ -443,7 +443,7 @@ func (c checkpointer) checkpointAsyncSteps(ctx context.Context, input AsyncCheck
 	// Persist cumulative metadata size delta to Redis so subsequent checkpoint
 	// requests (potentially on different instances) see the updated total.
 	if delta := md.Metrics.MetadataSizeDelta(); delta > 0 {
-		if err := c.State.IncrementMetadataSize(ctx, md.ID, delta); err != nil {
+		if err := state.TryIncrementMetadataSize(ctx, c.State, md.ID, delta); err != nil {
 			l.Warn("error persisting metadata size delta", "error", err, "delta", delta)
 		}
 	}
