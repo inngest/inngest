@@ -186,7 +186,7 @@ func (a router) AddRunMetadata(ctx context.Context, auth apiv1auth.V1Auth, runID
 	// Persist the cumulative metadata size delta back to the state store.
 	if stateMetadata != nil {
 		if delta := stateMetadata.Metrics.SwapMetadataSizeDelta(); delta > 0 {
-			if err := a.opts.State.IncrementMetadataSize(ctx, stateID, delta); err != nil {
+			if err := statev2.TryIncrementMetadataSize(ctx, a.opts.State, stateID, delta); err != nil {
 				logger.StdlibLogger(ctx).Error("failed to persist metadata size delta",
 					"error", err,
 					"run_id", runID.String(),

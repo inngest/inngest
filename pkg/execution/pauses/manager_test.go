@@ -403,6 +403,3 @@ func (m *mockRunService) LoadState(ctx context.Context, id statev2.ID) (statev2.
 	return statev2.State{}, nil
 }
 
-func (m *mockRunService) IncrementMetadataSize(ctx context.Context, id statev2.ID, delta int) error {
-	return nil
-}

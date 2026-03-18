@@ -57,11 +57,25 @@ type RunService interface {
 	// expected to wrap this call and handle any required pause cleanup. As a result,
 	// this is usually not the function you want to call directly.
 	ConsumePause(ctx context.Context, p state.Pause, opts state.ConsumePauseOpts) (state.ConsumePauseResult, error)
+}
 
+// MetadataSizeIncrementer is an optional extension to RunService for
+// implementations that support atomic metadata size tracking. Callers should
+// use TryIncrementMetadataSize to safely attempt the operation.
+type MetadataSizeIncrementer interface {
 	// IncrementMetadataSize atomically increments the cumulative metadata size
 	// counter for a run. Used by the checkpoint handler to persist metadata
 	// size deltas that were tracked in-memory during span creation.
 	IncrementMetadataSize(ctx context.Context, id ID, delta int) error
+}
+
+// TryIncrementMetadataSize attempts to increment the metadata size counter
+// if the given RunService supports it. Returns nil if unsupported.
+func TryIncrementMetadataSize(ctx context.Context, svc RunService, id ID, delta int) error {
+	if inc, ok := svc.(MetadataSizeIncrementer); ok {
+		return inc.IncrementMetadataSize(ctx, id, delta)
+	}
+	return nil
 }
 
 // Staeloader defines an interface for loading the entire run state from the state store.
