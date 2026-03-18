@@ -3,6 +3,8 @@ package logger
 import (
 	"bytes"
 	"context"
+	"encoding/json"
+	"log/slog"
 	"strings"
 	"sync"
 	"testing"
@@ -39,7 +41,6 @@ func TestAddEvent_AppendsEvent(t *testing.T) {
 	// Fn and File are auto-populated by runtime.Caller.
 	require.NotEmpty(t, evt.Fn)
 	require.True(t, strings.Contains(evt.Fn, "TestAddEvent_AppendsEvent"))
-	require.True(t, strings.Contains(evt.File, "event_test.go:"), "expected caller file, got %s", evt.File)
 }
 
 func TestAddEvent_PresetFnFile(t *testing.T) {
@@ -48,20 +49,18 @@ func TestAddEvent_PresetFnFile(t *testing.T) {
 	AddEvent(ctx, Event{
 		Name: "preset",
 		Fn:   "custom/pkg.MyFunc",
-		File: "custom/file.go:99",
 	})
 
 	store := ctx.Value(evtCtxKeyVal).(*eventstore)
 	require.Len(t, store.Events, 1)
 	require.Equal(t, "custom/pkg.MyFunc", store.Events[0].Fn)
-	require.Equal(t, "custom/file.go:99", store.Events[0].File)
 }
 
 func TestTrackFnAsEvent(t *testing.T) {
 	ctx := NewEventStore(context.Background(), "req")
 
 	func() {
-		defer TrackFnAsEvent(ctx)()
+		defer TrackFn(ctx, nil)()
 		time.Sleep(5 * time.Millisecond)
 	}()
 
@@ -78,7 +77,7 @@ func TestTrackFnAsEvent(t *testing.T) {
 func TestTrackFnAsEvent_NoStore(t *testing.T) {
 	// Should not panic on a bare context.
 	func() {
-		defer TrackFnAsEvent(context.Background())()
+		defer TrackFn(context.Background(), nil)()
 	}()
 }
 
@@ -88,7 +87,7 @@ func TestMultipleEvents(t *testing.T) {
 	AddEvent(ctx, Event{Name: "first"})
 
 	func() {
-		defer TrackFnAsEvent(ctx)()
+		defer TrackFn(ctx, nil)()
 	}()
 
 	AddEvent(ctx, Event{Name: "third"})
@@ -189,4 +188,115 @@ func TestEventStore_ConcurrentAppend(t *testing.T) {
 
 	store := ctx.Value(evtCtxKeyVal).(*eventstore)
 	require.Len(t, store.Events, goroutines*eventsPerGoroutine)
+}
+
+func TestEvent_LogValue(t *testing.T) {
+	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	evt := Event{
+		Name:     "test-event",
+		Fn:       "pkg.MyFunc",
+		Start:    now,
+		Duration: 5 * time.Millisecond,
+		Metadata: map[string]any{"key": "val"},
+	}
+
+	val := evt.LogValue()
+	require.Equal(t, slog.KindGroup, val.Kind())
+
+	attrs := val.Group()
+	attrMap := make(map[string]slog.Value, len(attrs))
+	for _, a := range attrs {
+		attrMap[a.Key] = a.Value
+	}
+
+	require.Equal(t, "test-event", attrMap["name"].String())
+	require.Equal(t, "pkg.MyFunc", attrMap["fn"].String()) // no slash prefix to trim
+	require.Equal(t, now, attrMap["start"].Time())
+	require.Equal(t, 5*time.Millisecond, attrMap["d"].Duration())
+	require.Equal(t, "val", attrMap["key"].Any())
+}
+
+func TestEvent_LogValue_ZeroFields(t *testing.T) {
+	evt := Event{}
+
+	val := evt.LogValue()
+	attrs := val.Group()
+	attrMap := make(map[string]slog.Value, len(attrs))
+	for _, a := range attrs {
+		attrMap[a.Key] = a.Value
+	}
+
+	// All zero-value fields should be omitted.
+	for _, key := range []string{"name", "fn", "start", "d"} {
+		_, has := attrMap[key]
+		require.False(t, has, "expected %q to be omitted for zero Event", key)
+	}
+}
+
+func TestEvent_LogValue_TrimsFn(t *testing.T) {
+	evt := Event{
+		Fn: "github.com/inngest/inngest/pkg/execution/queue.DurationWithTags[...]",
+	}
+	val := evt.LogValue()
+	attrs := val.Group()
+	attrMap := make(map[string]slog.Value, len(attrs))
+	for _, a := range attrs {
+		attrMap[a.Key] = a.Value
+	}
+	require.Equal(t, "queue.DurationWithTags[...]", attrMap["fn"].String())
+}
+
+func TestEventList_LogValue(t *testing.T) {
+	el := EventList{
+		{Name: "first", Fn: "a.Fn"},
+		{Name: "second", Fn: "b.Fn"},
+	}
+
+	val := el.LogValue()
+	require.Equal(t, slog.KindGroup, val.Kind())
+
+	attrs := val.Group()
+	require.Len(t, attrs, 2)
+	require.Equal(t, "0", attrs[0].Key)
+	require.Equal(t, "1", attrs[1].Key)
+
+	// Each element should itself be a group with event fields.
+	inner := attrs[0].Value.Resolve().Group()
+	innerMap := make(map[string]slog.Value, len(inner))
+	for _, a := range inner {
+		innerMap[a.Key] = a.Value
+	}
+	require.Equal(t, "first", innerMap["name"].String())
+}
+
+func TestLogEvents_StructuredJSON(t *testing.T) {
+	ctx := NewEventStore(context.Background(), "json-test")
+	AddEvent(ctx, Event{
+		Name:     "evt1",
+		Fn:       "pkg.Fn",
+		Metadata: map[string]any{"k": "v"},
+	})
+
+	var buf bytes.Buffer
+	l := newLogger(WithLoggerWriter(&buf), WithHandler(JSONHandler))
+
+	l.LogEvents(ctx).Info("done")
+
+	output := buf.String()
+
+	// Parse as JSON to verify structured output.
+	var parsed map[string]any
+	require.NoError(t, json.Unmarshal([]byte(output), &parsed))
+
+	// events should be a nested object, not a Go %v string.
+	events, ok := parsed["events"]
+	require.True(t, ok, "expected 'events' key in JSON output")
+
+	eventsMap, ok := events.(map[string]any)
+	require.True(t, ok, "events should be a JSON object, got: %T", events)
+
+	evt0, ok := eventsMap["0"].(map[string]any)
+	require.True(t, ok, "events.0 should be a JSON object")
+	require.Equal(t, "evt1", evt0["name"])
+	require.Equal(t, "v", evt0["k"])
 }

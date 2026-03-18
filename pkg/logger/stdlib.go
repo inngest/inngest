@@ -10,6 +10,7 @@ import (
 	"os"
 	"runtime/debug"
 	"strings"
+	"time"
 
 	"github.com/getsentry/sentry-go"
 	"github.com/google/uuid"
@@ -316,6 +317,8 @@ func (l *logger) LogEvents(ctx context.Context) Logger {
 
 	next := l.With(
 		slog.String("events_name", es.Name),
+		slog.Time("events_ts", es.T),
+		slog.Duration("events_d", time.Since(es.T)),
 		slog.Any("events", es.Events),
 	)
 
