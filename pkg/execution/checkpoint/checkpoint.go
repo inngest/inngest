@@ -308,7 +308,7 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 
 	// Persist cumulative metadata size delta to Redis so subsequent checkpoint
 	// requests (potentially on different instances) see the updated total.
-	if delta := input.Metadata.Metrics.MetadataSize - input.Metadata.Metrics.MetadataSizeLoaded; delta > 0 {
+	if delta := input.Metadata.Metrics.MetadataSizeDelta(); delta > 0 {
 		if err := c.State.IncrementMetadataSize(ctx, input.Metadata.ID, delta); err != nil {
 			l.Warn("error persisting metadata size delta", "error", err, "delta", delta)
 		}
@@ -442,7 +442,7 @@ func (c checkpointer) checkpointAsyncSteps(ctx context.Context, input AsyncCheck
 
 	// Persist cumulative metadata size delta to Redis so subsequent checkpoint
 	// requests (potentially on different instances) see the updated total.
-	if delta := md.Metrics.MetadataSize - md.Metrics.MetadataSizeLoaded; delta > 0 {
+	if delta := md.Metrics.MetadataSizeDelta(); delta > 0 {
 		if err := c.State.IncrementMetadataSize(ctx, md.ID, delta); err != nil {
 			l.Warn("error persisting metadata size delta", "error", err, "delta", delta)
 		}
@@ -528,13 +528,21 @@ func (c checkpointer) processMetadata(
 	}
 	for _, spanMd := range op.Metadata {
 		if err := spanMd.Validate(); err != nil {
-			l.Warn("invalid metadata in checkpoint step", "error", err)
+			l.Warn("invalid metadata in checkpoint step",
+				"error", err,
+				"run_id", md.ID.RunID,
+				"metadata_kind", spanMd.Kind(),
+			)
 			continue
 		}
 
 		values, err := spanMd.Serialize()
 		if err != nil {
-			l.Warn("failed to serialize metadata in checkpoint step", "error", err)
+			l.Warn("failed to serialize metadata in checkpoint step",
+				"error", err,
+				"run_id", md.ID.RunID,
+				"metadata_kind", spanMd.Kind(),
+			)
 			continue
 		}
 
@@ -569,7 +577,13 @@ func (c checkpointer) processMetadata(
 			spanMd.Scope,
 		)
 		if err != nil {
-			l.Warn("error creating metadata span in checkpoint", "error", err)
+			l.Warn("error creating metadata span in checkpoint",
+				"error", err,
+				"run_id", md.ID.RunID,
+				"metadata_kind", spanMd.Kind(),
+				"metadata_size", values.Size(),
+				"cumulative_metadata_size", md.Metrics.MetadataSize,
+			)
 		}
 	}
 }

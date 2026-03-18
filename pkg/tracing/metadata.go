@@ -38,8 +38,14 @@ func CreateMetadataSpanFromValues(ctx context.Context, tracerProvider TracerProv
 
 	// Per-run cumulative size limit. Skip when stateMetadata is nil (e.g. API
 	// endpoint, which does its own request-level check).
-	if stateMetadata != nil && stateMetadata.Metrics.MetadataSize+spanSize > consts.MaxRunMetadataSize {
-		return nil, metadata.ErrRunMetadataSizeExceeded
+	//
+	// TryAddMetadataSize atomically checks the limit and increments the
+	// counter under a mutex, which is safe for concurrent access from
+	// parallel step handlers (handleGeneratorGroup).
+	if stateMetadata != nil {
+		if !stateMetadata.Metrics.TryAddMetadataSize(spanSize, consts.MaxRunMetadataSize) {
+			return nil, metadata.ErrRunMetadataSizeExceeded
+		}
 	}
 
 	attrs := RawMetadataAttrs(kind, values, op)
@@ -76,13 +82,11 @@ func CreateMetadataSpanFromValues(ctx context.Context, tracerProvider TracerProv
 		},
 	)
 	if err != nil {
+		// Roll back the optimistic size increment on span creation failure.
+		if stateMetadata != nil {
+			stateMetadata.Metrics.RollbackMetadataSize(spanSize)
+		}
 		return nil, err
-	}
-
-	// Increment in-memory counter so subsequent calls in the same request
-	// see the updated cumulative total.
-	if stateMetadata != nil {
-		stateMetadata.Metrics.MetadataSize += spanSize
 	}
 
 	return ref, nil
