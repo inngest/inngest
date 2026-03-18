@@ -3402,6 +3402,14 @@ func (e *executor) handleGeneratorStep(ctx context.Context, runCtx execution.Run
 		return err
 	}
 
+	// Persist the cumulative metadata size delta alongside the step output.
+	// SwapMetadataSizeDelta atomically reads the delta and advances the
+	// loaded baseline so that concurrent handlers in handleGeneratorGroup
+	// each claim only their own contribution, preventing double-counting.
+	if delta := runCtx.Metadata().Metrics.SwapMetadataSizeDelta(); delta > 0 {
+		ctx = state.WithMetadataSizeDelta(ctx, delta)
+	}
+
 	hasPendingSteps, err := e.smv2.SaveStep(ctx, runCtx.Metadata().ID, gen.ID, []byte(output))
 	if errors.Is(err, state.ErrDuplicateResponse) || errors.Is(err, state.ErrIdempotentResponse) {
 		// This is fine.
@@ -3577,7 +3585,10 @@ func (e *executor) handleStepFailed(ctx context.Context, runCtx execution.RunCon
 	}
 
 	// Persist the cumulative metadata size delta alongside the step output.
-	if delta := runCtx.Metadata().Metrics.MetadataSize - runCtx.Metadata().Metrics.MetadataSizeLoaded; delta > 0 {
+	// SwapMetadataSizeDelta atomically reads the delta and advances the
+	// loaded baseline so that concurrent handlers in handleGeneratorGroup
+	// each claim only their own contribution, preventing double-counting.
+	if delta := runCtx.Metadata().Metrics.SwapMetadataSizeDelta(); delta > 0 {
 		ctx = state.WithMetadataSizeDelta(ctx, delta)
 	}
 
@@ -4022,7 +4033,10 @@ func (e *executor) handleGeneratorGateway(ctx context.Context, runCtx execution.
 	}
 
 	// Persist the cumulative metadata size delta alongside the step output.
-	if delta := runCtx.Metadata().Metrics.MetadataSize - runCtx.Metadata().Metrics.MetadataSizeLoaded; delta > 0 {
+	// SwapMetadataSizeDelta atomically reads the delta and advances the
+	// loaded baseline so that concurrent handlers in handleGeneratorGroup
+	// each claim only their own contribution, preventing double-counting.
+	if delta := runCtx.Metadata().Metrics.SwapMetadataSizeDelta(); delta > 0 {
 		ctx = state.WithMetadataSizeDelta(ctx, delta)
 	}
 
@@ -4272,7 +4286,10 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 	}
 
 	// Persist the cumulative metadata size delta alongside the step output.
-	if delta := runCtx.Metadata().Metrics.MetadataSize - runCtx.Metadata().Metrics.MetadataSizeLoaded; delta > 0 {
+	// SwapMetadataSizeDelta atomically reads the delta and advances the
+	// loaded baseline so that concurrent handlers in handleGeneratorGroup
+	// each claim only their own contribution, preventing double-counting.
+	if delta := runCtx.Metadata().Metrics.SwapMetadataSizeDelta(); delta > 0 {
 		ctx = state.WithMetadataSizeDelta(ctx, delta)
 	}
 
