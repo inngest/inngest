@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/inngest/inngest/pkg/consts"
 	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/tracing/meta"
@@ -28,6 +29,19 @@ func CreateMetadataSpan(ctx context.Context, tracerProvider TracerProvider, pare
 // CreateMetadataSpanFromValues creates a metadata span from pre-serialized values,
 // avoiding redundant serialization when the caller has already called Serialize.
 func CreateMetadataSpanFromValues(ctx context.Context, tracerProvider TracerProvider, parent *meta.SpanReference, location, pkgName string, stateMetadata *statev2.Metadata, kind metadata.Kind, op metadata.Opcode, values metadata.Values, scope metadata.Scope, opts ...MetadataSpanAttrOpts) (*meta.SpanReference, error) {
+	spanSize := values.Size()
+
+	// Per-span size limit
+	if spanSize > consts.MaxMetadataSpanSize {
+		return nil, metadata.ErrMetadataSpanTooLarge
+	}
+
+	// Per-run cumulative size limit. Skip when stateMetadata is nil (e.g. API
+	// endpoint, which does its own request-level check).
+	if stateMetadata != nil && stateMetadata.Metrics.MetadataSize+spanSize > consts.MaxRunMetadataSize {
+		return nil, metadata.ErrRunMetadataSizeExceeded
+	}
+
 	attrs := RawMetadataAttrs(kind, values, op)
 	meta.AddAttr(attrs, meta.Attrs.MetadataScope, &scope)
 
@@ -49,7 +63,7 @@ func CreateMetadataSpanFromValues(ctx context.Context, tracerProvider TracerProv
 			"kind": kindTag,
 		},
 	})
-	return tracerProvider.CreateSpan(
+	ref, err := tracerProvider.CreateSpan(
 		ctx,
 		meta.SpanNameMetadata,
 		&CreateSpanOptions{
@@ -61,6 +75,17 @@ func CreateMetadataSpanFromValues(ctx context.Context, tracerProvider TracerProv
 			DynamicSeed: MetadataSpanIDSeed(parent.DynamicSpanID, kind),
 		},
 	)
+	if err != nil {
+		return nil, err
+	}
+
+	// Increment in-memory counter so subsequent calls in the same request
+	// see the updated cumulative total.
+	if stateMetadata != nil {
+		stateMetadata.Metrics.MetadataSize += spanSize
+	}
+
+	return ref, nil
 }
 
 func RawMetadataAttrs(kind metadata.Kind, values metadata.Values, op metadata.Opcode) *meta.SerializableAttrs {

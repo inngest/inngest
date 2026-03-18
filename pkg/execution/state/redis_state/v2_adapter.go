@@ -441,6 +441,12 @@ func (v v2) ConsumePause(ctx context.Context, p statev1.Pause, opts statev1.Cons
 	return r, err
 }
 
+// IncrementMetadataSize atomically increments the cumulative metadata size
+// counter for a run via HINCRBY.
+func (v v2) IncrementMetadataSize(ctx context.Context, id state.ID, delta int) error {
+	return v.mgr.IncrementMetadataSize(ctx, id.Tenant.AccountID, id.RunID, delta)
+}
+
 // Duplicate creates a copy of the given state in this store,
 // preserving all metadata fields exactly including metrics, config, etc.
 // rawMeta is the v1 Metadata from the source, containing extended fields like

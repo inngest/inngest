@@ -407,6 +407,10 @@ func (m *mockRunService) LoadV1Metadata(ctx context.Context, id statev2.ID) (*st
 	return nil, nil
 }
 
+func (m *mockRunService) IncrementMetadataSize(ctx context.Context, id statev2.ID, delta int) error {
+	return nil
+}
+
 func (m *mockRunService) Duplicate(ctx context.Context, source statev2.State, destID statev2.ID, rawMeta *state.Metadata, stepInputs map[string]json.RawMessage) error {
 	return nil
 }
