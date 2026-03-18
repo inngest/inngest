@@ -27,6 +27,13 @@ import (
 const (
 	// SSEConnectionTimeout is the maximum duration an SSE connection can remain open
 	SSEConnectionTimeout = 15 * time.Minute
+
+	// MaxDurpStreamingRun is the maximum duration that a Durable Endpoint can
+	// stream. This is specifically enforced, but is rather a rough
+	// approximation due to the SSE endpoint timeout. Technically this is
+	// actually the max streaming duration after going async mode, but we'll
+	// simplify things for the end user by just saying 15 minutes overall
+	MaxDurpStreamingRun = SSEConnectionTimeout
 )
 
 type APIOpts struct {
@@ -409,24 +416,21 @@ func (a *api) PostPublishTee(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	// Accept realtime JWT with publish claim, or fall back to signing key auth.
+	var envID uuid.UUID
 	claims, err := realtimeAuth(ctx)
-	if err == nil && !claims.Publish {
-		http.Error(w, "Not authenticated for publishing", http.StatusUnauthorized)
-		return
-	}
-	if claims == nil {
+	if err != nil {
+		// Fallback to signing key auth.
 		auth, err := a.opts.AuthFinder(ctx)
 		if err != nil {
 			http.Error(w, "Not authenticated", http.StatusUnauthorized)
 			return
 		}
-		claims = &JWTClaims{
-			RegisteredClaims: jwt.RegisteredClaims{
-				Subject: auth.AccountID().String(),
-			},
-			Env:     auth.WorkspaceID(),
-			Publish: true,
-		}
+		envID = auth.WorkspaceID()
+	} else if !claims.Publish {
+		http.Error(w, "Not authenticated for publishing", http.StatusUnauthorized)
+		return
+	} else {
+		envID = claims.Env
 	}
 
 	channel := r.URL.Query().Get("channel")
@@ -442,7 +446,7 @@ func (a *api) PostPublishTee(w http.ResponseWriter, r *http.Request) {
 		broadcaster: a.opts.Broadcaster,
 		ctx:         ctx,
 		channel:     channel,
-		envID:       claims.Env,
+		envID:       envID,
 	}, r.Body)
 
 	metrics.HistogramRealtimeRawDataSizeBytes(ctx, n, metrics.HistogramOpt{

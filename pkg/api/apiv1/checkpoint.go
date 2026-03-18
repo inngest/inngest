@@ -120,9 +120,6 @@ func NewCheckpointAPI(o Opts) CheckpointAPI {
 	api.Post("/{runID}/steps", api.CheckpointSteps) // sync, API-based fns
 	api.Post("/{runID}/async", api.CheckpointAsyncSteps)
 	api.HandleFunc("/{runID}/output", api.Output)
-	// api.Post("/{runID}/stream", api.StreamIngest)
-	// NOTE: StreamOutput (GET) is registered in apiv1.go outside the
-	// auth/caching middleware group to avoid response buffering.
 
 	return api
 }
@@ -261,10 +258,14 @@ func (a checkpointAPI) CheckpointNewRun(w http.ResponseWriter, r *http.Request) 
 			auth.WorkspaceID(),
 			[]realtime.Topic{{
 				Channel: md.ID.RunID.String(),
-				Name:    streamTopicName,
+				Name:    streamingtypes.TopicNameStream,
 				Kind:    streamingtypes.TopicKindRun,
 				EnvID:   auth.WorkspaceID(),
 			}},
+			realtime.NewJWTOpts{
+				// Add a minute buffer just in case.
+				Expiry: util.ToPtr(realtime.MaxDurpStreamingRun + time.Minute),
+			},
 		)
 		if err != nil {
 			logger.StdlibLogger(ctx).Warn("error creating realtime subscribe JWT", "error", err)

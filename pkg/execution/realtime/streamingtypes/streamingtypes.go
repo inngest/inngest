@@ -13,6 +13,10 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
+const (
+	TopicNameStream = "$stream"
+)
+
 type (
 	// MessageKind represents the type of data in the message, eg. whether
 	// this is a step output, custom data, a run result, etc.
