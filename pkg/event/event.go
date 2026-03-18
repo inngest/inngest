@@ -35,6 +35,7 @@ type TrackedEvent interface {
 	GetWorkspaceID() uuid.UUID
 	GetInternalID() ulid.ULID
 	GetEvent() Event
+	GetReceivedAt() time.Time
 }
 
 // NewEvent unmarshals a byte slice into a concrete event type.
@@ -215,6 +216,10 @@ func (i InternalEvent) GetInternalID() ulid.ULID {
 
 func (i InternalEvent) GetEvent() Event {
 	return i.Event
+}
+
+func (i InternalEvent) GetReceivedAt() time.Time {
+	return time.Time{}
 }
 
 func IsCron(evtName string) bool {
