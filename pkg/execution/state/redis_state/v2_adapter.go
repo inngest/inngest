@@ -13,6 +13,7 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/util"
+	"github.com/redis/rueidis"
 )
 
 func MustRunServiceV2(m statev1.Manager, opts ...MgrV2Opt) state.RunService {
@@ -429,6 +430,109 @@ func (v v2) ConsumePause(ctx context.Context, p statev1.Pause, opts statev1.Cons
 	)
 
 	return r, err
+}
+
+// Duplicate creates a copy of the given state in this store,
+// preserving all metadata fields exactly including metrics, config, etc.
+// rawMeta is the v1 Metadata from the source, containing extended fields like
+// Status, Debugger, RunType, Version that aren't in v2 Metadata.
+// stepInputs must be loaded separately from the source backend via LoadStepInputs.
+func (v v2) Duplicate(ctx context.Context, source state.State, destID state.ID, rawMeta *statev1.Metadata, stepInputs map[string]json.RawMessage) error {
+	sourceMetadata := source.Metadata
+
+	// Convert step inputs map to slice
+	stepInputsSlice := make([]statev1.MemoizedStep, 0, len(stepInputs))
+	for id, data := range stepInputs {
+		var stepData any
+		if err := json.Unmarshal(data, &stepData); err != nil {
+			continue
+		}
+		stepInputsSlice = append(stepInputsSlice, statev1.MemoizedStep{ID: id, Data: stepData})
+	}
+
+	// Convert steps map to slice, maintaining stack order
+	steps := make([]statev1.MemoizedStep, 0, len(sourceMetadata.Stack))
+	for _, stepID := range sourceMetadata.Stack {
+		if data, ok := source.Steps[stepID]; ok {
+			var stepData any
+			if err := json.Unmarshal(data, &stepData); err != nil {
+				continue
+			}
+			steps = append(steps, statev1.MemoizedStep{ID: stepID, Data: stepData})
+		}
+	}
+
+	// Create state with all config fields
+	destInput := state.CreateState{
+		Metadata: state.Metadata{
+			ID: destID,
+			Config: *state.InitConfig(&state.Config{
+				SpanID:                sourceMetadata.Config.SpanID,
+				Idempotency:           sourceMetadata.Config.Idempotency,
+				FunctionVersion:       sourceMetadata.Config.FunctionVersion,
+				RequestVersion:        sourceMetadata.Config.RequestVersion,
+				EventIDs:              sourceMetadata.Config.EventIDs,
+				PriorityFactor:        sourceMetadata.Config.PriorityFactor,
+				CustomConcurrencyKeys: sourceMetadata.Config.CustomConcurrencyKeys,
+				BatchID:               sourceMetadata.Config.BatchID,
+				ReplayID:              sourceMetadata.Config.ReplayID,
+				OriginalRunID:         sourceMetadata.Config.OriginalRunID,
+				Context:               sourceMetadata.Config.Context,
+			}),
+		},
+		Events:     source.Events,
+		StepInputs: stepInputsSlice,
+		Steps:      steps,
+	}
+
+	_, err := v.Create(ctx, destInput)
+	if err != nil {
+		return fmt.Errorf("failed to create destination state: %w", err)
+	}
+
+	// After Create (which uses new.lua), we need to overwrite metadata fields
+	// that weren't passed correctly or were calculated differently.
+	// new.lua sets event_size via HINCRBY based on events length, so we need
+	// to correct it along with other metrics and config fields.
+	fnRunState := v.mgr.s.FunctionRunState()
+	client, isSharded := fnRunState.Client(ctx, destID.Tenant.AccountID, destID.RunID)
+	metadataKey := fnRunState.KeyGenerator().RunMetadata(ctx, isSharded, destID.RunID)
+
+	// Build field-value pairs for HSET to correct metadata.
+	// Metrics come from source.Metadata (v2), extended fields from rawMeta (v1).
+	fields := map[string]string{
+		// Metrics from v2 Metadata
+		"state_size": fmt.Sprintf("%d", sourceMetadata.Metrics.StateSize),
+		"step_count": fmt.Sprintf("%d", sourceMetadata.Metrics.StepCount),
+		"event_size": fmt.Sprintf("%d", sourceMetadata.Metrics.EventSize),
+		// Config fields from v1 Metadata
+		"hasAI": fmt.Sprintf("%t", rawMeta.HasAI),
+		"die":   fmt.Sprintf("%t", rawMeta.DisableImmediateExecution),
+		// Extended fields from v1 Metadata
+		"status":   fmt.Sprintf("%d", rawMeta.Status),
+		"debugger": fmt.Sprintf("%t", rawMeta.Debugger),
+		"version":  fmt.Sprintf("%d", rawMeta.Version),
+	}
+
+	if rawMeta.RunType != nil && *rawMeta.RunType != "" {
+		fields["runType"] = *rawMeta.RunType
+	}
+	if !rawMeta.StartedAt.IsZero() {
+		fields["sat"] = fmt.Sprintf("%d", rawMeta.StartedAt.UnixMilli())
+	}
+	// ReplayID is in Identifier for v1
+	if rawMeta.Identifier.ReplayID != nil {
+		fields["rID"] = rawMeta.Identifier.ReplayID.String()
+	}
+
+	// Use HSET to correct the metadata fields
+	return client.Do(ctx, func(c rueidis.Client) rueidis.Completed {
+		cmd := c.B().Hset().Key(metadataKey).FieldValue()
+		for k, val := range fields {
+			cmd = cmd.FieldValue(k, val)
+		}
+		return cmd.Build()
+	}).Error()
 }
 
 func (v v2) retryPolicy(opts ...util.RetryConfSetting) util.RetryConf {
