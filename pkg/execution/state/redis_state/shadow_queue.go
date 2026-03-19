@@ -187,7 +187,7 @@ func (q *queue) ShadowPartitionRequeue(ctx context.Context, sp *osqueue.QueueSha
 	}
 
 	partitionID := sp.Identifier()
-	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.ShadowPartitionRequeue", partitionID.AccountID, partitionID.EnvID)
+	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.ShadowPartitionRequeue", partitionID.AccountID, partitionID.EnvID, partitionID.FunctionID)
 	defer span.End()
 	span.SetAttributes(attribute.String("partition_id", sp.PartitionID))
 
