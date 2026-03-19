@@ -340,6 +340,7 @@ func (q *queueProcessor) ProcessItem(
 		// In this case, we need to stop extending the lease,
 		// and call Release() in a non-blocking way.
 		if i.CapacityLease != nil {
+			// Provide the release handle
 			i.CapacityLease.release = func() error {
 				// Stop extending capacity lease
 				cancelExtendCapacityLease()

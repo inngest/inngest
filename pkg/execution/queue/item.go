@@ -124,9 +124,14 @@ type CapacityLease struct {
 	LeaseID    ulid.ULID `json:"l,omitempty"`
 	IssuedAtMS int64     `json:"i,omitempty"`
 
+	// release is a handle to invoke the Constraint API.
+	// This is passed during item processing.
 	release func() error
 }
 
+// Release frees up all acquired capacity that is not time-bound (i.e. concurrency capacity).
+//
+// This function is idempotent and can be called multiple times.
 func (c CapacityLease) Release() error {
 	if c.release != nil {
 		return c.release()
