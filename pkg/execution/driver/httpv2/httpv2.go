@@ -147,6 +147,11 @@ func (d httpv2) sync(ctx context.Context, sl sv2.StateLoader, opts driver.V2Requ
 		req.Header.Add(headers.HeaderKeyForceStepPlan, "true")
 	}
 
+	req.Header.Add(headers.HeaderKeyFnID, opts.Metadata.ID.FunctionID.String())
+	if opts.QueueRef != "" {
+		req.Header.Add(headers.HeaderKeyQueueItemRef, opts.QueueRef)
+	}
+
 	if opts.StepID != nil && *opts.StepID != "" && *opts.StepID != "step" {
 		req.Header.Add(headers.HeaderInngestStepID, *opts.StepID)
 	}
