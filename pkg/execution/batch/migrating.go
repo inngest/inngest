@@ -35,42 +35,26 @@ const (
 // operation so the mode can change at runtime (e.g. via feature flag).
 type MigrationModeFunc func(ctx context.Context) MigrationMode
 
-// MigratingBatchManagerOpt configures a migratingBatchManager.
-type MigratingBatchManagerOpt func(m *migratingBatchManager)
-
-// WithMigratingLogger sets the logger for migration-related log messages.
-func WithMigratingLogger(l logger.Logger) MigratingBatchManagerOpt {
-	return func(m *migratingBatchManager) {
-		m.log = l
-	}
-}
-
 // NewMigratingBatchManager creates a BatchManager that delegates to two underlying
 // managers based on a runtime migration mode.
 //
 // If next is nil or mode is nil, current is returned directly with zero overhead.
-func NewMigratingBatchManager(current, next BatchManager, mode MigrationModeFunc, opts ...MigratingBatchManagerOpt) BatchManager {
+func NewMigratingBatchManager(current, next BatchManager, mode MigrationModeFunc) BatchManager {
 	if next == nil || mode == nil {
 		return current
 	}
 
-	m := &migratingBatchManager{
+	return &migratingBatchManager{
 		current: current,
 		next:    next,
 		mode:    mode,
-		log:     logger.StdlibLogger(context.Background()),
 	}
-	for _, opt := range opts {
-		opt(m)
-	}
-	return m
 }
 
 type migratingBatchManager struct {
 	current BatchManager
 	next    BatchManager
 	mode    MigrationModeFunc
-	log     logger.Logger
 }
 
 // writeManager returns the manager that should receive writes for the current mode.
@@ -105,9 +89,7 @@ func (m *migratingBatchManager) StartExecution(ctx context.Context, functionID u
 		return result, nil
 	}
 	if err != nil {
-		m.log.WarnContext(ctx, "migrating batch: next StartExecution failed, falling back to current",
-			"error", err,
-		)
+		logger.StdlibLogger(ctx).ReportError(err, "migrating batch: next StartExecution failed, falling back to current")
 	}
 	return m.current.StartExecution(ctx, functionID, batchID, batchPointer)
 }
@@ -122,9 +104,7 @@ func (m *migratingBatchManager) RetrieveItems(ctx context.Context, functionID uu
 		return items, nil
 	}
 	if err != nil {
-		m.log.WarnContext(ctx, "migrating batch: next RetrieveItems failed, falling back to current",
-			"error", err,
-		)
+		logger.StdlibLogger(ctx).ReportError(err, "migrating batch: next RetrieveItems failed, falling back to current")
 	}
 	return m.current.RetrieveItems(ctx, functionID, batchID)
 }
@@ -154,9 +134,7 @@ func (m *migratingBatchManager) GetBatchInfo(ctx context.Context, functionID uui
 		return info, nil
 	}
 	if err != nil {
-		m.log.WarnContext(ctx, "migrating batch: next GetBatchInfo failed, falling back to current",
-			"error", err,
-		)
+		logger.StdlibLogger(ctx).ReportError(err, "migrating batch: next GetBatchInfo failed, falling back to current")
 	}
 	return m.current.GetBatchInfo(ctx, functionID, batchKey)
 }
@@ -171,9 +149,7 @@ func (m *migratingBatchManager) DeleteBatch(ctx context.Context, functionID uuid
 		return result, nil
 	}
 	if err != nil {
-		m.log.WarnContext(ctx, "migrating batch: next DeleteBatch failed, falling back to current",
-			"error", err,
-		)
+		logger.StdlibLogger(ctx).ReportError(err, "migrating batch: next DeleteBatch failed, falling back to current")
 	}
 	return m.current.DeleteBatch(ctx, functionID, batchKey)
 }
@@ -188,9 +164,7 @@ func (m *migratingBatchManager) RunBatch(ctx context.Context, opts RunBatchOpts)
 		return result, nil
 	}
 	if err != nil {
-		m.log.WarnContext(ctx, "migrating batch: next RunBatch failed, falling back to current",
-			"error", err,
-		)
+		logger.StdlibLogger(ctx).ReportError(err, "migrating batch: next RunBatch failed, falling back to current")
 	}
 	return m.current.RunBatch(ctx, opts)
 }
