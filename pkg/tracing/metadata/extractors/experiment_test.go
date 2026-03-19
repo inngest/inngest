@@ -217,7 +217,7 @@ func TestExperimentMetadata_Serialize(t *testing.T) {
 		Variant:   "high-price",
 		SelectionStrategy: "random",
 		AvailableVariants: []string{"low-price", "high-price"},
-		VariantWeights:    map[string]int{"low-price": 50, "high-price": 50},
+		VariantWeights:    map[string]float64{"low-price": 50, "high-price": 50},
 	}
 
 	raw, err := md.Serialize()

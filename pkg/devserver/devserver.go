@@ -288,6 +288,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		Continuations: true,
 	}
 	enableKeyQueues := os.Getenv("EXPERIMENTAL_KEY_QUEUES_ENABLE") == "true"
+	// Step metadata is enabled by default in the dev server; set EXPERIMENTAL_STEP_METADATA=false to disable.
 	enableStepMetadata := os.Getenv("EXPERIMENTAL_STEP_METADATA") != "false"
 
 	if enableKeyQueues {
