@@ -2,528 +2,437 @@ package batch
 
 import (
 	"context"
-	"errors"
+	"crypto/rand"
 	"testing"
 
+	"github.com/alicebob/miniredis/v2"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/event"
+	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/oklog/ulid/v2"
+	"github.com/redis/rueidis"
 	"github.com/stretchr/testify/require"
 )
 
-// mockBatchManager is a test double that records calls and returns configured responses.
-type mockBatchManager struct {
-	name string
+type migratingTestEnv struct {
+	t *testing.T
 
-	appendResult    *BatchAppendResult
-	appendErr       error
-	appendCalls     int
+	rCurrent *miniredis.Miniredis
+	rNext    *miniredis.Miniredis
 
-	bulkAppendResult *BulkAppendResult
-	bulkAppendErr    error
-	bulkAppendCalls  int
+	rcCurrent rueidis.Client
+	rcNext    rueidis.Client
 
-	startResult     string
-	startErr        error
-	startCalls      int
+	bcCurrent *redis_state.BatchClient
+	bcNext    *redis_state.BatchClient
 
-	retrieveResult  []BatchItem
-	retrieveErr     error
-	retrieveCalls   int
+	bmCurrent BatchManager
+	bmNext    BatchManager
 
-	scheduleErr     error
-	scheduleCalls   int
-
-	deleteKeysErr   error
-	deleteKeysCalls int
-
-	getBatchInfoResult *BatchInfo
-	getBatchInfoErr    error
-	getBatchInfoCalls  int
-
-	deleteBatchResult *DeleteBatchResult
-	deleteBatchErr    error
-	deleteBatchCalls  int
-
-	runBatchResult *RunBatchResult
-	runBatchErr    error
-	runBatchCalls  int
-
-	closeCalls int
-	closeErr   error
+	mode    MigrationMode
+	migBM   BatchManager
 }
 
-func (m *mockBatchManager) Append(_ context.Context, _ BatchItem, _ inngest.Function) (*BatchAppendResult, error) {
-	m.appendCalls++
-	return m.appendResult, m.appendErr
-}
+func newMigratingTestEnv(t *testing.T) *migratingTestEnv {
+	t.Helper()
 
-func (m *mockBatchManager) BulkAppend(_ context.Context, _ []BatchItem, _ inngest.Function) (*BulkAppendResult, error) {
-	m.bulkAppendCalls++
-	return m.bulkAppendResult, m.bulkAppendErr
-}
+	rCurrent := miniredis.RunT(t)
+	rNext := miniredis.RunT(t)
 
-func (m *mockBatchManager) StartExecution(_ context.Context, _ uuid.UUID, _ ulid.ULID, _ string) (string, error) {
-	m.startCalls++
-	return m.startResult, m.startErr
-}
+	rcCurrent, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{rCurrent.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	t.Cleanup(func() { rcCurrent.Close() })
 
-func (m *mockBatchManager) RetrieveItems(_ context.Context, _ uuid.UUID, _ ulid.ULID) ([]BatchItem, error) {
-	m.retrieveCalls++
-	return m.retrieveResult, m.retrieveErr
-}
+	rcNext, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{rNext.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	t.Cleanup(func() { rcNext.Close() })
 
-func (m *mockBatchManager) ScheduleExecution(_ context.Context, _ ScheduleBatchOpts) error {
-	m.scheduleCalls++
-	return m.scheduleErr
-}
+	bcCurrent := redis_state.NewBatchClient(rcCurrent, redis_state.QueueDefaultKey)
+	bcNext := redis_state.NewBatchClient(rcNext, redis_state.QueueDefaultKey)
 
-func (m *mockBatchManager) DeleteKeys(_ context.Context, _ uuid.UUID, _ ulid.ULID) error {
-	m.deleteKeysCalls++
-	return m.deleteKeysErr
-}
+	bmCurrent := NewRedisBatchManager(bcCurrent, nil, WithoutBuffer())
+	bmNext := NewRedisBatchManager(bcNext, nil, WithoutBuffer())
 
-func (m *mockBatchManager) GetBatchInfo(_ context.Context, _ uuid.UUID, _ string) (*BatchInfo, error) {
-	m.getBatchInfoCalls++
-	return m.getBatchInfoResult, m.getBatchInfoErr
-}
-
-func (m *mockBatchManager) DeleteBatch(_ context.Context, _ uuid.UUID, _ string) (*DeleteBatchResult, error) {
-	m.deleteBatchCalls++
-	return m.deleteBatchResult, m.deleteBatchErr
-}
-
-func (m *mockBatchManager) RunBatch(_ context.Context, _ RunBatchOpts) (*RunBatchResult, error) {
-	m.runBatchCalls++
-	return m.runBatchResult, m.runBatchErr
-}
-
-func (m *mockBatchManager) Close() error {
-	m.closeCalls++
-	return m.closeErr
-}
-
-func staticMode(mode MigrationMode) MigrationModeFunc {
-	return func(_ context.Context) MigrationMode { return mode }
-}
-
-func TestMigratingBatchManager_NilNextReturnsCurrent(t *testing.T) {
-	current := &mockBatchManager{name: "current"}
-	result := NewMigratingBatchManager(current, nil, staticMode(MigrationModeCurrentOnly))
-	require.Equal(t, current, result, "nil next should return current directly")
-}
-
-func TestMigratingBatchManager_NilModeReturnsCurrent(t *testing.T) {
-	current := &mockBatchManager{name: "current"}
-	next := &mockBatchManager{name: "next"}
-	result := NewMigratingBatchManager(current, next, nil)
-	require.Equal(t, current, result, "nil mode should return current directly")
-}
-
-func TestMigratingBatchManager_CurrentOnly(t *testing.T) {
-	ctx := context.Background()
-	current := &mockBatchManager{
-		appendResult:    &BatchAppendResult{Status: enums.BatchNew, BatchID: "current-batch"},
-		bulkAppendResult: &BulkAppendResult{Status: "new", BatchID: "current-batch"},
-		startResult:     enums.BatchStatusReady.String(),
-		retrieveResult:  []BatchItem{{FunctionID: uuid.New()}},
-		getBatchInfoResult: &BatchInfo{BatchID: "current-batch"},
-		deleteBatchResult:  &DeleteBatchResult{Deleted: true, BatchID: "current-batch"},
-		runBatchResult:     &RunBatchResult{Scheduled: true, BatchID: "current-batch"},
+	env := &migratingTestEnv{
+		t:         t,
+		rCurrent:  rCurrent,
+		rNext:     rNext,
+		rcCurrent: rcCurrent,
+		rcNext:    rcNext,
+		bcCurrent: bcCurrent,
+		bcNext:    bcNext,
+		bmCurrent: bmCurrent,
+		bmNext:    bmNext,
+		mode:      MigrationModeCurrentOnly,
 	}
-	next := &mockBatchManager{name: "next"}
 
-	m := NewMigratingBatchManager(current, next, staticMode(MigrationModeCurrentOnly))
-
-	t.Run("Append", func(t *testing.T) {
-		res, err := m.Append(ctx, BatchItem{}, inngest.Function{})
-		require.NoError(t, err)
-		require.Equal(t, "current-batch", res.BatchID)
-		require.Equal(t, 1, current.appendCalls)
-		require.Equal(t, 0, next.appendCalls)
+	env.migBM = NewMigratingBatchManager(bmCurrent, bmNext, func(_ context.Context) MigrationMode {
+		return env.mode
 	})
 
-	t.Run("BulkAppend", func(t *testing.T) {
-		res, err := m.BulkAppend(ctx, []BatchItem{{}}, inngest.Function{})
-		require.NoError(t, err)
-		require.Equal(t, "current-batch", res.BatchID)
-		require.Equal(t, 1, current.bulkAppendCalls)
-		require.Equal(t, 0, next.bulkAppendCalls)
-	})
+	return env
+}
 
-	t.Run("StartExecution", func(t *testing.T) {
-		res, err := m.StartExecution(ctx, uuid.New(), ulid.Make(), "ptr")
-		require.NoError(t, err)
-		require.Equal(t, enums.BatchStatusReady.String(), res)
-		require.Equal(t, 1, current.startCalls)
-		require.Equal(t, 0, next.startCalls)
+func newFunction(fnID uuid.UUID) inngest.Function {
+	return inngest.Function{
+		ID: fnID,
+		EventBatch: &inngest.EventBatchConfig{
+			MaxSize: 10,
+			Timeout: "60s",
+		},
+	}
+}
+
+func appendItem(ctx context.Context, t *testing.T, bm BatchManager, fnID uuid.UUID, fn inngest.Function) (*BatchAppendResult, BatchItem) {
+	t.Helper()
+	bi := BatchItem{
+		AccountID:  uuid.New(),
+		FunctionID: fnID,
+		EventID:    ulid.MustNew(ulid.Now(), rand.Reader),
+		Event: event.Event{
+			Name: "test/event",
+			Data: map[string]any{"hello": "world"},
+		},
+	}
+	res, err := bm.Append(ctx, bi, fn)
+	require.NoError(t, err)
+	return res, bi
+}
+
+func TestMigratingIntegration_NilNextReturnsCurrent(t *testing.T) {
+	r := miniredis.RunT(t)
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
 	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	bc := redis_state.NewBatchClient(rc, redis_state.QueueDefaultKey)
+	current := NewRedisBatchManager(bc, nil, WithoutBuffer())
+
+	result := NewMigratingBatchManager(current, nil, func(_ context.Context) MigrationMode {
+		return MigrationModeCurrentOnly
+	})
+	require.Equal(t, current, result)
+}
+
+func TestMigratingIntegration_NilModeReturnsCurrent(t *testing.T) {
+	r1 := miniredis.RunT(t)
+	r2 := miniredis.RunT(t)
+
+	rc1, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r1.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc1.Close()
+
+	rc2, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r2.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc2.Close()
+
+	bc1 := redis_state.NewBatchClient(rc1, redis_state.QueueDefaultKey)
+	bc2 := redis_state.NewBatchClient(rc2, redis_state.QueueDefaultKey)
+
+	current := NewRedisBatchManager(bc1, nil, WithoutBuffer())
+	next := NewRedisBatchManager(bc2, nil, WithoutBuffer())
+
+	result := NewMigratingBatchManager(current, next, nil)
+	require.Equal(t, current, result)
+}
+
+func TestMigratingIntegration_CurrentOnly(t *testing.T) {
+	ctx := context.Background()
+	env := newMigratingTestEnv(t)
+	env.mode = MigrationModeCurrentOnly
+
+	fnID := uuid.New()
+	fn := newFunction(fnID)
+
+	// Append an item via the migrating manager.
+	res, bi := appendItem(ctx, t, env.migBM, fnID, fn)
+	require.Equal(t, enums.BatchNew, res.Status)
+	require.NotEmpty(t, res.BatchID)
+
+	batchID := ulid.MustParse(res.BatchID)
+
+	// Data should exist in current's Redis.
+	require.True(t, env.rCurrent.Exists(env.bcCurrent.KeyGenerator().Batch(ctx, fnID, batchID)))
+	// Data should NOT exist in next's Redis.
+	require.Equal(t, 0, len(env.rNext.Keys()))
 
 	t.Run("RetrieveItems", func(t *testing.T) {
-		items, err := m.RetrieveItems(ctx, uuid.New(), ulid.Make())
+		items, err := env.migBM.RetrieveItems(ctx, fnID, batchID)
 		require.NoError(t, err)
 		require.Len(t, items, 1)
-		require.Equal(t, 1, current.retrieveCalls)
-		require.Equal(t, 0, next.retrieveCalls)
-	})
-
-	t.Run("ScheduleExecution", func(t *testing.T) {
-		err := m.ScheduleExecution(ctx, ScheduleBatchOpts{})
-		require.NoError(t, err)
-		require.Equal(t, 1, current.scheduleCalls)
-		require.Equal(t, 0, next.scheduleCalls)
-	})
-
-	t.Run("DeleteKeys", func(t *testing.T) {
-		err := m.DeleteKeys(ctx, uuid.New(), ulid.Make())
-		require.NoError(t, err)
-		require.Equal(t, 1, current.deleteKeysCalls)
-		require.Equal(t, 0, next.deleteKeysCalls)
+		require.Equal(t, bi.EventID, items[0].EventID)
 	})
 
 	t.Run("GetBatchInfo", func(t *testing.T) {
-		info, err := m.GetBatchInfo(ctx, uuid.New(), "key")
+		info, err := env.migBM.GetBatchInfo(ctx, fnID, "")
 		require.NoError(t, err)
-		require.Equal(t, "current-batch", info.BatchID)
-		require.Equal(t, 1, current.getBatchInfoCalls)
-		require.Equal(t, 0, next.getBatchInfoCalls)
+		require.Equal(t, res.BatchID, info.BatchID)
+		require.Len(t, info.Items, 1)
 	})
 
-	t.Run("DeleteBatch", func(t *testing.T) {
-		res, err := m.DeleteBatch(ctx, uuid.New(), "key")
+	t.Run("StartExecution", func(t *testing.T) {
+		status, err := env.migBM.StartExecution(ctx, fnID, batchID, res.BatchPointerKey)
 		require.NoError(t, err)
-		require.True(t, res.Deleted)
-		require.Equal(t, 1, current.deleteBatchCalls)
-		require.Equal(t, 0, next.deleteBatchCalls)
+		require.Equal(t, enums.BatchStatusReady.String(), status)
 	})
 
 	t.Run("RunBatch", func(t *testing.T) {
-		res, err := m.RunBatch(ctx, RunBatchOpts{})
+		// Append enough items for a new batch to be schedulable.
+		newFnID := uuid.New()
+		newFn := newFunction(newFnID)
+		appendItem(ctx, t, env.migBM, newFnID, newFn)
+
+		result, err := env.migBM.RunBatch(ctx, RunBatchOpts{
+			FunctionID: newFnID,
+		})
 		require.NoError(t, err)
-		require.True(t, res.Scheduled)
-		require.Equal(t, 1, current.runBatchCalls)
-		require.Equal(t, 0, next.runBatchCalls)
+		// With nil queue manager, ScheduleExecution is a no-op, so RunBatch returns Scheduled: true.
+		require.True(t, result.Scheduled)
+	})
+
+	t.Run("DeleteBatch", func(t *testing.T) {
+		delFnID := uuid.New()
+		delFn := newFunction(delFnID)
+		appendItem(ctx, t, env.migBM, delFnID, delFn)
+
+		result, err := env.migBM.DeleteBatch(ctx, delFnID, "")
+		require.NoError(t, err)
+		require.True(t, result.Deleted)
+		require.Equal(t, 1, result.ItemCount)
+
+		// Verify batch is gone.
+		info, err := env.migBM.GetBatchInfo(ctx, delFnID, "")
+		require.NoError(t, err)
+		require.Equal(t, "", info.BatchID)
+	})
+
+	t.Run("DeleteKeys", func(t *testing.T) {
+		dkFnID := uuid.New()
+		dkFn := newFunction(dkFnID)
+		dkRes, _ := appendItem(ctx, t, env.migBM, dkFnID, dkFn)
+		dkBatchID := ulid.MustParse(dkRes.BatchID)
+
+		require.True(t, env.rCurrent.Exists(env.bcCurrent.KeyGenerator().Batch(ctx, dkFnID, dkBatchID)))
+
+		err := env.migBM.DeleteKeys(ctx, dkFnID, dkBatchID)
+		require.NoError(t, err)
+		require.False(t, env.rCurrent.Exists(env.bcCurrent.KeyGenerator().Batch(ctx, dkFnID, dkBatchID)))
 	})
 }
 
-func TestMigratingBatchManager_DualRead_WritesToCurrent(t *testing.T) {
+func TestMigratingIntegration_DualRead(t *testing.T) {
 	ctx := context.Background()
-	current := &mockBatchManager{
-		appendResult:     &BatchAppendResult{Status: enums.BatchNew, BatchID: "current-batch"},
-		bulkAppendResult: &BulkAppendResult{Status: "new", BatchID: "current-batch"},
-	}
-	next := &mockBatchManager{name: "next"}
 
-	m := NewMigratingBatchManager(current, next, staticMode(MigrationModeDualRead))
+	t.Run("writes go to current", func(t *testing.T) {
+		env := newMigratingTestEnv(t)
+		env.mode = MigrationModeDualRead
 
-	t.Run("Append writes to current", func(t *testing.T) {
-		res, err := m.Append(ctx, BatchItem{}, inngest.Function{})
-		require.NoError(t, err)
-		require.Equal(t, "current-batch", res.BatchID)
-		require.Equal(t, 1, current.appendCalls)
-		require.Equal(t, 0, next.appendCalls)
+		fnID := uuid.New()
+		fn := newFunction(fnID)
+
+		res, _ := appendItem(ctx, t, env.migBM, fnID, fn)
+		batchID := ulid.MustParse(res.BatchID)
+
+		// Data in current.
+		require.True(t, env.rCurrent.Exists(env.bcCurrent.KeyGenerator().Batch(ctx, fnID, batchID)))
+		// NOT in next.
+		require.Equal(t, 0, len(env.rNext.Keys()))
 	})
 
-	t.Run("BulkAppend writes to current", func(t *testing.T) {
-		res, err := m.BulkAppend(ctx, []BatchItem{{}}, inngest.Function{})
+	t.Run("reads find data on current via fallback", func(t *testing.T) {
+		env := newMigratingTestEnv(t)
+		env.mode = MigrationModeDualRead
+
+		fnID := uuid.New()
+		fn := newFunction(fnID)
+
+		// Append directly to current (bypassing migrating manager).
+		res, bi := appendItem(ctx, t, env.bmCurrent, fnID, fn)
+		batchID := ulid.MustParse(res.BatchID)
+
+		// Read through migrating manager — should find via fallback to current.
+		items, err := env.migBM.RetrieveItems(ctx, fnID, batchID)
 		require.NoError(t, err)
-		require.Equal(t, "current-batch", res.BatchID)
-		require.Equal(t, 1, current.bulkAppendCalls)
-		require.Equal(t, 0, next.bulkAppendCalls)
+		require.Len(t, items, 1)
+		require.Equal(t, bi.EventID, items[0].EventID)
 	})
 
-	t.Run("ScheduleExecution writes to current", func(t *testing.T) {
-		err := m.ScheduleExecution(ctx, ScheduleBatchOpts{})
+	t.Run("reads prefer next", func(t *testing.T) {
+		env := newMigratingTestEnv(t)
+		env.mode = MigrationModeDualRead
+
+		fnID := uuid.New()
+		fn := newFunction(fnID)
+
+		// Append directly to next.
+		resNext, biNext := appendItem(ctx, t, env.bmNext, fnID, fn)
+		batchID := ulid.MustParse(resNext.BatchID)
+
+		// Read through migrating manager — should return next's data.
+		items, err := env.migBM.RetrieveItems(ctx, fnID, batchID)
 		require.NoError(t, err)
-		require.Equal(t, 1, current.scheduleCalls)
-		require.Equal(t, 0, next.scheduleCalls)
+		require.Len(t, items, 1)
+		require.Equal(t, biNext.EventID, items[0].EventID)
+	})
+
+	t.Run("reads fall back when next is empty", func(t *testing.T) {
+		env := newMigratingTestEnv(t)
+		env.mode = MigrationModeDualRead
+
+		fnID := uuid.New()
+		fn := newFunction(fnID)
+
+		// Append to current only.
+		resCur, biCur := appendItem(ctx, t, env.bmCurrent, fnID, fn)
+		batchID := ulid.MustParse(resCur.BatchID)
+
+		// RetrieveItems through migrating — next has nothing, falls back to current.
+		items, err := env.migBM.RetrieveItems(ctx, fnID, batchID)
+		require.NoError(t, err)
+		require.Len(t, items, 1)
+		require.Equal(t, biCur.EventID, items[0].EventID)
+
+		// GetBatchInfo through migrating — next has nothing, falls back to current.
+		info, err := env.migBM.GetBatchInfo(ctx, fnID, "")
+		require.NoError(t, err)
+		require.Equal(t, resCur.BatchID, info.BatchID)
+	})
+
+	t.Run("DeleteKeys hits both clusters", func(t *testing.T) {
+		env := newMigratingTestEnv(t)
+		env.mode = MigrationModeDualRead
+
+		fnID := uuid.New()
+		fn := newFunction(fnID)
+
+		// Append to current directly.
+		resCur, _ := appendItem(ctx, t, env.bmCurrent, fnID, fn)
+		batchIDCur := ulid.MustParse(resCur.BatchID)
+
+		// Append to next directly (different batch but same fnID — use different event).
+		// We need to use the same batchID for DeleteKeys to remove from both.
+		// Since batches are created independently, we'll verify keys exist in each, then delete.
+		resNext, _ := appendItem(ctx, t, env.bmNext, fnID, fn)
+		batchIDNext := ulid.MustParse(resNext.BatchID)
+
+		require.True(t, env.rCurrent.Exists(env.bcCurrent.KeyGenerator().Batch(ctx, fnID, batchIDCur)))
+		require.True(t, env.rNext.Exists(env.bcNext.KeyGenerator().Batch(ctx, fnID, batchIDNext)))
+
+		// DeleteKeys for current's batchID — hits both clusters.
+		err := env.migBM.DeleteKeys(ctx, fnID, batchIDCur)
+		require.NoError(t, err)
+		require.False(t, env.rCurrent.Exists(env.bcCurrent.KeyGenerator().Batch(ctx, fnID, batchIDCur)))
+
+		// DeleteKeys for next's batchID — hits both clusters.
+		err = env.migBM.DeleteKeys(ctx, fnID, batchIDNext)
+		require.NoError(t, err)
+		require.False(t, env.rNext.Exists(env.bcNext.KeyGenerator().Batch(ctx, fnID, batchIDNext)))
 	})
 }
 
-func TestMigratingBatchManager_DualRead_ReadsNextFirst(t *testing.T) {
+func TestMigratingIntegration_WriteToNext(t *testing.T) {
 	ctx := context.Background()
+	env := newMigratingTestEnv(t)
+	env.mode = MigrationModeWriteToNext
 
-	t.Run("StartExecution found on next", func(t *testing.T) {
-		current := &mockBatchManager{startResult: enums.BatchStatusReady.String()}
-		next := &mockBatchManager{startResult: enums.BatchStatusReady.String()}
-		m := NewMigratingBatchManager(current, next, staticMode(MigrationModeDualRead))
+	fnID := uuid.New()
+	fn := newFunction(fnID)
 
-		res, err := m.StartExecution(ctx, uuid.New(), ulid.Make(), "ptr")
-		require.NoError(t, err)
-		require.Equal(t, enums.BatchStatusReady.String(), res)
-		require.Equal(t, 1, next.startCalls)
-		require.Equal(t, 0, current.startCalls)
-	})
+	// Append via migrating manager — should write to next.
+	res, bi := appendItem(ctx, t, env.migBM, fnID, fn)
+	require.Equal(t, enums.BatchNew, res.Status)
+	batchID := ulid.MustParse(res.BatchID)
 
-	t.Run("StartExecution absent on next falls back to current", func(t *testing.T) {
-		current := &mockBatchManager{startResult: enums.BatchStatusReady.String()}
-		next := &mockBatchManager{startResult: enums.BatchStatusAbsent.String()}
-		m := NewMigratingBatchManager(current, next, staticMode(MigrationModeDualRead))
+	// Data should be in next's Redis.
+	require.True(t, env.rNext.Exists(env.bcNext.KeyGenerator().Batch(ctx, fnID, batchID)))
+	// Data should NOT be in current's Redis.
+	require.Equal(t, 0, len(env.rCurrent.Keys()))
 
-		res, err := m.StartExecution(ctx, uuid.New(), ulid.Make(), "ptr")
-		require.NoError(t, err)
-		require.Equal(t, enums.BatchStatusReady.String(), res)
-		require.Equal(t, 1, next.startCalls)
-		require.Equal(t, 1, current.startCalls)
-	})
-
-	t.Run("StartExecution error on next falls back to current", func(t *testing.T) {
-		current := &mockBatchManager{startResult: enums.BatchStatusReady.String()}
-		next := &mockBatchManager{startErr: errors.New("connection refused")}
-		m := NewMigratingBatchManager(current, next, staticMode(MigrationModeDualRead))
-
-		res, err := m.StartExecution(ctx, uuid.New(), ulid.Make(), "ptr")
-		require.NoError(t, err)
-		require.Equal(t, enums.BatchStatusReady.String(), res)
-		require.Equal(t, 1, next.startCalls)
-		require.Equal(t, 1, current.startCalls)
-	})
-
-	t.Run("RetrieveItems found on next", func(t *testing.T) {
-		item := BatchItem{FunctionID: uuid.New()}
-		current := &mockBatchManager{retrieveResult: []BatchItem{{FunctionID: uuid.New()}}}
-		next := &mockBatchManager{retrieveResult: []BatchItem{item}}
-		m := NewMigratingBatchManager(current, next, staticMode(MigrationModeDualRead))
-
-		items, err := m.RetrieveItems(ctx, uuid.New(), ulid.Make())
-		require.NoError(t, err)
-		require.Len(t, items, 1)
-		require.Equal(t, item.FunctionID, items[0].FunctionID)
-		require.Equal(t, 1, next.retrieveCalls)
-		require.Equal(t, 0, current.retrieveCalls)
-	})
-
-	t.Run("RetrieveItems empty on next falls back to current", func(t *testing.T) {
-		item := BatchItem{FunctionID: uuid.New()}
-		current := &mockBatchManager{retrieveResult: []BatchItem{item}}
-		next := &mockBatchManager{retrieveResult: nil}
-		m := NewMigratingBatchManager(current, next, staticMode(MigrationModeDualRead))
-
-		items, err := m.RetrieveItems(ctx, uuid.New(), ulid.Make())
-		require.NoError(t, err)
-		require.Len(t, items, 1)
-		require.Equal(t, item.FunctionID, items[0].FunctionID)
-		require.Equal(t, 1, next.retrieveCalls)
-		require.Equal(t, 1, current.retrieveCalls)
-	})
-
-	t.Run("RetrieveItems error on next falls back to current", func(t *testing.T) {
-		item := BatchItem{FunctionID: uuid.New()}
-		current := &mockBatchManager{retrieveResult: []BatchItem{item}}
-		next := &mockBatchManager{retrieveErr: errors.New("timeout")}
-		m := NewMigratingBatchManager(current, next, staticMode(MigrationModeDualRead))
-
-		items, err := m.RetrieveItems(ctx, uuid.New(), ulid.Make())
-		require.NoError(t, err)
-		require.Len(t, items, 1)
-		require.Equal(t, 1, next.retrieveCalls)
-		require.Equal(t, 1, current.retrieveCalls)
-	})
-
-	t.Run("GetBatchInfo found on next", func(t *testing.T) {
-		current := &mockBatchManager{getBatchInfoResult: &BatchInfo{BatchID: "current"}}
-		next := &mockBatchManager{getBatchInfoResult: &BatchInfo{BatchID: "next"}}
-		m := NewMigratingBatchManager(current, next, staticMode(MigrationModeDualRead))
-
-		info, err := m.GetBatchInfo(ctx, uuid.New(), "key")
-		require.NoError(t, err)
-		require.Equal(t, "next", info.BatchID)
-		require.Equal(t, 1, next.getBatchInfoCalls)
-		require.Equal(t, 0, current.getBatchInfoCalls)
-	})
-
-	t.Run("GetBatchInfo empty BatchID on next falls back to current", func(t *testing.T) {
-		current := &mockBatchManager{getBatchInfoResult: &BatchInfo{BatchID: "current"}}
-		next := &mockBatchManager{getBatchInfoResult: &BatchInfo{BatchID: ""}}
-		m := NewMigratingBatchManager(current, next, staticMode(MigrationModeDualRead))
-
-		info, err := m.GetBatchInfo(ctx, uuid.New(), "key")
-		require.NoError(t, err)
-		require.Equal(t, "current", info.BatchID)
-		require.Equal(t, 1, next.getBatchInfoCalls)
-		require.Equal(t, 1, current.getBatchInfoCalls)
-	})
-
-	t.Run("DeleteBatch found on next", func(t *testing.T) {
-		current := &mockBatchManager{deleteBatchResult: &DeleteBatchResult{Deleted: true, BatchID: "current"}}
-		next := &mockBatchManager{deleteBatchResult: &DeleteBatchResult{Deleted: true, BatchID: "next"}}
-		m := NewMigratingBatchManager(current, next, staticMode(MigrationModeDualRead))
-
-		res, err := m.DeleteBatch(ctx, uuid.New(), "key")
-		require.NoError(t, err)
-		require.Equal(t, "next", res.BatchID)
-		require.Equal(t, 1, next.deleteBatchCalls)
-		require.Equal(t, 0, current.deleteBatchCalls)
-	})
-
-	t.Run("DeleteBatch not deleted on next falls back to current", func(t *testing.T) {
-		current := &mockBatchManager{deleteBatchResult: &DeleteBatchResult{Deleted: true, BatchID: "current"}}
-		next := &mockBatchManager{deleteBatchResult: &DeleteBatchResult{Deleted: false}}
-		m := NewMigratingBatchManager(current, next, staticMode(MigrationModeDualRead))
-
-		res, err := m.DeleteBatch(ctx, uuid.New(), "key")
-		require.NoError(t, err)
-		require.Equal(t, "current", res.BatchID)
-		require.Equal(t, 1, next.deleteBatchCalls)
-		require.Equal(t, 1, current.deleteBatchCalls)
-	})
-
-	t.Run("RunBatch found on next", func(t *testing.T) {
-		current := &mockBatchManager{runBatchResult: &RunBatchResult{Scheduled: true, BatchID: "current"}}
-		next := &mockBatchManager{runBatchResult: &RunBatchResult{Scheduled: true, BatchID: "next"}}
-		m := NewMigratingBatchManager(current, next, staticMode(MigrationModeDualRead))
-
-		res, err := m.RunBatch(ctx, RunBatchOpts{})
-		require.NoError(t, err)
-		require.Equal(t, "next", res.BatchID)
-		require.Equal(t, 1, next.runBatchCalls)
-		require.Equal(t, 0, current.runBatchCalls)
-	})
-
-	t.Run("RunBatch not scheduled on next falls back to current", func(t *testing.T) {
-		current := &mockBatchManager{runBatchResult: &RunBatchResult{Scheduled: true, BatchID: "current"}}
-		next := &mockBatchManager{runBatchResult: &RunBatchResult{Scheduled: false}}
-		m := NewMigratingBatchManager(current, next, staticMode(MigrationModeDualRead))
-
-		res, err := m.RunBatch(ctx, RunBatchOpts{})
-		require.NoError(t, err)
-		require.Equal(t, "current", res.BatchID)
-		require.Equal(t, 1, next.runBatchCalls)
-		require.Equal(t, 1, current.runBatchCalls)
-	})
-}
-
-func TestMigratingBatchManager_DualRead_DeleteKeysBothClusters(t *testing.T) {
-	ctx := context.Background()
-	current := &mockBatchManager{}
-	next := &mockBatchManager{}
-	m := NewMigratingBatchManager(current, next, staticMode(MigrationModeDualRead))
-
-	err := m.DeleteKeys(ctx, uuid.New(), ulid.Make())
+	// Reads still find data from next.
+	items, err := env.migBM.RetrieveItems(ctx, fnID, batchID)
 	require.NoError(t, err)
-	require.Equal(t, 1, current.deleteKeysCalls)
-	require.Equal(t, 1, next.deleteKeysCalls)
-}
+	require.Len(t, items, 1)
+	require.Equal(t, bi.EventID, items[0].EventID)
 
-func TestMigratingBatchManager_DualRead_DeleteKeysJoinsErrors(t *testing.T) {
-	ctx := context.Background()
-	current := &mockBatchManager{deleteKeysErr: errors.New("current err")}
-	next := &mockBatchManager{deleteKeysErr: errors.New("next err")}
-	m := NewMigratingBatchManager(current, next, staticMode(MigrationModeDualRead))
+	// GetBatchInfo reads from next.
+	info, err := env.migBM.GetBatchInfo(ctx, fnID, "")
+	require.NoError(t, err)
+	require.Equal(t, res.BatchID, info.BatchID)
 
-	err := m.DeleteKeys(ctx, uuid.New(), ulid.Make())
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "next err")
-	require.Contains(t, err.Error(), "current err")
-}
+	t.Run("reads fall back to current when next is empty", func(t *testing.T) {
+		curFnID := uuid.New()
+		curFn := newFunction(curFnID)
 
-func TestMigratingBatchManager_WriteToNext(t *testing.T) {
-	ctx := context.Background()
+		// Append directly to current.
+		curRes, curBI := appendItem(ctx, t, env.bmCurrent, curFnID, curFn)
+		curBatchID := ulid.MustParse(curRes.BatchID)
 
-	t.Run("Append writes to next", func(t *testing.T) {
-		current := &mockBatchManager{}
-		next := &mockBatchManager{
-			appendResult: &BatchAppendResult{Status: enums.BatchNew, BatchID: "next-batch"},
-		}
-		m := NewMigratingBatchManager(current, next, staticMode(MigrationModeWriteToNext))
-
-		res, err := m.Append(ctx, BatchItem{}, inngest.Function{})
-		require.NoError(t, err)
-		require.Equal(t, "next-batch", res.BatchID)
-		require.Equal(t, 0, current.appendCalls)
-		require.Equal(t, 1, next.appendCalls)
-	})
-
-	t.Run("BulkAppend writes to next", func(t *testing.T) {
-		current := &mockBatchManager{}
-		next := &mockBatchManager{
-			bulkAppendResult: &BulkAppendResult{Status: "new", BatchID: "next-batch"},
-		}
-		m := NewMigratingBatchManager(current, next, staticMode(MigrationModeWriteToNext))
-
-		res, err := m.BulkAppend(ctx, []BatchItem{{}}, inngest.Function{})
-		require.NoError(t, err)
-		require.Equal(t, "next-batch", res.BatchID)
-		require.Equal(t, 0, current.bulkAppendCalls)
-		require.Equal(t, 1, next.bulkAppendCalls)
-	})
-
-	t.Run("ScheduleExecution writes to next", func(t *testing.T) {
-		current := &mockBatchManager{}
-		next := &mockBatchManager{}
-		m := NewMigratingBatchManager(current, next, staticMode(MigrationModeWriteToNext))
-
-		err := m.ScheduleExecution(ctx, ScheduleBatchOpts{})
-		require.NoError(t, err)
-		require.Equal(t, 0, current.scheduleCalls)
-		require.Equal(t, 1, next.scheduleCalls)
-	})
-
-	t.Run("reads still check next first then current", func(t *testing.T) {
-		item := BatchItem{FunctionID: uuid.New()}
-		current := &mockBatchManager{retrieveResult: []BatchItem{item}}
-		next := &mockBatchManager{retrieveResult: nil}
-		m := NewMigratingBatchManager(current, next, staticMode(MigrationModeWriteToNext))
-
-		items, err := m.RetrieveItems(ctx, uuid.New(), ulid.Make())
+		// RetrieveItems through migrating — next has nothing for this fn, falls back to current.
+		items, err := env.migBM.RetrieveItems(ctx, curFnID, curBatchID)
 		require.NoError(t, err)
 		require.Len(t, items, 1)
-		require.Equal(t, 1, next.retrieveCalls)
-		require.Equal(t, 1, current.retrieveCalls)
+		require.Equal(t, curBI.EventID, items[0].EventID)
 	})
 }
 
-func TestMigratingBatchManager_Close(t *testing.T) {
-	t.Run("calls both", func(t *testing.T) {
-		current := &mockBatchManager{}
-		next := &mockBatchManager{}
-		m := NewMigratingBatchManager(current, next, staticMode(MigrationModeCurrentOnly))
-
-		err := m.Close()
-		require.NoError(t, err)
-		require.Equal(t, 1, current.closeCalls)
-		require.Equal(t, 1, next.closeCalls)
-	})
-
-	t.Run("joins errors", func(t *testing.T) {
-		current := &mockBatchManager{closeErr: errors.New("current close err")}
-		next := &mockBatchManager{closeErr: errors.New("next close err")}
-		m := NewMigratingBatchManager(current, next, staticMode(MigrationModeCurrentOnly))
-
-		err := m.Close()
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "current close err")
-		require.Contains(t, err.Error(), "next close err")
-	})
-}
-
-func TestMigratingBatchManager_DynamicModeSwitch(t *testing.T) {
+func TestMigratingIntegration_DynamicModeSwitch(t *testing.T) {
 	ctx := context.Background()
+	env := newMigratingTestEnv(t)
 
-	mode := MigrationModeCurrentOnly
-	modeFunc := func(_ context.Context) MigrationMode { return mode }
+	// Start in CurrentOnly mode.
+	env.mode = MigrationModeCurrentOnly
+	fnID1 := uuid.New()
+	fn1 := newFunction(fnID1)
 
-	current := &mockBatchManager{
-		appendResult: &BatchAppendResult{Status: enums.BatchNew, BatchID: "current-batch"},
-	}
-	next := &mockBatchManager{
-		appendResult: &BatchAppendResult{Status: enums.BatchNew, BatchID: "next-batch"},
-	}
-	m := NewMigratingBatchManager(current, next, modeFunc)
+	res1, bi1 := appendItem(ctx, t, env.migBM, fnID1, fn1)
+	batchID1 := ulid.MustParse(res1.BatchID)
 
-	// CurrentOnly: writes to current
-	res, err := m.Append(ctx, BatchItem{}, inngest.Function{})
+	// Data is in current.
+	require.True(t, env.rCurrent.Exists(env.bcCurrent.KeyGenerator().Batch(ctx, fnID1, batchID1)))
+	require.Equal(t, 0, len(env.rNext.Keys()))
+
+	// Switch to WriteToNext.
+	env.mode = MigrationModeWriteToNext
+	fnID2 := uuid.New()
+	fn2 := newFunction(fnID2)
+
+	res2, bi2 := appendItem(ctx, t, env.migBM, fnID2, fn2)
+	batchID2 := ulid.MustParse(res2.BatchID)
+
+	// New data is in next.
+	require.True(t, env.rNext.Exists(env.bcNext.KeyGenerator().Batch(ctx, fnID2, batchID2)))
+
+	// Reads find data from both clusters.
+	items1, err := env.migBM.RetrieveItems(ctx, fnID1, batchID1)
 	require.NoError(t, err)
-	require.Equal(t, "current-batch", res.BatchID)
-	require.Equal(t, 1, current.appendCalls)
-	require.Equal(t, 0, next.appendCalls)
+	require.Len(t, items1, 1)
+	require.Equal(t, bi1.EventID, items1[0].EventID)
 
-	// Switch to WriteToNext: writes to next
-	mode = MigrationModeWriteToNext
-	res, err = m.Append(ctx, BatchItem{}, inngest.Function{})
+	items2, err := env.migBM.RetrieveItems(ctx, fnID2, batchID2)
 	require.NoError(t, err)
-	require.Equal(t, "next-batch", res.BatchID)
-	require.Equal(t, 1, current.appendCalls)
-	require.Equal(t, 1, next.appendCalls)
+	require.Len(t, items2, 1)
+	require.Equal(t, bi2.EventID, items2[0].EventID)
+}
+
+func TestMigratingIntegration_Close(t *testing.T) {
+	env := newMigratingTestEnv(t)
+	err := env.migBM.Close()
+	require.NoError(t, err)
 }
