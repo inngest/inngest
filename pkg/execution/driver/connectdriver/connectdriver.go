@@ -141,10 +141,11 @@ func ProxyRequest(ctx, traceCtx context.Context, forwarder grpc.RequestForwarder
 	)
 
 	opts := grpc.ProxyOpts{
-		AccountID: id.Tenant.AccountID,
-		EnvID:     id.Tenant.EnvID,
-		AppID:     id.Tenant.AppID,
-		Data:      &requestToForward,
+		AccountID:  id.Tenant.AccountID,
+		EnvID:      id.Tenant.EnvID,
+		AppID:      id.Tenant.AppID,
+		FunctionID: id.FunctionID,
+		Data:       &requestToForward,
 	}
 
 	if spanID, err := item.SpanID(); err != nil {
