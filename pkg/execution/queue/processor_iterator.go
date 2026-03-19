@@ -133,6 +133,11 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 	ctx, span := p.Queue.Options().ConditionalTracer.NewSpan(ctx, "queue.Process", p.Partition.AccountID, partitionIdentifier.EnvID, partitionIdentifier.FunctionID)
 	defer span.End()
 	span.SetAttributes(attribute.String("partition_id", p.Partition.ID))
+	span.SetAttributes(attribute.String("run_id", item.Data.Identifier.RunID.String()))
+	span.SetAttributes(attribute.String("item_id", item.ID))
+	if item.Data.JobID != nil {
+		span.SetAttributes(attribute.String("job_id", *item.Data.JobID))
+	}
 
 	// TODO: Create an in-memory mapping of rate limit keys that have been hit,
 	//       and don't bother to process if the queue item has a limited key.  This
