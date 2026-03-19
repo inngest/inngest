@@ -389,7 +389,7 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 
 		metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{
 			PkgName: pkgName,
-			Tags:    map[string]any{"status": status, "queue_shard": p.Queue.Shard().Name(), "constraint_source": constraintCheckSource},
+			Tags:    map[string]any{"status": status, "queue_shard": p.Queue.Shard().Name(), "constraint_source": "constraintapi"},
 		})
 
 		if p.Queue.Options().ItemEnableKeyQueues(ctx, *item) {
@@ -433,7 +433,7 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 
 		metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{
 			PkgName: pkgName,
-			Tags:    map[string]any{"status": "custom_key_concurrency_limit", "queue_shard": p.Queue.Shard().Name(), "constraint_source": constraintCheckSource},
+			Tags:    map[string]any{"status": "custom_key_concurrency_limit", "queue_shard": p.Queue.Shard().Name(), "constraint_source": "constraintapi"},
 		})
 
 		if p.Queue.Options().ItemEnableKeyQueues(ctx, *item) {
@@ -460,7 +460,7 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 		p.CtrSuccess.Add(1) // count as a success for stats purposes.
 		metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{
 			PkgName: pkgName,
-			Tags:    map[string]any{"status": "success", "queue_shard": p.Queue.Shard().Name(), "constraint_source": constraintCheckSource},
+			Tags:    map[string]any{"status": "success", "queue_shard": p.Queue.Shard().Name(), "constraint_source": "constraintapi"},
 		})
 		return nil
 	case ErrQueueItemAlreadyLeased:
@@ -468,7 +468,7 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 		p.CtrSuccess.Add(1) // count as a success for stats purposes.
 		metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{
 			PkgName: pkgName,
-			Tags:    map[string]any{"status": "success", "queue_shard": p.Queue.Shard().Name(), "constraint_source": constraintCheckSource},
+			Tags:    map[string]any{"status": "success", "queue_shard": p.Queue.Shard().Name(), "constraint_source": "constraintapi"},
 		})
 		return nil
 	}
@@ -478,7 +478,7 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 		p.Err = fmt.Errorf("error leasing in process: %w", err)
 		metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{
 			PkgName: pkgName,
-			Tags:    map[string]any{"status": "error", "queue_shard": p.Queue.Shard().Name(), "constraint_source": constraintCheckSource},
+			Tags:    map[string]any{"status": "error", "queue_shard": p.Queue.Shard().Name(), "constraint_source": "constraintapi"},
 		})
 		return p.Err
 	}
@@ -492,7 +492,7 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 	p.CtrSuccess.Add(1)
 	metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{
 		PkgName: pkgName,
-		Tags:    map[string]any{"status": "success", "queue_shard": p.Queue.Shard().Name(), "constraint_source": constraintCheckSource},
+		Tags:    map[string]any{"status": "success", "queue_shard": p.Queue.Shard().Name(), "constraint_source": "constraintapi"},
 	})
 	p.Queue.Workers() <- ProcessItem{
 		P:    *p.Partition,
