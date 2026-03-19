@@ -697,6 +697,8 @@ func TestStateDuplicate(t *testing.T) {
 	destRunID := ulid.MustNew(ulid.Now(), rand.Reader)
 	eventID := ulid.MustNew(ulid.Now(), rand.Reader)
 	replayID := uuid.New()
+	batchID := ulid.MustNew(ulid.Now(), rand.Reader)
+	originalRunID := ulid.MustNew(ulid.Now(), rand.Reader)
 
 	// Step 1: Create complex state in Valkey
 	events := []json.RawMessage{
@@ -723,6 +725,8 @@ func TestStateDuplicate(t *testing.T) {
 				EventIDs:        []ulid.ULID{eventID},
 				PriorityFactor:  int64Ptr(80),
 				ReplayID:        &replayID,
+				BatchID:         &batchID,
+				OriginalRunID:   &originalRunID,
 				Context:         map[string]any{"env": "test", "region": "us-east-1", "count": 42},
 				CustomConcurrencyKeys: []statev2.CustomConcurrency{
 					{Key: "user:alice", Hash: "hash1", Limit: 5},
@@ -861,6 +865,27 @@ func TestStateDuplicate(t *testing.T) {
 	}
 
 	assert.Equal(t, len(sourceState.Metadata.Config.CustomConcurrencyKeys), len(destState.Metadata.Config.CustomConcurrencyKeys), "CustomConcurrencyKeys count")
+	for i := range sourceState.Metadata.Config.CustomConcurrencyKeys {
+		assert.Equal(t, sourceState.Metadata.Config.CustomConcurrencyKeys[i].Key, destState.Metadata.Config.CustomConcurrencyKeys[i].Key, "CustomConcurrencyKeys[%d].Key", i)
+		assert.Equal(t, sourceState.Metadata.Config.CustomConcurrencyKeys[i].Hash, destState.Metadata.Config.CustomConcurrencyKeys[i].Hash, "CustomConcurrencyKeys[%d].Hash", i)
+		assert.Equal(t, sourceState.Metadata.Config.CustomConcurrencyKeys[i].Limit, destState.Metadata.Config.CustomConcurrencyKeys[i].Limit, "CustomConcurrencyKeys[%d].Limit", i)
+	}
+
+	// BatchID
+	if sourceState.Metadata.Config.BatchID != nil {
+		require.NotNil(t, destState.Metadata.Config.BatchID, "BatchID should not be nil")
+		assert.Equal(t, *sourceState.Metadata.Config.BatchID, *destState.Metadata.Config.BatchID, "BatchID")
+	} else {
+		assert.Nil(t, destState.Metadata.Config.BatchID, "BatchID should be nil")
+	}
+
+	// OriginalRunID
+	if sourceState.Metadata.Config.OriginalRunID != nil {
+		require.NotNil(t, destState.Metadata.Config.OriginalRunID, "OriginalRunID should not be nil")
+		assert.Equal(t, *sourceState.Metadata.Config.OriginalRunID, *destState.Metadata.Config.OriginalRunID, "OriginalRunID")
+	} else {
+		assert.Nil(t, destState.Metadata.Config.OriginalRunID, "OriginalRunID should be nil")
+	}
 
 	// StartedAt (with tolerance for time precision)
 	if !sourceState.Metadata.Config.StartedAt.IsZero() {
