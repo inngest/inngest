@@ -5,6 +5,7 @@
 
 import { max, min } from 'date-fns';
 
+import { KindInngestExperiment } from '../../generated';
 import type {
   BarStyleKey,
   HTTPTimingBreakdownData,
@@ -13,6 +14,7 @@ import type {
 } from '../TimelineBar.types';
 import { traceWalk } from '../runDetailsUtils';
 import {
+  isExperimentMetadata,
   isStepInfoRun,
   type SpanMetadata,
   type SpanMetadataInngestHTTPTiming,
@@ -131,6 +133,20 @@ function traceToBarData(trace: Trace, orgName?: string, rootStatus?: string): Ti
     ? Math.max(0, new Date(trace.startedAt).getTime() - new Date(trace.queuedAt).getTime())
     : undefined;
 
+  // Check if this step has experiment metadata
+  const hasExperiment = trace.metadata?.some((m) => m.kind === KindInngestExperiment) ?? false;
+
+  // Extract experiment metadata for hover card display
+  const experimentMd = trace.metadata?.find(isExperimentMetadata);
+  const experimentMetadata = experimentMd
+    ? {
+        experimentName: experimentMd.values.experiment_name,
+        variantSelected: experimentMd.values.variant_selected,
+        availableVariants: experimentMd.values.available_variants,
+        variantWeights: experimentMd.values.variant_weights,
+      }
+    : undefined;
+
   return {
     id: trace.spanID,
     name: getSpanName(trace.name),
@@ -143,6 +159,8 @@ function traceToBarData(trace: Trace, orgName?: string, rootStatus?: string): Ti
     isRoot: trace.isRoot,
     status,
     delayMs,
+    hasExperiment,
+    experimentMetadata,
   };
 }
 

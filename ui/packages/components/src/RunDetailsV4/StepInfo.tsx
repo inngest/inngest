@@ -30,6 +30,7 @@ import { Tabs } from './Tabs';
 import { UserlandAttrs } from './UserlandAttrs';
 import { formatDuration, maybeBooleanToString, type StepInfoType } from './runDetailsUtils';
 import {
+  isExperimentMetadata,
   isStepInfoInvoke,
   isStepInfoSignal,
   isStepInfoSleep,
@@ -187,7 +188,7 @@ export const StepInfo = ({
   });
 
   const { booleanFlag } = useBooleanFlag();
-  const { value: metadataIsEnabled } = booleanFlag('enable-step-metadata', false);
+  const { value: metadataIsEnabled } = booleanFlag('enable-step-metadata', true);
 
   useEffect(() => {
     result && setPollInterval(undefined);
@@ -241,8 +242,16 @@ export const StepInfo = ({
     : [];
 
   const nonHeaderMetadata = metadataIsEnabled
-    ? trace.metadata?.filter((md) => md.kind !== 'inngest.response_headers')
+    ? trace.metadata?.filter(
+        (md) => md.kind !== 'inngest.response_headers' && !isExperimentMetadata(md)
+      )
     : undefined;
+
+  const experimentMetadataList = metadataIsEnabled
+    ? trace.metadata?.filter(isExperimentMetadata)
+    : undefined;
+
+  const experimentMetadata = experimentMetadataList?.[0];
 
   const hasNoData = !prettyInput && !prettyOutput && !result?.error;
 
@@ -341,6 +350,17 @@ export const StepInfo = ({
 
           {stepKindInfo}
 
+          {experimentMetadata && (
+            <>
+              <ElementWrapper label="Experiment name">
+                <TextElement>{experimentMetadata.values.experiment_name}</TextElement>
+              </ElementWrapper>
+              <ElementWrapper label="Variant">
+                <TextElement>{experimentMetadata.values.variant_selected}</TextElement>
+              </ElementWrapper>
+            </>
+          )}
+
           {debug && trace.debugRunID && (
             <ElementWrapper label="Debug Run ID">
               <IDElement>{trace.debugRunID}</IDElement>
@@ -367,6 +387,15 @@ export const StepInfo = ({
                       label: 'Headers',
                       id: 'headers',
                       node: <MetadataAttrs metadata={responseHeaderData} />,
+                    },
+                  ]
+                : []),
+              ...(experimentMetadataList?.length
+                ? [
+                    {
+                      label: 'Experiment',
+                      id: 'experiment',
+                      node: <MetadataAttrs metadata={experimentMetadataList} />,
                     },
                   ]
                 : []),
@@ -434,6 +463,15 @@ export const StepInfo = ({
                           label: 'Headers',
                           id: 'headers',
                           node: <MetadataAttrs metadata={responseHeaderData} />,
+                        },
+                      ]
+                    : []),
+                  ...(experimentMetadataList?.length
+                    ? [
+                        {
+                          label: 'Experiment',
+                          id: 'experiment',
+                          node: <MetadataAttrs metadata={experimentMetadataList} />,
                         },
                       ]
                     : []),
