@@ -40,7 +40,7 @@ type ExperimentMetadata struct {
 	Variant			string		`json:"variant"`
 	SelectionStrategy	string		`json:"selection_strategy"`
 	AvailableVariants	[]string	`json:"available_variants,omitempty"`
-	VariantWeights		map[string]int	`json:"variant_weights,omitempty"`
+	VariantWeights		map[string]float64	`json:"variant_weights,omitempty"`
 }
 
 // From http.go

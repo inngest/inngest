@@ -21,7 +21,7 @@ type ExperimentMetadata struct {
 	Variant           string         `json:"variant"`
 	SelectionStrategy string         `json:"selection_strategy"`
 	AvailableVariants []string       `json:"available_variants,omitempty"`
-	VariantWeights    map[string]int `json:"variant_weights,omitempty"`
+	VariantWeights    map[string]float64 `json:"variant_weights,omitempty"`
 }
 
 func (ms ExperimentMetadata) Kind() metadata.Kind {
@@ -96,7 +96,7 @@ func (e *ExperimentMetadataExtractor) extractExperimentMetadata(ctx context.Cont
 		case "inngest.experiment.variant_weights":
 			// Variant weights are stored as a JSON-encoded string attribute
 			if s := attr.Value.GetStringValue(); s != "" {
-				var weights map[string]int
+				var weights map[string]float64
 				if err := json.Unmarshal([]byte(s), &weights); err != nil {
 					logger.From(ctx).Warn("failed to parse experiment variant_weights", "error", err, "value", s)
 				} else {

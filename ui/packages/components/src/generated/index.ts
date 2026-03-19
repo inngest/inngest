@@ -54,7 +54,7 @@ export interface ExperimentMetadata {
   variant: string;
   selection_strategy: string;
   available_variants?: string[];
-  variant_weights?: { [key: string]: number /* int */ };
+  variant_weights?: { [key: string]: number /* float64 */ };
 }
 /**
  * From http.go
