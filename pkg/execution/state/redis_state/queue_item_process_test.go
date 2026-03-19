@@ -375,6 +375,122 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 		// Expect exactly 1 release call
 		require.Equal(t, 1, len(cmLifecycles.ReleaseCalls))
 	})
+
+	t.Run("with constraint api and valid lease and early release", func(t *testing.T) {
+		reset()
+
+		q, shard := newQueue(
+			t, rc,
+			osqueue.WithClock(clock),
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
+				return true
+			}),
+			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
+				return true
+			}),
+			osqueue.WithAcquireCapacityLeaseOnBacklogRefill(true),
+			osqueue.WithCapacityManager(cm),
+			// make lease extensions more frequent
+			osqueue.WithCapacityLeaseExtendInterval(time.Second),
+			osqueue.WithLogger(l),
+		)
+
+		qi, err := shard.EnqueueItem(ctx, item, start, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+
+		p := osqueue.ItemPartition(ctx, qi)
+
+		// Acquire a lease
+		resp, err := cm.Acquire(ctx, &constraintapi.CapacityAcquireRequest{
+			AccountID:            accountID,
+			EnvID:                envID,
+			IdempotencyKey:       qi.ID,
+			FunctionID:           fnID,
+			LeaseIdempotencyKeys: []string{qi.ID},
+			Amount:               1,
+			Configuration: constraintapi.ConstraintConfig{
+				FunctionVersion: 1,
+				Concurrency: constraintapi.ConcurrencyConfig{
+					AccountConcurrency:  5,
+					FunctionConcurrency: 2,
+				},
+			},
+			Constraints: []constraintapi.ConstraintItem{
+				{
+					Kind: constraintapi.ConstraintKindConcurrency,
+					Concurrency: &constraintapi.ConcurrencyConstraint{
+						Scope: enums.ConcurrencyScopeAccount,
+					},
+				},
+				{
+					Kind: constraintapi.ConstraintKindConcurrency,
+					Concurrency: &constraintapi.ConcurrencyConstraint{
+						Scope: enums.ConcurrencyScopeFn,
+					},
+				},
+			},
+			CurrentTime:     clock.Now(),
+			Duration:        10 * time.Second,
+			MaximumLifetime: time.Minute,
+			Source: constraintapi.LeaseSource{
+				Service:           constraintapi.ServiceExecutor,
+				Location:          constraintapi.CallerLocationItemLease,
+				RunProcessingMode: constraintapi.RunProcessingModeBackground,
+			},
+		})
+		require.NoError(t, err)
+		require.Len(t, resp.Leases, 1)
+
+		require.Len(t, cmLifecycles.AcquireCalls, 1)
+
+		var counter int64
+
+		err = q.ProcessItem(ctx, osqueue.ProcessItem{
+			I:                        qi,
+			P:                        p,
+			DisableConstraintUpdates: true,
+			CapacityLease: &osqueue.CapacityLease{
+				LeaseID:    resp.Leases[0].LeaseID,
+				IssuedAtMS: clock.Now().UnixMilli(),
+			},
+		}, func(ctx context.Context, ri osqueue.RunInfo, i osqueue.Item) (osqueue.RunResult, error) {
+			go func() {
+				for {
+					select {
+					case <-ctx.Done():
+						return
+					case <-time.After(time.Second):
+						// Ensure we tick the extend at least once
+						clock.Advance(time.Second)
+					}
+				}
+			}()
+
+			<-time.After(3 * time.Second)
+
+			// Release the capacity early
+			require.NotNil(t, ri.CapacityLease)
+
+			err := ri.CapacityLease.Release()
+			require.NoError(t, err)
+
+			// And do some more processing before returning
+			<-time.After(3 * time.Second)
+			atomic.AddInt64(&counter, 1)
+			return osqueue.RunResult{}, nil
+		})
+		require.NoError(t, err)
+
+		require.Equal(t, 1, int(counter))
+
+		service.Wait()
+
+		// Expect at least 1 extend call
+		require.Greater(t, len(cmLifecycles.ExtendCalls), 0)
+
+		// Expect exactly 1 release call
+		require.Equal(t, len(cmLifecycles.ReleaseCalls), 2)
+	})
 }
 
 func TestQueueProcessorPreLeaseWithConstraintAPI(t *testing.T) {
