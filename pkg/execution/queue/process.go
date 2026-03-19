@@ -127,6 +127,49 @@ func (q *queueProcessor) ProcessItem(
 	// We will not expect a lease when
 	// - the item is enqueued to a system queue
 	// - the Constraint API is disabled or the current account is not enrolled
+	extendCapacityLeaseCtx, cancelExtendCapacityLease := context.WithCancel(jobCtx)
+	defer cancelExtendCapacityLease()
+
+	releaseCapacityLease := func() {
+		cancelExtendCapacityLease()
+
+		currentLeaseID := capacityLeaseID.get()
+		if currentLeaseID == nil {
+			return
+		}
+
+		leaseIssuedAt := capacityLeaseID.issuedAt()
+
+		res, err := q.CapacityManager.Release(context.Background(), &constraintapi.CapacityReleaseRequest{
+			AccountID:      p.AccountID,
+			IdempotencyKey: qi.ID,
+			LeaseID:        *currentLeaseID,
+			Source: constraintapi.LeaseSource{
+				Location:          constraintapi.CallerLocationItemLease,
+				Service:           constraintapi.ServiceExecutor,
+				RunProcessingMode: constraintapi.RunProcessingModeBackground,
+			},
+			LeaseIssuedAt: leaseIssuedAt,
+		})
+		if err != nil {
+			l.ReportError(err, "failed to release capacity", logger.WithErrorReportTags(map[string]string{
+				"account_id":      p.AccountID.String(),
+				"lease_id":        currentLeaseID.String(),
+				"function_id":     p.FunctionID.String(),
+				"lease_issued_at": leaseIssuedAt.String(),
+			}))
+			return
+		}
+
+		if instrumentCapacityLease {
+			l.Debug(
+				"released capacity lease",
+				"res", res,
+				"lease_id", currentLeaseID.String(),
+			)
+		}
+	}
+
 	if capacityLeaseID.has() {
 		extendCapacityLeaseTick = q.Clock().NewTicker(q.CapacityLeaseExtendInterval)
 		defer extendCapacityLeaseTick.Stop()
@@ -135,7 +178,7 @@ func (q *queueProcessor) ProcessItem(
 			lastCapacityLeaseExtension := time.Now()
 			for {
 				select {
-				case <-jobCtx.Done():
+				case <-extendCapacityLeaseCtx.Done():
 					return
 				case <-extendCapacityLeaseTick.Chan():
 					if ctx.Err() != nil {
@@ -212,43 +255,7 @@ func (q *queueProcessor) ProcessItem(
 		// When capacity is leased, release it after the job function has completed.
 		// This is optional and best-effort to free up concurrency capacity as quickly as possible
 		// for the next worker to lease a queue item.
-		defer service.Go(func() {
-			currentLeaseID := capacityLeaseID.get()
-			if currentLeaseID == nil {
-				return
-			}
-
-			leaseIssuedAt := capacityLeaseID.issuedAt()
-
-			res, err := q.CapacityManager.Release(context.Background(), &constraintapi.CapacityReleaseRequest{
-				AccountID:      p.AccountID,
-				IdempotencyKey: qi.ID,
-				LeaseID:        *currentLeaseID,
-				Source: constraintapi.LeaseSource{
-					Location:          constraintapi.CallerLocationItemLease,
-					Service:           constraintapi.ServiceExecutor,
-					RunProcessingMode: constraintapi.RunProcessingModeBackground,
-				},
-				LeaseIssuedAt: leaseIssuedAt,
-			})
-			if err != nil {
-				l.ReportError(err, "failed to release capacity", logger.WithErrorReportTags(map[string]string{
-					"account_id":      p.AccountID.String(),
-					"lease_id":        currentLeaseID.String(),
-					"function_id":     p.FunctionID.String(),
-					"lease_issued_at": leaseIssuedAt.String(),
-				}))
-				return
-			}
-
-			if instrumentCapacityLease {
-				l.Debug(
-					"released capacity lease",
-					"res", res,
-					"lease_id", currentLeaseID.String(),
-				)
-			}
-		})
+		defer service.Go(releaseCapacityLease)
 	}
 
 	startedAt := q.Clock().Now()
@@ -326,6 +333,23 @@ func (q *queueProcessor) ProcessItem(
 			PkgName: pkgName,
 			Tags:    map[string]any{"status": "started", "queue_shard": q.primaryQueueShard.Name()},
 		})
+
+		// If a capacity lease was acquired for this item,
+		// we want to allow the called function to invoke Release
+		// early.
+		// In this case, we need to stop extending the lease,
+		// and call Release() in a non-blocking way.
+		if i.CapacityLease != nil {
+			i.CapacityLease.release = func() error {
+				// Stop extending capacity lease
+				cancelExtendCapacityLease()
+
+				// Release capacity lease, if acquired
+				service.Go(releaseCapacityLease)
+
+				return nil
+			}
+		}
 
 		runInfo := RunInfo{
 			Latency:             latency,
