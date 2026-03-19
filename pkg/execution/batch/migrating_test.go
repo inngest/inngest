@@ -193,8 +193,41 @@ func TestMigratingIntegration_CurrentOnly(t *testing.T) {
 		require.Equal(t, enums.BatchStatusReady.String(), status)
 	})
 
+	t.Run("BulkAppend", func(t *testing.T) {
+		baFnID := uuid.New()
+		baFn := newFunction(baFnID)
+		items := []BatchItem{
+			{
+				AccountID:  uuid.New(),
+				FunctionID: baFnID,
+				EventID:    ulid.MustNew(ulid.Now(), rand.Reader),
+				Event:      event.Event{Name: "test/event", Data: map[string]any{"i": 0}},
+			},
+			{
+				AccountID:  uuid.New(),
+				FunctionID: baFnID,
+				EventID:    ulid.MustNew(ulid.Now(), rand.Reader),
+				Event:      event.Event{Name: "test/event", Data: map[string]any{"i": 1}},
+			},
+		}
+		bulkRes, err := env.migBM.BulkAppend(ctx, items, baFn)
+		require.NoError(t, err)
+		require.NotEmpty(t, bulkRes.BatchID)
+		require.Equal(t, 2, bulkRes.Committed)
+
+		// Data should be in current only.
+		baBatchID := ulid.MustParse(bulkRes.BatchID)
+		require.True(t, env.rCurrent.Exists(env.bcCurrent.KeyGenerator().Batch(ctx, baFnID, baBatchID)))
+		require.Equal(t, 0, len(env.rNext.Keys()))
+	})
+
+	t.Run("ScheduleExecution", func(t *testing.T) {
+		// With nil queue manager, ScheduleExecution is a no-op (returns nil).
+		err := env.migBM.ScheduleExecution(ctx, ScheduleBatchOpts{})
+		require.NoError(t, err)
+	})
+
 	t.Run("RunBatch", func(t *testing.T) {
-		// Append enough items for a new batch to be schedulable.
 		newFnID := uuid.New()
 		newFn := newFunction(newFnID)
 		appendItem(ctx, t, env.migBM, newFnID, newFn)
@@ -203,7 +236,6 @@ func TestMigratingIntegration_CurrentOnly(t *testing.T) {
 			FunctionID: newFnID,
 		})
 		require.NoError(t, err)
-		// With nil queue manager, ScheduleExecution is a no-op, so RunBatch returns Scheduled: true.
 		require.True(t, result.Scheduled)
 	})
 
@@ -315,6 +347,121 @@ func TestMigratingIntegration_DualRead(t *testing.T) {
 		require.Equal(t, resCur.BatchID, info.BatchID)
 	})
 
+	t.Run("BulkAppend writes to current", func(t *testing.T) {
+		env := newMigratingTestEnv(t)
+		env.mode = MigrationModeDualRead
+
+		fnID := uuid.New()
+		fn := newFunction(fnID)
+		items := []BatchItem{
+			{
+				AccountID:  uuid.New(),
+				FunctionID: fnID,
+				EventID:    ulid.MustNew(ulid.Now(), rand.Reader),
+				Event:      event.Event{Name: "test/event", Data: map[string]any{"i": 0}},
+			},
+		}
+		bulkRes, err := env.migBM.BulkAppend(ctx, items, fn)
+		require.NoError(t, err)
+		require.NotEmpty(t, bulkRes.BatchID)
+
+		batchID := ulid.MustParse(bulkRes.BatchID)
+		require.True(t, env.rCurrent.Exists(env.bcCurrent.KeyGenerator().Batch(ctx, fnID, batchID)))
+		require.Equal(t, 0, len(env.rNext.Keys()))
+	})
+
+	t.Run("ScheduleExecution writes to current", func(t *testing.T) {
+		env := newMigratingTestEnv(t)
+		env.mode = MigrationModeDualRead
+
+		err := env.migBM.ScheduleExecution(ctx, ScheduleBatchOpts{})
+		require.NoError(t, err)
+	})
+
+	t.Run("StartExecution prefers next then falls back", func(t *testing.T) {
+		// Data on next — returns from next.
+		env := newMigratingTestEnv(t)
+		env.mode = MigrationModeDualRead
+
+		fnID := uuid.New()
+		fn := newFunction(fnID)
+
+		resNext, _ := appendItem(ctx, t, env.bmNext, fnID, fn)
+		batchID := ulid.MustParse(resNext.BatchID)
+
+		status, err := env.migBM.StartExecution(ctx, fnID, batchID, resNext.BatchPointerKey)
+		require.NoError(t, err)
+		require.Equal(t, enums.BatchStatusReady.String(), status)
+
+		// Data only on current — falls back.
+		env2 := newMigratingTestEnv(t)
+		env2.mode = MigrationModeDualRead
+
+		fnID2 := uuid.New()
+		fn2 := newFunction(fnID2)
+
+		resCur, _ := appendItem(ctx, t, env2.bmCurrent, fnID2, fn2)
+		batchID2 := ulid.MustParse(resCur.BatchID)
+
+		status2, err := env2.migBM.StartExecution(ctx, fnID2, batchID2, resCur.BatchPointerKey)
+		require.NoError(t, err)
+		require.Equal(t, enums.BatchStatusReady.String(), status2)
+	})
+
+	t.Run("DeleteBatch prefers next then falls back", func(t *testing.T) {
+		// Data on next — deletes from next.
+		env := newMigratingTestEnv(t)
+		env.mode = MigrationModeDualRead
+
+		fnID := uuid.New()
+		fn := newFunction(fnID)
+		appendItem(ctx, t, env.bmNext, fnID, fn)
+
+		result, err := env.migBM.DeleteBatch(ctx, fnID, "")
+		require.NoError(t, err)
+		require.True(t, result.Deleted)
+		require.Equal(t, 1, result.ItemCount)
+
+		// Data only on current — falls back.
+		env2 := newMigratingTestEnv(t)
+		env2.mode = MigrationModeDualRead
+
+		fnID2 := uuid.New()
+		fn2 := newFunction(fnID2)
+		appendItem(ctx, t, env2.bmCurrent, fnID2, fn2)
+
+		result2, err := env2.migBM.DeleteBatch(ctx, fnID2, "")
+		require.NoError(t, err)
+		require.True(t, result2.Deleted)
+		require.Equal(t, 1, result2.ItemCount)
+	})
+
+	t.Run("RunBatch prefers next then falls back", func(t *testing.T) {
+		// Data on next — runs from next.
+		env := newMigratingTestEnv(t)
+		env.mode = MigrationModeDualRead
+
+		fnID := uuid.New()
+		fn := newFunction(fnID)
+		appendItem(ctx, t, env.bmNext, fnID, fn)
+
+		result, err := env.migBM.RunBatch(ctx, RunBatchOpts{FunctionID: fnID})
+		require.NoError(t, err)
+		require.True(t, result.Scheduled)
+
+		// Data only on current — falls back.
+		env2 := newMigratingTestEnv(t)
+		env2.mode = MigrationModeDualRead
+
+		fnID2 := uuid.New()
+		fn2 := newFunction(fnID2)
+		appendItem(ctx, t, env2.bmCurrent, fnID2, fn2)
+
+		result2, err := env2.migBM.RunBatch(ctx, RunBatchOpts{FunctionID: fnID2})
+		require.NoError(t, err)
+		require.True(t, result2.Scheduled)
+	})
+
 	t.Run("DeleteKeys hits both clusters", func(t *testing.T) {
 		env := newMigratingTestEnv(t)
 		env.mode = MigrationModeDualRead
@@ -375,6 +522,74 @@ func TestMigratingIntegration_WriteToNext(t *testing.T) {
 	info, err := env.migBM.GetBatchInfo(ctx, fnID, "")
 	require.NoError(t, err)
 	require.Equal(t, res.BatchID, info.BatchID)
+
+	t.Run("BulkAppend writes to next", func(t *testing.T) {
+		baFnID := uuid.New()
+		baFn := newFunction(baFnID)
+		baItems := []BatchItem{
+			{
+				AccountID:  uuid.New(),
+				FunctionID: baFnID,
+				EventID:    ulid.MustNew(ulid.Now(), rand.Reader),
+				Event:      event.Event{Name: "test/event", Data: map[string]any{"i": 0}},
+			},
+		}
+		bulkRes, err := env.migBM.BulkAppend(ctx, baItems, baFn)
+		require.NoError(t, err)
+		require.NotEmpty(t, bulkRes.BatchID)
+
+		baBatchID := ulid.MustParse(bulkRes.BatchID)
+		require.True(t, env.rNext.Exists(env.bcNext.KeyGenerator().Batch(ctx, baFnID, baBatchID)))
+	})
+
+	t.Run("ScheduleExecution writes to next", func(t *testing.T) {
+		err := env.migBM.ScheduleExecution(ctx, ScheduleBatchOpts{})
+		require.NoError(t, err)
+	})
+
+	t.Run("StartExecution prefers next", func(t *testing.T) {
+		seFnID := uuid.New()
+		seFn := newFunction(seFnID)
+		seRes, _ := appendItem(ctx, t, env.bmNext, seFnID, seFn)
+		seBatchID := ulid.MustParse(seRes.BatchID)
+
+		status, err := env.migBM.StartExecution(ctx, seFnID, seBatchID, seRes.BatchPointerKey)
+		require.NoError(t, err)
+		require.Equal(t, enums.BatchStatusReady.String(), status)
+	})
+
+	t.Run("DeleteBatch from next", func(t *testing.T) {
+		dbFnID := uuid.New()
+		dbFn := newFunction(dbFnID)
+		appendItem(ctx, t, env.bmNext, dbFnID, dbFn)
+
+		result, err := env.migBM.DeleteBatch(ctx, dbFnID, "")
+		require.NoError(t, err)
+		require.True(t, result.Deleted)
+	})
+
+	t.Run("RunBatch from next", func(t *testing.T) {
+		rbFnID := uuid.New()
+		rbFn := newFunction(rbFnID)
+		appendItem(ctx, t, env.bmNext, rbFnID, rbFn)
+
+		result, err := env.migBM.RunBatch(ctx, RunBatchOpts{FunctionID: rbFnID})
+		require.NoError(t, err)
+		require.True(t, result.Scheduled)
+	})
+
+	t.Run("DeleteKeys hits both clusters", func(t *testing.T) {
+		dkFnID := uuid.New()
+		dkFn := newFunction(dkFnID)
+
+		resCur, _ := appendItem(ctx, t, env.bmCurrent, dkFnID, dkFn)
+		curBatchID := ulid.MustParse(resCur.BatchID)
+		require.True(t, env.rCurrent.Exists(env.bcCurrent.KeyGenerator().Batch(ctx, dkFnID, curBatchID)))
+
+		err := env.migBM.DeleteKeys(ctx, dkFnID, curBatchID)
+		require.NoError(t, err)
+		require.False(t, env.rCurrent.Exists(env.bcCurrent.KeyGenerator().Batch(ctx, dkFnID, curBatchID)))
+	})
 
 	t.Run("reads fall back to current when next is empty", func(t *testing.T) {
 		curFnID := uuid.New()
