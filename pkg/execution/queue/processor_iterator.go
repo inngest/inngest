@@ -129,14 +129,21 @@ func (p *ProcessorIterator) Iterate(ctx context.Context) error {
 func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error {
 	l := logger.StdlibLogger(ctx).With("partition", p.Partition, "item", item)
 
-	ctx, span := p.Queue.Options().ConditionalTracer.NewSpan(ctx, "queue.Process", p.Partition.AccountID, p.Partition.Identifier().EnvID)
+	partitionIdentifier := p.Partition.Identifier()
+	ctx, span := p.Queue.Options().ConditionalTracer.NewSpan(ctx, "queue.Process", p.Partition.AccountID, partitionIdentifier.EnvID, partitionIdentifier.FunctionID)
 	defer span.End()
 	span.SetAttributes(attribute.String("partition_id", p.Partition.ID))
+	span.SetAttributes(attribute.String("run_id", item.Data.Identifier.RunID.String()))
+	span.SetAttributes(attribute.String("item_id", item.ID))
+	if item.Data.JobID != nil {
+		span.SetAttributes(attribute.String("job_id", *item.Data.JobID))
+	}
 
 	// TODO: Create an in-memory mapping of rate limit keys that have been hit,
 	//       and don't bother to process if the queue item has a limited key.  This
 	//       lessens work done in the queue, as we can `continue` immediately.
 	if item.IsLeased(p.Queue.Clock().Now()) {
+		span.SetAttributes(attribute.String("skip_reason", "already_leased"))
 		metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{
 			PkgName: pkgName,
 			Tags:    map[string]any{"status": "lease_contention", "queue_shard": p.Queue.Shard().Name(), "constraint_source": "lease"},
@@ -146,6 +153,7 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 
 	// Check if there's capacity from our local workers atomically prior to leasing our items.
 	if !p.Queue.Semaphore().TryAcquire(1) {
+		span.SetAttributes(attribute.String("skip_reason", "no_queue_worker_capacity"))
 		metrics.IncrQueuePartitionProcessNoCapacityCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": p.Queue.Shard().Name()}})
 		// Break the entire loop to prevent out of order work.
 		return ErrProcessNoCapacity
@@ -192,6 +200,7 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 		p.Queue.Clock().Now(),
 	)
 	if err != nil {
+		span.RecordError(err)
 		l.ReportError(err, "could not check constraints to lease item")
 		// Stop iterator but don't quit the queue
 		return ErrProcessStopIterator
@@ -209,6 +218,8 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 	// If we're limited by constraints, release semaphore early since we won't be leasing or processing
 	if constraintRes.LimitingConstraint != enums.QueueConstraintNotLimited {
 		release()
+
+		span.SetAttributes(attribute.String("limiting_constraint", constraintRes.LimitingConstraint.String()))
 	}
 
 	var leaseID *ulid.ULID
@@ -468,6 +479,7 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 
 	// Handle other errors.
 	if err != nil || leaseID == nil {
+		span.RecordError(err)
 		p.Err = fmt.Errorf("error leasing in process: %w", err)
 		metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{
 			PkgName: pkgName,
