@@ -3,6 +3,7 @@ package redis_state
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -471,6 +472,8 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 			// Release the capacity early
 			require.NotNil(t, ri.CapacityLease)
 
+			fmt.Println("early release")
+
 			err := ri.CapacityLease.Release()
 			require.NoError(t, err)
 
@@ -483,13 +486,15 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 
 		require.Equal(t, 1, int(counter))
 
+		fmt.Println("waiting")
+
 		service.Wait()
 
 		// Expect at least 1 extend call
 		require.Greater(t, len(cmLifecycles.ExtendCalls), 0)
 
 		// Expect exactly 1 release call
-		require.Equal(t, len(cmLifecycles.ReleaseCalls), 2)
+		require.Equal(t, 2, len(cmLifecycles.ReleaseCalls))
 	})
 }
 
