@@ -133,9 +133,6 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 	defer span.End()
 	span.SetAttributes(attribute.String("partition_id", p.Partition.ID))
 
-	// TODO: Create an in-memory mapping of rate limit keys that have been hit,
-	//       and don't bother to process if the queue item has a limited key.  This
-	//       lessens work done in the queue, as we can `continue` immediately.
 	if item.IsLeased(p.Queue.Clock().Now()) {
 		metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{
 			PkgName: pkgName,
@@ -173,16 +170,29 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 		release()
 	}()
 
+	//
+	// Before we can do any work on the queue item, we need to check if all the constraints have capacity.
+	// This was previously done in Lease and has since been moved to the Constraint API.
+	//
+	// The Constraint API employs in-memory caching for a subset of constraints, ensuring low-latency
+	// responses on hit constraints and avoiding overloading the API.
+	//
+
 	backlog := ItemBacklog(ctx, *item)
 	partition := ItemShadowPartition(ctx, *item)
 	constraints := p.Queue.Options().PartitionConstraintConfigGetter(ctx, partition.Identifier())
 
+	// The following lease options simply specify some objects that are required during lease but were already generated
 	leaseOptions := []LeaseOptionFn{
 		LeaseBacklog(backlog),
 		LeaseShadowPartition(partition),
 		LeaseConstraints(constraints),
 	}
 
+	// Acquire capacity lease, in case the Constraint API is enabled and the current queue item should use capacity leases.
+	// We only ignore capacity leases for system queues and items missing account ID / env ID / function ID combinations.
+	// When the Constraint API is enabled, it will handle concurrency and throttle checks on the queue item.
+	// This is for an individual lease. If a constraint is at capacity, no leases will be returned and we will handle the missing capacity accordingly.
 	constraintRes, err := p.Queue.ItemLeaseConstraintCheck(
 		ctx,
 		&partition,
@@ -197,11 +207,8 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 		return ErrProcessStopIterator
 	}
 
-	constraintCheckSource := "lease"
-	if constraintRes.SkipConstraintChecks || constraintRes.LimitingConstraint != enums.QueueConstraintNotLimited {
-		constraintCheckSource = "constraint-api"
-	}
-
+	// If we should skip constraint checks during lease (capacity lease acquired or system queue),
+	// ensure Lease simply moves the item out of the partition and updates indexes for scavenging, status, etc.
 	if constraintRes.SkipConstraintChecks {
 		leaseOptions = append(leaseOptions, LeaseOptionDisableConstraintChecks(true))
 	}
@@ -323,7 +330,7 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 		p.CtrRateLimit.Add(1)
 		metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{
 			PkgName: pkgName,
-			Tags:    map[string]any{"status": "throttled", "queue_shard": p.Queue.Shard().Name(), "constraint_source": constraintCheckSource},
+			Tags:    map[string]any{"status": "throttled", "queue_shard": p.Queue.Shard().Name(), "constraint_source": "constraintapi"},
 		})
 
 		if p.Queue.Options().ItemEnableKeyQueues(ctx, *item) {
