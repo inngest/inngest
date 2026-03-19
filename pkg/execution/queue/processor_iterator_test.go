@@ -87,7 +87,7 @@ func (m *mockShardForIterator) ItemLeaseConstraintCheck(
 	}, nil
 }
 
-func (m *mockShardForIterator) Lease(ctx context.Context, item QueueItem, duration time.Duration, now time.Time, denies *LeaseDenies, options ...LeaseOptionFn) (*ulid.ULID, error) {
+func (m *mockShardForIterator) Lease(ctx context.Context, item QueueItem, duration time.Duration, now time.Time, options ...LeaseOptionFn) (*ulid.ULID, error) {
 	id := ulid.Make()
 	return &id, nil
 }
@@ -125,8 +125,8 @@ func (m *mockShardForIterator) PartitionPeek(ctx context.Context, sequential boo
 	return nil, nil
 }
 
-func (m *mockShardForIterator) PartitionLease(ctx context.Context, p *QueuePartition, duration time.Duration, opts ...PartitionLeaseOpt) (*ulid.ULID, int, error) {
-	return nil, 0, nil
+func (m *mockShardForIterator) PartitionLease(ctx context.Context, p *QueuePartition, duration time.Duration, opts ...PartitionLeaseOpt) (*ulid.ULID, error) {
+	return nil, nil
 }
 
 func (m *mockShardForIterator) PartitionRequeue(ctx context.Context, p *QueuePartition, at time.Time, forceAt bool) error {
@@ -134,10 +134,6 @@ func (m *mockShardForIterator) PartitionRequeue(ctx context.Context, p *QueuePar
 }
 
 func (m *mockShardForIterator) Scavenge(ctx context.Context, limit int) (int, error) {
-	return 0, nil
-}
-
-func (m *mockShardForIterator) ActiveCheck(ctx context.Context) (int, error) {
 	return 0, nil
 }
 
@@ -257,7 +253,7 @@ func (m *mockShardForIterator) BacklogPeek(ctx context.Context, b *QueueBacklog,
 	return nil, 0, nil
 }
 
-func (m *mockShardForIterator) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueShadowPartition, refillUntil time.Time, refillItems []string, latestConstraints PartitionConstraintConfig, options ...BacklogRefillOptionFn) (*BacklogRefillResult, error) {
+func (m *mockShardForIterator) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueShadowPartition, refillUntil time.Time, refillItems []string, options ...BacklogRefillOptionFn) (*BacklogRefillResult, error) {
 	return nil, nil
 }
 
@@ -439,7 +435,6 @@ func TestProcessorIteratorCounterRaceCondition(t *testing.T) {
 		Items:                items,
 		PartitionContinueCtr: 0,
 		Queue:                mockProc,
-		Denies:               NewLeaseDenyList(),
 		StaticTime:           time.Now(),
 		Parallel:             true, // Enable parallel processing
 	}
@@ -550,7 +545,6 @@ func TestProcessorIteratorCounterRaceConditionMixed(t *testing.T) {
 		Items:                items,
 		PartitionContinueCtr: 0,
 		Queue:                mockProc,
-		Denies:               NewLeaseDenyList(),
 		StaticTime:           time.Now(),
 		Parallel:             true,
 	}
@@ -653,7 +647,6 @@ func TestProcessorIteratorIsCustomKeyLimitOnlyRace(t *testing.T) {
 		Items:                items,
 		PartitionContinueCtr: 0,
 		Queue:                mockProc,
-		Denies:               NewLeaseDenyList(),
 		StaticTime:           time.Now(),
 		Parallel:             true,
 	}

@@ -99,9 +99,6 @@ func TestItemLeaseConstraintCheck(t *testing.T) {
 			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 				return true
 			}),
-			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
-				return true
-			}),
 			osqueue.WithCapacityManager(cm),
 			// make lease extensions more frequent
 			osqueue.WithCapacityLeaseExtendInterval(time.Second),
@@ -147,9 +144,6 @@ func TestItemLeaseConstraintCheck(t *testing.T) {
 			t, rc,
 			osqueue.WithClock(clock),
 			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
-				return true
-			}),
-			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
 				return true
 			}),
 			osqueue.WithCapacityManager(cm),
@@ -201,9 +195,6 @@ func TestItemLeaseConstraintCheck(t *testing.T) {
 			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 				return true
 			}),
-			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
-				return true
-			}),
 			// make lease extensions more frequent
 			osqueue.WithCapacityLeaseExtendInterval(time.Second),
 			osqueue.WithLogger(l),
@@ -250,9 +241,6 @@ func TestItemLeaseConstraintCheck(t *testing.T) {
 			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 				return true
 			}),
-			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
-				return false // disable flag
-			}),
 			osqueue.WithCapacityManager(cm),
 			// make lease extensions more frequent
 			osqueue.WithCapacityLeaseExtendInterval(time.Second),
@@ -269,7 +257,9 @@ func TestItemLeaseConstraintCheck(t *testing.T) {
 		backlog := osqueue.ItemBacklog(ctx, qi)
 
 		res, err := q.ItemLeaseConstraintCheck(ctx, &sp, &backlog, constraints, &qi, clock.Now())
-		require.NoError(t, err)
+		require.Error(t, err)
+		require.ErrorContains(t, err, "missing accountID")
+		require.ErrorContains(t, err, "missing envID")
 
 		// No lease acquired
 		require.Nil(t, res.CapacityLease)
@@ -290,9 +280,6 @@ func TestItemLeaseConstraintCheck(t *testing.T) {
 			t, rc,
 			osqueue.WithClock(clock),
 			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
-				return true
-			}),
-			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
 				return true
 			}),
 			osqueue.WithCapacityManager(cm),
@@ -339,9 +326,6 @@ func TestItemLeaseConstraintCheck(t *testing.T) {
 			t, rc,
 			osqueue.WithClock(clock),
 			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
-				return true
-			}),
-			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
 				return true
 			}),
 			osqueue.WithCapacityManager(cm),
@@ -407,9 +391,6 @@ func TestItemLeaseConstraintCheck(t *testing.T) {
 			t, rc,
 			osqueue.WithClock(clock),
 			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
-				return true
-			}),
-			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
 				return true
 			}),
 			osqueue.WithCapacityManager(cm),
@@ -480,9 +461,6 @@ func TestItemLeaseConstraintCheck(t *testing.T) {
 			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 				return true
 			}),
-			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
-				return true
-			}),
 			osqueue.WithCapacityManager(cm),
 			// make lease extensions more frequent
 			osqueue.WithCapacityLeaseExtendInterval(time.Second),
@@ -516,9 +494,6 @@ func TestItemLeaseConstraintCheck(t *testing.T) {
 			t, rc,
 			osqueue.WithClock(clock),
 			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
-				return true
-			}),
-			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
 				return true
 			}),
 			osqueue.WithCapacityManager(cm),
@@ -570,9 +545,6 @@ func TestItemLeaseConstraintCheck(t *testing.T) {
 			t, rc,
 			osqueue.WithClock(clock),
 			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
-				return true
-			}),
-			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
 				return true
 			}),
 			osqueue.WithCapacityManager(cm),
@@ -674,9 +646,6 @@ func TestItemLeaseConstraintCheck(t *testing.T) {
 			t, rc,
 			osqueue.WithClock(clock),
 			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
-				return true
-			}),
-			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
 				return true
 			}),
 			osqueue.WithCapacityManager(cm),
@@ -813,9 +782,6 @@ func TestBacklogRefillConstraintCheck(t *testing.T) {
 			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 				return true
 			}),
-			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
-				return true
-			}),
 			osqueue.WithCapacityManager(cm),
 			// make lease extensions more frequent
 			osqueue.WithCapacityLeaseExtendInterval(time.Second),
@@ -856,9 +822,6 @@ func TestBacklogRefillConstraintCheck(t *testing.T) {
 			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 				return true
 			}),
-			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
-				return true
-			}),
 			// make lease extensions more frequent
 			osqueue.WithCapacityLeaseExtendInterval(time.Second),
 			osqueue.WithLogger(l),
@@ -897,9 +860,6 @@ func TestBacklogRefillConstraintCheck(t *testing.T) {
 			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 				return true
 			}),
-			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
-				return false
-			}),
 			osqueue.WithCapacityManager(cm),
 			// make lease extensions more frequent
 			osqueue.WithCapacityLeaseExtendInterval(time.Second),
@@ -920,12 +880,10 @@ func TestBacklogRefillConstraintCheck(t *testing.T) {
 		res, err := q.BacklogRefillConstraintCheck(ctx, &sp, &backlog, constraints, []*osqueue.QueueItem{&qi}, opIdempotencyKey, clock.Now())
 		require.NoError(t, err)
 
-		// No lease acquired
-		require.Nil(t, res.ItemCapacityLeases)
-		require.False(t, res.SkipConstraintChecks)
+		require.NotNil(t, res.ItemCapacityLeases)
+		require.True(t, res.SkipConstraintChecks)
 
-		// Do not expect a ConstraintAPI call for missing capacity manager
-		require.Equal(t, 0, len(cmLifecycles.AcquireCalls))
+		require.Equal(t, 1, len(cmLifecycles.AcquireCalls))
 		require.Equal(t, 0, len(cmLifecycles.ExtendCalls))
 		require.Equal(t, 0, len(cmLifecycles.ReleaseCalls))
 	})
@@ -937,9 +895,6 @@ func TestBacklogRefillConstraintCheck(t *testing.T) {
 			t, rc,
 			osqueue.WithClock(clock),
 			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
-				return true
-			}),
-			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
 				return true
 			}),
 			osqueue.WithCapacityManager(cm),
@@ -986,9 +941,6 @@ func TestBacklogRefillConstraintCheck(t *testing.T) {
 			t, rc,
 			osqueue.WithClock(clock),
 			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
-				return true
-			}),
-			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
 				return true
 			}),
 			osqueue.WithCapacityManager(cm),
