@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -44,6 +45,7 @@ type APIOpts struct {
 	// AuthMiddleware authenticates the incoming API request.
 	AuthMiddleware func(http.Handler) http.Handler
 	// AuthFinder authenticates the given request, returning the env and account IDs.
+	// Used as a fallback when JWT auth fails (e.g. signing-key auth in the dev server).
 	AuthFinder apiv1auth.AuthFinder
 }
 
@@ -439,6 +441,9 @@ func (a *api) PostPublishTee(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Limit the request body to prevent abuse.
+	maxBytes := int64(consts.MaxStreamingChunks) * int64(consts.StreamingChunkSize)
+	r.Body = http.MaxBytesReader(w, r.Body, maxBytes)
 	defer r.Body.Close()
 
 	// straight up copy using a lil util from the r.Body to our publishers.
@@ -480,7 +485,7 @@ func (a *api) publishStream(w http.ResponseWriter, r *http.Request) {
 	// We must create a new random stream ID for the data stream, allowing
 	// all published chunks to be associated with each other.
 	sID := util.XXHash(time.Now())
-	msg.Data = []byte(sID)
+	msg.Data = json.RawMessage(fmt.Sprintf("%q", sID))
 
 	if err := msg.Validate(); err != nil {
 		http.Error(w, err.Error(), 400)
