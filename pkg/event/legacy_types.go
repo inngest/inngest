@@ -3,6 +3,7 @@ package event
 import (
 	"crypto/rand"
 	"encoding/json"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
@@ -70,6 +71,10 @@ func (o BaseTrackedEvent) GetAccountID() uuid.UUID {
 	}
 	// There are no accounts in OSS yet.
 	return consts.DevServerAccountID
+}
+
+func (o BaseTrackedEvent) GetReceivedAt() time.Time {
+	return time.Time{}
 }
 
 func (o BaseTrackedEvent) GetWorkspaceID() uuid.UUID {

@@ -2344,6 +2344,7 @@ func (e *executor) handlePausesAllNaively(ctx context.Context, iter state.PauseI
 	)
 
 	evtID := evt.GetInternalID()
+	evtTime := evt.GetReceivedAt()
 
 	// Schedule up to PauseHandleConcurrency pauses at once.
 	sem := semaphore.NewWeighted(int64(PauseHandleConcurrency))
@@ -2365,6 +2366,11 @@ func (e *executor) handlePausesAllNaively(ctx context.Context, iter state.PauseI
 			defer sem.Release(1)
 
 			if pause == nil {
+				return
+			}
+
+			// Skip pauses created after the event. They can't be a valid match.
+			if pause.CreatedAfter(evtTime) {
 				return
 			}
 
@@ -2439,6 +2445,7 @@ func (e *executor) handleAggregatePauses(ctx context.Context, evt event.TrackedE
 	)
 
 	evtID := evt.GetInternalID()
+	evtTime := evt.GetReceivedAt()
 	evals, count, err := e.exprAggregator.EvaluateAsyncEvent(ctx, evt)
 	if err != nil {
 		log.Error("error evaluating async event", "error", err)
@@ -2459,6 +2466,12 @@ func (e *executor) handleAggregatePauses(ctx context.Context, evt event.TrackedE
 	for _, i := range evals {
 		// Copy pause into function
 		pause := *i
+
+		// Skip pauses created after the event. They can't be a valid match.
+		if pause.CreatedAfter(evtTime) {
+			continue
+		}
+
 		wg.Add(1)
 		go func() {
 			atomic.AddInt32(&res[0], 1)
