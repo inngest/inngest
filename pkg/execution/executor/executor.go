@@ -1688,7 +1688,6 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		},
 	)
 	if err != nil {
-		// return nil, fmt.Errorf("error creating execution span: %w", err)
 		l.Debug("error creating execution span", "error", err)
 	}
 
@@ -1705,6 +1704,15 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			})
 		}()
 
+		atties := tracing.DriverResponseAttrs(resp, nil)
+		if err != nil {
+			// this always adds any error as an internal error attribute to our spans.
+			errstr := err.Error()
+			atties = atties.Merge(
+				meta.NewAttrSet(meta.Attr(meta.StringAttr("internal.error"), &errstr)),
+			)
+		}
+
 		// XX: This is going to drop any sleep requests, because DriverResponseAttrs
 		// forces the drop field if resp.IsDiscoveryResponse() is true.
 		updateOpts := &tracing.UpdateSpanOptions{
@@ -1712,7 +1720,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			Metadata:   &md,
 			QueueItem:  &item,
 			TargetSpan: instance.execSpan,
-			Attributes: tracing.DriverResponseAttrs(resp, nil),
+			Attributes: atties,
 		}
 
 		// For most executions, we now set the status of the execution span.
@@ -3471,7 +3479,8 @@ func (e *executor) handleStepError(ctx context.Context, runCtx execution.RunCont
 	// - Steps throwing/returning NonRetriableErrors are still OpcodeStepError
 	// - We are now in charge of rescheduling the entire function
 	span := trace.SpanFromContext(ctx)
-	span.SetStatus(codes.Error, gen.Error.Name)
+	span.SetStatus(codes.Error, gen.Error.GetNameOrMessage())
+	meta.AttachInternalError(span, gen.Error.GetNameOrMessage())
 
 	if gen.Error == nil {
 		// This should never happen.
@@ -5008,6 +5017,7 @@ func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Func
 	if err != nil {
 		span.SetStatus(codes.Error, err.Error())
 		span.SetAttributes(attribute.Bool(consts.OtelSysStepDelete, true))
+		meta.AttachInternalError(span, err.Error())
 		return err
 	}
 
