@@ -1578,6 +1578,52 @@ func TestConstraintItemValid(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		{
+			name: "valid semaphore constraint with positive amount",
+			constraint: ConstraintItem{
+				Kind: ConstraintKindSemaphore,
+				Semaphore: &SemaphoreConstraint{
+					Name:   "test-sem",
+					Scope:  enums.SemaphoreScopeFn,
+					Amount: 1,
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "invalid semaphore constraint with zero amount",
+			constraint: ConstraintItem{
+				Kind: ConstraintKindSemaphore,
+				Semaphore: &SemaphoreConstraint{
+					Name:   "test-sem",
+					Scope:  enums.SemaphoreScopeFn,
+					Amount: 0,
+				},
+			},
+			wantErr:     true,
+			expectedMsg: "semaphore constraint amount must be greater than 0",
+		},
+		{
+			name: "invalid semaphore constraint with negative amount",
+			constraint: ConstraintItem{
+				Kind: ConstraintKindSemaphore,
+				Semaphore: &SemaphoreConstraint{
+					Name:   "test-sem",
+					Scope:  enums.SemaphoreScopeFn,
+					Amount: -1,
+				},
+			},
+			wantErr:     true,
+			expectedMsg: "semaphore constraint amount must be greater than 0",
+		},
+		{
+			name: "semaphore constraint with nil struct is valid",
+			constraint: ConstraintItem{
+				Kind:      ConstraintKindSemaphore,
+				Semaphore: nil,
+			},
+			wantErr: false,
+		},
 	}
 
 	for _, tt := range tests {
