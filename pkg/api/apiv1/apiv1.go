@@ -127,15 +127,13 @@ func (a *router) setup() {
 			})
 		}
 
-		// Create a single checkpoint API instance so that ingest and output
-		// handlers share the same stream registry.
-		checkpointAPI := NewCheckpointAPI(a.opts)
-
-		// Checkpoint output and stream APIs do their own auth (using JWT
-		// query params), so they live outside the auth/caching middleware
-		// group to avoid the caching middleware buffering streamed responses.
-		for _, prefix := range CheckpointRoutePrefixes {
-			r.Get(prefix+"/{runID}/output", checkpointAPI.Output)
+		// Checkpoint output API does its own auth (using query params), so
+		// should not be wrapped with the general auth middleware.
+		{
+			api := NewCheckpointAPI(a.opts)
+			for _, prefix := range CheckpointRoutePrefixes {
+				r.Get(prefix+"/{runID}/output", api.Output)
+			}
 		}
 
 		r.Group(func(r chi.Router) {
@@ -155,10 +153,13 @@ func (a *router) setup() {
 
 			// Add the HTTP-based checkpointing API.  Note that for backcompat,
 			// this exists at two URLs.
-			for _, prefix := range CheckpointRoutePrefixes {
-				r.Route(prefix, func(sub chi.Router) {
-					sub.Mount("/", checkpointAPI)
-				})
+			{
+				api := NewCheckpointAPI(a.opts)
+				for _, prefix := range CheckpointRoutePrefixes {
+					r.Route(prefix, func(sub chi.Router) {
+						sub.Mount("/", api)
+					})
+				}
 			}
 
 			r.Post("/signals", a.receiveSignal)
