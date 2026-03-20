@@ -17,10 +17,10 @@ import (
 
 func TestAPI_GetSSE(t *testing.T) {
 	t.Run("successful connection with headers", func(t *testing.T) {
-		broadcaster := NewInProcessBroadcaster()
+		bc := newTestBroadcaster(t)
 		server := httptest.NewServer(NewAPI(APIOpts{
 			JWTSecret:   []byte("test-secret"),
-			Broadcaster: broadcaster,
+			Broadcaster: bc,
 		}))
 		defer server.Close()
 
@@ -52,10 +52,7 @@ func TestAPI_GetSSE(t *testing.T) {
 		require.Equal(t, "*", resp.Header.Get("Access-Control-Allow-Origin"))
 
 		// Before closing, there should be 1 active subscription
-		broadcaster.l.RLock()
-		initialSubCount := len(broadcaster.subs)
-		broadcaster.l.RUnlock()
-		require.Equal(t, 1, initialSubCount, "Should have 1 active subscription")
+		require.Equal(t, 1, subCount(bc), "Should have 1 active subscription")
 
 		// Close the response to trigger cleanup
 		resp.Body.Close()
@@ -64,17 +61,14 @@ func TestAPI_GetSSE(t *testing.T) {
 		time.Sleep(50 * time.Millisecond)
 
 		// After closing, the subscription should be cleaned up
-		broadcaster.l.RLock()
-		finalSubCount := len(broadcaster.subs)
-		broadcaster.l.RUnlock()
-		require.Equal(t, 0, finalSubCount, "Subscription should be cleaned up after connection close")
+		require.Equal(t, 0, subCount(bc), "Subscription should be cleaned up after connection close")
 	})
 
 	t.Run("sends messages in SSE format", func(t *testing.T) {
-		broadcaster := NewInProcessBroadcaster()
+		bc := newTestBroadcaster(t)
 		server := httptest.NewServer(NewAPI(APIOpts{
 			JWTSecret:   []byte("test-secret"),
-			Broadcaster: broadcaster,
+			Broadcaster: bc,
 		}))
 		defer server.Close()
 
@@ -98,7 +92,7 @@ func TestAPI_GetSSE(t *testing.T) {
 				Channel:   "user:123",
 				Topic:     "ai",
 			}
-			broadcaster.Publish(context.Background(), msg)
+			bc.Publish(context.Background(), msg)
 		}()
 
 		// Create request with JWT authorization
@@ -132,7 +126,7 @@ func TestAPI_GetSSE(t *testing.T) {
 	t.Run("unauthorized request", func(t *testing.T) {
 		server := httptest.NewServer(NewAPI(APIOpts{
 			JWTSecret:   []byte("test-secret"),
-			Broadcaster: NewInProcessBroadcaster(),
+			Broadcaster: newTestBroadcaster(t),
 		}))
 		defer server.Close()
 
@@ -152,7 +146,7 @@ func TestAPI_GetSSE(t *testing.T) {
 	t.Run("invalid JWT", func(t *testing.T) {
 		server := httptest.NewServer(NewAPI(APIOpts{
 			JWTSecret:   []byte("test-secret"),
-			Broadcaster: NewInProcessBroadcaster(),
+			Broadcaster: newTestBroadcaster(t),
 		}))
 		defer server.Close()
 
@@ -170,10 +164,10 @@ func TestAPI_GetSSE(t *testing.T) {
 	})
 
 	t.Run("connection timeout behavior", func(t *testing.T) {
-		broadcaster := NewInProcessBroadcaster()
+		bc := newTestBroadcaster(t)
 		server := httptest.NewServer(NewAPI(APIOpts{
 			JWTSecret:   []byte("test-secret"),
-			Broadcaster: broadcaster,
+			Broadcaster: bc,
 		}))
 		defer server.Close()
 

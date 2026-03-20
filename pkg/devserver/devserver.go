@@ -17,6 +17,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/api"
 	"github.com/inngest/inngest/pkg/api/apiv1"
+	"github.com/inngest/inngest/pkg/api/apiv1/apiv1auth"
 	apiv2 "github.com/inngest/inngest/pkg/api/v2"
 	"github.com/inngest/inngest/pkg/api/v2/apiv2base"
 	"github.com/inngest/inngest/pkg/authn"
@@ -278,8 +279,11 @@ func start(ctx context.Context, opts StartOpts) error {
 	}
 	smv2 := redis_state.MustRunServiceV2(sm)
 
-	// Create a new broadcaster which lets us broadcast realtime messages.
-	broadcaster := realtime.NewInProcessBroadcaster()
+	broadcaster, closeBroadcasterRedis, err := newBroadcaster(opts.RedisURI)
+	if err != nil {
+		return err
+	}
+	defer closeBroadcasterRedis()
 
 	runMode := queue.QueueRunMode{
 		Sequential:    true,
@@ -638,6 +642,7 @@ func start(ctx context.Context, opts StartOpts) error {
 
 		apiv1.AddRoutes(r, apiv1.Opts{
 			AuthMiddleware:     authn.SigningKeyMiddleware(opts.SigningKey),
+			AuthFinder:         apiv1auth.NilAuthFinder,
 			CachingMiddleware:  caching,
 			FunctionReader:     ds.Data,
 			JobQueueReader:     ds.Queue.(queue.JobQueueReader),
@@ -1015,6 +1020,48 @@ func PartitionConstraintConfigGetter(dbcqrs cqrs.Manager) queue.PartitionConstra
 
 		return constraints
 	}
+}
+
+// newBroadcaster creates a Redis-backed broadcaster for realtime messages. If
+// redisURI is provided, it connects to that Redis instance; otherwise it spins
+// up an in-memory miniredis. The returned cleanup function closes the miniredis
+// instance (nil when using an external Redis).
+func newBroadcaster(redisURI string) (realtime.Broadcaster, func(), error) {
+	if redisURI != "" {
+		pubc, err := connectToOrCreateRedis(redisURI)
+		if err != nil {
+			return nil, nil, fmt.Errorf("error creating realtime redis pub client: %w", err)
+		}
+		subc, err := connectToOrCreateRedis(redisURI)
+		if err != nil {
+			pubc.Close()
+			return nil, nil, fmt.Errorf("error creating realtime redis sub client: %w", err)
+		}
+		return realtime.NewRedisBroadcaster(pubc, subc), func() { pubc.Close(); subc.Close() }, nil
+	}
+
+	r := miniredis.NewMiniRedis()
+	if err := r.Start(); err != nil {
+		return nil, nil, fmt.Errorf("error starting realtime redis: %w", err)
+	}
+	pubc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	if err != nil {
+		r.Close()
+		return nil, nil, fmt.Errorf("error creating realtime redis pub client: %w", err)
+	}
+	subc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	if err != nil {
+		pubc.Close()
+		r.Close()
+		return nil, nil, fmt.Errorf("error creating realtime redis sub client: %w", err)
+	}
+	return realtime.NewRedisBroadcaster(pubc, subc), func() { pubc.Close(); subc.Close(); r.Close() }, nil
 }
 
 func connectToOrCreateRedis(redisURI string) (rueidis.Client, error) {

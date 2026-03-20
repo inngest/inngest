@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -27,6 +28,13 @@ import (
 const (
 	// SSEConnectionTimeout is the maximum duration an SSE connection can remain open
 	SSEConnectionTimeout = 15 * time.Minute
+
+	// MaxDurpStreamingRun is the maximum duration that a Durable Endpoint can
+	// stream. This is specifically enforced, but is rather a rough
+	// approximation due to the SSE endpoint timeout. Technically this is
+	// actually the max streaming duration after going async mode, but we'll
+	// simplify things for the end user by just saying 15 minutes overall
+	MaxDurpStreamingRun = SSEConnectionTimeout
 )
 
 type APIOpts struct {
@@ -37,12 +45,15 @@ type APIOpts struct {
 	// AuthMiddleware authenticates the incoming API request.
 	AuthMiddleware func(http.Handler) http.Handler
 	// AuthFinder authenticates the given request, returning the env and account IDs.
+	// Used as a fallback when JWT auth fails (e.g. signing-key auth in the dev server).
 	AuthFinder apiv1auth.AuthFinder
 }
 
 func NewAPI(o APIOpts) http.Handler {
 	if o.AuthFinder == nil {
-		o.AuthFinder = apiv1auth.NilAuthFinder
+		o.AuthFinder = func(ctx context.Context) (apiv1auth.V1Auth, error) {
+			return nil, fmt.Errorf("no auth finder configured")
+		}
 	}
 
 	// Create the HTTP implementation, which wraps the handler.  We do ths to code
@@ -330,7 +341,7 @@ func (a *api) PostPublish(w http.ResponseWriter, r *http.Request) {
 	claims, err := realtimeAuth(r.Context())
 	if err == nil && !claims.Publish {
 		// We have claims, but not for publishing. Error out.
-		_ = publicerr.WriteHTTP(w, publicerr.Wrapf(err, 401, "Not authenticated"))
+		_ = publicerr.WriteHTTP(w, publicerr.Errorf(401, "Not authenticated for publishing"))
 		return
 	}
 	if claims == nil {
@@ -408,10 +419,22 @@ func (a *api) PostPublish(w http.ResponseWriter, r *http.Request) {
 func (a *api) PostPublishTee(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	auth, err := realtimeAuth(ctx)
-	if err != nil || auth == nil || !auth.Publish {
+	// Accept realtime JWT with publish claim, or fall back to signing key auth.
+	var envID uuid.UUID
+	claims, err := realtimeAuth(ctx)
+	if err != nil {
+		// Fallback to signing key auth.
+		auth, err := a.opts.AuthFinder(ctx)
+		if err != nil {
+			http.Error(w, "Not authenticated", http.StatusUnauthorized)
+			return
+		}
+		envID = auth.WorkspaceID()
+	} else if !claims.Publish {
 		http.Error(w, "Not authenticated for publishing", http.StatusUnauthorized)
 		return
+	} else {
+		envID = claims.Env
 	}
 
 	channel := r.URL.Query().Get("channel")
@@ -420,6 +443,9 @@ func (a *api) PostPublishTee(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Limit the request body to prevent abuse.
+	maxBytes := int64(consts.MaxStreamingChunks) * int64(consts.StreamingChunkSize)
+	r.Body = http.MaxBytesReader(w, r.Body, maxBytes)
 	defer r.Body.Close()
 
 	// straight up copy using a lil util from the r.Body to our publishers.
@@ -427,7 +453,7 @@ func (a *api) PostPublishTee(w http.ResponseWriter, r *http.Request) {
 		broadcaster: a.opts.Broadcaster,
 		ctx:         ctx,
 		channel:     channel,
-		envID:       auth.Env, // req'd for auth
+		envID:       envID,
 	}, r.Body)
 
 	metrics.HistogramRealtimeRawDataSizeBytes(ctx, n, metrics.HistogramOpt{
@@ -461,7 +487,7 @@ func (a *api) publishStream(w http.ResponseWriter, r *http.Request) {
 	// We must create a new random stream ID for the data stream, allowing
 	// all published chunks to be associated with each other.
 	sID := util.XXHash(time.Now())
-	msg.Data = []byte(sID)
+	msg.Data = json.RawMessage(fmt.Sprintf("%q", sID))
 
 	if err := msg.Validate(); err != nil {
 		http.Error(w, err.Error(), 400)

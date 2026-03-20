@@ -33,6 +33,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/ratelimit"
 	"github.com/inngest/inngest/pkg/execution/realtime"
+	"github.com/inngest/inngest/pkg/execution/realtime/streamingtypes"
 	"github.com/inngest/inngest/pkg/execution/singleton"
 	"github.com/inngest/inngest/pkg/execution/state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
@@ -5209,6 +5210,8 @@ func (e *executor) addRequestPublishOpts(ctx context.Context, item queue.Item, s
 
 	sr.Publish.Token = token
 	sr.Publish.PublishURL = e.rtconfig.PublishURL
+	sr.Publish.Channel = item.Identifier.RunID.String()
+	sr.Publish.Topic = streamingtypes.TopicNameStream
 }
 
 // shouldEnqueueDiscovery returns true if the ended step should have a discovery
