@@ -609,6 +609,13 @@ func (e *executor) createCancellationPauses(ctx context.Context, l logger.Logger
 			idSrc = fmt.Sprintf("%s-%s", idSrc, interpolated)
 		}
 
+		// If the interpolated expression evaluated to false,
+		// we will never cancel this run based on an incoming event.
+		// Skip creating the pause.
+		if expr != nil && *expr == "false" {
+			continue
+		}
+
 		// NOTE: making this deterministic so pause creation is also idempotent
 		pauseID := inngest.DeterministicSha1UUID(idSrc)
 		pause := state.Pause{
@@ -621,6 +628,7 @@ func (e *executor) createCancellationPauses(ctx context.Context, l logger.Logger
 			Cancel:            true,
 			TriggeringEventID: &triggeringID,
 		}
+
 		_, err := e.pm.Write(ctx, pauses.Index{WorkspaceID: req.WorkspaceID, EventName: c.Event}, &pause)
 		if err != nil && err != state.ErrPauseAlreadyExists {
 			return err
