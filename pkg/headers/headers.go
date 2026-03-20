@@ -45,6 +45,15 @@ const (
 	// HeaderKeyForceStepPlan tells the SDK to use step planning instead of
 	// immediate execution. This is used when parallel steps are detected.
 	HeaderKeyForceStepPlan = "X-Inngest-Force-Step-Plan"
+
+	// HeaderKeyFnID sends the internal function UUID to the SDK during
+	// sync function re-entry (e.g. after waitForEvent resume), enabling
+	// async checkpointing of intermediate steps.
+	HeaderKeyFnID = "X-Inngest-Fn-ID"
+
+	// HeaderKeyQueueItemRef sends the queue item reference to the SDK
+	// during sync function re-entry, used by the async checkpoint API.
+	HeaderKeyQueueItemRef = "X-Inngest-Queue-Item-Ref"
 )
 
 const (

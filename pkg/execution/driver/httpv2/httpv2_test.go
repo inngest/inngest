@@ -22,6 +22,7 @@ import (
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/google/uuid"
 	inngestgo "github.com/inngest/inngestgo"
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/require"
@@ -201,6 +202,86 @@ func TestSyncHeadersWithForceStepPlan(t *testing.T) {
 
 	// ForceStepPlan is set, so header should be present
 	require.Equal(t, "true", receivedHeaders.Get(headers.HeaderKeyForceStepPlan))
+}
+
+func TestSyncHeadersFnIDAndQueueRef(t *testing.T) {
+	fnID := uuid.New()
+	queueRef := "dGVzdC1qb2ItaWQ6OnRlc3Qtc2hhcmQtaWQ=" // base64-encoded job::shard
+
+	tests := []struct {
+		name             string
+		fnID             uuid.UUID
+		queueRef         string
+		expectFnID       string
+		expectQueueRef   string
+	}{
+		{
+			name:           "both fn_id and queue_ref sent",
+			fnID:           fnID,
+			queueRef:       queueRef,
+			expectFnID:     fnID.String(),
+			expectQueueRef: queueRef,
+		},
+		{
+			name:           "fn_id sent, queue_ref omitted when empty",
+			fnID:           fnID,
+			queueRef:       "",
+			expectFnID:     fnID.String(),
+			expectQueueRef: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var receivedHeaders http.Header
+			ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				receivedHeaders = r.Header
+				w.Header().Set(headers.HeaderKeySDK, "test-sdk")
+				opcodes := []*sv1.GeneratorOpcode{{Op: enums.OpcodeNone}}
+				w.WriteHeader(200)
+				_ = json.NewEncoder(w).Encode(opcodes)
+			}))
+			defer ts.Close()
+
+			client := exechttp.Client(exechttp.SecureDialerOpts{AllowPrivate: true})
+			d := &httpv2{Client: client}
+
+			u, _ := url.Parse(ts.URL)
+			fn := inngest.Function{
+				Driver: inngest.FunctionDriver{
+					URI: u.String(),
+					Metadata: map[string]any{
+						"type": "sync",
+					},
+				},
+			}
+
+			opts := driver.V2RequestOpts{
+				Fn:         fn,
+				SigningKey: []byte("test-signing-key"),
+				Metadata: sv2.Metadata{
+					ID: sv2.ID{
+						RunID:      ulid.MustNew(ulid.Now(), rand.Reader),
+						FunctionID: tt.fnID,
+					},
+				},
+				QueueRef: tt.queueRef,
+				URL:      u.String(),
+			}
+
+			resp, userErr, internalErr := d.Do(context.Background(), nil, opts)
+			require.NoError(t, userErr)
+			require.NoError(t, internalErr)
+			require.NotNil(t, resp)
+
+			require.Equal(t, tt.expectFnID, receivedHeaders.Get(headers.HeaderKeyFnID))
+			if tt.expectQueueRef != "" {
+				require.Equal(t, tt.expectQueueRef, receivedHeaders.Get(headers.HeaderKeyQueueItemRef))
+			} else {
+				require.Empty(t, receivedHeaders.Get(headers.HeaderKeyQueueItemRef))
+			}
+		})
+	}
 }
 
 func TestSyncNonSDKResponse(t *testing.T) {
