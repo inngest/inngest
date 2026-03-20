@@ -176,6 +176,10 @@ type RunContext interface {
 	UpdateOpcodeError(op *state.GeneratorOpcode, err state.UserError)
 	UpdateOpcodeOutput(op *state.GeneratorOpcode, output json.RawMessage)
 	SetError(err error)
+
+	// ReleaseCapacityLease is a convenient wrapper over checking whether a capacity lease
+	// was set on the queue item and then invoking Release() in a non-blocking way.
+	ReleaseCapacityLease() error
 }
 
 type ResumeSignalResult struct {
