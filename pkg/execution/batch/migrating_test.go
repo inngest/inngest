@@ -403,9 +403,15 @@ func TestMigratingIntegration_DualRead(t *testing.T) {
 		resCur, _ := appendItem(ctx, t, env2.bmCurrent, fnID2, fn2)
 		batchID2 := ulid.MustParse(resCur.BatchID)
 
+		// next has no keys before the call.
+		require.Equal(t, 0, len(env2.rNext.Keys()))
+
 		status2, err := env2.migBM.StartExecution(ctx, fnID2, batchID2, resCur.BatchPointerKey)
 		require.NoError(t, err)
 		require.Equal(t, enums.BatchStatusReady.String(), status2)
+
+		// next must still have no keys — the absent-batch path must not write a garbage pointer.
+		require.Equal(t, 0, len(env2.rNext.Keys()))
 	})
 
 	t.Run("DeleteBatch prefers next then falls back", func(t *testing.T) {
