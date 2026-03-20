@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strconv"
 	"testing"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 	sqlc_psql "github.com/inngest/inngest/pkg/cqrs/base_cqrs/sqlc/postgres"
 	sqlc_sqlite "github.com/inngest/inngest/pkg/cqrs/base_cqrs/sqlc/sqlite"
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/tracing/metadata"
 	"github.com/inngest/inngest/tests/testutil"
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/assert"
@@ -1872,4 +1874,173 @@ func initCQRS(t *testing.T, opts ...withInitCQRSOpt) (cqrs.Manager, func()) {
 	}
 
 	return cm, cleanup
+}
+
+// mockSpan implements normalizedSpan for testing mapSpanFromRow.
+type mockSpan struct {
+	traceID       string
+	runID         string
+	dynamicSpanID sql.NullString
+	parentSpanID  sql.NullString
+	startTime     interface{}
+	endTime       interface{}
+	spanFragments any
+}
+
+func (m mockSpan) GetTraceID() string              { return m.traceID }
+func (m mockSpan) GetRunID() string                { return m.runID }
+func (m mockSpan) GetDynamicSpanID() sql.NullString { return m.dynamicSpanID }
+func (m mockSpan) GetParentSpanID() sql.NullString  { return m.parentSpanID }
+func (m mockSpan) GetStartTime() interface{}        { return m.startTime }
+func (m mockSpan) GetEndTime() interface{}          { return m.endTime }
+func (m mockSpan) GetSpanFragments() any            { return m.spanFragments }
+
+func TestMapSpanFromRow_MapAttributes(t *testing.T) {
+	ctx := context.Background()
+	now := time.Now()
+	runID := ulid.MustNew(ulid.Now(), rand.Reader)
+
+	// Span fragments with attributes as a JSON object (not a string).
+	// This is what happens when PostgreSQL returns JSONB objects directly.
+	fragments := []map[string]any{
+		{
+			"name":       "executor.run",
+			"attributes": map[string]any{"test_key": "test_value", "count": float64(42)},
+		},
+	}
+	fragmentsJSON, err := json.Marshal(fragments)
+	require.NoError(t, err)
+
+	span := mockSpan{
+		traceID:       "abc123",
+		runID:         runID.String(),
+		dynamicSpanID: sql.NullString{String: "span-1", Valid: true},
+		parentSpanID:  sql.NullString{Valid: false},
+		startTime:     now,
+		endTime:       now.Add(time.Second),
+		spanFragments: string(fragmentsJSON),
+	}
+
+	result, err := mapSpanFromRow(ctx, span, nil)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+
+	assert.Equal(t, "executor.run", result.RawOtelSpan.Name)
+	assert.Equal(t, "test_value", result.RawOtelSpan.Attributes["test_key"])
+	assert.Equal(t, float64(42), result.RawOtelSpan.Attributes["count"])
+}
+
+func TestMapSpanFromRow_StringAttributes(t *testing.T) {
+	ctx := context.Background()
+	now := time.Now()
+	runID := ulid.MustNew(ulid.Now(), rand.Reader)
+
+	// Span fragments with attributes as a JSON string (SQLite path).
+	attrsStr := `{"test_key":"test_value","count":42}`
+	fragments := []map[string]any{
+		{
+			"name":       "executor.run",
+			"attributes": attrsStr,
+		},
+	}
+	fragmentsJSON, err := json.Marshal(fragments)
+	require.NoError(t, err)
+
+	span := mockSpan{
+		traceID:       "abc123",
+		runID:         runID.String(),
+		dynamicSpanID: sql.NullString{String: "span-1", Valid: true},
+		parentSpanID:  sql.NullString{Valid: false},
+		startTime:     now,
+		endTime:       now.Add(time.Second),
+		spanFragments: string(fragmentsJSON),
+	}
+
+	result, err := mapSpanFromRow(ctx, span, nil)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+
+	assert.Equal(t, "executor.run", result.RawOtelSpan.Name)
+	assert.Equal(t, "test_value", result.RawOtelSpan.Attributes["test_key"])
+	assert.Equal(t, float64(42), result.RawOtelSpan.Attributes["count"])
+}
+
+func TestRollupSpanMetadataFromFragments(t *testing.T) {
+	ctx := context.Background()
+	now := time.Now()
+
+	// Build a valid metadata attributes JSON string
+	metadataValues := `{"counter":42}`
+	attrsJSON := fmt.Sprintf(
+		`{"_inngest.metadata.scope":"run","_inngest.metadata.kind":"inngest.test","_inngest.metadata.op":"merge","_inngest.metadata.values":%s}`,
+		strconv.Quote(metadataValues),
+	)
+
+	t.Run("attributes as string", func(t *testing.T) {
+		fragments := []map[string]any{
+			{"attributes": attrsJSON},
+		}
+
+		result, err := rollupSpanMetadataFromFragments(ctx, fragments, now)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.Equal(t, enums.MetadataScopeRun, result.Scope)
+		assert.Equal(t, metadata.Kind("inngest.test"), result.Kind)
+		assert.NotEmpty(t, result.Values)
+	})
+
+	t.Run("attributes as map[string]any", func(t *testing.T) {
+		// Simulate what PostgreSQL JSONB returns: a parsed map instead of a string
+		var attrsMap map[string]any
+		require.NoError(t, json.Unmarshal([]byte(attrsJSON), &attrsMap))
+
+		fragments := []map[string]any{
+			{"attributes": attrsMap},
+		}
+
+		result, err := rollupSpanMetadataFromFragments(ctx, fragments, now)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.Equal(t, enums.MetadataScopeRun, result.Scope)
+		assert.Equal(t, metadata.Kind("inngest.test"), result.Kind)
+		assert.NotEmpty(t, result.Values)
+	})
+
+	t.Run("both types produce same result", func(t *testing.T) {
+		// String attributes
+		stringFragments := []map[string]any{
+			{"attributes": attrsJSON},
+		}
+		stringResult, err := rollupSpanMetadataFromFragments(ctx, stringFragments, now)
+		require.NoError(t, err)
+
+		// Map attributes (from JSONB)
+		var attrsMap map[string]any
+		require.NoError(t, json.Unmarshal([]byte(attrsJSON), &attrsMap))
+		mapFragments := []map[string]any{
+			{"attributes": attrsMap},
+		}
+		mapResult, err := rollupSpanMetadataFromFragments(ctx, mapFragments, now)
+		require.NoError(t, err)
+
+		assert.Equal(t, stringResult.Scope, mapResult.Scope)
+		assert.Equal(t, stringResult.Kind, mapResult.Kind)
+
+		// Compare serialized values
+		stringValBytes, _ := json.Marshal(stringResult.Values)
+		mapValBytes, _ := json.Marshal(mapResult.Values)
+		assert.JSONEq(t, string(stringValBytes), string(mapValBytes))
+	})
+
+	t.Run("skips fragment with no attributes", func(t *testing.T) {
+		fragments := []map[string]any{
+			{"other_field": "value"},
+		}
+
+		result, err := rollupSpanMetadataFromFragments(ctx, fragments, now)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		// No metadata extracted since no valid attributes
+		assert.Equal(t, enums.MetadataScopeUnknown, result.Scope)
+	})
 }

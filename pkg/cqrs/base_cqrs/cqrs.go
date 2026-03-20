@@ -429,31 +429,33 @@ fragmentLoop:
 			}
 		}
 
-		if attrs, ok := fragment["attributes"].(string); ok {
+		switch attrs := fragment["attributes"].(type) {
+		case string:
 			fragmentAttr := map[string]any{}
 			if err := json.Unmarshal([]byte(attrs), &fragmentAttr); err != nil {
 				logger.StdlibLogger(ctx).Error("error unmarshalling span attributes", "error", err)
 				return nil, err
 			}
-
 			maps.Copy(newSpan.RawOtelSpan.Attributes, fragmentAttr)
+		case map[string]any:
+			maps.Copy(newSpan.RawOtelSpan.Attributes, attrs)
+		}
 
-			if outputRef, ok := fragment["output_span_id"].(string); ok && info != nil {
-				outputSpanID = &outputRef
-				if io, ok := info.dynamicRefs[dynamicSpanID.String]; ok && io != nil {
-					io.OutputRef = outputRef
-				} else {
-					info.dynamicRefs[dynamicSpanID.String] = &IODynamicRef{OutputRef: outputRef}
-				}
+		if outputRef, ok := fragment["output_span_id"].(string); ok && info != nil {
+			outputSpanID = &outputRef
+			if io, ok := info.dynamicRefs[dynamicSpanID.String]; ok && io != nil {
+				io.OutputRef = outputRef
+			} else {
+				info.dynamicRefs[dynamicSpanID.String] = &IODynamicRef{OutputRef: outputRef}
 			}
+		}
 
-			if inputRef, ok := fragment["input_span_id"].(string); ok && info != nil {
-				inputSpanID = &inputRef
-				if io, ok := info.dynamicRefs[dynamicSpanID.String]; ok && io != nil {
-					io.InputRef = inputRef
-				} else {
-					info.dynamicRefs[dynamicSpanID.String] = &IODynamicRef{InputRef: inputRef}
-				}
+		if inputRef, ok := fragment["input_span_id"].(string); ok && info != nil {
+			inputSpanID = &inputRef
+			if io, ok := info.dynamicRefs[dynamicSpanID.String]; ok && io != nil {
+				io.InputRef = inputRef
+			} else {
+				info.dynamicRefs[dynamicSpanID.String] = &IODynamicRef{InputRef: inputRef}
 			}
 		}
 	}
@@ -618,8 +620,18 @@ func rollupSpanMetadataFromFragments(ctx context.Context, fragments []map[string
 	}
 
 	for _, fragment := range fragments {
-		attrs, ok := fragment["attributes"].(string)
-		if !ok {
+		var attrBytes []byte
+		switch attrs := fragment["attributes"].(type) {
+		case string:
+			attrBytes = []byte(attrs)
+		case map[string]any:
+			var err error
+			attrBytes, err = json.Marshal(attrs)
+			if err != nil {
+				logger.StdlibLogger(ctx).Error("error marshalling metadata span attributes", "error", err)
+				return nil, err
+			}
+		default:
 			logger.StdlibLogger(ctx).Error("error unmarshalling metadata span kind, no attributes")
 			continue
 		}
@@ -630,7 +642,7 @@ func rollupSpanMetadataFromFragments(ctx context.Context, fragments []map[string
 			Op     *metadata.Opcode `json:"_inngest.metadata.op"`
 			Values *string          `json:"_inngest.metadata.values"`
 		}
-		if err := json.Unmarshal([]byte(attrs), &fragmentAttr); err != nil {
+		if err := json.Unmarshal(attrBytes, &fragmentAttr); err != nil {
 			logger.StdlibLogger(ctx).Error("error unmarshalling metadata span attributes", "error", err)
 			return nil, err
 		}
