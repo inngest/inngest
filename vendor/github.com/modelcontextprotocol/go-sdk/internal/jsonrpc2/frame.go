@@ -163,8 +163,8 @@ func (r *headerReader) Read(ctx context.Context) (Message, error) {
 			return nil, fmt.Errorf("invalid header line %q", line)
 		}
 		name, value := line[:colon], strings.TrimSpace(line[colon+1:])
-		switch name {
-		case "Content-Length":
+		switch {
+		case strings.EqualFold(name, "Content-Length"):
 			if contentLength, err = strconv.ParseInt(value, 10, 32); err != nil {
 				return nil, fmt.Errorf("failed parsing Content-Length: %v", value)
 			}
