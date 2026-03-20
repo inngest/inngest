@@ -2362,9 +2362,7 @@ func (e *executor) handlePausesAllNaively(ctx context.Context, iter state.PauseI
 			}
 
 			// Skip pauses created after the event. They can't be a valid match.
-			// CreatedAt may be zero for older pauses; allow those through.
-			// Small fudge factor, just in case.
-			if !evtTime.IsZero() && !pause.CreatedAt.IsZero() && pause.CreatedAt.After(evtTime.Add(5*time.Second)) {
+			if pause.CreatedAfter(evtTime) {
 				return
 			}
 
@@ -2462,9 +2460,7 @@ func (e *executor) handleAggregatePauses(ctx context.Context, evt event.TrackedE
 		pause := *i
 
 		// Skip pauses created after the event. They can't be a valid match.
-		// CreatedAt may be zero for older pauses; allow those through. Small
-		// fudge factor, just in case.
-		if !evtTime.IsZero() && !pause.CreatedAt.IsZero() && pause.CreatedAt.After(evtTime.Add(5*time.Second)) {
+		if pause.CreatedAfter(evtTime) {
 			continue
 		}
 
