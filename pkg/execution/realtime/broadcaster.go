@@ -853,7 +853,7 @@ func (b *broadcaster) redisPublish(ctx context.Context, channel, message string)
 		if ctx.Err() != nil {
 			logger.StdlibLogger(ctx).Error(
 				"error publishing to realtime redis pubsub; ctx closed",
-				"channel", channel,
+				"channel", util.SanitizeLogField(channel),
 				"error", ctx.Err(),
 				"attempt", i,
 			)
@@ -865,14 +865,14 @@ func (b *broadcaster) redisPublish(ctx context.Context, channel, message string)
 		}
 		logger.StdlibLogger(ctx).Warn(
 			"error publishing to realtime redis pubsub",
-			"channel", channel,
+			"channel", util.SanitizeLogField(channel),
 			"error", err,
 			"attempt", i,
 		)
 	}
 	logger.StdlibLogger(ctx).Warn(
 		"failed to publish via realtime redis pubsub",
-		"channel", channel,
+		"channel", util.SanitizeLogField(channel),
 	)
 	metrics.IncrRealtimeRedisErrorsTotal(ctx, metrics.CounterOpt{
 		PkgName: "realtime",
