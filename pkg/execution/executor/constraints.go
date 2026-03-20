@@ -31,7 +31,6 @@ func WithConstraints[T any](
 	ctx context.Context,
 	now time.Time,
 	capacityManager constraintapi.CapacityManager,
-	useConstraintAPI constraintapi.UseConstraintAPIFn,
 	req execution.ScheduleRequest,
 	idempotencyKey string,
 	fn func(
@@ -50,34 +49,19 @@ func WithConstraints[T any](
 
 	start := time.Now()
 
-	// If capacity manager / feature flag are not passed, execute Schedule code
-	// with existing constraint checks
-	if capacityManager == nil || useConstraintAPI == nil {
-		metrics.IncrScheduleConstraintsCheckCounter(ctx, enums.ScheduleConstraintCheckReasonConstraintAPIUninitialized.String(), metrics.CounterOpt{
-			PkgName: pkgName,
-		})
-		return fn(ctx, true)
+	// If capacity manager is not passed, return an error
+	if capacityManager == nil {
+		return zero, fmt.Errorf("capacity manager is not initialized")
 	}
-
-	// Read feature flag
-	enable := useConstraintAPI(ctx, req.AccountID)
 
 	defer func() {
 		metrics.HistogramScheduleDuration(ctx, time.Since(start).Milliseconds(), metrics.HistogramOpt{
 			PkgName: pkgName,
 			Tags: map[string]any{
-				"constraint_api": enable,
+				"constraint_api": true,
 			},
 		})
 	}()
-
-	if !enable {
-		// If feature flag is disabled, execute Schedule code with existing constraint checks
-		metrics.IncrScheduleConstraintsCheckCounter(ctx, enums.ScheduleConstraintCheckReasonFeatureFlagDisabled.String(), metrics.CounterOpt{
-			PkgName: pkgName,
-		})
-		return fn(ctx, true)
-	}
 
 	constraints, err := getScheduleConstraints(ctx, req)
 	if err != nil {
@@ -101,7 +85,6 @@ func WithConstraints[T any](
 		ctx,
 		now,
 		capacityManager,
-		useConstraintAPI,
 		req,
 		idempotencyKey,
 		constraints,
@@ -301,7 +284,6 @@ func CheckConstraints(
 	ctx context.Context,
 	now time.Time,
 	capacityManager constraintapi.CapacityManager,
-	useConstraintAPI constraintapi.UseConstraintAPIFn,
 	req execution.ScheduleRequest,
 	idempotencyKey string,
 	constraints []constraintapi.ConstraintItem,

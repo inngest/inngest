@@ -353,11 +353,6 @@ func start(ctx context.Context, opts StartOpts) error {
 		queueOpts = append(
 			queueOpts,
 			queue.WithCapacityManager(cm),
-			// Always use Constraint API
-			queue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
-				return true
-			}),
-			queue.WithAcquireCapacityLeaseOnBacklogRefill(true),
 		)
 
 		services = append(services, constraintapi.NewLeaseScavengerService(cm, consts.ConstraintAPIScavengerTick))
@@ -544,9 +539,6 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	if capacityManager != nil {
 		executorOpts = append(executorOpts, executor.WithCapacityManager(capacityManager))
-		executorOpts = append(executorOpts, executor.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
-			return true
-		}))
 	}
 	executorOpts = append(executorOpts, executor.WithEnableBatchingInstrumentation(func(ctx context.Context, accountID, envID uuid.UUID) (enable bool) {
 		return false

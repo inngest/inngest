@@ -3,7 +3,6 @@ package redis_state
 import (
 	"context"
 	"crypto/rand"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
@@ -80,7 +79,6 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 			// put item in progress, this is tested separately
 			now := clock.Now()
 			leaseDur := 5 * time.Second
-			leaseExpires := now.Add(leaseDur)
 			leaseID, err := shard.Lease(ctx, qi, leaseDur, now, nil)
 			require.NoError(t, err)
 			require.NotNil(t, leaseID)
@@ -94,19 +92,18 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 			fnPart := osqueue.ItemPartition(ctx, item)
 			require.NotEmpty(t, fnPart.ID)
 
-			// expect key queue accounting to contain item in in-progress
-			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, shadowPartitionInProgressKey(shadowPartition, kg), qi.ID)))
-			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, shadowPartitionAccountInProgressKey(shadowPartition, kg), qi.ID)))
+			// In-progress keys are no longer populated by the lease Lua script (handled by Constraint API)
+			require.False(t, r.Exists(shadowPartitionInProgressKey(shadowPartition, kg)))
+			require.False(t, r.Exists(shadowPartitionAccountInProgressKey(shadowPartition, kg)))
 
 			// no active set for default partition since this uses the in progress key
 			require.Equal(t, kg.Concurrency("", ""), backlogCustomKeyInProgress(backlog, kg, 1))
 			require.Equal(t, kg.Concurrency("", ""), backlogCustomKeyInProgress(backlog, kg, 2))
 
-			// expect old accounting to be updated
-			// TODO Do we actually want to update previous accounting?
-			require.True(t, hasMember(t, r, partitionConcurrencyKey(fnPart, kg), qi.ID))
-			require.True(t, hasMember(t, r, kg.Concurrency("account", accountId.String()), qi.ID))
-			require.True(t, hasMember(t, r, kg.Concurrency("p", fnPart.Queue()), qi.ID))
+			// Concurrency keys are no longer populated by the lease Lua script
+			require.False(t, hasMember(t, r, partitionConcurrencyKey(fnPart, kg), qi.ID))
+			require.False(t, hasMember(t, r, kg.Concurrency("account", accountId.String()), qi.ID))
+			require.False(t, hasMember(t, r, kg.Concurrency("p", fnPart.Queue()), qi.ID))
 
 			err = shard.Dequeue(ctx, qi)
 			require.NoError(t, err)
@@ -114,12 +111,11 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 			// expect item not to be requeued
 			require.False(t, hasMember(t, r, kg.BacklogSet(backlog.BacklogID), qi.ID))
 
-			// expect key queue accounting to be updated
+			// expect key queue accounting to remain empty after dequeue
 			require.False(t, hasMember(t, r, shadowPartitionInProgressKey(shadowPartition, kg), qi.ID))
 			require.False(t, hasMember(t, r, shadowPartitionAccountInProgressKey(shadowPartition, kg), qi.ID))
 
-			// expect old accounting to be updated
-			// TODO Do we actually want to update previous accounting?
+			// expect old accounting to remain empty after dequeue
 			require.False(t, hasMember(t, r, partitionConcurrencyKey(fnPart, kg), qi.ID))
 			require.False(t, hasMember(t, r, kg.Concurrency("account", accountId.String()), qi.ID))
 			require.False(t, hasMember(t, r, kg.Concurrency("p", fnPart.Queue()), qi.ID))
@@ -216,7 +212,6 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 			// put item in progress, this is tested separately
 			now := clock.Now()
 			leaseDur := 5 * time.Second
-			leaseExpires := now.Add(leaseDur)
 			leaseID, err := shard.Lease(ctx, qi, leaseDur, now, nil)
 			require.NoError(t, err)
 			require.NotNil(t, leaseID)
@@ -230,19 +225,19 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 			fnPart := osqueue.ItemPartition(ctx, item)
 			require.NotEmpty(t, fnPart.ID)
 
-			// expect key queue accounting to contain item in in-progress
-			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, shadowPartitionInProgressKey(shadowPartition, kg), qi.ID)))
-			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, shadowPartitionAccountInProgressKey(shadowPartition, kg), qi.ID)))
+			// In-progress keys are no longer populated by the lease Lua script (handled by Constraint API)
+			require.False(t, r.Exists(shadowPartitionInProgressKey(shadowPartition, kg)))
+			require.False(t, r.Exists(shadowPartitionAccountInProgressKey(shadowPartition, kg)))
 
-			// 1 active set for custom concurrency key
+			// 1 active set for custom concurrency key - verify key derivation still correct
 			require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope, fnID, unhashedValue)), backlogCustomKeyInProgress(backlog, kg, 1))
-			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, backlogCustomKeyInProgress(backlog, kg, 1), qi.ID)))
+			// But the key is not populated by lease anymore
+			require.False(t, r.Exists(backlogCustomKeyInProgress(backlog, kg, 1)))
 
-			// expect old accounting to be updated
-			// TODO Do we actually want to update previous accounting?
-			require.True(t, hasMember(t, r, kg.Concurrency("account", accountId.String()), qi.ID))
-			require.True(t, hasMember(t, r, kg.Concurrency("p", fnID.String()), qi.ID), r.Keys())
-			require.True(t, hasMember(t, r, kg.Concurrency("custom", fullKey), qi.ID))
+			// Concurrency keys are no longer populated by the lease Lua script
+			require.False(t, hasMember(t, r, kg.Concurrency("account", accountId.String()), qi.ID))
+			require.False(t, hasMember(t, r, kg.Concurrency("p", fnID.String()), qi.ID))
+			require.False(t, hasMember(t, r, kg.Concurrency("custom", fullKey), qi.ID))
 
 			err = shard.Dequeue(ctx, qi)
 			require.NoError(t, err)
@@ -250,13 +245,12 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 			// expect item not to be requeued
 			require.False(t, hasMember(t, r, kg.BacklogSet(backlog.BacklogID), qi.ID))
 
-			// expect key queue accounting to be updated
+			// expect key queue accounting to remain empty after dequeue
 			require.False(t, hasMember(t, r, shadowPartitionInProgressKey(shadowPartition, kg), qi.ID))
 			require.False(t, hasMember(t, r, shadowPartitionAccountInProgressKey(shadowPartition, kg), qi.ID))
 			require.False(t, hasMember(t, r, backlogCustomKeyInProgress(backlog, kg, 1), qi.ID))
 
-			// expect old accounting to be updated
-			// TODO Do we actually want to update previous accounting?
+			// expect old accounting to remain empty after dequeue
 			require.False(t, hasMember(t, r, kg.Concurrency("account", accountId.String()), qi.ID))
 			require.False(t, hasMember(t, r, kg.Concurrency("p", fnID.String()), qi.ID))
 			require.False(t, hasMember(t, r, kg.Concurrency("custom", fullKey), qi.ID))
@@ -370,7 +364,6 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 			// put item in progress, this is tested separately
 			now := clock.Now()
 			leaseDur := 5 * time.Second
-			leaseExpires := now.Add(leaseDur)
 			leaseID, err := shard.Lease(ctx, qi, leaseDur, now, nil)
 			require.NoError(t, err)
 			require.NotNil(t, leaseID)
@@ -384,23 +377,22 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 			fnPart := osqueue.ItemPartition(ctx, item)
 			require.NotEmpty(t, fnPart.ID)
 
-			// expect key queue accounting to contain item in in-progress
-			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, shadowPartitionInProgressKey(shadowPartition, kg), qi.ID)))
-			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, shadowPartitionAccountInProgressKey(shadowPartition, kg), qi.ID)))
+			// In-progress keys are no longer populated by the lease Lua script (handled by Constraint API)
+			require.False(t, r.Exists(shadowPartitionInProgressKey(shadowPartition, kg)))
+			require.False(t, r.Exists(shadowPartitionAccountInProgressKey(shadowPartition, kg)))
 
-			// 2 active set for custom concurrency keys
+			// Verify key derivation still correct, but keys are not populated by lease anymore
 			require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope1, fnID, unhashedValue1)), backlogCustomKeyInProgress(backlog, kg, 1))
-			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, backlogCustomKeyInProgress(backlog, kg, 1), qi.ID)))
+			require.False(t, r.Exists(backlogCustomKeyInProgress(backlog, kg, 1)))
 
 			require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope2, wsID, unhashedValue2)), backlogCustomKeyInProgress(backlog, kg, 2))
-			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, backlogCustomKeyInProgress(backlog, kg, 2), qi.ID)))
+			require.False(t, r.Exists(backlogCustomKeyInProgress(backlog, kg, 2)))
 
-			// expect old accounting to be updated
-			// TODO Do we actually want to update previous accounting?
-			require.True(t, hasMember(t, r, kg.Concurrency("account", accountId.String()), qi.ID))
-			require.True(t, hasMember(t, r, kg.Concurrency("p", fnID.String()), qi.ID), r.Keys())
-			require.True(t, hasMember(t, r, kg.Concurrency("custom", fullKey1), qi.ID))
-			require.True(t, hasMember(t, r, kg.Concurrency("custom", fullKey2), qi.ID))
+			// Concurrency keys are no longer populated by the lease Lua script
+			require.False(t, hasMember(t, r, kg.Concurrency("account", accountId.String()), qi.ID))
+			require.False(t, hasMember(t, r, kg.Concurrency("p", fnID.String()), qi.ID))
+			require.False(t, hasMember(t, r, kg.Concurrency("custom", fullKey1), qi.ID))
+			require.False(t, hasMember(t, r, kg.Concurrency("custom", fullKey2), qi.ID))
 
 			err = shard.Dequeue(ctx, qi)
 			require.NoError(t, err)
@@ -408,13 +400,12 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 			// expect item not to be requeued
 			require.False(t, hasMember(t, r, kg.BacklogSet(backlog.BacklogID), qi.ID))
 
-			// expect key queue accounting to be updated
+			// expect key queue accounting to remain empty after dequeue
 			require.False(t, hasMember(t, r, shadowPartitionInProgressKey(shadowPartition, kg), qi.ID))
 			require.False(t, hasMember(t, r, shadowPartitionAccountInProgressKey(shadowPartition, kg), qi.ID))
 			require.False(t, hasMember(t, r, backlogCustomKeyInProgress(backlog, kg, 1), qi.ID))
 
-			// expect old accounting to be updated
-			// TODO Do we actually want to update previous accounting?
+			// expect old accounting to remain empty after dequeue
 			require.False(t, hasMember(t, r, kg.Concurrency("account", accountId.String()), qi.ID))
 			require.False(t, hasMember(t, r, kg.Concurrency("p", fnID.String()), qi.ID))
 			require.False(t, hasMember(t, r, kg.Concurrency("custom", fullKey1), qi.ID))
@@ -475,7 +466,6 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 			// put item in progress, this is tested separately
 			now := clock.Now()
 			leaseDur := 5 * time.Second
-			leaseExpires := now.Add(leaseDur)
 			leaseID, err := shard.Lease(ctx, qi, leaseDur, now, nil)
 			require.NoError(t, err)
 			require.NotNil(t, leaseID)
@@ -489,8 +479,8 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 			fnPart := osqueue.ItemPartition(ctx, item)
 			require.NotEmpty(t, fnPart.ID)
 
-			// expect key queue accounting to contain item in in-progress
-			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, shadowPartitionInProgressKey(shadowPartition, kg), qi.ID)))
+			// In-progress keys are no longer populated by the lease Lua script (handled by Constraint API)
+			require.False(t, r.Exists(shadowPartitionInProgressKey(shadowPartition, kg)))
 
 			require.Equal(t, kg.Concurrency("account", ""), shadowPartitionAccountInProgressKey(shadowPartition, kg))
 			require.False(t, r.Exists(shadowPartitionAccountInProgressKey(shadowPartition, kg)))
@@ -498,11 +488,10 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 			// no active set for default partition since this uses the in progress key
 			require.Equal(t, kg.Concurrency("", ""), backlogCustomKeyInProgress(backlog, kg, 1))
 
-			// expect old accounting to be updated
-			// TODO Do we actually want to update previous accounting?
-			require.True(t, hasMember(t, r, partitionConcurrencyKey(fnPart, kg), qi.ID))
+			// Concurrency keys are no longer populated by the lease Lua script
+			require.False(t, hasMember(t, r, partitionConcurrencyKey(fnPart, kg), qi.ID))
 			require.False(t, hasMember(t, r, kg.Concurrency("account", fnPart.Queue()), qi.ID)) // pseudo-limit for system queue
-			require.True(t, hasMember(t, r, kg.Concurrency("p", fnPart.Queue()), qi.ID))
+			require.False(t, hasMember(t, r, kg.Concurrency("p", fnPart.Queue()), qi.ID))
 
 			err = shard.Dequeue(ctx, qi)
 			require.NoError(t, err)
@@ -879,9 +868,10 @@ func TestQueueDequeue(t *testing.T) {
 		require.NoError(t, err)
 
 		itemCountMatches(0)
-		concurrencyItemCountMatches(1)
+		// Concurrency queue is no longer populated by lease Lua script (handled by Constraint API)
+		concurrencyItemCountMatches(0)
 
-		// Ensure the concurrency index is updated.
+		// The concurrency index (scavenger pointer) is still updated by lease
 		mem, err := r.ZMembers(kg.ConcurrencyIndex())
 		require.NoError(t, err)
 		assert.Equal(t, 1, len(mem))
@@ -901,59 +891,3 @@ func TestQueueDequeue(t *testing.T) {
 	})
 }
 
-func TestQueueDequeueWithDisabledConstraintUpdates(t *testing.T) {
-	r := miniredis.RunT(t)
-	rc, err := rueidis.NewClient(rueidis.ClientOption{
-		InitAddress:  []string{r.Addr()},
-		DisableCache: true,
-	})
-	require.NoError(t, err)
-	defer rc.Close()
-
-	clock := clockwork.NewFakeClock()
-
-	q, shard := newQueue(
-		t, rc,
-		osqueue.WithClock(clock),
-		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
-			return true
-		}),
-	)
-	kg := shard.Client().kg
-	ctx := context.Background()
-
-	accountID := uuid.New()
-	fnID := uuid.New()
-
-	qi := osqueue.QueueItem{
-		FunctionID: fnID,
-		Data: osqueue.Item{
-			Payload: json.RawMessage("{\"test\":\"payload\"}"),
-			Identifier: state.Identifier{
-				AccountID:  accountID,
-				WorkflowID: fnID,
-			},
-		},
-	}
-
-	start := time.Now().Truncate(time.Second)
-
-	item, err := shard.EnqueueItem(ctx, qi, start, osqueue.EnqueueOpts{})
-	require.NoError(t, err)
-
-	// Lease item in new mode (skip checks)
-	leaseID, err := shard.Lease(ctx, item, 5*time.Second, clock.Now(), nil, osqueue.LeaseOptionDisableConstraintChecks(true))
-	require.NoError(t, err)
-	require.NotNil(t, leaseID)
-
-	require.Equal(t, clock.Now().Add(5*time.Second).UnixMilli(), int64(score(t, r, kg.PartitionScavengerIndex(fnID.String()), item.ID)))
-	require.False(t, r.Exists(kg.Concurrency("p", fnID.String())))
-	require.False(t, r.Exists(kg.Concurrency("account", accountID.String())))
-
-	err = q.Dequeue(ctx, shard, item, osqueue.DequeueOptionDisableConstraintUpdates(true))
-	require.NoError(t, err)
-
-	require.False(t, r.Exists(kg.Concurrency("p", fnID.String())))
-	require.False(t, r.Exists(kg.Concurrency("account", accountID.String())))
-	require.False(t, r.Exists(kg.PartitionScavengerIndex(fnID.String())))
-}

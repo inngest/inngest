@@ -440,7 +440,7 @@ func (q *queueProcessor) ProcessShadowPartitionBacklog(
 
 	// Limit backlog peek to maximum lease generation
 	// TODO: Run multiple requests, etc. to balance peek size and throughput
-	if shadowPart.AccountID != nil && q.UseConstraintAPI != nil && q.UseConstraintAPI(ctx, *shadowPart.AccountID) {
+	if shadowPart.AccountID != nil && q.CapacityManager != nil {
 		refillLimit = constraintapi.MaximumAmount
 	}
 
@@ -503,8 +503,6 @@ func (q *queueProcessor) ProcessShadowPartitionBacklog(
 					constraintCheckRes.ItemsToRefill,
 					constraints,
 					WithBacklogRefillConstraintCheckIdempotencyKey(operationIdempotencyKey),
-					WithBacklogRefillDisableConstraintChecks(constraintCheckRes.SkipConstraintChecks),
-					WithBacklogRefillItemCapacityLeases(constraintCheckRes.ItemCapacityLeases),
 				)
 			},
 			map[string]any{

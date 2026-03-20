@@ -206,14 +206,7 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 		return ErrProcessStopIterator
 	}
 
-	constraintCheckSource := "lease"
-	if constraintRes.SkipConstraintChecks || constraintRes.LimitingConstraint != enums.QueueConstraintNotLimited {
-		constraintCheckSource = "constraint-api"
-	}
-
-	if constraintRes.SkipConstraintChecks {
-		leaseOptions = append(leaseOptions, LeaseOptionDisableConstraintChecks(true))
-	}
+	constraintCheckSource := "constraint-api"
 
 	// If we're limited by constraints, release semaphore early since we won't be leasing or processing
 	if constraintRes.LimitingConstraint != enums.QueueConstraintNotLimited {
@@ -505,10 +498,6 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 		PCtr: p.PartitionContinueCtr,
 
 		CapacityLease: constraintRes.CapacityLease,
-		// Disable constraint updates in case we skipped constraint checks.
-		// This should always be linked, as we want consistent behavior while
-		// processing a queue item.
-		DisableConstraintUpdates: constraintRes.SkipConstraintChecks,
 	}
 	commitSemaphoreAcquire = true
 

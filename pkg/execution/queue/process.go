@@ -55,8 +55,6 @@ func (q *queueProcessor) ProcessItem(
 	q.wg.Add(1)
 	defer q.wg.Done()
 
-	disableConstraintUpdates := i.DisableConstraintUpdates
-
 	errCh := make(chan error, 1)
 
 	// XXX: Add a max job time here, configurable.
@@ -103,8 +101,6 @@ func (q *queueProcessor) ProcessItem(
 					qi,
 					*leaseID,
 					QueueLeaseDuration,
-					// When holding a capacity lease, do not update constraint state
-					ExtendLeaseOptionDisableConstraintUpdates(disableConstraintUpdates),
 				)
 				if err != nil {
 					// log error if unexpected; the queue item may be removed by a Dequeue() operation
@@ -399,7 +395,7 @@ func (q *queueProcessor) ProcessItem(
 			}
 
 			qi.AtMS = at.UnixMilli()
-			if err := q.primaryQueueShard.Requeue(context.WithoutCancel(ctx), qi, at, RequeueOptionDisableConstraintUpdates(disableConstraintUpdates)); err != nil {
+			if err := q.primaryQueueShard.Requeue(context.WithoutCancel(ctx), qi, at); err != nil {
 				if err == ErrQueueItemNotFound {
 					// Safe. The executor may have dequeued.
 					return nil
@@ -417,7 +413,7 @@ func (q *queueProcessor) ProcessItem(
 
 		// Dequeue this entirely, as this permanently failed.
 		// XXX: Increase permanently failed counter here.
-		if err := q.primaryQueueShard.Dequeue(context.WithoutCancel(ctx), qi, DequeueOptionDisableConstraintUpdates(disableConstraintUpdates)); err != nil {
+		if err := q.primaryQueueShard.Dequeue(context.WithoutCancel(ctx), qi); err != nil {
 			if err == ErrQueueItemNotFound {
 				// Safe. The executor may have dequeued.
 				return nil
@@ -431,7 +427,7 @@ func (q *queueProcessor) ProcessItem(
 			return err
 		}
 	case <-jobCtx.Done():
-		if err := q.primaryQueueShard.Dequeue(context.WithoutCancel(ctx), qi, DequeueOptionDisableConstraintUpdates(disableConstraintUpdates)); err != nil {
+		if err := q.primaryQueueShard.Dequeue(context.WithoutCancel(ctx), qi); err != nil {
 			if err == ErrQueueItemNotFound {
 				// Safe. The executor may have dequeued.
 				return nil

@@ -32,7 +32,6 @@ func TestQueueE2E(t *testing.T) {
 		interval         time.Duration
 		concurrency      int
 		queueOptions     []queue.QueueOpt
-		useConstraintAPI constraintapi.UseConstraintAPIFn
 	}{
 		{
 			name:         "basic test",
@@ -117,9 +116,6 @@ func TestQueueE2E(t *testing.T) {
 				}),
 				queue.WithPollTick(150 * time.Millisecond),
 			},
-			useConstraintAPI: func(ctx context.Context, accountID uuid.UUID) (enable bool) {
-				return true
-			},
 		},
 		{
 			name:         "with capacity manager",
@@ -147,9 +143,6 @@ func TestQueueE2E(t *testing.T) {
 					return false
 				}),
 				queue.WithPollTick(150 * time.Millisecond),
-			},
-			useConstraintAPI: func(ctx context.Context, accountID uuid.UUID) (enable bool) {
-				return true
 			},
 		},
 	}
@@ -228,13 +221,7 @@ func TestQueueE2E(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			if tc.useConstraintAPI != nil {
-				options = append(options, queue.WithCapacityManager(cm))
-				options = append(options,
-					queue.WithUseConstraintAPI(tc.useConstraintAPI),
-					queue.WithAcquireCapacityLeaseOnBacklogRefill(true),
-				)
-			}
+			options = append(options, queue.WithCapacityManager(cm))
 
 			queueClient := redis_state.NewQueueClient(rc, redis_state.QueueDefaultKey)
 			shard := redis_state.NewQueueShard("test", queueClient, options...)

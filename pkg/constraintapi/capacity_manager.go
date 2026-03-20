@@ -343,6 +343,4 @@ type LeaseSource struct {
 	RunProcessingMode RunProcessingMode
 }
 
-type UseConstraintAPIFn func(ctx context.Context, accountID uuid.UUID) (enable bool)
-
 type EnableHighCardinalityInstrumentation func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool)
