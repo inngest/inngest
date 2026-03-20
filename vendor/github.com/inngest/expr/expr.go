@@ -194,6 +194,7 @@ func NewAggregateEvaluator[T Evaluable](
 		},
 		lock:            &sync.RWMutex{},
 		constants:       map[uuid.UUID]struct{}{},
+		alwaysTrue:      map[uuid.UUID]struct{}{},
 		mixed:           map[uuid.UUID]struct{}{},
 		stopGC:          make(chan struct{}),
 		concurrency:     opts.Concurrency,
@@ -239,6 +240,10 @@ type aggregator[T Evaluable] struct {
 	// the expression containing non-aggregateable clauses.
 	constants map[uuid.UUID]struct{}
 
+	// alwaysTrue tracks evaluable IDs whose expression is a constant true literal,
+	// meaning they always match without requiring CEL evaluation.
+	alwaysTrue map[uuid.UUID]struct{}
+
 	// deleted tracks evaluable IDs that have been soft-deleted.
 	// Remove operations mark items here instead of actually removing them,
 	// avoiding lock contention during evaluation.
@@ -261,7 +266,7 @@ type aggregator[T Evaluable] struct {
 func (a *aggregator[T]) Len() int {
 	a.lock.RLock()
 	defer a.lock.RUnlock()
-	return int(atomic.LoadInt32(&a.fastLen)) + len(a.mixed) + len(a.constants)
+	return int(atomic.LoadInt32(&a.fastLen)) + len(a.mixed) + len(a.constants) + len(a.alwaysTrue)
 }
 
 // FastLen returns the number of expressions being matched by aggregated trees.
@@ -308,6 +313,22 @@ func (a *aggregator[T]) Evaluate(ctx context.Context, data map[string]any) ([]T,
 	napool := newErrPool(errPoolOpts{concurrency: a.concurrency})
 
 	a.lock.RLock()
+
+	// Always-true expressions match without CEL evaluation.
+	for uuid := range a.alwaysTrue {
+		if _, deleted := a.deleted.Load(uuid); deleted {
+			continue
+		}
+		item, err := a.kv.Get(uuid)
+		if err != nil {
+			continue
+		}
+		atomic.AddInt32(&matched, 1)
+		s.Lock()
+		result = append(result, item)
+		s.Unlock()
+	}
+
 	for uuid := range a.constants {
 		// Skip deleted items
 		if _, deleted := a.deleted.Load(uuid); deleted {
@@ -490,6 +511,20 @@ func (a *aggregator[T]) Add(ctx context.Context, eval T) (float64, error) {
 
 	if err := a.kv.Set(eval); err != nil {
 		return -1, err
+	}
+
+	if parsed.LiteralBool != nil {
+		if !*parsed.LiteralBool {
+			// This is a constant false expression which never matches.
+			// Skip adding it entirely to avoid unnecessary evaluation.
+			return -1, nil
+		}
+		// This is a constant true expression which always matches.
+		// Add it to the always-true list for fast evaluation without CEL.
+		a.lock.Lock()
+		a.alwaysTrue[parsed.EvaluableID] = struct{}{}
+		a.lock.Unlock()
+		return -1, nil
 	}
 
 	if eval.GetExpression() == "" || parsed.HasMacros {
@@ -739,6 +774,7 @@ func (a *aggregator[T]) GC(ctx context.Context) bool {
 		a.lock.Lock()
 		for _, id := range constantsToDelete {
 			delete(a.constants, id)
+			delete(a.alwaysTrue, id)
 		}
 		for _, id := range mixedToDelete {
 			delete(a.mixed, id)
