@@ -3,7 +3,6 @@ package redis_state
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -472,8 +471,6 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 			// Release the capacity early
 			require.NotNil(t, ri.CapacityLease)
 
-			fmt.Println("early release")
-
 			err := ri.CapacityLease.Release()
 			require.NoError(t, err)
 
@@ -485,8 +482,6 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Equal(t, 1, int(counter))
-
-		fmt.Println("waiting")
 
 		service.Wait()
 
