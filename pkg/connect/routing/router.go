@@ -54,6 +54,11 @@ func GetRoute(ctx context.Context, stateMgr state.StateManager, rnd *util.FrandR
 		return nil, fmt.Errorf("could not parse env ID: %w", err)
 	}
 
+	fnID, err := uuid.Parse(data.FunctionId)
+	if err != nil {
+		return nil, fmt.Errorf("could not parse function ID: %w", err)
+	}
+
 	{
 		systemTraceCtx := propagation.MapCarrier{}
 		if err := json.Unmarshal(data.SystemTraceCtx, &systemTraceCtx); err != nil {
@@ -62,7 +67,7 @@ func GetRoute(ctx context.Context, stateMgr state.StateManager, rnd *util.FrandR
 
 		ctx = trace.SystemTracer().Propagator().Extract(ctx, systemTraceCtx)
 	}
-	ctx, span := tracer.NewSpan(ctx, "RouteExecutorRequest", accountID, envID)
+	ctx, span := tracer.NewSpan(ctx, "RouteExecutorRequest", accountID, envID, fnID)
 	defer span.End()
 
 	routeTo, err := getSuitableConnection(ctx, rnd, stateMgr, envID, appID, data.FunctionSlug, log)

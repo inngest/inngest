@@ -609,6 +609,13 @@ func (e *executor) createCancellationPauses(ctx context.Context, l logger.Logger
 			idSrc = fmt.Sprintf("%s-%s", idSrc, interpolated)
 		}
 
+		// If the interpolated expression evaluated to false,
+		// we will never cancel this run based on an incoming event.
+		// Skip creating the pause.
+		if expr != nil && *expr == "false" {
+			continue
+		}
+
 		// NOTE: making this deterministic so pause creation is also idempotent
 		pauseID := inngest.DeterministicSha1UUID(idSrc)
 		pause := state.Pause{
@@ -621,6 +628,7 @@ func (e *executor) createCancellationPauses(ctx context.Context, l logger.Logger
 			Cancel:            true,
 			TriggeringEventID: &triggeringID,
 		}
+
 		_, err := e.pm.Write(ctx, pauses.Index{WorkspaceID: req.WorkspaceID, EventName: c.Event}, &pause)
 		if err != nil && err != state.ErrPauseAlreadyExists {
 			return err
@@ -4783,9 +4791,26 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, runCtx execu
 	}
 
 	lifecycleItem := runCtx.LifecycleItem()
-	idx := pauses.Index{WorkspaceID: runCtx.Metadata().ID.Tenant.EnvID, EventName: opts.Event}
+	span, err := e.tracerProvider.CreateDroppableSpan(
+		ctx,
+		meta.SpanNameStep,
+		&tracing.CreateSpanOptions{
+			Carriers:    []map[string]any{pause.Metadata, nextItem.Metadata},
+			FollowsFrom: tracing.SpanRefFromQueueItem(&lifecycleItem),
+			Debug:       &tracing.SpanDebugData{Location: "executor.handleGeneratorWaitForEvent"},
+			Metadata:    runCtx.Metadata(),
+			QueueItem:   &nextItem,
+			Parent:      tracing.RunSpanRefFromMetadata(runCtx.Metadata()),
+			Attributes:  tracing.GeneratorAttrs(&gen),
+		},
+	)
+	if err != nil {
+		// return fmt.Errorf("error creating span for next step after
+		// WaitForEvent: %w", err)
+		e.log.Debug("error creating span for next step after WaitForEvent", "error", err)
+	}
 
-	attrs := tracing.GeneratorAttrs(&gen)
+	idx := pauses.Index{WorkspaceID: runCtx.Metadata().ID.Tenant.EnvID, EventName: opts.Event}
 
 	// We really don't want this to fail, this can be retried in an idempotent way but
 	// workflows with 0 retries setup will just hang forever if pause creation fails.
@@ -4801,30 +4826,7 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, runCtx execu
 			return err
 		}
 		// Allow pause already existing to be idempotent, and continue on with enqueueing.
-	}
-
-	afterPauseTS := e.now()
-
-	span, err := e.tracerProvider.CreateDroppableSpan(
-		ctx,
-		meta.SpanNameStep,
-		&tracing.CreateSpanOptions{
-			Carriers:    []map[string]any{pause.Metadata, nextItem.Metadata},
-			FollowsFrom: tracing.SpanRefFromQueueItem(&lifecycleItem),
-			Debug:       &tracing.SpanDebugData{Location: "executor.handleGeneratorWaitForEvent"},
-			Metadata:    runCtx.Metadata(),
-			QueueItem:   &nextItem,
-			Parent:      tracing.RunSpanRefFromMetadata(runCtx.Metadata()),
-			Attributes: attrs.Merge(meta.NewAttrSet(
-				meta.Attr(meta.Attrs.QueuedAt, &now),
-				meta.Attr(meta.Attrs.StartedAt, &afterPauseTS),
-			)),
-		},
-	)
-	if err != nil {
-		// return fmt.Errorf("error creating span for next step after
-		// WaitForEvent: %w", err)
-		e.log.Debug("error creating span for next step after WaitForEvent", "error", err)
+		span.Drop()
 	}
 
 	// TODO Is this fine to leave? No attempts.

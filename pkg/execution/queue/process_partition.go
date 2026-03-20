@@ -24,7 +24,8 @@ import (
 func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition, continuationCount uint, randomOffset bool) error {
 	l := logger.StdlibLogger(ctx)
 
-	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.processPartition", p.AccountID, p.Identifier().EnvID)
+	partitionIdentifier := p.Identifier()
+	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.processPartition", p.AccountID, partitionIdentifier.EnvID, partitionIdentifier.FunctionID)
 	defer span.End()
 
 	// When Constraint API is enabled, disable capacity checks on PartitionLease.
