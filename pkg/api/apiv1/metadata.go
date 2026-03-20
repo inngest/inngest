@@ -14,6 +14,8 @@ import (
 	"github.com/inngest/inngest/pkg/api/apiv1/apiv1auth"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/enums"
+	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/publicerr"
 	"github.com/inngest/inngest/pkg/tracing"
 	"github.com/inngest/inngest/pkg/tracing/meta"
@@ -76,6 +78,7 @@ func (a router) addRunMetadata(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 400, "Invalid metadata target"))
+		return
 	}
 
 	for _, md := range data.Metadata {
@@ -87,7 +90,12 @@ func (a router) addRunMetadata(w http.ResponseWriter, r *http.Request) {
 
 	err = a.AddRunMetadata(ctx, auth, runID, &data)
 	switch {
-	// TODO: better cases for specific errors
+	case errors.Is(err, metadata.ErrMetadataSpanTooLarge):
+		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 413, "Metadata span exceeds maximum size of 64KB"))
+		return
+	case errors.Is(err, metadata.ErrRunMetadataSizeExceeded):
+		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 413, "Cumulative metadata size exceeds limit"))
+		return
 	case err != nil:
 		_ = publicerr.WriteHTTP(w, err)
 		return
@@ -115,6 +123,31 @@ func (a router) AddRunMetadata(ctx context.Context, auth apiv1auth.V1Auth, runID
 		return err
 	}
 
+	// Load run metadata to enforce the per-run cumulative size limit against
+	// metadata that already exists in the run, not just this request.
+	stateID := statev2.ID{
+		RunID:      parentSpan.RunID,
+		FunctionID: parentSpan.FunctionID,
+		Tenant: statev2.Tenant{
+			AppID:     parentSpan.AppID,
+			EnvID:     auth.WorkspaceID(),
+			AccountID: auth.AccountID(),
+		},
+	}
+
+	var stateMetadata *statev2.Metadata
+	if a.opts.State != nil {
+		md, err := a.opts.State.LoadMetadata(ctx, stateID)
+		if err != nil {
+			logger.StdlibLogger(ctx).Warn("failed to load run metadata for size limit check, falling back to request-only limit",
+				"error", err,
+				"run_id", runID.String(),
+			)
+		} else {
+			stateMetadata = &md
+		}
+	}
+
 	parentSpanRef := &meta.SpanReference{
 		TraceParent:            fmt.Sprintf("00-%s-%s-00", parentSpan.TraceID, parentSpan.SpanID),
 		DynamicSpanID:          parentSpan.SpanID,
@@ -134,21 +167,32 @@ func (a router) AddRunMetadata(ctx context.Context, auth apiv1auth.V1Auth, runID
 			return publicerr.Wrap(err, 400, "Invalid metadata")
 		}
 
-		// TODO: validate that specific kinds are allowed to be set by the user and check account-level metadata
-		// limits.
-		_, err := tracing.CreateMetadataSpan(
+		_, err = tracing.CreateMetadataSpan(
 			ctx,
 			a.opts.TracerProvider,
 			parentSpanRef,
 			"router.AddRunMetadata",
 			pkgName,
-			nil,
+			stateMetadata,
 			md,
 			scope,
 			addTenantIDs,
 		)
 		if err != nil {
 			return err
+		}
+	}
+
+	// Persist the cumulative metadata size delta back to the state store.
+	if stateMetadata != nil {
+		if delta := stateMetadata.Metrics.SwapMetadataSizeDelta(); delta > 0 {
+			if err := statev2.TryIncrementMetadataSize(ctx, a.opts.State, stateID, delta); err != nil {
+				logger.StdlibLogger(ctx).Error("failed to persist metadata size delta",
+					"error", err,
+					"run_id", runID.String(),
+					"delta", delta,
+				)
+			}
 		}
 	}
 

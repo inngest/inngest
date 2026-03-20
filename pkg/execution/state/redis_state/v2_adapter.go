@@ -294,9 +294,11 @@ func (v v2) LoadMetadata(ctx context.Context, id state.ID) (state.Metadata, erro
 		}),
 		Stack: stack,
 		Metrics: state.RunMetrics{
-			EventSize: md.EventSize,
-			StateSize: md.StateSize,
-			StepCount: md.StepCount,
+			EventSize:          md.EventSize,
+			StateSize:          md.StateSize,
+			StepCount:          md.StepCount,
+			MetadataSize:       md.MetadataSize,
+			MetadataSizeLoaded: md.MetadataSize,
 		},
 	}
 
@@ -429,6 +431,12 @@ func (v v2) ConsumePause(ctx context.Context, p statev1.Pause, opts statev1.Cons
 	)
 
 	return r, err
+}
+
+// IncrementMetadataSize atomically increments the cumulative metadata size
+// counter for a run via HINCRBY.
+func (v v2) IncrementMetadataSize(ctx context.Context, id state.ID, delta int) error {
+	return v.mgr.IncrementMetadataSize(ctx, id.Tenant.AccountID, id.RunID, delta)
 }
 
 func (v v2) retryPolicy(opts ...util.RetryConfSetting) util.RetryConf {

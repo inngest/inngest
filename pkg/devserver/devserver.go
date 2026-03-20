@@ -658,6 +658,9 @@ func start(ctx context.Context, opts StartOpts) error {
 				RunOutputReader: devutil.NewLocalOutputReader(core.Resolver(), ds.Data, ds.Data),
 				RunJWTSecret:    consts.DevServerRunJWTSecret,
 				BackoffFunc:     retryBackoff,
+				AllowStepMetadata: func(ctx context.Context, acctID uuid.UUID) bool {
+					return enableStepMetadata
+				},
 			},
 
 			MetadataOpts: apiv1.MetadataOpts{
