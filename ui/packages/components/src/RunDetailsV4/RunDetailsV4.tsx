@@ -241,25 +241,21 @@ export const RunDetailsV4 = ({
     return () => clearTimeout(timeoutId);
   }, [runData?.trace.endedAt, pollInterval]);
 
+  const traceStatus = runData?.trace?.status;
+
   useEffect(() => {
-    if (!runData?.status || runData?.status === initialRunData?.status) {
+    if (!traceStatus || traceStatus === initialRunData?.status) {
       return;
     }
 
     updateDynamicRunData({
       runID,
-      status: runData.status,
-      endedAt: runData.trace.endedAt ?? undefined,
+      status: traceStatus,
+      endedAt: runData?.trace.endedAt ?? undefined,
     });
-  }, [
-    runData?.trace.endedAt,
-    runData?.status,
-    initialRunData?.status,
-    updateDynamicRunData,
-    runID,
-  ]);
+  }, [runData?.trace.endedAt, traceStatus, initialRunData?.status, updateDynamicRunData, runID]);
 
-  const waiting = isWaiting(initialRunData?.status || runData?.status, runError, resultError);
+  const waiting = isWaiting(initialRunData?.status || traceStatus, runError, resultError);
   const showError = waiting ? false : runError || resultError;
 
   // Works around a variety of layout and scroll issues with two column layout
@@ -273,7 +269,7 @@ export const RunDetailsV4 = ({
       {standalone && runData && (
         <div className="border-muted flex flex-row items-start justify-between border-b px-4 pb-4">
           <div className="flex flex-col gap-1">
-            <StatusCell status={runData.status} />
+            <StatusCell status={traceStatus || runData.status} />
             <p className="text-basis text-2xl font-medium">{runData.fn.name}</p>
             <p className="text-subtle font-mono">{runID}</p>
           </div>
