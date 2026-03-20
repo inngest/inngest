@@ -139,6 +139,20 @@ func lookupSchemaField(v reflect.Value, name string) reflect.Value {
 		}
 		return v.FieldByName("Types")
 	}
+	if name == "items" {
+		// The "items" keyword refers to the "union type" that is either a schema or a schema array.
+		// Implemented using the Items representing the schema and ItemsArray for the schema array.
+		if items := v.FieldByName("Items"); items.IsValid() && !items.IsNil() {
+			return items
+		}
+		return v.FieldByName("ItemsArray")
+	}
+	if name == "dependencies" {
+		// The "dependencies" keyword refers to both DependencyStrings and DependencySchemas maps.
+		// The value on schemaFieldMap is not garanteed to be DependencySchemas which we want
+		// for pointer dereference. So we use FieldByName to get the DependencySchemas map.
+		return v.FieldByName("DependencySchemas")
+	}
 	if sf, ok := schemaFieldMap[name]; ok {
 		return v.FieldByIndex(sf.Index)
 	}
