@@ -16,6 +16,7 @@ import {
   isStepInfoRun,
   type SpanMetadata,
   type SpanMetadataInngestHTTPTiming,
+  type SpanMetadataInngestTiming,
   type Trace,
 } from '../types';
 import { TIMELINE_CONSTANTS } from './timing';
@@ -88,6 +89,32 @@ function calculateTimingBreakdown(
 }
 
 /**
+ * Extract timing breakdown from inngest.timing metadata.
+ * Returns server-computed queue delay and Inngest overhead when available.
+ */
+function getTimingFromMetadata(
+  trace: Trace,
+  metadata?: SpanMetadata[]
+): { queueMs: number; executionMs: number; totalMs: number } | null {
+  if (!metadata) return null;
+
+  const timing = metadata.find((m): m is SpanMetadataInngestTiming => m.kind === 'inngest.timing');
+
+  if (!timing) return null;
+
+  const queueMs = timing.values.total_inngest_ms ?? 0;
+
+  // Execution time is still derived from span timestamps since the metadata
+  // captures Inngest-side overhead, not SDK execution duration.
+  const startedAt = trace.startedAt ? new Date(trace.startedAt).getTime() : null;
+  const endedAt = trace.endedAt ? new Date(trace.endedAt).getTime() : Date.now();
+  const executionMs = startedAt ? Math.max(0, endedAt - startedAt) : 0;
+  const totalMs = queueMs + executionMs;
+
+  return { queueMs, executionMs, totalMs };
+}
+
+/**
  * Extract HTTP timing breakdown from span metadata.
  * Returns timing phases for Inngest's HTTP call to the SDK endpoint.
  */
@@ -115,7 +142,10 @@ function getHTTPTimingFromMetadata(metadata?: SpanMetadata[]): HTTPTimingBreakdo
  */
 function traceToBarData(trace: Trace, orgName?: string, rootStatus?: string): TimelineBarData {
   const isStepRun = isStepRunSpan(trace) && !trace.isUserland;
-  const timingBreakdown = isStepRun ? calculateTimingBreakdown(trace) : undefined;
+  // Prefer server-computed timing from metadata, fall back to span-timestamp calculation
+  const timingBreakdown = isStepRun
+    ? getTimingFromMetadata(trace, trace.metadata) ?? calculateTimingBreakdown(trace)
+    : undefined;
 
   // HTTP timing applies to any step that Inngest calls via HTTP, not just step.run
   const httpTimingBreakdown = !trace.isRoot

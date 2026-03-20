@@ -42,6 +42,7 @@ export type SpanMetadata =
   | SpanMetadataInngestAI
   | SpanMetadataInngestHTTP
   | SpanMetadataInngestHTTPTiming
+  | SpanMetadataInngestTiming
   | SpanMetadataInngestResponseHeaders
   | SpanMetadataInngestWarnings
   | SpanMetadataUserland
@@ -87,6 +88,18 @@ export type SpanMetadataInngestHTTPTiming = {
     server_processing_ms: number;
     content_transfer_ms: number;
     total_ms: number;
+  };
+};
+
+export type SpanMetadataInngestTiming = {
+  scope: 'step_attempt';
+  kind: 'inngest.timing';
+  updatedAt: string;
+  values: {
+    queue_delay_ms?: number;
+    system_latency_ms?: number;
+    network_total_ms?: number;
+    total_inngest_ms?: number;
   };
 };
 
