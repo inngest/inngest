@@ -76,8 +76,10 @@ const MetadataAttrRow = ({
               <div className="text-muted w-48 shrink-0 text-sm font-normal leading-tight">
                 {key}
               </div>
-              <div className="text-basis min-w-0 break-words text-sm font-normal leading-tight">
-                {String(value) || '--'}
+              <div className="text-basis min-w-0 whitespace-pre-wrap break-words text-sm font-normal leading-tight">
+                {typeof value === 'object' && value !== null
+                  ? JSON.stringify(value, null, 2)
+                  : String(value) || '--'}
               </div>
             </div>
           );

@@ -91,6 +91,11 @@ var Attrs = struct {
 	// step.run attributes
 	StepRunType attr[*string]
 
+	// step.experiment attributes
+	ExperimentName    attr[*string]
+	ExperimentStepID  attr[*string]
+	ExperimentVariant attr[*string]
+
 	// Pause-related attributes
 	StepWaitExpired attr[*bool]
 	StepWaitExpiry  attr[*time.Time]
@@ -198,6 +203,9 @@ var Attrs = struct {
 	StepOutput:                         StringAttr("step.output"),
 	StepOutputRef:                      StringAttr("step.output_ref"),
 	StepRunType:                        StringAttr("step.run.type"),
+	ExperimentName:                     StringAttr("inngest.experiment.name"),
+	ExperimentStepID:                   StringAttr("inngest.experiment.step_id"),
+	ExperimentVariant:                  StringAttr("inngest.experiment.variant"),
 	StepSignalName:                     StringAttr("step.signal.name"),
 	StepSleepDuration:                  DurationAttr("step.sleep.duration"),
 	StepUserlandID:                     TruncatedStringAttr("step.userland.id", 128),

@@ -56,6 +56,9 @@ type ExtractedValues struct {
 	StepUserlandID *string
 	StepUserlandIndex *int
 	StepRunType *string
+	ExperimentName *string
+	ExperimentStepID *string
+	ExperimentVariant *string
 	StepWaitExpired *bool
 	StepWaitExpiry *time.Time
 	StepInvokeFunctionID *string

@@ -14,6 +14,7 @@ packages:
         | typeof KindInngestHTTP
         | typeof KindInngestHTTPTiming
         | typeof KindInngestResponseHeaders
+        | typeof KindInngestExperiment
         | typeof KindInngestWarnings
         | SpanMetadataKindUserland;
     type_mappings:
