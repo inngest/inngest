@@ -341,7 +341,7 @@ func (a *api) PostPublish(w http.ResponseWriter, r *http.Request) {
 	claims, err := realtimeAuth(r.Context())
 	if err == nil && !claims.Publish {
 		// We have claims, but not for publishing. Error out.
-		_ = publicerr.WriteHTTP(w, publicerr.Wrapf(err, 401, "Not authenticated"))
+		_ = publicerr.WriteHTTP(w, publicerr.Errorf(401, "Not authenticated for publishing"))
 		return
 	}
 	if claims == nil {
