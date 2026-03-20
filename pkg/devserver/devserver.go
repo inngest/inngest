@@ -17,6 +17,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/api"
 	"github.com/inngest/inngest/pkg/api/apiv1"
+	"github.com/inngest/inngest/pkg/api/apiv1/apiv1auth"
 	apiv2 "github.com/inngest/inngest/pkg/api/v2"
 	"github.com/inngest/inngest/pkg/api/v2/apiv2base"
 	"github.com/inngest/inngest/pkg/authn"
@@ -641,6 +642,7 @@ func start(ctx context.Context, opts StartOpts) error {
 
 		apiv1.AddRoutes(r, apiv1.Opts{
 			AuthMiddleware:     authn.SigningKeyMiddleware(opts.SigningKey),
+			AuthFinder:         apiv1auth.NilAuthFinder,
 			CachingMiddleware:  caching,
 			FunctionReader:     ds.Data,
 			JobQueueReader:     ds.Queue.(queue.JobQueueReader),

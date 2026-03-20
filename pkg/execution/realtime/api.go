@@ -51,7 +51,9 @@ type APIOpts struct {
 
 func NewAPI(o APIOpts) http.Handler {
 	if o.AuthFinder == nil {
-		o.AuthFinder = apiv1auth.NilAuthFinder
+		o.AuthFinder = func(ctx context.Context) (apiv1auth.V1Auth, error) {
+			return nil, fmt.Errorf("no auth finder configured")
+		}
 	}
 
 	// Create the HTTP implementation, which wraps the handler.  We do ths to code
