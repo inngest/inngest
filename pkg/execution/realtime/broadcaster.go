@@ -358,11 +358,9 @@ func (b *broadcaster) recordConnectionMetrics(ctx context.Context) {
 }
 
 func (b *broadcaster) Close(ctx context.Context) error {
-	if atomic.LoadInt32(&b.closing) == 1 {
+	if !atomic.CompareAndSwapInt32(&b.closing, 0, 1) {
 		return ErrBroadcasterClosed
 	}
-
-	atomic.StoreInt32(&b.closing, 1)
 
 	msg := Message{
 		Kind:      streamingtypes.MessageKindClosing,
