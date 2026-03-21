@@ -402,3 +402,11 @@ func (m *mockRunService) LoadStack(ctx context.Context, id statev2.ID) ([]string
 func (m *mockRunService) LoadState(ctx context.Context, id statev2.ID) (statev2.State, error) {
 	return statev2.State{}, nil
 }
+
+func (m *mockRunService) LoadV1Metadata(ctx context.Context, id statev2.ID) (*state.Metadata, error) {
+	return nil, nil
+}
+
+func (m *mockRunService) Duplicate(ctx context.Context, source statev2.State, destID statev2.ID, rawMeta *state.Metadata, stepInputs map[string]json.RawMessage) error {
+	return nil
+}
