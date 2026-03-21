@@ -14,11 +14,16 @@ local batchStatusStarted = ARGV[5]
 local nowUnixSeconds = tonumber(ARGV[6])
 local idempotenceSetTTL = tonumber(ARGV[7])
 local newULID = ARGV[8]              -- ULID to update the pointer with if the batch is full or doesn't exist
-local overflowULID = ARGV[9]         -- ULID to use for overflow batch if needed
-local eventCount = tonumber(ARGV[10])
+local overflowULIDCount = tonumber(ARGV[9])  -- number of overflow ULIDs provided
+-- Overflow ULIDs are ARGV[10] through ARGV[10 + overflowULIDCount - 1]
+local overflowULIDs = {}
+for i = 1, overflowULIDCount do
+  overflowULIDs[i] = ARGV[9 + i]
+end
+local eventCount = tonumber(ARGV[10 + overflowULIDCount])
 
 -- Events are passed as pairs: eventID1, event1, eventID2, event2, ...
--- Starting at ARGV[11]
+-- Starting at ARGV[11 + overflowULIDCount]
 
 -- helper functions
 -- $include(helpers.lua)
@@ -58,7 +63,7 @@ end
 -- Collect all events and check for duplicates
 local eventsToAdd = {}
 local duplicateCount = 0
-local argOffset = 11
+local argOffset = 11 + overflowULIDCount
 
 for i = 1, eventCount do
   local eventID = ARGV[argOffset + (i - 1) * 2]
@@ -119,8 +124,7 @@ local batchMemorySize = redis.call("MEMORY", "USAGE", batchKey) or 0
 
 -- Determine the result status
 local status = "append"
-local nextBatchID = nil
-local overflowCount = 0
+local overflowBatches = {}
 
 -- Check if this was the first item(s) in a new batch
 if currentLen == 0 then
@@ -137,25 +141,53 @@ if batchFull then
   -- Setting it here would cause start.lua to skip execution thinking
   -- the batch is already running.
 
-  -- Check if we have overflow events
   if #eventsForOverflow > 0 then
-    -- Create new batch for overflow
-    update_pointer(batchPointerKey, overflowULID)
-    nextBatchID = overflowULID
+    -- Split overflow events into batches of batchLimit each
+    local ulidIdx = 1
+    local evtIdx = 1
 
-    -- Set up new batch
-    local overflowBatchKey = string.format(keyfmt, prefix, overflowULID)
-    local overflowMetadataKey = string.format("%s:metadata", overflowBatchKey)
+    while evtIdx <= #eventsForOverflow do
+      if ulidIdx > #overflowULIDs then
+        -- Safety: no more ULIDs available. This shouldn't happen if Go
+        -- pre-generates enough, but avoid data loss by putting the rest
+        -- in the last batch.
+        local lastBatch = overflowBatches[#overflowBatches]
+        local lastKey = string.format(keyfmt, prefix, lastBatch.id)
+        local remaining = {}
+        for j = evtIdx, #eventsForOverflow do
+          table.insert(remaining, eventsForOverflow[j])
+        end
+        redis.call("RPUSH", lastKey, unpack(remaining))
+        lastBatch.count = lastBatch.count + #remaining
+        break
+      end
 
-    -- Add overflow events to new batch
-    redis.call("RPUSH", overflowBatchKey, unpack(eventsForOverflow))
-    set_batch_status(overflowMetadataKey, batchStatusAppending)
+      local batchULID = overflowULIDs[ulidIdx]
+      local chunk = {}
+      local chunkEnd = math.min(evtIdx + batchLimit - 1, #eventsForOverflow)
+      for j = evtIdx, chunkEnd do
+        table.insert(chunk, eventsForOverflow[j])
+      end
 
-    overflowCount = #eventsForOverflow
+      local overflowKey = string.format(keyfmt, prefix, batchULID)
+      local overflowMetaKey = string.format("%s:metadata", overflowKey)
+      redis.call("RPUSH", overflowKey, unpack(chunk))
+      set_batch_status(overflowMetaKey, batchStatusAppending)
+
+      local isFull = #chunk >= batchLimit
+      table.insert(overflowBatches, { id = batchULID, count = #chunk, full = isFull })
+
+      -- Point the batch pointer to the last overflow batch (the one still accepting events)
+      update_pointer(batchPointerKey, batchULID)
+
+      evtIdx = evtIdx + #chunk
+      ulidIdx = ulidIdx + 1
+    end
+
     status = "overflow"
   else
     -- No overflow, just rotate the pointer for next batch
-    update_pointer(batchPointerKey, overflowULID)
+    update_pointer(batchPointerKey, overflowULIDs[1])
 
     if batchMemorySize >= batchSizeLimit then
       status = "maxsize"
@@ -171,6 +203,5 @@ return cjson.encode({
   batchPointerKey = batchPointerKey,
   committed = #eventsToAdd,
   duplicates = duplicateCount,
-  nextBatchID = nextBatchID,
-  overflowCount = overflowCount
+  overflowBatches = overflowBatches
 })

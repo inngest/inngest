@@ -191,10 +191,65 @@ func TestBulkAppend(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, "overflow", result.Status)
 		require.Equal(t, 5, result.Committed)
-		require.Equal(t, 2, result.OverflowCount)
-		require.NotEmpty(t, result.NextBatchID)
-		require.NotEqual(t, result.BatchID, result.NextBatchID)
+		require.Len(t, result.OverflowBatches, 1)
+		require.Equal(t, 2, result.OverflowBatches[0].Count)
+		require.NotEqual(t, result.BatchID, result.OverflowBatches[0].ID)
 	})
+
+	t.Run("bulk append overflow splits into multiple batches", func(t *testing.T) {
+		// With 50 items (DefaultMaxBufferSize) and a batchLimit of 10, the Lua
+		// script should create the primary batch (10 items) + 4 overflow batches
+		// (10 items each), with no single batch exceeding the limit.
+		newFnId := uuid.New()
+		batchLimit := 10
+		fn := inngest.Function{
+			ID: newFnId,
+			EventBatch: &inngest.EventBatchConfig{
+				MaxSize: batchLimit,
+				Timeout: "60s",
+			},
+		}
+
+		totalItems := 50
+		items := make([]BatchItem, totalItems)
+		for i := 0; i < totalItems; i++ {
+			items[i] = BatchItem{
+				AccountID:   accountId,
+				WorkspaceID: workspaceId,
+				AppID:       appId,
+				FunctionID:  newFnId,
+				EventID:     ulid.MustNew(ulid.Now(), rand.Reader),
+				Event:       event.Event{Name: "test/event", Data: map[string]any{"i": i}},
+			}
+		}
+
+		result, err := rbm.BulkAppend(context.Background(), items, fn)
+		require.NoError(t, err)
+		require.Equal(t, "overflow", result.Status)
+		require.Equal(t, totalItems, result.Committed)
+
+		// Verify the primary batch has exactly batchLimit items
+		primaryBatchID := ulid.MustParse(result.BatchID)
+		primaryItems, err := rbm.RetrieveItems(context.Background(), newFnId, primaryBatchID)
+		require.NoError(t, err)
+		require.Len(t, primaryItems, batchLimit, "primary batch should have exactly %d items", batchLimit)
+
+		// Should have 4 overflow batches of 10 items each
+		require.Len(t, result.OverflowBatches, 4, "expected 4 overflow batches")
+
+		totalOverflowItems := 0
+		for i, ob := range result.OverflowBatches {
+			overflowBatchID := ulid.MustParse(ob.ID)
+			overflowItems, err := rbm.RetrieveItems(context.Background(), newFnId, overflowBatchID)
+			require.NoError(t, err)
+			require.Len(t, overflowItems, batchLimit,
+				"overflow batch %d should have exactly %d items", i, batchLimit)
+			totalOverflowItems += len(overflowItems)
+		}
+		require.Equal(t, totalItems-batchLimit, totalOverflowItems,
+			"all overflow items should be accounted for")
+	})
+
 }
 
 func TestBufferedBatchManager(t *testing.T) {
