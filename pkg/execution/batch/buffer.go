@@ -414,10 +414,16 @@ func (ab *appendBuffer) handleScheduling(result *BulkAppendResult, fn inngest.Fu
 			return
 		}
 
-		// Schedule execution after timeout for the overflow batch
-		if result.NextBatchID != "" {
-			if err := ab.scheduleBatchExecution(ctx, mgr, result.NextBatchID, result, firstItem, fn, time.Now().Add(timeout), "overflow_next"); err != nil {
-				return
+		// Schedule each overflow batch: full ones immediately, the last (partial) one after timeout
+		for _, ob := range result.OverflowBatches {
+			if ob.Full {
+				if err := ab.scheduleBatchExecution(ctx, mgr, ob.ID, result, firstItem, fn, time.Now(), "overflow_full"); err != nil {
+					return
+				}
+			} else {
+				if err := ab.scheduleBatchExecution(ctx, mgr, ob.ID, result, firstItem, fn, time.Now().Add(timeout), "overflow_next"); err != nil {
+					return
+				}
 			}
 		}
 	}
