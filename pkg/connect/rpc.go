@@ -8,20 +8,46 @@ import (
 	pb "github.com/inngest/inngest/proto/gen/connect/v1"
 )
 
+// forwardMessage pairs a request with a result channel so `Forward()` can block
+// until the WebSocket write completes. Without this, the Gateway believes
+// delivery succeeded while the write can still fail (e.g. during drain),
+// silently dropping the request.
+type forwardMessage struct {
+	Data   *pb.GatewayExecutorRequestData
+	Result chan error
+}
+
 func (c *connectGatewaySvc) Forward(ctx context.Context, req *pb.ForwardRequest) (*pb.ForwardResponse, error) {
 	l := logger.StdlibLogger(ctx)
 	l.Trace("received grpc message from executor")
 
 	if ch, ok := c.wsConnections.Load(req.ConnectionID); ok {
 		l.Trace("found ws connection by connectionID")
-		msgChan := ch.(chan *pb.GatewayExecutorRequestData)
+		msgChan := ch.(chan forwardMessage)
+
+		resultCh := make(chan error, 1)
+		msg := forwardMessage{
+			Data:   req.Data,
+			Result: resultCh,
+		}
 
 		select {
-		case msgChan <- req.Data:
-			// XXX: Should we ack after the ws write or it's fine to ack just
-			// after the message is consumed.
-
-			return &pb.ForwardResponse{Success: true}, nil
+		case msgChan <- msg:
+			// Block until the WebSocket write completes. Only ack success to
+			// the executor after confirmed delivery to the worker.
+			select {
+			case err := <-resultCh:
+				if err != nil {
+					l.Error("failed to write message to websocket", "err", err)
+					return &pb.ForwardResponse{Success: false}, nil
+				}
+				return &pb.ForwardResponse{Success: true}, nil
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-time.After(5 * time.Second):
+				l.Error("timeout waiting for websocket write confirmation")
+				return &pb.ForwardResponse{Success: false}, nil
+			}
 		case <-ctx.Done():
 			return nil, ctx.Err()
 		case <-time.After(5 * time.Second):

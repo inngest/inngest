@@ -101,7 +101,7 @@ func TestLeaseRenewal(t *testing.T) {
 	require.True(t, ok, "connection should be registered for gRPC delivery")
 
 	go func() {
-		messageChan.(chan *connect.GatewayExecutorRequestData) <- expectedPayload
+		messageChan.(chan forwardMessage) <- forwardMessage{Data: expectedPayload, Result: make(chan error, 1)}
 	}()
 
 	// Expect message to be received by gateway and forwarded over WebSocket
@@ -179,7 +179,7 @@ func TestLeaseRenewalWithInvalidLeaseShouldNotClose(t *testing.T) {
 	require.True(t, ok, "connection should be registered for gRPC delivery")
 
 	go func() {
-		messageChan.(chan *connect.GatewayExecutorRequestData) <- expectedPayload
+		messageChan.(chan forwardMessage) <- forwardMessage{Data: expectedPayload, Result: make(chan error, 1)}
 	}()
 
 	// Expect message to be received by gateway and forwarded over WebSocket
@@ -284,7 +284,7 @@ func TestLeaseRenewalWithDeletedLeaseShouldNotClose(t *testing.T) {
 	require.True(t, ok, "connection should be registered for gRPC delivery")
 
 	go func() {
-		messageChan.(chan *connect.GatewayExecutorRequestData) <- expectedPayload
+		messageChan.(chan forwardMessage) <- forwardMessage{Data: expectedPayload, Result: make(chan error, 1)}
 	}()
 
 	// Expect message to be received by gateway and forwarded over WebSocket
@@ -392,7 +392,7 @@ func TestExecutorMessageForwardingGRPC(t *testing.T) {
 	require.True(t, ok, "connection should be registered for gRPC delivery")
 
 	go func() {
-		messageChan.(chan *connect.GatewayExecutorRequestData) <- expectedPayload
+		messageChan.(chan forwardMessage) <- forwardMessage{Data: expectedPayload, Result: make(chan error, 1)}
 	}()
 
 	// Expect message to be received by gateway and forwarded over WS
