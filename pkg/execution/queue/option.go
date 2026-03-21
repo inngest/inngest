@@ -867,7 +867,7 @@ func NewQueueOptions(
 		ActiveCheckBacklogConcurrency: ActiveCheckBacklogConcurrency,
 		ActiveCheckScanBatchSize:      ActiveCheckScanBatchSize,
 		CapacityLeaseExtendInterval:   QueueLeaseDuration / 2,
-		ConditionalTracer: trace.NewConditionalTracer(noop.Tracer{}, func(ctx context.Context, accountID, envID uuid.UUID) bool {
+		ConditionalTracer: trace.NewConditionalTracer(noop.Tracer{}, func(ctx context.Context, accountID, envID, fnID uuid.UUID) bool {
 			return false
 		}),
 		EnableCapacityLeaseInstrumentation: func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool) {

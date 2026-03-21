@@ -116,12 +116,13 @@ func newGRPCConnector(ctx context.Context, opts GRPCConnectorOpts, options ...GR
 }
 
 type ProxyOpts struct {
-	AccountID uuid.UUID
-	EnvID     uuid.UUID
-	AppID     uuid.UUID
-	SpanID    string
-	Data      *connectpb.GatewayExecutorRequestData
-	logger    logger.Logger
+	AccountID  uuid.UUID
+	EnvID      uuid.UUID
+	AppID      uuid.UUID
+	FunctionID uuid.UUID
+	SpanID     string
+	Data       *connectpb.GatewayExecutorRequestData
+	logger     logger.Logger
 }
 
 // Proxy forwards a request to the executor and waits for a response.
@@ -148,7 +149,7 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 		"app_id", opts.Data.AppId,
 	)
 
-	traceCtx, span := i.tracer.NewSpan(traceCtx, "Proxy", opts.AccountID, opts.EnvID)
+	traceCtx, span := i.tracer.NewSpan(traceCtx, "Proxy", opts.AccountID, opts.EnvID, opts.FunctionID)
 	span.SetAttributes(attribute.Bool("inngest.system", true))
 	defer span.End()
 

@@ -786,7 +786,7 @@ github.com/hashicorp/hcl/hcl/token
 github.com/hashicorp/hcl/json/parser
 github.com/hashicorp/hcl/json/scanner
 github.com/hashicorp/hcl/json/token
-# github.com/inngest/expr v0.0.0-20260225032035-443da0a59989
+# github.com/inngest/expr v0.0.0-20260320151211-8abd2c0b8427
 ## explicit; go 1.24
 github.com/inngest/expr
 # github.com/inngest/go-httpstat v0.0.0-20250328150054-dfda91359d48

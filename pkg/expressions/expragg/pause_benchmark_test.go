@@ -46,6 +46,111 @@ func BenchmarkPauseSameVersionFast(b *testing.B) {
 	})
 }
 
+// BenchmarkPauseConstantFalse benchmarks that constant "false" expressions are skipped
+// and not added to the slow evaluation path.
+func BenchmarkPauseConstantFalse(b *testing.B) {
+	ctx := context.Background()
+	parser := expr.NewTreeParser(exprenv.CompilerSingleton())
+
+	ae := expr.NewAggregateEvaluator(expr.AggregateEvaluatorOpts[*state.Pause]{
+		Parser:      parser,
+		Eval:        expressions.ExprEvaluator,
+		Concurrency: 1000,
+		KV:          &mockKV{},
+		Log:         logger.From(ctx).SLog(),
+	})
+	defer ae.Close()
+
+	// Add 1000 constant false expressions
+	for i := 0; i < 1000; i++ {
+		expression := "false"
+		pause := &state.Pause{
+			ID:         uuid.New(),
+			Expression: &expression,
+		}
+		_, err := ae.Add(ctx, pause)
+		if err != nil {
+			b.Fatalf("Failed to add evaluable %d: %v", i, err)
+		}
+	}
+
+	// Verify none were added to slow path
+	if ae.SlowLen() != 0 {
+		b.Fatalf("Expected 0 slow expressions, got %d", ae.SlowLen())
+	}
+	if ae.Len() != 0 {
+		b.Fatalf("Expected 0 total expressions, got %d", ae.Len())
+	}
+
+	testData := map[string]any{
+		"async": map[string]any{
+			"data": map[string]any{"foo": "bar"},
+			"name": "test-event",
+		},
+	}
+
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			vals, _, _ := ae.Evaluate(ctx, testData)
+			if len(vals) != 0 {
+				b.Fatalf("Expected 0 matches, got %d", len(vals))
+			}
+		}
+	})
+}
+
+// BenchmarkPauseConstantTrue benchmarks that constant "true" expressions are matched
+// without CEL evaluation.
+func BenchmarkPauseConstantTrue(b *testing.B) {
+	ctx := context.Background()
+	parser := expr.NewTreeParser(exprenv.CompilerSingleton())
+
+	ae := expr.NewAggregateEvaluator(expr.AggregateEvaluatorOpts[*state.Pause]{
+		Parser:      parser,
+		Eval:        expressions.ExprEvaluator,
+		Concurrency: 1000,
+		KV:          &mockKV{},
+		Log:         logger.From(ctx).SLog(),
+	})
+	defer ae.Close()
+
+	// Add 1000 constant true expressions
+	for i := 0; i < 1000; i++ {
+		expression := "true"
+		pause := &state.Pause{
+			ID:         uuid.New(),
+			Expression: &expression,
+		}
+		_, err := ae.Add(ctx, pause)
+		if err != nil {
+			b.Fatalf("Failed to add evaluable %d: %v", i, err)
+		}
+	}
+
+	// Verify they're tracked (not in slow path)
+	if ae.SlowLen() != 0 {
+		b.Fatalf("Expected 0 slow expressions, got %d", ae.SlowLen())
+	}
+
+	testData := map[string]any{
+		"async": map[string]any{
+			"data": map[string]any{"foo": "bar"},
+			"name": "test-event",
+		},
+	}
+
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			vals, _, _ := ae.Evaluate(ctx, testData)
+			if len(vals) != 1000 {
+				b.Fatalf("Expected 1000 matches, got %d", len(vals))
+			}
+		}
+	})
+}
+
 type pauseBenchmarkOpts struct {
 	useSameVersion     bool
 	useMixedExpression bool
