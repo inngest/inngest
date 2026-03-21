@@ -326,6 +326,9 @@ func (ab *appendBuffer) flush(buf *batchBuffer, mgr BatchManager, trigger string
 			if bulkResult.Duplicates > 0 {
 				metrics.IncrBatchBufferItemsDuplicatedCounter(ctx, int64(bulkResult.Duplicates), metrics.CounterOpt{PkgName: pkgName})
 			}
+			if len(bulkResult.OverflowBatches) > 1 {
+				metrics.HistogramBatchBufferOverflowBatches(ctx, int64(len(bulkResult.OverflowBatches)), metrics.HistogramOpt{PkgName: pkgName})
+			}
 		}()
 
 	}
