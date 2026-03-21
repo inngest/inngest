@@ -307,6 +307,13 @@ func (v v2) LoadMetadata(ctx context.Context, id state.ID) (state.Metadata, erro
 	return result, nil
 }
 
+// LoadV1Metadata returns the v1 Metadata for a given run, which includes
+// extended fields like Status, Debugger, RunType, and Version that are
+// not part of the v2 Metadata struct.
+func (v v2) LoadV1Metadata(ctx context.Context, id state.ID) (*statev1.Metadata, error) {
+	return v.mgr.Metadata(ctx, id.Tenant.AccountID, id.RunID)
+}
+
 // LoadStack returns the current stack for a run.
 func (v v2) LoadStack(ctx context.Context, id state.ID) ([]string, error) {
 	return v.mgr.stack(ctx, id.Tenant.AccountID, id.RunID)

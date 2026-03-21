@@ -798,7 +798,7 @@ func TestStateDuplicate(t *testing.T) {
 		sourceState.Metadata.Config.ForceStepPlan)
 
 	// Step 5: Load raw metadata (v1) and step inputs, then duplicate to Garnet
-	sourceRawMeta, err := valkeyMgr.Metadata(ctx, accountID, runID)
+	sourceRawMeta, err := valkeySvc.LoadV1Metadata(ctx, sourceID)
 	require.NoError(t, err)
 
 	sourceStepInputs, err := valkeySvc.LoadStepInputs(ctx, sourceID)
@@ -921,7 +921,7 @@ func TestStateDuplicate(t *testing.T) {
 	}
 
 	// Verify extended metadata was copied correctly using v1 Metadata
-	destRawMeta, err := garnetMgr.Metadata(ctx, accountID, destRunID)
+	destRawMeta, err := garnetSvc.LoadV1Metadata(ctx, destID)
 	require.NoError(t, err)
 
 	assert.Equal(t, sourceRawMeta.Status, destRawMeta.Status, "Status")

@@ -69,6 +69,8 @@ type RunService interface {
 type StateLoader interface {
 	// Metadata returns metadata for a given run
 	LoadMetadata(ctx context.Context, id ID) (Metadata, error)
+	// LoadV1Metadata returns the v1 Metadata for a given run, like status, RunType, etc.
+	LoadV1Metadata(ctx context.Context, id ID) (*state.Metadata, error)
 	// LoadEvents loads the triggering events for the given run.
 	LoadEvents(ctx context.Context, id ID) ([]json.RawMessage, error)
 	// LoadState returns all steps for a run.
