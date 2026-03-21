@@ -1061,12 +1061,11 @@ func (c *connectionHandler) receiveRouterMessagesFromGRPC(ctx context.Context, o
 				context.Background(),
 				5*time.Second,
 			)
-			defer writeCancel()
-
 			err = wsproto.Write(writeCtx, c.ws, &connectpb.ConnectMessage{
 				Kind:    connectpb.GatewayMessageType_GATEWAY_EXECUTOR_REQUEST,
 				Payload: rawBytes,
 			})
+			writeCancel()
 			if err != nil {
 				msg.Result <- err
 				if isConnectionClosedErr(err) {
