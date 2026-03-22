@@ -268,7 +268,17 @@ func (a checkpointAPI) CheckpointNewRun(w http.ResponseWriter, r *http.Request) 
 			},
 		)
 		if err != nil {
-			logger.StdlibLogger(ctx).Warn("error creating realtime subscribe JWT", "error", err)
+			logger.StdlibLogger(ctx).Warn(
+				"error creating realtime subscribe JWT",
+				"error", err,
+				"account_id", auth.AccountID(),
+				"env_id", auth.WorkspaceID(),
+				"run_id", md.ID.RunID,
+			)
+			_ = publicerr.WriteHTTP(w, publicerr.Wrap(
+				err, 500, "error creating realtime subscribe JWT",
+			))
+			return
 		}
 		realtimeToken = rt
 	}
