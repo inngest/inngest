@@ -24,6 +24,28 @@ Three types flow through Redis, distinguished by prefix:
 
 `Publish` and `PublishChunk` are topic-aware (topics come from the `Message`). `Write` is topic-unaware: it always targets `$stream`, which is the convention for raw byte streams.
 
+## Topics and subscriptions
+
+A **topic** is a keyed Redis pub/sub channel that the broadcaster manages. Each unique topic key (`envID:xxhash(channel):name`) maps to one `runTopic` goroutine and a ordered set of local subscriptions. Topics are reference-counted: the first `Subscribe` call for a topic starts the goroutine, and the last `Unsubscribe` stops it.
+
+A **subscription** is a connected client. The `Subscription` interface wraps a single client connection and exposes `WriteMessage`, `WriteChunk`, `Write` (raw bytes), `SendKeepalive`, and `Close`. There are three implementations:
+
+- **SSE** (`sub_sse.go`): Writes to an `http.ResponseWriter`. All writes are mutex-protected. Keepalives are SSE comments (`:\n\n`). Messages are formatted as `data: {json}\n\n`.
+- **WebSocket** (`sub_websocket.go`): Writes text frames. Keepalives are WebSocket pings. Also implements `ReadWriteSubscription` — the `Poll` method reads incoming frames to handle subscribe/unsubscribe requests from the client.
+- **In-memory** (`sub_memory.go`): Backed by a callback function. Used in tests.
+
+## Local delivery
+
+When `runTopic` receives a message from Redis, it delivers to local subscriptions:
+
+1. The message is classified by prefix (none → structured, `RAW:` → raw, `CHUNK:` → chunk).
+2. The broadcaster acquires a read lock and looks up the topic's ordered set.
+3. `eachSubscription` iterates the ordered set (up to 5,000 subscribers) and calls the write method on each subscription.
+4. For structured messages and chunks, writes use `doPublish`, which attempts an immediate write and, on failure, spawns a background goroutine that retries up to 3 times at 3-second intervals.
+5. For raw bytes, writes are attempted once — failures are logged but not retried.
+
+Retries are async (they don't block fan-out to other subscriptions). If all retries are exhausted, the failure is logged and a metric is recorded, but the subscription is not closed.
+
 ## Subscription lifecycle
 
 1. `Subscribe` registers the subscription and starts a `runTopic` goroutine for any new topics.
@@ -40,5 +62,5 @@ Three types flow through Redis, distinguished by prefix:
 - **No buffering or replay.** If no subscriber is connected when a message is published, it's lost. Late-joining subscribers miss everything before they connected.
 - **Redis is required.** There is no in-process-only mode. The Dev Server uses miniredis to satisfy this.
 - **Two Redis clients required.** A Redis client that has subscribed cannot also publish. `NewRedisBroadcaster` takes separate `pubc` (publish) and `subc` (subscribe) clients.
-- **5,000 subscriber cap per topic.** The skiplist iteration is hard-capped at 5,000 nodes.
+- **5,000 subscriber cap per topic.** The ordered set iteration is hard-capped at 5,000 subscribers.
 - **Publish is fire-and-forget.** `Publish`/`Write`/`PublishChunk` do not return errors. Failures are logged and retried (3 attempts), but the caller has no signal.

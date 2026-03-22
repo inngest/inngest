@@ -115,6 +115,13 @@ type broadcaster struct {
 	shutdownGracePeriod time.Duration
 }
 
+// topicReady pairs a topic with its ready channel from startTopic, used to
+// wait for Redis subscription confirmation after releasing the lock.
+type topicReady struct {
+	topic Topic
+	ready <-chan error
+}
+
 func (b *broadcaster) Subscribe(ctx context.Context, s Subscription, topics []streamingtypes.Topic) error {
 	if len(topics) == 0 {
 		return nil
@@ -137,12 +144,6 @@ func (b *broadcaster) subscribe(
 
 	b.l.Lock()
 
-	// readyChans collects channels from startTopic so we can wait for Redis
-	// subscription confirmation after releasing the lock (`b.l`).
-	type topicReady struct {
-		topic Topic
-		ready <-chan error
-	}
 	var pendingTopics []topicReady
 	for _, t := range topics {
 		topicHash := t.String()
@@ -222,44 +223,47 @@ func (b *broadcaster) subscribe(
 	}
 
 	if anyErr != nil {
-		// Rollback all pending topics: remove subscription records and track
-		// which topics need their goroutines stopped.
-		var topicsToStop []Topic
-		b.l.Lock()
-		for _, pt := range pendingTopics {
-			topicHash := pt.topic.String()
-			topicsubs, ok := b.topics[topicHash]
-			if !ok {
-				// Already removed by a concurrent `Unsubscribe`.
-				continue
-			}
-			topicsubs.subscriptions.Delete(skiplistSub{s})
-			topicsubs.refCount--
-			if topicsubs.refCount == 0 {
-				delete(b.topics, topicHash)
-				topicsToStop = append(topicsToStop, pt.topic)
-			} else {
-				b.topics[topicHash] = topicsubs
-			}
-			if as, ok := b.subs[s.ID()]; ok {
-				delete(as.Topics, pt.topic.String())
-				if len(as.Topics) == 0 {
-					delete(b.subs, s.ID())
-				}
-			}
-		}
-		b.l.Unlock()
-
-		// Stop the `runTopic` goroutines for topics where this was the sole
-		// subscriber.
-		for _, t := range topicsToStop {
-			b.stopTopic(t)
-		}
-
+		b.rollbackPendingTopics(s, pendingTopics)
 		return anyErr
 	}
 
 	return nil
+}
+
+// rollbackPendingTopics undoes topic and subscription registrations for all
+// pending topics after a `Subscribe` failure. It removes the subscription from
+// each topic, cleans up the subscriber record, and stops `runTopic` goroutines
+// for topics that have no remaining subscribers.
+func (b *broadcaster) rollbackPendingTopics(s Subscription, pendingTopics []topicReady) {
+	var topicsToStop []Topic
+	b.l.Lock()
+	for _, pt := range pendingTopics {
+		topicHash := pt.topic.String()
+		topicsubs, ok := b.topics[topicHash]
+		if !ok {
+			// Already removed by a concurrent `Unsubscribe`.
+			continue
+		}
+		topicsubs.subscriptions.Delete(skiplistSub{s})
+		topicsubs.refCount--
+		if topicsubs.refCount == 0 {
+			delete(b.topics, topicHash)
+			topicsToStop = append(topicsToStop, pt.topic)
+		} else {
+			b.topics[topicHash] = topicsubs
+		}
+		if as, ok := b.subs[s.ID()]; ok {
+			delete(as.Topics, pt.topic.String())
+			if len(as.Topics) == 0 {
+				delete(b.subs, s.ID())
+			}
+		}
+	}
+	b.l.Unlock()
+
+	for _, t := range topicsToStop {
+		b.stopTopic(t)
+	}
 }
 
 // Unsubscribe removes a subscription from specific topics.
