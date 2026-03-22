@@ -214,16 +214,30 @@ func (b *broadcaster) subscribe(
 
 	// Wait for Redis subscription confirmations outside the lock. Do this
 	// outside the lock in case any of the topics take a long time to be ready.
+	var anyErr error
 	for _, pt := range pendingTopics {
 		if err := <-pt.ready; err != nil {
-			// Rollback: undo the topic and subscription registration.
-			b.l.Lock()
+			anyErr = fmt.Errorf("error starting topic %s: %w", pt.topic.String(), err)
+		}
+	}
+
+	if anyErr != nil {
+		// Rollback all pending topics: remove subscription records and track
+		// which topics need their goroutines stopped.
+		var topicsToStop []Topic
+		b.l.Lock()
+		for _, pt := range pendingTopics {
 			topicHash := pt.topic.String()
-			topicsubs := b.topics[topicHash]
+			topicsubs, ok := b.topics[topicHash]
+			if !ok {
+				// Already removed by a concurrent `Unsubscribe`.
+				continue
+			}
 			topicsubs.subscriptions.Delete(skiplistSub{s})
 			topicsubs.refCount--
 			if topicsubs.refCount == 0 {
 				delete(b.topics, topicHash)
+				topicsToStop = append(topicsToStop, pt.topic)
 			} else {
 				b.topics[topicHash] = topicsubs
 			}
@@ -233,9 +247,16 @@ func (b *broadcaster) subscribe(
 					delete(b.subs, s.ID())
 				}
 			}
-			b.l.Unlock()
-			return fmt.Errorf("error starting topic %s: %w", pt.topic.String(), err)
 		}
+		b.l.Unlock()
+
+		// Stop the `runTopic` goroutines for topics where this was the sole
+		// subscriber.
+		for _, t := range topicsToStop {
+			b.stopTopic(t)
+		}
+
+		return anyErr
 	}
 
 	return nil
