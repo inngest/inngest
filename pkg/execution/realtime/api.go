@@ -423,7 +423,9 @@ func (a *api) PostPublishTee(w http.ResponseWriter, r *http.Request) {
 	var envID uuid.UUID
 	claims, err := realtimeAuth(ctx)
 	if err != nil {
-		// Fallback to signing key auth.
+		// Fallback to signing key auth. Note: signing keys are fully trusted,
+		// so this implicitly grants publish rights without a claims.Publish
+		// check (unlike JWT auth above).
 		auth, err := a.opts.AuthFinder(ctx)
 		if err != nil {
 			http.Error(w, "Not authenticated", http.StatusUnauthorized)
