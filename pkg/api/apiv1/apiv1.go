@@ -1,7 +1,6 @@
 package apiv1
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -86,9 +85,7 @@ func AddRoutes(r chi.Router, o Opts) http.Handler {
 	}
 
 	if o.AuthFinder == nil {
-		o.AuthFinder = func(ctx context.Context) (apiv1auth.V1Auth, error) {
-			return nil, fmt.Errorf("no auth finder configured")
-		}
+		o.AuthFinder = apiv1auth.NilAuthFinder
 	}
 
 	// Create the HTTP implementation, which wraps the handler.  We do ths to code
