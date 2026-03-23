@@ -15,7 +15,6 @@ import (
 	"github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/jonboulle/clockwork"
 	"github.com/oklog/ulid/v2"
-	"go.opentelemetry.io/otel/trace/noop"
 )
 
 // PartitionPriorityFinder returns the priority for a given queue partition.
@@ -869,9 +868,7 @@ func NewQueueOptions(
 		ActiveCheckBacklogConcurrency: ActiveCheckBacklogConcurrency,
 		ActiveCheckScanBatchSize:      ActiveCheckScanBatchSize,
 		CapacityLeaseExtendInterval:   QueueLeaseDuration / 2,
-		ConditionalTracer: trace.NewConditionalTracer(noop.Tracer{}, func(ctx context.Context, accountID, envID, fnID uuid.UUID) bool {
-			return false
-		}),
+		ConditionalTracer:             trace.NoopConditionalTracer(),
 		EnableCapacityLeaseInstrumentation: func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool) {
 			return false
 		},

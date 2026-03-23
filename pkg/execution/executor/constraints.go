@@ -15,6 +15,7 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/service"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
+	"github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
 )
@@ -33,6 +34,7 @@ func WithConstraints[T any](
 	capacityManager constraintapi.CapacityManager,
 	useConstraintAPI constraintapi.UseConstraintAPIFn,
 	req execution.ScheduleRequest,
+	conditionalTracer trace.ConditionalTracer,
 	idempotencyKey string,
 	fn func(
 		ctx context.Context,
@@ -105,6 +107,7 @@ func WithConstraints[T any](
 		req,
 		idempotencyKey,
 		constraints,
+		conditionalTracer,
 	)
 	if err != nil {
 		l.Error("failed to check constraints", "err", err)
@@ -305,7 +308,10 @@ func CheckConstraints(
 	req execution.ScheduleRequest,
 	idempotencyKey string,
 	constraints []constraintapi.ConstraintItem,
+	conditionalTracer trace.ConditionalTracer,
 ) (checkResult, error) {
+	ctx, span := conditionalTracer.NewSpan(ctx, "executor.CheckConstraints", req.AccountID, req.WorkspaceID, req.Function.ID)
+
 	l := logger.StdlibLogger(ctx)
 
 	// NOTE: Schedule may be called from within new-runs or the API
@@ -352,6 +358,7 @@ func CheckConstraints(
 	})
 	if internalErr != nil {
 		l.Error("acquiring capacity lease failed", "err", internalErr, "method", "CheckConstraints", "req", req)
+		span.RecordError(err)
 		return checkResult{}, fmt.Errorf("could not enforce constraints: %w", internalErr)
 	}
 
