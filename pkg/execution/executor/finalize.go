@@ -19,8 +19,6 @@ import (
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/tracing"
 	"github.com/inngest/inngest/pkg/tracing/meta"
-	"github.com/inngest/inngest/pkg/tracing/metadata"
-	"github.com/inngest/inngest/pkg/tracing/metadata/extractors"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/inngest/inngestgo"
 	"github.com/oklog/ulid/v2"
@@ -48,31 +46,6 @@ func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) er
 			"run_id", opts.Metadata.ID.RunID,
 			"target_span", tracing.RunSpanRefFromMetadata(&opts.Metadata),
 		)
-	}
-
-	// Emit a run-scoped usage metadata span so the cumulative metadata size
-	// is visible in the UI alongside other metadata.  We pass nil for
-	// stateMetadata to skip the size-limit check — this is a tiny system span
-	// created at teardown.
-	if opts.Metadata.Metrics.MetadataSize > 0 {
-		usage := extractors.UsageMetadata{
-			MetadataBytes: opts.Metadata.Metrics.MetadataSize,
-		}
-		values, serErr := usage.Serialize()
-		if serErr == nil {
-			_, _ = tracing.CreateMetadataSpanFromValues(
-				ctx,
-				e.tracerProvider,
-				tracing.RunSpanRefFromMetadata(&opts.Metadata),
-				"executor.finalize.usage",
-				pkgName,
-				nil, // skip size-limit check at teardown
-				usage.Kind(),
-				usage.Op(),
-				values,
-				metadata.Scope(enums.MetadataScopeRun),
-			)
-		}
 	}
 
 	// If there are no input events, fetch them.
