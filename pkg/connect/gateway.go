@@ -986,7 +986,7 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 func (c *connectionHandler) receiveRouterMessagesFromGRPC(ctx context.Context, onSubscribed chan struct{}) {
 	additionalMetricsTags := c.svc.metricsTags()
 
-	messageChan := make(chan *connectpb.GatewayExecutorRequestData)
+	messageChan := make(chan forwardMessage)
 
 	connectionID := c.conn.ConnectionId.String()
 	c.svc.wsConnections.Store(connectionID, messageChan)
@@ -1009,11 +1009,13 @@ func (c *connectionHandler) receiveRouterMessagesFromGRPC(ctx context.Context, o
 			c.log.Debug("connection is draining, not forwarding message")
 			return
 
-		case data, ok := <-messageChan:
+		case msg, ok := <-messageChan:
 			if !ok {
 				c.log.ReportError(fmt.Errorf("close gRPC channel"), "BUG: message channel was closed unexpectedly - this should never happen")
 				return
 			}
+
+			data := msg.Data
 
 			rawBytes, err := proto.Marshal(data)
 			if err != nil {
@@ -1023,6 +1025,7 @@ func (c *connectionHandler) receiveRouterMessagesFromGRPC(ctx context.Context, o
 						"gateway_id": c.conn.GatewayId.String(),
 						"conn_id":    c.conn.ConnectionId.String(),
 					}))
+				msg.Result <- err
 				continue
 			}
 
@@ -1048,21 +1051,31 @@ func (c *connectionHandler) receiveRouterMessagesFromGRPC(ctx context.Context, o
 				Tags:    grpcTags,
 			})
 
-			// Forward message to SDK!
-			err = wsproto.Write(ctx, c.ws, &connectpb.ConnectMessage{
+			// Use a fresh context instead of the connection ctx. During a
+			// Gateway drain, ctx is cancelled, which would fail this write even
+			// though we already consumed the message from the channel. The 5s
+			// timeout prevents goroutine leaks if the write hangs. `Forward()`
+			// is blocked waiting on `msg.Err`, so a failure here correctly
+			// propagates back to the executor.
+			writeCtx, writeCancel := context.WithTimeout(
+				context.Background(),
+				5*time.Second,
+			)
+			err = wsproto.Write(writeCtx, c.ws, &connectpb.ConnectMessage{
 				Kind:    connectpb.GatewayMessageType_GATEWAY_EXECUTOR_REQUEST,
 				Payload: rawBytes,
 			})
+			writeCancel()
 			if err != nil {
+				msg.Result <- err
 				if isConnectionClosedErr(err) {
 					return
 				}
 				log.ReportError(err, "failed to forward message to worker")
-				// The connection cannot be used, the next read loop will run into the connection error and close the connection.
-				// If the worker receives the message, it will send an ack through a new connection. Otherwise, the message will be redelivered.
 				continue
 			}
 
+			msg.Result <- nil
 			log.Trace("forwarded message to worker")
 		}
 	}
