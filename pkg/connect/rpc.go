@@ -38,14 +38,29 @@ func (c *connectGatewaySvc) Forward(ctx context.Context, req *pb.ForwardRequest)
 			select {
 			case err := <-resultCh:
 				if err != nil {
-					l.Error("failed to write message to websocket", "err", err)
+					l.Error("failed to write message to websocket",
+						"err", err,
+						"account_id", req.Data.AccountId,
+						"app_id", req.Data.RunId,
+						"conn_id", req.ConnectionID,
+						"env_id", req.Data.EnvId,
+						"fn_id", req.Data.FunctionId,
+						"req_id", req.Data.RequestId,
+					)
 					return &pb.ForwardResponse{Success: false}, nil
 				}
 				return &pb.ForwardResponse{Success: true}, nil
 			case <-ctx.Done():
 				return nil, ctx.Err()
 			case <-time.After(5 * time.Second):
-				l.Error("timeout waiting for websocket write confirmation")
+				l.Error("timeout waiting for websocket write confirmation",
+					"account_id", req.Data.AccountId,
+					"app_id", req.Data.RunId,
+					"conn_id", req.ConnectionID,
+					"env_id", req.Data.EnvId,
+					"fn_id", req.Data.FunctionId,
+					"req_id", req.Data.RequestId,
+				)
 				return &pb.ForwardResponse{Success: false}, nil
 			}
 		case <-ctx.Done():
