@@ -36,8 +36,7 @@ func CreateMetadataSpanFromValues(ctx context.Context, tracerProvider TracerProv
 		return nil, metadata.ErrMetadataSpanTooLarge
 	}
 
-	// Per-run cumulative size limit. Skip when stateMetadata is nil (e.g. API
-	// endpoint, which does its own request-level check).
+	// Per-run cumulative size limit. Skip when stateMetadata is nil.
 	//
 	// TryAddMetadataSize atomically checks the limit and increments the
 	// counter under a mutex, which is safe for concurrent access from

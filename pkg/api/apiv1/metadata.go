@@ -136,16 +136,27 @@ func (a router) AddRunMetadata(ctx context.Context, auth apiv1auth.V1Auth, runID
 	}
 
 	var stateMetadata *statev2.Metadata
+	loadedFromState := false
 	if a.opts.State != nil {
 		md, err := a.opts.State.LoadMetadata(ctx, stateID)
 		if err != nil {
-			logger.StdlibLogger(ctx).Warn("failed to load run metadata for size limit check, falling back to request-only limit",
+			logger.StdlibLogger(ctx).Warn("failed to load run metadata for size limit check, falling back to request-local limit",
 				"error", err,
 				"run_id", runID.String(),
 			)
 		} else {
 			stateMetadata = &md
+			loadedFromState = true
 		}
+	}
+
+	// When state metadata is unavailable (e.g. stale runs evicted from the
+	// state store), use a zero-value Metadata as a request-local fallback so
+	// that CreateMetadataSpan still enforces the per-run cumulative size
+	// limit within this request. This prevents unbounded metadata writes to
+	// old runs.
+	if stateMetadata == nil {
+		stateMetadata = &statev2.Metadata{}
 	}
 
 	parentSpanRef := &meta.SpanReference{
@@ -184,7 +195,9 @@ func (a router) AddRunMetadata(ctx context.Context, auth apiv1auth.V1Auth, runID
 	}
 
 	// Persist the cumulative metadata size delta back to the state store.
-	if stateMetadata != nil {
+	// Only persist when we successfully loaded from state; the fallback
+	// Metadata is request-local and has no backing store to update.
+	if loadedFromState {
 		if delta := stateMetadata.Metrics.SwapMetadataSizeDelta(); delta > 0 {
 			if err := statev2.TryIncrementMetadataSize(ctx, a.opts.State, stateID, delta); err != nil {
 				logger.StdlibLogger(ctx).Error("failed to persist metadata size delta",
