@@ -57,12 +57,20 @@ type RunService interface {
 	// expected to wrap this call and handle any required pause cleanup. As a result,
 	// this is usually not the function you want to call directly.
 	ConsumePause(ctx context.Context, p state.Pause, opts state.ConsumePauseOpts) (state.ConsumePauseResult, error)
+
+	// Duplicate creates a copy of the given state in this store with the provided
+	// raw metadata (v1) and step inputs. This is used for migrating state between backends.
+	// Step inputs must be loaded separately from the source backend since State.Steps
+	// only contains step outputs.
+	Duplicate(ctx context.Context, source State, destID ID, rawMeta *state.Metadata, stepInputs map[string]json.RawMessage) error
 }
 
 // Staeloader defines an interface for loading the entire run state from the state store.
 type StateLoader interface {
 	// Metadata returns metadata for a given run
 	LoadMetadata(ctx context.Context, id ID) (Metadata, error)
+	// LoadV1Metadata returns the v1 Metadata for a given run, like status, RunType, etc.
+	LoadV1Metadata(ctx context.Context, id ID) (*state.Metadata, error)
 	// LoadEvents loads the triggering events for the given run.
 	LoadEvents(ctx context.Context, id ID) ([]json.RawMessage, error)
 	// LoadState returns all steps for a run.
