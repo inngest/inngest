@@ -430,7 +430,7 @@ func (v v2) ConsumePause(ctx context.Context, p statev1.Pause, opts statev1.Cons
 		ctx,
 		"state.ConsumePause",
 		func(ctx context.Context) (statev1.ConsumePauseResult, error) {
-			res,  err := v.mgr.ConsumePause(ctx, p, opts)
+			res, err := v.mgr.ConsumePause(ctx, p, opts)
 			return res, err
 		},
 		v.retryPolicy(),
@@ -447,29 +447,14 @@ func (v v2) ConsumePause(ctx context.Context, p statev1.Pause, opts statev1.Cons
 func (v v2) Duplicate(ctx context.Context, source state.State, destID state.ID, rawMeta *statev1.Metadata, stepInputs map[string]json.RawMessage) error {
 	sourceMetadata := source.Metadata
 
-	// Convert step inputs map to slice
+	// Convert step inputs map to slice (order doesn't matter for inputs - they don't go to stack)
 	stepInputsSlice := make([]statev1.MemoizedStep, 0, len(stepInputs))
 	for id, data := range stepInputs {
-		var stepData any
-		if err := json.Unmarshal(data, &stepData); err != nil {
-			continue
-		}
-		stepInputsSlice = append(stepInputsSlice, statev1.MemoizedStep{ID: id, Data: stepData})
+		stepInputsSlice = append(stepInputsSlice, statev1.MemoizedStep{ID: id, Data: data})
 	}
 
-	// Convert steps map to slice, maintaining stack order
-	steps := make([]statev1.MemoizedStep, 0, len(sourceMetadata.Stack))
-	for _, stepID := range sourceMetadata.Stack {
-		if data, ok := source.Steps[stepID]; ok {
-			var stepData any
-			if err := json.Unmarshal(data, &stepData); err != nil {
-				continue
-			}
-			steps = append(steps, statev1.MemoizedStep{ID: stepID, Data: stepData})
-		}
-	}
-
-	// Create state with all config fields
+	// Step 1: Create state with NO steps - only events, metadata, and step inputs
+	// We'll add steps individually via SaveStep to preserve Stack ordering
 	destInput := state.CreateState{
 		Metadata: state.Metadata{
 			ID: destID,
@@ -489,7 +474,7 @@ func (v v2) Duplicate(ctx context.Context, source state.State, destID state.ID, 
 		},
 		Events:     source.Events,
 		StepInputs: stepInputsSlice,
-		Steps:      steps,
+		Steps:      nil, // No steps - we'll add them individually
 	}
 
 	_, err := v.Create(ctx, destInput)
@@ -497,28 +482,41 @@ func (v v2) Duplicate(ctx context.Context, source state.State, destID state.ID, 
 		return fmt.Errorf("failed to create destination state: %w", err)
 	}
 
-	// After Create (which uses new.lua), we need to overwrite metadata fields
-	// that weren't passed correctly or were calculated differently.
-	// new.lua sets event_size via HINCRBY based on events length, so we need
-	// to correct it along with other metrics and config fields.
+	// Step 2: Save each step individually in Stack order
+	// This ensures the Stack is built correctly via SaveStep -> saveResponse.lua -> RPUSH
+	for _, stepID := range sourceMetadata.Stack {
+		stepData, ok := source.Steps[stepID]
+		if !ok {
+			return fmt.Errorf("step %q in Stack not found in Steps map", stepID)
+		}
+		_, err := v.SaveStep(ctx, destID, stepID, stepData)
+		if err != nil {
+			return fmt.Errorf("failed to save step %s: %w", stepID, err)
+		}
+	}
+
+	// Step 3: Correct metadata fields that weren't set correctly by Create/SaveStep
 	fnRunState := v.mgr.s.FunctionRunState()
 	client, isSharded := fnRunState.Client(ctx, destID.Tenant.AccountID, destID.RunID)
 	metadataKey := fnRunState.KeyGenerator().RunMetadata(ctx, isSharded, destID.RunID)
 
 	// Build field-value pairs for HSET to correct metadata.
-	// Metrics come from source.Metadata (v2), extended fields from rawMeta (v1).
+	// Extended fields from rawMeta (v1) that aren't set by Create/SaveStep.
+	// Note: hasAI and die are stored as "1" when true (matches Lua script behavior),
+	// while debugger is stored as "true"/"false" (matches Map() JSON behavior).
 	fields := map[string]string{
-		// Metrics from v2 Metadata
-		"state_size": fmt.Sprintf("%d", sourceMetadata.Metrics.StateSize),
-		"step_count": fmt.Sprintf("%d", sourceMetadata.Metrics.StepCount),
-		"event_size": fmt.Sprintf("%d", sourceMetadata.Metrics.EventSize),
-		// Config fields from v1 Metadata
-		"hasAI": fmt.Sprintf("%t", rawMeta.HasAI),
-		"die":   fmt.Sprintf("%t", rawMeta.DisableImmediateExecution),
 		// Extended fields from v1 Metadata
 		"status":   fmt.Sprintf("%d", rawMeta.Status),
 		"debugger": fmt.Sprintf("%t", rawMeta.Debugger),
 		"version":  fmt.Sprintf("%d", rawMeta.Version),
+	}
+
+	// Only set hasAI and die if they are true (matches Lua script behavior)
+	if rawMeta.HasAI {
+		fields["hasAI"] = "1"
+	}
+	if rawMeta.DisableImmediateExecution {
+		fields["die"] = "1"
 	}
 
 	if rawMeta.RunType != nil && *rawMeta.RunType != "" {
