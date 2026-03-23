@@ -292,60 +292,91 @@ func (ab *appendBuffer) flush(buf *batchBuffer, mgr BatchManager, trigger string
 		items[i] = p.item
 	}
 
-	// call BulkAppend - this commits all items atomically
-	redisStart := time.Now()
-	bulkResult, err := mgr.BulkAppend(ctx, items, fn)
-	redisDurationMs := time.Since(redisStart).Milliseconds()
-
-	metrics.HistogramBatchBufferRedisFlushDuration(ctx, redisDurationMs, metrics.HistogramOpt{PkgName: pkgName})
-
-	if err != nil {
-		metrics.IncrBatchBufferErrorsCounter(ctx, metrics.CounterOpt{
-			PkgName: pkgName,
-			Tags:    map[string]any{"error_type": "bulk_append"},
-		})
+	batchMaxSize := ab.maxSize
+	if fn.EventBatch != nil && fn.EventBatch.MaxSize > 0 {
+		batchMaxSize = fn.EventBatch.MaxSize
 	}
 
-	if err == nil && bulkResult != nil {
-		ab.handleScheduling(bulkResult, fn, items[0], mgr)
+	// Record per-flush metrics once for the entire flush, independent of how
+	// many BulkAppend calls are made below.
+	go func() {
+		metrics.IncrBatchBufferFlushCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: triggerTags})
+		metrics.IncrBatchBufferItemsFlushedCounter(ctx, flushCount, metrics.CounterOpt{PkgName: pkgName, Tags: triggerTags})
+		metrics.HistogramBatchBufferFlushSize(ctx, flushCount, metrics.HistogramOpt{PkgName: pkgName})
+		if waitDurationMs > 0 {
+			metrics.HistogramBatchBufferWaitDuration(ctx, waitDurationMs, metrics.HistogramOpt{PkgName: pkgName})
+		}
+	}()
 
-		go func() {
-			metrics.IncrBatchBufferFlushCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: triggerTags})
-			metrics.IncrBatchBufferItemsFlushedCounter(ctx, flushCount, metrics.CounterOpt{PkgName: pkgName, Tags: triggerTags})
-			metrics.HistogramBatchBufferFlushSize(ctx, flushCount, metrics.HistogramOpt{PkgName: pkgName})
-			if waitDurationMs > 0 {
-				metrics.HistogramBatchBufferWaitDuration(ctx, waitDurationMs, metrics.HistogramOpt{PkgName: pkgName})
-			}
-			metrics.IncrBatchBufferBulkAppendCounter(ctx, metrics.CounterOpt{
-				PkgName: pkgName,
-				Tags:    map[string]any{"status": bulkResult.Status},
-			})
-			if bulkResult.Committed > 0 {
-				metrics.IncrBatchBufferItemsCommittedCounter(ctx, int64(bulkResult.Committed), metrics.CounterOpt{PkgName: pkgName})
-			}
-			if bulkResult.Duplicates > 0 {
-				metrics.IncrBatchBufferItemsDuplicatedCounter(ctx, int64(bulkResult.Duplicates), metrics.CounterOpt{PkgName: pkgName})
-			}
-		}()
+	// During append(), if we detect that the buffer contains `batchMaxSize` items,
+	// we trigger a flush. append() releases the mutex lock on the shared buffer
+	// before calling flush() and flush() get a mutex lock on the same buffer to
+	// get all the items out of the buffer.
+	// There is an inherent race condition here. After append releases the mutex,
+	// even if the buffer is full, other appends can claim the mutex lock and
+	// continue to add to the full buffer before flush can get the lock and flush
+	// the buffer. This can lead to a scenario where we flush more than `batchMaxSize`
+	// items in a single flush.
+	//
+	// Since bulk-append just appends all overflow items into a single batch,
+	// this can result in a batch that is larger than the configured `batchMaxSize`.
+	// To avoid that, we make multiple BulkAppend calls with chunks of `batchMaxSize`
+	// items until we flush all the items in the buffer.
+	//
+	// Split items into chunks of batchMaxSize and call BulkAppend once per chunk.
+	// Each chunk is sized to fill at most one Redis batch, so subsequent chunks
+	// naturally flow into freshly-created batches after the previous one is filled
+	// and its pointer rotated — without relying on Lua-level overflow handling.
+	for start := 0; start < len(items); start += batchMaxSize {
+		end := start + batchMaxSize
+		if end > len(items) {
+			end = len(items)
+		}
+		chunk := items[start:end]
+		chunkPending := pending[start:end]
 
-	}
+		redisStart := time.Now()
+		bulkResult, err := mgr.BulkAppend(ctx, chunk, fn)
+		redisDurationMs := time.Since(redisStart).Milliseconds()
 
-	ab.log.Trace("flushed in-memory buffer", "len_pending", len(pending), "len_items", len(items), "result", bulkResult)
+		metrics.HistogramBatchBufferRedisFlushDuration(ctx, redisDurationMs, metrics.HistogramOpt{PkgName: pkgName})
 
-	// Send results to all waiters
-	for i, p := range pending {
 		if err != nil {
-			p.pending.err = err
-		} else {
-			status := ab.mapBulkStatus(bulkResult.Status, i)
+			metrics.IncrBatchBufferErrorsCounter(ctx, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags:    map[string]any{"error_type": "bulk_append"},
+			})
+			for _, p := range chunkPending {
+				p.pending.err = err
+				close(p.pending.done)
+			}
+			continue
+		}
+
+		ab.handleScheduling(bulkResult, fn, chunk[0], mgr)
+
+		metrics.IncrBatchBufferBulkAppendCounter(ctx, metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags:    map[string]any{"status": bulkResult.Status},
+		})
+		if bulkResult.Committed > 0 {
+			metrics.IncrBatchBufferItemsCommittedCounter(ctx, int64(bulkResult.Committed), metrics.CounterOpt{PkgName: pkgName})
+		}
+		if bulkResult.Duplicates > 0 {
+			metrics.IncrBatchBufferItemsDuplicatedCounter(ctx, int64(bulkResult.Duplicates), metrics.CounterOpt{PkgName: pkgName})
+		}
+
+		for i, p := range chunkPending {
 			p.pending.result = &BatchAppendResult{
-				Status:          status,
+				Status:          ab.mapBulkStatus(bulkResult.Status, i),
 				BatchID:         bulkResult.BatchID,
 				BatchPointerKey: bulkResult.BatchPointer,
 			}
+			close(p.pending.done)
 		}
-		close(p.pending.done)
 	}
+
+	ab.log.Trace("flushed in-memory buffer", "len_pending", len(pending), "len_items", len(items))
 
 	// clean up empty buffer to prevent unbounded map growth.
 	ab.mu.Lock()
