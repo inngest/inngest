@@ -495,42 +495,36 @@ func (v v2) Duplicate(ctx context.Context, source state.State, destID state.ID, 
 		}
 	}
 
-	// Step 3: Correct metadata fields that weren't set correctly by Create/SaveStep
+	// Step 3: Use UpdateMetadata to set mutable fields (hasAI, die, sat, rv)
+	// This ensures consistent behavior with the rest of the codebase
+	err = v.UpdateMetadata(ctx, destID, state.MutableConfig{
+		StartedAt:      rawMeta.StartedAt,
+		RequestVersion: rawMeta.RequestVersion,
+		ForceStepPlan:  rawMeta.DisableImmediateExecution,
+		HasAI:          rawMeta.HasAI,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to update metadata: %w", err)
+	}
+
+	// Step 4: Set extended metadata fields that aren't covered by UpdateMetadata
+	// These are v1-specific fields: status, debugger, version, runType
+	// Note: ReplayID is already stored inside the `id` JSON blob via Config.ReplayID
 	fnRunState := v.mgr.s.FunctionRunState()
 	client, isSharded := fnRunState.Client(ctx, destID.Tenant.AccountID, destID.RunID)
 	metadataKey := fnRunState.KeyGenerator().RunMetadata(ctx, isSharded, destID.RunID)
 
-	// Build field-value pairs for HSET to correct metadata.
-	// Extended fields from rawMeta (v1) that aren't set by Create/SaveStep.
-	// Note: hasAI and die are stored as "1" when true (matches Lua script behavior),
-	// while debugger is stored as "true"/"false" (matches Map() JSON behavior).
 	fields := map[string]string{
-		// Extended fields from v1 Metadata
 		"status":   fmt.Sprintf("%d", rawMeta.Status),
 		"debugger": fmt.Sprintf("%t", rawMeta.Debugger),
 		"version":  fmt.Sprintf("%d", rawMeta.Version),
 	}
 
-	// Only set hasAI and die if they are true (matches Lua script behavior)
-	if rawMeta.HasAI {
-		fields["hasAI"] = "1"
-	}
-	if rawMeta.DisableImmediateExecution {
-		fields["die"] = "1"
-	}
-
 	if rawMeta.RunType != nil && *rawMeta.RunType != "" {
 		fields["runType"] = *rawMeta.RunType
 	}
-	if !rawMeta.StartedAt.IsZero() {
-		fields["sat"] = fmt.Sprintf("%d", rawMeta.StartedAt.UnixMilli())
-	}
-	// ReplayID is in Identifier for v1
-	if rawMeta.Identifier.ReplayID != nil {
-		fields["rID"] = rawMeta.Identifier.ReplayID.String()
-	}
 
-	// Use HSET to correct the metadata fields
+	// Use HSET for the remaining fields
 	return client.Do(ctx, func(c rueidis.Client) rueidis.Completed {
 		cmd := c.B().Hset().Key(metadataKey).FieldValue()
 		for k, val := range fields {
