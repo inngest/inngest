@@ -509,6 +509,8 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 		// This should always be linked, as we want consistent behavior while
 		// processing a queue item.
 		DisableConstraintUpdates: constraintRes.SkipConstraintChecks,
+
+		ConditionalTraceCtx: context.WithoutCancel(ctx),
 	}
 	commitSemaphoreAcquire = true
 

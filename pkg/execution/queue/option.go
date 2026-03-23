@@ -719,6 +719,8 @@ type ProcessItem struct {
 	//
 	// NOTE: This value is set in itemLeaseConstraintCheck.
 	DisableConstraintUpdates bool
+
+	ConditionalTraceCtx context.Context
 }
 
 type capacityLease struct {

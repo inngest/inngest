@@ -20,7 +20,14 @@ func (q *queueProcessor) worker(ctx context.Context, f RunFunc) {
 			// Create a new context which isn't cancelled by the parent, when quit.
 			// XXX: When jobs can have their own cancellation signals, move this into
 			// process itself.
-			processCtx, cancel := context.WithCancel(context.Background())
+
+			processCtx := context.Background()
+			if i.ConditionalTraceCtx != nil {
+				processCtx = i.ConditionalTraceCtx
+			}
+
+			processCtx, cancel := context.WithCancel(processCtx)
+
 			err := q.ProcessItem(processCtx, i, f)
 			q.Semaphore().Release(1)
 			metrics.WorkerQueueCapacityCounter(ctx, -1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name()}})

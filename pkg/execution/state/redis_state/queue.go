@@ -948,6 +948,7 @@ func (q *queue) Lease(
 		args,
 	).ToInt64()
 	if err != nil {
+		span.RecordError(err)
 		return nil, fmt.Errorf("error leasing queue item: %w", err)
 	}
 
@@ -962,6 +963,7 @@ func (q *queue) Lease(
 	)
 
 	l = l.With("item_delay", itemDelay.String())
+	span.SetAttributes(attribute.Int64("item_delay", itemDelay.Milliseconds()))
 
 	refillDelay := item.RefillDelay()
 	metrics.HistogramQueueOperationDelay(ctx, refillDelay, metrics.HistogramOpt{
@@ -985,6 +987,7 @@ func (q *queue) Lease(
 	},
 	)
 	l = l.With("lease_delay", leaseDelay.String())
+	span.SetAttributes(attribute.Int64("lease_delay", leaseDelay.Milliseconds()))
 
 	l.Trace("leasing item",
 		"id", item.ID,

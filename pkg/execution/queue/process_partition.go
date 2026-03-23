@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 // ProcessPartition processes a given partition, peeking jobs from the partition to run.
@@ -27,6 +28,7 @@ func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition
 	partitionIdentifier := p.Identifier()
 	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.processPartition", p.AccountID, partitionIdentifier.EnvID, partitionIdentifier.FunctionID)
 	defer span.End()
+	span.SetAttributes(attribute.String("queue_shard", q.primaryQueueShard.Name()))
 
 	// When Constraint API is enabled, disable capacity checks on PartitionLease.
 	// This is necessary as capacity was already granted to individual items, and
@@ -90,6 +92,7 @@ func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition
 		// This prevents us from keeping partitions as continuations forever until
 		// we hit the max limit.
 		q.removeContinue(ctx, p, false)
+		span.SetAttributes(attribute.String("status", "already_leased"))
 		return nil
 	}
 	if errors.Is(err, ErrPartitionNotFound) || errors.Is(err, ErrPartitionGarbageCollected) {
@@ -103,11 +106,13 @@ func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition
 		q.removeContinue(ctx, p, false)
 
 		metrics.IncrPartitionGoneCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name()}})
+		span.SetAttributes(attribute.String("status", "partition_gone"))
 		return nil
 	}
 	if errors.Is(err, ErrPartitionPaused) {
 		// Don't return an error and remove continuations;  this isn't workable.
 		q.removeContinue(ctx, p, false)
+		span.SetAttributes(attribute.String("status", "partition_paused"))
 		return nil
 	}
 	if errors.Is(err, context.Canceled) {
@@ -165,6 +170,7 @@ func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition
 		return q.primaryQueueShard.Peek(peekCtx, p, fetch, peek)
 	})
 	if err != nil {
+		span.RecordError(err)
 		return err
 	}
 
@@ -275,8 +281,8 @@ func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition
 	if processErr := iter.Iterate(ctx); processErr != nil {
 		// Report the eerror.
 		l.Error("error iterating queue items", "error", processErr, "partition", p)
+		span.RecordError(err)
 		return processErr
-
 	}
 
 	if q.usePeekEWMA {
@@ -317,7 +323,14 @@ func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition
 		if errors.Is(err, ErrPartitionGarbageCollected) {
 			q.removeContinue(ctx, p, false)
 		}
-		return err
+		if err != nil {
+			span.RecordError(err)
+			return err
+		}
+
+		span.SetAttributes(attribute.String("status", "requeue_constrained"))
+		span.SetAttributes(attribute.Int64("requeue_ms", requeue.Milliseconds()))
+		return nil
 	}
 
 	// XXX: If we haven't been able to lease a single item, ensure we enqueue this
@@ -336,7 +349,10 @@ func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition
 		return nil
 	}
 	if err != nil {
+		span.RecordError(err)
 		return err
 	}
+	span.SetAttributes(attribute.String("status", "requeue_default"))
+	span.SetAttributes(attribute.Int64("requeue_ms", PartitionRequeueExtension.Milliseconds()))
 	return nil
 }
