@@ -1487,7 +1487,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	ctx = logger.WithStdlib(ctx, l)
 
 	conditionalSpan.SetAttributes(attribute.String("run_id", id.RunID.String()))
-	conditionalSpan.SetAttributes(attribute.String("event_id", id.EventID.String())
+	conditionalSpan.SetAttributes(attribute.String("event_id", id.EventID.String()))
 
 	// If this is of type sleep, ensure that we save "nil" within the state store
 	// for the outgoing edge ID.  This ensures that we properly increase the stack
