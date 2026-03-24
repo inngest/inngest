@@ -342,6 +342,8 @@ func (ab *appendBuffer) flush(buf *batchBuffer, mgr BatchManager, trigger string
 		metrics.HistogramBatchBufferRedisFlushDuration(ctx, redisDurationMs, metrics.HistogramOpt{PkgName: pkgName})
 
 		if err != nil {
+			ab.log.Error("error bulk-appending events to batch ", "chunk_size", len(chunk), "first_event", chunk[0].EventID, "function_id", fn.ID, "error", err)
+
 			metrics.IncrBatchBufferErrorsCounter(ctx, metrics.CounterOpt{
 				PkgName: pkgName,
 				Tags:    map[string]any{"error_type": "bulk_append"},
