@@ -11,6 +11,7 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
+	"github.com/inngest/inngest/pkg/tracing"
 	"github.com/oklog/ulid/v2"
 	"go.opentelemetry.io/otel/attribute"
 	"golang.org/x/sync/errgroup"
@@ -221,6 +222,17 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 		release()
 
 		span.SetAttributes(attribute.String("limiting_constraint", constraintRes.LimitingConstraint.String()))
+
+		var tracerProvider tracing.TracerProvider
+		if spanErr := tracerProvider.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
+			Attributes: nil,
+			Debug:      &tracing.SpanDebugData{Location: "executor.handleGeneratorAIGateway"},
+			Metadata:   runMetadata,
+			QueueItem:  &lifecycleItem,
+			TargetSpan: runCtx.ExecutionSpan(),
+		}); spanErr != nil {
+			e.log.Debug("error updating span for successful gateway request during handleGeneratorAIGateway", "error", spanErr)
+		}
 	}
 
 	var leaseID *ulid.ULID
