@@ -963,11 +963,12 @@ func (e *executor) schedule(
 			Event:            req.Events[0].GetEvent(),
 			FunctionPausedAt: req.FunctionPausedAt,
 		}, req.Function)
-		span.End()
 		if err != nil {
 			span.RecordError(err)
+			span.End()
 			return nil, nil, err
 		}
+		span.End()
 		return nil, nil, ErrFunctionDebounced
 	}
 
