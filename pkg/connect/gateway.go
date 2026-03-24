@@ -756,6 +756,15 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 		// routing requests to a worker that will skip them, causing leases to
 		// expire after 25s (ConnectWorkerRequestLeaseDuration + GracePeriod)
 		// and producing "worker stopped responding" errors. (SYS-709)
+		if c.svc.isDraining.Load() {
+			c.log.Warn("worker pause signal received during draining sequence",
+				"instance_id", c.conn.Data.InstanceId,
+				"env_id", c.conn.EnvID.String(),
+				"account_id", c.conn.AccountID.String(),
+				"gateway_id", c.conn.GatewayId.String(),
+				"connection_id", c.conn.ConnectionId.String(),
+			)
+		}
 
 		// Mark as draining before updating Redis so that concurrent heartbeat
 		// messages do not reset the status back to READY.
