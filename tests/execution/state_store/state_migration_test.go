@@ -706,6 +706,13 @@ func TestStateDuplicate(t *testing.T) {
 		json.RawMessage(`{"name":"test.event.2","data":{"user":"bob","action":"submit"}}`),
 	}
 
+	// Step inputs to be included in the state
+	stepInputs := []state.MemoizedStep{
+		{ID: "input-step-1", Data: json.RawMessage(`{"param":"value1","count":10}`)},
+		{ID: "input-step-2", Data: json.RawMessage(`{"param":"value2","nested":{"x":1,"y":2}}`)},
+		{ID: "input-step-3", Data: json.RawMessage(`{"param":"value3","array":[1,2,3]}`)},
+	}
+
 	createInput := statev2.CreateState{
 		Metadata: statev2.Metadata{
 			ID: statev2.ID{
@@ -734,7 +741,8 @@ func TestStateDuplicate(t *testing.T) {
 				},
 			}),
 		},
-		Events: events,
+		Events:     events,
+		StepInputs: stepInputs,
 	}
 
 	_, err = valkeySvc.Create(ctx, createInput)
@@ -903,40 +911,220 @@ func TestStateDuplicate(t *testing.T) {
 	assert.Greater(t, destState.Metadata.Metrics.StateSize, 0, "StateSize should be > 0")
 	assert.Equal(t, 5, destState.Metadata.Metrics.StepCount, "StepCount should be 5")
 
-	// Stack
-	assert.Equal(t, sourceState.Metadata.Stack, destState.Metadata.Stack, "Stack")
+	// Verify Stack and Steps match between Valkey (source) and Garnet (destination)
+	// with the same ordering preserved
+	// Note: Steps map contains both steps AND step inputs, while Stack only contains step IDs
+	require.Equal(t, len(sourceState.Metadata.Stack), len(destState.Metadata.Stack),
+		"Stack length should match: Valkey=%d, Garnet=%d", len(sourceState.Metadata.Stack), len(destState.Metadata.Stack))
+	require.Equal(t, len(sourceState.Steps), len(destState.Steps),
+		"Steps count should match: Valkey=%d, Garnet=%d", len(sourceState.Steps), len(destState.Steps))
 
-	// Steps
-	assert.Equal(t, len(sourceState.Steps), len(destState.Steps), "Steps count")
-	for stepID, sourceData := range sourceState.Steps {
-		destData, ok := destState.Steps[stepID]
-		require.True(t, ok, "Step %s should exist in destination", stepID)
-		assert.JSONEq(t, string(sourceData), string(destData), "Step %s data", stepID)
+	// Walk through Stack in order and verify both step ID and data match at each position
+	for i, sourceStepID := range sourceState.Metadata.Stack {
+		destStepID := destState.Metadata.Stack[i]
+		require.Equal(t, sourceStepID, destStepID,
+			"Stack ordering mismatch at position %d: Valkey=%q, Garnet=%q", i, sourceStepID, destStepID)
+
+		sourceData, sourceOK := sourceState.Steps[sourceStepID]
+		destData, destOK := destState.Steps[destStepID]
+		require.True(t, sourceOK, "Step %q at Stack[%d] should exist in Valkey Steps", sourceStepID, i)
+		require.True(t, destOK, "Step %q at Stack[%d] should exist in Garnet Steps", destStepID, i)
+		assert.JSONEq(t, string(sourceData), string(destData),
+			"Step data mismatch at Stack[%d] (%q): Valkey and Garnet data should match", i, sourceStepID)
 	}
 
-	// Events
-	assert.Equal(t, len(sourceState.Events), len(destState.Events), "Events count")
-	for i := range sourceState.Events {
-		assert.JSONEq(t, string(sourceState.Events[i]), string(destState.Events[i]), "Event %d", i)
+	// ============================================================================
+	// SERVICE-BASED VERIFICATION
+	// Use LoadStack, LoadSteps, LoadEvents, LoadMetadata, LoadStepInputs to
+	// compare Valkey (source) and Garnet (destination) data.
+	// These functions handle format differences (like "3" vs "3.0") correctly.
+	// ============================================================================
+
+	t.Log("=== Service-Based Verification ===")
+
+	// 1. LoadStack - Verify ordering is preserved (only actual steps, not inputs)
+	t.Log("Checking LoadStack (step ordering)...")
+	valkeyStack, err := valkeySvc.LoadStack(ctx, sourceID)
+	require.NoError(t, err, "Failed to LoadStack from Valkey")
+	garnetStack, err := garnetSvc.LoadStack(ctx, destID)
+	require.NoError(t, err, "Failed to LoadStack from Garnet")
+
+	t.Logf("  Valkey Stack: %v", valkeyStack)
+	t.Logf("  Garnet Stack: %v", garnetStack)
+	require.Equal(t, valkeyStack, garnetStack, "Stack mismatch between Valkey and Garnet")
+
+	// 2. LoadStepInputs - Verify raw step inputs (separate from actions)
+	t.Log("Checking LoadStepInputs (raw inputs only)...")
+	valkeyInputs, err := valkeySvc.LoadStepInputs(ctx, sourceID)
+	require.NoError(t, err, "Failed to LoadStepInputs from Valkey")
+	garnetInputs, err := garnetSvc.LoadStepInputs(ctx, destID)
+	require.NoError(t, err, "Failed to LoadStepInputs from Garnet")
+
+	t.Logf("  Valkey Step Inputs: %d entries", len(valkeyInputs))
+	t.Logf("  Garnet Step Inputs: %d entries", len(garnetInputs))
+	require.Equal(t, len(valkeyInputs), len(garnetInputs), "Step Inputs count mismatch")
+
+	for inputID, valkeyData := range valkeyInputs {
+		garnetData, ok := garnetInputs[inputID]
+		require.True(t, ok, "Step Input %q exists in Valkey but not in Garnet", inputID)
+		assert.JSONEq(t, string(valkeyData), string(garnetData), "Step Input %q data mismatch", inputID)
+		t.Logf("    %s: [MATCH]", inputID)
 	}
 
-	// Verify extended metadata was copied correctly using v1 Metadata
-	destRawMeta, err := garnetSvc.LoadV1Metadata(ctx, destID)
-	require.NoError(t, err)
+	// 3. LoadStepsWithIDs - Verify actual step actions using Stack IDs
+	t.Log("Checking LoadStepsWithIDs (actions only, using Stack IDs)...")
+	valkeyActions, err := valkeySvc.LoadStepsWithIDs(ctx, sourceID, valkeyStack)
+	require.NoError(t, err, "Failed to LoadStepsWithIDs from Valkey")
+	garnetActions, err := garnetSvc.LoadStepsWithIDs(ctx, destID, garnetStack)
+	require.NoError(t, err, "Failed to LoadStepsWithIDs from Garnet")
 
-	assert.Equal(t, sourceRawMeta.Status, destRawMeta.Status, "Status")
-	assert.Equal(t, sourceRawMeta.Debugger, destRawMeta.Debugger, "Debugger")
-	// RunType is *string in v1 Metadata
-	if sourceRawMeta.RunType != nil {
-		require.NotNil(t, destRawMeta.RunType, "RunType should not be nil")
-		assert.Equal(t, *sourceRawMeta.RunType, *destRawMeta.RunType, "RunType")
-	} else {
-		assert.Nil(t, destRawMeta.RunType, "RunType should be nil")
+	t.Logf("  Valkey Actions: %d entries", len(valkeyActions))
+	t.Logf("  Garnet Actions: %d entries", len(garnetActions))
+	require.Equal(t, len(valkeyActions), len(garnetActions), "Actions count mismatch")
+
+	for _, stepID := range valkeyStack {
+		valkeyData, vok := valkeyActions[stepID]
+		garnetData, gok := garnetActions[stepID]
+		require.True(t, vok, "Step %q from Stack not found in Valkey actions", stepID)
+		require.True(t, gok, "Step %q from Stack not found in Garnet actions", stepID)
+		assert.JSONEq(t, string(valkeyData), string(garnetData), "Step %q action data mismatch", stepID)
+		t.Logf("    %s: [MATCH]", stepID)
 	}
-	assert.Equal(t, sourceRawMeta.Version, destRawMeta.Version, "Version")
 
-	t.Logf("Extended metadata: Status=%d, Debugger=%v, RunType=%v, Version=%d",
-		destRawMeta.Status, destRawMeta.Debugger, destRawMeta.RunType, destRawMeta.Version)
+	// 3. LoadEvents - Verify event data
+	t.Log("Checking LoadEvents...")
+	valkeyEvents, err := valkeySvc.LoadEvents(ctx, sourceID)
+	require.NoError(t, err, "Failed to LoadEvents from Valkey")
+	garnetEvents, err := garnetSvc.LoadEvents(ctx, destID)
+	require.NoError(t, err, "Failed to LoadEvents from Garnet")
 
-	t.Log("All fields match - Duplicate successful!")
+	t.Logf("  Valkey Events: %d", len(valkeyEvents))
+	t.Logf("  Garnet Events: %d", len(garnetEvents))
+	require.Equal(t, len(valkeyEvents), len(garnetEvents), "Events count mismatch")
+
+	for i := range valkeyEvents {
+		assert.JSONEq(t, string(valkeyEvents[i]), string(garnetEvents[i]), "Event[%d] data mismatch", i)
+	}
+	t.Log("    Events: [MATCH]")
+
+	// 4. LoadMetadata (v2) - Verify metadata fields
+	t.Log("Checking LoadMetadata (v2)...")
+	valkeyMeta, err := valkeySvc.LoadMetadata(ctx, sourceID)
+	require.NoError(t, err, "Failed to LoadMetadata from Valkey")
+	garnetMeta, err := garnetSvc.LoadMetadata(ctx, destID)
+	require.NoError(t, err, "Failed to LoadMetadata from Garnet")
+
+	// Config fields (excluding RunID which is expected to differ)
+	assert.Equal(t, valkeyMeta.Config.SpanID, garnetMeta.Config.SpanID, "SpanID mismatch")
+	t.Logf("    SpanID: %s [MATCH]", valkeyMeta.Config.SpanID)
+
+	assert.Equal(t, valkeyMeta.Config.Idempotency, garnetMeta.Config.Idempotency, "Idempotency mismatch")
+	t.Logf("    Idempotency: %s [MATCH]", valkeyMeta.Config.Idempotency)
+
+	assert.Equal(t, valkeyMeta.Config.FunctionVersion, garnetMeta.Config.FunctionVersion, "FunctionVersion mismatch")
+	t.Logf("    FunctionVersion: %d [MATCH]", valkeyMeta.Config.FunctionVersion)
+
+	assert.Equal(t, valkeyMeta.Config.RequestVersion, garnetMeta.Config.RequestVersion, "RequestVersion mismatch")
+	t.Logf("    RequestVersion: %d [MATCH]", valkeyMeta.Config.RequestVersion)
+
+	assert.Equal(t, valkeyMeta.Config.HasAI, garnetMeta.Config.HasAI, "HasAI mismatch")
+	t.Logf("    HasAI: %v [MATCH]", valkeyMeta.Config.HasAI)
+
+	assert.Equal(t, valkeyMeta.Config.ForceStepPlan, garnetMeta.Config.ForceStepPlan, "ForceStepPlan mismatch")
+	t.Logf("    ForceStepPlan: %v [MATCH]", valkeyMeta.Config.ForceStepPlan)
+
+	assert.Equal(t, valkeyMeta.Config.EventIDs, garnetMeta.Config.EventIDs, "EventIDs mismatch")
+	t.Logf("    EventIDs: %v [MATCH]", valkeyMeta.Config.EventIDs)
+
+	if valkeyMeta.Config.PriorityFactor != nil {
+		require.NotNil(t, garnetMeta.Config.PriorityFactor, "PriorityFactor should not be nil in Garnet")
+		assert.Equal(t, *valkeyMeta.Config.PriorityFactor, *garnetMeta.Config.PriorityFactor, "PriorityFactor mismatch")
+		t.Logf("    PriorityFactor: %d [MATCH]", *valkeyMeta.Config.PriorityFactor)
+	}
+
+	if valkeyMeta.Config.ReplayID != nil {
+		require.NotNil(t, garnetMeta.Config.ReplayID, "ReplayID should not be nil in Garnet")
+		assert.Equal(t, *valkeyMeta.Config.ReplayID, *garnetMeta.Config.ReplayID, "ReplayID mismatch")
+		t.Logf("    ReplayID: %s [MATCH]", valkeyMeta.Config.ReplayID)
+	}
+
+	if valkeyMeta.Config.BatchID != nil {
+		require.NotNil(t, garnetMeta.Config.BatchID, "BatchID should not be nil in Garnet")
+		assert.Equal(t, *valkeyMeta.Config.BatchID, *garnetMeta.Config.BatchID, "BatchID mismatch")
+		t.Logf("    BatchID: %s [MATCH]", valkeyMeta.Config.BatchID)
+	}
+
+	if valkeyMeta.Config.OriginalRunID != nil {
+		require.NotNil(t, garnetMeta.Config.OriginalRunID, "OriginalRunID should not be nil in Garnet")
+		assert.Equal(t, *valkeyMeta.Config.OriginalRunID, *garnetMeta.Config.OriginalRunID, "OriginalRunID mismatch")
+		t.Logf("    OriginalRunID: %s [MATCH]", valkeyMeta.Config.OriginalRunID)
+	}
+
+	// StartedAt (with tolerance)
+	if !valkeyMeta.Config.StartedAt.IsZero() {
+		assert.False(t, garnetMeta.Config.StartedAt.IsZero(), "StartedAt should not be zero in Garnet")
+		assert.WithinDuration(t, valkeyMeta.Config.StartedAt, garnetMeta.Config.StartedAt, time.Second, "StartedAt mismatch")
+		t.Logf("    StartedAt: %v [MATCH]", valkeyMeta.Config.StartedAt)
+	}
+
+	// CustomConcurrencyKeys
+	assert.Equal(t, len(valkeyMeta.Config.CustomConcurrencyKeys), len(garnetMeta.Config.CustomConcurrencyKeys), "CustomConcurrencyKeys count mismatch")
+	for i := range valkeyMeta.Config.CustomConcurrencyKeys {
+		assert.Equal(t, valkeyMeta.Config.CustomConcurrencyKeys[i], garnetMeta.Config.CustomConcurrencyKeys[i], "CustomConcurrencyKeys[%d] mismatch", i)
+	}
+	t.Logf("    CustomConcurrencyKeys: %d keys [MATCH]", len(valkeyMeta.Config.CustomConcurrencyKeys))
+
+	// Metrics
+	t.Log("  Metrics:")
+	assert.Equal(t, valkeyMeta.Metrics.EventSize, garnetMeta.Metrics.EventSize, "EventSize mismatch")
+	t.Logf("    EventSize: %d [MATCH]", valkeyMeta.Metrics.EventSize)
+
+	assert.Equal(t, valkeyMeta.Metrics.StateSize, garnetMeta.Metrics.StateSize, "StateSize mismatch")
+	t.Logf("    StateSize: %d [MATCH]", valkeyMeta.Metrics.StateSize)
+
+	assert.Equal(t, valkeyMeta.Metrics.StepCount, garnetMeta.Metrics.StepCount, "StepCount mismatch")
+	t.Logf("    StepCount: %d [MATCH]", valkeyMeta.Metrics.StepCount)
+
+	// Stack from metadata
+	assert.Equal(t, valkeyMeta.Stack, garnetMeta.Stack, "Stack (from metadata) mismatch")
+	t.Logf("    Stack: %v [MATCH]", valkeyMeta.Stack)
+
+	// 5. LoadV1Metadata - Verify raw v1 metadata
+	t.Log("Checking LoadV1Metadata...")
+	valkeyV1Meta, err := valkeySvc.LoadV1Metadata(ctx, sourceID)
+	require.NoError(t, err, "Failed to LoadV1Metadata from Valkey")
+	garnetV1Meta, err := garnetSvc.LoadV1Metadata(ctx, destID)
+	require.NoError(t, err, "Failed to LoadV1Metadata from Garnet")
+
+	// Compare key fields (runID will differ)
+	assert.Equal(t, valkeyV1Meta.Identifier.WorkflowID, garnetV1Meta.Identifier.WorkflowID, "V1 WorkflowID mismatch")
+	assert.Equal(t, valkeyV1Meta.Identifier.WorkflowVersion, garnetV1Meta.Identifier.WorkflowVersion, "V1 WorkflowVersion mismatch")
+	assert.Equal(t, valkeyV1Meta.Identifier.AccountID, garnetV1Meta.Identifier.AccountID, "V1 AccountID mismatch")
+	assert.Equal(t, valkeyV1Meta.Identifier.WorkspaceID, garnetV1Meta.Identifier.WorkspaceID, "V1 WorkspaceID mismatch")
+	assert.Equal(t, valkeyV1Meta.Identifier.AppID, garnetV1Meta.Identifier.AppID, "V1 AppID mismatch")
+	assert.Equal(t, valkeyV1Meta.Identifier.EventIDs, garnetV1Meta.Identifier.EventIDs, "V1 EventIDs mismatch")
+	assert.Equal(t, valkeyV1Meta.RequestVersion, garnetV1Meta.RequestVersion, "V1 RequestVersion mismatch")
+	t.Log("    V1 Metadata fields: [MATCH]")
+
+	// 6. Verify V1 ReplayID specifically
+	if valkeyV1Meta.Identifier.ReplayID != nil {
+		require.NotNil(t, garnetV1Meta.Identifier.ReplayID, "V1 ReplayID should not be nil in Garnet")
+		assert.Equal(t, *valkeyV1Meta.Identifier.ReplayID, *garnetV1Meta.Identifier.ReplayID, "V1 ReplayID mismatch")
+		t.Logf("    V1 ReplayID: %s [MATCH]", valkeyV1Meta.Identifier.ReplayID)
+	}
+
+	// 7. LoadState - Full state comparison
+	t.Log("Checking LoadState (full state)...")
+	valkeyFullState, err := valkeySvc.LoadState(ctx, sourceID)
+	require.NoError(t, err, "Failed to LoadState from Valkey")
+	garnetFullState, err := garnetSvc.LoadState(ctx, destID)
+	require.NoError(t, err, "Failed to LoadState from Garnet")
+
+	// Verify counts match
+	assert.Equal(t, len(valkeyFullState.Steps), len(garnetFullState.Steps), "Full state Steps count mismatch")
+	assert.Equal(t, len(valkeyFullState.Events), len(garnetFullState.Events), "Full state Events count mismatch")
+	assert.Equal(t, len(valkeyFullState.Metadata.Stack), len(garnetFullState.Metadata.Stack), "Full state Stack count mismatch")
+	t.Log("    Full State counts: [MATCH]")
+
+	t.Log("=== Service-Based Verification Complete ===")
 }
