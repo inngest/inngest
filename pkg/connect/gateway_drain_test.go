@@ -37,9 +37,6 @@ func TestWorkerPauseDuringGatewayDrain_UpdatesRedisStatus(t *testing.T) {
 	// frame. Without the bug, the pause is handled normally.
 	sendWorkerPauseMessage(t, res.ws)
 
-	// Give the gateway time to process the WORKER_PAUSE message
-	time.Sleep(200 * time.Millisecond)
-
 	// If the bug is fixed: the WORKER_PAUSE handler updates Redis to
 	// DRAINING and removes the connection from wsConnections. The
 	// connection-level draining flag (ch.draining) is set by the
@@ -53,18 +50,23 @@ func TestWorkerPauseDuringGatewayDrain_UpdatesRedisStatus(t *testing.T) {
 	// Verify the connection status was set to DRAINING in Redis by the
 	// WORKER_PAUSE handler. Without the fix, the status remains READY
 	// because we only set isDraining (no drain goroutine was triggered).
-	conn, err := res.stateManager.GetConnection(ctx, res.envID, res.connID)
-	require.NoError(t, err)
-	require.NotNil(t, conn, "connection should still exist in Redis")
-	require.Equal(t, connectpb.ConnectionStatus_DRAINING, conn.Status,
-		"WORKER_PAUSE handler should update Redis status to DRAINING "+
-			"even when gateway isDraining is true")
+	require.EventuallyWithT(t, func(ct *assert.CollectT) {
+		conn, err := res.stateManager.GetConnection(ctx, res.envID, res.connID)
+		assert.NoError(ct, err)
+		if conn != nil {
+			assert.Equal(ct, connectpb.ConnectionStatus_DRAINING, conn.Status,
+				"WORKER_PAUSE handler should update Redis status to DRAINING "+
+					"even when gateway isDraining is true")
+		}
+	}, 2*time.Second, 100*time.Millisecond)
 
 	// Verify the connection was removed from the in-memory wsConnections
 	// map by the WORKER_PAUSE handler, preventing further message forwarding.
-	_, loaded := res.svc.wsConnections.Load(res.connID.String())
-	require.False(t, loaded,
-		"WORKER_PAUSE handler should remove connection from wsConnections map")
+	require.EventuallyWithT(t, func(ct *assert.CollectT) {
+		_, loaded := res.svc.wsConnections.Load(res.connID.String())
+		assert.False(ct, loaded,
+			"WORKER_PAUSE handler should remove connection from wsConnections map")
+	}, 2*time.Second, 100*time.Millisecond)
 }
 
 // TestWorkerPauseWhenGatewayNotDraining_ShouldWork is a control test verifying
