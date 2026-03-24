@@ -199,7 +199,7 @@ func (q *queue) EnqueueItem(ctx context.Context, i osqueue.QueueItem, at time.Ti
 		shadowPartition = osqueue.ItemShadowPartition(ctx, i)
 	}
 
-	partitionID := shadowPartition.Identifier()
+	partitionID := defaultPartition.Identifier()
 	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.EnqueueItem", partitionID.AccountID, partitionID.EnvID, partitionID.FunctionID)
 	defer span.End()
 	span.SetAttributes(attribute.String("partition_id", shadowPartition.PartitionID))
