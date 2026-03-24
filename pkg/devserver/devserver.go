@@ -400,6 +400,9 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	rl := ratelimit.New(ctx, unshardedRc, fmt.Sprintf("{%s}:", rateLimitPrefix))
 
+	// Create the batch manager. In production, a second BatchClient can be provided
+	// to enable zero-downtime migration between Redis clusters via
+	// batch.NewMigratingBatchManager.
 	batcher := batch.NewRedisBatchManager(shardedClient.Batch(), rq, batch.WithLogger(l))
 	debouncer := debounce.NewRedisDebouncer(unshardedClient.Debounce(), queueShard, rq)
 	croner := cron.NewRedisCronManager(queueShard, rq, l)
