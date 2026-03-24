@@ -278,11 +278,11 @@ func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition
 		Parallel:             parallel,
 	}
 
-	if processErr := iter.Iterate(ctx); processErr != nil {
+	if err := iter.Iterate(ctx); err != nil {
 		// Report the eerror.
-		l.Error("error iterating queue items", "error", processErr, "partition", p)
+		l.Error("error iterating queue items", "error", err, "partition", p)
 		span.RecordError(err)
-		return processErr
+		return err
 	}
 
 	if q.usePeekEWMA {
