@@ -301,6 +301,13 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	conditionalQueueTracer := itrace.NewConditionalTracer(itrace.QueueTracer(), itrace.AlwaysTrace)
 
+	tp := tracing.NewSqlcTracerProvider(base_cqrs.NewQueries(db, dbDriver, sqlc_postgres.NewNormalizedOpts{
+		MaxIdleConns:    opts.PostgresMaxIdleConns,
+		MaxOpenConns:    opts.PostgresMaxOpenConns,
+		ConnMaxIdle:     opts.PostgresConnMaxIdleTime,
+		ConnMaxLifetime: opts.PostgresConnMaxLifetime,
+	}))
+
 	queueOpts := []queue.QueueOpt{
 		queue.WithRunMode(runMode),
 		queue.WithIdempotencyTTL(time.Hour),
@@ -330,6 +337,7 @@ func start(ctx context.Context, opts StartOpts) error {
 			return queue.PartitionPausedInfo{}
 		}),
 		queue.WithConditionalTracer(conditionalQueueTracer),
+		queue.WithConstraintNotifier(tracing.NewConstraintNotifier(tp)),
 	}
 
 	const rateLimitPrefix = "ratelimit"
@@ -465,13 +473,6 @@ func start(ctx context.Context, opts StartOpts) error {
 	}
 
 	hmw := memory_writer.NewWriter(ctx, memory_writer.WriterOptions{DumpToFile: false})
-
-	tp := tracing.NewSqlcTracerProvider(base_cqrs.NewQueries(db, dbDriver, sqlc_postgres.NewNormalizedOpts{
-		MaxIdleConns:    opts.PostgresMaxIdleConns,
-		MaxOpenConns:    opts.PostgresMaxOpenConns,
-		ConnMaxIdle:     opts.PostgresConnMaxIdleTime,
-		ConnMaxLifetime: opts.PostgresConnMaxLifetime,
-	}))
 
 	url := opts.Config.CoreAPI.Addr
 	if url == "0.0.0.0" {

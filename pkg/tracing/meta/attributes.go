@@ -154,7 +154,7 @@ var Attrs = struct {
 
 	AIRequestMetadata:                  JsonAttr[aigateway.ParsedInferenceRequest]("ai.request"),
 	AIResponseMetadata:                 JsonAttr[aigateway.ParsedInferenceResponse]("ai.response"),
-	ConstraintsHit:                     JsonAttr[enums.QueueConstraint]("constraints.acquire_response"),
+	ConstraintHit:                      JsonAttr[enums.QueueConstraint]("constraints.acquire_response"),
 	AccountID:                          UUIDAttr("account.id"),
 	AppID:                              UUIDAttr("app.id"),
 	BatchID:                            ULIDAttr("batch.id"),
