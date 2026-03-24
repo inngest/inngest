@@ -90,5 +90,5 @@ type ExtractedValues struct {
 	MetadataKind *metadata.Kind
 	MetadataOp *metadata.Opcode
 	MetadataScope *metadata.Scope
-	ConstraintsHit *constraintapi.CapacityAcquireResponse
+	ConstraintHit *enums.QueueConstraint
 }
