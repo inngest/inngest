@@ -776,8 +776,11 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 		if err != nil {
 			c.log.Error("could not update connection status to DRAINING on WORKER_PAUSE",
 				"err", err,
-				"conn_id", c.conn.ConnectionId.String(),
+				"instance_id", c.conn.Data.InstanceId,
 				"env_id", c.conn.EnvID.String(),
+				"account_id", c.conn.AccountID.String(),
+				"gateway_id", c.conn.GatewayId.String(),
+				"connection_id", c.conn.ConnectionId.String(),
 			)
 		}
 
