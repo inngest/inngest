@@ -745,9 +745,17 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 
 		return nil
 	case connectpb.GatewayMessageType_WORKER_PAUSE:
-		if c.svc.isDraining.Load() {
-			return &ErrDraining
-		}
+		// NOTE: Unlike WORKER_READY and WORKER_HEARTBEAT, we intentionally do
+		// NOT reject WORKER_PAUSE when the gateway is draining. The worker is
+		// signaling that it wants to stop receiving new requests (e.g. graceful
+		// shutdown via SIGTERM). We must honour this by updating the connection
+		// status in Redis to DRAINING so the router stops selecting it.
+		//
+		// If we reject with ErrDraining here, the connection is closed without
+		// updating Redis, leaving the status as READY. The router then keeps
+		// routing requests to a worker that will skip them, causing leases to
+		// expire after 25s (ConnectWorkerRequestLeaseDuration + GracePeriod)
+		// and producing "worker stopped responding" errors. (SYS-709)
 
 		// Mark as draining before updating Redis so that concurrent heartbeat
 		// messages do not reset the status back to READY.
