@@ -774,19 +774,15 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 		// this connection for new requests.
 		err := c.updateConnStatus(connectpb.ConnectionStatus_DRAINING)
 		if err != nil {
-			return &connecterrors.SocketError{
-				SysCode:    syscode.CodeConnectInternal,
-				StatusCode: websocket.StatusInternalError,
-				Msg:        "could not update connection status",
-			}
+			c.log.Error("could not update connection status to DRAINING on WORKER_PAUSE",
+				"err", err,
+				"conn_id", c.conn.ConnectionId.String(),
+				"env_id", c.conn.EnvID.String(),
+			)
 		}
 
-		// Then delete from in-memory map to prevent forwarding. This must
-		// happen after the Redis status update to avoid a race where the
-		// router still sees status=READY but the gateway can no longer forward.
+		// Remove from in-memory map to prevent new requests from being forwarded.
 		c.svc.wsConnections.Delete(c.conn.ConnectionId.String())
-
-		// For pauses, worker capacity is not tracked and it will expire
 
 		for _, l := range c.svc.lifecycles {
 			go l.OnStartDraining(context.Background(), c.conn)
