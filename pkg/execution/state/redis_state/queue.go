@@ -579,9 +579,11 @@ func (q *queue) peek(ctx context.Context, opts peekOpts) (peekResult, error) {
 			case float64:
 				lastScore = int64(v)
 			case string:
-				parsed, parseErr := strconv.ParseInt(v, 10, 64)
+				// Redis ZSCORE returns float-formatted strings (e.g. "1711252800000"
+				// or "1711252800000.0"). Use ParseFloat to handle both forms.
+				parsed, parseErr := strconv.ParseFloat(v, 64)
 				if parseErr == nil {
-					lastScore = parsed
+					lastScore = int64(parsed)
 				}
 			}
 		}

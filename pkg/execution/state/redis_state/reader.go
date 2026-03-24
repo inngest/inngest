@@ -222,6 +222,16 @@ func (q *queue) ItemsByPartition(ctx context.Context, partitionID string, from t
 			// missing from hash). Advance the cursor past the last fetched
 			// item's score and continue to the next batch.
 			if iterated == 0 {
+				if result.LastScore <= 0 {
+					// Score parsing failed or returned an invalid value.
+					// Break to avoid an infinite loop (cursor would regress
+					// to epoch, re-fetching the same items forever).
+					l.Warn("breaking partition iterator: last score is invalid",
+						"last_score", result.LastScore,
+						"raw_count", result.RawCount,
+					)
+					break
+				}
 				ptFrom = time.UnixMilli(result.LastScore).Add(time.Millisecond)
 				<-time.After(opt.Interval)
 				continue
