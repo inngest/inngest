@@ -953,7 +953,6 @@ func (e *executor) schedule(
 
 	if req.Function.Debounce != nil && !req.PreventDebounce {
 		ctx, span := e.conditionalTracer.NewSpan(ctx, "executor.Debounce", req.AccountID, req.WorkspaceID, req.Function.ID)
-		defer span.End()
 		err := e.debouncer.Debounce(ctx, debounce.DebounceItem{
 			AccountID:        req.AccountID,
 			WorkspaceID:      req.WorkspaceID,
@@ -964,6 +963,7 @@ func (e *executor) schedule(
 			Event:            req.Events[0].GetEvent(),
 			FunctionPausedAt: req.FunctionPausedAt,
 		}, req.Function)
+		span.End()
 		if err != nil {
 			span.RecordError(err)
 			return nil, nil, err
