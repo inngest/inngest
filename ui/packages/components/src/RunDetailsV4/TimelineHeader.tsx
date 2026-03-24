@@ -9,9 +9,7 @@
  */
 
 import { useCallback, useLayoutEffect, useRef } from 'react';
-import { RiContractUpDownLine, RiExpandUpDownLine } from '@remixicon/react';
 
-import { Button } from '../Button';
 import { getStatusBackgroundClass } from '../Status/statusClasses';
 import { cn } from '../utils/classNames';
 import { TimeBrush } from './TimeBrush';
@@ -33,10 +31,6 @@ type Props = {
   selectionStart?: number;
   /** Current selection end as percentage (0-100), controlled by parent */
   selectionEnd?: number;
-  /** Callback to expand all timeline rows */
-  onExpandAll?: () => void;
-  /** Callback to collapse all timeline rows */
-  onCollapseAll?: () => void;
 };
 
 const TIME_MARKERS = [0, 25, 50, 75, 100];
@@ -69,8 +63,6 @@ export function TimelineHeader({
   status,
   selectionStart: selStart = 0,
   selectionEnd: selEnd = 100,
-  onExpandAll,
-  onCollapseAll,
 }: Props): JSX.Element {
   const totalMs = maxTime.getTime() - minTime.getTime();
   const durations = getMarkerDurations(totalMs);
@@ -138,37 +130,14 @@ export function TimelineHeader({
 
   return (
     <div className="mb-1 flex w-full items-end pt-5">
-      {/* Left panel with expand/collapse controls */}
+      {/* Left panel spacer */}
       <div
-        className="flex shrink-0 items-center gap-0.5 pr-2"
+        className="shrink-0 pr-2"
         style={{
           width: `${leftWidth}%`,
           paddingLeft: `${TIMELINE_CONSTANTS.BASE_LEFT_PADDING_PX}px`,
         }}
-      >
-        {onExpandAll && (
-          <Button
-            size="small"
-            appearance="ghost"
-            icon={<RiExpandUpDownLine className="h-3.5 w-3.5" />}
-            title="Expand all"
-            tooltip="Expand all"
-            aria-label="Expand all"
-            onClick={onExpandAll}
-          />
-        )}
-        {onCollapseAll && (
-          <Button
-            size="small"
-            appearance="ghost"
-            icon={<RiContractUpDownLine className="h-3.5 w-3.5" />}
-            title="Collapse all"
-            tooltip="Collapse all"
-            aria-label="Collapse all"
-            onClick={onCollapseAll}
-          />
-        )}
-      </div>
+      />
 
       {/* Right panel with brush and markers */}
       <div ref={rightPanelRef} className="relative flex-1">

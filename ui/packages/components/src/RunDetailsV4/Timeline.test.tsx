@@ -26,6 +26,15 @@ describe('Timeline', () => {
     leftWidth: 40,
     bars: [
       {
+        id: 'root',
+        name: 'Run',
+        startTime: new Date('2024-01-01T00:00:00Z'),
+        endTime: new Date('2024-01-01T00:00:10Z'),
+        style: 'root',
+        isRoot: true,
+        status: 'COMPLETED',
+      },
+      {
         id: 'step-1',
         name: 'Process payment',
         startTime: new Date('2024-01-01T00:00:00Z'),
@@ -59,7 +68,8 @@ describe('Timeline', () => {
     it('renders correct number of timeline bars', () => {
       render(<Timeline data={mockData} />, { wrapper: Wrapper });
       const bars = screen.getAllByTestId('timeline-bar-row');
-      expect(bars).toHaveLength(2);
+      // root + 2 step bars
+      expect(bars).toHaveLength(3);
     });
   });
 
@@ -68,9 +78,9 @@ describe('Timeline', () => {
     it('shows timing breakdown when step is expanded', async () => {
       render(<Timeline data={mockData} />, { wrapper: Wrapper });
 
-      // Click the first row to expand (has timingBreakdown)
+      // Click the first step row to expand (has timingBreakdown)
       const rows = screen.getAllByTestId('timeline-bar-row');
-      fireEvent.click(rows[0]!);
+      fireEvent.click(rows[1]!);
 
       // Should show Inngest and SERVER timing rows
       expect(screen.getByText('Inngest')).toBeTruthy();
@@ -80,14 +90,14 @@ describe('Timeline', () => {
     it('uses TimelineBar for timing breakdown rows', async () => {
       render(<Timeline data={mockData} />, { wrapper: Wrapper });
 
-      // Click first row to expand
+      // Click first step row to expand
       const rows = screen.getAllByTestId('timeline-bar-row');
-      fireEvent.click(rows[0]!);
+      fireEvent.click(rows[1]!);
 
       // Timing rows should be rendered as TimelineBar components
       const bars = screen.getAllByTestId('timeline-bar-row');
-      // 2 main bars + 2 timing breakdown bars (INNGEST, SERVER)
-      expect(bars.length).toBeGreaterThanOrEqual(4);
+      // root + 2 main bars + 2 timing breakdown bars (INNGEST, SERVER)
+      expect(bars.length).toBeGreaterThanOrEqual(5);
     });
   });
 
@@ -98,8 +108,8 @@ describe('Timeline', () => {
 
       const rows = screen.getAllByTestId('timeline-bar-row');
 
-      // Expand first bar
-      fireEvent.click(rows[0]!);
+      // Expand first step bar
+      fireEvent.click(rows[1]!);
       expect(screen.getAllByText('Inngest').length).toBeGreaterThan(0);
 
       // Second bar (if expandable) should still be collapsed
@@ -109,9 +119,9 @@ describe('Timeline', () => {
     it('can collapse an expanded bar', () => {
       render(<Timeline data={mockData} />, { wrapper: Wrapper });
 
-      // Expand first bar
+      // Expand first step bar
       const rows = screen.getAllByTestId('timeline-bar-row');
-      fireEvent.click(rows[0]!);
+      fireEvent.click(rows[1]!);
       expect(screen.getAllByText('Inngest').length).toBeGreaterThan(0);
 
       // Collapse by clicking the arrow (only the arrow collapses)
@@ -137,6 +147,15 @@ describe('Timeline', () => {
       const dataWithMultipleExpandable: TimelineData = {
         ...mockData,
         bars: [
+          {
+            id: 'root',
+            name: 'Run',
+            startTime: new Date('2024-01-01T00:00:00Z'),
+            endTime: new Date('2024-01-01T00:00:10Z'),
+            style: 'root',
+            isRoot: true,
+            status: 'COMPLETED',
+          },
           {
             id: 'step-1',
             name: 'Step one',
@@ -178,7 +197,7 @@ describe('Timeline', () => {
 
       // Expand the first step manually
       const rows = screen.getAllByTestId('timeline-bar-row');
-      fireEvent.click(rows[0]!);
+      fireEvent.click(rows[1]!);
       expect(screen.getByText('Inngest')).toBeTruthy();
 
       // Click collapse all

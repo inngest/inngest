@@ -7,10 +7,10 @@
  * - Expansion state for all expandable bars
  * - Recursive rendering of nested steps
  * - Column resize handling
- */
+ */ import { useCallback, useMemo, useState, type ReactNode } from 'react';
+import { RiContractUpDownLine, RiExpandUpDownLine } from '@remixicon/react';
 
-import { useCallback, useState } from 'react';
-
+import { Button } from '../Button';
 import { TimelineBar } from './TimelineBar';
 import type {
   BarSegment,
@@ -262,6 +262,8 @@ type TimelineBarRendererProps = {
   viewStartOffset?: number;
   /** View offset - end position as percentage (0-100) for zooming */
   viewEndOffset?: number;
+  /** Optional actions to render in the bar's left panel (e.g. expand/collapse all) */
+  actions?: ReactNode;
 };
 
 /**
@@ -280,6 +282,7 @@ function TimelineBarRenderer({
   selectedStepId,
   viewStartOffset = 0,
   viewEndOffset = 100,
+  actions,
 }: TimelineBarRendererProps): JSX.Element {
   const { startPercent, widthPercent } = calculateBarPosition(
     bar.startTime,
@@ -325,6 +328,7 @@ function TimelineBarRenderer({
       endTime={bar.endTime}
       minTime={minTime}
       delayMs={bar.delayMs}
+      actions={actions}
     >
       {/* Timing breakdown bars */}
       {isExpanded &&
@@ -510,6 +514,32 @@ export function Timeline({ data, onSelectStep }: Props): JSX.Element {
     setExpandedBars(new Set(rootBarIds));
   }, [bars]);
 
+  const expandCollapseActions = useMemo(
+    () => (
+      <span className="flex shrink-0 items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
+        <Button
+          size="small"
+          appearance="ghost"
+          icon={<RiExpandUpDownLine className="h-3.5 w-3.5" />}
+          title="Expand all"
+          tooltip="Expand all"
+          aria-label="Expand all"
+          onClick={handleExpandAll}
+        />
+        <Button
+          size="small"
+          appearance="ghost"
+          icon={<RiContractUpDownLine className="h-3.5 w-3.5" />}
+          title="Collapse all"
+          tooltip="Collapse all"
+          aria-label="Collapse all"
+          onClick={handleCollapseAll}
+        />
+      </span>
+    ),
+    [handleExpandAll, handleCollapseAll]
+  );
+
   // Handle timeline brush selection change
   const handleSelectionChange = useCallback((start: number, end: number) => {
     setViewStartOffset(start);
@@ -530,8 +560,6 @@ export function Timeline({ data, onSelectStep }: Props): JSX.Element {
         status={rootStatus}
         selectionStart={viewStartOffset}
         selectionEnd={viewEndOffset}
-        onExpandAll={handleExpandAll}
-        onCollapseAll={handleCollapseAll}
       />
 
       {/* Step bars */}
@@ -550,6 +578,7 @@ export function Timeline({ data, onSelectStep }: Props): JSX.Element {
           selectedStepId={selectedStepId}
           viewStartOffset={viewStartOffset}
           viewEndOffset={viewEndOffset}
+          actions={bar.isRoot ? expandCollapseActions : undefined}
         />
       ))}
     </div>
