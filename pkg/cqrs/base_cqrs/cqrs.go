@@ -319,6 +319,10 @@ type IODynamicRef struct {
 type spanRollupInfo struct {
 	metadataByParent map[string][]*cqrs.SpanMetadata
 	dynamicRefs      map[string]*IODynamicRef
+	// otelToDynamic maps OTEL span IDs to their owning dynamic span ID.
+	// This is needed because parent_span_id in the DB is an OTEL span ID,
+	// but the span tree is keyed by dynamic_span_id.
+	otelToDynamic map[string]string
 }
 
 func mapSpanFromRow[T normalizedSpan](ctx context.Context, span T, info *spanRollupInfo) (*cqrs.OtelSpan, error) {
@@ -418,6 +422,11 @@ func mapSpanFromRow[T normalizedSpan](ctx context.Context, span T, info *spanRol
 
 fragmentLoop:
 	for _, fragment := range fragments {
+		// Collect OTEL span IDs from fragments to build the reverse mapping.
+		if otelSpanID, ok := fragment["span_id"].(string); ok && otelSpanID != "" && info != nil {
+			info.otelToDynamic[otelSpanID] = dynamicSpanID.String
+		}
+
 		if name, ok := fragment["name"].(string); ok {
 			switch {
 			case strings.HasPrefix(name, "executor."):
@@ -530,6 +539,10 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 	// A map of dynamic span IDs to the specific span ID that contains I/O
 	dynamicRefs := make(map[string]*IODynamicRef)
 
+	// Maps OTEL span IDs to their owning dynamic span ID.  Parent references
+	// in the DB use OTEL span IDs, but the span tree is keyed by dynamic IDs.
+	otelToDynamic := make(map[string]string)
+
 	var root *cqrs.OtelSpan
 	var runID ulid.ULID
 	var err error
@@ -538,6 +551,7 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 		info := spanRollupInfo{
 			dynamicRefs:      dynamicRefs,
 			metadataByParent: metadataByParent,
+			otelToDynamic:    otelToDynamic,
 		}
 		newSpan, err := mapSpanFromRow(ctx, span, &info)
 		if err != nil {
@@ -549,6 +563,21 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 		}
 
 		spanMap.Set(newSpan.SpanID, newSpan)
+	}
+
+	// resolveDynamic looks up a dynamic span ID for the given ID, which may
+	// be either a dynamic span ID (already in the map) or an OTEL span ID
+	// that needs resolving via the otelToDynamic mapping.
+	resolveDynamic := func(id string) (string, bool) {
+		if _, ok := spanMap.Get(id); ok {
+			return id, true
+		}
+		if dynID, ok := otelToDynamic[id]; ok {
+			if _, ok := spanMap.Get(dynID); ok {
+				return dynID, true
+			}
+		}
+		return "", false
 	}
 
 	// Build a reverse lookup map for output references
@@ -574,8 +603,20 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 			}
 		}
 
+		// Attach metadata to spans. Metadata spans reference their parent by
+		// OTEL span ID, so also check the otelToDynamic mapping.
 		if metadata, ok := metadataByParent[span.SpanID]; ok {
 			span.Metadata = metadata
+		} else {
+			// Check if any metadata references an OTEL span ID that
+			// belongs to this dynamic span group.
+			for otelID, dynID := range otelToDynamic {
+				if dynID == span.SpanID {
+					if metadata, ok := metadataByParent[otelID]; ok {
+						span.Metadata = append(span.Metadata, metadata...)
+					}
+				}
+			}
 		}
 
 		if (span.Attributes.IsUserland == nil || !*span.Attributes.IsUserland) && (span.ParentSpanID == nil || *span.ParentSpanID == "" || *span.ParentSpanID == "0000000000000000") {
@@ -583,7 +624,11 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 			continue
 		}
 
-		if parent, ok := spanMap.Get(*span.ParentSpanID); ok {
+		// Resolve the parent span ID, which may be an OTEL span ID that
+		// needs mapping to the parent's dynamic span ID.
+		if parentDynID, ok := resolveDynamic(*span.ParentSpanID); ok {
+			parent, _ := spanMap.Get(parentDynID)
+
 			// This is wrong. Either do it properly in DB or infer it
 			// correctly here. e.g. if child failed but more attempts coming,
 			// still running

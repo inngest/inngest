@@ -12,7 +12,12 @@ import type { ReactNode } from 'react';
 /**
  * Available fill patterns for bars.
  */
-export type BarPattern = 'solid' | 'barber-pole' | 'dotted';
+export type BarPattern =
+  | 'solid'
+  | 'barber-pole'
+  | 'barber-pole-light'
+  | 'barber-pole-dark'
+  | 'dotted';
 
 /**
  * Available icons for bars.
@@ -45,6 +50,9 @@ export type BarStyleKey =
   | 'step.invoke'
   // Timing categories
   | 'timing.inngest' // Queue/delay time (short, gray)
+  | 'timing.inngest.queue' // Run queue delay (short, lightest)
+  | 'timing.inngest.discovery' // Discovery + scheduling (short, medium)
+  | 'timing.inngest.finalization' // Finalization (short, medium)
   | 'timing.server' // Execution time (tall, barber-pole, status color)
   | 'timing.connecting' // Connection time (short, dotted border, status color)
   // HTTP timing phases (nested under server execution)
@@ -249,6 +257,9 @@ export interface TimelineBarData {
   /** HTTP timing breakdown (for steps with HTTP timing metadata) */
   httpTimingBreakdown?: HTTPTimingBreakdownData;
 
+  /** Inngest overhead breakdown (queue delay, discovery, finalization) */
+  inngestBreakdown?: InngestBreakdownData;
+
   /** Whether this bar represents the root run (clicking shows TopInfo) */
   isRoot?: boolean;
 
@@ -270,6 +281,24 @@ export interface TimingBreakdownData {
   executionMs: number;
 
   /** Total duration */
+  totalMs: number;
+}
+
+/**
+ * Inngest overhead breakdown for the Inngest timing bar.
+ * Breaks down the non-execution time into distinct phases.
+ */
+export interface InngestBreakdownData {
+  /** Time the run waited in queue before execution started */
+  runQueueDelayMs: number;
+
+  /** Discovery + scheduling overhead (run started → step queued) */
+  discoveryMs: number;
+
+  /** Finalization overhead (step ended → run ended) */
+  finalizationMs: number;
+
+  /** Total Inngest overhead */
   totalMs: number;
 }
 

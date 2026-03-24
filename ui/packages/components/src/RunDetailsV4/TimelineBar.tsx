@@ -53,6 +53,7 @@ import { TIMELINE_CONSTANTS } from './utils/timing';
 const BAR_STYLES: Record<BarStyleKey, BarStyle> = {
   root: {
     barColor: 'bg-status-completed',
+    barHeight: 'short',
     statusBased: true,
   },
   'step.run': {
@@ -72,6 +73,26 @@ const BAR_STYLES: Record<BarStyleKey, BarStyle> = {
     barColor: 'bg-surfaceMuted',
     barHeight: 'short',
     durationColor: 'text-basis',
+    labelFormat: 'default',
+    textColor: 'text-light',
+  },
+  'timing.inngest.queue': {
+    barColor: 'bg-surfaceMuted',
+    barHeight: 'short',
+    labelFormat: 'default',
+    textColor: 'text-light',
+  },
+  'timing.inngest.discovery': {
+    barColor: 'bg-surfaceMuted',
+    barHeight: 'short',
+    pattern: 'barber-pole-light',
+    labelFormat: 'default',
+    textColor: 'text-light',
+  },
+  'timing.inngest.finalization': {
+    barColor: 'bg-surfaceMuted',
+    barHeight: 'short',
+    pattern: 'barber-pole-dark',
     labelFormat: 'default',
     textColor: 'text-light',
   },
@@ -110,8 +131,9 @@ const BAR_STYLES: Record<BarStyleKey, BarStyle> = {
     statusBased: true,
   },
   'timing.http.server': {
-    barColor: 'bg-primary-moderate',
-    barHeight: 'short',
+    barColor: 'bg-status-completed',
+    barHeight: 'tall',
+    pattern: 'barber-pole',
     labelFormat: 'uppercase',
     statusBased: true,
   },
@@ -140,6 +162,24 @@ const BAR_PATTERNS: Record<BarPattern, CSSProperties> = {
       transparent 6px,
       rgba(255, 255, 255, 0.15) 6px,
       rgba(255, 255, 255, 0.15) 8px
+    )`,
+  },
+  'barber-pole-light': {
+    backgroundImage: `repeating-linear-gradient(
+      -45deg,
+      transparent,
+      transparent 6px,
+      rgba(255, 255, 255, 0.15) 6px,
+      rgba(255, 255, 255, 0.15) 8px
+    )`,
+  },
+  'barber-pole-dark': {
+    backgroundImage: `repeating-linear-gradient(
+      -45deg,
+      transparent,
+      transparent 6px,
+      rgba(0, 0, 0, 0.15) 6px,
+      rgba(0, 0, 0, 0.15) 8px
     )`,
   },
   dotted: {
@@ -376,7 +416,6 @@ const VisualBar = memo(function VisualBar({
   widthPercent,
   style,
   segments,
-  expanded,
   originalBarStart,
   originalBarWidth,
   viewStartOffset = 0,
@@ -387,7 +426,6 @@ const VisualBar = memo(function VisualBar({
   widthPercent: number;
   style: TimelineBarProps['style'];
   segments?: BarSegment[];
-  expanded?: boolean;
   /** Original bar start before transform (for segment calculation) */
   originalBarStart?: number;
   /** Original bar width before transform (for segment calculation) */
@@ -402,7 +440,6 @@ const VisualBar = memo(function VisualBar({
   const barStyle = getBarStyle(style);
   const pattern = getBarPattern(barStyle.pattern);
   const heightClass = BAR_HEIGHT_CLASSES[barStyle.barHeight ?? 'tall'];
-  const opacityStyle = expanded ? { opacity: 0 } : {};
   const barColor = getBarColor(style, status);
 
   // Memoize segment transformation to avoid recalculating on every render
@@ -448,7 +485,6 @@ const VisualBar = memo(function VisualBar({
         style={{
           left: '0%',
           width: '100%',
-          ...opacityStyle,
         }}
       >
         {transformedSegments.map((segment) => {
@@ -484,7 +520,6 @@ const VisualBar = memo(function VisualBar({
         width: `${widthPercent}%`,
         minWidth: `${TIMELINE_CONSTANTS.MIN_BAR_WIDTH_PX}px`,
         ...pattern,
-        ...opacityStyle,
       }}
     />
   );
@@ -664,7 +699,6 @@ export function TimelineBar({
                   widthPercent={transformed.widthPercent}
                   style={style}
                   segments={segments}
-                  expanded={!!(expandable && expanded)}
                   originalBarStart={startPercent}
                   originalBarWidth={widthPercent}
                   viewStartOffset={viewStartOffset}

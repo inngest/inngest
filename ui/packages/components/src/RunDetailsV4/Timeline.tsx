@@ -18,6 +18,7 @@ import type {
   BarSegment,
   BarStyleKey,
   HTTPTimingBreakdownData,
+  InngestBreakdownData,
   TimelineBarData,
   TimelineData,
 } from './TimelineBar.types';
@@ -38,46 +39,6 @@ type Props = {
 // ============================================================================
 // Timing Breakdown Utilities
 // ============================================================================
-
-/**
- * Generate timing breakdown bars for a step with timing data.
- */
-function generateTimingBreakdownBars(bar: TimelineBarData, orgName?: string): TimelineBarData[] {
-  if (!bar.timingBreakdown) return [];
-
-  const { queueMs, executionMs } = bar.timingBreakdown;
-  const barStartTime = bar.startTime;
-
-  // Calculate queue end time
-  const queueEndTime = new Date(barStartTime.getTime() + queueMs);
-  const executionEndTime = new Date(queueEndTime.getTime() + executionMs);
-
-  const timingBars: TimelineBarData[] = [];
-
-  // INNGEST timing bar (queue time)
-  if (queueMs > 0) {
-    timingBars.push({
-      id: `${bar.id}-timing-inngest`,
-      name: 'Inngest',
-      startTime: barStartTime,
-      endTime: queueEndTime,
-      style: 'timing.inngest',
-    });
-  }
-
-  // SERVER timing bar (execution time)
-  if (executionMs > 0) {
-    timingBars.push({
-      id: `${bar.id}-timing-server`,
-      name: orgName ?? 'Your server',
-      startTime: queueEndTime,
-      endTime: executionEndTime,
-      style: 'timing.server',
-    });
-  }
-
-  return timingBars;
-}
 
 /**
  * Generate segments for a compound bar based on timing breakdown.
@@ -105,14 +66,14 @@ function generateBarSegments(bar: TimelineBarData): BarSegment[] | undefined {
     currentPercent += queuePercent;
   }
 
-  // Execution segment (SERVER)
+  // Execution segment — root bar uses short status-colored bar, steps use tall barber-pole
   if (executionMs > 0) {
     const execPercent = (executionMs / totalMs) * 100;
     segments.push({
       id: `${bar.id}-seg-server`,
       startPercent: currentPercent,
       widthPercent: execPercent,
-      style: 'timing.server',
+      style: bar.isRoot ? 'root' : 'timing.server',
       status: bar.status,
     });
   }
@@ -162,52 +123,80 @@ function generateDelaySegments(bar: TimelineBarData): BarSegment[] | undefined {
 }
 
 /**
- * Generate HTTP timing breakdown bars for a step with HTTP timing metadata.
- * These are sequential phases of Inngest's HTTP call to the SDK endpoint:
- * DNS -> TCP -> TLS -> Server Processing (TTFB) -> Content Transfer
- *
- * Only non-zero phases are included.
+ * Generate HTTP timing segments for the "Your server" compound bar.
+ * Shows each HTTP phase (DNS, TCP, TLS, TTFB, Transfer) as a colored segment
+ * within the bar, proportional to its duration.
  */
-function generateHTTPTimingBars(
-  parentBarId: string,
+function generateHTTPSegments(
+  barId: string,
   httpTiming: HTTPTimingBreakdownData,
-  parentStartTime: Date
-): TimelineBarData[] {
-  const phases: { key: string; label: string; ms: number; style: BarStyleKey }[] = [
-    { key: 'dns', label: 'DNS', ms: httpTiming.dnsLookupMs, style: 'timing.http.dns' },
-    { key: 'tcp', label: 'TCP', ms: httpTiming.tcpConnectionMs, style: 'timing.http.tcp' },
-    { key: 'tls', label: 'TLS', ms: httpTiming.tlsHandshakeMs, style: 'timing.http.tls' },
-    {
-      key: 'server',
-      label: 'TTFB',
-      ms: httpTiming.serverProcessingMs,
-      style: 'timing.http.server',
-    },
-    {
-      key: 'transfer',
-      label: 'Transfer',
-      ms: httpTiming.contentTransferMs,
-      style: 'timing.http.transfer',
-    },
+  status?: string
+): BarSegment[] | undefined {
+  const totalMs = httpTiming.totalMs;
+  if (totalMs <= 0) return undefined;
+
+  const phases: { key: string; ms: number; style: BarStyleKey }[] = [
+    { key: 'dns', ms: httpTiming.dnsLookupMs, style: 'timing.http.dns' },
+    { key: 'tcp', ms: httpTiming.tcpConnectionMs, style: 'timing.http.tcp' },
+    { key: 'tls', ms: httpTiming.tlsHandshakeMs, style: 'timing.http.tls' },
+    { key: 'server', ms: httpTiming.serverProcessingMs, style: 'timing.http.server' },
+    { key: 'transfer', ms: httpTiming.contentTransferMs, style: 'timing.http.transfer' },
   ];
 
-  let cumulativeMs = 0;
+  const segments: BarSegment[] = [];
+  let currentPercent = 0;
 
-  return phases
-    .filter((phase) => phase.ms > 0)
-    .map((phase) => {
-      const startTime = new Date(parentStartTime.getTime() + cumulativeMs);
-      const endTime = new Date(startTime.getTime() + phase.ms);
-      cumulativeMs += phase.ms;
-
-      return {
-        id: `${parentBarId}-http-${phase.key}`,
-        name: phase.label,
-        startTime,
-        endTime,
+  for (const phase of phases) {
+    if (phase.ms > 0) {
+      const widthPercent = (phase.ms / totalMs) * 100;
+      segments.push({
+        id: `${barId}-seg-http-${phase.key}`,
+        startPercent: currentPercent,
+        widthPercent,
         style: phase.style,
-      };
-    });
+        status,
+      });
+      currentPercent += widthPercent;
+    }
+  }
+
+  return segments.length > 0 ? segments : undefined;
+}
+
+/**
+ * Generate Inngest overhead segments for the Inngest compound bar.
+ * Shows queue delay, discovery/scheduling, and finalization as colored segments.
+ */
+function generateInngestSegments(
+  barId: string,
+  breakdown: InngestBreakdownData
+): BarSegment[] | undefined {
+  const totalMs = breakdown.totalMs;
+  if (totalMs <= 0) return undefined;
+
+  const phases: { key: string; ms: number; style: BarStyleKey }[] = [
+    { key: 'queue', ms: breakdown.runQueueDelayMs, style: 'timing.inngest.queue' },
+    { key: 'discovery', ms: breakdown.discoveryMs, style: 'timing.inngest.discovery' },
+    { key: 'finalization', ms: breakdown.finalizationMs, style: 'timing.inngest.finalization' },
+  ];
+
+  const segments: BarSegment[] = [];
+  let currentPercent = 0;
+
+  for (const phase of phases) {
+    if (phase.ms > 0) {
+      const widthPercent = (phase.ms / totalMs) * 100;
+      segments.push({
+        id: `${barId}-seg-inngest-${phase.key}`,
+        startPercent: currentPercent,
+        widthPercent,
+        style: phase.style,
+      });
+      currentPercent += widthPercent;
+    }
+  }
+
+  return segments.length > 0 ? segments : undefined;
 }
 
 // ============================================================================
@@ -304,8 +293,50 @@ function TimelineBarRenderer({
   // Bars with timingBreakdown use queue+execution segments; others fall back to delay+execution
   const segments = generateBarSegments(bar) ?? generateDelaySegments(bar);
 
-  // Generate timing breakdown bars for expanded view
-  const timingBars = hasTimingBreakdown ? generateTimingBreakdownBars(bar, orgName) : [];
+  // Pre-compute timing sub-bar positions from the parent bar's position.
+  // This ensures sub-bars visually align with the parent's compound segments.
+  const timingPositions = hasTimingBreakdown
+    ? (() => {
+        const { queueMs, executionMs, totalMs } = bar.timingBreakdown!;
+        if (totalMs <= 0) return null;
+
+        const inngestWidth = (queueMs / totalMs) * widthPercent;
+        const serverWidth = (executionMs / totalMs) * widthPercent;
+        const serverStart = startPercent + inngestWidth;
+
+        return {
+          inngest:
+            queueMs > 0
+              ? { startPercent: startPercent, widthPercent: inngestWidth, duration: queueMs }
+              : null,
+          server:
+            executionMs > 0
+              ? { startPercent: serverStart, widthPercent: serverWidth, duration: executionMs }
+              : null,
+        };
+      })()
+    : null;
+
+  // Server timing bar IDs for expansion tracking
+  const serverBarId = `${bar.id}-timing-server`;
+  const isServerExpandable = hasChildren || hasHTTPTiming;
+  const isServerExpanded = isServerExpandable && expandedBars.has(serverBarId);
+
+  // HTTP timing segments for the server bar's compound visualization
+  const serverBarSegments = hasHTTPTiming
+    ? generateHTTPSegments(serverBarId, bar.httpTimingBreakdown!, bar.status)
+    : undefined;
+
+  // Inngest timing bar IDs for expansion tracking
+  const inngestBarId = `${bar.id}-timing-inngest`;
+  const hasInngestBreakdown = !!bar.inngestBreakdown;
+  const isInngestExpandable = hasInngestBreakdown;
+  const isInngestExpanded = isInngestExpandable && expandedBars.has(inngestBarId);
+
+  // Inngest breakdown segments for the Inngest bar's compound visualization
+  const inngestBarSegments = hasInngestBreakdown
+    ? generateInngestSegments(inngestBarId, bar.inngestBreakdown!)
+    : undefined;
 
   return (
     <TimelineBar
@@ -332,111 +363,214 @@ function TimelineBarRenderer({
       delayMs={bar.delayMs}
       actions={actions}
     >
-      {/* Timing breakdown bars */}
-      {isExpanded &&
-        timingBars.map((timingBar) => {
-          const timingPosition = calculateBarPosition(
-            timingBar.startTime,
-            timingBar.endTime,
-            minTime,
-            maxTime
-          );
-          const timingDuration = calculateDuration(timingBar.startTime, timingBar.endTime);
+      {/* Inngest timing bar — positioned to match the queue segment of the parent.
+          Only for non-root bars; the root uses timingBreakdown only for compound segments. */}
+      {isExpanded && !bar.isRoot && timingPositions?.inngest && (
+        <TimelineBar
+          name="Inngest"
+          duration={timingPositions.inngest.duration}
+          startPercent={timingPositions.inngest.startPercent}
+          widthPercent={timingPositions.inngest.widthPercent}
+          depth={depth + 1}
+          leftWidth={leftWidth}
+          style="timing.inngest"
+          segments={inngestBarSegments}
+          orgName={orgName}
+          status={bar.status}
+          expandable={isInngestExpandable}
+          expanded={isInngestExpanded}
+          onToggle={isInngestExpandable ? () => onToggleExpand(inngestBarId) : undefined}
+          onClick={() => onSelectStep?.(bar.id)}
+          viewStartOffset={viewStartOffset}
+          viewEndOffset={viewEndOffset}
+          startTime={bar.startTime}
+          endTime={bar.endTime}
+          minTime={minTime}
+        >
+          {/* Inngest breakdown sub-bars — each positioned within the Inngest bar's range */}
+          {isInngestExpanded &&
+            hasInngestBreakdown &&
+            (() => {
+              const breakdown = bar.inngestBreakdown!;
+              const inngestTotalMs = breakdown.totalMs;
+              if (inngestTotalMs <= 0) return null;
 
-          // Timing bars are expandable when there are children or HTTP timing data to show
-          const isServerBar = timingBar.style === 'timing.server';
-          const isTimingBarExpandable = isServerBar && (hasChildren || hasHTTPTiming);
-          const isTimingBarExpanded = isTimingBarExpandable && expandedBars.has(timingBar.id);
+              const iPos = timingPositions.inngest!;
+              const phases = [
+                {
+                  key: 'queue',
+                  label: 'Queue delay',
+                  ms: breakdown.runQueueDelayMs,
+                  style: 'timing.inngest.queue' as BarStyleKey,
+                },
+                {
+                  key: 'discovery',
+                  label: 'Discovery',
+                  ms: breakdown.discoveryMs,
+                  style: 'timing.inngest.discovery' as BarStyleKey,
+                },
+                {
+                  key: 'finalization',
+                  label: 'Finalization',
+                  ms: breakdown.finalizationMs,
+                  style: 'timing.inngest.finalization' as BarStyleKey,
+                },
+              ];
 
-          // Generate HTTP timing bars for the SERVER bar
-          const httpTimingBars =
-            isServerBar && hasHTTPTiming
-              ? generateHTTPTimingBars(bar.id, bar.httpTimingBreakdown!, timingBar.startTime)
-              : [];
-
-          return (
-            <TimelineBar
-              key={timingBar.id}
-              name={timingBar.name}
-              duration={timingDuration}
-              startPercent={timingPosition.startPercent}
-              widthPercent={timingPosition.widthPercent}
-              depth={depth + 1}
-              leftWidth={leftWidth}
-              style={timingBar.style}
-              orgName={orgName}
-              status={bar.status}
-              expandable={isTimingBarExpandable}
-              expanded={isTimingBarExpanded}
-              onToggle={isTimingBarExpandable ? () => onToggleExpand(timingBar.id) : undefined}
-              onClick={() => onSelectStep?.(bar.id)}
-              viewStartOffset={viewStartOffset}
-              viewEndOffset={viewEndOffset}
-              startTime={timingBar.startTime}
-              endTime={timingBar.endTime}
-              minTime={minTime}
-            >
-              {/* HTTP timing bars nested under YOUR SERVER */}
-              {isTimingBarExpanded &&
-                isServerBar &&
-                httpTimingBars.map((httpBar) => {
-                  const httpPosition = calculateBarPosition(
-                    httpBar.startTime,
-                    httpBar.endTime,
-                    minTime,
-                    maxTime
-                  );
-                  const httpDuration = calculateDuration(httpBar.startTime, httpBar.endTime);
+              let cumulativePercent = 0;
+              return phases
+                .filter((p) => p.ms > 0)
+                .map((phase) => {
+                  const phaseWidthPercent = (phase.ms / inngestTotalMs) * iPos.widthPercent;
+                  const phaseStartPercent = iPos.startPercent + cumulativePercent;
+                  cumulativePercent += phaseWidthPercent;
 
                   return (
                     <TimelineBar
-                      key={httpBar.id}
-                      name={httpBar.name}
-                      duration={httpDuration}
-                      startPercent={httpPosition.startPercent}
-                      widthPercent={httpPosition.widthPercent}
+                      key={`${bar.id}-inngest-${phase.key}`}
+                      name={phase.label}
+                      duration={phase.ms}
+                      startPercent={phaseStartPercent}
+                      widthPercent={phaseWidthPercent}
                       depth={depth + 2}
                       leftWidth={leftWidth}
-                      style={httpBar.style}
+                      style={phase.style}
                       status={bar.status}
                       onClick={() => onSelectStep?.(bar.id)}
                       viewStartOffset={viewStartOffset}
                       viewEndOffset={viewEndOffset}
-                      startTime={httpBar.startTime}
-                      endTime={httpBar.endTime}
+                      startTime={bar.startTime}
+                      endTime={bar.endTime}
                       minTime={minTime}
                     />
                   );
-                })}
+                });
+            })()}
+        </TimelineBar>
+      )}
 
-              {/* Child bars nested under YOUR SERVER */}
-              {isTimingBarExpanded &&
-                isServerBar &&
-                hasChildren &&
-                bar.children?.map((child) => (
-                  <TimelineBarRenderer
-                    key={child.id}
-                    bar={child}
-                    depth={depth + 2}
-                    minTime={minTime}
-                    maxTime={maxTime}
-                    leftWidth={leftWidth}
-                    orgName={orgName}
-                    expandedBars={expandedBars}
-                    onToggleExpand={onToggleExpand}
-                    onSelectStep={onSelectStep}
-                    selectedStepId={selectedStepId}
-                    viewStartOffset={viewStartOffset}
-                    viewEndOffset={viewEndOffset}
-                  />
-                ))}
-            </TimelineBar>
-          );
-        })}
+      {/* Your server timing bar — positioned to match the execution segment of the parent.
+          Only for non-root bars; the root renders step children directly. */}
+      {isExpanded && !bar.isRoot && timingPositions?.server && (
+        <TimelineBar
+          name={orgName ?? 'Your server'}
+          duration={timingPositions.server.duration}
+          startPercent={timingPositions.server.startPercent}
+          widthPercent={timingPositions.server.widthPercent}
+          depth={depth + 1}
+          leftWidth={leftWidth}
+          style="timing.server"
+          segments={serverBarSegments}
+          orgName={orgName}
+          status={bar.status}
+          expandable={isServerExpandable}
+          expanded={isServerExpanded}
+          onToggle={isServerExpandable ? () => onToggleExpand(serverBarId) : undefined}
+          onClick={() => onSelectStep?.(bar.id)}
+          viewStartOffset={viewStartOffset}
+          viewEndOffset={viewEndOffset}
+          startTime={bar.startTime}
+          endTime={bar.endTime}
+          minTime={minTime}
+        >
+          {/* HTTP timing bars — each positioned within the server bar's range */}
+          {isServerExpanded &&
+            hasHTTPTiming &&
+            (() => {
+              const httpTiming = bar.httpTimingBreakdown!;
+              const httpTotalMs = httpTiming.totalMs;
+              if (httpTotalMs <= 0) return null;
 
-      {/* Child bars (when no timing breakdown, render directly) */}
+              const sPos = timingPositions.server!;
+              const phases = [
+                {
+                  key: 'dns',
+                  label: 'DNS',
+                  ms: httpTiming.dnsLookupMs,
+                  style: 'timing.http.dns' as BarStyleKey,
+                },
+                {
+                  key: 'tcp',
+                  label: 'TCP',
+                  ms: httpTiming.tcpConnectionMs,
+                  style: 'timing.http.tcp' as BarStyleKey,
+                },
+                {
+                  key: 'tls',
+                  label: 'TLS',
+                  ms: httpTiming.tlsHandshakeMs,
+                  style: 'timing.http.tls' as BarStyleKey,
+                },
+                {
+                  key: 'server',
+                  label: 'TTFB',
+                  ms: httpTiming.serverProcessingMs,
+                  style: 'timing.http.server' as BarStyleKey,
+                },
+                {
+                  key: 'transfer',
+                  label: 'Transfer',
+                  ms: httpTiming.contentTransferMs,
+                  style: 'timing.http.transfer' as BarStyleKey,
+                },
+              ];
+
+              let cumulativePercent = 0;
+              return phases
+                .filter((p) => p.ms > 0)
+                .map((phase) => {
+                  const phaseWidthPercent = (phase.ms / httpTotalMs) * sPos.widthPercent;
+                  const phaseStartPercent = sPos.startPercent + cumulativePercent;
+                  cumulativePercent += phaseWidthPercent;
+
+                  return (
+                    <TimelineBar
+                      key={`${bar.id}-http-${phase.key}`}
+                      name={phase.label}
+                      duration={phase.ms}
+                      startPercent={phaseStartPercent}
+                      widthPercent={phaseWidthPercent}
+                      depth={depth + 2}
+                      leftWidth={leftWidth}
+                      style={phase.style}
+                      status={bar.status}
+                      onClick={() => onSelectStep?.(bar.id)}
+                      viewStartOffset={viewStartOffset}
+                      viewEndOffset={viewEndOffset}
+                      startTime={bar.startTime}
+                      endTime={bar.endTime}
+                      minTime={minTime}
+                    />
+                  );
+                });
+            })()}
+
+          {/* Child bars nested under YOUR SERVER */}
+          {isServerExpanded &&
+            hasChildren &&
+            bar.children?.map((child) => (
+              <TimelineBarRenderer
+                key={child.id}
+                bar={child}
+                depth={depth + 2}
+                minTime={minTime}
+                maxTime={maxTime}
+                leftWidth={leftWidth}
+                orgName={orgName}
+                expandedBars={expandedBars}
+                onToggleExpand={onToggleExpand}
+                onSelectStep={onSelectStep}
+                selectedStepId={selectedStepId}
+                viewStartOffset={viewStartOffset}
+                viewEndOffset={viewEndOffset}
+              />
+            ))}
+        </TimelineBar>
+      )}
+
+      {/* Child bars (for root bars, or non-root bars without timing breakdown) */}
       {isExpanded &&
-        !hasTimingBreakdown &&
+        (bar.isRoot || !hasTimingBreakdown) &&
         bar.children?.map((child) => (
           <TimelineBarRenderer
             key={child.id}

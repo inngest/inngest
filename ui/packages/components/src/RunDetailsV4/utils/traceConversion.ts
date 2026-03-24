@@ -8,6 +8,7 @@ import { max, min } from 'date-fns';
 import type {
   BarStyleKey,
   HTTPTimingBreakdownData,
+  InngestBreakdownData,
   TimelineBarData,
   TimelineData,
 } from '../TimelineBar.types';
@@ -138,12 +139,26 @@ function getHTTPTimingFromMetadata(metadata?: SpanMetadata[]): HTTPTimingBreakdo
 }
 
 /**
+ * Root timing context passed to child bars so steps can span the full run lifecycle.
+ */
+type RootTiming = {
+  startTime: Date;
+  startedAt: Date | null;
+  endTime: Date | null;
+};
+
+/**
  * Convert a single Trace to TimelineBarData
  */
-function traceToBarData(trace: Trace, orgName?: string, rootStatus?: string): TimelineBarData {
+function traceToBarData(
+  trace: Trace,
+  orgName?: string,
+  rootStatus?: string,
+  rootTiming?: RootTiming
+): TimelineBarData {
   const isStepRun = isStepRunSpan(trace) && !trace.isUserland;
   // Prefer server-computed timing from metadata, fall back to span-timestamp calculation
-  const timingBreakdown = isStepRun
+  let timingBreakdown = isStepRun
     ? getTimingFromMetadata(trace, trace.metadata) ?? calculateTimingBreakdown(trace)
     : undefined;
 
@@ -161,15 +176,56 @@ function traceToBarData(trace: Trace, orgName?: string, rootStatus?: string): Ti
     ? Math.max(0, new Date(trace.startedAt).getTime() - new Date(trace.queuedAt).getTime())
     : undefined;
 
+  // For steps with timing data and a known root time range, widen the step bar to
+  // span the full run lifecycle. The Inngest (queue) portion then includes all
+  // non-execution overhead: discovery calls, queue delay, scheduling, and finalization.
+  let effectiveStartTime = new Date(trace.queuedAt);
+  let effectiveEndTime: Date | null = trace.endedAt ? new Date(trace.endedAt) : null;
+  let inngestBreakdown: InngestBreakdownData | undefined;
+
+  if (isStepRun && timingBreakdown && rootTiming?.endTime) {
+    const runDurationMs = rootTiming.endTime.getTime() - rootTiming.startTime.getTime();
+    if (runDurationMs > 0) {
+      const executionMs = timingBreakdown.executionMs;
+      const inngestMs = Math.max(0, runDurationMs - executionMs);
+      timingBreakdown = { queueMs: inngestMs, executionMs, totalMs: runDurationMs };
+      effectiveStartTime = rootTiming.startTime;
+      effectiveEndTime = rootTiming.endTime;
+
+      // Break down the Inngest overhead into distinct phases
+      const runStartedAt = rootTiming.startedAt?.getTime() ?? rootTiming.startTime.getTime();
+      const stepQueuedAt = new Date(trace.queuedAt).getTime();
+      const stepEndedAt = trace.endedAt
+        ? new Date(trace.endedAt).getTime()
+        : rootTiming.endTime.getTime();
+
+      const runQueueDelayMs = Math.max(0, runStartedAt - rootTiming.startTime.getTime());
+      const discoveryMs = Math.max(0, stepQueuedAt - runStartedAt);
+      const finalizationMs = Math.max(0, rootTiming.endTime.getTime() - stepEndedAt);
+
+      if (inngestMs > 0) {
+        inngestBreakdown = {
+          runQueueDelayMs,
+          discoveryMs,
+          finalizationMs,
+          totalMs: inngestMs,
+        };
+      }
+    }
+  }
+
   return {
     id: trace.spanID,
     name: getSpanName(trace.name),
-    startTime: new Date(trace.queuedAt),
-    endTime: trace.endedAt ? new Date(trace.endedAt) : null,
+    startTime: effectiveStartTime,
+    endTime: effectiveEndTime,
     style: getStyleForTrace(trace),
-    children: trace.childrenSpans?.map((child) => traceToBarData(child, orgName, rootStatus)),
+    children: trace.childrenSpans?.map((child) =>
+      traceToBarData(child, orgName, rootStatus, rootTiming)
+    ),
     timingBreakdown,
     httpTimingBreakdown,
+    inngestBreakdown,
     isRoot: trace.isRoot,
     status,
     delayMs,
@@ -201,10 +257,44 @@ export function traceToTimelineData(
     }
   });
 
+  // Root timing context for step bars to span the full run lifecycle
+  const rootTiming: RootTiming = {
+    startTime: new Date(trace.queuedAt),
+    startedAt: trace.startedAt ? new Date(trace.startedAt) : null,
+    endTime: trace.endedAt ? new Date(trace.endedAt) : null,
+  };
+
   // Convert root trace (rename to "Run")
   // Ensure isRoot is set to true for the root bar so clicking it shows TopInfo
   // Pass root status so all bars share the same status-based coloring
-  const rootBar = traceToBarData({ ...trace, name: 'Run', isRoot: true }, orgName, trace.status);
+  const rootBar = traceToBarData(
+    { ...trace, name: 'Run', isRoot: true },
+    orgName,
+    trace.status,
+    rootTiming
+  );
+
+  // Give the Run bar a timingBreakdown matching the step-level inngest/execution split.
+  // Sum execution time from all step children, and attribute the rest to Inngest overhead.
+  if (rootBar.endTime) {
+    const runDurationMs = rootBar.endTime.getTime() - rootBar.startTime.getTime();
+    if (runDurationMs > 0) {
+      let totalExecutionMs = 0;
+      for (const child of rootBar.children ?? []) {
+        if (child.timingBreakdown) {
+          totalExecutionMs += child.timingBreakdown.executionMs;
+        }
+      }
+      if (totalExecutionMs > 0) {
+        const inngestMs = Math.max(0, runDurationMs - totalExecutionMs);
+        rootBar.timingBreakdown = {
+          queueMs: inngestMs,
+          executionMs: totalExecutionMs,
+          totalMs: runDurationMs,
+        };
+      }
+    }
+  }
 
   // Include the root bar in the rendered bars so users can click it
   // to return to the TopInfo view (Input/Function Payload)

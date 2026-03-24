@@ -355,6 +355,7 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 		gqlSpan.ChildrenSpans = []*models.RunTraceSpan{}
 		lastStepQueueTime := &gqlSpan.QueuedAt
 		isFirstChild := true
+		var omittedStepMetadata []*models.SpanMetadata
 		haveSetRunStartTime := span.Name != meta.SpanNameRun
 
 		// If there's a run start time on the overall parent, use that.  Sometimes this
@@ -383,6 +384,16 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 					// the step if it's the first child.
 					gqlSpan.StartedAt = child.StartedAt
 					haveSetRunStartTime = true
+				}
+
+				// Preserve metadata from omitted step discovery spans so
+				// it can be transferred to a visible step sibling after
+				// the loop. The execution span (which holds timing
+				// metadata) is parented to the step discovery span, not
+				// the step span. When the discovery span is omitted, its
+				// metadata must be promoted to the visible step span.
+				if len(child.Metadata) > 0 && child.SpanTypeName == meta.SpanNameStepDiscovery {
+					omittedStepMetadata = append(omittedStepMetadata, child.Metadata...)
 				}
 
 				continue
@@ -523,6 +534,21 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 		case meta.SpanNameExecution:
 			{
 				gqlSpan.Name = GenericExecutionSpanName
+			}
+		}
+
+		// Transfer metadata from omitted step discovery spans to
+		// visible step siblings. The execution span (which holds
+		// timing metadata) is parented to the step discovery span;
+		// when the discovery span is omitted, promote its metadata
+		// to the next visible step child so it reaches the UI.
+		if len(omittedStepMetadata) > 0 {
+			for _, child := range gqlSpan.ChildrenSpans {
+				if child.SpanTypeName == meta.SpanNameStep || child.SpanTypeName == meta.SpanNameStepDiscovery {
+					child.Metadata = append(child.Metadata, omittedStepMetadata...)
+					omittedStepMetadata = nil
+					break
+				}
 			}
 		}
 	}
