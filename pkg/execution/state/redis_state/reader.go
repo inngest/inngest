@@ -173,7 +173,7 @@ func (q *queue) ItemsByPartition(ctx context.Context, partitionID string, from t
 			var iterated int
 
 			// peek function partition
-			items, err := q.peek(ctx, peekOpts{
+			result, err := q.peek(ctx, peekOpts{
 				From:         &ptFrom,
 				Until:        until,
 				Limit:        opt.BatchSize,
@@ -188,7 +188,7 @@ func (q *queue) ItemsByPartition(ctx context.Context, partitionID string, from t
 			}
 
 			var start, end time.Time
-			for _, qi := range items {
+			for _, qi := range result.Items {
 				if qi == nil {
 					continue
 				}
@@ -212,9 +212,19 @@ func (q *queue) ItemsByPartition(ctx context.Context, partitionID string, from t
 				"end", end.Format(time.StampMilli),
 			)
 
-			// didn't process anything, exit loop
-			if iterated == 0 {
+			// No raw items were fetched from the sorted set — the partition
+			// range is exhausted.
+			if result.RawCount == 0 {
 				break
+			}
+
+			// Raw items were fetched but none were usable (all leased or
+			// missing from hash). Advance the cursor past the last fetched
+			// item's score and continue to the next batch.
+			if iterated == 0 {
+				ptFrom = time.UnixMilli(result.LastScore).Add(time.Millisecond)
+				<-time.After(opt.Interval)
+				continue
 			}
 
 			if opt.EnableMillisecondIncrease {

@@ -448,7 +448,7 @@ func (q *queue) Peek(ctx context.Context, partition *osqueue.QueuePartition, unt
 	}
 
 	partitionKey := partitionZsetKey(*partition, q.RedisClient.kg)
-	return q.peek(
+	result, err := q.peek(
 		ctx,
 		peekOpts{
 			Limit:        limit,
@@ -457,6 +457,7 @@ func (q *queue) Peek(ctx context.Context, partition *osqueue.QueuePartition, unt
 			PartitionID:  partition.ID,
 		},
 	)
+	return result.Items, err
 }
 
 func (q *queue) PeekRandom(ctx context.Context, partition *osqueue.QueuePartition, until time.Time, limit int64) ([]*osqueue.QueueItem, error) {
@@ -476,7 +477,7 @@ func (q *queue) PeekRandom(ctx context.Context, partition *osqueue.QueuePartitio
 		limit = q.PeekMin
 	}
 	partitionKey := partitionZsetKey(*partition, q.RedisClient.kg)
-	return q.peek(
+	result, err := q.peek(
 		ctx,
 		peekOpts{
 			Limit:        limit,
@@ -486,6 +487,7 @@ func (q *queue) PeekRandom(ctx context.Context, partition *osqueue.QueuePartitio
 			Random:       true,
 		},
 	)
+	return result.Items, err
 }
 
 type peekOpts struct {
@@ -497,7 +499,19 @@ type peekOpts struct {
 	Limit        int64
 }
 
-func (q *queue) peek(ctx context.Context, opts peekOpts) ([]*osqueue.QueueItem, error) {
+type peekResult struct {
+	// Items contains only the decoded, non-leased, non-missing items.
+	Items []*osqueue.QueueItem
+	// RawCount is the total number of items fetched from the sorted set
+	// before filtering (leased items, missing hash entries, etc.).
+	RawCount int
+	// LastScore is the sorted set score (millisecond timestamp) of the last
+	// item fetched from the sorted set, before any filtering. This allows
+	// callers to advance the cursor past filtered items.
+	LastScore int64
+}
+
+func (q *queue) peek(ctx context.Context, opts peekOpts) (peekResult, error) {
 	l := logger.StdlibLogger(ctx)
 
 	from := "-inf"
@@ -526,7 +540,7 @@ func (q *queue) peek(ctx context.Context, opts peekOpts) ([]*osqueue.QueueItem, 
 		randomOffset,
 	})
 	if err != nil {
-		return nil, err
+		return peekResult{}, err
 	}
 
 	peekRet, err := scripts["queue/peek"].Exec(
@@ -536,41 +550,59 @@ func (q *queue) peek(ctx context.Context, opts peekOpts) ([]*osqueue.QueueItem, 
 		args,
 	).ToAny()
 	if err != nil {
-		return nil, fmt.Errorf("error peeking queue items: %w", err)
+		return peekResult{}, fmt.Errorf("error peeking queue items: %w", err)
 	}
 
 	returnedSet, ok := peekRet.([]any)
 	if !ok {
-		return nil, fmt.Errorf("unknown return type from peek: %T", peekRet)
+		return peekResult{}, fmt.Errorf("unknown return type from peek: %T", peekRet)
 	}
 
 	var potentiallyMissingItems, allQueueItemIds []any
-	if len(returnedSet) == 2 {
+	var lastScore int64
+	if len(returnedSet) == 3 {
 		potentiallyMissingItems, ok = returnedSet[0].([]any)
 		if !ok {
-			return nil, fmt.Errorf("unexpected first item in set returned from peek: %T", peekRet)
+			return peekResult{}, fmt.Errorf("unexpected first item in set returned from peek: %T", peekRet)
 		}
 
 		allQueueItemIds, ok = returnedSet[1].([]any)
 		if !ok {
-			return nil, fmt.Errorf("unexpected first item in set returned from peek: %T", peekRet)
+			return peekResult{}, fmt.Errorf("unexpected second item in set returned from peek: %T", peekRet)
+		}
+
+		// Parse the last score (returned as an integer from Lua)
+		if scoreVal := returnedSet[2]; scoreVal != nil {
+			switch v := scoreVal.(type) {
+			case int64:
+				lastScore = v
+			case float64:
+				lastScore = int64(v)
+			case string:
+				parsed, parseErr := strconv.ParseInt(v, 10, 64)
+				if parseErr == nil {
+					lastScore = parsed
+				}
+			}
 		}
 	} else if len(returnedSet) != 0 {
-		return nil, fmt.Errorf("expected zero or two items in set returned by peek: %v", returnedSet)
+		return peekResult{}, fmt.Errorf("expected zero or three items in set returned by peek: %v", returnedSet)
 	}
 
-	items := make([]any, 0, len(allQueueItemIds))
-	missingQueueItems := make([]string, 0, len(allQueueItemIds))
+	rawCount := len(allQueueItemIds)
+
+	items := make([]any, 0, rawCount)
+	missingQueueItems := make([]string, 0, rawCount)
 	for idx, itemId := range allQueueItemIds {
 		item := potentiallyMissingItems[idx]
 		if item == nil {
 			if itemId == nil {
-				return nil, fmt.Errorf("encountered nil queue item key in partition queue %q", opts.PartitionKey)
+				return peekResult{}, fmt.Errorf("encountered nil queue item key in partition queue %q", opts.PartitionKey)
 			}
 
 			str, ok := itemId.(string)
 			if !ok {
-				return nil, fmt.Errorf("encountered non-string queue item key in partition queue %q", opts.PartitionKey)
+				return peekResult{}, fmt.Errorf("encountered non-string queue item key in partition queue %q", opts.PartitionKey)
 			}
 
 			missingQueueItems = append(missingQueueItems, str)
@@ -594,11 +626,11 @@ func (q *queue) peek(ctx context.Context, opts peekOpts) ([]*osqueue.QueueItem, 
 		}
 
 		if err := eg.Wait(); err != nil {
-			return nil, fmt.Errorf("error cleaning up nil partitions in account pointer queue: %w", err)
+			return peekResult{}, fmt.Errorf("error cleaning up nil partitions in account pointer queue: %w", err)
 		}
 	}
 
-	return util.ParallelDecode(items, func(val any, _ int) (*osqueue.QueueItem, bool, error) {
+	decoded, err := util.ParallelDecode(items, func(val any, _ int) (*osqueue.QueueItem, bool, error) {
 		if val == nil {
 			l.Error("nil item value in peek response", "partition", opts.PartitionKey)
 			return nil, true, nil
@@ -636,6 +668,15 @@ func (q *queue) peek(ctx context.Context, opts peekOpts) ([]*osqueue.QueueItem, 
 		qi.Data.JobID = &qi.ID
 		return qi, false, nil
 	})
+	if err != nil {
+		return peekResult{}, err
+	}
+
+	return peekResult{
+		Items:     decoded,
+		RawCount:  rawCount,
+		LastScore: lastScore,
+	}, nil
 }
 
 func (q *queue) ResetAttemptsByJobID(ctx context.Context, jobID string) error {
