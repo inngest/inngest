@@ -336,7 +336,7 @@ func CheckConstraints(
 		return checkResult{}, fmt.Errorf("could not create configuration for acquire: %w", err)
 	}
 
-	res, internalErr := capacityManager.Acquire(ctx, &constraintapi.CapacityAcquireRequest{
+	res, err := capacityManager.Acquire(ctx, &constraintapi.CapacityAcquireRequest{
 		AccountID:            req.AccountID,
 		IdempotencyKey:       idempotencyKey,
 		LeaseIdempotencyKeys: []string{idempotencyKey},
@@ -356,10 +356,10 @@ func CheckConstraints(
 		Source:            source,
 		BlockingThreshold: 0, // Disable this for now
 	})
-	if internalErr != nil {
-		l.Error("acquiring capacity lease failed", "err", internalErr, "method", "CheckConstraints", "req", req)
+	if err != nil {
+		l.Error("acquiring capacity lease failed", "err", err, "method", "CheckConstraints", "req", req)
 		span.RecordError(err)
-		return checkResult{}, fmt.Errorf("could not enforce constraints: %w", internalErr)
+		return checkResult{}, fmt.Errorf("could not enforce constraints: %w", err)
 	}
 
 	// Rate limited
