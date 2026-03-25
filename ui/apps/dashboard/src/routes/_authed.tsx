@@ -1,5 +1,5 @@
 import { fetchClerkAuth, jwtAuth } from '@/lib/auth';
-import { sanitizeRedirectUrl } from '@/lib/deepLinkSearch';
+import { sanitizeRedirectUrl } from '@/lib/deepLinkUtils';
 import { createFileRoute, notFound, Outlet } from '@tanstack/react-router';
 
 import Layout from '@/components/Layout/Layout';

@@ -3,7 +3,7 @@ import SignInRedirectErrors, {
   hasErrorMessage,
 } from '@/components/SignIn/Errors';
 import SplitView from '@/components/SignIn/SplitView';
-import { validateRedirectUrlSearch } from '@/lib/deepLinkSearch';
+import { validateRedirectUrlSearch } from '@/lib/deepLinkUtils';
 import { SignIn } from '@clerk/tanstack-react-start';
 import { Alert } from '@inngest/components/Alert';
 import { createFileRoute, useLocation } from '@tanstack/react-router';

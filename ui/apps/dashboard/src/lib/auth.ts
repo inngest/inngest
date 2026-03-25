@@ -1,4 +1,4 @@
-import { sanitizeRedirectUrl } from '@/lib/deepLinkSearch';
+import { sanitizeRedirectUrl } from '@/lib/deepLinkUtils';
 import { auth, clerkClient } from '@clerk/tanstack-react-start/server';
 import { redirect } from '@tanstack/react-router';
 import { createServerFn } from '@tanstack/react-start';

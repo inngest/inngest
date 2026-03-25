@@ -4,7 +4,7 @@ import {
   isExpired,
   isValidDeepLink,
   type DashboardDeepLinkSearchParams,
-} from '@/lib/deepLinkCommon';
+} from '@/lib/deepLinkUtils';
 import {
   auth,
   clerkClient,
@@ -13,7 +13,7 @@ import {
 import { createServerFn } from '@tanstack/react-start';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
-export type { DashboardDeepLinkSearchParams } from '@/lib/deepLinkCommon';
+export type { DashboardDeepLinkSearchParams } from '@/lib/deepLinkUtils';
 
 type ResolveDashboardDeepLinkInput = DashboardDeepLinkSearchParams & {
   isJWTAuth: boolean;
@@ -108,7 +108,7 @@ export const resolveDashboardDeepLink = createServerFn({
     } satisfies ResolveDashboardDeepLinkResult;
   });
 
-export { hasDeepLinkParams, stripDeepLinkParams } from '@/lib/deepLinkCommon';
+export { hasDeepLinkParams, stripDeepLinkParams } from '@/lib/deepLinkUtils';
 
 function signDeepLink(
   secret: string,

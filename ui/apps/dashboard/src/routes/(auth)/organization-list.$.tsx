@@ -1,6 +1,6 @@
 import LoadingIcon from '@/components/Icons/LoadingIcon';
 import SplitView from '@/components/SignIn/SplitView';
-import { validateRedirectUrlSearch } from '@/lib/deepLinkSearch';
+import { validateRedirectUrlSearch } from '@/lib/deepLinkUtils';
 import { OrganizationList, useAuth } from '@clerk/tanstack-react-start';
 import { createFileRoute, useLocation } from '@tanstack/react-router';
 import logoImageUrl from '@inngest/components/icons/logos/inngest-logo-black.png';

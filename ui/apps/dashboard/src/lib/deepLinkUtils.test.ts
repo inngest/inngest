@@ -1,12 +1,62 @@
 import {
+  hasDeepLinkParams,
+  isExpired,
+  isValidDeepLink,
   sanitizeRedirectUrl,
+  stripDeepLinkParams,
   validateAgentDeepLinkSearch,
   validateDashboardDeepLinkSearch,
   validateSwitchOrganizationSearch,
-} from '@/lib/deepLinkSearch';
+} from '@/lib/deepLinkUtils';
 import { describe, expect, it } from 'vitest';
 
-describe('deepLinkSearch', () => {
+describe('deepLinkUtils', () => {
+  it('treats the exact expiry second as still valid', () => {
+    expect(isExpired('100', 100)).toBe(false);
+    expect(isExpired('99', 100)).toBe(true);
+  });
+
+  it('detects when any deep-link parameter is present', () => {
+    expect(hasDeepLinkParams({})).toBe(false);
+    expect(hasDeepLinkParams({ acct: 'acct_123' })).toBe(true);
+    expect(hasDeepLinkParams({ expires: '100' })).toBe(true);
+    expect(hasDeepLinkParams({ sig: 'a'.repeat(64) })).toBe(true);
+  });
+
+  it('strips deep-link params while preserving the rest of the URL', () => {
+    expect(
+      stripDeepLinkParams(
+        '/env/test?foo=bar&acct=acct_123&expires=100&sig=abc#section',
+      ),
+    ).toBe('/env/test?foo=bar#section');
+  });
+
+  it('only accepts a well-formed deep link payload', () => {
+    expect(
+      isValidDeepLink({
+        acct: 'acct_123',
+        expires: '100',
+        sig: 'a'.repeat(64),
+      }),
+    ).toBe(true);
+
+    expect(
+      isValidDeepLink({
+        acct: 'acct_123',
+        expires: 'not-a-number',
+        sig: 'a'.repeat(64),
+      }),
+    ).toBe(false);
+
+    expect(
+      isValidDeepLink({
+        acct: 'acct_123',
+        expires: '100',
+        sig: 'invalid',
+      }),
+    ).toBe(false);
+  });
+
   it('only allows internal redirect URLs', () => {
     expect(sanitizeRedirectUrl('/env/test?foo=bar')).toBe('/env/test?foo=bar');
     expect(sanitizeRedirectUrl('https://evil.example')).toBeUndefined();

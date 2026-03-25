@@ -1,6 +1,6 @@
 import LoadingIcon from '@/components/Icons/LoadingIcon';
 import SplitView from '@/components/SignIn/SplitView';
-import { validateSwitchOrganizationSearch } from '@/lib/deepLinkSearch';
+import { validateSwitchOrganizationSearch } from '@/lib/deepLinkUtils';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useClerk } from '@clerk/tanstack-react-start';
 import { useEffect } from 'react';

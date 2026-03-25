@@ -6,7 +6,7 @@ import {
   resolveDashboardDeepLink,
   stripDeepLinkParams,
 } from '@/lib/deepLinks';
-import { validateDashboardDeepLinkSearch } from '@/lib/deepLinkSearch';
+import { validateDashboardDeepLinkSearch } from '@/lib/deepLinkUtils';
 import { jwtAuth } from '@/lib/auth';
 import { Alert } from '@inngest/components/Alert';
 import {
