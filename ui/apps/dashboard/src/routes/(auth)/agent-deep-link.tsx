@@ -46,7 +46,7 @@ function AgentDeepLink() {
     const activate = async () => {
       //
       // Clear any existing session so the ticket sign-in doesn't compete
-      // with background session-refresh requests for Clerk rate-limit budget.
+      // with background session-refresh and hit clerk rate limits.
       await signOut().catch(() => {});
 
       const { createdSessionId } = await signIn.create({
@@ -59,9 +59,12 @@ function AgentDeepLink() {
         ...(organization_id && { organization: organization_id }),
       });
 
-      //
-      // Client-side navigate to preserve Clerk's in-memory session state.
-      await navigate({ to: redirect_url, replace: true });
+      const parsed = new URL(redirect_url, window.location.origin);
+      await navigate({
+        to: parsed.pathname,
+        search: Object.fromEntries(parsed.searchParams),
+        replace: true,
+      });
     };
 
     activate().catch((err) => {

@@ -19,6 +19,7 @@ describe('deepLinkUtils', () => {
   it('detects when any deep-link parameter is present', () => {
     expect(hasDeepLinkParams({})).toBe(false);
     expect(hasDeepLinkParams({ acct: 'acct_123' })).toBe(true);
+    expect(hasDeepLinkParams({ org: 'org_123' })).toBe(true);
     expect(hasDeepLinkParams({ expires: '100' })).toBe(true);
     expect(hasDeepLinkParams({ sig: 'a'.repeat(64) })).toBe(true);
   });
@@ -26,7 +27,7 @@ describe('deepLinkUtils', () => {
   it('strips deep-link params while preserving the rest of the URL', () => {
     expect(
       stripDeepLinkParams(
-        '/env/test?foo=bar&acct=acct_123&expires=100&sig=abc#section',
+        '/env/test?foo=bar&acct=acct_123&org=org_123&expires=100&sig=abc#section',
       ),
     ).toBe('/env/test?foo=bar#section');
   });
@@ -35,6 +36,7 @@ describe('deepLinkUtils', () => {
     expect(
       isValidDeepLink({
         acct: 'acct_123',
+        org: 'org_123',
         expires: '100',
         sig: 'a'.repeat(64),
       }),
@@ -43,6 +45,15 @@ describe('deepLinkUtils', () => {
     expect(
       isValidDeepLink({
         acct: 'acct_123',
+        expires: '100',
+        sig: 'a'.repeat(64),
+      }),
+    ).toBe(false);
+
+    expect(
+      isValidDeepLink({
+        acct: 'acct_123',
+        org: 'org_123',
         expires: 'not-a-number',
         sig: 'a'.repeat(64),
       }),
@@ -51,6 +62,7 @@ describe('deepLinkUtils', () => {
     expect(
       isValidDeepLink({
         acct: 'acct_123',
+        org: 'org_123',
         expires: '100',
         sig: 'invalid',
       }),
@@ -94,11 +106,13 @@ describe('deepLinkUtils', () => {
     expect(
       validateDashboardDeepLinkSearch({
         acct: 'acct_123',
+        org: 'org_123',
         expires: 100,
         sig: 'a'.repeat(64),
       }),
     ).toEqual({
       acct: 'acct_123',
+      org: 'org_123',
       expires: undefined,
       sig: 'a'.repeat(64),
     });

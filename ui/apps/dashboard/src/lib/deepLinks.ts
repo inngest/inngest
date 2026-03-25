@@ -5,11 +5,7 @@ import {
   isValidDeepLink,
   type DashboardDeepLinkSearchParams,
 } from '@/lib/deepLinkUtils';
-import {
-  auth,
-  clerkClient,
-  type OrganizationMembership,
-} from '@clerk/tanstack-react-start/server';
+import { auth, clerkClient } from '@clerk/tanstack-react-start/server';
 import { createServerFn } from '@tanstack/react-start';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
@@ -54,7 +50,12 @@ export const resolveDashboardDeepLink = createServerFn({
       return { status: 'invalid' } satisfies ResolveDashboardDeepLinkResult;
     }
 
-    const expectedSignature = signDeepLink(secret, data.acct, data.expires);
+    const expectedSignature = signDeepLink(
+      secret,
+      data.acct,
+      data.org,
+      data.expires,
+    );
     if (!signaturesMatch(expectedSignature, data.sig)) {
       return { status: 'invalid' } satisfies ResolveDashboardDeepLinkResult;
     }
@@ -85,17 +86,24 @@ export const resolveDashboardDeepLink = createServerFn({
       return { status: 'invalid' } satisfies ResolveDashboardDeepLinkResult;
     }
 
-    const user = await clerkClient().users.getUser(userId);
-    const membership = await findMembershipForAccount(user.id, data.acct);
-
-    if (!membership) {
+    //
+    // Verify the user belongs to the org from the signed deep link.
+    // The HMAC proves the org-to-account mapping is correct; this single
+    // Clerk call confirms membership instead of paginating all memberships.
+    const { data: memberships } =
+      await clerkClient().users.getOrganizationMembershipList({
+        userId,
+        limit: 200,
+        offset: 0,
+      });
+    if (!memberships.some((m) => m.organization.id === data.org)) {
       return { status: 'invalid' } satisfies ResolveDashboardDeepLinkResult;
     }
 
     return {
       status: 'valid',
-      shouldSwitchOrganization: membership.organization.id !== orgId,
-      organizationId: membership.organization.id,
+      shouldSwitchOrganization: data.org !== orgId,
+      organizationId: data.org,
     } satisfies ResolveDashboardDeepLinkResult;
   });
 
@@ -104,10 +112,11 @@ export { hasDeepLinkParams, stripDeepLinkParams } from '@/lib/deepLinkUtils';
 function signDeepLink(
   secret: string,
   accountId: string,
+  orgId: string,
   expires: string,
 ): string {
   return createHmac('sha256', secret)
-    .update(`${accountId}.${expires}`)
+    .update(`${accountId}.${orgId}.${expires}`)
     .digest('hex');
 }
 
@@ -119,44 +128,4 @@ function signaturesMatch(expected: string, actual: string): boolean {
     expectedBuffer.length === actualBuffer.length &&
     timingSafeEqual(expectedBuffer, actualBuffer)
   );
-}
-
-function organizationMatchesAccount(
-  membership: OrganizationMembership,
-  accountId: string,
-): boolean {
-  return membership.organization.publicMetadata?.accountID === accountId;
-}
-
-async function findMembershipForAccount(
-  userId: string,
-  accountId: string,
-): Promise<OrganizationMembership | undefined> {
-  const limit = 100;
-  let offset = 0;
-
-  while (true) {
-    const memberships: {
-      data: OrganizationMembership[];
-      totalCount: number;
-    } = await clerkClient().users.getOrganizationMembershipList({
-      userId,
-      limit,
-      offset,
-    });
-
-    const membership = memberships.data.find((membership) =>
-      organizationMatchesAccount(membership, accountId),
-    );
-
-    if (membership) {
-      return membership;
-    }
-
-    offset += memberships.data.length;
-
-    if (offset >= memberships.totalCount || memberships.data.length === 0) {
-      return undefined;
-    }
-  }
 }

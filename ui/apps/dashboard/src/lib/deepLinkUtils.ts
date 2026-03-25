@@ -1,5 +1,6 @@
 export type DashboardDeepLinkSearchParams = {
   acct?: string;
+  org?: string;
   expires?: string;
   sig?: string;
 };
@@ -22,13 +23,14 @@ export type RedirectUrlSearchParams = {
 export function hasDeepLinkParams(
   search: DashboardDeepLinkSearchParams,
 ): boolean {
-  return Boolean(search.acct || search.expires || search.sig);
+  return Boolean(search.acct || search.org || search.expires || search.sig);
 }
 
 export function stripDeepLinkParams(href: string): string {
   const url = new URL(href, 'https://app.inngest.com');
 
   url.searchParams.delete('acct');
+  url.searchParams.delete('org');
   url.searchParams.delete('expires');
   url.searchParams.delete('sig');
 
@@ -41,6 +43,8 @@ export function isValidDeepLink(
   return (
     typeof search.acct === 'string' &&
     search.acct.length > 0 &&
+    typeof search.org === 'string' &&
+    search.org.length > 0 &&
     typeof search.expires === 'string' &&
     /^\d+$/.test(search.expires) &&
     typeof search.sig === 'string' &&
@@ -93,6 +97,7 @@ export function validateDashboardDeepLinkSearch(
 ): DashboardDeepLinkSearchParams {
   return {
     acct: typeof search.acct === 'string' ? search.acct : undefined,
+    org: typeof search.org === 'string' ? search.org : undefined,
     expires: typeof search.expires === 'string' ? search.expires : undefined,
     sig: typeof search.sig === 'string' ? search.sig : undefined,
   };
