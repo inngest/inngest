@@ -5,11 +5,15 @@ import "github.com/inngest/inngest/pkg/enums"
 // Semaphore represents an evaluated semaphore reference.
 // Used on queue items, backlogs, partition config, and constraint API config.
 type Semaphore struct {
-	// Name is the evaluated semaphore name, always prefixed:
-	//   app:<uuid>    — worker concurrency
-	//   fn:<uuid>     — function concurrency
-	//   hash:<xxhash> — user-defined
-	Name string `json:"n"`
+	// ID is the semaphore identifier, always prefixed:
+	//   app:<uuid>                — worker concurrency
+	//   fn:<uuid>                 — function concurrency (no key)
+	//   fnkey:<xxhash(fnID+expr)> — function concurrency with key expression
+	ID string `json:"id"`
+
+	// UsageValue is the xxhash of the evaluated expression result.
+	// Empty for keyless semaphores (app:, fn:).
+	UsageValue string `json:"uv,omitempty"`
 
 	// Weight is the number of units to acquire (default 1).
 	Weight int64 `json:"w"`

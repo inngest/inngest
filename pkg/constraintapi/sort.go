@@ -131,7 +131,7 @@ func getConstraintKeyExpressionHash(constraint ConstraintItem) string {
 	case ConstraintKindSemaphore:
 		// Use name for tertiary sort ordering among semaphores.
 		if constraint.Semaphore != nil {
-			return constraint.Semaphore.Name
+			return constraint.Semaphore.ID
 		}
 	}
 	return ""

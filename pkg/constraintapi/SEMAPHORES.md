@@ -3,14 +3,27 @@
 Semaphores are a constraint kind (`ConstraintKindSemaphore`, kind=4) that use counters for O(1)
 capacity checks.  They power worker concurrency and function concurrency.
 
+
+## Naming convention
+
+Semaphore names are always prefixed to avoid collisions:
+
+- `app:<uuid>` — worker concurrency (one per app, capacity managed by connect lifecycle)
+- `fn:<uuid>` — function concurrency (one per function)
+- `hash:<xxhash>` — user-defined names (xxhash of user string)
+
 ## How they work
 
 A semaphore has a capacity and acquired weight, split across two keys.  In Redis, this is:
 
 ```
 {cs}:<account_scope>:sem:<name>:cap    → INT (total capacity)
-{cs}:<account_scope>:sem:<name>:usage  → INT (current acquired weight)
+{cs}:<account_scope>:sem:<name>:usage:<usagevalue>  → INT (current acquired weight)
 ```
+
+NOTE: This means that we only store capacity once per raw expression, but have many keys for
+each evaluated result of the expression.  We can always look up capacity for evaluated expressions
+based off of the key prefix.
 
 During `Acquire` (in `acquire.lua`), we read both keys.  If `capacity - usage < weight`,
 the constraint is exhausted and no leases are granted.  Otherwise, `usage` is incremented by
@@ -34,14 +47,6 @@ This is controlled by `SemaphoreReleaseMode`:
   run lifetime.  Only the start job includes the semaphore constraint — subsequent steps do not.
 
 NOTE:  If a constraint lease fails, scavenge will ALWAYS release semaphore capacity.
-
-## Naming convention
-
-Semaphore names are always prefixed to avoid collisions:
-
-- `app:<uuid>` — worker concurrency (one per app, capacity managed by connect lifecycle)
-- `fn:<uuid>` — function concurrency (one per function)
-- `hash:<xxhash>` — user-defined names (xxhash of user string)
 
 ## Lifecycle
 

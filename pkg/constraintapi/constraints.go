@@ -198,56 +198,6 @@ func (t *ThrottleConstraint) PrettyStringConfig(config ConstraintConfig) string 
 	return "unknown"
 }
 
-type SemaphoreReleaseMode int
-
-const (
-	// SemaphoreReleaseAuto decrements the semaphore counter when the constraint lease is released.
-	// Used for worker concurrency where each step independently acquires and releases.
-	SemaphoreReleaseAuto SemaphoreReleaseMode = 0
-
-	// SemaphoreReleaseManual requires explicit release via the SemaphoreManager API.
-	// Used for function concurrency where the hold persists across the entire run.
-	SemaphoreReleaseManual SemaphoreReleaseMode = 1
-)
-
-// SemaphoreConstraint represents a semaphore-based capacity constraint.
-// Semaphores track usage via simple counters (INCRBY/DECRBY) with separately
-// managed capacity, providing O(1) capacity checks.
-type SemaphoreConstraint struct {
-	// Name is the evaluated semaphore name, always prefixed:
-	//   app:<uuid>    — worker concurrency
-	//   fn:<uuid>     — function concurrency
-	//   hash:<xxhash> — user-defined
-	Name string
-
-	// Weight is the number of units to acquire from the semaphore (default 1).
-	Weight int64
-
-	// Release controls when the semaphore counter is decremented.
-	Release SemaphoreReleaseMode
-}
-
-func (s *SemaphoreConstraint) UsageKey(accountID uuid.UUID) string {
-	return fmt.Sprintf("{cs}:%s:sem:%s:usage", accountScope(accountID), s.Name)
-}
-
-func (s *SemaphoreConstraint) CapacityKey(accountID uuid.UUID) string {
-	return fmt.Sprintf("{cs}:%s:sem:%s:cap", accountScope(accountID), s.Name)
-}
-
-func (s *SemaphoreConstraint) PrettyString() string {
-	return fmt.Sprintf("name %s, weight %d, release %d", s.Name, s.Weight, s.Release)
-}
-
-func (s *SemaphoreConstraint) PrettyStringConfig(config ConstraintConfig) string {
-	for _, sc := range config.Semaphores {
-		if sc.Name == s.Name {
-			return fmt.Sprintf("weight %d, release %d", sc.Weight, sc.Release)
-		}
-	}
-	return "unknown"
-}
-
 type ConstraintItem struct {
 	Kind ConstraintKind
 
@@ -270,7 +220,7 @@ func (ci ConstraintItem) IsFunctionLevelConstraint() bool {
 		// XXX: Revisit when we add scopes to semaphores.
 		// For now, app-scoped semaphores (worker concurrency) are not function-level;
 		// all others (fn:, hash:) are.
-		return ci.Semaphore != nil && !strings.HasPrefix(ci.Semaphore.Name, "app:")
+		return ci.Semaphore != nil && !strings.HasPrefix(ci.Semaphore.ID, "app:")
 	default:
 		return false
 	}
@@ -425,7 +375,7 @@ func (ci ConstraintItem) CacheKey(accountID, envID, functionID uuid.UUID) string
 		if ci.Semaphore == nil {
 			return ""
 		}
-		return fmt.Sprintf("%s:s:%s", accountID, ci.Semaphore.Name)
+		return fmt.Sprintf("%s:s:%s:%s", accountID, ci.Semaphore.ID, ci.Semaphore.UsageValue)
 
 	default:
 		return ""

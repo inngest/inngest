@@ -79,14 +79,14 @@ func TestSemaphoreAcquire(t *testing.T) {
 	accountID, envID, fnID := uuid.New(), uuid.New(), uuid.New()
 
 	sem := SemaphoreConstraint{
-		Name:    "app:" + uuid.New().String(),
+		ID:      "app:" + uuid.New().String(),
 		Weight:  1,
 		Release: SemaphoreReleaseAuto,
 	}
 
 	config := ConstraintConfig{
 		FunctionVersion: 1,
-		Semaphores:      []Semaphore{{Name: sem.Name, Weight: 1, Release: SemaphoreReleaseAuto}},
+		Semaphores:      []Semaphore{{ID: sem.ID, Weight: 1, Release: SemaphoreReleaseAuto}},
 	}
 
 	constraints := []ConstraintItem{
@@ -130,14 +130,14 @@ func TestSemaphoreAutoRelease(t *testing.T) {
 	accountID, envID, fnID := uuid.New(), uuid.New(), uuid.New()
 
 	sem := SemaphoreConstraint{
-		Name:    "app:" + uuid.New().String(),
+		ID:      "app:" + uuid.New().String(),
 		Weight:  1,
 		Release: SemaphoreReleaseAuto,
 	}
 
 	config := ConstraintConfig{
 		FunctionVersion: 1,
-		Semaphores:      []Semaphore{{Name: sem.Name, Weight: 1, Release: SemaphoreReleaseAuto}},
+		Semaphores:      []Semaphore{{ID: sem.ID, Weight: 1, Release: SemaphoreReleaseAuto}},
 	}
 
 	constraints := []ConstraintItem{
@@ -189,14 +189,14 @@ func TestSemaphoreManualRelease(t *testing.T) {
 	accountID, envID, fnID := uuid.New(), uuid.New(), uuid.New()
 
 	sem := SemaphoreConstraint{
-		Name:    "fn:" + fnID.String(),
+		ID:      "fn:" + fnID.String(),
 		Weight:  1,
 		Release: SemaphoreReleaseManual,
 	}
 
 	config := ConstraintConfig{
 		FunctionVersion: 1,
-		Semaphores:      []Semaphore{{Name: sem.Name, Weight: 1, Release: SemaphoreReleaseManual}},
+		Semaphores:      []Semaphore{{ID: sem.ID, Weight: 1, Release: SemaphoreReleaseManual}},
 	}
 
 	constraints := []ConstraintItem{
@@ -248,14 +248,14 @@ func TestSemaphoreWeight(t *testing.T) {
 	accountID, envID, fnID := uuid.New(), uuid.New(), uuid.New()
 
 	sem := SemaphoreConstraint{
-		Name:    "app:" + uuid.New().String(),
+		ID:      "app:" + uuid.New().String(),
 		Weight:  3,
 		Release: SemaphoreReleaseAuto,
 	}
 
 	config := ConstraintConfig{
 		FunctionVersion: 1,
-		Semaphores:      []Semaphore{{Name: sem.Name, Weight: 3, Release: SemaphoreReleaseAuto}},
+		Semaphores:      []Semaphore{{ID: sem.ID, Weight: 3, Release: SemaphoreReleaseAuto}},
 	}
 
 	constraints := []ConstraintItem{
@@ -285,14 +285,14 @@ func TestSemaphoreZeroCapacity(t *testing.T) {
 	accountID, envID, fnID := uuid.New(), uuid.New(), uuid.New()
 
 	sem := SemaphoreConstraint{
-		Name:    "app:" + uuid.New().String(),
+		ID:      "app:" + uuid.New().String(),
 		Weight:  1,
 		Release: SemaphoreReleaseAuto,
 	}
 
 	config := ConstraintConfig{
 		FunctionVersion: 1,
-		Semaphores:      []Semaphore{{Name: sem.Name, Weight: 1, Release: SemaphoreReleaseAuto}},
+		Semaphores:      []Semaphore{{ID: sem.ID, Weight: 1, Release: SemaphoreReleaseAuto}},
 	}
 
 	constraints := []ConstraintItem{
@@ -310,7 +310,7 @@ func TestSemaphoreWithConcurrency(t *testing.T) {
 	accountID, envID, fnID := uuid.New(), uuid.New(), uuid.New()
 
 	sem := SemaphoreConstraint{
-		Name:    "app:" + uuid.New().String(),
+		ID:      "app:" + uuid.New().String(),
 		Weight:  1,
 		Release: SemaphoreReleaseAuto,
 	}
@@ -321,7 +321,7 @@ func TestSemaphoreWithConcurrency(t *testing.T) {
 			AccountConcurrency:  10,
 			FunctionConcurrency: 5,
 		},
-		Semaphores: []Semaphore{{Name: sem.Name, Weight: 1, Release: SemaphoreReleaseAuto}},
+		Semaphores: []Semaphore{{ID: sem.ID, Weight: 1, Release: SemaphoreReleaseAuto}},
 	}
 
 	constraints := []ConstraintItem{
@@ -371,7 +371,7 @@ func TestSemaphoreManager(t *testing.T) {
 		err := sm.SetCapacity(ctx, accountID, name, "set-1", 10)
 		require.NoError(t, err)
 
-		cap, usage, err := sm.GetCapacity(ctx, accountID, name)
+		cap, usage, err := sm.GetCapacity(ctx, accountID, name, "")
 		require.NoError(t, err)
 		require.Equal(t, int64(10), cap)
 		require.Equal(t, int64(0), usage)
@@ -384,7 +384,7 @@ func TestSemaphoreManager(t *testing.T) {
 		err = sm.SetCapacity(ctx, accountID, name, "set-idem", 99)
 		require.NoError(t, err)
 
-		cap, _, err := sm.GetCapacity(ctx, accountID, name)
+		cap, _, err := sm.GetCapacity(ctx, accountID, name, "")
 		require.NoError(t, err)
 		require.Equal(t, int64(20), cap, "idempotent call should not change capacity")
 	})
@@ -397,7 +397,7 @@ func TestSemaphoreManager(t *testing.T) {
 		err = sm.AdjustCapacity(ctx, accountID, name, "adj-1", 3)
 		require.NoError(t, err)
 
-		cap, _, err := sm.GetCapacity(ctx, accountID, name)
+		cap, _, err := sm.GetCapacity(ctx, accountID, name, "")
 		require.NoError(t, err)
 		require.Equal(t, int64(8), cap)
 	})
@@ -413,7 +413,7 @@ func TestSemaphoreManager(t *testing.T) {
 		err = sm.AdjustCapacity(ctx, accountID, name, "adj-idem-1", 3)
 		require.NoError(t, err)
 
-		cap, _, err := sm.GetCapacity(ctx, accountID, name)
+		cap, _, err := sm.GetCapacity(ctx, accountID, name, "")
 		require.NoError(t, err)
 		require.Equal(t, int64(8), cap, "idempotent adjust should not double-add")
 	})
@@ -421,42 +421,42 @@ func TestSemaphoreManager(t *testing.T) {
 	t.Run("release semaphore", func(t *testing.T) {
 		name := fmt.Sprintf("fn:%s", uuid.New())
 		// Manually set usage
-		usageKey := semaphoreUsageKey(accountID, name)
+		usageKey := semaphoreUsageKey(accountID, name, "")
 		r.Set(usageKey, "5")
 
-		err := sm.ReleaseSemaphore(ctx, accountID, name, "rel-1", 2)
+		err := sm.ReleaseSemaphore(ctx, accountID, name, "", "rel-1", 2)
 		require.NoError(t, err)
 
-		_, usage, err := sm.GetCapacity(ctx, accountID, name)
+		_, usage, err := sm.GetCapacity(ctx, accountID, name, "")
 		require.NoError(t, err)
 		require.Equal(t, int64(3), usage)
 	})
 
 	t.Run("release semaphore clamps to zero", func(t *testing.T) {
 		name := fmt.Sprintf("fn:%s", uuid.New())
-		usageKey := semaphoreUsageKey(accountID, name)
+		usageKey := semaphoreUsageKey(accountID, name, "")
 		r.Set(usageKey, "1")
 
-		err := sm.ReleaseSemaphore(ctx, accountID, name, "rel-clamp", 5)
+		err := sm.ReleaseSemaphore(ctx, accountID, name, "", "rel-clamp", 5)
 		require.NoError(t, err)
 
-		_, usage, err := sm.GetCapacity(ctx, accountID, name)
+		_, usage, err := sm.GetCapacity(ctx, accountID, name, "")
 		require.NoError(t, err)
 		require.Equal(t, int64(0), usage, "should clamp to 0")
 	})
 
 	t.Run("release semaphore idempotency", func(t *testing.T) {
 		name := fmt.Sprintf("fn:%s", uuid.New())
-		usageKey := semaphoreUsageKey(accountID, name)
+		usageKey := semaphoreUsageKey(accountID, name, "")
 		r.Set(usageKey, "5")
 
-		err := sm.ReleaseSemaphore(ctx, accountID, name, "rel-idem", 2)
+		err := sm.ReleaseSemaphore(ctx, accountID, name, "", "rel-idem", 2)
 		require.NoError(t, err)
 		// Same idempotency key — should not double-decrement
-		err = sm.ReleaseSemaphore(ctx, accountID, name, "rel-idem", 2)
+		err = sm.ReleaseSemaphore(ctx, accountID, name, "", "rel-idem", 2)
 		require.NoError(t, err)
 
-		_, usage, err := sm.GetCapacity(ctx, accountID, name)
+		_, usage, err := sm.GetCapacity(ctx, accountID, name, "")
 		require.NoError(t, err)
 		require.Equal(t, int64(3), usage, "idempotent release should not double-decrement")
 	})
@@ -471,14 +471,14 @@ func TestSemaphoreScavengeManualRelease(t *testing.T) {
 	accountID, envID, fnID := uuid.New(), uuid.New(), uuid.New()
 
 	sem := SemaphoreConstraint{
-		Name:    "fn:" + fnID.String(),
+		ID:      "fn:" + fnID.String(),
 		Weight:  1,
 		Release: SemaphoreReleaseManual,
 	}
 
 	config := ConstraintConfig{
 		FunctionVersion: 1,
-		Semaphores:      []Semaphore{{Name: sem.Name, Weight: 1, Release: SemaphoreReleaseManual}},
+		Semaphores:      []Semaphore{{ID: sem.ID, Weight: 1, Release: SemaphoreReleaseManual}},
 	}
 
 	constraints := []ConstraintItem{
@@ -511,4 +511,98 @@ func TestSemaphoreScavengeManualRelease(t *testing.T) {
 	// A scavenged lease means the executor died — holding the semaphore would deadlock.
 	val, _ = r.Get(usageKey)
 	require.Equal(t, "0", val, "scavenger must force-release manual semaphore to prevent deadlock")
+}
+
+// TestSemaphoreUsageValueIsolation verifies that different UsageValues get independent
+// usage counters while sharing the same capacity.  This is the core of key-based fn
+// concurrency: e.g., 5 concurrent runs per customer, where each customer has its own
+// usage counter but all share the same capacity limit.
+func TestSemaphoreUsageValueIsolation(t *testing.T) {
+	cm, r, _, clock := newSemaphoreTestEnv(t)
+	accountID, envID, fnID := uuid.New(), uuid.New(), uuid.New()
+
+	semID := "fnkey:" + uuid.New().String()
+
+	// Set shared capacity to 2
+	capKey := (&SemaphoreConstraint{ID: semID}).CapacityKey(accountID)
+	r.Set(capKey, "2")
+
+	// Two different usage values (e.g., two different customers)
+	semA := SemaphoreConstraint{ID: semID, UsageValue: "customer-a", Weight: 1, Release: SemaphoreReleaseManual}
+	semB := SemaphoreConstraint{ID: semID, UsageValue: "customer-b", Weight: 1, Release: SemaphoreReleaseManual}
+
+	configA := ConstraintConfig{
+		FunctionVersion: 1,
+		Semaphores:      []Semaphore{{ID: semA.ID, UsageValue: semA.UsageValue, Weight: 1, Release: SemaphoreReleaseManual}},
+	}
+	configB := ConstraintConfig{
+		FunctionVersion: 1,
+		Semaphores:      []Semaphore{{ID: semB.ID, UsageValue: semB.UsageValue, Weight: 1, Release: SemaphoreReleaseManual}},
+	}
+
+	constraintsA := []ConstraintItem{{Kind: ConstraintKindSemaphore, Semaphore: &semA}}
+	constraintsB := []ConstraintItem{{Kind: ConstraintKindSemaphore, Semaphore: &semB}}
+
+	// Acquire for customer A — should succeed (cap=2, usageA=0)
+	resp := acquireWithSemaphore(t, cm, clock, accountID, envID, fnID, configA, constraintsA, "iso-a1")
+	require.Len(t, resp.Leases, 1, "customer A first acquire should succeed")
+
+	// Acquire for customer B — should succeed (cap=2, usageB=0, independent counter)
+	clock.Advance(time.Second)
+	resp = acquireWithSemaphore(t, cm, clock, accountID, envID, fnID, configB, constraintsB, "iso-b1")
+	require.Len(t, resp.Leases, 1, "customer B first acquire should succeed")
+
+	// Verify independent usage counters
+	usageA, _ := r.Get(semA.UsageKey(accountID))
+	usageB, _ := r.Get(semB.UsageKey(accountID))
+	require.Equal(t, "1", usageA, "customer A usage should be 1")
+	require.Equal(t, "1", usageB, "customer B usage should be 1")
+
+	// Acquire again for customer A — should succeed (cap=2, usageA=1)
+	clock.Advance(time.Second)
+	resp = acquireWithSemaphore(t, cm, clock, accountID, envID, fnID, configA, constraintsA, "iso-a2")
+	require.Len(t, resp.Leases, 1, "customer A second acquire should succeed")
+
+	// Acquire again for customer A — should fail (cap=2, usageA=2)
+	clock.Advance(time.Second)
+	resp = acquireWithSemaphore(t, cm, clock, accountID, envID, fnID, configA, constraintsA, "iso-a3")
+	require.Len(t, resp.Leases, 0, "customer A third acquire should fail — capacity exhausted")
+
+	// Customer B should still be able to acquire (cap=2, usageB=1)
+	clock.Advance(time.Second)
+	resp = acquireWithSemaphore(t, cm, clock, accountID, envID, fnID, configB, constraintsB, "iso-b2")
+	require.Len(t, resp.Leases, 1, "customer B second acquire should still succeed — independent counter")
+}
+
+// TestSemaphoreSameUsageValueShared verifies that two acquires with the same
+// UsageValue share a single counter (same customer, same semaphore).
+func TestSemaphoreSameUsageValueShared(t *testing.T) {
+	cm, r, _, clock := newSemaphoreTestEnv(t)
+	accountID, envID, fnID := uuid.New(), uuid.New(), uuid.New()
+
+	semID := "fnkey:" + uuid.New().String()
+
+	// Set shared capacity to 1
+	capKey := (&SemaphoreConstraint{ID: semID}).CapacityKey(accountID)
+	r.Set(capKey, "1")
+
+	sem := SemaphoreConstraint{ID: semID, UsageValue: "same-customer", Weight: 1, Release: SemaphoreReleaseManual}
+	config := ConstraintConfig{
+		FunctionVersion: 1,
+		Semaphores:      []Semaphore{{ID: sem.ID, UsageValue: sem.UsageValue, Weight: 1, Release: SemaphoreReleaseManual}},
+	}
+	constraints := []ConstraintItem{{Kind: ConstraintKindSemaphore, Semaphore: &sem}}
+
+	// First acquire succeeds
+	resp := acquireWithSemaphore(t, cm, clock, accountID, envID, fnID, config, constraints, "same-1")
+	require.Len(t, resp.Leases, 1)
+
+	// Second acquire with same usage value fails — they share the counter
+	clock.Advance(time.Second)
+	resp = acquireWithSemaphore(t, cm, clock, accountID, envID, fnID, config, constraints, "same-2")
+	require.Len(t, resp.Leases, 0, "same usage value should share counter and exhaust capacity")
+
+	usageKey := sem.UsageKey(accountID)
+	val, _ := r.Get(usageKey)
+	require.Equal(t, "1", val, "shared counter should be 1")
 }

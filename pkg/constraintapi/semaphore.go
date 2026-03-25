@@ -1,117 +1,81 @@
 package constraintapi
 
 import (
-	"context"
 	"fmt"
-	"time"
 
 	"github.com/google/uuid"
-	"github.com/redis/rueidis"
+	"github.com/inngest/inngest/pkg/util"
 )
+
+type SemaphoreReleaseMode int
 
 const (
-	semaphoreIdempotencyTTL = 5 * time.Second
+	// SemaphoreReleaseAuto decrements the semaphore counter when the constraint lease is released.
+	// Used for worker concurrency where each step independently acquires and releases.
+	SemaphoreReleaseAuto SemaphoreReleaseMode = 0
+
+	// SemaphoreReleaseManual requires explicit release via the SemaphoreManager API.
+	// Used for function concurrency where the hold persists across the entire run.
+	SemaphoreReleaseManual SemaphoreReleaseMode = 1
 )
 
-// SemaphoreManager provides underlying internal APIs for managing semaphores.  these are required because,
-// unlike other constraints, semaphores can be manually adjusted:  the capacity must be adjusted when new
-// workers come online, and for fn concurrency Release is called manually.
-type SemaphoreManager interface {
-	// SetCapacity sets the total capacity for a named semaphore.
-	SetCapacity(ctx context.Context, accountID uuid.UUID, name, idempotencyKey string, capacity int64) error
-
-	// AdjustCapacity atomically adjusts capacity by delta (e.g., +N on worker connect, -N on disconnect).
-	AdjustCapacity(ctx context.Context, accountID uuid.UUID, name, idempotencyKey string, delta int64) error
-
-	// GetCapacity returns current capacity and usage for a named semaphore.
-	GetCapacity(ctx context.Context, accountID uuid.UUID, name string) (capacity int64, usage int64, err error)
-
-	// ReleaseSemaphore decrements the usage counter for a manual-release semaphore.
-	// Called on run finalization for function concurrency. Must be idempotent.
-	ReleaseSemaphore(ctx context.Context, accountID uuid.UUID, name, idempotencyKey string, weight int64) error
+// SemaphoreIDApp returns the semaphore ID for worker concurrency (per-app).
+func SemaphoreIDApp(appID uuid.UUID) string {
+	return fmt.Sprintf("app:%s", appID)
 }
 
-type redisSemaphoreManager struct {
-	client rueidis.Client
+// SemaphoreIDFn returns the semaphore ID for function concurrency (no key).
+func SemaphoreIDFn(functionID uuid.UUID) string {
+	return fmt.Sprintf("fn:%s", functionID)
 }
 
-func NewRedisSemaphoreManager(client rueidis.Client) SemaphoreManager {
-	return &redisSemaphoreManager{client: client}
+// SemaphoreIDFnKey returns the semaphore ID for function concurrency with a key expression.
+// The ID is a hash of the function ID + the raw (unevaluated) expression.
+func SemaphoreIDFnKey(functionID uuid.UUID, expression string) string {
+	return fmt.Sprintf("fnkey:%s", util.XXHash(functionID.String()+expression))
 }
 
-func semaphoreCapacityKey(accountID uuid.UUID, name string) string {
-	return fmt.Sprintf("{cs}:%s:sem:%s:cap", accountScope(accountID), name)
+// SemaphoreConstraint represents a semaphore-based capacity constraint.
+// Semaphores track usage via simple counters (INCRBY/DECRBY) with separately
+// managed capacity, providing O(1) capacity checks.
+type SemaphoreConstraint struct {
+	// ID is the unevaluated semaphore name, always prefixed:
+	//   app:<uuid>    — worker concurrency
+	//   fn:<uuid>     — function concurrency
+	//   fnkey:<xxhash(fnID + expression)> — hash of function ID & unevaluated expression
+	ID string
+
+	// UsageValue is the xxhash of the *evaluated* expression, if the semaphore was created via
+	// expressions.  This allows arbitrary expressions per fn for semaphores.
+	UsageValue string
+
+	// Weight is the number of units to acquire from the semaphore (default 1).
+	Weight int64
+
+	// Release controls when the semaphore counter is decremented.
+	Release SemaphoreReleaseMode
 }
 
-func semaphoreUsageKey(accountID uuid.UUID, name string) string {
-	return fmt.Sprintf("{cs}:%s:sem:%s:usage", accountScope(accountID), name)
+func (s *SemaphoreConstraint) UsageKey(accountID uuid.UUID) string {
+	return fmt.Sprintf("{cs}:%s:sem:%s:usage:%s", accountScope(accountID), s.ID, s.UsageValue)
 }
 
-func semaphoreIdempotencyKey(accountID uuid.UUID, op, idempotencyKey string) string {
-	return fmt.Sprintf("{cs}:%s:sem:ik:%s:%s", accountScope(accountID), op, idempotencyKey)
+func (s *SemaphoreConstraint) CapacityKey(accountID uuid.UUID) string {
+	return fmt.Sprintf("{cs}:%s:sem:%s:cap", accountScope(accountID), s.ID)
 }
 
-func (m *redisSemaphoreManager) SetCapacity(ctx context.Context, accountID uuid.UUID, name, idempotencyKey string, capacity int64) error {
-	keys := []string{
-		semaphoreCapacityKey(accountID, name),
-		semaphoreIdempotencyKey(accountID, "setcap", idempotencyKey),
+func (s *SemaphoreConstraint) PrettyString() string {
+	if s.UsageValue != "" {
+		return fmt.Sprintf("id %s, usage_value %s, weight %d, release %d", s.ID, s.UsageValue, s.Weight, s.Release)
 	}
-	args := []string{
-		fmt.Sprintf("%d", capacity),
-		fmt.Sprintf("%d", int(semaphoreIdempotencyTTL.Seconds())),
-	}
-
-	return scripts["semaphore_set_capacity"].Exec(ctx, m.client, keys, args).Error()
+	return fmt.Sprintf("id %s, weight %d, release %d", s.ID, s.Weight, s.Release)
 }
 
-func (m *redisSemaphoreManager) AdjustCapacity(ctx context.Context, accountID uuid.UUID, name, idempotencyKey string, delta int64) error {
-	keys := []string{
-		semaphoreCapacityKey(accountID, name),
-		semaphoreIdempotencyKey(accountID, "adjcap", idempotencyKey),
+func (s *SemaphoreConstraint) PrettyStringConfig(config ConstraintConfig) string {
+	for _, sc := range config.Semaphores {
+		if sc.ID == s.ID {
+			return fmt.Sprintf("weight %d, release %d", sc.Weight, sc.Release)
+		}
 	}
-	args := []string{
-		fmt.Sprintf("%d", delta),
-		fmt.Sprintf("%d", int(semaphoreIdempotencyTTL.Seconds())),
-	}
-
-	return scripts["semaphore_adjust_capacity"].Exec(ctx, m.client, keys, args).Error()
-}
-
-func (m *redisSemaphoreManager) GetCapacity(ctx context.Context, accountID uuid.UUID, name string) (int64, int64, error) {
-	capKey := semaphoreCapacityKey(accountID, name)
-	usageKey := semaphoreUsageKey(accountID, name)
-
-	results := m.client.DoMulti(ctx,
-		m.client.B().Get().Key(capKey).Build(),
-		m.client.B().Get().Key(usageKey).Build(),
-	)
-
-	capacity, err := results[0].AsInt64()
-	if rueidis.IsRedisNil(err) {
-		capacity = 0
-	} else if err != nil {
-		return 0, 0, fmt.Errorf("could not get semaphore capacity: %w", err)
-	}
-
-	usage, err := results[1].AsInt64()
-	if rueidis.IsRedisNil(err) {
-		usage = 0
-	} else if err != nil {
-		return 0, 0, fmt.Errorf("could not get semaphore usage: %w", err)
-	}
-
-	return capacity, usage, nil
-}
-
-func (m *redisSemaphoreManager) ReleaseSemaphore(ctx context.Context, accountID uuid.UUID, name, idempotencyKey string, weight int64) error {
-	keys := []string{
-		semaphoreUsageKey(accountID, name),
-		semaphoreIdempotencyKey(accountID, "rel", idempotencyKey),
-	}
-	args := []string{
-		fmt.Sprintf("%d", weight),
-		fmt.Sprintf("%d", int(semaphoreIdempotencyTTL.Seconds())),
-	}
-
-	return scripts["semaphore_release"].Exec(ctx, m.client, keys, args).Error()
+	return "unknown"
 }

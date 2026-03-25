@@ -214,8 +214,8 @@ func (ci ConstraintItem) Valid() error {
 		if ci.Semaphore == nil {
 			return fmt.Errorf("semaphore constraint must include semaphore data")
 		}
-		if ci.Semaphore.Name == "" {
-			return fmt.Errorf("semaphore constraint must include name")
+		if ci.Semaphore.ID == "" {
+			return fmt.Errorf("semaphore constraint must include ID")
 		}
 		if ci.Semaphore.Weight <= 0 {
 			return fmt.Errorf("semaphore constraint weight must be > 0")
@@ -295,7 +295,7 @@ func (cc ConstraintConfig) ValidConstraintUsage(ci ConstraintItem) error {
 	case ConstraintKindSemaphore:
 		if ci.Semaphore != nil {
 			for _, s := range cc.Semaphores {
-				if s.Name == ci.Semaphore.Name {
+				if s.ID == ci.Semaphore.ID {
 					return nil
 				}
 			}
