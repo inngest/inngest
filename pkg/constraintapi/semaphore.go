@@ -13,6 +13,9 @@ const (
 	semaphoreIdempotencyTTL = 5 * time.Second
 )
 
+// SemaphoreManager provides underlying internal APIs for managing semaphores.  these are required because,
+// unlike other constraints, semaphores can be manually adjusted:  the capacity must be adjusted when new
+// workers come online, and for fn concurrency Release is called manually.
 type SemaphoreManager interface {
 	// SetCapacity sets the total capacity for a named semaphore.
 	SetCapacity(ctx context.Context, accountID uuid.UUID, name, idempotencyKey string, capacity int64) error

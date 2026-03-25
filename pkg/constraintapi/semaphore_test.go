@@ -461,3 +461,54 @@ func TestSemaphoreManager(t *testing.T) {
 		require.Equal(t, int64(3), usage, "idempotent release should not double-decrement")
 	})
 }
+
+// TestSemaphoreScavengeManualRelease verifies that the scavenger force-releases
+// manual-release semaphores when a constraint lease expires.  Without this,
+// a crashed executor holding a manual-release semaphore would deadlock all
+// future runs waiting on that capacity.
+func TestSemaphoreScavengeManualRelease(t *testing.T) {
+	cm, r, _, clock := newSemaphoreTestEnv(t)
+	accountID, envID, fnID := uuid.New(), uuid.New(), uuid.New()
+
+	sem := SemaphoreConstraint{
+		Name:    "fn:" + fnID.String(),
+		Weight:  1,
+		Release: SemaphoreReleaseManual,
+	}
+
+	config := ConstraintConfig{
+		FunctionVersion: 1,
+		Semaphores:      []Semaphore{{Name: sem.Name, Weight: 1, Release: SemaphoreReleaseManual}},
+	}
+
+	constraints := []ConstraintItem{
+		{Kind: ConstraintKindSemaphore, Semaphore: &sem},
+	}
+
+	// Set capacity to 1
+	capKey := sem.CapacityKey(accountID)
+	r.Set(capKey, "1")
+
+	// Acquire a lease with a manual-release semaphore
+	resp := acquireWithSemaphore(t, cm, clock, accountID, envID, fnID, config, constraints, "scav-manual")
+	require.Len(t, resp.Leases, 1)
+
+	usageKey := sem.UsageKey(accountID)
+	val, _ := r.Get(usageKey)
+	require.Equal(t, "1", val, "usage should be 1 after acquire")
+
+	// Advance time past the lease expiry so the scavenger can find it
+	clock.Advance(10 * time.Second)
+	r.FastForward(10 * time.Second)
+	r.SetTime(clock.Now())
+
+	// Run scavenger — this should release the expired lease AND decrement the semaphore
+	result, err := cm.Scavenge(context.Background())
+	require.NoError(t, err)
+	require.Equal(t, 1, result.ReclaimedLeases, "scavenger should reclaim 1 expired lease")
+
+	// The semaphore usage MUST be decremented even though release mode is manual.
+	// A scavenged lease means the executor died — holding the semaphore would deadlock.
+	val, _ = r.Get(usageKey)
+	require.Equal(t, "0", val, "scavenger must force-release manual semaphore to prevent deadlock")
+}

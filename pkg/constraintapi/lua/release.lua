@@ -23,6 +23,7 @@ local accountID = ARGV[2]
 local currentLeaseID = ARGV[3]
 local operationIdempotencyTTL = tonumber(ARGV[4])--[[@as integer]]
 local enableDebugLogs = tonumber(ARGV[5]) == 1
+local forceReleaseSemaphores = tonumber(ARGV[6]) == 1
 
 ---@type string[]
 local debugLogs = {}
@@ -85,8 +86,8 @@ for _, c in ipairs(constraints) do
 		debug("removing in progress lease", c.c.ilk)
 		call("ZREM", c.c.ilk, currentLeaseID)
 	elseif c.k == 4 then
-		-- semaphore: only decrement for auto-release (rel == 0)
-		if c.sem.rel == 0 then
+		-- semaphore: decrement for auto-release, or when force-released by the scavenger
+		if c.sem.rel == 0 or forceReleaseSemaphores then
 			local weight = c.sem.w or 1
 			local newVal = call("DECRBY", c.sem.k, weight)
 			if tonumber(newVal) < 0 then

@@ -62,12 +62,20 @@ func (r *redisCapacityManager) Release(ctx context.Context, req *CapacityRelease
 
 	scopedKeyPrefix := fmt.Sprintf("{cs}:%s", accountScope(req.AccountID))
 
+	// Force-release semaphores when the scavenger is reclaiming an expired lease.
+	// Without this, manual-release semaphores would be permanently held after a crash.
+	forceReleaseSemaphores := "0"
+	if req.Source.Location == CallerLocationLeaseScavenge {
+		forceReleaseSemaphores = "1"
+	}
+
 	args, err := strSlice([]any{
 		scopedKeyPrefix,
 		req.AccountID,
 		req.LeaseID.String(),
 		int(r.operationIdempotencyTTL.Seconds()),
 		enableDebugLogsVal,
+		forceReleaseSemaphores,
 	})
 	if err != nil {
 		return nil, errs.Wrap(0, false, "invalid args: %w", err)
