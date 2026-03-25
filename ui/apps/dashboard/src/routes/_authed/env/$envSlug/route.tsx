@@ -5,8 +5,8 @@ import {
   hasDeepLinkParams,
   resolveDashboardDeepLink,
   stripDeepLinkParams,
-  type DashboardDeepLinkSearchParams,
 } from '@/lib/deepLinks';
+import { validateDashboardDeepLinkSearch } from '@/lib/deepLinkSearch';
 import { jwtAuth } from '@/lib/auth';
 import { Alert } from '@inngest/components/Alert';
 import {
@@ -29,13 +29,7 @@ const NotFound = () => (
 export const Route = createFileRoute('/_authed/env/$envSlug')({
   component: EnvLayout,
   notFoundComponent: NotFound,
-  validateSearch: (
-    search: Record<string, unknown>,
-  ): DashboardDeepLinkSearchParams => ({
-    acct: typeof search.acct === 'string' ? search.acct : undefined,
-    expires: typeof search.expires === 'string' ? search.expires : undefined,
-    sig: typeof search.sig === 'string' ? search.sig : undefined,
-  }),
+  validateSearch: validateDashboardDeepLinkSearch,
   beforeLoad: async ({ location, search }) => {
     if (!hasDeepLinkParams(search)) {
       return;

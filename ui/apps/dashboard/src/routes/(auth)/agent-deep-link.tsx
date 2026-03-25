@@ -1,14 +1,9 @@
 import LoadingIcon from '@/components/Icons/LoadingIcon';
 import SplitView from '@/components/SignIn/SplitView';
+import { validateAgentDeepLinkSearch } from '@/lib/deepLinkSearch';
 import { useClerk, useSignIn } from '@clerk/tanstack-react-start';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
-
-type AgentDeepLinkSearch = {
-  organization_id?: string;
-  redirect_url?: string;
-  ticket?: string;
-};
 
 //
 // Clerk tickets are single-use. Track consumed tickets at module scope
@@ -18,18 +13,7 @@ const consumedTickets = new Set<string>();
 
 export const Route = createFileRoute('/(auth)/agent-deep-link')({
   component: AgentDeepLink,
-  validateSearch: (search: Record<string, unknown>): AgentDeepLinkSearch => ({
-    organization_id:
-      typeof search.organization_id === 'string'
-        ? search.organization_id
-        : undefined,
-    redirect_url:
-      typeof search.redirect_url === 'string' &&
-      search.redirect_url.startsWith('/')
-        ? search.redirect_url
-        : undefined,
-    ticket: typeof search.ticket === 'string' ? search.ticket : undefined,
-  }),
+  validateSearch: validateAgentDeepLinkSearch,
 });
 
 function AgentDeepLink() {

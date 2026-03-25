@@ -1,29 +1,13 @@
 import LoadingIcon from '@/components/Icons/LoadingIcon';
 import SplitView from '@/components/SignIn/SplitView';
+import { validateSwitchOrganizationSearch } from '@/lib/deepLinkSearch';
 import { createFileRoute } from '@tanstack/react-router';
 import { useClerk } from '@clerk/tanstack-react-start';
 import { useEffect } from 'react';
 
-type SwitchOrganizationSearchParams = {
-  organization_id?: string;
-  redirect_url?: string;
-};
-
 export const Route = createFileRoute('/(auth)/switch-organization')({
   component: RouteComponent,
-  validateSearch: (
-    search: Record<string, unknown>,
-  ): SwitchOrganizationSearchParams => ({
-    organization_id:
-      typeof search.organization_id === 'string'
-        ? search.organization_id
-        : undefined,
-    redirect_url:
-      typeof search.redirect_url === 'string' &&
-      search.redirect_url.startsWith('/')
-        ? search.redirect_url
-        : undefined,
-  }),
+  validateSearch: validateSwitchOrganizationSearch,
 });
 
 function RouteComponent() {

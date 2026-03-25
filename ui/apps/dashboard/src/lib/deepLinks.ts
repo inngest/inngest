@@ -1,5 +1,11 @@
 import { graphqlAPI } from '@/queries/graphqlAPI';
 import {
+  hasDeepLinkParams,
+  isExpired,
+  isValidDeepLink,
+  type DashboardDeepLinkSearchParams,
+} from '@/lib/deepLinkCommon';
+import {
   auth,
   clerkClient,
   type OrganizationMembership,
@@ -7,11 +13,7 @@ import {
 import { createServerFn } from '@tanstack/react-start';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
-export type DashboardDeepLinkSearchParams = {
-  acct?: string;
-  expires?: string;
-  sig?: string;
-};
+export type { DashboardDeepLinkSearchParams } from '@/lib/deepLinkCommon';
 
 type ResolveDashboardDeepLinkInput = DashboardDeepLinkSearchParams & {
   isJWTAuth: boolean;
@@ -106,38 +108,7 @@ export const resolveDashboardDeepLink = createServerFn({
     } satisfies ResolveDashboardDeepLinkResult;
   });
 
-export function hasDeepLinkParams(
-  search: DashboardDeepLinkSearchParams,
-): boolean {
-  return Boolean(search.acct || search.expires || search.sig);
-}
-
-export function stripDeepLinkParams(href: string): string {
-  const url = new URL(href, 'https://app.inngest.com');
-
-  url.searchParams.delete('acct');
-  url.searchParams.delete('expires');
-  url.searchParams.delete('sig');
-
-  return `${url.pathname}${url.search}${url.hash}`;
-}
-
-function isValidDeepLink(
-  search: DashboardDeepLinkSearchParams,
-): search is Required<DashboardDeepLinkSearchParams> {
-  return (
-    typeof search.acct === 'string' &&
-    search.acct.length > 0 &&
-    typeof search.expires === 'string' &&
-    /^\d+$/.test(search.expires) &&
-    typeof search.sig === 'string' &&
-    /^[a-f0-9]{64}$/i.test(search.sig)
-  );
-}
-
-function isExpired(expires: string): boolean {
-  return Number(expires) <= Math.floor(Date.now() / 1000);
-}
+export { hasDeepLinkParams, stripDeepLinkParams } from '@/lib/deepLinkCommon';
 
 function signDeepLink(
   secret: string,
