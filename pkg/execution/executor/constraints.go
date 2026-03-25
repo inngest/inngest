@@ -7,11 +7,14 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/ratelimit"
+	"github.com/inngest/inngest/pkg/expressions"
+	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/service"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
@@ -260,6 +263,43 @@ type checkResult struct {
 
 	// leaseID is the current capacity lease which MUST be committed once done or rolled back on error
 	leaseID *ulid.ULID
+}
+
+// evaluateFnConcurrency evaluates function concurrency limits against event data
+// and returns the corresponding semaphore entries to store in run metadata.
+func (e *executor) evaluateFnConcurrency(
+	ctx context.Context,
+	accountID, functionID uuid.UUID,
+	fnLimits []inngest.FnConcurrency,
+	evtMap map[string]any,
+) []constraintapi.Semaphore {
+	if len(fnLimits) == 0 {
+		return nil
+	}
+
+	semaphores := make([]constraintapi.Semaphore, 0, len(fnLimits))
+	for _, fc := range fnLimits {
+		sem := constraintapi.Semaphore{
+			Weight:  1,
+			Release: constraintapi.SemaphoreReleaseManual,
+		}
+
+		if fc.Key != nil {
+			// Expression-based: ID is the hash of fnID + raw expression, UsageValue is the evaluated result
+			sem.ID = constraintapi.SemaphoreIDFnKey(functionID, *fc.Key)
+			evaluated := ""
+			if val, err := expressions.Evaluate(ctx, *fc.Key, map[string]any{"event": evtMap}); err == nil {
+				evaluated = fmt.Sprintf("%v", val)
+			}
+			sem.UsageValue = util.XXHash(evaluated)
+		} else {
+			sem.ID = constraintapi.SemaphoreIDFn(functionID)
+		}
+
+		semaphores = append(semaphores, sem)
+	}
+
+	return semaphores
 }
 
 func getScheduleConstraints(ctx context.Context, req execution.ScheduleRequest) ([]constraintapi.ConstraintItem, error) {

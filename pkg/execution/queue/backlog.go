@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/util"
@@ -66,9 +65,6 @@ type QueueBacklog struct {
 
 	// Set for backlogs containing start items only for a given throttle configuration
 	Throttle *BacklogThrottle `json:"t,omitempty"`
-
-	// Semaphores stores evaluated semaphore constraints, propagated from queue items.
-	Semaphores []constraintapi.Semaphore `json:"sem,omitempty"`
 
 	SuccessiveThrottleConstrained          int `json:"stc,omitzero"`
 	SuccessiveCustomConcurrencyConstrained int `json:"sccc,omitzero"`
@@ -249,11 +245,6 @@ func ItemBacklog(ctx context.Context, i QueueItem) QueueBacklog {
 				UnhashedValue: key.UnhashedEvaluatedKeyValue, // "customer1"
 			}
 		}
-	}
-
-	// Propagate semaphore constraints from item to backlog
-	if len(i.Data.Semaphores) > 0 {
-		b.Semaphores = i.Data.Semaphores
 	}
 
 	return b

@@ -335,37 +335,34 @@ func start(ctx context.Context, opts StartOpts) error {
 	const rateLimitPrefix = "ratelimit"
 
 	// Instantiate Constraint API
+	var semaphoreManager constraintapi.SemaphoreManager = constraintapi.NewRedisSemaphoreManager(unshardedRc)
+
 	var capacityManager constraintapi.CapacityManager
-	enableConstraintAPI := os.Getenv("ENABLE_CONSTRAINT_API") == "true"
-	if enableConstraintAPI {
-		cm, err := constraintapi.NewRedisCapacityManager(
-			constraintapi.WithClock(clockwork.NewRealClock()),
-			constraintapi.WithShardName("default"),
-			constraintapi.WithClient(unshardedRc),
-			constraintapi.WithEnableHighCardinalityInstrumentation(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool) {
-				return false
-			}),
-		)
-		if err != nil {
-			return fmt.Errorf("could not create contraint API: %w", err)
-		}
 
-		queueOpts = append(
-			queueOpts,
-			queue.WithCapacityManager(cm),
-			// Always use Constraint API
-			queue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
-				return true
-			}),
-			queue.WithAcquireCapacityLeaseOnBacklogRefill(true),
-		)
-
-		services = append(services, constraintapi.NewLeaseScavengerService(cm, consts.ConstraintAPIScavengerTick))
-
-		capacityManager = cm
-
-		l.Warn("EXPERIMENTAL: Enabling Constraint API")
+	cm, err := constraintapi.NewRedisCapacityManager(
+		constraintapi.WithClock(clockwork.NewRealClock()),
+		constraintapi.WithShardName("default"),
+		constraintapi.WithClient(unshardedRc),
+		constraintapi.WithEnableHighCardinalityInstrumentation(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool) {
+			return false
+		}),
+	)
+	if err != nil {
+		return fmt.Errorf("could not create contraint API: %w", err)
 	}
+
+	queueOpts = append(
+		queueOpts,
+		queue.WithCapacityManager(cm),
+		// Always use Constraint API
+		queue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
+			return true
+		}),
+		queue.WithAcquireCapacityLeaseOnBacklogRefill(true),
+	)
+
+	services = append(services, constraintapi.NewLeaseScavengerService(cm, consts.ConstraintAPIScavengerTick))
+	capacityManager = cm
 
 	var retryBackoff backoff.BackoffFunc
 	if opts.RetryInterval > 0 {
@@ -545,11 +542,12 @@ func start(ctx context.Context, opts StartOpts) error {
 		}),
 	}
 
-	if capacityManager != nil {
-		executorOpts = append(executorOpts, executor.WithCapacityManager(capacityManager))
-		executorOpts = append(executorOpts, executor.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
-			return true
-		}))
+	executorOpts = append(executorOpts, executor.WithCapacityManager(capacityManager))
+	executorOpts = append(executorOpts, executor.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
+		return true
+	}))
+	if semaphoreManager != nil {
+		executorOpts = append(executorOpts, executor.WithSemaphoreManager(semaphoreManager))
 	}
 	executorOpts = append(executorOpts, executor.WithEnableBatchingInstrumentation(func(ctx context.Context, accountID, envID uuid.UUID) (enable bool) {
 		return false
@@ -597,6 +595,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	ds.State = sm
 	ds.Queue = rq
 	ds.Executor = exec
+	ds.SemaphoreManager = semaphoreManager
 	ds.CronSyncer = croner
 	// start the API
 	// Create a new API endpoint which hosts SDK-related functionality for
@@ -1015,6 +1014,11 @@ func PartitionConstraintConfigGetter(dbcqrs cqrs.Manager) queue.PartitionConstra
 				Period:                    int(fn.Throttle.Period.Seconds()),
 			}
 		}
+
+		// NOTE: Manual-release semaphores (fn concurrency) are NOT added to the partition config.
+		// They are only embedded on the start job's queue item. Subsequent steps don't need them —
+		// the semaphore is already held for the run and released on finalization.
+		// Worker concurrency (auto-release) would go here when implemented.
 
 		return constraints
 	}

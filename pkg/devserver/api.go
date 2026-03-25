@@ -18,6 +18,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/api/tel"
+	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/cqrs/sync"
@@ -414,6 +415,7 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 				})
 			}
 
+			a.setSemaphoreCapacity(ctx, fn)
 			continue
 		}
 
@@ -444,6 +446,8 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 			})
 
 		}
+
+		a.setSemaphoreCapacity(ctx, fn)
 	}
 
 	reply := &sync.Reply{
@@ -732,4 +736,30 @@ type InfoResponse struct {
 
 	// Features acts as an in-memory feature flag for the UI
 	Features map[string]bool `json:"features"`
+}
+
+// setSemaphoreCapacity sets semaphore capacity for each FnConcurrency limit in the function config.
+// Called during function registration so capacity is available before any runs are scheduled.
+func (a devapi) setSemaphoreCapacity(ctx context.Context, fn *inngest.Function) {
+	if fn.Concurrency == nil || a.devserver.SemaphoreManager == nil {
+		return
+	}
+
+	for _, fc := range fn.Concurrency.Fn {
+		var semID string
+		if fc.Key != nil {
+			semID = constraintapi.SemaphoreIDFnKey(fn.ID, *fc.Key)
+		} else {
+			semID = constraintapi.SemaphoreIDFn(fn.ID)
+		}
+
+		// Idempotent: same fn ID + same config → same capacity
+		_ = a.devserver.SemaphoreManager.SetCapacity(
+			ctx,
+			consts.DevServerAccountID,
+			semID,
+			fn.ID.String(),
+			int64(fc.Limit),
+		)
+	}
 }

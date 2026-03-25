@@ -1113,6 +1113,7 @@ func (e *executor) schedule(
 	// Evaluate concurrency keys to use initially
 	if req.Function.Concurrency != nil {
 		metadata.Config.CustomConcurrencyKeys = queue.GetCustomConcurrencyKeys(ctx, metadata.ID, req.Function.Concurrency.Limits, evtMap)
+		metadata.Config.Semaphores = e.evaluateFnConcurrency(ctx, req.AccountID, req.Function.ID, req.Function.Concurrency.Fn, evtMap)
 	}
 
 	//

@@ -86,7 +86,8 @@ func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) er
 				return struct{}{}, e.semaphoreManager.ReleaseSemaphore(
 					ctx,
 					opts.Metadata.ID.Tenant.AccountID,
-					sem.Name,
+					sem.ID,
+					sem.UsageValue,
 					opts.Metadata.ID.RunID.String(),
 					sem.Weight,
 				)
@@ -96,7 +97,7 @@ func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) er
 					"error releasing semaphore on finalize after retries",
 					"error", releaseErr,
 					"run_id", opts.Metadata.ID.RunID,
-					"semaphore", sem.Name,
+					"semaphore", sem.ID,
 				)
 			}
 		}

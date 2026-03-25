@@ -82,7 +82,7 @@ func TestValidate(t *testing.T) {
 					},
 				},
 				Concurrency: &ConcurrencyLimits{
-					Limits: []Concurrency{
+					Limits: []StepConcurrency{
 						{
 							Limit: 5,
 							Key:   strptr("invalid because not a string"),

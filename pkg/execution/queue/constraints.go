@@ -21,9 +21,6 @@ type PartitionConstraintConfig struct {
 
 	// Throttle configuration, optionally specifying key. If no key is set, the throttle value will be the function ID.
 	Throttle *PartitionThrottle `json:"t,omitempty,omitzero"`
-
-	// Semaphores are evaluated semaphore constraints for this partition.
-	Semaphores []constraintapi.Semaphore `json:"sem,omitempty"`
 }
 
 type CustomConcurrencyLimit struct {
@@ -187,10 +184,6 @@ func ConstraintConfigFromConstraints(
 		})
 	}
 
-	if len(constraints.Semaphores) > 0 {
-		config.Semaphores = constraints.Semaphores
-	}
-
 	return config
 }
 
@@ -238,6 +231,25 @@ func (q *queueProcessor) BacklogRefillConstraintCheck(
 		}, nil
 	}
 
+	// Build constraint items and config. Semaphores come directly from queue items.
+	constraintItems := constraintItemsFromBacklog(shadowPart, backlog, constraints)
+	config := ConstraintConfigFromConstraints(constraints)
+
+	for _, item := range items {
+		for _, sem := range item.Data.Semaphores {
+			constraintItems = append(constraintItems, constraintapi.ConstraintItem{
+				Kind: constraintapi.ConstraintKindSemaphore,
+				Semaphore: &constraintapi.SemaphoreConstraint{
+					ID:         sem.ID,
+					UsageValue: sem.UsageValue,
+					Weight:     sem.Weight,
+					Release:    sem.Release,
+				},
+			})
+			config.Semaphores = append(config.Semaphores, sem)
+		}
+	}
+
 	res, err := q.CapacityManager.Acquire(ctx, &constraintapi.CapacityAcquireRequest{
 		AccountID:            *shadowPart.AccountID,
 		EnvID:                *shadowPart.EnvID,
@@ -245,8 +257,8 @@ func (q *queueProcessor) BacklogRefillConstraintCheck(
 		FunctionID:           *shadowPart.FunctionID,
 		CurrentTime:          now,
 		Duration:             QueueLeaseDuration,
-		Configuration:        ConstraintConfigFromConstraints(constraints),
-		Constraints:          constraintItemsFromBacklog(shadowPart, backlog, constraints),
+		Configuration:        config,
+		Constraints:          constraintItems,
 		Amount:               len(items),
 		LeaseIdempotencyKeys: itemIDs,
 		LeaseRunIDs:          itemRunIDs,
@@ -403,6 +415,24 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 		})
 	}
 
+	// Build constraint items and config. Semaphores come directly from the queue item —
+	// they are only present on start jobs (for fn concurrency) or all items (for worker concurrency).
+	constraintItems := constraintItemsFromBacklog(shadowPart, backlog, constraints)
+	config := ConstraintConfigFromConstraints(constraints)
+
+	for _, sem := range item.Data.Semaphores {
+		constraintItems = append(constraintItems, constraintapi.ConstraintItem{
+			Kind: constraintapi.ConstraintKindSemaphore,
+			Semaphore: &constraintapi.SemaphoreConstraint{
+				ID:         sem.ID,
+				UsageValue: sem.UsageValue,
+				Weight:     sem.Weight,
+				Release:    sem.Release,
+			},
+		})
+		config.Semaphores = append(config.Semaphores, sem)
+	}
+
 	res, err := q.CapacityManager.Acquire(ctx, &constraintapi.CapacityAcquireRequest{
 		AccountID: *shadowPart.AccountID,
 		EnvID:     *shadowPart.EnvID,
@@ -417,8 +447,8 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 		FunctionID:      *shadowPart.FunctionID,
 		CurrentTime:     now,
 		Duration:        QueueLeaseDuration,
-		Configuration:   ConstraintConfigFromConstraints(constraints),
-		Constraints:     constraintItemsFromBacklog(shadowPart, backlog, constraints),
+		Configuration:   config,
+		Constraints:     constraintItems,
 		Amount:          1,
 		MaximumLifetime: consts.MaxFunctionTimeout + 30*time.Minute,
 		Source: constraintapi.LeaseSource{
@@ -516,18 +546,6 @@ func constraintItemsFromBacklog(sp *QueueShadowPartition, backlog *QueueBacklog,
 				},
 			})
 		}
-	}
-
-	// Add semaphore constraints from backlog
-	for _, sem := range backlog.Semaphores {
-		constraints = append(constraints, constraintapi.ConstraintItem{
-			Kind: constraintapi.ConstraintKindSemaphore,
-			Semaphore: &constraintapi.SemaphoreConstraint{
-				Name:    sem.Name,
-				Weight:  sem.Weight,
-				Release: sem.Release,
-			},
-		})
 	}
 
 	return constraints

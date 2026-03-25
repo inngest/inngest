@@ -263,6 +263,8 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 		err = NewKeyError(ErrConcurrencyLimitCustomKey, backlog.CustomConcurrencyKeyID(1))
 	case enums.QueueConstraintCustomConcurrencyKey2:
 		err = NewKeyError(ErrConcurrencyLimitCustomKey, backlog.CustomConcurrencyKeyID(2))
+	case enums.QueueConstraintSemaphore:
+		err = ErrSemaphoreLimit
 	default:
 		l.ReportError(errors.New("unhandled queue constraint type"), fmt.Sprintf("constraint type: %s", constraintRes.LimitingConstraint))
 		// Limited but the constraint is unknown?
@@ -458,6 +460,16 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 				},
 			})
 		}
+		return nil
+	case ErrSemaphoreLimit:
+		// Semaphore capacity exhausted for this specific item (e.g., start job with fn concurrency).
+		// Skip this item and continue scanning — other items without semaphores (step 2, etc.)
+		// can still be processed.
+		p.CtrConcurrency.Add(1)
+		metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags:    map[string]any{"status": "semaphore_limit", "queue_shard": p.Queue.Shard().Name(), "constraint_source": constraintCheckSource},
+		})
 		return nil
 	case ErrQueueItemNotFound:
 		// This is an okay error.  Move to the next job item.
