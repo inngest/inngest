@@ -9,6 +9,7 @@ import type {
   BarStyleKey,
   HTTPTimingBreakdownData,
   InngestBreakdownData,
+  RunInngestBreakdownData,
   TimelineBarData,
   TimelineData,
 } from '../TimelineBar.types';
@@ -116,6 +117,37 @@ function getTimingFromMetadata(
 }
 
 /**
+ * Extract per-step Inngest overhead breakdown from metadata + timestamps.
+ * Combines discovery time (from timestamps) with concurrency delay and
+ * system latency (from inngest.timing metadata).
+ */
+function getInngestBreakdown(
+  trace: Trace,
+  runStartedAtMs: number | null
+): InngestBreakdownData | null {
+  // Discovery: time from when the run started executing to when this step was queued
+  const stepQueuedAt = new Date(trace.queuedAt).getTime();
+  const discoveryMs = runStartedAtMs !== null ? Math.max(0, stepQueuedAt - runStartedAtMs) : 0;
+
+  // Concurrency delay + system latency from metadata
+  let queueDelayMs = 0;
+  let systemLatencyMs = 0;
+
+  const timing = trace.metadata?.find(
+    (m): m is SpanMetadataInngestTiming => m.kind === 'inngest.timing'
+  );
+  if (timing) {
+    queueDelayMs = timing.values.queue_delay_ms ?? 0;
+    systemLatencyMs = timing.values.system_latency_ms ?? 0;
+  }
+
+  const totalMs = discoveryMs + queueDelayMs + systemLatencyMs;
+  if (totalMs <= 0) return null;
+
+  return { discoveryMs, queueDelayMs, systemLatencyMs, totalMs };
+}
+
+/**
  * Extract HTTP timing breakdown from span metadata.
  * Returns timing phases for Inngest's HTTP call to the SDK endpoint.
  */
@@ -139,22 +171,13 @@ function getHTTPTimingFromMetadata(metadata?: SpanMetadata[]): HTTPTimingBreakdo
 }
 
 /**
- * Root timing context passed to child bars so steps can span the full run lifecycle.
- */
-type RootTiming = {
-  startTime: Date;
-  startedAt: Date | null;
-  endTime: Date | null;
-};
-
-/**
  * Convert a single Trace to TimelineBarData
  */
 function traceToBarData(
   trace: Trace,
   orgName?: string,
   rootStatus?: string,
-  rootTiming?: RootTiming
+  runStartedAtMs?: number | null
 ): TimelineBarData {
   const isStepRun = isStepRunSpan(trace) && !trace.isUserland;
   // Prefer server-computed timing from metadata, fall back to span-timestamp calculation
@@ -176,52 +199,19 @@ function traceToBarData(
     ? Math.max(0, new Date(trace.startedAt).getTime() - new Date(trace.queuedAt).getTime())
     : undefined;
 
-  // For steps with timing data and a known root time range, widen the step bar to
-  // span the full run lifecycle. The Inngest (queue) portion then includes all
-  // non-execution overhead: discovery calls, queue delay, scheduling, and finalization.
-  let effectiveStartTime = new Date(trace.queuedAt);
-  let effectiveEndTime: Date | null = trace.endedAt ? new Date(trace.endedAt) : null;
-  let inngestBreakdown: InngestBreakdownData | undefined;
-
-  if (isStepRun && timingBreakdown && rootTiming?.endTime) {
-    const runDurationMs = rootTiming.endTime.getTime() - rootTiming.startTime.getTime();
-    if (runDurationMs > 0) {
-      const executionMs = timingBreakdown.executionMs;
-      const inngestMs = Math.max(0, runDurationMs - executionMs);
-      timingBreakdown = { queueMs: inngestMs, executionMs, totalMs: runDurationMs };
-      effectiveStartTime = rootTiming.startTime;
-      effectiveEndTime = rootTiming.endTime;
-
-      // Break down the Inngest overhead into distinct phases
-      const runStartedAt = rootTiming.startedAt?.getTime() ?? rootTiming.startTime.getTime();
-      const stepQueuedAt = new Date(trace.queuedAt).getTime();
-      const stepEndedAt = trace.endedAt
-        ? new Date(trace.endedAt).getTime()
-        : rootTiming.endTime.getTime();
-
-      const runQueueDelayMs = Math.max(0, runStartedAt - rootTiming.startTime.getTime());
-      const discoveryMs = Math.max(0, stepQueuedAt - runStartedAt);
-      const finalizationMs = Math.max(0, rootTiming.endTime.getTime() - stepEndedAt);
-
-      if (inngestMs > 0) {
-        inngestBreakdown = {
-          runQueueDelayMs,
-          discoveryMs,
-          finalizationMs,
-          totalMs: inngestMs,
-        };
-      }
-    }
-  }
+  // Per-step Inngest overhead breakdown (discovery + metadata timing)
+  const inngestBreakdown = isStepRun
+    ? getInngestBreakdown(trace, runStartedAtMs ?? null) ?? undefined
+    : undefined;
 
   return {
     id: trace.spanID,
     name: getSpanName(trace.name),
-    startTime: effectiveStartTime,
-    endTime: effectiveEndTime,
+    startTime: new Date(trace.queuedAt),
+    endTime: trace.endedAt ? new Date(trace.endedAt) : null,
     style: getStyleForTrace(trace),
     children: trace.childrenSpans?.map((child) =>
-      traceToBarData(child, orgName, rootStatus, rootTiming)
+      traceToBarData(child, orgName, rootStatus, runStartedAtMs)
     ),
     timingBreakdown,
     httpTimingBreakdown,
@@ -257,12 +247,8 @@ export function traceToTimelineData(
     }
   });
 
-  // Root timing context for step bars to span the full run lifecycle
-  const rootTiming: RootTiming = {
-    startTime: new Date(trace.queuedAt),
-    startedAt: trace.startedAt ? new Date(trace.startedAt) : null,
-    endTime: trace.endedAt ? new Date(trace.endedAt) : null,
-  };
+  // Run startedAt timestamp for computing per-step discovery time
+  const runStartedAtMs = trace.startedAt ? new Date(trace.startedAt).getTime() : null;
 
   // Convert root trace (rename to "Run")
   // Ensure isRoot is set to true for the root bar so clicking it shows TopInfo
@@ -271,7 +257,7 @@ export function traceToTimelineData(
     { ...trace, name: 'Run', isRoot: true },
     orgName,
     trace.status,
-    rootTiming
+    runStartedAtMs
   );
 
   // Give the Run bar a timingBreakdown matching the step-level inngest/execution split.
@@ -293,6 +279,35 @@ export function traceToTimelineData(
           totalMs: runDurationMs,
         };
       }
+    }
+  }
+
+  // Compute run-level Inngest overhead: run queue delay + finalization
+  if (rootBar.endTime) {
+    const runQueuedAtMs = rootBar.startTime.getTime();
+    const runEndedAtMs = rootBar.endTime.getTime();
+
+    // Run queue delay: time from queued to first execution
+    const runQueueDelayMs =
+      runStartedAtMs !== null ? Math.max(0, runStartedAtMs - runQueuedAtMs) : 0;
+
+    // Finalization: time after last step ended until run ended
+    let lastStepEndedAtMs = 0;
+    for (const child of rootBar.children ?? []) {
+      if (child.endTime) {
+        lastStepEndedAtMs = Math.max(lastStepEndedAtMs, child.endTime.getTime());
+      }
+    }
+    const finalizationMs =
+      lastStepEndedAtMs > 0 ? Math.max(0, runEndedAtMs - lastStepEndedAtMs) : 0;
+
+    const totalMs = runQueueDelayMs + finalizationMs;
+    if (totalMs > 0) {
+      rootBar.runInngestBreakdown = {
+        runQueueDelayMs,
+        finalizationMs,
+        totalMs,
+      };
     }
   }
 

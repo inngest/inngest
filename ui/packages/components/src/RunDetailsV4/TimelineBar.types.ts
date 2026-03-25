@@ -12,12 +12,7 @@ import type { ReactNode } from 'react';
 /**
  * Available fill patterns for bars.
  */
-export type BarPattern =
-  | 'solid'
-  | 'barber-pole'
-  | 'barber-pole-light'
-  | 'barber-pole-dark'
-  | 'dotted';
+export type BarPattern = 'solid' | 'barber-pole' | 'vertical-lines' | 'dotted';
 
 /**
  * Available icons for bars.
@@ -50,9 +45,10 @@ export type BarStyleKey =
   | 'step.invoke'
   // Timing categories
   | 'timing.inngest' // Queue/delay time (short, gray)
-  | 'timing.inngest.queue' // Run queue delay (short, lightest)
-  | 'timing.inngest.discovery' // Discovery + scheduling (short, medium)
-  | 'timing.inngest.finalization' // Finalization (short, medium)
+  | 'timing.inngest.queue' // Run queue delay (short, solid gray)
+  | 'timing.inngest.concurrency' // Concurrency delay (short, crosshatch gray)
+  | 'timing.inngest.discovery' // Discovery (short, barber-pole-light gray)
+  | 'timing.inngest.finalization' // Finalization / system latency (short, barber-pole-dark gray)
   | 'timing.server' // Execution time (tall, barber-pole, status color)
   | 'timing.connecting' // Connection time (short, dotted border, status color)
   // HTTP timing phases (nested under server execution)
@@ -67,7 +63,7 @@ export type BarStyleKey =
 /**
  * Bar height variants.
  */
-export type BarHeight = 'short' | 'tall';
+export type BarHeight = 'thin' | 'short' | 'tall';
 
 /**
  * Visual style configuration for a bar type.
@@ -87,6 +83,9 @@ export interface BarStyle {
 
   /** Fill pattern for the bar */
   pattern?: BarPattern;
+
+  /** Whether this bar renders as outlined (transparent bg + 1px inset border) instead of solid fill */
+  outlined?: boolean;
 
   /** Label format (for timing bars) */
   labelFormat?: 'uppercase' | 'titlecase' | 'default';
@@ -205,6 +204,20 @@ export interface TimelineBarProps {
 
   /** Optional actions to render in the left panel between the name and duration */
   actions?: ReactNode;
+
+  /** Timing breakdown rows shown in the hover tooltip */
+  timingDetails?: TimingDetail[];
+
+  /** Human-readable type label shown in the hover tooltip subtitle (e.g., "step.sleep") */
+  styleLabel?: string;
+}
+
+/**
+ * A single row in the hover tooltip timing breakdown.
+ */
+export interface TimingDetail {
+  label: string;
+  durationMs: number;
 }
 
 // ============================================================================
@@ -257,8 +270,11 @@ export interface TimelineBarData {
   /** HTTP timing breakdown (for steps with HTTP timing metadata) */
   httpTimingBreakdown?: HTTPTimingBreakdownData;
 
-  /** Inngest overhead breakdown (queue delay, discovery, finalization) */
+  /** Per-step Inngest overhead breakdown (discovery, concurrency delay, system latency) */
   inngestBreakdown?: InngestBreakdownData;
+
+  /** Run-level Inngest overhead breakdown (run queue delay, finalization) */
+  runInngestBreakdown?: RunInngestBreakdownData;
 
   /** Whether this bar represents the root run (clicking shows TopInfo) */
   isRoot?: boolean;
@@ -286,19 +302,34 @@ export interface TimingBreakdownData {
 
 /**
  * Inngest overhead breakdown for the Inngest timing bar.
- * Breaks down the non-execution time into distinct phases.
+ * Per-step-attempt breakdown combining metadata and timestamp-derived phases.
  */
 export interface InngestBreakdownData {
-  /** Time the run waited in queue before execution started */
-  runQueueDelayMs: number;
-
-  /** Discovery + scheduling overhead (run started → step queued) */
+  /** Discovery time: SDK executing user code until it discovers this step (run.startedAt → step.queuedAt) */
   discoveryMs: number;
 
-  /** Finalization overhead (step ended → run ended) */
-  finalizationMs: number;
+  /** Sojourn delay from concurrency limits, throttle, or other constraints (from metadata) */
+  queueDelayMs: number;
+
+  /** System processing overhead: queue lease to execution start (from metadata) */
+  systemLatencyMs: number;
 
   /** Total Inngest overhead */
+  totalMs: number;
+}
+
+/**
+ * Run-level Inngest overhead breakdown.
+ * Covers overhead not attributable to any single step.
+ */
+export interface RunInngestBreakdownData {
+  /** Time the run waited in queue before Inngest picked it up (run.queuedAt → run.startedAt) */
+  runQueueDelayMs: number;
+
+  /** Time after the last step completed until the run ended (lastStep.endedAt → run.endedAt) */
+  finalizationMs: number;
+
+  /** Total run-level Inngest overhead */
   totalMs: number;
 }
 

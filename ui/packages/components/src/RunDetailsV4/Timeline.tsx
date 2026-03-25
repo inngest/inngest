@@ -19,8 +19,10 @@ import type {
   BarStyleKey,
   HTTPTimingBreakdownData,
   InngestBreakdownData,
+  RunInngestBreakdownData,
   TimelineBarData,
   TimelineData,
+  TimingDetail,
 } from './TimelineBar.types';
 import { TimelineHeader } from './TimelineHeader';
 import { calculateBarPosition, calculateDuration } from './utils/timing';
@@ -175,9 +177,9 @@ function generateInngestSegments(
   if (totalMs <= 0) return undefined;
 
   const phases: { key: string; ms: number; style: BarStyleKey }[] = [
-    { key: 'queue', ms: breakdown.runQueueDelayMs, style: 'timing.inngest.queue' },
     { key: 'discovery', ms: breakdown.discoveryMs, style: 'timing.inngest.discovery' },
-    { key: 'finalization', ms: breakdown.finalizationMs, style: 'timing.inngest.finalization' },
+    { key: 'queue-delay', ms: breakdown.queueDelayMs, style: 'timing.inngest.concurrency' },
+    { key: 'system-latency', ms: breakdown.systemLatencyMs, style: 'timing.inngest.finalization' },
   ];
 
   const segments: BarSegment[] = [];
@@ -197,6 +199,109 @@ function generateInngestSegments(
   }
 
   return segments.length > 0 ? segments : undefined;
+}
+
+/**
+ * Generate segments for a run-level Inngest bar (run queue delay + finalization).
+ */
+function generateRunInngestSegments(
+  barId: string,
+  breakdown: RunInngestBreakdownData
+): BarSegment[] | undefined {
+  const totalMs = breakdown.totalMs;
+  if (totalMs <= 0) return undefined;
+
+  const phases: { key: string; ms: number; style: BarStyleKey }[] = [
+    { key: 'run-queue', ms: breakdown.runQueueDelayMs, style: 'timing.inngest.queue' },
+    { key: 'finalization', ms: breakdown.finalizationMs, style: 'timing.inngest.finalization' },
+  ];
+
+  const segments: BarSegment[] = [];
+  let currentPercent = 0;
+
+  for (const phase of phases) {
+    if (phase.ms > 0) {
+      const widthPercent = (phase.ms / totalMs) * 100;
+      segments.push({
+        id: `${barId}-seg-run-inngest-${phase.key}`,
+        startPercent: currentPercent,
+        widthPercent,
+        style: phase.style,
+      });
+      currentPercent += widthPercent;
+    }
+  }
+
+  return segments.length > 0 ? segments : undefined;
+}
+
+// ============================================================================
+// Hover Tooltip Timing Details
+// ============================================================================
+
+/** Human-readable labels for bar style keys shown in the hover tooltip. */
+const STYLE_LABELS: Partial<Record<BarStyleKey, string>> = {
+  'step.run': 'step.run',
+  'step.sleep': 'step.sleep',
+  'step.waitForEvent': 'step.waitForEvent',
+  'step.invoke': 'step.invoke',
+  'timing.inngest': 'Inngest overhead',
+  'timing.inngest.queue': 'Run queue delay',
+  'timing.inngest.concurrency': 'Concurrency delay',
+  'timing.inngest.discovery': 'Discovery',
+  'timing.inngest.finalization': 'Finalization',
+  'timing.server': 'Your server',
+  'timing.http.dns': 'DNS lookup',
+  'timing.http.tcp': 'TCP connection',
+  'timing.http.tls': 'TLS handshake',
+  'timing.http.server': 'Server processing',
+  'timing.http.transfer': 'Content transfer',
+};
+
+/**
+ * Build timing detail rows for a bar's hover tooltip based on available data.
+ */
+function buildTimingDetails(bar: TimelineBarData): TimingDetail[] | undefined {
+  const details: TimingDetail[] = [];
+
+  // Inngest overhead breakdown (per-step)
+  if (bar.inngestBreakdown) {
+    const b = bar.inngestBreakdown;
+    if (b.discoveryMs > 0) details.push({ label: 'Discovery', durationMs: b.discoveryMs });
+    if (b.queueDelayMs > 0)
+      details.push({ label: 'Concurrency delay', durationMs: b.queueDelayMs });
+    if (b.systemLatencyMs > 0)
+      details.push({ label: 'System latency', durationMs: b.systemLatencyMs });
+  }
+
+  // Run-level Inngest overhead (root bar)
+  if (bar.runInngestBreakdown) {
+    const b = bar.runInngestBreakdown;
+    if (b.runQueueDelayMs > 0)
+      details.push({ label: 'Run queue delay', durationMs: b.runQueueDelayMs });
+    if (b.finalizationMs > 0) details.push({ label: 'Finalization', durationMs: b.finalizationMs });
+  }
+
+  // Timing breakdown (queue + execution)
+  if (bar.timingBreakdown) {
+    const b = bar.timingBreakdown;
+    if (b.queueMs > 0) details.push({ label: 'Inngest', durationMs: b.queueMs });
+    if (b.executionMs > 0) details.push({ label: 'Your server', durationMs: b.executionMs });
+  }
+
+  // HTTP timing breakdown
+  if (bar.httpTimingBreakdown) {
+    const b = bar.httpTimingBreakdown;
+    if (b.dnsLookupMs > 0) details.push({ label: 'DNS', durationMs: b.dnsLookupMs });
+    if (b.tcpConnectionMs > 0) details.push({ label: 'TCP', durationMs: b.tcpConnectionMs });
+    if (b.tlsHandshakeMs > 0) details.push({ label: 'TLS', durationMs: b.tlsHandshakeMs });
+    if (b.serverProcessingMs > 0)
+      details.push({ label: 'Server processing', durationMs: b.serverProcessingMs });
+    if (b.contentTransferMs > 0)
+      details.push({ label: 'Content transfer', durationMs: b.contentTransferMs });
+  }
+
+  return details.length > 0 ? details : undefined;
 }
 
 // ============================================================================
@@ -286,7 +391,10 @@ function TimelineBarRenderer({
   const hasTimingBreakdown = !!bar.timingBreakdown;
   const hasHTTPTiming = !!bar.httpTimingBreakdown;
   const hasChildren = bar.children && bar.children.length > 0;
-  const isExpandable = !bar.isRoot && (hasTimingBreakdown || hasChildren);
+  const hasRunInngestBreakdown = !!bar.runInngestBreakdown;
+  const hasInngestBreakdown = !!bar.inngestBreakdown;
+  const isExpandable =
+    hasTimingBreakdown || hasInngestBreakdown || hasChildren || hasRunInngestBreakdown;
   const isExpanded = bar.isRoot ? true : expandedBars.has(bar.id);
 
   // Generate segments for compound bar visualization
@@ -295,27 +403,32 @@ function TimelineBarRenderer({
 
   // Pre-compute timing sub-bar positions from the parent bar's position.
   // This ensures sub-bars visually align with the parent's compound segments.
-  const timingPositions = hasTimingBreakdown
-    ? (() => {
-        const { queueMs, executionMs, totalMs } = bar.timingBreakdown!;
-        if (totalMs <= 0) return null;
+  //
+  // For the Inngest portion: prefer timingBreakdown.queueMs (from metadata),
+  // but fall back to inngestBreakdown.totalMs (from timestamps) so we still
+  // show the Inngest bar even when metadata is missing or reports 0.
+  const timingPositions = (() => {
+    const queueMs = bar.timingBreakdown?.queueMs ?? 0;
+    const executionMs = bar.timingBreakdown?.executionMs ?? 0;
+    const inngestMs = queueMs > 0 ? queueMs : bar.inngestBreakdown?.totalMs ?? 0;
+    const totalMs = inngestMs + executionMs;
+    if (totalMs <= 0) return null;
 
-        const inngestWidth = (queueMs / totalMs) * widthPercent;
-        const serverWidth = (executionMs / totalMs) * widthPercent;
-        const serverStart = startPercent + inngestWidth;
+    const inngestWidth = (inngestMs / totalMs) * widthPercent;
+    const serverWidth = (executionMs / totalMs) * widthPercent;
+    const serverStart = startPercent + inngestWidth;
 
-        return {
-          inngest:
-            queueMs > 0
-              ? { startPercent: startPercent, widthPercent: inngestWidth, duration: queueMs }
-              : null,
-          server:
-            executionMs > 0
-              ? { startPercent: serverStart, widthPercent: serverWidth, duration: executionMs }
-              : null,
-        };
-      })()
-    : null;
+    return {
+      inngest:
+        inngestMs > 0
+          ? { startPercent: startPercent, widthPercent: inngestWidth, duration: inngestMs }
+          : null,
+      server:
+        executionMs > 0
+          ? { startPercent: serverStart, widthPercent: serverWidth, duration: executionMs }
+          : null,
+    };
+  })();
 
   // Server timing bar IDs for expansion tracking
   const serverBarId = `${bar.id}-timing-server`;
@@ -329,13 +442,20 @@ function TimelineBarRenderer({
 
   // Inngest timing bar IDs for expansion tracking
   const inngestBarId = `${bar.id}-timing-inngest`;
-  const hasInngestBreakdown = !!bar.inngestBreakdown;
   const isInngestExpandable = hasInngestBreakdown;
   const isInngestExpanded = isInngestExpandable && expandedBars.has(inngestBarId);
 
   // Inngest breakdown segments for the Inngest bar's compound visualization
   const inngestBarSegments = hasInngestBreakdown
     ? generateInngestSegments(inngestBarId, bar.inngestBreakdown!)
+    : undefined;
+
+  // Run-level Inngest bar (run queue delay + finalization) — only for root bars
+  const runInngestBarId = `${bar.id}-run-inngest`;
+  const isRunInngestExpandable = hasRunInngestBreakdown;
+  const isRunInngestExpanded = isRunInngestExpandable && expandedBars.has(runInngestBarId);
+  const runInngestBarSegments = hasRunInngestBreakdown
+    ? generateRunInngestSegments(runInngestBarId, bar.runInngestBreakdown!)
     : undefined;
 
   return (
@@ -347,10 +467,11 @@ function TimelineBarRenderer({
       depth={depth}
       leftWidth={leftWidth}
       style={bar.style}
+      styleLabel={STYLE_LABELS[bar.style]}
       segments={segments}
-      expandable={isExpandable}
+      expandable={bar.isRoot ? false : isExpandable}
       expanded={isExpanded}
-      onToggle={() => onToggleExpand(bar.id)}
+      onToggle={bar.isRoot ? undefined : () => onToggleExpand(bar.id)}
       onClick={() => onSelectStep?.(bar.id)}
       selected={selectedStepId === bar.id}
       orgName={orgName}
@@ -362,6 +483,7 @@ function TimelineBarRenderer({
       minTime={minTime}
       delayMs={bar.delayMs}
       actions={actions}
+      timingDetails={buildTimingDetails(bar)}
     >
       {/* Inngest timing bar — positioned to match the queue segment of the parent.
           Only for non-root bars; the root uses timingBreakdown only for compound segments. */}
@@ -374,6 +496,7 @@ function TimelineBarRenderer({
           depth={depth + 1}
           leftWidth={leftWidth}
           style="timing.inngest"
+          styleLabel={STYLE_LABELS['timing.inngest']}
           segments={inngestBarSegments}
           orgName={orgName}
           status={bar.status}
@@ -398,21 +521,21 @@ function TimelineBarRenderer({
               const iPos = timingPositions.inngest!;
               const phases = [
                 {
-                  key: 'queue',
-                  label: 'Queue delay',
-                  ms: breakdown.runQueueDelayMs,
-                  style: 'timing.inngest.queue' as BarStyleKey,
-                },
-                {
                   key: 'discovery',
                   label: 'Discovery',
                   ms: breakdown.discoveryMs,
                   style: 'timing.inngest.discovery' as BarStyleKey,
                 },
                 {
-                  key: 'finalization',
-                  label: 'Finalization',
-                  ms: breakdown.finalizationMs,
+                  key: 'queue-delay',
+                  label: 'Concurrency delay',
+                  ms: breakdown.queueDelayMs,
+                  style: 'timing.inngest.concurrency' as BarStyleKey,
+                },
+                {
+                  key: 'system-latency',
+                  label: 'System latency',
+                  ms: breakdown.systemLatencyMs,
                   style: 'timing.inngest.finalization' as BarStyleKey,
                 },
               ];
@@ -435,6 +558,7 @@ function TimelineBarRenderer({
                       depth={depth + 2}
                       leftWidth={leftWidth}
                       style={phase.style}
+                      styleLabel={STYLE_LABELS[phase.style]}
                       status={bar.status}
                       onClick={() => onSelectStep?.(bar.id)}
                       viewStartOffset={viewStartOffset}
@@ -460,6 +584,7 @@ function TimelineBarRenderer({
           depth={depth + 1}
           leftWidth={leftWidth}
           style="timing.server"
+          styleLabel={STYLE_LABELS['timing.server']}
           segments={serverBarSegments}
           orgName={orgName}
           status={bar.status}
@@ -503,7 +628,7 @@ function TimelineBarRenderer({
                 },
                 {
                   key: 'server',
-                  label: 'TTFB',
+                  label: 'Server processing',
                   ms: httpTiming.serverProcessingMs,
                   style: 'timing.http.server' as BarStyleKey,
                 },
@@ -533,6 +658,7 @@ function TimelineBarRenderer({
                       depth={depth + 2}
                       leftWidth={leftWidth}
                       style={phase.style}
+                      styleLabel={STYLE_LABELS[phase.style]}
                       status={bar.status}
                       onClick={() => onSelectStep?.(bar.id)}
                       viewStartOffset={viewStartOffset}
@@ -565,6 +691,85 @@ function TimelineBarRenderer({
                 viewEndOffset={viewEndOffset}
               />
             ))}
+        </TimelineBar>
+      )}
+
+      {/* Run-level Inngest bar — shows run queue delay + finalization for root bars */}
+      {isExpanded && bar.isRoot && hasRunInngestBreakdown && timingPositions?.inngest && (
+        <TimelineBar
+          name="Inngest"
+          duration={bar.runInngestBreakdown!.totalMs}
+          startPercent={timingPositions.inngest.startPercent}
+          widthPercent={timingPositions.inngest.widthPercent}
+          depth={depth + 1}
+          leftWidth={leftWidth}
+          style="timing.inngest"
+          styleLabel={STYLE_LABELS['timing.inngest']}
+          segments={runInngestBarSegments}
+          status={bar.status}
+          expandable={isRunInngestExpandable}
+          expanded={isRunInngestExpanded}
+          onToggle={isRunInngestExpandable ? () => onToggleExpand(runInngestBarId) : undefined}
+          onClick={() => onSelectStep?.(bar.id)}
+          viewStartOffset={viewStartOffset}
+          viewEndOffset={viewEndOffset}
+          startTime={bar.startTime}
+          endTime={bar.endTime}
+          minTime={minTime}
+        >
+          {/* Run-level Inngest sub-bars */}
+          {isRunInngestExpanded &&
+            (() => {
+              const breakdown = bar.runInngestBreakdown!;
+              const runInngestTotalMs = breakdown.totalMs;
+              if (runInngestTotalMs <= 0) return null;
+
+              const iPos = timingPositions.inngest!;
+              const phases = [
+                {
+                  key: 'run-queue',
+                  label: 'Run queue delay',
+                  ms: breakdown.runQueueDelayMs,
+                  style: 'timing.inngest.queue' as BarStyleKey,
+                },
+                {
+                  key: 'finalization',
+                  label: 'Finalization',
+                  ms: breakdown.finalizationMs,
+                  style: 'timing.inngest.finalization' as BarStyleKey,
+                },
+              ];
+
+              let cumulativePercent = 0;
+              return phases
+                .filter((p) => p.ms > 0)
+                .map((phase) => {
+                  const phaseWidthPercent = (phase.ms / runInngestTotalMs) * iPos.widthPercent;
+                  const phaseStartPercent = iPos.startPercent + cumulativePercent;
+                  cumulativePercent += phaseWidthPercent;
+
+                  return (
+                    <TimelineBar
+                      key={`${bar.id}-run-inngest-${phase.key}`}
+                      name={phase.label}
+                      duration={phase.ms}
+                      startPercent={phaseStartPercent}
+                      widthPercent={phaseWidthPercent}
+                      depth={depth + 2}
+                      leftWidth={leftWidth}
+                      style={phase.style}
+                      styleLabel={STYLE_LABELS[phase.style]}
+                      status={bar.status}
+                      onClick={() => onSelectStep?.(bar.id)}
+                      viewStartOffset={viewStartOffset}
+                      viewEndOffset={viewEndOffset}
+                      startTime={bar.startTime}
+                      endTime={bar.endTime}
+                      minTime={minTime}
+                    />
+                  );
+                });
+            })()}
         </TimelineBar>
       )}
 
