@@ -7,7 +7,9 @@
  * - Expansion state for all expandable bars
  * - Recursive rendering of nested steps
  * - Column resize handling
- */ import { useCallback, useMemo, useState, type ReactNode } from 'react';
+ */
+
+import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import { RiContractUpDownLine, RiExpandUpDownLine } from '@remixicon/react';
 
 import { Button } from '../Button';
@@ -472,11 +474,11 @@ function TimelineBarRenderer({
  */
 export function Timeline({ data, onSelectStep }: Props): JSX.Element {
   const { minTime, maxTime, bars, leftWidth, orgName } = data;
+
+  const rootBarIds = useMemo(() => bars.filter((bar) => bar.isRoot).map((bar) => bar.id), [bars]);
+
   // Initialize with root bars expanded by default
-  const [expandedBars, setExpandedBars] = useState<Set<string>>(() => {
-    const rootBarIds = bars.filter((bar) => bar.isRoot).map((bar) => bar.id);
-    return new Set(rootBarIds);
-  });
+  const [expandedBars, setExpandedBars] = useState<Set<string>>(() => new Set(rootBarIds));
   const [selectedStepId, setSelectedStepId] = useState<string | undefined>();
 
   // Timeline brush selection state (for zooming)
@@ -504,15 +506,13 @@ export function Timeline({ data, onSelectStep }: Props): JSX.Element {
   );
 
   const handleExpandAll = useCallback(() => {
-    const rootBarIds = bars.filter((bar) => bar.isRoot).map((bar) => bar.id);
     const allExpandableIds = collectExpandableIds(bars);
     setExpandedBars(new Set([...rootBarIds, ...allExpandableIds]));
-  }, [bars]);
+  }, [bars, rootBarIds]);
 
   const handleCollapseAll = useCallback(() => {
-    const rootBarIds = bars.filter((bar) => bar.isRoot).map((bar) => bar.id);
     setExpandedBars(new Set(rootBarIds));
-  }, [bars]);
+  }, [rootBarIds]);
 
   const expandCollapseActions = useMemo(
     () => (
