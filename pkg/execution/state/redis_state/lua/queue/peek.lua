@@ -32,4 +32,8 @@ end
 
 local potentiallyMissingQueueItems = redis.call("HMGET", queueKey, unpack(itemIds))
 
-return {potentiallyMissingQueueItems, itemIds}
+-- Get the score of the last item so the caller can advance the cursor past
+-- all fetched items when every item in the batch was filtered (leased/missing).
+local lastScore = redis.call("ZSCORE", queueIndex, itemIds[#itemIds])
+
+return {potentiallyMissingQueueItems, itemIds, lastScore}

@@ -101,19 +101,22 @@ function RouteComponent() {
   const usageMetrics: UsageMetrics | undefined = usage?.reduce(
     (acc, u) => {
       acc.totalRuns += u.values.totalRuns;
+      acc.totalFinished += u.values.totalFinished;
       acc.totalFailures += u.values.failures;
       return acc;
     },
     {
       totalRuns: 0,
+      totalFinished: 0,
       totalFailures: 0,
     },
   );
 
-  const failureRate = !usageMetrics?.totalRuns
+  const failureRate = !usageMetrics?.totalFinished
     ? '0.00'
     : (
-        ((usageMetrics.totalFailures || 0) / (usageMetrics.totalRuns || 0)) *
+        ((usageMetrics.totalFailures || 0) /
+          (usageMetrics.totalFinished || 0)) *
         100
       ).toFixed(2);
 

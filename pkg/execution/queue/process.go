@@ -36,6 +36,7 @@ func (q *queueProcessor) ProcessItem(
 	defer span.End()
 	span.SetAttributes(attribute.String("partition_id", i.P.ID))
 	span.SetAttributes(attribute.String("item_id", i.I.ID))
+	span.SetAttributes(attribute.String("item_kind", i.I.Data.Kind))
 	span.SetAttributes(attribute.String("run_id", runID.String()))
 	if i.I.Data.JobID != nil {
 		span.SetAttributes(attribute.String("job_id", *i.I.Data.JobID))

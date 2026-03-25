@@ -745,8 +745,25 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 
 		return nil
 	case connectpb.GatewayMessageType_WORKER_PAUSE:
+		// NOTE: Unlike WORKER_READY and WORKER_HEARTBEAT, we intentionally do
+		// NOT reject WORKER_PAUSE when the gateway is draining. The worker is
+		// signaling that it wants to stop receiving new requests (e.g. graceful
+		// shutdown via SIGTERM). We must honour this by updating the connection
+		// status in Redis to DRAINING so the router stops selecting it.
+		//
+		// If we reject with ErrDraining here, the connection is closed without
+		// updating Redis, leaving the status as READY. The router then keeps
+		// routing requests to a worker that will skip them, causing leases to
+		// expire after 25s (ConnectWorkerRequestLeaseDuration + GracePeriod)
+		// and producing "worker stopped responding" errors. (SYS-709)
 		if c.svc.isDraining.Load() {
-			return &ErrDraining
+			c.log.Warn("worker pause signal received during draining sequence",
+				"instance_id", c.conn.Data.InstanceId,
+				"env_id", c.conn.EnvID.String(),
+				"account_id", c.conn.AccountID.String(),
+				"gateway_id", c.conn.GatewayId.String(),
+				"connection_id", c.conn.ConnectionId.String(),
+			)
 		}
 
 		// Mark as draining before updating Redis so that concurrent heartbeat
@@ -757,19 +774,18 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 		// this connection for new requests.
 		err := c.updateConnStatus(connectpb.ConnectionStatus_DRAINING)
 		if err != nil {
-			return &connecterrors.SocketError{
-				SysCode:    syscode.CodeConnectInternal,
-				StatusCode: websocket.StatusInternalError,
-				Msg:        "could not update connection status",
-			}
+			c.log.Error("could not update connection status to DRAINING on WORKER_PAUSE",
+				"err", err,
+				"instance_id", c.conn.Data.InstanceId,
+				"env_id", c.conn.EnvID.String(),
+				"account_id", c.conn.AccountID.String(),
+				"gateway_id", c.conn.GatewayId.String(),
+				"connection_id", c.conn.ConnectionId.String(),
+			)
 		}
 
-		// Then delete from in-memory map to prevent forwarding. This must
-		// happen after the Redis status update to avoid a race where the
-		// router still sees status=READY but the gateway can no longer forward.
+		// Remove from in-memory map to prevent new requests from being forwarded.
 		c.svc.wsConnections.Delete(c.conn.ConnectionId.String())
-
-		// For pauses, worker capacity is not tracked and it will expire
 
 		for _, l := range c.svc.lifecycles {
 			go l.OnStartDraining(context.Background(), c.conn)
@@ -986,7 +1002,7 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 func (c *connectionHandler) receiveRouterMessagesFromGRPC(ctx context.Context, onSubscribed chan struct{}) {
 	additionalMetricsTags := c.svc.metricsTags()
 
-	messageChan := make(chan *connectpb.GatewayExecutorRequestData)
+	messageChan := make(chan forwardMessage)
 
 	connectionID := c.conn.ConnectionId.String()
 	c.svc.wsConnections.Store(connectionID, messageChan)
@@ -1009,11 +1025,13 @@ func (c *connectionHandler) receiveRouterMessagesFromGRPC(ctx context.Context, o
 			c.log.Debug("connection is draining, not forwarding message")
 			return
 
-		case data, ok := <-messageChan:
+		case msg, ok := <-messageChan:
 			if !ok {
 				c.log.ReportError(fmt.Errorf("close gRPC channel"), "BUG: message channel was closed unexpectedly - this should never happen")
 				return
 			}
+
+			data := msg.Data
 
 			rawBytes, err := proto.Marshal(data)
 			if err != nil {
@@ -1023,6 +1041,7 @@ func (c *connectionHandler) receiveRouterMessagesFromGRPC(ctx context.Context, o
 						"gateway_id": c.conn.GatewayId.String(),
 						"conn_id":    c.conn.ConnectionId.String(),
 					}))
+				msg.Result <- err
 				continue
 			}
 
@@ -1048,21 +1067,31 @@ func (c *connectionHandler) receiveRouterMessagesFromGRPC(ctx context.Context, o
 				Tags:    grpcTags,
 			})
 
-			// Forward message to SDK!
-			err = wsproto.Write(ctx, c.ws, &connectpb.ConnectMessage{
+			// Use a fresh context instead of the connection ctx. During a
+			// Gateway drain, ctx is cancelled, which would fail this write even
+			// though we already consumed the message from the channel. The 5s
+			// timeout prevents goroutine leaks if the write hangs. `Forward()`
+			// is blocked waiting on `msg.Err`, so a failure here correctly
+			// propagates back to the executor.
+			writeCtx, writeCancel := context.WithTimeout(
+				context.Background(),
+				5*time.Second,
+			)
+			err = wsproto.Write(writeCtx, c.ws, &connectpb.ConnectMessage{
 				Kind:    connectpb.GatewayMessageType_GATEWAY_EXECUTOR_REQUEST,
 				Payload: rawBytes,
 			})
+			writeCancel()
 			if err != nil {
+				msg.Result <- err
 				if isConnectionClosedErr(err) {
 					return
 				}
 				log.ReportError(err, "failed to forward message to worker")
-				// The connection cannot be used, the next read loop will run into the connection error and close the connection.
-				// If the worker receives the message, it will send an ack through a new connection. Otherwise, the message will be redelivered.
 				continue
 			}
 
+			msg.Result <- nil
 			log.Trace("forwarded message to worker")
 		}
 	}

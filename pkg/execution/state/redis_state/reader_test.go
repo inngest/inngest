@@ -3,12 +3,14 @@ package redis_state
 import (
 	"context"
 	"crypto/rand"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/jonboulle/clockwork"
@@ -243,6 +245,486 @@ func TestItemsByPartitionWithSystemQueue(t *testing.T) {
 	}
 
 	require.Equal(t, num, count)
+}
+
+// leaseQueueItem modifies a queue item in Redis to simulate it being leased.
+// It reads the item from the hash, sets LeaseID to a future ULID, and writes it back.
+func leaseQueueItem(t *testing.T, rc rueidis.Client, kg QueueKeyGenerator, itemID string, leaseExpiry time.Time) {
+	t.Helper()
+	ctx := context.Background()
+
+	hashKey := kg.QueueItem()
+
+	// Read the current item
+	cmd := rc.B().Hget().Key(hashKey).Field(itemID).Build()
+	byt, err := rc.Do(ctx, cmd).AsBytes()
+	require.NoError(t, err, "failed to read queue item %s", itemID)
+
+	var qi osqueue.QueueItem
+	err = json.Unmarshal(byt, &qi)
+	require.NoError(t, err, "failed to unmarshal queue item %s", itemID)
+
+	// Set LeaseID to a ULID with a timestamp in the future
+	leaseID, err := ulid.New(ulid.Timestamp(leaseExpiry), rand.Reader)
+	require.NoError(t, err)
+	qi.LeaseID = &leaseID
+
+	// Write back
+	updated, err := json.Marshal(qi)
+	require.NoError(t, err)
+
+	setCmd := rc.B().Hset().Key(hashKey).FieldValue().FieldValue(itemID, string(updated)).Build()
+	err = rc.Do(ctx, setCmd).Error()
+	require.NoError(t, err, "failed to update queue item %s", itemID)
+}
+
+func TestItemsByPartitionLeasedItems(t *testing.T) {
+	r, rc := initRedis(t)
+	defer rc.Close()
+
+	ctx := context.Background()
+	clock := clockwork.NewFakeClock()
+
+	acctId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
+
+	enqueueItems := func(t *testing.T, shard RedisQueueShard, n int, prefix string, atFn func(i int) time.Time) []string {
+		t.Helper()
+		ids := make([]string, 0, n)
+		for i := range n {
+			item := osqueue.QueueItem{
+				ID:          fmt.Sprintf("%s-%d", prefix, i),
+				FunctionID:  fnID,
+				WorkspaceID: wsID,
+				Data: osqueue.Item{
+					WorkspaceID: wsID,
+					Kind:        osqueue.KindEdge,
+					Identifier: state.Identifier{
+						AccountID:       acctId,
+						WorkspaceID:     wsID,
+						WorkflowID:      fnID,
+						WorkflowVersion: 1,
+					},
+				},
+			}
+			enqueued, err := shard.EnqueueItem(ctx, item, atFn(i), osqueue.EnqueueOpts{})
+			require.NoError(t, err)
+			ids = append(ids, enqueued.ID)
+		}
+		return ids
+	}
+
+	countIter := func(items func(yield func(*osqueue.QueueItem) bool)) int {
+		var count int
+		for range items {
+			count++
+		}
+		return count
+	}
+
+	t.Run("should skip leased items but continue iterating remaining items", func(t *testing.T) {
+		r.FlushAll()
+
+		q, shard := newQueue(
+			t, rc,
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
+				return false
+			}),
+			osqueue.WithClock(clock),
+		)
+		kg := shard.Client().kg
+
+		// Enqueue 10 items spread across 10ms
+		ids := enqueueItems(t, shard, 10, "leased", func(i int) time.Time {
+			return clock.Now().Add(time.Duration(i) * time.Millisecond)
+		})
+
+		// Lease ALL items
+		leaseExpiry := clock.Now().Add(10 * time.Minute)
+		for _, id := range ids {
+			leaseQueueItem(t, rc, kg, id, leaseExpiry)
+		}
+
+		items, err := q.ItemsByPartition(ctx, shard, fnID.String(), time.Time{}, clock.Now().Add(time.Minute),
+			osqueue.WithQueueItemIterBatchSize(100),
+			osqueue.WithQueueItemIterEnableBacklog(false),
+		)
+		require.NoError(t, err)
+
+		// All items are leased so none should be yielded, but the iterator should
+		// NOT exit early — it should recognize that peek returned data (all leased)
+		// and that there may be more items beyond this batch. With all items fitting
+		// in a single batch and all leased, returning 0 is acceptable.
+		count := countIter(items)
+		require.Equal(t, 0, count, "all leased items should be skipped")
+	})
+
+	t.Run("should iterate past a fully-leased first batch to reach unleased items", func(t *testing.T) {
+		r.FlushAll()
+
+		q, shard := newQueue(
+			t, rc,
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
+				return false
+			}),
+			osqueue.WithClock(clock),
+		)
+		kg := shard.Client().kg
+
+		batchSize := int64(10)
+		leasedCount := int(batchSize) // first batch entirely leased
+		unleasedCount := 20           // items beyond the first batch
+
+		ids := enqueueItems(t, shard, leasedCount+unleasedCount, "mixed", func(i int) time.Time {
+			return clock.Now().Add(time.Duration(i) * time.Millisecond)
+		})
+
+		// Lease only the first batch worth of items
+		leaseExpiry := clock.Now().Add(10 * time.Minute)
+		for _, id := range ids[:leasedCount] {
+			leaseQueueItem(t, rc, kg, id, leaseExpiry)
+		}
+
+		items, err := q.ItemsByPartition(ctx, shard, fnID.String(), time.Time{}, clock.Now().Add(time.Minute),
+			osqueue.WithQueueItemIterBatchSize(batchSize),
+			osqueue.WithQueueItemIterEnableBacklog(false),
+		)
+		require.NoError(t, err)
+
+		// The iterator must continue past the fully-leased first batch and
+		// return all 20 unleased items from subsequent batches.
+		count := countIter(items)
+		require.Equal(t, unleasedCount, count,
+			"iterator should continue past fully-leased batch and return all unleased items")
+	})
+
+	t.Run("items at different milliseconds with leased entries across batch boundary", func(t *testing.T) {
+		r.FlushAll()
+
+		q, shard := newQueue(
+			t, rc,
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
+				return false
+			}),
+			osqueue.WithClock(clock),
+		)
+		kg := shard.Client().kg
+
+		batchSize := int64(5)
+
+		// Enqueue 10 items at distinct milliseconds
+		ids := enqueueItems(t, shard, 10, "diff-ms", func(i int) time.Time {
+			return clock.Now().Add(time.Duration(i) * time.Millisecond)
+		})
+
+		// Lease items 2 and 3 (in the middle of the first batch)
+		leaseExpiry := clock.Now().Add(10 * time.Minute)
+		leaseQueueItem(t, rc, kg, ids[2], leaseExpiry)
+		leaseQueueItem(t, rc, kg, ids[3], leaseExpiry)
+
+		items, err := q.ItemsByPartition(ctx, shard, fnID.String(), time.Time{}, clock.Now().Add(time.Minute),
+			osqueue.WithQueueItemIterBatchSize(batchSize),
+			osqueue.WithQueueItemIterEnableBacklog(false),
+		)
+		require.NoError(t, err)
+
+		// 10 items total, 2 leased → 8 should be returned.
+		// The iterator should advance past the first batch and pick up items from
+		// the second batch even though some items in the first batch were leased.
+		count := countIter(items)
+		require.Equal(t, 8, count,
+			"all unleased items across batches should be returned")
+	})
+}
+
+// deleteQueueItemFromHash removes a queue item from the hash map only,
+// leaving its entry in the sorted set (simulating a race where the item
+// was dequeued between ZRANGEBYSCORE and HMGET).
+func deleteQueueItemFromHash(t *testing.T, rc rueidis.Client, kg QueueKeyGenerator, itemID string) {
+	t.Helper()
+	ctx := context.Background()
+	cmd := rc.B().Hdel().Key(kg.QueueItem()).Field(itemID).Build()
+	err := rc.Do(ctx, cmd).Error()
+	require.NoError(t, err, "failed to delete queue item %s from hash", itemID)
+}
+
+func TestItemsByPartitionMissingHashItems(t *testing.T) {
+	r, rc := initRedis(t)
+	defer rc.Close()
+
+	ctx := context.Background()
+	clock := clockwork.NewFakeClock()
+
+	acctId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
+
+	enqueueItems := func(t *testing.T, shard RedisQueueShard, n int, prefix string, atFn func(i int) time.Time) []string {
+		t.Helper()
+		ids := make([]string, 0, n)
+		for i := range n {
+			item := osqueue.QueueItem{
+				ID:          fmt.Sprintf("%s-%d", prefix, i),
+				FunctionID:  fnID,
+				WorkspaceID: wsID,
+				Data: osqueue.Item{
+					WorkspaceID: wsID,
+					Kind:        osqueue.KindEdge,
+					Identifier: state.Identifier{
+						AccountID:       acctId,
+						WorkspaceID:     wsID,
+						WorkflowID:      fnID,
+						WorkflowVersion: 1,
+					},
+				},
+			}
+			enqueued, err := shard.EnqueueItem(ctx, item, atFn(i), osqueue.EnqueueOpts{})
+			require.NoError(t, err)
+			ids = append(ids, enqueued.ID)
+		}
+		return ids
+	}
+
+	countIter := func(items func(yield func(*osqueue.QueueItem) bool)) int {
+		var count int
+		for range items {
+			count++
+		}
+		return count
+	}
+
+	t.Run("should iterate past items missing from hash to reach remaining items", func(t *testing.T) {
+		r.FlushAll()
+
+		q, shard := newQueue(
+			t, rc,
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
+				return false
+			}),
+			osqueue.WithClock(clock),
+		)
+		kg := shard.Client().kg
+
+		batchSize := int64(10)
+		deletedCount := int(batchSize)
+		remainingCount := 15
+
+		ids := enqueueItems(t, shard, deletedCount+remainingCount, "missing-hash", func(i int) time.Time {
+			return clock.Now().Add(time.Duration(i) * time.Millisecond)
+		})
+
+		// Delete the first batch of items from the hash only, leaving them in the sorted set.
+		// This simulates items being dequeued/completed between the ZRANGEBYSCORE and HMGET
+		// calls inside peek's Lua script, or items that were cleaned up externally.
+		for _, id := range ids[:deletedCount] {
+			deleteQueueItemFromHash(t, rc, kg, id)
+		}
+
+		items, err := q.ItemsByPartition(ctx, shard, fnID.String(), time.Time{}, clock.Now().Add(time.Minute),
+			osqueue.WithQueueItemIterBatchSize(batchSize),
+			osqueue.WithQueueItemIterEnableBacklog(false),
+		)
+		require.NoError(t, err)
+
+		// The first peek returns `batchSize` items from the sorted set, but all are
+		// missing from the hash. peek cleans them up (removes from zset) and returns
+		// an empty slice. The iterator must NOT exit early — it should recognize that
+		// peek found items (even though they were missing) and continue to the next batch.
+		count := countIter(items)
+		require.Equal(t, remainingCount, count,
+			"iterator should continue past missing-hash items and return all remaining items")
+	})
+
+	t.Run("should handle all items missing from hash without panicking", func(t *testing.T) {
+		r.FlushAll()
+
+		q, shard := newQueue(
+			t, rc,
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
+				return false
+			}),
+			osqueue.WithClock(clock),
+		)
+		kg := shard.Client().kg
+
+		ids := enqueueItems(t, shard, 10, "all-missing", func(i int) time.Time {
+			return clock.Now().Add(time.Duration(i) * time.Millisecond)
+		})
+
+		// Delete ALL items from the hash
+		for _, id := range ids {
+			deleteQueueItemFromHash(t, rc, kg, id)
+		}
+
+		items, err := q.ItemsByPartition(ctx, shard, fnID.String(), time.Time{}, clock.Now().Add(time.Minute),
+			osqueue.WithQueueItemIterBatchSize(100),
+			osqueue.WithQueueItemIterEnableBacklog(false),
+		)
+		require.NoError(t, err)
+
+		// All items are missing from hash. peek cleans them up from the zset and
+		// returns nothing. After cleanup, the zset is empty, so the next peek also
+		// returns nothing. The iterator should gracefully return 0 items.
+		count := countIter(items)
+		require.Equal(t, 0, count, "all items missing from hash should result in 0 yielded items")
+	})
+}
+
+func TestItemsByPartitionScoreParsing(t *testing.T) {
+	r, rc := initRedis(t)
+	defer rc.Close()
+
+	ctx := context.Background()
+	clock := clockwork.NewFakeClock()
+
+	acctId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
+
+	enqueueItems := func(t *testing.T, shard RedisQueueShard, n int, prefix string, atFn func(i int) time.Time) []string {
+		t.Helper()
+		ids := make([]string, 0, n)
+		for i := range n {
+			item := osqueue.QueueItem{
+				ID:          fmt.Sprintf("%s-%d", prefix, i),
+				FunctionID:  fnID,
+				WorkspaceID: wsID,
+				Data: osqueue.Item{
+					WorkspaceID: wsID,
+					Kind:        osqueue.KindEdge,
+					Identifier: state.Identifier{
+						AccountID:       acctId,
+						WorkspaceID:     wsID,
+						WorkflowID:      fnID,
+						WorkflowVersion: 1,
+					},
+				},
+			}
+			enqueued, err := shard.EnqueueItem(ctx, item, atFn(i), osqueue.EnqueueOpts{})
+			require.NoError(t, err)
+			ids = append(ids, enqueued.ID)
+		}
+		return ids
+	}
+
+	countIter := func(items func(yield func(*osqueue.QueueItem) bool)) int {
+		var count int
+		for range items {
+			count++
+		}
+		return count
+	}
+
+	t.Run("iterator terminates when leased items share the same millisecond", func(t *testing.T) {
+		// This test verifies that the LastScore from peek is correctly parsed and
+		// used to advance the cursor. If the score were silently parsed as 0
+		// (e.g. due to float-string format like "1711252800000.0"), the cursor
+		// would regress to epoch+1ms and the iterator would loop forever.
+		r.FlushAll()
+
+		q, shard := newQueue(
+			t, rc,
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
+				return false
+			}),
+			osqueue.WithClock(clock),
+		)
+		kg := shard.Client().kg
+
+		batchSize := int64(5)
+		leasedCount := int(batchSize)
+		unleasedCount := 10
+
+		// Enqueue leased items all at the SAME millisecond, followed by unleased
+		// items at later milliseconds. The leased batch fills an entire peek, so
+		// the iterator must parse LastScore correctly to advance past them.
+		leasedTime := clock.Now().Add(time.Second)
+		ids := enqueueItems(t, shard, leasedCount+unleasedCount, "score-parse", func(i int) time.Time {
+			if i < leasedCount {
+				return leasedTime
+			}
+			return leasedTime.Add(time.Duration(i-leasedCount+1) * time.Millisecond)
+		})
+
+		leaseExpiry := clock.Now().Add(10 * time.Minute)
+		for _, id := range ids[:leasedCount] {
+			leaseQueueItem(t, rc, kg, id, leaseExpiry)
+		}
+
+		// Use a channel + timeout to detect an infinite loop.
+		done := make(chan int, 1)
+		go func() {
+			items, err := q.ItemsByPartition(ctx, shard, fnID.String(), time.Time{}, clock.Now().Add(time.Hour),
+				osqueue.WithQueueItemIterBatchSize(batchSize),
+				osqueue.WithQueueItemIterEnableBacklog(false),
+			)
+			if err != nil {
+				done <- -1
+				return
+			}
+			done <- countIter(items)
+		}()
+
+		select {
+		case count := <-done:
+			require.Equal(t, unleasedCount, count,
+				"should return all unleased items after advancing past leased batch")
+		case <-time.After(10 * time.Second):
+			t.Fatal("iterator did not terminate — likely infinite loop due to score parsing failure")
+		}
+	})
+
+	t.Run("iterator terminates when all leased items have score zero", func(t *testing.T) {
+		// If items in the sorted set have score 0 and are all leased, LastScore
+		// will be 0. The iterator must break instead of regressing to epoch+1ms.
+		r.FlushAll()
+
+		q, shard := newQueue(
+			t, rc,
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
+				return false
+			}),
+			osqueue.WithClock(clock),
+		)
+		kg := shard.Client().kg
+
+		// Enqueue items at a normal time, then overwrite their sorted set scores to 0.
+		ids := enqueueItems(t, shard, 5, "zero-score", func(i int) time.Time {
+			return clock.Now().Add(time.Duration(i) * time.Millisecond)
+		})
+
+		// Lease all items
+		leaseExpiry := clock.Now().Add(10 * time.Minute)
+		for _, id := range ids {
+			leaseQueueItem(t, rc, kg, id, leaseExpiry)
+		}
+
+		// Overwrite sorted set scores to 0, simulating a degenerate case where
+		// LastScore would be parsed as 0.
+		zsetKey := kg.PartitionQueueSet(enums.PartitionTypeDefault, fnID.String(), "")
+		for _, id := range ids {
+			_, err := r.ZAdd(zsetKey, 0, id)
+			require.NoError(t, err)
+		}
+
+		done := make(chan int, 1)
+		go func() {
+			items, err := q.ItemsByPartition(ctx, shard, fnID.String(), time.Time{}, clock.Now().Add(time.Hour),
+				osqueue.WithQueueItemIterBatchSize(100),
+				osqueue.WithQueueItemIterEnableBacklog(false),
+			)
+			if err != nil {
+				done <- -1
+				return
+			}
+			done <- countIter(items)
+		}()
+
+		select {
+		case count := <-done:
+			// All items are leased and have score 0 — the iterator should break
+			// gracefully via the lastScore <= 0 guard.
+			require.Equal(t, 0, count,
+				"should return 0 items and terminate when all leased items have score 0")
+		case <-time.After(10 * time.Second):
+			t.Fatal("iterator did not terminate — likely infinite loop due to lastScore == 0 regression")
+		}
+	})
 }
 
 func TestItemsByBacklog(t *testing.T) {

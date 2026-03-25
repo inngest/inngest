@@ -101,7 +101,7 @@ func TestLeaseRenewal(t *testing.T) {
 	require.True(t, ok, "connection should be registered for gRPC delivery")
 
 	go func() {
-		messageChan.(chan *connect.GatewayExecutorRequestData) <- expectedPayload
+		messageChan.(chan forwardMessage) <- forwardMessage{Data: expectedPayload, Result: make(chan error, 1)}
 	}()
 
 	// Expect message to be received by gateway and forwarded over WebSocket
@@ -179,7 +179,7 @@ func TestLeaseRenewalWithInvalidLeaseShouldNotClose(t *testing.T) {
 	require.True(t, ok, "connection should be registered for gRPC delivery")
 
 	go func() {
-		messageChan.(chan *connect.GatewayExecutorRequestData) <- expectedPayload
+		messageChan.(chan forwardMessage) <- forwardMessage{Data: expectedPayload, Result: make(chan error, 1)}
 	}()
 
 	// Expect message to be received by gateway and forwarded over WebSocket
@@ -284,7 +284,7 @@ func TestLeaseRenewalWithDeletedLeaseShouldNotClose(t *testing.T) {
 	require.True(t, ok, "connection should be registered for gRPC delivery")
 
 	go func() {
-		messageChan.(chan *connect.GatewayExecutorRequestData) <- expectedPayload
+		messageChan.(chan forwardMessage) <- forwardMessage{Data: expectedPayload, Result: make(chan error, 1)}
 	}()
 
 	// Expect message to be received by gateway and forwarded over WebSocket
@@ -392,7 +392,7 @@ func TestExecutorMessageForwardingGRPC(t *testing.T) {
 	require.True(t, ok, "connection should be registered for gRPC delivery")
 
 	go func() {
-		messageChan.(chan *connect.GatewayExecutorRequestData) <- expectedPayload
+		messageChan.(chan forwardMessage) <- forwardMessage{Data: expectedPayload, Result: make(chan error, 1)}
 	}()
 
 	// Expect message to be received by gateway and forwarded over WS
@@ -1056,7 +1056,7 @@ func createTestingGateway(t *testing.T, params ...testingParameters) testingReso
 				},
 			},
 			Steps: map[string]sdk.SDKStep{
-				"step": sdk.SDKStep{
+				"step": {
 					ID:   "step",
 					Name: fnName,
 					Runtime: map[string]any{
@@ -1395,14 +1395,15 @@ func TestHandleIncomingWebSocketMessageDraining(t *testing.T) {
 	require.NotNil(t, serr)
 	require.Equal(t, ErrDraining.SysCode, serr.SysCode)
 
-	// Test WORKER_PAUSE while draining
+	// Test WORKER_PAUSE while draining — this should NOT be rejected.
+	// The worker is signaling it wants to stop receiving requests, which
+	// must be honoured regardless of gateway drain state (SYS-709).
 	msg = &connect.ConnectMessage{
 		Kind: connect.GatewayMessageType_WORKER_PAUSE,
 	}
 
 	serr = ch.handleIncomingWebSocketMessage(context.Background(), msg)
-	require.NotNil(t, serr)
-	require.Equal(t, ErrDraining.SysCode, serr.SysCode)
+	require.Nil(t, serr, "WORKER_PAUSE should be accepted even when gateway is draining")
 }
 
 // TestHandleIncomingWebSocketMessageMissingInstanceId tests error handling for missing instance ID

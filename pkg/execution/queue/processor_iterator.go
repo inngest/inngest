@@ -133,6 +133,7 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 	ctx, span := p.Queue.Options().ConditionalTracer.NewSpan(ctx, "queue.Process", p.Partition.AccountID, partitionIdentifier.EnvID, partitionIdentifier.FunctionID)
 	defer span.End()
 	span.SetAttributes(attribute.String("partition_id", p.Partition.ID))
+	span.SetAttributes(attribute.String("item_kind", item.Data.Kind))
 	span.SetAttributes(attribute.String("run_id", item.Data.Identifier.RunID.String()))
 	span.SetAttributes(attribute.String("item_id", item.ID))
 	if item.Data.JobID != nil {
@@ -509,6 +510,8 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 		// This should always be linked, as we want consistent behavior while
 		// processing a queue item.
 		DisableConstraintUpdates: constraintRes.SkipConstraintChecks,
+
+		ConditionalTraceCtx: context.WithoutCancel(ctx),
 	}
 	commitSemaphoreAcquire = true
 

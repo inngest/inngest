@@ -1542,3 +1542,251 @@ func TestExecutorScheduleBacklogSizeLimit(t *testing.T) {
 	require.Equal(t, 1, int(atomic.LoadInt64(&fll.limitReachedCount)))
 	require.Equal(t, 1, int(atomic.LoadInt64(&fll.skippedCount)))
 }
+
+func TestScheduleSkipsCancelOnPauseWhenExpressionFalse(t *testing.T) {
+	ctx := context.Background()
+	_ = trace.UserTracer()
+	work := make(chan *hookData, 1)
+
+	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{Persist: false})
+	require.NoError(t, err)
+
+	dbDriver := "sqlite"
+	dbcqrs := base_cqrs.NewCQRS(db, dbDriver, sqlc_postgres.NewNormalizedOpts{})
+	loader := dbcqrs.(state.FunctionLoader)
+
+	_, shardedRc, err := createInmemoryRedis(t)
+	require.NoError(t, err)
+	defer shardedRc.Close()
+
+	_, unshardedRc, err := createInmemoryRedis(t)
+	require.NoError(t, err)
+	defer unshardedRc.Close()
+
+	unshardedClient := redis_state.NewUnshardedClient(unshardedRc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
+	shardedClient := redis_state.NewShardedClient(redis_state.ShardedClientOpts{
+		UnshardedClient:        unshardedClient,
+		FunctionRunStateClient: shardedRc,
+		StateDefaultKey:        redis_state.StateDefaultKey,
+		FnRunIsSharded:         redis_state.AlwaysShardOnRun,
+		BatchClient:            shardedRc,
+		QueueDefaultKey:        redis_state.QueueDefaultKey,
+	})
+
+	queueOpts := []queue.QueueOpt{
+		queue.WithIdempotencyTTL(time.Hour),
+	}
+	queueShard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), queueOpts...)
+
+	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (queue.QueueShard, error) {
+		return queueShard, nil
+	}
+
+	pauseMgr := pauses.NewPauseStoreManager(unshardedClient)
+
+	var sm state.Manager
+	sm, err = redis_state.New(ctx,
+		redis_state.WithShardedClient(shardedClient),
+		redis_state.WithPauseDeleter(pauseMgr),
+	)
+	require.NoError(t, err)
+	smv2 := redis_state.MustRunServiceV2(sm)
+
+	rq, err := queue.New(
+		context.Background(),
+		"test-queue",
+		queueShard,
+		map[string]queue.QueueShard{
+			queueShard.Name(): queueShard,
+		},
+		func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
+			return queueShard, nil
+		},
+		queueOpts...,
+	)
+	require.NoError(t, err)
+
+	exec, err := executor.NewExecutor(
+		executor.WithStateManager(smv2),
+		executor.WithPauseManager(pauseMgr),
+		executor.WithQueue(rq),
+		executor.WithLogger(logger.StdlibLogger(ctx)),
+		executor.WithFunctionLoader(loader),
+		executor.WithLifecycleListeners(newFakeLifecycle(work)),
+		executor.WithAssignedQueueShard(queueShard),
+		executor.WithShardSelector(shardSelector),
+		executor.WithTraceReader(dbcqrs),
+		executor.WithTracerProvider(tracing.NewSqlcTracerProvider(base_cqrs.NewQueries(db, dbDriver, sqlc_postgres.NewNormalizedOpts{}))),
+	)
+	require.NoError(t, err)
+
+	fnID, accountID, wsID, appID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+
+	// The expression checks if orgID is null. Since we'll send an event
+	// with a non-null orgID, the expression interpolates to "false",
+	// which should cause the cancel pause to be skipped.
+	expr := "event.data.orgID == null"
+	fn := inngest.Function{
+		ID:   fnID,
+		Name: "test-skip-cancel-pause",
+		Cancel: []inngest.Cancel{{
+			Event: "cancel/event",
+			If:    &expr,
+		}},
+	}
+
+	now := time.Now()
+	evtID := ulid.MustNew(ulid.Timestamp(now), rand.Reader)
+	evt := event.NewBaseTrackedEvent(event.Event{
+		Name: "test/trigger",
+		ID:   evtID.String(),
+		Data: map[string]any{
+			"orgID": "org-123",
+		},
+	}, event.SeededIDFromString("", 0))
+
+	_, _, err = exec.Schedule(ctx, execution.ScheduleRequest{
+		Function:    fn,
+		At:          &now,
+		AccountID:   accountID,
+		WorkspaceID: wsID,
+		AppID:       appID,
+		Events:      []event.TrackedEvent{evt},
+	})
+	require.NoError(t, err)
+
+	// Drain the lifecycle hook
+	<-work
+
+	// Verify no cancel pause was created for the "cancel/event" event,
+	// because the expression evaluated to false.
+	bufLen, err := pauseMgr.BufferLen(ctx, pauses.Index{
+		WorkspaceID: wsID,
+		EventName:   "cancel/event",
+	})
+	require.NoError(t, err)
+	require.Equal(t, int64(0), bufLen)
+}
+
+func TestScheduleCreatesCancelOnPauseWhenExpressionTrue(t *testing.T) {
+	ctx := context.Background()
+	_ = trace.UserTracer()
+	work := make(chan *hookData, 1)
+
+	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{Persist: false})
+	require.NoError(t, err)
+
+	dbDriver := "sqlite"
+	dbcqrs := base_cqrs.NewCQRS(db, dbDriver, sqlc_postgres.NewNormalizedOpts{})
+	loader := dbcqrs.(state.FunctionLoader)
+
+	_, shardedRc, err := createInmemoryRedis(t)
+	require.NoError(t, err)
+	defer shardedRc.Close()
+
+	_, unshardedRc, err := createInmemoryRedis(t)
+	require.NoError(t, err)
+	defer unshardedRc.Close()
+
+	unshardedClient := redis_state.NewUnshardedClient(unshardedRc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
+	shardedClient := redis_state.NewShardedClient(redis_state.ShardedClientOpts{
+		UnshardedClient:        unshardedClient,
+		FunctionRunStateClient: shardedRc,
+		StateDefaultKey:        redis_state.StateDefaultKey,
+		FnRunIsSharded:         redis_state.AlwaysShardOnRun,
+		BatchClient:            shardedRc,
+		QueueDefaultKey:        redis_state.QueueDefaultKey,
+	})
+
+	queueOpts := []queue.QueueOpt{
+		queue.WithIdempotencyTTL(time.Hour),
+	}
+	queueShard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), queueOpts...)
+
+	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (queue.QueueShard, error) {
+		return queueShard, nil
+	}
+
+	pauseMgr := pauses.NewPauseStoreManager(unshardedClient)
+
+	var sm state.Manager
+	sm, err = redis_state.New(ctx,
+		redis_state.WithShardedClient(shardedClient),
+		redis_state.WithPauseDeleter(pauseMgr),
+	)
+	require.NoError(t, err)
+	smv2 := redis_state.MustRunServiceV2(sm)
+
+	rq, err := queue.New(
+		context.Background(),
+		"test-queue",
+		queueShard,
+		map[string]queue.QueueShard{
+			queueShard.Name(): queueShard,
+		},
+		func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
+			return queueShard, nil
+		},
+		queueOpts...,
+	)
+	require.NoError(t, err)
+
+	exec, err := executor.NewExecutor(
+		executor.WithStateManager(smv2),
+		executor.WithPauseManager(pauseMgr),
+		executor.WithQueue(rq),
+		executor.WithLogger(logger.StdlibLogger(ctx)),
+		executor.WithFunctionLoader(loader),
+		executor.WithLifecycleListeners(newFakeLifecycle(work)),
+		executor.WithAssignedQueueShard(queueShard),
+		executor.WithShardSelector(shardSelector),
+		executor.WithTraceReader(dbcqrs),
+		executor.WithTracerProvider(tracing.NewSqlcTracerProvider(base_cqrs.NewQueries(db, dbDriver, sqlc_postgres.NewNormalizedOpts{}))),
+	)
+	require.NoError(t, err)
+
+	fnID, accountID, wsID, appID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+
+	// The expression checks if orgID is null. Since we send an event
+	// with a null orgID, the expression interpolates to "true",
+	// so the cancel pause should be created.
+	expr := "event.data.orgID == null"
+	fn := inngest.Function{
+		ID:   fnID,
+		Name: "test-create-cancel-pause",
+		Cancel: []inngest.Cancel{{
+			Event: "cancel/event",
+			If:    &expr,
+		}},
+	}
+
+	now := time.Now()
+	evtID := ulid.MustNew(ulid.Timestamp(now), rand.Reader)
+	evt := event.NewBaseTrackedEvent(event.Event{
+		Name: "test/trigger",
+		ID:   evtID.String(),
+		Data: map[string]any{},
+	}, event.SeededIDFromString("", 0))
+
+	_, _, err = exec.Schedule(ctx, execution.ScheduleRequest{
+		Function:    fn,
+		At:          &now,
+		AccountID:   accountID,
+		WorkspaceID: wsID,
+		AppID:       appID,
+		Events:      []event.TrackedEvent{evt},
+	})
+	require.NoError(t, err)
+
+	// Drain the lifecycle hook
+	<-work
+
+	// Verify the cancel pause was created for the "cancel/event" event,
+	// because the expression evaluated to true.
+	bufLen, err := pauseMgr.BufferLen(ctx, pauses.Index{
+		WorkspaceID: wsID,
+		EventName:   "cancel/event",
+	})
+	require.NoError(t, err)
+	require.Equal(t, int64(1), bufLen)
+}
