@@ -335,7 +335,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	const rateLimitPrefix = "ratelimit"
 
 	// Instantiate Constraint API
-	var semaphoreManager constraintapi.SemaphoreManager = constraintapi.NewRedisSemaphoreManager(unshardedRc)
+	semaphoreManager := constraintapi.NewRedisSemaphoreManager(unshardedRc)
 
 	var capacityManager constraintapi.CapacityManager
 
