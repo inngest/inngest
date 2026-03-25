@@ -75,8 +75,7 @@ func TestConsumePauseIdempotencyByData(t *testing.T) {
 		data := map[string]any{"id": "evt-123", "name": "test"}
 
 		res, err := m.ConsumePause(ctx, pause, state.ConsumePauseOpts{
-			IdempotencyKey: "evt-123",
-			Data:           data,
+			Data: data,
 		})
 		require.NoError(t, err)
 		require.True(t, res.DidConsume)
@@ -92,7 +91,7 @@ func TestConsumePauseIdempotencyByData(t *testing.T) {
 		s := createRun(t, ctx, m)
 		pause := pauseFor(s.Identifier(), "step-1")
 		data := map[string]any{"id": "evt-456", "name": "test"}
-		opts := state.ConsumePauseOpts{IdempotencyKey: "evt-456", Data: data}
+		opts := state.ConsumePauseOpts{Data: data}
 
 		res, err := m.ConsumePause(ctx, pause, opts)
 		require.NoError(t, err)
@@ -119,7 +118,7 @@ func TestConsumePauseIdempotencyByData(t *testing.T) {
 
 		pause := pauseFor(s.Identifier(), "step-1")
 		data := map[string]any{"id": "evt-retry", "name": "test"}
-		opts := state.ConsumePauseOpts{IdempotencyKey: "evt-retry", Data: data}
+		opts := state.ConsumePauseOpts{Data: data}
 
 		res, err := m.ConsumePause(ctx, pause, opts)
 		require.NoError(t, err)
@@ -154,7 +153,7 @@ func TestConsumePauseIdempotencyByData(t *testing.T) {
 				"data":   map[string]any{"hello": "world"},
 			},
 		}
-		opts := state.ConsumePauseOpts{IdempotencyKey: "my-signal-id", Data: data}
+		opts := state.ConsumePauseOpts{Data: data}
 
 		res, err := m.ConsumePause(ctx, pause, opts)
 		require.NoError(t, err)
@@ -177,7 +176,7 @@ func TestConsumePauseIdempotencyByData(t *testing.T) {
 		s := createRun(t, ctx, m)
 		pause := pauseFor(s.Identifier(), "invoke-step")
 		data := map[string]any{"data": nil}
-		opts := state.ConsumePauseOpts{IdempotencyKey: "run-123.invoke-step", Data: data}
+		opts := state.ConsumePauseOpts{Data: data}
 
 		res, err := m.ConsumePause(ctx, pause, opts)
 		require.NoError(t, err)
@@ -200,7 +199,7 @@ func TestConsumePauseIdempotencyByData(t *testing.T) {
 		s := createRun(t, ctx, m)
 		pause := pauseFor(s.Identifier(), "invoke-step")
 		data := map[string]any{"data": map[string]any{"result": "ok", "count": float64(42)}}
-		opts := state.ConsumePauseOpts{IdempotencyKey: "run-456.invoke-step", Data: data}
+		opts := state.ConsumePauseOpts{Data: data}
 
 		res, err := m.ConsumePause(ctx, pause, opts)
 		require.NoError(t, err)
@@ -223,8 +222,7 @@ func TestConsumePauseIdempotencyByData(t *testing.T) {
 
 		firstData := map[string]any{"id": "evt-aaa", "name": "resume"}
 		res, err := m.ConsumePause(ctx, pause, state.ConsumePauseOpts{
-			IdempotencyKey: "evt-aaa",
-			Data:           firstData,
+			Data: firstData,
 		})
 		require.NoError(t, err)
 		require.True(t, res.DidConsume)
@@ -232,8 +230,7 @@ func TestConsumePauseIdempotencyByData(t *testing.T) {
 		// Different event
 		secondData := map[string]any{"id": "evt-bbb", "name": "resume"}
 		res, err = m.ConsumePause(ctx, pause, state.ConsumePauseOpts{
-			IdempotencyKey: "evt-bbb",
-			Data:           secondData,
+			Data: secondData,
 		})
 		require.NoError(t, err)
 		require.False(t, res.DidConsume)

@@ -164,8 +164,8 @@ message Pause {
 }
 
 message ConsumePauseOpts {
-  string idempotency_key = 1;
-  bytes  data            = 2;
+  reserved 1; // removed: idempotency_key
+  bytes data = 2;
 }
 
 message ConsumePauseResult {
