@@ -20,6 +20,7 @@ import (
 	apiv2 "github.com/inngest/inngest/pkg/api/v2"
 	"github.com/inngest/inngest/pkg/api/v2/apiv2base"
 	"github.com/inngest/inngest/pkg/authn"
+	"github.com/inngest/inngest/pkg/azure"
 	"github.com/inngest/inngest/pkg/backoff"
 	"github.com/inngest/inngest/pkg/config"
 	connectConfig "github.com/inngest/inngest/pkg/config/connect"
@@ -194,7 +195,7 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	// Initialize the devserver
 	dbDriver := "sqlite"
-	if opts.PostgresURI != "" {
+	if opts.PostgresURI != "" || azure.IsAzureAuthEnabled() {
 		dbDriver = "postgres"
 	}
 	dbcqrs := base_cqrs.NewCQRS(db, dbDriver, sqlc_postgres.NewNormalizedOpts{
