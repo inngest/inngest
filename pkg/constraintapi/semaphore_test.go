@@ -95,7 +95,7 @@ func TestSemaphoreAcquire(t *testing.T) {
 
 	// Set capacity to 2
 	capKey := sem.CapacityKey(accountID)
-	r.Set(capKey, "2")
+	_ = r.Set(capKey, "2")
 
 	// First acquire should succeed
 	resp := acquireWithSemaphore(t, cm, clock, accountID, envID, fnID, config, constraints, "acq1")
@@ -146,7 +146,7 @@ func TestSemaphoreAutoRelease(t *testing.T) {
 
 	// Set capacity to 1
 	capKey := sem.CapacityKey(accountID)
-	r.Set(capKey, "1")
+	_ = r.Set(capKey, "1")
 
 	// Acquire
 	resp := acquireWithSemaphore(t, cm, clock, accountID, envID, fnID, config, constraints, "acq-auto")
@@ -205,7 +205,7 @@ func TestSemaphoreManualRelease(t *testing.T) {
 
 	// Set capacity to 1
 	capKey := sem.CapacityKey(accountID)
-	r.Set(capKey, "1")
+	_ = r.Set(capKey, "1")
 
 	// Acquire
 	resp := acquireWithSemaphore(t, cm, clock, accountID, envID, fnID, config, constraints, "acq-manual")
@@ -264,7 +264,7 @@ func TestSemaphoreWeight(t *testing.T) {
 
 	// Set capacity to 5
 	capKey := sem.CapacityKey(accountID)
-	r.Set(capKey, "5")
+	_ = r.Set(capKey, "5")
 
 	// First acquire with weight=3 should succeed (5-0 >= 3)
 	resp := acquireWithSemaphore(t, cm, clock, accountID, envID, fnID, config, constraints, "w1")
@@ -338,7 +338,7 @@ func TestSemaphoreWithConcurrency(t *testing.T) {
 
 	// Semaphore capacity = 1, concurrency limits = plenty
 	capKey := sem.CapacityKey(accountID)
-	r.Set(capKey, "1")
+	_ = r.Set(capKey, "1")
 
 	// First acquire: all constraints pass
 	resp := acquireWithSemaphore(t, cm, clock, accountID, envID, fnID, config, constraints, "multi1")
@@ -422,7 +422,7 @@ func TestSemaphoreManager(t *testing.T) {
 		name := fmt.Sprintf("fn:%s", uuid.New())
 		// Manually set usage
 		usageKey := semaphoreUsageKey(accountID, name, "")
-		r.Set(usageKey, "5")
+		_ = r.Set(usageKey, "5")
 
 		err := sm.ReleaseSemaphore(ctx, accountID, name, "", "rel-1", 2)
 		require.NoError(t, err)
@@ -435,7 +435,7 @@ func TestSemaphoreManager(t *testing.T) {
 	t.Run("release semaphore clamps to zero", func(t *testing.T) {
 		name := fmt.Sprintf("fn:%s", uuid.New())
 		usageKey := semaphoreUsageKey(accountID, name, "")
-		r.Set(usageKey, "1")
+		_ = r.Set(usageKey, "1")
 
 		err := sm.ReleaseSemaphore(ctx, accountID, name, "", "rel-clamp", 5)
 		require.NoError(t, err)
@@ -448,7 +448,7 @@ func TestSemaphoreManager(t *testing.T) {
 	t.Run("release semaphore idempotency", func(t *testing.T) {
 		name := fmt.Sprintf("fn:%s", uuid.New())
 		usageKey := semaphoreUsageKey(accountID, name, "")
-		r.Set(usageKey, "5")
+		_ = r.Set(usageKey, "5")
 
 		err := sm.ReleaseSemaphore(ctx, accountID, name, "", "rel-idem", 2)
 		require.NoError(t, err)
@@ -487,7 +487,7 @@ func TestSemaphoreScavengeManualRelease(t *testing.T) {
 
 	// Set capacity to 1
 	capKey := sem.CapacityKey(accountID)
-	r.Set(capKey, "1")
+	_ = r.Set(capKey, "1")
 
 	// Acquire a lease with a manual-release semaphore
 	resp := acquireWithSemaphore(t, cm, clock, accountID, envID, fnID, config, constraints, "scav-manual")
@@ -525,7 +525,7 @@ func TestSemaphoreUsageValueIsolation(t *testing.T) {
 
 	// Set shared capacity to 2
 	capKey := (&SemaphoreConstraint{ID: semID}).CapacityKey(accountID)
-	r.Set(capKey, "2")
+	_ = r.Set(capKey, "2")
 
 	// Two different usage values (e.g., two different customers)
 	semA := SemaphoreConstraint{ID: semID, UsageValue: "customer-a", Weight: 1, Release: SemaphoreReleaseManual}
@@ -584,7 +584,7 @@ func TestSemaphoreSameUsageValueShared(t *testing.T) {
 
 	// Set shared capacity to 1
 	capKey := (&SemaphoreConstraint{ID: semID}).CapacityKey(accountID)
-	r.Set(capKey, "1")
+	_ = r.Set(capKey, "1")
 
 	sem := SemaphoreConstraint{ID: semID, UsageValue: "same-customer", Weight: 1, Release: SemaphoreReleaseManual}
 	config := ConstraintConfig{
