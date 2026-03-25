@@ -3,7 +3,7 @@ import SplitView from '@/components/SignIn/SplitView';
 import { validateAgentDeepLinkSearch } from '@/lib/deepLinkUtils';
 import { useClerk, useSignIn } from '@clerk/tanstack-react-start';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 //
 // React Strict Mode double-mounts effects in development.
@@ -21,10 +21,18 @@ function AgentDeepLink() {
   const { isLoaded, signIn } = useSignIn();
   const { setActive, signOut } = useClerk();
   const navigate = useNavigate();
+  const isActivatingRef = useRef(false);
   const [error, setError] = useState<string>();
 
   useEffect(() => {
-    if (!isLoaded || !ticket || !redirect_url) return;
+    if (!isLoaded || !ticket || !redirect_url) {
+      return;
+    }
+
+    if (isActivatingRef.current) {
+      return;
+    }
+
     if (import.meta.env.DEV) {
       if (consumedTickets.has(ticket)) {
         return;
@@ -32,6 +40,8 @@ function AgentDeepLink() {
 
       consumedTickets.add(ticket);
     }
+
+    isActivatingRef.current = true;
 
     const activate = async () => {
       //
@@ -51,10 +61,11 @@ function AgentDeepLink() {
 
       //
       // Client-side navigate to preserve Clerk's in-memory session state.
-      navigate({ to: redirect_url, replace: true });
+      await navigate({ to: redirect_url, replace: true });
     };
 
     activate().catch((err) => {
+      isActivatingRef.current = false;
       console.error('Agent deep link sign-in failed:', err);
       setError('This deep link is invalid or has expired.');
     });

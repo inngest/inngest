@@ -86,16 +86,7 @@ export const resolveDashboardDeepLink = createServerFn({
     }
 
     const user = await clerkClient().users.getUser(userId);
-    const memberships = await clerkClient().users.getOrganizationMembershipList(
-      {
-        userId: user.id,
-        limit: 100,
-      },
-    );
-
-    const membership = memberships.data.find((membership) =>
-      organizationMatchesAccount(membership, data.acct),
-    );
+    const membership = await findMembershipForAccount(user.id, data.acct);
 
     if (!membership) {
       return { status: 'invalid' } satisfies ResolveDashboardDeepLinkResult;
@@ -135,4 +126,37 @@ function organizationMatchesAccount(
   accountId: string,
 ): boolean {
   return membership.organization.publicMetadata?.accountID === accountId;
+}
+
+async function findMembershipForAccount(
+  userId: string,
+  accountId: string,
+): Promise<OrganizationMembership | undefined> {
+  const limit = 100;
+  let offset = 0;
+
+  while (true) {
+    const memberships: {
+      data: OrganizationMembership[];
+      totalCount: number;
+    } = await clerkClient().users.getOrganizationMembershipList({
+      userId,
+      limit,
+      offset,
+    });
+
+    const membership = memberships.data.find((membership) =>
+      organizationMatchesAccount(membership, accountId),
+    );
+
+    if (membership) {
+      return membership;
+    }
+
+    offset += memberships.data.length;
+
+    if (offset >= memberships.totalCount || memberships.data.length === 0) {
+      return undefined;
+    }
+  }
 }
