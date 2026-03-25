@@ -21,6 +21,9 @@ type PartitionConstraintConfig struct {
 
 	// Throttle configuration, optionally specifying key. If no key is set, the throttle value will be the function ID.
 	Throttle *PartitionThrottle `json:"t,omitempty,omitzero"`
+
+	// Semaphores are evaluated semaphore constraints for this partition.
+	Semaphores []constraintapi.Semaphore `json:"sem,omitempty"`
 }
 
 type CustomConcurrencyLimit struct {
@@ -116,6 +119,11 @@ func ConvertLimitingConstraint(
 		case
 			c.Kind == constraintapi.ConstraintKindThrottle:
 			constraint = enums.QueueConstraintThrottle
+
+		// Semaphore
+		case
+			c.Kind == constraintapi.ConstraintKindSemaphore:
+			constraint = enums.QueueConstraintSemaphore
 		}
 	}
 
@@ -177,6 +185,10 @@ func ConstraintConfigFromConstraints(
 			Period:            constraints.Throttle.Period,
 			KeyExpressionHash: constraints.Throttle.ThrottleKeyExpressionHash,
 		})
+	}
+
+	if len(constraints.Semaphores) > 0 {
+		config.Semaphores = constraints.Semaphores
 	}
 
 	return config
@@ -504,6 +516,18 @@ func constraintItemsFromBacklog(sp *QueueShadowPartition, backlog *QueueBacklog,
 				},
 			})
 		}
+	}
+
+	// Add semaphore constraints from backlog
+	for _, sem := range backlog.Semaphores {
+		constraints = append(constraints, constraintapi.ConstraintItem{
+			Kind: constraintapi.ConstraintKindSemaphore,
+			Semaphore: &constraintapi.SemaphoreConstraint{
+				Name:    sem.Name,
+				Weight:  sem.Weight,
+				Release: sem.Release,
+			},
+		})
 	}
 
 	return constraints

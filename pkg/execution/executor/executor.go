@@ -295,6 +295,15 @@ func WithCapacityManager(cm constraintapi.CapacityManager) ExecutorOpt {
 	}
 }
 
+// WithSemaphoreManager assigns a semaphore manager to the executor, used to release
+// from semaphores when functions end (for fn concurrency)
+func WithSemaphoreManager(sm constraintapi.SemaphoreManager) ExecutorOpt {
+	return func(e execution.Executor) error {
+		e.(*executor).semaphoreManager = sm
+		return nil
+	}
+}
+
 func WithUseConstraintAPI(uca constraintapi.UseConstraintAPIFn) ExecutorOpt {
 	return func(e execution.Executor) error {
 		e.(*executor).useConstraintAPI = uca
@@ -465,6 +474,7 @@ type executor struct {
 	singletonMgr singleton.Singleton
 
 	capacityManager               constraintapi.CapacityManager
+	semaphoreManager              constraintapi.SemaphoreManager
 	useConstraintAPI              constraintapi.UseConstraintAPIFn
 	enableBatchingInstrumentation func(ctx context.Context, accountID, envID uuid.UUID) (enable bool)
 
@@ -1337,6 +1347,7 @@ func (e *executor) schedule(
 		Identifier:            stv1ID,
 		CustomConcurrencyKeys: metadata.Config.CustomConcurrencyKeys,
 		PriorityFactor:        metadata.Config.PriorityFactor,
+		Semaphores:            metadata.Config.Semaphores,
 		Attempt:               0,
 		MaxAttempts:           &maxAttempts,
 		Payload: queue.PayloadEdge{

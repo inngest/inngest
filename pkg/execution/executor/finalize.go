@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
@@ -57,6 +58,47 @@ func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) er
 				"error", err,
 				"run_id", opts.Metadata.ID.RunID,
 			)
+		}
+	}
+
+	// Release any manual-release semaphores held by this run.  Manual-release semaphores
+	// (e.g. function concurrency) are acquired when the start job is dequeued but are NOT
+	// released when individual step leases complete — they persist for the lifetime of the
+	// run.  We must release them here, before state deletion, so that the semaphore info
+	// from run metadata is still available.  The run ID is used as the idempotency key to
+	// guarantee safe retries.
+	if e.semaphoreManager == nil && len(opts.Metadata.Config.Semaphores) > 0 {
+		l.Error(
+			"semaphore manager is nil but run holds semaphores, leading to deadlock",
+			"run_id", opts.Metadata.ID.RunID,
+			"semaphores", len(opts.Metadata.Config.Semaphores),
+		)
+	}
+
+	if e.semaphoreManager != nil && len(opts.Metadata.Config.Semaphores) > 0 {
+		for _, sem := range opts.Metadata.Config.Semaphores {
+			if sem.Release != constraintapi.SemaphoreReleaseManual {
+				continue
+			}
+			// Retry semaphore release — a failure here means the semaphore is permanently
+			// held, which deadlocks all future runs waiting on capacity.
+			_, releaseErr := util.WithRetry(ctx, "release-semaphore", func(ctx context.Context) (struct{}, error) {
+				return struct{}{}, e.semaphoreManager.ReleaseSemaphore(
+					ctx,
+					opts.Metadata.ID.Tenant.AccountID,
+					sem.Name,
+					opts.Metadata.ID.RunID.String(),
+					sem.Weight,
+				)
+			}, util.NewRetryConf())
+			if releaseErr != nil {
+				l.Error(
+					"error releasing semaphore on finalize after retries",
+					"error", releaseErr,
+					"run_id", opts.Metadata.ID.RunID,
+					"semaphore", sem.Name,
+				)
+			}
 		}
 	}
 

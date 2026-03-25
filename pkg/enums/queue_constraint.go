@@ -17,4 +17,5 @@ const (
 	QueueConstraintCustomConcurrencyKey1 QueueConstraint = 3
 	QueueConstraintCustomConcurrencyKey2 QueueConstraint = 4
 	QueueConstraintThrottle              QueueConstraint = 5
+	QueueConstraintSemaphore             QueueConstraint = 6
 )

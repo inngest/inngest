@@ -340,6 +340,11 @@ type Item struct {
 	// ParallelMode controls discovery step scheduling after a parallel step
 	// ends
 	ParallelMode enums.ParallelMode `json:"pm,omitempty"`
+
+	// Semaphores stores evaluated semaphore constraints for this queue item.
+	// Only present on start jobs for function concurrency, or on all items
+	// for worker concurrency (app-scoped semaphores).
+	Semaphores []constraintapi.Semaphore `json:"sem,omitempty"`
 }
 
 func (i Item) GetMaxAttempts() int {
@@ -455,6 +460,7 @@ func (i *Item) UnmarshalJSON(b []byte) error {
 		CustomConcurrencyKeys []state.CustomConcurrency `json:"cck,omitempty"`
 		PriorityFactor        *int64                    `json:"pf,omitempty"`
 		ParallelMode          enums.ParallelMode        `json:"pm,omitempty"`
+		Semaphores            []constraintapi.Semaphore `json:"sem,omitempty"`
 	}
 	temp := &kind{}
 	err := json.Unmarshal(b, temp)
@@ -476,6 +482,7 @@ func (i *Item) UnmarshalJSON(b []byte) error {
 	i.PriorityFactor = temp.PriorityFactor
 	i.QueueName = temp.QueueName
 	i.ParallelMode = temp.ParallelMode
+	i.Semaphores = temp.Semaphores
 
 	// Save this for custom unmarshalling of other jobs.  This is overwritten
 	// for known queue kinds.
