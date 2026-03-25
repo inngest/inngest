@@ -2,6 +2,22 @@ package constraintapi
 
 import "github.com/inngest/inngest/pkg/enums"
 
+// Semaphore represents an evaluated semaphore reference.
+// Used on queue items, backlogs, partition config, and constraint API config.
+type Semaphore struct {
+	// Name is the evaluated semaphore name, always prefixed:
+	//   app:<uuid>    — worker concurrency
+	//   fn:<uuid>     — function concurrency
+	//   hash:<xxhash> — user-defined
+	Name string `json:"n"`
+
+	// Weight is the number of units to acquire (default 1).
+	Weight int64 `json:"w"`
+
+	// Release controls when the semaphore counter is decremented.
+	Release SemaphoreReleaseMode `json:"r"`
+}
+
 type ConstraintConfig struct {
 	// FunctionVersion specifies the latest known function version.
 	// If the version on the manager is newer, it will be used.
@@ -15,6 +31,9 @@ type ConstraintConfig struct {
 
 	// Throttle represents 0-n throttle constraints
 	Throttle []ThrottleConfig
+
+	// Semaphores represents 0-n semaphore constraints
+	Semaphores []Semaphore
 }
 
 type RateLimitConfig struct {
