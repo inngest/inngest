@@ -1,7 +1,7 @@
 import LoadingIcon from '@/components/Icons/LoadingIcon';
 import SplitView from '@/components/SignIn/SplitView';
 import { validateSwitchOrganizationSearch } from '@/lib/deepLinkSearch';
-import { createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useClerk } from '@clerk/tanstack-react-start';
 import { useEffect } from 'react';
 
@@ -13,6 +13,7 @@ export const Route = createFileRoute('/(auth)/switch-organization')({
 function RouteComponent() {
   const { organization_id, redirect_url } = Route.useSearch();
   const { loaded, setActive } = useClerk();
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (!loaded || !organization_id || !redirect_url) {
@@ -21,11 +22,19 @@ function RouteComponent() {
 
     const switchOrganization = async () => {
       await setActive({ organization: organization_id });
-      window.location.replace(redirect_url);
+      await navigate({ to: redirect_url, replace: true });
     };
 
     void switchOrganization();
-  }, [loaded, organization_id, redirect_url, setActive]);
+  }, [loaded, navigate, organization_id, redirect_url, setActive]);
+
+  if (!organization_id || !redirect_url) {
+    return (
+      <SplitView>
+        <div className="mx-auto my-auto text-center">Invalid deep link.</div>
+      </SplitView>
+    );
+  }
 
   return (
     <SplitView>

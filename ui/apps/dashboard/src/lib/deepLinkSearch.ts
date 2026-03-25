@@ -11,6 +11,10 @@ export type SwitchOrganizationSearchParams = {
   redirect_url?: string;
 };
 
+export type RedirectUrlSearchParams = {
+  redirect_url?: string;
+};
+
 export function sanitizeRedirectUrl(value: unknown): string | undefined {
   return typeof value === 'string' &&
     value.startsWith('/') &&
@@ -51,5 +55,13 @@ export function validateDashboardDeepLinkSearch(
     acct: typeof search.acct === 'string' ? search.acct : undefined,
     expires: typeof search.expires === 'string' ? search.expires : undefined,
     sig: typeof search.sig === 'string' ? search.sig : undefined,
+  };
+}
+
+export function validateRedirectUrlSearch(
+  search: Record<string, unknown>,
+): RedirectUrlSearchParams {
+  return {
+    redirect_url: sanitizeRedirectUrl(search.redirect_url),
   };
 }

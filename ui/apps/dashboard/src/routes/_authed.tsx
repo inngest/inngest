@@ -1,4 +1,5 @@
 import { fetchClerkAuth, jwtAuth } from '@/lib/auth';
+import { sanitizeRedirectUrl } from '@/lib/deepLinkSearch';
 import { createFileRoute, notFound, Outlet } from '@tanstack/react-router';
 
 import Layout from '@/components/Layout/Layout';
@@ -23,10 +24,7 @@ export const Route = createFileRoute('/_authed')({
 
     const { userId, token } = await fetchClerkAuth({
       data: {
-        redirectUrl:
-          typeof location.href === 'string' && location.href.startsWith('/')
-            ? location.href
-            : location.pathname,
+        redirectUrl: sanitizeRedirectUrl(location.href) ?? location.pathname,
       },
     });
 

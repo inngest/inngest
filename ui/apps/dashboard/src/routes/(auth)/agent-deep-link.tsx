@@ -6,9 +6,9 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
 
 //
-// Clerk tickets are single-use. Track consumed tickets at module scope
-// so React Strict Mode's development double-mount doesn't attempt to
-// consume the same ticket twice.
+// React Strict Mode double-mounts effects in development.
+// Track tickets at module scope there so we don't spend a single-use
+// Clerk ticket twice while developing this flow.
 const consumedTickets = new Set<string>();
 
 export const Route = createFileRoute('/(auth)/agent-deep-link')({
@@ -25,8 +25,13 @@ function AgentDeepLink() {
 
   useEffect(() => {
     if (!isLoaded || !ticket || !redirect_url) return;
-    if (consumedTickets.has(ticket)) return;
-    consumedTickets.add(ticket);
+    if (import.meta.env.DEV) {
+      if (consumedTickets.has(ticket)) {
+        return;
+      }
+
+      consumedTickets.add(ticket);
+    }
 
     const activate = async () => {
       //
