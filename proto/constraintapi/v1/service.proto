@@ -103,9 +103,10 @@ message ThrottleConfig {
 }
 
 message Semaphore {
-  string name = 1;
-  int64 weight = 2;
-  ConstraintApiSemaphoreReleaseMode release = 3;
+  string id = 1;
+  string usage_value = 2;
+  int64 weight = 3;
+  ConstraintApiSemaphoreReleaseMode release = 4;
 }
 
 message ConstraintConfig {
@@ -137,9 +138,10 @@ message ThrottleConstraint {
 }
 
 message SemaphoreConstraint {
-  string name = 1;
-  int64 weight = 2;
-  ConstraintApiSemaphoreReleaseMode release = 3;
+  string id = 1;
+  string usage_value = 2;
+  int64 weight = 3;
+  ConstraintApiSemaphoreReleaseMode release = 4;
 }
 
 // Constraint item that matches Go's ConstraintItem struct

@@ -786,9 +786,10 @@ func (x *ThrottleConfig) GetPeriod() int32 {
 
 type Semaphore struct {
 	state         protoimpl.MessageState            `protogen:"open.v1"`
-	Name          string                            `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	Weight        int64                             `protobuf:"varint,2,opt,name=weight,proto3" json:"weight,omitempty"`
-	Release       ConstraintApiSemaphoreReleaseMode `protobuf:"varint,3,opt,name=release,proto3,enum=constraintapi.v1.ConstraintApiSemaphoreReleaseMode" json:"release,omitempty"`
+	Id            string                            `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	UsageValue    string                            `protobuf:"bytes,2,opt,name=usage_value,json=usageValue,proto3" json:"usage_value,omitempty"`
+	Weight        int64                             `protobuf:"varint,3,opt,name=weight,proto3" json:"weight,omitempty"`
+	Release       ConstraintApiSemaphoreReleaseMode `protobuf:"varint,4,opt,name=release,proto3,enum=constraintapi.v1.ConstraintApiSemaphoreReleaseMode" json:"release,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -823,9 +824,16 @@ func (*Semaphore) Descriptor() ([]byte, []int) {
 	return file_constraintapi_v1_service_proto_rawDescGZIP(), []int{4}
 }
 
-func (x *Semaphore) GetName() string {
+func (x *Semaphore) GetId() string {
 	if x != nil {
-		return x.Name
+		return x.Id
+	}
+	return ""
+}
+
+func (x *Semaphore) GetUsageValue() string {
+	if x != nil {
+		return x.UsageValue
 	}
 	return ""
 }
@@ -1111,9 +1119,10 @@ func (x *ThrottleConstraint) GetEvaluatedKeyHash() string {
 
 type SemaphoreConstraint struct {
 	state         protoimpl.MessageState            `protogen:"open.v1"`
-	Name          string                            `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	Weight        int64                             `protobuf:"varint,2,opt,name=weight,proto3" json:"weight,omitempty"`
-	Release       ConstraintApiSemaphoreReleaseMode `protobuf:"varint,3,opt,name=release,proto3,enum=constraintapi.v1.ConstraintApiSemaphoreReleaseMode" json:"release,omitempty"`
+	Id            string                            `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	UsageValue    string                            `protobuf:"bytes,2,opt,name=usage_value,json=usageValue,proto3" json:"usage_value,omitempty"`
+	Weight        int64                             `protobuf:"varint,3,opt,name=weight,proto3" json:"weight,omitempty"`
+	Release       ConstraintApiSemaphoreReleaseMode `protobuf:"varint,4,opt,name=release,proto3,enum=constraintapi.v1.ConstraintApiSemaphoreReleaseMode" json:"release,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1148,9 +1157,16 @@ func (*SemaphoreConstraint) Descriptor() ([]byte, []int) {
 	return file_constraintapi_v1_service_proto_rawDescGZIP(), []int{9}
 }
 
-func (x *SemaphoreConstraint) GetName() string {
+func (x *SemaphoreConstraint) GetId() string {
 	if x != nil {
-		return x.Name
+		return x.Id
+	}
+	return ""
+}
+
+func (x *SemaphoreConstraint) GetUsageValue() string {
+	if x != nil {
+		return x.UsageValue
 	}
 	return ""
 }
@@ -2095,11 +2111,13 @@ const file_constraintapi_v1_service_proto_rawDesc = "" +
 	"\x13key_expression_hash\x18\x02 \x01(\tR\x11keyExpressionHash\x12\x14\n" +
 	"\x05limit\x18\x03 \x01(\x05R\x05limit\x12\x14\n" +
 	"\x05burst\x18\x04 \x01(\x05R\x05burst\x12\x16\n" +
-	"\x06period\x18\x05 \x01(\x05R\x06period\"\x86\x01\n" +
-	"\tSemaphore\x12\x12\n" +
-	"\x04name\x18\x01 \x01(\tR\x04name\x12\x16\n" +
-	"\x06weight\x18\x02 \x01(\x03R\x06weight\x12M\n" +
-	"\arelease\x18\x03 \x01(\x0e23.constraintapi.v1.ConstraintApiSemaphoreReleaseModeR\arelease\"\xc1\x02\n" +
+	"\x06period\x18\x05 \x01(\x05R\x06period\"\xa3\x01\n" +
+	"\tSemaphore\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1f\n" +
+	"\vusage_value\x18\x02 \x01(\tR\n" +
+	"usageValue\x12\x16\n" +
+	"\x06weight\x18\x03 \x01(\x03R\x06weight\x12M\n" +
+	"\arelease\x18\x04 \x01(\x0e23.constraintapi.v1.ConstraintApiSemaphoreReleaseModeR\arelease\"\xc1\x02\n" +
 	"\x10ConstraintConfig\x12)\n" +
 	"\x10function_version\x18\x01 \x01(\x05R\x0ffunctionVersion\x12@\n" +
 	"\n" +
@@ -2121,11 +2139,13 @@ const file_constraintapi_v1_service_proto_rawDesc = "" +
 	"\x12ThrottleConstraint\x12B\n" +
 	"\x05scope\x18\x01 \x01(\x0e2,.constraintapi.v1.ConstraintApiThrottleScopeR\x05scope\x12.\n" +
 	"\x13key_expression_hash\x18\x02 \x01(\tR\x11keyExpressionHash\x12,\n" +
-	"\x12evaluated_key_hash\x18\x03 \x01(\tR\x10evaluatedKeyHash\"\x90\x01\n" +
-	"\x13SemaphoreConstraint\x12\x12\n" +
-	"\x04name\x18\x01 \x01(\tR\x04name\x12\x16\n" +
-	"\x06weight\x18\x02 \x01(\x03R\x06weight\x12M\n" +
-	"\arelease\x18\x03 \x01(\x0e23.constraintapi.v1.ConstraintApiSemaphoreReleaseModeR\arelease\"\xb9\x03\n" +
+	"\x12evaluated_key_hash\x18\x03 \x01(\tR\x10evaluatedKeyHash\"\xad\x01\n" +
+	"\x13SemaphoreConstraint\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1f\n" +
+	"\vusage_value\x18\x02 \x01(\tR\n" +
+	"usageValue\x12\x16\n" +
+	"\x06weight\x18\x03 \x01(\x03R\x06weight\x12M\n" +
+	"\arelease\x18\x04 \x01(\x0e23.constraintapi.v1.ConstraintApiSemaphoreReleaseModeR\arelease\"\xb9\x03\n" +
 	"\x0eConstraintItem\x12A\n" +
 	"\x04kind\x18\x01 \x01(\x0e2-.constraintapi.v1.ConstraintApiConstraintKindR\x04kind\x12N\n" +
 	"\vconcurrency\x18\x02 \x01(\v2'.constraintapi.v1.ConcurrencyConstraintH\x00R\vconcurrency\x88\x01\x01\x12E\n" +
