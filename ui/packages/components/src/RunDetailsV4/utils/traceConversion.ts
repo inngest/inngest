@@ -262,6 +262,8 @@ export function traceToTimelineData(
 
   // Give the Run bar a timingBreakdown matching the step-level inngest/execution split.
   // Sum execution time from all step children, and attribute the rest to Inngest overhead.
+  // For children without a timingBreakdown (sleep, waitForEvent, invoke, etc.),
+  // use their wall-clock duration as execution time so it isn't misattributed as overhead.
   if (rootBar.endTime) {
     const runDurationMs = rootBar.endTime.getTime() - rootBar.startTime.getTime();
     if (runDurationMs > 0) {
@@ -269,6 +271,8 @@ export function traceToTimelineData(
       for (const child of rootBar.children ?? []) {
         if (child.timingBreakdown) {
           totalExecutionMs += child.timingBreakdown.executionMs;
+        } else if (child.endTime) {
+          totalExecutionMs += Math.max(0, child.endTime.getTime() - child.startTime.getTime());
         }
       }
       if (totalExecutionMs > 0) {

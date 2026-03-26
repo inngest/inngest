@@ -241,6 +241,42 @@ describe('traceConversion', () => {
       expect(result.bars[0]?.children?.[0]?.timingBreakdown).toBeUndefined();
     });
 
+    it('includes non-step.run children wall-clock duration in root bar execution time', () => {
+      const trace = createTrace({
+        isRoot: true,
+        queuedAt: '2024-01-01T00:00:00Z',
+        startedAt: '2024-01-01T00:00:01Z',
+        endedAt: '2024-01-01T00:01:11Z', // 71s total
+        childrenSpans: [
+          // step.run child: 1s execution (has timingBreakdown)
+          createTrace({
+            spanID: 'run-step',
+            stepOp: 'RUN',
+            queuedAt: '2024-01-01T00:00:01Z',
+            startedAt: '2024-01-01T00:00:02Z',
+            endedAt: '2024-01-01T00:00:03Z',
+          }),
+          // step.sleep child: 60s wall-clock (no timingBreakdown)
+          createTrace({
+            spanID: 'sleep-step',
+            stepOp: 'SLEEP',
+            queuedAt: '2024-01-01T00:00:03Z',
+            startedAt: '2024-01-01T00:00:03Z',
+            endedAt: '2024-01-01T00:01:03Z',
+          }),
+        ],
+      });
+      const result = traceToTimelineData(trace, { runID: 'run-1' });
+
+      const rootBar = result.bars[0];
+      expect(rootBar?.timingBreakdown).toBeDefined();
+      // execution = 1s (step.run) + 60s (step.sleep wall-clock) = 61s
+      expect(rootBar?.timingBreakdown?.executionMs).toBe(61000);
+      // inngest overhead = 71s total - 61s execution = 10s (not 70s!)
+      expect(rootBar?.timingBreakdown?.inngestMs).toBe(10000);
+      expect(rootBar?.timingBreakdown?.totalMs).toBe(71000);
+    });
+
     it('handles zero queue time', () => {
       const trace = createTrace({
         isRoot: true,
