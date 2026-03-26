@@ -394,8 +394,8 @@ func TestBroadcasterClose(t *testing.T) {
 	// After the grace period, topic goroutines should be cancelled.
 	bc := b.(*broadcaster)
 	r.Eventually(func() bool {
-		bc.redisMu.Lock()
-		defer bc.redisMu.Unlock()
+		bc.topicCancelMu.Lock()
+		defer bc.topicCancelMu.Unlock()
 		return len(bc.topicCancelFuncs) == 0
 	}, testEventualTimeout, testEventualPoll)
 }
