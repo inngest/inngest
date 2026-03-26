@@ -26,11 +26,63 @@ routing (`URLMux`). This creates several limitations:
 - Give each adapter full control over connections, consumer groups, ack/nack, and concurrency.
 - Make the system extensible via a self-registering factory (no hard-coded switch).
 - Enable cross-cutting concerns (metrics, tracing, retry) via middleware decorators.
-- Preserve backward compatibility during migration.
+- **Full backward compatibility** — existing callers (`Publisher`, `Subscriber`,
+  `PublishSubscriber`, `PerformFunc`, `Message`) must continue to compile and work unchanged
+  throughout the entire migration. No big-bang cutover.
+
+## Backward Compatibility Contract
+
+The following public API surface **must not break** at any point during this project:
+
+```go
+// Existing interfaces — preserved as-is
+type Publisher interface {
+    Publish(ctx context.Context, topic string, m Message) error
+}
+type Subscriber interface {
+    Subscribe(ctx context.Context, topic string, handler PerformFunc) error
+    SubscribeN(ctx context.Context, topic string, handler PerformFunc, concurrency int64) error
+}
+type PublishSubscriber interface {
+    Publisher
+    Subscriber
+}
+
+// Existing constructors — preserved as-is
+func NewPublisher(ctx context.Context, c config.MessagingService) (Publisher, error)
+func NewSubscriber(ctx context.Context, c config.MessagingService) (Subscriber, error)
+func NewPublishSubscriber(ctx context.Context, c config.MessagingService) (PublishSubscriber, error)
+
+// Existing types — preserved as-is
+type Message struct { ... }
+type PerformFunc func(context.Context, Message) error
+```
+
+### Existing callers (must remain untouched until explicit migration PR):
+
+| Caller | Usage |
+|--------|-------|
+| `pkg/api/service.go` | `pubsub.NewPublisher`, `pubsub.Publisher`, `pubsub.Message` |
+| `pkg/execution/runner/runner.go` | `pubsub.NewPublishSubscriber`, `pubsub.PublishSubscriber`, `pubsub.Publisher`, `pubsub.Message`, `handleMessage(ctx, pubsub.Message)` |
+| `pkg/execution/executor/service.go` | `pubsub.NewPublisher`, `pubsub.Publisher`, `pubsub.Message` |
+| `pkg/devserver/devserver.go` | `pubsub.NewPublisher`, `pubsub.Publisher` |
+| `pkg/devserver/service.go` | `pubsub.Publisher`, `pubsub.Message` |
+| `pkg/devserver/lifecycle.go` | `pubsub.Publisher` |
+| `pkg/config/messaging.go` | `MessagingService`, `TopicURLCreator`, all backend config structs |
+
+### Strategy: Bridge, don't break
+
+- The old interfaces (`Publisher`, `Subscriber`, `PublishSubscriber`) stay in `pubsub.go`
+  permanently — they are the stable API.
+- A `LegacyBridge` wraps new `Adapter` implementations to satisfy old interfaces.
+- `NewPublisher`/`NewSubscriber`/`NewPublishSubscriber` are updated internally to create
+  adapters + bridge, but their signatures and behavior are identical.
+- Old `broker.go` + gocloud.dev code is only removed in a final cleanup PR after all callers
+  have been verified.
 
 ## Design
 
-### Core Interfaces (`pkg/pubsub/adapter.go`)
+### Core Adapter Interface (`pkg/pubsub/adapter.go`)
 
 ```go
 // Adapter is the primary interface every pub/sub backend implements.
@@ -51,32 +103,7 @@ type Adapter interface {
 }
 ```
 
-### Message Type (`pkg/pubsub/message.go`)
-
-```go
-type Message struct {
-    // Core fields (always used)
-    ID        string            `json:"id,omitempty"`
-    Name      string            `json:"name"`
-    Version   int               `json:"v"`
-    Data      []byte            `json:"data"`
-    Timestamp time.Time         `json:"ts"`
-    Metadata  map[string]string `json:"meta,omitempty"`
-
-    // Backend hints — adapters use what they support, ignore the rest.
-    // These are not serialized; they're set in-process before Publish().
-    PartitionKey string        `json:"-"` // Kafka partition, SQS message group ID
-    OrderingKey  string        `json:"-"` // GCP Pub/Sub ordering key
-    RoutingKey   string        `json:"-"` // RabbitMQ routing key
-    Delay        time.Duration `json:"-"` // SQS delay, RabbitMQ delayed message
-    Headers      map[string]string `json:"-"` // Kafka headers, RabbitMQ headers, NATS headers
-}
-```
-
-Key change: `Data` is `[]byte` instead of `string`. The encoding strategy (JSON, protobuf,
-msgpack) is the caller's responsibility, not the adapter's.
-
-### Handler and Ack (`pkg/pubsub/handler.go`)
+### New Handler and Ack (`pkg/pubsub/handler.go`)
 
 ```go
 // HandlerFunc processes a received message. The Acknowledger gives the handler
@@ -92,9 +119,6 @@ type Acknowledger interface {
     Requeue(delay time.Duration)
 }
 ```
-
-The current design infers ack/nack from the handler's error return. Explicit ack gives handlers
-control over partial processing, dead-letter routing, and delayed requeue.
 
 ### Subscribe Options (`pkg/pubsub/options.go`)
 
@@ -123,10 +147,37 @@ func WithMaxRetries(n int) SubscribeOption { ... }
 func WithStartOffset(o StartOffset) SubscribeOption { ... }
 ```
 
+### Message Type Changes
+
+The existing `Message` struct is preserved. New backend-hint fields are added with `json:"-"`
+tags so they don't affect serialization. The existing `Data string` field is kept for backward
+compat; a future PR can add a `RawData []byte` field or change encoding.
+
+```go
+type Message struct {
+    // Existing fields — unchanged
+    Name      string         `json:"name"`
+    Version   int            `json:"v"`
+    Data      string         `json:"data"`
+    Timestamp time.Time      `json:"ts"`
+    Metadata  map[string]any `json:"meta,omitempty"`
+
+    // New: unique message identifier
+    ID string `json:"id,omitempty"`
+
+    // New: backend hints — adapters use what they support, ignore the rest.
+    // Not serialized; set in-process before Publish().
+    PartitionKey string            `json:"-"` // Kafka partition, SQS message group ID
+    OrderingKey  string            `json:"-"` // GCP Pub/Sub ordering key
+    RoutingKey   string            `json:"-"` // RabbitMQ routing key
+    Delay        time.Duration     `json:"-"` // SQS delay, RabbitMQ delayed message
+    Headers      map[string]string `json:"-"` // Kafka headers, RabbitMQ headers, NATS headers
+}
+```
+
 ### Adapter Registry (`pkg/pubsub/registry.go`)
 
 ```go
-// AdapterFactory creates an adapter from backend-specific config.
 type AdapterFactory func(ctx context.Context, cfg json.RawMessage) (Adapter, error)
 
 var (
@@ -134,60 +185,38 @@ var (
     registry = map[string]AdapterFactory{}
 )
 
-// Register makes a backend available by name. Called from init().
-func Register(name string, factory AdapterFactory) {
-    mu.Lock()
-    defer mu.Unlock()
-    registry[name] = factory
-}
-
-// NewAdapter creates an adapter for the named backend.
-func NewAdapter(ctx context.Context, backend string, cfg json.RawMessage) (Adapter, error) {
-    mu.RLock()
-    factory, ok := registry[backend]
-    mu.RUnlock()
-    if !ok {
-        return nil, fmt.Errorf("unknown pubsub backend: %s", backend)
-    }
-    return factory(ctx, cfg)
-}
+func Register(name string, factory AdapterFactory) { ... }
+func NewAdapter(ctx context.Context, backend string, cfg json.RawMessage) (Adapter, error) { ... }
 ```
 
-Each adapter package registers itself:
-```go
-// In adapters/kafka/kafka.go
-func init() {
-    pubsub.Register("kafka", New)
-}
-```
-
-### Middleware (`pkg/pubsub/middleware/`)
+### Legacy Bridge (`pkg/pubsub/bridge.go`)
 
 ```go
-type Middleware func(Adapter) Adapter
-
-// Compose applies middleware in order (outermost first).
-func Compose(adapter Adapter, mw ...Middleware) Adapter {
-    for i := len(mw) - 1; i >= 0; i-- {
-        adapter = mw[i](adapter)
-    }
-    return adapter
+// LegacyBridge wraps an Adapter to satisfy the existing Publisher/Subscriber/
+// PublishSubscriber interfaces. This allows existing callers to use new adapters
+// without code changes.
+type LegacyBridge struct {
+    adapter Adapter
 }
-```
 
-Initial middleware:
-- **`WithLogging`** — log publish/subscribe events, errors.
-- **`WithMetrics`** — publish/subscribe counters, latency histograms.
-- **`WithTracing`** — OpenTelemetry span propagation.
+func NewLegacyBridge(a Adapter) *LegacyBridge { ... }
+
+// Publish satisfies Publisher — delegates directly.
+func (b *LegacyBridge) Publish(ctx context.Context, topic string, m Message) error { ... }
+
+// Subscribe satisfies Subscriber — wraps old PerformFunc into new HandlerFunc,
+// translating error return to Ack/Nack.
+func (b *LegacyBridge) Subscribe(ctx context.Context, topic string, handler PerformFunc) error { ... }
+
+// SubscribeN satisfies Subscriber — same wrapping with WithConcurrency(n).
+func (b *LegacyBridge) SubscribeN(ctx context.Context, topic string, handler PerformFunc, concurrency int64) error { ... }
+```
 
 ### Concurrency Helper (`pkg/pubsub/concurrency.go`)
 
-The weighted-semaphore pattern currently in `broker.go` is good. Extract it as a reusable
-helper that adapters can optionally use:
+Extract the weighted-semaphore pattern from `broker.go` as a reusable helper:
 
 ```go
-// ConcurrentSubscriber wraps a base receive loop with semaphore-based concurrency.
-// Adapters that don't need custom concurrency can delegate to this.
 func ConcurrentSubscriber(
     ctx context.Context,
     concurrency int,
@@ -196,23 +225,118 @@ func ConcurrentSubscriber(
 ) error { ... }
 ```
 
-## Adapter Implementations
+### Middleware (`pkg/pubsub/middleware/`)
 
-### 1. In-Memory (`pkg/pubsub/adapters/memory/`)
+```go
+type Middleware func(Adapter) Adapter
 
-- For testing and single-process dev server.
-- Channel-based fan-out per topic.
-- No external dependencies.
+func Compose(adapter Adapter, mw ...Middleware) Adapter { ... }
+```
 
-### 2. NATS / JetStream (`pkg/pubsub/adapters/nats/`)
+- `WithLogging` — log publish/subscribe events, errors
+- `WithMetrics` — counters, latency histograms
+- `WithTracing` — OpenTelemetry span propagation
 
-- Unifies the current `broker` (via gocloud.dev) and `NatsConnector` into a single adapter.
-- Core NATS for fire-and-forget, JetStream for durable subscriptions.
-- Maps `ConsumerGroup` → NATS queue group / JetStream durable consumer.
-- Maps `Headers` → NATS message headers.
-- Uses existing `nats.go` and `nats.go/jetstream` packages.
+---
 
-Config:
+## Milestones
+
+This is a multi-PR project. Each milestone is a separate PR. Within each milestone,
+**tests are written first**, then the implementation is added to make them pass.
+
+### PR 1: Core Interfaces + Registry + Conformance Suite
+
+**What**: Foundation that all subsequent adapters build on. No changes to existing code paths.
+
+**Deliverables**:
+- `pkg/pubsub/adapter.go` — `Adapter` interface
+- `pkg/pubsub/handler.go` — `HandlerFunc`, `Acknowledger`
+- `pkg/pubsub/options.go` — `SubscribeConfig`, `SubscribeOption`, option funcs
+- `pkg/pubsub/registry.go` — `Register()`, `NewAdapter()`
+- `pkg/pubsub/registry_test.go` — registry unit tests
+- `pkg/pubsub/concurrency.go` — extracted semaphore helper
+- `pkg/pubsub/concurrency_test.go` — concurrency helper tests
+- `pkg/pubsub/bridge.go` — `LegacyBridge`
+- `pkg/pubsub/bridge_test.go` — bridge tests (verify old interface contract via adapter)
+- `pkg/pubsub/adaptertest/conformance.go` — shared conformance test suite
+- Add `ID`, `PartitionKey`, `OrderingKey`, `RoutingKey`, `Delay`, `Headers` fields to `Message`
+
+**Backward compat**: No existing files modified (except additive `Message` field additions).
+All existing tests pass unchanged.
+
+**Test order**: Write `registry_test.go`, `concurrency_test.go`, `bridge_test.go`, and
+`adaptertest/conformance.go` first. Bridge tests use a mock adapter to validate the translation
+from `PerformFunc` → `HandlerFunc` and error → ack/nack mapping.
+
+---
+
+### PR 2: Kafka Adapter (franz-go)
+
+**What**: First real adapter. New capability — Kafka was not previously supported.
+
+**Deliverables**:
+- `pkg/pubsub/adapters/kafka/kafka.go` — adapter implementation
+- `pkg/pubsub/adapters/kafka/kafka_test.go` — conformance + Kafka-specific tests
+
+**Config**:
+```go
+type Config struct {
+    Brokers       []string `json:"brokers"`
+    TLS           bool     `json:"tls"`
+    SASLMechanism string   `json:"sasl_mechanism,omitempty"`
+    SASLUser      string   `json:"sasl_user,omitempty"`
+    SASLPass      string   `json:"sasl_pass,omitempty"`
+}
+```
+
+**Kafka-specific tests** (build tag: `integration,kafka`; CI uses Redpanda container):
+- `TestProduceConsume` — basic round-trip
+- `TestPartitionKey` — same key lands on same partition
+- `TestConsumerGroup` — competing consumers, no duplicates
+- `TestConsumerGroupRebalance` — add/remove consumers
+- `TestKafkaHeaders` — header round-trip
+- `TestOffsetEarliest` / `TestOffsetLatest` — start position
+- `TestCommitOnAck` / `TestNackDoesNotCommit` — offset management
+- `TestBatchPerformance` — 10k messages, no per-message round-trip
+- `TestTLS` / `TestSASL` — auth/encryption
+
+**Backward compat**: Purely additive. No existing files modified.
+
+**Test order**: Write `kafka_test.go` with conformance suite call + all Kafka-specific tests
+first (they will fail/skip). Then implement `kafka.go`.
+
+---
+
+### PR 3: In-Memory Adapter
+
+**What**: Replace the gocloud.dev `mem://` backend. Used by all existing unit tests and the
+dev server.
+
+**Deliverables**:
+- `pkg/pubsub/adapters/memory/memory.go` — adapter implementation
+- `pkg/pubsub/adapters/memory/memory_test.go` — conformance + memory-specific tests
+
+**Memory-specific tests**:
+- `TestFanOut` — two subscribers each receive every message
+- `TestIsolatedTopics` — messages on topic A not received on topic B
+- `TestNoExternalDependencies` — zero config, no env vars
+
+**Backward compat**: Purely additive. Existing `broker.go` in-memory path unchanged.
+
+**Test order**: Write tests first, then implement.
+
+---
+
+### PR 4: NATS / JetStream Adapter
+
+**What**: Unify the current `broker` (gocloud.dev natspubsub) and `NatsConnector` into a
+single adapter that handles both core NATS and JetStream.
+
+**Deliverables**:
+- `pkg/pubsub/adapters/nats/nats.go` — adapter implementation
+- `pkg/pubsub/adapters/nats/nats_test.go` — conformance + NATS-specific tests
+
+**Config**:
 ```go
 type Config struct {
     URLs       string `json:"urls"`
@@ -221,52 +345,67 @@ type Config struct {
 }
 ```
 
-### 3. Kafka (`pkg/pubsub/adapters/kafka/`)
+**NATS-specific tests** (build tag: `integration,nats`; CI uses `nats:latest -js`):
+- `TestCoreNATSPublishSubscribe` — fire-and-forget
+- `TestJetStreamDurableConsumer` — survives subscriber restart
+- `TestQueueGroup` / `TestQueueGroupDifferentGroups` — competing vs fan-out
+- `TestNATSHeaders` — header round-trip
+- `TestJetStreamAckNack` — nack triggers redelivery
+- `TestConnectionReconnect` — adapter recovers after disconnect
+- `TestDrainOnClose` — buffered messages flushed
 
-- Uses **franz-go** (`github.com/twmb/franz-go`) — most complete Kafka protocol implementation.
-- Maps `PartitionKey` → Kafka record key.
-- Maps `ConsumerGroup` → Kafka consumer group.
-- Maps `Headers` → Kafka record headers.
-- Maps `StartOffset` → `kgo.ConsumeResetOffset`.
-- Supports batch consumption internally, dispatches to handler per-record.
+**Backward compat**: Purely additive. Existing `broker.go` NATS path and `broker/nats.go`
+unchanged.
 
-Config:
-```go
-type Config struct {
-    Brokers       []string `json:"brokers"`
-    TLS           bool     `json:"tls"`
-    SASLMechanism string   `json:"sasl_mechanism,omitempty"` // PLAIN, SCRAM-SHA-256, SCRAM-SHA-512
-    SASLUser      string   `json:"sasl_user,omitempty"`
-    SASLPass      string   `json:"sasl_pass,omitempty"`
-}
-```
+**Test order**: Write tests first, then implement.
 
-### 4. AWS SQS (`pkg/pubsub/adapters/sqs/`)
+---
 
-- Uses `aws-sdk-go-v2`.
-- Maps `PartitionKey` → SQS `MessageGroupId` (FIFO queues).
-- Maps `Delay` → `DelaySeconds`.
-- Maps `Ack` → `DeleteMessage`, `Nack` → no-op (visibility timeout expires), `Requeue` → `ChangeMessageVisibility`.
-- Publish goes to SNS topic or directly to SQS queue (configurable).
+### PR 5: AWS SQS Adapter
 
-Config:
+**What**: Replace the gocloud.dev `awssnssqs` backend with a direct `aws-sdk-go-v2`
+implementation.
+
+**Deliverables**:
+- `pkg/pubsub/adapters/sqs/sqs.go` — adapter implementation
+- `pkg/pubsub/adapters/sqs/sqs_test.go` — conformance + SQS-specific tests
+
+**Config**:
 ```go
 type Config struct {
     Region   string `json:"region"`
     QueueURL string `json:"queue_url"`
-    // Optional: publish to SNS topic instead of directly to SQS
-    TopicARN string `json:"topic_arn,omitempty"`
+    TopicARN string `json:"topic_arn,omitempty"` // optional SNS fan-out
 }
 ```
 
-### 5. GCP Pub/Sub (`pkg/pubsub/adapters/gcppubsub/`)
+**SQS-specific tests** (build tag: `integration,sqs`; CI uses LocalStack):
+- `TestSQSSendReceive` — basic round-trip
+- `TestSQSDelaySeconds` — `Delay` → `DelaySeconds`
+- `TestSQSFIFOMessageGroup` — `PartitionKey` → `MessageGroupId`
+- `TestSQSVisibilityTimeout` — unacked message reappears
+- `TestSQSRequeue` — `ChangeMessageVisibility`
+- `TestSQSDeleteOnAck` — ack deletes message
+- `TestSQSBatchReceive` — efficient batch polling
+- `TestSQSLongPolling` — `WaitTimeSeconds`, no busy-loop
+- `TestSNSPublish` — optional SNS topic publishing
 
-- Uses `cloud.google.com/go/pubsub`.
-- Maps `OrderingKey` → GCP ordering key.
-- Maps `ConsumerGroup` → GCP subscription name.
-- Maps `Ack`/`Nack` → native GCP ack/nack.
+**Backward compat**: Purely additive.
 
-Config:
+**Test order**: Write tests first, then implement.
+
+---
+
+### PR 6: GCP Pub/Sub Adapter
+
+**What**: Replace the gocloud.dev `gcppubsub` backend with a direct
+`cloud.google.com/go/pubsub` implementation.
+
+**Deliverables**:
+- `pkg/pubsub/adapters/gcppubsub/gcppubsub.go` — adapter implementation
+- `pkg/pubsub/adapters/gcppubsub/gcppubsub_test.go` — conformance + GCP-specific tests
+
+**Config**:
 ```go
 type Config struct {
     ProjectID      string `json:"project_id"`
@@ -274,15 +413,29 @@ type Config struct {
 }
 ```
 
-### 6. RabbitMQ (`pkg/pubsub/adapters/rabbitmq/`)
+**GCP-specific tests** (build tag: `integration,gcppubsub`; CI uses GCP emulator):
+- `TestGCPPublishSubscribe` — basic round-trip
+- `TestGCPOrderingKey` — ordering key preserves order
+- `TestGCPAckDeadline` — unacked redelivered after deadline
+- `TestGCPMultipleSubscriptions` — different subscriptions each get all messages
+- `TestGCPNack` — nack triggers redelivery
+- `TestGCPAttributeRoundTrip` — Metadata ↔ attributes
 
-- Uses `github.com/rabbitmq/amqp091-go`.
-- Maps `RoutingKey` → AMQP routing key.
-- Maps `Headers` → AMQP headers (for header-based routing).
-- Maps `Ack`/`Nack`/`Requeue` → AMQP ack/nack/reject with requeue.
-- Configurable exchange type (direct, topic, fanout, headers).
+**Backward compat**: Purely additive.
 
-Config:
+**Test order**: Write tests first, then implement.
+
+---
+
+### PR 7: RabbitMQ Adapter
+
+**What**: New capability — RabbitMQ was not previously supported.
+
+**Deliverables**:
+- `pkg/pubsub/adapters/rabbitmq/rabbitmq.go` — adapter implementation
+- `pkg/pubsub/adapters/rabbitmq/rabbitmq_test.go` — conformance + RabbitMQ-specific tests
+
+**Config**:
 ```go
 type Config struct {
     URL          string `json:"url"` // amqp://user:pass@host:5672/vhost
@@ -293,58 +446,117 @@ type Config struct {
 }
 ```
 
-## Migration Strategy
+**RabbitMQ-specific tests** (build tag: `integration,rabbitmq`; CI uses RabbitMQ container):
+- `TestDirectExchange` — routing key exact match
+- `TestTopicExchange` — wildcard routing
+- `TestFanoutExchange` — all queues receive
+- `TestHeaderExchange` — header-based routing
+- `TestAckNackRequeue` — nack with/without requeue
+- `TestDurableQueue` — survives subscriber restart
+- `TestPrefetchCount` — `WithConcurrency` → QoS prefetch
+- `TestConnectionRecovery` — auto-reconnect
 
-### Phase 1: Introduce new interfaces alongside existing code
-- Add `adapter.go`, `message.go`, `handler.go`, `options.go`, `registry.go`.
-- Add `concurrency.go` helper extracted from current `broker.go`.
-- No changes to existing `broker.go` or `config/messaging.go`.
+**Backward compat**: Purely additive.
 
-### Phase 2: Implement adapters
-- Start with `memory` and `nats` adapters (these cover existing test + production use).
-- Add `kafka` adapter (new capability).
-- Add `sqs` and `gcppubsub` adapters (replace gocloud.dev versions).
-- Add `rabbitmq` adapter.
+**Test order**: Write tests first, then implement.
 
-### Phase 3: Bridge layer for backward compatibility
-- Create a `LegacyBridge` that wraps the new `Adapter` interface and exposes the old
-  `Publisher`/`Subscriber`/`PublishSubscriber` interfaces.
-- Update `NewPublisher()`, `NewSubscriber()`, `NewPublishSubscriber()` to use the bridge
-  internally.
-- Existing callers (`api/service.go`, `runner/runner.go`, `executor/service.go`,
-  `devserver/devserver.go`) continue to work unchanged.
+---
 
-### Phase 4: Migrate callers
-- Update callers to use `Adapter` directly.
-- Remove bridge layer and old `broker.go`.
-- Remove `gocloud.dev/pubsub` dependency.
-- Remove `TopicURLCreator` interface from config.
+### PR 8: Middleware (Logging, Metrics, Tracing)
 
-## File Layout
+**What**: Cross-cutting decorator middleware.
+
+**Deliverables**:
+- `pkg/pubsub/middleware/middleware.go` — `Middleware` type, `Compose` func
+- `pkg/pubsub/middleware/logging.go` + `logging_test.go`
+- `pkg/pubsub/middleware/metrics.go` + `metrics_test.go`
+- `pkg/pubsub/middleware/tracing.go` + `tracing_test.go`
+
+**Tests**:
+- Logging: log on publish, subscribe start, errors
+- Metrics: publish counter, error counter, latency histogram, topic labels
+- Tracing: publish span, subscribe span, trace context propagation via headers
+
+**Backward compat**: Purely additive.
+
+**Test order**: Write tests first, then implement.
+
+---
+
+### PR 9: Wire In — Switch Constructors to Use Adapters + Bridge
+
+**What**: Update `NewPublisher`/`NewSubscriber`/`NewPublishSubscriber` to internally create
+new adapters + `LegacyBridge` instead of the old `broker`. This is the switchover PR.
+
+**Deliverables**:
+- Update `NewPublishSubscriber` to detect backend from `config.MessagingService` and create
+  the corresponding adapter, wrapped in `LegacyBridge`
+- Keep `broker.go` alive but unused (safety net for rollback)
+- Register all adapters via blank imports
+
+**Key constraint**: The function signatures of `NewPublisher`, `NewSubscriber`,
+`NewPublishSubscriber` do NOT change. All existing callers compile and behave identically.
+
+**Tests**:
+- Existing `broker_test.go` tests must pass (they call `NewPublishSubscriber` → bridge →
+  memory adapter)
+- All integration tests for existing callers pass
+
+**Backward compat**: Full. Same signatures, same behavior. Internal implementation changes only.
+
+---
+
+### PR 10: Cleanup — Remove gocloud.dev Dependency
+
+**What**: Remove old code now that adapters are in production.
+
+**Deliverables**:
+- Delete `pkg/pubsub/broker.go` (old gocloud.dev broker)
+- Delete `pkg/pubsub/broker/nats.go` (old NatsConnector — replaced by NATS adapter)
+- Remove gocloud.dev imports and dependencies from `go.mod`
+- Remove `TopicURLCreator` from `config/messaging.go` (or deprecate)
+- Update `config.MessagingService` to carry `json.RawMessage` for adapter config
+
+**Backward compat**: Breaking for `TopicURLCreator` users (internal only). All public
+`Publisher`/`Subscriber`/`PublishSubscriber` interfaces remain stable.
+
+---
+
+## File Layout (final state after all PRs)
 
 ```
 pkg/pubsub/
-    adapter.go              # Adapter interface
-    message.go              # Message type with backend hints
+    pubsub.go               # Original interfaces: Publisher, Subscriber, PublishSubscriber,
+                             #   PerformFunc, Message (preserved)
+    adapter.go              # New Adapter interface
     handler.go              # HandlerFunc, Acknowledger
-    options.go              # SubscribeOption, SubscribeConfig
+    options.go              # SubscribeConfig, SubscribeOption, option funcs
     registry.go             # Register(), NewAdapter()
+    registry_test.go
     concurrency.go          # Shared semaphore-based concurrency helper
-    bridge.go               # LegacyBridge for backward compat (Phase 3)
+    concurrency_test.go
+    bridge.go               # LegacyBridge (old interfaces → Adapter)
+    bridge_test.go
+    adaptertest/
+        conformance.go      # Shared conformance test suite
     middleware/
+        middleware.go        # Middleware type, Compose
         logging.go
+        logging_test.go
         metrics.go
+        metrics_test.go
         tracing.go
+        tracing_test.go
     adapters/
         memory/
             memory.go
             memory_test.go
-        nats/
-            nats.go         # Unifies current broker + NatsConnector
-            nats_test.go
         kafka/
-            kafka.go        # franz-go based
+            kafka.go        # franz-go
             kafka_test.go
+        nats/
+            nats.go
+            nats_test.go
         sqs/
             sqs.go
             sqs_test.go
@@ -354,11 +566,6 @@ pkg/pubsub/
         rabbitmq/
             rabbitmq.go
             rabbitmq_test.go
-    # Legacy (removed in Phase 4)
-    broker.go               # Current gocloud.dev broker
-    broker_test.go
-    broker/
-        nats.go             # Current NatsConnector
 ```
 
 ## Open Questions
