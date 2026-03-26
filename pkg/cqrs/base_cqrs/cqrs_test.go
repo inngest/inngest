@@ -1732,6 +1732,66 @@ func TestCQRSGetSpan(t *testing.T) {
 	})
 }
 
+// TestSpanWithAttributesAndOutput is a regression test ensuring that spans
+// with JSON attributes and output can be inserted and queried without
+// "JSON cannot hold BLOB values" errors. This catches the bug where []byte
+// fields were stored as BLOBs instead of TEXT in SQLite JSON columns.
+func TestSpanWithAttributesAndOutput(t *testing.T) {
+	cm, cleanup := initCQRS(t)
+	defer cleanup()
+
+	runULID := ulid.MustNew(ulid.Now(), rand.Reader)
+	runID := runULID.String()
+
+	insertTestSpan(t, cm, testSpanFields{
+		RunID:         runID,
+		DynamicSpanID: "dyn-with-attrs",
+		Name:          "executor.run",
+		Attributes:    []byte(`{"sdk.language":"go","sdk.version":"0.1.0"}`),
+		Output:        []byte(`{"data":{"num":42}}`),
+	})
+
+	// GetSpansByRunID uses json_group_array(json_object('attributes', attributes, ...))
+	// which fails with "JSON cannot hold BLOB values" if attributes/output are BLOBs.
+	result, err := cm.GetSpansByRunID(t.Context(), runULID)
+	require.NoError(t, err, "query must not fail with 'JSON cannot hold BLOB values'")
+	assert.NotNil(t, result)
+}
+
+// TestSpanOutputReadBack verifies that span output stored as []byte can be
+// read back via GetSpanOutput without corruption. This is a regression test
+// for double-encoding where json.Marshal(stringValue) would wrap the JSON
+// in extra quotes, breaking json_extract queries.
+func TestSpanOutputReadBack(t *testing.T) {
+	cm, cleanup := initCQRS(t)
+	defer cleanup()
+
+	runID := ulid.MustNew(ulid.Now(), rand.Reader).String()
+	spanID := ulid.MustNew(ulid.Now(), rand.Reader).String()
+
+	q := cm.(wrapper).q
+	err := q.InsertSpan(t.Context(), dbpkg.InsertSpanParams{
+		SpanID:    spanID,
+		TraceID:   ulid.MustNew(ulid.Now(), rand.Reader).String(),
+		Name:      "test-span",
+		StartTime: time.Now(),
+		EndTime:   time.Now().Add(100 * time.Millisecond),
+		RunID:     runID,
+		AccountID: "acct",
+		AppID:     "app",
+		FunctionID: "fn",
+		EnvID:     "env",
+		Output:    []byte(`{"data":{"num":42}}`),
+	})
+	require.NoError(t, err)
+
+	out, err := cm.GetSpanOutput(t.Context(), cqrs.SpanIdentifier{SpanID: spanID})
+	require.NoError(t, err)
+	require.NotNil(t, out)
+	// After the data/error unwrapping in GetSpanOutput, "data" key is extracted
+	assert.Contains(t, string(out.Data), `"num":42`, "output should contain raw JSON, not double-encoded")
+}
+
 //
 // Helpers
 //
@@ -1749,6 +1809,8 @@ type testSpanFields struct {
 	AppID          string    // default: "app"
 	FunctionID     string    // default: "fn"
 	EnvID          string    // default: "env"
+	Attributes     []byte    // JSON attributes (optional)
+	Output         []byte    // JSON output (optional)
 }
 
 // There aren't any functions exposed on cqrs.Manager that write to the new spans table
@@ -1797,6 +1859,8 @@ func insertTestSpan(t *testing.T, cm cqrs.Manager, spanFields testSpanFields) {
 		DynamicSpanID:  sql.NullString{String: spanFields.DynamicSpanID, Valid: spanFields.DynamicSpanID != ""},
 		DebugRunID:     sql.NullString{String: spanFields.DebugRunID, Valid: spanFields.DebugRunID != ""},
 		DebugSessionID: sql.NullString{String: spanFields.DebugSessionID, Valid: spanFields.DebugSessionID != ""},
+		Attributes:     spanFields.Attributes,
+		Output:         spanFields.Output,
 	})
 	require.NoError(t, err)
 }
