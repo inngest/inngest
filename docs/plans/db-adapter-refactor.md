@@ -34,21 +34,28 @@ business logic.
 
 **Goal:** Decouple the canonical data types from any specific database dialect.
 
-### 1.1 — Define domain models in `pkg/cqrs/models.go`
+### 1.1 — Define database row types in `pkg/cqrs/sqlc_types/models.go`
 
-Extract database-agnostic structs from the existing SQLite models. These become the
-single source of truth that all adapters return.
+> **Why `sqlc_types` subpackage instead of `pkg/cqrs/` directly?**
+>
+> `pkg/cqrs/` already defines application-level domain types (`cqrs.App`, `cqrs.Event`,
+> `cqrs.Function`, `cqrs.FunctionRun`, `cqrs.TraceRun`, `cqrs.WorkerConnection`, etc.)
+> with rich semantics (parsed JSON, proper UUIDs, etc.). These are consumed throughout
+> the codebase. The new "database row" types are a **lower layer** — the raw row
+> representations that all adapters convert their sqlc output into, before the `wrapper`
+> maps them to the higher-level `cqrs.*` types.
+>
+> Placing them in `pkg/cqrs/` would cause dozens of name collisions (`App` vs `App`,
+> `UpsertAppParams` vs `UpsertAppParams`, etc.). A subpackage keeps the layers clean:
+> `sqlc_types.App` (database row) -> `cqrs.App` (application domain).
+
+Extract database-agnostic row structs from the existing SQLite/Postgres models.
+These use the widest compatible Go types (`int64` everywhere, `[]byte` for JSON,
+`sql.Null*` for nullable fields) so every adapter can produce them without loss.
 
 ```go
-// pkg/cqrs/models.go
-package cqrs
-
-import (
-    "database/sql"
-    "time"
-    "github.com/google/uuid"
-    "github.com/oklog/ulid/v2"
-)
+// pkg/cqrs/sqlc_types/models.go
+package sqlc_types
 
 type App struct {
     ID          uuid.UUID
@@ -63,52 +70,49 @@ type App struct {
     CreatedAt   time.Time
     ArchivedAt  sql.NullTime
     Url         string
-    Method      sql.NullString
-    AppVersion  sql.NullInt64
+    Method      string
+    AppVersion  sql.NullString
 }
-
-type Function struct { /* ... */ }
-type Event struct { /* ... */ }
-type FunctionRun struct { /* ... */ }
-type History struct { /* ... */ }
-// ... one struct per table
+// ... one struct per table, plus composite row types
 ```
 
-### 1.2 — Define the `Querier` interface on domain types
-
-Move the `Querier` interface out of sqlc-generated code into `pkg/cqrs/querier.go`.
-It returns `cqrs.App`, not `sqlc.App`.
+### 1.2 — Define the `Querier` interface on row types
 
 ```go
-// pkg/cqrs/querier.go
-package cqrs
+// pkg/cqrs/sqlc_types/querier.go
+package sqlc_types
 
 type Querier interface {
     GetApp(ctx context.Context, id uuid.UUID) (*App, error)
     GetApps(ctx context.Context) ([]*App, error)
     UpsertApp(ctx context.Context, arg UpsertAppParams) (*App, error)
-    // ... all 99 current methods, typed with domain models
+    // ... all methods, typed with sqlc_types models
 }
 ```
 
-### 1.3 — Adapter implementations convert internally
+### 1.3 — Converter functions from dialect-specific types
 
-Each adapter's sqlc-generated code stays private. The adapter converts to domain types:
+Each dialect gets a converter file that maps sqlc-generated types to `sqlc_types.*`:
 
 ```go
-// pkg/cqrs/adapters/sqlite/querier.go
-func (a *Adapter) GetApp(ctx context.Context, id uuid.UUID) (*cqrs.App, error) {
-    row, err := a.q.GetApp(ctx, id)
-    if err != nil { return nil, err }
-    return toDomainApp(row), nil
-}
+// pkg/cqrs/sqlc_types/convert_sqlite.go
+func AppFromSQLite(s *sqlc_sqlite.App) *App { ... }
+
+// pkg/cqrs/sqlc_types/convert_postgres.go
+func AppFromPostgres(s *sqlc_pg.App) *App { ... }
 ```
+
+These converters handle type widening (int32 -> int64, pqtype -> []byte, etc.)
+and will move into adapter packages in Phase 2.
 
 ### Deliverables
 
-- [ ] `pkg/cqrs/models.go` — all domain structs
-- [ ] `pkg/cqrs/querier.go` — Querier interface on domain types
-- [ ] `pkg/cqrs/params.go` — param structs for write operations (shared across adapters)
+- [x] `pkg/cqrs/sqlc_types/models.go` — 14 row structs + 4 composite types
+- [x] `pkg/cqrs/sqlc_types/querier.go` — Querier interface on row types
+- [x] `pkg/cqrs/sqlc_types/params.go` — 25 param structs for write operations
+- [x] `pkg/cqrs/sqlc_types/convert_sqlite.go` — SQLite -> domain converters
+- [x] `pkg/cqrs/sqlc_types/convert_postgres.go` — Postgres -> domain converters
+- [x] `pkg/cqrs/sqlc_types/convert_test.go` — Cross-dialect conversion tests
 
 ---
 
@@ -521,13 +525,18 @@ Recommended approach:
 pkg/cqrs/
     adapter.go              # Adapter, TxAdapter, DialectHelpers interfaces
     cqrs.go                 # Manager, TxManager (unchanged)
-    models.go               # Domain model types (new)
-    params.go               # Shared write-operation param structs (new)
-    querier.go              # Querier interface on domain types (new)
     dbpool.go               # OpenDB + PoolConfig (new)
     apps.go                 # AppManager interface (unchanged)
     events.go               # EventManager interface (unchanged)
     ...
+
+    sqlc_types/
+        models.go           # Database row types — all adapters produce these
+        params.go           # Shared write-operation param structs
+        querier.go          # Querier interface on row types
+        convert_sqlite.go   # SQLite sqlc -> row type converters
+        convert_postgres.go # Postgres sqlc -> row type converters
+        convert_helpers.go  # Type widening helpers (int32->int64 etc.)
 
     adapters/
         cqrstest/
