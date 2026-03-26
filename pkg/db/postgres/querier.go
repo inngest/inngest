@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	"github.com/google/uuid"
 	sqlc "github.com/inngest/inngest/pkg/cqrs/base_cqrs/sqlc/postgres"
@@ -265,12 +266,29 @@ func (pq *pgQuerier) InsertFunctionRun(ctx context.Context, arg db.InsertFunctio
 }
 
 func (pq *pgQuerier) InsertFunctionFinish(ctx context.Context, arg db.InsertFunctionFinishParams) error {
+	// Postgres schema: status VARCHAR NOT NULL, output VARCHAR NOT NULL DEFAULT '{}',
+	// completed_step_count INT NOT NULL DEFAULT 1, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP.
+	// Use schema defaults when the nullable domain field is not set.
+	status := arg.Status.String
+	output := "{}"
+	if arg.Output.Valid {
+		output = arg.Output.String
+	}
+	var completedStepCount int32 = 1
+	if arg.CompletedStepCount.Valid {
+		completedStepCount = int32(arg.CompletedStepCount.Int64)
+	}
+	createdAt := time.Now()
+	if arg.CreatedAt.Valid {
+		createdAt = arg.CreatedAt.Time
+	}
+
 	return pq.q.InsertFunctionFinish(ctx, sqlc.InsertFunctionFinishParams{
 		RunID:              arg.RunID,
-		Status:             arg.Status.String,
-		Output:             arg.Output.String,
-		CompletedStepCount: int32(arg.CompletedStepCount.Int64),
-		CreatedAt:          arg.CreatedAt.Time,
+		Status:             status,
+		Output:             output,
+		CompletedStepCount: completedStepCount,
+		CreatedAt:          createdAt,
 	})
 }
 
@@ -463,7 +481,8 @@ func (pq *pgQuerier) GetSpansByDebugRunID(ctx context.Context, debugRunID sql.Nu
 		out[i] = &db.SpanRow{
 			RunID: r.RunID, TraceID: r.TraceID, DynamicSpanID: r.DynamicSpanID,
 			StartTime: r.StartTime, EndTime: r.EndTime, ParentSpanID: r.ParentSpanID,
-			SpanFragments: r.SpanFragments, DebugSessionID: r.DebugSessionID,
+			SpanFragments: r.SpanFragments,
+			DebugRunID: debugRunID, DebugSessionID: r.DebugSessionID,
 		}
 	}
 	return out, nil
@@ -480,7 +499,8 @@ func (pq *pgQuerier) GetSpansByDebugSessionID(ctx context.Context, debugSessionI
 		out[i] = &db.SpanRow{
 			RunID: r.RunID, TraceID: r.TraceID, DynamicSpanID: r.DynamicSpanID,
 			StartTime: r.StartTime, EndTime: r.EndTime, ParentSpanID: r.ParentSpanID,
-			SpanFragments: r.SpanFragments, DebugRunID: r.DebugRunID,
+			SpanFragments: r.SpanFragments,
+			DebugRunID: r.DebugRunID, DebugSessionID: debugSessionID,
 		}
 	}
 	return out, nil

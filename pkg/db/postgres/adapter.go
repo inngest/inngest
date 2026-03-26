@@ -34,7 +34,7 @@ func New(conn *sql.DB) *Adapter {
 func (a *Adapter) Dialect() db.Dialect              { return db.DialectPostgres }
 func (a *Adapter) Q() db.Querier                    { return a.q }
 func (a *Adapter) Helpers() driverhelp.DialectHelpers { return a.h }
-func (a *Adapter) Close() error                     { return nil }
+func (a *Adapter) Close() error                     { return a.conn.Close() }
 
 func (a *Adapter) WithTx(ctx context.Context) (db.TxAdapter, error) {
 	tx, err := a.conn.BeginTx(ctx, nil)
@@ -57,5 +57,16 @@ type TxAdapter struct {
 	tx *sql.Tx
 }
 
-func (t *TxAdapter) Commit(ctx context.Context) error  { return t.tx.Commit() }
-func (t *TxAdapter) Rollback(ctx context.Context) error { return t.tx.Rollback() }
+func (t *TxAdapter) Commit(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return t.tx.Commit()
+}
+
+func (t *TxAdapter) Rollback(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return t.tx.Rollback()
+}

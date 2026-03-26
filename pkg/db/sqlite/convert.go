@@ -124,7 +124,7 @@ func spanRowFromSQLiteRunID(r *sqlc.GetSpansByRunIDRow) *db.SpanRow {
 	return &db.SpanRow{
 		RunID: r.RunID, TraceID: r.TraceID, DynamicSpanID: r.DynamicSpanID,
 		StartTime: r.StartTime, EndTime: r.EndTime, ParentSpanID: r.ParentSpanID,
-		SpanFragments: r.SpanFragments,
+		SpanFragments: toBytes(r.SpanFragments),
 	}
 }
 

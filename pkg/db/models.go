@@ -249,7 +249,7 @@ type SpanRow struct {
 	StartTime      interface{}
 	EndTime        interface{}
 	ParentSpanID   sql.NullString
-	SpanFragments  interface{}
+	SpanFragments  []byte
 	DebugRunID     sql.NullString
 	DebugSessionID sql.NullString
 }
