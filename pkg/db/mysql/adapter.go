@@ -9,6 +9,7 @@ import (
 	"database/sql"
 
 	"github.com/inngest/inngest/pkg/db"
+	"github.com/inngest/inngest/pkg/db/driverhelp"
 )
 
 var (
@@ -26,10 +27,10 @@ func New(conn *sql.DB) *Adapter {
 	return &Adapter{conn: conn}
 }
 
-func (a *Adapter) Dialect() db.Dialect       { return db.DialectMySQL }
-func (a *Adapter) Q() db.Querier             { panic("mysql: not implemented") }
-func (a *Adapter) Helpers() db.DialectHelpers { panic("mysql: not implemented") }
-func (a *Adapter) Close() error              { return nil }
+func (a *Adapter) Dialect() db.Dialect              { return db.DialectMySQL }
+func (a *Adapter) Q() db.Querier                    { panic("mysql: not implemented") }
+func (a *Adapter) Helpers() driverhelp.DialectHelpers { panic("mysql: not implemented") }
+func (a *Adapter) Close() error                     { return nil }
 
 func (a *Adapter) WithTx(ctx context.Context) (db.TxAdapter, error) {
 	tx, err := a.conn.BeginTx(ctx, nil)

@@ -7,11 +7,11 @@ import (
 
 	sq "github.com/doug-martin/goqu/v9"
 	sqexp "github.com/doug-martin/goqu/v9/exp"
-	"github.com/inngest/inngest/pkg/db"
+	"github.com/inngest/inngest/pkg/db/driverhelp"
 	"github.com/inngest/inngest/pkg/run"
 )
 
-var _ db.DialectHelpers = (*helpers)(nil)
+var _ driverhelp.DialectHelpers = (*helpers)(nil)
 
 type helpers struct{}
 

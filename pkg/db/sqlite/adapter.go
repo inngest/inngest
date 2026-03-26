@@ -7,6 +7,7 @@ import (
 
 	sqlc "github.com/inngest/inngest/pkg/cqrs/base_cqrs/sqlc/sqlite"
 	"github.com/inngest/inngest/pkg/db"
+	"github.com/inngest/inngest/pkg/db/driverhelp"
 )
 
 var (
@@ -30,10 +31,10 @@ func New(conn *sql.DB) *Adapter {
 	}
 }
 
-func (a *Adapter) Dialect() db.Dialect       { return db.DialectSQLite }
-func (a *Adapter) Q() db.Querier             { return a.q }
-func (a *Adapter) Helpers() db.DialectHelpers { return a.h }
-func (a *Adapter) Close() error              { return nil }
+func (a *Adapter) Dialect() db.Dialect              { return db.DialectSQLite }
+func (a *Adapter) Q() db.Querier                    { return a.q }
+func (a *Adapter) Helpers() driverhelp.DialectHelpers { return a.h }
+func (a *Adapter) Close() error                     { return nil }
 
 func (a *Adapter) WithTx(ctx context.Context) (db.TxAdapter, error) {
 	tx, err := a.conn.BeginTx(ctx, nil)
