@@ -31,6 +31,19 @@ import { useVercelIntegration } from '@/queries/useVercelIntegration';
 
 const defaultPath = '/api/inngest';
 
+type ServePathRow = {
+  id: string;
+  value: string;
+};
+
+function createServePathRow(value: string): ServePathRow {
+  return {
+    // Generate a stable key for each row using a random number converted to a base-36 string.
+    id: Math.random().toString(36).slice(2),
+    value,
+  };
+}
+
 export const Route = createFileRoute(
   '/_authed/settings/integrations/vercel/configure/$id/',
 )({
@@ -50,7 +63,7 @@ function VercelConfigure() {
   const [project, setProject] = useState<VercelProject>();
   const [updated, setUpdated] = useState(false);
   const [notFound, setNotFound] = useState(false);
-  const [paths, setPaths] = useState([defaultPath]);
+  const [paths, setPaths] = useState<ServePathRow[]>([createServePathRow(defaultPath)]);
 
   //
   // For tracking loading states since urql does not offer that on mutations
@@ -67,7 +80,11 @@ function VercelConfigure() {
     // have been made as those operations are not idempotent upstream.
     const p = data.projects.find((p) => p.projectID === id);
     if (p) {
-      p.servePath && setPaths(p.servePath.split(','));
+      setPaths(
+        p.servePath
+          ? p.servePath.split(',').map((path) => createServePathRow(path))
+          : [createServePathRow(defaultPath)]
+      );
       setOriginalProject(p);
       setNotFound(false);
     } else {
@@ -84,7 +101,7 @@ function VercelConfigure() {
   }, [project]);
 
   useEffect(() => {
-    project && setProject({ ...project, servePath: paths.join(',') });
+    project && setProject({ ...project, servePath: paths.map((path) => path.value).join(',') });
   }, [paths]);
 
   const submit = useCallback(async () => {
@@ -252,16 +269,19 @@ function VercelConfigure() {
                 </div>
                 {paths.map((path, i) => (
                   <div
-                    key={`serve-path-${i}`}
+                    key={path.id}
                     className="flex flex-row items-center justify-start"
                   >
                     <div className="mr-2 w-full">
                       <Input
-                        defaultValue={path}
+                        value={path.value}
                         className="text-basis h-10 w-full px-2 py-2 text-base"
                         onChange={({ target: { value } }) => {
-                          setPaths(paths.map((p, n) => (i === n ? value : p)));
-                          setProject(project);
+                          setPaths((prevPaths) =>
+                            prevPaths.map((currentPath, n) =>
+                              i === n ? { ...currentPath, value } : currentPath
+                            )
+                          );
                         }}
                       />
                     </div>
@@ -273,7 +293,7 @@ function VercelConfigure() {
                         icon={<RiDeleteBinLine className="h-5 w-5" />}
                         className="h-10 w-10"
                         onClick={() =>
-                          setPaths(paths.filter((_, n) => n !== i))
+                          setPaths((prevPaths) => prevPaths.filter((_, n) => n !== i))
                         }
                       />
                     )}
@@ -286,10 +306,7 @@ function VercelConfigure() {
                     iconSide="left"
                     label="Add new path"
                     className="mt-3"
-                    onClick={() => {
-                      setProject({ ...project });
-                      setPaths([...paths, '']);
-                    }}
+                    onClick={() => setPaths((prevPaths) => [...prevPaths, createServePathRow('')])}
                   />
                 </div>
               </div>
