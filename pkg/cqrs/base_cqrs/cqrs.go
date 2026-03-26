@@ -588,6 +588,13 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 		}
 	}
 
+	// Build a reverse map from dynamic span IDs to their OTEL span IDs,
+	// so metadata lookups below are O(1) instead of scanning the entire map.
+	dynamicToOtelIDs := make(map[string][]string, len(otelToDynamic))
+	for otelID, dynID := range otelToDynamic {
+		dynamicToOtelIDs[dynID] = append(dynamicToOtelIDs[dynID], otelID)
+	}
+
 	for _, span := range spanMap.AllFromFront() {
 		// If we have an output reference for this span, set the appropriate
 		// target span ID here
@@ -607,14 +614,12 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 		// OTEL span ID, so also check the otelToDynamic mapping.
 		if metadata, ok := metadataByParent[span.SpanID]; ok {
 			span.Metadata = metadata
-		} else {
+		} else if otelIDs, ok := dynamicToOtelIDs[span.SpanID]; ok {
 			// Check if any metadata references an OTEL span ID that
 			// belongs to this dynamic span group.
-			for otelID, dynID := range otelToDynamic {
-				if dynID == span.SpanID {
-					if metadata, ok := metadataByParent[otelID]; ok {
-						span.Metadata = append(span.Metadata, metadata...)
-					}
+			for _, otelID := range otelIDs {
+				if metadata, ok := metadataByParent[otelID]; ok {
+					span.Metadata = append(span.Metadata, metadata...)
 				}
 			}
 		}

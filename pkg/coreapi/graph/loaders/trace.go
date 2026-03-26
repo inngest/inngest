@@ -542,6 +542,10 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 		// timing metadata) is parented to the step discovery span;
 		// when the discovery span is omitted, promote its metadata
 		// to the next visible step child so it reaches the UI.
+		//
+		// If no visible step/step_discovery child exists (e.g. all
+		// children were dropped), the accumulated metadata is
+		// intentionally discarded — there is no span to attach it to.
 		if len(omittedStepMetadata) > 0 {
 			for _, child := range gqlSpan.ChildrenSpans {
 				if child.SpanTypeName == meta.SpanNameStep || child.SpanTypeName == meta.SpanNameStepDiscovery {

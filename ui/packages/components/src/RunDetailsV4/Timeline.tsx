@@ -39,8 +39,110 @@ type Props = {
 };
 
 // ============================================================================
+// Phase Definitions (shared between segment generators and sub-bar renderers)
+// ============================================================================
+
+/** A phase definition shared by segment generators and the sub-bar renderer. */
+type PhaseDefinition<T> = {
+  key: string;
+  label: string;
+  style: BarStyleKey;
+  /** Extract the millisecond value for this phase from the breakdown data. */
+  getMs: (data: T) => number;
+};
+
+const HTTP_PHASES: PhaseDefinition<HTTPTimingBreakdownData>[] = [
+  { key: 'dns', label: 'DNS', style: 'timing.http.dns', getMs: (d) => d.dnsLookupMs },
+  { key: 'tcp', label: 'TCP', style: 'timing.http.tcp', getMs: (d) => d.tcpConnectionMs },
+  { key: 'tls', label: 'TLS', style: 'timing.http.tls', getMs: (d) => d.tlsHandshakeMs },
+  {
+    key: 'server',
+    label: 'Server processing',
+    style: 'timing.http.server',
+    getMs: (d) => d.serverProcessingMs,
+  },
+  {
+    key: 'transfer',
+    label: 'Transfer',
+    style: 'timing.http.transfer',
+    getMs: (d) => d.contentTransferMs,
+  },
+];
+
+const INNGEST_PHASES: PhaseDefinition<InngestBreakdownData>[] = [
+  {
+    key: 'discovery',
+    label: 'Discovery',
+    style: 'timing.inngest.discovery',
+    getMs: (d) => d.discoveryMs,
+  },
+  {
+    key: 'queue-delay',
+    label: 'Concurrency delay',
+    style: 'timing.inngest.concurrency',
+    getMs: (d) => d.queueDelayMs,
+  },
+  {
+    key: 'system-latency',
+    label: 'System latency',
+    style: 'timing.inngest.finalization',
+    getMs: (d) => d.systemLatencyMs,
+  },
+];
+
+const RUN_INNGEST_PHASES: PhaseDefinition<RunInngestBreakdownData>[] = [
+  {
+    key: 'run-queue',
+    label: 'Run queue delay',
+    style: 'timing.inngest.queue',
+    getMs: (d) => d.runQueueDelayMs,
+  },
+  {
+    key: 'finalization',
+    label: 'Finalization',
+    style: 'timing.inngest.finalization',
+    getMs: (d) => d.finalizationMs,
+  },
+];
+
+// ============================================================================
 // Timing Breakdown Utilities
 // ============================================================================
+
+/**
+ * Generate segments from phase definitions and breakdown data.
+ * Used by all three breakdown segment generators.
+ */
+function generatePhaseSegments<T extends { totalMs: number }>(
+  barId: string,
+  segmentPrefix: string,
+  phases: PhaseDefinition<T>[],
+  data: T,
+  status?: string
+): BarSegment[] | undefined {
+  const totalMs = data.totalMs;
+  if (totalMs <= 0) return undefined;
+
+  const segments: BarSegment[] = [];
+  let currentPercent = 0;
+
+  for (const phase of phases) {
+    const ms = phase.getMs(data);
+    if (ms > 0) {
+      const widthPercent = (ms / totalMs) * 100;
+      segments.push({
+        id: `${barId}-seg-${segmentPrefix}-${phase.key}`,
+        startPercent: currentPercent,
+        widthPercent,
+        style: phase.style,
+        status,
+      });
+      currentPercent += widthPercent;
+    }
+  }
+
+  return segments.length > 0 ? segments : undefined;
+}
 
 /**
  * Generate segments for a compound bar based on timing breakdown.
@@ -124,115 +226,29 @@ function generateDelaySegments(bar: TimelineBarData): BarSegment[] | undefined {
   return segments.length > 0 ? segments : undefined;
 }
 
-/**
- * Generate HTTP timing segments for the "Your server" compound bar.
- * Shows each HTTP phase (DNS, TCP, TLS, TTFB, Transfer) as a colored segment
- * within the bar, proportional to its duration.
- */
+/** Generate HTTP timing segments for the "Your server" compound bar. */
 function generateHTTPSegments(
   barId: string,
   httpTiming: HTTPTimingBreakdownData,
   status?: string
 ): BarSegment[] | undefined {
-  const totalMs = httpTiming.totalMs;
-  if (totalMs <= 0) return undefined;
-
-  const phases: { key: string; ms: number; style: BarStyleKey }[] = [
-    { key: 'dns', ms: httpTiming.dnsLookupMs, style: 'timing.http.dns' },
-    { key: 'tcp', ms: httpTiming.tcpConnectionMs, style: 'timing.http.tcp' },
-    { key: 'tls', ms: httpTiming.tlsHandshakeMs, style: 'timing.http.tls' },
-    { key: 'server', ms: httpTiming.serverProcessingMs, style: 'timing.http.server' },
-    { key: 'transfer', ms: httpTiming.contentTransferMs, style: 'timing.http.transfer' },
-  ];
-
-  const segments: BarSegment[] = [];
-  let currentPercent = 0;
-
-  for (const phase of phases) {
-    if (phase.ms > 0) {
-      const widthPercent = (phase.ms / totalMs) * 100;
-      segments.push({
-        id: `${barId}-seg-http-${phase.key}`,
-        startPercent: currentPercent,
-        widthPercent,
-        style: phase.style,
-        status,
-      });
-      currentPercent += widthPercent;
-    }
-  }
-
-  return segments.length > 0 ? segments : undefined;
+  return generatePhaseSegments(barId, 'http', HTTP_PHASES, httpTiming, status);
 }
 
-/**
- * Generate Inngest overhead segments for the Inngest compound bar.
- * Shows queue delay, discovery/scheduling, and finalization as colored segments.
- */
+/** Generate Inngest overhead segments for the Inngest compound bar. */
 function generateInngestSegments(
   barId: string,
   breakdown: InngestBreakdownData
 ): BarSegment[] | undefined {
-  const totalMs = breakdown.totalMs;
-  if (totalMs <= 0) return undefined;
-
-  const phases: { key: string; ms: number; style: BarStyleKey }[] = [
-    { key: 'discovery', ms: breakdown.discoveryMs, style: 'timing.inngest.discovery' },
-    { key: 'queue-delay', ms: breakdown.queueDelayMs, style: 'timing.inngest.concurrency' },
-    { key: 'system-latency', ms: breakdown.systemLatencyMs, style: 'timing.inngest.finalization' },
-  ];
-
-  const segments: BarSegment[] = [];
-  let currentPercent = 0;
-
-  for (const phase of phases) {
-    if (phase.ms > 0) {
-      const widthPercent = (phase.ms / totalMs) * 100;
-      segments.push({
-        id: `${barId}-seg-inngest-${phase.key}`,
-        startPercent: currentPercent,
-        widthPercent,
-        style: phase.style,
-      });
-      currentPercent += widthPercent;
-    }
-  }
-
-  return segments.length > 0 ? segments : undefined;
+  return generatePhaseSegments(barId, 'inngest', INNGEST_PHASES, breakdown);
 }
 
-/**
- * Generate segments for a run-level Inngest bar (run queue delay + finalization).
- */
+/** Generate segments for a run-level Inngest bar (run queue delay + finalization). */
 function generateRunInngestSegments(
   barId: string,
   breakdown: RunInngestBreakdownData
 ): BarSegment[] | undefined {
-  const totalMs = breakdown.totalMs;
-  if (totalMs <= 0) return undefined;
-
-  const phases: { key: string; ms: number; style: BarStyleKey }[] = [
-    { key: 'run-queue', ms: breakdown.runQueueDelayMs, style: 'timing.inngest.queue' },
-    { key: 'finalization', ms: breakdown.finalizationMs, style: 'timing.inngest.finalization' },
-  ];
-
-  const segments: BarSegment[] = [];
-  let currentPercent = 0;
-
-  for (const phase of phases) {
-    if (phase.ms > 0) {
-      const widthPercent = (phase.ms / totalMs) * 100;
-      segments.push({
-        id: `${barId}-seg-run-inngest-${phase.key}`,
-        startPercent: currentPercent,
-        widthPercent,
-        style: phase.style,
-      });
-      currentPercent += widthPercent;
-    }
-  }
-
-  return segments.length > 0 ? segments : undefined;
+  return generatePhaseSegments(barId, 'run-inngest', RUN_INNGEST_PHASES, breakdown);
 }
 
 // ============================================================================
@@ -519,56 +535,34 @@ function TimelineBarRenderer({
               if (inngestTotalMs <= 0) return null;
 
               const iPos = timingPositions.inngest!;
-              const phases = [
-                {
-                  key: 'discovery',
-                  label: 'Discovery',
-                  ms: breakdown.discoveryMs,
-                  style: 'timing.inngest.discovery' as BarStyleKey,
-                },
-                {
-                  key: 'queue-delay',
-                  label: 'Concurrency delay',
-                  ms: breakdown.queueDelayMs,
-                  style: 'timing.inngest.concurrency' as BarStyleKey,
-                },
-                {
-                  key: 'system-latency',
-                  label: 'System latency',
-                  ms: breakdown.systemLatencyMs,
-                  style: 'timing.inngest.finalization' as BarStyleKey,
-                },
-              ];
-
               let cumulativePercent = 0;
-              return phases
-                .filter((p) => p.ms > 0)
-                .map((phase) => {
-                  const phaseWidthPercent = (phase.ms / inngestTotalMs) * iPos.widthPercent;
-                  const phaseStartPercent = iPos.startPercent + cumulativePercent;
-                  cumulativePercent += phaseWidthPercent;
+              return INNGEST_PHASES.filter((p) => p.getMs(breakdown) > 0).map((phase) => {
+                const ms = phase.getMs(breakdown);
+                const phaseWidthPercent = (ms / inngestTotalMs) * iPos.widthPercent;
+                const phaseStartPercent = iPos.startPercent + cumulativePercent;
+                cumulativePercent += phaseWidthPercent;
 
-                  return (
-                    <TimelineBar
-                      key={`${bar.id}-inngest-${phase.key}`}
-                      name={phase.label}
-                      duration={phase.ms}
-                      startPercent={phaseStartPercent}
-                      widthPercent={phaseWidthPercent}
-                      depth={depth + 2}
-                      leftWidth={leftWidth}
-                      style={phase.style}
-                      styleLabel={STYLE_LABELS[phase.style]}
-                      status={bar.status}
-                      onClick={() => onSelectStep?.(bar.id)}
-                      viewStartOffset={viewStartOffset}
-                      viewEndOffset={viewEndOffset}
-                      startTime={bar.startTime}
-                      endTime={bar.endTime}
-                      minTime={minTime}
-                    />
-                  );
-                });
+                return (
+                  <TimelineBar
+                    key={`${bar.id}-inngest-${phase.key}`}
+                    name={phase.label}
+                    duration={ms}
+                    startPercent={phaseStartPercent}
+                    widthPercent={phaseWidthPercent}
+                    depth={depth + 2}
+                    leftWidth={leftWidth}
+                    style={phase.style}
+                    styleLabel={STYLE_LABELS[phase.style]}
+                    status={bar.status}
+                    onClick={() => onSelectStep?.(bar.id)}
+                    viewStartOffset={viewStartOffset}
+                    viewEndOffset={viewEndOffset}
+                    startTime={bar.startTime}
+                    endTime={bar.endTime}
+                    minTime={minTime}
+                  />
+                );
+              });
             })()}
         </TimelineBar>
       )}
@@ -607,68 +601,34 @@ function TimelineBarRenderer({
               if (httpTotalMs <= 0) return null;
 
               const sPos = timingPositions.server!;
-              const phases = [
-                {
-                  key: 'dns',
-                  label: 'DNS',
-                  ms: httpTiming.dnsLookupMs,
-                  style: 'timing.http.dns' as BarStyleKey,
-                },
-                {
-                  key: 'tcp',
-                  label: 'TCP',
-                  ms: httpTiming.tcpConnectionMs,
-                  style: 'timing.http.tcp' as BarStyleKey,
-                },
-                {
-                  key: 'tls',
-                  label: 'TLS',
-                  ms: httpTiming.tlsHandshakeMs,
-                  style: 'timing.http.tls' as BarStyleKey,
-                },
-                {
-                  key: 'server',
-                  label: 'Server processing',
-                  ms: httpTiming.serverProcessingMs,
-                  style: 'timing.http.server' as BarStyleKey,
-                },
-                {
-                  key: 'transfer',
-                  label: 'Transfer',
-                  ms: httpTiming.contentTransferMs,
-                  style: 'timing.http.transfer' as BarStyleKey,
-                },
-              ];
-
               let cumulativePercent = 0;
-              return phases
-                .filter((p) => p.ms > 0)
-                .map((phase) => {
-                  const phaseWidthPercent = (phase.ms / httpTotalMs) * sPos.widthPercent;
-                  const phaseStartPercent = sPos.startPercent + cumulativePercent;
-                  cumulativePercent += phaseWidthPercent;
+              return HTTP_PHASES.filter((p) => p.getMs(httpTiming) > 0).map((phase) => {
+                const ms = phase.getMs(httpTiming);
+                const phaseWidthPercent = (ms / httpTotalMs) * sPos.widthPercent;
+                const phaseStartPercent = sPos.startPercent + cumulativePercent;
+                cumulativePercent += phaseWidthPercent;
 
-                  return (
-                    <TimelineBar
-                      key={`${bar.id}-http-${phase.key}`}
-                      name={phase.label}
-                      duration={phase.ms}
-                      startPercent={phaseStartPercent}
-                      widthPercent={phaseWidthPercent}
-                      depth={depth + 2}
-                      leftWidth={leftWidth}
-                      style={phase.style}
-                      styleLabel={STYLE_LABELS[phase.style]}
-                      status={bar.status}
-                      onClick={() => onSelectStep?.(bar.id)}
-                      viewStartOffset={viewStartOffset}
-                      viewEndOffset={viewEndOffset}
-                      startTime={bar.startTime}
-                      endTime={bar.endTime}
-                      minTime={minTime}
-                    />
-                  );
-                });
+                return (
+                  <TimelineBar
+                    key={`${bar.id}-http-${phase.key}`}
+                    name={phase.label}
+                    duration={ms}
+                    startPercent={phaseStartPercent}
+                    widthPercent={phaseWidthPercent}
+                    depth={depth + 2}
+                    leftWidth={leftWidth}
+                    style={phase.style}
+                    styleLabel={STYLE_LABELS[phase.style]}
+                    status={bar.status}
+                    onClick={() => onSelectStep?.(bar.id)}
+                    viewStartOffset={viewStartOffset}
+                    viewEndOffset={viewEndOffset}
+                    startTime={bar.startTime}
+                    endTime={bar.endTime}
+                    minTime={minTime}
+                  />
+                );
+              });
             })()}
 
           {/* Child bars nested under YOUR SERVER */}
@@ -725,50 +685,34 @@ function TimelineBarRenderer({
               if (runInngestTotalMs <= 0) return null;
 
               const iPos = timingPositions.inngest!;
-              const phases = [
-                {
-                  key: 'run-queue',
-                  label: 'Run queue delay',
-                  ms: breakdown.runQueueDelayMs,
-                  style: 'timing.inngest.queue' as BarStyleKey,
-                },
-                {
-                  key: 'finalization',
-                  label: 'Finalization',
-                  ms: breakdown.finalizationMs,
-                  style: 'timing.inngest.finalization' as BarStyleKey,
-                },
-              ];
-
               let cumulativePercent = 0;
-              return phases
-                .filter((p) => p.ms > 0)
-                .map((phase) => {
-                  const phaseWidthPercent = (phase.ms / runInngestTotalMs) * iPos.widthPercent;
-                  const phaseStartPercent = iPos.startPercent + cumulativePercent;
-                  cumulativePercent += phaseWidthPercent;
+              return RUN_INNGEST_PHASES.filter((p) => p.getMs(breakdown) > 0).map((phase) => {
+                const ms = phase.getMs(breakdown);
+                const phaseWidthPercent = (ms / runInngestTotalMs) * iPos.widthPercent;
+                const phaseStartPercent = iPos.startPercent + cumulativePercent;
+                cumulativePercent += phaseWidthPercent;
 
-                  return (
-                    <TimelineBar
-                      key={`${bar.id}-run-inngest-${phase.key}`}
-                      name={phase.label}
-                      duration={phase.ms}
-                      startPercent={phaseStartPercent}
-                      widthPercent={phaseWidthPercent}
-                      depth={depth + 2}
-                      leftWidth={leftWidth}
-                      style={phase.style}
-                      styleLabel={STYLE_LABELS[phase.style]}
-                      status={bar.status}
-                      onClick={() => onSelectStep?.(bar.id)}
-                      viewStartOffset={viewStartOffset}
-                      viewEndOffset={viewEndOffset}
-                      startTime={bar.startTime}
-                      endTime={bar.endTime}
-                      minTime={minTime}
-                    />
-                  );
-                });
+                return (
+                  <TimelineBar
+                    key={`${bar.id}-run-inngest-${phase.key}`}
+                    name={phase.label}
+                    duration={ms}
+                    startPercent={phaseStartPercent}
+                    widthPercent={phaseWidthPercent}
+                    depth={depth + 2}
+                    leftWidth={leftWidth}
+                    style={phase.style}
+                    styleLabel={STYLE_LABELS[phase.style]}
+                    status={bar.status}
+                    onClick={() => onSelectStep?.(bar.id)}
+                    viewStartOffset={viewStartOffset}
+                    viewEndOffset={viewEndOffset}
+                    startTime={bar.startTime}
+                    endTime={bar.endTime}
+                    minTime={minTime}
+                  />
+                );
+              });
             })()}
         </TimelineBar>
       )}
