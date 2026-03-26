@@ -228,14 +228,14 @@ function generateBarSegments(bar: TimelineBarData): BarSegment[] | undefined {
 
   // Inngest overhead segment — short gray delay bar
   if (inngestMs > 0) {
-    const queuePercent = (inngestMs / totalMs) * 100;
+    const inngestPercent = (inngestMs / totalMs) * 100;
     segments.push({
       id: `${bar.id}-seg-delay`,
       startPercent: currentPercent,
-      widthPercent: queuePercent,
+      widthPercent: inngestPercent,
       style: 'timing.inngest',
     });
-    currentPercent += queuePercent;
+    currentPercent += inngestPercent;
   }
 
   // Execution segment — root bar uses short status-colored bar, steps use tall barber-pole
