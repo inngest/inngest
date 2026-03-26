@@ -409,7 +409,7 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 			// child list, so we attach metadata to the next visible step
 			// we encounter rather than collecting everything for a
 			// post-loop pass.
-			if len(omittedStepMetadata) > 0 && (child.SpanTypeName == meta.SpanNameStep || child.SpanTypeName == meta.SpanNameStepDiscovery) {
+			if len(omittedStepMetadata) > 0 && child.SpanTypeName == meta.SpanNameStep {
 				child.Metadata = append(child.Metadata, omittedStepMetadata...)
 				omittedStepMetadata = nil
 			}

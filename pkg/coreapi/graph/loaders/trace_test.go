@@ -275,6 +275,73 @@ func TestConvertRunSpanToGQL_MetadataPromotion(t *testing.T) {
 		assert.NotContains(t, stepB.Metadata[0].Values, "step_a")
 	})
 
+	t.Run("visible discovery span does not absorb omitted discovery metadata", func(t *testing.T) {
+		// A StepDiscovery span becomes visible when it has non-dropped
+		// children. If it appears between omitted discoveries, it must
+		// NOT receive their promoted metadata — only StepSpans should.
+		executionStatus := enums.StepStatusCompleted
+		executionOp := enums.OpcodeStepRun
+		span := &cqrs.OtelSpan{
+			RawOtelSpan: cqrs.RawOtelSpan{Name: meta.SpanNameRun},
+			Attributes:  &meta.ExtractedValues{},
+			Children: []*cqrs.OtelSpan{
+				{
+					// Omitted discovery with metadata
+					RawOtelSpan: cqrs.RawOtelSpan{Name: meta.SpanNameStepDiscovery},
+					Attributes:  &meta.ExtractedValues{},
+					Metadata:    []*cqrs.SpanMetadata{mdA},
+				},
+				{
+					// Visible discovery (has a non-dropped child execution)
+					RawOtelSpan: cqrs.RawOtelSpan{Name: meta.SpanNameStepDiscovery},
+					Attributes:  &meta.ExtractedValues{},
+					Children: []*cqrs.OtelSpan{
+						{
+							RawOtelSpan: cqrs.RawOtelSpan{Name: meta.SpanNameExecution},
+							Attributes: &meta.ExtractedValues{
+								DynamicStatus: &executionStatus,
+								StepOp:        &executionOp,
+								StepID:        strPtr("visible-discovery"),
+							},
+						},
+					},
+				},
+				{
+					// Visible step that should receive mdA
+					RawOtelSpan: cqrs.RawOtelSpan{Name: meta.SpanNameStep},
+					Attributes: &meta.ExtractedValues{
+						DynamicStatus: &completedStatus,
+						StepOp:        &stepOpRun,
+						StepID:        strPtr("step-a"),
+					},
+				},
+			},
+		}
+
+		result, err := tr.convertRunSpanToGQL(ctx, span)
+		require.NoError(t, err)
+
+		// Find the visible step span (not the discovery)
+		var stepSpan *models.RunTraceSpan
+		var discoverySpan *models.RunTraceSpan
+		for _, child := range result.ChildrenSpans {
+			if child.SpanTypeName == meta.SpanNameStep {
+				stepSpan = child
+			}
+			if child.SpanTypeName == meta.SpanNameStepDiscovery {
+				discoverySpan = child
+			}
+		}
+
+		require.NotNil(t, stepSpan, "should have a visible step span")
+		assert.Len(t, stepSpan.Metadata, 1, "step should receive promoted metadata from omitted discovery")
+		assert.Contains(t, stepSpan.Metadata[0].Values, "step_a")
+
+		if discoverySpan != nil {
+			assert.Empty(t, discoverySpan.Metadata, "visible discovery span must not absorb omitted discovery metadata")
+		}
+	})
+
 	t.Run("trailing omitted discovery with no following step discards metadata", func(t *testing.T) {
 		span := &cqrs.OtelSpan{
 			RawOtelSpan: cqrs.RawOtelSpan{Name: meta.SpanNameRun},
