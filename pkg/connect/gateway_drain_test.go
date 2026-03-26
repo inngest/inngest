@@ -12,6 +12,7 @@ import (
 	"github.com/coder/websocket"
 	"github.com/inngest/inngest/pkg/connect/types"
 	"github.com/inngest/inngest/pkg/connect/wsproto"
+	"github.com/inngest/inngest/pkg/consts"
 	connectpb "github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/assert"
@@ -354,6 +355,10 @@ func (s *mockExecutorServer) Ack(_ context.Context, msg *connectpb.AckMessage) (
 	return &connectpb.AckResponse{Success: true}, nil
 }
 
+func (s *mockExecutorServer) Ping(_ context.Context, _ *connectpb.PingRequest) (*connectpb.PingResponse, error) {
+	return &connectpb.PingResponse{Message: "ok"}, nil
+}
+
 // TestWorkerAckDuringGatewayDrain_IsProcessed verifies that worker request
 // acks are accepted and forwarded via gRPC during drain.
 func TestWorkerAckDuringGatewayDrain_IsProcessed(t *testing.T) {
@@ -538,7 +543,7 @@ func TestLeaseExtensionDuringGatewayDrain_IsProcessed(t *testing.T) {
 	// Verify the new lease ID is valid and has a reasonable expiry
 	parsed, err := ulid.Parse(*ackPayload.NewLeaseId)
 	require.NoError(t, err)
-	require.WithinDuration(t, time.Now().Add(5*time.Second), ulid.Time(parsed.Time()), 2*time.Second,
+	require.WithinDuration(t, time.Now().Add(consts.ConnectWorkerRequestLeaseDuration), ulid.Time(parsed.Time()), 2*time.Second,
 		"new lease should have a future expiry")
 
 	// Verify connection is still alive by exchanging a heartbeat
