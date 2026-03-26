@@ -422,7 +422,7 @@ func (sq *sqliteQuerier) GetSpansByDebugRunID(ctx context.Context, debugRunID sq
 	for i, r := range rows {
 		out[i] = &db.SpanRow{
 			RunID: r.RunID, TraceID: r.TraceID, DynamicSpanID: r.DynamicSpanID,
-			StartTime: r.StartTime, EndTime: r.EndTime, ParentSpanID: r.ParentSpanID,
+			StartTime: toTime(r.StartTime), EndTime: toTime(r.EndTime), ParentSpanID: r.ParentSpanID,
 			SpanFragments: toBytes(r.SpanFragments), DebugSessionID: r.DebugSessionID,
 			DebugRunID: debugRunID,
 		}
@@ -439,7 +439,7 @@ func (sq *sqliteQuerier) GetSpansByDebugSessionID(ctx context.Context, debugSess
 	for i, r := range rows {
 		out[i] = &db.SpanRow{
 			RunID: r.RunID, TraceID: r.TraceID, DynamicSpanID: r.DynamicSpanID,
-			StartTime: r.StartTime, EndTime: r.EndTime, ParentSpanID: r.ParentSpanID,
+			StartTime: toTime(r.StartTime), EndTime: toTime(r.EndTime), ParentSpanID: r.ParentSpanID,
 			SpanFragments: toBytes(r.SpanFragments), DebugRunID: r.DebugRunID,
 			DebugSessionID: debugSessionID,
 		}
@@ -454,7 +454,7 @@ func (sq *sqliteQuerier) GetRunSpanByRunID(ctx context.Context, arg db.GetRunSpa
 	}
 	return &db.SpanRow{
 		RunID: r.RunID, TraceID: r.TraceID, DynamicSpanID: r.DynamicSpanID,
-		StartTime: r.StartTime, EndTime: r.EndTime, ParentSpanID: r.ParentSpanID,
+		StartTime: toTime(r.StartTime), EndTime: toTime(r.EndTime), ParentSpanID: r.ParentSpanID,
 		SpanFragments: toBytes(r.SpanFragments),
 	}, nil
 }
@@ -466,7 +466,7 @@ func (sq *sqliteQuerier) GetSpanBySpanID(ctx context.Context, arg db.GetSpanBySp
 	}
 	return &db.SpanRow{
 		RunID: r.RunID, TraceID: r.TraceID, DynamicSpanID: r.DynamicSpanID,
-		StartTime: r.StartTime, EndTime: r.EndTime, ParentSpanID: r.ParentSpanID,
+		StartTime: toTime(r.StartTime), EndTime: toTime(r.EndTime), ParentSpanID: r.ParentSpanID,
 		SpanFragments: toBytes(r.SpanFragments),
 	}, nil
 }
@@ -478,7 +478,7 @@ func (sq *sqliteQuerier) GetStepSpanByStepID(ctx context.Context, arg db.GetStep
 	}
 	return &db.SpanRow{
 		RunID: r.RunID, TraceID: r.TraceID, DynamicSpanID: r.DynamicSpanID,
-		StartTime: r.StartTime, EndTime: r.EndTime, ParentSpanID: r.ParentSpanID,
+		StartTime: toTime(r.StartTime), EndTime: toTime(r.EndTime), ParentSpanID: r.ParentSpanID,
 		SpanFragments: toBytes(r.SpanFragments),
 	}, nil
 }
@@ -504,7 +504,7 @@ func (sq *sqliteQuerier) GetExecutionSpanByStepIDAndAttempt(ctx context.Context,
 	}
 	return &db.SpanRow{
 		RunID: r.RunID, TraceID: r.TraceID, DynamicSpanID: r.DynamicSpanID,
-		StartTime: r.StartTime, EndTime: r.EndTime, ParentSpanID: r.ParentSpanID,
+		StartTime: toTime(r.StartTime), EndTime: toTime(r.EndTime), ParentSpanID: r.ParentSpanID,
 		SpanFragments: toBytes(r.SpanFragments),
 	}, nil
 }
@@ -518,7 +518,7 @@ func (sq *sqliteQuerier) GetLatestExecutionSpanByStepID(ctx context.Context, arg
 	}
 	return &db.SpanRow{
 		RunID: r.RunID, TraceID: r.TraceID, DynamicSpanID: r.DynamicSpanID,
-		StartTime: r.StartTime, EndTime: r.EndTime, ParentSpanID: r.ParentSpanID,
+		StartTime: toTime(r.StartTime), EndTime: toTime(r.EndTime), ParentSpanID: r.ParentSpanID,
 		SpanFragments: toBytes(r.SpanFragments),
 	}, nil
 }

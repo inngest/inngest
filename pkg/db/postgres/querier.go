@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -270,6 +271,9 @@ func (pq *pgQuerier) InsertFunctionFinish(ctx context.Context, arg db.InsertFunc
 	// completed_step_count INT NOT NULL DEFAULT 1, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP.
 	// Use schema defaults when the nullable domain field is not set.
 	status := arg.Status.String
+	if !arg.Status.Valid {
+		return fmt.Errorf("InsertFunctionFinish: status is required")
+	}
 	output := "{}"
 	if arg.Output.Valid {
 		output = arg.Output.String
@@ -463,7 +467,7 @@ func (pq *pgQuerier) GetSpansByRunID(ctx context.Context, runID string) ([]*db.S
 	for i, r := range rows {
 		out[i] = &db.SpanRow{
 			RunID: r.RunID, TraceID: r.TraceID, DynamicSpanID: r.DynamicSpanID,
-			StartTime: r.StartTime, EndTime: r.EndTime, ParentSpanID: r.ParentSpanID,
+			StartTime: toTime(r.StartTime), EndTime: toTime(r.EndTime), ParentSpanID: r.ParentSpanID,
 			SpanFragments: r.SpanFragments,
 		}
 	}
@@ -480,7 +484,7 @@ func (pq *pgQuerier) GetSpansByDebugRunID(ctx context.Context, debugRunID sql.Nu
 	for i, r := range rows {
 		out[i] = &db.SpanRow{
 			RunID: r.RunID, TraceID: r.TraceID, DynamicSpanID: r.DynamicSpanID,
-			StartTime: r.StartTime, EndTime: r.EndTime, ParentSpanID: r.ParentSpanID,
+			StartTime: toTime(r.StartTime), EndTime: toTime(r.EndTime), ParentSpanID: r.ParentSpanID,
 			SpanFragments: r.SpanFragments,
 			DebugRunID: debugRunID, DebugSessionID: r.DebugSessionID,
 		}
@@ -498,7 +502,7 @@ func (pq *pgQuerier) GetSpansByDebugSessionID(ctx context.Context, debugSessionI
 	for i, r := range rows {
 		out[i] = &db.SpanRow{
 			RunID: r.RunID, TraceID: r.TraceID, DynamicSpanID: r.DynamicSpanID,
-			StartTime: r.StartTime, EndTime: r.EndTime, ParentSpanID: r.ParentSpanID,
+			StartTime: toTime(r.StartTime), EndTime: toTime(r.EndTime), ParentSpanID: r.ParentSpanID,
 			SpanFragments: r.SpanFragments,
 			DebugRunID: r.DebugRunID, DebugSessionID: debugSessionID,
 		}
@@ -513,7 +517,7 @@ func (pq *pgQuerier) GetRunSpanByRunID(ctx context.Context, arg db.GetRunSpanByR
 	}
 	return &db.SpanRow{
 		RunID: r.RunID, TraceID: r.TraceID, DynamicSpanID: r.DynamicSpanID,
-		StartTime: r.StartTime, EndTime: r.EndTime, ParentSpanID: r.ParentSpanID,
+		StartTime: toTime(r.StartTime), EndTime: toTime(r.EndTime), ParentSpanID: r.ParentSpanID,
 		SpanFragments: r.SpanFragments,
 	}, nil
 }
@@ -525,7 +529,7 @@ func (pq *pgQuerier) GetSpanBySpanID(ctx context.Context, arg db.GetSpanBySpanID
 	}
 	return &db.SpanRow{
 		RunID: r.RunID, TraceID: r.TraceID, DynamicSpanID: r.DynamicSpanID,
-		StartTime: r.StartTime, EndTime: r.EndTime, ParentSpanID: r.ParentSpanID,
+		StartTime: toTime(r.StartTime), EndTime: toTime(r.EndTime), ParentSpanID: r.ParentSpanID,
 		SpanFragments: r.SpanFragments,
 	}, nil
 }
@@ -537,7 +541,7 @@ func (pq *pgQuerier) GetStepSpanByStepID(ctx context.Context, arg db.GetStepSpan
 	}
 	return &db.SpanRow{
 		RunID: r.RunID, TraceID: r.TraceID, DynamicSpanID: r.DynamicSpanID,
-		StartTime: r.StartTime, EndTime: r.EndTime, ParentSpanID: r.ParentSpanID,
+		StartTime: toTime(r.StartTime), EndTime: toTime(r.EndTime), ParentSpanID: r.ParentSpanID,
 		SpanFragments: r.SpanFragments,
 	}, nil
 }
@@ -566,7 +570,7 @@ func (pq *pgQuerier) GetExecutionSpanByStepIDAndAttempt(ctx context.Context, arg
 	}
 	return &db.SpanRow{
 		RunID: r.RunID, TraceID: r.TraceID, DynamicSpanID: r.DynamicSpanID,
-		StartTime: r.StartTime, EndTime: r.EndTime, ParentSpanID: r.ParentSpanID,
+		StartTime: toTime(r.StartTime), EndTime: toTime(r.EndTime), ParentSpanID: r.ParentSpanID,
 		SpanFragments: r.SpanFragments,
 	}, nil
 }
@@ -580,7 +584,7 @@ func (pq *pgQuerier) GetLatestExecutionSpanByStepID(ctx context.Context, arg db.
 	}
 	return &db.SpanRow{
 		RunID: r.RunID, TraceID: r.TraceID, DynamicSpanID: r.DynamicSpanID,
-		StartTime: r.StartTime, EndTime: r.EndTime, ParentSpanID: r.ParentSpanID,
+		StartTime: toTime(r.StartTime), EndTime: toTime(r.EndTime), ParentSpanID: r.ParentSpanID,
 		SpanFragments: r.SpanFragments,
 	}, nil
 }

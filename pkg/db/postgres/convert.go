@@ -3,6 +3,7 @@ package postgres
 import (
 	"database/sql"
 	"encoding/json"
+	"time"
 
 	sqlc "github.com/inngest/inngest/pkg/cqrs/base_cqrs/sqlc/postgres"
 	"github.com/inngest/inngest/pkg/db"
@@ -124,6 +125,18 @@ func functionRunRowFromPG(run *sqlc.FunctionRun, finish *sqlc.FunctionFinish) *d
 		FunctionRun:    *functionRunFromPG(run),
 		FunctionFinish: *functionFinishFromPG(finish),
 	}
+}
+
+// toTime extracts a time.Time from the interface{} returned by sqlc for
+// aggregated timestamp columns (e.g. MIN(start_time)).
+func toTime(v interface{}) time.Time {
+	if v == nil {
+		return time.Time{}
+	}
+	if t, ok := v.(time.Time); ok {
+		return t
+	}
+	return time.Time{}
 }
 
 // --- helpers ---

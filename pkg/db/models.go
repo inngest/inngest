@@ -246,8 +246,8 @@ type SpanRow struct {
 	RunID          string
 	TraceID        string
 	DynamicSpanID  sql.NullString
-	StartTime      interface{}
-	EndTime        interface{}
+	StartTime      time.Time
+	EndTime        time.Time
 	ParentSpanID   sql.NullString
 	SpanFragments  []byte
 	DebugRunID     sql.NullString

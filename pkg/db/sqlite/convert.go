@@ -3,6 +3,8 @@ package sqlite
 import (
 	"database/sql"
 	"fmt"
+	"strings"
+	"time"
 
 	sqlc "github.com/inngest/inngest/pkg/cqrs/base_cqrs/sqlc/sqlite"
 	"github.com/inngest/inngest/pkg/db"
@@ -123,8 +125,30 @@ func functionRunRowFromSQLite(run *sqlc.FunctionRun, finish *sqlc.FunctionFinish
 func spanRowFromSQLiteRunID(r *sqlc.GetSpansByRunIDRow) *db.SpanRow {
 	return &db.SpanRow{
 		RunID: r.RunID, TraceID: r.TraceID, DynamicSpanID: r.DynamicSpanID,
-		StartTime: r.StartTime, EndTime: r.EndTime, ParentSpanID: r.ParentSpanID,
+		StartTime: toTime(r.StartTime), EndTime: toTime(r.EndTime), ParentSpanID: r.ParentSpanID,
 		SpanFragments: toBytes(r.SpanFragments),
+	}
+}
+
+// toTime parses a time.Time from the interface{} returned by sqlc for
+// aggregated timestamp columns. SQLite returns these as strings in Go's
+// default time format.
+func toTime(v interface{}) time.Time {
+	if v == nil {
+		return time.Time{}
+	}
+	switch val := v.(type) {
+	case time.Time:
+		return val
+	case string:
+		s := strings.Split(val, " m=")[0]
+		t, err := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", s)
+		if err != nil {
+			return time.Time{}
+		}
+		return t
+	default:
+		return time.Time{}
 	}
 }
 
