@@ -388,6 +388,8 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 
 		if fnExists {
 			fn.FunctionVersion = currentFn.FunctionVersion + 1
+		} else {
+			fn.FunctionVersion = 1
 		}
 
 		config, err := json.Marshal(fn)
