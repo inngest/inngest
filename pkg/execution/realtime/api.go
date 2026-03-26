@@ -201,6 +201,7 @@ func (a *api) GetSSE(w http.ResponseWriter, r *http.Request) {
 	}
 
 	sub := NewSSESubscription(ctx, w)
+	defer sub.Close()
 
 	err = a.opts.Broadcaster.Subscribe(ctx, sub, auth.Topics)
 	if err != nil {

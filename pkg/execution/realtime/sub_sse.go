@@ -40,9 +40,10 @@ func sseHeaders(w http.ResponseWriter) {
 }
 
 type subSSE struct {
-	id uuid.UUID
-	w  http.ResponseWriter
-	mu sync.Mutex // Protects concurrent writes to http.ResponseWriter
+	id     uuid.UUID
+	w      http.ResponseWriter
+	mu     sync.Mutex // Protects concurrent writes to http.ResponseWriter
+	closed bool       // Set when the handler is returning; prevents writes after the response is finalized
 }
 
 // ID returns a unique ID for the given subscription
@@ -101,11 +102,12 @@ func (s *subSSE) WriteChunk(c Chunk) error {
 	return s.writeSSE(byt)
 }
 
-// Closer closes the current subscription immediately, terminating any active connections.
+// Close closes the current subscription immediately, terminating any active connections.
 func (s *subSSE) Close() error {
 	// Close must also acquire the lock
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.closed = true
 
 	// Writer is a reguler http.ResponseWriter.  This is usually handled and closed
 	// by the http server.  However, when Close is called we can attempt to hijack this
@@ -134,6 +136,10 @@ func (s *subSSE) writeSSE(data []byte) error {
 func (s *subSSE) write(b []byte) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	if s.closed {
+		return nil
+	}
 
 	if _, err := s.w.Write(b); err != nil {
 		return err
