@@ -235,28 +235,11 @@ func (q *queueProcessor) BacklogRefillConstraintCheck(
 	constraintItems := constraintItemsFromBacklog(shadowPart, backlog, constraints)
 	config := ConstraintConfigFromConstraints(constraints)
 
-	// Deduplicate semaphores across items — multiple start jobs for the same function
-	// would otherwise INCRBY the same semaphore counter multiple times in the Lua script.
-	seenSemaphores := map[string]bool{}
-	for _, item := range items {
-		for _, sem := range item.Data.Semaphores {
-			key := sem.ID + ":" + sem.UsageValue
-			if seenSemaphores[key] {
-				continue
-			}
-			seenSemaphores[key] = true
-			constraintItems = append(constraintItems, constraintapi.ConstraintItem{
-				Kind: constraintapi.ConstraintKindSemaphore,
-				Semaphore: &constraintapi.SemaphoreConstraint{
-					ID:         sem.ID,
-					UsageValue: sem.UsageValue,
-					Weight:     sem.Weight,
-					Release:    sem.Release,
-				},
-			})
-			config.Semaphores = append(config.Semaphores, sem)
-		}
-	}
+	// NOTE: Semaphores are NOT included in the batch Acquire. They are per-item
+	// (different UsageValues per item) and can't be batched — the Lua script would
+	// increment ALL semaphore counters by `weight * granted`, corrupting counters
+	// for items with different usage values. Semaphores are checked per-item in
+	// ItemLeaseConstraintCheck instead.
 
 	res, err := q.CapacityManager.Acquire(ctx, &constraintapi.CapacityAcquireRequest{
 		AccountID:            *shadowPart.AccountID,
