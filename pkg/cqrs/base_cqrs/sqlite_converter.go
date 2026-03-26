@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/cqrs"
 	dbpkg "github.com/inngest/inngest/pkg/db"
 	"github.com/inngest/inngest/pkg/enums"
@@ -72,8 +73,19 @@ func domainEvent(obj *dbpkg.Event) *cqrs.Event {
 		return nil
 	}
 
+	var accountID uuid.UUID
+	if obj.AccountID.Valid {
+		accountID, _ = uuid.Parse(obj.AccountID.String)
+	}
+	var workspaceID uuid.UUID
+	if obj.WorkspaceID.Valid {
+		workspaceID, _ = uuid.Parse(obj.WorkspaceID.String)
+	}
+
 	evt := &cqrs.Event{
 		ID:           obj.InternalID,
+		AccountID:    accountID,
+		WorkspaceID:  workspaceID,
 		ReceivedAt:   obj.ReceivedAt,
 		EventID:      obj.EventID,
 		EventName:    obj.EventName,

@@ -696,10 +696,12 @@ func (w wrapper) WithTx(ctx context.Context) (cqrs.TxManager, error) {
 		return nil, err
 	}
 
-	// Type-assert to get helpers from the tx adapter's underlying type.
+	// The tx adapter must implement adapterWithHelpers; this is guaranteed by
+	// construction (both sqlite and postgres TxAdapter embed Adapter which has
+	// Helpers()). A failure here is a programming error, not a runtime condition.
 	txWithHelpers, ok := txAdapter.(adapterWithHelpers)
 	if !ok {
-		return nil, fmt.Errorf("tx adapter does not implement adapterWithHelpers")
+		panic("bug: tx adapter does not implement adapterWithHelpers — ensure the concrete TxAdapter embeds Adapter")
 	}
 
 	return &wrapper{
