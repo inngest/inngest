@@ -62,7 +62,7 @@ func TestRegister_FunctionVersionIncrement(t *testing.T) {
 		},
 	}
 
-	t.Run("new function starts with version 0", func(t *testing.T) {
+	t.Run("new function starts with version 1", func(t *testing.T) {
 		// Create a test devserver with in-memory data store
 		ds := newTestDevServer(t)
 		api := &devapi{
@@ -73,11 +73,11 @@ func TestRegister_FunctionVersionIncrement(t *testing.T) {
 		_, err := api.register(ctx, req)
 		require.NoError(t, err)
 
-		// Verify the function was created with version 0
+		// Verify the function was created with version 1
 		fnVersions := getFunctionIDandVersion(t, ds, req.AppName)
 		require.Len(t, fnVersions, 1)
 		for _, fnVersion := range fnVersions {
-			require.Equal(t, 0, fnVersion)
+			require.Equal(t, 1, fnVersion)
 		}
 	})
 
