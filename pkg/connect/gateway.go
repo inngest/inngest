@@ -719,22 +719,22 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(msg *connectpb.Connec
 	case connectpb.GatewayMessageType_WORKER_HEARTBEAT:
 		// Always allow heartbeats
 
-		// Don't reset status to READY if the connection or service is draining.
+		// Don't reset status to READY if the connection is draining.
 		status := connectpb.ConnectionStatus_READY
-		if c.svc.isDraining.Load() || c.draining.Load() {
+		if c.draining.Load() {
 			status = connectpb.ConnectionStatus_DRAINING
 
 			c.log.Warn("worker heartbeat received during draining sequence",
-				"conn_draining", c.draining.Load(),
-				"svc_draining", c.svc.isDraining.Load(),
+				"instance_id", c.conn.Data.InstanceId,
+				"env_id", c.conn.EnvID.String(),
+				"account_id", c.conn.AccountID.String(),
+				"gateway_id", c.conn.GatewayId.String(),
+				"connection_id", c.conn.ConnectionId.String(),
 			)
 		}
 
 		err := c.updateConnStatus(status)
 		if err != nil {
-
-			c.log.ReportError(err, "failed to update connection status after heartbeat")
-
 			// TODO Should we actually close the connection here?
 			return &connecterrors.SocketError{
 				SysCode:    syscode.CodeConnectInternal,
