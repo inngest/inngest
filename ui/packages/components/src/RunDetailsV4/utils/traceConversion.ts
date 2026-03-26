@@ -9,7 +9,6 @@ import type {
   BarStyleKey,
   HTTPTimingBreakdownData,
   InngestBreakdownData,
-  RunInngestBreakdownData,
   TimelineBarData,
   TimelineData,
 } from '../TimelineBar.types';
