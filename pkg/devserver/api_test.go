@@ -14,7 +14,7 @@ import (
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/cqrs/base_cqrs"
-	sqlc_postgres "github.com/inngest/inngest/pkg/cqrs/base_cqrs/sqlc/postgres"
+	dbsqlite "github.com/inngest/inngest/pkg/db/sqlite"
 	"github.com/inngest/inngest/pkg/deploy"
 	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/inngest"
@@ -266,8 +266,8 @@ func newTestDevServer(t *testing.T) *devserver {
 	require.NoError(t, err)
 
 	// Initialize CQRS manager
-	dbDriver := "sqlite"
-	data := base_cqrs.NewCQRS(db, dbDriver, sqlc_postgres.NewNormalizedOpts{})
+	adapter := dbsqlite.New(db)
+	data := base_cqrs.NewCQRS(adapter)
 
 	ds := &devserver{
 		Data:        data,

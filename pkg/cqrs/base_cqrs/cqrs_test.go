@@ -12,8 +12,9 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/cqrs"
-	sqlc_psql "github.com/inngest/inngest/pkg/cqrs/base_cqrs/sqlc/postgres"
-	sqlc_sqlite "github.com/inngest/inngest/pkg/cqrs/base_cqrs/sqlc/sqlite"
+	dbpkg "github.com/inngest/inngest/pkg/db"
+	dbpostgres "github.com/inngest/inngest/pkg/db/postgres"
+	dbsqlite "github.com/inngest/inngest/pkg/db/sqlite"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/tests/testutil"
 	"github.com/oklog/ulid/v2"
@@ -1780,7 +1781,7 @@ func insertTestSpan(t *testing.T, cm cqrs.Manager, spanFields testSpanFields) {
 
 	// TODO: ideally we should not have to do this type assertion to wrapper to write a span
 	q := cm.(wrapper).q
-	err := q.InsertSpan(t.Context(), sqlc_sqlite.InsertSpanParams{
+	err := q.InsertSpan(t.Context(), dbpkg.InsertSpanParams{
 		SpanID:         spanID,
 		TraceID:        traceID,
 		ParentSpanID:   sql.NullString{String: spanFields.ParentSpanID, Valid: spanFields.ParentSpanID != ""},
@@ -1824,12 +1825,13 @@ func initCQRS(t *testing.T, opts ...withInitCQRSOpt) (cqrs.Manager, func()) {
 	}
 
 	var (
-		db     *sql.DB
-		driver string
-		err    error
+		db  *sql.DB
+		err error
 	)
 
 	var pc *testutil.PostgresContainer
+
+	var adapter adapterWithHelpers
 
 	testDB := os.Getenv(EnvTestDatabase)
 	if testDB == "postgres" {
@@ -1839,14 +1841,14 @@ func initCQRS(t *testing.T, opts ...withInitCQRSOpt) (cqrs.Manager, func()) {
 
 		db, err = New(BaseCQRSOptions{PostgresURI: pc.URI, ForTest: true})
 		require.NoError(t, err)
-		driver = "postgres"
+		adapter = dbpostgres.New(db)
 	} else {
 		db, err = New(BaseCQRSOptions{Persist: false, ForTest: true})
 		require.NoError(t, err)
-		driver = "sqlite"
+		adapter = dbsqlite.New(db)
 	}
 
-	cm := NewCQRS(db, driver, sqlc_psql.NewNormalizedOpts{})
+	cm := NewCQRS(adapter)
 
 	cleanup := func() {
 		db.Close()

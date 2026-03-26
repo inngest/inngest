@@ -2,41 +2,51 @@ package base_cqrs
 
 import (
 	"encoding/json"
+	"strings"
 	"time"
 
 	"github.com/inngest/inngest/pkg/cqrs"
-	sqlc "github.com/inngest/inngest/pkg/cqrs/base_cqrs/sqlc/sqlite"
+	dbpkg "github.com/inngest/inngest/pkg/db"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/oklog/ulid/v2"
 )
 
-// SQLiteToCQRS accepts an input and converter, and convert the type to another
-func SQLiteToCQRS[T, R any](input *T, converter func(*T) *R) *R {
+// domainToCQRS accepts an input and converter, and converts the type to another.
+func domainToCQRS[T, R any](input *T, converter func(*T) *R) *R {
 	if input == nil {
 		return nil
 	}
 	return converter(input)
 }
 
-// SQLiteToCQRSList converts a slice of inputs using the provided converter function
-func SQLiteToCQRSList[T, R any](inputs []*T, converter func(*T) *R) []*R {
+// domainToCQRSList converts a slice of inputs using the provided converter function.
+func domainToCQRSList[T, R any](inputs []*T, converter func(*T) *R) []*R {
 	if len(inputs) == 0 {
 		return []*R{}
 	}
 
 	results := make([]*R, len(inputs))
 	for i, input := range inputs {
-		results[i] = SQLiteToCQRS(input, converter)
+		results[i] = domainToCQRS(input, converter)
 	}
 	return results
 }
 
+// Deprecated: SQLiteToCQRS is an alias kept during migration.
+func SQLiteToCQRS[T, R any](input *T, converter func(*T) *R) *R {
+	return domainToCQRS(input, converter)
+}
+
+// Deprecated: SQLiteToCQRSList is an alias kept during migration.
+func SQLiteToCQRSList[T, R any](inputs []*T, converter func(*T) *R) []*R {
+	return domainToCQRSList(inputs, converter)
+}
+
 //
-// Converters
+// Converters from domain types (pkg/db) to CQRS types (pkg/cqrs)
 //
 
-// sqliteFunction converts sqlc function to cqrs function
-func sqliteFunction(fn *sqlc.Function) *cqrs.Function {
+func domainFunction(fn *dbpkg.Function) *cqrs.Function {
 	if fn == nil {
 		return nil
 	}
@@ -57,8 +67,7 @@ func sqliteFunction(fn *sqlc.Function) *cqrs.Function {
 	}
 }
 
-// sqliteEvent converts sqlc event to cqrs event
-func sqliteEvent(obj *sqlc.Event) *cqrs.Event {
+func domainEvent(obj *dbpkg.Event) *cqrs.Event {
 	if obj == nil {
 		return nil
 	}
@@ -78,15 +87,17 @@ func sqliteEvent(obj *sqlc.Event) *cqrs.Event {
 	return evt
 }
 
-// sqliteEventBatch converts sqlc event batch to cqrs event batch
-func sqliteEventBatch(obj *sqlc.EventBatch) *cqrs.EventBatch {
+func domainEventBatch(obj *dbpkg.EventBatch) *cqrs.EventBatch {
 	if obj == nil {
 		return nil
 	}
 
 	var evtIDs []ulid.ULID
-	if ids, err := obj.EventIDs(); err == nil {
-		evtIDs = ids
+	strids := strings.Split(string(obj.EventIds), ",")
+	for _, sid := range strids {
+		if id, err := ulid.Parse(sid); err == nil {
+			evtIDs = append(evtIDs, id)
+		}
 	}
 
 	eb := cqrs.NewEventBatch(
@@ -102,8 +113,7 @@ func sqliteEventBatch(obj *sqlc.EventBatch) *cqrs.EventBatch {
 	return eb
 }
 
-// sqliteApp converts sqlc app to cqrs app
-func sqliteApp(obj *sqlc.App) *cqrs.App {
+func domainApp(obj *dbpkg.App) *cqrs.App {
 	if obj == nil {
 		return nil
 	}
@@ -139,8 +149,7 @@ func sqliteApp(obj *sqlc.App) *cqrs.App {
 	}
 }
 
-// sqliteFunctionFinish converts sqlc function finish to cqrs function run finish
-func sqliteFunctionFinish(obj *sqlc.FunctionFinish) *cqrs.FunctionRunFinish {
+func domainFunctionFinish(obj *dbpkg.FunctionFinish) *cqrs.FunctionRunFinish {
 	if obj == nil {
 		return nil
 	}

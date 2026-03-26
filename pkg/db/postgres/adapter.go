@@ -31,10 +31,11 @@ func New(conn *sql.DB) *Adapter {
 	}
 }
 
-func (a *Adapter) Dialect() db.Dialect              { return db.DialectPostgres }
-func (a *Adapter) Q() db.Querier                    { return a.q }
-func (a *Adapter) Helpers() driverhelp.DialectHelpers { return a.h }
-func (a *Adapter) Close() error                     { return a.conn.Close() }
+func (a *Adapter) Dialect() db.Dialect                { return db.DialectPostgres }
+func (a *Adapter) Q() db.Querier                      { return a.q }
+func (a *Adapter) Helpers() driverhelp.DialectHelpers  { return a.h }
+func (a *Adapter) Conn() *sql.DB                       { return a.conn }
+func (a *Adapter) Close() error                        { return a.conn.Close() }
 
 func (a *Adapter) WithTx(ctx context.Context) (db.TxAdapter, error) {
 	tx, err := a.conn.BeginTx(ctx, nil)
