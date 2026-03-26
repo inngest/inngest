@@ -92,11 +92,11 @@ func TestRegister_FunctionVersionIncrement(t *testing.T) {
 		_, err := api.register(ctx, req)
 		require.NoError(t, err)
 
-		// Verify the function was created with version 0
+		// Verify the function was created with version 1
 		fnVersions1 := getFunctionIDandVersion(t, ds, req.AppName)
 		require.Len(t, fnVersions1, 1)
 		for _, fnVersion := range fnVersions1 {
-			require.Equal(t, 0, fnVersion)
+			require.Equal(t, 1, fnVersion)
 		}
 
 		// Register the same app again
