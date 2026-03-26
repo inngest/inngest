@@ -590,6 +590,7 @@ const VisualBar = memo(function VisualBar({
         left: `${startPercent}%`,
         width: `${widthPercent}%`,
         minWidth: `${TIMELINE_CONSTANTS.MIN_BAR_WIDTH_PX}px`,
+        opacity: expanded ? 0 : 1,
         ...(isOutlined
           ? { boxShadow: 'inset 0 0 0 1px rgb(var(--color-background-surface-muted))' }
           : pattern),
