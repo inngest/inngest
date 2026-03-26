@@ -217,8 +217,8 @@ func (e *dbExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlyS
 			continue
 		}
 
-		outputByt, _ := json.Marshal(output)
-		inputByt, _ := json.Marshal(input)
+		outputByt := anyToBytes(output)
+		inputByt := anyToBytes(input)
 
 		err = e.q.InsertSpan(ctx, dbpkg.InsertSpanParams{
 			SpanID:       spanID,
@@ -273,3 +273,27 @@ func (e *dbExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlyS
 }
 
 func (e *dbExporter) Shutdown(context.Context) error { return nil }
+
+// anyToBytes converts a value to []byte for storage in a JSON column.
+// Strings and byte slices are used directly to avoid double-encoding;
+// other types are JSON-marshaled.
+func anyToBytes(v any) []byte {
+	if v == nil {
+		return nil
+	}
+	switch val := v.(type) {
+	case string:
+		if val == "" {
+			return nil
+		}
+		return []byte(val)
+	case []byte:
+		if len(val) == 0 {
+			return nil
+		}
+		return val
+	default:
+		byt, _ := json.Marshal(val)
+		return byt
+	}
+}

@@ -711,17 +711,19 @@ func (w wrapper) WithTx(ctx context.Context) (cqrs.TxManager, error) {
 }
 
 func (w wrapper) Commit(ctx context.Context) error {
-	if txAdapter, ok := w.adapter.(dbpkg.TxAdapter); ok {
-		return txAdapter.Commit(ctx)
+	txAdapter, ok := w.adapter.(dbpkg.TxAdapter)
+	if !ok {
+		panic("bug: Commit called on a non-transaction wrapper")
 	}
-	return fmt.Errorf("not in a transaction")
+	return txAdapter.Commit(ctx)
 }
 
 func (w wrapper) Rollback(ctx context.Context) error {
-	if txAdapter, ok := w.adapter.(dbpkg.TxAdapter); ok {
-		return txAdapter.Rollback(ctx)
+	txAdapter, ok := w.adapter.(dbpkg.TxAdapter)
+	if !ok {
+		panic("bug: Rollback called on a non-transaction wrapper")
 	}
-	return fmt.Errorf("not in a transaction")
+	return txAdapter.Rollback(ctx)
 }
 
 func (w wrapper) GetLatestQueueSnapshot(ctx context.Context) (*cqrs.QueueSnapshot, error) {
