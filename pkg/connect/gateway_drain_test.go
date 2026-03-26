@@ -126,8 +126,8 @@ func TestWorkerPauseWhenGatewayNotDraining_ShouldWork(t *testing.T) {
 
 // TestHeartbeatDuringGatewayDrain_ClosesConnection verifies that when a
 // gateway drain starts, the gateway sends GATEWAY_CLOSING and eventually
-// closes the connection. Heartbeats during drain are rejected with
-// ErrDraining, causing the connection to close.
+// force-closes the connection after the drain timeout if the worker
+// doesn't close voluntarily.
 func TestHeartbeatDuringGatewayDrain_ClosesConnection(t *testing.T) {
 	res := createTestingGateway(t, testingParameters{
 		consecutiveMissesBeforeClose: 10,

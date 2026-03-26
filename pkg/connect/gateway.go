@@ -38,6 +38,12 @@ const (
 const (
 	DefaultAppsPerConnection = 10
 	MaxAppsPerConnection     = 100
+
+	// wsWriteTimeout is the maximum time allowed for a WebSocket write to complete.
+	// Writes use context.Background() because the original request context may already
+	// be canceled (e.g. during drain). This timeout prevents blocking indefinitely
+	// on a dead TCP connection (network partition).
+	wsWriteTimeout = 5 * time.Second
 )
 
 func isConnectionClosedErr(err error) bool {
@@ -286,7 +292,9 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 
 			// If the parent context timed out or got canceled, we should signal the client that we're going away,
 			// and it should reconnect to another gateway.
-			err := wsproto.Write(context.Background(), ws, &connectpb.ConnectMessage{
+			closingWriteCtx, closingWriteCancel := context.WithTimeout(context.Background(), wsWriteTimeout)
+			defer closingWriteCancel()
+			err := wsproto.Write(closingWriteCtx, ws, &connectpb.ConnectMessage{
 				Kind: connectpb.GatewayMessageType_GATEWAY_CLOSING,
 			})
 			if err != nil {
@@ -763,7 +771,9 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(msg *connectpb.Connec
 		}
 
 		// Respond with gateway heartbeat
-		if err := wsproto.Write(context.Background(), c.ws, &connectpb.ConnectMessage{
+		writeCtx, writeCancel := context.WithTimeout(context.Background(), wsWriteTimeout)
+		defer writeCancel()
+		if err := wsproto.Write(writeCtx, c.ws, &connectpb.ConnectMessage{
 			Kind: connectpb.GatewayMessageType_GATEWAY_HEARTBEAT,
 		}); err != nil {
 			// The connection will fail to read and be closed in the read loop
@@ -941,7 +951,9 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(msg *connectpb.Connec
 						}
 					}
 
-					if err := wsproto.Write(context.Background(), c.ws, &connectpb.ConnectMessage{
+					nackWriteCtx, nackWriteCancel := context.WithTimeout(context.Background(), wsWriteTimeout)
+					defer nackWriteCancel()
+					if err := wsproto.Write(nackWriteCtx, c.ws, &connectpb.ConnectMessage{
 						Kind:    connectpb.GatewayMessageType_WORKER_REQUEST_EXTEND_LEASE_ACK,
 						Payload: nackPayload,
 					}); err != nil {
@@ -990,7 +1002,9 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(msg *connectpb.Connec
 				}
 			}
 
-			if err := wsproto.Write(context.Background(), c.ws, &connectpb.ConnectMessage{
+			ackWriteCtx, ackWriteCancel := context.WithTimeout(context.Background(), wsWriteTimeout)
+			defer ackWriteCancel()
+			if err := wsproto.Write(ackWriteCtx, c.ws, &connectpb.ConnectMessage{
 				Kind:    connectpb.GatewayMessageType_WORKER_REQUEST_EXTEND_LEASE_ACK,
 				Payload: ackPayload,
 			}); err != nil {
@@ -1393,7 +1407,9 @@ func (c *connectionHandler) handleSdkReply(ctx context.Context, msg *connectpb.C
 		return fmt.Errorf("could not marshal reply ack: %w", err)
 	}
 
-	if err := wsproto.Write(ctx, c.ws, &connectpb.ConnectMessage{
+	writeCtx, writeCancel := context.WithTimeout(context.Background(), wsWriteTimeout)
+	defer writeCancel()
+	if err := wsproto.Write(writeCtx, c.ws, &connectpb.ConnectMessage{
 		Kind:    connectpb.GatewayMessageType_WORKER_REPLY_ACK,
 		Payload: replyAck,
 	}); err != nil {
