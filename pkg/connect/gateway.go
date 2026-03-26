@@ -315,6 +315,8 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			for _, lifecycle := range c.lifecycles {
 				lifecycle.OnDisconnected(context.Background(), conn, *closeReasonPtr.Load())
 			}
+
+			ch.log.Debug("cleaned up connection in metadata store")
 		}()
 
 		{
@@ -646,11 +648,22 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(msg *connectpb.Connec
 	case connectpb.GatewayMessageType_WORKER_READY:
 		// Do not allow marking worker as ready when gateway is draining
 		if c.svc.isDraining.Load() {
+			c.log.Warn("ignoring worker ready as svc is draining",
+				"instance_id", c.conn.Data.InstanceId,
+				"env_id", c.conn.EnvID.String(),
+				"account_id", c.conn.AccountID.String(),
+				"gateway_id", c.conn.GatewayId.String(),
+				"connection_id", c.conn.ConnectionId.String(),
+				"conn_draining", c.draining.Load(),
+			)
+
 			return &ErrDraining
 		}
 
 		// Check if connection itself is already marked as draining
 		if c.draining.Load() {
+			c.log.Warn("ignoring worker ready as connection is marked as draining")
+
 			// Connection is draining, so don't reset status to READY.
 			return nil
 		}
@@ -680,7 +693,7 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(msg *connectpb.Connec
 			// Log but don't fail the heartbeat if TTL refresh fails
 			c.log.ReportError(err, "failed to refresh worker capacity TTL on heartbeat",
 				logger.WithErrorReportTags(map[string]string{
-					"instance_id":   c.conn.Data.InstanceId,
+					"instance_id":   util.SanitizeLogField(c.conn.Data.InstanceId),
 					"env_id":        c.conn.EnvID.String(),
 					"account_id":    c.conn.AccountID.String(),
 					"gateway_id":    c.conn.GatewayId.String(),
@@ -692,26 +705,28 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(msg *connectpb.Connec
 			go l.OnReady(context.Background(), c.conn)
 		}
 
+		c.log.Debug("marked worker as ready")
+
 		return nil
 	case connectpb.GatewayMessageType_WORKER_HEARTBEAT:
 		// Always allow heartbeats
 
-		// Don't reset status to READY if the connection is draining.
+		// Don't reset status to READY if the connection or service is draining.
 		status := connectpb.ConnectionStatus_READY
-		if c.draining.Load() {
+		if c.svc.isDraining.Load() || c.draining.Load() {
 			status = connectpb.ConnectionStatus_DRAINING
 
 			c.log.Warn("worker heartbeat received during draining sequence",
-				"instance_id", c.conn.Data.InstanceId,
-				"env_id", c.conn.EnvID.String(),
-				"account_id", c.conn.AccountID.String(),
-				"gateway_id", c.conn.GatewayId.String(),
-				"connection_id", c.conn.ConnectionId.String(),
+				"conn_draining", c.draining.Load(),
+				"svc_draining", c.svc.isDraining.Load(),
 			)
 		}
 
 		err := c.updateConnStatus(status)
 		if err != nil {
+
+			c.log.ReportError(err, "failed to update connection status after heartbeat")
+
 			// TODO Should we actually close the connection here?
 			return &connecterrors.SocketError{
 				SysCode:    syscode.CodeConnectInternal,
@@ -735,7 +750,7 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(msg *connectpb.Connec
 			// Log but don't fail the heartbeat if TTL refresh fails
 			c.log.ReportError(err, "failed to refresh worker capacity TTL on heartbeat",
 				logger.WithErrorReportTags(map[string]string{
-					"instance_id":   c.conn.Data.InstanceId,
+					"instance_id":   util.SanitizeLogField(c.conn.Data.InstanceId),
 					"env_id":        c.conn.EnvID.String(),
 					"account_id":    c.conn.AccountID.String(),
 					"gateway_id":    c.conn.GatewayId.String(),
@@ -765,13 +780,7 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(msg *connectpb.Connec
 		// shutdown via SIGTERM). We must honour this by updating the connection
 		// status in Redis to DRAINING so the router stops selecting it.
 		if c.svc.isDraining.Load() {
-			c.log.Warn("worker pause signal received during draining sequence",
-				"instance_id", c.conn.Data.InstanceId,
-				"env_id", c.conn.EnvID.String(),
-				"account_id", c.conn.AccountID.String(),
-				"gateway_id", c.conn.GatewayId.String(),
-				"connection_id", c.conn.ConnectionId.String(),
-			)
+			c.log.Warn("worker pause signal received during draining sequence")
 		}
 
 		// Mark as draining before updating Redis so that concurrent heartbeat
@@ -784,11 +793,6 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(msg *connectpb.Connec
 		if err != nil {
 			c.log.Error("could not update connection status to DRAINING on WORKER_PAUSE",
 				"err", err,
-				"instance_id", c.conn.Data.InstanceId,
-				"env_id", c.conn.EnvID.String(),
-				"account_id", c.conn.AccountID.String(),
-				"gateway_id", c.conn.GatewayId.String(),
-				"connection_id", c.conn.ConnectionId.String(),
 			)
 		}
 
