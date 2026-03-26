@@ -55,7 +55,8 @@ for _, c in ipairs(constraints) do
 		call("ZREM", c.c.ilk, currentLeaseID)
 	elseif c.k == 4 then
 		if c.sem.rel == 0 or forceReleaseSemaphores then
-			local weight = c.sem.w or 1
+			local weight = c.sem.w
+			if not weight or weight <= 0 then weight = 1 end
 			local newVal = call("DECRBY", c.sem.k, weight)
 			if tonumber(newVal) < 0 then
 				call("SET", c.sem.k, "0")
