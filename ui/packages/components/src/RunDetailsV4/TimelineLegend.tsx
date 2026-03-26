@@ -18,7 +18,7 @@ import type { BarStyleKey } from './TimelineBar.types';
 // ============================================================================
 
 const SAMPLE_WIDTH = 32;
-const SAMPLE_HEIGHTS: Record<string, number> = { thin: 2, short: 12, tall: 20 };
+const SAMPLE_HEIGHTS: Record<string, number> = { thin: 2, short: 8, tall: 16 };
 
 type LegendEntry = {
   label: string;
@@ -71,12 +71,8 @@ const inngestBars: LegendEntry[] = [
 ];
 
 const serverBars: LegendEntry[] = [
-  { label: 'Execution time', style: 'timing.server' },
-  { label: 'DNS lookup', style: 'timing.http.dns' },
-  { label: 'TCP connection', style: 'timing.http.tcp' },
-  { label: 'TLS handshake', style: 'timing.http.tls' },
-  { label: 'Server processing', style: 'timing.http.server' },
-  { label: 'Content transfer', style: 'timing.http.transfer' },
+  { label: 'Execution / server processing', style: 'timing.server' },
+  { label: 'DNS, TCP, TLS, transfer', style: 'timing.http.dns' },
 ];
 
 function LegendGroup({ title, items }: { title: string; items: LegendEntry[] }) {
