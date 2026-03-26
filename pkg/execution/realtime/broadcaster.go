@@ -871,6 +871,9 @@ func (b *broadcaster) redisPublish(ctx context.Context, channel, message string)
 	})
 
 	cmd := b.pubc.B().Publish().Channel(channel).Message(message).Build()
+	retryTimer := time.NewTimer(0)
+	retryTimer.Stop()
+	defer retryTimer.Stop()
 	for i := 0; i < redisPublishAttempts; i++ {
 		if i > 0 {
 			metrics.IncrRealtimeRedisOpsTotal(ctx, metrics.CounterOpt{
@@ -880,7 +883,11 @@ func (b *broadcaster) redisPublish(ctx context.Context, channel, message string)
 					"status": "retry",
 				},
 			})
-			<-time.After(redisRetryInterval)
+			retryTimer.Reset(redisRetryInterval)
+			select {
+			case <-retryTimer.C:
+			case <-ctx.Done():
+			}
 		}
 		if ctx.Err() != nil {
 			logger.StdlibLogger(ctx).Error(
