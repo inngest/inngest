@@ -217,8 +217,13 @@ func (b *broadcaster) subscribe(
 	// outside the lock in case any of the topics take a long time to be ready.
 	var anyErr error
 	for _, pt := range pendingTopics {
-		if err := <-pt.ready; err != nil {
-			anyErr = fmt.Errorf("error starting topic %s: %w", pt.topic.String(), err)
+		select {
+		case err := <-pt.ready:
+			if err != nil {
+				anyErr = fmt.Errorf("error starting topic %s: %w", pt.topic.String(), err)
+			}
+		case <-ctx.Done():
+			anyErr = fmt.Errorf("context canceled waiting for topic %s: %w", pt.topic.String(), ctx.Err())
 		}
 	}
 
@@ -750,9 +755,12 @@ func (b *broadcaster) stopTopic(t Topic) {
 // forwards received messages to local subscriptions. It signals ready once the
 // Redis subscription is confirmed.
 func (b *broadcaster) runTopic(ctx context.Context, t Topic, ready chan<- error) {
+	var signalReady sync.Once
+
 	defer func() {
 		if r := recover(); r != nil {
 			logger.StdlibLogger(ctx).Error("panic in redis topic subscriber", "panic", r, "topic", t)
+			signalReady.Do(func() { ready <- fmt.Errorf("panic in runTopic: %v", r) })
 		}
 
 		// Explicitly unsubscribe from the topic to ensure that we don't keep
@@ -765,7 +773,6 @@ func (b *broadcaster) runTopic(ctx context.Context, t Topic, ready chan<- error)
 
 	// Use `WithOnSubscriptionHook` to signal readiness once Redis confirms the
 	// subscription.
-	var signalReady sync.Once
 	hookCtx := rueidis.WithOnSubscriptionHook(ctx, func(s rueidis.PubSubSubscription) {
 		signalReady.Do(func() { ready <- nil })
 	})
