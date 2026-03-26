@@ -648,3 +648,279 @@ func TestAcquireCacheAccountScopedFlag(t *testing.T) {
 	assert.True(t, r.Exists(targetCacheKey), "target account cache key should exist")
 	assert.False(t, r.Exists(otherCacheKey), "other account cache key should NOT exist")
 }
+
+func TestAcquireCacheInvalidatedOnRelease(t *testing.T) {
+	accountID, envID, fnID := uuid.New(), uuid.New(), uuid.New()
+	cm, r, clock, ctx := newTestSetup(t, enableAllCache())
+
+	config := ConstraintConfig{
+		FunctionVersion: 1,
+		Concurrency: ConcurrencyConfig{
+			FunctionConcurrency: 1,
+		},
+	}
+	constraints := []ConstraintItem{
+		{
+			Kind: ConstraintKindConcurrency,
+			Concurrency: &ConcurrencyConstraint{
+				Scope: enums.ConcurrencyScopeFn,
+				Mode:  enums.ConcurrencyModeStep,
+			},
+		},
+	}
+
+	// Fill capacity
+	resp1, err := cm.Acquire(ctx, makeAcquireRequest(accountID, envID, fnID, clock, config, constraints, "fill"))
+	require.NoError(t, err)
+	require.Len(t, resp1.Leases, 1)
+
+	// Exhaust — cache key should be set
+	resp2, err := cm.Acquire(ctx, makeAcquireRequest(accountID, envID, fnID, clock, config, constraints, "exhaust"))
+	require.NoError(t, err)
+	require.Empty(t, resp2.Leases)
+
+	cacheKey := cm.keyConstraintCache(accountID, envID, fnID, constraints[0])
+	require.True(t, r.Exists(cacheKey), "cache key should exist after exhaustion")
+
+	// Release the lease
+	_, err = cm.Release(ctx, &CapacityReleaseRequest{
+		IdempotencyKey: "release-1",
+		AccountID:      accountID,
+		LeaseID:        resp1.Leases[0].LeaseID,
+		Source:         LeaseSource{Service: ServiceExecutor},
+	})
+	require.NoError(t, err)
+
+	// Cache key should be deleted
+	assert.False(t, r.Exists(cacheKey), "cache key should be deleted after release")
+
+	// Acquire should succeed (not blocked by stale cache)
+	resp3, err := cm.Acquire(ctx, makeAcquireRequest(accountID, envID, fnID, clock, config, constraints, "after-release"))
+	require.NoError(t, err)
+	assert.Len(t, resp3.Leases, 1, "should get lease after release invalidated cache")
+	assert.Equal(t, 0, resp3.internalDebugState.CacheHit, "should not be a cache hit")
+}
+
+func TestAcquireCacheNotInvalidatedForThrottleOnRelease(t *testing.T) {
+	accountID, envID, fnID := uuid.New(), uuid.New(), uuid.New()
+	cm, r, clock, ctx := newTestSetup(t, enableAllCache())
+
+	config := ConstraintConfig{
+		FunctionVersion: 1,
+		Concurrency: ConcurrencyConfig{
+			FunctionConcurrency: 1,
+		},
+		Throttle: []ThrottleConfig{
+			{
+				Scope:  enums.ThrottleScopeFn,
+				Limit:  1,
+				Burst:  1,
+				Period: 60,
+			},
+		},
+	}
+	constraints := []ConstraintItem{
+		{
+			Kind: ConstraintKindConcurrency,
+			Concurrency: &ConcurrencyConstraint{
+				Scope: enums.ConcurrencyScopeFn,
+				Mode:  enums.ConcurrencyModeStep,
+			},
+		},
+		{
+			Kind: ConstraintKindThrottle,
+			Throttle: &ThrottleConstraint{
+				Scope:            enums.ThrottleScopeFn,
+				EvaluatedKeyHash: "test-hash",
+			},
+		},
+	}
+
+	// Fill capacity
+	resp1, err := cm.Acquire(ctx, makeAcquireRequest(accountID, envID, fnID, clock, config, constraints, "fill"))
+	require.NoError(t, err)
+	require.Len(t, resp1.Leases, 1)
+
+	// Build cache keys by explicit constraint kind (sortConstraints reorders the slice)
+	concurrencyCacheKey := cm.keyConstraintCache(accountID, envID, fnID, ConstraintItem{
+		Kind:        ConstraintKindConcurrency,
+		Concurrency: &ConcurrencyConstraint{Scope: enums.ConcurrencyScopeFn, Mode: enums.ConcurrencyModeStep},
+	})
+	throttleCacheKey := cm.keyConstraintCache(accountID, envID, fnID, ConstraintItem{
+		Kind:     ConstraintKindThrottle,
+		Throttle: &ThrottleConstraint{Scope: enums.ThrottleScopeFn, EvaluatedKeyHash: "test-hash"},
+	})
+
+	// Manually set both cache keys (simulates prior acquires that exhausted each constraint)
+	retryAtMS := clock.Now().Add(10 * time.Second).UnixMilli()
+	require.NoError(t, r.Set(concurrencyCacheKey, fmt.Sprintf("%d", retryAtMS)))
+	r.SetTTL(concurrencyCacheKey, 30*time.Second)
+	require.NoError(t, r.Set(throttleCacheKey, fmt.Sprintf("%d", retryAtMS)))
+	r.SetTTL(throttleCacheKey, 30*time.Second)
+
+	// Release the lease
+	_, err = cm.Release(ctx, &CapacityReleaseRequest{
+		IdempotencyKey: "release-1",
+		AccountID:      accountID,
+		LeaseID:        resp1.Leases[0].LeaseID,
+		Source:         LeaseSource{Service: ServiceExecutor},
+	})
+	require.NoError(t, err)
+
+	// Concurrency cache key should be deleted, throttle should remain
+	assert.False(t, r.Exists(concurrencyCacheKey), "concurrency cache key should be deleted after release")
+	assert.True(t, r.Exists(throttleCacheKey), "throttle cache key should still exist after release")
+}
+
+func TestAcquireCacheInvalidatedWithCustomKey(t *testing.T) {
+	accountID, envID, fnID := uuid.New(), uuid.New(), uuid.New()
+	cm, r, clock, ctx := newTestSetup(t, enableAllCache())
+
+	config := ConstraintConfig{
+		FunctionVersion: 1,
+		Concurrency: ConcurrencyConfig{
+			CustomConcurrencyKeys: []CustomConcurrencyLimit{
+				{
+					Scope:             enums.ConcurrencyScopeFn,
+					Limit:             1,
+					KeyExpressionHash: "keyhash123",
+				},
+			},
+		},
+	}
+	constraints := []ConstraintItem{
+		{
+			Kind: ConstraintKindConcurrency,
+			Concurrency: &ConcurrencyConstraint{
+				Scope:              enums.ConcurrencyScopeFn,
+				Mode:               enums.ConcurrencyModeStep,
+				KeyExpressionHash:  "keyhash123",
+				EvaluatedKeyHash:   "evalhash456",
+			},
+		},
+	}
+
+	// Fill capacity
+	resp1, err := cm.Acquire(ctx, makeAcquireRequest(accountID, envID, fnID, clock, config, constraints, "fill"))
+	require.NoError(t, err)
+	require.Len(t, resp1.Leases, 1)
+
+	// Exhaust
+	resp2, err := cm.Acquire(ctx, makeAcquireRequest(accountID, envID, fnID, clock, config, constraints, "exhaust"))
+	require.NoError(t, err)
+	require.Empty(t, resp2.Leases)
+
+	cacheKey := cm.keyConstraintCache(accountID, envID, fnID, constraints[0])
+	require.True(t, r.Exists(cacheKey), "custom key cache should exist after exhaustion")
+
+	// Release
+	_, err = cm.Release(ctx, &CapacityReleaseRequest{
+		IdempotencyKey: "release-1",
+		AccountID:      accountID,
+		LeaseID:        resp1.Leases[0].LeaseID,
+		Source:         LeaseSource{Service: ServiceExecutor},
+	})
+	require.NoError(t, err)
+
+	assert.False(t, r.Exists(cacheKey), "custom key cache should be deleted after release")
+}
+
+func TestAcquireCacheInvalidatedMultipleConstraints(t *testing.T) {
+	accountID, envID, fnID := uuid.New(), uuid.New(), uuid.New()
+	cm, r, clock, ctx := newTestSetup(t, enableAllCache())
+
+	config := ConstraintConfig{
+		FunctionVersion: 1,
+		Concurrency: ConcurrencyConfig{
+			FunctionConcurrency: 1,
+			AccountConcurrency:  1,
+		},
+	}
+	constraints := []ConstraintItem{
+		{
+			Kind: ConstraintKindConcurrency,
+			Concurrency: &ConcurrencyConstraint{
+				Scope: enums.ConcurrencyScopeFn,
+				Mode:  enums.ConcurrencyModeStep,
+			},
+		},
+		{
+			Kind: ConstraintKindConcurrency,
+			Concurrency: &ConcurrencyConstraint{
+				Scope: enums.ConcurrencyScopeAccount,
+				Mode:  enums.ConcurrencyModeStep,
+			},
+		},
+	}
+
+	// Fill capacity
+	resp1, err := cm.Acquire(ctx, makeAcquireRequest(accountID, envID, fnID, clock, config, constraints, "fill"))
+	require.NoError(t, err)
+	require.Len(t, resp1.Leases, 1)
+
+	// Exhaust
+	resp2, err := cm.Acquire(ctx, makeAcquireRequest(accountID, envID, fnID, clock, config, constraints, "exhaust"))
+	require.NoError(t, err)
+	require.Empty(t, resp2.Leases)
+
+	fnCacheKey := cm.keyConstraintCache(accountID, envID, fnID, constraints[0])
+	acctCacheKey := cm.keyConstraintCache(accountID, envID, fnID, constraints[1])
+	require.True(t, r.Exists(fnCacheKey), "fn concurrency cache key should exist")
+	require.True(t, r.Exists(acctCacheKey), "account concurrency cache key should exist")
+
+	// Release
+	_, err = cm.Release(ctx, &CapacityReleaseRequest{
+		IdempotencyKey: "release-1",
+		AccountID:      accountID,
+		LeaseID:        resp1.Leases[0].LeaseID,
+		Source:         LeaseSource{Service: ServiceExecutor},
+	})
+	require.NoError(t, err)
+
+	assert.False(t, r.Exists(fnCacheKey), "fn concurrency cache key should be deleted after release")
+	assert.False(t, r.Exists(acctCacheKey), "account concurrency cache key should be deleted after release")
+}
+
+func TestAcquireCacheNotInvalidatedWhenCacheDisabled(t *testing.T) {
+	accountID, envID, fnID := uuid.New(), uuid.New(), uuid.New()
+	// Create manager WITHOUT cache enabled
+	cm, r, clock, ctx := newTestSetup(t, nil)
+
+	config := ConstraintConfig{
+		FunctionVersion: 1,
+		Concurrency: ConcurrencyConfig{
+			FunctionConcurrency: 1,
+		},
+	}
+	constraints := []ConstraintItem{
+		{
+			Kind: ConstraintKindConcurrency,
+			Concurrency: &ConcurrencyConstraint{
+				Scope: enums.ConcurrencyScopeFn,
+				Mode:  enums.ConcurrencyModeStep,
+			},
+		},
+	}
+
+	// Manually set a cache key to verify it's NOT deleted on release
+	cacheKey := cm.keyConstraintCache(accountID, envID, fnID, constraints[0])
+	require.NotEmpty(t, cacheKey)
+	require.NoError(t, r.Set(cacheKey, "12345"))
+
+	// Fill capacity
+	resp1, err := cm.Acquire(ctx, makeAcquireRequest(accountID, envID, fnID, clock, config, constraints, "fill"))
+	require.NoError(t, err)
+	require.Len(t, resp1.Leases, 1)
+
+	// Release
+	_, err = cm.Release(ctx, &CapacityReleaseRequest{
+		IdempotencyKey: "release-1",
+		AccountID:      accountID,
+		LeaseID:        resp1.Leases[0].LeaseID,
+		Source:         LeaseSource{Service: ServiceExecutor},
+	})
+	require.NoError(t, err)
+
+	// Cache key should still exist since cache invalidation is disabled
+	assert.True(t, r.Exists(cacheKey), "cache key should NOT be deleted when cache is disabled")
+}
