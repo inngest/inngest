@@ -106,7 +106,6 @@ func (a *devapi) addRoutes(AuthMiddleware func(http.Handler) http.Handler) {
 		// Everything else loads the UI (SPA fallback)
 		a.NotFound(a.UI)
 	}
-
 }
 
 func (a devapi) UI(w http.ResponseWriter, r *http.Request) {
@@ -387,6 +386,21 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 		if fnExists {
 			fn.FunctionVersion = currentFn.FunctionVersion + 1
 		}
+
+		// For connect apps, automatically add the app semaphore to the function config
+		// for worker-based concurrency.
+		if r.IsConnect() {
+			if fn.Concurrency == nil {
+				fn.Concurrency = &inngest.ConcurrencyLimits{Fn: []inngest.FnConcurrency{}}
+			}
+
+			appSem := inngest.FnConcurrency{
+				ID:    constraintapi.SemaphoreIDApp(appID),
+				Scope: inngest.FnConcurrencyScopeApp,
+			}
+			fn.Concurrency.Fn = append(fn.Concurrency.Fn, appSem)
+		}
+
 		config, err := json.Marshal(fn)
 		if err != nil {
 			return nil, publicerr.Wrap(err, 500, "Error marshalling function")
@@ -444,7 +458,6 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 				Expression:      cronExpr,
 				Op:              enums.CronOpNew,
 			})
-
 		}
 
 		a.setSemaphoreCapacity(ctx, fn)

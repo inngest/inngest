@@ -184,7 +184,7 @@ func TestConcurrencyLimits_Unmarshal(t *testing.T) {
 					{
 						Limit: 3,
 						Key:   strptr("event.data.customerId"),
-						Hash:  hashConcurrencyKey("event.data.customerId"),
+						ID:    hashConcurrencyKey("event.data.customerId"),
 					},
 				},
 			},

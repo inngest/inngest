@@ -22,6 +22,18 @@ type Semaphore struct {
 	Release SemaphoreReleaseMode `json:"r"`
 }
 
+// AutoReleaseSemaphores returns only auto-release semaphores from a slice.
+// Used to add worker concurrency semaphores to every queue item (not just start).
+func AutoReleaseSemaphores(sems []Semaphore) []Semaphore {
+	var result []Semaphore
+	for _, s := range sems {
+		if s.Release == SemaphoreReleaseAuto {
+			result = append(result, s)
+		}
+	}
+	return result
+}
+
 type ConstraintConfig struct {
 	// FunctionVersion specifies the latest known function version.
 	// If the version on the manager is newer, it will be used.
