@@ -147,19 +147,19 @@ func TestRegister_FunctionVersionIncrement(t *testing.T) {
 			devserver: ds,
 		}
 
-		// First registration with a single function has version=0
+		// First registration with a single function has version=1
 		_, err := api.register(ctx, req)
 		require.NoError(t, err)
 
 		fnVersions := getFunctionIDandVersion(t, ds, req.AppName)
 		require.Len(t, fnVersions, 1)
 		for _, fnVersion := range fnVersions {
-			require.Equal(t, 0, fnVersion)
+			require.Equal(t, 1, fnVersion)
 		}
 
 		// Second registration - add another function
-		// existing function bumped up to version 1
-		// new function set to version 0
+		// existing function bumped up to version 2
+		// new function set to version 1
 		req.Functions = []sdk.SDKFunction{sdkFunction1, sdkFunction2}
 		_, err = api.register(ctx, req)
 		require.NoError(t, err)
@@ -167,20 +167,20 @@ func TestRegister_FunctionVersionIncrement(t *testing.T) {
 		fnVersions = getFunctionIDandVersion(t, ds, req.AppName)
 		require.Len(t, fnVersions, 2)
 		require.Contains(t, fnVersions, sdkFunction1.Name)
-		require.Equal(t, fnVersions[sdkFunction1.Name], 1)
+		require.Equal(t, fnVersions[sdkFunction1.Name], 2)
 		require.Contains(t, fnVersions, sdkFunction2.Name)
-		require.Equal(t, fnVersions[sdkFunction2.Name], 0)
+		require.Equal(t, fnVersions[sdkFunction2.Name], 1)
 
 		// Now register only function1 again, removing function2
 		req.Functions = []sdk.SDKFunction{sdkFunction1}
 		_, err = api.register(ctx, req)
 		require.NoError(t, err)
 
-		// Function1 should bumped up to version 2, function2 should be removed.
+		// Function1 should bumped up to version 3, function2 should be removed.
 		fnVersions = getFunctionIDandVersion(t, ds, req.AppName)
 		require.Len(t, fnVersions, 1)
 		require.Contains(t, fnVersions, sdkFunction1.Name)
-		require.Equal(t, fnVersions[sdkFunction1.Name], 2)
+		require.Equal(t, fnVersions[sdkFunction1.Name], 3)
 	})
 
 	// When one function's config is changes, all functions get their versions udpated, even those that don't have any change in config.
