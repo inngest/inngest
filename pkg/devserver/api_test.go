@@ -196,11 +196,11 @@ func TestRegister_FunctionVersionIncrement(t *testing.T) {
 		_, err := api.register(ctx, req)
 		require.NoError(t, err)
 
-		// Verify the functions were created with version 0
+		// Verify the functions were created with version 1
 		fnVersions := getFunctionIDandVersion(t, ds, req.AppName)
 		require.Len(t, fnVersions, 2)
 		for _, fnVersion := range fnVersions {
-			require.Equal(t, 0, fnVersion)
+			require.Equal(t, 1, fnVersion)
 		}
 
 		// update fn config for sdkFunction1
@@ -217,7 +217,7 @@ func TestRegister_FunctionVersionIncrement(t *testing.T) {
 		fnVersions = getFunctionIDandVersion(t, ds, req.AppName)
 		require.Len(t, fnVersions, 2)
 		for _, fnVersion := range fnVersions {
-			require.Equal(t, 1, fnVersion)
+			require.Equal(t, 2, fnVersion)
 		}
 	})
 
@@ -233,11 +233,11 @@ func TestRegister_FunctionVersionIncrement(t *testing.T) {
 		_, err := api.register(ctx, req)
 		require.NoError(t, err)
 
-		// Verify the functions were created with version 0
+		// Verify the functions were created with version 1
 		fnVersions := getFunctionIDandVersion(t, ds, req.AppName)
 		require.Len(t, fnVersions, 2)
 		for _, fnVersion := range fnVersions {
-			require.Equal(t, fnVersion, 0)
+			require.Equal(t, fnVersion, 1)
 		}
 
 		// remove function1
@@ -249,11 +249,11 @@ func TestRegister_FunctionVersionIncrement(t *testing.T) {
 		_, err = api.register(ctx, req)
 		require.NoError(t, err)
 
-		// Verify function1 is gone and function2 is now on version=1
+		// Verify function1 is gone and function2 is now on version=2
 		fnVersions = getFunctionIDandVersion(t, ds, req.AppName)
 		require.Len(t, fnVersions, 1)
 		require.Contains(t, fnVersions, sdkFunction2.Name)
-		require.Equal(t, fnVersions[sdkFunction2.Name], 1)
+		require.Equal(t, fnVersions[sdkFunction2.Name], 2)
 	})
 }
 
