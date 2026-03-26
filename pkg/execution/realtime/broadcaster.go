@@ -428,10 +428,10 @@ func (b *broadcaster) Close(ctx context.Context) error {
 
 		// Cancel topics
 		b.topicCancelMu.Lock()
-		for key, cancel := range b.topicCancelFuncs {
+		for _, cancel := range b.topicCancelFuncs {
 			cancel()
-			delete(b.topicCancelFuncs, key)
 		}
+		clear(b.topicCancelFuncs)
 		b.topicCancelMu.Unlock()
 	}()
 
