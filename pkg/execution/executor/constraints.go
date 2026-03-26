@@ -290,6 +290,13 @@ func (e *executor) evaluateFnConcurrency(
 			evaluated := ""
 			if val, err := expressions.Evaluate(ctx, *fc.Key, map[string]any{"event": evtMap}); err == nil {
 				evaluated = fmt.Sprintf("%v", val)
+			} else {
+				logger.StdlibLogger(ctx).Warn(
+					"failed to evaluate fn concurrency key expression, all runs will share one semaphore bucket",
+					"error", err,
+					"expression", *fc.Key,
+					"function_id", functionID,
+				)
 			}
 			sem.UsageValue = util.XXHash(evaluated)
 		} else {

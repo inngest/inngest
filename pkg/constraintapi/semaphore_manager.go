@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	semaphoreIdempotencyTTL = 5 * time.Second
+	semaphoreIdempotencyTTL = 60 * time.Second
 )
 
 // SemaphoreManager provides underlying internal APIs for managing semaphores.  these are required because,
