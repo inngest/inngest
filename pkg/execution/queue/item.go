@@ -132,7 +132,7 @@ type CapacityLease struct {
 // Release frees up all acquired capacity that is not time-bound (i.e. concurrency capacity).
 //
 // This function is idempotent and can be called multiple times.
-func (c CapacityLease) Release() error {
+func (c *CapacityLease) Release() error {
 	if c.release != nil {
 		return c.release()
 	}

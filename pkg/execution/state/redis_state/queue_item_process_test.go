@@ -488,7 +488,7 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 		// Expect at least 1 extend call
 		require.Greater(t, len(cmLifecycles.ExtendCalls), 0)
 
-		// Expect exactly 1 release call
+		// Expect exactly 2 release calls
 		require.Equal(t, 2, len(cmLifecycles.ReleaseCalls))
 	})
 }
