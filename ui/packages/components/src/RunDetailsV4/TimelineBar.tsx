@@ -221,7 +221,7 @@ export const BAR_PATTERNS: Record<BarPattern, CSSProperties> = {
  * Falls back to 'default' if the key is not found.
  */
 function getBarStyle(styleKey: BarStyleKey): BarStyle {
-  return BAR_STYLES[styleKey] ?? BAR_STYLES.default;
+  return BAR_STYLES[styleKey];
 }
 
 /**

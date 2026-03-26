@@ -26,7 +26,7 @@ type LegendEntry = {
 };
 
 function BarSample({ label, style }: LegendEntry) {
-  const barStyle = BAR_STYLES[style] ?? BAR_STYLES.default;
+  const barStyle = BAR_STYLES[style];
   const height = SAMPLE_HEIGHTS[barStyle.barHeight ?? 'tall'] ?? SAMPLE_HEIGHTS.tall;
   const isOutlined = barStyle.outlined;
   const colorClass = isOutlined
