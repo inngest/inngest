@@ -1205,7 +1205,6 @@ func (w wrapper) GetEventsByExpressions(ctx context.Context, cel []string) ([]*c
 		}
 
 		evt := domainEvent(&data)
-		_ = err // domainEvent doesn't return errors
 
 		ok, err := expHandler.MatchEventExpressions(ctx, evt.GetEvent())
 		if err != nil {
