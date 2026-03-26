@@ -264,6 +264,9 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			// If gateway is shutting down, we must immediately start the draining process
 			ch.log.Debug("context done, starting draining process")
 
+			// Mark connection as draining to prevent subsequent heartbeats from marking it as ready
+			ch.draining.Store(true)
+
 			// Prevent routing any more messages to this connection
 			err = ch.updateConnStatus(connectpb.ConnectionStatus_DRAINING)
 			if err != nil {
@@ -498,7 +501,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 					Tags:    tags,
 				})
 
-				serr := ch.handleIncomingWebSocketMessage(ctx, &msg)
+				serr := ch.handleIncomingWebSocketMessage(&msg)
 				if serr != nil {
 					c.closeWithConnectError(ws, serr)
 					return serr
@@ -636,15 +639,17 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 	})
 }
 
-func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, msg *connectpb.ConnectMessage) *connecterrors.SocketError {
+func (c *connectionHandler) handleIncomingWebSocketMessage(msg *connectpb.ConnectMessage) *connecterrors.SocketError {
 	c.log.Trace("received WebSocket message", "kind", msg.Kind.String())
 
 	switch msg.Kind {
 	case connectpb.GatewayMessageType_WORKER_READY:
+		// Do not allow marking worker as ready when gateway is draining
 		if c.svc.isDraining.Load() {
 			return &ErrDraining
 		}
 
+		// Check if connection itself is already marked as draining
 		if c.draining.Load() {
 			// Connection is draining, so don't reset status to READY.
 			return nil
@@ -689,20 +694,29 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 
 		return nil
 	case connectpb.GatewayMessageType_WORKER_HEARTBEAT:
-		if c.svc.isDraining.Load() {
-			return &ErrDraining
-		}
+		// Always allow heartbeats
 
 		// Don't reset status to READY if the connection is draining.
-		if !c.draining.Load() {
-			err := c.updateConnStatus(connectpb.ConnectionStatus_READY)
-			if err != nil {
-				// TODO Should we actually close the connection here?
-				return &connecterrors.SocketError{
-					SysCode:    syscode.CodeConnectInternal,
-					StatusCode: websocket.StatusInternalError,
-					Msg:        "could not update connection status",
-				}
+		status := connectpb.ConnectionStatus_READY
+		if c.draining.Load() {
+			status = connectpb.ConnectionStatus_DRAINING
+
+			c.log.Warn("worker heartbeat received during draining sequence",
+				"instance_id", c.conn.Data.InstanceId,
+				"env_id", c.conn.EnvID.String(),
+				"account_id", c.conn.AccountID.String(),
+				"gateway_id", c.conn.GatewayId.String(),
+				"connection_id", c.conn.ConnectionId.String(),
+			)
+		}
+
+		err := c.updateConnStatus(status)
+		if err != nil {
+			// TODO Should we actually close the connection here?
+			return &connecterrors.SocketError{
+				SysCode:    syscode.CodeConnectInternal,
+				StatusCode: websocket.StatusInternalError,
+				Msg:        "could not update connection status",
 			}
 		}
 
@@ -734,7 +748,7 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 		}
 
 		// Respond with gateway heartbeat
-		if err := wsproto.Write(ctx, c.ws, &connectpb.ConnectMessage{
+		if err := wsproto.Write(context.Background(), c.ws, &connectpb.ConnectMessage{
 			Kind: connectpb.GatewayMessageType_GATEWAY_HEARTBEAT,
 		}); err != nil {
 			// The connection will fail to read and be closed in the read loop
@@ -745,17 +759,11 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 
 		return nil
 	case connectpb.GatewayMessageType_WORKER_PAUSE:
-		// NOTE: Unlike WORKER_READY and WORKER_HEARTBEAT, we intentionally do
+		// NOTE: Unlike WORKER_READY, we intentionally do
 		// NOT reject WORKER_PAUSE when the gateway is draining. The worker is
 		// signaling that it wants to stop receiving new requests (e.g. graceful
 		// shutdown via SIGTERM). We must honour this by updating the connection
 		// status in Redis to DRAINING so the router stops selecting it.
-		//
-		// If we reject with ErrDraining here, the connection is closed without
-		// updating Redis, leaving the status as READY. The router then keeps
-		// routing requests to a worker that will skip them, causing leases to
-		// expire after 25s (ConnectWorkerRequestLeaseDuration + GracePeriod)
-		// and producing "worker stopped responding" errors. (SYS-709)
 		if c.svc.isDraining.Load() {
 			c.log.Warn("worker pause signal received during draining sequence",
 				"instance_id", c.conn.Data.InstanceId,
@@ -807,7 +815,7 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 
 			// This will be sent exactly once, as the router selected this gateway to handle the request
 			// Even if the gateway is draining, we should ack the message, the SDK will buffer messages and use a new connection to report results
-			grpcClient, err := c.svc.getOrCreateGRPCClient(ctx, c.conn.EnvID, data.RequestId)
+			grpcClient, err := c.svc.getOrCreateGRPCClient(context.Background(), c.conn.EnvID, data.RequestId)
 			if err != nil {
 				return &connecterrors.SocketError{
 					SysCode:    syscode.CodeConnectInternal,
@@ -816,7 +824,7 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 				}
 			}
 
-			reply, err := grpcClient.Ack(ctx, &connectpb.AckMessage{
+			reply, err := grpcClient.Ack(context.Background(), &connectpb.AckMessage{
 				RequestId: data.RequestId,
 				Ts:        timestamppb.Now(),
 			})
@@ -878,7 +886,7 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 			}
 
 			// get worker capacity to check if we have worker limits to enforce
-			workerCap, err := c.svc.stateManager.GetWorkerCapacities(ctx, c.conn.EnvID, c.conn.Data.InstanceId)
+			workerCap, err := c.svc.stateManager.GetWorkerCapacities(context.Background(), c.conn.EnvID, c.conn.Data.InstanceId)
 			if err != nil {
 				c.log.ReportError(err, "failed to get worker available capacity",
 					logger.WithErrorReportTags(map[string]string{
@@ -894,7 +902,7 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 			c.log.Trace("worker capacity info before extending lease", "account_id", c.conn.AccountID, "env_id", c.conn.EnvID, "instance_id", c.conn.Data.InstanceId, "worker_total_capacity", workerCap.Total, "worker_available_capacity", workerCap.Available)
 
 			// extend lease with worker capacity limit if set
-			newLeaseID, err := c.svc.stateManager.ExtendRequestLease(ctx, c.conn.EnvID, c.conn.Data.InstanceId,
+			newLeaseID, err := c.svc.stateManager.ExtendRequestLease(context.Background(), c.conn.EnvID, c.conn.Data.InstanceId,
 				data.RequestId, leaseID, consts.ConnectWorkerRequestLeaseDuration, workerCap.IsUnlimited())
 			if err != nil {
 				switch {
@@ -929,7 +937,7 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 						}
 					}
 
-					if err := wsproto.Write(ctx, c.ws, &connectpb.ConnectMessage{
+					if err := wsproto.Write(context.Background(), c.ws, &connectpb.ConnectMessage{
 						Kind:    connectpb.GatewayMessageType_WORKER_REQUEST_EXTEND_LEASE_ACK,
 						Payload: nackPayload,
 					}); err != nil {
@@ -978,7 +986,7 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 				}
 			}
 
-			if err := wsproto.Write(ctx, c.ws, &connectpb.ConnectMessage{
+			if err := wsproto.Write(context.Background(), c.ws, &connectpb.ConnectMessage{
 				Kind:    connectpb.GatewayMessageType_WORKER_REQUEST_EXTEND_LEASE_ACK,
 				Payload: ackPayload,
 			}); err != nil {
