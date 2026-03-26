@@ -7,6 +7,8 @@ const (
 	MetadataScopeUnknown MetadataScope = iota
 	MetadataScopeRun
 	MetadataScopeStep
+	// NOTE: StepAttempt scope is legacy now and should be treated as step scope.
+	// We keep it here for backward compatibility with old metadata that was written with this scope.
 	MetadataScopeStepAttempt
 	MetadataScopeExtendedTrace
 )
