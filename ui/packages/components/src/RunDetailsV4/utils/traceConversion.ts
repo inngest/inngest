@@ -125,6 +125,8 @@ function getInngestBreakdown(
   trace: Trace,
   runStartedAtMs: number | null
 ): InngestBreakdownData | null {
+  if (!trace.queuedAt) return null;
+
   // Discovery: time from when the run started executing to when this step was queued
   const stepQueuedAt = new Date(trace.queuedAt).getTime();
   const discoveryMs = runStartedAtMs !== null ? Math.max(0, stepQueuedAt - runStartedAtMs) : 0;
