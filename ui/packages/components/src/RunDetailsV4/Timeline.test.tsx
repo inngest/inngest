@@ -58,7 +58,7 @@ describe('Timeline', () => {
         endTime: new Date('2024-01-01T00:00:05Z'), // 5 seconds
         style: 'step.run',
         timingBreakdown: {
-          queueMs: 1000,
+          inngestMs: 1000,
           executionMs: 4000,
           totalMs: 5000,
         },

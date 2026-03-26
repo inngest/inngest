@@ -51,6 +51,10 @@ func (m TimingMetadata) Serialize() (metadata.Values, error) {
 // BuildTimingMetadata constructs a TimingMetadata from queue RunInfo and
 // an optional httpstat result.
 func BuildTimingMetadata(runInfo *queue.RunInfo, stat *httpstat.Result) *TimingMetadata {
+	if runInfo == nil {
+		return nil
+	}
+
 	md := &TimingMetadata{}
 
 	queueDelayMs := runInfo.SojournDelay.Milliseconds()

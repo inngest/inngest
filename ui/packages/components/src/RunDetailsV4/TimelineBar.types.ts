@@ -290,8 +290,8 @@ export interface TimelineBarData {
  * Timing breakdown for a step bar.
  */
 export interface TimingBreakdownData {
-  /** Queue time (INNGEST) */
-  queueMs: number;
+  /** Total Inngest-side overhead (queue delay + system latency) */
+  inngestMs: number;
 
   /** Execution time (SERVER) */
   executionMs: number;

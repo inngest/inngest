@@ -205,7 +205,7 @@ describe('traceConversion', () => {
 
       const childBar = result.bars[0]?.children?.[0];
       expect(childBar?.timingBreakdown).toBeDefined();
-      expect(childBar?.timingBreakdown?.queueMs).toBe(2000);
+      expect(childBar?.timingBreakdown?.inngestMs).toBe(2000);
       expect(childBar?.timingBreakdown?.executionMs).toBe(5000);
       expect(childBar?.timingBreakdown?.totalMs).toBe(7000);
     });
@@ -257,7 +257,7 @@ describe('traceConversion', () => {
       const result = traceToTimelineData(trace, { runID: 'run-1' });
 
       const childBar = result.bars[0]?.children?.[0];
-      expect(childBar?.timingBreakdown?.queueMs).toBe(0);
+      expect(childBar?.timingBreakdown?.inngestMs).toBe(0);
       expect(childBar?.timingBreakdown?.executionMs).toBe(5000);
     });
   });

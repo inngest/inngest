@@ -56,6 +56,11 @@ func TestTimingMetadata_Serialize_OmitsNil(t *testing.T) {
 	assert.NotContains(t, values, "network_total_ms")
 }
 
+func TestBuildTimingMetadata_NilRunInfo(t *testing.T) {
+	md := BuildTimingMetadata(nil, nil)
+	assert.Nil(t, md)
+}
+
 func TestBuildTimingMetadata_WithRunInfoOnly(t *testing.T) {
 	runInfo := &queue.RunInfo{
 		SojournDelay: 150 * time.Millisecond,

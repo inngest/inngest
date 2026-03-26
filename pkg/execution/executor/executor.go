@@ -1834,8 +1834,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			}
 
 			// Attach timing breakdown metadata (queue delay, system latency, network total)
-			if instance.item.RunInfo != nil {
-				timingMd := extractors.BuildTimingMetadata(instance.item.RunInfo, resp.HTTPStat)
+			if timingMd := extractors.BuildTimingMetadata(instance.item.RunInfo, resp.HTTPStat); timingMd != nil {
 				_, err := e.createMetadataSpan(
 					ctx,
 					&instance,

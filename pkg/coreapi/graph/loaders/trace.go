@@ -387,11 +387,11 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 				}
 
 				// Preserve metadata from omitted step discovery spans so
-				// it can be transferred to a visible step sibling after
-				// the loop. The execution span (which holds timing
-				// metadata) is parented to the step discovery span, not
-				// the step span. When the discovery span is omitted, its
-				// metadata must be promoted to the visible step span.
+				// it can be transferred to the next visible step sibling.
+				// The execution span (which holds timing metadata) is
+				// parented to the step discovery span, not the step span.
+				// When the discovery span is omitted, its metadata must
+				// be promoted to the corresponding visible step span.
 				if len(child.Metadata) > 0 && child.SpanTypeName == meta.SpanNameStepDiscovery {
 					omittedStepMetadata = append(omittedStepMetadata, child.Metadata...)
 				}
@@ -401,6 +401,17 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 
 			if !cs.MarkedAsDropped {
 				showSpan = true
+			}
+
+			// Transfer any accumulated metadata from preceding omitted
+			// step discovery spans to this visible step sibling. Each
+			// discovery span precedes its corresponding step span in the
+			// child list, so we attach metadata to the next visible step
+			// we encounter rather than collecting everything for a
+			// post-loop pass.
+			if len(omittedStepMetadata) > 0 && (child.SpanTypeName == meta.SpanNameStep || child.SpanTypeName == meta.SpanNameStepDiscovery) {
+				child.Metadata = append(child.Metadata, omittedStepMetadata...)
+				omittedStepMetadata = nil
 			}
 
 			// Decide on changes to this parent span based on the children.
@@ -537,24 +548,9 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 			}
 		}
 
-		// Transfer metadata from omitted step discovery spans to
-		// visible step siblings. The execution span (which holds
-		// timing metadata) is parented to the step discovery span;
-		// when the discovery span is omitted, promote its metadata
-		// to the next visible step child so it reaches the UI.
-		//
-		// If no visible step/step_discovery child exists (e.g. all
-		// children were dropped), the accumulated metadata is
-		// intentionally discarded — there is no span to attach it to.
-		if len(omittedStepMetadata) > 0 {
-			for _, child := range gqlSpan.ChildrenSpans {
-				if child.SpanTypeName == meta.SpanNameStep || child.SpanTypeName == meta.SpanNameStepDiscovery {
-					child.Metadata = append(child.Metadata, omittedStepMetadata...)
-					omittedStepMetadata = nil
-					break
-				}
-			}
-		}
+		// Any remaining omittedStepMetadata at this point means
+		// there were trailing omitted discovery spans with no
+		// subsequent visible step child — intentionally discarded.
 	}
 
 	if !showSpan {

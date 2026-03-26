@@ -73,7 +73,7 @@ function getStyleForTrace(trace: Trace): BarStyleKey {
  */
 function calculateTimingBreakdown(
   trace: Trace
-): { queueMs: number; executionMs: number; totalMs: number } | undefined {
+): { inngestMs: number; executionMs: number; totalMs: number } | undefined {
   if (!trace.queuedAt) return undefined;
 
   const queuedAt = new Date(trace.queuedAt).getTime();
@@ -81,13 +81,13 @@ function calculateTimingBreakdown(
   const endedAt = trace.endedAt ? new Date(trace.endedAt).getTime() : Date.now();
 
   // Calculate durations
-  const queueMs = startedAt
+  const inngestMs = startedAt
     ? Math.max(0, startedAt - queuedAt)
     : Math.max(0, Date.now() - queuedAt);
   const executionMs = startedAt ? Math.max(0, endedAt - startedAt) : 0;
-  const totalMs = startedAt ? queueMs + executionMs : Date.now() - queuedAt;
+  const totalMs = startedAt ? inngestMs + executionMs : Date.now() - queuedAt;
 
-  return { queueMs, executionMs, totalMs };
+  return { inngestMs, executionMs, totalMs };
 }
 
 /**
@@ -97,23 +97,23 @@ function calculateTimingBreakdown(
 function getTimingFromMetadata(
   trace: Trace,
   metadata?: SpanMetadata[]
-): { queueMs: number; executionMs: number; totalMs: number } | null {
+): { inngestMs: number; executionMs: number; totalMs: number } | null {
   if (!metadata) return null;
 
   const timing = metadata.find((m): m is SpanMetadataInngestTiming => m.kind === 'inngest.timing');
 
   if (!timing) return null;
 
-  const queueMs = timing.values.total_inngest_ms ?? 0;
+  const inngestMs = timing.values.total_inngest_ms ?? 0;
 
   // Execution time is still derived from span timestamps since the metadata
   // captures Inngest-side overhead, not SDK execution duration.
   const startedAt = trace.startedAt ? new Date(trace.startedAt).getTime() : null;
   const endedAt = trace.endedAt ? new Date(trace.endedAt).getTime() : Date.now();
   const executionMs = startedAt ? Math.max(0, endedAt - startedAt) : 0;
-  const totalMs = queueMs + executionMs;
+  const totalMs = inngestMs + executionMs;
 
-  return { queueMs, executionMs, totalMs };
+  return { inngestMs, executionMs, totalMs };
 }
 
 /**
@@ -274,7 +274,7 @@ export function traceToTimelineData(
       if (totalExecutionMs > 0) {
         const inngestMs = Math.max(0, runDurationMs - totalExecutionMs);
         rootBar.timingBreakdown = {
-          queueMs: inngestMs,
+          inngestMs: inngestMs,
           executionMs: totalExecutionMs,
           totalMs: runDurationMs,
         };

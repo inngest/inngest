@@ -106,6 +106,74 @@ const RUN_INNGEST_PHASES: PhaseDefinition<RunInngestBreakdownData>[] = [
 ];
 
 // ============================================================================
+// Reusable Phase Sub-Bar Renderer
+// ============================================================================
+
+/** Renders a set of phase sub-bars within a parent bar's range. */
+function PhaseSubBars<T extends { totalMs: number }>({
+  phases,
+  data,
+  parentPosition,
+  barIdPrefix,
+  depth,
+  leftWidth,
+  status,
+  onClick,
+  viewStartOffset,
+  viewEndOffset,
+  startTime,
+  endTime,
+  minTime,
+}: {
+  phases: PhaseDefinition<T>[];
+  data: T;
+  parentPosition: { startPercent: number; widthPercent: number };
+  barIdPrefix: string;
+  depth: number;
+  leftWidth: number;
+  status?: string;
+  onClick?: () => void;
+  viewStartOffset?: number;
+  viewEndOffset?: number;
+  startTime?: Date;
+  endTime?: Date | null;
+  minTime: Date;
+}) {
+  if (data.totalMs <= 0) return null;
+
+  let cumulativePercent = 0;
+  return phases
+    .filter((p) => p.getMs(data) > 0)
+    .map((phase) => {
+      const ms = phase.getMs(data);
+      const phaseWidthPercent = (ms / data.totalMs) * parentPosition.widthPercent;
+      const phaseStartPercent = parentPosition.startPercent + cumulativePercent;
+      cumulativePercent += phaseWidthPercent;
+
+      return (
+        <TimelineBar
+          key={`${barIdPrefix}-${phase.key}`}
+          name={phase.label}
+          duration={ms}
+          startPercent={phaseStartPercent}
+          widthPercent={phaseWidthPercent}
+          depth={depth}
+          leftWidth={leftWidth}
+          style={phase.style}
+          styleLabel={STYLE_LABELS[phase.style]}
+          status={status}
+          onClick={onClick}
+          viewStartOffset={viewStartOffset}
+          viewEndOffset={viewEndOffset}
+          startTime={startTime}
+          endTime={endTime ?? undefined}
+          minTime={minTime}
+        />
+      );
+    });
+}
+
+// ============================================================================
 // Timing Breakdown Utilities
 // ============================================================================
 
@@ -151,16 +219,16 @@ function generatePhaseSegments<T extends { totalMs: number }>(
 function generateBarSegments(bar: TimelineBarData): BarSegment[] | undefined {
   if (!bar.timingBreakdown) return undefined;
 
-  const { queueMs, executionMs, totalMs } = bar.timingBreakdown;
+  const { inngestMs, executionMs, totalMs } = bar.timingBreakdown;
 
   if (totalMs <= 0) return undefined;
 
   const segments: BarSegment[] = [];
   let currentPercent = 0;
 
-  // Queue segment — short gray delay bar
-  if (queueMs > 0) {
-    const queuePercent = (queueMs / totalMs) * 100;
+  // Inngest overhead segment — short gray delay bar
+  if (inngestMs > 0) {
+    const queuePercent = (inngestMs / totalMs) * 100;
     segments.push({
       id: `${bar.id}-seg-delay`,
       startPercent: currentPercent,
@@ -274,6 +342,13 @@ const STYLE_LABELS: Partial<Record<BarStyleKey, string>> = {
   'timing.http.transfer': 'Content transfer',
 };
 
+/** Derive tooltip rows from a phase definition array, filtering out zero values. */
+function detailsFromPhases<T>(phases: PhaseDefinition<T>[], data: T): TimingDetail[] {
+  return phases
+    .map((p) => ({ label: p.label, durationMs: p.getMs(data) }))
+    .filter((d) => d.durationMs > 0);
+}
+
 /**
  * Build timing detail rows for a bar's hover tooltip based on available data.
  */
@@ -282,39 +357,24 @@ function buildTimingDetails(bar: TimelineBarData): TimingDetail[] | undefined {
 
   // Inngest overhead breakdown (per-step)
   if (bar.inngestBreakdown) {
-    const b = bar.inngestBreakdown;
-    if (b.discoveryMs > 0) details.push({ label: 'Discovery', durationMs: b.discoveryMs });
-    if (b.queueDelayMs > 0)
-      details.push({ label: 'Concurrency delay', durationMs: b.queueDelayMs });
-    if (b.systemLatencyMs > 0)
-      details.push({ label: 'System latency', durationMs: b.systemLatencyMs });
+    details.push(...detailsFromPhases(INNGEST_PHASES, bar.inngestBreakdown));
   }
 
   // Run-level Inngest overhead (root bar)
   if (bar.runInngestBreakdown) {
-    const b = bar.runInngestBreakdown;
-    if (b.runQueueDelayMs > 0)
-      details.push({ label: 'Run queue delay', durationMs: b.runQueueDelayMs });
-    if (b.finalizationMs > 0) details.push({ label: 'Finalization', durationMs: b.finalizationMs });
+    details.push(...detailsFromPhases(RUN_INNGEST_PHASES, bar.runInngestBreakdown));
   }
 
-  // Timing breakdown (queue + execution)
+  // Timing breakdown (queue + execution) — no matching phase array
   if (bar.timingBreakdown) {
     const b = bar.timingBreakdown;
-    if (b.queueMs > 0) details.push({ label: 'Inngest', durationMs: b.queueMs });
+    if (b.inngestMs > 0) details.push({ label: 'Inngest', durationMs: b.inngestMs });
     if (b.executionMs > 0) details.push({ label: 'Your server', durationMs: b.executionMs });
   }
 
   // HTTP timing breakdown
   if (bar.httpTimingBreakdown) {
-    const b = bar.httpTimingBreakdown;
-    if (b.dnsLookupMs > 0) details.push({ label: 'DNS', durationMs: b.dnsLookupMs });
-    if (b.tcpConnectionMs > 0) details.push({ label: 'TCP', durationMs: b.tcpConnectionMs });
-    if (b.tlsHandshakeMs > 0) details.push({ label: 'TLS', durationMs: b.tlsHandshakeMs });
-    if (b.serverProcessingMs > 0)
-      details.push({ label: 'Server processing', durationMs: b.serverProcessingMs });
-    if (b.contentTransferMs > 0)
-      details.push({ label: 'Content transfer', durationMs: b.contentTransferMs });
+    details.push(...detailsFromPhases(HTTP_PHASES, bar.httpTimingBreakdown));
   }
 
   return details.length > 0 ? details : undefined;
@@ -420,13 +480,14 @@ function TimelineBarRenderer({
   // Pre-compute timing sub-bar positions from the parent bar's position.
   // This ensures sub-bars visually align with the parent's compound segments.
   //
-  // For the Inngest portion: prefer timingBreakdown.queueMs (from metadata),
+  // For the Inngest portion: prefer timingBreakdown.inngestMs (from metadata),
   // but fall back to inngestBreakdown.totalMs (from timestamps) so we still
   // show the Inngest bar even when metadata is missing or reports 0.
   const timingPositions = (() => {
-    const queueMs = bar.timingBreakdown?.queueMs ?? 0;
+    const breakdownInngestMs = bar.timingBreakdown?.inngestMs ?? 0;
     const executionMs = bar.timingBreakdown?.executionMs ?? 0;
-    const inngestMs = queueMs > 0 ? queueMs : bar.inngestBreakdown?.totalMs ?? 0;
+    const inngestMs =
+      breakdownInngestMs > 0 ? breakdownInngestMs : bar.inngestBreakdown?.totalMs ?? 0;
     const totalMs = inngestMs + executionMs;
     if (totalMs <= 0) return null;
 
@@ -485,6 +546,8 @@ function TimelineBarRenderer({
       style={bar.style}
       styleLabel={STYLE_LABELS[bar.style]}
       segments={segments}
+      // Root bar is always expanded (children always visible) but not expandable
+      // (no toggle UI). expandable=false ensures VisualBar keeps opacity 1.
       expandable={bar.isRoot ? false : isExpandable}
       expanded={isExpanded}
       onToggle={bar.isRoot ? undefined : () => onToggleExpand(bar.id)}
@@ -527,43 +590,23 @@ function TimelineBarRenderer({
           minTime={minTime}
         >
           {/* Inngest breakdown sub-bars — each positioned within the Inngest bar's range */}
-          {isInngestExpanded &&
-            hasInngestBreakdown &&
-            (() => {
-              const breakdown = bar.inngestBreakdown!;
-              const inngestTotalMs = breakdown.totalMs;
-              if (inngestTotalMs <= 0) return null;
-
-              const iPos = timingPositions.inngest!;
-              let cumulativePercent = 0;
-              return INNGEST_PHASES.filter((p) => p.getMs(breakdown) > 0).map((phase) => {
-                const ms = phase.getMs(breakdown);
-                const phaseWidthPercent = (ms / inngestTotalMs) * iPos.widthPercent;
-                const phaseStartPercent = iPos.startPercent + cumulativePercent;
-                cumulativePercent += phaseWidthPercent;
-
-                return (
-                  <TimelineBar
-                    key={`${bar.id}-inngest-${phase.key}`}
-                    name={phase.label}
-                    duration={ms}
-                    startPercent={phaseStartPercent}
-                    widthPercent={phaseWidthPercent}
-                    depth={depth + 2}
-                    leftWidth={leftWidth}
-                    style={phase.style}
-                    styleLabel={STYLE_LABELS[phase.style]}
-                    status={bar.status}
-                    onClick={() => onSelectStep?.(bar.id)}
-                    viewStartOffset={viewStartOffset}
-                    viewEndOffset={viewEndOffset}
-                    startTime={bar.startTime}
-                    endTime={bar.endTime}
-                    minTime={minTime}
-                  />
-                );
-              });
-            })()}
+          {isInngestExpanded && hasInngestBreakdown && (
+            <PhaseSubBars
+              phases={INNGEST_PHASES}
+              data={bar.inngestBreakdown!}
+              parentPosition={timingPositions.inngest!}
+              barIdPrefix={`${bar.id}-inngest`}
+              depth={depth + 2}
+              leftWidth={leftWidth}
+              status={bar.status}
+              onClick={() => onSelectStep?.(bar.id)}
+              viewStartOffset={viewStartOffset}
+              viewEndOffset={viewEndOffset}
+              startTime={bar.startTime}
+              endTime={bar.endTime}
+              minTime={minTime}
+            />
+          )}
         </TimelineBar>
       )}
 
@@ -593,43 +636,23 @@ function TimelineBarRenderer({
           minTime={minTime}
         >
           {/* HTTP timing bars — each positioned within the server bar's range */}
-          {isServerExpanded &&
-            hasHTTPTiming &&
-            (() => {
-              const httpTiming = bar.httpTimingBreakdown!;
-              const httpTotalMs = httpTiming.totalMs;
-              if (httpTotalMs <= 0) return null;
-
-              const sPos = timingPositions.server!;
-              let cumulativePercent = 0;
-              return HTTP_PHASES.filter((p) => p.getMs(httpTiming) > 0).map((phase) => {
-                const ms = phase.getMs(httpTiming);
-                const phaseWidthPercent = (ms / httpTotalMs) * sPos.widthPercent;
-                const phaseStartPercent = sPos.startPercent + cumulativePercent;
-                cumulativePercent += phaseWidthPercent;
-
-                return (
-                  <TimelineBar
-                    key={`${bar.id}-http-${phase.key}`}
-                    name={phase.label}
-                    duration={ms}
-                    startPercent={phaseStartPercent}
-                    widthPercent={phaseWidthPercent}
-                    depth={depth + 2}
-                    leftWidth={leftWidth}
-                    style={phase.style}
-                    styleLabel={STYLE_LABELS[phase.style]}
-                    status={bar.status}
-                    onClick={() => onSelectStep?.(bar.id)}
-                    viewStartOffset={viewStartOffset}
-                    viewEndOffset={viewEndOffset}
-                    startTime={bar.startTime}
-                    endTime={bar.endTime}
-                    minTime={minTime}
-                  />
-                );
-              });
-            })()}
+          {isServerExpanded && hasHTTPTiming && (
+            <PhaseSubBars
+              phases={HTTP_PHASES}
+              data={bar.httpTimingBreakdown!}
+              parentPosition={timingPositions.server!}
+              barIdPrefix={`${bar.id}-http`}
+              depth={depth + 2}
+              leftWidth={leftWidth}
+              status={bar.status}
+              onClick={() => onSelectStep?.(bar.id)}
+              viewStartOffset={viewStartOffset}
+              viewEndOffset={viewEndOffset}
+              startTime={bar.startTime}
+              endTime={bar.endTime}
+              minTime={minTime}
+            />
+          )}
 
           {/* Child bars nested under YOUR SERVER */}
           {isServerExpanded &&
@@ -678,42 +701,23 @@ function TimelineBarRenderer({
           minTime={minTime}
         >
           {/* Run-level Inngest sub-bars */}
-          {isRunInngestExpanded &&
-            (() => {
-              const breakdown = bar.runInngestBreakdown!;
-              const runInngestTotalMs = breakdown.totalMs;
-              if (runInngestTotalMs <= 0) return null;
-
-              const iPos = timingPositions.inngest!;
-              let cumulativePercent = 0;
-              return RUN_INNGEST_PHASES.filter((p) => p.getMs(breakdown) > 0).map((phase) => {
-                const ms = phase.getMs(breakdown);
-                const phaseWidthPercent = (ms / runInngestTotalMs) * iPos.widthPercent;
-                const phaseStartPercent = iPos.startPercent + cumulativePercent;
-                cumulativePercent += phaseWidthPercent;
-
-                return (
-                  <TimelineBar
-                    key={`${bar.id}-run-inngest-${phase.key}`}
-                    name={phase.label}
-                    duration={ms}
-                    startPercent={phaseStartPercent}
-                    widthPercent={phaseWidthPercent}
-                    depth={depth + 2}
-                    leftWidth={leftWidth}
-                    style={phase.style}
-                    styleLabel={STYLE_LABELS[phase.style]}
-                    status={bar.status}
-                    onClick={() => onSelectStep?.(bar.id)}
-                    viewStartOffset={viewStartOffset}
-                    viewEndOffset={viewEndOffset}
-                    startTime={bar.startTime}
-                    endTime={bar.endTime}
-                    minTime={minTime}
-                  />
-                );
-              });
-            })()}
+          {isRunInngestExpanded && (
+            <PhaseSubBars
+              phases={RUN_INNGEST_PHASES}
+              data={bar.runInngestBreakdown!}
+              parentPosition={timingPositions.inngest!}
+              barIdPrefix={`${bar.id}-run-inngest`}
+              depth={depth + 2}
+              leftWidth={leftWidth}
+              status={bar.status}
+              onClick={() => onSelectStep?.(bar.id)}
+              viewStartOffset={viewStartOffset}
+              viewEndOffset={viewEndOffset}
+              startTime={bar.startTime}
+              endTime={bar.endTime}
+              minTime={minTime}
+            />
+          )}
         </TimelineBar>
       )}
 
