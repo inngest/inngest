@@ -397,11 +397,6 @@ func isHealthy(ctx context.Context, stateManager state.StateManager, envID uuid.
 				shouldDeleteUnhealthyGateway:    true,
 			}
 		}
-
-		// Drop associated connection
-		return isHealthyRes{
-			shouldDeleteUnhealthyConnection: true,
-		}
 	}
 
 	return isHealthyRes{
