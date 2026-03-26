@@ -104,8 +104,8 @@ type broadcaster struct {
 	// subc is the client connected to Redis for subscribing to pub-sub streams.
 	subc rueidis.Client
 
-	// redisMu protects topicCancelFuncs.
-	redisMu sync.Mutex
+	// topicCancelMu protects topicCancelFuncs.
+	topicCancelMu sync.Mutex
 
 	// topicCancelFuncs maps topic keys to the cancel function for their
 	// `runTopic` goroutine. Used by `stopTopic` (last subscriber leaves) and
@@ -427,12 +427,12 @@ func (b *broadcaster) Close(ctx context.Context) error {
 		b.l.RUnlock()
 
 		// Cancel topics
-		b.redisMu.Lock()
+		b.topicCancelMu.Lock()
 		for key, cancel := range b.topicCancelFuncs {
 			cancel()
 			delete(b.topicCancelFuncs, key)
 		}
-		b.redisMu.Unlock()
+		b.topicCancelMu.Unlock()
 	}()
 
 	return nil
@@ -714,8 +714,8 @@ func (b *broadcaster) keepalive(ctx context.Context, subID uuid.UUID) {
 // because it does not block on I/O: the caller should wait on the returned
 // channel after releasing the lock.
 func (b *broadcaster) startTopic(t Topic) <-chan error {
-	b.redisMu.Lock()
-	defer b.redisMu.Unlock()
+	b.topicCancelMu.Lock()
+	defer b.topicCancelMu.Unlock()
 
 	key := t.String()
 	if _, ok := b.topicCancelFuncs[key]; ok {
@@ -741,8 +741,8 @@ func (b *broadcaster) startTopic(t Topic) <-chan error {
 // stopTopic is called when the last subscriber disconnects from a topic. It
 // cancels the background subscriber goroutine.
 func (b *broadcaster) stopTopic(t Topic) {
-	b.redisMu.Lock()
-	defer b.redisMu.Unlock()
+	b.topicCancelMu.Lock()
+	defer b.topicCancelMu.Unlock()
 
 	key := t.String()
 	if cancel, ok := b.topicCancelFuncs[key]; ok {
