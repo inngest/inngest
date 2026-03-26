@@ -277,6 +277,129 @@ describe('traceConversion', () => {
       expect(rootBar?.timingBreakdown?.totalMs).toBe(71000);
     });
 
+    it('prefers metadata timing over timestamp-based calculation', () => {
+      const trace = createTrace({
+        isRoot: true,
+        childrenSpans: [
+          createTrace({
+            spanID: 'run-step',
+            stepOp: 'RUN',
+            queuedAt: '2024-01-01T00:00:00Z',
+            startedAt: '2024-01-01T00:00:02Z', // 2s timestamp delta
+            endedAt: '2024-01-01T00:00:07Z', // 5s execution
+            metadata: [
+              {
+                scope: 'step_attempt',
+                kind: 'inngest.timing',
+                updatedAt: '2024-01-01T00:00:07Z',
+                values: {
+                  total_inngest_ms: 3500, // Different from timestamp-based 2000ms
+                },
+              },
+            ],
+          }),
+        ],
+      });
+      const result = traceToTimelineData(trace, { runID: 'run-1' });
+
+      const childBar = result.bars[0]?.children?.[0];
+      expect(childBar?.timingBreakdown).toBeDefined();
+      // Should use metadata value (3500ms), not timestamp delta (2000ms)
+      expect(childBar?.timingBreakdown?.inngestMs).toBe(3500);
+      expect(childBar?.timingBreakdown?.executionMs).toBe(5000);
+      expect(childBar?.timingBreakdown?.totalMs).toBe(8500);
+    });
+
+    it('falls back to timestamp calculation when metadata has no inngest.timing', () => {
+      const trace = createTrace({
+        isRoot: true,
+        childrenSpans: [
+          createTrace({
+            spanID: 'run-step',
+            stepOp: 'RUN',
+            queuedAt: '2024-01-01T00:00:00Z',
+            startedAt: '2024-01-01T00:00:02Z',
+            endedAt: '2024-01-01T00:00:07Z',
+            metadata: [
+              {
+                scope: 'step_attempt',
+                kind: 'inngest.http',
+                updatedAt: '2024-01-01T00:00:07Z',
+                values: { req_method: 'POST' },
+              },
+            ],
+          }),
+        ],
+      });
+      const result = traceToTimelineData(trace, { runID: 'run-1' });
+
+      const childBar = result.bars[0]?.children?.[0];
+      expect(childBar?.timingBreakdown).toBeDefined();
+      // Falls back to timestamp-based: startedAt - queuedAt = 2000ms
+      expect(childBar?.timingBreakdown?.inngestMs).toBe(2000);
+      expect(childBar?.timingBreakdown?.executionMs).toBe(5000);
+      expect(childBar?.timingBreakdown?.totalMs).toBe(7000);
+    });
+
+    it('calculates inngestBreakdown from metadata timing values', () => {
+      const trace = createTrace({
+        isRoot: true,
+        startedAt: '2024-01-01T00:00:01Z', // run started at T+1s
+        childrenSpans: [
+          createTrace({
+            spanID: 'run-step',
+            stepOp: 'RUN',
+            queuedAt: '2024-01-01T00:00:03Z', // queued 2s after run started
+            startedAt: '2024-01-01T00:00:05Z',
+            endedAt: '2024-01-01T00:00:10Z',
+            metadata: [
+              {
+                scope: 'step_attempt',
+                kind: 'inngest.timing',
+                updatedAt: '2024-01-01T00:00:10Z',
+                values: {
+                  queue_delay_ms: 800,
+                  system_latency_ms: 200,
+                  total_inngest_ms: 2000,
+                },
+              },
+            ],
+          }),
+        ],
+      });
+      const result = traceToTimelineData(trace, { runID: 'run-1' });
+
+      const childBar = result.bars[0]?.children?.[0];
+      expect(childBar?.inngestBreakdown).toBeDefined();
+      // discoveryMs = queuedAt - runStartedAt = 3s - 1s = 2000ms
+      expect(childBar?.inngestBreakdown?.discoveryMs).toBe(2000);
+      expect(childBar?.inngestBreakdown?.queueDelayMs).toBe(800);
+      expect(childBar?.inngestBreakdown?.systemLatencyMs).toBe(200);
+      expect(childBar?.inngestBreakdown?.totalMs).toBe(3000);
+    });
+
+    it('returns no inngestBreakdown without metadata timing', () => {
+      const trace = createTrace({
+        isRoot: true,
+        startedAt: '2024-01-01T00:00:01Z',
+        childrenSpans: [
+          createTrace({
+            spanID: 'run-step',
+            stepOp: 'RUN',
+            queuedAt: '2024-01-01T00:00:01Z', // same as run start => discoveryMs=0
+            startedAt: '2024-01-01T00:00:01Z',
+            endedAt: '2024-01-01T00:00:05Z',
+            // No metadata
+          }),
+        ],
+      });
+      const result = traceToTimelineData(trace, { runID: 'run-1' });
+
+      const childBar = result.bars[0]?.children?.[0];
+      // Without metadata, queueDelayMs=0 and systemLatencyMs=0, discoveryMs=0 => totalMs=0 => null
+      expect(childBar?.inngestBreakdown).toBeUndefined();
+    });
+
     it('handles zero queue time', () => {
       const trace = createTrace({
         isRoot: true,
