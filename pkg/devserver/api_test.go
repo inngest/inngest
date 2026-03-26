@@ -117,7 +117,7 @@ func TestRegister_FunctionVersionIncrement(t *testing.T) {
 			devserver: ds,
 		}
 
-		expectedVersions := []int{0, 1, 2, 3, 4}
+		expectedVersions := []int{1, 2, 3, 4, 5}
 
 		// Register the function multiple times with different config
 		for i, expectedVersion := range expectedVersions {
