@@ -196,9 +196,6 @@ func (f FnConcurrency) Validate(ctx context.Context) error {
 		if f.Limit <= 0 {
 			return fmt.Errorf("function concurrency limit must be > 0")
 		}
-		if f.ID != "" {
-			return fmt.Errorf("function concurrency ID cannot be set")
-		}
 		if f.Key != nil {
 			if _, err := expressions.NewExpressionEvaluator(ctx, *f.Key); err != nil {
 				return fmt.Errorf("invalid function concurrency key '%s': %w", *f.Key, err)
