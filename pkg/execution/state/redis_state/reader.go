@@ -358,6 +358,11 @@ func (q *queue) ItemsByPartition(ctx context.Context, partitionID string, from t
 					// the same millisecond
 					backlogFrom = backlogFrom.Add(time.Millisecond)
 				}
+			} else {
+				// All cursors are 0 (epoch) — we cannot advance the cursor
+				// any further back, so continuing would re-fetch the same
+				// items forever. Break to avoid an infinite loop.
+				break
 			}
 
 			// wait a little before proceeding
@@ -446,6 +451,11 @@ func (q *queue) ItemsByBacklog(ctx context.Context, backlogID string, from time.
 			// NOT qi.AtMS which can diverge from the sorted set score.
 			if peekRes.Cursor > 0 {
 				backlogFrom = time.UnixMilli(peekRes.Cursor).Add(time.Millisecond)
+			} else {
+				// Cursor is 0 (epoch) — we cannot advance the cursor any
+				// further back, so continuing would re-fetch the same items
+				// forever. Break to avoid an infinite loop.
+				break
 			}
 
 			<-time.After(opt.Interval)
