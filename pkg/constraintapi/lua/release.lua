@@ -44,7 +44,10 @@ if opIdempotency ~= nil and opIdempotency ~= false then
 	return opIdempotency
 end
 
--- Check if lease details still exist
+-- Release is idempotent by lease ID. If another caller (e.g. the lease
+-- scavenger or a concurrent ItemLeaseConstraintCheck) already released this
+-- lease, the details will be gone and we return a no-op (status 1). This
+-- means multiple Release calls for the same lease are safe.
 local requestID = call("HGET", keyLeaseDetails, "req")
 if requestID == false or requestID == nil or requestID == "" then
 	local res = {}
