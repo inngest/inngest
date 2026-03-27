@@ -7,5 +7,9 @@ if existing ~= nil and existing ~= false then
 	return existing
 end
 local newCapacity = redis.call("INCRBY", keyCapacity, delta)
+if tonumber(newCapacity) < 0 then
+	redis.call("SET", keyCapacity, "0")
+	newCapacity = 0
+end
 redis.call("SET", keyIdempotency, tostring(newCapacity), "EX", tostring(idempotencyTTL))
 return newCapacity

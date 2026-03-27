@@ -646,7 +646,7 @@ func GetThrottleConfig(ctx context.Context, fnID uuid.UUID, throttle *inngest.Th
 	}
 }
 
-func GetCustomConcurrencyKeys(ctx context.Context, id sv2.ID, customConcurrency []inngest.Concurrency, evtMap map[string]any) []state.CustomConcurrency {
+func GetCustomConcurrencyKeys(ctx context.Context, id sv2.ID, customConcurrency []inngest.StepConcurrency, evtMap map[string]any) []state.CustomConcurrency {
 	if len(customConcurrency) == 0 {
 		return nil
 	}

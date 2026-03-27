@@ -1113,6 +1113,7 @@ func (e *executor) schedule(
 	// Evaluate concurrency keys to use initially
 	if req.Function.Concurrency != nil {
 		metadata.Config.CustomConcurrencyKeys = queue.GetCustomConcurrencyKeys(ctx, metadata.ID, req.Function.Concurrency.Limits, evtMap)
+		metadata.Config.Semaphores = e.evaluateFnConcurrency(ctx, req.AccountID, req.Function.ID, req.Function.Concurrency.Fn, evtMap)
 	}
 
 	//
@@ -2808,6 +2809,7 @@ func (e *executor) ResumePauseTimeout(ctx context.Context, pause state.Pause, r 
 			Identifier:            sv2.V1FromMetadata(md),
 			PriorityFactor:        md.Config.PriorityFactor,
 			CustomConcurrencyKeys: md.Config.CustomConcurrencyKeys,
+			Semaphores:            stepSemaphores(md),
 			MaxAttempts:           pause.MaxAttempts,
 			Payload: queue.PayloadEdge{
 				Edge: inngest.Edge{
@@ -2982,6 +2984,7 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 				Identifier:            sv2.V1FromMetadata(md),
 				PriorityFactor:        md.Config.PriorityFactor,
 				CustomConcurrencyKeys: md.Config.CustomConcurrencyKeys,
+				Semaphores:            stepSemaphores(md),
 				MaxAttempts:           pause.MaxAttempts,
 				Payload: queue.PayloadEdge{
 					Edge: pause.Edge(),
@@ -3281,6 +3284,7 @@ func (e *executor) maybeEnqueueDiscoveryStep(ctx context.Context, runCtx executi
 		Identifier:            sv2.V1FromMetadata(*runCtx.Metadata()), // Convert from v2 metadata
 		PriorityFactor:        runCtx.PriorityFactor(),
 		CustomConcurrencyKeys: runCtx.ConcurrencyKeys(),
+		Semaphores:            stepSemaphores(*runCtx.Metadata()),
 		Attempt:               0,
 		MaxAttempts:           runCtx.MaxAttempts(),
 		Payload:               queue.PayloadEdge{Edge: nextEdge},
@@ -3564,6 +3568,7 @@ func (e *executor) handleStepFailed(ctx context.Context, runCtx execution.RunCon
 		Identifier:            sv2.V1FromMetadata(*runCtx.Metadata()),
 		PriorityFactor:        runCtx.PriorityFactor(),
 		CustomConcurrencyKeys: runCtx.ConcurrencyKeys(),
+		Semaphores:            stepSemaphores(*runCtx.Metadata()),
 		Attempt:               0,
 		MaxAttempts:           runCtx.MaxAttempts(),
 		Payload:               queue.PayloadEdge{Edge: nextEdge},
@@ -3797,6 +3802,7 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, runCtx execution.Ru
 		Identifier:            sv2.V1FromMetadata(*runCtx.Metadata()),
 		PriorityFactor:        runCtx.PriorityFactor(),
 		CustomConcurrencyKeys: runCtx.ConcurrencyKeys(),
+		Semaphores:            stepSemaphores(*runCtx.Metadata()),
 		Attempt:               0,
 		MaxAttempts:           runCtx.MaxAttempts(),
 		Payload:               queue.PayloadEdge{Edge: nextEdge},
@@ -3996,6 +4002,7 @@ func (e *executor) handleGeneratorGateway(ctx context.Context, runCtx execution.
 		Identifier:            sv2.V1FromMetadata(*runCtx.Metadata()),
 		PriorityFactor:        runCtx.PriorityFactor(),
 		CustomConcurrencyKeys: runCtx.ConcurrencyKeys(),
+		Semaphores:            stepSemaphores(*runCtx.Metadata()),
 		Attempt:               0,
 		MaxAttempts:           runCtx.MaxAttempts(),
 		Payload:               queue.PayloadEdge{Edge: nextEdge},
@@ -4246,6 +4253,7 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 		Identifier:            sv2.V1FromMetadata(*runCtx.Metadata()), // Convert from v2 metadata
 		PriorityFactor:        runCtx.PriorityFactor(),
 		CustomConcurrencyKeys: runCtx.ConcurrencyKeys(),
+		Semaphores:            stepSemaphores(*runCtx.Metadata()),
 		Attempt:               0,
 		MaxAttempts:           runCtx.MaxAttempts(),
 		Payload:               queue.PayloadEdge{Edge: nextEdge},

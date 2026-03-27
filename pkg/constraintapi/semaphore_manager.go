@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	semaphoreIdempotencyTTL = 5 * time.Second
+	semaphoreIdempotencyTTL = 60 * time.Second
 )
 
 // SemaphoreManager provides underlying internal APIs for managing semaphores.  these are required because,
@@ -21,6 +21,7 @@ type SemaphoreManager interface {
 	SetCapacity(ctx context.Context, accountID uuid.UUID, name, idempotencyKey string, capacity int64) error
 
 	// AdjustCapacity atomically adjusts capacity by delta (e.g., +N on worker connect, -N on disconnect).
+	// This upserts the semaphore if it does not exist.
 	AdjustCapacity(ctx context.Context, accountID uuid.UUID, name, idempotencyKey string, delta int64) error
 
 	// GetCapacity returns current capacity and usage for a named semaphore.

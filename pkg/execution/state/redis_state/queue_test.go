@@ -2787,7 +2787,7 @@ func createConcurrencyKey(scope enums.ConcurrencyScope, scopeID uuid.UUID, value
 	// Always quote for these tests.
 	value = strconv.Quote(value)
 
-	c := inngest.Concurrency{
+	c := inngest.StepConcurrency{
 		Key:   &value,
 		Scope: scope,
 	}

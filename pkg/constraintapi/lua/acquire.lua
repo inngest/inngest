@@ -240,7 +240,8 @@ for index, value in ipairs(constraints) do
 		-- semaphore
 		local usage = tonumber(call("GET", value.sem.k)) or 0
 		local capacity = tonumber(call("GET", value.sem.ck)) or 0
-		local weight = value.sem.w or 1
+		local weight = value.sem.w
+		if not weight or weight <= 0 then weight = 1 end
 		local remaining = capacity - usage
 		if remaining < weight then
 			constraintCapacity = 0
@@ -359,7 +360,8 @@ for i, value in ipairs(constraints) do
 		constraintCapacity = throttleRes["remaining"] or 0
 	elseif value.k == 4 then
 		-- semaphore: increment usage counter
-		local weight = value.sem.w or 1
+		local weight = value.sem.w
+		if not weight or weight <= 0 then weight = 1 end
 		local newUsage = call("INCRBY", value.sem.k, weight * granted)
 		local capacity = tonumber(call("GET", value.sem.ck)) or 0
 		local remaining = capacity - newUsage
