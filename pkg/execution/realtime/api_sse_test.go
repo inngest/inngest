@@ -36,12 +36,14 @@ func TestAPI_GetSSE(t *testing.T) {
 		require.NoError(t, err)
 		req.Header.Set("Authorization", "Bearer "+jwt)
 
-		// Use a context with timeout to avoid hanging
-		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+		// Use a context with timeout to avoid hanging.  The timeout must be
+		// long enough for Subscribe (which waits for a Redis subscription
+		// confirmation) to succeed even on slow CI runners.
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
 		req = req.WithContext(ctx)
 
-		client := &http.Client{Timeout: 200 * time.Millisecond}
+		client := &http.Client{Timeout: 3 * time.Second}
 		resp, err := client.Do(req)
 		require.NoError(t, err)
 
@@ -51,17 +53,19 @@ func TestAPI_GetSSE(t *testing.T) {
 		require.Equal(t, "keep-alive", resp.Header.Get("Connection"))
 		require.Equal(t, "*", resp.Header.Get("Access-Control-Allow-Origin"))
 
-		// Before closing, there should be 1 active subscription
-		require.Equal(t, 1, subCount(bc), "Should have 1 active subscription")
+		// The subscription is created asynchronously on the server side;
+		// wait for it to appear.
+		require.Eventually(t, func() bool {
+			return subCount(bc) == 1
+		}, 2*time.Second, 10*time.Millisecond, "Should have 1 active subscription")
 
 		// Close the response to trigger cleanup
 		resp.Body.Close()
 
-		// Give time for cleanup to occur
-		time.Sleep(50 * time.Millisecond)
-
 		// After closing, the subscription should be cleaned up
-		require.Equal(t, 0, subCount(bc), "Subscription should be cleaned up after connection close")
+		require.Eventually(t, func() bool {
+			return subCount(bc) == 0
+		}, 2*time.Second, 10*time.Millisecond, "Subscription should be cleaned up after connection close")
 	})
 
 	t.Run("sends messages in SSE format", func(t *testing.T) {
