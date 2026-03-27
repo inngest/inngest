@@ -2,7 +2,9 @@ package expressions
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
+	"unsafe"
 
 	"github.com/google/cel-go/common/operators"
 	"github.com/google/cel-go/common/overloads"
@@ -25,6 +27,16 @@ func unknownDecorator(act interpreter.PartialActivation) interpreter.Interpretab
 	_ = dispatcher.Add(overloads...)
 
 	return func(i interpreter.Interpretable) (interpreter.Interpretable, error) {
+		// Handle logical OR/AND nodes.  CEL represents || and && as special
+		// evalOr/evalAnd (or evalExhaustiveOr/evalExhaustiveAnd) structs that
+		// are NOT InterpretableCall.  They require boolean operands, but users
+		// commonly write "event.data.a || event.data.b" expecting JS-like truthy
+		// coercion.  We detect these nodes via reflection and wrap them to
+		// implement truthy coercion when operands are non-boolean.
+		if wrapped, ok := maybeWrapLogicalOp(i, act); ok {
+			return wrapped, nil
+		}
+
 		// If this is a fold call, this is a macro (exists, has, etc), and is not an InterpretableCall
 		call, ok := i.(interpreter.InterpretableCall)
 		if !ok {
@@ -200,6 +212,121 @@ func handleUnknownCall(i interpreter.InterpretableCall, args *argColl) (interpre
 		// By default, return false, for eaxmple: "_<_", "@in", "@not_strictly_false"
 		// return staticCall{result: types.False, InterpretableCall: call}, nil
 		return staticCall{result: types.False, InterpretableCall: i}, nil
+	}
+}
+
+// maybeWrapLogicalOp detects CEL's internal evalOr/evalAnd (and their exhaustive
+// variants) via reflection and wraps them to implement JS-like truthy coercion
+// when operands are non-boolean.  Returns (wrapped, true) if the node was wrapped,
+// or (nil, false) if the node is not a logical operator.
+func maybeWrapLogicalOp(i interpreter.Interpretable, act interpreter.PartialActivation) (interpreter.Interpretable, bool) {
+	typeName := reflect.TypeOf(i).String()
+
+	var isOr bool
+	switch {
+	case strings.Contains(typeName, "evalOr") || strings.Contains(typeName, "evalExhaustiveOr"):
+		isOr = true
+	case strings.Contains(typeName, "evalAnd") || strings.Contains(typeName, "evalExhaustiveAnd"):
+		isOr = false
+	default:
+		return nil, false
+	}
+
+	// Extract the terms field via reflection + unsafe, since the CEL structs
+	// are unexported.  The struct layout is:
+	//   type eval{Exhaustive}{Or,And} struct {
+	//       id    int64
+	//       terms []interpreter.Interpretable
+	//   }
+	v := reflect.ValueOf(i)
+	if v.Kind() == reflect.Ptr {
+		v = v.Elem()
+	}
+	termsField := v.FieldByName("terms")
+	if !termsField.IsValid() {
+		return nil, false
+	}
+
+	// Use unsafe to read the unexported field.
+	terms := *(*[]interpreter.Interpretable)(unsafe.Pointer(termsField.UnsafeAddr()))
+
+	return &evalTruthyLogical{
+		inner: i,
+		terms: terms,
+		isOr:  isOr,
+	}, true
+}
+
+// evalTruthyLogical wraps a CEL evalOr/evalAnd node to support JS-like truthy
+// coercion for non-boolean operands.  If all operands are booleans, it delegates
+// to the original CEL evaluation.
+type evalTruthyLogical struct {
+	inner interpreter.Interpretable
+	terms []interpreter.Interpretable
+	isOr  bool
+}
+
+func (e *evalTruthyLogical) ID() int64 {
+	return e.inner.ID()
+}
+
+func (e *evalTruthyLogical) Eval(ctx interpreter.Activation) ref.Val {
+	// Evaluate all terms to check their types.
+	vals := make([]ref.Val, len(e.terms))
+	allBool := true
+	for idx, term := range e.terms {
+		vals[idx] = term.Eval(ctx)
+		if vals[idx] == nil || vals[idx].Type() != types.BoolType {
+			allBool = false
+		}
+	}
+
+	// If all operands are booleans, delegate to native CEL evaluation.
+	if allBool {
+		return e.inner.Eval(ctx)
+	}
+
+	// Apply JS-like truthy coercion.
+	if e.isOr {
+		// Return the first truthy value, or the last value.
+		for _, val := range vals {
+			if isTruthy(val) {
+				return val
+			}
+		}
+		return vals[len(vals)-1]
+	}
+
+	// AND: return the first falsy value, or the last value.
+	for _, val := range vals {
+		if !isTruthy(val) {
+			return val
+		}
+	}
+	return vals[len(vals)-1]
+}
+
+// isTruthy returns whether a CEL value is "truthy" using JS-like semantics.
+// Falsy values: unknown, error, null, false, empty string, 0, empty list/map.
+func isTruthy(v ref.Val) bool {
+	if v == nil || types.IsUnknown(v) || types.IsError(v) {
+		return false
+	}
+	switch v.Type() {
+	case types.NullType:
+		return false
+	case types.BoolType:
+		return v.Value().(bool)
+	case types.StringType:
+		return v.Value().(string) != ""
+	case types.IntType:
+		return v.Value().(int64) != 0
+	case types.UintType:
+		return v.Value().(uint64) != 0
+	case types.DoubleType:
+		return v.Value().(float64) != 0
+	default:
+		return true
 	}
 }
 

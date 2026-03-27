@@ -5320,9 +5320,7 @@ func (e *executor) createMetadataSpan(ctx context.Context, runCtx execution.RunC
 	switch scope {
 	case enums.MetadataScopeRun:
 		parent = tracing.RunSpanRefFromMetadata(runCtx.Metadata())
-	case enums.MetadataScopeStep:
-		parent = runCtx.ParentSpan()
-	case enums.MetadataScopeStepAttempt:
+	case enums.MetadataScopeStep, enums.MetadataScopeStepAttempt:
 		parent = runCtx.ExecutionSpan()
 	default:
 		return nil, fmt.Errorf("unknown metadata scope: %s", scope)

@@ -26,6 +26,7 @@
     "start:local": "PORT=5173 node -r dotenv/config .output/server/index.mjs dotenv_config_path=.env.local",
     "format": "prettier --write src",
     "lint": "eslint src --report-unused-disable-directives --max-warnings 0",
+    "test": "vitest run",
     "type-check": "tsc --noEmit",
     "preinstall": "npx only-allow pnpm",
     "env:pull": "npx vercel env pull",
@@ -118,7 +119,8 @@
     "typescript-eslint": "^8.37.0",
     "vite": "^7.3.1",
     "vite-plugin-svgr": "^4.5.0",
-    "vite-tsconfig-paths": "^6.0.5"
+    "vite-tsconfig-paths": "^6.0.5",
+    "vitest": "^3.2.4"
   },
   "packageManager": "pnpm@10.18.2",
   "engines": {

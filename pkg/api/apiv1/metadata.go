@@ -99,7 +99,7 @@ type RunMetadataTarget struct {
 	StepID *string `json:"step_id"`
 	// StepIndex == nil is equivalent to StepIndex == 0
 	StepIndex *int `json:"step_index"`
-	// When StepAttempt == -1, select the last attempt
+	// When StepAttempt == -1 (legacy) or nil, select the last attempt
 	StepAttempt *int    `json:"step_attempt"`
 	SpanID      *string `json:"span_id"`
 }
@@ -175,14 +175,11 @@ func (a router) getParentSpan(ctx context.Context, auth apiv1auth.V1Auth, runID 
 			stepID = hex.EncodeToString(sum[:])
 		}
 
-		if target.StepAttempt == nil {
+		if target.StepAttempt == nil || *target.StepAttempt < 0 {
 			scope = enums.MetadataScopeStep
-			span, err = a.opts.TraceReader.GetStepSpanByStepID(ctx, runID, stepID, auth.AccountID(), auth.WorkspaceID())
-		} else if *target.StepAttempt < 0 {
-			scope = enums.MetadataScopeStepAttempt
 			span, err = a.opts.TraceReader.GetLatestExecutionSpanByStepID(ctx, runID, stepID, auth.AccountID(), auth.WorkspaceID())
 		} else {
-			scope = enums.MetadataScopeStepAttempt
+			scope = enums.MetadataScopeStep
 			span, err = a.opts.TraceReader.GetExecutionSpanByStepIDAndAttempt(ctx, runID, stepID, *target.StepAttempt, auth.AccountID(), auth.WorkspaceID())
 		}
 	default:

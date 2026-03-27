@@ -60,6 +60,11 @@ func (r *redisCapacityManager) Release(ctx context.Context, req *CapacityRelease
 		enableDebugLogsVal = "1"
 	}
 
+	enableCacheInvalidation := "0"
+	if r.enableAcquireCache != nil {
+		enableCacheInvalidation = "1"
+	}
+
 	scopedKeyPrefix := fmt.Sprintf("{cs}:%s", accountScope(req.AccountID))
 
 	args, err := strSlice([]any{
@@ -68,6 +73,7 @@ func (r *redisCapacityManager) Release(ctx context.Context, req *CapacityRelease
 		req.LeaseID.String(),
 		int(r.operationIdempotencyTTL.Seconds()),
 		enableDebugLogsVal,
+		enableCacheInvalidation,
 	})
 	if err != nil {
 		return nil, errs.Wrap(0, false, "invalid args: %w", err)

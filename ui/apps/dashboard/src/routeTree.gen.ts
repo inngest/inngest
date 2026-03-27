@@ -18,8 +18,10 @@ import { Route as ApiInngestRouteImport } from './routes/api/inngest'
 import { Route as ApiCspReportRouteImport } from './routes/api/csp-report'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as authUserSetupRouteImport } from './routes/(auth)/user-setup'
+import { Route as authSwitchOrganizationRouteImport } from './routes/(auth)/switch-organization'
 import { Route as authSignOutRouteImport } from './routes/(auth)/sign-out'
 import { Route as authOrganizationSetupRouteImport } from './routes/(auth)/organization-setup'
+import { Route as authAgentDeepLinkRouteImport } from './routes/(auth)/agent-deep-link'
 import { Route as AuthedSettingsRouteRouteImport } from './routes/_authed/settings/route'
 import { Route as AuthedIntentRouteRouteImport } from './routes/_authed/intent/route'
 import { Route as AuthedBillingRouteRouteImport } from './routes/_authed/billing/route'
@@ -141,6 +143,11 @@ const authUserSetupRoute = authUserSetupRouteImport.update({
   path: '/user-setup',
   getParentRoute: () => rootRouteImport,
 } as any)
+const authSwitchOrganizationRoute = authSwitchOrganizationRouteImport.update({
+  id: '/(auth)/switch-organization',
+  path: '/switch-organization',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const authSignOutRoute = authSignOutRouteImport.update({
   id: '/(auth)/sign-out',
   path: '/sign-out',
@@ -149,6 +156,11 @@ const authSignOutRoute = authSignOutRouteImport.update({
 const authOrganizationSetupRoute = authOrganizationSetupRouteImport.update({
   id: '/(auth)/organization-setup',
   path: '/organization-setup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const authAgentDeepLinkRoute = authAgentDeepLinkRouteImport.update({
+  id: '/(auth)/agent-deep-link',
+  path: '/agent-deep-link',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthedSettingsRouteRoute = AuthedSettingsRouteRouteImport.update({
@@ -601,8 +613,10 @@ export interface FileRoutesByFullPath {
   '/billing': typeof AuthedBillingRouteRouteWithChildren
   '/intent': typeof AuthedIntentRouteRouteWithChildren
   '/settings': typeof AuthedSettingsRouteRouteWithChildren
+  '/agent-deep-link': typeof authAgentDeepLinkRoute
   '/organization-setup': typeof authOrganizationSetupRoute
   '/sign-out': typeof authSignOutRoute
+  '/switch-organization': typeof authSwitchOrganizationRoute
   '/user-setup': typeof authUserSetupRoute
   '/api/chat': typeof ApiChatRoute
   '/api/csp-report': typeof ApiCspReportRoute
@@ -688,8 +702,10 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/intent': typeof AuthedIntentRouteRouteWithChildren
   '/settings': typeof AuthedSettingsRouteRouteWithChildren
+  '/agent-deep-link': typeof authAgentDeepLinkRoute
   '/organization-setup': typeof authOrganizationSetupRoute
   '/sign-out': typeof authSignOutRoute
+  '/switch-organization': typeof authSwitchOrganizationRoute
   '/user-setup': typeof authUserSetupRoute
   '/api/chat': typeof ApiChatRoute
   '/api/csp-report': typeof ApiCspReportRoute
@@ -767,8 +783,10 @@ export interface FileRoutesById {
   '/_authed/billing': typeof AuthedBillingRouteRouteWithChildren
   '/_authed/intent': typeof AuthedIntentRouteRouteWithChildren
   '/_authed/settings': typeof AuthedSettingsRouteRouteWithChildren
+  '/(auth)/agent-deep-link': typeof authAgentDeepLinkRoute
   '/(auth)/organization-setup': typeof authOrganizationSetupRoute
   '/(auth)/sign-out': typeof authSignOutRoute
+  '/(auth)/switch-organization': typeof authSwitchOrganizationRoute
   '/(auth)/user-setup': typeof authUserSetupRoute
   '/api/chat': typeof ApiChatRoute
   '/api/csp-report': typeof ApiCspReportRoute
@@ -857,8 +875,10 @@ export interface FileRouteTypes {
     | '/billing'
     | '/intent'
     | '/settings'
+    | '/agent-deep-link'
     | '/organization-setup'
     | '/sign-out'
+    | '/switch-organization'
     | '/user-setup'
     | '/api/chat'
     | '/api/csp-report'
@@ -944,8 +964,10 @@ export interface FileRouteTypes {
     | '/'
     | '/intent'
     | '/settings'
+    | '/agent-deep-link'
     | '/organization-setup'
     | '/sign-out'
+    | '/switch-organization'
     | '/user-setup'
     | '/api/chat'
     | '/api/csp-report'
@@ -1022,8 +1044,10 @@ export interface FileRouteTypes {
     | '/_authed/billing'
     | '/_authed/intent'
     | '/_authed/settings'
+    | '/(auth)/agent-deep-link'
     | '/(auth)/organization-setup'
     | '/(auth)/sign-out'
+    | '/(auth)/switch-organization'
     | '/(auth)/user-setup'
     | '/api/chat'
     | '/api/csp-report'
@@ -1109,8 +1133,10 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthedRoute: typeof AuthedRouteWithChildren
+  authAgentDeepLinkRoute: typeof authAgentDeepLinkRoute
   authOrganizationSetupRoute: typeof authOrganizationSetupRoute
   authSignOutRoute: typeof authSignOutRoute
+  authSwitchOrganizationRoute: typeof authSwitchOrganizationRoute
   authUserSetupRoute: typeof authUserSetupRoute
   ApiChatRoute: typeof ApiChatRoute
   ApiCspReportRoute: typeof ApiCspReportRoute
@@ -1190,6 +1216,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof authUserSetupRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/(auth)/switch-organization': {
+      id: '/(auth)/switch-organization'
+      path: '/switch-organization'
+      fullPath: '/switch-organization'
+      preLoaderRoute: typeof authSwitchOrganizationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/(auth)/sign-out': {
       id: '/(auth)/sign-out'
       path: '/sign-out'
@@ -1202,6 +1235,13 @@ declare module '@tanstack/react-router' {
       path: '/organization-setup'
       fullPath: '/organization-setup'
       preLoaderRoute: typeof authOrganizationSetupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/(auth)/agent-deep-link': {
+      id: '/(auth)/agent-deep-link'
+      path: '/agent-deep-link'
+      fullPath: '/agent-deep-link'
+      preLoaderRoute: typeof authAgentDeepLinkRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authed/settings': {
@@ -2120,8 +2160,10 @@ const AuthedRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthedRoute: AuthedRouteWithChildren,
+  authAgentDeepLinkRoute: authAgentDeepLinkRoute,
   authOrganizationSetupRoute: authOrganizationSetupRoute,
   authSignOutRoute: authSignOutRoute,
+  authSwitchOrganizationRoute: authSwitchOrganizationRoute,
   authUserSetupRoute: authUserSetupRoute,
   ApiChatRoute: ApiChatRoute,
   ApiCspReportRoute: ApiCspReportRoute,
