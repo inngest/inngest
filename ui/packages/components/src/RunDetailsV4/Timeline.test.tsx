@@ -5,11 +5,28 @@
 
 import type { ReactNode } from 'react';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { TooltipProvider } from '../Tooltip/Tooltip';
 import { Timeline } from './Timeline';
 import type { TimelineData } from './TimelineBar.types';
+
+// Mock modules that use self-referencing @inngest/components/* imports
+// which cannot resolve in vitest without a resolve alias.
+vi.mock('../Button', () => ({
+  Button: ({
+    onClick,
+    ...props
+  }: {
+    onClick?: () => void;
+    'aria-label'?: string;
+    icon?: ReactNode;
+  }) => (
+    <button onClick={onClick} aria-label={props['aria-label']}>
+      {props.icon}
+    </button>
+  ),
+}));
 
 function Wrapper({ children }: { children: ReactNode }) {
   return <TooltipProvider>{children}</TooltipProvider>;
