@@ -102,27 +102,38 @@ func (s *subSSE) WriteChunk(c Chunk) error {
 	return s.writeSSE(byt)
 }
 
-// Close closes the current subscription immediately, terminating any active connections.
+// CloseWriter marks the subscription as closed so that no further writes will
+// be attempted on the underlying `http.ResponseWriter`. This MUST be called
+// before the HTTP handler returns to avoid a data race between the keepalive
+// goroutine and the HTTP server finalizing the response.
+//
+// Unlike Close, this does not hijack the connection. The HTTP server retains
+// ownership of the connection lifecycle.
+func (s *subSSE) CloseWriter() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.closed = true
+}
+
+// Close marks the subscription as closed and forcefully terminates the
+// underlying connection by hijacking it from the HTTP server.  This is
+// needed during broadcaster shutdown to unblock handler goroutines that
+// are waiting in a select.
 func (s *subSSE) Close() error {
-	// Close must also acquire the lock
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.closed = true
 
-	// Writer is a reguler http.ResponseWriter.  This is usually handled and closed
-	// by the http server.  However, when Close is called we can attempt to hijack this
-	// conn and call Close directly.
 	hj, ok := s.w.(http.Hijacker)
 	if !ok {
 		return nil
 	}
 	conn, bufrw, err := hj.Hijack()
 	if err != nil {
-		return fmt.Errorf("error hijacking sse sub: %w", err)
+		// Already closed or finalized by the HTTP server — not an error.
+		return nil
 	}
-	if err := bufrw.Flush(); err != nil {
-		return fmt.Errorf("error flushing hijacked sse sub: %w", err)
-	}
+	_ = bufrw.Flush()
 	return conn.Close()
 }
 
