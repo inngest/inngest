@@ -182,7 +182,7 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	services := []service.Service{}
 
-	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{
+	db, err := base_cqrs.New(ctx, base_cqrs.BaseCQRSOptions{
 		Persist:     opts.Persist,
 		PostgresURI: opts.PostgresURI,
 		Directory:   opts.SQLiteDir,
