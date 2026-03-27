@@ -1771,17 +1771,17 @@ func TestSpanOutputReadBack(t *testing.T) {
 
 	q := cm.(wrapper).q
 	err := q.InsertSpan(t.Context(), dbpkg.InsertSpanParams{
-		SpanID:    spanID,
-		TraceID:   ulid.MustNew(ulid.Now(), rand.Reader).String(),
-		Name:      "test-span",
-		StartTime: time.Now(),
-		EndTime:   time.Now().Add(100 * time.Millisecond),
-		RunID:     runID,
-		AccountID: "acct",
-		AppID:     "app",
+		SpanID:     spanID,
+		TraceID:    ulid.MustNew(ulid.Now(), rand.Reader).String(),
+		Name:       "test-span",
+		StartTime:  time.Now(),
+		EndTime:    time.Now().Add(100 * time.Millisecond),
+		RunID:      runID,
+		AccountID:  "acct",
+		AppID:      "app",
 		FunctionID: "fn",
-		EnvID:     "env",
-		Output:    []byte(`{"data":{"num":42}}`),
+		EnvID:      "env",
+		Output:     []byte(`{"data":{"num":42}}`),
 	})
 	require.NoError(t, err)
 
@@ -1903,11 +1903,11 @@ func initCQRS(t *testing.T, opts ...withInitCQRSOpt) (cqrs.Manager, func()) {
 		pc, pgErr = testutil.StartPostgres(t)
 		require.NoError(t, pgErr)
 
-		db, err = New(BaseCQRSOptions{PostgresURI: pc.URI, ForTest: true})
+		db, err = New(ctx, BaseCQRSOptions{PostgresURI: pc.URI, ForTest: true})
 		require.NoError(t, err)
 		adapter = dbpostgres.New(db)
 	} else {
-		db, err = New(BaseCQRSOptions{Persist: false, ForTest: true})
+		db, err = New(ctx, BaseCQRSOptions{Persist: false, ForTest: true})
 		require.NoError(t, err)
 		adapter = dbsqlite.New(db)
 	}
