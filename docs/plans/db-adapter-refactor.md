@@ -59,18 +59,18 @@ No import cycles: `pkg/db` is a leaf package that doesn't import `pkg/cqrs`.
 - [x] Create MySQL stub adapter (`pkg/db/mysql/`)
 - [x] Verify all packages build cleanly
 
-### Phase 3: Wire Adapter into base_cqrs (TODO)
-- [ ] Update `base_cqrs.New()` to accept `db.Adapter`
-- [ ] Replace `isPostgres()` calls with `adapter.Helpers()` dispatch
-- [ ] Remove `spanRunsAdapter` struct (replaced by `DialectHelpers`)
-- [ ] Remove `NormalizedQueries` wrapper (~882 lines)
-- [ ] Remove `normalization.go` converters (~459 lines)
-- [ ] Update `devserver.go` and other instantiation sites
+### Phase 3: Wire Adapter into base_cqrs (DONE)
+- [x] Update `base_cqrs.New()` to accept `db.Adapter`
+- [x] Replace `isPostgres()` calls with `adapter.Helpers()` dispatch
+- [x] Remove `spanRunsAdapter` struct (replaced by `DialectHelpers`)
+- [x] Remove `NormalizedQueries` wrapper (~882 lines)
+- [x] Remove `normalization.go` converters (~459 lines)
+- [x] Update `devserver.go` and other instantiation sites
 
-### Phase 4: Integration Tests
-- [ ] Add adapter-level integration tests using SQLite in-memory DB
-- [ ] Add Postgres integration tests via testcontainers-go
-- [ ] CI matrix: `[sqlite, postgres]` x `[experimentalKeyQueues]` x `[enableConstraintAPI]`
+### Phase 4: Integration Tests (DONE)
+- [x] Add adapter-level integration tests using SQLite in-memory DB
+- [x] Add Postgres integration tests via testcontainers-go (run with TEST_DATABASE=postgres)
+- [x] Tests cover: adapter contract, App/Function/Event/Span/History CRUD, transactions
 
 ### Phase 5: Migration Tooling (Follow-up)
 - [ ] Evaluate goose as replacement for golang-migrate
