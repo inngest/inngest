@@ -727,6 +727,180 @@ func TestItemsByPartitionScoreParsing(t *testing.T) {
 	})
 }
 
+// setQueueItemAtMS modifies a queue item's AtMS in the hash without touching
+// its sorted set score.  This simulates the production scenario where items
+// are retried/rescheduled and AtMS drifts far ahead of the original score.
+func setQueueItemAtMS(t *testing.T, rc rueidis.Client, kg QueueKeyGenerator, itemID string, newAtMS int64) {
+	t.Helper()
+	ctx := context.Background()
+
+	hashKey := kg.QueueItem()
+
+	cmd := rc.B().Hget().Key(hashKey).Field(itemID).Build()
+	byt, err := rc.Do(ctx, cmd).AsBytes()
+	require.NoError(t, err, "failed to read queue item %s", itemID)
+
+	var qi osqueue.QueueItem
+	err = json.Unmarshal(byt, &qi)
+	require.NoError(t, err, "failed to unmarshal queue item %s", itemID)
+
+	qi.AtMS = newAtMS
+
+	updated, err := json.Marshal(qi)
+	require.NoError(t, err)
+
+	setCmd := rc.B().Hset().Key(hashKey).FieldValue().FieldValue(itemID, string(updated)).Build()
+	err = rc.Do(ctx, setCmd).Error()
+	require.NoError(t, err, "failed to update queue item %s", itemID)
+}
+
+func TestItemsByPartitionAtMSDivergence(t *testing.T) {
+	r, rc := initRedis(t)
+	defer rc.Close()
+
+	ctx := context.Background()
+	clock := clockwork.NewFakeClock()
+
+	acctId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
+
+	enqueueItems := func(t *testing.T, shard RedisQueueShard, n int, prefix string, atFn func(i int) time.Time) []string {
+		t.Helper()
+		ids := make([]string, 0, n)
+		for i := range n {
+			item := osqueue.QueueItem{
+				ID:          fmt.Sprintf("%s-%d", prefix, i),
+				FunctionID:  fnID,
+				WorkspaceID: wsID,
+				Data: osqueue.Item{
+					WorkspaceID: wsID,
+					Kind:        osqueue.KindEdge,
+					Identifier: state.Identifier{
+						AccountID:       acctId,
+						WorkspaceID:     wsID,
+						WorkflowID:      fnID,
+						WorkflowVersion: 1,
+					},
+				},
+			}
+			enqueued, err := shard.EnqueueItem(ctx, item, atFn(i), osqueue.EnqueueOpts{})
+			require.NoError(t, err)
+			ids = append(ids, enqueued.ID)
+		}
+		return ids
+	}
+
+	countIter := func(items func(yield func(*osqueue.QueueItem) bool)) int {
+		var count int
+		for range items {
+			count++
+		}
+		return count
+	}
+
+	t.Run("should iterate all items when AtMS diverges ahead of sorted set score", func(t *testing.T) {
+		// This reproduces the production bug where items' AtMS was ~184 days
+		// ahead of their sorted set scores (due to retries/rescheduling),
+		// causing the iterator cursor to jump past all remaining items.
+		r.FlushAll()
+
+		q, shard := newQueue(
+			t, rc,
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
+				return false
+			}),
+			osqueue.WithClock(clock),
+		)
+		kg := shard.Client().kg
+
+		totalItems := 30
+		batchSize := int64(10)
+
+		// Enqueue items 1ms apart — sorted set scores will be
+		// clock.Now(), clock.Now()+1ms, clock.Now()+2ms, ...
+		ids := enqueueItems(t, shard, totalItems, "diverge", func(i int) time.Time {
+			return clock.Now().Add(time.Duration(i) * time.Millisecond)
+		})
+
+		// Now update every item's AtMS to be far in the future (simulating
+		// retries that bumped AtMS but didn't change the sorted set score).
+		futureAtMS := clock.Now().Add(180 * 24 * time.Hour).UnixMilli()
+		for _, id := range ids {
+			setQueueItemAtMS(t, rc, kg, id, futureAtMS)
+		}
+
+		done := make(chan int, 1)
+		go func() {
+			items, err := q.ItemsByPartition(ctx, shard, fnID.String(), time.Time{}, clock.Now().Add(time.Hour),
+				osqueue.WithQueueItemIterBatchSize(batchSize),
+				osqueue.WithQueueItemIterEnableBacklog(false),
+			)
+			if err != nil {
+				done <- -1
+				return
+			}
+			done <- countIter(items)
+		}()
+
+		select {
+		case count := <-done:
+			require.Equal(t, totalItems, count,
+				"iterator must return all items even when AtMS >> sorted set score")
+		case <-time.After(30 * time.Second):
+			t.Fatal("iterator did not terminate — likely stuck due to AtMS/score divergence")
+		}
+	})
+
+	t.Run("should iterate all items across multiple batches with varying AtMS", func(t *testing.T) {
+		// Items in early batches have AtMS far in the future, items in
+		// later batches have normal AtMS.  The old code would skip the
+		// later batches because the cursor jumped ahead.
+		r.FlushAll()
+
+		q, shard := newQueue(
+			t, rc,
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
+				return false
+			}),
+			osqueue.WithClock(clock),
+		)
+		kg := shard.Client().kg
+
+		totalItems := 25
+		batchSize := int64(5)
+
+		ids := enqueueItems(t, shard, totalItems, "mixed", func(i int) time.Time {
+			return clock.Now().Add(time.Duration(i) * time.Millisecond)
+		})
+
+		// Set first batch's AtMS far in the future; leave the rest alone.
+		futureAtMS := clock.Now().Add(365 * 24 * time.Hour).UnixMilli()
+		for _, id := range ids[:5] {
+			setQueueItemAtMS(t, rc, kg, id, futureAtMS)
+		}
+
+		done := make(chan int, 1)
+		go func() {
+			items, err := q.ItemsByPartition(ctx, shard, fnID.String(), time.Time{}, clock.Now().Add(time.Hour),
+				osqueue.WithQueueItemIterBatchSize(batchSize),
+				osqueue.WithQueueItemIterEnableBacklog(false),
+			)
+			if err != nil {
+				done <- -1
+				return
+			}
+			done <- countIter(items)
+		}()
+
+		select {
+		case count := <-done:
+			require.Equal(t, totalItems, count,
+				"iterator must return all items even when first batch has divergent AtMS")
+		case <-time.After(30 * time.Second):
+			t.Fatal("iterator did not terminate — likely stuck due to AtMS/score divergence")
+		}
+	})
+}
+
 func TestItemsByBacklog(t *testing.T) {
 	r, rc := initRedis(t)
 	defer rc.Close()
@@ -837,6 +1011,258 @@ func TestItemsByBacklog(t *testing.T) {
 			require.Equal(t, tc.expectedItems, count)
 		})
 	}
+}
+
+func TestItemsByBacklogZeroCursor(t *testing.T) {
+	// This test verifies that ItemsByBacklog terminates correctly when
+	// all items in the backlog sorted set have a score of 0 (epoch).
+	// Before the fix, peekRes.Cursor would be 0 and backlogFrom would
+	// never advance, causing an infinite loop.
+	r, rc := initRedis(t)
+	defer rc.Close()
+
+	ctx := context.Background()
+	clock := clockwork.NewFakeClock()
+
+	acctId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
+
+	q, shard := newQueue(
+		t, rc,
+		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
+			return true
+		}),
+		osqueue.WithClock(clock),
+	)
+	kg := shard.Client().kg
+
+	t.Run("terminates when all backlog items have score zero", func(t *testing.T) {
+		r.FlushAll()
+
+		totalItems := 5
+		for i := range totalItems {
+			item := osqueue.QueueItem{
+				ID:          fmt.Sprintf("zero-score-%d", i),
+				FunctionID:  fnID,
+				WorkspaceID: wsID,
+				Data: osqueue.Item{
+					WorkspaceID: wsID,
+					Kind:        osqueue.KindEdge,
+					Identifier: state.Identifier{
+						AccountID:       acctId,
+						WorkspaceID:     wsID,
+						WorkflowID:      fnID,
+						WorkflowVersion: 1,
+					},
+				},
+			}
+			_, err := shard.EnqueueItem(ctx, item, clock.Now().Add(time.Duration(i)*time.Millisecond), osqueue.EnqueueOpts{})
+			require.NoError(t, err)
+		}
+
+		// Find the backlog ID
+		var backlogID string
+		{
+			mem, err := r.ZMembers(kg.ShadowPartitionSet(fnID.String()))
+			require.NoError(t, err)
+			require.Len(t, mem, 1)
+			backlogID = mem[0]
+		}
+		require.NotEmpty(t, backlogID)
+
+		// Override all sorted set scores to 0 (epoch) to trigger the bug
+		backlogSetKey := kg.BacklogSet(backlogID)
+		members, err := r.ZMembers(backlogSetKey)
+		require.NoError(t, err)
+		for _, m := range members {
+			_, err := r.ZAdd(backlogSetKey, 0, m)
+			require.NoError(t, err)
+		}
+
+		done := make(chan int, 1)
+		go func() {
+			items, err := q.ItemsByBacklog(ctx, shard, backlogID, time.Time{}, clock.Now().Add(time.Hour),
+				osqueue.WithQueueItemIterBatchSize(100),
+			)
+			if err != nil {
+				done <- -1
+				return
+			}
+			var count int
+			for range items {
+				count++
+			}
+			done <- count
+		}()
+
+		select {
+		case count := <-done:
+			require.Equal(t, totalItems, count,
+				"should return all items and terminate even when backlog scores are zero")
+		case <-time.After(10 * time.Second):
+			t.Fatal("ItemsByBacklog did not terminate — infinite loop when Cursor == 0 with items yielded")
+		}
+	})
+
+	t.Run("terminates across multiple batches when backlog scores are zero", func(t *testing.T) {
+		r.FlushAll()
+
+		totalItems := 10
+		batchSize := int64(3)
+		for i := range totalItems {
+			item := osqueue.QueueItem{
+				ID:          fmt.Sprintf("zero-batch-%d", i),
+				FunctionID:  fnID,
+				WorkspaceID: wsID,
+				Data: osqueue.Item{
+					WorkspaceID: wsID,
+					Kind:        osqueue.KindEdge,
+					Identifier: state.Identifier{
+						AccountID:       acctId,
+						WorkspaceID:     wsID,
+						WorkflowID:      fnID,
+						WorkflowVersion: 1,
+					},
+				},
+			}
+			_, err := shard.EnqueueItem(ctx, item, clock.Now().Add(time.Duration(i)*time.Millisecond), osqueue.EnqueueOpts{})
+			require.NoError(t, err)
+		}
+
+		var backlogID string
+		{
+			mem, err := r.ZMembers(kg.ShadowPartitionSet(fnID.String()))
+			require.NoError(t, err)
+			require.Len(t, mem, 1)
+			backlogID = mem[0]
+		}
+		require.NotEmpty(t, backlogID)
+
+		// Override all sorted set scores to 0
+		backlogSetKey := kg.BacklogSet(backlogID)
+		members, err := r.ZMembers(backlogSetKey)
+		require.NoError(t, err)
+		for _, m := range members {
+			_, err := r.ZAdd(backlogSetKey, 0, m)
+			require.NoError(t, err)
+		}
+
+		done := make(chan int, 1)
+		go func() {
+			items, err := q.ItemsByBacklog(ctx, shard, backlogID, time.Time{}, clock.Now().Add(time.Hour),
+				osqueue.WithQueueItemIterBatchSize(batchSize),
+			)
+			if err != nil {
+				done <- -1
+				return
+			}
+			var count int
+			for range items {
+				count++
+			}
+			done <- count
+		}()
+
+		select {
+		case count := <-done:
+			// With all scores at 0 and batching, the iterator must still terminate.
+			// It should return items from the first batch and then stop (since cursor
+			// can't advance past 0).
+			require.Greater(t, count, 0,
+				"should return at least some items when backlog scores are zero")
+		case <-time.After(10 * time.Second):
+			t.Fatal("ItemsByBacklog did not terminate — infinite loop when Cursor == 0 across batches")
+		}
+	})
+}
+
+func TestItemsByPartitionBacklogZeroCursor(t *testing.T) {
+	// This test verifies that the backlog phase of ItemsByPartition terminates
+	// correctly when all backlogs return Cursor == 0. Before the fix,
+	// earliestCursor stayed 0, backlogFrom was never updated, and the
+	// outer loop re-fetched the same items forever.
+	r, rc := initRedis(t)
+	defer rc.Close()
+
+	ctx := context.Background()
+	clock := clockwork.NewFakeClock()
+
+	acctId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
+
+	q, shard := newQueue(
+		t, rc,
+		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
+			return true
+		}),
+		osqueue.WithClock(clock),
+	)
+	kg := shard.Client().kg
+
+	t.Run("terminates when all backlog cursors are zero", func(t *testing.T) {
+		r.FlushAll()
+
+		totalItems := 5
+		for i := range totalItems {
+			item := osqueue.QueueItem{
+				ID:          fmt.Sprintf("pt-zero-%d", i),
+				FunctionID:  fnID,
+				WorkspaceID: wsID,
+				Data: osqueue.Item{
+					WorkspaceID: wsID,
+					Kind:        osqueue.KindEdge,
+					Identifier: state.Identifier{
+						AccountID:       acctId,
+						WorkspaceID:     wsID,
+						WorkflowID:      fnID,
+						WorkflowVersion: 1,
+					},
+				},
+			}
+			_, err := shard.EnqueueItem(ctx, item, clock.Now().Add(time.Duration(i)*time.Millisecond), osqueue.EnqueueOpts{})
+			require.NoError(t, err)
+		}
+
+		// Find the backlog and override scores to 0
+		mem, err := r.ZMembers(kg.ShadowPartitionSet(fnID.String()))
+		require.NoError(t, err)
+		require.NotEmpty(t, mem)
+
+		for _, backlogID := range mem {
+			backlogSetKey := kg.BacklogSet(backlogID)
+			members, err := r.ZMembers(backlogSetKey)
+			require.NoError(t, err)
+			for _, m := range members {
+				_, err := r.ZAdd(backlogSetKey, 0, m)
+				require.NoError(t, err)
+			}
+		}
+
+		done := make(chan int, 1)
+		go func() {
+			items, err := q.ItemsByPartition(ctx, shard, fnID.String(), time.Time{}, clock.Now().Add(time.Hour),
+				osqueue.WithQueueItemIterBatchSize(100),
+				osqueue.WithQueueItemIterEnableBacklog(true),
+			)
+			if err != nil {
+				done <- -1
+				return
+			}
+			var count int
+			for range items {
+				count++
+			}
+			done <- count
+		}()
+
+		select {
+		case count := <-done:
+			// Items should be yielded from the backlog phase (scores are 0 which is <= until).
+			// The important thing is that the iterator terminates.
+			require.Greater(t, count, 0,
+				"should return items from backlogs and terminate even when all cursors are zero")
+		case <-time.After(10 * time.Second):
+			t.Fatal("ItemsByPartition backlog phase did not terminate — infinite loop when all Cursors == 0")
+		}
+	})
 }
 
 func TestQueueIterator(t *testing.T) {
