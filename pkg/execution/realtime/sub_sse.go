@@ -102,19 +102,6 @@ func (s *subSSE) WriteChunk(c Chunk) error {
 	return s.writeSSE(byt)
 }
 
-// CloseWriter marks the subscription as closed so that no further writes will
-// be attempted on the underlying `http.ResponseWriter`. This MUST be called
-// before the HTTP handler returns to avoid a data race between the keepalive
-// goroutine and the HTTP server finalizing the response.
-//
-// Unlike Close, this does not hijack the connection. The HTTP server retains
-// ownership of the connection lifecycle.
-func (s *subSSE) CloseWriter() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.closed = true
-}
-
 // Close marks the subscription as closed and forcefully terminates the
 // underlying connection by hijacking it from the HTTP server.  This is
 // needed during broadcaster shutdown to unblock handler goroutines that
