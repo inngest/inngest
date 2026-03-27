@@ -16,19 +16,25 @@ func NewSSESubscription(
 	ctx context.Context,
 	w http.ResponseWriter,
 ) *subSSE {
-	// Ensure SSE headers are sent and flushed immediately so that
-	// clients (e.g. browser fetch) receive the response headers
-	// without waiting for the first data write or keepalive.
-	sseHeaders(w)
-	w.WriteHeader(http.StatusOK)
-	if f, ok := w.(http.Flusher); ok {
+	return &subSSE{
+		id:    uuid.New(),
+		w:     w,
+		ready: make(chan struct{}),
+	}
+}
+
+// WriteHeaders sends the SSE response headers and flushes them to the client.
+// This should be called only after the subscription has been successfully
+// registered with the broadcaster so that errors can still be reported with
+// proper HTTP status codes.  It also unblocks any pending writes (e.g.
+// keepalives) that were waiting for headers to be committed.
+func (s *subSSE) WriteHeaders() {
+	sseHeaders(s.w)
+	s.w.WriteHeader(http.StatusOK)
+	if f, ok := s.w.(http.Flusher); ok {
 		f.Flush()
 	}
-
-	return &subSSE{
-		id: uuid.New(),
-		w:  w,
-	}
+	close(s.ready)
 }
 
 func sseHeaders(w http.ResponseWriter) {
@@ -42,8 +48,9 @@ func sseHeaders(w http.ResponseWriter) {
 type subSSE struct {
 	id     uuid.UUID
 	w      http.ResponseWriter
-	mu     sync.Mutex // Protects concurrent writes to http.ResponseWriter
-	closed bool       // Set when the handler is returning; prevents writes after the response is finalized
+	ready  chan struct{} // Closed by WriteHeaders; write blocks until headers are committed or the sub is closed.
+	mu     sync.Mutex    // Protects concurrent writes to http.ResponseWriter
+	closed bool          // Set when the handler is returning; prevents writes after the response is finalized
 }
 
 // ID returns a unique ID for the given subscription
@@ -109,7 +116,18 @@ func (s *subSSE) WriteChunk(c Chunk) error {
 func (s *subSSE) Close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.closed = true
+
+	if !s.closed {
+		s.closed = true
+		// Unblock any writes waiting on ready so they can see
+		// closed==true and return immediately.
+		select {
+		case <-s.ready:
+			// Already closed by WriteHeaders.
+		default:
+			close(s.ready)
+		}
+	}
 
 	hj, ok := s.w.(http.Hijacker)
 	if !ok {
@@ -132,6 +150,11 @@ func (s *subSSE) writeSSE(data []byte) error {
 }
 
 func (s *subSSE) write(b []byte) error {
+	// Wait for headers to be committed (WriteHeaders) or the sub to be
+	// closed before writing.  This prevents keepalives from implicitly
+	// committing headers before the handler has a chance to set them.
+	<-s.ready
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
 

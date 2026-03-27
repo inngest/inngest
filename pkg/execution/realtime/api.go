@@ -206,9 +206,18 @@ func (a *api) GetSSE(w http.ResponseWriter, r *http.Request) {
 	err = a.opts.Broadcaster.Subscribe(ctx, sub, auth.Topics)
 	if err != nil {
 		logger.StdlibLogger(ctx).Error("error subscribing to topics", "error", err)
+
+		// Close the subscription first to prevent the keepalive goroutine from
+		// writing to the ResponseWriter concurrently.
+		sub.Close()
+
 		http.Error(w, "error subscribing to topics", http.StatusInternalServerError)
 		return
 	}
+
+	// Write SSE headers only after a successful subscribe so that failures can
+	// still be reported with a proper HTTP error status.
+	sub.WriteHeaders()
 
 	logger.StdlibLogger(ctx).Info(
 		"new SSE connection",
