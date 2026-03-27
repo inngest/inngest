@@ -6,6 +6,7 @@ import (
 
 	"github.com/inngest/inngest/pkg/connect"
 	"github.com/inngest/inngest/pkg/connect/state"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/util"
@@ -28,13 +29,13 @@ func (s *semaphoreLifecycles) OnStartDisconnecting(ctx context.Context, conn *st
 // OnSynced is called after a worker group has been synced. At this point, AppID is available.
 // We adjust the app semaphore capacity by the worker's max concurrency.
 func (s *semaphoreLifecycles) OnSynced(ctx context.Context, conn *state.Connection) {
-	if conn.Data == nil || conn.Data.MaxWorkerConcurrency == nil {
+	if conn.Data == nil {
 		return
 	}
 
-	maxConcurrency := *conn.Data.MaxWorkerConcurrency
-	if maxConcurrency <= 0 {
-		return
+	maxConcurrency := consts.DefaultWorkerConcurrency
+	if conn.Data.MaxWorkerConcurrency != nil && *conn.Data.MaxWorkerConcurrency > 0 {
+		maxConcurrency = *conn.Data.MaxWorkerConcurrency
 	}
 
 	l := logger.StdlibLogger(ctx)
@@ -64,13 +65,13 @@ func (s *semaphoreLifecycles) OnSynced(ctx context.Context, conn *state.Connecti
 
 // OnDisconnected is called when a connection is lost. Decrement the app semaphore capacity.
 func (s *semaphoreLifecycles) OnDisconnected(ctx context.Context, conn *state.Connection, closeReason string) {
-	if conn.Data == nil || conn.Data.MaxWorkerConcurrency == nil {
+	if conn.Data == nil {
 		return
 	}
 
-	maxConcurrency := *conn.Data.MaxWorkerConcurrency
-	if maxConcurrency <= 0 {
-		return
+	maxConcurrency := consts.DefaultWorkerConcurrency
+	if conn.Data.MaxWorkerConcurrency != nil && *conn.Data.MaxWorkerConcurrency > 0 {
+		maxConcurrency = *conn.Data.MaxWorkerConcurrency
 	}
 
 	l := logger.StdlibLogger(ctx)
