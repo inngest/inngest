@@ -12,6 +12,7 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/queue"
+	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/execution/ratelimit"
 	"github.com/inngest/inngest/pkg/expressions"
 	"github.com/inngest/inngest/pkg/inngest"
@@ -265,6 +266,13 @@ type checkResult struct {
 	leaseID *ulid.ULID
 }
 
+// stepSemaphores returns the auto-release semaphores from run metadata that should
+// be added to every step queue item (not just the start job). This is used for
+// worker concurrency where each step independently acquires and releases a slot.
+func stepSemaphores(md sv2.Metadata) []constraintapi.Semaphore {
+	return constraintapi.AutoReleaseSemaphores(md.Config.Semaphores)
+}
+
 // evaluateFnConcurrency evaluates function concurrency limits against event data
 // and returns the corresponding semaphore entries to store in run metadata.
 func (e *executor) evaluateFnConcurrency(
@@ -279,28 +287,39 @@ func (e *executor) evaluateFnConcurrency(
 
 	semaphores := make([]constraintapi.Semaphore, 0, len(fnLimits))
 	for _, fc := range fnLimits {
+		scope := fc.EffectiveScope()
+
 		sem := constraintapi.Semaphore{
-			Weight:  1,
-			Release: constraintapi.SemaphoreReleaseManual,
+			Weight: 1,
 		}
 
-		if fc.Key != nil {
-			// Expression-based: ID is the hash of fnID + raw expression, UsageValue is the evaluated result
-			sem.ID = constraintapi.SemaphoreIDFnKey(functionID, *fc.Key)
-			evaluated := ""
-			if val, err := expressions.Evaluate(ctx, *fc.Key, map[string]any{"event": evtMap}); err == nil {
-				evaluated = fmt.Sprintf("%v", val)
+		// Scope determines the semaphore ID and release mode
+		switch scope {
+		case inngest.FnConcurrencyScopeApp:
+			// App-scoped: auto-release per step, ID set during registration
+			sem.ID = fc.ID
+			sem.Weight = 1
+			sem.Release = constraintapi.SemaphoreReleaseAuto
+		default:
+			// Fn-scoped (default): manual release on finalization
+			sem.Release = constraintapi.SemaphoreReleaseManual
+			if fc.Key != nil {
+				sem.ID = constraintapi.SemaphoreIDFnKey(functionID, *fc.Key)
+				evaluated := ""
+				if val, err := expressions.Evaluate(ctx, *fc.Key, map[string]any{"event": evtMap}); err == nil {
+					evaluated = fmt.Sprintf("%v", val)
+				} else {
+					logger.StdlibLogger(ctx).Warn(
+						"failed to evaluate fn concurrency key expression, all runs will share one semaphore bucket",
+						"error", err,
+						"expression", *fc.Key,
+						"function_id", functionID,
+					)
+				}
+				sem.UsageValue = util.XXHash(evaluated)
 			} else {
-				logger.StdlibLogger(ctx).Warn(
-					"failed to evaluate fn concurrency key expression, all runs will share one semaphore bucket",
-					"error", err,
-					"expression", *fc.Key,
-					"function_id", functionID,
-				)
+				sem.ID = constraintapi.SemaphoreIDFn(functionID)
 			}
-			sem.UsageValue = util.XXHash(evaluated)
-		} else {
-			sem.ID = constraintapi.SemaphoreIDFn(functionID)
 		}
 
 		semaphores = append(semaphores, sem)

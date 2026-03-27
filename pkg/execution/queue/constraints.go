@@ -144,6 +144,9 @@ type ItemLeaseConstraintCheckResult struct {
 	// When enrolled to the Constraint API and holding a valid capacity lease,
 	// constraint checks _and_ updates may be skipped, as state is maintained within
 	// the Constraint API.
+	//
+	// Note: semaphores are always checked inside ItemLeaseConstraintCheck even
+	// when a backlog capacity lease exists, since they are per-item.
 	SkipConstraintChecks bool
 
 	RetryAfter time.Time
@@ -235,28 +238,11 @@ func (q *queueProcessor) BacklogRefillConstraintCheck(
 	constraintItems := constraintItemsFromBacklog(shadowPart, backlog, constraints)
 	config := ConstraintConfigFromConstraints(constraints)
 
-	// Deduplicate semaphores across items — multiple start jobs for the same function
-	// would otherwise INCRBY the same semaphore counter multiple times in the Lua script.
-	seenSemaphores := map[string]bool{}
-	for _, item := range items {
-		for _, sem := range item.Data.Semaphores {
-			key := sem.ID + ":" + sem.UsageValue
-			if seenSemaphores[key] {
-				continue
-			}
-			seenSemaphores[key] = true
-			constraintItems = append(constraintItems, constraintapi.ConstraintItem{
-				Kind: constraintapi.ConstraintKindSemaphore,
-				Semaphore: &constraintapi.SemaphoreConstraint{
-					ID:         sem.ID,
-					UsageValue: sem.UsageValue,
-					Weight:     sem.Weight,
-					Release:    sem.Release,
-				},
-			})
-			config.Semaphores = append(config.Semaphores, sem)
-		}
-	}
+	// NOTE: Semaphores are NOT included in the batch Acquire. They are per-item
+	// (different UsageValues per item) and can't be batched — the Lua script would
+	// increment ALL semaphore counters by `weight * granted`, corrupting counters
+	// for items with different usage values. Semaphores are checked per-item in
+	// ItemLeaseConstraintCheck instead.
 
 	res, err := q.CapacityManager.Acquire(ctx, &constraintapi.CapacityAcquireRequest{
 		AccountID:            *shadowPart.AccountID,
@@ -363,8 +349,7 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 		return ItemLeaseConstraintCheckResult{}, nil
 	}
 
-	useAPI := q.UseConstraintAPI(ctx, *shadowPart.AccountID)
-	if !useAPI {
+	if !q.UseConstraintAPI(ctx, *shadowPart.AccountID) {
 		metrics.IncrQueueItemConstraintCheckCounter(ctx, enums.QueueItemConstraintReasonFeatureFlagDisabled.String(), metrics.CounterOpt{
 			PkgName: pkgName,
 		})
@@ -373,61 +358,71 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 
 	idempotencyKey := item.ID
 
-	// If capacity lease is still valid for the forseeable future, use it
-	if item.CapacityLease != nil {
-		expiry := item.CapacityLease.LeaseID.Timestamp()
-		hasValidLease := expiry.After(now.Add(2 * time.Second))
+	var (
+		// a container for constraints that we'll check
+		constraintItems []constraintapi.ConstraintItem
+		config          = constraintapi.ConstraintConfig{
+			FunctionVersion: constraints.FunctionVersion,
+		}
+	)
 
-		ttl := expiry.Sub(now)
-		expired := ttl <= 0
-
+	switch hasValidCapacityLease(item, now) {
+	case true:
+		// in this case, key queues claimed a bunch of constraints up front and we already have some
+		// capacity claimed.
+		//
+		// run some metrics.
+		ttl := item.CapacityLease.LeaseID.Timestamp().Sub(now)
 		metrics.HistogramConstraintAPIQueueItemLeaseTTL(ctx, ttl, metrics.HistogramOpt{
 			PkgName: pkgName,
 			Tags: map[string]any{
-				"expired": expired,
-				"kq":      item.RefilledAt != 0,
+				"kq": item.RefilledAt != 0,
 			},
 		})
 
-		// Lease is still valid, return immediately
-		if hasValidLease {
+		if len(item.Data.Semaphores) == 0 {
+			// backlog lease covers everything, no semaphores — skip Acquire entirely.
 			return ItemLeaseConstraintCheckResult{
-				CapacityLease: item.CapacityLease,
-				// Skip any constraint checks and subsequent updates,
-				// as constraint state is maintained in the Constraint API.
+				CapacityLease:        item.CapacityLease,
 				SkipConstraintChecks: true,
 			}, nil
 		}
-
-		// Lease is invalid or not valid long enough, optimistically return capacity
-		// without blocking critical path operations
-		service.Go(func() {
-			_, err := q.CapacityManager.Release(context.Background(), &constraintapi.CapacityReleaseRequest{
-				AccountID:      *shadowPart.AccountID,
-				IdempotencyKey: idempotencyKey,
-				LeaseID:        item.CapacityLease.LeaseID,
-				Source: constraintapi.LeaseSource{
-					Location:          constraintapi.CallerLocationItemLease,
-					Service:           constraintapi.ServiceExecutor,
-					RunProcessingMode: constraintapi.RunProcessingModeBackground,
-				},
-				LeaseIssuedAt: time.UnixMilli(item.CapacityLease.IssuedAtMS),
+	case false:
+		// release expired/near-expiring lease in the background so that capacity
+		// is freed promptly.  this is safe to call even if the lease scavenger has
+		// already released this lease... the release Lua script checks whether the
+		// lease details still exist as an idempotency key, so both ops do not
+		// conflict.  see release.lua L48-54.
+		if item.CapacityLease != nil {
+			expiredLease := item.CapacityLease
+			service.Go(func() {
+				_, err := q.CapacityManager.Release(context.Background(), &constraintapi.CapacityReleaseRequest{
+					AccountID:      *shadowPart.AccountID,
+					IdempotencyKey: idempotencyKey,
+					LeaseID:        expiredLease.LeaseID,
+					Source: constraintapi.LeaseSource{
+						Location:          constraintapi.CallerLocationItemLease,
+						Service:           constraintapi.ServiceExecutor,
+						RunProcessingMode: constraintapi.RunProcessingModeBackground,
+					},
+					LeaseIssuedAt: time.UnixMilli(expiredLease.IssuedAtMS),
+				})
+				if err != nil {
+					l.ReportError(err, "failed to release expired capacity", logger.WithErrorReportTags(map[string]string{
+						"account_id":  shadowPart.AccountID.String(),
+						"lease_id":    expiredLease.LeaseID.String(),
+						"function_id": shadowPart.FunctionID.String(),
+					}))
+				}
 			})
-			if err != nil {
-				l.ReportError(err, "failed to release expired capacity", logger.WithErrorReportTags(map[string]string{
-					"account_id":  shadowPart.AccountID.String(),
-					"lease_id":    item.CapacityLease.LeaseID.String(),
-					"function_id": shadowPart.FunctionID.String(),
-				}))
-			}
-		})
+		}
+
+		// claim everything from the constraint api: concurrency, keys, throttles, etc.
+		constraintItems = constraintItemsFromBacklog(shadowPart, backlog, constraints)
+		config = ConstraintConfigFromConstraints(constraints)
 	}
 
-	// Build constraint items and config. Semaphores come directly from the queue item —
-	// they are only present on start jobs (for fn concurrency) or all items (for worker concurrency).
-	constraintItems := constraintItemsFromBacklog(shadowPart, backlog, constraints)
-	config := ConstraintConfigFromConstraints(constraints)
-
+	// always add semaphores to each check, as this must be done per queue item.
 	for _, sem := range item.Data.Semaphores {
 		constraintItems = append(constraintItems, constraintapi.ConstraintItem{
 			Kind: constraintapi.ConstraintKindSemaphore,
@@ -496,6 +491,10 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 		// as constraint state is maintained in the Constraint API.
 		SkipConstraintChecks: true,
 	}, nil
+}
+
+func hasValidCapacityLease(item *QueueItem, now time.Time) bool {
+	return item.CapacityLease != nil && item.CapacityLease.LeaseID.Timestamp().After(now.Add(2*time.Second))
 }
 
 func constraintItemsFromBacklog(sp *QueueShadowPartition, backlog *QueueBacklog, latestConstraints PartitionConstraintConfig) []constraintapi.ConstraintItem {

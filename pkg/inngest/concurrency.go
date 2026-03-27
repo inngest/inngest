@@ -127,10 +127,10 @@ func (c *ConcurrencyLimits) UnmarshalJSON(b []byte) error {
 		}
 	}
 
-	// For each fn concurrency limit, calculate the hash if not set.
+	// For each fn concurrency limit, compute the ID from the key if not already set.
 	for n, item := range c.Fn {
-		if item.Key != nil && item.Hash == "" {
-			c.Fn[n].Hash = hashConcurrencyKey(*item.Key)
+		if item.Key != nil && item.ID == "" {
+			c.Fn[n].ID = hashConcurrencyKey(*item.Key)
 		}
 	}
 
@@ -161,25 +161,62 @@ func (c *ConcurrencyLimits) MarshalJSON() ([]byte, error) {
 	return json.Marshal(c.Limits)
 }
 
-// FnConcurrency represents function-level concurrency.  The semaphore is held
-// for the entire run (manual release on finalization).  No scope — always
-// scoped to the function.
+// FnConcurrencyScope determines what the semaphore is scoped to and
+// controls release behavior.
+type FnConcurrencyScope string
+
+const (
+	// FnConcurrencyScopeFn scopes the semaphore to the function. The semaphore is held
+	// for the entire run (manual release on finalization). Only on start jobs.
+	FnConcurrencyScopeFn FnConcurrencyScope = "fn"
+
+	// FnConcurrencyScopeApp scopes the semaphore to the app. The semaphore is acquired
+	// and released per step (auto-release), gating work behind worker capacity.
+	// Added to ALL queue items.
+	FnConcurrencyScopeApp FnConcurrencyScope = "app"
+)
+
+// FnConcurrency represents a concurrency limit enforced via semaphores.
+// The Scope determines the semaphore ID, release mode, and which queue items
+// carry the constraint.
 type FnConcurrency struct {
-	Limit int     `json:"limit"`
-	Key   *string `json:"key,omitempty"` // optional expression for the semaphore name
-	Hash  string  `json:"hash"`          // xxhash of Key, computed on unmarshal
+	Limit int                `json:"limit"`
+	Scope FnConcurrencyScope `json:"scope,omitempty"` // defaults to "fn"
+	Key   *string            `json:"key,omitempty"`   // optional expression for the semaphore name
+
+	// ID represents the pre-computed semaphore ID for this concurrency limit.
+	// Set internally during registration (e.g., "app:<appID>" for connect apps).
+	// For fn-scoped limits without a pre-set ID, evaluateFnConcurrency computes it.
+	ID string `json:"id,omitempty"`
 }
 
 func (f FnConcurrency) Validate(ctx context.Context) error {
-	if f.Limit <= 0 {
-		return fmt.Errorf("function concurrency limit must be > 0")
-	}
-	if f.Key != nil {
-		if _, err := expressions.NewExpressionEvaluator(ctx, *f.Key); err != nil {
-			return fmt.Errorf("invalid function concurrency key '%s': %w", *f.Key, err)
+	switch f.EffectiveScope() {
+	case FnConcurrencyScopeFn:
+		if f.Limit <= 0 {
+			return fmt.Errorf("function concurrency limit must be > 0")
 		}
+		if f.Key != nil {
+			if _, err := expressions.NewExpressionEvaluator(ctx, *f.Key); err != nil {
+				return fmt.Errorf("invalid function concurrency key '%s': %w", *f.Key, err)
+			}
+		}
+	case FnConcurrencyScopeApp:
+		// App scope is server-only — injected during connect registration.
+		// Users cannot set this scope directly.
+		return fmt.Errorf("app-scoped function concurrency cannot be set by users")
+	default:
+		return fmt.Errorf("invalid function concurrency scope: %s", f.Scope)
 	}
 	return nil
+}
+
+// EffectiveScope returns the scope, defaulting to FnConcurrencyScopeFn if unset.
+func (f FnConcurrency) EffectiveScope() FnConcurrencyScope {
+	if f.Scope == "" {
+		return FnConcurrencyScopeFn
+	}
+	return f.Scope
 }
 
 // StepConcurrency represents a single step-level concurrency limit for a function.

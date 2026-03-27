@@ -18,7 +18,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/api/tel"
-	"github.com/inngest/inngest/pkg/constraintapi"
+	"github.com/inngest/inngest/pkg/registration"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/cqrs/sync"
@@ -106,7 +106,6 @@ func (a *devapi) addRoutes(AuthMiddleware func(http.Handler) http.Handler) {
 		// Everything else loads the UI (SPA fallback)
 		a.NotFound(a.UI)
 	}
-
 }
 
 func (a devapi) UI(w http.ResponseWriter, r *http.Request) {
@@ -356,17 +355,20 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 	// this set.
 	seen := map[uuid.UUID]struct{}{}
 
-	// XXX (tonyhb): If we're authenticated, we can match the signing key against the workspace's
-	// signing key and warn if the user has an invalid key.
-	funcs, err := r.Parse(ctx)
+	// Parse, validate, and enrich functions via the shared registration pipeline.
+	processed, err := registration.ProcessFunctions(ctx, r, registration.ProcessOpts{
+		AccountID:          consts.DevServerAccountID,
+		EnvironmentID:      consts.DevServerEnvID,
+		AppID:              appID,
+		IsConnect:          r.IsConnect(),
+		UseDeterministicIDs: true,
+	})
 	if err != nil && err != sdk.ErrNoFunctions {
 		return nil, publicerr.Wrap(err, 400, "At least one function is invalid")
 	}
 
-	// For each function,
-	for _, fn := range funcs {
-		// Create a new UUID for the function.
-		fn.ID = fn.DeterministicUUID()
+	for _, df := range processed.Functions {
+		fn := &df.Function
 
 		// Mark as seen.
 		seen[fn.ID] = struct{}{}
@@ -386,7 +388,10 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 
 		if fnExists {
 			fn.FunctionVersion = currentFn.FunctionVersion + 1
+		} else {
+			fn.FunctionVersion = 1
 		}
+
 		config, err := json.Marshal(fn)
 		if err != nil {
 			return nil, publicerr.Wrap(err, 500, "Error marshalling function")
@@ -415,7 +420,6 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 				})
 			}
 
-			a.setSemaphoreCapacity(ctx, fn)
 			continue
 		}
 
@@ -444,11 +448,12 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 				Expression:      cronExpr,
 				Op:              enums.CronOpNew,
 			})
-
 		}
 
-		a.setSemaphoreCapacity(ctx, fn)
 	}
+
+	// Set semaphore capacity for all fn-scoped concurrency limits after DB storage.
+	processed.SetSemaphoreCapacity(ctx, a.devserver.SemaphoreManager)
 
 	reply := &sync.Reply{
 		OK:       true,
@@ -738,28 +743,3 @@ type InfoResponse struct {
 	Features map[string]bool `json:"features"`
 }
 
-// setSemaphoreCapacity sets semaphore capacity for each FnConcurrency limit in the function config.
-// Called during function registration so capacity is available before any runs are scheduled.
-func (a devapi) setSemaphoreCapacity(ctx context.Context, fn *inngest.Function) {
-	if fn.Concurrency == nil || a.devserver.SemaphoreManager == nil {
-		return
-	}
-
-	for _, fc := range fn.Concurrency.Fn {
-		var semID string
-		if fc.Key != nil {
-			semID = constraintapi.SemaphoreIDFnKey(fn.ID, *fc.Key)
-		} else {
-			semID = constraintapi.SemaphoreIDFn(fn.ID)
-		}
-
-		// Idempotent: same fn ID + same config → same capacity
-		_ = a.devserver.SemaphoreManager.SetCapacity(
-			ctx,
-			consts.DevServerAccountID,
-			semID,
-			fn.ID.String(),
-			int64(fc.Limit),
-		)
-	}
-}

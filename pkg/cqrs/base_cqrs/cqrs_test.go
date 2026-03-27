@@ -1546,7 +1546,7 @@ func TestCQRSGetTraceRunsPagination(t *testing.T) {
 	functionID := uuid.New()
 
 	// Create 3 spans with "executor.run" name (required for GetSpanRuns) with distinct start_time
-	baseTime := time.Now().Truncate(time.Second)
+	baseTime := time.Now().UTC().Truncate(time.Second)
 	runIDs := make([]string, 3)
 	for i := 0; i < 3; i++ {
 		runID := ulid.MustNew(ulid.Now(), rand.Reader).String()
@@ -1625,7 +1625,7 @@ func TestCQRSGetTraceRunsExcludesSkipped(t *testing.T) {
 	accountID := uuid.New()
 	workspaceID := uuid.New()
 	functionID := uuid.New()
-	baseTime := time.Now().Truncate(time.Second)
+	baseTime := time.Now().UTC().Truncate(time.Second)
 
 	completedRunID := ulid.MustNew(ulid.Now(), rand.Reader).String()
 
