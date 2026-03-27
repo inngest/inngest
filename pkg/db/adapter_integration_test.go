@@ -31,7 +31,7 @@ func newTestAdapter(t *testing.T) (db.Adapter, func()) {
 		pc, err := testutil.StartPostgres(t)
 		require.NoError(t, err)
 
-		conn, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{
+		conn, err := base_cqrs.New(t.Context(), base_cqrs.BaseCQRSOptions{
 			PostgresURI: pc.URI,
 			ForTest:     true,
 		})
@@ -44,7 +44,7 @@ func newTestAdapter(t *testing.T) (db.Adapter, func()) {
 		}
 	}
 
-	conn, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{
+	conn, err := base_cqrs.New(t.Context(), base_cqrs.BaseCQRSOptions{
 		Persist: false,
 		ForTest: true,
 	})
