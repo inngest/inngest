@@ -165,6 +165,9 @@ func (q *queue) ItemsByPartition(ctx context.Context, partitionID string, from t
 	}
 
 	l = l.With("account_id", pt.AccountID.String())
+	if pt.EnvID != nil {
+		l = l.With("env_id", pt.EnvID.String())
+	}
 
 	return func(yield func(*osqueue.QueueItem) bool) {
 		ptFrom := from
@@ -186,6 +189,7 @@ func (q *queue) ItemsByPartition(ctx context.Context, partitionID string, from t
 				}
 				return
 			}
+			l.Info("peeked partition items", "raw_count", result.RawCount, "last_score", result.LastScore, "item_count", len(result.Items))
 
 			var start, end time.Time
 			for _, qi := range result.Items {
@@ -215,6 +219,7 @@ func (q *queue) ItemsByPartition(ctx context.Context, partitionID string, from t
 			// No raw items were fetched from the sorted set — the partition
 			// range is exhausted.
 			if result.RawCount == 0 {
+				l.Info("no more items to iterate on in partition", "raw_count", result.RawCount, "last_score", result.LastScore, "item_count", len(result.Items))
 				break
 			}
 
