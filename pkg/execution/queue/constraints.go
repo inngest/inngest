@@ -2,6 +2,7 @@ package queue
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/inngest/inngest/pkg/service"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/oklog/ulid/v2"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 type PartitionConstraintConfig struct {
@@ -356,6 +358,9 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 		return ItemLeaseConstraintCheckResult{}, nil
 	}
 
+	ctx, span := q.Options().ConditionalTracer.NewSpan(ctx, "queue.ItemLeaseConstraintCheck", *shadowPart.AccountID, *shadowPart.EnvID, *shadowPart.FunctionID)
+	defer span.End()
+
 	idempotencyKey := item.ID
 
 	var (
@@ -382,6 +387,7 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 
 		if len(item.Data.Semaphores) == 0 {
 			// backlog lease covers everything, no semaphores — skip Acquire entirely.
+			span.SetAttributes(attribute.Bool("valid_lease", true))
 			return ItemLeaseConstraintCheckResult{
 				CapacityLease:        item.CapacityLease,
 				SkipConstraintChecks: true,
@@ -461,6 +467,7 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 		},
 	})
 	if err != nil {
+		span.RecordError(err)
 		l.Error("acquiring capacity lease failed", "err", err, "method", "itemLeaseConstraintCheck", "constraints", constraints, "item", item, "function_id", *shadowPart.FunctionID)
 		metrics.IncrQueueItemConstraintCheckCounter(ctx, enums.QueueItemConstraintReasonConstraintAPIError.String(), metrics.CounterOpt{
 			PkgName: pkgName,
@@ -468,12 +475,22 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 		return ItemLeaseConstraintCheckResult{}, fmt.Errorf("could not enforce constraints and acquire lease: %w", err)
 	}
 
+	// Attach entire response
+	if span.IsRecording() {
+		resJSON, _ := json.Marshal(res)
+		span.SetAttributes(attribute.String("acquire_response", string(resJSON)))
+	}
+
 	constraint := enums.QueueConstraintNotLimited
 	if len(res.ExhaustedConstraints) > 0 {
 		constraint = ConvertLimitingConstraint(constraints, res.ExhaustedConstraints)
 	}
 
+	span.SetAttributes(attribute.String("limiting_constraint", constraint.String()))
+
 	if len(res.Leases) == 0 {
+		span.SetAttributes(attribute.Bool("constrained", true))
+
 		return ItemLeaseConstraintCheckResult{
 			LimitingConstraint: constraint,
 			RetryAfter:         res.RetryAfter,
@@ -481,6 +498,8 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 	}
 
 	capacityLeaseID := res.Leases[0].LeaseID
+
+	span.SetAttributes(attribute.String("capacity_lease_id", capacityLeaseID.String()))
 
 	return ItemLeaseConstraintCheckResult{
 		CapacityLease: &CapacityLease{

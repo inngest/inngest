@@ -1031,6 +1031,133 @@ func TestEvaluateExpression(t *testing.T) {
 			false,
 			"",
 		},
+
+		// Logical OR with non-boolean operands uses JS-like truthy coercion.
+		// This returns the first truthy value, enabling expressions like
+		// "event.data.ingressId || event.data.userId" as debounce keys.
+		{
+			// Both present: returns the first truthy value (lhs)
+			expr: "event.data.ingressId || event.data.userId",
+			data: map[string]interface{}{
+				"event": map[string]interface{}{
+					"data": map[string]interface{}{
+						"ingressId": "IN_Mwj9Dm8r9QP2",
+						"userId":    "e67aed6a-4cd4-4465-ba23-bca6ef584292",
+					},
+				},
+			},
+			expected:  "IN_Mwj9Dm8r9QP2",
+			shouldErr: false,
+		},
+		{
+			// lhs present, rhs missing: returns lhs
+			expr: "event.data.ingressId || event.data.missing",
+			data: map[string]interface{}{
+				"event": map[string]interface{}{
+					"data": map[string]interface{}{
+						"ingressId": "IN_Mwj9Dm8r9QP2",
+					},
+				},
+			},
+			expected:  "IN_Mwj9Dm8r9QP2",
+			shouldErr: false,
+		},
+		{
+			// lhs missing, rhs present: returns rhs (fallback)
+			expr: "event.data.missing || event.data.userId",
+			data: map[string]interface{}{
+				"event": map[string]interface{}{
+					"data": map[string]interface{}{
+						"userId": "user-123",
+					},
+				},
+			},
+			expected:  "user-123",
+			shouldErr: false,
+		},
+		{
+			// lhs is empty string (falsy), rhs present: returns rhs
+			expr: "event.data.empty || event.data.userId",
+			data: map[string]interface{}{
+				"event": map[string]interface{}{
+					"data": map[string]interface{}{
+						"empty":  "",
+						"userId": "user-123",
+					},
+				},
+			},
+			expected:  "user-123",
+			shouldErr: false,
+		},
+		{
+			// both fields missing: both unknowns are falsy, returns rhs (unknown -> false)
+			expr: "event.data.a || event.data.b",
+			data: map[string]interface{}{
+				"event": map[string]interface{}{
+					"data": map[string]interface{}{},
+				},
+			},
+			expected:  false,
+			shouldErr: false,
+		},
+		{
+			// || with boolean operands still works correctly via native CEL
+			expr: "event.data.flagA || event.data.flagB",
+			data: map[string]interface{}{
+				"event": map[string]interface{}{
+					"data": map[string]interface{}{
+						"flagA": false,
+						"flagB": true,
+					},
+				},
+			},
+			expected:  true,
+			shouldErr: false,
+		},
+		{
+			// || with boolean operands, both false
+			expr: "event.data.flagA || event.data.flagB",
+			data: map[string]interface{}{
+				"event": map[string]interface{}{
+					"data": map[string]interface{}{
+						"flagA": false,
+						"flagB": false,
+					},
+				},
+			},
+			expected:  false,
+			shouldErr: false,
+		},
+		// Logical AND with non-boolean operands uses JS-like truthy coercion.
+		// Returns the first falsy value, or the last value if all truthy.
+		{
+			// Both truthy: returns rhs (last value)
+			expr: "event.data.a && event.data.b",
+			data: map[string]interface{}{
+				"event": map[string]interface{}{
+					"data": map[string]interface{}{
+						"a": "first",
+						"b": "second",
+					},
+				},
+			},
+			expected:  "second",
+			shouldErr: false,
+		},
+		{
+			// lhs is empty string (falsy): returns lhs
+			expr: "event.data.a && event.data.b",
+			data: map[string]interface{}{
+				"event": map[string]interface{}{
+					"data": map[string]interface{}{
+						"a": "",
+						"b": "second",
+					},
+				},
+			},
+			expected:  "",
+			shouldErr: false,
+		},
 	}
 
 	for n, item := range tests {
@@ -1188,6 +1315,99 @@ func TestFilteredAttributes(t *testing.T) {
 		require.NotNil(t, test.in)
 		actual := eval.FilteredAttributes(ctx, test.in)
 		require.Equal(t, test.expected, actual)
+	}
+}
+
+// TestDebounceKeyExpressions tests expression patterns commonly used as debounce keys.
+// Debounce keys use expressions.Evaluate() (not EvaluateBoolean), expecting the result
+// to be a string key. This test documents which patterns work and which fail.
+func TestDebounceKeyExpressions(t *testing.T) {
+	eventData := map[string]interface{}{
+		"event": map[string]interface{}{
+			"data": map[string]interface{}{
+				"ingressId": "IN_Mwj9Dm8r9QP2",
+				"timestamp": "2026-03-26T08:02:01.538Z",
+				"userId":    "e67aed6a-4cd4-4465-ba23-bca6ef584292",
+			},
+			"id":   "01KMMJM9P2JQWH09SKMQM4J1DF",
+			"name": "livekit/stream.started",
+			"ts":   1774512121538,
+			"user": map[string]interface{}{},
+		},
+	}
+
+	tests := []struct {
+		name      string
+		expr      string
+		data      map[string]interface{}
+		expected  interface{}
+		shouldErr bool
+	}{
+		{
+			name:     "simple field access returns string value",
+			expr:     "event.data.ingressId",
+			data:     eventData,
+			expected: "IN_Mwj9Dm8r9QP2",
+		},
+		{
+			name:     "string concatenation for composite key",
+			expr:     "event.data.ingressId + '-' + event.data.userId",
+			data:     eventData,
+			expected: "IN_Mwj9Dm8r9QP2-e67aed6a-4cd4-4465-ba23-bca6ef584292",
+		},
+		{
+			// This is the exact expression from the production error.
+			// || with non-boolean operands now uses JS-like truthy coercion,
+			// returning the first truthy value.
+			name:     "logical OR returns first truthy string value",
+			expr:     "event.data.ingressId || event.data.userId",
+			data:     eventData,
+			expected: "IN_Mwj9Dm8r9QP2",
+		},
+		{
+			name:     "logical OR falls back to second value when first is missing",
+			expr:     "event.data.nonexistent || event.data.userId",
+			data:     eventData,
+			expected: "e67aed6a-4cd4-4465-ba23-bca6ef584292",
+		},
+		{
+			name:     "missing field returns empty string via concatenation",
+			expr:     "event.data.ingressId + event.data.missing",
+			data:     eventData,
+			expected: "IN_Mwj9Dm8r9QP2",
+		},
+		{
+			name: "missing field alone returns false (treated as null/unknown)",
+			expr: "event.data.nonexistent",
+			data: eventData,
+			// Missing fields are treated as unknowns, which resolve to false.
+			expected: false,
+		},
+		{
+			name:     "event.id as debounce key",
+			expr:     "event.id",
+			data:     eventData,
+			expected: "01KMMJM9P2JQWH09SKMQM4J1DF",
+		},
+		{
+			name:     "event.name as debounce key",
+			expr:     "event.name",
+			data:     eventData,
+			expected: "livekit/stream.started",
+		},
+	}
+
+	ctx := context.Background()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := Evaluate(ctx, tt.expr, tt.data)
+			if tt.shouldErr {
+				require.Error(t, err, "expected error for expression: %s", tt.expr)
+				return
+			}
+			require.NoError(t, err, "unexpected error for expression: %s", tt.expr)
+			require.Equal(t, tt.expected, result, "unexpected result for expression: %s", tt.expr)
+		})
 	}
 }
 

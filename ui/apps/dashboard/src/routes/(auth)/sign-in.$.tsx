@@ -3,13 +3,13 @@ import SignInRedirectErrors, {
   hasErrorMessage,
 } from '@/components/SignIn/Errors';
 import SplitView from '@/components/SignIn/SplitView';
+import { validateRedirectUrlSearch } from '@/lib/deepLinkUtils';
 import { SignIn } from '@clerk/tanstack-react-start';
 import { Alert } from '@inngest/components/Alert';
 import { createFileRoute, useLocation } from '@tanstack/react-router';
 import logoImageUrl from '@inngest/components/icons/logos/inngest-logo-black.png';
 
-type SignInSearchParams = {
-  redirect_url?: string;
+type SignInSearchParams = ReturnType<typeof validateRedirectUrlSearch> & {
   error?: string;
 };
 
@@ -17,13 +17,7 @@ export const Route = createFileRoute('/(auth)/sign-in/$')({
   component: RouteComponent,
   validateSearch: (search: Record<string, unknown>): SignInSearchParams => {
     return {
-      redirect_url:
-        typeof search?.redirect_url === 'string' &&
-        //
-        // we only support relative redirects
-        search.redirect_url.startsWith('/')
-          ? search.redirect_url
-          : undefined,
+      ...validateRedirectUrlSearch(search),
       error: typeof search?.error === 'string' ? search.error : undefined,
     };
   },

@@ -121,9 +121,10 @@ func ScheduleStatus(err error) string {
 // can be directly executed next and saves a state.Pause for edges that have async conditions.
 func NewExecutor(opts ...ExecutorOpt) (execution.Executor, error) {
 	m := &executor{
-		driverv1: map[string]driver.DriverV1{},
-		driverv2: map[string]driver.DriverV2{},
-		clock:    clockwork.NewRealClock(),
+		driverv1:          map[string]driver.DriverV1{},
+		driverv2:          map[string]driver.DriverV2{},
+		clock:             clockwork.NewRealClock(),
+		conditionalTracer: itrace.NoopConditionalTracer(),
 	}
 
 	for _, o := range opts {
@@ -456,6 +457,13 @@ type BacklogSizeLimit struct {
 
 type BacklogSizeLimitFn func(ctx context.Context, accountID, envID, fnID uuid.UUID) BacklogSizeLimit
 
+func WithConditionalTracer(tracer itrace.ConditionalTracer) ExecutorOpt {
+	return func(e execution.Executor) error {
+		e.(*executor).conditionalTracer = tracer
+		return nil
+	}
+}
+
 // executor represents a built-in executor for running workflows.
 type executor struct {
 	log logger.Logger
@@ -515,6 +523,8 @@ type executor struct {
 
 	allowStepMetadata AllowStepMetadata
 	clock             clockwork.Clock
+
+	conditionalTracer itrace.ConditionalTracer
 }
 
 func (e *executor) SetFinalizer(f execution.FinalizePublisher) {
@@ -782,6 +792,9 @@ func (e *executor) checkBacklogSizeLimit(ctx context.Context, req execution.Sche
 // metadata will be nil.  This will return the original run ID if runs were skipped due
 // to idemptoency.
 func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) (*ulid.ULID, *sv2.Metadata, error) {
+	ctx, span := e.conditionalTracer.NewSpan(ctx, "executor.Schedule", req.AccountID, req.WorkspaceID, req.Function.ID)
+	defer span.End()
+
 	// Run IDs are created embedding the timestamp now, when the function is being scheduled.
 	// When running a cancellation, functions are cancelled at scheduling time based off of
 	// this run ID.
@@ -811,6 +824,9 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		"schedule_req", req,
 	)
 
+	span.SetAttributes(attribute.String("event_id", req.Events[0].GetInternalID().String()))
+	span.SetAttributes(attribute.String("run_id", runID.String()))
+
 	l.Optional(req.AccountID, "schedule").Debug("hitting constraint API")
 
 	// Check constraints and acquire lease
@@ -820,6 +836,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		e.capacityManager,
 		e.useConstraintAPI,
 		req,
+		e.conditionalTracer,
 		key,
 		func(ctx context.Context, performChecks bool) (*sv2.Metadata, error) {
 			return util.CritT(ctx, "schedule", func(ctx context.Context) (*sv2.Metadata, error) {
@@ -860,6 +877,9 @@ func (e *executor) schedule(
 	if req.AppID == uuid.Nil {
 		return nil, nil, fmt.Errorf("app ID is required to schedule a run")
 	}
+
+	ctx, span := e.conditionalTracer.NewSpan(ctx, "executor.schedule", req.AccountID, req.WorkspaceID, req.Function.ID)
+	defer span.End()
 
 	l := e.log.With(
 		"account_id", req.AccountID,
@@ -942,6 +962,7 @@ func (e *executor) schedule(
 	// NOTE: From this point, we are guaranteed to operate within user constraints.
 
 	if req.Function.Debounce != nil && !req.PreventDebounce {
+		ctx, span := e.conditionalTracer.NewSpan(ctx, "executor.Debounce", req.AccountID, req.WorkspaceID, req.Function.ID)
 		err := e.debouncer.Debounce(ctx, debounce.DebounceItem{
 			AccountID:        req.AccountID,
 			WorkspaceID:      req.WorkspaceID,
@@ -953,8 +974,11 @@ func (e *executor) schedule(
 			FunctionPausedAt: req.FunctionPausedAt,
 		}, req.Function)
 		if err != nil {
+			span.RecordError(err)
+			span.End()
 			return nil, nil, err
 		}
+		span.End()
 		return nil, nil, ErrFunctionDebounced
 	}
 
@@ -1210,7 +1234,10 @@ func (e *executor) schedule(
 
 	// Create run state if not skipped
 	if skipReason == enums.SkipReasonNone {
+		ctx, span := e.conditionalTracer.NewSpan(ctx, "executor.CreateState", req.AccountID, req.WorkspaceID, req.Function.ID)
 		st, err := e.smv2.Create(ctx, newState)
+		span.End()
+
 		switch {
 		case err == nil: // no-op
 		case errors.Is(err, state.ErrIdentifierExists): // no-op
@@ -1448,6 +1475,9 @@ func (e *executor) handleFunctionSkipped(ctx context.Context, req execution.Sche
 // Execute loads a workflow and the current run state, then executes the
 // function's step via the necessary driver.
 func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.Item, edge inngest.Edge) (*state.DriverResponse, error) {
+	conditionalTraceCtx, conditionalSpan := e.conditionalTracer.NewSpan(ctx, "executor.Execute", id.AccountID, id.WorkspaceID, id.WorkflowID)
+	defer conditionalSpan.End()
+
 	// Immediately store execution context for tracing.
 	ctx = tracing.WithExecutionContext(ctx, tracing.ExecutionContext{
 		Identifier:  sv2.IDFromV1(id),
@@ -1468,6 +1498,9 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		"run_id", id.RunID,
 	)
 	ctx = logger.WithStdlib(ctx, l)
+
+	conditionalSpan.SetAttributes(attribute.String("run_id", id.RunID.String()))
+	conditionalSpan.SetAttributes(attribute.String("event_id", id.EventID.String()))
 
 	// If this is of type sleep, ensure that we save "nil" within the state store
 	// for the outgoing edge ID.  This ensures that we properly increase the stack
@@ -1510,6 +1543,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		ctx = state.WithGroupID(ctx, uuid.New().String())
 	}
 
+	_, span := e.conditionalTracer.NewSpan(conditionalTraceCtx, "executor.LoadMetadata", id.AccountID, id.WorkspaceID, id.WorkflowID)
 	md, err := e.smv2.LoadMetadata(ctx, sv2.ID{
 		RunID:      id.RunID,
 		FunctionID: id.WorkflowID,
@@ -1519,6 +1553,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			AccountID: id.AccountID,
 		},
 	})
+	span.End()
 	// XXX: MetadataNotFound -> assume fn is deleted.
 	if err != nil {
 		return nil, fmt.Errorf("cannot load metadata to execute run: %w", err)
@@ -1530,7 +1565,9 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		}
 	}
 
+	_, span = e.conditionalTracer.NewSpan(conditionalTraceCtx, "executor.LoadFunction", id.AccountID, id.WorkspaceID, id.WorkflowID)
 	ef, err := e.fl.LoadFunction(ctx, md.ID.Tenant.EnvID, md.ID.FunctionID)
+	span.End()
 	if err != nil {
 		return nil, fmt.Errorf("error loading function for run: %w", err)
 	}
@@ -1551,7 +1588,9 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		}
 	}
 
+	_, span = e.conditionalTracer.NewSpan(conditionalTraceCtx, "executor.LoadEvents", id.AccountID, id.WorkspaceID, id.WorkflowID)
 	events, err := e.smv2.LoadEvents(ctx, md.ID)
+	span.End()
 	if err != nil {
 		return nil, fmt.Errorf("cannot load run events: %w", err)
 	}
@@ -1713,10 +1752,12 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	}
 
 	return util.CritT(ctx, "run step", func(ctx context.Context) (*state.DriverResponse, error) {
+		_, span = e.conditionalTracer.NewSpan(conditionalTraceCtx, "executor.run", id.AccountID, id.WorkspaceID, id.WorkflowID)
 		// Track how long it took us from the queue item job starting -> calling run.
 		instance.trackLatencyHistogram(ctx, "queue_to_run_start", nil)
 		resp, err := e.run(ctx, &instance)
 		instance.trackLatencyHistogram(ctx, "run_start_to_request_end", nil)
+		span.End()
 
 		defer func() {
 			// track how long it takes to finish accounting after running.
@@ -5298,9 +5339,7 @@ func (e *executor) createMetadataSpan(ctx context.Context, runCtx execution.RunC
 	switch scope {
 	case enums.MetadataScopeRun:
 		parent = tracing.RunSpanRefFromMetadata(runCtx.Metadata())
-	case enums.MetadataScopeStep:
-		parent = runCtx.ParentSpan()
-	case enums.MetadataScopeStepAttempt:
+	case enums.MetadataScopeStep, enums.MetadataScopeStepAttempt:
 		parent = runCtx.ExecutionSpan()
 	default:
 		return nil, fmt.Errorf("unknown metadata scope: %s", scope)

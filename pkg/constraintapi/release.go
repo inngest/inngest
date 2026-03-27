@@ -60,6 +60,11 @@ func (r *redisCapacityManager) Release(ctx context.Context, req *CapacityRelease
 		enableDebugLogsVal = "1"
 	}
 
+	enableCacheInvalidation := "0"
+	if r.enableAcquireCache != nil {
+		enableCacheInvalidation = "1"
+	}
+
 	scopedKeyPrefix := fmt.Sprintf("{cs}:%s", accountScope(req.AccountID))
 
 	// Force-release semaphores when the scavenger is reclaiming an expired lease.
@@ -76,6 +81,7 @@ func (r *redisCapacityManager) Release(ctx context.Context, req *CapacityRelease
 		int(r.operationIdempotencyTTL.Seconds()),
 		enableDebugLogsVal,
 		forceReleaseSemaphores,
+		enableCacheInvalidation,
 	})
 	if err != nil {
 		return nil, errs.Wrap(0, false, "invalid args: %w", err)

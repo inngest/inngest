@@ -14,6 +14,7 @@ local currentLeaseID = ARGV[3]
 local operationIdempotencyTTL = tonumber(ARGV[4])
 local enableDebugLogs = tonumber(ARGV[5]) == 1
 local forceReleaseSemaphores = tonumber(ARGV[6]) == 1
+local enableCacheInvalidation = ARGV[7] == "1"
 local debugLogs = {}
 local function debug(...)
 	if enableDebugLogs then
@@ -87,4 +88,27 @@ res["f"] = requestDetails.f
 res["m"] = requestDetails.m
 local encoded = cjson.encode(res)
 call("SET", keyOperationIdempotency, encoded, "EX", tostring(operationIdempotencyTTL))
+if enableCacheInvalidation then
+	local cacheKeysToDelete = {}
+	for _, c in ipairs(constraints) do
+		if c.k == 2 and c.c then
+			local scope = c.c.s or 0
+			local sl = (scope == 2 and "a") or (scope == 1 and "e") or "f"
+			local cacheKey
+			if c.c.h ~= nil and c.c.h ~= "" then
+				cacheKey = accountID .. ":c:" .. sl .. ":" .. c.c.h .. ":" .. (c.c.eh or "")
+			elseif scope == 0 then
+				cacheKey = accountID .. ":c:" .. sl .. ":" .. requestDetails.f
+			elseif scope == 1 then
+				cacheKey = accountID .. ":c:" .. sl .. ":" .. requestDetails.e
+			else
+				cacheKey = accountID .. ":c:" .. sl
+			end
+			table.insert(cacheKeysToDelete, scopedKeyPrefix .. ":cache:" .. cacheKey)
+		end
+	end
+	if #cacheKeysToDelete > 0 then
+		call("DEL", unpack(cacheKeysToDelete))
+	end
+end
 return encoded

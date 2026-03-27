@@ -165,6 +165,9 @@ func (q *queue) ItemsByPartition(ctx context.Context, partitionID string, from t
 	}
 
 	l = l.With("account_id", pt.AccountID.String())
+	if pt.EnvID != nil {
+		l = l.With("env_id", pt.EnvID.String())
+	}
 
 	return func(yield func(*osqueue.QueueItem) bool) {
 		ptFrom := from
@@ -173,7 +176,7 @@ func (q *queue) ItemsByPartition(ctx context.Context, partitionID string, from t
 			var iterated int
 
 			// peek function partition
-			items, err := q.peek(ctx, peekOpts{
+			result, err := q.peek(ctx, peekOpts{
 				From:         &ptFrom,
 				Until:        until,
 				Limit:        opt.BatchSize,
@@ -186,9 +189,10 @@ func (q *queue) ItemsByPartition(ctx context.Context, partitionID string, from t
 				}
 				return
 			}
+			l.Info("peeked partition items", "raw_count", result.RawCount, "last_score", result.LastScore, "item_count", len(result.Items))
 
 			var start, end time.Time
-			for _, qi := range items {
+			for _, qi := range result.Items {
 				if qi == nil {
 					continue
 				}
@@ -212,9 +216,30 @@ func (q *queue) ItemsByPartition(ctx context.Context, partitionID string, from t
 				"end", end.Format(time.StampMilli),
 			)
 
-			// didn't process anything, exit loop
-			if iterated == 0 {
+			// No raw items were fetched from the sorted set — the partition
+			// range is exhausted.
+			if result.RawCount == 0 {
+				l.Info("no more items to iterate on in partition", "raw_count", result.RawCount, "last_score", result.LastScore, "item_count", len(result.Items))
 				break
+			}
+
+			// Raw items were fetched but none were usable (all leased or
+			// missing from hash). Advance the cursor past the last fetched
+			// item's score and continue to the next batch.
+			if iterated == 0 {
+				if result.LastScore <= 0 {
+					// Score parsing failed or returned an invalid value.
+					// Break to avoid an infinite loop (cursor would regress
+					// to epoch, re-fetching the same items forever).
+					l.Warn("breaking partition iterator: last score is invalid",
+						"last_score", result.LastScore,
+						"raw_count", result.RawCount,
+					)
+					break
+				}
+				ptFrom = time.UnixMilli(result.LastScore).Add(time.Millisecond)
+				<-time.After(opt.Interval)
+				continue
 			}
 
 			if opt.EnableMillisecondIncrease {

@@ -745,8 +745,25 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 
 		return nil
 	case connectpb.GatewayMessageType_WORKER_PAUSE:
+		// NOTE: Unlike WORKER_READY and WORKER_HEARTBEAT, we intentionally do
+		// NOT reject WORKER_PAUSE when the gateway is draining. The worker is
+		// signaling that it wants to stop receiving new requests (e.g. graceful
+		// shutdown via SIGTERM). We must honour this by updating the connection
+		// status in Redis to DRAINING so the router stops selecting it.
+		//
+		// If we reject with ErrDraining here, the connection is closed without
+		// updating Redis, leaving the status as READY. The router then keeps
+		// routing requests to a worker that will skip them, causing leases to
+		// expire after 25s (ConnectWorkerRequestLeaseDuration + GracePeriod)
+		// and producing "worker stopped responding" errors. (SYS-709)
 		if c.svc.isDraining.Load() {
-			return &ErrDraining
+			c.log.Warn("worker pause signal received during draining sequence",
+				"instance_id", c.conn.Data.InstanceId,
+				"env_id", c.conn.EnvID.String(),
+				"account_id", c.conn.AccountID.String(),
+				"gateway_id", c.conn.GatewayId.String(),
+				"connection_id", c.conn.ConnectionId.String(),
+			)
 		}
 
 		// Mark as draining before updating Redis so that concurrent heartbeat
@@ -757,19 +774,18 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 		// this connection for new requests.
 		err := c.updateConnStatus(connectpb.ConnectionStatus_DRAINING)
 		if err != nil {
-			return &connecterrors.SocketError{
-				SysCode:    syscode.CodeConnectInternal,
-				StatusCode: websocket.StatusInternalError,
-				Msg:        "could not update connection status",
-			}
+			c.log.Error("could not update connection status to DRAINING on WORKER_PAUSE",
+				"err", err,
+				"instance_id", c.conn.Data.InstanceId,
+				"env_id", c.conn.EnvID.String(),
+				"account_id", c.conn.AccountID.String(),
+				"gateway_id", c.conn.GatewayId.String(),
+				"connection_id", c.conn.ConnectionId.String(),
+			)
 		}
 
-		// Then delete from in-memory map to prevent forwarding. This must
-		// happen after the Redis status update to avoid a race where the
-		// router still sees status=READY but the gateway can no longer forward.
+		// Remove from in-memory map to prevent new requests from being forwarded.
 		c.svc.wsConnections.Delete(c.conn.ConnectionId.String())
-
-		// For pauses, worker capacity is not tracked and it will expire
 
 		for _, l := range c.svc.lifecycles {
 			go l.OnStartDraining(context.Background(), c.conn)
