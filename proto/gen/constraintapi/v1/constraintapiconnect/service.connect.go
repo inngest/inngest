@@ -44,6 +44,15 @@ const (
 	ConstraintAPIReleaseProcedure = "/constraintapi.v1.ConstraintAPI/Release"
 )
 
+// These variables are the protoreflect.Descriptor objects for the RPCs defined in this package.
+var (
+	constraintAPIServiceDescriptor           = v1.File_constraintapi_v1_service_proto.Services().ByName("ConstraintAPI")
+	constraintAPICheckMethodDescriptor       = constraintAPIServiceDescriptor.Methods().ByName("Check")
+	constraintAPIAcquireMethodDescriptor     = constraintAPIServiceDescriptor.Methods().ByName("Acquire")
+	constraintAPIExtendLeaseMethodDescriptor = constraintAPIServiceDescriptor.Methods().ByName("ExtendLease")
+	constraintAPIReleaseMethodDescriptor     = constraintAPIServiceDescriptor.Methods().ByName("Release")
+)
+
 // ConstraintAPIClient is a client for the constraintapi.v1.ConstraintAPI service.
 type ConstraintAPIClient interface {
 	Check(context.Context, *connect.Request[v1.CapacityCheckRequest]) (*connect.Response[v1.CapacityCheckResponse], error)
@@ -61,30 +70,29 @@ type ConstraintAPIClient interface {
 // http://api.acme.com or https://acme.com/grpc).
 func NewConstraintAPIClient(httpClient connect.HTTPClient, baseURL string, opts ...connect.ClientOption) ConstraintAPIClient {
 	baseURL = strings.TrimRight(baseURL, "/")
-	constraintAPIMethods := v1.File_constraintapi_v1_service_proto.Services().ByName("ConstraintAPI").Methods()
 	return &constraintAPIClient{
 		check: connect.NewClient[v1.CapacityCheckRequest, v1.CapacityCheckResponse](
 			httpClient,
 			baseURL+ConstraintAPICheckProcedure,
-			connect.WithSchema(constraintAPIMethods.ByName("Check")),
+			connect.WithSchema(constraintAPICheckMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
 		acquire: connect.NewClient[v1.CapacityAcquireRequest, v1.CapacityAcquireResponse](
 			httpClient,
 			baseURL+ConstraintAPIAcquireProcedure,
-			connect.WithSchema(constraintAPIMethods.ByName("Acquire")),
+			connect.WithSchema(constraintAPIAcquireMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
 		extendLease: connect.NewClient[v1.CapacityExtendLeaseRequest, v1.CapacityExtendLeaseResponse](
 			httpClient,
 			baseURL+ConstraintAPIExtendLeaseProcedure,
-			connect.WithSchema(constraintAPIMethods.ByName("ExtendLease")),
+			connect.WithSchema(constraintAPIExtendLeaseMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
 		release: connect.NewClient[v1.CapacityReleaseRequest, v1.CapacityReleaseResponse](
 			httpClient,
 			baseURL+ConstraintAPIReleaseProcedure,
-			connect.WithSchema(constraintAPIMethods.ByName("Release")),
+			connect.WithSchema(constraintAPIReleaseMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
 	}
@@ -132,29 +140,28 @@ type ConstraintAPIHandler interface {
 // By default, handlers support the Connect, gRPC, and gRPC-Web protocols with the binary Protobuf
 // and JSON codecs. They also support gzip compression.
 func NewConstraintAPIHandler(svc ConstraintAPIHandler, opts ...connect.HandlerOption) (string, http.Handler) {
-	constraintAPIMethods := v1.File_constraintapi_v1_service_proto.Services().ByName("ConstraintAPI").Methods()
 	constraintAPICheckHandler := connect.NewUnaryHandler(
 		ConstraintAPICheckProcedure,
 		svc.Check,
-		connect.WithSchema(constraintAPIMethods.ByName("Check")),
+		connect.WithSchema(constraintAPICheckMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
 	constraintAPIAcquireHandler := connect.NewUnaryHandler(
 		ConstraintAPIAcquireProcedure,
 		svc.Acquire,
-		connect.WithSchema(constraintAPIMethods.ByName("Acquire")),
+		connect.WithSchema(constraintAPIAcquireMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
 	constraintAPIExtendLeaseHandler := connect.NewUnaryHandler(
 		ConstraintAPIExtendLeaseProcedure,
 		svc.ExtendLease,
-		connect.WithSchema(constraintAPIMethods.ByName("ExtendLease")),
+		connect.WithSchema(constraintAPIExtendLeaseMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
 	constraintAPIReleaseHandler := connect.NewUnaryHandler(
 		ConstraintAPIReleaseProcedure,
 		svc.Release,
-		connect.WithSchema(constraintAPIMethods.ByName("Release")),
+		connect.WithSchema(constraintAPIReleaseMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
 	return "/constraintapi.v1.ConstraintAPI/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

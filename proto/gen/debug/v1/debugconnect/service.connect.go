@@ -80,6 +80,31 @@ const (
 	DebugGetBacklogSizeProcedure = "/debug.v1.Debug/GetBacklogSize"
 )
 
+// These variables are the protoreflect.Descriptor objects for the RPCs defined in this package.
+var (
+	debugServiceDescriptor                   = v1.File_debug_v1_service_proto.Services().ByName("Debug")
+	debugGetPartitionMethodDescriptor        = debugServiceDescriptor.Methods().ByName("GetPartition")
+	debugGetPartitionStatusMethodDescriptor  = debugServiceDescriptor.Methods().ByName("GetPartitionStatus")
+	debugGetQueueItemMethodDescriptor        = debugServiceDescriptor.Methods().ByName("GetQueueItem")
+	debugGetPauseMethodDescriptor            = debugServiceDescriptor.Methods().ByName("GetPause")
+	debugGetIndexMethodDescriptor            = debugServiceDescriptor.Methods().ByName("GetIndex")
+	debugBlockPeekMethodDescriptor           = debugServiceDescriptor.Methods().ByName("BlockPeek")
+	debugBlockDeletedMethodDescriptor        = debugServiceDescriptor.Methods().ByName("BlockDeleted")
+	debugCheckConstraintsMethodDescriptor    = debugServiceDescriptor.Methods().ByName("CheckConstraints")
+	debugGetBatchInfoMethodDescriptor        = debugServiceDescriptor.Methods().ByName("GetBatchInfo")
+	debugDeleteBatchMethodDescriptor         = debugServiceDescriptor.Methods().ByName("DeleteBatch")
+	debugRunBatchMethodDescriptor            = debugServiceDescriptor.Methods().ByName("RunBatch")
+	debugGetSingletonInfoMethodDescriptor    = debugServiceDescriptor.Methods().ByName("GetSingletonInfo")
+	debugDeleteSingletonLockMethodDescriptor = debugServiceDescriptor.Methods().ByName("DeleteSingletonLock")
+	debugGetDebounceInfoMethodDescriptor     = debugServiceDescriptor.Methods().ByName("GetDebounceInfo")
+	debugDeleteDebounceMethodDescriptor      = debugServiceDescriptor.Methods().ByName("DeleteDebounce")
+	debugRunDebounceMethodDescriptor         = debugServiceDescriptor.Methods().ByName("RunDebounce")
+	debugDeleteDebounceByIDMethodDescriptor  = debugServiceDescriptor.Methods().ByName("DeleteDebounceByID")
+	debugGetShadowPartitionMethodDescriptor  = debugServiceDescriptor.Methods().ByName("GetShadowPartition")
+	debugGetBacklogsMethodDescriptor         = debugServiceDescriptor.Methods().ByName("GetBacklogs")
+	debugGetBacklogSizeMethodDescriptor      = debugServiceDescriptor.Methods().ByName("GetBacklogSize")
+)
+
 // DebugClient is a client for the debug.v1.Debug service.
 type DebugClient interface {
 	// GetPartition retrieves the partition data from the database
@@ -134,126 +159,125 @@ type DebugClient interface {
 // http://api.acme.com or https://acme.com/grpc).
 func NewDebugClient(httpClient connect.HTTPClient, baseURL string, opts ...connect.ClientOption) DebugClient {
 	baseURL = strings.TrimRight(baseURL, "/")
-	debugMethods := v1.File_debug_v1_service_proto.Services().ByName("Debug").Methods()
 	return &debugClient{
 		getPartition: connect.NewClient[v1.PartitionRequest, v1.PartitionResponse](
 			httpClient,
 			baseURL+DebugGetPartitionProcedure,
-			connect.WithSchema(debugMethods.ByName("GetPartition")),
+			connect.WithSchema(debugGetPartitionMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
 		getPartitionStatus: connect.NewClient[v1.PartitionRequest, v1.PartitionStatusResponse](
 			httpClient,
 			baseURL+DebugGetPartitionStatusProcedure,
-			connect.WithSchema(debugMethods.ByName("GetPartitionStatus")),
+			connect.WithSchema(debugGetPartitionStatusMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
 		getQueueItem: connect.NewClient[v1.QueueItemRequest, v1.QueueItemResponse](
 			httpClient,
 			baseURL+DebugGetQueueItemProcedure,
-			connect.WithSchema(debugMethods.ByName("GetQueueItem")),
+			connect.WithSchema(debugGetQueueItemMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
 		getPause: connect.NewClient[v1.PauseRequest, v1.PauseResponse](
 			httpClient,
 			baseURL+DebugGetPauseProcedure,
-			connect.WithSchema(debugMethods.ByName("GetPause")),
+			connect.WithSchema(debugGetPauseMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
 		getIndex: connect.NewClient[v1.IndexRequest, v1.IndexResponse](
 			httpClient,
 			baseURL+DebugGetIndexProcedure,
-			connect.WithSchema(debugMethods.ByName("GetIndex")),
+			connect.WithSchema(debugGetIndexMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
 		blockPeek: connect.NewClient[v1.BlockPeekRequest, v1.BlockPeekResponse](
 			httpClient,
 			baseURL+DebugBlockPeekProcedure,
-			connect.WithSchema(debugMethods.ByName("BlockPeek")),
+			connect.WithSchema(debugBlockPeekMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
 		blockDeleted: connect.NewClient[v1.BlockDeletedRequest, v1.BlockDeletedResponse](
 			httpClient,
 			baseURL+DebugBlockDeletedProcedure,
-			connect.WithSchema(debugMethods.ByName("BlockDeleted")),
+			connect.WithSchema(debugBlockDeletedMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
 		checkConstraints: connect.NewClient[v11.CapacityCheckRequest, v1.CheckConstraintsResponse](
 			httpClient,
 			baseURL+DebugCheckConstraintsProcedure,
-			connect.WithSchema(debugMethods.ByName("CheckConstraints")),
+			connect.WithSchema(debugCheckConstraintsMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
 		getBatchInfo: connect.NewClient[v1.BatchInfoRequest, v1.BatchInfoResponse](
 			httpClient,
 			baseURL+DebugGetBatchInfoProcedure,
-			connect.WithSchema(debugMethods.ByName("GetBatchInfo")),
+			connect.WithSchema(debugGetBatchInfoMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
 		deleteBatch: connect.NewClient[v1.DeleteBatchRequest, v1.DeleteBatchResponse](
 			httpClient,
 			baseURL+DebugDeleteBatchProcedure,
-			connect.WithSchema(debugMethods.ByName("DeleteBatch")),
+			connect.WithSchema(debugDeleteBatchMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
 		runBatch: connect.NewClient[v1.RunBatchRequest, v1.RunBatchResponse](
 			httpClient,
 			baseURL+DebugRunBatchProcedure,
-			connect.WithSchema(debugMethods.ByName("RunBatch")),
+			connect.WithSchema(debugRunBatchMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
 		getSingletonInfo: connect.NewClient[v1.SingletonInfoRequest, v1.SingletonInfoResponse](
 			httpClient,
 			baseURL+DebugGetSingletonInfoProcedure,
-			connect.WithSchema(debugMethods.ByName("GetSingletonInfo")),
+			connect.WithSchema(debugGetSingletonInfoMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
 		deleteSingletonLock: connect.NewClient[v1.DeleteSingletonLockRequest, v1.DeleteSingletonLockResponse](
 			httpClient,
 			baseURL+DebugDeleteSingletonLockProcedure,
-			connect.WithSchema(debugMethods.ByName("DeleteSingletonLock")),
+			connect.WithSchema(debugDeleteSingletonLockMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
 		getDebounceInfo: connect.NewClient[v1.DebounceInfoRequest, v1.DebounceInfoResponse](
 			httpClient,
 			baseURL+DebugGetDebounceInfoProcedure,
-			connect.WithSchema(debugMethods.ByName("GetDebounceInfo")),
+			connect.WithSchema(debugGetDebounceInfoMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
 		deleteDebounce: connect.NewClient[v1.DeleteDebounceRequest, v1.DeleteDebounceResponse](
 			httpClient,
 			baseURL+DebugDeleteDebounceProcedure,
-			connect.WithSchema(debugMethods.ByName("DeleteDebounce")),
+			connect.WithSchema(debugDeleteDebounceMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
 		runDebounce: connect.NewClient[v1.RunDebounceRequest, v1.RunDebounceResponse](
 			httpClient,
 			baseURL+DebugRunDebounceProcedure,
-			connect.WithSchema(debugMethods.ByName("RunDebounce")),
+			connect.WithSchema(debugRunDebounceMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
 		deleteDebounceByID: connect.NewClient[v1.DeleteDebounceByIDRequest, v1.DeleteDebounceByIDResponse](
 			httpClient,
 			baseURL+DebugDeleteDebounceByIDProcedure,
-			connect.WithSchema(debugMethods.ByName("DeleteDebounceByID")),
+			connect.WithSchema(debugDeleteDebounceByIDMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
 		getShadowPartition: connect.NewClient[v1.ShadowPartitionRequest, v1.ShadowPartitionResponse](
 			httpClient,
 			baseURL+DebugGetShadowPartitionProcedure,
-			connect.WithSchema(debugMethods.ByName("GetShadowPartition")),
+			connect.WithSchema(debugGetShadowPartitionMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
 		getBacklogs: connect.NewClient[v1.BacklogsRequest, v1.BacklogsResponse](
 			httpClient,
 			baseURL+DebugGetBacklogsProcedure,
-			connect.WithSchema(debugMethods.ByName("GetBacklogs")),
+			connect.WithSchema(debugGetBacklogsMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
 		getBacklogSize: connect.NewClient[v1.BacklogSizeRequest, v1.BacklogSizeResponse](
 			httpClient,
 			baseURL+DebugGetBacklogSizeProcedure,
-			connect.WithSchema(debugMethods.ByName("GetBacklogSize")),
+			connect.WithSchema(debugGetBacklogSizeMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
 	}
@@ -434,125 +458,124 @@ type DebugHandler interface {
 // By default, handlers support the Connect, gRPC, and gRPC-Web protocols with the binary Protobuf
 // and JSON codecs. They also support gzip compression.
 func NewDebugHandler(svc DebugHandler, opts ...connect.HandlerOption) (string, http.Handler) {
-	debugMethods := v1.File_debug_v1_service_proto.Services().ByName("Debug").Methods()
 	debugGetPartitionHandler := connect.NewUnaryHandler(
 		DebugGetPartitionProcedure,
 		svc.GetPartition,
-		connect.WithSchema(debugMethods.ByName("GetPartition")),
+		connect.WithSchema(debugGetPartitionMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
 	debugGetPartitionStatusHandler := connect.NewUnaryHandler(
 		DebugGetPartitionStatusProcedure,
 		svc.GetPartitionStatus,
-		connect.WithSchema(debugMethods.ByName("GetPartitionStatus")),
+		connect.WithSchema(debugGetPartitionStatusMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
 	debugGetQueueItemHandler := connect.NewUnaryHandler(
 		DebugGetQueueItemProcedure,
 		svc.GetQueueItem,
-		connect.WithSchema(debugMethods.ByName("GetQueueItem")),
+		connect.WithSchema(debugGetQueueItemMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
 	debugGetPauseHandler := connect.NewUnaryHandler(
 		DebugGetPauseProcedure,
 		svc.GetPause,
-		connect.WithSchema(debugMethods.ByName("GetPause")),
+		connect.WithSchema(debugGetPauseMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
 	debugGetIndexHandler := connect.NewUnaryHandler(
 		DebugGetIndexProcedure,
 		svc.GetIndex,
-		connect.WithSchema(debugMethods.ByName("GetIndex")),
+		connect.WithSchema(debugGetIndexMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
 	debugBlockPeekHandler := connect.NewUnaryHandler(
 		DebugBlockPeekProcedure,
 		svc.BlockPeek,
-		connect.WithSchema(debugMethods.ByName("BlockPeek")),
+		connect.WithSchema(debugBlockPeekMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
 	debugBlockDeletedHandler := connect.NewUnaryHandler(
 		DebugBlockDeletedProcedure,
 		svc.BlockDeleted,
-		connect.WithSchema(debugMethods.ByName("BlockDeleted")),
+		connect.WithSchema(debugBlockDeletedMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
 	debugCheckConstraintsHandler := connect.NewUnaryHandler(
 		DebugCheckConstraintsProcedure,
 		svc.CheckConstraints,
-		connect.WithSchema(debugMethods.ByName("CheckConstraints")),
+		connect.WithSchema(debugCheckConstraintsMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
 	debugGetBatchInfoHandler := connect.NewUnaryHandler(
 		DebugGetBatchInfoProcedure,
 		svc.GetBatchInfo,
-		connect.WithSchema(debugMethods.ByName("GetBatchInfo")),
+		connect.WithSchema(debugGetBatchInfoMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
 	debugDeleteBatchHandler := connect.NewUnaryHandler(
 		DebugDeleteBatchProcedure,
 		svc.DeleteBatch,
-		connect.WithSchema(debugMethods.ByName("DeleteBatch")),
+		connect.WithSchema(debugDeleteBatchMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
 	debugRunBatchHandler := connect.NewUnaryHandler(
 		DebugRunBatchProcedure,
 		svc.RunBatch,
-		connect.WithSchema(debugMethods.ByName("RunBatch")),
+		connect.WithSchema(debugRunBatchMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
 	debugGetSingletonInfoHandler := connect.NewUnaryHandler(
 		DebugGetSingletonInfoProcedure,
 		svc.GetSingletonInfo,
-		connect.WithSchema(debugMethods.ByName("GetSingletonInfo")),
+		connect.WithSchema(debugGetSingletonInfoMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
 	debugDeleteSingletonLockHandler := connect.NewUnaryHandler(
 		DebugDeleteSingletonLockProcedure,
 		svc.DeleteSingletonLock,
-		connect.WithSchema(debugMethods.ByName("DeleteSingletonLock")),
+		connect.WithSchema(debugDeleteSingletonLockMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
 	debugGetDebounceInfoHandler := connect.NewUnaryHandler(
 		DebugGetDebounceInfoProcedure,
 		svc.GetDebounceInfo,
-		connect.WithSchema(debugMethods.ByName("GetDebounceInfo")),
+		connect.WithSchema(debugGetDebounceInfoMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
 	debugDeleteDebounceHandler := connect.NewUnaryHandler(
 		DebugDeleteDebounceProcedure,
 		svc.DeleteDebounce,
-		connect.WithSchema(debugMethods.ByName("DeleteDebounce")),
+		connect.WithSchema(debugDeleteDebounceMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
 	debugRunDebounceHandler := connect.NewUnaryHandler(
 		DebugRunDebounceProcedure,
 		svc.RunDebounce,
-		connect.WithSchema(debugMethods.ByName("RunDebounce")),
+		connect.WithSchema(debugRunDebounceMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
 	debugDeleteDebounceByIDHandler := connect.NewUnaryHandler(
 		DebugDeleteDebounceByIDProcedure,
 		svc.DeleteDebounceByID,
-		connect.WithSchema(debugMethods.ByName("DeleteDebounceByID")),
+		connect.WithSchema(debugDeleteDebounceByIDMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
 	debugGetShadowPartitionHandler := connect.NewUnaryHandler(
 		DebugGetShadowPartitionProcedure,
 		svc.GetShadowPartition,
-		connect.WithSchema(debugMethods.ByName("GetShadowPartition")),
+		connect.WithSchema(debugGetShadowPartitionMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
 	debugGetBacklogsHandler := connect.NewUnaryHandler(
 		DebugGetBacklogsProcedure,
 		svc.GetBacklogs,
-		connect.WithSchema(debugMethods.ByName("GetBacklogs")),
+		connect.WithSchema(debugGetBacklogsMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
 	debugGetBacklogSizeHandler := connect.NewUnaryHandler(
 		DebugGetBacklogSizeProcedure,
 		svc.GetBacklogSize,
-		connect.WithSchema(debugMethods.ByName("GetBacklogSize")),
+		connect.WithSchema(debugGetBacklogSizeMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
 	return "/debug.v1.Debug/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
