@@ -63,24 +63,6 @@ const (
 	V2InvokeFunctionProcedure = "/api.v2.V2/InvokeFunction"
 )
 
-// These variables are the protoreflect.Descriptor objects for the RPCs defined in this package.
-var (
-	v2ServiceDescriptor                       = v2.File_api_v2_service_proto.Services().ByName("V2")
-	v2HealthMethodDescriptor                  = v2ServiceDescriptor.Methods().ByName("Health")
-	v2XSchemaOnlyMethodDescriptor             = v2ServiceDescriptor.Methods().ByName("_SchemaOnly")
-	v2CreatePartnerAccountMethodDescriptor    = v2ServiceDescriptor.Methods().ByName("CreatePartnerAccount")
-	v2CreateEnvMethodDescriptor               = v2ServiceDescriptor.Methods().ByName("CreateEnv")
-	v2FetchPartnerAccountsMethodDescriptor    = v2ServiceDescriptor.Methods().ByName("FetchPartnerAccounts")
-	v2FetchAccountMethodDescriptor            = v2ServiceDescriptor.Methods().ByName("FetchAccount")
-	v2FetchAccountEnvsMethodDescriptor        = v2ServiceDescriptor.Methods().ByName("FetchAccountEnvs")
-	v2FetchAccountEventKeysMethodDescriptor   = v2ServiceDescriptor.Methods().ByName("FetchAccountEventKeys")
-	v2FetchAccountSigningKeysMethodDescriptor = v2ServiceDescriptor.Methods().ByName("FetchAccountSigningKeys")
-	v2CreateWebhookMethodDescriptor           = v2ServiceDescriptor.Methods().ByName("CreateWebhook")
-	v2ListWebhooksMethodDescriptor            = v2ServiceDescriptor.Methods().ByName("ListWebhooks")
-	v2PatchEnvMethodDescriptor                = v2ServiceDescriptor.Methods().ByName("PatchEnv")
-	v2InvokeFunctionMethodDescriptor          = v2ServiceDescriptor.Methods().ByName("InvokeFunction")
-)
-
 // V2Client is a client for the api.v2.V2 service.
 type V2Client interface {
 	Health(context.Context, *connect.Request[v2.HealthRequest]) (*connect.Response[v2.HealthResponse], error)
@@ -108,83 +90,84 @@ type V2Client interface {
 // http://api.acme.com or https://acme.com/grpc).
 func NewV2Client(httpClient connect.HTTPClient, baseURL string, opts ...connect.ClientOption) V2Client {
 	baseURL = strings.TrimRight(baseURL, "/")
+	v2Methods := v2.File_api_v2_service_proto.Services().ByName("V2").Methods()
 	return &v2Client{
 		health: connect.NewClient[v2.HealthRequest, v2.HealthResponse](
 			httpClient,
 			baseURL+V2HealthProcedure,
-			connect.WithSchema(v2HealthMethodDescriptor),
+			connect.WithSchema(v2Methods.ByName("Health")),
 			connect.WithClientOptions(opts...),
 		),
 		xSchemaOnly: connect.NewClient[v2.HealthRequest, v2.ErrorResponse](
 			httpClient,
 			baseURL+V2XSchemaOnlyProcedure,
-			connect.WithSchema(v2XSchemaOnlyMethodDescriptor),
+			connect.WithSchema(v2Methods.ByName("_SchemaOnly")),
 			connect.WithClientOptions(opts...),
 		),
 		createPartnerAccount: connect.NewClient[v2.CreateAccountRequest, v2.CreateAccountResponse](
 			httpClient,
 			baseURL+V2CreatePartnerAccountProcedure,
-			connect.WithSchema(v2CreatePartnerAccountMethodDescriptor),
+			connect.WithSchema(v2Methods.ByName("CreatePartnerAccount")),
 			connect.WithClientOptions(opts...),
 		),
 		createEnv: connect.NewClient[v2.CreateEnvRequest, v2.CreateEnvResponse](
 			httpClient,
 			baseURL+V2CreateEnvProcedure,
-			connect.WithSchema(v2CreateEnvMethodDescriptor),
+			connect.WithSchema(v2Methods.ByName("CreateEnv")),
 			connect.WithClientOptions(opts...),
 		),
 		fetchPartnerAccounts: connect.NewClient[v2.FetchAccountsRequest, v2.FetchAccountsResponse](
 			httpClient,
 			baseURL+V2FetchPartnerAccountsProcedure,
-			connect.WithSchema(v2FetchPartnerAccountsMethodDescriptor),
+			connect.WithSchema(v2Methods.ByName("FetchPartnerAccounts")),
 			connect.WithClientOptions(opts...),
 		),
 		fetchAccount: connect.NewClient[v2.FetchAccountRequest, v2.FetchAccountResponse](
 			httpClient,
 			baseURL+V2FetchAccountProcedure,
-			connect.WithSchema(v2FetchAccountMethodDescriptor),
+			connect.WithSchema(v2Methods.ByName("FetchAccount")),
 			connect.WithClientOptions(opts...),
 		),
 		fetchAccountEnvs: connect.NewClient[v2.FetchAccountEnvsRequest, v2.FetchAccountEnvsResponse](
 			httpClient,
 			baseURL+V2FetchAccountEnvsProcedure,
-			connect.WithSchema(v2FetchAccountEnvsMethodDescriptor),
+			connect.WithSchema(v2Methods.ByName("FetchAccountEnvs")),
 			connect.WithClientOptions(opts...),
 		),
 		fetchAccountEventKeys: connect.NewClient[v2.FetchAccountEventKeysRequest, v2.FetchAccountEventKeysResponse](
 			httpClient,
 			baseURL+V2FetchAccountEventKeysProcedure,
-			connect.WithSchema(v2FetchAccountEventKeysMethodDescriptor),
+			connect.WithSchema(v2Methods.ByName("FetchAccountEventKeys")),
 			connect.WithClientOptions(opts...),
 		),
 		fetchAccountSigningKeys: connect.NewClient[v2.FetchAccountSigningKeysRequest, v2.FetchAccountSigningKeysResponse](
 			httpClient,
 			baseURL+V2FetchAccountSigningKeysProcedure,
-			connect.WithSchema(v2FetchAccountSigningKeysMethodDescriptor),
+			connect.WithSchema(v2Methods.ByName("FetchAccountSigningKeys")),
 			connect.WithClientOptions(opts...),
 		),
 		createWebhook: connect.NewClient[v2.CreateWebhookRequest, v2.CreateWebhookResponse](
 			httpClient,
 			baseURL+V2CreateWebhookProcedure,
-			connect.WithSchema(v2CreateWebhookMethodDescriptor),
+			connect.WithSchema(v2Methods.ByName("CreateWebhook")),
 			connect.WithClientOptions(opts...),
 		),
 		listWebhooks: connect.NewClient[v2.ListWebhooksRequest, v2.ListWebhooksResponse](
 			httpClient,
 			baseURL+V2ListWebhooksProcedure,
-			connect.WithSchema(v2ListWebhooksMethodDescriptor),
+			connect.WithSchema(v2Methods.ByName("ListWebhooks")),
 			connect.WithClientOptions(opts...),
 		),
 		patchEnv: connect.NewClient[v2.PatchEnvRequest, v2.PatchEnvsResponse](
 			httpClient,
 			baseURL+V2PatchEnvProcedure,
-			connect.WithSchema(v2PatchEnvMethodDescriptor),
+			connect.WithSchema(v2Methods.ByName("PatchEnv")),
 			connect.WithClientOptions(opts...),
 		),
 		invokeFunction: connect.NewClient[v2.InvokeFunctionRequest, v2.InvokeFunctionResponse](
 			httpClient,
 			baseURL+V2InvokeFunctionProcedure,
-			connect.WithSchema(v2InvokeFunctionMethodDescriptor),
+			connect.WithSchema(v2Methods.ByName("InvokeFunction")),
 			connect.WithClientOptions(opts...),
 		),
 	}
@@ -296,82 +279,83 @@ type V2Handler interface {
 // By default, handlers support the Connect, gRPC, and gRPC-Web protocols with the binary Protobuf
 // and JSON codecs. They also support gzip compression.
 func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Handler) {
+	v2Methods := v2.File_api_v2_service_proto.Services().ByName("V2").Methods()
 	v2HealthHandler := connect.NewUnaryHandler(
 		V2HealthProcedure,
 		svc.Health,
-		connect.WithSchema(v2HealthMethodDescriptor),
+		connect.WithSchema(v2Methods.ByName("Health")),
 		connect.WithHandlerOptions(opts...),
 	)
 	v2XSchemaOnlyHandler := connect.NewUnaryHandler(
 		V2XSchemaOnlyProcedure,
 		svc.XSchemaOnly,
-		connect.WithSchema(v2XSchemaOnlyMethodDescriptor),
+		connect.WithSchema(v2Methods.ByName("_SchemaOnly")),
 		connect.WithHandlerOptions(opts...),
 	)
 	v2CreatePartnerAccountHandler := connect.NewUnaryHandler(
 		V2CreatePartnerAccountProcedure,
 		svc.CreatePartnerAccount,
-		connect.WithSchema(v2CreatePartnerAccountMethodDescriptor),
+		connect.WithSchema(v2Methods.ByName("CreatePartnerAccount")),
 		connect.WithHandlerOptions(opts...),
 	)
 	v2CreateEnvHandler := connect.NewUnaryHandler(
 		V2CreateEnvProcedure,
 		svc.CreateEnv,
-		connect.WithSchema(v2CreateEnvMethodDescriptor),
+		connect.WithSchema(v2Methods.ByName("CreateEnv")),
 		connect.WithHandlerOptions(opts...),
 	)
 	v2FetchPartnerAccountsHandler := connect.NewUnaryHandler(
 		V2FetchPartnerAccountsProcedure,
 		svc.FetchPartnerAccounts,
-		connect.WithSchema(v2FetchPartnerAccountsMethodDescriptor),
+		connect.WithSchema(v2Methods.ByName("FetchPartnerAccounts")),
 		connect.WithHandlerOptions(opts...),
 	)
 	v2FetchAccountHandler := connect.NewUnaryHandler(
 		V2FetchAccountProcedure,
 		svc.FetchAccount,
-		connect.WithSchema(v2FetchAccountMethodDescriptor),
+		connect.WithSchema(v2Methods.ByName("FetchAccount")),
 		connect.WithHandlerOptions(opts...),
 	)
 	v2FetchAccountEnvsHandler := connect.NewUnaryHandler(
 		V2FetchAccountEnvsProcedure,
 		svc.FetchAccountEnvs,
-		connect.WithSchema(v2FetchAccountEnvsMethodDescriptor),
+		connect.WithSchema(v2Methods.ByName("FetchAccountEnvs")),
 		connect.WithHandlerOptions(opts...),
 	)
 	v2FetchAccountEventKeysHandler := connect.NewUnaryHandler(
 		V2FetchAccountEventKeysProcedure,
 		svc.FetchAccountEventKeys,
-		connect.WithSchema(v2FetchAccountEventKeysMethodDescriptor),
+		connect.WithSchema(v2Methods.ByName("FetchAccountEventKeys")),
 		connect.WithHandlerOptions(opts...),
 	)
 	v2FetchAccountSigningKeysHandler := connect.NewUnaryHandler(
 		V2FetchAccountSigningKeysProcedure,
 		svc.FetchAccountSigningKeys,
-		connect.WithSchema(v2FetchAccountSigningKeysMethodDescriptor),
+		connect.WithSchema(v2Methods.ByName("FetchAccountSigningKeys")),
 		connect.WithHandlerOptions(opts...),
 	)
 	v2CreateWebhookHandler := connect.NewUnaryHandler(
 		V2CreateWebhookProcedure,
 		svc.CreateWebhook,
-		connect.WithSchema(v2CreateWebhookMethodDescriptor),
+		connect.WithSchema(v2Methods.ByName("CreateWebhook")),
 		connect.WithHandlerOptions(opts...),
 	)
 	v2ListWebhooksHandler := connect.NewUnaryHandler(
 		V2ListWebhooksProcedure,
 		svc.ListWebhooks,
-		connect.WithSchema(v2ListWebhooksMethodDescriptor),
+		connect.WithSchema(v2Methods.ByName("ListWebhooks")),
 		connect.WithHandlerOptions(opts...),
 	)
 	v2PatchEnvHandler := connect.NewUnaryHandler(
 		V2PatchEnvProcedure,
 		svc.PatchEnv,
-		connect.WithSchema(v2PatchEnvMethodDescriptor),
+		connect.WithSchema(v2Methods.ByName("PatchEnv")),
 		connect.WithHandlerOptions(opts...),
 	)
 	v2InvokeFunctionHandler := connect.NewUnaryHandler(
 		V2InvokeFunctionProcedure,
 		svc.InvokeFunction,
-		connect.WithSchema(v2InvokeFunctionMethodDescriptor),
+		connect.WithSchema(v2Methods.ByName("InvokeFunction")),
 		connect.WithHandlerOptions(opts...),
 	)
 	return "/api.v2.V2/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
