@@ -2730,6 +2730,7 @@ func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequ
 	evts, err := e.smv2.LoadEvents(ctx, id)
 	if errors.Is(err, state.ErrEventNotFound) {
 		// If the event has gone, another thread cancelled the function.
+		l.Warn("cancel: events not found but metadata exists, skipping finalize")
 		return nil
 	}
 	if err != nil {
