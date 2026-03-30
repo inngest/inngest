@@ -16,7 +16,6 @@ type ProcessOpts struct {
 	AccountID     uuid.UUID
 	EnvironmentID uuid.UUID
 	AppID         uuid.UUID
-	IsConnect     bool
 
 	// UseDeterministicIDs determines whether we use determinisctic IDs for
 	// fn IDs during processing.  This is required for OSS versions.
@@ -90,7 +89,7 @@ func ProcessFunctions(ctx context.Context, req sdk.RegisterRequest, opts Process
 
 		// Inject app semaphore for connect apps. Runs AFTER Validate()
 		// so the app-scoped semaphore bypasses user-facing validation.
-		if opts.IsConnect {
+		if req.IsConnect() {
 			if fn.Concurrency == nil {
 				fn.Concurrency = &inngest.ConcurrencyLimits{}
 			}

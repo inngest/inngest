@@ -18,7 +18,6 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/api/tel"
-	"github.com/inngest/inngest/pkg/registration"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/cqrs/sync"
@@ -29,6 +28,7 @@ import (
 	"github.com/inngest/inngest/pkg/inngest/version"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/publicerr"
+	"github.com/inngest/inngest/pkg/registration"
 	"github.com/inngest/inngest/pkg/sdk"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
@@ -357,10 +357,9 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 
 	// Parse, validate, and enrich functions via the shared registration pipeline.
 	processed, err := registration.ProcessFunctions(ctx, r, registration.ProcessOpts{
-		AccountID:          consts.DevServerAccountID,
-		EnvironmentID:      consts.DevServerEnvID,
-		AppID:              appID,
-		IsConnect:          r.IsConnect(),
+		AccountID:           consts.DevServerAccountID,
+		EnvironmentID:       consts.DevServerEnvID,
+		AppID:               appID,
 		UseDeterministicIDs: true,
 	})
 	if err != nil && err != sdk.ErrNoFunctions {
@@ -742,4 +741,3 @@ type InfoResponse struct {
 	// Features acts as an in-memory feature flag for the UI
 	Features map[string]bool `json:"features"`
 }
-
