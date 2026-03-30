@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -16,9 +15,16 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const (
+	// testEventualTimeout is the max time to wait for async Redis delivery in tests.
+	testEventualTimeout = 5 * time.Second
+	// testEventualPoll is how often to check for async Redis delivery in tests.
+	testEventualPoll = 5 * time.Millisecond
+)
+
 func TestBroadcaster(t *testing.T) {
 	ctx := context.Background()
-	b := NewInProcessBroadcaster()
+	b := newTestBroadcaster(t)
 
 	var (
 		id       = uuid.New()
@@ -35,6 +41,11 @@ func TestBroadcaster(t *testing.T) {
 		l.Unlock()
 		return nil
 	}
+	msgCount := func() int {
+		l.Lock()
+		defer l.Unlock()
+		return len(messages)
+	}
 
 	sub := NewInmemorySubscription(id, appender)
 
@@ -48,6 +59,8 @@ func TestBroadcaster(t *testing.T) {
 
 		t.Run("no subscriptions", func(t *testing.T) {
 			b.Publish(ctx, msg)
+			// No subscribers, so nothing should be delivered even after a wait.
+			time.Sleep(50 * time.Millisecond)
 			require.Empty(t, messages)
 		})
 
@@ -58,15 +71,18 @@ func TestBroadcaster(t *testing.T) {
 			require.NoError(t, err)
 
 			b.Publish(ctx, msg)
-			require.Equal(t, 1, len(messages))
+			require.Eventually(t, func() bool { return msgCount() == 1 }, testEventualTimeout, testEventualPoll)
+
+			l.Lock()
 			require.Equal(t, msg, messages[0])
+			l.Unlock()
 
 			t.Run("subscribing twice on the same sub ID only sends one message", func(t *testing.T) {
 				err := b.Subscribe(ctx, sub, msg.Topics())
 				require.NoError(t, err)
 
 				b.Publish(ctx, msg)
-				require.Equal(t, 2, len(messages))
+				require.Eventually(t, func() bool { return msgCount() == 2 }, testEventualTimeout, testEventualPoll)
 			})
 		})
 
@@ -75,32 +91,41 @@ func TestBroadcaster(t *testing.T) {
 			require.NoError(t, err)
 
 			b.Publish(ctx, msg)
-			require.Equal(t, 2, len(messages))
-			require.Equal(t, msg, messages[0])
+			// No subscriber, so count should stay at 2.
+			time.Sleep(50 * time.Millisecond)
+			require.Equal(t, 2, msgCount())
 		})
 
 		t.Run("unsubscribing", func(t *testing.T) {
-			b = NewInProcessBroadcaster()
+			b = newTestBroadcaster(t)
+			l.Lock()
 			messages = []Message{}
+			l.Unlock()
 
 			err := b.Subscribe(ctx, sub, msg.Topics())
 			require.NoError(t, err)
 
 			b.Publish(ctx, msg)
-			require.Equal(t, 1, len(messages))
+			require.Eventually(t, func() bool { return msgCount() == 1 }, testEventualTimeout, testEventualPoll)
+
+			l.Lock()
 			require.Equal(t, msg, messages[0])
+			l.Unlock()
 
 			err = b.Unsubscribe(ctx, sub.ID(), msg.Topics())
 			require.NoError(t, err)
 			b.Publish(ctx, msg)
 
 			// No change in count
-			require.Equal(t, 1, len(messages))
-			require.Equal(t, msg, messages[0])
+			time.Sleep(50 * time.Millisecond)
+			require.Equal(t, 1, msgCount())
 		})
 
 		t.Run("many subscriptions", func(t *testing.T) {
+			b = newTestBroadcaster(t)
+			l.Lock()
 			messages = []Message{}
+			l.Unlock()
 
 			count := 10
 
@@ -109,17 +134,24 @@ func TestBroadcaster(t *testing.T) {
 				err := b.Subscribe(ctx, sub, msg.Topics())
 				require.NoError(t, err)
 			}
+			// Wait for the Redis subscriber goroutine to be established.
+			// Only one is started (for the first subscriber to this topic).
 
 			b.Publish(ctx, msg)
-			require.Equal(t, count, len(messages))
-			require.Equal(t, msg, messages[0])
+			// The message fans out once through Redis, then is delivered to
+			// all 10 local subscribers. But the "unsubscribing" subtest left
+			// `sub` unsubscribed from this broadcaster, so only the 10 new
+			// subs receive it.
+			require.Eventually(t, func() bool { return msgCount() == count }, testEventualTimeout, testEventualPoll)
 		})
 
 		t.Run("With failing writer", func(t *testing.T) {
-			// This fails on the first write attempt, then retries.  We should
+			// This fails on the first write attempt, then retries. We should
 			// always get a retry.
-			b = NewInProcessBroadcaster()
+			b = newTestBroadcaster(t)
+			l.Lock()
 			messages = []Message{}
+			l.Unlock()
 
 			failed := false
 			sub := NewInmemorySubscription(id, func(b []byte) error {
@@ -138,35 +170,25 @@ func TestBroadcaster(t *testing.T) {
 
 			b.Publish(ctx, msg)
 
-			l.Lock()
-			require.Equal(t, 0, len(messages))
-			l.Unlock()
+			// Initially zero because the first write fails, then the Redis
+			// roundtrip delivers and also fails, then retry succeeds.
+			time.Sleep(50 * time.Millisecond)
+			require.Equal(t, 0, msgCount())
 
-			<-time.After(WriteRetryInterval + (5 * time.Millisecond))
+			require.Eventually(t, func() bool { return msgCount() == 1 }, WriteRetryInterval+testEventualTimeout, testEventualPoll)
 
 			l.Lock()
-			require.Equal(t, 1, len(messages))
-			l.Unlock()
 			require.Equal(t, msg, messages[0])
+			l.Unlock()
 		})
 	})
 }
 
-// TestBroadcasterHooks ensures that the TopicStart and TopicStop hooks work correctly
-func TestBroadcasterHooks(t *testing.T) {
-	t.Run("Lifecycle hooks", func(t *testing.T) {
-		b := NewInProcessBroadcaster()
-
-		var startCalled, stopCalled int32
-
-		b.TopicStart = func(ctx context.Context, t Topic) error {
-			atomic.AddInt32(&startCalled, 1)
-			return nil
-		}
-		b.TopicStop = func(ctx context.Context, t Topic) error {
-			atomic.AddInt32(&stopCalled, 1)
-			return nil
-		}
+// TestBroadcasterTopicLifecycle ensures that topics are created and removed
+// based on subscription refcounts.
+func TestBroadcasterTopicLifecycle(t *testing.T) {
+	t.Run("topic created on first subscribe, removed on last unsubscribe", func(t *testing.T) {
+		b := newTestBroadcaster(t).(*broadcaster)
 
 		sub1 := NewInmemorySubscription(uuid.New(), nil)
 		sub2 := NewInmemorySubscription(uuid.New(), nil)
@@ -175,33 +197,47 @@ func TestBroadcasterHooks(t *testing.T) {
 			Channel: "test",
 			Topic:   "topic1",
 		}
+		topicHash := msg.Topics()[0].String()
 
-		// 1. First subscribe -> Start called
+		// 1. First subscribe -> topic created with refcount 1
 		err := b.Subscribe(context.Background(), sub1, msg.Topics())
 		require.NoError(t, err)
-		require.Equal(t, int32(1), atomic.LoadInt32(&startCalled))
-		require.Equal(t, int32(0), atomic.LoadInt32(&stopCalled))
+		b.l.RLock()
+		ts, ok := b.topics[topicHash]
+		require.True(t, ok)
+		require.Equal(t, 1, ts.refCount)
+		b.l.RUnlock()
 
-		// 2. Second subscribe -> Start NOT called
+		// 2. Second subscribe -> refcount incremented
 		err = b.Subscribe(context.Background(), sub2, msg.Topics())
 		require.NoError(t, err)
-		require.Equal(t, int32(1), atomic.LoadInt32(&startCalled))
+		b.l.RLock()
+		ts = b.topics[topicHash]
+		require.Equal(t, 2, ts.refCount)
+		b.l.RUnlock()
 
-		// 3. First unsubscribe -> Stop NOT called
+		// 3. First unsubscribe -> refcount decremented, topic still exists
 		err = b.Unsubscribe(context.Background(), sub1.ID(), msg.Topics())
 		require.NoError(t, err)
-		require.Equal(t, int32(0), atomic.LoadInt32(&stopCalled))
+		b.l.RLock()
+		ts, ok = b.topics[topicHash]
+		require.True(t, ok)
+		require.Equal(t, 1, ts.refCount)
+		b.l.RUnlock()
 
-		// 4. Second unsubscribe -> Stop called
+		// 4. Second unsubscribe -> topic removed
 		err = b.Unsubscribe(context.Background(), sub2.ID(), msg.Topics())
 		require.NoError(t, err)
-		require.Equal(t, int32(1), atomic.LoadInt32(&stopCalled))
+		b.l.RLock()
+		_, ok = b.topics[topicHash]
+		require.False(t, ok, "Topic should be removed after last unsubscribe")
+		b.l.RUnlock()
 	})
 }
 
 func TestBroadcasterStream(t *testing.T) {
 	ctx := context.Background()
-	b := NewInProcessBroadcaster()
+	b := newTestBroadcaster(t)
 
 	var (
 		id       = uuid.New()
@@ -238,6 +274,16 @@ func TestBroadcasterStream(t *testing.T) {
 		}
 		return nil
 	}
+	msgCount := func() int {
+		l.Lock()
+		defer l.Unlock()
+		return len(messages)
+	}
+	streamCount := func() int {
+		l.Lock()
+		defer l.Unlock()
+		return len(streams)
+	}
 
 	sub := NewInmemorySubscription(id, appender)
 
@@ -255,34 +301,101 @@ func TestBroadcasterStream(t *testing.T) {
 	// Publish a stream start.
 	t.Run("stream starts publish", func(t *testing.T) {
 		b.Publish(ctx, msg)
-		require.EqualValues(t, 1, len(messages), messages)
-		require.EqualValues(t, 0, len(streams))
+		require.Eventually(t, func() bool { return msgCount() == 1 }, testEventualTimeout, testEventualPoll)
+		require.Equal(t, 0, streamCount())
 	})
 
 	t.Run("streaming data works", func(t *testing.T) {
 		b.PublishChunk(ctx, msg, streamingtypes.ChunkFromMessage(msg, "a"))
-		require.EqualValues(t, 1, len(messages), messages)
-		require.EqualValues(t, 1, len(streams), streams)
+		require.Eventually(t, func() bool { return streamCount() == 1 }, testEventualTimeout, testEventualPoll)
+		require.Equal(t, 1, msgCount())
+
+		l.Lock()
 		require.Equal(t, Chunk{
 			Kind:     string(streamingtypes.MessageKindDataStreamChunk),
-			StreamID: `"streamid123"`,
+			StreamID: "streamid123",
 			Data:     "a",
 		}, streams[0])
+		l.Unlock()
 
 		b.PublishChunk(ctx, msg, streamingtypes.ChunkFromMessage(msg, "b"))
-		require.EqualValues(t, 1, len(messages), messages)
-		require.EqualValues(t, 2, len(streams), streams)
+		require.Eventually(t, func() bool { return streamCount() == 2 }, testEventualTimeout, testEventualPoll)
+		require.Equal(t, 1, msgCount())
+
+		l.Lock()
 		require.Equal(t, Chunk{
 			Kind:     string(streamingtypes.MessageKindDataStreamChunk),
-			StreamID: `"streamid123"`,
+			StreamID: "streamid123",
 			Data:     "b",
 		}, streams[1])
+		l.Unlock()
 	})
 
-	// Publish a stream start.
-	t.Run("stream starts publish", func(t *testing.T) {
+	// Publish a stream end.
+	t.Run("stream end publish", func(t *testing.T) {
 		msg.Kind = streamingtypes.MessageKindDataStreamEnd
 		b.Publish(ctx, msg)
-		require.EqualValues(t, 2, len(messages), messages)
+		require.Eventually(t, func() bool { return msgCount() == 2 }, testEventualTimeout, testEventualPoll)
 	})
+}
+
+func TestBroadcasterClose(t *testing.T) {
+	r := require.New(t)
+	ctx := context.Background()
+	b := newTestBroadcasterWithOpts(t, BroadcasterOpts{
+		ShutdownGracePeriod: 50 * time.Millisecond,
+	})
+
+	topic := Topic{
+		Kind:    streamingtypes.TopicKindRun,
+		EnvID:   uuid.New(),
+		Channel: "close-test",
+		Name:    "test",
+	}
+
+	var received []Message
+	var mu sync.Mutex
+	sub := NewInmemorySubscription(uuid.New(), func(data []byte) error {
+		var m Message
+		if err := json.Unmarshal(data, &m); err == nil {
+			mu.Lock()
+			received = append(received, m)
+			mu.Unlock()
+		}
+		return nil
+	})
+
+	r.NoError(b.Subscribe(ctx, sub, []Topic{topic}))
+	r.Equal(1, subCount(b))
+
+	// Close the broadcaster.
+	r.NoError(b.Close(ctx))
+
+	// Should receive a closing message.
+	r.Eventually(func() bool {
+		mu.Lock()
+		defer mu.Unlock()
+		for _, m := range received {
+			if m.Kind == streamingtypes.MessageKindClosing {
+				return true
+			}
+		}
+		return false
+	}, testEventualTimeout, testEventualPoll)
+
+	// New subscriptions should be rejected.
+	err := b.Subscribe(ctx, NewInmemorySubscription(uuid.New(), nil), []Topic{topic})
+	r.ErrorIs(err, ErrBroadcasterClosed)
+
+	// Calling Close again should return ErrBroadcasterClosed.
+	err = b.Close(ctx)
+	r.ErrorIs(err, ErrBroadcasterClosed)
+
+	// After the grace period, topic goroutines should be cancelled.
+	bc := b.(*broadcaster)
+	r.Eventually(func() bool {
+		bc.topicCancelMu.Lock()
+		defer bc.topicCancelMu.Unlock()
+		return len(bc.topicCancelFuncs) == 0
+	}, testEventualTimeout, testEventualPoll)
 }

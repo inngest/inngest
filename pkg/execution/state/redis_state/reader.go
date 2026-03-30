@@ -206,7 +206,6 @@ func (q *queue) ItemsByPartition(ctx context.Context, partitionID string, from t
 					start = at
 				}
 				end = at
-				ptFrom = at
 				iterated++
 			}
 
@@ -223,25 +222,28 @@ func (q *queue) ItemsByPartition(ctx context.Context, partitionID string, from t
 				break
 			}
 
-			// Raw items were fetched but none were usable (all leased or
-			// missing from hash). Advance the cursor past the last fetched
-			// item's score and continue to the next batch.
+			// Advance the cursor using the sorted set score of the last
+			// fetched item (LastScore), NOT qi.AtMS.  AtMS can diverge from
+			// the sorted set score when items are retried/rescheduled, which
+			// would cause the cursor to jump past remaining items.
+			if result.LastScore <= 0 {
+				l.Warn("breaking partition iterator: last score is invalid",
+					"last_score", result.LastScore,
+					"raw_count", result.RawCount,
+				)
+				break
+			}
+
 			if iterated == 0 {
-				if result.LastScore <= 0 {
-					// Score parsing failed or returned an invalid value.
-					// Break to avoid an infinite loop (cursor would regress
-					// to epoch, re-fetching the same items forever).
-					l.Warn("breaking partition iterator: last score is invalid",
-						"last_score", result.LastScore,
-						"raw_count", result.RawCount,
-					)
-					break
-				}
+				// Raw items were fetched but none were usable (all leased or
+				// missing from hash). Advance the cursor past the last fetched
+				// item's score and continue to the next batch.
 				ptFrom = time.UnixMilli(result.LastScore).Add(time.Millisecond)
 				<-time.After(opt.Interval)
 				continue
 			}
 
+			ptFrom = time.UnixMilli(result.LastScore)
 			if opt.EnableMillisecondIncrease {
 				// shift the starting point 1ms so it doesn't try to grab the same stuff again
 				// NOTE: this could result skipping items if the previous batch of items are all on
@@ -293,14 +295,13 @@ func (q *queue) ItemsByPartition(ctx context.Context, partitionID string, from t
 				return
 			}
 
-			latestTimes := []time.Time{}
+			latestCursors := []int64{}
 			for _, backlog := range backlogs {
 				errTags := map[string]string{
 					"backlog_id": backlog.BacklogID,
 				}
 
-				var last time.Time
-				items, _, err := q.BacklogPeek(ctx, backlog, backlogFrom, until, opt.BatchSize)
+				peekRes, err := q.BacklogPeek(ctx, backlog, backlogFrom, until, opt.BatchSize)
 				if err != nil {
 					l.ReportError(err, "error retrieving queue items from backlog",
 						logger.WithErrorReportTags(errTags),
@@ -309,7 +310,7 @@ func (q *queue) ItemsByPartition(ctx context.Context, partitionID string, from t
 				}
 
 				var start, end time.Time
-				for _, qi := range items {
+				for _, qi := range peekRes.Items {
 					if qi == nil {
 						continue
 					}
@@ -324,7 +325,6 @@ func (q *queue) ItemsByPartition(ctx context.Context, partitionID string, from t
 						start = at
 					}
 					end = at
-					last = at
 				}
 
 				l.Debug("iterated items in backlog",
@@ -332,7 +332,7 @@ func (q *queue) ItemsByPartition(ctx context.Context, partitionID string, from t
 					"start", start.Format(time.StampMilli),
 					"end", end.Format(time.StampMilli),
 				)
-				latestTimes = append(latestTimes, last)
+				latestCursors = append(latestCursors, peekRes.Cursor)
 
 				// didn't process anything, meaning there's nothing left to do
 				// exit loop
@@ -341,19 +341,28 @@ func (q *queue) ItemsByPartition(ctx context.Context, partitionID string, from t
 				}
 			}
 
-			// find the earliest time within the last item timestamp of the previously processed backlogs
-			var earliest time.Time
-			for _, t := range latestTimes {
-				if earliest.IsZero() || t.Before(earliest) {
-					earliest = t
+			// Find the earliest cursor (sorted set score) across the
+			// processed backlogs so we don't skip items in any backlog.
+			var earliestCursor int64
+			for _, c := range latestCursors {
+				if earliestCursor == 0 || (c > 0 && c < earliestCursor) {
+					earliestCursor = c
 				}
 			}
 
-			if opt.EnableMillisecondIncrease {
-				// shift the starting point 1ms so it doesn't try to grab the same stuff again
-				// NOTE: this could result skipping items if the previous batch of items are all on
-				// the same millisecond
-				backlogFrom = earliest.Add(time.Millisecond)
+			if earliestCursor > 0 {
+				backlogFrom = time.UnixMilli(earliestCursor)
+				if opt.EnableMillisecondIncrease {
+					// shift the starting point 1ms so it doesn't try to grab the same stuff again
+					// NOTE: this could result skipping items if the previous batch of items are all on
+					// the same millisecond
+					backlogFrom = backlogFrom.Add(time.Millisecond)
+				}
+			} else {
+				// All cursors are 0 (epoch) — we cannot advance the cursor
+				// any further back, so continuing would re-fetch the same
+				// items forever. Break to avoid an infinite loop.
+				break
 			}
 
 			// wait a little before proceeding
@@ -400,7 +409,7 @@ func (q *queue) ItemsByBacklog(ctx context.Context, backlogID string, from time.
 			var iterated int
 
 			// peek items for backlog
-			items, _, err := q.BacklogPeek(ctx, &backlog, backlogFrom, until, opt.BatchSize)
+			peekRes, err := q.BacklogPeek(ctx, &backlog, backlogFrom, until, opt.BatchSize)
 			if err != nil {
 				l.ReportError(err, "error retrieving queue items from backlog",
 					logger.WithErrorReportTags(map[string]string{
@@ -413,7 +422,7 @@ func (q *queue) ItemsByBacklog(ctx context.Context, backlogID string, from time.
 			}
 
 			var start, end time.Time
-			for _, qi := range items {
+			for _, qi := range peekRes.Items {
 				if !yield(qi) {
 					return
 				}
@@ -424,7 +433,6 @@ func (q *queue) ItemsByBacklog(ctx context.Context, backlogID string, from time.
 					start = at
 				}
 				end = at
-				backlogFrom = at
 			}
 
 			l.Debug("iterated items in backlog",
@@ -439,10 +447,16 @@ func (q *queue) ItemsByBacklog(ctx context.Context, backlogID string, from time.
 				return
 			}
 
-			// shift the starting point 1ms so it doesn't try to grab the same stuff again
-			// NOTE: this could result skipping items if the previous batch of items are all on
-			// the same millisecond
-			backlogFrom = backlogFrom.Add(time.Millisecond)
+			// Advance cursor using the sorted set score from the peek result,
+			// NOT qi.AtMS which can diverge from the sorted set score.
+			if peekRes.Cursor > 0 {
+				backlogFrom = time.UnixMilli(peekRes.Cursor).Add(time.Millisecond)
+			} else {
+				// Cursor is 0 (epoch) — we cannot advance the cursor any
+				// further back, so continuing would re-fetch the same items
+				// forever. Break to avoid an infinite loop.
+				break
+			}
 
 			<-time.After(opt.Interval)
 		}

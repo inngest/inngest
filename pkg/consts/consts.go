@@ -44,6 +44,12 @@ const (
 	// DefaultMaxStateSizeLimit is the maximum number of bytes of output state per function run allowed.
 	DefaultMaxStateSizeLimit = 1024 * 1024 * 32 // 32MB
 
+	// MaxMetadataSpanSize is the maximum size of a single metadata span in bytes (64 KB).
+	MaxMetadataSpanSize = 64 * 1024
+
+	// MaxRunMetadataSize is the maximum cumulative metadata size per function run in bytes (1 MB).
+	MaxRunMetadataSize = 1024 * 1024
+
 	// MaxRetries represents the maximum number of retries for a particular function or step
 	// possible.
 	MaxRetries = 20

@@ -33,6 +33,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/ratelimit"
 	"github.com/inngest/inngest/pkg/execution/realtime"
+	"github.com/inngest/inngest/pkg/execution/realtime/streamingtypes"
 	"github.com/inngest/inngest/pkg/execution/singleton"
 	"github.com/inngest/inngest/pkg/execution/state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
@@ -2397,6 +2398,7 @@ func (e *executor) handlePausesAllNaively(ctx context.Context, iter state.PauseI
 	)
 
 	evtID := evt.GetInternalID()
+	evtTime := evt.GetReceivedAt()
 
 	// Schedule up to PauseHandleConcurrency pauses at once.
 	sem := semaphore.NewWeighted(int64(PauseHandleConcurrency))
@@ -2418,6 +2420,11 @@ func (e *executor) handlePausesAllNaively(ctx context.Context, iter state.PauseI
 			defer sem.Release(1)
 
 			if pause == nil {
+				return
+			}
+
+			// Skip pauses created after the event. They can't be a valid match.
+			if pause.CreatedAfter(evtTime) {
 				return
 			}
 
@@ -2492,6 +2499,7 @@ func (e *executor) handleAggregatePauses(ctx context.Context, evt event.TrackedE
 	)
 
 	evtID := evt.GetInternalID()
+	evtTime := evt.GetReceivedAt()
 	evals, count, err := e.exprAggregator.EvaluateAsyncEvent(ctx, evt)
 	if err != nil {
 		log.Error("error evaluating async event", "error", err)
@@ -2512,6 +2520,12 @@ func (e *executor) handleAggregatePauses(ctx context.Context, evt event.TrackedE
 	for _, i := range evals {
 		// Copy pause into function
 		pause := *i
+
+		// Skip pauses created after the event. They can't be a valid match.
+		if pause.CreatedAfter(evtTime) {
+			continue
+		}
+
 		wg.Add(1)
 		go func() {
 			atomic.AddInt32(&res[0], 1)
@@ -2742,6 +2756,7 @@ func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequ
 	evts, err := e.smv2.LoadEvents(ctx, id)
 	if errors.Is(err, state.ErrEventNotFound) {
 		// If the event has gone, another thread cancelled the function.
+		l.Warn("cancel: events not found but metadata exists, skipping finalize")
 		return nil
 	}
 	if err != nil {
@@ -3416,20 +3431,8 @@ func (e *executor) handleGeneratorStep(ctx context.Context, runCtx execution.Run
 		return err
 	}
 
-	hasPendingSteps, err := e.smv2.SaveStep(ctx, runCtx.Metadata().ID, gen.ID, []byte(output))
-	if errors.Is(err, state.ErrDuplicateResponse) || errors.Is(err, state.ErrIdempotentResponse) {
-		// This is fine.
-		// XXX: we should totally attach a warning to the function run here.
-		return nil
-	}
-
-	if err != nil {
-		return err
-	}
-
-	// Extract AI metadata from step output.
-	// This attempts to detect and parse AI SDK responses (e.g. Vercel AI SDK)
-	// from any step output, using a cheap byte-level pre-check to skip non-AI outputs.
+	// Extract AI metadata from step output before saving so the cumulative
+	// metadata size delta is accurate when persisted alongside the step.
 	if e.allowStepMetadata.Enabled(ctx, runCtx.Metadata().ID.Tenant.AccountID) {
 		// Calculate step duration in milliseconds
 		stepDurationMs := gen.Timing.B / 1_000_000
@@ -3450,6 +3453,31 @@ func (e *executor) handleGeneratorStep(ctx context.Context, runCtx execution.Run
 				e.log.Warn("error creating AI output metadata span", "error", err)
 			}
 		}
+	}
+
+	// Persist the cumulative metadata size delta alongside the step output.
+	// SwapMetadataSizeDelta atomically reads the delta and advances the
+	// loaded baseline so that concurrent handlers in handleGeneratorGroup
+	// each claim only their own contribution, preventing double-counting.
+	if delta := runCtx.Metadata().Metrics.SwapMetadataSizeDelta(); delta > 0 {
+		ctx = state.WithMetadataSizeDelta(ctx, delta)
+	}
+
+	hasPendingSteps, err := e.smv2.SaveStep(ctx, runCtx.Metadata().ID, gen.ID, []byte(output))
+	if errors.Is(err, state.ErrDuplicateResponse) || errors.Is(err, state.ErrIdempotentResponse) {
+		// This is fine.
+		// XXX: we should totally attach a warning to the function run here.
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+
+	// Once step output has been saved, we can release the held capacity.
+	// This allows us to continue work in the queue on other items even before
+	// the next step is enqueued and accounting is handled.
+	if err := runCtx.ReleaseCapacityLease(); err != nil {
+		logger.StdlibLogger(ctx).ReportError(err, "could not release capacity lease early")
 	}
 
 	// Steps can be batched with checkpointing!  Imagine an SDK that opts into checkpointing,
@@ -3584,9 +3612,24 @@ func (e *executor) handleStepFailed(ctx context.Context, runCtx execution.RunCon
 		return err
 	}
 
+	// Persist the cumulative metadata size delta alongside the step output.
+	// SwapMetadataSizeDelta atomically reads the delta and advances the
+	// loaded baseline so that concurrent handlers in handleGeneratorGroup
+	// each claim only their own contribution, preventing double-counting.
+	if delta := runCtx.Metadata().Metrics.SwapMetadataSizeDelta(); delta > 0 {
+		ctx = state.WithMetadataSizeDelta(ctx, delta)
+	}
+
 	hasPendingSteps, err := e.smv2.SaveStep(ctx, runCtx.Metadata().ID, gen.ID, []byte(output))
 	if err != nil {
 		return err
+	}
+
+	// Once step output has been saved, we can release the held capacity.
+	// This allows us to continue work in the queue on other items even before
+	// the next step is enqueued and accounting is handled.
+	if err := runCtx.ReleaseCapacityLease(); err != nil {
+		logger.StdlibLogger(ctx).ReportError(err, "could not release capacity lease early")
 	}
 
 	// Because this is a final step error that was handled gracefully, enqueue
@@ -4019,6 +4062,14 @@ func (e *executor) handleGeneratorGateway(ctx context.Context, runCtx execution.
 		}
 	}
 
+	// Persist the cumulative metadata size delta alongside the step output.
+	// SwapMetadataSizeDelta atomically reads the delta and advances the
+	// loaded baseline so that concurrent handlers in handleGeneratorGroup
+	// each claim only their own contribution, preventing double-counting.
+	if delta := runCtx.Metadata().Metrics.SwapMetadataSizeDelta(); delta > 0 {
+		ctx = state.WithMetadataSizeDelta(ctx, delta)
+	}
+
 	// Save the output as the step result.
 	hasPendingSteps, err := e.smv2.SaveStep(ctx, runCtx.Metadata().ID, gen.ID, output)
 	if err != nil {
@@ -4263,6 +4314,14 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 			// step statuses when a step finishes.
 			go e.OnStepGatewayRequestFinished(context.WithoutCancel(ctx), *runCtx.Metadata(), lifecycleItem, edge.Edge, gen, nil, nil)
 		}
+	}
+
+	// Persist the cumulative metadata size delta alongside the step output.
+	// SwapMetadataSizeDelta atomically reads the delta and advances the
+	// loaded baseline so that concurrent handlers in handleGeneratorGroup
+	// each claim only their own contribution, preventing double-counting.
+	if delta := runCtx.Metadata().Metrics.SwapMetadataSizeDelta(); delta > 0 {
+		ctx = state.WithMetadataSizeDelta(ctx, delta)
 	}
 
 	// Save the output as the step result.
@@ -4876,6 +4935,13 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, runCtx execu
 		span.Drop()
 	}
 
+	// Once pause has been saved, we can release the held capacity.
+	// This allows us to continue work in the queue on other items even before
+	// the next step is enqueued and accounting is handled.
+	if err := runCtx.ReleaseCapacityLease(); err != nil {
+		logger.StdlibLogger(ctx).ReportError(err, "could not release capacity lease early")
+	}
+
 	// TODO Is this fine to leave? No attempts.
 	err = e.queue.Enqueue(ctx, nextItem, expires, queue.EnqueueOpts{})
 	if err == queue.ErrQueueItemExists {
@@ -5269,6 +5335,8 @@ func (e *executor) addRequestPublishOpts(ctx context.Context, item queue.Item, s
 
 	sr.Publish.Token = token
 	sr.Publish.PublishURL = e.rtconfig.PublishURL
+	sr.Publish.Channel = item.Identifier.RunID.String()
+	sr.Publish.Topic = streamingtypes.TopicNameStream
 }
 
 // shouldEnqueueDiscovery returns true if the ended step should have a discovery
@@ -5334,6 +5402,8 @@ func emitCheckpointTraces(ctx context.Context) bool {
 }
 
 func (e *executor) createMetadataSpan(ctx context.Context, runCtx execution.RunContext, location string, md metadata.Structured, scope metadata.Scope) (*meta.SpanReference, error) {
+	l := e.log
+
 	var parent *meta.SpanReference
 
 	switch scope {
@@ -5345,7 +5415,7 @@ func (e *executor) createMetadataSpan(ctx context.Context, runCtx execution.RunC
 		return nil, fmt.Errorf("unknown metadata scope: %s", scope)
 	}
 
-	return tracing.CreateMetadataSpan(
+	ref, err := tracing.CreateMetadataSpan(
 		ctx,
 		e.tracerProvider,
 		parent,
@@ -5355,6 +5425,27 @@ func (e *executor) createMetadataSpan(ctx context.Context, runCtx execution.RunC
 		md,
 		scope,
 	)
+	if err != nil {
+		if errors.Is(err, metadata.ErrMetadataSpanTooLarge) {
+			l.Warn("metadata span exceeds maximum size",
+				"run_id", runCtx.Metadata().ID.RunID,
+				"metadata_kind", md.Kind().String(),
+				"location", location,
+			)
+		}
+		if errors.Is(err, metadata.ErrRunMetadataSizeExceeded) {
+			l.Warn("run cumulative metadata size exceeded",
+				"current_size", runCtx.Metadata().Metrics.MetadataSize,
+				"limit", consts.MaxRunMetadataSize,
+				"run_id", runCtx.Metadata().ID.RunID,
+				"metadata_kind", md.Kind().String(),
+				"location", location,
+			)
+		}
+		return nil, err
+	}
+
+	return ref, nil
 }
 
 func hasPlanOp(ops []*state.GeneratorOpcode) bool {

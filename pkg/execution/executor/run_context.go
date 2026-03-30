@@ -145,3 +145,16 @@ func (r *runInstance) trackLatencyHistogram(ctx context.Context, kind string, ta
 
 	r._next = r.c.Now()
 }
+
+func (r *runInstance) ReleaseCapacityLease() error {
+	runInfo := r.item.RunInfo
+	if runInfo == nil {
+		return nil
+	}
+
+	if runInfo.CapacityLease == nil {
+		return nil
+	}
+
+	return runInfo.CapacityLease.Release()
+}

@@ -130,7 +130,7 @@ export function TimelineHeader({
 
   return (
     <div className="mb-1 flex w-full items-end pt-5">
-      {/* Left panel spacer (no label - label is now in the Run bar) */}
+      {/* Left panel spacer */}
       <div
         className="shrink-0 pr-2"
         style={{
