@@ -200,6 +200,9 @@ type InternalEvent struct {
 	WorkspaceID uuid.UUID `json:"workspace_id"`
 	// Event is the underlying event received.
 	Event Event `json:"event"`
+
+	// ReceivedAt is the time that our system received the event.
+	ReceivedAt time.Time `json:"received_at"`
 }
 
 func (i InternalEvent) GetAccountID() uuid.UUID {
@@ -219,7 +222,7 @@ func (i InternalEvent) GetEvent() Event {
 }
 
 func (i InternalEvent) GetReceivedAt() time.Time {
-	return time.Time{}
+	return i.ReceivedAt
 }
 
 func IsCron(evtName string) bool {
