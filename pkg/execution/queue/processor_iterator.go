@@ -476,7 +476,7 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 		p.CtrConcurrency.Add(1)
 		metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{
 			PkgName: pkgName,
-			Tags:    map[string]any{"status": "semaphore_limit", "queue_shard": p.Queue.Shard().Name(), "constraint_source": constraintCheckSource},
+			Tags:    map[string]any{"status": "semaphore_limit", "queue_shard": p.Queue.Shard().Name(), "constraint_source": "constraintapi"},
 		})
 		return nil
 	case ErrQueueItemNotFound:
