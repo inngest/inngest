@@ -9,8 +9,10 @@
  * - Column resize handling
  */
 
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState, type ReactNode } from 'react';
+import { RiContractUpDownLine, RiExpandUpDownLine } from '@remixicon/react';
 
+import { Button } from '../Button';
 import { TimelineBar } from './TimelineBar';
 import type {
   BarSegment,
@@ -209,6 +211,41 @@ function generateHTTPTimingBars(
 }
 
 // ============================================================================
+// Expand All / Collapse All Utilities
+// ============================================================================
+
+/**
+ * Recursively collect all expandable bar IDs from the timeline data.
+ * This includes:
+ * - Step bars with timingBreakdown or children (non-root)
+ * - Server timing bars that can expand to show HTTP timing or children
+ */
+function collectExpandableIds(bars: TimelineBarData[]): string[] {
+  const ids: string[] = [];
+  for (const bar of bars) {
+    const hasTimingBreakdown = !!bar.timingBreakdown;
+    const hasChildren = bar.children && bar.children.length > 0;
+    const hasHTTPTiming = !!bar.httpTimingBreakdown;
+
+    // Step-level bars are expandable when they have timing or children
+    if (!bar.isRoot && (hasTimingBreakdown || hasChildren)) {
+      ids.push(bar.id);
+
+      // The server timing bar is expandable when there are children or HTTP timing
+      if (hasTimingBreakdown && (hasHTTPTiming || hasChildren)) {
+        ids.push(`${bar.id}-timing-server`);
+      }
+    }
+
+    // Recurse into children
+    if (bar.children) {
+      ids.push(...collectExpandableIds(bar.children));
+    }
+  }
+  return ids;
+}
+
+// ============================================================================
 // Timeline Bar Renderer
 // ============================================================================
 
@@ -227,6 +264,8 @@ type TimelineBarRendererProps = {
   viewStartOffset?: number;
   /** View offset - end position as percentage (0-100) for zooming */
   viewEndOffset?: number;
+  /** Optional actions to render in the bar's left panel (e.g. expand/collapse all) */
+  actions?: ReactNode;
 };
 
 /**
@@ -245,6 +284,7 @@ function TimelineBarRenderer({
   selectedStepId,
   viewStartOffset = 0,
   viewEndOffset = 100,
+  actions,
 }: TimelineBarRendererProps): JSX.Element {
   const { startPercent, widthPercent } = calculateBarPosition(
     bar.startTime,
@@ -290,6 +330,7 @@ function TimelineBarRenderer({
       endTime={bar.endTime}
       minTime={minTime}
       delayMs={bar.delayMs}
+      actions={actions}
     >
       {/* Timing breakdown bars */}
       {isExpanded &&
@@ -433,11 +474,11 @@ function TimelineBarRenderer({
  */
 export function Timeline({ data, onSelectStep }: Props): JSX.Element {
   const { minTime, maxTime, bars, leftWidth, orgName } = data;
+
+  const rootBarIds = useMemo(() => bars.filter((bar) => bar.isRoot).map((bar) => bar.id), [bars]);
+
   // Initialize with root bars expanded by default
-  const [expandedBars, setExpandedBars] = useState<Set<string>>(() => {
-    const rootBarIds = bars.filter((bar) => bar.isRoot).map((bar) => bar.id);
-    return new Set(rootBarIds);
-  });
+  const [expandedBars, setExpandedBars] = useState<Set<string>>(() => new Set(rootBarIds));
   const [selectedStepId, setSelectedStepId] = useState<string | undefined>();
 
   // Timeline brush selection state (for zooming)
@@ -462,6 +503,41 @@ export function Timeline({ data, onSelectStep }: Props): JSX.Element {
       onSelectStep?.(stepId);
     },
     [onSelectStep]
+  );
+
+  const handleExpandAll = useCallback(() => {
+    const allExpandableIds = collectExpandableIds(bars);
+    setExpandedBars(new Set([...rootBarIds, ...allExpandableIds]));
+  }, [bars, rootBarIds]);
+
+  const handleCollapseAll = useCallback(() => {
+    setExpandedBars(new Set(rootBarIds));
+  }, [rootBarIds]);
+
+  const expandCollapseActions = useMemo(
+    () => (
+      <span className="flex shrink-0 items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
+        <Button
+          size="small"
+          appearance="ghost"
+          icon={<RiExpandUpDownLine className="h-3.5 w-3.5" />}
+          title="Expand all"
+          tooltip="Expand all"
+          aria-label="Expand all"
+          onClick={handleExpandAll}
+        />
+        <Button
+          size="small"
+          appearance="ghost"
+          icon={<RiContractUpDownLine className="h-3.5 w-3.5" />}
+          title="Collapse all"
+          tooltip="Collapse all"
+          aria-label="Collapse all"
+          onClick={handleCollapseAll}
+        />
+      </span>
+    ),
+    [handleExpandAll, handleCollapseAll]
   );
 
   // Handle timeline brush selection change
@@ -502,6 +578,7 @@ export function Timeline({ data, onSelectStep }: Props): JSX.Element {
           selectedStepId={selectedStepId}
           viewStartOffset={viewStartOffset}
           viewEndOffset={viewEndOffset}
+          actions={bar.isRoot ? expandCollapseActions : undefined}
         />
       ))}
     </div>
