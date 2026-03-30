@@ -25,7 +25,7 @@ import (
 
 // getItemIDsFromBacklog is a helper function to peek items from a backlog and extract their IDs
 func getItemIDsFromBacklog(ctx context.Context, q osqueue.ShardOperations, backlog *osqueue.QueueBacklog, refillUntil time.Time, limit int64) ([]string, error) {
-	items, _, err := q.BacklogPeek(
+	res, err := q.BacklogPeek(
 		ctx,
 		backlog,
 		time.Time{},
@@ -37,8 +37,8 @@ func getItemIDsFromBacklog(ctx context.Context, q osqueue.ShardOperations, backl
 		return nil, err
 	}
 
-	itemIDs := make([]string, len(items))
-	for i, item := range items {
+	itemIDs := make([]string, len(res.Items))
+	for i, item := range res.Items {
 		itemIDs[i] = item.ID
 	}
 	return itemIDs, nil

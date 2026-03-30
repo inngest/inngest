@@ -1,26 +1,13 @@
 import LoadingIcon from '@/components/Icons/LoadingIcon';
 import SplitView from '@/components/SignIn/SplitView';
+import { validateRedirectUrlSearch } from '@/lib/deepLinkUtils';
 import { OrganizationList, useAuth } from '@clerk/tanstack-react-start';
 import { createFileRoute, useLocation } from '@tanstack/react-router';
 import logoImageUrl from '@inngest/components/icons/logos/inngest-logo-black.png';
 
-type OrganizationListSearchParams = {
-  redirect_url?: string;
-};
-
 export const Route = createFileRoute('/(auth)/organization-list/$')({
   component: RouteComponent,
-  validateSearch: (
-    search: Record<string, unknown>,
-  ): OrganizationListSearchParams => {
-    return {
-      redirect_url:
-        typeof search?.redirect_url === 'string' &&
-        search.redirect_url.startsWith('/')
-          ? search.redirect_url
-          : undefined,
-    };
-  },
+  validateSearch: validateRedirectUrlSearch,
 });
 
 function RouteComponent() {

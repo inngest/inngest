@@ -140,12 +140,12 @@ function renderStepInfo(trace: Trace, { debug = false }: { debug?: boolean } = {
 }
 
 describe('StepInfo retry attempt badge', () => {
-  it('renders "Attempt 3" when trace.attempts = 2', () => {
+  it('renders "2 retries" when trace.attempts = 2', () => {
     const trace = makeTrace({ attempts: 2 });
     renderStepInfo(trace);
     const badge = screen.getByTestId('retry-attempt-badge');
     expect(badge).toBeTruthy();
-    expect(badge.textContent).toContain('Attempt 3');
+    expect(badge.textContent).toContain('2 retries');
   });
 
   it('does not render badge when trace.attempts = 0 and status is COMPLETED', () => {
@@ -154,12 +154,10 @@ describe('StepInfo retry attempt badge', () => {
     expect(screen.queryByTestId('retry-attempt-badge')).toBeNull();
   });
 
-  it('renders badge when trace.attempts = 0 and status is FAILED', () => {
+  it('does not render badge when trace.attempts = 0 and status is FAILED', () => {
     const trace = makeTrace({ attempts: 0, status: 'FAILED' });
     renderStepInfo(trace);
-    const badge = screen.getByTestId('retry-attempt-badge');
-    expect(badge).toBeTruthy();
-    expect(badge.textContent).toContain('Attempt 1');
+    expect(screen.queryByTestId('retry-attempt-badge')).toBeNull();
   });
 
   it('does not render badge when trace.attempts = null', () => {
@@ -168,17 +166,17 @@ describe('StepInfo retry attempt badge', () => {
     expect(screen.queryByTestId('retry-attempt-badge')).toBeNull();
   });
 
-  it('shows correct 1-based attempt numbers', () => {
-    // attempts=1 → "Attempt 2"
+  it('shows correct retry labels', () => {
+    // attempts=1 → "1 retry"
     const trace1 = makeTrace({ attempts: 1 });
     const { unmount: unmount1 } = renderStepInfo(trace1);
-    expect(screen.getByTestId('retry-attempt-badge').textContent).toContain('Attempt 2');
+    expect(screen.getByTestId('retry-attempt-badge').textContent).toContain('1 retry');
     unmount1();
 
-    // attempts=5 → "Attempt 6"
+    // attempts=5 → "5 retries"
     const trace5 = makeTrace({ attempts: 5 });
     renderStepInfo(trace5);
-    expect(screen.getByTestId('retry-attempt-badge').textContent).toContain('Attempt 6');
+    expect(screen.getByTestId('retry-attempt-badge').textContent).toContain('5 retries');
   });
 });
 
