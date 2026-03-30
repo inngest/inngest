@@ -1,3 +1,4 @@
+import { sanitizeRedirectUrl } from '@/lib/deepLinkUtils';
 import { auth, clerkClient } from '@clerk/tanstack-react-start/server';
 import { redirect } from '@tanstack/react-router';
 import { createServerFn } from '@tanstack/react-start';
@@ -13,7 +14,7 @@ export const fetchClerkAuth = createServerFn({ method: 'GET' })
         to: '/sign-in/$',
         params: { _splat: '' },
         search: {
-          redirect_url: redirectUrl?.startsWith('/') ? redirectUrl : undefined,
+          redirect_url: sanitizeRedirectUrl(redirectUrl),
         },
       });
     }
@@ -43,7 +44,7 @@ export const fetchClerkAuth = createServerFn({ method: 'GET' })
         to: '/organization-list/$',
         params: { _splat: '' },
         search: {
-          redirect_url: redirectUrl?.startsWith('/') ? redirectUrl : undefined,
+          redirect_url: sanitizeRedirectUrl(redirectUrl),
         },
       });
     }

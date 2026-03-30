@@ -462,7 +462,7 @@ WHERE span_id IN (
   SELECT
     parent_span_id
   FROM spans execSpans
-  WHERE execSpans.run_id = sqlc.arg(run_id) AND execSpans.account_id = sqlc.arg(account_id)
+  WHERE execSpans.run_id = sqlc.arg(run_id) AND execSpans.account_id = sqlc.arg(account_id) AND name != 'userland'
   GROUP BY dynamic_span_id
   HAVING
     SUM(attributes->>'$."_inngest.step.id"' = CAST(sqlc.arg(step_id) AS TEXT)) > 0
@@ -470,7 +470,7 @@ WHERE span_id IN (
     SUM(name = 'executor.execution') > 0
   ORDER BY start_time
   LIMIT 1
-)
+) AND name != 'userland'
 GROUP BY dynamic_span_id
 HAVING SUM(name = 'executor.step.discovery') > 0
 UNION ALL
@@ -489,7 +489,7 @@ SELECT
     'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
   )) AS span_fragments
 FROM spans
-WHERE run_id = sqlc.arg(run_id) AND account_id = sqlc.arg(account_id)
+WHERE run_id = sqlc.arg(run_id) AND account_id = sqlc.arg(account_id) AND name != 'userland'
 GROUP BY dynamic_span_id
 HAVING
   SUM(attributes->>'$."_inngest.step.id"' = CAST(sqlc.arg(step_id) AS TEXT)) > 0
@@ -514,7 +514,7 @@ SELECT
     'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
   )) AS span_fragments
 FROM spans
-WHERE run_id = ? AND account_id = ?
+WHERE run_id = ? AND account_id = ? AND name != 'userland'
 GROUP BY dynamic_span_id
 HAVING
   SUM(attributes->>'$."_inngest.step.id"' = CAST(sqlc.arg(step_id) AS TEXT)) > 0
@@ -541,7 +541,7 @@ SELECT
     'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
   )) AS span_fragments
 FROM spans b
-WHERE b.run_id = sqlc.arg(run_id) AND b.account_id = sqlc.arg(account_id)
+WHERE b.run_id = sqlc.arg(run_id) AND b.account_id = sqlc.arg(account_id) AND b.name != 'userland'
 GROUP BY dynamic_span_id
 HAVING
   SUM(attributes->>'$."_inngest.step.id"' = CAST(sqlc.arg(step_id) AS TEXT)) > 0

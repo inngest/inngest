@@ -4,7 +4,11 @@ import StackedBarChart from '@/components/Charts/StackedBarChart';
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { graphql } from '@/gql';
 
-export type UsageMetrics = { totalRuns: number; totalFailures: number };
+export type UsageMetrics = {
+  totalRuns: number;
+  totalFinished: number;
+  totalFailures: number;
+};
 
 const GetFunctionRunsMetricsDocument = graphql(`
   query GetFunctionRunsMetrics(
