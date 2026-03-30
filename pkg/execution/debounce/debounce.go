@@ -120,6 +120,10 @@ func (d DebounceItem) GetWorkspaceID() uuid.UUID {
 	return d.WorkspaceID
 }
 
+func (d DebounceItem) GetReceivedAt() time.Time {
+	return time.Time{}
+}
+
 // DebouncePayload represents the data stored within the queue's payload.
 type DebouncePayload struct {
 	DebounceID ulid.ULID `json:"debounceID"`
