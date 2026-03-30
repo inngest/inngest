@@ -60,6 +60,7 @@ import (
 	"github.com/inngest/inngest/pkg/history_drivers/memory_writer"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/metrics"
+	telemetrymetrics "github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/pubsub"
 	"github.com/inngest/inngest/pkg/run"
 	"github.com/inngest/inngest/pkg/service"
@@ -159,6 +160,13 @@ func enforceConnectLeaseExpiry(ctx context.Context, accountID uuid.UUID) bool {
 func start(ctx context.Context, opts StartOpts) error {
 	l := logger.StdlibLogger(ctx)
 	ctx = logger.WithStdlib(ctx, l)
+
+	meterShutdown, err := telemetrymetrics.MeterSetup("inngest", telemetrymetrics.MeterTypePrometheus)
+	if err != nil {
+		l.Warn("failed to initialize Prometheus meter provider", "error", err)
+	} else {
+		defer meterShutdown()
+	}
 
 	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{
 		InMemory:    opts.InMemory,
@@ -430,6 +438,7 @@ func start(ctx context.Context, opts StartOpts) error {
 				EventTopic: opts.Config.EventStream.Service.Concrete.TopicName(),
 			},
 			run.NewTraceLifecycleListener(nil),
+			metrics.NewPrometheusLifecycleListener(),
 		),
 		executor.WithStepLimits(func(id sv2.ID) int {
 			if override, hasOverride := stepLimitOverrides[id.FunctionID.String()]; hasOverride {
