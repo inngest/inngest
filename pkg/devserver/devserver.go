@@ -215,8 +215,8 @@ func start(ctx context.Context, opts StartOpts) error {
 	stateSizeLimitOverrides := make(map[string]int)
 	pauseOverrides := make(map[uuid.UUID]bool)
 
-	var shardedRc, unshardedRc, connectRc rueidis.Client
-	var shardedCluster, unshardedCluster, connectCluster *miniredis.Miniredis
+	var shardedRc, unshardedRc, connectRc, realtimePubRc, realtimeSubRc rueidis.Client
+	var shardedCluster, unshardedCluster, connectCluster, realtimeCluster *miniredis.Miniredis
 
 	if opts.RedisURI != "" {
 		// Use external Redis
@@ -243,6 +243,14 @@ func start(ctx context.Context, opts StartOpts) error {
 		if err != nil {
 			return err
 		}
+		realtimePubRc, err = connectToOrCreateRedis(opts.RedisURI)
+		if err != nil {
+			return err
+		}
+		realtimeSubRc, err = connectToOrCreateRedis(opts.RedisURI)
+		if err != nil {
+			return err
+		}
 	} else {
 		// Use in-memory Redis
 		shardedRc, shardedCluster, err = createInmemoryRedis(ctx, opts.Tick)
@@ -254,6 +262,21 @@ func start(ctx context.Context, opts StartOpts) error {
 			return err
 		}
 		connectRc, connectCluster, err = createInmemoryRedis(ctx, opts.Tick)
+		if err != nil {
+			return err
+		}
+
+		// Realtime MUST use separate Redis clients for publishing and
+		// subscribing. This is because a Redis client cannot publish once it
+		// enters subscribe mode.
+		realtimePubRc, realtimeCluster, err = createInmemoryRedis(ctx, opts.Tick)
+		if err != nil {
+			return err
+		}
+		realtimeSubRc, err = rueidis.NewClient(rueidis.ClientOption{
+			InitAddress:  []string{realtimeCluster.Addr()},
+			DisableCache: true,
+		})
 		if err != nil {
 			return err
 		}
@@ -278,11 +301,14 @@ func start(ctx context.Context, opts StartOpts) error {
 	}
 	smv2 := redis_state.MustRunServiceV2(sm)
 
-	broadcaster, closeBroadcasterRedis, err := newBroadcaster(opts.RedisURI)
-	if err != nil {
-		return err
-	}
-	defer closeBroadcasterRedis()
+	broadcaster := realtime.NewRedisBroadcaster(realtimePubRc, realtimeSubRc)
+	defer func() {
+		realtimePubRc.Close()
+		realtimeSubRc.Close()
+		if realtimeCluster != nil {
+			realtimeCluster.Close()
+		}
+	}()
 
 	runMode := queue.QueueRunMode{
 		Sequential:    true,
@@ -747,6 +773,9 @@ func start(ctx context.Context, opts StartOpts) error {
 				if connectCluster != nil {
 					connectCluster.FlushAll()
 				}
+				if realtimeCluster != nil {
+					realtimeCluster.FlushAll()
+				}
 			},
 			PauseFunction: func(id uuid.UUID) {
 				pauseOverrides[id] = true
@@ -1021,48 +1050,6 @@ func PartitionConstraintConfigGetter(dbcqrs cqrs.Manager) queue.PartitionConstra
 
 		return constraints
 	}
-}
-
-// newBroadcaster creates a Redis-backed broadcaster for realtime messages. If
-// redisURI is provided, it connects to that Redis instance; otherwise it spins
-// up an in-memory miniredis. The returned cleanup function closes the miniredis
-// instance (nil when using an external Redis).
-func newBroadcaster(redisURI string) (realtime.Broadcaster, func(), error) {
-	if redisURI != "" {
-		pubc, err := connectToOrCreateRedis(redisURI)
-		if err != nil {
-			return nil, nil, fmt.Errorf("error creating realtime redis pub client: %w", err)
-		}
-		subc, err := connectToOrCreateRedis(redisURI)
-		if err != nil {
-			pubc.Close()
-			return nil, nil, fmt.Errorf("error creating realtime redis sub client: %w", err)
-		}
-		return realtime.NewRedisBroadcaster(pubc, subc), func() { pubc.Close(); subc.Close() }, nil
-	}
-
-	r := miniredis.NewMiniRedis()
-	if err := r.Start(); err != nil {
-		return nil, nil, fmt.Errorf("error starting realtime redis: %w", err)
-	}
-	pubc, err := rueidis.NewClient(rueidis.ClientOption{
-		InitAddress:  []string{r.Addr()},
-		DisableCache: true,
-	})
-	if err != nil {
-		r.Close()
-		return nil, nil, fmt.Errorf("error creating realtime redis pub client: %w", err)
-	}
-	subc, err := rueidis.NewClient(rueidis.ClientOption{
-		InitAddress:  []string{r.Addr()},
-		DisableCache: true,
-	})
-	if err != nil {
-		pubc.Close()
-		r.Close()
-		return nil, nil, fmt.Errorf("error creating realtime redis sub client: %w", err)
-	}
-	return realtime.NewRedisBroadcaster(pubc, subc), func() { pubc.Close(); subc.Close(); r.Close() }, nil
 }
 
 func connectToOrCreateRedis(redisURI string) (rueidis.Client, error) {
