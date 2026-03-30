@@ -13,6 +13,10 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
+const (
+	TopicNameStream = "$stream"
+)
+
 type (
 	// MessageKind represents the type of data in the message, eg. whether
 	// this is a step output, custom data, a run result, etc.
@@ -184,7 +188,7 @@ func (m Message) Validate() error {
 			return fmt.Errorf("datastream kinds must have a stream id set")
 		}
 		if bytes.Contains(m.Data, []byte(":")) {
-			return fmt.Errorf("datstream stream id must not contain colons (:)")
+			return fmt.Errorf("datastream stream id must not contain colons (:)")
 		}
 	}
 	return nil
@@ -250,9 +254,17 @@ func (m Message) Topics() []Topic {
 }
 
 func ChunkFromMessage(m Message, data string) Chunk {
+	// Attempt to unmarshal Data as a JSON string for the stream ID.  If it's a
+	// valid JSON string (e.g. `"abc123"`), use the unquoted value.  Otherwise
+	// fall back to the raw bytes (backward compat).
+	streamID := string(m.Data)
+	var parsed string
+	if json.Unmarshal(m.Data, &parsed) == nil {
+		streamID = parsed
+	}
 	return Chunk{
 		Kind:     string(MessageKindDataStreamChunk),
-		StreamID: string(m.Data),
+		StreamID: streamID,
 		Data:     data,
 		FnID:     m.FnID,
 		FnSlug:   m.FnSlug,

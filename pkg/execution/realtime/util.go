@@ -46,7 +46,10 @@ func TeeStreamReaderToAPI(reader io.Reader, publishURL string, opts TeeStreamOpt
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return nil, err
+		// Return buf because the TeeReader may have already consumed part or
+		// all of the original reader while attempting to send the request. The
+		// caller needs buf to read whatever data was captured.
+		return buf, err
 	}
 
 	if resp.StatusCode != 200 {

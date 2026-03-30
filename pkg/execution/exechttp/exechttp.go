@@ -146,7 +146,13 @@ func (e ExtendedClient) DoRequest(ctx context.Context, r SerializableRequest) (*
 				"request_id":   r.Publish.RequestID,
 			},
 		})
-		if err == nil {
+
+		// Always use rdr if non-nil, even on error. TeeStreamReaderToAPI
+		// consumes the original body via io.TeeReader while posting to the
+		// publish endpoint. If publishing fails (e.g. a 401), the returned
+		// reader still holds the data that was read. Discarding it would leave
+		// the original reader exhausted and cause an empty body.
+		if rdr != nil {
 			body = rdr
 		}
 		if err != nil {
