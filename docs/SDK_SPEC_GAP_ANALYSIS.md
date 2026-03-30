@@ -10,11 +10,11 @@ This document identifies gaps between the current SDK spec (`SDK_SPEC.md`) and t
 
 #### 1.1 `INNGEST_SERVE_HOST` vs `INNGEST_SERVE_ORIGIN`
 
-| SDK | Variable Used | Spec Variable |
-|-----|--------------|---------------|
-| Go | `INNGEST_SERVE_HOST` | `INNGEST_SERVE_ORIGIN` |
-| TS | Both (`INNGEST_SERVE_HOST` deprecated, `INNGEST_SERVE_ORIGIN` preferred) | `INNGEST_SERVE_ORIGIN` |
-| Python | `INNGEST_SERVE_ORIGIN` | `INNGEST_SERVE_ORIGIN` |
+| SDK    | Variable Used                                                            | Spec Variable          |
+|--------|--------------------------------------------------------------------------|------------------------|
+| Go     | `INNGEST_SERVE_HOST`                                                     | `INNGEST_SERVE_ORIGIN` |
+| TS     | Both (`INNGEST_SERVE_HOST` deprecated, `INNGEST_SERVE_ORIGIN` preferred) | `INNGEST_SERVE_ORIGIN` |
+| Python | `INNGEST_SERVE_ORIGIN`                                                   | `INNGEST_SERVE_ORIGIN` |
 
 **Gap**: Go SDK uses `INNGEST_SERVE_HOST` instead of `INNGEST_SERVE_ORIGIN`.
 
@@ -22,18 +22,18 @@ This document identifies gaps between the current SDK spec (`SDK_SPEC.md`) and t
 
 All three SDKs support these additional variables:
 
-| Variable | Go | TS | Python | In Spec? |
-|----------|----|----|--------|----------|
-| `INNGEST_BASE_URL` | Yes | Yes | Yes | No |
-| `INNGEST_STREAMING` | Yes | Yes | Yes | No |
-| `INNGEST_ALLOW_IN_BAND_SYNC` | No | Yes | Yes | No |
-| `INNGEST_CONNECT_MAX_WORKER_CONCURRENCY` | Yes | Yes | Yes | No |
-| `INNGEST_CONNECT_ISOLATE_EXECUTION` | No | Yes | No | No |
-| `INNGEST_CONNECT_GATEWAY_URL` | No | Yes | No | No |
-| `INNGEST_LOG_LEVEL` | No | No | Yes | Recommended |
-| `INNGEST_THREAD_POOL_MAX_WORKERS` | No | No | Yes | No |
+| Variable                                 | Go  | TS  | Python | In Spec?                |
+|------------------------------------------|-----|-----|--------|-------------------------|
+| `INNGEST_BASE_URL`                       | Yes | Yes | Yes    | **Yes** (section 3.2)   |
+| `INNGEST_STREAMING`                      | Yes | Yes | Yes    | **Yes** (section 3.2)   |
+| `INNGEST_ALLOW_IN_BAND_SYNC`             | No  | Yes | Yes    | **Yes** (section 4.3.5) |
+| `INNGEST_CONNECT_MAX_WORKER_CONCURRENCY` | Yes | Yes | Yes    | **Yes** (section 8.1)   |
+| `INNGEST_CONNECT_ISOLATE_EXECUTION`      | No  | Yes | No     | **Yes** (section 8.1)   |
+| `INNGEST_CONNECT_GATEWAY_URL`            | No  | Yes | No     | **Yes** (section 8.1)   |
+| `INNGEST_LOG_LEVEL`                      | No  | No  | Yes    | Recommended             |
+| `INNGEST_THREAD_POOL_MAX_WORKERS`        | No  | No  | Yes    | No                      |
 
-Platform detection env vars (Vercel, Railway, Render, etc.) are also read by all SDKs but not in the spec.
+Platform detection env vars (Vercel, Railway, Render, etc.) are also read by all SDKs but not in the spec. **Note**: The spec now mentions platform detection in section 3.2.
 
 ---
 
@@ -41,19 +41,19 @@ Platform detection env vars (Vercel, Railway, Render, etc.) are also read by all
 
 #### 2.1 `X-Inngest-Req-Version` value
 
-**Spec says**: MUST be `1`.
-**All three SDKs send**: `2`.
+~~**Spec says**: MUST be `1`.~~
+~~**All three SDKs send**: `2`.~~
 
-This is the most significant divergence -- the spec is outdated. Execution version 2 is the current standard across all SDKs.
+**Status**: DONE. Spec now says MUST be `2` (section 4.1.2).
 
 #### 2.2 Extra headers not in spec
 
-| Header | Go | TS | Python | In Spec? |
-|--------|----|----|--------|----------|
-| `X-Inngest-Sync-Kind` | Yes | Yes | Yes | No |
-| `X-Inngest-Event-Id-Seed` | Yes | No | Yes | No |
-| `Server-Timing` | No | Yes | Yes | No |
-| `X-Inngest-Signature` (on responses) | Yes | No | No | No |
+| Header                               | Go  | TS  | Python | In Spec?                |
+|--------------------------------------|-----|-----|--------|-------------------------|
+| `X-Inngest-Sync-Kind`                | Yes | Yes | Yes    | **Yes** (section 4.1.1) |
+| `X-Inngest-Event-Id-Seed`            | Yes | No  | Yes    | No                      |
+| `Server-Timing`                      | No  | Yes | Yes    | **Yes** (section 4.1.1) |
+| `X-Inngest-Signature` (on responses) | Yes | No  | No     | No                      |
 
 #### 2.3 Response signing
 
@@ -74,11 +74,11 @@ throttle?: {
   key?: string;
   limit: number;
   period: TimeStr;
-  burst?: number;  // Not in spec, present in all SDKs
+  burst?: number;
 }
 ```
 
-**Status**: `throttle` is entirely absent from the spec. `burst` sub-field is in all three SDKs.
+**Status**: DONE. `throttle` with `key`, `limit`, `period`, and `burst` is now in the spec (section 4.3.2).
 
 #### 3.2 `singleton` (all SDKs)
 
@@ -91,7 +91,7 @@ singleton?: {
 }
 ```
 
-**Status**: Not in the spec at all.
+**Status**: DONE. `singleton` with `key` and `mode` is now in the spec (section 4.3.2).
 
 #### 3.3 `timeouts` (all SDKs)
 
@@ -104,20 +104,22 @@ timeouts?: {
 }
 ```
 
-**Status**: Not in the spec at all.
+**Status**: DONE. `timeouts` with `start` and `finish` is now in the spec (section 4.3.2).
 
 #### 3.4 `batchEvents` extra fields
 
-The spec defines `batchEvents` with only `maxSize` and `timeout`. All SDKs also support:
+~~The spec defines `batchEvents` with only `maxSize` and `timeout`.~~
 
 ```typescript
 batchEvents?: {
   maxSize: number;
   timeout: string;
-  key?: string;    // Not in spec
+  key?: string;    // Now in spec
   if?: string;     // Not in spec (TS only, possibly)
 }
 ```
+
+**Status**: `key` is DONE (section 4.3.2). `if` is still not in the spec.
 
 #### 3.5 `checkpointing` (Go and TS SDKs)
 
@@ -125,7 +127,9 @@ Checkpointing allows step results to be persisted to the Inngest Server during e
 
 #### 3.6 Step runtime `type`
 
-The spec only documents `type: "http"`. The TS SDK also supports `type: "ws"` for WebSocket-based Connect.
+~~The spec only documents `type: "http"`.~~
+
+**Status**: DONE. The spec now documents both `type: "http"` (section 4.3.2) and `type: "ws"` (section 8.2).
 
 ---
 
@@ -133,16 +137,16 @@ The spec only documents `type: "http"`. The TS SDK also supports `type: "ws"` fo
 
 The spec documents four step types in section 5.3: Run, Sleep, WaitForEvent, Invoke. All three SDKs implement additional step types:
 
-| Step Type | Opcode | Go | TS | Python | In Spec? |
-|-----------|--------|----|----|--------|----------|
-| Run | `StepRun` | Yes | Yes | Yes | Yes |
-| Sleep | `Sleep` | Yes | Yes | Yes | Yes |
-| WaitForEvent | `WaitForEvent` | Yes | Yes | Yes | Yes |
-| Invoke | `InvokeFunction` | Yes | Yes | Yes | Yes |
-| **SendEvent** | (uses `StepRun` internally) | Yes | Yes | Yes | **No** |
-| **WaitForSignal** | `WaitForSignal` | Yes | Yes | No | **No** |
-| **AI Infer** | `AiGateway` | Yes | Yes | Yes | **No** |
-| **Fetch** | `Gateway` | Yes | Yes | No | **No** |
+| Step Type         | Opcode                      | Go  | TS  | Python | In Spec?        |
+|-------------------|-----------------------------|-----|-----|--------|-----------------|
+| Run               | `StepRun`                   | Yes | Yes | Yes    | Yes             |
+| Sleep             | `Sleep`                     | Yes | Yes | Yes    | Yes             |
+| WaitForEvent      | `WaitForEvent`              | Yes | Yes | Yes    | Yes             |
+| Invoke            | `InvokeFunction`            | Yes | Yes | Yes    | Yes             |
+| ~~**SendEvent**~~ | (uses `StepRun` internally) | Yes | Yes | Yes    | **Yes** (5.3.5) |
+| **WaitForSignal** | `WaitForSignal`             | Yes | Yes | No     | **No**          |
+| ~~**AI Infer**~~  | `AiGateway`                 | Yes | Yes | Yes    | **Yes** (5.3.6) |
+| ~~**Fetch**~~     | `Gateway`                   | Yes | Yes | No     | **Yes** (5.3.7) |
 
 #### 4.1 `step.sendEvent()` / `step.send()`
 
@@ -175,11 +179,11 @@ These exist in the codebase but are not developer-facing step types:
 
 ### 5. `StepNotFound` Implementation
 
-| SDK | Implements `StepNotFound`? |
-|-----|---------------------------|
-| Go | Yes |
-| TS | Yes |
-| Python | **No** |
+| SDK    | Implements `StepNotFound`? |
+|--------|----------------------------|
+| Go     | Yes                        |
+| TS     | Yes                        |
+| Python | **No**                     |
 
 **Gap**: Python SDK does not implement the `StepNotFound` opcode, which the spec requires.
 
@@ -199,7 +203,7 @@ capabilities?: {
 }
 ```
 
-**Status**: Not in the spec. The spec says "An SDK MUST NOT set any top-level keys not specified in the aforementioned schemas" but allows `extra` for arbitrary data. The `capabilities` field is at the top level, violating this rule.
+**Status**: DONE. `capabilities` is now in both the authenticated and unauthenticated introspection response schemas (section 4.5). The spec explicitly allows `capabilities` as an exception to the "no unspecified top-level keys" rule.
 
 #### 6.2 `extra` field usage
 
@@ -211,29 +215,31 @@ The TS SDK puts `is_streaming` and `native_crypto` in `extra`. This is spec-comp
 
 The spec defines 7 lifecycle methods for function runs (section 6.3.1). Implementation varies:
 
-| Lifecycle Method | Spec | Go | TS | Python |
-|-----------------|------|----|----|--------|
-| Transform input | Required | Yes | Yes (`transformFunctionInput`) | Yes |
-| Before memoization | Required | **No** | **No** | **No** |
-| After memoization | Required | **No** | Yes (`onMemoizationEnd`) | **No** |
-| Before execution | Required | Yes | Yes (`onRunStart`) | Yes |
-| After execution | Required | Yes | Yes (`onRunComplete`) | Yes |
-| Transform output | Required | Yes | Yes | Yes |
-| Before response | Required | **No** | Yes (`wrapRequest`) | Yes |
+| Lifecycle Method   | Spec     | Go     | TS                             | Python |
+|--------------------|----------|--------|--------------------------------|--------|
+| Transform input    | Required | Yes    | Yes (`transformFunctionInput`) | Yes    |
+| Before memoization | Required | **No** | **No**                         | **No** |
+| After memoization  | Required | **No** | Yes (`onMemoizationEnd`)       | **No** |
+| Before execution   | Required | Yes    | Yes (`onRunStart`)             | Yes    |
+| After execution    | Required | Yes    | Yes (`onRunComplete`)          | Yes    |
+| Transform output   | Required | Yes    | Yes                            | Yes    |
+| Before response    | Required | **No** | Yes (`wrapRequest`)            | Yes    |
 
 **Gap**: No SDK implements `before_memoization`. Go SDK is missing `after_memoization` and `before_response`.
 
+**Status**: DONE. The spec has been simplified: `before_memoization` was removed. `after_memoization` and `before_response` are now RECOMMENDED (not REQUIRED). The spec also acknowledges additional step-level and event send hooks as optional extensions (section 6.3.1).
+
 #### 7.1 Extra middleware hooks (not in spec)
 
-| Hook | Go | TS | Python |
-|------|----|----|--------|
-| `onPanic` / error recovery | Yes | No | No |
-| `onStepStart/Complete/Error` | No | Yes | No |
-| `wrapStep/wrapStepHandler` | No | Yes | No |
-| `onRegister` (static) | No | Yes | No |
-| `before/after_send_events` | No | Yes | Yes |
-| `transformStepInput` | No | Yes | No |
-| `transformSendEvent` | No | Yes | No |
+| Hook                         | Go  | TS  | Python |
+|------------------------------|-----|-----|--------|
+| `onPanic` / error recovery   | Yes | No  | No     |
+| `onStepStart/Complete/Error` | No  | Yes | No     |
+| `wrapStep/wrapStepHandler`   | No  | Yes | No     |
+| `onRegister` (static)        | No  | Yes | No     |
+| `before/after_send_events`   | No  | Yes | Yes    |
+| `transformStepInput`         | No  | Yes | No     |
+| `transformSendEvent`         | No  | Yes | No     |
 
 The TS SDK has the richest middleware system with step-level hooks and wrapping patterns.
 
@@ -264,19 +270,25 @@ All three SDKs implement a WebSocket-based Connect protocol for persistent conne
 
 ### 9. Streaming
 
-All SDKs support HTTP streaming responses via `INNGEST_STREAMING`. Not mentioned in the spec.
+All SDKs support HTTP streaming responses via `INNGEST_STREAMING`.
+
+**Status**: DONE. Streaming is documented in the spec (section 9) and `INNGEST_STREAMING` is in section 3.2.
 
 ---
 
 ### 10. In-Band Sync
 
-SDKs support in-band synchronization (sync during function execution) controlled by `INNGEST_ALLOW_IN_BAND_SYNC` and signaled via the `X-Inngest-Sync-Kind` header. Not in the spec.
+SDKs support in-band synchronization (sync during function execution) controlled by `INNGEST_ALLOW_IN_BAND_SYNC` and signaled via the `X-Inngest-Sync-Kind` header.
+
+**Status**: DONE. In-band sync is documented in section 4.3.5, `X-Inngest-Sync-Kind` header in section 4.1.1.
 
 ---
 
 ### 11. `on_failure` Handler
 
-The Python SDK auto-creates internal failure handler functions triggered by `inngest/function.failed`. This pattern exists in all SDKs but is not documented in the spec.
+The Python SDK auto-creates internal failure handler functions triggered by `inngest/function.failed`. This pattern exists in all SDKs.
+
+**Status**: DONE. Failure handlers are documented in section 10.
 
 ---
 
@@ -286,93 +298,42 @@ Based on the gap analysis, here are the proposed changes to `SDK_SPEC.md`, order
 
 ### Priority 1: Fix Incorrect/Outdated Spec Content
 
-#### P1.1: Update `X-Inngest-Req-Version` to `2`
+#### P1.1: ~~Update `X-Inngest-Req-Version` to `2`~~ DONE
 
-**Section 4.1.2**: Change "MUST be `1`" to "MUST be `2`".
+Spec section 4.1.2 now says MUST be `2`.
 
-All SDKs use version 2. Version 1 is effectively dead.
+#### P1.2: ~~Add `throttle` to function configuration~~ DONE
 
-#### P1.2: Add `throttle` to function configuration
+`throttle` with `key`, `limit`, `period`, and `burst` is now in section 4.3.2.
 
-**Section 4.3.2**: Add alongside `rateLimit`:
+#### P1.3: ~~Add `singleton` to function configuration~~ DONE
 
-```typescript
-/**
- * Throttle function execution to a given number of runs per period.
- * Unlike rateLimit, throttle queues excess runs rather than dropping them.
- */
-throttle?: {
-  key?: string;
-  limit: number;
-  period: TimeStr;
-  burst?: number;
-};
-```
+`singleton` with `key` and `mode` is now in section 4.3.2.
 
-#### P1.3: Add `singleton` to function configuration
+#### P1.4: ~~Add `timeouts` to function configuration~~ DONE
 
-**Section 4.3.2**: Add new field:
+`timeouts` with `start` and `finish` is now in section 4.3.2.
 
-```typescript
-/**
- * Ensures only one run per key executes at a time.
- * New runs are either skipped or cancel the existing run.
- */
-singleton?: {
-  key?: string;
-  mode: "skip" | "cancel";
-};
-```
+#### P1.5: ~~Extend `batchEvents` with `key`~~ DONE
 
-#### P1.4: Add `timeouts` to function configuration
-
-**Section 4.3.2**: Add new field:
-
-```typescript
-/**
- * Controls how long a function has to start and finish execution.
- */
-timeouts?: {
-  /** Maximum time from trigger to first execution attempt. */
-  start?: TimeStr;
-  /** Maximum total time for the function run to complete. */
-  finish?: TimeStr;
-};
-```
-
-#### P1.5: Extend `batchEvents` with `key`
-
-**Section 4.3.2**: Add optional `key` field to `batchEvents`:
-
-```typescript
-batchEvents?: {
-  maxSize: number;
-  timeout: string;
-  /** Optional expression to partition batches by key. */
-  key?: string;
-};
-```
+`batchEvents.key` is now in section 4.3.2.
 
 ---
 
 ### Priority 2: Document New Step Types
 
-#### P2.1: Add `step.sendEvent()` (section 5.3.5)
+#### P2.1: ~~Add `step.sendEvent()` (section 5.3.5)~~ DONE
+
+`step.sendEvent()` is now documented in section 5.3.5.
+
+#### P2.2: Add `step.waitForSignal()` — NOT DONE
+
+`step.waitForSignal()` (opcode: `WaitForSignal`) is still not documented in the spec. Present in Go and TS SDKs.
+
+Proposed spec content:
 
 ```
-### 5.3.5. Send Event
-
-A Send Event Step sends one or more events to the Inngest Server as a
-retriable step. An SDK MAY implement this as a wrapper around a Run Step
-or as a distinct operation.
-
-The step returns an array of event IDs for the sent events.
-```
-
-#### P2.2: Add `step.waitForSignal()` (section 5.3.6)
-
-```
-### 5.3.6. Wait for Signal
+### 5.3.X. Wait for Signal
 
 A Wait for Signal Step pauses the Run until a signal is received from
 another Run or external source, or until a timeout is reached.
@@ -393,52 +354,13 @@ The memoized result will be the signal payload if received, or `null`
 if the timeout elapsed.
 ```
 
-#### P2.3: Add `step.ai.infer()` (section 5.3.7)
+#### P2.3: ~~Add `step.ai.infer()` (section 5.3.7)~~ DONE
 
-```
-### 5.3.7. AI Gateway
+`step.ai.infer()` (opcode: `AiGateway`) is now documented in section 5.3.6.
 
-An AI Gateway Step sends an inference request through Inngest's AI
-gateway, which handles provider routing, retries, and cost tracking.
+#### P2.4: ~~Add `step.fetch()` (section 5.3.8)~~ DONE
 
-{
-  id: string;
-  op: "AiGateway";
-  opts: {
-    // Provider-specific configuration
-    url: string;
-    headers?: Record<string, string>;
-    body: any;
-    format?: string;
-  };
-  displayName?: string;
-}
-
-The memoized result will be the inference response from the provider.
-```
-
-#### P2.4: Add `step.fetch()` (section 5.3.8)
-
-```
-### 5.3.8. Gateway (HTTP Fetch)
-
-A Gateway Step makes an HTTP request through Inngest's gateway,
-providing retries and observability for external API calls.
-
-{
-  id: string;
-  op: "Gateway";
-  opts: {
-    url: string;
-    method?: string;
-    headers?: Record<string, string>;
-    body?: any;
-  };
-  displayName?: string;
-}
-
-The memoized result will be the HTTP response.
-```
+`step.fetch()` (opcode: `Gateway`) is now documented in section 5.3.7.
 
 ---
 
@@ -448,49 +370,17 @@ The memoized result will be the HTTP response.
 
 Section 8 of `SDK_SPEC.md` has been expanded with comprehensive client-side protocol documentation derived from the Go SDK (`inngestgo/connect/`) and TypeScript SDK (`inngest-js/packages/inngest/src/components/connect/`) implementations. The updated section covers the full connection lifecycle (HTTP start API, 3-step WebSocket handshake, steady-state message loop), all 15 message types, function execution flow, reconnection with exponential backoff, message buffering for reliable delivery, graceful shutdown, gateway draining, worker pool management, and implementation differences between the two SDKs.
 
-#### P3.2: Add streaming section (section 9)
+#### P3.2: ~~Add streaming section (section 9)~~ DONE
 
-```
-# 9. Streaming
+Section 9 now documents streaming, including the `INNGEST_STREAMING` env var (also in section 3.2).
 
-An SDK MAY support HTTP streaming responses using the
-`INNGEST_STREAMING` environment variable. When enabled, the SDK sends
-keep-alive data on the HTTP response while executing functions,
-preventing platform timeouts on serverless environments.
-```
+#### P3.3: ~~Add in-band sync documentation~~ DONE
 
-#### P3.3: Add in-band sync documentation
+In-band sync is now documented in section 4.3.5. The `X-Inngest-Sync-Kind` header is defined in section 4.1.1.
 
-**Section 4.3**: Add subsection for in-band sync:
+#### P3.4: ~~Add `capabilities` to introspection response~~ DONE
 
-```
-### 4.3.5. In-Band Sync
-
-An SDK MAY support in-band sync, where registration data is sent
-alongside normal execution responses rather than as a separate POST
-request. This is signaled via the `X-Inngest-Sync-Kind` header with
-a value of `"in-band"`.
-
-Controlled by the `INNGEST_ALLOW_IN_BAND_SYNC` environment variable.
-```
-
-#### P3.4: Add `capabilities` to introspection response
-
-**Section 4.5**: Add `capabilities` to both authenticated and unauthenticated schemas, or move it into `extra`:
-
-```typescript
-// Authenticated response
-{
-  // ... existing fields ...
-  capabilities?: {
-    in_band_sync?: string;
-    trust_probe?: string;
-    connect?: string;
-  };
-}
-```
-
-Note: Currently all SDKs put `capabilities` at the top level, violating the spec rule about not setting unspecified top-level keys. The spec should either formalize `capabilities` or SDKs should move it to `extra`.
+`capabilities` is now in both the authenticated and unauthenticated introspection response schemas (section 4.5). The spec explicitly allows `capabilities` as an exception to the "no unspecified top-level keys" rule.
 
 ---
 
@@ -504,43 +394,29 @@ The Go SDK should migrate from `INNGEST_SERVE_HOST` to `INNGEST_SERVE_ORIGIN` (T
 
 The spec requires `StepNotFound` to be returned when a targeted step cannot be found. Python does not implement this.
 
-#### P4.3: Align middleware lifecycle
+#### P4.3: ~~Align middleware lifecycle~~ DONE
 
-The spec's 7-hook lifecycle is not fully implemented by any SDK. Options:
-1. **Simplify the spec** to match reality (remove `before_memoization` since no SDK implements it)
-2. **Require implementation** of missing hooks
+The spec has been simplified in section 6.3.1: `before_memoization` was removed entirely. `after_memoization` and `before_response` are now RECOMMENDED (not REQUIRED). The spec also acknowledges additional step-level and event send hooks as optional extensions.
 
-Recommendation: Simplify. The TS SDK's approach of `onMemoizationEnd` + wrapping patterns is more flexible than the spec's rigid 7-phase model. Consider rewriting section 6.3.1 to reflect a minimal required set:
+#### P4.4: ~~Add `on_failure` handler to spec~~ DONE
 
-Required:
-- Transform input
-- Before execution / After execution
-- Transform output
-
-Recommended:
-- After memoization
-- Before response
-- Step-level hooks
-
-#### P4.4: Add `on_failure` handler to spec
-
-All SDKs support auto-creating failure handler functions. This should be documented.
+Failure handlers are now documented in section 10.
 
 ---
 
 ### Priority 5: Housekeeping
 
-#### P5.1: Document `INNGEST_BASE_URL`
+#### P5.1: ~~Document `INNGEST_BASE_URL`~~ DONE
 
-All SDKs support this as a shorthand for setting both API and event base URLs.
+`INNGEST_BASE_URL` is now documented in section 3.2.
 
-#### P5.2: Document platform detection
+#### P5.2: ~~Document platform detection~~ DONE
 
-All SDKs detect hosting platforms (Vercel, Railway, Render, etc.) via environment variables. This should be mentioned in section 3.
+Platform detection is now mentioned in section 3.2.
 
-#### P5.3: Add `Server-Timing` header
+#### P5.3: ~~Add `Server-Timing` header~~ DONE
 
-TS and Python SDKs send `Server-Timing` headers for observability. This should be documented as optional.
+`Server-Timing` header is now documented as MAY in section 4.1.1.
 
 #### P5.4: Document `X-Inngest-Event-Id-Seed` header
 
@@ -550,24 +426,28 @@ Used by Go and Python SDKs for deterministic event ID generation.
 
 ## Summary Table
 
-| Gap | Priority | Effort | Impact |
-|-----|----------|--------|--------|
-| `X-Inngest-Req-Version` = 2 | P1 | Trivial | Spec is wrong |
-| Add `throttle` | P1 | Small | Core feature undocumented |
-| Add `singleton` | P1 | Small | Core feature undocumented |
-| Add `timeouts` | P1 | Small | Core feature undocumented |
-| Extend `batchEvents` with `key` | P1 | Trivial | Field exists in all SDKs |
-| Add `step.sendEvent` | P2 | Small | Used in all SDKs |
-| Add `step.waitForSignal` | P2 | Medium | New primitive |
-| Add `step.ai.infer` | P2 | Medium | Growing feature |
-| Add `step.fetch` | P2 | Medium | Growing feature |
-| ~~Document Connect~~ | ~~P3~~ | ~~Large~~ | **DONE** -- Section 8 expanded |
-| Document streaming | P3 | Small | All SDKs support |
-| Document in-band sync | P3 | Small | All SDKs support |
-| Add `capabilities` to introspection | P3 | Trivial | Spec violation |
-| Standardize `INNGEST_SERVE_ORIGIN` | P4 | Small | Go SDK change |
-| Python `StepNotFound` | P4 | Small | Spec compliance |
-| Simplify middleware lifecycle | P4 | Medium | Spec/reality mismatch |
-| Add `on_failure` handler | P4 | Small | All SDKs support |
-| Document `INNGEST_BASE_URL` | P5 | Trivial | Convenience |
-| Document platform detection | P5 | Small | All SDKs do it |
+| Gap                                     | Priority | Effort      | Status                            |
+|-----------------------------------------|----------|-------------|-----------------------------------|
+| ~~`X-Inngest-Req-Version` = 2~~         | ~~P1~~   | ~~Trivial~~ | **DONE**                          |
+| ~~Add `throttle`~~                      | ~~P1~~   | ~~Small~~   | **DONE**                          |
+| ~~Add `singleton`~~                     | ~~P1~~   | ~~Small~~   | **DONE**                          |
+| ~~Add `timeouts`~~                      | ~~P1~~   | ~~Small~~   | **DONE**                          |
+| ~~Extend `batchEvents` with `key`~~     | ~~P1~~   | ~~Trivial~~ | **DONE**                          |
+| ~~Add `step.sendEvent`~~                | ~~P2~~   | ~~Small~~   | **DONE**                          |
+| Add `step.waitForSignal`                | P2       | Medium      | **NOT DONE**                      |
+| ~~Add `step.ai.infer`~~                 | ~~P2~~   | ~~Medium~~  | **DONE**                          |
+| ~~Add `step.fetch`~~                    | ~~P2~~   | ~~Medium~~  | **DONE**                          |
+| ~~Document Connect~~                    | ~~P3~~   | ~~Large~~   | **DONE**                          |
+| ~~Document streaming~~                  | ~~P3~~   | ~~Small~~   | **DONE**                          |
+| ~~Document in-band sync~~               | ~~P3~~   | ~~Small~~   | **DONE**                          |
+| ~~Add `capabilities` to introspection~~ | ~~P3~~   | ~~Trivial~~ | **DONE**                          |
+| Standardize `INNGEST_SERVE_ORIGIN`      | P4       | Small       | NOT DONE (Go SDK code change)     |
+| Python `StepNotFound`                   | P4       | Small       | NOT DONE (Python SDK code change) |
+| ~~Simplify middleware lifecycle~~       | ~~P4~~   | ~~Medium~~  | **DONE**                          |
+| ~~Add `on_failure` handler~~            | ~~P4~~   | ~~Small~~   | **DONE**                          |
+| ~~Document `INNGEST_BASE_URL`~~         | ~~P5~~   | ~~Trivial~~ | **DONE**                          |
+| ~~Document platform detection~~         | ~~P5~~   | ~~Small~~   | **DONE**                          |
+| ~~Add `Server-Timing` header~~          | ~~P5~~   | ~~Trivial~~ | **DONE**                          |
+| Document `X-Inngest-Event-Id-Seed`      | P5       | Trivial     | NOT DONE                          |
+| Document response signing (Go only)     | P5       | Small       | NOT DONE                          |
+|                                         |          |             |                                   |
