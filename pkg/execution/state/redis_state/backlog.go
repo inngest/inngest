@@ -498,7 +498,7 @@ func (q *queue) BacklogPrepareNormalize(ctx context.Context, b *osqueue.QueueBac
 // BacklogPeek peeks item from the given backlog.
 //
 // Pointers to missing items will be removed from the backlog.
-func (q *queue) BacklogPeek(ctx context.Context, b *osqueue.QueueBacklog, from time.Time, until time.Time, limit int64, opts ...osqueue.PeekOpt) ([]*osqueue.QueueItem, int, error) {
+func (q *queue) BacklogPeek(ctx context.Context, b *osqueue.QueueBacklog, from time.Time, until time.Time, limit int64, opts ...osqueue.PeekOpt) (*osqueue.BacklogPeekResult, error) {
 	l := logger.StdlibLogger(ctx)
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "backlogPeek"), redis_telemetry.ScopeQueue)
 
@@ -508,7 +508,7 @@ func (q *queue) BacklogPeek(ctx context.Context, b *osqueue.QueueBacklog, from t
 	}
 
 	if b == nil {
-		return nil, 0, fmt.Errorf("expected backlog to be provided")
+		return nil, fmt.Errorf("expected backlog to be provided")
 	}
 
 	if limit > osqueue.AbsoluteQueuePeekMax || limit > q.PeekMax {
@@ -550,12 +550,16 @@ func (q *queue) BacklogPeek(ctx context.Context, b *osqueue.QueueBacklog, from t
 	res, err := p.peek(ctx, backlogSet, true, until, limit, opts...)
 	if err != nil {
 		if errors.Is(err, ErrPeekerPeekExceedsMaxLimits) {
-			return nil, 0, osqueue.ErrBacklogPeekMaxExceedsLimits
+			return nil, osqueue.ErrBacklogPeekMaxExceedsLimits
 		}
-		return nil, 0, fmt.Errorf("error peeking backlog queue items, %w", err)
+		return nil, fmt.Errorf("error peeking backlog queue items, %w", err)
 	}
 
-	return res.Items, res.TotalCount, nil
+	return &osqueue.BacklogPeekResult{
+		Items:      res.Items,
+		TotalCount: res.TotalCount,
+		Cursor:     res.Cursor,
+	}, nil
 }
 
 // NOTE: this function only work with key queues

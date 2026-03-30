@@ -123,3 +123,8 @@ func (c *checkpointRunContext) ExecutionSpan() *meta.SpanReference {
 func (c *checkpointRunContext) ParentSpan() *meta.SpanReference {
 	return tracing.RunSpanRefFromMetadata(&c.md)
 }
+
+func (c *checkpointRunContext) ReleaseCapacityLease() error {
+	// TODO: Implement this once capacity leases are supported in Checkpointing
+	return nil
+}

@@ -458,11 +458,12 @@ func (q *queueProcessor) ProcessShadowPartitionBacklog(
 	//
 	// Items that were added between backlogPeek and BacklogRefill will be considered in the next refill.
 	// Items that were moved between backlogPeek and BacklogRefill will still be refilled.
-	items, total, err := q.primaryQueueShard.BacklogPeek(ctx, backlog, time.Time{}, refillUntil, refillLimit)
+	peekResult, err := q.primaryQueueShard.BacklogPeek(ctx, backlog, time.Time{}, refillUntil, refillLimit)
 	if err != nil {
 		return nil, false, fmt.Errorf("could not peek backlog items for refill: %w", err)
 	}
 
+	items, total := peekResult.Items, peekResult.TotalCount
 	if len(items) == 0 {
 		return nil, false, nil
 	}

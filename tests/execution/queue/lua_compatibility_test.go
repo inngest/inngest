@@ -25,13 +25,13 @@ import (
 
 // getItemIDsFromBacklog is a helper function to peek items from a backlog and extract their IDs
 func getItemIDsFromBacklog(ctx context.Context, mgr queue.ShardOperations, backlog *queue.QueueBacklog, refillUntil time.Time, limit int64) ([]string, error) {
-	items, _, err := mgr.BacklogPeek(ctx, backlog, time.Time{}, refillUntil, limit)
+	res, err := mgr.BacklogPeek(ctx, backlog, time.Time{}, refillUntil, limit)
 	if err != nil {
 		return nil, err
 	}
 
-	itemIDs := make([]string, len(items))
-	for i, item := range items {
+	itemIDs := make([]string, len(res.Items))
+	for i, item := range res.Items {
 		itemIDs[i] = item.ID
 	}
 	return itemIDs, nil

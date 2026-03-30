@@ -253,8 +253,8 @@ func (m *mockShardForIterator) BacklogPrepareNormalize(ctx context.Context, b *Q
 	return nil
 }
 
-func (m *mockShardForIterator) BacklogPeek(ctx context.Context, b *QueueBacklog, from time.Time, until time.Time, limit int64, opts ...PeekOpt) ([]*QueueItem, int, error) {
-	return nil, 0, nil
+func (m *mockShardForIterator) BacklogPeek(ctx context.Context, b *QueueBacklog, from time.Time, until time.Time, limit int64, opts ...PeekOpt) (*BacklogPeekResult, error) {
+	return &BacklogPeekResult{}, nil
 }
 
 func (m *mockShardForIterator) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueShadowPartition, refillUntil time.Time, refillItems []string, latestConstraints PartitionConstraintConfig, options ...BacklogRefillOptionFn) (*BacklogRefillResult, error) {

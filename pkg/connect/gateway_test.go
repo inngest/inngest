@@ -1320,7 +1320,7 @@ func TestHandleIncomingWebSocketMessageInvalidPayloads(t *testing.T) {
 		Payload: []byte("invalid protobuf"),
 	}
 
-	serr := ch.handleIncomingWebSocketMessage(context.Background(), msg)
+	serr := ch.handleIncomingWebSocketMessage(msg)
 	require.NotNil(t, serr)
 	require.Equal(t, syscode.CodeConnectWorkerRequestAckInvalidPayload, serr.SysCode)
 
@@ -1330,7 +1330,7 @@ func TestHandleIncomingWebSocketMessageInvalidPayloads(t *testing.T) {
 		Payload: []byte("invalid protobuf"),
 	}
 
-	serr = ch.handleIncomingWebSocketMessage(context.Background(), msg)
+	serr = ch.handleIncomingWebSocketMessage(msg)
 	require.NotNil(t, serr)
 	require.Equal(t, syscode.CodeConnectWorkerRequestExtendLeaseInvalidPayload, serr.SysCode)
 
@@ -1351,7 +1351,7 @@ func TestHandleIncomingWebSocketMessageInvalidPayloads(t *testing.T) {
 		Payload: extendLeaseBytes,
 	}
 
-	serr = ch.handleIncomingWebSocketMessage(context.Background(), msg)
+	serr = ch.handleIncomingWebSocketMessage(msg)
 	require.NotNil(t, serr)
 	require.Equal(t, syscode.CodeConnectWorkerRequestExtendLeaseInvalidPayload, serr.SysCode)
 }
@@ -1382,18 +1382,18 @@ func TestHandleIncomingWebSocketMessageDraining(t *testing.T) {
 		Kind: connect.GatewayMessageType_WORKER_READY,
 	}
 
-	serr := ch.handleIncomingWebSocketMessage(context.Background(), msg)
+	serr := ch.handleIncomingWebSocketMessage(msg)
 	require.NotNil(t, serr)
 	require.Equal(t, ErrDraining.SysCode, serr.SysCode)
 
-	// Test WORKER_HEARTBEAT while draining
+	// Test WORKER_HEARTBEAT while draining — heartbeats are always allowed
+	// to keep the connection alive while in-flight work finishes.
 	msg = &connect.ConnectMessage{
 		Kind: connect.GatewayMessageType_WORKER_HEARTBEAT,
 	}
 
-	serr = ch.handleIncomingWebSocketMessage(context.Background(), msg)
-	require.NotNil(t, serr)
-	require.Equal(t, ErrDraining.SysCode, serr.SysCode)
+	serr = ch.handleIncomingWebSocketMessage(msg)
+	require.Nil(t, serr, "WORKER_HEARTBEAT should be accepted even when gateway is draining")
 
 	// Test WORKER_PAUSE while draining — this should NOT be rejected.
 	// The worker is signaling it wants to stop receiving requests, which
@@ -1402,7 +1402,7 @@ func TestHandleIncomingWebSocketMessageDraining(t *testing.T) {
 		Kind: connect.GatewayMessageType_WORKER_PAUSE,
 	}
 
-	serr = ch.handleIncomingWebSocketMessage(context.Background(), msg)
+	serr = ch.handleIncomingWebSocketMessage(msg)
 	require.Nil(t, serr, "WORKER_PAUSE should be accepted even when gateway is draining")
 }
 
@@ -1428,7 +1428,7 @@ func TestHandleIncomingWebSocketMessageMissingInstanceId(t *testing.T) {
 		Kind: connect.GatewayMessageType_WORKER_READY,
 	}
 
-	serr := ch.handleIncomingWebSocketMessage(context.Background(), msg)
+	serr := ch.handleIncomingWebSocketMessage(msg)
 	require.NotNil(t, serr)
 	t.Logf("serr: %+v", serr)
 	require.Equal(t, syscode.CodeConnectInternal, serr.SysCode)
@@ -1439,7 +1439,7 @@ func TestHandleIncomingWebSocketMessageMissingInstanceId(t *testing.T) {
 		Kind: connect.GatewayMessageType_WORKER_HEARTBEAT,
 	}
 
-	serr = ch.handleIncomingWebSocketMessage(context.Background(), msg)
+	serr = ch.handleIncomingWebSocketMessage(msg)
 	require.NotNil(t, serr)
 	require.Equal(t, syscode.CodeConnectInternal, serr.SysCode)
 	require.Contains(t, serr.Msg, "missing instanceId")

@@ -2730,6 +2730,7 @@ func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequ
 	evts, err := e.smv2.LoadEvents(ctx, id)
 	if errors.Is(err, state.ErrEventNotFound) {
 		// If the event has gone, another thread cancelled the function.
+		l.Warn("cancel: events not found but metadata exists, skipping finalize")
 		return nil
 	}
 	if err != nil {
@@ -3407,9 +3408,15 @@ func (e *executor) handleGeneratorStep(ctx context.Context, runCtx execution.Run
 		// XXX: we should totally attach a warning to the function run here.
 		return nil
 	}
-
 	if err != nil {
 		return err
+	}
+
+	// Once step output has been saved, we can release the held capacity.
+	// This allows us to continue work in the queue on other items even before
+	// the next step is enqueued and accounting is handled.
+	if err := runCtx.ReleaseCapacityLease(); err != nil {
+		logger.StdlibLogger(ctx).ReportError(err, "could not release capacity lease early")
 	}
 
 	// Extract AI metadata from step output.
@@ -3572,6 +3579,13 @@ func (e *executor) handleStepFailed(ctx context.Context, runCtx execution.RunCon
 	hasPendingSteps, err := e.smv2.SaveStep(ctx, runCtx.Metadata().ID, gen.ID, []byte(output))
 	if err != nil {
 		return err
+	}
+
+	// Once step output has been saved, we can release the held capacity.
+	// This allows us to continue work in the queue on other items even before
+	// the next step is enqueued and accounting is handled.
+	if err := runCtx.ReleaseCapacityLease(); err != nil {
+		logger.StdlibLogger(ctx).ReportError(err, "could not release capacity lease early")
 	}
 
 	// Because this is a final step error that was handled gracefully, enqueue
@@ -4855,6 +4869,13 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, runCtx execu
 		}
 		// Allow pause already existing to be idempotent, and continue on with enqueueing.
 		span.Drop()
+	}
+
+	// Once pause has been saved, we can release the held capacity.
+	// This allows us to continue work in the queue on other items even before
+	// the next step is enqueued and accounting is handled.
+	if err := runCtx.ReleaseCapacityLease(); err != nil {
+		logger.StdlibLogger(ctx).ReportError(err, "could not release capacity lease early")
 	}
 
 	// TODO Is this fine to leave? No attempts.

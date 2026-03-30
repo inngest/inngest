@@ -271,14 +271,14 @@ export const StepInfo = ({
           />
 
           <span className="text-basis text-sm font-normal">{trace.name}</span>
-          {trace.attempts !== null && (trace.attempts > 0 || trace.status === 'FAILED') && (
+          {trace.attempts !== null && trace.attempts > 0 && (
             <span data-testid="retry-attempt-badge">
               <Pill
                 className={`${getStatusBackgroundClass(trace.status)} ${getStatusTextClass(
                   trace.status
                 )}`}
               >
-                Attempt {trace.attempts + 1}
+                {trace.attempts} {trace.attempts === 1 ? 'retry' : 'retries'}
               </Pill>
             </span>
           )}
