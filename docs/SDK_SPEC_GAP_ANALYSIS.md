@@ -119,9 +119,9 @@ batchEvents?: {
 }
 ```
 
-#### 3.5 `checkpoint` (Go SDK)
+#### 3.5 `checkpointing` (Go and TS SDKs)
 
-Checkpoint configuration for storing step results via API. Only in Go SDK currently.
+Checkpointing allows step results to be persisted to the Inngest Server during execution via API calls, providing durability for long-running sync executions. Configurable with `bufferedSteps`, `maxInterval`, and `maxRuntime`. Present in Go and TypeScript SDKs; not yet in Python.
 
 #### 3.6 Step runtime `type`
 
