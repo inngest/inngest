@@ -11,7 +11,14 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/expressions"
+	"github.com/inngest/inngest/pkg/syscode"
 	cron "github.com/robfig/cron/v3"
+	"go.uber.org/multierr"
+)
+
+const (
+	MaxCronLength      = 255
+	MaxEventNameLength = 255
 )
 
 // Triggerable represents a single or multiple triggers for a function.
@@ -51,6 +58,20 @@ func (m MultipleTriggers) Validate(ctx context.Context) error {
 
 		if terr := t.Validate(ctx); terr != nil {
 			err = multierror.Append(err, terr)
+		}
+
+		if t.CronTrigger != nil && len(t.CronTrigger.Cron) > MaxCronLength {
+			err = multierr.Append(err, syscode.Error{
+				Code:    syscode.CodeCronInvalid,
+				Message: fmt.Sprintf("cron is too long. maximum length is %d characters", MaxCronLength),
+			})
+		}
+
+		if t.EventTrigger != nil && len(t.Event) > MaxEventNameLength {
+			err = multierr.Append(err, syscode.Error{
+				Code:    syscode.CodeEventNameInvalid,
+				Message: fmt.Sprintf("event name is too long. maximum length is %d characters", MaxEventNameLength),
+			})
 		}
 	}
 
