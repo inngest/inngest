@@ -1572,14 +1572,17 @@ Connect changes the execution model: instead of Inngest making HTTP `POST` reque
 
 This is useful when the SDK is running in an environment that cannot receive inbound HTTP requests (e.g. behind a firewall, on a developer's local machine without tunneling, or in a container without a public URL).
 
-The reference implementation of Connect is in the Go SDK ([`inngestgo/connect.go`](https://github.com/inngest/inngestgo)). The TypeScript SDK also provides a Connect implementation ([`inngest-js/packages/inngest/src/components/connect/`](https://github.com/inngest/inngest-js)).
+The reference implementations of Connect are in the Go SDK ([`inngestgo/connect/`](https://github.com/inngest/inngestgo/tree/main/connect)) and the TypeScript SDK ([`inngest-js/packages/inngest/src/components/connect/`](https://github.com/inngest/inngest-js/tree/main/packages/inngest/src/components/connect)). The protocol definitions are in [`proto/connect/v1/connect.proto`](https://github.com/inngest/inngest/blob/main/proto/connect/v1/connect.proto).
 
 ## 8.1. Environment variables
 
 The following environment variables are relevant to Connect:
 
-- `INNGEST_CONNECT_MAX_WORKER_CONCURRENCY`
-Controls the maximum number of concurrent function executions when using Connect. If not set, the SDK SHOULD use a reasonable default.
+| Variable                                 | Required | Description                                                                                                                                  |
+|------------------------------------------|----------|----------------------------------------------------------------------------------------------------------------------------------------------|
+| `INNGEST_CONNECT_MAX_WORKER_CONCURRENCY` | No       | Maximum concurrent function executions. Go SDK defaults to 1,000.                                                                            |
+| `INNGEST_CONNECT_ISOLATE_EXECUTION`      | No       | TS SDK only. When `true` (default), runs the WebSocket connection in a separate worker thread to prevent user code from blocking heartbeats. |
+| `INNGEST_CONNECT_GATEWAY_URL`            | No       | TS SDK only. Override the WebSocket gateway endpoint URL.                                                                                    |
 
 ## 8.2. Runtime type
 
@@ -1596,6 +1599,316 @@ steps: {
   };
 };
 ```
+
+## 8.3. Wire format
+
+All Connect messages use Protocol Buffers (`connect.v1` package) serialized as binary WebSocket frames. The message envelope is:
+
+```protobuf
+message ConnectMessage {
+  GatewayMessageType kind = 1;
+  bytes payload = 2;
+}
+```
+
+The `payload` field contains a nested Protobuf message specific to the `kind`. The WebSocket sub-protocol MUST be `v0.connect.inngest.com`.
+
+## 8.4. Message types
+
+The following message types are defined in the `GatewayMessageType` enum:
+
+| Value | Name                              | Direction        | Purpose                                                         |
+|-------|-----------------------------------|------------------|-----------------------------------------------------------------|
+| 0     | `GATEWAY_HELLO`                   | Gateway → Worker | Server greeting after WebSocket open                            |
+| 1     | `WORKER_CONNECT`                  | Worker → Gateway | Worker authentication and registration                          |
+| 2     | `GATEWAY_CONNECTION_READY`        | Gateway → Worker | Connection confirmed ready (includes heartbeat/lease intervals) |
+| 3     | `GATEWAY_EXECUTOR_REQUEST`        | Gateway → Worker | Function execution request                                      |
+| 4     | `WORKER_READY`                    | Worker → Gateway | Manual readiness acknowledgment (optional)                      |
+| 5     | `WORKER_REQUEST_ACK`              | Worker → Gateway | Acknowledges receipt of execution request                       |
+| 6     | `WORKER_REPLY`                    | Worker → Gateway | Function execution response                                     |
+| 7     | `WORKER_REPLY_ACK`                | Gateway → Worker | Gateway confirms receipt of worker reply                        |
+| 8     | `WORKER_PAUSE`                    | Worker → Gateway | Worker is shutting down, stop sending requests                  |
+| 9     | `WORKER_HEARTBEAT`                | Worker → Gateway | Periodic worker keepalive                                       |
+| 10    | `GATEWAY_HEARTBEAT`               | Gateway → Worker | Periodic gateway keepalive                                      |
+| 11    | `GATEWAY_CLOSING`                 | Gateway → Worker | Gateway is draining; worker should reconnect                    |
+| 12    | `WORKER_REQUEST_EXTEND_LEASE`     | Worker → Gateway | Request to extend execution lease                               |
+| 13    | `WORKER_REQUEST_EXTEND_LEASE_ACK` | Gateway → Worker | Lease extension response (contains new lease ID)                |
+| 14    | `SYNC_FAILED`                     | Gateway → Worker | Sync failure notification                                       |
+
+## 8.5. Connection lifecycle
+
+The Connect protocol has three phases: Pre-Connection (HTTP), Handshake (WebSocket), and Steady-State (WebSocket).
+
+### 8.5.1. Phase 1: Pre-Connection (HTTP Start API)
+
+Before establishing the WebSocket connection, the SDK MUST obtain connection parameters from the Inngest API via an HTTP request.
+
+**Request:**
+
+```
+POST {apiBaseURL}/v0/connect/start
+Content-Type: application/protobuf
+Authorization: Bearer {hashedSigningKey}
+X-Inngest-Env: {environment}  (optional)
+```
+
+The request body is a Protobuf-encoded `StartRequest`:
+
+```protobuf
+message StartRequest {
+  repeated string exclude_gateways = 1;
+}
+```
+
+The `exclude_gateways` field lists gateway groups that should be avoided (e.g. a gateway that was previously draining or timed out during handshake).
+
+**Response:**
+
+On success (HTTP 200), the response body is a Protobuf-encoded `StartResponse`:
+
+```protobuf
+message StartResponse {
+  string connection_id = 1;    // ULID assigned to this connection
+  string gateway_endpoint = 2; // WebSocket URL to dial
+  string gateway_group = 3;    // Gateway group name (for exclusion on reconnect)
+  string session_token = 4;    // Auth token for the WebSocket handshake
+  string sync_token = 5;       // Sync token for the WebSocket handshake
+}
+```
+
+**Error responses:**
+
+| HTTP Status | Meaning              | SDK Behavior                                                     |
+|-------------|----------------------|------------------------------------------------------------------|
+| 401         | Unauthenticated      | Retry with fallback signing key if available; fatal if both fail |
+| 429         | Too many connections | Fatal on initial connection; retry on subsequent reconnects      |
+| Other       | Server error         | Treat as retriable; reconnect with backoff                       |
+
+### 8.5.2. Phase 2: WebSocket Handshake
+
+After obtaining a `StartResponse`, the SDK opens a WebSocket connection to the `gateway_endpoint` with sub-protocol `v0.connect.inngest.com`. The SDK SHOULD use a connection timeout of 10 seconds. The default message read limit SHOULD be 10MB.
+
+The handshake consists of three steps:
+
+**Step 1: Gateway Hello** (Gateway → Worker)
+
+The first message received MUST be a `ConnectMessage` with `kind = GATEWAY_HELLO`. The SDK SHOULD time out after 5 seconds if no message is received. If any other message type is received first, the handshake MUST fail and the SDK SHOULD reconnect.
+
+**Step 2: Worker Connect** (Worker → Gateway)
+
+The SDK sends a `ConnectMessage` with `kind = WORKER_CONNECT`. The payload is a Protobuf-encoded `WorkerConnectRequestData`:
+
+```protobuf
+message WorkerConnectRequestData {
+  string connection_id = 1;                   // From StartResponse
+  string instance_id = 2;                     // Stable worker identifier (hostname or user-provided)
+  AuthData auth_data = 3;                     // session_token + sync_token from StartResponse
+  bytes capabilities = 4;                     // JSON-marshaled SDK capabilities
+  repeated AppConfiguration apps = 5;         // App configs with serialized function definitions
+  bool worker_manual_readiness_ack = 6;       // Whether the worker will send WORKER_READY manually
+  SystemAttributes system_attributes = 7;     // CPU cores, memory, OS
+  optional string environment = 8;            // Environment name
+  string framework = 9;                       // Framework identifier (e.g. "connect")
+  optional string platform = 10;              // Platform identifier
+  string sdk_version = 11;                    // SDK version string
+  string sdk_language = 12;                   // "go" or "typescript"
+  google.protobuf.Timestamp started_at = 13;  // Worker start time
+  optional int64 max_worker_concurrency = 14; // Max concurrent executions
+}
+```
+
+The `capabilities` field SHOULD include at minimum:
+
+```json
+{ "trust_probe": "v1", "connect": "v1" }
+```
+
+Each `AppConfiguration` contains:
+
+```protobuf
+message AppConfiguration {
+  string app_name = 1;
+  optional string app_version = 2;
+  bytes functions = 4;  // JSON-serialized function configurations
+}
+```
+
+**Step 3: Connection Ready** (Gateway → Worker)
+
+The next message received MUST be a `ConnectMessage` with `kind = GATEWAY_CONNECTION_READY`. The SDK SHOULD time out after 20 seconds. The payload is a Protobuf-encoded `GatewayConnectionReadyData`:
+
+```protobuf
+message GatewayConnectionReadyData {
+  string heartbeat_interval = 1;       // Duration string (e.g. "10s")
+  string extend_lease_interval = 2;    // Duration string (e.g. "5s")
+}
+```
+
+These server-provided intervals govern all subsequent heartbeat and lease extension timing. The SDK MUST parse these duration strings and use the specified intervals. After receiving this message, the connection transitions to the `ACTIVE` state.
+
+### 8.5.3. Phase 3: Steady-State
+
+Once the handshake completes, the SDK enters a message processing loop. The SDK MUST handle the following message types:
+
+#### Heartbeats
+
+- The SDK MUST send `WORKER_HEARTBEAT` messages at the interval specified by `heartbeat_interval` from the `GATEWAY_CONNECTION_READY` message.
+- The SDK MUST monitor for `GATEWAY_HEARTBEAT` messages from the server.
+- If the SDK misses 2 consecutive expected gateway heartbeats (i.e. no `GATEWAY_HEARTBEAT` received within `2 × heartbeat_interval`), the SDK MUST treat the connection as dead and trigger reconnection.
+
+Both Go and TS SDKs implement this as: increment a pending-heartbeats counter on each sent heartbeat, reset to 0 on each received `GATEWAY_HEARTBEAT`, and reconnect when the counter reaches 2.
+
+#### Function execution
+
+When a `GATEWAY_EXECUTOR_REQUEST` message is received:
+
+1. **Decode** the `GatewayExecutorRequestData` payload:
+
+```protobuf
+message GatewayExecutorRequestData {
+  string request_id = 1;
+  string account_id = 2;
+  string env_id = 3;
+  string app_id = 4;
+  string app_name = 5;
+  string function_id = 6;
+  string function_slug = 7;
+  optional string step_id = 8;
+  bytes request_payload = 9;    // JSON body (same format as HTTP execution requests)
+  bytes system_trace_ctx = 10;
+  bytes user_trace_ctx = 11;
+  string run_id = 12;
+  string lease_id = 13;
+}
+```
+
+2. **Acknowledge** the request immediately by sending `WORKER_REQUEST_ACK` with a `WorkerRequestAckData` payload that echoes back the request metadata fields (`request_id`, `account_id`, `env_id`, `app_id`, `function_slug`, `step_id`, `system_trace_ctx`, `user_trace_ctx`, `run_id`).
+
+3. **Begin lease extension** by periodically sending `WORKER_REQUEST_EXTEND_LEASE` at the `extend_lease_interval` from the handshake. The payload (`WorkerRequestExtendLeaseData`) includes the current `lease_id`. The server responds with `WORKER_REQUEST_EXTEND_LEASE_ACK` containing a `new_lease_id`. If `new_lease_id` is present, the SDK MUST update its stored lease ID. If absent, the lease could not be extended and the SDK SHOULD stop extending.
+
+4. **Execute** the function using the same execution logic as HTTP-based execution (the `request_payload` has the same JSON format as the HTTP POST body).
+
+5. **Reply** by sending `WORKER_REPLY` with a Protobuf-encoded `SDKResponse` payload:
+
+```protobuf
+message SDKResponse {
+  string request_id = 1;
+  string account_id = 2;
+  string env_id = 3;
+  string app_id = 4;
+  SDKResponseStatus status = 5;  // NOT_COMPLETED=0, DONE=1, ERROR=2
+  bytes body = 6;                // JSON response body
+  bool no_retry = 7;
+  optional string retry_after = 8;  // RFC3339 timestamp
+  string sdk_version = 9;
+  uint32 request_version = 10;
+  bytes system_trace_ctx = 11;
+  bytes user_trace_ctx = 12;
+  string run_id = 13;
+}
+```
+
+The `status` field maps to HTTP status codes as follows:
+- `DONE` (1) → 200
+- `ERROR` (2) → 500
+- `NOT_COMPLETED` (0) → 206 (step/generator opcodes returned; function is mid-execution)
+
+6. **Wait for acknowledgment**: The gateway responds with `WORKER_REPLY_ACK` containing the `request_id`. The SDK SHOULD track pending replies and use a timeout (both SDKs use 5 seconds) to detect unacknowledged replies.
+
+#### Gateway draining
+
+When a `GATEWAY_CLOSING` message is received, the gateway is shutting down. The SDK SHOULD:
+
+1. Establish a **new** connection to a different gateway (excluding the draining gateway's group via `exclude_gateways` in the `StartRequest`).
+2. Keep the old connection open for in-flight requests until the new connection is ready.
+3. Transition in-flight lease extensions to use the **new** connection's WebSocket.
+4. Close the old connection after all in-flight requests complete or the new connection is ready.
+
+Both the Go and TS SDKs implement this pattern: establish the replacement connection first, then tear down the old one.
+
+## 8.6. Reconnection
+
+The SDK MUST implement automatic reconnection with exponential backoff. Both reference implementations use the following backoff sequence: `[1s, 2s, 5s, 10s, 20s, 30s, 60s, 120s, 300s]`.
+
+**Reconnect triggers:**
+- WebSocket close (any close code, unless non-retriable)
+- Unexpected `net.ErrClosed`, `io.EOF`, or equivalent connection errors
+- Missed gateway heartbeats (2 consecutive)
+- Any retriable error during the handshake or start API
+
+**Reconnection behavior:**
+- The SDK SHOULD allow a maximum number of consecutive failed attempts (Go SDK uses 5) before giving up.
+- The attempt counter MUST reset to 0 on a successful connection.
+- Before reconnecting, the SDK SHOULD flush any buffered unacknowledged replies via the HTTP flush API (`POST /v0/connect/flush`).
+
+**Non-retriable close codes:**
+
+The SDK SHOULD treat certain WebSocket close codes as fatal (non-retriable). Close codes for auth failures that are not recoverable (e.g. invalid signing key with no fallback) SHOULD terminate the connection loop.
+
+**Auth retry:**
+
+On a 401 from the start API, the SDK SHOULD retry once using a fallback signing key (if available). If both keys fail, the error is fatal.
+
+## 8.7. Message buffering and reliable delivery
+
+The SDK SHOULD implement a message buffer to ensure at-least-once delivery of `WORKER_REPLY` messages:
+
+1. When a reply is sent, add it to a pending-acknowledgment map with a timeout (both SDKs use 5 seconds).
+2. When `WORKER_REPLY_ACK` is received, remove the corresponding entry from the map.
+3. If the timeout expires without acknowledgment, move the message to a buffer for fallback delivery.
+4. If the WebSocket is unavailable when a reply completes (e.g. mid-reconnection), add the reply directly to the buffer.
+5. Flush buffered messages via `POST {apiBaseURL}/v0/connect/flush` with the Protobuf-encoded `SDKResponse` as the request body.
+6. Flush SHOULD be attempted: before each reconnect, after establishing a new connection, and during graceful shutdown.
+7. Flush SHOULD retry up to 5 times with exponential backoff.
+
+## 8.8. Graceful shutdown
+
+When the SDK is shutting down (e.g. SIGINT/SIGTERM), it SHOULD:
+
+1. Send `WORKER_PAUSE` to tell the gateway to stop sending new requests.
+2. Wait for all in-progress function executions to complete (via the worker pool).
+3. Flush any buffered unacknowledged replies via the HTTP flush API.
+4. Close the WebSocket with close code `1000` (Normal Closure) and reason `WORKER_SHUTDOWN`.
+
+## 8.9. Worker pool
+
+The SDK SHOULD maintain a bounded worker pool to limit concurrent function executions:
+
+- The pool size is configured via `INNGEST_CONNECT_MAX_WORKER_CONCURRENCY` or the `maxWorkerConcurrency` option.
+- The Go SDK defaults to 1,000 concurrent workers.
+- The TS SDK defaults to the value of `maxWorkerConcurrency` if set, with no hard default.
+- The pool tracks in-progress requests via a wait group (or equivalent) for graceful shutdown.
+- Incoming `GATEWAY_EXECUTOR_REQUEST` messages SHOULD be dispatched to the pool non-blocking.
+
+## 8.10. Connection states
+
+The SDK SHOULD track connection state using the following states:
+
+| State          | Description                                                 |
+|----------------|-------------------------------------------------------------|
+| `CONNECTING`   | Initial state; performing HTTP start + WebSocket handshake  |
+| `ACTIVE`       | Handshake complete; processing messages                     |
+| `RECONNECTING` | Connection lost; attempting to re-establish                 |
+| `CLOSING`      | Graceful shutdown initiated; waiting for in-flight requests |
+| `CLOSED`       | Fully closed; terminal state                                |
+
+## 8.11. Implementation differences between Go and TypeScript SDKs
+
+While both SDKs implement the same protocol, there are notable implementation differences:
+
+| Aspect                           | Go SDK (`inngestgo`)                                 | TypeScript SDK (`inngest-js`)                                                                                                                                                      |
+|----------------------------------|------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Entry point**                  | `connect/handler.go`, `connect/connection.go`        | `components/connect/index.ts`, `strategies/core/connection.ts`                                                                                                                     |
+| **Thread model**                 | Single goroutine-based; goroutine pool for execution | Supports two strategies: same-thread and worker-thread (default). Worker-thread runs WebSocket in a Node.js `worker_threads` Worker to prevent user code from blocking heartbeats. |
+| **Default concurrency**          | 1,000                                                | No hard default (configured by user)                                                                                                                                               |
+| **Reconnect max attempts**       | 5 consecutive failures                               | Unlimited (loops until `CLOSED` state)                                                                                                                                             |
+| **Backoff sequence**             | `[1s, 2s, 5s, 10s, 20s, 30s, 60s, 120s, 300s]`       | `[1s, 2s, 5s, 10s, 20s, 30s, 60s, 120s, 300s]`                                                                                                                                     |
+| **Pending ack timeout**          | 5 seconds                                            | 5 seconds                                                                                                                                                                          |
+| **Handshake hello timeout**      | 5 seconds                                            | 10 seconds (entire handshake)                                                                                                                                                      |
+| **Handshake ready timeout**      | 20 seconds                                           | 10 seconds (entire handshake)                                                                                                                                                      |
+| **Heartbeat miss threshold**     | 2 × heartbeat_interval grace period                  | 2 consecutive missed heartbeats                                                                                                                                                    |
+| **Capabilities JSON**            | `{"trust_probe":"v1","connect":"v1"}`                | `{"trust_probe":"v1","connect":"v1"}`                                                                                                                                              |
+| **Worker thread crash recovery** | N/A                                                  | Respawns with exponential backoff (500ms base, 30s max), gives up after 10 consecutive crashes                                                                                     |
 
 # 9. Streaming
 

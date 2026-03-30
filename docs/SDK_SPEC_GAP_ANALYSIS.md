@@ -241,11 +241,24 @@ The TS SDK has the richest middleware system with step-level hooks and wrapping 
 
 ### 8. Connect Protocol
 
-All three SDKs implement a WebSocket-based Connect protocol for persistent connections between the SDK and Inngest. This is a significant feature with no spec coverage.
+All three SDKs implement a WebSocket-based Connect protocol for persistent connections between the SDK and Inngest.
 
-- **Go**: `inngestgo/connect.go`
-- **TS**: `inngest-js/packages/inngest/src/components/connect/`
+- **Go**: `inngestgo/connect/` (handler.go, connection.go, handshake.go, invoke.go, buffer.go, workerapi.go, worker_pool.go)
+- **TS**: `inngest-js/packages/inngest/src/components/connect/` (index.ts, strategies/core/connection.ts, buffer.ts, messages.ts, util.ts)
 - **Python**: `inngest-py/pkg/inngest/inngest/connect/`
+
+**Status**: Section 8 of the spec has been expanded with full client-side protocol documentation covering:
+- Wire format (Protobuf over binary WebSocket frames)
+- All 15 message types with direction and purpose
+- Full connection lifecycle (HTTP start API → WebSocket handshake → steady-state)
+- Function execution flow (ack → lease extension → reply → reply ack)
+- Reconnection logic with exponential backoff
+- Message buffering and reliable delivery (at-least-once semantics)
+- Graceful shutdown protocol
+- Gateway draining and transparent reconnection
+- Worker pool configuration
+- Connection state machine
+- Implementation differences between Go and TS SDKs
 
 ---
 
@@ -431,31 +444,9 @@ The memoized result will be the HTTP response.
 
 ### Priority 3: Document New Features
 
-#### P3.1: Add Connect protocol section (section 8)
+#### P3.1: ~~Add Connect protocol section (section 8)~~ DONE
 
-Add a new top-level section:
-
-```
-# 8. Connect
-
-An SDK MAY support a persistent WebSocket-based connection to the
-Inngest Server, called "Connect." When using Connect, the SDK
-maintains a long-lived connection instead of exposing an HTTP endpoint.
-
-Connect changes the execution model: instead of Inngest making HTTP
-POST requests to the SDK, the SDK receives execution requests over the
-WebSocket connection and sends responses back on the same connection.
-
-## 8.1. Environment Variables
-
-- `INNGEST_CONNECT_MAX_WORKER_CONCURRENCY`
-  Controls the maximum number of concurrent function executions.
-
-## 8.2. Runtime Type
-
-When using Connect, the step runtime `type` in the sync payload MUST
-be `"ws"` instead of `"http"`.
-```
+Section 8 of `SDK_SPEC.md` has been expanded with comprehensive client-side protocol documentation derived from the Go SDK (`inngestgo/connect/`) and TypeScript SDK (`inngest-js/packages/inngest/src/components/connect/`) implementations. The updated section covers the full connection lifecycle (HTTP start API, 3-step WebSocket handshake, steady-state message loop), all 15 message types, function execution flow, reconnection with exponential backoff, message buffering for reliable delivery, graceful shutdown, gateway draining, worker pool management, and implementation differences between the two SDKs.
 
 #### P3.2: Add streaming section (section 9)
 
@@ -570,7 +561,7 @@ Used by Go and Python SDKs for deterministic event ID generation.
 | Add `step.waitForSignal` | P2 | Medium | New primitive |
 | Add `step.ai.infer` | P2 | Medium | Growing feature |
 | Add `step.fetch` | P2 | Medium | Growing feature |
-| Document Connect | P3 | Large | Major feature |
+| ~~Document Connect~~ | ~~P3~~ | ~~Large~~ | **DONE** -- Section 8 expanded |
 | Document streaming | P3 | Small | All SDKs support |
 | Document in-band sync | P3 | Small | All SDKs support |
 | Add `capabilities` to introspection | P3 | Trivial | Spec violation |
