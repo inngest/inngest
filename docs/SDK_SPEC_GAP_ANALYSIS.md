@@ -125,6 +125,8 @@ batchEvents?: {
 
 Checkpointing allows step results to be persisted to the Inngest Server during execution via API calls, providing durability for long-running sync executions. Configurable with `bufferedSteps`, `maxInterval`, and `maxRuntime`. Present in Go and TypeScript SDKs; not yet in Python.
 
+**Status**: DONE. Checkpointing is now fully documented in section 10, covering configuration, sync/async opcode classification, checkpoint API endpoints, execution flows (async and sync modes), graceful fallback, and implementation differences between Go and TS SDKs.
+
 #### 3.6 Step runtime `type`
 
 ~~The spec only documents `type: "http"`.~~

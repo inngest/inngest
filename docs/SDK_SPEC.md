@@ -71,9 +71,18 @@ This document presents the Open Source SDK Specification for Inngest, outlining 
 - [9](#9-streaming). Streaming
 - [10](#10-checkpointing). Checkpointing
   - [10.1](#101-configuration). Configuration
+    - [10.1.1](#1011-sync-payload). Sync payload
   - [10.2](#102-sync-and-async-opcodes). Sync and async opcodes
   - [10.3](#103-checkpoint-api). Checkpoint API
+    - [10.3.1](#1031-async-checkpointing). Async checkpointing
+    - [10.3.2](#1032-sync-checkpointing). Sync checkpointing
+    - [10.3.3](#1033-retry-behavior). Retry behavior
+    - [10.3.4](#1034-signing-key-fallback). Signing key fallback
   - [10.4](#104-execution-flow). Execution flow
+    - [10.4.1](#1041-async-checkpointing-flow). Async checkpointing flow
+    - [10.4.2](#1042-sync-checkpointing-flow). Sync checkpointing flow
+    - [10.4.3](#1043-graceful-fallback). Graceful fallback
+  - [10.5](#105-implementation-differences-between-go-and-typescript-sdks). Implementation differences
 - [11](#11-failure-handlers). Failure Handlers
 
 # 1. Introduction
@@ -1920,23 +1929,326 @@ The final response data MUST still be sent as the last chunk of the stream and M
 
 # 10. Checkpointing
 
-TODO: Document the Checkpointing feature.
+An SDK MAY support checkpointing, which allows the SDK to execute multiple steps within a single invocation by sending step results to the Inngest Server's API in the background, rather than yielding control back to the executor after each step.
+
+In the traditional (non-checkpointed) execution model, the SDK returns a `206` response after each step, and the Inngest executor makes a new Call Request for the next step. This creates one HTTP round-trip per step. Checkpointing eliminates this overhead by letting the SDK persist step results to the server as they complete, continuing execution without waiting for a new Call Request.
+
+Checkpointing is only applicable to **sync opcodes** (primarily `StepRun`). When the SDK encounters an **async opcode** (e.g. `Sleep`, `WaitForEvent`, `InvokeFunction`), it MUST fall back to the standard yield-and-return model, because these opcodes require the executor to schedule future work.
+
+The reference implementations are in the Go SDK ([`inngestgo/internal/checkpoint/`](https://github.com/inngest/inngestgo)) and the TypeScript SDK ([`inngest-js/packages/inngest/src/components/execution/engine.ts`](https://github.com/inngest/inngest-js)).
 
 ## 10.1. Configuration
 
-TODO
+An SDK that supports checkpointing SHOULD allow configuration at both the client level (default for all functions) and the function level (overrides client default). If no explicit configuration is provided, the SDK MAY enable checkpointing by default (the TS SDK defaults to enabled; the Go SDK requires explicit opt-in).
+
+The configuration options are:
+
+```typescript
+checkpoint?: {
+  /**
+   * Maximum number of steps to buffer before sending a checkpoint
+   * request to the server. When the buffer reaches this count,
+   * the SDK MUST flush immediately.
+   *
+   * A value of 0 or 1 means checkpoint after every single step
+   * (safest, highest latency). A higher value batches steps for
+   * fewer API calls (faster, less granular durability).
+   *
+   * Go SDK calls this `batch_steps`. TS SDK calls this `bufferedSteps`.
+   */
+  bufferedSteps?: number;  // Default: 0 (Go) or 1 (TS) — checkpoint after every step
+
+  /**
+   * Maximum time interval between checkpoint flushes. If set, the
+   * SDK starts a timer when the first step enters the buffer. When
+   * the timer fires, all buffered steps are flushed regardless of
+   * count.
+   *
+   * Go SDK calls this `batch_interval`. TS SDK calls this `maxInterval`.
+   */
+  maxInterval?: Duration;  // Default: 0 (disabled)
+
+  /**
+   * Maximum total execution time for a single invocation. When
+   * exceeded, the SDK MUST yield control back to the executor
+   * (by returning a `DiscoveryRequest` opcode), which will
+   * schedule a new Call Request to continue execution.
+   *
+   * This is useful in serverless environments with execution
+   * time limits.
+   */
+  maxRuntime?: Duration;   // Default: 0 (disabled)
+}
+```
+
+Both SDKs provide preset configurations:
+
+| Preset         | `bufferedSteps` | `maxInterval` | Description                                              |
+|----------------|-----------------|---------------|----------------------------------------------------------|
+| Safe (default) | 0 / 1           | 0             | Checkpoint after every step. Most durable.               |
+| Performant     | 1000            | 0             | Batch as many steps as possible. Least durable, fastest. |
+| Blended        | 3               | 3s            | Checkpoint after 3 steps or 3 seconds. Balanced.         |
+
+### 10.1.1. Sync payload
+
+When registering a function that has checkpointing enabled, the SDK SHOULD include the checkpoint configuration in the sync payload so the Inngest Server is aware of the function's checkpointing behavior:
+
+```json
+{
+  "checkpoint": {
+    "batch_steps": 0,
+    "batch_interval": "3s",
+    "max_runtime": "0s"
+  }
+}
+```
 
 ## 10.2. Sync and async opcodes
 
-TODO
+Opcodes are classified as either **sync** (checkpointable) or **async** (requires executor intervention):
+
+| Opcode                 | Classification | Rationale                                         |
+|------------------------|----------------|---------------------------------------------------|
+| `StepRun` (2)          | Sync           | Step executed and returned data; SDK can continue |
+| `Step` (1)             | Sync           | Legacy variant of StepRun                         |
+| `RunComplete` (11)     | Sync           | Function finished; terminal                       |
+| `SyncRunComplete` (13) | Sync           | Sync API function completed; terminal             |
+| `StepFailed` (12)      | Sync           | Step permanently failed; terminal                 |
+| `StepPlanned` (4)      | Async          | Step needs to be scheduled for separate execution |
+| `Sleep` (5)            | Async          | Requires executor to schedule a future wake-up    |
+| `WaitForEvent` (6)     | Async          | Requires executor to listen for an event          |
+| `InvokeFunction` (7)   | Async          | Requires executor to trigger another function     |
+| `AIGateway` (8)        | Async          | Requires executor to route through AI gateway     |
+| `Gateway` (9)          | Async          | Requires executor to route through HTTP gateway   |
+| `WaitForSignal` (10)   | Async          | Requires executor to listen for a signal          |
+| `StepError` (3)        | Async*         | Requires executor to schedule a retry             |
+
+\* `StepError` is treated as async because it requires the executor to manage retry scheduling and backoff.
+
+When the SDK is in checkpoint mode and encounters an async opcode, it MUST stop checkpointing and yield control by returning the accumulated opcodes (including the async one) in the standard `206` response format. The executor then takes over scheduling.
 
 ## 10.3. Checkpoint API
 
-TODO
+The SDK communicates checkpointed step results to the Inngest Server via HTTP API calls. There are two checkpoint flows depending on how the function was initiated.
+
+### 10.3.1. Async checkpointing
+
+Used when a function was initiated by the Inngest executor (the standard background execution model) but has checkpointing enabled. The SDK sends step results to the server without yielding the HTTP response.
+
+**Endpoint:**
+
+```
+POST {apiBaseURL}/v1/checkpoint/{runID}/async
+Authorization: Bearer {hashedSigningKey}
+Content-Type: application/json
+```
+
+**Request body:**
+
+```json
+{
+  "run_id": "01ABC123...",
+  "fn_id": "uuid-of-function",
+  "qi_id": "base64-encoded-queue-item-ref",
+  "steps": [
+    {
+      "op": "StepRun",
+      "id": "hashed-step-id",
+      "name": "step-name",
+      "data": { "result": "value" }
+    }
+  ]
+}
+```
+
+The `qi_id` (queue item reference) is provided in the Call Request context as `ctx.qi_id`. It identifies the current queue item so the server can reset the retry counter after a successful checkpoint (since a single queue item is shared across many checkpointed steps).
+
+**Response:** `200 OK` on success.
+
+**Error handling:**
+- `401`: Retry with fallback signing key if available.
+- Other errors: The SDK SHOULD fall back to the standard async response (return all buffered steps in the `206` response body). This ensures the function run is not lost even if the checkpoint API is unavailable.
+
+**Constraints:** Only sync opcodes (`StepRun`) are accepted. The server rejects async opcodes (sleep, waitForEvent, etc.) in async checkpoint requests.
+
+### 10.3.2. Sync checkpointing
+
+Used for sync/durable endpoint functions where the SDK drives the entire execution flow from an external HTTP request (e.g. an API route handler). In this mode, the SDK creates the run itself and checkpoints all steps.
+
+**Create run + initial checkpoint:**
+
+```
+POST {apiBaseURL}/v1/checkpoint
+Authorization: Bearer {hashedSigningKey}
+Content-Type: application/json
+```
+
+```json
+{
+  "run_id": "01ABC123...",
+  "event": { "name": "...", "data": { ... } },
+  "steps": [ ... ],
+  "request_version": 2,
+  "retries": 3
+}
+```
+
+**Response:**
+
+```json
+{
+  "data": {
+    "fn_id": "uuid",
+    "app_id": "uuid",
+    "run_id": "ulid",
+    "token": "jwt-token"
+  }
+}
+```
+
+The `token` is a JWT that can be used to poll for run output (for async fallback).
+
+**Subsequent step checkpoints:**
+
+```
+POST {apiBaseURL}/v1/checkpoint/{runID}/steps
+Authorization: Bearer {hashedSigningKey}
+Content-Type: application/json
+```
+
+```json
+{
+  "fn_id": "uuid",
+  "app_id": "uuid",
+  "run_id": "ulid",
+  "steps": [ ... ]
+}
+```
+
+**Run completion:**
+
+When the function completes in sync mode, the SDK checkpoints a `RunComplete` opcode containing the final result.
+
+### 10.3.3. Retry behavior
+
+All checkpoint API calls SHOULD be retried on transient failures. Both SDKs use up to 5 retry attempts with exponential backoff (Go: not explicitly retried at the checkpoint level; TS: 5 attempts, 100ms base delay with jitter).
+
+### 10.3.4. Signing key fallback
+
+If a checkpoint API call returns `401 Unauthorized` and a fallback signing key is available, the SDK SHOULD retry with the fallback key. This is a one-way switch: once the fallback key succeeds, all subsequent calls use it.
 
 ## 10.4. Execution flow
 
-TODO
+### 10.4.1. Async checkpointing flow
+
+This is the most common checkpointing mode, used when the Inngest executor initiates the function via a standard Call Request.
+
+```
+Inngest Server                          SDK
+     |                                   |
+     |--- POST (Call Request) ---------->|
+     |    (with step state, fn_id,       |
+     |     qi_id in ctx)                 |
+     |                                   |  Resolve checkpoint config
+     |                                   |  Enter checkpoint mode
+     |                                   |
+     |                                   |  Execute step A
+     |                                   |  Buffer step A result
+     |<-- POST /v1/checkpoint/{id}/async |  (buffer full or interval)
+     |--- 200 OK ----------------------->|
+     |                                   |  Execute step B
+     |                                   |  Buffer step B result
+     |<-- POST /v1/checkpoint/{id}/async |
+     |--- 200 OK ----------------------->|
+     |                                   |  Execute step C (sleep)
+     |                                   |  Async opcode → yield
+     |<---------- 206 (step C: Sleep) ---|
+     |                                   |
+     |  (executor schedules sleep,       |
+     |   calls back after sleep)         |
+```
+
+**Key rules:**
+
+1. When the SDK receives a Call Request and the function has checkpointing enabled, the SDK enters checkpoint mode (both SDKs call this `StepModeCheckpoint` or `AsyncCheckpointing`).
+
+2. As each `StepRun` completes, the result is added to a buffer.
+
+3. When the buffer reaches `bufferedSteps` count, OR `maxInterval` time elapses since the first buffered step, the SDK flushes: sends all buffered steps to `POST /v1/checkpoint/{runID}/async` and clears the buffer.
+
+4. If the checkpoint API call succeeds, the checkpointed steps are removed from the SDK's response opcode list (they have already been persisted server-side).
+
+5. If the checkpoint API call fails, the SDK MUST fall back: include the buffered steps in the normal `206` response. This ensures no step results are lost.
+
+6. If an async opcode is encountered (sleep, waitForEvent, etc.), the SDK MUST flush any buffered steps first, then yield by returning a `206` response containing the async opcode.
+
+7. If `maxRuntime` is exceeded, the SDK MUST yield by returning a `DiscoveryRequest` opcode, which tells the executor to schedule a new Call Request to continue execution.
+
+8. When the function completes (returns a value or throws a final error), the SDK returns a `206` response containing any remaining buffered steps plus a `RunComplete` opcode (TS SDK), or returns the standard `200` response (Go SDK, after final checkpoint flush).
+
+### 10.4.2. Sync checkpointing flow
+
+Used for durable endpoint / API-route functions where the SDK drives execution from an external HTTP request.
+
+```
+Client                SDK                    Inngest Server
+  |                    |                          |
+  |-- HTTP request --->|                          |
+  |                    |  Execute step A          |
+  |                    |-- POST /v1/checkpoint -->|  (creates run)
+  |                    |<-- {run_id, token} ------|
+  |                    |                          |
+  |                    |  Execute step B          |
+  |                    |-- POST /checkpoint/      |
+  |                    |   {runID}/steps -------->|
+  |                    |<-- 200 OK ---------------|
+  |                    |                          |
+  |                    |  Execute step C (sleep)  |
+  |                    |  Async opcode → switch   |
+  |                    |-- POST /checkpoint/      |
+  |                    |   {runID}/steps -------->|  (with sleep opcode)
+  |                    |<-- 200 OK ---------------|
+  |                    |                          |
+  |<-- 302 redirect --|  (or token response)     |
+  |    to /v1/checkpoint/{runID}/output?token=... |
+```
+
+**Key rules:**
+
+1. In sync mode, the SDK creates the run by calling `POST /v1/checkpoint` with the event and initial steps. The server returns a `run_id` and `token`.
+
+2. Subsequent steps are checkpointed via `POST /v1/checkpoint/{runID}/steps`.
+
+3. If the function completes without hitting any async opcodes, the SDK checkpoints a `RunComplete` and returns the result directly to the caller.
+
+4. If an async opcode is encountered (e.g. sleep, parallel steps), the SDK checkpoints the current state and transitions from sync to async mode. It returns either:
+   - A `302` redirect to a long-poll output endpoint: `/v1/checkpoint/{runID}/output?token=...`
+   - A `200` response with `{ "run_id": "...", "token": "..." }` for the caller to poll
+
+5. The executor then takes over scheduling, and the caller can poll for the final result.
+
+### 10.4.3. Graceful fallback
+
+If any checkpoint API call fails, the SDK MUST NOT lose step results. The fallback behavior is:
+
+- **Async checkpointing**: Return the buffered steps in the standard `206` response. The executor receives them as if checkpointing was never used.
+- **Sync checkpointing**: Transition to async mode, returning a redirect/token for the caller to poll.
+
+This ensures that checkpointing is a transparent optimization: function execution correctness does not depend on the checkpoint API being available.
+
+## 10.5. Implementation differences between Go and TypeScript SDKs
+
+| Aspect                    | Go SDK (`inngestgo`)                                     | TypeScript SDK (`inngest-js`)                                                           |
+|---------------------------|----------------------------------------------------------|-----------------------------------------------------------------------------------------|
+| **Default behavior**      | Opt-in (requires explicit `Checkpoint` config)           | Opt-in via `checkpointing` option (defaults to `true` when not running a targeted step) |
+| **Config field names**    | `BatchSteps`, `BatchInterval`, `MaxRuntime`              | `bufferedSteps`, `maxInterval`, `maxRuntime`                                            |
+| **Preset names**          | `ConfigSafe`, `ConfigPerformant`, `ConfigBlended`        | No named presets; raw config object                                                     |
+| **Default bufferedSteps** | 0 (checkpoint every step)                                | 1 (checkpoint every step)                                                               |
+| **Checkpoint retry**      | Single attempt + key fallback                            | 5 attempts with exponential backoff + key fallback                                      |
+| **Async fallback**        | Steps remain in response buffer on error                 | Steps returned as `206` `steps-found` on error                                          |
+| **Sync mode**             | Supported via `stephttp` package                         | Supported via `StepMode.Sync` with redirect/token                                       |
+| **DiscoveryRequest**      | Not explicitly emitted (yields with remaining ops)       | Returns `DiscoveryRequest` opcode on `maxRuntime` timeout                               |
+| **Entry points**          | `internal/checkpoint/`, `internal/sdkrequest/manager.go` | `components/execution/engine.ts`                                                        |
 
 # 11. Failure Handlers
 
