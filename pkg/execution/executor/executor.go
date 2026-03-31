@@ -3267,9 +3267,6 @@ func (e *executor) HandleGenerator(ctx context.Context, runCtx execution.RunCont
 
 	// Track generator usage
 	metrics.IncrExecutorHandleGeneratorCount(ctx, gen.Op.String(), metrics.CounterOpt{
-		Tags: map[string]any{
-			"queue_shard": e.assignedQueueShard.Name(),
-		},
 		PkgName: pkgName,
 	})
 
