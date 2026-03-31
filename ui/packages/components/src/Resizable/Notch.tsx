@@ -6,7 +6,7 @@ import { addSplitListeners, makeOnMove, makeOnStopDrag } from './split';
 import type { Orientation } from './types';
 
 type NotchProps = {
-  containerRef: React.RefObject<HTMLDivElement>;
+  containerRef: React.RefObject<HTMLDivElement | null>;
   maxSplitPercentage: number;
   minSplitPercentage: number;
   orientation: Orientation;

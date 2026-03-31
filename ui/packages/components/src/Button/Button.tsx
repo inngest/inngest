@@ -104,8 +104,8 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     const spinnerStyles = getSpinnerStyles({ kind, appearance });
     const iconSizes = getIconSizeStyles({ size });
 
-    const iconElement = React.isValidElement(icon)
-      ? React.cloneElement(icon as React.ReactElement, {
+    const iconElement = React.isValidElement<{ className?: string }>(icon)
+      ? React.cloneElement(icon, {
           className: cn(iconSizes, icon.props.className, loading && 'invisible'),
         })
       : null;

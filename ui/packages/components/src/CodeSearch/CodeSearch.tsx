@@ -112,7 +112,7 @@ export default function CodeSearch({
   const [dark, setDark] = useState(isDark());
   const editorRef = useRef<MonacoEditorType>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
-  const monacoRef = useRef<Monaco>();
+  const monacoRef = useRef<Monaco>(undefined);
 
   const monaco = useMonaco();
 

@@ -20,7 +20,7 @@ type Props = {
 export function InlineSpans({ className, minTime, maxTime, trace, depth }: Props) {
   const [open, setOpen] = useState(false);
   const spanRef = useRef<HTMLDivElement | null>(null);
-  const hoverTimeoutRef = useRef<NodeJS.Timeout>();
+  const hoverTimeoutRef = useRef<NodeJS.Timeout>(undefined);
   const spanName = getSpanName(trace.name);
 
   const handleMouseEnter = useCallback(() => {

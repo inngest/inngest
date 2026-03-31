@@ -8,8 +8,8 @@ type TableBlankStateProps = {
 };
 
 export function TableBlankState({ actions, title, description, icon }: TableBlankStateProps) {
-  const iconElement = React.isValidElement(icon)
-    ? React.cloneElement(icon as React.ReactElement, {
+  const iconElement = React.isValidElement<{ className?: string }>(icon)
+    ? React.cloneElement(icon, {
         className: 'h-7 w-7',
       })
     : null;

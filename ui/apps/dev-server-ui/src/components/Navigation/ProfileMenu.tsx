@@ -1,3 +1,4 @@
+import type { JSX } from 'react';
 import { Listbox } from '@headlessui/react';
 import ModeSwitch from '@inngest/components/ThemeMode/ModeSwitch';
 

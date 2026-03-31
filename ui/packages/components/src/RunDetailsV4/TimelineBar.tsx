@@ -8,7 +8,7 @@
  * - Optional expansion to show nested children
  */
 
-import { memo, useMemo, useState, type CSSProperties } from 'react';
+import { memo, useMemo, useState, type CSSProperties, type JSX } from 'react';
 import {
   RiArrowRightLine,
   RiArrowRightSFill,

@@ -8,7 +8,7 @@
  * - Timing markers at 0%, 25%, 50%, 75%, 100% with duration labels
  */
 
-import { useCallback, useLayoutEffect, useRef } from 'react';
+import { useCallback, useLayoutEffect, useRef, type JSX } from 'react';
 
 import { getStatusBackgroundClass } from '../Status/statusClasses';
 import { cn } from '../utils/classNames';

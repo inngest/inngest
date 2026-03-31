@@ -74,7 +74,7 @@ export function Pill({
     return Children.toArray(node)
       .map((child) => {
         if (typeof child === 'string') return child;
-        if (isValidElement(child)) return extractText(child.props.children);
+        if (isValidElement<{ children?: React.ReactNode }>(child)) return extractText(child.props.children);
         return '';
       })
       .join('')

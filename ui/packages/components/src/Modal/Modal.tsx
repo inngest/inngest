@@ -21,7 +21,7 @@ type ModalProps = {
   alignTop?: boolean;
 
   /** Ref to the element to focus when the modal opens */
-  initialFocus?: React.RefObject<HTMLElement>;
+  initialFocus?: React.RefObject<HTMLElement | null>;
 };
 
 export function Modal({
