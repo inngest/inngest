@@ -48,7 +48,7 @@
     "@segment/analytics-next": "^1.81.1",
     "@sentry/tanstackstart-react": "^10.26.0",
     "@sindresorhus/slugify": "^3.0.0",
-    "@stripe/react-stripe-js": "^3.1.1",
+    "@stripe/react-stripe-js": "^6.0.0",
     "@stripe/stripe-js": "^1.52.1",
     "@tanstack/eslint-config": "^0.3.0",
     "@tanstack/nitro-v2-vite-plugin": "^1.154.7",
