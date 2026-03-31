@@ -3265,6 +3265,13 @@ func (e *executor) HandleGenerator(ctx context.Context, runCtx execution.RunCont
 		return fmt.Errorf("unknown queue item type handling generator: %T", lifecycleItem.Payload)
 	}
 
+	// Track generator usage
+	metrics.IncrExecutorHandleGeneratorCount(ctx, gen.Op.String(), metrics.CounterOpt{
+		Tags: map[string]any{
+			"queue_shard": e.assignedQueueShard.Name(),
+		},
+	})
+
 	switch gen.Op {
 	case enums.OpcodeNone:
 		// OpcodeNone essentially terminates this "thread" or execution path.  We don't need to do
