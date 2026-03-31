@@ -227,7 +227,7 @@ func (q *queueProcessor) BacklogRefillConstraintCheck(
 		}, nil
 	}
 
-	constraintsToCheck := constraintItemsFromBacklog(shadowPart, backlog, constraints)
+	constraintsToCheck := constraintItemsFromBacklog(backlog, constraints)
 	if len(constraintsToCheck) == 0 {
 		return &BacklogRefillConstraintCheckResult{
 			ItemsToRefill: itemIDs,
@@ -395,7 +395,7 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 		})
 	}
 
-	constraintsToCheck := constraintItemsFromBacklog(shadowPart, backlog, constraints)
+	constraintsToCheck := constraintItemsFromBacklog(backlog, constraints)
 	if len(constraintsToCheck) == 0 {
 		return ItemLeaseConstraintCheckResult{
 			SkipConstraintChecks: true,
