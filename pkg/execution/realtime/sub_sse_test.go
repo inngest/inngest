@@ -22,12 +22,7 @@ func TestNewSSESubscription(t *testing.T) {
 	require.NotEqual(t, uuid.Nil, sub.ID())
 	require.Equal(t, "sse", sub.Protocol())
 
-	// Headers should not be set until WriteHeaders is called.
-	require.Empty(t, w.Header().Get("Content-Type"))
-
-	sub.WriteHeaders()
-
-	// Verify SSE headers are set after WriteHeaders.
+	// Verify SSE headers are set
 	require.Equal(t, "*", w.Header().Get("Access-Control-Allow-Origin"))
 	require.Equal(t, "Content-Type", w.Header().Get("Access-Control-Expose-Headers"))
 	require.Equal(t, "text/event-stream", w.Header().Get("Content-Type"))
@@ -56,7 +51,6 @@ func TestSSESubscription_Protocol(t *testing.T) {
 func TestSSESubscription_Write(t *testing.T) {
 	w := httptest.NewRecorder()
 	sub := NewSSESubscription(context.Background(), w)
-	sub.WriteHeaders()
 
 	testData := []byte("test data")
 	err := sub.Write(testData)
@@ -69,7 +63,6 @@ func TestSSESubscription_Write(t *testing.T) {
 func TestSSESubscription_WriteMessage(t *testing.T) {
 	w := httptest.NewRecorder()
 	sub := NewSSESubscription(context.Background(), w)
-	sub.WriteHeaders()
 
 	msg := Message{
 		Kind:      streamingtypes.MessageKindData,
@@ -101,7 +94,6 @@ func TestSSESubscription_WriteMessage(t *testing.T) {
 func TestSSESubscription_WriteMessage_InvalidJSON(t *testing.T) {
 	w := httptest.NewRecorder()
 	sub := NewSSESubscription(context.Background(), w)
-	sub.WriteHeaders()
 
 	// Create a message with invalid JSON data
 	msg := Message{
@@ -135,7 +127,6 @@ func TestSSESubscription_WriteMessage_InvalidJSON(t *testing.T) {
 func TestSSESubscription_WriteChunk(t *testing.T) {
 	w := httptest.NewRecorder()
 	sub := NewSSESubscription(context.Background(), w)
-	sub.WriteHeaders()
 
 	chunk := Chunk{
 		Kind:     "chunk",
@@ -165,7 +156,6 @@ func TestSSESubscription_WriteChunk(t *testing.T) {
 func TestSSESubscription_SendKeepalive(t *testing.T) {
 	w := httptest.NewRecorder()
 	sub := NewSSESubscription(context.Background(), w)
-	sub.WriteHeaders()
 
 	msg := Message{
 		Kind: streamingtypes.MessageKindPing,
@@ -206,7 +196,6 @@ func TestSSEHeaders(t *testing.T) {
 func TestSSESubscription_MultipleMessages(t *testing.T) {
 	w := httptest.NewRecorder()
 	sub := NewSSESubscription(context.Background(), w)
-	sub.WriteHeaders()
 
 	// Send multiple messages
 	msg1 := Message{
@@ -242,7 +231,6 @@ func TestSSESubscription_MultipleMessages(t *testing.T) {
 func TestSSESubscription_SSEMessageFormat(t *testing.T) {
 	w := httptest.NewRecorder()
 	sub := NewSSESubscription(context.Background(), w)
-	sub.WriteHeaders()
 
 	msg := Message{
 		Kind:      streamingtypes.MessageKindData,
@@ -274,7 +262,6 @@ func TestSSESubscription_SSEMessageFormat(t *testing.T) {
 func TestSSESubscription_MultipleMessagesFormat(t *testing.T) {
 	w := httptest.NewRecorder()
 	sub := NewSSESubscription(context.Background(), w)
-	sub.WriteHeaders()
 
 	// Send multiple messages
 	msg1 := Message{
