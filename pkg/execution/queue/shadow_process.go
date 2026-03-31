@@ -556,28 +556,24 @@ func (q *queueProcessor) ProcessShadowPartitionBacklog(
 		}
 
 		metrics.IncrBacklogProcessedCounter(ctx, opts)
+		metrics.IncrQueueBacklogRefilledCounter(ctx, int64(len(res.RefilledItems)), opts)
 
-		if len(constraintCheckRes.ItemsToRefill) > 0 {
-			metrics.IncrQueueBacklogRefilledCounter(ctx, int64(len(res.RefilledItems)), opts)
+		shouldFireLifecyles := len(items) > 0 && len(constraintCheckRes.ItemsToRefill) == 0 && constraintCheckRes.LimitingConstraint != enums.QueueConstraintNotLimited
+		if shouldFireLifecyles {
+			// NOTE:
+			// we don't want to add an extended amount of time for requeue when there are
+			// contraint hits, so we make sure to check more often in order to admit items
+			// into processing
+			metrics.IncrQueueBacklogRefillConstraintCounter(ctx, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags: map[string]any{
+					"queue_shard": q.primaryQueueShard.Name(),
+					// "partition_id": shadowPart.PartitionID,
+					"constraint": constraintCheckRes.LimitingConstraint.String(),
+				},
+			})
 
-			switch constraintCheckRes.LimitingConstraint {
-			case enums.QueueConstraintNotLimited: // no-op
-			default:
-				// NOTE:
-				// we don't want to add an extended amount of time for requeue when there are
-				// contraint hits, so we make sure to check more often in order to admit items
-				// into processing
-				metrics.IncrQueueBacklogRefillConstraintCounter(ctx, metrics.CounterOpt{
-					PkgName: pkgName,
-					Tags: map[string]any{
-						"queue_shard": q.primaryQueueShard.Name(),
-						// "partition_id": shadowPart.PartitionID,
-						"constraint": constraintCheckRes.LimitingConstraint.String(),
-					},
-				})
-
-				q.lifecycles.OnBacklogRefillConstraintHit(ctx, shadowPart, backlog, res)
-			}
+			q.lifecycles.OnBacklogRefillConstraintHit(ctx, shadowPart, backlog, res)
 
 			// NOTE: custom method to instrument result - potentially handling high cardinality data
 			q.lifecycles.OnBacklogRefilled(ctx, shadowPart, backlog, res)
