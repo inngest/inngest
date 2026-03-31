@@ -141,6 +141,7 @@ function PhaseSubBars<T extends { totalMs: number }>({
 }) {
   if (data.totalMs <= 0) return null;
 
+  let cumulativeMs = 0;
   let cumulativePercent = 0;
   return phases
     .filter((p) => p.getMs(data) > 0)
@@ -148,6 +149,13 @@ function PhaseSubBars<T extends { totalMs: number }>({
       const ms = phase.getMs(data);
       const phaseWidthPercent = (ms / data.totalMs) * parentPosition.widthPercent;
       const phaseStartPercent = parentPosition.startPercent + cumulativePercent;
+
+      // Compute phase-specific start/end times so the hover card shows
+      // the phase's own time window, not the parent bar's.
+      const phaseStartTime = startTime ? new Date(startTime.getTime() + cumulativeMs) : undefined;
+      const phaseEndTime = phaseStartTime ? new Date(phaseStartTime.getTime() + ms) : undefined;
+
+      cumulativeMs += ms;
       cumulativePercent += phaseWidthPercent;
 
       return (
@@ -165,8 +173,8 @@ function PhaseSubBars<T extends { totalMs: number }>({
           onClick={onClick}
           viewStartOffset={viewStartOffset}
           viewEndOffset={viewEndOffset}
-          startTime={startTime}
-          endTime={endTime ?? undefined}
+          startTime={phaseStartTime}
+          endTime={phaseEndTime}
           minTime={minTime}
         />
       );
