@@ -69,7 +69,7 @@
     "dotenv": "^17.2.3",
     "framer-motion": "^10.16.4",
     "graphql": "16.8.1",
-    "graphql-config": "^4.5.0",
+    "graphql-config": "^5.0.0",
     "graphql-request": "^7.0.0",
     "inngest": "^3.48.0",
     "ky": "^0.33.3",
