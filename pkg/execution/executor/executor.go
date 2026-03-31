@@ -1250,9 +1250,17 @@ func (e *executor) schedule(
 			// The run was already completed and GC'd, or was deleted.
 			// The idempotency key was used, so skip this run.
 			if err != nil && errors.Is(err, state.ErrRunNotFound) {
+				// Log with delta to help identify short deltas (like 5ms)
+				originalRunCreatedAt := time.UnixMilli(int64(stv1ID.RunID.Time()))
+				deltaMs := time.Since(originalRunCreatedAt).Milliseconds()
+				l.Warn("idempotency key exists but run state not found",
+					"original_run_id", stv1ID.RunID.String(),
+					"original_run_created_at", originalRunCreatedAt,
+					"delta_ms", deltaMs,
+				)
 				return &stv1ID.RunID, nil, ErrFunctionSkippedIdempotency
 			}
-			// usually other failures
+			// usually other failures (logged by caller)
 			if err != nil {
 				return nil, nil, err
 			}
