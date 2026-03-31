@@ -200,8 +200,10 @@ func TestStreamResponseTooLarge(t *testing.T) {
 
 		// Indicate a streaming response.
 		w.WriteHeader(201)
-		err = json.NewEncoder(w).Encode(data)
-		require.NoError(t, err)
+		// The client may close the connection early when it detects the
+		// response is too large, causing a broken pipe here. That is
+		// expected behaviour, so we intentionally ignore the write error.
+		_ = json.NewEncoder(w).Encode(data)
 	}))
 
 	defer ts.Close()

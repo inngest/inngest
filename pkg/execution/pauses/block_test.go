@@ -1974,9 +1974,13 @@ func TestBlockstoreDeleteByID(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	// Check that all keys are cleaned up after run deletion
-	remainingKeys := r.Keys()
-	require.Equal(t, 0, len(remainingKeys), "Expected no keys remaining after run deletion, but found: %v", remainingKeys)
+	// Check that all keys are cleaned up after run deletion.
+	// Background compaction goroutines spawned by DeleteByID may still be
+	// finishing, so we poll instead of asserting immediately.
+	require.EventuallyWithT(t, func(ct *assert.CollectT) {
+		remainingKeys := r.Keys()
+		assert.Equal(ct, 0, len(remainingKeys), "Expected no keys remaining after run deletion, but found: %v", remainingKeys)
+	}, 5*time.Second, 50*time.Millisecond)
 }
 
 func TestLoadEvaluablesSinceExpiredPauseCleanup(t *testing.T) {
@@ -2481,10 +2485,14 @@ func TestCompactionSkipsPhantomBlocks(t *testing.T) {
 		Leaser:                 leaser,
 		BlockSize:              3,
 		CompactionGarbageRatio: 0.5,
-		CompactionSample:       1.0,
-		CompactionLeaser:       leaser,
-		DeleteAfterFlush:       func(ctx context.Context, workspaceID uuid.UUID) bool { return true },
-		EnableBlockCompaction:  func(ctx context.Context, workspaceID uuid.UUID) bool { return true },
+		// Disable automatic compaction triggered by Delete so that only the
+		// explicit compact() calls in this test run compaction.  With a non-zero
+		// sample rate, Delete spawns a background goroutine that races with the
+		// synchronous compact() assertions below.
+		CompactionSample:      -1,
+		CompactionLeaser:      leaser,
+		DeleteAfterFlush:      func(ctx context.Context, workspaceID uuid.UUID) bool { return true },
+		EnableBlockCompaction: func(ctx context.Context, workspaceID uuid.UUID) bool { return true },
 	})
 	require.NoError(t, err)
 

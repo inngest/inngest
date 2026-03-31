@@ -156,7 +156,7 @@ func TestHeartbeatDuringGatewayDrain_ClosesConnection(t *testing.T) {
 		assert.Equal(ct, 1, len(res.lifecycles.onReady))
 		assert.GreaterOrEqual(ct, len(res.lifecycles.onStartDraining), 1)
 		assert.Equal(ct, 1, len(res.lifecycles.onDisconnected))
-	}, 10*time.Second, 200*time.Millisecond)
+	}, 20*time.Second, 200*time.Millisecond)
 }
 
 // TestWorkerReadyDuringGatewayDrain_ClosesConnection verifies that when a

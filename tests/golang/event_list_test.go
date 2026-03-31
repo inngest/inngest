@@ -598,6 +598,7 @@ func TestEventList(t *testing.T) {
 		}
 		expectedFunctionId := "internal-events-fn"
 		r.EventuallyWithT(func(t *assert.CollectT) {
+			r := require.New(t)
 			// Explicitly include internal events.
 			res, err := c.GetEvents(ctx, client.GetEventsOpts{
 				PageSize: 50,

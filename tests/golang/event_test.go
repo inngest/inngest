@@ -43,6 +43,7 @@ func TestEvent(t *testing.T) {
 
 		var evt *models.EventV2
 		r.EventuallyWithT(func(t *assert.CollectT) {
+			r := require.New(t)
 			var err error
 			evt, err = c.GetEvent(ctx, ulid.MustParse(eventID))
 			r.NoError(err)
@@ -95,6 +96,7 @@ func TestEvent(t *testing.T) {
 
 		var evt *models.EventV2
 		r.EventuallyWithT(func(t *assert.CollectT) {
+			r := require.New(t)
 			evt, err = c.GetEvent(ctx, ulid.MustParse(eventID))
 			r.NoError(err)
 			r.NotNil(evt) // TODO Delete once runs are completed
