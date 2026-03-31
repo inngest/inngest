@@ -27,7 +27,7 @@
     "@team-plain/typescript-sdk": "^3.0.1",
     "@types/hast": "^3.0.4",
     "@unpic/react": "^1.0.1",
-    "@urql/exchange-auth": "^2.1.6",
+    "@urql/exchange-auth": "^3.0.0",
     "@urql/exchange-request-policy": "^2.0.0",
     "@urql/exchange-retry": "^2.0.0",
     "date-fns": "^4.0.0",

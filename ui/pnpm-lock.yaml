@@ -174,8 +174,8 @@ importers:
         specifier: ^1.0.1
         version: 1.0.1(next@14.2.35(@babel/core@7.29.0)(@opentelemetry/api@1.9.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@urql/exchange-auth':
-        specifier: ^2.1.6
-        version: 2.1.6(graphql@16.8.1)
+        specifier: ^3.0.0
+        version: 3.0.0(@urql/core@4.1.1(graphql@16.8.1))
       '@urql/exchange-request-policy':
         specifier: ^2.0.0
         version: 2.0.0(@urql/core@4.1.1(graphql@16.8.1))
@@ -566,8 +566,8 @@ importers:
         specifier: ^1.0.1
         version: 1.0.1(next@14.2.35(@babel/core@7.29.0)(@opentelemetry/api@1.9.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@urql/exchange-auth':
-        specifier: ^2.1.6
-        version: 2.1.6(graphql@16.8.1)
+        specifier: ^3.0.0
+        version: 3.0.0(@urql/core@4.1.1(graphql@16.8.1))
       '@urql/exchange-request-policy':
         specifier: ^2.0.0
         version: 2.0.0(@urql/core@4.1.1(graphql@16.8.1))
@@ -6775,8 +6775,10 @@ packages:
   '@urql/core@4.1.1':
     resolution: {integrity: sha512-iIoAy6BY+BUZZ7KIpnMT7C9q+ULf5ZCVxGe3/i7WZSJBrQa2h1QkIMhL+8fAKmOn9gt83jSIv5drWWnhZ9izEA==}
 
-  '@urql/exchange-auth@2.1.6':
-    resolution: {integrity: sha512-snOlt7p5kYq0KnPDuXkKe2qW3/BucQZOElvTeo3svLQuk9JiNJVnm6ffQ6QGiGO+G3AtMrctnno1+X44fLtDuQ==}
+  '@urql/exchange-auth@3.0.0':
+    resolution: {integrity: sha512-tj09xiOR2f1J2h8TE9uZWjRZipCdmDoTewEytOacDQ+0Teo+yIZxm3ppHxolQtiA51OHrGYiNTkMte8HtfvaBw==}
+    peerDependencies:
+      '@urql/core': ^6.0.0
 
   '@urql/exchange-request-policy@2.0.0':
     resolution: {integrity: sha512-GjTY7PMFTGUlXmz75mYcAS6TdLbJxNJ0DilHsLEFPW8CB36McSomCDRKFeCn8OBSw9+BJAaIFLBeGsPf75i69A==}
@@ -20329,12 +20331,10 @@ snapshots:
     transitivePeerDependencies:
       - graphql
 
-  '@urql/exchange-auth@2.1.6(graphql@16.8.1)':
+  '@urql/exchange-auth@3.0.0(@urql/core@4.1.1(graphql@16.8.1))':
     dependencies:
       '@urql/core': 4.1.1(graphql@16.8.1)
       wonka: 6.3.2
-    transitivePeerDependencies:
-      - graphql
 
   '@urql/exchange-request-policy@2.0.0(@urql/core@4.1.1(graphql@16.8.1))':
     dependencies:
