@@ -255,8 +255,8 @@ importers:
         specifier: ^5.0.0
         version: 5.3.1
       ulid:
-        specifier: ^2.3.0
-        version: 2.3.0
+        specifier: ^3.0.0
+        version: 3.0.2
       urql:
         specifier: ^4.0.5
         version: 4.0.5(graphql@16.8.1)(react@18.2.0)
@@ -421,8 +421,8 @@ importers:
         specifier: 0.8.15
         version: 0.8.15
       ulid:
-        specifier: ^2.3.0
-        version: 2.3.0
+        specifier: ^3.0.0
+        version: 3.0.2
       zod:
         specifier: ^3.22.4
         version: 3.22.4
@@ -831,8 +831,8 @@ importers:
         specifier: ^1.10.0
         version: 1.10.0
       ulid:
-        specifier: ^2.3.0
-        version: 2.3.0
+        specifier: ^3.0.0
+        version: 3.0.2
       zod:
         specifier: ^3.22.4
         version: 3.22.4
@@ -12416,6 +12416,10 @@ packages:
 
   ulid@2.3.0:
     resolution: {integrity: sha512-keqHubrlpvT6G2wH0OEfSW4mquYRcbe/J8NMmveoQOjUqmo+hXtO+ORCpWhdbZ7k72UtY61BL7haGxW6enBnjw==}
+    hasBin: true
+
+  ulid@3.0.2:
+    resolution: {integrity: sha512-yu26mwteFYzBAot7KVMqFGCVpsF6g8wXfJzQUHvu1no3+rRRSFcSV2nKeYvNPLD2J4b08jYBDhHUjeH0ygIl9w==}
     hasBin: true
 
   ultrahtml@1.6.0:
@@ -27312,6 +27316,8 @@ snapshots:
   ufo@1.6.3: {}
 
   ulid@2.3.0: {}
+
+  ulid@3.0.2: {}
 
   ultrahtml@1.6.0: {}
 

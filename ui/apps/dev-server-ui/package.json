@@ -48,7 +48,7 @@
     "react-redux": "^8.0.5",
     "sonner": "^2.0.0",
     "srvx": "0.8.15",
-    "ulid": "^2.3.0",
+    "ulid": "^3.0.0",
     "zod": "^3.22.4"
   },
   "devDependencies": {
