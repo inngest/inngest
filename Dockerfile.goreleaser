@@ -1,4 +1,4 @@
-FROM --platform=$BUILDPLATFORM debian:stable-slim AS inngest
+FROM --platform=$BUILDPLATFORM debian:stable-slim@sha256:99fc6d2a0882fcbcdc452948d2d54eab91faafc7db037df82425edcdcf950e1f AS inngest
 RUN apt-get update && apt-get install -y ca-certificates tzdata curl && update-ca-certificates
 COPY inngest /bin/inngest
 CMD ["inngest"]

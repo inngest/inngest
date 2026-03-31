@@ -25,21 +25,21 @@ jobs:
         experimentalKeyQueues: [false, true]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           submodules: true
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version-file: ./go.mod
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "20"
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
         with:
           version: 10.18.2
 
@@ -81,14 +81,14 @@ jobs:
 
       - name: Upload devserver logs
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: devserver-logs-kq-${{ matrix.experimentalKeyQueues }}-api
           path: /tmp/devserver-logs-kq-${{ matrix.experimentalKeyQueues }}-api.txt
           retention-days: 7
 
       - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@75cd11691c0faa626561e295848008c8a7dddffe # v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           flags: ts-e2e,kq-${{ matrix.experimentalKeyQueues }}
@@ -107,12 +107,12 @@ jobs:
         index: [0, 1, 2, 3, 4]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           submodules: true
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version-file: ./go.mod
 
@@ -175,14 +175,14 @@ jobs:
 
       - name: Upload devserver logs
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: devserver-logs-golang-kq-${{ matrix.experimentalKeyQueues }}-db-${{ matrix.database }}-split-${{ matrix.index }}
           path: /tmp/dev-output.txt
           retention-days: 7
 
       - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@75cd11691c0faa626561e295848008c8a7dddffe # v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           flags: go-e2e,split-${{ matrix.index }},kq-${{ matrix.experimentalKeyQueues }},db-${{ matrix.database }}
@@ -197,12 +197,12 @@ jobs:
         database: [sqlite, postgres]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           submodules: true
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version-file: ./go.mod
 
@@ -261,14 +261,14 @@ jobs:
 
       - name: Upload devserver logs
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: devserver-logs-api-kq-${{ matrix.experimentalKeyQueues }}-db-${{ matrix.database }}
           path: /tmp/dev-output.txt
           retention-days: 7
 
       - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@75cd11691c0faa626561e295848008c8a7dddffe # v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           flags: api-e2e,kq-${{ matrix.experimentalKeyQueues }},db-${{ matrix.database }}
@@ -282,12 +282,12 @@ jobs:
         experimentalKeyQueues: [false, true]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           submodules: true
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version-file: ./go.mod
 
@@ -297,7 +297,7 @@ jobs:
           EXPERIMENTAL_KEY_QUEUES_ENABLE: "${{ matrix.experimentalKeyQueues }}"
 
       - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@75cd11691c0faa626561e295848008c8a7dddffe # v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           flags: exec,kq-${{ matrix.experimentalKeyQueues }}
