@@ -1247,6 +1247,12 @@ func (e *executor) schedule(
 		if metadata.ID.RunID != stv1ID.RunID {
 			id := sv2.IDFromV1(stv1ID)
 			metadata, err = e.smv2.LoadMetadata(ctx, id)
+			// The run was already completed and GC'd, or was deleted.
+			// The idempotency key was used, so skip this run.
+			if err != nil && errors.Is(err, state.ErrRunNotFound) {
+				return &stv1ID.RunID, nil, ErrFunctionSkippedIdempotency
+			}
+			// usually other failures
 			if err != nil {
 				return nil, nil, err
 			}
