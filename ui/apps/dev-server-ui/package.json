@@ -52,7 +52,7 @@
     "zod": "^3.22.4"
   },
   "devDependencies": {
-    "@eslint/compat": "1.4.1",
+    "@eslint/compat": "2.0.3",
     "@eslint/js": "9.39.0",
     "@graphql-codegen/cli": "3.2.2",
     "@graphql-codegen/typescript": "2.8.8",

@@ -94,7 +94,7 @@
     "zod": "^4.2.1"
   },
   "devDependencies": {
-    "@eslint/compat": "1.4.1",
+    "@eslint/compat": "2.0.3",
     "@eslint/js": "9.39.0",
     "@graphql-codegen/cli": "6.1.0",
     "@graphql-codegen/client-preset": "5.2.1",
