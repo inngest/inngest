@@ -207,8 +207,8 @@ importers:
         specifier: ^3.48.0
         version: 3.48.0(@opentelemetry/core@2.2.0(@opentelemetry/api@1.9.0))(@vercel/node@5.1.16(rollup@4.57.1))(express@5.1.0)(h3@1.15.5)(next@14.2.35(@babel/core@7.29.0)(@opentelemetry/api@1.9.0)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(typescript@5.9.3)(zod@4.2.1)
       ky:
-        specifier: ^0.33.3
-        version: 0.33.3
+        specifier: ^1.0.0
+        version: 1.14.3
       launchdarkly-react-client-sdk:
         specifier: ^3.0.8
         version: 3.0.8(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
@@ -590,8 +590,8 @@ importers:
         specifier: ^7.0.0
         version: 7.4.0(graphql@16.8.1)
       ky:
-        specifier: ^0.33.3
-        version: 0.33.3
+        specifier: ^1.0.0
+        version: 1.14.3
       launchdarkly-react-client-sdk:
         specifier: ^3.0.8
         version: 3.0.8(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
@@ -9588,9 +9588,9 @@ packages:
   knitwork@1.3.0:
     resolution: {integrity: sha512-4LqMNoONzR43B1W0ek0fhXMsDNW/zxa1NdFAVMY+k28pgZLovR4G3PB5MrpTxCy1QaZCqNoiaKPr5w5qZHfSNw==}
 
-  ky@0.33.3:
-    resolution: {integrity: sha512-CasD9OCEQSFIam2U8efFK81Yeg8vNMTBUqtMOHlrcWQHqUX3HeCl9Dr31u4toV7emlH8Mymk5+9p0lL6mKb/Xw==}
-    engines: {node: '>=14.16'}
+  ky@1.14.3:
+    resolution: {integrity: sha512-9zy9lkjac+TR1c2tG+mkNSVlyOpInnWdSMiue4F+kq8TwJSgv6o8jhLRg8Ho6SnZ9wOYUq/yozts9qQCfk7bIw==}
+    engines: {node: '>=18'}
 
   launchdarkly-eventsource@2.0.1:
     resolution: {integrity: sha512-zyceGtRni8ct4es5hH8Q+2evvttItb5lOKMm8JtudZbfQFfVdH55NitgJQoGTRYkIvyMGjcaXnyt0FlzCTfspA==}
@@ -23780,7 +23780,7 @@ snapshots:
 
   knitwork@1.3.0: {}
 
-  ky@0.33.3: {}
+  ky@1.14.3: {}
 
   launchdarkly-eventsource@2.0.1: {}
 
