@@ -71,7 +71,7 @@
     "@testing-library/react": "16.3.0",
     "@types/json-schema": "7.0.15",
     "@types/react": "19.2.14",
-    "@vitejs/plugin-react": "5.1.0",
+    "@vitejs/plugin-react": "6.0.1",
     "eslint": "9.8.0",
     "eslint-plugin-react": "7.35.0",
     "eslint-plugin-react-hooks": "4.6.2",
