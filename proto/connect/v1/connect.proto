@@ -21,6 +21,7 @@ enum GatewayMessageType {
   WORKER_HEARTBEAT = 9;
   GATEWAY_HEARTBEAT = 10;
   GATEWAY_CLOSING = 11;
+  WORKER_STATUS = 15;
 }
 
 message ConnectMessage {
@@ -65,6 +66,12 @@ message WorkerConnectRequestData {
 message GatewayConnectionReadyData {
 	string heartbeat_interval = 1;
 	string extend_lease_interval = 2;
+	string status_interval = 3;
+}
+
+message WorkerStatusData {
+	repeated string in_flight_request_ids = 1;
+	bool shutdown_requested = 2;
 }
 
 message GatewayExecutorRequestData {

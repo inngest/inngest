@@ -2,9 +2,11 @@ package redis_telemetry
 
 import (
 	"context"
+	"time"
+
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/redis/rueidis"
-	"time"
 )
 
 type scopeValType struct{}
@@ -156,16 +158,28 @@ func (i instrumentedClient) report(ctx context.Context, start, end time.Time, co
 func (i instrumentedClient) asyncReport(ctx context.Context, start time.Time, command string) {
 	end := time.Now()
 
-	i.reports <- &reportItem{ctx, start, end, command}
+	select {
+	case i.reports <- &reportItem{ctx, start, end, command}:
+	default:
+		logger.StdlibLogger(ctx).Error("redis telemetry report buffer full, dropping metrics", "cluster", i.cluster, "pkg", i.pkgName)
+	}
 }
 
 func (i instrumentedClient) worker(ctx context.Context) {
 	for {
 		select {
-		case <-ctx.Done():
-			return
 		case item := <-i.reports:
 			i.report(item.ctx, item.start, item.end, item.command)
+		case <-ctx.Done():
+			// Drain remaining items in the buffer before exiting.
+			for {
+				select {
+				case item := <-i.reports:
+					i.report(item.ctx, item.start, item.end, item.command)
+				default:
+					return
+				}
+			}
 		}
 	}
 }

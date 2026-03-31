@@ -264,6 +264,16 @@ type Pause struct {
 	CreatedAt time.Time `json:"ca"`
 }
 
+// CreatedAfter reports whether this pause was created after the given
+// timestamp (with a small fudge factor). It returns false if either
+// timestamp is zero, allowing older pauses through.
+func (p Pause) CreatedAfter(t time.Time) bool {
+	if p.CreatedAt.IsZero() || t.IsZero() {
+		return false
+	}
+	return p.CreatedAt.After(t.Add(5 * time.Second))
+}
+
 func (p Pause) GetOpcode() enums.Opcode {
 	if p.Opcode == nil {
 		return enums.OpcodeNone

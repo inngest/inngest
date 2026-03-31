@@ -938,3 +938,18 @@ func IncrConstraintAPIAcquireCacheCounter(ctx context.Context, opts CounterOpt) 
 		Tags:        opts.Tags,
 	})
 }
+
+func IncrExecutorHandleGeneratorCount(ctx context.Context, op string, opts CounterOpt) {
+	if opts.Tags == nil {
+		opts.Tags = map[string]any{}
+	}
+
+	opts.Tags["op"] = op
+
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "executor_handle_generator_total",
+		Description: "Total number of executor handle generator calls",
+		Tags:        opts.Tags,
+	})
+}

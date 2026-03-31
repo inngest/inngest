@@ -93,6 +93,9 @@ type connectionHandler struct {
 
 	lastHeartbeatLock       sync.Mutex
 	lastHeartbeatReceivedAt time.Time
+
+	lastStatusLock       sync.Mutex
+	lastStatusReceivedAt time.Time
 }
 
 func (c *connectionHandler) setLastHeartbeat(time time.Time) {
@@ -105,6 +108,18 @@ func (c *connectionHandler) getLastHeartbeat() time.Time {
 	c.lastHeartbeatLock.Lock()
 	defer c.lastHeartbeatLock.Unlock()
 	return c.lastHeartbeatReceivedAt
+}
+
+func (c *connectionHandler) setLastStatus(t time.Time) {
+	c.lastStatusLock.Lock()
+	defer c.lastStatusLock.Unlock()
+	c.lastStatusReceivedAt = t
+}
+
+func (c *connectionHandler) getLastStatus() time.Time {
+	c.lastStatusLock.Lock()
+	defer c.lastStatusLock.Unlock()
+	return c.lastStatusReceivedAt
 }
 
 var ErrDraining = connecterrors.SocketError{
@@ -521,9 +536,11 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 
 		// Let the worker know we're ready to receive messages
 		{
+			statusInterval := c.workerStatusInterval(ctx, conn.AccountID, conn.EnvID)
 			readyPayload, err := proto.Marshal(&connectpb.GatewayConnectionReadyData{
 				HeartbeatInterval:   c.workerHeartbeatInterval.String(),
 				ExtendLeaseInterval: c.workerRequestExtendLeaseInterval.String(),
+				StatusInterval:      statusInterval.String(),
 			})
 			if err != nil {
 				ch.log.ReportError(err, "could not marshal connection ready")
@@ -782,6 +799,25 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(msg *connectpb.Connec
 
 		c.setLastHeartbeat(time.Now())
 
+		return nil
+	case connectpb.GatewayMessageType_WORKER_STATUS:
+		if time.Since(c.getLastStatus()) < 2*time.Second {
+			c.log.Trace("ignoring WORKER_STATUS, rate limited")
+			return nil
+		}
+		c.setLastStatus(time.Now())
+
+		var data connectpb.WorkerStatusData
+		if err := proto.Unmarshal(msg.Payload, &data); err != nil {
+			c.log.Warn("invalid WORKER_STATUS payload", "err", err)
+			return nil
+		}
+
+		c.log.Debug("worker status received",
+			"in_flight_request_count", len(data.InFlightRequestIds),
+			"in_flight_request_ids", data.InFlightRequestIds,
+			"shutdown_requested", data.ShutdownRequested,
+		)
 		return nil
 	case connectpb.GatewayMessageType_WORKER_PAUSE:
 		// NOTE: Unlike WORKER_READY, we intentionally do

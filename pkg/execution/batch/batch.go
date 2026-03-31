@@ -154,6 +154,10 @@ func (b BatchItem) GetEvent() event.Event {
 	return b.Event
 }
 
+func (b BatchItem) GetReceivedAt() time.Time {
+	return time.Time{}
+}
+
 // BatchAppendResult represents the status of attempting to append to a batch
 type BatchAppendResult struct {
 	// Status represents the result of the operation

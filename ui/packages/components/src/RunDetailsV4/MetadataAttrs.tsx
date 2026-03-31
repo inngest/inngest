@@ -7,11 +7,20 @@ const inngestKindLabels: Record<string, string> = {
   ai: 'AI Metadata',
   http: 'HTTP Metadata',
   response_headers: 'Response Headers',
+  usage: 'Run Usage',
   warnings: 'Warnings',
 };
 
+const formatBytes = (bytes: number): string => {
+  if (bytes < 1024) return `${bytes} B`;
+  return `${(bytes / 1024).toFixed(1)} KB`;
+};
+
+const byteValueKeys = new Set(['metadata_bytes']);
+
 /** Returns a human-readable label for a metadata kind. Handles both inngest.* and userland.* kinds. */
 const getKindLabel = (kind: SpanMetadataKind): string => {
+  if (!kind) return 'Unknown Metadata';
   const [namespace, kindName] = kind.split('.');
   if (!kindName) {
     return `Unknown Metadata (kind: ${kind})`;
@@ -37,7 +46,7 @@ const MetadataAttrRow = ({
 }: SpanMetadata & { isLast: boolean }) => {
   const sortedEntries = useMemo(
     () =>
-      Object.entries(values).sort(([a], [b]) => {
+      Object.entries(values ?? {}).sort(([a], [b]) => {
         if (a === 'Status Code') return -1;
         if (b === 'Status Code') return 1;
         return a.localeCompare(b);
@@ -64,7 +73,7 @@ const MetadataAttrRow = ({
       <div
         className={`${
           isLast ? '' : 'border-muted border-b pb-4'
-        } mt-2 flex max-h-full flex-col gap-2`}
+        } mt-2 flex max-h-full flex-col gap-2 overflow-hidden`}
       >
         <div className="text-muted bg-canvasSubtle sticky top-0 flex flex-row px-4 py-2 text-sm font-medium leading-tight">
           <div className="w-48">Key</div>
@@ -72,12 +81,17 @@ const MetadataAttrRow = ({
         </div>
         {sortedEntries.map(([key, value]) => {
           return (
-            <div key={`metadata-attr-${key}`} className="flex flex-row items-start px-4 pb-2">
+            <div
+              key={`metadata-attr-${key}`}
+              className="flex flex-row items-start overflow-hidden px-4 pb-2"
+            >
               <div className="text-muted w-48 shrink-0 text-sm font-normal leading-tight">
                 {key}
               </div>
-              <div className="text-basis min-w-0 break-words text-sm font-normal leading-tight">
-                {String(value) || '--'}
+              <div className="text-basis min-w-0 break-all text-sm font-normal leading-tight [overflow-wrap:anywhere]">
+                {byteValueKeys.has(key) && typeof value === 'number'
+                  ? formatBytes(value)
+                  : String(value) || '--'}
               </div>
             </div>
           );
@@ -96,10 +110,12 @@ export const MetadataAttrs = ({ metadata }: { metadata: SpanMetadata[] }) => {
     }
   }, [metadata]);
 
+  const safeMetadata = metadata.filter((md) => md && typeof md === 'object' && md.kind);
+
   return (
-    <div className="relative h-full overflow-y-auto" ref={ref}>
-      {metadata.map((md, idx) => {
-        const isLast = idx === metadata.length - 1;
+    <div className="relative h-full overflow-y-auto overflow-x-hidden" ref={ref}>
+      {safeMetadata.map((md, idx) => {
+        const isLast = idx === safeMetadata.length - 1;
 
         return (
           <MetadataAttrRow

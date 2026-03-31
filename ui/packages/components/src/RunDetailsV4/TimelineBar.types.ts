@@ -194,6 +194,9 @@ export interface TimelineBarProps {
 
   /** Queue delay in milliseconds (startedAt - queuedAt) for tooltip display */
   delayMs?: number;
+
+  /** Optional actions to render in the left panel between the name and duration */
+  actions?: ReactNode;
 }
 
 // ============================================================================

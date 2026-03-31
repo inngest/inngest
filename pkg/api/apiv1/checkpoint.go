@@ -20,6 +20,8 @@ import (
 	"github.com/inngest/inngest/pkg/execution/apiresult"
 	"github.com/inngest/inngest/pkg/execution/checkpoint"
 	"github.com/inngest/inngest/pkg/execution/executor"
+	"github.com/inngest/inngest/pkg/execution/realtime"
+	"github.com/inngest/inngest/pkg/execution/realtime/streamingtypes"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/publicerr"
@@ -75,6 +77,8 @@ type CheckpointAPIOpts struct {
 	RunJWTSecret []byte
 	// BackoffFunc computes retry timing. If nil, uses the default backoff table.
 	BackoffFunc backoff.BackoffFunc
+	// AllowStepMetadata controls whether step metadata is allowed for a given account.
+	AllowStepMetadata executor.AllowStepMetadata
 }
 
 // checkpointAPI is the base implementation.
@@ -96,13 +100,14 @@ type checkpointAPI struct {
 
 func NewCheckpointAPI(o Opts) CheckpointAPI {
 	c := checkpoint.New(checkpoint.Opts{
-		State:           o.State,
-		FnReader:        o.FunctionReader,
-		Executor:        o.Executor,
-		TracerProvider:  o.TracerProvider,
-		Queue:           o.Queue,
-		MetricsProvider: o.CheckpointOpts.CheckpointMetrics,
-		BackoffFunc:     o.CheckpointOpts.BackoffFunc,
+		State:             o.State,
+		FnReader:          o.FunctionReader,
+		Executor:          o.Executor,
+		TracerProvider:    o.TracerProvider,
+		Queue:             o.Queue,
+		MetricsProvider:   o.CheckpointOpts.CheckpointMetrics,
+		BackoffFunc:       o.CheckpointOpts.BackoffFunc,
+		AllowStepMetadata: o.CheckpointOpts.AllowStepMetadata,
 	})
 
 	api := checkpointAPI{
@@ -176,11 +181,11 @@ func (a checkpointAPI) CheckpointNewRun(w http.ResponseWriter, r *http.Request) 
 	// SHOULD automatically have a timeout after 60 minutes;  we should auomatically ensure
 	// that functions are marked as FAILED if we do not get a call to finalize them.
 	_, md, err := a.Executor.Schedule(ctx, execution.ScheduleRequest{
-		RunID:       &input.RunID,
-		Function:    fn,
-		AccountID:   auth.AccountID(),
-		WorkspaceID: auth.WorkspaceID(),
-		AppID:       input.AppID(auth.WorkspaceID()),
+		RunID:          &input.RunID,
+		Function:       fn,
+		AccountID:      auth.AccountID(),
+		WorkspaceID:    auth.WorkspaceID(),
+		AppID:          input.AppID(auth.WorkspaceID()),
 		RunMode:        enums.RunModeSync,
 		Events:         []event.TrackedEvent{evt},
 		URL:            input.URL(),
@@ -243,11 +248,50 @@ func (a checkpointAPI) CheckpointNewRun(w http.ResponseWriter, r *http.Request) 
 
 	}
 
+	// This is for DurableEndpoint streaming. It gives the DurableEndpoint a
+	// realtime JWT that it can pass back to its client (e.g. the browser). The
+	// client needs a realtime JWT to redirect to the Inngest Server so it can
+	// subscribe to the new stream after the run goes async.
+	var realtimeToken string
+	if len(a.Opts.RealtimeJWTSecret) > 0 {
+		rt, err := realtime.NewJWT(
+			ctx,
+			a.Opts.RealtimeJWTSecret,
+			auth.AccountID(),
+			auth.WorkspaceID(),
+			[]realtime.Topic{{
+				Channel: md.ID.RunID.String(),
+				Name:    streamingtypes.TopicNameStream,
+				Kind:    streamingtypes.TopicKindRun,
+				EnvID:   auth.WorkspaceID(),
+			}},
+			realtime.NewJWTOpts{
+				// Add a minute buffer just in case.
+				Expiry: util.ToPtr(realtime.MaxDurpStreamingRun + time.Minute),
+			},
+		)
+		if err != nil {
+			logger.StdlibLogger(ctx).Warn(
+				"error creating realtime subscribe JWT",
+				"error", err,
+				"account_id", auth.AccountID(),
+				"env_id", auth.WorkspaceID(),
+				"run_id", md.ID.RunID,
+			)
+			_ = publicerr.WriteHTTP(w, publicerr.Wrap(
+				err, 500, "error creating realtime subscribe JWT",
+			))
+			return
+		}
+		realtimeToken = rt
+	}
+
 	_ = WriteResponse(w, CheckpointNewRunResponse{
-		RunID: md.ID.RunID.String(),
-		FnID:  fn.ID,
-		AppID: appID,
-		Token: jwt,
+		RunID:         md.ID.RunID.String(),
+		FnID:          fn.ID,
+		AppID:         appID,
+		Token:         jwt,
+		RealtimeToken: realtimeToken,
 	})
 }
 

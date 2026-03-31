@@ -486,6 +486,17 @@ func (m shardedMgr) Exists(ctx context.Context, accountId uuid.UUID, runID ulid.
 	}).AsBool()
 }
 
+func (m shardedMgr) IncrementMetadataSize(ctx context.Context, accountID uuid.UUID, runID ulid.ULID, delta int) error {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "IncrementMetadataSize"), redis_telemetry.ScopeFnRunState)
+
+	fnRunState := m.s.FunctionRunState()
+	r, isSharded := fnRunState.Client(ctx, accountID, runID)
+	_, err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
+		return client.B().Hincrby().Key(fnRunState.kg.RunMetadata(ctx, isSharded, runID)).Field("metadata_size").Increment(int64(delta)).Build()
+	}).AsInt64()
+	return err
+}
+
 func (m shardedMgr) metadata(ctx context.Context, accountId uuid.UUID, runID ulid.ULID) (*runMetadata, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "metadata"), redis_telemetry.ScopeFnRunState)
 
@@ -773,7 +784,8 @@ func (m shardedMgr) SaveResponse(ctx context.Context, i state.Identifier, stepID
 		fnRunState.kg.ActionInputs(ctx, isSharded, i),
 		fnRunState.kg.Pending(ctx, isSharded, i),
 	}
-	args := []string{stepID, marshalledOuptut}
+	metadataSizeDelta := state.MetadataSizeDeltaFromContext(ctx)
+	args := []string{stepID, marshalledOuptut, strconv.Itoa(metadataSizeDelta)}
 
 	indexes, err := retriableScripts["saveResponse"].Exec(
 		redis_telemetry.WithScriptName(ctx, "saveResponse"),
@@ -1214,6 +1226,7 @@ func newRunMetadata(data map[string]string) (*runMetadata, error) {
 	m.StateSize, _ = parseInt("state_size")
 	m.EventSize, _ = parseInt("event_size")
 	m.StepCount, _ = parseInt("step_count")
+	m.MetadataSize, _ = parseInt("metadata_size")
 
 	if val, ok := data["version"]; ok && val != "" {
 		v, err := strconv.Atoi(strings.TrimSuffix(val, ".0"))
@@ -1424,6 +1437,7 @@ type runMetadata struct {
 	StateSize                 int            `json:"state_size"`
 	EventSize                 int            `json:"event_size"`
 	StepCount                 int            `json:"step_count"`
+	MetadataSize              int            `json:"metadata_size"`
 	Debugger                  bool           `json:"debugger"`
 	RunType                   string         `json:"runType,omitempty"`
 	ReplayID                  string         `json:"rID,omitempty"`

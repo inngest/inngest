@@ -607,6 +607,7 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 	}
 
 	sorter(root)
+	computeAndAttachUsageMetadata(root)
 
 	return root, nil
 }
@@ -685,6 +686,50 @@ func rollupSpanMetadataFromFragments(ctx context.Context, fragments []map[string
 	}
 
 	return ret, nil
+}
+
+// computeAndAttachUsageMetadata walks the span tree, sums the size of all
+// non-usage metadata values, and attaches a synthetic "inngest.usage" metadata
+// entry to the root span. Any previously stored usage metadata entries are
+// removed first so the computed value is always authoritative.
+func computeAndAttachUsageMetadata(root *cqrs.OtelSpan) {
+	var totalSize int
+	removeStoredUsage(root)
+	walkMetadataSize(root, &totalSize)
+
+	if totalSize <= 0 {
+		return
+	}
+
+	ts := root.EndTime
+	if ts.IsZero() {
+		ts = root.StartTime
+	}
+
+	root.Metadata = append(root.Metadata, &cqrs.SpanMetadata{
+		Scope:     enums.MetadataScopeRun,
+		Kind:      "inngest.usage",
+		Values:    metadata.Values{"metadata_bytes": json.RawMessage(strconv.Itoa(totalSize))},
+		UpdatedAt: ts,
+	})
+}
+
+func removeStoredUsage(span *cqrs.OtelSpan) {
+	span.Metadata = slices.DeleteFunc(span.Metadata, func(m *cqrs.SpanMetadata) bool {
+		return m.Kind == "inngest.usage"
+	})
+	for _, child := range span.Children {
+		removeStoredUsage(child)
+	}
+}
+
+func walkMetadataSize(span *cqrs.OtelSpan, total *int) {
+	for _, md := range span.Metadata {
+		*total += md.Values.Size()
+	}
+	for _, child := range span.Children {
+		walkMetadataSize(child, total)
+	}
 }
 
 func encodeSpanOutputID(outputSpanID *string, inputSpanID *string) (*string, error) {

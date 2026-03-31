@@ -495,6 +495,26 @@ type RunMetrics struct {
 	// StepCount represents the total number of steps already completed.
 	StepCount int
 
+	// MetadataSize tracks the cumulative metadata size in bytes across all
+	// steps in a run. This value is persisted to Redis via the saveResponse
+	// Lua script and loaded at the start of each step execution. During a
+	// step, it grows in-memory as metadata spans are created.
+	//
+	// Use TryAddMetadataSize / RollbackMetadataSize for concurrent access.
+	MetadataSize int
+
+	// MetadataSizeLoaded stores the MetadataSize value as loaded from Redis
+	// at the start of a step execution. This is used to compute the delta
+	// (MetadataSize - MetadataSizeLoaded) that gets persisted back to Redis
+	// when the step output is saved.
+	MetadataSizeLoaded int
+
+	// metadataMu guards concurrent access to MetadataSize and
+	// MetadataSizeLoaded. It is a pointer so that RunMetrics remains safe
+	// to copy by value (no copylocks violation) — all copies share the
+	// same mutex. Lazily allocated on first use via mu().
+	metadataMu *sync.Mutex
+
 	// TODO
 
 	// Waits stores the current number of in-progress waits for the run.
@@ -508,6 +528,62 @@ type RunMetrics struct {
 	// Steps stores the current number of in-progress or pending steps for the run.
 	// This is usually 1, but may be > 1 in the case of step parallelism.
 	// Steps int
+}
+
+// mu returns the mutex for guarding MetadataSize fields, lazily allocating
+// it on first use. This is safe because RunMetrics is always constructed in
+// a single goroutine before being shared for concurrent access.
+func (rm *RunMetrics) mu() *sync.Mutex {
+	if rm.metadataMu == nil {
+		rm.metadataMu = &sync.Mutex{}
+	}
+	return rm.metadataMu
+}
+
+// TryAddMetadataSize atomically checks whether adding spanSize would exceed
+// the given limit and, if not, increments MetadataSize. Returns true on
+// success, false if the limit would be exceeded.
+func (rm *RunMetrics) TryAddMetadataSize(spanSize, limit int) bool {
+	m := rm.mu()
+	m.Lock()
+	defer m.Unlock()
+	if rm.MetadataSize+spanSize > limit {
+		return false
+	}
+	rm.MetadataSize += spanSize
+	return true
+}
+
+// RollbackMetadataSize decrements MetadataSize by the given amount. This is
+// used to undo an optimistic TryAddMetadataSize when span creation fails.
+func (rm *RunMetrics) RollbackMetadataSize(spanSize int) {
+	m := rm.mu()
+	m.Lock()
+	defer m.Unlock()
+	rm.MetadataSize -= spanSize
+}
+
+// SwapMetadataSizeDelta returns the current delta (MetadataSize - MetadataSizeLoaded)
+// and advances MetadataSizeLoaded to MetadataSize. This ensures that each caller
+// in a concurrent group of handlers claims only its own contribution, preventing
+// double-counting when multiple goroutines persist deltas via SaveStep.
+func (rm *RunMetrics) SwapMetadataSizeDelta() int {
+	m := rm.mu()
+	m.Lock()
+	defer m.Unlock()
+	delta := rm.MetadataSize - rm.MetadataSizeLoaded
+	rm.MetadataSizeLoaded = rm.MetadataSize
+	return delta
+}
+
+// MetadataSizeDelta returns MetadataSize - MetadataSizeLoaded without advancing
+// the loaded baseline. Use this in sequential code paths (e.g. checkpoint) where
+// the entire delta is persisted in a single call at the end.
+func (rm *RunMetrics) MetadataSizeDelta() int {
+	m := rm.mu()
+	m.Lock()
+	defer m.Unlock()
+	return rm.MetadataSize - rm.MetadataSizeLoaded
 }
 
 // MutableConfig represents mutable config options.

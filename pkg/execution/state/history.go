@@ -21,3 +21,21 @@ func GroupIDFromContext(ctx context.Context) string {
 }
 
 type groupIDValType struct{}
+
+type metadataSizeDeltaKeyType struct{}
+
+var metadataSizeDeltaKey = metadataSizeDeltaKeyType{}
+
+// WithMetadataSizeDelta returns a context carrying the metadata size delta
+// to be persisted alongside SaveResponse. The delta represents the number
+// of bytes of metadata created during the current step execution.
+func WithMetadataSizeDelta(ctx context.Context, delta int) context.Context {
+	return context.WithValue(ctx, metadataSizeDeltaKey, delta)
+}
+
+// MetadataSizeDeltaFromContext returns the metadata size delta from the
+// context, or 0 if absent.
+func MetadataSizeDeltaFromContext(ctx context.Context) int {
+	v, _ := ctx.Value(metadataSizeDeltaKey).(int)
+	return v
+}

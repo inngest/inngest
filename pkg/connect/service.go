@@ -33,6 +33,10 @@ const (
 	GatewayGCInterval         = 30 * time.Minute
 )
 
+// WorkerStatusIntervalFunc returns the status reporting interval for a given
+// account and environment. Returning 0 disables status reporting.
+type WorkerStatusIntervalFunc func(ctx context.Context, accountID uuid.UUID, envID uuid.UUID) time.Duration
+
 type gatewayOpt func(*connectGatewaySvc)
 
 type connectionCounter struct {
@@ -91,6 +95,7 @@ type connectGatewaySvc struct {
 	workerHeartbeatInterval                               time.Duration
 	workerRequestExtendLeaseInterval                      time.Duration
 	workerRequestLeaseDuration                            time.Duration
+	workerStatusInterval                                  WorkerStatusIntervalFunc
 
 	hostname  string
 	ipAddress net.IP
@@ -203,6 +208,12 @@ func WithWorkerRequestLeaseDuration(duration time.Duration) gatewayOpt {
 	}
 }
 
+func WithWorkerStatusInterval(fn WorkerStatusIntervalFunc) gatewayOpt {
+	return func(svc *connectGatewaySvc) {
+		svc.workerStatusInterval = fn
+	}
+}
+
 func WithConsecutiveWorkerHeartbeatMissesBeforeConnectionClose(misses int) gatewayOpt {
 	return func(svc *connectGatewaySvc) {
 		svc.consecutiveWorkerHeartbeatMissesBeforeConnectionClose = misses
@@ -224,6 +235,9 @@ func NewConnectGatewayService(opts ...gatewayOpt) *connectGatewaySvc {
 		workerHeartbeatInterval:                               consts.ConnectWorkerHeartbeatInterval,
 		workerRequestExtendLeaseInterval:                      consts.ConnectWorkerRequestExtendLeaseInterval,
 		workerRequestLeaseDuration:                            consts.ConnectWorkerRequestLeaseDuration,
+		workerStatusInterval: func(_ context.Context, _ uuid.UUID, _ uuid.UUID) time.Duration {
+			return consts.ConnectWorkerStatusInterval
+		},
 		consecutiveWorkerHeartbeatMissesBeforeConnectionClose: 5,
 
 		grpcServer: grpcLib.NewServer(),
