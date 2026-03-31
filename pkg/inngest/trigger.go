@@ -13,7 +13,6 @@ import (
 	"github.com/inngest/inngest/pkg/expressions"
 	"github.com/inngest/inngest/pkg/syscode"
 	cron "github.com/robfig/cron/v3"
-	"go.uber.org/multierr"
 )
 
 const (
@@ -61,14 +60,14 @@ func (m MultipleTriggers) Validate(ctx context.Context) error {
 		}
 
 		if t.CronTrigger != nil && len(t.CronTrigger.Cron) > MaxCronLength {
-			err = multierr.Append(err, syscode.Error{
+			err = multierror.Append(err, syscode.Error{
 				Code:    syscode.CodeCronInvalid,
 				Message: fmt.Sprintf("cron is too long. maximum length is %d characters", MaxCronLength),
 			})
 		}
 
 		if t.EventTrigger != nil && len(t.Event) > MaxEventNameLength {
-			err = multierr.Append(err, syscode.Error{
+			err = multierror.Append(err, syscode.Error{
 				Code:    syscode.CodeEventNameInvalid,
 				Message: fmt.Sprintf("event name is too long. maximum length is %d characters", MaxEventNameLength),
 			})
