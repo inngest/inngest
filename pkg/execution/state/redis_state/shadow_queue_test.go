@@ -1335,7 +1335,12 @@ func TestConstraintLifecycleReporting(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, res)
 
-	require.Equal(t, enums.QueueConstraintNotLimited, limitingConstraint)
+	// 1 item must have been refilled
+	require.Len(t, res.RefilledItems, 1)
+
+	// This was the last unit of account + function concurrency, so we should see function concurrency as the constraint
+	require.Equal(t, enums.QueueConstraintFunctionConcurrency, limitingConstraint)
+
 	testLifecycles.lock.Lock()
 	require.Equal(t, 0, testLifecycles.acctConcurrency[accountID1])
 	require.Equal(t, 0, testLifecycles.fnConcurrency[fnID1])
@@ -1354,12 +1359,15 @@ func TestConstraintLifecycleReporting(t *testing.T) {
 	res, limitingConstraint, err = q.ProcessShadowPartitionBacklog(ctx, &sp1, &b1, at.Add(time.Minute), constraints)
 	require.NoError(t, err)
 	require.NotNil(t, res)
+
 	require.Equal(t, enums.QueueConstraintFunctionConcurrency, limitingConstraint)
+	require.Len(t, res.RefilledItems, 0)
+
 	require.EventuallyWithT(t, func(t *assert.CollectT) {
 		testLifecycles.lock.Lock()
 		assert.Equal(t, 1, len(cmLifecycles.AcquireCalls))
 		assert.Equal(t, 0, testLifecycles.acctConcurrency[accountID1], "expected account not to be hit")
-		assert.Equal(t, 1, testLifecycles.fnConcurrency[fnID1], "expected fn1 to be hit once")
+		assert.Equal(t, 2, testLifecycles.fnConcurrency[fnID1], "expected fn1 to be hit twice", fnID1, testLifecycles.fnConcurrency)
 		assert.Equal(t, 0, testLifecycles.fnConcurrency[fnID2], "expected fn2 not to be hit")
 		testLifecycles.lock.Unlock()
 	}, 1*time.Second, 100*time.Millisecond)
@@ -1380,7 +1388,7 @@ func TestConstraintLifecycleReporting(t *testing.T) {
 	require.EventuallyWithT(t, func(t *assert.CollectT) {
 		testLifecycles.lock.Lock()
 		assert.Equal(t, 1, testLifecycles.acctConcurrency[accountID1])
-		assert.Equal(t, 1, testLifecycles.fnConcurrency[fnID1])
+		assert.Equal(t, 2, testLifecycles.fnConcurrency[fnID1])
 		assert.Equal(t, 0, testLifecycles.fnConcurrency[fnID2])
 		testLifecycles.lock.Unlock()
 	}, 1*time.Second, 100*time.Millisecond)
