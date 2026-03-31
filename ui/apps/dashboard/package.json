@@ -42,7 +42,7 @@
     "@inngest/realtime": "0.4.5",
     "@inngest/use-agent": "^0.4.0",
     "@launchdarkly/node-server-sdk": "^9.0.3",
-    "@radix-ui/react-select": "^1.2.2",
+    "@radix-ui/react-select": "^2.0.0",
     "@radix-ui/react-toggle-group": "^1.1.11",
     "@remixicon/react": "^4.7.0",
     "@segment/analytics-next": "^1.81.1",
