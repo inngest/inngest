@@ -46,7 +46,7 @@ const platformMap: Partial<
 /**
  * Fetches the supposed URL of the binary on GitHub for this version.
  */
-async function getBinaryUrl(source: "cdn" | "github"): Promise<URL> {
+async function getBinaryUrl(source: "github"): Promise<URL> {
   const debug = rootDebug.extend("getBinaryUrl");
 
   const { arch, platform } = getArchPlatform();
@@ -56,19 +56,11 @@ async function getBinaryUrl(source: "cdn" | "github"): Promise<URL> {
   let version = packageJson.version.trim();
   debug("package.json version:", version);
 
-  if (source === "cdn") {
-    const url = new URL(
-      `https://cli.inngest.com/artifact/v${version}/inngest_${version}_${platform.platform}_${arch}${platform.extension}`
-    );
-    debug("targetUrl:", url.href);
-    return url;
-  } else {
-    const url = new URL(
-      `https://github.com/inngest/inngest/releases/download/v${version}/inngest_${version}_${platform.platform}_${arch}${platform.extension}`
-    );
-    debug("targetUrl:", url.href);
-    return url;
-  }
+  const url = new URL(
+    `https://github.com/avido-ai/inngest/releases/download/v${version}/inngest_${version}_${platform.platform}_${arch}${platform.extension}`
+  );
+  debug("targetUrl:", url.href);
+  return url;
 }
 
 /**
@@ -227,18 +219,10 @@ function pipeBinaryToInstallLocation(
   }
 
   try {
-    try {
-      const binaryUrl = await getBinaryUrl("cdn");
-      const req = await downloadBinary(binaryUrl);
-      await pipeBinaryToInstallLocation(req, binaryUrl);
-      rootDebug("postinstall complete (via cdn)");
-    } catch (err) {
-      rootDebug("failed to download from cdn; falling back to github");
-      const binaryUrl = await getBinaryUrl("github");
-      const req = await downloadBinary(binaryUrl);
-      await pipeBinaryToInstallLocation(req, binaryUrl);
-      rootDebug("postinstall complete (via github)");
-    }
+    const binaryUrl = await getBinaryUrl("github");
+    const req = await downloadBinary(binaryUrl);
+    await pipeBinaryToInstallLocation(req, binaryUrl);
+    rootDebug("postinstall complete (via github)");
   } catch (err) {
     console.error(err);
     process.exit(1);
