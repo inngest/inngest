@@ -2,6 +2,7 @@ package realtime
 
 import (
 	"encoding/json"
+	"sync/atomic"
 
 	"github.com/google/uuid"
 )
@@ -13,9 +14,12 @@ func NewInmemorySubscription(id uuid.UUID, writer func(b []byte) error) Subscrip
 	}
 }
 
-// subMemory represents an in-memory subscription backed by a writer callback.
+// subMemory represents an in-memory noop subscription
 type subMemory struct {
-	id     uuid.UUID
+	writeCalls  int32
+	streamCalls int32
+	id          uuid.UUID
+
 	writer func(b []byte) error
 }
 
@@ -28,6 +32,7 @@ func (s subMemory) Protocol() string {
 }
 
 func (s subMemory) Write(b []byte) error {
+	atomic.AddInt32(&s.writeCalls, 1)
 	if s.writer != nil {
 		return s.writer(b)
 	}
@@ -43,6 +48,7 @@ func (s subMemory) WriteMessage(m Message) error {
 }
 
 func (s subMemory) WriteChunk(c Chunk) error {
+	atomic.AddInt32(&s.streamCalls, 1)
 	byt, err := json.Marshal(c)
 	if err != nil {
 		return err

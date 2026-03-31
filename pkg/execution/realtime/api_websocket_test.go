@@ -17,10 +17,10 @@ import (
 
 func TestAPI_GetWebsocketUpgrade(t *testing.T) {
 	t.Run("successful connection and upgrade", func(t *testing.T) {
-		bc := newTestBroadcaster(t)
+		broadcaster := NewInProcessBroadcaster()
 		server := httptest.NewServer(NewAPI(APIOpts{
 			JWTSecret:   []byte("test-secret"),
-			Broadcaster: bc,
+			Broadcaster: broadcaster,
 		}))
 		defer server.Close()
 
@@ -46,20 +46,23 @@ func TestAPI_GetWebsocketUpgrade(t *testing.T) {
 		require.NoError(t, err)
 
 		// Give time for subscription to be established
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(20 * time.Millisecond)
 
 		// Verify subscription was created
-		require.Equal(t, 1, subCount(bc), "Should have 1 active subscription")
+		broadcaster.l.RLock()
+		initialSubCount := len(broadcaster.subs)
+		broadcaster.l.RUnlock()
+		require.Equal(t, 1, initialSubCount, "Should have 1 active subscription")
 
 		// Close connection immediately to avoid async Poll delay
 		conn.Close(websocket.StatusNormalClosure, "test complete")
 	})
 
 	t.Run("receives messages over websocket", func(t *testing.T) {
-		bc := newTestBroadcaster(t)
+		broadcaster := NewInProcessBroadcaster()
 		server := httptest.NewServer(NewAPI(APIOpts{
 			JWTSecret:   []byte("test-secret"),
-			Broadcaster: bc,
+			Broadcaster: broadcaster,
 		}))
 		defer server.Close()
 
@@ -85,7 +88,7 @@ func TestAPI_GetWebsocketUpgrade(t *testing.T) {
 		require.NoError(t, err)
 
 		// Give time for subscription to be established
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(20 * time.Millisecond)
 
 		// Publish a message to the topic
 		msg := Message{
@@ -95,7 +98,7 @@ func TestAPI_GetWebsocketUpgrade(t *testing.T) {
 			Channel:   "user:123",
 			Topic:     "ai",
 		}
-		bc.Publish(ctx, msg)
+		broadcaster.Publish(ctx, msg)
 
 		// Read message from websocket
 		ctx2, cancel2 := context.WithTimeout(context.Background(), 200*time.Millisecond)
@@ -118,10 +121,10 @@ func TestAPI_GetWebsocketUpgrade(t *testing.T) {
 	})
 
 	t.Run("receives chunks over websocket", func(t *testing.T) {
-		bc := newTestBroadcaster(t)
+		broadcaster := NewInProcessBroadcaster()
 		server := httptest.NewServer(NewAPI(APIOpts{
 			JWTSecret:   []byte("test-secret"),
-			Broadcaster: bc,
+			Broadcaster: broadcaster,
 		}))
 		defer server.Close()
 
@@ -144,7 +147,7 @@ func TestAPI_GetWebsocketUpgrade(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(20 * time.Millisecond)
 
 		// Publish a stream start and chunk
 		streamMsg := Message{
@@ -154,8 +157,8 @@ func TestAPI_GetWebsocketUpgrade(t *testing.T) {
 			Channel:   "user:123",
 			Topic:     "ai",
 		}
-		bc.Publish(ctx, streamMsg)
-		bc.PublishChunk(ctx, streamMsg, streamingtypes.ChunkFromMessage(streamMsg, "chunk data"))
+		broadcaster.Publish(ctx, streamMsg)
+		broadcaster.PublishChunk(ctx, streamMsg, streamingtypes.ChunkFromMessage(streamMsg, "chunk data"))
 
 		// Read stream start message
 		ctx2, cancel2 := context.WithTimeout(context.Background(), 200*time.Millisecond)
@@ -186,7 +189,7 @@ func TestAPI_GetWebsocketUpgrade(t *testing.T) {
 	t.Run("unauthorized connection", func(t *testing.T) {
 		server := httptest.NewServer(NewAPI(APIOpts{
 			JWTSecret:   []byte("test-secret"),
-			Broadcaster: newTestBroadcaster(t),
+			Broadcaster: NewInProcessBroadcaster(),
 		}))
 		defer server.Close()
 
@@ -205,7 +208,7 @@ func TestAPI_GetWebsocketUpgrade(t *testing.T) {
 	t.Run("invalid JWT connection", func(t *testing.T) {
 		server := httptest.NewServer(NewAPI(APIOpts{
 			JWTSecret:   []byte("test-secret"),
-			Broadcaster: newTestBroadcaster(t),
+			Broadcaster: NewInProcessBroadcaster(),
 		}))
 		defer server.Close()
 
@@ -225,10 +228,10 @@ func TestAPI_GetWebsocketUpgrade(t *testing.T) {
 	})
 
 	t.Run("multiple messages received correctly", func(t *testing.T) {
-		bc := newTestBroadcaster(t)
+		broadcaster := NewInProcessBroadcaster()
 		server := httptest.NewServer(NewAPI(APIOpts{
 			JWTSecret:   []byte("test-secret"),
-			Broadcaster: bc,
+			Broadcaster: broadcaster,
 		}))
 		defer server.Close()
 
@@ -250,7 +253,7 @@ func TestAPI_GetWebsocketUpgrade(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(20 * time.Millisecond)
 
 		// Send multiple messages
 		messages := []string{"message 1", "message 2", "message 3"}
@@ -262,11 +265,11 @@ func TestAPI_GetWebsocketUpgrade(t *testing.T) {
 				Channel:   "user:123",
 				Topic:     "ai",
 			}
-			bc.Publish(ctx, msg)
+			broadcaster.Publish(ctx, msg)
 
 			// Small delay between messages
 			if i < len(messages)-1 {
-				time.Sleep(100 * time.Millisecond)
+				time.Sleep(20 * time.Millisecond)
 			}
 		}
 
@@ -297,10 +300,10 @@ func TestAPI_GetWebsocketUpgrade(t *testing.T) {
 	})
 
 	t.Run("connection cleanup on context cancellation", func(t *testing.T) {
-		bc := newTestBroadcaster(t)
+		broadcaster := NewInProcessBroadcaster()
 		server := httptest.NewServer(NewAPI(APIOpts{
 			JWTSecret:   []byte("test-secret"),
-			Broadcaster: bc,
+			Broadcaster: broadcaster,
 		}))
 		defer server.Close()
 
@@ -323,10 +326,13 @@ func TestAPI_GetWebsocketUpgrade(t *testing.T) {
 
 		if err == nil {
 			// Give time for subscription to be established
-			time.Sleep(100 * time.Millisecond)
+			time.Sleep(20 * time.Millisecond)
 
 			// Connection should be established briefly
-			require.Equal(t, 1, subCount(bc), "Should have 1 active subscription")
+			broadcaster.l.RLock()
+			initialSubCount := len(broadcaster.subs)
+			broadcaster.l.RUnlock()
+			require.Equal(t, 1, initialSubCount, "Should have 1 active subscription")
 
 			// Close connection immediately
 			conn.Close(websocket.StatusNormalClosure, "test complete")
@@ -340,7 +346,9 @@ func TestAPI_GetWebsocketUpgrade(t *testing.T) {
 
 		// Check if subscription was cleaned up
 		// Note: With websockets using context.Background() for Poll, cleanup may not happen immediately on context cancellation
-		finalSubCount := subCount(bc)
+		broadcaster.l.RLock()
+		finalSubCount := len(broadcaster.subs)
+		broadcaster.l.RUnlock()
 
 		// Allow for either immediate cleanup or eventual cleanup
 		if finalSubCount > 0 {
