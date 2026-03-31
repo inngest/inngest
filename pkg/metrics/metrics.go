@@ -153,8 +153,6 @@ func (api *MetricsAPI) handleMetrics(w http.ResponseWriter, r *http.Request) {
 
 	api.queueGauge.Set(float64(sanitizedDepth))
 
-	// Gather metrics from the default Prometheus registry, which includes
-	// both the queue depth gauge and all OTel-instrumented metrics.
 	metricFamilies, err := prometheus.DefaultGatherer.Gather()
 	if err != nil {
 		http.Error(w, "Failed to gather metrics", http.StatusInternalServerError)
