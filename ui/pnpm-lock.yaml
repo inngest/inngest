@@ -180,8 +180,8 @@ importers:
         specifier: ^2.0.0
         version: 2.0.0(@urql/core@4.1.1(graphql@16.8.1))
       '@urql/exchange-retry':
-        specifier: ^1.2.0
-        version: 1.2.0(graphql@16.8.1)
+        specifier: ^2.0.0
+        version: 2.0.0(@urql/core@4.1.1(graphql@16.8.1))
       change-case:
         specifier: ^5.4.4
         version: 5.4.4
@@ -572,8 +572,8 @@ importers:
         specifier: ^2.0.0
         version: 2.0.0(@urql/core@4.1.1(graphql@16.8.1))
       '@urql/exchange-retry':
-        specifier: ^1.2.0
-        version: 1.2.0(graphql@16.8.1)
+        specifier: ^2.0.0
+        version: 2.0.0(@urql/core@4.1.1(graphql@16.8.1))
       date-fns:
         specifier: ^4.0.0
         version: 4.1.0
@@ -6783,8 +6783,10 @@ packages:
     peerDependencies:
       '@urql/core': ^6.0.0
 
-  '@urql/exchange-retry@1.2.0':
-    resolution: {integrity: sha512-1O/biKiVhhn0EtvDF4UOvz325K4RrLupfL8rHcmqD2TBLv4qVDWQuzx4JGa1FfqjjRb+C9TNZ6w19f32Mq85Ug==}
+  '@urql/exchange-retry@2.0.0':
+    resolution: {integrity: sha512-VdSMCiOptd6Ah6g5Bo+MzrNMAGzgRMC775W86strLRQN7lvvNlhx1LwU0gzb2h/z0atcJFAmDJEbMyvupkT+7A==}
+    peerDependencies:
+      '@urql/core': ^6.0.0
 
   '@vercel/build-utils@10.5.1':
     resolution: {integrity: sha512-BtqwEmU1AoITpd0KxYrdQOwyKZL8RKba+bWxI8mr3gXPQZWRAE9ok1zF0AXfvMGCstYPHBPNolZGDSfWmY2jqg==}
@@ -20339,12 +20341,10 @@ snapshots:
       '@urql/core': 4.1.1(graphql@16.8.1)
       wonka: 6.3.2
 
-  '@urql/exchange-retry@1.2.0(graphql@16.8.1)':
+  '@urql/exchange-retry@2.0.0(@urql/core@4.1.1(graphql@16.8.1))':
     dependencies:
       '@urql/core': 4.1.1(graphql@16.8.1)
       wonka: 6.3.2
-    transitivePeerDependencies:
-      - graphql
 
   '@vercel/build-utils@10.5.1':
     optional: true
