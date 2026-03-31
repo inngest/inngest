@@ -365,13 +365,13 @@ importers:
         version: 4.6.0(monaco-editor@0.52.2)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@reduxjs/toolkit':
         specifier: ^1.9.0
-        version: 1.9.0(react-redux@8.0.5(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(redux@4.2.1))(react@19.2.4)
+        version: 1.9.0(react-redux@9.2.0(@types/react@19.2.14)(react@19.2.4)(redux@4.2.1))(react@19.2.4)
       '@remixicon/react':
         specifier: ^4.2.0
         version: 4.2.0(react@19.2.4)
       '@rtk-query/graphql-request-base-query':
         specifier: ^2.2.0
-        version: 2.2.0(@reduxjs/toolkit@1.9.0(react-redux@8.0.5(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(redux@4.2.1))(react@19.2.4))(graphql@16.8.1)
+        version: 2.2.0(@reduxjs/toolkit@1.9.0(react-redux@9.2.0(@types/react@19.2.14)(react@19.2.4)(redux@4.2.1))(react@19.2.4))(graphql@16.8.1)
       '@tanstack/react-query':
         specifier: ^5.66.5
         version: 5.90.2(react@19.2.4)
@@ -412,8 +412,8 @@ importers:
         specifier: ^19.2.4
         version: 19.2.4(react@19.2.4)
       react-redux:
-        specifier: ^8.0.5
-        version: 8.0.5(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(redux@4.2.1)
+        specifier: ^9.0.0
+        version: 9.2.0(@types/react@19.2.14)(react@19.2.4)(redux@4.2.1)
       sonner:
         specifier: ^2.0.0
         version: 2.0.7(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
@@ -444,7 +444,7 @@ importers:
         version: 2.5.7(graphql@16.8.1)
       '@graphql-codegen/typescript-rtk-query':
         specifier: 2.3.7
-        version: 2.3.7(@reduxjs/toolkit@1.9.0(react-redux@8.0.5(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(redux@4.2.1))(react@19.2.4))(graphql-request@7.4.0(graphql@16.8.1))(graphql-tag@2.12.6(graphql@16.8.1))(graphql@16.8.1)
+        version: 2.3.7(@reduxjs/toolkit@1.9.0(react-redux@9.2.0(@types/react@19.2.14)(react@19.2.4)(redux@4.2.1))(react@19.2.4))(graphql-request@7.4.0(graphql@16.8.1))(graphql-tag@2.12.6(graphql@16.8.1))(graphql@16.8.1)
       '@inngest/tsconfig':
         specifier: workspace:*
         version: link:../../packages/tsconfig
@@ -6666,9 +6666,6 @@ packages:
   '@types/hast@3.0.4':
     resolution: {integrity: sha512-WPs+bbQw5aCj+x6laNGWLH3wviHtoCv/P3+otBhbOhJgG8qtpdAMlTCxLtsTWA7LH1Oh/bFCHsBn0TPS5m30EQ==}
 
-  '@types/hoist-non-react-statics@3.3.5':
-    resolution: {integrity: sha512-SbcrWzkKBw2cdwRTwQAswfpB9g9LJWfjtUeW/jvNwbhC8cpmmNYVePa+ncbUe0rGTQ7G3Ff6mYUN2VMfLVr+Sg==}
-
   '@types/html-minifier-terser@6.1.0':
     resolution: {integrity: sha512-oh/6byDPnL1zeNXFrDXFLyZjkr1MsBG667IM792caf1L2UPOOMf65NFzjUH/ltyfwjAGfs1rsX1eftK0jC/KIg==}
 
@@ -6758,8 +6755,8 @@ packages:
   '@types/unist@3.0.3':
     resolution: {integrity: sha512-ko/gIFJRv177XgZsZcBwnqJN5x/Gien8qNOn0D5bQU/zAzVf9Zt3BlcUiLqhV9y4ARk0GbT3tnUiPNgnTXzc/Q==}
 
-  '@types/use-sync-external-store@0.0.3':
-    resolution: {integrity: sha512-EwmlvuaxPNej9+T4v5AuBPJa2x2UOJVdjCtDHgcDqitUeOtjnJKJ+apYjVcAoBEMjKW1VVFGZLUb5+qqa09XFA==}
+  '@types/use-sync-external-store@0.0.6':
+    resolution: {integrity: sha512-zFDAD+tlpf2r4asuHEj0XH6pY6i0g5NeAHPn+15wk3BV6JA69eERFXC1gyGThDkVa1zCyKr5jox1+2LbV/AMLg==}
 
   '@types/ws@8.5.5':
     resolution: {integrity: sha512-lwhs8hktwxSjf9UaZ9tG5M03PGogvFaH8gUgLNbN9HKIg0dvv6q+gkSuJ8HN4/VbyxkuLzCjlN7GquQ0gUJfIg==}
@@ -11492,23 +11489,14 @@ packages:
       '@types/react': '>=18'
       react: '>=18'
 
-  react-redux@8.0.5:
-    resolution: {integrity: sha512-Q2f6fCKxPFpkXt1qNRZdEDLlScsDWyrgSj0mliK59qU6W5gvBiKkdMEG2lJzhd1rCctf0hb6EtePPLZ2e0m1uw==}
+  react-redux@9.2.0:
+    resolution: {integrity: sha512-ROY9fvHhwOD9ySfrF0wmvu//bKCQ6AeZZq1nJNtbDC+kk5DuSuNX/n6YWYF/SYy7bSba4D4FSz8DJeKY/S/r+g==}
     peerDependencies:
-      '@types/react': ^16.8 || ^17.0 || ^18.0
-      '@types/react-dom': ^16.8 || ^17.0 || ^18.0
-      react: ^16.8 || ^17.0 || ^18.0
-      react-dom: ^16.8 || ^17.0 || ^18.0
-      react-native: '>=0.59'
-      redux: ^4
+      '@types/react': ^18.2.25 || ^19
+      react: ^18.0 || ^19
+      redux: ^5.0.0
     peerDependenciesMeta:
       '@types/react':
-        optional: true
-      '@types/react-dom':
-        optional: true
-      react-dom:
-        optional: true
-      react-native:
         optional: true
       redux:
         optional: true
@@ -15491,11 +15479,11 @@ snapshots:
     transitivePeerDependencies:
       - encoding
 
-  '@graphql-codegen/typescript-rtk-query@2.3.7(@reduxjs/toolkit@1.9.0(react-redux@8.0.5(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(redux@4.2.1))(react@19.2.4))(graphql-request@7.4.0(graphql@16.8.1))(graphql-tag@2.12.6(graphql@16.8.1))(graphql@16.8.1)':
+  '@graphql-codegen/typescript-rtk-query@2.3.7(@reduxjs/toolkit@1.9.0(react-redux@9.2.0(@types/react@19.2.14)(react@19.2.4)(redux@4.2.1))(react@19.2.4))(graphql-request@7.4.0(graphql@16.8.1))(graphql-tag@2.12.6(graphql@16.8.1))(graphql@16.8.1)':
     dependencies:
       '@graphql-codegen/plugin-helpers': 2.7.2(graphql@16.8.1)
       '@graphql-codegen/visitor-plugin-common': 2.13.1(graphql@16.8.1)
-      '@reduxjs/toolkit': 1.9.0(react-redux@8.0.5(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(redux@4.2.1))(react@19.2.4)
+      '@reduxjs/toolkit': 1.9.0(react-redux@9.2.0(@types/react@19.2.14)(react@19.2.4)(redux@4.2.1))(react@19.2.4)
       auto-bind: 4.0.0
       change-case-all: 1.0.14
       graphql: 16.8.1
@@ -18814,7 +18802,7 @@ snapshots:
     dependencies:
       react: 19.2.4
 
-  '@reduxjs/toolkit@1.9.0(react-redux@8.0.5(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(redux@4.2.1))(react@19.2.4)':
+  '@reduxjs/toolkit@1.9.0(react-redux@9.2.0(@types/react@19.2.14)(react@19.2.4)(redux@4.2.1))(react@19.2.4)':
     dependencies:
       immer: 9.0.21
       redux: 4.2.1
@@ -18822,7 +18810,7 @@ snapshots:
       reselect: 4.1.8
     optionalDependencies:
       react: 19.2.4
-      react-redux: 8.0.5(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(redux@4.2.1)
+      react-redux: 9.2.0(@types/react@19.2.14)(react@19.2.4)(redux@4.2.1)
 
   '@remixicon/react@4.2.0(react@19.2.4)':
     dependencies:
@@ -19098,9 +19086,9 @@ snapshots:
   '@rollup/rollup-win32-x64-msvc@4.57.1':
     optional: true
 
-  '@rtk-query/graphql-request-base-query@2.2.0(@reduxjs/toolkit@1.9.0(react-redux@8.0.5(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(redux@4.2.1))(react@19.2.4))(graphql@16.8.1)':
+  '@rtk-query/graphql-request-base-query@2.2.0(@reduxjs/toolkit@1.9.0(react-redux@9.2.0(@types/react@19.2.14)(react@19.2.4)(redux@4.2.1))(react@19.2.4))(graphql@16.8.1)':
     dependencies:
-      '@reduxjs/toolkit': 1.9.0(react-redux@8.0.5(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(redux@4.2.1))(react@19.2.4)
+      '@reduxjs/toolkit': 1.9.0(react-redux@9.2.0(@types/react@19.2.14)(react@19.2.4)(redux@4.2.1))(react@19.2.4)
       graphql: 16.8.1
       graphql-request: 4.3.0(graphql@16.8.1)
     transitivePeerDependencies:
@@ -20372,11 +20360,6 @@ snapshots:
     dependencies:
       '@types/unist': 3.0.3
 
-  '@types/hoist-non-react-statics@3.3.5':
-    dependencies:
-      '@types/react': 19.2.14
-      hoist-non-react-statics: 3.3.2
-
   '@types/html-minifier-terser@6.1.0': {}
 
   '@types/js-cookie@2.2.7': {}
@@ -20462,7 +20445,7 @@ snapshots:
 
   '@types/unist@3.0.3': {}
 
-  '@types/use-sync-external-store@0.0.3': {}
+  '@types/use-sync-external-store@0.0.6': {}
 
   '@types/ws@8.5.5':
     dependencies:
@@ -26328,19 +26311,13 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  react-redux@8.0.5(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(redux@4.2.1):
+  react-redux@9.2.0(@types/react@19.2.14)(react@19.2.4)(redux@4.2.1):
     dependencies:
-      '@babel/runtime': 7.27.0
-      '@types/hoist-non-react-statics': 3.3.5
-      '@types/use-sync-external-store': 0.0.3
-      hoist-non-react-statics: 3.3.2
+      '@types/use-sync-external-store': 0.0.6
       react: 19.2.4
-      react-is: 18.3.1
-      use-sync-external-store: 1.2.2(react@19.2.4)
+      use-sync-external-store: 1.6.0(react@19.2.4)
     optionalDependencies:
       '@types/react': 19.2.14
-      '@types/react-dom': 19.2.3(@types/react@19.2.14)
-      react-dom: 19.2.4(react@19.2.4)
       redux: 4.2.1
 
   react-refresh@0.14.2: {}
