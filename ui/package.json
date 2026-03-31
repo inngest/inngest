@@ -83,7 +83,7 @@
       "minimatch@<5.0.0": ">=5.0.0",
       "nodemon": ">=3.0.0",
       "nodemon>minimatch": "10.2.4",
-      "nodemon>brace-expansion": "1.1.11"
+      "nodemon>brace-expansion": "5.0.5"
     },
     "onlyBuiltDependencies": [
       "@sentry/cli",
