@@ -122,7 +122,6 @@ function PhaseSubBars<T extends { totalMs: number }>({
   viewStartOffset,
   viewEndOffset,
   startTime,
-  endTime,
   minTime,
 }: {
   phases: PhaseDefinition<T>[];
@@ -136,7 +135,6 @@ function PhaseSubBars<T extends { totalMs: number }>({
   viewStartOffset?: number;
   viewEndOffset?: number;
   startTime?: Date;
-  endTime?: Date | null;
   minTime: Date;
 }) {
   if (data.totalMs <= 0) return null;
@@ -611,7 +609,6 @@ function TimelineBarRenderer({
               viewStartOffset={viewStartOffset}
               viewEndOffset={viewEndOffset}
               startTime={bar.startTime}
-              endTime={bar.endTime}
               minTime={minTime}
             />
           )}
@@ -657,7 +654,6 @@ function TimelineBarRenderer({
               viewStartOffset={viewStartOffset}
               viewEndOffset={viewEndOffset}
               startTime={bar.startTime}
-              endTime={bar.endTime}
               minTime={minTime}
             />
           )}
@@ -722,7 +718,6 @@ function TimelineBarRenderer({
               viewStartOffset={viewStartOffset}
               viewEndOffset={viewEndOffset}
               startTime={bar.startTime}
-              endTime={bar.endTime}
               minTime={minTime}
             />
           )}
