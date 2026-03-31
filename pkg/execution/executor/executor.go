@@ -3270,6 +3270,7 @@ func (e *executor) HandleGenerator(ctx context.Context, runCtx execution.RunCont
 		Tags: map[string]any{
 			"queue_shard": e.assignedQueueShard.Name(),
 		},
+		PkgName: pkgName,
 	})
 
 	switch gen.Op {
