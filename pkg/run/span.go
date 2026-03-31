@@ -461,9 +461,6 @@ func (s *Span) IsRecording() bool {
 // official one doesn't actually set the status, but we'll just do it here
 // for convinence's sake.
 func (s *Span) RecordError(err error, opts ...trace.EventOption) {
-	s.Lock()
-	defer s.Unlock()
-
 	s.AddEvent(err.Error(), opts...)
 	s.setStatus(codes.Error, err.Error())
 }
