@@ -252,8 +252,8 @@ importers:
         specifier: 0.8.15
         version: 0.8.15
       type-fest:
-        specifier: ^3.7.2
-        version: 3.7.2
+        specifier: ^5.0.0
+        version: 5.3.1
       ulid:
         specifier: ^2.3.0
         version: 2.3.0
@@ -27209,7 +27209,8 @@ snapshots:
 
   type-fest@2.19.0: {}
 
-  type-fest@3.7.2: {}
+  type-fest@3.7.2:
+    optional: true
 
   type-fest@5.3.1:
     dependencies:
