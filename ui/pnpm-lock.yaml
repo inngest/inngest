@@ -452,8 +452,8 @@ importers:
         specifier: ^0.3.0
         version: 0.3.2(@typescript-eslint/utils@8.46.2(eslint@9.39.0(jiti@2.6.1))(typescript@5.9.2))(eslint-import-resolver-node@0.3.9)(eslint@9.39.0(jiti@2.6.1))(typescript@5.9.2)
       '@types/ms':
-        specifier: ^0.7.31
-        version: 0.7.31
+        specifier: ^2.0.0
+        version: 2.1.0
       '@types/node':
         specifier: ^24.0.14
         version: 24.9.2
@@ -6646,9 +6646,6 @@ packages:
 
   '@types/memcached@2.2.10':
     resolution: {integrity: sha512-AM9smvZN55Gzs2wRrqeMHVP7KE8KWgCJO/XL5yCly2xF6EKa4YlbpK+cLSAH4NG/Ah64HrlegmGqW8kYws7Vxg==}
-
-  '@types/ms@0.7.31':
-    resolution: {integrity: sha512-iiUgKzV9AuaEkZqkOLDIvlQiL6ltuZd9tGcW3gwpnX8JbuiuhFlEGmmFXEXkN50Cvq7Os88IY2v0dkDqXYWVgA==}
 
   '@types/ms@2.1.0':
     resolution: {integrity: sha512-GsCCIZDE/p3i96vtEqx+7dBUGXrc7zeSK3wwPHIaRThS+9OhWIXRqzs4d6k1SVU8g91DrNRWxWUGhp5KXQb2VA==}
@@ -21143,7 +21140,7 @@ snapshots:
 
   '@types/debug@4.1.12':
     dependencies:
-      '@types/ms': 0.7.31
+      '@types/ms': 2.1.0
 
   '@types/deep-eql@4.0.2': {}
 
@@ -21199,8 +21196,6 @@ snapshots:
   '@types/memcached@2.2.10':
     dependencies:
       '@types/node': 24.9.2
-
-  '@types/ms@0.7.31': {}
 
   '@types/ms@2.1.0': {}
 
