@@ -340,8 +340,8 @@ importers:
         specifier: 8.0.3
         version: 8.0.3(@emnapi/core@1.7.1)(@emnapi/runtime@1.7.1)(@types/node@24.9.2)(esbuild@0.27.2)(jiti@2.6.1)(terser@5.39.0)(tsx@4.20.6)(yaml@2.8.0)
       vite-plugin-svgr:
-        specifier: 4.5.0
-        version: 4.5.0(rollup@4.57.1)(typescript@5.9.3)(vite@8.0.3(@emnapi/core@1.7.1)(@emnapi/runtime@1.7.1)(@types/node@24.9.2)(esbuild@0.27.2)(jiti@2.6.1)(terser@5.39.0)(tsx@4.20.6)(yaml@2.8.0))
+        specifier: 5.0.0
+        version: 5.0.0(rollup@4.57.1)(typescript@5.9.3)(vite@8.0.3(@emnapi/core@1.7.1)(@emnapi/runtime@1.7.1)(@types/node@24.9.2)(esbuild@0.27.2)(jiti@2.6.1)(terser@5.39.0)(tsx@4.20.6)(yaml@2.8.0))
       vite-tsconfig-paths:
         specifier: 6.0.5
         version: 6.0.5(typescript@5.9.3)(vite@8.0.3(@emnapi/core@1.7.1)(@emnapi/runtime@1.7.1)(@types/node@24.9.2)(esbuild@0.27.2)(jiti@2.6.1)(terser@5.39.0)(tsx@4.20.6)(yaml@2.8.0))
@@ -13093,8 +13093,8 @@ packages:
     engines: {node: ^18.0.0 || ^20.0.0 || >=22.0.0}
     hasBin: true
 
-  vite-plugin-svgr@4.5.0:
-    resolution: {integrity: sha512-W+uoSpmVkSmNOGPSsDCWVW/DDAyv+9fap9AZXBvWiQqrboJ08j2vh0tFxTD/LjwqwAd3yYSVJgm54S/1GhbdnA==}
+  vite-plugin-svgr@5.0.0:
+    resolution: {integrity: sha512-CZFWDtbWSLnF6C+uv8u7E5Ao6UVQYBpJrS6212XsEod/Lm4ErhOoFc01/po4ie5hqvMCr5KYrlMrSGQQEtMtBg==}
     peerDependencies:
       vite: '>=4.5.11'
 
@@ -28072,7 +28072,7 @@ snapshots:
       - tsx
       - yaml
 
-  vite-plugin-svgr@4.5.0(rollup@4.57.1)(typescript@5.9.3)(vite@8.0.3(@emnapi/core@1.7.1)(@emnapi/runtime@1.7.1)(@types/node@24.9.2)(esbuild@0.27.2)(jiti@2.6.1)(terser@5.39.0)(tsx@4.20.6)(yaml@2.8.0)):
+  vite-plugin-svgr@5.0.0(rollup@4.57.1)(typescript@5.9.3)(vite@8.0.3(@emnapi/core@1.7.1)(@emnapi/runtime@1.7.1)(@types/node@24.9.2)(esbuild@0.27.2)(jiti@2.6.1)(terser@5.39.0)(tsx@4.20.6)(yaml@2.8.0)):
     dependencies:
       '@rollup/pluginutils': 5.3.0(rollup@4.57.1)
       '@svgr/core': 8.1.0(typescript@5.9.3)
