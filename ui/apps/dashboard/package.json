@@ -84,7 +84,7 @@
     "react-use": "^17.6.0",
     "recharts": "^2.4.3",
     "remark-gfm": "^4.0.1",
-    "sonner": "^1.2.0",
+    "sonner": "^2.0.0",
     "sql-formatter": "^15.7.1",
     "srvx": "0.8.15",
     "type-fest": "^5.0.0",

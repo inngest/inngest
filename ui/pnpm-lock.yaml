@@ -243,8 +243,8 @@ importers:
         specifier: ^4.0.1
         version: 4.0.1
       sonner:
-        specifier: ^1.2.0
-        version: 1.2.0(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
+        specifier: ^2.0.0
+        version: 2.0.7(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       sql-formatter:
         specifier: ^15.7.1
         version: 15.7.1
@@ -415,8 +415,8 @@ importers:
         specifier: ^8.0.5
         version: 8.0.5(@types/react-dom@18.2.4)(@types/react@18.2.11)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(redux@4.2.1)
       sonner:
-        specifier: ^1.2.0
-        version: 1.2.0(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
+        specifier: ^2.0.0
+        version: 2.0.7(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       srvx:
         specifier: 0.8.15
         version: 0.8.15
@@ -620,8 +620,8 @@ importers:
         specifier: ^4.0.1
         version: 4.0.1
       sonner:
-        specifier: ^1.2.0
-        version: 1.2.0(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
+        specifier: ^2.0.0
+        version: 2.0.7(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       srvx:
         specifier: 0.8.15
         version: 0.8.15
@@ -822,8 +822,8 @@ importers:
         specifier: ^2.4.3
         version: 2.4.3(prop-types@15.8.1)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       sonner:
-        specifier: ^1.2.0
-        version: 1.2.0(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
+        specifier: ^2.0.0
+        version: 2.0.7(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       sql-formatter:
         specifier: ^15.6.10
         version: 15.7.1
@@ -11713,11 +11713,11 @@ packages:
   solid-js@1.9.10:
     resolution: {integrity: sha512-Coz956cos/EPDlhs6+jsdTxKuJDPT7B5SVIWgABwROyxjY7Xbr8wkzD68Et+NxnV7DLJ3nJdAC2r9InuV/4Jew==}
 
-  sonner@1.2.0:
-    resolution: {integrity: sha512-4bIPKrhF+Z4yEC4EZvNBswcVzMrUhztOQXqyIoiZqiqN1TT39FeK+TgRsQidvvztnYgOn4+S3LdAsri61c7ATA==}
+  sonner@2.0.7:
+    resolution: {integrity: sha512-W6ZN4p58k8aDKA4XPcx2hpIQXBRAgyiWVkYhT7CvK6D3iAu7xjvVyhQHg2/iaKJZ1XVJ4r7XuwGL+WGEK37i9w==}
     peerDependencies:
-      react: ^18.0.0
-      react-dom: ^18.0.0
+      react: ^18.0.0 || ^19.0.0 || ^19.0.0-rc
+      react-dom: ^18.0.0 || ^19.0.0 || ^19.0.0-rc
 
   source-map-js@1.2.1:
     resolution: {integrity: sha512-UXWMKhLOwVKb728IUtQPXxfYU+usdybtUrK/8uGE8CQMvrhOpwvzDBwj0QhSL7MQc7vIsISBG8VQ8+IDQxpfQA==}
@@ -26469,7 +26469,7 @@ snapshots:
       seroval: 1.3.2
       seroval-plugins: 1.3.3(seroval@1.3.2)
 
-  sonner@1.2.0(react-dom@18.2.0(react@18.2.0))(react@18.2.0):
+  sonner@2.0.7(react-dom@18.2.0(react@18.2.0))(react@18.2.0):
     dependencies:
       react: 18.2.0
       react-dom: 18.2.0(react@18.2.0)

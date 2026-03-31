@@ -52,7 +52,7 @@
     "react-json-tree": "^0.20.0",
     "react-use": "^17.4.0",
     "recharts": "^2.4.3",
-    "sonner": "^1.2.0",
+    "sonner": "^2.0.0",
     "sql-formatter": "^15.6.10",
     "tailwind-merge": "^1.10.0",
     "ulid": "^2.3.0",
