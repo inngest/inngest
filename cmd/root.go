@@ -9,7 +9,6 @@ import (
 	"github.com/inngest/inngest/cmd/devserver"
 	"github.com/inngest/inngest/cmd/start"
 	"github.com/inngest/inngest/cmd/version"
-	"github.com/inngest/inngest/pkg/api/tel"
 	inncli "github.com/inngest/inngest/pkg/cli"
 	inngestversion "github.com/inngest/inngest/pkg/inngest/version"
 	isatty "github.com/mattn/go-isatty"
@@ -62,15 +61,7 @@ func execute() {
 				}
 			}
 
-			m := tel.NewMetadata(ctx)
-			m.SetCliContext(cmd)
-			tel.SendMetadata(ctx, m)
 			return ctx, nil
-		},
-		After: func(ctx context.Context, cmd *cli.Command) error {
-			// Wait for any events to have been sent.
-			tel.Wait()
-			return nil
 		},
 
 		Flags: globalFlags,

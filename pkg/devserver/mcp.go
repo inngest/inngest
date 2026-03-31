@@ -16,7 +16,6 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/inngest/inngest/internal/embeddocs"
 	"github.com/inngest/inngest/pkg/api"
-	"github.com/inngest/inngest/pkg/api/tel"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/event"
@@ -325,15 +324,6 @@ type ListDocsResult struct {
 }
 
 func (h *MCPHandler) sendEvent(ctx context.Context, req *mcp.CallToolRequest, args SendEventArgs) (*mcp.CallToolResult, any, error) {
-	// Track MCP tool usage
-	metadata := tel.NewMetadata(ctx)
-	metadata.Context["tool"] = "send_event"
-	metadata.Context["event_name"] = args.Name
-	if args.EventIDSeed != "" {
-		metadata.Context["has_event_id_seed"] = true
-	}
-	tel.SendEvent(ctx, "cli/mcp.tool.executed", metadata)
-
 	evt := event.Event{
 		Name: args.Name,
 	}
@@ -412,11 +402,6 @@ type FunctionInfo struct {
 
 // listFunctions handles the list_functions tool
 func (h *MCPHandler) listFunctions(ctx context.Context, req *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, any, error) {
-	// Track MCP tool usage
-	metadata := tel.NewMetadata(ctx)
-	metadata.Context["tool"] = "list_functions"
-	tel.SendEvent(ctx, "cli/mcp.tool.executed", metadata)
-
 	// Get all functions using existing CQRS interface
 	functions, err := h.data.GetFunctions(ctx)
 	if err != nil {
@@ -608,12 +593,6 @@ func (h *MCPHandler) getRunStatusInternal(ctx context.Context, runIDStr string) 
 
 // getRunStatus handles the get_run_status tool
 func (h *MCPHandler) getRunStatus(ctx context.Context, req *mcp.CallToolRequest, args GetRunStatusArgs) (*mcp.CallToolResult, any, error) {
-	// Track MCP tool usage
-	metadata := tel.NewMetadata(ctx)
-	metadata.Context["tool"] = "get_run_status"
-	metadata.Context["run_id"] = args.RunID
-	tel.SendEvent(ctx, "cli/mcp.tool.executed", metadata)
-
 	result, err := h.getRunStatusInternal(ctx, args.RunID)
 	if err != nil {
 		return nil, nil, err
@@ -655,14 +634,6 @@ func (h *MCPHandler) getRunStatus(ctx context.Context, req *mcp.CallToolRequest,
 
 // pollRunStatus handles the poll_run_status tool
 func (h *MCPHandler) pollRunStatus(ctx context.Context, req *mcp.CallToolRequest, args PollRunStatusArgs) (*mcp.CallToolResult, any, error) {
-	// Track MCP tool usage
-	metadata := tel.NewMetadata(ctx)
-	metadata.Context["tool"] = "poll_run_status"
-	metadata.Context["run_count"] = len(args.RunIDs)
-	metadata.Context["timeout"] = args.Timeout
-	metadata.Context["poll_interval"] = args.PollInterval
-	tel.SendEvent(ctx, "cli/mcp.tool.executed", metadata)
-
 	// Set defaults
 	timeout := args.Timeout
 	if timeout == 0 {
@@ -764,13 +735,6 @@ func (h *MCPHandler) pollRunStatus(ctx context.Context, req *mcp.CallToolRequest
 
 // invokeFunction handles the invoke_function tool
 func (h *MCPHandler) invokeFunction(ctx context.Context, req *mcp.CallToolRequest, args InvokeFunctionArgs) (*mcp.CallToolResult, any, error) {
-	// Track MCP tool usage
-	metadata := tel.NewMetadata(ctx)
-	metadata.Context["tool"] = "invoke_function"
-	metadata.Context["function_id"] = args.FunctionID
-	metadata.Context["timeout"] = args.Timeout
-	tel.SendEvent(ctx, "cli/mcp.tool.executed", metadata)
-
 	// Set default timeout
 	timeout := args.Timeout
 	if timeout == 0 {
@@ -919,12 +883,6 @@ func (h *MCPHandler) invokeFunction(ctx context.Context, req *mcp.CallToolReques
 
 // grepDocs handles the grep_docs tool
 func (h *MCPHandler) grepDocs(ctx context.Context, req *mcp.CallToolRequest, args GrepDocsArgs) (*mcp.CallToolResult, any, error) {
-	// Track MCP tool usage
-	metadata := tel.NewMetadata(ctx)
-	metadata.Context["tool"] = "grep_docs"
-	metadata.Context["pattern_length"] = len(args.Pattern)
-	tel.SendEvent(ctx, "cli/mcp.tool.executed", metadata)
-
 	// Set default limit
 	limit := args.Limit
 	if limit == 0 {
@@ -1011,12 +969,6 @@ func (h *MCPHandler) grepDocs(ctx context.Context, req *mcp.CallToolRequest, arg
 
 // readDoc handles the read_doc tool
 func (h *MCPHandler) readDoc(ctx context.Context, req *mcp.CallToolRequest, args ReadDocArgs) (*mcp.CallToolResult, any, error) {
-	// Track MCP tool usage
-	metadata := tel.NewMetadata(ctx)
-	metadata.Context["tool"] = "read_doc"
-	metadata.Context["path"] = args.Path
-	tel.SendEvent(ctx, "cli/mcp.tool.executed", metadata)
-
 	// Validate and sanitize path
 	if args.Path == "" {
 		return nil, nil, fmt.Errorf("path cannot be empty")
@@ -1074,11 +1026,6 @@ func (h *MCPHandler) readDoc(ctx context.Context, req *mcp.CallToolRequest, args
 
 // listDocs handles the list_docs tool
 func (h *MCPHandler) listDocs(ctx context.Context, req *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, any, error) {
-	// Track MCP tool usage
-	metadata := tel.NewMetadata(ctx)
-	metadata.Context["tool"] = "list_docs"
-	tel.SendEvent(ctx, "cli/mcp.tool.executed", metadata)
-
 	// Count documents and categorize them
 	categories := make(map[string]int)
 	sdks := make(map[string]int)

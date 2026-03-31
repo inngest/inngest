@@ -17,7 +17,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
-	"github.com/inngest/inngest/pkg/api/tel"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/cqrs/sync"
@@ -126,10 +125,6 @@ func (a devapi) UI(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, r.URL.String(), http.StatusSeeOther)
 		return
 	}
-
-	m := tel.NewMetadata(r.Context())
-	tel.SendEvent(r.Context(), "cli/dev_ui.loaded", m)
-	tel.SendMetadata(r.Context(), m)
 
 	byt := serve(r.Context(), r.URL.Path)
 	_, _ = w.Write(byt)

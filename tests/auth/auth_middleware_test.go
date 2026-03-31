@@ -110,7 +110,6 @@ func getProtectedEndpoints() []TestEndpoint {
 		{"core_cancel_run", "DELETE", "/v0/runs/test-run-id"},
 		{"core_run_batch", "GET", "/v0/runs/test-run-id/batch"},
 		{"core_run_actions", "GET", "/v0/runs/test-run-id/actions"},
-		{"core_telemetry", "POST", "/v0/telemetry"},
 	}
 }
 

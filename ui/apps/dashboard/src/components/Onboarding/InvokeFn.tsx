@@ -14,7 +14,6 @@ import { pathCreator } from '@/utils/urls';
 import { OnboardingSteps } from './types';
 import { invokeFunction, prefetchFunctions } from '@/queries/server/functions';
 import useOnboardingStep from './useOnboardingStep';
-import { useOnboardingTracking } from './useOnboardingTracking';
 import { useNavigate, ClientOnly } from '@tanstack/react-router';
 
 const initialCode = JSON.stringify(
@@ -48,8 +47,6 @@ export default function InvokeFn() {
   const [rawPayload, setRawPayload] = useState(initialCode);
   const [isFnInvoked, setIsFnInvoked] = useState(false);
   const navigate = useNavigate();
-  const tracking = useOnboardingTracking();
-
   const isOnboardingCompleted = lastCompletedStep?.isFinalStep;
 
   const hasEventTrigger =
@@ -93,12 +90,7 @@ export default function InvokeFn() {
         },
       });
       if (success) {
-        updateCompletedSteps(currentStepName, {
-          metadata: {
-            completionSource: 'manual',
-            invokedFunction: selectedFunction,
-          },
-        });
+        updateCompletedSteps(currentStepName);
         setError(undefined);
         setIsFnInvoked(true);
         // TO DO: add link to run ID, need to update mutation first to return ID
@@ -210,13 +202,6 @@ export default function InvokeFn() {
                 label="Invoke test function"
                 disabled={!selectedFunction}
                 onClick={() => {
-                  tracking?.trackOnboardingAction(currentStepName, {
-                    metadata: {
-                      type: 'btn-click',
-                      label: 'invoke',
-                      invokedFunction: selectedFunction,
-                    },
-                  });
                   handleInvokeFn();
                 }}
               />
@@ -224,19 +209,7 @@ export default function InvokeFn() {
                 appearance="outlined"
                 label="Skip to dashboard"
                 onClick={() => {
-                  updateCompletedSteps(currentStepName, {
-                    metadata: {
-                      completionSource: 'manual',
-                      invokedFunction: null,
-                    },
-                  });
-                  tracking?.trackOnboardingAction(currentStepName, {
-                    metadata: {
-                      type: 'btn-click',
-                      label: 'skip',
-                      invokedFunction: selectedFunction,
-                    },
-                  });
+                  updateCompletedSteps(currentStepName);
                   navigate({ to: pathCreator.apps({ envSlug: 'production' }) });
                 }}
               />
@@ -245,13 +218,6 @@ export default function InvokeFn() {
             <Button
               label="Go to runs"
               onClick={() => {
-                tracking?.trackOnboardingAction(currentStepName, {
-                  metadata: {
-                    type: 'btn-click',
-                    label: 'go-to-runs',
-                    invokedFunction: selectedFunction,
-                  },
-                });
                 navigate({ to: pathCreator.runs({ envSlug: 'production' }) });
               }}
             />

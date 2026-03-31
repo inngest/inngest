@@ -71,12 +71,7 @@ export const Connect = ({ searchParams, integrations }: VercelConnectProps) => {
       projects,
     });
     setSaving(false);
-    updateCompletedSteps(OnboardingSteps.DeployApp, {
-      metadata: {
-        completionSource: 'automatic',
-        hostingProvider: 'vercel',
-      },
-    });
+    updateCompletedSteps(OnboardingSteps.DeployApp);
 
     navigate({
       to: '/integrations/vercel/callback/success',

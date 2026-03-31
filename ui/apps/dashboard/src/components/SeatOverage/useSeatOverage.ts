@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
 
-import { trackEvent, useTrackingUser } from '@/utils/tracking';
 import { parseSeatOverageData, useSeatOverageCheck } from './data';
 
 const STORAGE_KEY = 'seatOverageDismissedUntil';
@@ -23,8 +22,6 @@ const dismissSeatCTA = (hours = 24): void => {
 export function useSeatOverage() {
   const [isReady, setIsReady] = useState(false);
   const [shouldShow, setShouldShow] = useState(true);
-  const trackingUser = useTrackingUser();
-
   const { data: rawData, error } = useSeatOverageCheck();
   const seatOverageData = parseSeatOverageData(rawData);
 
@@ -33,24 +30,10 @@ export function useSeatOverage() {
     setIsReady(true);
   }, []);
 
-  const dismiss = useCallback(
-    (hours = 24) => {
-      dismissSeatCTA(hours);
-      setShouldShow(false);
-
-      if (trackingUser) {
-        trackEvent({
-          name: 'app/upsell.seat.overage.dismissed',
-          data: {
-            variant: 'widget',
-          },
-          user: trackingUser,
-          v: '2025-07-14.1',
-        });
-      }
-    },
-    [trackingUser],
-  );
+  const dismiss = useCallback((hours = 24) => {
+    dismissSeatCTA(hours);
+    setShouldShow(false);
+  }, []);
 
   const isWidgetVisible =
     !error &&
