@@ -14,8 +14,7 @@
     "lint-staged": "15.5.0",
     "postcss-nesting": "14.0.0",
     "prettier": "3.8.1",
-    "prettier-plugin-tailwindcss": "0.2.7",
-    "turbo": "2.0.1"
+    "prettier-plugin-tailwindcss": "0.2.7"
   },
   "engines": {
     "node": "24.x",
