@@ -40,7 +40,7 @@
     "cronstrue": "^2.51.0",
     "date-fns": "^4.0.0",
     "date-fns-tz": "^3.2.0",
-    "echarts": "^5.5.1",
+    "echarts": "^6.0.0",
     "framer-motion": "^10.16.4",
     "lodash.debounce": "^4.0.8",
     "monaco-editor": "^0.52.0",
