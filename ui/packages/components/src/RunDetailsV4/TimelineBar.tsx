@@ -37,6 +37,7 @@ import type {
   BarStyle,
   BarStyleKey,
   TimelineBarProps,
+  TimingDetail,
 } from './TimelineBar.types';
 import { formatDuration } from './runDetailsUtils';
 import { formatLabel } from './utils/formatting';
@@ -50,9 +51,10 @@ import { TIMELINE_CONSTANTS } from './utils/timing';
  * Consolidated style configurations for all bar types.
  * Each entry contains visual style, status-based coloring flag, icon, height, and pattern.
  */
-const BAR_STYLES: Record<BarStyleKey, BarStyle> = {
+export const BAR_STYLES: Record<BarStyleKey, BarStyle> = {
   root: {
     barColor: 'bg-status-completed',
+    barHeight: 'short',
     statusBased: true,
   },
   'step.run': {
@@ -60,18 +62,50 @@ const BAR_STYLES: Record<BarStyleKey, BarStyle> = {
     statusBased: true,
   },
   'step.sleep': {
-    barColor: 'bg-surfaceMuted',
+    barColor: 'bg-status-completed',
+    pattern: 'vertical-lines',
+    statusBased: true,
   },
   'step.waitForEvent': {
-    barColor: 'bg-surfaceMuted',
+    barColor: 'bg-status-completed',
+    pattern: 'vertical-lines',
+    statusBased: true,
   },
   'step.invoke': {
-    barColor: 'bg-surfaceMuted',
+    barColor: 'bg-status-completed',
+    pattern: 'vertical-lines',
+    statusBased: true,
   },
   'timing.inngest': {
     barColor: 'bg-surfaceMuted',
     barHeight: 'short',
     durationColor: 'text-basis',
+    labelFormat: 'default',
+    textColor: 'text-light',
+  },
+  'timing.inngest.queue': {
+    barColor: 'bg-surfaceMuted',
+    barHeight: 'short',
+    labelFormat: 'default',
+    textColor: 'text-light',
+  },
+  'timing.inngest.concurrency': {
+    barColor: 'bg-surfaceMuted',
+    barHeight: 'short',
+    labelFormat: 'default',
+    textColor: 'text-light',
+  },
+  'timing.inngest.discovery': {
+    barColor: 'bg-surfaceMuted',
+    barHeight: 'short',
+    outlined: true,
+    labelFormat: 'default',
+    textColor: 'text-light',
+  },
+  'timing.inngest.finalization': {
+    barColor: 'bg-surfaceMuted',
+    barHeight: 'short',
+    outlined: true,
     labelFormat: 'default',
     textColor: 'text-light',
   },
@@ -85,39 +119,45 @@ const BAR_STYLES: Record<BarStyleKey, BarStyle> = {
     textColor: 'text-light',
   },
   'timing.connecting': {
-    barColor: 'bg-transparent',
+    barColor: 'bg-status-completed',
     pattern: 'dotted',
     labelFormat: 'uppercase',
-    barHeight: 'short',
+    barHeight: 'thin',
+    statusBased: true,
   },
   // HTTP timing phases (children of SERVER bar)
   'timing.http.dns': {
-    barColor: 'bg-secondary-moderate',
-    barHeight: 'short',
+    barColor: 'bg-status-completed',
+    barHeight: 'thin',
+    pattern: 'dotted',
     labelFormat: 'uppercase',
     statusBased: true,
   },
   'timing.http.tcp': {
-    barColor: 'bg-secondary-moderate',
-    barHeight: 'short',
+    barColor: 'bg-status-completed',
+    barHeight: 'thin',
+    pattern: 'dotted',
     labelFormat: 'uppercase',
     statusBased: true,
   },
   'timing.http.tls': {
-    barColor: 'bg-secondary-moderate',
-    barHeight: 'short',
+    barColor: 'bg-status-completed',
+    barHeight: 'thin',
+    pattern: 'dotted',
     labelFormat: 'uppercase',
     statusBased: true,
   },
   'timing.http.server': {
-    barColor: 'bg-primary-moderate',
-    barHeight: 'short',
+    barColor: 'bg-status-completed',
+    barHeight: 'tall',
+    pattern: 'barber-pole',
     labelFormat: 'uppercase',
     statusBased: true,
   },
   'timing.http.transfer': {
-    barColor: 'bg-primary-moderate',
-    barHeight: 'short',
+    barColor: 'bg-status-completed',
+    barHeight: 'thin',
+    pattern: 'dotted',
     labelFormat: 'uppercase',
     statusBased: true,
   },
@@ -131,7 +171,7 @@ const BAR_STYLES: Record<BarStyleKey, BarStyle> = {
  * CSS pattern definitions for bar fills.
  * Barber-pole uses semi-transparent white stripes to work on any background color.
  */
-const BAR_PATTERNS: Record<BarPattern, CSSProperties> = {
+export const BAR_PATTERNS: Record<BarPattern, CSSProperties> = {
   solid: {},
   'barber-pole': {
     backgroundImage: `repeating-linear-gradient(
@@ -142,9 +182,37 @@ const BAR_PATTERNS: Record<BarPattern, CSSProperties> = {
       rgba(255, 255, 255, 0.15) 8px
     )`,
   },
+  'vertical-lines': {
+    WebkitMaskImage: `repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent 3px,
+      black 3px,
+      black 5px
+    )`,
+    maskImage: `repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent 3px,
+      black 3px,
+      black 5px
+    )`,
+  },
   dotted: {
-    border: '2px dotted rgb(var(--color-primary-subtle))',
-    borderRadius: '2px',
+    WebkitMaskImage: `repeating-linear-gradient(
+      90deg,
+      black 0px,
+      black 3px,
+      transparent 3px,
+      transparent 7px
+    )`,
+    maskImage: `repeating-linear-gradient(
+      90deg,
+      black 0px,
+      black 3px,
+      transparent 3px,
+      transparent 7px
+    )`,
   },
 };
 
@@ -153,7 +221,7 @@ const BAR_PATTERNS: Record<BarPattern, CSSProperties> = {
  * Falls back to 'default' if the key is not found.
  */
 function getBarStyle(styleKey: BarStyleKey): BarStyle {
-  return BAR_STYLES[styleKey] ?? BAR_STYLES.default;
+  return BAR_STYLES[styleKey];
 }
 
 /**
@@ -316,22 +384,33 @@ function BarHoverCardContent({
   startTime,
   endTime,
   delayMs,
+  timingDetails,
+  styleLabel,
 }: {
   name: string;
   startTime: Date;
   endTime: Date | null;
   delayMs?: number;
+  timingDetails?: TimingDetail[];
+  styleLabel?: string;
 }) {
   const startTimestamp = format(startTime, 'yyyy-MM-dd HH:mm:ss.SSS');
   const endTimestamp = endTime ? format(endTime, 'yyyy-MM-dd HH:mm:ss.SSS') : null;
 
   const durationMs = endTime ? endTime.getTime() - startTime.getTime() : 0;
+  const hasDetails = timingDetails && timingDetails.length > 0;
 
   return (
     <div className="whitespace-nowrap px-1 py-0.5 text-xs">
       <p className="text-basis mb-1.5 font-medium">{name}</p>
+      {styleLabel && <p className="text-light mb-1.5 font-mono text-[11px]">{styleLabel}</p>}
       <div className="flex flex-col gap-1">
-        <div className="border-subtle flex flex-col gap-1 border-b pb-1.5">
+        <div
+          className={cn(
+            'flex flex-col gap-1',
+            (hasDetails || delayMs != null) && 'border-subtle border-b pb-1.5'
+          )}
+        >
           <div className="flex justify-between gap-6">
             <span className="text-light font-mono uppercase">Duration</span>
             <span className="text-basis tabular-nums">
@@ -347,7 +426,23 @@ function BarHoverCardContent({
             </div>
           )}
         </div>
-        <div className="mt-0.5 flex justify-between gap-6">
+
+        {hasDetails && (
+          <div className="border-subtle flex flex-col gap-1 border-b pb-1.5">
+            {timingDetails.map((detail) => (
+              <div key={detail.label} className="flex justify-between gap-6">
+                <span className="text-light font-mono uppercase">{detail.label}</span>
+                <span className="text-basis tabular-nums">
+                  {detail.durationMs > 0 ? formatDuration(detail.durationMs) : '-'}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div
+          className={cn(!hasDetails && delayMs == null && 'mt-0.5', 'flex justify-between gap-6')}
+        >
           <span className="text-light font-mono uppercase">Start</span>
           <span className="text-basis tabular-nums">{startTimestamp}</span>
         </div>
@@ -364,7 +459,7 @@ function BarHoverCardContent({
   );
 }
 
-const BAR_HEIGHT_CLASSES: Record<BarHeight, string> = { short: 'h-2', tall: 'h-4' };
+const BAR_HEIGHT_CLASSES: Record<BarHeight, string> = { thin: 'h-0.5', short: 'h-2', tall: 'h-4' };
 
 /**
  * Renders the visual bar in the right panel.
@@ -376,18 +471,17 @@ const VisualBar = memo(function VisualBar({
   widthPercent,
   style,
   segments,
-  expanded,
   originalBarStart,
   originalBarWidth,
   viewStartOffset = 0,
   viewEndOffset = 100,
   status,
+  expanded,
 }: {
   startPercent: number;
   widthPercent: number;
   style: TimelineBarProps['style'];
   segments?: BarSegment[];
-  expanded?: boolean;
   /** Original bar start before transform (for segment calculation) */
   originalBarStart?: number;
   /** Original bar width before transform (for segment calculation) */
@@ -398,11 +492,12 @@ const VisualBar = memo(function VisualBar({
   viewEndOffset?: number;
   /** Run status for status-based coloring */
   status?: string;
+  /** Whether the parent row is expanded */
+  expanded?: boolean;
 }) {
   const barStyle = getBarStyle(style);
   const pattern = getBarPattern(barStyle.pattern);
   const heightClass = BAR_HEIGHT_CLASSES[barStyle.barHeight ?? 'tall'];
-  const opacityStyle = expanded ? { opacity: 0 } : {};
   const barColor = getBarColor(style, status);
 
   // Memoize segment transformation to avoid recalculating on every render
@@ -448,7 +543,7 @@ const VisualBar = memo(function VisualBar({
         style={{
           left: '0%',
           width: '100%',
-          ...opacityStyle,
+          opacity: expanded ? 0 : 1,
         }}
       >
         {transformedSegments.map((segment) => {
@@ -457,15 +552,22 @@ const VisualBar = memo(function VisualBar({
           const segmentPattern = getBarPattern(segmentStyle.pattern);
           const segmentHeightClass = BAR_HEIGHT_CLASSES[segmentStyle.barHeight ?? 'tall'];
           const segmentColor = getBarColor(segment.style, segment.status);
+          const isOutlined = segmentStyle.outlined;
           return (
             <div
               key={segment.id}
-              className={cn('absolute top-1/2 -translate-y-1/2', segmentHeightClass, segmentColor)}
+              className={cn(
+                'absolute top-1/2 -translate-y-1/2',
+                segmentHeightClass,
+                isOutlined ? 'bg-canvasBase' : segmentColor
+              )}
               style={{
                 left: `${segment.transformedStart}%`,
                 width: `${segment.transformedWidth}%`,
                 minWidth: `${TIMELINE_CONSTANTS.MIN_BAR_WIDTH_PX}px`,
-                ...segmentPattern,
+                ...(isOutlined
+                  ? { boxShadow: 'inset 0 0 0 1px rgb(var(--color-background-surface-muted))' }
+                  : segmentPattern),
               }}
             />
           );
@@ -475,16 +577,23 @@ const VisualBar = memo(function VisualBar({
   }
 
   // Render simple bar
+  const isOutlined = barStyle.outlined;
   return (
     <div
       data-testid="timeline-bar-visual"
-      className={cn('absolute top-1/2 -translate-y-1/2', heightClass, barColor)}
+      className={cn(
+        'absolute top-1/2 -translate-y-1/2',
+        heightClass,
+        isOutlined ? 'bg-canvasBase' : barColor
+      )}
       style={{
         left: `${startPercent}%`,
         width: `${widthPercent}%`,
         minWidth: `${TIMELINE_CONSTANTS.MIN_BAR_WIDTH_PX}px`,
-        ...pattern,
-        ...opacityStyle,
+        opacity: expanded ? 0 : 1,
+        ...(isOutlined
+          ? { boxShadow: 'inset 0 0 0 1px rgb(var(--color-background-surface-muted))' }
+          : pattern),
       }}
     />
   );
@@ -529,6 +638,8 @@ export function TimelineBar({
   endTime,
   delayMs,
   actions,
+  timingDetails,
+  styleLabel,
 }: TimelineBarProps): JSX.Element {
   const barStyle = getBarStyle(style);
   const effectiveIcon = icon ?? barStyle.icon ?? getRootIcon(style, status);
@@ -664,12 +775,12 @@ export function TimelineBar({
                   widthPercent={transformed.widthPercent}
                   style={style}
                   segments={segments}
-                  expanded={!!(expandable && expanded)}
                   originalBarStart={startPercent}
                   originalBarWidth={widthPercent}
                   viewStartOffset={viewStartOffset}
                   viewEndOffset={viewEndOffset}
                   status={status}
+                  expanded={expandable && expanded}
                 />
                 {showHoverCard && (
                   <HoverCardRoot open={hoverCardOpen} closeDelay={0}>
@@ -689,6 +800,8 @@ export function TimelineBar({
                         startTime={startTime!}
                         endTime={endTime ?? null}
                         delayMs={delayMs}
+                        timingDetails={timingDetails}
+                        styleLabel={styleLabel}
                       />
                     </HoverCardContent>
                   </HoverCardRoot>

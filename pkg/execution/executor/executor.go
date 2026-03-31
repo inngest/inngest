@@ -1832,6 +1832,20 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 					l.Warn("error creating HTTP timing metadata span", "error", err)
 				}
 			}
+
+			// Attach timing breakdown metadata (queue delay, system latency, network total)
+			if timingMd := extractors.BuildTimingMetadata(instance.item.RunInfo, resp.HTTPStat); timingMd != nil {
+				_, err := e.createMetadataSpan(
+					ctx,
+					&instance,
+					"executor.timing",
+					timingMd,
+					enums.MetadataScopeStepAttempt,
+				)
+				if err != nil {
+					l.Warn("error creating timing metadata span", "error", err)
+				}
+			}
 		}
 
 		if handleErr := e.HandleResponse(ctx, &instance); handleErr != nil {

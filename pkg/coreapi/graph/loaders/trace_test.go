@@ -3,11 +3,13 @@ package loader
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/tracing/meta"
+	"github.com/inngest/inngest/pkg/tracing/metadata"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -160,5 +162,212 @@ func TestConvertRunSpanToGQL_UserlandCollapse(t *testing.T) {
 		assert.True(t, result.ChildrenSpans[0].IsUserland)
 		require.Len(t, result.ChildrenSpans[0].ChildrenSpans, 1, "should preserve children")
 		assert.Equal(t, "child-span", result.ChildrenSpans[0].ChildrenSpans[0].Name)
+	})
+}
+
+func TestConvertRunSpanToGQL_MetadataPromotion(t *testing.T) {
+	tr := &traceReader{}
+	ctx := context.Background()
+	now := time.Now()
+
+	mdA := &cqrs.SpanMetadata{
+		Scope: enums.MetadataScopeStep,
+		Kind:  metadata.Kind("inngest.timing"),
+		Values: metadata.Values{
+			"step_a": []byte(`"data_a"`),
+		},
+		UpdatedAt: now,
+	}
+	mdB := &cqrs.SpanMetadata{
+		Scope: enums.MetadataScopeStep,
+		Kind:  metadata.Kind("inngest.timing"),
+		Values: metadata.Values{
+			"step_b": []byte(`"data_b"`),
+		},
+		UpdatedAt: now,
+	}
+
+	completedStatus := enums.StepStatusCompleted
+	stepOpRun := enums.OpcodeStepRun
+
+	t.Run("single omitted discovery promotes metadata to following step", func(t *testing.T) {
+		span := &cqrs.OtelSpan{
+			RawOtelSpan: cqrs.RawOtelSpan{Name: meta.SpanNameRun},
+			Attributes:  &meta.ExtractedValues{},
+			Children: []*cqrs.OtelSpan{
+				{
+					// Omitted step discovery with metadata
+					RawOtelSpan: cqrs.RawOtelSpan{Name: meta.SpanNameStepDiscovery},
+					Attributes:  &meta.ExtractedValues{},
+					Metadata:    []*cqrs.SpanMetadata{mdA},
+				},
+				{
+					// Visible step
+					RawOtelSpan: cqrs.RawOtelSpan{Name: meta.SpanNameStep},
+					Attributes: &meta.ExtractedValues{
+						DynamicStatus: &completedStatus,
+						StepOp:        &stepOpRun,
+						StepID:        strPtr("step-a"),
+					},
+				},
+			},
+		}
+
+		result, err := tr.convertRunSpanToGQL(ctx, span)
+		require.NoError(t, err)
+		require.Len(t, result.ChildrenSpans, 1, "only the visible step child")
+		assert.Len(t, result.ChildrenSpans[0].Metadata, 1, "step should have promoted metadata")
+		assert.Equal(t, metadata.Kind("inngest.timing"), result.ChildrenSpans[0].Metadata[0].Kind)
+	})
+
+	t.Run("multi-step: each step gets only its own discovery metadata", func(t *testing.T) {
+		span := &cqrs.OtelSpan{
+			RawOtelSpan: cqrs.RawOtelSpan{Name: meta.SpanNameRun},
+			Attributes:  &meta.ExtractedValues{},
+			Children: []*cqrs.OtelSpan{
+				{
+					// Omitted step discovery for step A
+					RawOtelSpan: cqrs.RawOtelSpan{Name: meta.SpanNameStepDiscovery},
+					Attributes:  &meta.ExtractedValues{},
+					Metadata:    []*cqrs.SpanMetadata{mdA},
+				},
+				{
+					// Visible step A
+					RawOtelSpan: cqrs.RawOtelSpan{Name: meta.SpanNameStep},
+					Attributes: &meta.ExtractedValues{
+						DynamicStatus: &completedStatus,
+						StepOp:        &stepOpRun,
+						StepID:        strPtr("step-a"),
+					},
+				},
+				{
+					// Omitted step discovery for step B
+					RawOtelSpan: cqrs.RawOtelSpan{Name: meta.SpanNameStepDiscovery},
+					Attributes:  &meta.ExtractedValues{},
+					Metadata:    []*cqrs.SpanMetadata{mdB},
+				},
+				{
+					// Visible step B
+					RawOtelSpan: cqrs.RawOtelSpan{Name: meta.SpanNameStep},
+					Attributes: &meta.ExtractedValues{
+						DynamicStatus: &completedStatus,
+						StepOp:        &stepOpRun,
+						StepID:        strPtr("step-b"),
+					},
+				},
+			},
+		}
+
+		result, err := tr.convertRunSpanToGQL(ctx, span)
+		require.NoError(t, err)
+		require.Len(t, result.ChildrenSpans, 2, "two visible step children")
+
+		// Step A should only have mdA
+		stepA := result.ChildrenSpans[0]
+		require.Len(t, stepA.Metadata, 1, "step A should have exactly one metadata entry")
+		assert.Contains(t, stepA.Metadata[0].Values, "step_a")
+		assert.NotContains(t, stepA.Metadata[0].Values, "step_b")
+
+		// Step B should only have mdB
+		stepB := result.ChildrenSpans[1]
+		require.Len(t, stepB.Metadata, 1, "step B should have exactly one metadata entry")
+		assert.Contains(t, stepB.Metadata[0].Values, "step_b")
+		assert.NotContains(t, stepB.Metadata[0].Values, "step_a")
+	})
+
+	t.Run("visible discovery span does not absorb omitted discovery metadata", func(t *testing.T) {
+		// A StepDiscovery span becomes visible when it has non-dropped
+		// children. If it appears between omitted discoveries, it must
+		// NOT receive their promoted metadata — only StepSpans should.
+		executionStatus := enums.StepStatusCompleted
+		executionOp := enums.OpcodeStepRun
+		span := &cqrs.OtelSpan{
+			RawOtelSpan: cqrs.RawOtelSpan{Name: meta.SpanNameRun},
+			Attributes:  &meta.ExtractedValues{},
+			Children: []*cqrs.OtelSpan{
+				{
+					// Omitted discovery with metadata
+					RawOtelSpan: cqrs.RawOtelSpan{Name: meta.SpanNameStepDiscovery},
+					Attributes:  &meta.ExtractedValues{},
+					Metadata:    []*cqrs.SpanMetadata{mdA},
+				},
+				{
+					// Visible discovery (has a non-dropped child execution)
+					RawOtelSpan: cqrs.RawOtelSpan{Name: meta.SpanNameStepDiscovery},
+					Attributes:  &meta.ExtractedValues{},
+					Children: []*cqrs.OtelSpan{
+						{
+							RawOtelSpan: cqrs.RawOtelSpan{Name: meta.SpanNameExecution},
+							Attributes: &meta.ExtractedValues{
+								DynamicStatus: &executionStatus,
+								StepOp:        &executionOp,
+								StepID:        strPtr("visible-discovery"),
+							},
+						},
+					},
+				},
+				{
+					// Visible step that should receive mdA
+					RawOtelSpan: cqrs.RawOtelSpan{Name: meta.SpanNameStep},
+					Attributes: &meta.ExtractedValues{
+						DynamicStatus: &completedStatus,
+						StepOp:        &stepOpRun,
+						StepID:        strPtr("step-a"),
+					},
+				},
+			},
+		}
+
+		result, err := tr.convertRunSpanToGQL(ctx, span)
+		require.NoError(t, err)
+
+		// Find the visible step span (not the discovery)
+		var stepSpan *models.RunTraceSpan
+		var discoverySpan *models.RunTraceSpan
+		for _, child := range result.ChildrenSpans {
+			if child.SpanTypeName == meta.SpanNameStep {
+				stepSpan = child
+			}
+			if child.SpanTypeName == meta.SpanNameStepDiscovery {
+				discoverySpan = child
+			}
+		}
+
+		require.NotNil(t, stepSpan, "should have a visible step span")
+		assert.Len(t, stepSpan.Metadata, 1, "step should receive promoted metadata from omitted discovery")
+		assert.Contains(t, stepSpan.Metadata[0].Values, "step_a")
+
+		if discoverySpan != nil {
+			assert.Empty(t, discoverySpan.Metadata, "visible discovery span must not absorb omitted discovery metadata")
+		}
+	})
+
+	t.Run("trailing omitted discovery with no following step discards metadata", func(t *testing.T) {
+		span := &cqrs.OtelSpan{
+			RawOtelSpan: cqrs.RawOtelSpan{Name: meta.SpanNameRun},
+			Attributes:  &meta.ExtractedValues{},
+			Children: []*cqrs.OtelSpan{
+				{
+					// Visible step
+					RawOtelSpan: cqrs.RawOtelSpan{Name: meta.SpanNameStep},
+					Attributes: &meta.ExtractedValues{
+						DynamicStatus: &completedStatus,
+						StepOp:        &stepOpRun,
+						StepID:        strPtr("step-a"),
+					},
+				},
+				{
+					// Trailing omitted step discovery (no following step)
+					RawOtelSpan: cqrs.RawOtelSpan{Name: meta.SpanNameStepDiscovery},
+					Attributes:  &meta.ExtractedValues{},
+					Metadata:    []*cqrs.SpanMetadata{mdB},
+				},
+			},
+		}
+
+		result, err := tr.convertRunSpanToGQL(ctx, span)
+		require.NoError(t, err)
+		require.Len(t, result.ChildrenSpans, 1, "only the visible step")
+		assert.Empty(t, result.ChildrenSpans[0].Metadata, "step should not have trailing discovery metadata")
 	})
 }

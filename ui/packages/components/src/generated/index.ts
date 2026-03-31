@@ -9,6 +9,7 @@ export type SpanMetadataKind =
   | typeof KindInngestHTTP
   | typeof KindInngestHTTPTiming
   | typeof KindInngestResponseHeaders
+  | typeof KindInngestTiming
   | typeof KindInngestWarnings
   | SpanMetadataKindUserland;
 
@@ -101,3 +102,33 @@ export const KindInngestResponseHeaders = 'inngest.response_headers';
  * From response_headers.go
  */
 export type ResponseHeaderMetadata = { [key: string]: string };
+/**
+ * From timing.go
+ */
+export const KindInngestTiming = 'inngest.timing';
+/**
+ * From timing.go
+ * TimingMetadata contains high-level timing categories for a step execution:
+ * queue delay, system processing overhead, and network total.
+ */
+export interface TimingMetadata {
+  /**
+   * QueueDelayMs is the sojourn delay caused by concurrency limits, throttle,
+   * or other user-defined concurrency constraints.
+   */
+  queue_delay_ms?: number /* int64 */;
+  /**
+   * SystemLatencyMs is the processing delay excluding sojourn latency
+   * (time from queue lease to execution start).
+   */
+  system_latency_ms?: number /* int64 */;
+  /**
+   * NetworkTotalMs is the total HTTP request duration from httpstat,
+   * covering the full SDK call lifecycle.
+   */
+  network_total_ms?: number /* int64 */;
+  /**
+   * TotalInngestMs is the sum of Inngest-side overhead (queue delay + system latency).
+   */
+  total_inngest_ms?: number /* int64 */;
+}

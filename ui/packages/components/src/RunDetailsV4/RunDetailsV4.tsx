@@ -23,6 +23,7 @@ import { StepInfo } from './StepInfo';
 import { Tabs } from './Tabs';
 // Import V4 Timeline
 import { Timeline } from './Timeline';
+import { TimelineLegend } from './TimelineLegend';
 import { TopInfo } from './TopInfo';
 import { Waiting } from './Waiting';
 import { traceWalk, useDynamicRunData, useStepSelection } from './runDetailsUtils';
@@ -301,7 +302,12 @@ export const RunDetailsV4 = ({
           <Tabs
             tabs={[
               {
-                label: 'Trace',
+                label: (
+                  <span className="flex items-center gap-0.5">
+                    Trace
+                    <TimelineLegend />
+                  </span>
+                ),
                 id: 'trace',
                 node: waiting ? (
                   <Waiting />
