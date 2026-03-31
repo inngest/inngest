@@ -201,8 +201,8 @@ importers:
         specifier: ^4.5.0
         version: 4.5.0(@types/node@24.9.2)(graphql@16.8.1)
       graphql-request:
-        specifier: ^6.1.0
-        version: 6.1.0(graphql@16.8.1)
+        specifier: ^7.0.0
+        version: 7.4.0(graphql@16.8.1)
       inngest:
         specifier: ^3.48.0
         version: 3.48.0(@opentelemetry/core@2.2.0(@opentelemetry/api@1.9.0))(@vercel/node@5.1.16(rollup@4.57.1))(express@5.1.0)(h3@1.15.5)(next@14.2.35(@babel/core@7.29.0)(@opentelemetry/api@1.9.0)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(typescript@5.9.3)(zod@4.2.1)
@@ -397,8 +397,8 @@ importers:
         specifier: ^16.8.1
         version: 16.8.1
       graphql-request:
-        specifier: ^6.1.0
-        version: 6.1.0(graphql@16.8.1)
+        specifier: ^7.0.0
+        version: 7.4.0(graphql@16.8.1)
       monaco-editor:
         specifier: ^0.52.2
         version: 0.52.2
@@ -444,7 +444,7 @@ importers:
         version: 2.5.7(graphql@16.8.1)
       '@graphql-codegen/typescript-rtk-query':
         specifier: 2.3.7
-        version: 2.3.7(@reduxjs/toolkit@1.9.0(react-redux@8.0.5(@types/react-dom@18.2.4)(@types/react@18.2.11)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(redux@4.2.1))(react@18.2.0))(graphql-request@6.1.0(graphql@16.8.1))(graphql-tag@2.12.6(graphql@16.8.1))(graphql@16.8.1)
+        version: 2.3.7(@reduxjs/toolkit@1.9.0(react-redux@8.0.5(@types/react-dom@18.2.4)(@types/react@18.2.11)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(redux@4.2.1))(react@18.2.0))(graphql-request@7.4.0(graphql@16.8.1))(graphql-tag@2.12.6(graphql@16.8.1))(graphql@16.8.1)
       '@inngest/tsconfig':
         specifier: workspace:*
         version: link:../../packages/tsconfig
@@ -587,8 +587,8 @@ importers:
         specifier: ^4.5.0
         version: 4.5.0(@types/node@24.9.2)(graphql@16.8.1)
       graphql-request:
-        specifier: ^6.1.0
-        version: 6.1.0(graphql@16.8.1)
+        specifier: ^7.0.0
+        version: 7.4.0(graphql@16.8.1)
       ky:
         specifier: ^0.33.3
         version: 0.33.3
@@ -8839,6 +8839,11 @@ packages:
     peerDependencies:
       graphql: 14 - 16
 
+  graphql-request@7.4.0:
+    resolution: {integrity: sha512-xfr+zFb/QYbs4l4ty0dltqiXIp07U6sl+tOKAb0t50/EnQek6CVVBLjETXi+FghElytvgaAWtIOt3EV7zLzIAQ==}
+    peerDependencies:
+      graphql: 14 - 16
+
   graphql-tag@2.12.6:
     resolution: {integrity: sha512-FdSNcu2QQcWnM2VNvSCCDCVS5PpPqpzgFT8+GXzqJuoDd0CBncxCY278u4mhRO7tMgo2JjgJA5aZ+nWSQ/Z+xg==}
     engines: {node: '>=10'}
@@ -14967,7 +14972,7 @@ snapshots:
     transitivePeerDependencies:
       - encoding
 
-  '@graphql-codegen/typescript-rtk-query@2.3.7(@reduxjs/toolkit@1.9.0(react-redux@8.0.5(@types/react-dom@18.2.4)(@types/react@18.2.11)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(redux@4.2.1))(react@18.2.0))(graphql-request@6.1.0(graphql@16.8.1))(graphql-tag@2.12.6(graphql@16.8.1))(graphql@16.8.1)':
+  '@graphql-codegen/typescript-rtk-query@2.3.7(@reduxjs/toolkit@1.9.0(react-redux@8.0.5(@types/react-dom@18.2.4)(@types/react@18.2.11)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(redux@4.2.1))(react@18.2.0))(graphql-request@7.4.0(graphql@16.8.1))(graphql-tag@2.12.6(graphql@16.8.1))(graphql@16.8.1)':
     dependencies:
       '@graphql-codegen/plugin-helpers': 2.7.2(graphql@16.8.1)
       '@graphql-codegen/visitor-plugin-common': 2.13.1(graphql@16.8.1)
@@ -14975,7 +14980,7 @@ snapshots:
       auto-bind: 4.0.0
       change-case-all: 1.0.14
       graphql: 16.8.1
-      graphql-request: 6.1.0(graphql@16.8.1)
+      graphql-request: 7.4.0(graphql@16.8.1)
       graphql-tag: 2.12.6(graphql@16.8.1)
       tslib: 2.4.1
     transitivePeerDependencies:
@@ -23025,6 +23030,11 @@ snapshots:
       graphql: 16.8.1
     transitivePeerDependencies:
       - encoding
+
+  graphql-request@7.4.0(graphql@16.8.1):
+    dependencies:
+      '@graphql-typed-document-node/core': 3.2.0(graphql@16.8.1)
+      graphql: 16.8.1
 
   graphql-tag@2.12.6(graphql@16.8.1):
     dependencies:
