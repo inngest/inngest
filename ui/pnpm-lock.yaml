@@ -177,8 +177,8 @@ importers:
         specifier: ^2.1.6
         version: 2.1.6(graphql@16.8.1)
       '@urql/exchange-request-policy':
-        specifier: ^1.0.2
-        version: 1.0.2(graphql@16.8.1)
+        specifier: ^2.0.0
+        version: 2.0.0(@urql/core@4.1.1(graphql@16.8.1))
       '@urql/exchange-retry':
         specifier: ^1.2.0
         version: 1.2.0(graphql@16.8.1)
@@ -569,8 +569,8 @@ importers:
         specifier: ^2.1.6
         version: 2.1.6(graphql@16.8.1)
       '@urql/exchange-request-policy':
-        specifier: ^1.0.2
-        version: 1.0.2(graphql@16.8.1)
+        specifier: ^2.0.0
+        version: 2.0.0(@urql/core@4.1.1(graphql@16.8.1))
       '@urql/exchange-retry':
         specifier: ^1.2.0
         version: 1.2.0(graphql@16.8.1)
@@ -6630,8 +6630,10 @@ packages:
   '@urql/exchange-auth@2.1.6':
     resolution: {integrity: sha512-snOlt7p5kYq0KnPDuXkKe2qW3/BucQZOElvTeo3svLQuk9JiNJVnm6ffQ6QGiGO+G3AtMrctnno1+X44fLtDuQ==}
 
-  '@urql/exchange-request-policy@1.0.2':
-    resolution: {integrity: sha512-IEC7BQGe6y5Wx3XY5PUUKSaB2TQcYkdBPw1pvgQFd09HxHyizGiB1u2Ziupz2Rmf29Eu/ZlJyxIIHcpebIliWg==}
+  '@urql/exchange-request-policy@2.0.0':
+    resolution: {integrity: sha512-GjTY7PMFTGUlXmz75mYcAS6TdLbJxNJ0DilHsLEFPW8CB36McSomCDRKFeCn8OBSw9+BJAaIFLBeGsPf75i69A==}
+    peerDependencies:
+      '@urql/core': ^6.0.0
 
   '@urql/exchange-retry@1.2.0':
     resolution: {integrity: sha512-1O/biKiVhhn0EtvDF4UOvz325K4RrLupfL8rHcmqD2TBLv4qVDWQuzx4JGa1FfqjjRb+C9TNZ6w19f32Mq85Ug==}
@@ -20161,12 +20163,10 @@ snapshots:
     transitivePeerDependencies:
       - graphql
 
-  '@urql/exchange-request-policy@1.0.2(graphql@16.8.1)':
+  '@urql/exchange-request-policy@2.0.0(@urql/core@4.1.1(graphql@16.8.1))':
     dependencies:
       '@urql/core': 4.1.1(graphql@16.8.1)
       wonka: 6.3.2
-    transitivePeerDependencies:
-      - graphql
 
   '@urql/exchange-retry@1.2.0(graphql@16.8.1)':
     dependencies:
@@ -20242,7 +20242,7 @@ snapshots:
       ts-morph: 12.0.0
       ts-node: 10.9.1(@types/node@16.18.11)(typescript@4.9.5)
       typescript: 4.9.5
-      undici: 7.16.0
+      undici: 7.24.6
     transitivePeerDependencies:
       - '@swc/core'
       - '@swc/wasm'
