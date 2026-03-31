@@ -465,7 +465,7 @@ func (s *Span) RecordError(err error, opts ...trace.EventOption) {
 	defer s.Unlock()
 
 	s.AddEvent(err.Error(), opts...)
-	s.SetStatus(codes.Error, err.Error())
+	s.setStatus(codes.Error, err.Error())
 }
 
 // SetStatus sets the span status.  If this contains an error, this will
