@@ -179,7 +179,7 @@ describe('Timeline', () => {
             startTime: new Date('2024-01-01T00:00:00Z'),
             endTime: new Date('2024-01-01T00:00:05Z'),
             style: 'step.run',
-            timingBreakdown: { queueMs: 1000, executionMs: 4000, totalMs: 5000 },
+            timingBreakdown: { inngestMs: 1000, executionMs: 4000, totalMs: 5000 },
           },
           {
             id: 'step-2',
@@ -187,7 +187,7 @@ describe('Timeline', () => {
             startTime: new Date('2024-01-01T00:00:05Z'),
             endTime: new Date('2024-01-01T00:00:08Z'),
             style: 'step.run',
-            timingBreakdown: { queueMs: 500, executionMs: 2500, totalMs: 3000 },
+            timingBreakdown: { inngestMs: 500, executionMs: 2500, totalMs: 3000 },
           },
         ],
         orgName: 'Acme Corp',
