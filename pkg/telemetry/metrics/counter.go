@@ -953,3 +953,12 @@ func IncrExecutorHandleGeneratorCount(ctx context.Context, op string, opts Count
 		Tags:        opts.Tags,
 	})
 }
+
+func IncrConnectProxyLeaseExpiredCount(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "connect_proxy.lease_expired_total",
+		Description: "Total number of expired leases",
+		Tags:        opts.Tags,
+	})
+}
