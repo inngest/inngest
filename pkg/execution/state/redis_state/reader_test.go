@@ -949,6 +949,8 @@ func TestItemsByBacklog(t *testing.T) {
 			from:          clock.Now(),
 			until:         clock.Now().Add(7 * time.Second).Truncate(time.Second),
 			interval:      time.Second,
+			// 10 items enqueued at 0s–9s; the inclusive [from, until] window
+			// covers 0s–7s, so 8 items (at offsets 0–7) are returned.
 			expectedItems: 8,
 		},
 		{
