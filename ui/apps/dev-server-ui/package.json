@@ -45,10 +45,10 @@
     "zod": "^3.22.4"
   },
   "devDependencies": {
-    "@graphql-codegen/cli": "3.2.2",
-    "@graphql-codegen/typescript": "2.8.8",
-    "@graphql-codegen/typescript-operations": "2.5.7",
-    "@graphql-codegen/typescript-rtk-query": "2.3.7",
+    "@graphql-codegen/cli": "6.2.1",
+    "@graphql-codegen/typescript": "5.0.9",
+    "@graphql-codegen/typescript-operations": "5.0.9",
+    "@graphql-codegen/typescript-rtk-query": "4.0.0",
     "@inngest/components": "workspace:*",
     "@tanstack/eslint-config": "0.3.2",
     "@types/node": "24.9.2",

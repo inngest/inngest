@@ -35,6 +35,7 @@ const codegenConfig: CodegenConfig = {
       plugins: [
         'typescript',
         'typescript-operations',
+        './codegen-typed-document-string-plugin.cjs',
         {
           'typescript-rtk-query': {
             importBaseApiFrom: './baseApi',
