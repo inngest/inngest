@@ -453,32 +453,45 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 				LeaseID:    resp.Leases[0].LeaseID,
 				IssuedAtMS: clock.Now().UnixMilli(),
 			},
-		}, func(ctx context.Context, ri osqueue.RunInfo, i osqueue.Item) (osqueue.RunResult, error) {
-			go func() {
-				for {
-					select {
-					case <-ctx.Done():
-						return
-					case <-time.After(time.Second):
-						// Ensure we tick the extend at least once
-						clock.Advance(time.Second)
+			}, func(ctx context.Context, ri osqueue.RunInfo, i osqueue.Item) (osqueue.RunResult, error) {
+				// Use a channel to stop clock advances before releasing the capacity lease.
+				// This avoids a race condition where the extend ticker fires at the exact
+				// moment the release cleans up Redis state (Go's select randomly picks
+				// between simultaneously ready channels).
+				stopAdvance := make(chan struct{})
+				go func() {
+					for {
+						select {
+						case <-ctx.Done():
+							return
+						case <-stopAdvance:
+							return
+						case <-time.After(time.Second):
+							// Ensure we tick the extend at least once
+							clock.Advance(time.Second)
+						}
 					}
-				}
-			}()
+				}()
 
-			<-time.After(3 * time.Second)
+				<-time.After(3 * time.Second)
 
-			// Release the capacity early
-			require.NotNil(t, ri.CapacityLease)
+				// Stop clock advances and let any in-flight extends finish
+				// before releasing, to prevent the extend from racing with
+				// the release's Redis cleanup.
+				close(stopAdvance)
+				<-time.After(200 * time.Millisecond)
 
-			err := ri.CapacityLease.Release()
-			require.NoError(t, err)
+				// Release the capacity early
+				require.NotNil(t, ri.CapacityLease)
 
-			// And do some more processing before returning
-			<-time.After(3 * time.Second)
-			atomic.AddInt64(&counter, 1)
-			return osqueue.RunResult{}, nil
-		})
+				err := ri.CapacityLease.Release()
+				require.NoError(t, err)
+
+				// And do some more processing before returning
+				<-time.After(3 * time.Second)
+				atomic.AddInt64(&counter, 1)
+				return osqueue.RunResult{}, nil
+			})
 		require.NoError(t, err)
 
 		require.Equal(t, 1, int(counter))
