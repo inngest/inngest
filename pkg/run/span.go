@@ -477,7 +477,8 @@ func (s *Span) SetStatus(code codes.Code, desc string) {
 			),
 		)
 
-		// Set string attribute.
+		// Set string attribute, so that we have atties as well as an event.  We do this
+		// as events are (sometimes, depending on datastores) not stored.
 		s.SetAttributes(attribute.String("internal.error", desc))
 	}
 }
