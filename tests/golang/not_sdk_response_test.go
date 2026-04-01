@@ -100,14 +100,9 @@ func TestNotSDKResponse(t *testing.T) {
 				run = c.WaitForRunStatus(ctx, t, "FAILED", runs[0].ID)
 			}, 20*time.Second, time.Second)
 
-			if statusCode == http.StatusOK {
-				// Function output includes the HTML response.
-				r.Equal("<html>hi</html>", run.Output)
-			} else {
-				// Step output is empty. We should probably change this in the
-				// future.
-				r.Equal("", run.Output)
-			}
+			// Function output includes the HTML response for both status codes,
+			// since non-SDK responses are handled through the same code path.
+			r.Equal("<html>hi</html>", run.Output)
 		})
 	}
 }
