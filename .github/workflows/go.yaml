@@ -20,7 +20,7 @@ jobs:
         os: [ubuntu-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           submodules: true
 
@@ -39,7 +39,7 @@ jobs:
     name: 'git state after "make gen protobuf"'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           submodules: true
       - uses: DeterminateSystems/nix-installer-action@430608d219b9321ec0c98eb6c37245a39aa6756e # main
@@ -61,7 +61,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     name: "Test / OS: ${{ matrix.os }}, key-queues: ${{ matrix.experimentalKeyQueues }}, constraint-api: ${{ matrix.enableConstraintAPI }}, db: ${{ matrix.database }}"
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           submodules: true
 
