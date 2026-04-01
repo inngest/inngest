@@ -25,6 +25,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/ratelimit"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
+	"github.com/inngest/inngest/pkg/syscode"
 	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
@@ -719,6 +720,7 @@ func TestFinalize(t *testing.T) {
 // mockDriverV1 implements driver.DriverV1 for testing
 type mockDriverV1 struct {
 	response *state.DriverResponse
+	err      error
 	t        *testing.T
 }
 
@@ -734,7 +736,7 @@ func (m *mockDriverV1) Execute(
 	stackIndex int,
 	attempt int,
 ) (*state.DriverResponse, error) {
-	return m.response, nil
+	return m.response, m.err
 }
 
 // This tests a scenario where a run used to hang when retrying an invoke and the invoke's pause was already created.
@@ -1137,6 +1139,196 @@ func TestExecutorReturnsResponseWhenNonRetriableError(t *testing.T) {
 	// State should have been deleted when finalizing the run
 	_, err = smv2.LoadState(ctx, run.ID)
 	require.ErrorContains(t, err, state.ErrRunNotFound.Error())
+}
+
+// TestCapacityErrorRetriesWhenAttemptsExhausted reproduces the bug where a capacity
+// error (AlwaysRetryError) fails to retry after a function has exhausted its retry
+// attempts from real errors. The executor incorrectly sets NoRetry=true because it
+// calls ShouldRetry(nil, ...) instead of passing the actual error.
+func TestCapacityErrorRetriesWhenAttemptsExhausted(t *testing.T) {
+	ctx := context.Background()
+
+	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{Persist: false})
+	require.NoError(t, err)
+
+	dbDriver := "sqlite"
+	dbcqrs := base_cqrs.NewCQRS(db, dbDriver, sqlc_postgres.NewNormalizedOpts{})
+	loader := dbcqrs.(state.FunctionLoader)
+
+	fnID, wsID, appID, aID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+
+	retries := 3
+	fn := inngest.Function{
+		ID:              fnID,
+		FunctionVersion: 1,
+		Name:            "test-fn",
+		Slug:            "test-fn",
+		Steps: []inngest.Step{
+			{
+				ID:      "step",
+				Name:    "step",
+				URI:     "/step",
+				Retries: &retries,
+			},
+		},
+	}
+
+	config, err := json.Marshal(fn)
+	require.NoError(t, err)
+
+	_, err = dbcqrs.UpsertApp(ctx, cqrs.UpsertAppParams{
+		ID:   appID,
+		Name: "test-app",
+	})
+	require.NoError(t, err)
+
+	_, err = dbcqrs.InsertFunction(ctx, cqrs.InsertFunctionParams{
+		ID:     fnID,
+		AppID:  appID,
+		Name:   fn.Name,
+		Slug:   fn.Slug,
+		Config: string(config),
+	})
+	require.NoError(t, err)
+
+	_, shardedRc, err := createInmemoryRedis(t)
+	require.NoError(t, err)
+	defer shardedRc.Close()
+
+	_, unshardedRc, err := createInmemoryRedis(t)
+	require.NoError(t, err)
+	defer unshardedRc.Close()
+
+	unshardedClient := redis_state.NewUnshardedClient(unshardedRc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
+	shardedClient := redis_state.NewShardedClient(redis_state.ShardedClientOpts{
+		UnshardedClient:        unshardedClient,
+		FunctionRunStateClient: shardedRc,
+		StateDefaultKey:        redis_state.StateDefaultKey,
+		FnRunIsSharded:         redis_state.AlwaysShardOnRun,
+		BatchClient:            shardedRc,
+		QueueDefaultKey:        redis_state.QueueDefaultKey,
+	})
+
+	queueOpts := []queue.QueueOpt{
+		queue.WithIdempotencyTTL(time.Hour),
+	}
+	queueShard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), queueOpts...)
+
+	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (queue.QueueShard, error) {
+		return queueShard, nil
+	}
+
+	pauseMgr := pauses.NewPauseStoreManager(unshardedClient)
+
+	var sm state.Manager
+	sm, err = redis_state.New(ctx,
+		redis_state.WithShardedClient(shardedClient),
+		redis_state.WithPauseDeleter(pauseMgr),
+	)
+	require.NoError(t, err)
+	smv2 := redis_state.MustRunServiceV2(sm)
+
+	rq, err := queue.New(
+		context.Background(),
+		"test-queue",
+		queueShard,
+		map[string]queue.QueueShard{
+			queueShard.Name(): queueShard,
+		},
+		func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
+			return queueShard, nil
+		},
+		queueOpts...,
+	)
+	require.NoError(t, err)
+
+	// Mock driver that returns a capacity error (syscode.Error), simulating
+	// a connect worker at capacity.
+	capacityDriver := &mockDriverV1{
+		t: t,
+		err: syscode.Error{
+			Code:    syscode.CodeConnectAllWorkersAtCapacity,
+			Message: "All workers are at capacity",
+		},
+	}
+
+	exec, err := executor.NewExecutor(
+		executor.WithStateManager(smv2),
+		executor.WithPauseManager(pauseMgr),
+		executor.WithQueue(rq),
+		executor.WithLogger(logger.StdlibLogger(ctx)),
+		executor.WithFunctionLoader(loader),
+		executor.WithAssignedQueueShard(queueShard),
+		executor.WithShardSelector(shardSelector),
+		executor.WithTracerProvider(tracing.NewOtelTracerProvider(nil, time.Millisecond)),
+		executor.WithDriverV1(capacityDriver),
+	)
+	require.NoError(t, err)
+
+	now := time.Now()
+	evtID := ulid.MustNew(ulid.Timestamp(now), rand.Reader)
+
+	_, run, err := exec.Schedule(ctx, execution.ScheduleRequest{
+		Function:    fn,
+		At:          &now,
+		AccountID:   aID,
+		WorkspaceID: wsID,
+		AppID:       appID,
+		Events: []event.TrackedEvent{
+			event.NewBaseTrackedEventWithID(event.Event{
+				Name: "test/event",
+			}, evtID),
+		},
+	})
+	require.NoError(t, err)
+
+	jobsAfterSchedule, err := rq.RunJobs(
+		ctx,
+		queueShard.Name(),
+		run.ID.Tenant.EnvID,
+		run.ID.FunctionID,
+		run.ID.RunID,
+		1000,
+		0,
+	)
+	require.NoError(t, err)
+	require.NotEmpty(t, jobsAfterSchedule)
+
+	jobCtx := queue.WithJobID(ctx, jobsAfterSchedule[0].JobID)
+
+	// Execute with attempts exhausted (attempt 3 of max 4, which is retries+1).
+	// This simulates a function that already failed 3 times from real errors,
+	// and now hits a capacity error on what would be its final attempt.
+	maxAttempts := retries + 1
+	resp, err := exec.Execute(jobCtx, state.Identifier{
+		WorkflowID: fnID,
+		RunID:      run.ID.RunID,
+		AccountID:  aID,
+	}, queue.Item{
+		WorkspaceID: wsID,
+		Kind:        queue.KindStart,
+		Identifier: state.Identifier{
+			WorkflowID: fnID,
+			RunID:      run.ID.RunID,
+			AccountID:  aID,
+		},
+		Attempt:     maxAttempts - 1, // 0-indexed, so this is the last attempt
+		MaxAttempts: &maxAttempts,
+		Payload:     queue.PayloadEdge{Edge: inngest.Edge{Incoming: "$trigger", Outgoing: "step"}},
+	}, inngest.Edge{
+		Incoming: "$trigger",
+		Outgoing: "step",
+	})
+
+	// The error should be retryable — capacity errors must always retry.
+	require.Error(t, err)
+	require.True(t, queue.IsAlwaysRetryable(err),
+		"capacity error should be wrapped as AlwaysRetryError, got: %v", err)
+
+	// The response should NOT have NoRetry set for capacity errors.
+	require.NotNil(t, resp)
+	require.True(t, resp.Retryable(),
+		"response should be retryable for capacity errors even when attempts are exhausted")
 }
 
 func TestExecutorScheduleRateLimit(t *testing.T) {
