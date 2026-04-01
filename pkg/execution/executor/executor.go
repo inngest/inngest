@@ -1254,7 +1254,7 @@ func (e *executor) schedule(
 				originalRunCreatedAt := time.UnixMilli(int64(stv1ID.RunID.Time()))
 				deltaMs := time.Since(originalRunCreatedAt).Milliseconds()
 				l.Warn("idempotency key exists but run state not found",
-					"original_run_id", stv1ID.RunID.String(),
+					"original_run_id", stv1ID.RunID,
 					"original_run_created_at", originalRunCreatedAt,
 					"delta_ms", deltaMs,
 				)
