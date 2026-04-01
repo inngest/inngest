@@ -2319,7 +2319,7 @@ func (e *executor) executeDriverV1(ctx context.Context, i *runInstance) (*state.
 	//
 	// TODO: Refactor response.Err
 	if len(response.Generator) == 1 && response.Generator[0].Op == enums.OpcodeStepError {
-		if !queue.ShouldRetry(nil, i.item.Attempt, step.RetryCount()+1) {
+		if !queue.ShouldRetry(err, i.item.Attempt, step.RetryCount()+1) {
 			response.NoRetry = true
 		}
 	}
@@ -2327,7 +2327,7 @@ func (e *executor) executeDriverV1(ctx context.Context, i *runInstance) (*state.
 	// Max attempts is encoded at the queue level from step configuration.  If we're at max attempts,
 	// ensure the response's NoRetry flag is set, as we shouldn't retry any more.  This also ensures
 	// that we properly handle this response as a Failure (permanent) vs an Error (transient).
-	if response.Err != nil && !queue.ShouldRetry(nil, i.item.Attempt, step.RetryCount()+1) {
+	if response.Err != nil && !queue.ShouldRetry(err, i.item.Attempt, step.RetryCount()+1) {
 		response.NoRetry = true
 	}
 
