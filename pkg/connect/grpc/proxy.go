@@ -429,7 +429,7 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 		// evicted the connection (e.g. during a drain/rollout).
 		const maxForwardAttempts = 3
 		for forwardAttempt := range maxForwardAttempts {
-			l.Trace("forwarding request to gateway",
+			l.Optional(opts.AccountID, "connect").Debug("forwarding request to gateway",
 				"attempt", forwardAttempt,
 				"gateway_id", route.GatewayID.String(),
 				"conn_id", route.ConnectionID.String(),
@@ -489,7 +489,7 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 			},
 		})
 
-		l.Trace("forwarded executor request to gateway", "gateway_id", route.GatewayID, "conn_id", route.ConnectionID)
+		l.Optional(opts.AccountID, "connect").Debug("forwarded executor request to gateway", "gateway_id", route.GatewayID, "conn_id", route.ConnectionID)
 
 		metrics.IncrConnectRouterGRPCMessageSentCounter(ctx, 1, metrics.CounterOpt{
 			PkgName: pkgName,
