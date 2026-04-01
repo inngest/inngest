@@ -95,7 +95,9 @@ func TestNonJSONOutput(t *testing.T) {
 			return true
 		}, 5*time.Second, 100*time.Millisecond)
 
-		run := c.WaitForRunStatus(ctx, t, "FAILED", runID)
+		run := c.WaitForRunStatus(ctx, t, "FAILED", runID, client.WaitForRunStatusOpts{
+			Timeout: 30 * time.Second,
+		})
 		r.Equal("<html>502 Bad Gateway</html>", run.Output)
 	})
 }

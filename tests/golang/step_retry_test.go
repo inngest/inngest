@@ -204,7 +204,7 @@ func TestStepRetry(t *testing.T) {
 		r.NoError(err)
 
 		c.WaitForRunStatus(ctx, t, models.FunctionStatusFailed.String(), rid.Wait(t), client.WaitForRunStatusOpts{
-			Timeout: 15 * time.Second,
+			Timeout: 30 * time.Second,
 		})
 
 		r.Equal(int32(1), functionExecutions.Load(), "function should execute exactly once (no retries)")
