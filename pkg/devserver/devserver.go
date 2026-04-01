@@ -311,7 +311,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		}),
 	)
 	if err != nil {
-		return fmt.Errorf("could not create contraint API: %w", err)
+		return fmt.Errorf("could not create constraint API: %w", err)
 	}
 
 	queueOpts := []queue.QueueOpt{
