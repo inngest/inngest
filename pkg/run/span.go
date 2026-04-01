@@ -458,15 +458,13 @@ func (s *Span) IsRecording() bool {
 	return true
 }
 
-// official one doesn't actually set the status, but we'll just do it here
-// for convinence's sake.
+// RecordError sets the span status to error and tracks an error event.
 func (s *Span) RecordError(err error, opts ...trace.EventOption) {
-	s.AddEvent(err.Error(), opts...)
 	s.setStatus(codes.Error, err.Error())
 }
 
 // SetStatus sets the span status.  If this contains an error, this will
-// be tracked as an event.
+// be tracked as an event, plus an Inngest error attribute.
 func (s *Span) SetStatus(code codes.Code, desc string) {
 	s.setStatus(code, desc)
 
@@ -478,6 +476,9 @@ func (s *Span) SetStatus(code codes.Code, desc string) {
 				attribute.String("desc", desc),
 			),
 		)
+
+		// Set string attribute.
+		s.SetAttributes(attribute.String("internal.error", desc))
 	}
 }
 
