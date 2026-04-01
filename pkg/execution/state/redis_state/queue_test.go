@@ -213,10 +213,11 @@ func TestQueueEnqueueItem(t *testing.T) {
 	require.NoError(t, err)
 	defer rc.Close()
 
-	_, shard := newQueue(t, rc)
+	clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Second))
+	_, shard := newQueue(t, rc, osqueue.WithClock(clock))
 	ctx := context.Background()
 
-	start := time.Now().Truncate(time.Second)
+	start := clock.Now()
 
 	accountId := uuid.New()
 
@@ -277,7 +278,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 	})
 
 	t.Run("It sets the right item score", func(t *testing.T) {
-		start := time.Now()
+		start := clock.Now()
 
 		item, err := shard.EnqueueItem(ctx, osqueue.QueueItem{}, start, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
@@ -289,7 +290,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 		// Empty the DB.
 		r.FlushAll()
 
-		at := time.Now().Add(time.Hour).Truncate(time.Second)
+		at := clock.Now().Add(time.Hour).Truncate(time.Second)
 
 		item, err := shard.EnqueueItem(ctx, osqueue.QueueItem{
 			Data: osqueue.Item{
@@ -328,7 +329,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 	})
 
 	t.Run("Updates partition vesting time to earlier times", func(t *testing.T) {
-		now := time.Now()
+		now := clock.Now()
 		at := now.Add(-10 * time.Minute).Truncate(time.Second)
 
 		// Note: This will reuse the existing partition (zero UUID) from the step above
@@ -370,7 +371,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 	})
 
 	t.Run("Adding another workflow ID increases partition set", func(t *testing.T) {
-		at := time.Now().Truncate(time.Second)
+		at := clock.Now().Truncate(time.Second)
 
 		accountId := uuid.New()
 
@@ -405,7 +406,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 	})
 
 	t.Run("Stores default indexes", func(t *testing.T) {
-		at := time.Now().Truncate(time.Second)
+		at := clock.Now().Truncate(time.Second)
 		rid := ulid.MustNew(ulid.Now(), rand.Reader)
 		_, err := shard.EnqueueItem(ctx, osqueue.QueueItem{
 			FunctionID: uuid.New(),
@@ -424,7 +425,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 	})
 
 	t.Run("Custom concurrency key queues", func(t *testing.T) {
-		now := time.Now()
+		now := clock.Now()
 		fnID := uuid.New()
 
 		r.FlushAll()
@@ -539,7 +540,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 			require.Contains(t, mem, i.ID)
 
 			t.Run("Peeking partitions returns the three partitions", func(t *testing.T) {
-				parts, err := shard.PartitionPeek(ctx, true, time.Now().Add(time.Hour), 10)
+				parts, err := shard.PartitionPeek(ctx, true, clock.Now().Add(time.Hour), 10)
 				require.NoError(t, err)
 				require.Equal(t, 1, len(parts))
 				require.Equal(t, expectedDefaultPartition, *parts[0], "Got: %v", spew.Sdump(parts), r.Dump())
