@@ -56,7 +56,7 @@
     "typescript": "5.9.3",
     "typescript-eslint": "8.46.2",
     "vite": "8.0.3",
-    "vite-tsconfig-paths": "5.1.4"
+    "vite-tsconfig-paths": "6.1.1"
   },
   "packageManager": "pnpm@10.18.2"
 }
