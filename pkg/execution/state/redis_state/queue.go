@@ -400,6 +400,9 @@ func (q *queue) LoadQueueItem(ctx context.Context, itemID string) (*osqueue.Queu
 		return nil, fmt.Errorf("error unmarshalling loaded queue item: %w", err)
 	}
 
+	// The nested osqueue.Item never has an ID set;  always re-set it
+	qi.Data.JobID = &qi.ID
+
 	return qi, nil
 }
 
