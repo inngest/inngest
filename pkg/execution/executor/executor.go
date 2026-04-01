@@ -1251,10 +1251,10 @@ func (e *executor) schedule(
 			// The idempotency key was used, so skip this run.
 			if err != nil && errors.Is(err, state.ErrRunNotFound) {
 				// Log with delta to help identify short deltas (like 5ms)
-				originalRunCreatedAt := time.UnixMilli(int64(stv1ID.RunID.Time()))
+				originalRunCreatedAt := time.UnixMilli(int64(id.RunID.Time()))
 				deltaMs := time.Since(originalRunCreatedAt).Milliseconds()
 				l.Warn("idempotency key exists but run state not found",
-					"original_run_id", stv1ID.RunID,
+					"original_run_id", id.RunID,
 					"original_run_created_at", originalRunCreatedAt,
 					"delta_ms", deltaMs,
 				)
