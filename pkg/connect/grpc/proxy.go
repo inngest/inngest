@@ -512,6 +512,11 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 	case <-leaseCtx.Done():
 		span.SetStatus(codes.Error, "lease expired")
 
+		// Track expired lease
+		metrics.IncrConnectProxyLeaseExpiredCount(ctx, metrics.CounterOpt{
+			PkgName: pkgName,
+		})
+
 		// in the case of instance contention for concurrency, the executor gets multiple leases
 		// however workers have reached capacity and there's no routedInstanceID
 		if routedInstanceID == "" {
