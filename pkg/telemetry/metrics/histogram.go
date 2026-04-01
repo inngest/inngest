@@ -192,6 +192,17 @@ func HistogramConnectProxyAckTime(ctx context.Context, dur int64, opts Histogram
 	})
 }
 
+func HistogramConnectGatewayDrainDuration(ctx context.Context, dur int64, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, dur, HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "connect_gateway.drain_duration",
+		Description: "Duration from sending GATEWAY_CLOSING to the worker until the WebSocket is closed.",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  DefaultBoundaries,
+	})
+}
+
 func HistogramConnectExecutorEndToEndDuration(ctx context.Context, dur int64, opts HistogramOpt) {
 	RecordIntHistogramMetric(ctx, dur, HistogramOpt{
 		PkgName:     opts.PkgName,

@@ -425,30 +425,71 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 
 		transport := "grpc"
 
-		// Forward the request
-		err = i.gatewayGRPCManager.Forward(ctx, route.GatewayID, route.ConnectionID, opts.Data)
-		if err != nil {
-			// Handle gateway ack
-			metrics.HistogramConnectProxyAckTime(ctx, time.Since(proxyStartTime).Milliseconds(), metrics.HistogramOpt{
-				PkgName: pkgName,
-				Tags: map[string]any{
-					"kind": "gateway",
-				},
-			})
+		// Forward the request, retrying with re-route if the gateway
+		// evicted the connection (e.g. during a drain/rollout).
+		const maxForwardAttempts = 3
+		for forwardAttempt := range maxForwardAttempts {
+			l.Optional(opts.AccountID, "connect").Debug("forwarding request to gateway",
+				"attempt", forwardAttempt,
+				"gateway_id", route.GatewayID.String(),
+				"conn_id", route.ConnectionID.String(),
+				"req_id", opts.Data.RequestId,
+				"run_id", opts.Data.RunId,
+				"fn_slug", opts.Data.FunctionSlug,
+			)
+
+			// Forward now awaits the SDK to ack a job, so an error means that it's likely
+			// safe to retry through a different route (in case workers/gateways are unavailable)
+			err = i.gatewayGRPCManager.Forward(ctx, route.GatewayID, route.ConnectionID, opts.Data)
+			if err == nil {
+				break
+			}
+
+			// Clean up the old worker lease before re-routing.
+			cleanupWorkerRequestOrLogError(ctx, i.stateManager, opts.EnvID, routedInstanceID, opts.Data.RequestId,
+				l, "could not clean up worker lease after forward failure")
+
+			if forwardAttempt == maxForwardAttempts-1 {
+				break
+			}
+
+			l.Warn("forward to gateway failed, re-routing", "attempt", forwardAttempt+1, "err", err)
+
+			route, err = routing.GetRoute(ctx, i.stateManager, i.rnd, i.tracer, l, opts.Data)
+			if err != nil {
+				l.Warn("re-route failed", "attempt", forwardAttempt+1, "err", err, "req_id", opts.Data.RequestId, "run_id", opts.Data.RunId)
+				break
+			}
+			routedInstanceID = route.InstanceID
+			if assignErr := i.stateManager.AssignRequestToWorker(ctx, opts.EnvID, routedInstanceID, opts.Data.RequestId); assignErr != nil {
+				l.ReportError(assignErr, "could not re-assign request lease on retry")
+			}
 		}
 
 		if err != nil {
+			metrics.HistogramConnectProxyAckTime(ctx, time.Since(proxyStartTime).Milliseconds(), metrics.HistogramOpt{
+				PkgName: pkgName,
+				Tags: map[string]any{
+					"kind":    "gateway",
+					"success": false,
+				},
+			})
+
 			span.RecordError(err)
 			span.SetStatus(codes.Error, "could not forward request to gateway")
-
-			// Clean up worker lease if forwarding failed
-			cleanupWorkerRequestOrLogError(ctx, i.stateManager, opts.EnvID, routedInstanceID, opts.Data.RequestId,
-				l, "could not clean up worker lease after forward failure")
 
 			return nil, fmt.Errorf("failed to route request to gateway: %w", err)
 		}
 
-		l.Trace("forwarded executor request to gateway", "gateway_id", route.GatewayID, "conn_id", route.ConnectionID)
+		metrics.HistogramConnectProxyAckTime(ctx, time.Since(proxyStartTime).Milliseconds(), metrics.HistogramOpt{
+			PkgName: pkgName,
+			Tags: map[string]any{
+				"kind":    "gateway",
+				"success": true,
+			},
+		})
+
+		l.Optional(opts.AccountID, "connect").Debug("forwarded executor request to gateway", "gateway_id", route.GatewayID, "conn_id", route.ConnectionID)
 
 		metrics.IncrConnectRouterGRPCMessageSentCounter(ctx, 1, metrics.CounterOpt{
 			PkgName: pkgName,
