@@ -37,7 +37,11 @@ func (c *connectGatewaySvc) Forward(ctx context.Context, req *pb.ForwardRequest)
 				"req_id", req.Data.RequestId,
 				"run_id", req.Data.RunId,
 			)
-			<-handler.stopForwarding
+			select {
+			case <-handler.stopForwarding:
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			}
 			l.Optional(accID, "connect").Debug("forward released after drain complete",
 				"conn_id", req.ConnectionID,
 				"req_id", req.Data.RequestId,
