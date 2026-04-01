@@ -336,7 +336,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			select {
 			case <-workerDrainedCtx.Done():
 				ch.log.Debug("worker closed connection")
-			case <-time.After(25 * time.Second):
+			case <-time.After(c.drainAckTimeout):
 				ch.log.Debug("timed out waiting for drain ack, marking connection as draining")
 			}
 

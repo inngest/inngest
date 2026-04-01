@@ -96,6 +96,7 @@ type connectGatewaySvc struct {
 	workerRequestExtendLeaseInterval                      time.Duration
 	workerRequestLeaseDuration                            time.Duration
 	workerStatusInterval                                  WorkerStatusIntervalFunc
+	drainAckTimeout                                       time.Duration
 
 	hostname  string
 	ipAddress net.IP
@@ -220,6 +221,12 @@ func WithConsecutiveWorkerHeartbeatMissesBeforeConnectionClose(misses int) gatew
 	}
 }
 
+func WithDrainAckTimeout(d time.Duration) gatewayOpt {
+	return func(svc *connectGatewaySvc) {
+		svc.drainAckTimeout = d
+	}
+}
+
 func NewConnectGatewayService(opts ...gatewayOpt) *connectGatewaySvc {
 	gateway := &connectGatewaySvc{
 		gatewayId:         ulid.MustNew(ulid.Now(), rand.Reader),
@@ -239,6 +246,7 @@ func NewConnectGatewayService(opts ...gatewayOpt) *connectGatewaySvc {
 			return consts.ConnectWorkerStatusInterval
 		},
 		consecutiveWorkerHeartbeatMissesBeforeConnectionClose: 5,
+		drainAckTimeout: 25 * time.Second,
 
 		grpcServer: grpcLib.NewServer(),
 	}

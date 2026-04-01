@@ -101,7 +101,7 @@ func TestLeaseRenewal(t *testing.T) {
 	require.True(t, ok, "connection should be registered for gRPC delivery")
 
 	go func() {
-		messageChan.(chan forwardMessage) <- forwardMessage{Data: expectedPayload, Result: make(chan error, 1)}
+		messageChan.(*connectionHandler).messageChan <- forwardMessage{Data: expectedPayload, Result: make(chan error, 1)}
 	}()
 
 	// Expect message to be received by gateway and forwarded over WebSocket
@@ -179,7 +179,7 @@ func TestLeaseRenewalWithInvalidLeaseShouldNotClose(t *testing.T) {
 	require.True(t, ok, "connection should be registered for gRPC delivery")
 
 	go func() {
-		messageChan.(chan forwardMessage) <- forwardMessage{Data: expectedPayload, Result: make(chan error, 1)}
+		messageChan.(*connectionHandler).messageChan <- forwardMessage{Data: expectedPayload, Result: make(chan error, 1)}
 	}()
 
 	// Expect message to be received by gateway and forwarded over WebSocket
@@ -284,7 +284,7 @@ func TestLeaseRenewalWithDeletedLeaseShouldNotClose(t *testing.T) {
 	require.True(t, ok, "connection should be registered for gRPC delivery")
 
 	go func() {
-		messageChan.(chan forwardMessage) <- forwardMessage{Data: expectedPayload, Result: make(chan error, 1)}
+		messageChan.(*connectionHandler).messageChan <- forwardMessage{Data: expectedPayload, Result: make(chan error, 1)}
 	}()
 
 	// Expect message to be received by gateway and forwarded over WebSocket
@@ -392,7 +392,7 @@ func TestExecutorMessageForwardingGRPC(t *testing.T) {
 	require.True(t, ok, "connection should be registered for gRPC delivery")
 
 	go func() {
-		messageChan.(chan forwardMessage) <- forwardMessage{Data: expectedPayload, Result: make(chan error, 1)}
+		messageChan.(*connectionHandler).messageChan <- forwardMessage{Data: expectedPayload, Result: make(chan error, 1)}
 	}()
 
 	// Expect message to be received by gateway and forwarded over WS
@@ -503,6 +503,7 @@ func TestDraining(t *testing.T) {
 	params := testingParameters{
 		consecutiveMissesBeforeClose: 10,
 		heartbeatInterval:            1 * time.Second,
+		drainAckTimeout:              5 * time.Second,
 	}
 	res := createTestingGateway(t, params)
 
@@ -521,18 +522,15 @@ func TestDraining(t *testing.T) {
 	require.True(t, res.svc.IsDraining())
 	require.False(t, res.svc.IsDrained())
 
-	require.EventuallyWithT(t, func(t *assert.CollectT) {
-		conn, err = res.stateManager.GetConnection(context.Background(), res.envID, res.connID)
-		assert.NoError(t, err)
-		assert.NotNil(t, conn)
-		assert.Equal(t, connect.ConnectionStatus_DRAINING, conn.Status)
-	}, 5*time.Second, 100*time.Millisecond)
-
 	msg := awaitNextMessage(t, res.ws, 3*time.Second)
 	require.Equal(t, connect.GatewayMessageType_GATEWAY_CLOSING, msg.Kind)
 
 	require.Equal(t, uint64(1), res.svc.connectionCount.Count())
 
+	// Worker closes the connection in response to GATEWAY_CLOSING.
+	// The gateway defers updating Redis to DRAINING until the worker
+	// closes (or the drain ack timeout elapses), so the close must
+	// happen before we assert on the status.
 	err = res.ws.Close(websocket.StatusNormalClosure, "")
 	require.NoError(t, err)
 
@@ -562,6 +560,7 @@ func TestDrainingWithForceDisconnect(t *testing.T) {
 	params := testingParameters{
 		consecutiveMissesBeforeClose: 10,
 		heartbeatInterval:            1 * time.Second,
+		drainAckTimeout:              500 * time.Millisecond,
 	}
 	res := createTestingGateway(t, params)
 
@@ -580,18 +579,12 @@ func TestDrainingWithForceDisconnect(t *testing.T) {
 	require.True(t, res.svc.IsDraining())
 	require.False(t, res.svc.IsDrained())
 
-	require.EventuallyWithT(t, func(t *assert.CollectT) {
-		conn, err = res.stateManager.GetConnection(context.Background(), res.envID, res.connID)
-		assert.NoError(t, err)
-		assert.NotNil(t, conn)
-		assert.Equal(t, connect.ConnectionStatus_DRAINING, conn.Status)
-	}, 5*time.Second, 100*time.Millisecond)
-
 	msg := awaitNextMessage(t, res.ws, 3*time.Second)
 	require.Equal(t, connect.GatewayMessageType_GATEWAY_CLOSING, msg.Kind)
 
 	require.Equal(t, uint64(1), res.svc.connectionCount.Count())
 
+	// Worker does not close, so the gateway force-closes after the drain ack timeout.
 	status, reason := awaitClosure(t, res.ws, 10*time.Second)
 	require.Equal(t, websocket.StatusGoingAway, status)
 	require.Equal(t, ErrDraining.SysCode, reason)
@@ -831,6 +824,7 @@ type testingParameters struct {
 	heartbeatInterval            time.Duration
 	leaseDuration                time.Duration
 	extendLeaseInterval          time.Duration
+	drainAckTimeout              time.Duration
 	consecutiveMissesBeforeClose int
 	shouldFailSync               bool
 	disallowConnection           bool
@@ -976,6 +970,10 @@ func createTestingGateway(t *testing.T, params ...testingParameters) testingReso
 
 		if params[0].consecutiveMissesBeforeClose > 0 {
 			opts = append(opts, WithConsecutiveWorkerHeartbeatMissesBeforeConnectionClose(params[0].consecutiveMissesBeforeClose))
+		}
+
+		if params[0].drainAckTimeout > 0 {
+			opts = append(opts, WithDrainAckTimeout(params[0].drainAckTimeout))
 		}
 
 	}
@@ -1373,8 +1371,9 @@ func TestHandleIncomingWebSocketMessageDraining(t *testing.T) {
 				InstanceId: "test-instance",
 			},
 		},
-		ws:  res.ws,
-		log: res.svc.logger,
+		ws:             res.ws,
+		log:            res.svc.logger,
+		stopForwarding: make(chan struct{}),
 	}
 
 	// Test WORKER_READY while draining
