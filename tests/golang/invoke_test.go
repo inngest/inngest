@@ -76,16 +76,16 @@ func TestInvoke(t *testing.T) {
 
 	t.Run("trace run should have appropriate data", func(t *testing.T) {
 		r := require.New(t)
-		run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{Status: models.FunctionStatusCompleted, ChildSpanCount: 1})
+				run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{Status: models.FunctionStatusCompleted, ChildSpanCount: 1, RequireTraceOutputID: true})
 
-		r.NotNil(run.Trace)
-		r.True(run.Trace.IsRoot)
-		r.Equal(models.RunTraceSpanStatusCompleted.String(), run.Trace.Status)
+				r.NotNil(run.Trace)
+				r.True(run.Trace.IsRoot)
+				r.Equal(models.RunTraceSpanStatusCompleted.String(), run.Trace.Status)
 
-		// output test
-		r.NotNil(run.Trace.OutputID)
-		output := c.RunSpanOutput(ctx, *run.Trace.OutputID)
-		c.ExpectSpanOutput(t, "success", output)
+				// output test
+				r.NotNil(run.Trace.OutputID)
+				output := c.RunSpanOutput(ctx, *run.Trace.OutputID)
+				c.ExpectSpanOutput(t, "success", output)
 
 		rootSpanID := run.Trace.SpanID
 
@@ -214,17 +214,17 @@ func TestInvokeGroup(t *testing.T) {
 	})
 
 	t.Run("trace run should have appropriate data", func(t *testing.T) {
-		run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{Status: models.FunctionStatusCompleted, ChildSpanCount: 1})
+				run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{Status: models.FunctionStatusCompleted, ChildSpanCount: 1, RequireTraceOutputID: true})
 
-		as := assert.New(t)
+				as := assert.New(t)
 
-		r.True(run.Trace.IsRoot)
-		r.Equal(models.RunTraceSpanStatusCompleted.String(), run.Trace.Status)
+				r.True(run.Trace.IsRoot)
+				r.Equal(models.RunTraceSpanStatusCompleted.String(), run.Trace.Status)
 
-		// output test
-		r.NotNil(run.Trace.OutputID)
-		output := c.RunSpanOutput(ctx, *run.Trace.OutputID)
-		c.ExpectSpanOutput(t, "success", output)
+				// output test
+				r.NotNil(run.Trace.OutputID)
+				output := c.RunSpanOutput(ctx, *run.Trace.OutputID)
+				c.ExpectSpanOutput(t, "success", output)
 
 		rootSpanID := run.Trace.SpanID
 
@@ -315,14 +315,14 @@ func TestInvokeTimeout(t *testing.T) {
 
 	t.Run("trace run should have appropriate data", func(t *testing.T) {
 		errMsg := "Timed out waiting for invoked function to complete"
-		run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{Status: models.FunctionStatusFailed})
+				run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{Status: models.FunctionStatusFailed, RequireTraceOutputID: true})
 
-		require.NotNil(t, run.Trace)
-		require.True(t, run.Trace.IsRoot)
-		require.Equal(t, models.RunTraceSpanStatusFailed.String(), run.Trace.Status)
+				require.NotNil(t, run.Trace)
+				require.True(t, run.Trace.IsRoot)
+				require.Equal(t, models.RunTraceSpanStatusFailed.String(), run.Trace.Status)
 
-		// output test
-		require.NotNil(t, run.Trace.OutputID)
+				// output test
+				require.NotNil(t, run.Trace.OutputID)
 		output := c.RunSpanOutput(ctx, *run.Trace.OutputID)
 		require.NotNil(t, output)
 

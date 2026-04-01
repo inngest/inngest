@@ -77,16 +77,16 @@ func TestBatchEvents(t *testing.T) {
 	})
 
 	t.Run("trace run should have appropriate data", func(t *testing.T) {
-		run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{Status: models.FunctionStatusCompleted})
+				run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{Status: models.FunctionStatusCompleted, RequireTraceOutputID: true})
 
-		require.True(t, run.IsBatch)
-		require.NotNil(t, run.BatchCreatedAt)
+				require.True(t, run.IsBatch)
+				require.NotNil(t, run.BatchCreatedAt)
 
-		require.NotNil(t, run.Trace)
-		require.True(t, run.Trace.IsRoot)
-		require.Equal(t, models.RunTraceSpanStatusCompleted.String(), run.Trace.Status)
-		// output test
-		require.NotNil(t, run.Trace.OutputID)
+				require.NotNil(t, run.Trace)
+				require.True(t, run.Trace.IsRoot)
+				require.Equal(t, models.RunTraceSpanStatusCompleted.String(), run.Trace.Status)
+				// output test
+				require.NotNil(t, run.Trace.OutputID)
 		output := c.RunSpanOutput(ctx, *run.Trace.OutputID)
 		c.ExpectSpanOutput(t, "batched!!", output)
 

@@ -94,18 +94,19 @@ func TestSleep(t *testing.T) {
 	})
 
 	t.Run("complete", func(t *testing.T) {
-		run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{
-			Status:         models.FunctionStatusCompleted,
-			ChildSpanCount: 3,
-			Timeout:        9 * time.Second,
-			Interval:       3 * time.Second,
-		})
-		require.EqualValues(t, 1, atomic.LoadInt32(&completed))
+			run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{
+				Status:               models.FunctionStatusCompleted,
+				ChildSpanCount:       3,
+				Timeout:              9 * time.Second,
+				Interval:             3 * time.Second,
+				RequireTraceOutputID: true,
+			})
+			require.EqualValues(t, 1, atomic.LoadInt32(&completed))
 
-		require.NotEqual(t, models.RunTraceSpanStatusRunning.String(), run.Trace.Status)
+			require.NotEqual(t, models.RunTraceSpanStatusRunning.String(), run.Trace.Status)
 
-		// output test
-		require.NotNil(t, run.Trace.OutputID)
+			// output test
+			require.NotNil(t, run.Trace.OutputID)
 		output := c.RunSpanOutput(ctx, *run.Trace.OutputID)
 		require.NotNil(t, output)
 		c.ExpectSpanOutput(t, "true", output)

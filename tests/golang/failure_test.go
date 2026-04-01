@@ -64,20 +64,20 @@ func TestFunctionFailure(t *testing.T) {
 	require.EqualValues(t, counter, 1)
 
 	t.Run("trace run should have appropriate data", func(t *testing.T) {
-		run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{Status: models.FunctionStatusFailed, ChildSpanCount: 1})
+				run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{Status: models.FunctionStatusFailed, ChildSpanCount: 1, RequireTraceOutputID: true})
 
-		require.Equal(t, models.RunTraceSpanStatusFailed.String(), run.Trace.Status)
-		// output test
-		require.NotNil(t, run.Trace.OutputID)
-		runOutput := c.RunSpanOutput(ctx, *run.Trace.OutputID)
-		require.NotNil(t, runOutput)
-		c.ExpectSpanErrorOutput(t, "nope!", "", runOutput)
+				require.Equal(t, models.RunTraceSpanStatusFailed.String(), run.Trace.Status)
+				// output test
+				require.NotNil(t, run.Trace.OutputID)
+				runOutput := c.RunSpanOutput(ctx, *run.Trace.OutputID)
+				require.NotNil(t, runOutput)
+				c.ExpectSpanErrorOutput(t, "nope!", "", runOutput)
 
-		rootSpanID := run.Trace.SpanID
+				rootSpanID := run.Trace.SpanID
 
-		t.Run("failed run", func(t *testing.T) {
-			span := run.Trace.ChildSpans[0]
-			require.Equal(t, consts.OtelExecFnErr, span.Name)
+				t.Run("failed run", func(t *testing.T) {
+					span := run.Trace.ChildSpans[0]
+					require.Equal(t, consts.OtelExecFnErr, span.Name)
 			require.False(t, span.IsRoot)
 			require.Equal(t, rootSpanID, span.ParentSpanID)
 			require.Equal(t, models.RunTraceSpanStatusFailed.String(), span.Status)
@@ -171,13 +171,13 @@ func TestFunctionFailureWithRetries(t *testing.T) {
 	})
 
 	t.Run("trace run should have appropriate data", func(t *testing.T) {
-		run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{Status: models.FunctionStatusFailed, Timeout: 1 * time.Minute, Interval: 5 * time.Second, ChildSpanCount: 1})
+				run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{Status: models.FunctionStatusFailed, Timeout: 1 * time.Minute, Interval: 5 * time.Second, ChildSpanCount: 1, RequireTraceOutputID: true})
 
-		require.Equal(t, models.RunTraceSpanStatusFailed.String(), run.Trace.Status)
-		// output test
-		require.NotNil(t, run.Trace.OutputID)
-		runOutput := c.RunSpanOutput(ctx, *run.Trace.OutputID)
-		c.ExpectSpanErrorOutput(t, "nope!", "", runOutput)
+				require.Equal(t, models.RunTraceSpanStatusFailed.String(), run.Trace.Status)
+				// output test
+				require.NotNil(t, run.Trace.OutputID)
+				runOutput := c.RunSpanOutput(ctx, *run.Trace.OutputID)
+				c.ExpectSpanErrorOutput(t, "nope!", "", runOutput)
 
 		rootSpanID := run.Trace.SpanID
 
@@ -266,15 +266,16 @@ func TestFunctionResponseTooLargeFailure(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("trace run should fail with output too large error", func(t *testing.T) {
-		run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{
-			Status:         models.FunctionStatusFailed,
-			Timeout:        30 * time.Second,
-			Interval:       2 * time.Second,
-			ChildSpanCount: 1,
-		})
+				run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{
+					Status:               models.FunctionStatusFailed,
+					Timeout:              30 * time.Second,
+					Interval:             2 * time.Second,
+					ChildSpanCount:       1,
+					RequireTraceOutputID: true,
+				})
 
-		require.Equal(t, models.RunTraceSpanStatusFailed.String(), run.Trace.Status)
-		require.NotNil(t, run.Trace.OutputID)
+				require.Equal(t, models.RunTraceSpanStatusFailed.String(), run.Trace.Status)
+				require.NotNil(t, run.Trace.OutputID)
 
 		rootSpanID := run.Trace.SpanID
 		require.NotEmpty(t, rootSpanID)

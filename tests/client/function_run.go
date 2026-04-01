@@ -268,6 +268,13 @@ func (c *Client) WaitForRunTraces(ctx context.Context, t *testing.T, runID *stri
 			a.GreaterOrEqual(len(run.Trace.ChildSpans), opts.ChildSpanCount)
 		}
 
+		if opts.RequireTraceOutputID {
+			if run.Trace == nil || run.Trace.OutputID == nil {
+				a.Fail("trace OutputID is not yet populated")
+				return
+			}
+		}
+
 		traces = run
 	}, opts.Timeout, opts.Interval)
 
@@ -281,6 +288,11 @@ type WaitForRunTracesOptions struct {
 	NewTraces bool
 
 	ChildSpanCount int
+
+	// RequireTraceOutputID makes WaitForRunTraces keep polling until the
+	// root trace span's OutputID is non-nil.  This avoids a race where the
+	// run status flips to Completed before the trace output is persisted.
+	RequireTraceOutputID bool
 }
 
 func (c *Client) RunTraces(ctx context.Context, runID string, newTraces bool) (*RunV2, error) {

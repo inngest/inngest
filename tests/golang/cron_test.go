@@ -52,16 +52,16 @@ func TestCron(t *testing.T) {
 	})
 
 	t.Run("trace run should have appropriate data", func(t *testing.T) {
-		run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{Status: models.FunctionStatusCompleted})
+				run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{Status: models.FunctionStatusCompleted, RequireTraceOutputID: true})
 
-		r.NotNil(run.CronSchedule)
-		r.Equal("* * * * *", *run.CronSchedule)
+				r.NotNil(run.CronSchedule)
+				r.Equal("* * * * *", *run.CronSchedule)
 
-		r.NotNil(run.Trace)
-		r.True(run.Trace.IsRoot)
-		r.Equal(models.RunTraceSpanStatusCompleted.String(), run.Trace.Status)
-		// output test
-		r.NotNil(run.Trace.OutputID)
+				r.NotNil(run.Trace)
+				r.True(run.Trace.IsRoot)
+				r.Equal(models.RunTraceSpanStatusCompleted.String(), run.Trace.Status)
+				// output test
+				r.NotNil(run.Trace.OutputID)
 		output := c.RunSpanOutput(ctx, *run.Trace.OutputID)
 		c.ExpectSpanOutput(t, "schedule done", output)
 

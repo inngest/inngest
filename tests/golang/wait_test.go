@@ -115,8 +115,9 @@ func TestWait(t *testing.T) {
 		<-time.After(2 * time.Second)
 
 		run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{
-			Status:         models.FunctionStatusCompleted,
-			ChildSpanCount: 1,
+			Status:               models.FunctionStatusCompleted,
+			ChildSpanCount:       1,
+			RequireTraceOutputID: true,
 		})
 
 		require.Equal(t, models.RunTraceSpanStatusCompleted.String(), run.Trace.Status)
@@ -267,8 +268,9 @@ func TestWaitGroup(t *testing.T) {
 		<-time.After(2 * time.Second)
 
 		run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{
-			Status:         models.FunctionStatusCompleted,
-			ChildSpanCount: 1,
+			Status:               models.FunctionStatusCompleted,
+			ChildSpanCount:       1,
+			RequireTraceOutputID: true,
 		})
 
 		require.Equal(t, models.RunTraceSpanStatusCompleted.String(), run.Trace.Status)

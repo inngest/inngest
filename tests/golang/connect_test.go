@@ -109,13 +109,13 @@ func TestEndToEnd(t *testing.T) {
 
 		// Check span tree
 		t.Run("trace run should have appropriate data", func(t *testing.T) {
-			run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{Status: models.FunctionStatusCompleted})
+						run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{Status: models.FunctionStatusCompleted, RequireTraceOutputID: true})
 
-			require.NotNil(t, run.Trace)
-			require.True(t, run.Trace.IsRoot)
-			require.Equal(t, models.RunTraceSpanStatusCompleted.String(), run.Trace.Status)
-			// output test
-			require.NotNil(t, run.Trace.OutputID)
+						require.NotNil(t, run.Trace)
+						require.True(t, run.Trace.IsRoot)
+						require.Equal(t, models.RunTraceSpanStatusCompleted.String(), run.Trace.Status)
+						// output test
+						require.NotNil(t, run.Trace.OutputID)
 			output := c.RunSpanOutput(ctx, *run.Trace.OutputID)
 			c.ExpectSpanOutput(t, "connect done", output)
 		})
@@ -149,15 +149,15 @@ func TestEndToEnd(t *testing.T) {
 		require.EqualValues(t, 0, atomic.LoadInt32(&counter))
 		require.NotEmpty(t, failedRunId)
 
-		run := c.WaitForRunTraces(ctx, t, &failedRunId, client.WaitForRunTracesOptions{Status: models.FunctionStatusFailed})
+				run := c.WaitForRunTraces(ctx, t, &failedRunId, client.WaitForRunTracesOptions{Status: models.FunctionStatusFailed, RequireTraceOutputID: true})
 
-		require.NotNil(t, run.Trace)
-		require.True(t, run.Trace.IsRoot)
-		require.Equal(t, models.RunTraceSpanStatusFailed.String(), run.Trace.Status)
-		require.Equal(t, 1, len(run.Trace.ChildSpans))
-		require.Equal(t, models.RunTraceSpanStatusFailed.String(), run.Trace.ChildSpans[0].Status)
-		// output test
-		require.NotNil(t, run.Trace.OutputID)
+				require.NotNil(t, run.Trace)
+				require.True(t, run.Trace.IsRoot)
+				require.Equal(t, models.RunTraceSpanStatusFailed.String(), run.Trace.Status)
+				require.Equal(t, 1, len(run.Trace.ChildSpans))
+				require.Equal(t, models.RunTraceSpanStatusFailed.String(), run.Trace.ChildSpans[0].Status)
+				// output test
+				require.NotNil(t, run.Trace.OutputID)
 		output := c.RunSpanOutput(ctx, *run.Trace.OutputID)
 
 		errorMsg := "{\"error\":{\"error\":\"connect_no_healthy_connection: Could not find a healthy connection\",\"name\":\"connect_no_healthy_connection\",\"message\":\"Could not find a healthy connection\"}}"
