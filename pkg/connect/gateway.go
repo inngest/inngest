@@ -313,6 +313,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			}()
 
 			// Signal the client that we're going away so it reconnects.
+			drainStart := time.Now()
 			closingWriteCtx, closingWriteCancel := context.WithTimeout(context.Background(), wsWriteTimeout)
 			defer closingWriteCancel()
 			err := wsproto.Write(closingWriteCtx, ws, &connectpb.ConnectMessage{
@@ -348,8 +349,13 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 				go l.OnStartDraining(context.Background(), conn)
 			}
 
-			// We gave enough time for the worker to close the old connection.
-			ch.log.Debug("reached timeout waiting for worker to close connection")
+			metrics.HistogramConnectGatewayDrainDuration(context.Background(), time.Since(drainStart).Milliseconds(), metrics.HistogramOpt{
+				PkgName: pkgName,
+				Tags: map[string]any{
+					"workspace_id": conn.EnvID.String(),
+				},
+			})
+
 			c.closeDraining(ws)
 		}()
 
