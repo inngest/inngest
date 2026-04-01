@@ -320,9 +320,34 @@ function generateInngestSegments(
 /** Generate segments for a run-level Inngest bar (run queue delay + finalization). */
 function generateRunInngestSegments(
   barId: string,
-  breakdown: RunInngestBreakdownData
+  breakdown: RunInngestBreakdownData,
+  runDurationMs: number
 ): BarSegment[] | undefined {
-  return generatePhaseSegments(barId, 'run-inngest', RUN_INNGEST_PHASES, breakdown);
+  if (runDurationMs <= 0) return undefined;
+
+  const segments: BarSegment[] = [];
+
+  // Run queue delay: starts at 0% (beginning of run)
+  if (breakdown.runQueueDelayMs > 0) {
+    segments.push({
+      id: `${barId}-seg-run-inngest-run-queue`,
+      startPercent: 0,
+      widthPercent: (breakdown.runQueueDelayMs / runDurationMs) * 100,
+      style: 'timing.inngest.queue',
+    });
+  }
+
+  // Finalization: positioned at end of run (lastStepEndedAt → runEndedAt)
+  if (breakdown.finalizationMs > 0) {
+    segments.push({
+      id: `${barId}-seg-run-inngest-finalization`,
+      startPercent: ((runDurationMs - breakdown.finalizationMs) / runDurationMs) * 100,
+      widthPercent: (breakdown.finalizationMs / runDurationMs) * 100,
+      style: 'timing.inngest.finalization',
+    });
+  }
+
+  return segments.length > 0 ? segments : undefined;
 }
 
 // ============================================================================
@@ -538,7 +563,11 @@ function TimelineBarRenderer({
   const isRunInngestExpandable = hasRunInngestBreakdown;
   const isRunInngestExpanded = isRunInngestExpandable && expandedBars.has(runInngestBarId);
   const runInngestBarSegments = hasRunInngestBreakdown
-    ? generateRunInngestSegments(runInngestBarId, bar.runInngestBreakdown!)
+    ? generateRunInngestSegments(
+        runInngestBarId,
+        bar.runInngestBreakdown!,
+        calculateDuration(bar.startTime, bar.endTime)
+      )
     : undefined;
 
   return (
@@ -682,12 +711,12 @@ function TimelineBarRenderer({
       )}
 
       {/* Run-level Inngest bar — shows run queue delay + finalization for root bars */}
-      {isExpanded && bar.isRoot && hasRunInngestBreakdown && timingPositions?.inngest && (
+      {isExpanded && bar.isRoot && hasRunInngestBreakdown && (
         <TimelineBar
           name="Inngest"
           duration={bar.runInngestBreakdown!.totalMs}
-          startPercent={timingPositions.inngest.startPercent}
-          widthPercent={timingPositions.inngest.widthPercent}
+          startPercent={startPercent}
+          widthPercent={widthPercent}
           depth={depth + 1}
           leftWidth={leftWidth}
           style="timing.inngest"
@@ -704,22 +733,71 @@ function TimelineBarRenderer({
           endTime={bar.endTime}
           minTime={minTime}
         >
-          {/* Run-level Inngest sub-bars */}
+          {/* Run-level Inngest sub-bars — positioned at their absolute timeline locations */}
           {isRunInngestExpanded && (
-            <PhaseSubBars
-              phases={RUN_INNGEST_PHASES}
-              data={bar.runInngestBreakdown!}
-              parentPosition={timingPositions.inngest!}
-              barIdPrefix={`${bar.id}-run-inngest`}
-              depth={depth + 2}
-              leftWidth={leftWidth}
-              status={bar.status}
-              onClick={() => onSelectStep?.(bar.id)}
-              viewStartOffset={viewStartOffset}
-              viewEndOffset={viewEndOffset}
-              startTime={bar.startTime}
-              minTime={minTime}
-            />
+            <>
+              {/* Run queue delay: run.queuedAt → run.startedAt */}
+              {bar.runInngestBreakdown!.runQueueDelayMs > 0 && (
+                <TimelineBar
+                  key={`${bar.id}-run-inngest-run-queue`}
+                  name="Run queue delay"
+                  duration={bar.runInngestBreakdown!.runQueueDelayMs}
+                  startPercent={startPercent}
+                  widthPercent={
+                    (bar.runInngestBreakdown!.runQueueDelayMs /
+                      Math.max(1, (bar.endTime?.getTime() ?? 0) - bar.startTime.getTime())) *
+                    widthPercent
+                  }
+                  depth={depth + 2}
+                  leftWidth={leftWidth}
+                  style="timing.inngest.queue"
+                  styleLabel={STYLE_LABELS['timing.inngest.queue']}
+                  status={bar.status}
+                  onClick={() => onSelectStep?.(bar.id)}
+                  viewStartOffset={viewStartOffset}
+                  viewEndOffset={viewEndOffset}
+                  startTime={bar.startTime}
+                  endTime={
+                    new Date(bar.startTime.getTime() + bar.runInngestBreakdown!.runQueueDelayMs)
+                  }
+                  minTime={minTime}
+                />
+              )}
+              {/* Finalization: lastStep.endedAt → run.endedAt */}
+              {bar.runInngestBreakdown!.finalizationMs > 0 && bar.endTime && (
+                <TimelineBar
+                  key={`${bar.id}-run-inngest-finalization`}
+                  name="Finalization"
+                  duration={bar.runInngestBreakdown!.finalizationMs}
+                  startPercent={
+                    startPercent +
+                    ((bar.endTime.getTime() -
+                      bar.runInngestBreakdown!.finalizationMs -
+                      bar.startTime.getTime()) /
+                      Math.max(1, bar.endTime.getTime() - bar.startTime.getTime())) *
+                      widthPercent
+                  }
+                  widthPercent={
+                    (bar.runInngestBreakdown!.finalizationMs /
+                      Math.max(1, bar.endTime.getTime() - bar.startTime.getTime())) *
+                    widthPercent
+                  }
+                  depth={depth + 2}
+                  leftWidth={leftWidth}
+                  style="timing.inngest.finalization"
+                  styleLabel={STYLE_LABELS['timing.inngest.finalization']}
+                  status={bar.status}
+                  onClick={() => onSelectStep?.(bar.id)}
+                  viewStartOffset={viewStartOffset}
+                  viewEndOffset={viewEndOffset}
+                  startTime={
+                    new Date(bar.endTime.getTime() - bar.runInngestBreakdown!.finalizationMs)
+                  }
+                  endTime={bar.endTime}
+                  minTime={minTime}
+                />
+              )}
+            </>
           )}
         </TimelineBar>
       )}
