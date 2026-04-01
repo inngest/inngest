@@ -146,11 +146,15 @@ var Attrs = struct {
 	MetadataKind  attr[*metadata.Kind]
 	MetadataOp    attr[*metadata.Opcode]
 	MetadataScope attr[*metadata.Scope]
+
+	// TODO: Use actual type
+	ConstraintHit attr[*enums.QueueConstraint]
 }{
 	internalError: StringAttr("internal.error"),
 
 	AIRequestMetadata:                  JsonAttr[aigateway.ParsedInferenceRequest]("ai.request"),
 	AIResponseMetadata:                 JsonAttr[aigateway.ParsedInferenceResponse]("ai.response"),
+	ConstraintHit:                      JsonAttr[enums.QueueConstraint]("constraints.acquire_response"),
 	AccountID:                          UUIDAttr("account.id"),
 	AppID:                              UUIDAttr("app.id"),
 	BatchID:                            ULIDAttr("batch.id"),

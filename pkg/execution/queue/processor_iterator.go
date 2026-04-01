@@ -228,6 +228,12 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 		release()
 
 		span.SetAttributes(attribute.String("limiting_constraint", constraintRes.LimitingConstraint.String()))
+
+		if notifier := p.Queue.Options().ConstraintNotifier; notifier != nil {
+			if spanErr := notifier.OnConstraintHit(ctx, constraintRes.LimitingConstraint, item.Data.Metadata); spanErr != nil {
+				l.Debug("error updating span with constraint hit", "error", spanErr)
+			}
+		}
 	}
 
 	var leaseID *ulid.ULID

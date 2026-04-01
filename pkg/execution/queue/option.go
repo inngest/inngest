@@ -10,6 +10,7 @@ import (
 	"github.com/inngest/inngest/pkg/backoff"
 	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/execution/constraintlifecycle"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/trace"
@@ -478,6 +479,8 @@ type QueueOptions struct {
 
 	ConditionalTracer trace.ConditionalTracer
 
+	ConstraintNotifier constraintlifecycle.Notifier
+
 	ShardAssignmentConfig ShardAssignmentConfig
 	// OnShardLeaseAcquired is called immediately after a shard lease is successfully claimed.
 	// The shardName parameter is the name of the specific shard that was leased.
@@ -641,6 +644,12 @@ func WithEnableThrottleInstrumentation(fn EnableThrottleInstrumentationFn) Queue
 func WithConditionalTracer(tracer trace.ConditionalTracer) QueueOpt {
 	return func(q *QueueOptions) {
 		q.ConditionalTracer = tracer
+	}
+}
+
+func WithConstraintNotifier(n constraintlifecycle.Notifier) QueueOpt {
+	return func(q *QueueOptions) {
+		q.ConstraintNotifier = n
 	}
 }
 
