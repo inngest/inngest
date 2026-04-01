@@ -219,7 +219,7 @@ func (q *queueProcessor) BacklogRefillConstraintCheck(
 	}
 
 	if !q.AcquireCapacityLeaseOnBacklogRefill {
-		metrics.IncrBacklogRefillConstraintCheckCounter(ctx, enums.BacklogRefillConstraintCheckReasonFeatureFlagDisabled.String(), metrics.CounterOpt{
+		metrics.IncrBacklogRefillConstraintCheckCounter(ctx, enums.BacklogRefillConstraintCheckReasonAcquireOnRefillDisabled.String(), metrics.CounterOpt{
 			PkgName: pkgName,
 		})
 		return &BacklogRefillConstraintCheckResult{
