@@ -148,6 +148,18 @@ func TestQueueOperations(t *testing.T) {
 		require.NotNil(t, lID)
 		require.Equal(t, clock.Now().Add(10*time.Second).Truncate(time.Millisecond), lID.Timestamp())
 
+		t.Run("should not be possible to lease again", func(t *testing.T) {
+			_, err := shard.Lease(ctx, *item, 10*time.Second, clock.Now())
+			require.Error(t, err)
+			require.ErrorIs(t, err, queue.ErrQueueItemAlreadyLeased)
+		})
+
+		t.Run("should not find anything in queue when peeking", func(t *testing.T) {
+			peeked, err := shard.Peek(ctx, partition, clock.Now().Add(10*time.Second), 10)
+			require.NoError(t, err)
+			require.Len(t, peeked, 0)
+		})
+
 		leaseID = lID
 	})
 
@@ -179,6 +191,14 @@ func TestQueueOperations(t *testing.T) {
 
 		require.Nil(t, loaded.LeaseID)
 		require.Equal(t, *item, *loaded)
+
+		t.Run("should find item in queue when peeking", func(t *testing.T) {
+			peeked, err := shard.Peek(ctx, partition, clock.Now().Add(30*time.Second), 10)
+			require.NoError(t, err)
+			require.Len(t, peeked, 1)
+
+			require.Equal(t, item, peeked[0], "items must match")
+		})
 	})
 
 	t.Run("Dequeue", func(t *testing.T) {
@@ -192,5 +212,11 @@ func TestQueueOperations(t *testing.T) {
 		_, err = shard.LoadQueueItem(ctx, item.ID)
 		require.Error(t, err)
 		require.ErrorIs(t, err, queue.ErrQueueItemNotFound)
+
+		t.Run("should not find anything in queue when peeking", func(t *testing.T) {
+			peeked, err := shard.Peek(ctx, partition, clock.Now().Add(10*time.Second), 10)
+			require.NoError(t, err)
+			require.Len(t, peeked, 0)
+		})
 	})
 }
