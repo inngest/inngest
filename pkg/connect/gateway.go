@@ -91,6 +91,19 @@ type connectionHandler struct {
 	// Once set, heartbeats must not reset the connection status to READY.
 	draining atomic.Bool
 
+	// messageChan receives forwarded requests from the router.
+	messageChan chan forwardMessage
+
+	// stopForwarding is closed after the connection is marked DRAINING in
+	// Redis, signalling receiveRouterMessagesFromGRPC to exit and remove
+	// the connection from the in-memory map.
+	stopForwarding     chan struct{}
+	stopForwardingOnce sync.Once
+
+	// pendingAcks tracks request IDs waiting for WORKER_REQUEST_ACK.
+	// Forward blocks until the ACK arrives or times out.
+	pendingAcks sync.Map // requestID -> chan struct{}
+
 	lastHeartbeatLock       sync.Mutex
 	lastHeartbeatReceivedAt time.Time
 
@@ -179,11 +192,12 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 		}
 
 		ch := &connectionHandler{
-			svc:        c,
-			log:        c.logger,
-			ws:         ws,
-			updateLock: sync.Mutex{},
-			remoteAddr: remoteAddr,
+			svc:            c,
+			log:            c.logger,
+			ws:             ws,
+			updateLock:     sync.Mutex{},
+			remoteAddr:     remoteAddr,
+			stopForwarding: make(chan struct{}),
 		}
 
 		closeReason := connectpb.WorkerDisconnectReason_UNEXPECTED.String()
@@ -285,18 +299,11 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			// If gateway is shutting down, we must immediately start the draining process
 			ch.log.Debug("context done, starting draining process")
 
-			// Mark connection as draining to prevent subsequent heartbeats from marking it as ready
+			// Mark connection as draining in-memory to prevent subsequent
+			// heartbeats from marking it as ready, but do NOT update Redis
+			// yet, the connection stays READY for routing to give the worker
+			// enough time to reconnect to a different gateway.
 			ch.draining.Store(true)
-
-			// Prevent routing any more messages to this connection
-			err = ch.updateConnStatus(connectpb.ConnectionStatus_DRAINING)
-			if err != nil {
-				ch.log.ReportError(err, "could not update connection status after context done")
-			}
-
-			for _, l := range c.lifecycles {
-				go l.OnStartDraining(context.Background(), conn)
-			}
 
 			setCloseReason(connectpb.WorkerDisconnectReason_GATEWAY_DRAINING.String())
 
@@ -305,30 +312,53 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 				_ = ws.CloseNow()
 			}()
 
-			// If the parent context timed out or got canceled, we should signal the client that we're going away,
-			// and it should reconnect to another gateway.
+			// Signal the client that we're going away so it reconnects.
 			closingWriteCtx, closingWriteCancel := context.WithTimeout(context.Background(), wsWriteTimeout)
 			defer closingWriteCancel()
 			err := wsproto.Write(closingWriteCtx, ws, &connectpb.ConnectMessage{
 				Kind: connectpb.GatewayMessageType_GATEWAY_CLOSING,
 			})
 			if err != nil {
+				// Can't tell the worker so we mark as DRAINING immediately.
+				if statusErr := ch.updateConnStatus(connectpb.ConnectionStatus_DRAINING); statusErr != nil {
+					ch.log.ReportError(statusErr, "could not update connection status after context done")
+				}
+				ch.stopForwardingOnce.Do(func() { close(ch.stopForwarding) })
+				for _, l := range c.lifecycles {
+					go l.OnStartDraining(context.Background(), conn)
+				}
 				return
 			}
 
+			// Wait for the worker to close the connection, worker should make sure that it established
+			// a new connection before closing the current one.
 			select {
 			case <-workerDrainedCtx.Done():
 				ch.log.Debug("worker closed connection")
-			case <-time.After(5 * time.Second):
-				ch.log.Debug("reached timeout waiting for worker to close connection")
-				// On timeout, the gateway forcefully closes the connection
-				c.closeDraining(ws)
+			case <-time.After(25 * time.Second):
+				ch.log.Debug("timed out waiting for drain ack, marking connection as draining")
 			}
+
+			if statusErr := ch.updateConnStatus(connectpb.ConnectionStatus_DRAINING); statusErr != nil {
+				ch.log.ReportError(statusErr, "could not update connection status after drain ack")
+			}
+			ch.stopForwardingOnce.Do(func() { close(ch.stopForwarding) })
+
+			for _, l := range c.lifecycles {
+				go l.OnStartDraining(context.Background(), conn)
+			}
+
+			// We gave enough time for the worker to close the old connection.
+			ch.log.Debug("reached timeout waiting for worker to close connection")
+			c.closeDraining(ws)
 		}()
 
 		// Once a connection is established, we must make sure to update the state on any disconnect,
 		// regardless of whether it's permanent or temporary
 		defer func() {
+			// Ensure receiveRouterMessagesFromGRPC exits on any disconnect.
+			ch.stopForwardingOnce.Do(func() { close(ch.stopForwarding) })
+
 			// This is a transactional operation, it should always complete regardless of context cancellation
 			err := c.stateManager.DeleteConnection(context.Background(), conn.EnvID, conn.ConnectionId)
 			if err != nil {
@@ -844,6 +874,7 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(msg *connectpb.Connec
 
 		// Remove from in-memory map to prevent new requests from being forwarded.
 		c.svc.wsConnections.Delete(c.conn.ConnectionId.String())
+		c.stopForwardingOnce.Do(func() { close(c.stopForwarding) })
 
 		for _, l := range c.svc.lifecycles {
 			go l.OnStartDraining(context.Background(), c.conn)
@@ -861,6 +892,11 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(msg *connectpb.Connec
 					StatusCode: websocket.StatusPolicyViolation,
 					Msg:        "invalid payload in worker request ack",
 				}
+			}
+
+			// Unblock the Forward() call that's waiting for this ACK.
+			if ackCh, ok := c.pendingAcks.LoadAndDelete(data.RequestId); ok {
+				close(ackCh.(chan struct{}))
 			}
 
 			// This will be sent exactly once, as the router selected this gateway to handle the request
@@ -1067,7 +1103,8 @@ func (c *connectionHandler) receiveRouterMessagesFromGRPC(ctx context.Context, o
 	messageChan := make(chan forwardMessage)
 
 	connectionID := c.conn.ConnectionId.String()
-	c.svc.wsConnections.Store(connectionID, messageChan)
+	c.messageChan = messageChan
+	c.svc.wsConnections.Store(connectionID, c)
 
 	// Ensure cleanup when function exits
 	defer func() {
@@ -1083,8 +1120,8 @@ func (c *connectionHandler) receiveRouterMessagesFromGRPC(ctx context.Context, o
 	// running for each app.
 	for {
 		select {
-		case <-ctx.Done():
-			c.log.Debug("connection is draining, not forwarding message")
+		case <-c.stopForwarding:
+			c.log.Debug("connection marked as draining, stopping forwarding")
 			return
 
 		case msg, ok := <-messageChan:
@@ -1116,6 +1153,15 @@ func (c *connectionHandler) receiveRouterMessagesFromGRPC(ctx context.Context, o
 				"run_id", data.RunId,
 				"transport", "grpc",
 			)
+
+			// Block forwards while draining — wait for the new connection
+			// to be READY before failing so the proxy re-route succeeds.
+			if c.draining.Load() {
+				<-c.stopForwarding
+				log.Debug("rejecting forward, connection finished draining")
+				msg.Result <- fmt.Errorf("connection is draining")
+				continue
+			}
 
 			log.Trace("gateway received grpc message")
 			grpcTags := map[string]any{
@@ -1153,8 +1199,20 @@ func (c *connectionHandler) receiveRouterMessagesFromGRPC(ctx context.Context, o
 				continue
 			}
 
-			msg.Result <- nil
-			log.Trace("forwarded message to worker")
+			// Wait for WORKER_REQUEST_ACK in a goroutine so we don't
+			// block the message loop from processing other requests.
+			ackCh := make(chan struct{})
+			c.pendingAcks.Store(data.RequestId, ackCh)
+			go func() {
+				select {
+				case <-ackCh:
+					msg.Result <- nil
+				case <-time.After(consts.ConnectWorkerRequestLeaseDuration + consts.ConnectWorkerRequestGracePeriod):
+					c.pendingAcks.Delete(data.RequestId)
+					msg.Result <- fmt.Errorf("worker did not ACK request %s", data.RequestId)
+					log.Warn("worker did not ACK request in time", "req_id", data.RequestId)
+				}
+			}()
 		}
 	}
 }

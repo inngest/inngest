@@ -444,7 +444,10 @@ func (c *connectGatewaySvc) Run(ctx context.Context) error {
 		c.connectionCount.Wait()
 
 		c.logger.Info("shutting down gateway api")
-		_ = server.Shutdown(ctx)
+		_ = server.Shutdown(context.Background())
+
+		c.logger.Info("shutting down gateway grpc server")
+		c.grpcServer.GracefulStop()
 	}()
 
 	eg := errgroup.Group{}
