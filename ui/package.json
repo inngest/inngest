@@ -11,7 +11,7 @@
     "@ianvs/prettier-plugin-sort-imports": "4.7.1",
     "eslint": "9.39.0",
     "husky": "9.1.7",
-    "lint-staged": "15.5.0",
+    "lint-staged": "16.4.0",
     "postcss-nesting": "14.0.0",
     "prettier": "3.8.1",
     "prettier-plugin-tailwindcss": "0.2.7"
