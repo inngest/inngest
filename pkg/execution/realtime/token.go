@@ -70,11 +70,29 @@ func TopicsFromJWT(ctx context.Context, secret []byte, token string) ([]Topic, e
 	return claims.Topics, nil
 }
 
+type NewJWTOpts struct {
+	Expiry *time.Duration
+}
+
 // NewJWT returns a new JWT used to subscribe to topics as an unauthenticated user.
 //
 // JWTs are made using a pre-shared key, and can then be passed to the frontend to
 // subscribe to the JWT's encoded topics.
-func NewJWT(ctx context.Context, secret []byte, accountID, envID uuid.UUID, topics []Topic) (string, error) {
+func NewJWT(
+	ctx context.Context,
+	secret []byte,
+	accountID,
+	envID uuid.UUID,
+	topics []Topic,
+	opts ...NewJWTOpts,
+) (string, error) {
+	expiry := DefaultExpiry
+	for _, opt := range opts {
+		if opt.Expiry != nil {
+			expiry = *opt.Expiry
+		}
+	}
+
 	now := time.Now()
 
 	id, err := ulid.New(ulid.Now(), rand.Reader)
@@ -85,7 +103,7 @@ func NewJWT(ctx context.Context, secret []byte, accountID, envID uuid.UUID, topi
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    Issuer,
 			Subject:   accountID.String(),
-			ExpiresAt: jwt.NewNumericDate(now.Add(DefaultExpiry)),
+			ExpiresAt: jwt.NewNumericDate(now.Add(expiry)),
 			IssuedAt:  jwt.NewNumericDate(now),
 			ID:        id.String(),
 		},

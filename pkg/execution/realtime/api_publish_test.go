@@ -3,6 +3,7 @@ package realtime
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/api/apiv1/apiv1auth"
 	"github.com/inngest/inngest/pkg/execution/realtime/streamingtypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -18,7 +20,7 @@ import (
 
 func TestAPI_PostPublishTee(t *testing.T) {
 	t.Run("successfully forwards raw data to subscribers", func(t *testing.T) {
-		broadcaster := NewInProcessBroadcaster()
+		broadcaster := newTestBroadcaster(t)
 		server := httptest.NewServer(NewAPI(APIOpts{
 			JWTSecret:   []byte("test-secret"),
 			Broadcaster: broadcaster,
@@ -42,7 +44,7 @@ func TestAPI_PostPublishTee(t *testing.T) {
 		topic := Topic{
 			Kind:    streamingtypes.TopicKindRun,
 			Channel: channel,
-			Name:    "test-topic",
+			Name:    streamingtypes.TopicNameStream,
 			EnvID:   uuid.New(),
 		}
 
@@ -50,7 +52,6 @@ func TestAPI_PostPublishTee(t *testing.T) {
 		require.NoError(t, err)
 
 		// Give time for subscription to be established
-		time.Sleep(20 * time.Millisecond)
 
 		// Create JWT with publish permissions
 		accountID := uuid.New()
@@ -90,7 +91,7 @@ func TestAPI_PostPublishTee(t *testing.T) {
 	})
 
 	t.Run("handles large data correctly", func(t *testing.T) {
-		broadcaster := NewInProcessBroadcaster()
+		broadcaster := newTestBroadcaster(t)
 		server := httptest.NewServer(NewAPI(APIOpts{
 			JWTSecret:   []byte("test-secret"),
 			Broadcaster: broadcaster,
@@ -111,14 +112,12 @@ func TestAPI_PostPublishTee(t *testing.T) {
 		topic := Topic{
 			Kind:    streamingtypes.TopicKindRun,
 			Channel: channel,
-			Name:    "test-topic",
+			Name:    streamingtypes.TopicNameStream,
 			EnvID:   uuid.New(),
 		}
 
 		err := broadcaster.Subscribe(context.Background(), testSub, []Topic{topic})
 		require.NoError(t, err)
-
-		time.Sleep(20 * time.Millisecond)
 
 		// Create JWT with publish permissions
 		accountID := uuid.New()
@@ -162,7 +161,7 @@ func TestAPI_PostPublishTee(t *testing.T) {
 	})
 
 	t.Run("handles multiple subscribers correctly", func(t *testing.T) {
-		broadcaster := NewInProcessBroadcaster()
+		broadcaster := newTestBroadcaster(t)
 		server := httptest.NewServer(NewAPI(APIOpts{
 			JWTSecret:   []byte("test-secret"),
 			Broadcaster: broadcaster,
@@ -192,7 +191,7 @@ func TestAPI_PostPublishTee(t *testing.T) {
 		topic := Topic{
 			Kind:    streamingtypes.TopicKindRun,
 			Channel: channel,
-			Name:    "test-topic",
+			Name:    streamingtypes.TopicNameStream,
 			EnvID:   uuid.New(),
 		}
 
@@ -201,8 +200,6 @@ func TestAPI_PostPublishTee(t *testing.T) {
 		require.NoError(t, err)
 		err = broadcaster.Subscribe(context.Background(), sub2, []Topic{topic})
 		require.NoError(t, err)
-
-		time.Sleep(20 * time.Millisecond)
 
 		// Create JWT
 		accountID := uuid.New()
@@ -244,7 +241,10 @@ func TestAPI_PostPublishTee(t *testing.T) {
 	t.Run("unauthorized request fails", func(t *testing.T) {
 		server := httptest.NewServer(NewAPI(APIOpts{
 			JWTSecret:   []byte("test-secret"),
-			Broadcaster: NewInProcessBroadcaster(),
+			Broadcaster: newTestBroadcaster(t),
+			AuthFinder: apiv1auth.AuthFinder(func(ctx context.Context) (apiv1auth.V1Auth, error) {
+				return nil, fmt.Errorf("not authenticated")
+			}),
 		}))
 		defer server.Close()
 
@@ -262,7 +262,7 @@ func TestAPI_PostPublishTee(t *testing.T) {
 	})
 
 	t.Run("missing channel parameter fails", func(t *testing.T) {
-		broadcaster := NewInProcessBroadcaster()
+		broadcaster := newTestBroadcaster(t)
 		server := httptest.NewServer(NewAPI(APIOpts{
 			JWTSecret:   []byte("test-secret"),
 			Broadcaster: broadcaster,
@@ -291,7 +291,10 @@ func TestAPI_PostPublishTee(t *testing.T) {
 	t.Run("invalid JWT fails", func(t *testing.T) {
 		server := httptest.NewServer(NewAPI(APIOpts{
 			JWTSecret:   []byte("test-secret"),
-			Broadcaster: NewInProcessBroadcaster(),
+			Broadcaster: newTestBroadcaster(t),
+			AuthFinder: apiv1auth.AuthFinder(func(ctx context.Context) (apiv1auth.V1Auth, error) {
+				return nil, fmt.Errorf("not authenticated")
+			}),
 		}))
 		defer server.Close()
 
@@ -309,7 +312,7 @@ func TestAPI_PostPublishTee(t *testing.T) {
 	})
 
 	t.Run("streaming data works correctly", func(t *testing.T) {
-		broadcaster := NewInProcessBroadcaster()
+		broadcaster := newTestBroadcaster(t)
 		server := httptest.NewServer(NewAPI(APIOpts{
 			JWTSecret:   []byte("test-secret"),
 			Broadcaster: broadcaster,
@@ -330,14 +333,12 @@ func TestAPI_PostPublishTee(t *testing.T) {
 		topic := Topic{
 			Kind:    streamingtypes.TopicKindRun,
 			Channel: channel,
-			Name:    "test-topic",
+			Name:    streamingtypes.TopicNameStream,
 			EnvID:   uuid.New(),
 		}
 
 		err := broadcaster.Subscribe(context.Background(), testSub, []Topic{topic})
 		require.NoError(t, err)
-
-		time.Sleep(20 * time.Millisecond)
 
 		// Create JWT
 		accountID := uuid.New()
@@ -373,4 +374,141 @@ func TestAPI_PostPublishTee(t *testing.T) {
 		assert.Equal(t, []byte(streamingData), receivedData[0])
 		mu.Unlock()
 	})
+
+	t.Run("signing key auth fallback publishes to correct env", func(t *testing.T) {
+		r := require.New(t)
+		broadcaster := newTestBroadcaster(t)
+
+		expectedEnvID := uuid.New()
+		expectedAccountID := uuid.New()
+
+		server := httptest.NewServer(NewAPI(APIOpts{
+			JWTSecret:   []byte("test-secret"),
+			Broadcaster: broadcaster,
+			AuthFinder: apiv1auth.AuthFinder(func(ctx context.Context) (apiv1auth.V1Auth, error) {
+				return &mockAuth{accountID: expectedAccountID, workspaceID: expectedEnvID}, nil
+			}),
+		}))
+		defer server.Close()
+
+		var mu sync.Mutex
+		receivedData := [][]byte{}
+
+		testSub := NewInmemorySubscription(uuid.New(), func(data []byte) error {
+			mu.Lock()
+			receivedData = append(receivedData, append([]byte(nil), data...))
+			mu.Unlock()
+			return nil
+		})
+
+		channel := "signing-key-channel"
+		topic := Topic{
+			Kind:    streamingtypes.TopicKindRun,
+			Channel: channel,
+			Name:    streamingtypes.TopicNameStream,
+			EnvID:   expectedEnvID,
+		}
+
+		r.NoError(broadcaster.Subscribe(context.Background(), testSub, []Topic{topic}))
+
+		testData := []byte("Data via signing key auth")
+
+		// Send request with NO JWT header — should fall back to AuthFinder.
+		req, err := http.NewRequest("POST", server.URL+"/realtime/publish/tee?channel="+channel, bytes.NewReader(testData))
+		r.NoError(err)
+
+		client := &http.Client{Timeout: 5 * time.Second}
+		resp, err := client.Do(req)
+		r.NoError(err)
+		defer resp.Body.Close()
+
+		r.Equal(200, resp.StatusCode)
+
+		r.EventuallyWithT(func(t *assert.CollectT) {
+			mu.Lock()
+			defer mu.Unlock()
+			require.Len(t, receivedData, 1)
+		}, 2*time.Second, 50*time.Millisecond)
+
+		mu.Lock()
+		r.Equal(testData, receivedData[0])
+		mu.Unlock()
+	})
+
+	t.Run("body exceeding size limit is rejected", func(t *testing.T) {
+		r := require.New(t)
+		broadcaster := newTestBroadcaster(t)
+		server := httptest.NewServer(NewAPI(APIOpts{
+			JWTSecret:   []byte("test-secret"),
+			Broadcaster: broadcaster,
+		}))
+		defer server.Close()
+
+		accountID := uuid.New()
+		envID := uuid.New()
+		jwt, err := NewPublishJWT(context.Background(), []byte("test-secret"), accountID, envID)
+		r.NoError(err)
+
+		// Create a body that exceeds MaxStreamingChunks * StreamingChunkSize (1000 * 1024 = ~1MB).
+		oversizedData := bytes.Repeat([]byte("X"), 1000*1024+1)
+
+		req, err := http.NewRequest("POST", server.URL+"/realtime/publish/tee?channel=test-channel", bytes.NewReader(oversizedData))
+		r.NoError(err)
+		req.Header.Set("Authorization", "Bearer "+jwt)
+
+		client := &http.Client{Timeout: 10 * time.Second}
+		resp, err := client.Do(req)
+		r.NoError(err)
+		defer resp.Body.Close()
+
+		// MaxBytesReader causes a 413 or the handler logs the error.
+		// The key assertion: the response should NOT be 200.
+		r.NotEqual(200, resp.StatusCode)
+	})
+
+	t.Run("valid JWT without publish claim is rejected", func(t *testing.T) {
+		r := require.New(t)
+		broadcaster := newTestBroadcaster(t)
+		server := httptest.NewServer(NewAPI(APIOpts{
+			JWTSecret:   []byte("test-secret"),
+			Broadcaster: broadcaster,
+		}))
+		defer server.Close()
+
+		// Create a subscribe-only JWT (no publish claim).
+		accountID := uuid.New()
+		envID := uuid.New()
+		subscribeJWT, err := NewJWT(
+			context.Background(),
+			[]byte("test-secret"),
+			accountID,
+			envID,
+			[]Topic{{
+				Kind:    streamingtypes.TopicKindRun,
+				Channel: "test-channel",
+				Name:    streamingtypes.TopicNameStream,
+				EnvID:   envID,
+			}},
+		)
+		r.NoError(err)
+
+		req, err := http.NewRequest("POST", server.URL+"/realtime/publish/tee?channel=test-channel", bytes.NewReader([]byte("data")))
+		r.NoError(err)
+		req.Header.Set("Authorization", "Bearer "+subscribeJWT)
+
+		client := &http.Client{Timeout: 5 * time.Second}
+		resp, err := client.Do(req)
+		r.NoError(err)
+		defer resp.Body.Close()
+
+		r.Equal(401, resp.StatusCode)
+	})
 }
+
+type mockAuth struct {
+	accountID   uuid.UUID
+	workspaceID uuid.UUID
+}
+
+func (m *mockAuth) AccountID() uuid.UUID   { return m.accountID }
+func (m *mockAuth) WorkspaceID() uuid.UUID { return m.workspaceID }

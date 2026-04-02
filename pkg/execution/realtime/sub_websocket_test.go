@@ -23,7 +23,7 @@ import (
 func TestWebsocketMessage(t *testing.T) {
 	ctx := context.Background()
 
-	b := NewInProcessBroadcaster()
+	b := newTestBroadcaster(t)
 	s := httptest.NewServer(NewAPI(APIOpts{
 		JWTSecret:   []byte("foo"),
 		Broadcaster: b,
@@ -55,7 +55,7 @@ func TestWebsocketMessage(t *testing.T) {
 }
 
 func TestWebsocketPostRealtimeMessage(t *testing.T) {
-	b := NewInProcessBroadcaster()
+	b := newTestBroadcaster(t)
 	s := httptest.NewServer(NewAPI(APIOpts{
 		JWTSecret:   []byte("foo"),
 		Broadcaster: b,
@@ -84,7 +84,7 @@ func TestWebsocketPostRealtimeMessage(t *testing.T) {
 }
 
 func TestWebsocketPostStreamingMessage(t *testing.T) {
-	b := NewInProcessBroadcaster()
+	b := newTestBroadcaster(t)
 	s := httptest.NewServer(NewAPI(APIOpts{
 		JWTSecret:   []byte("foo"),
 		Broadcaster: b,
@@ -152,12 +152,12 @@ func TestWebsocketPostStreamingMessage(t *testing.T) {
 		err = json.Unmarshal(contents[2], &end)
 		require.NoError(t, err)
 
+		require.EqualValues(t, streamingtypes.MessageKindDataStreamStart, start.Kind)
+		require.EqualValues(t, streamingtypes.MessageKindDataStreamEnd, end.Kind)
+
 		var streamID string
 		err = json.Unmarshal(start.Data, &streamID)
 		require.NoError(t, err)
-
-		require.EqualValues(t, streamingtypes.MessageKindDataStreamStart, start.Kind)
-		require.EqualValues(t, streamingtypes.MessageKindDataStreamEnd, end.Kind)
 
 		byt, _ := json.Marshal(Chunk{
 			Kind:     string(streamingtypes.MessageKindDataStreamChunk),
