@@ -27,7 +27,9 @@ type Item[T any] struct {
 	expires    int64
 	size       int64
 	value      T
-	node       *Node[*Item[T]]
+	next       *Item[T]
+	prev       *Item[T]
+	inList     bool
 }
 
 func newItem[T any](key string, value T, expires int64, track bool) *Item[T] {
@@ -37,6 +39,7 @@ func newItem[T any](key string, value T, expires int64, track bool) *Item[T] {
 	if sized, ok := (interface{})(value).(Sized); ok {
 		size = sized.Size()
 	}
+
 	item := &Item[T]{
 		key:        key,
 		value:      value,
@@ -97,5 +100,9 @@ func (i *Item[T]) Extend(duration time.Duration) {
 // fmt.Sprintf expression could cause fields of the Item to be read in a non-thread-safe
 // way.
 func (i *Item[T]) String() string {
-	return fmt.Sprintf("Item(%v)", i.value)
+	group := i.group
+	if group == "" {
+		return fmt.Sprintf("Item(%s:%v)", i.key, i.value)
+	}
+	return fmt.Sprintf("Item(%s:%s:%v)", group, i.key, i.value)
 }

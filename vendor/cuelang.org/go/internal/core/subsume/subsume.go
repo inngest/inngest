@@ -17,7 +17,6 @@ package subsume
 
 import (
 	"cuelang.org/go/cue/errors"
-	"cuelang.org/go/internal"
 	"cuelang.org/go/internal/core/adt"
 )
 
@@ -84,12 +83,6 @@ func (p *Profile) Value(ctx *adt.OpContext, a, b adt.Value) errors.Error {
 	return nil // ignore errors here even if there are some.
 }
 
-// Check reports whether b is an instance of a.
-func (p *Profile) Check(ctx *adt.OpContext, a, b adt.Value) bool {
-	s := subsumer{ctx: ctx, Profile: *p}
-	return s.values(a, b)
-}
-
 func isBottom(x adt.Node) bool {
 	b, _ := x.(*adt.Bottom)
 	return b != nil
@@ -120,6 +113,8 @@ func unifyValue(c *adt.OpContext, a, b adt.Value) adt.Value {
 	return x
 }
 
+var ErrInexact = errors.New("inexact subsumption")
+
 func (s *subsumer) getError() (err errors.Error) {
 	c := s.ctx
 	// src := binSrc(token.NoPos, opUnify, gt, lt)
@@ -138,7 +133,7 @@ func (s *subsumer) getError() (err errors.Error) {
 	}
 	err = s.errs
 	if s.inexact {
-		err = internal.DecorateError(internal.ErrInexact, err)
+		err = errors.Wrap(err, ErrInexact)
 	}
 	return err
 }

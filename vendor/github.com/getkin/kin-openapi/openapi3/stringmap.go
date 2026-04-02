@@ -3,11 +3,11 @@ package openapi3
 import "encoding/json"
 
 // StringMap is a map[string]string that ignores the origin in the underlying json representation.
-type StringMap map[string]string
+type StringMap[V any] map[string]V
 
 // UnmarshalJSON sets StringMap to a copy of data.
-func (stringMap *StringMap) UnmarshalJSON(data []byte) (err error) {
-	*stringMap, _, err = unmarshalStringMap[string](data)
+func (stringMap *StringMap[V]) UnmarshalJSON(data []byte) (err error) {
+	*stringMap, _, err = unmarshalStringMap[V](data)
 	return
 }
 

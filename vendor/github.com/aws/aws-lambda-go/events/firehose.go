@@ -5,8 +5,8 @@ package events
 // KinesisFirehoseEvent represents the input event from Amazon Kinesis Firehose. It is used as the input parameter.
 type KinesisFirehoseEvent struct {
 	InvocationID           string                       `json:"invocationId"`
-	DeliveryStreamArn      string                       `json:"deliveryStreamArn"`      //nolint: stylecheck
-	SourceKinesisStreamArn string                       `json:"sourceKinesisStreamArn"` //nolint: stylecheck
+	DeliveryStreamArn      string                       `json:"deliveryStreamArn"`      //nolint: staticcheck
+	SourceKinesisStreamArn string                       `json:"sourceKinesisStreamArn"` //nolint: staticcheck
 	Region                 string                       `json:"region"`
 	Records                []KinesisFirehoseEventRecord `json:"records"`
 }
@@ -25,6 +25,15 @@ const (
 	KinesisFirehoseTransformedStateProcessingFailed = "ProcessingFailed"
 )
 
+// KinesisFirehoseOTFOperation represents the operation to apply on the record during on-the-fly record routing.
+type KinesisFirehoseOTFOperation string
+
+const (
+	KinesisFirehoseOTFOperationInsert KinesisFirehoseOTFOperation = "insert"
+	KinesisFirehoseOTFOperationUpdate KinesisFirehoseOTFOperation = "update"
+	KinesisFirehoseOTFOperationDelete KinesisFirehoseOTFOperation = "delete"
+)
+
 type KinesisFirehoseResponse struct {
 	Records []KinesisFirehoseResponseRecord `json:"records"`
 }
@@ -37,7 +46,14 @@ type KinesisFirehoseResponseRecord struct {
 }
 
 type KinesisFirehoseResponseRecordMetadata struct {
-	PartitionKeys map[string]string `json:"partitionKeys"`
+	PartitionKeys map[string]string                        `json:"partitionKeys"`
+	OTFMetadata   KinesisFirehoseResponseRecordOTFMetadata `json:"otfMetadata"`
+}
+
+type KinesisFirehoseResponseRecordOTFMetadata struct {
+	DestinationDatabaseName string                      `json:"destinationDatabaseName"`
+	DestinationTableName    string                      `json:"destinationTableName"`
+	Operation               KinesisFirehoseOTFOperation `json:"operation"` // The Operation field must have one of the following values – insert, update, or delete.
 }
 
 type KinesisFirehoseRecordMetadata struct {

@@ -1,4 +1,4 @@
-// Copyright 2021-2024 The Connect Authors
+// Copyright 2021-2025 The Connect Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,10 +20,18 @@ import (
 	"net/http"
 )
 
+var (
+	// errNoStreamInitialized signals that a no stream has been initialized when
+	// attempting to access stream-related methods.
+	errNoStreamInitialized = errors.New("no stream initialized")
+)
+
 // ClientStreamForClient is the client's view of a client streaming RPC.
 //
 // It's returned from [Client].CallClientStream, but doesn't currently have an
 // exported constructor function.
+//
+// When using this stream, request headers should be set via the [ClientStreamForClient.RequestHeader] method.
 type ClientStreamForClient[Req, Res any] struct {
 	conn        StreamingClientConn
 	initializer maybeInitializer
@@ -91,6 +99,61 @@ func (c *ClientStreamForClient[Req, Res]) CloseAndReceive() (*Response[Res], err
 // you'd prefer to wrap the connection in a different high-level API.
 func (c *ClientStreamForClient[Req, Res]) Conn() (StreamingClientConn, error) {
 	return c.conn, c.err
+}
+
+// ClientStreamForClientSimple is the client's view of a client streaming RPC.
+//
+// It's returned from [Client.CallClientStreamSimple], but doesn't currently have an
+// exported constructor function.
+//
+// Usage of this stream requires that request headers be set in a [CallInfo] object in context via [NewClientContext].
+// In addition, the response returned by [ClientStreamForClientSimple.CloseAndReceive] is the response type defined for
+// the stream and _not_ a Connect [Response] wrapper type. As a result, response headers/trailers should be read from
+// the [CallInfo] object in context.
+type ClientStreamForClientSimple[Req, Res any] struct {
+	stream *ClientStreamForClient[Req, Res]
+}
+
+// Spec returns the specification for the RPC.
+func (c *ClientStreamForClientSimple[_, _]) Spec() Spec {
+	if c.stream == nil {
+		return Spec{}
+	}
+	return c.stream.Spec()
+}
+
+// Peer describes the server for the RPC.
+func (c *ClientStreamForClientSimple[_, _]) Peer() Peer {
+	if c.stream == nil {
+		return Peer{}
+	}
+	return c.stream.Peer()
+}
+
+// Send a message to the server. The first call to Send also sends the request
+// headers.
+//
+// If the server returns an error, Send returns an error that wraps [io.EOF].
+// Clients should check for case using the standard library's [errors.Is] and
+// unmarshal the error using CloseAndReceive.
+func (c *ClientStreamForClientSimple[Req, Res]) Send(request *Req) error {
+	if c.stream == nil {
+		return errNoStreamInitialized
+	}
+	return c.stream.Send(request)
+}
+
+// CloseAndReceive closes the send side of the stream and waits for the
+// response.
+func (c *ClientStreamForClientSimple[Req, Res]) CloseAndReceive() (*Res, error) {
+	if c.stream == nil {
+		return nil, errNoStreamInitialized
+	}
+	res, err := c.stream.CloseAndReceive()
+	if err != nil {
+		return nil, err
+	}
+	return res.Msg, nil
 }
 
 // ServerStreamForClient is the client's view of a server streaming RPC.
@@ -163,6 +226,10 @@ func (s *ServerStreamForClient[Res]) ResponseTrailer() http.Header {
 }
 
 // Close the receive side of the stream.
+//
+// Close is non-blocking. To gracefully close the stream and allow for
+// connection resuse ensure all messages have been received before calling
+// Close. All messages are received when Receive returns false.
 func (s *ServerStreamForClient[Res]) Close() error {
 	if s.constructErr != nil {
 		return s.constructErr
@@ -251,6 +318,11 @@ func (b *BidiStreamForClient[Req, Res]) Receive() (*Res, error) {
 }
 
 // CloseResponse closes the receive side of the stream.
+//
+// CloseResponse is non-blocking. To gracefully close the stream and allow for
+// connection resuse ensure all messages have been received before calling
+// CloseResponse. All messages are received when Receive returns an error
+// wrapping [io.EOF].
 func (b *BidiStreamForClient[Req, Res]) CloseResponse() error {
 	if b.err != nil {
 		return b.err
@@ -280,4 +352,90 @@ func (b *BidiStreamForClient[Req, Res]) ResponseTrailer() http.Header {
 // you'd prefer to wrap the connection in a different high-level API.
 func (b *BidiStreamForClient[Req, Res]) Conn() (StreamingClientConn, error) {
 	return b.conn, b.err
+}
+
+// BidiStreamForClientSimple is the client's view of a bidirectional streaming RPC.
+//
+// It's returned from [Client].CallBidiStream, but doesn't currently have an
+// exported constructor function.
+type BidiStreamForClientSimple[Req, Res any] struct {
+	stream *BidiStreamForClient[Req, Res]
+}
+
+// Spec returns the specification for the RPC.
+func (b *BidiStreamForClientSimple[_, _]) Spec() Spec {
+	if b.stream == nil {
+		return Spec{}
+	}
+	return b.stream.Spec()
+}
+
+// Peer describes the server for the RPC.
+func (b *BidiStreamForClientSimple[_, _]) Peer() Peer {
+	if b.stream == nil {
+		return Peer{}
+	}
+	return b.stream.Peer()
+}
+
+// Send a message to the server. The first call to Send also sends the request
+// headers. To send just the request headers, without a body, call Send with a
+// nil pointer.
+//
+// If the server returns an error, Send returns an error that wraps [io.EOF].
+// Clients should check for EOF using the standard library's [errors.Is] and
+// call Receive to retrieve the error.
+func (b *BidiStreamForClientSimple[Req, Res]) Send(msg *Req) error {
+	if b.stream == nil {
+		return errNoStreamInitialized
+	}
+	return b.stream.Send(msg)
+}
+
+// CloseRequest closes the send side of the stream.
+func (b *BidiStreamForClientSimple[Req, Res]) CloseRequest() error {
+	if b.stream == nil {
+		return errNoStreamInitialized
+	}
+	return b.stream.CloseRequest()
+}
+
+// Receive a message. When the server is done sending messages and no other
+// errors have occurred, Receive will return an error that wraps [io.EOF].
+func (b *BidiStreamForClientSimple[Req, Res]) Receive() (*Res, error) {
+	if b.stream == nil {
+		return nil, errNoStreamInitialized
+	}
+	return b.stream.Receive()
+}
+
+// CloseResponse closes the receive side of the stream.
+//
+// CloseResponse is non-blocking. To gracefully close the stream and allow for
+// connection resuse ensure all messages have been received before calling
+// CloseResponse. All messages are received when Receive returns an error
+// wrapping [io.EOF].
+func (b *BidiStreamForClientSimple[Req, Res]) CloseResponse() error {
+	if b.stream == nil {
+		return errNoStreamInitialized
+	}
+	return b.stream.CloseResponse()
+}
+
+// ResponseHeader returns the headers received from the server. It blocks until
+// the first call to Receive returns.
+func (b *BidiStreamForClientSimple[Req, Res]) ResponseHeader() http.Header {
+	if b.stream == nil {
+		return make(http.Header)
+	}
+	return b.stream.ResponseHeader()
+}
+
+// ResponseTrailer returns the trailers received from the server. Trailers
+// aren't fully populated until Receive() returns an error wrapping [io.EOF].
+func (b *BidiStreamForClientSimple[Req, Res]) ResponseTrailer() http.Header {
+	if b.stream == nil {
+		return make(http.Header)
+	}
+	return b.stream.ResponseTrailer()
 }

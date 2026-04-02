@@ -99,7 +99,7 @@ func (seg *segment) set(key, value []byte, hashVal uint64, expireSeconds int) (e
 		hdr.expireAt = expireAt
 		hdr.valLen = uint32(len(value))
 		if hdr.valCap >= hdr.valLen {
-			//in place overwrite
+			// in place overwrite
 			atomic.AddInt64(&seg.totalTime, int64(hdr.accessTime)-int64(originAccessTime))
 			seg.rb.WriteAt(hdrBuf[:], matchedPtr.offset)
 			seg.rb.WriteAt(value, matchedPtr.offset+ENTRY_HDR_SIZE+int64(hdr.keyLen))
@@ -186,7 +186,7 @@ func (seg *segment) touch(key []byte, hashVal uint64, expireSeconds int) (err er
 	originAccessTime := hdr.accessTime
 	hdr.accessTime = now
 	hdr.expireAt = expireAt
-	//in place overwrite
+	// in place overwrite
 	atomic.AddInt64(&seg.totalTime, int64(hdr.accessTime)-int64(originAccessTime))
 	seg.rb.WriteAt(hdrBuf[:], matchedPtr.offset)
 	atomic.AddInt64(&seg.touched, 1)
@@ -236,7 +236,7 @@ func (seg *segment) evacuate(entryLen int64, slotId uint8, now uint32) (slotModi
 }
 
 func (seg *segment) get(key, buf []byte, hashVal uint64, peek bool) (value []byte, expireAt uint32, err error) {
-	hdr, ptr, err := seg.locate(key, hashVal, peek)
+	hdr, ptrOffset, err := seg.locate(key, hashVal, peek)
 	if err != nil {
 		return
 	}
@@ -247,7 +247,7 @@ func (seg *segment) get(key, buf []byte, hashVal uint64, peek bool) (value []byt
 		value = make([]byte, hdr.valLen)
 	}
 
-	seg.rb.ReadAt(value, ptr.offset+ENTRY_HDR_SIZE+int64(hdr.keyLen))
+	seg.rb.ReadAt(value, ptrOffset+ENTRY_HDR_SIZE+int64(hdr.keyLen))
 	if !peek {
 		atomic.AddInt64(&seg.hitCount, 1)
 	}
@@ -257,11 +257,11 @@ func (seg *segment) get(key, buf []byte, hashVal uint64, peek bool) (value []byt
 // view provides zero-copy access to the element's value, without copying to
 // an intermediate buffer.
 func (seg *segment) view(key []byte, fn func([]byte) error, hashVal uint64, peek bool) (err error) {
-	hdr, ptr, err := seg.locate(key, hashVal, peek)
+	hdr, ptrOffset, err := seg.locate(key, hashVal, peek)
 	if err != nil {
 		return
 	}
-	start := ptr.offset + ENTRY_HDR_SIZE + int64(hdr.keyLen)
+	start := ptrOffset + ENTRY_HDR_SIZE + int64(hdr.keyLen)
 	val, err := seg.rb.Slice(start, int64(hdr.valLen))
 	if err != nil {
 		return err
@@ -273,7 +273,7 @@ func (seg *segment) view(key []byte, fn func([]byte) error, hashVal uint64, peek
 	return
 }
 
-func (seg *segment) locate(key []byte, hashVal uint64, peek bool) (hdr *entryHdr, ptr *entryPtr, err error) {
+func (seg *segment) locate(key []byte, hashVal uint64, peek bool) (hdrEntry entryHdr, ptrOffset int64, err error) {
 	slotId := uint8(hashVal >> 8)
 	hash16 := uint16(hashVal >> 16)
 	slot := seg.getSlot(slotId)
@@ -285,11 +285,11 @@ func (seg *segment) locate(key []byte, hashVal uint64, peek bool) (hdr *entryHdr
 		}
 		return
 	}
-	ptr = &slot[idx]
+	ptr := &slot[idx]
 
 	var hdrBuf [ENTRY_HDR_SIZE]byte
 	seg.rb.ReadAt(hdrBuf[:], ptr.offset)
-	hdr = (*entryHdr)(unsafe.Pointer(&hdrBuf[0]))
+	hdr := (*entryHdr)(unsafe.Pointer(&hdrBuf[0]))
 	if !peek {
 		now := seg.timer.Now()
 		if isExpired(hdr.expireAt, now) {
@@ -303,7 +303,7 @@ func (seg *segment) locate(key []byte, hashVal uint64, peek bool) (hdr *entryHdr
 		hdr.accessTime = now
 		seg.rb.WriteAt(hdrBuf[:], ptr.offset)
 	}
-	return hdr, ptr, err
+	return *hdr, ptr.offset, nil
 }
 
 func (seg *segment) del(key []byte, hashVal uint64) (affected bool) {

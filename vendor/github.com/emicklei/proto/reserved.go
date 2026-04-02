@@ -53,7 +53,7 @@ func (r *Reserved) parse(p *Parser) error {
 		}
 		// first char that determined tok
 		ch := []rune(lit)[0]
-		if isDigit(ch) {
+		if isDigit(ch) || ch == '-' {
 			// use unread here because it could be start of ranges
 			p.nextPut(pos, tok, lit)
 			list, err := parseRanges(p, r)

@@ -98,7 +98,7 @@ func (c *Codec) Delete(ctx context.Context, key any) error {
 	return err
 }
 
-// Invalidate invalidates some cach items from given options
+// Invalidate invalidates some cache items from given options
 func (c *Codec) Invalidate(ctx context.Context, options ...store.InvalidateOption) error {
 	err := c.store.Invalidate(ctx, options...)
 

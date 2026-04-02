@@ -165,6 +165,8 @@ func validateValuesInLabels(labels Labels, expectedNumberOfValues int) error {
 
 func validateLabelValues(vals []string, expectedNumberOfValues int) error {
 	if len(vals) != expectedNumberOfValues {
+		// The call below makes vals escape, copy them to avoid that.
+		vals := append([]string(nil), vals...)
 		return fmt.Errorf(
 			"%w: expected %d label values but got %d in %#v",
 			errInconsistentCardinality, expectedNumberOfValues,
@@ -182,5 +184,6 @@ func validateLabelValues(vals []string, expectedNumberOfValues int) error {
 }
 
 func checkLabelName(l string) bool {
-	return model.LabelName(l).IsValid() && !strings.HasPrefix(l, reservedLabelPrefix)
+	//nolint:staticcheck // TODO: Don't use deprecated model.NameValidationScheme.
+	return model.NameValidationScheme.IsValidLabelName(l) && !strings.HasPrefix(l, reservedLabelPrefix)
 }

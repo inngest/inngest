@@ -20,6 +20,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"text/scanner"
@@ -47,7 +48,7 @@ func (s *Extractor) parse(filename string, src interface{}) (p *protoConverter, 
 		s.fileCache[filename] = result{p, err}
 	}()
 
-	b, err := source.Read(filename, src)
+	b, err := source.ReadAll(filename, src)
 	if err != nil {
 		return nil, err
 	}
@@ -61,7 +62,7 @@ func (s *Extractor) parse(filename string, src interface{}) (p *protoConverter, 
 		return nil, errors.Newf(token.NoPos, "protobuf: %v", err)
 	}
 
-	tfile := token.NewFile(filename, 0, len(b))
+	tfile := token.NewFile(filename, -1, len(b))
 	tfile.SetLinesForContent(b)
 
 	p = &protoConverter{
@@ -260,8 +261,8 @@ func (p *protoConverter) resolve(pos scanner.Position, name string, options []*p
 	if strings.HasPrefix(name, ".") {
 		return p.resolveTopScope(pos, name[1:], options)
 	}
-	for i := len(p.scope) - 1; i > 0; i-- {
-		if m, ok := p.scope[i][name]; ok {
+	for _, scope := range slices.Backward(p.scope) {
+		if m, ok := scope[name]; ok {
 			return m.cue()
 		}
 	}
@@ -276,7 +277,11 @@ func (p *protoConverter) resolveTopScope(pos scanner.Position, name string, opti
 		if k == -1 {
 			i = len(name)
 		}
-		if m, ok := p.scope[0][name[:i]]; ok {
+		curName := name[:i]
+		if local, ok := strings.CutPrefix(curName, p.protoPkg+"."); ok {
+			curName = local
+		}
+		if m, ok := p.scope[0][curName]; ok {
 			if m.pkg != nil {
 				p.imported[m.pkg.qualifiedImportPath()] = true
 			}
@@ -297,7 +302,7 @@ func (p *protoConverter) resolveTopScope(pos scanner.Position, name string, opti
 }
 
 func (p *protoConverter) doImport(v *proto.Import) error {
-	if v.Filename == "cue/cue.proto" {
+	if p.mapBuiltinPackage(v.Filename) {
 		return nil
 	}
 
@@ -316,10 +321,6 @@ func (p *protoConverter) doImport(v *proto.Import) error {
 		err := errors.Newf(p.toCUEPos(v.Position), "could not find import %q", v.Filename)
 		p.state.addErr(err)
 		return err
-	}
-
-	if !p.mapBuiltinPackage(v.Position, v.Filename, filename == "") {
-		return nil
 	}
 
 	imp, err := p.state.parse(filename, nil)
@@ -528,7 +529,7 @@ func (p *protoConverter) messageField(s *ast.StructLit, i int, v proto.Visitee) 
 		p.addTag(f, o.tags)
 
 		if !o.required {
-			f.Optional = token.NoSpace.Pos()
+			f.Constraint = token.OPTION
 		}
 
 	case *proto.Enum:
@@ -561,17 +562,17 @@ func (p *protoConverter) messageField(s *ast.StructLit, i int, v proto.Visitee) 
 //
 // An enum will generate two top-level definitions:
 //
-//    Enum:
-//      "Value1" |
-//      "Value2" |
-//      "Value3"
+//	Enum:
+//	  "Value1" |
+//	  "Value2" |
+//	  "Value3"
 //
 // and
 //
-//    Enum_value: {
-//        "Value1": 0
-//        "Value2": 1
-//    }
+//	Enum_value: {
+//	    "Value1": 0
+//	    "Value2": 1
+//	}
 //
 // Enums are always defined at the top level. The name of a nested enum
 // will be prefixed with the name of its parent and an underscore.
@@ -705,7 +706,7 @@ func (p *protoConverter) oneOf(x *proto.Oneof) {
 	s := ast.NewStruct()
 	ast.SetRelPos(s, token.Newline)
 	embed := &ast.EmbedDecl{Expr: s}
-	embed.AddComment(comment(x.Comment, true))
+	ast.AddComment(embed, comment(x.Comment, true))
 
 	p.addDecl(embed)
 
@@ -721,7 +722,7 @@ func (p *protoConverter) oneOf(x *proto.Oneof) {
 		case *proto.OneOfField:
 			newStruct()
 			oneOf := p.parseField(s, 0, x.Field)
-			oneOf.Optional = token.NoPos
+			oneOf.Constraint = token.ILLEGAL
 
 		case *proto.Comment:
 			cg := comment(x, false)
@@ -760,7 +761,7 @@ func (p *protoConverter) parseField(s *ast.StructLit, i int, x *proto.Field) *as
 	p.addTag(f, o.tags)
 
 	if !o.required {
-		f.Optional = token.NoSpace.Pos()
+		f.Constraint = token.OPTION
 	}
 	return f
 }
@@ -794,9 +795,12 @@ func (p *optionParser) parse(options []*proto.Option) {
 			addComments(constraint, 1, o.Comment, o.InlineComment)
 			p.message.Elts = append(p.message.Elts, constraint)
 			if !p.required {
-				constraint.Optional = token.NoSpace.Pos()
+				constraint.Constraint = token.OPTION
 			}
-
+		case "(google.api.field_behavior)":
+			if o.Constant.Source == "REQUIRED" {
+				p.required = true
+			}
 		default:
 			// TODO: dropping comments. Maybe add dummy tag?
 

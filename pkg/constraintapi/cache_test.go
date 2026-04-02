@@ -1110,7 +1110,7 @@ func TestCache(t *testing.T) {
 					WithConstraintCacheClock(deps.clock),
 					WithConstraintCacheManager(deps.cm),
 					WithConstraintCacheMaxSize(3),
-					WithConstraintCacheItemsToPrune(1),
+					WithConstraintCacheItemsToPrune(33),
 					WithConstraintCacheEnable(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, minTTL, maxTTL time.Duration) {
 						return true, MinCacheTTL, MaxCacheTTL
 					}),

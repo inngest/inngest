@@ -19,7 +19,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
+	"io/fs"
 	"os"
 	"path/filepath"
 
@@ -29,17 +29,20 @@ import (
 	"cuelang.org/go/cue/errors"
 	"cuelang.org/go/cue/format"
 	"cuelang.org/go/cue/token"
+	"cuelang.org/go/encoding/jsonschema"
 	"cuelang.org/go/encoding/openapi"
 	"cuelang.org/go/encoding/protobuf/jsonpb"
 	"cuelang.org/go/encoding/protobuf/textproto"
+	"cuelang.org/go/encoding/toml"
+	"cuelang.org/go/encoding/yaml"
 	"cuelang.org/go/internal"
 	"cuelang.org/go/internal/filetypes"
-	"cuelang.org/go/pkg/encoding/yaml"
 )
 
 // An Encoder converts CUE to various file formats, including CUE itself.
 // An Encoder allows
 type Encoder struct {
+	ctx          *cue.Context
 	cfg          *Config
 	close        func() error
 	interpret    func(cue.Value) (*ast.File, error)
@@ -47,13 +50,12 @@ type Encoder struct {
 	encValue     func(cue.Value) error
 	autoSimplify bool
 	concrete     bool
-	instance     *cue.Instance
 }
 
 // IsConcrete reports whether the output is required to be concrete.
 //
 // INTERNAL ONLY: this is just to work around a problem related to issue #553
-// of catching errors ony after syntax generation, dropping line number
+// of catching errors only after syntax generation, dropping line number
 // information.
 func (e *Encoder) IsConcrete() bool {
 	return e.concrete
@@ -67,12 +69,10 @@ func (e Encoder) Close() error {
 }
 
 // NewEncoder writes content to the file with the given specification.
-func NewEncoder(f *build.File, cfg *Config) (*Encoder, error) {
-	w, close, err := writer(f, cfg)
-	if err != nil {
-		return nil, err
-	}
+func NewEncoder(ctx *cue.Context, f *build.File, cfg *Config) (*Encoder, error) {
+	w, close := writer(f, cfg)
 	e := &Encoder{
+		ctx:   ctx,
 		cfg:   cfg,
 		close: close,
 	}
@@ -83,24 +83,23 @@ func NewEncoder(f *build.File, cfg *Config) (*Encoder, error) {
 		// TODO: get encoding options
 		cfg := &openapi.Config{}
 		e.interpret = func(v cue.Value) (*ast.File, error) {
-			i := e.instance
-			if i == nil {
-				i = internal.MakeInstance(v).(*cue.Instance)
+			return openapi.Generate(v, cfg)
+		}
+	case build.JSONSchema:
+		// TODO: get encoding options
+		cfg := &jsonschema.GenerateConfig{}
+		e.interpret = func(v cue.Value) (*ast.File, error) {
+			expr, err := jsonschema.Generate(v, cfg)
+			if err != nil {
+				return nil, err
 			}
-			return openapi.Generate(i, cfg)
+			return internal.ToFile(expr, false), nil
 		}
 	case build.ProtobufJSON:
 		e.interpret = func(v cue.Value) (*ast.File, error) {
-			f := valueToFile(v)
+			f := internal.ToFile(v.Syntax(), false)
 			return f, jsonpb.NewEncoder(v).RewriteFile(f)
 		}
-
-	// case build.JSONSchema:
-	// 	// TODO: get encoding options
-	// 	cfg := openapi.Config{}
-	// 	i.interpret = func(inst *cue.Instance) (*ast.File, error) {
-	// 		return jsonschmea.Generate(inst, cfg)
-	// 	}
 	default:
 		return nil, fmt.Errorf("unsupported interpretation %q", f.Interpretation)
 	}
@@ -124,8 +123,8 @@ func NewEncoder(f *build.File, cfg *Config) (*Encoder, error) {
 			cue.Optional(fi.Optional),
 			cue.Concrete(!fi.Incomplete),
 			cue.Definitions(fi.Definitions),
-			cue.ResolveReferences(!fi.References),
 			cue.DisallowCycles(!fi.Cycles),
+			cue.InlineImports(cfg.InlineImports),
 		)
 
 		opts := []format.Option{}
@@ -148,7 +147,18 @@ func NewEncoder(f *build.File, cfg *Config) (*Encoder, error) {
 
 			// Casting an ast.Expr to an ast.File ensures that it always ends
 			// with a newline.
-			b, err := format.Node(internal.ToFile(n), opts...)
+			f := internal.ToFile(n, false)
+			if e.cfg.PkgName != "" && f.PackageName() == "" {
+				pkg := &ast.Package{
+					PackagePos: token.NoPos.WithRel(token.NewSection),
+					Name:       ast.NewIdent(e.cfg.PkgName),
+				}
+				doc, rest := internal.FileComments(f)
+				ast.SetComments(pkg, doc)
+				ast.SetComments(f, rest)
+				f.Decls = append([]ast.Decl{pkg}, f.Decls...)
+			}
+			b, err := format.Node(f, opts...)
 			if err != nil {
 				return err
 			}
@@ -176,19 +186,25 @@ func NewEncoder(f *build.File, cfg *Config) (*Encoder, error) {
 	case build.YAML:
 		e.concrete = true
 		streamed := false
+		// TODO(mvdan): use a NewEncoder API like in TOML below.
 		e.encValue = func(v cue.Value) error {
 			if streamed {
 				fmt.Fprintln(w, "---")
 			}
 			streamed = true
 
-			str, err := yaml.Marshal(v)
+			b, err := yaml.Encode(v)
 			if err != nil {
 				return err
 			}
-			_, err = fmt.Fprint(w, str)
+			_, err = w.Write(b)
 			return err
 		}
+
+	case build.TOML:
+		e.concrete = true
+		enc := toml.NewEncoder(w)
+		e.encValue = enc.Encode
 
 	case build.TextProto:
 		// TODO: verify that the schema is given. Otherwise err out.
@@ -238,79 +254,83 @@ func NewEncoder(f *build.File, cfg *Config) (*Encoder, error) {
 }
 
 func (e *Encoder) EncodeFile(f *ast.File) error {
-	e.autoSimplify = false
-	return e.encodeFile(f, e.interpret)
-}
-
-// EncodeInstance is as Encode, but stores instance information. This should
-// all be retrievable from the value itself.
-func (e *Encoder) EncodeInstance(v *cue.Instance) error {
-	e.instance = v
-	err := e.Encode(v.Value())
-	e.instance = nil
-	return err
+	if e.interpret == nil && e.encFile != nil {
+		// TODO it's not clear that it's actually desirable to turn
+		// off simplification in this case. This case generally arises
+		// when we're producing CUE code with `cue eval` and
+		// simplified results seem generally preferable.
+		e.autoSimplify = false
+		return e.encFile(f)
+	}
+	e.autoSimplify = true
+	return e.Encode(e.ctx.BuildFile(f))
 }
 
 func (e *Encoder) Encode(v cue.Value) error {
 	e.autoSimplify = true
-	if e.interpret != nil {
-		f, err := e.interpret(v)
-		if err != nil {
+	if e.interpret == nil {
+		if err := v.Validate(cue.Concrete(e.concrete)); err != nil {
 			return err
 		}
-		return e.encodeFile(f, nil)
-	}
-	if err := v.Validate(cue.Concrete(e.concrete)); err != nil {
-		return err
-	}
-	if e.encValue != nil {
 		return e.encValue(v)
 	}
-	return e.encFile(valueToFile(v))
-}
-
-func (e *Encoder) encodeFile(f *ast.File, interpret func(cue.Value) (*ast.File, error)) error {
-	if interpret == nil && e.encFile != nil {
-		return e.encFile(f)
+	if err := v.Validate(); err != nil {
+		return err
 	}
-	e.autoSimplify = true
-	var r cue.Runtime
-	inst, err := r.CompileFile(f)
+	f, err := e.interpret(v)
 	if err != nil {
 		return err
 	}
-	if interpret != nil {
-		return e.Encode(inst.Value())
+	if e.encFile != nil {
+		return e.encFile(f)
 	}
-	v := inst.Value()
+	v = e.ctx.BuildFile(f)
 	if err := v.Validate(cue.Concrete(e.concrete)); err != nil {
 		return err
 	}
 	return e.encValue(v)
 }
 
-func writer(f *build.File, cfg *Config) (_ io.Writer, close func() error, err error) {
+func writer(f *build.File, cfg *Config) (_ io.Writer, close func() error) {
 	if cfg.Out != nil {
-		return cfg.Out, nil, nil
+		return cfg.Out, nil
 	}
 	path := f.Filename
 	if path == "-" {
 		if cfg.Stdout == nil {
-			return os.Stdout, nil, nil
+			return os.Stdout, nil
 		}
-		return cfg.Stdout, nil, nil
+		return cfg.Stdout, nil
 	}
-	if !cfg.Force {
-		if _, err := os.Stat(path); err == nil {
-			return nil, nil, errors.Wrapf(os.ErrExist, token.NoPos,
-				"error writing %q", path)
-		}
-	}
-	// Delay opening the file until we can write it to completion. This will
-	// prevent clobbering the file in case of a crash.
+	// Delay opening the file until we can write it to completion.
+	// This prevents clobbering the file in case of a crash.
 	b := &bytes.Buffer{}
 	fn := func() error {
-		return ioutil.WriteFile(path, b.Bytes(), 0644)
+		mode := os.O_WRONLY | os.O_CREATE | os.O_EXCL
+		if cfg.Force {
+			// Swap O_EXCL for O_TRUNC to allow replacing an entire existing file.
+			mode = os.O_WRONLY | os.O_CREATE | os.O_TRUNC
+		}
+		f, err := os.OpenFile(path, mode, 0o666)
+		if errors.Is(err, fs.ErrExist) {
+			// If we failed because the file already existed,
+			// but the file in question is not regular, allow writing to it.
+			// This is done as a retry to avoid a Stat call before every OpenFile.
+			stat, err2 := os.Stat(path)
+			if err2 == nil && !stat.Mode().IsRegular() {
+				f, err = os.OpenFile(path, os.O_WRONLY, 0o666)
+			} else {
+				return errors.Wrapf(fs.ErrExist, token.NoPos, "error writing %q", path)
+			}
+		}
+		if err != nil {
+			return err
+		}
+		_, err = f.Write(b.Bytes())
+		if err1 := f.Close(); err1 != nil && err == nil {
+			err = err1
+		}
+		return err
 	}
-	return b, fn, nil
+	return b, fn
 }

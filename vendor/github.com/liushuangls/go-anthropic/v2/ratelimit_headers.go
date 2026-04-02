@@ -11,13 +11,19 @@ import (
 type rateLimitHeaderKey string
 
 const (
-	requestsLimit     rateLimitHeaderKey = "anthropic-ratelimit-requests-limit"
-	requestsRemaining rateLimitHeaderKey = "anthropic-ratelimit-requests-remaining"
-	requestsReset     rateLimitHeaderKey = "anthropic-ratelimit-requests-reset"
-	tokensLimit       rateLimitHeaderKey = "anthropic-ratelimit-tokens-limit"
-	tokensRemaining   rateLimitHeaderKey = "anthropic-ratelimit-tokens-remaining"
-	tokensReset       rateLimitHeaderKey = "anthropic-ratelimit-tokens-reset"
-	retryAfter        rateLimitHeaderKey = "retry-after"
+	requestsLimit         rateLimitHeaderKey = "anthropic-ratelimit-requests-limit"
+	requestsRemaining     rateLimitHeaderKey = "anthropic-ratelimit-requests-remaining"
+	requestsReset         rateLimitHeaderKey = "anthropic-ratelimit-requests-reset"
+	tokensLimit           rateLimitHeaderKey = "anthropic-ratelimit-tokens-limit"
+	tokensRemaining       rateLimitHeaderKey = "anthropic-ratelimit-tokens-remaining"
+	tokensReset           rateLimitHeaderKey = "anthropic-ratelimit-tokens-reset"
+	inputTokensLimit      rateLimitHeaderKey = "anthropic-ratelimit-input-tokens-limit"
+	inputTokensRemaining  rateLimitHeaderKey = "anthropic-ratelimit-input-tokens-remaining"
+	inputTokensReset      rateLimitHeaderKey = "anthropic-ratelimit-input-tokens-reset"
+	outputTokensLimit     rateLimitHeaderKey = "anthropic-ratelimit-output-tokens-limit"
+	outputTokensRemaining rateLimitHeaderKey = "anthropic-ratelimit-output-tokens-remaining"
+	outputTokensReset     rateLimitHeaderKey = "anthropic-ratelimit-output-tokens-reset"
+	retryAfter            rateLimitHeaderKey = "retry-after"
 )
 
 type RateLimitHeaders struct {
@@ -33,6 +39,18 @@ type RateLimitHeaders struct {
 	TokensRemaining int `json:"anthropic-ratelimit-tokens-remaining"`
 	// The time when the token rate limit window will reset, provided in RFC 3339 format.
 	TokensReset time.Time `json:"anthropic-ratelimit-tokens-reset"`
+	// The maximum number of input tokens allowed within any rate limit period.
+	InputTokensLimit int `json:"anthropic-ratelimit-input-tokens-limit"`
+	// The number of input tokens remaining (rounded to the nearest thousand) before being rate limited.
+	InputTokensRemaining int `json:"anthropic-ratelimit-input-tokens-remaining"`
+	// The time when the input token rate limit will be fully replenished, provided in RFC 3339 format.
+	InputTokensReset time.Time `json:"anthropic-ratelimit-input-tokens-reset"`
+	// The maximum number of output tokens allowed within any rate limit period.
+	OutputTokensLimit int `json:"anthropic-ratelimit-output-tokens-limit"`
+	// The number of output tokens remaining (rounded to the nearest thousand) before being rate limited.
+	OutputTokensRemaining int `json:"anthropic-ratelimit-output-tokens-remaining"`
+	// The time when the output token rate limit will be fully replenished, provided in RFC 3339 format.
+	OutputTokensReset time.Time `json:"anthropic-ratelimit-output-tokens-reset"`
 	// The number of seconds until the rate limit window resets.
 	RetryAfter int `json:"retry-after"`
 }
@@ -65,13 +83,22 @@ func newRateLimitHeaders(h http.Header) (RateLimitHeaders, error) {
 	}
 
 	headers := RateLimitHeaders{}
-	headers.RequestsLimit = parseIntHeader(requestsLimit, true)
-	headers.RequestsRemaining = parseIntHeader(requestsRemaining, true)
-	headers.RequestsReset = parseTimeHeader(requestsReset, true)
+
+	headers.RequestsLimit = parseIntHeader(requestsLimit, false)
+	headers.RequestsRemaining = parseIntHeader(requestsRemaining, false)
+	headers.RequestsReset = parseTimeHeader(requestsReset, false)
 
 	headers.TokensLimit = parseIntHeader(tokensLimit, true)
 	headers.TokensRemaining = parseIntHeader(tokensRemaining, true)
 	headers.TokensReset = parseTimeHeader(tokensReset, true)
+
+	headers.InputTokensLimit = parseIntHeader(inputTokensLimit, false)
+	headers.InputTokensRemaining = parseIntHeader(inputTokensRemaining, false)
+	headers.InputTokensReset = parseTimeHeader(inputTokensReset, false)
+
+	headers.OutputTokensLimit = parseIntHeader(outputTokensLimit, false)
+	headers.OutputTokensRemaining = parseIntHeader(outputTokensRemaining, false)
+	headers.OutputTokensReset = parseTimeHeader(outputTokensReset, false)
 
 	headers.RetryAfter = parseIntHeader(retryAfter, false) // optional
 

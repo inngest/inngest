@@ -1,4 +1,4 @@
-// Copyright 2021-2024 The Connect Authors
+// Copyright 2021-2025 The Connect Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,7 +17,6 @@ package connect
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -131,7 +130,7 @@ func (d *duplexHTTPCall) sendUnary(payload messagePayload) (int64, error) {
 	// Unary messages are sent as a single HTTP request. We don't need to use a
 	// pipe for the request body and we don't need to send headers separately.
 	if !d.requestSent.CompareAndSwap(false, true) {
-		return 0, fmt.Errorf("request already sent")
+		return 0, errors.New("request already sent")
 	}
 	payloadLength := int64(payload.Len())
 	if payloadLength > 0 {
@@ -141,7 +140,7 @@ func (d *duplexHTTPCall) sendUnary(payload messagePayload) (int64, error) {
 		d.request.ContentLength = payloadLength
 		d.request.GetBody = func() (io.ReadCloser, error) {
 			if !payloadBody.Rewind() {
-				return nil, fmt.Errorf("payload cannot be retried")
+				return nil, errors.New("payload cannot be retried")
 			}
 			return payloadBody, nil
 		}
@@ -169,6 +168,8 @@ func (d *duplexHTTPCall) CloseWrite() error {
 	// response to read from.
 	if d.requestSent.CompareAndSwap(false, true) {
 		go d.makeRequest()
+		// We never setup a request body, so it's effectively already closed.
+		// So nothing else to do.
 		return nil
 	}
 	// The user calls CloseWrite to indicate that they're done sending data. It's
@@ -238,13 +239,7 @@ func (d *duplexHTTPCall) CloseRead() error {
 	if d.response == nil {
 		return nil
 	}
-	_, err := discard(d.response.Body)
-	closeErr := d.response.Body.Close()
-	if err == nil ||
-		errors.Is(err, context.Canceled) ||
-		errors.Is(err, context.DeadlineExceeded) {
-		err = closeErr
-	}
+	err := d.response.Body.Close()
 	err = wrapIfContextDone(d.ctx, err)
 	return wrapIfRSTError(err)
 }
@@ -307,6 +302,11 @@ func (d *duplexHTTPCall) makeRequest() {
 	// pipe. Write's check for io.ErrClosedPipe and will convert this to io.EOF.
 	response, err := d.httpClient.Do(d.request) //nolint:bodyclose
 	if err != nil {
+		if errors.Is(err, io.EOF) {
+			// We use io.EOF as a sentinel in many places and don't want this
+			// transport error to be confused for those other situations.
+			err = io.ErrUnexpectedEOF
+		}
 		err = wrapIfContextError(err)
 		err = wrapIfLikelyH2CNotConfiguredError(d.request, err)
 		err = wrapIfLikelyWithGRPCNotUsedError(err)
@@ -363,12 +363,15 @@ var _ messagePayload = nopPayload{}
 func (nopPayload) Read([]byte) (int, error) {
 	return 0, io.EOF
 }
+
 func (nopPayload) WriteTo(io.Writer) (int64, error) {
 	return 0, nil
 }
+
 func (nopPayload) Seek(int64, int) (int64, error) {
 	return 0, nil
 }
+
 func (nopPayload) Len() int {
 	return 0
 }

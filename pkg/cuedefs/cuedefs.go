@@ -15,6 +15,7 @@ import (
 	"sync"
 
 	"cuelang.org/go/cue"
+	"cuelang.org/go/cue/cuecontext"
 	cueerrors "cuelang.org/go/cue/errors"
 	"cuelang.org/go/cue/load"
 )
@@ -47,7 +48,7 @@ func Unlock() {
 }
 
 // Prepare generates a cue instance for the configuration.
-func Prepare(input []byte) (*cue.Instance, error) {
+func Prepare(input []byte) (cue.Value, error) {
 	cfg := &load.Config{
 		Overlay:    map[string]load.Source{},
 		Dir:        string(filepath.Separator),
@@ -100,28 +101,28 @@ func Prepare(input []byte) (*cue.Instance, error) {
 		return nil
 	})
 	if err != nil {
-		return nil, err
+		return cue.Value{}, err
 	}
 
 	// Add the input.
 	builds := load.Instances([]string{"-"}, cfg)
 	if len(builds) != 1 {
-		return nil, fmt.Errorf("unexpected cue build instances generated: %d", len(builds))
+		return cue.Value{}, fmt.Errorf("unexpected cue build instances generated: %d", len(builds))
 	}
 
 	if builds[0].Err != nil {
 		buf := &bytes.Buffer{}
 		cueerrors.Print(buf, builds[0].Err, nil)
-		return nil, fmt.Errorf("error loading instance: %s", buf.String())
+		return cue.Value{}, fmt.Errorf("error loading instance: %s", buf.String())
 	}
 
-	r := &cue.Runtime{}
-	inst, err := r.Build(builds[0])
-	if err != nil {
+	ctx := cuecontext.New()
+	val := ctx.BuildInstance(builds[0])
+	if err := val.Err(); err != nil {
 		buf := &bytes.Buffer{}
 		cueerrors.Print(buf, err, nil)
-		return nil, fmt.Errorf("error building instance: %s", buf.String())
+		return cue.Value{}, fmt.Errorf("error building instance: %s", buf.String())
 	}
 
-	return inst, nil
+	return val, nil
 }

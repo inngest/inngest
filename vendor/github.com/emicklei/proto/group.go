@@ -88,6 +88,7 @@ func (g *Group) parse(p *Parser) error {
 		return p.unexpected(lit, "group sequence number", g)
 	}
 	g.Sequence = i
+	consumeCommentFor(p, g)
 	_, tok, lit = p.next()
 	if tok != tLEFTCURLY {
 		return p.unexpected(lit, "group opening {", g)

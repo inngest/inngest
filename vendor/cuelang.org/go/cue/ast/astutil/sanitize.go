@@ -16,7 +16,7 @@ package astutil
 
 import (
 	"fmt"
-	"math/rand"
+	"math/rand/v2"
 	"strings"
 
 	"cuelang.org/go/cue/ast"
@@ -28,21 +28,18 @@ import (
 // - handle comprehensions
 // - change field from foo to "foo" if it isn't referenced, rather than
 //   relying on introducing a unique alias.
-// - change a predeclared identifier reference to use the __ident form,
-//   instead of introducing an alias.
 
-// Sanitize rewrites File f in place to be well formed after automated
+// Sanitize rewrites File f in place to be well-formed after automated
 // construction of an AST.
 //
 // Rewrites:
-//    - auto inserts imports associated with Idents
-//    - unshadows imports associated with idents
-//    - unshadows references for identifiers that were already resolved.
-//
+//   - auto inserts imports associated with Idents
+//   - unshadows imports associated with idents
+//   - unshadows references for identifiers that were already resolved.
 func Sanitize(f *ast.File) error {
 	z := &sanitizer{
 		file: f,
-		rand: rand.New(rand.NewSource(808)),
+		rand: rand.New(rand.NewPCG(123, 456)), // ensure determinism between runs
 
 		names:      map[string]bool{},
 		importMap:  map[string]*ast.ImportSpec{},
@@ -51,24 +48,29 @@ func Sanitize(f *ast.File) error {
 	}
 
 	// Gather all names.
-	walk(&scope{
-		errFn:   z.errf,
-		nameFn:  z.addName,
-		identFn: z.markUsed,
-	}, f)
+	stack := make([]*scope, 0, 8)
+	s := &scope{
+		errFn:      z.errf,
+		nameFn:     z.addName,
+		identFn:    z.markUsed,
+		scopeStack: &stack,
+	}
+	ast.Walk(f, s.Before, nil)
 	if z.errs != nil {
 		return z.errs
 	}
 
 	// Add imports and unshadow.
-	s := &scope{
-		file:    f,
-		errFn:   z.errf,
-		identFn: z.handleIdent,
-		index:   make(map[string]entry),
+	stack = stack[:0]
+	s = &scope{
+		file:       f,
+		errFn:      z.errf,
+		identFn:    z.handleIdent,
+		index:      make(map[string]entry),
+		scopeStack: &stack,
 	}
 	z.fileScope = s
-	walk(s, f)
+	ast.Walk(f, s.Before, nil)
 	if z.errs != nil {
 		return z.errs
 	}
@@ -169,16 +171,26 @@ func (z *sanitizer) markUsed(s *scope, n *ast.Ident) bool {
 }
 
 func (z *sanitizer) cleanImports() {
-	z.file.VisitImports(func(d *ast.ImportDecl) {
-		k := 0
-		for _, s := range d.Specs {
-			if _, ok := z.referenced[s]; ok {
-				d.Specs[k] = s
-				k++
+	var fileImports []*ast.ImportSpec
+	for decl := range z.file.ImportDecls() {
+		newLen := 0
+		for _, spec := range decl.Specs {
+			if _, ok := z.referenced[spec]; ok {
+				fileImports = append(fileImports, spec)
+				decl.Specs[newLen] = spec
+				newLen++
 			}
 		}
-		d.Specs = d.Specs[:k]
-	})
+		decl.Specs = decl.Specs[:newLen]
+	}
+	z.file.Imports = fileImports
+	// Ensure that the first import always starts a new section
+	// so that if the file has a comment, it won't be associated with
+	// the import comment rather than the file.
+	for decl := range z.file.ImportDecls() {
+		ast.SetRelPos(decl, token.NewSection)
+		break
+	}
 }
 
 func (z *sanitizer) handleIdent(s *scope, n *ast.Ident) bool {
@@ -199,7 +211,7 @@ func (z *sanitizer) handleIdent(s *scope, n *ast.Ident) bool {
 
 		_ = z.addImport(spec)
 		info, _ := ParseImportSpec(spec)
-		z.fileScope.insert(info.Ident, spec, spec)
+		z.fileScope.insert(info.Ident, spec, spec, nil)
 		return true
 	}
 
@@ -229,7 +241,7 @@ func (z *sanitizer) handleIdent(s *scope, n *ast.Ident) bool {
 				Path: x.Path,
 			})
 			z.importMap[xi.ID] = spec
-			z.fileScope.insert(name, spec, spec)
+			z.fileScope.insert(name, spec, spec, nil)
 		}
 
 		info, _ := ParseImportSpec(spec)
@@ -242,6 +254,15 @@ func (z *sanitizer) handleIdent(s *scope, n *ast.Ident) bool {
 
 	if node.node == n.Node {
 		return true
+	}
+
+	// A predeclared reference (e.g. "self") is shadowed by a local
+	// declaration. Use the "__"-prefixed form to avoid the shadow.
+	if n.IsPredeclared() {
+		n.Name = "__" + n.Name
+		n.Node = nil
+		n.Scope = nil
+		return false
 	}
 
 	// n.Node != node and are both not nil and n.Node is not an ImportSpec.
@@ -318,13 +339,12 @@ func (z *sanitizer) handleIdent(s *scope, n *ast.Ident) bool {
 }
 
 // uniqueName returns a new name globally unique name of the form
-// base_XX ... base_XXXXXXXXXXXXXX or _base or the same pattern with a '_'
+// base_NN ... base_NNNNNNNNNNNNNN or _base or the same pattern with a '_'
 // prefix if hidden is true.
 //
 // It prefers short extensions over large ones, while ensuring the likelihood of
 // fast termination is high. There are at least two digits to make it visually
 // clearer this concerns a generated number.
-//
 func (z *sanitizer) uniqueName(base string, hidden bool) string {
 	if hidden && !strings.HasPrefix(base, "_") {
 		base = "_" + base
@@ -334,11 +354,10 @@ func (z *sanitizer) uniqueName(base string, hidden bool) string {
 		}
 	}
 
-	// TODO(go1.13): const mask = 0xff_ffff_ffff_ffff
-	const mask = 0xffffffffffffff // max bits; stay clear of int64 overflow
-	const shift = 4               // rate of growth
-	for n := int64(0x10); ; n = int64(mask&((n<<shift)-1)) + 1 {
-		num := z.rand.Intn(int(n))
+	const mask = 0xff_ffff_ffff_ffff // max bits; stay clear of int64 overflow
+	const shift = 4                  // rate of growth
+	for n := int64(0x10); ; n = mask&((n<<shift)-1) + 1 {
+		num := z.rand.IntN(int(n))
 		name := fmt.Sprintf("%s_%01X", base, num)
 		if !z.names[name] {
 			z.names[name] = true

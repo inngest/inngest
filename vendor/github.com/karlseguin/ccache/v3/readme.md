@@ -35,7 +35,7 @@ The most likely configuration options to tweak are:
 
 * `MaxSize(int)` - the maximum number size  to store in the cache (default: 5000)
 * `GetsPerPromote(int)` - the number of times an item is fetched before we promote it. For large caches with long TTLs, it normally isn't necessary to promote an item after every fetch (default: 3)
-* `ItemsToPrune(int)` - the number of items to prune when we hit `MaxSize`. Freeing up more than 1 slot at a time improved performance (default: 500)
+* `PercentToPrune(int)` - the percentage, relative to `MaxSize`, to prune when the cache is full (default: 10)
 
 Configurations that change the internals of the cache, which aren't as likely to need tweaking:
 

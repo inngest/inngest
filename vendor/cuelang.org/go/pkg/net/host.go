@@ -56,7 +56,7 @@ func JoinHostPort(host, port cue.Value) (string, error) {
 	switch host.Kind() {
 	case cue.ListKind:
 		ipdata := netGetIP(host)
-		if len(ipdata) != 4 && len(ipdata) != 16 {
+		if !ipdata.IsValid() {
 			err = fmt.Errorf("invalid host %s", host)
 		}
 		hostStr = ipdata.String()
@@ -91,7 +91,7 @@ func JoinHostPort(host, port cue.Value) (string, error) {
 	return net.JoinHostPort(hostStr, portStr), nil
 }
 
-// FQDN reports whether is is a valid fully qualified domain name.
+// FQDN reports whether is a valid fully qualified domain name.
 //
 // FQDN allows only ASCII characters as prescribed by RFC 1034 (A-Z, a-z, 0-9
 // and the hyphen).

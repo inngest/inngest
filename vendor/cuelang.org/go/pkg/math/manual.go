@@ -17,52 +17,55 @@ package math
 import (
 	"math/big"
 
-	"github.com/cockroachdb/apd/v2"
+	"github.com/cockroachdb/apd/v3"
 
 	"cuelang.org/go/internal"
 )
 
-func roundContext(rounder string) *apd.Context {
-	c := *apdContext
+func roundContext(rounder apd.Rounder) internal.Context {
+	c := internal.BaseContext
 	c.Rounding = rounder
-	return &c
+	return c
 }
 
 // TODO: for now we convert Decimals to int. This allows the desired type to be
-// conveyed. This has the disadvantage tht a number like 1E10000 will need to be
-// expanded. Eventually it would be better to to unify number types and allow
+// conveyed. This has the disadvantage that a number like 1E10000 will need to be
+// expanded. Eventually it would be better to unify number types and allow
 // anything that results in an integer to pose as an integer type.
+// TODO: this is likely buggy, as we discard d.Exponent entirely.
 func toInt(d *internal.Decimal) *big.Int {
 	i := &d.Coeff
 	if d.Negative {
 		i.Neg(i)
 	}
-	return i
+	return i.MathBigInt()
 }
 
 // Floor returns the greatest integer value less than or equal to x.
 //
 // Special cases are:
+//
 //	Floor(±0) = ±0
 //	Floor(±Inf) = ±Inf
 //	Floor(NaN) = NaN
 func Floor(x *internal.Decimal) (*big.Int, error) {
 	var d internal.Decimal
-	_, err := apdContext.Floor(&d, x)
-	_, _ = apdContext.Quantize(&d, &d, 0)
+	_, err := internal.BaseContext.Floor(&d, x)
+	_, _ = internal.BaseContext.Quantize(&d, &d, 0)
 	return toInt(&d), err
 }
 
 // Ceil returns the least integer value greater than or equal to x.
 //
 // Special cases are:
+//
 //	Ceil(±0) = ±0
 //	Ceil(±Inf) = ±Inf
 //	Ceil(NaN) = NaN
 func Ceil(x *internal.Decimal) (*big.Int, error) {
 	var d internal.Decimal
-	_, err := apdContext.Ceil(&d, x)
-	_, _ = apdContext.Quantize(&d, &d, 0)
+	_, err := internal.BaseContext.Ceil(&d, x)
+	_, _ = internal.BaseContext.Quantize(&d, &d, 0)
 	return toInt(&d), err
 }
 
@@ -71,6 +74,7 @@ var roundTruncContext = roundContext(apd.RoundDown)
 // Trunc returns the integer value of x.
 //
 // Special cases are:
+//
 //	Trunc(±0) = ±0
 //	Trunc(±Inf) = ±Inf
 //	Trunc(NaN) = NaN
@@ -85,6 +89,7 @@ var roundUpContext = roundContext(apd.RoundHalfUp)
 // Round returns the nearest integer, rounding half away from zero.
 //
 // Special cases are:
+//
 //	Round(±0) = ±0
 //	Round(±Inf) = ±Inf
 //	Round(NaN) = NaN
@@ -99,6 +104,7 @@ var roundEvenContext = roundContext(apd.RoundHalfEven)
 // RoundToEven returns the nearest integer, rounding ties to even.
 //
 // Special cases are:
+//
 //	RoundToEven(±0) = ±0
 //	RoundToEven(±Inf) = ±Inf
 //	RoundToEven(NaN) = NaN
@@ -108,11 +114,18 @@ func RoundToEven(x *internal.Decimal) (*big.Int, error) {
 	return toInt(&d), err
 }
 
-var mulContext = apd.BaseContext.WithPrecision(1)
-
 // MultipleOf reports whether x is a multiple of y.
 func MultipleOf(x, y *internal.Decimal) (bool, error) {
 	var d apd.Decimal
-	cond, err := mulContext.Quo(&d, x, y)
-	return !cond.Inexact(), err
+
+	// TODO: It would be preferable to use internal.BaseContext.Rem here, and directly
+	//       check the result for 0. However, this currently fails with "division impossible".
+	//       Fix this when https://github.com/cockroachdb/apd/issues/134 is resolved.
+	_, err := internal.BaseContext.Quo(&d, x, y)
+	if err != nil {
+		return false, err
+	}
+	var frac apd.Decimal
+	d.Modf(nil, &frac)
+	return frac.IsZero(), nil
 }

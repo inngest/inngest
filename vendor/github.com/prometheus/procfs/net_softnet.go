@@ -1,4 +1,4 @@
-// Copyright 2019 The Prometheus Authors
+// Copyright The Prometheus Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -64,7 +64,7 @@ func (fs FS) NetSoftnetStat() ([]SoftnetStat, error) {
 
 	entries, err := parseSoftnet(bytes.NewReader(b))
 	if err != nil {
-		return nil, fmt.Errorf("%s: /proc/net/softnet_stat: %w", ErrFileParse, err)
+		return nil, fmt.Errorf("%w: /proc/net/softnet_stat: %w", ErrFileParse, err)
 	}
 
 	return entries, nil

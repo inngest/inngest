@@ -93,6 +93,10 @@ var (
 	DisableClientSetInfo = make([]string, 0)
 )
 
+// Define distinct types for safety.
+type ReadNodeSelectorFunc func(slot uint16, nodes []NodeInfo) int
+type ReplicaSelectorFunc func(slot uint16, replicas []NodeInfo) int
+
 // ClientOption should be passed to NewClient to construct a Client
 type ClientOption struct {
 	TLSConfig *tls.Config
@@ -135,7 +139,7 @@ type ClientOption struct {
 	// Each ReplicaInfo must not be modified.
 	// NOTE: This function can't be used with ReplicaOnly option.
 	// NOTE: This function must be used with the SendToReplicas function.
-	ReplicaSelector func(slot uint16, replicas []NodeInfo) int
+	ReplicaSelector ReplicaSelectorFunc
 
 	// ReadNodeSelector returns index of node selected for a read only command.
 	// If set, ReadNodeSelector is prioritized over ReplicaSelector.
@@ -143,7 +147,7 @@ type ClientOption struct {
 	// The function is called only when SendToReplicas returns true.
 	// Each NodeInfo must not be modified.
 	// NOTE: This function can't be used with ReplicaSelector option.
-	ReadNodeSelector func(slot uint16, nodes []NodeInfo) int
+	ReadNodeSelector ReadNodeSelectorFunc
 
 	// Sentinel options, including MasterSet and Auth options
 	Sentinel SentinelOption
@@ -277,6 +281,10 @@ type ClientOption struct {
 	// EnableReplicaAZInfo enables the client to load the replica node's availability zone.
 	// If true, the client will set the `AZ` field in `ReplicaInfo`.
 	EnableReplicaAZInfo bool
+
+	// AZFromInfo forces the `availability_zone` field to be taken from an INFO command instead of HELLO.
+	// Primarily used for AWS MemoryDB.
+	AZFromInfo bool
 }
 
 // SentinelOption contains MasterSet,
@@ -301,6 +309,12 @@ type ClusterOption struct {
 	// If the value is zero, refreshment will be disabled.
 	// Cluster topology cache refresh happens always in the background after a successful scan.
 	ShardsRefreshInterval time.Duration
+
+	// MaxMovedRedirections is the maximum number of times to retry a command when receiving MOVED|ASK responses.
+	// If set to 0 (default), MOVED|ASK retries will continue until the context timeout.
+	// If set to a positive value, the client will return an error after that many MOVED|ASK redirects.
+	// This helps prevent infinite redirect loops in case of cluster misconfiguration.
+	MaxMovedRedirections int
 }
 
 // StandaloneOption is the options for the standalone client.

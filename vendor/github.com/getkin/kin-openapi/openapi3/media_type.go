@@ -111,6 +111,7 @@ func (mediaType *MediaType) UnmarshalJSON(data []byte) error {
 		x.Extensions = nil
 	}
 	*mediaType = MediaType(x)
+	mediaType.Example = stripOriginFromAny(mediaType.Example)
 	return nil
 }
 

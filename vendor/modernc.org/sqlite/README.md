@@ -1,76 +1,62 @@
-# sqlite
+The repository you are currently viewing might be a mirror. Please review the guidelines below based on where you are viewing this:
 
-Package sqlite is a cgo-free port of SQLite. Although you could see mattn's driver (`github.com/mattn/go-sqlite3`) in go.mod file, we import it for tests only.
+| Platform | Role | Contributing Guidelines |
+| :--- | :--- | :--- |
+| **GitLab** | **Primary Source** | This is the canonical repository (`cznic/sqlite`). CI pipelines and main development happen here. |
+| **GitHub** | **Mirror** | This is a mirror (`modernc-org/sqlite`). We **do accept** Issues and Pull Requests here for your convenience! <br> *Note: PRs submitted here will be manually merged into the GitLab source, so please allow extra time for processing.* |
 
-SQLite is an in-process implementation of a self-contained, serverless,
-zero-configuration, transactional SQL database engine.
+[![Go Reference](https://pkg.go.dev/badge/modernc.org/sqlite.svg)](https://pkg.go.dev/modernc.org/sqlite)
+[![LiberaPay](https://liberapay.com/assets/widgets/donate.svg)](https://liberapay.com/jnml/donate)
+[![receives](https://img.shields.io/liberapay/receives/jnml.svg?logo=liberapay)](https://liberapay.com/jnml/donate)
+[![patrons](https://img.shields.io/liberapay/patrons/jnml.svg?logo=liberapay)](https://liberapay.com/jnml/donate)
 
-## Thanks
+---
 
-This project is sponsored by Schleibinger Geräte Teubert u. Greim GmbH by
-allowing one of the maintainers to work on it also in office hours.
+![heart](sponsors/heart.png "heart")
+[Github Sponsors Account](https://github.com/sponsors/j-modernc-org) /  j-modernc-org
 
-## Installation
+### Enterprise Infrastructure Tier Sponsor
 
-    $ go get modernc.org/sqlite
+![tailscale](sponsors/tailscale.png "tailscale") [Tailscale](https://tailscale.com/)
 
-## Documentation
+### Startup / Small Business Tier Sponsor
 
-[godoc.org/modernc.org/sqlite](http://godoc.org/modernc.org/sqlite)
+![exe.dev](sponsors/boldsoftware.png "boldsoftware") [exe.dev](https://exe.dev)
 
-## Builders
+![octoberswimmer](sponsors/octoberswimmer.png "osctoberswimmer") [October Swimmer](https://www.octoberswimmer.com/)
 
-[modern-c.appspot.com/-/builder/?importpath=modernc.org%2fsqlite](https://modern-c.appspot.com/-/builder/?importpath=modernc.org%2fsqlite)
+---
 
-## Speedtest1
+![benchmarks](bench.png "benchmarks") [The SQLite Drivers Benchmarks Game]
 
-Numbers for the pure Go version were produced by
+[The SQLite Drivers Benchmarks Game]: https://pkg.go.dev/modernc.org/sqlite-bench#readme-tl-dr-scorecard
 
-     ~/src/modernc.org/sqlite/speedtest1$ go build && ./speedtest1
+---
 
-Numbers for the pure C version were produced by
+Virtual Tables (vtab)
+---------------------
 
-     ~/src/modernc.org/sqlite/testdata/sqlite-src-3410200/test$ gcc speedtest1.c ../../sqlite-amalgamation-3410200/sqlite3.c -lpthread -ldl && ./a.out
+The driver exposes a Go API to implement SQLite virtual table modules in pure Go via the `modernc.org/sqlite/vtab` package. This lets you back SQL tables with arbitrary data sources (e.g., vector indexes, CSV files, remote APIs) and integrate with SQLite’s planner.
 
-The results are from Go version 1.20.4 and GCC version 10.2.1 on a
-Linux/amd64 machine, CPU: AMD Ryzen 9 3900X 12-Core Processor × 24, 128GB
-RAM. Shown are the best of 3 runs.
+- Register: `vtab.RegisterModule(db, name, module)`. Registration applies to new connections only.
+- Schema declaration: Call `ctx.Declare("CREATE TABLE <name>(<cols...>)")` within `Create` or `Connect`. The driver does not auto-declare schemas, enabling dynamic schemas.
+- Module arguments: `args []string` passed to `Create/Connect` are configuration parsed from `USING module(...)`. They are not treated as columns unless your module chooses to.
+- Planning (BestIndex):
+  - Inspect `info.Constraints` (with `Column`, `Op`, `Usable`, 0-based `ArgIndex`, and `Omit`), `info.OrderBy`, and `info.ColUsed` (bitmask of referenced columns).
+  - Set `ArgIndex` (0-based) to populate `Filter`’s `vals` in the chosen order; set `Omit` to ask SQLite not to re-check a constraint you fully handle.
+- Execution: `Cursor.Filter(idxNum, idxStr, vals)` receives arguments in the order implied by `ArgIndex`.
+- Operators: Common SQLite operators map to `ConstraintOp` (EQ/NE/GT/GE/LT/LE/MATCH/IS/ISNOT/ISNULL/ISNOTNULL/LIKE/GLOB/REGEXP/FUNCTION/LIMIT/OFFSET). Unknown operators map to `OpUnknown`.
+- Errors: Returning an error from vtab methods surfaces a descriptive message to SQLite (e.g., `zErrMsg` for xCreate/xConnect/xBestIndex/xFilter; `sqlite3_result_error` for xColumn).
 
-     Go											C
+Examples
+--------
 
-     -- Speedtest1 for SQLite 3.41.2 2023-03-22 11:56:21 0d1fc92f94cb6b76bffe3ec34d69	-- Speedtest1 for SQLite 3.41.2 2023-03-22 11:56:21 0d1fc92f94cb6b76bffe3ec34d69
-      100 - 50000 INSERTs into table with no index......................    0.071s            100 - 50000 INSERTs into table with no index......................    0.077s
-      110 - 50000 ordered INSERTS with one index/PK.....................    0.114s            110 - 50000 ordered INSERTS with one index/PK.....................    0.082s
-      120 - 50000 unordered INSERTS with one index/PK...................    0.137s            120 - 50000 unordered INSERTS with one index/PK...................    0.099s
-      130 - 25 SELECTS, numeric BETWEEN, unindexed......................    0.083s            130 - 25 SELECTS, numeric BETWEEN, unindexed......................    0.091s
-      140 - 10 SELECTS, LIKE, unindexed.................................    0.210s            140 - 10 SELECTS, LIKE, unindexed.................................    0.120s
-      142 - 10 SELECTS w/ORDER BY, unindexed............................    0.276s            142 - 10 SELECTS w/ORDER BY, unindexed............................    0.182s
-      145 - 10 SELECTS w/ORDER BY and LIMIT, unindexed..................    0.183s            145 - 10 SELECTS w/ORDER BY and LIMIT, unindexed..................    0.099s
-      150 - CREATE INDEX five times.....................................    0.172s            150 - CREATE INDEX five times.....................................    0.127s
-      160 - 10000 SELECTS, numeric BETWEEN, indexed.....................    0.080s            160 - 10000 SELECTS, numeric BETWEEN, indexed.....................    0.078s
-      161 - 10000 SELECTS, numeric BETWEEN, PK..........................    0.080s            161 - 10000 SELECTS, numeric BETWEEN, PK..........................    0.078s
-      170 - 10000 SELECTS, text BETWEEN, indexed........................    0.187s            170 - 10000 SELECTS, text BETWEEN, indexed........................    0.169s
-      180 - 50000 INSERTS with three indexes............................    0.196s            180 - 50000 INSERTS with three indexes............................    0.154s
-      190 - DELETE and REFILL one table.................................    0.200s            190 - DELETE and REFILL one table.................................    0.155s
-      200 - VACUUM......................................................    0.180s            200 - VACUUM......................................................    0.142s
-      210 - ALTER TABLE ADD COLUMN, and query...........................    0.004s            210 - ALTER TABLE ADD COLUMN, and query...........................    0.005s
-      230 - 10000 UPDATES, numeric BETWEEN, indexed.....................    0.093s            230 - 10000 UPDATES, numeric BETWEEN, indexed.....................    0.080s
-      240 - 50000 UPDATES of individual rows............................    0.153s            240 - 50000 UPDATES of individual rows............................    0.137s
-      250 - One big UPDATE of the whole 50000-row table.................    0.024s            250 - One big UPDATE of the whole 50000-row table.................    0.019s
-      260 - Query added column after filling............................    0.004s            260 - Query added column after filling............................    0.005s
-      270 - 10000 DELETEs, numeric BETWEEN, indexed.....................    0.278s            270 - 10000 DELETEs, numeric BETWEEN, indexed.....................    0.263s
-      280 - 50000 DELETEs of individual rows............................    0.188s            280 - 50000 DELETEs of individual rows............................    0.180s
-      290 - Refill two 50000-row tables using REPLACE...................    0.411s            290 - Refill two 50000-row tables using REPLACE...................    0.359s
-      300 - Refill a 50000-row table using (b&1)==(a&1).................    0.175s            300 - Refill a 50000-row table using (b&1)==(a&1).................    0.151s
-      310 - 10000 four-ways joins.......................................    0.427s            310 - 10000 four-ways joins.......................................    0.365s
-      320 - subquery in result set......................................    0.440s            320 - subquery in result set......................................    0.521s
-      400 - 70000 REPLACE ops on an IPK.................................    0.125s            400 - 70000 REPLACE ops on an IPK.................................    0.106s
-      410 - 70000 SELECTS on an IPK.....................................    0.081s            410 - 70000 SELECTS on an IPK.....................................    0.078s
-      500 - 70000 REPLACE on TEXT PK....................................    0.174s            500 - 70000 REPLACE on TEXT PK....................................    0.116s
-      510 - 70000 SELECTS on a TEXT PK..................................    0.153s            510 - 70000 SELECTS on a TEXT PK..................................    0.117s
-      520 - 70000 SELECT DISTINCT.......................................    0.083s            520 - 70000 SELECT DISTINCT.......................................    0.067s
-      980 - PRAGMA integrity_check......................................    0.436s            980 - PRAGMA integrity_check......................................    0.377s
-      990 - ANALYZE.....................................................    0.107s            990 - ANALYZE.....................................................    0.038s
-            TOTAL.......................................................    5.525s                  TOTAL.......................................................    4.637s
+- Vector search (sqlite-vec style):
+  - `CREATE VIRTUAL TABLE vec_docs USING vec(dim=128, metric="cosine")`
+  - Module reads args (e.g., `dim`, `metric`), calls `ctx.Declare("CREATE TABLE vec_docs(id, embedding, content HIDDEN)")`, and implements search via `BestIndex`/`Filter`.
 
-This particular test executes 16.1% faster in the C version.
+- CSV loader:
+  - `CREATE VIRTUAL TABLE csv_users USING csv(filename="/tmp/users.csv", delimiter=",", header=true)`
+  - Module reads the file header to compute columns, declares them via `ctx.Declare("CREATE TABLE csv_users(name, email, ...)")`, and streams rows via a cursor.
+
+See `vtab` package docs for full API details.

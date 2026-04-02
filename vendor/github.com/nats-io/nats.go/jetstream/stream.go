@@ -1,4 +1,4 @@
-// Copyright 2022-2024 The NATS Authors
+// Copyright 2022-2025 The NATS Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -48,7 +48,7 @@ type (
 		GetMsg(ctx context.Context, seq uint64, opts ...GetMsgOpt) (*RawStreamMsg, error)
 
 		// GetLastMsgForSubject retrieves the last raw stream message stored in
-		// JetStream on a given subject subject.
+		// JetStream on a given subject.
 		GetLastMsgForSubject(ctx context.Context, subject string) (*RawStreamMsg, error)
 
 		// DeleteMsg deletes a message from a stream.
@@ -67,13 +67,13 @@ type (
 	// [Consumer] interface, allowing to operate on a consumer (e.g. consume
 	// messages).
 	ConsumerManager interface {
-		// CreateOrUpdateConsumer creates a consumer on a given stream with
+		// CreateOrUpdateConsumer creates a pull consumer on a given stream with
 		// given config. If consumer already exists, it will be updated (if
 		// possible). Consumer interface is returned, allowing to operate on a
 		// consumer (e.g. fetch messages).
 		CreateOrUpdateConsumer(ctx context.Context, cfg ConsumerConfig) (Consumer, error)
 
-		// CreateConsumer creates a consumer on a given stream with given
+		// CreateConsumer creates a pull consumer on a given stream with given
 		// config. If consumer already exists and the provided configuration
 		// differs from its configuration, ErrConsumerExists is returned. If the
 		// provided configuration is the same as the existing consumer, the
@@ -81,7 +81,7 @@ type (
 		// allowing to operate on a consumer (e.g. fetch messages).
 		CreateConsumer(ctx context.Context, cfg ConsumerConfig) (Consumer, error)
 
-		// UpdateConsumer updates an existing consumer. If consumer does not
+		// UpdateConsumer updates an existing pull consumer. If consumer does not
 		// exist, ErrConsumerDoesNotExist is returned. Consumer interface is
 		// returned, allowing to operate on a consumer (e.g. fetch messages).
 		UpdateConsumer(ctx context.Context, cfg ConsumerConfig) (Consumer, error)
@@ -95,11 +95,19 @@ type (
 		// Consumer returns an interface to an existing consumer, allowing processing
 		// of messages. If consumer does not exist, ErrConsumerNotFound is
 		// returned.
+		//
+		// It returns ErrNotPullConsumer if the consumer is not a pull consumer (deliver subject is not set).
 		Consumer(ctx context.Context, consumer string) (Consumer, error)
 
 		// DeleteConsumer removes a consumer with given name from a stream.
 		// If consumer does not exist, ErrConsumerNotFound is returned.
 		DeleteConsumer(ctx context.Context, consumer string) error
+
+		// PauseConsumer pauses a consumer.
+		PauseConsumer(ctx context.Context, consumer string, pauseUntil time.Time) (*ConsumerPauseResponse, error)
+
+		// ResumeConsumer resumes a consumer.
+		ResumeConsumer(ctx context.Context, consumer string) (*ConsumerPauseResponse, error)
 
 		// ListConsumers returns ConsumerInfoLister enabling iterating over a
 		// channel of consumer infos.
@@ -108,6 +116,35 @@ type (
 		// ConsumerNames returns a ConsumerNameLister enabling iterating over a
 		// channel of consumer names.
 		ConsumerNames(context.Context) ConsumerNameLister
+
+		// UnpinConsumer unpins the currently pinned client for a consumer for the given group name.
+		// If consumer does not exist, ErrConsumerNotFound is returned.
+		UnpinConsumer(ctx context.Context, consumer string, group string) error
+
+		// CreateOrUpdatePushConsumer creates a push consumer on a given stream with
+		// given config. If consumer already exists, it will be updated (if
+		// possible). Consumer interface is returned, allowing to consume messages.
+		CreateOrUpdatePushConsumer(ctx context.Context, cfg ConsumerConfig) (PushConsumer, error)
+
+		// CreatePushConsumer creates a push consumer on a given stream with given
+		// config. If consumer already exists and the provided configuration
+		// differs from its configuration, ErrConsumerExists is returned. If the
+		// provided configuration is the same as the existing consumer, the
+		// existing consumer is returned. Consumer interface is returned,
+		// allowing to consume messages.
+		CreatePushConsumer(ctx context.Context, cfg ConsumerConfig) (PushConsumer, error)
+
+		// UpdatePushConsumer updates an existing push consumer. If consumer does not
+		// exist, ErrConsumerDoesNotExist is returned. Consumer interface is
+		// returned, allowing to consume messages.
+		UpdatePushConsumer(ctx context.Context, cfg ConsumerConfig) (PushConsumer, error)
+
+		// PushConsumer returns an interface to an existing push consumer, allowing processing
+		// of messages. If consumer does not exist, ErrConsumerNotFound is
+		// returned.
+		//
+		// It returns ErrNotPushConsumer if the consumer is not a push consumer (deliver subject is not set).
+		PushConsumer(ctx context.Context, consumer string) (PushConsumer, error)
 	}
 
 	RawStreamMsg struct {
@@ -119,16 +156,16 @@ type (
 	}
 
 	stream struct {
-		name      string
-		info      *StreamInfo
-		jetStream *jetStream
+		name string
+		info *StreamInfo
+		js   *jetStream
 	}
 
 	// StreamInfoOpt is a function setting options for [Stream.Info]
 	StreamInfoOpt func(*streamInfoRequest) error
 
 	streamInfoRequest struct {
-		apiPaged
+		apiPagedRequest
 		DeletedDetails bool   `json:"deleted_details,omitempty"`
 		SubjectFilter  string `json:"subjects_filter,omitempty"`
 	}
@@ -161,6 +198,24 @@ type (
 	consumerDeleteResponse struct {
 		apiResponse
 		Success bool `json:"success,omitempty"`
+	}
+
+	consumerPauseRequest struct {
+		PauseUntil *time.Time `json:"pause_until,omitempty"`
+	}
+
+	ConsumerPauseResponse struct {
+		// Paused is true if the consumer is paused.
+		Paused bool `json:"paused"`
+		// PauseUntil is the time until the consumer is paused.
+		PauseUntil time.Time `json:"pause_until"`
+		// PauseRemaining is the time remaining until the consumer is paused.
+		PauseRemaining time.Duration `json:"pause_remaining,omitempty"`
+	}
+
+	consumerPauseApiResponse struct {
+		apiResponse
+		ConsumerPauseResponse
 	}
 
 	// GetMsgOpt is a function setting options for [Stream.GetMsg]
@@ -234,6 +289,10 @@ type (
 		apiPaged
 		Consumers []string `json:"consumers"`
 	}
+
+	consumerUnpinRequest struct {
+		Group string `json:"group"`
+	}
 )
 
 // CreateOrUpdateConsumer creates a consumer on a given stream with
@@ -241,7 +300,7 @@ type (
 // possible). Consumer interface is returned, allowing to operate on a
 // consumer (e.g. fetch messages).
 func (s *stream) CreateOrUpdateConsumer(ctx context.Context, cfg ConsumerConfig) (Consumer, error) {
-	return upsertConsumer(ctx, s.jetStream, s.name, cfg, consumerActionCreateOrUpdate)
+	return upsertPullConsumer(ctx, s.js, s.name, cfg, consumerActionCreateOrUpdate)
 }
 
 // CreateConsumer creates a consumer on a given stream with given
@@ -251,14 +310,38 @@ func (s *stream) CreateOrUpdateConsumer(ctx context.Context, cfg ConsumerConfig)
 // existing consumer is returned. Consumer interface is returned,
 // allowing to operate on a consumer (e.g. fetch messages).
 func (s *stream) CreateConsumer(ctx context.Context, cfg ConsumerConfig) (Consumer, error) {
-	return upsertConsumer(ctx, s.jetStream, s.name, cfg, consumerActionCreate)
+	return upsertPullConsumer(ctx, s.js, s.name, cfg, consumerActionCreate)
 }
 
 // UpdateConsumer updates an existing consumer. If consumer does not
 // exist, ErrConsumerDoesNotExist is returned. Consumer interface is
 // returned, allowing to operate on a consumer (e.g. fetch messages).
 func (s *stream) UpdateConsumer(ctx context.Context, cfg ConsumerConfig) (Consumer, error) {
-	return upsertConsumer(ctx, s.jetStream, s.name, cfg, consumerActionUpdate)
+	return upsertPullConsumer(ctx, s.js, s.name, cfg, consumerActionUpdate)
+}
+
+// CreateOrUpdatePushConsumer creates a consumer on a given stream with
+// given config. If consumer already exists, it will be updated (if
+// possible). Consumer interface is returned, allowing to consume messages.
+func (s *stream) CreateOrUpdatePushConsumer(ctx context.Context, cfg ConsumerConfig) (PushConsumer, error) {
+	return upsertPushConsumer(ctx, s.js, s.name, cfg, consumerActionCreateOrUpdate)
+}
+
+// CreatePushConsumer creates a consumer on a given stream with given
+// config. If consumer already exists and the provided configuration
+// differs from its configuration, ErrConsumerExists is returned. If the
+// provided configuration is the same as the existing consumer, the
+// existing consumer is returned. Consumer interface is returned,
+// allowing to consume messages.
+func (s *stream) CreatePushConsumer(ctx context.Context, cfg ConsumerConfig) (PushConsumer, error) {
+	return upsertPushConsumer(ctx, s.js, s.name, cfg, consumerActionCreate)
+}
+
+// UpdatePushConsumer updates an existing consumer. If consumer does not
+// exist, ErrConsumerDoesNotExist is returned. Consumer interface is
+// returned, allowing to consume messages.
+func (s *stream) UpdatePushConsumer(ctx context.Context, cfg ConsumerConfig) (PushConsumer, error) {
+	return upsertPushConsumer(ctx, s.js, s.name, cfg, consumerActionUpdate)
 }
 
 // OrderedConsumer returns an OrderedConsumer instance. OrderedConsumer
@@ -266,11 +349,15 @@ func (s *stream) UpdateConsumer(ctx context.Context, cfg ConsumerConfig) (Consum
 // messages from a stream. Ordered consumers are ephemeral in-memory
 // pull consumers and are resilient to deletes and restarts.
 func (s *stream) OrderedConsumer(ctx context.Context, cfg OrderedConsumerConfig) (Consumer, error) {
+	namePrefix := cfg.NamePrefix
+	if namePrefix == "" {
+		namePrefix = nuid.Next()
+	}
 	oc := &orderedConsumer{
-		jetStream:  s.jetStream,
+		js:         s.js,
 		cfg:        &cfg,
 		stream:     s.name,
-		namePrefix: nuid.Next(),
+		namePrefix: namePrefix,
 		doReset:    make(chan struct{}, 1),
 	}
 	consCfg := oc.getConsumerConfig()
@@ -287,18 +374,32 @@ func (s *stream) OrderedConsumer(ctx context.Context, cfg OrderedConsumerConfig)
 // of messages. If consumer does not exist, ErrConsumerNotFound is
 // returned.
 func (s *stream) Consumer(ctx context.Context, name string) (Consumer, error) {
-	return getConsumer(ctx, s.jetStream, s.name, name)
+	return getConsumer(ctx, s.js, s.name, name)
+}
+
+func (s *stream) PushConsumer(ctx context.Context, name string) (PushConsumer, error) {
+	return getPushConsumer(ctx, s.js, s.name, name)
 }
 
 // DeleteConsumer removes a consumer with given name from a stream.
 // If consumer does not exist, ErrConsumerNotFound is returned.
 func (s *stream) DeleteConsumer(ctx context.Context, name string) error {
-	return deleteConsumer(ctx, s.jetStream, s.name, name)
+	return deleteConsumer(ctx, s.js, s.name, name)
+}
+
+// PauseConsumer pauses a consumer.
+func (s *stream) PauseConsumer(ctx context.Context, name string, pauseUntil time.Time) (*ConsumerPauseResponse, error) {
+	return pauseConsumer(ctx, s.js, s.name, name, &pauseUntil)
+}
+
+// ResumeConsumer resumes a consumer.
+func (s *stream) ResumeConsumer(ctx context.Context, name string) (*ConsumerPauseResponse, error) {
+	return resumeConsumer(ctx, s.js, s.name, name)
 }
 
 // Info returns StreamInfo from the server.
 func (s *stream) Info(ctx context.Context, opts ...StreamInfoOpt) (*StreamInfo, error) {
-	ctx, cancel := wrapContextWithoutDeadline(ctx)
+	ctx, cancel := s.js.wrapContextWithoutDeadline(ctx)
 	if cancel != nil {
 		defer cancel()
 	}
@@ -316,7 +417,7 @@ func (s *stream) Info(ctx context.Context, opts ...StreamInfoOpt) (*StreamInfo, 
 	var subjectMap map[string]uint64
 	var offset int
 
-	infoSubject := apiSubj(s.jetStream.apiPrefix, fmt.Sprintf(apiStreamInfoT, s.name))
+	infoSubject := fmt.Sprintf(apiStreamInfoT, s.name)
 	var info *StreamInfo
 	for {
 		if infoReq != nil {
@@ -332,7 +433,7 @@ func (s *stream) Info(ctx context.Context, opts ...StreamInfoOpt) (*StreamInfo, 
 			}
 		}
 		var resp streamInfoResponse
-		if _, err = s.jetStream.apiRequestJSON(ctx, infoSubject, &resp, req); err != nil {
+		if _, err = s.js.apiRequestJSON(ctx, infoSubject, &resp, req); err != nil {
 			return nil, err
 		}
 		if resp.Error != nil {
@@ -375,7 +476,7 @@ func (s *stream) CachedInfo() *StreamInfo {
 // Purge removes messages from a stream. It is a destructive operation.
 // Use with caution. See StreamPurgeOpt for available options.
 func (s *stream) Purge(ctx context.Context, opts ...StreamPurgeOpt) error {
-	ctx, cancel := wrapContextWithoutDeadline(ctx)
+	ctx, cancel := s.js.wrapContextWithoutDeadline(ctx)
 	if cancel != nil {
 		defer cancel()
 	}
@@ -392,10 +493,10 @@ func (s *stream) Purge(ctx context.Context, opts ...StreamPurgeOpt) error {
 		return err
 	}
 
-	purgeSubject := apiSubj(s.jetStream.apiPrefix, fmt.Sprintf(apiStreamPurgeT, s.name))
+	purgeSubject := fmt.Sprintf(apiStreamPurgeT, s.name)
 
 	var resp streamPurgeResponse
-	if _, err = s.jetStream.apiRequestJSON(ctx, purgeSubject, &resp, req); err != nil {
+	if _, err = s.js.apiRequestJSON(ctx, purgeSubject, &resp, req); err != nil {
 		return err
 	}
 	if resp.Error != nil {
@@ -423,7 +524,7 @@ func (s *stream) GetLastMsgForSubject(ctx context.Context, subject string) (*Raw
 }
 
 func (s *stream) getMsg(ctx context.Context, mreq *apiMsgGetRequest) (*RawStreamMsg, error) {
-	ctx, cancel := wrapContextWithoutDeadline(ctx)
+	ctx, cancel := s.js.wrapContextWithoutDeadline(ctx)
 	if cancel != nil {
 		defer cancel()
 	}
@@ -431,29 +532,30 @@ func (s *stream) getMsg(ctx context.Context, mreq *apiMsgGetRequest) (*RawStream
 	if err != nil {
 		return nil, err
 	}
+
 	var gmSubj string
 
 	// handle direct gets
 	if s.info.Config.AllowDirect {
 		if mreq.LastFor != "" {
-			gmSubj = apiSubj(s.jetStream.apiPrefix, fmt.Sprintf(apiDirectMsgGetLastBySubjectT, s.name, mreq.LastFor))
-			r, err := s.jetStream.apiRequest(ctx, gmSubj, nil)
+			gmSubj = fmt.Sprintf(apiDirectMsgGetLastBySubjectT, s.name, mreq.LastFor)
+			r, err := s.js.apiRequest(ctx, gmSubj, nil)
 			if err != nil {
 				return nil, err
 			}
-			return convertDirectGetMsgResponseToMsg(s.name, r.msg)
+			return convertDirectGetMsgResponseToMsg(r.msg)
 		}
-		gmSubj = apiSubj(s.jetStream.apiPrefix, fmt.Sprintf(apiDirectMsgGetT, s.name))
-		r, err := s.jetStream.apiRequest(ctx, gmSubj, req)
+		gmSubj = fmt.Sprintf(apiDirectMsgGetT, s.name)
+		r, err := s.js.apiRequest(ctx, gmSubj, req)
 		if err != nil {
 			return nil, err
 		}
-		return convertDirectGetMsgResponseToMsg(s.name, r.msg)
+		return convertDirectGetMsgResponseToMsg(r.msg)
 	}
 
 	var resp apiMsgGetResponse
-	dsSubj := apiSubj(s.jetStream.apiPrefix, fmt.Sprintf(apiMsgGetT, s.name))
-	_, err = s.jetStream.apiRequestJSON(ctx, dsSubj, &resp, req)
+	dsSubj := fmt.Sprintf(apiMsgGetT, s.name)
+	_, err = s.js.apiRequestJSON(ctx, dsSubj, &resp, req)
 	if err != nil {
 		return nil, err
 	}
@@ -484,13 +586,13 @@ func (s *stream) getMsg(ctx context.Context, mreq *apiMsgGetRequest) (*RawStream
 	}, nil
 }
 
-func convertDirectGetMsgResponseToMsg(name string, r *nats.Msg) (*RawStreamMsg, error) {
+func convertDirectGetMsgResponseToMsg(r *nats.Msg) (*RawStreamMsg, error) {
 	// Check for 404/408. We would get a no-payload message and a "Status" header
 	if len(r.Data) == 0 {
 		val := r.Header.Get(statusHdr)
 		if val != "" {
 			switch val {
-			case noMessages:
+			case statusNoMsgs:
 				return nil, ErrMsgNotFound
 			default:
 				desc := r.Header.Get("Description")
@@ -501,19 +603,20 @@ func convertDirectGetMsgResponseToMsg(name string, r *nats.Msg) (*RawStreamMsg, 
 			}
 		}
 	}
+
 	// Check for headers that give us the required information to
 	// reconstruct the message.
 	if len(r.Header) == 0 {
-		return nil, fmt.Errorf("nats: response should have headers")
+		return nil, errors.New("nats: response should have headers")
 	}
 	stream := r.Header.Get(StreamHeader)
 	if stream == "" {
-		return nil, fmt.Errorf("nats: missing stream header")
+		return nil, errors.New("nats: missing stream header")
 	}
 
 	seqStr := r.Header.Get(SequenceHeader)
 	if seqStr == "" {
-		return nil, fmt.Errorf("nats: missing sequence header")
+		return nil, errors.New("nats: missing sequence header")
 	}
 	seq, err := strconv.ParseUint(seqStr, 10, 64)
 	if err != nil {
@@ -521,7 +624,7 @@ func convertDirectGetMsgResponseToMsg(name string, r *nats.Msg) (*RawStreamMsg, 
 	}
 	timeStr := r.Header.Get(TimeStampHeaer)
 	if timeStr == "" {
-		return nil, fmt.Errorf("nats: missing timestamp header")
+		return nil, errors.New("nats: missing timestamp header")
 	}
 
 	tm, err := time.Parse(time.RFC3339Nano, timeStr)
@@ -530,7 +633,7 @@ func convertDirectGetMsgResponseToMsg(name string, r *nats.Msg) (*RawStreamMsg, 
 	}
 	subj := r.Header.Get(SubjectHeader)
 	if subj == "" {
-		return nil, fmt.Errorf("nats: missing subject header")
+		return nil, errors.New("nats: missing subject header")
 	}
 	return &RawStreamMsg{
 		Subject:  subj,
@@ -555,7 +658,7 @@ func (s *stream) SecureDeleteMsg(ctx context.Context, seq uint64) error {
 }
 
 func (s *stream) deleteMsg(ctx context.Context, req *msgDeleteRequest) error {
-	ctx, cancel := wrapContextWithoutDeadline(ctx)
+	ctx, cancel := s.js.wrapContextWithoutDeadline(ctx)
 	if cancel != nil {
 		defer cancel()
 	}
@@ -563,13 +666,13 @@ func (s *stream) deleteMsg(ctx context.Context, req *msgDeleteRequest) error {
 	if err != nil {
 		return err
 	}
-	subj := apiSubj(s.jetStream.apiPrefix, fmt.Sprintf(apiMsgDeleteT, s.name))
+	subj := fmt.Sprintf(apiMsgDeleteT, s.name)
 	var resp msgDeleteResponse
-	if _, err = s.jetStream.apiRequestJSON(ctx, subj, &resp, r); err != nil {
+	if _, err = s.js.apiRequestJSON(ctx, subj, &resp, r); err != nil {
 		return err
 	}
 	if !resp.Success {
-		return fmt.Errorf("%w: %s", ErrMsgDeleteUnsuccessful, err)
+		return fmt.Errorf("%w: %s", ErrMsgDeleteUnsuccessful, resp.Error.Error())
 	}
 	return nil
 }
@@ -578,12 +681,12 @@ func (s *stream) deleteMsg(ctx context.Context, req *msgDeleteRequest) error {
 // channel of consumer infos.
 func (s *stream) ListConsumers(ctx context.Context) ConsumerInfoLister {
 	l := &consumerLister{
-		js:        s.jetStream,
+		js:        s.js,
 		consumers: make(chan *ConsumerInfo),
 	}
 	go func() {
 		defer close(l.consumers)
-		ctx, cancel := wrapContextWithoutDeadline(ctx)
+		ctx, cancel := s.js.wrapContextWithoutDeadline(ctx)
 		if cancel != nil {
 			defer cancel()
 		}
@@ -625,12 +728,12 @@ func (s *consumerLister) Err() error {
 // channel of consumer names.
 func (s *stream) ConsumerNames(ctx context.Context) ConsumerNameLister {
 	l := &consumerLister{
-		js:    s.jetStream,
+		js:    s.js,
 		names: make(chan string),
 	}
 	go func() {
 		defer close(l.names)
-		ctx, cancel := wrapContextWithoutDeadline(ctx)
+		ctx, cancel := s.js.wrapContextWithoutDeadline(ctx)
 		if cancel != nil {
 			defer cancel()
 		}
@@ -674,7 +777,7 @@ func (s *consumerLister) consumerInfos(ctx context.Context, stream string) ([]*C
 		return nil, err
 	}
 
-	slSubj := apiSubj(s.js.apiPrefix, fmt.Sprintf(apiConsumerListT, stream))
+	slSubj := fmt.Sprintf(apiConsumerListT, stream)
 	var resp consumerListResponse
 	_, err = s.js.apiRequestJSON(ctx, slSubj, &resp, req)
 	if err != nil {
@@ -702,7 +805,7 @@ func (s *consumerLister) consumerNames(ctx context.Context, stream string) ([]st
 		return nil, err
 	}
 
-	slSubj := apiSubj(s.js.apiPrefix, fmt.Sprintf(apiConsumerNamesT, stream))
+	slSubj := fmt.Sprintf(apiConsumerNamesT, stream)
 	var resp consumerNamesResponse
 	_, err = s.js.apiRequestJSON(ctx, slSubj, &resp, req)
 	if err != nil {
@@ -715,4 +818,10 @@ func (s *consumerLister) consumerNames(ctx context.Context, stream string) ([]st
 	s.pageInfo = &resp.apiPaged
 	s.offset += len(resp.Consumers)
 	return resp.Consumers, nil
+}
+
+// UnpinConsumer unpins the currently pinned client for a consumer for the given group name.
+// If consumer does not exist, ErrConsumerNotFound is returned.
+func (s *stream) UnpinConsumer(ctx context.Context, consumer string, group string) error {
+	return unpinConsumer(ctx, s.js, s.name, consumer, group)
 }

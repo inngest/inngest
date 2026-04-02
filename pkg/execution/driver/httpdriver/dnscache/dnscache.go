@@ -54,7 +54,7 @@ func New(opts ...ResolverOpts) *resolver {
 	}
 
 	// initialize the cache
-	r.cache = ccache.New(ccache.Configure[cacheType]().MaxSize(10_000).ItemsToPrune(500))
+	r.cache = ccache.New(ccache.Configure[cacheType]().MaxSize(10_000).PercentToPrune(5))
 
 	return &r
 }

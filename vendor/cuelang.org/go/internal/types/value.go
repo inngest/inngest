@@ -25,13 +25,5 @@ type Value struct {
 }
 
 type Interface interface {
-	Core(v *Value)
-}
-
-func CastValue(t *Value, x interface{}) bool {
-	c, ok := x.(Interface)
-	if ok {
-		c.Core(t)
-	}
-	return ok
+	Core() Value
 }

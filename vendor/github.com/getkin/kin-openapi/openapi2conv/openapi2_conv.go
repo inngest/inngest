@@ -28,7 +28,7 @@ func ToV3WithLoader(doc2 *openapi2.T, loader *openapi3.Loader, location *url.URL
 
 	if host := doc2.Host; host != "" {
 		if strings.Contains(host, "/") {
-			err := fmt.Errorf("invalid host %q. This MUST be the host only and does not include the scheme nor sub-paths.", host)
+			err := fmt.Errorf("invalid host %q. This MUST be the host only and does not include the scheme nor sub-paths", host)
 			return nil, err
 		}
 		schemes := doc2.Schemes
@@ -149,12 +149,13 @@ func ToV3Operation(doc2 *openapi2.T, components *openapi3.Components, pathItem *
 		return nil, nil
 	}
 	doc3 := &openapi3.Operation{
-		OperationID: operation.OperationID,
-		Summary:     operation.Summary,
-		Description: operation.Description,
-		Deprecated:  operation.Deprecated,
-		Tags:        operation.Tags,
-		Extensions:  stripNonExtensions(operation.Extensions),
+		OperationID:  operation.OperationID,
+		Summary:      operation.Summary,
+		Description:  operation.Description,
+		Deprecated:   operation.Deprecated,
+		Tags:         operation.Tags,
+		Extensions:   stripNonExtensions(operation.Extensions),
+		ExternalDocs: operation.ExternalDocs,
 	}
 	if v := operation.Security; v != nil {
 		doc3Security := ToV3SecurityRequirements(*v)
@@ -483,7 +484,7 @@ func ToV3SchemaRef(schema *openapi2.SchemaRef) *openapi3.SchemaRef {
 	}
 
 	v3Schema := &openapi3.Schema{
-		Extensions:           schema.Extensions,
+		Extensions:           schema.Value.Extensions,
 		Type:                 schema.Value.Type,
 		Title:                schema.Value.Title,
 		Format:               schema.Value.Format,
@@ -534,7 +535,7 @@ func ToV3SchemaRef(schema *openapi2.SchemaRef) *openapi3.SchemaRef {
 	for i, v := range schema.Value.AllOf {
 		v3Schema.AllOf[i] = ToV3SchemaRef(v)
 	}
-	if val, ok := schema.Value.Extensions["x-nullable"]; ok {
+	if val, ok := v3Schema.Extensions["x-nullable"]; ok {
 		if nullable, valid := val.(bool); valid {
 			v3Schema.Nullable = nullable
 			delete(v3Schema.Extensions, "x-nullable")
@@ -567,6 +568,14 @@ func convertRefsInV3SchemaRef(from *openapi3.SchemaRef) *openapi3.SchemaRef {
 			to.Value.Items.Ref = ToV3Ref(to.Value.Items.Ref)
 		}
 		to.Value.AdditionalProperties = toV3AdditionalProperties(to.Value.AdditionalProperties)
+
+		if len(to.Value.AllOf) > 0 {
+			allOf := make(openapi3.SchemaRefs, len(to.Value.AllOf))
+			for i, schemaRef := range to.Value.AllOf {
+				allOf[i] = convertRefsInV3SchemaRef(schemaRef)
+			}
+			to.Value.AllOf = allOf
+		}
 	}
 	return &to
 }
@@ -678,12 +687,11 @@ func FromV3(doc3 *openapi3.T) (*openapi2.T, error) {
 	isHTTP := false
 	servers := doc3.Servers
 	for i, server := range servers {
-		parsedURL, err := url.Parse(server.URL)
-		if err == nil {
-			// See which schemes seem to be supported
-			if parsedURL.Scheme == "https" {
+		if parsedURL, err := url.Parse(server.URL); err == nil {
+			switch parsedURL.Scheme {
+			case "https":
 				isHTTPS = true
-			} else if parsedURL.Scheme == "http" {
+			case "http":
 				isHTTP = true
 			}
 			// The first server is assumed to provide the base path
@@ -1065,12 +1073,13 @@ func FromV3Operation(doc3 *openapi3.T, operation *openapi3.Operation) (*openapi2
 		return nil, nil
 	}
 	result := &openapi2.Operation{
-		OperationID: operation.OperationID,
-		Summary:     operation.Summary,
-		Description: operation.Description,
-		Deprecated:  operation.Deprecated,
-		Tags:        operation.Tags,
-		Extensions:  stripNonExtensions(operation.Extensions),
+		OperationID:  operation.OperationID,
+		Summary:      operation.Summary,
+		Description:  operation.Description,
+		Deprecated:   operation.Deprecated,
+		Tags:         operation.Tags,
+		Extensions:   stripNonExtensions(operation.Extensions),
+		ExternalDocs: operation.ExternalDocs,
 	}
 	if v := operation.Security; v != nil {
 		resultSecurity := FromV3SecurityRequirements(*v)

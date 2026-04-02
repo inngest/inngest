@@ -93,12 +93,18 @@ func (b *bucket[T]) set(key string, value T, duration time.Duration, track bool)
 	return item, existing
 }
 
-func (b *bucket[T]) delete(key string) *Item[T] {
+func (b *bucket[T]) remove(key string) *Item[T] {
 	b.Lock()
 	item := b.lookup[key]
 	delete(b.lookup, key)
 	b.Unlock()
 	return item
+}
+
+func (b *bucket[T]) delete(key string) {
+	b.Lock()
+	delete(b.lookup, key)
+	b.Unlock()
 }
 
 // This is an expensive operation, so we do what we can to optimize it and limit

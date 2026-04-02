@@ -36,7 +36,7 @@ func (cmd *Command) parseFlags(args Args) (Args, error) {
 			pCmd.Name, cmd.Name,
 		)
 
-		for _, fl := range pCmd.Flags {
+		for _, fl := range pCmd.allFlags() {
 			flNames := fl.Names()
 
 			pfl, ok := fl.(LocalFlag)
@@ -80,12 +80,20 @@ func (cmd *Command) parseFlags(args Args) (Args, error) {
 
 		firstArg := strings.TrimSpace(rargs[0])
 		if len(firstArg) == 0 {
-			break
+			posArgs = append(posArgs, rargs[0])
+			continue
 		}
 
 		// stop parsing once we see a "--"
 		if firstArg == "--" {
 			posArgs = append(posArgs, rargs[1:]...)
+			return &stringSliceArgs{posArgs}, nil
+		}
+
+		// Check if we've reached the Nth argument and should stop flag parsing
+		if cmd.StopOnNthArg != nil && len(posArgs) == *cmd.StopOnNthArg {
+			// Append current arg and all remaining args without parsing
+			posArgs = append(posArgs, rargs[0:]...)
 			return &stringSliceArgs{posArgs}, nil
 		}
 
@@ -129,15 +137,17 @@ func (cmd *Command) parseFlags(args Args) (Args, error) {
 
 		flagName := firstArg[numMinuses:]
 		flagVal := ""
+		valFromEqual := false
 		tracef("flagName:1 (fName=%[1]q)", flagName)
 		if index := strings.Index(flagName, "="); index != -1 {
 			flagVal = flagName[index+1:]
 			flagName = flagName[:index]
+			valFromEqual = true
 		}
 
 		tracef("flagName:2 (fName=%[1]q) (fVal=%[2]q)", flagName, flagVal)
 
-		f := cmd.lookupFlag(flagName)
+		f := cmd.lookupAppliedFlag(flagName)
 		// found a flag matching given flagName
 		if f != nil {
 			tracef("Trying flag type (fName=%[1]q) (type=%[2]T)", flagName, f)
@@ -154,7 +164,7 @@ func (cmd *Command) parseFlags(args Args) (Args, error) {
 
 			tracef("processing non bool flag (fName=%[1]q)", flagName)
 			// not a bool flag so need to get the next arg
-			if flagVal == "" {
+			if flagVal == "" && !valFromEqual {
 				if len(rargs) == 1 {
 					return &stringSliceArgs{posArgs}, fmt.Errorf("%s%s", argumentNotProvidedErrMsg, firstArg)
 				}
@@ -198,6 +208,7 @@ func (cmd *Command) parseFlags(args Args) (Args, error) {
 						return &stringSliceArgs{posArgs}, fmt.Errorf("%s%s", argumentNotProvidedErrMsg, string(c))
 					}
 					flagVal = rargs[1]
+					rargs = rargs[1:]
 				}
 				tracef("parseFlags (flagName %[1]q) (flagVal %[2]q)", flagName, flagVal)
 				if err := cmd.set(flagName, sf, flagVal); err != nil {

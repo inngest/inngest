@@ -33,13 +33,17 @@ func Resolve(ctx *OpContext, c Conjunct) *Vertex {
 
 	var v Value
 
-	expr := c.Expr()
+	expr := c.Elem() // TODO: why is this not Expr?
 	switch x := expr.(type) {
 	case Value:
 		v = x
 
 	case Resolver:
-		r, err := ctx.Resolve(env, x)
+		r, err := ctx.resolveState(c, x, Flags{
+			status:    finalized,
+			condition: allKnown,
+			mode:      attemptOnly,
+		})
 		if err != nil {
 			v = err
 			break
@@ -49,18 +53,18 @@ func Resolve(ctx *OpContext, c Conjunct) *Vertex {
 
 	case Evaluator:
 		// TODO: have a way to evaluate, but not strip down to the value.
-		v, _ = ctx.Evaluate(env, expr)
+		v, _ = ctx.Evaluate(env, expr.(Expr))
 
 	default:
 		// Unknown type.
 		v = ctx.NewErrf(
-			"could not evaluate expression %s of type %T", c.Expr(), c)
+			"could not evaluate expression %s of type %T", c.Elem(), c)
 	}
 
 	return ToVertex(v)
 }
 
-// A Node is any abstract data type representing an value or expression.
+// A Node is any abstract data type representing a value or expression.
 type Node interface {
 	Source() ast.Node
 	node() // enforce internal.
@@ -108,22 +112,22 @@ type Evaluator interface {
 
 	// evaluate evaluates the underlying expression. If the expression
 	// is incomplete, it may record the error in ctx and return nil.
-	evaluate(ctx *OpContext) Value
+	evaluate(ctx *OpContext, state Flags) Value
 }
 
 // A Resolver represents a reference somewhere else within a tree that resolves
 // a value.
 type Resolver interface {
 	Node
-	resolve(ctx *OpContext, state VertexStatus) *Vertex
+	resolve(ctx *OpContext, state Flags) *Vertex
 }
 
-type YieldFunc func(env *Environment, s *StructLit)
+type YieldFunc func(env *Environment)
 
 // A Yielder represents 0 or more labeled values of structs or lists.
 type Yielder interface {
 	Node
-	yield(ctx *OpContext, fn YieldFunc)
+	yield(s *compState)
 }
 
 // A Validator validates a Value. All Validators are Values.
@@ -134,6 +138,9 @@ type Validator interface {
 
 // Pos returns the file position of n, or token.NoPos if it is unknown.
 func Pos(n Node) token.Pos {
+	if n == nil {
+		return token.NoPos
+	}
 	src := n.Source()
 	if src == nil {
 		return token.NoPos
@@ -183,6 +190,13 @@ func (*StructLit) expr()       {}
 func (*ListLit) expr()         {}
 func (*DisjunctionExpr) expr() {}
 
+// TODO: also allow?
+//       a: b: if cond {}
+//
+// It is unclear here, though, whether field `a` should be added
+// unconditionally.
+// func (*Comprehension) expr() {}
+
 // Expr and Value
 
 func (*Bottom) expr()           {}
@@ -221,18 +235,35 @@ func (*SliceExpr) expr()     {}
 func (*Interpolation) expr() {}
 func (*UnaryExpr) expr()     {}
 func (*BinaryExpr) expr()    {}
+func (*OpenExpr) expr()      {}
 func (*CallExpr) expr()      {}
 
 // Decl and Expr (so allow attaching original source in Conjunct)
 
 func (*Field) declNode()                {}
 func (x *Field) expr() Expr             { return x.Value }
-func (*OptionalField) declNode()        {}
-func (x *OptionalField) expr() Expr     { return x.Value }
+func (*LetField) declNode()             {}
+func (x *LetField) expr() Expr          { return x.Value }
 func (*BulkOptionalField) declNode()    {}
 func (x *BulkOptionalField) expr() Expr { return x.Value }
 func (*DynamicField) declNode()         {}
 func (x *DynamicField) expr() Expr      { return x.Value }
+
+// Decl, Elem, and Expr (so allow attaching original source in Conjunct)
+
+func (*Ellipsis) elemNode() {}
+func (*Ellipsis) declNode() {}
+func (x *Ellipsis) expr() Expr {
+	if x.Value == nil {
+		return top
+	}
+	return x.Value
+}
+func (*ConjunctGroup) declNode() {}
+func (*ConjunctGroup) elemNode() {}
+func (*ConjunctGroup) expr()     {}
+
+var top = &Top{}
 
 // Decl and Yielder
 
@@ -244,8 +275,6 @@ func (*StructLit) declNode()        {}
 func (*StructLit) elemNode()        {}
 func (*ListLit) declNode()          {}
 func (*ListLit) elemNode()          {}
-func (*Ellipsis) elemNode()         {}
-func (*Ellipsis) declNode()         {}
 func (*Bottom) declNode()           {}
 func (*Bottom) elemNode()           {}
 func (*Null) declNode()             {}
@@ -304,6 +333,8 @@ func (*UnaryExpr) declNode()        {}
 func (*UnaryExpr) elemNode()        {}
 func (*BinaryExpr) declNode()       {}
 func (*BinaryExpr) elemNode()       {}
+func (*OpenExpr) declNode()         {}
+func (*OpenExpr) elemNode()         {}
 func (*CallExpr) declNode()         {}
 func (*CallExpr) elemNode()         {}
 func (*Builtin) declNode()          {}
@@ -313,17 +344,15 @@ func (*DisjunctionExpr) elemNode()  {}
 
 // Decl, Elem, and Yielder
 
-func (*ForClause) declNode() {}
-func (*ForClause) elemNode() {}
-func (*IfClause) declNode()  {}
-func (*IfClause) elemNode()  {}
-
-// Yielder only: ValueClause
+func (*Comprehension) declNode() {}
+func (*Comprehension) elemNode() {}
 
 // Node
 
 func (*Vertex) node()            {}
 func (*Conjunction) node()       {}
+func (*OpenExpr) node()          {}
+func (*ConjunctGroup) node()     {}
 func (*Disjunction) node()       {}
 func (*BoundValue) node()        {}
 func (*Builtin) node()           {}
@@ -355,11 +384,12 @@ func (*BinaryExpr) node()        {}
 func (*CallExpr) node()          {}
 func (*DisjunctionExpr) node()   {}
 func (*Field) node()             {}
-func (*OptionalField) node()     {}
+func (*LetField) node()          {}
 func (*BulkOptionalField) node() {}
 func (*DynamicField) node()      {}
 func (*Ellipsis) node()          {}
+func (*Comprehension) node()     {}
 func (*ForClause) node()         {}
 func (*IfClause) node()          {}
 func (*LetClause) node()         {}
-func (*ValueClause) node()       {}
+func (*TryClause) node()         {}

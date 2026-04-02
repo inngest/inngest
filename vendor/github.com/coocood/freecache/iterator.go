@@ -14,8 +14,9 @@ type Iterator struct {
 
 // Entry represents a key/value pair.
 type Entry struct {
-	Key   []byte
-	Value []byte
+	Key      []byte
+	Value    []byte
+	ExpireAt uint32
 }
 
 // Next returns the next entry for the iterator.
@@ -63,6 +64,7 @@ func (it *Iterator) nextForSlot(seg *segment, slotId int) *Entry {
 			entry := new(Entry)
 			entry.Key = make([]byte, hdr.keyLen)
 			entry.Value = make([]byte, hdr.valLen)
+			entry.ExpireAt = hdr.expireAt
 			seg.rb.ReadAt(entry.Key, ptr.offset+ENTRY_HDR_SIZE)
 			seg.rb.ReadAt(entry.Value, ptr.offset+ENTRY_HDR_SIZE+int64(hdr.keyLen))
 			return entry

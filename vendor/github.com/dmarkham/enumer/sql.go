@@ -1,7 +1,6 @@
 package main
 
-// Arguments to format are:
-//	[1]: type name
+// Arguments to format are: [1]: type name
 const valueMethod = `func (i %[1]s) Value() (driver.Value, error) {
 	return i.String(), nil
 }

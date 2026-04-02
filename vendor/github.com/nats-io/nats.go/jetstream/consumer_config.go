@@ -75,9 +75,31 @@ type (
 
 		// TimeStamp indicates when the info was gathered by the server.
 		TimeStamp time.Time `json:"ts"`
+
+		// PriorityGroups contains the information about the currently defined priority groups
+		PriorityGroups []PriorityGroupState `json:"priority_groups,omitempty"`
+
+		// Paused indicates whether the consumer is paused.
+		Paused bool `json:"paused,omitempty"`
+
+		// PauseRemaining contains the amount of time left until the consumer
+		// unpauses. It will only be non-zero if the consumer is currently paused.
+		PauseRemaining time.Duration `json:"pause_remaining,omitempty"`
 	}
 
-	// ConsumerConfig is the configuration of a JetStream consumer.
+	PriorityGroupState struct {
+		// Group this status is for.
+		Group string `json:"group"`
+
+		// PinnedClientID is the generated ID of the pinned client.
+		PinnedClientID string `json:"pinned_client_id,omitempty"`
+
+		// PinnedTS is the timestamp when the client was pinned.
+		PinnedTS time.Time `json:"pinned_ts,omitempty"`
+	}
+
+	// ConsumerConfig represents the configuration of a JetStream consumer,
+	// encompassing both push and pull consumer settings
 	ConsumerConfig struct {
 		// Name is an optional name for the consumer. If not set, one is
 		// generated automatically.
@@ -194,14 +216,14 @@ type (
 		// settings from stream's ConsumerLimits. If neither are set, server
 		// default is 5 seconds.
 		//
-		// A consumer is considered inactive there are not pull requests
-		// received by the server (for pull consumers), or no interest detected
-		// on deliver subject (for push consumers), not if there are no
+		// A consumer is considered inactive if no pull requests are received by
+		// the server (for pull consumers), or no interest is detected on the
+		// deliver subject (for push consumers), not if there are no
 		// messages to be delivered.
 		InactiveThreshold time.Duration `json:"inactive_threshold,omitempty"`
 
-		// Replicas the number of replicas for the consumer's state. By default,
-		// consumers inherit the number of replicas from the stream.
+		// Replicas is the number of replicas for the consumer's state. By
+		// default, consumers inherit the number of replicas from the stream.
 		Replicas int `json:"num_replicas"`
 
 		// MemoryStorage is a flag to force the consumer to use memory storage
@@ -217,6 +239,41 @@ type (
 		// associating metadata on the consumer. This feature requires
 		// nats-server v2.10.0 or later.
 		Metadata map[string]string `json:"metadata,omitempty"`
+
+		// PauseUntil is for suspending the consumer until the deadline.
+		PauseUntil *time.Time `json:"pause_until,omitempty"`
+
+		// PriorityPolicy represents the priority policy the consumer is set to.
+		// Requires nats-server v2.11.0 or later.
+		PriorityPolicy PriorityPolicy `json:"priority_policy,omitempty"`
+
+		// PinnedTTL represents the time after which the client will be unpinned
+		// if no new pull requests are sent. Used with PriorityPolicyPinned.
+		// Requires nats-server v2.11.0 or later.
+		PinnedTTL time.Duration `json:"priority_timeout,omitempty"`
+
+		// PriorityGroups is a list of priority groups this consumer supports.
+		PriorityGroups []string `json:"priority_groups,omitempty"`
+
+		// Fields specific to push consumers:
+
+		// DeliverSubject is the subject to deliver messages to for push consumers
+		DeliverSubject string `json:"deliver_subject,omitempty"`
+
+		// DeliverGroup is the group name for push consumers
+		DeliverGroup string `json:"deliver_group,omitempty"`
+
+		// FlowControl is a flag to enable flow control for the consumer.
+		// When set, the server will regularly send an empty message with status
+		// header 100 and a reply subject. Consumers must reply to these
+		// messages to control the rate of message delivery.
+		FlowControl bool `json:"flow_control,omitempty"`
+
+		// IdleHeartbeat enables push consumer idle heartbeat messages.
+		// If the Consumer is idle for more than the set value, an empty message
+		// with Status header 100 will be sent indicating the consumer is still
+		// alive.
+		IdleHeartbeat time.Duration `json:"idle_heartbeat,omitempty"`
 	}
 
 	// OrderedConsumerConfig is the configuration of an ordered JetStream
@@ -245,24 +302,35 @@ type (
 
 		// ReplayPolicy defines the rate at which messages are sent to the
 		// consumer. If ReplayOriginalPolicy is set, messages are sent in the
-		// same intervals in which they were stored on stream. This can be used
-		// e.g. to simulate production traffic in development environments. If
-		// ReplayInstantPolicy is set, messages are sent as fast as possible.
+		// same intervals in which they were stored on the stream. This can be
+		// used e.g. to simulate production traffic in development environments.
+		// If ReplayInstantPolicy is set, messages are sent as fast as possible.
 		// Defaults to ReplayInstantPolicy.
 		ReplayPolicy ReplayPolicy `json:"replay_policy"`
 
 		// InactiveThreshold is a duration which instructs the server to clean
 		// up the consumer if it has been inactive for the specified duration.
-		// Defaults to 5s.
+		// Defaults to 5m.
 		InactiveThreshold time.Duration `json:"inactive_threshold,omitempty"`
 
 		// HeadersOnly indicates whether only headers of messages should be sent
 		// (and no payload). Defaults to false.
 		HeadersOnly bool `json:"headers_only,omitempty"`
 
-		// Maximum number of attempts for the consumer to be recreated in a
-		// single recreation cycle. Defaults to unlimited.
+		// MaxResetAttempts is the maximum number of attempts to recreate the
+		// consumer in a single recovery cycle. Defaults to unlimited.
 		MaxResetAttempts int
+
+		// Metadata is a set of application-defined key-value pairs for
+		// associating metadata with the consumer. This feature requires
+		// nats-server v2.10.0 or later.
+		Metadata map[string]string `json:"metadata,omitempty"`
+
+		// NamePrefix is an optional custom prefix for the consumer name.
+		// If provided, ordered consumer names will be generated as:
+		// {NamePrefix}_{sequence_number} (e.g., "custom_1", "custom_2").
+		// If not provided, a unique ID (NUID) will be used as the prefix.
+		NamePrefix string `json:"-"`
 	}
 
 	// DeliverPolicy determines from which point to start delivering messages.
@@ -283,7 +351,59 @@ type (
 		Stream   uint64     `json:"stream_seq"`
 		Last     *time.Time `json:"last_active,omitempty"`
 	}
+
+	// PriorityPolicy determines the priority policy the consumer is set to.
+	PriorityPolicy int
 )
+
+const (
+	// PriorityPolicyNone is the default priority policy.
+	PriorityPolicyNone PriorityPolicy = iota
+
+	// PriorityPolicyPinned is the priority policy that pins a consumer to a
+	// specific client.
+	PriorityPolicyPinned
+
+	// PriorityPolicyOverflow is the priority policy that allows for
+	// restricting when a consumer will receive messages based on the number of
+	// pending messages or acks.
+	PriorityPolicyOverflow
+
+	// PriorityPolicyPrioritized is the priority policy that allows for the
+	// server to deliver messages to clients based on their priority (instead
+	// of round-robin). Requires nats-server v2.12.0 or later.
+	PriorityPolicyPrioritized
+)
+
+func (p *PriorityPolicy) UnmarshalJSON(data []byte) error {
+	switch string(data) {
+	case jsonString(""):
+		*p = PriorityPolicyNone
+	case jsonString("pinned_client"):
+		*p = PriorityPolicyPinned
+	case jsonString("overflow"):
+		*p = PriorityPolicyOverflow
+	case jsonString("prioritized"):
+		*p = PriorityPolicyPrioritized
+	default:
+		return fmt.Errorf("nats: cannot unmarshal %q", data)
+	}
+	return nil
+}
+
+func (p PriorityPolicy) MarshalJSON() ([]byte, error) {
+	switch p {
+	case PriorityPolicyNone:
+		return json.Marshal("")
+	case PriorityPolicyPinned:
+		return json.Marshal("pinned_client")
+	case PriorityPolicyOverflow:
+		return json.Marshal("overflow")
+	case PriorityPolicyPrioritized:
+		return json.Marshal("prioritized")
+	}
+	return nil, fmt.Errorf("nats: unknown priority policy %v", p)
+}
 
 const (
 	// DeliverAllPolicy starts delivering messages from the very beginning of a
@@ -326,7 +446,7 @@ func (p *DeliverPolicy) UnmarshalJSON(data []byte) error {
 	case jsonString("last_per_subject"):
 		*p = DeliverLastPerSubjectPolicy
 	default:
-		return fmt.Errorf("nats: can not unmarshal %q", data)
+		return fmt.Errorf("nats: cannot unmarshal %q", data)
 	}
 
 	return nil
@@ -389,7 +509,7 @@ func (p *AckPolicy) UnmarshalJSON(data []byte) error {
 	case jsonString("explicit"):
 		*p = AckExplicitPolicy
 	default:
-		return fmt.Errorf("nats: can not unmarshal %q", data)
+		return fmt.Errorf("nats: cannot unmarshal %q", data)
 	}
 	return nil
 }
@@ -434,7 +554,7 @@ func (p *ReplayPolicy) UnmarshalJSON(data []byte) error {
 	case jsonString("original"):
 		*p = ReplayOriginalPolicy
 	default:
-		return fmt.Errorf("nats: can not unmarshal %q", data)
+		return fmt.Errorf("nats: cannot unmarshal %q", data)
 	}
 	return nil
 }

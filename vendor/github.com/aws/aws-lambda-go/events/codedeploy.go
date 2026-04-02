@@ -20,8 +20,6 @@ const (
 	CodeDeployDeploymentStateSuccess CodeDeployDeploymentState = "SUCCESS"
 )
 
-// CodeDeployEvent is documented at:
-// https://docs.aws.amazon.com/AmazonCloudWatch/latest/events/EventTypes.html#acd_event_types
 type CodeDeployEvent struct {
 	// AccountID is the id of the AWS account from which the event originated.
 	AccountID string `json:"account"`

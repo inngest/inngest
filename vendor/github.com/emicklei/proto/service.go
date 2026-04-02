@@ -73,6 +73,7 @@ func (s *Service) parse(p *Parser) error {
 		}
 	}
 	s.Name = lit
+	consumeCommentFor(p, s)
 	pos, tok, lit = p.next()
 	if tok != tLEFTCURLY {
 		return p.unexpected(lit, "service opening {", s)

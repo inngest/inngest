@@ -54,7 +54,7 @@ func (x *{{ $type.Name }}Ref) setRefPath(u *url.URL) {
 // MarshalYAML returns the YAML encoding of {{ $type.Name }}Ref.
 func (x {{ $type.Name }}Ref) MarshalYAML() (any, error) {
 	if ref := x.Ref; ref != "" {
-		return &Ref{Ref: ref}, nil
+		return &Ref{Ref: ref, Extensions: x.Extensions}, nil
 	}
 	return x.Value.MarshalYAML()
 }

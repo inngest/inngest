@@ -23,7 +23,6 @@ import (
 	"cuelang.org/go/cue/errors"
 	"cuelang.org/go/cue/literal"
 	"cuelang.org/go/cue/token"
-	"cuelang.org/go/internal"
 )
 
 // A Feature is an encoded form of a label which comprises a compact
@@ -37,7 +36,7 @@ const (
 	InvalidLabel Feature = 0
 
 	// MaxIndex indicates the maximum number of unique strings that are used for
-	// labeles within this CUE implementation.
+	// labels within this CUE implementation.
 	MaxIndex = 1<<(32-indexShift) - 1
 )
 
@@ -60,6 +59,9 @@ type StringIndexer interface {
 
 	// ToString returns a string s for index such that ToIndex(s) == index.
 	IndexToString(index int64) string
+
+	// NextUniqueID returns a new unique identifier.
+	NextUniqueID() uint64
 }
 
 // SelectorString reports the shortest string representation of f when used as a
@@ -68,13 +70,19 @@ func (f Feature) SelectorString(index StringIndexer) string {
 	x := f.safeIndex()
 	switch f.Typ() {
 	case IntLabel:
+		if f == AnyIndex {
+			return "_"
+		}
 		return strconv.Itoa(int(x))
 	case StringLabel:
-		s := index.IndexToString(x)
-		if ast.IsValidIdent(s) && !internal.IsDefOrHidden(s) {
-			return s
+		if f == AnyString {
+			return "_"
 		}
-		return literal.String.Quote(s)
+		s := index.IndexToString(x)
+		if ast.StringLabelNeedsQuoting(s) {
+			return literal.Label.Quote(s)
+		}
+		return s
 	default:
 		return f.IdentString(index)
 	}
@@ -84,7 +92,7 @@ func (f Feature) SelectorString(index StringIndexer) string {
 // is not an identifier label.
 func (f Feature) IdentString(index StringIndexer) string {
 	s := index.IndexToString(f.safeIndex())
-	if f.IsHidden() {
+	if f.IsHidden() || f.IsLet() {
 		if p := strings.IndexByte(s, '\x00'); p >= 0 {
 			s = s[:p]
 		}
@@ -115,6 +123,12 @@ func (f Feature) StringValue(index StringIndexer) string {
 	return index.IndexToString(x)
 }
 
+// RawString reports the underlying string value of f without interpretation.
+func (f Feature) RawString(index StringIndexer) string {
+	x := f.safeIndex()
+	return index.IndexToString(x)
+}
+
 // ToValue converts a label to a value, which will be a Num for integer labels
 // and a String for string labels. It panics when f is not a regular label.
 func (f Feature) ToValue(ctx *OpContext) Value {
@@ -132,7 +146,7 @@ func (f Feature) ToValue(ctx *OpContext) Value {
 
 // StringLabel converts s to a string label.
 func (c *OpContext) StringLabel(s string) Feature {
-	return labelFromValue(c, nil, &String{Str: s})
+	return LabelFromValue(c, nil, &String{Str: s})
 }
 
 // MakeStringLabel creates a label for the given string.
@@ -153,11 +167,11 @@ func MakeIdentLabel(r StringIndexer, s, pkgpath string) Feature {
 	switch {
 	case strings.HasPrefix(s, "_#"):
 		t = HiddenDefinitionLabel
-		s = fmt.Sprintf("%s\x00%s", s, pkgpath)
+		s = HiddenKey(s, pkgpath)
 	case strings.HasPrefix(s, "#"):
 		t = DefinitionLabel
 	case strings.HasPrefix(s, "_"):
-		s = fmt.Sprintf("%s\x00%s", s, pkgpath)
+		s = HiddenKey(s, pkgpath)
 		t = HiddenLabel
 	}
 	i := r.StringToIndex(s)
@@ -168,19 +182,64 @@ func MakeIdentLabel(r StringIndexer, s, pkgpath string) Feature {
 	return f
 }
 
+// HiddenKey constructs the uniquely identifying string for a hidden fields and
+// its package.
+func HiddenKey(s, pkgPath string) string {
+	// TODO: Consider just using space instead of \x00.
+	return fmt.Sprintf("%s\x00%s", s, pkgPath)
+}
+
+// MakeNamedLabel creates a feature for the given name and feature type.
+func MakeNamedLabel(r StringIndexer, t FeatureType, s string) Feature {
+	i := r.StringToIndex(s)
+	f, err := MakeLabel(nil, i, t)
+	if err != nil {
+		panic("out of free string slots")
+	}
+	return f
+}
+
+// MakeLetLabel creates a label for the given let identifier s.
+//
+// A let declaration is always logically unique within its scope and will never
+// unify with a let field of another struct. This is enforced by ensuring that
+// the let identifier is unique across an entire configuration. This, in turn,
+// is done by adding a unique number to each let identifier.
+func MakeLetLabel(r StringIndexer, s string) Feature {
+	id := r.NextUniqueID()
+	s = fmt.Sprintf("%s\x00%X", s, id)
+	i := r.StringToIndex(s)
+	f, err := MakeLabel(nil, i, LetLabel)
+	if err != nil {
+		panic("out of free string slots")
+	}
+	return f
+}
+
+// MakeIntLabel creates an integer label.
+func MakeIntLabel(t FeatureType, i int64) Feature {
+	f, err := MakeLabel(nil, i, t)
+	if err != nil {
+		panic("index out of range")
+	}
+	return f
+}
+
 const msgGround = "invalid non-ground value %s (must be concrete %s)"
 
-func labelFromValue(c *OpContext, src Expr, v Value) Feature {
+func LabelFromValue(c *OpContext, src Expr, v Value) Feature {
+	v, _ = c.getDefault(v)
+
 	var i int64
 	var t FeatureType
 	if isError(v) {
 		return InvalidLabel
 	}
 	switch v.Kind() {
-	case IntKind, NumKind:
+	case IntKind, NumberKind:
 		x, _ := Unwrap(v).(*Num)
 		if x == nil {
-			c.addErrf(IncompleteError, pos(v), msgGround, v, "int")
+			c.addErrf(IncompleteError, Pos(v), msgGround, v, "int")
 			return InvalidLabel
 		}
 		t = IntLabel
@@ -198,10 +257,10 @@ func labelFromValue(c *OpContext, src Expr, v Value) Feature {
 			case nil, *Num, *UnaryExpr:
 				// If the value is a constant, we know it is always an error.
 				// UnaryExpr is an approximation for a constant value here.
-				c.AddErrf("invalid index %s (index must be non-negative)", x)
+				c.AddErrf("invalid index %v (index must be non-negative)", x)
 			default:
 				// Use a different message is it is the result of evaluation.
-				c.AddErrf("index %s out of range [%s]", src, x)
+				c.AddErrf("index %v out of range [%v]", src, x)
 			}
 			return InvalidLabel
 		}
@@ -209,7 +268,7 @@ func labelFromValue(c *OpContext, src Expr, v Value) Feature {
 	case StringKind:
 		x, _ := Unwrap(v).(*String)
 		if x == nil {
-			c.addErrf(IncompleteError, pos(v), msgGround, v, "string")
+			c.addErrf(IncompleteError, Pos(v), msgGround, v, "string")
 			return InvalidLabel
 		}
 		t = StringLabel
@@ -260,6 +319,7 @@ const (
 	DefinitionLabel
 	HiddenLabel
 	HiddenDefinitionLabel
+	LetLabel
 )
 
 const (
@@ -274,6 +334,10 @@ func (f FeatureType) IsDef() bool {
 
 func (f FeatureType) IsHidden() bool {
 	return f == HiddenLabel || f == HiddenDefinitionLabel
+}
+
+func (f FeatureType) IsLet() bool {
+	return f == LetLabel
 }
 
 // IsValid reports whether f is a valid label.
@@ -292,7 +356,7 @@ func (f Feature) IsRegular() bool {
 func (f Feature) IsString() bool { return f.Typ() == StringLabel }
 
 // IsDef reports whether the label is a definition (an identifier starting with
-// # or #_.
+// # or _#.
 func (f Feature) IsDef() bool {
 	return f.Typ().IsDef()
 }
@@ -304,6 +368,11 @@ func (f Feature) IsInt() bool { return f.Typ() == IntLabel }
 // _ or #_).
 func (f Feature) IsHidden() bool {
 	return f.Typ().IsHidden()
+}
+
+// IsLet reports whether this label is a let field (like `let X = value`).
+func (f Feature) IsLet() bool {
+	return f.Typ().IsLet()
 }
 
 // Index reports the abstract index associated with f.
@@ -319,6 +388,3 @@ func (f Feature) safeIndex() int64 {
 	}
 	return int64(x)
 }
-
-// TODO: should let declarations be implemented as fields?
-// func (f Feature) isLet() bool  { return f.typ() == letLabel }

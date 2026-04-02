@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package pkg define CUE standard packages.
+// Package pkg defines CUE standard packages.
 //
 // Many of the standard packages are modeled after and generated from the Go
 // core packages. The types, values, and functions are defined as their Go
@@ -29,10 +29,12 @@
 //   - no querying of the file system of any kind
 //   - no communication on the network
 //   - no information about the type of environment
-//   - only reproduceable random generators
+//   - only reproducible random generators
 //
 // Hermetic configurations allow for fast and advanced analysis that otherwise
 // would not be possible or practical. The cue "cmd" command can be used to mix
 // in non-hermetic influences into configurations by using packages defined
 // in the tool subdirectory.
 package pkg
+
+//go:generate go run gen.go

@@ -1,4 +1,4 @@
-// Copyright 2021-2024 The Connect Authors
+// Copyright 2021-2025 The Connect Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -33,7 +33,7 @@ import (
 )
 
 // Version is the semantic version of the connect module.
-const Version = "1.16.1"
+const Version = "1.19.1"
 
 // These constants are used in compile-time handshakes with connect's generated
 // code.
@@ -339,7 +339,7 @@ type Peer struct {
 	Query    url.Values // server-only
 }
 
-func newPeerFromURL(url *url.URL, protocol string) Peer {
+func newPeerForURL(url *url.URL, protocol string) Peer {
 	return Peer{
 		Addr:     url.Host,
 		Protocol: protocol,
@@ -366,6 +366,47 @@ type receiveConn interface {
 // POST.
 type hasHTTPMethod interface {
 	getHTTPMethod() string
+}
+
+// errStreamingClientConn is a sentinel error implementation of StreamingClientConn.
+type errStreamingClientConn struct {
+	err error
+}
+
+func (c *errStreamingClientConn) Receive(msg any) error {
+	return c.err
+}
+
+func (c *errStreamingClientConn) Spec() Spec {
+	return Spec{}
+}
+
+func (c *errStreamingClientConn) Peer() Peer {
+	return Peer{}
+}
+
+func (c *errStreamingClientConn) Send(msg any) error {
+	return c.err
+}
+
+func (c *errStreamingClientConn) CloseRequest() error {
+	return c.err
+}
+
+func (c *errStreamingClientConn) CloseResponse() error {
+	return c.err
+}
+
+func (c *errStreamingClientConn) RequestHeader() http.Header {
+	return make(http.Header)
+}
+
+func (c *errStreamingClientConn) ResponseHeader() http.Header {
+	return make(http.Header)
+}
+
+func (c *errStreamingClientConn) ResponseTrailer() http.Header {
+	return make(http.Header)
 }
 
 // receiveUnaryResponse unmarshals a message from a StreamingClientConn, then
@@ -424,7 +465,7 @@ func receiveUnaryMessage[T any](conn receiveConn, initializer maybeInitializer, 
 	}
 	// In a well-formed stream, the one message must be the only content in the body.
 	// To verify that it is well-formed, try to read another message from the stream.
-	// TODO: optimise this second receive: ideally do it w/out allocation, w/out
+	// TODO: optimize this second receive: ideally do it w/out allocation, w/out
 	//       fully reading next message (if one is present), and w/out trying to
 	//       actually unmarshal the bytes)
 	var msg2 T

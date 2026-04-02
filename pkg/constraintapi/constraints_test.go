@@ -26,7 +26,7 @@ func TestConstraintEnforcement(t *testing.T) {
 
 	type deps struct {
 		cm    *redisCapacityManager
-		clock clockwork.FakeClock
+		clock *clockwork.FakeClock
 		r     *miniredis.Miniredis
 		rc    rueidis.Client
 

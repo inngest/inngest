@@ -160,6 +160,87 @@ func (c Xadd) Key(key string) XaddKey {
 	return (XaddKey)(c)
 }
 
+type XaddConditionAcked Incomplete
+
+func (c XaddConditionAcked) Idmpauto() XaddIdmpIdmpautoIdmpauto {
+	c.cs.s = append(c.cs.s, "IDMPAUTO")
+	return (XaddIdmpIdmpautoIdmpauto)(c)
+}
+
+func (c XaddConditionAcked) Idmp() XaddIdmpIdmpIdmp {
+	c.cs.s = append(c.cs.s, "IDMP")
+	return (XaddIdmpIdmpIdmp)(c)
+}
+
+func (c XaddConditionAcked) Maxlen() XaddTrimStrategyMaxlen {
+	c.cs.s = append(c.cs.s, "MAXLEN")
+	return (XaddTrimStrategyMaxlen)(c)
+}
+
+func (c XaddConditionAcked) Minid() XaddTrimStrategyMinid {
+	c.cs.s = append(c.cs.s, "MINID")
+	return (XaddTrimStrategyMinid)(c)
+}
+
+func (c XaddConditionAcked) Id(id string) XaddId {
+	c.cs.s = append(c.cs.s, id)
+	return (XaddId)(c)
+}
+
+type XaddConditionDelref Incomplete
+
+func (c XaddConditionDelref) Idmpauto() XaddIdmpIdmpautoIdmpauto {
+	c.cs.s = append(c.cs.s, "IDMPAUTO")
+	return (XaddIdmpIdmpautoIdmpauto)(c)
+}
+
+func (c XaddConditionDelref) Idmp() XaddIdmpIdmpIdmp {
+	c.cs.s = append(c.cs.s, "IDMP")
+	return (XaddIdmpIdmpIdmp)(c)
+}
+
+func (c XaddConditionDelref) Maxlen() XaddTrimStrategyMaxlen {
+	c.cs.s = append(c.cs.s, "MAXLEN")
+	return (XaddTrimStrategyMaxlen)(c)
+}
+
+func (c XaddConditionDelref) Minid() XaddTrimStrategyMinid {
+	c.cs.s = append(c.cs.s, "MINID")
+	return (XaddTrimStrategyMinid)(c)
+}
+
+func (c XaddConditionDelref) Id(id string) XaddId {
+	c.cs.s = append(c.cs.s, id)
+	return (XaddId)(c)
+}
+
+type XaddConditionKeepref Incomplete
+
+func (c XaddConditionKeepref) Idmpauto() XaddIdmpIdmpautoIdmpauto {
+	c.cs.s = append(c.cs.s, "IDMPAUTO")
+	return (XaddIdmpIdmpautoIdmpauto)(c)
+}
+
+func (c XaddConditionKeepref) Idmp() XaddIdmpIdmpIdmp {
+	c.cs.s = append(c.cs.s, "IDMP")
+	return (XaddIdmpIdmpIdmp)(c)
+}
+
+func (c XaddConditionKeepref) Maxlen() XaddTrimStrategyMaxlen {
+	c.cs.s = append(c.cs.s, "MAXLEN")
+	return (XaddTrimStrategyMaxlen)(c)
+}
+
+func (c XaddConditionKeepref) Minid() XaddTrimStrategyMinid {
+	c.cs.s = append(c.cs.s, "MINID")
+	return (XaddTrimStrategyMinid)(c)
+}
+
+func (c XaddConditionKeepref) Id(id string) XaddId {
+	c.cs.s = append(c.cs.s, id)
+	return (XaddId)(c)
+}
+
 type XaddFieldValue Incomplete
 
 func (c XaddFieldValue) FieldValue(field string, value string) XaddFieldValue {
@@ -178,11 +259,91 @@ func (c XaddId) FieldValue() XaddFieldValue {
 	return (XaddFieldValue)(c)
 }
 
+type XaddIdmpIdmpIdmp Incomplete
+
+func (c XaddIdmpIdmpIdmp) Pid(pid string) XaddIdmpIdmpPid {
+	c.cs.s = append(c.cs.s, pid)
+	return (XaddIdmpIdmpPid)(c)
+}
+
+type XaddIdmpIdmpIid Incomplete
+
+func (c XaddIdmpIdmpIid) Maxlen() XaddTrimStrategyMaxlen {
+	c.cs.s = append(c.cs.s, "MAXLEN")
+	return (XaddTrimStrategyMaxlen)(c)
+}
+
+func (c XaddIdmpIdmpIid) Minid() XaddTrimStrategyMinid {
+	c.cs.s = append(c.cs.s, "MINID")
+	return (XaddTrimStrategyMinid)(c)
+}
+
+func (c XaddIdmpIdmpIid) Id(id string) XaddId {
+	c.cs.s = append(c.cs.s, id)
+	return (XaddId)(c)
+}
+
+type XaddIdmpIdmpPid Incomplete
+
+func (c XaddIdmpIdmpPid) Iid(iid string) XaddIdmpIdmpIid {
+	c.cs.s = append(c.cs.s, iid)
+	return (XaddIdmpIdmpIid)(c)
+}
+
+type XaddIdmpIdmpautoIdmpauto Incomplete
+
+func (c XaddIdmpIdmpautoIdmpauto) Pid(pid string) XaddIdmpIdmpautoPid {
+	c.cs.s = append(c.cs.s, pid)
+	return (XaddIdmpIdmpautoPid)(c)
+}
+
+type XaddIdmpIdmpautoPid Incomplete
+
+func (c XaddIdmpIdmpautoPid) Maxlen() XaddTrimStrategyMaxlen {
+	c.cs.s = append(c.cs.s, "MAXLEN")
+	return (XaddTrimStrategyMaxlen)(c)
+}
+
+func (c XaddIdmpIdmpautoPid) Minid() XaddTrimStrategyMinid {
+	c.cs.s = append(c.cs.s, "MINID")
+	return (XaddTrimStrategyMinid)(c)
+}
+
+func (c XaddIdmpIdmpautoPid) Id(id string) XaddId {
+	c.cs.s = append(c.cs.s, id)
+	return (XaddId)(c)
+}
+
 type XaddKey Incomplete
 
 func (c XaddKey) Nomkstream() XaddNomkstream {
 	c.cs.s = append(c.cs.s, "NOMKSTREAM")
 	return (XaddNomkstream)(c)
+}
+
+func (c XaddKey) Keepref() XaddConditionKeepref {
+	c.cs.s = append(c.cs.s, "KEEPREF")
+	return (XaddConditionKeepref)(c)
+}
+
+func (c XaddKey) Delref() XaddConditionDelref {
+	c.cs.s = append(c.cs.s, "DELREF")
+	return (XaddConditionDelref)(c)
+}
+
+func (c XaddKey) Acked() XaddConditionAcked {
+	c.cs.s = append(c.cs.s, "ACKED")
+	return (XaddConditionAcked)(c)
+}
+
+func (c XaddKey) Idmpauto() XaddIdmpIdmpautoIdmpauto {
+	c.cs.s = append(c.cs.s, "IDMPAUTO")
+	return (XaddIdmpIdmpautoIdmpauto)(c)
+}
+
+func (c XaddKey) Idmp() XaddIdmpIdmpIdmp {
+	c.cs.s = append(c.cs.s, "IDMP")
+	return (XaddIdmpIdmpIdmp)(c)
 }
 
 func (c XaddKey) Maxlen() XaddTrimStrategyMaxlen {
@@ -202,6 +363,31 @@ func (c XaddKey) Id(id string) XaddId {
 
 type XaddNomkstream Incomplete
 
+func (c XaddNomkstream) Keepref() XaddConditionKeepref {
+	c.cs.s = append(c.cs.s, "KEEPREF")
+	return (XaddConditionKeepref)(c)
+}
+
+func (c XaddNomkstream) Delref() XaddConditionDelref {
+	c.cs.s = append(c.cs.s, "DELREF")
+	return (XaddConditionDelref)(c)
+}
+
+func (c XaddNomkstream) Acked() XaddConditionAcked {
+	c.cs.s = append(c.cs.s, "ACKED")
+	return (XaddConditionAcked)(c)
+}
+
+func (c XaddNomkstream) Idmpauto() XaddIdmpIdmpautoIdmpauto {
+	c.cs.s = append(c.cs.s, "IDMPAUTO")
+	return (XaddIdmpIdmpautoIdmpauto)(c)
+}
+
+func (c XaddNomkstream) Idmp() XaddIdmpIdmpIdmp {
+	c.cs.s = append(c.cs.s, "IDMP")
+	return (XaddIdmpIdmpIdmp)(c)
+}
+
 func (c XaddNomkstream) Maxlen() XaddTrimStrategyMaxlen {
 	c.cs.s = append(c.cs.s, "MAXLEN")
 	return (XaddTrimStrategyMaxlen)(c)
@@ -218,21 +404,6 @@ func (c XaddNomkstream) Id(id string) XaddId {
 }
 
 type XaddTrimLimit Incomplete
-
-func (c XaddTrimLimit) Keepref() XaddTrimReferenceKeepref {
-	c.cs.s = append(c.cs.s, "KEEPREF")
-	return (XaddTrimReferenceKeepref)(c)
-}
-
-func (c XaddTrimLimit) Delref() XaddTrimReferenceDelref {
-	c.cs.s = append(c.cs.s, "DELREF")
-	return (XaddTrimReferenceDelref)(c)
-}
-
-func (c XaddTrimLimit) Acked() XaddTrimReferenceAcked {
-	c.cs.s = append(c.cs.s, "ACKED")
-	return (XaddTrimReferenceAcked)(c)
-}
 
 func (c XaddTrimLimit) Id(id string) XaddId {
 	c.cs.s = append(c.cs.s, id)
@@ -251,27 +422,6 @@ type XaddTrimOperatorExact Incomplete
 func (c XaddTrimOperatorExact) Threshold(threshold string) XaddTrimThreshold {
 	c.cs.s = append(c.cs.s, threshold)
 	return (XaddTrimThreshold)(c)
-}
-
-type XaddTrimReferenceAcked Incomplete
-
-func (c XaddTrimReferenceAcked) Id(id string) XaddId {
-	c.cs.s = append(c.cs.s, id)
-	return (XaddId)(c)
-}
-
-type XaddTrimReferenceDelref Incomplete
-
-func (c XaddTrimReferenceDelref) Id(id string) XaddId {
-	c.cs.s = append(c.cs.s, id)
-	return (XaddId)(c)
-}
-
-type XaddTrimReferenceKeepref Incomplete
-
-func (c XaddTrimReferenceKeepref) Id(id string) XaddId {
-	c.cs.s = append(c.cs.s, id)
-	return (XaddId)(c)
 }
 
 type XaddTrimStrategyMaxlen Incomplete
@@ -313,21 +463,6 @@ type XaddTrimThreshold Incomplete
 func (c XaddTrimThreshold) Limit(count int64) XaddTrimLimit {
 	c.cs.s = append(c.cs.s, "LIMIT", strconv.FormatInt(count, 10))
 	return (XaddTrimLimit)(c)
-}
-
-func (c XaddTrimThreshold) Keepref() XaddTrimReferenceKeepref {
-	c.cs.s = append(c.cs.s, "KEEPREF")
-	return (XaddTrimReferenceKeepref)(c)
-}
-
-func (c XaddTrimThreshold) Delref() XaddTrimReferenceDelref {
-	c.cs.s = append(c.cs.s, "DELREF")
-	return (XaddTrimReferenceDelref)(c)
-}
-
-func (c XaddTrimThreshold) Acked() XaddTrimReferenceAcked {
-	c.cs.s = append(c.cs.s, "ACKED")
-	return (XaddTrimReferenceAcked)(c)
 }
 
 func (c XaddTrimThreshold) Id(id string) XaddId {
@@ -413,6 +548,74 @@ func (c XautoclaimStart) Justid() XautoclaimJustid {
 }
 
 func (c XautoclaimStart) Build() Completed {
+	c.cs.Build()
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
+}
+
+type Xcfgset Incomplete
+
+func (b Builder) Xcfgset() (c Xcfgset) {
+	c = Xcfgset{cs: get(), ks: b.ks}
+	c.cs.s = append(c.cs.s, "XCFGSET")
+	return c
+}
+
+func (c Xcfgset) Key(key string) XcfgsetKey {
+	if c.ks&NoSlot == NoSlot {
+		c.ks = NoSlot | slot(key)
+	} else {
+		c.ks = check(c.ks, slot(key))
+	}
+	c.cs.s = append(c.cs.s, key)
+	return (XcfgsetKey)(c)
+}
+
+type XcfgsetIdmpDurationBlockDuration Incomplete
+
+func (c XcfgsetIdmpDurationBlockDuration) IdmpMaxsize() XcfgsetIdmpMaxsizeBlockIdmpMaxsizeTokenIdmpMaxsize {
+	c.cs.s = append(c.cs.s, "IDMP-MAXSIZE")
+	return (XcfgsetIdmpMaxsizeBlockIdmpMaxsizeTokenIdmpMaxsize)(c)
+}
+
+func (c XcfgsetIdmpDurationBlockDuration) Build() Completed {
+	c.cs.Build()
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
+}
+
+type XcfgsetIdmpDurationBlockIdmpDurationTokenIdmpDuration Incomplete
+
+func (c XcfgsetIdmpDurationBlockIdmpDurationTokenIdmpDuration) Duration(duration int64) XcfgsetIdmpDurationBlockDuration {
+	c.cs.s = append(c.cs.s, strconv.FormatInt(duration, 10))
+	return (XcfgsetIdmpDurationBlockDuration)(c)
+}
+
+type XcfgsetIdmpMaxsizeBlockIdmpMaxsizeTokenIdmpMaxsize Incomplete
+
+func (c XcfgsetIdmpMaxsizeBlockIdmpMaxsizeTokenIdmpMaxsize) Maxsize(maxsize int64) XcfgsetIdmpMaxsizeBlockMaxsize {
+	c.cs.s = append(c.cs.s, strconv.FormatInt(maxsize, 10))
+	return (XcfgsetIdmpMaxsizeBlockMaxsize)(c)
+}
+
+type XcfgsetIdmpMaxsizeBlockMaxsize Incomplete
+
+func (c XcfgsetIdmpMaxsizeBlockMaxsize) Build() Completed {
+	c.cs.Build()
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
+}
+
+type XcfgsetKey Incomplete
+
+func (c XcfgsetKey) IdmpDuration() XcfgsetIdmpDurationBlockIdmpDurationTokenIdmpDuration {
+	c.cs.s = append(c.cs.s, "IDMP-DURATION")
+	return (XcfgsetIdmpDurationBlockIdmpDurationTokenIdmpDuration)(c)
+}
+
+func (c XcfgsetKey) IdmpMaxsize() XcfgsetIdmpMaxsizeBlockIdmpMaxsizeTokenIdmpMaxsize {
+	c.cs.s = append(c.cs.s, "IDMP-MAXSIZE")
+	return (XcfgsetIdmpMaxsizeBlockIdmpMaxsizeTokenIdmpMaxsize)(c)
+}
+
+func (c XcfgsetKey) Build() Completed {
 	c.cs.Build()
 	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }

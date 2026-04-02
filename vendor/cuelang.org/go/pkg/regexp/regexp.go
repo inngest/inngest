@@ -16,7 +16,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-//go:generate go run cuelang.org/go/internal/cmd/qgo -exclude=Compile,Append,Reader,Match$ -stripstr extract regexp
+// Originally generated with: go run qgo.go -exclude=Compile,Append,Reader,Match$ -stripstr extract regexp
 
 package regexp
 
@@ -24,7 +24,6 @@ import "regexp"
 
 // Match reports whether the string s
 // contains any match of the regular expression pattern.
-// More complicated queries need to use Compile and the full Regexp interface.
 func Match(pattern string, s string) (matched bool, err error) {
 	return regexp.MatchString(pattern, s)
 }

@@ -71,8 +71,7 @@ func (responses Responses) JSONLookup(token string) (any, error) {
 	} else if ref := v.Ref; ref != "" {
 		return &Ref{Ref: ref}, nil
 	} else {
-		var vv *Response = v.Value
-		return vv, nil
+		return v.Value, nil
 	}
 }
 
@@ -213,8 +212,7 @@ func (callback Callback) JSONLookup(token string) (any, error) {
 	} else if ref := v.Ref; ref != "" {
 		return &Ref{Ref: ref}, nil
 	} else {
-		var vv *PathItem = v
-		return vv, nil
+		return v, nil
 	}
 }
 
@@ -355,8 +353,7 @@ func (paths Paths) JSONLookup(token string) (any, error) {
 	} else if ref := v.Ref; ref != "" {
 		return &Ref{Ref: ref}, nil
 	} else {
-		var vv *PathItem = v
-		return vv, nil
+		return v, nil
 	}
 }
 

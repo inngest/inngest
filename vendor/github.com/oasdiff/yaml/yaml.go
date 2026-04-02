@@ -16,7 +16,7 @@ import (
 	"reflect"
 	"strconv"
 
-	"github.com/oasdiff/yaml3"
+	yaml "github.com/oasdiff/yaml3"
 )
 
 // Marshal the object into JSON then converts JSON to YAML and returns the
@@ -44,14 +44,21 @@ type YAMLOpt func(*yaml.Decoder) *yaml.Decoder
 // Unmarshal converts YAML to JSON then uses JSON to unmarshal into an object,
 // optionally configuring the behavior of the JSON unmarshal.
 func Unmarshal(y []byte, o interface{}, opts ...JSONOpt) error {
-	return UnmarshalWithOrigin(y, o, false, opts...)
+	return UnmarshalWithOrigin(y, o, OriginOpt{}, opts...)
 }
 
-// UnmarshalWithOrigin is like Unmarshal but if withOrigin is true, it will
-// include the origin information in the output.
-func UnmarshalWithOrigin(y []byte, o interface{}, withOrigin bool, opts ...JSONOpt) error {
+// OriginOpt controls origin-tracking behavior in UnmarshalWithOrigin.
+type OriginOpt struct {
+	// Enabled adds __origin__ metadata to maps during unmarshaling.
+	Enabled bool
+	// File is the source file name recorded in origin metadata.
+	File string
+}
+
+// UnmarshalWithOrigin is like Unmarshal but supports origin tracking via OriginOpt.
+func UnmarshalWithOrigin(y []byte, o interface{}, origin OriginOpt, opts ...JSONOpt) error {
 	dec := yaml.NewDecoder(bytes.NewReader(y))
-	dec.Origin(withOrigin)
+	dec.Origin(origin.Enabled, origin.File)
 	return unmarshal(dec, o, opts)
 }
 
@@ -142,6 +149,7 @@ func yamlToJSON(dec *yaml.Decoder, jsonTarget *reflect.Value) ([]byte, error) {
 	return json.Marshal(jsonObj)
 }
 
+// convertToJSONableObject converts a YAML object to a JSON-compatible object.
 func convertToJSONableObject(yamlObj interface{}, jsonTarget *reflect.Value) (interface{}, error) { //nolint:gocyclo
 	var err error
 

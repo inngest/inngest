@@ -30,6 +30,6 @@ func (schema *Schema) compilePattern(c RegexCompilerFunc) (cp RegexMatcher, err 
 		return
 	}
 
-	var _ bool = compiledPatterns.CompareAndSwap(pattern, nil, cp)
+	compiledPatterns.Store(pattern, cp)
 	return
 }

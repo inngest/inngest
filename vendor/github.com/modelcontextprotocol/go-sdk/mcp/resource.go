@@ -15,8 +15,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/modelcontextprotocol/go-sdk/internal/jsonrpc2"
 	"github.com/modelcontextprotocol/go-sdk/internal/util"
+	"github.com/modelcontextprotocol/go-sdk/jsonrpc"
 	"github.com/yosida95/uritemplate/v3"
 )
 
@@ -40,8 +40,8 @@ type ResourceHandler func(context.Context, *ReadResourceRequest) (*ReadResourceR
 // ResourceNotFoundError returns an error indicating that a resource being read could
 // not be found.
 func ResourceNotFoundError(uri string) error {
-	return &jsonrpc2.WireError{
-		Code:    codeResourceNotFound,
+	return &jsonrpc.Error{
+		Code:    CodeResourceNotFound,
 		Message: "Resource not found",
 		Data:    json.RawMessage(fmt.Sprintf(`{"uri":%q}`, uri)),
 	}
@@ -111,6 +111,23 @@ func computeURIFilepath(rawURI, dirFilepath string, rootFilepaths []string) (str
 		}
 	}
 	return uriFilepathRel, nil
+}
+
+// withFile calls f on the file at join(dir, rel),
+// protecting against path traversal attacks.
+func withFile(dir, rel string, f func(*os.File) error) (err error) {
+	r, err := os.OpenRoot(dir)
+	if err != nil {
+		return err
+	}
+	defer r.Close()
+	file, err := r.Open(rel)
+	if err != nil {
+		return err
+	}
+	// Record error, in case f writes.
+	defer func() { err = errors.Join(err, file.Close()) }()
+	return f(file)
 }
 
 // fileRoots transforms the Roots obtained from the client into absolute paths on

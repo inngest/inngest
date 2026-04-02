@@ -14,9 +14,6 @@
 
 package os
 
-//go:generate go run gen.go
-//go:generate gofmt -s -w .
-
 import (
 	"os"
 	"strings"
@@ -57,7 +54,7 @@ func (c *getenvCmd) Run(ctx *task.Context) (res interface{}, err error) {
 	update := map[string]interface{}{}
 
 	for iter.Next() {
-		name := iter.Label()
+		name := iter.Selector().Unquoted()
 		if strings.HasPrefix(name, "$") {
 			continue
 		}
@@ -101,12 +98,8 @@ func (c *environCmd) Run(ctx *task.Context) (res interface{}, err error) {
 	update := map[string]interface{}{}
 
 	for _, kv := range os.Environ() {
-		a := strings.SplitN(kv, "=", 2)
-
-		name := a[0]
-		str := a[1]
-
-		if v := ctx.Obj.Lookup(name); v.Exists() {
+		name, str, _ := strings.Cut(kv, "=")
+		if v := ctx.Obj.LookupPath(cue.MakePath(cue.Str(name))); v.Exists() {
 			update[name], err = fromString(name, str, v)
 			if err != nil {
 				return nil, err
@@ -117,7 +110,7 @@ func (c *environCmd) Run(ctx *task.Context) (res interface{}, err error) {
 	}
 
 	for iter.Next() {
-		name := iter.Label()
+		name := iter.Selector().Unquoted()
 		if strings.HasPrefix(name, "$") {
 			continue
 		}

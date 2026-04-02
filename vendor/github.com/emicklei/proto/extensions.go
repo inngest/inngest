@@ -35,6 +35,7 @@ type Extensions struct {
 	Ranges        []Range
 	InlineComment *Comment
 	Parent        Visitee
+	Options       []*Option
 }
 
 // inlineComment is part of commentInliner.
@@ -54,6 +55,33 @@ func (e *Extensions) parse(p *Parser) error {
 		return err
 	}
 	e.Ranges = list
+
+	// see if there are options
+	pos, tok, lit := p.next()
+	if tLEFTSQUARE != tok {
+		p.nextPut(pos, tok, lit)
+		return nil
+	}
+	// consume options (copied from normal field parsing)
+	for {
+		o := new(Option)
+		o.Position = pos
+		o.IsEmbedded = true
+		o.parent(e)
+		err := o.parse(p)
+		if err != nil {
+			return err
+		}
+		e.Options = append(e.Options, o)
+
+		pos, tok, lit = p.next()
+		if tRIGHTSQUARE == tok {
+			break
+		}
+		if tCOMMA != tok {
+			return p.unexpected(lit, "option ,", o)
+		}
+	}
 	return nil
 }
 

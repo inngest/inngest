@@ -1,4 +1,4 @@
-// Copyright 2021-2024 The Connect Authors
+// Copyright 2021-2025 The Connect Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -27,7 +27,7 @@ import (
 )
 
 // The names of the Connect, gRPC, and gRPC-Web protocols (as exposed by
-// [Peer.Protocol]). Additional protocols may be added in the future.
+// [Peer].Protocol). Additional protocols may be added in the future.
 const (
 	ProtocolConnect = "connect"
 	ProtocolGRPC    = "grpc"

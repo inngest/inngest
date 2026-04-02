@@ -51,14 +51,24 @@ func (b *layeredBucket[T]) set(primary, secondary string, value T, duration time
 	return item, existing
 }
 
-func (b *layeredBucket[T]) delete(primary, secondary string) *Item[T] {
+func (b *layeredBucket[T]) remove(primary, secondary string) *Item[T] {
 	b.RLock()
 	bucket, exists := b.buckets[primary]
 	b.RUnlock()
 	if !exists {
 		return nil
 	}
-	return bucket.delete(secondary)
+	return bucket.remove(secondary)
+}
+
+func (b *layeredBucket[T]) delete(primary, secondary string) {
+	b.RLock()
+	bucket, exists := b.buckets[primary]
+	b.RUnlock()
+	if !exists {
+		return
+	}
+	bucket.delete(secondary)
 }
 
 func (b *layeredBucket[T]) deletePrefix(primary, prefix string, deletables chan *Item[T]) int {

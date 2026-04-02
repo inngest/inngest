@@ -17,6 +17,7 @@ import (
 
 	"github.com/go-openapi/jsonpointer"
 	"github.com/mohae/deepcopy"
+	"github.com/woodsbury/decimal128"
 )
 
 const (
@@ -245,7 +246,7 @@ func (addProps *AdditionalProperties) UnmarshalJSON(data []byte) error {
 			addProps.Schema = &SchemaRef{Value: &Schema{}}
 		} else {
 			buf := new(bytes.Buffer)
-			json.NewEncoder(buf).Encode(y)
+			_ = json.NewEncoder(buf).Encode(y)
 			if err := json.NewDecoder(buf).Decode(&addProps.Schema); err != nil {
 				return err
 			}
@@ -467,6 +468,12 @@ func (schema *Schema) UnmarshalJSON(data []byte) error {
 	}
 
 	*schema = Schema(x)
+
+	for i, v := range schema.Enum {
+		schema.Enum[i] = stripOriginFromAny(v)
+	}
+	schema.Default = stripOriginFromAny(schema.Default)
+	schema.Example = stripOriginFromAny(schema.Example)
 
 	if schema.Format == "date" {
 		// This is a fix for: https://github.com/getkin/kin-openapi/issues/697
@@ -837,12 +844,12 @@ func (schema *Schema) WithMaxProperties(i int64) *Schema {
 }
 
 func (schema *Schema) WithAnyAdditionalProperties() *Schema {
-	schema.AdditionalProperties = AdditionalProperties{Has: BoolPtr(true)}
+	schema.AdditionalProperties = AdditionalProperties{Has: Ptr(true)}
 	return schema
 }
 
 func (schema *Schema) WithoutAdditionalProperties() *Schema {
-	schema.AdditionalProperties = AdditionalProperties{Has: BoolPtr(false)}
+	schema.AdditionalProperties = AdditionalProperties{Has: Ptr(false)}
 	return schema
 }
 
@@ -1298,7 +1305,7 @@ func (schema *Schema) visitNotOperation(settings *schemaValidationSettings, valu
 func (schema *Schema) visitXOFOperations(settings *schemaValidationSettings, value any) (err error, run bool) {
 	var visitedOneOf, visitedAnyOf, visitedAllOf bool
 	if v := schema.OneOf; len(v) > 0 {
-		var discriminatorRef string
+		var discriminatorRef MappingRef
 		if schema.Discriminator != nil {
 			pn := schema.Discriminator.PropertyName
 			if valuemap, okcheck := value.(map[string]any); okcheck {
@@ -1344,7 +1351,7 @@ func (schema *Schema) visitXOFOperations(settings *schemaValidationSettings, val
 				return foundUnresolvedRef(item.Ref), false
 			}
 
-			if discriminatorRef != "" && discriminatorRef != item.Ref {
+			if discriminatorRef.Ref != "" && discriminatorRef.Ref != item.Ref {
 				continue
 			}
 
@@ -1428,6 +1435,7 @@ func (schema *Schema) visitXOFOperations(settings *schemaValidationSettings, val
 		visitedAnyOf = true
 	}
 
+	validationErrors := multiErrorForAllOf{}
 	for _, item := range schema.AllOf {
 		v := item.Value
 		if v == nil {
@@ -1437,16 +1445,19 @@ func (schema *Schema) visitXOFOperations(settings *schemaValidationSettings, val
 			if settings.failfast {
 				return errSchema, false
 			}
-			return &SchemaError{
-				Value:                 value,
-				Schema:                schema,
-				SchemaField:           "allOf",
-				Reason:                `doesn't match all schemas from "allOf"`,
-				Origin:                err,
-				customizeMessageError: settings.customizeMessageError,
-			}, false
+			validationErrors = append(validationErrors, err)
 		}
 		visitedAllOf = true
+	}
+	if len(validationErrors) > 0 {
+		return &SchemaError{
+			Value:                 value,
+			Schema:                schema,
+			SchemaField:           "allOf",
+			Reason:                `doesn't match all schemas from "allOf"`,
+			Origin:                fmt.Errorf("doesn't match schema due to: %w", validationErrors),
+			customizeMessageError: settings.customizeMessageError,
+		}, false
 	}
 
 	run = !((visitedOneOf || visitedAnyOf || visitedAllOf) && value == nil)
@@ -1522,7 +1533,12 @@ func (schema *Schema) visitJSONNumber(settings *schemaValidationSettings, value 
 	format := schema.Format
 	if format != "" {
 		if requireInteger {
-			if f, ok := SchemaIntegerFormats[format]; ok {
+			// Check per-validation validators first, then fall back to global
+			f, ok := settings.integerFormats[format]
+			if !ok {
+				f, ok = SchemaIntegerFormats[format]
+			}
+			if ok {
 				if err := f.Validate(int64(value)); err != nil {
 					var reason string
 					schemaErr := &SchemaError{}
@@ -1536,7 +1552,12 @@ func (schema *Schema) visitJSONNumber(settings *schemaValidationSettings, value 
 				}
 			}
 		} else {
-			if f, ok := SchemaNumberFormats[format]; ok {
+			// Check per-validation validators first, then fall back to global
+			f, ok := settings.numberFormats[format]
+			if !ok {
+				f, ok = SchemaNumberFormats[format]
+			}
+			if ok {
 				if err := f.Validate(value); err != nil {
 					var reason string
 					schemaErr := &SchemaError{}
@@ -1643,7 +1664,10 @@ func (schema *Schema) visitJSONNumber(settings *schemaValidationSettings, value 
 	if v := schema.MultipleOf; v != nil {
 		// "A numeric instance is valid only if division by this keyword's
 		//    value results in an integer."
-		if bigFloat := big.NewFloat(value / *v); !bigFloat.IsInt() {
+		numParsed, _ := decimal128.Parse(fmt.Sprintf("%.10f", value))
+		denParsed, _ := decimal128.Parse(fmt.Sprintf("%.10f", *v))
+		_, remainder := numParsed.QuoRem(denParsed)
+		if !remainder.IsZero() {
 			if settings.failfast {
 				return errSchema
 			}
@@ -1759,7 +1783,12 @@ func (schema *Schema) visitJSONString(settings *schemaValidationSettings, value 
 	var formatStrErr string
 	var formatErr error
 	if format := schema.Format; format != "" {
-		if f, ok := SchemaStringFormats[format]; ok {
+		// Check per-validation validators first, then fall back to global
+		f, ok := settings.stringFormats[format]
+		if !ok {
+			f, ok = SchemaStringFormats[format]
+		}
+		if ok {
 			if err := f.Validate(value); err != nil {
 				var reason string
 				schemaErr := &SchemaError{}
@@ -2134,6 +2163,9 @@ func markSchemaErrorKey(err error, key string) error {
 		if v.Origin != nil {
 			if unwrapped := errors.Unwrap(v.Origin); unwrapped != nil {
 				if me, ok := unwrapped.(multiErrorForOneOf); ok {
+					_ = markSchemaErrorKey(MultiError(me), key)
+				}
+				if me, ok := unwrapped.(multiErrorForAllOf); ok {
 					_ = markSchemaErrorKey(MultiError(me), key)
 				}
 			}

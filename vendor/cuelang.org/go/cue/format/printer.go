@@ -39,11 +39,18 @@ type printer struct {
 	pos     token.Position // current pos in AST
 	lineout line
 
-	lastTok token.Token // last token printed (syntax.ILLEGAL if it's whitespace)
+	lastTok token.Token // last token printed ([token.ILLEGAL] if it's whitespace)
 
-	output      []byte
-	indent      int
-	spaceBefore bool
+	output           []byte
+	indent           int
+	spaceBefore      bool
+	prevLbraceOnLine bool // true if a '{' has been written on the current line
+
+	// TODO(mvdan): This is similar to nooverride but used only for comments,
+	// to ensure that we always print a newline after them.
+	// We should fix our logic with whiteSpace instead, but for now this ensures
+	// we don't break the syntax by omitting the newline after a comment.
+	printingComment bool
 
 	errs errors.Error
 }
@@ -91,7 +98,7 @@ func (p *printer) Print(v interface{}) {
 			// the previous and the current token must be
 			// separated by a blank otherwise they combine
 			// into a different incorrect token sequence
-			// (except for syntax.INT followed by a '.' this
+			// (except for token.INT followed by a '.' this
 			// should never happen because it is taken care
 			// of via binary expression formatting)
 			if p.allowed&blank != 0 {
@@ -173,6 +180,9 @@ func (p *printer) Print(v interface{}) {
 		p.lastTok = token.IDENT
 
 	case string:
+		// We can print a Go string as part of a CUE identifier or literal;
+		// for example, see the formatter.label method.
+		isLit = true
 		data = x
 		impliedComma = true
 		p.lastTok = token.STRING
@@ -194,12 +204,14 @@ func (p *printer) Print(v interface{}) {
 		return
 
 	case *ast.Attribute:
+		isLit = true
 		data = x.Text
 		impliedComma = true
 		p.lastTok = token.ATTRIBUTE
 
 	case *ast.Comment:
 		// TODO: if implied comma, postpone comment
+		isLit = true
 		data = x.Text
 		p.lastTok = token.COMMENT
 
@@ -225,6 +237,9 @@ func (p *printer) Print(v interface{}) {
 				case token.NewSection:
 					requested |= newsection
 				}
+				if p.printingComment {
+					requested |= newline
+				}
 				p.writeWhitespace(requested)
 				p.allowed = 0
 				p.requested = 0
@@ -241,6 +256,7 @@ func (p *printer) Print(v interface{}) {
 	p.writeWhitespace(p.allowed)
 	p.allowed = 0
 	p.requested = 0
+	p.printingComment = false
 	p.writeString(data, isLit)
 	p.allowed = nextWS
 	_ = impliedComma // TODO: delay comment printings
@@ -264,17 +280,17 @@ func (p *printer) writeWhitespace(ws whiteSpace) {
 	case ws&newsection != 0:
 		p.maybeIndentLine(ws)
 		p.writeByte('\f', 2)
-		p.lineout += 2
+		p.incrementLine(2)
 		p.spaceBefore = true
 	case ws&formfeed != 0:
 		p.maybeIndentLine(ws)
 		p.writeByte('\f', 1)
-		p.lineout++
+		p.incrementLine(1)
 		p.spaceBefore = true
 	case ws&newline != 0:
 		p.maybeIndentLine(ws)
 		p.writeByte('\n', 1)
-		p.lineout++
+		p.incrementLine(1)
 		p.spaceBefore = true
 	case ws&declcomma != 0:
 		p.writeByte(',', 1)
@@ -288,6 +304,13 @@ func (p *printer) writeWhitespace(ws whiteSpace) {
 		p.writeByte(' ', 1)
 		p.spaceBefore = true
 	}
+}
+
+func (p *printer) incrementLine(n int) {
+	if n != 0 {
+		p.prevLbraceOnLine = false
+	}
+	p.lineout += line(n)
 }
 
 func (p *printer) markLineIndent(ws whiteSpace) {
@@ -339,7 +362,6 @@ func (f *formatter) matchUnindent() whiteSpace {
 // needed (i.e., when we don't know that s contains no tabs or line breaks)
 // avoids processing extra escape characters and reduces run time of the
 // printer benchmark by up to 10%.
-//
 func (p *printer) writeString(s string, isLit bool) {
 	if s != "" {
 		p.spaceBefore = false
@@ -379,7 +401,7 @@ func (p *printer) writeString(s string, isLit bool) {
 }
 
 func (p *printer) writeByte(ch byte, n int) {
-	for i := 0; i < n; i++ {
+	for range n {
 		p.output = append(p.output, ch)
 	}
 
@@ -390,7 +412,7 @@ func (p *printer) writeByte(ch byte, n int) {
 		p.pos.Column = 1
 
 		n := p.cfg.Indent + p.indent // include base indentation
-		for i := 0; i < n; i++ {
+		for range n {
 			p.output = append(p.output, '\t')
 		}
 
@@ -403,9 +425,18 @@ func (p *printer) writeByte(ch byte, n int) {
 	p.pos.Column += n
 }
 
+// TODO(mvdan): mayCombine as a name was carried over from Go,
+// but it doesn't really make sense as a name for our logic here,
+// since we return true when either side must use a blank space.
+
 func mayCombine(prev, next token.Token) (before, after bool) {
 	s := next.String()
 	if 'a' <= s[0] && s[0] < 'z' {
+		if prev == token.ILLEGAL {
+			// If we're printing the first token,
+			// we don't need a blank space before it.
+			return false, true
+		}
 		return true, true
 	}
 	switch prev {

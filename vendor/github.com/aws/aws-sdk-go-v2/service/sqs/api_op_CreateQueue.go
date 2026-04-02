@@ -20,7 +20,7 @@ import (
 //
 //	existing standard queue into a FIFO queue. You must either create a new FIFO
 //	queue for your application or delete your existing standard queue and recreate
-//	it as a FIFO queue. For more information, see [Moving From a Standard Queue to a FIFO Queue]in the Amazon SQS Developer
+//	it as a FIFO queue. For more information, see [Moving From a standard queue to a FIFO queue]in the Amazon SQS Developer
 //	Guide.
 //
 //	- If you don't provide a value for an attribute, the queue is created with
@@ -35,23 +35,29 @@ import (
 // After you create a queue, you must wait at least one second after the queue is
 // created to be able to use the queue.
 //
-// To get the queue URL, use the GetQueueUrl action. GetQueueUrl requires only the QueueName parameter.
-// be aware of existing queue names:
+// To retrieve the URL of a queue, use the [GetQueueUrl]GetQueueUrl action. This action only
+// requires the [QueueName]QueueName parameter.
 //
-//   - If you provide the name of an existing queue along with the exact names and
-//     values of all the queue's attributes, CreateQueue returns the queue URL for
-//     the existing queue.
+// When creating queues, keep the following points in mind:
 //
-//   - If the queue name, attribute names, or attribute values don't match an
-//     existing queue, CreateQueue returns an error.
+//   - If you specify the name of an existing queue and provide the exact same
+//     names and values for all its attributes, the [CreateQueue]CreateQueue action will return
+//     the URL of the existing queue instead of creating a new one.
+//
+//   - If you attempt to create a queue with a name that already exists but with
+//     different attribute names or values, the CreateQueue action will return an
+//     error. This ensures that existing queues are not inadvertently altered.
 //
 // Cross-account permissions don't apply to this action. For more information, see [Grant cross-account permissions to a role and a username]
 // in the Amazon SQS Developer Guide.
 //
 // [limits related to queues]: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/limits-queues.html
+// [CreateQueue]: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/APIReference/API_CreateQueue.html
 // [Grant cross-account permissions to a role and a username]: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-customer-managed-policy-examples.html#grant-cross-account-permissions-to-role-and-user-name
+// [QueueName]: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/APIReference/API_CreateQueue.html#API_CreateQueue_RequestSyntax
+// [GetQueueUrl]: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/APIReference/API_GetQueueUrl.html
 //
-// [Moving From a Standard Queue to a FIFO Queue]: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/FIFO-queues.html#FIFO-queues-moving
+// [Moving From a standard queue to a FIFO queue]: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/FIFO-queues.html#FIFO-queues-moving
 func (c *Client) CreateQueue(ctx context.Context, params *CreateQueueInput, optFns ...func(*Options)) (*CreateQueueOutput, error) {
 	if params == nil {
 		params = &CreateQueueInput{}
@@ -93,7 +99,7 @@ type CreateQueueInput struct {
 	//
 	//   - MaximumMessageSize – The limit of how many bytes a message can contain
 	//   before Amazon SQS rejects it. Valid values: An integer from 1,024 bytes (1 KiB)
-	//   to 262,144 bytes (256 KiB). Default: 262,144 (256 KiB).
+	//   to 1,048,576 bytes (1 MiB). Default: 1,048,576 bytes (1 MiB).
 	//
 	//   - MessageRetentionPeriod – The length of time, in seconds, for which Amazon
 	//   SQS retains a message. Valid values: An integer from 60 seconds (1 minute) to
@@ -339,6 +345,9 @@ func (c *Client) addOperationCreateQueueMiddlewares(stack *middleware.Stack, opt
 	if err = addRecordResponseTiming(stack); err != nil {
 		return err
 	}
+	if err = addSpanRetryLoop(stack, options); err != nil {
+		return err
+	}
 	if err = addClientUserAgent(stack, options); err != nil {
 		return err
 	}
@@ -355,6 +364,9 @@ func (c *Client) addOperationCreateQueueMiddlewares(stack *middleware.Stack, opt
 		return err
 	}
 	if err = addUserAgentRetryMode(stack, options); err != nil {
+		return err
+	}
+	if err = addCredentialSource(stack, options); err != nil {
 		return err
 	}
 	if err = addOpCreateQueueValidationMiddleware(stack); err != nil {
@@ -376,6 +388,15 @@ func (c *Client) addOperationCreateQueueMiddlewares(stack *middleware.Stack, opt
 		return err
 	}
 	if err = addDisableHTTPSMiddleware(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptBeforeRetryLoop(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptAttempt(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptors(stack, options); err != nil {
 		return err
 	}
 	return nil

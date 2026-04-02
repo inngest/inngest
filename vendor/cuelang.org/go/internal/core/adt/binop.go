@@ -19,26 +19,56 @@ import (
 	"strings"
 )
 
+var checkConcrete = &ValidateConfig{
+	Concrete: true,
+	Final:    true,
+}
+
+// errOnDiffType is a special value that is used as a source to BinOp to
+// indicate that the operation is not supported for the operands of different
+// kinds.
+var errOnDiffType = &UnaryExpr{}
+
+// BinOpBool is like [BinOp] but it avoids allocating a [Bool] for boolean operators
+// such as [EqualOp].
+func BinOpBool(c *OpContext, node Node, op Op, left, right Value) bool {
+	// The caller doesn't need a full [Value], so to save allocations,
+	// use a nil source to ensure that [OpContext.newBool] won't allocate.
+	// This swap seems fine given that OpContext is not meant for concurrent use.
+	src := c.src
+	c.src = nil
+	defer func() { c.src = src }()
+
+	v := BinOp(c, node, op, left, right)
+	b, ok := v.(*Bool)
+	return ok && b.B
+}
+
 // BinOp handles all operations except AndOp and OrOp. This includes processing
 // unary comparators such as '<4' and '=~"foo"'.
 //
+// The node argument is the adt node corresponding to the binary expression. It
+// is used to determine the source position of the operation, which in turn is
+// used to determine the experiment context.
+//
 // BinOp returns nil if not both left and right are concrete.
-func BinOp(c *OpContext, op Op, left, right Value) Value {
+func BinOp(c *OpContext, node Node, op Op, left, right Value) Value {
+	p := Pos(node)
 	leftKind := left.Kind()
 	rightKind := right.Kind()
 
-	const msg = "non-concrete value '%v' to operation '%s'"
-	if left.Concreteness() > Concrete {
-		return &Bottom{
-			Code: IncompleteError,
-			Err:  c.Newf(msg, left, op),
-		}
+	if err := validateValue(c, left, checkConcrete); err != nil {
+		const msg = "invalid left-hand value to '%s' (type %s): %v"
+		// TODO: Wrap bottom instead of using NewErrf?
+		b := c.NewErrf(msg, op, leftKind, err.Err)
+		b.Code = err.Code
+		return b
 	}
-	if right.Concreteness() > Concrete {
-		return &Bottom{
-			Code: IncompleteError,
-			Err:  c.Newf(msg, right, op),
-		}
+	if err := validateValue(c, right, checkConcrete); err != nil {
+		const msg = "invalid right-hand value to '%s' (type %s): %v"
+		b := c.NewErrf(msg, op, leftKind, err.Err)
+		b.Code = err.Code
+		return b
 	}
 
 	if err := CombineErrors(c.src, left, right); err != nil {
@@ -48,14 +78,21 @@ func BinOp(c *OpContext, op Op, left, right Value) Value {
 	switch op {
 	case EqualOp:
 		switch {
-		case leftKind == NullKind && rightKind == NullKind:
-			return c.newBool(true)
+		case leftKind&NumberKind != 0 && rightKind&NumberKind != 0:
+			return cmpTonode(c, op, c.Num(left, op).X.Cmp(&c.Num(right, op).X))
 
-		case leftKind == NullKind || rightKind == NullKind:
-			return c.newBool(false)
+		case leftKind != rightKind:
+			if p.Experiment().StructCmp ||
+				// compatibility with !structCmp:
+				leftKind == NullKind || rightKind == NullKind {
+				return c.NewBool(false)
+			}
+
+		case leftKind == NullKind:
+			return c.NewBool(true)
 
 		case leftKind == BoolKind:
-			return c.newBool(c.BoolValue(left) == c.BoolValue(right))
+			return c.NewBool(c.BoolValue(left) == c.BoolValue(right))
 
 		case leftKind == StringKind:
 			// normalize?
@@ -64,36 +101,32 @@ func BinOp(c *OpContext, op Op, left, right Value) Value {
 		case leftKind == BytesKind:
 			return cmpTonode(c, op, bytes.Compare(c.bytesValue(left, op), c.bytesValue(right, op)))
 
-		case leftKind&NumKind != 0 && rightKind&NumKind != 0:
-			// n := c.newNum()
-			return cmpTonode(c, op, c.Num(left, op).X.Cmp(&c.Num(right, op).X))
+		case leftKind == ListKind:
+			return c.NewBool(Equal(c, left, right, RegularOnly|IgnoreOptional))
 
-		case leftKind == ListKind && rightKind == ListKind:
-			x := c.Elems(left)
-			y := c.Elems(right)
-			if len(x) != len(y) {
-				return c.newBool(false)
-			}
-			for i, e := range x {
-				a, _ := c.Concrete(nil, e, op)
-				b, _ := c.Concrete(nil, y[i], op)
-				if !test(c, EqualOp, a, b) {
-					return c.newBool(false)
-				}
-			}
-			return c.newBool(true)
+		case !p.Experiment().StructCmp:
+		case leftKind == StructKind:
+			return c.NewBool(Equal(c, left, right, RegularOnly|IgnoreOptional))
 		}
 
 	case NotEqualOp:
 		switch {
-		case leftKind == NullKind && rightKind == NullKind:
-			return c.newBool(false)
+		case leftKind&NumberKind != 0 && rightKind&NumberKind != 0:
+			return cmpTonode(c, op, c.Num(left, op).X.Cmp(&c.Num(right, op).X))
 
-		case leftKind == NullKind || rightKind == NullKind:
-			return c.newBool(true)
+		case leftKind != rightKind:
+			if p.Experiment().StructCmp ||
+				// compatibility with !structCmp:
+				leftKind == NullKind ||
+				rightKind == NullKind {
+				return c.NewBool(true)
+			}
+
+		case leftKind == NullKind:
+			return c.NewBool(false)
 
 		case leftKind == BoolKind:
-			return c.newBool(c.boolValue(left, op) != c.boolValue(right, op))
+			return c.NewBool(c.boolValue(left, op) != c.boolValue(right, op))
 
 		case leftKind == StringKind:
 			// normalize?
@@ -102,24 +135,12 @@ func BinOp(c *OpContext, op Op, left, right Value) Value {
 		case leftKind == BytesKind:
 			return cmpTonode(c, op, bytes.Compare(c.bytesValue(left, op), c.bytesValue(right, op)))
 
-		case leftKind&NumKind != 0 && rightKind&NumKind != 0:
-			// n := c.newNum()
-			return cmpTonode(c, op, c.Num(left, op).X.Cmp(&c.Num(right, op).X))
+		case leftKind == ListKind:
+			return c.NewBool(!Equal(c, left, right, RegularOnly|IgnoreOptional))
 
-		case leftKind == ListKind && rightKind == ListKind:
-			x := c.Elems(left)
-			y := c.Elems(right)
-			if len(x) != len(y) {
-				return c.newBool(false)
-			}
-			for i, e := range x {
-				a, _ := c.Concrete(nil, e, op)
-				b, _ := c.Concrete(nil, y[i], op)
-				if !test(c, EqualOp, a, b) {
-					return c.newBool(true)
-				}
-			}
-			return c.newBool(false)
+		case !p.Experiment().StructCmp:
+		case leftKind == StructKind:
+			return c.NewBool(!Equal(c, left, right, RegularOnly|IgnoreOptional))
 		}
 
 	case LessThanOp, LessEqualOp, GreaterEqualOp, GreaterThanOp:
@@ -131,16 +152,16 @@ func BinOp(c *OpContext, op Op, left, right Value) Value {
 		case leftKind == BytesKind && rightKind == BytesKind:
 			return cmpTonode(c, op, bytes.Compare(c.bytesValue(left, op), c.bytesValue(right, op)))
 
-		case leftKind&NumKind != 0 && rightKind&NumKind != 0:
+		case leftKind&NumberKind != 0 && rightKind&NumberKind != 0:
 			// n := c.newNum(left, right)
 			return cmpTonode(c, op, c.Num(left, op).X.Cmp(&c.Num(right, op).X))
 		}
 
 	case BoolAndOp:
-		return c.newBool(c.boolValue(left, op) && c.boolValue(right, op))
+		return c.NewBool(c.boolValue(left, op) && c.boolValue(right, op))
 
 	case BoolOrOp:
-		return c.newBool(c.boolValue(left, op) || c.boolValue(right, op))
+		return c.NewBool(c.boolValue(left, op) || c.boolValue(right, op))
 
 	case MatchOp:
 		// if y.re == nil {
@@ -151,14 +172,14 @@ func BinOp(c *OpContext, op Op, left, right Value) Value {
 		// 	}
 		// 	return boolTonode(Src, b)
 		// }
-		return c.newBool(c.regexp(right).MatchString(c.stringValue(left, op)))
+		return c.NewBool(c.regexp(right).MatchString(c.stringValue(left, op)))
 
 	case NotMatchOp:
-		return c.newBool(!c.regexp(right).MatchString(c.stringValue(left, op)))
+		return c.NewBool(!c.regexp(right).MatchString(c.stringValue(left, op)))
 
 	case AddOp:
 		switch {
-		case leftKind&NumKind != 0 && rightKind&NumKind != 0:
+		case leftKind&NumberKind != 0 && rightKind&NumberKind != 0:
 			return c.Add(c.Num(left, op), c.Num(right, op))
 
 		case leftKind == StringKind && rightKind == StringKind:
@@ -173,37 +194,7 @@ func BinOp(c *OpContext, op Op, left, right Value) Value {
 			return c.newBytes(b)
 
 		case leftKind == ListKind && rightKind == ListKind:
-			// TODO: get rid of list addition. Semantically it is somewhat
-			// unclear and, as it turns out, it is also hard to get right.
-			// Simulate addition with comprehensions now.
-			if err := c.Err(); err != nil {
-				return err
-			}
-
-			x := MakeIdentLabel(c, "x", "")
-
-			forClause := func(src Expr) *ForClause {
-				return &ForClause{
-					Value: x,
-					Src:   src,
-					Dst: &ValueClause{&StructLit{Decls: []Decl{
-						&FieldReference{UpCount: 1, Label: x},
-					}}},
-				}
-			}
-
-			list := &ListLit{
-				Elems: []Elem{
-					forClause(left),
-					forClause(right),
-				},
-			}
-
-			n := &Vertex{}
-			n.AddConjunct(MakeRootConjunct(c.Env(0), list))
-			n.Finalize(c)
-
-			return n
+			return c.NewErrf("Addition of lists is superseded by list.Concat; see https://cuelang.org/e/v0.11-list-arithmetic")
 		}
 
 	case SubtractOp:
@@ -212,7 +203,7 @@ func BinOp(c *OpContext, op Op, left, right Value) Value {
 	case MultiplyOp:
 		switch {
 		// float
-		case leftKind&NumKind != 0 && rightKind&NumKind != 0:
+		case leftKind&NumberKind != 0 && rightKind&NumberKind != 0:
 			return c.Mul(c.Num(left, op), c.Num(right, op))
 
 		case leftKind == StringKind && rightKind == IntKind:
@@ -231,40 +222,14 @@ func BinOp(c *OpContext, op Op, left, right Value) Value {
 			const as = "bytes multiplication"
 			return c.newBytes(bytes.Repeat(c.bytesValue(right, as), int(c.uint64(left, as))))
 
-		case leftKind == ListKind && rightKind == IntKind:
-			left, right = right, left
-			fallthrough
-
 		case leftKind == IntKind && rightKind == ListKind:
-			// TODO: get rid of list multiplication.
-
-			list := &ListLit{}
-			x := MakeIdentLabel(c, "x", "")
-
-			for i := c.uint64(left, "list multiplier"); i > 0; i-- {
-				list.Elems = append(list.Elems,
-					&ForClause{
-						Value: x,
-						Src:   right,
-						Dst: &ValueClause{&StructLit{Decls: []Decl{
-							&FieldReference{UpCount: 1, Label: x},
-						}}},
-					},
-				)
-			}
-			if err := c.Err(); err != nil {
-				return err
-			}
-
-			n := &Vertex{}
-			n.AddConjunct(MakeRootConjunct(c.Env(0), list))
-			n.Finalize(c)
-
-			return n
+			fallthrough
+		case leftKind == ListKind && rightKind == IntKind:
+			return c.NewErrf("Multiplication of lists is superseded by list.Repeat; see https://cuelang.org/e/v0.11-list-arithmetic")
 		}
 
 	case FloatQuotientOp:
-		if leftKind&NumKind != 0 && rightKind&NumKind != 0 {
+		if leftKind&NumberKind != 0 && rightKind&NumberKind != 0 {
 			return c.Quo(c.Num(left, op), c.Num(right, op))
 		}
 
@@ -309,5 +274,5 @@ func cmpTonode(c *OpContext, op Op, r int) Value {
 	case GreaterThanOp:
 		result = r == 1
 	}
-	return c.newBool(result)
+	return c.NewBool(result)
 }

@@ -71,18 +71,6 @@ type LambdaFunctionURLResponse struct {
 // LambdaFunctionURLStreamingResponse models the response to a Lambda Function URL when InvokeMode is RESPONSE_STREAM.
 // If the InvokeMode of the Function URL is BUFFERED (default), use LambdaFunctionURLResponse instead.
 //
-// Example:
-//
-//	lambda.Start(func() (*events.LambdaFunctionURLStreamingResponse, error) {
-//		return &events.LambdaFunctionURLStreamingResponse{
-//			StatusCode: 200,
-//			Headers: map[string]string{
-//				"Content-Type": "text/html",
-//			},
-//			Body: strings.NewReader("<html><body>Hello World!</body></html>"),
-//		}, nil
-//	})
-//
 // Note: This response type requires compiling with `-tags lambda.norpc`, or choosing the `provided` or `provided.al2` runtime.
 type LambdaFunctionURLStreamingResponse struct {
 	prelude *bytes.Buffer

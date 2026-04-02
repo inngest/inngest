@@ -35,6 +35,10 @@ services:
     image: redis:5-alpine
     ports:
       - "6356:6379"
+  compat860:
+    image: redis:8.6.0-alpine
+    ports:
+      - "6382:6379"
   compat-redisearch:
     image: redis/redis-stack:7.4.0-v0
     ports:

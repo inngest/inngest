@@ -18,9 +18,9 @@
 // Some of the functions in this package are specifically intended as field
 // constraints. For instance, MaxRunes as used in this CUE program
 //
-//    import "strings"
+//	import "strings"
 //
-//    myString: strings.MaxRunes(5)
+//	myString: strings.MaxRunes(5)
 //
 // specifies that the myString should be at most 5 code points.
 package strings
@@ -29,6 +29,7 @@ import (
 	"fmt"
 	"strings"
 	"unicode"
+	"unicode/utf8"
 )
 
 // ByteAt reports the ith byte of the underlying strings or byte.
@@ -54,21 +55,21 @@ func Runes(s string) []rune {
 }
 
 // MinRunes reports whether the number of runes (Unicode codepoints) in a string
-// is at least a certain minimum. MinRunes can be used a a field constraint to
+// is at least a certain minimum. MinRunes can be used a field constraint to
 // except all strings for which this property holds.
 func MinRunes(s string, min int) bool {
 	// TODO: CUE strings cannot be invalid UTF-8. In case this changes, we need
 	// to use the following conversion to count properly:
 	// s, _ = unicodeenc.UTF8.NewDecoder().String(s)
-	return len([]rune(s)) >= min
+	return utf8.RuneCountInString(s) >= min
 }
 
 // MaxRunes reports whether the number of runes (Unicode codepoints) in a string
-// exceeds a certain maximum. MaxRunes can be used a a field constraint to
+// exceeds a certain maximum. MaxRunes can be used a field constraint to
 // except all strings for which this property holds
 func MaxRunes(s string, max int) bool {
 	// See comment in MinRunes implementation.
-	return len([]rune(s)) <= max
+	return utf8.RuneCountInString(s) <= max
 }
 
 // ToTitle returns a copy of the string s with all Unicode letters that begin

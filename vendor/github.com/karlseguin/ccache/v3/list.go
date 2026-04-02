@@ -1,57 +1,47 @@
 package ccache
 
 type List[T any] struct {
-	Head *Node[T]
-	Tail *Node[T]
+	Head *Item[T]
+	Tail *Item[T]
 }
 
 func NewList[T any]() *List[T] {
 	return &List[T]{}
 }
 
-func (l *List[T]) Remove(node *Node[T]) {
-	next := node.Next
-	prev := node.Prev
+func (l *List[T]) Remove(item *Item[T]) {
+	next := item.next
+	prev := item.prev
 
 	if next == nil {
-		l.Tail = node.Prev
+		l.Tail = prev
 	} else {
-		next.Prev = prev
+		next.prev = prev
 	}
 
 	if prev == nil {
-		l.Head = node.Next
+		l.Head = next
 	} else {
-		prev.Next = next
+		prev.next = next
 	}
-	node.Next = nil
-	node.Prev = nil
+	item.next = nil
+	item.prev = nil
+	item.inList = false
 }
 
-func (l *List[T]) MoveToFront(node *Node[T]) {
-	l.Remove(node)
-	l.nodeToFront(node)
+func (l *List[T]) MoveToFront(item *Item[T]) {
+	l.Remove(item)
+	l.Insert(item)
 }
 
-func (l *List[T]) Insert(value T) *Node[T] {
-	node := &Node[T]{Value: value}
-	l.nodeToFront(node)
-	return node
-}
-
-func (l *List[T]) nodeToFront(node *Node[T]) {
+func (l *List[T]) Insert(item *Item[T]) {
 	head := l.Head
-	l.Head = node
+	l.Head = item
+	item.inList = true
 	if head == nil {
-		l.Tail = node
+		l.Tail = item
 		return
 	}
-	node.Next = head
-	head.Prev = node
-}
-
-type Node[T any] struct {
-	Next  *Node[T]
-	Prev  *Node[T]
-	Value T
+	item.next = head
+	head.prev = item
 }

@@ -21,18 +21,19 @@ import (
 	"fmt"
 	"math/big"
 	"reflect"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
-	"github.com/cockroachdb/apd/v2"
-	"golang.org/x/text/encoding/unicode"
+	"github.com/cockroachdb/apd/v3"
 
 	"cuelang.org/go/cue/ast"
 	"cuelang.org/go/cue/ast/astutil"
 	"cuelang.org/go/cue/errors"
 	"cuelang.org/go/cue/parser"
 	"cuelang.org/go/cue/token"
+	"cuelang.org/go/internal"
 	"cuelang.org/go/internal/core/adt"
 	"cuelang.org/go/internal/core/compile"
 	"cuelang.org/go/internal/types"
@@ -43,27 +44,40 @@ import (
 // The code in this file is a prototype implementation and is far from
 // optimized.
 
-func GoValueToValue(ctx *adt.OpContext, x interface{}, nilIsTop bool) adt.Value {
-	v := GoValueToExpr(ctx, nilIsTop, x)
+// TODO(mvdan): get rid of the uses of %T below; have the recursive methods return *Bottom
+// TODO(mvdan): swap order of parameters in the recursive methods to match the top-level API order
+
+// FromGoValue converts a Go value to an internal CUE value.
+// The returned CUE value is finalized and concrete.
+func FromGoValue(ctx *adt.OpContext, x any, nilIsTop bool) adt.Value {
+	val := reflect.ValueOf(x)
+	v := fromGoValue(ctx, nilIsTop, val)
+	if v == nil {
+		return ctx.AddErrf("unsupported Go type (%T)", x)
+	}
 	// TODO: return Value
-	return toValue(v)
+	return v
 }
 
-func GoTypeToExpr(ctx *adt.OpContext, x interface{}) (adt.Expr, errors.Error) {
-	v := convertGoType(ctx, reflect.TypeOf(x))
+// FromGoType converts a Go type to an internal CUE expression.
+func FromGoType(ctx *adt.OpContext, x any) (adt.Expr, errors.Error) {
+	// TODO: if this value will always be unified with a concrete type in Go,
+	// then many of the fields may be omitted.
+	// TODO: this can be much more efficient.
+	// TODO: synchronize
+	typ := reflect.TypeOf(x)
+	if _, t, ok := ctx.LoadType(typ); ok {
+		return t, nil
+	}
+	_, expr := fromGoType(ctx, true, typ)
+	if expr == nil {
+		expr = ctx.AddErrf("unsupported Go type (%v)", typ)
+	}
 	if err := ctx.Err(); err != nil {
-		return v, err.Err
+		// TODO: return an error as the expr itself, like [FromGoValue]?
+		return expr, err.Err
 	}
-	return v, nil
-}
-
-func toValue(e adt.Expr) adt.Value {
-	if v, ok := e.(adt.Value); ok {
-		return v
-	}
-	obj := &adt.Vertex{}
-	obj.AddConjunct(adt.MakeRootConjunct(nil, e))
-	return obj
+	return expr, nil
 }
 
 func compileExpr(ctx *adt.OpContext, expr ast.Expr) adt.Value {
@@ -75,21 +89,27 @@ func compileExpr(ctx *adt.OpContext, expr ast.Expr) adt.Value {
 }
 
 // parseTag parses a CUE expression from a cue tag.
-func parseTag(ctx *adt.OpContext, obj *ast.StructLit, field, tag string) ast.Expr {
-	if p := strings.Index(tag, ","); p >= 0 {
-		tag = tag[:p]
-	}
+func parseTag(ctx *adt.OpContext, field, tag string) ast.Expr {
+	tag, _ = splitTag(tag)
 	if tag == "" {
 		return topSentinel
 	}
 	expr, err := parser.ParseExpr("<field:>", tag)
 	if err != nil {
 		err := errors.Promote(err, "parser")
-		ctx.AddErr(errors.Wrapf(err, ctx.Pos(),
-			"invalid tag %q for field %q", tag, field))
+		ctx.AddErr(errors.Wrapf(err, ctx.Pos(), "invalid tag %q for field %q", tag, field))
 		return &ast.BadExpr{}
 	}
 	return expr
+}
+
+// splitTag splits a cue tag into cue and options.
+func splitTag(tag string) (cue string, options string) {
+	q := strings.LastIndexByte(tag, '"')
+	if c := strings.IndexByte(tag[q+1:], ','); c >= 0 {
+		return tag[:q+1+c], tag[q+1+c+1:]
+	}
+	return tag, ""
 }
 
 // TODO: should we allow mapping names in cue tags? This only seems like a good
@@ -103,7 +123,7 @@ func getName(f *reflect.StructField) string {
 	}
 	for _, s := range tagsWithNames {
 		if tag, ok := f.Tag.Lookup(s); ok {
-			if p := strings.Index(tag, ","); p >= 0 {
+			if p := strings.IndexByte(tag, ','); p >= 0 {
 				tag = tag[:p]
 			}
 			if tag != "" {
@@ -119,7 +139,7 @@ func getName(f *reflect.StructField) string {
 func isOptional(f *reflect.StructField) bool {
 	isOptional := false
 	switch f.Type.Kind() {
-	case reflect.Ptr, reflect.Map, reflect.Chan, reflect.Interface, reflect.Slice:
+	case reflect.Pointer, reflect.Map, reflect.Chan, reflect.Interface, reflect.Slice:
 		// Note: it may be confusing to distinguish between an empty slice and
 		// a nil slice. However, it is also surprising to not be able to specify
 		// a default value for a slice. So for now we will allow it.
@@ -127,8 +147,9 @@ func isOptional(f *reflect.StructField) bool {
 	}
 	if tag, ok := f.Tag.Lookup("cue"); ok {
 		// TODO: only if first field is not empty.
+		_, opt := splitTag(tag)
 		isOptional = false
-		for _, f := range strings.Split(tag, ",")[1:] {
+		for f := range strings.SplitSeq(opt, ",") {
 			switch f {
 			case "opt":
 				isOptional = true
@@ -138,10 +159,8 @@ func isOptional(f *reflect.StructField) bool {
 		}
 	} else if tag, ok = f.Tag.Lookup("json"); ok {
 		isOptional = false
-		for _, f := range strings.Split(tag, ",")[1:] {
-			if f == "omitempty" {
-				return true
-			}
+		if slices.Contains(strings.Split(tag, ",")[1:], "omitempty") {
+			return true
 		}
 	}
 	return isOptional
@@ -151,12 +170,11 @@ func isOptional(f *reflect.StructField) bool {
 func isOmitEmpty(f *reflect.StructField) bool {
 	isOmitEmpty := false
 	switch f.Type.Kind() {
-	case reflect.Ptr, reflect.Map, reflect.Chan, reflect.Interface, reflect.Slice:
+	case reflect.Pointer, reflect.Map, reflect.Chan, reflect.Interface, reflect.Slice:
 		// Note: it may be confusing to distinguish between an empty slice and
 		// a nil slice. However, it is also surprising to not be able to specify
 		// a default value for a slice. So for now we will allow it.
 		isOmitEmpty = true
-
 	default:
 		// TODO: we can also infer omit empty if a type cannot be nil if there
 		// is a constraint that unconditionally disallows the zero value.
@@ -164,100 +182,59 @@ func isOmitEmpty(f *reflect.StructField) bool {
 	tag, ok := f.Tag.Lookup("json")
 	if ok {
 		isOmitEmpty = false
-		for _, f := range strings.Split(tag, ",")[1:] {
-			if f == "omitempty" {
-				return true
-			}
+		if slices.Contains(strings.Split(tag, ",")[1:], "omitempty") {
+			return true
 		}
 	}
 	return isOmitEmpty
 }
 
-// parseJSON parses JSON into a CUE value. b must be valid JSON.
-func parseJSON(ctx *adt.OpContext, b []byte) adt.Value {
-	expr, err := parser.ParseExpr("json", b)
-	if err != nil {
-		panic(err) // cannot happen
-	}
-	return compileExpr(ctx, expr)
-}
-
-func isZero(v reflect.Value) bool {
-	x := v.Interface()
-	if x == nil {
-		return true
-	}
-	switch k := v.Kind(); k {
-	case reflect.Struct, reflect.Array:
-		// we never allow optional values for these types.
-		return false
-
-	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map,
-		reflect.Slice:
-		// Note that for maps we preserve the distinction between a nil map and
-		// an empty map.
-		return v.IsNil()
-
-	case reflect.String:
-		return v.Len() == 0
-
-	default:
-		return x == reflect.Zero(v.Type()).Interface()
-	}
-}
-
-func GoValueToExpr(ctx *adt.OpContext, nilIsTop bool, x interface{}) adt.Expr {
-	e := convertRec(ctx, nilIsTop, x)
-	if e == nil {
-		return ctx.AddErrf("unsupported Go type (%T)", x)
-	}
-	return e
-}
-
 func isNil(x reflect.Value) bool {
-	switch x.Kind() {
-	// Only check for supported types; ignore func and chan.
-	case reflect.Ptr, reflect.Map, reflect.Slice, reflect.Interface:
+	switch x.Kind() { // Only check for supported types; ignore func and chan.
+	case reflect.Pointer, reflect.Map, reflect.Slice, reflect.Interface:
 		return x.IsNil()
 	}
 	return false
 }
 
-func convertRec(ctx *adt.OpContext, nilIsTop bool, x interface{}) adt.Value {
-	if t := (&types.Value{}); types.CastValue(t, x) {
-		// TODO: panic if nto the same runtime.
-		return t.V
-	}
+func fromGoValue(ctx *adt.OpContext, nilIsTop bool, val reflect.Value) (result adt.Value) {
 	src := ctx.Source()
-	switch v := x.(type) {
-	case nil:
+	if !val.IsValid() { // untyped nil, or dereferencing a nil pointer/interface
 		if nilIsTop {
-			ident, _ := ctx.Source().(*ast.Ident)
+			ident, _ := src.(*ast.Ident)
 			return &adt.Top{Src: ident}
 		}
-		return &adt.Null{Src: ctx.Source()}
-
-	case *ast.File:
+		return &adt.Null{Src: src}
+	}
+	env := ctx.Env(0)
+	typ := val.Type()
+	switch typ {
+	case astFile:
+		v, _ := reflect.TypeAssert[*ast.File](val)
 		x, err := compile.Files(nil, ctx, pkgID(), v)
 		if err != nil {
 			return &adt.Bottom{Err: errors.Promote(err, "compile")}
 		}
-		if len(x.Conjuncts) != 1 {
+		if _, n := x.SingleConjunct(); n != 1 {
 			panic("unexpected length")
 		}
 		return x
 
-	case ast.Expr:
-		return compileExpr(ctx, v)
+	case bigInt:
+		v, _ := reflect.TypeAssert[*big.Int](val)
+		return &adt.Num{
+			Src: src,
+			K:   adt.IntKind,
+			X:   fromGoBigInt(v),
+		}
 
-	case *big.Int:
-		return &adt.Num{Src: src, K: adt.IntKind, X: *apd.NewWithBigInt(v, 0)}
-
-	case *big.Rat:
+	case bigRat:
+		v, _ := reflect.TypeAssert[*big.Rat](val)
 		// should we represent this as a binary operation?
 		n := &adt.Num{Src: src, K: adt.IntKind}
-		_, err := apd.BaseContext.Quo(&n.X, apd.NewWithBigInt(v.Num(), 0), apd.NewWithBigInt(v.Denom(), 0))
-		if err != nil {
+		num := fromGoBigInt(v.Num())
+		denom := fromGoBigInt(v.Denom())
+		if _, err := internal.BaseContext.Quo(&n.X, &num, &denom); err != nil {
 			return ctx.AddErrf("could not convert *big.Rat: %v", err)
 		}
 		if !v.IsInt() {
@@ -265,328 +242,338 @@ func convertRec(ctx *adt.OpContext, nilIsTop bool, x interface{}) adt.Value {
 		}
 		return n
 
-	case *big.Float:
+	case bigFloat:
+		v, _ := reflect.TypeAssert[*big.Float](val)
 		n := &adt.Num{Src: src, K: adt.FloatKind}
-		_, _, err := n.X.SetString(v.String())
-		if err != nil {
+		// NOTE: apd.Decimal has an API to set from a big.Int, but not from a big.Float.
+		if _, _, err := n.X.SetString(v.String()); err != nil {
 			return ctx.AddErr(errors.Promote(err, "invalid float"))
 		}
 		return n
 
-	case *apd.Decimal:
-		// TODO: should we allow an "int" bit to be set here? It is a bit
-		// tricky, as we would also need to pass down the result of rounding.
-		// So more likely an API must return explicitly whether a value is
-		// a float or an int after all.
-		// The code to autodetect whether something is an integer can be done
-		// with this:
+	case apdDecimal:
+		v, _ := reflect.TypeAssert[*apd.Decimal](val)
+		// TODO: should we allow an "int" bit to be set here?
+		// It is a bit tricky, as we would also need to pass down the result of rounding.
+		// So more likely an API must return explicitly whether a value is a float or an int after all.
+		// The code to autodetect whether something is an integer can be done with this:
 		kind := adt.FloatKind
 		var d apd.Decimal
-		res, _ := apd.BaseContext.RoundToIntegralExact(&d, v)
+		res, _ := internal.BaseContext.RoundToIntegralExact(&d, v)
 		if !res.Inexact() {
 			kind = adt.IntKind
+			v = &d
 		}
-		n := &adt.Num{Src: ctx.Source(), K: kind}
+		n := &adt.Num{Src: src, K: kind}
 		n.X = *v
 		return n
+	}
 
-	case json.Marshaler:
+	if _, ok := implements(typ, typesInterface); ok {
+		v, _ := reflect.TypeAssert[types.Interface](val)
+		t := v.Core()
+		// TODO: panic if not the same runtime.
+		return t.V
+	}
+	if _, ok := implements(typ, astExpr); ok {
+		v, _ := reflect.TypeAssert[ast.Expr](val)
+		return compileExpr(ctx, v)
+	}
+	if _, ok := implements(typ, jsonMarshaler); ok {
+		v, _ := reflect.TypeAssert[json.Marshaler](val)
 		b, err := v.MarshalJSON()
 		if err != nil {
 			return ctx.AddErr(errors.Promote(err, "json.Marshaler"))
 		}
-
-		return parseJSON(ctx, b)
-
-	case encoding.TextMarshaler:
+		expr, err := parser.ParseExpr("json", b)
+		if err != nil {
+			panic(err) // cannot happen
+		}
+		return compileExpr(ctx, expr)
+	}
+	if _, ok := implements(typ, textMarshaler); ok {
+		v, _ := reflect.TypeAssert[encoding.TextMarshaler](val)
 		b, err := v.MarshalText()
 		if err != nil {
 			return ctx.AddErr(errors.Promote(err, "encoding.TextMarshaler"))
 		}
-		b, err = json.Marshal(string(b))
-		if err != nil {
-			return ctx.AddErr(errors.Promote(err, "json"))
-		}
-		return parseJSON(ctx, b)
-
-	case error:
-		var errs errors.Error
-		switch x := v.(type) {
-		case errors.Error:
-			errs = x
-		default:
-			errs = ctx.Newf("%s", x.Error())
+		str := strings.ToValidUTF8(string(b), string(utf8.RuneError))
+		return &adt.String{Src: src, Str: str}
+	}
+	if _, ok := implements(typ, goError); ok {
+		v, _ := reflect.TypeAssert[error](val)
+		errs, ok := v.(errors.Error)
+		if !ok {
+			errs = ctx.Newf("%s", v.Error())
 		}
 		return &adt.Bottom{Err: errs}
-	case bool:
-		return &adt.Bool{Src: ctx.Source(), B: v}
-	case string:
-		s, _ := unicode.UTF8.NewEncoder().String(v)
-		return &adt.String{Src: ctx.Source(), Str: s}
-	case []byte:
-		return &adt.Bytes{Src: ctx.Source(), B: v}
-	case int:
-		return toInt(ctx, int64(v))
-	case int8:
-		return toInt(ctx, int64(v))
-	case int16:
-		return toInt(ctx, int64(v))
-	case int32:
-		return toInt(ctx, int64(v))
-	case int64:
-		return toInt(ctx, int64(v))
-	case uint:
-		return toUint(ctx, uint64(v))
-	case uint8:
-		return toUint(ctx, uint64(v))
-	case uint16:
-		return toUint(ctx, uint64(v))
-	case uint32:
-		return toUint(ctx, uint64(v))
-	case uint64:
-		return toUint(ctx, uint64(v))
-	case uintptr:
-		return toUint(ctx, uint64(v))
-	case float64:
-		n := &adt.Num{Src: src, K: adt.FloatKind}
-		_, _, err := n.X.SetString(fmt.Sprint(v))
-		if err != nil {
-			return ctx.AddErr(errors.Promote(err, "invalid float"))
-		}
+	}
+
+	switch typ.Kind() {
+	case reflect.Bool:
+		return ctx.NewBool(val.Bool())
+
+	case reflect.String:
+		str := strings.ToValidUTF8(val.String(), string(utf8.RuneError))
+		// TODO: here and above: allow to fail on invalid strings.
+		// if !utf8.ValidString(str) {
+		// 	return ctx.AddErrf("cannot convert result to string: invalid UTF-8")
+		// }
+		return &adt.String{Src: src, Str: str}
+
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		n := &adt.Num{Src: src, K: adt.IntKind}
+		n.X = *apd.New(val.Int(), 0)
 		return n
-	case float32:
+
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
+		n := &adt.Num{Src: src, K: adt.IntKind}
+		n.X.Coeff.SetUint64(val.Uint())
+		return n
+
+	case reflect.Float64:
 		n := &adt.Num{Src: src, K: adt.FloatKind}
-		_, _, err := n.X.SetString(fmt.Sprint(v))
-		if err != nil {
+		if _, err := n.X.SetFloat64(val.Float()); err != nil {
 			return ctx.AddErr(errors.Promote(err, "invalid float"))
 		}
 		return n
 
-	case reflect.Value:
-		if v.CanInterface() {
-			return convertRec(ctx, nilIsTop, v.Interface())
+	case reflect.Float32:
+		n := &adt.Num{Src: src, K: adt.FloatKind}
+		// NOTE: apd.Decimal has a SetFloat64 method, but no SetFloat32.
+		if _, _, err := n.X.SetString(strconv.FormatFloat(val.Float(), 'E', -1, 32)); err != nil {
+			return ctx.AddErr(errors.Promote(err, "invalid float"))
+		}
+		return n
+
+	case reflect.Pointer, reflect.Interface:
+		return fromGoValue(ctx, nilIsTop, val.Elem())
+
+	case reflect.Struct:
+		// Grow the slices to match the number of fields in the Go struct,
+		// avoiding repeated slice growth in append calls below.
+		numFields := typ.NumField()
+		sl := &adt.StructLit{
+			Src:   src,
+			Decls: make([]adt.Decl, 0, numFields),
+		}
+		sl.Init(ctx)
+		v := &adt.Vertex{
+			Arcs: make([]*adt.Vertex, 0, numFields),
 		}
 
-	default:
-		value := reflect.ValueOf(v)
-		switch value.Kind() {
-		case reflect.Bool:
-			return &adt.Bool{Src: ctx.Source(), B: value.Bool()}
-
-		case reflect.String:
-			str := value.String()
-			str, _ = unicode.UTF8.NewEncoder().String(str)
-			// TODO: here and above: allow to fail on invalid strings.
-			// if !utf8.ValidString(str) {
-			// 	return ctx.AddErrf("cannot convert result to string: invalid UTF-8")
-			// }
-			return &adt.String{Src: ctx.Source(), Str: str}
-
-		case reflect.Int, reflect.Int8, reflect.Int16,
-			reflect.Int32, reflect.Int64:
-			return toInt(ctx, value.Int())
-
-		case reflect.Uint, reflect.Uint8, reflect.Uint16,
-			reflect.Uint32, reflect.Uint64, reflect.Uintptr:
-			return toUint(ctx, value.Uint())
-
-		case reflect.Float32, reflect.Float64:
-			return convertRec(ctx, nilIsTop, value.Float())
-
-		case reflect.Ptr:
-			if value.IsNil() {
-				if nilIsTop {
-					ident, _ := ctx.Source().(*ast.Ident)
-					return &adt.Top{Src: ident}
-				}
-				return &adt.Null{Src: ctx.Source()}
+		for i := range typ.NumField() {
+			sf := typ.Field(i)
+			if sf.PkgPath != "" {
+				continue
 			}
-			return convertRec(ctx, nilIsTop, value.Elem().Interface())
-
-		case reflect.Struct:
-			obj := &adt.StructLit{Src: src}
-			v := &adt.Vertex{}
-			env := ctx.Env(0)
-			if env == nil {
-				env = &adt.Environment{}
+			val := val.Field(i)
+			if !nilIsTop && isNil(val) {
+				continue
 			}
-			v.AddStruct(obj, env, adt.CloseInfo{})
-			v.SetValue(ctx, adt.Finalized, &adt.StructMarker{})
+			if tag, _ := sf.Tag.Lookup("json"); tag == "-" {
+				continue
+			}
+			if isOmitEmpty(&sf) && val.IsZero() {
+				continue
+			}
+			sub := fromGoValue(ctx, nilIsTop, val)
+			if sub == nil {
+				// mimic behavior of encoding/json: skip fields of unsupported types
+				continue
+			}
+			if _, ok := sub.(*adt.Bottom); ok {
+				return sub
+			}
 
-			t := value.Type()
-			for i := 0; i < value.NumField(); i++ {
-				sf := t.Field(i)
-				if sf.PkgPath != "" {
-					continue
+			// leave errors like we do during normal evaluation or do we want to return the error?
+			name := getName(&sf)
+			if name == "-" {
+				continue
+			}
+			if sf.Anonymous && name == "" {
+				arc, ok := sub.(*adt.Vertex)
+				if ok {
+					v.Arcs = append(v.Arcs, arc.Arcs...)
 				}
-				val := value.Field(i)
-				if !nilIsTop && isNil(val) {
-					continue
-				}
-				if tag, _ := sf.Tag.Lookup("json"); tag == "-" {
-					continue
-				}
-				if isOmitEmpty(&sf) && isZero(val) {
-					continue
-				}
-				sub := convertRec(ctx, nilIsTop, val.Interface())
+				continue
+			}
+
+			f := ctx.StringLabel(name)
+			sl.Decls = append(sl.Decls, &adt.Field{Label: f, Value: sub})
+			v.Arcs = append(v.Arcs, ensureArcVertex(ctx, env, sub, f))
+		}
+
+		// There is no closedness or cycle info for Go structs, so we pass an empty CloseInfo.
+		v.AddStruct(sl)
+		v.SetValue(ctx, &adt.StructMarker{})
+		v.ForceDone()
+		return v
+
+	case reflect.Map:
+		obj := &adt.StructLit{Src: src}
+		obj.Init(ctx)
+		v := &adt.Vertex{}
+
+		switch key := typ.Key(); key.Kind() {
+		default:
+			if !key.Implements(textMarshaler) {
+				return ctx.AddErrf("unsupported Go type for map key (%v)", key)
+			}
+			fallthrough
+		case reflect.String, reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+			reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
+
+			// Note that we don't use [reflect.Value.Seq2]; see the note below for [reflect.Array].
+			iter := val.MapRange()
+			for iter.Next() {
+				k, val := iter.Key(), iter.Value()
+				sub := fromGoValue(ctx, nilIsTop, val)
+				// mimic behavior of encoding/json: report error of unsupported type.
 				if sub == nil {
-					// mimic behavior of encoding/json: skip fields of unsupported types
-					continue
+					return ctx.AddErrf("unsupported Go type (%T)", val.Interface())
 				}
-				if _, ok := sub.(*adt.Bottom); ok {
+				if isBottom(sub) {
 					return sub
 				}
 
-				// leave errors like we do during normal evaluation or do we
-				// want to return the error?
-				name := getName(&sf)
-				if name == "-" {
-					continue
-				}
-				if sf.Anonymous && name == "" {
-					arc, ok := sub.(*adt.Vertex)
-					if ok {
-						v.Arcs = append(v.Arcs, arc.Arcs...)
-					}
-					continue
-				}
-
-				f := ctx.StringLabel(name)
-				obj.Decls = append(obj.Decls, &adt.Field{Label: f, Value: sub})
-				arc, ok := sub.(*adt.Vertex)
-				if ok {
-					a := *arc
-					arc = &a
-					arc.Label = f
-				} else {
-					arc = &adt.Vertex{Label: f, BaseValue: sub}
-					arc.UpdateStatus(adt.Finalized)
-					arc.AddConjunct(adt.MakeRootConjunct(nil, sub))
-				}
-				v.Arcs = append(v.Arcs, arc)
+				s := fmt.Sprint(k)
+				f := ctx.StringLabel(s)
+				v.Arcs = append(v.Arcs, ensureArcVertex(ctx, env, sub, f))
 			}
-
-			return v
-
-		case reflect.Map:
-			v := &adt.Vertex{BaseValue: &adt.StructMarker{}}
-			v.SetValue(ctx, adt.Finalized, &adt.StructMarker{})
-
-			t := value.Type()
-			switch key := t.Key(); key.Kind() {
-			default:
-				if !key.Implements(textMarshaler) {
-					return ctx.AddErrf("unsupported Go type for map key (%v)", key)
-				}
-				fallthrough
-			case reflect.String,
-				reflect.Int, reflect.Int8, reflect.Int16,
-				reflect.Int32, reflect.Int64,
-				reflect.Uint, reflect.Uint8, reflect.Uint16,
-				reflect.Uint32, reflect.Uint64, reflect.Uintptr:
-
-				keys := value.MapKeys()
-				sort.Slice(keys, func(i, j int) bool {
-					return fmt.Sprint(keys[i]) < fmt.Sprint(keys[j])
-				})
-				for _, k := range keys {
-					val := value.MapIndex(k)
-					// if isNil(val) {
-					// 	continue
-					// }
-
-					sub := convertRec(ctx, nilIsTop, val.Interface())
-					// mimic behavior of encoding/json: report error of
-					// unsupported type.
-					if sub == nil {
-						return ctx.AddErrf("unsupported Go type (%T)", val.Interface())
-					}
-					if isBottom(sub) {
-						return sub
-					}
-
-					s := fmt.Sprint(k)
-					f := ctx.StringLabel(s)
-					arc, ok := sub.(*adt.Vertex)
-					if ok {
-						a := *arc
-						arc = &a
-						arc.Label = f
-					} else {
-						arc = &adt.Vertex{Label: f, BaseValue: sub}
-						arc.UpdateStatus(adt.Finalized)
-						arc.AddConjunct(adt.MakeRootConjunct(nil, sub))
-					}
-					v.Arcs = append(v.Arcs, arc)
-				}
+			slices.SortFunc(v.Arcs, func(a, b *adt.Vertex) int {
+				return strings.Compare(a.Label.IdentString(ctx), b.Label.IdentString(ctx))
+			})
+			// Create all the adt/ast fields after sorting the arcs
+			for _, arc := range v.Arcs {
+				obj.Decls = append(obj.Decls, &adt.Field{Label: arc.Label, Value: arc})
 			}
-
-			return v
-
-		case reflect.Slice, reflect.Array:
-			var values []adt.Value
-
-			for i := 0; i < value.Len(); i++ {
-				val := value.Index(i)
-				x := convertRec(ctx, nilIsTop, val.Interface())
-				if x == nil {
-					return ctx.AddErrf("unsupported Go type (%T)",
-						val.Interface())
-				}
-				if isBottom(x) {
-					return x
-				}
-				values = append(values, x)
-			}
-
-			return ctx.NewList(values...)
 		}
+
+		v.AddStruct(obj)
+		v.SetValue(ctx, structMarker)
+		v.ForceDone()
+		return v
+
+	case reflect.Slice:
+		if typ.Elem().Kind() == reflect.Uint8 { // []byte
+			return &adt.Bytes{Src: src, B: val.Bytes()}
+		}
+		fallthrough
+	case reflect.Array:
+		// Grow the slices to match the number of fields in the Go struct,
+		// avoiding repeated slice growth in append calls below.
+		numElems := val.Len()
+		src, _ := src.(*ast.ListLit)
+		list := &adt.ListLit{
+			Src:   src,
+			Elems: make([]adt.Elem, 0, numElems),
+		}
+		v := &adt.Vertex{
+			Arcs: make([]*adt.Vertex, 0, numElems),
+		}
+
+		// Note that we don't use [reflect.Value.Seq2],
+		// as it allocates more per iteration, and we don't need the index value.
+		// We can't use [reflect.Value.Seq] either, as that's just the indices.
+		// See the upstream bug report: https://go.dev/issue/76357
+		for i := range numElems {
+			val := val.Index(i)
+			x := fromGoValue(ctx, nilIsTop, val)
+			if x == nil {
+				return ctx.AddErrf("unsupported Go type (%T)", val.Interface())
+			}
+			if isBottom(x) {
+				return x
+			}
+			list.Elems = append(list.Elems, x)
+			f := adt.MakeIntLabel(adt.IntLabel, int64(i))
+			v.Arcs = append(v.Arcs, ensureArcVertex(ctx, env, x, f))
+		}
+
+		v.AddConjunct(adt.MakeRootConjunct(env, list))
+		v.SetValue(ctx, listMarker)
+		v.ForceDone()
+		return v
 	}
 	return nil
 }
 
-func toInt(ctx *adt.OpContext, x int64) adt.Value {
-	n := &adt.Num{Src: ctx.Source(), K: adt.IntKind}
-	n.X = *apd.New(x, 0)
-	return n
+// These are effectively singletons, so avoid allocating new ones.
+var (
+	structMarker = &adt.StructMarker{}
+	listMarker   = &adt.ListMarker{}
+)
+
+func fromGoBigInt(x *big.Int) apd.Decimal {
+	// Integers fitting in 64 bits is rather common.
+	// In that case, avoid the conversion to [apd.BigInt], which also allocates.
+	if x.IsInt64() {
+		var dec apd.Decimal
+		dec.SetInt64(x.Int64())
+		return dec
+	}
+	return *apd.NewWithBigInt(new(apd.BigInt).SetMathBigInt(x), 0)
 }
 
-func toUint(ctx *adt.OpContext, x uint64) adt.Value {
-	n := &adt.Num{Src: ctx.Source(), K: adt.IntKind}
-	n.X.Coeff.SetUint64(x)
-	return n
-}
+func ensureArcVertex(ctx *adt.OpContext, env *adt.Environment, x adt.Value, l adt.Feature) *adt.Vertex {
+	if arc, ok := x.(*adt.Vertex); ok {
+		if arc.Label == l {
+			// We already have a vertex with the correct label; do not make a copy.
+			return arc
+		}
+		// We already have a vertex; copy it and adjust its label.
+		a := *arc
+		a.Label = l
+		return &a
+	}
+	// We know this is one vertex with exactly one conjunct,
+	// so allocate both together to reduce the runtime overhead.
+	var alloc struct {
+		arc   adt.Vertex
+		conjs [1]adt.Conjunct
+	}
+	arc := &alloc.arc
+	arc.Conjuncts = alloc.conjs[:0]
 
-func convertGoType(ctx *adt.OpContext, t reflect.Type) adt.Expr {
-	// TODO: this can be much more efficient.
-	// TODO: synchronize
-	return goTypeToValue(ctx, true, t)
+	arc.Label = l
+	arc.AddConjunct(adt.MakeRootConjunct(env, x))
+	arc.SetValue(ctx, x)
+	arc.ForceDone()
+	return arc
 }
 
 var (
-	jsonMarshaler = reflect.TypeOf(new(json.Marshaler)).Elem()
-	textMarshaler = reflect.TypeOf(new(encoding.TextMarshaler)).Elem()
-	topSentinel   = ast.NewIdent("_")
+	goError        = reflect.TypeFor[error]()
+	typesInterface = reflect.TypeFor[types.Interface]()
+	jsonMarshaler  = reflect.TypeFor[json.Marshaler]()
+	textMarshaler  = reflect.TypeFor[encoding.TextMarshaler]()
+	astExpr        = reflect.TypeFor[ast.Expr]()
+	astFile        = reflect.TypeFor[*ast.File]()
+	bigInt         = reflect.TypeFor[*big.Int]()
+	bigRat         = reflect.TypeFor[*big.Rat]()
+	bigFloat       = reflect.TypeFor[*big.Float]()
+	apdDecimal     = reflect.TypeFor[*apd.Decimal]()
+	topSentinel    = ast.NewIdent("_")
 )
 
-// goTypeToValue converts a Go Type to a value.
-//
-// TODO: if this value will always be unified with a concrete type in Go, then
-// many of the fields may be omitted.
-func goTypeToValue(ctx *adt.OpContext, allowNullDefault bool, t reflect.Type) adt.Expr {
-	if _, t, ok := ctx.LoadType(t); ok {
-		return t
+// implements is like t.Implements(ifaceType) but checks whether
+// either t or reflect.PointerTo(t) implements the interface.
+// It also returns false for the case where t is an interface type.
+func implements(t, ifaceType reflect.Type) (needAddr, ok bool) {
+	switch {
+	case t.Kind() == reflect.Interface:
+		return false, false
+	case t.Implements(ifaceType):
+		return false, true
+	case reflect.PointerTo(t).Implements(ifaceType):
+		return true, true
+	default:
+		return false, false
 	}
-
-	_, v := goTypeToValueRec(ctx, allowNullDefault, t)
-	if v == nil {
-		return ctx.AddErrf("unsupported Go type (%v)", t)
-	}
-	return v
 }
 
-func goTypeToValueRec(ctx *adt.OpContext, allowNullDefault bool, t reflect.Type) (e ast.Expr, expr adt.Expr) {
+func fromGoType(ctx *adt.OpContext, allowNullDefault bool, t reflect.Type) (e ast.Expr, expr adt.Expr) {
 	if src, t, ok := ctx.LoadType(t); ok {
 		return src, t
 	}
@@ -610,16 +597,17 @@ func goTypeToValueRec(ctx *adt.OpContext, allowNullDefault bool, t reflect.Type)
 	// strict instances and there cannot be any tags that further constrain
 	// the values.
 	if t.Implements(jsonMarshaler) || t.Implements(textMarshaler) {
-		return topSentinel, nil
+		e = topSentinel
+		goto store
 	}
 
 	switch k := t.Kind(); k {
-	case reflect.Ptr:
+	case reflect.Pointer:
 		elem := t.Elem()
-		for elem.Kind() == reflect.Ptr {
+		for elem.Kind() == reflect.Pointer {
 			elem = elem.Elem()
 		}
-		e, _ = goTypeToValueRec(ctx, false, elem)
+		e, _ = fromGoType(ctx, false, elem)
 		if allowNullDefault {
 			e = wrapOrNull(e)
 		}
@@ -660,13 +648,13 @@ func goTypeToValueRec(ctx *adt.OpContext, allowNullDefault bool, t reflect.Type)
 		// references. Maybe have a special kind of "hardlink" reference.
 		ctx.StoreType(t, obj, nil)
 
-		for i := 0; i < t.NumField(); i++ {
+		for i := range t.NumField() {
 			f := t.Field(i)
 			if f.PkgPath != "" {
 				continue
 			}
 			_, ok := f.Tag.Lookup("cue")
-			elem, _ := goTypeToValueRec(ctx, !ok, f.Type)
+			elem, _ := fromGoType(ctx, !ok, f.Type)
 			if isBad(elem) {
 				continue // Ignore fields for unsupported types
 			}
@@ -679,7 +667,7 @@ func goTypeToValueRec(ctx *adt.OpContext, allowNullDefault bool, t reflect.Type)
 			}
 
 			if tag, ok := f.Tag.Lookup("cue"); ok {
-				v := parseTag(ctx, obj, name, tag)
+				v := parseTag(ctx, name, tag)
 				if isBad(v) {
 					return v, nil
 				}
@@ -689,10 +677,10 @@ func goTypeToValueRec(ctx *adt.OpContext, allowNullDefault bool, t reflect.Type)
 			// valid CUE name), make it a string and create a map to a new
 			// name for references.
 
-			// The GO JSON decoder always allows a value to be undefined.
+			// The Go JSON decoder always allows a value to be undefined.
 			d := &ast.Field{Label: ast.NewIdent(name), Value: elem}
 			if isOptional(&f) {
-				d.Optional = token.Blank.Pos()
+				d.Constraint = token.OPTION
 			}
 			obj.Elts = append(obj.Elts, d)
 		}
@@ -706,16 +694,19 @@ func goTypeToValueRec(ctx *adt.OpContext, allowNullDefault bool, t reflect.Type)
 		if t.Elem().Kind() == reflect.Uint8 {
 			e = ast.NewIdent("__bytes")
 		} else {
-			elem, _ := goTypeToValueRec(ctx, allowNullDefault, t.Elem())
+			elem, _ := fromGoType(ctx, allowNullDefault, t.Elem())
 			if elem == nil {
-				b := ctx.AddErrf("unsupported Go type (%v)", t.Elem())
-				return &ast.BadExpr{}, b
+				return &ast.BadExpr{}, ctx.AddErrf("unsupported Go type (%v)", t.Elem())
 			}
 
 			if t.Kind() == reflect.Array {
-				e = ast.NewBinExpr(token.MUL,
-					ast.NewLit(token.INT, strconv.Itoa(t.Len())),
-					ast.NewList(elem))
+				e = ast.NewCall(
+					ast.NewSel(&ast.Ident{
+						Name: "list",
+						Node: ast.NewImport(nil, "list"),
+					}, "Repeat"),
+					ast.NewList(elem),
+					ast.NewLit(token.INT, strconv.Itoa(t.Len())))
 			} else {
 				e = ast.NewList(&ast.Ellipsis{Type: elem})
 			}
@@ -730,14 +721,12 @@ func goTypeToValueRec(ctx *adt.OpContext, allowNullDefault bool, t reflect.Type)
 			reflect.Int32, reflect.Int64, reflect.Uint, reflect.Uint8,
 			reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
 		default:
-			b := ctx.AddErrf("unsupported Go type for map key (%v)", key)
-			return &ast.BadExpr{}, b
+			return &ast.BadExpr{}, ctx.AddErrf("unsupported Go type for map key (%v)", key)
 		}
 
-		v, x := goTypeToValueRec(ctx, allowNullDefault, t.Elem())
+		v, x := fromGoType(ctx, allowNullDefault, t.Elem())
 		if v == nil {
-			b := ctx.AddErrf("unsupported Go type (%v)", t.Elem())
-			return &ast.BadExpr{}, b
+			return &ast.BadExpr{}, ctx.AddErrf("unsupported Go type (%v)", t.Elem())
 		}
 		if isBad(v) {
 			return v, x
@@ -759,13 +748,13 @@ store:
 			ctx.AddErrf(msg, args...)
 		})
 		var x adt.Expr
-		c, err := compile.Expr(nil, ctx, pkgID(), e)
+		x2, err := compile.Expr(nil, ctx, pkgID(), e)
 		if err != nil {
 			b := &adt.Bottom{Err: err}
 			ctx.AddBottom(b)
 			x = b
 		} else {
-			x = c.Expr()
+			x = x2.Expr()
 		}
 		ctx.StoreType(t, e, x)
 		return e, x

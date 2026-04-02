@@ -1,4 +1,4 @@
-// Copyright 2021-2024 The Connect Authors
+// Copyright 2021-2025 The Connect Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -80,7 +80,7 @@ func (d *ErrorDetail) Type() string {
 	//
 	// If we ever want to support remote registries, we can add an explicit
 	// `TypeURL` method.
-	return typeNameFromURL(d.pbAny.GetTypeUrl())
+	return typeNameForURL(d.pbAny.GetTypeUrl())
 }
 
 // Bytes returns a copy of the Protobuf-serialized detail.
@@ -226,12 +226,6 @@ func (e *Error) AddDetail(d *ErrorDetail) {
 }
 
 // Meta allows the error to carry additional information as key-value pairs.
-//
-// Metadata attached to errors returned by unary handlers is always sent as
-// HTTP headers, regardless of the protocol. Metadata attached to errors
-// returned by streaming handlers may be sent as HTTP headers, HTTP trailers,
-// or a block of in-body metadata, depending on the protocol in use and whether
-// or not the handler has already written messages to the stream.
 //
 // Protocol-specific headers and trailers may be removed to avoid breaking
 // protocol semantics. For example, Content-Length and Content-Type headers
@@ -459,6 +453,6 @@ func wrapIfMaxBytesError(err error, tmpl string, args ...any) error {
 	return errorf(CodeResourceExhausted, "%s: exceeded %d byte http.MaxBytesReader limit", prefix, maxBytesErr.Limit)
 }
 
-func typeNameFromURL(url string) string {
+func typeNameForURL(url string) string {
 	return url[strings.LastIndexByte(url, '/')+1:]
 }

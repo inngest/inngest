@@ -132,7 +132,7 @@ func New(c ErrorCode, err error, callDepth int, msg string) *Error {
 }
 
 // Newf uses format and args to format a message, then calls New.
-func Newf(c ErrorCode, err error, format string, args ...interface{}) *Error {
+func Newf(c ErrorCode, err error, format string, args ...any) *Error {
 	return New(c, err, 2, fmt.Sprintf(format, args...))
 }
 
@@ -187,7 +187,7 @@ func GRPCCode(err error) ErrorCode {
 // It performs some initial nil checks, and does a single level of unwrapping
 // when err is a *gcerr.Error. Then it calls its errorAs argument, which should
 // be a driver implementation of ErrorAs.
-func ErrorAs(err error, target interface{}, errorAs func(error, interface{}) bool) bool {
+func ErrorAs(err error, target any, errorAs func(error, any) bool) bool {
 	if err == nil {
 		return false
 	}
@@ -195,7 +195,7 @@ func ErrorAs(err error, target interface{}, errorAs func(error, interface{}) boo
 		panic("ErrorAs target cannot be nil")
 	}
 	val := reflect.ValueOf(target)
-	if val.Type().Kind() != reflect.Ptr || val.IsNil() {
+	if val.Type().Kind() != reflect.Pointer || val.IsNil() {
 		panic("ErrorAs target must be a non-nil pointer")
 	}
 	if e, ok := err.(*Error); ok {

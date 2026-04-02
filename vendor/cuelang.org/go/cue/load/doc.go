@@ -13,4 +13,10 @@
 // limitations under the License.
 
 // Package load loads CUE instances.
-package load // import "cuelang.org/go/cue/load"
+package load
+
+// Trigger the unconditional loading of all core builtin packages if load is used.
+// This was deemed the simplest way to avoid having to import this line explicitly,
+// and thus breaking existing code, for the majority of cases,
+// while not introducing an import cycle.
+import _ "cuelang.org/go/pkg"

@@ -14,21 +14,22 @@
 
 package http
 
-//go:generate go run gen.go
-//go:generate gofmt -s -w .
-
 import (
 	"bytes"
+	"crypto/tls"
+	"crypto/x509"
+	"encoding/pem"
 	"io"
-	"io/ioutil"
 	"net/http"
 
 	"cuelang.org/go/cue"
+	"cuelang.org/go/cue/errors"
 	"cuelang.org/go/internal/task"
 )
 
 func init() {
 	task.Register("tool/http.Do", newHTTPCmd)
+	task.Register("tool/http.Serve", newServeCmd)
 
 	// For backwards compatibility.
 	task.Register("http", newHTTPCmd)
@@ -47,8 +48,8 @@ func (c *httpCmd) Run(ctx *task.Context) (res interface{}, err error) {
 		u      = ctx.String("url")
 	)
 	var r io.Reader
-	if obj := ctx.Obj.Lookup("request"); obj.Exists() {
-		if v := obj.Lookup("body"); v.Exists() {
+	if obj := ctx.Obj.LookupPath(cue.MakePath(cue.Str("request"))); obj.Exists() {
+		if v := obj.LookupPath(cue.MakePath(cue.Str("body"))); v.Exists() {
 			r, err = v.Reader()
 			if err != nil {
 				return nil, err
@@ -63,8 +64,80 @@ func (c *httpCmd) Run(ctx *task.Context) (res interface{}, err error) {
 			return nil, err
 		}
 	}
+
+	var caCert []byte
+	caCertValue := ctx.Obj.LookupPath(cue.MakePath(cue.Str("tls"), cue.Str("caCert")))
+	if caCertValue.Exists() {
+		caCert, err = caCertValue.Bytes()
+		if err != nil {
+			return nil, errors.Wrapf(err, caCertValue.Pos(), "invalid bytes value")
+		}
+	}
+
+	tlsVerify := true
+	tlsVerifyValue := ctx.Obj.LookupPath(cue.MakePath(cue.Str("tls"), cue.Str("verify")))
+	if tlsVerifyValue.Exists() {
+		tlsVerify, err = tlsVerifyValue.Bool()
+		if err != nil {
+			return nil, errors.Wrapf(err, tlsVerifyValue.Pos(), "invalid bool value")
+		}
+	}
+
 	if ctx.Err != nil {
 		return nil, ctx.Err
+	}
+
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.TLSClientConfig = &tls.Config{}
+
+	if !tlsVerify {
+		transport.TLSClientConfig.InsecureSkipVerify = true
+	}
+	if tlsVerify && len(caCert) > 0 {
+		pool := x509.NewCertPool()
+		for {
+			block, rest := pem.Decode(caCert)
+			if block == nil {
+				break
+			}
+			if block.Type == "PUBLIC KEY" {
+				c, err := x509.ParseCertificate(block.Bytes)
+				if err != nil {
+					return nil, errors.Wrapf(err, ctx.Obj.Pos(), "failed to parse caCert")
+				}
+				pool.AddCert(c)
+			}
+			caCert = rest
+		}
+		transport.TLSClientConfig.RootCAs = pool
+	}
+
+	client := &http.Client{
+		Transport: transport,
+		// TODO: timeout
+	}
+
+	// Rather clumsily, we need to also default followRedirects here because
+	// it's still valid for tasks to be specified via the special $id field, in
+	// which case we cannot be clear that the documented CUE-based defaults have
+	// been applied.
+	//
+	// This is noted as something to fix, more precisely a mistake not to make
+	// again, in https://cuelang.org/issue/1325
+	followRedirects := true
+	followRedirectsValue := ctx.Obj.LookupPath(cue.MakePath(cue.Str("followRedirects")))
+	if followRedirectsValue.Exists() {
+		var err error
+		followRedirects, err = followRedirectsValue.Bool()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if !followRedirects {
+		client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		}
 	}
 
 	req, err := http.NewRequest(method, u, r)
@@ -74,15 +147,13 @@ func (c *httpCmd) Run(ctx *task.Context) (res interface{}, err error) {
 	req.Header = header
 	req.Trailer = trailer
 
-	// TODO:
-	//  - retry logic
-	//  - TLS certs
-	resp, err := http.DefaultClient.Do(req)
+	// TODO: retry logic
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	b, err := ioutil.ReadAll(resp.Body)
+	b, err := io.ReadAll(resp.Body)
 	// parse response body and headers
 	return map[string]interface{}{
 		"response": map[string]interface{}{
@@ -96,7 +167,7 @@ func (c *httpCmd) Run(ctx *task.Context) (res interface{}, err error) {
 }
 
 func parseHeaders(obj cue.Value, label string) (http.Header, error) {
-	m := obj.Lookup(label)
+	m := obj.LookupPath(cue.MakePath(cue.Str(label)))
 	if !m.Exists() {
 		return nil, nil
 	}
@@ -106,11 +177,27 @@ func parseHeaders(obj cue.Value, label string) (http.Header, error) {
 	}
 	h := http.Header{}
 	for iter.Next() {
-		str, err := iter.Value().String()
+		key := iter.Selector().Unquoted()
+		val := iter.Value()
+
+		// Handle single string value
+		if s, err := val.String(); err == nil {
+			h.Add(key, s)
+			continue
+		}
+
+		// Each header value is a list of strings [string, ...string]
+		list, err := val.List()
 		if err != nil {
 			return nil, err
 		}
-		h.Add(iter.Label(), str)
+		for list.Next() {
+			str, err := list.Value().String()
+			if err != nil {
+				return nil, err
+			}
+			h.Add(key, str)
+		}
 	}
 	return h, nil
 }

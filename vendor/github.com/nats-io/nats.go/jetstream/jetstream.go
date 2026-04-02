@@ -19,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -33,9 +34,9 @@ type (
 	//
 	// - Publishing messages to a stream using [Publisher].
 	// - Managing streams using [StreamManager].
-	// - Managing consumers using [StreamConsumerManager]. Those are the same
-	//   methods as on [Stream], but are available as a shortcut to a consumer
-	//   bypassing stream lookup.
+	// - Managing consumers using [StreamConsumerManager]. These are the same
+	//   methods available on [Stream], but exposed here as a shortcut that bypasses
+	//   stream lookup.
 	// - Managing KeyValue stores using [KeyValueManager].
 	// - Managing Object Stores using [ObjectStoreManager].
 	//
@@ -48,6 +49,13 @@ type (
 		// the server does not have JetStream enabled, ErrJetStreamNotEnabled is
 		// returned.
 		AccountInfo(ctx context.Context) (*AccountInfo, error)
+
+		// Conn returns the underlying NATS connection.
+		Conn() *nats.Conn
+
+		// Options returns read-only JetStreamOptions used
+		// when making requests to JetStream.
+		Options() JetStreamOptions
 
 		StreamConsumerManager
 		StreamManager
@@ -87,8 +95,8 @@ type (
 		// be bound to a stream) and nats.Message.
 		//
 		// PublishMsgAsync does not guarantee that the message has been
-		// sent to the server and thus messages can be stored in the stream
 		// received by the server. It only guarantees that the message has been
+		// sent to the server and thus messages can be stored in the stream
 		// out of order in case of retries.
 		PublishMsgAsync(msg *nats.Msg, opts ...PublishOpt) (PubAckFuture, error)
 
@@ -102,7 +110,7 @@ type (
 		// server.
 		PublishAsyncComplete() <-chan struct{}
 
-		// CleanupPublisher will cleanup the publishing side of JetStreamContext.
+		// CleanupPublisher will clean up the publishing side of JetStreamContext.
 		//
 		// This will unsubscribe from the internal reply subject if needed.
 		// All pending async publishes will fail with ErrJetStreamContextClosed.
@@ -121,8 +129,9 @@ type (
 	// CreateOrUpdateStream and Stream methods return a [Stream] interface, allowing
 	// to operate on a stream.
 	StreamManager interface {
-		// CreateStream creates a new stream with given config and returns an
-		// interface to operate on it. If stream with given name already exists,
+		// CreateStream creates a new stream with the given config and returns an
+		// interface to operate on it. If stream with given name already exists
+		// and its configuration differs from the provided one,
 		// ErrStreamNameAlreadyInUse is returned.
 		CreateStream(ctx context.Context, cfg StreamConfig) (Stream, error)
 
@@ -130,7 +139,7 @@ type (
 		// ErrStreamNotFound is returned.
 		UpdateStream(ctx context.Context, cfg StreamConfig) (Stream, error)
 
-		// CreateOrUpdateStream creates a stream with given config. If stream
+		// CreateOrUpdateStream creates a stream with the given config. If stream
 		// already exists, it will be updated (if possible).
 		CreateOrUpdateStream(ctx context.Context, cfg StreamConfig) (Stream, error)
 
@@ -138,7 +147,7 @@ type (
 		// If stream does not exist, ErrStreamNotFound is returned.
 		Stream(ctx context.Context, stream string) (Stream, error)
 
-		// StreamNameBySubject returns a stream name stream listening on given
+		// StreamNameBySubject returns the name of the stream that listens on the given
 		// subject. If no stream is bound to given subject, ErrStreamNotFound
 		// is returned.
 		StreamNameBySubject(ctx context.Context, subject string) (string, error)
@@ -147,11 +156,11 @@ type (
 		// exist, ErrStreamNotFound is returned.
 		DeleteStream(ctx context.Context, stream string) error
 
-		// ListStreams returns StreamInfoLister, enabling iterating over a
+		// ListStreams returns StreamInfoLister, enabling iteration over a
 		// channel of stream infos.
 		ListStreams(context.Context, ...StreamListOpt) StreamInfoLister
 
-		// StreamNames returns a  StreamNameLister, enabling iterating over a
+		// StreamNames returns a StreamNameLister, enabling iteration over a
 		// channel of stream names.
 		StreamNames(context.Context, ...StreamListOpt) StreamNameLister
 	}
@@ -160,11 +169,11 @@ type (
 	// available as a part of [JetStream] interface. This is an alternative to
 	// [Stream] interface, allowing to bypass stream lookup. CreateConsumer,
 	// UpdateConsumer, CreateOrUpdateConsumer and Consumer methods return a
-	// [Consumer] interface, allowing to operate on a consumer (e.g. consume
+	// [Consumer] interface, allowing operation on a consumer (e.g. consume
 	// messages).
 	StreamConsumerManager interface {
 		// CreateOrUpdateConsumer creates a consumer on a given stream with
-		// given config. If consumer already exists, it will be updated (if
+		// the given config. If consumer already exists, it will be updated (if
 		// possible). Consumer interface is returned, allowing to operate on a
 		// consumer (e.g. fetch messages).
 		CreateOrUpdateConsumer(ctx context.Context, stream string, cfg ConsumerConfig) (Consumer, error)
@@ -182,10 +191,11 @@ type (
 		// returned, allowing to operate on a consumer (e.g. fetch messages).
 		UpdateConsumer(ctx context.Context, stream string, cfg ConsumerConfig) (Consumer, error)
 
-		// OrderedConsumer returns an OrderedConsumer instance. OrderedConsumer
-		// are managed by the library and provide a simple way to consume
-		// messages from a stream. Ordered consumers are ephemeral in-memory
-		// pull consumers and are resilient to deletes and restarts.
+		// OrderedConsumer returns a client-managed ordered consumer for the given stream.
+		// Ordered consumers use ephemeral pull consumers and automatically reset
+		// themselves when ordering is lost. The client tracks state in memory and
+		// recreates the underlying consumer as needed, making them resilient to deletes
+		// and restarts while ensuring message order is preserved.
 		OrderedConsumer(ctx context.Context, stream string, cfg OrderedConsumerConfig) (Consumer, error)
 
 		// Consumer returns an interface to an existing consumer, allowing processing
@@ -196,6 +206,37 @@ type (
 		// DeleteConsumer removes a consumer with given name from a stream.
 		// If consumer does not exist, ErrConsumerNotFound is returned.
 		DeleteConsumer(ctx context.Context, stream string, consumer string) error
+
+		// PauseConsumer pauses a consumer until the given time.
+		PauseConsumer(ctx context.Context, stream string, consumer string, pauseUntil time.Time) (*ConsumerPauseResponse, error)
+
+		// ResumeConsumer resumes a paused consumer.
+		ResumeConsumer(ctx context.Context, stream string, consumer string) (*ConsumerPauseResponse, error)
+
+		// CreateOrUpdatePushConsumer creates a push consumer on a given stream with
+		// the given config. If consumer already exists, it will be updated (if
+		// possible). Consumer interface is returned, allowing to consume messages.
+		CreateOrUpdatePushConsumer(ctx context.Context, stream string, cfg ConsumerConfig) (PushConsumer, error)
+
+		// CreatePushConsumer creates a push consumer on a given stream with given
+		// config. If consumer already exists and the provided configuration
+		// differs from its configuration, ErrConsumerExists is returned. If the
+		// provided configuration is the same as the existing consumer, the
+		// existing consumer is returned. Consumer interface is returned,
+		// allowing to consume messages.
+		CreatePushConsumer(ctx context.Context, stream string, cfg ConsumerConfig) (PushConsumer, error)
+
+		// UpdatePushConsumer updates an existing push consumer. If consumer does not
+		// exist, ErrConsumerDoesNotExist is returned. Consumer interface is
+		// returned, allowing to consume messages.
+		UpdatePushConsumer(ctx context.Context, stream string, cfg ConsumerConfig) (PushConsumer, error)
+
+		// PushConsumer returns an interface to an existing push consumer, allowing processing
+		// of messages. If consumer does not exist, ErrConsumerNotFound is
+		// returned.
+		//
+		// It returns ErrNotPushConsumer if the consumer is not a push consumer (delivery subject is not set).
+		PushConsumer(ctx context.Context, stream string, consumer string) (PushConsumer, error)
 	}
 
 	// StreamListOpt is a functional option for [StreamManager.ListStreams] and
@@ -247,11 +288,17 @@ type (
 
 	// APIStats reports on API calls to JetStream for this account.
 	APIStats struct {
+		// Level is the API level for this account.
+		Level int `json:"level"`
+
 		// Total is the total number of API calls.
 		Total uint64 `json:"total"`
 
 		// Errors is the total number of API errors.
 		Errors uint64 `json:"errors"`
+
+		// Inflight is the number of API calls currently in flight.
+		Inflight uint64 `json:"inflight,omitempty"`
 	}
 
 	// AccountLimits includes the JetStream limits of the current account.
@@ -269,25 +316,58 @@ type (
 		// MaxConsumers is the maximum number of consumers allowed for this
 		// account.
 		MaxConsumers int `json:"max_consumers"`
+
+		// MaxAckPending is the maximum number of outstanding ACKs any consumer
+		// may configure.
+		MaxAckPending int `json:"max_ack_pending"`
+
+		// MemoryMaxStreamBytes is is the maximum size any single memory based
+		// stream may be.
+		MemoryMaxStreamBytes int64 `json:"memory_max_stream_bytes"`
+
+		// StoreMaxStreamBytes is the maximum size any single storage based
+		// stream may be.
+		StoreMaxStreamBytes int64 `json:"storage_max_stream_bytes"`
+
+		// MaxBytesRequired indicates if max bytes is required to be set for
+		// streams in this account.
+		MaxBytesRequired bool `json:"max_bytes_required"`
 	}
 
 	jetStream struct {
 		conn *nats.Conn
-		jsOpts
+		opts JetStreamOptions
 
 		publisher *jetStreamClient
 	}
 
 	// JetStreamOpt is a functional option for [New], [NewWithAPIPrefix] and
 	// [NewWithDomain] methods.
-	JetStreamOpt func(*jsOpts) error
+	JetStreamOpt func(*JetStreamOptions) error
 
-	jsOpts struct {
-		publisherOpts  asyncPublisherOpts
+	// JetStreamOptions are used to configure JetStream.
+	JetStreamOptions struct {
+		// APIPrefix is the prefix used for JetStream API requests.
+		APIPrefix string
+
+		// Domain is the domain name token used when sending JetStream requests.
+		Domain string
+
+		// DefaultTimeout is the default timeout used for JetStream API requests.
+		// This applies when the context passed to JetStream methods does not have
+		// a deadline set.
+		DefaultTimeout time.Duration
+
+		// ClientTrace enables request/response API calls tracing.
+		ClientTrace *ClientTrace
+
+		publisherOpts asyncPublisherOpts
+
+		// this is the actual prefix used in the API requests
+		// it is either APIPrefix or a domain specific prefix
 		apiPrefix      string
 		replyPrefix    string
 		replyPrefixLen int
-		clientTrace    *ClientTrace
 	}
 
 	// ClientTrace can be used to trace API interactions for [JetStream].
@@ -378,11 +458,12 @@ var subjectRegexp = regexp.MustCompile(`^[^ >]*[>]?$`)
 //   - [WithPublishAsyncMaxPending] - sets the maximum outstanding async publishes
 //     that can be inflight at one time.
 func New(nc *nats.Conn, opts ...JetStreamOpt) (JetStream, error) {
-	jsOpts := jsOpts{
+	jsOpts := JetStreamOptions{
 		apiPrefix: DefaultAPIPrefix,
 		publisherOpts: asyncPublisherOpts{
 			maxpa: defaultAsyncPubAckInflight,
 		},
+		DefaultTimeout: defaultAPITimeout,
 	}
 	setReplyPrefix(nc, &jsOpts)
 	for _, opt := range opts {
@@ -392,7 +473,7 @@ func New(nc *nats.Conn, opts ...JetStreamOpt) (JetStream, error) {
 	}
 	js := &jetStream{
 		conn:      nc,
-		jsOpts:    jsOpts,
+		opts:      jsOpts,
 		publisher: &jetStreamClient{asyncPublisherOpts: jsOpts.publisherOpts},
 	}
 
@@ -404,7 +485,7 @@ const (
 	defaultAsyncPubAckInflight = 4000
 )
 
-func setReplyPrefix(nc *nats.Conn, jsOpts *jsOpts) {
+func setReplyPrefix(nc *nats.Conn, jsOpts *JetStreamOptions) {
 	jsOpts.replyPrefix = nats.InboxPrefix
 	if nc.Opts.InboxPrefix != "" {
 		jsOpts.replyPrefix = nc.Opts.InboxPrefix + "."
@@ -423,10 +504,12 @@ func setReplyPrefix(nc *nats.Conn, jsOpts *jsOpts) {
 //   - [WithPublishAsyncMaxPending] - sets the maximum outstanding async publishes
 //     that can be inflight at one time.
 func NewWithAPIPrefix(nc *nats.Conn, apiPrefix string, opts ...JetStreamOpt) (JetStream, error) {
-	jsOpts := jsOpts{
+	jsOpts := JetStreamOptions{
 		publisherOpts: asyncPublisherOpts{
 			maxpa: defaultAsyncPubAckInflight,
 		},
+		APIPrefix:      apiPrefix,
+		DefaultTimeout: defaultAPITimeout,
 	}
 	setReplyPrefix(nc, &jsOpts)
 	for _, opt := range opts {
@@ -435,14 +518,16 @@ func NewWithAPIPrefix(nc *nats.Conn, apiPrefix string, opts ...JetStreamOpt) (Je
 		}
 	}
 	if apiPrefix == "" {
-		return nil, fmt.Errorf("API prefix cannot be empty")
+		return nil, errors.New("API prefix cannot be empty")
 	}
 	if !strings.HasSuffix(apiPrefix, ".") {
 		jsOpts.apiPrefix = fmt.Sprintf("%s.", apiPrefix)
+	} else {
+		jsOpts.apiPrefix = apiPrefix
 	}
 	js := &jetStream{
 		conn:      nc,
-		jsOpts:    jsOpts,
+		opts:      jsOpts,
 		publisher: &jetStreamClient{asyncPublisherOpts: jsOpts.publisherOpts},
 	}
 	return js, nil
@@ -457,10 +542,12 @@ func NewWithAPIPrefix(nc *nats.Conn, apiPrefix string, opts ...JetStreamOpt) (Je
 //   - [WithPublishAsyncMaxPending] - sets the maximum outstanding async publishes
 //     that can be inflight at one time.
 func NewWithDomain(nc *nats.Conn, domain string, opts ...JetStreamOpt) (JetStream, error) {
-	jsOpts := jsOpts{
+	jsOpts := JetStreamOptions{
 		publisherOpts: asyncPublisherOpts{
 			maxpa: defaultAsyncPubAckInflight,
 		},
+		Domain:         domain,
+		DefaultTimeout: defaultAPITimeout,
 	}
 	setReplyPrefix(nc, &jsOpts)
 	for _, opt := range opts {
@@ -474,44 +561,42 @@ func NewWithDomain(nc *nats.Conn, domain string, opts ...JetStreamOpt) (JetStrea
 	jsOpts.apiPrefix = fmt.Sprintf(jsDomainT, domain)
 	js := &jetStream{
 		conn:      nc,
-		jsOpts:    jsOpts,
+		opts:      jsOpts,
 		publisher: &jetStreamClient{asyncPublisherOpts: jsOpts.publisherOpts},
 	}
 	return js, nil
 }
 
-// CreateStream creates a new stream with given config and returns an
+// Conn returns the underlying NATS connection.
+func (js *jetStream) Conn() *nats.Conn {
+	return js.conn
+}
+
+func (js *jetStream) Options() JetStreamOptions {
+	opts := js.opts
+	// Return a copy of ClientTrace to prevent modification
+	if opts.ClientTrace != nil {
+		clientTraceCopy := *opts.ClientTrace
+		opts.ClientTrace = &clientTraceCopy
+	}
+	return opts
+}
+
+// CreateStream creates a new stream with the given config and returns an
 // interface to operate on it. If stream with given name already exists,
 // ErrStreamNameAlreadyInUse is returned.
 func (js *jetStream) CreateStream(ctx context.Context, cfg StreamConfig) (Stream, error) {
 	if err := validateStreamName(cfg.Name); err != nil {
 		return nil, err
 	}
-	ctx, cancel := wrapContextWithoutDeadline(ctx)
+	ctx, cancel := js.wrapContextWithoutDeadline(ctx)
 	if cancel != nil {
 		defer cancel()
 	}
-	ncfg := cfg
-	// If we have a mirror and an external domain, convert to ext.APIPrefix.
-	if ncfg.Mirror != nil && ncfg.Mirror.Domain != "" {
-		// Copy so we do not change the caller's version.
-		ncfg.Mirror = ncfg.Mirror.copy()
-		if err := ncfg.Mirror.convertDomain(); err != nil {
-			return nil, err
-		}
-	}
 
-	// Check sources for the same.
-	if len(ncfg.Sources) > 0 {
-		ncfg.Sources = append([]*StreamSource(nil), ncfg.Sources...)
-		for i, ss := range ncfg.Sources {
-			if ss.Domain != "" {
-				ncfg.Sources[i] = ss.copy()
-				if err := ncfg.Sources[i].convertDomain(); err != nil {
-					return nil, err
-				}
-			}
-		}
+	ncfg, err := convertStreamConfigDomains(cfg)
+	if err != nil {
+		return nil, err
 	}
 
 	req, err := json.Marshal(ncfg)
@@ -519,7 +604,7 @@ func (js *jetStream) CreateStream(ctx context.Context, cfg StreamConfig) (Stream
 		return nil, err
 	}
 
-	createSubject := apiSubj(js.apiPrefix, fmt.Sprintf(apiStreamCreateT, cfg.Name))
+	createSubject := fmt.Sprintf(apiStreamCreateT, cfg.Name)
 	var resp streamInfoResponse
 
 	if _, err = js.apiRequestJSON(ctx, createSubject, &resp, req); err != nil {
@@ -541,17 +626,25 @@ func (js *jetStream) CreateStream(ctx context.Context, cfg StreamConfig) (Stream
 		if len(cfg.Sources) != len(resp.Config.Sources) {
 			return nil, ErrStreamSourceNotSupported
 		}
-		for i := range cfg.Sources {
-			if len(cfg.Sources[i].SubjectTransforms) != 0 && len(resp.Sources[i].SubjectTransforms) == 0 {
-				return nil, ErrStreamSourceMultipleFilterSubjectsNotSupported
-			}
+
+		// the sources list in the response is not ordered
+		cfgNumTransforms := make([]int, len(cfg.Sources))
+		respNumTransforms := make([]int, len(resp.Config.Sources))
+		for i, cfgSource := range cfg.Sources {
+			cfgNumTransforms[i] = len(cfgSource.SubjectTransforms)
+			respNumTransforms[i] = len(resp.Config.Sources[i].SubjectTransforms)
+		}
+		slices.Sort(cfgNumTransforms)
+		slices.Sort(respNumTransforms)
+		if !slices.Equal(cfgNumTransforms, respNumTransforms) {
+			return nil, ErrStreamSubjectTransformNotSupported
 		}
 	}
 
 	return &stream{
-		jetStream: js,
-		name:      cfg.Name,
-		info:      resp.StreamInfo,
+		js:   js,
+		name: cfg.Name,
+		info: resp.StreamInfo,
 	}, nil
 }
 
@@ -583,23 +676,58 @@ func (ss *StreamSource) copy() *StreamSource {
 	return &nss
 }
 
+// convertStreamConfigDomains converts domain configurations to external configurations
+// in both mirror and sources of a StreamConfig. It creates a copy of the config to avoid
+// modifying the caller's version.
+func convertStreamConfigDomains(cfg StreamConfig) (StreamConfig, error) {
+	ncfg := cfg
+	// If we have a mirror and an external domain, convert to ext.APIPrefix.
+	if ncfg.Mirror != nil && ncfg.Mirror.Domain != "" {
+		// Copy so we do not change the caller's version.
+		ncfg.Mirror = ncfg.Mirror.copy()
+		if err := ncfg.Mirror.convertDomain(); err != nil {
+			return StreamConfig{}, err
+		}
+	}
+
+	// Check sources for the same conversion.
+	if len(ncfg.Sources) > 0 {
+		ncfg.Sources = append([]*StreamSource(nil), ncfg.Sources...)
+		for i, ss := range ncfg.Sources {
+			if ss.Domain != "" {
+				ncfg.Sources[i] = ss.copy()
+				if err := ncfg.Sources[i].convertDomain(); err != nil {
+					return StreamConfig{}, err
+				}
+			}
+		}
+	}
+
+	return ncfg, nil
+}
+
 // UpdateStream updates an existing stream. If stream does not exist,
 // ErrStreamNotFound is returned.
 func (js *jetStream) UpdateStream(ctx context.Context, cfg StreamConfig) (Stream, error) {
 	if err := validateStreamName(cfg.Name); err != nil {
 		return nil, err
 	}
-	ctx, cancel := wrapContextWithoutDeadline(ctx)
+	ctx, cancel := js.wrapContextWithoutDeadline(ctx)
 	if cancel != nil {
 		defer cancel()
 	}
 
-	req, err := json.Marshal(cfg)
+	ncfg, err := convertStreamConfigDomains(cfg)
 	if err != nil {
 		return nil, err
 	}
 
-	updateSubject := apiSubj(js.apiPrefix, fmt.Sprintf(apiStreamUpdateT, cfg.Name))
+	req, err := json.Marshal(ncfg)
+	if err != nil {
+		return nil, err
+	}
+
+	updateSubject := fmt.Sprintf(apiStreamUpdateT, cfg.Name)
 	var resp streamInfoResponse
 
 	if _, err = js.apiRequestJSON(ctx, updateSubject, &resp, req); err != nil {
@@ -621,21 +749,29 @@ func (js *jetStream) UpdateStream(ctx context.Context, cfg StreamConfig) (Stream
 		if len(cfg.Sources) != len(resp.Config.Sources) {
 			return nil, ErrStreamSourceNotSupported
 		}
-		for i := range cfg.Sources {
-			if len(cfg.Sources[i].SubjectTransforms) != 0 && len(resp.Sources[i].SubjectTransforms) == 0 {
-				return nil, ErrStreamSourceMultipleFilterSubjectsNotSupported
-			}
+
+		// the sources list in the response is not ordered
+		cfgNumTransforms := make([]int, len(cfg.Sources))
+		respNumTransforms := make([]int, len(resp.Config.Sources))
+		for i, cfgSource := range cfg.Sources {
+			cfgNumTransforms[i] = len(cfgSource.SubjectTransforms)
+			respNumTransforms[i] = len(resp.Config.Sources[i].SubjectTransforms)
+		}
+		slices.Sort(cfgNumTransforms)
+		slices.Sort(respNumTransforms)
+		if !slices.Equal(cfgNumTransforms, respNumTransforms) {
+			return nil, ErrStreamSubjectTransformNotSupported
 		}
 	}
 
 	return &stream{
-		jetStream: js,
-		name:      cfg.Name,
-		info:      resp.StreamInfo,
+		js:   js,
+		name: cfg.Name,
+		info: resp.StreamInfo,
 	}, nil
 }
 
-// CreateOrUpdateStream creates a stream with given config. If stream
+// CreateOrUpdateStream creates a stream with the given config. If stream
 // already exists, it will be updated (if possible).
 func (js *jetStream) CreateOrUpdateStream(ctx context.Context, cfg StreamConfig) (Stream, error) {
 	s, err := js.UpdateStream(ctx, cfg)
@@ -655,11 +791,11 @@ func (js *jetStream) Stream(ctx context.Context, name string) (Stream, error) {
 	if err := validateStreamName(name); err != nil {
 		return nil, err
 	}
-	ctx, cancel := wrapContextWithoutDeadline(ctx)
+	ctx, cancel := js.wrapContextWithoutDeadline(ctx)
 	if cancel != nil {
 		defer cancel()
 	}
-	infoSubject := apiSubj(js.apiPrefix, fmt.Sprintf(apiStreamInfoT, name))
+	infoSubject := fmt.Sprintf(apiStreamInfoT, name)
 
 	var resp streamInfoResponse
 
@@ -673,9 +809,9 @@ func (js *jetStream) Stream(ctx context.Context, name string) (Stream, error) {
 		return nil, resp.Error
 	}
 	return &stream{
-		jetStream: js,
-		name:      name,
-		info:      resp.StreamInfo,
+		js:   js,
+		name: name,
+		info: resp.StreamInfo,
 	}, nil
 }
 
@@ -684,11 +820,11 @@ func (js *jetStream) DeleteStream(ctx context.Context, name string) error {
 	if err := validateStreamName(name); err != nil {
 		return err
 	}
-	ctx, cancel := wrapContextWithoutDeadline(ctx)
+	ctx, cancel := js.wrapContextWithoutDeadline(ctx)
 	if cancel != nil {
 		defer cancel()
 	}
-	deleteSubject := apiSubj(js.apiPrefix, fmt.Sprintf(apiStreamDeleteT, name))
+	deleteSubject := fmt.Sprintf(apiStreamDeleteT, name)
 	var resp streamDeleteResponse
 
 	if _, err := js.apiRequestJSON(ctx, deleteSubject, &resp); err != nil {
@@ -704,14 +840,14 @@ func (js *jetStream) DeleteStream(ctx context.Context, name string) error {
 }
 
 // CreateOrUpdateConsumer creates a consumer on a given stream with
-// given config. If consumer already exists, it will be updated (if
+// the given config. If consumer already exists, it will be updated (if
 // possible). Consumer interface is returned, allowing to operate on a
 // consumer (e.g. fetch messages).
 func (js *jetStream) CreateOrUpdateConsumer(ctx context.Context, stream string, cfg ConsumerConfig) (Consumer, error) {
 	if err := validateStreamName(stream); err != nil {
 		return nil, err
 	}
-	return upsertConsumer(ctx, js, stream, cfg, consumerActionCreateOrUpdate)
+	return upsertPullConsumer(ctx, js, stream, cfg, consumerActionCreateOrUpdate)
 }
 
 // CreateConsumer creates a consumer on a given stream with given
@@ -724,7 +860,7 @@ func (js *jetStream) CreateConsumer(ctx context.Context, stream string, cfg Cons
 	if err := validateStreamName(stream); err != nil {
 		return nil, err
 	}
-	return upsertConsumer(ctx, js, stream, cfg, consumerActionCreate)
+	return upsertPullConsumer(ctx, js, stream, cfg, consumerActionCreate)
 }
 
 // UpdateConsumer updates an existing consumer. If consumer does not
@@ -734,7 +870,7 @@ func (js *jetStream) UpdateConsumer(ctx context.Context, stream string, cfg Cons
 	if err := validateStreamName(stream); err != nil {
 		return nil, err
 	}
-	return upsertConsumer(ctx, js, stream, cfg, consumerActionUpdate)
+	return upsertPullConsumer(ctx, js, stream, cfg, consumerActionUpdate)
 }
 
 // OrderedConsumer returns an OrderedConsumer instance. OrderedConsumer
@@ -745,11 +881,15 @@ func (js *jetStream) OrderedConsumer(ctx context.Context, stream string, cfg Ord
 	if err := validateStreamName(stream); err != nil {
 		return nil, err
 	}
+	namePrefix := cfg.NamePrefix
+	if namePrefix == "" {
+		namePrefix = nuid.Next()
+	}
 	oc := &orderedConsumer{
-		jetStream:  js,
+		js:         js,
 		cfg:        &cfg,
 		stream:     stream,
-		namePrefix: nuid.Next(),
+		namePrefix: namePrefix,
 		doReset:    make(chan struct{}, 1),
 	}
 	consCfg := oc.getConsumerConfig()
@@ -781,12 +921,69 @@ func (js *jetStream) DeleteConsumer(ctx context.Context, stream string, name str
 	return deleteConsumer(ctx, js, stream, name)
 }
 
+// CreateOrUpdatePushConsumer creates a push consumer on a given stream with
+// the given config. If consumer already exists, it will be updated (if
+// possible). Consumer interface is returned, allowing to consume messages.
+func (js *jetStream) CreateOrUpdatePushConsumer(ctx context.Context, stream string, cfg ConsumerConfig) (PushConsumer, error) {
+	if err := validateStreamName(stream); err != nil {
+		return nil, err
+	}
+	return upsertPushConsumer(ctx, js, stream, cfg, consumerActionCreateOrUpdate)
+}
+
+// CreatePushConsumer creates a push consumer on a given stream with given
+// config. If consumer already exists and the provided configuration
+// differs from its configuration, ErrConsumerExists is returned. If the
+// provided configuration is the same as the existing consumer, the
+// existing consumer is returned. Consumer interface is returned,
+// allowing to consume messages.
+func (js *jetStream) CreatePushConsumer(ctx context.Context, stream string, cfg ConsumerConfig) (PushConsumer, error) {
+	if err := validateStreamName(stream); err != nil {
+		return nil, err
+	}
+	return upsertPushConsumer(ctx, js, stream, cfg, consumerActionCreate)
+}
+
+// UpdatePushConsumer updates an existing push consumer. If consumer does not
+// exist, ErrConsumerDoesNotExist is returned. Consumer interface is
+// returned, allowing to consume messages.
+func (js *jetStream) UpdatePushConsumer(ctx context.Context, stream string, cfg ConsumerConfig) (PushConsumer, error) {
+	if err := validateStreamName(stream); err != nil {
+		return nil, err
+	}
+	return upsertPushConsumer(ctx, js, stream, cfg, consumerActionUpdate)
+}
+
+// PushConsumer returns an interface to an existing consumer, allowing processing
+// of messages. If consumer does not exist, ErrConsumerNotFound is
+// returned.
+func (js *jetStream) PushConsumer(ctx context.Context, stream string, name string) (PushConsumer, error) {
+	if err := validateStreamName(stream); err != nil {
+		return nil, err
+	}
+	return getPushConsumer(ctx, js, stream, name)
+}
+
+func (js *jetStream) PauseConsumer(ctx context.Context, stream string, consumer string, pauseUntil time.Time) (*ConsumerPauseResponse, error) {
+	if err := validateStreamName(stream); err != nil {
+		return nil, err
+	}
+	return pauseConsumer(ctx, js, stream, consumer, &pauseUntil)
+}
+
+func (js *jetStream) ResumeConsumer(ctx context.Context, stream string, consumer string) (*ConsumerPauseResponse, error) {
+	if err := validateStreamName(stream); err != nil {
+		return nil, err
+	}
+	return resumeConsumer(ctx, js, stream, consumer)
+}
+
 func validateStreamName(stream string) error {
 	if stream == "" {
 		return ErrStreamNameRequired
 	}
-	if strings.ContainsAny(stream, ">*. /\\") {
-		return fmt.Errorf("%w: '%s'", ErrInvalidStreamName, stream)
+	if strings.ContainsAny(stream, ">*. /\\\t\r\n") {
+		return fmt.Errorf("%w: %q", ErrInvalidStreamName, stream)
 	}
 	return nil
 }
@@ -809,14 +1006,13 @@ func validateSubject(subject string) error {
 // returned (for a single server setup). For clustered topologies, AccountInfo
 // will time out.
 func (js *jetStream) AccountInfo(ctx context.Context) (*AccountInfo, error) {
-	ctx, cancel := wrapContextWithoutDeadline(ctx)
+	ctx, cancel := js.wrapContextWithoutDeadline(ctx)
 	if cancel != nil {
 		defer cancel()
 	}
 	var resp accountInfoResponse
 
-	infoSubject := apiSubj(js.apiPrefix, apiAccountInfo)
-	if _, err := js.apiRequestJSON(ctx, infoSubject, &resp); err != nil {
+	if _, err := js.apiRequestJSON(ctx, apiAccountInfo, &resp); err != nil {
 		if errors.Is(err, nats.ErrNoResponders) {
 			return nil, ErrJetStreamNotEnabled
 		}
@@ -835,7 +1031,7 @@ func (js *jetStream) AccountInfo(ctx context.Context) (*AccountInfo, error) {
 	return &resp.AccountInfo, nil
 }
 
-// ListStreams returns StreamInfoLister, enabling iterating over a
+// ListStreams returns StreamInfoLister, enabling iteration over a
 // channel of stream infos.
 func (js *jetStream) ListStreams(ctx context.Context, opts ...StreamListOpt) StreamInfoLister {
 	l := &streamLister{
@@ -852,7 +1048,7 @@ func (js *jetStream) ListStreams(ctx context.Context, opts ...StreamListOpt) Str
 	}
 	go func() {
 		defer close(l.streams)
-		ctx, cancel := wrapContextWithoutDeadline(ctx)
+		ctx, cancel := js.wrapContextWithoutDeadline(ctx)
 		if cancel != nil {
 			defer cancel()
 		}
@@ -889,7 +1085,7 @@ func (s *streamLister) Err() error {
 	return s.err
 }
 
-// StreamNames returns a  StreamNameLister, enabling iterating over a
+// StreamNames returns a StreamNameLister, enabling iteration over a
 // channel of stream names.
 func (js *jetStream) StreamNames(ctx context.Context, opts ...StreamListOpt) StreamNameLister {
 	l := &streamLister{
@@ -900,12 +1096,12 @@ func (js *jetStream) StreamNames(ctx context.Context, opts ...StreamListOpt) Str
 	for _, opt := range opts {
 		if err := opt(&streamsReq); err != nil {
 			l.err = err
-			close(l.streams)
+			close(l.names)
 			return l
 		}
 	}
 	go func() {
-		ctx, cancel := wrapContextWithoutDeadline(ctx)
+		ctx, cancel := js.wrapContextWithoutDeadline(ctx)
 		if cancel != nil {
 			defer cancel()
 		}
@@ -933,18 +1129,17 @@ func (js *jetStream) StreamNames(ctx context.Context, opts ...StreamListOpt) Str
 	return l
 }
 
-// StreamNameBySubject returns a stream name stream listening on given
+// StreamNameBySubject returns the name of the stream bound to the given
 // subject. If no stream is bound to given subject, ErrStreamNotFound
 // is returned.
 func (js *jetStream) StreamNameBySubject(ctx context.Context, subject string) (string, error) {
-	ctx, cancel := wrapContextWithoutDeadline(ctx)
+	ctx, cancel := js.wrapContextWithoutDeadline(ctx)
 	if cancel != nil {
 		defer cancel()
 	}
 	if err := validateSubject(subject); err != nil {
 		return "", err
 	}
-	streamsSubject := apiSubj(js.apiPrefix, apiStreams)
 
 	r := &streamsRequest{Subject: subject}
 	req, err := json.Marshal(r)
@@ -952,7 +1147,7 @@ func (js *jetStream) StreamNameBySubject(ctx context.Context, subject string) (s
 		return "", err
 	}
 	var resp streamNamesResponse
-	_, err = js.apiRequestJSON(ctx, streamsSubject, &resp, req)
+	_, err = js.apiRequestJSON(ctx, apiStreams, &resp, req)
 	if err != nil {
 		return "", err
 	}
@@ -988,9 +1183,8 @@ func (s *streamLister) streamInfos(ctx context.Context, streamsReq streamsReques
 		return nil, err
 	}
 
-	slSubj := apiSubj(s.js.apiPrefix, apiStreamListT)
 	var resp streamListResponse
-	_, err = s.js.apiRequestJSON(ctx, slSubj, &resp, reqJSON)
+	_, err = s.js.apiRequestJSON(ctx, apiStreamListT, &resp, reqJSON)
 	if err != nil {
 		return nil, err
 	}
@@ -1020,9 +1214,8 @@ func (s *streamLister) streamNames(ctx context.Context, streamsReq streamsReques
 		return nil, err
 	}
 
-	slSubj := apiSubj(s.js.apiPrefix, apiStreams)
 	var resp streamNamesResponse
-	_, err = s.js.apiRequestJSON(ctx, slSubj, &resp, reqJSON)
+	_, err = s.js.apiRequestJSON(ctx, apiStreams, &resp, reqJSON)
 	if err != nil {
 		return nil, err
 	}
@@ -1038,11 +1231,11 @@ func (s *streamLister) streamNames(ctx context.Context, streamsReq streamsReques
 // wrapContextWithoutDeadline wraps context without deadline with default timeout.
 // If deadline is already set, it will be returned as is, and cancel() will be nil.
 // Caller should check if cancel() is nil before calling it.
-func wrapContextWithoutDeadline(ctx context.Context) (context.Context, context.CancelFunc) {
+func (js *jetStream) wrapContextWithoutDeadline(ctx context.Context) (context.Context, context.CancelFunc) {
 	if _, ok := ctx.Deadline(); ok {
 		return ctx, nil
 	}
-	return context.WithTimeout(ctx, defaultAPITimeout)
+	return context.WithTimeout(ctx, js.opts.DefaultTimeout)
 }
 
 // CleanupPublisher will cleanup the publishing side of JetStreamContext.
@@ -1088,7 +1281,7 @@ func (js *jetStream) cleanupReplySub() {
 		js.publisher.replySub = nil
 	}
 	if js.publisher.connStatusCh != nil {
-		close(js.publisher.connStatusCh)
+		js.conn.RemoveStatusListener(js.publisher.connStatusCh)
 		js.publisher.connStatusCh = nil
 	}
 	js.publisher.Unlock()

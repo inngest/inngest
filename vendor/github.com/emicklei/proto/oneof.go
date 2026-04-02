@@ -64,6 +64,7 @@ func (o *Oneof) parse(p *Parser) error {
 		}
 	}
 	o.Name = lit
+	consumeCommentFor(p, o)
 	pos, tok, lit = p.next()
 	if tok != tLEFTCURLY {
 		return p.unexpected(lit, "oneof opening {", o)
@@ -80,7 +81,7 @@ func (o *Oneof) parse(p *Parser) error {
 			f.Position = pos
 			f.Comment, o.Elements = takeLastCommentIfEndsOnLine(o.elements(), pos.Line-1) // TODO call takeLastComment instead?
 			f.Type = lit
-			if err := parseFieldAfterType(f.Field, p); err != nil {
+			if err := parseFieldAfterType(f.Field, p, f); err != nil {
 				return err
 			}
 			o.addElement(f)
@@ -117,6 +118,11 @@ done:
 // Accept dispatches the call to the visitor.
 func (o *Oneof) Accept(v Visitor) {
 	v.VisitOneof(o)
+}
+
+// Doc is part of Documented
+func (o *Oneof) Doc() *Comment {
+	return o.Comment
 }
 
 // OneOfField is part of Oneof.

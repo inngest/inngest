@@ -9,7 +9,9 @@ import (
 	"bytes"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gosimple/unidecode"
 )
@@ -21,16 +23,32 @@ var (
 	CustomRuneSub map[rune]string
 
 	// MaxLength stores maximum slug length.
-	// It's smart so it will cat slug after full word.
 	// By default slugs aren't shortened.
 	// If MaxLength is smaller than length of the first word, then returned
 	// slug will contain only substring from the first word truncated
 	// after MaxLength.
 	MaxLength int
 
+	// EnableSmartTruncate defines if cutting with MaxLength is smart.
+	// Smart algorithm will cat slug after full word.
+	// Default is true.
+	EnableSmartTruncate = true
+
 	// Lowercase defines if the resulting slug is transformed to lowercase.
 	// Default is true.
 	Lowercase = true
+
+	// DisableMultipleDashTrim defines if multiple dashes should be preserved.
+	// Default is false (multiple dashes will be replaced with single dash).
+	DisableMultipleDashTrim = false
+
+	// DisableEndsTrim defines if the slug should keep leading and trailing
+	// dashes and underscores. Default is false (trim enabled).
+	DisableEndsTrim = false
+
+	// Append timestamp to the end in order to make slug unique
+	// Default is false
+	AppendTimestamp = false
 
 	regexpNonAuthorizedChars = regexp.MustCompile("[^a-zA-Z0-9-_]")
 	regexpMultipleDashes     = regexp.MustCompile("-+")
@@ -57,6 +75,8 @@ func MakeLang(s string, lang string) (slug string) {
 	// Process string with selected substitution language.
 	// Catch ISO 3166-1, ISO 639-1:2002 and ISO 639-3:2007.
 	switch strings.ToLower(lang) {
+	case "bg", "bgr":
+		slug = SubstituteRune(slug, bgSub)
 	case "cs", "ces":
 		slug = SubstituteRune(slug, csSub)
 	case "de", "deu":
@@ -75,6 +95,8 @@ func MakeLang(s string, lang string) (slug string) {
 		slug = SubstituteRune(slug, huSub)
 	case "id", "idn", "ind":
 		slug = SubstituteRune(slug, idSub)
+	case "it", "ita":
+		slug = SubstituteRune(slug, itSub)
 	case "kz", "kk", "kaz":
 		slug = SubstituteRune(slug, kkSub)
 	case "nb", "nob":
@@ -85,6 +107,10 @@ func MakeLang(s string, lang string) (slug string) {
 		slug = SubstituteRune(slug, nnSub)
 	case "pl", "pol":
 		slug = SubstituteRune(slug, plSub)
+	case "pt", "prt", "pt-br", "br", "bra", "por":
+		slug = SubstituteRune(slug, ptSub)
+	case "ro", "rou":
+		slug = SubstituteRune(slug, roSub)
 	case "sl", "slv":
 		slug = SubstituteRune(slug, slSub)
 	case "sv", "swe":
@@ -102,13 +128,25 @@ func MakeLang(s string, lang string) (slug string) {
 		slug = strings.ToLower(slug)
 	}
 
+	if !EnableSmartTruncate && len(slug) >= MaxLength {
+		slug = slug[:MaxLength]
+	}
+
 	// Process all remaining symbols
 	slug = regexpNonAuthorizedChars.ReplaceAllString(slug, "-")
-	slug = regexpMultipleDashes.ReplaceAllString(slug, "-")
-	slug = strings.Trim(slug, "-_")
+	if !DisableMultipleDashTrim {
+		slug = regexpMultipleDashes.ReplaceAllString(slug, "-")
+	}
+	if !DisableEndsTrim {
+		slug = strings.Trim(slug, "-_")
+	}
 
-	if MaxLength > 0 {
+	if MaxLength > 0 && EnableSmartTruncate {
 		slug = smartTruncate(slug)
+	}
+
+	if AppendTimestamp {
+		slug = slug + "-" + timestamp()
 	}
 
 	return slug
@@ -119,7 +157,7 @@ func MakeLang(s string, lang string) (slug string) {
 // order. Many passes, on one substitution another one could apply.
 func Substitute(s string, sub map[string]string) (buf string) {
 	buf = s
-	var keys []string
+	keys := make([]string, 0, len(sub))
 	for k := range sub {
 		keys = append(keys, k)
 	}
@@ -146,25 +184,24 @@ func SubstituteRune(s string, sub map[rune]string) string {
 }
 
 func smartTruncate(text string) string {
-	if len(text) < MaxLength {
+	if len(text) <= MaxLength {
 		return text
 	}
 
-	var truncated string
-	words := strings.SplitAfter(text, "-")
-	// If MaxLength is smaller than length of the first word return word
-	// truncated after MaxLength.
-	if len(words[0]) > MaxLength {
-		return words[0][:MaxLength]
-	}
-	for _, word := range words {
-		if len(truncated)+len(word)-1 <= MaxLength {
-			truncated = truncated + word
-		} else {
-			break
+	// If slug is too long, we need to find the last '-' before MaxLength, and
+	// we cut there.
+	// If we don't find any, we have only one word, and we cut at MaxLength.
+	for i := MaxLength; i >= 0; i-- {
+		if text[i] == '-' {
+			return text[:i]
 		}
 	}
-	return strings.Trim(truncated, "-")
+	return text[:MaxLength]
+}
+
+// timestamp returns current timestamp as string
+func timestamp() string {
+	return strconv.FormatInt(time.Now().Unix(), 10)
 }
 
 // IsSlug returns True if provided text does not contain white characters,

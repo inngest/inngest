@@ -79,6 +79,7 @@ func (link *Link) UnmarshalJSON(data []byte) error {
 		x.Extensions = nil
 	}
 	*link = Link(x)
+	link.RequestBody = stripOriginFromAny(link.RequestBody)
 	return nil
 }
 

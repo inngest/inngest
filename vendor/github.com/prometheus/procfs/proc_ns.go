@@ -1,4 +1,4 @@
-// Copyright 2018 The Prometheus Authors
+// Copyright The Prometheus Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -40,7 +40,7 @@ func (p Proc) Namespaces() (Namespaces, error) {
 
 	names, err := d.Readdirnames(-1)
 	if err != nil {
-		return nil, fmt.Errorf("%s: failed to read contents of ns dir: %w", ErrFileRead, err)
+		return nil, fmt.Errorf("%w: failed to read contents of ns dir: %w", ErrFileRead, err)
 	}
 
 	ns := make(Namespaces, len(names))
@@ -58,7 +58,7 @@ func (p Proc) Namespaces() (Namespaces, error) {
 		typ := fields[0]
 		inode, err := strconv.ParseUint(strings.Trim(fields[1], "[]"), 10, 32)
 		if err != nil {
-			return nil, fmt.Errorf("%s: inode from %q: %w", ErrFileParse, fields[1], err)
+			return nil, fmt.Errorf("%w: inode from %q: %w", ErrFileParse, fields[1], err)
 		}
 
 		ns[name] = Namespace{typ, uint32(inode)}

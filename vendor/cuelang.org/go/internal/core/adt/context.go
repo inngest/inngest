@@ -16,93 +16,23 @@ package adt
 
 import (
 	"fmt"
-	"log"
-	"os"
+	"iter"
 	"reflect"
 	"regexp"
+	"strings"
+	"sync/atomic"
+	"unicode/utf8"
 
-	"github.com/cockroachdb/apd/v2"
-	"golang.org/x/text/encoding/unicode"
+	"github.com/cockroachdb/apd/v3"
 
 	"cuelang.org/go/cue/ast"
+	"cuelang.org/go/cue/build"
 	"cuelang.org/go/cue/errors"
+	"cuelang.org/go/cue/stats"
 	"cuelang.org/go/cue/token"
+	"cuelang.org/go/internal"
+	"cuelang.org/go/internal/cuedebug"
 )
-
-// Debug sets whether extra aggressive checking should be done.
-// This should typically default to true for pre-releases and default to
-// false otherwise.
-var Debug bool = os.Getenv("CUE_DEBUG") != "0"
-
-// Verbosity sets the log level. There are currently only two levels:
-//   0: no logging
-//   1: logging
-var Verbosity int
-
-// Assert panics if the condition is false. Assert can be used to check for
-// conditions that are considers to break an internal variant or unexpected
-// condition, but that nonetheless probably will be handled correctly down the
-// line. For instance, a faulty condition could lead to to error being caught
-// down the road, but resulting in an inaccurate error message. In production
-// code it is better to deal with the bad error message than to panic.
-//
-// It is advisable for each use of Assert to document how the error is expected
-// to be handled down the line.
-func Assertf(b bool, format string, args ...interface{}) {
-	if Debug && !b {
-		panic(fmt.Sprintf("assertion failed: "+format, args...))
-	}
-}
-
-// Assertf either panics or reports an error to c if the condition is not met.
-func (c *OpContext) Assertf(pos token.Pos, b bool, format string, args ...interface{}) {
-	if !b {
-		if Debug {
-			panic(fmt.Sprintf("assertion failed: "+format, args...))
-		}
-		c.addErrf(0, pos, format, args...)
-	}
-}
-
-func init() {
-	log.SetFlags(log.Lshortfile)
-}
-
-func Logf(format string, args ...interface{}) {
-	if Verbosity == 0 {
-		return
-	}
-	s := fmt.Sprintf(format, args...)
-	_ = log.Output(2, s)
-}
-
-var pMap = map[*Vertex]int{}
-
-func (c *OpContext) Logf(v *Vertex, format string, args ...interface{}) {
-	if Verbosity == 0 {
-		return
-	}
-	p := pMap[v]
-	if p == 0 {
-		p = len(pMap) + 1
-		pMap[v] = p
-	}
-	a := append([]interface{}{
-		p,
-		v.Label.SelectorString(c),
-		v.Path(),
-	}, args...)
-	for i := 2; i < len(a); i++ {
-		switch x := a[i].(type) {
-		case Node:
-			a[i] = c.Str(x)
-		case Feature:
-			a[i] = x.SelectorString(c)
-		}
-	}
-	s := fmt.Sprintf(" [%d] %s/%v"+format, a...)
-	_ = log.Output(2, s)
-}
 
 // Runtime defines an interface for low-level representation conversion and
 // lookup.
@@ -111,9 +41,14 @@ type Runtime interface {
 	// canonical numeric representation.
 	StringIndexer
 
-	// LoadImport loads a unique Vertex associated with a given import path. It
-	// returns nil if no import for this package could be found.
-	LoadImport(importPath string) *Vertex
+	// LoadBuiltin loads a unique Vertex associated with a given builtin
+	// (standard library) import path. It returns nil if no builtin for
+	// this import path could be found.
+	LoadBuiltin(importPath string) *Vertex
+
+	// LoadInstance loads a unique Vertex associated with the given build
+	// instance. It returns nil if no such instance has been compiled.
+	LoadInstance(inst *build.Instance) *Vertex
 
 	// StoreType associates a CUE expression with a Go type.
 	StoreType(t reflect.Type, src ast.Expr, expr Expr)
@@ -121,55 +56,138 @@ type Runtime interface {
 	// LoadType retrieves a previously stored CUE expression for a given Go
 	// type if available.
 	LoadType(t reflect.Type) (src ast.Expr, expr Expr, ok bool)
+
+	// ConfigureOpCtx configures the [*OpContext] with details such as
+	// evaluator version, debug options etc.
+	ConfigureOpCtx(ctx *OpContext)
 }
 
 type Config struct {
 	Runtime
-	Format func(Node) string
+	Format func(Runtime, Node) string
 }
+
+var contextGeneration atomic.Uint64
 
 // New creates an operation context.
 func New(v *Vertex, cfg *Config) *OpContext {
 	if cfg.Runtime == nil {
 		panic("nil Runtime")
 	}
+
 	ctx := &OpContext{
-		Runtime: cfg.Runtime,
-		Format:  cfg.Format,
-		vertex:  v,
+		opID:        contextGeneration.Add(1),
+		Runtime:     cfg.Runtime,
+		Format:      cfg.Format,
+		vertex:      v,
+		taskContext: schedConfig,
 	}
+	cfg.Runtime.ConfigureOpCtx(ctx)
+	ctx.stats.EvalVersion = ctx.Version
 	if v != nil {
 		ctx.e = &Environment{Up: nil, Vertex: v}
+	}
+	if ctx.LogEval > 0 {
+		ctx.Logf(v, "New context at opID %d", ctx.opID)
 	}
 	return ctx
 }
 
-// An OpContext implements CUE's unification operation. It's operations only
-// operation on values that are created with the Runtime with which an OpContext
-// is associated. An OpContext is not goroutine save and only one goroutine may
-// use an OpContext at a time.
+func (c *OpContext) isDevVersion() bool {
+	return c.Version == internal.DevVersion
+}
+
+// An OpContext holds context associated with an on-going CUE
+// evaluation. It functions both as an optimized memory store,
+// amortizing allocations during an evaluation, and as a record of the
+// current state within an evaluation.
 //
+// It should only be used on values that are created with the Runtime
+// with which an OpContext is created.
+//
+// An OpContext is not goroutine safe and only one goroutine may use an
+// OpContext at a time.
+//
+// An OpContext is typically used for an entire operation involving CUE
+// values that are derived from the same [cue.Context], such as any call
+// to exported Go APIs like methods on [cue.Value].
+//
+// An OpContext stores:
+// - errors encountered during the evaluation
+// - the current vertex and its parents
+// - statistics on evaluation operations
+//
+// The recorded set of errors is added to by calls to [OpContext.AddErr],
+// [OpContext.AddErr], [OpContext.AddErrf], and in general
+// any other operation that encounters an error.
+//
+// The current vertex is modified by calling [OpContext.PushArc], which
+// must be balanced by a corresponding call to [OpContext.PopArc].
+//
+// The entire state, including recorded errors and the current vertex, can be
+// reset by calling [OpContext.PushState], which must be balanced by a
+// corresponding call to [OpContext.PopState], causing the original
+// errors and vertex to be restored.
 type OpContext struct {
 	Runtime
-	Format func(Node) string
+	Format func(Runtime, Node) string
 
-	stats        Stats
+	cuedebug.Config
+	Version internal.EvaluatorVersion // Copied from Runtime
+
+	taskContext
+
+	nest int
+
+	// used in typocheck.go
+	nextDefID          defID           // next available defID
+	containments       []containment   // parent relations
+	containsDefIDCache map[uint64]bool // cache for containsDefID results
+
+	// [token.Pos] interning for containments to reduce memory usage,
+	// given that millions of elements in [OpContext.containments]
+	// can share the same position. [uint32] is 4 bytes,
+	// whereas [token.Pos] is 16 bytes with alignment.
+	positionTable []token.Pos          // unique positions
+	positionIndex map[token.Pos]uint32 // reverse lookup for interning
+
+	// disjunctBuffer is reused when constructing [envDisjunct.disjuncts].
+	disjunctBuffer []disjunct
+
+	stats        stats.Counts
 	freeListNode *nodeContext
 
-	e         *Environment
-	src       ast.Node
+	e  *Environment
+	ci CloseInfo
+
+	// Source node associated with the CUE operation, if any.
+	// When nil, created nodes like [Bool] may use sentinels to avoid allocations.
+	src ast.Node
+
 	errs      *Bottom
 	positions []Node // keep track of error positions
+	skipTry   bool   // set when an option reference is not present
 
 	// vertex is used to determine the path location in case of error. Turning
 	// this into a stack could also allow determining the cyclic path for
 	// structural cycle errors.
 	vertex *Vertex
 
-	nonMonotonicLookupNest int32
-	nonMonotonicRejectNest int32
-	nonMonotonicInsertNest int32
-	nonMonotonicGeneration int32
+	// list of vertices that need to be finalized.
+	// TODO: remove this again once we have a proper way of detecting references
+	// across optional boundaries in hasAncestorV3. We can probably do this
+	// with an optional depth counter.
+	// See the TODO in unify.go for toFinalize.
+	// toFinalize []*Vertex
+
+	// freeScope tracks the nodeContexts that are currently responsible for
+	// allocating new inlined vertices. Only nodes within the current scope can
+	// refer to any values allocated within an inline node, which means it is
+	// safe to reuse the nodeContext when all values have been processed.
+	//
+	// TODO(mem): we can mark Vertex nodes as being used in sharing and then
+	// free them too if they are not used.
+	freeScope []*nodeContext
 
 	// These fields are used associate scratch fields for computing closedness
 	// of a Vertex. These fields could have been included in StructInfo (like
@@ -179,35 +197,53 @@ type OpContext struct {
 	// TODO(perf): have two generations: one for each pass of the closedness
 	// algorithm, so that the results of the first pass can be reused for all
 	// features of a node.
-	generation int
-	closed     map[*closeInfo]*closeStats
-	todo       *closeStats
+	opID uint64
 
-	// inDisjunct indicates that non-monotonic checks should be skipped.
-	// This is used if we want to do some extra work to eliminate disjunctions
-	// early. The result of unificantion should be thrown away if this check is
-	// used.
-	//
-	// TODO: replace this with a mechanism to determine the correct set (per
-	// conjunct) of StructInfos to include in closedness checking.
-	inDisjunct int
+	// evalDepth indicates the current depth of evaluation. It is used to
+	// detect structural cycles and their severity.s
+	evalDepth int
 
-	// inConstaint overrides inDisjunct as field matching should always be
-	// enabled.
-	inConstraint int
+	// holdID is a unique identifier for the current "hole", a choice of
+	// disjunct to be made when processing disjunctions.
+	holeID int
+
+	// inDetached indicates that inline structs evaluated in the current context
+	// should never be shared. This is the case, for instance, with the source
+	// for the for clause in a comprehension.
+	inDetached int
+
+	// inValidator defines whether full evaluation need to be enforced, for
+	// instance when comparing against bottom.
+	inValidator int
+
+	// The current call is a validator. A builtin may return a boolean false
+	// along with an error message describing a validation error. If the latter
+	// is wrapped in an internal.ValidationError, it will only be interpreted
+	// as an error if this is true.
+	// TODO: strictly separate validators and functions.
+	IsValidator bool
+
+	overlays []overlayFrame
+
+	// ==== Debugging ====
+	logID int // sequence number for log messages
+
+	// ErrorGraphs contains an analysis, represented as a Mermaid graph, for
+	// each node that has an error.
+	ErrorGraphs map[string]string
+
+	currentDisjunctionID int // sequence number for call to processDisjunctions
+
+	disjunctStack []disjunctInfo // stack of disjunct IDs
+
+	// altPath, if non-empty, provides an alternative path for errors. This is
+	// necessary to get the right path for incomplete errors in the presence of
+	// structure sharing.
+	altPath []*Vertex // stack of selectors
 }
 
-func (n *nodeContext) skipNonMonotonicChecks() bool {
-	if n.ctx.inConstraint > 0 {
-		return false
-	}
-	return n.ctx.inDisjunct > 0
-}
-
-// Impl is for internal use only. This will go.
-func (c *OpContext) Impl() Runtime {
-	return c.Runtime
-}
+func (c *OpContext) CloseInfo() CloseInfo         { return c.ci }
+func (c *OpContext) UpdateCloseInfo(ci CloseInfo) { c.ci = ci }
 
 func (c *OpContext) Pos() token.Pos {
 	if c.src == nil {
@@ -233,41 +269,34 @@ func (c *OpContext) pos() token.Pos {
 }
 
 func (c *OpContext) spawn(node *Vertex) *Environment {
-	node.Parent = c.e.Vertex // TODO: Is this necessary?
-	return &Environment{
-		Up:     c.e,
-		Vertex: node,
+	return spawn(c.e, node)
+}
 
-		// Copy cycle data.
-		Cyclic: c.e.Cyclic,
-		Deref:  c.e.Deref,
-		Cycles: c.e.Cycles,
+func spawn(env *Environment, node *Vertex) *Environment {
+	return &Environment{
+		Up:     env,
+		Vertex: node,
 	}
 }
 
 func (c *OpContext) Env(upCount int32) *Environment {
-	e := c.e
-	for ; upCount > 0; upCount-- {
-		e = e.Up
-	}
-	return e
+	return c.e.up(c, upCount)
 }
 
 func (c *OpContext) relNode(upCount int32) *Vertex {
-	e := c.e
-	for ; upCount > 0; upCount-- {
-		e = e.Up
-	}
-	c.Unify(e.Vertex, Partial)
-	return e.Vertex
+	e := c.e.up(c, upCount)
+	v := e.DerefVertex(c)
+	c.unify(v, Flags{
+		status:    partial,
+		condition: allKnown,
+		mode:      ignore,
+	})
+	return v
 }
 
 func (c *OpContext) relLabel(upCount int32) Feature {
 	// locate current label.
-	e := c.e
-	for ; upCount > 0; upCount-- {
-		e = e.Up
-	}
+	e := c.e.up(c, upCount)
 	return e.DynamicLabel
 }
 
@@ -281,7 +310,7 @@ func (c *OpContext) concreteIsPossible(op Op, x Expr) bool {
 	return true
 }
 
-// Assert that the given expression can evaluate to a concrete value.
+// AssertConcreteIsPossible reports whether the given expression can evaluate to a concrete value.
 func AssertConcreteIsPossible(op Op, x Expr) bool {
 	switch v := x.(type) {
 	case *Bottom:
@@ -311,7 +340,11 @@ func (c *OpContext) addErrf(code ErrorCode, pos token.Pos, msg string, args ...i
 }
 
 func (c *OpContext) addErr(code ErrorCode, err errors.Error) {
-	c.AddBottom(&Bottom{Code: code, Err: err})
+	c.AddBottom(&Bottom{
+		Code: code,
+		Err:  err,
+		Node: c.vertex,
+	})
 }
 
 // AddBottom records an error in OpContext.
@@ -322,7 +355,10 @@ func (c *OpContext) AddBottom(b *Bottom) {
 // AddErr records an error in OpContext. It returns errors collected so far.
 func (c *OpContext) AddErr(err errors.Error) *Bottom {
 	if err != nil {
-		c.AddBottom(&Bottom{Err: err})
+		c.AddBottom(&Bottom{
+			Err:  err,
+			Node: c.vertex,
+		})
 	}
 	return c.errs
 }
@@ -333,7 +369,12 @@ func (c *OpContext) NewErrf(format string, args ...interface{}) *Bottom {
 	// TODO: consider renaming ot NewBottomf: this is now confusing as we also
 	// have Newf.
 	err := c.Newf(format, args...)
-	return &Bottom{Src: c.src, Err: err, Code: EvalError}
+	return &Bottom{
+		Src:  c.src,
+		Err:  err,
+		Code: EvalError,
+		Node: c.vertex,
+	}
 }
 
 // AddErrf records an error in OpContext. It returns errors collected so far.
@@ -345,12 +386,20 @@ type frame struct {
 	env *Environment
 	err *Bottom
 	src ast.Node
+	ci  CloseInfo
 }
 
+// PushState resets c as if it was a newly created context
+// with the same configuration c was created with,
+// returning a value which should be used to restore the current
+// state by passing it to a matching call to [OpContext.PopState].
+//
+// If src is nil, c will still refer to the same source node.
 func (c *OpContext) PushState(env *Environment, src ast.Node) (saved frame) {
 	saved.env = c.e
 	saved.err = c.errs
 	saved.src = c.src
+	saved.ci = c.ci
 
 	c.errs = nil
 	if src != nil {
@@ -361,11 +410,31 @@ func (c *OpContext) PushState(env *Environment, src ast.Node) (saved frame) {
 	return saved
 }
 
+func (c *OpContext) PushConjunct(x Conjunct) (saved frame) {
+	src := x.Expr().Source()
+
+	saved.env = c.e
+	saved.err = c.errs
+	saved.src = c.src
+	saved.ci = c.ci
+
+	c.errs = nil
+	if src != nil {
+		c.src = src
+	}
+	c.e = x.Env
+	c.ci = x.CloseInfo
+
+	return saved
+}
+
+// PopState restores a state pushed by [OpContext.PushState].
 func (c *OpContext) PopState(s frame) *Bottom {
 	err := c.errs
 	c.e = s.env
 	c.errs = s.err
 	c.src = s.src
+	c.ci = s.ci
 	return err
 }
 
@@ -376,20 +445,49 @@ func (c *OpContext) PushArc(v *Vertex) (saved *Vertex) {
 	c.vertex, saved = v, c.vertex
 	return saved
 }
+func (c *OpContext) PushArcAndLabel(v *Vertex) (saved *Vertex) {
+
+	c.vertex, saved = v, c.vertex
+	c.altPath = append(c.altPath, v)
+	return saved
+}
 
 // PopArc signals completion of processing the current arc.
 func (c *OpContext) PopArc(saved *Vertex) {
 	c.vertex = saved
 }
 
+func (c *OpContext) PopArcAndLabel(saved *Vertex) {
+	c.vertex = saved
+	c.altPath = c.altPath[:len(c.altPath)-1]
+}
+
 // Resolve finds a node in the tree.
 //
 // Should only be used to insert Conjuncts. TODO: perhaps only return Conjuncts
 // and error.
-func (c *OpContext) Resolve(env *Environment, r Resolver) (*Vertex, *Bottom) {
-	s := c.PushState(env, r.Source())
+func (c *OpContext) Resolve(x Conjunct, r Resolver) (v *Vertex, b *Bottom) {
+	defer func() {
+		x := recover()
+		switch x.(type) {
+		case nil:
+		case *scheduler:
+			b = c.NewErrf("unresolved value %s", r)
+		default:
+			panic(x)
+		}
+	}()
+	return c.resolveState(x, r, Flags{
+		status:    finalized,
+		condition: allKnown,
+		mode:      finalize,
+	})
+}
 
-	arc := r.resolve(c, Partial)
+func (c *OpContext) resolveState(x Conjunct, r Resolver, state Flags) (*Vertex, *Bottom) {
+	s := c.PushConjunct(x)
+
+	arc := r.resolve(c, state)
 
 	err := c.PopState(s)
 	if err != nil {
@@ -400,7 +498,24 @@ func (c *OpContext) Resolve(env *Environment, r Resolver) (*Vertex, *Bottom) {
 		return nil, arc.ChildErrors
 	}
 
-	arc = arc.Indirect()
+	// Dereference any vertices that do not contribute to more knownledge about
+	// the node.
+	arc = arc.DerefNonRooted()
+
+	return arc, err
+}
+
+// Lookup looks up r in env without further resolving the value.
+func (c *OpContext) Lookup(env *Environment, r Resolver) (*Vertex, *Bottom) {
+	s := c.PushState(env, r.Source())
+
+	arc := r.resolve(c, Flags{
+		status:    partial,
+		condition: allKnown,
+		mode:      ignore,
+	})
+
+	err := c.PopState(s)
 
 	return arc, err
 }
@@ -409,33 +524,42 @@ func (c *OpContext) Resolve(env *Environment, r Resolver) (*Vertex, *Bottom) {
 //
 // TODO(errors): return boolean instead: only the caller has enough information
 // to generate a proper error message.
-func (c *OpContext) Validate(check Validator, value Value) *Bottom {
+func (c *OpContext) Validate(check Conjunct, value Value) *Bottom {
 	// TODO: use a position stack to push both values.
-	saved := c.src
+
+	// TODO(evalv3): move to PushConjunct once the migration is complete.
+	// Using PushConjunct also saves and restores the error, which may be
+	// impactful, so we want to do this in a separate commit.
+	// saved := c.PushConjunct(check)
+
+	src := c.src
+	ci := c.ci
+	env := c.e
 	c.src = check.Source()
+	c.ci = check.CloseInfo
+	c.e = check.Env
 
-	err := check.validate(c, value)
+	err := check.x.(Validator).validate(c, value)
 
-	c.src = saved
+	c.src = src
+	c.ci = ci
+	c.e = env
 
 	return err
 }
 
-// Yield evaluates a Yielder and calls f for each result.
-func (c *OpContext) Yield(env *Environment, y Yielder, f YieldFunc) *Bottom {
-	s := c.PushState(env, y.Source())
-
-	y.yield(c, f)
-
-	return c.PopState(s)
-
-}
-
-// Concrete returns the concrete value of x after evaluating it.
+// concrete returns the concrete value of x after evaluating it.
 // msg is used to mention the context in which an error occurred, if any.
-func (c *OpContext) Concrete(env *Environment, x Expr, msg interface{}) (result Value, complete bool) {
+func (c *OpContext) concrete(env *Environment, x Expr, msg interface{}) (result Value, complete bool) {
+	s := c.PushState(env, x.Source())
 
-	w, complete := c.Evaluate(env, x)
+	state := Flags{
+		status:    partial,
+		condition: concreteKnown,
+		mode:      yield,
+	}
+	w := c.evalState(x, state)
+	_ = c.PopState(s)
 
 	w, ok := c.getDefault(w)
 	if !ok {
@@ -443,6 +567,7 @@ func (c *OpContext) Concrete(env *Environment, x Expr, msg interface{}) (result 
 	}
 	v := Unwrap(w)
 
+	complete = w != nil
 	if !IsConcrete(v) {
 		complete = false
 		b := c.NewErrf("non-concrete value %v in operand to %s", w, msg)
@@ -450,11 +575,7 @@ func (c *OpContext) Concrete(env *Environment, x Expr, msg interface{}) (result 
 		v = b
 	}
 
-	if !complete {
-		return v, complete
-	}
-
-	return v, true
+	return v, complete
 }
 
 // getDefault resolves a disjunction to a single value. If there is no default
@@ -486,7 +607,7 @@ func (c *OpContext) getDefault(v Value) (result Value, ok bool) {
 
 	if d.NumDefaults != 1 {
 		c.addErrf(IncompleteError, c.pos(),
-			"unresolved disjunction %s (type %s)", d, d.Kind())
+			"unresolved disjunction %v (type %s)", d, d.Kind())
 		return nil, false
 	}
 	return c.getDefault(d.Values[0])
@@ -497,7 +618,11 @@ func (c *OpContext) getDefault(v Value) (result Value, ok bool) {
 func (c *OpContext) Evaluate(env *Environment, x Expr) (result Value, complete bool) {
 	s := c.PushState(env, x.Source())
 
-	val := c.evalState(x, Partial)
+	val := c.evalState(x, Flags{
+		status:    partial,
+		condition: concreteKnown,
+		mode:      finalize,
+	})
 
 	complete = true
 
@@ -510,6 +635,7 @@ func (c *OpContext) Evaluate(env *Environment, x Expr) (result Value, complete b
 		val = &Bottom{
 			Code: IncompleteError,
 			Err:  c.Newf("UNANTICIPATED ERROR"),
+			Node: env.DerefVertex(c),
 		}
 
 	}
@@ -523,52 +649,59 @@ func (c *OpContext) Evaluate(env *Environment, x Expr) (result Value, complete b
 	return val, true
 }
 
-func (c *OpContext) evaluateRec(env *Environment, x Expr, state VertexStatus) Value {
-	s := c.PushState(env, x.Source())
+// EvaluateKeepState does an evaluate, but leaves any errors and cycle info
+// within the context.
+func (c *OpContext) EvaluateKeepState(x Expr) (result Value) {
+	src := c.src
+	c.src = x.Source()
 
-	val := c.evalState(x, state)
-	if val == nil {
-		// Be defensive: this never happens, but just in case.
-		Assertf(false, "nil return value: unspecified error")
-		val = &Bottom{
-			Code: IncompleteError,
-			Err:  c.Newf("UNANTICIPATED ERROR"),
-		}
-	}
-	_ = c.PopState(s)
+	result, ci := c.evalStateCI(x, Flags{
+		status:    partial,
+		condition: concreteKnown,
+		mode:      finalize,
+	})
 
-	return val
+	c.src = src
+	c.ci = ci
+
+	return result
 }
 
 // value evaluates expression v within the current environment. The result may
 // be nil if the result is incomplete. value leaves errors untouched to that
 // they can be collected by the caller.
-func (c *OpContext) value(x Expr) (result Value) {
-	v := c.evalState(x, Partial)
+func (c *OpContext) value(x Expr, state Flags) (result Value) {
+	state.concrete = true
+	v := c.evalState(x, state)
 
 	v, _ = c.getDefault(v)
 	v = Unwrap(v)
 	return v
 }
 
-func (c *OpContext) evalState(v Expr, state VertexStatus) (result Value) {
+func (c *OpContext) evalState(v Expr, state Flags) (result Value) {
+	result, _ = c.evalStateCI(v, state)
+	return result
+}
+
+func (c *OpContext) evalStateCI(v Expr, state Flags) (result Value, ci CloseInfo) {
 	savedSrc := c.src
 	c.src = v.Source()
 	err := c.errs
 	c.errs = nil
+	// Save the old CloseInfo and restore after evaluate to avoid detecting
+	// spurious cycles.
+	saved := c.ci
 
 	defer func() {
 		c.errs = CombineErrors(c.src, c.errs, err)
 
 		if v, ok := result.(*Vertex); ok {
-			if b, _ := v.BaseValue.(*Bottom); b != nil {
+			if b := v.Bottom(); b != nil {
 				switch b.Code {
 				case IncompleteError:
 				case CycleError:
-					if state == Partial {
-						break
-					}
-					fallthrough
+					break
 				default:
 					result = b
 				}
@@ -577,13 +710,7 @@ func (c *OpContext) evalState(v Expr, state VertexStatus) (result Value) {
 
 		// TODO: remove this when we handle errors more principally.
 		if b, ok := result.(*Bottom); ok {
-			if c.src != nil &&
-				b.Code == CycleError &&
-				len(errors.Positions(b.Err)) == 0 {
-				bb := *b
-				bb.Err = errors.Wrapf(b.Err, c.src.Pos(), "")
-				result = &bb
-			}
+			result = c.wrapCycleError(c.src, b)
 			if c.errs != result {
 				c.errs = CombineErrors(c.src, c.errs, result)
 			}
@@ -592,27 +719,112 @@ func (c *OpContext) evalState(v Expr, state VertexStatus) (result Value) {
 			result = c.errs
 		}
 		c.src = savedSrc
+
+		// TODO(evalv3): this c.ci should be passed to the caller who may need
+		// it to continue cycle detection for partially evaluated values.
+		// Either this or we must prove that this is covered by structural cycle
+		// detection.
+		c.ci = saved
 	}()
 
 	switch x := v.(type) {
 	case Value:
-		return x
+		return x, c.ci
+
+	case *OpenExpr:
+		v, ci := c.evalStateCI(x.X, state)
+		ci.Opened = true
+		return v, ci
 
 	case Evaluator:
-		v := x.evaluate(c)
-		return v
+		v := x.evaluate(c, state)
+		return v, c.ci
 
 	case Resolver:
 		arc := x.resolve(c, state)
 		if c.HasErr() {
-			return nil
+			return nil, c.ci
 		}
 		if arc == nil {
-			return nil
+			return nil, c.ci
+		}
+		// TODO(3977): register internal nodes for later verifications. The
+		// following limits the possibility of some common and useful cycles.
+		//
+		// if arc.Internal() {
+		//  mode := state.conditions()
+		//  state = final(partial, mode|allTasksCompleted)
+		// }
+		orig := arc
+		// TODO(deref): what is the right level of dereferencing here?
+		// DerefValue seems to work too.
+		arc = arc.DerefNonShared()
+
+		// TODO: consider moving this after markCycle, depending on how we
+		// implement markCycle, or whether we need it at all.
+		// TODO: is this indirect necessary?
+		// arc = arc.Indirect()
+
+		if n := arc.getState(c); n != nil {
+			c.ci, _ = n.detectCycle(arc, nil, x, c.ci)
 		}
 
-		v := c.evaluate(arc, state)
-		return v
+		if s := arc.getState(c); s != nil {
+			defer s.retainProcess().releaseProcess()
+
+			origNeeds := state.condition
+			needs := origNeeds | arcTypeKnown
+			runMode := state.mode
+
+			switch runMode {
+			case finalize:
+				arc.unify(c, Flags{condition: needs, mode: attemptOnly, checkTypos: true}) // to set scalar
+				s.freeze(needs)
+			case attemptOnly:
+				arc.unify(c, Flags{condition: needs, mode: attemptOnly, checkTypos: true}) // to set scalar
+
+			case yield:
+				arc.unify(c, Flags{condition: needs, mode: runMode, checkTypos: true}) // to set scalar
+
+				evaluating := arc.status == evaluating
+				if state.concrete && orig != arc && orig.state != nil && orig.state.meets(scalarKnown) && IsRecursivelyConcrete(arc) {
+					evaluating = false
+				}
+
+				// We cannot resolve a value that represents an unresolved
+				// disjunction.
+				if evaluating && orig != arc && arc.IsDisjunct {
+					task := c.current()
+					if origNeeds == scalarKnown && !orig.state.meets(scalarKnown) {
+						orig.state.defaultAttemptInCycle = task.node.node
+						task.waitFor(&orig.state.scheduler, needs)
+						s.yield()
+						panic("unreachable")
+					}
+					err := c.Newf("unresolved disjunction: %v", x)
+					b := &Bottom{Code: CycleError, Err: err}
+					return b, c.ci
+				}
+
+				hasCycleBreakingValue := s.hasFieldValue ||
+					!isCyclePlaceholder(arc.BaseValue)
+
+				if evaluating && !hasCycleBreakingValue {
+					err := c.Newf("cycle with field: %v", x)
+					b := &Bottom{Code: CycleError, Err: err}
+					c.AddBottom(b)
+					break
+				}
+
+				v := c.evaluate(arc, x, state)
+
+				return v, c.ci
+			}
+		}
+		arc = arc.DerefValue()
+		v := c.evaluate(arc, x, state)
+
+		return v, c.ci
 
 	default:
 		// This can only happen, really, if v == nil, which is not allowed.
@@ -620,13 +832,25 @@ func (c *OpContext) evalState(v Expr, state VertexStatus) (result Value) {
 	}
 }
 
+// wrapCycleError converts the sentinel cycleError in a concrete one with
+// position information.
+func (c *OpContext) wrapCycleError(src ast.Node, b *Bottom) *Bottom {
+	if src != nil &&
+		b.Code == CycleError &&
+		len(errors.Positions(b.Err)) == 0 {
+		bb := *b
+		bb.Err = errors.Wrapf(b.Err, src.Pos(), "")
+		b = &bb
+	}
+	return b
+}
+
 // unifyNode returns a possibly partially evaluated node value.
 //
 // TODO: maybe return *Vertex, *Bottom
-//
-func (c *OpContext) unifyNode(v Expr, state VertexStatus) (result Value) {
+func (c *OpContext) unifyNode(expr Expr, state Flags) (result Value) {
 	savedSrc := c.src
-	c.src = v.Source()
+	c.src = expr.Source()
 	err := c.errs
 	c.errs = nil
 
@@ -634,17 +858,8 @@ func (c *OpContext) unifyNode(v Expr, state VertexStatus) (result Value) {
 		c.errs = CombineErrors(c.src, c.errs, err)
 
 		if v, ok := result.(*Vertex); ok {
-			if b, _ := v.BaseValue.(*Bottom); b != nil {
-				switch b.Code {
-				case IncompleteError:
-				case CycleError:
-					if state == Partial {
-						break
-					}
-					fallthrough
-				default:
-					result = b
-				}
+			if b := v.Bottom(); b != nil && !b.IsIncomplete() {
+				result = b
 			}
 		}
 
@@ -652,7 +867,7 @@ func (c *OpContext) unifyNode(v Expr, state VertexStatus) (result Value) {
 		if b, ok := result.(*Bottom); ok {
 			if c.src != nil &&
 				b.Code == CycleError &&
-				b.Err.Position() == token.NoPos &&
+				!b.Err.Position().IsValid() &&
 				len(b.Err.InputPositions()) == 0 {
 				bb := *b
 				bb.Err = errors.Wrapf(b.Err, c.src.Pos(), "")
@@ -666,166 +881,74 @@ func (c *OpContext) unifyNode(v Expr, state VertexStatus) (result Value) {
 		c.src = savedSrc
 	}()
 
-	switch x := v.(type) {
+	var v *Vertex
+
+	switch x := expr.(type) {
 	case Value:
 		return x
 
 	case Evaluator:
-		v := x.evaluate(c)
-		return v
+		return x.evaluate(c, state)
 
 	case Resolver:
-		v := x.resolve(c, state)
-		if c.HasErr() {
-			return nil
-		}
-		if v == nil {
-			return nil
-		}
-
-		if v.isUndefined() {
-			// Use node itself to allow for cycle detection.
-			c.Unify(v, AllArcs)
-		}
-
-		return v
+		v = x.resolve(c, state)
 
 	default:
 		// This can only happen, really, if v == nil, which is not allowed.
-		panic(fmt.Sprintf("unexpected Expr type %T", v))
+		panic(fmt.Sprintf("unexpected Expr type %T", expr))
 	}
+
+	if c.HasErr() {
+		return nil
+	}
+	if v == nil {
+		return nil
+	}
+	v = v.DerefValue()
+
+	// TODO: consider moving this after markCycle, depending on how we
+	// implement markCycle, or whether we need it at all.
+	// TODO: is this indirect necessary?
+	// v = v.Indirect()
+
+	if n := v.getState(c); n != nil {
+		defer n.retainProcess().releaseProcess()
+
+		// A lookup counts as new structure. See the commend in Section
+		// "Lookups in inline cycles" in cycle.go.
+		if !c.ci.IsCyclic() || v.Label.IsLet() {
+			// TODO: fix! Setting this when we are not structure sharing can
+			// cause some hangs. We are conservative and not set this in
+			// this case, with the potential that some configurations will
+			// break. It is probably related to let.
+			n.hasNonCycle = true
+		}
+
+		// Always yield to not get spurious errors.
+		n.process(arcTypeKnown, yield)
+		// It is possible that the node is only midway through
+		// evaluating a disjunction. In this case, we want to ensure
+		// that disjunctions are finalized, so that disjunction shows
+		// up in BaseValue.
+		if len(n.disjuncts) > 0 {
+			n.node.unify(c, Flags{condition: arcTypeKnown, mode: yield, checkTypos: false})
+		}
+	}
+
+	return v
 }
 
-func (c *OpContext) lookup(x *Vertex, pos token.Pos, l Feature, state VertexStatus) *Vertex {
-	if l == InvalidLabel || x == nil {
-		// TODO: is it possible to have an invalid label here? Maybe through the
-		// API?
-		return &Vertex{}
-	}
+func (c *OpContext) lookup(x *Vertex, pos token.Pos, l Feature, flags Flags) *Vertex {
+	return x.lookup(c, pos, l, flags)
+}
 
-	// var kind Kind
-	// if x.BaseValue != nil {
-	// 	kind = x.BaseValue.Kind()
-	// }
-
-	switch x.BaseValue.(type) {
-	case *StructMarker:
-		if l.Typ() == IntLabel {
-			c.addErrf(0, pos, "invalid struct selector %s (type int)", l)
-			return nil
-		}
-
-	case *ListMarker:
-		switch {
-		case l.Typ() == IntLabel:
-			switch {
-			case l.Index() < 0:
-				c.addErrf(0, pos, "invalid list index %s (index must be non-negative)", l)
-				return nil
-			case l.Index() > len(x.Arcs):
-				c.addErrf(0, pos, "invalid list index %s (out of bounds)", l)
-				return nil
-			}
-
-		case l.IsDef(), l.IsHidden():
-
-		default:
-			c.addErrf(0, pos, "invalid list index %s (type string)", l)
-			return nil
-		}
-
-	case nil:
-		// c.addErrf(IncompleteError, pos, "incomplete value %s", x)
-		// return nil
-
-	case *Bottom:
-
-	default:
-		kind := x.BaseValue.Kind()
-		if kind&(ListKind|StructKind) != 0 {
-			// c.addErrf(IncompleteError, pos,
-			// 	"cannot look up %s in incomplete type %s (type %s)",
-			// 	l, x.Source(), kind)
-			// return nil
-		} else if !l.IsDef() && !l.IsHidden() {
-			c.addErrf(0, pos,
-				"invalid selector %s for value of type %s", l, kind)
-			return nil
-		}
-	}
-
-	a := x.Lookup(l)
-	if a != nil {
-		a = a.Indirect()
-	}
-
-	var hasCycle bool
-outer:
-	switch {
-	case c.nonMonotonicLookupNest == 0 && c.nonMonotonicRejectNest == 0:
-	case a != nil:
-		if state == Partial {
-			a.nonMonotonicLookupGen = c.nonMonotonicGeneration
-		}
-
-	case x.state != nil && state == Partial:
-		for _, e := range x.state.exprs {
-			if isCyclePlaceholder(e.err) {
-				hasCycle = true
-			}
-		}
-		for _, a := range x.state.usedArcs {
-			if a.Label == l {
-				a.nonMonotonicLookupGen = c.nonMonotonicGeneration
-				if c.nonMonotonicRejectNest > 0 {
-					a.nonMonotonicReject = true
-				}
-				break outer
-			}
-		}
-		a := &Vertex{Label: l, nonMonotonicLookupGen: c.nonMonotonicGeneration}
-		if c.nonMonotonicRejectNest > 0 {
-			a.nonMonotonicReject = true
-		}
-		x.state.usedArcs = append(x.state.usedArcs, a)
-	}
-	if a == nil {
-		if x.state != nil {
-			for _, e := range x.state.exprs {
-				if isCyclePlaceholder(e.err) {
-					hasCycle = true
-				}
-			}
-		}
-		code := IncompleteError
-		if !x.Accept(c, l) {
-			code = 0
-		} else if hasCycle {
-			code = CycleError
-		}
-		// TODO: if the struct was a literal struct, we can also treat it as
-		// closed and make this a permanent error.
-		label := l.SelectorString(c.Runtime)
-
-		// TODO(errors): add path reference and make message
-		//       "undefined field %s in %s"
-		if l.IsInt() {
-			c.addErrf(code, pos, "index out of range [%d] with length %d",
-				l.Index(), len(x.Elems()))
-		} else {
-			if code != 0 && x.IsOptional(l) {
-				c.addErrf(code, pos,
-					"cannot reference optional field: %s", label)
-			} else {
-				c.addErrf(code, pos, "undefined field: %s", label)
-			}
-		}
-	}
-	return a
+func (c *OpContext) undefinedFieldError(v *Vertex, code ErrorCode) {
+	label := v.Label.SelectorString(c)
+	c.addErrf(code, c.pos(), "undefined field: %s", label)
 }
 
 func (c *OpContext) Label(src Expr, x Value) Feature {
-	return labelFromValue(c, src, x)
+	return LabelFromValue(c, src, x)
 }
 
 func (c *OpContext) typeError(v Value, k Kind) {
@@ -833,7 +956,7 @@ func (c *OpContext) typeError(v Value, k Kind) {
 		return
 	}
 	if !IsConcrete(v) && v.Kind()&k != 0 {
-		c.addErrf(IncompleteError, pos(v), "incomplete %s: %s", k, v)
+		c.addErrf(IncompleteError, Pos(v), "incomplete %s: %s", k, v)
 	} else {
 		c.AddErrf("cannot use %s (type %s) as type %s", v, v.Kind(), k)
 	}
@@ -848,23 +971,25 @@ func (c *OpContext) typeErrorAs(v Value, k Kind, as interface{}) {
 		return
 	}
 	if !IsConcrete(v) && v.Kind()&k != 0 {
-		c.addErrf(IncompleteError, pos(v),
+		c.addErrf(IncompleteError, Pos(v),
 			"incomplete %s in %v: %s", k, as, v)
 	} else {
 		c.AddErrf("cannot use %s (type %s) as type %s in %v", v, v.Kind(), k, as)
 	}
 }
 
-var emptyNode = &Vertex{}
+var emptyNode = &Vertex{status: finalized}
 
-func pos(x Node) token.Pos {
-	if x.Source() == nil {
-		return token.NoPos
+// node is called by SelectorExpr.resolve and IndexExpr.resolve.
+func (c *OpContext) node(orig Node, x Expr, scalar bool, state Flags) *Vertex {
+	// Do not treat inline structs as closed by default if within a schema.
+	// See comment at top of scheduleVertexConjuncts.
+	if _, ok := x.(Resolver); !ok {
+		saved := c.ci.FromDef
+		c.ci.FromDef = false
+		defer func() { c.ci.FromDef = saved }()
 	}
-	return x.Source().Pos()
-}
 
-func (c *OpContext) node(orig Node, x Expr, scalar bool, state VertexStatus) *Vertex {
 	// TODO: always get the vertex. This allows a whole bunch of trickery
 	// down the line.
 	v := c.unifyNode(x, state)
@@ -893,14 +1018,8 @@ func (c *OpContext) node(orig Node, x Expr, scalar bool, state VertexStatus) *Ve
 
 	switch nv := v.(type) {
 	case nil:
-		switch orig.(type) {
-		case *ForClause:
-			c.addErrf(IncompleteError, pos(x),
-				"cannot range over %s (incomplete)", x)
-		default:
-			c.addErrf(IncompleteError, pos(x),
-				"%s undefined (%s is incomplete)", orig, x)
-		}
+		c.addErrf(IncompleteError, Pos(x),
+			"%s undefined (%s is incomplete)", orig, x)
 		return emptyNode
 
 	case *Bottom:
@@ -914,21 +1033,21 @@ func (c *OpContext) node(orig Node, x Expr, scalar bool, state VertexStatus) *Ve
 		if node == nil {
 			panic("unexpected markers with nil node")
 		}
-
+		// Needed for package dep: dep does partial evaluation of expressions
+		// while traversing values. Not evaluating the node here could lead
+		// to a lookup in an unevaluated node, resulting in erroneously failing
+		// lookups.
+		if nv.nonRooted {
+			nv.CompleteArcsOnly(c)
+		}
 	default:
 		if kind := v.Kind(); kind&StructKind != 0 {
-			switch orig.(type) {
-			case *ForClause:
-				c.addErrf(IncompleteError, pos(x),
-					"cannot range over %s (incomplete type %s)", x, kind)
-			default:
-				c.addErrf(IncompleteError, pos(x),
-					"%s undefined as %s is incomplete (type %s)", orig, x, kind)
-			}
+			c.addErrf(IncompleteError, Pos(x),
+				"%s undefined as %s is incomplete (type %s)", orig, x, kind)
 			return emptyNode
 
 		} else if !ok {
-			c.addErrf(0, pos(x), // TODO(error): better message.
+			c.addErrf(0, Pos(x), // TODO(error): better message.
 				"invalid operand %s (found %s, want list or struct)",
 				x.Source(), v.Kind())
 			return emptyNode
@@ -938,13 +1057,25 @@ func (c *OpContext) node(orig Node, x Expr, scalar bool, state VertexStatus) *Ve
 	return node
 }
 
-// Elems returns the elements of a list.
-func (c *OpContext) Elems(v Value) []*Vertex {
+// Elems returns the evaluated elements of a list.
+func (c *OpContext) Elems(v Value) iter.Seq[*Vertex] {
+	list := c.list(v)
+	list.Finalize(c)
+	return list.Elems()
+}
+
+// RawElems returns the elements of the list without evaluating them.
+func (c *OpContext) RawElems(v Value) iter.Seq[*Vertex] {
 	list := c.list(v)
 	return list.Elems()
 }
 
 func (c *OpContext) list(v Value) *Vertex {
+	if v != nil {
+		if a, ok := c.getDefault(v); ok {
+			v = a
+		}
+	}
 	x, ok := v.(*Vertex)
 	if !ok || !x.IsList() {
 		c.typeError(v, ListKind)
@@ -953,17 +1084,7 @@ func (c *OpContext) list(v Value) *Vertex {
 	return x
 }
 
-func (c *OpContext) scalar(v Value) Value {
-	v = Unwrap(v)
-	switch v.(type) {
-	case *Null, *Bool, *Num, *String, *Bytes:
-	default:
-		c.typeError(v, ScalarKinds)
-	}
-	return v
-}
-
-var zero = &Num{K: NumKind}
+var zero = &Num{K: NumberKind}
 
 func (c *OpContext) Num(v Value, as interface{}) *Num {
 	v = Unwrap(v)
@@ -972,7 +1093,7 @@ func (c *OpContext) Num(v Value, as interface{}) *Num {
 	}
 	x, ok := v.(*Num)
 	if !ok {
-		c.typeErrorAs(v, NumKind, as)
+		c.typeErrorAs(v, NumberKind, as)
 		return zero
 	}
 	return x
@@ -1013,7 +1134,7 @@ func (c *OpContext) uint64(v Value, as string) uint64 {
 	}
 	if !x.X.Coeff.IsUint64() {
 		// TODO: improve message
-		c.AddErrf("cannot convert number %s to uint64", x.X)
+		c.AddErrf("cannot convert number %s to uint64", &x.X)
 		return 0
 	}
 	return x.X.Coeff.Uint64()
@@ -1050,7 +1171,7 @@ func (c *OpContext) ToBytes(v Value) []byte {
 
 // ToString returns the string value of a scalar value.
 func (c *OpContext) ToString(v Value) string {
-	return c.toStringValue(v, StringKind|NumKind|BytesKind|BoolKind, nil)
+	return c.toStringValue(v, StringKind|NumberKind|BytesKind|BoolKind, nil)
 
 }
 
@@ -1095,8 +1216,7 @@ func (c *OpContext) toStringValue(v Value, k Kind, as interface{}) string {
 }
 
 func bytesToString(b []byte) string {
-	b, _ = unicode.UTF8.NewDecoder().Bytes(b)
-	return string(b)
+	return strings.ToValidUTF8(string(b), string(utf8.RuneError))
 }
 
 func (c *OpContext) bytesValue(v Value, as interface{}) []byte {
@@ -1114,45 +1234,40 @@ func (c *OpContext) bytesValue(v Value, as interface{}) []byte {
 
 var matchNone = regexp.MustCompile("^$")
 
+// regexpCache caches compiled regular expressions by pattern string.
+// Uses weak references so unused patterns can be garbage collected.
+var regexpCache = newMemoizer(func(pattern string) (*regexp.Regexp, error) {
+	// TODO(mvdan): consider simplifying patterns (which regexp/syntax can do)
+	// before we look up or insert on the weak map? so that e.g. fo[o] bar{1} and
+	// foo bar share the same entry.
+	return regexp.Compile(pattern)
+})
+
+// cachedRegexp returns a compiled regexp for the given pattern, using a shared
+// cache to avoid recompilation and enable thread-safe access.
+//
+
 func (c *OpContext) regexp(v Value) *regexp.Regexp {
 	v = Unwrap(v)
 	if isError(v) {
 		return matchNone
 	}
+	var pattern string
 	switch x := v.(type) {
 	case *String:
-		if x.RE != nil {
-			return x.RE
-		}
-		// TODO: synchronization
-		p, err := regexp.Compile(x.Str)
-		if err != nil {
-			// FatalError? How to cache error
-			c.AddErrf("invalid regexp: %s", err)
-			x.RE = matchNone
-		} else {
-			x.RE = p
-		}
-		return x.RE
-
+		pattern = x.Str
 	case *Bytes:
-		if x.RE != nil {
-			return x.RE
-		}
-		// TODO: synchronization
-		p, err := regexp.Compile(string(x.B))
-		if err != nil {
-			c.AddErrf("invalid regexp: %s", err)
-			x.RE = matchNone
-		} else {
-			x.RE = p
-		}
-		return x.RE
-
+		pattern = string(x.B)
 	default:
 		c.typeError(v, StringKind|BytesKind)
 		return matchNone
 	}
+	re, err := regexpCache.get(pattern)
+	if err != nil {
+		c.AddErrf("invalid regexp: %s", err)
+		return matchNone
+	}
+	return re
 }
 
 // newNum creates a new number of the given kind. It reports an error value
@@ -1186,36 +1301,78 @@ func (c *OpContext) newBytes(b []byte) Value {
 	return &Bytes{Src: c.src, B: b}
 }
 
-func (c *OpContext) newBool(b bool) Value {
+var (
+	StaticBoolFalse = &Bool{B: false}
+	StaticBoolTrue  = &Bool{B: true}
+)
+
+func (c *OpContext) NewBool(b bool) Value {
 	if c.HasErr() {
 		return c.Err()
+	}
+	// Creating boolean values is a very common operation,
+	// such as when evaluating unary and binary operators.
+	// A significant portion of the time, no source is attached
+	// to the operation, so we can reuse Bool allocations.
+	if c.src == nil {
+		if b {
+			return StaticBoolTrue
+		} else {
+			return StaticBoolFalse
+		}
 	}
 	return &Bool{Src: c.src, B: b}
 }
 
 func (c *OpContext) newList(src ast.Node, parent *Vertex) *Vertex {
-	return &Vertex{Parent: parent, BaseValue: &ListMarker{}}
+	return c.newInlineVertex(parent, &ListMarker{})
 }
 
-// Str reports a debug string of x.
-func (c *OpContext) Str(x Node) string {
+// String reports a string of x, for use in errors or debugging.
+// Use [OpContext.Str] instead for %s format arguments, as it delays the work.
+func (c *OpContext) String(x Node) string {
 	if c.Format == nil {
 		return fmt.Sprintf("%T", x)
 	}
-	return c.Format(x)
+	return c.Format(c.Runtime, x)
+}
+
+// Formatter wraps an adt.Node with the necessary information to print it.
+//
+// TODO: we could eliminate the need for this by ensuring that errors are
+// _always_ formatted with a printer. We are not far off from this goal, but
+// we need to verify several things.
+// This is mainly possible because we intend to have a global string index
+// using weak references. It also assumes that errors are always printed
+// equally.
+type Formatter struct {
+	X Node
+
+	// F formats Node, resolving references as needed.using Runtime.
+	// TODO: only used for cases where the debug printer is somehow
+	// circumvented. Verify this no longer happens.
+	F func(Runtime, Node) string
+
+	// TODO: is runtime needed? Probably not if we have a global string index.
+	R Runtime
+}
+
+func (f Formatter) String() string { return f.F(f.R, f.X) }
+
+// Str reports a string of x via a [fmt.Stringer], for use in errors or debugging.
+func (c *OpContext) Str(x Node) fmt.Stringer {
+	return Formatter{X: x, F: c.Format, R: c.Runtime}
 }
 
 // NewList returns a new list for the given values.
 func (c *OpContext) NewList(values ...Value) *Vertex {
 	// TODO: consider making this a literal list instead.
 	list := &ListLit{}
-	v := &Vertex{
-		Conjuncts: []Conjunct{{Env: nil, x: list}},
-	}
+	v := c.newInlineVertex(nil, nil, Conjunct{Env: nil, x: list})
 
 	for _, x := range values {
 		list.Elems = append(list.Elems, x)
 	}
-	c.Unify(v, Finalized)
+	v.Finalize(c)
 	return v
 }

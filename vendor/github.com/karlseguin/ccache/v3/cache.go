@@ -10,25 +10,27 @@ import (
 type Cache[T any] struct {
 	*Configuration[T]
 	control
-	list        *List[*Item[T]]
-	size        int64
-	buckets     []*bucket[T]
-	bucketMask  uint32
-	deletables  chan *Item[T]
-	promotables chan *Item[T]
+	list            *List[T]
+	size            int64
+	pruneTargetSize int64
+	buckets         []*bucket[T]
+	bucketMask      uint32
+	deletables      chan *Item[T]
+	promotables     chan *Item[T]
 }
 
 // Create a new cache with the specified configuration
 // See ccache.Configure() for creating a configuration
 func New[T any](config *Configuration[T]) *Cache[T] {
 	c := &Cache[T]{
-		list:          NewList[*Item[T]](),
-		Configuration: config,
-		control:       newControl(),
-		bucketMask:    uint32(config.buckets) - 1,
-		buckets:       make([]*bucket[T], config.buckets),
-		deletables:    make(chan *Item[T], config.deleteBuffer),
-		promotables:   make(chan *Item[T], config.promoteBuffer),
+		list:            NewList[T](),
+		Configuration:   config,
+		control:         newControl(),
+		bucketMask:      uint32(config.buckets) - 1,
+		buckets:         make([]*bucket[T], config.buckets),
+		deletables:      make(chan *Item[T], config.deleteBuffer),
+		promotables:     make(chan *Item[T], config.promoteBuffer),
+		pruneTargetSize: config.maxSize - config.maxSize*int64(config.percentToPrune)/100,
 	}
 	for i := 0; i < config.buckets; i++ {
 		c.buckets[i] = &bucket[T]{
@@ -184,7 +186,7 @@ func (c *Cache[T]) Fetch(key string, duration time.Duration, fetch func() (T, er
 
 // Remove the item from the cache, return true if the item was present, false otherwise.
 func (c *Cache[T]) Delete(key string) bool {
-	item := c.bucket(key).delete(key)
+	item := c.bucket(key).remove(key)
 	if item != nil {
 		c.deletables <- item
 		return true
@@ -249,7 +251,9 @@ func (c *Cache[T]) worker() {
 				msg.res <- dropped
 				dropped = 0
 			case controlSetMaxSize:
-				c.maxSize = msg.size
+				newMaxSize := msg.size
+				c.maxSize = newMaxSize
+				c.pruneTargetSize = newMaxSize - newMaxSize*int64(c.percentToPrune)/100
 				if c.size > c.maxSize {
 					dropped += c.gc()
 				}
@@ -269,7 +273,7 @@ func (c *Cache[T]) worker() {
 						bucket.clear()
 					}
 					c.size = 0
-					c.list = NewList[*Item[T]]()
+					c.list = NewList[T]()
 				})
 				msg.done <- struct{}{}
 			case controlGetSize:
@@ -327,64 +331,64 @@ doAllDeletes:
 }
 
 func (c *Cache[T]) doDelete(item *Item[T]) {
-	if item.node == nil {
+	if !item.inList {
 		item.promotions = -2
 	} else {
 		c.size -= item.size
 		if c.onDelete != nil {
 			c.onDelete(item)
 		}
-		c.list.Remove(item.node)
-		item.node = nil
+		c.list.Remove(item)
 		item.promotions = -2
 	}
 }
 
 func (c *Cache[T]) doPromote(item *Item[T]) bool {
-	//already deleted
+	// already deleted
 	if item.promotions == -2 {
 		return false
 	}
-	if item.node != nil { //not a new item
+
+	if item.inList {
 		if item.shouldPromote(c.getsPerPromote) {
-			c.list.MoveToFront(item.node)
+			c.list.MoveToFront(item)
 			item.promotions = 0
 		}
 		return false
 	}
 
 	c.size += item.size
-	item.node = c.list.Insert(item)
+	c.list.Insert(item)
 	return true
 }
 
 func (c *Cache[T]) gc() int {
 	dropped := 0
-	node := c.list.Tail
+	item := c.list.Tail
 
-	itemsToPrune := int64(c.itemsToPrune)
-	if min := c.size - c.maxSize; min > itemsToPrune {
-		itemsToPrune = min
-	}
+	prunedSize := int64(0)
+	sizeToPrune := c.size - c.pruneTargetSize
 
-	for i := int64(0); i < itemsToPrune; i++ {
-		if node == nil {
+	for prunedSize < sizeToPrune {
+		if item == nil {
 			return dropped
 		}
-		prev := node.Prev
-		item := node.Value
+		// fmt.Println(item.key)
+		prev := item.prev
 		if !c.tracking || atomic.LoadInt32(&item.refCount) == 0 {
 			c.bucket(item.key).delete(item.key)
-			c.size -= item.size
-			c.list.Remove(node)
+			itemSize := item.size
+			c.size -= itemSize
+			prunedSize += itemSize
+
+			c.list.Remove(item)
 			if c.onDelete != nil {
 				c.onDelete(item)
 			}
 			dropped += 1
-			item.node = nil
 			item.promotions = -2
 		}
-		node = prev
+		item = prev
 	}
 	return dropped
 }

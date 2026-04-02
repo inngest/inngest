@@ -19,62 +19,63 @@
 // discussed in https://developers.google.com/protocol-buffers/docs/proto3, and
 // carries some of the mapping further when possible with CUE.
 //
-//
-// Package Paths
+// # Package Paths
 //
 // If a .proto file contains a go_package directive, it will be used as the
-// destination package fo the generated .cue files. A common use case is to
+// destination package for the generated .cue files. A common use case is to
 // generate the CUE in the same directory as the .proto definition. If a
 // destination package is not within the current CUE module, it will be written
 // relative to the pkg directory.
 //
 // If a .proto file does not specify go_package, it will convert a proto package
 // "google.parent.sub" to the import path "googleapis.com/google/parent/sub".
-// It is safe to mix package with and without a go_package within the same
+// It is safe to mix packages with and without a go_package within the same
 // project.
 //
-// Type Mappings
+// # Type Mappings
 //
 // The following type mappings of definitions apply:
 //
-//   Proto type     CUE type/def     Comments
-//   message        struct           Message fields become CUE fields, whereby
-//                                   names are mapped to lowerCamelCase.
-//   enum           e1 | e2 | ...    Where ex are strings. A separate mapping is
-//                                   generated to obtain the numeric values.
-//   map<K, V>      { <>: V }        All keys are converted to strings.
-//   repeated V     [...V]           null is accepted as the empty list [].
-//   bool           bool
-//   string         string
-//   bytes          bytes            A base64-encoded string when converted to JSON.
-//   int32, fixed32 int32            An integer with bounds as defined by int32.
-//   uint32         uint32           An integer with bounds as defined by uint32.
-//   int64, fixed64 int64            An integer with bounds as defined by int64.
-//   uint64         uint64           An integer with bounds as defined by uint64.
-//   float          float32          A number with bounds as defined by float32.
-//   double         float64          A number with bounds as defined by float64.
-//   Struct         struct           See struct.proto.
-//   Value          _                See struct.proto.
-//   ListValue      [...]            See struct.proto.
-//   NullValue      null             See struct.proto.
-//   BoolValue      bool             See struct.proto.
-//   StringValue    string           See struct.proto.
-//   NumberValue    number           See struct.proto.
-//   StringValue    string           See struct.proto.
-//   Empty          close({})
-//   Timestamp      time.Time        See struct.proto.
-//   Duration       time.Duration    See struct.proto.
+//	Proto type     CUE type/def     Comments
+//	message        struct           Message fields become CUE fields, whereby
+//	                                names are mapped to lowerCamelCase.
+//	enum           e1 | e2 | ...    Where ex are strings. A separate mapping is
+//	                                generated to obtain the numeric values.
+//	map<K, V>      { <>: V }        All keys are converted to strings.
+//	repeated V     [...V]           null is accepted as the empty list [].
+//	bool           bool
+//	string         string
+//	bytes          bytes            A base64-encoded string when converted to JSON.
+//	int32, fixed32 int32            An integer with bounds as defined by int32.
+//	uint32         uint32           An integer with bounds as defined by uint32.
+//	int64, fixed64 int64            An integer with bounds as defined by int64.
+//	uint64         uint64           An integer with bounds as defined by uint64.
+//	float          float32          A number with bounds as defined by float32.
+//	double         float64          A number with bounds as defined by float64.
+//	Struct         struct           See struct.proto.
+//	Value          _                See struct.proto.
+//	ListValue      [...]            See struct.proto.
+//	NullValue      null             See struct.proto.
+//	BoolValue      bool             See struct.proto.
+//	StringValue    string           See struct.proto.
+//	NumberValue    number           See struct.proto.
+//	StringValue    string           See struct.proto.
+//	Empty          close({})
+//	Timestamp      time.Time        See struct.proto.
+//	Duration       time.Duration    See struct.proto.
+//
+// # Annotations
 //
 // Protobuf definitions can be annotated with CUE constraints that are included
 // in the generated CUE:
-//    (cue.val)     string        CUE expression defining a constraint for this
-//                                field. The string may refer to other fields
-//                                in a message definition using their JSON name.
 //
-//    (cue.opt)     FieldOptions
-//       required   bool          Defines the field is required. Use with
-//                                caution.
+//	(cue.val)     string        CUE expression defining a constraint for this
+//	                            field. The string may refer to other fields
+//	                            in a message definition using their JSON name.
 //
+//	(cue.opt)     FieldOptions
+//	   required   bool          Defines the field is required. Use with
+//	                            caution.
 package protobuf
 
 // TODO mappings:
@@ -88,10 +89,8 @@ package protobuf
 import (
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
-
-	"github.com/mpvl/unique"
 
 	"cuelang.org/go/cue/ast"
 	"cuelang.org/go/cue/build"
@@ -158,7 +157,6 @@ type Config struct {
 // specified Root (or current working directory if none is specified).
 // All other imported files are assigned to the CUE pkg dir ($Root/pkg)
 // according to their Go package import path.
-//
 type Extractor struct {
 	root     string
 	cwd      string
@@ -183,13 +181,22 @@ type result struct {
 // it will be observable by the Err method fo the Extractor. It is safe,
 // however, to only check errors after building the output.
 func NewExtractor(c *Config) *Extractor {
+	var modulePath string
+	// We don't want to consider the module's major version as
+	// part of the path when checking to see a protobuf package
+	// declares itself as part of that module.
+	// TODO(rogpeppe) the Go package path might itself include a major
+	// version, so we should probably consider that too.
+	if c.Module != "" {
+		modulePath, _, _ = ast.SplitPackageVersion(c.Module)
+	}
 	cwd, _ := os.Getwd()
 	b := &Extractor{
 		root:      c.Root,
 		cwd:       cwd,
 		paths:     c.Paths,
 		pkgName:   c.PkgName,
-		module:    c.Module,
+		module:    modulePath,
 		enumMode:  c.EnumMode,
 		fileCache: map[string]result{},
 		imports:   map[string]*build.Instance{},
@@ -203,7 +210,7 @@ func NewExtractor(c *Config) *Extractor {
 }
 
 // Err returns the errors accumulated during testing. The returned error may be
-// of type cuelang.org/go/cue/errors.List.
+// of type [errors.List].
 func (b *Extractor) Err() error {
 	return b.errs
 }
@@ -219,7 +226,6 @@ func (b *Extractor) addErr(err error) {
 // AddFile assumes that the proto file compiles with protoc and may not report
 // an error if it does not. Imports are resolved using the paths defined in
 // Config.
-//
 func (b *Extractor) AddFile(filename string, src interface{}) error {
 	if b.done {
 		err := errors.Newf(token.NoPos,
@@ -248,9 +254,7 @@ func (b *Extractor) Files() (files []*ast.File, err error) {
 	}
 
 	for _, p := range instances {
-		for _, f := range p.Files {
-			files = append(files, f)
-		}
+		files = append(files, p.Files...)
 	}
 	return files, nil
 }
@@ -305,20 +309,20 @@ func (b *Extractor) Instances() (instances []*build.Instance, err error) {
 
 	for _, p := range b.imports {
 		instances = append(instances, p)
-		sort.Strings(p.ImportPaths)
-		unique.Strings(&p.ImportPaths)
+		slices.Sort(p.ImportPaths)
+		p.ImportPaths = slices.Compact(p.ImportPaths)
 		for _, i := range p.ImportPaths {
 			if imp := b.imports[i]; imp != nil {
 				p.Imports = append(p.Imports, imp)
 			}
 		}
 
-		sort.Slice(p.Files, func(i, j int) bool {
-			return p.Files[i].Filename < p.Files[j].Filename
+		slices.SortFunc(p.Files, func(a, b *ast.File) int {
+			return strings.Compare(a.Filename, b.Filename)
 		})
 	}
-	sort.Slice(instances, func(i, j int) bool {
-		return instances[i].ImportPath < instances[j].ImportPath
+	slices.SortFunc(instances, func(a, b *build.Instance) int {
+		return strings.Compare(a.ImportPath, b.ImportPath)
 	})
 
 	if err != nil {
@@ -392,12 +396,11 @@ func (b *Extractor) getInst(p *protoConverter) *build.Instance {
 
 // Extract parses a single proto file and returns its contents translated to a CUE
 // file. If src is not nil, it will use this as the contents of the file. It may
-// be a string, []byte or io.Reader. Otherwise Extract will open the given file
+// be a string, []byte or [io.Reader]. Otherwise Extract will open the given file
 // name at the fully qualified path.
 //
 // Extract assumes the proto file compiles with protoc and may not report an error
 // if it does not. Imports are resolved using the paths defined in Config.
-//
 func Extract(filename string, src interface{}, c *Config) (f *ast.File, err error) {
 	if c == nil {
 		c = &Config{}

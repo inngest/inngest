@@ -15,9 +15,7 @@
 package astutil
 
 import (
-	"path"
 	"strconv"
-	"strings"
 
 	"cuelang.org/go/cue/ast"
 	"cuelang.org/go/cue/token"
@@ -26,16 +24,17 @@ import (
 // ImportPathName derives the package name from the given import path.
 //
 // Examples:
-//      string           string
-//      foo.com/bar      bar
-//      foo.com/bar:baz  baz
 //
+//	string           string
+//	foo.com/bar      bar
+//	foo.com/bar:baz  baz
+//
+// Deprecated: use [ast.ParseImportPath] instead to obtain the
+// qualifier.
+//
+//go:fix inline
 func ImportPathName(id string) string {
-	name := path.Base(id)
-	if p := strings.LastIndexByte(name, ':'); p > 0 {
-		name = name[p+1:]
-	}
-	return name
+	return ast.ParseImportPath(id).Qualifier
 }
 
 // ImportInfo describes the information contained in an ImportSpec.
@@ -43,32 +42,30 @@ type ImportInfo struct {
 	Ident   string // identifier used to refer to the import
 	PkgName string // name of the package
 	ID      string // full import path, including the name
-	Dir     string // import path, excluding the name
+
+	// Deprecated: use [ast.ParseImportPath](ID).Path instead.
+	Dir string // import path, excluding the name
 }
 
 // ParseImportSpec returns the name and full path of an ImportSpec.
-func ParseImportSpec(spec *ast.ImportSpec) (info ImportInfo, err error) {
+func ParseImportSpec(spec *ast.ImportSpec) (ImportInfo, error) {
 	str, err := strconv.Unquote(spec.Path.Value)
 	if err != nil {
-		return info, err
+		return ImportInfo{}, err
 	}
-
-	info.ID = str
-
-	if p := strings.LastIndexByte(str, ':'); p > 0 {
-		info.Dir = str[:p]
-		info.PkgName = str[p+1:]
-	} else {
-		info.Dir = str
-		info.PkgName = path.Base(str)
+	ip := ast.ParseImportPath(str)
+	info := ImportInfo{
+		ID:      str,
+		Ident:   ip.Qualifier,
+		PkgName: ip.Qualifier,
+		// Note: this still leave the major version suffix in place
+		// so this "directory" isn't likely to correspond to any
+		// actual directory if there's a version present.
+		Dir: ip.Unqualified().String(),
 	}
-
 	if spec.Name != nil {
 		info.Ident = spec.Name.Name
-	} else {
-		info.Ident = info.PkgName
 	}
-
 	return info, nil
 }
 
@@ -78,7 +75,7 @@ func CopyComments(to, from ast.Node) {
 	if from == nil {
 		return
 	}
-	ast.SetComments(to, from.Comments())
+	ast.SetComments(to, ast.Comments(from))
 }
 
 // CopyPosition sets the position of one node to another.
@@ -95,7 +92,7 @@ func CopyMeta(to, from ast.Node) ast.Node {
 	if from == nil {
 		return to
 	}
-	ast.SetComments(to, from.Comments())
+	ast.SetComments(to, ast.Comments(from))
 	ast.SetPos(to, from.Pos())
 	return to
 }

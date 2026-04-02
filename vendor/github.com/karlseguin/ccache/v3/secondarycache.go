@@ -41,7 +41,7 @@ func (s *SecondaryCache[T]) Fetch(secondary string, duration time.Duration, fetc
 // Delete a secondary key.
 // The semantics are the same as for LayeredCache.Delete
 func (s *SecondaryCache[T]) Delete(secondary string) bool {
-	item := s.bucket.delete(secondary)
+	item := s.bucket.remove(secondary)
 	if item != nil {
 		s.pCache.deletables <- item
 		return true

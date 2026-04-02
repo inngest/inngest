@@ -5,8 +5,7 @@ import (
 	"time"
 )
 
-// CloudWatchEvent is the outer structure of an event sent via CloudWatch Events.
-// For examples of events that come via CloudWatch Events, see https://docs.aws.amazon.com/AmazonCloudWatch/latest/events/EventTypes.html
+// CloudWatchEvent is the outer structure of an event sent via EventBridge serverless service.
 type CloudWatchEvent struct {
 	Version    string          `json:"version"`
 	ID         string          `json:"id"`
@@ -18,3 +17,5 @@ type CloudWatchEvent struct {
 	Resources  []string        `json:"resources"`
 	Detail     json.RawMessage `json:"detail"`
 }
+
+type EventBridgeEvent = CloudWatchEvent

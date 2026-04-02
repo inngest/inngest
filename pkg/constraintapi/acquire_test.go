@@ -17,7 +17,7 @@ import (
 )
 
 // newTestSetup creates a common test setup for acquire cache tests.
-func newTestSetup(t *testing.T, enableCache EnableAcquireCacheFn) (*redisCapacityManager, *miniredis.Miniredis, clockwork.FakeClock, context.Context) {
+func newTestSetup(t *testing.T, enableCache EnableAcquireCacheFn) (*redisCapacityManager, *miniredis.Miniredis, *clockwork.FakeClock, context.Context) {
 	t.Helper()
 
 	r := miniredis.RunT(t)

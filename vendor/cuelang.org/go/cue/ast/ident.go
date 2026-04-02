@@ -34,30 +34,28 @@ func isDigit(ch rune) bool {
 }
 
 // IsValidIdent reports whether str is a valid identifier.
+// Note that the underscore "_" string is considered valid, for top.
 func IsValidIdent(ident string) bool {
 	if ident == "" {
 		return false
 	}
 
-	// TODO: use consumed again to allow #0.
-	// consumed := false
-	if strings.HasPrefix(ident, "_") {
-		ident = ident[1:]
-		// consumed = true
-		if len(ident) == 0 {
-			return true
-		}
+	ident, consumed := strings.CutPrefix(ident, "_")
+	if ident == "" {
+		return true // "_" is a valid identifier
 	}
-	if strings.HasPrefix(ident, "#") {
-		ident = ident[1:]
-		// consumed = true
+	ident, consumedHash := strings.CutPrefix(ident, "#")
+	if consumedHash {
+		// Note: _#0 is not allowed by the spec, although _0 is.
+		// TODO: set consumed to true here to allow #0.
+		consumed = false
 	}
 
-	// if !consumed {
-	if r, _ := utf8.DecodeRuneInString(ident); isDigit(r) {
-		return false
+	if !consumed {
+		if r, _ := utf8.DecodeRuneInString(ident); isDigit(r) {
+			return false
+		}
 	}
-	// }
 
 	for _, r := range ident {
 		if isLetter(r) || isDigit(r) || r == '_' || r == '$' {
@@ -68,91 +66,19 @@ func IsValidIdent(ident string) bool {
 	return true
 }
 
-// QuoteIdent quotes an identifier, if needed, and reports
-// an error if the identifier is invalid.
+// StringLabelNeedsQuoting reports whether the given string
+// must be quoted via [literal.Label].Quote to represent itself
+// as a string label, such as a regular field.
 //
-// Deprecated: quoted identifiers are deprecated. Use aliases.
-func QuoteIdent(ident string) (string, error) {
-	if ident != "" && ident[0] == '`' {
-		if _, err := strconv.Unquote(ident); err != nil {
-			return "", errors.Newf(token.NoPos, "invalid quoted identifier %q", ident)
-		}
-		return ident, nil
-	}
-
-	// TODO: consider quoting keywords
-	// switch ident {
-	// case "for", "in", "if", "let", "true", "false", "null":
-	// 	goto escape
-	// }
-
-	for _, r := range ident {
-		if isLetter(r) || isDigit(r) || r == '_' || r == '$' {
-			continue
-		}
-		if r == '-' {
-			return "`" + ident + "`", nil
-		}
-		return "", errors.Newf(token.NoPos, "invalid character '%s' in identifier", string(r))
-	}
-
-	_, err := parseIdent(token.NoPos, ident)
-	return ident, err
-}
-
-// ParseIdent unquotes a possibly quoted identifier and validates
-// if the result is valid.
+// Note that a negative result does not mean you can simply use
+// [NewIdent](name) to create a valid label without affecting any references.
+// In the general case, you should use [Ident.Node] to ensure each identifier references
+// exactly what they mean to, or quote any string label which doesn't need to be referenced.
 //
-// Deprecated: quoted identifiers are deprecated. Use aliases.
-func ParseIdent(n *Ident) (string, error) {
-	return parseIdent(n.NamePos, n.Name)
-}
-
-func parseIdent(pos token.Pos, ident string) (string, error) {
-	if ident == "" {
-		return "", errors.Newf(pos, "empty identifier")
-	}
-	quoted := false
-	if ident[0] == '`' {
-		u, err := strconv.Unquote(ident)
-		if err != nil {
-			return "", errors.Newf(pos, "invalid quoted identifier")
-		}
-		ident = u
-		quoted = true
-	}
-
-	p := 0
-	if strings.HasPrefix(ident, "_") {
-		p++
-		if len(ident) == 1 {
-			return ident, nil
-		}
-	}
-	if strings.HasPrefix(ident[p:], "#") {
-		p++
-		// if len(ident) == p {
-		// 	return "", errors.Newf(pos, "invalid identifier '_#'")
-		// }
-	}
-
-	if p == 0 || ident[p-1] == '#' {
-		if r, _ := utf8.DecodeRuneInString(ident[p:]); isDigit(r) {
-			return "", errors.Newf(pos, "invalid character '%s' in identifier", string(r))
-		}
-	}
-
-	for _, r := range ident[p:] {
-		if isLetter(r) || isDigit(r) || r == '_' || r == '$' {
-			continue
-		}
-		if r == '-' && quoted {
-			continue
-		}
-		return "", errors.Newf(pos, "invalid character '%s' in identifier", string(r))
-	}
-
-	return ident, nil
+// The main use case of this API is for simple scenarios, such as a JSON decoder
+// where the input is all data without any references.
+func StringLabelNeedsQuoting(name string) bool {
+	return strings.HasPrefix(name, "#") || strings.HasPrefix(name, "_") || !IsValidIdent(name)
 }
 
 // LabelName reports the name of a label, whether it is an identifier
@@ -161,15 +87,14 @@ func parseIdent(pos token.Pos, ident string) (string, error) {
 //
 // Examples:
 //
-//     Label   Result
-//     foo     "foo"  true   nil
-//     true    "true" true   nil
-//     "foo"   "foo"  false  nil
-//     "x-y"   "x-y"  false  nil
-//     "foo    ""     false  invalid string
-//     "\(x)"  ""     false  errors.Is(err, ErrIsExpression)
-//     X=foo   "foo"  true   nil
-//
+//	Label   Result
+//	foo     "foo"  true   nil
+//	true    "true" true   nil
+//	"foo"   "foo"  false  nil
+//	"x-y"   "x-y"  false  nil
+//	"foo    ""     false  invalid string
+//	"\(x)"  ""     false  errors.Is(err, ErrIsExpression)
+//	X=foo   "foo"  true   nil
 func LabelName(l Label) (name string, isIdent bool, err error) {
 	if a, ok := l.(*Alias); ok {
 		l, _ = a.Expr.(Label)
@@ -181,14 +106,11 @@ func LabelName(l Label) (name string, isIdent bool, err error) {
 			"cannot reference fields with square brackets labels outside the field value")
 
 	case *Ident:
-		// TODO(legacy): use name = n.Name
-		name, err = ParseIdent(n)
-		if err != nil {
-			return "", false, err
+		name = n.Name
+		if !IsValidIdent(name) {
+			return "", false, errors.Newf(l.Pos(), "invalid identifier")
 		}
-		isIdent = true
-		// TODO(legacy): remove this return once quoted identifiers are removed.
-		return name, isIdent, err
+		return name, true, err
 
 	case *BasicLit:
 		switch n.Kind {
@@ -209,19 +131,15 @@ func LabelName(l Label) (name string, isIdent bool, err error) {
 			return "", false, errors.Wrapf(ErrIsExpression, l.Pos(),
 				"cannot use numbers as fields")
 		}
+		return name, isIdent, err
 
 	default:
 		// This includes interpolation and template labels.
 		return "", false, errors.Wrapf(ErrIsExpression, l.Pos(),
 			"label is an expression")
 	}
-	if !IsValidIdent(name) {
-		isIdent = false
-	}
-	return name, isIdent, err
-
 }
 
 // ErrIsExpression reports whether a label is an expression.
-// This error is never returned directly. Use errors.Is or xerrors.Is.
+// This error is never returned directly. Use [errors.Is].
 var ErrIsExpression = errors.New("not a concrete label")

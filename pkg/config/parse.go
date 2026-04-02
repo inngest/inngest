@@ -104,7 +104,7 @@ func Parse(input []byte) (*Config, error) {
 }
 
 // prepare generates a cue instance for the configuration.
-func prepare(input []byte) (*cue.Instance, error) {
+func prepare(input []byte) (cue.Value, error) {
 	// Trim the input, and ensure that the JSON has a #Config prefix.
 	input = bytes.TrimSpace(input)
 	if len(input) == 0 {
@@ -117,17 +117,17 @@ func prepare(input []byte) (*cue.Instance, error) {
 }
 
 // decode attempts to decode the input within a cue instance.
-func decode(i *cue.Instance) (*Config, error) {
+func decode(val cue.Value) (*Config, error) {
 	// Initialize our definition as the root value of the cue instance.  This is
 	// the root, top-level object.
-	def := i.Value()
+	def := val
 
-	field, err := i.LookupField("config")
-	if err == nil {
+	field := val.LookupPath(cue.ParsePath("config"))
+	if field.Exists() {
 		// This is a cue definition which contains a function definition.  Cue
 		// definitions always have a root level object, and we define the function
 		// using the "function" identifier.
-		def = field.Value
+		def = field
 	}
 
 	if err := def.Validate(cue.Final(), cue.Concrete(true)); err != nil {

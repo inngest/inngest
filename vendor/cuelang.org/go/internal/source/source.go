@@ -20,34 +20,90 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
+	"math"
+	"os"
+	"strings"
 )
 
-// Read loads the source bytes for the given arguments. If src != nil,
-// Read converts src to a []byte if possible; otherwise it returns an
-// error. If src == nil, readSource returns the result of reading the file
+// ReadAll loads the source bytes for the given arguments. If src != nil,
+// ReadAll converts src to a []byte if possible; otherwise it returns an
+// error. If src == nil, ReadAll returns the result of reading the file
 // specified by filename.
-//
-func Read(filename string, src interface{}) ([]byte, error) {
+func ReadAll(filename string, src any) ([]byte, error) {
 	if src != nil {
-		switch s := src.(type) {
+		switch src := src.(type) {
 		case string:
-			return []byte(s), nil
+			return []byte(src), nil
 		case []byte:
-			return s, nil
+			return src, nil
 		case *bytes.Buffer:
 			// is io.Reader, but src is already available in []byte form
-			if s != nil {
-				return s.Bytes(), nil
-			}
+			return src.Bytes(), nil
 		case io.Reader:
-			var buf bytes.Buffer
-			if _, err := io.Copy(&buf, s); err != nil {
-				return nil, err
-			}
-			return buf.Bytes(), nil
+			return io.ReadAll(src)
 		}
 		return nil, fmt.Errorf("invalid source type %T", src)
 	}
-	return ioutil.ReadFile(filename)
+	return os.ReadFile(filename)
+}
+
+// ReadAllSize is like [io.ReadAll] while taking advantage of a size hint for the input reader,
+// much like [os.ReadFile] does when reading regular files with a known size.
+// When the size hint is negative, it simply uses [io.ReadAll].
+func ReadAllSize(r io.Reader, size int) ([]byte, error) {
+	if size >= 0 {
+		// We use a [bytes.Buffer] here, because the given size is a hint,
+		// and not guaranteed to be exactly correct.
+		//
+		// Before each read, [bytes.Buffer] ensures that the internal buffer
+		// has enough available capacity to read at least [bytes.MinRead] bytes.
+		// Many readers tend to signal EOF via a final (0, EOF) read,
+		// which then triggers growing the slice to accomodate [bytes.MinRead].
+		buf := bytes.NewBuffer(make([]byte, 0, size+bytes.MinRead))
+		_, err := buf.ReadFrom(r)
+		return buf.Bytes(), err
+	}
+	return io.ReadAll(r)
+}
+
+// Open creates a source reader for the given arguments.
+// If src != nil, Open converts src to an [io.Reader] if possible; otherwise it returns an error.
+// If src == nil, Open returns the result of opening the file specified by filename.
+//
+// The caller must check if the result is an [io.Closer], and if so, close it when done.
+// The size of the opened reader is returned if possible, or -1 otherwise.
+func Open(filename string, src any) (_ io.Reader, size int, _ error) {
+	if src != nil {
+		switch src := src.(type) {
+		case string:
+			return strings.NewReader(src), len(src), nil
+		case []byte:
+			return bytes.NewReader(src), len(src), nil
+		case *os.File:
+			return fileWithSize(src)
+		case io.Reader:
+			return src, -1, nil
+		}
+		return nil, -1, fmt.Errorf("invalid source type %T", src)
+	}
+	f, err := os.Open(filename)
+	if err != nil {
+		return nil, -1, err
+	}
+	return fileWithSize(f)
+}
+
+func fileWithSize(f *os.File) (io.Reader, int, error) {
+	// If we just opened a regular file, return its size too.
+	// If we can't get its size, such as non-regular files, don't give one.
+	stat, err := f.Stat()
+	if err != nil || !stat.Mode().IsRegular() {
+		return f, -1, nil
+	}
+	size := stat.Size()
+	// If the size would overflow an int, it won't fit in memory anyway.
+	if size > math.MaxInt {
+		return f, -1, nil
+	}
+	return f, int(size), nil
 }

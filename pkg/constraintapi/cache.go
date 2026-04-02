@@ -33,7 +33,7 @@ type constraintCache struct {
 
 	cache                                *ccache.Cache[*constraintCacheItem]
 	maxSize                              int64
-	itemsToPrune                         uint32
+	percentToPrune                       uint8
 	enableHighCardinalityInstrumentation EnableHighCardinalityInstrumentation
 	enableCache                          EnableConstraintCacheFn
 	shouldCache                          ShouldCacheConstraintFn
@@ -82,9 +82,9 @@ func WithConstraintCacheMaxSize(maxSize int64) ConstraintCacheOption {
 	}
 }
 
-func WithConstraintCacheItemsToPrune(itemsToPrune uint32) ConstraintCacheOption {
+func WithConstraintCacheItemsToPrune(percentToPrune uint8) ConstraintCacheOption {
 	return func(c *constraintCache) {
-		c.itemsToPrune = itemsToPrune
+		c.percentToPrune = percentToPrune
 	}
 }
 
@@ -261,8 +261,8 @@ func NewConstraintCache(
 	options ...ConstraintCacheOption,
 ) *constraintCache {
 	cache := &constraintCache{
-		maxSize:      10_000,
-		itemsToPrune: 500,
+			maxSize:        10_000,
+			percentToPrune: 5,
 	}
 
 	for _, opt := range options {
@@ -272,7 +272,7 @@ func NewConstraintCache(
 	cache.cache = ccache.New(
 		ccache.Configure[*constraintCacheItem]().
 			MaxSize(cache.maxSize).
-			ItemsToPrune(cache.itemsToPrune).
+			PercentToPrune(cache.percentToPrune).
 			OnDelete(func(item *ccache.Item[*constraintCacheItem]) {
 				// Track cache evictions to detect thrashing (cache size too small).
 				// OnDelete fires on the ccache worker goroutine for both LRU evictions

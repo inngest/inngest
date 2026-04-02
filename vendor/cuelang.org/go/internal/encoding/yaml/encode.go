@@ -21,13 +21,15 @@ import (
 	"math/big"
 	"regexp"
 	"strings"
+	"sync"
 
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v3"
 
 	"cuelang.org/go/cue/ast"
 	"cuelang.org/go/cue/errors"
 	"cuelang.org/go/cue/literal"
 	"cuelang.org/go/cue/token"
+	"cuelang.org/go/internal"
 	"cuelang.org/go/internal/astinternal"
 )
 
@@ -35,15 +37,16 @@ import (
 //
 // The given file must only contain values that can be directly supported by
 // YAML:
-//    Type          Restrictions
-//    BasicLit
-//    File          no imports, aliases, or definitions
-//    StructLit     no embeddings, aliases, or definitions
-//    List
-//    Field         must be regular; label must be a BasicLit or Ident
-//    CommentGroup
 //
-//    TODO: support anchors through Ident.
+//	Type          Restrictions
+//	BasicLit
+//	File          no imports, aliases, or definitions
+//	StructLit     no embeddings, aliases, or definitions
+//	List
+//	Field         must be regular; label must be a BasicLit or Ident
+//	CommentGroup
+//
+// TODO: support anchors through Ident.
 func Encode(n ast.Node) (b []byte, err error) {
 	y, err := encode(n)
 	if err != nil {
@@ -157,12 +160,14 @@ func encodeScalar(b *ast.BasicLit) (n *yaml.Node, err error) {
 // shouldQuote indicates that a string may be a YAML 1.1. legacy value and that
 // the string should be quoted.
 func shouldQuote(str string) bool {
-	return legacyStrings[str] || useQuote.MatchString(str)
+	return legacyStrings[str] || useQuote().MatchString(str)
 }
 
 // This regular expression conservatively matches any date, time string,
 // or base60 float.
-var useQuote = regexp.MustCompile(`^[\-+0-9:\. \t]+([-:]|[tT])[\-+0-9:\. \t]+[zZ]?$`)
+var useQuote = sync.OnceValue(func() *regexp.Regexp {
+	return regexp.MustCompile(`^[\-+0-9:\. \t]+([-:]|[tT])[\-+0-9:\. \t]+[zZ]?$|^0x[a-fA-F0-9]+$`)
+})
 
 // legacyStrings contains a map of fixed strings with special meaning for any
 // type in the YAML Tag registry (https://yaml.org/type/index.html) as used
@@ -229,6 +234,28 @@ func encodeExprs(exprs []ast.Expr) (n *yaml.Node, err error) {
 	return n, nil
 }
 
+// extractYAMLTag looks for @yaml(,tag="...") attribute and returns the tag value.
+// Returns an empty string if no @yaml attribute or no tag argument is found.
+// Returns an error if the attribute is malformed.
+func extractYAMLTag(attrs []*ast.Attribute) (string, error) {
+	for _, attr := range attrs {
+		key, body := attr.Split()
+		if key != "yaml" {
+			continue
+		}
+		parsed := internal.ParseAttrBody(attr.Pos(), body)
+		if parsed.Err != nil {
+			return "", parsed.Err
+		}
+		if val, found, err := parsed.Lookup(1, "tag"); err != nil {
+			return "", err
+		} else if found {
+			return val, nil
+		}
+	}
+	return "", nil
+}
+
 // encodeDecls converts a sequence of declarations to a value. If it encounters
 // an embedded value, it will return this expression. This is more relaxed for
 // structs than is currently allowed for CUE, but the expectation is that this
@@ -259,11 +286,11 @@ func encodeDecls(decls []ast.Decl) (n *yaml.Node, err error) {
 			continue
 
 		case *ast.Field:
-			if x.Token == token.ISA {
-				return nil, errors.Newf(x.TokenPos, "yaml: definition not allowed")
+			if !internal.IsRegularField(x) {
+				return nil, errors.Newf(x.TokenPos, "yaml: definition or hidden fields not allowed")
 			}
-			if x.Optional != token.NoPos {
-				return nil, errors.Newf(x.Optional, "yaml: optional fields not allowed")
+			if x.Constraint != token.ILLEGAL {
+				return nil, errors.Newf(x.TokenPos, "yaml: optional fields not allowed")
 			}
 			if hasEmbed {
 				return nil, errors.Newf(x.TokenPos, "yaml: embedding mixed with fields")
@@ -284,6 +311,15 @@ func encodeDecls(decls []ast.Decl) (n *yaml.Node, err error) {
 			if err != nil {
 				return nil, err
 			}
+
+			yamlTag, err := extractYAMLTag(x.Attrs)
+			if err != nil {
+				return nil, err
+			}
+			if yamlTag != "" {
+				value.Tag = yamlTag
+			}
+
 			lastHead = label
 			lastFoot = value
 			addDocs(x, label, value)
@@ -364,9 +400,7 @@ func addDocs(n ast.Node, h, f *yaml.Node) {
 // that comments with empty lines get properly converted.
 func docToYAML(c *ast.CommentGroup) string {
 	s := c.Text()
-	if strings.HasSuffix(s, "\n") { // always true
-		s = s[:len(s)-1]
-	}
+	s = strings.TrimSuffix(s, "\n") // always trims
 	lines := strings.Split(s, "\n")
 	for i, l := range lines {
 		if l == "" {

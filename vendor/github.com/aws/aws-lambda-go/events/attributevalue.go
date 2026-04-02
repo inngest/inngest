@@ -20,7 +20,7 @@ type DynamoDBAttributeValue struct {
 
 // This struct represents DynamoDBAttributeValue which doesn't
 // implement fmt.Stringer interface and safely `fmt.Sprintf`able
-type dynamoDbAttributeValue DynamoDBAttributeValue //nolint: stylecheck
+type dynamoDbAttributeValue DynamoDBAttributeValue //nolint: staticcheck
 
 // Binary provides access to an attribute of type Binary.
 // Method panics if the attribute is not of type Binary.

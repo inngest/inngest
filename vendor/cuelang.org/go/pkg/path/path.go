@@ -16,13 +16,9 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// Package filepath implements utility routines for manipulating filename paths
-// in a way compatible with the target operating system-defined file paths.
-//
-// The filepath package uses either forward slashes or backslashes,
-// depending on the operating system. To process paths such as URLs
-// that always use forward slashes regardless of the operating
-// system, see the path package.
+// Package path implements utility routines for manipulating filename paths as
+// defined by targetted operating systems, and also paths that always use
+// forward slashes regardless of the operating system, such as URLs.
 package path
 
 import (
@@ -74,13 +70,13 @@ func (b *lazybuf) string() string {
 // It applies the following rules
 // iteratively until no further processing can be done:
 //
-//	1. Replace multiple Separator elements with a single one.
-//	2. Eliminate each . path name element (the current directory).
-//	3. Eliminate each inner .. path name element (the parent directory)
-//	   along with the non-.. element that precedes it.
-//	4. Eliminate .. elements that begin a rooted path:
-//	   that is, replace "/.." by "/" at the beginning of a path,
-//	   assuming Separator is '/'.
+//  1. Replace multiple Separator elements with a single one.
+//  2. Eliminate each . path name element (the current directory).
+//  3. Eliminate each inner .. path name element (the parent directory)
+//     along with the non-.. element that precedes it.
+//  4. Eliminate .. elements that begin a rooted path:
+//     that is, replace "/.." by "/" at the beginning of a path,
+//     assuming Separator is '/'.
 //
 // The returned path ends in a slash only if it represents a root directory,
 // such as "/" on Unix or `C:\` on Windows.
@@ -90,8 +86,8 @@ func (b *lazybuf) string() string {
 // If the result of this process is an empty string, Clean
 // returns the string ".".
 //
-// See also Rob Pike, ``Lexical File Names in Plan 9 or
-// Getting Dot-Dot Right,''
+// See also Rob Pike, “Lexical File Names in Plan 9 or
+// Getting Dot-Dot Right,”
 // https://9p.io/sys/doc/lexnames.html
 func Clean(path string, os OS) string {
 	return clean(path, getOS(os))
@@ -323,7 +319,7 @@ func Rel(basepath, targpath string, os OS) (string, error) {
 		}
 		buf := make([]byte, size)
 		n := copy(buf, "..")
-		for i := 0; i < seps; i++ {
+		for range seps {
 			buf[n] = x.Separator
 			copy(buf[n+1:], "..")
 			n += 3

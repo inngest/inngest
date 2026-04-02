@@ -17,18 +17,16 @@
 // Note that the result is not valid CUE, but instead prints the internals
 // of an ADT node in human-readable form. It uses a simple indentation algorithm
 // for improved readability and diffing.
-//
 package debug
 
 import (
 	"fmt"
-	"io"
+	"slices"
 	"strconv"
 	"strings"
 
 	"cuelang.org/go/cue/errors"
 	"cuelang.org/go/cue/literal"
-	"cuelang.org/go/internal"
 	"cuelang.org/go/internal/core/adt"
 )
 
@@ -41,32 +39,41 @@ type Config struct {
 	Cwd     string
 	Compact bool
 	Raw     bool
+
+	// ExpandLetExpr causes the expression of let reference to be printed.
+	// Note that this may result in large outputs. Use with care.
+	// Only applies if Compact is false.
+	ExpandLetExpr bool
 }
 
-func WriteNode(w io.Writer, i adt.StringIndexer, n adt.Node, config *Config) {
+// AppendNode writes a string representation of the node to w.
+func AppendNode(dst []byte, i adt.StringIndexer, n adt.Node, config *Config) []byte {
 	if config == nil {
 		config = &Config{}
 	}
-	p := printer{Writer: w, index: i, cfg: config}
-	if config.Compact {
-		p := compactPrinter{p}
-		p.node(n)
-	} else {
-		p.node(n)
-	}
+	p := printer{dst: dst, index: i, cfg: config, compact: config.Compact}
+	p.node(n)
+	return p.dst
 }
 
+// NodeString returns a string representation of the given node.
+// The StringIndexer value i is used to translate elements of n to strings.
+// Commonly available implementations of StringIndexer include *adt.OpContext
+// and *runtime.Runtime.
 func NodeString(i adt.StringIndexer, n adt.Node, config *Config) string {
-	b := &strings.Builder{}
-	WriteNode(b, i, n, config)
-	return b.String()
+	var buf [128]byte
+	return string(AppendNode(buf[:0], i, n, config))
 }
 
 type printer struct {
-	io.Writer
-	index  adt.StringIndexer
-	indent string
-	cfg    *Config
+	dst     []byte
+	index   adt.StringIndexer
+	indent  string
+	cfg     *Config
+	compact bool // copied from config.Compact
+
+	// keep track of vertices to avoid cycles.
+	stack []*adt.Vertex
 
 	// modes:
 	// - show vertex
@@ -75,46 +82,168 @@ type printer struct {
 	// - auto
 }
 
+// ReplaceArg implements the format.Printer interface. It wraps Vertex arguments
+// with a formatter value, that holds a pointer to w. This allows the stack
+// of processed vertices to be passed down, which in turn is used for cycle
+// detection.
+func (w *printer) ReplaceArg(arg any) (replacement any, replaced bool) {
+	var x adt.Node
+	var r adt.Runtime
+	switch v := arg.(type) {
+	case adt.Node:
+		x = v
+	case adt.Formatter:
+		x = v.X
+		r = v.R
+	case errors.Error:
+		// Wrap errors to ensure they are formatted with our printer,
+		// which enables cycle detection in nested error formatting.
+		return errorFormatter{p: w, err: v}, true
+	}
+
+	switch x := x.(type) {
+	default:
+		return arg, false
+	case *adt.Vertex:
+		// We replace the formatter (or node) with our own formatter that is
+		// capable of detecting cycles.
+		return formatter{p: w, x: x, r: r}, true
+	}
+}
+
+type formatter struct {
+	p *printer
+	x adt.Node
+	r adt.Runtime ``
+}
+
+func (f formatter) String() string {
+	p := printer{
+		dst:     make([]byte, 0, 128),
+		index:   f.r,
+		cfg:     f.p.cfg,
+		compact: true, // Always compact for error arguments.
+		stack:   f.p.stack,
+	}
+	p.node(f.x)
+	return string(p.dst)
+}
+
+// errorFormatter wraps an error to ensure it is formatted with a printer
+// that supports cycle detection.
+type errorFormatter struct {
+	p   *printer
+	err errors.Error
+}
+
+func (f errorFormatter) String() string {
+	cfg := &errors.Config{Printer: f.p}
+	return errors.StringWithConfig(f.err, cfg)
+}
+
 func (w *printer) string(s string) {
-	s = strings.Replace(s, "\n", "\n"+w.indent, -1)
-	_, _ = io.WriteString(w, s)
+	if !w.compact && len(w.indent) > 0 {
+		s = strings.Replace(s, "\n", "\n"+w.indent, -1)
+	}
+	w.dst = append(w.dst, s...)
+}
+
+func (w *printer) int(i int64) {
+	w.dst = strconv.AppendInt(w.dst, i, 10)
 }
 
 func (w *printer) label(f adt.Feature) {
-	w.string(w.labelString(f))
+	switch {
+	case f.IsHidden():
+		ident := f.IdentString(w.index)
+		if pkgName := f.PkgID(w.index); pkgName != "_" {
+			ident = fmt.Sprintf("%s(%s)", ident, pkgName)
+		}
+		w.string(ident)
+
+	case f.IsLet():
+		ident := f.RawString(w.index)
+		ident = strings.Replace(ident, "\x00", "#", 1)
+		w.string(ident)
+
+	default:
+		w.string(f.SelectorString(w.index))
+	}
 }
 
 func (w *printer) ident(f adt.Feature) {
 	w.string(f.IdentString(w.index))
 }
 
-// TODO: fold into label once :: is no longer supported.
-func (w *printer) labelString(f adt.Feature) string {
-	if f.IsHidden() {
-		ident := f.IdentString(w.index)
-		if pkgName := f.PkgID(w.index); pkgName != "_" {
-			ident = fmt.Sprintf("%s(%s)", ident, pkgName)
-		}
-		return ident
+func (w *printer) path(v *adt.Vertex) {
+	if p := v.Parent; p != nil && p.Label != 0 {
+		w.path(v.Parent)
+		w.string(".")
 	}
-	return f.SelectorString(w.index)
+	w.label(v.Label)
 }
 
-func (w *printer) shortError(errs errors.Error) {
-	for {
-		msg, args := errs.Msg()
-		fmt.Fprintf(w, msg, args...)
+func (w *printer) shared(v *adt.Vertex) {
+	w.string("~(")
+	w.path(v)
+	w.string(")")
+}
 
-		err := errors.Unwrap(errs)
-		if err == nil {
-			break
-		}
-
-		if errs, _ = err.(errors.Error); errs != nil {
-			w.string(err.Error())
-			break
-		}
+// printShared prints a reference to a structure-shared node that is a value
+// of v, if it is a shared node. It reports the dereferenced node and whether
+// the node was printed.
+func (w *printer) printShared(v0 *adt.Vertex) (x *adt.Vertex, ok bool) {
+	// Handle cyclic shared nodes differently.  If a shared node was part of
+	// a disjunction, it will still be wrapped in a disjunct Vertex.
+	// Similarly, a shared node should never point to a disjunct directly,
+	// but rather to the original arc that subsequently points to a
+	// disjunct.
+	v0 = v0.DerefDisjunct()
+	s, ok := v0.BaseValue.(*adt.Vertex)
+	v1 := v0.DerefValue()
+	useReference := v0.IsShared && !v1.Internal()
+	// NOTE(debug): use this line instead of the following to expand shared
+	// cases where it is safe to do so.
+	// if useReference && isCyclic && ok && len(v.Arcs) > 0 {
+	if useReference && ok && len(v1.Arcs) > 0 {
+		w.shared(v1)
+		return v1, true
 	}
+	if !w.pushVertex(v1) {
+		if s != nil {
+			w.shared(s)
+			w.string(" =>")
+		}
+		w.shared(v1)
+		return v1, true
+	}
+	return v1, false
+}
+
+func (w *printer) pushVertex(v *adt.Vertex) bool {
+	if slices.Contains(w.stack, v) {
+		w.string("value at path '")
+		w.path(v)
+		w.string("'")
+		return false
+	}
+	w.stack = append(w.stack, v)
+	return true
+}
+
+func (w *printer) popVertex() {
+	w.stack = w.stack[:len(w.stack)-1]
+}
+
+// TODO: always print path? We allow a choice for keeping the error diff at a
+// minimum.
+func (w *printer) shortError(errs errors.Error, omitPath bool) {
+	w.string(errors.StringWithConfig(errs, &errors.Config{
+		Cwd:      w.cfg.Cwd,
+		ToSlash:  true,
+		OmitPath: omitPath,
+		Printer:  w,
+	}))
 }
 
 func (w *printer) interpolation(x *adt.Interpolation) {
@@ -133,7 +262,7 @@ func (w *printer) interpolation(x *adt.Interpolation) {
 			}
 		case adt.BytesKind:
 			if s, ok := x.Parts[i].(*adt.Bytes); ok {
-				_, _ = w.Write(s.B)
+				w.dst = append(w.dst, s.B...)
 			} else {
 				w.string("<bad bytes>")
 			}
@@ -147,9 +276,29 @@ func (w *printer) interpolation(x *adt.Interpolation) {
 	w.string(quote)
 }
 
+func (w *printer) arg(n adt.Node) {
+	if x, ok := n.(*adt.Vertex); ok {
+		if x.Label != adt.InvalidLabel {
+			w.path(x)
+			return
+		}
+	}
+	w.node(n)
+}
+
 func (w *printer) node(n adt.Node) {
+	if w.compact {
+		w.compactNode(n)
+		return
+	}
 	switch x := n.(type) {
 	case *adt.Vertex:
+		x, ok := w.printShared(x)
+		if ok {
+			return
+		}
+		defer w.popVertex()
+
 		var kind adt.Kind
 		if x.BaseValue != nil {
 			kind = x.BaseValue.Kind()
@@ -164,7 +313,7 @@ func (w *printer) node(n adt.Node) {
 			}
 		}
 
-		fmt.Fprintf(w, "(%s){", kindStr)
+		w.dst = fmt.Appendf(w.dst, "(%s){", kindStr)
 
 		saved := w.indent
 		w.indent += "  "
@@ -177,16 +326,26 @@ func (w *printer) node(n adt.Node) {
 			saved := w.indent
 			w.indent += "// "
 			w.string("\n")
-			fmt.Fprintf(w, "[%v]", v.Code)
-			if !v.ChildError {
+			w.dst = fmt.Appendf(w.dst, "[%v]", v.Code)
+			if !v.ChildError || len(x.Arcs) == 0 {
 				msg := errors.Details(v.Err, &errors.Config{
 					Cwd:     w.cfg.Cwd,
 					ToSlash: true,
+					Printer: w,
 				})
 				msg = strings.TrimSpace(msg)
 				if msg != "" {
 					w.string(" ")
 					w.string(msg)
+				}
+
+				// TODO: we could consider removing CycleError here. It does
+				// seem safer, however, as sometimes structural cycles are
+				// detected as regular cycles.
+				// Alternatively, we could consider to never report arcs if
+				// there is any error.
+				if v.Code == adt.CycleError || v.Code == adt.StructuralCycleError {
+					goto endVertex
 				}
 			}
 			w.indent = saved
@@ -209,22 +368,53 @@ func (w *printer) node(n adt.Node) {
 		}
 
 		for _, a := range x.Arcs {
-			w.string("\n")
-			w.label(a.Label)
-			w.string(": ")
-			w.node(a)
+			if a.ArcType == adt.ArcNotPresent {
+				continue
+			}
+			if a.Label.IsLet() {
+				w.string("\n")
+				w.string("let ")
+				w.label(a.Label)
+				if a.MultiLet {
+					w.string("multi")
+				}
+				w.string(" = ")
+				if c := a.ConjunctAt(0); a.MultiLet {
+					w.node(c.Expr())
+					continue
+				}
+				w.node(a)
+			} else {
+				w.string("\n")
+				w.label(a.Label)
+				w.string(a.ArcType.Suffix())
+				w.string(": ")
+				w.node(a)
+			}
 		}
 
 		if x.BaseValue == nil {
 			w.indent += "// "
 			w.string("// ")
 			for i, c := range x.Conjuncts {
+				if c.CloseInfo.FromDef || c.CloseInfo.FromEmbed {
+					w.string("[")
+					if c.CloseInfo.FromDef {
+						w.string("d")
+					}
+					if c.CloseInfo.FromEmbed {
+						w.string("e")
+					}
+					w.string("]")
+				}
 				if i > 0 {
 					w.string(" & ")
 				}
-				w.node(c.Expr()) // TODO: also include env?
+				w.node(c.Elem()) // TODO: also include env?
 			}
 		}
+
+	endVertex:
 
 		w.indent = saved
 		w.string("\n")
@@ -266,23 +456,19 @@ func (w *printer) node(n adt.Node) {
 		w.string("\n]")
 
 	case *adt.Field:
-		s := w.labelString(x.Label)
-		w.string(s)
+		w.label(x.Label)
+		w.string(x.ArcType.Suffix())
 		w.string(":")
-		if x.Label.IsDef() && !internal.IsDef(s) {
-			w.string(":")
-		}
 		w.string(" ")
 		w.node(x.Value)
 
-	case *adt.OptionalField:
-		s := w.labelString(x.Label)
-		w.string(s)
-		w.string("?:")
-		if x.Label.IsDef() && !internal.IsDef(s) {
-			w.string(":")
+	case *adt.LetField:
+		w.string("let ")
+		w.label(x.Label)
+		if x.IsMulti {
+			w.string("multi")
 		}
-		w.string(" ")
+		w.string(" = ")
 		w.node(x.Value)
 
 	case *adt.BulkOptionalField:
@@ -293,9 +479,7 @@ func (w *printer) node(n adt.Node) {
 
 	case *adt.DynamicField:
 		w.node(x.Key)
-		if x.IsOptional() {
-			w.string("?")
-		}
+		w.string(x.ArcType.Suffix())
 		w.string(": ")
 		w.node(x.Value)
 
@@ -309,7 +493,7 @@ func (w *printer) node(n adt.Node) {
 		w.string(`_|_`)
 		if x.Err != nil {
 			w.string("(")
-			w.shortError(x.Err)
+			w.shortError(x.Err, true)
 			w.string(")")
 		}
 
@@ -317,29 +501,29 @@ func (w *printer) node(n adt.Node) {
 		w.string("null")
 
 	case *adt.Bool:
-		fmt.Fprint(w, x.B)
+		w.dst = strconv.AppendBool(w.dst, x.B)
 
 	case *adt.Num:
-		fmt.Fprint(w, &x.X)
+		w.string(x.X.String())
 
 	case *adt.String:
-		w.string(literal.String.Quote(x.Str))
+		w.dst = literal.String.Append(w.dst, x.Str)
 
 	case *adt.Bytes:
-		w.string(literal.Bytes.Quote(string(x.B)))
+		w.dst = literal.Bytes.Append(w.dst, string(x.B))
 
 	case *adt.Top:
 		w.string("_")
 
 	case *adt.BasicType:
-		fmt.Fprint(w, x.K)
+		w.string(x.K.String())
 
 	case *adt.BoundExpr:
-		fmt.Fprint(w, x.Op)
+		w.string(x.Op.String())
 		w.node(x.Expr)
 
 	case *adt.BoundValue:
-		fmt.Fprint(w, x.Op)
+		w.string(x.Op.String())
 		w.node(x.Value)
 
 	case *adt.NodeLink:
@@ -354,25 +538,28 @@ func (w *printer) node(n adt.Node) {
 
 	case *adt.FieldReference:
 		w.string(openTuple)
-		w.string(strconv.Itoa(int(x.UpCount)))
+		w.int(int64(x.UpCount))
 		w.string(";")
 		w.label(x.Label)
 		w.string(closeTuple)
+		if x.Optional {
+			w.string("?")
+		}
 
 	case *adt.ValueReference:
 		w.string(openTuple)
-		w.string(strconv.Itoa(int(x.UpCount)))
+		w.int(int64(x.UpCount))
 		w.string(closeTuple)
 
 	case *adt.LabelReference:
 		w.string(openTuple)
-		w.string(strconv.Itoa(int(x.UpCount)))
+		w.int(int64(x.UpCount))
 		w.string(";-")
 		w.string(closeTuple)
 
 	case *adt.DynamicReference:
 		w.string(openTuple)
-		w.string(strconv.Itoa(int(x.UpCount)))
+		w.int(int64(x.UpCount))
 		w.string(";(")
 		w.node(x.Label)
 		w.string(")")
@@ -385,21 +572,31 @@ func (w *printer) node(n adt.Node) {
 
 	case *adt.LetReference:
 		w.string(openTuple)
-		w.string(strconv.Itoa(int(x.UpCount)))
+		w.int(int64(x.UpCount))
 		w.string(";let ")
-		w.ident(x.Label)
+		w.label(x.Label)
 		w.string(closeTuple)
+		if w.cfg.ExpandLetExpr {
+			w.string("=>")
+			w.node(x.X)
+		}
 
 	case *adt.SelectorExpr:
 		w.node(x.X)
 		w.string(".")
 		w.label(x.Sel)
+		if x.Optional {
+			w.string("?")
+		}
 
 	case *adt.IndexExpr:
 		w.node(x.X)
 		w.string("[")
 		w.node(x.Index)
 		w.string("]")
+		if x.Optional {
+			w.string("?")
+		}
 
 	case *adt.SliceExpr:
 		w.node(x.X)
@@ -421,15 +618,21 @@ func (w *printer) node(n adt.Node) {
 		w.interpolation(x)
 
 	case *adt.UnaryExpr:
-		fmt.Fprint(w, x.Op)
+		w.string(x.Op.String())
 		w.node(x.X)
 
 	case *adt.BinaryExpr:
 		w.string("(")
 		w.node(x.X)
-		fmt.Fprint(w, " ", x.Op, " ")
+		w.string(" ")
+		w.string(x.Op.String())
+		w.string(" ")
 		w.node(x.Y)
 		w.string(")")
+
+	case *adt.OpenExpr:
+		w.node(x.X)
+		w.string("...")
 
 	case *adt.CallExpr:
 		w.node(x.Fun)
@@ -438,7 +641,7 @@ func (w *printer) node(n adt.Node) {
 			if i > 0 {
 				w.string(", ")
 			}
-			w.node(a)
+			w.arg(a)
 		}
 		w.string(")")
 
@@ -456,7 +659,7 @@ func (w *printer) node(n adt.Node) {
 			if i > 0 {
 				w.string(", ")
 			}
-			w.node(a)
+			w.arg(a)
 		}
 		w.string(")")
 
@@ -484,6 +687,16 @@ func (w *printer) node(n adt.Node) {
 		}
 		w.string(")")
 
+	case *adt.ConjunctGroup:
+		w.string("&[")
+		for i, c := range *x {
+			if i > 0 {
+				w.string(", ")
+			}
+			w.node(c.Expr())
+		}
+		w.string("]")
+
 	case *adt.Disjunction:
 		w.string("|(")
 		for i, c := range x.Values {
@@ -497,6 +710,16 @@ func (w *printer) node(n adt.Node) {
 		}
 		w.string(")")
 
+	case *adt.Comprehension:
+		for _, c := range x.Clauses {
+			w.node(c)
+		}
+		w.node(adt.ToExpr(x.Value))
+		if x.Fallback != nil {
+			w.string(" else ")
+			w.node(x.Fallback)
+		}
+
 	case *adt.ForClause:
 		w.string("for ")
 		w.ident(x.Key)
@@ -505,13 +728,11 @@ func (w *printer) node(n adt.Node) {
 		w.string(" in ")
 		w.node(x.Src)
 		w.string(" ")
-		w.node(x.Dst)
 
 	case *adt.IfClause:
 		w.string("if ")
 		w.node(x.Condition)
 		w.string(" ")
-		w.node(x.Dst)
 
 	case *adt.LetClause:
 		w.string("let ")
@@ -519,10 +740,18 @@ func (w *printer) node(n adt.Node) {
 		w.string(" = ")
 		w.node(x.Expr)
 		w.string(" ")
-		w.node(x.Dst)
+
+	case *adt.TryClause:
+		w.string("try ")
+		if x.Label != adt.InvalidLabel {
+			// Assignment form: try x = expr
+			w.ident(x.Label)
+			w.string(" = ")
+			w.node(x.Expr)
+			w.string(" ")
+		}
 
 	case *adt.ValueClause:
-		w.node(x.StructLit)
 
 	default:
 		panic(fmt.Sprintf("unknown type %T", x))

@@ -57,15 +57,8 @@ type CreateTopicInput struct {
 	//
 	//   - DisplayName – The display name to use for a topic with SMS subscriptions.
 	//
-	//   - FifoTopic – Set to true to create a FIFO topic.
-	//
 	//   - Policy – The policy that defines who can access your topic. By default, only
 	//   the topic owner can publish or subscribe to the topic.
-	//
-	//   - SignatureVersion – The signature version corresponds to the hashing
-	//   algorithm used while creating the signature of the notifications, subscription
-	//   confirmations, or unsubscribe confirmation messages sent by Amazon SNS. By
-	//   default, SignatureVersion is set to 1 .
 	//
 	//   - TracingConfig – Tracing mode of an Amazon SNS topic. By default
 	//   TracingConfig is set to PassThrough , and the topic passes through the tracing
@@ -73,6 +66,80 @@ type CreateTopicInput struct {
 	//   Active , Amazon SNS will vend X-Ray segment data to topic owner account if the
 	//   sampled flag in the tracing header is true. This is only supported on standard
 	//   topics.
+	//
+	//   - HTTP
+	//
+	//   - HTTPSuccessFeedbackRoleArn – Indicates successful message delivery status
+	//   for an Amazon SNS topic that is subscribed to an HTTP endpoint.
+	//
+	//   - HTTPSuccessFeedbackSampleRate – Indicates percentage of successful messages
+	//   to sample for an Amazon SNS topic that is subscribed to an HTTP endpoint.
+	//
+	//   - HTTPFailureFeedbackRoleArn – Indicates failed message delivery status for an
+	//   Amazon SNS topic that is subscribed to an HTTP endpoint.
+	//
+	//   - Amazon Data Firehose
+	//
+	//   - FirehoseSuccessFeedbackRoleArn – Indicates successful message delivery
+	//   status for an Amazon SNS topic that is subscribed to an Amazon Data Firehose
+	//   endpoint.
+	//
+	//   - FirehoseSuccessFeedbackSampleRate – Indicates percentage of successful
+	//   messages to sample for an Amazon SNS topic that is subscribed to an Amazon Data
+	//   Firehose endpoint.
+	//
+	//   - FirehoseFailureFeedbackRoleArn – Indicates failed message delivery status
+	//   for an Amazon SNS topic that is subscribed to an Amazon Data Firehose endpoint.
+	//
+	//   - Lambda
+	//
+	//   - LambdaSuccessFeedbackRoleArn – Indicates successful message delivery status
+	//   for an Amazon SNS topic that is subscribed to an Lambda endpoint.
+	//
+	//   - LambdaSuccessFeedbackSampleRate – Indicates percentage of successful
+	//   messages to sample for an Amazon SNS topic that is subscribed to an Lambda
+	//   endpoint.
+	//
+	//   - LambdaFailureFeedbackRoleArn – Indicates failed message delivery status for
+	//   an Amazon SNS topic that is subscribed to an Lambda endpoint.
+	//
+	//   - Platform application endpoint
+	//
+	//   - ApplicationSuccessFeedbackRoleArn – Indicates successful message delivery
+	//   status for an Amazon SNS topic that is subscribed to a platform application
+	//   endpoint.
+	//
+	//   - ApplicationSuccessFeedbackSampleRate – Indicates percentage of successful
+	//   messages to sample for an Amazon SNS topic that is subscribed to an platform
+	//   application endpoint.
+	//
+	//   - ApplicationFailureFeedbackRoleArn – Indicates failed message delivery status
+	//   for an Amazon SNS topic that is subscribed to an platform application endpoint.
+	//
+	// In addition to being able to configure topic attributes for message delivery
+	//   status of notification messages sent to Amazon SNS application endpoints, you
+	//   can also configure application attributes for the delivery status of push
+	//   notification messages sent to push notification services.
+	//
+	// For example, For more information, see [Using Amazon SNS Application Attributes for Message Delivery Status].
+	//
+	//   - Amazon SQS
+	//
+	//   - SQSSuccessFeedbackRoleArn – Indicates successful message delivery status for
+	//   an Amazon SNS topic that is subscribed to an Amazon SQS endpoint.
+	//
+	//   - SQSSuccessFeedbackSampleRate – Indicates percentage of successful messages
+	//   to sample for an Amazon SNS topic that is subscribed to an Amazon SQS endpoint.
+	//
+	//   - SQSFailureFeedbackRoleArn – Indicates failed message delivery status for an
+	//   Amazon SNS topic that is subscribed to an Amazon SQS endpoint.
+	//
+	// The SuccessFeedbackRoleArn and FailureFeedbackRoleArn attributes are used to
+	// give Amazon SNS write access to use CloudWatch Logs on your behalf. The
+	// SuccessFeedbackSampleRate attribute is for specifying the sample rate percentage
+	// (0-100) of successfully delivered messages. After you configure the
+	// FailureFeedbackRoleArn attribute, then all failed message deliveries generate
+	// CloudWatch Logs.
 	//
 	// The following attribute applies only to [server-side encryption]:
 	//
@@ -82,12 +149,8 @@ type CreateTopicInput struct {
 	//
 	// The following attributes apply only to [FIFO topics]:
 	//
-	//   - ArchivePolicy – Adds or updates an inline policy document to archive
-	//   messages stored in the specified Amazon SNS topic.
-	//
-	//   - BeginningArchiveTime – The earliest starting point at which a message in the
-	//   topic’s archive can be replayed from. This point in time is based on the
-	//   configured message retention period set by the topic’s message archiving policy.
+	//   - ArchivePolicy – The policy that sets the retention period for messages
+	//   stored in the message archive of an Amazon SNS FIFO topic.
 	//
 	//   - ContentBasedDeduplication – Enables content-based deduplication for FIFO
 	//   topics.
@@ -103,6 +166,20 @@ type CreateTopicInput struct {
 	// (Optional) To override the generated value, you can specify a value for the
 	//   MessageDeduplicationId parameter for the Publish action.
 	//
+	//   - FifoThroughputScope – Enables higher throughput for your FIFO topic by
+	//   adjusting the scope of deduplication. This attribute has two possible values:
+	//
+	//   - Topic – The scope of message deduplication is across the entire topic. This
+	//   is the default value and maintains existing behavior, with a maximum throughput
+	//   of 3000 messages per second or 20MB per second, whichever comes first.
+	//
+	//   - MessageGroup – The scope of deduplication is within each individual message
+	//   group, which enables higher throughput per topic subject to regional quotas. For
+	//   more information on quotas or to request an increase, see [Amazon SNS service quotas]in the Amazon Web
+	//   Services General Reference.
+	//
+	// [Amazon SNS service quotas]: https://docs.aws.amazon.com/general/latest/gr/sns.html
+	// [Using Amazon SNS Application Attributes for Message Delivery Status]: https://docs.aws.amazon.com/sns/latest/dg/sns-msg-status.html
 	// [server-side encryption]: https://docs.aws.amazon.com/sns/latest/dg/sns-server-side-encryption.html
 	// [Key Terms]: https://docs.aws.amazon.com/sns/latest/dg/sns-server-side-encryption.html#sse-key-terms
 	// [KeyId]: https://docs.aws.amazon.com/kms/latest/APIReference/API_DescribeKey.html#API_DescribeKey_RequestParameters
@@ -183,6 +260,9 @@ func (c *Client) addOperationCreateTopicMiddlewares(stack *middleware.Stack, opt
 	if err = addRecordResponseTiming(stack); err != nil {
 		return err
 	}
+	if err = addSpanRetryLoop(stack, options); err != nil {
+		return err
+	}
 	if err = addClientUserAgent(stack, options); err != nil {
 		return err
 	}
@@ -199,6 +279,9 @@ func (c *Client) addOperationCreateTopicMiddlewares(stack *middleware.Stack, opt
 		return err
 	}
 	if err = addUserAgentRetryMode(stack, options); err != nil {
+		return err
+	}
+	if err = addCredentialSource(stack, options); err != nil {
 		return err
 	}
 	if err = addOpCreateTopicValidationMiddleware(stack); err != nil {
@@ -220,6 +303,15 @@ func (c *Client) addOperationCreateTopicMiddlewares(stack *middleware.Stack, opt
 		return err
 	}
 	if err = addDisableHTTPSMiddleware(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptBeforeRetryLoop(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptAttempt(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptors(stack, options); err != nil {
 		return err
 	}
 	return nil

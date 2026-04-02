@@ -842,6 +842,242 @@ func (c FlushdbAsyncSync) Build() Completed {
 	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
+type HotkeysGet Incomplete
+
+func (b Builder) HotkeysGet() (c HotkeysGet) {
+	c = HotkeysGet{cs: get(), ks: b.ks}
+	c.cs.s = append(c.cs.s, "HOTKEYS", "GET")
+	return c
+}
+
+func (c HotkeysGet) Build() Completed {
+	c.cs.Build()
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
+}
+
+type HotkeysReset Incomplete
+
+func (b Builder) HotkeysReset() (c HotkeysReset) {
+	c = HotkeysReset{cs: get(), ks: b.ks}
+	c.cs.s = append(c.cs.s, "HOTKEYS", "RESET")
+	return c
+}
+
+func (c HotkeysReset) Build() Completed {
+	c.cs.Build()
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
+}
+
+type HotkeysStart Incomplete
+
+func (b Builder) HotkeysStart() (c HotkeysStart) {
+	c = HotkeysStart{cs: get(), ks: b.ks}
+	c.cs.s = append(c.cs.s, "HOTKEYS", "START")
+	return c
+}
+
+func (c HotkeysStart) Metrics() HotkeysStartMetricsMetrics {
+	c.cs.s = append(c.cs.s, "METRICS")
+	return (HotkeysStartMetricsMetrics)(c)
+}
+
+type HotkeysStartCount Incomplete
+
+func (c HotkeysStartCount) Duration(seconds int64) HotkeysStartDuration {
+	c.cs.s = append(c.cs.s, "DURATION", strconv.FormatInt(seconds, 10))
+	return (HotkeysStartDuration)(c)
+}
+
+func (c HotkeysStartCount) Sample(ratio int64) HotkeysStartSample {
+	c.cs.s = append(c.cs.s, "SAMPLE", strconv.FormatInt(ratio, 10))
+	return (HotkeysStartSample)(c)
+}
+
+func (c HotkeysStartCount) Slots() HotkeysStartSlotsSlots {
+	c.cs.s = append(c.cs.s, "SLOTS")
+	return (HotkeysStartSlotsSlots)(c)
+}
+
+func (c HotkeysStartCount) Build() Completed {
+	c.cs.Build()
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
+}
+
+type HotkeysStartDuration Incomplete
+
+func (c HotkeysStartDuration) Sample(ratio int64) HotkeysStartSample {
+	c.cs.s = append(c.cs.s, "SAMPLE", strconv.FormatInt(ratio, 10))
+	return (HotkeysStartSample)(c)
+}
+
+func (c HotkeysStartDuration) Slots() HotkeysStartSlotsSlots {
+	c.cs.s = append(c.cs.s, "SLOTS")
+	return (HotkeysStartSlotsSlots)(c)
+}
+
+func (c HotkeysStartDuration) Build() Completed {
+	c.cs.Build()
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
+}
+
+type HotkeysStartMetricsCount Incomplete
+
+func (c HotkeysStartMetricsCount) Cpu() HotkeysStartMetricsCpu {
+	c.cs.s = append(c.cs.s, "CPU")
+	return (HotkeysStartMetricsCpu)(c)
+}
+
+func (c HotkeysStartMetricsCount) Net() HotkeysStartMetricsNet {
+	c.cs.s = append(c.cs.s, "NET")
+	return (HotkeysStartMetricsNet)(c)
+}
+
+func (c HotkeysStartMetricsCount) Count(k int64) HotkeysStartCount {
+	c.cs.s = append(c.cs.s, "COUNT", strconv.FormatInt(k, 10))
+	return (HotkeysStartCount)(c)
+}
+
+func (c HotkeysStartMetricsCount) Duration(seconds int64) HotkeysStartDuration {
+	c.cs.s = append(c.cs.s, "DURATION", strconv.FormatInt(seconds, 10))
+	return (HotkeysStartDuration)(c)
+}
+
+func (c HotkeysStartMetricsCount) Sample(ratio int64) HotkeysStartSample {
+	c.cs.s = append(c.cs.s, "SAMPLE", strconv.FormatInt(ratio, 10))
+	return (HotkeysStartSample)(c)
+}
+
+func (c HotkeysStartMetricsCount) Slots() HotkeysStartSlotsSlots {
+	c.cs.s = append(c.cs.s, "SLOTS")
+	return (HotkeysStartSlotsSlots)(c)
+}
+
+func (c HotkeysStartMetricsCount) Build() Completed {
+	c.cs.Build()
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
+}
+
+type HotkeysStartMetricsCpu Incomplete
+
+func (c HotkeysStartMetricsCpu) Net() HotkeysStartMetricsNet {
+	c.cs.s = append(c.cs.s, "NET")
+	return (HotkeysStartMetricsNet)(c)
+}
+
+func (c HotkeysStartMetricsCpu) Count(k int64) HotkeysStartCount {
+	c.cs.s = append(c.cs.s, "COUNT", strconv.FormatInt(k, 10))
+	return (HotkeysStartCount)(c)
+}
+
+func (c HotkeysStartMetricsCpu) Duration(seconds int64) HotkeysStartDuration {
+	c.cs.s = append(c.cs.s, "DURATION", strconv.FormatInt(seconds, 10))
+	return (HotkeysStartDuration)(c)
+}
+
+func (c HotkeysStartMetricsCpu) Sample(ratio int64) HotkeysStartSample {
+	c.cs.s = append(c.cs.s, "SAMPLE", strconv.FormatInt(ratio, 10))
+	return (HotkeysStartSample)(c)
+}
+
+func (c HotkeysStartMetricsCpu) Slots() HotkeysStartSlotsSlots {
+	c.cs.s = append(c.cs.s, "SLOTS")
+	return (HotkeysStartSlotsSlots)(c)
+}
+
+func (c HotkeysStartMetricsCpu) Build() Completed {
+	c.cs.Build()
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
+}
+
+type HotkeysStartMetricsMetrics Incomplete
+
+func (c HotkeysStartMetricsMetrics) Count(count int64) HotkeysStartMetricsCount {
+	c.cs.s = append(c.cs.s, strconv.FormatInt(count, 10))
+	return (HotkeysStartMetricsCount)(c)
+}
+
+type HotkeysStartMetricsNet Incomplete
+
+func (c HotkeysStartMetricsNet) Count(k int64) HotkeysStartCount {
+	c.cs.s = append(c.cs.s, "COUNT", strconv.FormatInt(k, 10))
+	return (HotkeysStartCount)(c)
+}
+
+func (c HotkeysStartMetricsNet) Duration(seconds int64) HotkeysStartDuration {
+	c.cs.s = append(c.cs.s, "DURATION", strconv.FormatInt(seconds, 10))
+	return (HotkeysStartDuration)(c)
+}
+
+func (c HotkeysStartMetricsNet) Sample(ratio int64) HotkeysStartSample {
+	c.cs.s = append(c.cs.s, "SAMPLE", strconv.FormatInt(ratio, 10))
+	return (HotkeysStartSample)(c)
+}
+
+func (c HotkeysStartMetricsNet) Slots() HotkeysStartSlotsSlots {
+	c.cs.s = append(c.cs.s, "SLOTS")
+	return (HotkeysStartSlotsSlots)(c)
+}
+
+func (c HotkeysStartMetricsNet) Build() Completed {
+	c.cs.Build()
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
+}
+
+type HotkeysStartSample Incomplete
+
+func (c HotkeysStartSample) Slots() HotkeysStartSlotsSlots {
+	c.cs.s = append(c.cs.s, "SLOTS")
+	return (HotkeysStartSlotsSlots)(c)
+}
+
+func (c HotkeysStartSample) Build() Completed {
+	c.cs.Build()
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
+}
+
+type HotkeysStartSlotsCount Incomplete
+
+func (c HotkeysStartSlotsCount) Slot(slot ...int64) HotkeysStartSlotsSlot {
+	for _, n := range slot {
+		c.cs.s = append(c.cs.s, strconv.FormatInt(n, 10))
+	}
+	return (HotkeysStartSlotsSlot)(c)
+}
+
+type HotkeysStartSlotsSlot Incomplete
+
+func (c HotkeysStartSlotsSlot) Slot(slot ...int64) HotkeysStartSlotsSlot {
+	for _, n := range slot {
+		c.cs.s = append(c.cs.s, strconv.FormatInt(n, 10))
+	}
+	return c
+}
+
+func (c HotkeysStartSlotsSlot) Build() Completed {
+	c.cs.Build()
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
+}
+
+type HotkeysStartSlotsSlots Incomplete
+
+func (c HotkeysStartSlotsSlots) Count(count int64) HotkeysStartSlotsCount {
+	c.cs.s = append(c.cs.s, strconv.FormatInt(count, 10))
+	return (HotkeysStartSlotsCount)(c)
+}
+
+type HotkeysStop Incomplete
+
+func (b Builder) HotkeysStop() (c HotkeysStop) {
+	c = HotkeysStop{cs: get(), ks: b.ks}
+	c.cs.s = append(c.cs.s, "HOTKEYS", "STOP")
+	return c
+}
+
+func (c HotkeysStop) Build() Completed {
+	c.cs.Build()
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
+}
+
 type Info Incomplete
 
 func (b Builder) Info() (c Info) {

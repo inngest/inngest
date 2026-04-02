@@ -15,7 +15,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"reflect"
 	"slices"
@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/auth"
+	internaljson "github.com/modelcontextprotocol/go-sdk/internal/json"
 	"github.com/modelcontextprotocol/go-sdk/internal/jsonrpc2"
 	"github.com/modelcontextprotocol/go-sdk/jsonrpc"
 )
@@ -34,12 +35,14 @@ const (
 	// It is the version that the client sends in the initialization request, and
 	// the default version used by the server.
 	latestProtocolVersion   = protocolVersion20250618
+	protocolVersion20251125 = "2025-11-25" // not yet released
 	protocolVersion20250618 = "2025-06-18"
 	protocolVersion20250326 = "2025-03-26"
 	protocolVersion20241105 = "2024-11-05"
 )
 
 var supportedProtocolVersions = []string{
+	protocolVersion20251125,
 	protocolVersion20250618,
 	protocolVersion20250326,
 	protocolVersion20241105,
@@ -86,20 +89,28 @@ func addMiddleware(handlerp *MethodHandler, middleware []Middleware) {
 	}
 }
 
-func defaultSendingMethodHandler[S Session](ctx context.Context, method string, req Request) (Result, error) {
+func defaultSendingMethodHandler(ctx context.Context, method string, req Request) (Result, error) {
 	info, ok := req.GetSession().sendingMethodInfos()[method]
 	if !ok {
 		// This can be called from user code, with an arbitrary value for method.
 		return nil, jsonrpc2.ErrNotHandled
 	}
+	params := req.GetParams()
+	if initParams, ok := params.(*InitializeParams); ok {
+		// Fix the marshaling of initialize params, to work around #607.
+		//
+		// The initialize params we produce should never be nil, nor have nil
+		// capabilities, so any panic here is a bug.
+		params = initParams.toV2()
+	}
 	// Notifications don't have results.
 	if strings.HasPrefix(method, "notifications/") {
-		return nil, req.GetSession().getConn().Notify(ctx, method, req.GetParams())
+		return nil, req.GetSession().getConn().Notify(ctx, method, params)
 	}
 	// Create the result to unmarshal into.
 	// The concrete type of the result is the return type of the receiving function.
 	res := info.newResult()
-	if err := call(ctx, req.GetSession().getConn(), method, req.GetParams(), res); err != nil {
+	if err := call(ctx, req.GetSession().getConn(), method, params, res); err != nil {
 		return nil, err
 	}
 	return res, nil
@@ -273,7 +284,7 @@ func newMethodInfo[P paramsPtr[T], R Result, T any](flags methodFlags) methodInf
 		unmarshalParams: func(m json.RawMessage) (Params, error) {
 			var p P
 			if m != nil {
-				if err := json.Unmarshal(m, &p); err != nil {
+				if err := internaljson.Unmarshal(m, &p); err != nil {
 					return nil, fmt.Errorf("unmarshaling %q into a %T: %w", m, p, err)
 				}
 			}
@@ -329,21 +340,63 @@ func clientSessionMethod[P Params, R Result](f func(*ClientSession, context.Cont
 	}
 }
 
-// Error codes
+// MCP-specific error codes.
 const (
-	codeResourceNotFound = -32002
+	// CodeResourceNotFound indicates that a requested resource could not be found.
+	CodeResourceNotFound = -32002
+	// CodeURLElicitationRequired indicates that the server requires URL elicitation
+	// before processing the request. The client should execute the elicitation handler
+	// with the elicitations provided in the error data.
+	CodeURLElicitationRequired = -32042
+)
+
+// URLElicitationRequiredError returns an error indicating that URL elicitation is required
+// before the request can be processed. The elicitations parameter should contain the
+// elicitation requests that must be completed.
+func URLElicitationRequiredError(elicitations []*ElicitParams) error {
+	// Validate that all elicitations are URL mode
+	for _, elicit := range elicitations {
+		mode := elicit.Mode
+		if mode == "" {
+			mode = "form" // default mode
+		}
+		if mode != "url" {
+			panic(fmt.Sprintf("URLElicitationRequiredError requires all elicitations to be URL mode, got %q", mode))
+		}
+	}
+
+	data, err := json.Marshal(map[string]any{
+		"elicitations": elicitations,
+	})
+	if err != nil {
+		// This should never happen with valid ElicitParams
+		panic(fmt.Sprintf("failed to marshal elicitations: %v", err))
+	}
+	return &jsonrpc.Error{
+		Code:    CodeURLElicitationRequired,
+		Message: "URL elicitation required",
+		Data:    json.RawMessage(data),
+	}
+}
+
+// Internal error codes
+const (
 	// The error code if the method exists and was called properly, but the peer does not support it.
+	//
+	// TODO(rfindley): this code is wrong, and we should fix it to be
+	// consistent with other SDKs.
 	codeUnsupportedMethod = -31001
-	// The error code for invalid parameters
-	codeInvalidParams = -32602
 )
 
 // notifySessions calls Notify on all the sessions.
 // Should be called on a copy of the peer sessions.
-func notifySessions[S Session, P Params](sessions []S, method string, params P) {
+// The logger must be non-nil.
+func notifySessions[S Session, P Params](sessions []S, method string, params P, logger *slog.Logger) {
 	if sessions == nil {
 		return
 	}
+	// Notify with the background context, so the messages are sent on the
+	// standalone stream.
 	// TODO: make this timeout configurable, or call handleNotify asynchronously.
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -353,8 +406,7 @@ func notifySessions[S Session, P Params](sessions []S, method string, params P) 
 	for _, s := range sessions {
 		req := newRequest(s, params)
 		if err := handleNotify(ctx, method, req); err != nil {
-			// TODO(jba): surface this error better
-			log.Printf("calling %s: %v", method, err)
+			logger.Warn(fmt.Sprintf("calling %s: %v", method, err))
 		}
 	}
 }
@@ -427,6 +479,24 @@ type ServerRequest[P Params] struct {
 type RequestExtra struct {
 	TokenInfo *auth.TokenInfo // bearer token info (e.g. from OAuth) if any
 	Header    http.Header     // header from HTTP request, if any
+
+	// If set, CloseSSEStream explicitly closes the current SSE request stream.
+	//
+	// [SEP-1699] introduced server-side SSE stream disconnection: for
+	// long-running requests, servers may opt to close the SSE stream and
+	// ask the client to retry at a later time. CloseSSEStream implements this
+	// feature; if RetryAfter is set, an event is sent with a `retry:` field
+	// to configure the reconnection delay.
+	//
+	// [SEP-1699]: https://github.com/modelcontextprotocol/modelcontextprotocol/issues/1699
+	CloseSSEStream func(CloseSSEStreamArgs)
+}
+
+// CloseSSEStreamArgs are arguments for [RequestExtra.CloseSSEStream].
+type CloseSSEStreamArgs struct {
+	// RetryAfter configures the reconnection delay sent to the client via the
+	// SSE retry field. If zero, no retry field is sent.
+	RetryAfter time.Duration
 }
 
 func (*ClientRequest[P]) isRequest() {}

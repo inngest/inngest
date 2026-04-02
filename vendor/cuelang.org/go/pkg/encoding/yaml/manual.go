@@ -20,22 +20,18 @@ import (
 
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/ast"
-	"cuelang.org/go/internal"
+	"cuelang.org/go/internal/core/adt"
 	cueyaml "cuelang.org/go/internal/encoding/yaml"
-	"cuelang.org/go/internal/third_party/yaml"
+	"cuelang.org/go/internal/pkg"
+	"cuelang.org/go/internal/value"
 )
 
 // Marshal returns the YAML encoding of v.
 func Marshal(v cue.Value) (string, error) {
 	if err := v.Validate(cue.Concrete(true)); err != nil {
-		if err := v.Validate(); err != nil {
-			return "", err
-		}
-		// TODO: allow adt.Bottom to implement errors.Error so that code and
-		// messages can be passed.
-		return "", internal.ErrIncomplete
+		return "", err
 	}
-	n := v.Syntax(cue.Final(), cue.Concrete(true))
+	n := v.Syntax(cue.Concrete(true))
 	b, err := cueyaml.Encode(n)
 	return string(b), err
 }
@@ -54,14 +50,9 @@ func MarshalStream(v cue.Value) (string, error) {
 		}
 		v := iter.Value()
 		if err := v.Validate(cue.Concrete(true)); err != nil {
-			if err := v.Validate(); err != nil {
-				return "", err
-			}
-			// TODO: allow adt.Bottom to implement errors.Error so that code and
-			// messages can be passed.
-			return "", internal.ErrIncomplete
+			return "", err
 		}
-		n := v.Syntax(cue.Final(), cue.Concrete(true))
+		n := v.Syntax(cue.Concrete(true))
 		b, err := cueyaml.Encode(n)
 		if err != nil {
 			return "", err
@@ -73,16 +64,12 @@ func MarshalStream(v cue.Value) (string, error) {
 
 // Unmarshal parses the YAML to a CUE expression.
 func Unmarshal(data []byte) (ast.Expr, error) {
-	return yaml.Unmarshal("", data)
+	return cueyaml.Unmarshal("", data)
 }
 
 // UnmarshalStream parses the YAML to a CUE list expression on success.
 func UnmarshalStream(data []byte) (ast.Expr, error) {
-	d, err := yaml.NewDecoder("", data)
-	if err != nil {
-		return nil, err
-	}
-
+	d := cueyaml.NewDecoder("", data)
 	a := []ast.Expr{}
 	for {
 		x, err := d.Decode()
@@ -98,74 +85,34 @@ func UnmarshalStream(data []byte) (ast.Expr, error) {
 	return ast.NewList(a...), nil
 }
 
-// Validate validates YAML and confirms it is an instance of the schema
-// specified by v. If the YAML source is a stream, every object must match v.
-func Validate(b []byte, v cue.Value) (bool, error) {
-	d, err := yaml.NewDecoder("yaml.Validate", b)
-	if err != nil {
-		return false, err
-	}
-	r := v.Context()
-	for {
-		expr, err := d.Decode()
-		if err != nil {
-			if err == io.EOF {
-				return true, nil
-			}
-			return false, err
-		}
+// Validate validates YAML and confirms it is an instance of schema.
+// If the YAML source is a stream, every object must match v.
+func Validate(b []byte, v pkg.Schema) (bool, error) {
+	// This function is left for Go documentation. The package entry calls
+	// cueyaml.Validate directly, passing it the call context.
 
-		x := r.BuildExpr(expr)
-		if err := x.Err(); err != nil {
-			return false, err
-		}
+	ctx := value.OpContext(v)
+	return cueyaml.Validate(ctx, b, v)
+}
 
-		// TODO: consider using subsumption again here.
-		// Alternatives:
-		// - allow definition of non-concrete list,
-		//   like list.Of(int), or []int.
-		// - Introduce ! in addition to ?, allowing:
-		//   list!: [...]
-		// if err := v.Subsume(inst.Value(), cue.Final()); err != nil {
-		// 	return false, err
-		// }
-		x = v.Unify(x)
-		if err := x.Err(); err != nil {
-			return false, err
-		}
-		if err := x.Validate(cue.Concrete(true)); err != nil {
-			return false, err
-		}
-
-	}
+// validate is the actual implementation of Validate.
+func validate(c *adt.OpContext, b []byte, v pkg.Schema) (bool, error) {
+	return cueyaml.Validate(c, b, v)
 }
 
 // ValidatePartial validates YAML and confirms it matches the constraints
 // specified by v using unification. This means that b must be consistent with,
 // but does not have to be an instance of v. If the YAML source is a stream,
 // every object must match v.
-func ValidatePartial(b []byte, v cue.Value) (bool, error) {
-	d, err := yaml.NewDecoder("yaml.ValidatePartial", b)
-	if err != nil {
-		return false, err
-	}
-	r := v.Context()
-	for {
-		expr, err := d.Decode()
-		if err != nil {
-			if err == io.EOF {
-				return true, nil
-			}
-			return false, err
-		}
+func ValidatePartial(b []byte, v pkg.Schema) (bool, error) {
+	// This function is left for Go documentation. The package entry calls
+	// cueyaml.ValidatePartial directly, passing it the call context.
 
-		x := r.BuildExpr(expr)
-		if err := x.Err(); err != nil {
-			return false, err
-		}
+	ctx := value.OpContext(v)
+	return cueyaml.ValidatePartial(ctx, b, v)
+}
 
-		if x := v.Unify(x); x.Err() != nil {
-			return false, x.Err()
-		}
-	}
+// validatePartial is the actual implementation of ValidatePartial.
+func validatePartial(c *adt.OpContext, b []byte, v pkg.Schema) (bool, error) {
+	return cueyaml.ValidatePartial(c, b, v)
 }
