@@ -1254,7 +1254,7 @@ func (e *executor) schedule(
 				originalRunCreatedAt := time.UnixMilli(int64(id.RunID.Time()))
 				deltaMs := time.Since(originalRunCreatedAt).Milliseconds()
 				// This sanitization is not needed but CodeQL complains about it
-				sanitizedRunID := strings.ReplaceAll(strings.ReplaceAll(id.RunID.String(), "\n", ""), "\r", "")
+				sanitizedRunID := util.SanitizeLogField(id.RunID.String())
 				l.Warn("idempotency key exists but run state not found",
 					"original_run_id", sanitizedRunID,
 					"original_run_created_at", originalRunCreatedAt,
