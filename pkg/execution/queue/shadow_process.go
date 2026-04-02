@@ -573,11 +573,6 @@ func (q *queueProcessor) ProcessShadowPartitionBacklog(
 				},
 			})
 
-			q.lifecycles.OnBacklogRefillConstraintHit(ctx, shadowPart, backlog, res)
-
-			// NOTE: custom method to instrument result - potentially handling high cardinality data
-			q.lifecycles.OnBacklogRefilled(ctx, shadowPart, backlog, res)
-
 			// Invoke previous constraint lifecycles to update UI
 			switch constraintCheckRes.LimitingConstraint {
 			case enums.QueueConstraintAccountConcurrency:
