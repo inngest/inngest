@@ -62,8 +62,6 @@ function AgentDeepLink() {
       await navigate({
         //
         // Deep-link auth params are only for the sign-in handoff.
-        // Strip them before navigating so TanStack Router doesn't
-        // re-serialize parseable values like Unix timestamps.
         href: stripDeepLinkParams(redirect_url),
         replace: true,
       });
