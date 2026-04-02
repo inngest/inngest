@@ -57,6 +57,7 @@ func TeeStreamReaderToAPI(reader io.Reader, publishURL string, opts TeeStreamOpt
 		_, _ = io.Copy(buf, reader)
 		return buf, err
 	}
+	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
 		return buf, fmt.Errorf("invalid status code publishing stream: %d", resp.StatusCode)
