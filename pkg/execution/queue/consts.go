@@ -109,7 +109,6 @@ const (
 	defaultPollTick                 = 10 * time.Millisecond
 	defaultShadowPollTick           = 100 * time.Millisecond
 	defaultBacklogNormalizePollTick = 250 * time.Millisecond
-	defaultActiveCheckTick          = 10 * time.Second
 
 	defaultIdempotencyTTL = 12 * time.Hour
 	DefaultConcurrency    = 1000 // TODO: add function to override.
