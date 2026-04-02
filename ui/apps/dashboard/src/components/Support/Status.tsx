@@ -27,6 +27,7 @@ const incidentSchema = statusEventSchema.extend({
     'partial_outage',
     'degraded_performance',
     'full_outage',
+    'operational', // undocumented status for worst impact
   ]),
 });
 
