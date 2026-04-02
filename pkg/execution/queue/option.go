@@ -615,22 +615,6 @@ type ProcessItem struct {
 
 	CapacityLease *CapacityLease
 
-	// DisableConstraintUpdates determines whether ExtendLease, Requeue,
-	// and Dequeue should update constraint state.
-	//
-	// Disable constraint updates in case
-	// - we are processing an item for a system queue
-	// - we are holding an active capacity lease
-	//
-	// For system queues, we skip constraint checks + updates entirely,
-	// for regular functions we manage constraint checks + updates in the Constraint API,
-	// if enabled for the current account.
-	//
-	// If the Constraint API is disabled or the lease expired, we will manage constraint state internally.
-	//
-	// NOTE: This value is set in itemLeaseConstraintCheck.
-	DisableConstraintUpdates bool
-
 	ConditionalTraceCtx context.Context
 }
 

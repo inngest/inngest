@@ -91,10 +91,9 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 		var counter int64
 
 		err = q.ProcessItem(ctx, osqueue.ProcessItem{
-			I:                        qi,
-			P:                        p,
-			DisableConstraintUpdates: false,
-			CapacityLease:            nil,
+			I:             qi,
+			P:             p,
+			CapacityLease: nil,
 		}, func(ctx context.Context, ri osqueue.RunInfo, i osqueue.Item) (osqueue.RunResult, error) {
 			atomic.AddInt64(&counter, 1)
 			return osqueue.RunResult{}, nil
@@ -127,10 +126,9 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 		var counter int64
 
 		err = q.ProcessItem(ctx, osqueue.ProcessItem{
-			I:                        qi,
-			P:                        p,
-			DisableConstraintUpdates: false,
-			CapacityLease:            nil,
+			I:             qi,
+			P:             p,
+			CapacityLease: nil,
 		}, func(ctx context.Context, ri osqueue.RunInfo, i osqueue.Item) (osqueue.RunResult, error) {
 			<-time.After(3 * time.Second)
 			atomic.AddInt64(&counter, 1)
@@ -210,9 +208,8 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 		var counter int64
 
 		err = q.ProcessItem(ctx, osqueue.ProcessItem{
-			I:                        qi,
-			P:                        p,
-			DisableConstraintUpdates: true,
+			I: qi,
+			P: p,
 			CapacityLease: &osqueue.CapacityLease{
 				LeaseID:    resp.Leases[0].LeaseID,
 				IssuedAtMS: clock.Now().UnixMilli(),
@@ -323,9 +320,8 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 		var counter int64
 
 		err = q.ProcessItem(ctx, osqueue.ProcessItem{
-			I:                        qi,
-			P:                        p,
-			DisableConstraintUpdates: true,
+			I: qi,
+			P: p,
 			CapacityLease: &osqueue.CapacityLease{
 				LeaseID:    resp.Leases[0].LeaseID,
 				IssuedAtMS: clock.Now().UnixMilli(),
@@ -434,9 +430,8 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 		var counter int64
 
 		err = q.ProcessItem(ctx, osqueue.ProcessItem{
-			I:                        qi,
-			P:                        p,
-			DisableConstraintUpdates: true,
+			I: qi,
+			P: p,
 			CapacityLease: &osqueue.CapacityLease{
 				LeaseID:    resp.Leases[0].LeaseID,
 				IssuedAtMS: clock.Now().UnixMilli(),
@@ -717,7 +712,6 @@ func TestQueueProcessorPreLeaseWithConstraintAPI(t *testing.T) {
 		item := <-q.Workers()
 		require.Equal(t, qi, item.I)
 		require.Equal(t, qi.CapacityLease, item.CapacityLease)
-		require.True(t, item.DisableConstraintUpdates)
 	})
 }
 

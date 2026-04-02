@@ -82,8 +82,7 @@ func (m *mockShardForIterator) ItemLeaseConstraintCheck(
 	// This method is no longer called by ProcessorIterator since the logic
 	// moved to QueueProcessor.ItemLeaseConstraintCheck
 	return ItemLeaseConstraintCheckResult{
-		LimitingConstraint:   enums.QueueConstraintNotLimited,
-		SkipConstraintChecks: true,
+		LimitingConstraint: enums.QueueConstraintNotLimited,
 	}, nil
 }
 
@@ -347,8 +346,7 @@ func (m *mockQueueProcessor) ItemLeaseConstraintCheck(ctx context.Context, shado
 	}
 
 	return ItemLeaseConstraintCheckResult{
-		LimitingConstraint:   constraint,
-		SkipConstraintChecks: true,
+		LimitingConstraint: constraint,
 	}, nil
 }
 

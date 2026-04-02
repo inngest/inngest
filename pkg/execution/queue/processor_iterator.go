@@ -488,12 +488,7 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 		I:    *item,
 		PCtr: p.PartitionContinueCtr,
 
-		CapacityLease: constraintRes.CapacityLease,
-		// Disable constraint updates in case we skipped constraint checks.
-		// This should always be linked, as we want consistent behavior while
-		// processing a queue item.
-		DisableConstraintUpdates: constraintRes.SkipConstraintChecks,
-
+		CapacityLease:       constraintRes.CapacityLease,
 		ConditionalTraceCtx: context.WithoutCancel(ctx),
 	}
 	commitSemaphoreAcquire = true

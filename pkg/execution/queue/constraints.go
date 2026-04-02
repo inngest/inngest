@@ -66,10 +66,9 @@ type PartitionConcurrency struct {
 }
 
 type BacklogRefillConstraintCheckResult struct {
-	ItemsToRefill        []string
-	ItemCapacityLeases   []CapacityLease
-	LimitingConstraint   enums.QueueConstraint
-	SkipConstraintChecks bool
+	ItemsToRefill      []string
+	ItemCapacityLeases []CapacityLease
+	LimitingConstraint enums.QueueConstraint
 
 	RetryAfter time.Time
 }
@@ -133,15 +132,6 @@ type ItemLeaseConstraintCheckResult struct {
 	// limitingConstraint returns the most limiting constraint in case
 	// no capacity was available.
 	LimitingConstraint enums.QueueConstraint
-
-	// skipConstraintChecks determines whether subsequent operations
-	// should check and enforce constraints, and whether constraint state
-	// should be updated while processing a queue item.
-	//
-	// When enrolled to the Constraint API and holding a valid capacity lease,
-	// constraint checks _and_ updates may be skipped, as state is maintained within
-	// the Constraint API.
-	SkipConstraintChecks bool
 
 	RetryAfter time.Time
 }
@@ -289,8 +279,6 @@ func (q *queueProcessor) BacklogRefillConstraintCheck(
 		ItemsToRefill:      itemsToRefill,
 		ItemCapacityLeases: itemCapacityLeases,
 		LimitingConstraint: constraint,
-		// NOTE: We've enforced constraints, so BacklogRefill can skip GCRA, etc.
-		SkipConstraintChecks: true,
 	}, nil
 }
 
@@ -317,9 +305,7 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 	// Disable lease checks for system queues
 	// NOTE: This also disables constraint updates during processing, for consistency.
 	if shadowPart.SystemQueueName != nil {
-		return ItemLeaseConstraintCheckResult{
-			SkipConstraintChecks: true,
-		}, nil
+		return ItemLeaseConstraintCheckResult{}, nil
 	}
 
 	if shadowPart.AccountID == nil ||
@@ -365,9 +351,6 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 
 			return ItemLeaseConstraintCheckResult{
 				CapacityLease: item.CapacityLease,
-				// Skip any constraint checks and subsequent updates,
-				// as constraint state is maintained in the Constraint API.
-				SkipConstraintChecks: true,
 			}, nil
 		}
 
@@ -397,9 +380,7 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 
 	constraintsToCheck := constraintItemsFromBacklog(backlog, constraints)
 	if len(constraintsToCheck) == 0 {
-		return ItemLeaseConstraintCheckResult{
-			SkipConstraintChecks: true,
-		}, nil
+		return ItemLeaseConstraintCheckResult{}, nil
 	}
 
 	res, err := q.CapacityManager.Acquire(ctx, &constraintapi.CapacityAcquireRequest{
@@ -466,9 +447,6 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 			LeaseID:    capacityLeaseID,
 			IssuedAtMS: now.UnixMilli(),
 		},
-		// Skip any constraint checks and subsequent updates,
-		// as constraint state is maintained in the Constraint API.
-		SkipConstraintChecks: true,
 	}, nil
 }
 
