@@ -7,7 +7,7 @@ Output:
 ]]
 
 local keyQueueMap = KEYS[1]
-local concurrencyPointer = KEYS[2]
+local keyScavengerEntrypoint = KEYS[2]
 
 local keyReadyQueue = KEYS[3] -- queue:sorted:$workflowID - zset
 
@@ -64,7 +64,7 @@ if scavengerIndexScores ~= false and scavengerIndexScores ~= nil then
 	local earliestLease = tonumber(scavengerIndexScores[2])
 
 	-- Ensure that we update the score with the earliest lease
-	redis.call("ZADD", concurrencyPointer, earliestLease, partitionID)
+	redis.call("ZADD", keyScavengerEntrypoint, earliestLease, partitionID)
 end
 
 return 0

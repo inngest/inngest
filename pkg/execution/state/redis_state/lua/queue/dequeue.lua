@@ -9,7 +9,7 @@ Output:
 local keyQueueMap              = KEYS[1]
 local keyPartitionMap          = KEYS[2]
 
-local concurrencyPointer       = KEYS[3]
+local keyScavengerEntrypoint   = KEYS[3]
 
 local keyReadyQueue            = KEYS[4]  -- queue:sorted:$workflowID - zset
 local keyGlobalPointer         = KEYS[5]
@@ -75,12 +75,12 @@ redis.call("ZREM", keyPartitionScavengerIndex, queueID)
 -- leased job, if exists.
 local scavengerIndexScores = redis.call("ZRANGE", keyPartitionScavengerIndex, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
 if scavengerIndexScores == false or scavengerIndexScores == nil or #scavengerIndexScores == 0 then
-  redis.call("ZREM", concurrencyPointer, partitionID)
+  redis.call("ZREM", keyScavengerEntrypoint, partitionID)
 else
   local earliestLease = tonumber(scavengerIndexScores[2])
 
   -- Ensure that we update the score with the earliest lease
-  redis.call("ZADD", concurrencyPointer, earliestLease, partitionID)
+  redis.call("ZADD", keyScavengerEntrypoint, earliestLease, partitionID)
 end
 
 -- For each partition, we now have an extra available capacity.  Check the partition's
