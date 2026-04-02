@@ -83,21 +83,6 @@ const (
 )
 
 const (
-	// ActiveCheckBacklogConcurrency determines how many accounts are peeked and processed in parallel
-	ActiveCheckAccountConcurrency = 30
-
-	// ActiveCheckBacklogConcurrency determines how many backlogs are peeked and processed in parallel
-	ActiveCheckBacklogConcurrency = 30
-
-	// ActiveCheckScanBatchSize determines how many queue items are scanned in each loop.
-	// More queue items will slow down the active checker but yield faster iteration over the set. Tune carefully.
-	ActiveCheckScanBatchSize = 25
-
-	BacklogActiveCheckCooldownDuration = 1 * time.Minute
-	AccountActiveCheckCooldownDuration = 1 * time.Minute
-)
-
-const (
 	// NormalizeAccountPeekMax sets the maximum number of accounts that can be peeked from the global normalization index.
 	NormalizeAccountPeekMax = int64(30)
 	// NormalizePartitionPeekMax sets the maximum number of backlogs that can be peeked from the shadow partition.

@@ -86,11 +86,6 @@ func TestQueueRequeue(t *testing.T) {
 			requirePartitionScoreEquals(t, r, pi.FunctionID, next)
 		})
 
-		t.Run("run indexes are updated on requeue to partition", func(t *testing.T) {
-			require.False(t, r.Exists(kg.ActiveRunsSet("p", item.FunctionID.String())))
-			require.False(t, r.Exists(kg.ActiveSet("run", runID.String())))
-		})
-
 		t.Run("It should not update the partition's earliest time, if later", func(t *testing.T) {
 			_, err := shard.EnqueueItem(ctx, osqueue.QueueItem{
 				FunctionID: fnID,
@@ -344,9 +339,6 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 
 			require.False(t, hasMember(t, r, shadowPartitionInProgressKey(shadowPartition, kg), qi.ID), remainingMembers)
 			require.False(t, hasMember(t, r, shadowPartitionAccountInProgressKey(shadowPartition, kg), qi.ID))
-
-			require.False(t, r.Exists(kg.ActiveSet("run", runID.String())))
-			require.False(t, r.Exists(kg.ActiveRunsSet("p", fnID.String())))
 
 			// expect old accounting to be updated
 			// TODO Do we actually want to update previous accounting?
@@ -812,7 +804,6 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 				return enqueueToBacklog
 			}),
 		)
-		kg := shard.Client().kg
 		ctx := context.Background()
 
 		accountId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
@@ -891,10 +882,6 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 
 		err = shard.Requeue(ctx, qi2, requeueFor.Add(time.Hour))
 		require.NoError(t, err)
-
-		runSetExists := r.Exists(kg.ActiveSet("run", runID.String()))
-		require.False(t, runSetExists)
-		require.False(t, r.Exists(kg.ActiveRunsSet("p", fnID.String())))
 	})
 
 	t.Run("item without throttle key expression should be backfilled", func(t *testing.T) {

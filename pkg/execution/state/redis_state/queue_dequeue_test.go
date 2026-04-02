@@ -283,13 +283,6 @@ func TestQueueDequeue(t *testing.T) {
 			require.EqualValues(t, 0, count)
 		})
 
-		t.Run("run indexes are updated", func(t *testing.T) {
-			// Run indexes should be updated
-
-			require.False(t, r.Exists(kg.ActiveSet("run", runID.String())))
-			require.False(t, r.Exists(kg.ActiveRunsSet("p", fnID.String())))
-		})
-
 		t.Run("It should work if the item is not leased (eg. deletions)", func(t *testing.T) {
 			item, err := shard.EnqueueItem(ctx, osqueue.QueueItem{}, start, osqueue.EnqueueOpts{})
 			require.NoError(t, err)
