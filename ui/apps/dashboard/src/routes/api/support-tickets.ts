@@ -3,9 +3,9 @@ import { auth, clerkClient } from '@clerk/tanstack-react-start/server';
 import { getTimestampDaysAgo } from '@inngest/components/utils/date';
 import {
   PlainClient,
+  type ComponentInput,
   type CreateThreadInput,
   type ThreadPartsFragment,
-  type UpsertCustomTimelineEntryInput,
 } from '@team-plain/typescript-sdk';
 
 import {
@@ -41,7 +41,7 @@ export type RequestBody = {
 
 const createComponents = (
   ticket: RequestBody['ticket'],
-): UpsertCustomTimelineEntryInput['components'] => {
+): ComponentInput[] => {
   return [
     {
       componentText: {

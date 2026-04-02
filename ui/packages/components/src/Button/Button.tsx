@@ -21,7 +21,7 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   size?: ButtonSize;
   loading?: boolean;
   href?: LinkComponentProps['href'];
-  to?: LinkComponentProps['to'];
+  to?: LinkComponentProps['to'] | (string & {});
   target?: string;
   tooltip?: ReactNode;
   label?: ReactNode;
@@ -36,11 +36,11 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 type LinkWrapperProps = {
   children: ReactNode;
   href?: LinkComponentProps['href'];
-  to?: LinkComponentProps['to'];
+  to?: LinkComponentProps['to'] | (string & {});
   target?: string;
   prefetch?: false | 'intent' | 'viewport' | 'render';
   scroll?: boolean;
-} & Omit<LinkComponentProps, 'href'>;
+} & Omit<LinkComponentProps, 'href' | 'to'>;
 
 export const LinkWrapper = forwardRef<HTMLAnchorElement, LinkWrapperProps>(
   ({ children, href, to, target, prefetch = false, scroll = true, ...props }, ref) =>
@@ -49,7 +49,7 @@ export const LinkWrapper = forwardRef<HTMLAnchorElement, LinkWrapperProps>(
         {children}
       </a>
     ) : to ? (
-      <Link to={to} target={target} preload={prefetch} resetScroll={scroll} ref={ref} {...props}>
+      <Link to={to as LinkComponentProps['to']} target={target} preload={prefetch} resetScroll={scroll} ref={ref} {...props}>
         {children}
       </Link>
     ) : (

@@ -1,4 +1,4 @@
-import { getQuickJS, shouldInterruptAfterDeadline } from 'quickjs-emscripten';
+import { type QuickJSHandle, getQuickJS, shouldInterruptAfterDeadline } from 'quickjs-emscripten';
 
 type Disposable = { readonly alive: boolean; dispose: () => void };
 
@@ -34,7 +34,7 @@ export default async function makeVM(timeout: number = -1) {
   const disposables = new DisposableComposer();
 
   const QuickJS = await getQuickJS();
-  const vm = QuickJS.createVm();
+  const vm = QuickJS.newContext();
   let alive = true;
   disposables.add({
     get alive() {
@@ -47,7 +47,7 @@ export default async function makeVM(timeout: number = -1) {
   });
 
   if (timeout !== -1) {
-    vm.setInterruptHandler(shouldInterruptAfterDeadline(Date.now() + timeout));
+    vm.runtime.setInterruptHandler(shouldInterruptAfterDeadline(Date.now() + timeout));
   }
 
   const trueHandle = vm.unwrapResult(vm.evalCode('true'));
@@ -64,7 +64,7 @@ export default async function makeVM(timeout: number = -1) {
    * For functions, the arguments and return value may only be
    * JSON-serializable values or primitives.
    */
-  function marshal(target: any) {
+  function marshal(target: any): QuickJSHandle | undefined {
     switch (typeof target) {
       case 'number': {
         const handle = vm.newNumber(target);
@@ -112,7 +112,7 @@ export default async function makeVM(timeout: number = -1) {
           target.then((result: any) => {
             const marshaled = marshal(result);
             deferred.resolve(marshaled);
-            vm.executePendingJobs(-1);
+            vm.runtime.executePendingJobs(-1);
           });
           return deferred.handle;
         }
@@ -150,9 +150,9 @@ export default async function makeVM(timeout: number = -1) {
         return obj;
       }
       case 'function': {
-        const handle = vm.newFunction(
+        const handle: QuickJSHandle = vm.newFunction(
           target.name || '<anonymous function>',
-          (...handles) => {
+          (...handles): QuickJSHandle | undefined => {
             const unmarshaledArgs = handles.map((handle) => vm.dump(handle));
             let result = undefined;
             try {
@@ -161,7 +161,7 @@ export default async function makeVM(timeout: number = -1) {
               const errResult = vm.callFunction(
                 errorHandle,
                 vm.undefined,
-                marshal(err.message),
+                marshal(err.message)!,
               );
               if (errResult.error) {
                 const context = vm.dump(errResult.error);
@@ -209,7 +209,7 @@ export default async function makeVM(timeout: number = -1) {
     return handle;
   };
 
-  const newFunction: typeof vm.newFunction = (name, fn) => {
+  const newFunction = (name: string | undefined, fn: Parameters<typeof vm.newFunction>[1]) => {
     const handle = vm.newFunction(name, fn);
     disposables.add(handle);
     return handle;
@@ -227,7 +227,7 @@ export default async function makeVM(timeout: number = -1) {
     });
   });
   const vmConsole = newObject();
-  vm.setProp(vmConsole, 'log', log);
+  vm.setProp(vmConsole, 'log', log!);
   vm.setProp(vm.global, 'console', vmConsole);
 
   // Add fetch, but ensure we never include credentials.
@@ -388,7 +388,7 @@ export default async function makeVM(timeout: number = -1) {
      */
     dump: typedBind(vm.dump, vm),
 
-    executePendingJobs: typedBind(vm.executePendingJobs, vm),
+    executePendingJobs: typedBind(vm.runtime.executePendingJobs, vm.runtime),
 
     /**
      * Unwrap a VmCallResult, returning it's value on success, and throwing the dumped
@@ -403,13 +403,13 @@ export default async function makeVM(timeout: number = -1) {
      *
      * The interrupt handler can be removed with [[removeInterruptHandler]].
      */
-    setInterruptHandler: typedBind(vm.setInterruptHandler, vm),
+    setInterruptHandler: typedBind(vm.runtime.setInterruptHandler, vm.runtime),
 
     /**
      * Remove the interrupt handler, if any.
      * See [[setInterruptHandler]].
      */
-    removeInterruptHandler: typedBind(vm.removeInterruptHandler, vm),
+    removeInterruptHandler: typedBind(vm.runtime.removeInterruptHandler, vm.runtime),
 
     /**
      * Dispose of this VM's underlying resources.

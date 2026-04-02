@@ -24,7 +24,7 @@ export function Pill({
   children: React.ReactNode;
   className?: string;
   href?: LinkComponentProps['href'];
-  to?: LinkComponentProps['to'];
+  to?: LinkComponentProps['to'] | (string & {});
   appearance?: PillAppearance;
   kind?: PillKind;
   icon?: React.ReactNode;
@@ -85,7 +85,7 @@ export function Pill({
 
   const pillWrapper =
     href || to ? (
-      <Link href={href} to={to} className="flex" onClick={(e) => e.stopPropagation()}>
+      <Link href={href} to={to as LinkComponentProps['to']} className="flex" onClick={(e) => e.stopPropagation()}>
         <span ref={pillRef} className={cn('rounded', classNames)}>
           {icon && iconSide === 'left' && icon}
           {icon && iconSide === 'iconOnly' ? icon : <span className="truncate">{children}</span>}

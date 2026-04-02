@@ -10,7 +10,6 @@ export const client = new GraphQLClient(graphQLEndpoint.toString());
 
 export const api = createApi({
   baseQuery: graphqlRequestBaseQuery({
-    // @ts-expect-error
     client,
   }),
   endpoints: () => ({}),

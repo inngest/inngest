@@ -9,12 +9,12 @@
   },
   "devDependencies": {
     "@ianvs/prettier-plugin-sort-imports": "4.7.1",
-    "eslint": "9.39.0",
+    "eslint": "9.39.4",
     "husky": "9.1.7",
     "lint-staged": "16.4.0",
     "postcss-nesting": "14.0.0",
     "prettier": "3.8.1",
-    "prettier-plugin-tailwindcss": "0.2.7"
+    "prettier-plugin-tailwindcss": "0.7.2"
   },
   "engines": {
     "node": "24.x",
@@ -82,7 +82,8 @@
       "minimatch@<5.0.0": ">=5.0.0",
       "nodemon": ">=3.0.0",
       "nodemon>minimatch": "10.2.4",
-      "nodemon>brace-expansion": "5.0.5"
+      "nodemon>brace-expansion": "5.0.5",
+      "@urql/core": "4.1.1"
     },
     "onlyBuiltDependencies": [
       "@sentry/cli",

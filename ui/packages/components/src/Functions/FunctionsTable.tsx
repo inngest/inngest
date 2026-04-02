@@ -22,9 +22,9 @@ export function FunctionsTable({
 }: {
   emptyActions: React.ReactNode;
   pathCreator: {
-    function: (params: { functionSlug: string }) => LinkComponentProps['to'];
-    eventType: (params: { eventName: string }) => LinkComponentProps['to'];
-    app: (params: { externalAppID: string }) => LinkComponentProps['to'];
+    function: (params: { functionSlug: string }) => LinkComponentProps['to'] | (string & {});
+    eventType: (params: { eventName: string }) => LinkComponentProps['to'] | (string & {});
+    app: (params: { externalAppID: string }) => LinkComponentProps['to'] | (string & {});
   };
   getFunctions: ({
     cursor,
@@ -165,7 +165,7 @@ export function FunctionsTable({
           onRowClick={(row) =>
             navigate({ to: pathCreator.function({ functionSlug: row.original.slug }) })
           }
-          getRowHref={(row) => pathCreator.function({ functionSlug: row.original.slug })}
+          getRowHref={(row) => pathCreator.function({ functionSlug: row.original.slug }) as string}
         />
         <InfiniteScrollTrigger
           onIntersect={fetchNextPage}

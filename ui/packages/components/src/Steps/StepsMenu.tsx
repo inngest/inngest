@@ -37,7 +37,7 @@ function StepMenuItem({
   isCompleted: boolean;
   isActive: boolean;
   isDisabled?: boolean;
-  url: LinkComponentProps['to'];
+  url: LinkComponentProps['to'] | (string & {});
 }) {
   const { title, description, icon: Icon } = stepContent;
 

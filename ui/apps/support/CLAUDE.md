@@ -6,15 +6,15 @@ The Inngest Support Portal is a customer support application built with TanStack
 
 ## Tech Stack
 
-- **Framework**: TanStack Start v1.134.6 (React SSR framework)
-- **Router**: TanStack Router v1.134.4 with SSR Query integration
+- **Framework**: TanStack Start v1.167.13 (React SSR framework)
+- **Router**: TanStack Router v1.168.8 with SSR Query integration
 - **State Management**: TanStack Query (React Query) v5.66.5
 - **Authentication**: Clerk (`@clerk/tanstack-react-start`)
 - **Styling**: Tailwind CSS with custom Inngest component library
 - **Theme**: `next-themes` for dark/light mode
-- **Server**: Nitro v3.0.1-alpha.1
-- **Build Tool**: Vite v7.1.10
-- **Package Manager**: pnpm v10.18.2
+- **Server**: Nitro v3.0.1-alpha.2
+- **Build Tool**: Vite v8.0.3
+- **Package Manager**: pnpm v10.33.0
 
 ## Project Structure
 

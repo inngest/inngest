@@ -253,7 +253,8 @@ export function SendEventModal({ data, isOpen, onClose, config }: SharedSendEven
       colors: dark ? createColors(true) : createColors(false),
     });
 
-    monaco.languages.json.jsonDefaults.setDiagnosticsOptions({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (monaco.languages.json as any).jsonDefaults.setDiagnosticsOptions({
       validate: true,
       schemas: [
         {
