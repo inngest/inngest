@@ -1,14 +1,16 @@
 import LoadingIcon from '@/components/Icons/LoadingIcon';
 import SplitView from '@/components/SignIn/SplitView';
-import { validateAgentDeepLinkSearch } from '@/lib/deepLinkUtils';
+import {
+  stripDeepLinkParams,
+  validateAgentDeepLinkSearch,
+} from '@/lib/deepLinkUtils';
 import { useClerk, useSignIn } from '@clerk/tanstack-react-start';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useEffect, useRef, useState } from 'react';
 
 //
-// React Strict Mode double-mounts effects in development.
-// Track tickets at module scope there so we don't spend a single-use
-// Clerk ticket twice while developing this flow.
+// Clerk sign-in tokens are single-use and some clerk operations below can cause
+// re-mounts, so we track consumed tickets to prevent double-consumption.
 const consumedTickets = new Set<string>();
 
 export const Route = createFileRoute('/(auth)/agent-deep-link')({
@@ -33,13 +35,11 @@ function AgentDeepLink() {
       return;
     }
 
-    if (import.meta.env.DEV) {
-      if (consumedTickets.has(ticket)) {
-        return;
-      }
-
-      consumedTickets.add(ticket);
+    if (consumedTickets.has(ticket)) {
+      return;
     }
+
+    consumedTickets.add(ticket);
 
     isActivatingRef.current = true;
 
@@ -59,10 +59,12 @@ function AgentDeepLink() {
         ...(organization_id && { organization: organization_id }),
       });
 
-      const parsed = new URL(redirect_url, window.location.origin);
       await navigate({
-        to: parsed.pathname,
-        search: Object.fromEntries(parsed.searchParams),
+        //
+        // Deep-link auth params are only for the sign-in handoff.
+        // Strip them before navigating so TanStack Router doesn't
+        // re-serialize parseable values like Unix timestamps.
+        href: stripDeepLinkParams(redirect_url),
         replace: true,
       });
     };
