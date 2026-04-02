@@ -20,7 +20,6 @@ local currentTime = tonumber(ARGV[4]) -- in ms
 
 -- Use our custom Go preprocessor to inject the file from ./includes/
 -- $include(decode_ulid_time.lua)
--- $include(check_concurrency.lua)
 -- $include(get_queue_item.lua)
 -- $include(set_item_peek_time.lua)
 -- $include(update_pointer_score.lua)

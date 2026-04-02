@@ -9,18 +9,17 @@ Output:
 
 ]]
 
-local keyPartitionMap         = KEYS[1] -- key storing all partitions
-local keyGlobalPartitionPtr   = KEYS[2] -- global top-level partitioned queue
+local keyPartitionMap = KEYS[1] -- key storing all partitions
+local keyGlobalPartitionPtr = KEYS[2] -- global top-level partitioned queue
 local keyGlobalAccountPointer = KEYS[3] -- accounts:sorted - zset
-local keyAccountPartitions    = KEYS[4] -- accounts:$accountID:partition:sorted - zset
+local keyAccountPartitions = KEYS[4] -- accounts:$accountID:partition:sorted - zset
 
-local partitionID             = ARGV[1]
-local leaseID                 = ARGV[2]
-local currentTime             = tonumber(ARGV[3]) -- in ms, to check lease validation
-local leaseTime               = tonumber(ARGV[4]) -- in seconds, as partition score
-local accountID               = ARGV[5]
+local partitionID = ARGV[1]
+local leaseID = ARGV[2]
+local currentTime = tonumber(ARGV[3]) -- in ms, to check lease validation
+local leaseTime = tonumber(ARGV[4]) -- in seconds, as partition score
+local accountID = ARGV[5]
 
--- $include(check_concurrency.lua)
 -- $include(get_partition_item.lua)
 -- $include(decode_ulid_time.lua)
 -- $include(update_pointer_score.lua)
@@ -29,12 +28,12 @@ local accountID               = ARGV[5]
 
 local existing = get_partition_item(keyPartitionMap, partitionID)
 if existing == nil or existing == false then
-    return { -3 }
+	return { -3 }
 end
 
 -- Check for an existing lease.
 if existing.leaseID ~= nil and existing.leaseID ~= cjson.null and decode_ulid_time(existing.leaseID) > currentTime then
-    return { -4 }
+	return { -4 }
 end
 
 local existingTime = existing.last -- store a ref to the last time we successfully checked this partition
