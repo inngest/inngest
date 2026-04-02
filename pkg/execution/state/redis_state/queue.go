@@ -1094,12 +1094,8 @@ func (q *queue) PartitionLease(
 
 	switch result[0] {
 	case -1:
-		return nil, osqueue.ErrAccountConcurrencyLimit
-	case -2:
-		return nil, osqueue.ErrPartitionConcurrencyLimit
-	case -3:
 		return nil, osqueue.ErrPartitionNotFound
-	case -4:
+	case -2:
 		return nil, osqueue.ErrPartitionAlreadyLeased
 	default:
 		// Update the partition's last indicator.

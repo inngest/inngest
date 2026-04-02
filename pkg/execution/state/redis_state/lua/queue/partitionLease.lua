@@ -2,10 +2,8 @@
 
 Output:
     0: Success
-   -1: No account capacity left, not leased
-   -2: No fn capacity left, not leased
-   -3: Partition item not found
-   -4: Partition item already leased
+   -1: Partition item not found
+   -2: Partition item already leased
 
 ]]
 
@@ -28,12 +26,12 @@ local accountID = ARGV[5]
 
 local existing = get_partition_item(keyPartitionMap, partitionID)
 if existing == nil or existing == false then
-	return { -3 }
+	return { -1 }
 end
 
 -- Check for an existing lease.
 if existing.leaseID ~= nil and existing.leaseID ~= cjson.null and decode_ulid_time(existing.leaseID) > currentTime then
-	return { -4 }
+	return { -2 }
 end
 
 local existingTime = existing.last -- store a ref to the last time we successfully checked this partition
