@@ -558,7 +558,7 @@ func TestConstraintItemsFromBacklog(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := constraintItemsFromBacklog(tt.sp, tt.backlog, tt.constraints)
+			result := constraintItemsFromBacklog(tt.backlog, tt.constraints)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -964,7 +964,7 @@ func TestConstraintItemsBacklogToLimitingConstraintRoundTrip(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Step 1: Generate constraint items from the backlog
-			constraintItems := constraintItemsFromBacklog(tt.sp, tt.backlog, tt.constraints)
+			constraintItems := constraintItemsFromBacklog(tt.backlog, tt.constraints)
 
 			// Step 2: Filter the constraint items to find the ones that would be limiting
 			// We simulate what the constraint API would return as limiting constraints

@@ -27,11 +27,6 @@ type ProcessorIterator struct {
 	// Queue is the Queue that owns this processor.
 	Queue QueueProcessor
 
-	// Denies records a denylist as keys hit concurrency and throttling limits.
-	// this lets us prevent lease attempts for consecutive keys, as soon as the first
-	// key is denied.
-	Denies *LeaseDenies
-
 	// error returned when processing
 	Err error
 
@@ -217,12 +212,6 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 		return ErrProcessStopIterator
 	}
 
-	// If we should skip constraint checks during lease (capacity lease acquired or system queue),
-	// ensure Lease simply moves the item out of the partition and updates indexes for scavenging, status, etc.
-	if constraintRes.SkipConstraintChecks {
-		leaseOptions = append(leaseOptions, LeaseOptionDisableConstraintChecks(true))
-	}
-
 	// If we're limited by constraints, release semaphore early since we won't be leasing or processing
 	if constraintRes.LimitingConstraint != enums.QueueConstraintNotLimited {
 		release()
@@ -249,7 +238,6 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 				*item,
 				QueueLeaseDuration,
 				p.StaticTime,
-				p.Denies,
 				leaseOptions...,
 			)
 		})
@@ -334,10 +322,6 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 	switch cause {
 	case ErrQueueItemThrottled:
 		p.IsCustomKeyLimitOnly.Store(false)
-		// Here we denylist each throttled key that's been limited here, then ignore
-		// any other jobs from being leased as we continue to iterate through the loop.
-		// This maintains FIFO ordering amongst all custom concurrency keys.
-		p.Denies.AddThrottled(err)
 
 		p.CtrRateLimit.Add(1)
 		metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{
@@ -427,14 +411,6 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 	case ErrConcurrencyLimitCustomKey:
 		p.CtrConcurrency.Add(1)
 
-		// Custom concurrency keys are different.  Each job may have a different key,
-		// so we cannot break the loop in case the next job has a different key and
-		// has capacity.
-		//
-		// Here we denylist each concurrency key that's been limited here, then ignore
-		// any other jobs from being leased as we continue to iterate through the loop.
-		p.Denies.AddConcurrency(err)
-
 		// For backwards compatibility, we report on the function level as well
 		if p.Partition.FunctionID != nil {
 			p.Queue.Options().lifecycles.OnFnConcurrencyLimitReached(context.WithoutCancel(ctx), *p.Partition.FunctionID)
@@ -512,12 +488,7 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 		I:    *item,
 		PCtr: p.PartitionContinueCtr,
 
-		CapacityLease: constraintRes.CapacityLease,
-		// Disable constraint updates in case we skipped constraint checks.
-		// This should always be linked, as we want consistent behavior while
-		// processing a queue item.
-		DisableConstraintUpdates: constraintRes.SkipConstraintChecks,
-
+		CapacityLease:       constraintRes.CapacityLease,
 		ConditionalTraceCtx: context.WithoutCancel(ctx),
 	}
 	commitSemaphoreAcquire = true

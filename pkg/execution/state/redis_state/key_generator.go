@@ -166,10 +166,6 @@ type QueueKeyGenerator interface {
 	GlobalShadowPartitionSet() string
 	// BacklogSet returns the key to the ZSET storing pointers (queue item IDs) for a given backlog.
 	BacklogSet(backlogID string) string
-	// ActiveSet returns the key to the set of active queue items for a given scope and ID.
-	ActiveSet(scope string, scopeID string) string
-	// ActiveRunsSet returns the key to the set of active runs for a given scope and ID.
-	ActiveRunsSet(scope string, scopeID string) string
 	// BacklogMeta returns the key to the hash storing serialized QueueBacklog objects by ID.
 	BacklogMeta() string
 	// BacklogNormalizationLease returns the key to the lease for the backlog for normalization purposes
@@ -183,17 +179,9 @@ type QueueKeyGenerator interface {
 	// GlobalAccountShadowPartitions returns the key to the ZSET storing pointers (account IDs) for accounts with existing shadow partitions.
 	GlobalAccountShadowPartitions() string
 
-	// RunActiveSet returns the key to the set of active queue items for a given run ID.
-	RunActiveSet(runID ulid.ULID) string
-
 	GlobalAccountNormalizeSet() string
 	AccountNormalizeSet(accountID uuid.UUID) string
 	PartitionNormalizeSet(partitionID string) string
-
-	BacklogActiveCheckSet() string
-	BacklogActiveCheckCooldown(backlogID string) string
-	AccountActiveCheckSet() string
-	AccountActiveCheckCooldown(accountID string) string
 
 	//
 	// Queue metadata keys
@@ -213,8 +201,6 @@ type QueueKeyGenerator interface {
 	// Instrumentation returns the key which allows one worker to run instrumentation against
 	// the queue
 	Instrumentation() string
-	// ActiveChecker returns the key which allows a worker to run spot checks on recently-constrained backlogs
-	ActiveChecker() string
 	// Idempotency stores the map for storing idempotency keys in redis
 	Idempotency(key string) string
 	// Concurrency returns a key for a given concurrency string.  This stores an ordered
@@ -329,10 +315,6 @@ func (u queueKeyGenerator) ShardLeaseKey(scope string) string {
 	return fmt.Sprintf("{%s}:queue:shard-lease:%s", u.queueDefaultKey, scope)
 }
 
-func (u queueKeyGenerator) ActiveChecker() string {
-	return fmt.Sprintf("{%s}:queue:active-checker", u.queueDefaultKey)
-}
-
 func (u queueKeyGenerator) Idempotency(key string) string {
 	return fmt.Sprintf("{%s}:queue:seen:%s", u.queueDefaultKey, key)
 }
@@ -399,39 +381,6 @@ func (u queueKeyGenerator) BacklogSet(backlogID string) string {
 	return fmt.Sprintf("{%s}:backlog:sorted:%s", u.queueDefaultKey, backlogID)
 }
 
-// ActiveSet returns the key to the number of active queue items for a given backlog.
-func (u queueKeyGenerator) ActiveSet(scope string, scopeID string) string {
-	if scope == "" || scopeID == "" {
-		// this is a placeholder because passing an empty key into Lua will cause multi-slot key errors
-		return fmt.Sprintf("{%s}:v2:active:-", u.queueDefaultKey)
-	}
-
-	return fmt.Sprintf("{%s}:v2:active:%s:%s", u.queueDefaultKey, scope, scopeID)
-}
-
-func isEmptyULID(id ulid.ULID) bool {
-	return id == [16]byte{}
-}
-
-func (u queueKeyGenerator) RunActiveSet(runID ulid.ULID) string {
-	if isEmptyULID(runID) {
-		// this is a placeholder because passing an empty key into Lua will cause multi-slot key errors
-		return u.ActiveSet("run", "")
-	}
-
-	return u.ActiveSet("run", runID.String())
-}
-
-// ActiveRunsSet returns the key to the number of active runs for a given backlog.
-func (u queueKeyGenerator) ActiveRunsSet(scope string, scopeID string) string {
-	if scope == "" || scopeID == "" {
-		// this is a placeholder because passing an empty key into Lua will cause multi-slot key errors
-		return fmt.Sprintf("{%s}:v2:active-runs:-", u.queueDefaultKey)
-	}
-
-	return fmt.Sprintf("{%s}:v2:active-runs:%s:%s", u.queueDefaultKey, scope, scopeID)
-}
-
 // BacklogMeta returns the key to the hash storing serialized QueueBacklog objects by ID.
 func (u queueKeyGenerator) BacklogMeta() string {
 	return fmt.Sprintf("{%s}:backlogs", u.queueDefaultKey)
@@ -478,28 +427,6 @@ func (u queueKeyGenerator) PartitionNormalizeSet(partitionID string) string {
 	}
 
 	return fmt.Sprintf("{%s}:normalize:partition:%s:sorted", u.queueDefaultKey, partitionID)
-}
-
-func (u queueKeyGenerator) BacklogActiveCheckSet() string {
-	return fmt.Sprintf("{%s}:active-check:backlog:sorted", u.queueDefaultKey)
-}
-
-func (u queueKeyGenerator) BacklogActiveCheckCooldown(backlogID string) string {
-	if backlogID == "" {
-		return fmt.Sprintf("{%s}:active-check:cooldown:backlog:-", u.queueDefaultKey)
-	}
-	return fmt.Sprintf("{%s}:active-check:cooldown:backlog:%s", u.queueDefaultKey, backlogID)
-}
-
-func (u queueKeyGenerator) AccountActiveCheckSet() string {
-	return fmt.Sprintf("{%s}:active-check:account:sorted", u.queueDefaultKey)
-}
-
-func (u queueKeyGenerator) AccountActiveCheckCooldown(accountID string) string {
-	if accountID == "" {
-		return fmt.Sprintf("{%s}:active-check:cooldown:account:-", u.queueDefaultKey)
-	}
-	return fmt.Sprintf("{%s}:active-check:cooldown:account:%s", u.queueDefaultKey, accountID)
 }
 
 func (u queueKeyGenerator) QueuePrefix() string {

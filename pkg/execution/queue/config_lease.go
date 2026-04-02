@@ -100,26 +100,8 @@ func (q *queueProcessor) scavengerLease() *ulid.ULID {
 	return &copied
 }
 
-func (q *queueProcessor) activeCheckerLease() *ulid.ULID {
-	q.activeCheckerLeaseLock.RLock()
-	defer q.activeCheckerLeaseLock.RUnlock()
-	if q.activeCheckerLeaseID == nil {
-		return nil
-	}
-	copied := *q.activeCheckerLeaseID
-	return &copied
-}
-
 func (q *queueProcessor) isScavenger() bool {
 	l := q.scavengerLease()
-	if l == nil {
-		return false
-	}
-	return ulid.Time(l.Time()).After(q.Clock().Now())
-}
-
-func (q *queueProcessor) isActiveChecker() bool {
-	l := q.activeCheckerLease()
 	if l == nil {
 		return false
 	}

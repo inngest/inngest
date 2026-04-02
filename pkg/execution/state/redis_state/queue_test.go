@@ -780,10 +780,9 @@ func TestQueueSystemPartitions(t *testing.T) {
 	t.Run("leases correct partition", func(t *testing.T) {
 		qp := getSystemPartition(t, r, customQueueName)
 
-		leaseId, availableCapacity, err := shard.PartitionLease(ctx, &qp, time.Second)
+		leaseId, err := shard.PartitionLease(ctx, &qp, time.Second)
 		require.NoError(t, err)
 		require.NotNil(t, leaseId)
-		require.Equal(t, 1, availableCapacity)
 	})
 
 	t.Run("peeks partition successfully", func(t *testing.T) {
@@ -810,14 +809,13 @@ func TestQueueSystemPartitions(t *testing.T) {
 		found := getQueueItem(t, r, item.ID)
 		require.Equal(t, item, found)
 
-		leaseId, err := shard.Lease(ctx, item, time.Second, clock.Now(), nil)
+		leaseId, err := shard.Lease(ctx, item, time.Second, clock.Now())
 		require.NoError(t, err)
 		require.NotNil(t, leaseId)
 
-		leaseId, err = shard.Lease(ctx, item2, time.Second, clock.Now(), nil)
-		require.Error(t, err)
-		require.ErrorIs(t, err, osqueue.ErrSystemConcurrencyLimit)
-		require.Nil(t, leaseId)
+		leaseId, err = shard.Lease(ctx, item2, time.Second, clock.Now())
+		require.NoError(t, err)
+		require.NotNil(t, leaseId)
 	})
 
 	t.Run("scavenges partition items with expired leases", func(t *testing.T) {
@@ -828,90 +826,7 @@ func TestQueueSystemPartitions(t *testing.T) {
 
 		requeued, err := shard.Scavenge(ctx, osqueue.ScavengePeekSize)
 		require.NoError(t, err)
-		assert.Equal(t, 1, requeued, "expected one item with expired leases to be requeued by scavenge", r.Dump())
-	})
-
-	t.Run("backcompat: scavenges previous partition items with expired leases", func(t *testing.T) {
-		r.FlushAll()
-
-		start := clock.Now().Truncate(time.Second)
-
-		item, err := shard.EnqueueItem(ctx, qi, start, osqueue.EnqueueOpts{})
-		require.NoError(t, err)
-		require.NotEqual(t, item.ID, ulid.Zero)
-		require.Equal(t, time.UnixMilli(item.WallTimeMS).Truncate(time.Second), start)
-
-		qp := getSystemPartition(t, r, customQueueName)
-
-		leaseStart := clock.Now()
-		leaseExpires := clock.Now().Add(time.Second)
-
-		itemCountMatches := func(num int) {
-			zsetKey := partitionZsetKey(qp, shard.Client().kg)
-			items, err := rc.Do(ctx, rc.B().
-				Zrangebyscore().
-				Key(zsetKey).
-				Min("-inf").
-				Max("+inf").
-				Build()).AsStrSlice()
-			require.NoError(t, err)
-			assert.Equal(t, num, len(items), "expected %d items in the queue %q", num, zsetKey, r.Dump())
-		}
-
-		concurrencyItemCountMatches := func(num int) {
-			items, err := rc.Do(ctx, rc.B().
-				Zrangebyscore().
-				Key(partitionConcurrencyKey(qp, shard.Client().kg)).
-				Min("-inf").
-				Max("+inf").
-				Build()).AsStrSlice()
-			require.NoError(t, err)
-			assert.Equal(t, num, len(items), "expected %d items in the concurrency queue", num, r.Dump())
-		}
-
-		itemCountMatches(1)
-		concurrencyItemCountMatches(0)
-
-		leaseId, err := shard.Lease(ctx, item, time.Second, leaseStart, nil)
-		require.NoError(t, err)
-		require.NotNil(t, leaseId)
-
-		itemCountMatches(0)
-		concurrencyItemCountMatches(1)
-
-		// wait til leases are expired
-		clock.Advance(2 * time.Second)
-		r.FastForward(2 * time.Second)
-		r.SetTime(clock.Now())
-
-		require.True(t, clock.Now().After(leaseExpires))
-
-		incompatibleConcurrencyIndexItem := shard.Client().kg.Concurrency("p", customQueueName)
-		compatibleConcurrencyIndexItem := customQueueName
-
-		indexMembers, err := r.ZMembers(shard.Client().kg.ConcurrencyIndex())
-		require.NoError(t, err)
-		require.Equal(t, 1, len(indexMembers))
-		require.Contains(t, indexMembers, compatibleConcurrencyIndexItem)
-
-		requeued, err := shard.Scavenge(ctx, osqueue.ScavengePeekSize)
-		require.NoError(t, err)
-		assert.Equal(t, 1, requeued, "expected one item with expired leases to be requeued by scavenge", r.Dump())
-
-		itemCountMatches(1)
-		concurrencyItemCountMatches(0)
-
-		indexItems, err := rc.Do(ctx, rc.B().Zcard().Key(shard.Client().kg.ConcurrencyIndex()).Build()).AsInt64()
-		require.NoError(t, err)
-		assert.Equal(t, 0, int(indexItems), "expected no items in the concurrency index", r.Dump())
-
-		newConcurrencyQueueItems, err := rc.Do(ctx, rc.B().Zcard().Key(incompatibleConcurrencyIndexItem).Build()).AsInt64()
-		require.NoError(t, err)
-		assert.Equal(t, 0, int(newConcurrencyQueueItems), "expected no items in the new concurrency queue", r.Dump())
-
-		oldConcurrencyQueueItems, err := rc.Do(ctx, rc.B().Zcard().Key(compatibleConcurrencyIndexItem).Build()).AsInt64()
-		require.NoError(t, err)
-		assert.Equal(t, 0, int(oldConcurrencyQueueItems), "expected no items in the old concurrency queue", r.Dump())
+		assert.Equal(t, 2, requeued, "expected two items with expired leases to be requeued by scavenge", r.Dump())
 	})
 
 	t.Run("It enqueues an item to account queues when account id is present", func(t *testing.T) {
@@ -1028,7 +943,7 @@ func TestQueuePeek(t *testing.T) {
 
 		t.Run("It should remove any leased items from the list", func(t *testing.T) {
 			// Lease step A, and it should be removed.
-			_, err := shard.Lease(ctx, ia, 50*time.Millisecond, time.Now(), nil)
+			_, err := shard.Lease(ctx, ia, 50*time.Millisecond, time.Now())
 			require.NoError(t, err)
 
 			items, err = shard.Peek(ctx, &osqueue.QueuePartition{FunctionID: &workflowID}, d, osqueue.DefaultQueuePeekMax)
@@ -1397,7 +1312,7 @@ func TestQueuePartitionRequeue(t *testing.T) {
 
 		next := now.Add(5 * time.Second)
 		t.Run("It removes any lease when requeueing", func(t *testing.T) {
-			_, _, err := shard.PartitionLease(ctx, &osqueue.QueuePartition{FunctionID: &idA}, time.Minute)
+			_, err := shard.PartitionLease(ctx, &osqueue.QueuePartition{FunctionID: &idA}, time.Minute)
 			require.NoError(t, err)
 
 			err = shard.PartitionRequeue(ctx, &p, next, true)
@@ -1456,7 +1371,7 @@ func TestQueuePartitionRequeue(t *testing.T) {
 			requirePartitionScoreEquals(t, r, &idA, now)
 
 			// Simulate processing queue item, add to partition scavenger index
-			_, err = shard.Lease(ctx, qi, 10*time.Second, clock.Now(), nil)
+			_, err = shard.Lease(ctx, qi, 10*time.Second, clock.Now())
 			require.NoError(t, err)
 			kg := shard.Client().kg
 			require.True(t, r.Exists(kg.PartitionScavengerIndex(idA.String())))
@@ -1536,7 +1451,7 @@ func TestQueuePartitionRequeue(t *testing.T) {
 			})
 
 			t.Run("It doesn't dequeue the partition with an in-progress job", func(t *testing.T) {
-				id, err := shard.Lease(ctx, item, 10*time.Second, clock.Now(), nil)
+				id, err := shard.Lease(ctx, item, 10*time.Second, clock.Now())
 				require.NoError(t, err)
 				require.NotNil(t, id)
 
@@ -1645,9 +1560,9 @@ func TestQueuePartitionRequeue(t *testing.T) {
 		itemIDs, err := getItemIDsFromBacklog(ctx, shard, &backlog, time.Now().Add(time.Minute), 1000)
 		require.NoError(t, err)
 
-		res, err := shard.BacklogRefill(ctx, &backlog, &shadowPart, time.Now().Add(time.Minute), itemIDs, osqueue.PartitionConstraintConfig{})
+		res, err := shard.BacklogRefill(ctx, &backlog, &shadowPart, time.Now().Add(time.Minute), itemIDs)
 		require.NoError(t, err)
-		require.Equal(t, 1, res.Refilled)
+		require.Equal(t, 1, len(res.RefilledItems))
 
 		err = shard.Dequeue(ctx, qi2)
 		require.NoError(t, err)
@@ -1959,7 +1874,7 @@ func TestQueueRequeueByJobID(t *testing.T) {
 			require.Equal(t, 1, len(partitions))
 
 			// Lease
-			lid, err := shard.Lease(ctx, item, time.Second*10, time.Now(), nil)
+			lid, err := shard.Lease(ctx, item, time.Second*10, time.Now())
 			require.NoError(t, err)
 			require.NotNil(t, lid)
 
@@ -2178,230 +2093,6 @@ func TestQueueLeaseSequential(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, leaseID)
 		require.WithinDuration(t, now.Add(dur), ulid.Time(leaseID.Time()), 5*time.Millisecond)
-	})
-}
-
-// TestQueueRateLimit asserts that the queue respects rate limits when added to a queue item.
-func TestQueueRateLimit(t *testing.T) {
-	mr := miniredis.RunT(t)
-	rc, err := rueidis.NewClient(rueidis.ClientOption{
-		InitAddress:  []string{mr.Addr()},
-		DisableCache: true,
-	})
-	require.NoError(t, err)
-	defer rc.Close()
-	ctx := context.Background()
-	clock := clockwork.NewFakeClock()
-
-	idA, idB := uuid.New(), uuid.New()
-
-	r := require.New(t)
-
-	t.Run("Without bursts", func(t *testing.T) {
-		throttle := &osqueue.Throttle{
-			Key:    "some-key",
-			Limit:  1,
-			Period: 5, // Admit one every 5 seconds
-			Burst:  0, // No burst.
-		}
-
-		_, shard := newQueue(t, rc,
-			osqueue.WithClock(clock),
-			osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
-				return osqueue.PartitionConstraintConfig{
-					Throttle: &osqueue.PartitionThrottle{
-						Limit:                     1,
-						Period:                    5,
-						Burst:                     0,
-						ThrottleKeyExpressionHash: util.XXHash(throttle.Key),
-					},
-				}
-			}),
-		)
-
-		aa, err := shard.EnqueueItem(ctx, osqueue.QueueItem{
-			FunctionID: idA,
-			Data: osqueue.Item{
-				Identifier: state.Identifier{
-					WorkflowID: idA,
-				},
-				Throttle: throttle,
-			},
-		}, clock.Now(), osqueue.EnqueueOpts{})
-		r.NoError(err)
-
-		ab, err := shard.EnqueueItem(ctx, osqueue.QueueItem{
-			FunctionID: idA,
-			Data: osqueue.Item{
-				Identifier: state.Identifier{
-					WorkflowID: idA,
-				},
-				Throttle: throttle,
-			},
-		}, clock.Now().Add(time.Second), osqueue.EnqueueOpts{})
-		r.NoError(err)
-
-		// Leasing A should succeed, then B should fail.
-		partitions, err := shard.PartitionPeek(ctx, true, clock.Now().Add(5*time.Second), 5)
-		r.NoError(err)
-		r.EqualValues(1, len(partitions))
-
-		// clock.Advance(10 * time.Millisecond)
-
-		t.Run("Leasing a first item succeeds", func(t *testing.T) {
-			leaseA, err := shard.Lease(ctx, aa, 10*time.Second, clock.Now(), nil)
-			r.NoError(err, "leasing throttled queue item with capacity failed")
-			r.NotNil(leaseA)
-		})
-
-		// clock.Advance(10 * time.Millisecond)
-
-		t.Run("Attempting to lease another throttled key immediately fails", func(t *testing.T) {
-			leaseB, err := shard.Lease(ctx, ab, 10*time.Second, clock.Now(), nil)
-			r.NotNil(err, "leasing throttled queue item without capacity didn't error")
-			r.Nil(leaseB)
-		})
-
-		// clock.Advance(10 * time.Millisecond)
-
-		t.Run("Leasing another function succeeds", func(t *testing.T) {
-			_, shard := newQueue(t, rc,
-				osqueue.WithClock(clock),
-				osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
-					return osqueue.PartitionConstraintConfig{
-						Throttle: &osqueue.PartitionThrottle{
-							Limit:                     1,
-							Period:                    5,
-							Burst:                     0,
-							ThrottleKeyExpressionHash: util.XXHash("another-key"),
-						},
-					}
-				}),
-			)
-
-			ba, err := shard.EnqueueItem(ctx, osqueue.QueueItem{
-				FunctionID: idB,
-				Data: osqueue.Item{
-					Identifier: state.Identifier{
-						WorkflowID: idB,
-					},
-					Throttle: &osqueue.Throttle{
-						Key:    "another-key",
-						Limit:  1,
-						Period: 5, // Admit one every 5 seconds
-						Burst:  0, // No burst.
-					},
-				},
-			}, clock.Now().Add(time.Second), osqueue.EnqueueOpts{})
-			r.NoError(err)
-			lease, err := shard.Lease(ctx, ba, 10*time.Second, clock.Now(), nil)
-			r.Nil(err, "leasing throttled queue item without capacity didn't error")
-			r.NotNil(lease)
-		})
-
-		// clock.Advance(10 * time.Millisecond)
-
-		t.Run("Leasing after the period succeeds", func(t *testing.T) {
-			clock.Advance(time.Duration(throttle.Period)*time.Second + time.Second)
-
-			leaseB, err := shard.Lease(ctx, ab, 10*time.Second, clock.Now(), nil)
-			r.Nil(err, "leasing after waiting for throttle should succeed")
-			r.NotNil(leaseB)
-		})
-	})
-
-	mr.FlushAll()
-	clock.Advance(10 * time.Second)
-
-	t.Run("With bursts", func(t *testing.T) {
-		throttle := &osqueue.Throttle{
-			Key:    "burst-plz",
-			Limit:  1,
-			Period: 10, // Admit one every 10 seconds
-			Burst:  3,  // With bursts of 3
-		}
-		// NOTE: Since fixing GCRA, we will now admit the maximum of limit + burst requests
-		// This means we can admit up to 1 + 3 = 4 items at once
-
-		_, shard := newQueue(t, rc,
-			osqueue.WithClock(clock),
-			osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
-				return osqueue.PartitionConstraintConfig{
-					Throttle: &osqueue.PartitionThrottle{
-						ThrottleKeyExpressionHash: util.XXHash("burst-plz"),
-						Limit:                     1,
-						Period:                    10,
-						Burst:                     3,
-					},
-				}
-			}),
-		)
-
-		accountID := uuid.New()
-
-		items := []osqueue.QueueItem{}
-		for i := 0; i <= 20; i++ {
-			item, err := shard.EnqueueItem(ctx, osqueue.QueueItem{
-				FunctionID: idA,
-				Data: osqueue.Item{
-					Identifier: state.Identifier{WorkflowID: idA, AccountID: accountID},
-					Throttle:   throttle,
-				},
-			}, clock.Now(), osqueue.EnqueueOpts{})
-			clock.Advance(1 * time.Millisecond)
-			r.NoError(err)
-			items = append(items, item)
-		}
-
-		// Leasing A should succeed, then B should fail.
-		partitions, err := shard.PartitionPeek(ctx, true, clock.Now().Add(5*time.Second), 5)
-		r.NoError(err)
-		r.EqualValues(1, len(partitions))
-
-		idx := 0
-
-		t.Run("Leasing up to bursts succeeds", func(t *testing.T) {
-			for i := 0; i < 4; i++ {
-				lease, err := shard.Lease(ctx, items[i], 2*time.Second, clock.Now(), nil)
-				r.NoError(err, "leasing throttled queue item with capacity failed")
-				r.NotNil(lease)
-				idx++
-			}
-		})
-
-		t.Run("Leasing the 5th time fails", func(t *testing.T) {
-			lease, err := shard.Lease(ctx, items[idx], 1*time.Second, clock.Now(), nil)
-			r.NotNil(err, "leasing throttled queue item without capacity didn't error")
-			r.ErrorContains(err, osqueue.ErrQueueItemThrottled.Error())
-			r.Nil(lease)
-		})
-
-		t.Run("After 10s, we can re-lease once as bursting is done.", func(t *testing.T) {
-			clock.Advance(time.Duration(throttle.Period)*time.Second + time.Second)
-
-			lease, err := shard.Lease(ctx, items[idx], 2*time.Second, clock.Now(), nil)
-			r.NoError(err, "leasing throttled queue item with capacity failed")
-			r.NotNil(lease)
-
-			idx++
-
-			// It should fail, as bursting is done.
-			lease, err = shard.Lease(ctx, items[idx], 1*time.Second, clock.Now(), nil)
-			r.NotNil(err, "leasing throttled queue item without capacity didn't error")
-			r.ErrorContains(err, osqueue.ErrQueueItemThrottled.Error())
-			r.Nil(lease)
-		})
-
-		t.Run("After another 40s, we can burst again", func(t *testing.T) {
-			clock.Advance(time.Duration(throttle.Period*4) * time.Second)
-
-			for i := 0; i < 3; i++ {
-				lease, err := shard.Lease(ctx, items[i], 2*time.Second, clock.Now(), nil)
-				r.NoError(err, "leasing throttled queue item with capacity failed")
-				r.NotNil(lease)
-				idx++
-			}
-		})
 	})
 }
 
@@ -3475,529 +3166,6 @@ func TestQueueEnqueueItemSingleton(t *testing.T) {
 	})
 }
 
-func TestQueueActiveCounters(t *testing.T) {
-	r := miniredis.RunT(t)
-	rc, err := rueidis.NewClient(rueidis.ClientOption{
-		InitAddress:  []string{r.Addr()},
-		DisableCache: true,
-	})
-	require.NoError(t, err)
-	defer rc.Close()
-
-	enqueueToBacklog := false
-
-	clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Minute))
-	_, shard := newQueue(
-		t, rc,
-		osqueue.WithClock(clock),
-		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
-			return enqueueToBacklog
-		}),
-	)
-	kg := shard.Client().kg
-	ctx := context.Background()
-
-	scard := func(key string) int {
-		if !r.Exists(key) {
-			return 0
-		}
-
-		val, err := rc.Do(ctx, rc.B().Scard().Key(key).Build()).AsInt64()
-		require.NoError(t, err)
-
-		return int(val)
-	}
-
-	accountID, fnID, envID := uuid.New(), uuid.New(), uuid.New()
-
-	t.Run("single item", func(t *testing.T) {
-		runID := ulid.MustNew(ulid.Timestamp(clock.Now()), rand.Reader)
-
-		item := osqueue.QueueItem{
-			ID:          "test",
-			FunctionID:  fnID,
-			WorkspaceID: envID,
-			Data: osqueue.Item{
-				WorkspaceID: envID,
-				Kind:        osqueue.KindEdge,
-				Identifier: state.Identifier{
-					WorkflowID:  fnID,
-					AccountID:   accountID,
-					WorkspaceID: envID,
-					RunID:       runID,
-				},
-				QueueName:             nil,
-				Throttle:              nil,
-				CustomConcurrencyKeys: nil,
-			},
-			QueueName: nil,
-		}
-
-		at := clock.Now()
-
-		t.Run("from backlog, requeue", func(t *testing.T) {
-			r.FlushAll()
-
-			// enqueue to backlog
-			enqueueToBacklog = true
-			i, err := shard.EnqueueItem(ctx, item, at, osqueue.EnqueueOpts{})
-			require.NoError(t, err)
-
-			shadowPart := osqueue.ItemShadowPartition(ctx, item)
-			backlog := osqueue.ItemBacklog(ctx, item)
-
-			refillUntil := at.Add(time.Minute)
-
-			require.Equal(t, 0, scard(kg.ActiveRunsSet("p", shadowPart.PartitionID)))
-			require.Equal(t, 0, scard(kg.ActiveRunsSet("account", accountID.String())))
-			require.Equal(t, 0, scard(kg.RunActiveSet(runID)))
-			require.Equal(t, 0, scard(kg.ActiveSet("p", fnID.String())))
-			require.Equal(t, 0, scard(kg.ActiveSet("account", accountID.String())))
-
-			require.Empty(t, i.RefilledFrom)
-			require.Zero(t, i.RefilledAt)
-
-			// refill
-			// Get items to refill from backlog
-			itemIDs, err := getItemIDsFromBacklog(ctx, shard, &backlog, refillUntil, 1000)
-			require.NoError(t, err)
-
-			res, err := shard.BacklogRefill(ctx, &backlog, &shadowPart, refillUntil, itemIDs, osqueue.PartitionConstraintConfig{
-				Concurrency: osqueue.PartitionConcurrency{
-					SystemConcurrency:   consts.DefaultConcurrencyLimit,
-					AccountConcurrency:  consts.DefaultConcurrencyLimit,
-					FunctionConcurrency: consts.DefaultConcurrencyLimit,
-				},
-			})
-			require.NoError(t, err)
-
-			require.Equal(t, 1, res.Refilled)
-
-			require.Equal(t, 1, scard(kg.ActiveRunsSet("p", shadowPart.PartitionID)))
-			require.Equal(t, 1, scard(kg.ActiveRunsSet("account", accountID.String())))
-			require.Equal(t, 1, scard(kg.RunActiveSet(runID)))
-			require.Equal(t, 1, scard(kg.ActiveSet("p", fnID.String())))
-			require.Equal(t, 1, scard(kg.ActiveSet("account", accountID.String())))
-
-			currentItemStr := r.HGet(kg.QueueItem(), i.ID)
-			require.NoError(t, json.Unmarshal([]byte(currentItemStr), &i))
-			require.Equal(t, backlog.BacklogID, i.RefilledFrom)
-			require.Equal(t, clock.Now(), time.UnixMilli(i.RefilledAt))
-
-			// lease
-			leaseID, err := shard.Lease(ctx, i, 10*time.Second, clock.Now(), nil)
-			require.NoError(t, err)
-			require.NotNil(t, leaseID)
-
-			require.Equal(t, 1, scard(kg.ActiveRunsSet("p", shadowPart.PartitionID)))
-			require.Equal(t, 1, scard(kg.ActiveRunsSet("account", accountID.String())))
-			require.Equal(t, 1, scard(kg.RunActiveSet(runID)))
-			require.Equal(t, 1, scard(kg.ActiveSet("p", fnID.String())))
-			require.Equal(t, 1, scard(kg.ActiveSet("account", accountID.String())))
-
-			// requeue to backlog
-			requeueAt := clock.Now().Add(time.Minute)
-			enqueueToBacklog = true
-			require.NoError(t, shard.Requeue(ctx, i, requeueAt))
-
-			require.Equal(t, 0, scard(kg.ActiveRunsSet("p", shadowPart.PartitionID)))
-			require.Equal(t, 0, scard(kg.ActiveRunsSet("account", accountID.String())))
-			require.Equal(t, 0, scard(kg.RunActiveSet(runID)))
-			require.Equal(t, 0, scard(kg.ActiveSet("p", fnID.String())))
-			require.Equal(t, 0, scard(kg.ActiveSet("account", accountID.String())))
-		})
-
-		t.Run("from backlog, dequeue", func(t *testing.T) {
-			r.FlushAll()
-
-			// enqueue to backlog
-			enqueueToBacklog = true
-			i, err := shard.EnqueueItem(ctx, item, at, osqueue.EnqueueOpts{})
-			require.NoError(t, err)
-
-			shadowPart := osqueue.ItemShadowPartition(ctx, item)
-			backlog := osqueue.ItemBacklog(ctx, item)
-
-			refillUntil := at.Add(time.Minute)
-
-			require.Equal(t, 0, scard(kg.ActiveRunsSet("p", shadowPart.PartitionID)))
-			require.Equal(t, 0, scard(kg.ActiveRunsSet("account", accountID.String())))
-			require.Equal(t, 0, scard(kg.RunActiveSet(runID)))
-			require.Equal(t, 0, scard(kg.ActiveSet("p", fnID.String())))
-			require.Equal(t, 0, scard(kg.ActiveSet("account", accountID.String())))
-
-			require.Empty(t, i.RefilledFrom)
-			require.Zero(t, i.RefilledAt)
-
-			// refill
-			// Get items to refill from backlog
-			itemIDs, err := getItemIDsFromBacklog(ctx, shard, &backlog, refillUntil, 1000)
-			require.NoError(t, err)
-
-			res, err := shard.BacklogRefill(ctx, &backlog, &shadowPart, refillUntil, itemIDs, osqueue.PartitionConstraintConfig{
-				Concurrency: osqueue.PartitionConcurrency{
-					SystemConcurrency:   consts.DefaultConcurrencyLimit,
-					AccountConcurrency:  consts.DefaultConcurrencyLimit,
-					FunctionConcurrency: consts.DefaultConcurrencyLimit,
-				},
-			})
-			require.NoError(t, err)
-
-			require.Equal(t, 1, res.Refilled)
-
-			require.Equal(t, 1, scard(kg.ActiveRunsSet("p", shadowPart.PartitionID)))
-			require.Equal(t, 1, scard(kg.ActiveRunsSet("account", accountID.String())))
-			require.Equal(t, 1, scard(kg.RunActiveSet(runID)))
-			require.Equal(t, 1, scard(kg.ActiveSet("p", fnID.String())))
-			require.Equal(t, 1, scard(kg.ActiveSet("account", accountID.String())))
-
-			currentItemStr := r.HGet(kg.QueueItem(), i.ID)
-			require.NoError(t, json.Unmarshal([]byte(currentItemStr), &i))
-			require.Equal(t, backlog.BacklogID, i.RefilledFrom)
-			require.Equal(t, clock.Now(), time.UnixMilli(i.RefilledAt))
-
-			// lease
-			leaseID, err := shard.Lease(ctx, i, 10*time.Second, clock.Now(), nil)
-			require.NoError(t, err)
-			require.NotNil(t, leaseID)
-
-			require.Equal(t, 1, scard(kg.ActiveRunsSet("p", shadowPart.PartitionID)))
-			require.Equal(t, 1, scard(kg.ActiveRunsSet("account", accountID.String())))
-			require.Equal(t, 1, scard(kg.RunActiveSet(runID)))
-			require.Equal(t, 1, scard(kg.ActiveSet("p", fnID.String())))
-			require.Equal(t, 1, scard(kg.ActiveSet("account", accountID.String())))
-
-			// dequeue
-			require.NoError(t, shard.Dequeue(ctx, i))
-
-			require.Equal(t, 0, scard(kg.ActiveRunsSet("p", shadowPart.PartitionID)))
-			require.Equal(t, 0, scard(kg.ActiveRunsSet("account", accountID.String())))
-			require.Equal(t, 0, scard(kg.RunActiveSet(runID)))
-			require.Equal(t, 0, scard(kg.ActiveSet("p", fnID.String())))
-			require.Equal(t, 0, scard(kg.ActiveSet("account", accountID.String())))
-		})
-
-		t.Run("from ready queue, requeue", func(t *testing.T) {
-			r.FlushAll()
-
-			// enqueue to backlog
-			enqueueToBacklog = false
-			i, err := shard.EnqueueItem(ctx, item, at, osqueue.EnqueueOpts{})
-			require.NoError(t, err)
-
-			shadowPart := osqueue.ItemShadowPartition(ctx, item)
-
-			require.Equal(t, 0, scard(kg.ActiveRunsSet("p", shadowPart.PartitionID)))
-			require.Equal(t, 0, scard(kg.ActiveRunsSet("account", accountID.String())))
-			require.Equal(t, 0, scard(kg.RunActiveSet(runID)))
-			require.Equal(t, 0, scard(kg.ActiveSet("p", fnID.String())))
-			require.Equal(t, 0, scard(kg.ActiveSet("account", accountID.String())))
-
-			// lease
-			leaseID, err := shard.Lease(ctx, i, 10*time.Second, clock.Now(), nil)
-			require.NoError(t, err)
-			require.NotNil(t, leaseID)
-
-			require.Equal(t, 1, scard(kg.ActiveRunsSet("p", shadowPart.PartitionID)))
-			require.Equal(t, 1, scard(kg.ActiveRunsSet("account", accountID.String())))
-			require.Equal(t, 1, scard(kg.RunActiveSet(runID)))
-			require.Equal(t, 1, scard(kg.ActiveSet("p", fnID.String())))
-			require.Equal(t, 1, scard(kg.ActiveSet("account", accountID.String())))
-
-			// requeue to ready partition
-			requeueAt := clock.Now().Add(time.Minute)
-			enqueueToBacklog = false
-			require.NoError(t, shard.Requeue(ctx, i, requeueAt))
-
-			require.Equal(t, 0, scard(kg.ActiveRunsSet("p", shadowPart.PartitionID)))
-			require.Equal(t, 0, scard(kg.ActiveRunsSet("account", accountID.String())))
-			require.Equal(t, 0, scard(kg.RunActiveSet(runID)))
-			require.Equal(t, 0, scard(kg.ActiveSet("p", fnID.String())))
-			require.Equal(t, 0, scard(kg.ActiveSet("account", accountID.String())))
-		})
-
-		t.Run("from ready queue, dequeue", func(t *testing.T) {
-			r.FlushAll()
-
-			// enqueue to backlog
-			enqueueToBacklog = false
-			i, err := shard.EnqueueItem(ctx, item, at, osqueue.EnqueueOpts{})
-			require.NoError(t, err)
-
-			shadowPart := osqueue.ItemShadowPartition(ctx, item)
-
-			require.Equal(t, 0, scard(kg.ActiveRunsSet("p", shadowPart.PartitionID)))
-			require.Equal(t, 0, scard(kg.ActiveRunsSet("account", accountID.String())))
-			require.Equal(t, 0, scard(kg.RunActiveSet(runID)))
-			require.Equal(t, 0, scard(kg.ActiveSet("p", fnID.String())))
-			require.Equal(t, 0, scard(kg.ActiveSet("account", accountID.String())))
-
-			// lease
-			leaseID, err := shard.Lease(ctx, i, 10*time.Second, clock.Now(), nil)
-			require.NoError(t, err)
-			require.NotNil(t, leaseID)
-
-			require.Equal(t, 1, scard(kg.ActiveRunsSet("p", shadowPart.PartitionID)))
-			require.Equal(t, 1, scard(kg.ActiveRunsSet("account", accountID.String())))
-			require.Equal(t, 1, scard(kg.RunActiveSet(runID)))
-			require.Equal(t, 1, scard(kg.ActiveSet("p", fnID.String())))
-			require.Equal(t, 1, scard(kg.ActiveSet("account", accountID.String())))
-
-			// dequeue
-			require.NoError(t, shard.Dequeue(ctx, i))
-
-			require.Equal(t, 0, scard(kg.ActiveRunsSet("p", shadowPart.PartitionID)))
-			require.Equal(t, 0, scard(kg.ActiveRunsSet("account", accountID.String())))
-			require.Equal(t, 0, scard(kg.RunActiveSet(runID)))
-			require.Equal(t, 0, scard(kg.ActiveSet("p", fnID.String())))
-			require.Equal(t, 0, scard(kg.ActiveSet("account", accountID.String())))
-		})
-	})
-
-	t.Run("multiple items", func(t *testing.T) {
-		runIDA := ulid.MustNew(ulid.Timestamp(clock.Now()), rand.Reader)
-
-		itemA1 := osqueue.QueueItem{
-			FunctionID:  fnID,
-			WorkspaceID: envID,
-			Data: osqueue.Item{
-				WorkspaceID: envID,
-				Kind:        osqueue.KindEdge,
-				Identifier: state.Identifier{
-					WorkflowID:  fnID,
-					AccountID:   accountID,
-					WorkspaceID: envID,
-					RunID:       runIDA,
-				},
-				QueueName:             nil,
-				Throttle:              nil,
-				CustomConcurrencyKeys: nil,
-			},
-			QueueName: nil,
-		}
-
-		itemA2 := osqueue.QueueItem{
-			FunctionID:  fnID,
-			WorkspaceID: envID,
-			Data: osqueue.Item{
-				WorkspaceID: envID,
-				Kind:        osqueue.KindEdge,
-				Identifier: state.Identifier{
-					WorkflowID:  fnID,
-					AccountID:   accountID,
-					WorkspaceID: envID,
-					RunID:       runIDA,
-				},
-				QueueName:             nil,
-				Throttle:              nil,
-				CustomConcurrencyKeys: nil,
-			},
-			QueueName: nil,
-		}
-
-		runIDB := ulid.MustNew(ulid.Timestamp(clock.Now()), rand.Reader)
-
-		itemB1 := osqueue.QueueItem{
-			FunctionID:  fnID,
-			WorkspaceID: envID,
-			Data: osqueue.Item{
-				WorkspaceID: envID,
-				Kind:        osqueue.KindEdge,
-				Identifier: state.Identifier{
-					WorkflowID:  fnID,
-					AccountID:   accountID,
-					WorkspaceID: envID,
-					RunID:       runIDB,
-				},
-				QueueName:             nil,
-				Throttle:              nil,
-				CustomConcurrencyKeys: nil,
-			},
-			QueueName: nil,
-		}
-
-		itemB2 := osqueue.QueueItem{
-			FunctionID:  fnID,
-			WorkspaceID: envID,
-			Data: osqueue.Item{
-				WorkspaceID: envID,
-				Kind:        osqueue.KindEdge,
-				Identifier: state.Identifier{
-					WorkflowID:  fnID,
-					AccountID:   accountID,
-					WorkspaceID: envID,
-					RunID:       runIDB,
-				},
-				QueueName:             nil,
-				Throttle:              nil,
-				CustomConcurrencyKeys: nil,
-			},
-			QueueName: nil,
-		}
-
-		at := clock.Now()
-
-		t.Run("from backlog, requeue", func(t *testing.T) {
-			r.FlushAll()
-
-			//
-			// Enqueue all
-			//
-
-			// enqueue to backlog
-			enqueueToBacklog = true
-			iA1, err := shard.EnqueueItem(ctx, itemA1, at, osqueue.EnqueueOpts{})
-			require.NoError(t, err)
-			iA2, err := shard.EnqueueItem(ctx, itemA2, at, osqueue.EnqueueOpts{})
-			require.NoError(t, err)
-			iB1, err := shard.EnqueueItem(ctx, itemB1, at, osqueue.EnqueueOpts{})
-			require.NoError(t, err)
-			iB2, err := shard.EnqueueItem(ctx, itemB2, at, osqueue.EnqueueOpts{})
-			require.NoError(t, err)
-
-			shadowPart := osqueue.ItemShadowPartition(ctx, itemA1)
-			backlog := osqueue.ItemBacklog(ctx, itemA1)
-
-			refillUntil := at.Add(time.Minute)
-
-			require.Equal(t, 0, scard(kg.ActiveRunsSet("p", shadowPart.PartitionID)))
-			require.Equal(t, 0, scard(kg.ActiveRunsSet("account", accountID.String())))
-			require.Equal(t, 0, scard(kg.RunActiveSet(runIDA)))
-			require.Equal(t, 0, scard(kg.RunActiveSet(runIDB)))
-			require.Equal(t, 0, scard(kg.ActiveSet("p", fnID.String())))
-			require.Equal(t, 0, scard(kg.ActiveSet("account", accountID.String())))
-
-			require.Empty(t, iA1.RefilledFrom)
-			require.Zero(t, iA1.RefilledAt)
-
-			//
-			// Refill all
-			//
-
-			// refill
-			// Get items to refill from backlog
-			itemIDs, err := getItemIDsFromBacklog(ctx, shard, &backlog, refillUntil, 1000)
-			require.NoError(t, err)
-
-			res, err := shard.BacklogRefill(ctx, &backlog, &shadowPart, refillUntil, itemIDs, osqueue.PartitionConstraintConfig{
-				Concurrency: osqueue.PartitionConcurrency{
-					SystemConcurrency:   consts.DefaultConcurrencyLimit,
-					AccountConcurrency:  consts.DefaultConcurrencyLimit,
-					FunctionConcurrency: consts.DefaultConcurrencyLimit,
-				},
-			})
-			require.NoError(t, err)
-
-			require.Equal(t, 4, res.Refilled)
-
-			require.Equal(t, 2, scard(kg.ActiveRunsSet("p", shadowPart.PartitionID)))
-			require.Equal(t, 2, scard(kg.ActiveRunsSet("account", accountID.String())))
-			require.Equal(t, 2, scard(kg.RunActiveSet(runIDA)))
-			require.Equal(t, 2, scard(kg.RunActiveSet(runIDB)))
-			require.Equal(t, 4, scard(kg.ActiveSet("p", fnID.String())))
-			require.Equal(t, 4, scard(kg.ActiveSet("account", accountID.String())))
-
-			//
-			// Process A1
-			//
-
-			currentItemStr := r.HGet(kg.QueueItem(), iA1.ID)
-			require.NoError(t, json.Unmarshal([]byte(currentItemStr), &iA1))
-			require.Equal(t, backlog.BacklogID, iA1.RefilledFrom)
-			require.Equal(t, clock.Now(), time.UnixMilli(iA1.RefilledAt))
-
-			// lease
-			leaseID, err := shard.Lease(ctx, iA1, 10*time.Second, clock.Now(), nil)
-			require.NoError(t, err)
-			require.NotNil(t, leaseID)
-
-			require.Equal(t, 2, scard(kg.ActiveRunsSet("p", shadowPart.PartitionID)))
-			require.Equal(t, 2, scard(kg.ActiveRunsSet("account", accountID.String())))
-			require.Equal(t, 2, scard(kg.RunActiveSet(runIDA)))
-			require.Equal(t, 2, scard(kg.RunActiveSet(runIDB)))
-			require.Equal(t, 4, scard(kg.ActiveSet("p", fnID.String())))
-			require.Equal(t, 4, scard(kg.ActiveSet("account", accountID.String())))
-
-			// requeue to backlog
-			requeueAt := clock.Now().Add(time.Minute)
-			enqueueToBacklog = true
-			require.NoError(t, shard.Requeue(ctx, iA1, requeueAt))
-
-			require.Equal(t, 2, scard(kg.ActiveRunsSet("p", shadowPart.PartitionID)))
-			require.Equal(t, 2, scard(kg.ActiveRunsSet("account", accountID.String())))
-			require.Equal(t, 1, scard(kg.RunActiveSet(runIDA)))
-			require.Equal(t, 2, scard(kg.RunActiveSet(runIDB)))
-			require.Equal(t, 3, scard(kg.ActiveSet("p", fnID.String())))
-			require.Equal(t, 3, scard(kg.ActiveSet("account", accountID.String())))
-
-			//
-			// Process A2
-			//
-
-			currentItemStr = r.HGet(kg.QueueItem(), iA2.ID)
-			require.NoError(t, json.Unmarshal([]byte(currentItemStr), &iA2))
-
-			// lease
-			leaseID, err = shard.Lease(ctx, iA2, 10*time.Second, clock.Now(), nil)
-			require.NoError(t, err)
-			require.NotNil(t, leaseID)
-
-			require.Equal(t, 2, scard(kg.ActiveRunsSet("p", shadowPart.PartitionID)))
-			require.Equal(t, 2, scard(kg.ActiveRunsSet("account", accountID.String())))
-			require.Equal(t, 1, scard(kg.RunActiveSet(runIDA)))
-			require.Equal(t, 2, scard(kg.RunActiveSet(runIDB)))
-			require.Equal(t, 3, scard(kg.ActiveSet("p", fnID.String())))
-			require.Equal(t, 3, scard(kg.ActiveSet("account", accountID.String())))
-
-			// requeue to backlog
-			requeueAt = clock.Now().Add(time.Minute)
-			enqueueToBacklog = true
-			require.NoError(t, shard.Requeue(ctx, iA2, requeueAt))
-
-			require.Equal(t, 1, scard(kg.ActiveRunsSet("p", shadowPart.PartitionID)))
-			require.Equal(t, 1, scard(kg.ActiveRunsSet("account", accountID.String())))
-			require.Equal(t, 0, scard(kg.RunActiveSet(runIDA)))
-			require.Equal(t, 2, scard(kg.RunActiveSet(runIDB)))
-			require.Equal(t, 2, scard(kg.ActiveSet("p", fnID.String())))
-			require.Equal(t, 2, scard(kg.ActiveSet("account", accountID.String())))
-
-			//
-			// Process B1
-			//
-
-			currentItemStr = r.HGet(kg.QueueItem(), iB1.ID)
-			require.NoError(t, json.Unmarshal([]byte(currentItemStr), &iB1))
-			_, err = shard.Lease(ctx, iB1, 10*time.Second, clock.Now(), nil)
-			require.NoError(t, err)
-			require.NoError(t, shard.Requeue(ctx, iB1, requeueAt))
-
-			require.Equal(t, 1, scard(kg.ActiveRunsSet("p", shadowPart.PartitionID)))
-			require.Equal(t, 1, scard(kg.ActiveRunsSet("account", accountID.String())))
-			require.Equal(t, 0, scard(kg.RunActiveSet(runIDA)))
-			require.Equal(t, 1, scard(kg.RunActiveSet(runIDB)))
-			require.Equal(t, 1, scard(kg.ActiveSet("p", fnID.String())))
-			require.Equal(t, 1, scard(kg.ActiveSet("account", accountID.String())))
-
-			//
-			// Process B2
-			//
-
-			currentItemStr = r.HGet(kg.QueueItem(), iB2.ID)
-			require.NoError(t, json.Unmarshal([]byte(currentItemStr), &iB2))
-			_, err = shard.Lease(ctx, iB2, 10*time.Second, clock.Now(), nil)
-			require.NoError(t, err)
-			require.NoError(t, shard.Requeue(ctx, iB2, requeueAt))
-
-			require.Equal(t, 0, scard(kg.ActiveRunsSet("p", shadowPart.PartitionID)))
-			require.Equal(t, 0, scard(kg.ActiveRunsSet("account", accountID.String())))
-			require.Equal(t, 0, scard(kg.RunActiveSet(runIDA)))
-			require.Equal(t, 0, scard(kg.RunActiveSet(runIDB)))
-			require.Equal(t, 0, scard(kg.ActiveSet("p", fnID.String())))
-			require.Equal(t, 0, scard(kg.ActiveSet("account", accountID.String())))
-		})
-	})
-}
-
 func score(t *testing.T, r *miniredis.Miniredis, key string, member string) float64 {
 	require.True(t, r.Exists(key), r.Keys())
 
@@ -4132,10 +3300,9 @@ func TestInvalidScoreOnRefill(t *testing.T) {
 			qi.ID,
 			qi2.ID,
 		},
-		constraints,
 	)
 	require.NoError(t, err)
 
-	require.Equal(t, 1, res.Refilled)
+	require.Equal(t, 1, len(res.RefilledItems))
 	require.Equal(t, qi2.ID, res.RefilledItems[0])
 }

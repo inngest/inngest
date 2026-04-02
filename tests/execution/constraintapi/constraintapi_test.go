@@ -97,9 +97,6 @@ func TestConstraintEnforcement(t *testing.T) {
 			queueOpts := []queue.QueueOpt{
 				queue.WithClock(clock),
 				queue.WithCapacityManager(cm),
-				queue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) bool {
-					return true
-				}),
 				queue.WithAcquireCapacityLeaseOnBacklogRefill(true),
 				queue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p queue.PartitionIdentifier) queue.PartitionConstraintConfig {
 					return test.queueConstraints
