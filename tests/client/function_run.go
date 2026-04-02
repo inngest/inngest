@@ -160,8 +160,22 @@ type Run struct {
 func (c *Client) Run(ctx context.Context, runID string) Run {
 	c.Helper()
 
+	run, err := c.TryRun(ctx, runID)
+	if err != nil {
+		c.Fatal(err.Error())
+	}
+	return run
+}
+
+// TryRun is like Run but returns an error instead of calling Fatal, making it
+// safe to use inside polling loops such as WaitForRunStatus where transient
+// errors (e.g. "not found") should be retried rather than immediately failing
+// the test.
+func (c *Client) TryRun(ctx context.Context, runID string) (Run, error) {
+	c.Helper()
+
 	if runID == "" {
-		c.Fatalf("runID cannot be empty")
+		return Run{}, fmt.Errorf("runID cannot be empty")
 	}
 
 	query := `
@@ -172,14 +186,17 @@ func (c *Client) Run(ctx context.Context, runID string) Run {
 			}
 		}`
 
-	resp := c.MustDoGQL(ctx, graphql.RawParams{
+	resp, err := c.DoGQL(ctx, graphql.RawParams{
 		Query: query,
 		Variables: map[string]any{
 			"runID": runID,
 		},
 	})
+	if err != nil {
+		return Run{}, err
+	}
 	if len(resp.Errors) > 0 {
-		c.Fatalf("err with gql: %#v", resp.Errors)
+		return Run{}, fmt.Errorf("err with gql: %#v", resp.Errors)
 	}
 
 	type response struct {
@@ -188,10 +205,10 @@ func (c *Client) Run(ctx context.Context, runID string) Run {
 
 	data := &response{}
 	if err := json.Unmarshal(resp.Data, data); err != nil {
-		c.Fatal(err.Error())
+		return Run{}, err
 	}
 
-	return data.FunctionRun
+	return data.FunctionRun, nil
 }
 
 type WaitForRunStatusOpts struct {
@@ -216,11 +233,22 @@ func (c *Client) WaitForRunStatus(
 	}
 
 	start := time.Now()
-	var run Run
+	var (
+		run     Run
+		lastErr error
+	)
 	for {
-		run = c.Run(ctx, runID)
-		if run.Status == expectedStatus {
-			return run
+		var err error
+		run, err = c.TryRun(ctx, runID)
+		if err != nil {
+			// Transient GQL errors (e.g. "not found" while the run is
+			// still being created) should be retried, not fatal.
+			lastErr = err
+		} else {
+			lastErr = nil
+			if run.Status == expectedStatus {
+				return run
+			}
 		}
 
 		if time.Since(start) > timeout {
@@ -229,6 +257,9 @@ func (c *Client) WaitForRunStatus(
 		time.Sleep(100 * time.Millisecond)
 	}
 
+	if lastErr != nil {
+		require.Failf(t, "run query failed", "last error querying run %s: %v", runID, lastErr)
+	}
 	require.Failf(t, "status didn't match", "didn't get expected status: %s, got %s (runID: %s)", expectedStatus, run.Status, runID)
 	return run
 }

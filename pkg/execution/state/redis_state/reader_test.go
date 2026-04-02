@@ -906,7 +906,10 @@ func TestItemsByBacklog(t *testing.T) {
 	defer rc.Close()
 
 	ctx := context.Background()
-	clock := clockwork.NewFakeClock()
+	// Use a deterministic clock time with a sub-second offset so that
+	// Truncate(time.Second) always rounds down, avoiding off-by-one
+	// boundary issues when the clock happens to start at an exact second.
+	clock := clockwork.NewFakeClockAt(time.Date(2024, 1, 1, 0, 0, 0, 500_000_000, time.UTC))
 
 	acctId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
 

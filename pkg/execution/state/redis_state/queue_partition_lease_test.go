@@ -17,7 +17,12 @@ import (
 )
 
 func TestQueuePartitionLease(t *testing.T) {
-	now := time.Now().Truncate(time.Second)
+	// Add a buffer before truncating so that enqueue times are never in the
+	// past relative to the wall clock.  When at.Before(clock.Now()) inside
+	// EnqueueItem the partition score is set to clock.Now() instead of the
+	// provided `at`, which can make two partitions share the same
+	// Unix-second score and produce non-deterministic ordering.
+	now := time.Now().Add(2 * time.Second).Truncate(time.Second)
 
 	idA, idB, idC := uuid.New(), uuid.New(), uuid.New()
 	atA, atB, atC := now, now.Add(time.Second), now.Add(2*time.Second)

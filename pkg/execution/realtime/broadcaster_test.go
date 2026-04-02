@@ -142,12 +142,19 @@ func TestBroadcaster(t *testing.T) {
 			require.Equal(t, 0, len(messages))
 			l.Unlock()
 
-			<-time.After(WriteRetryInterval + (5 * time.Millisecond))
+			// Poll for the retried message instead of using a fixed sleep.
+			// The retry goroutine's timer starts only when it is scheduled,
+			// so a tight fixed buffer after WriteRetryInterval can miss it
+			// on slow CI runners.
+			require.Eventually(t, func() bool {
+				l.Lock()
+				defer l.Unlock()
+				return len(messages) == 1
+			}, WriteRetryInterval+time.Second, 50*time.Millisecond)
 
 			l.Lock()
-			require.Equal(t, 1, len(messages))
-			l.Unlock()
 			require.Equal(t, msg, messages[0])
+			l.Unlock()
 		})
 	})
 }
