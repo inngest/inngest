@@ -83,7 +83,7 @@
       "nodemon": ">=3.0.0",
       "nodemon>minimatch": "10.2.4",
       "nodemon>brace-expansion": "5.0.5",
-      "@urql/core": "4.1.1"
+      "@urql/core": "6.0.1"
     },
     "onlyBuiltDependencies": [
       "@sentry/cli",
