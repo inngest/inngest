@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -497,7 +496,7 @@ func (a *api) publishStream(w http.ResponseWriter, r *http.Request) {
 	// We must create a new random stream ID for the data stream, allowing
 	// all published chunks to be associated with each other.
 	sID := util.XXHash(time.Now())
-	msg.Data = json.RawMessage(fmt.Sprintf("%q", sID))
+	msg.Data = []byte(sID)
 
 	if err := msg.Validate(); err != nil {
 		http.Error(w, err.Error(), 400)
