@@ -433,25 +433,9 @@ func (q *queueProcessor) ProcessShadowPartitionBacklog(
 		return nil, enums.QueueConstraintNotLimited, nil
 	}
 
-	refillLimit := q.backlogRefillLimit
-	if refillLimit <= 0 {
-		refillLimit = BacklogRefillHardLimit
-	}
-
-	// Limit backlog peek to maximum lease generation
-	// TODO: Run multiple requests, etc. to balance peek size and throughput
-	if shadowPart.AccountID != nil {
-		refillLimit = constraintapi.MaximumAmount
-	}
-
-	// Cap at custom limit
-	if q.backlogRefillLimit > 0 && refillLimit > q.backlogRefillLimit {
+	refillLimit := int64(constraintapi.MaximumAmount)
+	if q.backlogRefillLimit > 0 && q.backlogRefillLimit < refillLimit {
 		refillLimit = q.backlogRefillLimit
-	}
-
-	// Cap at hard limit
-	if refillLimit > BacklogRefillHardLimit {
-		refillLimit = BacklogRefillHardLimit
 	}
 
 	// Peek items (scheduled to run within the next 2s) to be refilled.
