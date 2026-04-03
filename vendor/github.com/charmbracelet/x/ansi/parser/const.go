@@ -1,3 +1,4 @@
+// Package parser provides ANSI escape sequence parsing functionality.
 package parser
 
 // Action is a DEC ANSI parser action.
@@ -8,7 +9,7 @@ const (
 	NoneAction Action = iota
 	ClearAction
 	CollectAction
-	MarkerAction
+	PrefixAction
 	DispatchAction
 	ExecuteAction
 	StartAction // Start of a data string
@@ -19,12 +20,12 @@ const (
 	IgnoreAction = NoneAction
 )
 
-// nolint: unused
+// ActionNames provides string names for parser actions.
 var ActionNames = []string{
 	"NoneAction",
 	"ClearAction",
 	"CollectAction",
-	"MarkerAction",
+	"PrefixAction",
 	"DispatchAction",
 	"ExecuteAction",
 	"StartAction",
@@ -58,7 +59,7 @@ const (
 	Utf8State
 )
 
-// nolint: unused
+// StateNames provides string names for parser states.
 var StateNames = []string{
 	"GroundState",
 	"CsiEntryState",

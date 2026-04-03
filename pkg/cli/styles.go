@@ -1,23 +1,26 @@
 package cli
 
-import "github.com/charmbracelet/lipgloss"
+import (
+	lipgloss "charm.land/lipgloss/v2"
+	"charm.land/lipgloss/v2/compat"
+)
 
 var (
-	Color   = lipgloss.AdaptiveColor{Light: "#111222", Dark: "#FAFAFA"}
+	Color   = compat.AdaptiveColor{Light: lipgloss.Color("#111222"), Dark: lipgloss.Color("#FAFAFA")}
 	Primary = lipgloss.Color("#4636f5")
 	Green   = lipgloss.Color("#9dcc3a")
 	Red     = lipgloss.Color("#ff0000")
 	White   = lipgloss.Color("#ffffff")
 	Black   = lipgloss.Color("#000000")
 	Orange  = lipgloss.Color("#D3A347")
-	Feint   = lipgloss.AdaptiveColor{Light: "#333333", Dark: "#888888"}
+	Feint   = compat.AdaptiveColor{Light: lipgloss.Color("#333333"), Dark: lipgloss.Color("#888888")}
 	Iris    = lipgloss.Color("#5D5FEF")
 	Fuschia = lipgloss.Color("#EF5DA8")
 
 	TextStyle    = lipgloss.NewStyle().Foreground(Color)
-	FeintStyle   = TextStyle.Copy().Foreground(Feint)
-	BoldStyle    = TextStyle.Copy().Bold(true)
-	WarningStyle = TextStyle.Copy().Foreground(Orange)
+	FeintStyle   = TextStyle.Foreground(Feint)
+	BoldStyle    = TextStyle.Bold(true)
+	WarningStyle = TextStyle.Foreground(Orange)
 )
 
 // RenderError returns a formatted error string.

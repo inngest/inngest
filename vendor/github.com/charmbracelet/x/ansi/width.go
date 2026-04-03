@@ -4,7 +4,6 @@ import (
 	"bytes"
 
 	"github.com/charmbracelet/x/ansi/parser"
-	"github.com/rivo/uniseg"
 )
 
 // Strip removes ANSI escape codes from a string.
@@ -18,7 +17,7 @@ func Strip(s string) string {
 
 	// This implements a subset of the Parser to only collect runes and
 	// printable characters.
-	for i := 0; i < len(s); i++ {
+	for i := range len(s) {
 		if pstate == parser.Utf8State {
 			// During this state, collect rw bytes to form a valid rune in the
 			// buffer. After getting all the rune bytes into the buffer,
@@ -62,23 +61,36 @@ func Strip(s string) string {
 // cells that the string will occupy when printed in a terminal. ANSI escape
 // codes are ignored and wide characters (such as East Asians and emojis) are
 // accounted for.
+// This treats the text as a sequence of grapheme clusters.
 func StringWidth(s string) int {
+	return stringWidth(GraphemeWidth, s)
+}
+
+// StringWidthWc returns the width of a string in cells. This is the number of
+// cells that the string will occupy when printed in a terminal. ANSI escape
+// codes are ignored and wide characters (such as East Asians and emojis) are
+// accounted for.
+// This treats the text as a sequence of wide characters and runes.
+func StringWidthWc(s string) int {
+	return stringWidth(WcWidth, s)
+}
+
+func stringWidth(m Method, s string) int {
 	if s == "" {
 		return 0
 	}
 
 	var (
-		pstate  = parser.GroundState // initial state
-		cluster string
-		width   int
+		pstate = parser.GroundState // initial state
+		width  int
 	)
 
 	for i := 0; i < len(s); i++ {
 		state, action := parser.Table.Transition(pstate, s[i])
 		if state == parser.Utf8State {
-			var w int
-			cluster, _, w, _ = uniseg.FirstGraphemeClusterInString(s[i:], -1)
+			cluster, w := FirstGraphemeCluster(s[i:], m)
 			width += w
+
 			i += len(cluster) - 1
 			pstate = parser.GroundState
 			continue

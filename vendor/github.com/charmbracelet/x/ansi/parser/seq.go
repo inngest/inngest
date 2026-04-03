@@ -4,9 +4,9 @@ import "math"
 
 // Shift and masks for sequence parameters and intermediates.
 const (
-	MarkerShift    = 8
+	PrefixShift    = 8
 	IntermedShift  = 16
-	CommandMask    = 0xff
+	FinalMask      = 0xff
 	HasMoreFlag    = math.MinInt32
 	ParamMask      = ^HasMoreFlag
 	MissingParam   = ParamMask
@@ -22,12 +22,12 @@ const (
 	DefaultParamValue = 0
 )
 
-// Marker returns the marker byte of the sequence.
+// Prefix returns the prefix byte of the sequence.
 // This is always gonna be one of the following '<' '=' '>' '?' and in the
 // range of 0x3C-0x3F.
-// Zero is returned if the sequence does not have a marker.
-func Marker(cmd int) int {
-	return (cmd >> MarkerShift) & CommandMask
+// Zero is returned if the sequence does not have a prefix.
+func Prefix(cmd int) int {
+	return (cmd >> PrefixShift) & FinalMask
 }
 
 // Intermediate returns the intermediate byte of the sequence.
@@ -36,12 +36,12 @@ func Marker(cmd int) int {
 // ',', '-', '.', '/'.
 // Zero is returned if the sequence does not have an intermediate byte.
 func Intermediate(cmd int) int {
-	return (cmd >> IntermedShift) & CommandMask
+	return (cmd >> IntermedShift) & FinalMask
 }
 
 // Command returns the command byte of the CSI sequence.
 func Command(cmd int) int {
-	return cmd & CommandMask
+	return cmd & FinalMask
 }
 
 // Param returns the parameter at the given index.
@@ -78,7 +78,7 @@ func Subparams(params []int, i int) []int {
 	// Count the number of parameters before the given parameter index.
 	var count int
 	var j int
-	for j = 0; j < len(params); j++ {
+	for j = range params {
 		if count == i {
 			break
 		}
@@ -116,7 +116,7 @@ func Subparams(params []int, i int) []int {
 // sub-parameters.
 func Len(params []int) int {
 	var n int
-	for i := 0; i < len(params); i++ {
+	for i := range params {
 		if !HasMore(params, i) {
 			n++
 		}
@@ -128,7 +128,7 @@ func Len(params []int) int {
 // function for each parameter.
 // The function should return false to stop the iteration.
 func Range(params []int, fn func(i int, param int, hasMore bool) bool) {
-	for i := 0; i < len(params); i++ {
+	for i := range params {
 		if !fn(i, Param(params, i), HasMore(params, i)) {
 			break
 		}

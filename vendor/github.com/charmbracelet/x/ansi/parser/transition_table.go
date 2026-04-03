@@ -30,7 +30,7 @@ func NewTransitionTable(size int) TransitionTable {
 
 // SetDefault sets default transition.
 func (t TransitionTable) SetDefault(action Action, state State) {
-	for i := 0; i < len(t); i++ {
+	for i := range t {
 		t[i] = action<<TransitionActionShift | state
 	}
 }
@@ -63,7 +63,7 @@ func (t TransitionTable) Transition(state State, code byte) (State, Action) {
 	return value & TransitionStateMask, value >> TransitionActionShift
 }
 
-// byte range macro
+// byte range macro.
 func r(start, end byte) []byte {
 	var a []byte
 	for i := int(start); i <= int(end); i++ {
@@ -178,7 +178,7 @@ func GenerateTransitionTable() TransitionTable {
 	table.AddRange(0x20, 0x2F, DcsEntryState, CollectAction, DcsIntermediateState)
 	// Dcs_entry -> Dcs_param
 	table.AddRange(0x30, 0x3B, DcsEntryState, ParamAction, DcsParamState)
-	table.AddRange(0x3C, 0x3F, DcsEntryState, MarkerAction, DcsParamState)
+	table.AddRange(0x3C, 0x3F, DcsEntryState, PrefixAction, DcsParamState)
 	// Dcs_entry -> Dcs_passthrough
 	table.AddRange(0x08, 0x0D, DcsEntryState, PutAction, DcsStringState) // Follows ECMA-48 § 8.3.27
 	// XXX: allows passing ESC (not a ECMA-48 standard) this to allow for
@@ -254,7 +254,7 @@ func GenerateTransitionTable() TransitionTable {
 	table.AddRange(0x20, 0x2F, CsiEntryState, CollectAction, CsiIntermediateState)
 	// Csi_entry -> Csi_param
 	table.AddRange(0x30, 0x3B, CsiEntryState, ParamAction, CsiParamState)
-	table.AddRange(0x3C, 0x3F, CsiEntryState, MarkerAction, CsiParamState)
+	table.AddRange(0x3C, 0x3F, CsiEntryState, PrefixAction, CsiParamState)
 
 	// Osc_string
 	table.AddRange(0x00, 0x06, OscStringState, IgnoreAction, OscStringState)
