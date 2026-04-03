@@ -239,7 +239,6 @@ func (q *queueProcessor) BacklogRefillConstraintCheck(
 		FunctionID:           *shadowPart.FunctionID,
 		CurrentTime:          now,
 		Duration:             QueueLeaseDuration,
-		Configuration:        config,
 		Constraints:          constraintsToCheck,
 		Configuration:        ConstraintConfigFromConstraints(constraints),
 		Amount:               len(items),
@@ -398,7 +397,7 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 		}
 
 		// claim everything from the constraint api: concurrency, keys, throttles, etc.
-		constraintItems = constraintItemsFromBacklog(shadowPart, backlog, constraints)
+		constraintItems = constraintItemsFromBacklog(backlog, constraints)
 		config = ConstraintConfigFromConstraints(constraints)
 	}
 
