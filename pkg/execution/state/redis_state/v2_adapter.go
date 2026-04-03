@@ -174,6 +174,9 @@ func (v v2) Create(ctx context.Context, s state.CreateState) (state.State, error
 			"account_id": s.Metadata.ID.Tenant.AccountID,
 		},
 	})
+	metrics.HistogramStateWrittenCounter(ctx, int64(stateSize), metrics.HistogramOpt{
+		PkgName: "redis_state",
+	})
 
 	steps := make(map[string]json.RawMessage)
 	for _, step := range s.Steps {
@@ -402,6 +405,9 @@ func (v v2) SaveStep(ctx context.Context, id state.ID, stepID string, data []byt
 		Tags: map[string]any{
 			"account_id": id.Tenant.AccountID,
 		},
+	})
+	metrics.HistogramStateWrittenCounter(ctx, int64(len(data)), metrics.HistogramOpt{
+		PkgName: "redis_state",
 	})
 
 	return hasPending, err

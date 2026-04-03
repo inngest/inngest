@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"time"
 
-	sqlc "github.com/inngest/inngest/pkg/cqrs/base_cqrs/sqlc/sqlite"
+	dbpkg "github.com/inngest/inngest/pkg/db"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/tracing/meta"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
@@ -16,13 +16,13 @@ const (
 	cleanAttrs = false
 )
 
-func NewSqlcTracerProvider(q sqlc.Querier) TracerProvider {
+func NewSqlcTracerProvider(q dbpkg.Querier) TracerProvider {
 	// With sqlc, write every 50.
 	return NewOtelTracerProvider(&dbExporter{q: q}, 50*time.Millisecond)
 }
 
 type dbExporter struct {
-	q sqlc.Querier
+	q dbpkg.Querier
 }
 
 func (e *dbExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlySpan) error {
@@ -217,7 +217,10 @@ func (e *dbExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlyS
 			continue
 		}
 
-		err = e.q.InsertSpan(ctx, sqlc.InsertSpanParams{
+		outputByt := anyToBytes(output)
+		inputByt := anyToBytes(input)
+
+		err = e.q.InsertSpan(ctx, dbpkg.InsertSpanParams{
 			SpanID:       spanID,
 			TraceID:      traceID,
 			ParentSpanID: sql.NullString{String: parentID, Valid: parentID != ""},
@@ -227,16 +230,16 @@ func (e *dbExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlyS
 			RunID:        runID,
 			AppID:        appID,
 			FunctionID:   functionID,
-			Attributes:   string(attrsByt),
-			Links:        string(linksByt),
+			Attributes:   attrsByt,
+			Links:        linksByt,
 			DynamicSpanID: sql.NullString{
 				String: dynamicSpanID,
 				Valid:  dynamicSpanID != "",
 			},
 			AccountID: accountID,
 			EnvID:     envID,
-			Output:    output,
-			Input:     input,
+			Output:    outputByt,
+			Input:     inputByt,
 			DebugSessionID: sql.NullString{
 				String: debugSessionID,
 				Valid:  debugSessionID != "",
@@ -249,7 +252,7 @@ func (e *dbExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlyS
 				String: status,
 				Valid:  status != "",
 			},
-			EventIds: string(eventIdsByt),
+			EventIds: eventIdsByt,
 		})
 		if err != nil {
 			logger.StdlibLogger(ctx).Error("failed to insert span into database",
@@ -270,3 +273,27 @@ func (e *dbExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlyS
 }
 
 func (e *dbExporter) Shutdown(context.Context) error { return nil }
+
+// anyToBytes converts a value to []byte for storage in a JSON column.
+// Strings and byte slices are used directly to avoid double-encoding;
+// other types are JSON-marshaled.
+func anyToBytes(v any) []byte {
+	if v == nil {
+		return nil
+	}
+	switch val := v.(type) {
+	case string:
+		if val == "" {
+			return nil
+		}
+		return []byte(val)
+	case []byte:
+		if len(val) == 0 {
+			return nil
+		}
+		return val
+	default:
+		byt, _ := json.Marshal(val)
+		return byt
+	}
+}

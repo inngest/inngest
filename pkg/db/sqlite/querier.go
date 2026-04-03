@@ -16,6 +16,15 @@ type sqliteQuerier struct {
 	q sqlc.Querier
 }
 
+// bytesToAny converts a byte slice to a string for SQLite JSON columns,
+// returning nil when the slice is empty so that NULL checks work correctly.
+func bytesToAny(b []byte) any {
+	if len(b) == 0 {
+		return nil
+	}
+	return string(b)
+}
+
 // --- Apps ---
 
 func (sq *sqliteQuerier) DeleteApp(ctx context.Context, id uuid.UUID) error {
@@ -394,10 +403,15 @@ func (sq *sqliteQuerier) InsertSpan(ctx context.Context, arg db.InsertSpanParams
 		Name: arg.Name, StartTime: arg.StartTime, EndTime: arg.EndTime,
 		RunID: arg.RunID, AccountID: arg.AccountID, AppID: arg.AppID,
 		FunctionID: arg.FunctionID, EnvID: arg.EnvID,
-		DynamicSpanID: arg.DynamicSpanID, Attributes: arg.Attributes,
-		Links: arg.Links, Output: arg.Output, Input: arg.Input,
-		DebugRunID: arg.DebugRunID, DebugSessionID: arg.DebugSessionID,
-		Status: arg.Status, EventIds: arg.EventIds,
+		DynamicSpanID:  arg.DynamicSpanID,
+		Attributes:     bytesToAny(arg.Attributes),
+		Links:          bytesToAny(arg.Links),
+		Output:         bytesToAny(arg.Output),
+		Input:          bytesToAny(arg.Input),
+		DebugRunID:     arg.DebugRunID,
+		DebugSessionID: arg.DebugSessionID,
+		Status:         arg.Status,
+		EventIds:       bytesToAny(arg.EventIds),
 	})
 }
 

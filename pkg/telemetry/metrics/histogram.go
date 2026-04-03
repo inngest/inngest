@@ -57,6 +57,22 @@ var (
 		4 * 1024 * 1024, // 4 MiB
 	}
 
+	stateStoreBytesWrittenBoundaries = []float64{
+		32,              // 32 bytes
+		128,             // 128 bytes
+		512,             // 512 bytes
+		1024,            // 1 KiB
+		4 * 1024,        // 4 KiB
+		16 * 1024,       // 16 KiB
+		64 * 1024,       // 64 KiB
+		256 * 1024,      // 256 KiB
+		512 * 1024,      // 512 KiB
+		1024 * 1024,     // 1 MiB
+		2 * 1024 * 1024, // 2 MiB
+		3 * 1024 * 1024, // 3 MiB
+		4 * 1024 * 1024, // 4 MiB
+	}
+
 	ConstraintAPIDurationBoundaries = []float64{
 		5,
 		10,
@@ -594,5 +610,16 @@ func HistogramQueueBacklogGroupingDuration(ctx context.Context, dur int64, opts 
 		Tags:        opts.Tags,
 		Unit:        "ms",
 		Boundaries:  ConstraintAPIDurationBoundaries,
+	})
+}
+
+func HistogramStateWrittenCounter(ctx context.Context, bytes int64, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, bytes, HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "state_store_bytes_written_hist",
+		Description: "Distribution of bytes written to the state store",
+		Tags:        opts.Tags,
+		Unit:        "bytes",
+		Boundaries:  stateStoreBytesWrittenBoundaries,
 	})
 }
