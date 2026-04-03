@@ -36,7 +36,10 @@ import (
 	"github.com/inngest/inngest/pkg/coreapi"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/cqrs/base_cqrs"
-	sqlc_postgres "github.com/inngest/inngest/pkg/cqrs/base_cqrs/sqlc/postgres"
+	dbpkg "github.com/inngest/inngest/pkg/db"
+	"github.com/inngest/inngest/pkg/db/driverhelp"
+	dbpostgres "github.com/inngest/inngest/pkg/db/postgres"
+	dbsqlite "github.com/inngest/inngest/pkg/db/sqlite"
 	"github.com/inngest/inngest/pkg/debugapi"
 	"github.com/inngest/inngest/pkg/deploy"
 	"github.com/inngest/inngest/pkg/devserver/devutil"
@@ -179,7 +182,7 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	services := []service.Service{}
 
-	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{
+	db, err := base_cqrs.New(ctx, base_cqrs.BaseCQRSOptions{
 		Persist:     opts.Persist,
 		PostgresURI: opts.PostgresURI,
 		Directory:   opts.SQLiteDir,
@@ -193,22 +196,17 @@ func start(ctx context.Context, opts StartOpts) error {
 	}
 
 	// Initialize the devserver
-	dbDriver := "sqlite"
-	if opts.PostgresURI != "" {
-		dbDriver = "postgres"
+	var adapter interface {
+		dbpkg.Adapter
+		Helpers() driverhelp.DialectHelpers
 	}
-	dbcqrs := base_cqrs.NewCQRS(db, dbDriver, sqlc_postgres.NewNormalizedOpts{
-		MaxIdleConns:    opts.PostgresMaxIdleConns,
-		MaxOpenConns:    opts.PostgresMaxOpenConns,
-		ConnMaxIdle:     opts.PostgresConnMaxIdleTime,
-		ConnMaxLifetime: opts.PostgresConnMaxLifetime,
-	})
-	hd := base_cqrs.NewHistoryDriver(db, dbDriver, sqlc_postgres.NewNormalizedOpts{
-		MaxIdleConns:    opts.PostgresMaxIdleConns,
-		MaxOpenConns:    opts.PostgresMaxOpenConns,
-		ConnMaxIdle:     opts.PostgresConnMaxIdleTime,
-		ConnMaxLifetime: opts.PostgresConnMaxLifetime,
-	})
+	if opts.PostgresURI != "" {
+		adapter = dbpostgres.New(db)
+	} else {
+		adapter = dbsqlite.New(db)
+	}
+	dbcqrs := base_cqrs.NewCQRS(adapter)
+	hd := base_cqrs.NewHistoryDriver(adapter)
 	loader := dbcqrs.(state.FunctionLoader)
 
 	stepLimitOverrides := make(map[string]int)
@@ -477,12 +475,7 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	hmw := memory_writer.NewWriter(ctx, memory_writer.WriterOptions{DumpToFile: false})
 
-	tp := tracing.NewSqlcTracerProvider(base_cqrs.NewQueries(db, dbDriver, sqlc_postgres.NewNormalizedOpts{
-		MaxIdleConns:    opts.PostgresMaxIdleConns,
-		MaxOpenConns:    opts.PostgresMaxOpenConns,
-		ConnMaxIdle:     opts.PostgresConnMaxIdleTime,
-		ConnMaxLifetime: opts.PostgresConnMaxLifetime,
-	}))
+	tp := tracing.NewSqlcTracerProvider(adapter.Q())
 
 	url := opts.Config.CoreAPI.Addr
 	if url == "0.0.0.0" {

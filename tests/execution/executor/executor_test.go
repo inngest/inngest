@@ -15,7 +15,7 @@ import (
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/cqrs/base_cqrs"
-	sqlc_postgres "github.com/inngest/inngest/pkg/cqrs/base_cqrs/sqlc/postgres"
+	dbsqlite "github.com/inngest/inngest/pkg/db/sqlite"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
@@ -131,12 +131,12 @@ func TestScheduleRaceCondition(t *testing.T) {
 	_ = trace.UserTracer()
 	work := make(chan *hookData)
 
-	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{Persist: false})
+	db, err := base_cqrs.New(ctx, base_cqrs.BaseCQRSOptions{Persist: false})
 	require.NoError(t, err)
 
 	// Initialize the devserver
-	dbDriver := "sqlite"
-	dbcqrs := base_cqrs.NewCQRS(db, dbDriver, sqlc_postgres.NewNormalizedOpts{})
+	adapter := dbsqlite.New(db)
+	dbcqrs := base_cqrs.NewCQRS(adapter)
 	loader := dbcqrs.(state.FunctionLoader)
 
 	_, shardedRc, err := createInmemoryRedis(t)
@@ -200,7 +200,7 @@ func TestScheduleRaceCondition(t *testing.T) {
 		executor.WithAssignedQueueShard(queueShard),
 		executor.WithShardSelector(shardSelector),
 		executor.WithTraceReader(dbcqrs),
-		executor.WithTracerProvider(tracing.NewSqlcTracerProvider(base_cqrs.NewQueries(db, dbDriver, sqlc_postgres.NewNormalizedOpts{}))),
+		executor.WithTracerProvider(tracing.NewSqlcTracerProvider(adapter.Q())),
 	)
 	require.NoError(t, err)
 
@@ -305,12 +305,12 @@ func TestScheduleRaceConditionWithExistingIdempotencyKey(t *testing.T) {
 
 	work := make(chan *hookData)
 
-	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{Persist: false})
+	db, err := base_cqrs.New(ctx, base_cqrs.BaseCQRSOptions{Persist: false})
 	require.NoError(t, err)
 
 	// Initialize the devserver
-	dbDriver := "sqlite"
-	dbcqrs := base_cqrs.NewCQRS(db, dbDriver, sqlc_postgres.NewNormalizedOpts{})
+	adapter := dbsqlite.New(db)
+	dbcqrs := base_cqrs.NewCQRS(adapter)
 	loader := dbcqrs.(state.FunctionLoader)
 
 	stateRedis, shardedRc, err := createInmemoryRedis(t)
@@ -485,12 +485,12 @@ func TestFinalize(t *testing.T) {
 	_ = trace.UserTracer()
 	work := make(chan *hookData)
 
-	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{Persist: false})
+	db, err := base_cqrs.New(ctx, base_cqrs.BaseCQRSOptions{Persist: false})
 	require.NoError(t, err)
 
 	// Initialize the devserver
-	dbDriver := "sqlite"
-	dbcqrs := base_cqrs.NewCQRS(db, dbDriver, sqlc_postgres.NewNormalizedOpts{})
+	adapter := dbsqlite.New(db)
+	dbcqrs := base_cqrs.NewCQRS(adapter)
 	loader := dbcqrs.(state.FunctionLoader)
 
 	fnID, accountID, wsID, appID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
@@ -744,11 +744,11 @@ func TestInvokeRetrySucceedsIfPauseAlreadyCreated(t *testing.T) {
 	ctx := context.Background()
 
 	// Set up database and function loader
-	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{Persist: false})
+	db, err := base_cqrs.New(ctx, base_cqrs.BaseCQRSOptions{Persist: false})
 	require.NoError(t, err)
 
-	dbDriver := "sqlite"
-	dbcqrs := base_cqrs.NewCQRS(db, dbDriver, sqlc_postgres.NewNormalizedOpts{})
+	adapter := dbsqlite.New(db)
+	dbcqrs := base_cqrs.NewCQRS(adapter)
 	loader := dbcqrs.(state.FunctionLoader)
 
 	fnID, wsID, appID, aID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
@@ -956,11 +956,11 @@ func TestInvokeRetrySucceedsIfPauseAlreadyCreated(t *testing.T) {
 func TestExecutorReturnsResponseWhenNonRetriableError(t *testing.T) {
 	ctx := context.Background()
 
-	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{Persist: false})
+	db, err := base_cqrs.New(ctx, base_cqrs.BaseCQRSOptions{Persist: false})
 	require.NoError(t, err)
 
-	dbDriver := "sqlite"
-	dbcqrs := base_cqrs.NewCQRS(db, dbDriver, sqlc_postgres.NewNormalizedOpts{})
+	adapter := dbsqlite.New(db)
+	dbcqrs := base_cqrs.NewCQRS(adapter)
 	loader := dbcqrs.(state.FunctionLoader)
 
 	fnID, wsID, appID, aID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
@@ -1334,11 +1334,11 @@ func TestCapacityErrorRetriesWhenAttemptsExhausted(t *testing.T) {
 func TestExecutorScheduleRateLimit(t *testing.T) {
 	ctx := context.Background()
 
-	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{Persist: false})
+	db, err := base_cqrs.New(ctx, base_cqrs.BaseCQRSOptions{Persist: false})
 	require.NoError(t, err)
 
-	dbDriver := "sqlite"
-	dbcqrs := base_cqrs.NewCQRS(db, dbDriver, sqlc_postgres.NewNormalizedOpts{})
+	adapter := dbsqlite.New(db)
+	dbcqrs := base_cqrs.NewCQRS(adapter)
 	loader := dbcqrs.(state.FunctionLoader)
 
 	fnID, wsID, appID, aID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
@@ -1543,11 +1543,11 @@ func (fll *fakeLimitLifecycle) OnFunctionBacklogSizeLimitReached(context.Context
 func TestExecutorScheduleBacklogSizeLimit(t *testing.T) {
 	ctx := context.Background()
 
-	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{Persist: false})
+	db, err := base_cqrs.New(ctx, base_cqrs.BaseCQRSOptions{Persist: false})
 	require.NoError(t, err)
 
-	dbDriver := "sqlite"
-	dbcqrs := base_cqrs.NewCQRS(db, dbDriver, sqlc_postgres.NewNormalizedOpts{})
+	adapter := dbsqlite.New(db)
+	dbcqrs := base_cqrs.NewCQRS(adapter)
 	loader := dbcqrs.(state.FunctionLoader)
 
 	fnID, wsID, appID, aID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
@@ -1740,11 +1740,11 @@ func TestScheduleSkipsCancelOnPauseWhenExpressionFalse(t *testing.T) {
 	_ = trace.UserTracer()
 	work := make(chan *hookData, 1)
 
-	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{Persist: false})
+	db, err := base_cqrs.New(ctx, base_cqrs.BaseCQRSOptions{Persist: false})
 	require.NoError(t, err)
 
-	dbDriver := "sqlite"
-	dbcqrs := base_cqrs.NewCQRS(db, dbDriver, sqlc_postgres.NewNormalizedOpts{})
+	adapter := dbsqlite.New(db)
+	dbcqrs := base_cqrs.NewCQRS(adapter)
 	loader := dbcqrs.(state.FunctionLoader)
 
 	_, shardedRc, err := createInmemoryRedis(t)
@@ -1808,7 +1808,7 @@ func TestScheduleSkipsCancelOnPauseWhenExpressionFalse(t *testing.T) {
 		executor.WithAssignedQueueShard(queueShard),
 		executor.WithShardSelector(shardSelector),
 		executor.WithTraceReader(dbcqrs),
-		executor.WithTracerProvider(tracing.NewSqlcTracerProvider(base_cqrs.NewQueries(db, dbDriver, sqlc_postgres.NewNormalizedOpts{}))),
+		executor.WithTracerProvider(tracing.NewSqlcTracerProvider(adapter.Q())),
 	)
 	require.NoError(t, err)
 
@@ -1865,11 +1865,11 @@ func TestScheduleCreatesCancelOnPauseWhenExpressionTrue(t *testing.T) {
 	_ = trace.UserTracer()
 	work := make(chan *hookData, 1)
 
-	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{Persist: false})
+	db, err := base_cqrs.New(ctx, base_cqrs.BaseCQRSOptions{Persist: false})
 	require.NoError(t, err)
 
-	dbDriver := "sqlite"
-	dbcqrs := base_cqrs.NewCQRS(db, dbDriver, sqlc_postgres.NewNormalizedOpts{})
+	adapter := dbsqlite.New(db)
+	dbcqrs := base_cqrs.NewCQRS(adapter)
 	loader := dbcqrs.(state.FunctionLoader)
 
 	_, shardedRc, err := createInmemoryRedis(t)
@@ -1933,7 +1933,7 @@ func TestScheduleCreatesCancelOnPauseWhenExpressionTrue(t *testing.T) {
 		executor.WithAssignedQueueShard(queueShard),
 		executor.WithShardSelector(shardSelector),
 		executor.WithTraceReader(dbcqrs),
-		executor.WithTracerProvider(tracing.NewSqlcTracerProvider(base_cqrs.NewQueries(db, dbDriver, sqlc_postgres.NewNormalizedOpts{}))),
+		executor.WithTracerProvider(tracing.NewSqlcTracerProvider(adapter.Q())),
 	)
 	require.NoError(t, err)
 

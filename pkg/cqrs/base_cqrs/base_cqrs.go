@@ -1,6 +1,7 @@
 package base_cqrs
 
 import (
+	"context"
 	"crypto/rand"
 	"database/sql"
 	"embed"
@@ -19,6 +20,7 @@ import (
 	"github.com/golang-migrate/migrate/v4/source"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/logger"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/oklog/ulid/v2"
 	_ "modernc.org/sqlite"
@@ -46,8 +48,10 @@ type BaseCQRSOptions struct {
 	Directory string
 }
 
-func New(opts BaseCQRSOptions) (*sql.DB, error) {
+func New(ctx context.Context, opts BaseCQRSOptions) (*sql.DB, error) {
 	var err error
+
+	l := logger.StdlibLogger(ctx)
 
 	if opts.PostgresURI != "" {
 		if !strings.HasPrefix(opts.PostgresURI, "postgres://") && !strings.HasPrefix(opts.PostgresURI, "postgresql://") {
@@ -65,6 +69,7 @@ func New(opts BaseCQRSOptions) (*sql.DB, error) {
 				db, err = sql.Open("pgx", opts.PostgresURI)
 			})
 		}
+		l = l.With("db", "postgres")
 	} else if opts.Persist {
 		o.Do(func() {
 			// make the dir if it doesn't exist
@@ -92,6 +97,7 @@ func New(opts BaseCQRSOptions) (*sql.DB, error) {
 
 			db, err = sql.Open("sqlite", fmt.Sprintf("file:%s?cache=shared", file))
 		})
+		l = l.With("db", "sqlite", "mode", "persisted")
 	} else {
 		// In-memory
 		if opts.ForTest {
@@ -104,7 +110,9 @@ func New(opts BaseCQRSOptions) (*sql.DB, error) {
 				db, err = sql.Open("sqlite", "file:inngest?mode=memory&cache=shared")
 			})
 		}
+		l = l.With("db", "sqlite", "mode", "memory")
 	}
+	l.Info("initialized database")
 
 	if err != nil {
 		return nil, err
@@ -118,6 +126,7 @@ func New(opts BaseCQRSOptions) (*sql.DB, error) {
 	if err := up(db, opts); err != nil {
 		return nil, err
 	}
+	l.Info("ran database migrations")
 
 	return db, err
 }
