@@ -434,7 +434,7 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 		CurrentTime:     now,
 		Duration:        QueueLeaseDuration,
 		Constraints:     constraintItems,
-		Configuration:   ConstraintConfigFromConstraints(constraints),
+		Configuration:   config,
 		Amount:          1,
 		MaximumLifetime: consts.MaxFunctionTimeout + 30*time.Minute,
 		Source: constraintapi.LeaseSource{
