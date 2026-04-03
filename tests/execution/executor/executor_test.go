@@ -1148,11 +1148,11 @@ func TestExecutorReturnsResponseWhenNonRetriableError(t *testing.T) {
 func TestCapacityErrorRetriesWhenAttemptsExhausted(t *testing.T) {
 	ctx := context.Background()
 
-	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{Persist: false})
+	db, err := base_cqrs.New(ctx, base_cqrs.BaseCQRSOptions{Persist: false})
 	require.NoError(t, err)
 
-	dbDriver := "sqlite"
-	dbcqrs := base_cqrs.NewCQRS(db, dbDriver, sqlc_postgres.NewNormalizedOpts{})
+	adapter := dbsqlite.New(db)
+	dbcqrs := base_cqrs.NewCQRS(adapter)
 	loader := dbcqrs.(state.FunctionLoader)
 
 	fnID, wsID, appID, aID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
