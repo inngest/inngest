@@ -84,8 +84,6 @@ package main
 import (
         "flag"
         "fmt"
-        "math/rand"
-        "time"
         "github.com/dustinkirkland/golang-petname"
 )
 
@@ -94,16 +92,13 @@ var (
         separator = flag.String("separator", "-", "The separator between words in the pet name")
 )
 
-func init() {
-        rand.Seed(time.Now().UTC().UnixNano())
-}
-
 func main() {
         flag.Parse()
-        rand.Seed(time.Now().UnixNano())
         fmt.Println(petname.Generate(*words, *separator))
 }
 ```
+
+**Note:** As of Go 1.20+, the random number generator is automatically seeded at program startup, so no manual seeding is required. Petname generation will be random by default.
 
 ### **Python Example**
 See: [on pypi](https://pypi.python.org/pypi/petname).
