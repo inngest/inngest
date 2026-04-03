@@ -3857,18 +3857,8 @@ func (e *executor) handleGeneratorStepPlanned(ctx context.Context, runCtx execut
 		ParallelMode: gen.ParallelMode(),
 	}
 
-	// Determine parent span: use experiment step span for variant sub-steps,
-	// otherwise use the run root span.
 	parent := tracing.RunSpanRefFromMetadata(runCtx.Metadata())
 	attrs := tracing.GeneratorAttrs(&gen)
-	if runOpts, err := gen.RunOpts(); err == nil && runOpts != nil && runOpts.ExperimentStepID != "" {
-		if experimentSpan := runCtx.ParentSpan(); experimentSpan != nil {
-			parent = experimentSpan
-		}
-		meta.AddAttr(attrs, meta.Attrs.ExperimentName, &runOpts.ExperimentName)
-		meta.AddAttr(attrs, meta.Attrs.ExperimentStepID, &runOpts.ExperimentStepID)
-		meta.AddAttr(attrs, meta.Attrs.ExperimentVariant, &runOpts.Variant)
-	}
 
 	lifecycleItem := runCtx.LifecycleItem()
 	span, err := e.tracerProvider.CreateDroppableSpan(
