@@ -10,7 +10,7 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/knadh/koanf/parsers/json"
 	"github.com/knadh/koanf/parsers/yaml"
-	"github.com/knadh/koanf/providers/env"
+	"github.com/knadh/koanf/providers/env/v2"
 	"github.com/knadh/koanf/providers/file"
 	"github.com/knadh/koanf/v2"
 	"github.com/urfave/cli/v3"
@@ -189,28 +189,31 @@ func loadConfigFromPath(path string) error {
 func loadEnvironmentVariables() error {
 	// Load environment variables with INNGEST_ prefix
 	// The callback function receives the full env var name, so we need to strip the prefix
-	return k.Load(env.ProviderWithValue("INNGEST_", "", func(key, value string) (string, interface{}) {
-		// Convert environment variable names to config keys
-		// INNGEST_SDK_URL -> sdk-url
-		// INNGEST_NO_DISCOVERY -> no-discovery
-		// INNGEST_POLL_INTERVAL -> poll-interval
-		var configKey string
-		if strings.HasPrefix(key, "INNGEST_") {
-			configKey = strings.ToLower(strings.ReplaceAll(key[8:], "_", "-"))
-		} else {
-			configKey = strings.ToLower(strings.ReplaceAll(key, "_", "-"))
-		}
-
-		// Handle array fields - convert single values and comma-separated values to arrays
-		if configKey == "sdk-url" || configKey == "event-key" {
-			if strings.Contains(value, ",") {
-				return configKey, strings.Split(value, ",")
+	return k.Load(env.Provider("", env.Opt{
+		Prefix: "INNGEST_",
+		TransformFunc: func(key, value string) (string, any) {
+			// Convert environment variable names to config keys
+			// INNGEST_SDK_URL -> sdk-url
+			// INNGEST_NO_DISCOVERY -> no-discovery
+			// INNGEST_POLL_INTERVAL -> poll-interval
+			var configKey string
+			if strings.HasPrefix(key, "INNGEST_") {
+				configKey = strings.ToLower(strings.ReplaceAll(key[8:], "_", "-"))
+			} else {
+				configKey = strings.ToLower(strings.ReplaceAll(key, "_", "-"))
 			}
-			// Single value should also be converted to array for consistency
-			return configKey, []string{value}
-		}
 
-		return configKey, value
+			// Handle array fields - convert single values and comma-separated values to arrays
+			if configKey == "sdk-url" || configKey == "event-key" {
+				if strings.Contains(value, ",") {
+					return configKey, strings.Split(value, ",")
+				}
+				// Single value should also be converted to array for consistency
+				return configKey, []string{value}
+			}
+
+			return configKey, value
+		},
 	}), nil)
 }
 
