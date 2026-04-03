@@ -369,6 +369,9 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 	for _, df := range processed.Functions {
 		fn := &df.Function
 
+		// Ensure function version is at least 1 and incremented on re-sync
+		fn.FunctionVersion = max(fn.FunctionVersion, 1)
+
 		// Mark as seen.
 		seen[fn.ID] = struct{}{}
 
@@ -383,12 +386,8 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 				return nil, publicerr.Wrap(fmt.Errorf("function config empty"), 500, "Error unmarshalling function config")
 			}
 			fnExists = true
-		}
 
-		if fnExists {
 			fn.FunctionVersion = currentFn.FunctionVersion + 1
-		} else {
-			fn.FunctionVersion = 1
 		}
 
 		config, err := json.Marshal(fn)

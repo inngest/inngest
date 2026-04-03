@@ -9,7 +9,7 @@ Output:
 local keyQueueMap              = KEYS[1]
 local keyPartitionMap          = KEYS[2]
 
-local concurrencyPointer       = KEYS[3]
+local keyScavengerEntrypoint   = KEYS[3]
 
 local keyReadyQueue            = KEYS[4]  -- queue:sorted:$workflowID - zset
 local keyGlobalPointer         = KEYS[5]
@@ -26,30 +26,13 @@ local keyGlobalAccountShadowPartitionSet = KEYS[13]
 local keyAccountShadowPartitionSet       = KEYS[14]
 local keyPartitionNormalizeSet           = KEYS[15]
 
-local keyInProgressAccount                  = KEYS[16]
-local keyInProgressPartition                = KEYS[17] -- Account concurrency level
-local keyInProgressCustomConcurrencyKey1    = KEYS[18] -- When leasing an item we need to place the lease into this key.
-local keyInProgressCustomConcurrencyKey2    = KEYS[19] -- Optional for eg. for concurrency amongst steps
+local keyIdempotency           = KEYS[16]
+local singletonRunKey          = KEYS[17]
 
-local keyActiveAccount             = KEYS[20]
-local keyActivePartition           = KEYS[21]
-local keyActiveConcurrencyKey1     = KEYS[22]
-local keyActiveConcurrencyKey2     = KEYS[23]
-local keyActiveCompound            = KEYS[24]
+local keyPartitionScavengerIndex  = KEYS[18]
 
-local keyActiveRun                        = KEYS[25]
-local keyActiveRunsAccount                = KEYS[26]
-local keyActiveRunsPartition              = KEYS[27]
-local keyActiveRunsCustomConcurrencyKey1  = KEYS[28]
-local keyActiveRunsCustomConcurrencyKey2  = KEYS[29]
-
-local keyIdempotency           = KEYS[30]
-local singletonRunKey          = KEYS[31]
-
-local keyPartitionScavengerIndex  = KEYS[32]
-
-local keyItemIndexA            = KEYS[33]   -- custom item index 1
-local keyItemIndexB            = KEYS[34]  -- custom item index 2
+local keyItemIndexA            = KEYS[19]   -- custom item index 1
+local keyItemIndexB            = KEYS[20]  -- custom item index 2
 
 local queueID        = ARGV[1]
 local partitionID    = ARGV[2]
@@ -58,15 +41,12 @@ local accountID      = ARGV[4]
 local runID          = ARGV[5]
 local idempotencyTTL = tonumber(ARGV[6])
 
-local updateConstraintState = tonumber(ARGV[7])
-
 -- $include(get_queue_item.lua)
 -- $include(get_partition_item.lua)
 -- $include(update_pointer_score.lua)
 -- $include(ends_with.lua)
 -- $include(update_account_queues.lua)
 -- $include(update_backlog_pointer.lua)
--- $include(update_active_sets.lua)
 
 --
 -- Fetch this item to see if it was in progress prior to deleting.
@@ -84,35 +64,6 @@ if idempotencyTTL > 0 then
 	redis.call("SETEX", keyIdempotency, idempotencyTTL, "")
 end
 
-if updateConstraintState == 1 then
-  -- This removes the current queue item from the concurrency/in-progress queue,
-  -- ensures the concurrency index/scavenger queue is updated to the next earliest in-progress item,
-  -- and updates the global and account partition pointers to the next earliest item score
-  local function handleDequeueConcurrency(keyConcurrency)
-    redis.call("ZREM", keyConcurrency, item.id) -- remove from concurrency/in-progress queue
-  end
-
-  handleDequeueConcurrency(keyInProgressPartition)
-
-  if exists_without_ending(keyInProgressCustomConcurrencyKey1, ":-") then
-    handleDequeueConcurrency(keyInProgressCustomConcurrencyKey1)
-  end
-
-  if exists_without_ending(keyInProgressCustomConcurrencyKey2, ":-") then
-    handleDequeueConcurrency(keyInProgressCustomConcurrencyKey2)
-  end
-
-  if exists_without_ending(keyInProgressAccount, ":-") then
-    -- This does not have a scavenger queue, as it's purely an entitlement limitation. See extendLease
-    -- and Lease for respective ZADD calls.
-    redis.call("ZREM", keyInProgressAccount, item.id)
-  end
-
-  -- Remove item from active sets
-  removeFromActiveSets(keyActivePartition, keyActiveAccount, keyActiveCompound, keyActiveConcurrencyKey1, keyActiveConcurrencyKey2, queueID)
-  removeFromActiveRunSets(keyActiveRun, keyActiveRunsPartition, keyActiveRunsAccount, keyActiveRunsCustomConcurrencyKey1, keyActiveRunsCustomConcurrencyKey2, runID, queueID)
-end
-
 -- Remove item from scavenger index
 redis.call("ZREM", keyPartitionScavengerIndex, queueID)
 
@@ -124,12 +75,12 @@ redis.call("ZREM", keyPartitionScavengerIndex, queueID)
 -- leased job, if exists.
 local scavengerIndexScores = redis.call("ZRANGE", keyPartitionScavengerIndex, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
 if scavengerIndexScores == false or scavengerIndexScores == nil or #scavengerIndexScores == 0 then
-  redis.call("ZREM", concurrencyPointer, partitionID)
+  redis.call("ZREM", keyScavengerEntrypoint, partitionID)
 else
   local earliestLease = tonumber(scavengerIndexScores[2])
 
   -- Ensure that we update the score with the earliest lease
-  redis.call("ZADD", concurrencyPointer, earliestLease, partitionID)
+  redis.call("ZADD", keyScavengerEntrypoint, earliestLease, partitionID)
 end
 
 -- For each partition, we now have an extra available capacity.  Check the partition's

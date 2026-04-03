@@ -103,7 +103,7 @@ func TestRegister_FunctionVersionIncrement(t *testing.T) {
 		_, err = api.register(ctx, req)
 		require.NoError(t, err)
 
-		// Get the updated version
+		// Get the updated version — same config means no increment
 		fnVersions2 := getFunctionIDandVersion(t, ds, req.AppName)
 		require.Len(t, fnVersions2, 1)
 
@@ -183,7 +183,7 @@ func TestRegister_FunctionVersionIncrement(t *testing.T) {
 		require.Equal(t, fnVersions[sdkFunction1.Name], 3)
 	})
 
-	// When one function's config is changes, all functions get their versions udpated, even those that don't have any change in config.
+	// When one function's config changes, all functions get their versions updated, even those that don't have any change in config.
 	t.Run("all function versions incremented on app sync", func(t *testing.T) {
 		ds := newTestDevServer(t)
 		api := &devapi{

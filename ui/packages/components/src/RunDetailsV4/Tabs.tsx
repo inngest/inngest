@@ -22,7 +22,7 @@ export const Tab = ({
 };
 
 export type TabType = {
-  label: string;
+  label: ReactNode;
   id: string;
   node: ReactNode;
 };

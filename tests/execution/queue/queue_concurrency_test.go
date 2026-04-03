@@ -1,4 +1,4 @@
-package redis_state
+package queue
 
 import (
 	"context"
@@ -9,12 +9,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/consts"
+	"github.com/jonboulle/clockwork"
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/google/uuid"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 	"github.com/stretchr/testify/require"
@@ -42,6 +45,7 @@ func TestQueuePartitionConcurrency(t *testing.T) {
 		switch p.FunctionID {
 		case limit_1:
 			return osqueue.PartitionConstraintConfig{
+				FunctionVersion: 1,
 				Concurrency: osqueue.PartitionConcurrency{
 					AccountConcurrency:  osqueue.NoConcurrencyLimit,
 					FunctionConcurrency: 1,
@@ -49,6 +53,7 @@ func TestQueuePartitionConcurrency(t *testing.T) {
 			}
 		case limit_10:
 			return osqueue.PartitionConstraintConfig{
+				FunctionVersion: 1,
 				Concurrency: osqueue.PartitionConcurrency{
 					AccountConcurrency:  osqueue.NoConcurrencyLimit,
 					FunctionConcurrency: 10,
@@ -57,6 +62,7 @@ func TestQueuePartitionConcurrency(t *testing.T) {
 		default:
 			// No concurrency, which means use the default concurrency limits.
 			return osqueue.PartitionConstraintConfig{
+				FunctionVersion: 1,
 				Concurrency: osqueue.PartitionConcurrency{
 					AccountConcurrency:  osqueue.NoConcurrencyLimit,
 					FunctionConcurrency: osqueue.NoConcurrencyLimit,
@@ -68,13 +74,28 @@ func TestQueuePartitionConcurrency(t *testing.T) {
 	// Create a new lifecycle listener.  This should be invoked each time we hit limits.
 	ll := newTestLifecycleListener()
 
+	clock := clockwork.NewRealClock()
 	opts := []osqueue.QueueOpt{
 		osqueue.WithNumWorkers(100),
 		osqueue.WithPartitionConstraintConfigGetter(pkf),
 		osqueue.WithQueueLifecycles(ll),
+		osqueue.WithClock(clock),
 	}
 
-	shard1 := NewQueueShard(consts.DefaultQueueShardName, NewQueueClient(rc, QueueDefaultKey), opts...)
+	cm, err := constraintapi.NewRedisCapacityManager(
+		constraintapi.WithClient(rc),
+		constraintapi.WithShardName("test"),
+		constraintapi.WithClock(clock),
+		constraintapi.WithEnableDebugLogs(true),
+	)
+	require.NoError(t, err)
+
+	opts = append(opts, osqueue.WithCapacityManager(cm))
+	opts = append(opts,
+		osqueue.WithAcquireCapacityLeaseOnBacklogRefill(true),
+	)
+
+	shard1 := redis_state.NewQueueShard(consts.DefaultQueueShardName, redis_state.NewQueueClient(rc, redis_state.QueueDefaultKey), opts...)
 
 	shards := map[string]osqueue.QueueShard{
 		consts.DefaultQueueShardName: shard1,
@@ -126,6 +147,9 @@ func TestQueuePartitionConcurrency(t *testing.T) {
 
 	at := time.Now().Add(time.Second).Truncate(time.Second)
 
+	accountID := uuid.New()
+	envID := uuid.New()
+
 	// Schedule 10 jobs;  it should take 20 seconds for limit_1 to finish,
 	// and 2 seconds for limit_10 to finish, given each job takes 2 seconds.
 	start := time.Now()
@@ -133,9 +157,12 @@ func TestQueuePartitionConcurrency(t *testing.T) {
 		for _, id := range workflowIDs {
 			err := q.Enqueue(ctx, osqueue.Item{
 				Identifier: state.Identifier{
-					WorkflowID: id,
-					RunID:      ulid.MustNew(ulid.Now(), rand.Reader),
+					AccountID:   accountID,
+					WorkspaceID: envID,
+					WorkflowID:  id,
+					RunID:       ulid.MustNew(ulid.Now(), rand.Reader),
 				},
+				WorkspaceID: envID,
 			}, at, osqueue.EnqueueOpts{})
 			require.NoError(t, err)
 		}

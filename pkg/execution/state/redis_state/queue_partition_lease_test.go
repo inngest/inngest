@@ -59,10 +59,9 @@ func TestQueuePartitionLease(t *testing.T) {
 	t.Run("It leases a partition", func(t *testing.T) {
 		// Lease the first item now.
 		leasedAt := time.Now()
-		leaseID, capacity, err := shard.PartitionLease(ctx, &pA, time.Until(leaseUntil))
+		leaseID, err := shard.PartitionLease(ctx, &pA, time.Until(leaseUntil))
 		require.NoError(t, err)
 		require.NotNil(t, leaseID)
-		require.NotZero(t, capacity)
 
 		// Pause so that we can assert that the last lease time was set correctly.
 		<-time.After(50 * time.Millisecond)
@@ -92,10 +91,9 @@ func TestQueuePartitionLease(t *testing.T) {
 		})
 
 		t.Run("It can't lease an existing partition lease", func(t *testing.T) {
-			id, capacity, err := shard.PartitionLease(ctx, &pA, time.Second*29)
+			id, err := shard.PartitionLease(ctx, &pA, time.Second*29)
 			require.Equal(t, osqueue.ErrPartitionAlreadyLeased, err)
 			require.Nil(t, id)
-			require.Zero(t, capacity)
 
 			// Assert that score didn't change (we added 1 second in the previous test)
 			requirePartitionScoreEquals(t, r, &idA, leaseUntil)
@@ -107,10 +105,9 @@ func TestQueuePartitionLease(t *testing.T) {
 
 		requirePartitionScoreEquals(t, r, &idA, leaseUntil)
 
-		id, capacity, err := shard.PartitionLease(ctx, &pA, time.Second*5)
+		id, err := shard.PartitionLease(ctx, &pA, time.Second*5)
 		require.Nil(t, err)
 		require.NotNil(t, id)
-		require.NotZero(t, capacity)
 
 		requirePartitionScoreEquals(t, r, &idA, time.Now().Add(time.Second*5))
 	})
@@ -132,10 +129,9 @@ func TestQueuePartitionLease(t *testing.T) {
 		defaultPartition := getDefaultPartition(t, r, fnID)
 
 		leaseUntil := now.Add(3 * time.Second)
-		leaseID, capacity, err := shard.PartitionLease(ctx, &defaultPartition, time.Until(leaseUntil))
+		leaseID, err := shard.PartitionLease(ctx, &defaultPartition, time.Until(leaseUntil))
 		require.NoError(t, err)
 		require.NotNil(t, leaseID)
-		require.NotZero(t, capacity)
 	})
 
 	t.Run("concurrency is checked early", func(t *testing.T) {
@@ -165,15 +161,14 @@ func TestQueuePartitionLease(t *testing.T) {
 			p := osqueue.QueuePartition{ID: itemA.FunctionID.String(), FunctionID: &itemA.FunctionID}
 
 			t.Run("Leases with capacity", func(t *testing.T) {
-				_, err = shard.Lease(ctx, itemA, 5*time.Second, time.Now(), nil)
+				_, err = shard.Lease(ctx, itemA, 5*time.Second, time.Now())
 				require.NoError(t, err)
 			})
 
-			t.Run("Partition lease errors without capacity", func(t *testing.T) {
-				leaseId, _, err := shard.PartitionLease(ctx, &p, 5*time.Second)
-				require.Nil(t, leaseId, "No lease id when leasing fails.\n%s", r.Dump())
-				require.Error(t, err)
-				require.ErrorIs(t, err, osqueue.ErrPartitionConcurrencyLimit)
+			t.Run("Partition lease does not error without capacity", func(t *testing.T) {
+				leaseId, err := shard.PartitionLease(ctx, &p, 5*time.Second)
+				require.NotNil(t, leaseId)
+				require.NoError(t, err)
 			})
 		})
 
@@ -204,15 +199,14 @@ func TestQueuePartitionLease(t *testing.T) {
 			p := osqueue.QueuePartition{AccountID: acctId, FunctionID: &itemA.FunctionID}
 
 			t.Run("Leases with capacity", func(t *testing.T) {
-				_, err = shard.Lease(ctx, itemA, 5*time.Second, time.Now(), nil)
+				_, err = shard.Lease(ctx, itemA, 5*time.Second, time.Now())
 				require.NoError(t, err)
 			})
 
-			t.Run("Partition lease errors without capacity", func(t *testing.T) {
-				leaseId, _, err := shard.PartitionLease(ctx, &p, 5*time.Second)
-				require.Nil(t, leaseId, "No lease id when leasing fails.\n%s", r.Dump())
-				require.Error(t, err)
-				require.ErrorIs(t, err, osqueue.ErrAccountConcurrencyLimit)
+			t.Run("Partition lease does not error without capacity", func(t *testing.T) {
+				leaseId, err := shard.PartitionLease(ctx, &p, 5*time.Second)
+				require.NotNil(t, leaseId)
+				require.NoError(t, err)
 			})
 		})
 
@@ -273,7 +267,7 @@ func TestQueuePartitionLease(t *testing.T) {
 			require.NoError(t, err)
 
 			t.Run("Leases with capacity", func(t *testing.T) {
-				_, err = shard.Lease(ctx, itemA, 5*time.Second, time.Now(), nil)
+				_, err = shard.Lease(ctx, itemA, 5*time.Second, time.Now())
 				require.NoError(t, err)
 			})
 
@@ -283,7 +277,7 @@ func TestQueuePartitionLease(t *testing.T) {
 				// Since we don't peek and lease concurrency key queue partitions anymore,
 				// we won't check for custom concurrency limits ahead of processing items.
 				// Leasing a default partition works even though the concurrency key has no additional capacity.
-				leaseId, _, err := shard.PartitionLease(ctx, &p, 5*time.Second)
+				leaseId, err := shard.PartitionLease(ctx, &p, 5*time.Second)
 				require.NotNil(t, leaseId, "Expected lease id.\n%s", r.Dump())
 				require.NoError(t, err)
 			})
@@ -315,17 +309,11 @@ func TestQueuePartitionLease(t *testing.T) {
 		// Use the new item's workflow ID
 		p := osqueue.QueuePartition{ID: itemA.FunctionID.String(), FunctionID: &itemA.FunctionID}
 
-		_, err = shard.Lease(ctx, itemA, 5*time.Second, time.Now(), nil)
+		_, err = shard.Lease(ctx, itemA, 5*time.Second, time.Now())
 		require.NoError(t, err)
 
-		// Should fail without skipping
-		leaseId, _, err := shard.PartitionLease(ctx, &p, 5*time.Second)
-		require.Nil(t, leaseId, "No lease id when leasing fails.\n%s", r.Dump())
-		require.Error(t, err)
-		require.ErrorIs(t, err, osqueue.ErrPartitionConcurrencyLimit)
-
 		// Should work with skip
-		leaseId, _, err = shard.PartitionLease(ctx, &p, 5*time.Second, osqueue.PartitionLeaseOptionDisableLeaseChecks(true))
+		leaseId, err := shard.PartitionLease(ctx, &p, 5*time.Second)
 		require.NoError(t, err)
 		require.NotNil(t, leaseId)
 	})

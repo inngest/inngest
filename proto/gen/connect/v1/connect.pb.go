@@ -40,6 +40,7 @@ const (
 	GatewayMessageType_WORKER_HEARTBEAT                GatewayMessageType = 9
 	GatewayMessageType_GATEWAY_HEARTBEAT               GatewayMessageType = 10
 	GatewayMessageType_GATEWAY_CLOSING                 GatewayMessageType = 11
+	GatewayMessageType_WORKER_STATUS                   GatewayMessageType = 15
 )
 
 // Enum value maps for GatewayMessageType.
@@ -60,6 +61,7 @@ var (
 		9:  "WORKER_HEARTBEAT",
 		10: "GATEWAY_HEARTBEAT",
 		11: "GATEWAY_CLOSING",
+		15: "WORKER_STATUS",
 	}
 	GatewayMessageType_value = map[string]int32{
 		"GATEWAY_HELLO":                   0,
@@ -77,6 +79,7 @@ var (
 		"WORKER_HEARTBEAT":                9,
 		"GATEWAY_HEARTBEAT":               10,
 		"GATEWAY_CLOSING":                 11,
+		"WORKER_STATUS":                   15,
 	}
 )
 
@@ -582,6 +585,7 @@ type GatewayConnectionReadyData struct {
 	state               protoimpl.MessageState `protogen:"open.v1"`
 	HeartbeatInterval   string                 `protobuf:"bytes,1,opt,name=heartbeat_interval,json=heartbeatInterval,proto3" json:"heartbeat_interval,omitempty"`
 	ExtendLeaseInterval string                 `protobuf:"bytes,2,opt,name=extend_lease_interval,json=extendLeaseInterval,proto3" json:"extend_lease_interval,omitempty"`
+	StatusInterval      string                 `protobuf:"bytes,3,opt,name=status_interval,json=statusInterval,proto3" json:"status_interval,omitempty"`
 	unknownFields       protoimpl.UnknownFields
 	sizeCache           protoimpl.SizeCache
 }
@@ -630,6 +634,65 @@ func (x *GatewayConnectionReadyData) GetExtendLeaseInterval() string {
 	return ""
 }
 
+func (x *GatewayConnectionReadyData) GetStatusInterval() string {
+	if x != nil {
+		return x.StatusInterval
+	}
+	return ""
+}
+
+type WorkerStatusData struct {
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	InFlightRequestIds []string               `protobuf:"bytes,1,rep,name=in_flight_request_ids,json=inFlightRequestIds,proto3" json:"in_flight_request_ids,omitempty"`
+	ShutdownRequested  bool                   `protobuf:"varint,2,opt,name=shutdown_requested,json=shutdownRequested,proto3" json:"shutdown_requested,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
+}
+
+func (x *WorkerStatusData) Reset() {
+	*x = WorkerStatusData{}
+	mi := &file_connect_v1_connect_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WorkerStatusData) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WorkerStatusData) ProtoMessage() {}
+
+func (x *WorkerStatusData) ProtoReflect() protoreflect.Message {
+	mi := &file_connect_v1_connect_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WorkerStatusData.ProtoReflect.Descriptor instead.
+func (*WorkerStatusData) Descriptor() ([]byte, []int) {
+	return file_connect_v1_connect_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *WorkerStatusData) GetInFlightRequestIds() []string {
+	if x != nil {
+		return x.InFlightRequestIds
+	}
+	return nil
+}
+
+func (x *WorkerStatusData) GetShutdownRequested() bool {
+	if x != nil {
+		return x.ShutdownRequested
+	}
+	return false
+}
+
 type GatewayExecutorRequestData struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	RequestId      string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
@@ -651,7 +714,7 @@ type GatewayExecutorRequestData struct {
 
 func (x *GatewayExecutorRequestData) Reset() {
 	*x = GatewayExecutorRequestData{}
-	mi := &file_connect_v1_connect_proto_msgTypes[5]
+	mi := &file_connect_v1_connect_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -663,7 +726,7 @@ func (x *GatewayExecutorRequestData) String() string {
 func (*GatewayExecutorRequestData) ProtoMessage() {}
 
 func (x *GatewayExecutorRequestData) ProtoReflect() protoreflect.Message {
-	mi := &file_connect_v1_connect_proto_msgTypes[5]
+	mi := &file_connect_v1_connect_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -676,7 +739,7 @@ func (x *GatewayExecutorRequestData) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GatewayExecutorRequestData.ProtoReflect.Descriptor instead.
 func (*GatewayExecutorRequestData) Descriptor() ([]byte, []int) {
-	return file_connect_v1_connect_proto_rawDescGZIP(), []int{5}
+	return file_connect_v1_connect_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *GatewayExecutorRequestData) GetRequestId() string {
@@ -787,7 +850,7 @@ type WorkerRequestAckData struct {
 
 func (x *WorkerRequestAckData) Reset() {
 	*x = WorkerRequestAckData{}
-	mi := &file_connect_v1_connect_proto_msgTypes[6]
+	mi := &file_connect_v1_connect_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -799,7 +862,7 @@ func (x *WorkerRequestAckData) String() string {
 func (*WorkerRequestAckData) ProtoMessage() {}
 
 func (x *WorkerRequestAckData) ProtoReflect() protoreflect.Message {
-	mi := &file_connect_v1_connect_proto_msgTypes[6]
+	mi := &file_connect_v1_connect_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -812,7 +875,7 @@ func (x *WorkerRequestAckData) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WorkerRequestAckData.ProtoReflect.Descriptor instead.
 func (*WorkerRequestAckData) Descriptor() ([]byte, []int) {
-	return file_connect_v1_connect_proto_rawDescGZIP(), []int{6}
+	return file_connect_v1_connect_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *WorkerRequestAckData) GetRequestId() string {
@@ -896,7 +959,7 @@ type WorkerRequestExtendLeaseData struct {
 
 func (x *WorkerRequestExtendLeaseData) Reset() {
 	*x = WorkerRequestExtendLeaseData{}
-	mi := &file_connect_v1_connect_proto_msgTypes[7]
+	mi := &file_connect_v1_connect_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -908,7 +971,7 @@ func (x *WorkerRequestExtendLeaseData) String() string {
 func (*WorkerRequestExtendLeaseData) ProtoMessage() {}
 
 func (x *WorkerRequestExtendLeaseData) ProtoReflect() protoreflect.Message {
-	mi := &file_connect_v1_connect_proto_msgTypes[7]
+	mi := &file_connect_v1_connect_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -921,7 +984,7 @@ func (x *WorkerRequestExtendLeaseData) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WorkerRequestExtendLeaseData.ProtoReflect.Descriptor instead.
 func (*WorkerRequestExtendLeaseData) Descriptor() ([]byte, []int) {
-	return file_connect_v1_connect_proto_rawDescGZIP(), []int{7}
+	return file_connect_v1_connect_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *WorkerRequestExtendLeaseData) GetRequestId() string {
@@ -1008,7 +1071,7 @@ type WorkerRequestExtendLeaseAckData struct {
 
 func (x *WorkerRequestExtendLeaseAckData) Reset() {
 	*x = WorkerRequestExtendLeaseAckData{}
-	mi := &file_connect_v1_connect_proto_msgTypes[8]
+	mi := &file_connect_v1_connect_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1020,7 +1083,7 @@ func (x *WorkerRequestExtendLeaseAckData) String() string {
 func (*WorkerRequestExtendLeaseAckData) ProtoMessage() {}
 
 func (x *WorkerRequestExtendLeaseAckData) ProtoReflect() protoreflect.Message {
-	mi := &file_connect_v1_connect_proto_msgTypes[8]
+	mi := &file_connect_v1_connect_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1033,7 +1096,7 @@ func (x *WorkerRequestExtendLeaseAckData) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WorkerRequestExtendLeaseAckData.ProtoReflect.Descriptor instead.
 func (*WorkerRequestExtendLeaseAckData) Descriptor() ([]byte, []int) {
-	return file_connect_v1_connect_proto_rawDescGZIP(), []int{8}
+	return file_connect_v1_connect_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *WorkerRequestExtendLeaseAckData) GetRequestId() string {
@@ -1099,7 +1162,7 @@ type SDKResponse struct {
 
 func (x *SDKResponse) Reset() {
 	*x = SDKResponse{}
-	mi := &file_connect_v1_connect_proto_msgTypes[9]
+	mi := &file_connect_v1_connect_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1111,7 +1174,7 @@ func (x *SDKResponse) String() string {
 func (*SDKResponse) ProtoMessage() {}
 
 func (x *SDKResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_connect_v1_connect_proto_msgTypes[9]
+	mi := &file_connect_v1_connect_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1124,7 +1187,7 @@ func (x *SDKResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SDKResponse.ProtoReflect.Descriptor instead.
 func (*SDKResponse) Descriptor() ([]byte, []int) {
-	return file_connect_v1_connect_proto_rawDescGZIP(), []int{9}
+	return file_connect_v1_connect_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *SDKResponse) GetRequestId() string {
@@ -1227,7 +1290,7 @@ type WorkerReplyAckData struct {
 
 func (x *WorkerReplyAckData) Reset() {
 	*x = WorkerReplyAckData{}
-	mi := &file_connect_v1_connect_proto_msgTypes[10]
+	mi := &file_connect_v1_connect_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1239,7 +1302,7 @@ func (x *WorkerReplyAckData) String() string {
 func (*WorkerReplyAckData) ProtoMessage() {}
 
 func (x *WorkerReplyAckData) ProtoReflect() protoreflect.Message {
-	mi := &file_connect_v1_connect_proto_msgTypes[10]
+	mi := &file_connect_v1_connect_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1252,7 +1315,7 @@ func (x *WorkerReplyAckData) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WorkerReplyAckData.ProtoReflect.Descriptor instead.
 func (*WorkerReplyAckData) Descriptor() ([]byte, []int) {
-	return file_connect_v1_connect_proto_rawDescGZIP(), []int{10}
+	return file_connect_v1_connect_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *WorkerReplyAckData) GetRequestId() string {
@@ -1281,7 +1344,7 @@ type ConnMetadata struct {
 
 func (x *ConnMetadata) Reset() {
 	*x = ConnMetadata{}
-	mi := &file_connect_v1_connect_proto_msgTypes[11]
+	mi := &file_connect_v1_connect_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1293,7 +1356,7 @@ func (x *ConnMetadata) String() string {
 func (*ConnMetadata) ProtoMessage() {}
 
 func (x *ConnMetadata) ProtoReflect() protoreflect.Message {
-	mi := &file_connect_v1_connect_proto_msgTypes[11]
+	mi := &file_connect_v1_connect_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1306,7 +1369,7 @@ func (x *ConnMetadata) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConnMetadata.ProtoReflect.Descriptor instead.
 func (*ConnMetadata) Descriptor() ([]byte, []int) {
-	return file_connect_v1_connect_proto_rawDescGZIP(), []int{11}
+	return file_connect_v1_connect_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *ConnMetadata) GetId() string {
@@ -1390,7 +1453,7 @@ type SystemAttributes struct {
 
 func (x *SystemAttributes) Reset() {
 	*x = SystemAttributes{}
-	mi := &file_connect_v1_connect_proto_msgTypes[12]
+	mi := &file_connect_v1_connect_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1402,7 +1465,7 @@ func (x *SystemAttributes) String() string {
 func (*SystemAttributes) ProtoMessage() {}
 
 func (x *SystemAttributes) ProtoReflect() protoreflect.Message {
-	mi := &file_connect_v1_connect_proto_msgTypes[12]
+	mi := &file_connect_v1_connect_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1415,7 +1478,7 @@ func (x *SystemAttributes) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SystemAttributes.ProtoReflect.Descriptor instead.
 func (*SystemAttributes) Descriptor() ([]byte, []int) {
-	return file_connect_v1_connect_proto_rawDescGZIP(), []int{12}
+	return file_connect_v1_connect_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *SystemAttributes) GetCpuCores() int32 {
@@ -1454,7 +1517,7 @@ type ConnGroup struct {
 
 func (x *ConnGroup) Reset() {
 	*x = ConnGroup{}
-	mi := &file_connect_v1_connect_proto_msgTypes[13]
+	mi := &file_connect_v1_connect_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1466,7 +1529,7 @@ func (x *ConnGroup) String() string {
 func (*ConnGroup) ProtoMessage() {}
 
 func (x *ConnGroup) ProtoReflect() protoreflect.Message {
-	mi := &file_connect_v1_connect_proto_msgTypes[13]
+	mi := &file_connect_v1_connect_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1479,7 +1542,7 @@ func (x *ConnGroup) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConnGroup.ProtoReflect.Descriptor instead.
 func (*ConnGroup) Descriptor() ([]byte, []int) {
-	return file_connect_v1_connect_proto_rawDescGZIP(), []int{13}
+	return file_connect_v1_connect_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *ConnGroup) GetEnvId() string {
@@ -1544,7 +1607,7 @@ type StartResponse struct {
 
 func (x *StartResponse) Reset() {
 	*x = StartResponse{}
-	mi := &file_connect_v1_connect_proto_msgTypes[14]
+	mi := &file_connect_v1_connect_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1556,7 +1619,7 @@ func (x *StartResponse) String() string {
 func (*StartResponse) ProtoMessage() {}
 
 func (x *StartResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_connect_v1_connect_proto_msgTypes[14]
+	mi := &file_connect_v1_connect_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1569,7 +1632,7 @@ func (x *StartResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartResponse.ProtoReflect.Descriptor instead.
 func (*StartResponse) Descriptor() ([]byte, []int) {
-	return file_connect_v1_connect_proto_rawDescGZIP(), []int{14}
+	return file_connect_v1_connect_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *StartResponse) GetConnectionId() string {
@@ -1616,7 +1679,7 @@ type StartRequest struct {
 
 func (x *StartRequest) Reset() {
 	*x = StartRequest{}
-	mi := &file_connect_v1_connect_proto_msgTypes[15]
+	mi := &file_connect_v1_connect_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1628,7 +1691,7 @@ func (x *StartRequest) String() string {
 func (*StartRequest) ProtoMessage() {}
 
 func (x *StartRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_connect_v1_connect_proto_msgTypes[15]
+	mi := &file_connect_v1_connect_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1641,7 +1704,7 @@ func (x *StartRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartRequest.ProtoReflect.Descriptor instead.
 func (*StartRequest) Descriptor() ([]byte, []int) {
-	return file_connect_v1_connect_proto_rawDescGZIP(), []int{15}
+	return file_connect_v1_connect_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *StartRequest) GetExcludeGateways() []string {
@@ -1660,7 +1723,7 @@ type FlushResponse struct {
 
 func (x *FlushResponse) Reset() {
 	*x = FlushResponse{}
-	mi := &file_connect_v1_connect_proto_msgTypes[16]
+	mi := &file_connect_v1_connect_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1672,7 +1735,7 @@ func (x *FlushResponse) String() string {
 func (*FlushResponse) ProtoMessage() {}
 
 func (x *FlushResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_connect_v1_connect_proto_msgTypes[16]
+	mi := &file_connect_v1_connect_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1685,7 +1748,7 @@ func (x *FlushResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FlushResponse.ProtoReflect.Descriptor instead.
 func (*FlushResponse) Descriptor() ([]byte, []int) {
-	return file_connect_v1_connect_proto_rawDescGZIP(), []int{16}
+	return file_connect_v1_connect_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *FlushResponse) GetRequestId() string {
@@ -1706,7 +1769,7 @@ type PubSubAckMessage struct {
 
 func (x *PubSubAckMessage) Reset() {
 	*x = PubSubAckMessage{}
-	mi := &file_connect_v1_connect_proto_msgTypes[17]
+	mi := &file_connect_v1_connect_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1718,7 +1781,7 @@ func (x *PubSubAckMessage) String() string {
 func (*PubSubAckMessage) ProtoMessage() {}
 
 func (x *PubSubAckMessage) ProtoReflect() protoreflect.Message {
-	mi := &file_connect_v1_connect_proto_msgTypes[17]
+	mi := &file_connect_v1_connect_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1731,7 +1794,7 @@ func (x *PubSubAckMessage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PubSubAckMessage.ProtoReflect.Descriptor instead.
 func (*PubSubAckMessage) Descriptor() ([]byte, []int) {
-	return file_connect_v1_connect_proto_rawDescGZIP(), []int{17}
+	return file_connect_v1_connect_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *PubSubAckMessage) GetTs() *timestamppb.Timestamp {
@@ -1766,7 +1829,7 @@ type SystemError struct {
 
 func (x *SystemError) Reset() {
 	*x = SystemError{}
-	mi := &file_connect_v1_connect_proto_msgTypes[18]
+	mi := &file_connect_v1_connect_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1778,7 +1841,7 @@ func (x *SystemError) String() string {
 func (*SystemError) ProtoMessage() {}
 
 func (x *SystemError) ProtoReflect() protoreflect.Message {
-	mi := &file_connect_v1_connect_proto_msgTypes[18]
+	mi := &file_connect_v1_connect_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1791,7 +1854,7 @@ func (x *SystemError) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SystemError.ProtoReflect.Descriptor instead.
 func (*SystemError) Descriptor() ([]byte, []int) {
-	return file_connect_v1_connect_proto_rawDescGZIP(), []int{18}
+	return file_connect_v1_connect_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *SystemError) GetCode() string {
@@ -1855,10 +1918,14 @@ const file_connect_v1_connect_proto_rawDesc = "" +
 	"\x16max_worker_concurrency\x18\x0e \x01(\x03H\x02R\x14maxWorkerConcurrency\x88\x01\x01B\x0e\n" +
 	"\f_environmentB\v\n" +
 	"\t_platformB\x19\n" +
-	"\x17_max_worker_concurrency\"\x7f\n" +
+	"\x17_max_worker_concurrency\"\xa8\x01\n" +
 	"\x1aGatewayConnectionReadyData\x12-\n" +
 	"\x12heartbeat_interval\x18\x01 \x01(\tR\x11heartbeatInterval\x122\n" +
-	"\x15extend_lease_interval\x18\x02 \x01(\tR\x13extendLeaseInterval\"\xbe\x03\n" +
+	"\x15extend_lease_interval\x18\x02 \x01(\tR\x13extendLeaseInterval\x12'\n" +
+	"\x0fstatus_interval\x18\x03 \x01(\tR\x0estatusInterval\"t\n" +
+	"\x10WorkerStatusData\x121\n" +
+	"\x15in_flight_request_ids\x18\x01 \x03(\tR\x12inFlightRequestIds\x12-\n" +
+	"\x12shutdown_requested\x18\x02 \x01(\bR\x11shutdownRequested\"\xbe\x03\n" +
 	"\x1aGatewayExecutorRequestData\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12\x1d\n" +
@@ -2005,7 +2072,7 @@ const file_connect_v1_connect_proto_rawDesc = "" +
 	"\x04code\x18\x01 \x01(\tR\x04code\x12\x17\n" +
 	"\x04data\x18\x02 \x01(\fH\x00R\x04data\x88\x01\x01\x12\x18\n" +
 	"\amessage\x18\x03 \x01(\tR\amessageB\a\n" +
-	"\x05_data*\xf4\x02\n" +
+	"\x05_data*\x87\x03\n" +
 	"\x12GatewayMessageType\x12\x11\n" +
 	"\rGATEWAY_HELLO\x10\x00\x12\x12\n" +
 	"\x0eWORKER_CONNECT\x10\x01\x12\x0f\n" +
@@ -2022,7 +2089,8 @@ const file_connect_v1_connect_proto_rawDesc = "" +
 	"\x10WORKER_HEARTBEAT\x10\t\x12\x15\n" +
 	"\x11GATEWAY_HEARTBEAT\x10\n" +
 	"\x12\x13\n" +
-	"\x0fGATEWAY_CLOSING\x10\v*;\n" +
+	"\x0fGATEWAY_CLOSING\x10\v\x12\x11\n" +
+	"\rWORKER_STATUS\x10\x0f*;\n" +
 	"\x11SDKResponseStatus\x12\x11\n" +
 	"\rNOT_COMPLETED\x10\x00\x12\b\n" +
 	"\x04DONE\x10\x01\x12\t\n" +
@@ -2054,7 +2122,7 @@ func file_connect_v1_connect_proto_rawDescGZIP() []byte {
 }
 
 var file_connect_v1_connect_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
-var file_connect_v1_connect_proto_msgTypes = make([]protoimpl.MessageInfo, 21)
+var file_connect_v1_connect_proto_msgTypes = make([]protoimpl.MessageInfo, 22)
 var file_connect_v1_connect_proto_goTypes = []any{
 	(GatewayMessageType)(0),                 // 0: connect.v1.GatewayMessageType
 	(SDKResponseStatus)(0),                  // 1: connect.v1.SDKResponseStatus
@@ -2065,39 +2133,40 @@ var file_connect_v1_connect_proto_goTypes = []any{
 	(*AuthData)(nil),                        // 6: connect.v1.AuthData
 	(*WorkerConnectRequestData)(nil),        // 7: connect.v1.WorkerConnectRequestData
 	(*GatewayConnectionReadyData)(nil),      // 8: connect.v1.GatewayConnectionReadyData
-	(*GatewayExecutorRequestData)(nil),      // 9: connect.v1.GatewayExecutorRequestData
-	(*WorkerRequestAckData)(nil),            // 10: connect.v1.WorkerRequestAckData
-	(*WorkerRequestExtendLeaseData)(nil),    // 11: connect.v1.WorkerRequestExtendLeaseData
-	(*WorkerRequestExtendLeaseAckData)(nil), // 12: connect.v1.WorkerRequestExtendLeaseAckData
-	(*SDKResponse)(nil),                     // 13: connect.v1.SDKResponse
-	(*WorkerReplyAckData)(nil),              // 14: connect.v1.WorkerReplyAckData
-	(*ConnMetadata)(nil),                    // 15: connect.v1.ConnMetadata
-	(*SystemAttributes)(nil),                // 16: connect.v1.SystemAttributes
-	(*ConnGroup)(nil),                       // 17: connect.v1.ConnGroup
-	(*StartResponse)(nil),                   // 18: connect.v1.StartResponse
-	(*StartRequest)(nil),                    // 19: connect.v1.StartRequest
-	(*FlushResponse)(nil),                   // 20: connect.v1.FlushResponse
-	(*PubSubAckMessage)(nil),                // 21: connect.v1.PubSubAckMessage
-	(*SystemError)(nil),                     // 22: connect.v1.SystemError
-	nil,                                     // 23: connect.v1.ConnMetadata.AllWorkerGroupsEntry
-	nil,                                     // 24: connect.v1.ConnMetadata.SyncedWorkerGroupsEntry
-	(*timestamppb.Timestamp)(nil),           // 25: google.protobuf.Timestamp
+	(*WorkerStatusData)(nil),                // 9: connect.v1.WorkerStatusData
+	(*GatewayExecutorRequestData)(nil),      // 10: connect.v1.GatewayExecutorRequestData
+	(*WorkerRequestAckData)(nil),            // 11: connect.v1.WorkerRequestAckData
+	(*WorkerRequestExtendLeaseData)(nil),    // 12: connect.v1.WorkerRequestExtendLeaseData
+	(*WorkerRequestExtendLeaseAckData)(nil), // 13: connect.v1.WorkerRequestExtendLeaseAckData
+	(*SDKResponse)(nil),                     // 14: connect.v1.SDKResponse
+	(*WorkerReplyAckData)(nil),              // 15: connect.v1.WorkerReplyAckData
+	(*ConnMetadata)(nil),                    // 16: connect.v1.ConnMetadata
+	(*SystemAttributes)(nil),                // 17: connect.v1.SystemAttributes
+	(*ConnGroup)(nil),                       // 18: connect.v1.ConnGroup
+	(*StartResponse)(nil),                   // 19: connect.v1.StartResponse
+	(*StartRequest)(nil),                    // 20: connect.v1.StartRequest
+	(*FlushResponse)(nil),                   // 21: connect.v1.FlushResponse
+	(*PubSubAckMessage)(nil),                // 22: connect.v1.PubSubAckMessage
+	(*SystemError)(nil),                     // 23: connect.v1.SystemError
+	nil,                                     // 24: connect.v1.ConnMetadata.AllWorkerGroupsEntry
+	nil,                                     // 25: connect.v1.ConnMetadata.SyncedWorkerGroupsEntry
+	(*timestamppb.Timestamp)(nil),           // 26: google.protobuf.Timestamp
 }
 var file_connect_v1_connect_proto_depIdxs = []int32{
 	0,  // 0: connect.v1.ConnectMessage.kind:type_name -> connect.v1.GatewayMessageType
 	6,  // 1: connect.v1.WorkerConnectRequestData.auth_data:type_name -> connect.v1.AuthData
 	5,  // 2: connect.v1.WorkerConnectRequestData.apps:type_name -> connect.v1.AppConfiguration
-	16, // 3: connect.v1.WorkerConnectRequestData.system_attributes:type_name -> connect.v1.SystemAttributes
-	25, // 4: connect.v1.WorkerConnectRequestData.started_at:type_name -> google.protobuf.Timestamp
+	17, // 3: connect.v1.WorkerConnectRequestData.system_attributes:type_name -> connect.v1.SystemAttributes
+	26, // 4: connect.v1.WorkerConnectRequestData.started_at:type_name -> google.protobuf.Timestamp
 	1,  // 5: connect.v1.SDKResponse.status:type_name -> connect.v1.SDKResponseStatus
-	23, // 6: connect.v1.ConnMetadata.all_worker_groups:type_name -> connect.v1.ConnMetadata.AllWorkerGroupsEntry
-	24, // 7: connect.v1.ConnMetadata.synced_worker_groups:type_name -> connect.v1.ConnMetadata.SyncedWorkerGroupsEntry
+	24, // 6: connect.v1.ConnMetadata.all_worker_groups:type_name -> connect.v1.ConnMetadata.AllWorkerGroupsEntry
+	25, // 7: connect.v1.ConnMetadata.synced_worker_groups:type_name -> connect.v1.ConnMetadata.SyncedWorkerGroupsEntry
 	2,  // 8: connect.v1.ConnMetadata.status:type_name -> connect.v1.ConnectionStatus
-	25, // 9: connect.v1.ConnMetadata.last_heartbeat_at:type_name -> google.protobuf.Timestamp
-	16, // 10: connect.v1.ConnMetadata.attributes:type_name -> connect.v1.SystemAttributes
-	15, // 11: connect.v1.ConnGroup.conns:type_name -> connect.v1.ConnMetadata
-	25, // 12: connect.v1.PubSubAckMessage.ts:type_name -> google.protobuf.Timestamp
-	22, // 13: connect.v1.PubSubAckMessage.nack_reason:type_name -> connect.v1.SystemError
+	26, // 9: connect.v1.ConnMetadata.last_heartbeat_at:type_name -> google.protobuf.Timestamp
+	17, // 10: connect.v1.ConnMetadata.attributes:type_name -> connect.v1.SystemAttributes
+	16, // 11: connect.v1.ConnGroup.conns:type_name -> connect.v1.ConnMetadata
+	26, // 12: connect.v1.PubSubAckMessage.ts:type_name -> google.protobuf.Timestamp
+	23, // 13: connect.v1.PubSubAckMessage.nack_reason:type_name -> connect.v1.SystemError
 	14, // [14:14] is the sub-list for method output_type
 	14, // [14:14] is the sub-list for method input_type
 	14, // [14:14] is the sub-list for extension type_name
@@ -2112,21 +2181,21 @@ func file_connect_v1_connect_proto_init() {
 	}
 	file_connect_v1_connect_proto_msgTypes[1].OneofWrappers = []any{}
 	file_connect_v1_connect_proto_msgTypes[3].OneofWrappers = []any{}
-	file_connect_v1_connect_proto_msgTypes[5].OneofWrappers = []any{}
 	file_connect_v1_connect_proto_msgTypes[6].OneofWrappers = []any{}
 	file_connect_v1_connect_proto_msgTypes[7].OneofWrappers = []any{}
 	file_connect_v1_connect_proto_msgTypes[8].OneofWrappers = []any{}
 	file_connect_v1_connect_proto_msgTypes[9].OneofWrappers = []any{}
-	file_connect_v1_connect_proto_msgTypes[13].OneofWrappers = []any{}
-	file_connect_v1_connect_proto_msgTypes[17].OneofWrappers = []any{}
+	file_connect_v1_connect_proto_msgTypes[10].OneofWrappers = []any{}
+	file_connect_v1_connect_proto_msgTypes[14].OneofWrappers = []any{}
 	file_connect_v1_connect_proto_msgTypes[18].OneofWrappers = []any{}
+	file_connect_v1_connect_proto_msgTypes[19].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_connect_v1_connect_proto_rawDesc), len(file_connect_v1_connect_proto_rawDesc)),
 			NumEnums:      4,
-			NumMessages:   21,
+			NumMessages:   22,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

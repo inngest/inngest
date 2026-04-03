@@ -582,33 +582,6 @@ func IncrHTTPAPIRequestsCounter(ctx context.Context, opts CounterOpt) {
 	})
 }
 
-func IncrQueueActiveCheckInvalidItemsFoundCounter(ctx context.Context, val int64, opts CounterOpt) {
-	RecordCounterMetric(ctx, val, CounterOpt{
-		PkgName:     opts.PkgName,
-		MetricName:  "queue_active_check_invalid_items_found_total",
-		Description: "The total number of invalid items found during an active check",
-		Tags:        opts.Tags,
-	})
-}
-
-func IncrQueueActiveCheckInvalidItemsRemovedCounter(ctx context.Context, val int64, opts CounterOpt) {
-	RecordCounterMetric(ctx, val, CounterOpt{
-		PkgName:     opts.PkgName,
-		MetricName:  "queue_active_check_invalid_items_removed_total",
-		Description: "The total number of invalid items removed during an active check",
-		Tags:        opts.Tags,
-	})
-}
-
-func IncrQueueActiveCheckAccountScannedCounter(ctx context.Context, opts CounterOpt) {
-	RecordCounterMetric(ctx, 1, CounterOpt{
-		PkgName:     opts.PkgName,
-		MetricName:  "queue_active_check_account_scanned_total",
-		Description: "The total number of times an account was scanned during an active check",
-		Tags:        opts.Tags,
-	})
-}
-
 func ActiveBacklogNormalizeCount(ctx context.Context, incr int64, opts CounterOpt) {
 	RecordUpDownCounterMetric(ctx, incr, CounterOpt{
 		PkgName:     opts.PkgName,
@@ -935,6 +908,30 @@ func IncrConstraintAPIAcquireCacheCounter(ctx context.Context, opts CounterOpt) 
 		PkgName:     opts.PkgName,
 		MetricName:  "constraintapi_acquire_cache_total",
 		Description: "Total number of centralized Redis acquire cache hits and misses",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrExecutorHandleGeneratorCount(ctx context.Context, op string, opts CounterOpt) {
+	if opts.Tags == nil {
+		opts.Tags = map[string]any{}
+	}
+
+	opts.Tags["op"] = op
+
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "executor_handle_generator_total",
+		Description: "Total number of executor handle generator calls",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrConnectProxyLeaseExpiredCount(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "connect_proxy.lease_expired_total",
+		Description: "Total number of expired leases",
 		Tags:        opts.Tags,
 	})
 }

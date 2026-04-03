@@ -155,8 +155,9 @@ const (
 	ConnectGatewayHeartbeatInterval = 5 * time.Second
 	ConnectGCThreshold              = 5 * time.Minute
 
-	ConnectWorkerRequestLeaseDuration = 20 * time.Second
+	ConnectWorkerRequestLeaseDuration = 2 * time.Minute
 	ConnectWorkerRequestGracePeriod   = 5 * time.Second
+	ConnectWorkerStatusInterval       = 0 * time.Second // disabled by default
 
 	// ConnectWorkerCapacityForNoConcurrencyLimit is used to indicate that a worker has no capacity limit.
 	// Due to integer overflows of using negative numbers, we use 0 to indicate no limit.``

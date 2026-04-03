@@ -28,8 +28,9 @@ const (
 )
 
 var (
-	ErrNoHealthyConnection  = fmt.Errorf("no healthy connection")
-	ErrAllWorkersAtCapacity = fmt.Errorf("all connect workers at capacity")
+	ErrNoHealthyConnection     = fmt.Errorf("no healthy connection")
+	ErrOnlyDrainingConnections = fmt.Errorf("all connections draining")
+	ErrAllWorkersAtCapacity    = fmt.Errorf("all connect workers at capacity")
 )
 
 type RouteResult struct {
@@ -72,21 +73,51 @@ func GetRoute(ctx context.Context, stateMgr state.StateManager, rnd *util.FrandR
 
 	routeTo, err := getSuitableConnection(ctx, rnd, stateMgr, envID, appID, data.FunctionSlug, log)
 
-	if err != nil && !errors.Is(err, ErrNoHealthyConnection) && !errors.Is(err, ErrAllWorkersAtCapacity) {
+	// Retry when all connections are draining — during gateway rollouts
+	// there's a brief window where the replacement isn't READY yet.
+	if errors.Is(err, ErrOnlyDrainingConnections) {
+		log.Info("all connections draining, waiting for replacement",
+			"fn_slug", data.FunctionSlug,
+			"app_id", data.AppId,
+			"run_id", data.RunId,
+			"req_id", data.RequestId,
+		)
+		for i := 0; i < 10; i++ {
+			select {
+			case <-ctx.Done():
+				return nil, ErrNoHealthyConnection
+			case <-time.After(1 * time.Second):
+			}
+			routeTo, err = getSuitableConnection(ctx, rnd, stateMgr, envID, appID, data.FunctionSlug, log)
+			if !errors.Is(err, ErrOnlyDrainingConnections) {
+				log.Info("found connection after draining retry",
+					"attempt", i+1,
+					"run_id", data.RunId,
+					"req_id", data.RequestId,
+					"err", err,
+				)
+				break
+			}
+			log.Info("still draining, retrying",
+				"attempt", i+1,
+				"run_id", data.RunId,
+				"req_id", data.RequestId,
+			)
+		}
+	}
+
+	if err != nil && !errors.Is(err, ErrNoHealthyConnection) && !errors.Is(err, ErrOnlyDrainingConnections) && !errors.Is(err, ErrAllWorkersAtCapacity) {
 		return nil, fmt.Errorf("could not retrieve suitable connection: %w", err)
 	}
 
 	if routeTo == nil {
-		// no healthy connections
-		if errors.Is(err, ErrNoHealthyConnection) {
+		if errors.Is(err, ErrNoHealthyConnection) || errors.Is(err, ErrOnlyDrainingConnections) {
 			log.Warn("no healthy connections")
 			metrics.IncrConnectRouterNoHealthyConnectionCounter(ctx, 1, metrics.CounterOpt{
 				PkgName: pkgNameRouter,
 			})
-
 			return nil, ErrNoHealthyConnection
 		}
-		// all workers at capacity
 		if errors.Is(err, ErrAllWorkersAtCapacity) {
 			metrics.IncrConnectRouterAllWorkersAtCapacityCounter(ctx, 1, metrics.CounterOpt{
 				PkgName: pkgNameRouter,
@@ -150,6 +181,7 @@ func getSuitableConnection(ctx context.Context, rnd *util.FrandRNG, stateMgr sta
 	capacityCache := make(map[string]*checkCapacityRes)
 	workerCapacityAvailable := false
 	hasHealthyConnections := false
+	hasDrainingConnections := false
 	for _, conn := range conns {
 		res := isHealthy(ctx, stateMgr, envID, appID, fnSlug, conn, log)
 		// avoid duplicate calls to check capacity for same instance
@@ -161,6 +193,10 @@ func getSuitableConnection(ctx context.Context, rnd *util.FrandRNG, stateMgr sta
 		// Track if we have any healthy connections
 		if res.isHealthy {
 			hasHealthyConnections = true
+		}
+
+		if conn.Status == connectpb.ConnectionStatus_DRAINING {
+			hasDrainingConnections = true
 		}
 
 		// check if the connection is healthy and has worker capacity
@@ -184,6 +220,9 @@ func getSuitableConnection(ctx context.Context, rnd *util.FrandRNG, stateMgr sta
 
 	// If no healthy connections at all, return ErrNoHealthyConnection
 	if !hasHealthyConnections {
+		if hasDrainingConnections {
+			return nil, ErrOnlyDrainingConnections
+		}
 		return nil, ErrNoHealthyConnection
 	}
 

@@ -33,7 +33,6 @@ import (
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/ratelimit"
 	"github.com/inngest/inngest/pkg/execution/realtime"
-	"github.com/inngest/inngest/pkg/execution/realtime/streamingtypes"
 	"github.com/inngest/inngest/pkg/execution/singleton"
 	"github.com/inngest/inngest/pkg/execution/state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
@@ -1845,6 +1844,20 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 					l.Warn("error creating HTTP timing metadata span", "error", err)
 				}
 			}
+
+			// Attach timing breakdown metadata (queue delay, system latency, network total)
+			if timingMd := extractors.BuildTimingMetadata(instance.item.RunInfo, resp.HTTPStat); timingMd != nil {
+				_, err := e.createMetadataSpan(
+					ctx,
+					&instance,
+					"executor.timing",
+					timingMd,
+					enums.MetadataScopeStepAttempt,
+				)
+				if err != nil {
+					l.Warn("error creating timing metadata span", "error", err)
+				}
+			}
 		}
 
 		if handleErr := e.HandleResponse(ctx, &instance); handleErr != nil {
@@ -2318,7 +2331,7 @@ func (e *executor) executeDriverV1(ctx context.Context, i *runInstance) (*state.
 	//
 	// TODO: Refactor response.Err
 	if len(response.Generator) == 1 && response.Generator[0].Op == enums.OpcodeStepError {
-		if !queue.ShouldRetry(nil, i.item.Attempt, step.RetryCount()+1) {
+		if !queue.ShouldRetry(err, i.item.Attempt, step.RetryCount()+1) {
 			response.NoRetry = true
 		}
 	}
@@ -2326,7 +2339,7 @@ func (e *executor) executeDriverV1(ctx context.Context, i *runInstance) (*state.
 	// Max attempts is encoded at the queue level from step configuration.  If we're at max attempts,
 	// ensure the response's NoRetry flag is set, as we shouldn't retry any more.  This also ensures
 	// that we properly handle this response as a Failure (permanent) vs an Error (transient).
-	if response.Err != nil && !queue.ShouldRetry(nil, i.item.Attempt, step.RetryCount()+1) {
+	if response.Err != nil && !queue.ShouldRetry(err, i.item.Attempt, step.RetryCount()+1) {
 		response.NoRetry = true
 	}
 
@@ -3278,6 +3291,11 @@ func (e *executor) HandleGenerator(ctx context.Context, runCtx execution.RunCont
 	if !ok {
 		return fmt.Errorf("unknown queue item type handling generator: %T", lifecycleItem.Payload)
 	}
+
+	// Track generator usage
+	metrics.IncrExecutorHandleGeneratorCount(ctx, gen.Op.String(), metrics.CounterOpt{
+		PkgName: pkgName,
+	})
 
 	switch gen.Op {
 	case enums.OpcodeNone:
@@ -5335,8 +5353,6 @@ func (e *executor) addRequestPublishOpts(ctx context.Context, item queue.Item, s
 
 	sr.Publish.Token = token
 	sr.Publish.PublishURL = e.rtconfig.PublishURL
-	sr.Publish.Channel = item.Identifier.RunID.String()
-	sr.Publish.Topic = streamingtypes.TopicNameStream
 }
 
 // shouldEnqueueDiscovery returns true if the ended step should have a discovery

@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -15,7 +16,6 @@ import (
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/logger"
-	"github.com/inngest/inngest/pkg/util"
 	"github.com/jonboulle/clockwork"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
@@ -126,16 +126,10 @@ func TestQueueRefillBacklog(t *testing.T) {
 		itemIDs, err := getItemIDsFromBacklog(ctx, shard, &expectedBacklog, clock.Now(), 1000)
 		require.NoError(t, err)
 
-		res, err := shard.BacklogRefill(ctx, &expectedBacklog, &shadowPartition, clock.Now(), itemIDs, osqueue.PartitionConstraintConfig{
-			Concurrency: osqueue.PartitionConcurrency{
-				AccountConcurrency:  osqueue.DefaultConcurrency,
-				FunctionConcurrency: osqueue.DefaultConcurrency,
-			},
-		})
+		res, err := shard.BacklogRefill(ctx, &expectedBacklog, &shadowPartition, clock.Now(), itemIDs)
 		require.NoError(t, err)
 
-		require.Equal(t, 1, res.Refilled)
-		require.Equal(t, enums.QueueConstraintNotLimited, res.Constraint)
+		require.Equal(t, 1, len(res.RefilledItems))
 
 		require.False(t, hasMember(t, r, kg.BacklogSet(expectedBacklog.BacklogID), qi.ID))
 
@@ -145,17 +139,6 @@ func TestQueueRefillBacklog(t *testing.T) {
 		require.Equal(t, at.Unix(), int64(score(t, r, kg.GlobalPartitionIndex(), fnID.String())))
 		require.Equal(t, at.Unix(), int64(score(t, r, kg.GlobalAccountIndex(), accountId.String())))
 		require.Equal(t, at.Unix(), int64(score(t, r, kg.AccountPartitionIndex(accountId), fnID.String())))
-
-		// Run indexes should be updated
-		{
-			itemIsMember, err := r.SIsMember(kg.ActiveSet("run", runID.String()), qi.ID)
-			require.NoError(t, err)
-			require.True(t, itemIsMember)
-
-			isMember, err := r.SIsMember(kg.ActiveRunsSet("p", fnID.String()), runID.String())
-			require.NoError(t, err)
-			require.True(t, isMember)
-		}
 	})
 
 	t.Run("should clean up dangling pointers", func(t *testing.T) {
@@ -219,16 +202,10 @@ func TestQueueRefillBacklog(t *testing.T) {
 		// Simulate peek returned missing items
 		itemIDs = append(itemIDs, "missing-1", "missing-2", "missing-3")
 
-		res, err := shard.BacklogRefill(ctx, &expectedBacklog, &shadowPartition, clock.Now(), itemIDs, osqueue.PartitionConstraintConfig{
-			Concurrency: osqueue.PartitionConcurrency{
-				AccountConcurrency:  osqueue.DefaultConcurrency,
-				FunctionConcurrency: osqueue.DefaultConcurrency,
-			},
-		})
+		res, err := shard.BacklogRefill(ctx, &expectedBacklog, &shadowPartition, clock.Now(), itemIDs)
 		require.NoError(t, err)
 
-		require.Equal(t, 1, res.Refilled)
-		require.Equal(t, enums.QueueConstraintNotLimited, res.Constraint)
+		require.Equal(t, 1, len(res.RefilledItems))
 
 		require.False(t, hasMember(t, r, kg.BacklogSet(expectedBacklog.BacklogID), qi.ID))
 		require.False(t, r.Exists(kg.BacklogMeta()))
@@ -342,20 +319,12 @@ func TestQueueRefillBacklog(t *testing.T) {
 		// Only include first 2 items
 		itemIDs = itemIDs[:2]
 
-		res, err := shard.BacklogRefill(ctx, &backlog, &shadowPart, refillUntil, itemIDs, osqueue.PartitionConstraintConfig{
-			Concurrency: osqueue.PartitionConcurrency{
-				AccountConcurrency:  123,
-				FunctionConcurrency: 45,
-			},
-		})
+		res, err := shard.BacklogRefill(ctx, &backlog, &shadowPart, refillUntil, itemIDs)
 		require.NoError(t, err)
 
 		require.Equal(t, 3, res.TotalBacklogCount)
 		require.Equal(t, 3, res.BacklogCountUntil)
-		require.Equal(t, 45, res.Capacity) // limit by function concurrency
-		require.Equal(t, 2, res.Refill)    // limited by max refill limit of 1
-		require.Equal(t, 2, res.Refilled)
-		require.Equal(t, enums.QueueConstraintNotLimited, res.Constraint)
+		require.Equal(t, 2, len(res.RefilledItems))
 	})
 
 	t.Run("should not move future items but adjust pointers", func(t *testing.T) {
@@ -454,20 +423,12 @@ func TestQueueRefillBacklog(t *testing.T) {
 		itemIDs, err := getItemIDsFromBacklog(ctx, shard, &backlog, refillUntil, 1000)
 		require.NoError(t, err)
 
-		res, err := shard.BacklogRefill(ctx, &backlog, &shadowPart, refillUntil, itemIDs, osqueue.PartitionConstraintConfig{
-			Concurrency: osqueue.PartitionConcurrency{
-				AccountConcurrency:  123,
-				FunctionConcurrency: 45,
-			},
-		})
+		res, err := shard.BacklogRefill(ctx, &backlog, &shadowPart, refillUntil, itemIDs)
 		require.NoError(t, err)
 
 		require.Equal(t, 2, res.TotalBacklogCount)
 		require.Equal(t, 1, res.BacklogCountUntil)
-		require.Equal(t, 45, res.Capacity) // limit by function concurrency
-		require.Equal(t, 1, res.Refill)
-		require.Equal(t, 1, res.Refilled)
-		require.Equal(t, enums.QueueConstraintNotLimited, res.Constraint)
+		require.Equal(t, 1, len(res.RefilledItems))
 
 		require.Equal(t, futureAt.UnixMilli(), int64(score(t, r, kg.BacklogSet(backlog.BacklogID), qi2.ID)))
 		require.Equal(t, futureAt.UnixMilli(), int64(score(t, r, kg.ShadowPartitionSet(shadowPart.PartitionID), backlog.BacklogID)))
@@ -486,171 +447,15 @@ func TestQueueRefillBacklog(t *testing.T) {
 		itemIDs, err = getItemIDsFromBacklog(ctx, shard, &backlog, refillUntil, 1000)
 		require.NoError(t, err)
 
-		res, err = shard.BacklogRefill(ctx, &backlog, &shadowPart, refillUntil, itemIDs, osqueue.PartitionConstraintConfig{
-			Concurrency: osqueue.PartitionConcurrency{
-				AccountConcurrency:  123,
-				FunctionConcurrency: 45,
-			},
-		})
+		res, err = shard.BacklogRefill(ctx, &backlog, &shadowPart, refillUntil, itemIDs)
 		require.NoError(t, err)
 
 		require.Equal(t, 1, res.TotalBacklogCount)
 		require.Equal(t, 1, res.BacklogCountUntil)
-		require.Equal(t, 44, res.Capacity) // limit by function concurrency
-		require.Equal(t, 1, res.Refill)
-		require.Equal(t, 1, res.Refilled)
-		require.Equal(t, enums.QueueConstraintNotLimited, res.Constraint)
+		require.Equal(t, 1, len(res.RefilledItems))
 
 		require.False(t, r.Exists(kg.BacklogSet(backlog.BacklogID)))
 		require.False(t, r.Exists(kg.ShadowPartitionSet(shadowPart.PartitionID)))
-	})
-
-	t.Run("should move partition to active check queue when running into concurrency limit", func(t *testing.T) {
-		r := miniredis.RunT(t)
-		rc, err := rueidis.NewClient(rueidis.ClientOption{
-			InitAddress:  []string{r.Addr()},
-			DisableCache: true,
-		})
-		require.NoError(t, err)
-		defer rc.Close()
-
-		ctx := context.Background()
-
-		clock := clockwork.NewFakeClock()
-
-		enqueueToBacklog := true
-		_, shard := newQueue(
-			t, rc,
-			osqueue.WithClock(clock),
-			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
-				return enqueueToBacklog
-			}),
-			osqueue.WithRunMode(osqueue.QueueRunMode{
-				Sequential:                        true,
-				Scavenger:                         true,
-				Partition:                         true,
-				Account:                           true,
-				AccountWeight:                     85,
-				ShadowPartition:                   true,
-				AccountShadowPartition:            true,
-				AccountShadowPartitionWeight:      85,
-				ShadowContinuations:               true,
-				ShadowContinuationSkipProbability: 0,
-				NormalizePartition:                true,
-				ActiveChecker:                     true,
-			}),
-			osqueue.WithBacklogRefillLimit(500),
-			osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
-				return osqueue.PartitionConstraintConfig{
-					Concurrency: osqueue.PartitionConcurrency{
-						AccountConcurrency:  123,
-						FunctionConcurrency: 45,
-						SystemConcurrency:   678,
-					},
-				}
-			}),
-			osqueue.WithActiveSpotCheckProbability(func(ctx context.Context, acctID uuid.UUID) (int, int) {
-				return 100, 100
-			}),
-		)
-
-		item := osqueue.QueueItem{
-			ID:          "test",
-			FunctionID:  fnID,
-			WorkspaceID: wsID,
-			Data: osqueue.Item{
-				WorkspaceID: wsID,
-				Kind:        osqueue.KindEdge,
-				Identifier: state.Identifier{
-					WorkflowID:  fnID,
-					AccountID:   accountId,
-					WorkspaceID: wsID,
-					RunID:       runID,
-				},
-				QueueName:             nil,
-				Throttle:              nil,
-				CustomConcurrencyKeys: nil,
-			},
-			QueueName: nil,
-		}
-
-		qi, err := shard.EnqueueItem(ctx, item, clock.Now(), osqueue.EnqueueOpts{})
-		require.NoError(t, err)
-
-		fnID2 := uuid.New()
-
-		item2 := osqueue.QueueItem{
-			ID:          "test-2",
-			FunctionID:  fnID2,
-			WorkspaceID: wsID,
-			Data: osqueue.Item{
-				WorkspaceID: wsID,
-				Kind:        osqueue.KindEdge,
-				Identifier: state.Identifier{
-					WorkflowID:  fnID2,
-					AccountID:   accountId,
-					WorkspaceID: wsID,
-					RunID:       runID,
-				},
-				QueueName:             nil,
-				Throttle:              nil,
-				CustomConcurrencyKeys: nil,
-			},
-			QueueName: nil,
-		}
-
-		_, err = shard.EnqueueItem(ctx, item2, clock.Now(), osqueue.EnqueueOpts{})
-		require.NoError(t, err)
-
-		b := osqueue.ItemBacklog(ctx, qi)
-		sp := osqueue.ItemShadowPartition(ctx, qi)
-
-		enqueueToBacklog = true
-
-		// Get items to refill from backlog
-		itemIDs, err := getItemIDsFromBacklog(ctx, shard, &b, clock.Now().Add(10*time.Second), 1000)
-		require.NoError(t, err)
-
-		res, err := shard.BacklogRefill(ctx, &b, &sp, clock.Now().Add(10*time.Second), itemIDs, osqueue.PartitionConstraintConfig{
-			Concurrency: osqueue.PartitionConcurrency{
-				AccountConcurrency:  1,
-				FunctionConcurrency: 1,
-			},
-		})
-		require.NoError(t, err)
-		require.Equal(t, 1, res.TotalBacklogCount)
-		require.Equal(t, 1, res.Capacity)
-		require.Equal(t, 1, res.Refill)
-		require.Equal(t, 1, res.Refilled)
-		require.Equal(t, enums.QueueConstraintNotLimited, res.Constraint)
-
-		b2 := osqueue.ItemBacklog(ctx, item2)
-		sp2 := osqueue.ItemShadowPartition(ctx, item2)
-
-		enqueueToBacklog = true
-
-		// Get items to refill from backlog
-		itemIDs2, err := getItemIDsFromBacklog(ctx, shard, &b2, clock.Now().Add(10*time.Second), 1000)
-		require.NoError(t, err)
-
-		res, err = shard.BacklogRefill(ctx, &b2, &sp2, clock.Now().Add(10*time.Second), itemIDs2, osqueue.PartitionConstraintConfig{
-			Concurrency: osqueue.PartitionConcurrency{
-				AccountConcurrency:  1,
-				FunctionConcurrency: 1,
-			},
-		})
-		require.NoError(t, err)
-		require.Equal(t, 1, res.TotalBacklogCount)
-		require.Equal(t, 0, res.Capacity)
-		require.Equal(t, 0, res.Refill)
-		require.Equal(t, 0, res.Refilled)
-		require.Equal(t, enums.QueueConstraintAccountConcurrency, res.Constraint)
-
-		require.True(t, r.Exists(kg.BacklogActiveCheckSet()))
-		members, err := r.ZMembers(kg.BacklogActiveCheckSet())
-		require.NoError(t, err)
-		require.Len(t, members, 1)
-		require.Equal(t, b2.BacklogID, members[0])
 	})
 }
 
@@ -1041,8 +846,6 @@ func TestQueueShadowScannerContinuations(t *testing.T) {
 		err = q.ScanShadowPartitions(ctx, at, qspc)
 		require.NoError(t, err)
 
-		fmt.Println("waiting for message")
-
 		// check that it's scanned and gone
 
 		_, ok = q.GetShadowContinuations()[sp1.PartitionID]
@@ -1200,738 +1003,6 @@ func TestQueueShadowScannerContinuations(t *testing.T) {
 	})
 }
 
-func TestRefillConstraints(t *testing.T) {
-	fnID1, accountID1, envID1 := uuid.New(), uuid.New(), uuid.New()
-
-	type knobs struct {
-		maxRefill              int
-		danglingItemsInBacklog int
-
-		accountConcurrencyLimit  int
-		functionConcurrencyLimit int
-
-		throttle              *osqueue.Throttle
-		customConcurrencyKey1 *state.CustomConcurrency
-		customConcurrencyKey2 *state.CustomConcurrency
-		isStartItem           bool
-	}
-
-	type expected struct {
-		result            osqueue.BacklogRefillResult
-		itemsInBacklog    int
-		itemsInReadyQueue int
-		retryAt           time.Duration
-	}
-
-	type currentValues struct {
-		itemsInBacklog int
-
-		accountActive               int
-		functionActive              int
-		customConcurrencyKey1Active int
-		customConcurrencyKey2Active int
-
-		throttleUsageWithinPeriod int
-	}
-
-	ck1 := createConcurrencyKey(enums.ConcurrencyScopeFn, fnID1, "bruno", 5)
-
-	ck2 := createConcurrencyKey(enums.ConcurrencyScopeEnv, envID1, "inngest", 10)
-
-	throttleKey := "bruno"
-	throttle := &osqueue.Throttle{
-		Key:                 util.XXHash(throttleKey),
-		Limit:               100,
-		Burst:               10,
-		Period:              int((10 * time.Hour).Seconds()),
-		KeyExpressionHash:   util.XXHash("event.data.userID"),
-		UnhashedThrottleKey: throttleKey,
-	}
-
-	tests := []struct {
-		name          string
-		currentValues currentValues
-		knobs         knobs
-		expected      expected
-	}{
-		{
-			name: "simple item",
-			currentValues: currentValues{
-				itemsInBacklog: 1,
-			},
-			knobs: knobs{
-				maxRefill:                1,
-				accountConcurrencyLimit:  20,
-				functionConcurrencyLimit: 10,
-			},
-			expected: expected{
-				result: osqueue.BacklogRefillResult{
-					Constraint:        enums.QueueConstraintNotLimited,
-					TotalBacklogCount: 1,
-					BacklogCountUntil: 1,
-					Capacity:          10,
-					Refill:            1,
-					Refilled:          1,
-				},
-				itemsInBacklog:    0,
-				itemsInReadyQueue: 1,
-			},
-		},
-		// Function limits
-		{
-			name: "function limits disallow",
-			currentValues: currentValues{
-				itemsInBacklog: 40,
-				functionActive: 10,
-			},
-			knobs: knobs{
-				maxRefill:                50,
-				accountConcurrencyLimit:  20,
-				functionConcurrencyLimit: 10,
-			},
-			expected: expected{
-				result: osqueue.BacklogRefillResult{
-					Constraint:        enums.QueueConstraintFunctionConcurrency,
-					TotalBacklogCount: 40,
-					BacklogCountUntil: 40,
-					Capacity:          0,
-					Refill:            0,
-					Refilled:          0,
-				},
-				itemsInBacklog:    40,
-				itemsInReadyQueue: 0,
-			},
-		},
-		{
-			name: "function limits disallow already exceeding",
-			currentValues: currentValues{
-				itemsInBacklog: 40,
-				functionActive: 30, // 30 running but only 10 allowed
-			},
-			knobs: knobs{
-				maxRefill:                50,
-				accountConcurrencyLimit:  20,
-				functionConcurrencyLimit: 10,
-			},
-			expected: expected{
-				result: osqueue.BacklogRefillResult{
-					Constraint:        enums.QueueConstraintFunctionConcurrency,
-					TotalBacklogCount: 40,
-					BacklogCountUntil: 40,
-					Capacity:          0, // would be -20 but can't go negative
-					Refill:            0,
-					Refilled:          0,
-				},
-				itemsInBacklog:    40,
-				itemsInReadyQueue: 0,
-			},
-		},
-		{
-			name: "function limits allow",
-			currentValues: currentValues{
-				itemsInBacklog: 40,
-				functionActive: 9,
-			},
-			knobs: knobs{
-				maxRefill:                50,
-				accountConcurrencyLimit:  20,
-				functionConcurrencyLimit: 10,
-			},
-			expected: expected{
-				result: osqueue.BacklogRefillResult{
-					Constraint:        enums.QueueConstraintNotLimited,
-					TotalBacklogCount: 40,
-					BacklogCountUntil: 40,
-					Capacity:          1,
-					Refill:            1,
-					Refilled:          1,
-				},
-				itemsInBacklog:    39,
-				itemsInReadyQueue: 1,
-			},
-		},
-		// Account limits
-		{
-			name: "account limits disallow",
-			currentValues: currentValues{
-				itemsInBacklog: 40,
-				accountActive:  20,
-			},
-			knobs: knobs{
-				maxRefill:                50,
-				accountConcurrencyLimit:  20,
-				functionConcurrencyLimit: 10,
-			},
-			expected: expected{
-				result: osqueue.BacklogRefillResult{
-					Constraint:        enums.QueueConstraintAccountConcurrency,
-					TotalBacklogCount: 40,
-					BacklogCountUntil: 40,
-					Capacity:          0,
-					Refill:            0,
-					Refilled:          0,
-				},
-				itemsInBacklog:    40,
-				itemsInReadyQueue: 0,
-			},
-		},
-		{
-			name: "account limits allow",
-			currentValues: currentValues{
-				itemsInBacklog: 40,
-				accountActive:  19,
-			},
-			knobs: knobs{
-				maxRefill:                50,
-				accountConcurrencyLimit:  20,
-				functionConcurrencyLimit: 10,
-			},
-			expected: expected{
-				result: osqueue.BacklogRefillResult{
-					Constraint:        enums.QueueConstraintNotLimited,
-					TotalBacklogCount: 40,
-					BacklogCountUntil: 40,
-					Capacity:          1,
-					Refill:            1,
-					Refilled:          1,
-				},
-				itemsInBacklog:    39,
-				itemsInReadyQueue: 1,
-			},
-		},
-		// Single custom concurrency key limits
-		{
-			name: "single custom concurrency key limits allow",
-			knobs: knobs{
-				maxRefill:                50,
-				accountConcurrencyLimit:  30,
-				functionConcurrencyLimit: 20,
-				customConcurrencyKey1:    &ck1,
-			},
-			currentValues: currentValues{
-				itemsInBacklog:              40,
-				accountActive:               21,
-				functionActive:              11,
-				customConcurrencyKey1Active: 2,
-			},
-			expected: expected{
-				result: osqueue.BacklogRefillResult{
-					Constraint:        enums.QueueConstraintNotLimited,
-					TotalBacklogCount: 40,
-					BacklogCountUntil: 40,
-					Capacity:          3,
-					Refill:            3,
-					Refilled:          3,
-				},
-				itemsInBacklog:    37,
-				itemsInReadyQueue: 3,
-			},
-		},
-		{
-			name: "single custom concurrency key limits disallow",
-			currentValues: currentValues{
-				itemsInBacklog:              40,
-				accountActive:               20,
-				functionActive:              10,
-				customConcurrencyKey1Active: 5,
-			},
-			knobs: knobs{
-				maxRefill:                50,
-				accountConcurrencyLimit:  30,
-				functionConcurrencyLimit: 20,
-				customConcurrencyKey1:    &ck1,
-			},
-			expected: expected{
-				result: osqueue.BacklogRefillResult{
-					Constraint:        enums.QueueConstraintCustomConcurrencyKey1,
-					TotalBacklogCount: 40,
-					BacklogCountUntil: 40,
-					Capacity:          0,
-					Refill:            0,
-					Refilled:          0,
-				},
-				itemsInBacklog:    40,
-				itemsInReadyQueue: 0,
-			},
-		},
-		// Dual custom concurrency key limits
-		{
-			name: "dual custom concurrency key limits allow",
-			currentValues: currentValues{
-				itemsInBacklog:              40,
-				accountActive:               20, // 20 out of 30
-				functionActive:              10, // 10 out of 20
-				customConcurrencyKey1Active: 2,  // 2 out of 5
-				customConcurrencyKey2Active: 8,  // 8 out of 10
-			},
-			knobs: knobs{
-				maxRefill:                50,
-				accountConcurrencyLimit:  30,
-				functionConcurrencyLimit: 20,
-				customConcurrencyKey1:    &ck1,
-				customConcurrencyKey2:    &ck2,
-			},
-			expected: expected{
-				result: osqueue.BacklogRefillResult{
-					Constraint:        enums.QueueConstraintNotLimited,
-					TotalBacklogCount: 40,
-					BacklogCountUntil: 40,
-					Capacity:          2,
-					Refill:            2,
-					Refilled:          2,
-				},
-				itemsInBacklog:    38,
-				itemsInReadyQueue: 2,
-			},
-		},
-		{
-			name: "dual custom concurrency key limits disallow",
-			currentValues: currentValues{
-				itemsInBacklog:              40,
-				accountActive:               20, // 20 out of 30
-				functionActive:              10, // 10 out of 20
-				customConcurrencyKey1Active: 3,  // 3 out of 5
-				customConcurrencyKey2Active: 10, // 10 out of 10
-			},
-			knobs: knobs{
-				maxRefill:                50,
-				accountConcurrencyLimit:  30,
-				functionConcurrencyLimit: 20,
-				customConcurrencyKey1:    &ck1,
-				customConcurrencyKey2:    &ck2,
-			},
-			expected: expected{
-				result: osqueue.BacklogRefillResult{
-					Constraint:        enums.QueueConstraintCustomConcurrencyKey2,
-					TotalBacklogCount: 40,
-					BacklogCountUntil: 40,
-					Capacity:          0,
-					Refill:            0,
-					Refilled:          0,
-				},
-				itemsInBacklog:    40,
-				itemsInReadyQueue: 0,
-			},
-		},
-		// Should adjust by ready queue
-		{
-			name: "adjust by ready queue",
-			knobs: knobs{
-				maxRefill:                50,
-				accountConcurrencyLimit:  100,
-				functionConcurrencyLimit: 20,
-			},
-			currentValues: currentValues{
-				itemsInBacklog: 40,
-				accountActive:  25, // 25 out of 100
-				functionActive: 15, // 15 out of 20
-			},
-			expected: expected{
-				result: osqueue.BacklogRefillResult{
-					Constraint:        enums.QueueConstraintNotLimited,
-					TotalBacklogCount: 40,
-					BacklogCountUntil: 40,
-					Capacity:          5,
-					Refill:            5,
-					Refilled:          5,
-				},
-				itemsInBacklog:    35,
-				itemsInReadyQueue: 5,
-			},
-		},
-		{
-			name: "with 'full' ready queue, no items will be refilled",
-			knobs: knobs{
-				maxRefill:                50,
-				accountConcurrencyLimit:  100,
-				functionConcurrencyLimit: 20,
-			},
-			currentValues: currentValues{
-				itemsInBacklog: 40,
-				// these items could be for any key, but we assume the ready queue will be cleared out asap
-				accountActive:  30, // 30 out of 100
-				functionActive: 20, // 20 out of 20
-			},
-			expected: expected{
-				result: osqueue.BacklogRefillResult{
-					Constraint:        enums.QueueConstraintFunctionConcurrency,
-					TotalBacklogCount: 40,
-					BacklogCountUntil: 40,
-					Capacity:          0,
-					Refill:            0,
-					Refilled:          0,
-				},
-				itemsInBacklog:    40,
-				itemsInReadyQueue: 0,
-			},
-		},
-		{
-			name: "move entire backlog, if possible",
-			knobs: knobs{
-				maxRefill:                50,
-				accountConcurrencyLimit:  100,
-				functionConcurrencyLimit: 100,
-			},
-			currentValues: currentValues{
-				itemsInBacklog: 40,
-				accountActive:  25, // 25 out of 100
-			},
-			expected: expected{
-				result: osqueue.BacklogRefillResult{
-					Constraint:        enums.QueueConstraintNotLimited,
-					TotalBacklogCount: 40, // would move 40
-					BacklogCountUntil: 40,
-					Capacity:          75,
-					Refill:            40,
-					Refilled:          40,
-				},
-				itemsInBacklog:    0,
-				itemsInReadyQueue: 40,
-			},
-		},
-		// Throttle allow
-		{
-			name: "throttle allow",
-			currentValues: currentValues{
-				itemsInBacklog:            10,
-				throttleUsageWithinPeriod: 20,
-			},
-			knobs: knobs{
-				throttle:    throttle,
-				isStartItem: true,
-			},
-			expected: expected{
-				itemsInBacklog:    0,
-				itemsInReadyQueue: 10,
-				result: osqueue.BacklogRefillResult{
-					Constraint:        enums.QueueConstraintNotLimited,
-					TotalBacklogCount: 10,
-					BacklogCountUntil: 10,
-					Capacity:          90,
-					Refill:            10,
-					Refilled:          10,
-				},
-				retryAt: 6 * time.Minute,
-			},
-		},
-		// Throttle deny
-		{
-			name: "throttle deny",
-			currentValues: currentValues{
-				itemsInBacklog:            10,
-				throttleUsageWithinPeriod: 110,
-			},
-			knobs: knobs{
-				throttle:    throttle,
-				isStartItem: true,
-			},
-			expected: expected{
-				itemsInBacklog:    10,
-				itemsInReadyQueue: 0,
-				result: osqueue.BacklogRefillResult{
-					Constraint:        enums.QueueConstraintThrottle,
-					TotalBacklogCount: 10,
-					BacklogCountUntil: 10,
-					Capacity:          0,
-					Refill:            0,
-					Refilled:          0,
-				},
-				retryAt: 6 * time.Minute, // expect GCRA to allow the next item after 6m
-			},
-		},
-	}
-
-	for _, testCase := range tests {
-		t.Run(testCase.name, func(t *testing.T) {
-			r := miniredis.RunT(t)
-			rc, err := rueidis.NewClient(rueidis.ClientOption{
-				InitAddress:  []string{r.Addr()},
-				DisableCache: true,
-			})
-			require.NoError(t, err)
-			defer rc.Close()
-
-			ctx := context.Background()
-
-			clock := clockwork.NewFakeClock()
-
-			testLifecycles := newTestLifecycleListener()
-
-			enqueueToBacklog := true
-			q, shard := newQueue(
-				t, rc,
-				osqueue.WithClock(clock),
-				osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
-					return enqueueToBacklog
-				}),
-				osqueue.WithRunMode(osqueue.QueueRunMode{
-					Sequential:                        true,
-					Scavenger:                         true,
-					Partition:                         true,
-					Account:                           true,
-					AccountWeight:                     85,
-					ShadowPartition:                   true,
-					AccountShadowPartition:            true,
-					AccountShadowPartitionWeight:      85,
-					ShadowContinuations:               true,
-					ShadowContinuationSkipProbability: 0,
-					NormalizePartition:                true,
-				}),
-				osqueue.WithBacklogRefillLimit(int64(testCase.knobs.maxRefill)),
-				osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
-					return osqueue.PartitionConstraintConfig{
-						Concurrency: osqueue.PartitionConcurrency{
-							AccountConcurrency:  testCase.knobs.accountConcurrencyLimit,
-							FunctionConcurrency: testCase.knobs.functionConcurrencyLimit,
-							SystemConcurrency:   678,
-						},
-					}
-				}),
-				osqueue.WithQueueLifecycles(testLifecycles),
-			)
-			kg := shard.Client().kg
-
-			addItem := func(id string, identifier state.Identifier, at time.Time) osqueue.QueueItem {
-				kind := osqueue.KindEdge
-				if testCase.knobs.isStartItem {
-					kind = osqueue.KindStart
-				}
-
-				var customConc []state.CustomConcurrency
-				if testCase.knobs.customConcurrencyKey1 != nil {
-					customConc = append(customConc, *testCase.knobs.customConcurrencyKey1)
-				}
-
-				if testCase.knobs.customConcurrencyKey2 != nil {
-					customConc = append(customConc, *testCase.knobs.customConcurrencyKey2)
-				}
-
-				item := osqueue.QueueItem{
-					ID:          id,
-					FunctionID:  identifier.WorkflowID,
-					WorkspaceID: identifier.WorkspaceID,
-					Data: osqueue.Item{
-						WorkspaceID:           identifier.WorkspaceID,
-						Kind:                  kind,
-						Identifier:            identifier,
-						QueueName:             nil,
-						Throttle:              testCase.knobs.throttle,
-						CustomConcurrencyKeys: customConc,
-					},
-					QueueName: nil,
-				}
-
-				qi, err := shard.EnqueueItem(ctx, item, at, osqueue.EnqueueOpts{})
-				require.NoError(t, err)
-
-				return qi
-			}
-			at := clock.Now()
-
-			// Prepare backlog
-			qi1 := addItem("test0", state.Identifier{
-				AccountID:   accountID1,
-				WorkspaceID: envID1,
-				WorkflowID:  fnID1,
-			}, at)
-
-			if testCase.currentValues.itemsInBacklog > 1 {
-				for i := 1; i < testCase.currentValues.itemsInBacklog; i++ {
-					addItem(fmt.Sprintf("test%d", i), state.Identifier{
-						AccountID:   accountID1,
-						WorkspaceID: envID1,
-						WorkflowID:  fnID1,
-					}, at)
-				}
-			}
-
-			backlog := osqueue.ItemBacklog(ctx, qi1)
-			shadowPart := osqueue.ItemShadowPartition(ctx, qi1)
-
-			if testCase.knobs.danglingItemsInBacklog > 0 {
-				for i := 1; i <= testCase.knobs.danglingItemsInBacklog; i++ {
-					_, err = r.ZAdd(kg.BacklogSet(backlog.BacklogID), float64(at.UnixMilli()), fmt.Sprintf("dangling%d", i))
-					require.NoError(t, err)
-				}
-			}
-
-			if testCase.currentValues.accountActive > 0 {
-				for i := 1; i <= testCase.currentValues.accountActive; i++ {
-					key := kg.ActiveSet("account", accountID1.String())
-					_, err = r.SAdd(key, fmt.Sprintf("item%d", i))
-					require.NoError(t, err)
-				}
-			}
-
-			if testCase.currentValues.functionActive > 0 {
-				for i := 1; i <= testCase.currentValues.functionActive; i++ {
-					key := kg.ActiveSet("p", fnID1.String())
-					_, err = r.SAdd(key, fmt.Sprintf("item%d", i))
-					require.NoError(t, err)
-				}
-			}
-
-			if testCase.currentValues.customConcurrencyKey1Active > 0 {
-				for i := 1; i <= testCase.currentValues.customConcurrencyKey1Active; i++ {
-					key := kg.ActiveSet("custom", testCase.knobs.customConcurrencyKey1.Key)
-					_, err = r.SAdd(key, fmt.Sprintf("item%d", i))
-					require.NoError(t, err)
-				}
-			}
-
-			if testCase.currentValues.customConcurrencyKey2Active > 0 {
-				for i := 1; i <= testCase.currentValues.customConcurrencyKey2Active; i++ {
-					key := kg.ActiveSet("custom", testCase.knobs.customConcurrencyKey2.Key)
-					_, err = r.SAdd(key, fmt.Sprintf("item%d", i))
-					require.NoError(t, err)
-				}
-			}
-
-			testThrottle := testCase.knobs.throttle
-			if testThrottle != nil {
-				runGCRAScript := func(t *testing.T, rc rueidis.Client, key string, now time.Time, period time.Duration, limit, burst, capacity int) (int, time.Time) {
-					nowMS := now.UnixMilli()
-					args, err := StrSlice([]any{
-						key,
-						nowMS,
-						limit,
-						burst,
-						period.Milliseconds(),
-						capacity,
-					})
-					require.NoError(t, err)
-
-					res, err := scripts["test/gcra_capacity"].Exec(t.Context(), rc, []string{}, args).ToAny()
-					require.NoError(t, err)
-
-					capacityAndRetry, ok := res.([]any)
-					require.True(t, ok)
-
-					statusOrCapacity, ok := capacityAndRetry[0].(int64)
-					require.True(t, ok)
-
-					var retryAt time.Time
-					retryAtMillis, ok := capacityAndRetry[1].(int64)
-					require.True(t, ok)
-
-					if retryAtMillis > nowMS {
-						retryAt = time.UnixMilli(retryAtMillis)
-					}
-
-					switch statusOrCapacity {
-					case -1:
-						return 0, retryAt
-					default:
-						return int(statusOrCapacity), retryAt
-					}
-				}
-
-				// Reduce throttle capacity
-				runGCRAScript(
-					t,
-					rc,
-					kg.ThrottleKey(&osqueue.Throttle{Key: testThrottle.Key}),
-					at,
-					time.Duration(testThrottle.Period)*time.Second,
-					testThrottle.Limit,
-					testThrottle.Burst,
-					testCase.currentValues.throttleUsageWithinPeriod,
-				)
-			}
-
-			refillUntil := at.Add(time.Minute)
-
-			logKeyValues := func() {
-				fmt.Println("all keys:")
-				fmt.Println(r.Dump())
-			}
-
-			logKeyValues()
-
-			constraints := osqueue.PartitionConstraintConfig{
-				Concurrency: osqueue.PartitionConcurrency{
-					AccountConcurrency:  testCase.knobs.accountConcurrencyLimit,
-					FunctionConcurrency: testCase.knobs.functionConcurrencyLimit,
-				},
-			}
-
-			if testCase.knobs.customConcurrencyKey1 != nil {
-				scope, _, _, _ := testCase.knobs.customConcurrencyKey1.ParseKey()
-				constraints.Concurrency.CustomConcurrencyKeys = append(constraints.Concurrency.CustomConcurrencyKeys,
-					osqueue.CustomConcurrencyLimit{
-						Mode:                enums.ConcurrencyModeStep,
-						Scope:               scope,
-						HashedKeyExpression: testCase.knobs.customConcurrencyKey1.Hash,
-						Limit:               testCase.knobs.customConcurrencyKey1.Limit,
-					})
-			}
-
-			if testCase.knobs.customConcurrencyKey2 != nil {
-				scope, _, _, _ := testCase.knobs.customConcurrencyKey2.ParseKey()
-				constraints.Concurrency.CustomConcurrencyKeys = append(constraints.Concurrency.CustomConcurrencyKeys,
-					osqueue.CustomConcurrencyLimit{
-						Mode:                enums.ConcurrencyModeStep,
-						Scope:               scope,
-						HashedKeyExpression: testCase.knobs.customConcurrencyKey2.Hash,
-						Limit:               testCase.knobs.customConcurrencyKey2.Limit,
-					})
-			}
-
-			if testCase.knobs.throttle != nil {
-				constraints.Throttle = &osqueue.PartitionThrottle{
-					ThrottleKeyExpressionHash: testCase.knobs.throttle.KeyExpressionHash,
-					Limit:                     testCase.knobs.throttle.Limit,
-					Burst:                     testCase.knobs.throttle.Burst,
-					Period:                    testCase.knobs.throttle.Period,
-				}
-			}
-
-			res, _, err := q.ProcessShadowPartitionBacklog(ctx, &shadowPart, &backlog, refillUntil, constraints)
-			require.NoError(t, err)
-
-			logKeyValues()
-
-			itemsInBacklog, err := rc.Do(ctx, rc.B().Zcount().Key(kg.BacklogSet(backlog.BacklogID)).Min("-inf").Max(fmt.Sprintf("%d", refillUntil.UnixMilli())).Build()).ToInt64()
-			require.NoError(t, err)
-
-			itemsInReadyQueue, err := rc.Do(ctx, rc.B().Zcount().Key(kg.PartitionQueueSet(enums.PartitionTypeDefault, shadowPart.PartitionID, "")).Min("-inf").Max(fmt.Sprintf("%d", refillUntil.UnixMilli())).Build()).ToInt64()
-			require.NoError(t, err)
-
-			// we do not test refilled items
-			require.Equal(t, testCase.expected.result.Refilled, len(res.RefilledItems))
-			res.RefilledItems = nil
-
-			if !res.RetryAt.IsZero() {
-				require.Greater(t, testCase.expected.retryAt.Milliseconds(), int64(0))
-				diff := clock.Now().Add(testCase.expected.retryAt)
-
-				require.WithinDuration(t, diff, res.RetryAt, 10*time.Second)
-
-				res.RetryAt = time.Time{}
-			}
-
-			require.Equal(t, testCase.expected.result, *res, "result comparison failed", res, itemsInBacklog, itemsInReadyQueue)
-
-			require.Equal(t, int64(testCase.expected.itemsInBacklog), itemsInBacklog)
-			require.Equal(t, int64(testCase.expected.itemsInReadyQueue), itemsInReadyQueue)
-
-			testLifecycles.lock.Lock()
-			switch res.Constraint {
-			case enums.QueueConstraintAccountConcurrency:
-				require.Equal(t, 1, testLifecycles.acctConcurrency[accountID1])
-			case enums.QueueConstraintFunctionConcurrency:
-				require.Equal(t, 1, testLifecycles.fnConcurrency[fnID1])
-			case enums.QueueConstraintCustomConcurrencyKey1:
-				require.Equal(t, 1, testLifecycles.ckConcurrency[ck1.Key])
-			case enums.QueueConstraintCustomConcurrencyKey2:
-				require.Equal(t, 1, testLifecycles.ckConcurrency[ck2.Key])
-			default:
-			}
-			testLifecycles.lock.Unlock()
-		})
-	}
-}
-
 func TestShadowPartitionPointerTimings(t *testing.T) {
 	t.Run("multiple spaced out items", func(t *testing.T) {
 		r := miniredis.RunT(t)
@@ -2041,18 +1112,12 @@ func TestShadowPartitionPointerTimings(t *testing.T) {
 			itemIDs, err := getItemIDsFromBacklog(ctx, shard, &backlog, refillUntil, 1000)
 			require.NoError(t, err)
 
-			res, err := shard.BacklogRefill(ctx, &backlog, &shadowPart, refillUntil, itemIDs, osqueue.PartitionConstraintConfig{
-				Concurrency: osqueue.PartitionConcurrency{
-					AccountConcurrency:  123,
-					FunctionConcurrency: 45,
-				},
-			})
+			res, err := shard.BacklogRefill(ctx, &backlog, &shadowPart, refillUntil, itemIDs)
 			require.NoError(t, err)
 
 			require.Equal(t, numItems-i, res.TotalBacklogCount)
 			require.Equal(t, 1, res.BacklogCountUntil)
-			require.Equal(t, 1, res.Refill)
-			require.Equal(t, 1, res.Refilled)
+			require.Equal(t, 1, len(res.RefilledItems))
 
 			if i == numItems-1 {
 				break
@@ -2182,6 +1247,23 @@ func TestConstraintLifecycleReporting(t *testing.T) {
 
 	testLifecycles := newTestLifecycleListener()
 
+	cmLifecycles := constraintapi.NewConstraintAPIDebugLifecycles()
+	cm, err := constraintapi.NewRedisCapacityManager(
+		constraintapi.WithClock(clock),
+		constraintapi.WithClient(rc),
+		constraintapi.WithShardName("test"),
+		constraintapi.WithLifecycles(cmLifecycles),
+	)
+	require.NoError(t, err)
+
+	constraints := osqueue.PartitionConstraintConfig{
+		FunctionVersion: 1,
+		Concurrency: osqueue.PartitionConcurrency{
+			AccountConcurrency:  1,
+			FunctionConcurrency: 1,
+		},
+	}
+
 	enqueueToBacklog := true
 	q, shard := newQueue(
 		t, rc,
@@ -2204,15 +1286,11 @@ func TestConstraintLifecycleReporting(t *testing.T) {
 		}),
 		osqueue.WithBacklogRefillLimit(100),
 		osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
-			return osqueue.PartitionConstraintConfig{
-				Concurrency: osqueue.PartitionConcurrency{
-					AccountConcurrency:  123,
-					FunctionConcurrency: 45,
-					SystemConcurrency:   678,
-				},
-			}
+			return constraints
 		}),
 		osqueue.WithQueueLifecycles(testLifecycles),
+		osqueue.WithCapacityManager(cm),
+		osqueue.WithAcquireCapacityLeaseOnBacklogRefill(true),
 	)
 
 	fnID1, accountID1, envID1 := uuid.New(), uuid.New(), uuid.New()
@@ -2241,13 +1319,6 @@ func TestConstraintLifecycleReporting(t *testing.T) {
 	}
 	at := clock.Now()
 
-	constraints := osqueue.PartitionConstraintConfig{
-		Concurrency: osqueue.PartitionConcurrency{
-			AccountConcurrency:  1,
-			FunctionConcurrency: 1,
-		},
-	}
-
 	itemA1 := addItem("test1", state.Identifier{
 		AccountID:   accountID1,
 		WorkspaceID: envID1,
@@ -2260,16 +1331,24 @@ func TestConstraintLifecycleReporting(t *testing.T) {
 	require.Equal(t, 1, constraints.Concurrency.FunctionConcurrency)
 	require.Equal(t, 1, constraints.Concurrency.AccountConcurrency)
 
-	res, _, err := q.ProcessShadowPartitionBacklog(ctx, &sp1, &b1, at.Add(time.Minute), constraints)
+	res, limitingConstraint, err := q.ProcessShadowPartitionBacklog(ctx, &sp1, &b1, at.Add(time.Minute), constraints)
 	require.NoError(t, err)
 	require.NotNil(t, res)
-	require.Equal(t, enums.QueueConstraintNotLimited, res.Constraint)
+
+	// 1 item must have been refilled
+	require.Len(t, res.RefilledItems, 1)
+
+	// This was the last unit of account + function concurrency, so we should see function concurrency as the constraint
+	require.Equal(t, enums.QueueConstraintFunctionConcurrency, limitingConstraint)
 
 	testLifecycles.lock.Lock()
 	require.Equal(t, 0, testLifecycles.acctConcurrency[accountID1])
-	assert.Equal(t, 0, testLifecycles.fnConcurrency[fnID1])
-	assert.Equal(t, 0, testLifecycles.fnConcurrency[fnID2])
+	require.Equal(t, 0, testLifecycles.fnConcurrency[fnID1])
+	require.Equal(t, 0, testLifecycles.fnConcurrency[fnID2])
 	testLifecycles.lock.Unlock()
+
+	require.Equal(t, 1, len(cmLifecycles.AcquireCalls))
+	cmLifecycles.Reset()
 
 	_ = addItem("test2", state.Identifier{
 		AccountID:   accountID1,
@@ -2277,15 +1356,19 @@ func TestConstraintLifecycleReporting(t *testing.T) {
 		WorkflowID:  fnID1,
 	}, at)
 
-	res, _, err = q.ProcessShadowPartitionBacklog(ctx, &sp1, &b1, at.Add(time.Minute), constraints)
+	res, limitingConstraint, err = q.ProcessShadowPartitionBacklog(ctx, &sp1, &b1, at.Add(time.Minute), constraints)
 	require.NoError(t, err)
 	require.NotNil(t, res)
-	require.Equal(t, enums.QueueConstraintFunctionConcurrency, res.Constraint)
+
+	require.Equal(t, enums.QueueConstraintFunctionConcurrency, limitingConstraint)
+	require.Len(t, res.RefilledItems, 0)
+
 	require.EventuallyWithT(t, func(t *assert.CollectT) {
 		testLifecycles.lock.Lock()
-		assert.Equal(t, 0, testLifecycles.acctConcurrency[accountID1])
-		assert.Equal(t, 1, testLifecycles.fnConcurrency[fnID1])
-		assert.Equal(t, 0, testLifecycles.fnConcurrency[fnID2])
+		assert.Equal(t, 1, len(cmLifecycles.AcquireCalls))
+		assert.Equal(t, 0, testLifecycles.acctConcurrency[accountID1], "expected account not to be hit")
+		assert.Equal(t, 1, testLifecycles.fnConcurrency[fnID1], "expected fn1 to be hit once", fnID1, testLifecycles.fnConcurrency)
+		assert.Equal(t, 0, testLifecycles.fnConcurrency[fnID2], "expected fn2 not to be hit")
 		testLifecycles.lock.Unlock()
 	}, 1*time.Second, 100*time.Millisecond)
 
@@ -2302,7 +1385,6 @@ func TestConstraintLifecycleReporting(t *testing.T) {
 	res, _, err = q.ProcessShadowPartitionBacklog(ctx, &sp2, &b2, at.Add(time.Minute), constraints)
 	require.NoError(t, err)
 	require.NotNil(t, res)
-	require.Equal(t, enums.QueueConstraintAccountConcurrency, res.Constraint)
 	require.EventuallyWithT(t, func(t *assert.CollectT) {
 		testLifecycles.lock.Lock()
 		assert.Equal(t, 1, testLifecycles.acctConcurrency[accountID1])
@@ -2345,9 +1427,6 @@ func TestBacklogRefillWithDisabledConstraintChecks(t *testing.T) {
 		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 			return true
 		}),
-		osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
-			return true
-		}),
 		osqueue.WithAcquireCapacityLeaseOnBacklogRefill(true),
 		osqueue.WithCapacityManager(cm),
 		osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
@@ -2382,8 +1461,6 @@ func TestBacklogRefillWithDisabledConstraintChecks(t *testing.T) {
 
 	item1, err := shard.EnqueueItem(ctx, qi, start, osqueue.EnqueueOpts{})
 	require.NoError(t, err)
-	item2, err := shard.EnqueueItem(ctx, qi, start, osqueue.EnqueueOpts{})
-	require.NoError(t, err)
 	item3, err := shard.EnqueueItem(ctx, qi, start, osqueue.EnqueueOpts{})
 	require.NoError(t, err)
 
@@ -2392,37 +1469,19 @@ func TestBacklogRefillWithDisabledConstraintChecks(t *testing.T) {
 
 	shadowPart := osqueue.ItemShadowPartition(ctx, item1)
 
-	// Refill once, should work
-	res, err := shard.BacklogRefill(ctx, &backlog, &shadowPart, clock.Now().Add(time.Minute), []string{item1.ID}, constraints)
+	res, err := shard.BacklogRefill(ctx, &backlog, &shadowPart, clock.Now().Add(time.Minute), []string{item1.ID})
 	require.NoError(t, err)
-	require.Equal(t, 1, res.Refill) // refill gets adjusted to constraint
-	require.Equal(t, 1, res.Capacity)
-	require.Equal(t, 1, res.Refilled)
-	require.Equal(t, enums.QueueConstraintNotLimited, res.Constraint)
+	require.Equal(t, 1, len(res.RefilledItems))
 
-	// Refill again, should fail due throttle
-	res, err = shard.BacklogRefill(ctx, &backlog, &shadowPart, clock.Now().Add(time.Minute), []string{item2.ID}, constraints)
-	require.NoError(t, err)
-	require.Equal(t, 0, res.Refill) // refill gets adjusted to constraint
-
-	require.Equal(t, 0, res.Capacity)
-	require.Equal(t, 0, res.Refilled)
-	require.Equal(t, enums.QueueConstraintThrottle, res.Constraint)
-
-	// Refill with ignoring checks should work
 	res, err = shard.BacklogRefill(
 		ctx,
 		&backlog,
 		&shadowPart,
 		clock.Now().Add(time.Minute),
 		[]string{item3.ID},
-		constraints,
-		osqueue.WithBacklogRefillDisableConstraintChecks(true),
 	)
 	require.NoError(t, err)
-	require.Equal(t, 1, res.Refill)
-	require.Equal(t, 1, res.Capacity)
-	require.Equal(t, 1, res.Refilled)
+	require.Equal(t, 1, len(res.RefilledItems))
 	require.Equal(t, []string{item3.ID}, res.RefilledItems)
 }
 
@@ -2507,14 +1566,10 @@ func TestBacklogRefillSetCapacityLease(t *testing.T) {
 		&shadowPart,
 		clock.Now().Add(time.Minute),
 		refillItemIDs,
-		constraints,
 		osqueue.WithBacklogRefillItemCapacityLeases(capacityLeaseIDs),
 	)
 	require.NoError(t, err)
-	require.Equal(t, 3, res.Refill) // refill gets adjusted to constraint
-	require.Equal(t, 5, res.Capacity)
-	require.Equal(t, 3, res.Refilled)
-	require.Equal(t, enums.QueueConstraintNotLimited, res.Constraint)
+	require.Equal(t, 3, len(res.RefilledItems))
 
 	loaded, err := q.ItemByID(ctx, shard, item1.ID)
 	require.NoError(t, err)
@@ -2814,7 +1869,51 @@ func TestPreventThrottleBacklogUnfairness(t *testing.T) {
 
 		mem, err = r.ZMembers(kg.PartitionQueueSet(enums.PartitionTypeDefault, fnID.String(), ""))
 		require.NoError(t, err)
-		require.Len(t, mem, 1)
+		require.Len(t, mem, 101)
 		require.Contains(t, mem, item2.ID)
 	})
+}
+
+type testLifecycleListener struct {
+	lock            *sync.Mutex
+	fnConcurrency   map[uuid.UUID]int
+	acctConcurrency map[uuid.UUID]int
+	ckConcurrency   map[string]int
+}
+
+func newTestLifecycleListener() testLifecycleListener {
+	return testLifecycleListener{
+		lock:            &sync.Mutex{},
+		fnConcurrency:   map[uuid.UUID]int{},
+		acctConcurrency: map[uuid.UUID]int{},
+		ckConcurrency:   map[string]int{},
+	}
+}
+
+func (t testLifecycleListener) OnFnConcurrencyLimitReached(_ context.Context, fnID uuid.UUID) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	i := t.fnConcurrency[fnID]
+	t.fnConcurrency[fnID] = i + 1
+}
+
+func (t testLifecycleListener) OnAccountConcurrencyLimitReached(
+	_ context.Context,
+	acctID uuid.UUID,
+	workspaceID *uuid.UUID,
+) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	i := t.acctConcurrency[acctID]
+	t.acctConcurrency[acctID] = i + 1
+}
+
+func (t testLifecycleListener) OnCustomKeyConcurrencyLimitReached(_ context.Context, key string) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	i := t.ckConcurrency[key]
+	t.ckConcurrency[key] = i + 1
 }

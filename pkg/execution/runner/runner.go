@@ -603,6 +603,11 @@ func (s *svc) initialize(ctx context.Context, fn inngest.Function, evt event.Tra
 		appID = fn.AppID
 	}
 
+	// Ensure function version is set for Constraint API
+	if fn.FunctionVersion <= 0 {
+		fn.FunctionVersion = 1
+	}
+
 	if fn.IsBatchEnabled() {
 		bi := batch.BatchItem{
 			WorkspaceID:     wsID,

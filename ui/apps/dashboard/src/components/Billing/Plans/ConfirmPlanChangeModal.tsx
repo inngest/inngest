@@ -255,10 +255,6 @@ export default function ConfirmPlanChangeModal({
                   lose access to your current plan and its features{' '}
                   <b>immediately</b>.
                 </li>
-                <li>
-                  You will be credited for any unused time from your current
-                  plan, calculated on a prorated basis.
-                </li>
               </ul>
             </>
           )
