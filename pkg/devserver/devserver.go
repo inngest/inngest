@@ -458,6 +458,7 @@ func start(ctx context.Context, opts StartOpts) error {
 				EventTopic: opts.Config.EventStream.Service.Concrete.TopicName(),
 			},
 			run.NewTraceLifecycleListener(nil),
+			metrics.NewPrometheusLifecycleListener(),
 		),
 		executor.WithStepLimits(func(id sv2.ID) int {
 			if override, hasOverride := stepLimitOverrides[id.FunctionID.String()]; hasOverride {
