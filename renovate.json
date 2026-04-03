@@ -3,9 +3,8 @@
 	"packageRules": [
 		{
 			"matchPackageNames": ["securego/gosec"],
-			"matchNewVersion": ">2.22.8 <=2.25.0",
-			"matchManagers": ["github-actions"],
-			"enabled": false
+			"allowedVersions": "<=2.22.8 || >2.25.0",
+			"matchManagers": ["github-actions"]
 		}
 	]
 }
