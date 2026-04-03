@@ -437,19 +437,9 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 				IssuedAtMS: clock.Now().UnixMilli(),
 			},
 		}, func(ctx context.Context, ri osqueue.RunInfo, i osqueue.Item) (osqueue.RunResult, error) {
-			go func() {
-				for {
-					select {
-					case <-ctx.Done():
-						return
-					case <-time.After(time.Second):
-						// Ensure we tick the extend at least once
-						clock.Advance(time.Second)
-					}
-				}
-			}()
-
-			<-time.After(3 * time.Second)
+			// Advance fake clock to trigger at least one lease extension
+			clock.Advance(2 * time.Second)
+			<-time.After(500 * time.Millisecond) // let the extend goroutine run
 
 			// Release the capacity early
 			require.NotNil(t, ri.CapacityLease)
@@ -458,7 +448,7 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 			require.NoError(t, err)
 
 			// And do some more processing before returning
-			<-time.After(3 * time.Second)
+			<-time.After(500 * time.Millisecond)
 			atomic.AddInt64(&counter, 1)
 			return osqueue.RunResult{}, nil
 		})
