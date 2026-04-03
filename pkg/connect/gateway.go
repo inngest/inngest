@@ -903,6 +903,13 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(msg *connectpb.Connec
 			// Unblock the Forward() call that's waiting for this ACK.
 			if ackCh, ok := c.pendingAcks.LoadAndDelete(data.RequestId); ok {
 				close(ackCh.(chan struct{}))
+			} else {
+				c.log.Warn(
+					"worker request ack received for unknown request ID",
+					"conn_id", c.conn.ConnectionId.String(),
+					"req_id", data.RequestId,
+					"run_id", data.RunId,
+				)
 			}
 
 			// This will be sent exactly once, as the router selected this gateway to handle the request
