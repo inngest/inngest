@@ -1181,6 +1181,13 @@ func (c *connectionHandler) receiveRouterMessagesFromGRPC(ctx context.Context, o
 				Tags:    grpcTags,
 			})
 
+			// Wait for WORKER_REQUEST_ACK in a goroutine so we don't
+			// block the message loop from processing other requests.
+			// IMPORTANT: Store before writing to the WebSocket to avoid a race
+			// condition.
+			ackCh := make(chan struct{})
+			c.pendingAcks.Store(data.RequestId, ackCh)
+
 			// Use a fresh context instead of the connection ctx. During a
 			// Gateway drain, ctx is cancelled, which would fail this write even
 			// though we already consumed the message from the channel. The 5s
@@ -1197,6 +1204,7 @@ func (c *connectionHandler) receiveRouterMessagesFromGRPC(ctx context.Context, o
 			})
 			writeCancel()
 			if err != nil {
+				c.pendingAcks.Delete(data.RequestId)
 				msg.Result <- err
 				if isConnectionClosedErr(err) {
 					return
@@ -1205,10 +1213,6 @@ func (c *connectionHandler) receiveRouterMessagesFromGRPC(ctx context.Context, o
 				continue
 			}
 
-			// Wait for WORKER_REQUEST_ACK in a goroutine so we don't
-			// block the message loop from processing other requests.
-			ackCh := make(chan struct{})
-			c.pendingAcks.Store(data.RequestId, ackCh)
 			go func() {
 				select {
 				case <-ackCh:
