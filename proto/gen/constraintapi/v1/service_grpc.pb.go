@@ -19,10 +19,14 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	ConstraintAPI_Check_FullMethodName       = "/constraintapi.v1.ConstraintAPI/Check"
-	ConstraintAPI_Acquire_FullMethodName     = "/constraintapi.v1.ConstraintAPI/Acquire"
-	ConstraintAPI_ExtendLease_FullMethodName = "/constraintapi.v1.ConstraintAPI/ExtendLease"
-	ConstraintAPI_Release_FullMethodName     = "/constraintapi.v1.ConstraintAPI/Release"
+	ConstraintAPI_Check_FullMethodName                   = "/constraintapi.v1.ConstraintAPI/Check"
+	ConstraintAPI_Acquire_FullMethodName                 = "/constraintapi.v1.ConstraintAPI/Acquire"
+	ConstraintAPI_ExtendLease_FullMethodName             = "/constraintapi.v1.ConstraintAPI/ExtendLease"
+	ConstraintAPI_Release_FullMethodName                 = "/constraintapi.v1.ConstraintAPI/Release"
+	ConstraintAPI_SetSemaphoreCapacity_FullMethodName    = "/constraintapi.v1.ConstraintAPI/SetSemaphoreCapacity"
+	ConstraintAPI_AdjustSemaphoreCapacity_FullMethodName = "/constraintapi.v1.ConstraintAPI/AdjustSemaphoreCapacity"
+	ConstraintAPI_GetSemaphoreCapacity_FullMethodName    = "/constraintapi.v1.ConstraintAPI/GetSemaphoreCapacity"
+	ConstraintAPI_ReleaseSemaphore_FullMethodName        = "/constraintapi.v1.ConstraintAPI/ReleaseSemaphore"
 )
 
 // ConstraintAPIClient is the client API for ConstraintAPI service.
@@ -33,6 +37,11 @@ type ConstraintAPIClient interface {
 	Acquire(ctx context.Context, in *CapacityAcquireRequest, opts ...grpc.CallOption) (*CapacityAcquireResponse, error)
 	ExtendLease(ctx context.Context, in *CapacityExtendLeaseRequest, opts ...grpc.CallOption) (*CapacityExtendLeaseResponse, error)
 	Release(ctx context.Context, in *CapacityReleaseRequest, opts ...grpc.CallOption) (*CapacityReleaseResponse, error)
+	// Semaphore management
+	SetSemaphoreCapacity(ctx context.Context, in *SemaphoreSetCapacityRequest, opts ...grpc.CallOption) (*SemaphoreResponse, error)
+	AdjustSemaphoreCapacity(ctx context.Context, in *SemaphoreAdjustCapacityRequest, opts ...grpc.CallOption) (*SemaphoreResponse, error)
+	GetSemaphoreCapacity(ctx context.Context, in *SemaphoreGetCapacityRequest, opts ...grpc.CallOption) (*SemaphoreGetCapacityResponse, error)
+	ReleaseSemaphore(ctx context.Context, in *SemaphoreReleaseRequest, opts ...grpc.CallOption) (*SemaphoreResponse, error)
 }
 
 type constraintAPIClient struct {
@@ -83,6 +92,46 @@ func (c *constraintAPIClient) Release(ctx context.Context, in *CapacityReleaseRe
 	return out, nil
 }
 
+func (c *constraintAPIClient) SetSemaphoreCapacity(ctx context.Context, in *SemaphoreSetCapacityRequest, opts ...grpc.CallOption) (*SemaphoreResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SemaphoreResponse)
+	err := c.cc.Invoke(ctx, ConstraintAPI_SetSemaphoreCapacity_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *constraintAPIClient) AdjustSemaphoreCapacity(ctx context.Context, in *SemaphoreAdjustCapacityRequest, opts ...grpc.CallOption) (*SemaphoreResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SemaphoreResponse)
+	err := c.cc.Invoke(ctx, ConstraintAPI_AdjustSemaphoreCapacity_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *constraintAPIClient) GetSemaphoreCapacity(ctx context.Context, in *SemaphoreGetCapacityRequest, opts ...grpc.CallOption) (*SemaphoreGetCapacityResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SemaphoreGetCapacityResponse)
+	err := c.cc.Invoke(ctx, ConstraintAPI_GetSemaphoreCapacity_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *constraintAPIClient) ReleaseSemaphore(ctx context.Context, in *SemaphoreReleaseRequest, opts ...grpc.CallOption) (*SemaphoreResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SemaphoreResponse)
+	err := c.cc.Invoke(ctx, ConstraintAPI_ReleaseSemaphore_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ConstraintAPIServer is the server API for ConstraintAPI service.
 // All implementations must embed UnimplementedConstraintAPIServer
 // for forward compatibility.
@@ -91,6 +140,11 @@ type ConstraintAPIServer interface {
 	Acquire(context.Context, *CapacityAcquireRequest) (*CapacityAcquireResponse, error)
 	ExtendLease(context.Context, *CapacityExtendLeaseRequest) (*CapacityExtendLeaseResponse, error)
 	Release(context.Context, *CapacityReleaseRequest) (*CapacityReleaseResponse, error)
+	// Semaphore management
+	SetSemaphoreCapacity(context.Context, *SemaphoreSetCapacityRequest) (*SemaphoreResponse, error)
+	AdjustSemaphoreCapacity(context.Context, *SemaphoreAdjustCapacityRequest) (*SemaphoreResponse, error)
+	GetSemaphoreCapacity(context.Context, *SemaphoreGetCapacityRequest) (*SemaphoreGetCapacityResponse, error)
+	ReleaseSemaphore(context.Context, *SemaphoreReleaseRequest) (*SemaphoreResponse, error)
 	mustEmbedUnimplementedConstraintAPIServer()
 }
 
@@ -112,6 +166,18 @@ func (UnimplementedConstraintAPIServer) ExtendLease(context.Context, *CapacityEx
 }
 func (UnimplementedConstraintAPIServer) Release(context.Context, *CapacityReleaseRequest) (*CapacityReleaseResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Release not implemented")
+}
+func (UnimplementedConstraintAPIServer) SetSemaphoreCapacity(context.Context, *SemaphoreSetCapacityRequest) (*SemaphoreResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SetSemaphoreCapacity not implemented")
+}
+func (UnimplementedConstraintAPIServer) AdjustSemaphoreCapacity(context.Context, *SemaphoreAdjustCapacityRequest) (*SemaphoreResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method AdjustSemaphoreCapacity not implemented")
+}
+func (UnimplementedConstraintAPIServer) GetSemaphoreCapacity(context.Context, *SemaphoreGetCapacityRequest) (*SemaphoreGetCapacityResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetSemaphoreCapacity not implemented")
+}
+func (UnimplementedConstraintAPIServer) ReleaseSemaphore(context.Context, *SemaphoreReleaseRequest) (*SemaphoreResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ReleaseSemaphore not implemented")
 }
 func (UnimplementedConstraintAPIServer) mustEmbedUnimplementedConstraintAPIServer() {}
 func (UnimplementedConstraintAPIServer) testEmbeddedByValue()                       {}
@@ -206,6 +272,78 @@ func _ConstraintAPI_Release_Handler(srv interface{}, ctx context.Context, dec fu
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ConstraintAPI_SetSemaphoreCapacity_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SemaphoreSetCapacityRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ConstraintAPIServer).SetSemaphoreCapacity(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ConstraintAPI_SetSemaphoreCapacity_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ConstraintAPIServer).SetSemaphoreCapacity(ctx, req.(*SemaphoreSetCapacityRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ConstraintAPI_AdjustSemaphoreCapacity_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SemaphoreAdjustCapacityRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ConstraintAPIServer).AdjustSemaphoreCapacity(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ConstraintAPI_AdjustSemaphoreCapacity_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ConstraintAPIServer).AdjustSemaphoreCapacity(ctx, req.(*SemaphoreAdjustCapacityRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ConstraintAPI_GetSemaphoreCapacity_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SemaphoreGetCapacityRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ConstraintAPIServer).GetSemaphoreCapacity(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ConstraintAPI_GetSemaphoreCapacity_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ConstraintAPIServer).GetSemaphoreCapacity(ctx, req.(*SemaphoreGetCapacityRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ConstraintAPI_ReleaseSemaphore_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SemaphoreReleaseRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ConstraintAPIServer).ReleaseSemaphore(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ConstraintAPI_ReleaseSemaphore_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ConstraintAPIServer).ReleaseSemaphore(ctx, req.(*SemaphoreReleaseRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ConstraintAPI_ServiceDesc is the grpc.ServiceDesc for ConstraintAPI service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -228,6 +366,22 @@ var ConstraintAPI_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Release",
 			Handler:    _ConstraintAPI_Release_Handler,
+		},
+		{
+			MethodName: "SetSemaphoreCapacity",
+			Handler:    _ConstraintAPI_SetSemaphoreCapacity_Handler,
+		},
+		{
+			MethodName: "AdjustSemaphoreCapacity",
+			Handler:    _ConstraintAPI_AdjustSemaphoreCapacity_Handler,
+		},
+		{
+			MethodName: "GetSemaphoreCapacity",
+			Handler:    _ConstraintAPI_GetSemaphoreCapacity_Handler,
+		},
+		{
+			MethodName: "ReleaseSemaphore",
+			Handler:    _ConstraintAPI_ReleaseSemaphore_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

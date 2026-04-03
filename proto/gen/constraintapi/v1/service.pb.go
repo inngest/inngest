@@ -2085,6 +2085,366 @@ func (*CapacityReleaseResponse) Descriptor() ([]byte, []int) {
 	return file_constraintapi_v1_service_proto_rawDescGZIP(), []int{21}
 }
 
+type SemaphoreSetCapacityRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	AccountId      string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	Name           string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	IdempotencyKey string                 `protobuf:"bytes,3,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
+	Capacity       int64                  `protobuf:"varint,4,opt,name=capacity,proto3" json:"capacity,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *SemaphoreSetCapacityRequest) Reset() {
+	*x = SemaphoreSetCapacityRequest{}
+	mi := &file_constraintapi_v1_service_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SemaphoreSetCapacityRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SemaphoreSetCapacityRequest) ProtoMessage() {}
+
+func (x *SemaphoreSetCapacityRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_constraintapi_v1_service_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SemaphoreSetCapacityRequest.ProtoReflect.Descriptor instead.
+func (*SemaphoreSetCapacityRequest) Descriptor() ([]byte, []int) {
+	return file_constraintapi_v1_service_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *SemaphoreSetCapacityRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *SemaphoreSetCapacityRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *SemaphoreSetCapacityRequest) GetIdempotencyKey() string {
+	if x != nil {
+		return x.IdempotencyKey
+	}
+	return ""
+}
+
+func (x *SemaphoreSetCapacityRequest) GetCapacity() int64 {
+	if x != nil {
+		return x.Capacity
+	}
+	return 0
+}
+
+type SemaphoreAdjustCapacityRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	AccountId      string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	Name           string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	IdempotencyKey string                 `protobuf:"bytes,3,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
+	Delta          int64                  `protobuf:"varint,4,opt,name=delta,proto3" json:"delta,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *SemaphoreAdjustCapacityRequest) Reset() {
+	*x = SemaphoreAdjustCapacityRequest{}
+	mi := &file_constraintapi_v1_service_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SemaphoreAdjustCapacityRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SemaphoreAdjustCapacityRequest) ProtoMessage() {}
+
+func (x *SemaphoreAdjustCapacityRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_constraintapi_v1_service_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SemaphoreAdjustCapacityRequest.ProtoReflect.Descriptor instead.
+func (*SemaphoreAdjustCapacityRequest) Descriptor() ([]byte, []int) {
+	return file_constraintapi_v1_service_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *SemaphoreAdjustCapacityRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *SemaphoreAdjustCapacityRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *SemaphoreAdjustCapacityRequest) GetIdempotencyKey() string {
+	if x != nil {
+		return x.IdempotencyKey
+	}
+	return ""
+}
+
+func (x *SemaphoreAdjustCapacityRequest) GetDelta() int64 {
+	if x != nil {
+		return x.Delta
+	}
+	return 0
+}
+
+type SemaphoreGetCapacityRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccountId     string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	UsageValue    string                 `protobuf:"bytes,3,opt,name=usage_value,json=usageValue,proto3" json:"usage_value,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SemaphoreGetCapacityRequest) Reset() {
+	*x = SemaphoreGetCapacityRequest{}
+	mi := &file_constraintapi_v1_service_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SemaphoreGetCapacityRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SemaphoreGetCapacityRequest) ProtoMessage() {}
+
+func (x *SemaphoreGetCapacityRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_constraintapi_v1_service_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SemaphoreGetCapacityRequest.ProtoReflect.Descriptor instead.
+func (*SemaphoreGetCapacityRequest) Descriptor() ([]byte, []int) {
+	return file_constraintapi_v1_service_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *SemaphoreGetCapacityRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *SemaphoreGetCapacityRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *SemaphoreGetCapacityRequest) GetUsageValue() string {
+	if x != nil {
+		return x.UsageValue
+	}
+	return ""
+}
+
+type SemaphoreGetCapacityResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Capacity      int64                  `protobuf:"varint,1,opt,name=capacity,proto3" json:"capacity,omitempty"`
+	Usage         int64                  `protobuf:"varint,2,opt,name=usage,proto3" json:"usage,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SemaphoreGetCapacityResponse) Reset() {
+	*x = SemaphoreGetCapacityResponse{}
+	mi := &file_constraintapi_v1_service_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SemaphoreGetCapacityResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SemaphoreGetCapacityResponse) ProtoMessage() {}
+
+func (x *SemaphoreGetCapacityResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_constraintapi_v1_service_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SemaphoreGetCapacityResponse.ProtoReflect.Descriptor instead.
+func (*SemaphoreGetCapacityResponse) Descriptor() ([]byte, []int) {
+	return file_constraintapi_v1_service_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *SemaphoreGetCapacityResponse) GetCapacity() int64 {
+	if x != nil {
+		return x.Capacity
+	}
+	return 0
+}
+
+func (x *SemaphoreGetCapacityResponse) GetUsage() int64 {
+	if x != nil {
+		return x.Usage
+	}
+	return 0
+}
+
+type SemaphoreReleaseRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	AccountId      string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	Name           string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	UsageValue     string                 `protobuf:"bytes,3,opt,name=usage_value,json=usageValue,proto3" json:"usage_value,omitempty"`
+	IdempotencyKey string                 `protobuf:"bytes,4,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
+	Weight         int64                  `protobuf:"varint,5,opt,name=weight,proto3" json:"weight,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *SemaphoreReleaseRequest) Reset() {
+	*x = SemaphoreReleaseRequest{}
+	mi := &file_constraintapi_v1_service_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SemaphoreReleaseRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SemaphoreReleaseRequest) ProtoMessage() {}
+
+func (x *SemaphoreReleaseRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_constraintapi_v1_service_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SemaphoreReleaseRequest.ProtoReflect.Descriptor instead.
+func (*SemaphoreReleaseRequest) Descriptor() ([]byte, []int) {
+	return file_constraintapi_v1_service_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *SemaphoreReleaseRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *SemaphoreReleaseRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *SemaphoreReleaseRequest) GetUsageValue() string {
+	if x != nil {
+		return x.UsageValue
+	}
+	return ""
+}
+
+func (x *SemaphoreReleaseRequest) GetIdempotencyKey() string {
+	if x != nil {
+		return x.IdempotencyKey
+	}
+	return ""
+}
+
+func (x *SemaphoreReleaseRequest) GetWeight() int64 {
+	if x != nil {
+		return x.Weight
+	}
+	return 0
+}
+
+type SemaphoreResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SemaphoreResponse) Reset() {
+	*x = SemaphoreResponse{}
+	mi := &file_constraintapi_v1_service_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SemaphoreResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SemaphoreResponse) ProtoMessage() {}
+
+func (x *SemaphoreResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_constraintapi_v1_service_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SemaphoreResponse.ProtoReflect.Descriptor instead.
+func (*SemaphoreResponse) Descriptor() ([]byte, []int) {
+	return file_constraintapi_v1_service_proto_rawDescGZIP(), []int{27}
+}
+
 var File_constraintapi_v1_service_proto protoreflect.FileDescriptor
 
 const file_constraintapi_v1_service_proto_rawDesc = "" +
@@ -2236,7 +2596,37 @@ const file_constraintapi_v1_service_proto_rawDesc = "" +
 	"\x06source\x18\x04 \x01(\v2\x1d.constraintapi.v1.LeaseSourceR\x06source\x12'\n" +
 	"\x0frequest_attempt\x18\x05 \x01(\rR\x0erequestAttempt\x12B\n" +
 	"\x0flease_issued_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\rleaseIssuedAt\"\x19\n" +
-	"\x17CapacityReleaseResponse*\xd2\x01\n" +
+	"\x17CapacityReleaseResponse\"\x95\x01\n" +
+	"\x1bSemaphoreSetCapacityRequest\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12'\n" +
+	"\x0fidempotency_key\x18\x03 \x01(\tR\x0eidempotencyKey\x12\x1a\n" +
+	"\bcapacity\x18\x04 \x01(\x03R\bcapacity\"\x92\x01\n" +
+	"\x1eSemaphoreAdjustCapacityRequest\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12'\n" +
+	"\x0fidempotency_key\x18\x03 \x01(\tR\x0eidempotencyKey\x12\x14\n" +
+	"\x05delta\x18\x04 \x01(\x03R\x05delta\"q\n" +
+	"\x1bSemaphoreGetCapacityRequest\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1f\n" +
+	"\vusage_value\x18\x03 \x01(\tR\n" +
+	"usageValue\"P\n" +
+	"\x1cSemaphoreGetCapacityResponse\x12\x1a\n" +
+	"\bcapacity\x18\x01 \x01(\x03R\bcapacity\x12\x14\n" +
+	"\x05usage\x18\x02 \x01(\x03R\x05usage\"\xae\x01\n" +
+	"\x17SemaphoreReleaseRequest\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1f\n" +
+	"\vusage_value\x18\x03 \x01(\tR\n" +
+	"usageValue\x12'\n" +
+	"\x0fidempotency_key\x18\x04 \x01(\tR\x0eidempotencyKey\x12\x16\n" +
+	"\x06weight\x18\x05 \x01(\x03R\x06weight\"\x13\n" +
+	"\x11SemaphoreResponse*\xd2\x01\n" +
 	"\x1bConstraintApiRateLimitScope\x12/\n" +
 	"+CONSTRAINT_API_RATE_LIMIT_SCOPE_UNSPECIFIED\x10\x00\x12,\n" +
 	"(CONSTRAINT_API_RATE_LIMIT_SCOPE_FUNCTION\x10\x01\x12'\n" +
@@ -2282,12 +2672,16 @@ const file_constraintapi_v1_service_proto_rawDesc = "" +
 	"%CONSTRAINT_API_LEASE_SERVICE_NEW_RUNS\x10\x01\x12)\n" +
 	"%CONSTRAINT_API_LEASE_SERVICE_EXECUTOR\x10\x02\x12$\n" +
 	" CONSTRAINT_API_LEASE_SERVICE_API\x10\x03\x12-\n" +
-	")CONSTRAINT_API_LEASE_CONSTRAINT_SCAVENGER\x10\x042\x95\x03\n" +
+	")CONSTRAINT_API_LEASE_CONSTRAINT_SCAVENGER\x10\x042\xce\x06\n" +
 	"\rConstraintAPI\x12X\n" +
 	"\x05Check\x12&.constraintapi.v1.CapacityCheckRequest\x1a'.constraintapi.v1.CapacityCheckResponse\x12^\n" +
 	"\aAcquire\x12(.constraintapi.v1.CapacityAcquireRequest\x1a).constraintapi.v1.CapacityAcquireResponse\x12j\n" +
 	"\vExtendLease\x12,.constraintapi.v1.CapacityExtendLeaseRequest\x1a-.constraintapi.v1.CapacityExtendLeaseResponse\x12^\n" +
-	"\aRelease\x12(.constraintapi.v1.CapacityReleaseRequest\x1a).constraintapi.v1.CapacityReleaseResponseBEZCgithub.com/inngest/inngest/proto/gen/constraintapi/v1;constraintapib\x06proto3"
+	"\aRelease\x12(.constraintapi.v1.CapacityReleaseRequest\x1a).constraintapi.v1.CapacityReleaseResponse\x12j\n" +
+	"\x14SetSemaphoreCapacity\x12-.constraintapi.v1.SemaphoreSetCapacityRequest\x1a#.constraintapi.v1.SemaphoreResponse\x12p\n" +
+	"\x17AdjustSemaphoreCapacity\x120.constraintapi.v1.SemaphoreAdjustCapacityRequest\x1a#.constraintapi.v1.SemaphoreResponse\x12u\n" +
+	"\x14GetSemaphoreCapacity\x12-.constraintapi.v1.SemaphoreGetCapacityRequest\x1a..constraintapi.v1.SemaphoreGetCapacityResponse\x12b\n" +
+	"\x10ReleaseSemaphore\x12).constraintapi.v1.SemaphoreReleaseRequest\x1a#.constraintapi.v1.SemaphoreResponseBEZCgithub.com/inngest/inngest/proto/gen/constraintapi/v1;constraintapib\x06proto3"
 
 var (
 	file_constraintapi_v1_service_proto_rawDescOnce sync.Once
@@ -2302,7 +2696,7 @@ func file_constraintapi_v1_service_proto_rawDescGZIP() []byte {
 }
 
 var file_constraintapi_v1_service_proto_enumTypes = make([]protoimpl.EnumInfo, 9)
-var file_constraintapi_v1_service_proto_msgTypes = make([]protoimpl.MessageInfo, 23)
+var file_constraintapi_v1_service_proto_msgTypes = make([]protoimpl.MessageInfo, 29)
 var file_constraintapi_v1_service_proto_goTypes = []any{
 	(ConstraintApiRateLimitScope)(0),       // 0: constraintapi.v1.ConstraintApiRateLimitScope
 	(ConstraintApiConcurrencyScope)(0),     // 1: constraintapi.v1.ConstraintApiConcurrencyScope
@@ -2335,9 +2729,15 @@ var file_constraintapi_v1_service_proto_goTypes = []any{
 	(*CapacityExtendLeaseResponse)(nil),    // 28: constraintapi.v1.CapacityExtendLeaseResponse
 	(*CapacityReleaseRequest)(nil),         // 29: constraintapi.v1.CapacityReleaseRequest
 	(*CapacityReleaseResponse)(nil),        // 30: constraintapi.v1.CapacityReleaseResponse
-	nil,                                    // 31: constraintapi.v1.CapacityAcquireRequest.LeaseRunIdsEntry
-	(*timestamppb.Timestamp)(nil),          // 32: google.protobuf.Timestamp
-	(*durationpb.Duration)(nil),            // 33: google.protobuf.Duration
+	(*SemaphoreSetCapacityRequest)(nil),    // 31: constraintapi.v1.SemaphoreSetCapacityRequest
+	(*SemaphoreAdjustCapacityRequest)(nil), // 32: constraintapi.v1.SemaphoreAdjustCapacityRequest
+	(*SemaphoreGetCapacityRequest)(nil),    // 33: constraintapi.v1.SemaphoreGetCapacityRequest
+	(*SemaphoreGetCapacityResponse)(nil),   // 34: constraintapi.v1.SemaphoreGetCapacityResponse
+	(*SemaphoreReleaseRequest)(nil),        // 35: constraintapi.v1.SemaphoreReleaseRequest
+	(*SemaphoreResponse)(nil),              // 36: constraintapi.v1.SemaphoreResponse
+	nil,                                    // 37: constraintapi.v1.CapacityAcquireRequest.LeaseRunIdsEntry
+	(*timestamppb.Timestamp)(nil),          // 38: google.protobuf.Timestamp
+	(*durationpb.Duration)(nil),            // 39: google.protobuf.Duration
 }
 var file_constraintapi_v1_service_proto_depIdxs = []int32{
 	0,  // 0: constraintapi.v1.RateLimitConfig.scope:type_name -> constraintapi.v1.ConstraintApiRateLimitScope
@@ -2368,35 +2768,43 @@ var file_constraintapi_v1_service_proto_depIdxs = []int32{
 	19, // 25: constraintapi.v1.CapacityCheckRequest.constraints:type_name -> constraintapi.v1.ConstraintItem
 	19, // 26: constraintapi.v1.CapacityCheckResponse.limiting_constraints:type_name -> constraintapi.v1.ConstraintItem
 	20, // 27: constraintapi.v1.CapacityCheckResponse.usage:type_name -> constraintapi.v1.ConstraintUsage
-	32, // 28: constraintapi.v1.CapacityCheckResponse.retry_after:type_name -> google.protobuf.Timestamp
+	38, // 28: constraintapi.v1.CapacityCheckResponse.retry_after:type_name -> google.protobuf.Timestamp
 	19, // 29: constraintapi.v1.CapacityCheckResponse.exhausted_constraints:type_name -> constraintapi.v1.ConstraintItem
 	14, // 30: constraintapi.v1.CapacityAcquireRequest.configuration:type_name -> constraintapi.v1.ConstraintConfig
 	19, // 31: constraintapi.v1.CapacityAcquireRequest.constraints:type_name -> constraintapi.v1.ConstraintItem
-	31, // 32: constraintapi.v1.CapacityAcquireRequest.lease_run_ids:type_name -> constraintapi.v1.CapacityAcquireRequest.LeaseRunIdsEntry
-	32, // 33: constraintapi.v1.CapacityAcquireRequest.current_time:type_name -> google.protobuf.Timestamp
-	33, // 34: constraintapi.v1.CapacityAcquireRequest.duration:type_name -> google.protobuf.Duration
-	33, // 35: constraintapi.v1.CapacityAcquireRequest.maximum_lifetime:type_name -> google.protobuf.Duration
-	33, // 36: constraintapi.v1.CapacityAcquireRequest.blocking_threshold:type_name -> google.protobuf.Duration
+	37, // 32: constraintapi.v1.CapacityAcquireRequest.lease_run_ids:type_name -> constraintapi.v1.CapacityAcquireRequest.LeaseRunIdsEntry
+	38, // 33: constraintapi.v1.CapacityAcquireRequest.current_time:type_name -> google.protobuf.Timestamp
+	39, // 34: constraintapi.v1.CapacityAcquireRequest.duration:type_name -> google.protobuf.Duration
+	39, // 35: constraintapi.v1.CapacityAcquireRequest.maximum_lifetime:type_name -> google.protobuf.Duration
+	39, // 36: constraintapi.v1.CapacityAcquireRequest.blocking_threshold:type_name -> google.protobuf.Duration
 	22, // 37: constraintapi.v1.CapacityAcquireRequest.source:type_name -> constraintapi.v1.LeaseSource
 	21, // 38: constraintapi.v1.CapacityAcquireResponse.leases:type_name -> constraintapi.v1.CapacityLease
 	19, // 39: constraintapi.v1.CapacityAcquireResponse.limiting_constraints:type_name -> constraintapi.v1.ConstraintItem
-	32, // 40: constraintapi.v1.CapacityAcquireResponse.retry_after:type_name -> google.protobuf.Timestamp
+	38, // 40: constraintapi.v1.CapacityAcquireResponse.retry_after:type_name -> google.protobuf.Timestamp
 	19, // 41: constraintapi.v1.CapacityAcquireResponse.exhausted_constraints:type_name -> constraintapi.v1.ConstraintItem
-	33, // 42: constraintapi.v1.CapacityExtendLeaseRequest.duration:type_name -> google.protobuf.Duration
+	39, // 42: constraintapi.v1.CapacityExtendLeaseRequest.duration:type_name -> google.protobuf.Duration
 	22, // 43: constraintapi.v1.CapacityExtendLeaseRequest.source:type_name -> constraintapi.v1.LeaseSource
-	32, // 44: constraintapi.v1.CapacityExtendLeaseRequest.lease_issued_at:type_name -> google.protobuf.Timestamp
+	38, // 44: constraintapi.v1.CapacityExtendLeaseRequest.lease_issued_at:type_name -> google.protobuf.Timestamp
 	22, // 45: constraintapi.v1.CapacityReleaseRequest.source:type_name -> constraintapi.v1.LeaseSource
-	32, // 46: constraintapi.v1.CapacityReleaseRequest.lease_issued_at:type_name -> google.protobuf.Timestamp
+	38, // 46: constraintapi.v1.CapacityReleaseRequest.lease_issued_at:type_name -> google.protobuf.Timestamp
 	23, // 47: constraintapi.v1.ConstraintAPI.Check:input_type -> constraintapi.v1.CapacityCheckRequest
 	25, // 48: constraintapi.v1.ConstraintAPI.Acquire:input_type -> constraintapi.v1.CapacityAcquireRequest
 	27, // 49: constraintapi.v1.ConstraintAPI.ExtendLease:input_type -> constraintapi.v1.CapacityExtendLeaseRequest
 	29, // 50: constraintapi.v1.ConstraintAPI.Release:input_type -> constraintapi.v1.CapacityReleaseRequest
-	24, // 51: constraintapi.v1.ConstraintAPI.Check:output_type -> constraintapi.v1.CapacityCheckResponse
-	26, // 52: constraintapi.v1.ConstraintAPI.Acquire:output_type -> constraintapi.v1.CapacityAcquireResponse
-	28, // 53: constraintapi.v1.ConstraintAPI.ExtendLease:output_type -> constraintapi.v1.CapacityExtendLeaseResponse
-	30, // 54: constraintapi.v1.ConstraintAPI.Release:output_type -> constraintapi.v1.CapacityReleaseResponse
-	51, // [51:55] is the sub-list for method output_type
-	47, // [47:51] is the sub-list for method input_type
+	31, // 51: constraintapi.v1.ConstraintAPI.SetSemaphoreCapacity:input_type -> constraintapi.v1.SemaphoreSetCapacityRequest
+	32, // 52: constraintapi.v1.ConstraintAPI.AdjustSemaphoreCapacity:input_type -> constraintapi.v1.SemaphoreAdjustCapacityRequest
+	33, // 53: constraintapi.v1.ConstraintAPI.GetSemaphoreCapacity:input_type -> constraintapi.v1.SemaphoreGetCapacityRequest
+	35, // 54: constraintapi.v1.ConstraintAPI.ReleaseSemaphore:input_type -> constraintapi.v1.SemaphoreReleaseRequest
+	24, // 55: constraintapi.v1.ConstraintAPI.Check:output_type -> constraintapi.v1.CapacityCheckResponse
+	26, // 56: constraintapi.v1.ConstraintAPI.Acquire:output_type -> constraintapi.v1.CapacityAcquireResponse
+	28, // 57: constraintapi.v1.ConstraintAPI.ExtendLease:output_type -> constraintapi.v1.CapacityExtendLeaseResponse
+	30, // 58: constraintapi.v1.ConstraintAPI.Release:output_type -> constraintapi.v1.CapacityReleaseResponse
+	36, // 59: constraintapi.v1.ConstraintAPI.SetSemaphoreCapacity:output_type -> constraintapi.v1.SemaphoreResponse
+	36, // 60: constraintapi.v1.ConstraintAPI.AdjustSemaphoreCapacity:output_type -> constraintapi.v1.SemaphoreResponse
+	34, // 61: constraintapi.v1.ConstraintAPI.GetSemaphoreCapacity:output_type -> constraintapi.v1.SemaphoreGetCapacityResponse
+	36, // 62: constraintapi.v1.ConstraintAPI.ReleaseSemaphore:output_type -> constraintapi.v1.SemaphoreResponse
+	55, // [55:63] is the sub-list for method output_type
+	47, // [47:55] is the sub-list for method input_type
 	47, // [47:47] is the sub-list for extension type_name
 	47, // [47:47] is the sub-list for extension extendee
 	0,  // [0:47] is the sub-list for field type_name
@@ -2415,7 +2823,7 @@ func file_constraintapi_v1_service_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_constraintapi_v1_service_proto_rawDesc), len(file_constraintapi_v1_service_proto_rawDesc)),
 			NumEnums:      9,
-			NumMessages:   23,
+			NumMessages:   29,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
