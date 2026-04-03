@@ -511,14 +511,11 @@ function TimelineBarRenderer({
   // Pre-compute timing sub-bar positions from the parent bar's position.
   // This ensures sub-bars visually align with the parent's compound segments.
   //
-  // For the Inngest portion: prefer timingBreakdown.inngestMs (from metadata),
-  // but fall back to inngestBreakdown.totalMs (from timestamps) so we still
-  // show the Inngest bar even when metadata is missing or reports 0.
+  // timingBreakdown.inngestMs already includes discovery time
+  // so the Inngest bar encompasses all its sub-phases.
   const timingPositions = (() => {
-    const breakdownInngestMs = bar.timingBreakdown?.inngestMs ?? 0;
+    const inngestMs = bar.timingBreakdown?.inngestMs ?? 0;
     const executionMs = bar.timingBreakdown?.executionMs ?? 0;
-    const inngestMs =
-      breakdownInngestMs > 0 ? breakdownInngestMs : bar.inngestBreakdown?.totalMs ?? 0;
     const totalMs = inngestMs + executionMs;
     if (totalMs <= 0) return null;
 
