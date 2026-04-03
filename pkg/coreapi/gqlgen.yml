@@ -10,6 +10,9 @@ model:
   package: models
 
 resolver:
+  layout: follow-schema
+  dir: pkg/coreapi/graph/resolvers
+  package: resolvers
   filename: pkg/coreapi/graph/resolvers/resolver.go
   type: Resolver
 

@@ -2,11 +2,13 @@ package codegen
 
 import (
 	"fmt"
-	"strconv"
+	"slices"
 	"strings"
 
-	"github.com/99designs/gqlgen/codegen/templates"
 	"github.com/vektah/gqlparser/v2/ast"
+
+	"github.com/99designs/gqlgen/codegen/config"
+	"github.com/99designs/gqlgen/codegen/templates"
 )
 
 type DirectiveList map[string]*Directive
@@ -18,25 +20,27 @@ func (dl DirectiveList) LocationDirectives(location string) DirectiveList {
 
 type Directive struct {
 	*ast.DirectiveDefinition
-	Name    string
-	Args    []*FieldArgument
-	Builtin bool
+	Name string
+	Args []*FieldArgument
+
+	config.DirectiveConfig
 }
 
 // IsLocation check location directive
 func (d *Directive) IsLocation(location ...ast.DirectiveLocation) bool {
 	for _, l := range d.Locations {
-		for _, a := range location {
-			if l == a {
-				return true
-			}
+		if slices.Contains(location, l) {
+			return true
 		}
 	}
 
 	return false
 }
 
-func locationDirectives(directives DirectiveList, location ...ast.DirectiveLocation) map[string]*Directive {
+func locationDirectives(
+	directives DirectiveList,
+	location ...ast.DirectiveLocation,
+) map[string]*Directive {
 	mDirectives := make(map[string]*Directive)
 	for name, d := range directives {
 		if d.IsLocation(location...) {
@@ -71,7 +75,12 @@ func (b *builder) buildDirectives() (map[string]*Directive, error) {
 				var err error
 				newArg.Default, err = arg.DefaultValue.Value(nil)
 				if err != nil {
-					return nil, fmt.Errorf("default value for directive argument %s(%s) is not valid: %w", dir.Name, arg.Name, err)
+					return nil, fmt.Errorf(
+						"default value for directive argument %s(%s) is not valid: %w",
+						dir.Name,
+						arg.Name,
+						err,
+					)
 				}
 			}
 			args = append(args, newArg)
@@ -81,7 +90,7 @@ func (b *builder) buildDirectives() (map[string]*Directive, error) {
 			DirectiveDefinition: dir,
 			Name:                name,
 			Args:                args,
-			Builtin:             b.Config.Directives[name].SkipRuntime,
+			DirectiveConfig:     b.Config.Directives[name],
 		}
 	}
 
@@ -91,7 +100,7 @@ func (b *builder) buildDirectives() (map[string]*Directive, error) {
 func (b *builder) getDirectives(list ast.DirectiveList) ([]*Directive, error) {
 	dirs := make([]*Directive, len(list))
 	for i, d := range list {
-		argValues := make(map[string]interface{}, len(d.Arguments))
+		argValues := make(map[string]any, len(d.Arguments))
 		for _, da := range d.Arguments {
 			val, err := da.Value.Value(nil)
 			if err != nil {
@@ -121,9 +130,8 @@ func (b *builder) getDirectives(list ast.DirectiveList) ([]*Directive, error) {
 			Name:                d.Name,
 			Args:                args,
 			DirectiveDefinition: list[i].Definition,
-			Builtin:             b.Config.Directives[d.Name].SkipRuntime,
+			DirectiveConfig:     b.Config.Directives[d.Name],
 		}
-
 	}
 
 	return dirs, nil
@@ -141,7 +149,14 @@ func (d *Directive) CallArgs() string {
 	args := []string{"ctx", "obj", "n"}
 
 	for _, arg := range d.Args {
-		args = append(args, "args["+strconv.Quote(arg.Name)+"].("+templates.CurrentImports.LookupType(arg.TypeReference.GO)+")")
+		args = append(
+			args,
+			fmt.Sprintf(
+				"args[%q].(%s)",
+				arg.Name,
+				templates.CurrentImports.LookupType(arg.TypeReference.GO),
+			),
+		)
 	}
 
 	return strings.Join(args, ", ")
@@ -162,13 +177,44 @@ func (d *Directive) ResolveArgs(obj string, next int) string {
 	return strings.Join(args, ", ")
 }
 
-func (d *Directive) Declaration() string {
-	res := ucFirst(d.Name) + " func(ctx context.Context, obj interface{}, next graphql.Resolver"
+func (d *Directive) CallName() string {
+	return ucFirst(d.Name)
+}
 
+func (d *Directive) Declaration() string {
+	res := d.CallName() + " func(ctx context.Context, obj any, next graphql.Resolver"
+
+	var resSb173 strings.Builder
 	for _, arg := range d.Args {
-		res += fmt.Sprintf(", %s %s", templates.ToGoPrivate(arg.Name), templates.CurrentImports.LookupType(arg.TypeReference.GO))
+		fmt.Fprintf(
+			&resSb173,
+			", %s %s",
+			templates.ToGoPrivate(arg.Name),
+			templates.CurrentImports.LookupType(arg.TypeReference.GO),
+		)
+	}
+	res += resSb173.String()
+
+	res += ") (res any, err error)"
+	return res
+}
+
+func (d *Directive) IsBuiltIn() bool {
+	return d.Implementation != nil
+}
+
+func (d *Directive) CallPath() string {
+	if d.IsBuiltIn() {
+		return "builtInDirective" + d.CallName()
 	}
 
-	res += ") (res interface{}, err error)"
-	return res
+	return "ec.Directives." + d.CallName()
+}
+
+func (d *Directive) FunctionImpl() string {
+	if d.Implementation == nil {
+		return ""
+	}
+
+	return d.CallPath() + " = " + *d.Implementation
 }

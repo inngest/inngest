@@ -21,7 +21,7 @@ type Field struct {
 	Arguments    ArgumentList
 	Directives   DirectiveList
 	SelectionSet SelectionSet
-	Position     *Position `dump:"-"`
+	Position     *Position `dump:"-" json:"-"`
 	Comment      *CommentGroup
 
 	// Require validation
@@ -32,10 +32,13 @@ type Field struct {
 type Argument struct {
 	Name     string
 	Value    *Value
-	Position *Position `dump:"-"`
+	Position *Position `dump:"-" json:"-"`
 	Comment  *CommentGroup
 }
 
-func (f *Field) ArgumentMap(vars map[string]interface{}) map[string]interface{} {
+func (f *Field) ArgumentMap(vars map[string]any) map[string]any {
+	if f.Definition == nil {
+		return nil
+	}
 	return arg2map(f.Definition.Arguments, f.Arguments, vars)
 }

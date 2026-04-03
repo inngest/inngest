@@ -1,14 +1,14 @@
-package validator
+package rules
 
 import (
 	"github.com/vektah/gqlparser/v2/ast"
-
-	//nolint:revive // Validator rules each use dot imports for convenience.
-	. "github.com/vektah/gqlparser/v2/validator"
+	//nolint:staticcheck // Validator rules each use dot imports for convenience.
+	. "github.com/vektah/gqlparser/v2/validator/core"
 )
 
-func init() {
-	AddRule("NoUnusedVariables", func(observers *Events, addError AddErrFunc) {
+var NoUnusedVariablesRule = Rule{
+	Name: "NoUnusedVariables",
+	RuleFunc: func(observers *Events, addError AddErrFunc) {
 		observers.OnOperation(func(walker *Walker, operation *ast.OperationDefinition) {
 			for _, varDef := range operation.VariableDefinitions {
 				if varDef.Used {
@@ -17,7 +17,11 @@ func init() {
 
 				if operation.Name != "" {
 					addError(
-						Message(`Variable "$%s" is never used in operation "%s".`, varDef.Variable, operation.Name),
+						Message(
+							`Variable "$%s" is never used in operation "%s".`,
+							varDef.Variable,
+							operation.Name,
+						),
 						At(varDef.Position),
 					)
 				} else {
@@ -28,5 +32,5 @@ func init() {
 				}
 			}
 		})
-	})
+	},
 }

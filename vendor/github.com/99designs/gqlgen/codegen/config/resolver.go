@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"go/types"
 	"path/filepath"
@@ -10,12 +11,15 @@ import (
 )
 
 type ResolverConfig struct {
-	Filename         string         `yaml:"filename,omitempty"`
-	FilenameTemplate string         `yaml:"filename_template,omitempty"`
-	Package          string         `yaml:"package,omitempty"`
-	Type             string         `yaml:"type,omitempty"`
-	Layout           ResolverLayout `yaml:"layout,omitempty"`
-	DirName          string         `yaml:"dir"`
+	Filename            string         `yaml:"filename,omitempty"`
+	FilenameTemplate    string         `yaml:"filename_template,omitempty"`
+	Package             string         `yaml:"package,omitempty"`
+	Type                string         `yaml:"type,omitempty"`
+	Layout              ResolverLayout `yaml:"layout,omitempty"`
+	DirName             string         `yaml:"dir"`
+	OmitTemplateComment bool           `yaml:"omit_template_comment,omitempty"`
+	ResolverTemplate    string         `yaml:"resolver_template,omitempty"`
+	PreserveResolver    bool           `yaml:"preserve_resolver,omitempty"`
 }
 
 type ResolverLayout string
@@ -39,7 +43,10 @@ func (r *ResolverConfig) Check() error {
 			return fmt.Errorf("filename must be specified with layout=%s", r.Layout)
 		}
 		if !strings.HasSuffix(r.Filename, ".go") {
-			return fmt.Errorf("filename should be path to a go source file with layout=%s", r.Layout)
+			return fmt.Errorf(
+				"filename should be path to a go source file with layout=%s",
+				r.Layout,
+			)
 		}
 		r.Filename = abs(r.Filename)
 	case LayoutFollowSchema:
@@ -53,11 +60,18 @@ func (r *ResolverConfig) Check() error {
 			r.Filename = abs(r.Filename)
 		}
 	default:
-		return fmt.Errorf("invalid layout %s. must be %s or %s", r.Layout, LayoutSingleFile, LayoutFollowSchema)
+		return fmt.Errorf(
+			"invalid layout %s. must be %s or %s",
+			r.Layout,
+			LayoutSingleFile,
+			LayoutFollowSchema,
+		)
 	}
 
 	if strings.ContainsAny(r.Package, "./\\") {
-		return fmt.Errorf("package should be the output package name only, do not include the output filename")
+		return errors.New(
+			"package should be the output package name only, do not include the output filename",
+		)
 	}
 
 	if r.Package == "" && r.Dir() != "" {

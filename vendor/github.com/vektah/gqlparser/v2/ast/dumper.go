@@ -8,8 +8,8 @@ import (
 	"strings"
 )
 
-// Dump turns ast into a stable string format for assertions in tests
-func Dump(i interface{}) string {
+// Dump turns ast into a stable string format for assertions in tests.
+func Dump(i any) string {
 	v := reflect.ValueOf(i)
 
 	d := dumper{Buffer: &bytes.Buffer{}}
@@ -40,13 +40,13 @@ func (d *dumper) dump(v reflect.Value) {
 			d.WriteString("false")
 		}
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		d.WriteString(fmt.Sprintf("%d", v.Int()))
+		fmt.Fprintf(d, "%d", v.Int())
 
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		d.WriteString(fmt.Sprintf("%d", v.Uint()))
+		fmt.Fprintf(d, "%d", v.Uint())
 
 	case reflect.Float32, reflect.Float64:
-		d.WriteString(fmt.Sprintf("%.2f", v.Float()))
+		fmt.Fprintf(d, "%.2f", v.Float())
 
 	case reflect.String:
 		if v.Type().Name() != "string" {
@@ -70,11 +70,11 @@ func (d *dumper) dump(v reflect.Value) {
 }
 
 func (d *dumper) writeIndent() {
-	d.Buffer.WriteString(strings.Repeat("  ", d.indent))
+	d.WriteString(strings.Repeat("  ", d.indent))
 }
 
 func (d *dumper) nl() {
-	d.Buffer.WriteByte('\n')
+	d.WriteByte('\n')
 	d.writeIndent()
 }
 
@@ -126,7 +126,6 @@ func isZero(v reflect.Value) bool {
 		return v.IsNil()
 	case reflect.Func, reflect.Map:
 		return v.IsNil()
-
 	case reflect.Array, reflect.Slice:
 		if v.IsNil() {
 			return true
@@ -144,10 +143,13 @@ func isZero(v reflect.Value) bool {
 		return z
 	case reflect.String:
 		return v.String() == ""
+	case reflect.Bool:
+		// Never consider Bool field as zero value.
+		// Always include them in AST dump.
+		return false
+	default:
+		return reflect.DeepEqual(v.Interface(), reflect.Zero(v.Type()).Interface())
 	}
-
-	// Compare other types directly:
-	return reflect.DeepEqual(v.Interface(), reflect.Zero(v.Type()))
 }
 
 func (d *dumper) dumpPtr(v reflect.Value) {

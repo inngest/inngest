@@ -1,14 +1,14 @@
-package validator
+package rules
 
 import (
 	"github.com/vektah/gqlparser/v2/ast"
-
-	//nolint:revive // Validator rules each use dot imports for convenience.
-	. "github.com/vektah/gqlparser/v2/validator"
+	//nolint:staticcheck // Validator rules each use dot imports for convenience.
+	. "github.com/vektah/gqlparser/v2/validator/core"
 )
 
-func init() {
-	AddRule("VariablesAreInputTypes", func(observers *Events, addError AddErrFunc) {
+var VariablesAreInputTypesRule = Rule{
+	Name: "VariablesAreInputTypes",
+	RuleFunc: func(observers *Events, addError AddErrFunc) {
 		observers.OnOperation(func(walker *Walker, operation *ast.OperationDefinition) {
 			for _, def := range operation.VariableDefinitions {
 				if def.Definition == nil {
@@ -26,5 +26,5 @@ func init() {
 				}
 			}
 		})
-	})
+	},
 }

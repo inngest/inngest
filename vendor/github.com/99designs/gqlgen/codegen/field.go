@@ -7,14 +7,17 @@ import (
 	"go/types"
 	"log"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 
-	"github.com/99designs/gqlgen/codegen/config"
-	"github.com/99designs/gqlgen/codegen/templates"
 	"github.com/vektah/gqlparser/v2/ast"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
+
+	"github.com/99designs/gqlgen/codegen/config"
+	"github.com/99designs/gqlgen/codegen/templates"
+	"github.com/99designs/gqlgen/internal/code"
 )
 
 type Field struct {
@@ -28,11 +31,14 @@ type Field struct {
 	Args             []*FieldArgument // A list of arguments to be passed to this field
 	MethodHasContext bool             // If this is bound to a go method, does the method also take a context
 	NoErr            bool             // If this is bound to a go method, does that method have an error as the second argument
-	VOkFunc          bool             // If this is bound to a go method, is it of shape (interface{}, bool)
+	VOkFunc          bool             // If this is bound to a go method, is it of shape (any, bool)
 	Object           *Object          // A link back to the parent object
-	Default          interface{}      // The default value
+	Default          any              // The default value
 	Stream           bool             // does this field return a channel?
 	Directives       []*Directive
+	HasHaser         bool   // Whether a haser method is available (e.g., HasName())
+	HaserMethodName  string // Name of the haser method
+	Batch            bool   // Enable batch resolver for this field
 }
 
 func (b *builder) buildField(obj *Object, field *ast.FieldDefinition) (*Field, error) {
@@ -74,7 +80,26 @@ func (b *builder) buildField(obj *Object, field *ast.FieldDefinition) (*Field, e
 		log.Println(err.Error())
 	}
 
-	if f.IsResolver && b.Config.ResolversAlwaysReturnPointers && !f.TypeReference.IsPtr() && f.TypeReference.IsStruct() {
+	// Set Batch flag from config (independent of resolver setting)
+	if fieldCfg, ok := b.Config.Models[obj.Name]; ok {
+		if fieldEntry, ok := fieldCfg.Fields[field.Name]; ok {
+			f.Batch = fieldEntry.Batch
+			if f.Batch {
+				if f.Object.Root {
+					return nil, fmt.Errorf(
+						"batch resolver is not supported for root field %s.%s",
+						obj.Name,
+						field.Name,
+					)
+				}
+				// batch resolvers are always user-provided
+				f.IsResolver = true
+			}
+		}
+	}
+
+	if f.IsResolver && b.Config.ResolversAlwaysReturnPointers && !f.TypeReference.IsPtr() &&
+		f.TypeReference.IsStruct() {
 		f.TypeReference = b.Binder.PointerTo(f.TypeReference)
 	}
 
@@ -95,12 +120,17 @@ func (b *builder) bindField(obj *Object, f *Field) (errret error) {
 			if err != nil {
 				errret = err
 			}
-			for _, dir := range obj.Directives {
-				if dir.IsLocation(ast.LocationInputObject) {
-					dirs = append(dirs, dir)
+			// Filter out INPUT_OBJECT directives from type references - they should
+			// only be executed on the input object itself, not on fields that use the type.
+			// See: https://github.com/99designs/gqlgen/issues/2281
+			var filteredDirs []*Directive
+			for _, dir := range dirs {
+				if !dir.IsLocation(ast.LocationInputObject) {
+					filteredDirs = append(filteredDirs, dir)
 				}
 			}
-			f.Directives = append(dirs, f.Directives...)
+
+			f.Directives = append(filteredDirs, f.Directives...)
 		}
 	}()
 
@@ -110,12 +140,12 @@ func (b *builder) bindField(obj *Object, f *Field) (errret error) {
 	case f.Name == "__schema":
 		f.GoFieldType = GoFieldMethod
 		f.GoReceiverName = "ec"
-		f.GoFieldName = "introspectSchema"
+		f.GoFieldName = "IntrospectSchema"
 		return nil
 	case f.Name == "__type":
 		f.GoFieldType = GoFieldMethod
 		f.GoReceiverName = "ec"
-		f.GoFieldName = "introspectType"
+		f.GoFieldName = "IntrospectType"
 		return nil
 	case f.Name == "_entities":
 		f.GoFieldType = GoFieldMethod
@@ -143,7 +173,26 @@ func (b *builder) bindField(obj *Object, f *Field) (errret error) {
 		f.GoFieldName = b.Config.Models[obj.Name].Fields[f.Name].FieldName
 	}
 
-	target, err := b.findBindTarget(obj.Type.(*types.Named), f.GoFieldName)
+	// Check for protobuf-style haser method (only if enabled and field is nullable)
+	// Use the original field name, not the bound method/field name
+	// (e.g., for field "name" bound to "GetName()", look for "HasName" not "HasGetName")
+	// Check for protobuf-style haser method (only if enabled and field is nullable)
+	// Use the original field name, not the bound method/field name
+	// (e.g., for field "name" bound to "GetName()", look for "HasName" not "HasGetName")
+	autoBindGetterHaser := b.Config.AutobindGetterHaser
+	if val := b.Config.Models[obj.Name].Fields[f.Name].AutoBindGetterHaser; val != nil {
+		autoBindGetterHaser = *val
+	}
+
+	if autoBindGetterHaser && !f.Type.NonNull {
+		haser, _ := b.findBindHaserMethod(obj.Type, f.GoFieldName)
+		if haser != nil {
+			f.HasHaser = true
+			f.HaserMethodName = haser.Name()
+		}
+	}
+
+	target, err := b.findBindTarget(obj.Type, f.GoFieldName, autoBindGetterHaser)
 	if err != nil {
 		return err
 	}
@@ -152,6 +201,11 @@ func (b *builder) bindField(obj *Object, f *Field) (errret error) {
 
 	switch target := target.(type) {
 	case nil:
+		// Skips creating a resolver for any root types
+		if b.Config.IsRoot(b.Schema.Types[f.Type.Name()]) {
+			return nil
+		}
+
 		objPos := b.Binder.TypePosition(obj.Type)
 		return fmt.Errorf(
 			"%s:%d adding resolver method for %s.%s, nothing matched",
@@ -168,7 +222,7 @@ func (b *builder) bindField(obj *Object, f *Field) (errret error) {
 		} else if s := sig.Results(); s.Len() == 2 && s.At(1).Type().String() == "bool" {
 			f.VOkFunc = true
 		} else if sig.Results().Len() != 2 {
-			return fmt.Errorf("method has wrong number of args")
+			return errors.New("method has wrong number of args")
 		}
 		params := sig.Params()
 		// If the first argument is the context, remove it from the comparison and set
@@ -203,7 +257,6 @@ func (b *builder) bindField(obj *Object, f *Field) (errret error) {
 		f.TypeReference = tr
 
 		return nil
-
 	case *types.Var:
 		tr, err := b.Binder.TypeReference(f.Type, target.Type())
 		if err != nil {
@@ -223,16 +276,35 @@ func (b *builder) bindField(obj *Object, f *Field) (errret error) {
 }
 
 // findBindTarget attempts to match the name to a field or method on a Type
-// with the following priorites:
+// with the following priorities:
 // 1. Any Fields with a struct tag (see config.StructTag). Errors if more than one match is found
-// 2. Any method or field with a matching name. Errors if more than one match is found
-// 3. Same logic again for embedded fields
-func (b *builder) findBindTarget(t types.Type, name string) (types.Object, error) {
+// 2. If enabled, try getter pattern (GetFieldName)
+// 3. Any method or field with a matching name. Errors if more than one match is found
+// 4. Same logic again for embedded fields
+func (b *builder) findBindTarget(
+	t types.Type,
+	name string,
+	autoBindGetterHaser bool,
+) (types.Object, error) {
 	// NOTE: a struct tag will override both methods and fields
 	// Bind to struct tag
 	found, err := b.findBindStructTagTarget(t, name)
 	if found != nil || err != nil {
 		return found, err
+	}
+
+	// If enabled, try getter pattern (GetFieldName) first
+	var foundGetter types.Object
+	if autoBindGetterHaser {
+		getterName := "Get" + name
+		foundGetter, err = b.findBindMethodTarget(t, getterName)
+		if err != nil {
+			return nil, err
+		}
+
+		if foundGetter != nil {
+			return foundGetter, nil
+		}
 	}
 
 	// Search for a method to bind to
@@ -260,7 +332,7 @@ func (b *builder) findBindTarget(t types.Type, name string) (types.Object, error
 	}
 
 	// Search embeds
-	return b.findBindEmbedsTarget(t, name)
+	return b.findBindEmbedsTarget(t, name, autoBindGetterHaser)
 }
 
 func (b *builder) findBindStructTagTarget(in types.Type, name string) (types.Object, error) {
@@ -281,7 +353,11 @@ func (b *builder) findBindStructTagTarget(in types.Type, name string) (types.Obj
 			tags := reflect.StructTag(t.Tag(i))
 			if val, ok := tags.Lookup(b.Config.StructTag); ok && equalFieldName(val, name) {
 				if found != nil {
-					return nil, fmt.Errorf("tag %s is ambigious; multiple fields have the same tag value of %s", b.Config.StructTag, val)
+					return nil, fmt.Errorf(
+						"tag %s is ambiguous; multiple fields have the same tag value of %s",
+						b.Config.StructTag,
+						val,
+					)
 				}
 
 				found = field
@@ -310,9 +386,13 @@ func (b *builder) findBindMethodTarget(in types.Type, name string) (types.Object
 	return nil, nil
 }
 
-func (b *builder) findBindMethoderTarget(methodFunc func(i int) *types.Func, methodCount int, name string) (types.Object, error) {
+func (b *builder) findBindMethoderTarget(
+	methodFunc func(i int) *types.Func,
+	methodCount int,
+	name string,
+) (types.Object, error) {
 	var found types.Object
-	for i := 0; i < methodCount; i++ {
+	for i := range methodCount {
 		method := methodFunc(i)
 		if !method.Exported() || !strings.EqualFold(method.Name(), name) {
 			continue
@@ -334,8 +414,7 @@ func (b *builder) findBindFieldTarget(in types.Type, name string) (types.Object,
 		return b.findBindFieldTarget(t.Underlying(), name)
 	case *types.Struct:
 		var found types.Object
-		for i := 0; i < t.NumFields(); i++ {
-			field := t.Field(i)
+		for field := range t.Fields() {
 			if !field.Exported() || !equalFieldName(field.Name(), name) {
 				continue
 			}
@@ -353,33 +432,40 @@ func (b *builder) findBindFieldTarget(in types.Type, name string) (types.Object,
 	return nil, nil
 }
 
-func (b *builder) findBindEmbedsTarget(in types.Type, name string) (types.Object, error) {
+func (b *builder) findBindEmbedsTarget(
+	in types.Type,
+	name string,
+	autoBindGetterHaser bool,
+) (types.Object, error) {
 	switch t := in.(type) {
 	case *types.Named:
-		return b.findBindEmbedsTarget(t.Underlying(), name)
+		return b.findBindEmbedsTarget(t.Underlying(), name, autoBindGetterHaser)
 	case *types.Struct:
-		return b.findBindStructEmbedsTarget(t, name)
+		return b.findBindStructEmbedsTarget(t, name, autoBindGetterHaser)
 	case *types.Interface:
-		return b.findBindInterfaceEmbedsTarget(t, name)
+		return b.findBindInterfaceEmbedsTarget(t, name, autoBindGetterHaser)
 	}
 
 	return nil, nil
 }
 
-func (b *builder) findBindStructEmbedsTarget(strukt *types.Struct, name string) (types.Object, error) {
+func (b *builder) findBindStructEmbedsTarget(
+	strukt *types.Struct,
+	name string,
+	autoBindGetterHaser bool,
+) (types.Object, error) {
 	var found types.Object
-	for i := 0; i < strukt.NumFields(); i++ {
-		field := strukt.Field(i)
+	for field := range strukt.Fields() {
 		if !field.Embedded() {
 			continue
 		}
 
-		fieldType := field.Type()
+		fieldType := code.Unalias(field.Type())
 		if ptr, ok := fieldType.(*types.Pointer); ok {
 			fieldType = ptr.Elem()
 		}
 
-		f, err := b.findBindTarget(fieldType, name)
+		f, err := b.findBindTarget(fieldType, name, autoBindGetterHaser)
 		if err != nil {
 			return nil, err
 		}
@@ -396,12 +482,14 @@ func (b *builder) findBindStructEmbedsTarget(strukt *types.Struct, name string) 
 	return found, nil
 }
 
-func (b *builder) findBindInterfaceEmbedsTarget(iface *types.Interface, name string) (types.Object, error) {
+func (b *builder) findBindInterfaceEmbedsTarget(
+	iface *types.Interface,
+	name string,
+	autoBindGetterHaser bool,
+) (types.Object, error) {
 	var found types.Object
-	for i := 0; i < iface.NumEmbeddeds(); i++ {
-		embeddedType := iface.EmbeddedType(i)
-
-		f, err := b.findBindTarget(embeddedType, name)
+	for embeddedType := range iface.EmbeddedTypes() {
+		f, err := b.findBindTarget(embeddedType, name, autoBindGetterHaser)
 		if err != nil {
 			return nil, err
 		}
@@ -416,6 +504,55 @@ func (b *builder) findBindInterfaceEmbedsTarget(iface *types.Interface, name str
 	}
 
 	return found, nil
+}
+
+// findBindHaserMethod looks for a protobuf-style haser method (e.g., HasName for field Name)
+// Haser methods are used to check if an optional field is set
+func (b *builder) findBindHaserMethod(in types.Type, name string) (types.Object, error) {
+	haserName := "Has" + name
+
+	switch t := in.(type) {
+	case *types.Named:
+		if _, ok := t.Underlying().(*types.Interface); ok {
+			return b.findBindHaserMethod(t.Underlying(), name)
+		}
+
+		// Search for haser method
+		method, err := b.findBindMethoderTarget(t.Method, t.NumMethods(), haserName)
+		if err != nil || method == nil {
+			return nil, err
+		}
+
+		// Verify haser signature: no parameters, returns bool
+		sig := method.Type().(*types.Signature)
+		if sig.Params().Len() != 0 || sig.Results().Len() != 1 {
+			return nil, nil
+		}
+		if sig.Results().At(0).Type().String() != "bool" {
+			return nil, nil
+		}
+
+		return method, nil
+
+	case *types.Interface:
+		method, err := b.findBindMethoderTarget(t.Method, t.NumMethods(), haserName)
+		if err != nil || method == nil {
+			return nil, err
+		}
+
+		// Verify haser signature
+		sig := method.Type().(*types.Signature)
+		if sig.Params().Len() != 0 || sig.Results().Len() != 1 {
+			return nil, nil
+		}
+		if sig.Results().At(0).Type().String() != "bool" {
+			return nil, nil
+		}
+
+		return method, nil
+	}
+
+	return nil, nil
 }
 
 func (f *Field) HasDirectives() bool {
@@ -436,7 +573,7 @@ func (f *Field) ImplDirectives() []*Directive {
 		loc = ast.LocationInputFieldDefinition
 	}
 	for i := range f.Directives {
-		if !f.Directives[i].Builtin &&
+		if !f.Directives[i].SkipRuntime &&
 			(f.Directives[i].IsLocation(loc, ast.LocationObject) || f.Directives[i].IsLocation(loc, ast.LocationInputObject)) {
 			d = append(d, f.Directives[i])
 		}
@@ -467,6 +604,67 @@ func (f *Field) IsConcurrent() bool {
 	return f.MethodHasContext || f.IsResolver
 }
 
+// IsBatch returns true if this field has batch resolver enabled.
+func (f *Field) IsBatch() bool {
+	return f.Batch
+}
+
+// ShortBatchResolverDeclaration returns the method signature for a batch resolver.
+// Batch resolvers accept multiple parent objects and return results for all of them.
+// For example, if the normal resolver is:
+//
+//	Posts(ctx context.Context, obj *User) ([]*Post, error)
+//
+// The batch resolver would be:
+//
+//	Posts(ctx context.Context, objs []*User) ([][]*Post, error)
+func (f *Field) ShortBatchResolverDeclaration() string {
+	if f.Object.Root {
+		// Root fields don't have a parent object, so batch doesn't make sense
+		return ""
+	}
+
+	parentType := templates.CurrentImports.LookupType(f.Object.Reference())
+	res := fmt.Sprintf("(ctx context.Context, objs []%s", parentType)
+
+	var resSb strings.Builder
+	var inlineInfo *InlineArgsInfo
+	if f.Object != nil && f.Object.Definition != nil {
+		inlineInfo = GetInlineArgsMetadata(f.Object.Name, f.Name)
+	}
+	if inlineInfo != nil {
+		goType := formatGoType(inlineInfo.GoType)
+		fmt.Fprintf(&resSb, ", %s %s", inlineInfo.OriginalArgName, goType)
+
+		for _, arg := range f.Args {
+			if !slices.Contains(inlineInfo.ExpandedArgs, arg.Name) {
+				fmt.Fprintf(
+					&resSb,
+					", %s %s",
+					arg.VarName,
+					templates.CurrentImports.LookupType(arg.TypeReference.GO),
+				)
+			}
+		}
+	} else {
+		for _, arg := range f.Args {
+			fmt.Fprintf(
+				&resSb,
+				", %s %s",
+				arg.VarName,
+				templates.CurrentImports.LookupType(arg.TypeReference.GO),
+			)
+		}
+	}
+	res += resSb.String()
+
+	return fmt.Sprintf(
+		"%s) ([]%s, error)",
+		res,
+		templates.CurrentImports.LookupType(f.TypeReference.GO),
+	)
+}
+
 func (f *Field) GoNameUnexported() string {
 	return templates.ToGoPrivate(f.Name)
 }
@@ -474,9 +672,9 @@ func (f *Field) GoNameUnexported() string {
 func (f *Field) ShortInvocation() string {
 	caser := cases.Title(language.English, cases.NoLower)
 	if f.Object.Kind == ast.InputObject {
-		return fmt.Sprintf("%s().%s(ctx, &it, data)", caser.String(f.Object.Definition.Name), f.GoFieldName)
+		return fmt.Sprintf("%s().%s(ctx, &it, data)", caser.String(f.Object.Name), f.GoFieldName)
 	}
-	return fmt.Sprintf("%s().%s(%s)", caser.String(f.Object.Definition.Name), f.GoFieldName, f.CallArgs())
+	return fmt.Sprintf("%s().%s(%s)", caser.String(f.Object.Name), f.GoFieldName, f.CallArgs())
 }
 
 func (f *Field) ArgsFunc() string {
@@ -484,11 +682,11 @@ func (f *Field) ArgsFunc() string {
 		return ""
 	}
 
-	return "field_" + f.Object.Definition.Name + "_" + f.Name + "_args"
+	return "field_" + f.Object.Name + "_" + f.Name + "_args"
 }
 
 func (f *Field) FieldContextFunc() string {
-	return "fieldContext_" + f.Object.Definition.Name + "_" + f.Name
+	return "fieldContext_" + f.Object.Name + "_" + f.Name
 }
 
 func (f *Field) ChildFieldContextFunc(name string) string {
@@ -500,7 +698,7 @@ func (f *Field) ResolverType() string {
 		return ""
 	}
 
-	return fmt.Sprintf("%s().%s(%s)", f.Object.Definition.Name, f.GoFieldName, f.CallArgs())
+	return fmt.Sprintf("%s().%s(%s)", f.Object.Name, f.GoFieldName, f.CallArgs())
 }
 
 func (f *Field) IsInputObject() bool {
@@ -509,6 +707,27 @@ func (f *Field) IsInputObject() bool {
 
 func (f *Field) IsRoot() bool {
 	return f.Object.Root
+}
+
+func formatGoType(goType string) string {
+	if strings.Contains(goType, "/") {
+		lastDot := strings.LastIndex(goType, ".")
+		if lastDot == -1 {
+			return goType
+		}
+
+		packagePath := goType[:lastDot]
+		typeName := goType[lastDot+1:]
+
+		alias := templates.CurrentImports.Lookup(packagePath)
+		if alias == "" {
+			return typeName
+		}
+
+		return alias + "." + typeName
+	}
+
+	return goType
 }
 
 func (f *Field) ShortResolverDeclaration() string {
@@ -530,9 +749,37 @@ func (f *Field) ShortResolverSignature(ft *goast.FuncType) string {
 	if !f.Object.Root {
 		res += fmt.Sprintf(", obj %s", templates.CurrentImports.LookupType(f.Object.Reference()))
 	}
-	for _, arg := range f.Args {
-		res += fmt.Sprintf(", %s %s", arg.VarName, templates.CurrentImports.LookupType(arg.TypeReference.GO))
+	var resSb540 strings.Builder
+
+	var inlineInfo *InlineArgsInfo
+	if f.Object != nil && f.Object.Definition != nil {
+		inlineInfo = GetInlineArgsMetadata(f.Object.Name, f.Name)
 	}
+	if inlineInfo != nil {
+		goType := formatGoType(inlineInfo.GoType)
+		fmt.Fprintf(&resSb540, ", %s %s", inlineInfo.OriginalArgName, goType)
+
+		for _, arg := range f.Args {
+			if !slices.Contains(inlineInfo.ExpandedArgs, arg.Name) {
+				fmt.Fprintf(
+					&resSb540,
+					", %s %s",
+					arg.VarName,
+					templates.CurrentImports.LookupType(arg.TypeReference.GO),
+				)
+			}
+		}
+	} else {
+		for _, arg := range f.Args {
+			fmt.Fprintf(
+				&resSb540,
+				", %s %s",
+				arg.VarName,
+				templates.CurrentImports.LookupType(arg.TypeReference.GO),
+			)
+		}
+	}
+	res += resSb540.String()
 
 	result := templates.CurrentImports.LookupType(f.TypeReference.GO)
 	if f.Object.Stream {
@@ -548,7 +795,11 @@ func (f *Field) ShortResolverSignature(ft *goast.FuncType) string {
 			namedE = ft.Results.List[1].Names[0].Name
 		}
 	}
-	res += fmt.Sprintf(") (%s %s, %s error)", namedV, result, namedE)
+	if namedV != "" || namedE != "" {
+		res += fmt.Sprintf(") (%s %s, %s error)", namedV, result, namedE)
+	} else {
+		res += fmt.Sprintf(") (%s, error)", result)
+	}
 	return res
 }
 
@@ -561,9 +812,16 @@ func (f *Field) GoResultName() (string, bool) {
 
 func (f *Field) ComplexitySignature() string {
 	res := "func(childComplexity int"
+	var resSb571 strings.Builder
 	for _, arg := range f.Args {
-		res += fmt.Sprintf(", %s %s", arg.VarName, templates.CurrentImports.LookupType(arg.TypeReference.GO))
+		fmt.Fprintf(
+			&resSb571,
+			", %s %s",
+			arg.VarName,
+			templates.CurrentImports.LookupType(arg.TypeReference.GO),
+		)
 	}
+	res += resSb571.String()
 	res += ") int"
 	return res
 }
@@ -571,7 +829,11 @@ func (f *Field) ComplexitySignature() string {
 func (f *Field) ComplexityArgs() string {
 	args := make([]string, len(f.Args))
 	for i, arg := range f.Args {
-		args[i] = "args[" + strconv.Quote(arg.Name) + "].(" + templates.CurrentImports.LookupType(arg.TypeReference.GO) + ")"
+		args[i] = "args[" + strconv.Quote(
+			arg.Name,
+		) + "].(" + templates.CurrentImports.LookupType(
+			arg.TypeReference.GO,
+		) + ")"
 	}
 
 	return strings.Join(args, ", ")
@@ -581,7 +843,7 @@ func (f *Field) CallArgs() string {
 	args := make([]string, 0, len(f.Args)+2)
 
 	if f.IsResolver {
-		args = append(args, "rctx")
+		args = append(args, "ctx")
 
 		if !f.Object.Root {
 			args = append(args, "obj")
@@ -590,21 +852,122 @@ func (f *Field) CallArgs() string {
 		args = append(args, "ctx")
 	}
 
-	for _, arg := range f.Args {
-		tmp := "fc.Args[" + strconv.Quote(arg.Name) + "].(" + templates.CurrentImports.LookupType(arg.TypeReference.GO) + ")"
+	args = append(args, f.callArgExpressions()...)
+	return strings.Join(args, ", ")
+}
 
-		if iface, ok := arg.TypeReference.GO.(*types.Interface); ok && iface.Empty() {
-			tmp = fmt.Sprintf(`
-				func () interface{} {
+func (f *Field) callArgExpressions() []string {
+	args := make([]string, 0, len(f.Args))
+	var inlineInfo *InlineArgsInfo
+	if f.Object != nil && f.Object.Definition != nil {
+		inlineInfo = GetInlineArgsMetadata(f.Object.Name, f.Name)
+	}
+	if inlineInfo != nil {
+		isMap := strings.Contains(inlineInfo.GoType, "map[")
+
+		var entries []string
+		for _, argName := range inlineInfo.ExpandedArgs {
+			var argRef *FieldArgument
+			for _, arg := range f.Args {
+				if arg.Name == argName {
+					argRef = arg
+					break
+				}
+			}
+			if argRef != nil {
+				goType := templates.CurrentImports.LookupType(argRef.TypeReference.GO)
+				var entry string
+				if isMap {
+					entry = fmt.Sprintf("%q: fc.Args[%q].(%s)", argName, argName, goType)
+				} else {
+					fieldName := templates.ToGo(argName)
+					entry = fmt.Sprintf("%s: fc.Args[%q].(%s)", fieldName, argName, goType)
+				}
+				entries = append(entries, entry)
+			}
+		}
+
+		goType := formatGoType(inlineInfo.GoType)
+		bundled := fmt.Sprintf("%s{\n\t\t%s,\n\t}", goType, strings.Join(entries, ",\n\t\t"))
+		args = append(args, bundled)
+
+		for _, arg := range f.Args {
+			if !slices.Contains(inlineInfo.ExpandedArgs, arg.Name) {
+				tmp := "fc.Args[" + strconv.Quote(
+					arg.Name,
+				) + "].(" + templates.CurrentImports.LookupType(
+					arg.TypeReference.GO,
+				) + ")"
+
+				if iface, ok := arg.TypeReference.GO.(*types.Interface); ok && iface.Empty() {
+					tmp = fmt.Sprintf(`
+				func () any {
 					if fc.Args["%s"] == nil {
 						return nil
 					}
-					return fc.Args["%s"].(interface{})
+					return fc.Args["%s"].(any)
 				}()`, arg.Name, arg.Name,
-			)
-		}
+					)
+				}
 
-		args = append(args, tmp)
+				args = append(args, tmp)
+			}
+		}
+	} else {
+		for _, arg := range f.Args {
+			tmp := "fc.Args[" + strconv.Quote(
+				arg.Name,
+			) + "].(" + templates.CurrentImports.LookupType(
+				arg.TypeReference.GO,
+			) + ")"
+
+			if iface, ok := arg.TypeReference.GO.(*types.Interface); ok && iface.Empty() {
+				tmp = fmt.Sprintf(`
+				func () any {
+					if fc.Args["%s"] == nil {
+						return nil
+					}
+					return fc.Args["%s"].(any)
+				}()`, arg.Name, arg.Name,
+				)
+			}
+
+			args = append(args, tmp)
+		}
+	}
+
+	return args
+}
+
+// BatchCallArgs returns a comma-separated list of resolver call arguments for batch resolvers.
+func (f *Field) BatchCallArgs(parentVar string) string {
+	args := make([]string, 0, len(f.Args)+2)
+	args = append(args, "ctx")
+	if parentVar != "" {
+		args = append(args, parentVar)
+	}
+
+	args = append(args, f.callArgExpressions()...)
+	return strings.Join(args, ", ")
+}
+
+// StubCallArgs returns a comma-separated list of argument variable names for stub code.
+func (f *Field) StubCallArgs() string {
+	args := make([]string, 0, len(f.Args)+2)
+
+	inlineInfo := GetInlineArgsMetadata(f.Object.Name, f.Name)
+	if inlineInfo != nil {
+		args = append(args, inlineInfo.OriginalArgName)
+
+		for _, arg := range f.Args {
+			if !slices.Contains(inlineInfo.ExpandedArgs, arg.Name) {
+				args = append(args, arg.VarName)
+			}
+		}
+	} else {
+		for _, arg := range f.Args {
+			args = append(args, arg.VarName)
+		}
 	}
 
 	return strings.Join(args, ", ")

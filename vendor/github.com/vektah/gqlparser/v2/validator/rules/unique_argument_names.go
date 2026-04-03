@@ -1,14 +1,14 @@
-package validator
+package rules
 
 import (
 	"github.com/vektah/gqlparser/v2/ast"
-
-	//nolint:revive // Validator rules each use dot imports for convenience.
-	. "github.com/vektah/gqlparser/v2/validator"
+	//nolint:staticcheck // Validator rules each use dot imports for convenience.
+	. "github.com/vektah/gqlparser/v2/validator/core"
 )
 
-func init() {
-	AddRule("UniqueArgumentNames", func(observers *Events, addError AddErrFunc) {
+var UniqueArgumentNamesRule = Rule{
+	Name: "UniqueArgumentNames",
+	RuleFunc: func(observers *Events, addError AddErrFunc) {
 		observers.OnField(func(walker *Walker, field *ast.Field) {
 			checkUniqueArgs(field.Arguments, addError)
 		})
@@ -16,7 +16,7 @@ func init() {
 		observers.OnDirective(func(walker *Walker, directive *ast.Directive) {
 			checkUniqueArgs(directive.Arguments, addError)
 		})
-	})
+	},
 }
 
 func checkUniqueArgs(args ast.ArgumentList, addError AddErrFunc) {

@@ -4,9 +4,10 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/vektah/gqlparser/v2/ast"
+
 	"github.com/99designs/gqlgen/codegen"
 	"github.com/99designs/gqlgen/codegen/templates"
-	"github.com/vektah/gqlparser/v2/ast"
 )
 
 // Set represents a FieldSet that is used in federation directives @key and @requires.
@@ -45,7 +46,10 @@ func New(raw string, prefix []string) Set {
 }
 
 // FieldDefinition looks up a field in the type.
-func (f Field) FieldDefinition(schemaType *ast.Definition, schema *ast.Schema) *ast.FieldDefinition {
+func (f Field) FieldDefinition(
+	schemaType *ast.Definition,
+	schema *ast.Schema,
+) *ast.FieldDefinition {
 	objType := schemaType
 	def := objType.Fields.ForName(f[0])
 
@@ -87,9 +91,11 @@ func (f Field) TypeReference(obj *codegen.Object, objects codegen.Objects) *code
 func (f Field) ToGo() string {
 	var ret string
 
+	var retSb91 strings.Builder
 	for _, field := range f {
-		ret += templates.ToGo(field)
+		retSb91.WriteString(templates.ToGo(field))
 	}
+	ret += retSb91.String()
 	return ret
 }
 
@@ -97,13 +103,16 @@ func (f Field) ToGo() string {
 func (f Field) ToGoPrivate() string {
 	var ret string
 
+	var retSb101 strings.Builder
 	for i, field := range f {
 		if i == 0 {
-			ret += templates.ToGoPrivate(field)
+			field = trimArgumentFromFieldName(field)
+			retSb101.WriteString(templates.ToGoPrivate(field))
 			continue
 		}
-		ret += templates.ToGo(field)
+		retSb101.WriteString(templates.ToGo(field))
 	}
+	ret += retSb101.String()
 	return ret
 }
 
@@ -112,7 +121,8 @@ func (f Field) Join(str string) string {
 	return strings.Join(f, str)
 }
 
-// JoinGo concatenates the Go name of field parts with a string separator between. Useful in templates.
+// JoinGo concatenates the Go name of field parts with a string separator between. Useful in
+// templates.
 func (f Field) JoinGo(str string) string {
 	strs := []string{}
 
@@ -131,9 +141,24 @@ func (f Field) LastIndex() int {
 // parseUnnestedKeyFieldSet // handles simple case where none of the fields are nested.
 func parseUnnestedKeyFieldSet(raw string, prefix []string) Set {
 	ret := Set{}
+	unionField := false
 
-	for _, s := range strings.Fields(raw) {
-		next := append(prefix[:], s) //nolint:gocritic // slicing out on purpose
+	for s := range strings.FieldsSeq(raw) {
+		if s == "..." {
+			continue
+		}
+		if s == "on" {
+			unionField = true
+			continue
+		}
+
+		if unionField {
+			s = "... on " + s
+			unionField = false
+		}
+
+		next := prefix[0:len(prefix):len(prefix)]
+		next = append(next, s)
 		ret = append(ret, next)
 	}
 	return ret
@@ -147,7 +172,13 @@ func extractSubs(str string) (string, string, string) {
 	if start < 0 || end < 0 {
 		panic("invalid key fieldSet: " + str)
 	}
-	return strings.TrimSpace(str[:start]), strings.TrimSpace(str[start+1 : end]), strings.TrimSpace(str[end+1:])
+	return trimArgumentFromFieldName(
+			strings.TrimSpace(str[:start]),
+		), strings.TrimSpace(
+			str[start+1 : end],
+		), strings.TrimSpace(
+			str[end+1:],
+		)
 }
 
 // matchingBracketIndex returns the index of the closing bracket, assuming an open bracket at start.
@@ -173,9 +204,16 @@ func matchingBracketIndex(str string, start int) int {
 
 func fieldByName(obj *codegen.Object, name string) *codegen.Field {
 	for _, field := range obj.Fields {
+		field.Name = trimArgumentFromFieldName(field.Name)
 		if field.Name == name {
 			return field
 		}
 	}
 	return nil
+}
+
+// trimArgumentFromFieldName removes any arguments from the field name.
+// It removes any suffixes from the raw string, starting from the argument-open character `(`
+func trimArgumentFromFieldName(raw string) string {
+	return strings.Split(raw, "(")[0]
 }

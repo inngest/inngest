@@ -1,7 +1,6 @@
 package parser
 
 import (
-	"fmt"
 	"strconv"
 
 	"github.com/vektah/gqlparser/v2/ast"
@@ -92,7 +91,7 @@ func (p *parser) peek() lexer.Token {
 	return p.peekToken
 }
 
-func (p *parser) error(tok lexer.Token, format string, args ...interface{}) {
+func (p *parser) error(tok lexer.Token, format string, args ...any) {
 	if p.err != nil {
 		return
 	}
@@ -106,7 +105,7 @@ func (p *parser) next() lexer.Token {
 	// Increment the token count before reading the next token
 	p.tokenCount++
 	if p.maxTokenLimit != 0 && p.tokenCount > p.maxTokenLimit {
-		p.err = fmt.Errorf("exceeded token limit of %d", p.maxTokenLimit)
+		p.err = gqlerror.Errorf("exceeded token limit of %d", p.maxTokenLimit)
 		return p.prev
 	}
 	if p.peeked {
@@ -166,7 +165,7 @@ func (p *parser) unexpectedToken(tok lexer.Token) {
 	p.error(tok, "Unexpected %s", tok.String())
 }
 
-func (p *parser) many(start lexer.Type, end lexer.Type, cb func()) {
+func (p *parser) many(start, end lexer.Type, cb func()) {
 	hasDef := p.skip(start)
 	if !hasDef {
 		return
@@ -178,7 +177,7 @@ func (p *parser) many(start lexer.Type, end lexer.Type, cb func()) {
 	p.next()
 }
 
-func (p *parser) some(start lexer.Type, end lexer.Type, cb func()) *ast.CommentGroup {
+func (p *parser) some(start, end lexer.Type, cb func()) *ast.CommentGroup {
 	hasDef := p.skip(start)
 	if !hasDef {
 		return nil

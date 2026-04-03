@@ -1,10 +1,7 @@
 package resolvers
 
-// THIS CODE IS A STARTING POINT ONLY. IT WILL NOT BE UPDATED WITH SCHEMA CHANGES.
-
 import (
 	"github.com/inngest/inngest/pkg/api"
-	"github.com/inngest/inngest/pkg/coreapi/generated"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/queue"
@@ -30,56 +27,3 @@ type Resolver struct {
 	// ingesting events will not work.
 	RequireKeys bool
 }
-
-// Query returns generated.QueryResolver implementation.
-func (r *Resolver) Query() generated.QueryResolver { return &queryResolver{r} }
-
-func (r *Resolver) Mutation() generated.MutationResolver { return &mutationResolver{r} }
-
-func (r *Resolver) Event() generated.EventResolver { return &eventResolver{r} }
-
-func (r *Resolver) FunctionRun() generated.FunctionRunResolver { return &functionRunResolver{r} }
-
-func (r *Resolver) FunctionRunV2() generated.FunctionRunV2Resolver { return &functionRunV2Resolver{r} }
-
-func (r *Resolver) App() generated.AppResolver { return &appResolver{r} }
-
-func (r *Resolver) Function() generated.FunctionResolver { return &functionResolver{r} }
-
-func (r *Resolver) StreamItem() generated.StreamItemResolver { return &streamItemResolver{r} }
-
-func (r *Resolver) RunsV2Connection() generated.RunsV2ConnectionResolver {
-	return &runsV2ConnResolver{r}
-}
-
-func (r *Resolver) ConnectV1WorkerConnection() generated.ConnectV1WorkerConnectionResolver {
-	return &connectV1workerConnectionConnResolver{r}
-}
-
-func (r *Resolver) ConnectV1WorkerConnectionsConnection() generated.ConnectV1WorkerConnectionsConnectionResolver {
-	return &connectV1workerConnectionResolver{r}
-}
-
-func (r *Resolver) EventsConnection() generated.EventsConnectionResolver {
-	return &eventsConnectionResolver{r}
-}
-
-func (r *Resolver) EventV2() generated.EventV2Resolver {
-	return &eventV2Resolver{r}
-}
-
-type mutationResolver struct{ *Resolver }
-type queryResolver struct{ *Resolver }
-type eventResolver struct{ *Resolver }
-type appResolver struct{ *Resolver }
-
-type functionRunResolver struct{ *Resolver }
-type functionRunV2Resolver struct{ *Resolver }
-type connectV1workerConnectionConnResolver struct{ *Resolver }
-type connectV1workerConnectionResolver struct{ *Resolver }
-type functionResolver struct{ *Resolver }
-type streamItemResolver struct{ *Resolver }
-type runsV2ConnResolver struct{ *Resolver }
-type eventsConnectionResolver struct{ *Resolver }
-
-type eventV2Resolver struct{ *Resolver }
