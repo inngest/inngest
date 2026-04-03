@@ -55,11 +55,24 @@ end
 -- Check that the queue item is not leased (ie. this debounce is not in progress)
 local item = get_queue_item(keyQueueHash, queueJobID)
 if item == nil then
-	-- The queue item was not found. return not found but set the debounce in the hash map
-  -- for lookup
-  redis.call("SETEX", keyPtr, ttl, debounceID)
-  redis.call("HSET", keyDbc, debounceID, debounce)
-  return -3
+	-- The queue item was not found. Before overwriting, check if the existing debounce
+	-- has a newer event timestamp to preserve out-of-order event protection.
+	-- This handles a race where newDebounce created the hash entry but hasn't enqueued yet.
+	local existingData = redis.call("HGET", keyDbc, debounceID)
+	if existingData ~= false then
+		local existingItem = cjson.decode(existingData)
+		if existingItem ~= nil and existingItem.e ~= nil and existingItem.e.ts > eventTime then
+			-- The stored event occurs after the event we're updating, so don't overwrite.
+			-- Unlike the normal-path -2 (line 86), we refresh the pointer TTL here because
+			-- the queue item doesn't exist yet (newDebounce is still enqueuing), so we need
+			-- to keep the pointer alive until the original enqueue completes.
+			redis.call("SETEX", keyPtr, ttl, debounceID)
+			return -2
+		end
+	end
+	redis.call("SETEX", keyPtr, ttl, debounceID)
+	redis.call("HSET", keyDbc, debounceID, debounce)
+	return -3
 end
 
 if item.leaseID ~= nil and item.leaseID ~= cjson.null and decode_ulid_time(item.leaseID) > currentTime then
