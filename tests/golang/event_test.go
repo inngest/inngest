@@ -94,6 +94,7 @@ func TestEvent(t *testing.T) {
 		registerFuncs()
 
 		eventID, err := inngestClient.Send(ctx, &event.Event{Name: eventName})
+		r.NoError(err)
 
 		var evt *models.EventV2
 		r.EventuallyWithT(func(ct *assert.CollectT) {
