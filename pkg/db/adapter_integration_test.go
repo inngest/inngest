@@ -164,7 +164,7 @@ func TestUpsertAppRoundTrip(t *testing.T) {
 // Function CRUD round-trip
 // ---------------------------------------------------------------------------
 
-func TestQuerierFunctionRoundTrip(t *testing.T) {
+func TestInsertFunctionRoundTrip(t *testing.T) {
 	adapter, cleanup := newTestAdapter(t)
 	defer cleanup()
 
@@ -190,27 +190,34 @@ func TestQuerierFunctionRoundTrip(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, fnID, fn.ID)
 	assert.Equal(t, "my-function", fn.Name)
+	assert.False(t, fn.ArchivedAt.Valid)
 
 	got, err := q.GetFunctionByID(ctx, fnID)
 	require.NoError(t, err)
 	assert.Equal(t, "my-function", got.Name)
 	assert.JSONEq(t, `{"retries":{"attempts":3}}`, string(got.Config))
+	assert.False(t, got.ArchivedAt.Valid)
 
 	fns, err := q.GetAppFunctions(ctx, appID)
 	require.NoError(t, err)
 	assert.Len(t, fns, 1)
+
+	allFns, err := q.GetFunctions(ctx)
+	require.NoError(t, err)
+	assert.Len(t, allFns, 1)
 }
 
 // ---------------------------------------------------------------------------
 // Event insert and read
 // ---------------------------------------------------------------------------
 
-func TestQuerierEventRoundTrip(t *testing.T) {
+func TestInsertEventRoundTrip(t *testing.T) {
 	adapter, cleanup := newTestAdapter(t)
 	defer cleanup()
 
 	ctx := context.Background()
 	q := adapter.Q()
+	now := time.Now().UTC()
 
 	eventID := ulid.Make()
 	err := q.InsertEvent(ctx, db.InsertEventParams{
@@ -219,8 +226,8 @@ func TestQuerierEventRoundTrip(t *testing.T) {
 		EventName:  "test/event",
 		EventData:  `{"key":"value"}`,
 		EventUser:  `{}`,
-		EventTs:    time.Now().UTC(),
-		ReceivedAt: time.Now().UTC(),
+		EventTs:    now,
+		ReceivedAt: now,
 	})
 	require.NoError(t, err)
 
@@ -228,13 +235,32 @@ func TestQuerierEventRoundTrip(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "test/event", got.EventName)
 	assert.Equal(t, "test-event-id", got.EventID)
+	assert.JSONEq(t, `{"key":"value"}`, got.EventData)
+	assert.JSONEq(t, `{}`, got.EventUser)
+	assert.False(t, got.AccountID.Valid)
+	assert.False(t, got.WorkspaceID.Valid)
+	assert.WithinDuration(t, now, got.ReceivedAt, time.Second)
+
+	scopedEventID := ulid.Make()
+	accountID := uuid.New()
+	workspaceID := uuid.New()
+	insertEventWithScopes(t, ctx, adapter, scopedEventID, accountID, workspaceID)
+
+	scoped, err := q.GetEventByInternalID(ctx, scopedEventID)
+	require.NoError(t, err)
+	assert.Equal(t, accountID.String(), scoped.AccountID.String)
+	assert.Equal(t, workspaceID.String(), scoped.WorkspaceID.String)
+
+	batch, err := q.GetEventsByInternalIDs(ctx, []ulid.ULID{eventID, scopedEventID})
+	require.NoError(t, err)
+	assert.Len(t, batch, 2)
 }
 
 // ---------------------------------------------------------------------------
 // Span insert + query (BLOB-in-JSON regression)
 // ---------------------------------------------------------------------------
 
-func TestQuerierSpanRoundTrip(t *testing.T) {
+func TestInsertSpanRoundTrip(t *testing.T) {
 	adapter, cleanup := newTestAdapter(t)
 	defer cleanup()
 
@@ -244,6 +270,7 @@ func TestQuerierSpanRoundTrip(t *testing.T) {
 	spanID := ulid.Make().String()
 	traceID := ulid.Make().String()
 	runID := ulid.Make().String()
+	accountID := uuid.New().String()
 
 	err := q.InsertSpan(ctx, db.InsertSpanParams{
 		SpanID:     spanID,
@@ -252,7 +279,7 @@ func TestQuerierSpanRoundTrip(t *testing.T) {
 		StartTime:  time.Now().UTC(),
 		EndTime:    time.Now().UTC().Add(100 * time.Millisecond),
 		RunID:      runID,
-		AccountID:  uuid.New().String(),
+		AccountID:  accountID,
 		AppID:      uuid.New().String(),
 		FunctionID: uuid.New().String(),
 		EnvID:      uuid.New().String(),
@@ -260,6 +287,7 @@ func TestQuerierSpanRoundTrip(t *testing.T) {
 		Links:      []byte(`[]`),
 		Output:     []byte(`{"data":{"num":42}}`),
 		Input:      []byte(`{"events":[{}]}`),
+		Status:     sql.NullString{String: "completed", Valid: true},
 		EventIds:   []byte(`["event-1"]`),
 		DynamicSpanID: sql.NullString{
 			String: "dyn-1",
@@ -274,6 +302,11 @@ func TestQuerierSpanRoundTrip(t *testing.T) {
 	require.NoError(t, err, "query must not fail with 'JSON cannot hold BLOB values'")
 	require.Len(t, spans, 1)
 
+	var fragments []map[string]any
+	require.NoError(t, json.Unmarshal(spans[0].SpanFragments, &fragments))
+	require.Len(t, fragments, 1)
+	assert.Equal(t, spanID, fragments[0]["span_id"])
+
 	// Verify output is readable (not double-encoded)
 	outputs, err := q.GetSpanOutput(ctx, []string{spanID})
 	require.NoError(t, err)
@@ -283,6 +316,25 @@ func TestQuerierSpanRoundTrip(t *testing.T) {
 	err = json.Unmarshal(outputs[0].Output, &parsed)
 	require.NoError(t, err, "output must be valid JSON, not double-encoded")
 	assert.Contains(t, parsed, "data")
+
+	runSpan, err := q.GetRunSpanByRunID(ctx, db.GetRunSpanByRunIDParams{
+		RunID:     runID,
+		AccountID: accountID,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, traceID, runSpan.TraceID)
+
+	spanRow, err := q.GetSpanBySpanID(ctx, db.GetSpanBySpanIDParams{
+		RunID:     runID,
+		SpanID:    spanID,
+		AccountID: accountID,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, traceID, spanRow.TraceID)
+
+	status, eventIDs := readStoredSpanState(t, ctx, adapter, traceID, spanID)
+	assert.Equal(t, "completed", status)
+	assert.Contains(t, eventIDs, "event-1")
 }
 
 // ---------------------------------------------------------------------------
@@ -337,7 +389,7 @@ func TestQuerierTransaction(t *testing.T) {
 // History insert + read
 // ---------------------------------------------------------------------------
 
-func TestQuerierHistoryRoundTrip(t *testing.T) {
+func TestInsertHistoryRoundTrip(t *testing.T) {
 	adapter, cleanup := newTestAdapter(t)
 	defer cleanup()
 
@@ -356,9 +408,15 @@ func TestQuerierHistoryRoundTrip(t *testing.T) {
 		FunctionVersion: 1,
 		RunID:           runID,
 		EventID:         ulid.Make(),
+		GroupID:         sql.NullString{String: "group-a", Valid: true},
 		Type:            "FunctionStarted",
 		Attempt:         0,
 		IdempotencyKey:  ulid.Make().String(),
+		StepName:        sql.NullString{String: "fetch", Valid: true},
+		StepID:          sql.NullString{String: "step-1", Valid: true},
+		StepType:        sql.NullString{String: "step", Valid: true},
+		Url:             sql.NullString{String: "https://example.com/step", Valid: true},
+		Result:          sql.NullString{String: `{"ok":true}`, Valid: true},
 	})
 	require.NoError(t, err)
 
@@ -366,6 +424,11 @@ func TestQuerierHistoryRoundTrip(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "FunctionStarted", got.Type)
 	assert.Equal(t, runID, got.RunID)
+	assert.Equal(t, "group-a", got.GroupID.String)
+	assert.Equal(t, "fetch", got.StepName.String)
+	assert.Equal(t, "step", got.StepType.String)
+	assert.Equal(t, "https://example.com/step", got.Url.String)
+	assert.JSONEq(t, `{"ok":true}`, got.Result.String)
 
 	items, err := q.GetFunctionRunHistory(ctx, runID)
 	require.NoError(t, err)

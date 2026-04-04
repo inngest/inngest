@@ -12,9 +12,15 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	gqlloader "github.com/inngest/inngest/pkg/coreapi/graph/loaders"
+	gqlmodels "github.com/inngest/inngest/pkg/coreapi/graph/models"
+	gqlresolvers "github.com/inngest/inngest/pkg/coreapi/graph/resolvers"
+	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/cqrs/base_cqrs"
 	"github.com/inngest/inngest/pkg/db"
+	"github.com/inngest/inngest/pkg/db/driverhelp"
 	dbsqlite "github.com/inngest/inngest/pkg/db/sqlite"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -30,6 +36,11 @@ type schemaColumn struct {
 type logicalColumn struct {
 	Name string
 	Type string
+}
+
+type adapterWithHelpers interface {
+	db.Adapter
+	Helpers() driverhelp.DialectHelpers
 }
 
 func TestSchemaColumnsMatchSqlc(t *testing.T) {
@@ -49,7 +60,7 @@ func TestCrossDialectSchemaParity(t *testing.T) {
 	require.Equal(t, postgresSchema, sqliteSchema)
 }
 
-func TestSQLiteDefaultValues(t *testing.T) {
+func TestDefaultValues(t *testing.T) {
 	adapter, cleanup := newSQLiteTestAdapter(t)
 	defer cleanup()
 
@@ -214,70 +225,43 @@ func TestSQLiteDefaultValues(t *testing.T) {
 	})
 }
 
-func TestSQLiteNotNullConstraints(t *testing.T) {
+func TestNotNullConstraints(t *testing.T) {
+	adapter, cleanup := newSQLiteTestAdapter(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	conn := adapter.Conn()
+	for tableName, requiredColumns := range sqliteRequiredColumnsWithoutDefaults() {
+		spec, ok := sqliteInsertSpecs()[tableName]
+		require.Truef(t, ok, "missing sqlite insert spec for %s", tableName)
+
+		for _, columnName := range requiredColumns {
+			t.Run(tableName+"."+columnName, func(t *testing.T) {
+				query, args := buildSQLiteInsert(tableName, spec, columnName)
+				_, err := conn.ExecContext(ctx, query, args...)
+				require.Error(t, err)
+				assert.Contains(t, strings.ToLower(err.Error()), "not null")
+			})
+		}
+	}
+}
+
+func TestForeignKeyAndPrimaryKey(t *testing.T) {
 	adapter, cleanup := newSQLiteTestAdapter(t)
 	defer cleanup()
 
 	ctx := context.Background()
 	conn := adapter.Conn()
 
-	testCases := []struct {
-		name string
-		sql  string
-		args []any
-	}{
-		{
-			name: "apps.name",
-			sql: `
-				INSERT INTO apps (id, sdk_language, sdk_version, status, checksum, url)
-				VALUES (?, ?, ?, ?, ?, ?)
-			`,
-			args: []any{uuid.New().String(), "go", "1.0.0", "active", "missing-name", "https://example.com"},
-		},
-		{
-			name: "events.event_id",
-			sql: `
-				INSERT INTO events (internal_id, event_name, event_ts)
-				VALUES (?, ?, ?)
-			`,
-			args: []any{ulid.Make().String(), "app/missing-event-id", time.Now().UTC()},
-		},
-		{
-			name: "function_runs.event_id",
-			sql: `
-				INSERT INTO function_runs (run_id, function_version)
-				VALUES (?, ?)
-			`,
-			args: []any{ulid.Make().String(), 1},
-		},
-		{
-			name: "trace_runs.account_id",
-			sql: `
-				INSERT INTO trace_runs (
-					run_id, workspace_id, app_id, function_id, trace_id,
-					queued_at, started_at, ended_at, status, source_id, trigger_ids, is_debounce
-				)
-				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-			`,
-			args: []any{
-				ulid.Make().String(),
-				uuid.New().String(),
-				uuid.New().String(),
-				uuid.New().String(),
-				[]byte("trace-not-null"),
-				1, 2, 3, 1,
-				"source-not-null",
-				[]byte(`["evt-not-null"]`),
-				false,
-			},
-		},
-	}
-
-	for _, tc := range testCases {
+	for _, tc := range sqlitePrimaryKeyDuplicateCases() {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := conn.ExecContext(ctx, tc.sql, tc.args...)
+			query, args := buildSQLiteInsert(tc.tableName, tc.values, "")
+			_, err := conn.ExecContext(ctx, query, args...)
+			require.NoError(t, err)
+
+			_, err = conn.ExecContext(ctx, query, args...)
 			require.Error(t, err)
-			assert.Contains(t, strings.ToLower(err.Error()), "not null")
+			assert.Contains(t, strings.ToLower(err.Error()), "unique")
 		})
 	}
 }
@@ -498,6 +482,109 @@ func TestWorkerConnectionRoundTrip(t *testing.T) {
 	assert.Equal(t, "2026.04", got.AppVersion.String)
 }
 
+func TestGetEventByID(t *testing.T) {
+	manager, gqlCtx, cleanup := newTestManagerAndResolverCtx(t)
+	defer cleanup()
+
+	resolver := &gqlresolvers.Resolver{Data: manager}
+	query := resolver.Query()
+	now := time.Now().UTC()
+	eventID := ulid.Make()
+
+	require.NoError(t, manager.InsertEvent(gqlCtx, cqrs.Event{
+		ID:         eventID,
+		EventID:    "evt-gql",
+		EventName:  "app/gql.event",
+		EventData:  map[string]any{"msg": "hi"},
+		EventUser:  map[string]any{"id": "user_123"},
+		EventTS:    now.UnixMilli(),
+		ReceivedAt: now,
+	}))
+
+	got, err := query.EventV2(gqlCtx, eventID)
+	require.NoError(t, err)
+	require.NotNil(t, got)
+
+	assert.Equal(t, eventID, got.ID)
+	assert.Equal(t, "app/gql.event", got.Name)
+	assert.False(t, got.ReceivedAt.IsZero())
+	assert.False(t, got.OccurredAt.IsZero())
+
+	raw, err := resolver.EventV2().Raw(gqlCtx, got)
+	require.NoError(t, err)
+	assert.Contains(t, raw, `"name":"app/gql.event"`)
+	assert.Contains(t, raw, `"id":"evt-gql"`)
+	assert.Contains(t, raw, `"msg":"hi"`)
+}
+
+func TestFunctionRunStatusLifecycle(t *testing.T) {
+	manager, gqlCtx, cleanup := newTestManagerAndResolverCtx(t)
+	defer cleanup()
+
+	resolver := &gqlresolvers.Resolver{Data: manager}
+	query := resolver.Query()
+	runID := ulid.Make()
+	now := time.Now().UTC()
+
+	insertRun := func(status enums.RunStatus, startedAt, endedAt time.Time) *gqlmodels.FunctionRunV2 {
+		require.NoError(t, manager.InsertTraceRun(gqlCtx, &cqrs.TraceRun{
+			AccountID:   uuid.New(),
+			WorkspaceID: uuid.New(),
+			AppID:       uuid.New(),
+			FunctionID:  uuid.New(),
+			TraceID:     "trace-" + runID.String(),
+			RunID:       runID.String(),
+			QueuedAt:    now,
+			StartedAt:   startedAt,
+			EndedAt:     endedAt,
+			SourceID:    "source-" + status.String(),
+			TriggerIDs:  []string{ulid.Make().String()},
+			Status:      status,
+		}))
+
+		run, err := query.Run(gqlCtx, runID.String())
+		require.NoError(t, err)
+		require.NotNil(t, run)
+		return run
+	}
+
+	t.Run("queued", func(t *testing.T) {
+		run := insertRun(enums.RunStatusScheduled, time.Time{}, time.Time{})
+		assert.Equal(t, gqlmodels.FunctionRunStatusQueued, run.Status)
+		assert.Nil(t, run.StartedAt)
+		assert.Nil(t, run.EndedAt)
+	})
+
+	t.Run("running", func(t *testing.T) {
+		startedAt := now.Add(5 * time.Second)
+		run := insertRun(enums.RunStatusRunning, startedAt, time.Time{})
+		assert.Equal(t, gqlmodels.FunctionRunStatusRunning, run.Status)
+		require.NotNil(t, run.StartedAt)
+		assert.WithinDuration(t, startedAt, *run.StartedAt, time.Second)
+		assert.Nil(t, run.EndedAt)
+	})
+
+	for _, tc := range []struct {
+		name     string
+		status   enums.RunStatus
+		expected gqlmodels.FunctionRunStatus
+	}{
+		{name: "completed", status: enums.RunStatusCompleted, expected: gqlmodels.FunctionRunStatusCompleted},
+		{name: "failed", status: enums.RunStatusFailed, expected: gqlmodels.FunctionRunStatusFailed},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			startedAt := now.Add(10 * time.Second)
+			endedAt := now.Add(20 * time.Second)
+			run := insertRun(tc.status, startedAt, endedAt)
+			assert.Equal(t, tc.expected, run.Status)
+			require.NotNil(t, run.StartedAt)
+			assert.WithinDuration(t, startedAt, *run.StartedAt, time.Second)
+			require.NotNil(t, run.EndedAt)
+			assert.WithinDuration(t, endedAt, *run.EndedAt, time.Second)
+		})
+	}
+}
+
 func TestEventListFiltering(t *testing.T) {
 	adapter, cleanup := newTestAdapter(t)
 	defer cleanup()
@@ -582,6 +669,280 @@ func newSQLiteTestAdapter(t *testing.T) (db.Adapter, func()) {
 
 	adapter := dbsqlite.New(conn)
 	return adapter, func() { conn.Close() }
+}
+
+func newTestManagerAndResolverCtx(t *testing.T) (cqrs.Manager, context.Context, func()) {
+	t.Helper()
+
+	adapter, cleanup := newTestAdapter(t)
+	helperAdapter, ok := adapter.(adapterWithHelpers)
+	require.True(t, ok, "test adapter must expose dialect helpers")
+
+	manager := base_cqrs.NewCQRS(helperAdapter)
+	ctx := gqlloader.ToCtx(context.Background(), gqlloader.NewLoaders(gqlloader.LoaderParams{DB: manager}))
+	return manager, ctx, cleanup
+}
+
+func sqliteRequiredColumnsWithoutDefaults() map[string][]string {
+	return map[string][]string{
+		"apps":                  {"name", "sdk_language", "sdk_version", "status", "checksum", "url"},
+		"events":                {"event_id", "event_name", "event_ts"},
+		"functions":             {"name", "slug", "config"},
+		"function_runs":         {"function_version", "event_id"},
+		"history":               {"function_version", "run_id", "event_id", "idempotency_key", "type", "attempt"},
+		"event_batches":         {"run_id", "started_at", "event_ids"},
+		"traces":                {"timestamp", "timestamp_unix_ms", "trace_id", "span_id", "span_name", "span_kind", "service_name", "resource_attributes", "scope_name", "scope_version", "span_attributes", "duration", "status_code", "events", "links"},
+		"trace_runs":            {"account_id", "workspace_id", "app_id", "function_id", "trace_id", "queued_at", "started_at", "ended_at", "status", "source_id", "trigger_ids", "is_debounce"},
+		"queue_snapshot_chunks": {"snapshot_id", "chunk_id"},
+		"worker_connections":    {"account_id", "workspace_id", "app_name", "id", "gateway_id", "instance_id", "status", "worker_ip", "max_worker_concurrency", "connected_at", "recorded_at", "inserted_at", "group_hash", "sdk_lang", "sdk_version", "sdk_platform", "function_count", "cpu_cores", "mem_bytes", "os"},
+		"spans":                 {"span_id", "trace_id", "name", "start_time", "end_time", "account_id", "app_id", "function_id", "run_id", "env_id"},
+	}
+}
+
+func sqlitePrimaryKeyDuplicateCases() []struct {
+	name      string
+	tableName string
+	values    map[string]any
+} {
+	specs := sqliteInsertSpecs()
+	return []struct {
+		name      string
+		tableName string
+		values    map[string]any
+	}{
+		{name: "apps.id", tableName: "apps", values: specs["apps"]},
+		{name: "events.internal_id", tableName: "events", values: specs["events"]},
+		{name: "functions.id", tableName: "functions", values: specs["functions"]},
+		{name: "event_batches.id", tableName: "event_batches", values: specs["event_batches"]},
+		{name: "trace_runs.run_id", tableName: "trace_runs", values: specs["trace_runs"]},
+		{name: "queue_snapshot_chunks.snapshot_id_chunk_id", tableName: "queue_snapshot_chunks", values: specs["queue_snapshot_chunks"]},
+		{name: "worker_connections.id_app_name", tableName: "worker_connections", values: specs["worker_connections"]},
+		{name: "spans.trace_id_span_id", tableName: "spans", values: specs["spans"]},
+	}
+}
+
+func sqliteInsertSpecs() map[string]map[string]any {
+	now := time.Now().UTC()
+	historyID := ulid.Make()
+	historyRunID := ulid.Make()
+	historyEventID := ulid.Make()
+	traceRunID := ulid.Make()
+
+	return map[string]map[string]any{
+		"apps": {
+			"id":           uuid.New().String(),
+			"name":         "sqlite-app",
+			"sdk_language": "go",
+			"sdk_version":  "1.0.0",
+			"status":       "active",
+			"checksum":     "checksum-app",
+			"url":          "https://example.com/inngest",
+		},
+		"events": {
+			"internal_id": ulid.Make().String(),
+			"event_id":    "evt-required",
+			"event_name":  "app/required",
+			"event_ts":    now,
+		},
+		"functions": {
+			"id":     uuid.New().String(),
+			"name":   "sqlite-function",
+			"slug":   "sqlite-function",
+			"config": `{"retries":{"attempts":3}}`,
+		},
+		"function_runs": {
+			"run_id":           ulid.Make().String(),
+			"function_version": 1,
+			"event_id":         ulid.Make().String(),
+		},
+		"history": {
+			"id":               historyID[:],
+			"function_version": 1,
+			"run_id":           historyRunID[:],
+			"event_id":         historyEventID[:],
+			"idempotency_key":  "history-key",
+			"type":             "FunctionStarted",
+			"attempt":          0,
+		},
+		"event_batches": {
+			"id":         ulid.Make().String(),
+			"run_id":     ulid.Make().String(),
+			"started_at": now,
+			"event_ids":  []byte(`["evt-batch"]`),
+		},
+		"traces": {
+			"timestamp":           now,
+			"timestamp_unix_ms":   now.UnixMilli(),
+			"trace_id":            "trace-required",
+			"span_id":             "span-required",
+			"span_name":           "executor.required",
+			"span_kind":           "internal",
+			"service_name":        "inngest",
+			"resource_attributes": []byte(`{"service.name":"inngest"}`),
+			"scope_name":          "regression",
+			"scope_version":       "1.0.0",
+			"span_attributes":     []byte(`{"component":"executor"}`),
+			"duration":            100,
+			"status_code":         "ok",
+			"events":              []byte(`[]`),
+			"links":               []byte(`[]`),
+		},
+		"trace_runs": {
+			"run_id":       traceRunID.String(),
+			"account_id":   uuid.New().String(),
+			"workspace_id": uuid.New().String(),
+			"app_id":       uuid.New().String(),
+			"function_id":  uuid.New().String(),
+			"trace_id":     []byte("trace-run-required"),
+			"queued_at":    1,
+			"started_at":   2,
+			"ended_at":     3,
+			"status":       200,
+			"source_id":    "source-required",
+			"trigger_ids":  []byte(`["evt-trace"]`),
+			"is_debounce":  false,
+		},
+		"queue_snapshot_chunks": {
+			"snapshot_id": ulid.Make().String(),
+			"chunk_id":    1,
+		},
+		"worker_connections": {
+			"account_id":             uuid.New().String(),
+			"workspace_id":           uuid.New().String(),
+			"app_name":               "worker-app",
+			"id":                     ulid.Make().String(),
+			"gateway_id":             ulid.Make().String(),
+			"instance_id":            "instance-1",
+			"status":                 1,
+			"worker_ip":              "127.0.0.1",
+			"max_worker_concurrency": 5,
+			"connected_at":           100,
+			"recorded_at":            110,
+			"inserted_at":            120,
+			"group_hash":             []byte("group-hash"),
+			"sdk_lang":               "go",
+			"sdk_version":            "1.0.0",
+			"sdk_platform":           "darwin",
+			"function_count":         2,
+			"cpu_cores":              4,
+			"mem_bytes":              2048,
+			"os":                     "darwin",
+		},
+		"spans": {
+			"span_id":     "span-primary",
+			"trace_id":    "trace-primary",
+			"name":        "executor.run",
+			"start_time":  now,
+			"end_time":    now.Add(time.Second),
+			"account_id":  uuid.New().String(),
+			"app_id":      uuid.New().String(),
+			"function_id": uuid.New().String(),
+			"run_id":      ulid.Make().String(),
+			"env_id":      uuid.New().String(),
+		},
+	}
+}
+
+func buildSQLiteInsert(tableName string, values map[string]any, omitColumn string) (string, []any) {
+	columns := make([]string, 0, len(values))
+	for columnName := range values {
+		if columnName == omitColumn {
+			continue
+		}
+		columns = append(columns, columnName)
+	}
+	sort.Strings(columns)
+
+	placeholders := make([]string, len(columns))
+	args := make([]any, len(columns))
+	for i, columnName := range columns {
+		placeholders[i] = "?"
+		args[i] = values[columnName]
+		columns[i] = fmt.Sprintf(`"%s"`, columnName)
+	}
+
+	return fmt.Sprintf(
+		`INSERT INTO "%s" (%s) VALUES (%s)`,
+		tableName,
+		strings.Join(columns, ", "),
+		strings.Join(placeholders, ", "),
+	), args
+}
+
+func insertEventWithScopes(t *testing.T, ctx context.Context, adapter db.Adapter, internalID ulid.ULID, accountID, workspaceID uuid.UUID) {
+	t.Helper()
+
+	var (
+		query string
+		args  []any
+	)
+
+	switch adapter.Dialect() {
+	case db.DialectPostgres:
+		query = `
+			INSERT INTO events (
+				internal_id, account_id, workspace_id, received_at, event_id, event_name, event_data, event_user, event_ts
+			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		`
+		args = []any{
+			internalID[:],
+			accountID.String(),
+			workspaceID.String(),
+			time.Now().UTC(),
+			"evt-scoped",
+			"app/scoped",
+			`{"scoped":true}`,
+			`{"user_id":"u_123"}`,
+			time.Now().UTC(),
+		}
+	default:
+		query = `
+			INSERT INTO events (
+				internal_id, account_id, workspace_id, received_at, event_id, event_name, event_data, event_user, event_ts
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+		`
+		args = []any{
+			internalID,
+			accountID.String(),
+			workspaceID.String(),
+			time.Now().UTC(),
+			"evt-scoped",
+			"app/scoped",
+			`{"scoped":true}`,
+			`{"user_id":"u_123"}`,
+			time.Now().UTC(),
+		}
+	}
+
+	_, err := adapter.Conn().ExecContext(ctx, query, args...)
+	require.NoError(t, err)
+}
+
+func readStoredSpanState(t *testing.T, ctx context.Context, adapter db.Adapter, traceID, spanID string) (string, string) {
+	t.Helper()
+
+	var (
+		status   string
+		eventIDs string
+		err      error
+	)
+
+	switch adapter.Dialect() {
+	case db.DialectPostgres:
+		err = adapter.Conn().QueryRowContext(ctx, `
+			SELECT status, COALESCE(event_ids::text, '')
+			FROM spans
+			WHERE trace_id = $1 AND span_id = $2
+		`, traceID, spanID).Scan(&status, &eventIDs)
+	default:
+		err = adapter.Conn().QueryRowContext(ctx, `
+			SELECT status, COALESCE(CAST(event_ids AS TEXT), '')
+			FROM spans
+			WHERE trace_id = ? AND span_id = ?
+		`, traceID, spanID).Scan(&status, &eventIDs)
+	}
+	require.NoError(t, err)
+	return status, eventIDs
 }
 
 func readExpectedSchema(t *testing.T, dialect db.Dialect) map[string][]schemaColumn {

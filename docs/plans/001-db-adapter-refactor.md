@@ -211,12 +211,12 @@ Affected packages and tests:
 
 ##### Layer 1: Schema Validation (fast, no DB required for comparison)
 
-- [ ] **`TestSchemaColumnsMatchSqlc`** — After running migrations, query `PRAGMA table_info(...)` (SQLite) or `information_schema.columns` (Postgres) for every table. Compare column names, types, nullability, and defaults against a parsed representation of the sqlc `schema.sql` files. Fail if any mismatch. This is the single most important test — it would have caught the `apps.created_at` regression instantly.
-- [ ] **`TestCrossDialectSchemaParity`** — Compare the logical schema (table names, column names, nullability, defaults) between SQLite and Postgres baselines. Flag divergences that aren't expected (e.g., `UUID` vs `CHAR(36)` is expected; a missing column is not).
+- [x] **`TestSchemaColumnsMatchSqlc`** — After running migrations, query `PRAGMA table_info(...)` (SQLite) or `information_schema.columns` (Postgres) for every table. Compare column names, types, nullability, and defaults against a parsed representation of the sqlc `schema.sql` files. Fail if any mismatch. This is the single most important test — it would have caught the `apps.created_at` regression instantly.
+- [x] **`TestCrossDialectSchemaParity`** — Compare the logical schema (table names, column names, nullability, defaults) between SQLite and Postgres baselines. Flag divergences that aren't expected (e.g., `UUID` vs `CHAR(36)` is expected; a missing column is not).
 
 ##### Layer 2: Constraint & Default Verification (requires in-memory SQLite)
 
-- [ ] **`TestDefaultValues`** — For every table, INSERT a row with only required columns (omit all columns that have DEFAULTs). SELECT the row back and verify that default-populated columns have correct non-zero values. Tables to cover:
+- [x] **`TestDefaultValues`** — For every table, INSERT a row with only required columns (omit all columns that have DEFAULTs). SELECT the row back and verify that default-populated columns have correct non-zero values. Tables to cover:
   - `apps` — `created_at`, `metadata`, `method`
   - `events` — `received_at`
   - `function_runs` — `run_started_at`, `trigger_type`
@@ -224,21 +224,21 @@ Affected packages and tests:
   - `history` — `created_at`, `run_started_at`
   - `event_batches` — `executed_at`
   - `trace_runs` — `has_ai`
-- [ ] **`TestNotNullConstraints`** — For every NOT NULL column without a DEFAULT, verify that INSERT without that column fails with a constraint error. This ensures the schema is strict where it should be.
-- [ ] **`TestForeignKeyAndPrimaryKey`** — Verify PKs reject duplicate inserts. (No FK constraints currently, but this future-proofs the suite.)
+- [x] **`TestNotNullConstraints`** — For every NOT NULL column without a DEFAULT, verify that INSERT without that column fails with a constraint error. This ensures the schema is strict where it should be.
+- [x] **`TestForeignKeyAndPrimaryKey`** — Verify PKs reject duplicate inserts. (No FK constraints currently, but this future-proofs the suite.)
 
 ##### Layer 3: Query Round-Trip Tests (requires in-memory SQLite + testcontainer Postgres)
 
 These extend the existing `pkg/db/adapter_integration_test.go` with more comprehensive coverage:
 
-- [ ] **`TestUpsertAppRoundTrip`** — INSERT via `UpsertApp`, SELECT back, verify all fields including `created_at` default. Then UPDATE the same app and verify `created_at` is preserved.
-- [ ] **`TestInsertFunctionRoundTrip`** — Same pattern for functions, covering `archived_at` NULL behavior.
-- [ ] **`TestInsertEventRoundTrip`** — Verify all event fields including nullable `account_id` and `workspace_id`.
-- [ ] **`TestInsertHistoryRoundTrip`** — Cover the `app_name` column added in migration 011/012.
-- [ ] **`TestInsertSpanRoundTrip`** — Cover JSON fields (`attributes`, `links`, `output`, `input`) and the `status`/`event_ids` columns added in later migrations.
-- [ ] **`TestWorkerConnectionRoundTrip`** — Cover the `worker_connections` table which has no existing test coverage.
-- [ ] **`TestTracesAndTraceRunsRoundTrip`** — Cover the OTEL trace tables.
-- [ ] **`TestEventBatchRoundTrip`** — Cover batch table.
+- [x] **`TestUpsertAppRoundTrip`** — INSERT via `UpsertApp`, SELECT back, verify all fields including `created_at` default. Then UPDATE the same app and verify `created_at` is preserved.
+- [x] **`TestInsertFunctionRoundTrip`** — Same pattern for functions, covering `archived_at` NULL behavior.
+- [x] **`TestInsertEventRoundTrip`** — Verify event round-trip behavior including nullable `account_id` and `workspace_id` decoding.
+- [x] **`TestInsertHistoryRoundTrip`** — Cover current history round-trip fields including nullable step metadata and result payloads.
+- [x] **`TestInsertSpanRoundTrip`** — Cover JSON fields (`attributes`, `links`, `output`, `input`) and the `status`/`event_ids` columns added in later migrations.
+- [x] **`TestWorkerConnectionRoundTrip`** — Cover the `worker_connections` table which has no existing test coverage.
+- [x] **`TestTracesAndTraceRunsRoundTrip`** — Cover the OTEL trace tables.
+- [x] **`TestEventBatchRoundTrip`** — Cover batch table.
 
 Each test runs against both SQLite and Postgres via `TEST_DATABASE` env var.
 
@@ -246,21 +246,21 @@ Each test runs against both SQLite and Postgres via `TEST_DATABASE` env var.
 
 These address the Postgres-specific failures where queries return unexpected results:
 
-- [ ] **`TestGetEventByID`** — Insert an event, fetch it by ID via the GQL resolver, verify it's found and all fields match. Covers the `event not found` regression.
-- [ ] **`TestFunctionRunStatusLifecycle`** — Create a run, update its status through the expected lifecycle (Queued → Running → Completed/Failed), verify each status is correctly persisted and queryable. Covers the `status didn't match` regression.
-- [ ] **`TestEventListFiltering`** — Insert events with various names including internal events (`inngest/*`), verify list queries return correct results with and without internal event filtering.
+- [x] **`TestGetEventByID`** — Insert an event, fetch it by ID via the GQL resolver, verify it's found and all fields match. Covers the `event not found` regression.
+- [x] **`TestFunctionRunStatusLifecycle`** — Create a run, update its status through the expected lifecycle (Queued → Running → Completed/Failed), verify each status is correctly persisted and queryable. Covers the `status didn't match` regression.
+- [x] **`TestEventListFiltering`** — Insert events with various names including internal events (`inngest/*`), verify list queries return correct results with and without internal event filtering.
 
 ##### Layer 4: Migration Lifecycle Tests
 
-- [ ] **`TestMigrationIdempotency`** — Run `up()` twice; second call is a no-op (already exists, verify it covers both dialects).
-- [ ] **`TestMigrationFromLegacy`** — Start with golang-migrate at version 18 (using the old `up()` function preserved in test code). Then run goose `up()`. Verify the schema is identical to a fresh goose baseline. This prevents regressions when we eventually delete the legacy migrations.
-- [ ] **`TestGooseVersionTableExists`** — After migration, verify `goose_db_version` table exists and has the expected version recorded.
+- [x] **`TestMigrationIdempotency`** — Run `up()` twice; second call is a no-op (already exists, verify it covers both dialects).
+- [x] **`TestMigrationFromLegacy`** — Start with golang-migrate at version 18 (using the old `up()` function preserved in test code). Then run goose `up()`. Verify the schema is identical to a fresh goose baseline. This prevents regressions when we eventually delete the legacy migrations.
+- [x] **`TestGooseVersionTableExists`** — After migration, verify `goose_db_version` table exists and has the expected version recorded.
 
 #### 6.4 — Implementation location
 
-All new tests go in `pkg/db/regression_test.go` (or a `pkg/db/regression/` subpackage if size warrants). They share the existing `newTestAdapter()` helper from `adapter_integration_test.go` which handles both SQLite in-memory and Postgres testcontainer setup.
+Phase 6 coverage now lives in both `pkg/db/regression_test.go` and `pkg/db/adapter_integration_test.go`. The tests share the existing `newTestAdapter()` helper, which handles both SQLite in-memory and Postgres testcontainer setup.
 
-Layer 1 (schema validation) and Layer 2 (constraints) should be **build-tagged for CI** and run on every PR. They're fast (< 5 seconds total with in-memory SQLite) and catch the class of bugs seen in PR #3945.
+Layer 1 (schema validation) and Layer 2 (constraints/defaults) now run as standard package tests on every `go test ./pkg/db` invocation. They're fast with in-memory SQLite and catch the class of bugs seen in PR #3945 before broader integration suites run.
 
 #### 6.5 — Priority order
 

@@ -455,9 +455,12 @@ func (pq *pgQuerier) GetLatestQueueSnapshotChunks(ctx context.Context) ([]*db.Qu
 // --- Spans ---
 
 func (pq *pgQuerier) InsertSpan(ctx context.Context, arg db.InsertSpanParams) error {
+	startTime := arg.StartTime.Round(0).UTC()
+	endTime := arg.EndTime.Round(0).UTC()
+
 	return pq.q.InsertSpan(ctx, sqlc.InsertSpanParams{
 		SpanID: arg.SpanID, TraceID: arg.TraceID, ParentSpanID: arg.ParentSpanID,
-		Name: arg.Name, StartTime: arg.StartTime, EndTime: arg.EndTime,
+		Name: arg.Name, StartTime: startTime, EndTime: endTime,
 		RunID: arg.RunID, AccountID: arg.AccountID, AppID: arg.AppID,
 		FunctionID: arg.FunctionID, EnvID: arg.EnvID,
 		DynamicSpanID: arg.DynamicSpanID,
