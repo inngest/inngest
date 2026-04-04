@@ -151,7 +151,7 @@ func TestQueueSemaphore(t *testing.T) {
 	type deps struct {
 		r                         *miniredis.Miniredis
 		rc                        rueidis.Client
-		clock                     clockwork.FakeClock
+		clock                     *clockwork.FakeClock
 		cmLifecycles              *constraintapi.ConstraintApiDebugLifecycles
 		cm                        constraintapi.CapacityManager
 		shard                     redis_state.RedisQueueShard

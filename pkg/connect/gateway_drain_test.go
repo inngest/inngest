@@ -132,6 +132,7 @@ func TestHeartbeatDuringGatewayDrain_ClosesConnection(t *testing.T) {
 	res := createTestingGateway(t, testingParameters{
 		consecutiveMissesBeforeClose: 10,
 		heartbeatInterval:            1 * time.Second,
+		drainAckTimeout:              2 * time.Second,
 		silent:                       true,
 	})
 	handshake(t, res)
@@ -144,9 +145,10 @@ func TestHeartbeatDuringGatewayDrain_ClosesConnection(t *testing.T) {
 	msg := awaitNextMessage(t, res.ws, 3*time.Second)
 	require.Equal(t, connectpb.GatewayMessageType_GATEWAY_CLOSING, msg.Kind)
 
-	// The drain goroutine waits up to 5s for the worker to close, then
-	// force-closes. Since the test client doesn't close the WS, we need
-	// to wait past the 5s timeout for the full disconnect lifecycle.
+	// The drain goroutine waits for drainAckTimeout (2s in this test) for
+	// the worker to close, then force-closes. Since the test client
+	// doesn't close the WS, we need to wait past that timeout for the
+	// full disconnect lifecycle.
 	require.EventuallyWithT(t, func(ct *assert.CollectT) {
 		res.lifecycles.lock.Lock()
 		defer res.lifecycles.lock.Unlock()

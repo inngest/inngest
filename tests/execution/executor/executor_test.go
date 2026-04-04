@@ -25,11 +25,11 @@ import (
 	"github.com/inngest/inngest/pkg/execution/ratelimit"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
-	"github.com/inngest/inngest/pkg/syscode"
 	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/service"
+	"github.com/inngest/inngest/pkg/syscode"
 	"github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/inngest/inngest/pkg/tracing"
 	"github.com/inngest/inngest/pkg/util"
@@ -1148,11 +1148,10 @@ func TestExecutorReturnsResponseWhenNonRetriableError(t *testing.T) {
 func TestCapacityErrorRetriesWhenAttemptsExhausted(t *testing.T) {
 	ctx := context.Background()
 
-	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{Persist: false})
+	db, err := base_cqrs.New(ctx, base_cqrs.BaseCQRSOptions{Persist: false})
 	require.NoError(t, err)
 
-	dbDriver := "sqlite"
-	dbcqrs := base_cqrs.NewCQRS(db, dbDriver, sqlc_postgres.NewNormalizedOpts{})
+	dbcqrs := base_cqrs.NewCQRS(dbsqlite.New(db))
 	loader := dbcqrs.(state.FunctionLoader)
 
 	fnID, wsID, appID, aID := uuid.New(), uuid.New(), uuid.New(), uuid.New()

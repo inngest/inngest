@@ -17,7 +17,7 @@ import (
 )
 
 // newTestSetup creates a common test setup for acquire cache tests.
-func newTestSetup(t *testing.T, enableCache EnableAcquireCacheFn) (*redisCapacityManager, *miniredis.Miniredis, clockwork.FakeClock, context.Context) {
+func newTestSetup(t *testing.T, enableCache EnableAcquireCacheFn) (*redisCapacityManager, *miniredis.Miniredis, *clockwork.FakeClock, context.Context) {
 	t.Helper()
 
 	r := miniredis.RunT(t)
@@ -404,8 +404,8 @@ func TestAcquireCachePerConstraintGranularity(t *testing.T) {
 		{
 			Kind: ConstraintKindThrottle,
 			Throttle: &ThrottleConstraint{
-				Scope:             enums.ThrottleScopeFn,
-				EvaluatedKeyHash:  "test-hash",
+				Scope:            enums.ThrottleScopeFn,
+				EvaluatedKeyHash: "test-hash",
 			},
 		},
 	}
@@ -792,10 +792,10 @@ func TestAcquireCacheInvalidatedWithCustomKey(t *testing.T) {
 		{
 			Kind: ConstraintKindConcurrency,
 			Concurrency: &ConcurrencyConstraint{
-				Scope:              enums.ConcurrencyScopeFn,
-				Mode:               enums.ConcurrencyModeStep,
-				KeyExpressionHash:  "keyhash123",
-				EvaluatedKeyHash:   "evalhash456",
+				Scope:             enums.ConcurrencyScopeFn,
+				Mode:              enums.ConcurrencyModeStep,
+				KeyExpressionHash: "keyhash123",
+				EvaluatedKeyHash:  "evalhash456",
 			},
 		},
 	}
