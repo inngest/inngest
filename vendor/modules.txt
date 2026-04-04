@@ -996,7 +996,7 @@ github.com/kr/text
 ## explicit; go 1.11
 github.com/kylelemons/godebug/diff
 github.com/kylelemons/godebug/pretty
-# github.com/lib/pq v1.12.2
+# github.com/lib/pq v1.12.3
 ## explicit; go 1.21
 github.com/lib/pq
 github.com/lib/pq/internal/pgpass
@@ -1923,7 +1923,7 @@ modernc.org/mathutil
 # modernc.org/memory v1.11.0
 ## explicit; go 1.23.0
 modernc.org/memory
-# modernc.org/sqlite v1.48.0
+# modernc.org/sqlite v1.48.1
 ## explicit; go 1.25.0
 modernc.org/sqlite
 modernc.org/sqlite/lib

@@ -1,5 +1,11 @@
 # Changelog
 
+ - 2026-04-03 v1.48.1:
+     - Fix memory leaks and double-free vulnerabilities in the multi-statement query execution path.
+     - Ensure bind-parameter allocations are reliably freed via strict ownership transfer if an error occurs mid-loop or if multiple statements bind parameters.
+     - Fix a resource leak where a subsequent statement's error could orphan a previously generated `rows` object without closing it, leaking the prepared statement handle.
+     - See [GitLab merge request #96](https://gitlab.com/cznic/sqlite/-/merge_requests/96), thanks Josh Bleecher Snyder!
+
  - 2026-03-27 v1.48.0:
      - Add `_timezone` DSN query parameter to apply IANA timezones (e.g., "America/New_York") to both reads and writes.
      - Writes will convert `time.Time` values to the target timezone before formatting as a string.

@@ -310,9 +310,7 @@ func (c *conn) bind(pstmt uintptr, n int, args []driver.NamedValue) (allocs []ui
 			return
 		}
 
-		for _, v := range allocs {
-			c.free(v)
-		}
+		c.freeAllocs(allocs)
 		allocs = nil
 	}()
 
@@ -636,6 +634,12 @@ func (c *conn) malloc(n int) (uintptr, error) {
 func (c *conn) free(p uintptr) {
 	if p != 0 {
 		libc.Xfree(c.tls, p)
+	}
+}
+
+func (c *conn) freeAllocs(allocs []uintptr) {
+	for _, v := range allocs {
+		c.free(v)
 	}
 }
 

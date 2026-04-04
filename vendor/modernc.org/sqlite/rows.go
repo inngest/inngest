@@ -27,8 +27,13 @@ type rows struct {
 	reuseStmt bool // If true, Close() resets instead of finalizing
 }
 
-func newRows(c *conn, pstmt uintptr, allocs []uintptr, empty bool) (r *rows, err error) {
-	r = &rows{c: c, pstmt: pstmt, allocs: allocs, empty: empty}
+func newRows(c *conn, pstmt uintptr, allocs *[]uintptr, empty bool) (r *rows, err error) {
+	var a []uintptr
+	if allocs != nil {
+		a = *allocs
+		*allocs = nil
+	}
+	r = &rows{c: c, pstmt: pstmt, allocs: a, empty: empty}
 
 	defer func() {
 		if err != nil {
@@ -54,9 +59,7 @@ func newRows(c *conn, pstmt uintptr, allocs []uintptr, empty bool) (r *rows, err
 
 // Close closes the rows iterator.
 func (r *rows) Close() (err error) {
-	for _, v := range r.allocs {
-		r.c.free(v)
-	}
+	r.c.freeAllocs(r.allocs)
 	r.allocs = nil
 
 	if r.reuseStmt {

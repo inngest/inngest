@@ -56,7 +56,7 @@ require (
 	github.com/knadh/koanf/providers/env/v2 v2.0.0
 	github.com/knadh/koanf/providers/file v1.2.1
 	github.com/knadh/koanf/v2 v2.3.4
-	github.com/lib/pq v1.12.2
+	github.com/lib/pq v1.12.3
 	github.com/liushuangls/go-anthropic/v2 v2.17.3
 	github.com/lmittmann/tint v1.1.3
 	github.com/mattn/go-isatty v0.0.20
@@ -110,7 +110,7 @@ require (
 	google.golang.org/grpc v1.80.0
 	google.golang.org/protobuf v1.36.11
 	lukechampine.com/frand v1.5.1
-	modernc.org/sqlite v1.48.0
+	modernc.org/sqlite v1.48.1
 )
 
 require (
