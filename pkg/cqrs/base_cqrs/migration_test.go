@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"embed"
 	"fmt"
+	"sort"
 	"net/url"
 	"os"
 	"path"
@@ -74,6 +75,10 @@ func TestSchemaMatchesSqlcSQLite(t *testing.T) {
 	actual := readApplicationSchemaSnapshot(t, db, migrationDialectSQLite)
 	expected := expectedTableColumns(t, migrationDialectSQLite)
 	require.Equal(t, expected, actual.Tables)
+
+	expectedIdx := expectedIndexNames(t, migrationDialectSQLite)
+	actualIdx := actualIndexNames(actual.Indexes)
+	require.Equal(t, expectedIdx, actualIdx, "indexes from migration do not match sqlc schema")
 }
 
 func TestLegacyMigrationThenGooseBaselineIsNoopSQLite(t *testing.T) {
@@ -125,6 +130,10 @@ func TestSchemaMatchesSqlcPostgres(t *testing.T) {
 	actual := readApplicationSchemaSnapshot(t, db, migrationDialectPostgres)
 	expected := expectedTableColumns(t, migrationDialectPostgres)
 	require.Equal(t, expected, actual.Tables)
+
+	expectedIdx := expectedIndexNames(t, migrationDialectPostgres)
+	actualIdx := actualIndexNames(actual.Indexes)
+	require.Equal(t, expectedIdx, actualIdx, "indexes from migration do not match sqlc schema")
 }
 
 func TestLegacyMigrationThenGooseBaselineIsNoopPostgres(t *testing.T) {
@@ -253,6 +262,70 @@ func expectedTableColumns(t *testing.T, dialect migrationDialect) map[string][]s
 	require.NoError(t, err)
 
 	return parseTableColumns(t, string(schemaBytes))
+}
+
+func expectedIndexNames(t *testing.T, dialect migrationDialect) map[string][]string {
+	t.Helper()
+
+	schemaBytes, err := os.ReadFile(path.Join("sqlc", string(dialect), "schema.sql"))
+	require.NoError(t, err)
+
+	result := parseIndexNames(string(schemaBytes))
+	for table := range result {
+		sort.Strings(result[table])
+	}
+	return result
+}
+
+func parseIndexNames(schema string) map[string][]string {
+	result := map[string][]string{}
+
+	for _, rawLine := range strings.Split(schema, "\n") {
+		line := strings.TrimSpace(rawLine)
+
+		if idx := strings.Index(line, "--"); idx >= 0 {
+			line = strings.TrimSpace(line[:idx])
+		}
+		if line == "" {
+			continue
+		}
+
+		if !strings.HasPrefix(line, "CREATE INDEX ") && !strings.HasPrefix(line, "CREATE UNIQUE INDEX ") {
+			continue
+		}
+
+		parts := strings.Fields(line)
+		// CREATE [UNIQUE] INDEX [IF NOT EXISTS] name ON table(...)
+		var indexName, tableName string
+		for i, p := range parts {
+			if strings.EqualFold(p, "ON") && i+1 < len(parts) {
+				indexName = parts[i-1]
+				tableName = parts[i+1]
+				// Strip parenthesized column list from table name
+				if paren := strings.Index(tableName, "("); paren >= 0 {
+					tableName = tableName[:paren]
+				}
+				break
+			}
+		}
+		if indexName != "" && tableName != "" {
+			result[tableName] = append(result[tableName], indexName)
+		}
+	}
+
+	return result
+}
+
+func actualIndexNames(indexes map[string]map[string]string) map[string][]string {
+	result := map[string][]string{}
+	for table, idxMap := range indexes {
+		for name := range idxMap {
+			result[table] = append(result[table], name)
+		}
+		// Sort for deterministic comparison
+		sort.Strings(result[table])
+	}
+	return result
 }
 
 func parseTableColumns(t *testing.T, schema string) map[string][]string {
@@ -412,11 +485,15 @@ func readIndexes(t *testing.T, db *sql.DB, dialect migrationDialect, tableName s
 	switch dialect {
 	case migrationDialectPostgres:
 		rows, err := db.Query(`
-			SELECT indexname, indexdef
-			FROM pg_indexes
-			WHERE schemaname = current_schema()
-			  AND tablename = $1
-			ORDER BY indexname
+			SELECT i.indexname, i.indexdef
+			FROM pg_indexes i
+			LEFT JOIN pg_constraint c
+			  ON c.conindid = (i.schemaname || '.' || i.indexname)::regclass
+			  AND c.contype = 'p'
+			WHERE i.schemaname = current_schema()
+			  AND i.tablename = $1
+			  AND c.oid IS NULL
+			ORDER BY i.indexname
 		`, tableName)
 		require.NoError(t, err)
 		defer rows.Close()

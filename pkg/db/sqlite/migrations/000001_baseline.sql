@@ -204,6 +204,9 @@ CREATE TABLE IF NOT EXISTS spans (
 	PRIMARY KEY (trace_id, span_id)
 );
 
+CREATE INDEX IF NOT EXISTS idx_spans_run_id ON spans(run_id);
+CREATE INDEX IF NOT EXISTS idx_spans_run_id_dynamic_start_time ON spans(run_id, dynamic_span_id, start_time);
+
 -- +goose Down
 DROP TABLE IF EXISTS spans;
 DROP TABLE IF EXISTS worker_connections;
